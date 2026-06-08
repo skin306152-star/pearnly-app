@@ -113,5 +113,66 @@ class ClassifyExpenseTests(unittest.TestCase):
         self.assertEqual(r["amount"], Decimal("30"))
 
 
+class _FakeCur:
+    def execute(self, *a, **k):
+        return None
+
+    def fetchone(self):
+        return {"tax_id": "1234567890123"}
+
+
+class _FakeCM:
+    def __enter__(self):
+        return _FakeCur()
+
+    def __exit__(self, *a):
+        return False
+
+
+class LineDispatchFirmSafetyTests(unittest.TestCase):
+    """LINE 底线(铁律 #26):事务所 firm / 未选业态 → route_line_image 不落库、返回 False。"""
+
+    def _run(self, business_type, expense_on=True):
+        from unittest import mock
+
+        from core import db
+        from services.modules import store as mstore
+
+        stashed = []
+        with (
+            mock.patch.object(db, "get_cursor_rls", return_value=_FakeCM()),
+            mock.patch.object(mstore, "get_business_type", return_value=business_type),
+            mock.patch.object(mstore, "is_enabled", return_value=expense_on),
+            mock.patch.object(ik, "_stash_inbox", side_effect=lambda *a, **k: stashed.append(1)),
+        ):
+            ret = ik.route_line_image(
+                tenant_id="t",
+                workspace_client_id=1,
+                fields={"document_type": "tax_invoice", "vat": "7"},
+                confidence="auto",
+            )
+        return ret, stashed
+
+    def test_firm_is_noop(self):
+        ret, stashed = self._run("firm")
+        self.assertFalse(ret)
+        self.assertEqual(stashed, [])  # 识别中心路径不落采购库
+
+    def test_unonboarded_is_noop(self):
+        ret, stashed = self._run(None)
+        self.assertFalse(ret)
+        self.assertEqual(stashed, [])
+
+    def test_expense_off_is_noop(self):
+        ret, stashed = self._run("retail", expense_on=False)
+        self.assertFalse(ret)
+        self.assertEqual(stashed, [])
+
+    def test_merchant_stashes(self):
+        ret, stashed = self._run("retail", expense_on=True)
+        self.assertTrue(ret)
+        self.assertEqual(stashed, [1])  # 商户租户 → 落采购待办
+
+
 if __name__ == "__main__":
     unittest.main()

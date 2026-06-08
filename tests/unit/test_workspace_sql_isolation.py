@@ -60,14 +60,13 @@ CONVERTED: list[tuple[str, str]] = [
     ("services/recon_jobs/store.py", "recon_jobs"),
     # PO-7a 销项单据(读/改/删/开出按 seller_workspace_client_id 主体过滤)
     ("services/sales/document.py", "sales_documents"),
+    # PO-7b 连号计数器按主体(计号键含 ws · 唯一索引 uq_dns_ws · 每法人主体号段独立连续)
+    ("services/sales/numbering.py", "document_number_sequences"),
 ]
 
 # PO-8 完整性闸:尚未切隔离的运营表,必须在此显式登记理由(否则完整性测试 fail)。
 # 杜绝"新建运营表忘了隔离又没人发现"。登记 = 有意识的延后,不是漏。
 DEFERRED: dict[str, str] = {
-    # 连号按主体 = RD 合规 + 需 prod schema 迁移(建 uq_dns_ws + drop 旧 PK)+ 代码同上,
-    # 铁律"改计费/主路径先报方案"· 见 docs/workspace-isolation/06-po7b-numbering-proposal.md。
-    "document_number_sequences": "PO-7b · 连号按主体 · Zihao-gated(需 prod 迁移+在场)",
     # e-Tax 提交/通道 = 未来 e-Tax 模块的占位表,当前零 DAL 代码(grep services/routes = 0)。
     # 待该模块开建时按套账隔离从一开始就做。PO-1 已回填列,无读写可隔离。
     "etax_submissions": "无 DAL 代码(未来 e-Tax 模块占位)· 建表时随手隔离",

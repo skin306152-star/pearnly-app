@@ -316,3 +316,8 @@ window.loadSalesProducts = function () {
     }
     load();
 };
+
+// 切账套(右上角)→ 在商品页则重载本主体商品(products 按套账隔离)
+window.addEventListener('pearnly:workspace-changed', () => {
+    if (typeof currentRoute !== 'undefined' && currentRoute === 'sales-products') load();
+});

@@ -211,7 +211,12 @@ def checkout(
         terminal_id=payload.get("terminal_id"),
     )
     receipt_no, _n = numbering.next_number(
-        cur, tenant_id=tenant_id, terminal_id=terminal_id, kind="receipt", on=sold_at.date()
+        cur,
+        tenant_id=tenant_id,
+        terminal_id=terminal_id,
+        kind="receipt",
+        on=sold_at.date(),
+        workspace_client_id=workspace_client_id,
     )
 
     payments = payload.get("payments") or []

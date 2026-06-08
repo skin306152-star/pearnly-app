@@ -13,6 +13,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from core import db
+from core import workspace_context as wc
 from core.auth import get_current_user_from_request
 from services.vat.vat_report_parser import parse_vat_report  # noqa: F401  re-export (handlers)
 from services.recon.reconciliation_matcher import run_matching
@@ -224,6 +225,9 @@ async def run_recon(
     task = db.get_recon_task(task_id)
     if not task:
         raise HTTPException(404, "任务不存在")
+    # 套账隔离:取当前请求的活动主体,只对账本主体的识别记录(ocr_history 读侧已隔离,
+    # 这里是对账源查询的同一过滤)。rollout-safe:解析不到 → None → 旧行为不变。
+    ws = wc.active_workspace_for_request(request, task.get("tenant_id"))
     # v118.32.4.3 · 屏 B 流程优先按 source_ref=task_id 取本次任务关联的发票(隔离历史 OCR 缓存)
     # 无结果(屏 A 流程:用户手动跑对账)再按 客户+期间 老逻辑
     invoice_rows = db.list_invoices_for_recon(
@@ -232,6 +236,7 @@ async def run_recon(
         period_year=task["period_year"],
         period_month=task["period_month"],
         source_ref=str(task_id),
+        workspace_client_id=ws,
     )
     if not invoice_rows:
         invoice_rows = db.list_invoices_for_recon(
@@ -239,6 +244,7 @@ async def run_recon(
             client_id=task["client_id"],
             period_year=task["period_year"],
             period_month=task["period_month"],
+            workspace_client_id=ws,
         )
     report = db.get_vat_report(task["vat_report_id"])
     report_rows = (report or {}).get("parsed_rows") or []

@@ -94,6 +94,7 @@ def refund(
         terminal_id=terminal_id or orig.get("terminal_id"),
         kind="refund",
         on=date.today(),
+        workspace_client_id=workspace_client_id,
     )
     grand = -totals["grand_total"]
 

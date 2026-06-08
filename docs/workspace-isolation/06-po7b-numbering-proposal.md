@@ -1,8 +1,15 @@
-# PO-7b · 连号按主体(document_number_sequences)· 方案待 Zihao 过目
+# PO-7b · 连号按主体(document_number_sequences)· 已施工
 
-> **状态:未施工(Zihao-gated)。** PO-7a(sales_documents 读写按 seller_workspace_client_id 隔离)
-> 已上线。本子 PO 是销项隔离里**唯一涉及 RD 合规且需 prod schema 迁移**的部分,按铁律"改计费/
-> 主路径先报方案"+ 04 施工单"销项连号 Zihao 在场",**自动化窗口不擅自 apply**。
+> **状态:已施工(2026-06-08 · Zihao 授权"全做完不必报方案")。** 计号键扩到
+> (tenant, ws, doc_type, prefix, period);三个取号点(开票 / 红冲补开 / POS 小票)全传主体;
+> 红冲单继承原单卖方主体(补 PO-7a 的 notes 漏继承)。迁移做成**启动自愈 ensure**
+> (`services/db_migrations/numbering_workspace_key.py` · startup 调):建唯一索引 `uq_dns_ws`
+> + NULL 主体回填 + **守门式 drop 旧 PK**(仅当全表零 NULL 主体才落地,否则保留兜底)。
+> 部署即随重启迁移,代码与迁移同上(不会"代码先行")。机械闸 `document_number_sequences`
+> 已从 DEFERRED 移入 CONVERTED。**单主体租户号序逐张不变;多主体各自独立连续、跨主体不撞。**
+> 待办:部署后跑 `_e2e_ws_isolation.py` 验连号独立(uq_dns_ws 上线后才有)。
+>
+> 下为原方案记录(已落地,留档对照)。
 
 ## 现状
 `document_number_sequences` 主键 = `(tenant_id, doc_type, prefix, period)`,即**每租户一条连号**。

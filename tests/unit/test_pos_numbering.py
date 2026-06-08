@@ -15,8 +15,13 @@ class NumberingTests(unittest.TestCase):
         self.captured = {}
         self._saved = numbering.sales_numbering.allocate
 
-        def fake_allocate(cur, *, tenant_id, doc_type, prefix, reset, on):
-            self.captured = {"doc_type": doc_type, "prefix": prefix, "reset": reset}
+        def fake_allocate(cur, *, tenant_id, doc_type, prefix, reset, on, workspace_client_id=None):
+            self.captured = {
+                "doc_type": doc_type,
+                "prefix": prefix,
+                "reset": reset,
+                "workspace_client_id": workspace_client_id,
+            }
             return f"{prefix}{on.year}-00001", 1
 
         numbering.sales_numbering.allocate = fake_allocate
@@ -49,6 +54,18 @@ class NumberingTests(unittest.TestCase):
     def test_unknown_kind_falls_back_to_rcp(self):
         numbering.next_number(None, tenant_id="t", terminal_id=9, kind="weird", on=date(2026, 1, 1))
         self.assertEqual(self.captured["prefix"], "RCP-T9-")
+
+    def test_workspace_passed_through(self):
+        # PO-7b:门店/套账透传到 allocate → 多门店连号互不撞。
+        numbering.next_number(
+            None,
+            tenant_id="t",
+            terminal_id=1,
+            kind="receipt",
+            on=date(2026, 1, 1),
+            workspace_client_id=42,
+        )
+        self.assertEqual(self.captured["workspace_client_id"], 42)
 
 
 if __name__ == "__main__":

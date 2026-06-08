@@ -22,8 +22,13 @@ _PREFIX = {
 }
 
 
-def next_number(cur, *, tenant_id: str, terminal_id, kind: str, on: date) -> tuple[str, int]:
-    """取该终端下一个连号 → (展示号, 流水号)。kind ∈ receipt/abbrev_tax_invoice/refund。"""
+def next_number(
+    cur, *, tenant_id: str, terminal_id, kind: str, on: date, workspace_client_id=None
+) -> tuple[str, int]:
+    """取该终端下一个连号 → (展示号, 流水号)。kind ∈ receipt/abbrev_tax_invoice/refund。
+
+    PO-7b:计号键含主体(每终端属一个门店/套账 → 单主体下号序不变,多主体跨店不撞)。
+    """
     base = _PREFIX.get(kind, "RCP")
     prefix = f"{base}-T{terminal_id}-"
     return sales_numbering.allocate(
@@ -33,4 +38,5 @@ def next_number(cur, *, tenant_id: str, terminal_id, kind: str, on: date) -> tup
         prefix=prefix,
         reset=sales_numbering.RESET_YEARLY,
         on=on,
+        workspace_client_id=workspace_client_id,
     )

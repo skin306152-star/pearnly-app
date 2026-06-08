@@ -23,6 +23,7 @@ from services.sales.document_writes import write_header_totals as _write_header_
 
 # compute_totals 在此 re-export(沿用 doc_svc.compute_totals 约定);_CENT/_d 供收款归一化复用。
 from services.sales.totals import _CENT, _d, compute_totals  # noqa: F401
+from core import workspace_context as wc
 
 STATUS_DRAFT = "draft"
 STATUS_ISSUED = "issued"
@@ -378,6 +379,8 @@ def finalize_issue(
     if perr:
         return None, perr
     use_prefix = prefix or DEFAULT_PREFIX.get(row["doc_type"], "DOC")
+    # PO-7b 连号按主体:用本单的卖方主体取号(NULL 单兜底到租户默认套账),每主体号段独立连续。
+    ws = row.get("seller_workspace_client_id") or wc.default_workspace_id(cur, tenant_id)
     doc_number, _ = numbering.allocate(
         cur,
         tenant_id=tenant_id,
@@ -386,6 +389,7 @@ def finalize_issue(
         reset=reset,
         on=on,
         start=start,
+        workspace_client_id=ws,
     )
     snapshot = _freeze_parties(cur, tenant_id, row)
     sets = [

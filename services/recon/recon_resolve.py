@@ -18,12 +18,17 @@ def list_invoices_for_recon(
     period_year: int = None,
     period_month: int = None,
     source_ref: str = None,
+    workspace_client_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """
     拉取指定客户 × 纳税期间内已归档发票
     从 ocr_history 顶层字段 + pages[0].fields 提取买方信息
     v118.32.4.3 · source_ref(=task_id 字符串) 传了就只取本次 task 关联的发票
     用于屏 B 流程隔离 · 不传时是屏 A 老逻辑(按客户+期间扫全部历史)
+
+    套账隔离 · workspace_client_id 给了 → 仅取本主体(+ 尚未归属套账的 NULL 行)的发票。
+    ocr_history 读侧已按套账隔离(PO-4),本源查询是对账侧的同一过滤,防多主体把别套账的
+    识别记录混进核对表(client_id 是买方维度,挡不住跨主体)。None → 旧行为(不过滤)。
     """
     try:
         with db.get_cursor() as cur:
@@ -38,6 +43,9 @@ def list_invoices_for_recon(
             if tenant_id:
                 base_where += " AND h.user_id IN (SELECT id FROM users WHERE tenant_id = %s::uuid)"
                 params.append(str(tenant_id))
+            if workspace_client_id is not None:
+                base_where += " AND (h.workspace_client_id = %s OR h.workspace_client_id IS NULL)"
+                params.append(int(workspace_client_id))
             if client_id:
                 base_where += " AND h.client_id = %s"
                 params.append(client_id)

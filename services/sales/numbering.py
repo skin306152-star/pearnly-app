@@ -37,29 +37,48 @@ def format_number(prefix: str, reset: str, on: date, n: int, width: int = 5) -> 
 
 
 def allocate(
-    cur, *, tenant_id: str, doc_type: str, prefix: str, reset: str, on: date, start: int = 1
+    cur,
+    *,
+    tenant_id: str,
+    doc_type: str,
+    prefix: str,
+    reset: str,
+    on: date,
+    start: int = 1,
+    workspace_client_id: int | None = None,
 ) -> tuple[str, int]:
     """事务内取下一个连号 → (展示号, 流水号)。调用方负责开事务并提交。
 
     start = 新序列(该 period 首次出号)的起始流水号(接旧账本设 = 旧末号+1);序列已存在则
     忽略 start(不回拨已发出的号)。
+
+    PO-7b 连号按主体(RD 合规):workspace_client_id 给了 → 计号键含主体
+    (tenant, ws, doc_type, prefix, period),每法人主体号段独立连续、跨主体不撞;靠唯一索引
+    uq_dns_ws 保证(见 services/db_migrations/numbering_workspace_key.py)。None → 旧 4 列键
+    (迁移前 / 无主体上下文的兼容路径,旧 PK 仍在时安全)。单主体租户两路径号序逐张一致。
     """
     period = period_key(reset, on)
+    if workspace_client_id is None:
+        cols = ("tenant_id", "doc_type", "prefix", "period")
+        key = (tenant_id, doc_type, prefix, period)
+    else:
+        cols = ("tenant_id", "workspace_client_id", "doc_type", "prefix", "period")
+        key = (tenant_id, int(workspace_client_id), doc_type, prefix, period)
+    # 列名为代码常量(非用户输入)· f-string 拼装安全;值仍全部参数化。
+    where = " AND ".join(f"{c}=%s" for c in cols)
+    placeholders = ", ".join(["%s"] * (len(cols) + 1))
     cur.execute(
-        "INSERT INTO document_number_sequences (tenant_id, doc_type, prefix, period, next_number) "
-        "VALUES (%s, %s, %s, %s, %s) "
-        "ON CONFLICT (tenant_id, doc_type, prefix, period) DO NOTHING",
-        (tenant_id, doc_type, prefix, period, max(int(start), 1)),
+        f"INSERT INTO document_number_sequences ({', '.join(cols)}, next_number) "
+        f"VALUES ({placeholders}) ON CONFLICT ({', '.join(cols)}) DO NOTHING",
+        (*key, max(int(start), 1)),
     )
     cur.execute(
-        "SELECT next_number FROM document_number_sequences "
-        "WHERE tenant_id=%s AND doc_type=%s AND prefix=%s AND period=%s FOR UPDATE",
-        (tenant_id, doc_type, prefix, period),
+        f"SELECT next_number FROM document_number_sequences WHERE {where} FOR UPDATE",
+        key,
     )
     n = cur.fetchone()["next_number"]
     cur.execute(
-        "UPDATE document_number_sequences SET next_number = next_number + 1 "
-        "WHERE tenant_id=%s AND doc_type=%s AND prefix=%s AND period=%s",
-        (tenant_id, doc_type, prefix, period),
+        f"UPDATE document_number_sequences SET next_number = next_number + 1 WHERE {where}",
+        key,
     )
     return format_number(prefix, reset, on, n), n

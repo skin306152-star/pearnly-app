@@ -137,7 +137,12 @@ def create_sale(
     doc_kind = payload.get("doc_kind", "receipt")
     num_kind = doc_kind if doc_kind in ("receipt", "abbrev_tax_invoice") else "receipt"
     receipt_no, _n = numbering.next_number(
-        cur, tenant_id=tenant_id, terminal_id=terminal_id, kind=num_kind, on=sold_at.date()
+        cur,
+        tenant_id=tenant_id,
+        terminal_id=terminal_id,
+        kind=num_kind,
+        on=sold_at.date(),
+        workspace_client_id=workspace_client_id,
     )
 
     payments = payload.get("payments") or []

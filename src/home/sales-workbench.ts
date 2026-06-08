@@ -225,6 +225,11 @@ window.addEventListener('pearnly:sales-changed', () => {
     if (typeof currentRoute !== 'undefined' && currentRoute === 'sales-invoices') load();
 });
 
+// 切账套(右上角)→ 在工作台则重载本主体的销项单据(单据按 seller 主体隔离)
+window.addEventListener('pearnly:workspace-changed', () => {
+    if (typeof currentRoute !== 'undefined' && currentRoute === 'sales-invoices') load();
+});
+
 // P1 · 销售发票子菜单:默认收起,点头部展开/收起(chevron);在销项子路由时自动展开
 (function initSalesSubnav() {
     const head = document.querySelector<HTMLElement>('.nav-sales-head');

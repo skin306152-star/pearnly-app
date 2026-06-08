@@ -306,3 +306,8 @@ window.clearHistorySelection = clearHistorySelection;
 
 // 自举:直接刷新落在 history 路由(routeTo 早于本 module 跑)→ 本 module 就绪后补加载一次
 if (typeof currentRoute !== 'undefined' && currentRoute === 'history') loadHistoryPage();
+
+// 切账套(右上角)→ 在识别记录页则重载本套账记录(数据已按套账隔离,这里只补刷新)
+window.addEventListener('pearnly:workspace-changed', function () {
+    if (typeof currentRoute !== 'undefined' && currentRoute === 'history') loadHistoryPage();
+});

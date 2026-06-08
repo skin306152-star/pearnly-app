@@ -179,155 +179,41 @@ async def run_startup() -> dict:
     except Exception as e:
         logger.warning(f"启动清理过期历史失败(不影响运行): {e}")
 
-    # v106 · 成本追踪表初始化
-    try:
-        db.ensure_ocr_cost_log_table()
-    except Exception as e:
-        logger.warning(f"启动 ocr_cost_log 建表失败: {e}")
-
-    # v107 · 客户实体表初始化
-    try:
-        db.ensure_clients_table()
-    except Exception as e:
-        logger.warning(f"启动 clients 建表失败: {e}")
-
-    # B0 (2026-05-25) · workspace_clients 账套主体表(独立于买方 clients · 见 services/workspace)
-    try:
-        db.ensure_workspace_tables()
-    except Exception as e:
-        logger.warning(f"启动 workspace_clients 建表失败: {e}")
-
-    # P1a (2026-05-26) · seller 路由记忆表(seller_tax/name → workspace · 卖方智能分拣)
-    try:
-        db.ensure_seller_route_table()
-    except Exception as e:
-        logger.warning(f"启动 seller_workspace_routes 建表失败: {e}")
-
-    # v118.18 · 推荐分类学习表初始化
-    try:
-        db.ensure_supplier_categories_table()
-    except Exception as e:
-        logger.warning(f"启动 supplier_categories 建表失败: {e}")
-
-    # 批 1 改动 1 (Zihao 2026-05-19 拍板 · v118.34.33) · buyer→client 学习表
-    try:
-        db.ensure_buyer_to_client_table()
-    except Exception as e:
-        logger.warning(f"启动 buyer_to_client_memory 建表失败: {e}")
-
-    # v118.27.5 · users.google_sub 列(Google OAuth 关联)
-    try:
-        db.ensure_google_sub_column()
-    except Exception as e:
-        logger.warning(f"启动 google_sub 列建立失败: {e}")
-
-    # v118.28.4 · users.line_uid 列(LINE Login OAuth 关联)
-    try:
-        db.ensure_line_uid_column()
-    except Exception as e:
-        logger.warning(f"启动 line_uid 列建立失败: {e}")
-
-    # v118.28.9 · users.password_changed_at 列(改密后旧 JWT 失效)
-    try:
-        db.ensure_password_changed_at_column()
-    except Exception as e:
-        logger.warning(f"启动 password_changed_at 列建立失败: {e}")
-
-    # v118.27.6 · email_codes 表(注册邮箱验证码)
-    try:
-        db.ensure_email_codes_table()
-    except Exception as e:
-        logger.warning(f"启动 email_codes 建表失败: {e}")
-
-    # v118.32.5 · gl_vat_task 表(GL vs 销项税报告 对账)
-    try:
-        db.ensure_gl_vat_task_table()
-    except Exception as e:
-        logger.warning(f"启动 gl_vat_task 建表失败: {e}")
-
-    # v118.27.7 · 多租户改造 P0 · memberships / client_assignments / roles 三表(纯底层 · 不自动迁移)
-    try:
-        db.ensure_membership_tables()
-    except Exception as e:
-        logger.warning(f"启动 membership 建表失败: {e}")
-
-    # v108 · 余额追踪表初始化
-    try:
-        db.ensure_billing_balance_table()
-    except Exception as e:
-        logger.warning(f"启动 billing_balance_log 建表失败: {e}")
-
-    # v118.20.1 · 异常栏数据表初始化(exceptions + exception_whitelist)
-    try:
-        db.ensure_exceptions_tables()
-    except Exception as e:
-        logger.warning(f"启动 exceptions 建表失败: {e}")
-
-    # v118.22.1 · 智能提醒数据表初始化(notification_rules + notification_logs)
-    try:
-        db.ensure_notification_tables()
-    except Exception as e:
-        logger.warning(f"启动 notification 建表失败: {e}")
-
-    # v118.25 · ERP 推送自动重试 · 给 erp_push_logs 表加 retry_count / max_retries / next_retry_at 列(幂等)
-    try:
-        db.ensure_erp_retry_columns()
-    except Exception as e:
-        logger.warning(f"启动 erp_push_logs retry 列补齐失败: {e}")
-
-    # v118.34.14 (Zihao 2026-05-19 拍板) · 把 erp_endpoints / erp_push_logs
-    # 的 adapter CHECK 白名单更新到包含 'mrerp' · 之前漏写 migration 导致
-    # POST /api/erp/endpoints 创建 mrerp endpoint 时 PostgreSQL 抛
-    # CheckViolation → 500。这两个函数幂等 · 已包含 'mrerp' 时跳过。
-    try:
-        db.ensure_erp_endpoints_adapter_constraint()
-    except Exception as e:
-        logger.warning(f"启动 erp_endpoints adapter constraint migration 失败: {e}")
-    try:
-        db.ensure_erp_push_logs_adapter_constraint()
-    except Exception as e:
-        logger.warning(f"启动 erp_push_logs adapter constraint migration 失败: {e}")
-    try:
-        # ERP-2(2026-05-25):放开 erp_push_logs.status CHECK 接受 skipped_dup(防重日志落库)
-        db.ensure_erp_push_logs_status_constraint()
-    except Exception as e:
-        logger.warning(f"启动 erp_push_logs status constraint migration 失败: {e}")
-
-    # v118.26.2 · bank_reconcile_sessions.client_id 列(v28.1 客户分配 filter 适配)
-    try:
-        db.ensure_bank_recon_client_id_column()
-    except Exception as e:
-        logger.warning(f"启动 bank_reconcile_sessions.client_id 列补齐失败: {e}")
-
-    # v118.27.0 · ERP 映射底座 3 张表(客户 / 科目 / 税码)
-    try:
-        db.ensure_erp_mapping_tables()
-    except Exception as e:
-        logger.warning(f"启动 erp_mapping 建表失败: {e}")
-
-    # v118.27.4 · Xero / OAuth 通用 token 表
-    try:
-        db.ensure_erp_oauth_tables()
-    except Exception as e:
-        logger.warning(f"启动 erp_oauth 建表失败: {e}")
-
-    # v118.32.0 · 销项税对账三张表(vat_report / reconciliation_task / reconciliation_row)
-    try:
-        db.ensure_vat_recon_tables()
-    except Exception as e:
-        logger.warning(f"启动 vat_recon 建表失败: {e}")
-
-    # v118.32.4.10.0 · Excel 对账任务持久化表
-    try:
-        db.ensure_vat_recon_tasks_table()
-    except Exception as e:
-        logger.warning(f"启动 vat_recon_tasks 建表失败: {e}")
-
-    # v118.33.6 · Bank Reconciliation v2 (Statement vs GL)
-    try:
-        db.ensure_bank_recon_v2_table()
-    except Exception as e:
-        logger.warning(f"启动 bank_recon_v2 建表失败: {e}")
+    # 各域建表/补列:全部幂等 · 逐个独立 try/except(一处失败不拦其余)· 与 alembic 双跑兜底
+    # (prod 无 alembic 钩子)。erp adapter/status CHECK 白名单含 mrerp/skipped_dup —— 历史漏
+    # migration 致 500,函数幂等,已含则跳过。
+    boot_ensures = [
+        (db.ensure_ocr_cost_log_table, "ocr_cost_log 建表"),
+        (db.ensure_clients_table, "clients 建表"),
+        (db.ensure_workspace_tables, "workspace_clients 建表"),
+        (db.ensure_seller_route_table, "seller_workspace_routes 建表"),
+        (db.ensure_supplier_categories_table, "supplier_categories 建表"),
+        (db.ensure_buyer_to_client_table, "buyer_to_client_memory 建表"),
+        (db.ensure_google_sub_column, "google_sub 列"),
+        (db.ensure_line_uid_column, "line_uid 列"),
+        (db.ensure_password_changed_at_column, "password_changed_at 列"),
+        (db.ensure_email_codes_table, "email_codes 建表"),
+        (db.ensure_gl_vat_task_table, "gl_vat_task 建表"),
+        (db.ensure_membership_tables, "membership 建表"),
+        (db.ensure_billing_balance_table, "billing_balance_log 建表"),
+        (db.ensure_exceptions_tables, "exceptions 建表"),
+        (db.ensure_notification_tables, "notification 建表"),
+        (db.ensure_erp_retry_columns, "erp_push_logs retry 列"),
+        (db.ensure_erp_endpoints_adapter_constraint, "erp_endpoints adapter constraint"),
+        (db.ensure_erp_push_logs_adapter_constraint, "erp_push_logs adapter constraint"),
+        (db.ensure_erp_push_logs_status_constraint, "erp_push_logs status constraint"),
+        (db.ensure_bank_recon_client_id_column, "bank_reconcile_sessions.client_id 列"),
+        (db.ensure_erp_mapping_tables, "erp_mapping 建表"),
+        (db.ensure_erp_oauth_tables, "erp_oauth 建表"),
+        (db.ensure_vat_recon_tables, "vat_recon 建表"),
+        (db.ensure_vat_recon_tasks_table, "vat_recon_tasks 建表"),
+        (db.ensure_bank_recon_v2_table, "bank_recon_v2 建表"),
+    ]
+    for ensure_fn, label in boot_ensures:
+        try:
+            ensure_fn()
+        except Exception as e:
+            logger.warning(f"启动 {label} 失败: {e}")
 
     # P1.1 BUG-FIX-P1.1 v118.35.0.41 · 4 模块 task/row 表加 field_overrides JSONB
     # 跟 alembic/versions/002_field_overrides_4_modules.py 双跑(prod 启动兼容)
@@ -344,6 +230,17 @@ async def run_startup() -> dict:
         db.ensure_credits_tables()
     except Exception as e:
         logger.warning(f"启动 credits 建表失败: {e}")
+
+    # 套账隔离 PO-7b · 连号计数器按主体(建 uq_dns_ws + 回填 + 守门式 drop 旧 PK)
+    # 铁律 #21:新 schema 独立 services/db_migrations/ · 见 06-po7b-numbering-proposal
+    try:
+        from services.db_migrations.numbering_workspace_key import (
+            ensure_numbering_workspace_key,
+        )
+
+        ensure_numbering_workspace_key()
+    except Exception as e:
+        logger.warning(f"启动 连号按主体迁移失败: {e}")
 
     # POS 项目 schema 双跑(A1 tenant_modules / A2 product_units / ...)· 集中在 services/pos_schema
     try:

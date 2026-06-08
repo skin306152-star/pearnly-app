@@ -14,6 +14,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional
 
+from core import workspace_context as wc
 from services.sales import archive
 from services.sales import document as doc_svc
 from services.sales import numbering
@@ -45,7 +46,8 @@ def create_note(
     if note_type not in NOTE_TYPES:
         return None, "bad_note_type"
     cur.execute(
-        "SELECT status, price_includes_vat FROM sales_documents WHERE tenant_id=%s AND id=%s",
+        "SELECT status, price_includes_vat, seller_workspace_client_id "
+        "FROM sales_documents WHERE tenant_id=%s AND id=%s",
         (tenant_id, original_id),
     )
     row = cur.fetchone()
@@ -58,19 +60,28 @@ def create_note(
         lines, vat_rate=vat_rate, wht_rate=wht_rate, price_includes_vat=row["price_includes_vat"]
     )
     use_prefix = prefix or _NOTE_PREFIX[note_type]
+    # PO-7b:红冲/补开是原票的法律延续,继承原单卖方主体 → 同主体号段连续 + 归属同套账。
+    ws = row.get("seller_workspace_client_id") or wc.default_workspace_id(cur, tenant_id)
     doc_number, _ = numbering.allocate(
-        cur, tenant_id=tenant_id, doc_type=note_type, prefix=use_prefix, reset=reset, on=on
+        cur,
+        tenant_id=tenant_id,
+        doc_type=note_type,
+        prefix=use_prefix,
+        reset=reset,
+        on=on,
+        workspace_client_id=ws,
     )
     # 买方/卖方信息从原单继承冻结快照(docs/16 §A):红冲/补开是原票的法律延续,
     # 双方信息须与原单一致,且原单开出时已冻结,这里 verbatim 带过来。
+    # seller_workspace_client_id 同样继承(PO-7a 隔离:notes 不能留 NULL 跨套账泄漏)。
     cur.execute(
         "INSERT INTO sales_documents (tenant_id, doc_type, doc_number, client_id, issue_date, "
         "status, currency, subtotal, discount_total, vat_rate, vat_amount, wht_rate, wht_amount, "
         "grand_total, price_includes_vat, issued_at, created_by, references_document_id, "
-        "reference_reason, parties_snapshot, buyer_type, buyer_name, buyer_address, buyer_tax_id, "
-        "buyer_branch_type, buyer_branch_no) "
+        "reference_reason, seller_workspace_client_id, parties_snapshot, buyer_type, buyer_name, "
+        "buyer_address, buyer_tax_id, buyer_branch_type, buyer_branch_no) "
         "SELECT %s, %s, %s, client_id, %s, 'issued', currency, %s, %s, %s, %s, %s, %s, "
-        "price_includes_vat, now(), %s, id, %s, parties_snapshot, buyer_type, buyer_name, "
+        "price_includes_vat, now(), %s, id, %s, %s, parties_snapshot, buyer_type, buyer_name, "
         "buyer_address, buyer_tax_id, buyer_branch_type, buyer_branch_no FROM sales_documents "
         "WHERE tenant_id=%s AND id=%s RETURNING id",
         (
@@ -87,6 +98,7 @@ def create_note(
             t["grand_total"],
             created_by,
             reason,
+            ws,
             tenant_id,
             original_id,
         ),

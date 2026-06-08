@@ -1,142 +1,367 @@
 /* 移动端响应式 · 从 landing-static-bg.css 拆出(铁律 ≤500)·
-   必在 landing-static-bg.css 之后加载(覆盖桌面基础规则) */
-@media (max-width: 760px) {
-  :root {
-    --stage-w: min(100vw, 430px);
-    --stage-h: calc(var(--stage-w) * 1.7778);
-  }
+   必在 landing-static-bg.css 之后加载(覆盖桌面基础规则)·
+   B 版手机稿照搬:品牌场景背景 + 底部登录按钮上拉登录框(桌面端不受影响) */
 
+/* 新增的手机端专属元素 · 桌面端一律隐藏(桌面恒显示内联表单) */
+.m-dock,
+.m-backdrop,
+.m-sheet-close {
+  display: none;
+}
+
+@media (max-width: 760px) {
   body {
     overflow-x: hidden;
   }
 
   #pearnly-auth-root {
     padding: 0;
-    display: flex;
-    justify-content: center;
+    display: block;
     height: auto !important;
   }
 
   .auth-stage {
-    width: var(--stage-w);
-    min-height: var(--stage-h);
+    width: 100%;
+    min-height: 100vh;
     transform: none !important;
+    position: relative;
   }
 
+  /* 场景背景:弃用整张烤图 · 换柔和渐变(对齐预览 .scene) */
   .auth-shell {
-    width: var(--stage-w);
-    height: var(--stage-h);
-    min-height: var(--stage-h);
-    background-image: url('./auth-bg-mobile.png');
-    background-size: 100% 100%;
+    width: 100%;
+    height: auto;
+    min-height: 100vh;
+    background:
+      radial-gradient(120% 70% at 18% 8%, #eef0ff 0%, rgba(238, 240, 255, 0) 55%),
+      radial-gradient(120% 60% at 100% 26%, #fbe6f2 0%, rgba(251, 230, 242, 0) 60%),
+      linear-gradient(168deg, #e9e6fb 0%, #f3ecf7 42%, #fdeaf0 68%, #e9eefb 100%);
   }
 
+  /* 悬浮玻璃 logo 标牌:复用桌面玻璃底/扫光/浮动 · 仅改尺寸位置 */
   .brand-panel {
     position: absolute;
     inset: 0;
     height: auto;
-  }
-
-  .brand-panel::before {
-    top: 18px;
-    left: 18px;
-    width: 230px;
-    height: 82px;
-    border-radius: 18px;
+    --badge-x: 20px;
+    --badge-y: 22px;
+    --badge-w: 218px;
+    --badge-h: 80px;
+    --badge-r: 20px;
   }
 
   .brand-logo {
-    top: 24px;
-    left: 24px;
-    width: 220px;
-    height: 68px;
+    top: 34px;
+    left: 38px;
+    width: 182px;
+    height: 64px;
+    object-fit: contain;
+    object-position: left center;
   }
 
   .welcome-copy {
-    top: 110px;
-    left: 28px;
+    top: 116px;
+    left: 24px;
+    right: 182px;
   }
 
   .welcome-copy h1 {
-    font-size: 24px;
+    font-size: 31px;
+    color: #3a2bb8;
   }
 
   .welcome-copy p {
-    font-size: 13px;
+    font-size: 15px;
+    color: #3a3358;
   }
 
-  .work-bubble,
-  .check-card {
+  /* 工作气泡(显示 · 收窄靠右 · 不压问候) */
+  .work-bubble {
+    display: flex;
+    top: 150px;
+    left: auto;
+    right: 16px;
+    width: 152px;
+    padding: 12px 14px;
+    border-radius: 20px;
+  }
+
+  .work-bubble::after {
+    left: 28px;
+    bottom: -15px;
+    border-top: 18px solid rgba(255, 255, 255, 0.9);
+    border-right: 19px solid transparent;
+  }
+
+  .work-bubble p {
+    font-size: 13px;
+    line-height: 1.32;
+  }
+
+  /* 桌面端靠烤图把这些 live 挂件 display:none · 移动端换了渐变场景须重新显示 */
+  .cat-wrap {
+    display: block;
+  }
+
+  .spark {
+    display: block;
+  }
+
+  .mini-bars {
+    display: grid;
+  }
+
+  /* 猫:全宽 cover + 四边羽化融入背景(不再像贴图) */
+  .cat-wrap {
+    left: 0;
+    right: 0;
+    top: 246px;
+    width: auto;
+    height: 244px;
+    transform: none;
+  }
+
+  .cat-art {
+    object-fit: cover;
+    object-position: center top;
+    -webkit-mask-image:
+      linear-gradient(180deg, transparent 0, #000 13%, #000 99%, #000 100%),
+      linear-gradient(90deg, transparent 0, #000 11%, #000 89%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image:
+      linear-gradient(180deg, transparent 0, #000 13%, #000 99%, #000 100%),
+      linear-gradient(90deg, transparent 0, #000 11%, #000 89%, transparent 100%);
+    mask-composite: intersect;
+  }
+
+  .spark-a {
+    left: 32px;
+    top: 392px;
+    font-size: 28px;
+  }
+
+  .spark-b {
+    left: auto;
+    right: 40px;
+    top: 326px;
+    font-size: 22px;
+  }
+
+  /* 清单卡隐藏 */
+  .check-card,
+  .check-heart {
     display: none;
   }
 
+  /* 今日 Quote(精确参数 · 盖住桌面下沿) */
   .quote-card {
-    left: 34px;
-    top: auto;
-    bottom: 208px;
-    width: calc(100% - 84px);
-    padding: 14px 16px;
+    left: 13px;
+    right: 16px;
+    top: 476px;
+    bottom: auto;
+    width: auto;
+    padding: 13px 20px 12px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 16px 40px rgba(96, 74, 156, 0.18);
+    backdrop-filter: blur(10px);
   }
 
   .quote-card header {
-    margin-bottom: 5px;
-    font-size: 11px;
+    font-size: 12px;
+    margin-bottom: 6px;
+    gap: 8px;
   }
 
   .quote-card blockquote {
-    font-size: 11px;
-    line-height: 1.35;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .quote-card blockquote::before,
+  .quote-card blockquote::after {
+    display: none;
   }
 
   .quote-card footer {
-    font-size: 10px;
+    font-size: 12px;
+    margin-top: 6px;
+  }
+
+  .quote-card footer::after {
+    display: none;
+  }
+
+  /* ===== 底部 dock(关闭态):登录按钮 + 联系方式 + 安全三件 ===== */
+  .m-dock {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 12;
+    padding: 22px 22px 30px;
+    background: linear-gradient(0deg, rgba(248, 246, 255, 0.98) 58%, rgba(248, 246, 255, 0));
+  }
+
+  .m-login-cta {
+    width: 100%;
+    height: 56px;
+    border: 0;
+    border-radius: 15px;
+    cursor: pointer;
+    color: #fff;
+    background: linear-gradient(100deg, #7655f6 0%, #8b55fb 37%, #f04fbd 100%);
+    box-shadow: 0 16px 30px rgba(124, 87, 246, 0.32);
+    font-size: 17px;
+    font-weight: 850;
+  }
+
+  .m-contact {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 14px;
+    color: #6a6384;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .m-contact a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #6a6384;
+    text-decoration: none;
+  }
+
+  .m-contact svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .m-secure {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    margin: 14px 0 0;
+    padding-top: 14px;
+    list-style: none;
+    border-top: 1px solid rgba(124, 87, 246, 0.1);
+  }
+
+  .m-sec-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #9a93b2;
+  }
+
+  .m-sec-item svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .m-sec-item b {
+    color: #8a83a0;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  /* ===== 上拉登录框(复用 .auth-card 作底部 sheet) ===== */
+  .m-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 49;
+    background: rgba(40, 33, 63, 0.42);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+  }
+
+  .auth-stage.m-auth-open .m-backdrop {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .auth-card,
   .auth-card.signup-mode {
-    position: absolute;
-    top: 172px;
-    right: 22px;
-    width: min(360px, calc(100% - 44px));
-    height: auto;
-    /* 覆盖桌面 min-height:914(覆盖背景第二层用)· 否则手机端卡片被撑到 914px 溢出舞台 */
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    z-index: 50;
+    width: 100%;
+    max-height: 92%;
     min-height: 0;
-    max-height: calc(var(--stage-h) - 200px);
+    height: auto;
     margin: 0;
-    /* 顶部留够空间给堆叠的语言切换(top18)+ 登录/注册 tab(top58·底~98)· 标题不再压到 tab 上 */
-    padding: 108px 24px 22px;
+    padding: 18px 22px 28px;
+    border: 0;
+    border-radius: 26px 26px 0 0;
+    background: #fff;
+    box-shadow: 0 -16px 40px rgba(40, 33, 63, 0.28);
+    backdrop-filter: none;
     overflow-y: auto;
-    border-radius: 24px;
-    border: 1px solid rgba(255, 255, 255, 0.85);
-    background: rgba(255, 255, 255, 0.95);
-    box-shadow: 0 20px 50px rgba(72, 58, 128, 0.2);
-    backdrop-filter: blur(10px);
+    transform: translateY(110%);
+    transition: transform 0.28s ease;
   }
 
+  .auth-stage.m-auth-open .auth-card {
+    transform: translateY(0);
+  }
+
+  .m-sheet-close {
+    display: grid;
+    place-items: center;
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 50%;
+    background: #f2eefb;
+    color: #6a6384;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  /* 登录框内:语言切换 / 模式 tab 回归正常流(预览样式) */
   .language-switcher {
-    top: 18px;
-    left: 22px;
+    position: static;
+    top: auto;
+    left: auto;
+    display: flex;
+    justify-content: center;
+    margin: 0 auto 14px;
   }
 
   .auth-mode {
-    top: 58px;
-    left: 22px;
+    position: static;
+    top: auto;
+    left: auto;
     right: auto;
-    width: calc(100% - 44px);
+    width: 100%;
+    margin: 0 0 18px;
   }
 
   .auth-heading h2 {
-    font-size: 28px;
+    font-size: 26px;
   }
 
-  .field {
-    height: 50px;
+  /* 开票内联帮助卡:移动端由 dock 内联系方式替代 */
+  .support-card {
+    display: none;
   }
 
-  .primary-btn {
-    height: 52px;
-  }
-
+  /* 桌面端三件 / 版权:移动端走 dock 内 .m-secure */
   .security-footer,
   .copyright {
     display: none;

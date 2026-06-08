@@ -437,6 +437,17 @@
         document.querySelectorAll('.security-item div span').forEach((el, i) => {
             el.textContent = [c.secure1Sub, c.secure2Sub, c.secure3Sub][i];
         });
+        // 手机端专属:底部登录按钮 + 安全三件短词(桌面端长文案 secure* 不动)
+        setText('#m-login-cta', `${c.loginTab} / ${c.signupTab}`);
+        const mSecShort = {
+            zh: ['安全保障', '随时访问', '数据安全'],
+            th: ['ปลอดภัย', 'เข้าถึงทุกที่', 'ข้อมูลปลอดภัย'],
+            en: ['Secure', 'Anywhere', 'Private'],
+            ja: ['安全', 'どこでも', 'データ保護'],
+        }[lang] || ['ปลอดภัย', 'เข้าถึงทุกที่', 'ข้อมูลปลอดภัย'];
+        document.querySelectorAll('.m-sec-item b').forEach((el, i) => {
+            el.textContent = mSecShort[i] || '';
+        });
         setText('#forgot-title', c.forgotTitle);
         setText('.forgot-modal p', c.forgotText);
         setPlaceholder('#forgot-email', c.emailPh);

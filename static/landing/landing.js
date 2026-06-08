@@ -80,6 +80,7 @@
       </section>
 
       <section class="auth-card" aria-label="Login and registration">
+        <button class="m-sheet-close" type="button" id="m-sheet-close" aria-label="Close">&times;</button>
         <div class="auth-mode" role="tablist" aria-label="Authentication mode">
           <button class="mode-btn active" type="button" data-mode="login" role="tab" aria-selected="true">เข้าสู่ระบบ</button>
           <button class="mode-btn" type="button" data-mode="signup" role="tab" aria-selected="false">สมัครใช้งาน</button>
@@ -153,6 +154,20 @@
         </aside>
       </section>
     </main>
+    <div class="m-backdrop" id="m-backdrop"></div>
+    <div class="m-dock">
+      <button class="m-login-cta" type="button" id="m-login-cta">เข้าสู่ระบบ / สมัครใช้งาน</button>
+      <nav class="m-contact" aria-label="Contact">
+        <a href="mailto:hello@pearnly.com">${icon('mail')}<span>Email</span></a>
+        <a href="https://line.me/R/ti/p/@pearnly" target="_blank" rel="noopener">${icon('chat')}<span>@pearnly</span></a>
+        <a href="tel:0868892228">${icon('phone')}<span>086-889-2228</span></a>
+      </nav>
+      <ul class="m-secure" aria-label="Trust">
+        <li class="m-sec-item">${icon('shield')}<b>ปลอดภัย</b></li>
+        <li class="m-sec-item">${icon('cloud')}<b>เข้าถึงทุกที่</b></li>
+        <li class="m-sec-item">${icon('lock')}<b>ข้อมูลปลอดภัย</b></li>
+      </ul>
+    </div>
     <footer class="security-footer" aria-label="Security information">
       <div class="security-item"><span class="security-icon">${icon('shield')}</span><div><strong>ปลอดภัย มั่นใจทุกข้อมูล</strong><span>มาตรฐานความปลอดภัยระดับสากล</span></div></div>
       <div class="security-item"><span class="security-icon">${icon('cloud')}</span><div><strong>เข้าถึงได้ทุกที่ ทุกเวลา</strong><span>ใช้งานได้บนทุกอุปกรณ์</span></div></div>
@@ -394,6 +409,17 @@
     forgotModal.addEventListener('click', (event) => {
         if (event.target === forgotModal) forgotModal.classList.remove('show');
     });
+
+    // 手机端:底部登录按钮上拉登录框(桌面端这些元素 display:none · 桌面恒显示表单)
+    const authStage = document.querySelector('.auth-stage');
+    const mOpenSheet = () => authStage && authStage.classList.add('m-auth-open');
+    const mCloseSheet = () => authStage && authStage.classList.remove('m-auth-open');
+    const mLoginCta = document.getElementById('m-login-cta');
+    if (mLoginCta) mLoginCta.addEventListener('click', mOpenSheet);
+    const mSheetClose = document.getElementById('m-sheet-close');
+    if (mSheetClose) mSheetClose.addEventListener('click', mCloseSheet);
+    const mBackdrop = document.getElementById('m-backdrop');
+    if (mBackdrop) mBackdrop.addEventListener('click', mCloseSheet);
 
     document.getElementById('forgot-submit').addEventListener('click', async () => {
         const email = document.getElementById('forgot-email').value.trim().toLowerCase();

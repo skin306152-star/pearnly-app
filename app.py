@@ -86,6 +86,9 @@ from routes.pos_payment_routes import (
 from routes.purchase_routes import (
     router as purchase_router,
 )  # 商户采购 单据/入账/付款/作废 · 2026-06-08
+from routes.purchase_intake_routes import (
+    router as purchase_intake_router,
+)  # 商户采购 智能入口 intake/expense · 2026-06-08
 from routes.purchase_config_routes import (
     router as purchase_config_router,
 )  # 商户采购 配置后台(供应商/科目/设置)· 2026-06-08
@@ -237,6 +240,7 @@ app.include_router(pos_restaurant_router)  # 餐厅 POS 前台/后厨/埋单 14 
 app.include_router(pos_restaurant_admin_router)  # 餐厅 POS 桌台/区域管理 6 路由(PO-R · 2026-06-07)
 app.include_router(pos_payment_router)  # POS 收款设置 GET/PUT(老板后台 · 2026-06-08)
 app.include_router(purchase_router)  # 商户采购 单据/入账/付款/作废 + 行匹配(2026-06-08)
+app.include_router(purchase_intake_router)  # 商户采购 智能入口 intake/expense(2026-06-08)
 app.include_router(purchase_config_router)  # 商户采购 配置后台 供应商/科目/设置(2026-06-08)
 app.include_router(sales_router)  # 销项单据/开票 6 路由(PO-4 · 2026-06-06)
 app.include_router(sales_seller_router)  # 销项开票方资料 3 路由(PO-6 · 2026-06-06)

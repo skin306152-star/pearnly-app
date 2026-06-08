@@ -1,0 +1,252 @@
+# -*- coding: utf-8 -*-
+"""智能分流 intake · AI 判类型 + 方向 + 去向(商户采购 ★ · docs/purchasing/02 §0 · product-vision §三-bis)。
+
+统一入口:图(OCR 结构化结果)/ 文字一句话 → 判「是什么 + 去哪」。
+判方向(P0a):比对 OCR 买卖双方税号 vs 本套账主体税号 —— 买方=我 → 进项票(route=purchase);
+卖方=我 → 销项(route=sales);非发票/银行单 → recon;低置信/拿不准 → inbox(落 intake_items
+待用户一点,绝不静默丢错)。判定 + 草稿构建 + 费用文本归类全做纯函数(可测),OCR 运行/计费
+在路由层复用 services/ocr/entrypoints。隔离=每句 WHERE tenant_id;调用方管事务。
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from decimal import Decimal, InvalidOperation
+from typing import Optional
+
+from services.purchase import totals as totals_svc
+
+_TAX_RE = re.compile(r"\d")
+_NUM_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
+
+# 费用文本 → 子科目关键词(打车→ค่าแท็กซี่ 等)· 命中即归类,未命中留空待用户选。
+_EXPENSE_KEYWORDS = {
+    "ค่าแท็กซี่": ("แท็กซี่", "taxi", "grab", "打车", "出租"),
+    "ค่าน้ำมัน": ("น้ำมัน", "ปตท", "fuel", "ptt", "油", "加油"),
+    "ค่าน้ำ": ("ค่าน้ำ", "ประปา", "water", "水费"),
+    "ค่าไฟ": ("ค่าไฟ", "ไฟฟ้า", "electric", "电费"),
+    "เครื่องเขียน": ("เครื่องเขียน", "stationery", "文具", "纸"),
+    "ค่าทำความสะอาด": ("ทำความสะอาด", "clean", "清洁", "洗"),
+    "ค่าเช่า": ("ค่าเช่า", "rent", "租"),
+    "ค่าโฆษณา": ("โฆษณา", "ads", "facebook", "广告"),
+    "ค่าซ่อมบำรุง": ("ซ่อม", "repair", "维修", "保养"),
+}
+
+
+def _norm_tax(v) -> str:
+    """税号归一 = 只留数字(挡空格/连字符差异)。"""
+    return "".join(_TAX_RE.findall(str(v or "")))
+
+
+def _to_decimal(v) -> Decimal:
+    try:
+        return Decimal(str(v).replace(",", "").strip()) if v not in (None, "") else Decimal("0")
+    except (InvalidOperation, ValueError):
+        return Decimal("0")
+
+
+def judge_direction(fields: dict, *, my_tax_id) -> tuple[str, str]:
+    """判 (kind, route)。fields = OCR 抽取(document_type/seller_tax/buyer_tax/vat/...)。
+
+    买方=本主体 → 进项票;卖方=本主体 → 销项;非发票 → inbox(银行单交由 recon 上层另判)。
+    两边都不匹配但确是发票 → 默认进项(商户拍的是收到的票),置信下调由调用方据 confidence 决定。
+    """
+    if fields.get("is_not_invoice"):
+        return "unknown", "inbox"
+    dtype = (fields.get("document_type") or "").lower()
+    mine = _norm_tax(my_tax_id)
+    buyer = _norm_tax(fields.get("buyer_tax"))
+    seller = _norm_tax(fields.get("seller_tax"))
+    has_vat = _to_decimal(fields.get("vat")) > 0
+
+    if mine and seller == mine and buyer != mine:
+        return "sales", "sales"  # 我是卖方 → 销项,不归采购
+    if dtype in ("tax_invoice", "receipt") or has_vat:
+        # 买方=我,或两边都没匹配上(商户拍收到的票)→ 进项。
+        kind = "purchase_invoice" if has_vat else "expense"
+        return kind, ("purchase" if has_vat else "expense")
+    return "unknown", "inbox"
+
+
+def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
+    """OCR 抽取 → 进项录入草稿(屏10 预填)。行取自 items,无 items 则按总额单行兜底。"""
+    has_vat = _to_decimal(fields.get("vat")) > 0
+    vat_rate = 7 if has_vat else 0
+    lines = []
+    for it in fields.get("items") or []:
+        qty = _to_decimal(it.get("qty")) or Decimal("1")
+        price = _to_decimal(it.get("price"))
+        lines.append(
+            {
+                "item_type": "goods",
+                "description": (it.get("name") or "").strip(),
+                "qty": str(qty),
+                "unit_price": str(price),
+                "vat_rate": vat_rate,
+                "wht_rate": 0,
+            }
+        )
+    if not lines:
+        # 无明细:用税前小计或总额倒推单行,让用户在屏10 补全。
+        base = _to_decimal(fields.get("subtotal")) or _to_decimal(fields.get("total_amount"))
+        lines = [
+            {
+                "item_type": "goods",
+                "description": (fields.get("seller_name") or "").strip() or "—",
+                "qty": "1",
+                "unit_price": str(base),
+                "vat_rate": vat_rate,
+                "wht_rate": 0,
+            }
+        ]
+    return {
+        "doc_kind": kind,
+        "supplier": {
+            "name": (fields.get("seller_name") or "").strip(),
+            "tax_id": (fields.get("seller_tax") or "").strip() or None,
+            "address": (fields.get("seller_addr") or "").strip() or None,
+        },
+        "doc_no": (fields.get("invoice_number") or "").strip() or None,
+        "doc_date": (fields.get("date") or "").strip() or None,
+        "has_vat": has_vat,
+        "currency": "THB",
+        "lines": lines,
+    }
+
+
+def classify_expense_text(text: str, categories: list) -> dict:
+    """费用一句话 → {description, amount, category_id, subcategory_id}。关键词归类,未命中留空。"""
+    raw = (text or "").strip()
+    amount = Decimal("0")
+    m = list(_NUM_RE.finditer(raw))
+    if m:
+        amount = _to_decimal(m[-1].group(0))
+        desc = (raw[: m[-1].start()] + raw[m[-1].end() :]).strip(" -·:") or raw
+    else:
+        desc = raw
+    cat_id, sub_id = _match_category(raw, categories)
+    return {
+        "description": desc,
+        "amount": amount,
+        "category_id": cat_id,
+        "subcategory_id": sub_id,
+    }
+
+
+def _match_category(text: str, categories: list) -> tuple[Optional[str], Optional[str]]:
+    """文本命中子科目关键词 → (大类id, 子类id);命中大类名 → (大类id, None);否则 (None,None)。"""
+    low = text.lower()
+    for parent in categories or []:
+        for child in parent.get("children") or []:
+            kws = _EXPENSE_KEYWORDS.get(child["name"], (child["name"],))
+            if any(k.lower() in low for k in kws):
+                return parent["id"], child["id"]
+        if parent["name"].lower() in low:
+            return parent["id"], None
+    return None, None
+
+
+def _my_tax_id(cur, *, tenant_id, workspace_client_id) -> str:
+    """本套账主体税号(方向判定基准)。"""
+    cur.execute(
+        "SELECT tax_id FROM workspace_clients WHERE id = %s AND tenant_id = %s",
+        (workspace_client_id, tenant_id),
+    )
+    row = cur.fetchone()
+    return (row["tax_id"] or "") if row else ""
+
+
+def resolve_image_intake(
+    cur,
+    *,
+    tenant_id,
+    workspace_client_id,
+    fields,
+    confidence,
+    settings,
+    source="photo",
+    image_url=None,
+) -> dict:
+    """图路:判方向 → 建草稿 → dedupe 提示;低置信/unknown → 落 inbox。返回分流信封 data。"""
+    my_tax = _my_tax_id(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
+    kind, route = judge_direction(fields, my_tax_id=my_tax)
+    low_conf = str(confidence or "").lower() in ("needs_review", "low", "")
+
+    if route == "inbox" or (low_conf and route == "purchase"):
+        _stash_inbox(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            source=source,
+            raw=fields,
+            image_url=image_url,
+            ai_guess={"kind": kind, "confidence": confidence},
+        )
+        return {
+            "kind": kind,
+            "confidence": confidence,
+            "route": "inbox",
+            "draft": None,
+            "dedupe_hit": False,
+        }
+
+    if route in ("sales", "recon"):
+        return {
+            "kind": kind,
+            "confidence": confidence,
+            "route": route,
+            "draft": None,
+            "dedupe_hit": False,
+        }
+
+    draft = build_draft_from_invoice(fields, kind=kind)
+    calc = totals_svc.compute_purchase_totals(draft["lines"])
+    dkey = totals_svc.dedupe_key(
+        supplier_tax=draft["supplier"]["tax_id"],
+        doc_no=draft["doc_no"],
+        grand_total=calc["grand_total"],
+    )
+    dup = False
+    if dkey:
+        from services.purchase import docs as docs_svc
+
+        dup = (
+            docs_svc.find_by_dedupe(
+                cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, dedupe_key=dkey
+            )
+            is not None
+        )
+    draft.update(
+        {
+            "subtotal": str(calc["subtotal"]),
+            "vat_amount": str(calc["vat_amount"]),
+            "wht_amount": str(calc["wht_amount"]),
+            "grand_total": str(calc["grand_total"]),
+            "net_payable": str(calc["net_payable"]),
+        }
+    )
+    return {
+        "kind": kind,
+        "confidence": confidence,
+        "route": route,
+        "draft": draft,
+        "dedupe_hit": dup,
+    }
+
+
+def _stash_inbox(cur, *, tenant_id, workspace_client_id, source, raw, image_url, ai_guess) -> None:
+    """低置信/拿不准落待归类(绝不静默丢错)。"""
+    cur.execute(
+        "INSERT INTO intake_items "
+        "(tenant_id, workspace_client_id, source, raw, image_url, ai_guess, status) "
+        "VALUES (%s, %s, %s, %s::jsonb, %s, %s::jsonb, 'pending')",
+        (
+            tenant_id,
+            workspace_client_id,
+            source,
+            json.dumps(raw, default=str),
+            image_url,
+            json.dumps(ai_guess, default=str),
+        ),
+    )

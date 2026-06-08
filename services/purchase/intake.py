@@ -134,6 +134,20 @@ def classify_expense_text(text: str, categories: list) -> dict:
     }
 
 
+def expense_line(parsed: dict) -> dict:
+    """费用归类结果 → 单条明细行(/intake 文字 与 /expense 共用)。"""
+    return {
+        "item_type": "goods",
+        "description": parsed["description"],
+        "qty": "1",
+        "unit_price": str(parsed["amount"]),
+        "vat_rate": 0,
+        "wht_rate": 0,
+        "category_id": parsed["category_id"],
+        "subcategory_id": parsed["subcategory_id"],
+    }
+
+
 def _match_category(text: str, categories: list) -> tuple[Optional[str], Optional[str]]:
     """文本命中子科目关键词 → (大类id, 子类id);命中大类名 → (大类id, None);否则 (None,None)。"""
     low = text.lower()

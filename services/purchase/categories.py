@@ -79,17 +79,22 @@ def seed_presets(cur, *, tenant_id: str, workspace_client_id: int) -> None:
             )
 
 
-def get_tree(cur, *, tenant_id: str, workspace_client_id: int) -> list:
-    """返回两级科目树:[{...大类, children:[...子类]}]。空树先种预设再读。"""
-    if _count(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id) == 0:
-        seed_presets(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
+def _select_all(cur, *, tenant_id: str, workspace_client_id: int) -> list:
     cur.execute(
         f"SELECT {_SELECT} FROM expense_categories "
         "WHERE tenant_id = %s AND workspace_client_id = %s "
         "ORDER BY sort, name",
         (tenant_id, workspace_client_id),
     )
-    rows = cur.fetchall()
+    return cur.fetchall()
+
+
+def get_tree(cur, *, tenant_id: str, workspace_client_id: int) -> list:
+    """返回两级科目树:[{...大类, children:[...子类]}]。空树先种预设再读(稳态单查)。"""
+    rows = _select_all(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
+    if not rows:
+        seed_presets(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
+        rows = _select_all(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
     parents = [dict(r, children=[]) for r in rows if r["parent_id"] is None]
     by_id = {p["id"]: p for p in parents}
     for r in rows:

@@ -60,3 +60,8 @@ def resolve_ws(cur, request: Request, tenant_id: str, override: Optional[int]) -
 def gate(cur, tenant_id: str) -> None:
     """模块门控:expense 关 → pos.module_disabled(403)。老租户默认开(opt-in 不破坏)。"""
     assert_module_enabled(cur, tenant_id, "expense")
+
+
+def uid(user: dict) -> Optional[str]:
+    """主体 user_id(created_by 用),缺失 → None。"""
+    return str(user["id"]) if user and user.get("id") else None

@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 
 from core import db
 from core.pos_api import PosError, ok
-from routes.purchase_common import auth_member, auth_owner, gate, resolve_ws
+from routes.purchase_common import auth_member, auth_owner, gate, resolve_ws, uid as _uid
 from services.purchase import documents as documents_svc
 from services.purchase import docs as docs_svc
 from services.purchase import posting as posting_svc
@@ -23,10 +23,6 @@ from services.purchase import reports as reports_svc
 from services.purchase import settings as settings_svc
 
 router = APIRouter(prefix="/api/purchase", tags=["purchase-docs"])
-
-
-def _uid(user: dict) -> Optional[str]:
-    return str(user["id"]) if user and user.get("id") else None
 
 
 class DocIn(BaseModel):
@@ -232,18 +228,22 @@ class AttachmentIn(BaseModel):
     url: str = ""
 
 
+def _renderer_for(kind: str):
+    """凭据 kind → 渲染函数(替代收据 / 扣缴凭证)。"""
+    return (
+        documents_svc.render_substitute_receipt
+        if kind == "substitute_receipt"
+        else documents_svc.render_wht_cert
+    )
+
+
 def _gen_credential(request: Request, doc_id: str, ws_override, kind: str):
     """生成凭据(替代收据/扣缴凭证)· owner 限定 · 渲染校验后登记附件。"""
     _, tid = auth_owner(request)
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, ws_override)
-        renderer = (
-            documents_svc.render_substitute_receipt
-            if kind == "substitute_receipt"
-            else documents_svc.render_wht_cert
-        )
-        renderer(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)  # 校验可生成
+        _renderer_for(kind)(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)  # 校验可生成
         att = documents_svc.record_generated(
             cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id, kind=kind
         )

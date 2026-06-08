@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 from core import db
 from core.pos_api import PosError, ok
-from routes.purchase_common import auth_member, gate, resolve_ws
+from routes.purchase_common import auth_member, gate, resolve_ws, uid as _uid
 from services.ocr import entrypoints as ocr
 from services.purchase import categories as cat_svc
 from services.purchase import docs as docs_svc
@@ -26,35 +26,6 @@ from services.purchase import posting as posting_svc
 from services.purchase import settings as settings_svc
 
 router = APIRouter(prefix="/api/purchase", tags=["purchase-intake"])
-
-
-def _uid(user: dict) -> Optional[str]:
-    return str(user["id"]) if user and user.get("id") else None
-
-
-def _fields_from_invoice(inv) -> dict:
-    return {
-        "document_type": getattr(inv, "document_type", ""),
-        "is_not_invoice": getattr(inv, "is_not_invoice", False),
-        "seller_name": getattr(inv, "seller_name", ""),
-        "seller_tax": getattr(inv, "seller_tax", ""),
-        "seller_addr": getattr(inv, "seller_addr", ""),
-        "buyer_name": getattr(inv, "buyer_name", ""),
-        "buyer_tax": getattr(inv, "buyer_tax", ""),
-        "invoice_number": getattr(inv, "invoice_number", ""),
-        "date": getattr(inv, "date", ""),
-        "subtotal": getattr(inv, "subtotal", ""),
-        "vat": getattr(inv, "vat", ""),
-        "total_amount": getattr(inv, "total_amount", ""),
-        "items": [
-            {
-                "name": getattr(it, "name", ""),
-                "qty": getattr(it, "qty", ""),
-                "price": getattr(it, "price", ""),
-            }
-            for it in (getattr(inv, "items", None) or [])
-        ],
-    }
 
 
 def _run_ocr(user_fresh: dict, file_bytes: bytes, filename: str) -> tuple[dict, str]:
@@ -78,7 +49,7 @@ def _run_ocr(user_fresh: dict, file_bytes: bytes, filename: str) -> tuple[dict, 
         raise PosError("purchase.unexpected", 422, detail="ocr_empty")
     _charge(user_fresh, quote)
     page = pages[0]
-    return _fields_from_invoice(page.invoice), getattr(page, "confidence_band", "")
+    return intake_svc.fields_from_invoice(page.invoice), getattr(page, "confidence_band", "")
 
 
 def _charge(user_fresh: dict, quote: dict) -> None:
@@ -128,18 +99,7 @@ async def api_intake(
         draft = {
             "doc_kind": "expense",
             "supplier": None,
-            "lines": [
-                {
-                    "item_type": "goods",
-                    "description": parsed["description"],
-                    "qty": "1",
-                    "unit_price": str(parsed["amount"]),
-                    "vat_rate": 0,
-                    "wht_rate": 0,
-                    "category_id": parsed["category_id"],
-                    "subcategory_id": parsed["subcategory_id"],
-                }
-            ],
+            "lines": [intake_svc.expense_line(parsed)],
             "category_id": parsed["category_id"],
         }
         return ok(
@@ -178,18 +138,7 @@ async def api_quick_expense(req: ExpenseIn, request: Request):
             "doc_kind": "expense",
             "source": "line",
             "category_id": category_id,
-            "lines": [
-                {
-                    "item_type": "goods",
-                    "description": parsed["description"],
-                    "qty": "1",
-                    "unit_price": str(parsed["amount"]),
-                    "vat_rate": 0,
-                    "wht_rate": 0,
-                    "category_id": parsed["category_id"],
-                    "subcategory_id": parsed["subcategory_id"],
-                }
-            ],
+            "lines": [intake_svc.expense_line(parsed)],
         }
         created = docs_svc.create_doc(
             cur,

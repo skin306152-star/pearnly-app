@@ -1,6 +1,6 @@
 /* ============================================================
  * REFACTOR-WB-C · 全站统一按钮系统(品牌色)· Zihao 2026-05-29 拍板
- * 主 = 蓝 #2563EB(hover #1D4ED8 / active #1E40AF)
+ * 主 = 蓝 #0E7C66(hover #0A5F4E / active #0A5F4E)
  * 强调 = 琥珀橙 #F59E0B(全站仅最关键 1 个转化按钮:充值/升级 · 勿滥用)
  * 规格:高 38(小 32)· 圆角 9 · 扁平无渐变 · 字号 13.5 / 600
  * 四层级:btn-primary(实心蓝)/ btn-secondary(白底描边)/ btn-ghost(幽灵)/ btn-danger(白底红描边)
@@ -10,8 +10,8 @@
 
 /* 按钮蓝唯一 token(Zihao 2026-06-05)· 全站按钮/切换黑底收编到此 · 只导航栏可黑 */
 :root {
-    --btn-blue: #2563eb;
-    --btn-blue-hover: #1d4ed8;
+    --btn-blue: #0E7C66;
+    --btn-blue-hover: #0A5F4E;
 }
 
 .btn {
@@ -57,18 +57,18 @@
 
 /* ── 主操作 · 实心蓝(每页通常仅 1 个)── */
 .btn-primary {
-    background: #2563eb;
+    background: #0E7C66;
     color: #fff;
-    border-color: #2563eb;
+    border-color: #0E7C66;
 }
 .btn-primary:hover:not(:disabled):not(.is-disabled) {
-    background: #1d4ed8;
-    border-color: #1d4ed8;
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28);
+    background: #0A5F4E;
+    border-color: #0A5F4E;
+    box-shadow: 0 2px 8px rgba(14, 124, 102, 0.28);
 }
 .btn-primary:active:not(:disabled):not(.is-disabled) {
-    background: #1e40af;
-    border-color: #1e40af;
+    background: #0A5F4E;
+    border-color: #0A5F4E;
     transform: translateY(1px);
     box-shadow: none;
 }
@@ -210,7 +210,7 @@
 }
 .btn-toggle:checked,
 .btn-toggle[aria-checked="true"] {
-    background: #2563eb;
+    background: #0E7C66;
 }
 .btn-toggle:checked::after,
 .btn-toggle[aria-checked="true"]::after {
@@ -234,20 +234,20 @@ button.btn-primary,
 button.btn-primary.btn-tiny,
 button.btn-primary.btn-sm,
 .btn.btn-primary {
-    background: #2563eb !important;
-    border-color: #2563eb !important;
+    background: #0E7C66 !important;
+    border-color: #0E7C66 !important;
     color: #fff !important;
 }
 .btn-primary:hover:not(:disabled):not(.is-disabled),
 button.btn-primary.btn-tiny:hover:not(:disabled),
 button.btn-primary.btn-sm:hover:not(:disabled) {
-    background: #1d4ed8 !important;
-    border-color: #1d4ed8 !important;
+    background: #0A5F4E !important;
+    border-color: #0A5F4E !important;
 }
 .btn-primary:disabled,
 .btn-primary.is-disabled {
-    background: #93b4f5 !important;
-    border-color: #93b4f5 !important;
+    background: #8FC9BB !important;
+    border-color: #8FC9BB !important;
     cursor: not-allowed;
 }
 
@@ -257,5 +257,5 @@ button.btn-primary.btn-sm:hover:not(:disabled) {
    逐页改必漏。此处全局兜底:所有复选框勾选=蓝。radio(单选指示)不在此列,保持原样。
    ============================================================ */
 input[type="checkbox"] {
-    accent-color: #2563eb;
+    accent-color: #0E7C66;
 }

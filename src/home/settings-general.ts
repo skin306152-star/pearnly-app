@@ -30,26 +30,31 @@
     const LS_TZ = 'pearnly_general_tz';
     const LS_DATE = 'pearnly_general_date_format';
     const LS_NUMBER = 'pearnly_general_number_format';
+    const LS_CALENDAR = 'pearnly_calendar';
 
     const DEFAULTS = {
         tz: 'Asia/Bangkok',
         date: 'YYYY-MM-DD',
         number: 'comma_dot',
+        calendar: 'buddhist',
     };
 
     function _loadGeneral() {
         const tz = document.getElementById('general-tz') as HTMLSelectElement | null;
         const dt = document.getElementById('general-date') as HTMLSelectElement | null;
         const nm = document.getElementById('general-number') as HTMLSelectElement | null;
+        const cal = document.getElementById('general-calendar') as HTMLSelectElement | null;
         if (!tz || !dt || !nm) return;
         try {
             tz.value = localStorage.getItem(LS_TZ) || DEFAULTS.tz;
             dt.value = localStorage.getItem(LS_DATE) || DEFAULTS.date;
             nm.value = localStorage.getItem(LS_NUMBER) || DEFAULTS.number;
+            if (cal) cal.value = localStorage.getItem(LS_CALENDAR) || DEFAULTS.calendar;
         } catch (e) {
             tz.value = DEFAULTS.tz;
             dt.value = DEFAULTS.date;
             nm.value = DEFAULTS.number;
+            if (cal) cal.value = DEFAULTS.calendar;
         }
     }
 
@@ -74,10 +79,14 @@
             const nm =
                 ((document.getElementById('general-number') || {}) as { value?: string }).value ||
                 DEFAULTS.number;
+            const cal =
+                ((document.getElementById('general-calendar') || {}) as { value?: string }).value ||
+                DEFAULTS.calendar;
             try {
                 localStorage.setItem(LS_TZ, tz);
                 localStorage.setItem(LS_DATE, dt);
                 localStorage.setItem(LS_NUMBER, nm);
+                localStorage.setItem(LS_CALENDAR, cal);
             } catch (e) {}
             window._pearnlyGeneral = { tz: tz, date_format: dt, number_format: nm };
             if (msg) msg.textContent = t('msg-saved') || '已保存';

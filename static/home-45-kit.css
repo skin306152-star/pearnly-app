@@ -1,0 +1,820 @@
+/* ============================================================
+ * 组件 Kit · 风格 B · Emerald · 实物源 scripts/_mock/kit-final.html(逐字照搬)
+ * ------------------------------------------------------------
+ * 全站唯一组件库:.btn / .fin / .sel / .ms / .cbx / .rdo / .sw / .bdg /
+ * .tabs / .tbl / .band / .ov / .menu / .toast / .bnr / .sk / .cal / .bulk / ...
+ * 作用域 .ui:页面根挂 class="ui" 才生效 —— 隔离存量屏的同名裸类(.sw/.chip/.row
+ * 各 100+ 处)避免误伤;迁移屏改用 kit 标签即纳入。令牌值见 home-01-base.css :root。
+ * 加载于所有 home-*.css 之后,确保 cascade 内 kit 终态。
+ * ============================================================ */
+
+.ui svg.ic {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+}
+
+.ui .lbl {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink2);
+    margin-bottom: 6px;
+    display: block;
+}
+.ui .req {
+    color: var(--red);
+}
+
+/* ── buttons ── */
+.ui .btn {
+    border: 1px solid transparent;
+    border-radius: var(--rs);
+    padding: 9px 14px;
+    font-weight: 600;
+    font-size: 13.5px;
+    font-family: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1;
+}
+.ui .btn.pri {
+    background: var(--accent);
+    color: var(--accent-ink);
+}
+.ui .btn.sec {
+    background: var(--card);
+    border-color: var(--line);
+    color: var(--ink);
+}
+.ui .btn.gh {
+    background: transparent;
+    color: var(--accent);
+}
+.ui .btn.dng {
+    background: var(--red);
+    color: #fff;
+}
+.ui .btn.sm {
+    padding: 6px 10px;
+    font-size: 12.5px;
+}
+.ui .btn[disabled] {
+    opacity: 0.45;
+}
+.ui .spin {
+    width: 13px;
+    height: 13px;
+    border: 2px solid rgba(255, 255, 255, 0.45);
+    border-top-color: #fff;
+    border-radius: 50%;
+    display: inline-block;
+    animation: kit-spin 0.7s linear infinite;
+}
+@keyframes kit-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ── inputs ── */
+.ui .fin {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: var(--rs);
+    padding: 9px 11px;
+    font-size: 13.5px;
+    font-family: inherit;
+    color: var(--ink);
+    background: var(--card);
+}
+.ui .fin::placeholder {
+    color: var(--ink3);
+}
+.ui .fin.foc,
+.ui .fin:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-weak);
+    outline: none;
+}
+.ui .fin.err {
+    border-color: var(--red);
+    box-shadow: 0 0 0 3px var(--red-weak);
+}
+.ui .errtx {
+    color: var(--red);
+    font-size: 11.5px;
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.ui .help {
+    color: var(--ink3);
+    font-size: 11.5px;
+    margin-top: 5px;
+}
+.ui .srch {
+    position: relative;
+}
+.ui .srch .fin {
+    padding-left: 33px;
+}
+.ui .srch .ic {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--ink3);
+}
+.ui .selwrap {
+    position: relative;
+}
+.ui .selwrap .ic {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--ink3);
+    pointer-events: none;
+}
+.ui .sel {
+    appearance: none;
+    -webkit-appearance: none;
+}
+.ui .ms {
+    border: 1px solid var(--line);
+    border-radius: var(--rs);
+    padding: 6px 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    min-height: 40px;
+}
+.ui .chip {
+    background: var(--accent-weak);
+    color: var(--accent-deep);
+    border-radius: var(--rxs);
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.ui .chip .ic {
+    width: 12px;
+    height: 12px;
+    opacity: 0.7;
+}
+.ui .ms input {
+    border: none;
+    outline: none;
+    flex: 1;
+    min-width: 50px;
+    font-family: inherit;
+    font-size: 13px;
+    background: transparent;
+    color: var(--ink);
+}
+
+/* ── check / radio / toggle ── */
+.ui .opt {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13.5px;
+    margin-right: 16px;
+}
+.ui .cbx {
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid var(--line);
+    border-radius: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+}
+.ui .cbx .ic {
+    width: 12px;
+    height: 12px;
+    stroke-width: 3;
+}
+.ui .cbx.on {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+.ui .rdo {
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid var(--line);
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.ui .rdo.on {
+    border-color: var(--accent);
+}
+.ui .rdo.on::after {
+    content: "";
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--accent);
+}
+.ui .sw {
+    width: 38px;
+    height: 22px;
+    border-radius: 999px;
+    background: var(--line);
+    position: relative;
+    flex-shrink: 0;
+}
+.ui .sw.on {
+    background: var(--accent);
+}
+.ui .sw::after {
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    top: 2px;
+    left: 2px;
+    transition: left 0.15s;
+}
+.ui .sw.on::after {
+    left: 18px;
+}
+
+/* ── badges ── */
+.ui .bdg {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 999px;
+    display: inline-block;
+}
+.ui .bdg.g {
+    background: var(--green-weak);
+    color: var(--green);
+}
+.ui .bdg.a {
+    background: var(--amber-weak);
+    color: var(--amber);
+}
+.ui .bdg.r {
+    background: var(--red-weak);
+    color: var(--red);
+}
+.ui .bdg.n {
+    background: var(--line2);
+    color: var(--ink2);
+}
+
+/* ── tabs ── */
+.ui .tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 12px;
+}
+.ui .tab {
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink2);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    cursor: pointer;
+}
+.ui .tab.on {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+/* ── table ── */
+.ui .tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.ui .tbl th {
+    text-align: left;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink3);
+    padding: 0 10px 9px;
+}
+.ui .tbl td {
+    padding: 11px 10px;
+    border-top: 1px solid var(--line2);
+}
+.ui .tbl .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+.ui .tbl tr:hover td {
+    background: var(--line2);
+}
+.ui .tact {
+    color: var(--ink3);
+    cursor: pointer;
+    display: inline-flex;
+}
+
+/* ── stat band ── */
+.ui .band {
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    overflow: hidden;
+}
+.ui .bandtop {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 16px 18px 13px;
+}
+.ui .bandtop .l {
+    font-size: 11px;
+    color: var(--ink2);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.ui .bandtop .n {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-top: 5px;
+    font-variant-numeric: tabular-nums;
+}
+.ui .kpis {
+    display: flex;
+    border-top: 1px solid var(--line);
+    background: var(--line2);
+}
+.ui .kpi {
+    flex: 1;
+    padding: 11px 16px;
+    border-right: 1px solid var(--line);
+}
+.ui .kpi:last-child {
+    border-right: none;
+}
+.ui .kpi .l {
+    font-size: 11px;
+    color: var(--ink2);
+}
+.ui .kpi .n {
+    font-size: 19px;
+    font-weight: 700;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── overlays ── */
+.ui .ov {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    box-shadow: var(--sh2);
+    overflow: hidden;
+}
+.ui .ovh {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+    font-weight: 700;
+    font-size: 14.5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.ui .ovh .ic {
+    color: var(--ink3);
+}
+.ui .ovb {
+    padding: 16px;
+}
+.ui .ovf {
+    padding: 12px 16px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+.ui .menu {
+    border: 1px solid var(--line);
+    border-radius: var(--rs);
+    box-shadow: var(--sh2);
+    padding: 5px;
+    width: 190px;
+    background: var(--card);
+}
+.ui .mi {
+    padding: 8px 10px;
+    border-radius: var(--rxs);
+    font-size: 13.5px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    cursor: pointer;
+}
+.ui .mi:hover {
+    background: var(--line2);
+}
+.ui .mi.dng {
+    color: var(--red);
+}
+.ui .toast {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-radius: var(--rs);
+    padding: 11px 14px;
+    font-size: 13.5px;
+    font-weight: 500;
+    box-shadow: var(--sh);
+    margin-bottom: 9px;
+    border: 1px solid;
+}
+.ui .toast.s {
+    background: var(--green-weak);
+    border-color: var(--green);
+    color: var(--green);
+}
+.ui .toast.e {
+    background: var(--red-weak);
+    border-color: var(--red);
+    color: var(--red);
+}
+.ui .toast.w {
+    background: var(--amber-weak);
+    border-color: var(--amber);
+    color: var(--amber);
+}
+
+/* ── banner ── */
+.ui .bnr {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-radius: var(--rs);
+    padding: 11px 14px;
+    font-size: 13px;
+    margin-bottom: 10px;
+    border: 1px solid;
+}
+.ui .bnr.i {
+    background: var(--blue-weak);
+    border-color: var(--blue);
+    color: var(--blue);
+}
+.ui .bnr.w {
+    background: var(--amber-weak);
+    border-color: var(--amber);
+    color: var(--amber);
+}
+.ui .bnr.e {
+    background: var(--red-weak);
+    border-color: var(--red);
+    color: var(--red);
+}
+.ui .bnr .gobtn {
+    margin-left: auto;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+}
+
+/* ── skeleton ── */
+@keyframes kit-shimmer {
+    0% {
+        background-position: -300px 0;
+    }
+    100% {
+        background-position: 300px 0;
+    }
+}
+.ui .sk {
+    background: linear-gradient(90deg, var(--line2) 25%, var(--line) 37%, var(--line2) 63%);
+    background-size: 600px 100%;
+    animation: kit-shimmer 1.3s infinite;
+    border-radius: 5px;
+}
+.ui .skln {
+    height: 11px;
+    margin-bottom: 9px;
+}
+
+/* ── date picker ── */
+.ui .cal {
+    border: 1px solid var(--line);
+    border-radius: var(--rs);
+    box-shadow: var(--sh2);
+    padding: 12px;
+    width: 226px;
+    background: var(--card);
+}
+.ui .calh {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 10px;
+}
+.ui .calg {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+    text-align: center;
+}
+.ui .calg .d {
+    font-size: 11.5px;
+    padding: 6px 0;
+    border-radius: 5px;
+    color: var(--ink);
+    cursor: pointer;
+}
+.ui .calg .h {
+    font-size: 10px;
+    color: var(--ink3);
+    font-weight: 600;
+    padding: 2px 0;
+}
+.ui .calg .d.mut {
+    color: var(--ink3);
+}
+.ui .calg .d.on {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+}
+.ui .calg .d:hover:not(.on) {
+    background: var(--line2);
+}
+
+/* ── bulk bar ── */
+.ui .bulk {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: var(--rs);
+    padding: 9px 13px;
+    font-size: 13px;
+    font-weight: 500;
+}
+.ui .bulk .x {
+    margin-right: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+.ui .bulk .b {
+    background: rgba(255, 255, 255, 0.16);
+    border: none;
+    color: #fff;
+    border-radius: 5px;
+    padding: 6px 11px;
+    font-size: 12.5px;
+    font-weight: 600;
+    font-family: inherit;
+    display: inline-flex;
+    gap: 5px;
+    align-items: center;
+    cursor: pointer;
+}
+
+/* ── empty / tooltip / pagination / avatar ── */
+.ui .empty {
+    text-align: center;
+    padding: 22px;
+}
+.ui .empty .ill {
+    width: 50px;
+    height: 50px;
+    border-radius: 13px;
+    background: var(--accent-weak);
+    color: var(--accent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 11px;
+}
+.ui .empty .ill .ic {
+    width: 24px;
+    height: 24px;
+}
+.ui .empty .t {
+    font-weight: 600;
+    font-size: 13.5px;
+}
+.ui .empty .s {
+    color: var(--ink2);
+    font-size: 12px;
+    margin-top: 3px;
+}
+.ui .tip {
+    position: relative;
+    display: inline-block;
+    background: var(--ink);
+    color: var(--card);
+    font-size: 11.5px;
+    padding: 5px 9px;
+    border-radius: 6px;
+    font-weight: 500;
+}
+.ui .tip::after {
+    content: "";
+    position: absolute;
+    bottom: -4px;
+    left: 18px;
+    border: 5px solid transparent;
+    border-top-color: var(--ink);
+    border-bottom: 0;
+}
+.ui .pg {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.ui .pg .p {
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink2);
+    cursor: pointer;
+}
+.ui .pg .p.on {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+.ui .av {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+}
+
+/* ── 页面内容容器 · 流式居中填满(对标 dashboard-final .wrap / 标杆 history 屏)──
+ * 迁移屏页根用 class="ui ...",内层套 .wrap 得统一居中列;.wrap.full = 不限宽贴满。
+ * 禁各屏小固定 max-width(760/920…)→ 50–200% 缩放贴满不跑偏。 */
+.ui .wrap {
+    width: 100%;
+    max-width: calc(var(--content) + 56px);
+    margin: 0 auto;
+}
+.ui .wrap.full {
+    max-width: none;
+}
+
+/* ============================================================
+ * 页面模板骨架原语 · 实物源 scripts/_mock/templates.html
+ * 全站 6 种页骨架(概览/列表/详情/录入/设置/向导)用这些原语 + 上面 kit 组件拼。
+ * 见 src/home/ui-templates.ts 的 6 个组装函数。
+ * ============================================================ */
+.ui .pagehead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--s4);
+    margin-bottom: var(--s5);
+}
+.ui .pagehead .h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+.ui .pagehead .sub {
+    color: var(--ink2);
+    font-size: 13.5px;
+    margin-top: var(--s1);
+}
+.ui .panel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    box-shadow: var(--sh);
+}
+.ui .box {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--rs);
+    padding: var(--s4);
+}
+.ui .cols {
+    display: grid;
+    gap: var(--s4);
+}
+.ui .cols.c2 {
+    grid-template-columns: 1fr 1fr;
+}
+.ui .cols.detail {
+    grid-template-columns: 1fr 360px;
+}
+.ui .cols.entry {
+    grid-template-columns: 1fr 1.3fr;
+}
+/* 控件带:筛选/页签左 · 搜索/导出右 */
+.ui .tool {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    padding: var(--s3) var(--s4);
+}
+.ui .tool .spacer {
+    margin-left: auto;
+}
+/* 保存条 / 向导底栏:动作右对齐 */
+.ui .foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--s2);
+    padding: var(--s3) var(--s4);
+    border-top: 1px solid var(--line);
+}
+/* 设置分节行 */
+.ui .setrow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s4);
+    padding: var(--s4);
+    border-top: 1px solid var(--line2);
+}
+.ui .setrow:first-child {
+    border-top: none;
+}
+.ui .setrow .st {
+    font-weight: 600;
+    font-size: 13px;
+}
+.ui .setrow .ss {
+    font-size: 11.5px;
+    color: var(--ink2);
+    margin-top: 2px;
+}
+/* 向导步骤条 */
+.ui .steps {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    padding: var(--s4);
+}
+.ui .dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--line2);
+    color: var(--ink3);
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.ui .dot.on {
+    background: var(--accent);
+    color: var(--accent-ink);
+}
+.ui .seg {
+    flex: 1;
+    height: 2px;
+    background: var(--line2);
+    border-radius: 2px;
+}
+.ui .seg.on {
+    background: var(--accent);
+}

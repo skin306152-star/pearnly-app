@@ -19,8 +19,7 @@ const TOPBAR_HTML = `
         </button>
         <div class="brand" id="brand">
             <img class="brand-icon" src="/static/brand/pwa-icon-192.png?v=1" alt="Pearnly" />
-            <div class="brand-divider"></div>
-            <div class="brand-workspace" id="brand-workspace" data-i18n="brand-workspace-fallback">我的工作台</div>
+            <span class="brand-name">Pearnly</span>
         </div>
     </div>
 
@@ -110,6 +109,13 @@ const TOPBAR_HTML = `
                     <span data-i18n="avatar-menu-test">测试中心</span>
                 </button>
                 <div class="avatar-popup-sep"></div>
+                <button type="button" class="avatar-popup-item" data-action="theme" id="avatar-menu-theme" role="menuitem">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M16 11.2A6 6 0 1 1 8.8 4 4.7 4.7 0 0 0 16 11.2z"/>
+                    </svg>
+                    <span data-i18n="avatar-menu-theme">暗夜模式</span>
+                    <span class="theme-sw" id="avatar-theme-sw" aria-hidden="true"></span>
+                </button>
                 <button type="button" class="avatar-popup-item" data-action="help" id="avatar-menu-help" role="menuitem">
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <circle cx="10" cy="10" r="8"/>

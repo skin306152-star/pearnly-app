@@ -102,6 +102,7 @@ const MAPPINGS = [
             { design: '.card', prod: '.rpay .card', props: ['borderRadius'] },
         ],
         bluemust: '.rpay .save',
+        primary: 'rgb(14, 124, 102)', // 已令牌化迁到 emerald(风格 B)· 其余 B 组屏待 Window B 迁移仍蓝
         nosvgemoji: '.rpay .pm .ic svg',
     },
     {
@@ -338,7 +339,8 @@ async function styleOf(page, sel, props) {
             const el = document.querySelector(s);
             return el ? getComputedStyle(el).backgroundColor : null;
         }, m.bluemust);
-        ok(blue === BLUE, `主按钮主色 #2563EB(got ${blue})`);
+        const wantPrimary = m.primary || BLUE; // 默认蓝 · 已迁 emerald 的屏在 mapping 里覆写
+        ok(blue === wantPrimary, `主按钮主色 ${wantPrimary}(got ${blue})`);
         const hasSvg = await page.$(m.nosvgemoji);
         ok(!!hasSvg, `图标为线性 svg(无 emoji)· ${m.nosvgemoji}`);
     }

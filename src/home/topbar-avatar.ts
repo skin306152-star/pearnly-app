@@ -144,6 +144,11 @@
             ) as HTMLElement | null;
             if (!item) return;
             var action = item.dataset.action;
+            if (action === 'theme') {
+                // 暗夜模式开关:翻面 + 持久化 · 不关菜单让用户看到开关状态
+                if (typeof window.toggleTheme === 'function') window.toggleTheme();
+                return;
+            }
             closePopup();
 
             switch (action) {

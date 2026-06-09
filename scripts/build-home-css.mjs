@@ -57,6 +57,7 @@ const HOME_CSS = [
     'home-43-pos-report.css',
     'home-44-pos-cashiers.css',
     'erp-mrerp-connect.css',
+    'home-45-kit.css',
 ];
 
 const ADMIN_CSS = [
@@ -99,6 +100,7 @@ const ADMIN_CSS = [
     'home-37-html-inline.css',
     'home-38-buttons.css',
     'admin/admin.css',
+    'home-45-kit.css',
 ];
 
 const LANDING_CSS = [

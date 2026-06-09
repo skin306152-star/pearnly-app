@@ -99,5 +99,34 @@ function installNetworkBanner() {
     updateBanner(); // 页面加载时立即检查
 }
 
+// ============================================================
+// 暗夜模式 · 切 :root.dark 换第二套令牌(home-01-base.css :root.dark)
+// 偏好存 localStorage『pearnly_theme』· home.html <head> 内联脚本先行加 .dark 防首屏闪白。
+// ============================================================
+const THEME_KEY = 'pearnly_theme';
+function syncThemeSwitch() {
+    const on = document.documentElement.classList.contains('dark');
+    const sw = document.getElementById('avatar-theme-sw');
+    if (sw) sw.classList.toggle('on', on);
+}
+function toggleTheme() {
+    const dark = !document.documentElement.classList.contains('dark');
+    document.documentElement.classList.toggle('dark', dark);
+    try {
+        localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light');
+    } catch (_) {
+        /* silent · 私模/配额 */
+    }
+    syncThemeSwitch();
+}
+window.toggleTheme = toggleTheme;
+window.syncThemeSwitch = syncThemeSwitch;
+// 外壳注入后把开关指示同步成当前主题(内联脚本已据偏好加好 .dark)
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', syncThemeSwitch);
+} else {
+    setTimeout(syncThemeSwitch, 0);
+}
+
 window.renderBrandWorkspace = renderBrandWorkspace;
 window.installNetworkBanner = installNetworkBanner;

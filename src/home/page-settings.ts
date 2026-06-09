@@ -410,6 +410,14 @@
                             <div class="form-hint" data-i18n="set-general-date-hint">显示在历史 / 异常 / 对账 / 导出 CSV</div>
                         </div>
                         <div class="form-row form-row-inline">
+                            <label data-i18n="set-general-calendar">历法</label>
+                            <select id="general-calendar" class="form-input">
+                                <option value="buddhist">พ.ศ. · 佛历</option>
+                                <option value="gregorian">ค.ศ. · 公历</option>
+                            </select>
+                            <div class="form-hint" data-i18n="set-general-calendar-hint">显示 / 表格 / 导出统一用此历法 · 数据始终存公历</div>
+                        </div>
+                        <div class="form-row form-row-inline">
                             <label data-i18n="set-general-number">数字格式</label>
                             <select id="general-number" class="form-input">
                                 <option value="comma_dot">1,234,567.89</option>

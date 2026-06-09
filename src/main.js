@@ -8,6 +8,8 @@
 
 import './home/state.js'; // REFACTOR-C1-home-batch9g2 · 应用引导/全局状态(错误拦截IIFE + i18n总线 + window.* 状态 init)· 【必第 1 个】早于所有 sibling · 取代已删的 home.js
 import './home/core.js'; // REFACTOR-C1-home-batch9f · 真核心叶子层(t/escapeHtml/svgIcon/鉴权API🔴/_showSessionRevokedModal🔴/getMax*)· 【必第 1 个】保证 sibling 模块 eval 期 window.t/apiGet 等已就绪
+import './home/format-date.js'; // 共享日期格式化(formatDate/历法偏好)· window 桥 · 须早于消费方
+import './home/ui-templates.js'; // 6 页面模板骨架(uiTpl.*)· window 桥 · 供新屏/迁移屏对号套用
 import './home/page-ocr-html.js'; // REFACTOR-WB-C3 · 上传识别主页(#page-ocr·默认 active 页)inner 注入(home.html 空壳 · ⚠️须在【所有】OCR 消费模块前·upload-files/ocr-recognize/ocr-results/export 等 eval 顶层无守卫绑 drop-zone/btn-start/results-tbody)
 import './home/app-shell-html.js'; // REFACTOR-WB-C3 · app shell(顶栏 .topbar + 侧栏 #sidebar)inner 注入(home.html 空壳 · ⚠️须在 core-boot 前·其 bootstrap eval 期 routeTo→querySelectorAll(.nav-item) + sidebar-nav.js eval 期 getElementById(sidebar-toggle) 无守卫;漏则 boot 崩·全 app 导航瘫)
 import './home/core-boot.js'; // REFACTOR-C1-home-batch9f · 真核心编排+引导(applyLang/setupDropdown/routeTo/loadAll/render助手 + bootstrap)· 【必第 2 个】紧随 core.js · bootstrap 尾部自执行 · 先于其余 sibling

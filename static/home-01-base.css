@@ -6,39 +6,65 @@
    v118.33.6 · Bank Reconciliation v2 CSS (Statement vs GL)
    ============================================================ */
 :root {
-    /* v118.33.7.9 · 主色调一刀切:深蓝 → 纯黑 · 浅蓝 → 暖灰 · 跟 sidebar active 和 prototype 完全统一 */
-    --brand: #111111;
-    --brand-hover: #333333;
-    /* v118.33.7.10 · accent 亮蓝 → 纯黑 · 全产品 active/focus/drop hover 统一(对齐 prototype --accent: #111) */
-    --accent: #111111;
-    --accent-soft: #f4f4f0;
-    /* v118.33.7.1 · 整体皮肤改暖灰调(冷蓝灰 → 暖米灰)· 对齐 prototype */
-    --bg: #f4f4f0;
+
+    /* ============================================================
+       风格 B · Emerald · 2026-06-09 封板 · 值来自实物源 scripts/_mock/kit-final.html :root
+       旧语义名(--brand/--success/--btn-blue…)保留为别名收编到 emerald · 存量屏零改即换肤。
+       ============================================================ */
+    --accent: #0E7C66;
+    --accent-weak: #E4F4F0;
+    --accent-deep: #0A5F4E;
+    --accent-ink: #fff;
+    --accent-soft: #E4F4F0;
+    --brand: #0E7C66;
+    --brand-hover: #0A5F4E;
+    --bg: #FBFBFC;
     --card: #ffffff;
-    --line: #e8e8e3;
-    --line-soft: #f0f0eb;
-    --ink: #111111;
-    --ink-2: #555555;
-    --ink-3: #999999;
+    --ink: #0B1A2B;
+    --ink2: #5A6B7B;
+    --ink3: #9BA8B5;
+    --ink-2: #5A6B7B;
+    --ink-3: #9BA8B5;
     --ink-4: #cbd5e0;
-    --success: #16a34a;
-    --success-bg: #dcfce7;
-    --warn: #d97706;
-    --warn-bg: #fef3c7;
-    --danger: #dc2626;
-    --danger-bg: #fee2e2;
+    --line: #E7EAEE;
+    --line2: #F3F5F7;
+    --line-soft: #F3F5F7;
+    --green: #149E62;
+    --green-weak: #E7F6EE;
+    --amber: #C9820C;
+    --amber-weak: #FCF3E1;
+    --red: #DC4A47;
+    --red-weak: #FCEDED;
+    --blue: #2563EB;
+    --blue-weak: #EAF1FE;
+    --success: #149E62;
+    --success-bg: #E7F6EE;
+    --warn: #C9820C;
+    --warn-bg: #FCF3E1;
+    --danger: #DC4A47;
+    --danger-bg: #FCEDED;
+    --btn-blue: #0E7C66;
+    --btn-blue-hover: #0A5F4E;
     --line-color: #06c755;
     --fb-color: #1877f2;
-    /* v118.33.7.1 · 阴影柔化 · 主要靠边框做卡片分隔 */
-    --shadow-sm: 0 1px 2px rgba(0,0,0,0.03);
-    --shadow: 0 4px 16px rgba(0,0,0,0.04);
-    --shadow-lg: 0 10px 32px rgba(0,0,0,0.08);
+    /* 间距标度(4 的倍数 · 全站只用这几个值) */
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px; --s8: 32px;
+    /* 圆角 · 阴影(实物源)· 旧阴影名映射到柔阴影 */
+    --r: 7px; --rs: 6px; --rxs: 5px;
+    --sh: 0 1px 2px rgba(11,26,43,.06);
+    --sh2: 0 8px 28px rgba(11,26,43,.14);
+    --shadow-sm: var(--sh);
+    --shadow: var(--sh);
+    --shadow-lg: var(--sh2);
+    --fs: 14px;
     --font-mono: "SF Mono", "Monaco", Consolas, "Courier New", monospace;
-    --sidebar-w: 220px;
+    --sidebar-w: 240px;
     --sidebar-w-collapsed: 64px;
-    /* v118.33.7.6 · 顶栏更轻盈 · 56→48 · 对齐 prototype */
-    --topbar-h: 48px;
+    --topbar-h: 58px;
+    --sb: 240px;
+    --content: 1160px;
 
+    
     /* ============================================================
     Tailwind palette 精确值令牌(REFACTOR-WB-C1 · R-UI3)
     裸 hex → 同值令牌 · 令牌值逐字节 == 原 hex · 0 视觉变化
@@ -232,6 +258,52 @@
     --c-fff3c4: #fff3c4;
 }
 
+/* ============================================================
+   暗夜模式 · :root.dark 换第二套令牌(实物源 kit-final.html :root.dark)
+   切换由 core-boot 读偏好加 .dark 到 <html> · 令牌驱动的表面随之翻面。
+   ============================================================ */
+:root.dark {
+    --accent: #2DD4A7;
+    --accent-weak: #11261F;
+    --accent-deep: #5EEAC4;
+    --accent-ink: #06281F;
+    --accent-soft: #11261F;
+    --brand: #2DD4A7;
+    --brand-hover: #5EEAC4;
+    --bg: #0E1116;
+    --card: #161B22;
+    --ink: #E6EDF3;
+    --ink2: #9AA7B4;
+    --ink3: #6E7B89;
+    --ink-2: #9AA7B4;
+    --ink-3: #6E7B89;
+    --ink-4: #6E7B89;
+    --line: #272E38;
+    --line2: #1B222B;
+    --line-soft: #1B222B;
+    --green: #3FB984;
+    --green-weak: #11281F;
+    --amber: #E0A93B;
+    --amber-weak: #2A2113;
+    --red: #F0635F;
+    --red-weak: #2A1517;
+    --blue: #5B8DEF;
+    --blue-weak: #16223A;
+    --success: #3FB984;
+    --success-bg: #11281F;
+    --warn: #E0A93B;
+    --warn-bg: #2A2113;
+    --danger: #F0635F;
+    --danger-bg: #2A1517;
+    --btn-blue: #2DD4A7;
+    --btn-blue-hover: #5EEAC4;
+    --sh: 0 1px 2px rgba(0,0,0,.5);
+    --sh2: 0 10px 30px rgba(0,0,0,.55);
+    --shadow-sm: var(--sh);
+    --shadow: var(--sh);
+    --shadow-lg: var(--sh2);
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; }
 body {
@@ -306,4 +378,42 @@ body.sidebar-collapsed .topbar-left { width: var(--sidebar-w-collapsed); padding
 }
 .brand-divider { width: 1px; height: 16px; background: var(--line); margin: 0 6px; }
 .brand-sub { font-size: 12px; color: var(--ink-3); }
+
+/* 品牌名(固定「Pearnly」· 取代旧 brand-workspace 工作台名)*/
+.brand-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--brand);
+    letter-spacing: -0.3px;
+    line-height: 1;
+    white-space: nowrap;
+}
+@media (max-width: 600px) { .brand-name { font-size: 14px; } }
+
+/* 头像菜单 · 暗夜模式开关指示器(kit .sw 同款 · 蛋壳外故不走 .ui 作用域)*/
+.theme-sw {
+    margin-left: auto;
+    width: 34px;
+    height: 20px;
+    border-radius: 999px;
+    background: var(--line);
+    position: relative;
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+.theme-sw::after {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    top: 2px;
+    left: 2px;
+    transition: left 0.15s;
+    box-shadow: 0 1px 2px rgba(0,0,0,.25);
+}
+.theme-sw.on { background: var(--accent); }
+.theme-sw.on::after { left: 16px; }
+
 

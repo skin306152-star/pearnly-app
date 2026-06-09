@@ -20,6 +20,8 @@ export default [
             'probes/**',
             // 逆向工程抓取的 MR.ERP 页面 JS + 一次性探针(非本项目源码 · 铁律 #8 不改抓取样本)
             'scripts/probe/**',
+            'scripts/_mock/**', // UI 标准化实物源 + 截图助手(设计参照 · 非交付源码)
+            'scripts/_ui_audit/**', // 逐屏视觉审计产物(gitignored · 非源码)
             '_uitest/**', // 本地真站点 UI 实测脚本(gitignore · 非交付源码)
             'home.js', // REFACTOR-C1 拆解目标
             // REFACTOR-C1(2026-05-25)· 从 home.js verbatim 抽出的 4 语 i18n 数据 ·

@@ -27,36 +27,15 @@ PDF_STORAGE_BASE = os.environ.get("PDF_STORAGE_DIR", "/opt/mrpilot/storage/pdfs"
 
 
 def save_pdf(user_id: str, content: bytes) -> Tuple[Optional[str], int]:
-    """
-    保存 PDF 到本地文件系统。
-
-    Args:
-        user_id: 用户 UUID(我们只用前 8 位作为目录名)
-        content: PDF 字节流
-
-    Returns:
-        (相对路径, 字节数) · 失败返回 (None, 0)
-    """
-    if not content:
-        return None, 0
-    try:
-        user_short = str(user_id).replace("-", "")[:8]
-        ym = datetime.now().strftime("%Y-%m")
-        fname = f"{uuid.uuid4().hex}.pdf"
-        rel = f"{user_short}/{ym}/{fname}"
-        abs_path = Path(PDF_STORAGE_BASE) / rel
-        abs_path.parent.mkdir(parents=True, exist_ok=True)
-        abs_path.write_bytes(content)
-        size = len(content)
-        logger.info(f"💾 PDF saved · user={user_short} · path={rel} · size={size}B")
-        return rel, size
-    except Exception as e:
-        logger.error(f"❌ PDF save failed · user={user_id} · err={e}")
-        return None, 0
+    """保存 PDF 到本地文件系统(user_id 取前 8 位作目录)· 失败返回 (None, 0)。"""
+    rel, size = save_bytes(user_id, content, ".pdf")
+    if rel:
+        logger.info(f"💾 PDF saved · path={rel} · size={size}B")
+    return rel, size
 
 
 def save_bytes(user_id: str, content: bytes, suffix: str = ".bin") -> Tuple[Optional[str], int]:
-    """通用字节落盘(进项票图等)· 同 save_pdf 路径规则,但保留真实扩展名。"""
+    """通用字节落盘(PDF 留底 / 进项票图等)· {user前8}/{YYYY-MM}/{uuid}{保留扩展名}。"""
     if not content:
         return None, 0
     try:

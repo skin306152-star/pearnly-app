@@ -692,11 +692,8 @@
  * 禁各屏小固定 max-width(760/920…)→ 50–200% 缩放贴满不跑偏。 */
 .ui .wrap {
     width: 100%;
-    max-width: calc(var(--content) + 56px);
-    margin: 0 auto;
-}
-.ui .wrap.full {
     max-width: none;
+    margin: 0;
 }
 
 /* ============================================================

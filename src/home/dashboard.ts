@@ -106,9 +106,9 @@ async function loadDashboard() {
         if (elList) {
             if (list.length === 0) {
                 elList.innerHTML =
-                    '<div class="dash-recent-empty">' +
+                    '<div class="empty"><div class="t">' +
                     _t('dash-recent-empty', '还没有识别记录 · 去上传第一张吧') +
-                    '</div>';
+                    '</div></div>';
             } else {
                 const html = list
                     .slice(0, 5)
@@ -135,17 +135,17 @@ async function loadDashboard() {
                                     })[c as '&' | '<' | '>' | '"' | "'"]
                             );
                         return (
-                            '<div class="dash-recent-row"><span class="dash-recent-key" title="' +
+                            '<div class="act"><div class="th"><svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>' +
+                            '<div style="min-width:0"><div class="nm" title="' +
+                            esc(mid || key) +
+                            '">' +
+                            esc(mid || key) +
+                            '</div><div class="mt" title="' +
                             esc(key) +
                             '">' +
-                            esc(key) +
-                            '</span><span class="dash-recent-mid" title="' +
-                            esc(mid) +
-                            '">' +
-                            esc(mid) +
-                            '</span><span class="dash-recent-time">' +
+                            esc(key ? key + ' · ' : '') +
                             esc(t!) +
-                            '</span></div>'
+                            '</div></div></div>'
                         );
                     })
                     .join('');
@@ -156,9 +156,9 @@ async function loadDashboard() {
         // 失败静默 · 显示 — · 不打扰用户
         if (elList)
             elList.innerHTML =
-                '<div class="dash-recent-empty">' +
+                '<div class="empty"><div class="t">' +
                 _t('dash-recent-empty', '还没有识别记录 · 去上传第一张吧') +
-                '</div>';
+                '</div></div>';
     }
 }
 window.loadDashboard = loadDashboard;
@@ -203,7 +203,7 @@ async function loadCreditsCard() {
             if (isExempt) {
                 if (balVal) {
                     balVal.textContent = '∞';
-                    balVal.className = 'dash-kpi-val dash-green';
+                    balVal.className = 'n dash-green';
                 }
                 if (balSub) {
                     balSub.textContent =
@@ -215,7 +215,7 @@ async function loadCreditsCard() {
                 const bal = typeof data.balance_thb === 'number' ? data.balance_thb : 0;
                 if (balVal) {
                     balVal.textContent = '฿' + bal.toFixed(2);
-                    balVal.className = bal < 50 ? 'dash-kpi-val dash-red' : 'dash-kpi-val';
+                    balVal.className = bal < 50 ? 'n dash-red' : 'n';
                 }
                 if (balSub) {
                     // v118.35.0.24 · 充值入口永远显示(老逻辑只在 <50 时显示 · 转化率低)

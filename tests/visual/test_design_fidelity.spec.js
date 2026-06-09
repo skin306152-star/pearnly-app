@@ -72,6 +72,28 @@ const API = {
 // layout: 仅查生产容器左对齐(marginLeft=0)。
 const MAPPINGS = [
     {
+        name: '首页 dashboard(样板 · A组屏)',
+        design: 'dashboard-final.html',
+        route: 'dashboard',
+        ready: '#page-dashboard .band .btn.pri',
+        layout: { sel: '#page-dashboard .wrap', maxWidth: 'none', centered: true },
+        tokens: [
+            {
+                design: '.btn',
+                prod: '#page-dashboard .band .btn.pri',
+                props: ['backgroundColor', 'borderRadius', 'fontSize'],
+            },
+            {
+                design: '.panel',
+                prod: '#page-dashboard .panel',
+                props: ['borderRadius', 'boxShadow'],
+            },
+        ],
+        primary: 'rgb(14, 124, 102)',
+        bluemust: '#page-dashboard .band .btn.pri',
+        nosvgemoji: '#page-dashboard .qa .qb svg',
+    },
+    {
         name: '桌台管理(05 v2)',
         design: '05-tables.html',
         route: 'pos-tables',
@@ -110,7 +132,7 @@ const MAPPINGS = [
         design: 'pur-list.html',
         route: 'purchase',
         ready: '.pur .btn.primary',
-        layout: { sel: '.pur .wrap', maxWidth: '1020px' },
+        layout: { sel: '.pur .wrap', maxWidth: 'none', centered: true },
         tokens: [
             {
                 design: '.btn.primary',
@@ -121,6 +143,7 @@ const MAPPINGS = [
             { design: '.seg .o', prod: '.pur .seg .o', props: ['borderRadius'] },
         ],
         bluemust: '.pur .btn.primary',
+        primary: 'rgb(14, 124, 102)', // Window B 迁 emerald(风格 B)
         nosvgemoji: '.pur .btn.primary svg',
     },
     {
@@ -128,7 +151,7 @@ const MAPPINGS = [
         design: 'pur-form.html',
         route: 'purchase-form',
         ready: '.pur .btn.primary',
-        layout: { sel: '.pur .wrap', maxWidth: '1080px' },
+        layout: { sel: '.pur .wrap', maxWidth: 'none', centered: true },
         tokens: [
             {
                 design: '.btn.primary',
@@ -138,6 +161,7 @@ const MAPPINGS = [
             { design: '.card', prod: '.pur .card', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .btn.primary',
+        primary: 'rgb(14, 124, 102)', // Window B 迁 emerald(风格 B)
         nosvgemoji: '.pur .img svg',
     },
     {
@@ -146,7 +170,7 @@ const MAPPINGS = [
         route: 'purchase-detail',
         pre: () => window.openPurchaseDetail && window.openPurchaseDetail('doc-1'),
         ready: '.pur .btn.primary',
-        layout: { sel: '.pur .wrap', maxWidth: '1000px' },
+        layout: { sel: '.pur .wrap', maxWidth: 'none', centered: true },
         tokens: [
             {
                 design: '.btn.primary',
@@ -156,6 +180,7 @@ const MAPPINGS = [
             { design: '.card', prod: '.pur .card', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .btn.primary',
+        primary: 'rgb(14, 124, 102)', // Window B 迁 emerald(风格 B)
         nosvgemoji: '.pur .img svg',
     },
     {
@@ -163,7 +188,7 @@ const MAPPINGS = [
         design: 'pur-suppliers.html',
         route: 'purchase-suppliers',
         ready: '.pur .add',
-        layout: { sel: '.pur .wrap', maxWidth: '920px' },
+        layout: { sel: '.pur .wrap', maxWidth: 'none', centered: true },
         tokens: [
             {
                 design: '.btn',
@@ -173,6 +198,7 @@ const MAPPINGS = [
             { design: '.panel', prod: '.pur .panel', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .add',
+        primary: 'rgb(14, 124, 102)', // Window B 迁 emerald(风格 B)
         nosvgemoji: '.pur .add svg',
     },
     {
@@ -180,7 +206,7 @@ const MAPPINGS = [
         design: 'pur-settings.html',
         route: 'purchase-settings',
         ready: '.pur .save',
-        layout: { sel: '.pur .wrap', maxWidth: '820px' },
+        layout: { sel: '.pur .wrap', maxWidth: 'none', centered: true },
         tokens: [
             {
                 design: '.btn',
@@ -190,6 +216,7 @@ const MAPPINGS = [
             { design: '.panel', prod: '.pur .panel', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .save',
+        primary: 'rgb(14, 124, 102)', // Window B 迁 emerald(风格 B)
         nosvgemoji: '.pur .addcat svg',
     },
 ];
@@ -316,10 +343,18 @@ async function styleOf(page, sel, props) {
             lay && lay.maxWidth === m.layout.maxWidth,
             `容器 ${m.layout.sel} max-width=${m.layout.maxWidth}(got ${lay && lay.maxWidth})`
         );
-        ok(
-            lay && lay.marginLeft === '0px',
-            `容器左对齐 marginLeft=0(got ${lay && lay.marginLeft})`
-        );
+        if (m.layout.centered) {
+            // A 组屏流式居中(.ui .wrap margin:0 auto)· 两侧 margin 相等 = 居中不跑偏
+            ok(
+                lay && lay.marginLeft === lay.marginRight,
+                `容器流式居中 marginLeft==marginRight(got ${lay && lay.marginLeft} / ${lay && lay.marginRight})`
+            );
+        } else {
+            ok(
+                lay && lay.marginLeft === '0px',
+                `容器左对齐 marginLeft=0(got ${lay && lay.marginLeft})`
+            );
+        }
 
         // 4) token 逐项比对(稿 vs 生产)
         for (const tk of m.tokens) {

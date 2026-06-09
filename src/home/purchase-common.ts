@@ -420,23 +420,23 @@ export const DEFAULT_PURCHASE_SETTINGS: PurchaseSettings = {
 // ── 共享设计令牌(.pur 作用域 · 逐字搬自设计稿 :root + .btn + .card)──────
 // 各屏注入自身页样式前先注入这套基底。容器 .pur .wrap 左对齐(margin:0)贴侧栏 —— 视觉闸要 marginLeft=0;
 // 令牌(主色/圆角/阴影/字号)与设计稿逐字相等,闸逐项比对生产页 getComputedStyle。
+// PO 全站标准化(2026-06-09 · 风格 B Emerald):.pur 不再自定义令牌,继承全局
+// home-01-base :root(浅 + :root.dark 暗夜)→ 换肤/暗夜随令牌翻面,零本地阴影裸值。
+// 主按钮 emerald(--accent);.wrap 去小固定宽 → 流式居中填满(对标 history,DESIGN_SYSTEM §2)。
 const PUR_BASE_CSS = `
-.pur{--blue:#2563EB;--blue-d:#1D4ED8;--blue-l:#DBEAFE;--ink:#111827;--ink2:#6B7280;--ink3:#9CA3AF;
-  --bg:#f4f4f0;--card:#fff;--line:#e8e8e3;--green:#16A34A;--amber:#F59E0B;--red:#DC2626;
-  --shadow:0 1px 2px rgba(17,24,39,.04),0 6px 20px rgba(17,24,39,.06);
-  color:var(--ink);font-size:13.5px;}
+.pur{color:var(--ink);font-size:13.5px;}
 .pur *{box-sizing:border-box;}
 .pur .tnum{font-variant-numeric:tabular-nums;}
-.pur .wrap{max-width:1000px;margin:0;}
+.pur .wrap{width:100%;}
 .pur .num{text-align:right;font-variant-numeric:tabular-nums;}
-.pur .btn{height:40px;padding:0 15px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;text-decoration:none;}
-.pur .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700;}
-.pur .btn.primary:hover{background:var(--blue-d);}
+.pur .btn{height:40px;padding:0 15px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;text-decoration:none;}
+.pur .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700;}
+.pur .btn.primary:hover{background:var(--accent-deep);}
 .pur .btn.danger{color:var(--red);}
 .pur .btn:disabled{opacity:.55;cursor:not-allowed;}
-.pur .card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);}
-/* 收拢版面板(钉死令牌:圆角16 + 收拢阴影)· 单一来源 · 进项4屏(list/suppliers/settings/inbox)共用 */
-.pur .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 2px rgba(15,23,42,.04),0 10px 30px rgba(15,23,42,.06);overflow:hidden;}
+.pur .card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh);}
+/* 收拢版面板(钉死令牌:圆角16 + 卡阴影 --sh)· 单一来源 · 进项4屏(list/suppliers/settings/inbox)共用 */
+.pur .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh);overflow:hidden;}
 .pur .state{padding:48px 20px;text-align:center;color:var(--ink3);font-size:13px;}
 .pur .state .btn{margin-top:12px;}
 `;

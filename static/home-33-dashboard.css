@@ -1,126 +1,168 @@
 /* ============================================================
-   v118.32.5.5.16 · 首页 dashboard 样式 · 对照 prototype_final
+   首页 dashboard · 风格 B · 实物源 scripts/_mock/dashboard-final.html
+   作用域 .ui(section#page-dashboard 挂 .ui)· band/kpis 来自 kit · 这里补
+   dashboard 专有件:卡头 .ch/.cs · 快捷 .qa/.qb · 最近动态 .act/.th/.nm/.mt。
    ============================================================ */
-.dash-kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-    margin-bottom: 14px;
-}
-.dash-kpi {
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 14px 16px;
-}
-.dash-kpi-label {
-    font-size: 11px;
-    color: var(--ink-3);
-    margin-bottom: 6px;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-.dash-kpi-label svg { width: 13px; height: 13px; }
-.dash-kpi-val {
-    font-size: 22px;
+/* 北极星 / kpi 数字的语义色修饰(叠加在 kit .n 上) */
+.ui .n.dash-amber { color: var(--amber); }
+.ui .n.dash-red { color: var(--red); }
+.ui .n.dash-green { color: var(--green); }
+
+/* 卡头 */
+.ui .ch {
+    font-size: 14.5px;
     font-weight: 700;
-    color: var(--ink);
-    line-height: 1.1;
 }
-.dash-kpi-val.dash-amber { color: var(--warn); }
-.dash-kpi-val.dash-red { color: var(--danger); }
-.dash-kpi-val.dash-green { color: var(--success); }
-.dash-kpi-sub {
-    font-size: 11px;
-    color: var(--ink-3);
-    margin-top: 3px;
+.ui .cs {
+    font-size: 12.5px;
+    color: var(--ink2);
+    margin-top: 2px;
+    margin-bottom: var(--s4);
 }
-.dash-grid2 {
+
+/* 快捷:2×2 图标卡 */
+.ui .qa {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: var(--s3);
 }
-/* v3(主控 2026-05-31)· 4 入口 2×2 图标卡片 · 自适应高度·不撑破父 .card */
-.dash-quick-list {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-top: 12px;
-}
-.dash-quick-btn {
-    flex-direction: column !important;
-    justify-content: center !important;
-    align-items: center !important;
-    gap: 7px !important;
-    height: auto !important;
-    min-height: 72px;
-    padding: 14px 12px !important;
-    border: 1px solid var(--line) !important;
-    border-radius: 12px !important;
-    background: var(--card) !important;
-    color: var(--ink) !important;
-    font-weight: 500;
+.ui .qb {
     position: relative;
-    transition: border-color .15s, background .15s, transform .1s, box-shadow .15s;
+    border: 1px solid var(--line);
+    border-radius: var(--rs);
+    padding: var(--s4) var(--s2);
+    text-align: center;
+    font-weight: 600;
+    font-size: 12.5px;
+    color: var(--ink);
+    background: var(--card);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 9px;
+    cursor: pointer;
+    transition:
+        border-color 0.15s,
+        box-shadow 0.15s,
+        transform 0.1s;
 }
-.dash-quick-btn:hover {
-    border-color: #2563eb !important;
-    background: #f5f8ff !important;
-    box-shadow: 0 2px 10px rgba(37, 99, 235, 0.12);
+.ui .qb:hover {
+    border-color: var(--accent);
+    box-shadow: var(--sh);
     transform: translateY(-1px);
 }
-.dash-quick-btn:active { transform: translateY(0); }
-.dash-quick-btn svg {
-    width: 26px; height: 26px; flex-shrink: 0;
-    color: #2563eb;
+.ui .qb:active {
+    transform: translateY(0);
 }
-.dash-quick-btn span { font-size: 13px; }
-/* 处理异常入口:图标用警示色 */
-.dash-quick-btn-warn svg { color: var(--danger); }
-.dash-quick-btn-warn:hover {
-    border-color: var(--danger) !important;
-    background: #fff5f5 !important;
-    box-shadow: 0 2px 10px rgba(220, 38, 38, 0.12);
+.ui .qb .qi {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: var(--accent-weak);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
-.dash-quick-badge {
+.ui .qb .qi svg {
+    width: 18px;
+    height: 18px;
+}
+.ui .qb.qb-warn .qi {
+    background: var(--red-weak);
+    color: var(--red);
+}
+.ui .qb.qb-warn:hover {
+    border-color: var(--red);
+}
+.ui .qb-badge {
     position: absolute;
-    top: 8px; right: 8px;
-    margin-left: 0;
-    background: var(--danger);
+    top: 8px;
+    right: 8px;
+    background: var(--red);
     color: #fff;
     font-size: 10px;
     font-weight: 700;
     padding: 1px 6px;
-    border-radius: 20px;
+    border-radius: 999px;
     min-width: 18px;
     text-align: center;
 }
-.dash-recent-list {
-    font-size: 12px;
-    color: var(--ink-3);
-    line-height: 1.9;
-}
-.dash-recent-row {
-    display: flex;
-    gap: 8px;
-    padding: 4px 0;
-    border-bottom: 1px solid var(--line-soft);
-}
-.dash-recent-row:last-child { border-bottom: 0; }
-.dash-recent-row .dash-recent-key { color: var(--ink); font-weight: 500; min-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dash-recent-row .dash-recent-mid { flex: 1; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dash-recent-row .dash-recent-time { color: var(--ink-3); font-size: 11px; flex-shrink: 0; }
-.dash-recent-empty {
-    padding: 24px 16px;
-    text-align: center;
-    color: var(--ink-3);
-    font-size: 12px;
-}
-@media (max-width: 800px) {
-    .dash-kpi-grid { grid-template-columns: repeat(2, 1fr); }
-    .dash-grid2 { grid-template-columns: 1fr; }
-}
-.glv-history-actions button.glv-del:hover { background: var(--red-50); color: var(--red-700); }
-.glv-history-actions button svg { display: block; }
 
+/* 最近动态 */
+.ui .act {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    padding: var(--s3) 0;
+    border-bottom: 1px solid var(--line2);
+}
+.ui .act:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+.ui .th {
+    width: 40px;
+    height: 40px;
+    border-radius: 9px;
+    background: var(--line2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink3);
+    flex-shrink: 0;
+}
+.ui .th svg {
+    width: 18px;
+    height: 18px;
+}
+.ui .nm {
+    font-weight: 600;
+    font-size: 13.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ui .mt {
+    font-size: 11.5px;
+    color: var(--ink3);
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ui .amt {
+    margin-left: auto;
+    text-align: right;
+}
+.ui .amt .v {
+    font-weight: 700;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+}
+.ui .pill {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--green-weak);
+    color: var(--green);
+    margin-top: 3px;
+}
+
+/* 窄屏:两栏叠单列 */
+@media (max-width: 800px) {
+    .ui .cols {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* gl-vat 历史操作按钮(与 dashboard 无关 · 历史遗留同文件 · 保留) */
+.glv-history-actions button.glv-del:hover {
+    background: var(--red-50);
+    color: var(--red-700);
+}
+.glv-history-actions button svg {
+    display: block;
+}

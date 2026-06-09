@@ -351,8 +351,9 @@
     position: static;
     top: auto;
     left: auto;
-    display: flex;
-    justify-content: center;
+    /* 收缩包裹(非块级 flex 撑满)· 居中 · 给右上角 X 让出空间防重叠 */
+    display: grid;
+    width: max-content;
     margin: 0 auto 14px;
   }
 

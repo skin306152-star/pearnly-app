@@ -387,6 +387,8 @@
   position: relative;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  /* 顶对齐:某语言文案换行也不撑高同行、三条标题永远同一水平线 */
+  align-items: start;
   gap: 44px;
   width: 1050px;
   margin: 20px auto 0;
@@ -397,7 +399,7 @@
   display: grid;
   grid-template-columns: 46px 1fr;
   gap: 14px;
-  align-items: center;
+  align-items: start;
 }
 
 .security-icon {

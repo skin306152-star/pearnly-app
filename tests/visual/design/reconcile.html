@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="th">
+<head><meta charset="utf-8">
+<style>
+/* 风格 B · Emerald — 仅供 getComputedStyle 快照断言 */
+:root {
+  --accent: #0E7C66; --ink: #0B1A2B; --ink2: #5A6B7B;
+  --r: 7px; --s1: 4px; --s5: 20px;
+}
+.ui .wrap { width: 100%; max-width: none; margin: 0; }
+.ui .pagehead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: var(--s5); }
+.ui .pagehead .h1 { font-size: 22px; font-weight: 700; }
+.ui .pagehead .sub { color: var(--ink2); font-size: 13.5px; margin-top: var(--s1); }
+.recon-tab-btn.active {
+  color: #111;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.06);
+  border-radius: 7px;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 16px; font-size: 13px; font-weight: 500;
+}
+</style>
+</head>
+<body>
+<section id="page-reconcile" class="ui">
+  <div class="wrap">
+    <div class="pagehead">
+      <div>
+        <div class="h1">对账中心</div>
+        <div class="sub">核对账目 · 找出差异 · 关账更快</div>
+      </div>
+    </div>
+    <div class="recon-tab-bar">
+      <button class="recon-tab-btn active">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M2 6h12M3 6V4a5 5 0 0110 0v2M2 6v7a1 1 0 001 1h10a1 1 0 001-1V6"/><path d="M6 10h4"/></svg>
+        银行对账
+      </button>
+    </div>
+  </div>
+</section>
+</body>
+</html>

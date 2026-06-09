@@ -122,6 +122,19 @@ const MAPPINGS = [
         nosvgemoji: '#history-empty svg',
     },
     {
+        name: '对账中心 reconcile(A组屏)',
+        design: 'reconcile.html',
+        route: 'reconcile',
+        ready: '#page-reconcile .pagehead',
+        layout: { sel: '#page-reconcile .wrap', maxWidth: 'none', centered: true },
+        tokens: [
+            { design: '.h1', prod: '#page-reconcile .pagehead .h1', props: ['fontSize', 'fontWeight'] },
+            { design: '.recon-tab-btn.active', prod: '.recon-tab-btn.active', props: ['boxShadow', 'borderRadius'] },
+        ],
+        // 无 bluemust:对账中心 tab 用中性色(白底·非 emerald)
+        nosvgemoji: '.recon-tab-btn.active svg',
+    },
+    {
         name: '桌台管理(05 v2)',
         design: '05-tables.html',
         route: 'pos-tables',

@@ -15,7 +15,8 @@ import { RECON_HTML_2 } from './page-reconcile-panes-2.js'; // REFACTOR-WB-C1 ·
     'use strict';
     const sec = document.getElementById('page-reconcile');
     if (!sec || sec.dataset.wbInjected === '1') return;
-    sec.innerHTML = RECON_HTML_1 + RECON_HTML_2;
+    sec.classList.add('ui');
+    sec.innerHTML = '<div class="wrap">' + RECON_HTML_1 + RECON_HTML_2 + '</div>';
     sec.dataset.wbInjected = '1';
     try {
         const lang = window._currentLang || localStorage.getItem('mrpilot_lang') || 'th';

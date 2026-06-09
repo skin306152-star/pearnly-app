@@ -4,17 +4,10 @@
 // page-reconcile.js 注入时 RECON_HTML_1 + RECON_HTML_2 拼接 = 原 innerHTML 逐字节一致。
 // ============================================================
 export const RECON_HTML_1 = `
-        <!-- 顶部 page head -->
-        <div class="page-head-clean">
-            <div class="page-head-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 10l9-6 9 6v11H3V10z"/>
-                    <path d="M9 21V12h6v9"/>
-                </svg>
-            </div>
-            <div class="page-head-text">
-                <div class="page-head-title" id="recon-main-title" data-i18n="rc-page-title">对账中心</div>
-                <div class="page-head-sub" id="recon-main-sub" data-i18n="rc-page-sub">核对账目 · 找出差异 · 关账更快</div>
+        <div class="pagehead">
+            <div>
+                <div class="h1" id="recon-main-title" data-i18n="rc-page-title">对账中心</div>
+                <div class="sub" id="recon-main-sub" data-i18n="rc-page-sub">核对账目 · 找出差异 · 关账更快</div>
             </div>
         </div>
 

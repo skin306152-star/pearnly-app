@@ -606,17 +606,10 @@ This device has been logged out automatically.`,th:`บัญชีของค�
         </div>
     </div>
 `;Fe("pearnly-confirm-modal",tu);Fe("confirm-modal",nu);window.pearnlyConfirm=function(e,n){return new Promise(function(a){const s=document.getElementById("pearnly-confirm-modal"),i=document.getElementById("pearnly-confirm-title"),o=document.getElementById("pearnly-confirm-msg"),r=document.getElementById("pearnly-confirm-ok"),l=document.getElementById("pearnly-confirm-cancel"),u=document.getElementById("pearnly-confirm-close");if(!s||!o||!r||!l){a(window.confirm(e));return}i&&(i.textContent=n||(typeof t=="function"?t("confirm-default-title"):"Please confirm")),o.textContent=e||"",s.style.display="flex";function d(f){s.style.display="none",r.removeEventListener("click",p),l.removeEventListener("click",c),u&&u.removeEventListener("click",c),s.removeEventListener("click",m),document.removeEventListener("keydown",v),a(f)}function p(){d(!0)}function c(){d(!1)}function m(f){f.target===s&&d(!1)}function v(f){f.key==="Escape"?d(!1):f.key==="Enter"&&d(!0)}r.addEventListener("click",p),l.addEventListener("click",c),u&&u.addEventListener("click",c),s.addEventListener("click",m),document.addEventListener("keydown",v),setTimeout(function(){try{l.focus()}catch{}},50)})};const au=`
-        <!-- 顶部 page head -->
-        <div class="page-head-clean">
-            <div class="page-head-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 10l9-6 9 6v11H3V10z"/>
-                    <path d="M9 21V12h6v9"/>
-                </svg>
-            </div>
-            <div class="page-head-text">
-                <div class="page-head-title" id="recon-main-title" data-i18n="rc-page-title">对账中心</div>
-                <div class="page-head-sub" id="recon-main-sub" data-i18n="rc-page-sub">核对账目 · 找出差异 · 关账更快</div>
+        <div class="pagehead">
+            <div>
+                <div class="h1" id="recon-main-title" data-i18n="rc-page-title">对账中心</div>
+                <div class="sub" id="recon-main-sub" data-i18n="rc-page-sub">核对账目 · 找出差异 · 关账更快</div>
             </div>
         </div>
 
@@ -1334,7 +1327,7 @@ This device has been logged out automatically.`,th:`บัญชีของค�
         </div><!-- /recon-pane-gl-vat -->
 
 
-`;(function(){const e=document.getElementById("page-reconcile");if(!(!e||e.dataset.wbInjected==="1")){e.innerHTML=au+su,e.dataset.wbInjected="1";try{const n=window._currentLang||localStorage.getItem("mrpilot_lang")||"th",a=window.I18N;a&&a[n]&&(e.querySelectorAll("[data-i18n]").forEach(s=>{const i=s.getAttribute("data-i18n");i&&a[n][i]&&(s.textContent=a[n][i])}),e.querySelectorAll("[data-i18n-placeholder]").forEach(s=>{const i=s.getAttribute("data-i18n-placeholder");i&&a[n][i]&&(s.placeholder=a[n][i])}))}catch{}}})();(function(){const e=document.getElementById("page-integrations");if(!(!e||e.dataset.wbInjected==="1")){e.innerHTML=`
+`;(function(){const e=document.getElementById("page-reconcile");if(!(!e||e.dataset.wbInjected==="1")){e.classList.add("ui"),e.innerHTML='<div class="wrap">'+au+su+"</div>",e.dataset.wbInjected="1";try{const n=window._currentLang||localStorage.getItem("mrpilot_lang")||"th",a=window.I18N;a&&a[n]&&(e.querySelectorAll("[data-i18n]").forEach(s=>{const i=s.getAttribute("data-i18n");i&&a[n][i]&&(s.textContent=a[n][i])}),e.querySelectorAll("[data-i18n-placeholder]").forEach(s=>{const i=s.getAttribute("data-i18n-placeholder");i&&a[n][i]&&(s.placeholder=a[n][i])}))}catch{}}})();(function(){const e=document.getElementById("page-integrations");if(!(!e||e.dataset.wbInjected==="1")){e.innerHTML=`
         <div class="page-head-clean">
             <div class="page-head-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">

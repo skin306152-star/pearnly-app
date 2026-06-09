@@ -256,7 +256,7 @@ window.loadSalesReport = function () {
     if (!sec) return;
     if (sec.dataset.repInit !== '1') {
         sec.classList.add('ui');
-        sec.innerHTML = `<div class="posrep wrap"><div class="ph" id="rep-head"></div><div id="rep-body"></div></div>`;
+        sec.innerHTML = `<div class="posrep"><div class="wrap"><div class="ph" id="rep-head"></div><div id="rep-body"></div></div></div>`;
         sec.dataset.repInit = '1';
     }
     renderHead();

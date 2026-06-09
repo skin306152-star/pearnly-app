@@ -97,12 +97,14 @@
         </div>
 `,
     };
+    // Pages that have been migrated to the Emerald kit scope.
+    const KIT_PAGES = new Set(['page-receivables']);
     const lang = window._currentLang || localStorage.getItem('mrpilot_lang') || 'th';
     const I = window.I18N;
     Object.keys(PAGES).forEach((id) => {
         const sec = document.getElementById(id);
         if (!sec || sec.dataset.wbInjected === '1') return;
-        if (id === 'page-receivables') sec.classList.add('ui');
+        if (KIT_PAGES.has(id)) sec.classList.add('ui');
         sec.innerHTML = PAGES[id as keyof typeof PAGES];
         sec.dataset.wbInjected = '1';
         if (I && I[lang]) {

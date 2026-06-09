@@ -189,7 +189,7 @@ const MAPPINGS = [
         design: 'sales-report.html',
         route: 'sales-report',
         ready: '.posrep .ph .t',
-        layout: { sel: '.posrep.wrap', maxWidth: 'none', centered: true },
+        layout: { sel: '.posrep .wrap', maxWidth: 'none', centered: true },
         tokens: [
             // 报表头字体照搬 home-43-pos-report.css(.posrep .ph .t) · 19px 非 kit 22px
             { design: '.ph .t', prod: '.posrep .ph .t', props: ['fontSize', 'fontWeight'] },

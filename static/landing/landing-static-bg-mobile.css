@@ -103,10 +103,15 @@
   /* 工作气泡(等比缩放 · 收窄靠右 · 不压问候) */
   .work-bubble {
     display: flex;
+    align-items: center;
     top: calc(150 * var(--s));
     left: auto;
     right: calc(16 * var(--s));
-    width: calc(152 * var(--s));
+    /* 硬封顶宽度:右锚 16 + 宽 150 → 左缘 224 · 让出问候框(右缘 208)
+       基规则 landing-static-bg.css 有 min-width:212(min 永远压过 max)· 此处必须清零才生效 */
+    min-width: 0;
+    width: calc(150 * var(--s));
+    max-width: calc(150 * var(--s));
     padding: calc(12 * var(--s)) calc(14 * var(--s));
     gap: calc(10 * var(--s));
     border-radius: calc(20 * var(--s));
@@ -120,6 +125,10 @@
   }
 
   .work-bubble p {
+    /* min-width:0 让弹性子项可收缩到框宽以下 · overflow-wrap 让无空格泰文也在框内换行
+       (真机 iOS Safari 泰文渲染更宽 · 不兜底就横向溢出气泡) */
+    min-width: 0;
+    overflow-wrap: anywhere;
     font-size: calc(13 * var(--s));
     line-height: 1.32;
   }
@@ -138,11 +147,11 @@
     object-fit: cover;
     object-position: center top;
     -webkit-mask-image:
-      linear-gradient(180deg, transparent 0, #000 13%, #000 99%, #000 100%),
+      linear-gradient(180deg, transparent 0, #000 13%, #000 90%, transparent 100%),
       linear-gradient(90deg, transparent 0, #000 11%, #000 89%, transparent 100%);
     -webkit-mask-composite: source-in;
     mask-image:
-      linear-gradient(180deg, transparent 0, #000 13%, #000 99%, #000 100%),
+      linear-gradient(180deg, transparent 0, #000 13%, #000 90%, transparent 100%),
       linear-gradient(90deg, transparent 0, #000 11%, #000 89%, transparent 100%);
     mask-composite: intersect;
   }
@@ -165,11 +174,11 @@
     display: none;
   }
 
-  /* 今日 Quote(等比 · 盖住桌面下沿) */
+  /* 今日 Quote(等比 · 下移到猫/笔记本下方 · 猫底已羽化融入渐变 · 不再压挂件) */
   .quote-card {
     left: calc(13 * var(--s));
     right: calc(16 * var(--s));
-    top: calc(476 * var(--s));
+    top: calc(502 * var(--s));
     bottom: auto;
     width: auto;
     padding: calc(13 * var(--s)) calc(20 * var(--s)) calc(12 * var(--s));

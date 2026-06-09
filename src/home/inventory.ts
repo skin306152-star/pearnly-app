@@ -262,7 +262,4 @@ window.reloadInventory = function () {
     load();
 };
 
-// 切换账套(右上角工作区)→ 在库存页则重载本账套库存。
-window.addEventListener('pearnly:workspace-changed', () => {
-    if (typeof currentRoute !== 'undefined' && currentRoute === 'inventory') load();
-});
+// 切账套重载已统一收口到 core-boot 全局 pearnly:workspace-changed → reloadCurrentRoute。

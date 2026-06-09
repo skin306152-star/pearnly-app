@@ -148,12 +148,12 @@ function refreshCats(): void {
 
 function bind(): void {
     document.querySelectorAll<HTMLElement>('[data-toggle]').forEach((el) => {
-        el.onclick = () => {
+        const sw = el.querySelector<HTMLElement>('.sw'); // 只开关本身可点 · 不绑整行防误触
+        sw?.addEventListener('click', () => {
             const key = el.dataset.toggle as keyof PurchaseSettings;
             (cfg as unknown as Record<string, boolean>)[key] = !cfg[key];
-            const sw = el.querySelector('.sw');
-            if (sw) sw.classList.toggle('on');
-        };
+            sw!.classList.toggle('on');
+        });
     });
     document.getElementById('pur-set-save')!.onclick = save;
     bindCats();

@@ -382,10 +382,5 @@
         window.subscribeI18n('reconcile', window._rerenderReconcile);
     }
 
-    // 切账套(右上角)→ 在对账中心则重载(对账源/任务已按套账隔离,这里补刷新)
-    window.addEventListener('pearnly:workspace-changed', () => {
-        if (typeof currentRoute === 'string' && currentRoute === 'reconcile') {
-            load().catch(() => {});
-        }
-    });
+    // 切账套重载已统一收口到 core-boot 全局 pearnly:workspace-changed → reloadCurrentRoute。
 })();

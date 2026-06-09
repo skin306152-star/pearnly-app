@@ -80,10 +80,8 @@ function applyLang(lang?: any) {
 
     if (_userInfo && typeof window.renderInfoBar === 'function') window.renderInfoBar();
     if (_quota) updateUploadHint();
-    // v118.35.0.8 · renderTrialBanner 已废 · 不再调
-    // REFACTOR-C1-home-batch5 · renderFileList 已迁 upload-files.js(defer)· bootstrap applyLang 同步调时守卫(此刻 _selectedFiles 空 · 跳过无害)
+    // renderFileList/renderResults 已迁 defer 模块 · bootstrap 同步调时 window 桥可能未就绪 → 守卫跳过(数据空 · 无害)
     if (window.renderFileList) window.renderFileList();
-    // REFACTOR-C1-home-batch1 · renderResults 已迁 ocr-results.js(defer)· bootstrap 期 applyLang 同步调时 window 桥可能未就绪 → 守卫(此刻 _results 空 · 跳过无害)
     if (window.renderResults) window.renderResults();
     if (currentRoute === 'settings' && typeof window.renderSettings === 'function')
         window.renderSettings();
@@ -115,9 +113,6 @@ function applyLang(lang?: any) {
             window._rerenderEmailIngest();
         }
     } catch (e) {}
-    // v0.18 · M10 · 银行对账 panel 重渲染
-    //   v118.26.1.2 · 已迁移到 subscribeI18n 总线 · 不再在这里散调用
-    //   (保留注释作历史记号 · 之后写新模块照 bank-recon 模式 · 不走这里)
     // 归档编辑器(设置页打开着的话)
     try {
         if (typeof window._rerenderArchiveAll === 'function') {
@@ -136,8 +131,6 @@ function applyLang(lang?: any) {
             window._rerenderNotifications();
         }
     } catch (e) {}
-    // v118.26.0 · 对账中心切语言重渲(刷「最近对账时间」文案)
-    //   v118.26.1.2 · 已迁移到 subscribeI18n 总线 · 不再在这里散调用
     // 历史行
     try {
         if (typeof renderHistoryList === 'function' && currentRoute === 'history') {
@@ -322,6 +315,13 @@ function routeTo(route?: any) {
     }
 }
 
+// 重载当前路由(不切页/不改 hash)· 复用:① 初始 hash 兜底 ② 切账套后拉对应套账数据。
+function reloadCurrentRoute(): void {
+    const loader = ROUTE_LOADERS[currentRoute];
+    const winFns = window as unknown as Record<string, () => void>;
+    if (loader && typeof winFns[loader] === 'function') winFns[loader]();
+}
+
 function updateUploadHint() {
     if (!_quota) return;
     document.getElementById('upload-hint')!.textContent = t('upload-hint', {
@@ -488,11 +488,11 @@ try {
     console.warn('[boot] routeTo failed', e);
 }
 
-// v118.33.10.1 · reconcile 页初始 hash 时 loadReconcilePage(module · defer)还未注册 · setTimeout 0 补一次调用
-setTimeout(() => {
-    if (currentRoute === 'reconcile' && typeof window.loadReconcilePage === 'function') {
-        window.loadReconcilePage();
-    }
-}, 0);
+// defer 模块的 loader 注册晚于此处同步执行 → 初始进非首屏路由会空白(只剩侧栏);
+// 微任务后 sibling 已 eval,补调一次。原仅 reconcile 兜底,现泛化到所有路由。
+setTimeout(reloadCurrentRoute, 0);
+
+// 切账套(右上角切换器 / 表单「切换公司」)→ 重载当前模块。单一收口,替代原各页分散订阅。
+window.addEventListener('pearnly:workspace-changed', reloadCurrentRoute);
 
 loadAll();

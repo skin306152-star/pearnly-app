@@ -39,10 +39,7 @@ window.loadClientsPage = async function () {
     renderBuyerList();
 };
 
-// 账套主体在别处(右上角弹窗)切换 → 客户管理页账套 tab 即时更新当前标记
-window.addEventListener('pearnly:workspace-changed', function () {
-    if (typeof currentRoute !== 'undefined' && currentRoute === 'clients') renderSellerList();
-});
+// 切账套重载已统一收口到 core-boot 全局 pearnly:workspace-changed → reloadCurrentRoute(loadClientsPage)。
 
 // 抽屉打开后绑定客户下拉(从 history detail 拿 client_id 填充)
 // v118.16 · history_id 为 null 时只填充选项 · 不绑 onchange(识别中心 cache 命中时没 history_id)

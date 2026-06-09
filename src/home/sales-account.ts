@@ -239,7 +239,4 @@ window.loadSalesAccount = function () {
     load();
 };
 
-// 切账套(右上角)→ 在账套主体页则重载(刷新当前主体标记)
-window.addEventListener('pearnly:workspace-changed', () => {
-    if (typeof currentRoute !== 'undefined' && currentRoute === 'sales-account') load();
-});
+// 切账套重载已统一收口到 core-boot 全局 pearnly:workspace-changed → reloadCurrentRoute。

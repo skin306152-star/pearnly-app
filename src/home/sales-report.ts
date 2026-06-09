@@ -255,7 +255,8 @@ window.loadSalesReport = function () {
     const sec = document.getElementById('page-sales-report');
     if (!sec) return;
     if (sec.dataset.repInit !== '1') {
-        sec.innerHTML = `<div class="posrep"><div class="ph" id="rep-head"></div><div id="rep-body"></div></div>`;
+        sec.classList.add('ui');
+        sec.innerHTML = `<div class="posrep wrap"><div class="ph" id="rep-head"></div><div id="rep-body"></div></div>`;
         sec.dataset.repInit = '1';
     }
     renderHead();

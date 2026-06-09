@@ -11,31 +11,25 @@
     'use strict';
     const sec = document.getElementById('page-clients');
     if (!sec || sec.dataset.wbInjected === '1') return;
+    sec.classList.add('ui');
     sec.innerHTML = `
-        <div class="page-head">
-            <div class="page-head-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-                    <circle cx="9" cy="7" r="4"/>
-                    <path d="M23 21v-2a4 4 0 00-3-3.87"/>
-                    <path d="M16 3.13a4 4 0 010 7.75"/>
-                </svg>
-            </div>
-            <div class="page-head-text">
-                <h1 class="page-title" data-i18n="clients-title">客户管理</h1>
-                <div class="page-subtitle" data-i18n="clients-sub">账套主体 + 买方客户 · 统一归档管理</div>
+        <div class="wrap">
+        <div class="pagehead">
+            <div>
+                <div class="h1" data-i18n="clients-title">客户管理</div>
+                <div class="sub" data-i18n="clients-sub">账套主体 + 买方客户 · 统一归档管理</div>
             </div>
         </div>
 
         <!-- 顶部横向 tab 条(对账中心同款)· 账套主体 / 买方客户 -->
         <div class="recon-tab-bar cust-tab-bar">
-            <button class="recon-tab-btn active" data-cust-tab="seller" data-i18n="cust-tab-seller">
+            <button class="recon-tab-btn active" data-cust-tab="seller">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="2" y="5" width="12" height="9" rx="1"/><path d="M10 14V4a1 1 0 00-1-1H7a1 1 0 00-1 1v10"/></svg>
-                账套主体
+                <span data-i18n="cust-tab-seller">账套主体</span>
             </button>
-            <button class="recon-tab-btn" data-cust-tab="buyer" data-i18n="cust-tab-buyer">
+            <button class="recon-tab-btn" data-cust-tab="buyer">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M11 14v-1.2a2.4 2.4 0 00-2.4-2.4H4.4A2.4 2.4 0 002 12.8V14"/><circle cx="6.2" cy="5.2" r="2.4"/><path d="M14 14v-1.2a2.4 2.4 0 00-1.8-2.3"/></svg>
-                买方客户
+                <span data-i18n="cust-tab-buyer">买方客户</span>
             </button>
         </div>
 
@@ -101,6 +95,7 @@
                     <button class="btn btn-ghost btn-sm" id="buyer-next" data-i18n="cust-next">下一页</button>
                 </div>
             </div>
+        </div>
         </div>
 `;
     sec.dataset.wbInjected = '1';

@@ -878,3 +878,7 @@ table.sx-tbl tr.click:hover td {
         grid-template-columns: 1fr;
     }
 }
+
+/* ── PO-UI 迁移 · 销项工作台 kit 补丁 ── */
+/* .main 已有 padding:20px 28px · .sx-page 的 22px 不再叠加 */
+.ui .sx-page { padding: 0; }

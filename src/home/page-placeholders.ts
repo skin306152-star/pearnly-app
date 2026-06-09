@@ -59,6 +59,7 @@
         </div>
 `,
         'page-receivables': `
+        <div class="wrap">
         <div class="auto-coming-hero">
             <div class="coming-big-icon">
                 <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -74,6 +75,7 @@
                 <li data-i18n="cs-receivables-f3">银行流水回款自动核销 · 不用手动对账 · 收款秒到账</li>
             </ul>
             <div class="coming-eta" data-i18n="cs-receivables-eta">预计 v107 上线</div>
+        </div>
         </div>
 `,
         'page-cloud': `
@@ -100,6 +102,7 @@
     Object.keys(PAGES).forEach((id) => {
         const sec = document.getElementById(id);
         if (!sec || sec.dataset.wbInjected === '1') return;
+        if (id === 'page-receivables') sec.classList.add('ui');
         sec.innerHTML = PAGES[id as keyof typeof PAGES];
         sec.dataset.wbInjected = '1';
         if (I && I[lang]) {

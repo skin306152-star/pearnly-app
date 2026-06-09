@@ -135,6 +135,44 @@ const MAPPINGS = [
         nosvgemoji: '.recon-tab-btn.active svg',
     },
     {
+        name: '销售工作台 sales-invoices(A组屏)',
+        design: 'sales-invoices.html',
+        route: 'sales-invoices',
+        ready: '#sx-new-btn',
+        layout: { sel: '#page-sales-invoices .wrap', maxWidth: 'none', centered: true },
+        tokens: [
+            { design: '.btn-primary', prod: '#sx-new-btn', props: ['backgroundColor', 'borderRadius'] },
+            { design: '.h1', prod: '#page-sales-invoices .pagehead .h1', props: ['fontSize', 'fontWeight'] },
+        ],
+        bluemust: '#sx-new-btn',
+        primary: 'rgb(14, 124, 102)',
+        nosvgemoji: '#sx-new-btn svg',
+    },
+    {
+        name: '客户管理 clients(A组屏)',
+        design: 'clients.html',
+        route: 'clients',
+        ready: '#page-clients .pagehead .h1',
+        layout: { sel: '#page-clients .wrap', maxWidth: 'none', centered: true },
+        tokens: [
+            { design: '.h1', prod: '#page-clients .pagehead .h1', props: ['fontSize', 'fontWeight'] },
+        ],
+        // 无 bluemust:seller 面板 #btn-seller-new display:none · buyer 面板初始隐藏
+        nosvgemoji: '.cust-tab-bar .recon-tab-btn svg',
+    },
+    {
+        name: '销售报表 sales-report(A组屏)',
+        design: 'sales-report.html',
+        route: 'sales-report',
+        ready: '.posrep .ph .t',
+        layout: { sel: '.posrep.wrap', maxWidth: 'none', centered: true },
+        tokens: [
+            // 报表头字体照搬 home-43-pos-report.css(.posrep .ph .t) · 19px 非 kit 22px
+            { design: '.ph .t', prod: '.posrep .ph .t', props: ['fontSize', 'fontWeight'] },
+        ],
+        // 无 bluemust:报表页无 primary 按钮 · 无 nosvgemoji:范围选择栏文字按钮无 SVG
+    },
+    {
         name: '桌台管理(05 v2)',
         design: '05-tables.html',
         route: 'pos-tables',
@@ -420,8 +458,10 @@ async function styleOf(page, sel, props) {
             const wantPrimary = m.primary || BLUE; // 默认蓝 · 已迁 emerald 的屏在 mapping 里覆写
             ok(blue === wantPrimary, `主按钮主色 ${wantPrimary}(got ${blue})`);
         }
-        const hasSvg = await page.$(m.nosvgemoji);
-        ok(!!hasSvg, `图标为线性 svg(无 emoji)· ${m.nosvgemoji}`);
+        if (m.nosvgemoji) {
+            const hasSvg = await page.$(m.nosvgemoji);
+            ok(!!hasSvg, `图标为线性 svg(无 emoji)· ${m.nosvgemoji}`);
+        }
     }
 
     await browser.close();

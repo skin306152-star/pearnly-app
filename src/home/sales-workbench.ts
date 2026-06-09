@@ -105,10 +105,11 @@ function listInnerHtml(): string {
 }
 
 function pageShell(): string {
-    return `<div class="sx-page">
-        <div class="sx-head">
-            <h2 data-i18n="sx-wb-title">${escapeHtml(t('sx-wb-title'))}</h2>
-            
+    return `<div class="wrap sx-page">
+        <div class="pagehead">
+            <div>
+                <div class="h1" data-i18n="sx-wb-title">${escapeHtml(t('sx-wb-title'))}</div>
+            </div>
             <div class="sx-actions">
                 <button class="btn btn-ghost" id="sx-settings-btn">${ICON_GEAR}<span>${escapeHtml(t('sx-settings'))}</span></button>
                 <button class="btn btn-primary" id="sx-new-btn">${ICON_PLUS}<span>${escapeHtml(t('sx-new'))}</span></button>
@@ -213,6 +214,7 @@ window.loadSalesWorkbench = function () {
     const sec = document.getElementById('page-sales-invoices');
     if (!sec) return;
     if (sec.dataset.sxInit !== '1') {
+        sec.classList.add('ui');
         sec.innerHTML = pageShell();
         sec.dataset.sxInit = '1';
         bindShell();

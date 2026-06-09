@@ -161,6 +161,19 @@ def create_doc(
     )
     doc_id = cur.fetchone()["id"]
     _insert_lines(cur, tenant_id=tenant_id, doc_id=doc_id, lines=calc["lines"])
+    # 拍票留底:把 intake 落盘的票图挂成 bill 附件(C · 详情/编辑可回看原票)。
+    bill_ref = (data.get("bill_image_ref") or "").strip()
+    if bill_ref:
+        from services.purchase import documents as doc_files
+
+        doc_files.add_attachment(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            doc_id=doc_id,
+            kind="bill",
+            url=bill_ref,
+        )
     return get_doc(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=doc_id)
 
 
@@ -222,7 +235,25 @@ def get_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> Optional[dict]:
         (tenant_id, doc_id),
     )
     attachments = cur.fetchall()
+    for a in attachments:
+        # bill 票图:DB 存的是落盘 ref(内部)· 对外只给鉴权 serving 端点,不暴露存储路径。
+        if a.get("kind") == "bill":
+            a["url"] = f"/api/purchase/docs/{doc_id}/bill-image"
     return {"doc": doc, "lines": lines, "attachments": attachments}
+
+
+def get_bill_image_ref(cur, *, tenant_id, workspace_client_id, doc_id) -> Optional[str]:
+    """取单据 bill 票图的落盘 ref(套账硬边界:join purchase_docs 过 ws)· 无则 None。"""
+    cur.execute(
+        "SELECT a.url FROM purchase_attachments a "
+        "JOIN purchase_docs d ON d.id = a.purchase_doc_id AND d.tenant_id = a.tenant_id "
+        "WHERE a.tenant_id = %s AND d.workspace_client_id = %s "
+        "AND a.purchase_doc_id = %s AND a.kind = 'bill' "
+        "ORDER BY a.created_at DESC LIMIT 1",
+        (tenant_id, workspace_client_id, doc_id),
+    )
+    row = cur.fetchone()
+    return row["url"] if row else None
 
 
 def list_docs(

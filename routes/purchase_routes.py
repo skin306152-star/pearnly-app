@@ -44,6 +44,8 @@ class DocIn(BaseModel):
     rounding: float = 0
     grand_total: Optional[float] = None
     ocr_raw: Optional[dict] = None
+    # 拍票留底 ref(intake 落盘)· 建单时挂成 bill 附件 · 仅新建草稿传(编辑不传)。
+    bill_image_ref: Optional[str] = None
 
 
 class PostIn(BaseModel):
@@ -280,6 +282,31 @@ async def api_document_pdf(
         )
         pdf = renderer(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)
     return Response(content=pdf, media_type="application/pdf")
+
+
+@router.get("/docs/{doc_id}/bill-image")
+async def api_bill_image(
+    doc_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
+):
+    """票图原图(拍票留底)· 鉴权 + 套账边界 · 落盘文件流式返回。"""
+    _, tid = auth_member(request)
+    with db.get_cursor_rls(tid, commit=False) as cur:
+        gate(cur, tid)
+        ws = resolve_ws(cur, request, tid, workspace_client_id)
+        ref = docs_svc.get_bill_image_ref(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)
+    if not ref:
+        raise PosError("purchase.unexpected", 404, detail="no_bill_image")
+    from services.ocr import pdf_storage
+
+    abs_path = pdf_storage.get_pdf_abs_path(ref)
+    if not abs_path or not abs_path.exists():
+        raise PosError("purchase.unexpected", 404, detail="bill_image_missing")
+    import mimetypes
+
+    from fastapi.responses import FileResponse
+
+    media = mimetypes.guess_type(str(abs_path))[0] or "image/jpeg"
+    return FileResponse(path=str(abs_path), media_type=media)
 
 
 @router.post("/docs/{doc_id}/attachments")

@@ -201,6 +201,18 @@ export async function openPurchasePdf(path: string): Promise<void> {
     setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
+// 受鉴权资源(票图)→ blob → object URL · 供 <img src> 与「放大看」新标签复用(同带 Bearer)。
+export async function fetchAuthedBlobUrl(path: string): Promise<string> {
+    let r: Response;
+    try {
+        r = await fetch(path, { headers: authHeaders() as HeadersInit });
+    } catch (_) {
+        throw new PurchaseError('purchase.unexpected');
+    }
+    if (!r.ok) throw new PurchaseError('purchase.unexpected');
+    return URL.createObjectURL(await r.blob());
+}
+
 // 当前账套(进项按 workspace_client_id 隔离)· 个人模式/未选 → null(调用方提示选账套)。
 export function activeWsId(): number | null {
     try {

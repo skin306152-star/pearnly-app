@@ -55,6 +55,24 @@ def save_pdf(user_id: str, content: bytes) -> Tuple[Optional[str], int]:
         return None, 0
 
 
+def save_bytes(user_id: str, content: bytes, suffix: str = ".bin") -> Tuple[Optional[str], int]:
+    """通用字节落盘(进项票图等)· 同 save_pdf 路径规则,但保留真实扩展名。"""
+    if not content:
+        return None, 0
+    try:
+        user_short = str(user_id).replace("-", "")[:8]
+        ym = datetime.now().strftime("%Y-%m")
+        safe = suffix if (suffix.startswith(".") and 2 <= len(suffix) <= 6) else ".bin"
+        rel = f"{user_short}/{ym}/{uuid.uuid4().hex}{safe}"
+        abs_path = Path(PDF_STORAGE_BASE) / rel
+        abs_path.parent.mkdir(parents=True, exist_ok=True)
+        abs_path.write_bytes(content)
+        return rel, len(content)
+    except Exception as e:
+        logger.error(f"❌ save_bytes failed · user={user_id} · err={e}")
+        return None, 0
+
+
 def get_pdf_abs_path(rel_path: str) -> Optional[Path]:
     """根据相对路径取绝对路径 · 文件不存在返回 None"""
     if not rel_path:

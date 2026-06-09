@@ -245,6 +245,8 @@ def resolve_image_intake(
             "wht_amount": str(calc["wht_amount"]),
             "grand_total": str(calc["grand_total"]),
             "net_payable": str(calc["net_payable"]),
+            # 票图存盘 ref → 确认入账时挂成 bill 附件(C)。
+            "bill_image_ref": image_url,
         }
     )
     return {

@@ -82,6 +82,11 @@ async def api_intake(
             raise PosError("purchase.line_invalid", 422, detail="empty_image")
         user_fresh = db.find_user_by_id(_uid(user)) or user
         fields, confidence = _run_ocr(user_fresh, file_bytes, image.filename or "upload.jpg")
+        # 票图落盘留底 → ref 进草稿,确认入账时挂成 bill 附件(C · 表单/详情可回看原票)。
+        from services.ocr import pdf_storage
+
+        _suffix = os.path.splitext(image.filename or "")[1].lower() or ".jpg"
+        bill_ref, _ = pdf_storage.save_bytes(_uid(user), file_bytes, _suffix)
         with db.get_cursor_rls(tid, commit=True) as cur:
             data = intake_svc.resolve_image_intake(
                 cur,
@@ -91,6 +96,7 @@ async def api_intake(
                 confidence=confidence,
                 settings=cfg,
                 source="photo",
+                image_url=bill_ref,
             )
         return ok(data)
 

@@ -19,6 +19,7 @@ import {
 } from './purchase-common.js';
 import { computePurchaseTotals } from './purchase-calc.js';
 import { PURCHASE_FORM_CSS } from './purchase-form-css.js';
+import { leftColHtml, mountBillImage, wireBillZoom } from './purchase-form-bill.js';
 
 interface DraftIn {
     id?: string;
@@ -34,9 +35,12 @@ interface DraftIn {
     lines?: DocLine[];
     ai_fields?: number;
     dedupe_hit?: boolean;
+    bill_image_ref?: string | null; // intake 落盘 ref(新建草稿→存)
+    bill_image_url?: string | null; // 已存单据详情的鉴权 serving url
+    bill_image_local?: string | null; // 刚拍那张的本地 blob url(即时显示·不走后端)
 }
 
-interface FormState {
+export interface FormState {
     id: string | null;
     doc_kind: DocKind;
     supplierName: string;
@@ -53,6 +57,8 @@ interface FormState {
     lines: DocLine[];
     aiFields: number;
     dedupeHit: boolean;
+    billRef: string; // 存盘 ref · 仅新建草稿带去 payload(编辑不带)
+    billUrl: string; // 票图显示源:本地 blob(刚拍)或鉴权 serving url(已存)
 }
 
 let st: FormState | null = null;
@@ -94,6 +100,8 @@ function fromDraft(d: DraftIn): FormState {
         lines: (d.lines && d.lines.length ? d.lines : [blankLine()]).map((l) => ({ ...l })),
         aiFields: d.ai_fields || 0,
         dedupeHit: !!d.dedupe_hit,
+        billRef: d.bill_image_ref || '',
+        billUrl: d.bill_image_local || d.bill_image_url || '',
     };
 }
 
@@ -169,24 +177,6 @@ function totalsHtml(): string {
         <div class="sum tot"><span>${escapeHtml(t('pur-net-payable'))}</span><span class="tnum">฿${r.net_payable}</span></div>`;
 }
 
-function leftCol(): string {
-    const aiMark = st!.aiFields
-        ? `<span class="aimark">${escapeHtml(t('pur-ai-read'))} ${st!.aiFields}</span>`
-        : '';
-    return `<div class="col">
-        <div class="card"><div class="hd">${escapeHtml(t('pur-bill'))}</div><div class="bd">
-            <div class="img">${ICON_DOC}${aiMark}</div>
-            <div class="seg2"><button class="btn sm" id="pur-reshoot">${escapeHtml(t('pur-reshoot'))}</button><button class="btn sm" id="pur-zoom">${escapeHtml(t('pur-zoom'))}</button></div>
-        </div></div>
-        <div class="card"><div class="hd">${escapeHtml(t('pur-vouchers-hd'))}</div><div class="bd">
-            <div class="hint">${escapeHtml(t('pur-sub-receipt-hint'))}</div>
-            <button class="btn full ghost mt" id="pur-gen-receipt" style="margin-bottom:8px;">+ ${escapeHtml(t('pur-gen-receipt'))}</button>
-            <button class="btn full ghost" id="pur-attach">+ ${escapeHtml(t('pur-attach'))}</button>
-            <div class="field mt"><label>${escapeHtml(t('pur-requester'))}</label><div class="inp"><input class="fin" data-fld="requester" value="${escapeHtml(st!.requester)}" placeholder="—"></div></div>
-        </div></div>
-    </div>`;
-}
-
 function infoCard(): string {
     const k = st!.doc_kind;
     const supMark = st!.supplierName
@@ -238,7 +228,7 @@ function shell(): string {
         </div>
         ${dup}
         <div class="wsbar">${escapeHtml(t('pur-ws-for'))} <b id="pur-ws-name">${escapeHtml(wsName())}</b> · <span class="link" id="pur-ws-switch">${escapeHtml(t('pur-ws-switch'))}</span></div>
-        <div class="grid">${leftCol()}${rightCol()}</div>
+        <div class="grid">${leftColHtml(st!)}${rightCol()}</div>
     </div></div>`;
 }
 
@@ -247,9 +237,6 @@ function wsName(): string {
         (window._userInfo && (window._userInfo as { company_name?: string }).company_name) || '—'
     );
 }
-
-const ICON_DOC =
-    '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/></svg>';
 
 function refreshLines(): void {
     const box = document.getElementById('pur-lines');
@@ -335,6 +322,8 @@ function bindShell(): void {
     document.getElementById('pur-back')!.onclick = () => window.routeTo?.('purchase');
     document.getElementById('pur-ws-switch')!.onclick = () =>
         document.getElementById('workspace-switcher-root')?.querySelector('button')?.click();
+    mountBillImage(st!.billUrl);
+    wireBillZoom();
     const supPick = document.getElementById('pur-supplier-pick');
     if (supPick)
         supPick.onclick = () =>
@@ -429,6 +418,8 @@ function payload(status: 'draft' | 'posted'): unknown {
         rounding: r.rounding,
         grand_total: r.grand_total,
         net_payable: r.net_payable,
+        // 拍票留底 ref · 仅新建草稿(刚 intake)带 · 建单时挂成 bill 附件。
+        bill_image_ref: st!.billRef || undefined,
         status,
     };
 }

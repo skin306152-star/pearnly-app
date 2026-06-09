@@ -266,7 +266,12 @@ async function onCapture(input: HTMLInputElement): Promise<void> {
         };
         const d = res && res.draft;
         if (d) {
-            window.openPurchaseForm?.(null, { ...d, dedupe_hit: res.dedupe_hit });
+            // 刚拍那张本地 blob 即时显示(不等后端 serving)· 后端已存盘,保存时按 ref 挂附件。
+            window.openPurchaseForm?.(null, {
+                ...d,
+                dedupe_hit: res.dedupe_hit,
+                bill_image_local: URL.createObjectURL(f),
+            });
             return;
         }
         const route = (res && res.route) || 'inbox';

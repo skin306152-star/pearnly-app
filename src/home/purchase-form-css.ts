@@ -35,6 +35,7 @@ export const PURCHASE_FORM_CSS = `
 .pur .docchip .x{margin-left:auto;color:var(--ink3);cursor:pointer;}
 .pur .img{aspect-ratio:3/4;background:#fafaf8;border:1px dashed var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--ink3);margin-bottom:9px;overflow:hidden;}
 .pur .img img{width:100%;height:100%;object-fit:cover;}
+.pur .img img.billimg{object-fit:contain;cursor:zoom-in;}
 .pur .seg2{display:flex;gap:8px;} .pur .mt{margin-top:10px;}
 .pur .item{border:1px solid var(--line);border-radius:11px;padding:11px 12px;margin-bottom:10px;}
 .pur .irow1{display:flex;align-items:center;gap:10px;margin-bottom:10px;}

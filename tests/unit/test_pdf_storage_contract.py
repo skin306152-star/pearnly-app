@@ -41,6 +41,23 @@ class PdfStorageTests(unittest.TestCase):
     def test_save_empty_content_returns_none(self):
         self.assertEqual(pdf_storage.save_pdf("u", b""), (None, 0))
 
+    def test_save_bytes_keeps_suffix_and_round_trips(self):
+        # 进项票图(C):通用落盘 · 保留真实扩展名 · 同 save_pdf 路径规则。
+        rel, size = pdf_storage.save_bytes("abcdef12-3456", b"\x89PNG bytes", ".png")
+        self.assertEqual(size, len(b"\x89PNG bytes"))
+        parts = rel.split("/")
+        self.assertEqual(parts[0], "abcdef12")
+        self.assertTrue(parts[2].endswith(".png"))
+        self.assertTrue(pdf_storage.get_pdf_abs_path(rel).exists())
+
+    def test_save_bytes_sanitizes_bad_suffix(self):
+        # 异常后缀(无点 / 超长 / 路径段)→ 回落 .bin,不被用于穿越。
+        rel, _ = pdf_storage.save_bytes("u", b"x", "../evil")
+        self.assertTrue(rel.endswith(".bin"))
+
+    def test_save_bytes_empty_returns_none(self):
+        self.assertEqual(pdf_storage.save_bytes("u", b"", ".jpg"), (None, 0))
+
     def test_save_get_delete_round_trip(self):
         rel, _ = pdf_storage.save_pdf("user1234", b"data")
         p = pdf_storage.get_pdf_abs_path(rel)

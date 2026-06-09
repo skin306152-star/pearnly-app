@@ -116,7 +116,11 @@ const MAPPINGS = [
         tokens: [
             // #history-main 初始 display:none — getComputedStyle 仍计算结构属性(borderRadius/boxShadow)
             { design: '.panel', prod: '#history-main', props: ['borderRadius', 'boxShadow'] },
-            { design: '.h1', prod: '#page-history .pagehead .h1', props: ['fontSize', 'fontWeight'] },
+            {
+                design: '.h1',
+                prod: '#page-history .pagehead .h1',
+                props: ['fontSize', 'fontWeight'],
+            },
         ],
         // 无 bluemust:history-main 初始隐藏,无可见主色按钮可验
         nosvgemoji: '#history-empty svg',
@@ -128,8 +132,16 @@ const MAPPINGS = [
         ready: '#page-reconcile .pagehead',
         layout: { sel: '#page-reconcile .wrap', maxWidth: 'none', centered: true },
         tokens: [
-            { design: '.h1', prod: '#page-reconcile .pagehead .h1', props: ['fontSize', 'fontWeight'] },
-            { design: '.recon-tab-btn.active', prod: '.recon-tab-btn.active', props: ['boxShadow', 'borderRadius'] },
+            {
+                design: '.h1',
+                prod: '#page-reconcile .pagehead .h1',
+                props: ['fontSize', 'fontWeight'],
+            },
+            {
+                design: '.recon-tab-btn.active',
+                prod: '.recon-tab-btn.active',
+                props: ['boxShadow', 'borderRadius'],
+            },
         ],
         // 无 bluemust:对账中心 tab 用中性色(白底·非 emerald)
         nosvgemoji: '.recon-tab-btn.active svg',
@@ -141,8 +153,16 @@ const MAPPINGS = [
         ready: '#sx-new-btn',
         layout: { sel: '#page-sales-invoices .wrap', maxWidth: 'none', centered: true },
         tokens: [
-            { design: '.btn-primary', prod: '#sx-new-btn', props: ['backgroundColor', 'borderRadius'] },
-            { design: '.h1', prod: '#page-sales-invoices .pagehead .h1', props: ['fontSize', 'fontWeight'] },
+            {
+                design: '.btn-primary',
+                prod: '#sx-new-btn',
+                props: ['backgroundColor', 'borderRadius'],
+            },
+            {
+                design: '.h1',
+                prod: '#page-sales-invoices .pagehead .h1',
+                props: ['fontSize', 'fontWeight'],
+            },
         ],
         bluemust: '#sx-new-btn',
         primary: 'rgb(14, 124, 102)',
@@ -155,7 +175,11 @@ const MAPPINGS = [
         ready: '#page-clients .pagehead .h1',
         layout: { sel: '#page-clients .wrap', maxWidth: 'none', centered: true },
         tokens: [
-            { design: '.h1', prod: '#page-clients .pagehead .h1', props: ['fontSize', 'fontWeight'] },
+            {
+                design: '.h1',
+                prod: '#page-clients .pagehead .h1',
+                props: ['fontSize', 'fontWeight'],
+            },
         ],
         // 无 bluemust:seller 面板 #btn-seller-new display:none · buyer 面板初始隐藏
         nosvgemoji: '.cust-tab-bar .recon-tab-btn svg',

@@ -105,9 +105,14 @@ function shellHtml(): string {
             <div class="t">${escapeHtml(t('inv-title'))}</div>
             <div class="acts">
                 <button class="btn" id="inv-btn-count">${escapeHtml(t('inv-act-count'))}</button>
-                <button class="btn" id="inv-btn-transfer">${escapeHtml(t('inv-act-transfer'))}</button>
-                <button class="btn" id="inv-btn-export">${escapeHtml(t('inv-act-export'))}</button>
                 <button class="btn primary" id="inv-btn-in">${IC_PLUS}${escapeHtml(t('inv-act-in'))}</button>
+                <div class="more">
+                    <button class="btn more-btn" id="inv-btn-more" aria-haspopup="true" aria-expanded="false">⋯</button>
+                    <div class="menu" id="inv-more-menu" hidden>
+                        <div class="mi" id="inv-btn-export" role="button" tabindex="0">${escapeHtml(t('inv-act-export'))}</div>
+                        <div class="mi" id="inv-btn-transfer" role="button" tabindex="0">${escapeHtml(t('inv-act-transfer'))}</div>
+                    </div>
+                </div>
             </div>
         </div>
         <div id="inv-body"></div>
@@ -255,6 +260,23 @@ function bindShell() {
     const transferBtn = document.getElementById('inv-btn-transfer');
     // 调拨 = 多仓功能 · 05 标「后续」· 单仓阶段给明确提示,不做死按钮也不做假功能。
     if (transferBtn) transferBtn.onclick = () => showToast(t('inv-transfer-soon'), 'info');
+    // §4-bis 渐进披露:⋯ 更多菜单(导出/调拨)· 点外部关闭。
+    const moreBtn = document.getElementById('inv-btn-more');
+    const moreMenu = document.getElementById('inv-more-menu');
+    if (moreBtn && moreMenu) {
+        moreBtn.onclick = (e) => {
+            e.stopPropagation();
+            const opening = moreMenu.hasAttribute('hidden');
+            moreMenu.toggleAttribute('hidden', !opening);
+            moreBtn.setAttribute('aria-expanded', String(opening));
+        };
+        document.addEventListener('click', () => {
+            if (!moreMenu.hasAttribute('hidden')) {
+                moreMenu.setAttribute('hidden', '');
+                moreBtn.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
 }
 
 // 入库/盘点弹窗提交成功后回流刷新列表。

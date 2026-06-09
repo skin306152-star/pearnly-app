@@ -16,24 +16,24 @@ function ensureDom(): void {
     st.textContent = `
 .kb-info-mask{position:fixed;inset:0;background:rgba(17,17,17,.42);z-index:1300;display:none;align-items:center;justify-content:center;padding:20px}
 .kb-info-mask.open{display:flex}
-.kb-info-modal{background:#fff;border-radius:16px;width:560px;max-width:100%;max-height:88vh;overflow:auto;box-shadow:0 30px 80px rgba(17,17,17,.3)}
+.kb-info-modal{background:var(--card);border-radius:16px;width:560px;max-width:100%;max-height:88vh;overflow:auto;box-shadow:0 30px 80px rgba(17,17,17,.3)}
 .kb-info-head{display:flex;align-items:flex-start;gap:14px;padding:22px 24px 0}
-.kb-info-head .ic{width:52px;height:52px;border-radius:13px;background:#fff7ee;overflow:hidden;display:grid;place-items:center;flex-shrink:0}
+.kb-info-head .ic{width:52px;height:52px;border-radius:13px;background:var(--amber-weak);overflow:hidden;display:grid;place-items:center;flex-shrink:0}
 .kb-info-head .ic img{width:48px;height:48px;object-fit:cover;object-position:center 14%}
 .kb-info-head h2{font-size:18px;font-weight:800;margin:0}
 .kb-info-head .lead{color:var(--ink-2,#555);font-size:12.5px;margin-top:3px;line-height:1.55}
 .kb-info-head .x{margin-left:auto;color:var(--ink-3,#999);width:30px;height:30px;border-radius:8px;display:grid;place-items:center;cursor:pointer;border:none;background:none;flex-shrink:0}
 .kb-info-head .x svg{width:16px;height:16px}
-.kb-info-head .x:hover{background:var(--bg,#f4f4f0);color:var(--ink,#111)}
+.kb-info-head .x:hover{background:var(--bg,#f4f4f0);color:var(--ink,var(--ink))}
 .kb-info-body{padding:18px 24px 24px}
 .kb-info-h{font-size:13px;font-weight:800;margin:18px 0 9px;display:flex;align-items:center;gap:8px}
-.kb-info-h .l{width:4px;height:14px;border-radius:3px;background:var(--btn-blue,#2563eb)}
+.kb-info-h .l{width:4px;height:14px;border-radius:3px;background:var(--btn-blue,var(--accent))}
 .kb-info-use{list-style:none;display:flex;flex-direction:column;gap:9px;padding:0;margin:0}
 .kb-info-use li{display:flex;gap:10px;font-size:12.5px;color:var(--ink-2,#555);line-height:1.55}
-.kb-info-use li .ck{width:20px;height:20px;border-radius:6px;background:var(--info-bg,#dbeafe);color:var(--info-ink,#1e40af);display:grid;place-items:center;flex-shrink:0}
+.kb-info-use li .ck{width:20px;height:20px;border-radius:6px;background:var(--info-bg,var(--accent-weak));color:var(--info-ink,var(--accent-deep));display:grid;place-items:center;flex-shrink:0}
 .kb-info-use li .ck svg{width:13px;height:13px;stroke-width:2.4}
-.kb-info-price{border:1px solid var(--border,#e8e8e3);border-radius:12px;overflow:hidden}
-.kb-info-price .row{display:flex;align-items:center;gap:12px;padding:13px 15px;border-bottom:1px solid var(--border,#e8e8e3)}
+.kb-info-price{border:1px solid var(--line,#e8e8e3);border-radius:12px;overflow:hidden}
+.kb-info-price .row{display:flex;align-items:center;gap:12px;padding:13px 15px;border-bottom:1px solid var(--line,#e8e8e3)}
 .kb-info-price .row:last-child{border-bottom:none}
 .kb-info-price .pi{width:34px;height:34px;border-radius:9px;background:var(--bg,#f4f4f0);display:grid;place-items:center;color:var(--ink-2,#555);flex-shrink:0}
 .kb-info-price .pi svg{width:17px;height:17px}
@@ -41,7 +41,7 @@ function ensureDom(): void {
 .kb-info-price .pm b{font-weight:700;font-size:13px}
 .kb-info-price .pm .d{font-size:11px;color:var(--ink-3,#999);margin-top:1px;line-height:1.4}
 .kb-info-price .amt{font-size:11px;font-weight:700;color:var(--ink-3,#999);background:var(--bg,#f4f4f0);border-radius:7px;padding:4px 9px;white-space:nowrap}
-.kb-info-tbd{display:flex;align-items:flex-start;gap:8px;background:#fffaeb;color:#b54708;border:1px solid #fde68a;border-radius:8px;padding:9px 12px;font-size:11.5px;font-weight:600;margin-top:12px;line-height:1.5}
+.kb-info-tbd{display:flex;align-items:flex-start;gap:8px;background:var(--amber-weak);color:var(--amber);border:1px solid var(--amber-weak);border-radius:8px;padding:9px 12px;font-size:11.5px;font-weight:600;margin-top:12px;line-height:1.5}
 .kb-info-foot{display:flex;justify-content:flex-end;padding:0 24px 22px}
 `;
     document.head.appendChild(st);

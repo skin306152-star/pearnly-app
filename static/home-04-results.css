@@ -171,3 +171,18 @@ table.results-table { width: 100%; border-collapse: collapse; font-size: 13px; t
     z-index: 10; pointer-events: none;
 }
 
+/* ── PO-UI 迁移 · OCR 屏 kit 补丁 ── */
+/* 面板内小标题(upload + results 两个 panel 共用) */
+.ocr-card-title { font-size: 14.5px; font-weight: 700; margin-bottom: 4px; }
+.ocr-card-sub { font-size: 12px; color: var(--ink2); margin-bottom: var(--s3); }
+
+/* export split 在 kit .ui 作用域内:防止 kit .ui .btn 的 border-radius 覆盖连接边 */
+.ui .export-split-wrap .btn.export-main {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+.ui .export-split-wrap .btn.export-arrow {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+

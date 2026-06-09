@@ -31,8 +31,8 @@ function ensureStyle(): void {
 @keyframes kbBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
 @keyframes kbJump{0%{transform:translateY(0)}30%{transform:translateY(-16px) rotate(-4deg)}55%{transform:translateY(0) scaleY(.92) scaleX(1.06)}75%{transform:translateY(-5px)}100%{transform:translateY(0)}}
 @keyframes kbCheer{0%{transform:translateY(0)}25%{transform:translateY(-10px) rotate(6deg)}50%{transform:translateY(0) scaleY(.9) scaleX(1.08)}70%{transform:translateY(-6px) rotate(-5deg)}100%{transform:translateY(0)}}
-.kb-say{position:absolute;bottom:60px;left:50%;transform:translateX(-50%) scale(.6);transform-origin:bottom center;background:#111;color:#fff;font-size:11px;font-weight:700;padding:5px 11px;border-radius:13px;white-space:nowrap;opacity:0;pointer-events:none;transition:.18s;box-shadow:0 4px 12px rgba(17,17,17,.2)}
-.kb-say::after{content:"";position:absolute;bottom:-5px;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#111;border-bottom:0}
+.kb-say{position:absolute;bottom:60px;left:50%;transform:translateX(-50%) scale(.6);transform-origin:bottom center;background:var(--ink);color:var(--card);font-size:11px;font-weight:700;padding:5px 11px;border-radius:13px;white-space:nowrap;opacity:0;pointer-events:none;transition:.18s;box-shadow:0 4px 12px rgba(17,17,17,.2)}
+.kb-say::after{content:"";position:absolute;bottom:-5px;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--ink);border-bottom:0}
 .kb-say.show{opacity:1;transform:translateX(-50%) scale(1)}
 .kb-spark{position:absolute;left:50%;top:8px;font-size:15px;pointer-events:none;animation:kbFloat 1s ease-out forwards}
 @keyframes kbFloat{0%{opacity:0;transform:translate(-50%,0) scale(.4)}25%{opacity:1}100%{opacity:0;transform:translate(var(--dx,0),-46px) scale(1.1)}}
@@ -41,11 +41,11 @@ function ensureStyle(): void {
 @keyframes kbPop{from{opacity:0;transform:translateY(20px) scale(.96)}to{opacity:1;transform:none}}
 .kb-card-top{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid rgba(17,17,17,.07)}
 .kb-card-top .tt{font-weight:700;display:flex;align-items:center;gap:8px;font-size:13px}
-.kb-card-top .tt .mini{width:26px;height:26px;border-radius:8px;background:#fff7ee;overflow:hidden;display:grid;place-items:center}
+.kb-card-top .tt .mini{width:26px;height:26px;border-radius:8px;background:var(--amber-weak);overflow:hidden;display:grid;place-items:center}
 .kb-card-top .tt .mini img{width:26px;height:26px;object-fit:cover;object-position:center 16%}
-.kb-card-top .ws{font-size:11px;color:var(--ink-2,#555);background:rgba(255,255,255,.6);border:1px solid var(--border,#e8e8e3);border-radius:7px;padding:3px 8px;font-weight:600;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kb-card-top .ws{font-size:11px;color:var(--ink-2,#555);background:rgba(255,255,255,.6);border:1px solid var(--line,#e8e8e3);border-radius:7px;padding:3px 8px;font-weight:600;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .kb-card-x{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;color:var(--ink-3,#999);border:none;background:none;cursor:pointer}
-.kb-card-x:hover{background:rgba(17,17,17,.06);color:var(--ink,#111)}
+.kb-card-x:hover{background:rgba(17,17,17,.06);color:var(--ink,var(--ink))}
 .kb-card .kb-qa-thread{background:transparent}
 .kb-card .kb-qa-input{border-top:1px solid rgba(17,17,17,.07)}
 @media(max-width:820px){.kb-card{right:0!important;left:0!important;bottom:0!important;top:auto!important;width:100%;height:78vh;border-radius:18px 18px 0 0}}

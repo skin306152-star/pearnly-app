@@ -12,42 +12,42 @@ import {
 } from './purchase-common.js';
 
 const PAGE_CSS = `
-.pur.s .wrap{max-width:920px;}
+.pur.s .wrap{width:100%;}
 .pur.s .ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;}
 .pur.s .ph .t{font-size:21px;font-weight:680;letter-spacing:-.2px;}
 .pur.s .ph .sub{color:var(--ink2);font-size:13px;margin-top:5px;}
-.pur.s .add{height:40px;padding:0 16px;border:1px solid var(--blue);border-radius:11px;background:var(--blue);color:#fff;font-weight:650;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
-.pur.s .add:hover{background:var(--blue-d);}
-.pur.s .hint{display:flex;align-items:center;gap:9px;padding:13px 20px;background:var(--blue-l);border-bottom:1px solid #F1F1EC;font-size:12.5px;color:#1e40af;}
+.pur.s .add{height:40px;padding:0 16px;border:1px solid var(--accent);border-radius:11px;background:var(--accent);color:var(--card);font-weight:650;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+.pur.s .add:hover{background:var(--accent-deep);}
+.pur.s .hint{display:flex;align-items:center;gap:9px;padding:13px 20px;background:var(--accent-weak);border-bottom:1px solid var(--line);font-size:12.5px;color:var(--accent-deep);}
 .pur.s .hint svg{flex:0 0 16px;}
-.pur.s .toolbar{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid #F1F1EC;background:#FCFCFA;}
-.pur.s .search{flex:1;height:36px;background:#fff;border:1px solid #ECECE7;border-radius:10px;display:flex;align-items:center;gap:8px;padding:0 12px;}
+.pur.s .toolbar{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--line2);}
+.pur.s .search{flex:1;height:36px;background:var(--card);border:1px solid var(--line);border-radius:10px;display:flex;align-items:center;gap:8px;padding:0 12px;}
 .pur.s .search input{border:0;outline:0;flex:1;background:transparent;font-size:13.5px;}
-.pur.s .row{display:flex;align-items:center;gap:13px;padding:14px 20px;border-bottom:1px solid #F1F1EC;}
-.pur.s .row:last-child{border-bottom:0;} .pur.s .row:hover{background:#FCFCFA;}
-.pur.s .av{width:38px;height:38px;border-radius:10px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;color:var(--ink2);font-weight:700;flex:0 0 38px;}
+.pur.s .row{display:flex;align-items:center;gap:13px;padding:14px 20px;border-bottom:1px solid var(--line);}
+.pur.s .row:last-child{border-bottom:0;} .pur.s .row:hover{background:var(--line2);}
+.pur.s .av{width:38px;height:38px;border-radius:10px;background:var(--line2);display:flex;align-items:center;justify-content:center;color:var(--ink2);font-weight:700;flex:0 0 38px;}
 .pur.s .sinfo{flex:1;min-width:0;} .pur.s .nm{font-weight:600;font-size:13.5px;} .pur.s .meta{color:var(--ink3);font-size:11.5px;margin-top:2px;}
 .pur.s .amt{margin-left:auto;text-align:right;} .pur.s .amt .v{font-weight:700;font-variant-numeric:tabular-nums;} .pur.s .amt .l{font-size:11px;color:var(--ink3);}
-.pur.s .edit{margin-left:14px;height:32px;padding:0 13px;border:1px solid #ECECE7;border-radius:9px;background:#fff;font-size:12.5px;cursor:pointer;color:var(--ink2);}
-.pur.s .edit:hover{border-color:#c7d2fe;color:var(--blue);}
-.pur.s .foot{padding:12px 20px;font-size:11.5px;color:var(--ink3);background:#FCFCFA;border-top:1px solid #F1F1EC;}
+.pur.s .edit{margin-left:14px;height:32px;padding:0 13px;border:1px solid var(--line);border-radius:9px;background:var(--card);font-size:12.5px;cursor:pointer;color:var(--ink2);}
+.pur.s .edit:hover{border-color:var(--accent-weak);color:var(--accent);}
+.pur.s .foot{padding:12px 20px;font-size:11.5px;color:var(--ink3);background:var(--line2);border-top:1px solid var(--line);}
 .pur .smask{position:fixed;inset:0;background:rgba(17,24,39,.45);display:none;align-items:center;justify-content:center;z-index:1200;padding:18px;}
 .pur .smask.show{display:flex;}
-.pur .smodal{width:380px;max-width:92vw;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.25);}
-.pur .smh{padding:16px 20px;border-bottom:1px solid #f0f0ec;font-weight:700;font-size:16px;}
+.pur .smodal{width:380px;max-width:92vw;background:var(--card);border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.25);}
+.pur .smh{padding:16px 20px;border-bottom:1px solid var(--line2);font-weight:700;font-size:16px;}
 .pur .smb{padding:18px 20px;} .pur .smb label{display:block;font-size:12.5px;color:var(--ink2);margin-bottom:7px;}
-.pur .fld{height:44px;border:1px solid var(--line);border-radius:10px;padding:0 13px;display:flex;align-items:center;background:#fbfbf9;margin-bottom:14px;}
+.pur .fld{height:44px;border:1px solid var(--line);border-radius:10px;padding:0 13px;display:flex;align-items:center;background:var(--line2);margin-bottom:14px;}
 .pur .fld input{border:0;outline:0;background:transparent;flex:1;font-size:14.5px;}
 .pur .smf{padding:0 20px 20px;display:flex;gap:10px;}
-.pur .smf .g{height:46px;padding:0 16px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink2);cursor:pointer;}
-.pur .smf .ok{flex:1;height:46px;border:0;border-radius:10px;background:var(--blue);color:#fff;font-weight:700;font-size:15px;cursor:pointer;}
+.pur .smf .g{height:46px;padding:0 16px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink2);cursor:pointer;}
+.pur .smf .ok{flex:1;height:46px;border:0;border-radius:10px;background:var(--accent);color:var(--card);font-weight:700;font-size:15px;cursor:pointer;}
 @media(max-width:600px){ .pur.s .amt{display:none;} }
 `;
 
 const ICON_STAR =
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21l2.3-7.4-6-4.6h7.6z"/></svg>';
 const ICON_SEARCH =
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
 const ICON_PLUS =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
 

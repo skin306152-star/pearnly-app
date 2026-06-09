@@ -113,42 +113,42 @@ function ensureStyle(): void {
     const st = document.createElement('style');
     st.id = 'kb-ask-style';
     st.textContent = `
-.kb-qa{background:var(--card,#fff);border:1px solid var(--border,#e8e8e3);border-radius:12px;display:flex;flex-direction:column;height:460px;max-width:760px}
+.kb-qa{background:var(--card,var(--card));border:1px solid var(--line,#e8e8e3);border-radius:12px;display:flex;flex-direction:column;height:460px;max-width:760px}
 .kb-qa-thread{flex:1;padding:18px;display:flex;flex-direction:column;gap:16px;overflow:auto}
 .kb-msg{max-width:80%;display:flex;gap:9px}
 .kb-msg.user{align-self:flex-end}
-.kb-msg.user .kb-bub{background:var(--btn-blue,#2563eb);color:#fff;border-radius:14px 14px 4px 14px;padding:9px 13px}
+.kb-msg.user .kb-bub{background:var(--btn-blue,var(--accent));color:var(--card);border-radius:14px 14px 4px 14px;padding:9px 13px}
 .kb-msg.ai{align-self:flex-start}
-.kb-ava{width:28px;height:28px;border-radius:8px;background:#fff7ee;flex-shrink:0;display:grid;place-items:center;overflow:hidden}
+.kb-ava{width:28px;height:28px;border-radius:8px;background:var(--amber-weak);flex-shrink:0;display:grid;place-items:center;overflow:hidden}
 .kb-ava img{width:28px;height:28px;object-fit:cover;object-position:center 16%}
 .kb-msg.ai .kb-bub{background:var(--bg,#f4f4f0);border-radius:14px 14px 14px 4px;padding:10px 14px;line-height:1.6}
-.kb-bub.no-src{border-left:3px solid var(--warn,#d97706);color:var(--ink-2,#555)}
+.kb-bub.no-src{border-left:3px solid var(--amber);color:var(--ink-2,#555)}
 .kb-bub.kb-thinking{color:var(--ink-3,#999)}
 .kb-cites{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
-.kb-cite{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--border,#e8e8e3);border-radius:9px;padding:6px 10px;font-size:12px;font-weight:600;color:var(--info-ink,#1e40af);cursor:pointer}
-.kb-cite:hover{border-color:var(--btn-blue,#2563eb);box-shadow:0 2px 8px rgba(37,99,235,.12)}
+.kb-cite{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line,#e8e8e3);border-radius:9px;padding:6px 10px;font-size:12px;font-weight:600;color:var(--info-ink,var(--accent-deep));cursor:pointer}
+.kb-cite:hover{border-color:var(--btn-blue,var(--accent));box-shadow:0 2px 8px rgba(37,99,235,.12)}
 .kb-cite svg{width:13px;height:13px}
 .kb-cite .ch{color:var(--ink-3,#999)}
-.kb-qa-foot{border-top:1px solid var(--border,#e8e8e3);padding:0}
+.kb-qa-foot{border-top:1px solid var(--line,#e8e8e3);padding:0}
 .kb-qa-ex{display:flex;flex-wrap:wrap;gap:7px;padding:11px 14px 0}
-.kb-chip{background:#fff;border:1px solid var(--border,#e8e8e3);border-radius:18px;padding:5px 11px;font-size:12px;color:var(--ink-2,#555);cursor:pointer}
-.kb-chip:hover{border-color:var(--btn-blue,#2563eb);color:var(--btn-blue,#2563eb)}
+.kb-chip{background:var(--card);border:1px solid var(--line,#e8e8e3);border-radius:18px;padding:5px 11px;font-size:12px;color:var(--ink-2,#555);cursor:pointer}
+.kb-chip:hover{border-color:var(--btn-blue,var(--accent));color:var(--btn-blue,var(--accent))}
 .kb-qa-input{display:flex;gap:9px;align-items:center;padding:12px 14px}
-.kb-qa-input input{flex:1;border:1px solid var(--border,#e8e8e3);border-radius:9px;padding:9px 13px;font-size:13px;font-family:inherit;background:var(--bg,#f4f4f0)}
-.kb-qa-input input:focus{outline:none;border-color:var(--btn-blue,#2563eb);background:#fff}
-.kb-send{width:38px;height:38px;border-radius:9px;background:var(--btn-blue,#2563eb);color:#fff;display:grid;place-items:center;flex-shrink:0;border:none;cursor:pointer}
-.kb-send:hover{background:var(--btn-blue-hover,#1d4ed8)}
-.kb-send svg{width:17px;height:17px;stroke:#fff;fill:none;stroke-width:2}
+.kb-qa-input input{flex:1;border:1px solid var(--line,#e8e8e3);border-radius:9px;padding:9px 13px;font-size:13px;font-family:inherit;background:var(--bg,#f4f4f0)}
+.kb-qa-input input:focus{outline:none;border-color:var(--btn-blue,var(--accent));background:var(--card)}
+.kb-send{width:38px;height:38px;border-radius:9px;background:var(--btn-blue,var(--accent));color:var(--card);display:grid;place-items:center;flex-shrink:0;border:none;cursor:pointer}
+.kb-send:hover{background:var(--accent-deep)}
+.kb-send svg{width:17px;height:17px;stroke:var(--card);fill:none;stroke-width:2}
 .kb-qa-hint{font-size:12px;color:var(--ink-3,#999);margin-top:12px;max-width:760px;line-height:1.6}
-.kb-ft{display:flex;align-items:center;gap:13px;background:var(--card,#fff);border:1px solid var(--border,#e8e8e3);border-radius:12px;padding:13px 16px;margin-bottom:16px;max-width:760px}
-.kb-ft .ft-cat{width:38px;height:38px;border-radius:10px;background:#fff7ee;display:grid;place-items:center;overflow:hidden;flex-shrink:0}
+.kb-ft{display:flex;align-items:center;gap:13px;background:var(--card,var(--card));border:1px solid var(--line,#e8e8e3);border-radius:12px;padding:13px 16px;margin-bottom:16px;max-width:760px}
+.kb-ft .ft-cat{width:38px;height:38px;border-radius:10px;background:var(--amber-weak);display:grid;place-items:center;overflow:hidden;flex-shrink:0}
 .kb-ft .ft-cat img{width:34px;height:34px;object-fit:cover;object-position:center 16%}
 .kb-ft .ft-txt{flex:1}
 .kb-ft .ft-txt b{font-weight:700}
 .kb-ft .ft-txt .sub{font-size:11px;color:var(--ink-3,#999);margin-top:1px}
-.kb-switch{width:38px;height:22px;border-radius:20px;background:#d6d6d0;position:relative;transition:.18s;flex-shrink:0;cursor:pointer;border:none}
-.kb-switch.on{background:var(--btn-blue,#2563eb)}
-.kb-switch::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.18s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.kb-switch{width:38px;height:22px;border-radius:20px;background:var(--line);position:relative;transition:.18s;flex-shrink:0;cursor:pointer;border:none}
+.kb-switch.on{background:var(--btn-blue,var(--accent))}
+.kb-switch::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--card);transition:.18s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
 .kb-switch.on::after{left:18px}
 `;
     document.head.appendChild(st);

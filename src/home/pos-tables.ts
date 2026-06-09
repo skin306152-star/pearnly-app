@@ -58,65 +58,65 @@ function errToast(e: unknown): void {
 
 // ── 注入式作用域样式(.ptbl · 逐令牌照搬桌面 05-桌台管理 v2 稿:左对齐 960 · :root 令牌原样)──
 const STYLE = `
-.ptbl{max-width:960px;margin:0;padding:26px 0 60px 28px;font-size:13.5px;color:#111827;}
+.ptbl{width:100%;margin:0;padding:26px 0 60px 28px;font-size:13.5px;color:var(--ink);}
 .ptbl .ph{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px;}
 .ptbl .ph .tt{font-size:21px;font-weight:700;}
-.ptbl .ph .sub{color:#6B7280;font-size:13px;margin-top:4px;}
-.ptbl .btn{height:38px;padding:0 15px;border-radius:10px;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;border:1px solid #e8e8e3;background:#fff;color:#111827;font-weight:500;}
-.ptbl .btn:hover{border-color:#c7d2fe;}
-.ptbl .btn.primary{background:#2563EB;border-color:#2563EB;color:#fff;font-weight:600;}
-.ptbl .btn.primary:hover{background:#1D4ED8;}
+.ptbl .ph .sub{color:var(--ink2);font-size:13px;margin-top:4px;}
+.ptbl .btn{height:38px;padding:0 15px;border-radius:10px;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;border:1px solid #e8e8e3;background:var(--card);color:var(--ink);font-weight:500;}
+.ptbl .btn:hover{border-color:var(--accent-weak);}
+.ptbl .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+.ptbl .btn.primary:hover{background:var(--accent-deep);}
 .ptbl .zones{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
-.ptbl .zone{height:36px;padding:0 6px 0 15px;border-radius:999px;border:1px solid #e8e8e3;background:#fff;color:#6B7280;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;}
-.ptbl .zone .c{font-size:12px;color:#9CA3AF;}
+.ptbl .zone{height:36px;padding:0 6px 0 15px;border-radius:999px;border:1px solid #e8e8e3;background:var(--card);color:var(--ink2);font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;}
+.ptbl .zone .c{font-size:12px;color:var(--ink3);}
 .ptbl .zone .mg{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:transparent;}
-.ptbl .zone:hover .mg{color:#9CA3AF;}
-.ptbl .zone.on{background:#111827;color:#fff;border-color:#111827;}
-.ptbl .zone.on .c{color:#cbd2dc;}.ptbl .zone.on .mg{color:#9aa3af;}
+.ptbl .zone:hover .mg{color:var(--ink3);}
+.ptbl .zone.on{background:var(--ink);color:#fff;border-color:var(--ink);}
+.ptbl .zone.on .c{color:var(--line);}.ptbl .zone.on .mg{color:var(--ink3);}
 .ptbl .zone.on:hover .mg{color:#fff;}
-.ptbl .card{background:#fff;border:1px solid #e8e8e3;border-radius:14px;box-shadow:0 1px 2px rgba(17,24,39,.04),0 4px 14px rgba(17,24,39,.05);overflow:hidden;}
-.ptbl .ch{padding:14px 18px;border-bottom:1px solid #f0f0ec;display:flex;align-items:center;justify-content:space-between;}
+.ptbl .card{background:var(--card);border:1px solid #e8e8e3;border-radius:14px;box-shadow:0 1px 2px rgba(17,24,39,.04),0 4px 14px rgba(17,24,39,.05);overflow:hidden;}
+.ptbl .ch{padding:14px 18px;border-bottom:1px solid var(--line2);display:flex;align-items:center;justify-content:space-between;}
 .ptbl .ch .zt{font-weight:700;font-size:15px;display:flex;align-items:center;gap:10px;}
 .ptbl .ch .zacts{display:flex;align-items:center;gap:8px;}
-.ptbl .ch .zlink{font-size:12.5px;color:#6B7280;cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:7px;}
-.ptbl .ch .zlink:hover{background:#f4f4f0;color:#111827;}
-.ptbl .ch .zlink.del:hover{background:#fef2f2;color:#DC2626;}
+.ptbl .ch .zlink{font-size:12.5px;color:var(--ink2);cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:7px;}
+.ptbl .ch .zlink:hover{background:var(--line2);color:var(--ink);}
+.ptbl .ch .zlink.del:hover{background:var(--red-weak);color:var(--red);}
 .ptbl .grid{padding:16px 18px;display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
-.ptbl .t{border:1px solid #e8e8e3;border-radius:12px;padding:14px;background:#fff;transition:box-shadow .12s;}
+.ptbl .t{border:1px solid #e8e8e3;border-radius:12px;padding:14px;background:var(--card);transition:box-shadow .12s;}
 .ptbl .t:hover{box-shadow:0 1px 2px rgba(17,24,39,.04),0 4px 14px rgba(17,24,39,.05);}
 .ptbl .t .top{display:flex;align-items:flex-start;justify-content:space-between;}
 .ptbl .t .no{font-size:19px;font-weight:800;}
-.ptbl .t .more{color:#9CA3AF;line-height:1;}
-.ptbl .t .seats{font-size:12.5px;color:#6B7280;margin-top:6px;display:flex;align-items:center;gap:5px;}
+.ptbl .t .more{color:var(--ink3);line-height:1;}
+.ptbl .t .seats{font-size:12.5px;color:var(--ink2);margin-top:6px;display:flex;align-items:center;gap:5px;}
 .ptbl .t .ops{display:flex;gap:7px;margin-top:12px;}
-.ptbl .t .op{flex:1;height:30px;border:1px solid #e8e8e3;border-radius:7px;background:#fff;color:#6B7280;font-size:12px;cursor:pointer;}
-.ptbl .t .op:hover{border-color:#c7d2fe;color:#2563EB;}
-.ptbl .t.off{opacity:.55;}.ptbl .t.off .no{color:#9CA3AF;}
-.ptbl .addt{border:1.5px dashed #d8d8d3;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#9CA3AF;cursor:pointer;min-height:104px;font-size:13px;}
-.ptbl .addt:hover{border-color:#2563EB;color:#2563EB;background:#EEF4FF;}
-.ptbl .empty{padding:34px 18px;text-align:center;color:#9CA3AF;}
+.ptbl .t .op{flex:1;height:30px;border:1px solid #e8e8e3;border-radius:7px;background:var(--card);color:var(--ink2);font-size:12px;cursor:pointer;}
+.ptbl .t .op:hover{border-color:var(--accent-weak);color:var(--accent);}
+.ptbl .t.off{opacity:.55;}.ptbl .t.off .no{color:var(--ink3);}
+.ptbl .addt{border:1.5px dashed var(--line);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:var(--ink3);cursor:pointer;min-height:104px;font-size:13px;}
+.ptbl .addt:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-weak);}
+.ptbl .empty{padding:34px 18px;text-align:center;color:var(--ink3);}
 .ptbl .empty svg{opacity:.4;margin-bottom:10px;}
 .ptbl .empty .e-btn{margin-top:14px;}
-.ptbl .state{padding:34px 18px;text-align:center;color:#9CA3AF;}
-.ptbl .note{margin-top:16px;font-size:12.5px;color:#6B7280;background:#fff;border:1px solid #e8e8e3;border-radius:12px;padding:13px 16px;line-height:1.7;}
-.ptbl .note b{color:#111827;}
+.ptbl .state{padding:34px 18px;text-align:center;color:var(--ink3);}
+.ptbl .note{margin-top:16px;font-size:12.5px;color:var(--ink2);background:var(--card);border:1px solid #e8e8e3;border-radius:12px;padding:13px 16px;line-height:1.7;}
+.ptbl .note b{color:var(--ink);}
 .ptbl-sub{position:fixed;inset:0;background:rgba(17,24,39,.45);display:none;align-items:center;justify-content:center;z-index:1300;padding:16px;}
 .ptbl-sub.show{display:flex;}
-.ptbl-dlg{width:380px;max-width:92vw;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.25);}
-.ptbl-dlg .mh{padding:15px 20px;border-bottom:1px solid #f0f0ec;font-weight:700;font-size:16px;color:#111827;}
+.ptbl-dlg{width:380px;max-width:92vw;background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.25);}
+.ptbl-dlg .mh{padding:15px 20px;border-bottom:1px solid var(--line2);font-weight:700;font-size:16px;color:var(--ink);}
 .ptbl-dlg .mb{padding:16px 20px;}
-.ptbl-dlg label{display:block;font-size:12.5px;color:#6b7280;margin:0 0 6px;}
-.ptbl-dlg .fld{height:44px;border:1px solid #e8e8e3;border-radius:10px;padding:0 13px;display:flex;align-items:center;background:#fbfbf9;margin-bottom:13px;}
-.ptbl-dlg .fld input,.ptbl-dlg .fld select{border:0;outline:0;background:transparent;flex:1;font-size:15px;color:#111827;}
+.ptbl-dlg label{display:block;font-size:12.5px;color:var(--ink2);margin:0 0 6px;}
+.ptbl-dlg .fld{height:44px;border:1px solid #e8e8e3;border-radius:10px;padding:0 13px;display:flex;align-items:center;background:var(--line2);margin-bottom:13px;}
+.ptbl-dlg .fld input,.ptbl-dlg .fld select{border:0;outline:0;background:transparent;flex:1;font-size:15px;color:var(--ink);}
 .ptbl-dlg .seg{display:flex;gap:8px;margin-bottom:13px;}
-.ptbl-dlg .seg button{flex:1;height:36px;border:1px solid #e8e8e3;border-radius:9px;background:#fff;color:#6b7280;font-size:13px;cursor:pointer;}
-.ptbl-dlg .seg button.on{background:#DBEAFE;border-color:var(--btn-blue,#2563EB);color:var(--btn-blue,#2563EB);font-weight:700;}
+.ptbl-dlg .seg button{flex:1;height:36px;border:1px solid #e8e8e3;border-radius:9px;background:var(--card);color:var(--ink2);font-size:13px;cursor:pointer;}
+.ptbl-dlg .seg button.on{background:var(--accent-weak);border-color:var(--btn-blue,var(--accent));color:var(--btn-blue,var(--accent));font-weight:700;}
 .ptbl-dlg .two{display:flex;gap:10px;}
 .ptbl-dlg .two>div{flex:1;}
 .ptbl-dlg .mf{padding:0 20px 18px;display:flex;gap:10px;}
-.ptbl-dlg .g{height:44px;padding:0 16px;border:1px solid #e8e8e3;border-radius:10px;background:#fff;color:#6b7280;cursor:pointer;}
-.ptbl-dlg .ok{flex:1;height:44px;border:0;border-radius:10px;background:var(--btn-blue,#2563EB);color:#fff;font-weight:700;font-size:15px;cursor:pointer;}
-.ptbl-dlg .ok:disabled{background:#c7cdd6;cursor:not-allowed;}
+.ptbl-dlg .g{height:44px;padding:0 16px;border:1px solid #e8e8e3;border-radius:10px;background:var(--card);color:var(--ink2);cursor:pointer;}
+.ptbl-dlg .ok{flex:1;height:44px;border:0;border-radius:10px;background:var(--btn-blue,var(--accent));color:var(--accent-ink);font-weight:700;font-size:15px;cursor:pointer;}
+.ptbl-dlg .ok:disabled{background:var(--line);cursor:not-allowed;}
 `;
 
 function ensureStyle(): void {
@@ -270,7 +270,7 @@ function deleteArea(): void {
     if (!a) return;
     showDialog(
         t('rtbl.del_area'),
-        `<div style="font-size:13.5px;color:#374151;line-height:1.6;">${escapeHtml(t('rtbl.del_area_confirm').replace('{name}', a.name))}</div>`,
+        `<div style="font-size:13.5px;color:var(--ink);line-height:1.6;">${escapeHtml(t('rtbl.del_area_confirm').replace('{name}', a.name))}</div>`,
         async () => {
             try {
                 await call('DELETE', `/areas/${a.id}?workspace_client_id=${ws}`);
@@ -290,7 +290,7 @@ function deleteArea(): void {
 function deleteTable(tb: Table): void {
     showDialog(
         t('rtbl.delete'),
-        `<div style="font-size:13.5px;color:#374151;line-height:1.6;">${escapeHtml(t('rtbl.del_confirm').replace('{name}', tb.name))}</div>`,
+        `<div style="font-size:13.5px;color:var(--ink);line-height:1.6;">${escapeHtml(t('rtbl.del_confirm').replace('{name}', tb.name))}</div>`,
         async () => {
             try {
                 await call('DELETE', `/tables/${tb.id}?workspace_client_id=${ws}`);

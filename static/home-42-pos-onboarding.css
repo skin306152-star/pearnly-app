@@ -2,43 +2,41 @@
  * 令牌 + 结构逐字移植,数值一个不改;全作用域到 .posob(同 home-41 的 .invp)防与 home.css 互污染。
  * 裸 hex 经 check_ui_consistency TOKEN_CSS 白名单容纳(同 home-38/41)。
  * 与 home-*.css 同策略入 .prettierignore(保紧凑 · 不重排扰乱视觉对照)。 */
-.posob { --blue: #2563EB; --blue-d: #1D4ED8; --blue-l: #DBEAFE; --ink: #111827; --ink2: #6B7280; --ink3: #9CA3AF;
-    --card: #fff; --line: #e8e8e3; --green: #16A34A; --shadow: 0 1px 2px rgba(17,24,39,.04), 0 8px 26px rgba(17,24,39,.08);
-    max-width: 880px; color: var(--ink); }
+.posob { width: 100%; color: var(--ink); }
 .posob h1 { font-size: 21px; margin-bottom: 4px; }
 .posob .sub { color: var(--ink2); font-size: 13.5px; margin-bottom: 24px; }
 .posob .cols { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; align-items: start; }
 .posob .q { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
 .posob .types { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .posob .type { background: var(--card); border: 1.5px solid var(--line); border-radius: 14px; padding: 16px; cursor: pointer; box-shadow: var(--shadow); transition: .12s; }
-.posob .type:hover { border-color: #c7d2fe; }
-.posob .type.on { border-color: var(--blue); background: var(--blue-l); }
-.posob .type .ico { width: 40px; height: 40px; border-radius: 11px; background: #fff; border: 1px solid var(--line); display: grid; place-items: center; color: var(--blue); margin-bottom: 10px; }
-.posob .type.on .ico { background: var(--blue); color: #fff; border-color: var(--blue); }
+.posob .type:hover { border-color: var(--accent-weak); }
+.posob .type.on { border-color: var(--accent); background: var(--accent-weak); }
+.posob .type .ico { width: 40px; height: 40px; border-radius: 11px; background: var(--card); border: 1px solid var(--line); display: grid; place-items: center; color: var(--accent); margin-bottom: 10px; }
+.posob .type.on .ico { background: var(--accent); color: var(--card); border-color: var(--accent); }
 .posob .type .nm { font-weight: 700; font-size: 15px; }
 .posob .type .ds { font-size: 12px; color: var(--ink2); margin-top: 5px; line-height: 1.5; }
 .posob .panel { background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; position: sticky; top: 20px; }
-.posob .panel .h { padding: 14px 18px; border-bottom: 1px solid #f0f0ec; font-weight: 700; font-size: 14px; }
+.posob .panel .h { padding: 14px 18px; border-bottom: 1px solid var(--line2); font-weight: 700; font-size: 14px; }
 .posob .panel .h .s { color: var(--ink2); font-weight: 400; font-size: 12px; margin-top: 2px; }
 .posob .mods { padding: 8px 18px; }
-.posob .mod { display: flex; align-items: center; gap: 11px; padding: 9px 0; border-bottom: 1px solid #f6f6f3; font-size: 13.5px; }
+.posob .mod { display: flex; align-items: center; gap: 11px; padding: 9px 0; border-bottom: 1px solid var(--line2); font-size: 13.5px; }
 .posob .mod:last-child { border-bottom: 0; }
 .posob .mod .sw { width: 38px; height: 22px; border-radius: 999px; flex: 0 0 38px; position: relative; transition: .15s; }
-.posob .mod .sw::after { content: ""; position: absolute; top: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: .15s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
-.posob .mod.on .sw { background: var(--blue); }
+.posob .mod .sw::after { content: ""; position: absolute; top: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--card); transition: .15s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+.posob .mod.on .sw { background: var(--accent); }
 .posob .mod.on .sw::after { left: 18px; }
-.posob .mod.off .sw { background: #d8d8d3; }
+.posob .mod.off .sw { background: var(--line); }
 .posob .mod.off .sw::after { left: 2px; }
 .posob .mod.off { color: var(--ink3); }
 .posob .mod .tag { margin-left: auto; font-size: 10.5px; color: var(--ink3); }
-.posob .foot { padding: 14px 18px; border-top: 1px solid #f0f0ec; }
-.posob .cashier { display: flex; align-items: center; gap: 10px; background: #f8f8f5; border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; font-size: 13px; color: var(--ink2); margin-bottom: 12px; cursor: pointer; }
+.posob .foot { padding: 14px 18px; border-top: 1px solid var(--line2); }
+.posob .cashier { display: flex; align-items: center; gap: 10px; background: var(--line2); border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; font-size: 13px; color: var(--ink2); margin-bottom: 12px; cursor: pointer; }
 .posob .cashier-form { display: flex; gap: 8px; margin-bottom: 12px; }
-.posob .cashier-form input { flex: 1; height: 42px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; font-size: 14px; background: #fbfbf9; outline: none; }
-.posob .cashier-form input:focus { border-color: var(--blue); }
+.posob .cashier-form input { flex: 1; height: 42px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; font-size: 14px; background: var(--line2); outline: none; }
+.posob .cashier-form input:focus { border-color: var(--accent); }
 .posob .cashier-form input:last-child { flex: 0 0 110px; letter-spacing: 3px; }
-.posob .go { width: 100%; height: 48px; border: 0; border-radius: 11px; background: var(--blue); color: #fff; font-weight: 700; font-size: 15px; cursor: pointer; }
-.posob .go:hover { background: var(--blue-d); }
-.posob .go:disabled { background: #c7cdd6; cursor: not-allowed; }
+.posob .go { width: 100%; height: 48px; border: 0; border-radius: 11px; background: var(--accent); color: var(--card); font-weight: 700; font-size: 15px; cursor: pointer; }
+.posob .go:hover { background: var(--accent-deep); }
+.posob .go:disabled { background: var(--line); cursor: not-allowed; }
 .posob .posob-blocked { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 40px 24px; text-align: center; color: var(--ink2); font-size: 14px; box-shadow: var(--shadow); }
 @media (max-width: 760px) { .posob .cols { grid-template-columns: 1fr; } .posob .types { grid-template-columns: 1fr 1fr; } }

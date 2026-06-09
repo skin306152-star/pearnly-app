@@ -94,11 +94,25 @@ const MAPPINGS = [
         nosvgemoji: '#page-dashboard .qa .qb svg',
     },
     {
+        name: '上传识别 OCR(A组屏)',
+        design: 'ocr.html',
+        route: 'ocr',
+        ready: '#page-ocr .panel',
+        layout: { sel: '#page-ocr .wrap', maxWidth: 'none', centered: true },
+        tokens: [
+            // #btn-start 开始时 disabled → home-38 .btn:disabled!important 覆盖背景色 → 测 panel 代替
+            { design: '.panel', prod: '#page-ocr .panel', props: ['borderRadius', 'boxShadow'] },
+            { design: '.h1', prod: '#page-ocr .pagehead .h1', props: ['fontSize', 'fontWeight'] },
+        ],
+        // 无 bluemust:所有操作按钮初始 disabled,颜色被 home-38 disabled!important 覆盖(正确行为)
+        nosvgemoji: '#page-ocr .drop-zone svg',
+    },
+    {
         name: '桌台管理(05 v2)',
         design: '05-tables.html',
         route: 'pos-tables',
         ready: '.ptbl .btn.primary',
-        layout: { sel: '.ptbl', maxWidth: '960px' },
+        layout: { sel: '.ptbl', maxWidth: 'none', centered: true }, // B6d:去 max-width:960px → 真铺满
         tokens: [
             {
                 design: '.btn.primary',
@@ -111,6 +125,7 @@ const MAPPINGS = [
             { design: '.t', prod: '.ptbl .t', props: ['borderRadius'] },
         ],
         bluemust: '.ptbl .btn.primary',
+        primary: 'rgb(14, 124, 102)', // B6d:hex → var(--accent) emerald
         nosvgemoji: '.ptbl .btn.primary svg',
     },
     {
@@ -118,7 +133,7 @@ const MAPPINGS = [
         design: '13-payment.html',
         route: 'pos-payment',
         ready: '.rpay .save',
-        layout: { sel: '.rpay', maxWidth: '760px' },
+        layout: { sel: '.rpay', maxWidth: 'none', centered: true }, // B6e:去 max-width:760px → 真铺满
         tokens: [
             { design: '.save', prod: '.rpay .save', props: ['backgroundColor', 'borderRadius'] },
             { design: '.card', prod: '.rpay .card', props: ['borderRadius'] },
@@ -369,13 +384,15 @@ async function styleOf(page, sel, props) {
             }
         }
 
-        // 5) 主色 #2563EB + 图标是线性 svg(无 emoji)
-        const blue = await page.evaluate((s) => {
-            const el = document.querySelector(s);
-            return el ? getComputedStyle(el).backgroundColor : null;
-        }, m.bluemust);
-        const wantPrimary = m.primary || BLUE; // 默认蓝 · 已迁 emerald 的屏在 mapping 里覆写
-        ok(blue === wantPrimary, `主按钮主色 ${wantPrimary}(got ${blue})`);
+        // 5) 主色 + 图标是线性 svg(无 emoji) · bluemust 不设则跳过主色检查
+        if (m.bluemust) {
+            const blue = await page.evaluate((s) => {
+                const el = document.querySelector(s);
+                return el ? getComputedStyle(el).backgroundColor : null;
+            }, m.bluemust);
+            const wantPrimary = m.primary || BLUE; // 默认蓝 · 已迁 emerald 的屏在 mapping 里覆写
+            ok(blue === wantPrimary, `主按钮主色 ${wantPrimary}(got ${blue})`);
+        }
         const hasSvg = await page.$(m.nosvgemoji);
         ok(!!hasSvg, `图标为线性 svg(无 emoji)· ${m.nosvgemoji}`);
     }

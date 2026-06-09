@@ -2,18 +2,8 @@
    作用域 .cshp 防污染;令牌按概念稿裸 hex 整块移植(同 home-41/42/43 · TOKEN_CSS 处理)。
    按钮一律蓝(全站按钮蓝硬规),删除为白底 hover 转红(danger)非黑底。 */
 .cshp {
-    --c-blue: #2563eb;
-    --c-blue-d: #1d4ed8;
-    --c-blue-l: #dbeafe;
-    --c-ink: #111827;
-    --c-ink2: #6b7280;
-    --c-ink3: #9ca3af;
-    --c-card: #fff;
-    --c-line: #e8e8e3;
-    --c-red: #dc2626;
-    --c-shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 6px 20px rgba(17, 24, 39, 0.07);
-    color: var(--c-ink);
-    max-width: 680px;
+    width: 100%;
+    color: var(--ink);
 }
 .cshp .csh-hd {
     display: flex;
@@ -30,8 +20,8 @@
     padding: 0 16px;
     border: 0;
     border-radius: 10px;
-    background: var(--c-blue);
-    color: #fff;
+    background: var(--accent);
+    color: var(--card);
     font-weight: 700;
     font-size: 14px;
     cursor: pointer;
@@ -40,13 +30,13 @@
     gap: 7px;
 }
 .cshp .csh-add:hover {
-    background: var(--c-blue-d);
+    background: var(--accent-deep);
 }
 .cshp .csh-access-card {
-    background: var(--c-card);
-    border: 1px solid var(--c-line);
+    background: var(--card);
+    border: 1px solid var(--line);
     border-radius: 14px;
-    box-shadow: var(--c-shadow);
+    box-shadow: var(--sh);
     padding: 16px 18px;
     margin-top: 14px;
 }
@@ -56,7 +46,7 @@
 }
 .cshp .csh-ac-sub {
     font-size: 12.5px;
-    color: var(--c-ink2);
+    color: var(--ink2);
     margin: 4px 0 14px;
     line-height: 1.5;
 }
@@ -70,10 +60,10 @@
     width: 132px;
     height: 132px;
     flex: 0 0 132px;
-    border: 1px solid var(--c-line);
+    border: 1px solid var(--line);
     border-radius: 12px;
     padding: 8px;
-    background: #fff;
+    background: var(--card);
 }
 .cshp .csh-ac-info {
     flex: 1;
@@ -90,7 +80,7 @@
 }
 .cshp .csh-ac-label {
     font-size: 11px;
-    color: var(--c-ink3);
+    color: var(--ink3);
     margin-bottom: 5px;
 }
 .cshp .csh-ac-code {
@@ -98,18 +88,18 @@
     font-size: 22px;
     font-weight: 800;
     letter-spacing: 3px;
-    color: var(--c-blue);
+    color: var(--accent);
 }
 .cshp .csh-ac-link {
     height: 38px;
-    border: 1px solid var(--c-line);
+    border: 1px solid var(--line);
     border-radius: 9px;
-    background: #fbfbf9;
+    background: var(--line2);
     display: flex;
     align-items: center;
     padding: 0 11px;
     font-size: 12.5px;
-    color: var(--c-ink2);
+    color: var(--ink2);
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -120,10 +110,10 @@
     margin-top: 14px;
 }
 .cshp .csh-card {
-    background: var(--c-card);
-    border: 1px solid var(--c-line);
+    background: var(--card);
+    border: 1px solid var(--line);
     border-radius: 14px;
-    box-shadow: var(--c-shadow);
+    box-shadow: var(--sh);
     overflow: hidden;
     margin-top: 14px;
 }
@@ -132,7 +122,7 @@
     align-items: center;
     gap: 14px;
     padding: 14px 16px;
-    border-bottom: 1px solid #f4f4f0;
+    border-bottom: 1px solid var(--line2);
 }
 .cshp .csh-row:last-child {
     border-bottom: 0;
@@ -143,13 +133,13 @@
     border-radius: 50%;
     display: grid;
     place-items: center;
-    color: #fff;
+    color: var(--card);
     font-weight: 700;
     font-size: 16px;
     flex: 0 0 42px;
 }
 .cshp .csh-row.off .csh-av {
-    background: #cbd5e1 !important;
+    background: var(--line) !important;
 }
 .cshp .csh-info {
     flex: 1;
@@ -163,11 +153,11 @@
     gap: 9px;
 }
 .cshp .csh-row.off .csh-n {
-    color: var(--c-ink3);
+    color: var(--ink3);
 }
 .cshp .csh-m {
     font-size: 12.5px;
-    color: var(--c-ink2);
+    color: var(--ink2);
     margin-top: 3px;
     font-variant-numeric: tabular-nums;
 }
@@ -178,12 +168,12 @@
     font-weight: 600;
 }
 .cshp .csh-st.on {
-    background: #dcfce7;
-    color: #15803d;
+    background: var(--green-weak);
+    color: var(--green);
 }
 .cshp .csh-st.off {
-    background: #f1f1ee;
-    color: #9ca3af;
+    background: var(--line2);
+    color: var(--ink3);
 }
 .cshp .csh-ops {
     display: flex;
@@ -193,39 +183,39 @@
 .cshp .csh-op {
     height: 34px;
     padding: 0 12px;
-    border: 1px solid var(--c-line);
+    border: 1px solid var(--line);
     border-radius: 8px;
-    background: #fff;
-    color: var(--c-ink2);
+    background: var(--card);
+    color: var(--ink2);
     font-size: 12.5px;
     cursor: pointer;
 }
 .cshp .csh-op:hover {
-    border-color: #c7d2fe;
-    color: var(--c-blue);
+    border-color: var(--accent-weak);
+    color: var(--accent);
 }
 .cshp .csh-op.danger:hover {
-    border-color: #fecaca;
-    color: var(--c-red);
+    border-color: var(--red-weak);
+    color: var(--red);
 }
 .cshp .csh-note {
     margin-top: 16px;
     font-size: 12.5px;
-    color: var(--c-ink2);
-    background: var(--c-card);
-    border: 1px solid var(--c-line);
+    color: var(--ink2);
+    background: var(--card);
+    border: 1px solid var(--line);
     border-radius: 12px;
     padding: 13px 15px;
     line-height: 1.6;
 }
 .cshp .csh-state {
     text-align: center;
-    color: var(--c-ink3);
+    color: var(--ink3);
     padding: 48px 16px;
     font-size: 13.5px;
 }
 .cshp .csh-state.error {
-    color: var(--c-ink2);
+    color: var(--ink2);
 }
 .cshp .csh-state .csh-op,
 .cshp .csh-state .csh-add {
@@ -251,14 +241,14 @@
 .cshp .csh-modal {
     width: 380px;
     max-width: 92vw;
-    background: #fff;
+    background: var(--card);
     border-radius: 18px;
     overflow: hidden;
     box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
 }
 .cshp .csh-mh {
     padding: 16px 20px;
-    border-bottom: 1px solid #f0f0ec;
+    border-bottom: 1px solid var(--line2);
     font-weight: 700;
     font-size: 16px;
 }
@@ -268,17 +258,17 @@
 .cshp .csh-mb label {
     display: block;
     font-size: 12.5px;
-    color: var(--c-ink2);
+    color: var(--ink2);
     margin-bottom: 7px;
 }
 .cshp .csh-fld {
     height: 46px;
-    border: 1px solid var(--c-line);
+    border: 1px solid var(--line);
     border-radius: 10px;
     padding: 0 13px;
     display: flex;
     align-items: center;
-    background: #fbfbf9;
+    background: var(--line2);
     margin-bottom: 15px;
 }
 .cshp .csh-fld input {
@@ -288,7 +278,7 @@
     flex: 1;
     min-width: 0;
     font-size: 15px;
-    color: var(--c-ink);
+    color: var(--ink);
 }
 .cshp .csh-fld input.csh-pin {
     letter-spacing: 8px;
@@ -297,7 +287,7 @@
     font-variant-numeric: tabular-nums;
 }
 .cshp .csh-err {
-    color: var(--c-red);
+    color: var(--red);
     font-size: 12.5px;
     min-height: 16px;
 }
@@ -310,10 +300,10 @@
     flex: 0 0 auto;
     height: 46px;
     padding: 0 16px;
-    border: 1px solid var(--c-line);
+    border: 1px solid var(--line);
     border-radius: 10px;
-    background: #fff;
-    color: var(--c-ink2);
+    background: var(--card);
+    color: var(--ink2);
     cursor: pointer;
 }
 .cshp .csh-ok {
@@ -321,16 +311,16 @@
     height: 46px;
     border: 0;
     border-radius: 10px;
-    background: var(--c-blue);
-    color: #fff;
+    background: var(--accent);
+    color: var(--card);
     font-weight: 700;
     font-size: 15px;
     cursor: pointer;
 }
 .cshp .csh-ok:hover {
-    background: var(--c-blue-d);
+    background: var(--accent-deep);
 }
 .cshp .csh-ok:disabled {
-    background: #c7cdd6;
+    background: var(--line);
     cursor: not-allowed;
 }

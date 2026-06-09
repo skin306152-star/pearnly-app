@@ -97,7 +97,7 @@
     padding: 5px 12px;
     font-size: 12px;
     border: 1px solid var(--line);
-    background: white;
+    background: var(--card);
     color: var(--ink-2);
     border-radius: 14px;
     cursor: pointer;
@@ -109,9 +109,9 @@
 }
 .exc-chip:hover { background: var(--gray-50); color: var(--ink); }
 .exc-chip.active {
-    background: var(--brand);
-    color: white;
-    border-color: var(--brand);
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: var(--accent);
 }
 .exc-chip-count {
     font-size: 11px;
@@ -124,7 +124,7 @@
 }
 .exc-chip.active .exc-chip-count {
     background: rgba(255, 255, 255, 0.22);
-    color: white;
+    color: var(--accent-ink);
 }
 
 /* 列表 */
@@ -252,16 +252,16 @@
     transition: all 0.15s;
     flex-shrink: 0;
 }
-.exc-row-check:hover { border-color: #2563eb; }
+.exc-row-check:hover { border-color: var(--accent); }
 .exc-row-check svg {
     width: 12px; height: 12px;
-    color: #fff;
+    color: var(--accent-ink);
     opacity: 0;
     transition: opacity 0.12s;
 }
 .exc-row-check.checked {
-    background: #2563eb;
-    border-color: #2563eb;
+    background: var(--accent);
+    border-color: var(--accent);
 }
 .exc-row-check.checked svg { opacity: 1; }
 .exc-row.selected {
@@ -500,7 +500,7 @@
 .exc-edit-btn.ghost:hover { border-color: var(--accent); color: var(--accent); }
 .exc-edit-btn.primary {
     background: var(--accent);
-    color: #fff;
+    color: var(--accent-ink);
     border-color: var(--accent);
 }
 .exc-edit-btn.primary:hover { filter: brightness(1.05); }
@@ -544,7 +544,7 @@
     color: var(--ink-2);
     line-height: 1.6;
     font-family: var(--font-mono, 'SF Mono', Menlo, monospace);
-    background: white;
+    background: var(--card);
     border-radius: 6px;
     padding: 8px 10px;
     border: 1px solid var(--line-soft);
@@ -637,7 +637,7 @@
     border-radius: 10px;
     transition: border-color .15s, background .15s;
 }
-.notif-rule-row:hover { border-color: var(--gray-300); background: #fff; }
+.notif-rule-row:hover { border-color: var(--gray-300); background: var(--card); }
 .notif-rule-row.disabled { opacity: 0.55; }
 
 .notif-rule-tmpl-badge {
@@ -690,7 +690,7 @@
 
 .notif-rule-btn {
     border: 1px solid var(--border, var(--gray-200));
-    background: #fff;
+    background: var(--card);
     border-radius: 6px;
     padding: 5px 10px;
     font-size: 12px;

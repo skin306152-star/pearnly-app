@@ -6,21 +6,9 @@
  * 本文件在 check_ui_consistency TOKEN_CSS 白名单(同 home-38)· 容纳概念稿原样裸 hex。
  */
 
-/* —— 概念稿 :root 令牌(原样)· 作用域到 .invp 子树 —— */
+/* PO 全站标准化(风格 B Emerald):去本地令牌块 → 继承全局 home-01-base :root(浅+暗夜),
+ * 主色 emerald · 暗夜随令牌翻面。.invp 无 max-width = 内容区铺满(对标 history)。 */
 .invp {
-    --blue: #2563eb;
-    --blue-d: #1d4ed8;
-    --blue-l: #dbeafe;
-    --ink: #111827;
-    --ink2: #6b7280;
-    --ink3: #9ca3af;
-    --bg: #f4f4f0;
-    --card: #fff;
-    --line: #e8e8e3;
-    --green: #16a34a;
-    --red: #dc2626;
-    --amber: #f59e0b;
-    --shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 6px 20px rgba(17, 24, 39, 0.06);
     color: var(--ink);
     font-size: 13px;
     padding: 20px 24px 50px;
@@ -59,7 +47,7 @@
     padding: 0 14px;
     border-radius: 9px;
     border: 1px solid var(--line);
-    background: #fff;
+    background: var(--card);
     color: var(--ink);
     font-size: 13px;
     cursor: pointer;
@@ -68,12 +56,51 @@
     gap: 7px;
 }
 .invp .btn.primary {
-    background: var(--blue);
-    border-color: var(--blue);
-    color: #fff;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--card);
 }
 .invp .btn.primary:hover {
-    background: var(--blue-d);
+    background: var(--accent-deep);
+}
+/* §4-bis 渐进披露:页头只露 盘点(次)+ 入库(主),其余收进 ⋯ 更多菜单 */
+.invp .more {
+    position: relative;
+}
+.invp .more-btn {
+    width: 38px;
+    padding: 0;
+    justify-content: center;
+    font-size: 18px;
+    line-height: 1;
+}
+.invp .menu {
+    position: absolute;
+    right: 0;
+    top: 44px;
+    min-width: 152px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--sh2);
+    padding: 5px;
+    z-index: 1000;
+}
+.invp .menu[hidden] {
+    display: none;
+}
+.invp .mi {
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--ink);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.invp .mi:hover {
+    background: var(--line2);
 }
 
 /* —— stat cards —— */
@@ -137,7 +164,7 @@
     padding: 0 13px;
     border-radius: 999px;
     border: 1px solid var(--line);
-    background: #fff;
+    background: var(--card);
     color: var(--ink2);
     font-size: 12.5px;
     cursor: pointer;
@@ -147,9 +174,9 @@
     justify-content: center;
 }
 .invp .chip.on {
-    background: #fff8ec;
-    border-color: #fde9c8;
-    color: #b45309;
+    background: var(--amber-weak);
+    border-color: var(--amber-weak);
+    color: var(--amber);
 }
 
 /* —— table —— */
@@ -171,18 +198,18 @@
     letter-spacing: 0.4px;
     padding: 11px 14px;
     border-bottom: 1px solid var(--line);
-    background: #fafaf8;
+    background: var(--line2);
 }
 .invp td {
     padding: 12px 14px;
-    border-bottom: 1px solid #f4f4f0;
+    border-bottom: 1px solid var(--line2);
     font-size: 13.5px;
 }
 .invp tr:last-child td {
     border-bottom: 0;
 }
 .invp tr:hover td {
-    background: #fafaf8;
+    background: var(--line2);
 }
 .invp .num {
     text-align: right;
@@ -200,22 +227,22 @@
     border-radius: 6px;
 }
 .invp .st.ok {
-    background: #dcfce7;
-    color: #15803d;
+    background: var(--green-weak);
+    color: var(--green);
 }
 .invp .st.low {
-    background: #fef3c7;
-    color: #b45309;
+    background: var(--amber-weak);
+    color: var(--amber);
 }
 .invp .st.out {
-    background: #fee2e2;
-    color: #b91c1c;
+    background: var(--red-weak);
+    color: var(--red);
 }
 .invp .thumb {
     width: 30px;
     height: 30px;
     border-radius: 7px;
-    background: linear-gradient(135deg, #f0f0ec, #e3e3de);
+    background: linear-gradient(135deg, var(--line2), var(--line));
     display: inline-grid;
     place-items: center;
     color: var(--ink3);
@@ -251,7 +278,7 @@
 .invp .inv-skel {
     height: 14px;
     border-radius: 6px;
-    background: linear-gradient(90deg, #efefe9 25%, #f6f6f2 37%, #efefe9 63%);
+    background: linear-gradient(90deg, var(--line2) 25%, var(--line) 37%, var(--line2) 63%);
     background-size: 400% 100%;
     animation: inv-shimmer 1.2s ease-in-out infinite;
 }
@@ -295,20 +322,11 @@
     display: flex;
 }
 .inv-modal {
-    --blue: #2563eb;
-    --blue-d: #1d4ed8;
-    --ink: #111827;
-    --ink2: #6b7280;
-    --ink3: #9ca3af;
-    --card: #fff;
-    --line: #e8e8e3;
-    --red: #dc2626;
-    --shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 6px 20px rgba(17, 24, 39, 0.06);
     width: 100%;
     max-width: 640px;
     background: var(--card);
     border-radius: 14px;
-    box-shadow: 0 24px 60px rgba(17, 24, 39, 0.18);
+    box-shadow: var(--sh2);
     color: var(--ink);
     font-family: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
     font-size: 13px;
@@ -337,7 +355,7 @@
     place-items: center;
 }
 .inv-modal-x:hover {
-    background: #f4f4f0;
+    background: var(--line2);
 }
 .inv-modal-body {
     padding: 16px 18px;
@@ -366,13 +384,13 @@
     border-radius: 8px;
     padding: 0 10px;
     font-size: 13px;
-    background: #fff;
+    background: var(--card);
     color: var(--ink);
     width: 100%;
     outline: 0;
 }
 .inv-field:focus {
-    border-color: var(--blue);
+    border-color: var(--accent);
 }
 .inv-flabels {
     display: grid;
@@ -389,8 +407,8 @@
     height: 34px;
     border: 1px dashed var(--line);
     border-radius: 8px;
-    background: #fff;
-    color: var(--blue);
+    background: var(--card);
+    color: var(--accent);
     cursor: pointer;
     width: 100%;
     font-size: 12.5px;
@@ -409,18 +427,18 @@
     padding: 0 16px;
     border-radius: 9px;
     border: 1px solid var(--line);
-    background: #fff;
+    background: var(--card);
     color: var(--ink);
     font-size: 13px;
     cursor: pointer;
 }
 .inv-mbtn.primary {
-    background: var(--blue);
-    border-color: var(--blue);
-    color: #fff;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--card);
 }
 .inv-mbtn.primary:hover {
-    background: var(--blue-d);
+    background: var(--accent-deep);
 }
 .inv-mbtn:disabled {
     opacity: 0.55;

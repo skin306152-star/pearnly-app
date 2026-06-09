@@ -20,14 +20,14 @@ let pendingId: string | null = null;
 let cur: DocDetail | null = null;
 
 const PAGE_CSS = `
-.pur.d .wrap{max-width:1000px;}
+.pur.d .wrap{width:100%;}
 .pur .back{display:inline-flex;align-items:center;gap:6px;color:var(--ink2);font-size:12.5px;margin-bottom:12px;cursor:pointer;}
 .pur .ph{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px;}
 .pur .ph .t{font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px;}
 .pur .ph .sub{color:var(--ink2);font-size:13px;margin-top:4px;}
 .pur .acts{display:flex;gap:9px;flex-shrink:0;}
 .pur .badge{font-size:11px;padding:2px 9px;border-radius:6px;}
-.pur .badge.paid{background:#dcfce7;color:#15803d;} .pur .badge.unpaid{background:#fef3c7;color:#b45309;} .pur .badge.partial{background:#ffedd5;color:#c2410c;} .pur .badge.void{background:#f3f4f6;color:#6b7280;}
+.pur .badge.paid{background:var(--green-weak);color:var(--green);} .pur .badge.unpaid{background:var(--amber-weak);color:var(--amber);} .pur .badge.partial{background:var(--amber-weak);color:var(--amber);} .pur .badge.void{background:var(--line2);color:var(--ink2);}
 .pur .grid{display:grid;grid-template-columns:1fr 360px;gap:14px;align-items:start;}
 .pur .col{display:flex;flex-direction:column;gap:14px;}
 .pur .card .hd{padding:13px 16px;border-bottom:1px solid var(--line);font-weight:600;font-size:13px;display:flex;justify-content:space-between;align-items:center;}
@@ -36,22 +36,22 @@ const PAGE_CSS = `
 .pur .meta{display:grid;grid-template-columns:1fr 1fr;gap:12px 18px;}
 .pur .meta .f .l{color:var(--ink2);font-size:11.5px;}
 .pur .meta .f .v{font-size:14px;margin-top:3px;font-weight:600;}
-.pur .src{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2px 8px;border-radius:6px;background:#eef2ff;color:#4338ca;}
-.pur .src.line{background:#dcfce7;color:#15803d;}
+.pur .src{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2px 8px;border-radius:6px;background:var(--accent-weak);color:var(--accent-deep);}
+.pur .src.line{background:var(--green-weak);color:var(--green);}
 .pur table{width:100%;border-collapse:collapse;}
 .pur .card th{text-align:left;font-size:11.5px;color:var(--ink2);font-weight:600;padding:9px 0;border-bottom:1px solid var(--line);background:transparent;text-transform:none;letter-spacing:0;}
-.pur .card td{padding:11px 0;border-bottom:1px solid #f4f4f0;font-size:13px;vertical-align:top;}
+.pur .card td{padding:11px 0;border-bottom:1px solid var(--line2);font-size:13px;vertical-align:top;}
 .pur .card tr:last-child td{border-bottom:0;}
 .pur .pill{font-size:10.5px;padding:1px 7px;border-radius:5px;margin-left:6px;}
-.pur .pill.ok{background:#dcfce7;color:#15803d;} .pur .pill.warn{background:#fef3c7;color:#b45309;cursor:pointer;}
+.pur .pill.ok{background:var(--green-weak);color:var(--green);} .pur .pill.warn{background:var(--amber-weak);color:var(--amber);cursor:pointer;}
 .pur .sum{display:flex;justify-content:space-between;padding:7px 0;font-size:13px;}
 .pur .sum.tot{border-top:1px solid var(--line);margin-top:6px;padding-top:11px;font-weight:800;font-size:15px;}
 .pur .sum .tax{color:var(--green);}
 .pur .pay{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;font-size:13px;}
 .pur .pay .due{color:var(--amber);font-weight:700;}
-.pur .img{aspect-ratio:3/4;background:#fafaf8;border:1px dashed var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--ink3);margin-bottom:10px;overflow:hidden;}
+.pur .img{aspect-ratio:3/4;background:var(--line2);border:1px dashed var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--ink3);margin-bottom:10px;overflow:hidden;}
 .pur .img img{width:100%;height:100%;object-fit:cover;}
-.pur .stocknote{margin-top:10px;font-size:12px;color:var(--ink2);background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;padding:9px 11px;}
+.pur .stocknote{margin-top:10px;font-size:12px;color:var(--ink2);background:var(--green-weak);border:1px solid var(--green-weak);border-radius:9px;padding:9px 11px;}
 .pur.voided{opacity:.62;}
 @media(max-width:600px){
   .pur .ph{flex-direction:column;} .pur .acts{width:100%;} .pur .acts .btn{flex:1;}

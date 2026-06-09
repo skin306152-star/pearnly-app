@@ -13,28 +13,28 @@ import {
 } from './purchase-common.js';
 
 const PAGE_CSS = `
-.pur.cfg .wrap{max-width:820px;}
+.pur.cfg .wrap{width:100%;}
 .pur.cfg .ph{margin-bottom:16px;}
 .pur.cfg .ph .t{font-size:21px;font-weight:680;letter-spacing:-.2px;}
 .pur.cfg .ph .sub{color:var(--ink2);font-size:13px;margin-top:5px;}
-.pur.cfg .grp{padding:11px 22px;font-size:11.5px;color:var(--ink3);font-weight:600;letter-spacing:.3px;background:#FCFCFA;border-bottom:1px solid #F1F1EC;}
-.pur.cfg .item{display:flex;align-items:center;gap:14px;padding:15px 22px;border-bottom:1px solid #F1F1EC;}
+.pur.cfg .grp{padding:11px 22px;font-size:11.5px;color:var(--ink3);font-weight:600;letter-spacing:.3px;background:var(--line2);border-bottom:1px solid var(--line);}
+.pur.cfg .item{display:flex;align-items:center;gap:14px;padding:15px 22px;border-bottom:1px solid var(--line);}
 .pur.cfg .item .l .t2{font-size:13.5px;font-weight:600;}
 .pur.cfg .item .l .d{color:var(--ink2);font-size:12px;margin-top:3px;}
 .pur.cfg .item .ctl{margin-left:auto;display:flex;align-items:center;gap:10px;}
-.pur.cfg .sw{width:42px;height:24px;border-radius:999px;background:#E2E8F0;position:relative;cursor:pointer;flex:0 0 42px;}
-.pur.cfg .sw.on{background:var(--blue);} .pur.cfg .sw i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.15s;} .pur.cfg .sw.on i{left:21px;}
-.pur.cfg .inp{height:36px;min-width:90px;border:1px solid #ECECE7;border-radius:9px;display:flex;align-items:center;justify-content:flex-end;padding:0 12px;font-size:13px;background:#fff;gap:4px;}
+.pur.cfg .sw{width:42px;height:24px;border-radius:999px;background:var(--line);position:relative;cursor:pointer;flex:0 0 42px;}
+.pur.cfg .sw.on{background:var(--accent);} .pur.cfg .sw i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--card);transition:.15s;} .pur.cfg .sw.on i{left:21px;}
+.pur.cfg .inp{height:36px;min-width:90px;border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;justify-content:flex-end;padding:0 12px;font-size:13px;background:var(--card);gap:4px;}
 .pur.cfg .inp input{border:0;outline:0;background:transparent;width:48px;text-align:right;font-size:13px;font-weight:600;}
 .pur.cfg .inp .u{color:var(--ink3);}
-.pur.cfg .cats{padding:14px 22px;border-bottom:1px solid #F1F1EC;display:flex;flex-wrap:wrap;gap:9px;align-items:center;}
-.pur.cfg .chip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 13px;border:1px solid #ECECE7;border-radius:999px;background:#fff;font-size:12.5px;}
+.pur.cfg .cats{padding:14px 22px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:9px;align-items:center;}
+.pur.cfg .chip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 13px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:12.5px;}
 .pur.cfg .chip .x{color:var(--ink3);cursor:pointer;}
-.pur.cfg .addcat{height:32px;padding:0 13px;border:1px dashed var(--blue);border-radius:999px;color:var(--blue);font-size:12.5px;background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:5px;}
-.pur.cfg .addcat-input{height:32px;padding:0 13px;border:1px solid var(--blue);border-radius:999px;font-size:12.5px;outline:0;min-width:130px;}
+.pur.cfg .addcat{height:32px;padding:0 13px;border:1px dashed var(--accent);border-radius:999px;color:var(--accent);font-size:12.5px;background:var(--card);cursor:pointer;display:inline-flex;align-items:center;gap:5px;}
+.pur.cfg .addcat-input{height:32px;padding:0 13px;border:1px solid var(--accent);border-radius:999px;font-size:12.5px;outline:0;min-width:130px;}
 .pur.cfg .foot{display:flex;justify-content:flex-end;padding:14px 22px;}
-.pur.cfg .save{height:40px;padding:0 22px;border-radius:11px;border:1px solid var(--blue);background:var(--blue);color:#fff;font-weight:650;font-size:14px;cursor:pointer;}
-.pur.cfg .save:hover{background:var(--blue-d);}
+.pur.cfg .save{height:40px;padding:0 22px;border-radius:11px;border:1px solid var(--accent);background:var(--accent);color:var(--card);font-weight:650;font-size:14px;cursor:pointer;}
+.pur.cfg .save:hover{background:var(--accent-deep);}
 .pur.cfg .state{padding:48px 16px;text-align:center;color:var(--ink2);font-size:14px;}
 `;
 

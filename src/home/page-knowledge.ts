@@ -15,18 +15,18 @@
         const st = document.createElement('style');
         st.id = 'kb-center-style';
         st.textContent = `
-.kb-ws-bar{display:flex;align-items:center;gap:9px;background:var(--card,#fff);border:1px solid var(--border,#e8e8e3);border-radius:9px;padding:8px 13px;font-size:13px;margin-bottom:16px}
-.kb-ws-bar .kb-ws-dot{width:8px;height:8px;border-radius:50%;background:var(--ok,#16a34a);flex-shrink:0}
-.kb-ws-bar.kb-ws-empty .kb-ws-dot{background:var(--warn,#d97706)}
+.kb-ws-bar{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--line,#e8e8e3);border-radius:9px;padding:8px 13px;font-size:13px;margin-bottom:16px}
+.kb-ws-bar .kb-ws-dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0}
+.kb-ws-bar.kb-ws-empty .kb-ws-dot{background:var(--amber)}
 .kb-ws-bar b{font-weight:600}
 .kb-pane{display:none}
 .kb-pane.active{display:block}
-.kb-soon{background:var(--card,#fff);border:1px dashed var(--border,#e8e8e3);border-radius:12px;padding:46px 20px;text-align:center;color:var(--ink-3,#999)}
+.kb-soon{background:var(--card);border:1px dashed var(--line,#e8e8e3);border-radius:12px;padding:46px 20px;text-align:center;color:var(--ink-3,#999)}
 .kb-soon h3{color:var(--ink-2,#555);font-size:15px;margin:0 0 6px}
-.kb-rules-intro{background:var(--card,#fff);border:1px solid var(--border,#e8e8e3);border-radius:12px;padding:20px}
+.kb-rules-intro{background:var(--card);border:1px solid var(--line,#e8e8e3);border-radius:12px;padding:20px}
 .kb-rules-intro p{color:var(--ink-2,#555);font-size:13px;margin:0 0 14px;line-height:1.6}
-.kb-info-btn{margin-left:auto;align-self:center;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--btn-blue,#2563eb);background:var(--info-bg,#dbeafe);border:none;border-radius:18px;padding:6px 13px;cursor:pointer}
-.kb-info-btn:hover{background:#cfe0fd}
+.kb-info-btn{margin-left:auto;align-self:center;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-weak);border:none;border-radius:18px;padding:6px 13px;cursor:pointer}
+.kb-info-btn:hover{background:var(--accent-weak)}
 .kb-info-btn svg{width:14px;height:14px}
 `;
         document.head.appendChild(st);

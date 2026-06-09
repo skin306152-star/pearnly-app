@@ -71,14 +71,12 @@ async function _runExport(templateId?: any) {
                         const inv = invs[i] || {};
                         flatRecords.push({
                             filename: r.filename + ' #' + (i + 1) + '/' + invs.length,
-                            engine: r.engine,
                             merged_fields: inv.fields || {},
                         });
                     }
                 } else {
                     flatRecords.push({
                         filename: r.filename,
-                        engine: r.engine,
                         merged_fields: r.merged_fields,
                     });
                 }

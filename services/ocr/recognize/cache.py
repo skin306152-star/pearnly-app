@@ -115,7 +115,6 @@ def serve_cache_hit(cached, user, plan, _erp_mode, file, monthly_quota, file_has
         "filename": file.filename,
         "page_count": cached["page_count"],
         "elapsed_ms": 0,
-        "engine": "cache",
         "pages": cached["pages"],
         "confidence": cached["confidence"],
         "history_id": cached["id"],

@@ -24,6 +24,7 @@ from services.ocr.entrypoints import (
 from services.ocr.recognize.cache import serve_cache_hit
 from services.ocr.recognize.persist import persist_invoices
 from services.ocr.recognize.autopush import dispatch_auto_push
+from services.ocr.recognize.sanitize import strip_internal_fields
 
 logger = logging.getLogger("mr-pilot")
 router = APIRouter()
@@ -124,14 +125,16 @@ async def ocr_recognize(
     file_hash = _ocr_content_hash(content)
     cached = _ocr_get_cached(user, file_hash, workspace_client_id=_ws_client_id)
     if cached:
-        return serve_cache_hit(
-            cached=cached,
-            user=user,
-            plan=plan,
-            _erp_mode=_erp_mode,
-            file=file,
-            monthly_quota=monthly_quota,
-            file_hash=file_hash,
+        return strip_internal_fields(
+            serve_cache_hit(
+                cached=cached,
+                user=user,
+                plan=plan,
+                _erp_mode=_erp_mode,
+                file=file,
+                monthly_quota=monthly_quota,
+                file_hash=file_hash,
+            )
         )
 
     # v118.35.0.21 · Credits 余额前置检查(v0.20 重做 · 1 次 SELECT · 修连接池超时)
@@ -177,8 +180,6 @@ async def ocr_recognize(
     # 2026-05-21 multi-format refactor: dispatch by extension to PDF /
     # image / table reader. PDF and image go through OCR; Excel/CSV/Word
     # bypass OCR via table_path.
-    chain_info = ["pipeline_v1"]
-    fallback_used = False
     _chg_kind = None  # v118.46 · 扣费参数 · 算在此 · 实际扣费在 history 落库后
     _chg_units = 0
     try:
@@ -197,7 +198,6 @@ async def ocr_recognize(
             _pipe_res = _pipeline_run_table(
                 content, filename=file.filename or "upload", api_key=api_key
             )
-            chain_info = ["pipeline_v1_table"]
         result = pipeline_result_to_legacy_dict(_pipe_res)
         _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
         logger.info(
@@ -253,10 +253,6 @@ async def ocr_recognize(
         if all_not_invoice and len(_pages) > 0:
             logger.warning(f"⚠️ Gemini 判定非发票 · 不入库 · file={file.filename}")
             raise HTTPException(400, detail="ocr.not_invoice")
-
-    # v105 · 删除 Typhoon 二次增援 · 简化引擎架构
-    typhoon_enhanced = False
-    typhoon_pages_enhanced = []
 
     # 6. 更新配额 · v87 多租户支持:shared=扣租户 · monthly=扣用户(老) · admin/lifetime 不扣
     new_month_used = None
@@ -449,51 +445,47 @@ async def ocr_recognize(
             if isinstance(_w, str) and _w.startswith("possible_missed_invoice"):
                 missed_invoice_warnings.append({"page": _pg.get("page_number"), "reason": _w})
 
-    return {
-        "filename": file.filename,
-        "page_count": result["page_count"],
-        "elapsed_ms": result["elapsed_ms"],
-        "engine": result["engine"],
-        "pages": result["pages"],
-        "confidence": confidence,
-        # P0 修 · 可能漏识别发票(同页多票兜底)· 非空时前端必须提示用户人工核对
-        "missed_invoice_warnings": missed_invoice_warnings,
-        "needs_review": bool(missed_invoice_warnings),
-        "history_id": primary_history_id,  # 兼容老前端
-        "history_ids": history_ids,  # v0.11 · 全部 id 列表
-        "invoice_count": invoice_count,  # v0.11 · 识别出几张发票
-        # v118.27.5.1 · 多发票拆分修复 · 给前端每张独立 fields(导出/抽屉用)
-        # 之前只返回扁平 pages · 前端 mergeFields 把多发票合并成 1 个 → 导出丢字段
-        "invoices": [
-            {
-                "history_id": history_ids[i] if i < len(history_ids) else None,
-                "fields": (invoice_groups[i] or {}).get("invoice_fields") or {},
-                "page_indices": (invoice_groups[i] or {}).get("page_indices") or [],
-                "page_count": len((invoice_groups[i] or {}).get("source_pages") or []),
-                "source_index": i + 1,
-                "source_total": invoice_count,
-            }
-            for i in range(min(invoice_count, len(history_ids) or invoice_count))
-        ],
-        "archive_name": primary_archive_name,
-        "category_tag": primary_category_tag,
-        "auto_pushed": auto_pushed,
-        # v0.12 · Typhoon 增援标记(v105 已废弃 · 留兼容字段不破坏前端)
-        "typhoon_enhanced": typhoon_enhanced,
-        "typhoon_pages": typhoon_pages_enhanced,
-        # v105 · 引擎降级简化:Gemini 主 + Vision 备
-        "engine_chain": chain_info,
-        "fallback_used": fallback_used,
-        # v0.13 · 重复发票警告
-        "duplicate_warnings": duplicate_warnings,
-        "quota": {
-            "ip_used_today": None,
-            "ip_daily_limit": None,
-            "used_this_month": (
-                new_month_used
-                if new_month_used is not None
-                else int(user.get("used_this_month") or 0)
-            ),
-            "monthly_quota": monthly_quota,
-        },
-    }
+    # strip_internal_fields:出口剥引擎/品牌标识 + 每页 _ 前缀 debug(DB 留底不动)。
+    return strip_internal_fields(
+        {
+            "filename": file.filename,
+            "page_count": result["page_count"],
+            "elapsed_ms": result["elapsed_ms"],
+            "pages": result["pages"],
+            "confidence": confidence,
+            # P0 修 · 可能漏识别发票(同页多票兜底)· 非空时前端必须提示用户人工核对
+            "missed_invoice_warnings": missed_invoice_warnings,
+            "needs_review": bool(missed_invoice_warnings),
+            "history_id": primary_history_id,  # 兼容老前端
+            "history_ids": history_ids,  # v0.11 · 全部 id 列表
+            "invoice_count": invoice_count,  # v0.11 · 识别出几张发票
+            # v118.27.5.1 · 多发票拆分修复 · 给前端每张独立 fields(导出/抽屉用)
+            # 之前只返回扁平 pages · 前端 mergeFields 把多发票合并成 1 个 → 导出丢字段
+            "invoices": [
+                {
+                    "history_id": history_ids[i] if i < len(history_ids) else None,
+                    "fields": (invoice_groups[i] or {}).get("invoice_fields") or {},
+                    "page_indices": (invoice_groups[i] or {}).get("page_indices") or [],
+                    "page_count": len((invoice_groups[i] or {}).get("source_pages") or []),
+                    "source_index": i + 1,
+                    "source_total": invoice_count,
+                }
+                for i in range(min(invoice_count, len(history_ids) or invoice_count))
+            ],
+            "archive_name": primary_archive_name,
+            "category_tag": primary_category_tag,
+            "auto_pushed": auto_pushed,
+            # v0.13 · 重复发票警告
+            "duplicate_warnings": duplicate_warnings,
+            "quota": {
+                "ip_used_today": None,
+                "ip_daily_limit": None,
+                "used_this_month": (
+                    new_month_used
+                    if new_month_used is not None
+                    else int(user.get("used_this_month") or 0)
+                ),
+                "monthly_quota": monthly_quota,
+            },
+        }
+    )

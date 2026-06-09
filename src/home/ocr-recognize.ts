@@ -158,7 +158,6 @@ document.getElementById('btn-start')!.addEventListener('click', async () => {
                 pages: data.pages,
                 page_count: data.page_count,
                 elapsed_ms: data.elapsed_ms,
-                engine: data.engine,
                 merged_fields: merged,
                 edits: {},
                 confidence: confidence,
@@ -169,8 +168,6 @@ document.getElementById('btn-start')!.addEventListener('click', async () => {
                 archive_name: data.archive_name || null,
                 category_tag: data.category_tag || null,
                 auto_pushed: !!data.auto_pushed,
-                typhoon_enhanced: !!data.typhoon_enhanced, // v0.12
-                typhoon_pages: data.typhoon_pages || [], // v0.12
                 from_cache: !!data.from_cache, // v92 · Bug 8
             });
 
@@ -204,29 +201,6 @@ document.getElementById('btn-start')!.addEventListener('click', async () => {
                     8000
                 );
                 console.warn('[OCR] possible missed invoice(s)', data.missed_invoice_warnings);
-            }
-
-            // v0.12 · Typhoon 增援提示
-            if (data.typhoon_enhanced && data.typhoon_pages && data.typhoon_pages.length) {
-                showToast(
-                    t('typhoon-enhanced-toast', {
-                        file: data.filename,
-                        n: data.typhoon_pages.length,
-                    }),
-                    'success'
-                );
-            }
-
-            // v103 · 引擎降级链提示 · Gemini 不可用时静默切换 · 用户至少知道
-            if (data.fallback_used) {
-                const chain = data.engine_chain || [];
-                const usedEngine = data.engine || '';
-                let key;
-                if (usedEngine === 'typhoon_nvidia') key = 'fallback-typhoon-nvidia-toast';
-                else if (usedEngine === 'easyocr') key = 'fallback-easyocr-toast';
-                else key = 'fallback-generic-toast';
-                showToast(t(key, { file: data.filename }), 'warn');
-                console.info('[OCR Chain]', chain);
             }
 
             // v92 · Bug 8 · 缓存命中提示

@@ -954,10 +954,6 @@ window.I18N = {
         'quota-banner-very-low': '今日识别配额仅剩 {n} 次 · 即将耗尽',
         'quota-banner-exhausted': '今日识别配额已用尽 · 新发票识别会失败 · 请明天再试或升级套餐',
         'quota-banner-dismiss': '今天不再提醒',
-        // ============ v103 · OCR 引擎降级链提示 ============
-        'fallback-typhoon-nvidia-toast': '主引擎暂时不可用 · {file} 已用备用引擎识别 · 建议复核字段',
-        'fallback-easyocr-toast': '主引擎和备用引擎都不可用 · {file} 已用本地引擎识别 · 字段较粗 · 请人工复核',
-        'fallback-generic-toast': '主引擎暂时不可用 · {file} 已用备用方案识别 · 建议复核',
         // ============ v104 · 文档扫描器(Adobe Scan 体验)============
         'btn-scan-doc': '拍摄票据',
         'btn-upload-pic': '上传图片',
@@ -1639,7 +1635,6 @@ window.I18N = {
         'val-lifetime-history': '永久',
         'val-lifetime-suitable': '高频用户 · 长期使用',
         'upgrade-title-paid': '升级 Pearnly',
-        'typhoon-enhanced-toast': '{file} · 已用泰文增强 {n} 页',
         'typhoon-badge': '泰文增强',
         'typhoon-badge-tip': '该发票部分字段缺失 · 已自动启用泰文增强',
         'dup-title-exact': '检测到重复发票',
@@ -4490,10 +4485,6 @@ window.I18N = {
         'quota-banner-very-low': 'Only {n} OCR runs left today · nearly exhausted',
         'quota-banner-exhausted': 'Daily OCR quota exhausted · new invoices will fail · try tomorrow or upgrade plan',
         'quota-banner-dismiss': 'Dismiss for today',
-        // ============ v103 · OCR engine fallback chain ============
-        'fallback-typhoon-nvidia-toast': 'Primary engine unavailable · {file} processed with backup engine · please review fields',
-        'fallback-easyocr-toast': 'Primary and backup engines unavailable · {file} processed with local engine · fields are rough · manual review needed',
-        'fallback-generic-toast': 'Primary engine unavailable · {file} processed with fallback · please review',
         // ============ v104 · Document scanner ============
         'btn-scan-doc': 'Take Photo',
         'btn-upload-pic': 'Upload Image',
@@ -5170,7 +5161,6 @@ window.I18N = {
         'val-lifetime-history': 'Forever',
         'val-lifetime-suitable': 'Heavy users',
         'upgrade-title-paid': 'Upgrade Pearnly',
-        'typhoon-enhanced-toast': '{file} · {n} page(s) enhanced with Thai OCR',
         'typhoon-badge': 'Thai-enhanced',
         'typhoon-badge-tip': 'Some fields were missing · Thai-enhanced mode applied automatically',
         'dup-title-exact': 'Duplicate invoice detected',
@@ -8009,10 +7999,6 @@ window.I18N = {
         'quota-banner-very-low': 'เหลือโควตา OCR วันนี้เพียง {n} ครั้ง · ใกล้หมด',
         'quota-banner-exhausted': 'โควตา OCR วันนี้หมดแล้ว · ใบกำกับใหม่จะไม่ทำงาน · ลองพรุ่งนี้หรืออัพเกรดแพคเกจ',
         'quota-banner-dismiss': 'ไม่แจ้งวันนี้',
-        // ============ v103 · ระบบสำรอง OCR ============
-        'fallback-typhoon-nvidia-toast': 'เครื่องหลักไม่พร้อม · {file} ใช้เครื่องสำรอง · กรุณาตรวจทาน',
-        'fallback-easyocr-toast': 'เครื่องหลักและสำรองไม่พร้อม · {file} ใช้ระบบในเครื่อง · ฟิลด์อาจไม่สมบูรณ์ · ตรวจทานด้วยตนเอง',
-        'fallback-generic-toast': 'เครื่องหลักไม่พร้อม · {file} ใช้ระบบสำรอง · กรุณาตรวจทาน',
         // ============ v104 · เครื่องสแกนเอกสาร ============
         'btn-scan-doc': 'ถ่ายเอกสาร',
         'btn-upload-pic': 'เลือกรูปภาพ',
@@ -8689,7 +8675,6 @@ window.I18N = {
         'val-lifetime-history': 'ถาวร',
         'val-lifetime-suitable': 'ผู้ใช้หนัก',
         'upgrade-title-paid': 'อัปเกรด Pearnly',
-        'typhoon-enhanced-toast': '{file} · เสริมการอ่านภาษาไทย {n} หน้า',
         'typhoon-badge': 'เสริมไทย',
         'typhoon-badge-tip': 'บางฟิลด์ขาด · เปิดโหมดเสริมภาษาไทยอัตโนมัติ',
         'dup-title-exact': 'พบใบกำกับซ้ำ',
@@ -11524,10 +11509,6 @@ window.I18N = {
         'quota-banner-very-low': '本日の OCR 残り {n} 回のみ · ほぼ上限',
         'quota-banner-exhausted': '本日の OCR 上限に達しました · 新規認識は失敗します · 明日再試行またはプランをアップグレード',
         'quota-banner-dismiss': '本日は再表示しない',
-        // ============ v103 · OCR フォールバック ============
-        'fallback-typhoon-nvidia-toast': 'メインエンジン利用不可 · {file} はバックアップエンジンで処理 · フィールド確認推奨',
-        'fallback-easyocr-toast': 'メインとバックアップ共に不可 · {file} はローカルエンジンで処理 · フィールドは粗いため手動確認必須',
-        'fallback-generic-toast': 'メインエンジン利用不可 · {file} はフォールバックで処理 · 確認推奨',
         // ============ v104 · ドキュメントスキャナー ============
         'btn-scan-doc': '領収書を撮影',
         'btn-upload-pic': '画像アップロード',
@@ -12204,7 +12185,6 @@ window.I18N = {
         'val-lifetime-history': '永久',
         'val-lifetime-suitable': 'ヘビーユーザー',
         'upgrade-title-paid': 'Pearnly をアップグレード',
-        'typhoon-enhanced-toast': '{file} · タイ語強化 {n} ページ',
         'typhoon-badge': 'タイ語強化',
         'typhoon-badge-tip': '一部フィールド欠落 · タイ語強化モードで自動補完',
         'dup-title-exact': '重複した請求書を検出',

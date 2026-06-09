@@ -199,7 +199,7 @@ function openDrawer(idx: number) {
     document.getElementById('drawer-title')!.textContent = r.filename as string;
 
     // 副标题:页数 + 耗时 + 缓存标记(隐藏引擎档位 · v0.15.6)
-    const isCached = r.engine === 'cache' || r.from_cache;
+    const isCached = !!r.from_cache;
     const timeText = isCached
         ? t('badge-cached-hint')
         : `${((r.elapsed_ms as number) / 1000).toFixed(1)}s`;

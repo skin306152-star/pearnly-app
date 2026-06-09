@@ -10,9 +10,17 @@ from __future__ import annotations
 
 from typing import Any
 
-# 引擎/品牌/流水线标识 key — 面向用户响应一律不出现。
+# 引擎/品牌/流水线标识 + LLM 用量 key — 面向用户响应一律不出现(token 数泄漏底层用 LLM)。
 _BLOCKED_KEYS = frozenset(
-    {"engine", "engine_chain", "fallback_used", "typhoon_enhanced", "typhoon_pages"}
+    {
+        "engine",
+        "engine_chain",
+        "fallback_used",
+        "typhoon_enhanced",
+        "typhoon_pages",
+        "input_tokens",
+        "output_tokens",
+    }
 )
 
 

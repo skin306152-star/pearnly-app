@@ -10,7 +10,7 @@ import unittest
 from services.ocr.recognize.sanitize import strip_internal_fields
 
 # 内部标识子串黑名单(出现在 key 名里即视为泄漏)。
-_LEAK_SUBSTRINGS = ("engine", "typhoon", "layer", "gemini", "vision", "flash")
+_LEAK_SUBSTRINGS = ("engine", "typhoon", "layer", "gemini", "vision", "flash", "token")
 
 
 def _iter_keys(obj):
@@ -38,6 +38,8 @@ def _sample_main_response():
             {
                 "page_number": 1,
                 "fields": {"total": "100"},
+                "input_tokens": 1234,
+                "output_tokens": 567,
                 "_layer_chain": ["text", "vision", "flash"],
                 "_trigger_reasons": ["low_conf"],
                 "_confidence_band": "mid",

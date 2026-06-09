@@ -1,10 +1,33 @@
 # -*- coding: utf-8 -*-
 """OCR schemas · 泰国税务发票(ThaiInvoice/LineItem + 值coercion)(REFACTOR-WA · R20 拆 · 0 逻辑改)。"""
 
+import re
+from datetime import date
 from typing import Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from services.ocr.schemas_layer1 import FieldRef
+
+# 泰式 2 位年(DD/MM/YY)正则:两个分隔符 + 结尾 2 位年。
+_TWO_DIGIT_DATE = re.compile(r"^\s*\d{1,2}[/\-.]\d{1,2}[/\-.](\d{2})\s*$")
+
+
+def _fix_two_digit_year_date(date_raw: str, model_date: Optional[str], today_year: int):
+    """泰式收据 2 位年消歧(B · 24/08/25 模型常猜成 2023)。
+    只在 date_raw 是 DD/MM/YY 时介入,且只重算「年」(保留模型的 -MM-DD,避免日/月歧义):
+    候选 = 公历 20YY 与 2 位佛历 25YY−543,取 [2000, 今年+1] 内最接近今天的那个。
+    4 位年/非日期 → 原样交还模型(不干预 4 位佛历减 543 的既有逻辑)。"""
+    if not model_date or not re.match(r"^\d{4}-\d{2}-\d{2}$", model_date):
+        return model_date
+    m = _TWO_DIGIT_DATE.match(date_raw or "")
+    if not m:
+        return model_date
+    yy = int(m.group(1))
+    cands = [y for y in (2000 + yy, 2500 + yy - 543) if 2000 <= y <= today_year + 1]
+    if not cands:
+        return model_date
+    year = min(cands, key=lambda y: abs(today_year - y))
+    return f"{year:04d}{model_date[4:]}"
 
 
 # ============================================================
@@ -202,6 +225,12 @@ class ThaiInvoice(BaseModel):
     @classmethod
     def _coerce_additional(cls, v):
         return [] if v is None else v
+
+    @model_validator(mode="after")
+    def _normalize_two_digit_year(self):
+        """2 位年(DD/MM/YY)模型常猜错年份 → 确定性重算(见 _fix_two_digit_year_date)。"""
+        self.date = _fix_two_digit_year_date(self.date_raw, self.date, date.today().year)
+        return self
 
 
 # Self-referencing field (additional_invoices: List[ThaiInvoice]) needs rebuild.

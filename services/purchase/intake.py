@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
@@ -343,6 +344,8 @@ def record_line_expense(cur, *, tenant_id, workspace_client_id, text, created_by
     data = {
         "doc_kind": "expense",
         "source": "line",
+        # LINE 一句话记账无日期 → 默认记账当天(否则 doc_date 空 · 永不进"本月花费"等按月统计)。
+        "doc_date": date.today().isoformat(),
         "category_id": parsed["category_id"],
         "lines": [expense_line(parsed)],
     }

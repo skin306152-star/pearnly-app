@@ -108,6 +108,20 @@ const MAPPINGS = [
         nosvgemoji: '#page-ocr .drop-zone svg',
     },
     {
+        name: '识别记录 history(A组屏)',
+        design: 'history.html',
+        route: 'history',
+        ready: '#page-history .pagehead',
+        layout: { sel: '#page-history .wrap', maxWidth: 'none', centered: true },
+        tokens: [
+            // #history-main 初始 display:none — getComputedStyle 仍计算结构属性(borderRadius/boxShadow)
+            { design: '.panel', prod: '#history-main', props: ['borderRadius', 'boxShadow'] },
+            { design: '.h1', prod: '#page-history .pagehead .h1', props: ['fontSize', 'fontWeight'] },
+        ],
+        // 无 bluemust:history-main 初始隐藏,无可见主色按钮可验
+        nosvgemoji: '#history-empty svg',
+    },
+    {
         name: '桌台管理(05 v2)',
         design: '05-tables.html',
         route: 'pos-tables',

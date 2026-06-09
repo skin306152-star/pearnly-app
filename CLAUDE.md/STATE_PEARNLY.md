@@ -6,6 +6,20 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
+## 🎯 状态卡（2026-06-09 · **进项/OCR 真用 bug 一批修复上线 + 统一智能录入设计稿待拍板** · HEAD `a0aa6408`(?v=11850726)· 前序见下:套账隔离 / POS / 销项 / 知识库 / LINE）
+
+- **🆕 本窗口(2026-06-09)· Zihao 真用一路报问题、逐个修+真 prod 验证上线**:
+  - **登录/着陆页**:手机端语言条压关闭X、桌面安全三件换行对不齐(浏览器翻译触发)修;手机场景挂件防遮挡(工作气泡 min-width:0 解锁收窄不压问候、Quote 下移露出猫+笔记本)·`a44fd358`/`064055ff`(?v=12/13)。
+  - **home SPA 三修**:刷新某模块只剩侧栏(bootstrap 早于 defer 模块注册 loader→`reloadCurrentRoute` 泛化兜底)/ 切套账界面无反应(全局 `pearnly:workspace-changed`→重载当前路由·删 7 处分散订阅 DRY)/ 采购设置开关整行可点误触(改绑 `.sw`)·`d03a958f`。
+  - **A1** LINE 一句话记费用默认带当天日期(修"本月花费 ฿0"·doc_date 空永不进按月统计)·`4b8a2601`。
+  - **E** `/api/ocr/recognize` 响应净化(新 `services/ocr/recognize/sanitize.py` 递归剥引擎/品牌/层/`_`debug/token·两出口都过·删死字段+前端死 toast+死i18n键×4语·防回潮单测)·**真账号 prod 双出口实测 CLEAN**·`698cda97`/`c18f816a`。
+  - **C+D** 进项票图持久化+渲染+放大:拍票图原 `_run_ocr` 跑完即丢→`pdf_storage.save_bytes` 落盘→挂 `purchase_attachments(kind=bill)`→`get_doc` 改写 url 不暴露存储路径→新端点 `/docs/{id}/bill-image`(鉴权+套账边界)→前端本地 blob 即时显示/已存单据鉴权取图/「放大看」+点图开浏览器原生缩放拖动查看器(票图整块拆 `purchase-form-bill.ts` 守<500)·**prod 全链真字节 200595 + ws=33 隔离 404 实测**·`be36785d`(?v=11850726)。
+  - **B** 泰式 2 位年日期消歧(24/08/25→2023 bug):`ThaiInvoice` model_validator 只在 date_raw 是 DD/MM/YY 时只重算年(公历20YY vs 2位佛历25YY−543 取最接近今天)·**prod 新识别实测 24/08/25→2025-08-24**(对齐 Paypers)·`61fa7e05`。
+  - /simplify:`save_pdf` 委托 `save_bytes` 去重·`a0aa6408`。
+  - **🔴 未完(已记忆+设计稿·待拍板)**:LINE 拍进项票只落识别记录(门控未选业态)+ 缺手动改方向 + 事务所客户做账分流 → **统一智能录入设计稿 `docs/smart-intake/02`·待 Zihao 拍 4 分叉再施工**·见 [[smart-intake-routing-override]]。
+  - **留给 Zihao 浏览器确认**:C+D 拍清晰票后表单显示票图+放大(我测试图都低置信进待归类出不了表单)。
+
+<!-- ===== 以下为前序窗口历史(2026-06-08 及更早)· 详见各 [[memory]] ===== -->
 ## 🎯 状态卡（2026-06-08 · **🏁 套账隔离 100% 收官(PO-7b 连号按主体 + A/B prod E2E 9/9)· HEAD `e449d80`(?v=11850716)** · 前序:POS 全栈 / 销项 PO-10 / 知识库 / LINE @pearnly）
 
 - **🏁 套账隔离全闭环(2026-06-08·本窗口·commit `89e71ca`/`021c25f`/`e449d80`·Zihao 授权"全做完不必报方案")**:把前两窗口遗留的 gated/尾巴全做完并 **prod 真账号 A/B E2E 9/9 通过**。① **PO-7b 连号按主体**(RD 合规):计号键扩 (tenant,ws,doc_type,prefix,period)·开票/红冲/POS 三取号点全传主体·迁移做成**启动自愈 ensure**(`numbering_workspace_key.py`·建 uq_dns_ws+回填+守门式 drop 旧 PK·稳态早退·部署即自应用·无需手动 prod 迁移)·单主体号序逐张不变。② 顺带补 PO-7a 漏:红冲单继承 `seller_workspace_client_id`(原留 NULL 跨套账泄漏)。③ 对账源查询 `list_invoices_for_recon` 加套账过滤。④ 切套账自动重载 history/sales×3/reconcile 五页。⑤ /simplify:startup.py 25 个 ensure 块 DRY 成 loop(507→393)+ 取号主体解析抽 `document.workspace_for_numbering`。**剩余仅 etax 两表(零 DAL·建表随手隔离·DEFERRED)。** 详见 [[workspace-isolation-audit]]。

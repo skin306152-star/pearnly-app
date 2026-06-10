@@ -1,7 +1,7 @@
 /* ============ 侧栏(2026-06-10 Claude 式:全高列 · 顶=品牌 · 中=滚动导航 · 底=pinned)============ */
 .sidebar {
     position: fixed; top: 0; left: 0; bottom: 0;
-    width: var(--sidebar-w);
+    width: var(--sidebar-current-w);
     background: var(--card);
     border-right: 1px solid var(--line);
     display: flex;
@@ -10,7 +10,6 @@
     z-index: 40;
     transition: width 180ms ease;
 }
-body.sidebar-collapsed .sidebar { width: var(--sidebar-w-collapsed); }
 .sb-brand {
     display: flex; align-items: center; gap: 9px;
     padding: 13px 14px 9px;
@@ -144,12 +143,11 @@ body.sidebar-collapsed .nav-item:hover .nav-label::before {
 /* ============ 主区 ============ */
 .main {
     margin-top: var(--topbar-h);
-    margin-left: var(--sidebar-w);
+    margin-left: var(--sidebar-current-w);
     padding: 20px 28px;
     min-height: calc(100vh - var(--topbar-h));
     transition: margin-left 180ms ease, margin-top 180ms ease;
 }
-body.sidebar-collapsed .main { margin-left: var(--sidebar-w-collapsed); }
 /* v109.4 · banner 显示时主内容自动下移 36px · 不被遮挡 */
 body.has-plan-banner .main { margin-top: calc(var(--topbar-h) + 36px); }
 

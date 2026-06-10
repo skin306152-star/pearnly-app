@@ -61,6 +61,8 @@
     --font-mono: "SF Mono", "Monaco", Consolas, "Courier New", monospace;
     --sidebar-w: 240px;
     --sidebar-w-collapsed: 64px;
+    /* 侧栏实时宽度 · body.sidebar-collapsed 一处切换 · 顶栏/主区/侧栏/弹窗全跟随 */
+    --sidebar-current-w: var(--sidebar-w);
     --topbar-h: 58px;
     --sb: 240px;
     --content: 1160px;
@@ -326,10 +328,10 @@ body {
     border-bottom: 1px solid var(--line);
     padding: 0 20px 0 0;
     display: flex; align-items: center; justify-content: space-between;
-    position: fixed; top: 0; left: var(--sidebar-w); right: 0; z-index: 50;
+    position: fixed; top: 0; left: var(--sidebar-current-w); right: 0; z-index: 50;
     transition: left 180ms ease;
 }
-body.sidebar-collapsed .topbar { left: var(--sidebar-w-collapsed); }
+body.sidebar-collapsed { --sidebar-current-w: var(--sidebar-w-collapsed); }
 .topbar-left {
     display: flex; align-items: center; gap: 12px;
     padding-left: 16px;

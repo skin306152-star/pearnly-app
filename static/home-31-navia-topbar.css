@@ -76,16 +76,13 @@ body.is-windows .topbar-search-kbd-win { display: inline; }
     z-index: 200;
 }
 .avatar-popup.show { display: block; }
-/* 从侧栏底部用户卡打开时 · 弹窗贴左下(Claude 式)· 跟随侧栏实际宽度(展开/rail) */
+/* 从侧栏底部用户卡打开时 · 弹窗贴左下(Claude 式)· 左偏移随 --sidebar-current-w 自动跟随展开/rail */
 .avatar-popup.from-sidebar {
     position: fixed;
-    left: calc(var(--sidebar-w) + 10px);
+    left: calc(var(--sidebar-current-w) + 10px);
     bottom: 14px;
     top: auto;
     right: auto;
-}
-body.sidebar-collapsed .avatar-popup.from-sidebar {
-    left: calc(var(--sidebar-w-collapsed) + 10px);
 }
 .avatar-popup-head {
     padding: 12px 10px 10px;

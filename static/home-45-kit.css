@@ -603,48 +603,14 @@
     cursor: pointer;
 }
 
-/* ── empty / tooltip / pagination / avatar ── */
-.ui .empty {
-    text-align: center;
-    padding: 22px;
-}
-.ui .empty .ill {
-    width: 50px;
-    height: 50px;
-    border-radius: 13px;
-    background: var(--accent-weak);
-    color: var(--accent);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 11px;
-}
-.ui .empty .ill .ic {
-    width: 24px;
-    height: 24px;
-}
-.ui .empty .t {
-    font-weight: 600;
-    font-size: 13.5px;
-}
-.ui .empty .s {
-    color: var(--ink2);
-    font-size: 12px;
-    margin-top: 3px;
-}
-/* ── 标准空态 · 全局版(2026-06-10 评审 S3)· .ui .empty 镜像 + fill 铺满垂直居中 ── */
+/* ── empty / tooltip / pagination / avatar ──
+   .pn-empty = 全局版标准空态(2026-06-10 S3)· 与 .ui .empty 并列共享声明防双份漂移 */
+.ui .empty,
 .pn-empty {
     text-align: center;
     padding: 22px;
 }
-.pn-empty.fill {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 300px;
-    width: 100%;
-}
+.ui .empty .ill,
 .pn-empty .ill {
     width: 50px;
     height: 50px;
@@ -656,19 +622,29 @@
     justify-content: center;
     margin-bottom: 11px;
 }
+.ui .empty .ill .ic,
 .pn-empty .ill svg {
     width: 24px;
     height: 24px;
 }
+.ui .empty .t,
 .pn-empty .t {
     font-weight: 600;
     font-size: 13.5px;
-    color: var(--ink);
 }
+.ui .empty .s,
 .pn-empty .s {
     color: var(--ink2);
     font-size: 12px;
     margin-top: 3px;
+}
+.pn-empty.fill {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+    width: 100%;
 }
 .pn-empty .act {
     margin-top: 11px;

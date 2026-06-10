@@ -94,6 +94,7 @@
 - [x] **2026-06-10 prod 补抓两轮已跑**(61 面 · scripts/_ui_audit_full/):L0 浅+暗 24 屏、L1 设置/规矩/ws-modal、L05 向导 5 步全拿到;prod 实证 S5 文案(อ่านแม่นยำ 0% · ผลการอ่านต้องตรวจสอบ)/S8 信息带/S9 进项主屏均已生效。
 - [ ] 补抓遗留(下一轮 spec 再修):① cmdk openCmdk() 调了但面板没出(截到背景页)② camera-tips/help 无此全局函数(openers 表要换真名或删)③ L1 行点开抽屉 flaky(行渲染受套账/工作模式态影响 · 历史验收多轮过 = 非产品 bug · spec 要带 console 捕获 + JS 直点 + 固定 work_mode)④ 销项/客户 no row = e2e_3 该套账列表空,补种子再抓。
 - [x] **补抓发现并已修:home-40 向导/票样 9 处不翻面固定色**(.sw-cart #fbfbf9 · 票样表头 #f3f3ee/#444/#e3e3dd · words #faf9f5 · 合计线 #111 · copy 徽章 #888 → 语义令牌)。
+- [x] **补抓发现并已修(根因级):emerald 阶 blue-50..800 无暗夜翻面** `8a24deb`:浅色定义了亮阶而 :root.dark 没覆盖 → blue-50/100 当底在暗夜压不住翻亮的 --ink(向导选中卡洗字、对账 stmt 斑马行、推送日志 retry chip、history 徽章等 ~30 处同根因)。:root.dark 补整组暗夜阶(浅档底变深 · blue-800 当字色变亮);home-01-base 纳 lint TOKEN_SOURCE。
 
 ## 四、非代码项 / 拍板记录(2026-06-10 Zihao:「需要拍板的全按标准走」)
 - [x] Codex 测试种子数据已清(2026-06-10 prod):BAKELAB 套账 Codex 页脚置 NULL · 27 个 Codex 商品停用(is_active=false)· 20 张 Codex 单据已是 void(连号合规保留不删)· 别租户的 Codex QA 数据不动(E2E 基线)。

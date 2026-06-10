@@ -418,7 +418,7 @@ const SIDEBAR_HTML = `
                 <path d="M10 6.5v7M6.5 10h7"/>
             </svg>
             <span class="nav-label" data-i18n="nav-enroll">可开启功能</span>
-            <span class="nav-label" style="margin-left:auto;color:var(--brand,#0E7C66);">→</span>
+            <svg style="margin-left:auto;flex-shrink:0;color:var(--brand,#0E7C66);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
         </div>
         <div class="nav-item" data-route="integrations" id="nav-integrations">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">

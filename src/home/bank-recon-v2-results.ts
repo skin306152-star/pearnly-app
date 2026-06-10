@@ -396,11 +396,11 @@ function renderTable() {
             // v118.33.13.0 · OCR accuracy warning icons (balance check, confidence)
             let warnIcons = '';
             if (r.stmt_balance_ok === false) {
-                warnIcons += `<span class="brv2-ocr-warn brv2-ocr-warn-bal" title="${esc2(T_OCR_WARN_BAL)}">⚠</span>`;
+                warnIcons += `<span class="brv2-ocr-warn brv2-ocr-warn-bal" title="${esc2(T_OCR_WARN_BAL)}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4M12 17h.01"/></svg></span>`;
                 rowClass += ' brv2-row-warn';
             }
             if (r.stmt_confidence === 'low') {
-                warnIcons += `<span class="brv2-ocr-warn brv2-ocr-warn-conf" title="${esc2(T_OCR_LOW_CONF)}">◌</span>`;
+                warnIcons += `<span class="brv2-ocr-warn brv2-ocr-warn-conf" title="${esc2(T_OCR_LOW_CONF)}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/></svg></span>`;
                 if (!rowClass.includes('brv2-row-warn')) rowClass += ' brv2-row-warn-soft';
             }
 

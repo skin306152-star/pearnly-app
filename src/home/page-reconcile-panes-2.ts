@@ -9,21 +9,21 @@ export const RECON_HTML_2 = `        <!-- ── 销项税对账面板(v118.32.0
             <!-- v4.10.7 · KPI 3 卡统一视觉 -->
             <div class="vex-kpi-strip" id="vex-kpi-strip">
                 <div class="vex-kpi-card">
-                    <div class="vex-kpi-icon-wrap vex-kpi-icon-warn">⏱</div>
+                    <div class="vex-kpi-icon-wrap vex-kpi-icon-warn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
                     <div>
                         <div class="vex-kpi-val" id="vex-kpi-running-val">—</div>
                         <div class="vex-kpi-lbl" data-i18n="vex-kpi-running">进行中</div>
                     </div>
                 </div>
                 <div class="vex-kpi-card">
-                    <div class="vex-kpi-icon-wrap vex-kpi-icon-ok">✓</div>
+                    <div class="vex-kpi-icon-wrap vex-kpi-icon-ok"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
                     <div>
                         <div class="vex-kpi-val" id="vex-kpi-done-val">—</div>
                         <div class="vex-kpi-lbl" data-i18n="vex-kpi-done">已完成</div>
                     </div>
                 </div>
                 <div class="vex-kpi-card">
-                    <div class="vex-kpi-icon-wrap vex-kpi-icon-err">!</div>
+                    <div class="vex-kpi-icon-wrap vex-kpi-icon-err"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4M12 17h.01"/></svg></div>
                     <div>
                         <div class="vex-kpi-val" id="vex-kpi-failed-val">—</div>
                         <div class="vex-kpi-lbl" data-i18n="vex-kpi-failed">失败</div>
@@ -209,21 +209,21 @@ export const RECON_HTML_2 = `        <!-- ── 销项税对账面板(v118.32.0
             <!-- KPI 3 卡（沿用 vex-kpi-strip 视觉 · 默认可见，跑完更新数字） -->
             <div class="vex-kpi-strip" id="glv-kpi-strip">
                 <div class="vex-kpi-card">
-                    <div class="vex-kpi-icon-wrap vex-kpi-icon-ok">✓</div>
+                    <div class="vex-kpi-icon-wrap vex-kpi-icon-ok"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
                     <div>
                         <div class="vex-kpi-val" id="glv-kpi-matched">—</div>
                         <div class="vex-kpi-lbl" data-i18n="glv-kpi-matched">完全匹配</div>
                     </div>
                 </div>
                 <div class="vex-kpi-card">
-                    <div class="vex-kpi-icon-wrap vex-kpi-icon-warn">⚠</div>
+                    <div class="vex-kpi-icon-wrap vex-kpi-icon-warn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4M12 17h.01"/></svg></div>
                     <div>
                         <div class="vex-kpi-val" id="glv-kpi-diff">—</div>
                         <div class="vex-kpi-lbl" data-i18n="glv-kpi-diff">有差异</div>
                     </div>
                 </div>
                 <div class="vex-kpi-card">
-                    <div class="vex-kpi-icon-wrap vex-kpi-icon-err">!</div>
+                    <div class="vex-kpi-icon-wrap vex-kpi-icon-err"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4M12 17h.01"/></svg></div>
                     <div>
                         <div class="vex-kpi-val" id="glv-kpi-unmatched">—</div>
                         <div class="vex-kpi-lbl" data-i18n="glv-kpi-unmatched">GL 未找到</div>

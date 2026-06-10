@@ -17,6 +17,7 @@ from core import db
 from core.pos_api import PosError, ok
 from routes.accounting_common import auth_member, auth_owner, gate, resolve_ws, uid
 from services.accounting import books, books_pdf, closing
+from services.tax import hooks as tax_hooks
 
 router = APIRouter(prefix="/api/accounting", tags=["accounting-books"])
 
@@ -139,6 +140,11 @@ async def api_close_period(
         ws = resolve_ws(cur, request, tid, workspace_client_id)
         result = closing.close_period(
             cur, tenant_id=tid, workspace_client_id=ws, period=req.period, closed_by=uid(user)
+        )
+        # 报税挂点(docs/tax-filing/04 seam):结账完成 → 本期税表草稿。SAVEPOINT 隔离,
+        # 失败吞不挡结账,兜底=报税中心手动重算。
+        tax_hooks.enqueue_generate(
+            cur, tenant_id=tid, workspace_client_id=ws, period=result["closed"]
         )
     return ok(result)
 

@@ -268,6 +268,15 @@ async def run_startup() -> dict:
     except Exception as e:
         logger.warning(f"启动 accounting schema 失败: {e}")
 
+    # 自动报税 schema(税表/明细/设置 3 表 · docs/tax-filing/01)。
+    # NEW-DEBT-EXEMPT: 启动自愈式迁移,口径同 accounting。
+    try:
+        from services.tax.schema import ensure_tax_schema
+
+        ensure_tax_schema()
+    except Exception as e:
+        logger.warning(f"启动 tax schema 失败: {e}")
+
     # 商户采购(进项)schema 双跑(suppliers / purchase_docs+lines / categories+settings+
     # intake+attachments)· 与 alembic 0031-0033 同源幂等 DDL(docs/purchasing/01)。
     try:

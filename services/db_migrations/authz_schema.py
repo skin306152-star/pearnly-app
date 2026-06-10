@@ -74,7 +74,9 @@ def _migrate_memberships(cur) -> None:
           AND m.role_id IN (SELECT id FROM roles WHERE key IS NULL)
         """)
 
-    # 存量回填:有 tenant 的用户人手一行(已有行不动 · UNIQUE(user_id))
+    # 存量回填:有 tenant 的用户人手一行(已有行不动 · UNIQUE(user_id))。
+    # EXISTS 守门:prod 有孤儿 tenant_id(用户指向已删租户 · 2026-06-10 真库实测
+    # b6b184cc)· 不排除会撞 memberships_tenant_id_fkey 整批回滚。
     cur.execute("""
         INSERT INTO memberships (user_id, tenant_id, role_id, status, scope_mode)
         SELECT u.id, u.tenant_id,
@@ -87,6 +89,7 @@ def _migrate_memberships(cur) -> None:
                'active', 'all'
         FROM users u
         WHERE u.tenant_id IS NOT NULL
+          AND EXISTS (SELECT 1 FROM tenants t WHERE t.id = u.tenant_id)
         ON CONFLICT (user_id) DO NOTHING
         """)
     backfilled = cur.rowcount or 0
@@ -155,11 +158,18 @@ def _create_tables(cur) -> None:
 
 
 def ensure_authz_schema() -> None:
-    """startup 调 · 幂等。一处失败不拦其余(与 boot_ensures 口径一致由调用方兜 try)。"""
-    with db.get_cursor(commit=True) as cur:
-        _seed_roles(cur)
-        _migrate_memberships(cur)
-        _create_tables(cur)
+    """startup 调 · 幂等。三步各自独立事务:一步失败(如脏数据撞 FK)不连坐
+    其余——roles 种子缺失会让批3 控制台瘫,绝不能被回填的孤儿行拖下水。"""
+    for step, label in (
+        (_seed_roles, "roles 种子"),
+        (_migrate_memberships, "memberships 回填"),
+        (_create_tables, "scopes/invitations/transfers 建表"),
+    ):
+        try:
+            with db.get_cursor(commit=True) as cur:
+                step(cur)
+        except Exception as e:
+            logger.error(f"authz schema {label} 失败: {e}")
 
     problems = _jsonb_selfcheck()
     if problems:

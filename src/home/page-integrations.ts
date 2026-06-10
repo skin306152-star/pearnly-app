@@ -188,15 +188,14 @@
         <!-- Tab 2: 推送日志(从 auto-panel="erp" subpanel="logs" 搬过来 · A4 · v118.34.19) -->
         <div class="int-top-panel" data-int-top-panel="logs">
             <div class="card">
-                <!-- 今日推送统计 -->
-                <div id="erp-today-stats" class="erp-today-stats"></div>
                 <section class="erp-logs-section" id="erp-logs-section">
+                    <!-- 今日推送统计并入标题行 · 空态不再单飘一条 banner(S7/S8) -->
                     <div class="erp-logs-head">
                         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 1"/>
                         </svg>
                         <span data-i18n="erp-logs-title">推送日志</span>
-                        <span class="erp-logs-today-stats" id="erp-logs-today-stats"></span>
+                        <div id="erp-today-stats" class="erp-today-stats"></div>
                     </div>
 
                     <div class="erp-logs-toolbar">

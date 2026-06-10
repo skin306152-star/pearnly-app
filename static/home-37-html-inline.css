@@ -518,6 +518,10 @@
 .erp-today-stats:empty {
     display: none;
 }
+/* 并入推送日志标题行后:去独立块外边距 · 统计靠右(S7/S8) */
+.erp-logs-head .erp-today-stats {
+    margin: 0 0 0 auto;
+}
 .erp-today-item {
     display: inline-flex;
     align-items: center;

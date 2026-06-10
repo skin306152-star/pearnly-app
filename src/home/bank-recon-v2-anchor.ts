@@ -117,7 +117,7 @@ function _brv2RenderAnchorAudit(summary: any) {
         panel = document.createElement('div');
         panel.id = 'brv2-anchor-audit';
         panel.style.cssText =
-            'margin-top:14px;background:#fff7ed;border:1px solid #fed7aa;' +
+            'margin-top:14px;background:var(--warn-bg);border:1px solid var(--amber-500);' +
             'border-radius:8px;padding:14px 16px;';
         host.parentNode.insertBefore(panel, host.nextSibling);
     }

@@ -6,6 +6,12 @@
     border-top: 1px solid var(--line);
     padding-top: 16px;
 }
+/* 集成页·推送日志 tab:section 是卡片唯一内容 · 顶部分隔线没有上文 · 去掉 */
+.int-top-panel .erp-logs-section {
+    margin-top: 0;
+    border-top: 0;
+    padding-top: 0;
+}
 .erp-logs-head {
     display: flex;
     align-items: center;

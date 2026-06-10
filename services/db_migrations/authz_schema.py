@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 
 from core import db
@@ -36,8 +37,6 @@ def _seed_roles(cur) -> None:
         if key == "owner":
             permissions = '{"all": true}'
         else:
-            import json
-
             permissions = json.dumps(sorted(registry.ROLE_PERMISSIONS[key]))
         cur.execute(
             """
@@ -186,8 +185,6 @@ def _jsonb_selfcheck() -> list:
         for row in cur.fetchall():
             perms = row["permissions"]
             if isinstance(perms, str):
-                import json
-
                 try:
                     perms = json.loads(perms)
                 except (TypeError, ValueError):

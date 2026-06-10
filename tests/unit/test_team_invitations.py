@@ -19,13 +19,13 @@ def _row(**kw):
 
 class TokenHashTests(unittest.TestCase):
     def test_sha256_hex_only_no_plaintext(self):
-        h = invitations._hash("secret-token")
+        h = invitations.hash_token("secret-token")
         self.assertEqual(len(h), 64)
         self.assertNotIn("secret", h)
 
     def test_deterministic(self):
-        self.assertEqual(invitations._hash("a"), invitations._hash("a"))
-        self.assertNotEqual(invitations._hash("a"), invitations._hash("b"))
+        self.assertEqual(invitations.hash_token("a"), invitations.hash_token("a"))
+        self.assertNotEqual(invitations.hash_token("a"), invitations.hash_token("b"))
 
 
 class StatusDerivationTests(unittest.TestCase):

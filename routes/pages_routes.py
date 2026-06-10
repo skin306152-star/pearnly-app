@@ -184,40 +184,30 @@ async def pos_layout_page(rest: str):
     return _pos_page()
 
 
+# SPA 外壳统一 no-cache(防浏览器缓存旧壳拿不到新版)
+_NO_CACHE = {
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
+
 # 管理控制台 SPA(权限批3 · 2026-06-10)· 照 /pos 套路:独立 static/console 自含,
 # 登录态前端鉴权(can(team.member.view) 不过 → 403 人话页)。紫色主题只作用 /console。
-def _console_page() -> FileResponse:
-    return FileResponse(
-        "static/console/console.html",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-        },
-    )
-
-
 @router.get("/console", response_class=HTMLResponse)
 async def console_page():
-    return _console_page()
+    return FileResponse("static/console/console.html", headers=_NO_CACHE)
 
 
 @router.get("/console/{rest:path}", response_class=HTMLResponse)
 async def console_layout_page(rest: str):
-    return _console_page()
+    return FileResponse("static/console/console.html", headers=_NO_CACHE)
 
 
 # 邀请接受公开页(无登录态 · token 在路径上由前端 JS 读取)
 @router.get("/invite/{token}", response_class=HTMLResponse)
 async def invite_page(token: str):
-    return FileResponse(
-        "static/console/invite.html",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-        },
-    )
+    return FileResponse("static/console/invite.html", headers=_NO_CACHE)
 
 
 @router.get("/reset", response_class=HTMLResponse)

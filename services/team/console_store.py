@@ -138,13 +138,13 @@ def set_scope(
     with db.get_cursor(commit=True) as cur:
         valid_ids: List[int] = []
         if scope_mode == "assigned":
-            for ws in workspace_ids or []:
+            wanted = [int(ws) for ws in (workspace_ids or [])]
+            if wanted:
                 cur.execute(
-                    "SELECT 1 FROM workspace_clients WHERE id = %s AND tenant_id = %s",
-                    (int(ws), str(tenant_id)),
+                    "SELECT id FROM workspace_clients WHERE id = ANY(%s) AND tenant_id = %s",
+                    (wanted, str(tenant_id)),
                 )
-                if cur.fetchone():
-                    valid_ids.append(int(ws))
+                valid_ids = sorted(int(r["id"]) for r in cur.fetchall())
             if not valid_ids:
                 return {"error": "team.scope_empty"}
         cur.execute(

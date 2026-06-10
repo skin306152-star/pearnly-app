@@ -80,9 +80,9 @@ def _check(request: Request, user: dict, code: str) -> tuple[bool, str]:
         return False, "unknown_code"
     if user.get("is_super_admin"):
         return True, ""
-    if user.get("role") == "cashier" or (
-        request is not None and _pos_token_payload(request) is not None
-    ):
+    # POS 双令牌主体到这里必已是 role=cashier(typ=pos 由 pos_auth 合成;typ=pos_store
+    # 进不了用户鉴权早 401)——不再额外解一次 JWT。
+    if user.get("role") == "cashier":
         if code in CASHIER_CODES:
             return True, ""
         return False, "pos_token_out_of_scope"
@@ -181,14 +181,7 @@ def check_request_scope(
     else:
         authz = cached[1]
         user = {"id": cached[0]}
-    if authz.allows_workspace(workspace_client_id):
-        return
-    _deny_log(user, f"workspace:{workspace_client_id}", "scope_not_assigned", request)
-    if pos:
-        from core.pos_api import PosError
-
-        raise PosError("pos.not_found", 404)
-    raise HTTPException(404, detail="authz.not_found")
+    _assert_scope(request, user, authz, workspace_client_id, pos)
 
 
 def check_workspace_scope(
@@ -201,7 +194,10 @@ def check_workspace_scope(
     """
     if user.get("is_super_admin") or user.get("role") == "cashier":
         return
-    authz = _cached_authz(request, user)
+    _assert_scope(request, user, _cached_authz(request, user), workspace_client_id, pos)
+
+
+def _assert_scope(request, user: dict, authz: Authz, workspace_client_id, pos: bool) -> None:
     if authz.allows_workspace(workspace_client_id):
         return
     _deny_log(user, f"workspace:{workspace_client_id}", "scope_not_assigned", request)

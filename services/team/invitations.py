@@ -21,14 +21,15 @@ import bcrypt
 
 from core import db
 from services.authz.registry import ASSIGNABLE_ROLE_KEYS, SCOPABLE_ROLE_KEYS
-from services.authz.resolver import create_membership, set_membership_role
+from services.authz.resolver import create_membership
 
 logger = logging.getLogger("mr-pilot")
 
 INVITE_TTL_DAYS = 7
 
 
-def _hash(token: str) -> str:
+def hash_token(token: str) -> str:
+    """一次性链接 token 的存库形态(邀请/所有权转移共用 · 同改密链路只存哈希)。"""
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
@@ -78,7 +79,7 @@ def create_invitation(
                 role_key,
                 scope_mode,
                 json.dumps(ws_ids),
-                _hash(token),
+                hash_token(token),
                 str(invited_by),
                 INVITE_TTL_DAYS,
             ),
@@ -146,7 +147,7 @@ def find_by_token(token: str) -> Optional[Dict[str, Any]]:
             LEFT JOIN tenants t ON t.id = i.tenant_id
             WHERE i.token_hash = %s
             """,
-            (_hash(token),),
+            (hash_token(token),),
         )
         row = cur.fetchone()
     if row is None:
@@ -206,14 +207,6 @@ def accept(
             role_key=inv["role_key"],
             granted_by=str(inv["invited_by"]),
             scope_mode=inv["scope_mode"],
-        )
-        # create_membership 幂等不覆盖角色;新号必无旧行,role 再钉一次保险
-        set_membership_role(
-            cur,
-            user_id=new_id,
-            tenant_id=tenant_id,
-            role_key=inv["role_key"],
-            granted_by=str(inv["invited_by"]),
         )
         if inv["scope_mode"] == "assigned":
             cur.execute(

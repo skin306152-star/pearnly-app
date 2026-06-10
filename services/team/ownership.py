@@ -7,21 +7,17 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import secrets
 from typing import Any, Dict
 
 from core import db
 from services.authz.resolver import set_membership_role
+from services.team.invitations import hash_token
 
 logger = logging.getLogger("mr-pilot")
 
 TRANSFER_TTL_HOURS = 24
-
-
-def _hash(token: str) -> str:
-    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def initiate(*, tenant_id: str, from_user_id: str, to_user_id: str) -> Dict[str, Any]:
@@ -50,7 +46,13 @@ def initiate(*, tenant_id: str, from_user_id: str, to_user_id: str) -> Dict[str,
             VALUES (%s, %s, %s, %s, NOW() + %s * INTERVAL '1 hour')
             RETURNING id, expires_at
             """,
-            (str(tenant_id), str(from_user_id), str(to_user_id), _hash(token), TRANSFER_TTL_HOURS),
+            (
+                str(tenant_id),
+                str(from_user_id),
+                str(to_user_id),
+                hash_token(token),
+                TRANSFER_TTL_HOURS,
+            ),
         )
         row = cur.fetchone()
     return {
@@ -70,7 +72,7 @@ def accept(*, token: str, acting_user_id: str) -> Dict[str, Any]:
             SELECT * FROM ownership_transfers
             WHERE token_hash = %s AND completed_at IS NULL AND cancelled_at IS NULL
             """,
-            (_hash(token),),
+            (hash_token(token),),
         )
         row = cur.fetchone()
         if row is None:

@@ -41,17 +41,18 @@ def get_pool() -> SimpleConnectionPool:
         # v118.35.0.21 · maxconn 5 → 30 · 修 v0.20 部署后全站超时的真因
         # 老 maxconn=5 在 v0.20 加 credits 检查后(每个 OCR 多 3 次 DB 查询)
         # 5 个并发 OCR 就把连接池打满 · 后续请求阻塞 → 累积 → 全站超时
-        # 性能窗口 · maxconn 30 → 15 配合 uvicorn workers 2 → 4(systemd):池是 per-worker,
-        # 总连接 = workers × maxconn,保持 4×15=60 = 老 2×30 ≤ Postgres max_connections(60),
-        # 不超 Supabase 上限;负载摊到 4 worker 后单 worker 15 的并发余量≈老 2-worker 时的 30。
+        # 性能窗口曾试 30→15 配 workers 2→4,但 4 worker 并发启动撞 ensure_erp_oauth_tables
+        # 等无 advisory lock 的启动 DDL deadlock → 回退 workers=2,maxconn 复原 30(总 2×30=60
+        # ≤ Postgres max_connections,且保留团队为防 OCR 并发打满刻意留的余量)。
+        # workers=4 待先给各 ensure_* 加 advisory lock 串行化启动 DDL 后再议。
         _pool = SimpleConnectionPool(
             minconn=2,
-            maxconn=15,
+            maxconn=30,
             dsn=url,
             connect_timeout=10,
             sslmode="require",
         )
-        logger.info("✅ PostgreSQL 连接池已建立(minconn=2 maxconn=15)")
+        logger.info("✅ PostgreSQL 连接池已建立(minconn=2 maxconn=30)")
     return _pool
 
 

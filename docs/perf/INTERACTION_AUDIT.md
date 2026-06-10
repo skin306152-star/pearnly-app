@@ -4,7 +4,7 @@
 
 ## 0. 一句话结论
 
-**慢的根因不是某个端点的代码,而是两条系统性瓶颈叠加:① 应用服务器在日本、数据库在新加坡,每条 SQL 跨区往返 ~69ms;② 异步 handler 里直接做阻塞式 psycopg2 查询,2 个 worker 下首屏 22 个并发请求严重串行化。** 单个请求耗时 ≈ (该请求的 SQL 条数) × 69ms。最大杠杆是**让应用和数据库同区**(顺带泰国用户也更近),其次是减少每请求 SQL 条数 + 首屏请求数。
+**慢的根因不是某个端点的代码,而是两条系统性瓶颈叠加:① 应用服务器在日本、数据库在新加坡,每条 SQL 跨区往返 ~69ms;② 异步 handler 里直接做阻塞式 psycopg2 查询,2 个 worker 下首屏 22 个并发请求严重串行化。** 单个请求耗时 ≈ (该请求的 SQL 条数) × 69ms。**实测各 dashboard 端点仅 2–5 条 SQL、无 N+1(§3)→ 端点级没有可批量化的水分**;首屏 11.7s = 22 请求 × 跨区 RTT × 串行。最大杠杆:① **应用与 DB 同区**(顺带泰国用户更近);② **降首屏请求数**(去重 + 懒加载,前端);③ workers↑ / 鉴权-workspace 短 TTL 缓存(需签字)。
 
 ---
 
@@ -13,6 +13,7 @@
 | 层 | 方法 | 含什么 | 不含什么 |
 |---|---|---|---|
 | **服务端处理(干净)** | prod 本机对 `127.0.0.1:7860` 打端点 ×5 取中位(`scripts/_perf_probe.py`) | 纯服务端处理(含跨区 SQL 往返) | 机房↔用户网络 |
+| **每端点 SQL 条数** | 计数游标 patch `get_cursor`/`get_cursor_rls`,直调 handler 数 `execute()`(`scripts/_perf_sqlcount.py`) | 真实跨区往返**条数**(区分 N+1 vs 慢单查) | — |
 | **DB 往返** | prod 本机 `SELECT 1` ×10(psycopg2) | Japan↔Singapore 网络 RTT | — |
 | **真浏览器端到端** | Playwright 注入 e2e_3 token 加载 prod `/home`(`scripts/_perf_browser.cjs` / `_perf_clicks.cjs`) | 网络 + 服务端 + 渲染 + worker 排队 | — |
 
@@ -42,22 +43,26 @@
 
 服务端处理中位(本机打 localhost,干净):
 
-| # | 用户交互 | 端点 | 服务端中位 | 估算 SQL 条数¹ | 归因 |
+服务端处理中位(本机打 localhost)+ **实测 SQL 往返条数**(计数游标 patch `get_cursor` 直调 handler·`scripts/_perf_sqlcount.py`·e2e_3):
+
+| # | 用户交互 | 端点 | 服务端中位 | **实测 SQL 条数** | 归因 |
 |---|---|---|---|---|---|
-| 1 | 对账中心·VAT 导出列表 | `/api/vat_excel/tasks` | **1351ms** | ~20 | N+1 串行查询 × 69ms |
-| 2 | 知识库·文档库列表 | `/api/knowledge/bases` | **1155ms** | ~17 | N+1 × 69ms |
-| 3 | 首页·历史记录列表 | `/api/history` | **1140ms** | ~17 | N+1 × 69ms |
-| 4 | 进项页·采购单据列表/翻页 | `/api/purchase/docs` | **1132ms** | ~16 | N+1 × 69ms |
-| 5 | 对账中心·银行对账任务 | `/api/recon/bank-v2/tasks` | **1074ms** | ~16 | N+1 × 69ms |
-| 6 | 进项页·汇总卡片 | `/api/purchase/summary` | **1050ms** | ~15 | 上下文查询 + 聚合 × 69ms |
-| 7 | 套餐/额度信息 | `/api/me/plan` | **789ms** | ~11 | 多次串行 × 69ms |
-| 8 | 账套切换器加载 | `/api/workspace/clients` | **653ms** | ~9 | × 69ms |
-| 9 | 团队成员(console) | `/api/team/members` | **648ms** | ~9 | × 69ms |
-| 10 | 首页·异常数角标 | `/api/exceptions/stats` | **646ms** | ~9 | × 69ms |
+| 1 | 对账中心·VAT 导出列表 | `/api/vat_excel/tasks` | 1351ms | **5** | 请求级 RTT,非 N+1 |
+| 2 | 知识库·文档库列表 | `/api/knowledge/bases` | 1155ms | **2** | 请求级 RTT |
+| 3 | 首页·历史记录列表 | `/api/history` | 1140ms | **4** | 请求级 RTT |
+| 4 | 对账中心·银行对账任务 | `/api/recon/bank-v2/tasks` | 1074ms | **4** | 请求级 RTT |
+| 5 | 套餐/额度信息 | `/api/me/plan` | 789ms | **5** | 请求级 RTT |
+| 6 | 账户余额/用量 | `/api/me/credits` | — | **5** | 请求级 RTT |
+| 7 | 本月用量 | `/api/me/tenant-usage` | — | **4** | 请求级 RTT |
+| 8 | 首页·异常数角标 | `/api/exceptions/stats` | 646ms | **3** | 请求级 RTT(且首屏被打 2 次) |
+| 9 | 账套切换器加载 | `/api/workspace/clients` | 653ms | **2** | 请求级 RTT(enriched 仍单查·非 N+1) |
+| 10 | 集成端点列表 | `/api/erp/endpoints` | 437ms | **2** | 请求级 RTT(且首屏被打 3 次) |
 
-> 参照:最便宜的真端点 `/api/ocr/quota` 222ms(~3 跳);`/api/me` 435ms(~6 跳);鉴权失败短路的 404/422 仅 **2–13ms**(不打 DB)——印证**成本几乎全在 SQL 往返,不在 CPU**。
+> 参照:`/api/me` **2 SQL** / `/api/clients` **2 SQL**;鉴权失败短路的 404/422 仅 **2–13ms**(不打 DB)。
 
-¹ 估算 = 服务端中位 ÷ 69ms 单跳。**已代码确认的固定开销**:鉴权依赖 `get_current_user_from_request` 每请求 1 条 `find_user_by_id`(~69ms);叠加 tenant/workspace 上下文解析,任何鉴权端点的地板 ≈ 3 跳 ≈ 200ms。
+**🔑 关键纠正(实测推翻早先估算)**:**dashboard 读路径没有 N+1**——每端点 2–5 条 SQL,且条数**与数据量无关**(无逐行循环查),代码也确认无循环内查询。早先"~17/~20 条"是「服务端中位 ÷ 69ms」的**错误估算**(把单查慢/序列化/连接获取也算成了往返数)。**已代码确认的固定开销**:每请求鉴权 `find_user_by_id` 1 条;workspace-aware 端点多 1 条 `default_workspace_id`。所以**端点级没有可"批量化"的 SQL**——首屏慢的真因在下面三条,不在单端点。
+
+**首屏总 SQL ≈ Σ(各请求条数)≈ 22 请求 × 平均 ~3 = ~66 条往返**,跨区 69ms + 2-worker 事件循环串行(见 §4)→ 累积成 11.7s。**降首屏 SQL 的唯一杠杆是降「请求数」**(去重 + 懒加载),不是降单端点条数(已无水分)。
 
 ### 3-bis. 首屏冷启动(最痛点 · 真浏览器)
 
@@ -91,11 +96,14 @@ async def get_me(request: Request):
 | 优先 | 动作 | 杠杆 | 谁来做 |
 |---|---|---|---|
 | **P0** | **应用服务器迁新加坡(与 Supabase 同区)** | SQL 往返 69ms→~1ms,首屏与每个慢端点直接砍掉 90%+;泰国用户 RTT 也降 | ⚠️ 需 Zihao 拍板 + 运维迁移(换 Vultr 区/重部署)。**不在本窗口擅自动 prod 拓扑。** |
+| **P0** | **前端首屏请求去重 + 懒加载**(降请求数=降总 SQL) | erp/endpoints ×3、exceptions/stats ×2 去重 + 非首屏端点推迟 → 22 请求可砍到 ~6 → 总 SQL 与串行同比下降 | **前端窗口**(本窗口禁碰 src/home)·见 §6 |
 | P1 | uvicorn `--workers 2 → 4` | 缓解事件循环阻塞导致的串行(并发翻倍) | ⚠️ 改 prod systemd 单元,属运维决定 + 当前并行窗口活跃 → **建议 Zihao 确认后改**(内存够:4×~190MB)。 |
-| P1 | Top N+1 端点批量化(vat_excel/tasks、purchase/docs、history、knowledge/bases) | 20 跳→3 跳 ≈ 砍 80% | 专项后端窗口(逐端点改 + E2E 回归,中等风险,不宜与并行窗口叠) |
+| P1（需签字） | 进程级**短 TTL 缓存** `find_user_by_id`(鉴权)+ `default_workspace_id` | 首屏 22 请求各 1 条 `find_user_by_id`(同一行)= ~22 条 → 缓存命中后 ~1 条;workspace 默认查同理。可砍首屏后端 SQL ~1/3 | ⚠️ `find_user_by_id` = **鉴权主路径**(铁律:改鉴权先报方案)·TTL 缓存会让改密/踢设备/权限变更有 N 秒延迟 → **必须 Zihao 拍板**才做 |
 | P2 | 鉴权/DAL 改非阻塞(`run_in_threadpool` 或 asyncpg) | 根治事件循环阻塞 | 大重构,单列窗口 |
 
-**本窗口未擅自施工的理由**:P0/P1 属 prod 拓扑/运维决定;N+1 批量化需逐端点回归且与报税前端并行窗口共享树,贸然改读路径风险高于收益。诊断已定位到端点 + 行级根因,交专项窗口照本施工即可。
+**❌ 没有 "Top N+1 端点批量化" 这一项**:实测(§3)各 dashboard 读路径仅 2–5 条 SQL、与数据量无关、无循环内查询 → **不存在可批量化的 N+1**。早先把它列为 P1 是基于错误估算,已纠正删除。**端点级 SQL 已无水分**——降首屏只能降请求数(前端 P0)或降单查往返成本(迁区 P0 / 缓存 P1)。
+
+**本窗口未擅自施工**:P0 属拓扑/前端(非本窗口领地);P1 缓存触鉴权主路径需签字;无 N+1 可改。诚实结论 > 凑工作量。
 
 ---
 
@@ -111,10 +119,7 @@ async def get_me(request: Request):
 
 ---
 
-## 7. 复现脚本(临时诊断件,未入提交)
+## 7. 复现脚本
 
-- `scripts/_perf_probe.py` — 服务端处理 Top 端点(prod 本机打 localhost)。
-- `scripts/_perf_browser.cjs` — 真浏览器首屏 XHR 瀑布 + 导航时序。
-- `scripts/_perf_clicks.cjs` — 侧栏 tab 点击→首个 DOM 变化/网络静止。
-
-> 运行需在 prod 本机注入 `DATABASE_URL`/`JWT_SECRET`(probe)或本地 e2e_3 token(浏览器件)。诊断完成后可删。
+- `scripts/_perf_sqlcount.py` — **已入提交**·每端点真实 SQL 往返条数(计数游标 patch `get_cursor` 直调 handler)。**证伪 N+1 的关键件**,后续 perf 工作可复跑(prod 本机注入 `DATABASE_URL`/`JWT_SECRET`)。
+- 一次性件(已删·方法见 §1):服务端 localhost 计时(`urllib` 打 `127.0.0.1:7860`)、真浏览器首屏 XHR 瀑布 + tab 点击时序(Playwright 注入 e2e_3 token 加载 prod `/home`)。

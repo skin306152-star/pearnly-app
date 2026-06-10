@@ -6,15 +6,16 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-10 · **🧾 报税前端 4 屏 + 导航重分 + UI 补漏 + 团队 tab 死链修**(本窗口·已 commit·待 push)· 前序见下）
+## 🎯 状态卡（2026-06-11 · **🧾 报税前端 4 屏 + 导航重分 + UI 补漏 + 团队 tab 死链修 全上线**(本窗口·HEAD `364a1cef`·?v=11850747·prod 字节已验)· 前序见下）
 
-- **🆕 本窗口(2026-06-10)· 🧾 报税前端 4 屏 + 商户/事务所导航重分 + UI 补漏一次扫平 + 团队 tab 死链修复**(已 commit 本地 master·**待 push**:排在 billing 窗口 2 commit 后或同推):
+- **🆕 本窗口(2026-06-10→11)· 🧾 报税前端 4 屏 + 商户/事务所导航重分 + UI 补漏一次扫平 + 团队 tab 死链修复**(**已上线** `528cb7e1`+/simplify `e86a1c82`+bump `364a1cef`·?v=11850747·随推携 billing 窗口 2 commit `d441b4f2`/`92708fce` 一并上线·prod 真机验 main.js?v=747 含 loadTaxCenter/bindFileActions):
   - **报税 4 屏(任务A)**:`tax-common/center/pp30/pnd/settings.ts` 接 `/api/tax/*`(信封复用 acct-common 的 aapi/withWs/弹窗)· 做账组加「报税中心」一级入口(PP30/PND 复核从中心点进)· i18n 四语(112 键×4)· 四态齐 · 提交=POST /check 体检→二次确认(更正申报文案)→file(manual)+导出zip→已报只读 · e-Tax 未接=诚实「即将开放/导出手报」**无假直报按钮**。前端流程 E2E 19/19(本地真 bundle+stub)+ 浅暗截图眼验(`tests/visual/_shot/tax-*.png`)。
   - **导航重分(任务C·product-vision 五-bis)**:销项管理→「销售开票」(发票工作台/账套/应收);新建「事务所工具」组(上传识别/识别记录/对账中心)`business_type=firm` 或未选(老租户兜底)显·商户业态隐(`module-nav.ts` apply 控);集成页卡片按归属重排(采集渠道/归档交付/ERP/通知)+ `data-firm-only` 业态显隐(商户只 LINE Bot+智能提醒)。
   - **UI 补漏(任务B·THEME_FOLLOWUP_BACKLOG)**:#1 进项筛选 tab 黑→紫 pill;#1-bis 全站 4 处黑底交互控件(.seg/.zone/.cs-chip)接令牌 + **治本闸**`check_ui_consistency` D2 扩到 segmented/tab/chip/zone 激活态 + 扫 src/home/*.ts CSS-in-JS(D2=0);#2/#3 原生控件 `accent-color:var(--accent)` 全站令牌化;#4 中文字体顺位提前;#1-ter 按现状收口(emoji 棘轮已治本·全量 icons.ts/D3 留专项);#6 对照核销留专项。
   - **团队 tab 死链修(prod 真坏)**:旧设置→团队管理 tab 调已删 `/api/team/*`→点开载入失败。删 tab+`team.ts`/`assign-clients.ts`/`modal-assign-clients.ts`+死 i18n 键(55 删·保留 bank-client-picker 复用的 assign-loading/cancel/save)+ avatar 旧 `data-action=team` 入口删 → 统一 `/console`。
-  - **自检全绿**:typecheck/eslint(0 error·顺手加 `scripts/_*.cjs` 进 eslint ignore 解兄弟窗口 scratch 卡 lint)/3184 单测/i18n 四语 0 缺/ui_design_lint 棘轮/D1·D2/asset bundling/authz/file_size/视觉照搬闸全绿。**?v=11850745→11850746**(home.html 5 处+rebuild dist)。**/simplify 待跑**(收尾时)。
-  - **⚠️ push 协调**:`origin/master..HEAD` 含 billing 窗口 2 commit(`d441b4f2`/`92708fce`·其 `credits_schema.py +5` 无 exempt)。我 commit 已带 `RATCHET-EXEMPT: home.html` + `credits_schema.py`(共享树补其债范式)。push 取决于谁最后推;**报税 .py 后端早已 `6ccc1a3f` 上线**,本窗口纯前端 = dist 重建。
+  - **自检全绿**:typecheck/eslint(0 error·顺手加 `scripts/_*.cjs` 进 eslint ignore 解兄弟窗口 scratch 卡 lint)/3184 单测/i18n 四语 0 缺/ui_design_lint 棘轮/D1·D2/asset bundling/authz/file_size/视觉照搬闸全绿。报税 4 屏前端流程 E2E 19/19。**?v=11850745→747**。
+  - **/simplify 已跑**(`e86a1c82`):4 审查 agent → 抽 `bindFileActions`(PP30/PND 复核三动作共用)+ 复用 tax-common 的 `num` + tax-settings `bindSwitch`;跳过项(GET+/check 状态门控非浪费/.ts 扫描=#1-bis 治本不加 flag/restaurant 既有特例/lint 正则脆性=同性质非回归)已记 commit。bump `364a1cef`(refactor 后 bundle 字节变·刷缓存)。
+  - **push 已收口**:共享树携 billing 窗口 2 commit 一并上线(其 `credits_schema.py +5` 由本窗口 commit 补 RATCHET-EXEMPT·共享树补债范式);billing 窗口明示「托报税窗口 clean push 带上线」。报税 .py 后端早 `6ccc1a3f` 上线·本窗口纯前端。
 
 - **本窗口(2026-06-10)· 🧹 后端杂项收尾 + ★交互性能诊断专项**(commit `d441b4f2` 本地 master·**未由本窗口 push**=报税前端窗口 dist WIP 卡 pre-push 一致性闸·本窗口禁碰 build/dist→搭其下次 clean push 一并上线):
   - **任务A 两笔数据债(同根因·已修)**:prod 4 个 Codex QA 孤儿用户(tenant_id 指已删租户)使 `ensure_credits_tables` step7 INSERT 违 FK、整建表事务每启动回滚报 ERROR。① `credits_schema` step7 加 `EXISTS(tenants)` 守门根治复发 ② `scripts/cleanup_orphan_users.py` 幂等脚本(dry-run/--apply·停用+断 tenant_id+notes 留痕)prod 已 --apply 清 **4→0**·重启后 credits 日志转 INFO 零 ERROR。

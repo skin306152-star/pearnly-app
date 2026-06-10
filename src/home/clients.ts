@@ -28,6 +28,7 @@ import {
     saveWsClient,
     archiveWsClient,
 } from './clients-seller.js';
+import { toggleMoreMenu } from './more-menu.js';
 
 window.loadClientsPage = async function () {
     const st = document.getElementById('seller-tbody');
@@ -232,18 +233,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const wid = parseInt(btn.dataset.wid as string, 10);
             const act = btn.dataset.saction;
             const ws = S.sellerClients.find((x: any) => Number(x.id) === wid) as any;
+            // S9 行尾 ⋯ 菜单:开本行关其他;点任意动作即收
             if (act === 'more') {
-                // S9 行尾 ⋯ 菜单:开本行 · 关其他行
-                const menu = btn.parentElement?.querySelector('.more-menu') as HTMLElement | null;
-                sellerTbody.querySelectorAll<HTMLElement>('.more-menu').forEach((m) => {
-                    if (m !== menu) m.hidden = true;
-                });
-                if (menu) menu.hidden = !menu.hidden;
+                toggleMoreMenu('#seller-tbody', btn);
                 return;
             }
-            sellerTbody
-                .querySelectorAll<HTMLElement>('.more-menu')
-                .forEach((m) => (m.hidden = true));
+            toggleMoreMenu('#seller-tbody', null);
             if (act === 'activate') {
                 if (typeof window.setActiveWorkspaceClientId === 'function')
                     window.setActiveWorkspaceClientId(wid);

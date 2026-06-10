@@ -262,6 +262,7 @@ const RS_ICON = {
     trash: '<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
     plus: '<path d="M5 12h14M12 5v14"/>',
     x: '<path d="M18 6 6 18M6 6l12 12"/>',
+    dots: '<circle cx="5" cy="12" r="0.9" fill="currentColor"/><circle cx="12" cy="12" r="0.9" fill="currentColor"/><circle cx="19" cy="12" r="0.9" fill="currentColor"/>',
 };
 
 export function rsSvg(name: keyof typeof RS_ICON, size = 16): string {

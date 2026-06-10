@@ -9,6 +9,7 @@
 /* global escapeHtml, showToast, showConfirm */
 import type { ClientRuleRow } from './rules-settings-data.js';
 import { RS_STYLE, rsL, rsSvg } from './rules-settings-data.js';
+import { toggleMoreMenu } from './more-menu.js';
 
 let rsBuilt = false;
 let rsRules: ClientRuleRow[] = [];
@@ -92,13 +93,11 @@ function rsRow(r: ClientRuleRow): string {
         `<span class="rs-sev ${sev}">${sevLabel}</span>` +
         `<button class="rs-sw${r.is_active ? '' : ' off'}" data-toggle="${r.id}" aria-label="toggle"></button>` +
         // S9 4-bis:编辑/删除收行尾 ⋯ 菜单(toggle 留在行上 · 删除二次确认在 rsDelete)
-        `<div class="more-wrap">` +
-        `<button class="rs-icobtn" data-more="${r.id}" aria-label="more"><svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><circle cx="3" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="13" cy="8" r="1.3"/></svg></button>` +
+        `<div class="more-wrap"><button class="rs-icobtn" data-more="${r.id}" aria-label="more">${rsSvg('dots', 14)}</button>` +
         `<div class="more-menu right" hidden>` +
         `<button class="mi" data-edit="${r.id}">${rsSvg('pencil', 14)}<span>${L.edit}</span></button>` +
         `<button class="mi dng" data-del="${r.id}">${rsSvg('trash', 14)}<span>${L.del}</span></button>` +
-        `</div></div>` +
-        `</div>`
+        `</div></div></div>`
     );
 }
 
@@ -406,14 +405,7 @@ function rsBuild(): void {
         if (addBtn) rsOpenAdd(addBtn.dataset.addType!);
         // S9 行尾 ⋯ 菜单:开本行关其他;点任意动作/外部即收
         const moreBtn = el.closest('[data-more]') as HTMLElement | null;
-        const rsMenus = document.querySelectorAll<HTMLElement>('#rules-settings-modal .more-menu');
-        if (moreBtn) {
-            const menu = moreBtn.parentElement?.querySelector('.more-menu') as HTMLElement | null;
-            rsMenus.forEach((m) => m !== menu && (m.hidden = true));
-            if (menu) menu.hidden = !menu.hidden;
-            return;
-        }
-        rsMenus.forEach((m) => (m.hidden = true));
+        if (toggleMoreMenu('#rules-settings-modal', moreBtn)) return;
         const editBtn = el.closest('[data-edit]') as HTMLElement | null;
         if (editBtn) {
             const r = rsRules.find((x) => x.id === Number(editBtn.dataset.edit));

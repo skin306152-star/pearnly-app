@@ -6,9 +6,14 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-11 · **🧾 报税前端 4 屏 + 导航重分 + UI 补漏 + 团队 tab 死链修 全上线**(本窗口·HEAD `364a1cef`·?v=11850747·prod 字节已验)· 前序见下）
+## 🎯 状态卡（2026-06-11 · **🧪 真账号报税交叉核 E2E 落档**(本窗口·`d3945f04`)· 前序见下）
 
-- **🆕 本窗口(2026-06-10→11)· 🧾 报税前端 4 屏 + 商户/事务所导航重分 + UI 补漏一次扫平 + 团队 tab 死链修复**(**已上线** `528cb7e1`+/simplify `e86a1c82`+bump `364a1cef`·?v=11850747·随推携 billing 窗口 2 commit `d441b4f2`/`92708fce` 一并上线·prod 真机验 main.js?v=747 含 loadTaxCenter/bindFileActions):
+- **🆕 本窗口(2026-06-11)· 🧪 真账号报税交叉核 E2E(验证欠账清账)**(`d3945f04`·纯 tests/ 零业务改动):
+  - `tests/e2e/_tax_crosscheck_live_e2e.py`:pearnly_e2e_3 真租户全程 HTTP(本地 uvicorn × 真 Supabase)——真进销项→引擎凭证(auto_post·凭证 6 张)→账本 VAT 报告→结账挂点→PP30/PND53/PND3·数字三方交叉核(脚本期望 vs tax-reports vs 税表 breakdown:销 700/进 gross 315/缺税号剔 35/可抵 280/应缴 420/PND 75+30)·体检拦→补税号重算→提交→导出 zip/PDF→已报 409→隔离。**实跑 19/19 PASS**。
+  - 残留治理:专用一次性套账承载 + 结尾直连库清 + information_schema 全表扫归零(连首轮中断孤儿套账 52 一并回收·`--cleanup N` 模式入脚本)。凭据走临时文件不落上下文,用完即删。
+  - 撞车规避:丝滑专项+打包收编窗口独占 src/home+static/{dist,pos,console}+build,本窗口刻意选纯后端验证项,零交集。前窗口 backlog #1-ter/#6/#7 仍留给该窗口收尾后做。
+
+- **本窗口(2026-06-10→11)· 🧾 报税前端 4 屏 + 商户/事务所导航重分 + UI 补漏一次扫平 + 团队 tab 死链修复**(**已上线** `528cb7e1`+/simplify `e86a1c82`+bump `364a1cef`·?v=11850747·随推携 billing 窗口 2 commit `d441b4f2`/`92708fce` 一并上线·prod 真机验 main.js?v=747 含 loadTaxCenter/bindFileActions):
   - **报税 4 屏(任务A)**:`tax-common/center/pp30/pnd/settings.ts` 接 `/api/tax/*`(信封复用 acct-common 的 aapi/withWs/弹窗)· 做账组加「报税中心」一级入口(PP30/PND 复核从中心点进)· i18n 四语(112 键×4)· 四态齐 · 提交=POST /check 体检→二次确认(更正申报文案)→file(manual)+导出zip→已报只读 · e-Tax 未接=诚实「即将开放/导出手报」**无假直报按钮**。前端流程 E2E 19/19(本地真 bundle+stub)+ 浅暗截图眼验(`tests/visual/_shot/tax-*.png`)。
   - **导航重分(任务C·product-vision 五-bis)**:销项管理→「销售开票」(发票工作台/账套/应收);新建「事务所工具」组(上传识别/识别记录/对账中心)`business_type=firm` 或未选(老租户兜底)显·商户业态隐(`module-nav.ts` apply 控);集成页卡片按归属重排(采集渠道/归档交付/ERP/通知)+ `data-firm-only` 业态显隐(商户只 LINE Bot+智能提醒)。
   - **UI 补漏(任务B·THEME_FOLLOWUP_BACKLOG)**:#1 进项筛选 tab 黑→紫 pill;#1-bis 全站 4 处黑底交互控件(.seg/.zone/.cs-chip)接令牌 + **治本闸**`check_ui_consistency` D2 扩到 segmented/tab/chip/zone 激活态 + 扫 src/home/*.ts CSS-in-JS(D2=0);#2/#3 原生控件 `accent-color:var(--accent)` 全站令牌化;#4 中文字体顺位提前;#1-ter 按现状收口(emoji 棘轮已治本·全量 icons.ts/D3 留专项);#6 对照核销留专项。

@@ -18,7 +18,6 @@ from fastapi.responses import Response
 
 from core import db
 from core import workspace_context as wc
-from core.route_helpers import _require_tenant
 from routes.sales_schemas import ConvertIn, DocumentIn, IssueIn, NoteIn, RejectIn
 from services.authz.deps import require_perm, require_perm_tid
 from services.sales import approval as approval_svc
@@ -427,7 +426,7 @@ async def api_reject_document(doc_id: str, req: RejectIn, request: Request):
 
 
 def _make_note(doc_id: str, req: NoteIn, request: Request, note_type: str) -> dict:
-    tid, uid = _require_tenant(request)
+    tid, uid = require_perm_tid(request, "sales.doc.approve")
     p = _dump(req)
     on = _resolve_issue_date(p.get("issue_date"))
     with db.get_cursor_rls(tid, commit=True) as cur:
@@ -452,15 +451,13 @@ def _make_note(doc_id: str, req: NoteIn, request: Request, note_type: str) -> di
 
 @router.post("/{doc_id}/credit-note")
 async def api_credit_note(doc_id: str, req: NoteIn, request: Request):
-    """红冲 ใบลดหนี้:引用已开出原单 · 自身连号开出。"""
-    require_perm(request, "sales.doc.approve")
+    """红冲 ใบลดหนี้:引用已开出原单 · 自身连号开出(门在 _make_note)。"""
     return _make_note(doc_id, req, request, "credit_note")
 
 
 @router.post("/{doc_id}/debit-note")
 async def api_debit_note(doc_id: str, req: NoteIn, request: Request):
-    """补开 ใบเพิ่มหนี้:引用已开出原单 · 自身连号开出。"""
-    require_perm(request, "sales.doc.approve")
+    """补开 ใบเพิ่มหนี้:引用已开出原单 · 自身连号开出(门在 _make_note)。"""
     return _make_note(doc_id, req, request, "debit_note")
 
 

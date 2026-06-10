@@ -35,7 +35,7 @@ GATE_PATTERNS = [
     (
         "helper_gated",
         r"\b(_read|_write|_run|_owner_ctx|_subject|resolve_caller|_require_user|_get_user"
-        r"|_report|_gen_credential|_get_user_safe)\s*\(",
+        r"|_report|_gen_credential|_get_user_safe|_make_note)\s*\(",
     ),
 ]
 

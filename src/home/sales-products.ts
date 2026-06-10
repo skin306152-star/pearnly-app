@@ -58,7 +58,7 @@ function closeMask(id: string) {
 function rowsHtml(): string {
     const list = products;
     if (!list.length)
-        return `<tr><td colspan="7"><div class="sx-state">${escapeHtml(t('sx-empty'))}</div></td></tr>`;
+        return `<tr><td colspan="7"><div class="sx-state">${escapeHtml(t('sx-products-empty'))}</div></td></tr>`;
     return list
         .map((p) => {
             const name = p.name_th || p.name_en || p.name_zh || '—';

@@ -50,12 +50,7 @@
             </div>
             <div class="coming-big-title" data-i18n="cs-vouchers-title">凭证中心</div>
             <div class="coming-big-desc" data-i18n="cs-vouchers-desc">识别后自动生成会计凭证 · 借贷科目 AI 推荐 · 审核后一键推 ERP</div>
-            <ul class="coming-features">
-                <li data-i18n="cs-vouchers-f1">凭证自动生成 · AI 推荐借贷科目和金额分录</li>
-                <li data-i18n="cs-vouchers-f2">批量审核 + 单笔修改 · 审计追溯完整 · 所有改动留痕</li>
-                <li data-i18n="cs-vouchers-f3">支持中式凭证(借 / 贷)与泰式凭证(ใบสำคัญ)双格式</li>
-            </ul>
-            <div class="coming-eta" data-i18n="cs-vouchers-eta">预计 v104 上线</div>
+            <div class="coming-eta" data-i18n="cs-coming-soon">即将上线</div>
         </div>
 `,
         'page-receivables': `
@@ -69,12 +64,7 @@
             </div>
             <div class="coming-big-title" data-i18n="cs-receivables-title">应收追踪</div>
             <div class="coming-big-desc" data-i18n="cs-receivables-desc">应收未收款一目了然 · 账龄自动分组 · 到期自动提醒客户付款 · DSO 指标实时更新</div>
-            <ul class="coming-features">
-                <li data-i18n="cs-receivables-f1">账龄分析(30 / 60 / 90 / 90+ 天)· 逾期自动红标</li>
-                <li data-i18n="cs-receivables-f2">LINE / 邮件自动催收 · 多模板预设 · 一键群发不失礼</li>
-                <li data-i18n="cs-receivables-f3">银行流水回款自动核销 · 不用手动对账 · 收款秒到账</li>
-            </ul>
-            <div class="coming-eta" data-i18n="cs-receivables-eta">预计 v107 上线</div>
+            <div class="coming-eta" data-i18n="cs-coming-soon">即将上线</div>
         </div>
         </div>
 `,
@@ -88,12 +78,7 @@
             </div>
             <div class="coming-big-title" data-i18n="cs-cloud-title">云盘同步</div>
             <div class="coming-big-desc" data-i18n="cs-cloud-desc">Google Drive / OneDrive 指定文件夹监听 · 跨设备远程入账 · 不依赖本地浏览器</div>
-            <ul class="coming-features">
-                <li data-i18n="cs-cloud-f1">手机拍照 → Drive app 上传 → Pearnly 自动识别推 ERP</li>
-                <li data-i18n="cs-cloud-f2">服务器侧轮询 · 浏览器关了照样跑 · 真 24/7 不间断</li>
-                <li data-i18n="cs-cloud-f3">多设备协作 · 出纳外勤扫描 + 会计坐班复核分工</li>
-            </ul>
-            <div class="coming-eta" data-i18n="cs-cloud-eta">预计 v108 上线</div>
+            <div class="coming-eta" data-i18n="cs-coming-soon">即将上线</div>
         </div>
 `,
     };

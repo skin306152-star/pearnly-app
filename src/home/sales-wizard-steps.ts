@@ -216,7 +216,7 @@ export function step5(st: WState): string {
     const checks = compliance(st)
         .map((c) => {
             if (c.na)
-                return `<div class="sw-check"><div class="sw-ci" style="background:#eee;color:#999">${ICO.checkG}</div><div><div class="sw-ct">${escapeHtml(wt(c.key))} <span class="sw-pill">${escapeHtml(wt('ckNa'))}</span></div></div></div>`;
+                return `<div class="sw-check"><div class="sw-ci" style="background:var(--line2);color:var(--ink-3)">${ICO.checkG}</div><div><div class="sw-ct">${escapeHtml(wt(c.key))} <span class="sw-pill">${escapeHtml(wt('ckNa'))}</span></div></div></div>`;
             return `<div class="sw-check ${c.pass ? 'pass' : 'fail'}"><div class="sw-ci">${c.pass ? ICO.checkG : ICO.x}</div><div><div class="sw-ct">${escapeHtml(wt(c.key))}${c.req && !c.pass ? ' <span class="sw-req">*</span>' : ''}</div><div class="sw-cd">${escapeHtml(wt(c.descKey))}</div></div></div>`;
         })
         .join('');

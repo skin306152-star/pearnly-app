@@ -202,8 +202,7 @@ async function load(): Promise<void> {
     // 收款设置按账套(workspace_client_id)隔离 · 未选账套 → 页内引导先选账套。
     const id = activeWsId();
     if (id == null) {
-        if (body)
-            body.innerHTML = `<div class="state">${escapeHtml(t('rpay.no_workspace'))}<br><button class="save" id="rpay-pick-ws" style="margin-top:14px;width:auto;padding:0 20px;height:42px;">${escapeHtml(t('rpay.pick_ws'))}</button></div>`;
+        if (body) body.innerHTML = window.wsEmptyHtml ? window.wsEmptyHtml('rpay-pick-ws') : '';
         const pick = document.getElementById('rpay-pick-ws');
         if (pick)
             pick.onclick = () =>

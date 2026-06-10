@@ -212,8 +212,7 @@ async function load(): Promise<void> {
     const id = activeWsId();
     if (id == null) {
         const body = document.getElementById('ptbl-body');
-        if (body)
-            body.innerHTML = `<div class="state">${escapeHtml(t('rtbl.no_workspace'))}<br><button class="btn primary e-btn" id="ptbl-pick-ws">${escapeHtml(t('rtbl.pick_ws'))}</button></div>`;
+        if (body) body.innerHTML = window.wsEmptyHtml ? window.wsEmptyHtml('ptbl-pick-ws') : '';
         const pick = document.getElementById('ptbl-pick-ws');
         if (pick)
             pick.onclick = () =>

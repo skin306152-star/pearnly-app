@@ -325,8 +325,7 @@ async function removeCashier(c: Cashier) {
 }
 
 function needWorkspaceHtml(): string {
-    return `<div class="csh-state">${escapeHtml(t('csh-need-workspace'))}
-        <button class="csh-add" id="csh-pick-ws">${escapeHtml(t('csh-pick-workspace'))}</button></div>`;
+    return window.wsEmptyHtml ? window.wsEmptyHtml('csh-pick-ws') : '';
 }
 
 async function load() {

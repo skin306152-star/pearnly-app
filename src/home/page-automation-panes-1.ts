@@ -129,7 +129,7 @@ export const AUTO_HTML_1 = `
                         <div class="erp-subpanel active" data-erp-subpanel="connect">
                             <!-- P1b · 全局「ERP 自动处理方式」(账户级 · 对所有 ERP 端点统一生效 ·
                                  不是单个端点的设置 · 故放在卡片上方而非某张卡片内)。 -->
-                            <div class="erp-global-mode" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 16px;padding:12px 14px;background:#fff;border:1px solid #e8e8e3;border-radius:8px;">
+                            <div class="erp-global-mode" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 16px;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:8px;">
                                 <span data-i18n="pref-erp-mode-title" style="font-weight:600;font-size:13px;">ERP 自动处理方式</span>
                                 <select id="erp-global-push-mode" class="folder-interval-select">
                                     <option value="smart" data-i18n="pref-erp-mode-smart">智能分拣(推荐)</option>

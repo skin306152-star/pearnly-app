@@ -30,6 +30,18 @@
         return fallback;
     }
 
+    // 「先选账套」阻断态全站统一一版(kit .pn-empty)· 库存/桌台/收款/收银员四屏共用。
+    window.wsEmptyHtml = function (btnId: string): string {
+        const ico =
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>';
+        return (
+            `<div class="pn-empty fill"><div class="ill">${ico}</div>` +
+            `<div class="t">${_t('ws-empty-title', '先选择账套')}</div>` +
+            `<div class="s">${_t('ws-empty-sub', '这个页面按账套隔离 · 选好后才会显示数据')}</div>` +
+            `<div class="act"><button class="btn btn-primary btn-sm" id="${btnId}">${_t('ws-empty-pick', '选择账套')}</button></div></div>`
+        );
+    };
+
     function _isOwner() {
         // B4 修 (2026-05-26) · owner 判定要宽松:自行注册/白名单/付费主账号默认都是 owner。
         // 兼容多种后端字段命名 · 任一命中即 owner。绝不能把 owner 当成员工(否则空 workspace

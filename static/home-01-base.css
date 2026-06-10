@@ -308,6 +308,9 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; }
+/* 表单控件不继承 body 文字色(UA 默认黑字)→ 暗夜下深字压深底看不清 · 全局收口(2026-06-10 Zihao 实测采购设置数字隐身) */
+input, select, textarea { color: var(--ink); }
+input::placeholder, textarea::placeholder { color: var(--ink3); }
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Thai", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
     background: var(--bg); color: var(--ink);

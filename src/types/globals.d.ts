@@ -354,6 +354,7 @@ interface Window {
     openWorkspaceChooserUI?: LegacyBridge;
     openWorkspaceChooser?: LegacyBridge;
     requireWorkspace?: LegacyBridge;
+    wsEmptyHtml?: (btnId: string) => string;
     fetchWorkspaceClients?: LegacyBridge;
     getWorkMode?: () => unknown;
     _rerenderEmailIngest?: () => void;

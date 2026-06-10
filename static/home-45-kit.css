@@ -632,6 +632,47 @@
     font-size: 12px;
     margin-top: 3px;
 }
+/* ── 标准空态 · 全局版(2026-06-10 评审 S3)· .ui .empty 镜像 + fill 铺满垂直居中 ── */
+.pn-empty {
+    text-align: center;
+    padding: 22px;
+}
+.pn-empty.fill {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+    width: 100%;
+}
+.pn-empty .ill {
+    width: 50px;
+    height: 50px;
+    border-radius: 13px;
+    background: var(--accent-weak);
+    color: var(--accent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 11px;
+}
+.pn-empty .ill svg {
+    width: 24px;
+    height: 24px;
+}
+.pn-empty .t {
+    font-weight: 600;
+    font-size: 13.5px;
+    color: var(--ink);
+}
+.pn-empty .s {
+    color: var(--ink2);
+    font-size: 12px;
+    margin-top: 3px;
+}
+.pn-empty .act {
+    margin-top: 11px;
+}
 .ui .tip {
     position: relative;
     display: inline-block;

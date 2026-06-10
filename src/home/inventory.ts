@@ -201,8 +201,7 @@ function currentFilter(): StockFilter {
 
 // 库存按账套(workspace_client_id)隔离 · 个人模式/未选账套 → 引导先选账套(不空请求 422)。
 function needWorkspaceHtml(): string {
-    return `<div class="inv-state">${IC_BOX}<div>${escapeHtml(t('inv-need-workspace'))}</div>
-        <button class="btn primary" id="inv-pick-ws">${escapeHtml(t('inv-pick-workspace'))}</button></div>`;
+    return window.wsEmptyHtml ? window.wsEmptyHtml('inv-pick-ws') : '';
 }
 
 async function load() {

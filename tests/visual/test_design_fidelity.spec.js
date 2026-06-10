@@ -32,6 +32,8 @@ const API = {
         tenant_id: 't1',
     },
     '/api/ocr/quota': { used: 0, limit: 100 },
+    // S7(2026-06-10):充值按钮与余额卡同生死 · stub 需 owner+余额才渲染 dashboard 主按钮
+    '/api/me/credits': { is_owner: true, is_billing_exempt: false, balance_thb: 100 },
     '/api/me/plan': {},
     '/api/contact': {},
     '/api/me/modules': {

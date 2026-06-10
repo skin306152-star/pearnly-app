@@ -6,18 +6,24 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-10 · **🧾 报税 Phase 3 后端已 commit 待推** + 🟣 Purple v2 已上线 + 做账 Phase 2 闭环 + 权限批1-5 · 前序见下）
+## 🎯 状态卡（2026-06-10 · **🔐 权限批5收口+PEAK吸收+console真机5修(三窗口合流 push)** + 🧾 报税 Phase 3 后端 + 🟣 Purple v2 · 前序见下）
 
-- **🆕 本窗口(2026-06-10)· 🧾 自动报税(Phase 3)后端全量 commit `6ccc1a3f` · 自检全绿 · ⏳ 待 console 窗口收口顺带 push**:
+- **🆕 本窗口(2026-06-10)· 🔐 权限批5收口 + PEAK 吸收 4 条 + /console·邀请页真机 5 修**(`038ae65e`+`634fb5d3`+`1359ebd6`·随推主题/报税共 9 commit 合流上线):
+  - **批5(权限整顿收官)**:九门旧别名全删(`_require_owner_or_super`/`_require_tenant`/`require_owner`/`require_account_owner`·契约测试锁不许复活);billing 4 处 invited_by owner 判定改 membership(`authz.deps.is_owner_role`);旧团队管理处决=`routes/team_routes.py` 7 接口+`services/team/store.py` 删除(活函数并入 console_store 直调·退出 dal_reexports 防循环 import·EmployeeToggleRequest 迁 admin_users_mutation);改密链路单点留 auth_password_routes(invitations 复用确认)。06 对照表随更。
+  - **PEAK 吸收**:B1 席位「当前用户 N/M」+满员升级提示 / B2 角色卡「使用权」模块芯片 / B3 角色「N 人在用」 / B4 行内展开使用权行。芯片全令牌 accent 系(10 色 hex 板撞禁裸hex+紫封板→收敛·mod-* 类名留位,彩色板须先进 console-theme 令牌)。
+  - **真机 5 修**:logo 换 pwa-icon-192 / invite 接受失败必复位+422数组人话+pwd.*四语 / 已注册邮箱明确码 `invite.account_exists_other_tenant`(1人1租户·配单测) / 语言切换→站内 seg pills / checkbox 站内样式(顺手修 .field input 全宽压垮 .wsopt)。?v= bump。
+  - **自检**:全量单测 3184 绿·权限矩阵真库 E2E **54/54**(批5删后 diff=空)·真浏览器 17/17+增量 16/16(截图 tests/visual/_shot/console2-*)·authz 闸 439 路由绿·ui_lint 棘轮绿(裸hex 清零+baseline 收紧)·inventory helper_gated 收编 `_auth`(解报税 tax_routes push 卡点)。
+  - **⚠️ 留存 TODO(碰 src/home+build·下个窗口尽快)**:旧「设置→团队管理」tab 前端处决(data-action=team 改指 /console·删 team.ts/assign-clients.ts/page-settings team pane+i18n)——**后端 7 接口已删,该 tab 现点开会载入失败**。/console 入口本体已有(`45ce1f46`)。
+- **本日同窗口(2026-06-10)· 🧾 自动报税(Phase 3)后端全量 commit `6ccc1a3f` · 自检全绿 · 已随批5窗口收口 push 上线**:
   - 照 docs/tax-filing/00-05 封板:`services/tax/`(schema ensure 3表/aggregate PP30销−进+超期剔除+缺税号不计·PND53/3按税号首位分流/anomalies 报前体检 hard·info/filings 幂等+已报不可改/efiling e-Tax诚实降级+PDF·XML·zip 导出/hooks SAVEPOINT)+`routes/tax_routes.py` 11端点(tax.filing.* 逐路由码·accounting 门控·套账 fail-closed)+ close-period 挂点一行。
   - 自检:40 新单测+全量 3182 绿·真库 E2E `tests/e2e/_tax_e2e.py` **25/25**(数字对账本 books.vat_report 同基/体检拦缺税号→补→提交→已报只读/导出真生成/0税额照报/未结账拦/跨套账隔离)·做账 E2E 28/28 回归零红·/simplify 已跑(5 改:mark_filed 去双重聚合等)。
-  - **🚦 给 console 窗口(push 调度)**:master 本地链 `49a0ef2d`(主题·已授权随推)→`6ccc1a3f`(报税)→`07a7b8b5`→`467de8bf`→`038ae65e`(批5)→`634fb5d3`(console·**+18 裸hex/+1 旧蓝超 ui_lint baseline=push 卡点·你的 CSS 你来收**)→`90c3d834`(**black 修复 admin_users_query_routes·批5携带·删了 black 闸过不去**)。收口时一并 push 即全员上线;报税 .py 改动靠部署重启生效。
+  - **🚦 push 调度(已完结)**:9 commit 链(主题 2+报税 1+批5/console 4+docs 2)由批5窗口收口一并 push;裸hex 卡点已令牌化清零(`1359ebd6`),black 携带修复 `90c3d834` 已并入。报税 .py 改动靠部署重启生效。
   - 决策:模块门控用 accounting(报税吃账本·registry tax 码组本就不挂模块键);e-Tax 未接通(RD 开放度未确认)→ file(etax) 返 tax.efiling_failed·主路径=导出 PDF/XML 手报+mark-filed;ensure-only 无 alembic(做账先例)。前端 4 屏照 docs/tax-filing/04 另开窗口接。
 - **本日同窗口(2026-06-10)· 🟣 全站主题切 Purple v2 上线**(`1552209c`·?v=11850745·prod 字节已验):
   - 色值唯一来源 = 桌面/Pearnly_紫色主题预览 `.panel.purple` 浅+暗 + partner-components primary-50..900,逐字搬零调色。home-01-base.css 浅/暗令牌(accent 系/blue 别名/btn-blue/blue-50..800 紫阶/bg/ink/line)+ home-38 按钮 + /console v1 估值→v2 真值 + POS 旧蓝→紫(厨房深色屏用暗夜紫 A974FF·sw 缓存 bump)+ /admin 自动跟随(真浏览器抽查 3 屏)。状态色(green/amber/red)按任务范围未动;主按钮全站纯色 var(--accent),渐变不全站化。
   - 视觉闸:design 17 快照重着色 + fidelity 主色断言→rgb(124,77,255) 全绿;ui_lint_baseline 旧蓝随迁紫下降已收紧。DESIGN_LANGUAGE 令牌节=Purple v2(真相=home-01-base.css·禁写死 hex·并入一-bis 交互原则成稿)。
   - 自检:`_s1_shot` 全路由浅/暗逐张眼验(无残留绿/暗夜不洗字)+ `_purple_spotshot/_purple_admin3`(console/pos/admin 抽查)+ 守门全绿。**注意:工作树有权限批5窗口活跃 WIP(.py/tests)·本 commit 严格只含主题 pathspec**。
-  - **/simplify 已跑 · 2 个 commit 未 push**(`49a0ef2` 收口:home-38 删重复 :root --btn-blue 块改单源 home-01+fidelity spec 删 15 处冗余 primary 字段;`07a7b8b` 回撤 var(--blue) 换法=lint 旧token棘轮拦)。**push 被批5窗口工作树 console 裸hex(+18 超 ui_lint baseline)拦在 pre-push——其收口 push 时顺带带上这两个 commit 即可,内容已全绿(fidelity/prettier/build 复验过)**。
+  - **/simplify 已跑**(`49a0ef2` 收口:home-38 删重复 :root --btn-blue 块改单源 home-01+fidelity spec 删 15 处冗余 primary 字段;`07a7b8b` 回撤 var(--blue) 换法=lint 旧token棘轮拦)。两 commit 已随批5窗口收口 push 上线(console 裸hex 卡点已令牌化清零)。
 - **本日同窗口(2026-06-10)· 📒 做账引擎(Phase 2)出账本后端 + 前端 5 屏全闭环上线**(HEAD `3e157b10`·?v=11850742):
   - **出账本后端 `5f82e6bc`**:`services/accounting/{books,books_pdf,closing}.py` + 独立 `routes/accounting_books_routes.py`(books 总账/明细账/试算表 · tax-reports VAT/WHT · financials · close-period · export-package zip)。close=待审挡结(≤period 全段)+ R9 经引擎生成直接 posted + closed_through 水位只进不退;VAT 报告/结转剔除 vat_closing 自身;PDF 泰中混排 4 语表头。31 单测+隔离闸绿。
   - **前端 5 屏 `67f5b783`**:`src/home/acct-{common,list,review,accounts,settings,books,modals}.ts` 照桌面稿 01-05+emerald 基座。主屏(北极星+待审行动卡+行内展开借贷·撤销重做/作废二次确认)/逐笔审(原因人话+改科目.modal+remember·缺映射壳给设置落点)/科目表/设置(自动过账全局+R1-R9 粒度开自动二次确认+映射弹窗+learned 可见规则)/出账本(接后端·结账流)。i18n acct-* ~140键×4语·导航做账组 5 子项(accounting 门控默认关 opt-in·「即将上线」退场)。

@@ -135,6 +135,23 @@ def _create_tables(cur) -> None:
     cur.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_invitations_token_hash " "ON invitations(token_hash)"
     )
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS ownership_transfers (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            tenant_id UUID NOT NULL,
+            from_user_id UUID NOT NULL,
+            to_user_id UUID NOT NULL,
+            token_hash TEXT NOT NULL,
+            expires_at TIMESTAMPTZ NOT NULL,
+            completed_at TIMESTAMPTZ,
+            cancelled_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """)
+    cur.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_ownership_transfers_token "
+        "ON ownership_transfers(token_hash)"
+    )
 
 
 def ensure_authz_schema() -> None:

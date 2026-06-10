@@ -27,6 +27,11 @@
 
 ### 批 5 · 收口
 - 删旧门别名、user_company_roles 读取点改造 + drop、client_assignments 只读冻结(下版本 drop)、users.role 标记 deprecated(读侧兼容保留)。
+- **旧团队管理整体处决(Zihao 2026-06-10:无方案期的临时产物,新体系上线后全删,不留死代码)**:
+  - 后端:routes/team_routes.py 7 接口 + services/team/store.py 整体删除;唯一保留物 = 改密链接发送链路(email/LINE),抽成共享助手供 invitations 复用后再删宿主。
+  - 前端:设置内团队管理页/入口(data-show-if-team 逻辑改指向控制台链接)、相关 i18n 键四语清理。
+  - 时序硬约束:**批 3 上线 + 控制台可用 + 存量员工 membership 映射完成之后才动刀**——存量租户的员工管理不能出现真空期。
+  - 删后跑全量回归:老员工账号登录/改密/被分配数据可见性全部走新体系验证。
 - **机械闸合闸**(见下)。
 - /simplify 全链。
 

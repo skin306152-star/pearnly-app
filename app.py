@@ -95,6 +95,9 @@ from routes.purchase_config_routes import (
 from routes.accounting_routes import (
     router as accounting_router,
 )  # 自动做账 凭证/逐笔审/科目/映射/设置 · 2026-06-10
+from routes.accounting_books_routes import (
+    router as accounting_books_router,
+)  # 自动做账 出账本/报税材料/月末结账 · 2026-06-10
 from routes.sales_routes import router as sales_router  # 销项单据/开票 PO-4 · 2026-06-06
 from routes.sales_seller_routes import (
     router as sales_seller_router,
@@ -107,6 +110,8 @@ from routes.sales_send_routes import (
 )  # 销项发票发送/分享 PO-7 · 2026-06-06
 from routes.uploads_routes import router as uploads_router  # 图片上传/取图 §L4 · 2026-06-06
 from routes.team_routes import router as team_router  # REFACTOR-B1 · 员工管理 7 路由 · 2026-05-25
+from routes.console_team_routes import router as console_team_router  # 权限批3 · 成员/角色/安全日志
+from routes.console_invite_routes import router as console_invite_router  # 权限批3 · 邀请/所有权转移
 from routes.email_ingest_routes import (
     router as email_ingest_router,
 )  # REFACTOR-B1 · 邮箱抓取 6 路由 · 2026-05-25
@@ -246,12 +251,15 @@ app.include_router(purchase_router)  # 商户采购 单据/入账/付款/作废 
 app.include_router(purchase_intake_router)  # 商户采购 智能入口 intake/expense(2026-06-08)
 app.include_router(purchase_config_router)  # 商户采购 配置后台 供应商/科目/设置(2026-06-08)
 app.include_router(accounting_router)  # 自动做账 凭证/逐笔审/科目/映射/设置(2026-06-10)
+app.include_router(accounting_books_router)  # 自动做账 出账本/报税/结账(2026-06-10)
 app.include_router(sales_router)  # 销项单据/开票 6 路由(PO-4 · 2026-06-06)
 app.include_router(sales_seller_router)  # 销项开票方资料 3 路由(PO-6 · 2026-06-06)
 app.include_router(sales_settings_router)  # 销项开票设置 2 路由(§M7 · 2026-06-06)
 app.include_router(sales_send_router)  # 销项发票发送/公开分享 2 路由(PO-7 · 2026-06-06)
 app.include_router(uploads_router)  # 图片上传/取图 2 路由(§L4 · 2026-06-06)
 app.include_router(team_router)  # REFACTOR-B1 · 员工管理 7 路由(2026-05-25)
+app.include_router(console_team_router)  # 权限批3 · 控制台成员管理 8 路由(2026-06-10)
+app.include_router(console_invite_router)  # 权限批3 · 邀请/转移 7 路由(2026-06-10)
 app.include_router(erp_mappings_router)  # REFACTOR-B1 · ERP 映射 12 路由(2026-05-25)
 app.include_router(email_ingest_router)  # REFACTOR-B1 · 邮箱抓取 6 路由(2026-05-25)
 app.include_router(rd_router)  # REFACTOR-B1 · 泰国 RD 税务 4 路由(2026-05-25)

@@ -67,6 +67,166 @@ const API = {
             promptpay_id: '',
         },
     },
+    // 做账 Phase 2(屏1/2/3/5/4):列表带待审 → 主屏行动卡/逐笔审有内容渲染
+    '/api/accounting/vouchers': {
+        ok: true,
+        data: {
+            summary: { auto_count: 244, posted_count: 245, pending_count: 1 },
+            items: [
+                {
+                    id: 'v1',
+                    voucher_no: 'JV2606-0001',
+                    voucher_date: '2026-06-08',
+                    period: '2026-06',
+                    source_type: 'purchase',
+                    description: '向 ทิปโก้ 进货付款',
+                    rule_key: 'R1',
+                    confidence: 95,
+                    method: 'auto',
+                    status: 'auto_posted',
+                    total_debit: 18190,
+                    total_credit: 18190,
+                },
+                {
+                    id: 'v2',
+                    voucher_no: 'JV2606-0002',
+                    voucher_date: '2026-06-07',
+                    period: '2026-06',
+                    source_type: 'payment',
+                    description: '付设计服务费(含预扣税)',
+                    rule_key: 'R2',
+                    confidence: 60,
+                    method: 'suggested',
+                    status: 'pending_review',
+                    review_reason: 'suggest_mode',
+                    total_debit: 10700,
+                    total_credit: 10700,
+                },
+            ],
+        },
+    },
+    '/api/accounting/vouchers/v2': {
+        ok: true,
+        data: {
+            voucher: {
+                id: 'v2',
+                voucher_no: 'JV2606-0002',
+                voucher_date: '2026-06-07',
+                period: '2026-06',
+                source_type: 'payment',
+                description: '付设计服务费(含预扣税)',
+                human_note: '选「服务」会自动多一笔代扣,实付对方少 300。',
+                rule_key: 'R2',
+                method: 'suggested',
+                status: 'pending_review',
+                review_reason: 'suggest_mode',
+                total_debit: 10700,
+                total_credit: 10700,
+                lines: [
+                    {
+                        id: 'l1',
+                        account_id: 'a1',
+                        account_code: '5210',
+                        account_name: '外包服务费',
+                        dr_cr: 'debit',
+                        amount: 10000,
+                    },
+                    {
+                        id: 'l2',
+                        account_id: 'a2',
+                        account_code: '1140',
+                        account_name: '进项税',
+                        dr_cr: 'debit',
+                        amount: 700,
+                    },
+                    {
+                        id: 'l3',
+                        account_id: 'a3',
+                        account_code: '1020',
+                        account_name: '银行存款',
+                        dr_cr: 'credit',
+                        amount: 10400,
+                    },
+                    {
+                        id: 'l4',
+                        account_id: 'a4',
+                        account_code: '2050',
+                        account_name: '预扣税应缴',
+                        dr_cr: 'credit',
+                        amount: 300,
+                    },
+                ],
+            },
+        },
+    },
+    '/api/accounting/review': {
+        ok: true,
+        data: {
+            count: 1,
+            items: [
+                {
+                    id: 'v2',
+                    voucher_no: 'JV2606-0002',
+                    source_type: 'payment',
+                    description: '付设计服务费(含预扣税)',
+                    status: 'pending_review',
+                    review_reason: 'suggest_mode',
+                    total_debit: 10700,
+                    total_credit: 10700,
+                },
+            ],
+        },
+    },
+    '/api/accounting/accounts': {
+        ok: true,
+        data: {
+            accounts: [
+                {
+                    id: 'a1',
+                    code: '1010',
+                    name_zh: '现金',
+                    name_th: 'เงินสด',
+                    acct_type: 'asset',
+                    is_preset: true,
+                    is_active: true,
+                },
+                {
+                    id: 'a2',
+                    code: '2010',
+                    name_zh: '应付账款',
+                    name_th: 'เจ้าหนี้การค้า',
+                    acct_type: 'liability',
+                    is_preset: true,
+                    is_active: true,
+                },
+                {
+                    id: 'a3',
+                    code: '4010',
+                    name_zh: '销售收入',
+                    name_th: 'รายได้จากการขาย',
+                    acct_type: 'revenue',
+                    is_preset: true,
+                    is_active: true,
+                },
+            ],
+        },
+    },
+    '/api/accounting/settings': {
+        ok: true,
+        data: {
+            settings: {
+                auto_post: false,
+                auto_post_threshold: 90,
+                auto_post_rules: {},
+                accounting_standard: 'TFRS_NPAE',
+                inventory_method: 'periodic',
+                base_currency: 'THB',
+                start_period: '2026-06',
+                closed_through: null,
+            },
+        },
+    },
+    '/api/accounting/learned': { ok: true, data: { items: [] } },
 };
 
 // 映射表:稿 ↔ 生产路由 ↔ 关键选择器比对项。
@@ -324,6 +484,116 @@ const MAPPINGS = [
         bluemust: '.pur .save',
         primary: 'rgb(14, 124, 102)', // Window B 迁 emerald(风格 B)
         nosvgemoji: '.pur .addcat svg',
+    },
+    {
+        name: '做账主屏(01 收拢版)',
+        design: 'acct-list.html',
+        route: 'vouchers',
+        ready: '#acct-star',
+        layout: { sel: '#page-vouchers .acct .wrap', maxWidth: 'none', centered: true },
+        tokens: [
+            {
+                design: '.panel',
+                prod: '#page-vouchers .acct .panel',
+                props: ['borderRadius', 'boxShadow'],
+            },
+            {
+                design: '.ph .t',
+                prod: '#page-vouchers .acct .ph .t',
+                props: ['fontSize', 'fontWeight'],
+            },
+            {
+                design: '.mctl .exp',
+                prod: '#acct-books-btn',
+                props: ['backgroundColor', 'borderRadius'],
+            },
+        ],
+        bluemust: '#acct-books-btn',
+        primary: 'rgb(14, 124, 102)',
+    },
+    {
+        name: '做账逐笔审(02)',
+        design: 'acct-review.html',
+        route: 'acct-review',
+        ready: '#page-acct-review .led',
+        layout: { sel: '#page-acct-review .acct .wrap', maxWidth: 'none', centered: true },
+        tokens: [
+            {
+                design: '.panel',
+                prod: '#page-acct-review .acct .panel',
+                props: ['borderRadius', 'boxShadow'],
+            },
+            {
+                design: '.btn.primary',
+                prod: '#page-acct-review [data-act="confirm"]',
+                props: ['backgroundColor', 'borderRadius', 'fontSize'],
+            },
+        ],
+        bluemust: '#page-acct-review [data-act="confirm"]',
+        primary: 'rgb(14, 124, 102)',
+    },
+    {
+        name: '做账科目表(03)',
+        design: 'acct-accounts.html',
+        route: 'acct-accounts',
+        ready: '#acct-acc-add',
+        layout: { sel: '#page-acct-accounts .acct .wrap', maxWidth: 'none', centered: true },
+        tokens: [
+            {
+                design: '.panel',
+                prod: '#page-acct-accounts .acct .panel',
+                props: ['borderRadius', 'boxShadow'],
+            },
+            {
+                design: '.btn.primary',
+                prod: '#acct-acc-add',
+                props: ['backgroundColor', 'borderRadius', 'fontSize'],
+            },
+        ],
+        bluemust: '#acct-acc-add',
+        primary: 'rgb(14, 124, 102)',
+    },
+    {
+        name: '做账设置(05)',
+        design: 'acct-settings.html',
+        route: 'acct-settings',
+        ready: '#acct-set-save',
+        layout: { sel: '#page-acct-settings .acct .wrap', maxWidth: 'none', centered: true },
+        tokens: [
+            {
+                design: '.panel',
+                prod: '#page-acct-settings .acct .panel',
+                props: ['borderRadius', 'boxShadow'],
+            },
+            {
+                design: '.foot .btn',
+                prod: '#acct-set-save',
+                props: ['backgroundColor', 'borderRadius', 'fontSize'],
+            },
+        ],
+        bluemust: '#acct-set-save',
+        primary: 'rgb(14, 124, 102)',
+    },
+    {
+        name: '做账出账本/报税包(04)',
+        design: 'acct-books.html',
+        route: 'acct-books',
+        ready: '#acct-books-pack',
+        layout: { sel: '#page-acct-books .acct .wrap', maxWidth: 'none', centered: true },
+        tokens: [
+            {
+                design: '.panel',
+                prod: '#page-acct-books .acct .panel',
+                props: ['borderRadius', 'boxShadow'],
+            },
+            {
+                design: '.btn.primary',
+                prod: '#acct-books-pack',
+                props: ['backgroundColor', 'borderRadius'],
+            },
+        ],
+        bluemust: '#acct-books-pack',
+        primary: 'rgb(14, 124, 102)',
     },
 ];
 

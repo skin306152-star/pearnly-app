@@ -10,7 +10,7 @@
 <link rel="icon" href="/static/brand/favicon.ico?v=1" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png?v=1">
 <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon-180.png?v=1">
-<link rel="stylesheet" href="/static/dist/home.css?v=11850741">
+<link rel="stylesheet" href="/static/dist/home.css?v=11850742">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 
@@ -114,6 +114,13 @@
     <section class="page" id="page-vouchers">
 
     </section>
+
+    <!-- 自动做账 Phase 2 · 逐笔审/科目表/做账设置/出账本 四页空壳 + 弹窗 mask(acct-*.ts 运行期注入;主屏复用 page-vouchers) -->
+    <section class="page" id="page-acct-review"></section>
+    <section class="page" id="page-acct-accounts"></section>
+    <section class="page" id="page-acct-settings"></section>
+    <section class="page" id="page-acct-books"></section>
+    <div class="modal-mask" id="acct-modal-mask" style="display:none;"></div>
 
     <!-- 商户采购(进项)Phase 1 · 主屏/供应商/设置/录入/详情 五页空壳(purchase-*.ts 运行期注入) -->
     <section class="page" id="page-purchase"></section>
@@ -269,14 +276,14 @@
 
 <div class="modal-overlay" id="assign-clients-modal" style="display:none;"></div>
 
-<script src="/static/i18n-data.js?v=11850741"></script>
+<script src="/static/i18n-data.js?v=11850742"></script>
 
-<script src="/static/dist/pre.js?v=11850741" defer></script>
+<script src="/static/dist/pre.js?v=11850742" defer></script>
 
 
-<script type="module" src="/static/dist/main.js?v=11850741"></script>
+<script type="module" src="/static/dist/main.js?v=11850742"></script>
 
-<script src="/static/dist/post.js?v=11850741" defer></script>
+<script src="/static/dist/post.js?v=11850742" defer></script>
 
 
 

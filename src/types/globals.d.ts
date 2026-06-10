@@ -299,6 +299,12 @@ interface Window {
     loadPosOnboardingPage?: () => void;
     loadSalesReport?: () => void;
     loadPosCashiers?: () => void;
+    // 自动做账 Phase 2 · 路由页加载器(主屏复用 vouchers 路由)
+    loadAcctList?: () => void;
+    loadAcctReview?: () => void;
+    loadAcctAccounts?: () => void;
+    loadAcctSettings?: () => void;
+    loadAcctBooks?: () => void;
     // 商户采购(进项)Phase 1 · 路由页加载器 + 跨屏唤起桥
     loadPurchaseList?: () => void;
     loadPurchaseSuppliers?: () => void;

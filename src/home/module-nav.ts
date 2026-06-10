@@ -13,7 +13,7 @@ interface ModuleFlag {
 
 // knowledge 不在此列:它已有自己的门控(knowledge-center.ts 的 kbProbe 按后端可用性显隐 #nav-knowledge),
 // 此处接管会与 kbProbe 抢同一元素 → 留给它,避免回归。module-nav 只数据驱动后端模块门控的 6 项。
-const GATEABLE = ['sales', 'expense', 'recon', 'inventory', 'pos', 'receivable'];
+const GATEABLE = ['sales', 'expense', 'recon', 'inventory', 'pos', 'receivable', 'accounting'];
 
 // 识别记录(上传识别 / 单据记录)= 事务所栈,仅事务所显示。显式商户业态 → 隐藏(F14·降级事务所专用)。
 // 关键:legacy 事务所从未 onboard → business_type=null,必须保留(与后端 route_line_image 的
@@ -54,6 +54,7 @@ function apply(modules: Record<string, ModuleFlag>, businessType?: string | null
         on('sales') || on('recon') || on('receivable')
     );
     show(document.querySelector<HTMLElement>('[data-collapsible="expense"]'), on('expense'));
+    show(document.querySelector<HTMLElement>('[data-collapsible="accounting"]'), on('accounting'));
 
     // 收银业务组(inventory/pos)+ 开通引导:pos 未开通 + owner 仍显「开通收银台 →」(enabled≠provisioned)。
     const pos = on('pos');

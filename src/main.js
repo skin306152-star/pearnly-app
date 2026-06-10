@@ -119,6 +119,13 @@ import './home/purchase-modals.js'; // 屏7 记付款 / 屏8 商品匹配 / 屏9
 import './home/purchase-suppliers.js'; // 屏4 供应商管理(window.loadPurchaseSuppliers · CRUD · 套账隔离)
 import './home/purchase-settings.js'; // 屏5 采购设置(window.loadPurchaseSettings · 默认VAT/进货入库/重复票拦/两级科目/账期/审批)
 import './home/purchase-inbox.js'; // 待归类收件箱(window.loadPurchaseInbox · 长尾安全网 · 智能猜测 + 一点归类)
+// 自动做账 Phase 2 · 屏1 主屏(路由 vouchers)/ 屏2 逐笔审 / 屏3 科目表 / 屏5 设置 / 屏4 出账本(docs/accounting)
+import './home/acct-list.js'; // 屏1 主屏(window.loadAcctList · 北极星+待审行动卡+凭证列表行内展开借贷)
+import './home/acct-review.js'; // 屏2 逐笔审(window.loadAcctReview · 队列逐笔 · 确认/改科目/跳过 · 记忆)
+import './home/acct-accounts.js'; // 屏3 科目表(window.loadAcctAccounts · 泰标预置 · 类型筛/搜 · 加改=.modal)
+import './home/acct-settings.js'; // 屏5 做账设置(window.loadAcctSettings · 自动过账粒度+门槛+映射+可见规则)
+import './home/acct-books.js'; // 屏4 出账本/报税包(window.loadAcctBooks · 月末结账+账本/VAT/WHT/财报 PDF+打包)
+import './home/acct-modals.js'; // 共享弹窗(改科目选择器/加改科目 · 站内 .modal 禁原生 prompt)
 import './home/cmdk-mask-html.js'; // REFACTOR-WB-C3 · 命令面板(Cmd+K · #cmdk-mask)inner 注入(home.html 空壳 · 须在 topbar-avatar.js 前 · _initCmdk DOMContentLoaded 带守卫绑 cmdk-input/body/esc-btn · openCmdk 按需)
 import './home/topbar-avatar.js'; // REFACTOR-C1 · 顶栏三件套/头像菜单
 import './home/recon-collapse.js'; // REFACTOR-C1 · 对账折叠组件

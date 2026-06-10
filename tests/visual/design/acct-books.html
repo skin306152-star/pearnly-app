@@ -1,0 +1,68 @@
+﻿<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>做账 · 出账本 / 报税包</title>
+<style>
+  :root{--blue:#0E7C66;--blue-d:#1D4ED8;--blue-l:#EFF4FF;--ink:#0F172A;--ink2:#64748B;--ink3:#94A3B8;
+    --bg:#FAFAF8;--card:#fff;--line:#ECECE7;--line2:#F1F1EC;--green:#16A34A;--green-bg:#F0FDF4;--amber:#F59E0B;
+    --shadow:0 1px 2px rgba(11,26,43,.06);}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;}
+  body{background:var(--bg);min-height:100vh;color:var(--ink);font-size:13.5px;padding:30px 28px 60px;}
+  .tnum{font-variant-numeric:tabular-nums;}
+  .wrap{max-width:900px;margin:0 auto;}
+  .ph{margin-bottom:16px;}
+  .ph .t{font-size:21px;font-weight:680;letter-spacing:-.2px;}
+  .ph .sub{color:var(--ink2);font-size:13px;margin-top:5px;}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;}
+  .band{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line2);}
+  .band .num{font-size:24px;font-weight:740;letter-spacing:-.5px;}
+  .band .lbl{color:var(--ink2);font-size:12.5px;margin-top:5px;display:flex;align-items:center;gap:8px;}
+  .ok{font-size:11px;background:var(--green-bg);color:#15803d;padding:2px 9px;border-radius:6px;font-weight:600;}
+  .mo{display:inline-flex;align-items:center;padding:7px 13px;border:1px solid var(--line);border-radius:10px;font-size:12.5px;color:var(--ink2);cursor:pointer;}
+  .grp{padding:11px 22px 5px;font-size:11.5px;color:var(--ink3);font-weight:600;letter-spacing:.3px;}
+  .row{display:flex;align-items:center;gap:14px;padding:13px 22px;border-bottom:1px solid var(--line2);}
+  .row:last-child{border-bottom:0;}
+  .row .ic{width:34px;height:34px;border-radius:9px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+  .row .nm{font-weight:600;font-size:13.5px;}
+  .row .d{color:var(--ink3);font-size:11.5px;margin-top:2px;}
+  .row .act{margin-left:auto;display:flex;gap:8px;}
+  .btn{height:34px;padding:0 13px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:12.5px;cursor:pointer;}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:650;}
+  .allbar{padding:14px 22px;background:#FCFCFA;border-top:1px solid var(--line2);display:flex;align-items:center;gap:12px;}
+  .allbar .t2{flex:1;font-size:12.5px;color:var(--ink2);}
+  .ptag{position:fixed;left:12px;bottom:12px;background:rgba(37,99,235,.9);color:#fff;font-size:11px;padding:5px 11px;border-radius:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="ph"><div class="t">出账本 / 报税包</div><div class="sub">本月已结 —— 账本和报税材料一键导出,直接交税局/会计</div></div>
+
+  <div class="panel">
+    <div class="band">
+      <div><div class="num tnum">2026 年 6 月</div><div class="lbl"><span class="ok">✓ 已结账 · 借贷平</span>248 笔凭证已过账</div></div>
+      <div class="mo">换月份 2026/06 ▾</div>
+    </div>
+
+    <div class="grp">法定账本</div>
+    <div class="row"><div class="ic">📒</div><div><div class="nm">总账</div><div class="d">所有科目本月借贷汇总</div></div><div class="act"><button class="btn">预览</button><button class="btn primary">下载</button></div></div>
+    <div class="row"><div class="ic">📑</div><div><div class="nm">明细账</div><div class="d">按科目逐笔明细</div></div><div class="act"><button class="btn">预览</button><button class="btn primary">下载</button></div></div>
+    <div class="row"><div class="ic">⚖️</div><div><div class="nm">试算表</div><div class="d">借贷平衡核对</div></div><div class="act"><button class="btn">预览</button><button class="btn primary">下载</button></div></div>
+
+    <div class="grp">报税材料</div>
+    <div class="row"><div class="ic">🧾</div><div><div class="nm">进项税 / 销项税报告</div><div class="d">ภ.พ.30 附表 · 销项−进项 = 应交 VAT</div></div><div class="act"><button class="btn">预览</button><button class="btn primary">下载</button></div></div>
+    <div class="row"><div class="ic">💸</div><div><div class="nm">预扣税明细 + 扣缴凭证</div><div class="d">ภ.ง.ด.3/53 · 给供应商的扣缴凭证</div></div><div class="act"><button class="btn">预览</button><button class="btn primary">下载</button></div></div>
+
+    <div class="grp">财务报表(年末)</div>
+    <div class="row"><div class="ic">📊</div><div><div class="nm">损益表 · 资产负债表</div><div class="d">报 DBD / 企业所得税用</div></div><div class="act"><button class="btn">预览</button><button class="btn primary">下载</button></div></div>
+
+    <div class="allbar">
+      <div class="t2">一键打包本月全部 → 直接发会计 / 报税</div>
+      <button class="btn primary" style="height:38px;padding:0 18px;">打包下载本月 · 报税包</button>
+    </div>
+  </div>
+</div>
+<div class="ptag">做账 · 出账本/报税包(月末出口)· 法定账本+VAT/WHT报税材料+年末财报 · 接报税Phase3 · Phase2</div>
+</body>
+</html>

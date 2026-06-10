@@ -1,0 +1,128 @@
+﻿<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pearnly · 自动做账主屏(收拢版 · 一个面板分主次)</title>
+<style>
+  :root{--blue:#0E7C66;--blue-d:#1D4ED8;--blue-l:#EFF4FF;--ink:#0F172A;--ink2:#64748B;--ink3:#94A3B8;
+    --bg:#FAFAF8;--card:#fff;--line:#ECECE7;--line2:#F1F1EC;--green:#16A34A;--green-bg:#F0FDF4;--amber:#F59E0B;--amber-bg:#FFF8EC;--amber-line:#FCE9C0;--red:#DC2626;
+    --shadow:0 1px 2px rgba(11,26,43,.06);}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;}
+  body{background:var(--bg);min-height:100vh;color:var(--ink);font-size:13.5px;padding:30px 26px 60px;}
+  .tnum{font-variant-numeric:tabular-nums;}
+  .wrap{max-width:1000px;margin:0 auto;}
+  .ph{margin-bottom:16px;}
+  .ph .t{font-size:21px;font-weight:680;letter-spacing:-.2px;}
+  .ph .sub{color:var(--ink2);font-size:13px;margin-top:5px;}
+
+  /* 一个完整面板:主信息带 → 控件带 → 内容列表,三层都收在里面 */
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;}
+
+  /* 第一层:主信息(北极星)+ 待审(行动)同处一带·主次分明 */
+  .band{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 22px;border-bottom:1px solid var(--line2);}
+  .star .lbl{color:var(--ink2);font-size:12.5px;margin-bottom:5px;}
+  .star .num{font-size:30px;font-weight:740;letter-spacing:-1px;line-height:1;}
+  .star .num small{font-size:15px;font-weight:600;color:var(--ink2);}
+  .star .ctx{margin-top:8px;color:var(--ink2);font-size:12.5px;}
+  .star .ctx .g{color:var(--green);font-weight:600;}
+  .attn{display:flex;align-items:center;gap:13px;background:var(--amber-bg);border:1px solid var(--amber-line);border-radius:12px;padding:10px 12px 10px 14px;}
+  .attn .txt .l{display:flex;align-items:center;gap:6px;font-size:11.5px;color:#B45309;font-weight:600;}
+  .attn .txt .l .pip{width:6px;height:6px;border-radius:50%;background:var(--amber);}
+  .attn .txt .m{font-size:14px;font-weight:700;margin-top:2px;}
+  .attn .go{height:34px;padding:0 13px;border-radius:9px;background:#fff;border:1px solid var(--amber-line);color:#B45309;font-weight:650;font-size:12.5px;cursor:pointer;display:flex;align-items:center;}
+
+  /* 第二层:控件带(筛选 + 月份/导出)·次级·同一条 */
+  .toolbar{display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--line2);background:#FCFCFA;}
+  .seg{display:inline-flex;gap:2px;}
+  .seg .o{height:30px;padding:0 13px;border-radius:8px;display:flex;align-items:center;font-size:12.5px;color:var(--ink2);cursor:pointer;}
+  .seg .o.on{background:var(--ink);color:#fff;font-weight:600;}
+  .seg .o .b{margin-left:5px;background:#FFF1E6;color:#C2410C;font-size:10px;padding:0 5px;border-radius:5px;font-weight:600;}
+  .mctl{margin-left:auto;display:inline-flex;align-items:center;gap:10px;}
+  .mctl .mo{font-size:12.5px;color:var(--ink2);cursor:pointer;}
+  .mctl .exp{height:32px;padding:0 13px;border-radius:10px;background:var(--blue);color:#fff;font-weight:650;font-size:12.5px;cursor:pointer;display:flex;align-items:center;gap:6px;}
+
+  /* 第三层:内容(凭证列表) */
+  .row{display:flex;align-items:center;gap:13px;padding:14px 18px;border-bottom:1px solid var(--line2);cursor:pointer;}
+  .row:last-child{border-bottom:0;} .row:hover{background:#FCFCFA;}
+  .row .no{width:50px;color:var(--ink3);font-size:11.5px;}
+  .src{font-size:10.5px;padding:2px 9px;border-radius:6px;white-space:nowrap;width:50px;text-align:center;}
+  .src.buy{background:#EEF2FF;color:#4338ca;} .src.sell{background:#ECFDF3;color:#15803d;} .src.pos{background:#FEFCE8;color:#A16207;} .src.exp{background:#FDF4FF;color:#A21CAF;}
+  .row .sum{flex:1;font-size:13.5px;}
+  .row .amt{font-weight:700;font-variant-numeric:tabular-nums;font-size:14px;}
+  .tag{font-size:10.5px;padding:3px 9px;border-radius:6px;width:62px;text-align:center;line-height:1.25;}
+  .tag.ai{background:#F0FDF4;color:#15803d;} .tag.todo{background:#FFF1E6;color:#C2410C;font-weight:600;}
+
+  /* 展开凭证(收在行内·按钮右对齐有归属) */
+  .open{background:#FCFCFA;border-bottom:1px solid var(--line2);padding:4px 18px 16px 80px;}
+  .open .ttl{font-size:12px;color:var(--ink2);padding:12px 0 9px;}
+  .led{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:11px;overflow:hidden;}
+  .led th{font-size:11px;color:var(--ink2);text-align:left;padding:9px 14px;border-bottom:1px solid var(--line);background:#FAFAF8;font-weight:600;}
+  .led td{padding:10px 14px;border-bottom:1px solid var(--line2);font-size:13px;}
+  .led tr:last-child td{border-bottom:0;}
+  .led .num{text-align:right;font-variant-numeric:tabular-nums;}
+  .led .bal{background:var(--green-bg);font-weight:700;}
+  .led .dr{color:var(--ink2);width:46px;}
+  .foot{display:flex;align-items:center;gap:12px;margin-top:11px;}
+  .foot .human{flex:1;font-size:12px;color:var(--ink2);}
+  .btn{height:34px;padding:0 14px;border:1px solid var(--line);border-radius:9px;background:#fff;font-size:12.5px;cursor:pointer;}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:650;}
+  .ptag{position:fixed;left:12px;bottom:12px;background:rgba(37,99,235,.9);color:#fff;font-size:11px;padding:5px 11px;border-radius:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="ph"><div class="t">自动做账</div><div class="sub">进货 / 卖货 / 收款 一发生 → 自动记成账本凭证 · 你只审例外</div></div>
+
+  <div class="panel">
+    <!-- 第一层:主信息 + 待审 -->
+    <div class="band">
+      <div class="star">
+        <div class="lbl">本月已自动做账</div>
+        <div class="num tnum">248 <small>笔凭证</small></div>
+        <div class="ctx"><span class="g">245 笔已过账</span> · 借贷自动平 · 全程留痕可追溯</div>
+      </div>
+      <div class="attn">
+        <div class="txt">
+          <div class="l"><span class="pip"></span>需要你审</div>
+          <div class="m tnum">3 笔拿不准</div>
+        </div>
+        <div class="go">逐笔审 →</div>
+      </div>
+    </div>
+
+    <!-- 第二层:控件 -->
+    <div class="toolbar">
+      <div class="seg"><div class="o on">全部</div><div class="o">待审<span class="b">3</span></div><div class="o">进货</div><div class="o">销售</div><div class="o">POS</div><div class="o">费用</div></div>
+      <div class="mctl"><span class="mo">2026 年 6 月 ▾</span><div class="exp">出账本 / 报税包 →</div></div>
+    </div>
+
+    <!-- 第三层:凭证列表 -->
+    <div class="row"><span class="no tnum">#0248</span><span class="src buy">进货</span><div class="sum">向 ทิปโก้ 进货付款</div><span class="amt">฿18,190</span><span class="tag ai">自动·已过账</span></div>
+    <div class="open">
+      <div class="ttl">凭证 #0248 · 来源:采购进项单 · 06-08 · 自动按「进货付款」生成</div>
+      <table class="led">
+        <thead><tr><th>借/贷</th><th>科目</th><th class="num">金额</th></tr></thead>
+        <tbody>
+          <tr><td class="dr">借</td><td>库存商品</td><td class="num tnum">17,000.00</td></tr>
+          <tr><td class="dr">借</td><td>进项税 (ภาษีซื้อ · 可抵)</td><td class="num tnum">1,190.00</td></tr>
+          <tr><td class="dr">贷</td><td>应付账款 — ทิปโก้</td><td class="num tnum">18,190.00</td></tr>
+          <tr class="bal"><td colspan="2">借 = 贷 ✓</td><td class="num tnum">18,190.00</td></tr>
+        </tbody>
+      </table>
+      <div class="foot">
+        <div class="human">这批货 17,000 进库存,另付 1,190 的税(以后能抵),18,190 先欠供应商。<b>整张自动写好,你不用懂借贷。</b></div>
+        <button class="btn">改科目</button>
+        <button class="btn primary">确认</button>
+      </div>
+    </div>
+
+    <div class="row"><span class="no tnum">#0247</span><span class="src sell">销售</span><div class="sum">开票给 Sabuy 公司</div><span class="amt">฿32,100</span><span class="tag ai">自动·已过账</span></div>
+    <div class="row"><span class="no tnum">#0246</span><span class="src pos">POS</span><div class="sum">收银台 06-07 当日营业额</div><span class="amt">฿8,540</span><span class="tag ai">自动·已过账</span></div>
+    <div class="row"><span class="no tnum">#0245</span><span class="src exp">费用</span><div class="sum">付设计服务费(含预扣税 WHT)</div><span class="amt">฿10,000</span><span class="tag todo">待审</span></div>
+    <div class="row"><span class="no tnum">#0244</span><span class="src buy">进货</span><div class="sum">向 แม็คโคร 进货(现付)</div><span class="amt">฿9,630</span><span class="tag ai">自动·已过账</span></div>
+  </div>
+</div>
+<div class="ptag">收拢版 · 一个面板分三层(主信息/控件/列表)· 元素都收在框里·主次分明 · Phase2 未施工</div>
+</body>
+</html>

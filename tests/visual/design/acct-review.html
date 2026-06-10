@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>做账 · 逐笔审(审例外)</title>
+<style>
+  :root{--blue:#0E7C66;--blue-d:#1D4ED8;--blue-l:#EFF4FF;--ink:#0F172A;--ink2:#64748B;--ink3:#94A3B8;
+    --bg:#FAFAF8;--card:#fff;--line:#ECECE7;--line2:#F1F1EC;--green:#16A34A;--green-bg:#F0FDF4;--amber:#F59E0B;--amber-bg:#FFF8EC;--amber-line:#FCE9C0;
+    --shadow:0 1px 2px rgba(11,26,43,.06);}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;}
+  body{background:var(--bg);min-height:100vh;color:var(--ink);font-size:13.5px;padding:30px 28px 60px;}
+  .tnum{font-variant-numeric:tabular-nums;}
+  .wrap{max-width:920px;margin:0 auto;}
+  .ph{margin-bottom:16px;}
+  .ph .t{font-size:21px;font-weight:680;letter-spacing:-.2px;}
+  .ph .sub{color:var(--ink2);font-size:13px;margin-top:5px;}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;}
+  .band{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--line2);}
+  .band .prog{font-size:14px;font-weight:700;}
+  .band .prog small{color:var(--ink2);font-weight:500;font-size:12.5px;margin-left:6px;}
+  .band .meta{color:var(--ink2);font-size:12.5px;}
+  .q{display:flex;align-items:center;gap:9px;padding:13px 22px;background:var(--amber-bg);border-bottom:1px solid var(--line2);font-size:13.5px;color:#92400E;}
+  .q .pip{width:7px;height:7px;border-radius:50%;background:var(--amber);flex-shrink:0;}
+  .body{padding:18px 22px;}
+  .evt{font-size:12.5px;color:var(--ink2);margin-bottom:14px;}
+  .evt b{color:var(--ink);font-size:14px;}
+  .choice{display:flex;gap:10px;margin-bottom:16px;}
+  .opt{flex:1;border:1px solid var(--line);border-radius:11px;padding:12px 14px;cursor:pointer;}
+  .opt.on{border-color:var(--blue);background:var(--blue-l);}
+  .opt .ot{font-weight:650;font-size:13.5px;}
+  .opt .od{color:var(--ink2);font-size:12px;margin-top:3px;}
+  .opt.on .ot{color:var(--blue-d);}
+  .led{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:11px;overflow:hidden;}
+  .led th{font-size:11px;color:var(--ink2);text-align:left;padding:9px 14px;border-bottom:1px solid var(--line);background:#FAFAF8;font-weight:600;}
+  .led td{padding:10px 14px;border-bottom:1px solid var(--line2);font-size:13px;}
+  .led tr:last-child td{border-bottom:0;}
+  .led .num{text-align:right;font-variant-numeric:tabular-nums;}
+  .led .bal{background:var(--green-bg);font-weight:700;}
+  .led .dr{color:var(--ink2);width:46px;}
+  .led .hl{color:var(--amber);font-weight:600;}
+  .foot{display:flex;align-items:center;gap:11px;margin-top:16px;}
+  .human{flex:1;font-size:12px;color:var(--ink2);}
+  .btn{height:38px;padding:0 16px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:13px;cursor:pointer;}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:650;}
+  .queue{padding:12px 22px;border-top:1px solid var(--line2);background:#FCFCFA;display:flex;align-items:center;gap:14px;font-size:12.5px;color:var(--ink2);}
+  .queue .q2{display:flex;align-items:center;gap:7px;}
+  .dotg{width:6px;height:6px;border-radius:50%;background:var(--amber);}
+  .ptag{position:fixed;left:12px;bottom:12px;background:rgba(37,99,235,.9);color:#fff;font-size:11px;padding:5px 11px;border-radius:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="ph"><div class="t">逐笔审</div><div class="sub">智能拿不准的,你定一下 —— 系统记住,下次同类自动套,越用越省</div></div>
+
+  <div class="panel">
+    <div class="band">
+      <div class="prog">第 1 笔 <small>/ 共 3 笔待审</small></div>
+      <div class="meta">本月 245 笔已自动过账 · 这 3 笔要你定</div>
+    </div>
+
+    <div class="q"><span class="pip"></span>拿不准:这笔是「服务」还是「商品」?<b style="color:#92400E;margin-left:4px;">服务要代扣 3% 预扣税,商品不用。</b></div>
+
+    <div class="body">
+      <div class="evt">来源:费用单 #0245 · 06-07 · <b>付 ABC 设计 服务费 ฿10,000</b></div>
+
+      <div class="choice">
+        <div class="opt on"><div class="ot">服务(代扣 WHT 3%)</div><div class="od">付给设计/咨询/外包 —— 替对方预扣税</div></div>
+        <div class="opt"><div class="ot">商品(不扣)</div><div class="od">买实物货品 —— 不预扣</div></div>
+      </div>
+
+      <table class="led">
+        <thead><tr><th>借/贷</th><th>科目</th><th class="num">金额</th></tr></thead>
+        <tbody>
+          <tr><td class="dr">借</td><td>外包服务费</td><td class="num tnum">10,000.00</td></tr>
+          <tr><td class="dr">借</td><td>进项税 (可抵)</td><td class="num tnum">700.00</td></tr>
+          <tr><td class="dr">贷</td><td>银行</td><td class="num tnum">10,400.00</td></tr>
+          <tr><td class="dr">贷</td><td class="hl">预扣税应缴 (代扣 3%)</td><td class="num tnum hl">300.00</td></tr>
+          <tr class="bal"><td colspan="2">借 = 贷 ✓</td><td class="num tnum">10,700.00</td></tr>
+        </tbody>
+      </table>
+
+      <div class="foot">
+        <div class="human">选「服务」→ 自动多一笔「代扣 ฿300」,实付对方 ฿9,700。<b>系统记住:以后付 ABC 设计都按服务扣。</b></div>
+        <button class="btn">跳过</button>
+        <button class="btn">改科目</button>
+        <button class="btn primary">确认 · 下一笔</button>
+      </div>
+    </div>
+
+    <div class="queue">
+      还在等:
+      <span class="q2"><span class="dotg"></span>#0240 退货红冲 拿不准方向</span>
+      <span class="q2"><span class="dotg"></span>#0233 一笔费用 科目模糊</span>
+    </div>
+  </div>
+</div>
+<div class="ptag">做账 · 逐笔审(审例外·核心)· 业务+拿不准的点+借贷预览+一选就改 · 系统记忆 · Phase2</div>
+</body>
+</html>

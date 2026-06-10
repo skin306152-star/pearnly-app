@@ -241,6 +241,10 @@ const VALID_ROUTES = [
     'pos-cashiers',
     'pos-tables',
     'pos-payment',
+    'acct-review',
+    'acct-accounts',
+    'acct-settings',
+    'acct-books',
 ];
 
 // route → 页面加载函数名(window.*)· routeTo 进路由即调。数据驱动替原 if 链。
@@ -268,6 +272,11 @@ const ROUTE_LOADERS: Record<string, string> = {
     reconcile: 'loadReconcilePage',
     'test-center': 'loadTestCenterPage',
     dashboard: 'loadDashboard',
+    vouchers: 'loadAcctList',
+    'acct-review': 'loadAcctReview',
+    'acct-accounts': 'loadAcctAccounts',
+    'acct-settings': 'loadAcctSettings',
+    'acct-books': 'loadAcctBooks',
 };
 
 function routeTo(route?: any) {

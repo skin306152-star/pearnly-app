@@ -1,0 +1,80 @@
+﻿<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>做账 · 做账设置(配置后台)</title>
+<style>
+  :root{--blue:#0E7C66;--blue-d:#1D4ED8;--blue-l:#EFF4FF;--ink:#0F172A;--ink2:#64748B;--ink3:#94A3B8;
+    --bg:#FAFAF8;--card:#fff;--line:#ECECE7;--line2:#F1F1EC;--green:#16A34A;--amber:#F59E0B;
+    --shadow:0 1px 2px rgba(11,26,43,.06);}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;}
+  body{background:var(--bg);min-height:100vh;color:var(--ink);font-size:13.5px;padding:30px 28px 60px;}
+  .tnum{font-variant-numeric:tabular-nums;}
+  .wrap{max-width:860px;margin:0 auto;}
+  .ph{margin-bottom:16px;}
+  .ph .t{font-size:21px;font-weight:680;letter-spacing:-.2px;}
+  .ph .sub{color:var(--ink2);font-size:13px;margin-top:5px;}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;}
+  .grp{padding:11px 22px;font-size:11.5px;color:var(--ink3);font-weight:600;letter-spacing:.3px;background:#FCFCFA;border-bottom:1px solid var(--line2);}
+  .item{display:flex;align-items:center;gap:14px;padding:15px 22px;border-bottom:1px solid var(--line2);}
+  .item .l .t2{font-size:13.5px;font-weight:600;}
+  .item .l .d{color:var(--ink2);font-size:12px;margin-top:3px;}
+  .item .ctl{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .sw{width:42px;height:24px;border-radius:999px;background:#E2E8F0;position:relative;cursor:pointer;}
+  .sw.on{background:var(--blue);}
+  .sw i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.15s;}
+  .sw.on i{left:21px;}
+  .inp{height:36px;min-width:90px;border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;padding:0 12px;font-size:13px;background:#fff;}
+  .seg{display:inline-flex;gap:2px;border:1px solid var(--line);border-radius:9px;padding:3px;}
+  .seg .o{height:30px;padding:0 13px;border-radius:7px;display:flex;align-items:center;font-size:12.5px;color:var(--ink2);cursor:pointer;}
+  .seg .o.on{background:var(--blue-l);color:var(--blue-d);font-weight:600;}
+  .pill{font-size:11.5px;background:#F1F5F9;color:#475569;padding:4px 11px;border-radius:8px;}
+  .map{padding:14px 22px;border-bottom:1px solid var(--line2);font-size:12.5px;color:var(--ink2);line-height:1.9;}
+  .map b{color:var(--ink);} .map .link{color:var(--blue);cursor:pointer;}
+  .foot{display:flex;justify-content:flex-end;padding:14px 22px;}
+  .btn{height:40px;padding:0 22px;border-radius:10px;border:1px solid var(--blue);background:var(--blue);color:#fff;font-weight:650;font-size:13px;cursor:pointer;}
+  .ptag{position:fixed;left:12px;bottom:12px;background:rgba(37,99,235,.9);color:#fff;font-size:11px;padding:5px 11px;border-radius:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="ph"><div class="t">做账设置</div><div class="sub">配一次,以后自动按这套做账 —— 多数保持默认即可</div></div>
+
+  <div class="panel">
+    <div class="grp">自动化</div>
+    <div class="item">
+      <div class="l"><div class="t2">自动过账</div><div class="d">智能记好的凭证自动过账,只有拿不准的才进「逐笔审」</div></div>
+      <div class="ctl"><div class="sw on"><i></i></div></div>
+    </div>
+    <div class="item">
+      <div class="l"><div class="t2">自动过账门槛</div><div class="d">把握低于这个值就不自动过、放进待审</div></div>
+      <div class="ctl"><div class="inp tnum">90 %</div></div>
+    </div>
+
+    <div class="grp">记账</div>
+    <div class="item">
+      <div class="l"><div class="t2">会计准则</div><div class="d">泰国中小企业标准 · 开箱即用</div></div>
+      <div class="ctl"><span class="pill">TFRS for NPAEs</span></div>
+    </div>
+    <div class="item">
+      <div class="l"><div class="t2">存货记账法</div><div class="d">永续=进出货即时结转成本;定期=月末统一结</div></div>
+      <div class="ctl"><div class="seg"><div class="o on">永续盘存</div><div class="o">定期盘存</div></div></div>
+    </div>
+    <div class="item">
+      <div class="l"><div class="t2">本位币 · 启用期</div><div class="d">非本位币按记账日汇率折算</div></div>
+      <div class="ctl"><span class="pill">THB</span><div class="inp tnum">2026 / 06 起</div></div>
+    </div>
+
+    <div class="grp">科目映射(自动套 · 一般不用动)</div>
+    <div class="map">
+      进货 → <b>库存商品 / 进项税</b> · 销售 → <b>销售收入 / 销项税</b> · 服务付款 → <b>费用 / 进项税 / 预扣税应缴</b> · POS → <b>银行 / 销售收入 / 销项税</b><br>
+      规则自动套,要改某类去向 → <span class="link">调整科目映射</span> · 看全部科目 → <span class="link">科目表</span>
+    </div>
+
+    <div class="foot"><button class="btn">保存</button></div>
+  </div>
+</div>
+<div class="ptag">做账 · 做账设置(配置后台)· 自动过账门槛/准则/存货法/本位币/科目映射 · 多数默认 · Phase2</div>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>做账 · 科目表(配置后台)</title>
+<style>
+  :root{--blue:#0E7C66;--blue-d:#1D4ED8;--blue-l:#EFF4FF;--ink:#0F172A;--ink2:#64748B;--ink3:#94A3B8;
+    --bg:#FAFAF8;--card:#fff;--line:#ECECE7;--line2:#F1F1EC;--green:#16A34A;--amber:#F59E0B;
+    --shadow:0 1px 2px rgba(11,26,43,.06);}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;}
+  body{background:var(--bg);min-height:100vh;color:var(--ink);font-size:13.5px;padding:30px 28px 60px;}
+  .tnum{font-variant-numeric:tabular-nums;}
+  .wrap{max-width:960px;margin:0 auto;}
+  .ph{margin-bottom:16px;}
+  .ph .t{font-size:21px;font-weight:680;letter-spacing:-.2px;}
+  .ph .sub{color:var(--ink2);font-size:13px;margin-top:5px;}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;}
+  .band{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line2);}
+  .band .num{font-size:26px;font-weight:740;letter-spacing:-.5px;}
+  .band .num small{font-size:14px;color:var(--ink2);font-weight:600;}
+  .band .lbl{color:var(--ink2);font-size:12.5px;margin-top:4px;}
+  .btn{height:38px;padding:0 15px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:650;}
+  .toolbar{display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--line2);background:#FCFCFA;}
+  .seg{display:inline-flex;gap:2px;}
+  .seg .o{height:30px;padding:0 13px;border-radius:8px;display:flex;align-items:center;font-size:12.5px;color:var(--ink2);cursor:pointer;}
+  .seg .o.on{background:var(--ink);color:#fff;font-weight:600;}
+  .search{margin-left:auto;width:200px;height:34px;background:#fff;border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;gap:8px;padding:0 11px;}
+  .search input{border:0;outline:0;flex:1;background:transparent;font-size:13px;}
+  .grp{padding:9px 22px;font-size:11.5px;color:var(--ink3);font-weight:600;letter-spacing:.3px;background:#FCFCFA;border-bottom:1px solid var(--line2);}
+  .row{display:flex;align-items:center;gap:14px;padding:12px 22px;border-bottom:1px solid var(--line2);}
+  .row:hover{background:#FCFCFA;}
+  .row .code{width:60px;color:var(--ink3);font-size:12px;font-variant-numeric:tabular-nums;}
+  .row .nm{flex:1;font-size:13.5px;font-weight:550;}
+  .row .th{color:var(--ink3);font-size:12px;width:200px;}
+  .row .edit{color:var(--blue);font-size:12px;cursor:pointer;opacity:0;}
+  .row:hover .edit{opacity:1;}
+  .preset{font-size:10.5px;background:#F1F5F9;color:#64748B;padding:1px 7px;border-radius:5px;}
+  .ptag{position:fixed;left:12px;bottom:12px;background:rgba(37,99,235,.9);color:#fff;font-size:11px;padding:5px 11px;border-radius:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="ph"><div class="t">科目表</div><div class="sub">泰国标准科目(TFRS-NPAEs)已预置 · 开箱即用 · 一般不用动,要细分再加</div></div>
+
+  <div class="panel">
+    <div class="band">
+      <div><div class="num tnum">48 <small>个科目</small></div><div class="lbl">全部预置 · 自动记账时套这些 · 改一次系统记住</div></div>
+      <button class="btn primary">+ 加科目</button>
+    </div>
+
+    <div class="toolbar">
+      <div class="seg"><div class="o on">全部</div><div class="o">资产</div><div class="o">负债</div><div class="o">权益</div><div class="o">收入</div><div class="o">费用</div></div>
+      <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input placeholder="搜科目"></div>
+    </div>
+
+    <div class="grp">资产</div>
+    <div class="row"><span class="code">1010</span><span class="nm">现金</span><span class="th">เงินสด</span><span class="preset">预置</span><span class="edit">编辑</span></div>
+    <div class="row"><span class="code">1020</span><span class="nm">银行存款</span><span class="th">เงินฝากธนาคาร</span><span class="preset">预置</span><span class="edit">编辑</span></div>
+    <div class="row"><span class="code">1130</span><span class="nm">应收账款</span><span class="th">ลูกหนี้การค้า</span><span class="preset">预置</span><span class="edit">编辑</span></div>
+    <div class="row"><span class="code">1140</span><span class="nm">库存商品</span><span class="th">สินค้าคงเหลือ</span><span class="preset">预置</span><span class="edit">编辑</span></div>
+    <div class="row"><span class="code">1150</span><span class="nm">进项税 (可抵)</span><span class="th">ภาษีซื้อ</span><span class="preset">预置</span><span class="edit">编辑</span></div>
+
+    <div class="grp">负债</div>
+    <div class="row"><span class="code">2010</span><span class="nm">应付账款</span><span class="th">เจ้าหนี้การค้า</span><span class="preset">预置</span><span class="edit">编辑</span></div>
+    <div class="row"><span class="code">2150</span><span class="nm">销项税</span><span class="th">ภาษีขาย</span><span class="preset">预置</span><span class="edit">编辑</span></div>
+    <div class="row"><span class="code">2160</span><span class="nm">预扣税应缴</span><span class="th">ภาษีหัก ณ ที่จ่ายค้างจ่าย</span><span class="preset">预置</span><span class="edit">编辑</span></div>
+
+    <div class="grp">收入 / 费用</div>
+    <div class="row"><span class="code">4010</span><span class="nm">销售收入</span><span class="th">รายได้จากการขาย</span><span class="preset">预置</span><span class="edit">编辑</span></div>
+    <div class="row"><span class="code">5210</span><span class="nm">外包服务费</span><span class="th">ค่าจ้างบริการภายนอก</span><span class="preset">预置</span><span class="edit">编辑</span></div>
+  </div>
+</div>
+<div class="ptag">做账 · 科目表(老板配置后台)· 泰标预置开箱即用 · 按类型筛 · 加/改 = 会计/owner · Phase2</div>
+</body>
+</html>

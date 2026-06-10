@@ -271,8 +271,8 @@ const SIDEBAR_HTML = `
         </div>
     </div>
 
-    <!-- 做账 ▼ 新建组(Phase 2 占位 · 本期不开发)· 凭证中心改名「自动凭证」归位 · 标「即将上线」 -->
-    <div class="nav-group nav-collapsible" data-collapsible="accounting">
+    <!-- 做账 ▼ Phase 2 已落地(屏1-5)· module-nav 按 accounting 模块开关显隐(默认关 opt-in) -->
+    <div class="nav-group nav-collapsible" data-collapsible="accounting" style="display:none;">
         <div class="nav-group-toggle" data-toggle-group="accounting">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="3" y="3" width="14" height="14" rx="2"/>
@@ -284,14 +284,40 @@ const SIDEBAR_HTML = `
             </svg>
         </div>
         <div class="nav-sub">
-            <div class="nav-item nav-sub-item" data-route="vouchers">
+            <div class="nav-item nav-sub-item" data-route="vouchers" data-module="accounting">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 4h7l5 5v7a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1z"/>
                     <path d="M11 4v5h5"/>
                     <path d="M6 13l2 2 4-4"/>
                 </svg>
                 <span class="nav-label" data-i18n="nav-vouchers">自动凭证</span>
-                <span class="nav-badge" style="margin-left:auto;" data-i18n="nav-soon">即将上线</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="acct-review" data-module="accounting">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="10" cy="10" r="7"/>
+                    <path d="M7 10l2 2 4-4"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-acct-review">逐笔审</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="acct-accounts" data-module="accounting">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 5h14M3 10h14M3 15h9"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-acct-accounts">科目表</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="acct-settings" data-module="accounting">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="10" cy="10" r="2.5"/>
+                    <path d="M10 4v2M10 14v2M4 10h2M14 10h2M5.8 5.8l1.4 1.4M12.8 12.8l1.4 1.4M14.2 5.8l-1.4 1.4M7.2 12.8l-1.4 1.4"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-acct-settings">做账设置</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="acct-books" data-module="accounting">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 3.5h9a2 2 0 012 2V17l-3.5-2-3 2-3-2L4 17V3.5z"/>
+                    <path d="M7 7h5M7 10h5"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-acct-books">出账本/报税包</span>
             </div>
         </div>
     </div>

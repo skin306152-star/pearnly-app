@@ -6,9 +6,14 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-10 · **🟣 Purple v2 全站主题已上线** + 做账 Phase 2 闭环 + 权限批1-3/console · HEAD `1552209c` · ?v=11850745 · 前序见下）
+## 🎯 状态卡（2026-06-10 · **🧾 报税 Phase 3 后端已 commit 待推** + 🟣 Purple v2 已上线 + 做账 Phase 2 闭环 + 权限批1-5 · 前序见下）
 
-- **🆕 本窗口(2026-06-10)· 🟣 全站主题切 Purple v2 上线**(`1552209c`·?v=11850745·prod 字节已验):
+- **🆕 本窗口(2026-06-10)· 🧾 自动报税(Phase 3)后端全量 commit `6ccc1a3f` · 自检全绿 · ⏳ 待 console 窗口收口顺带 push**:
+  - 照 docs/tax-filing/00-05 封板:`services/tax/`(schema ensure 3表/aggregate PP30销−进+超期剔除+缺税号不计·PND53/3按税号首位分流/anomalies 报前体检 hard·info/filings 幂等+已报不可改/efiling e-Tax诚实降级+PDF·XML·zip 导出/hooks SAVEPOINT)+`routes/tax_routes.py` 11端点(tax.filing.* 逐路由码·accounting 门控·套账 fail-closed)+ close-period 挂点一行。
+  - 自检:40 新单测+全量 3182 绿·真库 E2E `tests/e2e/_tax_e2e.py` **25/25**(数字对账本 books.vat_report 同基/体检拦缺税号→补→提交→已报只读/导出真生成/0税额照报/未结账拦/跨套账隔离)·做账 E2E 28/28 回归零红·/simplify 已跑(5 改:mark_filed 去双重聚合等)。
+  - **🚦 给 console 窗口(push 调度)**:master 本地链 `49a0ef2d`(主题·已授权随推)→`6ccc1a3f`(报税)→`07a7b8b5`→`467de8bf`→`038ae65e`(批5)→`634fb5d3`(console·**+18 裸hex/+1 旧蓝超 ui_lint baseline=push 卡点·你的 CSS 你来收**)→`90c3d834`(**black 修复 admin_users_query_routes·批5携带·删了 black 闸过不去**)。收口时一并 push 即全员上线;报税 .py 改动靠部署重启生效。
+  - 决策:模块门控用 accounting(报税吃账本·registry tax 码组本就不挂模块键);e-Tax 未接通(RD 开放度未确认)→ file(etax) 返 tax.efiling_failed·主路径=导出 PDF/XML 手报+mark-filed;ensure-only 无 alembic(做账先例)。前端 4 屏照 docs/tax-filing/04 另开窗口接。
+- **本日同窗口(2026-06-10)· 🟣 全站主题切 Purple v2 上线**(`1552209c`·?v=11850745·prod 字节已验):
   - 色值唯一来源 = 桌面/Pearnly_紫色主题预览 `.panel.purple` 浅+暗 + partner-components primary-50..900,逐字搬零调色。home-01-base.css 浅/暗令牌(accent 系/blue 别名/btn-blue/blue-50..800 紫阶/bg/ink/line)+ home-38 按钮 + /console v1 估值→v2 真值 + POS 旧蓝→紫(厨房深色屏用暗夜紫 A974FF·sw 缓存 bump)+ /admin 自动跟随(真浏览器抽查 3 屏)。状态色(green/amber/red)按任务范围未动;主按钮全站纯色 var(--accent),渐变不全站化。
   - 视觉闸:design 17 快照重着色 + fidelity 主色断言→rgb(124,77,255) 全绿;ui_lint_baseline 旧蓝随迁紫下降已收紧。DESIGN_LANGUAGE 令牌节=Purple v2(真相=home-01-base.css·禁写死 hex·并入一-bis 交互原则成稿)。
   - 自检:`_s1_shot` 全路由浅/暗逐张眼验(无残留绿/暗夜不洗字)+ `_purple_spotshot/_purple_admin3`(console/pos/admin 抽查)+ 守门全绿。**注意:工作树有权限批5窗口活跃 WIP(.py/tests)·本 commit 严格只含主题 pathspec**。

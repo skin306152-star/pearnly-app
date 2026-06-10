@@ -377,7 +377,7 @@ body {
   border-color: var(--accent);
   background: var(--accent-weak);
 }
-/* 站内 checkbox(高特异性:邀请弹窗里 .wsopt 落在 .field 内,防 .field input 全宽样式压过) */
+/* 站内 checkbox(.field input 已 :not 排除 checkbox · 此处只管绘制) */
 .wsopt input[type='checkbox'] {
   appearance: none;
   -webkit-appearance: none;
@@ -456,7 +456,7 @@ body {
   font-size: 11.5px;
   color: var(--ink2);
 }
-.field input,
+.field input:not([type='checkbox']),
 .field select {
   background: var(--card);
   border: 1px solid var(--line);

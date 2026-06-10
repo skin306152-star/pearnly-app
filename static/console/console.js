@@ -69,7 +69,10 @@
         });
     }
     function errMsg(e) {
-        var key = 'err_' + String((e && e.code) || 'generic').replace(/\./g, '_');
+        var code = e && e.code;
+        // pydantic 校验 422 的 detail 是数组/对象 · 统一翻「输入格式不对」(同 invite.js)
+        if (Array.isArray(code) || (code && typeof code === 'object')) code = 'invalid_input';
+        var key = 'err_' + String(code || 'generic').replace(/\./g, '_');
         var s = ct(key);
         return s === key ? ct('err_generic') : s;
     }

@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 
 from core import db
 from core.route_helpers import _log_op
+from services.auth.signup_core import PLAN_CONFIG
 from services.authz.deps import get_authz, require_perm
 from services.authz.registry import ASSIGNABLE_ROLE_KEYS, ROLE_PERMISSIONS, SCOPABLE_ROLE_KEYS
 from services.team import console_store
@@ -82,8 +83,6 @@ async def team_members(request: Request):
     for m in members:
         m["is_self"] = m["id"] == me
     # 席位计量(PEAK 吸收 · 套餐 seats_max,前端显「当前用户 N/M」+ 满员升级提示)
-    from services.auth.signup_core import PLAN_CONFIG
-
     plan = PLAN_CONFIG.get(str(user.get("plan") or ""), PLAN_CONFIG["credits"])
     return {
         "ok": True,

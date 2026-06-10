@@ -10,7 +10,7 @@
 <link rel="icon" href="/static/brand/favicon.ico?v=1" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png?v=1">
 <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon-180.png?v=1">
-<link rel="stylesheet" href="/static/dist/home.css?v=11850745">
+<link rel="stylesheet" href="/static/dist/home.css?v=11850746">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 
@@ -121,6 +121,12 @@
     <section class="page" id="page-acct-settings"></section>
     <section class="page" id="page-acct-books"></section>
     <div class="modal-mask" id="acct-modal-mask" style="display:none;"></div>
+
+    <!-- 自动报税 Phase 3 · 报税中心/PP30复核/PND复核/报税设置 四页空壳(tax-*.ts 运行期注入) -->
+    <section class="page" id="page-tax-center"></section>
+    <section class="page" id="page-tax-pp30"></section>
+    <section class="page" id="page-tax-pnd"></section>
+    <section class="page" id="page-tax-settings"></section>
 
     <!-- 商户采购(进项)Phase 1 · 主屏/供应商/设置/录入/详情 五页空壳(purchase-*.ts 运行期注入) -->
     <section class="page" id="page-purchase"></section>
@@ -274,16 +280,15 @@
 
 <div class="modal-overlay" id="help-modal" style="display:none;"></div>
 
-<div class="modal-overlay" id="assign-clients-modal" style="display:none;"></div>
 
-<script src="/static/i18n-data.js?v=11850745"></script>
+<script src="/static/i18n-data.js?v=11850746"></script>
 
-<script src="/static/dist/pre.js?v=11850745" defer></script>
+<script src="/static/dist/pre.js?v=11850746" defer></script>
 
 
-<script type="module" src="/static/dist/main.js?v=11850745"></script>
+<script type="module" src="/static/dist/main.js?v=11850746"></script>
 
-<script src="/static/dist/post.js?v=11850745" defer></script>
+<script src="/static/dist/post.js?v=11850746" defer></script>
 
 
 

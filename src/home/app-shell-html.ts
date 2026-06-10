@@ -60,15 +60,6 @@ const TOPBAR_HTML = `
                     </svg>
                     <span data-i18n="avatar-menu-settings">设置</span>
                 </button>
-                <button type="button" class="avatar-popup-item" data-action="team" data-show-if-team="1" id="avatar-menu-team" role="menuitem">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <circle cx="7" cy="8" r="2.5"/>
-                        <path d="M3 16c0-2.2 1.8-4 4-4s4 1.8 4 4"/>
-                        <circle cx="14" cy="7" r="2"/>
-                        <path d="M12 16c0-2 1-3.5 3-3.5s3 1.5 3 3.5"/>
-                    </svg>
-                    <span data-i18n="avatar-menu-team">团队成员</span>
-                </button>
                 <a class="avatar-popup-item" href="/console" data-show-if-team="1" id="avatar-menu-console" role="menuitem" style="text-decoration:none;color:inherit;">
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M10 2.5l6.5 3.75v7.5L10 17.5l-6.5-3.75v-7.5L10 2.5z"/>
@@ -175,37 +166,14 @@ const SIDEBAR_HTML = `
                 <path d="M8 8h5M8 11h5M8 14h3"/>
                 <path d="M13 2v3h3"/>
             </svg>
-            <span class="nav-label" data-i18n="nav-group-sales">销项管理</span>
+            <span class="nav-label" data-i18n="nav-group-sales">销售开票</span>
             <svg class="nav-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M6 8l4 4 4-4"/>
             </svg>
         </div>
         <div class="nav-sub">
-            <div class="nav-item nav-sub-item active" data-route="ocr" data-module="sales">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 4h8l4 4v8a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1z"/>
-                    <path d="M12 4v4h4"/>
-                    <path d="M7 12h6M7 15h4"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-ocr">上传识别</span>
-            </div>
-            <div class="nav-item nav-sub-item" data-route="history" data-module="sales">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="10" cy="10" r="7"/>
-                    <path d="M10 6v4l3 2"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-history">单据记录</span>
-            </div>
-            <div class="nav-item nav-sub-item" data-route="reconcile" data-module="recon">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="3" y1="17" x2="17" y2="17"/>
-                    <rect x="4" y="11" width="2.5" height="5"/>
-                    <rect x="8.75" y="8" width="2.5" height="8"/>
-                    <rect x="13.5" y="5" width="2.5" height="11"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-reconcile">对账中心</span>
-            </div>
-            <!-- 2026-06-10 Claude 式导航:「销售发票」二级子组拍平 · 全站导航最多两层 -->
+            <!-- 2026-06-10 五-bis:识别/对账 = 事务所代账工具 · 已移出到「事务所工具」组(business_type=firm 显)·
+                 销售开票组只留商户自己开票/收款相关:发票工作台 / 账套·开票资料 / 应收追踪 -->
             <div class="nav-item nav-sub-item" data-route="sales-invoices" data-module="sales">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M5 2h8l3 3v13H5z"/>
@@ -227,6 +195,48 @@ const SIDEBAR_HTML = `
                     <path d="M14 6.5h-5a2.5 2.5 0 000 5h2a2.5 2.5 0 010 5h-5"/>
                 </svg>
                 <span class="nav-label" data-i18n="nav-receivables">应收追踪</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 事务所工具 ▼ 可折叠组(2026-06-10 五-bis · 代账工具:上传识别/识别记录/对账中心)·
+         business_type=firm 或未选(老租户兜底)显示 · 商户业态隐藏 · module-nav.ts apply() 控显隐 -->
+    <div class="nav-group nav-collapsible" data-collapsible="firm" style="display:none;">
+        <div class="nav-group-toggle" data-toggle-group="firm">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 17V8l4-3 4 3v9"/>
+                <path d="M11 17V5l3-2 3 2v12"/>
+                <path d="M2 17h16M6 11h2M14 8h1"/>
+            </svg>
+            <span class="nav-label" data-i18n="nav-group-firm">事务所工具</span>
+            <svg class="nav-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 8l4 4 4-4"/>
+            </svg>
+        </div>
+        <div class="nav-sub">
+            <div class="nav-item nav-sub-item" data-route="ocr" data-module="sales">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 4h8l4 4v8a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1z"/>
+                    <path d="M12 4v4h4"/>
+                    <path d="M7 12h6M7 15h4"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-ocr">上传识别</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="history" data-module="sales">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="10" cy="10" r="7"/>
+                    <path d="M10 6v4l3 2"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-history">识别记录</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="reconcile" data-module="recon">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="17" x2="17" y2="17"/>
+                    <rect x="4" y="11" width="2.5" height="5"/>
+                    <rect x="8.75" y="8" width="2.5" height="8"/>
+                    <rect x="13.5" y="5" width="2.5" height="11"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-reconcile">对账中心</span>
             </div>
         </div>
     </div>
@@ -325,6 +335,21 @@ const SIDEBAR_HTML = `
                     <path d="M7 7h5M7 10h5"/>
                 </svg>
                 <span class="nav-label" data-i18n="nav-acct-books">出账本/报税包</span>
+            </div>
+            <!-- 自动报税 Phase 3 · 报税中心(一级入口)+ 报税设置 · PP30/PND 复核从中心点进 · 门控同做账(accounting) -->
+            <div class="nav-item nav-sub-item" data-route="tax-center" data-module="accounting">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 3.5h7l4 4V16a1 1 0 01-1 1H5a1 1 0 01-1-1V4.5a1 1 0 011-1z"/>
+                    <path d="M12 3.5V8h4M7 12h6M7 14.5h4"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-tax-center">报税中心</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="tax-settings" data-module="accounting">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="10" cy="10" r="2.5"/>
+                    <path d="M10 4v2M10 14v2M4 10h2M14 10h2M5.8 5.8l1.4 1.4M12.8 12.8l1.4 1.4M14.2 5.8l-1.4 1.4M7.2 12.8l-1.4 1.4"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-tax-settings">报税设置</span>
             </div>
         </div>
     </div>

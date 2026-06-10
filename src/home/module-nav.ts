@@ -35,23 +35,36 @@ function apply(modules: Record<string, ModuleFlag>, businessType?: string | null
             .forEach((el) => show(el, on(k)));
     });
 
-    // F14 · 识别记录降级事务所专用:显式商户业态隐藏「上传识别 / 单据记录」(null/firm 保留)。
+    // 五-bis(2026-06-10):识别中心/对账 = 事务所代账工具 → 收进「事务所工具」组(data-collapsible=firm),
+    // 仅事务所(firm)或未选业态(老租户兜底)显示,商户业态隐藏整组(隐藏≠删,切回 firm 即复现)。
+    // 关键:legacy 事务所从未 onboard → business_type=null,必须保留(与后端 route_line_image 的
+    // `bt in (None,"firm")` 同源)。绝不"非 firm 就隐",会误杀老事务所主路径(铁律#26)。
     const isMerchant = !!businessType && MERCHANT_TYPES.indexOf(businessType) >= 0;
+    show(
+        document.querySelector<HTMLElement>('[data-collapsible="firm"]'),
+        !isMerchant && (on('sales') || on('recon'))
+    );
     if (isMerchant) {
-        document
-            .querySelectorAll<HTMLElement>('[data-route="ocr"], [data-route="history"]')
-            .forEach((el) => show(el, false));
-        // 商户落在已隐藏的识别记录路由(含 routeTo 兜底回落 ocr)→ 改去首页(默认落地页)。
+        // 商户落在已隐藏的事务所工具路由(识别/记录/对账,含 routeTo 兜底回落 ocr)→ 改去首页。
         const cur = (location.hash || '').replace(/^#\//, '');
-        if ((!cur || cur === 'ocr' || cur === 'history') && typeof window.routeTo === 'function') {
+        if (
+            (!cur || cur === 'ocr' || cur === 'history' || cur === 'reconcile') &&
+            typeof window.routeTo === 'function'
+        ) {
             window.routeTo('dashboard');
         }
     }
 
-    // 折叠组级:混装组按「组内任一模块开」显隐(整组仅当全关才收起)。
+    // 集成页卡片业态显隐(五-bis):firm 全显;商户只显 LINE Bot + 智能提醒。
+    // 标 data-firm-only 的卡/分组标题/分隔线在商户业态隐藏(隐藏≠删,切回 firm 复现)。
+    document
+        .querySelectorAll<HTMLElement>('#page-integrations [data-firm-only]')
+        .forEach((el) => show(el, !isMerchant));
+
+    // 折叠组级:销售开票组(发票工作台/账套/应收)按「sales 或 receivable 开」显隐。
     show(
         document.querySelector<HTMLElement>('[data-collapsible="sales"]'),
-        on('sales') || on('recon') || on('receivable')
+        on('sales') || on('receivable')
     );
     show(document.querySelector<HTMLElement>('[data-collapsible="expense"]'), on('expense'));
     show(document.querySelector<HTMLElement>('[data-collapsible="accounting"]'), on('accounting'));

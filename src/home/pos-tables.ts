@@ -71,9 +71,9 @@ const STYLE = `
 .ptbl .zone .c{font-size:12px;color:var(--ink3);}
 .ptbl .zone .mg{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:transparent;}
 .ptbl .zone:hover .mg{color:var(--ink3);}
-.ptbl .zone.on{background:var(--ink);color:var(--card);border-color:var(--ink);}
-.ptbl .zone.on .c{color:var(--line);}.ptbl .zone.on .mg{color:var(--ink3);}
-.ptbl .zone.on:hover .mg{color:var(--card);}
+.ptbl .zone.on{background:var(--accent-weak);color:var(--accent-deep);border-color:var(--accent);}
+.ptbl .zone.on .c{color:var(--accent-deep);}.ptbl .zone.on .mg{color:var(--accent-deep);}
+.ptbl .zone.on:hover .mg{color:var(--accent-deep);}
 .ptbl .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 2px rgba(17,24,39,.04),0 4px 14px rgba(17,24,39,.05);overflow:hidden;}
 .ptbl .ch{padding:14px 18px;border-bottom:1px solid var(--line2);display:flex;align-items:center;justify-content:space-between;}
 .ptbl .ch .zt{font-weight:700;font-size:15px;display:flex;align-items:center;gap:10px;}

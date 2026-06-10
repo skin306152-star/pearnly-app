@@ -22,6 +22,9 @@ export default [
             'scripts/probe/**',
             'scripts/_mock/**', // UI 标准化实物源 + 截图助手(设计参照 · 非交付源码)
             'scripts/_ui_audit/**', // 逐屏视觉审计产物(gitignored · 非源码)
+            'scripts/_*.cjs', // 截图/探针等一次性脚本(下划线前缀 = 临时 · 非交付源码 · 同 _mock 策略)
+            'scripts/_*.js',
+            'scripts/_ui_audit_full/**',
             '_uitest/**', // 本地真站点 UI 实测脚本(gitignore · 非交付源码)
             'home.js', // REFACTOR-C1 拆解目标
             // REFACTOR-C1(2026-05-25)· 从 home.js verbatim 抽出的 4 语 i18n 数据 ·

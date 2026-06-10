@@ -41,7 +41,7 @@ const PAGE_CSS = `
 .acct.al .toolbar{display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--line2);background:var(--line2);flex-wrap:wrap;}
 .acct.al .seg{display:inline-flex;gap:2px;}
 .acct.al .seg .o{height:30px;padding:0 13px;border-radius:8px;display:flex;align-items:center;font-size:12.5px;color:var(--ink2);cursor:pointer;}
-.acct.al .seg .o.on{background:var(--ink);color:var(--card);font-weight:600;}
+.acct.al .seg .o.on{background:var(--accent-weak);color:var(--accent-deep);font-weight:600;}
 .acct.al .seg .o .b{margin-left:5px;background:var(--amber-weak);color:var(--amber);font-size:10px;padding:0 5px;border-radius:5px;font-weight:600;}
 .acct.al .mctl{margin-left:auto;display:inline-flex;align-items:center;gap:10px;}
 .acct.al .mctl select{height:32px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink2);font-size:12.5px;padding:0 8px;outline:0;}

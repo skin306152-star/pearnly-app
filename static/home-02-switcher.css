@@ -313,7 +313,7 @@
     text-transform: uppercase;
 }
 .cs-item-chip.cs-chip-all {
-    background: var(--ink);  /* v118.33.7.9 · 蓝色渐变 → 纯黑 · 跟 active 统一 */
+    background: var(--accent);  /* 2026-06-10 · 纯黑 → 品牌色令牌(Purple v2 漏网 · THEME #1-bis) */
 }
 .cs-item-chip-icon { width: 13px; height: 13px; color: var(--card); }
 .cs-item-text {

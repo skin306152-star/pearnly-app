@@ -55,10 +55,6 @@
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17V7l7-3 7 3v10"/><path d="M3 17h14M8 12h4M8 17v-4"/></svg>
                     <span>公司信息</span>
                 </button>
-                <button class="settings-tab settings-nav-item" data-tab="team" data-i18n="set-tab-team">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="14" cy="6.5" r="3"/><circle cx="6" cy="6.5" r="3"/><path d="M2 17v-1.5a3 3 0 013-3h2a3 3 0 013 3V17M11 13a3 3 0 013-3h2a3 3 0 013 3v4"/></svg>
-                    <span>团队管理</span>
-                </button>
                 <button class="settings-tab settings-nav-item" data-tab="plan" data-i18n="set-tab-plan">
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="10" rx="1.5"/><path d="M3 9h14M7 13h2"/></svg>
                     <span>用量</span>
@@ -305,31 +301,8 @@
                 </div>
             </div>
 
-            <!-- Tab 6 · 团队管理(老板可见 · 由 JS 控制 tab 显隐) -->
-            <div class="settings-pane settings-panel" data-pane="team" data-settings-panel="team">
-                <div class="card">
-                    <div class="section-head">
-                        <div class="section-title" data-i18n="team-title">员工管理</div>
-                        <div class="section-sub" data-i18n="team-sub">添加员工后 · 他能用自己的账号登录 · 只看到本公司数据</div>
-                    </div>
-
-                    <div class="admin-toolbar">
-                        <button class="btn btn-primary" id="btn-add-employee">
-                            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M10 4v12M4 10h12"/>
-                            </svg>
-                            <span data-i18n="team-add">添加员工</span>
-                        </button>
-                        <div class="admin-stats" id="team-count"></div>
-                    </div>
-
-                    <div class="admin-table-wrap">
-                        <div id="team-loading" class="admin-loading" data-i18n="admin-loading">加载中...</div>
-                        <div class="team-list" id="team-list" style="display:none;"></div>
-                        <div id="team-empty" class="admin-empty" style="display:none;" data-i18n="team-empty">还没有员工 · 点「添加员工」开始</div>
-                    </div>
-                </div>
-            </div>
+            <!-- 团队管理 tab 已下线(2026-06-10):团队/权限统一收口到 /console(avatar 菜单「团队与权限」)·
+                 旧 tab 调的 /api/team/* 接口已随权限批5删除 · 删 tab 防点开载入失败 -->
 
             <!-- v118.19.1 · Tab · 归档规则(从识别中心右上角移过来 · 低频功能) -->
             <div class="settings-pane" data-pane="archive">

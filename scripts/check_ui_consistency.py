@@ -171,18 +171,25 @@ def main(argv=None):
         for m in re.finditer(r"\.drawer[\w-]*\s*[{,]", read(f)):
             drawer_hits.append((f.name, m.group(0)))
 
-    # ── 硬规则 D2:按钮/切换 黑底(只导航栏可黑)· 目标基线 0 ──
-    # 逐 CSS 规则块扫:选择器含 btn/toggle/switch/act-btn/.primary,
-    # 且 background 用 var(--ink)/#000/#111/#222/#333/#1a202c → 违规。排除 nav/sidebar 与令牌文件。
+    # ── 硬规则 D2:交互控件激活态 黑底(只导航栏可黑)· 目标基线 0 ──
+    # 2026-06-10 扩面(THEME #1-bis):从 .btn 扩到所有交互控件激活态 —— 分段/标签/芯片/胶囊/
+    # 区域/开关(seg/tab/chip/pill/zone/toggle/switch/segment)+ .on/.active/.selected;且 background
+    # 用 var(--ink)/var(--ink2)/#000/#111/#222/#333/#1a* → 违规(主题切换漏网的黑底控件)。
+    # 扫 home-*.css + src/home/*.ts(CSS-in-JS)· 排除 nav/sidebar 与令牌文件。
     black_bg = re.compile(
         r"background[^;}]*:\s*[^;}]*"
-        r"(var\(--ink\)|#000000\b|#000\b|#111111\b|#111\b|#222\b|#333\b|#1a202c\b)",
+        r"(var\(--ink\)|var\(--ink2\)|#000000\b|#000\b|#111111\b|#111\b|#222\b|#333\b|#1a202c\b|#1a\b)",
         re.I,
     )
-    btn_sel = re.compile(r"(btn|toggle|switch|act-btn|\.primary)", re.I)
+    # 新增控件词用 \b 边界,避免子串误伤(如 "table" 含 "tab"、"image" 含无关词)
+    btn_sel = re.compile(
+        r"(btn|toggle|switch|act-btn|\.primary|\b(?:tab|chip|pill|zone|seg|segment)\b)", re.I
+    )
+    active_sel = re.compile(r"\.(on|active|selected|current)\b", re.I)
     nav_sel = re.compile(r"(nav|sidebar)", re.I)
     black_btn = []
-    for f in CSS_FILES:
+    ui_ts = sorted((ROOT / "src" / "home").glob("*.ts"))
+    for f in CSS_FILES + ui_ts:
         if f.name in TOKEN_CSS:
             continue
         for chunk in read(f).split("}"):
@@ -190,7 +197,10 @@ def main(argv=None):
                 continue
             sel, body = chunk.rsplit("{", 1)
             sel = sel.split("{")[-1]  # 取最末段选择器 · 防 @media 包裹串味
-            if btn_sel.search(sel) and not nav_sel.search(sel) and black_bg.search(body):
+            # .ts CSS-in-JS:只认带激活态后缀的控件块,避免 JS 对象/字面量误伤
+            is_ts = f.suffix == ".ts"
+            sel_ok = btn_sel.search(sel) and (active_sel.search(sel) if is_ts else True)
+            if sel_ok and not nav_sel.search(sel) and black_bg.search(body):
                 black_btn.append((f.name, sel.strip().replace("\n", " ")[:60]))
 
     # ── 输出 ──

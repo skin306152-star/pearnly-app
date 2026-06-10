@@ -2,7 +2,7 @@
 // applyLang/setupDropdown/routeTo/loadAll + 引导期 render 助手 + bootstrap(尾部 import 自执行)。
 // main.js 第 2 个 import(紧随 core.js):裸调 t/apiGet/escapeHtml/getMax* 经全局对象解析到 core.js 已挂的 window.X。
 // bootstrap 仍先于其余 sibling 模块 eval · typeof window.fn 守卫 + 模块自举范式照旧成立。
-/* global I18N, currentLang:writable, _quota:writable, _contact:writable, escapeHtml, svgIcon, apiGet, getMaxFiles, getMaxPagesPerFile, getMaxMbPerFile, renderErpEndpointsList, loadErpLogs, loadErpTodayStats, renderHistoryList, loadTeamList, applyRoleVisibility, renderAvatarMenu */
+/* global I18N, currentLang:writable, _quota:writable, _contact:writable, escapeHtml, svgIcon, apiGet, getMaxFiles, getMaxPagesPerFile, getMaxMbPerFile, renderErpEndpointsList, loadErpLogs, loadErpTodayStats, renderHistoryList, applyRoleVisibility, renderAvatarMenu */
 
 // ============================================================
 // 语言切换
@@ -143,14 +143,6 @@ function applyLang(lang?: any) {
     try {
         if (currentRoute === 'clients' && typeof window.loadClientsPage === 'function') {
             window.loadClientsPage();
-        }
-    } catch (e) {}
-
-    // v118.11 · BUG 4 修复 · 切语言时如果在 team tab 上 · 重新调 loadTeamList 让动态 innerHTML 跟语言走
-    try {
-        if (currentRoute === 'settings' && typeof loadTeamList === 'function') {
-            const activeTeamTab = document.querySelector('.settings-tab[data-tab="team"].active');
-            if (activeTeamTab) loadTeamList();
         }
     } catch (e) {}
 

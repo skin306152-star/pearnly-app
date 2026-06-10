@@ -49,7 +49,7 @@ const PAGE_CSS = `
 .pur.pl .toolbar{display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--line2);background:var(--line2);}
 .pur.pl .seg{display:inline-flex;gap:2px;}
 .pur.pl .seg .o{height:30px;padding:0 13px;border-radius:8px;display:flex;align-items:center;font-size:12.5px;color:var(--ink2);cursor:pointer;}
-.pur.pl .seg .o.on{background:var(--ink);color:var(--card);font-weight:600;}
+.pur.pl .seg .o.on{background:var(--accent-weak);color:var(--accent-deep);font-weight:600;}
 .pur.pl .search{margin-left:auto;width:230px;height:34px;background:var(--card);border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;gap:8px;padding:0 11px;}
 .pur.pl .search input{border:0;outline:0;flex:1;background:transparent;font-size:13px;color:var(--ink);}
 .pur.pl .row{display:flex;align-items:center;gap:14px;padding:15px 18px;border-bottom:1px solid var(--line2);cursor:pointer;}

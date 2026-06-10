@@ -15,7 +15,7 @@ const PAGE_CSS = `
 .acct.aa .toolbar{display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--line2);background:var(--line2);flex-wrap:wrap;}
 .acct.aa .seg{display:inline-flex;gap:2px;}
 .acct.aa .seg .o{height:30px;padding:0 13px;border-radius:8px;display:flex;align-items:center;font-size:12.5px;color:var(--ink2);cursor:pointer;}
-.acct.aa .seg .o.on{background:var(--ink);color:var(--card);font-weight:600;}
+.acct.aa .seg .o.on{background:var(--accent-weak);color:var(--accent-deep);font-weight:600;}
 .acct.aa .search{margin-left:auto;width:200px;height:34px;background:var(--card);border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;gap:8px;padding:0 11px;}
 .acct.aa .search input{border:0;outline:0;flex:1;background:transparent;font-size:13px;color:var(--ink);}
 .acct.aa .grp{padding:9px 22px;font-size:11.5px;color:var(--ink3);font-weight:600;letter-spacing:.3px;background:var(--line2);border-bottom:1px solid var(--line2);}

@@ -99,7 +99,6 @@ declare function applyRoleVisibility(...args: any[]): any;
 declare function loadErpLogs(silent?: boolean): Promise<void>;
 declare function loadErpTodayStats(): Promise<void>;
 declare function loadErpEndpoints(): Promise<void>;
-declare function loadTeamList(): Promise<void>;
 /** OCR upload helpers (home.js core). */
 declare function handleCameraImages(imageFiles: File[], source: string): Promise<void>;
 declare function getMaxFiles(): number;
@@ -228,7 +227,6 @@ interface Window {
     activateIntegrationsLogsTab?: () => void;
     closeIntegrationDrawer?: () => void;
     maybeShowOnboarding?: LegacyBridge;
-    openAssignClientsModal?: LegacyBridge;
     __accessLogSearchTimer?: ReturnType<typeof setTimeout>;
     _deleteBankSession?: LegacyBridge;
     _rerenderBankRecon?: () => void;
@@ -308,6 +306,11 @@ interface Window {
     loadAcctAccounts?: () => void;
     loadAcctSettings?: () => void;
     loadAcctBooks?: () => void;
+    // 自动报税 Phase 3 · 路由页加载器
+    loadTaxCenter?: () => void;
+    loadTaxPp30?: () => void;
+    loadTaxPnd?: () => void;
+    loadTaxSettings?: () => void;
     // 商户采购(进项)Phase 1 · 路由页加载器 + 跨屏唤起桥
     loadPurchaseList?: () => void;
     loadPurchaseSuppliers?: () => void;

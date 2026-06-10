@@ -14,16 +14,16 @@
  *   下线 · #api-key-card 不存在)→ 该分支永不执行。verbatim 保真 · 列入下方 global
  *   注释过 no-undef。
  */
-/* global escapeHtml, apiGet, apiPut, shouldHideMoney, loadTeamList, renderBrandWorkspace, tt */
+/* global escapeHtml, apiGet, apiPut, shouldHideMoney, renderBrandWorkspace, tt */
 
 // v118.10 · 设置页 · 二级 tab 切换
 function switchSettingsTab(tabName: any) {
     if (!tabName) return;
-    // v118.12.3 · 员工守卫:阻止切到隐藏的 tab(team/api/plan/company)
-    // 防止 localStorage 恢复 + 老板用过 team 后员工登录被带到 team panel
+    // v118.12.3 · 员工守卫:阻止切到隐藏的 tab(api/plan/company · team 已下线)
+    // 防止 localStorage 恢复把员工带到隐藏 panel
     try {
         if (typeof shouldHideMoney === 'function' && shouldHideMoney(_userInfo)) {
-            if (['team', 'api', 'plan', 'company'].indexOf(tabName) >= 0) {
+            if (['api', 'plan', 'company'].indexOf(tabName) >= 0) {
                 tabName = 'profile';
                 try {
                     localStorage.setItem('mrpilot_settings_tab', 'profile');
@@ -48,8 +48,6 @@ function switchSettingsTab(tabName: any) {
             window.loadAboutPanel();
         if (tabName === 'notifications' && typeof window.loadPrefsSettings === 'function')
             window.loadPrefsSettings();
-        // v118.10.2 · 切到 team tab 时加载员工列表
-        if (tabName === 'team') loadTeamList();
         // v118.21.2 · 切到 learned tab 时加载学习规则
         if (tabName === 'learned' && typeof window.loadLearnedRules === 'function')
             window.loadLearnedRules();

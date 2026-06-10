@@ -38,6 +38,10 @@ export const VALID_ROUTES = [
     'acct-accounts',
     'acct-settings',
     'acct-books',
+    'tax-center',
+    'tax-pp30',
+    'tax-pnd',
+    'tax-settings',
 ];
 
 // route → 页面加载函数名(window.*)· routeTo 进路由即调。数据驱动替原 if 链。
@@ -70,4 +74,8 @@ export const ROUTE_LOADERS: Record<string, string> = {
     'acct-accounts': 'loadAcctAccounts',
     'acct-settings': 'loadAcctSettings',
     'acct-books': 'loadAcctBooks',
+    'tax-center': 'loadTaxCenter',
+    'tax-pp30': 'loadTaxPp30',
+    'tax-pnd': 'loadTaxPnd',
+    'tax-settings': 'loadTaxSettings',
 };

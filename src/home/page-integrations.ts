@@ -40,71 +40,13 @@
         <!-- Tab 1: integration-row 卡片(现有内容不变) -->
         <div class="int-top-panel active" data-int-top-panel="cards">
         <div class="card">
-            <!-- Google 一次授权双服务 · 蓝色信息条 -->
-            <div class="integrations-info-bar">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="10" cy="10" r="8"/>
-                    <line x1="10" y1="6" x2="10" y2="10"/>
-                    <circle cx="10" cy="14" r="0.6" fill="currentColor"/>
-                </svg>
-                <span data-i18n="integrations-google-info">授权一次 Google 账号 · Drive 和 Sheets 均可使用 · 无需重复授权</span>
-            </div>
+            <!-- 2026-06-10 五-bis · 卡片按归属重排 + 业态显隐:
+                 firm 全显;商户业态(retail/restaurant/…)只显 LINE Bot + 智能提醒(data-firm-only 由 module-nav 控)。
+                 采集渠道(LINE 全业态 · Gmail/文件夹=事务所代收) / 归档交付(Drive/Sheets) / ERP / 通知。
+                 隐藏≠删除:后端配置不动,切回 firm 即复现。 -->
 
-            <!-- 第 1 组 · Google 服务 -->
-            <div class="integrations-section-title" data-i18n="integrations-section-google">GOOGLE 服务</div>
-
-            <div class="integration-row" data-int-target="automation" data-int-anchor="google-drive">
-                <div class="int-icon ic-g">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 2L4 16h6l2-4h4l2 4h-6L12 2z"/>
-                    </svg>
-                </div>
-                <div class="int-info">
-                    <div class="int-name"><span data-i18n="int-name-drive">Google Drive</span></div>
-                    <div class="int-desc" data-i18n="int-desc-drive">发票/PV 审核后自动存入 Drive · 按客户和月份归档</div>
-                </div>
-                <div class="int-actions">
-                    <button class="int-btn-configure" data-route="automation" data-i18n="btn-configure">配置</button>
-                </div>
-            </div>
-
-            <div class="integration-row" data-int-target="automation" data-int-anchor="google-sheets">
-                <div class="int-icon ic-gs">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                        <path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>
-                    </svg>
-                </div>
-                <div class="int-info">
-                    <div class="int-name"><span data-i18n="int-name-sheets">Google Sheets</span></div>
-                    <div class="int-desc" data-i18n="int-desc-sheets">识别结果实时同步到 Sheets · 老板/会计师在线查看</div>
-                </div>
-                <div class="int-actions">
-                    <button class="int-btn-configure" data-route="automation" data-i18n="btn-configure">配置</button>
-                </div>
-            </div>
-
-            <div class="sec-divider"></div>
-
-            <!-- 第 2 组 · 收票渠道(含 Gmail · v118.32.5.5.37 调整) -->
-            <div class="integrations-section-title" data-i18n="integrations-section-channels">收票渠道</div>
-
-            <!-- Gmail 抓取移至收票渠道(邮件是收票渠道 · 非 Google 产品功能) -->
-            <div class="integration-row" data-int-target="automation" data-int-anchor="gmail">
-                <div class="int-icon ic-gm">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="5" width="18" height="14" rx="2"/>
-                        <path d="M3 7l9 6 9-6"/>
-                    </svg>
-                </div>
-                <div class="int-info">
-                    <div class="int-name"><span data-i18n="int-name-gmail">Gmail 抓取</span></div>
-                    <div class="int-desc" data-i18n="int-desc-gmail">客户发来邮件附件自动抓 · 不用手动转发</div>
-                </div>
-                <div class="int-actions">
-                    <button class="int-btn-configure" data-route="automation" data-i18n="btn-configure">配置</button>
-                </div>
-            </div>
+            <!-- 第 1 组 · 采集渠道 -->
+            <div class="integrations-section-title" data-i18n="integrations-section-channels">采集渠道</div>
 
             <div class="integration-row" data-int-target="automation" data-int-anchor="line">
                 <div class="int-icon ic-line">
@@ -121,7 +63,23 @@
                 </div>
             </div>
 
-            <div class="integration-row" data-int-target="automation" data-int-anchor="folder">
+            <div class="integration-row" data-firm-only="1" data-int-target="automation" data-int-anchor="gmail">
+                <div class="int-icon ic-gm">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="5" width="18" height="14" rx="2"/>
+                        <path d="M3 7l9 6 9-6"/>
+                    </svg>
+                </div>
+                <div class="int-info">
+                    <div class="int-name"><span data-i18n="int-name-gmail">Gmail 抓取</span></div>
+                    <div class="int-desc" data-i18n="int-desc-gmail">客户发来邮件附件自动抓 · 不用手动转发</div>
+                </div>
+                <div class="int-actions">
+                    <button class="int-btn-configure" data-route="automation" data-i18n="btn-configure">配置</button>
+                </div>
+            </div>
+
+            <div class="integration-row" data-firm-only="1" data-int-target="automation" data-int-anchor="folder">
                 <div class="int-icon ic-folder">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M3 7a2 2 0 012-2h4l2 3h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
@@ -136,12 +94,57 @@
                 </div>
             </div>
 
-            <div class="sec-divider"></div>
+            <div class="sec-divider" data-firm-only="1"></div>
+
+            <!-- 第 2 组 · 归档交付(Google · 事务所把结果交付客户/会计) -->
+            <div class="integrations-info-bar" data-firm-only="1">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="10" cy="10" r="8"/>
+                    <line x1="10" y1="6" x2="10" y2="10"/>
+                    <circle cx="10" cy="14" r="0.6" fill="currentColor"/>
+                </svg>
+                <span data-i18n="integrations-google-info">授权一次 Google 账号 · Drive 和 Sheets 均可使用 · 无需重复授权</span>
+            </div>
+
+            <div class="integrations-section-title" data-firm-only="1" data-i18n="integrations-section-archive">归档交付</div>
+
+            <div class="integration-row" data-firm-only="1" data-int-target="automation" data-int-anchor="google-drive">
+                <div class="int-icon ic-g">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2L4 16h6l2-4h4l2 4h-6L12 2z"/>
+                    </svg>
+                </div>
+                <div class="int-info">
+                    <div class="int-name"><span data-i18n="int-name-drive">Google Drive</span></div>
+                    <div class="int-desc" data-i18n="int-desc-drive">发票/PV 审核后自动存入 Drive · 按客户和月份归档</div>
+                </div>
+                <div class="int-actions">
+                    <button class="int-btn-configure" data-route="automation" data-i18n="btn-configure">配置</button>
+                </div>
+            </div>
+
+            <div class="integration-row" data-firm-only="1" data-int-target="automation" data-int-anchor="google-sheets">
+                <div class="int-icon ic-gs">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                        <path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>
+                    </svg>
+                </div>
+                <div class="int-info">
+                    <div class="int-name"><span data-i18n="int-name-sheets">Google Sheets</span></div>
+                    <div class="int-desc" data-i18n="int-desc-sheets">识别结果实时同步到 Sheets · 老板/会计师在线查看</div>
+                </div>
+                <div class="int-actions">
+                    <button class="int-btn-configure" data-route="automation" data-i18n="btn-configure">配置</button>
+                </div>
+            </div>
+
+            <div class="sec-divider" data-firm-only="1"></div>
 
             <!-- 第 3 组 · ERP 系统 -->
-            <div class="integrations-section-title" data-i18n="integrations-section-erp">ERP 系统</div>
+            <div class="integrations-section-title" data-firm-only="1" data-i18n="integrations-section-erp">ERP 系统</div>
 
-            <div class="integration-row" data-int-target="automation" data-int-anchor="erp">
+            <div class="integration-row" data-firm-only="1" data-int-target="automation" data-int-anchor="erp">
                 <div class="int-icon ic-erp">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -154,16 +157,13 @@
                     <div class="int-desc" data-i18n="int-desc-erp">Xero · MR.ERP · Webhook 等 · 识别完自动推到 ERP</div>
                 </div>
                 <div class="int-actions">
-                    <!-- Bug 4 (Zihao 2026-05-19 拍板 · v118.34.22) · 集成卡片右下「看推送日志」link 删 ·
-                         入口收敛: 点「配置」进 ERP 抽屉 → 在抽屉里点「看推送日志 →」 ·
-                         或直接点集成主页顶部的「推送日志」tab. -->
                     <button class="int-btn-configure" data-route="automation" data-i18n="btn-configure">配置</button>
                 </div>
             </div>
 
             <div class="sec-divider"></div>
 
-            <!-- v118.32.5.5.37 NAV-IA Phase 5 收尾 · 自动化 & 提醒 区块 -->
+            <!-- 第 4 组 · 通知提醒(全业态) -->
             <div class="integrations-section-title" data-i18n="int-section-automation">通知提醒</div>
 
             <div class="integration-row" data-int-target="drawer" data-int-anchor="alert">

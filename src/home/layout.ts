@@ -5,11 +5,11 @@
  * - 3 个函数 window.X=X 挂出 —— home.js 用户初始化(loadAll post-await)+ applyLang 裸调
  *   (4 处已在 home.js 加 `typeof window.X==='function'` 引导期守卫);ocr-recognize 裸调
  *   renderInfoBar/renderQuotaBanner(批5 已在其 global 注释声明)。
- * - 依赖 permissions.js 的角色原子函数(shouldHideMoney/canManageTeam/canManageApiKey/
+ * - 依赖 permissions.js 的角色原子函数(shouldHideMoney/canManageApiKey/
  *   isSuperAdmin/isEmployee/isOwner)· 经全局作用域解析 · 调用都在函数内 · import 顺序无关。
  * - applySidebarVisibility 内裸调 switchSettingsTab(settings-core.js)同款经 window 桥。
  */
-/* global _quota, svgIcon, escapeHtml, shouldHideMoney, canManageTeam, canManageApiKey, isSuperAdmin, isEmployee, isOwner, switchSettingsTab */
+/* global _quota, svgIcon, escapeHtml, shouldHideMoney, canManageApiKey, isSuperAdmin, isEmployee, isOwner, switchSettingsTab */
 
 // v102 · 顶部配额预警 banner 渲染
 // v109.4 · 统一用 tenant_used/tenant_quota · 跟顶栏 chip / 设置页 / 用户管理表对齐
@@ -108,7 +108,6 @@ function applySidebarVisibility() {
     const u = _userInfo;
     if (!u) return;
     const _hideMoney = shouldHideMoney(u);
-    const _canTeam = canManageTeam(u);
     const _canApiKey = canManageApiKey(u);
 
     // 模板 / API Key 主导航 · 目前还没实现 · 保持"即将上线"样式
@@ -132,16 +131,8 @@ function applySidebarVisibility() {
     // REFACTOR-C1 · 顶栏超管下拉(#admin-dropdown)+ 老 home.html admin 布局已下线 · 超管走独立 /admin SPA
 
     // ============================================================
-    // v118.12 · 设置页 6 个 tab 显隐(原子函数驱动)
+    // v118.12 · 设置页 tab 显隐(原子函数驱动)· 团队管理 tab 已下线(→ /console)
     // ============================================================
-    // 团队管理:仅 owner / 超管
-    const teamTab = document.querySelector('.settings-tab[data-tab="team"]') as HTMLElement | null;
-    if (teamTab) teamTab.style.display = _canTeam ? '' : 'none';
-    const teamPanel = document.querySelector(
-        '.settings-panel[data-settings-panel="team"]'
-    ) as HTMLElement | null;
-    if (teamPanel) teamPanel.dataset.permHidden = _canTeam ? '0' : '1';
-
     // API & 密钥:仅买断 owner / 超管
     const apiTab = document.querySelector('.settings-tab[data-tab="api"]') as HTMLElement | null;
     if (apiTab) apiTab.style.display = _canApiKey || isSuperAdmin(u) ? '' : 'none';

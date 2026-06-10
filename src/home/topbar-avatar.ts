@@ -182,13 +182,6 @@
                     if (typeof openSettingsModal === 'function') openSettingsModal();
                     else if (typeof routeTo === 'function') routeTo('settings');
                     break;
-                case 'team':
-                    if (typeof openSettingsModal === 'function') openSettingsModal();
-                    else if (typeof routeTo === 'function') routeTo('settings');
-                    setTimeout(function () {
-                        if (typeof switchSettingsTab === 'function') switchSettingsTab('team');
-                    }, 50);
-                    break;
                 case 'billing':
                     if (typeof openSettingsModal === 'function') openSettingsModal();
                     else if (typeof routeTo === 'function') routeTo('settings');

@@ -94,7 +94,7 @@ body.sidebar-collapsed .nav-section-label {
 }
 .sx-seg button.on {
     background: var(--btn-blue);
-    color: #fff;
+    color: var(--accent-ink);
 }
 .sx-search {
     position: relative;
@@ -135,7 +135,7 @@ table.sx-tbl th {
     text-align: left;
     padding: 11px 14px;
     border-bottom: 1px solid var(--line);
-    background: #fbfbf9;
+    background: var(--bg);
 }
 table.sx-tbl td {
     padding: 11px 14px;
@@ -149,7 +149,7 @@ table.sx-tbl tr.click {
     cursor: pointer;
 }
 table.sx-tbl tr.click:hover td {
-    background: #fafaf7;
+    background: var(--bg);
 }
 .sx-tbl td.r,
 .sx-tbl th.r {
@@ -257,7 +257,7 @@ table.sx-tbl tr.click:hover td {
     color: var(--red-700);
 }
 .sx-badge.void {
-    background: #f3f3f3;
+    background: var(--bg);
     color: var(--ink-3);
     text-decoration: line-through;
 }
@@ -373,7 +373,7 @@ table.sx-tbl tr.click:hover td {
     margin-bottom: 8px;
 }
 .sx-inv table th {
-    background: #f3f3ee;
+    background: var(--bg);
     font-size: 10px;
     padding: 5px 7px;
     border: 1px solid var(--line);
@@ -533,7 +533,7 @@ table.sx-tbl tr.click:hover td {
 }
 .sx-tpl-pv {
     height: 86px;
-    background: #faf9f5;
+    background: var(--bg);
     border-bottom: 1px solid var(--line);
     padding: 9px;
     overflow: hidden;
@@ -685,7 +685,7 @@ table.sx-tbl tr.click:hover td {
     height: 28px;
     border-radius: 8px;
     cursor: pointer;
-    border: 2px solid #fff;
+    border: 2px solid var(--card);
     box-shadow: 0 0 0 1px var(--line);
     display: inline-block;
 }

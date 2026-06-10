@@ -17,7 +17,9 @@ body.sidebar-collapsed .sidebar { width: var(--sidebar-w-collapsed); }
     flex-shrink: 0;
 }
 .sb-brand .sidebar-toggle { margin-left: auto; }
-body.sidebar-collapsed .sb-brand { flex-direction: column; gap: 10px; padding: 13px 0 5px; }
+/* 收起 = Claude 同款:rail 顶部只留折叠键 · logo 随品牌名一起收起 */
+body.sidebar-collapsed .sb-brand { justify-content: center; padding: 13px 0 5px; }
+body.sidebar-collapsed .sb-brand .brand-icon,
 body.sidebar-collapsed .sb-brand .brand-name { display: none; }
 body.sidebar-collapsed .sb-brand .sidebar-toggle { margin-left: 0; }
 .sb-nav {

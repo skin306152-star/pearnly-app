@@ -2,12 +2,14 @@
  * Pearnly POS 收银前台 · 独立 SPA 样式表(docs/pos · PO-B3)
  * 视觉照搬概念稿(09 §H):桌面 Pearnly_POS_UI预览 的 5 屏 :root 令牌 + <style> 逐字移植,
  * 数值一个不改;按屏作用域(.pos-view--*)隔离,防跨屏同名类(.card/.line/.top/.go)互覆盖。
+ * 主题 Purple v2(2026-06-10 合伙人终审):主色旧蓝系切紫系(值对照
+ * 桌面/Pearnly_紫色主题预览 partner primary 阶),其余概念稿数值不动。
  * /pos 是独立页(只加载本表),不与 home.css 同台,无污染顾虑。
  * 与 home-*.css 同策略:verbatim 设计切片 · .prettierignore 豁免(保紧凑 · 不重排扰乱视觉对照)。
  */
 
 :root {
-    --blue: #2563EB; --blue-d: #1D4ED8; --blue-l: #DBEAFE;
+    --blue: #7C4DFF; --blue-d: #6B3FF2; --blue-l: #EEE5FF;
     --ink: #111827; --ink2: #6B7280; --ink3: #9CA3AF;
     --ink-2: #6B7280; --ink-3: #9CA3AF; --line-2: #ecece8;
     --bg: #f4f4f0; --card: #fff; --line: #e8e8e3;
@@ -86,7 +88,7 @@ body { background: var(--bg); color: var(--ink); font-size: 14px; }
 .pos-view--main .topbar-langs { display: flex; gap: 4px; }
 .pos-view--main .topbar-langs button { height: 28px; padding: 0 9px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 999px; background: rgba(255, 255, 255, .06); color: #cbd5e1; font-size: 12px; cursor: pointer; }
 .pos-view--main .topbar-langs button.on { border-color: var(--blue); background: var(--blue); color: #fff; }
-.pos-view--main .sync-pill { background: rgba(37, 99, 235, .22); color: #bfdbfe; }
+.pos-view--main .sync-pill { background: rgba(124, 77, 255, .22); color: #ddccff; }
 .pos-view--main .sync-pill.busy .ic { animation: pos-spin 1s linear infinite; }
 @keyframes pos-spin { to { transform: rotate(360deg); } }
 .pos-view--main .top-cashier { display: flex; align-items: center; gap: 9px; }
@@ -143,7 +145,7 @@ body { background: var(--bg); color: var(--ink); font-size: 14px; }
 .pos-view--main .grand { display: flex; justify-content: space-between; align-items: baseline; margin: 10px 0 14px; }
 .pos-view--main .grand .lbl { font-size: 15px; font-weight: 600; }
 .pos-view--main .grand .val { font-size: 30px; font-weight: 800; letter-spacing: -.5px; }
-.pos-view--main .pay-btn { width: 100%; height: 60px; border: 0; border-radius: var(--r-s); background: var(--blue); color: #fff; font-size: 19px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 6px 16px rgba(37, 99, 235, .28); transition: background .12s; }
+.pos-view--main .pay-btn { width: 100%; height: 60px; border: 0; border-radius: var(--r-s); background: var(--blue); color: #fff; font-size: 19px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 6px 16px rgba(124, 77, 255, .28); transition: background .12s; }
 .pos-view--main .pay-btn:hover { background: var(--blue-d); }
 .pos-view--main .pay-btn:disabled { background: #c7cdd6; box-shadow: none; cursor: not-allowed; }
 .pos-view--main .cart-foot { display: flex; gap: 10px; padding: 0 18px 16px; }

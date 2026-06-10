@@ -2,7 +2,7 @@
  * 视觉照搬机械闸(docs/pos/12-visual-fidelity-gate.md)· 治"施工不照搬设计稿反复返工"。
  *
  * 对每个照搬稿页:把【设计稿 file://】与【生产页本地渲染】的关键元素 getComputedStyle 逐项比对:
- * 主色 #2563EB(rgb(37,99,235))/ 圆角 / box-shadow / font-size / font-family / 无 emoji(线性 svg);
+ * 主色 Purple v2 #7C4DFF(rgb(124,77,255))/ 圆角 / box-shadow / font-size / font-family / 无 emoji(线性 svg);
  * 容器另查"左对齐不居中飘"(marginLeft=0,不 auto)。不一致 = 退出码 1 + 打印 哪页/哪选择器/稿X 生产Y。
  *
  * 自洽跑(无需真账号 / 真后端):内置静态服务器伺服 repo + stub 所有 /api/**,渲染本地 dist 真 bundle。
@@ -20,7 +20,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 // 设计稿改了 → 更新这里的快照副本(README「视觉照搬闸」段)。
 const DESIGN_DIR = path.join(__dirname, 'design');
 const PORT = 8791;
-const BLUE = 'rgb(37, 99, 235)';
+const DEFAULT_PRIMARY = 'rgb(124, 77, 255)'; // Purple v2 --accent #7C4DFF
 
 // stub:让生产页在无后端下渲染到目标子页。
 const API = {
@@ -251,7 +251,7 @@ const MAPPINGS = [
                 props: ['borderRadius', 'boxShadow'],
             },
         ],
-        primary: 'rgb(14, 124, 102)',
+        primary: 'rgb(124, 77, 255)',
         bluemust: '#page-dashboard .band .btn.pri',
         nosvgemoji: '#page-dashboard .qa .qb svg',
     },
@@ -305,7 +305,7 @@ const MAPPINGS = [
                 props: ['boxShadow', 'borderRadius'],
             },
         ],
-        // 无 bluemust:对账中心 tab 用中性色(白底·非 emerald)
+        // 无 bluemust:对账中心 tab 用中性色(白底·非主色)
         nosvgemoji: '.recon-tab-btn.active svg',
     },
     {
@@ -327,7 +327,7 @@ const MAPPINGS = [
             },
         ],
         bluemust: '#sx-new-btn',
-        primary: 'rgb(14, 124, 102)',
+        primary: 'rgb(124, 77, 255)',
         nosvgemoji: '#sx-new-btn svg',
     },
     {
@@ -376,7 +376,7 @@ const MAPPINGS = [
             { design: '.t', prod: '.ptbl .t', props: ['borderRadius'] },
         ],
         bluemust: '.ptbl .btn.primary',
-        primary: 'rgb(14, 124, 102)', // B6d:hex → var(--accent) emerald
+        primary: 'rgb(124, 77, 255)', // B6d:hex → var(--accent)
         nosvgemoji: '.ptbl .btn.primary svg',
     },
     {
@@ -390,7 +390,7 @@ const MAPPINGS = [
             { design: '.card', prod: '.rpay .card', props: ['borderRadius'] },
         ],
         bluemust: '.rpay .save',
-        primary: 'rgb(14, 124, 102)', // 已令牌化迁到 emerald(风格 B)· 其余 B 组屏待 Window B 迁移仍蓝
+        primary: 'rgb(124, 77, 255)',
         nosvgemoji: '.rpay .pm .ic svg',
     },
     {
@@ -409,7 +409,7 @@ const MAPPINGS = [
             { design: '.seg .o', prod: '.pur .seg .o', props: ['borderRadius'] },
         ],
         bluemust: '.pur .btn.primary',
-        primary: 'rgb(14, 124, 102)', // Window B 迁 emerald(风格 B)
+        primary: 'rgb(124, 77, 255)',
         nosvgemoji: '.pur .btn.primary svg',
     },
     {
@@ -427,7 +427,7 @@ const MAPPINGS = [
             { design: '.card', prod: '.pur .card', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .btn.primary',
-        primary: 'rgb(14, 124, 102)', // Window B 迁 emerald(风格 B)
+        primary: 'rgb(124, 77, 255)',
         nosvgemoji: '.pur .img svg',
     },
     {
@@ -446,7 +446,7 @@ const MAPPINGS = [
             { design: '.card', prod: '.pur .card', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .btn.primary',
-        primary: 'rgb(14, 124, 102)', // Window B 迁 emerald(风格 B)
+        primary: 'rgb(124, 77, 255)',
         nosvgemoji: '.pur .img svg',
     },
     {
@@ -464,7 +464,7 @@ const MAPPINGS = [
             { design: '.panel', prod: '.pur .panel', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .add',
-        primary: 'rgb(14, 124, 102)', // Window B 迁 emerald(风格 B)
+        primary: 'rgb(124, 77, 255)',
         nosvgemoji: '.pur .add svg',
     },
     {
@@ -482,7 +482,7 @@ const MAPPINGS = [
             { design: '.panel', prod: '.pur .panel', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .save',
-        primary: 'rgb(14, 124, 102)', // Window B 迁 emerald(风格 B)
+        primary: 'rgb(124, 77, 255)',
         nosvgemoji: '.pur .addcat svg',
     },
     {
@@ -509,7 +509,7 @@ const MAPPINGS = [
             },
         ],
         bluemust: '#acct-books-btn',
-        primary: 'rgb(14, 124, 102)',
+        primary: 'rgb(124, 77, 255)',
     },
     {
         name: '做账逐笔审(02)',
@@ -530,7 +530,7 @@ const MAPPINGS = [
             },
         ],
         bluemust: '#page-acct-review [data-act="confirm"]',
-        primary: 'rgb(14, 124, 102)',
+        primary: 'rgb(124, 77, 255)',
     },
     {
         name: '做账科目表(03)',
@@ -551,7 +551,7 @@ const MAPPINGS = [
             },
         ],
         bluemust: '#acct-acc-add',
-        primary: 'rgb(14, 124, 102)',
+        primary: 'rgb(124, 77, 255)',
     },
     {
         name: '做账设置(05)',
@@ -572,7 +572,7 @@ const MAPPINGS = [
             },
         ],
         bluemust: '#acct-set-save',
-        primary: 'rgb(14, 124, 102)',
+        primary: 'rgb(124, 77, 255)',
     },
     {
         name: '做账出账本/报税包(04)',
@@ -593,7 +593,7 @@ const MAPPINGS = [
             },
         ],
         bluemust: '#acct-books-pack',
-        primary: 'rgb(14, 124, 102)',
+        primary: 'rgb(124, 77, 255)',
     },
 ];
 
@@ -751,7 +751,7 @@ async function styleOf(page, sel, props) {
                 const el = document.querySelector(s);
                 return el ? getComputedStyle(el).backgroundColor : null;
             }, m.bluemust);
-            const wantPrimary = m.primary || BLUE; // 默认蓝 · 已迁 emerald 的屏在 mapping 里覆写
+            const wantPrimary = m.primary || DEFAULT_PRIMARY;
             ok(blue === wantPrimary, `主按钮主色 ${wantPrimary}(got ${blue})`);
         }
         if (m.nosvgemoji) {

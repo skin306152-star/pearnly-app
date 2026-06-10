@@ -1,6 +1,6 @@
 /* ============================================================
  * REFACTOR-WB-C · 全站统一按钮系统(品牌色)· Zihao 2026-05-29 拍板
- * 主 = 蓝 #0E7C66(hover #0A5F4E / active #0A5F4E)
+ * 主 = 品牌紫 #7C4DFF(hover #6B3FF2 / active #6B3FF2 · Purple v2 2026-06-10 合伙人终审)
  * 强调 = 琥珀橙 #F59E0B(全站仅最关键 1 个转化按钮:充值/升级 · 勿滥用)
  * 规格:高 38(小 32)· 圆角 9 · 扁平无渐变 · 字号 13.5 / 600
  * 四层级:btn-primary(实心蓝)/ btn-secondary(白底描边)/ btn-ghost(幽灵)/ btn-danger(白底红描边)
@@ -10,8 +10,8 @@
 
 /* 按钮蓝唯一 token(Zihao 2026-06-05)· 全站按钮/切换黑底收编到此 · 只导航栏可黑 */
 :root {
-    --btn-blue: #0E7C66;
-    --btn-blue-hover: #0A5F4E;
+    --btn-blue: #7C4DFF;
+    --btn-blue-hover: #6B3FF2;
 }
 
 .btn {
@@ -64,7 +64,7 @@
 .btn-primary:hover:not(:disabled):not(.is-disabled) {
     background: var(--btn-blue-hover);
     border-color: var(--btn-blue-hover);
-    box-shadow: 0 2px 8px rgba(14, 124, 102, 0.28);
+    box-shadow: 0 2px 8px rgba(124, 77, 255, 0.28);
 }
 .btn-primary:active:not(:disabled):not(.is-disabled) {
     background: var(--btn-blue-hover);

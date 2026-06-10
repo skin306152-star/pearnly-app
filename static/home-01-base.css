@@ -8,44 +8,45 @@
 :root {
 
     /* ============================================================
-       风格 B · Emerald · 2026-06-09 封板 · 值来自实物源 scripts/_mock/kit-final.html :root
-       旧语义名(--brand/--success/--btn-blue…)保留为别名收编到 emerald · 存量屏零改即换肤。
+       主题 Purple v2 · 2026-06-10 合伙人终审 · 值来自实物源 桌面/Pearnly_紫色主题预览
+       (.panel.purple 浅+暗两套 · 色阶对照 partner-components.html primary-50..900)
+       旧语义名(--brand/--success/--btn-blue…)保留为别名收编到 accent · 存量屏零改即换肤。
        ============================================================ */
-    --accent: #0E7C66;
-    --accent-weak: #E4F4F0;
-    --accent-deep: #0A5F4E;
+    --accent: #7C4DFF;
+    --accent-weak: #EEE5FF;
+    --accent-deep: #6B3FF2;
     --accent-ink: #fff;
-    --accent-soft: #E4F4F0;
-    --brand: #0E7C66;
-    --brand-hover: #0A5F4E;
-    --bg: #FBFBFC;
+    --accent-soft: #EEE5FF;
+    --brand: #7C4DFF;
+    --brand-hover: #6B3FF2;
+    --bg: #F7F5FC;
     --card: #ffffff;
-    --ink: #0B1A2B;
-    --ink2: #5A6B7B;
-    --ink3: #9BA8B5;
-    --ink-2: #5A6B7B;
-    --ink-3: #9BA8B5;
-    --ink-4: #cbd5e0;
-    --line: #E7EAEE;
-    --line2: #F3F5F7;
-    --line-soft: #F3F5F7;
+    --ink: #231942;
+    --ink2: #5B5875;
+    --ink3: #8F8AA8;
+    --ink-2: #5B5875;
+    --ink-3: #8F8AA8;
+    --ink-4: #B8B4CA;
+    --line: #ECE8F6;
+    --line2: #F4F2FA;
+    --line-soft: #F4F2FA;
     --green: #149E62;
     --green-weak: #E7F6EE;
     --amber: #C9820C;
     --amber-weak: #FCF3E1;
     --red: #DC4A47;
     --red-weak: #FCEDED;
-    /* 旧蓝调色板收口为 emerald(2026-06-10 设计评审 S1):238 处 --blue 引用一次性随令牌翻绿 */
-    --blue: #0E7C66;
-    --blue-weak: #E4F4F0;
+    /* 旧蓝调色板收口为 accent(S1 收编 · Purple v2 随令牌翻紫):238 处 --blue 引用一次性换肤 */
+    --blue: #7C4DFF;
+    --blue-weak: #EEE5FF;
     --success: #149E62;
     --success-bg: #E7F6EE;
     --warn: #C9820C;
     --warn-bg: #FCF3E1;
     --danger: #DC4A47;
     --danger-bg: #FCEDED;
-    --btn-blue: #0E7C66;
-    --btn-blue-hover: #0A5F4E;
+    --btn-blue: #7C4DFF;
+    --btn-blue-hover: #6B3FF2;
     --line-color: #06c755;
     --fb-color: #1877f2;
     /* 间距标度(4 的倍数 · 全站只用这几个值) */
@@ -139,15 +140,15 @@
     --emerald-700: #047857;
     --emerald-800: #065f46;
     /* blue */
-    /* blue 阶 → emerald 阶(S1 · 600=accent 700=accent-deep) */
-    --blue-50: #f0f9f6;
-    --blue-100: #e4f4f0;
-    --blue-200: #c2e5db;
-    --blue-300: #8fcfc0;
-    --blue-400: #4daa95;
-    --blue-600: #0e7c66;
-    --blue-700: #0a5f4e;
-    --blue-800: #084c3f;
+    /* blue 阶 → purple 阶(Purple v2 · 600=accent 700=accent-deep · 对照 partner primary-50..900)*/
+    --blue-50: #f7f3ff;
+    --blue-100: #eee5ff;
+    --blue-200: #ddccff;
+    --blue-300: #c7a8ff;
+    --blue-400: #a974ff;
+    --blue-600: #7c4dff;
+    --blue-700: #6b3ff2;
+    --blue-800: #5931d8;
     /* sky */
     --sky-50: #f0f9ff;
     --sky-200: #bae6fd;
@@ -263,54 +264,57 @@
 }
 
 /* ============================================================
-   暗夜模式 · :root.dark 换第二套令牌(实物源 kit-final.html :root.dark)
+   暗夜模式 · :root.dark 换第二套令牌(实物源 桌面/Pearnly_紫色主题预览 .panel.purple 暗夜
+   + partner-components.html 暗夜配平补丁:状态浅底/聚焦圈/表头底翻面)
    切换由 core-boot 读偏好加 .dark 到 <html> · 令牌驱动的表面随之翻面。
    ============================================================ */
 :root.dark {
-    --accent: #2DD4A7;
-    --accent-weak: #11261F;
-    --accent-deep: #5EEAC4;
-    --accent-ink: #06281F;
-    --accent-soft: #11261F;
-    --brand: #2DD4A7;
-    --brand-hover: #5EEAC4;
-    --bg: #0E1116;
-    --card: #161B22;
-    --ink: #E6EDF3;
-    --ink2: #9AA7B4;
-    --ink3: #6E7B89;
-    --ink-2: #9AA7B4;
-    --ink-3: #6E7B89;
-    --ink-4: #6E7B89;
-    --line: #272E38;
-    --line2: #1B222B;
-    --line-soft: #1B222B;
+    --accent: #A974FF;
+    --accent-weak: #2C2347;
+    --accent-deep: #C7A8FF;
+    --accent-ink: #1D1438;
+    --accent-soft: #2C2347;
+    --brand: #A974FF;
+    --brand-hover: #C7A8FF;
+    --bg: #13111B;
+    --card: #211D2E;
+    --ink: #F0EEFA;
+    --ink2: #A8A2C2;
+    --ink3: #706A84;
+    --ink-2: #A8A2C2;
+    --ink-3: #706A84;
+    --ink-4: #706A84;
+    --line: #322D43;
+    --line2: #191722;
+    --line-soft: #191722;
     --green: #3FB984;
     --green-weak: #11281F;
     --amber: #E0A93B;
     --amber-weak: #2A2113;
     --red: #F0635F;
     --red-weak: #2A1517;
-    --blue: #2DD4A7;
-    --blue-weak: #11261F;
-    /* emerald 阶暗夜翻面(浅档=底色变深 · 深档=字色变亮):
-       浅色只定义了亮阶 → 暗夜下 blue-50/100 当底压不住翻亮的 --ink(向导选中卡白底洗字根因) */
-    --blue-50: #0D1F1A;
-    --blue-100: #11261F;
-    --blue-200: #1C3B31;
-    --blue-300: #2A574A;
-    --blue-400: #3E8772;
-    --blue-600: #25B28C;
-    --blue-700: #2DD4A7;
-    --blue-800: #7FE0C3;
+    --blue: #A974FF;
+    --blue-weak: #2C2347;
+    /* purple 阶暗夜翻面(浅档=底色变深 · 深档=字色变亮):
+       浅色只定义了亮阶 → 暗夜下 blue-50/100 当底压不住翻亮的 --ink(向导选中卡白底洗字根因)。
+       50/100=partner 暗夜补丁 primary-50/100 · 200-400=partner primary-900/800/700 当暗底 ·
+       600-800=partner primary-400/300/200 当亮字 */
+    --blue-50: #241D3A;
+    --blue-100: #2C2347;
+    --blue-200: #361D8A;
+    --blue-300: #4727B1;
+    --blue-400: #5931D8;
+    --blue-600: #A974FF;
+    --blue-700: #C7A8FF;
+    --blue-800: #DDCCFF;
     --success: #3FB984;
     --success-bg: #11281F;
     --warn: #E0A93B;
     --warn-bg: #2A2113;
     --danger: #F0635F;
     --danger-bg: #2A1517;
-    --btn-blue: #2DD4A7;
-    --btn-blue-hover: #5EEAC4;
+    --btn-blue: #A974FF;
+    --btn-blue-hover: #C7A8FF;
     --sh: 0 1px 2px rgba(0,0,0,.5);
     --sh2: 0 10px 30px rgba(0,0,0,.55);
     --shadow-sm: var(--sh);

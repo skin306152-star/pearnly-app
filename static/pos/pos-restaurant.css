@@ -7,7 +7,7 @@
 
 /* 餐厅状态色(总览 + 厨房共用)*/
 .pos-view--rtables, .pos-view--rorder {
-    --free: #16A34A; --free-bg: #f0fdf4; --seat: #2563EB; --seat-bg: #eff5ff;
+    --free: #16A34A; --free-bg: #f0fdf4; --seat: #7C4DFF; --seat-bg: #f7f3ff;
     --cook: #F59E0B; --cook-bg: #fffbeb; --bill: #DC2626; --bill-bg: #fef2f2;
 }
 
@@ -41,8 +41,8 @@
 .pos-view--rtables .t.free { border-color: #bbf7d0; background: var(--free-bg); }
 .pos-view--rtables .t.free .st { background: #dcfce7; color: #15803d; }
 .pos-view--rtables .t.free .amt { color: var(--ink3); }
-.pos-view--rtables .t.seat { border-color: #bfdbfe; background: var(--seat-bg); }
-.pos-view--rtables .t.seat .st { background: #dbeafe; color: #1d4ed8; }
+.pos-view--rtables .t.seat { border-color: #ddccff; background: var(--seat-bg); }
+.pos-view--rtables .t.seat .st { background: #eee5ff; color: #6b3ff2; }
 .pos-view--rtables .t.cook { border-color: #fde9c8; background: var(--cook-bg); }
 .pos-view--rtables .t.cook .st { background: #fef3c7; color: #b45309; }
 .pos-view--rtables .t.bill { border-color: #fecaca; background: var(--bill-bg); }
@@ -95,7 +95,8 @@
 .pos-view--rorder .empty { padding: 30px 16px; text-align: center; color: var(--ink3); font-size: 13px; }
 
 /* ════════════════ 屏 3 · 厨房单 KOT(概念稿 03 · 深色)════════════════ */
-.pos-view--rkitchen { --kbg: #0f1115; --kcard: #1b1e25; --kline: #2a2e37; --knew: #F59E0B; --kcook: #2563EB; --klate: #DC2626; --kdone: #16A34A; }
+/* 厨房=深色屏 · 制作中用暗夜紫(.panel.purple 暗夜 accent · 浅色主紫压不住深底) */
+.pos-view--rkitchen { --kbg: #0f1115; --kcard: #1b1e25; --kline: #2a2e37; --knew: #F59E0B; --kcook: #A974FF; --klate: #DC2626; --kdone: #16A34A; }
 .pos-view--rkitchen.is-active { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: var(--kbg); color: #e5e7eb; }
 .pos-view--rkitchen .ktop { height: 52px; flex: 0 0 52px; background: #15171c; display: flex; align-items: center; gap: 16px; padding: 0 18px; border-bottom: 1px solid var(--kline); }
 .pos-view--rkitchen .ktop .brand { font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; }
@@ -114,7 +115,7 @@
 .pos-view--rkitchen .tk .items { padding: 10px 14px; flex: 1; }
 .pos-view--rkitchen .it { display: flex; gap: 9px; padding: 6px 0; font-size: 14.5px; }
 .pos-view--rkitchen .it .q { color: var(--knew); font-weight: 800; flex: 0 0 auto; }
-.pos-view--rkitchen .tk.cooking .it .q { color: #60a5fa; }
+.pos-view--rkitchen .tk.cooking .it .q { color: #c7a8ff; }
 .pos-view--rkitchen .it .nt { font-size: 12px; color: #fca5a5; margin-left: auto; }
 .pos-view--rkitchen .tk .act { padding: 10px 14px; border-top: 1px solid var(--kline); }
 .pos-view--rkitchen .tk .btn { width: 100%; height: 42px; border: 0; border-radius: 9px; font-weight: 700; font-size: 14px; cursor: pointer; color: #fff; }

@@ -401,7 +401,7 @@
     max-height: 300px;
     overflow: auto;
     padding: 7px;
-    background: #fbfbf9;
+    background: var(--bg);
 }
 .sw-cart-empty {
     color: var(--ink-3);
@@ -615,8 +615,8 @@
     font-weight: 700;
 }
 .sw-copybadge.copy {
-    border-color: #888;
-    color: #888;
+    border-color: var(--ink-3);
+    color: var(--ink-3);
 }
 .sw-invoice h3 {
     text-align: center;
@@ -662,16 +662,16 @@
     margin-bottom: 10px;
 }
 .sw-inv-items th {
-    background: #f3f3ee;
+    background: var(--bg);
     font-size: 10.5px;
-    color: #444;
+    color: var(--ink-2);
     padding: 6px 8px;
-    border: 1px solid #e3e3dd;
+    border: 1px solid var(--line);
     text-align: left;
 }
 .sw-inv-items td {
     padding: 6px 8px;
-    border: 1px solid #ededea;
+    border: 1px solid var(--line-soft);
     font-size: 11px;
 }
 .sw-inv-items td.r,
@@ -689,14 +689,14 @@
     padding: 3px 8px;
 }
 .sw-inv-tot .sw-tr.g {
-    border-top: 1.4px solid #111;
+    border-top: 1.4px solid var(--ink);
     font-weight: 700;
     margin-top: 3px;
     padding-top: 6px;
 }
 .sw-inv-words {
-    background: #faf9f5;
-    border: 1px solid #ededea;
+    background: var(--bg);
+    border: 1px solid var(--line-soft);
     border-radius: 5px;
     padding: 7px 10px;
     margin-top: 8px;

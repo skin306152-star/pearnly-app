@@ -155,10 +155,12 @@ test('full surface audit', async ({ page }) => {
             }, route);
             await page.waitForTimeout(1500);
             await killWs(page);
+            // killWs 点「个人事务」会触发套账切换遮罩(กำลังเปลี่ยน…)盖住页面吃掉行点击 · 等它消失
+            await page.waitForTimeout(2200);
             const el = page.locator(sel).first();
             if (await el.isVisible().catch(() => false)) {
                 await el.click({ timeout: 2500 }).catch(() => {});
-                await page.waitForTimeout(1100);
+                await page.waitForTimeout(1600);
                 await shot(page, name, m);
                 await esc(page);
             } else m.push({ name, ok: false, err: 'no row' });

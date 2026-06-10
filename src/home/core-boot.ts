@@ -208,76 +208,8 @@ document.addEventListener('click', () => {
 });
 setupDropdown('lang-dropdown', (item: any) => applyLang(item.dataset.lang));
 
-// v118.32.5.5.37 NAV-IA Phase 5: automation 页面无侧边栏入口且不可路由 · 银行上传改为对账中心原地上传
-const VALID_ROUTES = [
-    'ocr',
-    'dashboard',
-    'history',
-    'integration',
-    'integrations',
-    'templates',
-    'api-keys',
-    'settings',
-    'exceptions',
-    'clients',
-    'vouchers',
-    'purchase',
-    'purchase-suppliers',
-    'purchase-settings',
-    'purchase-inbox',
-    'purchase-form',
-    'purchase-detail',
-    'sales-invoices',
-    'sales-products',
-    'sales-account',
-    'receivables',
-    'reconcile',
-    'cloud',
-    'test-center',
-    'knowledge',
-    'inventory',
-    'pos-onboarding',
-    'sales-report',
-    'pos-cashiers',
-    'pos-tables',
-    'pos-payment',
-    'acct-review',
-    'acct-accounts',
-    'acct-settings',
-    'acct-books',
-];
-
-// route → 页面加载函数名(window.*)· routeTo 进路由即调。数据驱动替原 if 链。
-const ROUTE_LOADERS: Record<string, string> = {
-    settings: 'renderSettings',
-    history: 'loadHistoryPage',
-    clients: 'loadClientsPage',
-    knowledge: 'loadKnowledgePage',
-    inventory: 'loadInventoryPage',
-    'pos-onboarding': 'loadPosOnboardingPage',
-    'sales-report': 'loadSalesReport',
-    'pos-cashiers': 'loadPosCashiers',
-    'pos-tables': 'loadPosTables',
-    'pos-payment': 'loadPosPayment',
-    'sales-invoices': 'loadSalesWorkbench',
-    'sales-products': 'loadSalesProducts',
-    'sales-account': 'loadSalesAccount',
-    purchase: 'loadPurchaseList',
-    'purchase-suppliers': 'loadPurchaseSuppliers',
-    'purchase-settings': 'loadPurchaseSettings',
-    'purchase-inbox': 'loadPurchaseInbox',
-    'purchase-form': 'loadPurchaseForm',
-    'purchase-detail': 'loadPurchaseDetail',
-    exceptions: 'loadExceptionsPage',
-    reconcile: 'loadReconcilePage',
-    'test-center': 'loadTestCenterPage',
-    dashboard: 'loadDashboard',
-    vouchers: 'loadAcctList',
-    'acct-review': 'loadAcctReview',
-    'acct-accounts': 'loadAcctAccounts',
-    'acct-settings': 'loadAcctSettings',
-    'acct-books': 'loadAcctBooks',
-};
+// 路由表抽 route-table.ts(纯数据 · 控本文件行数):加新页改那边,这里只消费。
+import { VALID_ROUTES, ROUTE_LOADERS } from './route-table.js';
 
 function routeTo(route?: any) {
     // REFACTOR-C1 · 老 admin/admin-users/admin-cost 路由已下线(超管走独立 /admin SPA)· 落到 ocr

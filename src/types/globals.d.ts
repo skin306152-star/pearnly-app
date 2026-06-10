@@ -299,6 +299,9 @@ interface Window {
     loadPosOnboardingPage?: () => void;
     loadSalesReport?: () => void;
     loadPosCashiers?: () => void;
+    // core-boot 模块化(route-table 抽出后成 ES module)· 引导期全局桥
+    loadAll?: () => void;
+    updateUploadHint?: () => void;
     // 自动做账 Phase 2 · 路由页加载器(主屏复用 vouchers 路由)
     loadAcctList?: () => void;
     loadAcctReview?: () => void;

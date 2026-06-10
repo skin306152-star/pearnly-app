@@ -137,9 +137,18 @@ class CheckFileSizeTests(unittest.TestCase):
             tmp.unlink(missing_ok=True)
 
 
+def _scrubbed_env() -> dict:
+    """剥掉 git hook 注入的 GIT_DIR/GIT_WORK_TREE 等定位变量。
+
+    pre-push hook 里跑本测试时,这些变量指向真仓:不剥的话 mini-repo 的
+    `git init/commit` 会打进宿主仓(主仓被翻 bare / worktree HEAD 被劫持·2026-06-10 血泪)。
+    """
+    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+
+
 def _git(repo: Path, *args: str) -> str:
     """跑 git 命令 · 失败 raise(测试用)"""
-    env = os.environ.copy()
+    env = _scrubbed_env()
     # CI / 干净环境兜底 · 配 user 不然 git commit 报 author error
     env["GIT_AUTHOR_NAME"] = "test"
     env["GIT_AUTHOR_EMAIL"] = "test@example.com"
@@ -186,6 +195,7 @@ class CheckLineRatchetTests(unittest.TestCase):
             text=True,
             encoding="utf-8",
             errors="replace",
+            env=_scrubbed_env(),
         )
         return result.returncode, result.stdout + result.stderr
 

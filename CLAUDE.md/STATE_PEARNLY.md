@@ -6,9 +6,15 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-10 · **UI 整顿 S1-S4 大刀 + Claude 式导航全部上线** · HEAD `76865395`(?v=11850737)· 前序见下）
+## 🎯 状态卡（2026-06-10 · **做账 Phase 2 前后端全闭环 + 权限批1-3/console 上线** · HEAD `?v=11850744` · 前序见下）
 
-- **🆕 本窗口(2026-06-10)· 🔐 权限管理批1-3 + /console 管理控制台全量上线**(Zihao 授权自检即 push·HEAD `cc9c3bb3`):
+- **🆕 本窗口(2026-06-10)· 📒 做账引擎(Phase 2)出账本后端 + 前端 5 屏全闭环上线**(HEAD `3e157b10`·?v=11850742):
+  - **出账本后端 `5f82e6bc`**:`services/accounting/{books,books_pdf,closing}.py` + 独立 `routes/accounting_books_routes.py`(books 总账/明细账/试算表 · tax-reports VAT/WHT · financials · close-period · export-package zip)。close=待审挡结(≤period 全段)+ R9 经引擎生成直接 posted + closed_through 水位只进不退;VAT 报告/结转剔除 vat_closing 自身;PDF 泰中混排 4 语表头。31 单测+隔离闸绿。
+  - **前端 5 屏 `67f5b783`**:`src/home/acct-{common,list,review,accounts,settings,books,modals}.ts` 照桌面稿 01-05+emerald 基座。主屏(北极星+待审行动卡+行内展开借贷·撤销重做/作废二次确认)/逐笔审(原因人话+改科目.modal+remember·缺映射壳给设置落点)/科目表/设置(自动过账全局+R1-R9 粒度开自动二次确认+映射弹窗+learned 可见规则)/出账本(接后端·结账流)。i18n acct-* ~140键×4语·导航做账组 5 子项(accounting 门控默认关 opt-in·「即将上线」退场)。
+  - **验**:真浏览器冒烟 32/32 浅+暗(`scripts/_acct_shot.cjs`)·视觉照搬闸 5 屏登记 PASS(快照 emerald 适配入库)·tsc/eslint/守门全绿。顺手 `c4ac0cd` core-boot 路由表抽 `route-table.ts`(507→<500·以后加页不碰 core-boot)+ `/simplify` withWs/acctConfirm 收敛(净-42)。
+  - **prod 真账号实证(e2e_3)**:开 accounting 模块即 seed 泰标科目 · vouchers/accounts/settings/review/试算表/VAT 报告 6 端点信封全 ok(诚实空账且平)· 试算表 PDF %PDF 9.4KB + 报税包 zip 54.8KB 真生成。/console 入口已补进头像菜单(`45ce1f46`·data-show-if-team 显隐·4 语)。
+  - **剩(已记忆)**:① 真业务流 E2E(e2e_3 新进项/销项→凭证→审→close·新业务才生成凭证)② 屏6 银行对账缺后端(复用 importer/recon·单独立项)③ 逐笔审「服务/商品」分叉需后端 review 加 choice 入参 ④ 手工凭证录入 UI。
+- **本日同窗口(2026-06-10)· 🔐 权限管理批1-3 + /console 管理控制台全量上线**(Zihao 授权自检即 push·HEAD `cc9c3bb3`):
   - **批1 地基**:`services/authz/`(registry 62 码=02 矩阵代码化/resolver memberships→roles·users.role 兜底/deps require_perm 统一执行点 deny-by-default)+ ensure(roles 种子 6 角色·JSONB 每启动按 registry 刷新/memberships 加列+存量回填 21 行/member_scopes/invitations/ownership_transfers)+ 注册/加员工/懒建 tenant 三建号点同事务双写。坑:**prod 有孤儿 tenant_id(b6b184cc)撞 FK→迁移改三步独立事务+EXISTS 守门**(billing ensure 同病未修非本窗口)。
   - **批2 九门收敛**:167 路由逐码 require_perm(销项/进项/做账/知识库/对账/ERP/团队/套账/POS后台/库存),owner 判定 invited_by→membership,作用域闸 check_request_scope(assigned 未分配 404 防枚举·套账切换器按分配过滤)。**矩阵为准的行为偏差全记 docs/permissions/06**(收紧:POS后台/销项设置 owner+admin;放宽:会计获审批/付款/过账,admin 获 ERP/模块开关)。POS 双令牌/LINE 零改动。16 契约测试改钉逐路由权限码。
   - **批3 团队后端**:邀请(email+LINE·sha256 单次 7 天)/改角色/配作用域/启停移除(边界 422:自锁/动 owner/最后 owner)/所有权转移(目标须 admin·24h·双向确认不可逆)/安全事件落 operation_logs(team./role./scope./ownership.)。

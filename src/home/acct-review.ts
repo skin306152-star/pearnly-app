@@ -16,7 +16,7 @@ import {
     withWs,
     type Voucher,
 } from './acct-common.js';
-import { fmtBaht, fmtMoney } from './purchase-common.js';
+import { fmtBaht } from './purchase-common.js';
 import { openAcctAccountPicker } from './acct-modals.js';
 
 const PAGE_CSS = `
@@ -58,7 +58,7 @@ function itemHtml(v: Voucher): string {
     const table = shell
         ? `<div class="state" style="padding:18px;">${escapeHtml(t('acct-shell-hint'))}<br>
             <button class="btn" id="acct-goto-settings" style="margin-top:10px;">${escapeHtml(t('acct-goto-settings'))} →</button></div>`
-        : ledgerTable(v, fmtMoney);
+        : ledgerTable(v);
     const actions = shell
         ? `<button class="btn" data-act="skip">${escapeHtml(t('acct-skip'))}</button>`
         : `<button class="btn" data-act="skip">${escapeHtml(t('acct-skip'))}</button>

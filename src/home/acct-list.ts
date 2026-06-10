@@ -20,7 +20,7 @@ import {
     type Voucher,
     type VoucherSummary,
 } from './acct-common.js';
-import { fmtBaht, fmtMoney } from './purchase-common.js';
+import { fmtBaht } from './purchase-common.js';
 import { openAcctAccountPicker } from './acct-modals.js';
 import { MORE_SVG } from './more-menu.js';
 
@@ -163,7 +163,7 @@ function openHtml(v: Voucher): string {
     const shell = isMappingShell(v);
     const table = shell
         ? `<div class="state" style="padding:18px;">${escapeHtml(t('acct-shell-hint'))}<br><button class="btn" id="acct-goto-settings" style="margin-top:10px;">${escapeHtml(t('acct-goto-settings'))} →</button></div>`
-        : ledgerTable(v, fmtMoney);
+        : ledgerTable(v);
     let actions = '';
     if (v.status === 'pending_review' && !shell) {
         actions = `<button class="btn" data-act="override">${escapeHtml(t('acct-change-account'))}</button>

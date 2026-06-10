@@ -2,7 +2,7 @@
 // 接口契约 docs/accounting/03。信封同 POS:{ok:true,data} / {ok:false,error:{code}}。
 // 全接口带 workspace_client_id(套账隔离);未选账套 → null,调用方提示先选公司。
 /* global t, token, escapeHtml */
-import { activeWsId } from './purchase-common.js';
+import { activeWsId, fmtMoney } from './purchase-common.js';
 
 export type VoucherStatus = 'pending_review' | 'auto_posted' | 'posted' | 'void';
 export type VoucherMethod = 'auto' | 'suggested' | 'manual';
@@ -328,7 +328,7 @@ export function injectAcctBase(): void {
 }
 
 // 凭证借贷表(主屏行展开 / 逐笔审 / 弹窗共用 · 单一来源)。
-export function ledgerTable(v: Voucher, fmtMoney: (n: number) => string): string {
+export function ledgerTable(v: Voucher): string {
     const esc = (s: unknown) => escapeHtml(String(s == null ? '' : s));
     const rows = (v.lines || [])
         .map(

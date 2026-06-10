@@ -250,6 +250,15 @@ async def run_startup() -> dict:
     except Exception as e:
         logger.warning(f"启动 POS schema 失败: {e}")
 
+    # 权限整顿批1 schema(roles 激活+种子 / memberships 加列+回填 / member_scopes /
+    # invitations · docs/permissions/01)。NEW-DEBT-EXEMPT: 启动自愈式迁移同上口径。
+    try:
+        from services.db_migrations.authz_schema import ensure_authz_schema
+
+        ensure_authz_schema()
+    except Exception as e:
+        logger.warning(f"启动 authz schema 失败: {e}")
+
     # 自动做账 schema(科目/映射/凭证/分录/设置/学习记忆 6 表 · docs/accounting/01)。
     # NEW-DEBT-EXEMPT: 启动自愈式迁移,prod 无 alembic 钩子,与守门豁免口径一致。
     try:

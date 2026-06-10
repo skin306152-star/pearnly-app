@@ -466,6 +466,17 @@ def _ensure_tenant_for_new_user(
             _modules_store.set_needs_onboarding(cur, tenant_id=str(new_tenant_id), value=True)
         except Exception as _e_onb:
             logger.warning(f"[platform-onboarding] set_needs_onboarding skip: {_e_onb}")
+
+        # 权限整顿批1 · 新 owner 同事务写 membership(memberships=成员唯一真相 ·
+        # docs/permissions/01)。失败不阻塞注册(resolver 有 users.role 存量兜底)。
+        try:
+            from services.authz.resolver import create_membership
+
+            create_membership(
+                cur, user_id=str(user_id), tenant_id=str(new_tenant_id), role_key="owner"
+            )
+        except Exception as _e_mb:
+            logger.warning(f"[authz] signup create_membership skip: {_e_mb}")
         logger.info(
             f"[v118.26.2.5 ensure-tenant] +tenant {str(new_tenant_id)[:8]}.. user={str(user_id)[:8]}.. plan={plan} quota={monthly_quota}"
         )

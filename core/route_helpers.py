@@ -250,6 +250,15 @@ def _require_owner_or_super(request: Request) -> Dict[str, Any]:
                         "UPDATE users SET tenant_id = %s WHERE id = %s AND tenant_id IS NULL",
                         (new_tid, str(user["id"])),
                     )
+                    # 权限整顿批1 · 懒建 tenant 同步写 owner membership(docs/permissions/01)
+                    try:
+                        from services.authz.resolver import create_membership
+
+                        create_membership(
+                            _cur, user_id=str(user["id"]), tenant_id=str(new_tid), role_key="owner"
+                        )
+                    except Exception as _e_mb:
+                        logger.warning(f"[authz] lazy-tenant create_membership skip: {_e_mb}")
                 user["tenant_id"] = new_tid
                 logger.info(
                     f"[v118.26.2.4 lazy-tenant] +tenant {new_tid[:8]}.. for user {user.get('username')!r}"

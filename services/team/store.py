@@ -79,7 +79,23 @@ def add_employee(
                     company_name,
                 ),
             )
-            return str(cur.fetchone()["id"])
+            new_id = str(cur.fetchone()["id"])
+
+            # 权限整顿批1 · 同事务写 membership(存量映射口径:受邀员工=会计 ·
+            # docs/permissions/01 拍板点#6)。失败不阻塞建号(resolver 有兜底)。
+            try:
+                from services.authz.resolver import create_membership
+
+                create_membership(
+                    cur,
+                    user_id=new_id,
+                    tenant_id=str(tenant_id),
+                    role_key="accountant",
+                    granted_by=str(invited_by) if invited_by else None,
+                )
+            except Exception as _e_mb:
+                logger.warning(f"[authz] add_employee create_membership skip: {_e_mb}")
+            return new_id
     except Exception as e:
         logger.error(f"add_employee failed: {e}")
         return None

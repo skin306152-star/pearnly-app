@@ -4,22 +4,23 @@
 /* global t, escapeHtml, showToast */
 import {
     aapi,
+    acctConfirm,
     acctErrMsg,
+    closeAcctModal,
     currentPeriod,
     injectAcctBase,
     injectStyle,
     isMappingShell,
     ledgerTable,
     normVoucher,
-    openAcctModal,
-    closeAcctModal,
     periodLabel,
     recentPeriods,
     srcKey,
+    withWs,
     type Voucher,
     type VoucherSummary,
 } from './acct-common.js';
-import { activeWsId, fmtBaht, fmtMoney } from './purchase-common.js';
+import { fmtBaht, fmtMoney } from './purchase-common.js';
 import { openAcctAccountPicker } from './acct-modals.js';
 import { MORE_SVG } from './more-menu.js';
 
@@ -268,12 +269,6 @@ async function toggleOpen(id: string): Promise<void> {
     renderBody();
 }
 
-function withWs(path: string): string {
-    const ws = activeWsId();
-    if (ws == null) return path;
-    return path + (path.includes('?') ? '&' : '?') + 'workspace_client_id=' + ws;
-}
-
 async function confirmVoucher(id: string, btn: HTMLButtonElement): Promise<void> {
     btn.disabled = true;
     try {
@@ -309,7 +304,7 @@ function overrideAccounts(id: string): void {
 
 // 撤销重做(安全带②):确认 → void+重判,toast 报重判结果。
 function unpostVoucher(id: string): void {
-    confirmModal(t('acct-unpost'), t('acct-unpost-confirm'), async () => {
+    acctConfirm(t('acct-unpost'), t('acct-unpost-confirm'), async () => {
         try {
             const data = (await aapi('POST', withWs(`/api/accounting/vouchers/${id}/unpost`))) as {
                 voucher?: Record<string, unknown> | null;
@@ -334,7 +329,7 @@ function unpostVoucher(id: string): void {
 }
 
 function voidVoucher(id: string): void {
-    confirmModal(t('acct-void'), t('acct-void-confirm'), async () => {
+    acctConfirm(t('acct-void'), t('acct-void-confirm'), async () => {
         try {
             await aapi('POST', withWs(`/api/accounting/vouchers/${id}/void`));
             showToast(t('acct-void-ok'), 'success');
@@ -344,23 +339,6 @@ function voidVoucher(id: string): void {
             showToast(acctErrMsg(e, 'acct.period_closed'), 'error');
         }
     });
-}
-
-// 不可逆动作二次确认(四-bis)。
-export function confirmModal(title: string, msg: string, onOk: () => void): void {
-    const inner = `<div class="acctm"><div class="mh"><div class="t">${escapeHtml(title)}</div><div class="x" data-close>×</div></div>
-        <div class="mb"><div class="hint">${escapeHtml(msg)}</div></div>
-        <div class="mf"><button class="btn" data-close>${escapeHtml(t('acct-cancel'))}</button>
-        <button class="btn primary" id="acctm-ok">${escapeHtml(t('acct-ok'))}</button></div></div>`;
-    const mask = openAcctModal(inner);
-    if (!mask) return;
-    const ok = mask.querySelector<HTMLButtonElement>('#acctm-ok');
-    if (ok)
-        ok.onclick = () => {
-            ok.disabled = true;
-            closeAcctModal();
-            onOk();
-        };
 }
 
 function showState(html: string): void {

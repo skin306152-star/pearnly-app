@@ -4,15 +4,15 @@
 /* global t, escapeHtml, showToast */
 import {
     aapi,
+    acctConfirm,
     acctErrMsg,
     injectAcctBase,
     injectStyle,
     openAcctModal,
-    closeAcctModal,
     periodLabel,
+    withWs,
     type Account,
 } from './acct-common.js';
-import { activeWsId } from './purchase-common.js';
 import { fetchAccounts } from './acct-modals.js';
 
 interface AcctSettings {
@@ -69,12 +69,6 @@ const PAGE_CSS = `
 let settings: AcctSettings | null = null;
 let learned: LearnedRule[] = [];
 let dirty: Record<string, unknown> = {};
-
-function withWs(path: string): string {
-    const ws = activeWsId();
-    if (ws == null) return path;
-    return path + (path.includes('?') ? '&' : '?') + 'workspace_client_id=' + ws;
-}
 
 function swHtml(id: string, on: boolean): string {
     return `<div class="sw ${on ? 'on' : ''}" id="${id}"><i></i></div>`;
@@ -226,20 +220,9 @@ function bind(sec: HTMLElement): void {
         };
 }
 
-// 开自动过账二次确认(04 §五:「确认让这类业务免审自动过账?」)。
+// 开自动过账 = 放权动作 → 二次确认(04 §五)。
 function confirmAuto(onOk: () => void): void {
-    const inner = `<div class="acctm"><div class="mh"><div class="t">${escapeHtml(t('acct-set-autopost'))}</div><div class="x" data-close>×</div></div>
-        <div class="mb"><div class="hint">${escapeHtml(t('acct-autopost-confirm'))}</div></div>
-        <div class="mf"><button class="btn" data-close>${escapeHtml(t('acct-cancel'))}</button>
-        <button class="btn primary" id="acctm-ok">${escapeHtml(t('acct-ok'))}</button></div></div>`;
-    const mask = openAcctModal(inner);
-    if (!mask) return;
-    const ok = mask.querySelector<HTMLButtonElement>('#acctm-ok');
-    if (ok)
-        ok.onclick = () => {
-            closeAcctModal();
-            onOk();
-        };
+    acctConfirm(t('acct-set-autopost'), t('acct-autopost-confirm'), onOk);
 }
 
 // 科目映射弹窗:role → 科目下拉,改即 PUT(单条生效 · 不攒)。

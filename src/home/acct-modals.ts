@@ -4,18 +4,13 @@
 import {
     aapi,
     acctErrMsg,
-    openAcctModal,
     closeAcctModal,
+    openAcctModal,
+    withWs,
     type Account,
     type Voucher,
 } from './acct-common.js';
-import { activeWsId, fmtMoney } from './purchase-common.js';
-
-function withWs(path: string): string {
-    const ws = activeWsId();
-    if (ws == null) return path;
-    return path + (path.includes('?') ? '&' : '?') + 'workspace_client_id=' + ws;
-}
+import { fmtMoney } from './purchase-common.js';
 
 export async function fetchAccounts(): Promise<Account[]> {
     const data = (await aapi('GET', withWs('/api/accounting/accounts'))) as {

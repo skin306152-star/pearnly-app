@@ -2,6 +2,7 @@
 // 接口契约 docs/accounting/03。信封同 POS:{ok:true,data} / {ok:false,error:{code}}。
 // 全接口带 workspace_client_id(套账隔离);未选账套 → null,调用方提示先选公司。
 /* global t, token, escapeHtml */
+import { activeWsId } from './purchase-common.js';
 
 export type VoucherStatus = 'pending_review' | 'auto_posted' | 'posted' | 'void';
 export type VoucherMethod = 'auto' | 'suggested' | 'manual';
@@ -131,6 +132,13 @@ export function acctErrMsg(err: unknown, fallbackKey: string): string {
         if (msg && msg !== c) return msg;
     }
     return t(fallbackKey);
+}
+
+// 带当前套账 query(全屏共用 · 个人模式/未选 → 原样)。
+export function withWs(path: string): string {
+    const ws = activeWsId();
+    if (ws == null) return path;
+    return path + (path.includes('?') ? '&' : '?') + 'workspace_client_id=' + ws;
 }
 
 // ── 期间(YYYY-MM)──────────────────────────────────────────────────────
@@ -263,6 +271,23 @@ export function closeAcctModal(): void {
         mask.style.display = 'none';
         mask.innerHTML = '';
     }
+}
+
+// 不可逆动作二次确认(四-bis · 作废/撤销重做/开自动/结账共用)。
+export function acctConfirm(title: string, msg: string, onOk: () => void): void {
+    const inner = `<div class="acctm"><div class="mh"><div class="t">${escapeHtml(title)}</div><div class="x" data-close>×</div></div>
+        <div class="mb"><div class="hint">${escapeHtml(msg)}</div></div>
+        <div class="mf"><button class="btn" data-close>${escapeHtml(t('acct-cancel'))}</button>
+        <button class="btn primary" id="acctm-ok">${escapeHtml(t('acct-ok'))}</button></div></div>`;
+    const mask = openAcctModal(inner);
+    if (!mask) return;
+    const ok = mask.querySelector<HTMLButtonElement>('#acctm-ok');
+    if (ok)
+        ok.onclick = () => {
+            ok.disabled = true;
+            closeAcctModal();
+            onOk();
+        };
 }
 
 // ── 作用域样式(.acct · 继承全局令牌 · 与 .pur 同范式)─────────────────

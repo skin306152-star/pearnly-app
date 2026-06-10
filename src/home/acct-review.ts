@@ -5,17 +5,18 @@
 import {
     aapi,
     acctErrMsg,
+    closeAcctModal,
     injectAcctBase,
     injectStyle,
     isMappingShell,
     ledgerTable,
     normVoucher,
-    closeAcctModal,
     reasonKey,
     srcKey,
+    withWs,
     type Voucher,
 } from './acct-common.js';
-import { activeWsId, fmtBaht, fmtMoney } from './purchase-common.js';
+import { fmtBaht, fmtMoney } from './purchase-common.js';
 import { openAcctAccountPicker } from './acct-modals.js';
 
 const PAGE_CSS = `
@@ -42,12 +43,6 @@ const PAGE_CSS = `
 let queue: Voucher[] = [];
 let idx = 0;
 let postedCount = 0;
-
-function withWs(path: string): string {
-    const ws = activeWsId();
-    if (ws == null) return path;
-    return path + (path.includes('?') ? '&' : '?') + 'workspace_client_id=' + ws;
-}
 
 function cur(): Voucher | null {
     return queue[idx] || null;

@@ -5,17 +5,17 @@
 import {
     AcctError,
     aapi,
+    acctConfirm,
     acctErrMsg,
     currentPeriod,
     injectAcctBase,
     injectStyle,
     openAcctFile,
-    openAcctModal,
-    closeAcctModal,
     periodLabel,
     recentPeriods,
+    withWs,
 } from './acct-common.js';
-import { activeWsId, fmtBaht } from './purchase-common.js';
+import { fmtBaht } from './purchase-common.js';
 
 const PAGE_CSS = `
 .acct.ab .band{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line2);flex-wrap:wrap;gap:10px;}
@@ -102,12 +102,6 @@ let period = currentPeriod();
 let closedThrough: string | null = null;
 let pendingCount = 0;
 let postedCount = 0;
-
-function withWs(path: string): string {
-    const ws = activeWsId();
-    if (ws == null) return path;
-    return path + (path.includes('?') ? '&' : '?') + 'workspace_client_id=' + ws;
-}
 
 function isClosed(): boolean {
     return !!closedThrough && period <= closedThrough;
@@ -224,34 +218,22 @@ function bind(sec: HTMLElement): void {
 
 // 月末结账:不可逆 → 二次确认;成功报 VAT 结转结果;待审挡结给逐笔审落点。
 function confirmClose(): void {
-    const inner = `<div class="acctm"><div class="mh"><div class="t">${escapeHtml(t('acct-close-action'))}</div><div class="x" data-close>×</div></div>
-        <div class="mb"><div class="hint">${escapeHtml(t('acct-close-confirm'))}</div></div>
-        <div class="mf"><button class="btn" data-close>${escapeHtml(t('acct-cancel'))}</button>
-        <button class="btn primary" id="acctm-ok">${escapeHtml(t('acct-ok'))}</button></div></div>`;
-    const mask = openAcctModal(inner);
-    if (!mask) return;
-    const ok = mask.querySelector<HTMLButtonElement>('#acctm-ok');
-    if (!ok) return;
-    ok.onclick = async () => {
-        ok.disabled = true;
+    acctConfirm(t('acct-close-action'), t('acct-close-confirm'), async () => {
         try {
             const data = (await aapi('POST', withWs('/api/accounting/close-period'), {
                 period,
             })) as { closed?: string; vat_payable?: number };
-            closeAcctModal();
             const vat = Number(data && data.vat_payable) || 0;
             showToast(`${t('acct-close-ok')} · ${t('acct-close-vat')} ${fmtBaht(vat)}`, 'success');
-            load();
         } catch (e) {
-            closeAcctModal();
             if (e instanceof AcctError && e.code === 'acct.unbalanced') {
                 showToast(t('acct-close-blocked-toast'), 'error');
             } else {
                 showToast(acctErrMsg(e, 'acct.unexpected'), 'error');
             }
-            load();
         }
-    };
+        load();
+    });
 }
 
 async function load(): Promise<void> {

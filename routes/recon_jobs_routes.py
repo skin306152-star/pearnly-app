@@ -26,8 +26,8 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from core import db
 from core import workspace_context as wc
-from core.auth import get_current_user_from_request
 from core.route_helpers import _tid
+from services.authz.deps import require_perm
 from services.recon_jobs import store, worker
 
 logger = logging.getLogger("recon_jobs.routes")
@@ -182,7 +182,7 @@ async def bank_v2_submit(
     stmt_closing_override: Optional[float] = Form(None),
 ):
     lang = lang if lang in ("zh", "en", "th", "ja") else "th"
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     if not user:
         raise HTTPException(401, "未登录")
     if not stmt_files or not gl_files:
@@ -246,7 +246,7 @@ async def gl_vat_submit(
     lang: str = Form("th"),
 ):
     lang = lang if lang in ("zh", "en", "th", "ja") else "th"
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     if not user:
         raise HTTPException(401, "未登录")
 
@@ -304,7 +304,7 @@ async def vat_excel_submit(
     lang: str = Form("th"),
 ):
     lang = lang if lang in ("zh", "en", "th", "ja") else "th"
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     if not user:
         raise HTTPException(401, "未登录")
     if len(invoices) == 0 or len(reports) == 0:
@@ -347,7 +347,7 @@ async def vat_excel_submit(
 # ════ 统一状态查询(三个对账共用)════
 @router.get("/api/recon/jobs/{job_id}")
 async def get_job(job_id: str, request: Request):
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.view")
     if not user:
         raise HTTPException(401, "未登录")
     job = store.get(job_id, user_id=str(user["id"]), tenant_id=user.get("tenant_id"))
@@ -383,7 +383,7 @@ async def bank_v2_confirm_rows(job_id: str, request: Request):
     """
     import shutil
 
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.approve")
     if not user:
         raise HTTPException(401, "未登录")
     body = await request.json()

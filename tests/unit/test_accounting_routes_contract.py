@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-"""做账路由契约闸(docs/accounting/03):路由集合 / 信封 / 权限接线 / 模块门控。"""
+"""做账路由契约闸(docs/accounting/03 · 批2:权限码接线):路由集合 / 信封 / 逐路由带码 / 模块门控。"""
 
+import inspect
 import unittest
 
 import routes.accounting_routes as mod
@@ -26,28 +27,26 @@ EXPECTED = {
     ("DELETE", "/api/accounting/learned/{learned_id}"),
 }
 
-# 写接口 = 账号 owner 专属(员工只看 · docs/accounting/04 §六)
-_OWNER_HANDLERS = (
-    "api_manual_voucher",
-    "api_review_voucher",
-    "api_patch_voucher",
-    "api_void_voucher",
-    "api_unpost_voucher",
-    "api_create_account",
-    "api_update_account",
-    "api_set_mapping",
-    "api_update_settings",
-    "api_delete_learned",
-)
-_MEMBER_HANDLERS = (
-    "api_list_vouchers",
-    "api_get_voucher",
-    "api_review_queue",
-    "api_list_accounts",
-    "api_list_mappings",
-    "api_get_settings",
-    "api_list_learned",
-)
+# 批2:逐路由权限码(docs/permissions/02 矩阵接线 · 写档分 review/approve/coa/settings,读=view)
+GATE_CODES = {
+    "api_list_vouchers": "acct.entry.view",
+    "api_get_voucher": "acct.entry.view",
+    "api_manual_voucher": "acct.entry.review",
+    "api_review_voucher": "acct.entry.review",
+    "api_patch_voucher": "acct.entry.review",
+    "api_void_voucher": "acct.entry.approve",
+    "api_unpost_voucher": "acct.entry.approve",
+    "api_review_queue": "acct.entry.review",
+    "api_list_accounts": "acct.entry.view",
+    "api_create_account": "acct.coa.manage",
+    "api_update_account": "acct.coa.manage",
+    "api_list_mappings": "acct.entry.view",
+    "api_set_mapping": "acct.coa.manage",
+    "api_get_settings": "acct.entry.view",
+    "api_update_settings": "acct.settings.manage",
+    "api_list_learned": "acct.entry.view",
+    "api_delete_learned": "acct.coa.manage",
+}
 
 
 class AccountingRoutesContractTests(unittest.TestCase):
@@ -63,19 +62,20 @@ class AccountingRoutesContractTests(unittest.TestCase):
         self.assertTrue(hasattr(mod, "ok"))
         self.assertTrue(hasattr(mod, "PosError"))
 
-    def test_write_handlers_gate_on_owner(self):
-        for name in _OWNER_HANDLERS:
+    def test_every_handler_pins_perm_code(self):
+        for name, code in GATE_CODES.items():
             fn = getattr(mod, name)
-            self.assertIn("auth_owner", fn.__code__.co_names, f"{name} 没走 auth_owner")
+            self.assertIn(
+                f'auth_member(request, "{code}")', inspect.getsource(fn), f"{name} 没钉 {code}"
+            )
 
-    def test_read_handlers_allow_members(self):
-        for name in _MEMBER_HANDLERS:
-            fn = getattr(mod, name)
-            self.assertIn("auth_member", fn.__code__.co_names, f"{name} 没走 auth_member")
-            self.assertNotIn("auth_owner", fn.__code__.co_names, f"{name} 误锁 owner")
+    def test_gate_codes_cover_all_router_handlers(self):
+        # 防新增路由漏进矩阵:GATE_CODES 键集 = router 全部 handler
+        handlers = {r.endpoint.__name__ for r in router.routes if hasattr(r, "endpoint")}
+        self.assertEqual(handlers, set(GATE_CODES))
 
     def test_every_handler_gates_module_and_workspace(self):
-        for name in _OWNER_HANDLERS + _MEMBER_HANDLERS:
+        for name in GATE_CODES:
             fn = getattr(mod, name)
             self.assertIn("gate", fn.__code__.co_names, f"{name} 缺模块门控")
             self.assertIn("resolve_ws", fn.__code__.co_names, f"{name} 缺套账解析")

@@ -15,7 +15,7 @@ Pearnly · 员工管理路由模块(REFACTOR-B1 · 2026-05-25 抽出)
 
 依赖:
   - db.*(员工 CRUD + 客户分配 + 操作日志)
-  - route_helpers._require_owner_or_super / _log_op / _check_password_strength(公共 helper)
+  - authz.require_perm(team.member.* 逐路由)/ _log_op / _check_password_strength(公共 helper)
   - auth.get_client_ip
   - auth_signup.send_reset_link_for_employee(函数内懒 import · 防循环)
 
@@ -33,7 +33,8 @@ from pydantic import BaseModel, Field
 
 from core import db
 from core.auth import get_client_ip
-from core.route_helpers import _check_password_strength, _log_op, _require_owner_or_super
+from core.route_helpers import _check_password_strength, _log_op
+from services.authz.deps import require_perm
 
 logger = logging.getLogger("mr-pilot")
 router = APIRouter()
@@ -58,7 +59,7 @@ class EmployeeAssignmentsRequest(BaseModel):
 # 列员工
 @router.get("/api/team/employees")
 async def team_list_employees(request: Request):
-    owner = _require_owner_or_super(request)
+    owner = require_perm(request, "team.member.view")
     employees = db.list_employees(str(owner["tenant_id"]))
     # v118.28.1 · 顺手把每个员工已分配的客户数带上(团队卡片显示用)
     assignments = db.list_assignments_by_employees(str(owner["tenant_id"]))
@@ -82,7 +83,7 @@ async def team_list_employees(request: Request):
 @router.get("/api/team/employees/{employee_id}/assignments")
 async def team_get_employee_assignments(employee_id: str, request: Request):
     """老板拿单个员工的客户分配列表"""
-    owner = _require_owner_or_super(request)
+    owner = require_perm(request, "team.member.view")
     tid = str(owner.get("tenant_id") or "")
     if not tid:
         raise HTTPException(400, detail="team.no_tenant")
@@ -99,7 +100,7 @@ async def team_set_employee_assignments(
     employee_id: str, req: EmployeeAssignmentsRequest, request: Request
 ):
     """老板覆盖式设置某员工的客户分配 · 写审计日志"""
-    owner = _require_owner_or_super(request)
+    owner = require_perm(request, "team.member.scope")
     tid = str(owner.get("tenant_id") or "")
     if not tid:
         raise HTTPException(400, detail="team.no_tenant")
@@ -137,7 +138,7 @@ async def team_set_employee_assignments(
 # 加员工
 @router.post("/api/team/employees")
 async def team_add_employee(req: EmployeeAddRequest, request: Request):
-    owner = _require_owner_or_super(request)
+    owner = require_perm(request, "team.member.invite")
     # v118.11 · 密码强度校验
     pw_err = _check_password_strength(req.password)
     if pw_err:
@@ -189,7 +190,7 @@ async def team_add_employee(req: EmployeeAddRequest, request: Request):
 async def team_reset_employee_password(employee_id: str, request: Request):
     """v118.28.7 · 老板给员工发改密链接 · 老板永远拿不到密码
     员工没邮箱也没 LINE 关联 → 拒绝 · 提示先补邮箱(对齐大厂)"""
-    owner = _require_owner_or_super(request)
+    owner = require_perm(request, "team.member.toggle")
     target = db.find_user_by_id(employee_id)
     if not target:
         raise HTTPException(404, detail="team.employee_not_found")
@@ -252,7 +253,7 @@ async def team_reset_employee_password(employee_id: str, request: Request):
 # 删员工
 @router.delete("/api/team/employees/{employee_id}")
 async def team_remove_employee(employee_id: str, request: Request):
-    owner = _require_owner_or_super(request)
+    owner = require_perm(request, "team.member.remove")
     # 记下员工 username 再删
     target = db.find_user_by_id(employee_id)
     target_name = target.get("username") if target else None
@@ -266,7 +267,7 @@ async def team_remove_employee(employee_id: str, request: Request):
 # 启用/停用员工
 @router.patch("/api/team/employees/{employee_id}/active")
 async def team_toggle_employee(employee_id: str, req: EmployeeToggleRequest, request: Request):
-    owner = _require_owner_or_super(request)
+    owner = require_perm(request, "team.member.toggle")
     target = db.find_user_by_id(employee_id)
     target_name = target.get("username") if target else None
     ok = db.toggle_employee_active(str(owner["tenant_id"]), employee_id, req.is_active)

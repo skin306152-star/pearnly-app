@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 
 from core import db
 from core.pos_api import PosError, ok
-from routes.purchase_common import auth_member, auth_owner, gate, resolve_ws
+from routes.purchase_common import auth_member, gate, resolve_ws
 from services.purchase import categories as cat_svc
 from services.purchase import settings as settings_svc
 from services.purchase import suppliers as sup_svc
@@ -45,7 +45,7 @@ async def api_list_suppliers(
     q: Optional[str] = Query(None),
     include_inactive: bool = Query(False),
 ):
-    _, tid = auth_member(request)
+    _, tid = auth_member(request, "purchase.doc.view")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -61,7 +61,7 @@ async def api_list_suppliers(
 
 @router.post("/suppliers")
 async def api_create_supplier(req: SupplierIn, request: Request):
-    _, tid = auth_owner(request)
+    _, tid = auth_member(request, "purchase.supplier.manage")
     if not (req.name or "").strip():
         raise PosError("purchase.line_invalid", 422, detail="name_required")
     if not sup_svc.is_valid_tax_id(req.tax_id):
@@ -86,7 +86,7 @@ async def api_create_supplier(req: SupplierIn, request: Request):
 
 @router.patch("/suppliers/{supplier_id}")
 async def api_update_supplier(supplier_id: str, req: SupplierIn, request: Request):
-    _, tid = auth_owner(request)
+    _, tid = auth_member(request, "purchase.supplier.manage")
     if req.tax_id is not None and not sup_svc.is_valid_tax_id(req.tax_id):
         raise PosError("purchase.tax_id_invalid", 422)
     fields = req.model_dump(exclude_unset=True, exclude={"workspace_client_id", "is_active"})
@@ -113,7 +113,7 @@ async def api_update_supplier(supplier_id: str, req: SupplierIn, request: Reques
 async def api_delete_supplier(
     supplier_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
 ):
-    _, tid = auth_owner(request)
+    _, tid = auth_member(request, "purchase.supplier.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -139,7 +139,7 @@ class CategoryIn(BaseModel):
 
 @router.get("/categories")
 async def api_get_categories(request: Request, workspace_client_id: Optional[int] = Query(None)):
-    _, tid = auth_member(request)
+    _, tid = auth_member(request, "purchase.doc.view")
     with db.get_cursor_rls(tid, commit=True) as cur:  # commit:首次读懒种子预设
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -148,7 +148,7 @@ async def api_get_categories(request: Request, workspace_client_id: Optional[int
 
 @router.post("/categories")
 async def api_create_category(req: CategoryIn, request: Request):
-    _, tid = auth_owner(request)
+    _, tid = auth_member(request, "purchase.supplier.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)
@@ -167,7 +167,7 @@ async def api_create_category(req: CategoryIn, request: Request):
 
 @router.patch("/categories/{category_id}")
 async def api_update_category(category_id: str, req: CategoryIn, request: Request):
-    _, tid = auth_owner(request)
+    _, tid = auth_member(request, "purchase.supplier.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)
@@ -189,7 +189,7 @@ async def api_update_category(category_id: str, req: CategoryIn, request: Reques
 async def api_delete_category(
     category_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
 ):
-    _, tid = auth_owner(request)
+    _, tid = auth_member(request, "purchase.supplier.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -213,7 +213,7 @@ class SettingsIn(BaseModel):
 
 @router.get("/settings")
 async def api_get_settings(request: Request, workspace_client_id: Optional[int] = Query(None)):
-    _, tid = auth_member(request)
+    _, tid = auth_member(request, "purchase.doc.view")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -222,7 +222,7 @@ async def api_get_settings(request: Request, workspace_client_id: Optional[int] 
 
 @router.put("/settings")
 async def api_save_settings(req: SettingsIn, request: Request):
-    _, tid = auth_owner(request)
+    _, tid = auth_member(request, "purchase.settings.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)

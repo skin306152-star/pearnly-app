@@ -11,7 +11,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from core import db
-from core.auth import get_current_user_from_request
+from services.authz.deps import require_perm
 from services.vat.vat_report_parser import parse_vat_report
 from routes.recon_routes_shared import _user_key, _pdf_billing_units
 from services.recon.gl_vat_reconciler import (
@@ -95,7 +95,7 @@ async def gl_vat_run(
     - lang: 错误消息语言 zh/en/th/ja
     """
     lang = lang if lang in ("zh", "en", "th", "ja") else "th"
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     if not user:
         raise HTTPException(401, _glv_err("auth_required", lang))
 
@@ -295,7 +295,7 @@ async def gl_vat_run(
 @glvat_router.get("/gl-vat/tasks")
 async def gl_vat_list_tasks(request: Request):
     """列出最近 GL 对账任务"""
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.view")
     if not user:
         raise HTTPException(401, "未登录")
     tasks = db.list_gl_vat_tasks(
@@ -314,7 +314,7 @@ async def gl_vat_get_task(task_id: int, request: Request):
     旧 db.get_gl_vat_task(task_id) 无任何权限校验 · 改成强制传 user_id + tenant_id ·
     跨 tenant 用户拿不到 task · 自然 404 (跟 task 不存在一样的响应 · 防枚举侧信道)
     """
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.view")
     if not user:
         raise HTTPException(401, _glv_err("auth_required", "th"))
     task = db.get_gl_vat_task(task_id, str(user["id"]), user.get("tenant_id"))
@@ -341,7 +341,7 @@ async def gl_vat_get_task(task_id: int, request: Request):
 @glvat_router.get("/gl-vat/{task_id}/export")
 async def gl_vat_export(task_id: int, request: Request, lang: str = "th"):
     """下载 GL 对账 Excel · 表头按 lang 切换 zh/en/th/ja"""
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.export")
     if not user:
         raise HTTPException(401, "未登录")
     if lang not in ("th", "zh", "en", "ja"):
@@ -379,7 +379,7 @@ async def gl_vat_export(task_id: int, request: Request, lang: str = "th"):
 
 @glvat_router.delete("/gl-vat/{task_id}")
 async def gl_vat_delete(task_id: int, request: Request):
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     if not user:
         raise HTTPException(401, "未登录")
     ok = db.delete_gl_vat_task(task_id, str(user["id"]))
@@ -395,7 +395,7 @@ class _GlBatchDeleteBody(BaseModel):
 
 @glvat_router.post("/gl-vat/tasks/batch_delete")
 async def gl_vat_batch_delete(body: _GlBatchDeleteBody, request: Request):
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     if not user:
         raise HTTPException(401, "未登录")
     if not body.ids:

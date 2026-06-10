@@ -32,8 +32,8 @@ from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
 from core import db
 from core import workspace_context as wc
-from core.auth import get_current_user_from_request
 from core.route_helpers import _tid
+from services.authz.deps import require_perm
 
 logger = logging.getLogger("mr-pilot")
 
@@ -47,7 +47,7 @@ async def bank_recon_upload(request: Request, file: UploadFile = File(...)):
     - 不做匹配(用户下一步手动触发,方便分步)
     - 失败返回 4xx 明确错误码
     """
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     filename = file.filename or "statement.pdf"
     # 2026-05-21 multi-format refactor: bank statement upload supports
     # PDF / image / Excel / CSV / Word. PDF goes through bank_recon_v2's
@@ -160,7 +160,7 @@ async def bank_recon_list_sessions(request: Request, limit: int = 30):
     """最近对账会话列表
     v118.26.2 · 接 client_assignments filter(v28.1 铁律 · 员工只看分到的客户的对账)
     """
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.view")
     limit = max(1, min(int(limit), 100))
     restrict = db.get_visible_client_ids_for_user(user)
     return db.list_bank_recon_sessions(
@@ -184,7 +184,7 @@ async def bank_recon_stats(request: Request):
       last_activity_at - 最近一次操作时间(iso 字符串 · null 表示无)
     时区按 Asia/Bangkok 算「当月」
     """
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.view")
     return db.get_bank_recon_stats(
         user["id"], workspace_client_id=wc.active_workspace_for_request(request, _tid(user))
     )
@@ -193,7 +193,7 @@ async def bank_recon_stats(request: Request):
 @router.get("/api/bank-recon/sessions/{session_id}")
 async def bank_recon_session_detail(session_id: str, request: Request, filter: str = "all"):
     """会话详情 · 含流水列表 · 可按 match_status 过滤"""
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.view")
     session = db.get_bank_recon_session(
         user["id"],
         session_id,
@@ -212,7 +212,7 @@ async def bank_recon_session_detail(session_id: str, request: Request, filter: s
 @router.delete("/api/bank-recon/sessions/{session_id}")
 async def bank_recon_delete_session(session_id: str, request: Request):
     """删除对账会话(级联删流水和候选)"""
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     ok = db.delete_bank_recon_session(
         user["id"],
         session_id,
@@ -226,7 +226,7 @@ async def bank_recon_delete_session(session_id: str, request: Request):
 @router.post("/api/bank-recon/sessions/{session_id}/match")
 async def bank_recon_run_match(session_id: str, request: Request):
     """触发匹配算法 · 同步等结果(最长 60 秒)"""
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     session = db.get_bank_recon_session(
         user["id"],
         session_id,
@@ -254,7 +254,7 @@ async def bank_recon_run_match(session_id: str, request: Request):
 @router.post("/api/bank-recon/tx/{tx_id}/override")
 async def bank_recon_tx_override(tx_id: str, request: Request):
     """用户手动指派匹配 · body: {history_id?, status}"""
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     body = await request.json()
     status = (body.get("status") or "").strip()
     history_id = body.get("history_id")
@@ -276,7 +276,7 @@ async def bank_recon_tx_candidates(tx_id: str, request: Request):
     每项含发票字段(invoice_no / vendor / amount_total / invoice_date / filename)
     没跑过匹配的流水返回空数组 · 前端显示「请先点开始匹配」
     """
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.view")
     return {"candidates": db.get_tx_candidates(tx_id, str(user["id"]))}
 
 
@@ -286,7 +286,7 @@ async def bank_recon_set_session_client(session_id: str, request: Request):
     """body: {client_id: int|null}
     鉴权:session 必须属于 user 且 client_id 必须在 visible 范围内(防越权)
     """
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     body = await request.json()
     cid = body.get("client_id")
     # 校验客户在 visible 范围
@@ -320,7 +320,7 @@ _TEST_USER_IDS = {
 @router.post("/api/bank-recon/_dev/seed")
 async def bank_recon_dev_seed(request: Request):
     """skin 白名单 · 插一份 KBANK mock session(8 条流水)· 用于演示对账 UI"""
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     uid = str(user["id"])
     if uid not in _TEST_USER_IDS:
         raise HTTPException(403, detail="bank_recon.dev_not_allowed")
@@ -333,7 +333,7 @@ async def bank_recon_dev_seed(request: Request):
 @router.post("/api/bank-recon/_dev/clear")
 async def bank_recon_dev_clear(request: Request):
     """skin 白名单 · 清掉所有 _MOCK_ session"""
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     uid = str(user["id"])
     if uid not in _TEST_USER_IDS:
         raise HTTPException(403, detail="bank_recon.dev_not_allowed")

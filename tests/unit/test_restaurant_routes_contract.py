@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
-"""餐厅 POS 路由守门测试(餐厅 POS · PO-R)。
+"""餐厅 POS 路由守门测试(餐厅 POS · PO-R · 批2:管理端走 require_perm 统一执行点)。
 
-锁定:前台 14 + 管理 6 = 20 条路由 path+method 契约 · app.py include · 路由用 POS 信封 + 模块守门。"""
+锁定:前台 14 + 管理 8 路由 path+method 契约 · app.py include · POS 信封 + 模块守门 +
+前台收银员 token(pos_auth)/ 管理 pos.admin.manage 带码守门。"""
 
+import inspect
 import unittest
 
 import routes.pos_restaurant_admin_routes as admin_mod
@@ -67,8 +69,13 @@ class RestaurantRoutesContractTests(unittest.TestCase):
             self.assertTrue(hasattr(mod, "ok"))
             self.assertTrue(hasattr(mod, "assert_module_enabled"))
             self.assertTrue(hasattr(mod, "PosError"))
-            self.assertTrue(hasattr(mod, "pos_auth"))
             self.assertTrue(hasattr(mod, "require_workspace"))
+        # 前台 = 收银员 token(pos_auth);管理 = 权限码统一执行点(收银员 403)
+        self.assertTrue(hasattr(front_mod, "pos_auth"))
+        self.assertIn(
+            'require_perm_pos(request, "pos.admin.manage")',
+            inspect.getsource(admin_mod._owner_ctx),
+        )
 
 
 if __name__ == "__main__":

@@ -175,21 +175,15 @@ def require_owner(request: Request) -> tuple[str, Optional[str]]:
 
 
 def require_account_owner(request: Request) -> tuple[str, Optional[str]]:
-    """取 (tenant_id, user_id) 且主体必须是【账号 owner】(invited_by is None · 非收银员)。
+    """取 (tenant_id, user_id) 且主体须有租户级配置权(settings.modules.manage)。
 
-    比 require_owner 更严:require_owner 只挡收银员,受邀成员/会计可过;平台模块配置
-    (业态 onboarding / 模块开关)是租户级动作,只有创建账号的 owner 能改 → 否则 pos.forbidden。
+    权限整顿批2(docs/permissions/03):owner 判定从 invited_by IS NULL 切到
+    membership 角色——require_perm 经 resolver 读 memberships,owner/admin 过,
+    会计/录入/只读/收银员 403。语义升级:管理员(admin 角色)从此可改模块开关(矩阵 ✔)。
     """
-    user = pos_auth(request)
-    tid = user.get("tenant_id") if user else None
-    if not tid:
-        raise PosError("pos.forbidden", 403)
-    is_cashier = user.get("role") == "cashier" and not user.get("is_super_admin")
-    is_owner = user.get("invited_by") is None
-    if is_cashier or not (is_owner or user.get("is_super_admin")):
-        raise PosError("pos.forbidden", 403)
-    uid = str(user["id"]) if user and user.get("id") else None
-    return str(tid), uid
+    from services.authz.deps import require_perm_pos_tid
+
+    return require_perm_pos_tid(request, "settings.modules.manage")
 
 
 def require_workspace(cur, tenant_id: str, workspace_client_id: int) -> None:

@@ -13,19 +13,18 @@ from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
 from core import db
-from core.pos_api import PosError, assert_module_enabled, ok, pos_auth, require_workspace
+from core.pos_api import PosError, assert_module_enabled, ok, require_workspace
+from services.authz.deps import require_perm_pos
 from services.pos import payment_settings as svc
 
 router = APIRouter(prefix="/api/pos/admin", tags=["pos-payment"])
 
 
 def _owner_ctx(request: Request, ws_override: Optional[int]) -> tuple[str, int]:
-    user = pos_auth(request)
+    user = require_perm_pos(request, "pos.admin.manage")  # 收款配置=老板动作,收银员 403
     tid = user.get("tenant_id")
     if not tid:
         raise PosError("pos.forbidden", 403)
-    if user.get("role") == "cashier" and not user.get("is_super_admin"):
-        raise PosError("pos.forbidden", 403)  # 收款配置=老板动作,收银员 403
     ws = user.get("workspace_client_id") or ws_override
     if ws is None:
         raise PosError("pos.forbidden", 403)

@@ -10,7 +10,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request
 from pydantic import BaseModel
 
 from core import db
-from core.auth import get_current_user_from_request
+from services.authz.deps import require_perm
 from services.vat.vat_report_parser import parse_vat_report
 from routes.recon_routes_shared import _user_key
 from routes.recon_routes_progress import _progress_init, _progress_update
@@ -34,7 +34,7 @@ async def batch_process(
 ):
     """v118.32.2 · 屏 B · 用户确认分组后 · OCR 发票 + 解析报告 + 建任务
     v118.32.4 · 拆两阶段 + 进度上报 + parse_vat_report 走 run_in_executor 防阻塞"""
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     if not user:
         raise HTTPException(401, "未登录")
     api_key = _user_key(user)
@@ -274,7 +274,7 @@ async def batch_delete_tasks(body: _DeleteIdsBody, request: Request):
     - ocr_history(本任务上传的发票 · 按 source_ref=task_id 关联)
     - vat_report(该任务的 VAT 报告解析结果 · 仅当无其他任务引用)
     """
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     if not user:
         raise HTTPException(401, "未登录")
     if not body.ids:

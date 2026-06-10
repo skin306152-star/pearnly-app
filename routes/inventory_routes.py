@@ -18,10 +18,9 @@ from core.pos_api import (
     PosError,
     assert_module_enabled,
     ok,
-    require_owner,
-    require_tenant,
     require_workspace,
 )
+from services.authz.deps import check_request_scope, require_perm_pos_tid
 from services.inventory import ledger, queries, store
 
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
@@ -32,26 +31,28 @@ def _read(request: Request, workspace_client_id: int, fn, commit: bool = False):
 
     模块守门与业务读用同一游标(不另起连接);GET 需懒建默认仓时传 commit=True。
     """
-    tid, _uid = require_tenant(request)
+    tid, _uid = require_perm_pos_tid(request, "inv.view")
     with db.get_cursor_rls(tid, commit=commit) as cur:
         assert_module_enabled(cur, tid, "inventory")
         require_workspace(cur, tid, workspace_client_id)
+        check_request_scope(request, workspace_client_id, pos=True)
         return ok(fn(cur, tid))
 
 
-def _write(request: Request, req, fn):
-    """写端骨架:鉴权(老板/会计 · 收银员 token 不可调库存写)→ 单事务(模块守门 + 账套归属
+def _write(request: Request, req, fn, code: str):
+    """写端骨架:鉴权(权限码守门 · 收银员 token 不可调库存写)→ 单事务(模块守门 + 账套归属
     + 解析仓 + fn)→ 信封。
 
-    require_owner:库存进货/盘点/调整是后台动作,收银员 token → pos.forbidden(403)(docs/10
-    §5.1)。POS 售卖扣库存走服务层(不经此路由),不受影响。
+    require_perm_pos_tid:库存进货/盘点/调整是后台动作,收银员 token → pos.forbidden(403)
+    (docs/10 §5.1)。POS 售卖扣库存走服务层(不经此路由),不受影响。
     InventoryError → PosError(422) 收口在此一处(各 handler 不再各写 try/except)。
     """
-    tid, uid = require_owner(request)
+    tid, uid = require_perm_pos_tid(request, code)
     try:
         with db.get_cursor_rls(tid, commit=True) as cur:
             assert_module_enabled(cur, tid, "inventory")
             require_workspace(cur, tid, req.workspace_client_id)
+            check_request_scope(request, req.workspace_client_id, pos=True)
             wh = _resolve_warehouse(cur, tid, req.workspace_client_id, req.warehouse_id)
             return ok(fn(cur, tid, uid, wh))
     except ledger.InventoryError as e:
@@ -175,6 +176,7 @@ async def api_receive(req: InRequest, request: Request):
             client_uuid=req.client_uuid,
             created_by=uid,
         ),
+        "inv.create",
     )
 
 
@@ -191,6 +193,7 @@ async def api_count(req: CountRequest, request: Request):
             lines=[_dump(line) for line in req.lines],
             created_by=uid,
         ),
+        "inv.approve",
     )
 
 
@@ -211,4 +214,5 @@ async def api_adjust(req: AdjustRequest, request: Request):
             client_uuid=req.client_uuid,
             created_by=uid,
         ),
+        "inv.approve",
     )

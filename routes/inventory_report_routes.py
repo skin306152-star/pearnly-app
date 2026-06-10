@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """库存报表路由(POS 项目 · C1 · docs/pos/04 §4)。
 
-薄层:require_owner(库存报表是老板/会计后台分析,收银员 token 不可调)→ 模块守门(inventory)
+薄层:require_perm_pos_tid(库存报表是老板/会计后台分析,收银员 token 不可调)→ 模块守门(inventory)
 → account 归属 → 调 services/inventory/reports。统一 POS 信封。只读。
 """
 
@@ -13,7 +13,8 @@ from typing import Optional
 from fastapi import APIRouter, Query, Request
 
 from core import db
-from core.pos_api import assert_module_enabled, ok, require_owner, require_workspace
+from core.pos_api import assert_module_enabled, ok, require_workspace
+from services.authz.deps import require_perm_pos_tid
 from services.inventory import reports as report_svc
 
 router = APIRouter(prefix="/api/inventory", tags=["inventory-report"])
@@ -40,7 +41,7 @@ async def api_inventory_report(
     today = date.today()
     d_to = _parse_date(date_to, today)
     d_from = _parse_date(date_from, today.replace(day=1))
-    tid, _uid = require_owner(request)
+    tid, _uid = require_perm_pos_tid(request, "inv.report.view")
     with db.get_cursor_rls(tid) as cur:
         assert_module_enabled(cur, tid, "inventory")
         require_workspace(cur, tid, workspace_client_id)

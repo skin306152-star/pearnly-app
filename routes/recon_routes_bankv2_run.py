@@ -9,8 +9,8 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request
 
 from core import db
 from core import workspace_context as wc
-from core.auth import get_current_user_from_request
 from core.route_helpers import _tid
+from services.authz.deps import require_perm
 from routes.recon_routes_shared import _user_key, _pdf_billing_units
 from routes.recon_routes_bankv2_helpers import (
     _BANK_V2_OK,
@@ -58,7 +58,7 @@ async def bank_v2_run(
     import asyncio
 
     lang = lang if lang in ("zh", "en", "th", "ja") else "th"
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     if not user:
         raise HTTPException(401, _brv2_err("auth_required", lang))
 

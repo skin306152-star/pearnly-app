@@ -14,6 +14,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel
 
 from core import db
+from services.authz.deps import require_perm
 from services.billing.charge import SATANG_PER_THB
 from services.knowledge import contract
 from routes.knowledge_common import authorize_write, resolve_caller
@@ -49,6 +50,7 @@ def _answer_out(answer: KnowledgeAnswer) -> dict[str, Any]:
 
 @router.post("/ask")
 def ask_question(request: Request, body: AskRequest) -> dict[str, Any]:
+    require_perm(request, "kb.ask")
     identity, accessible = resolve_caller(request)
     question = body.question.strip()
     if not question:
@@ -118,6 +120,7 @@ def ask_question(request: Request, body: AskRequest) -> dict[str, Any]:
 
 @router.get("/answers/{answer_id}")
 def get_answer(request: Request, answer_id: int) -> dict[str, Any]:
+    require_perm(request, "kb.doc.view")
     identity, accessible = resolve_caller(request)
     with db.get_cursor_rls(identity.tenant_id) as cur:
         answer = dal.get_answer(
@@ -131,6 +134,7 @@ def get_answer(request: Request, answer_id: int) -> dict[str, Any]:
 @router.get("/chunks/{chunk_id}")
 def get_chunk(request: Request, chunk_id: int) -> dict[str, Any]:
     """出处原文:取被引用的 chunk + 相邻段落,供来源弹窗高亮命中片段。"""
+    require_perm(request, "kb.doc.view")
     identity, accessible = resolve_caller(request)
     with db.get_cursor_rls(identity.tenant_id) as cur:
         ctx = search.get_chunk_context(

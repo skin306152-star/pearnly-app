@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
-"""设置页模块管理路由守门测试(POS 项目 · C3)。
+"""设置页模块管理路由守门测试(POS 项目 · C3 · 批2:require_perm 统一执行点)。
 
-锁定:4 条路由契约 · app.py include · POS 信封 + require_owner(收银员不可调模块管理)。"""
+锁定:4 条路由契约 · app.py include · POS 信封 + settings.modules.manage 带码守门
+(收银员/低权限成员不可调模块管理)。"""
 
+import inspect
 import unittest
 
 import routes.pos_modules_routes as mod
@@ -32,14 +34,18 @@ class PosModulesRoutesContractTests(unittest.TestCase):
         for _m, p in EXPECTED:
             self.assertIn(p, paths)
 
-    def test_all_handlers_owner_gated(self):
+    def test_all_handlers_perm_gated(self):
         for fn in (
             mod.api_get_modules,
             mod.api_set_module,
             mod.api_onboarding_state,
             mod.api_business_presets,
         ):
-            self.assertIn("require_owner", fn.__code__.co_names, fn.__name__)
+            self.assertIn(
+                'require_perm_pos_tid(request, "settings.modules.manage")',
+                inspect.getsource(fn),
+                fn.__name__,
+            )
 
     def test_uses_envelope(self):
         self.assertTrue(hasattr(mod, "ok"))

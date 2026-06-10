@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 
 from core import db
 from core.pos_api import PosError, ok
-from routes.purchase_common import auth_member, auth_owner, gate, resolve_ws, uid as _uid
+from routes.purchase_common import auth_member, gate, resolve_ws, uid as _uid
 from services.purchase import documents as documents_svc
 from services.purchase import docs as docs_svc
 from services.purchase import posting as posting_svc
@@ -69,7 +69,7 @@ class MatchIn(BaseModel):
 
 @router.post("/docs")
 async def api_create_doc(req: DocIn, request: Request):
-    user, tid = auth_member(request)
+    user, tid = auth_member(request, "purchase.doc.create")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)
@@ -95,7 +95,7 @@ async def api_list_docs(
     unpaid: bool = Query(False),
     q: Optional[str] = Query(None),
 ):
-    _, tid = auth_member(request)
+    _, tid = auth_member(request, "purchase.doc.view")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -116,7 +116,7 @@ async def api_list_docs(
 async def api_get_doc(
     doc_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
 ):
-    _, tid = auth_member(request)
+    _, tid = auth_member(request, "purchase.doc.view")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -128,7 +128,7 @@ async def api_get_doc(
 
 @router.put("/docs/{doc_id}")
 async def api_update_doc(doc_id: str, req: DocIn, request: Request):
-    user, tid = auth_member(request)
+    user, tid = auth_member(request, "purchase.doc.edit")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)
@@ -147,7 +147,7 @@ async def api_update_doc(doc_id: str, req: DocIn, request: Request):
 
 @router.post("/docs/{doc_id}/post")
 async def api_post_doc(doc_id: str, req: PostIn, request: Request):
-    user, tid = auth_member(request)
+    user, tid = auth_member(request, "purchase.doc.approve")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)
@@ -166,7 +166,7 @@ async def api_post_doc(doc_id: str, req: PostIn, request: Request):
 
 @router.post("/docs/{doc_id}/pay")
 async def api_pay_doc(doc_id: str, req: PayIn, request: Request):
-    _, tid = auth_owner(request)
+    _, tid = auth_member(request, "purchase.doc.approve")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)
@@ -178,7 +178,7 @@ async def api_pay_doc(doc_id: str, req: PayIn, request: Request):
 
 @router.post("/docs/{doc_id}/void")
 async def api_void_doc(doc_id: str, req: PostIn, request: Request):
-    user, tid = auth_owner(request)
+    user, tid = auth_member(request, "purchase.doc.approve")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)
@@ -196,7 +196,7 @@ async def api_void_doc(doc_id: str, req: PostIn, request: Request):
 async def api_delete_doc(
     doc_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
 ):
-    _, tid = auth_member(request)
+    _, tid = auth_member(request, "purchase.doc.delete")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -206,7 +206,7 @@ async def api_delete_doc(
 
 @router.post("/lines/{line_id}/match-product")
 async def api_match_product(line_id: str, req: MatchIn, request: Request):
-    _, tid = auth_member(request)
+    _, tid = auth_member(request, "purchase.doc.edit")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)
@@ -241,7 +241,7 @@ def _renderer_for(kind: str):
 
 def _gen_credential(request: Request, doc_id: str, ws_override, kind: str):
     """生成凭据(替代收据/扣缴凭证)· owner 限定 · 渲染校验后登记附件。"""
-    _, tid = auth_owner(request)
+    _, tid = auth_member(request, "purchase.doc.approve")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, ws_override)
@@ -269,7 +269,7 @@ async def api_document_pdf(
     kind: str = Query("substitute_receipt"),
     workspace_client_id: Optional[int] = Query(None),
 ):
-    _, tid = auth_member(request)
+    _, tid = auth_member(request, "purchase.doc.view")
     if documents_svc.get_generated_kind(kind) is None:
         raise PosError("purchase.line_invalid", 422, detail="bad_kind")
     with db.get_cursor_rls(tid, commit=False) as cur:
@@ -289,7 +289,7 @@ async def api_bill_image(
     doc_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
 ):
     """票图原图(拍票留底)· 鉴权 + 套账边界 · 落盘文件流式返回。"""
-    _, tid = auth_member(request)
+    _, tid = auth_member(request, "purchase.doc.view")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -311,7 +311,7 @@ async def api_bill_image(
 
 @router.post("/docs/{doc_id}/attachments")
 async def api_add_attachment(doc_id: str, req: AttachmentIn, request: Request):
-    _, tid = auth_member(request)
+    _, tid = auth_member(request, "purchase.doc.edit")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)
@@ -325,7 +325,7 @@ async def api_add_attachment(doc_id: str, req: AttachmentIn, request: Request):
 async def api_delete_attachment(
     attachment_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
 ):
-    _, tid = auth_owner(request)
+    _, tid = auth_member(request, "purchase.doc.edit")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -342,7 +342,7 @@ async def api_summary(
     date_from: Optional[str] = Query(None, alias="from"),
     date_to: Optional[str] = Query(None, alias="to"),
 ):
-    _, tid = auth_member(request)
+    _, tid = auth_member(request, "purchase.doc.view")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)

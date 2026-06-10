@@ -15,22 +15,14 @@ from pydantic import BaseModel, Field
 
 from core import db
 from core import workspace_context as wc
-from core.auth import get_current_user_from_request
 from core.route_helpers import translate_unique_violation
+from services.authz.deps import require_perm_tid
 from services.sales import product_import
 from services.sales import products as products_dal
 from services.products import units as units_dal
 
 logger = logging.getLogger("mr-pilot")
 router = APIRouter(prefix="/api/sales/products", tags=["sales-products"])
-
-
-def _require_tenant(request: Request) -> str:
-    user = get_current_user_from_request(request)
-    tid = user.get("tenant_id") if user else None
-    if not tid:
-        raise HTTPException(400, detail="sales.tenant_required")
-    return str(tid)
 
 
 # POS PO-A2 库存地基:base_unit/批次效期/称重/低库存阈值/参考成本(都可空 · 不破既有调用)。
@@ -141,7 +133,7 @@ def _unit_out(u: dict) -> dict:
 async def api_list_products(
     request: Request, include_inactive: bool = False, q: Optional[str] = None
 ):
-    tid = _require_tenant(request)
+    tid, _ = require_perm_tid(request, "sales.product.view")
     with db.get_cursor_rls(tid) as cur:
         ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
         rows = products_dal.list_products(
@@ -156,7 +148,7 @@ async def api_list_products(
 
 @router.post("")
 async def api_create_product(req: ProductCreate, request: Request):
-    tid = _require_tenant(request)
+    tid, _ = require_perm_tid(request, "sales.product.manage")
     with (
         db.get_cursor_rls(tid, commit=True) as cur,
         translate_unique_violation("sales.product_code_exists"),
@@ -176,7 +168,7 @@ async def api_lookup_product(
     qr: Optional[str] = None,
 ):
     """按 code/barcode/qr 精确带出在售商品(POS 点单/扫码用)。"""
-    tid = _require_tenant(request)
+    tid, _ = require_perm_tid(request, "sales.product.view")
     key, value = next(
         ((k, v) for k, v in (("code", code), ("barcode", barcode), ("qr", qr)) if v),
         (None, None),
@@ -194,7 +186,7 @@ async def api_lookup_product(
 @router.post("/import")
 async def api_import_products(request: Request, file: UploadFile = File(...)):
     """Excel 批量导入:解析 → 行校验 → 入库可入库行 · 返回入库数 + 行级错误。"""
-    tid = _require_tenant(request)
+    tid, _ = require_perm_tid(request, "sales.product.manage")
     data = await file.read()
     if not data:
         raise HTTPException(400, detail="sales.empty_file")
@@ -217,7 +209,7 @@ async def api_import_products(request: Request, file: UploadFile = File(...)):
 
 @router.get("/{product_id}")
 async def api_get_product(product_id: str, request: Request):
-    tid = _require_tenant(request)
+    tid, _ = require_perm_tid(request, "sales.product.view")
     with db.get_cursor_rls(tid) as cur:
         ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
         row = products_dal.get_product(
@@ -230,7 +222,7 @@ async def api_get_product(product_id: str, request: Request):
 
 @router.patch("/{product_id}")
 async def api_update_product(product_id: str, req: ProductUpdate, request: Request):
-    tid = _require_tenant(request)
+    tid, _ = require_perm_tid(request, "sales.product.manage")
     raw = {k: v for k, v in _dump(req).items() if v is not None}
     if not raw:
         raise HTTPException(400, detail="sales.no_changes")
@@ -249,7 +241,7 @@ async def api_update_product(product_id: str, req: ProductUpdate, request: Reque
 
 @router.delete("/{product_id}")
 async def api_delete_product(product_id: str, request: Request):
-    tid = _require_tenant(request)
+    tid, _ = require_perm_tid(request, "sales.product.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
         ok = products_dal.deactivate_product(
@@ -263,7 +255,7 @@ async def api_delete_product(product_id: str, request: Request):
 # ── 多单位/拆零 product_units(POS PO-A2 · 盒/板/粒 换算)──────────────
 @router.get("/{product_id}/units")
 async def api_list_units(product_id: str, request: Request):
-    tid = _require_tenant(request)
+    tid, _ = require_perm_tid(request, "sales.product.view")
     with db.get_cursor_rls(tid) as cur:
         ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
         rows = units_dal.list_units(
@@ -274,7 +266,7 @@ async def api_list_units(product_id: str, request: Request):
 
 @router.post("/{product_id}/units")
 async def api_create_unit(product_id: str, req: UnitCreate, request: Request):
-    tid = _require_tenant(request)
+    tid, _ = require_perm_tid(request, "sales.product.manage")
     with (
         db.get_cursor_rls(tid, commit=True) as cur,
         translate_unique_violation("sales.unit_name_exists"),
@@ -293,7 +285,7 @@ async def api_create_unit(product_id: str, req: UnitCreate, request: Request):
 
 @router.patch("/{product_id}/units/{unit_id}")
 async def api_update_unit(product_id: str, unit_id: str, req: UnitUpdate, request: Request):
-    tid = _require_tenant(request)
+    tid, _ = require_perm_tid(request, "sales.product.manage")
     raw = {k: v for k, v in _dump(req).items() if v is not None}
     if not raw:
         raise HTTPException(400, detail="sales.no_changes")
@@ -317,7 +309,7 @@ async def api_update_unit(product_id: str, unit_id: str, req: UnitUpdate, reques
 
 @router.delete("/{product_id}/units/{unit_id}")
 async def api_delete_unit(product_id: str, unit_id: str, request: Request):
-    tid = _require_tenant(request)
+    tid, _ = require_perm_tid(request, "sales.product.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         ws = wc.resolve_active_workspace_id(cur, request, tenant_id=tid)
         ok = units_dal.delete_unit(

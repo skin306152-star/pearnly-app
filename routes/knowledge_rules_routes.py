@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel
 
 from core import db
+from services.authz.deps import require_perm
 from routes.knowledge_common import authorize_write, resolve_caller
 from services.knowledge import rules_dal
 from services.knowledge.schema import ClientRule
@@ -62,6 +63,7 @@ def list_rules(
 ) -> dict[str, Any]:
     # include_inactive: the settings UI lists disabled rules too (greyed, re-enableable);
     # the engine's ruleset loader stays active-only and is unaffected.
+    require_perm(request, "kb.doc.view")
     identity, accessible = resolve_caller(request)
     with db.get_cursor_rls(identity.tenant_id) as cur:
         rules = rules_dal.list_client_rules(
@@ -76,6 +78,7 @@ def list_rules(
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_rule(request: Request, body: RuleCreate) -> dict[str, Any]:
+    require_perm(request, "kb.doc.create")
     identity, accessible = resolve_caller(request)
     authorize_write(accessible, body.workspace_client_id)
     try:
@@ -104,6 +107,7 @@ def create_rule(request: Request, body: RuleCreate) -> dict[str, Any]:
 
 @router.patch("/{rule_id}")
 def update_rule(request: Request, rule_id: int, body: RulePatch) -> dict[str, Any]:
+    require_perm(request, "kb.doc.create")
     identity, accessible = resolve_caller(request)
     try:
         with db.get_cursor_rls(identity.tenant_id, commit=True) as cur:
@@ -125,6 +129,7 @@ def update_rule(request: Request, rule_id: int, body: RulePatch) -> dict[str, An
 
 @router.delete("/{rule_id}")
 def delete_rule(request: Request, rule_id: int) -> dict[str, Any]:
+    require_perm(request, "kb.doc.delete")
     identity, accessible = resolve_caller(request)
     with db.get_cursor_rls(identity.tenant_id, commit=True) as cur:
         deleted = rules_dal.delete_client_rule(

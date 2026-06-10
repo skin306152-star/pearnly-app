@@ -20,7 +20,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from core import db
-from core.route_helpers import _require_tenant
+from services.authz.deps import require_perm_tid
 from services.sales import document as doc_svc
 from services.sales import pdf as pdf_svc
 from services.sales import render as sales_render
@@ -71,7 +71,7 @@ def _email_content(doc: dict, seller: dict, message: Optional[str]) -> tuple[str
 @router.post("/{doc_id}/send")
 async def api_send_document(doc_id: str, req: SendIn, request: Request):
     """发送已开票:channel=email 官方代发 PDF;channel=line 出分享链接。各渠道唯一发法,其余拒。"""
-    tid, uid = _require_tenant(request)
+    tid, uid = require_perm_tid(request, "sales.doc.approve")
     p = req.model_dump() if hasattr(req, "model_dump") else req.dict()
     channel = p["channel"]
     if channel not in ("email", "line"):

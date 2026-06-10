@@ -41,11 +41,17 @@ class BankGetEnrichTests(unittest.TestCase):
             "created_at": "2026-05-24",
         }
 
+    # 权限批2:路由入口换统一执行点 require_perm(request, "recon.view")→ 过返 user dict
+    @staticmethod
+    def _fake_require_perm(request, code):
+        assert code == "recon.view", f"bank_v2_get_task 守门码应为 recon.view · 实际 {code}"
+        return {"id": "u1", "tenant_id": "t1"}
+
     def test_stats_parse_info_warnings_restored(self):
         with (
             mock.patch(
-                "routes.recon_routes_bankv2.get_current_user_from_request",
-                return_value={"id": "u1", "tenant_id": "t1"},
+                "routes.recon_routes_bankv2.require_perm",
+                side_effect=self._fake_require_perm,
             ),
             mock.patch.object(rr.db, "get_bank_recon_v2_task", return_value=self._task()),
         ):
@@ -64,8 +70,8 @@ class BankGetEnrichTests(unittest.TestCase):
         task["summary_json"] = None
         with (
             mock.patch(
-                "routes.recon_routes_bankv2.get_current_user_from_request",
-                return_value={"id": "u1", "tenant_id": "t1"},
+                "routes.recon_routes_bankv2.require_perm",
+                side_effect=self._fake_require_perm,
             ),
             mock.patch.object(rr.db, "get_bank_recon_v2_task", return_value=task),
         ):

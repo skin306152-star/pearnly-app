@@ -22,7 +22,8 @@ from pydantic import BaseModel, Field
 
 from core import db
 from core.auth import get_current_user_from_request
-from core.route_helpers import _tid, _require_owner_or_super
+from core.route_helpers import _tid
+from services.authz.deps import get_authz, require_perm
 
 router = APIRouter()
 
@@ -65,6 +66,10 @@ async def list_workspace_clients(request: Request, include_inactive: bool = Fals
     rows = db.list_workspace_clients_enriched(
         str(user["id"]), tenant_id=_tid(user), active_only=not include_inactive
     )
+    authz = get_authz(request, user)
+    if not user.get("is_super_admin") and authz.scope_mode == "assigned":
+        allowed = authz.workspace_ids or frozenset()
+        rows = [r for r in rows if int(r.get("id") or 0) in allowed]
     return {"clients": rows, "count": len(rows)}
 
 
@@ -75,7 +80,7 @@ async def create_workspace_client(req: WorkspaceClientCreate, request: Request):
     注意:Pearnly 不在 ERP 内自动创建账套公司,这里只是在 Pearnly 侧登记一个工作台
     主体,并可绑定到一个**已存在**的 ERP endpoint。
     """
-    user = _require_owner_or_super(request)
+    user = require_perm(request, "settings.workspace.manage")
     wid = db.create_workspace_client(
         str(user["id"]),
         _tid(user),
@@ -97,7 +102,7 @@ async def bind_workspace_endpoint(
     workspace_client_id: int, req: WorkspaceEndpointBind, request: Request
 ):
     """把账套主体绑定到一个**已有** ERP endpoint(绝不创建 ERP 账套)。仅老板/超管。"""
-    user = _require_owner_or_super(request)
+    user = require_perm(request, "settings.workspace.manage")
     ok = db.bind_workspace_endpoint(
         workspace_client_id,
         req.erp_endpoint_id,
@@ -114,7 +119,7 @@ async def update_workspace_client_route(
     workspace_client_id: int, req: WorkspaceClientUpdate, request: Request
 ):
     """改账套主体名称/税号。仅老板/超管(账套主体是重大主体 · 与改买方不同)。"""
-    user = _require_owner_or_super(request)
+    user = require_perm(request, "settings.workspace.manage")
     raw = req.model_dump() if hasattr(req, "model_dump") else req.dict()
     payload = {k: v for k, v in raw.items() if v is not None}
     if not payload:
@@ -136,7 +141,7 @@ async def archive_workspace_client_route(workspace_client_id: int, request: Requ
 
     软删保留发票归属链与 seller 路由记忆,不做硬删。归档后默认列表不显示。
     """
-    user = _require_owner_or_super(request)
+    user = require_perm(request, "settings.workspace.manage")
     ok = db.archive_workspace_client(
         workspace_client_id,
         str(user["id"]),

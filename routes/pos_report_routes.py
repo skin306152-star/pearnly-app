@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """POS 销售报表路由(POS 项目 · PO-B6 · docs/pos/04 §7)。
 
-薄层:require_owner(收银员 token 不可调报表)→ 模块守门(pos)→ account 归属 → 调
+薄层:require_perm_pos_tid(收银员 token 不可调报表)→ 模块守门(pos)→ account 归属 → 调
 services/pos/report 聚合。统一 POS 信封。只读(get_cursor_rls 不 commit)。
 """
 
@@ -13,7 +13,8 @@ from typing import Optional
 from fastapi import APIRouter, Query, Request
 
 from core import db
-from core.pos_api import assert_module_enabled, ok, require_owner, require_workspace
+from core.pos_api import assert_module_enabled, ok, require_workspace
+from services.authz.deps import require_perm_pos_tid
 from services.pos import report as report_svc
 
 router = APIRouter(prefix="/api/pos", tags=["pos-report"])
@@ -37,7 +38,7 @@ async def api_report(
     date_to: Optional[str] = Query(None, alias="to"),
 ):
     """销售报表:KPI / 按天 / 按支付 / 畅销 / 按收银员。数据从 pos_sales 流水聚合。"""
-    tid, _uid = require_owner(request)
+    tid, _uid = require_perm_pos_tid(request, "pos.report.view")
     with db.get_cursor_rls(tid) as cur:
         assert_module_enabled(cur, tid, "pos")
         require_workspace(cur, tid, workspace_client_id)

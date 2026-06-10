@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-"""POS 销售报表路由守门测试(POS 项目 · PO-B6)。
+"""POS 销售报表路由守门测试(POS 项目 · PO-B6 · 批2:require_perm 统一执行点)。
 
-锁定:GET /api/pos/admin/report 契约 · app.py include · 用 POS 信封 + require_owner 守门
-(收银员不可调报表)+ 日期解析容错。"""
+锁定:GET /api/pos/admin/report 契约 · app.py include · POS 信封 + pos.report.view 带码守门
+(收银员 token 不可调报表)+ 日期解析容错。"""
 
+import inspect
 import unittest
 
 import routes.pos_report_routes as mod
@@ -27,10 +28,14 @@ class PosReportRoutesContractTests(unittest.TestCase):
         paths = {r.path for r in app.app.routes if hasattr(r, "path")}
         self.assertIn("/api/pos/admin/report", paths)
 
-    def test_uses_owner_gate_and_envelope(self):
+    def test_uses_perm_gate_and_envelope(self):
         self.assertTrue(hasattr(mod, "ok"))
-        self.assertTrue(hasattr(mod, "require_owner"))
+        self.assertTrue(hasattr(mod, "require_perm_pos_tid"))
         self.assertTrue(hasattr(mod, "assert_module_enabled"))
+        self.assertIn(
+            'require_perm_pos_tid(request, "pos.report.view")',
+            inspect.getsource(mod.api_report),
+        )
 
     def test_parse_date_tolerant(self):
         self.assertEqual(mod._parse_date("2026-06-07").isoformat(), "2026-06-07")

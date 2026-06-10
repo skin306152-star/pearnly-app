@@ -11,29 +11,28 @@ from typing import Optional
 
 from fastapi import Request
 
-from core.pos_api import PosError, assert_module_enabled, pos_auth
+from core.pos_api import PosError, assert_module_enabled
 from core.workspace_context import default_workspace_id, read_workspace_id
+from services.authz.deps import check_request_scope, require_perm_pos
 
 
-def auth_member(request: Request) -> tuple[dict, str]:
-    """取 (user, tenant_id);无租户 → acct.forbidden(403)。任意成员可读。"""
-    user = pos_auth(request)
+def auth_member(request: Request, code: str = "acct.entry.view") -> tuple[dict, str]:
+    """取 (user, tenant_id),按权限码守门(批2:逐路由传码 · 默认 view 兜底)。"""
+    user = require_perm_pos(request, code, err="acct.forbidden")
     tid = user.get("tenant_id")
     if not tid:
         raise PosError("acct.forbidden", 403)
     return user, str(tid)
 
 
-def auth_owner(request: Request) -> tuple[dict, str]:
-    """取 (user, tenant_id) 且主体须为账号 owner 或超管(审/改/过账/配置是租户级动作)。"""
-    user, tid = auth_member(request)
-    if not (user.get("invited_by") is None or user.get("is_super_admin")):
-        raise PosError("acct.forbidden", 403)
-    return user, tid
+def auth_owner(request: Request, code: str = "acct.settings.manage") -> tuple[dict, str]:
+    """审/过账/配置档(批2:invited_by 判定退役,矩阵码集为准)。"""
+    return auth_member(request, code)
 
 
 def resolve_ws(cur, request: Request, tenant_id: str, override: Optional[int]) -> int:
-    """解析当前套账(入参优先 → 请求头 → 本租户默认)。归属不符 → forbidden;无套账 → required。"""
+    """解析当前套账(入参优先 → 请求头 → 本租户默认)。归属不符 → forbidden;无套账 → required;
+    assigned 成员未分配 → 404(批2 作用域闸)。"""
     ws = override if override is not None else read_workspace_id(request)
     if ws is not None:
         cur.execute(
@@ -42,10 +41,12 @@ def resolve_ws(cur, request: Request, tenant_id: str, override: Optional[int]) -
         )
         if not cur.fetchone():
             raise PosError("acct.forbidden", 403)
+        check_request_scope(request, int(ws), pos=True)
         return int(ws)
     ws = default_workspace_id(cur, tenant_id)
     if ws is None:
         raise PosError("workspace.required", 400)
+    check_request_scope(request, ws, pos=True)
     return ws
 
 

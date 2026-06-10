@@ -25,6 +25,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, s
 from pydantic import BaseModel
 
 from core import db
+from services.authz.deps import require_perm
 from services.billing.charge import thb_to_satang
 from services.knowledge import contract
 from routes.knowledge_common import authorize_write, resolve_caller
@@ -89,6 +90,7 @@ def _job_out(job: Optional[IngestJob]) -> Optional[dict[str, Any]]:
 
 @router.get("/bases")
 def list_bases(request: Request) -> dict[str, Any]:
+    require_perm(request, "kb.doc.view")
     identity, accessible = resolve_caller(request)
     with db.get_cursor_rls(identity.tenant_id) as cur:
         bases = dal.list_bases(cur, tenant_id=identity.tenant_id, accessible_ids=accessible)
@@ -102,6 +104,7 @@ async def upload_document(
     workspace_client_id: Optional[int] = Form(None),
     knowledge_base_id: Optional[int] = Form(None),
 ) -> dict[str, Any]:
+    require_perm(request, "kb.doc.create")
     identity, accessible = resolve_caller(request)
     authorize_write(accessible, workspace_client_id)
 
@@ -238,6 +241,7 @@ def list_documents(
     knowledge_base_id: Optional[int] = None,
     include_deleted: bool = False,
 ) -> dict[str, Any]:
+    require_perm(request, "kb.doc.view")
     identity, accessible = resolve_caller(request)
     with db.get_cursor_rls(identity.tenant_id) as cur:
         docs = dal.list_documents(
@@ -252,6 +256,7 @@ def list_documents(
 
 @router.get("/documents/{document_id}")
 def get_document(request: Request, document_id: int) -> dict[str, Any]:
+    require_perm(request, "kb.doc.view")
     identity, accessible = resolve_caller(request)
     with db.get_cursor_rls(identity.tenant_id) as cur:
         doc = dal.get_document(
@@ -267,6 +272,7 @@ def get_document(request: Request, document_id: int) -> dict[str, Any]:
 
 @router.get("/documents/{document_id}/ingest-status")
 def get_ingest_status(request: Request, document_id: int) -> dict[str, Any]:
+    require_perm(request, "kb.doc.view")
     identity, accessible = resolve_caller(request)
     with db.get_cursor_rls(identity.tenant_id) as cur:
         doc = dal.get_document(
@@ -287,6 +293,7 @@ def get_ingest_status(request: Request, document_id: int) -> dict[str, Any]:
 
 @router.delete("/documents/{document_id}")
 def delete_document(request: Request, document_id: int) -> dict[str, Any]:
+    require_perm(request, "kb.doc.delete")
     identity, accessible = resolve_caller(request)
     with db.get_cursor_rls(identity.tenant_id, commit=True) as cur:
         deleted = dal.soft_delete_document(
@@ -317,6 +324,7 @@ def _hit_out(hit: SearchHit) -> dict[str, Any]:
 
 @router.post("/search")
 def search_documents(request: Request, body: SearchRequest) -> dict[str, Any]:
+    require_perm(request, "kb.doc.view")
     identity, accessible = resolve_caller(request)
     query = body.query.strip()
     if not query:

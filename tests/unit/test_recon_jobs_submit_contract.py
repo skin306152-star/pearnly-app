@@ -9,11 +9,15 @@ ADR-005 #15 守门测试 · 对账异步 submit + 状态查询路由 + store 扩
   4. submit 端到端:落盘暂存(stmt/gl role)+ enqueue('bank') + 秒回 {ok, job_id}
   5. credits 不足 → 402(前置检查不被 submit 绕过)
   6. GET /api/recon/jobs/{id}:命中→映射 status/progress/result_*;不存在→404
+  7. 权限批2:路由入口统一执行点 require_perm(services/authz/deps 单一来源)·
+     逐路由码契约(submit=recon.create / GET job=recon.view / confirm-rows=recon.approve)
 """
 
 import asyncio
+import inspect
 import io
 import os
+import re
 import tempfile
 import unittest
 from unittest import mock
@@ -48,6 +52,28 @@ class RouteContractTests(unittest.TestCase):
         paths = {r.path for r in app.app.routes if hasattr(r, "path")}
         self.assertIn("/api/recon/bank-v2/submit", paths)
         self.assertIn("/api/recon/jobs/{job_id}", paths)
+
+    def test_routes_use_require_perm_with_expected_codes(self):
+        """权限批2:全部路由入口走统一执行点 require_perm(deps 单一来源)·
+        逐路由码契约:submit=recon.create / GET job=recon.view / confirm-rows=recon.approve"""
+        from services.authz import deps
+
+        self.assertIs(rjr.require_perm, deps.require_perm)
+        expected = {
+            ("POST", "/api/recon/bank-v2/submit"): "recon.create",
+            ("POST", "/api/recon/gl-vat/submit"): "recon.create",
+            ("POST", "/api/vat_excel/submit"): "recon.create",
+            ("GET", "/api/recon/jobs/{job_id}"): "recon.view",
+            ("POST", "/api/recon/bank-v2/confirm-rows/{job_id}"): "recon.approve",
+        }
+        got = {}
+        for r in rjr.router.routes:
+            src = inspect.getsource(r.endpoint)
+            m = re.search(r'require_perm\(request, "([\w.]+)"\)', src)
+            for method in getattr(r, "methods", set()) or set():
+                if method in ("GET", "POST"):
+                    got[(method, r.path)] = m.group(1) if m else None
+        self.assertEqual(got, expected)
 
 
 class StoreEnqueueTests(unittest.TestCase):
@@ -104,9 +130,14 @@ class SubmitFlowTests(unittest.TestCase):
         p.start()
         self.addCleanup(p.stop)
         self.addCleanup(self._tmp.cleanup)
-        au = mock.patch.object(
-            rjr, "get_current_user_from_request", return_value={"id": "u1", "tenant_id": "t1"}
-        )
+        # 权限批2:路由入口换统一执行点 require_perm(request, code)→ 过返 user dict
+        self.perm_calls = []
+
+        def fake_require_perm(request, code):
+            self.perm_calls.append(code)
+            return {"id": "u1", "tenant_id": "t1"}
+
+        au = mock.patch.object(rjr, "require_perm", side_effect=fake_require_perm)
         au.start()
         self.addCleanup(au.stop)
 
@@ -141,6 +172,7 @@ class SubmitFlowTests(unittest.TestCase):
         self.assertTrue(out["ok"])
         self.assertEqual(out["job_id"], captured["job_id"])
         self.assertEqual(captured["job_type"], "bank")
+        self.assertEqual(self.perm_calls, ["recon.create"])  # 守门码契约
         roles = sorted(r["role"] for r in captured["input_ref"])
         self.assertEqual(roles, ["gl", "stmt"])
         # 文件真落盘
@@ -166,9 +198,14 @@ class SubmitFlowTests(unittest.TestCase):
 
 class GetJobTests(unittest.TestCase):
     def setUp(self):
-        au = mock.patch.object(
-            rjr, "get_current_user_from_request", return_value={"id": "u1", "tenant_id": "t1"}
-        )
+        # 权限批2:GET job 守门 require_perm(request, "recon.view")→ 过返 user dict
+        self.perm_calls = []
+
+        def fake_require_perm(request, code):
+            self.perm_calls.append(code)
+            return {"id": "u1", "tenant_id": "t1"}
+
+        au = mock.patch.object(rjr, "require_perm", side_effect=fake_require_perm)
         au.start()
         self.addCleanup(au.stop)
 
@@ -186,6 +223,7 @@ class GetJobTests(unittest.TestCase):
         }
         with mock.patch.object(rjr.store, "get", return_value=job):
             out = asyncio.run(rjr.get_job("j1", request=None))
+        self.assertEqual(self.perm_calls, ["recon.view"])  # 守门码契约
         self.assertEqual(out["status"], "done")
         self.assertEqual(out["result_table"], "bank_recon_v2_task")
         self.assertEqual(out["result_id"], "42")

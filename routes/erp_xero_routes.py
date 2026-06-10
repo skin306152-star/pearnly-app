@@ -35,7 +35,8 @@ from fastapi import APIRouter, HTTPException, Request
 
 from core import db
 from core.auth import get_current_user_from_request
-from core.route_helpers import _require_owner_or_super, _tid
+from core.route_helpers import _tid
+from services.authz.deps import require_perm
 
 logger = logging.getLogger("mr-pilot")
 
@@ -142,7 +143,7 @@ async def xero_auth_start(request: Request):
     老板点「连接 Xero」→ 后端生成 state · 存 db · 返回 redirect URL
     前端拿到 URL 后用 window.location 跳转
     """
-    owner = _require_owner_or_super(request)
+    owner = require_perm(request, "settings.org.edit")
     try:
         from services.erp.xero_pusher import is_configured, build_auth_url, gen_state
     except ImportError:
@@ -267,7 +268,7 @@ async def xero_status(request: Request):
 @router.post("/api/erp/xero/auto-push")
 async def xero_set_auto_push(request: Request):
     """v27.8.1.3 · 切换 Xero 识别完自动推送(老板权限)"""
-    owner = _require_owner_or_super(request)
+    owner = require_perm(request, "settings.org.edit")
     body = await request.json()
     on = bool(body.get("on"))
     if not db.set_xero_auto_push(str(owner["tenant_id"]), on):
@@ -278,7 +279,7 @@ async def xero_set_auto_push(request: Request):
 @router.post("/api/erp/xero/select_org")
 async def xero_select_org(request: Request):
     """切换默认 organisation"""
-    owner = _require_owner_or_super(request)
+    owner = require_perm(request, "settings.org.edit")
     body = await request.json()
     token_id = body.get("token_id")
     if not token_id:
@@ -292,7 +293,7 @@ async def xero_select_org(request: Request):
 @router.post("/api/erp/xero/disconnect")
 async def xero_disconnect(request: Request):
     """断开 Xero 连接 · 删 tenant 在 Xero 的所有 token"""
-    owner = _require_owner_or_super(request)
+    owner = require_perm(request, "settings.org.edit")
     n = db.delete_oauth_tokens(str(owner["tenant_id"]), "xero")
     return {"ok": True, "deleted": n}
 

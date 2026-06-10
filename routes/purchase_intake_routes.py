@@ -69,7 +69,7 @@ async def api_intake(
     text: Optional[str] = Form(None),
     workspace_client_id: Optional[int] = Form(None),
 ):
-    user, tid = auth_member(request)
+    user, tid = auth_member(request, "intake.upload")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -130,7 +130,7 @@ class ExpenseIn(BaseModel):
 @router.post("/expense")
 async def api_quick_expense(req: ExpenseIn, request: Request):
     """文字一句话 → 直接记一笔 posted 费用(LINE bot 复用)。替代收据由 S2d 凭据接口补。"""
-    user, tid = auth_member(request)
+    user, tid = auth_member(request, "purchase.doc.create")
     if not req.text.strip():
         raise PosError("purchase.line_invalid", 422, detail="empty_text")
     with db.get_cursor_rls(tid, commit=True) as cur:
@@ -169,7 +169,7 @@ async def api_quick_expense(req: ExpenseIn, request: Request):
 @router.get("/inbox")
 async def api_inbox_list(request: Request, workspace_client_id: Optional[int] = None):
     """待归类收件箱:本套账 pending intake_items(长尾安全网入口)。成员可读。"""
-    _user, tid = auth_member(request)
+    _user, tid = auth_member(request, "intake.classify")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -185,7 +185,7 @@ class InboxResolveIn(BaseModel):
 @router.post("/inbox/{item_id}/resolve")
 async def api_inbox_resolve(item_id: str, req: InboxResolveIn, request: Request):
     """一点归类:purchase/expense → 建草稿单(返 doc_id);sales/recon → 移出;dismiss → 非票。"""
-    user, tid = auth_member(request)
+    user, tid = auth_member(request, "intake.classify")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)

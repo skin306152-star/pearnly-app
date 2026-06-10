@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from core import db
 from core import workspace_context as wc
-from core.auth import get_current_user_from_request
+from services.authz.deps import require_perm
 from services.vat.vat_report_parser import parse_vat_report  # noqa: F401  re-export (handlers)
 from services.recon.reconciliation_matcher import run_matching
 from services.recon.field_comparator import compare_all_fields
@@ -58,7 +58,7 @@ router = APIRouter(prefix="/api/recon", tags=["recon"])
 @router.get("/progress/{pid}")
 async def get_progress(pid: str, request: Request):
     """v118.32.4 · C · 前端轮询拿当前阶段+当前文件+剩余预估"""
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.view")
     if not user:
         raise HTTPException(401, "未登录")
     p = _progress_store.get(pid)
@@ -198,7 +198,7 @@ class CreateTaskBody(BaseModel):
 
 @router.post("/task")
 async def create_task(body: CreateTaskBody, request: Request):
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     if not user:
         raise HTTPException(401, "未登录")
     task_id = db.create_recon_task(
@@ -219,7 +219,7 @@ async def run_recon(
     task_id: int, request: Request, progress_id: Optional[str] = None, is_last: int = 0
 ):
     """v118.32.4 · 可带 progress_id 上报 match 阶段;is_last=1 时标记 done"""
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     if not user:
         raise HTTPException(401, "未登录")
     task = db.get_recon_task(task_id)
@@ -287,7 +287,7 @@ async def run_recon(
 
 @router.get("/result/{task_id}")
 async def get_result(task_id: int, request: Request):
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.view")
     if not user:
         raise HTTPException(401, "未登录")
     task = db.get_recon_task(task_id)
@@ -301,7 +301,7 @@ async def get_result(task_id: int, request: Request):
 
 @router.post("/row/{row_id}/analyze")
 async def row_ai(row_id: int, request: Request):
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     if not user:
         raise HTTPException(401, "未登录")
     row = db.get_recon_row(row_id)
@@ -333,7 +333,7 @@ class RowActionBody(BaseModel):
 
 @router.post("/row/{row_id}/action")
 async def row_action(row_id: int, body: RowActionBody, request: Request):
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     if not user:
         raise HTTPException(401, "未登录")
     if body.action not in ("pending", "resolved", "customer_issue", "accepted_diff"):
@@ -355,7 +355,7 @@ class FieldOverrideBody(BaseModel):
 @router.patch("/row/{row_id}/field")
 async def row_field_override(row_id: int, body: FieldOverrideBody, request: Request):
     """P1.2-M2 · 用户校正发票侧 OCR 字段 · 记 OCR 原值 vs 用户值到 field_overrides"""
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     if not user:
         raise HTTPException(401, "未登录")
     if body.field not in _OVERRIDE_FIELDS:
@@ -374,7 +374,7 @@ async def row_field_override(row_id: int, body: FieldOverrideBody, request: Requ
 
 @router.get("/tasks")
 async def list_tasks(request: Request, client_id: Optional[int] = None):
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.view")
     if not user:
         raise HTTPException(401, "未登录")
     tasks = db.list_recon_tasks(
@@ -386,7 +386,7 @@ async def list_tasks(request: Request, client_id: Optional[int] = None):
 @router.get("/export/{task_id}")
 async def export_excel(task_id: int, request: Request, lang: str = "th"):
     """v118.32.3 · F2 · lang 参数接收前端当前界面语言(th/zh/en/ja)· 默认泰文给税局"""
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.export")
     if not user:
         raise HTTPException(401, "未登录")
     if lang not in ("th", "zh", "en", "ja"):

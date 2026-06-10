@@ -131,7 +131,8 @@ class RoutesContractTests(unittest.TestCase):
         from routes import pos_payment_routes
 
         src = inspect.getsource(pos_payment_routes)
-        self.assertIn('role") == "cashier"', src)  # 收银员 403
+        # 批2:统一执行点带码守门(收银员/低权限成员 403)
+        self.assertIn('require_perm_pos(request, "pos.admin.manage")', src)
         self.assertIn('assert_module_enabled(cur, tid, "pos")', src)  # 模块守门
         self.assertIn("require_workspace", src)  # 账套归属
 

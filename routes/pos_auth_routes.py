@@ -7,7 +7,7 @@
 反查 tenant,再以该 tenant 为界查收银员。匿名只暴露名字/颜色(低敏);真正登录仍需 PIN。游标用
 bypass=True 但每条语句仍 WHERE tenant_id(应用层硬隔离 · RLS 仅兜底)。
 
-onboarding 是管理动作:require_owner(收银员 token 不可调)。
+onboarding 是管理动作:require_perm_pos_tid(收银员 token 不可调)。
 """
 
 from __future__ import annotations
@@ -19,7 +19,8 @@ from pydantic import BaseModel, Field
 
 from core import db
 from core.auth import create_pos_store_token, decode_access_token
-from core.pos_api import PosError, ok, require_owner, require_workspace
+from core.pos_api import PosError, ok, require_workspace
+from services.authz.deps import require_perm_pos_tid
 from services.pos import auth as pos_auth
 from services.pos import cashier as cashier_dal
 from services.pos import onboarding as onboarding_svc
@@ -157,7 +158,7 @@ async def api_pin_login(req: PinLoginRequest, request: Request):
 @router.get("/admin/store-code")
 async def api_get_store_code(request: Request, workspace_client_id: int = Query(...)):
     """取该账套店铺码(无则建)· owner。前端拼二维码/链接 pearnly.com/pos?store=<code>。"""
-    tid, _uid = require_owner(request)
+    tid, _uid = require_perm_pos_tid(request, "pos.admin.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         require_workspace(cur, tid, workspace_client_id)
         store_name = _store_name(cur, tid, workspace_client_id)
@@ -182,7 +183,7 @@ async def api_get_store_code(request: Request, workspace_client_id: int = Query(
 @router.post("/admin/store-code/reset")
 async def api_reset_store_code(req: WorkspaceBody, request: Request):
     """重置店铺码:换码 + 吊销所有已绑设备(丢机/离职)· owner。"""
-    tid, _uid = require_owner(request)
+    tid, _uid = require_perm_pos_tid(request, "pos.admin.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         require_workspace(cur, tid, req.workspace_client_id)
         store_name = _store_name(cur, tid, req.workspace_client_id)
@@ -222,7 +223,7 @@ def _cashier_out(row) -> dict:
 @router.get("/admin/cashiers")
 async def api_admin_list_cashiers(request: Request, workspace_client_id: int = Query(...)):
     """收银员后台管理列表(老板/超管 · 含停用项 + 最近开班 + 可否删)。"""
-    tid, _uid = require_owner(request)
+    tid, _uid = require_perm_pos_tid(request, "pos.admin.manage")
     with db.get_cursor_rls(tid) as cur:
         require_workspace(cur, tid, workspace_client_id)
         rows = cashier_dal.list_cashiers_admin(
@@ -241,7 +242,7 @@ async def api_admin_list_cashiers(request: Request, workspace_client_id: int = Q
 @router.post("/admin/cashiers")
 async def api_admin_create_cashier(req: CashierCreate, request: Request):
     """新增收银员(名字 + PIN + 颜色)。"""
-    tid, _uid = require_owner(request)
+    tid, _uid = require_perm_pos_tid(request, "pos.admin.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         require_workspace(cur, tid, req.workspace_client_id)
         row = cashier_dal.create_cashier(
@@ -258,7 +259,7 @@ async def api_admin_create_cashier(req: CashierCreate, request: Request):
 @router.put("/admin/cashiers/{cashier_id}")
 async def api_admin_update_cashier(cashier_id: str, req: CashierUpdate, request: Request):
     """改名/换色/启停/重设 PIN(只更传入字段)。"""
-    tid, _uid = require_owner(request)
+    tid, _uid = require_perm_pos_tid(request, "pos.admin.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         require_workspace(cur, tid, req.workspace_client_id)
         row = cashier_dal.update_cashier(
@@ -281,7 +282,7 @@ async def api_admin_delete_cashier(
     cashier_id: str, request: Request, workspace_client_id: int = Query(...)
 ):
     """删除从未开过班的收银员;开过班的只能停用(保历史)→ pos.cashier_in_use(409)。"""
-    tid, _uid = require_owner(request)
+    tid, _uid = require_perm_pos_tid(request, "pos.admin.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         require_workspace(cur, tid, workspace_client_id)
         res = cashier_dal.delete_cashier_if_unused(
@@ -297,7 +298,7 @@ async def api_admin_delete_cashier(
 @router.put("/admin/onboarding")
 async def api_onboarding(req: OnboardingRequest, request: Request):
     """开通收银(老板/超管)→ 开模块 + 建仓/终端/首位收银员。"""
-    tid, _uid = require_owner(request)
+    tid, _uid = require_perm_pos_tid(request, "settings.modules.manage")
     fc = req.first_cashier.model_dump() if req.first_cashier else None
     with db.get_cursor_rls(tid, commit=True) as cur:
         require_workspace(cur, tid, req.workspace_client_id)

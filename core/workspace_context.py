@@ -60,6 +60,9 @@ def require_workspace_id(request: Request) -> int:
     ws = read_workspace_id(request)
     if ws is None:
         raise HTTPException(400, detail="workspace.required")
+    from services.authz.deps import check_request_scope
+
+    check_request_scope(request, ws)
     return ws
 
 
@@ -116,13 +119,17 @@ def resolve_active_workspace_id(cur, request: Request, *, tenant_id: str) -> int
 
     与 PO-0 的 require_workspace_id 区别:那个是 fail-closed 终态;本函数是兼容前端冻结的过渡态。
     """
+    from services.authz.deps import check_request_scope
+
     ws = read_workspace_id(request)
     if ws is not None:
         assert_workspace_in_tenant(cur, tenant_id=tenant_id, workspace_client_id=ws)
+        check_request_scope(request, ws)
         return ws
     ws = default_workspace_id(cur, tenant_id)
     if ws is None:
         raise HTTPException(400, detail="workspace.required")
+    check_request_scope(request, ws)
     return ws
 
 

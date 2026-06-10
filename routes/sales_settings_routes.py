@@ -10,22 +10,14 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from core import db
-from core.auth import get_current_user_from_request
+from services.authz.deps import require_perm_tid
 from services.sales import settings as settings_svc
 
 router = APIRouter(prefix="/api/sales/settings", tags=["sales-settings"])
-
-
-def _require_tenant(request: Request) -> str:
-    user = get_current_user_from_request(request)
-    tid = user.get("tenant_id") if user else None
-    if not tid:
-        raise HTTPException(400, detail="sales.tenant_required")
-    return str(tid)
 
 
 class SettingsIn(BaseModel):
@@ -58,7 +50,7 @@ def _out(s: dict) -> dict:
 
 @router.get("")
 async def api_get_settings(request: Request):
-    tid = _require_tenant(request)
+    tid, _ = require_perm_tid(request, "sales.doc.view")
     with db.get_cursor_rls(tid) as cur:
         s = settings_svc.get_settings(cur, tenant_id=tid)
     return {"settings": _out(s)}
@@ -66,7 +58,7 @@ async def api_get_settings(request: Request):
 
 @router.put("")
 async def api_set_settings(req: SettingsIn, request: Request):
-    tid = _require_tenant(request)
+    tid, _ = require_perm_tid(request, "sales.settings.manage")
     fields = req.model_dump() if hasattr(req, "model_dump") else req.dict()
     with db.get_cursor_rls(tid, commit=True) as cur:
         s = settings_svc.set_settings(cur, tenant_id=tid, fields=fields)

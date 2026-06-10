@@ -12,6 +12,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request, status
 
 from core import db
+from services.authz.deps import require_perm
 from routes.knowledge_common import resolve_caller
 from services.knowledge import risk_check
 from services.knowledge.schema import InvoiceRiskCheck
@@ -35,6 +36,7 @@ def _check_out(check: InvoiceRiskCheck) -> dict[str, Any]:
 
 @router.post("/from-history/{history_id}")
 def run_check(request: Request, history_id: str) -> dict[str, Any]:
+    require_perm(request, "kb.doc.create")
     identity, _ = resolve_caller(request)
     with db.get_cursor_rls(identity.tenant_id, commit=True) as cur:
         check = risk_check.run_risk_check(cur, identity=identity, history_id=history_id)
@@ -45,6 +47,7 @@ def run_check(request: Request, history_id: str) -> dict[str, Any]:
 
 @router.get("/{history_id}")
 def latest_check(request: Request, history_id: str) -> dict[str, Any]:
+    require_perm(request, "kb.doc.view")
     identity, accessible = resolve_caller(request)
     with db.get_cursor_rls(identity.tenant_id) as cur:
         check = risk_check.get_latest_risk_check(

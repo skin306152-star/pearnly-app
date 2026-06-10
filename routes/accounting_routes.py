@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from core import db
 from core.pos_api import PosError, ok
-from routes.accounting_common import auth_member, auth_owner, gate, resolve_ws, uid
+from routes.accounting_common import auth_member, gate, resolve_ws, uid
 from services.accounting import coa_preset, posting, review
 from services.accounting import settings as acct_settings
 from services.accounting import store as acct_store
@@ -82,7 +82,7 @@ async def api_list_vouchers(
     q: Optional[str] = Query(None),
     workspace_client_id: Optional[int] = Query(None),
 ):
-    _, tid = auth_member(request)
+    _, tid = auth_member(request, "acct.entry.view")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -105,7 +105,7 @@ async def api_list_vouchers(
 async def api_get_voucher(
     voucher_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
 ):
-    _, tid = auth_member(request)
+    _, tid = auth_member(request, "acct.entry.view")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -119,7 +119,7 @@ async def api_get_voucher(
 async def api_manual_voucher(
     req: ManualVoucherIn, request: Request, workspace_client_id: Optional[int] = Query(None)
 ):
-    user, tid = auth_owner(request)
+    user, tid = auth_member(request, "acct.entry.review")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -142,7 +142,7 @@ async def api_review_voucher(
     request: Request,
     workspace_client_id: Optional[int] = Query(None),
 ):
-    user, tid = auth_owner(request)
+    user, tid = auth_member(request, "acct.entry.review")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -166,7 +166,7 @@ async def api_patch_voucher(
     workspace_client_id: Optional[int] = Query(None),
 ):
     """改科目(仅待审 · 金额来自业务单不可改;posted 改走撤销重做/调整分录)。"""
-    user, tid = auth_owner(request)
+    user, tid = auth_member(request, "acct.entry.review")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -195,7 +195,7 @@ async def api_patch_voucher(
 async def api_void_voucher(
     voucher_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
 ):
-    _, tid = auth_owner(request)
+    _, tid = auth_member(request, "acct.entry.approve")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -210,7 +210,7 @@ async def api_unpost_voucher(
     voucher_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
 ):
     """安全带②:撤销重做(void + 同 source 重判·吃最新映射/记忆)。"""
-    user, tid = auth_owner(request)
+    user, tid = auth_member(request, "acct.entry.approve")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -226,7 +226,7 @@ async def api_review_queue(
     period: Optional[str] = Query(None),
     workspace_client_id: Optional[int] = Query(None),
 ):
-    _, tid = auth_member(request)
+    _, tid = auth_member(request, "acct.entry.review")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -241,7 +241,7 @@ async def api_list_accounts(
     q: Optional[str] = Query(None),
     workspace_client_id: Optional[int] = Query(None),
 ):
-    _, tid = auth_member(request)
+    _, tid = auth_member(request, "acct.entry.view")
     # commit=True:首次访问顺手 seed 预置科目(屏3 永不空态)
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
@@ -257,7 +257,7 @@ async def api_list_accounts(
 async def api_create_account(
     req: AccountIn, request: Request, workspace_client_id: Optional[int] = Query(None)
 ):
-    _, tid = auth_owner(request)
+    _, tid = auth_member(request, "acct.coa.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -275,7 +275,7 @@ async def api_update_account(
     request: Request,
     workspace_client_id: Optional[int] = Query(None),
 ):
-    _, tid = auth_owner(request)
+    _, tid = auth_member(request, "acct.coa.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -291,7 +291,7 @@ async def api_update_account(
 
 @router.get("/mappings")
 async def api_list_mappings(request: Request, workspace_client_id: Optional[int] = Query(None)):
-    _, tid = auth_member(request)
+    _, tid = auth_member(request, "acct.entry.view")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -305,7 +305,7 @@ async def api_list_mappings(request: Request, workspace_client_id: Optional[int]
 async def api_set_mapping(
     req: MappingIn, request: Request, workspace_client_id: Optional[int] = Query(None)
 ):
-    _, tid = auth_owner(request)
+    _, tid = auth_member(request, "acct.coa.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -319,7 +319,7 @@ async def api_set_mapping(
 
 @router.get("/settings")
 async def api_get_settings(request: Request, workspace_client_id: Optional[int] = Query(None)):
-    _, tid = auth_member(request)
+    _, tid = auth_member(request, "acct.entry.view")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -332,7 +332,7 @@ async def api_get_settings(request: Request, workspace_client_id: Optional[int] 
 async def api_update_settings(
     req: SettingsIn, request: Request, workspace_client_id: Optional[int] = Query(None)
 ):
-    _, tid = auth_owner(request)
+    _, tid = auth_member(request, "acct.settings.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -345,7 +345,7 @@ async def api_update_settings(
 @router.get("/learned")
 async def api_list_learned(request: Request, workspace_client_id: Optional[int] = Query(None)):
     """可见规则(智能不黑箱):review_learned 学到的全部列出。"""
-    _, tid = auth_member(request)
+    _, tid = auth_member(request, "acct.entry.view")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
@@ -356,7 +356,7 @@ async def api_list_learned(request: Request, workspace_client_id: Optional[int] 
 async def api_delete_learned(
     learned_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
 ):
-    _, tid = auth_owner(request)
+    _, tid = auth_member(request, "acct.coa.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)

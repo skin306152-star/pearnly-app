@@ -110,8 +110,12 @@ def require_perm(request: Request, code: str) -> dict:
     raise HTTPException(403, detail="authz.forbidden")
 
 
-def require_perm_pos(request: Request, code: str) -> dict:
-    """POS 信封路由守门:同 require_perm,错误走 PosError 信封。"""
+def require_perm_pos(request: Request, code: str, err: str = "pos.forbidden") -> dict:
+    """POS 信封路由守门:同 require_perm,错误走 PosError 信封。
+
+    err 给模块自有错误码命名空间(purchase.forbidden / acct.forbidden),保住前端
+    错误码契约;module_disabled 全模块统一 pos.module_disabled(既有约定)。
+    """
     from core.pos_api import PosError, pos_auth
 
     user = pos_auth(request)
@@ -121,12 +125,68 @@ def require_perm_pos(request: Request, code: str) -> dict:
     _deny_log(user, code, reason, request)
     if reason == "module_disabled":
         raise PosError("pos.module_disabled", 403)
-    raise PosError("pos.forbidden", 403)
+    raise PosError(err, 403)
+
+
+def require_perm_tid(request: Request, code: str) -> tuple:
+    """require_perm 的 (tenant_id, user_id) 形态(_require_tenant 调用点的机械替换)。"""
+    user = require_perm(request, code)
+    tid = user.get("tenant_id")
+    uid = str(user["id"]) if user.get("id") else None
+    return str(tid), uid
+
+
+def require_perm_pos_tid(request: Request, code: str, err: str = "pos.forbidden") -> tuple:
+    """require_perm_pos 的 (tenant_id, user_id) 形态(require_owner 等调用点的机械替换)。"""
+    user = require_perm_pos(request, code, err)
+    tid = user.get("tenant_id")
+    if not tid:
+        from core.pos_api import PosError
+
+        raise PosError(err, 403)
+    uid = str(user["id"]) if user.get("id") else None
+    return str(tid), uid
 
 
 def get_authz(request: Optional[Request], user: dict) -> Authz:
     """取当前请求的权限快照(作用域过滤等下游用)。"""
     return _cached_authz(request, user)
+
+
+def check_request_scope(request: Optional[Request], workspace_client_id, *, pos: bool = False) -> None:
+    """套账解析点的作用域闸(resolve_ws / workspace_context 等 ws 选定处调)。
+
+    优先用本请求已缓存的权限快照;没有(路由还没走 require_perm)则按 Authorization
+    懒解一次普通用户(POS 双令牌/匿名直接跳过——它们各有自含校验)。scope_mode='all'
+    与超管零额外开销。未分配 → 404 防枚举。
+    """
+    if request is None or workspace_client_id is None:
+        return
+    state = getattr(request, "state", None)
+    cached = getattr(state, _STATE_KEY, None) if state is not None else None
+    if cached is None:
+        if _pos_token_payload(request) is not None:
+            return
+        from core.auth import get_current_user_from_request
+
+        try:
+            user = get_current_user_from_request(request)
+        except Exception:
+            return
+        if user.get("is_super_admin") or user.get("role") == "cashier":
+            return
+        authz = _cached_authz(request, user)
+    else:
+        authz = cached[1]
+        user = {"id": cached[0]}
+    if authz.allows_workspace(workspace_client_id):
+        return
+    _deny_log(user, f"workspace:{workspace_client_id}", "scope_not_assigned", request)
+    if pos:
+        from core.pos_api import PosError
+
+        raise PosError("pos.not_found", 404)
+    raise HTTPException(404, detail="authz.not_found")
 
 
 def check_workspace_scope(

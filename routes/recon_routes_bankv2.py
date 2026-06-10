@@ -12,8 +12,8 @@ from pydantic import BaseModel
 
 from core import db
 from core import workspace_context as wc
-from core.auth import get_current_user_from_request
 from core.route_helpers import _tid
+from services.authz.deps import require_perm
 from routes.recon_routes_bankv2_helpers import (
     _brv2_err,
     bank_summary_from_json,
@@ -29,7 +29,7 @@ bankv2_router = APIRouter()
 
 @bankv2_router.get("/bank-v2/tasks")
 async def bank_v2_list_tasks(request: Request):
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.view")
     if not user:
         raise HTTPException(401, "未登录")
     tasks = db.list_bank_recon_v2_tasks(
@@ -44,7 +44,7 @@ async def bank_v2_list_tasks(request: Request):
 @bankv2_router.get("/bank-v2/{task_id}")
 async def bank_v2_get_task(task_id: int, request: Request):
     """v118.35.0.29 P0 隔离 (体检 2026-05-21 风险 2) · 镜像 gl_vat 修复"""
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.view")
     if not user:
         raise HTTPException(401, "未登录")
     task = db.get_bank_recon_v2_task(
@@ -113,7 +113,7 @@ async def bank_v2_export(task_id: int, request: Request, lang: str = "th"):
     import json as _j
     import urllib.parse
 
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.export")
     if not user:
         raise HTTPException(401, "未登录")
     if lang not in ("th", "zh", "en", "ja"):
@@ -204,7 +204,7 @@ async def bank_v2_export(task_id: int, request: Request, lang: str = "th"):
 
 @bankv2_router.delete("/bank-v2/{task_id}")
 async def bank_v2_delete(task_id: int, request: Request):
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     if not user:
         raise HTTPException(401, "未登录")
     ok = db.delete_bank_recon_v2_task(task_id, str(user["id"]))
@@ -219,7 +219,7 @@ class _BankV2BatchDeleteBody(BaseModel):
 
 @bankv2_router.post("/bank-v2/tasks/batch_delete")
 async def bank_v2_batch_delete(body: _BankV2BatchDeleteBody, request: Request):
-    user = get_current_user_from_request(request)
+    user = require_perm(request, "recon.create")
     if not user:
         raise HTTPException(401, "未登录")
     if not body.ids:

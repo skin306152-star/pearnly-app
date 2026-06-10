@@ -15,19 +15,11 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from core import db
-from core.auth import get_current_user_from_request
+from services.authz.deps import require_perm_tid
 from services.sales import seller_profile
 
 logger = logging.getLogger("mr-pilot")
 router = APIRouter(prefix="/api/sales/sellers", tags=["sales-sellers"])
-
-
-def _require_tenant(request: Request) -> str:
-    user = get_current_user_from_request(request)
-    tid = user.get("tenant_id") if user else None
-    if not tid:
-        raise HTTPException(400, detail="sales.tenant_required")
-    return str(tid)
 
 
 class SellerProfileIn(BaseModel):
@@ -70,7 +62,7 @@ def _out(s: dict) -> dict:
 
 @router.get("")
 async def api_list_sellers(request: Request):
-    tid = _require_tenant(request)
+    tid, _ = require_perm_tid(request, "sales.doc.view")
     with db.get_cursor_rls(tid) as cur:
         rows = seller_profile.list_sellers(cur, tenant_id=tid)
     return {"sellers": [_out(r) for r in rows]}
@@ -78,7 +70,7 @@ async def api_list_sellers(request: Request):
 
 @router.get("/{workspace_client_id}")
 async def api_get_seller(workspace_client_id: int, request: Request):
-    tid = _require_tenant(request)
+    tid, _ = require_perm_tid(request, "sales.doc.view")
     with db.get_cursor_rls(tid) as cur:
         row = seller_profile.get_seller(cur, tenant_id=tid, workspace_client_id=workspace_client_id)
     if not row:
@@ -88,7 +80,7 @@ async def api_get_seller(workspace_client_id: int, request: Request):
 
 @router.put("/{workspace_client_id}")
 async def api_set_seller(workspace_client_id: int, req: SellerProfileIn, request: Request):
-    tid = _require_tenant(request)
+    tid, _ = require_perm_tid(request, "sales.settings.manage")
     fields = req.model_dump() if hasattr(req, "model_dump") else req.dict()
     with db.get_cursor_rls(tid, commit=True) as cur:
         row = seller_profile.set_seller(

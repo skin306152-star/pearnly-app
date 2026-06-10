@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """餐厅 POS 桌台/区域管理路由(POS 项目 · PO-R1 · docs/pos/restaurant/02 §1)。
 
-薄层:require_owner(收银员不可改桌位布局)→ 模块守门(pos)→ 账套归属 → 调 services/pos/restaurant/tables。
+薄层:require_perm_pos(收银员不可改桌位布局)→ 模块守门(pos)→ 账套归属 → 调 services/pos/restaurant/tables。
 统一 POS 信封。写端单事务(get_cursor_rls commit=True)。
 """
 
@@ -13,19 +13,18 @@ from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
 from core import db
-from core.pos_api import PosError, assert_module_enabled, ok, pos_auth, require_workspace
+from core.pos_api import PosError, assert_module_enabled, ok, require_workspace
+from services.authz.deps import require_perm_pos
 from services.pos.restaurant import tables as tables_svc
 
 router = APIRouter(prefix="/api/pos/admin/restaurant", tags=["pos-restaurant-admin"])
 
 
 def _owner_ctx(request: Request, ws_override: Optional[int]) -> tuple[dict, str, int]:
-    user = pos_auth(request)
+    user = require_perm_pos(request, "pos.admin.manage")  # 桌位布局=老板动作,收银员 403
     tid = user.get("tenant_id")
     if not tid:
         raise PosError("pos.forbidden", 403)
-    if user.get("role") == "cashier" and not user.get("is_super_admin"):
-        raise PosError("pos.forbidden", 403)  # 桌位布局=老板动作,收银员 403
     ws = user.get("workspace_client_id") or ws_override
     if ws is None:
         raise PosError("pos.forbidden", 403)

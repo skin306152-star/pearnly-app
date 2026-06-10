@@ -38,8 +38,11 @@ class RouteHelpersImportContractTests(unittest.TestCase):
         from routes import admin_users_routes
         import app
         from routes import billing_routes
+        from routes import erp_mappings_routes
         from routes import erp_xero_routes
         from routes import team_routes
+        from routes import workspace_routes
+        from services.authz import deps
 
         # REFACTOR-B1(2026-05-25):_require_super_admin / _log_op 在 app.py 的最后消费者
         # (超管用户/员工路由)已随 admin_users_routes 搬出 · app.py 不再 import(ruff F401)·
@@ -48,11 +51,6 @@ class RouteHelpersImportContractTests(unittest.TestCase):
         self.assertIs(admin_users_routes._require_super_admin, route_helpers._require_super_admin)
         self.assertIs(admin_users_routes._log_op, route_helpers._log_op)
         self.assertIs(app._plan_permissions, route_helpers._plan_permissions)
-        # REFACTOR-B1(2026-05-25):_require_owner_or_super 在 app.py 的最后消费者(Xero 路由)
-        # 已随 erp_xero_routes 搬出 · app.py 不再 import(ruff F401)· 单一来源断言跟到新消费者。
-        self.assertIs(
-            erp_xero_routes._require_owner_or_super, route_helpers._require_owner_or_super
-        )
         self.assertIs(billing_routes._require_super_admin, route_helpers._require_super_admin)
         self.assertIs(
             admin_diagnostics_routes._require_super_admin,
@@ -60,9 +58,18 @@ class RouteHelpersImportContractTests(unittest.TestCase):
         )
         # REFACTOR-B1(2026-05-25):team_add_employee 随 7 路由从 app.py 搬到 team_routes ·
         # _check_password_strength 的消费者随之转移 · 单一来源断言跟到 team_routes。
-        self.assertIs(team_routes._require_owner_or_super, route_helpers._require_owner_or_super)
         self.assertIs(team_routes._log_op, route_helpers._log_op)
         self.assertIs(team_routes._check_password_strength, route_helpers._check_password_strength)
+        # 权限批2(2026-06-10):路由旧门换成统一执行点 require_perm(services/authz/deps)·
+        # team/workspace/erp_* 必须复用 deps 同一份对象 · 且不再持有旧门 _require_owner_or_super
+        # (本体仍单一定义于 route_helpers · 批5 前过渡保留 · 不许在路由模块复活)。
+        for mod in (team_routes, workspace_routes, erp_mappings_routes, erp_xero_routes):
+            self.assertIs(mod.require_perm, deps.require_perm, f"{mod.__name__} require_perm 漂移")
+            self.assertFalse(
+                hasattr(mod, "_require_owner_or_super"),
+                f"{mod.__name__} 不应再持有旧门 _require_owner_or_super",
+            )
+        self.assertTrue(callable(route_helpers._require_owner_or_super))
 
 
 class PlanPermissionsContractTests(unittest.TestCase):

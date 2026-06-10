@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
-"""POS 收银员鉴权路由守门测试(POS 项目 · PO-B1)。
+"""POS 收银员鉴权路由守门测试(POS 项目 · PO-B1 · 批2:require_perm 统一执行点)。
 
-锁定:3 条路由 path+method 契约 · app.py include · 路由用 POS 信封 + onboarding 走 require_owner
-(收银员 token 不可开通)· POS token 自含声明且不污染普通用户鉴权(_pos_token_subject)。"""
+锁定:路由 path+method 契约 · app.py include · POS 信封 + 管理端点逐条带码
+(pos.admin.manage / 开通=settings.modules.manage · 收银员 token 不可调)· POS token
+自含声明且不污染普通用户鉴权(_pos_token_subject)。"""
 
+import inspect
 import os
 import unittest
 
@@ -45,10 +47,35 @@ class PosAuthRoutesContractTests(unittest.TestCase):
         for _m, p in EXPECTED:
             self.assertIn(p, paths, f"pos-auth route missing from app: {p}")
 
-    def test_uses_pos_envelope_and_owner_gate(self):
+    def test_uses_pos_envelope_and_perm_gate(self):
         self.assertTrue(hasattr(mod, "ok"))
         self.assertTrue(hasattr(mod, "PosError"))
-        self.assertTrue(hasattr(mod, "require_owner"))
+        self.assertTrue(hasattr(mod, "require_perm_pos_tid"))
+
+    def test_admin_handlers_pin_perm_codes(self):
+        # 管理 7 端点逐条带码:6 条 pos.admin.manage + 开通 settings.modules.manage
+        for fn in (
+            mod.api_get_store_code,
+            mod.api_reset_store_code,
+            mod.api_admin_list_cashiers,
+            mod.api_admin_create_cashier,
+            mod.api_admin_update_cashier,
+            mod.api_admin_delete_cashier,
+        ):
+            self.assertIn(
+                'require_perm_pos_tid(request, "pos.admin.manage")',
+                inspect.getsource(fn),
+                fn.__name__,
+            )
+        self.assertIn(
+            'require_perm_pos_tid(request, "settings.modules.manage")',
+            inspect.getsource(mod.api_onboarding),
+        )
+
+    def test_public_endpoints_not_perm_gated(self):
+        # 公开端点(bind/cashiers/auth/pin)自含校验(店铺码/店铺令牌/PIN),不走 require_perm
+        for fn in (mod.api_bind_device, mod.api_list_cashiers, mod.api_pin_login):
+            self.assertNotIn("require_perm", inspect.getsource(fn), fn.__name__)
 
 
 class _Req:
@@ -78,14 +105,26 @@ class PosTokenSubjectTests(unittest.TestCase):
     def test_no_auth_header_returns_none(self):
         self.assertIsNone(pos_api._pos_token_subject(_Req()))
 
-    def test_require_owner_rejects_cashier_token(self):
+    def test_perm_gate_rejects_cashier_token_for_admin_code(self):
+        from services.authz.deps import require_perm_pos
+
         token, _ = core_auth.create_pos_token(
             tenant_id="t-1", workspace_client_id=9, cashier_id="c1", display_name="Nok"
         )
         with self.assertRaises(pos_api.PosError) as ctx:
-            pos_api.require_owner(_Req(token))
+            require_perm_pos(_Req(token), "pos.admin.manage")
         self.assertEqual(ctx.exception.code, "pos.forbidden")
         self.assertEqual(ctx.exception.http_status, 403)
+
+    def test_perm_gate_allows_cashier_token_for_cashier_code(self):
+        from services.authz.deps import require_perm_pos
+
+        token, _ = core_auth.create_pos_token(
+            tenant_id="t-1", workspace_client_id=9, cashier_id="c1", display_name="Nok"
+        )
+        subj = require_perm_pos(_Req(token), "pos.sale.operate")
+        self.assertEqual(subj["role"], "cashier")
+        self.assertEqual(subj["tenant_id"], "t-1")
 
 
 if __name__ == "__main__":

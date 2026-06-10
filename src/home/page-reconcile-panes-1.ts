@@ -103,9 +103,9 @@ export const RECON_HTML_1 = `
                                 <path d="M6 8l1.5 1.5L10.5 6.5"/>
                             </svg>
                         </span>
-                        <span class="brv2-anchor-title" data-i18n="brv2-anchor-title">OCR 抽不准?手动录入 3 个余额(可选 · 留空走 OCR)</span>
+                        <span class="brv2-anchor-title" data-i18n="brv2-anchor-title">手动校正 3 个余额(可选 · 留空自动识别)</span>
                     </div>
-                    <div class="brv2-anchor-prefill-banner" id="brv2-anchor-prefill-banner" data-i18n="brv2-anchor-prefill-banner">⚠ 下面带橙色背景的数字是上次 OCR 识别的(浏览器本地缓存)· 不对请点击修改</div>
+                    <div class="brv2-anchor-prefill-banner" id="brv2-anchor-prefill-banner" data-i18n="brv2-anchor-prefill-banner">⚠ 下面带橙色背景的数字是上次识别的(浏览器本地缓存)· 不对请点击修改</div>
                     <div class="brv2-anchor-grid">
                         <div class="brv2-anchor-cell">
                             <label for="brv2-anchor-gl-closing" data-i18n="brv2-anchor-gl-closing">GL 期末余额</label>

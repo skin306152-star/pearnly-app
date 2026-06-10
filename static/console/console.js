@@ -215,7 +215,6 @@
                 row.onclick = function () {
                     toggleExpand(m);
                 };
-            bindExpand(m);
         });
     }
     function rowHtml(m) {
@@ -270,9 +269,6 @@
             el.innerHTML = expandHtml(m);
             bindExpandActions(m);
         }
-    }
-    function bindExpand(m) {
-        /* 行内容器已建,動作在 toggleExpand 时绑 */
     }
     function expandHtml(m) {
         // owner 行:无操作;owner 本人行只给「转移所有权」
@@ -507,7 +503,7 @@
             .filter(function (r) {
                 return r.assignable;
             })
-            .map(function (r, i) {
+            .map(function (r) {
                 return (
                     '<div class="rolecard' +
                     (r.key === 'accountant' ? ' on' : '') +

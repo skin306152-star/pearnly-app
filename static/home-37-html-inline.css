@@ -1900,7 +1900,7 @@ tr.brv2-row-warn-soft td { background: var(--orange-50) !important; }
 tr.brv2-row-warn:hover td,
 tr.brv2-row-warn-soft:hover td { background: var(--danger-bg) !important; }
 
-/* BUG-B v118.35.0.36 (2026-05-22) · OCR 抽不准时手动录入 3 个 anchor 余额兜底
+/* BUG-B v118.35.0.36 (2026-05-22) · 余额识别有误时手动录入 3 个 anchor 余额兜底
    位置:brv2 上传卡和 action-bar 之间 · 跟 Pearnly 设计语言一致(暖灰底 / 黑 focus / 13px / tabular-nums) */
 .brv2-anchor-row {
     background: var(--bg);

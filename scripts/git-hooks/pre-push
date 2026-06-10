@@ -139,6 +139,13 @@ if [ -n "$FE_CHANGED" ]; then
   echo "  · check_asset_bundling(源页只引 bundle · 新资产须进打包清单)"
   python scripts/check_asset_bundling.py || fail "前端打包闸(见上方:源页明文引用=view-source 退化 / 资产漏进打包清单=样式丢)"
 
+  # UI 设计 lint 棘轮闸(2026-06-10 · punch list 收官后挂)· 各类违规命中数只许降不许升
+  # 存量(POS/admin 独立 SPA · i18n 文字强调等)在 scripts/ui_lint_baseline.json;
+  # 命中下降后跑 node scripts/ui_design_lint.mjs --update-baseline 收紧。
+  echo "  · ui_design_lint --gate(设计违规棘轮 · 新增旧蓝/emoji图标/自曝文案等 = 拦)"
+  node scripts/ui_design_lint.mjs --gate >/dev/null 2>&1 \
+    || { node scripts/ui_design_lint.mjs --gate | tail -15; fail "UI 设计 lint 棘轮(新增违规超 baseline · 看上方类别)"; }
+
   # 视觉照搬闸(docs/pos/12)· 改了 POS/库存/采购照搬稿页才跑 · 关键令牌必 == 设计快照
   if [ -n "$DESIGN_CHANGED" ]; then
     echo "  · 视觉照搬闸(关键令牌 getComputedStyle == 设计稿 · docs/pos/12)"

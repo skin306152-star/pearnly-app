@@ -139,6 +139,16 @@ jobs:
       - name: UI 一致性棘轮 · 违规不许反弹超基线(审计 #2)
         run: python scripts/check_ui_consistency.py
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # 设计 lint 棘轮(2026-06-10 punch list 收官)· 旧蓝/emoji图标/自曝文案等
+      # 各类命中只许降不许升 · 基线 scripts/ui_lint_baseline.json · 与 pre-push 同闸双层兜底
+      - name: UI 设计 lint 棘轮(--gate · FAIL mode)
+        run: node scripts/ui_design_lint.mjs --gate
+
   # REFACTOR-WC · 新债 diff 闸(封死铁律 #5/#17 · 审计发现「纸面规矩没机械执行」)
   #   #5  db.py/services/** 不许新增 def ensure_*  (运行期建表反模式 · schema 只走 alembic)
   #   #17 app.py 不许新增 @app.<verb> 路由         (路由必落 *_routes.py · 防巨石回潮)

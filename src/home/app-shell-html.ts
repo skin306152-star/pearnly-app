@@ -17,10 +17,7 @@ const TOPBAR_HTML = `
                 <line x1="3" y1="14" x2="17" y2="14"/>
             </svg>
         </button>
-        <div class="brand" id="brand">
-            <img class="brand-icon" src="/static/brand/pwa-icon-192.png?v=1" alt="Pearnly" />
-            <span class="brand-name">Pearnly</span>
-        </div>
+        <!-- 2026-06-10 Claude 式导航:品牌区迁入侧栏顶部(.sb-brand)· 顶栏左侧只留手机端汉堡 -->
     </div>
 
     <div class="topbar-right">
@@ -138,14 +135,18 @@ const TOPBAR_HTML = `
 `;
 
 const SIDEBAR_HTML = `
-    <!-- v22 · 侧栏顶部汉堡(移自原顶栏) -->
-    <button class="sidebar-toggle sidebar-toggle-in" id="sidebar-toggle" title="">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="3" y1="6" x2="17" y2="6"/>
-            <line x1="3" y1="10" x2="17" y2="10"/>
-            <line x1="3" y1="14" x2="17" y2="14"/>
-        </svg>
-    </button>
+    <!-- 2026-06-10 Claude 式导航拍板:侧栏顶区 = logo + 品牌名 + 折叠键(logo 自顶栏迁入) -->
+    <div class="sb-brand">
+        <img class="brand-icon" src="/static/brand/pwa-icon-192.png?v=1" alt="Pearnly" />
+        <span class="brand-name">Pearnly</span>
+        <button class="sidebar-toggle sidebar-toggle-in" id="sidebar-toggle" title="">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2.5" y="3.5" width="15" height="13" rx="2"/>
+                <line x1="7.5" y1="3.5" x2="7.5" y2="16.5"/>
+            </svg>
+        </button>
+    </div>
+    <div class="sb-nav">
 
     <!-- v118.33.7.3 · sidebar 顶部 CTA「上传发票」按钮已删 · 对齐 prototype_final(prototype 顶部直接是「首页」· 无 CTA)· 上传发票走「销项管理 → 上传识别」入口 -->
 
@@ -197,23 +198,21 @@ const SIDEBAR_HTML = `
                 </svg>
                 <span class="nav-label" data-i18n="nav-reconcile">对账中心</span>
             </div>
-            <div class="nav-sub-item nav-sales-head" data-module="sales">
+            <!-- 2026-06-10 Claude 式导航:「销售发票」二级子组拍平 · 全站导航最多两层 -->
+            <div class="nav-item nav-sub-item" data-route="sales-invoices" data-module="sales">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M5 2h8l3 3v13H5z"/>
                     <path d="M8 8h5M8 11h5M8 14h3"/>
                     <path d="M13 2v3h3"/>
                 </svg>
-                <span class="nav-label" data-i18n="nav-sales-invoices">销售发票</span>
-                <svg class="nav-sub2-chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8l4 4 4-4"/></svg>
+                <span class="nav-label" data-i18n="nav-sales-workbench">发票工作台</span>
             </div>
-            <!-- 销售发票 两子屏(PO-10)· 默认收起 · 点头部展开 · 工作台 / 账套(商品=共享主数据·见下方主数据区) -->
-            <div class="nav-sub2" data-module="sales">
-                <div class="nav-item nav-sub2-item" data-route="sales-invoices">
-                    <span class="nav-label" data-i18n="nav-sales-workbench">发票工作台</span>
-                </div>
-                <div class="nav-item nav-sub2-item" data-route="sales-account">
-                    <span class="nav-label" data-i18n="nav-sales-account">账套 / 开票资料</span>
-                </div>
+            <div class="nav-item nav-sub-item" data-route="sales-account" data-module="sales">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2.5" y="4.5" width="15" height="11" rx="1.5"/>
+                    <path d="M6 8.5h5M6 12h3"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-sales-account">账套 / 开票资料</span>
             </div>
             <div class="nav-item nav-sub-item" data-route="receivables" data-module="receivable">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -399,16 +398,6 @@ const SIDEBAR_HTML = `
         <span class="nav-label" data-i18n="nav-knowledge">客户知识</span>
     </div>
 
-    <!-- 平台业态套餐 PO-PP1 · 有未开模块时(owner)显「可开启功能 →」· 点击弹业态选择器(onboarding-business.ts)· module-nav.ts 控显隐 -->
-    <div class="nav-item" id="nav-enroll" style="display:none;">
-        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="10" cy="10" r="7.5"/>
-            <path d="M10 6.5v7M6.5 10h7"/>
-        </svg>
-        <span class="nav-label" data-i18n="nav-enroll">可开启功能</span>
-        <span class="nav-label" style="margin-left:auto;color:var(--brand,#0E7C66);">→</span>
-    </div>
-
     <div class="nav-item" data-route="exceptions">
         <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9.1 3.4L2.3 15a1.5 1.5 0 001.3 2.3h12.8A1.5 1.5 0 0017.7 15L10.9 3.4a1.5 1.5 0 00-1.8 0z"/>
@@ -419,9 +408,18 @@ const SIDEBAR_HTML = `
         <span class="nav-badge danger" id="nav-exc-badge" style="display:none;">0</span>
     </div>
 
-    <!-- v118.32.5.5.37 NAV-IA Phase 5 收尾 · 自动化入口已移至集成页右侧抽屉 -->
-    <!-- v118.33.3 NAV-IA Phase 3 · sidebar 底部「集成」一级入口 · 空壳路由 · Phase 7 才填内容(Google/LINE/Gmail/文件夹/ERP 第三方授权聚合) -->
+    </div>
+
+    <!-- 底部 pinned(Claude 式):可开启功能 / 集成 / 用户卡(点开 = 头像菜单) -->
     <div class="sidebar-bottom">
+        <div class="nav-item" id="nav-enroll" style="display:none;">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="10" cy="10" r="7.5"/>
+                <path d="M10 6.5v7M6.5 10h7"/>
+            </svg>
+            <span class="nav-label" data-i18n="nav-enroll">可开启功能</span>
+            <span class="nav-label" style="margin-left:auto;color:var(--brand,#0E7C66);">→</span>
+        </div>
         <div class="nav-item" data-route="integrations" id="nav-integrations">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M6 14L3 17M14 6l3-3"/>
@@ -429,6 +427,13 @@ const SIDEBAR_HTML = `
             </svg>
             <span class="nav-label" data-i18n="nav-integrations">集成</span>
         </div>
+        <button type="button" class="sb-user" id="sb-user" title="">
+            <span class="avatar sb-user-ava" id="sb-user-ava" aria-hidden="true">·</span>
+            <span class="sb-user-tx">
+                <span class="sb-user-name" id="sb-user-name">—</span>
+                <span class="sb-user-mail" id="sb-user-mail">—</span>
+            </span>
+        </button>
     </div>
 `;
 

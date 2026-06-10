@@ -106,6 +106,13 @@
         nameEl.textContent = namePart;
         emailEl.textContent = email || '—';
         btn.setAttribute('title', email || '');
+        // 侧栏底部用户卡(Claude 式 · 2026-06-10)与顶栏头像同源填充
+        var sbAva = document.getElementById('sb-user-ava');
+        var sbName = document.getElementById('sb-user-name');
+        var sbMail = document.getElementById('sb-user-mail');
+        if (sbAva) sbAva.textContent = letter;
+        if (sbName) sbName.textContent = namePart;
+        if (sbMail) sbMail.textContent = email || '—';
     };
 
     // ---- 头像 popup 交互 ----
@@ -115,8 +122,11 @@
         var popup = document.getElementById('avatar-popup');
         if (!wrap || !btn || !popup) return;
 
+        var sbUser = document.getElementById('sb-user');
+
         function closePopup() {
             popup!.classList.remove('show');
+            popup!.classList.remove('from-sidebar');
             btn!.setAttribute('aria-expanded', 'false');
         }
         function openPopup() {
@@ -130,9 +140,25 @@
             else openPopup();
         });
 
-        // 外部点击关闭(仅当 popup 开着 + 点击点不在 wrap 内)
+        // 侧栏底部用户卡 → 同一菜单 · 贴左下弹出(Claude 式)
+        if (sbUser)
+            sbUser.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (popup!.classList.contains('show')) closePopup();
+                else {
+                    popup!.classList.add('from-sidebar');
+                    openPopup();
+                }
+            });
+
+        // 外部点击关闭(仅当 popup 开着 + 点击点不在 wrap/用户卡 内)
         document.addEventListener('click', function (e) {
-            if (popup!.classList.contains('show') && !wrap!.contains(e.target as Node | null)) {
+            var n = e.target as Node | null;
+            if (
+                popup!.classList.contains('show') &&
+                !wrap!.contains(n) &&
+                !(sbUser && sbUser.contains(n))
+            ) {
                 closePopup();
             }
         });

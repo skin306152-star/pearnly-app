@@ -75,7 +75,7 @@
 }
 /* admin-mode 下 · 把 topbar / sidebar / main 都下推 36px · 给 banner 让位 */
 body.admin-mode .topbar { top: 36px; }
-body.admin-mode .sidebar { top: calc(var(--topbar-h) + 36px); }
+body.admin-mode .sidebar { top: 36px; }
 body.admin-mode .main { margin-top: calc(var(--topbar-h) + 36px); }
 @media (max-width: 640px) {
     .admin-mode-banner {

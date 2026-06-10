@@ -76,6 +76,14 @@ body.is-windows .topbar-search-kbd-win { display: inline; }
     z-index: 200;
 }
 .avatar-popup.show { display: block; }
+/* 从侧栏底部用户卡打开时 · 弹窗贴左下(Claude 式) */
+.avatar-popup.from-sidebar {
+    position: fixed;
+    left: calc(var(--sidebar-w) + 10px);
+    bottom: 14px;
+    top: auto;
+    right: auto;
+}
 .avatar-popup-head {
     padding: 12px 10px 10px;
     border-bottom: 1px solid var(--line-soft);

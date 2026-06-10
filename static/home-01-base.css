@@ -319,26 +319,23 @@ body {
 }
 
 /* ============ 顶栏 ============ */
+/* 2026-06-10 Claude 式导航:logo 迁入侧栏 · 顶栏从侧栏右缘开始(不再保留 logo 区) */
 .topbar {
     height: var(--topbar-h);
     background: var(--card);
     border-bottom: 1px solid var(--line);
     padding: 0 20px 0 0;
     display: flex; align-items: center; justify-content: space-between;
-    position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+    position: fixed; top: 0; left: var(--sidebar-w); right: 0; z-index: 50;
+    transition: left 180ms ease;
 }
-/* v86 · topbar-left 占 sidebar 宽度 · Logo 与 sidebar 对齐 */
-/* v118.33.7.5 · 加 border-right 跟 sidebar 顶部分隔线对齐 · 顶栏视觉跟 sidebar 焊接(prototype 风格) */
+body.sidebar-collapsed .topbar { left: var(--sidebar-w-collapsed); }
 .topbar-left {
     display: flex; align-items: center; gap: 12px;
-    width: var(--sidebar-w);
-    box-sizing: border-box;
-    padding-left: 20px;
+    padding-left: 16px;
     flex-shrink: 0;
-    transition: width 180ms ease;
     height: 100%;
 }
-body.sidebar-collapsed .topbar-left { width: var(--sidebar-w-collapsed); padding-left: 14px; }
 /* v86 · 手机端汉堡菜单按钮(在 topbar 左侧) */
 .topbar-hamburger {
     display: none;

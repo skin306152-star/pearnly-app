@@ -1,7 +1,9 @@
 /* ============ 响应式 ============ */
 @media (max-width: 768px) {
-    .sidebar { transform: translateX(-100%); transition: transform 200ms ease; }
+    /* 2026-06-10 Claude 式导航:侧栏全高 off-canvas(盖过顶栏)· 顶栏回满宽 */
+    .sidebar { transform: translateX(-100%); transition: transform 200ms ease; z-index: 60; }
     body.sidebar-open .sidebar { transform: translateX(0); }
+    .topbar { left: 0; }
     .main { margin-left: 0 !important; padding: 14px; }
     .brand-divider, .brand-sub { display: none; }
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
@@ -16,9 +18,9 @@
     .sidebar-toggle-in { display: none; }
     /* v86 · 手机端打开侧栏时的遮罩 */
     .sidebar-overlay {
-        position: fixed; top: var(--topbar-h); left: 0; right: 0; bottom: 0;
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
         background: rgba(0,0,0,0.4);
-        z-index: 35;
+        z-index: 55;
         display: none;
     }
     body.sidebar-open .sidebar-overlay { display: block; }

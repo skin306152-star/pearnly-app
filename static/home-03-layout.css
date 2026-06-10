@@ -1,22 +1,56 @@
-/* ============ 侧栏 ============ */
+/* ============ 侧栏(2026-06-10 Claude 式:全高列 · 顶=品牌 · 中=滚动导航 · 底=pinned)============ */
 .sidebar {
-    position: fixed; top: var(--topbar-h); left: 0; bottom: 0;
+    position: fixed; top: 0; left: 0; bottom: 0;
     width: var(--sidebar-w);
     background: var(--card);
     border-right: 1px solid var(--line);
-    padding: 4px 8px 24px;
-    overflow-x: hidden;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     z-index: 40;
     transition: width 180ms ease;
+}
+body.sidebar-collapsed .sidebar { width: var(--sidebar-w-collapsed); }
+.sb-brand {
+    display: flex; align-items: center; gap: 9px;
+    padding: 13px 14px 9px;
+    flex-shrink: 0;
+}
+.sb-brand .sidebar-toggle { margin-left: auto; }
+body.sidebar-collapsed .sb-brand { flex-direction: column; gap: 10px; padding: 13px 0 5px; }
+body.sidebar-collapsed .sb-brand .brand-name { display: none; }
+body.sidebar-collapsed .sb-brand .sidebar-toggle { margin-left: 0; }
+.sb-nav {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 2px 8px 8px;
     scrollbar-width: thin;
     scrollbar-color: var(--line) transparent;
 }
-.sidebar::-webkit-scrollbar { width: 6px; }
-.sidebar::-webkit-scrollbar-track { background: transparent; }
-.sidebar::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
-.sidebar::-webkit-scrollbar-thumb:hover { background: var(--ink-3); }
-body.sidebar-collapsed .sidebar { width: var(--sidebar-w-collapsed); }
+.sb-nav::-webkit-scrollbar { width: 6px; }
+.sb-nav::-webkit-scrollbar-track { background: transparent; }
+.sb-nav::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+.sb-nav::-webkit-scrollbar-thumb:hover { background: var(--ink-3); }
+/* 底部用户卡(点开 = 头像菜单) */
+.sb-user {
+    display: flex; align-items: center; gap: 9px;
+    width: 100%;
+    padding: 7px 8px;
+    margin-top: 2px;
+    border: 0; background: transparent;
+    border-radius: 9px;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+}
+.sb-user:hover { background: var(--line2); }
+.sb-user-ava { width: 28px; height: 28px; font-size: 12px; }
+.sb-user-tx { min-width: 0; display: flex; flex-direction: column; }
+.sb-user-name { font-size: 12.5px; font-weight: 600; color: var(--ink); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-user-mail { font-size: 11px; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.sidebar-collapsed .sb-user { justify-content: center; padding: 6px 0; }
+body.sidebar-collapsed .sb-user-tx { display: none; }
 .nav-group { margin-bottom: 4px; }
 .nav-group-label {
     padding: 8px 12px 4px;
@@ -36,10 +70,10 @@ body.sidebar-collapsed .nav-group-label { display: none; }
     transition: all 120ms;
 }
 .nav-item:hover { background: var(--bg); color: var(--ink); }
-/* v118.33.7.5 · active 配色对齐 prototype:纯黑底白字 · 删 3px 左侧竖条 · 简洁实心高亮 */
-.nav-item.active { background: var(--ink); color: var(--card); font-weight: 500; }
-.nav-item.active .nav-icon { color: var(--card); }
-.nav-item.active svg { color: var(--card); }
+/* 2026-06-10 Claude 式导航拍板:激活态统一淡绿 pill(accent-weak 底 + ink 字 + accent 图标 · 暗夜随令牌翻) */
+.nav-item.active { background: var(--accent-weak); color: var(--ink); font-weight: 600; }
+.nav-item.active .nav-icon { color: var(--accent); }
+.nav-item.active svg { color: var(--accent); }
 .nav-item .nav-icon {
     width: 18px; height: 18px; flex-shrink: 0;
     color: currentColor;

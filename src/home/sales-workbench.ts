@@ -229,16 +229,4 @@ window.addEventListener('pearnly:sales-changed', () => {
 
 // 切账套重载已统一收口到 core-boot 全局 pearnly:workspace-changed → reloadCurrentRoute。
 
-// P1 · 销售发票子菜单:默认收起,点头部展开/收起(chevron);在销项子路由时自动展开
-(function initSalesSubnav() {
-    const head = document.querySelector<HTMLElement>('.nav-sales-head');
-    const sub2 = document.querySelector<HTMLElement>('.nav-sub2');
-    if (!head || !sub2) return;
-    const open = (on: boolean) => {
-        sub2.classList.toggle('show', on);
-        head.classList.toggle('sx-open', on);
-    };
-    const route = (location.hash || '').replace(/^#\//, '');
-    if (route === 'sales-invoices' || route === 'sales-account') open(true);
-    head.addEventListener('click', () => open(!sub2.classList.contains('show')));
-})();
+// 2026-06-10 Claude 式导航:销售发票二级子组拍平为一级子项 · 原 initSalesSubnav 随之退场。

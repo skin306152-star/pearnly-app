@@ -22,6 +22,7 @@
   - **任务C 验证欠账清零**:POS 跨套账 E2E 修测试种子漏 `workspace_client_id`(致 line_invalid)→ **9/9**;清 e2e_3 残留 3 张已提交进项测试单 → 进项隔离 **18/18**;prod 0030 `product_units.workspace_client_id` 列已确认。
   - **任务D 交互性能诊断**(`docs/perf/INTERACTION_AUDIT.md`):真测量定位两根因 = ① 应用在**日本**/DB 在**新加坡**每条 SQL 跨区 **69ms** ② `async` handler 直接做阻塞 psycopg2 致 2-worker 串行(首屏 **22 请求/11.7s**)。Top10 慢交互×分解×归因 + RTT 基线 + 后端建议(**迁同区=最大杠杆**)+ 前端修复清单(交 src/home 窗口)。
   - **/simplify 已跑**(diff 小·四角度自审 already clean)·守门 black/format/imports/ai-smell/size/ratchet 全绿。**下一步**:① 此 commit 待报税窗口 push 带上线 ② 性能 P0(迁新加坡同区)+P1(workers 2→4 / N+1 批量化)待 Zihao 拍板 ③ 前端修复清单待 src/home 窗口。
+  - **任务D 续(2026-06-11)· 实测证伪首屏 N+1**(commit `e427b7eb`):按「砍首屏 SQL 往返」目标排查,新增计数游标探针 `scripts/_perf_sqlcount.py`(已入提交)实测所有 boot 端点 **2-5 条 SQL·无 N+1**(与数据量无关·无循环查)。纠正报告早先「~17/~20 条」错误估算(那是中位÷69ms 的估算非实测)。**端点级 SQL已无水分**→降首屏只能降请求数(前端去重/懒加载)或降单查往返(迁区/鉴权-workspace 短 TTL 缓存·需签字)。本轮无 N+1 可改 → 未擅动后端读路径(状态诚实)。
 
 - **🆕 本窗口(2026-06-10)· 🔐 权限批5收口 + PEAK 吸收 4 条 + /console·邀请页真机 5 修**(`038ae65e`+`634fb5d3`+`1359ebd6`·随推主题/报税共 9 commit 合流上线):
   - **批5(权限整顿收官)**:九门旧别名全删(`_require_owner_or_super`/`_require_tenant`/`require_owner`/`require_account_owner`·契约测试锁不许复活);billing 4 处 invited_by owner 判定改 membership(`authz.deps.is_owner_role`);旧团队管理处决=`routes/team_routes.py` 7 接口+`services/team/store.py` 删除(活函数并入 console_store 直调·退出 dal_reexports 防循环 import·EmployeeToggleRequest 迁 admin_users_mutation);改密链路单点留 auth_password_routes(invitations 复用确认)。06 对照表随更。

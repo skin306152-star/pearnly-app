@@ -32,6 +32,14 @@
 .cshp .csh-add:hover {
     background: var(--accent-deep);
 }
+/* S9 · 未选账套时禁用(避免与空态的「选账套」动作打架) */
+.cshp .csh-add:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+.cshp .csh-add:disabled:hover {
+    background: var(--accent);
+}
 .cshp .csh-access-card {
     background: var(--card);
     border: 1px solid var(--line);

@@ -91,8 +91,13 @@ function rsRow(r: ClientRuleRow): string {
         `<div class="rs-rm"><div class="rs-rt">${rsRuleText(r)}</div></div>` +
         `<span class="rs-sev ${sev}">${sevLabel}</span>` +
         `<button class="rs-sw${r.is_active ? '' : ' off'}" data-toggle="${r.id}" aria-label="toggle"></button>` +
-        `<button class="rs-icobtn" data-edit="${r.id}" aria-label="edit">${rsSvg('pencil', 14)}</button>` +
-        `<button class="rs-icobtn" data-del="${r.id}" aria-label="delete">${rsSvg('trash', 14)}</button>` +
+        // S9 4-bis:编辑/删除收行尾 ⋯ 菜单(toggle 留在行上 · 删除二次确认在 rsDelete)
+        `<div class="more-wrap">` +
+        `<button class="rs-icobtn" data-more="${r.id}" aria-label="more"><svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><circle cx="3" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="13" cy="8" r="1.3"/></svg></button>` +
+        `<div class="more-menu right" hidden>` +
+        `<button class="mi" data-edit="${r.id}">${rsSvg('pencil', 14)}<span>${L.edit}</span></button>` +
+        `<button class="mi dng" data-del="${r.id}">${rsSvg('trash', 14)}<span>${L.del}</span></button>` +
+        `</div></div>` +
         `</div>`
     );
 }
@@ -399,6 +404,16 @@ function rsBuild(): void {
             add.classList.remove('rs-open');
         const addBtn = el.closest('[data-add-type]') as HTMLElement | null;
         if (addBtn) rsOpenAdd(addBtn.dataset.addType!);
+        // S9 行尾 ⋯ 菜单:开本行关其他;点任意动作/外部即收
+        const moreBtn = el.closest('[data-more]') as HTMLElement | null;
+        const rsMenus = document.querySelectorAll<HTMLElement>('#rules-settings-modal .more-menu');
+        if (moreBtn) {
+            const menu = moreBtn.parentElement?.querySelector('.more-menu') as HTMLElement | null;
+            rsMenus.forEach((m) => m !== menu && (m.hidden = true));
+            if (menu) menu.hidden = !menu.hidden;
+            return;
+        }
+        rsMenus.forEach((m) => (m.hidden = true));
         const editBtn = el.closest('[data-edit]') as HTMLElement | null;
         if (editBtn) {
             const r = rsRules.find((x) => x.id === Number(editBtn.dataset.edit));

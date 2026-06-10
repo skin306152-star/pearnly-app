@@ -64,16 +64,16 @@ const STYLE = `
 .ptbl .ph .sub{color:var(--ink2);font-size:13px;margin-top:4px;}
 .ptbl .btn{height:38px;padding:0 15px;border-radius:10px;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-weight:500;}
 .ptbl .btn:hover{border-color:var(--accent-weak);}
-.ptbl .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+.ptbl .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600;}
 .ptbl .btn.primary:hover{background:var(--accent-deep);}
 .ptbl .zones{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
 .ptbl .zone{height:36px;padding:0 6px 0 15px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink2);font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;}
 .ptbl .zone .c{font-size:12px;color:var(--ink3);}
 .ptbl .zone .mg{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:transparent;}
 .ptbl .zone:hover .mg{color:var(--ink3);}
-.ptbl .zone.on{background:var(--ink);color:#fff;border-color:var(--ink);}
+.ptbl .zone.on{background:var(--ink);color:var(--card);border-color:var(--ink);}
 .ptbl .zone.on .c{color:var(--line);}.ptbl .zone.on .mg{color:var(--ink3);}
-.ptbl .zone.on:hover .mg{color:#fff;}
+.ptbl .zone.on:hover .mg{color:var(--card);}
 .ptbl .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 2px rgba(17,24,39,.04),0 4px 14px rgba(17,24,39,.05);overflow:hidden;}
 .ptbl .ch{padding:14px 18px;border-bottom:1px solid var(--line2);display:flex;align-items:center;justify-content:space-between;}
 .ptbl .ch .zt{font-weight:700;font-size:15px;display:flex;align-items:center;gap:10px;}
@@ -136,7 +136,7 @@ function ensureShell(sec: HTMLElement): void {
     sec.innerHTML = `<div class="ptbl">
         <div class="ph">
             <div><div class="tt">${escapeHtml(t('rtbl.title'))}</div><div class="sub">${escapeHtml(t('rtbl.sub'))}</div></div>
-            <button class="btn" id="ptbl-add-area">${plus}${escapeHtml(t('rtbl.add_area'))}</button>
+            <button class="btn primary" id="ptbl-add-area">${plus}${escapeHtml(t('rtbl.add_area'))}</button>
         </div>
         <div id="ptbl-body"></div>
         <div class="note">${t('rtbl.note')}</div>

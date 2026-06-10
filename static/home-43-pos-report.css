@@ -38,8 +38,24 @@
 }
 .posrep .range button.on {
     background: var(--accent);
-    color: var(--card);
+    color: var(--accent-ink);
     border-color: var(--accent);
+}
+/* S9 4-bis · 时间段 4 独立按钮 → segmented control(单框分段 · 选中实心) */
+.posrep .range .seg {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.posrep .range .seg button {
+    border: 0;
+    border-right: 1px solid var(--line);
+    border-radius: 0;
+    font-family: inherit;
+}
+.posrep .range .seg button:last-child {
+    border-right: 0;
 }
 .posrep .range input[type='date'] {
     height: 34px;

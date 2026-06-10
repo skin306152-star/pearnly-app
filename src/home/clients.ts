@@ -232,6 +232,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const wid = parseInt(btn.dataset.wid as string, 10);
             const act = btn.dataset.saction;
             const ws = S.sellerClients.find((x: any) => Number(x.id) === wid) as any;
+            if (act === 'more') {
+                // S9 行尾 ⋯ 菜单:开本行 · 关其他行
+                const menu = btn.parentElement?.querySelector('.more-menu') as HTMLElement | null;
+                sellerTbody.querySelectorAll<HTMLElement>('.more-menu').forEach((m) => {
+                    if (m !== menu) m.hidden = true;
+                });
+                if (menu) menu.hidden = !menu.hidden;
+                return;
+            }
+            sellerTbody
+                .querySelectorAll<HTMLElement>('.more-menu')
+                .forEach((m) => (m.hidden = true));
             if (act === 'activate') {
                 if (typeof window.setActiveWorkspaceClientId === 'function')
                     window.setActiveWorkspaceClientId(wid);
@@ -246,6 +258,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 archiveWsClient();
             }
         });
+        document.addEventListener(
+            'click',
+            (e) => {
+                if (!(e.target as HTMLElement).closest('#seller-tbody .more-wrap'))
+                    sellerTbody
+                        .querySelectorAll<HTMLElement>('.more-menu')
+                        .forEach((m) => (m.hidden = true));
+            },
+            true
+        );
     }
     const sellerSearch = document.getElementById('seller-search');
     if (sellerSearch) {

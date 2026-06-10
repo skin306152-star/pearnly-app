@@ -8,6 +8,23 @@ const GLV_PAGE_SIZE = 10;
 var _glvAllTasks: any[] = [];
 var _glvPage = 1;
 
+// S9 行尾 ⋯ 菜单 · 点外关(全局只绑一次)
+let _glvMoreCloserBound = false;
+function _bindGlvMoreCloser() {
+    if (_glvMoreCloserBound) return;
+    _glvMoreCloserBound = true;
+    document.addEventListener(
+        'click',
+        (e) => {
+            if ((e.target as HTMLElement).closest('#glv-history-tbody .more-wrap')) return;
+            document
+                .querySelectorAll<HTMLElement>('#glv-history-tbody .more-menu')
+                .forEach((m) => (m.hidden = true));
+        },
+        true
+    );
+}
+
 function _applyGlvSearch() {
     _glvPage = 1;
     _renderGlvPage();
@@ -92,7 +109,38 @@ function _renderGlvPage() {
             '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="3 4 13 4"/><path d="M6 4V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5V4"/><path d="M5 4l1 9a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1l1-9"/></svg>';
         cellAct.appendChild(mkBtn(SVG_LOAD, _t('hist_load'), '', () => _loadTask(t.id)));
         cellAct.appendChild(mkBtn(SVG_DL, _t('hist_export'), '', () => _exportTask(t.id)));
-        cellAct.appendChild(mkBtn(SVG_DEL, _t('hist_delete'), 'glv-del', () => _deleteTask(t.id)));
+        // S9 4-bis:删除(危险)收行尾 ⋯ 菜单 · 二次确认在 _deleteTask
+        const SVG_MORE =
+            '<svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><circle cx="3" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="13" cy="8" r="1.3"/></svg>';
+        const moreWrap = document.createElement('div');
+        moreWrap.className = 'more-wrap';
+        const menu = document.createElement('div');
+        menu.className = 'more-menu right';
+        menu.hidden = true;
+        const delItem = document.createElement('button');
+        delItem.type = 'button';
+        delItem.className = 'mi dng';
+        delItem.innerHTML = SVG_DEL;
+        const delLabel = document.createElement('span');
+        delLabel.textContent = _t('hist_delete');
+        delItem.appendChild(delLabel);
+        delItem.onclick = () => {
+            menu.hidden = true;
+            _deleteTask(t.id);
+        };
+        menu.appendChild(delItem);
+        const moreBtn = mkBtn(SVG_MORE, '⋯', '', () => {});
+        moreBtn.onclick = (e) => {
+            e.stopPropagation();
+            tbody
+                .querySelectorAll<HTMLElement>('.more-menu')
+                .forEach((m) => m !== menu && (m.hidden = true));
+            menu.hidden = !menu.hidden;
+        };
+        moreWrap.appendChild(moreBtn);
+        moreWrap.appendChild(menu);
+        cellAct.appendChild(moreWrap);
+        _bindGlvMoreCloser();
         [cellTime, cellFiles, cellRows, cellMatched, cellDiff, cellMiss, cellAct].forEach((c) =>
             tr.appendChild(c)
         );

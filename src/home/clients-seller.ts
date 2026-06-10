@@ -86,10 +86,16 @@ function renderSellerList() {
             const current = isActive
                 ? `<span class="cust-badge-current"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7.5l3.2 3.2L12 4"/></svg>${escapeHtml(t('seller-current'))}</span>`
                 : `<button class="cust-row-btn primary" data-saction="activate" data-wid="${c.id}">${escapeHtml(t('seller-set-current'))}</button>`;
+            // S9 4-bis:行内最多 2 个按钮 · 归档(危险)收进 ⋯ 菜单(确认弹窗在 archiveWsClient)
             const ownerBtns = owner
                 ? `
             <button class="cust-row-btn" data-saction="edit" data-wid="${c.id}"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2l3 3-7 7H2v-3z"/></svg><span>${escapeHtml(t('client-card-edit'))}</span></button>
-            <button class="cust-row-btn danger" data-saction="archive" data-wid="${c.id}"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h10M4 4v7a1 1 0 001 1h4a1 1 0 001-1V4M5.5 4V2.8a1 1 0 011-1h1a1 1 0 011 1V4"/></svg><span>${escapeHtml(t('wsclient-archive'))}</span></button>`
+            <div class="more-wrap">
+                <button class="cust-row-btn" data-saction="more" data-wid="${c.id}" aria-label="more"><svg viewBox="0 0 14 14" fill="currentColor"><circle cx="2.5" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11.5" cy="7" r="1.2"/></svg></button>
+                <div class="more-menu right" hidden>
+                    <button class="mi dng" data-saction="archive" data-wid="${c.id}"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M2 4h10M4 4v7a1 1 0 001 1h4a1 1 0 001-1V4M5.5 4V2.8a1 1 0 011-1h1a1 1 0 011 1V4"/></svg><span>${escapeHtml(t('wsclient-archive'))}</span></button>
+                </div>
+            </div>`
                 : '';
             return `<div class="cust-row seller-grid" data-wid="${c.id}">
             <div class="cust-cell-name"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;opacity:.55"><rect x="2" y="5" width="12" height="9" rx="1"/><path d="M10 14V4a1 1 0 00-1-1H7a1 1 0 00-1 1v10"/></svg><span class="cust-name-text">${escapeHtml(c.name || '#' + c.id)}</span></div>

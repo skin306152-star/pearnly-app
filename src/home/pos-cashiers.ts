@@ -330,6 +330,9 @@ function needWorkspaceHtml(): string {
 
 async function load() {
     const wsId = activeWsId();
+    // S9:未选账套时头部「加收银员」禁用 · 不与空态的「选账套」动作打架
+    const addBtn = document.getElementById('csh-add') as HTMLButtonElement | null;
+    if (addBtn) addBtn.disabled = wsId == null;
     if (wsId == null) {
         setList(needWorkspaceHtml());
         const pick = document.getElementById('csh-pick-ws');

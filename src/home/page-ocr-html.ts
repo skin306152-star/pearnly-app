@@ -77,10 +77,6 @@
                         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="10" height="10" rx="1.5"/></svg>
                         <span data-i18n="btn-stop">停止识别</span>
                     </button>
-                    <button class="btn sec" id="btn-clear" disabled>
-                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h10M8 3h4M7 7l1 10h4l1-10"/></svg>
-                        <span data-i18n="btn-clear">清空</span>
-                    </button>
                     <div class="export-split-wrap" id="export-split-wrap">
                         <button class="btn sec export-main" id="btn-export" disabled>
                             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v10M6 9l4 4 4-4M4 15v2h12v-2"/></svg>
@@ -90,10 +86,22 @@
                             <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5l3 3 3-3"/></svg>
                         </button>
                     </div>
-                    <button class="btn sec btn-locked" id="btn-custom-template" style="display:none;">
-                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="12" rx="1"/><path d="M3 8h14M7 4v12"/></svg>
-                        <span data-i18n="btn-custom-tpl">自定义模板</span>
-                    </button>
+                    <!-- S9 4-bis:一排 ≥4 按钮收 ⋯ 更多(清空 / 自定义模板 · id 不变保既有绑定) -->
+                    <div class="more-wrap" id="ocr-more-wrap">
+                        <button class="btn sec" id="btn-ocr-more" aria-haspopup="true" aria-label="more">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><circle cx="4" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="16" cy="10" r="1.6"/></svg>
+                        </button>
+                        <div class="menu more-menu" id="ocr-more-menu" hidden>
+                            <button class="mi" id="btn-clear" disabled>
+                                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M5 7h10M8 3h4M7 7l1 10h4l1-10"/></svg>
+                                <span data-i18n="btn-clear">清空</span>
+                            </button>
+                            <button class="mi" id="btn-custom-template" style="display:none;">
+                                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><rect x="3" y="4" width="14" height="12" rx="1"/><path d="M3 8h14M7 4v12"/></svg>
+                                <span data-i18n="btn-custom-tpl">自定义模板</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="alert alert-info" id="alert-info">

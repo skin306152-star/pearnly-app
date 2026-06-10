@@ -19,6 +19,29 @@ if (_btnCustomTpl)
         showToast(t('cs-coming-soon'), 'info');
     });
 
+// S9 4-bis · OCR 工具条 ⋯ 更多菜单(清空/自定义模板收进来 · 点外关 · 点项后关)
+const _ocrMoreBtn = document.getElementById('btn-ocr-more');
+const _ocrMoreMenu = document.getElementById('ocr-more-menu');
+if (_ocrMoreBtn && _ocrMoreMenu) {
+    _ocrMoreBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        _ocrMoreMenu.hidden = !_ocrMoreMenu.hidden;
+    });
+    _ocrMoreMenu.addEventListener('click', (e) => {
+        if ((e.target as HTMLElement).closest('button.mi')) _ocrMoreMenu.hidden = true;
+    });
+    // capture 相位:中间元素 stopPropagation 也拦不住点外关
+    document.addEventListener(
+        'click',
+        (e) => {
+            const el = e.target as HTMLElement;
+            if (el.closest('#btn-ocr-more')) return;
+            if (!_ocrMoreMenu.hidden && !_ocrMoreMenu.contains(el)) _ocrMoreMenu.hidden = true;
+        },
+        true
+    );
+}
+
 // 事件绑定(页面加载时只绑一次)
 document.addEventListener('DOMContentLoaded', () => {
     // v118.35.0.16 · BYO Gemini Key 按钮事件绑定永久下线

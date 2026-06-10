@@ -102,8 +102,7 @@ function rangeBar(): string {
                <input type="date" id="rep-to" value="${escapeHtml(customTo)}" />`
             : '';
     return `<div class="range">
-        ${btn('today', t('rep-range-today'))}${btn('week', t('rep-range-week'))}
-        ${btn('month', t('rep-range-month'))}${btn('custom', t('rep-range-custom'))}
+        <div class="seg">${btn('today', t('rep-range-today'))}${btn('week', t('rep-range-week'))}${btn('month', t('rep-range-month'))}${btn('custom', t('rep-range-custom'))}</div>
         ${custom}
     </div>`;
 }

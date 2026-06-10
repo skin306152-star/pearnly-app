@@ -42,7 +42,7 @@
 .pos-view--rtables .t.free .st { background: #dcfce7; color: #15803d; }
 .pos-view--rtables .t.free .amt { color: var(--ink3); }
 .pos-view--rtables .t.seat { border-color: #ddccff; background: var(--seat-bg); }
-.pos-view--rtables .t.seat .st { background: var(--blue-l); color: var(--blue-d); }
+.pos-view--rtables .t.seat .st { background: #eee5ff; color: #6b3ff2; }
 .pos-view--rtables .t.cook { border-color: #fde9c8; background: var(--cook-bg); }
 .pos-view--rtables .t.cook .st { background: #fef3c7; color: #b45309; }
 .pos-view--rtables .t.bill { border-color: #fecaca; background: var(--bill-bg); }

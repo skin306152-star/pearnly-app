@@ -174,15 +174,15 @@ function ensureShell(): void {
         const st = document.createElement('style');
         st.id = 'kb-docs-style';
         st.textContent = `
-.kb-up{border:1.5px dashed var(--line,#e8e8e3);border-radius:12px;background:var(--card,var(--card));padding:22px;text-align:center;color:var(--ink-3,#999);margin-bottom:16px;cursor:pointer;transition:.15s}
-.kb-up:hover,.kb-up.drag{border-color:var(--brand,var(--ink));color:var(--ink-2,#555);background:var(--bg,#f4f4f0)}
+.kb-up{border:1.5px dashed var(--line,var(--line));border-radius:12px;background:var(--card,var(--card));padding:22px;text-align:center;color:var(--ink-3,#999);margin-bottom:16px;cursor:pointer;transition:.15s}
+.kb-up:hover,.kb-up.drag{border-color:var(--brand,var(--ink));color:var(--ink-2,#555);background:var(--bg,var(--line2))}
 .kb-up svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:1.5;margin-bottom:6px}
 .kb-up b{color:var(--btn-blue,var(--accent))}
 .kb-up .kb-up-types{font-size:11px;color:var(--ink-3,#999);margin-top:4px}
-.kb-doc-list{background:var(--card,var(--card));border:1px solid var(--line,#e8e8e3);border-radius:12px;overflow:hidden;min-height:80px}
-.kb-doc-row{display:flex;align-items:center;gap:13px;padding:13px 16px;border-bottom:1px solid var(--line,#e8e8e3)}
+.kb-doc-list{background:var(--card,var(--card));border:1px solid var(--line,var(--line));border-radius:12px;overflow:hidden;min-height:80px}
+.kb-doc-row{display:flex;align-items:center;gap:13px;padding:13px 16px;border-bottom:1px solid var(--line,var(--line))}
 .kb-doc-row:last-child{border-bottom:none}
-.kb-doc-ic{width:34px;height:34px;border-radius:8px;background:var(--bg,#f4f4f0);display:grid;place-items:center;flex-shrink:0;color:var(--ink-2,#555)}
+.kb-doc-ic{width:34px;height:34px;border-radius:8px;background:var(--bg,var(--line2));display:grid;place-items:center;flex-shrink:0;color:var(--ink-2,#555)}
 .kb-doc-ic svg{width:17px;height:17px}
 .kb-doc-meta{flex:1;min-width:0}
 .kb-doc-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

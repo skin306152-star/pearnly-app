@@ -67,7 +67,7 @@
 }
 .log-detail-collapsible > summary {
     padding: 8px 12px;
-    background: var(--gray-100);
+    background: var(--line2);
     border-radius: 6px;
     cursor: pointer;
     font-size: 12px;
@@ -87,7 +87,7 @@
     transform: rotate(90deg);
 }
 .log-detail-collapsible > summary:hover {
-    background: var(--gray-200);
+    background: var(--line);
     color: var(--ink);
 }
 
@@ -150,14 +150,14 @@ button.history-missing-amount-btn {
 .archive-palette-btn.amount  { color: var(--emerald-800); }
 .archive-palette-btn.invoice { color: var(--c-9f1239); }
 .archive-palette-btn.buyer   { color: var(--violet-800); }
-.archive-palette-btn.sep     { color: var(--gray-500); }
+.archive-palette-btn.sep     { color: var(--ink2); }
 .archive-palette-btn.date:hover    { background: var(--blue-100); border-color: var(--line); }
 .archive-palette-btn.seller:hover  { background: var(--indigo-100); border-color: var(--indigo-200); }
 .archive-palette-btn.category:hover{ background: var(--warn-bg); border-color: var(--amber-300); }
 .archive-palette-btn.amount:hover  { background: var(--emerald-100); border-color: var(--emerald-200); }
 .archive-palette-btn.invoice:hover { background: var(--pink-100); border-color: var(--pink-200); }
 .archive-palette-btn.buyer:hover   { background: var(--violet-100); border-color: var(--violet-200); }
-.archive-palette-btn.sep:hover     { background: var(--gray-100); }
+.archive-palette-btn.sep:hover     { background: var(--line2); }
 
 /* 升级窗卖点 banner */
 .plan-selling-point {
@@ -209,7 +209,7 @@ button.history-missing-amount-btn {
 
 .diagnose-json {
     background: var(--slate-900);
-    color: var(--slate-200);
+    color: var(--line);
     border: none;
     border-radius: 8px;
     padding: 16px 18px;
@@ -267,8 +267,8 @@ button.history-missing-amount-btn {
     height: 20px;
     border-radius: 50%;
     border: none;
-    background: var(--gray-200);
-    color: var(--gray-500);
+    background: var(--line);
+    color: var(--ink2);
     cursor: pointer;
     font-size: 10px;
     line-height: 1;
@@ -279,7 +279,7 @@ button.history-missing-amount-btn {
     transition: background 0.15s;
 }
 .search-wrap .search-clear:hover {
-    background: var(--gray-300);
+    background: var(--ink-4);
     color: var(--ink);
 }
 .search-matches {

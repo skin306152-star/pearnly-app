@@ -47,7 +47,7 @@
     padding: 20px;
 }
 .ws-modal-box {
-    background: #fff;
+    background: var(--card);
     border-radius: 12px;
     width: 100%;
     max-width: 420px;
@@ -99,7 +99,7 @@
     font-size: 13px;
     border: 1px solid var(--line);
     border-radius: 8px;
-    background: #fff;
+    background: var(--card);
     color: var(--ink, #111);
     cursor: pointer;
 }
@@ -231,7 +231,7 @@
     left: 0;
     top: calc(100% + 6px);
     width: 280px;
-    background: #fff;
+    background: var(--card);
     border: 1px solid var(--line);
     border-radius: 10px;
     box-shadow: var(--shadow-lg);
@@ -272,7 +272,7 @@
     outline: none;
 }
 .cs-search-input:focus {
-    background: #fff;
+    background: var(--card);
     border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(17,17,17,0.12);
 }
@@ -315,7 +315,7 @@
 .cs-item-chip.cs-chip-all {
     background: var(--ink);  /* v118.33.7.9 · 蓝色渐变 → 纯黑 · 跟 active 统一 */
 }
-.cs-item-chip-icon { width: 13px; height: 13px; color: #fff; }
+.cs-item-chip-icon { width: 13px; height: 13px; color: var(--card); }
 .cs-item-text {
     flex: 1 1 auto;
     min-width: 0;
@@ -374,7 +374,7 @@
 .dropdown { position: relative; }
 .dd-btn {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 10px; background: #fff;
+    padding: 6px 10px; background: var(--card);
     border: 1px solid var(--line); border-radius: 7px;
     font-size: 13px; color: var(--ink-2);
     cursor: pointer; transition: all 120ms;
@@ -386,7 +386,7 @@
 .dd-menu {
     display: none;
     position: absolute; right: 0; top: calc(100% + 6px);
-    background: #fff; border: 1px solid var(--line);
+    background: var(--card); border: 1px solid var(--line);
     border-radius: 8px; box-shadow: var(--shadow);
     min-width: 150px; padding: 5px; z-index: 100;
     animation: ddIn 150ms ease;

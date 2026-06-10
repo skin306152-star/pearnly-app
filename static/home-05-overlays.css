@@ -9,7 +9,7 @@
 .drawer {
     position: fixed; top: 0; right: 0; height: 100vh;
     width: 480px; max-width: 92vw;
-    background: #fff; box-shadow: -8px 0 32px rgba(0,0,0,0.12);
+    background: var(--card); box-shadow: -8px 0 32px rgba(0,0,0,0.12);
     z-index: 999; transform: translateX(100%);
     transition: transform 250ms cubic-bezier(.22,.61,.36,1);
     display: flex; flex-direction: column;
@@ -81,7 +81,7 @@
 .drawer-field input, .drawer-field textarea {
     width: 100%; padding: 8px 10px; font-size: 13px; color: var(--ink);
     border: 1px solid var(--line); border-radius: 6px;
-    background: #fff; font-family: inherit; outline: none;
+    background: var(--card); font-family: inherit; outline: none;
     transition: all 120ms; resize: none;
 }
 .drawer-field input:focus, .drawer-field textarea:focus {
@@ -153,7 +153,7 @@ details.raw-text pre {
 }
 .modal-mask.show { display: flex; }
 .modal {
-    background: #fff; border-radius: 12px;
+    background: var(--card); border-radius: 12px;
     box-shadow: var(--shadow-lg);
     width: 100%;
     overflow: hidden;
@@ -272,7 +272,7 @@ a.contact-item:hover { background: var(--bg-hover); }
 .contact-icon.phone { background: var(--c-718096); }
 .contact-icon.line { background: var(--line-color); }
 .contact-icon.email { background: var(--amber-500); }
-.contact-icon.address { background: var(--slate-400); }
+.contact-icon.address { background: var(--ink3); }
 .contact-icon svg { width: 14px; height: 14px; }
 .contact-text { min-width: 0; }
 .contact-label { font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.05em; }
@@ -312,7 +312,7 @@ a.contact-item:hover { background: var(--bg-hover); }
     position: fixed; bottom: 20px; left: 50%;
     transform: translateX(-50%);
     padding: 10px 20px; background: var(--ink);
-    color: #fff; border-radius: 8px;
+    color: var(--card); border-radius: 8px;
     font-size: 13px; font-weight: 500;
     box-shadow: var(--shadow-lg);
     display: none; z-index: 2000;

@@ -15,7 +15,7 @@
 }
 .topup-v2-ov[style*="flex"] { display: flex; }
 .topup-v2-box {
-    background: #fff;
+    background: var(--card);
     border-radius: 16px;
     width: min(480px, 94vw);
     max-height: 90vh;
@@ -34,7 +34,7 @@
     color: var(--ink-3); border-radius: 6px; line-height: 0;
     transition: background .15s;
 }
-.topup-v2-close:hover { background: var(--gray-100); }
+.topup-v2-close:hover { background: var(--line2); }
 .topup-v2-steps {
     display: flex; align-items: center; padding: 16px 22px 0; flex-shrink: 0;
 }
@@ -43,12 +43,12 @@
 }
 .topup-v2-dot {
     width: 26px; height: 26px; border-radius: 50%;
-    background: var(--line); color: var(--gray-400);
+    background: var(--line); color: var(--ink3);
     display: flex; align-items: center; justify-content: center;
     font-size: 12px; font-weight: 600; transition: all .2s;
 }
 .topup-v2-step.active .topup-v2-dot { background: var(--brand, #111); color: #fff; }
-.topup-v2-slabel { font-size: 11px; color: var(--gray-400); white-space: nowrap; }
+.topup-v2-slabel { font-size: 11px; color: var(--ink3); white-space: nowrap; }
 .topup-v2-step.active .topup-v2-slabel { color: var(--brand, #111); }
 .topup-v2-line { flex: 1; height: 1px; background: var(--line); margin: 0 6px 18px; }
 .topup-v2-body { padding: 16px 22px; flex: 1; overflow-y: auto; }
@@ -61,7 +61,7 @@
     width: 100%; box-sizing: border-box;
     padding: 9px 11px; border: 1px solid var(--line);
     border-radius: 8px; font-size: 14px; font-family: inherit;
-    background: #fff; color: var(--ink); transition: border-color .15s;
+    background: var(--card); color: var(--ink); transition: border-color .15s;
 }
 .topup-v2-input:focus { outline: none; border-color: var(--brand, #111); }
 .topup-v2-qamts {
@@ -69,7 +69,7 @@
 }
 .topup-v2-qamt {
     padding: 8px 4px; border: 1px solid var(--line);
-    border-radius: 8px; background: #fff; cursor: pointer;
+    border-radius: 8px; background: var(--card); cursor: pointer;
     font-size: 13px; font-weight: 500; color: var(--ink);
     transition: all .15s;
 }
@@ -86,7 +86,7 @@
 }
 .topup-v2-bank-label { font-size: 12px; color: var(--ink-3); margin: 0 0 10px; }
 .topup-v2-bank-card {
-    background: var(--slate-50); border: 1px solid var(--line);
+    background: var(--bg); border: 1px solid var(--line);
     border-radius: 12px; padding: 16px; margin-bottom: 12px;
 }
 .topup-v2-bank-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
@@ -94,11 +94,11 @@
 .topup-v2-bank-acct { font-size: 22px; font-weight: 700; letter-spacing: .05em; margin-bottom: 2px; }
 .topup-v2-bank-holder { font-size: 12px; color: var(--ink-3); margin-bottom: 12px; }
 .topup-v2-copy {
-    border: 1px solid var(--line); background: #fff;
+    border: 1px solid var(--line); background: var(--card);
     border-radius: 7px; padding: 6px 14px; font-size: 12px;
     cursor: pointer; transition: all .15s; color: var(--ink);
 }
-.topup-v2-copy:hover { background: var(--gray-100); }
+.topup-v2-copy:hover { background: var(--line2); }
 .topup-v2-warn {
     background: var(--amber-50); border: 1px solid var(--amber-200); border-radius: 8px;
     padding: 10px 13px; font-size: 12px; color: var(--amber-800); line-height: 1.5;
@@ -111,7 +111,7 @@
     align-items: center; gap: 8px;
 }
 .topup-v2-drop:hover, .topup-v2-drop.drag-over {
-    border-color: var(--brand, #111); background: var(--gray-50);
+    border-color: var(--brand, #111); background: var(--bg);
 }
 .topup-v2-drop.has-file { border-color: var(--emerald-500); background: var(--green-50); color: var(--emerald-800); }
 .topup-v2-drop-text { font-size: 13px; }

@@ -155,7 +155,7 @@
     display: flex;
     gap: 8px;
     padding: 14px 20px;
-    background: var(--c-fafaf8);
+    background: var(--bg);
     border-top: 1px solid var(--line);
     justify-content: flex-end;
 }

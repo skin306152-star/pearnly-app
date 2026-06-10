@@ -472,19 +472,19 @@
 .add-emp-head {
     display: flex; align-items: center; justify-content: space-between;
     padding: 16px 20px;
-    border-bottom: 1px solid var(--slate-100);
+    border-bottom: 1px solid var(--line2);
 }
-.add-emp-title { font-size: 16px; font-weight: 600; color: var(--slate-900); }
+.add-emp-title { font-size: 16px; font-weight: 600; color: var(--ink); }
 .add-emp-close {
     width: 30px; height: 30px;
     background: transparent;
     border: none;
-    color: var(--slate-500);
+    color: var(--ink2);
     cursor: pointer;
     border-radius: 6px;
     display: flex; align-items: center; justify-content: center;
 }
-.add-emp-close:hover { background: var(--slate-100); color: var(--slate-900); }
+.add-emp-close:hover { background: var(--line2); color: var(--ink); }
 .add-emp-close svg { width: 14px; height: 14px; }
 .add-emp-body { padding: 20px; }
 .add-emp-field { margin-bottom: 16px; }
@@ -492,13 +492,13 @@
     display: block;
     font-size: 13px;
     font-weight: 500;
-    color: var(--slate-600);
+    color: var(--ink2);
     margin-bottom: 6px;
 }
 .add-emp-input {
     width: 100%;
     padding: 10px 12px;
-    border: 1px solid var(--slate-200);
+    border: 1px solid var(--line);
     border-radius: 8px;
     font-size: 14px;
     font-family: inherit;
@@ -506,13 +506,13 @@
     box-sizing: border-box;
 }
 .add-emp-input:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.1); }
-.add-emp-hint { font-size: 12px; color: var(--slate-400); margin-top: 4px; }
+.add-emp-hint { font-size: 12px; color: var(--ink3); margin-top: 4px; }
 .add-emp-msg { font-size: 13px; min-height: 20px; color: var(--emerald-500); }
 .add-emp-msg.error { color: var(--red-500); }
 .add-emp-foot {
     display: flex; justify-content: flex-end; gap: 8px;
     padding: 14px 20px;
-    border-top: 1px solid var(--slate-100);
+    border-top: 1px solid var(--line2);
     background: var(--bg);
 }
 .settings-prefs-inline {

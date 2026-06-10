@@ -2,10 +2,10 @@
    v118.29.0 · 操作日志表 + 分页器 + CSV 导出
    ============================================================ */
 .adm-logs-table {
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--line);
     border-radius: 8px;
     overflow: hidden;
-    background: #fff;
+    background: var(--card);
 }
 .adm-logs-table .adm-log-row {
     display: grid;
@@ -14,16 +14,16 @@
     padding: 10px 12px;
     align-items: center;
     font-size: 13px;
-    border-bottom: 1px solid var(--slate-100);
+    border-bottom: 1px solid var(--line2);
 }
 .adm-logs-table .adm-log-head {
     background: var(--bg);
     font-weight: 600;
-    color: var(--slate-600);
+    color: var(--ink2);
 }
 .adm-logs-table .adm-log-row:last-child { border-bottom: none; }
-.adm-logs-table .adm-log-time { font-family: 'Courier New', monospace; font-size: 12px; color: var(--slate-600); }
-.adm-logs-table .adm-log-actor { font-weight: 500; color: var(--slate-900); }
+.adm-logs-table .adm-log-time { font-family: 'Courier New', monospace; font-size: 12px; color: var(--ink2); }
+.adm-logs-table .adm-log-actor { font-weight: 500; color: var(--ink); }
 .adm-logs-table .adm-log-action {
     display: inline-block;
     padding: 2px 8px;
@@ -33,9 +33,9 @@
     font-size: 12px;
     font-weight: 500;
 }
-.adm-logs-table .adm-log-target { color: var(--slate-600); word-break: break-all; }
-.adm-logs-table .adm-log-ip { font-family: 'Courier New', monospace; font-size: 12px; color: var(--slate-400); }
-.adm-logs-table .adm-log-empty { padding: 32px 16px; text-align: center; color: var(--slate-400); font-size: 13px; }
+.adm-logs-table .adm-log-target { color: var(--ink2); word-break: break-all; }
+.adm-logs-table .adm-log-ip { font-family: 'Courier New', monospace; font-size: 12px; color: var(--ink3); }
+.adm-logs-table .adm-log-empty { padding: 32px 16px; text-align: center; color: var(--ink3); font-size: 13px; }
 
 .adm-pager {
     display: flex;
@@ -44,25 +44,25 @@
     padding: 12px 4px;
     margin-top: 8px;
     font-size: 13px;
-    color: var(--slate-500);
+    color: var(--ink2);
     flex-wrap: wrap;
     gap: 10px;
 }
-.adm-pager-info { color: var(--slate-500); }
+.adm-pager-info { color: var(--ink2); }
 .adm-pager-ctrl { display: flex; gap: 6px; align-items: center; }
 .adm-pager-btn {
     padding: 6px 12px;
-    border: 1px solid var(--gray-200);
-    background: #fff;
+    border: 1px solid var(--line);
+    background: var(--card);
     border-radius: 6px;
     cursor: pointer;
     font-size: 13px;
-    color: var(--slate-600);
+    color: var(--ink2);
     transition: all 0.15s;
 }
 .adm-pager-btn:hover:not(:disabled) {
     background: var(--bg);
-    border-color: var(--slate-300);
+    border-color: var(--ink-4);
 }
 .adm-pager-btn:disabled {
     opacity: 0.4;
@@ -71,7 +71,7 @@
 .adm-pager-page {
     padding: 0 10px;
     font-weight: 500;
-    color: var(--slate-900);
+    color: var(--ink);
 }
 
 /* 移动端 logs 表竖排 */
@@ -88,7 +88,7 @@
     .adm-logs-table .adm-log-row > div::before {
         content: attr(data-label);
         font-size: 11px;
-        color: var(--slate-400);
+        color: var(--ink3);
         font-weight: 500;
         margin-right: 6px;
         text-transform: uppercase;
@@ -110,10 +110,10 @@
 }
 .access-log-toolbar .form-input { flex: 1 1 200px; max-width: 320px; }
 .access-log-table {
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--line);
     border-radius: 8px;
     overflow: hidden;
-    background: #fff;
+    background: var(--card);
 }
 .access-log-row {
     display: grid;
@@ -122,19 +122,19 @@
     padding: 12px 14px;
     align-items: center;
     font-size: 13px;
-    border-bottom: 1px solid var(--slate-100);
+    border-bottom: 1px solid var(--line2);
 }
 .access-log-head {
     background: var(--bg);
     font-weight: 600;
-    color: var(--slate-600);
+    color: var(--ink2);
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.3px;
 }
 .access-log-row:last-child { border-bottom: none; }
-.access-log-time { font-family: 'Courier New', monospace; font-size: 12px; color: var(--slate-600); }
-.access-log-actor { font-weight: 500; color: var(--slate-900); display: inline-flex; align-items: center; gap: 4px; }
+.access-log-time { font-family: 'Courier New', monospace; font-size: 12px; color: var(--ink2); }
+.access-log-actor { font-weight: 500; color: var(--ink); display: inline-flex; align-items: center; gap: 4px; }
 .access-log-actor::before {
     content: "";
     width: 6px;
@@ -152,9 +152,9 @@
     font-size: 12px;
     font-weight: 500;
 }
-.access-log-target { color: var(--slate-600); word-break: break-all; }
-.access-log-ip { font-family: 'Courier New', monospace; font-size: 12px; color: var(--slate-400); }
-.access-log-empty { padding: 32px 16px; text-align: center; color: var(--slate-400); font-size: 13px; }
+.access-log-target { color: var(--ink2); word-break: break-all; }
+.access-log-ip { font-family: 'Courier New', monospace; font-size: 12px; color: var(--ink3); }
+.access-log-empty { padding: 32px 16px; text-align: center; color: var(--ink3); font-size: 13px; }
 
 .access-log-pager {
     display: flex;
@@ -163,25 +163,25 @@
     padding: 12px 4px;
     margin-top: 8px;
     font-size: 13px;
-    color: var(--slate-500);
+    color: var(--ink2);
     flex-wrap: wrap;
     gap: 10px;
 }
-.access-log-pager-info { color: var(--slate-500); }
+.access-log-pager-info { color: var(--ink2); }
 .access-log-pager-ctrl { display: flex; gap: 6px; align-items: center; }
 .access-log-pager-btn {
     padding: 6px 12px;
-    border: 1px solid var(--gray-200);
-    background: #fff;
+    border: 1px solid var(--line);
+    background: var(--card);
     border-radius: 6px;
     cursor: pointer;
     font-size: 13px;
-    color: var(--slate-600);
+    color: var(--ink2);
     transition: all 0.15s;
 }
 .access-log-pager-btn:hover:not(:disabled) {
     background: var(--bg);
-    border-color: var(--slate-300);
+    border-color: var(--ink-4);
 }
 .access-log-pager-btn:disabled {
     opacity: 0.4;
@@ -190,7 +190,7 @@
 .access-log-pager-page {
     padding: 0 10px;
     font-weight: 500;
-    color: var(--slate-900);
+    color: var(--ink);
 }
 
 @media (max-width: 768px) {
@@ -203,7 +203,7 @@
     .access-log-row > div::before {
         content: attr(data-label);
         font-size: 11px;
-        color: var(--slate-400);
+        color: var(--ink3);
         font-weight: 500;
         margin-right: 6px;
         text-transform: uppercase;

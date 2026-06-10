@@ -262,7 +262,7 @@
             '<span class="ws-modal-item-name">' +
             _esc(_t('ws-personal', '个人事务')) +
             '</span>' +
-            '<span class="ws-modal-item-desc" style="font-size:11px;color:#6b7280;font-weight:400;margin-top:2px;line-height:1.35;white-space:normal;">' +
+            '<span class="ws-modal-item-desc" style="font-size:11px;color:var(--ink2);font-weight:400;margin-top:2px;line-height:1.35;white-space:normal;">' +
             _esc(_t('ws-personal-desc', '用于临时识别、测试或处理不归属任何公司的文件。')) +
             '</span>' +
             '</span>' +
@@ -309,7 +309,7 @@
                 : '';
         // 弹层只为「选择」· 新增账套主体到「客户管理」做(Zihao 2026-06-06)。
         const createHtml =
-            '<div class="ws-modal-hint" style="font-size:12px;color:#6b7280;padding:10px 4px 2px;line-height:1.5;white-space:normal;">' +
+            '<div class="ws-modal-hint" style="font-size:12px;color:var(--ink2);padding:10px 4px 2px;line-height:1.5;white-space:normal;">' +
             _esc(_t('ws-add-hint', '如需新增账套主体,请前往「客户管理」添加')) +
             '</div>';
 
@@ -322,7 +322,7 @@
             '<button type="button" class="ws-modal-close" data-ws-close="1" aria-label="close">✕</button>' +
             '</div>' +
             // B1 (P3) · 副标题点明:工作空间 = 你的公司(发票卖方)· 跟"买方客户"对称
-            '<div class="ws-modal-subtitle" style="font-size:12px;color:#6b7280;padding:2px 4px 12px;line-height:1.45;white-space:normal;">' +
+            '<div class="ws-modal-subtitle" style="font-size:12px;color:var(--ink2);padding:2px 4px 12px;line-height:1.45;white-space:normal;">' +
             _esc(
                 _t(
                     'ws-chooser-subtitle',

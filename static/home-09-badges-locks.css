@@ -64,7 +64,7 @@
     margin-top: 12px;
     font-size: 12px;
     color: var(--ink-3);
-    background: var(--gray-50);
+    background: var(--bg);
     border-radius: 8px;
     text-align: center;
 }
@@ -94,7 +94,7 @@
     transition: all 0.15s;
 }
 .drawer-archive-copy:hover {
-    background: white;
+    background: var(--card);
     transform: scale(1.05);
 }
 .drawer-archive-copy svg {
@@ -116,7 +116,7 @@
 }
 .nav-item.locked-for-plan:hover {
     opacity: 0.75;
-    background: var(--bg-hover, var(--gray-100));
+    background: var(--line2);
 }
 .nav-item.locked-for-plan .nav-label {
     color: var(--ink-3);

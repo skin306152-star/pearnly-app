@@ -113,7 +113,7 @@ function ensureStyle(): void {
     const st = document.createElement('style');
     st.id = 'kb-ask-style';
     st.textContent = `
-.kb-qa{background:var(--card,var(--card));border:1px solid var(--line,#e8e8e3);border-radius:12px;display:flex;flex-direction:column;height:460px;max-width:760px}
+.kb-qa{background:var(--card,var(--card));border:1px solid var(--line,var(--line));border-radius:12px;display:flex;flex-direction:column;height:460px;max-width:760px}
 .kb-qa-thread{flex:1;padding:18px;display:flex;flex-direction:column;gap:16px;overflow:auto}
 .kb-msg{max-width:80%;display:flex;gap:9px}
 .kb-msg.user{align-self:flex-end}
@@ -121,26 +121,26 @@ function ensureStyle(): void {
 .kb-msg.ai{align-self:flex-start}
 .kb-ava{width:28px;height:28px;border-radius:8px;background:var(--amber-weak);flex-shrink:0;display:grid;place-items:center;overflow:hidden}
 .kb-ava img{width:28px;height:28px;object-fit:cover;object-position:center 16%}
-.kb-msg.ai .kb-bub{background:var(--bg,#f4f4f0);border-radius:14px 14px 14px 4px;padding:10px 14px;line-height:1.6}
+.kb-msg.ai .kb-bub{background:var(--bg,var(--line2));border-radius:14px 14px 14px 4px;padding:10px 14px;line-height:1.6}
 .kb-bub.no-src{border-left:3px solid var(--amber);color:var(--ink-2,#555)}
 .kb-bub.kb-thinking{color:var(--ink-3,#999)}
 .kb-cites{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
-.kb-cite{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line,#e8e8e3);border-radius:9px;padding:6px 10px;font-size:12px;font-weight:600;color:var(--info-ink,var(--accent-deep));cursor:pointer}
+.kb-cite{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line,var(--line));border-radius:9px;padding:6px 10px;font-size:12px;font-weight:600;color:var(--info-ink,var(--accent-deep));cursor:pointer}
 .kb-cite:hover{border-color:var(--btn-blue,var(--accent));box-shadow:0 2px 8px rgba(14,124,102,.12)}
 .kb-cite svg{width:13px;height:13px}
 .kb-cite .ch{color:var(--ink-3,#999)}
-.kb-qa-foot{border-top:1px solid var(--line,#e8e8e3);padding:0}
+.kb-qa-foot{border-top:1px solid var(--line,var(--line));padding:0}
 .kb-qa-ex{display:flex;flex-wrap:wrap;gap:7px;padding:11px 14px 0}
-.kb-chip{background:var(--card);border:1px solid var(--line,#e8e8e3);border-radius:18px;padding:5px 11px;font-size:12px;color:var(--ink-2,#555);cursor:pointer}
+.kb-chip{background:var(--card);border:1px solid var(--line,var(--line));border-radius:18px;padding:5px 11px;font-size:12px;color:var(--ink-2,#555);cursor:pointer}
 .kb-chip:hover{border-color:var(--btn-blue,var(--accent));color:var(--btn-blue,var(--accent))}
 .kb-qa-input{display:flex;gap:9px;align-items:center;padding:12px 14px}
-.kb-qa-input input{flex:1;border:1px solid var(--line,#e8e8e3);border-radius:9px;padding:9px 13px;font-size:13px;font-family:inherit;background:var(--bg,#f4f4f0)}
+.kb-qa-input input{flex:1;border:1px solid var(--line,var(--line));border-radius:9px;padding:9px 13px;font-size:13px;font-family:inherit;background:var(--bg,var(--line2))}
 .kb-qa-input input:focus{outline:none;border-color:var(--btn-blue,var(--accent));background:var(--card)}
 .kb-send{width:38px;height:38px;border-radius:9px;background:var(--btn-blue,var(--accent));color:var(--card);display:grid;place-items:center;flex-shrink:0;border:none;cursor:pointer}
 .kb-send:hover{background:var(--accent-deep)}
 .kb-send svg{width:17px;height:17px;stroke:var(--card);fill:none;stroke-width:2}
 .kb-qa-hint{font-size:12px;color:var(--ink-3,#999);margin-top:12px;max-width:760px;line-height:1.6}
-.kb-ft{display:flex;align-items:center;gap:13px;background:var(--card,var(--card));border:1px solid var(--line,#e8e8e3);border-radius:12px;padding:13px 16px;margin-bottom:16px;max-width:760px}
+.kb-ft{display:flex;align-items:center;gap:13px;background:var(--card,var(--card));border:1px solid var(--line,var(--line));border-radius:12px;padding:13px 16px;margin-bottom:16px;max-width:760px}
 .kb-ft .ft-cat{width:38px;height:38px;border-radius:10px;background:var(--amber-weak);display:grid;place-items:center;overflow:hidden;flex-shrink:0}
 .kb-ft .ft-cat img{width:34px;height:34px;object-fit:cover;object-position:center 16%}
 .kb-ft .ft-txt{flex:1}

@@ -171,7 +171,7 @@
     display: block;
     font-size: 12px;
     margin-bottom: 5px;
-    color: #374151;
+    color: var(--ink);
 }
 .sw-req {
     color: var(--red-700);
@@ -291,7 +291,7 @@
     font-size: 12px;
     cursor: pointer;
     background: var(--card);
-    color: #374151;
+    color: var(--ink);
 }
 .sw-chip:hover {
     border-color: var(--btn-blue);
@@ -600,7 +600,7 @@
     background: var(--card);
     padding: 24px;
     font-size: 12px;
-    color: #111;
+    color: var(--ink);
     position: relative;
 }
 .sw-copybadge {
@@ -646,7 +646,7 @@
 .sw-ptitle {
     font-weight: 700;
     font-size: 11px;
-    color: #374151;
+    color: var(--ink);
     margin-bottom: 5px;
 }
 .sw-pname {

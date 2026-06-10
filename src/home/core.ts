@@ -142,17 +142,17 @@ function _showSessionRevokedModal() {
     overlay.style.cssText =
         'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px;';
     overlay.innerHTML =
-        '<div style="background:#fff;border-radius:14px;padding:32px 24px 24px;max-width:360px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.2);text-align:center;">' +
+        '<div style="background:var(--card);border-radius:14px;padding:32px 24px 24px;max-width:360px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.2);text-align:center;">' +
         '<div style="width:52px;height:52px;border-radius:50%;background:#FEF2F2;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;flex-shrink:0;">' +
         '<svg width="26" height="26" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="#DC2626"/></svg>' +
         '</div>' +
-        '<div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:10px;line-height:1.4;">' +
+        '<div style="font-size:16px;font-weight:700;color:var(--ink);margin-bottom:10px;line-height:1.4;">' +
         titles[lang as keyof typeof titles] +
         '</div>' +
         '<div style="font-size:13px;color:#6B7280;line-height:1.7;margin-bottom:24px;white-space:pre-line;">' +
         bodies[lang as keyof typeof bodies] +
         '</div>' +
-        '<button id="pn-srm-ok" style="width:100%;padding:11px 0;background:#111111;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">' +
+        '<button id="pn-srm-ok" style="width:100%;padding:11px 0;background:var(--btn-blue);color:var(--accent-ink);border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">' +
         okLabels[lang as keyof typeof okLabels] +
         '</button>' +
         '</div>';

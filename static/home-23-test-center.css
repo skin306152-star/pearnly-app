@@ -46,7 +46,7 @@
     font-size: 13px;
     font-weight: 600;
     color: var(--ink);
-    background: #fff;
+    background: var(--card);
     cursor: pointer;
     transition: all 120ms;
     font-family: inherit;
@@ -168,7 +168,7 @@
     width: 28px; height: 28px;
     border: 1px solid var(--line);
     border-radius: 6px;
-    background: #fff;
+    background: var(--card);
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -205,7 +205,7 @@
 }
 .tc-filter-chip:hover { color: var(--ink); }
 .tc-filter-chip.active {
-    background: #fff;
+    background: var(--card);
     color: var(--brand);
     font-weight: 600;
     box-shadow: var(--shadow-sm);
@@ -312,7 +312,7 @@
     padding: 14px;
     border: 1px solid var(--line);
     border-radius: 8px;
-    background: #fff;
+    background: var(--card);
     cursor: pointer;
     text-align: left;
     transition: all 150ms;
@@ -385,7 +385,7 @@
     padding: 14px 16px;
     border: 1.5px solid var(--line);
     border-radius: 8px;
-    background: #fff;
+    background: var(--card);
     cursor: pointer;
     text-align: left;
     transition: all 150ms;

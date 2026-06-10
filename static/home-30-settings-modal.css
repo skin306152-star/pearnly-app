@@ -140,7 +140,7 @@ body.settings-modal-open { overflow: hidden; }
 }
 .cpw-input:focus {
     outline: none;
-    border-color: #111111;
+    border-color: var(--ink);
     box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.12);
 }
 .cpw-eye {
@@ -198,14 +198,14 @@ body.settings-modal-open { overflow: hidden; }
 .cpw-forgot-link {
     background: transparent;
     border: none;
-    color: #111111;
+    color: var(--ink);
     font-size: 12px;
     cursor: pointer;
     padding: 0;
     text-decoration: underline;
     text-underline-offset: 2px;
 }
-.cpw-forgot-link:hover { color: #111111; }
+.cpw-forgot-link:hover { color: var(--ink); }
 /* 忘记密码 modal · z-index 10000 高于 settings-modal-overlay(9998) */
 .cpw-forgot-overlay {
     position: fixed; inset: 0;
@@ -232,7 +232,7 @@ body.settings-modal-open { overflow: hidden; }
 .cpw-forgot-title {
     font-size: 17px;
     font-weight: 600;
-    color: #0f172a;
+    color: var(--ink);
 }
 .cpw-forgot-close {
     width: 28px; height: 28px;
@@ -242,7 +242,7 @@ body.settings-modal-open { overflow: hidden; }
     color: #64748b;
     display: flex; align-items: center; justify-content: center;
 }
-.cpw-forgot-close:hover { background: #f1f5f9; color: #0f172a; }
+.cpw-forgot-close:hover { background: #f1f5f9; color: var(--ink); }
 .cpw-forgot-close svg { width: 14px; height: 14px; }
 .cpw-forgot-body { padding: 16px 24px 8px; }
 .cpw-forgot-desc {
@@ -257,7 +257,7 @@ body.settings-modal-open { overflow: hidden; }
     padding: 10px 14px;
     font-family: 'Courier New', monospace;
     font-size: 14px;
-    color: #0f172a;
+    color: var(--ink);
     margin-bottom: 12px;
 }
 .cpw-forgot-tip {
@@ -619,7 +619,7 @@ body.settings-modal-open { overflow: hidden; }
 .vex-files-count {
     display: inline-flex; align-items: center; justify-content: center;
     min-width: 22px; padding: 1px 8px; border-radius: 99px;
-    background: var(--ink); color: #fff; font-size: 11px; font-weight: 600;
+    background: var(--ink); color: var(--card); font-size: 11px; font-weight: 600;
 }
 .vex-files-list { max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 .vex-fi-empty { padding: 14px; color: var(--ink3); font-size: 12px; text-align: center; }

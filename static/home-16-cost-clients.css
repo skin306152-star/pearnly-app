@@ -19,8 +19,8 @@
     margin: 24px 0 32px;
 }
 .cost-kpi-card {
-    background: #fff;
-    border: 1px solid var(--border, var(--gray-200));
+    background: var(--card);
+    border: 1px solid var(--line);
     border-radius: 12px;
     padding: 18px 20px;
     transition: box-shadow 0.15s, transform 0.15s;
@@ -82,8 +82,8 @@
 
 /* Section 通用 */
 .cost-section {
-    background: #fff;
-    border: 1px solid var(--border, var(--gray-200));
+    background: var(--card);
+    border: 1px solid var(--line);
     border-radius: 12px;
     padding: 20px 24px;
     margin-bottom: 24px;
@@ -129,7 +129,7 @@
 }
 .cost-trend-chart .trend-bar:hover { opacity: 1; }
 .cost-trend-chart .trend-axis {
-    stroke: var(--gray-300);
+    stroke: var(--ink-4);
     stroke-width: 1;
 }
 .cost-trend-chart .trend-label {
@@ -156,19 +156,19 @@
 .cost-table th {
     text-align: left;
     padding: 10px 12px;
-    background: var(--gray-50);
+    background: var(--bg);
     color: var(--ink-3);
     font-weight: 600;
-    border-bottom: 1px solid var(--border, var(--gray-200));
+    border-bottom: 1px solid var(--line);
     white-space: nowrap;
 }
 .cost-table td {
     padding: 12px;
-    border-bottom: 1px solid var(--gray-100);
+    border-bottom: 1px solid var(--line2);
     color: var(--ink);
     white-space: nowrap;
 }
-.cost-table tbody tr:hover { background: var(--c-fafaf8); }
+.cost-table tbody tr:hover { background: var(--bg); }
 .cost-table-empty {
     text-align: center;
     color: var(--ink-3);
@@ -218,8 +218,8 @@
     font-size: 14px;
 }
 .client-card {
-    background: #fff;
-    border: 1px solid var(--border, var(--gray-200));
+    background: var(--card);
+    border: 1px solid var(--line);
     border-radius: 12px;
     padding: 20px;
     cursor: pointer;
@@ -265,7 +265,7 @@
     gap: 12px;
     margin: 14px 0;
     padding: 12px;
-    background: var(--gray-50);
+    background: var(--bg);
     border-radius: 8px;
 }
 .client-card-stat-label {
@@ -288,8 +288,8 @@
     flex: 1;
     padding: 6px 12px;
     font-size: 12px;
-    background: #fff;
-    border: 1px solid var(--border, var(--gray-200));
+    background: var(--card);
+    border: 1px solid var(--line);
     border-radius: 6px;
     color: var(--ink-2);
     cursor: pointer;
@@ -300,7 +300,7 @@
     transition: all 0.12s;
 }
 .client-card-btn:hover {
-    background: var(--gray-100);
+    background: var(--line2);
     border-color: var(--client-color, var(--ink));
     color: var(--client-color, var(--ink));
 }
@@ -310,7 +310,7 @@
     text-align: center;
     padding: 80px 20px;
     color: var(--ink-3);
-    border: 2px dashed var(--border, var(--gray-200));
+    border: 2px dashed var(--line);
     border-radius: 12px;
 }
 .client-card-empty-icon {
@@ -334,7 +334,7 @@
 }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 .modal {
-    background: #fff;
+    background: var(--card);
     border-radius: 12px;
     width: 90%;
     max-width: 520px;
@@ -350,7 +350,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 18px 22px;
-    border-bottom: 1px solid var(--border, var(--gray-200));
+    border-bottom: 1px solid var(--line);
 }
 .modal-title {
     font-size: 16px;
@@ -369,7 +369,7 @@
     border-radius: 6px;
     line-height: 1;
 }
-.modal-close:hover { background: var(--gray-100); }
+.modal-close:hover { background: var(--line2); }
 .modal-body {
     padding: 20px 22px;
     overflow-y: auto;
@@ -377,7 +377,7 @@
 }
 .modal-footer {
     padding: 14px 22px;
-    border-top: 1px solid var(--border, var(--gray-200));
+    border-top: 1px solid var(--line);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -398,11 +398,11 @@
 .form-row input, .form-row textarea {
     width: 100%;
     padding: 8px 12px;
-    border: 1px solid var(--border, var(--gray-200));
+    border: 1px solid var(--line);
     border-radius: 6px;
     font-size: 13px;
     color: var(--ink);
-    background: #fff;
+    background: var(--card);
     transition: border-color 0.15s;
     box-sizing: border-box;
     font-family: inherit;
@@ -441,8 +441,8 @@
 
 /* 抽屉里 · 客户卡片 */
 .drawer-client-card {
-    background: var(--gray-50);
-    border: 1px solid var(--border, var(--gray-200));
+    background: var(--bg);
+    border: 1px solid var(--line);
     border-radius: 8px;
     padding: 12px 14px;
     margin-bottom: 12px;
@@ -465,20 +465,20 @@
 .drawer-client-select {
     flex: 1;
     padding: 8px 10px;
-    border: 1px solid var(--border, var(--gray-200));
+    border: 1px solid var(--line);
     border-radius: 6px;
-    background: #fff;
+    background: var(--card);
     font-size: 13px;
     color: var(--ink);
     cursor: pointer;
 }
-.drawer-client-select:disabled { background: var(--gray-100); cursor: not-allowed; }
+.drawer-client-select:disabled { background: var(--line2); cursor: not-allowed; }
 .drawer-client-add {
     width: 34px;
     height: 34px;
     border-radius: 6px;
-    background: #fff;
-    border: 1px solid var(--border, var(--gray-200));
+    background: var(--card);
+    border: 1px solid var(--line);
     color: var(--ink-3);
     cursor: pointer;
     display: inline-flex;
@@ -532,12 +532,12 @@
 .page-head-clean .page-head-text { flex: 1; min-width: 0; }
 .btn-archive-rule {
     display: inline-flex; align-items: center; gap: 6px;
-    background: #fff; border: 1px solid var(--gray-300); color: var(--gray-700);
+    background: var(--card); border: 1px solid var(--ink-4); color: var(--ink);
     padding: 7px 12px; border-radius: 8px; cursor: pointer;
     font-size: 13px; font-weight: 500; white-space: nowrap;
     transition: background 0.15s;
 }
-.btn-archive-rule:hover { background: var(--gray-100); }
+.btn-archive-rule:hover { background: var(--line2); }
 .btn-archive-rule svg { width: 16px; height: 16px; }
 
 /* v117 · modal-lg · 归档规则 modal 用宽版 */

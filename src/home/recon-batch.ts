@@ -83,7 +83,7 @@
         s.textContent =
             // checkbox 列(thead + tbody 共用)
             '.recon-sel-cell{width:36px;text-align:center;padding-left:10px!important;padding-right:6px!important}' +
-            '.recon-sel-cb,.recon-master-cb{cursor:pointer;width:14px;height:14px;accent-color:#111;margin:0;vertical-align:middle}' +
+            '.recon-sel-cb,.recon-master-cb{cursor:pointer;width:14px;height:14px;accent-color:var(--btn-blue);margin:0;vertical-align:middle}' +
             // 时间列防压缩
             'th.recon-time-col,td.recon-time-col{white-space:nowrap}' +
             // Gmail thead 切换:default vs batch 互斥显示
@@ -91,13 +91,13 @@
             'thead.recon-batch-mode tr.recon-thead-default{display:none}' +
             'thead.recon-batch-mode tr.recon-thead-batch{display:table-row}' +
             // batch 行视觉(浅暖灰底 · 同行高 · 内嵌按钮)
-            'tr.recon-thead-batch th{background:#fafaf8;border-bottom:1px solid #e8e8e3;padding:8px 12px}' +
-            'tr.recon-thead-batch .recon-batch-inline{display:flex;align-items:center;gap:10px;font-size:12px;color:#111;font-weight:normal}' +
-            'tr.recon-thead-batch .recon-batch-count-inline{font-weight:600;color:#111;margin-right:4px}' +
+            'tr.recon-thead-batch th{background:var(--bg);border-bottom:1px solid var(--line);padding:8px 12px}' +
+            'tr.recon-thead-batch .recon-batch-inline{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--ink);font-weight:normal}' +
+            'tr.recon-thead-batch .recon-batch-count-inline{font-weight:600;color:var(--ink);margin-right:4px}' +
             'tr.recon-thead-batch .recon-batch-del-inline{background:#dc2626;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px}' +
             'tr.recon-thead-batch .recon-batch-del-inline:hover{background:#b91c1c}' +
-            'tr.recon-thead-batch .recon-batch-clear-inline{background:transparent;border:none;color:#555;cursor:pointer;font-size:12px;font-family:inherit;text-decoration:underline;padding:4px 2px}' +
-            'tr.recon-thead-batch .recon-batch-clear-inline:hover{color:#111}' +
+            'tr.recon-thead-batch .recon-batch-clear-inline{background:transparent;border:none;color:var(--ink-2);cursor:pointer;font-size:12px;font-family:inherit;text-decoration:underline;padding:4px 2px}' +
+            'tr.recon-thead-batch .recon-batch-clear-inline:hover{color:var(--ink)}' +
             // 隐藏老 banner(v5.5.20 残留 · 不再渲染但兼容老 DOM)
             '.recon-batch-bar{display:none!important}';
         document.head.appendChild(s);

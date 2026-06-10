@@ -2,7 +2,7 @@
    v0.6.1 续 · 页头卡片(历史 / 自动化共用)
    ============================================================ */
 .page-head-card {
-    background: #fff;
+    background: var(--card);
     border: 1px solid var(--line);
     border-radius: 10px;
     padding: 14px 18px;
@@ -143,7 +143,7 @@
     gap: 8px;
     padding: 10px 16px;
     font-size: 13px;
-    background: #fff;
+    background: var(--card);
     color: var(--ink);
     border: 1px solid var(--c-d0e5d5);
     border-left: 3px solid var(--green-700);

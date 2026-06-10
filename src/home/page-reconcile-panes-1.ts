@@ -41,7 +41,7 @@ export const RECON_HTML_1 = `
                     </div>
                 </div>
                 <div class="vex-kpi-card">
-                    <div class="vex-kpi-icon-wrap" id="brv2-kpi-diff-icon" style="background:#f3f4f6;color:#6b7280">△</div>
+                    <div class="vex-kpi-icon-wrap" id="brv2-kpi-diff-icon" style="background:#f3f4f6;color:var(--ink2)">△</div>
                     <div>
                         <div class="vex-kpi-val" id="brv2-kpi-diff">—</div>
                         <div class="vex-kpi-lbl" data-i18n="brv2-stat-diff">差额</div>

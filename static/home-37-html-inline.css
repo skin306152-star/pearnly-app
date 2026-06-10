@@ -398,7 +398,7 @@
     gap: 14px;
     padding: 10px 14px 10px 18px;
     background: var(--ink);
-    color: #fff;
+    color: var(--card);
     border-radius: 12px;
     box-shadow: 0 8px 28px rgba(0,0,0,0.28);
     z-index: 900;
@@ -910,7 +910,7 @@
 }
 .bank-upload-sub {
     font-size: 12px;
-    color: var(--slate-600);
+    color: var(--ink2);
     line-height: 1.5;
 }
 .bank-upload-btn {
@@ -1653,7 +1653,7 @@
     padding: 22px 24px 14px;
     border-bottom: 1px solid rgba(15, 23, 42, 0.06);
 }
-.reset-pwd-title { font-size: 16px; font-weight: 600; color: var(--slate-900); }
+.reset-pwd-title { font-size: 16px; font-weight: 600; color: var(--ink); }
 .force-pw-icon {
     width: 40px; height: 40px; border-radius: 10px;
     background: linear-gradient(135deg, var(--warn-bg) 0%, var(--amber-200) 100%);
@@ -1662,8 +1662,8 @@
     margin-bottom: 12px;
 }
 .force-pw-icon svg { width: 22px; height: 22px; }
-.force-pw-title { font-size: 17px; font-weight: 700; color: var(--slate-900); margin-bottom: 4px; }
-.force-pw-sub { font-size: 13px; color: var(--slate-500); line-height: 1.5; }
+.force-pw-title { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+.force-pw-sub { font-size: 13px; color: var(--ink2); line-height: 1.5; }
 
 .reset-pwd-warn {
     padding: 14px 24px;
@@ -1679,14 +1679,14 @@
 }
 .reset-pwd-pwd {
     flex: 1;
-    background: var(--slate-100);
-    border: 1px solid var(--slate-200);
+    background: var(--line2);
+    border: 1px solid var(--line);
     border-radius: 8px;
     padding: 12px 14px;
     font-family: 'SF Mono', Menlo, Consolas, monospace;
     font-size: 16px;
     font-weight: 600;
-    color: var(--slate-900);
+    color: var(--ink);
     letter-spacing: 1px;
     user-select: all;
     word-break: break-all;
@@ -1697,7 +1697,7 @@
     padding: 14px 24px 20px;
     display: flex; justify-content: flex-end; gap: 10px;
     border-top: 1px solid rgba(15, 23, 42, 0.04);
-    background: var(--c-fafbfc);
+    background: var(--bg);
 }
 
 .force-pw-body {
@@ -1708,14 +1708,14 @@
 .force-pw-field label {
     font-size: 12.5px;
     font-weight: 600;
-    color: var(--slate-600);
+    color: var(--ink2);
 }
 .force-pw-input {
     padding: 10px 12px;
-    border: 1px solid var(--slate-300);
+    border: 1px solid var(--ink-4);
     border-radius: 8px;
     font-size: 14px;
-    color: var(--slate-900);
+    color: var(--ink);
     background: var(--card);
     transition: border-color 0.15s, box-shadow 0.15s;
     font-family: inherit;
@@ -1727,7 +1727,7 @@
 }
 .force-pw-msg {
     font-size: 13px;
-    color: var(--slate-500);
+    color: var(--ink2);
     min-height: 18px;
     padding: 4px 0;
 }
@@ -1742,7 +1742,7 @@
     display: flex;
     gap: 4px;
     padding: 4px;
-    background: var(--slate-100);
+    background: var(--line2);
     border-radius: 10px;
     margin-bottom: 16px;
     width: fit-content;
@@ -1754,11 +1754,11 @@
     border-radius: 7px;
     font-size: 13.5px;
     font-weight: 500;
-    color: var(--slate-500);
+    color: var(--ink2);
     cursor: pointer;
     transition: all 0.15s;
 }
-.adm-tab:hover { color: var(--slate-900); }
+.adm-tab:hover { color: var(--ink); }
 .adm-tab.active {
     background: var(--card);
     color: var(--ink);
@@ -1768,7 +1768,7 @@
 
 .adm-employees-table {
     background: var(--card);
-    border: 1px solid var(--slate-200);
+    border: 1px solid var(--line);
     border-radius: 10px;
     overflow: hidden;
 }
@@ -1778,20 +1778,20 @@
     gap: 12px;
     padding: 14px 18px;
     align-items: center;
-    border-bottom: 1px solid var(--slate-100);
+    border-bottom: 1px solid var(--line2);
     font-size: 13.5px;
 }
 .adm-emp-row:last-child { border-bottom: none; }
 .adm-emp-row-head {
     background: var(--bg);
     font-weight: 600;
-    color: var(--slate-600);
+    color: var(--ink2);
     font-size: 12.5px;
     text-transform: uppercase;
     letter-spacing: 0.3px;
 }
-.adm-emp-cell-strong { font-weight: 600; color: var(--slate-900); }
-.adm-emp-cell-mute { color: var(--slate-400); font-size: 12.5px; }
+.adm-emp-cell-strong { font-weight: 600; color: var(--ink); }
+.adm-emp-cell-mute { color: var(--ink3); font-size: 12.5px; }
 .adm-emp-status-active { color: var(--success); }
 .adm-emp-status-disabled { color: var(--danger); }
 .adm-emp-owner-link {

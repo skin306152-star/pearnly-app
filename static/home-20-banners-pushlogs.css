@@ -19,7 +19,7 @@
 }
 .chrome-only-banner-close {
     flex-shrink: 0;
-    background: #fff;
+    background: var(--card);
     border: 1px solid var(--amber-300);
     color: var(--amber-800);
     padding: 5px 12px;
@@ -99,7 +99,7 @@ body.admin-mode .main { margin-top: calc(var(--topbar-h) + 36px); }
  * ============================================================ */
 .erp-log-row.retrying {
     /* 重试中:橙色调 · 区分于成功(绿)/ 失败(红) */
-    background: linear-gradient(to right, var(--amber-50) 0%, #fff 30%);
+    background: linear-gradient(to right, var(--amber-weak) 0%, var(--card) 30%);
     border-left: 3px solid var(--amber-500);
 }
 .erp-log-row.retrying .log-status {
@@ -146,15 +146,15 @@ body.admin-mode .main { margin-top: calc(var(--topbar-h) + 36px); }
 /* 问题 3 (Zihao 2026-05-19 拍板 · v118.34.24) · 推送日志表头行
    · 全选 checkbox + 列标签 · 区分于数据 row */
 .erp-log-row-header {
-    background: var(--gray-50);
-    color: var(--gray-500);
+    background: var(--bg);
+    color: var(--ink2);
     font-size: 12px;
     font-weight: 500;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--line);
     cursor: default !important;
 }
 .erp-log-row-header:hover {
-    background: var(--gray-50) !important;
+    background: var(--bg) !important;
 }
 .erp-log-cb-all {
     cursor: pointer;

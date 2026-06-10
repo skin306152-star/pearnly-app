@@ -352,7 +352,7 @@ body.is-windows .topbar-search-kbd-win { display: inline; }
 }
 .glv-summary-table tr.glv-summary-total td {
     background: var(--ink);
-    color: #fff;
+    color: var(--card);
     font-weight: 700;
     font-size: 15px;
     padding: 13px 14px;

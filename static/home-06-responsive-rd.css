@@ -50,18 +50,18 @@
     padding: 3px 8px;
     font-size: 12px;
     font-weight: 500;
-    color: var(--gray-600);
-    background: var(--gray-100);
-    border: 1px solid var(--gray-200);
+    color: var(--ink2);
+    background: var(--line2);
+    border: 1px solid var(--line);
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.15s;
     line-height: 1;
 }
 .rd-btn:hover {
-    background: var(--gray-200);
-    color: var(--gray-800);
-    border-color: var(--gray-300);
+    background: var(--line);
+    color: var(--ink);
+    border-color: var(--ink-4);
 }
 .rd-btn svg {
     width: 12px;
@@ -83,9 +83,9 @@
     display: inline-flex;
     align-items: center;
     padding: 3px 6px;
-    color: var(--gray-400);
+    color: var(--ink3);
     background: transparent;
-    border: 1px dashed var(--gray-300);
+    border: 1px dashed var(--ink-4);
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.15s;
@@ -110,7 +110,7 @@
     padding: 0 4px;
     min-height: 16px;
 }
-.rd-status.loading { color: var(--gray-500); }
+.rd-status.loading { color: var(--ink2); }
 .rd-status.valid   { color: var(--emerald-600); }
 .rd-status.invalid { color: var(--danger); }
 .rd-status.error   { color: var(--warn); }
@@ -136,7 +136,7 @@
     display: flex;
 }
 .rd-modal {
-    background: #fff;
+    background: var(--card);
     border-radius: 12px;
     width: 100%;
     max-width: 600px;
@@ -155,19 +155,19 @@
     align-items: center;
     justify-content: space-between;
     padding: 16px 20px;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--line);
 }
 .rd-modal-head h3 {
     margin: 0;
     font-size: 15px;
     font-weight: 600;
-    color: var(--gray-900);
+    color: var(--ink);
 }
 .rd-modal-close {
     background: none;
     border: none;
     font-size: 22px;
-    color: var(--gray-500);
+    color: var(--ink2);
     cursor: pointer;
     padding: 0;
     width: 28px;
@@ -176,8 +176,8 @@
     line-height: 1;
 }
 .rd-modal-close:hover {
-    background: var(--gray-100);
-    color: var(--gray-900);
+    background: var(--line2);
+    color: var(--ink);
 }
 .rd-modal-body {
     padding: 16px 20px;
@@ -190,21 +190,21 @@
     justify-content: flex-end;
     gap: 8px;
     padding: 12px 20px;
-    border-top: 1px solid var(--gray-200);
+    border-top: 1px solid var(--line);
 }
 .rd-modal-btn {
     padding: 8px 16px;
     font-size: 13px;
     font-weight: 500;
-    border: 1px solid var(--gray-300);
-    background: #fff;
-    color: var(--gray-700);
+    border: 1px solid var(--ink-4);
+    background: var(--card);
+    color: var(--ink);
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.15s;
 }
 .rd-modal-btn:hover {
-    background: var(--gray-50);
+    background: var(--bg);
 }
 .rd-modal-btn.primary {
     background: var(--btn-blue);
@@ -222,38 +222,38 @@
     gap: 10px;
     align-items: center;
     padding: 12px;
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--line);
     border-radius: 8px;
     margin-bottom: 8px;
     cursor: pointer;
     transition: background 0.15s;
 }
 .rd-diff-row:hover {
-    background: var(--gray-50);
+    background: var(--bg);
 }
 .rd-diff-row input[type="checkbox"] {
     cursor: pointer;
 }
 .rd-diff-label {
     font-size: 12px;
-    color: var(--gray-500);
+    color: var(--ink2);
     font-weight: 500;
 }
 .rd-diff-col-label {
     font-size: 10px;
-    color: var(--gray-400);
+    color: var(--ink3);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     margin-bottom: 2px;
 }
 .rd-diff-val {
     font-size: 13px;
-    color: var(--gray-700);
+    color: var(--ink);
     line-height: 1.4;
     word-break: break-word;
 }
 .rd-diff-current .rd-diff-val {
-    color: var(--gray-500);
+    color: var(--ink2);
     text-decoration: line-through;
     text-decoration-color: var(--red-300);
 }
@@ -262,7 +262,7 @@
     font-weight: 500;
 }
 .rd-diff-arrow {
-    color: var(--gray-400);
+    color: var(--ink3);
     font-size: 14px;
     text-align: center;
 }
@@ -285,10 +285,10 @@
 .rd-modal-extra {
     margin-top: 10px;
     padding: 10px 12px;
-    background: var(--gray-50);
+    background: var(--bg);
     border-radius: 6px;
     font-size: 12px;
-    color: var(--gray-500);
+    color: var(--ink2);
 }
 
 /* 窄屏:堆叠显示 */

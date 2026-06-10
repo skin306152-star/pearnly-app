@@ -37,9 +37,9 @@ body.sidebar-collapsed .nav-group-label { display: none; }
 }
 .nav-item:hover { background: var(--bg); color: var(--ink); }
 /* v118.33.7.5 · active 配色对齐 prototype:纯黑底白字 · 删 3px 左侧竖条 · 简洁实心高亮 */
-.nav-item.active { background: var(--ink); color: #fff; font-weight: 500; }
-.nav-item.active .nav-icon { color: #fff; }
-.nav-item.active svg { color: #fff; }
+.nav-item.active { background: var(--ink); color: var(--card); font-weight: 500; }
+.nav-item.active .nav-icon { color: var(--card); }
+.nav-item.active svg { color: var(--card); }
 .nav-item .nav-icon {
     width: 18px; height: 18px; flex-shrink: 0;
     color: currentColor;

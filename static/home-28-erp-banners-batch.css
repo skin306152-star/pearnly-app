@@ -71,7 +71,7 @@
     height: 28px;
     padding: 0 12px;
     font-size: 12px;
-    background: #fff;
+    background: var(--card);
     border-color: var(--line);
     color: var(--ink);
 }
@@ -89,7 +89,7 @@
     gap: 6px;
     margin: 0 0 12px;
     padding: 8px 12px;
-    background: var(--gray-50);
+    background: var(--bg);
     border: 1px solid var(--line);
     border-radius: 8px;
     font-size: 12px;
@@ -294,7 +294,7 @@
     max-width: 420px;
     padding: 14px 16px 12px;
     background: var(--ink);
-    color: #fff;
+    color: var(--card);
     border-radius: 10px;
     box-shadow: 0 8px 30px rgba(0,0,0,0.25);
     opacity: 0;
@@ -361,11 +361,11 @@
 }
 .mrerp-undo-toast .mut-btn-ok {
     color: var(--ink);
-    background: #fff;
+    background: var(--card);
     border-color: #fff;
 }
 .mrerp-undo-toast .mut-btn-ok:hover {
-    background: var(--slate-200);
+    background: var(--line);
 }
 
 @media (max-width: 640px) {

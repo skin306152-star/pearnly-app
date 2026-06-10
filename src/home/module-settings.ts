@@ -50,30 +50,30 @@ const BIZ_ICONS: Record<string, string> = {
 
 const STYLE = `
 .modset{max-width:680px;}
-.modset .bizbar{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #e8e8e3;border-radius:12px;padding:14px 16px;margin-bottom:16px;}
+.modset .bizbar{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px;}
 .modset .bizbar .ico{width:40px;height:40px;border-radius:11px;background:var(--blue-weak);color:var(--btn-blue,#0E7C66);display:grid;place-items:center;flex:0 0 40px;}
 .modset .bizbar .info{flex:1;min-width:0;}
-.modset .bizbar .info .a{font-size:12px;color:#6b7280;}
-.modset .bizbar .info .b{font-weight:700;font-size:15px;color:#111827;}
-.modset .bizbar .chg{height:34px;padding:0 14px;border:1px solid #e8e8e3;border-radius:9px;background:#fff;color:var(--btn-blue,#0E7C66);font-size:13px;cursor:pointer;flex:0 0 auto;}
-.modset .mcard{background:#fff;border:1px solid #e8e8e3;border-radius:14px;overflow:hidden;margin-bottom:16px;}
-.modset .mcard .h{padding:12px 16px;border-bottom:1px solid #f0f0ec;font-weight:700;font-size:13.5px;color:#111827;}
-.modset .mod{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid #f6f6f3;}
+.modset .bizbar .info .a{font-size:12px;color:var(--ink2);}
+.modset .bizbar .info .b{font-weight:700;font-size:15px;color:var(--ink);}
+.modset .bizbar .chg{height:34px;padding:0 14px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--btn-blue,#0E7C66);font-size:13px;cursor:pointer;flex:0 0 auto;}
+.modset .mcard{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:16px;}
+.modset .mcard .h{padding:12px 16px;border-bottom:1px solid var(--line2);font-weight:700;font-size:13.5px;color:var(--ink);}
+.modset .mod{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line2);}
 .modset .mod:last-child{border-bottom:0;}
-.modset .mod .mi{width:34px;height:34px;border-radius:9px;background:#f4f4f0;color:#6b7280;display:grid;place-items:center;flex:0 0 34px;}
+.modset .mod .mi{width:34px;height:34px;border-radius:9px;background:var(--line2);color:var(--ink2);display:grid;place-items:center;flex:0 0 34px;}
 .modset .mod .tx{flex:1;min-width:0;}
-.modset .mod .tx .n{font-size:14px;font-weight:600;color:#111827;}
-.modset .mod .tx .d{font-size:12px;color:#6b7280;margin-top:2px;}
-.modset .mod .tag{font-size:10.5px;color:#9CA3AF;flex:0 0 auto;}
-.modset .sw{width:42px;height:24px;border-radius:999px;flex:0 0 42px;position:relative;cursor:pointer;transition:.15s;background:#d8d8d3;}
-.modset .sw::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.25);}
+.modset .mod .tx .n{font-size:14px;font-weight:600;color:var(--ink);}
+.modset .mod .tx .d{font-size:12px;color:var(--ink2);margin-top:2px;}
+.modset .mod .tag{font-size:10.5px;color:var(--ink3);flex:0 0 auto;}
+.modset .sw{width:42px;height:24px;border-radius:999px;flex:0 0 42px;position:relative;cursor:pointer;transition:.15s;background:var(--ink-4);}
+.modset .sw::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--card);transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.25);}
 .modset .mod.on .sw{background:var(--btn-blue,#0E7C66);}.modset .mod.on .sw::after{left:20px;}
 .modset .mod.lock .sw{background:var(--blue-200);cursor:not-allowed;}.modset .mod.lock .sw::after{left:20px;}
-.modset .mod.lock .tx,.modset .mod.off .tx .n{color:#6b7280;}
+.modset .mod.lock .tx,.modset .mod.off .tx .n{color:var(--ink2);}
 .modset .sw.busy{opacity:.5;pointer-events:none;}
-.modset .note{font-size:12.5px;color:#6b7280;background:#f8f8f5;border:1px solid #e8e8e3;border-radius:10px;padding:11px 13px;line-height:1.7;}
-.modset .note b{color:#111827;}
-.modset .modset-load{padding:30px 0;text-align:center;color:#9CA3AF;font-size:13px;}
+.modset .note{font-size:12.5px;color:var(--ink2);background:#f8f8f5;border:1px solid var(--line);border-radius:10px;padding:11px 13px;line-height:1.7;}
+.modset .note b{color:var(--ink);}
+.modset .modset-load{padding:30px 0;text-align:center;color:var(--ink3);font-size:13px;}
 `;
 
 function ensureStyle(): void {

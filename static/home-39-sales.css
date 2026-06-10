@@ -310,7 +310,7 @@ table.sx-tbl tr.click:hover td {
 }
 .sx-badge.void {
     background: #f3f3f3;
-    color: #999;
+    color: var(--ink-3);
     text-decoration: line-through;
 }
 .sx-badge.paid {
@@ -538,7 +538,7 @@ table.sx-tbl tr.click:hover td {
     display: block;
     font-size: 12px;
     margin-bottom: 5px;
-    color: #374151;
+    color: var(--ink);
 }
 .sx-page input[type='text'],
 .sx-page input[type='number'],
@@ -604,14 +604,14 @@ table.sx-tbl tr.click:hover td {
     margin-top: 5px;
     padding-top: 4px;
     font-size: 7.5px;
-    color: #999;
+    color: var(--ink-3);
 }
 .sx-tpl-tt {
     text-align: right;
     font-weight: 700;
     font-size: 9px;
     margin-top: 5px;
-    color: #333;
+    color: var(--ink);
 }
 
 /* 账套 2 栏:表单 + 右侧实时预览 */
@@ -631,7 +631,7 @@ table.sx-tbl tr.click:hover td {
     background: var(--card);
     padding: 18px;
     font-size: 11.5px;
-    color: #111;
+    color: var(--ink);
     margin-top: 8px;
 }
 .sx-prev-co {

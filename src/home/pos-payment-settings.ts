@@ -45,7 +45,7 @@ const STYLE = `
 .rpay{width:100%;margin:0;padding:26px 0 60px 28px;font-size:13.5px;color:var(--ink);}
 .rpay h1{font-size:21px;font-weight:700;color:var(--ink);margin:0 0 4px;}
 .rpay .sub{color:var(--ink2);font-size:13px;margin-bottom:18px;}
-.rpay .card{border:1px solid #e8e8e3;border-radius:14px;overflow:hidden;margin-bottom:16px;}
+.rpay .card{border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:16px;}
 .rpay .ch{padding:12px 16px;border-bottom:1px solid var(--line2);font-weight:700;font-size:13.5px;color:var(--ink);}
 .rpay .pm{padding:14px 16px;border-bottom:1px solid var(--line2);}
 .rpay .pm:last-child{border-bottom:0;}
@@ -62,14 +62,14 @@ const STYLE = `
 .rpay .pm.lock .sw{background:var(--accent-weak);cursor:not-allowed;}.rpay .pm.lock .sw::after{left:21px;}
 .rpay .sub-cfg{margin:12px 0 0 50px;}
 .rpay .sub-cfg label{display:block;font-size:12px;color:var(--ink2);margin-bottom:6px;}
-.rpay .fld{height:44px;border:1px solid #e8e8e3;border-radius:10px;padding:0 13px;display:flex;align-items:center;background:var(--line2);}
+.rpay .fld{height:44px;border:1px solid var(--line);border-radius:10px;padding:0 13px;display:flex;align-items:center;background:var(--line2);}
 .rpay .fld .pre{color:var(--ink3);font-size:13px;margin-right:8px;}
 .rpay .fld input{border:0;outline:0;background:transparent;flex:1;font-size:14.5px;color:var(--ink);}
 .rpay .hint{font-size:11.5px;color:var(--ink3);margin-top:6px;line-height:1.5;}
 .rpay .row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line2);}
 .rpay .row:last-child{border-bottom:0;}
 .rpay .row .tx{flex:1;}.rpay .row .n{font-size:14px;font-weight:600;color:var(--ink);}.rpay .row .d{font-size:12px;color:var(--ink2);margin-top:2px;}
-.rpay .pctfld{width:90px;height:38px;border:1px solid #e8e8e3;border-radius:9px;display:flex;align-items:center;padding:0 10px;background:var(--line2);}
+.rpay .pctfld{width:90px;height:38px;border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;padding:0 10px;background:var(--line2);}
 .rpay .pctfld input{border:0;outline:0;background:transparent;width:100%;text-align:right;font-size:14px;font-weight:600;color:var(--ink);}
 .rpay .pctfld span{color:var(--ink3);font-size:13px;}
 .rpay .save{width:100%;height:50px;border:0;border-radius:11px;background:var(--btn-blue,var(--accent));color:var(--accent-ink);font-weight:700;font-size:16px;cursor:pointer;}

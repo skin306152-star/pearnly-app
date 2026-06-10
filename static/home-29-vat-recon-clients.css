@@ -403,7 +403,7 @@
 }
 .bv-stage-steps li.done .dot::after {
     content: ""; width: 8px; height: 5px;
-    border-left: 1.5px solid #fff; border-bottom: 1.5px solid #fff;
+    border-left: 1.5px solid var(--card); border-bottom: 1.5px solid var(--card);
     transform: rotate(-45deg) translate(1px, -1px);
 }
 .bv-stage-steps li.done .lab { color: var(--ink2); }

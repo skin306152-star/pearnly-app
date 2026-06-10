@@ -27,8 +27,8 @@
     margin-bottom: 16px;
 }
 .erp-connect-card {
-    background: #fff;
-    border: 1px solid var(--gray-200);
+    background: var(--card);
+    border: 1px solid var(--line);
     border-radius: 10px;
     padding: 16px;
 }
@@ -42,7 +42,7 @@
 .erp-cc-title {
     font-size: 16px;
     font-weight: 600;
-    color: var(--slate-900);
+    color: var(--ink);
 }
 .erp-cc-badge {
     display: inline-block;
@@ -56,26 +56,26 @@
     color: var(--green-800);
 }
 .erp-cc-badge.gray {
-    background: var(--slate-100);
-    color: var(--slate-500);
+    background: var(--line2);
+    color: var(--ink2);
 }
 .erp-cc-body {
     font-size: 13px;
-    color: var(--slate-600);
+    color: var(--ink2);
     line-height: 1.6;
 }
 .erp-cc-empty {
-    color: var(--slate-400);
+    color: var(--ink3);
     padding: 8px 0;
 }
 .erp-cc-meta {
-    color: var(--slate-500);
+    color: var(--ink2);
     font-size: 12px;
     margin-bottom: 8px;
 }
 .erp-cc-org-label {
     font-weight: 500;
-    color: var(--slate-900);
+    color: var(--ink);
     margin: 6px 0 4px;
     font-size: 13px;
 }
@@ -100,7 +100,7 @@
     cursor: pointer;
 }
 .erp-cc-org-name {
-    color: var(--slate-900);
+    color: var(--ink);
     font-size: 13px;
     word-break: break-word;
 }
@@ -108,7 +108,7 @@
     display: flex;
     gap: 8px;
     margin-top: 8px;
-    border-top: 1px solid var(--slate-100);
+    border-top: 1px solid var(--line2);
     padding-top: 10px;
 }
 
@@ -138,7 +138,7 @@
     border: 1px solid var(--line);
     border-radius: 6px;
     overflow: hidden;
-    background: #fff;
+    background: var(--card);
 }
 .pn-push-main,
 .pn-push-arrow {
@@ -357,7 +357,7 @@
     color: var(--green-800);
 }
 .export-dd-badge.badge-soon {
-    background: var(--gray-100);
+    background: var(--line2);
     color: var(--ink-3);
     font-weight: 500;
 }
@@ -392,7 +392,7 @@
     cursor: not-allowed;
 }
 .report-tpl-badge.report-tpl-badge-soon {
-    background: var(--gray-100);
+    background: var(--line2);
     color: var(--ink-3);
 }
 

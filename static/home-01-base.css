@@ -359,6 +359,8 @@ body.sidebar-collapsed .topbar-left { width: var(--sidebar-w-collapsed); padding
 
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand-icon { width: 26px; height: 26px; border-radius: 6px; flex-shrink: 0; }
+/* 暗夜:品牌图(紫P底猫)垫白色小底板 · 同集成页品牌彩图标"中性底块"拍板 · 不改品牌资产 */
+:root.dark .brand-icon { background: #fff; padding: 2px; }
 .brand-divider {
     width: 1px; height: 18px;
     background: rgba(15,23,42,0.12);

@@ -8,7 +8,7 @@
 .team-card {
     display: flex; align-items: center; gap: 14px;
     padding: 14px 16px;
-    background: #fff;
+    background: var(--card);
     border: 1px solid var(--line);
     border-radius: 10px;
     transition: border-color .15s, box-shadow .15s;
@@ -19,7 +19,7 @@
 }
 .team-card.disabled {
     opacity: 0.65;
-    background: var(--c-fafafa);
+    background: var(--bg);
 }
 .team-avatar {
     width: 40px; height: 40px;
@@ -32,7 +32,7 @@
     user-select: none;
 }
 .team-card.disabled .team-avatar {
-    background: var(--gray-400);
+    background: var(--ink3);
 }
 .team-card.owner .team-avatar {
     background: linear-gradient(135deg, var(--amber-500), var(--orange-500));
@@ -66,7 +66,7 @@
     flex-shrink: 0;
 }
 .team-status-badge.on { background: var(--emerald-100); color: var(--emerald-800); }
-.team-status-badge.off { background: var(--gray-100); color: var(--gray-500); }
+.team-status-badge.off { background: var(--line2); color: var(--ink2); }
 .team-card-actions {
     display: flex; gap: 6px; flex-shrink: 0;
 }
@@ -75,14 +75,14 @@
     font-size: 12px;
     border: 1px solid var(--line);
     border-radius: 6px;
-    background: #fff;
+    background: var(--card);
     color: var(--ink-2);
     cursor: pointer;
     transition: all .15s;
 }
 .team-card-actions button:hover {
-    border-color: var(--gray-400);
-    background: var(--gray-50);
+    border-color: var(--ink3);
+    background: var(--bg);
 }
 .team-card-actions button.danger { color: var(--danger); }
 .team-card-actions button.danger:hover {
@@ -98,7 +98,7 @@
  * v95 · 文件夹监听 · 浏览器 File System Access API
  * ============================================================ */
 .folder-card {
-    background: #fff; border: 1px solid var(--gray-200); border-radius: 12px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
     padding: 24px; margin-top: 16px;
 }
 /* CSS 兜底 · 防止 SVG 撑爆容器 */
@@ -110,7 +110,7 @@
 }
 .folder-unsupported-icon, .folder-empty-icon {
     width: 64px; height: 64px; margin: 0 auto 16px;
-    color: var(--gray-400);
+    color: var(--ink3);
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
 }
@@ -119,13 +119,13 @@
     display: block;
 }
 .folder-unsupported-title, .folder-empty-title {
-    font-size: 18px; font-weight: 600; color: var(--gray-900); margin-bottom: 8px;
+    font-size: 18px; font-weight: 600; color: var(--ink); margin-bottom: 8px;
 }
 .folder-unsupported-desc, .folder-empty-desc {
-    color: var(--gray-500); font-size: 14px; margin-bottom: 24px; max-width: 480px; margin-left: auto; margin-right: auto;
+    color: var(--ink2); font-size: 14px; margin-bottom: 24px; max-width: 480px; margin-left: auto; margin-right: auto;
 }
 .folder-alt-section { margin-top: 24px; }
-.folder-alt-title { font-size: 13px; color: var(--gray-500); margin-bottom: 12px; font-weight: 500; }
+.folder-alt-title { font-size: 13px; color: var(--ink2); margin-bottom: 12px; font-weight: 500; }
 .folder-alt-btn { margin: 4px; }
 .folder-warn-row {
     display: inline-flex; align-items: center; gap: 6px;
@@ -150,11 +150,11 @@
 }
 .folder-config-icon svg { width: 22px; height: 22px; }
 .folder-config-path {
-    font-size: 15px; font-weight: 600; color: var(--gray-900); margin-bottom: 4px;
+    font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 4px;
     word-break: break-all;
 }
 .folder-config-meta {
-    font-size: 13px; color: var(--gray-500);
+    font-size: 13px; color: var(--ink2);
     display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
 }
 .folder-status-pulse {
@@ -164,7 +164,7 @@
     margin-right: 4px;
 }
 .folder-status-pulse.paused {
-    background: var(--gray-400);
+    background: var(--ink3);
     animation: none;
 }
 @keyframes folder-pulse {
@@ -173,8 +173,8 @@
 }
 .folder-interval-select {
     padding: 2px 6px; font-size: 13px;
-    border: 1px solid var(--gray-300); border-radius: 4px;
-    background: #fff; color: var(--gray-900); cursor: pointer;
+    border: 1px solid var(--ink-4); border-radius: 4px;
+    background: var(--card); color: var(--ink); cursor: pointer;
 }
 .folder-config-actions {
     display: flex; gap: 6px; flex-wrap: wrap;
@@ -184,31 +184,31 @@
 
 .folder-stats {
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
-    margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--gray-100);
+    margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line2);
 }
 .folder-stat { text-align: center; }
-.folder-stat-label { font-size: 11px; color: var(--gray-500); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
-.folder-stat-value { font-size: 20px; font-weight: 600; color: var(--gray-900); }
+.folder-stat-label { font-size: 11px; color: var(--ink2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+.folder-stat-value { font-size: 20px; font-weight: 600; color: var(--ink); }
 
 .folder-recent-card { padding: 20px 24px; }
 .folder-recent-head {
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 12px;
 }
-.folder-recent-title { font-size: 14px; font-weight: 600; color: var(--gray-900); }
+.folder-recent-title { font-size: 14px; font-weight: 600; color: var(--ink); }
 .btn-tiny {
     font-size: 11px; padding: 3px 10px;
-    background: transparent; color: var(--gray-500);
-    border: 1px solid var(--gray-200); border-radius: 4px; cursor: pointer;
+    background: transparent; color: var(--ink2);
+    border: 1px solid var(--line); border-radius: 4px; cursor: pointer;
 }
-.btn-tiny:hover { background: var(--gray-50); }
+.btn-tiny:hover { background: var(--bg); }
 .folder-recent-list { display: flex; flex-direction: column; gap: 6px; }
 .folder-recent-empty {
-    text-align: center; color: var(--gray-400); font-size: 13px; padding: 24px 0;
+    text-align: center; color: var(--ink3); font-size: 13px; padding: 24px 0;
 }
 .folder-recent-item {
     display: flex; align-items: center; gap: 12px;
-    padding: 10px 12px; background: var(--gray-50); border-radius: 6px;
+    padding: 10px 12px; background: var(--bg); border-radius: 6px;
 }
 .folder-recent-icon {
     width: 22px; height: 22px; border-radius: 50%;
@@ -217,20 +217,20 @@
 .folder-recent-icon.ok   { background: var(--emerald-100); color: var(--emerald-800); }
 .folder-recent-icon.fail { background: var(--danger-bg); color: var(--red-800); }
 .folder-recent-icon.dup  { background: var(--blue-100); color: var(--ink); }
-.folder-recent-icon.skip { background: var(--gray-100); color: var(--gray-500); }
+.folder-recent-icon.skip { background: var(--line2); color: var(--ink2); }
 .folder-recent-body { flex: 1; min-width: 0; }
 .folder-recent-name {
-    font-size: 13px; color: var(--gray-900);
+    font-size: 13px; color: var(--ink);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .folder-recent-err { font-size: 11px; color: var(--danger); margin-top: 2px; }
 .folder-recent-time {
-    font-size: 11px; color: var(--gray-500); flex-shrink: 0; font-variant-numeric: tabular-nums;
+    font-size: 11px; color: var(--ink2); flex-shrink: 0; font-variant-numeric: tabular-nums;
 }
 
 /* status pill 颜色 */
 .auto-status-pill.running { background: var(--emerald-100); color: var(--emerald-800); }
-.auto-status-pill.paused  { background: var(--gray-100); color: var(--gray-500); }
+.auto-status-pill.paused  { background: var(--line2); color: var(--ink2); }
 
 @media (max-width: 720px) {
     .folder-stats { grid-template-columns: repeat(2, 1fr); }
@@ -266,19 +266,19 @@
     display: inline-flex; align-items: center; gap: 5px;
     padding: 5px 10px;
     font-size: 11px; font-weight: 500;
-    background: transparent; color: var(--gray-400);
-    border: 1px dashed var(--gray-300); border-radius: 999px;
+    background: transparent; color: var(--ink3);
+    border: 1px dashed var(--ink-4); border-radius: 999px;
     cursor: help;
     transition: all 0.15s;
     user-select: none;
 }
 .folder-info-chip:hover, .folder-info-chip:focus-visible {
-    background: var(--gray-50); color: var(--gray-700); border-color: var(--gray-400);
+    background: var(--bg); color: var(--ink); border-color: var(--ink3);
     outline: none;
 }
 .folder-info-chip-link {
     cursor: pointer;
-    color: var(--gray-500);
+    color: var(--ink2);
     border-color: var(--line);
 }
 .folder-info-chip-link:hover, .folder-info-chip-link:focus-visible {
@@ -301,7 +301,7 @@
 .folder-info-tooltip::after {
     content: ''; position: absolute; top: 100%; left: 50%;
     transform: translateX(-50%);
-    border: 5px solid transparent; border-top-color: var(--gray-800);
+    border: 5px solid transparent; border-top-color: var(--ink);
 }
 .folder-info-chip:hover .folder-info-tooltip,
 .folder-info-chip:focus-visible .folder-info-tooltip {
@@ -311,7 +311,7 @@
 
 /* v113 · 「文档扫描」按钮(主扫描入口) · v113.1 · 改 outline 风格 · 与"上传图片"统一 */
 .btn-scan-doc {
-    background: #fff;
+    background: var(--card);
     color: var(--ink);
     border: 1.5px solid var(--indigo-200);
     padding: 11px 18px;
@@ -370,7 +370,8 @@
 .preview-overlay {
     position: absolute;
     inset: 0;
-    background: var(--c-1a1a1a);
+    /* 图片预览遮罩 · 双主题固定深底(lightbox 惯例 · 不随暗夜翻浅) */
+    background: #0B1A2B;
     display: flex;
     flex-direction: column;
     z-index: 50;
@@ -423,7 +424,7 @@
     align-items: center;
     justify-content: center;
     padding: 16px;
-    background: var(--c-1a1a1a);
+    background: var(--ink);
 }
 .preview-canvas {
     max-width: 100%;

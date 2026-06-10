@@ -133,10 +133,10 @@ function _brv2RenderAnchorAudit(summary: any) {
             var diffColor = Math.abs(diff) < 0.005 ? '#6b7280' : diff > 0 ? '#16a34a' : '#dc2626';
             return (
                 '<tr>' +
-                '<td style="padding:6px 10px;color:#111827;font-size:13px">' +
+                '<td style="padding:6px 10px;color:var(--ink);font-size:13px">' +
                 _brv2EscHtml(_brv2T(pair[1], pair[0])) +
                 '</td>' +
-                '<td style="padding:6px 10px;color:#6b7280;font-size:13px;text-align:right;' +
+                '<td style="padding:6px 10px;color:var(--ink2);font-size:13px;text-align:right;' +
                 'font-variant-numeric:tabular-nums">' +
                 _brv2EscHtml(_brv2FmtNum(ocr)) +
                 '</td>' +
@@ -162,19 +162,19 @@ function _brv2RenderAnchorAudit(summary: any) {
         '</div>' +
         '<table style="width:100%;border-collapse:collapse;font-family:inherit">' +
         '<thead><tr>' +
-        '<th style="padding:6px 10px;text-align:left;color:#6b7280;font-size:11px;' +
+        '<th style="padding:6px 10px;text-align:left;color:var(--ink2);font-size:11px;' +
         'font-weight:500;border-bottom:1px solid #fed7aa">' +
         _brv2EscHtml(_brv2T('brv2-anchor-audit-col-field', 'Field')) +
         '</th>' +
-        '<th style="padding:6px 10px;text-align:right;color:#6b7280;font-size:11px;' +
+        '<th style="padding:6px 10px;text-align:right;color:var(--ink2);font-size:11px;' +
         'font-weight:500;border-bottom:1px solid #fed7aa">' +
         _brv2EscHtml(_brv2T('brv2-anchor-audit-col-ocr', 'OCR')) +
         '</th>' +
-        '<th style="padding:6px 10px;text-align:right;color:#6b7280;font-size:11px;' +
+        '<th style="padding:6px 10px;text-align:right;color:var(--ink2);font-size:11px;' +
         'font-weight:500;border-bottom:1px solid #fed7aa">' +
         _brv2EscHtml(_brv2T('brv2-anchor-audit-col-user', 'User')) +
         '</th>' +
-        '<th style="padding:6px 10px;text-align:right;color:#6b7280;font-size:11px;' +
+        '<th style="padding:6px 10px;text-align:right;color:var(--ink2);font-size:11px;' +
         'font-weight:500;border-bottom:1px solid #fed7aa">' +
         _brv2EscHtml(_brv2T('brv2-anchor-audit-col-diff', 'Diff')) +
         '</th>' +

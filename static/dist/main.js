@@ -222,6 +222,13 @@ This device has been logged out automatically.`,th:`บัญชีของค�
                     </svg>
                     <span data-i18n="avatar-menu-team">团队成员</span>
                 </button>
+                <a class="avatar-popup-item" href="/console" data-show-if-team="1" id="avatar-menu-console" role="menuitem" style="text-decoration:none;color:inherit;">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M10 2.5l6.5 3.75v7.5L10 17.5l-6.5-3.75v-7.5L10 2.5z"/>
+                        <circle cx="10" cy="10" r="2.5"/>
+                    </svg>
+                    <span data-i18n="avatar-menu-console">团队与权限</span>
+                </a>
                 <button type="button" class="avatar-popup-item" data-action="billing" data-show-if-money="1" id="avatar-menu-billing" role="menuitem">
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <rect x="2.5" y="5" width="15" height="11" rx="1.5"/>

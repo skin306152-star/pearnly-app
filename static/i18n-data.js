@@ -9,6 +9,7 @@
 window.I18N = {
     zh: {
         // 自动做账 Phase 2 · acct-*.ts
+        'avatar-menu-console': '团队与权限',
         'nav-acct-review': '逐笔审',
         'nav-acct-accounts': '科目表',
         'nav-acct-settings': '做账设置',
@@ -3748,6 +3749,7 @@ window.I18N = {
     },
     en: {
         // 自动做账 Phase 2 · acct-*.ts
+        'avatar-menu-console': 'Team & permissions',
         'nav-acct-review': 'Review queue',
         'nav-acct-accounts': 'Chart of accounts',
         'nav-acct-settings': 'Accounting settings',
@@ -7472,6 +7474,7 @@ window.I18N = {
     },
     th: {
         // 自动做账 Phase 2 · acct-*.ts
+        'avatar-menu-console': 'ทีมงานและสิทธิ์',
         'nav-acct-review': 'ตรวจทีละรายการ',
         'nav-acct-accounts': 'ผังบัญชี',
         'nav-acct-settings': 'ตั้งค่าบัญชี',
@@ -11189,6 +11192,7 @@ window.I18N = {
     },
     ja: {
         // 自动做账 Phase 2 · acct-*.ts
+        'avatar-menu-console': 'チームと権限',
         'nav-acct-review': '個別レビュー',
         'nav-acct-accounts': '勘定科目表',
         'nav-acct-settings': '記帳設定',

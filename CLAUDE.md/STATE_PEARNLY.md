@@ -8,6 +8,13 @@
 
 ## 🎯 状态卡（2026-06-10 · **🔐 权限批5收口+PEAK吸收+console真机5修(三窗口合流 push)** + 🧾 报税 Phase 3 后端 + 🟣 Purple v2 · 前序见下）
 
+- **🆕 本窗口(2026-06-10)· 🧹 后端杂项收尾 + ★交互性能诊断专项**(commit `d441b4f2` 本地 master·**未由本窗口 push**=报税前端窗口 dist WIP 卡 pre-push 一致性闸·本窗口禁碰 build/dist→搭其下次 clean push 一并上线):
+  - **任务A 两笔数据债(同根因·已修)**:prod 4 个 Codex QA 孤儿用户(tenant_id 指已删租户)使 `ensure_credits_tables` step7 INSERT 违 FK、整建表事务每启动回滚报 ERROR。① `credits_schema` step7 加 `EXISTS(tenants)` 守门根治复发 ② `scripts/cleanup_orphan_users.py` 幂等脚本(dry-run/--apply·停用+断 tenant_id+notes 留痕)prod 已 --apply 清 **4→0**·重启后 credits 日志转 INFO 零 ERROR。
+  - **任务B**:static/console 暗夜品牌图垫白圆角底板(照 home S2-bis·`html.dark .brand-icon`)·浅/暗真浏览器实测·console/invite `?v=3→4`。
+  - **任务C 验证欠账清零**:POS 跨套账 E2E 修测试种子漏 `workspace_client_id`(致 line_invalid)→ **9/9**;清 e2e_3 残留 3 张已提交进项测试单 → 进项隔离 **18/18**;prod 0030 `product_units.workspace_client_id` 列已确认。
+  - **任务D 交互性能诊断**(`docs/perf/INTERACTION_AUDIT.md`):真测量定位两根因 = ① 应用在**日本**/DB 在**新加坡**每条 SQL 跨区 **69ms** ② `async` handler 直接做阻塞 psycopg2 致 2-worker 串行(首屏 **22 请求/11.7s**)。Top10 慢交互×分解×归因 + RTT 基线 + 后端建议(**迁同区=最大杠杆**)+ 前端修复清单(交 src/home 窗口)。
+  - **/simplify 已跑**(diff 小·四角度自审 already clean)·守门 black/format/imports/ai-smell/size/ratchet 全绿。**下一步**:① 此 commit 待报税窗口 push 带上线 ② 性能 P0(迁新加坡同区)+P1(workers 2→4 / N+1 批量化)待 Zihao 拍板 ③ 前端修复清单待 src/home 窗口。
+
 - **🆕 本窗口(2026-06-10)· 🔐 权限批5收口 + PEAK 吸收 4 条 + /console·邀请页真机 5 修**(`038ae65e`+`634fb5d3`+`1359ebd6`·随推主题/报税共 9 commit 合流上线):
   - **批5(权限整顿收官)**:九门旧别名全删(`_require_owner_or_super`/`_require_tenant`/`require_owner`/`require_account_owner`·契约测试锁不许复活);billing 4 处 invited_by owner 判定改 membership(`authz.deps.is_owner_role`);旧团队管理处决=`routes/team_routes.py` 7 接口+`services/team/store.py` 删除(活函数并入 console_store 直调·退出 dal_reexports 防循环 import·EmployeeToggleRequest 迁 admin_users_mutation);改密链路单点留 auth_password_routes(invitations 复用确认)。06 对照表随更。
   - **PEAK 吸收**:B1 席位「当前用户 N/M」+满员升级提示 / B2 角色卡「使用权」模块芯片 / B3 角色「N 人在用」 / B4 行内展开使用权行。芯片全令牌 accent 系(10 色 hex 板撞禁裸hex+紫封板→收敛·mod-* 类名留位,彩色板须先进 console-theme 令牌)。

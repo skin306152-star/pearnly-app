@@ -81,20 +81,17 @@ function shellHtml(): string {
 function bind(sec: HTMLElement): void {
     const goSeller = sec.querySelector<HTMLElement>('#tax-set-goseller');
     if (goSeller) goSeller.onclick = () => window.routeTo?.('sales-account');
-    const swVat = sec.querySelector<HTMLElement>('#tax-sw-vat');
-    if (swVat)
-        swVat.onclick = () => {
-            const on = !swVat.classList.contains('on');
-            swVat.classList.toggle('on', on);
-            dirty.vat_registered = on;
-        };
-    const swZero = sec.querySelector<HTMLElement>('#tax-sw-filezero');
-    if (swZero)
-        swZero.onclick = () => {
-            const on = !swZero.classList.contains('on');
-            swZero.classList.toggle('on', on);
-            dirty.file_zero = on;
-        };
+    const bindSwitch = (id: string, key: 'vat_registered' | 'file_zero') => {
+        const el = sec.querySelector<HTMLElement>('#' + id);
+        if (el)
+            el.onclick = () => {
+                const on = !el.classList.contains('on');
+                el.classList.toggle('on', on);
+                dirty[key] = on;
+            };
+    };
+    bindSwitch('tax-sw-vat', 'vat_registered');
+    bindSwitch('tax-sw-filezero', 'file_zero');
     sec.querySelectorAll<HTMLElement>('#tax-seg-branch .o').forEach((el) => {
         el.onclick = () => {
             sec.querySelectorAll<HTMLElement>('#tax-seg-branch .o').forEach((o) =>

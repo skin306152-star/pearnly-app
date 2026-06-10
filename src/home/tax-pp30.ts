@@ -2,19 +2,18 @@
 // GET filing(销项税/进项税/net + 异常 + lines)→ POST /check 拿最新体检 →
 // 提交 = 体检过 + 二次确认 + file(manual) + 导出申报包(e-Tax 未接通的诚实路径)。
 // 已报(filed)= 只读,无提交按钮,可重下载 + 补回执号。
-/* global t, escapeHtml, showToast */
+/* global t, escapeHtml */
 import { aapi, acctErrMsg, injectStyle, withWs } from './acct-common.js';
 import { fmtBaht } from './purchase-common.js';
 import {
     anomalyRow,
     bindAnomalyLinks,
-    confirmFile,
-    downloadExport,
+    bindFileActions,
     dueLabel,
     hasHard,
     injectTaxBase,
     normFiling,
-    openReceiptModal,
+    num,
 } from './tax-common.js';
 import type { Anomaly, Filing } from './tax-common.js';
 import { takePendingFiling } from './tax-center.js';
@@ -32,10 +31,6 @@ const PAGE_CSS = `
 
 let filing: Filing | null = null;
 let fresh: { anomalies: Anomaly[]; fileable: boolean } | null = null;
-
-function num(v: unknown): number {
-    return Number(v || 0);
-}
 
 function calcHtml(f: Filing): string {
     const b = f.breakdown as Record<string, number>;
@@ -108,25 +103,7 @@ function bind(sec: HTMLElement): void {
         el.onclick = () =>
             window.routeTo?.(el.dataset.trace === 'sale' ? 'sales-invoices' : 'purchase');
     });
-    const exportBtn = sec.querySelector<HTMLButtonElement>('[data-act="export"]');
-    if (exportBtn)
-        exportBtn.onclick = async () => {
-            exportBtn.disabled = true;
-            try {
-                await downloadExport(
-                    `/api/tax/filings/${filing!.id}/export?fmt=zip`,
-                    `${filing!.kind}_${filing!.period}.zip`
-                );
-            } catch (e) {
-                showToast(acctErrMsg(e, 'tax.export_failed'), 'error');
-            } finally {
-                exportBtn.disabled = false;
-            }
-        };
-    const fileBtn = sec.querySelector<HTMLButtonElement>('[data-act="file"]');
-    if (fileBtn) fileBtn.onclick = () => confirmFile(filing!, () => load(filing!.id));
-    const markBtn = sec.querySelector<HTMLButtonElement>('[data-act="mark"]');
-    if (markBtn) markBtn.onclick = () => openReceiptModal(filing!, () => load(filing!.id));
+    bindFileActions(sec, filing!, () => load(filing!.id));
 }
 
 async function load(id: string): Promise<void> {

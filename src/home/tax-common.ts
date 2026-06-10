@@ -53,7 +53,7 @@ export interface Filing {
     lines?: FilingLine[];
 }
 
-const num = (v: unknown): number => Number(v || 0);
+export const num = (v: unknown): number => Number(v || 0);
 
 export function normFiling(raw: Record<string, unknown>): Filing {
     const lines = (raw.lines as Record<string, unknown>[] | undefined)?.map((l) => ({
@@ -201,6 +201,29 @@ export function openReceiptModal(filing: Filing, onDone: () => void): void {
 // 受鉴权导出(zip/pdf)→ blob 下载(与 openAcctFile 同因:window.open 带不了 Bearer)。
 export async function downloadExport(path: string, filename: string): Promise<void> {
     await openAcctFile(withWs(path), filename);
+}
+
+// 复核屏底部三动作(导出/提交/标记手报)统一绑定 · PP30 与 PND 复核共用(onDone 各传自己的刷新)。
+export function bindFileActions(sec: HTMLElement, filing: Filing, onDone: () => void): void {
+    const exportBtn = sec.querySelector<HTMLButtonElement>('[data-act="export"]');
+    if (exportBtn)
+        exportBtn.onclick = async () => {
+            exportBtn.disabled = true;
+            try {
+                await downloadExport(
+                    `/api/tax/filings/${filing.id}/export?fmt=zip`,
+                    `${filing.kind}_${filing.period}.zip`
+                );
+            } catch (e) {
+                showToast(acctErrMsg(e, 'tax.export_failed'), 'error');
+            } finally {
+                exportBtn.disabled = false;
+            }
+        };
+    const fileBtn = sec.querySelector<HTMLButtonElement>('[data-act="file"]');
+    if (fileBtn) fileBtn.onclick = () => confirmFile(filing, onDone);
+    const markBtn = sec.querySelector<HTMLButtonElement>('[data-act="mark"]');
+    if (markBtn) markBtn.onclick = () => openReceiptModal(filing, onDone);
 }
 
 // 作用域基底 .taxp(继承全局令牌 · 与 .acct 同范式 · 照搬 Pearnly_报税_UI预览 4 屏)。

@@ -7,13 +7,11 @@ import { fmtBaht } from './purchase-common.js';
 import {
     anomalyRow,
     bindAnomalyLinks,
-    confirmFile,
-    downloadExport,
+    bindFileActions,
     dueLabel,
     hasHard,
     injectTaxBase,
     normFiling,
-    openReceiptModal,
 } from './tax-common.js';
 import type { Anomaly, Filing, FilingKind, FilingLine } from './tax-common.js';
 import { takePendingFiling } from './tax-center.js';
@@ -134,25 +132,7 @@ function bind(sec: HTMLElement): void {
     sec.querySelectorAll<HTMLElement>('[data-fix-taxid]').forEach((el) => {
         el.onclick = () => window.routeTo?.('purchase-suppliers');
     });
-    const exportBtn = sec.querySelector<HTMLButtonElement>('[data-act="export"]');
-    if (exportBtn)
-        exportBtn.onclick = async () => {
-            exportBtn.disabled = true;
-            try {
-                await downloadExport(
-                    `/api/tax/filings/${detail!.id}/export?fmt=zip`,
-                    `${detail!.kind}_${detail!.period}.zip`
-                );
-            } catch (e) {
-                showToast(acctErrMsg(e, 'tax.export_failed'), 'error');
-            } finally {
-                exportBtn.disabled = false;
-            }
-        };
-    const fileBtn = sec.querySelector<HTMLButtonElement>('[data-act="file"]');
-    if (fileBtn) fileBtn.onclick = () => confirmFile(detail!, () => loadDetail());
-    const markBtn = sec.querySelector<HTMLButtonElement>('[data-act="mark"]');
-    if (markBtn) markBtn.onclick = () => openReceiptModal(detail!, () => loadDetail());
+    bindFileActions(sec, detail!, () => loadDetail());
 }
 
 // 当前 tab 详情(含 lines + 最新体检);切 tab / 提交后复用。

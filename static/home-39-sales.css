@@ -628,7 +628,7 @@ table.sx-tbl tr.click:hover td {
 .sx-prev-inv {
     border: 1px solid var(--line);
     border-radius: 8px;
-    background: #fff;
+    background: var(--card);
     padding: 18px;
     font-size: 11.5px;
     color: #111;
@@ -822,7 +822,7 @@ table.sx-tbl tr.click:hover td {
     width: 100%;
     height: 100%;
     object-fit: contain;
-    background: #fff;
+    background: var(--card);
 }
 .sx-drop-lbl {
     display: inline-flex;

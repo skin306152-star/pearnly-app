@@ -107,7 +107,7 @@
     align-items: center;
     gap: 6px;
 }
-.exc-chip:hover { background: var(--gray-50); color: var(--ink); }
+.exc-chip:hover { background: var(--bg); color: var(--ink); }
 .exc-chip.active {
     background: var(--accent);
     color: var(--accent-ink);
@@ -632,12 +632,12 @@
 .notif-rule-row {
     display: flex; align-items: center; gap: 14px;
     padding: 14px 16px;
-    background: var(--c-fafaf8);
-    border: 1px solid var(--border, var(--gray-200));
+    background: var(--bg);
+    border: 1px solid var(--line);
     border-radius: 10px;
     transition: border-color .15s, background .15s;
 }
-.notif-rule-row:hover { border-color: var(--gray-300); background: var(--card); }
+.notif-rule-row:hover { border-color: var(--ink-4); background: var(--card); }
 .notif-rule-row.disabled { opacity: 0.55; }
 
 .notif-rule-tmpl-badge {
@@ -661,7 +661,7 @@
     font-size: 12px; color: var(--ink-3);
     display: flex; align-items: center; gap: 10px;
 }
-.notif-rule-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--gray-300); }
+.notif-rule-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--ink-4); }
 
 .notif-rule-actions {
     flex-shrink: 0;
@@ -671,7 +671,7 @@
     appearance: none;
     width: 36px; height: 20px;
     border-radius: 999px;
-    background: var(--gray-300);
+    background: var(--ink-4);
     position: relative; cursor: pointer;
     transition: background .2s;
     border: none;
@@ -681,7 +681,7 @@
     content: ''; position: absolute;
     width: 16px; height: 16px;
     border-radius: 50%;
-    background: #fff; top: 2px; left: 2px;
+    background: var(--card); top: 2px; left: 2px;
     transition: left .2s;
     box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
@@ -689,7 +689,7 @@
 .notif-rule-toggle.on::after { left: 18px; }
 
 .notif-rule-btn {
-    border: 1px solid var(--border, var(--gray-200));
+    border: 1px solid var(--line);
     background: var(--card);
     border-radius: 6px;
     padding: 5px 10px;
@@ -699,7 +699,7 @@
     transition: border-color .15s, background .15s, color .15s;
     white-space: nowrap;
 }
-.notif-rule-btn:hover { border-color: var(--gray-400); background: var(--gray-50); }
+.notif-rule-btn:hover { border-color: var(--ink3); background: var(--bg); }
 .notif-rule-btn.danger { color: var(--red-700); }
 .notif-rule-btn.danger:hover { background: var(--red-50); border-color: var(--red-300); }
 
@@ -715,8 +715,8 @@
 .notif-log-row {
     display: flex; align-items: center; gap: 12px;
     padding: 10px 14px;
-    background: var(--c-fafaf8);
-    border: 1px solid var(--gray-100);
+    background: var(--bg);
+    border: 1px solid var(--line2);
     border-radius: 8px;
     font-size: 12px;
 }
@@ -754,11 +754,11 @@
 .notif-template-card {
     flex: 1;
     padding: 12px 14px;
-    border: 1px solid var(--border, var(--gray-200));
+    border: 1px solid var(--line);
     border-radius: 8px;
     transition: border-color .15s, background .15s;
 }
-.notif-template-opt:hover .notif-template-card { border-color: var(--gray-400); }
+.notif-template-opt:hover .notif-template-card { border-color: var(--ink3); }
 .notif-template-opt input[type="radio"]:checked ~ .notif-template-card {
     border-color: var(--ink); background: var(--bg);
 }

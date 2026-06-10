@@ -33,7 +33,7 @@
 .brv2-zone-btn {
   align-self: flex-start;
   padding: 5px 12px; font-size: 12px; border-radius: 6px;
-  border: 1px solid var(--line); background: #fff; cursor: pointer;
+  border: 1px solid var(--line); background: var(--card); cursor: pointer;
   color: var(--ink-2, #555); font-weight: 500;
   transition: background .1s, color .1s;
 }
@@ -42,7 +42,7 @@
 .brv2-file-list { display: flex; flex-direction: column; gap: 4px; }
 .brv2-file-chip {
   display: flex; align-items: center; gap: 6px;
-  background: #fff; border: 1px solid var(--line);
+  background: var(--card); border: 1px solid var(--line);
   border-radius: 5px; padding: 3px 8px; font-size: 11px; color: var(--ink-2);
 }
 .brv2-file-chip-remove {
@@ -58,7 +58,7 @@
 .brv2-acct-label { font-size: 12px; font-weight: 600; color: var(--ink-2); white-space: nowrap; }
 .brv2-acct-select {
   padding: 5px 10px; border-radius: 6px; border: 1px solid var(--line);
-  font-size: 12px; background: #fff; color: var(--ink); min-width: 140px;
+  font-size: 12px; background: var(--card); color: var(--ink); min-width: 140px;
 }
 .brv2-acct-hint { font-size: 11px; color: var(--ink-3); }
 
@@ -157,7 +157,7 @@
 /* Detail table */
 .brv2-table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--line); }
 .brv2-table {
-  width: 100%; border-collapse: collapse; font-size: 12px; background: #fff;
+  width: 100%; border-collapse: collapse; font-size: 12px; background: var(--card);
 }
 .brv2-table th {
   padding: 8px 10px; background: var(--bg); color: var(--ink-2);
@@ -243,7 +243,7 @@
 /* ── acct-select 在 vex-action-bar 内的尺寸 ── */
 .brv2-acct-select {
   padding: 5px 10px; border-radius: 6px; border: 1px solid var(--line);
-  font-size: 12px; background: #fff; color: var(--ink); min-width: 140px;
+  font-size: 12px; background: var(--card); color: var(--ink); min-width: 140px;
 }
 
 /* ── filter-tabs 在 recon-collapse-head 内（右侧对齐） ── */

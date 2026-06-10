@@ -127,7 +127,7 @@ body.has-plan-banner .main { margin-top: calc(var(--topbar-h) + 36px); }
 }
 .info-chip {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 5px 10px; background: #fff;
+    padding: 5px 10px; background: var(--card);
     border: 1px solid var(--line); border-radius: 6px;
     font-size: 12px; color: var(--ink-2);
 }
@@ -160,10 +160,10 @@ body.has-plan-banner .main { margin-top: calc(var(--topbar-h) + 36px); }
     border: 2px dashed var(--line); border-radius: 8px;
     padding: 28px 20px; text-align: center;
     cursor: pointer; transition: border-color 150ms;
-    background: var(--c-fafaf8);
+    background: var(--bg);
 }
 .drop-zone:hover, .drop-zone.drag-over {
-    border-color: var(--ink); background: var(--c-fafaf8);
+    border-color: var(--ink); background: var(--bg);
 }
 .drop-zone .icon {
     width: 36px; height: 36px; color: var(--ink-3);
@@ -201,7 +201,7 @@ body.has-plan-banner .main { margin-top: calc(var(--topbar-h) + 36px); }
     border: 1px solid var(--line);
     border-radius: 8px;
     padding: 6px;
-    background: var(--c-fafafa);
+    background: var(--bg);
     transition: max-height 0.2s ease;
 }
 .file-list-body.expanded {
@@ -214,7 +214,7 @@ body.has-plan-banner .main { margin-top: calc(var(--topbar-h) + 36px); }
 }
 .file-item {
     display: flex; align-items: center; gap: 10px;
-    padding: 8px 12px; background: #fff;
+    padding: 8px 12px; background: var(--card);
     border-radius: 6px; margin-bottom: 4px;
     font-size: 13px;
 }

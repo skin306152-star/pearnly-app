@@ -47,7 +47,7 @@
     border: 1px solid var(--line);
     border-radius: 6px;
     outline: none;
-    background: #fff;
+    background: var(--card);
     color: var(--ink);
 }
 .api-key-input:focus {
@@ -61,7 +61,7 @@
 }
 .api-key-msg.success { color: var(--emerald-600); }
 .api-key-msg.error   { color: var(--danger); }
-.api-key-msg.info    { color: var(--gray-600); }
+.api-key-msg.info    { color: var(--ink2); }
 .api-key-help {
     font-size: 12px;
 }
@@ -94,9 +94,9 @@
     display: inline-block;
     margin-top: 12px;
     padding: 5px 14px;
-    background: var(--gray-100);
-    color: var(--gray-500);
-    border: 1px solid var(--gray-200);
+    background: var(--line2);
+    color: var(--ink2);
+    border: 1px solid var(--line);
     border-radius: 14px;
     font-size: 12px;
     font-weight: 600;
@@ -104,8 +104,8 @@
 
 /* v0.15 · 覆盖:旧 Plus/Pro tag 相关(如果还在用) · 统一为中性灰 */
 .cs-tag.plus, .cs-tag.pro, .cs-tag.free {
-    background: var(--gray-100) !important;
-    color: var(--gray-500) !important;
+    background: var(--line2) !important;
+    color: var(--ink2) !important;
 }
 .plus-badge, .pro-badge {
     display: none !important;   /* 彻底隐藏旧 Plus/Pro 徽章 */
@@ -147,25 +147,25 @@
 }
 #page-admin .admin-stats {
     margin-left: auto;
-    color: var(--gray-500);
+    color: var(--ink2);
     font-size: 13px;
 }
 #page-admin .admin-loading {
     padding: 60px 20px;
     text-align: center;
-    color: var(--gray-400);
+    color: var(--ink3);
     font-size: 14px;
 }
 #page-admin .admin-empty {
     padding: 60px 20px;
     text-align: center;
-    color: var(--gray-400);
+    color: var(--ink3);
 }
 #page-admin .admin-table-wrap {
     overflow-x: auto;
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--line);
     border-radius: 8px;
-    background: #fff;
+    background: var(--card);
 }
 #page-admin .admin-table {
     width: 100%;
@@ -173,33 +173,33 @@
     font-size: 13px;
 }
 #page-admin .admin-table thead th {
-    background: var(--gray-50);
-    color: var(--gray-500);
+    background: var(--bg);
+    color: var(--ink2);
     font-weight: 600;
     text-align: left;
     padding: 12px 14px;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--line);
     white-space: nowrap;
 }
 #page-admin .admin-table tbody td {
     padding: 14px;
-    border-bottom: 1px solid var(--gray-100);
-    color: var(--gray-900);
+    border-bottom: 1px solid var(--line2);
+    color: var(--ink);
     vertical-align: middle;
 }
 #page-admin .admin-table tbody tr:last-child td {
     border-bottom: none;
 }
 #page-admin .admin-table tbody tr:hover {
-    background: var(--gray-50);
+    background: var(--bg);
 }
 #page-admin .tenant-name {
     font-weight: 600;
-    color: var(--gray-900);
+    color: var(--ink);
 }
 #page-admin .tenant-notes {
     display: block;
-    color: var(--gray-400);
+    color: var(--ink3);
     font-size: 11px;
     margin-top: 2px;
 }
@@ -218,12 +218,12 @@
 #page-admin .tenant-status-active     { background: var(--emerald-100); color: var(--emerald-800); }
 #page-admin .tenant-status-warning    { background: var(--warn-bg); color: var(--amber-800); }
 #page-admin .tenant-status-suspended  { background: var(--danger-bg); color: var(--red-800); }
-#page-admin .tenant-status-frozen     { background: var(--gray-100); color: var(--gray-600); }
+#page-admin .tenant-status-frozen     { background: var(--line2); color: var(--ink2); }
 #page-admin .tenant-quota-bar {
     display: inline-block;
     width: 80px;
     height: 6px;
-    background: var(--gray-100);
+    background: var(--line2);
     border-radius: 3px;
     overflow: hidden;
     vertical-align: middle;
@@ -238,7 +238,7 @@
 #page-admin .tenant-quota-fill.over { background: var(--red-500); }
 #page-admin .tenant-quota-text {
     font-size: 12px;
-    color: var(--gray-500);
+    color: var(--ink2);
     vertical-align: middle;
 }
 #page-admin .tenant-actions {
@@ -249,16 +249,16 @@
 #page-admin .tenant-actions button {
     padding: 4px 10px;
     font-size: 12px;
-    border: 1px solid var(--gray-200);
-    background: #fff;
-    color: var(--gray-700);
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--ink);
     border-radius: 6px;
     cursor: pointer;
     transition: all .15s;
 }
 #page-admin .tenant-actions button:hover {
-    background: var(--gray-100);
-    border-color: var(--gray-300);
+    background: var(--line2);
+    border-color: var(--ink-4);
 }
 #page-admin .tenant-actions button.danger {
     color: var(--danger);
@@ -280,7 +280,7 @@
     padding: 20px;
 }
 .admin-modal {
-    background: #fff;
+    background: var(--card);
     border-radius: 12px;
     width: 100%;
     max-width: 460px;
@@ -292,7 +292,7 @@
 .admin-modal h3 {
     margin: 0 0 16px;
     font-size: 18px;
-    color: var(--gray-900);
+    color: var(--ink);
 }
 .admin-modal .form-row {
     margin-bottom: 16px;
@@ -301,7 +301,7 @@
     display: block;
     margin-bottom: 6px;
     font-size: 13px;
-    color: var(--gray-600);
+    color: var(--ink2);
     font-weight: 500;
 }
 .admin-modal .form-row input,
@@ -309,7 +309,7 @@
 .admin-modal .form-row textarea {
     width: 100%;
     padding: 8px 10px;
-    border: 1px solid var(--gray-300);
+    border: 1px solid var(--ink-4);
     border-radius: 6px;
     font-size: 14px;
     font-family: inherit;
@@ -323,7 +323,7 @@
 }
 .admin-modal .form-hint {
     font-size: 12px;
-    color: var(--gray-400);
+    color: var(--ink3);
     margin-top: 4px;
 }
 .admin-modal .form-actions {
@@ -346,11 +346,11 @@
     padding: 8px;
     margin: 2px auto 2px;   /* v100 · 压缩上下 · 让菜单多出空间 */
     border-radius: 8px;
-    color: var(--gray-500);
+    color: var(--ink2);
     cursor: pointer;
     transition: background .15s;
 }
-.sidebar-toggle-in:hover { background: var(--gray-100); }
+.sidebar-toggle-in:hover { background: var(--line2); }
 .sidebar-toggle-in svg { width: 20px; height: 20px; display: block; margin: 0 auto; }
 
 /* 默认显示侧栏内的汉堡 · 顶栏的那个已经删了 */
@@ -364,15 +364,15 @@
     align-items: center;
     padding: 8px 12px;
     min-width: 160px;
-    color: var(--gray-700);
+    color: var(--ink);
 }
 .admin-dd-menu .dd-item svg {
     width: 16px;
     height: 16px;
     flex-shrink: 0;
-    color: var(--gray-500);
+    color: var(--ink2);
 }
-.admin-dd-menu .dd-item:disabled { color: var(--gray-400); }
+.admin-dd-menu .dd-item:disabled { color: var(--ink3); }
 
 /* 返回按钮 + 详情头 */
 .admin-detail-head {
@@ -381,7 +381,7 @@
     gap: 12px;
     margin-bottom: 16px;
     padding-bottom: 12px;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--line);
 }
 .admin-detail-head .btn-back {
     display: inline-flex;
@@ -392,14 +392,14 @@
 .admin-detail-title {
     font-size: 18px;
     font-weight: 600;
-    color: var(--gray-900);
+    color: var(--ink);
 }
 
 .admin-detail-info {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 12px;
-    background: var(--gray-50);
+    background: var(--bg);
     padding: 14px 16px;
     border-radius: 8px;
     margin-bottom: 20px;
@@ -410,14 +410,14 @@
 }
 .admin-detail-info .info-label {
     font-size: 11px;
-    color: var(--gray-400);
+    color: var(--ink3);
     text-transform: uppercase;
     letter-spacing: 0.03em;
     margin-bottom: 4px;
 }
 .admin-detail-info .info-value {
     font-size: 14px;
-    color: var(--gray-900);
+    color: var(--ink);
     font-weight: 500;
 }
 
@@ -425,7 +425,7 @@
 .admin-detail-tabs {
     display: flex;
     gap: 4px;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--line);
     margin-bottom: 16px;
 }
 .admin-tab {
@@ -433,12 +433,12 @@
     background: transparent;
     border: none;
     border-bottom: 2px solid transparent;
-    color: var(--gray-500);
+    color: var(--ink2);
     font-size: 14px;
     cursor: pointer;
     transition: all .15s;
 }
-.admin-tab:hover { color: var(--gray-900); }
+.admin-tab:hover { color: var(--ink); }
 .admin-tab.active {
     color: var(--ink);
     border-bottom-color: var(--ink);
@@ -455,36 +455,36 @@
 
 /* 操作日志列表 */
 .admin-logs-list {
-    background: #fff;
-    border: 1px solid var(--gray-200);
+    background: var(--card);
+    border: 1px solid var(--line);
     border-radius: 8px;
     max-height: 500px;
     overflow-y: auto;
 }
 .admin-logs-list .log-item {
     padding: 12px 16px;
-    border-bottom: 1px solid var(--gray-100);
+    border-bottom: 1px solid var(--line2);
     font-size: 13px;
 }
 .admin-logs-list .log-item:last-child { border-bottom: none; }
 .admin-logs-list .log-time {
     font-size: 11px;
-    color: var(--gray-400);
+    color: var(--ink3);
     margin-bottom: 2px;
 }
 .admin-logs-list .log-main {
-    color: var(--gray-900);
+    color: var(--ink);
 }
 .admin-logs-list .log-main .log-actor {
     font-weight: 600;
     color: var(--ink);
 }
 .admin-logs-list .log-main .log-action {
-    color: var(--gray-500);
+    color: var(--ink2);
     margin: 0 4px;
 }
 .admin-logs-list .log-main .log-target {
-    color: var(--gray-900);
+    color: var(--ink);
 }
 .admin-logs-list .log-super-badge {
     display: inline-block;
@@ -499,7 +499,7 @@
 .admin-logs-list .log-empty {
     padding: 60px 20px;
     text-align: center;
-    color: var(--gray-400);
+    color: var(--ink3);
 }
 
 /* ============================================================
@@ -511,7 +511,7 @@
     gap: 16px;
     margin-bottom: 20px;
     padding-bottom: 16px;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--line);
 }
 .admin-detail-head .btn-back {
     padding: 6px 12px;
@@ -523,14 +523,14 @@
 .admin-detail-title {
     font-size: 18px;
     font-weight: 600;
-    color: var(--gray-900);
+    color: var(--ink);
 }
 .admin-detail-info {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 12px 20px;
     padding: 16px;
-    background: var(--gray-50);
+    background: var(--bg);
     border-radius: 8px;
     margin-bottom: 20px;
 }
@@ -541,17 +541,17 @@
 }
 .admin-detail-info .info-label {
     font-size: 12px;
-    color: var(--gray-500);
+    color: var(--ink2);
 }
 .admin-detail-info .info-item span:last-child {
     font-size: 14px;
-    color: var(--gray-900);
+    color: var(--ink);
     font-weight: 500;
 }
 .admin-detail-tabs {
     display: flex;
     gap: 4px;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--line);
     margin-bottom: 16px;
 }
 .admin-detail-tabs .admin-tab {
@@ -559,12 +559,12 @@
     background: transparent;
     border: none;
     border-bottom: 2px solid transparent;
-    color: var(--gray-500);
+    color: var(--ink2);
     font-size: 14px;
     cursor: pointer;
     transition: all .15s;
 }
-.admin-detail-tabs .admin-tab:hover { color: var(--gray-900); }
+.admin-detail-tabs .admin-tab:hover { color: var(--ink); }
 .admin-detail-tabs .admin-tab.active {
     color: var(--ink);
     border-bottom-color: var(--ink);
@@ -579,13 +579,13 @@
     display: flex;
     gap: 12px;
     padding: 10px 14px;
-    background: var(--gray-50);
+    background: var(--bg);
     border-radius: 6px;
     font-size: 13px;
     align-items: flex-start;
 }
 .admin-log-time {
-    color: var(--gray-400);
+    color: var(--ink3);
     font-size: 12px;
     white-space: nowrap;
     padding-top: 1px;
@@ -593,7 +593,7 @@
 }
 .admin-log-body {
     flex: 1;
-    color: var(--gray-700);
+    color: var(--ink);
     line-height: 1.5;
 }
 .admin-log-body .admin-log-action {
@@ -605,12 +605,12 @@
     margin: 0 4px;
 }
 .admin-log-body .admin-log-target {
-    color: var(--gray-900);
+    color: var(--ink);
     font-weight: 500;
 }
 .admin-log-body .admin-log-meta {
     margin-left: 8px;
-    color: var(--gray-400);
+    color: var(--ink3);
     font-size: 11px;
 }
 /* 删除危险警告 */
@@ -666,12 +666,12 @@
     border: none;
     border-radius: 6px;
     cursor: pointer;
-    color: var(--gray-500);
+    color: var(--ink2);
     transition: all .15s;
 }
 .sidebar-toggle.sidebar-toggle-in:hover {
-    background: var(--gray-100);
-    color: var(--gray-900);
+    background: var(--line2);
+    color: var(--ink);
 }
 .sidebar-toggle.sidebar-toggle-in svg {
     width: 20px;
@@ -702,7 +702,7 @@
     border: none;
     padding: 4px;
     cursor: pointer;
-    color: var(--gray-400);
+    color: var(--ink3);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -710,8 +710,8 @@
     transition: color .15s, background .15s;
 }
 .pw-eye:hover {
-    color: var(--gray-500);
-    background: var(--gray-100);
+    color: var(--ink2);
+    background: var(--line2);
 }
 .pw-eye svg {
     width: 18px;
@@ -769,27 +769,27 @@
 
 /* v23 · 超管账号在用户列表中变灰 · 不可操作 */
 .admin-self-row-tr {
-    background: var(--gray-50);
+    background: var(--bg);
 }
 .admin-self-row-tr td {
-    color: var(--gray-400);
+    color: var(--ink3);
 }
 .admin-self-name {
-    color: var(--gray-500) !important;
+    color: var(--ink2) !important;
     cursor: not-allowed;
 }
 .tenant-actions button.disabled-btn,
 .tenant-actions button[disabled] {
     opacity: 0.4;
     cursor: not-allowed !important;
-    background: var(--gray-100);
-    color: var(--gray-400);
-    border-color: var(--gray-200);
+    background: var(--line2);
+    color: var(--ink3);
+    border-color: var(--line);
 }
 .tenant-actions button.disabled-btn:hover,
 .tenant-actions button[disabled]:hover {
-    background: var(--gray-100);
-    color: var(--gray-400);
+    background: var(--line2);
+    color: var(--ink3);
 }
 .admin-self-row:hover {
     cursor: not-allowed;
@@ -799,11 +799,11 @@
 .admin-detail-section-head {
     margin: 16px 0 12px;
     padding-bottom: 10px;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--line);
 }
 .admin-detail-section-title {
     font-size: 15px;
     font-weight: 600;
-    color: var(--gray-700);
+    color: var(--ink);
 }
 

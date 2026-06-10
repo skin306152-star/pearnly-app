@@ -15,7 +15,7 @@ interface Cashier {
     has_shifts: boolean;
 }
 
-const COLORS = ['#2563EB', '#0891b2', '#7c3aed', '#16a34a', '#db2777', '#f59e0b'];
+const COLORS = ['#0E7C66', '#0891b2', '#7c3aed', '#16a34a', '#db2777', '#f59e0b'];
 
 let items: Cashier[] = [];
 let modalTarget: Cashier | null = null; // null = 新增模式;非空 = 给该收银员重设 PIN

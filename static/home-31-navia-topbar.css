@@ -50,7 +50,7 @@ body.is-windows .topbar-search-kbd-win { display: inline; }
 .avatar {
     width: 30px; height: 30px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent), var(--indigo-500));
+    background: linear-gradient(135deg, var(--accent), var(--accent-deep));
     color: #fff;
     font-size: 13px; font-weight: 600;
     display: inline-flex; align-items: center; justify-content: center;

@@ -35,8 +35,9 @@
     --amber-weak: #FCF3E1;
     --red: #DC4A47;
     --red-weak: #FCEDED;
-    --blue: #2563EB;
-    --blue-weak: #EAF1FE;
+    /* 旧蓝调色板收口为 emerald(2026-06-10 设计评审 S1):238 处 --blue 引用一次性随令牌翻绿 */
+    --blue: #0E7C66;
+    --blue-weak: #E4F4F0;
     --success: #149E62;
     --success-bg: #E7F6EE;
     --warn: #C9820C;
@@ -136,14 +137,15 @@
     --emerald-700: #047857;
     --emerald-800: #065f46;
     /* blue */
-    --blue-50: #eff6ff;
-    --blue-100: #dbeafe;
-    --blue-200: #bfdbfe;
-    --blue-300: #93c5fd;
-    --blue-400: #60a5fa;
-    --blue-600: #2563eb;
-    --blue-700: #1d4ed8;
-    --blue-800: #1e40af;
+    /* blue 阶 → emerald 阶(S1 · 600=accent 700=accent-deep) */
+    --blue-50: #f0f9f6;
+    --blue-100: #e4f4f0;
+    --blue-200: #c2e5db;
+    --blue-300: #8fcfc0;
+    --blue-400: #4daa95;
+    --blue-600: #0e7c66;
+    --blue-700: #0a5f4e;
+    --blue-800: #084c3f;
     /* sky */
     --sky-50: #f0f9ff;
     --sky-200: #bae6fd;
@@ -287,8 +289,8 @@
     --amber-weak: #2A2113;
     --red: #F0635F;
     --red-weak: #2A1517;
-    --blue: #5B8DEF;
-    --blue-weak: #16223A;
+    --blue: #2DD4A7;
+    --blue-weak: #11261F;
     --success: #3FB984;
     --success-bg: #11281F;
     --warn: #E0A93B;

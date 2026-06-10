@@ -21,12 +21,12 @@ interface Seller {
 }
 
 const TEMPLATES = ['classic', 'clean', 'brand', 'compact', 'official', 'mono'];
-const COLORS = ['#2563eb', '#0f766e', '#b45309', '#7c3aed', '#be123c', '#111827'];
+const COLORS = ['#0E7C66', '#0f766e', '#b45309', '#7c3aed', '#be123c', '#111827'];
 
 let sellers: Seller[] = [];
 let idx = 0;
 let tpl = 'classic';
-let color = '#2563eb';
+let color = '#0E7C66';
 
 function cur(): Seller | undefined {
     return sellers[idx];
@@ -128,7 +128,7 @@ function selectSeller(i: number) {
     idx = i;
     const s = cur();
     tpl = (s && s.template_id) || 'classic';
-    color = (s && s.brand_color) || '#2563eb';
+    color = (s && s.brand_color) || '#0E7C66';
     render();
 }
 

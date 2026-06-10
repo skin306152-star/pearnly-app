@@ -24,7 +24,7 @@ export const ICO = {
     box: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7"><path d="M21 8 12 3 3 8l9 5 9-5ZM3 8v8l9 5 9-5V8"/></svg>',
 };
 const PCOLORS = [
-    '#2563eb',
+    '#0E7C66',
     '#db2777',
     '#16a34a',
     '#d97706',

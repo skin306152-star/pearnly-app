@@ -406,7 +406,7 @@ const SIDEBAR_HTML = `
             <path d="M10 6.5v7M6.5 10h7"/>
         </svg>
         <span class="nav-label" data-i18n="nav-enroll">可开启功能</span>
-        <span class="nav-label" style="margin-left:auto;color:var(--brand,#2563EB);">→</span>
+        <span class="nav-label" style="margin-left:auto;color:var(--brand,#0E7C66);">→</span>
     </div>
 
     <div class="nav-item" data-route="exceptions">

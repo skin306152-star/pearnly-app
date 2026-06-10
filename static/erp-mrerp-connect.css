@@ -82,8 +82,8 @@
   color: #5d5d57;
 }
 .mrerp-pill-info {
-  background: #dbeafe;
-  color: #1e40af;
+  background: var(--blue-weak);
+  color: var(--blue-800);
 }
 .mrerp-pill-testing {
   background: #eef2ff;

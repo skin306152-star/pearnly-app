@@ -3,7 +3,7 @@
 //
 // 与 rules-settings.ts(逻辑)分文件以守 <500 行。自包含 4 语言(zh/th/en/ja)
 // 镜像 _showSessionRevokedModal 范式 · 不动 i18n-data;注入式 scoped CSS(含手机端
-// media query)· 不碰 CSS bundle。配色对齐异常模块(蓝 #2563eb / 选中黑)。
+// media query)· 不碰 CSS bundle。配色走全局令牌(--blue 系 · 选中黑)。
 // ============================================================
 
 export interface ClientRuleRow {
@@ -270,7 +270,7 @@ export const RS_STYLE = `
 .rs-pop{width:720px;max-width:100%;max-height:86vh;background:#fff;border-radius:16px;box-shadow:0 10px 32px rgba(0,0,0,.18);display:grid;grid-template-rows:auto 1fr auto;overflow:hidden;}
 .rs-head{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid #e8e8e3;}
 .rs-head h2{font-size:16px;font-weight:650;margin:0;color:#111;}
-.rs-tag{font-size:11px;font-weight:600;color:#2563eb;background:#eaf1fe;border:1px solid #cfe0fc;padding:2px 7px;border-radius:6px;}
+.rs-tag{font-size:11px;font-weight:600;color:var(--blue);background:var(--blue-weak);border:1px solid var(--blue-200);padding:2px 7px;border-radius:6px;}
 .rs-close{margin-left:auto;width:32px;height:32px;border-radius:8px;border:1px solid #e8e8e3;background:#fff;color:#999;cursor:pointer;display:grid;place-items:center;}
 .rs-close:hover{border-color:#111;color:#111;}
 .rs-body{overflow-y:auto;padding:16px 20px;}
@@ -281,7 +281,7 @@ export const RS_STYLE = `
 .rs-gico{width:30px;height:30px;border-radius:8px;background:#f4f4f0;display:grid;place-items:center;color:#555;flex:none;}
 .rs-gt{font-size:14px;font-weight:600;color:#111;}
 .rs-gd{font-size:12px;color:#999;margin-top:1px;}
-.rs-addbtn{margin-left:auto;display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;color:#2563eb;background:#eaf1fe;border:1px solid #cfe0fc;border-radius:8px;padding:6px 11px;cursor:pointer;}
+.rs-addbtn{margin-left:auto;display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;color:var(--blue);background:var(--blue-weak);border:1px solid var(--blue-200);border-radius:8px;padding:6px 11px;cursor:pointer;}
 .rs-gbody{padding:4px 16px 12px;}
 .rs-rule{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #f0f0eb;}
 .rs-rule:last-child{border-bottom:none;}
@@ -294,7 +294,7 @@ export const RS_STYLE = `
 .rs-sev.high{background:#fee2e2;color:#dc2626;}
 .rs-sev.medium{background:#fef3c7;color:#d97706;}
 .rs-sev.low{background:#f4f4f0;color:#999;}
-.rs-sw{width:38px;height:22px;border-radius:999px;background:#2563eb;position:relative;cursor:pointer;flex:none;border:none;padding:0;}
+.rs-sw{width:38px;height:22px;border-radius:999px;background:var(--blue);position:relative;cursor:pointer;flex:none;border:none;padding:0;}
 .rs-sw::after{content:"";position:absolute;top:2px;left:18px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.15s;}
 .rs-sw.off{background:#cbd5e0;}
 .rs-sw.off::after{left:2px;}
@@ -303,19 +303,19 @@ export const RS_STYLE = `
 .rs-empty{font-size:12.5px;color:#999;padding:10px 0 4px;}
 .rs-types{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px;}
 .rs-type{border:1px solid #e8e8e3;border-radius:9px;padding:10px 11px;font-size:12.5px;cursor:pointer;text-align:left;background:#fff;}
-.rs-type.on{border-color:#2563eb;background:#eaf1fe;}
+.rs-type.on{border-color:var(--blue);background:var(--blue-weak);}
 .rs-type .tt{font-weight:600;color:#111;}
 .rs-type .td{color:#999;font-size:11px;margin-top:2px;}
 .rs-mlbl{font-size:12px;font-weight:600;color:#555;margin:14px 0 7px;}
 .rs-field{font-size:13.5px;width:100%;border:1px solid #e8e8e3;border-radius:8px;padding:9px 11px;background:#fff;color:#111;box-sizing:border-box;}
 .rs-two{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .rs-check{display:flex;align-items:center;gap:8px;font-size:13px;color:#555;margin-top:12px;cursor:pointer;}
-.rs-check input{width:16px;height:16px;accent-color:#2563eb;}
+.rs-check input{width:16px;height:16px;accent-color:var(--blue);}
 .rs-btn{height:38px;padding:0 16px;border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer;border:1px solid transparent;}
 .rs-btn-ghost{background:transparent;color:#6b7280;}
 .rs-btn-ghost:hover{background:#f0f1ee;}
-.rs-btn-primary{background:#2563eb;color:#fff;}
-.rs-btn-primary:hover{background:#1d4ed8;}
+.rs-btn-primary{background:var(--blue);color:#fff;}
+.rs-btn-primary:hover{background:var(--blue-700);}
 @media (max-width:560px){
 .rs-pop{max-height:94vh;border-radius:14px;}
 .rs-types{grid-template-columns:1fr;}

@@ -60,10 +60,10 @@
     border: 1px solid var(--line); background: var(--bg); color: var(--ink-2);
     cursor: pointer;
 }
-.erp-exc-chip.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+.erp-exc-chip.active { background: var(--blue); color: #fff; border-color: var(--blue); }
 .erp-exc-chip-count { font-size: 11px; opacity: .8; }
-/* 行/全选 复选框勾选态 → 品牌蓝(局部·不动全局 --accent) */
-.erp-exc-cb, .erp-exc-cb-all { accent-color: #2563eb; width: 16px; height: 16px; cursor: pointer; }
+/* 行/全选 复选框勾选态 → 品牌主色(局部·不动全局 --accent) */
+.erp-exc-cb, .erp-exc-cb-all { accent-color: var(--blue); width: 16px; height: 16px; cursor: pointer; }
 .erp-exc-search {
     margin-left: auto; min-width: 220px; padding: 6px 10px; font-size: 12px;
     border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink-1);
@@ -490,7 +490,7 @@ button.btn-primary.btn-tiny:hover {
 .erp-receipt-primary-btn {
     display: inline-block;
     padding: 9px 18px;
-    background: #2563eb;
+    background: var(--blue);
     color: #fff;
     border: none;
     border-radius: 8px;
@@ -541,9 +541,9 @@ button.btn-primary.btn-tiny:hover {
 }
 .erp-receipt-action-btn:hover { background: var(--bg); }
 .erp-receipt-action-btn.primary {
-    background: #2563eb;
+    background: var(--blue);
     color: #fff;
-    border-color: #2563eb;
+    border-color: var(--blue);
 }
 .erp-receipt-action-btn.primary:hover { opacity: 0.9; }
 

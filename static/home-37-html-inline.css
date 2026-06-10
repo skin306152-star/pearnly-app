@@ -23,7 +23,7 @@
     width: 16px;
     height: 16px;
     cursor: pointer;
-    accent-color: #2563eb;
+    accent-color: var(--blue);
     margin: 0;
 }
 
@@ -292,7 +292,7 @@
     background: linear-gradient(135deg, var(--bg) 0%, var(--bg) 100%);
     border: 1px solid var(--blue-200);
     border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.05);
+    box-shadow: 0 1px 3px rgba(14, 124, 102, 0.05);
 }
 .drawer-decision-title {
     display: flex;
@@ -494,7 +494,7 @@
 }
 .drawer-suggest-input:focus {
     border-color: var(--ink);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    box-shadow: 0 0 0 3px rgba(14, 124, 102, 0.12);
 }
 .drawer-suggest-input[readonly] {
     background: var(--gray-50);
@@ -607,7 +607,7 @@
 .camera-tips-skip-row input {
     width: 15px;
     height: 15px;
-    accent-color: #2563eb;
+    accent-color: var(--blue);
     cursor: pointer;
 }
 
@@ -892,7 +892,7 @@
     background: #fff;
     color: var(--ink);
     flex-shrink: 0;
-    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.15);
+    box-shadow: 0 1px 3px rgba(14, 124, 102, 0.15);
 }
 .bank-upload-icon svg {
     width: 26px;
@@ -984,7 +984,7 @@
 }
 .bank-session-row:hover {
     border-color: var(--blue-300);
-    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.1);
+    box-shadow: 0 1px 3px rgba(14, 124, 102, 0.1);
 }
 .bank-session-bank {
     font-size: 11px;
@@ -1145,9 +1145,9 @@
     background: var(--gray-100);
 }
 .bank-filter-btn.active {
-    background: #2563eb;
+    background: var(--blue);
     color: #fff;
-    border-color: #2563eb;
+    border-color: var(--blue);
 }
 
 /* 流水表格 */
@@ -1723,7 +1723,7 @@
 .force-pw-input:focus {
     outline: none;
     border-color: var(--ink);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    box-shadow: 0 0 0 3px rgba(14, 124, 102, 0.1);
 }
 .force-pw-msg {
     font-size: 13px;

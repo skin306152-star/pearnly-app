@@ -126,7 +126,7 @@ function ensureStyle(): void {
 .kb-bub.kb-thinking{color:var(--ink-3,#999)}
 .kb-cites{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
 .kb-cite{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line,#e8e8e3);border-radius:9px;padding:6px 10px;font-size:12px;font-weight:600;color:var(--info-ink,var(--accent-deep));cursor:pointer}
-.kb-cite:hover{border-color:var(--btn-blue,var(--accent));box-shadow:0 2px 8px rgba(37,99,235,.12)}
+.kb-cite:hover{border-color:var(--btn-blue,var(--accent));box-shadow:0 2px 8px rgba(14,124,102,.12)}
 .kb-cite svg{width:13px;height:13px}
 .kb-cite .ch{color:var(--ink-3,#999)}
 .kb-qa-foot{border-top:1px solid var(--line,#e8e8e3);padding:0}

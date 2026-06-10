@@ -83,7 +83,7 @@
 .align-right { text-align: right; }
 
 .cust-col-check, .cust-cell-check { display: flex; align-items: center; justify-content: center; }
-.cust-col-check input, .cust-cell-check input { width: 16px; height: 16px; accent-color: #2563eb; cursor: pointer; }
+.cust-col-check input, .cust-cell-check input { width: 16px; height: 16px; accent-color: var(--blue); cursor: pointer; }
 
 .cust-cell-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .cust-color-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
@@ -103,8 +103,8 @@
 .cust-row-btn svg { width: 13px; height: 13px; }
 .cust-row-btn:hover { background: var(--bg); border-color: var(--gray-300); }
 .cust-row-btn.danger:hover { background: var(--red-50); border-color: var(--red-200); color: var(--danger); }
-.cust-row-btn.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
-.cust-row-btn.primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+.cust-row-btn.primary { background: var(--blue); color: #fff; border-color: var(--blue); }
+.cust-row-btn.primary:hover { background: var(--blue-700); border-color: var(--blue-700); }
 .cust-badge-current {
     display: inline-flex; align-items: center; gap: 4px;
     background: var(--emerald-50); color: var(--emerald-600); border: 1px solid var(--emerald-200);

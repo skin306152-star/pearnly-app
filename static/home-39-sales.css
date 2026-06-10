@@ -166,7 +166,7 @@ body.sidebar-collapsed .nav-section-label {
 .sx-search input:focus {
     outline: 0;
     border-color: var(--btn-blue);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    box-shadow: 0 0 0 3px rgba(14, 124, 102, 0.12);
 }
 
 /* 列表面板 + 表 */
@@ -565,7 +565,7 @@ table.sx-tbl tr.click:hover td {
 .sx-modal-mask textarea:focus {
     outline: 0;
     border-color: var(--btn-blue);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    box-shadow: 0 0 0 3px rgba(14, 124, 102, 0.12);
 }
 .sx-tpls {
     display: grid;
@@ -581,7 +581,7 @@ table.sx-tbl tr.click:hover td {
 }
 .sx-tpl.on {
     border-color: var(--btn-blue);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    box-shadow: 0 0 0 3px rgba(14, 124, 102, 0.12);
 }
 .sx-tpl-pv {
     height: 86px;

@@ -827,7 +827,7 @@ body [data-i18n] {
 }
 .ob-option:hover {
     background: #f4f4f0;
-    border-color: #93c5fd;
+    border-color: var(--blue-300);
 }
 .ob-option.selected {
     background: #f4f4f0;

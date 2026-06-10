@@ -195,7 +195,7 @@
 .sw-wrap select:focus {
     outline: 0;
     border-color: var(--btn-blue);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    box-shadow: 0 0 0 3px rgba(14, 124, 102, 0.12);
 }
 .sw-hint {
     font-size: 11.5px;
@@ -366,7 +366,7 @@
 }
 .sw-pcard:hover {
     border-color: var(--btn-blue);
-    box-shadow: 0 3px 10px rgba(37, 99, 235, 0.14);
+    box-shadow: 0 3px 10px rgba(14, 124, 102, 0.14);
     transform: translateY(-1px);
 }
 .sw-pimg {

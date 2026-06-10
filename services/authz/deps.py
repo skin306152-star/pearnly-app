@@ -153,7 +153,9 @@ def get_authz(request: Optional[Request], user: dict) -> Authz:
     return _cached_authz(request, user)
 
 
-def check_request_scope(request: Optional[Request], workspace_client_id, *, pos: bool = False) -> None:
+def check_request_scope(
+    request: Optional[Request], workspace_client_id, *, pos: bool = False
+) -> None:
     """套账解析点的作用域闸(resolve_ws / workspace_context 等 ws 选定处调)。
 
     优先用本请求已缓存的权限快照;没有(路由还没走 require_perm)则按 Authorization

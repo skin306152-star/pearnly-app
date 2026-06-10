@@ -111,7 +111,9 @@ from routes.sales_send_routes import (
 from routes.uploads_routes import router as uploads_router  # 图片上传/取图 §L4 · 2026-06-06
 from routes.team_routes import router as team_router  # REFACTOR-B1 · 员工管理 7 路由 · 2026-05-25
 from routes.console_team_routes import router as console_team_router  # 权限批3 · 成员/角色/安全日志
-from routes.console_invite_routes import router as console_invite_router  # 权限批3 · 邀请/所有权转移
+from routes.console_invite_routes import (
+    router as console_invite_router,
+)  # 权限批3 · 邀请/所有权转移
 from routes.email_ingest_routes import (
     router as email_ingest_router,
 )  # REFACTOR-B1 · 邮箱抓取 6 路由 · 2026-05-25

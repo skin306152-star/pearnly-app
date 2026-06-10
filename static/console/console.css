@@ -333,7 +333,8 @@ body {
   white-space: nowrap;
 }
 
-/* 角色「使用权」芯片(PEAK 吸收)· 业务模块各一色 · 浅/暗共用半透明底 */
+/* 角色「使用权」芯片(PEAK 吸收)· 全令牌:业务模块 accent 系 · 管理类灰系。
+   每模块一色的调色板须先进 console-theme 令牌(类名 mod-* 已留位,只改这里即可上色)。 */
 .modchips {
   display: flex;
   flex-wrap: wrap;
@@ -346,80 +347,12 @@ body {
   padding: 2px 7px;
   border-radius: 99px;
   white-space: nowrap;
-}
-.modchip.mod-sales {
-  background: rgba(37, 99, 235, 0.12);
-  color: #2563eb;
-}
-.modchip.mod-purchase {
-  background: rgba(217, 119, 6, 0.12);
-  color: #d97706;
-}
-.modchip.mod-acct {
-  background: rgba(5, 150, 105, 0.12);
-  color: #059669;
-}
-.modchip.mod-tax {
-  background: rgba(225, 29, 72, 0.12);
-  color: #e11d48;
-}
-.modchip.mod-recon {
-  background: rgba(8, 145, 178, 0.12);
-  color: #0891b2;
-}
-.modchip.mod-ar {
-  background: rgba(99, 102, 241, 0.12);
-  color: #6366f1;
-}
-.modchip.mod-inv {
-  background: rgba(101, 163, 13, 0.12);
-  color: #65a30d;
-}
-.modchip.mod-pos {
-  background: rgba(234, 88, 12, 0.12);
-  color: #ea580c;
-}
-.modchip.mod-kb {
-  background: rgba(124, 58, 237, 0.12);
-  color: #7c3aed;
-}
-.modchip.mod-intake {
-  background: rgba(13, 148, 136, 0.12);
-  color: #0d9488;
+  background: var(--accent-weak);
+  color: var(--accent-deep);
 }
 .modchip.mod-admin {
   background: var(--line);
   color: var(--ink2);
-}
-.dark .modchip.mod-sales {
-  color: #93b4f8;
-}
-.dark .modchip.mod-purchase {
-  color: #f0b35f;
-}
-.dark .modchip.mod-acct {
-  color: #5fd0a5;
-}
-.dark .modchip.mod-tax {
-  color: #f48aa4;
-}
-.dark .modchip.mod-recon {
-  color: #67cfe3;
-}
-.dark .modchip.mod-ar {
-  color: #a5a8f5;
-}
-.dark .modchip.mod-inv {
-  color: #aed368;
-}
-.dark .modchip.mod-pos {
-  color: #f4a268;
-}
-.dark .modchip.mod-kb {
-  color: #c2a4f2;
-}
-.dark .modchip.mod-intake {
-  color: #5fd0c5;
 }
 
 .wslist {

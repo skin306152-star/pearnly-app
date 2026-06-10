@@ -21,7 +21,7 @@ body {
   grid-template-columns: 208px 1fr;
   min-height: 100vh;
 }
-@media (max-width: 860px) {
+@media (width <= 860px) {
   .shell {
     grid-template-columns: 1fr;
   }
@@ -74,6 +74,14 @@ body {
   background: var(--accent-weak);
   color: var(--ink);
   font-weight: 600;
+}
+.ic {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+.sb a.on .ic {
+  color: var(--accent);
 }
 .sb .foot {
   margin-top: 24px;
@@ -231,7 +239,19 @@ body {
   text-align: right;
 }
 .crown {
-  font-size: 13px;
+  width: 14px;
+  height: 14px;
+  color: var(--warn);
+  vertical-align: -2px;
+}
+.btn.armed {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.av .ic {
+  width: 14px;
+  height: 14px;
 }
 
 .pill {

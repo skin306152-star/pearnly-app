@@ -3,6 +3,10 @@
    不过 → 403 人话页;错误码经 console-i18n 翻 4 语,不裸露。 */
 (function () {
     'use strict';
+    var ICON_CROWN =
+        '<svg class="crown" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.56 3.27a.5.5 0 0 1 .88 0l2.95 5.6a1 1 0 0 0 1.52.3l4.27-3.67a.5.5 0 0 1 .8.52l-2.83 10.25a1 1 0 0 1-.96.73H5.81a1 1 0 0 1-.96-.73L2.02 6.02a.5.5 0 0 1 .8-.52l4.28 3.67a1 1 0 0 0 1.51-.3z"/></svg>';
+    var ICON_MAIL =
+        '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>';
     var S = {
         token: null,
         perms: [],
@@ -237,7 +241,7 @@
             esc((m.username || '?').slice(0, 2).toUpperCase()) +
             '</span>' +
             '<span class="who"><span class="nm">' +
-            (isOwner ? '<span class="crown">👑</span> ' : '') +
+            (isOwner ? ICON_CROWN + ' ' : '') +
             esc(m.username) +
             (m.is_self ? ' <span style="color:var(--ink3)">' + ct('you') + '</span>' : '') +
             '</span>' +
@@ -354,7 +358,7 @@
             ct('grp_role') +
             '</div><div class="rolecards" id="a-roles">' +
             roleCards +
-            '</div></div>' +
+            '</div><div class="acts" id="a-roleconfirm" style="display:none"></div></div>' +
             scopeHtml +
             '<div class="grp"><div class="lb">' +
             ct('grp_danger') +
@@ -381,12 +385,29 @@
                     ev.stopPropagation();
                     var rk = card.getAttribute('data-role');
                     if (rk === m.role_key) return;
-                    if (!confirm(ct('confirm_role', { role: roleName(rk) }))) return;
-                    api('PUT', '/api/team/members/' + m.id + '/role', { role_key: rk })
-                        .then(loadAll)
-                        .catch(function (e) {
-                            toast(errMsg(e));
-                        });
+                    // 行内确认条(全站禁原生弹窗)
+                    var bar = $('a-roleconfirm');
+                    bar.style.display = '';
+                    bar.innerHTML =
+                        '<span class="hint">' +
+                        ct('confirm_role', { role: roleName(rk) }) +
+                        '</span><button class="btn pri sm" id="a-roleok">' +
+                        ct('btn_save') +
+                        '</button><button class="btn sec sm" id="a-rolecancel">' +
+                        ct('btn_cancel') +
+                        '</button>';
+                    $('a-rolecancel').onclick = function (e2) {
+                        e2.stopPropagation();
+                        bar.style.display = 'none';
+                    };
+                    $('a-roleok').onclick = function (e2) {
+                        e2.stopPropagation();
+                        api('PUT', '/api/team/members/' + m.id + '/role', { role_key: rk })
+                            .then(loadAll)
+                            .catch(function (e) {
+                                toast(errMsg(e));
+                            });
+                    };
                 };
             });
         var seg = $('a-scopeseg');
@@ -433,24 +454,50 @@
         if (tg)
             tg.onclick = function (ev) {
                 ev.stopPropagation();
-                if (m.is_active && !confirm(ct('confirm_disable'))) return;
-                api('PATCH', '/api/team/members/' + m.id + '/active', { is_active: !m.is_active })
-                    .then(loadAll)
-                    .catch(function (e) {
-                        toast(errMsg(e));
-                    });
+                var act = function () {
+                    api('PATCH', '/api/team/members/' + m.id + '/active', {
+                        is_active: !m.is_active,
+                    })
+                        .then(loadAll)
+                        .catch(function (e) {
+                            toast(errMsg(e));
+                        });
+                };
+                if (m.is_active) armConfirm(tg, act);
+                else act();
             };
         var rm = $('a-remove');
         if (rm)
             rm.onclick = function (ev) {
                 ev.stopPropagation();
-                if (!confirm(ct('confirm_remove'))) return;
-                api('DELETE', '/api/team/members/' + m.id)
-                    .then(loadAll)
-                    .catch(function (e) {
-                        toast(errMsg(e));
-                    });
+                armConfirm(rm, function () {
+                    api('DELETE', '/api/team/members/' + m.id)
+                        .then(loadAll)
+                        .catch(function (e) {
+                            toast(errMsg(e));
+                        });
+                });
             };
+    }
+
+    // 危险按钮两段式确认(替代原生弹窗):首点变「再点一次确认」,3.5s 不点自动还原
+    function armConfirm(btn, fn) {
+        if (btn.dataset.armed) {
+            delete btn.dataset.armed;
+            fn();
+            return;
+        }
+        btn.dataset.armed = '1';
+        var prev = btn.textContent;
+        btn.classList.add('armed');
+        btn.textContent = ct('confirm_step');
+        setTimeout(function () {
+            if (btn.dataset.armed) {
+                delete btn.dataset.armed;
+                btn.classList.remove('armed');
+                btn.textContent = prev;
+            }
+        }, 3500);
     }
 
     // ── 待接受邀请
@@ -465,7 +512,9 @@
         $('pendingBox').innerHTML = S.invites
             .map(function (iv) {
                 return (
-                    '<div class="mrow" style="cursor:default"><span class="av">✉</span>' +
+                    '<div class="mrow" style="cursor:default"><span class="av">' +
+                    ICON_MAIL +
+                    '</span>' +
                     '<span class="who"><span class="nm">' +
                     esc(iv.target) +
                     '</span><div class="em">' +

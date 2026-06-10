@@ -8,6 +8,14 @@
 
 ## 🎯 状态卡（2026-06-10 · **UI 整顿 S1-S4 大刀 + Claude 式导航全部上线** · HEAD `76865395`(?v=11850737)· 前序见下）
 
+- **🆕 本窗口(2026-06-10)· 🔐 权限管理批1-3 + /console 管理控制台全量上线**(Zihao 授权自检即 push·HEAD `cc9c3bb3`):
+  - **批1 地基**:`services/authz/`(registry 62 码=02 矩阵代码化/resolver memberships→roles·users.role 兜底/deps require_perm 统一执行点 deny-by-default)+ ensure(roles 种子 6 角色·JSONB 每启动按 registry 刷新/memberships 加列+存量回填 21 行/member_scopes/invitations/ownership_transfers)+ 注册/加员工/懒建 tenant 三建号点同事务双写。坑:**prod 有孤儿 tenant_id(b6b184cc)撞 FK→迁移改三步独立事务+EXISTS 守门**(billing ensure 同病未修非本窗口)。
+  - **批2 九门收敛**:167 路由逐码 require_perm(销项/进项/做账/知识库/对账/ERP/团队/套账/POS后台/库存),owner 判定 invited_by→membership,作用域闸 check_request_scope(assigned 未分配 404 防枚举·套账切换器按分配过滤)。**矩阵为准的行为偏差全记 docs/permissions/06**(收紧:POS后台/销项设置 owner+admin;放宽:会计获审批/付款/过账,admin 获 ERP/模块开关)。POS 双令牌/LINE 零改动。16 契约测试改钉逐路由权限码。
+  - **批3 团队后端**:邀请(email+LINE·sha256 单次 7 天)/改角色/配作用域/启停移除(边界 422:自锁/动 owner/最后 owner)/所有权转移(目标须 admin·24h·双向确认不可逆)/安全事件落 operation_logs(team./role./scope./ownership.)。
+  - **/console 独立 SPA**(紫色主题 v1 只作用 /console+/invite·令牌抄合伙人预览稿·结构全走 var):屏1 成员列表行内展开/屏2 邀请弹窗(角色卡+作用域多选+copy-link)/屏3 安全日志人话 4 语/转移口令流/邀请接受公开页四态。主程序入口未加(src/home 红线·留做账前端窗口顺手加一行指向 /console)。
+  - **第 8 道机械闸** `check_authz_coverage.py` 挂 pre-push(441 路由全覆盖·公开白名单 42 条显式注释)。
+  - **自检**:单测 3144 绿(矩阵 6×62 逐格/deny-by-default/边界)·真库 E2E 54/54(本地 uvicorn×真 Supabase·5 角色矩阵/作用域 404/邀请生命周期/转移去回/降档即时生效)·真浏览器 17/17(三屏+邀请页四态+浅暗截图 tests/visual/_shot/console-*)·prod 部署后冒烟过(/console 200·permissions API owner 62 码)。
+  - **共享树**:连带做账窗口托管的 `5f82e6bc`(出账本后端·其知会可上)一起上线;其 FE WIP stash 已无冲突恢复(src/home acct-* 等 12 文件回树)。**批5 收口待做**:删旧门别名+旧团队管理处决(05 文档 Zihao 拍板·控制台可用+存量映射完成后动刀)。
 - **🆕 本窗口(2026-06-10)· 🚀 做账引擎(Phase 2)后端全量上线**(Zihao 授权一次性建完·自检即 push):
   - **图纸修订先行**:超越方案 C1 数据源分级(第一方100直通/OCR分流/银行只建议) + C3 错账安全带三件套(method 标注·unpost 撤销重做·粒度 opt-in 默认建议模式) + C4 六大行对账单解析复用 recon/importer → 并入 docs/accounting 01-05。
   - **后端**:`services/accounting/`(schema ensure 6表双隔离+partial唯一防重复排除void / 泰标 NPAEs 科目+角色映射 seed / rules R1-R9 纯函数 / posting 置信分流+借贷平断言 / review 学习记忆 / hooks SAVEPOINT 包死)+`routes/accounting_routes.py` 17 端点(信封·owner 写·accounting 门控·**i18n 键前端窗口接**)·模块默认关 opt-in·预设全业态开。

@@ -39,7 +39,9 @@ class AuthBindsLogContextTest(unittest.TestCase):
 
     def _call(self, user: dict):
         import core.auth as auth
+        from services.auth import user_lookup
 
+        user_lookup._USER_CACHE.clear()  # 鉴权走 TTL 缓存 · 每次从干净态进,避免跨用例串行
         with (
             patch.object(auth, "decode_access_token", return_value={"sub": "42"}),
             patch("core.db.find_user_by_id", return_value=user),

@@ -316,6 +316,8 @@ _REEXPORTS = {
     "services.auth.user_lookup": [
         "find_user_by_username",
         "find_user_by_id",
+        "find_user_by_id_cached",
+        "evict_user_cache",
         "find_user_by_google_sub",
         "link_google_sub_to_user",
         "update_user_avatar",

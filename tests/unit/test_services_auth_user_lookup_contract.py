@@ -17,6 +17,8 @@ class UserLookupReExportTests(unittest.TestCase):
     NAMES = [
         "find_user_by_username",
         "find_user_by_id",
+        "find_user_by_id_cached",
+        "evict_user_cache",
         "find_user_by_google_sub",
         "link_google_sub_to_user",
         "update_user_avatar",
@@ -163,6 +165,68 @@ class UserLookupBehaviorTests(unittest.TestCase):
             self.assertTrue(user_lookup.link_line_uid_to_user("u1", "L9"))
         self.assertEqual(cur.executed[0][1], ("L9", "u1"))
         self.assertIn("UPDATE users SET line_uid", cur.executed[0][0])
+
+
+class UserCacheTests(unittest.TestCase):
+    """鉴权热路径 TTL 缓存:命中省查 / 返回副本 / 不缓存 None / evict 强刷。"""
+
+    def setUp(self):
+        from services.auth import user_lookup
+
+        user_lookup._USER_CACHE.clear()
+
+    def test_second_call_within_ttl_hits_cache_no_db(self):
+        from services.auth import user_lookup
+
+        cur = _FakeCursor(row={"id": "u1", "active_jti": "j1"})
+        with mock.patch.object(user_lookup.db, "get_cursor", _ctxmgr(cur)):
+            a = user_lookup.find_user_by_id_cached("u1")
+            b = user_lookup.find_user_by_id_cached("u1")
+        self.assertEqual(a["id"], "u1")
+        self.assertEqual(b["id"], "u1")
+        self.assertEqual(len(cur.executed), 1, "第二次应命中缓存,不再查 DB")
+
+    def test_returns_copy_not_shared_cache_object(self):
+        from services.auth import user_lookup
+
+        cur = _FakeCursor(row={"id": "u1", "tenant_id": "t1"})
+        with mock.patch.object(user_lookup.db, "get_cursor", _ctxmgr(cur)):
+            first = user_lookup.find_user_by_id_cached("u1")
+            first["tenant_id"] = "MUTATED"  # 模拟 get_current_user 改写 active_tenant
+            second = user_lookup.find_user_by_id_cached("u1")
+        self.assertEqual(second["tenant_id"], "t1", "调用方改写不可污染缓存")
+
+    def test_does_not_cache_none(self):
+        from services.auth import user_lookup
+
+        cur = _FakeCursor(row=None)
+        with mock.patch.object(user_lookup.db, "get_cursor", _ctxmgr(cur)):
+            user_lookup.find_user_by_id_cached("ghost")
+            user_lookup.find_user_by_id_cached("ghost")
+        self.assertEqual(len(cur.executed), 2, "None 不缓存,每次都查")
+
+    def test_evict_forces_refetch(self):
+        from services.auth import user_lookup
+
+        cur = _FakeCursor(row={"id": "u1", "active_jti": "j1"})
+        with mock.patch.object(user_lookup.db, "get_cursor", _ctxmgr(cur)):
+            user_lookup.find_user_by_id_cached("u1")
+            user_lookup.evict_user_cache("u1")
+            user_lookup.find_user_by_id_cached("u1")
+        self.assertEqual(len(cur.executed), 2, "evict 后应重新查 DB")
+
+    def test_expired_entry_refetches(self):
+        import time
+
+        from services.auth import user_lookup
+
+        cur = _FakeCursor(row={"id": "u1"})
+        with mock.patch.object(user_lookup.db, "get_cursor", _ctxmgr(cur)):
+            user_lookup.find_user_by_id_cached("u1")
+            # 手动让缓存过期
+            user_lookup._USER_CACHE["u1"] = (time.monotonic() - 1, {"id": "u1"})
+            user_lookup.find_user_by_id_cached("u1")
+        self.assertEqual(len(cur.executed), 2, "过期后应重新查 DB")
 
 
 if __name__ == "__main__":

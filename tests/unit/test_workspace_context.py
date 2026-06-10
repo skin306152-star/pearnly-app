@@ -107,5 +107,44 @@ class WorkspaceScopeTest(unittest.TestCase):
             wc.assert_scope(cur_bad, scope)
 
 
+class _CountingCursor:
+    """统计 execute 次数,验缓存命中。"""
+
+    def __init__(self, row):
+        self._row = row
+        self.n = 0
+
+    def execute(self, sql, params=None):
+        self.n += 1
+
+    def fetchone(self):
+        return self._row
+
+
+class DefaultWorkspaceCacheTest(unittest.TestCase):
+    """default_workspace_id 结果缓存:非 None 命中省查;None 不缓存。"""
+
+    def setUp(self):
+        wc._DEFAULT_WS_CACHE.clear()
+
+    def test_caches_non_none(self):
+        cur = _CountingCursor(row={"id": 11})
+        self.assertEqual(wc.default_workspace_id(cur, "t1"), 11)
+        self.assertEqual(wc.default_workspace_id(cur, "t1"), 11)
+        self.assertEqual(cur.n, 1, "第二次应命中缓存,不查 DB")
+
+    def test_does_not_cache_none(self):
+        cur = _CountingCursor(row=None)
+        self.assertIsNone(wc.default_workspace_id(cur, "t_new"))
+        self.assertIsNone(wc.default_workspace_id(cur, "t_new"))
+        self.assertEqual(cur.n, 2, "无套账(None)不缓存,首套账建好即生效")
+
+    def test_cache_scoped_per_tenant(self):
+        cur_a = _CountingCursor(row={"id": 11})
+        cur_b = _CountingCursor(row={"id": 22})
+        self.assertEqual(wc.default_workspace_id(cur_a, "tA"), 11)
+        self.assertEqual(wc.default_workspace_id(cur_b, "tB"), 22)
+
+
 if __name__ == "__main__":
     unittest.main()

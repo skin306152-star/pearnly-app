@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -27,6 +28,12 @@ from fastapi import HTTPException, Request
 logger = logging.getLogger("mr-pilot")
 
 WS_HEADER = "X-Workspace-Client-Id"
+
+# 租户「默认套账」(最早建的那个)结果缓存。该值稳定(created_at ASC,几乎不变),
+# 被无套账头的运营请求每次重查一条(跨区 69ms)。进程级 TTL 缓存;只缓存非 None:
+# 新租户尚无套账时不缓存,首套账建好即生效。删最早套账是极罕见操作,≤TTL 秒陈旧可接受。
+_DEFAULT_WS_CACHE: dict = {}
+_DEFAULT_WS_TTL = 60.0
 
 
 @dataclass(frozen=True)
@@ -101,13 +108,24 @@ def assert_scope(cur, scope: WorkspaceScope) -> None:
 
 
 def default_workspace_id(cur, tenant_id: str) -> Optional[int]:
-    """租户的"默认套账"= 最早建的那个(与 PO-1 回填口径一致)。无则 None。"""
+    """租户的"默认套账"= 最早建的那个(与 PO-1 回填口径一致)。无则 None。
+
+    最早套账稳定 → TTL 缓存(只缓存非 None),降无套账头请求的每次重查。
+    """
+    key = str(tenant_id)
+    ent = _DEFAULT_WS_CACHE.get(key)
+    now = time.monotonic()
+    if ent and ent[0] > now:
+        return ent[1]
     cur.execute(
         "SELECT id FROM workspace_clients WHERE tenant_id = %s ORDER BY created_at, id LIMIT 1",
         (tenant_id,),
     )
     row = cur.fetchone()
-    return int(row["id"]) if row else None
+    ws = int(row["id"]) if row else None
+    if ws is not None:
+        _DEFAULT_WS_CACHE[key] = (now + _DEFAULT_WS_TTL, ws)
+    return ws
 
 
 def resolve_active_workspace_id(cur, request: Request, *, tenant_id: str) -> int:

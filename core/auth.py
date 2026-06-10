@@ -82,6 +82,8 @@ def create_access_token(
 
         with _db.get_cursor(commit=True) as cur:
             cur.execute("UPDATE users SET active_jti=%s WHERE id=%s", (jti, user_id))
+        # 令牌轮换 → evict 鉴权缓存(本进程),使新 active_jti 即时生效不被旧缓存误判
+        _db.evict_user_cache(user_id)
         logger.info(f"[session] new login · user={user_id} jti={jti[:8]}...")
     except Exception as e:
         logger.warning(f"[session] set active_jti failed (non-blocking): {e}")
@@ -178,9 +180,10 @@ def get_current_user_from_request(request: Request) -> Dict[str, Any]:
         )
 
     # 从 DB 查最新的用户信息(防止 JWT 过期后权限还有效)
-    from core.db import find_user_by_id
+    # 鉴权热路径走 TTL 缓存(降首屏 ~22 个请求重复同一查);jti 不匹配时下方强制 fresh 重取兜底。
+    from core.db import find_user_by_id_cached
 
-    user = find_user_by_id(payload["sub"])
+    user = find_user_by_id_cached(payload["sub"])
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -231,14 +234,23 @@ def get_current_user_from_request(request: Request) -> Dict[str, Any]:
         token_jti = payload.get("jti")
         user_active_jti = user.get("active_jti")
         if token_jti and user_active_jti and token_jti != user_active_jti:
-            logger.info(
-                f"[session] revoked · user={user.get('id')} "
-                f"token_jti={token_jti[:8]}... active={user_active_jti[:8]}..."
-            )
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="auth.session_revoked",
-            )
+            # 缓存可能陈旧(刚换令牌/换设备 active_jti 已轮换)→ 强制 fresh 重取再判,
+            # 绝不拿旧缓存误拒新令牌。重取后仍不等才是真·旧设备。
+            from core.db import find_user_by_id
+
+            fresh = find_user_by_id(payload["sub"])
+            if fresh is not None:
+                user = fresh
+                user_active_jti = user.get("active_jti")
+            if token_jti and user_active_jti and token_jti != user_active_jti:
+                logger.info(
+                    f"[session] revoked · user={user.get('id')} "
+                    f"token_jti={token_jti[:8]}... active={user_active_jti[:8]}..."
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="auth.session_revoked",
+                )
     except HTTPException:
         raise
     except Exception as _e:

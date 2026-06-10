@@ -15,8 +15,7 @@ billing_routes / admin_diagnostics_routes 改成从这里 import(去掉各自的
 
 覆盖:
   _tid                       · 取 user 的 tenant_id 字符串(多租户共享过滤)
-  _require_super_admin       · 超管守门(非超管 403)
-  _require_owner_or_super    · 老板或超管(含懒建 tenant 兜底)
+  _require_super_admin       · 超管守门(非超管 403 · 平台层 · 不走 require_perm)
   _log_op                    · 写操作日志便捷函数
   _get_client_ip             · 从 X-Forwarded-For / client.host 取真实 IP
   _check_password_strength   · 密码强度校验(返 None 通过 / code 拒绝)
@@ -204,71 +203,6 @@ def _check_password_strength(password: str) -> Optional[str]:
     if not (has_letter and has_digit):
         return "pwd.too_weak"
     return None
-
-
-def _require_tenant(request: Request) -> "tuple[str, Optional[str]]":
-    """销项等 router 共用:取当前用户的 (tenant_id, user_id) 字符串;无 tenant 报 400。
-
-    返回 2 元组(tid, uid);uid 可空。错误码 sales.tenant_required(沿用既有契约)。
-    """
-    user = get_current_user_from_request(request)
-    tid = user.get("tenant_id") if user else None
-    if not tid:
-        raise HTTPException(400, detail="sales.tenant_required")
-    return str(tid), (str(user["id"]) if user and user.get("id") else None)
-
-
-def _require_owner_or_super(request: Request) -> Dict[str, Any]:
-    """老板或超管
-    v118.26.2.4 · BUG 4 修补:新注册老板 tenant_id=NULL · 加员工时被拒
-    懒建模式:首次需要 tenant 时自动建一个 + 回填 user.tenant_id · 不影响新签名 API
-    """
-    user = get_current_user_from_request(request)
-    if user.get("is_super_admin"):
-        return user
-    if user.get("role") != "owner":
-        raise HTTPException(403, detail="team.only_owner_or_super")
-    if not user.get("tenant_id"):
-        # v118.26.2.4 · 懒建 tenant · 只在首次需要时
-        try:
-            tenant_name = (
-                user.get("company_name")
-                or user.get("full_name")
-                or user.get("username")
-                or f"user_{str(user['id'])[:8]}"
-            )[:100]
-            new_tid = db.create_tenant(
-                name=tenant_name,
-                owner_user_id=str(user["id"]),
-                tenant_type="shared_api",
-                monthly_quota=100,
-                notes="auto-created on first owner action",
-            )
-            if new_tid:
-                with db.get_cursor(commit=True) as _cur:
-                    _cur.execute(
-                        "UPDATE users SET tenant_id = %s WHERE id = %s AND tenant_id IS NULL",
-                        (new_tid, str(user["id"])),
-                    )
-                    # 权限整顿批1 · 懒建 tenant 同步写 owner membership(docs/permissions/01)
-                    try:
-                        from services.authz.resolver import create_membership
-
-                        create_membership(
-                            _cur, user_id=str(user["id"]), tenant_id=str(new_tid), role_key="owner"
-                        )
-                    except Exception as _e_mb:
-                        logger.warning(f"[authz] lazy-tenant create_membership skip: {_e_mb}")
-                user["tenant_id"] = new_tid
-                logger.info(
-                    f"[v118.26.2.4 lazy-tenant] +tenant {new_tid[:8]}.. for user {user.get('username')!r}"
-                )
-        except Exception as _e:
-            logger.error(f"_require_owner_or_super lazy-tenant fail: {_e}")
-            raise HTTPException(500, detail="team.tenant_create_failed")
-        if not user.get("tenant_id"):
-            raise HTTPException(400, detail="team.no_tenant")
-    return user
 
 
 # v118.34.13 (Zihao 2026-05-19 拍板) · 最近 500 错误的现场摘要 ·

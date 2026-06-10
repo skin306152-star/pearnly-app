@@ -96,6 +96,35 @@ class MemberActionGuardTests(unittest.TestCase):
             self.assertIsNone(console_store.guard_member_action("t", "u1", "u2"))
 
 
+class RoleMemberCountsTests(unittest.TestCase):
+    def test_groups_by_role_key(self):
+        rows = [{"role_key": "owner", "c": 1}, {"role_key": "accountant", "c": 3}]
+
+        class _Cur:
+            def execute(self, sql, params):
+                self.sql, self.params = sql, params
+
+            def fetchall(self):
+                return rows
+
+        class _CM:
+            def __init__(self):
+                self.cur = _Cur()
+
+            def __enter__(self):
+                return self.cur
+
+            def __exit__(self, *a):
+                return False
+
+        cm = _CM()
+        with mock.patch.object(console_store.db, "get_cursor", lambda *a, **k: cm):
+            out = console_store.role_member_counts("t1")
+        self.assertEqual(out, {"owner": 1, "accountant": 3})
+        self.assertIn("status = 'active'", cm.cur.sql)
+        self.assertEqual(cm.cur.params, ("t1",))
+
+
 class OwnershipGuardTests(unittest.TestCase):
     def test_transfer_to_self_rejected(self):
         out = ownership.initiate(tenant_id="t", from_user_id="u1", to_user_id="u1")

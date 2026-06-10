@@ -18,16 +18,15 @@ v118.27.0 · ERP 映射底座(客户 / 科目 / 税码 / 商品 4 个 sub-tab ·
   POST   /api/erp/mappings/products              · upsert 商品映射(owner/super)
   DELETE /api/erp/mappings/products/{mapping_id}  · 删商品映射(owner/super)
 
-权限(原样保留):
+权限(批2 收敛):
   - 客户映射:接 client_assignments filter(员工只看自己客户)· GET 全员可调
   - 科目/税码映射:tenant 共享 · GET 全员可调
-  - POST/DELETE 全部要 _require_owner_or_super(老板/超管才能改)
-  - 商品映射:GET/POST/DELETE 都自查 role==owner or is_super_admin
+  - POST/DELETE 全部 require_perm("settings.org.edit")(owner/admin)
+  - 商品映射:GET/POST/DELETE 登录态(P2 待映射)
 
 依赖:
   - db.*(ERP 映射 CRUD + get_visible_client_ids_for_user)
-  - auth.get_current_user_from_request
-  - route_helpers._require_owner_or_super
+  - auth.get_current_user_from_request / authz.require_perm
   - _tid:app.py 也有同名 helper · 这里复制一份防循环 import
 """
 

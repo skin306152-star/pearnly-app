@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """自动做账接口(docs/accounting/03 契约 · 信封同 POS)。
 
-鉴权:读 = 任意成员(员工只看);写(审/改/作废/撤销重做/手工凭证/科目/映射/设置)= 账号
-owner(invited_by is None)。套账解析 fail-closed(缺 → workspace.required)。模块门控
+鉴权:按权限码逐路由守门(acct.entry.view / review / approve / coa.manage / settings.manage,
+矩阵 docs/permissions/02)。套账解析 fail-closed(缺 → workspace.required)。模块门控
 accounting。错误码 4 语键由前端窗口接(本层只返 message_key)。
 """
 

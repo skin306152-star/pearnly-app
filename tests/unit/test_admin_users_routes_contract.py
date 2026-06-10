@@ -7,7 +7,7 @@ REFACTOR-B1 守门测试 · 超管用户/员工管理 15 路由从 app.py 抽到
   2. app.py 通过 include_router 真挂上了(含 users.csv)
   3. _require_super_admin / _log_op 复用 route_helpers(单一来源)
   4. 复用 model 单一来源:AdminUpdateTenantQuota/Status from tenant_routes ·
-     EmployeeToggleRequest from team_routes(不在本模块重复定义)
+     EmployeeToggleRequest from admin_users_mutation_routes(批5 旧团队管理处决后迁入)
   5. 本模块自有 model 字段契约(AdminCreateUserRequest / CascadeDeleteRequest)
 """
 
@@ -15,7 +15,7 @@ import unittest
 
 from core import route_helpers
 from routes import tenant_routes
-from routes import team_routes
+from routes import admin_users_mutation_routes
 from routes import admin_users_routes
 from routes.admin_users_routes import (
     AdminCreateUserRequest,
@@ -80,7 +80,10 @@ class AdminUsersRoutesContractTests(unittest.TestCase):
             admin_users_routes.AdminUpdateTenantStatusRequest,
             tenant_routes.AdminUpdateTenantStatusRequest,
         )
-        self.assertIs(admin_users_routes.EmployeeToggleRequest, team_routes.EmployeeToggleRequest)
+        self.assertIs(
+            admin_users_routes.EmployeeToggleRequest,
+            admin_users_mutation_routes.EmployeeToggleRequest,
+        )
 
     def test_own_model_fields(self):
         """本模块自有 model 字段契约"""

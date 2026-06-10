@@ -153,6 +153,18 @@ def get_authz(request: Optional[Request], user: dict) -> Authz:
     return _cached_authz(request, user)
 
 
+def is_owner_role(request: Optional[Request], user: dict) -> bool:
+    """owner 视角判定(计费等 owner 专属读侧)。批5:invited_by IS NULL 语义退役,
+    改读 membership 角色;无 tenant 时走存量映射兜底(与 resolver 同口径)。"""
+    if user.get("is_super_admin"):
+        return True
+    if not user.get("tenant_id"):
+        from services.authz.resolver import legacy_role_key
+
+        return legacy_role_key(user) == "owner"
+    return _cached_authz(request, user).role_key == "owner"
+
+
 def check_request_scope(
     request: Optional[Request], workspace_client_id, *, pos: bool = False
 ) -> None:

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """餐厅 POS 编排 · 区域/桌台 CRUD + 总览状态机(POS 项目 · PO-R1 · docs/pos/restaurant/02 §1/§2)。
 
-CRUD 为 owner 管理动作(路由层 require_owner);总览前台可读。桌台总览状态 free/seat/cook/bill 实时从
+CRUD 为管理动作(路由层 pos.admin.manage);总览前台可读。桌台总览状态 free/seat/cook/bill 实时从
 session.status + 行 kitchen_status 派生(单一真理 · docs/restaurant/01 §6),不存冗余态。
 """
 

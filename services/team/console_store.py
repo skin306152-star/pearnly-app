@@ -3,6 +3,9 @@
 
 成员真相 = memberships JOIN roles(批1);users 行只供资料字段。
 所有写操作边界(改自己/动 owner/最后一个 owner)在这里集中拦,路由层翻 422。
+
+文件尾的 users 表员工操作(list/remove/toggle)随批5从 services/team/store.py 并入
+(旧团队管理 7 接口处决 · 新控制台与超管路由直调本模块 · 不进 dal_reexports 防循环 import)。
 """
 
 from __future__ import annotations
@@ -60,6 +63,21 @@ def list_members(tenant_id: str) -> List[Dict[str, Any]]:
             }
         )
     return out
+
+
+def role_member_counts(tenant_id: str) -> Dict[str, int]:
+    """各角色 active 成员数(角色说明卡「N 人在用」· PEAK 吸收)。"""
+    with db.get_cursor() as cur:
+        cur.execute(
+            """
+            SELECT r.key AS role_key, COUNT(*) AS c
+            FROM memberships m JOIN roles r ON r.id = m.role_id
+            WHERE m.tenant_id = %s AND m.status = 'active'
+            GROUP BY r.key
+            """,
+            (str(tenant_id),),
+        )
+        return {r["role_key"]: int(r["c"]) for r in cur.fetchall()}
 
 
 def get_member(tenant_id: str, user_id: str) -> Optional[Dict[str, Any]]:
@@ -188,3 +206,82 @@ def guard_member_action(tenant_id: str, actor_id: str, target_user_id: str) -> O
     if member["role_key"] == "owner":
         return "team.target_is_owner"
     return None
+
+
+def list_employees(tenant_id: str) -> List[Dict[str, Any]]:
+    """列某 tenant 下的员工(role=member · 超管租户摘要用)"""
+    try:
+        with db.get_cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, username, role, is_active, last_login_at, created_at, invited_by
+                FROM users
+                WHERE tenant_id = %s AND role = 'member'
+                ORDER BY created_at ASC
+            """,
+                (str(tenant_id),),
+            )
+            return [dict(r) for r in cur.fetchall()]
+    except Exception as e:
+        logger.error(f"list_employees failed: {e}")
+        return []
+
+
+def remove_employee(tenant_id: str, employee_user_id: str) -> bool:
+    """
+    移除成员
+    安全校验:只删 tenant_id 匹配 + role=member 的 user(owner 由调用方边界拦)
+    """
+    try:
+        with db.get_cursor(commit=True) as cur:
+            # 先看员工是否存在且属于该 tenant
+            cur.execute(
+                """
+                SELECT id FROM users
+                WHERE id = %s AND tenant_id = %s AND role = 'member'
+                LIMIT 1
+            """,
+                (str(employee_user_id), str(tenant_id)),
+            )
+            if not cur.fetchone():
+                return False
+
+            # 级联删员工相关数据
+            for sql in [
+                "DELETE FROM ocr_history WHERE user_id = %s",
+                "DELETE FROM erp_push_logs WHERE user_id = %s",
+                "DELETE FROM line_bindings WHERE user_id = %s",
+                "DELETE FROM line_binding_codes WHERE user_id = %s",
+                "DELETE FROM user_settings WHERE user_id = %s",
+            ]:
+                try:
+                    cur.execute(sql, (str(employee_user_id),))
+                except Exception:
+                    pass  # 表可能不存在 · 安全跳过
+
+            cur.execute("DELETE FROM users WHERE id = %s", (str(employee_user_id),))
+            return True
+    except Exception as e:
+        logger.error(f"remove_employee failed: {e}")
+        return False
+
+
+def toggle_employee_active(
+    tenant_id: str,
+    employee_user_id: str,
+    is_active: bool,
+) -> bool:
+    """启用/停用成员"""
+    try:
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                """
+                UPDATE users SET is_active = %s
+                WHERE id = %s AND tenant_id = %s AND role = 'member'
+            """,
+                (bool(is_active), str(employee_user_id), str(tenant_id)),
+            )
+            return cur.rowcount > 0
+    except Exception as e:
+        logger.error(f"toggle_employee_active failed: {e}")
+        return False

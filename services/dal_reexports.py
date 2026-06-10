@@ -152,12 +152,6 @@ _REEXPORTS = {
         "list_operation_logs",
         "list_operation_logs_paged",
     ],
-    "services.team.store": [
-        "list_employees",
-        "add_employee",
-        "remove_employee",
-        "toggle_employee_active",
-    ],
     "services.recon.vat_recon_store": [
         "ensure_vat_recon_tables",
         "create_vat_report",

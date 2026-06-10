@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """做账路由共享上下文(鉴权 / 套账解析 / 模块门控 · 同 purchase_common 范式)。
 
-读 = 任意成员(员工只看);写 = 账号 owner(invited_by is None)。错误码走 acct.* 命名空间
-(与 purchase_common 唯一差异),模块门控 accounting。套账解析 fail-closed。
+守门按权限码逐路由传(acct.entry.view / review / approve / coa.manage,矩阵 docs/permissions/02)。
+错误码走 acct.* 命名空间(与 purchase_common 唯一差异),模块门控 accounting。套账解析 fail-closed。
 """
 
 from __future__ import annotations

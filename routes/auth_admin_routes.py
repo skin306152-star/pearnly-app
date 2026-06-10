@@ -144,7 +144,6 @@ def admin_cleanup_demo(request: Request):
 
 
 # 密码找回/重置/改密 + 发送器 → auth_password_routes.py(模块化深化 · 2026-06-01)。
-# 下方 import 回 router 并 include · 并 re-export send_reset_link_for_employee(team_routes 用)。
 @router.get("/api/admin/password_resets")
 def admin_password_resets(request: Request):
     """后台 · 查看密码重置请求历史(应急客服)"""

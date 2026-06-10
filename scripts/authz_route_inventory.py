@@ -2,8 +2,8 @@
 """全量路由 × 守门方式盘点(权限整顿批2 · docs/permissions/06 对照表的数据源)。
 
 用法:PEARNLY_SKIP_HEAVY_INIT=1 python scripts/authz_route_inventory.py [--json]
-对每条 FastAPI 路由扫 endpoint 源码,识别它走哪道门(require_perm / 九旧门 /
-仅登录 / 公开),输出 markdown 表或 JSON。check_authz_coverage 闸复用本模块。
+对每条 FastAPI 路由扫 endpoint 源码,识别它走哪道门(require_perm 系 / 平台层 /
+登录态 / 公开),输出 markdown 表或 JSON。check_authz_coverage 闸复用本模块。
 """
 
 from __future__ import annotations
@@ -24,18 +24,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 GATE_PATTERNS = [
     ("require_perm", r"\brequire_perm(_pos)?(_tid)?(_pos_tid)?\s*\("),
     ("super_admin", r"\b_require_super_admin\s*\("),
-    ("owner_or_super", r"\b_require_owner_or_super\s*\("),
-    ("account_owner", r"\brequire_account_owner\s*\("),
-    ("pos_require_owner", r"\brequire_owner\s*\("),
     ("pos_require_tenant", r"\brequire_tenant\s*\("),
-    ("tenant", r"\b_require_tenant\s*\("),
     ("auth_member", r"\bauth_(member|owner)\s*\("),
     ("pos_auth", r"\bpos_auth\s*\("),
     ("login_only", r"\bget_current_user_from_request\s*\("),
     (
         "helper_gated",
         r"\b(_read|_write|_run|_owner_ctx|_subject|resolve_caller|_require_user|_get_user"
-        r"|_report|_gen_credential|_get_user_safe|_make_note)\s*\(",
+        r"|_report|_gen_credential|_get_user_safe|_make_note|_require_tenant|_auth)\s*\(",
     ),
 ]
 

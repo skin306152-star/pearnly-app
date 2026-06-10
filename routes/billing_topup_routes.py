@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from core import db
 from core.auth import get_current_user_from_request
 from core.route_helpers import _require_super_admin
+from services.authz.deps import is_owner_role
 
 logger = logging.getLogger("mr-pilot")
 
@@ -105,7 +106,7 @@ class _AdminTopupRejectBody(BaseModel):
 @router.post("/api/credits/topup/request")
 async def credits_topup_request(req: _TopupRequestBody, request: Request):
     user = get_current_user_from_request(request)
-    if user.get("invited_by") is not None:
+    if not is_owner_role(request, user):
         raise HTTPException(403, detail="credits.owner_only")
     tenant_id = user.get("tenant_id")
     if not tenant_id:

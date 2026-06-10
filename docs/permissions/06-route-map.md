@@ -1,35 +1,37 @@
-# 权限管理整顿 · 06 全量路由对照表(批2 产物 · 2026-06-10)
+# 权限管理整顿 · 06 全量路由对照表(批2 产物 · 批5 收口更新 2026-06-10)
 
 > 生成源:`scripts/authz_route_inventory.py`(随 `check_authz_coverage` 闸常新)。
 > 表为快照;真相 = 源码守门 + 第 8 道闸。
 
-## 收敛结果速览
+## 收敛结果速览(批5 后)
 
 | 守门形态 | 路由数 |
 |---|---|
-| require_perm | 116 |
+| require_perm | 109 |
 | 登录态(resolver 吸收 · P2 待映射) | 104 |
-| 文件内 helper 守门 | 64 |
-| 公开白名单 | 53 |
+| 文件内 helper 守门 | 68 |
+| 公开白名单 | 54(含 fastapi /docs 4 条) |
 | 平台层 _require_super_admin(保留) | 52 |
 | require_perm(经 auth_member/auth_owner) | 47 |
-| require_account_owner→settings.modules.manage | 2 |
-| _require_tenant(登录+租户) | 2 |
 | POS require_tenant(收银员可调) | 1 |
 
-## 九门收敛状态(docs/permissions/03 映射的落地)
+## 九门收敛状态(批5 收口后 · 旧门别名全删)
 
 | 旧门 | 状态 |
 |---|---|
 | `_require_super_admin` | 保留(平台层短路,52 路由不动) |
-| `_require_owner_or_super` | **23 调用点清零**:team.* / settings.workspace.manage / settings.org.edit / sales.doc.approve 逐路由换码;函数本体留 route_helpers(批5 删) |
-| `_require_tenant` | 销项家族已换 require_perm_tid;余 2 处(_make_note 内部 · 调用方已守门) |
-| `require_account_owner` | **owner 判定从 invited_by 切 membership**(内部= require_perm_pos "settings.modules.manage") |
-| `require_owner`(POS) | **13 调用点清零**:pos.admin.manage / settings.modules.manage / inv.* / pos.report.view |
+| `_require_owner_or_super` | **批5 已删**(批2 清零 23 调用点 · 本体随批5 从 route_helpers 移除 · 契约测试锁不许复活) |
+| `_require_tenant` | **批5 已删**(route_helpers 本体移除;uploads_routes 文件内同名 helper 为局部租户解析,非旧门) |
+| `require_account_owner` | **批5 已删**(modules 写接口直走 require_perm_pos_tid "settings.modules.manage") |
+| `require_owner`(POS) | **批5 已删**(批2 清零 13 调用点 · 本体随批5 从 pos_api 移除) |
 | `pos_auth` | 保留为令牌解析层(require_perm_pos 内部走它) |
 | `require_workspace` | 保留 + 套账解析点叠 `check_request_scope`(assigned 未分配 → 404) |
 | `assert_module_enabled` | 仍在(双保险);require_perm 第 3 步按码→模块自动判 |
 | `auth_member/auth_owner`(purchase/accounting) | 改带码签名,invited_by 判定退役,46+ 调用点逐路由带码 |
+
+批5 同时收口:旧团队管理 7 接口(`/api/team/employees*` · routes/team_routes.py)整体处决,
+员工管理全走 /console 新体系(`/api/team/members*`);billing 读侧 owner 判定从
+`invited_by IS NULL` 切 membership(`authz.deps.is_owner_role`)。
 
 ## 行为偏差清单(矩阵为准 · 与切换前 diff 的全部已知项)
 
@@ -270,8 +272,8 @@ OCR 识别/上传、history、ERP push/endpoints、对账 v0 杂项、clients/ca
 | POST | `/api/v1/ocr/recognize` | public | — | routes/meta_aliases_routes.py |
 | GET | `/api/version` | public | — | routes/meta_aliases_routes.py |
 | GET | `/api/me/modules` | pos_require_tenant | — | routes/modules_routes.py |
-| PUT | `/api/me/modules/{module_key}` | account_owner | — | routes/modules_routes.py |
-| PUT | `/api/me/onboarding` | account_owner | — | routes/modules_routes.py |
+| PUT | `/api/me/modules/{module_key}` | require_perm | `settings.modules.manage` | routes/modules_routes.py |
+| PUT | `/api/me/onboarding` | require_perm | `settings.modules.manage` | routes/modules_routes.py |
 | GET | `/api/notifications/logs` | login_only | — | routes/notification_routes.py |
 | GET | `/api/notifications/rules` | login_only | — | routes/notification_routes.py |
 | POST | `/api/notifications/rules` | login_only | — | routes/notification_routes.py |
@@ -466,21 +468,14 @@ OCR 识别/上传、history、ERP push/endpoints、对账 v0 杂项、clients/ca
 | PUT | `/api/settings/dup-check` | login_only | — | routes/settings_routes.py |
 | GET | `/api/settings/erp-push-mode` | login_only | — | routes/settings_routes.py |
 | PUT | `/api/settings/erp-push-mode` | login_only | — | routes/settings_routes.py |
-| GET | `/api/team/employees` | require_perm | `team.member.invite` `team.member.view` | routes/team_routes.py |
-| POST | `/api/team/employees` | require_perm | `team.member.invite` `team.member.view` | routes/team_routes.py |
-| DELETE | `/api/team/employees/{employee_id}` | require_perm | `team.member.remove` | routes/team_routes.py |
-| PATCH | `/api/team/employees/{employee_id}/active` | require_perm | `team.member.toggle` | routes/team_routes.py |
-| GET | `/api/team/employees/{employee_id}/assignments` | require_perm | `team.member.scope` `team.member.view` | routes/team_routes.py |
-| POST | `/api/team/employees/{employee_id}/assignments` | require_perm | `team.member.scope` `team.member.view` | routes/team_routes.py |
-| POST | `/api/team/employees/{employee_id}/reset-password` | require_perm | `team.member.toggle` | routes/team_routes.py |
 | GET | `/api/admin/tenants` | super_admin | — | routes/tenant_routes.py |
 | POST | `/api/admin/tenants` | super_admin | — | routes/tenant_routes.py |
 | PATCH | `/api/admin/tenants/{tenant_id}/quota` | super_admin | — | routes/tenant_routes.py |
 | PATCH | `/api/admin/tenants/{tenant_id}/status` | super_admin | — | routes/tenant_routes.py |
 | GET | `/api/admin/tenants/{tenant_id}/summary` | super_admin | — | routes/tenant_routes.py |
 | GET | `/api/me/tenant-usage` | login_only | — | routes/tenant_routes.py |
-| POST | `/api/uploads/image` | tenant | — | routes/uploads_routes.py |
-| GET | `/api/uploads/image/{tenant_id}/{name}` | tenant | — | routes/uploads_routes.py |
+| POST | `/api/uploads/image` | helper_gated | — | routes/uploads_routes.py |
+| GET | `/api/uploads/image/{tenant_id}/{name}` | helper_gated | — | routes/uploads_routes.py |
 | POST | `/api/vat_excel/build` | helper_gated | — | routes/vat_excel_routes.py |
 | GET | `/api/vat_excel/check` | login_only | — | routes/vat_excel_routes.py |
 | GET | `/api/vat_excel/tasks/{task_id}/download` | helper_gated | — | routes/vat_excel_routes.py |

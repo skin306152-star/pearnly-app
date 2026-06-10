@@ -3,7 +3,7 @@
 
 会计事务所代多家公司开票:有的要老板审批、有的图快直接开。审批是每租户/账套可开关的
 策略(approval_mode,落 sales_settings),本模块只管单据的状态迁移,不判角色——角色
-(owner=审批人)由路由层 _require_owner_or_super 把关,不在此自造权限体系。
+(审批人)由路由层 require_perm("sales.doc.approve") 把关,不在此自造权限体系。
 
 状态机(在 document 的 draft/issued/void 基础上加):
     draft ──提交──> pending_approval ──批准──> (取号) issued

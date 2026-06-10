@@ -407,7 +407,7 @@ def _get_plan(user_id: str) -> str:
 # ============================================================
 # v118.26.2.5 · 新用户注册自动建 tenant
 # 解决 v27.7 fix_orphan 留下的根因:signup 不建 tenant · 导致 tenant_id=NULL ·
-# 用户加员工/查 tenant 数据时被 _require_owner_or_super 拦或懒建。
+# 用户加员工/查 tenant 数据时被拒(require_perm 对 no_tenant 一律 403)。
 # 3 个注册路径(email signup / Google OAuth / LINE OAuth)统一调此函数。
 # ============================================================
 def _ensure_tenant_for_new_user(
@@ -415,7 +415,7 @@ def _ensure_tenant_for_new_user(
 ) -> Optional[str]:
     """新用户注册同事务建 tenant + 回填 user.tenant_id
     cur: 已开 commit=True 模式的 cursor(跟 user INSERT 同事务)
-    返回 new_tenant_id · 失败返 None(不抛 · 让 _require_owner_or_super 懒建兜底)
+    返回 new_tenant_id · 失败返 None(不抛 · 不阻塞注册 · 该用户后续走 no_tenant 拒)
     """
     try:
         # tenant.name 优先级:company > full_name > username > user_<8>

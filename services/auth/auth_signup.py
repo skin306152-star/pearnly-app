@@ -409,12 +409,8 @@ def _log_risk(user_id, event_type, request, detail_dict=None):
 # CLEANUP-PLAN-01 (2026-05-22) · funnel 改瘦:删 by_plan / trial_expiring_soon / conversion_pct
 #   credits 模式不再有"套餐"概念 · admin 只看用户增长 + 国家分布
 # 超管风控/用户管理 8 路由 → auth_admin_routes.py(模块化深化 · 2026-06-01)· 下方 include。
-# 密码路由组已抽到 auth_password_routes.py(模块化深化 · 2026-06-01)·
-# re-export send_reset_link_for_employee 给 team_routes(不改其 import)。
-from routes.auth_password_routes import (  # noqa: E402
-    router as _password_router,
-    send_reset_link_for_employee,  # noqa: F401 · re-export(team_routes 用)
-)
+# 密码路由组已抽到 auth_password_routes.py(模块化深化 · 2026-06-01)。
+from routes.auth_password_routes import router as _password_router  # noqa: E402
 
 router.include_router(_password_router)
 from routes.auth_admin_routes import router as _admin_router  # noqa: E402

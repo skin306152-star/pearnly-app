@@ -83,7 +83,7 @@ def assert_workspace_in_tenant(cur, *, tenant_id: str, workspace_client_id: int)
 def scope_from_request(request: Request, *, tenant_id, user_id=None) -> WorkspaceScope:
     """打包当前运营请求的 WorkspaceScope(fail-closed:缺套账 → 400 workspace.required)。
 
-    tenant_id / user_id 由调用方先经既有鉴权(route_helpers._require_tenant)解析后传入;
+    tenant_id / user_id 由调用方先经既有鉴权(authz.require_perm_tid)解析后传入;
     本函数只补"当前套账"并打包。归属校验在事务游标内另做(assert_scope)。
     """
     return WorkspaceScope(

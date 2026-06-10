@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from core import db
 from core.auth import get_current_user_from_request
+from services.authz.deps import is_owner_role
 
 logger = logging.getLogger("mr-pilot")
 
@@ -35,8 +36,8 @@ async def get_my_credits(request: Request, response: Response):
     user_id = str(user.get("id", ""))
     tenant_id = user.get("tenant_id")
     is_exempt = bool(user.get("is_billing_exempt", False))
-    # 老板 = 自己注册（invited_by IS NULL）；员工 = 被老板邀请创建
-    is_owner = user.get("invited_by") is None
+    # 老板视角看全租户余额;员工只看自己用量(批5:owner 判定读 membership)
+    is_owner = is_owner_role(request, user)
 
     if not tenant_id:
         return {"has_tenant": False, "is_owner": is_owner}
@@ -210,7 +211,7 @@ async def credits_usage_history(
             "is_owner": False,
             "members": [],
         }
-    is_owner = user.get("invited_by") is None
+    is_owner = is_owner_role(request, user)
     if not is_owner:
         user_id = str(user["id"])
     per_page = min(50, max(1, per_page))
@@ -315,7 +316,7 @@ async def credits_usage_report(
     if not tid:
         raise HTTPException(status_code=400, detail="no_tenant")
 
-    is_owner = user.get("invited_by") is None
+    is_owner = is_owner_role(request, user)
     if not is_owner:
         user_id = str(user["id"])  # 员工只能导出自己
 

@@ -3,8 +3,9 @@
 
 纯搬家 · URL/method/权限/返回结构/错误码/业务逻辑 0 改 · 路由 verbatim(@router 装饰器不动)。
 覆盖 9 变更路由:创建用户 · 改配额/状态 · 删除(密码确认)· 改密(410)· 员工启停/改密/删(410)·
-级联删除老板(双确认)。复用 model 单一来源:AdminUpdateTenantQuota/Status from tenant_routes ·
-EmployeeToggleRequest from team_routes。admin_users_routes.py 门面经 include_router 聚合本 router。
+级联删除老板(双确认)。复用 model 单一来源:AdminUpdateTenantQuota/Status from tenant_routes;
+EmployeeToggleRequest 定义在本模块(批5 旧团队管理处决后随宿主迁入)。
+admin_users_routes.py 门面经 include_router 聚合本 router。
 """
 
 from __future__ import annotations
@@ -20,11 +21,14 @@ from core.route_helpers import _log_op, _require_super_admin
 
 # 复用已抽出模块的 model(单一来源 · 不重复定义)
 from routes.tenant_routes import AdminUpdateTenantQuotaRequest, AdminUpdateTenantStatusRequest
-from routes.team_routes import EmployeeToggleRequest
 
 logger = logging.getLogger("mr-pilot")
 
 router = APIRouter()
+
+
+class EmployeeToggleRequest(BaseModel):
+    is_active: bool
 
 
 class AdminCreateUserRequest(BaseModel):

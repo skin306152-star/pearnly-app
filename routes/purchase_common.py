@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """商户采购路由共享上下文(鉴权 / 套账解析 / 模块门控 · docs/purchasing/02 §鉴权)。
 
-两类主体:
-  - 成员(owner + 受邀员工):可录入(建/列/详单据 · intake)。auth_member。
-  - 账号 owner:配置 + 审付款 + 改供应商/科目/设置 + 生成凭据。auth_owner(invited_by is None)。
+两档入口同走权限码(矩阵 docs/permissions/02):
+  - auth_member:录入档(建/列/详单据 · intake),默认码 purchase.doc.view。
+  - auth_owner:配置/审付款/凭据档,默认码 purchase.settings.manage。
 套账解析 fail-closed:请求头/入参 X-Workspace-Client-Id → 校验归属;缺 → 回落本租户默认套账,
 无默认 → workspace.required。模块门控走 expense(关 → pos.module_disabled)。
 信封/错误码统一 core.pos_api。

@@ -1,15 +1,9 @@
 # -*- coding: utf-8 -*-
-"""REFACTOR-D2 · services/team/store.py 行为/契约覆盖(只测安全增删查)
+"""员工操作 DAL 行为覆盖(批5 后宿主 = services/team/console_store.py)
 
-补行为测试(既有 test_team_store_contract.py 只验 re-export)。
-
-范围(REFACTOR-D2 铁律):
-- 测员工增删查的安全部分:list_employees / remove_employee / toggle_employee_active
-- add_employee 涉及密码哈希(高敏认证路径)→ 仅测「用户名已存在 → 早返 None · 完全不
-  触碰密码哈希」这一安全分支;**不测**真正的哈希/写库分支(高敏跳过)。
-
-import 顺序:先 import db(触发 re-export)再 from services.team import store ·
-否则 services.team.store 单独先导入会撞 db 的循环 import。
+补行为测试(既有 test_team_store_contract.py 只验单一来源):
+list_employees / remove_employee / toggle_employee_active 的安全部分
+(tenant + role=member 过滤 · 级联删 · 异常兜底)。
 """
 
 import sys
@@ -57,7 +51,7 @@ if "psycopg2" not in sys.modules:
     sys.modules["psycopg2.sql"] = _pg.sql
 
 from core import db  # noqa: E402  (先 import db 触发 re-export · 解循环)
-from services.team import store  # noqa: E402
+from services.team import console_store as store  # noqa: E402
 
 
 class _FakeCursor:
@@ -121,19 +115,6 @@ class ListEmployeesTests(unittest.TestCase):
     def test_exception_returns_empty(self):
         with _patch(_ExplodingCursor()):
             self.assertEqual(store.list_employees("t1"), [])
-
-
-class AddEmployeeUsernameCollisionTests(unittest.TestCase):
-    """只测安全早返分支:用户名已存在 → None · 不进入密码哈希/写库(高敏跳过)。"""
-
-    def test_existing_username_returns_none_without_hashing(self):
-        cur = _FakeCursor()  # 不该被用到
-        # find_user_by_username 命中 → 立即返 None · 不调 get_cursor / bcrypt
-        with patch.object(db, "find_user_by_username", lambda u: {"id": "existing"}):
-            with patch.object(db, "get_cursor", lambda *a, **k: _CM(cur)):
-                rid = store.add_employee("t1", "taken_name", "pw")
-        self.assertIsNone(rid)
-        self.assertEqual(len(cur.executed), 0)  # 没碰 DB(也没哈希写库)
 
 
 class RemoveEmployeeTests(unittest.TestCase):

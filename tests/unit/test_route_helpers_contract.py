@@ -23,7 +23,6 @@ class RouteHelpersImportContractTests(unittest.TestCase):
     def test_all_helpers_importable(self):
         for name in (
             "_require_super_admin",
-            "_require_owner_or_super",
             "_log_op",
             "_get_client_ip",
             "_check_password_strength",
@@ -31,6 +30,11 @@ class RouteHelpersImportContractTests(unittest.TestCase):
             "_plan_permissions",
         ):
             self.assertTrue(hasattr(route_helpers, name), f"route_helpers 缺 {name}")
+
+    def test_legacy_gates_deleted(self):
+        # 权限批5:九门旧别名收口 · 不许复活(守门只剩 require_perm 系 + 平台层超管门)
+        for name in ("_require_owner_or_super", "_require_tenant"):
+            self.assertFalse(hasattr(route_helpers, name), f"旧门 {name} 不许复活")
 
     def test_single_source_of_truth(self):
         """app.py 与已抽出的 routes 必须复用 route_helpers 同一份对象 · 不许各自拷贝"""
@@ -40,7 +44,6 @@ class RouteHelpersImportContractTests(unittest.TestCase):
         from routes import billing_routes
         from routes import erp_mappings_routes
         from routes import erp_xero_routes
-        from routes import team_routes
         from routes import workspace_routes
         from services.authz import deps
 
@@ -56,20 +59,10 @@ class RouteHelpersImportContractTests(unittest.TestCase):
             admin_diagnostics_routes._require_super_admin,
             route_helpers._require_super_admin,
         )
-        # REFACTOR-B1(2026-05-25):team_add_employee 随 7 路由从 app.py 搬到 team_routes ·
-        # _check_password_strength 的消费者随之转移 · 单一来源断言跟到 team_routes。
-        self.assertIs(team_routes._log_op, route_helpers._log_op)
-        self.assertIs(team_routes._check_password_strength, route_helpers._check_password_strength)
         # 权限批2(2026-06-10):路由旧门换成统一执行点 require_perm(services/authz/deps)·
-        # team/workspace/erp_* 必须复用 deps 同一份对象 · 且不再持有旧门 _require_owner_or_super
-        # (本体仍单一定义于 route_helpers · 批5 前过渡保留 · 不许在路由模块复活)。
-        for mod in (team_routes, workspace_routes, erp_mappings_routes, erp_xero_routes):
+        # workspace/erp_* 必须复用 deps 同一份对象(批5:旧门别名已删 · team_routes 整体处决)。
+        for mod in (workspace_routes, erp_mappings_routes, erp_xero_routes):
             self.assertIs(mod.require_perm, deps.require_perm, f"{mod.__name__} require_perm 漂移")
-            self.assertFalse(
-                hasattr(mod, "_require_owner_or_super"),
-                f"{mod.__name__} 不应再持有旧门 _require_owner_or_super",
-            )
-        self.assertTrue(callable(route_helpers._require_owner_or_super))
 
 
 class PlanPermissionsContractTests(unittest.TestCase):

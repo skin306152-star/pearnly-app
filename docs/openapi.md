@@ -48,7 +48,7 @@ FastAPI 默认生成:
 | `me_routes.py` | `/api/me` | `GET /` · `GET /lang` · `PUT /lang` · `PUT /password` | unit + spec 13 | 当前用户信息 / 改密 |
 | `tenant_routes.py` | `/api/tenant` | `GET /companies` · `PUT /active` | unit | 多公司账套切换 |
 | `workspace_routes.py` | `/api/workspace` | 工作区 / role 管理 | unit | 员工 / 老板 / 超管 |
-| `team_routes.py` | `/api/team` | 团队成员管理 | unit | 老板加员工 |
+| `console_team_routes.py` / `console_invite_routes.py` | `/api/team` | 成员/角色/邀请/转移(批5 后唯一团队管理面) | unit | 控制台管成员 |
 | `settings_routes.py` | `/api/settings` | dup_check / ERP push mode / Gemini key | unit | 用户级设置 |
 
 ### 📸 OCR / 上传识别(高敏热路径)

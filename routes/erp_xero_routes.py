@@ -20,8 +20,8 @@ error code / OAuth 跳转行为全部不变。
 
 依赖:
   - db.*(oauth token / state / push log / mappings)
-  - auth.get_current_user_from_request
-  - route_helpers._require_owner_or_super / _tid
+  - auth.get_current_user_from_request / authz.require_perm("settings.org.edit")
+  - route_helpers._tid
   - xero_pusher.*(函数内懒 import · requests 实现 · 非 Playwright · 无 async tripwire)
 """
 

@@ -4,7 +4,7 @@
 锁定:
   1. router 注册 GET /api/me/modules + PUT /api/me/onboarding + PUT /api/me/modules/{key} 契约
   2. app.py include_router 真挂上
-  3. 写接口(onboarding/toggle)用 require_account_owner(owner 专属)· 读用 require_tenant
+  3. 写接口(onboarding/toggle)走 settings.modules.manage 权限码 · 读用 require_tenant
 """
 
 import inspect
@@ -37,11 +37,11 @@ class ModulesRoutesContractTests(unittest.TestCase):
         self.assertIn("/api/me/onboarding", paths)
         self.assertIn("/api/me/modules/{module_key}", paths)
 
-    def test_write_endpoints_require_account_owner(self):
-        # 写接口源码须调 require_account_owner(比 require_owner 更严 · 挡受邀成员)
+    def test_write_endpoints_require_modules_manage_perm(self):
+        # 写接口源码须走 settings.modules.manage(owner/admin · 挡会计/录入/收银员)
         for fn in (modules_routes.api_onboarding, modules_routes.api_toggle_module):
             src = inspect.getsource(fn)
-            self.assertIn("require_account_owner", src)
+            self.assertIn('require_perm_pos_tid(request, "settings.modules.manage")', src)
         # 读接口用 require_tenant(任意已登录主体)
         self.assertIn("require_tenant", inspect.getsource(modules_routes.api_get_modules))
 

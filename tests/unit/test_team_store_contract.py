@@ -1,43 +1,53 @@
 # -*- coding: utf-8 -*-
-"""REFACTOR-B2 守门 · 员工管理 DAL 抽到 services/team/store.py
+"""员工操作 DAL 单一来源守门(批5:services/team/store.py 处决 · 活函数并入 console_store)。
 
-验证 4 个函数都在 service 模块 + db 命名空间 re-export 同一对象(防漂移)。
-add_employee 复用 db.find_user_by_username(留在 db.py)· 经 db.* 调用 · 可被 patch。
+验证 3 个函数活在 console_store(调用点直调模块 · 不再经 db.* re-export,防 dal_reexports
+循环 import);旧模块 services/team/store 与 db.* 旧名不许复活;add_employee 随宿主退役。
 """
 
 import unittest
 
 from core import db
-from services.team import store
+from services.team import console_store
 
 _MOVED = [
     "list_employees",
-    "add_employee",
     "remove_employee",
     "toggle_employee_active",
 ]
 
 
 class TeamStoreContractTests(unittest.TestCase):
-    def test_all_functions_live_in_service_module(self):
+    def test_all_functions_live_in_console_store(self):
         for name in _MOVED:
-            self.assertTrue(hasattr(store, name), f"team.store 缺 {name}")
-            self.assertTrue(callable(getattr(store, name)), name)
+            self.assertTrue(hasattr(console_store, name), f"team.console_store 缺 {name}")
+            self.assertTrue(callable(getattr(console_store, name)), name)
 
-    def test_db_reexports_same_object(self):
-        for name in _MOVED:
-            self.assertTrue(hasattr(db, name), f"db 未 re-export {name}")
-            self.assertIs(getattr(db, name), getattr(store, name), f"db.{name} 漂移!")
+    def test_db_legacy_names_retired(self):
+        for name in _MOVED + ["add_employee"]:
+            self.assertFalse(hasattr(db, name), f"db.{name} 应随旧团队管理退役(直调 console_store)")
 
-    def test_add_employee_uses_db_find_user_by_username(self):
-        # add_employee 内部走 db.find_user_by_username(留 db.py)· patch 应可拦截 ·
-        # 命中已存在用户 → 返回 None(不建重复用户名)
-        from unittest import mock
+    def test_legacy_store_module_gone(self):
+        with self.assertRaises(ModuleNotFoundError):
+            import services.team.store  # noqa: F401
 
-        with mock.patch("core.db.find_user_by_username", return_value={"id": "existing"}) as m:
-            rid = db.add_employee("tenant-1", "dupuser", "pw123456")
-        self.assertTrue(m.called, "add_employee 未经 db.find_user_by_username(re-export 失效?)")
-        self.assertIsNone(rid)
+    def test_routes_call_console_store(self):
+        import inspect
+
+        from routes import admin_users_query_routes, console_team_routes
+
+        self.assertIn(
+            "console_store.list_employees",
+            inspect.getsource(admin_users_query_routes.admin_user_detail),
+        )
+        self.assertIn(
+            "console_store.remove_employee",
+            inspect.getsource(console_team_routes.remove_member),
+        )
+        self.assertIn(
+            "console_store.toggle_employee_active",
+            inspect.getsource(console_team_routes.toggle_member),
+        )
 
 
 if __name__ == "__main__":

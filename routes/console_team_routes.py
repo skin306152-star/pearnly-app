@@ -81,13 +81,23 @@ async def team_members(request: Request):
     me = str(user["id"])
     for m in members:
         m["is_self"] = m["id"] == me
-    return {"ok": True, "members": members, "total": len(members)}
+    # 席位计量(PEAK 吸收 · 套餐 seats_max,前端显「当前用户 N/M」+ 满员升级提示)
+    from services.auth.signup_core import PLAN_CONFIG
+
+    plan = PLAN_CONFIG.get(str(user.get("plan") or ""), PLAN_CONFIG["credits"])
+    return {
+        "ok": True,
+        "members": members,
+        "total": len(members),
+        "seats_max": int(plan["seats_max"]),
+    }
 
 
 @router.get("/api/team/roles")
 async def team_roles(request: Request):
-    """角色说明卡(permission-role review):key + 权限分组摘要。owner 不可邀。"""
-    require_perm(request, "team.member.view")
+    """角色说明卡(permission-role review):key + 权限分组摘要 + 在用人数。owner 不可邀。"""
+    user = require_perm(request, "team.member.view")
+    counts = console_store.role_member_counts(str(user["tenant_id"]))
     roles = []
     for key in ("owner",) + ASSIGNABLE_ROLE_KEYS:
         codes = sorted(ROLE_PERMISSIONS[key])
@@ -98,6 +108,7 @@ async def team_roles(request: Request):
                 "scopable": key in SCOPABLE_ROLE_KEYS,
                 "permission_groups": sorted({c.split(".", 1)[0] for c in codes}),
                 "permission_count": len(codes),
+                "member_count": counts.get(key, 0),
             }
         )
     return {"ok": True, "roles": roles}
@@ -163,7 +174,7 @@ async def toggle_member(uid: str, req: ActiveRequest, request: Request):
     if err:
         raise HTTPException(422, detail=err)
     target = db.find_user_by_id(uid)
-    ok = db.toggle_employee_active(str(user["tenant_id"]), uid, req.is_active)
+    ok = console_store.toggle_employee_active(str(user["tenant_id"]), uid, req.is_active)
     if not ok:
         raise HTTPException(404, detail="team.member_not_found")
     _log_op(
@@ -185,7 +196,7 @@ async def remove_member(uid: str, request: Request):
     if err:
         raise HTTPException(422, detail=err)
     target = db.find_user_by_id(uid)
-    ok = db.remove_employee(str(user["tenant_id"]), uid)
+    ok = console_store.remove_employee(str(user["tenant_id"]), uid)
     if not ok:
         raise HTTPException(404, detail="team.member_not_found")
     _log_op(

@@ -2,8 +2,8 @@
 auth_password_routes.py · 密码找回 / 重置 / 改密 + 邮件 & LINE 发送器
 
 从 auth_signup.py 抽出(模块化深化 · 2026-06-01 · 纯搬家 0 逻辑改)。
-🔴 高敏:改密码路径(铁律 #26)。auth_signup include 本 router 并 re-export
-send_reset_link_for_employee(team_routes 经 auth_signup 调到)。
+🔴 高敏:改密码路径(铁律 #26)。auth_signup include 本 router;
+send_reset_link_for_employee(email/LINE 改密链接发送器)单一定义在此。
 auth_signup 的 helper(_hash_password / normalize_email / _now / get_client_ip_safe)
 在路由函数内 lazy import(破循环 · 同 oauth_routes 惯用法)。
 """

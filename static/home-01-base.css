@@ -293,6 +293,16 @@
     --red-weak: #2A1517;
     --blue: #2DD4A7;
     --blue-weak: #11261F;
+    /* emerald 阶暗夜翻面(浅档=底色变深 · 深档=字色变亮):
+       浅色只定义了亮阶 → 暗夜下 blue-50/100 当底压不住翻亮的 --ink(向导选中卡白底洗字根因) */
+    --blue-50: #0D1F1A;
+    --blue-100: #11261F;
+    --blue-200: #1C3B31;
+    --blue-300: #2A574A;
+    --blue-400: #3E8772;
+    --blue-600: #25B28C;
+    --blue-700: #2DD4A7;
+    --blue-800: #7FE0C3;
     --success: #3FB984;
     --success-bg: #11281F;
     --warn: #E0A93B;

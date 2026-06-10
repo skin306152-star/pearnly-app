@@ -13,7 +13,7 @@ const MODE_UPDATE = process.argv.includes('--update-baseline');
 const ROOTS = ['src/home', 'static/pos', 'static'];
 // 设计系统"实物源/令牌定义"文件——允许裸 hex(它们就是令牌来源),扫描时跳过 hex 检查
 const TOKEN_SOURCE =
-    /kit-final\.html|templates\.html|dashboard-final\.html|a\.html|b\.html|c\.html|kit\.html|i18n-data|sales-wizard-i18n/i;
+    /kit-final\.html|templates\.html|dashboard-final\.html|a\.html|b\.html|c\.html|kit\.html|i18n-data|sales-wizard-i18n|home-01-base\.css/i;
 const SKIP_DIR = /node_modules|[\\/]dist[\\/]|_mock|\.map$/i;
 const EXT = /\.(ts|js|css|html)$/i;
 

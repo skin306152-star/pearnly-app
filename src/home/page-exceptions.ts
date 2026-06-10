@@ -42,19 +42,19 @@
         <!-- 顶部 4 KPI -->
         <div class="exc-kpi-row" id="exc-kpi-row">
             <div class="exc-kpi">
-                <div class="exc-kpi-value" id="exc-kpi-pending">—</div>
+                <div class="exc-kpi-value" id="exc-kpi-pending">0</div>
                 <div class="exc-kpi-label" data-i18n="exc-kpi-pending">待复核</div>
             </div>
             <div class="exc-kpi exc-kpi-danger">
-                <div class="exc-kpi-value" id="exc-kpi-high">—</div>
+                <div class="exc-kpi-value" id="exc-kpi-high">0</div>
                 <div class="exc-kpi-label" data-i18n="exc-kpi-high">高危异常</div>
             </div>
             <div class="exc-kpi">
-                <div class="exc-kpi-value" id="exc-kpi-resolved">—</div>
+                <div class="exc-kpi-value" id="exc-kpi-resolved">0</div>
                 <div class="exc-kpi-label" data-i18n="exc-kpi-resolved">已处理</div>
             </div>
             <div class="exc-kpi">
-                <div class="exc-kpi-value" id="exc-kpi-learned">—</div>
+                <div class="exc-kpi-value" id="exc-kpi-learned">0</div>
                 <div class="exc-kpi-label" data-i18n="exc-kpi-learned">已学习规则</div>
             </div>
         </div>

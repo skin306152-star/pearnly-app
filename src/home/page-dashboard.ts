@@ -29,16 +29,16 @@
                         <div class="n" id="dash-kpi-balance">—</div>
                         <div class="help" id="dash-kpi-balance-sub" style="margin-top:4px">&nbsp;</div>
                     </div>
-                    <button class="btn pri" onclick="window._openTopupModal&&window._openTopupModal()">
+                    <button class="btn pri" id="dash-topup-btn" style="display:none" onclick="window._openTopupModal&&window._openTopupModal()">
                         <svg class="ic" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                         <span data-i18n="dash-topup">充值</span>
                     </button>
                 </div>
                 <div class="kpis">
-                    <div class="kpi"><div class="l" data-i18n="dash-kpi-month-invoices">本月发票</div><div class="n" id="dash-kpi-invoices">—</div></div>
-                    <div class="kpi"><div class="l" data-i18n="dash-kpi-pending">待处理</div><div class="n dash-amber" id="dash-kpi-pending">—</div></div>
-                    <div class="kpi"><div class="l" data-i18n="dash-kpi-exceptions">异常</div><div class="n dash-red" id="dash-kpi-exceptions">—</div></div>
-                    <div class="kpi" id="dash-kpi-usage-card"><div class="l" data-i18n="dash-kpi-usage">本月用量</div><div class="n" id="dash-kpi-usage">—</div><div class="help" id="dash-kpi-usage-sub">&nbsp;</div></div>
+                    <div class="kpi"><div class="l" data-i18n="dash-kpi-month-invoices">本月发票</div><div class="n" id="dash-kpi-invoices">0</div></div>
+                    <div class="kpi"><div class="l" data-i18n="dash-kpi-pending">待处理</div><div class="n dash-amber" id="dash-kpi-pending">0</div></div>
+                    <div class="kpi"><div class="l" data-i18n="dash-kpi-exceptions">异常</div><div class="n dash-red" id="dash-kpi-exceptions">0</div></div>
+                    <div class="kpi" id="dash-kpi-usage-card"><div class="l" data-i18n="dash-kpi-usage">本月用量</div><div class="n" id="dash-kpi-usage">0</div><div class="help" id="dash-kpi-usage-sub">&nbsp;</div></div>
                 </div>
             </div>
 

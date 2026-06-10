@@ -22,7 +22,7 @@ function _t(k: string, fb?: string) {
     }
 }
 function _fmtNum(n: number) {
-    if (n == null || isNaN(n)) return '—';
+    if (n == null || isNaN(n)) return '0';
     try {
         return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     } catch (_) {
@@ -181,12 +181,18 @@ async function loadCreditsCard() {
     const usageVal = document.getElementById('dash-kpi-usage');
     const usageSub = document.getElementById('dash-kpi-usage-sub');
     if (!balCard || !usageCard) return;
+    // 充值按钮与余额卡同生死 · 卡隐藏时按钮单飘在信息带顶上
+    const topupBtn = document.getElementById('dash-topup-btn');
+    const showBalance = (on: boolean) => {
+        balCard.style.display = on ? '' : 'none';
+        if (topupBtn) topupBtn.style.display = on ? '' : 'none';
+    };
     try {
         const auth = { Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
         const resp = await fetch('/api/me/credits', { headers: auth, cache: 'no-store' });
         if (!resp.ok) {
             // 鉴权失败或服务异常 · 默认隐藏余额 · 用量显示 "—"
-            balCard.style.display = 'none';
+            showBalance(false);
             if (usageVal) usageVal.textContent = '—';
             if (usageSub) usageSub.textContent = '';
             return;
@@ -197,9 +203,9 @@ async function loadCreditsCard() {
 
         // === 卡 1 · 账户余额 ===
         if (!isOwner) {
-            balCard.style.display = 'none';
+            showBalance(false);
         } else {
-            balCard.style.display = '';
+            showBalance(true);
             if (isExempt) {
                 if (balVal) {
                     balVal.textContent = '∞';
@@ -214,7 +220,8 @@ async function loadCreditsCard() {
             } else {
                 const bal = typeof data.balance_thb === 'number' ? data.balance_thb : 0;
                 if (balVal) {
-                    balVal.textContent = '฿' + bal.toFixed(2);
+                    // ฿ 与数字之间垫窄空格 · 泰铢符号字形偏宽与首位数字贴撞(S8)
+                    balVal.textContent = '฿ ' + bal.toFixed(2);
                     balVal.className = bal < 50 ? 'n dash-red' : 'n';
                 }
                 if (balSub) {
@@ -267,7 +274,7 @@ async function loadCreditsCard() {
         }
     } catch (e) {
         console.warn('[credits] loadCreditsCard failed:', e);
-        balCard.style.display = 'none';
+        showBalance(false);
         if (usageVal) usageVal.textContent = '—';
     }
 }

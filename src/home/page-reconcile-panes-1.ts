@@ -34,23 +34,29 @@ export const RECON_HTML_1 = `
             <!-- KPI 3 卡 -->
             <div class="vex-kpi-strip" id="brv2-kpi-strip">
                 <div class="vex-kpi-card">
-                    <div class="vex-kpi-icon-wrap vex-kpi-icon-ok">✓</div>
+                    <div class="vex-kpi-icon-wrap vex-kpi-icon-ok">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M3 8.5l3.5 3.5L13 5"/></svg>
+                    </div>
                     <div>
-                        <div class="vex-kpi-val" id="brv2-kpi-matched">—</div>
+                        <div class="vex-kpi-val" id="brv2-kpi-matched">0</div>
                         <div class="vex-kpi-lbl" data-i18n="brv2-stat-matched">完全匹配</div>
                     </div>
                 </div>
                 <div class="vex-kpi-card">
-                    <div class="vex-kpi-icon-wrap" id="brv2-kpi-diff-icon" style="background:#f3f4f6;color:var(--ink2)">△</div>
+                    <div class="vex-kpi-icon-wrap" id="brv2-kpi-diff-icon" style="background:var(--line-soft);color:var(--ink-2)">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M8 3l5.5 9.5h-11z"/></svg>
+                    </div>
                     <div>
-                        <div class="vex-kpi-val" id="brv2-kpi-diff">—</div>
+                        <div class="vex-kpi-val" id="brv2-kpi-diff">0</div>
                         <div class="vex-kpi-lbl" data-i18n="brv2-stat-diff">差额</div>
                     </div>
                 </div>
                 <div class="vex-kpi-card">
-                    <div class="vex-kpi-icon-wrap vex-kpi-icon-err">!</div>
+                    <div class="vex-kpi-icon-wrap vex-kpi-icon-err">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="14" height="14"><line x1="8" y1="3.5" x2="8" y2="9.5"/><circle cx="8" cy="12.5" r="0.5" fill="currentColor" stroke="none"/></svg>
+                    </div>
                     <div>
-                        <div class="vex-kpi-val" id="brv2-kpi-unmatched">—</div>
+                        <div class="vex-kpi-val" id="brv2-kpi-unmatched">0</div>
                         <div class="vex-kpi-lbl" data-i18n="brv2-stat-unmatched">未匹配</div>
                     </div>
                 </div>

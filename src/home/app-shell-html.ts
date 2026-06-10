@@ -291,7 +291,7 @@ const SIDEBAR_HTML = `
                     <path d="M6 13l2 2 4-4"/>
                 </svg>
                 <span class="nav-label" data-i18n="nav-vouchers">自动凭证</span>
-                <span class="nav-badge" style="margin-left:auto;background:#f3f4f6;color:#6b7280;" data-i18n="nav-soon">即将上线</span>
+                <span class="nav-badge" style="margin-left:auto;" data-i18n="nav-soon">即将上线</span>
             </div>
         </div>
     </div>

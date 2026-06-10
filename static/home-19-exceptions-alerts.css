@@ -2,24 +2,29 @@
  * v118.20.2 · 异常栏(Exceptions)阶段 2 · 列表页骨架
  * ============================================================ */
 
-/* 顶部 KPI 行 */
+/* 顶部 KPI · 收成一条信息带(S8 · 与 tab 计数语义重复 · 降卡墙存在感) */
 .exc-kpi-row {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
     margin-bottom: 16px;
-}
-.exc-kpi {
     background: var(--card);
     border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 14px 16px;
+    border-radius: 12px;
+    overflow: hidden;
+}
+.exc-kpi {
+    padding: 12px 16px;
+    border-right: 1px solid var(--line-soft);
+}
+.exc-kpi:last-child {
+    border-right: 0;
 }
 .exc-kpi-value {
-    font-size: 26px;
+    font-size: 20px;
     font-weight: 700;
     color: var(--ink);
     font-family: var(--font-mono, 'SF Mono', Menlo, monospace);
+    font-variant-numeric: tabular-nums;
     line-height: 1.1;
 }
 .exc-kpi-label {
@@ -31,7 +36,9 @@
 
 @media (max-width: 768px) {
     .exc-kpi-row { grid-template-columns: repeat(2, 1fr); }
-    .exc-kpi-value { font-size: 22px; }
+    .exc-kpi:nth-child(2n) { border-right: 0; }
+    .exc-kpi:nth-child(-n + 2) { border-bottom: 1px solid var(--line-soft); }
+    .exc-kpi-value { font-size: 18px; }
 }
 
 /* v118.21.1 · 状态切换 tab(待复核 / 已处理 / 已忽略) */

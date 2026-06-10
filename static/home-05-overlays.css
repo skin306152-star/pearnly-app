@@ -284,6 +284,10 @@ a.contact-item:hover { background: var(--bg-hover); }
     border: 1px dashed var(--line);
     padding: 60px 30px; text-align: center;
     margin-top: 20px;
+    /* S7 占位卡铺满内容区 · 内容成组垂直居中(不留下方死白) */
+    min-height: calc(100vh - 260px);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
 }
 .coming-soon svg.cs-icon {
     width: 48px; height: 48px; color: var(--ink-4);

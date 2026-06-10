@@ -42,7 +42,7 @@ function formHtml(): string {
         )
         .join('');
     const tplCards = TEMPLATES.map((id) => {
-        const accent = id === 'brand' || id === 'official' ? color : '#111827';
+        const accent = id === 'brand' || id === 'official' ? color : 'var(--ink)';
         const bar =
             id === 'brand' ? `<div class="sx-tpl-bar" style="background:${accent}"></div>` : '';
         const center = id === 'official' ? 'text-align:center;' : '';
@@ -79,7 +79,9 @@ function formHtml(): string {
         <div class="sx-head" style="margin-top:14px"><h2 style="font-size:14px">${escapeHtml(t('sx-acc-sec-color'))}</h2></div>
         <div style="display:flex;gap:10px">${swatches}</div>
 
-        <button class="btn btn-primary" id="sx-a-save" style="margin-top:18px">${escapeHtml(t('sx-acc-save'))}</button>
+        <div style="margin-top:18px;display:flex;justify-content:flex-end">
+            <button class="btn btn-primary" id="sx-a-save">${escapeHtml(t('sx-acc-save'))}</button>
+        </div>
       </div>
       <div class="sx-acc-preview-col">
         <div class="sx-set-h">${escapeHtml(t('sx-acc-preview'))}</div>

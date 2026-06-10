@@ -86,6 +86,7 @@ body.sidebar-collapsed .nav-group-label { display: none; }
     font-size: 10px; padding: 1px 5px;
     background: var(--line-soft); color: var(--ink-3);
     border-radius: 3px; flex-shrink: 0;
+    white-space: nowrap;
 }
 /* v118.20.2 · 异常栏待复核计数 红色徽章 */
 .nav-item .nav-badge.danger {

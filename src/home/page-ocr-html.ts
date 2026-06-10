@@ -14,6 +14,8 @@
 //   results-card · results-head-stats · results-tbody · results-table · search-input
 //   search-clear · search-matches
 // ============================================================
+import { MORE_SVG } from './more-menu.js';
+
 (function () {
     'use strict';
     const sec = document.getElementById('page-ocr');
@@ -88,9 +90,7 @@
                     </div>
                     <!-- S9 4-bis:一排 ≥4 按钮收 ⋯ 更多(清空 / 自定义模板 · id 不变保既有绑定) -->
                     <div class="more-wrap" id="ocr-more-wrap">
-                        <button class="btn sec" id="btn-ocr-more" aria-haspopup="true" aria-label="more">
-                            <svg viewBox="0 0 20 20" fill="currentColor"><circle cx="4" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="16" cy="10" r="1.6"/></svg>
-                        </button>
+                        <button class="btn sec" id="btn-ocr-more" aria-haspopup="true" aria-label="more">${MORE_SVG}</button>
                         <div class="menu more-menu" id="ocr-more-menu" hidden>
                             <button class="mi" id="btn-clear" disabled>
                                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M5 7h10M8 3h4M7 7l1 10h4l1-10"/></svg>

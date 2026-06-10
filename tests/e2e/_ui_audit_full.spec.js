@@ -78,34 +78,25 @@ test('full surface audit', async ({ page }) => {
     await shot(page, 'L1-ws-modal-账套选择', m);
     await killWs(page);
 
-    // L0 顶层屏 · 浅色
-    for (const r of ROUTES) {
-        try {
-            await page.evaluate((x) => {
-                window.navigateTo ? window.navigateTo(x) : (location.hash = '#/' + x);
-            }, r);
-            await page.waitForTimeout(1300);
-            await killWs(page);
-            await page.waitForTimeout(300);
-            await shot(page, `L0-${r}`, m);
-        } catch (e) {
-            m.push({ name: 'L0-' + r, ok: false, err: String(e).slice(0, 80) });
+    // L0 顶层屏 · 浅 + 暗(强制 .dark 类)同一循环跑两遍
+    const sweepRoutes = async (prefix) => {
+        for (const r of ROUTES) {
+            try {
+                await page.evaluate((x) => {
+                    window.navigateTo ? window.navigateTo(x) : (location.hash = '#/' + x);
+                }, r);
+                await page.waitForTimeout(1200);
+                await killWs(page);
+                await page.waitForTimeout(300);
+                await shot(page, `${prefix}-${r}`, m);
+            } catch (e) {
+                m.push({ name: `${prefix}-${r}`, ok: false, err: String(e).slice(0, 80) });
+            }
         }
-    }
-
-    // L0 暗夜(强制 .dark 类)· 抓几个代表 + 全部
+    };
+    await sweepRoutes('L0');
     await page.evaluate(() => document.documentElement.classList.add('dark'));
-    for (const r of ROUTES) {
-        try {
-            await page.evaluate((x) => {
-                window.navigateTo ? window.navigateTo(x) : (location.hash = '#/' + x);
-            }, r);
-            await page.waitForTimeout(1100);
-            await killWs(page);
-            await page.waitForTimeout(250);
-            await shot(page, `DARK-${r}`, m);
-        } catch (e) {}
-    }
+    await sweepRoutes('DARK');
     await page.evaluate(() => document.documentElement.classList.remove('dark'));
     await page.waitForTimeout(300);
 

@@ -4,6 +4,7 @@
 /* global escapeHtml, showConfirm */
 import { S, _sellerState } from './clients-store.js';
 import { apiClient } from './clients-helpers.js';
+import { MORE_SVG } from './more-menu.js';
 
 // ==========================================================
 // P3 · 客户管理页 · tab 切换
@@ -91,7 +92,7 @@ function renderSellerList() {
                 ? `
             <button class="cust-row-btn" data-saction="edit" data-wid="${c.id}"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2l3 3-7 7H2v-3z"/></svg><span>${escapeHtml(t('client-card-edit'))}</span></button>
             <div class="more-wrap">
-                <button class="cust-row-btn" data-saction="more" data-wid="${c.id}" aria-label="more"><svg viewBox="0 0 14 14" fill="currentColor"><circle cx="2.5" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11.5" cy="7" r="1.2"/></svg></button>
+                <button class="cust-row-btn" data-saction="more" data-wid="${c.id}" aria-label="more">${MORE_SVG}</button>
                 <div class="more-menu right" hidden>
                     <button class="mi dng" data-saction="archive" data-wid="${c.id}"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M2 4h10M4 4v7a1 1 0 001 1h4a1 1 0 001-1V4M5.5 4V2.8a1 1 0 011-1h1a1 1 0 011 1V4"/></svg><span>${escapeHtml(t('wsclient-archive'))}</span></button>
                 </div>

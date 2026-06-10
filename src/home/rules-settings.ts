@@ -9,7 +9,6 @@
 /* global escapeHtml, showToast, showConfirm */
 import type { ClientRuleRow } from './rules-settings-data.js';
 import { RS_STYLE, rsL, rsSvg } from './rules-settings-data.js';
-import { toggleMoreMenu } from './more-menu.js';
 
 let rsBuilt = false;
 let rsRules: ClientRuleRow[] = [];
@@ -403,9 +402,8 @@ function rsBuild(): void {
             add.classList.remove('rs-open');
         const addBtn = el.closest('[data-add-type]') as HTMLElement | null;
         if (addBtn) rsOpenAdd(addBtn.dataset.addType!);
-        // S9 行尾 ⋯ 菜单:开本行关其他;点任意动作/外部即收
-        const moreBtn = el.closest('[data-more]') as HTMLElement | null;
-        if (toggleMoreMenu('#rules-settings-modal', moreBtn)) return;
+        // ⋯ 菜单开关/点外关由 more-menu 全局控制器管 · 这里只接业务动作
+        if (el.closest('[data-more]')) return;
         const editBtn = el.closest('[data-edit]') as HTMLElement | null;
         if (editBtn) {
             const r = rsRules.find((x) => x.id === Number(editBtn.dataset.edit));

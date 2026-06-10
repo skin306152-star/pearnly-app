@@ -17,6 +17,7 @@ import {
     type DocListItem,
     type DocSummary,
 } from './purchase-common.js';
+import { MORE_SVG } from './more-menu.js';
 
 const ICON_CAM =
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
@@ -26,9 +27,6 @@ const ICON_CAM_SM =
     '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/></svg>';
 
 type Chip = 'all' | 'purchase' | 'expense' | 'unpaid';
-
-// ⋯ 下拉点外关 · 全局只绑一次(bindChrome 每次重渲都会跑)
-let purMoreCloserBound = false;
 
 // 收拢版令牌页内自定义(.pur.pl 作用域 · 不动 base/detail/form):面板圆角16 · 按钮圆角11。
 // PO 标准化:裸 hex 全换全局令牌(暗夜随翻面);.wrap 流式宽继承 base(去 1020 固定宽)。
@@ -175,7 +173,7 @@ function shell(): string {
                 <div class="acts">
                     <button class="btn primary" id="pur-cam-btn">${ICON_CAM}${escapeHtml(t('pur-photo'))}</button>
                     <div class="more-wrap">
-                        <button class="btn" id="pur-more-btn" aria-label="more"><svg viewBox="0 0 16 16" fill="currentColor" width="15" height="15"><circle cx="3" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="13" cy="8" r="1.3"/></svg></button>
+                        <button class="btn" id="pur-more-btn" aria-label="more">${MORE_SVG}</button>
                         <div class="more-menu right" id="pur-more-menu" hidden>
                             <button class="mi" id="pur-manual-btn">${escapeHtml(t('pur-manual-new'))}</button>
                             <button class="mi" id="pur-line-btn">${escapeHtml(t('pur-line-expense'))}</button>
@@ -243,41 +241,13 @@ function bindChrome(): void {
             searchTimer = window.setTimeout(renderBody, 200);
         };
     }
-    // S9 4-bis:拍票=唯一主入口 · 手动/LINE 收 ⋯ 下拉
-    const moreBtn = document.getElementById('pur-more-btn');
-    const moreMenu = document.getElementById('pur-more-menu');
-    if (moreBtn && moreMenu) {
-        moreBtn.onclick = (e) => {
-            e.stopPropagation();
-            moreMenu.hidden = !moreMenu.hidden;
-        };
-        if (!purMoreCloserBound) {
-            purMoreCloserBound = true;
-            document.addEventListener(
-                'click',
-                (e) => {
-                    const el = e.target as HTMLElement;
-                    if (el.closest('#pur-more-btn')) return;
-                    const m = document.getElementById('pur-more-menu');
-                    if (m && !m.hidden && !el.closest('#pur-more-menu')) m.hidden = true;
-                },
-                true
-            );
-        }
-    }
+    // S9 4-bis:拍票=唯一主入口 · 手动/LINE 收 ⋯ 下拉(开关/点外关由 more-menu 全局控制器管)
     const manualBtn = document.getElementById('pur-manual-btn');
     // F3a · 手动记一笔(没发票费用)→ 直接进录入屏费用模式。
     if (manualBtn)
-        manualBtn.onclick = () => {
-            if (moreMenu) moreMenu.hidden = true;
-            window.openPurchaseForm?.(null, { doc_kind: 'expense' });
-        };
+        manualBtn.onclick = () => window.openPurchaseForm?.(null, { doc_kind: 'expense' });
     const lineBtn = document.getElementById('pur-line-btn');
-    if (lineBtn)
-        lineBtn.onclick = () => {
-            if (moreMenu) moreMenu.hidden = true;
-            window.openPurchaseLine?.();
-        };
+    if (lineBtn) lineBtn.onclick = () => window.openPurchaseLine?.();
     const camBtn = document.getElementById('pur-cam-btn');
     const camInput = document.getElementById('pur-cam-input') as HTMLInputElement | null;
     if (camBtn && camInput) camBtn.onclick = () => camInput.click();

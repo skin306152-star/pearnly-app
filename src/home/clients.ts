@@ -28,7 +28,6 @@ import {
     saveWsClient,
     archiveWsClient,
 } from './clients-seller.js';
-import { toggleMoreMenu } from './more-menu.js';
 
 window.loadClientsPage = async function () {
     const st = document.getElementById('seller-tbody');
@@ -233,12 +232,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const wid = parseInt(btn.dataset.wid as string, 10);
             const act = btn.dataset.saction;
             const ws = S.sellerClients.find((x: any) => Number(x.id) === wid) as any;
-            // S9 行尾 ⋯ 菜单:开本行关其他;点任意动作即收
-            if (act === 'more') {
-                toggleMoreMenu('#seller-tbody', btn);
-                return;
-            }
-            toggleMoreMenu('#seller-tbody', null);
+            // ⋯ 菜单开关/点外关由 more-menu 全局控制器管 · 这里只接业务动作
+            if (act === 'more') return;
             if (act === 'activate') {
                 if (typeof window.setActiveWorkspaceClientId === 'function')
                     window.setActiveWorkspaceClientId(wid);
@@ -253,16 +248,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 archiveWsClient();
             }
         });
-        document.addEventListener(
-            'click',
-            (e) => {
-                if (!(e.target as HTMLElement).closest('#seller-tbody .more-wrap'))
-                    sellerTbody
-                        .querySelectorAll<HTMLElement>('.more-menu')
-                        .forEach((m) => (m.hidden = true));
-            },
-            true
-        );
     }
     const sellerSearch = document.getElementById('seller-search');
     if (sellerSearch) {

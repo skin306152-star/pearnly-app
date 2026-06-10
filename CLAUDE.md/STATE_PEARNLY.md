@@ -13,6 +13,7 @@
   - **PEAK 吸收**:B1 席位「当前用户 N/M」+满员升级提示 / B2 角色卡「使用权」模块芯片 / B3 角色「N 人在用」 / B4 行内展开使用权行。芯片全令牌 accent 系(10 色 hex 板撞禁裸hex+紫封板→收敛·mod-* 类名留位,彩色板须先进 console-theme 令牌)。
   - **真机 5 修**:logo 换 pwa-icon-192 / invite 接受失败必复位+422数组人话+pwd.*四语 / 已注册邮箱明确码 `invite.account_exists_other_tenant`(1人1租户·配单测) / 语言切换→站内 seg pills / checkbox 站内样式(顺手修 .field input 全宽压垮 .wsopt)。?v= bump。
   - **自检**:全量单测 3184 绿·权限矩阵真库 E2E **54/54**(批5删后 diff=空)·真浏览器 17/17+增量 16/16(截图 tests/visual/_shot/console2-*)·authz 闸 439 路由绿·ui_lint 棘轮绿(裸hex 清零+baseline 收紧)·inventory helper_gated 收编 `_auth`(解报税 tax_routes push 卡点)。
+  - **/simplify 已跑**(`82da056f` 上线):errMsg 泛化 422 数组(同 invite.js 口径)/.field input :not(checkbox) 根治选择器竞争/PLAN_CONFIG import 上提;skip 项=测试 fixture 共享(unittest 惯例自含)、inventory 白名单机制重构(动第8道闸·另立项)、BRAND_HTML 跨页共享(两独立 plain-script 不值引公共 js)。
   - **⚠️ 留存 TODO(碰 src/home+build·下个窗口尽快)**:旧「设置→团队管理」tab 前端处决(data-action=team 改指 /console·删 team.ts/assign-clients.ts/page-settings team pane+i18n)——**后端 7 接口已删,该 tab 现点开会载入失败**。/console 入口本体已有(`45ce1f46`)。
 - **本日同窗口(2026-06-10)· 🧾 自动报税(Phase 3)后端全量 commit `6ccc1a3f` · 自检全绿 · 已随批5窗口收口 push 上线**:
   - 照 docs/tax-filing/00-05 封板:`services/tax/`(schema ensure 3表/aggregate PP30销−进+超期剔除+缺税号不计·PND53/3按税号首位分流/anomalies 报前体检 hard·info/filings 幂等+已报不可改/efiling e-Tax诚实降级+PDF·XML·zip 导出/hooks SAVEPOINT)+`routes/tax_routes.py` 11端点(tax.filing.* 逐路由码·accounting 门控·套账 fail-closed)+ close-period 挂点一行。

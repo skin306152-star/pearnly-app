@@ -6,7 +6,14 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-09 · **进项/OCR 真用 bug 一批修复上线 + 统一智能录入设计稿待拍板** · HEAD `a0aa6408`(?v=11850726)· 前序见下:套账隔离 / POS / 销项 / 知识库 / LINE）
+## 🎯 状态卡（2026-06-10 · **UI 整顿 S1-S4 大刀 + Claude 式导航全部上线** · HEAD `76865395`(?v=11850737)· 前序见下）
+
+- **🆕 本窗口(2026-06-10 · Fable 5 接手 Opus 卡顿窗口)· UI 整顿 punch list 推进 + Claude 式导航**:
+  - **唯一修复清单 = `docs/ui/UI_DESIGN_AUDIT_FINDINGS.md`**(逐项勾+commit)。已完:S1 蓝绿收口 `74a56a5a` / S2 暗夜换肤 `9efd4fed`+全局清零 `a1d58008` / S3 空态统一+暗夜表单 `179123b9` / S4 图标 Lucide `a49ad27f` / S6 激活态(并入导航)。
+  - **Claude 式导航 `f72a10a5`**(Zihao 拍板·稿 `scripts/_mock/nav-claude.html`):logo 进侧栏/分区小字标题/淡绿激活 pill/三级拍平/底部 pinned 用户卡/窄 rail;后续修 rail 顶只留折叠键 `ac54f023`、弹窗随 `--sidebar-current-w` `5e8f00af`、/simplify 收口 `76865395`。
+  - **拍板已落档(findings 四)**:POS/admin SPA 按标准排迁 emerald(后续窗口)· 暗夜 mint 不降饱和(封板即标准)· **着陆页永不动** · Codex 种子已清(prod:页脚 NULL+27 商品停用·void 单据合规保留)。
+  - **剩余(下窗口从这接)**:S5 文案收口 → S7/S8 布局 → S9 按钮 retrofit → 杂项(漏迁3屏/弹窗迁kit/原生confirm) → 补抓评审(抽屉/嵌套/流程态/生成文件)→ lint 清零挂闸。验证基建:`scripts/_s1_shot.cjs`(浅暗截图)+ `scripts/_nav_verify.cjs`(导航交互+手机)。
+  - **坑**:两连推 webhook 会吞第二次部署(prod 卡旧 commit → ssh `git fetch pearnly && merge --ff-only pearnly/master`;服务器 `git pull` 默认 origin=旧 mrpilot 仓别用)· 改 home-NN.css 必 bump ?v= 否则 immutable 缓存吃旧文件。
 
 - **🆕 本窗口(2026-06-09)· Zihao 真用一路报问题、逐个修+真 prod 验证上线**:
   - **登录/着陆页**:手机端语言条压关闭X、桌面安全三件换行对不齐(浏览器翻译触发)修;手机场景挂件防遮挡(工作气泡 min-width:0 解锁收窄不压问候、Quote 下移露出猫+笔记本)·`a44fd358`/`064055ff`(?v=12/13)。

@@ -15,12 +15,12 @@ from services.authz.registry import (  # noqa: F401
     module_of,
     selfcheck,
 )
-from services.authz.resolver import (
+from services.authz.resolver import (  # noqa: F401
     Authz,
     resolve,
     create_membership,
     set_membership_role,
-)  # noqa: F401
+)
 from services.authz.deps import (  # noqa: F401
     require_perm,
     require_perm_pos,

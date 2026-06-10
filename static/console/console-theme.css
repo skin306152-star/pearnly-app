@@ -1,0 +1,35 @@
+/* 控制台主题令牌 · 紫色 v1(值抄 桌面/Pearnly_紫色主题预览 .panel.purple 浅+暗两套)。
+   只作用 /console 与 /invite 页 — 主程序 Emerald 一个字节不动。
+   换主题 = 只改本文件(结构样式全在 console.css 走 var)。 */
+
+:root {
+  --accent: #7c3aed;
+  --accent-weak: #f1eafd;
+  --accent-deep: #6527c9;
+  --accent-ink: #fff;
+  --bg: #fbfafd;
+  --card: #ffffff;
+  --ink: #171130;
+  --ink2: #62607a;
+  --ink3: #9d9bb3;
+  --line: #ece9f4;
+  --danger: #dc2626;
+  --warn: #d97706;
+  --ok: #16a34a;
+}
+
+html.dark {
+  --accent: #a78bfa;
+  --accent-weak: #221a38;
+  --accent-deep: #c4b5fd;
+  --accent-ink: #190e33;
+  --bg: #121018;
+  --card: #1b1824;
+  --ink: #eae6f4;
+  --ink2: #a29dba;
+  --ink3: #6b6683;
+  --line: #2c2738;
+  --danger: #f87171;
+  --warn: #fbbf24;
+  --ok: #4ade80;
+}

@@ -122,14 +122,19 @@ def ensure_credits_tables():
             """)
 
             # 7. 迁移现有用户归属到 user_company_roles
+            #    EXISTS 守门:跳过 tenant_id 指向已删租户的孤儿用户。否则 FK
+            #    (user_company_roles_tenant_id_fkey) 在此 INSERT 上违例,整个
+            #    建表事务回滚,启动日志每次报一条 ERROR(见孤儿用户清理脚本
+            #    scripts/cleanup_orphan_users.py)。孤儿本就建不出合法 ucr 行。
             cur.execute("""
                 INSERT INTO user_company_roles (user_id, tenant_id, role)
                 SELECT
-                    id,
-                    tenant_id,
-                    CASE WHEN role = 'owner' THEN 'admin' ELSE 'member' END
-                FROM users
-                WHERE tenant_id IS NOT NULL AND is_active = TRUE
+                    u.id,
+                    u.tenant_id,
+                    CASE WHEN u.role = 'owner' THEN 'admin' ELSE 'member' END
+                FROM users u
+                WHERE u.tenant_id IS NOT NULL AND u.is_active = TRUE
+                  AND EXISTS (SELECT 1 FROM tenants t WHERE t.id = u.tenant_id)
                 ON CONFLICT (user_id, tenant_id) DO NOTHING
             """)
 

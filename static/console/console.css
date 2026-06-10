@@ -49,6 +49,11 @@ body {
   border-radius: 7px;
   flex: none;
 }
+/* 暗夜:品牌图(紫 P 底猫)垫白色圆角底板 · 同主程序 home S2-bis 处理 · 不改品牌资产 */
+html.dark .brand-icon {
+  background: #fff;
+  padding: 2px;
+}
 .sb .sec {
   font-size: 10.5px;
   color: var(--ink3);

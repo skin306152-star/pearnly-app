@@ -75,10 +75,13 @@ def main() -> int:
         ws_a_other = int(ws_a) + 999_000
 
         # 租户 A 造小票 + 库存
+        # 商品必须落到 ws_a 套账 · get_product_for_sale 连 workspace_client_id 过滤(RO-003),
+        # 漏填则永远查不到该商品 → create_sale 报 pos.line_invalid。
         cur.execute(
-            "INSERT INTO products (tenant_id, name_th, base_unit, vat_applicable, is_active) "
-            "VALUES (%s,'ISO-A','ชิ้น',TRUE,TRUE) RETURNING id",
-            (tid_a,),
+            "INSERT INTO products "
+            "(tenant_id, workspace_client_id, name_th, base_unit, vat_applicable, is_active) "
+            "VALUES (%s,%s,'ISO-A','ชิ้น',TRUE,TRUE) RETURNING id",
+            (tid_a, ws_a),
         )
         pid = str(cur.fetchone()["id"])
         wh = inv_store.get_or_create_default_warehouse(

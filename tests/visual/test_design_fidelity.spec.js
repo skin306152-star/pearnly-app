@@ -251,7 +251,6 @@ const MAPPINGS = [
                 props: ['borderRadius', 'boxShadow'],
             },
         ],
-        primary: 'rgb(124, 77, 255)',
         bluemust: '#page-dashboard .band .btn.pri',
         nosvgemoji: '#page-dashboard .qa .qb svg',
     },
@@ -327,7 +326,6 @@ const MAPPINGS = [
             },
         ],
         bluemust: '#sx-new-btn',
-        primary: 'rgb(124, 77, 255)',
         nosvgemoji: '#sx-new-btn svg',
     },
     {
@@ -376,7 +374,6 @@ const MAPPINGS = [
             { design: '.t', prod: '.ptbl .t', props: ['borderRadius'] },
         ],
         bluemust: '.ptbl .btn.primary',
-        primary: 'rgb(124, 77, 255)', // B6d:hex → var(--accent)
         nosvgemoji: '.ptbl .btn.primary svg',
     },
     {
@@ -390,7 +387,6 @@ const MAPPINGS = [
             { design: '.card', prod: '.rpay .card', props: ['borderRadius'] },
         ],
         bluemust: '.rpay .save',
-        primary: 'rgb(124, 77, 255)',
         nosvgemoji: '.rpay .pm .ic svg',
     },
     {
@@ -409,7 +405,6 @@ const MAPPINGS = [
             { design: '.seg .o', prod: '.pur .seg .o', props: ['borderRadius'] },
         ],
         bluemust: '.pur .btn.primary',
-        primary: 'rgb(124, 77, 255)',
         nosvgemoji: '.pur .btn.primary svg',
     },
     {
@@ -427,7 +422,6 @@ const MAPPINGS = [
             { design: '.card', prod: '.pur .card', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .btn.primary',
-        primary: 'rgb(124, 77, 255)',
         nosvgemoji: '.pur .img svg',
     },
     {
@@ -446,7 +440,6 @@ const MAPPINGS = [
             { design: '.card', prod: '.pur .card', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .btn.primary',
-        primary: 'rgb(124, 77, 255)',
         nosvgemoji: '.pur .img svg',
     },
     {
@@ -464,7 +457,6 @@ const MAPPINGS = [
             { design: '.panel', prod: '.pur .panel', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .add',
-        primary: 'rgb(124, 77, 255)',
         nosvgemoji: '.pur .add svg',
     },
     {
@@ -482,7 +474,6 @@ const MAPPINGS = [
             { design: '.panel', prod: '.pur .panel', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .save',
-        primary: 'rgb(124, 77, 255)',
         nosvgemoji: '.pur .addcat svg',
     },
     {
@@ -509,7 +500,6 @@ const MAPPINGS = [
             },
         ],
         bluemust: '#acct-books-btn',
-        primary: 'rgb(124, 77, 255)',
     },
     {
         name: '做账逐笔审(02)',
@@ -530,7 +520,6 @@ const MAPPINGS = [
             },
         ],
         bluemust: '#page-acct-review [data-act="confirm"]',
-        primary: 'rgb(124, 77, 255)',
     },
     {
         name: '做账科目表(03)',
@@ -551,7 +540,6 @@ const MAPPINGS = [
             },
         ],
         bluemust: '#acct-acc-add',
-        primary: 'rgb(124, 77, 255)',
     },
     {
         name: '做账设置(05)',
@@ -572,7 +560,6 @@ const MAPPINGS = [
             },
         ],
         bluemust: '#acct-set-save',
-        primary: 'rgb(124, 77, 255)',
     },
     {
         name: '做账出账本/报税包(04)',
@@ -593,7 +580,6 @@ const MAPPINGS = [
             },
         ],
         bluemust: '#acct-books-pack',
-        primary: 'rgb(124, 77, 255)',
     },
 ];
 

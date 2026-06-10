@@ -8,11 +8,8 @@
  * ⚠ 覆盖 NAV-IA 旧视觉铁律「主按钮纯黑 #111111」(2026-05-29 Zihao 改蓝 · 已同步改铁律)。
  * ============================================================ */
 
-/* 按钮蓝唯一 token(Zihao 2026-06-05)· 全站按钮/切换黑底收编到此 · 只导航栏可黑 */
-:root {
-    --btn-blue: #7C4DFF;
-    --btn-blue-hover: #6B3FF2;
-}
+/* 按钮主色 token --btn-blue/--btn-blue-hover(Zihao 2026-06-05 收编 · 只导航栏可黑)定义在
+   home-01-base.css :root/:root.dark(浅暗两套单一来源)· 本文件只消费 var() · 换主题不用动这里 */
 
 .btn {
     box-sizing: border-box;

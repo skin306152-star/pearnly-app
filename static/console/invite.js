@@ -103,7 +103,9 @@
         return s;
     }
     function brand(html) {
-        card.innerHTML = '<div class="brand"><span class="dot">P</span> Pearnly</div>' + html;
+        card.innerHTML =
+            '<div class="brand"><img class="brand-icon" src="/static/brand/pwa-icon-192.png?v=1" alt="Pearnly"> Pearnly</div>' +
+            html;
     }
     function emptyState(titleKey, subKey) {
         brand(
@@ -192,12 +194,16 @@
                         });
                 })
                 .catch(function (e) {
+                    // 任何失败(业务拒绝/校验 422 数组/网络)都复位按钮 + 显示人话错误
                     btn.disabled = false;
                     btn.textContent = t('join');
-                    var key = 'err_' + String(e.code || 'generic').replace(/\./g, '_');
+                    var code = e && e.code;
+                    if (Array.isArray(code) || (code && typeof code === 'object'))
+                        code = 'invalid_input';
+                    var key = 'err_' + String(code || 'generic').replace(/\./g, '_');
                     var msg = window.ct(key);
-                    document.getElementById('f-err').textContent =
-                        msg === key ? window.ct('err_generic') : msg;
+                    var errEl = document.getElementById('f-err');
+                    if (errEl) errEl.textContent = msg === key ? window.ct('err_generic') : msg;
                 });
         };
     }

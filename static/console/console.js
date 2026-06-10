@@ -7,6 +7,8 @@
         '<svg class="crown" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.56 3.27a.5.5 0 0 1 .88 0l2.95 5.6a1 1 0 0 0 1.52.3l4.27-3.67a.5.5 0 0 1 .8.52l-2.83 10.25a1 1 0 0 1-.96.73H5.81a1 1 0 0 1-.96-.73L2.02 6.02a.5.5 0 0 1 .8-.52l4.28 3.67a1 1 0 0 0 1.51-.3z"/></svg>';
     var ICON_MAIL =
         '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>';
+    var BRAND_HTML =
+        '<div class="brand"><img class="brand-icon" src="/static/brand/pwa-icon-192.png?v=1" alt="Pearnly"> Pearnly Console</div>';
     var S = {
         token: null,
         perms: [],
@@ -15,9 +17,24 @@
         invites: [],
         roles: [],
         ws: [],
+        seatsMax: 0,
         secLoaded: false,
         expanded: null,
     };
+    // 角色「使用权」芯片(PEAK 吸收):业务模块逐个上色,管理类权限组并成一枚
+    var MOD_ORDER = [
+        'sales',
+        'purchase',
+        'acct',
+        'tax',
+        'recon',
+        'ar',
+        'inv',
+        'pos',
+        'kb',
+        'intake',
+    ];
+    var ADMIN_GROUPS = ['team', 'settings', 'billing', 'audit', 'ownership'];
     var $ = function (id) {
         return document.getElementById(id);
     };
@@ -70,6 +87,46 @@
     function roleName(k) {
         return ct('role_' + k);
     }
+    function roleGroups(key) {
+        var r = S.roles.find(function (x) {
+            return x.key === key;
+        });
+        return (r && r.permission_groups) || [];
+    }
+    function modChips(groups) {
+        groups = groups || [];
+        var html = MOD_ORDER.filter(function (g) {
+            return groups.indexOf(g) >= 0;
+        })
+            .map(function (g) {
+                return '<span class="modchip mod-' + g + '">' + ct('mod_' + g) + '</span>';
+            })
+            .join('');
+        if (
+            ADMIN_GROUPS.some(function (g) {
+                return groups.indexOf(g) >= 0;
+            })
+        )
+            html += '<span class="modchip mod-admin">' + ct('mod_admin') + '</span>';
+        return html ? '<div class="modchips">' + html + '</div>' : '';
+    }
+    function roleCardHtml(r, on) {
+        return (
+            '<div class="rolecard' +
+            (on ? ' on' : '') +
+            '" data-role="' +
+            r.key +
+            '"><div class="rn">' +
+            roleName(r.key) +
+            '<span class="rc-count">' +
+            ct('rc_inuse', { n: r.member_count || 0 }) +
+            '</span></div><div class="rd">' +
+            ct('roledesc_' + r.key) +
+            '</div>' +
+            modChips(r.permission_groups) +
+            '</div>'
+        );
+    }
     function applyTexts() {
         document.querySelectorAll('[data-ct]').forEach(function (el) {
             el.textContent = ct(el.getAttribute('data-ct'));
@@ -80,8 +137,7 @@
     function gate(html) {
         $('gateView').style.display = 'grid';
         $('appShell').style.display = 'none';
-        $('gateCard').innerHTML =
-            '<div class="brand"><span class="dot">P</span> Pearnly Console</div>' + html;
+        $('gateCard').innerHTML = BRAND_HTML + html;
     }
     function gateNeedLogin() {
         gate(
@@ -108,12 +164,21 @@
         if (localStorage.getItem('console_dark') === '1')
             document.documentElement.classList.add('dark');
         applyTexts();
-        $('langSel').value = window.CI18N.lang;
-        $('langSel').onchange = function () {
-            ctSetLang(this.value);
-            applyTexts();
-            renderAll();
-        };
+        var langSeg = $('langSeg');
+        function syncLangSeg() {
+            langSeg.querySelectorAll('b').forEach(function (b) {
+                b.classList.toggle('on', b.getAttribute('data-lang') === window.CI18N.lang);
+            });
+        }
+        syncLangSeg();
+        langSeg.querySelectorAll('b').forEach(function (b) {
+            b.onclick = function () {
+                ctSetLang(b.getAttribute('data-lang'));
+                syncLangSeg();
+                applyTexts();
+                renderAll();
+            };
+        });
         $('darkToggle').onclick = function () {
             var on = document.documentElement.classList.toggle('dark');
             localStorage.setItem('console_dark', on ? '1' : '0');
@@ -174,6 +239,7 @@
         ])
             .then(function (rs) {
                 S.members = rs[0].members || [];
+                S.seatsMax = rs[0].seats_max || 0;
                 S.invites = rs[1].invitations || [];
                 S.roles = rs[2].roles || [];
                 S.ws = rs[3].clients || [];
@@ -197,8 +263,15 @@
 
     // ── 屏1 · 成员列表 + 行内展开
     function renderMembers() {
-        $('teamStat').textContent = ct('act_n_members', { n: S.members.length });
-        $('teamStat2').textContent = ct('act_n_pending', { n: S.invites.length });
+        // 席位计量(PEAK 吸收):有 seats_max 显「当前用户 N/M」,满员追加升级提示
+        $('teamStat').textContent = S.seatsMax
+            ? ct('seats_count', { n: S.members.length, m: S.seatsMax })
+            : ct('act_n_members', { n: S.members.length });
+        var pending = ct('act_n_pending', { n: S.invites.length });
+        $('teamStat2').textContent =
+            S.seatsMax && S.members.length >= S.seatsMax
+                ? pending + ' · ' + ct('seats_full')
+                : pending;
         if (S.members.length <= 1 && !S.invites.length) {
             $('membersBox').innerHTML =
                 '<div class="card">' +
@@ -275,34 +348,33 @@
         }
     }
     function expandHtml(m) {
+        // 使用权一行(PEAK 屏6 对位):该成员角色能碰哪些模块
+        var accessHtml =
+            '<div class="grp"><div class="lb">' +
+            ct('grp_access') +
+            '</div>' +
+            modChips(roleGroups(m.role_key)) +
+            '</div>';
         // owner 行:无操作;owner 本人行只给「转移所有权」
         if (m.role_key === 'owner') {
             if (m.is_self && can('ownership.transfer')) {
                 return (
+                    accessHtml +
                     '<div class="acts"><button class="btn sec" id="a-transfer">' +
                     ct('btn_transfer') +
                     '</button></div>'
                 );
             }
-            return '<div class="hint">' + ct('roledesc_owner') + '</div>';
+            return accessHtml + '<div class="hint">' + ct('roledesc_owner') + '</div>';
         }
-        if (m.is_self) return '<div class="hint">' + ct('err_team_cannot_modify_self') + '</div>';
+        if (m.is_self)
+            return accessHtml + '<div class="hint">' + ct('err_team_cannot_modify_self') + '</div>';
         var roleCards = S.roles
             .filter(function (r) {
                 return r.assignable;
             })
             .map(function (r) {
-                return (
-                    '<div class="rolecard' +
-                    (r.key === m.role_key ? ' on' : '') +
-                    '" data-role="' +
-                    r.key +
-                    '"><div class="rn">' +
-                    roleName(r.key) +
-                    '</div><div class="rd">' +
-                    ct('roledesc_' + r.key) +
-                    '</div></div>'
-                );
+                return roleCardHtml(r, r.key === m.role_key);
             })
             .join('');
         var scopable = (
@@ -354,6 +426,7 @@
                 '</button></div></div>';
         }
         return (
+            accessHtml +
             '<div class="grp"><div class="lb">' +
             ct('grp_role') +
             '</div><div class="rolecards" id="a-roles">' +
@@ -553,17 +626,7 @@
                 return r.assignable;
             })
             .map(function (r) {
-                return (
-                    '<div class="rolecard' +
-                    (r.key === 'accountant' ? ' on' : '') +
-                    '" data-role="' +
-                    r.key +
-                    '"><div class="rn">' +
-                    roleName(r.key) +
-                    '</div><div class="rd">' +
-                    ct('roledesc_' + r.key) +
-                    '</div></div>'
-                );
+                return roleCardHtml(r, r.key === 'accountant');
             })
             .join('');
         var wsOpts = S.ws

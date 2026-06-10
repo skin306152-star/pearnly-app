@@ -184,8 +184,14 @@ def accept(
         if cur.fetchone():
             return {"error": "team.username_exists"}
         if use_email:
-            cur.execute("SELECT 1 FROM users WHERE LOWER(email) = LOWER(%s) LIMIT 1", (use_email,))
-            if cur.fetchone():
+            cur.execute(
+                "SELECT tenant_id FROM users WHERE LOWER(email) = LOWER(%s) LIMIT 1", (use_email,)
+            )
+            row = cur.fetchone()
+            if row:
+                # 1 人 1 租户:邮箱已有账号且已归属公司 → 明确拒绝(接受页人话文案)
+                if row.get("tenant_id"):
+                    return {"error": "invite.account_exists_other_tenant"}
                 return {"error": "team.email_exists"}
         cur.execute("SELECT name FROM tenants WHERE id = %s", (tenant_id,))
         trow = cur.fetchone()

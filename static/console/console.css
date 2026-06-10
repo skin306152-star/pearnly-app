@@ -43,15 +43,11 @@ body {
   font-size: 14px;
   padding: 4px 8px 16px;
 }
-.sb .dot {
+.brand .brand-icon {
   width: 24px;
   height: 24px;
   border-radius: 7px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  display: grid;
-  place-items: center;
-  font-size: 12px;
+  flex: none;
 }
 .sb .sec {
   font-size: 10.5px;
@@ -319,12 +315,111 @@ body {
 .rolecard .rn {
   font-size: 12.5px;
   font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
 }
 .rolecard .rd {
   font-size: 10.5px;
   color: var(--ink2);
   margin-top: 3px;
   line-height: 1.45;
+}
+.rc-count {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ink3);
+  white-space: nowrap;
+}
+
+/* 角色「使用权」芯片(PEAK 吸收)· 业务模块各一色 · 浅/暗共用半透明底 */
+.modchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 7px;
+}
+.modchip {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+.modchip.mod-sales {
+  background: rgba(37, 99, 235, 0.12);
+  color: #2563eb;
+}
+.modchip.mod-purchase {
+  background: rgba(217, 119, 6, 0.12);
+  color: #d97706;
+}
+.modchip.mod-acct {
+  background: rgba(5, 150, 105, 0.12);
+  color: #059669;
+}
+.modchip.mod-tax {
+  background: rgba(225, 29, 72, 0.12);
+  color: #e11d48;
+}
+.modchip.mod-recon {
+  background: rgba(8, 145, 178, 0.12);
+  color: #0891b2;
+}
+.modchip.mod-ar {
+  background: rgba(99, 102, 241, 0.12);
+  color: #6366f1;
+}
+.modchip.mod-inv {
+  background: rgba(101, 163, 13, 0.12);
+  color: #65a30d;
+}
+.modchip.mod-pos {
+  background: rgba(234, 88, 12, 0.12);
+  color: #ea580c;
+}
+.modchip.mod-kb {
+  background: rgba(124, 58, 237, 0.12);
+  color: #7c3aed;
+}
+.modchip.mod-intake {
+  background: rgba(13, 148, 136, 0.12);
+  color: #0d9488;
+}
+.modchip.mod-admin {
+  background: var(--line);
+  color: var(--ink2);
+}
+.dark .modchip.mod-sales {
+  color: #93b4f8;
+}
+.dark .modchip.mod-purchase {
+  color: #f0b35f;
+}
+.dark .modchip.mod-acct {
+  color: #5fd0a5;
+}
+.dark .modchip.mod-tax {
+  color: #f48aa4;
+}
+.dark .modchip.mod-recon {
+  color: #67cfe3;
+}
+.dark .modchip.mod-ar {
+  color: #a5a8f5;
+}
+.dark .modchip.mod-inv {
+  color: #aed368;
+}
+.dark .modchip.mod-pos {
+  color: #f4a268;
+}
+.dark .modchip.mod-kb {
+  color: #c2a4f2;
+}
+.dark .modchip.mod-intake {
+  color: #5fd0c5;
 }
 
 .wslist {
@@ -349,8 +444,39 @@ body {
   border-color: var(--accent);
   background: var(--accent-weak);
 }
-.wsopt input {
-  accent-color: var(--accent);
+/* 站内 checkbox(高特异性:邀请弹窗里 .wsopt 落在 .field 内,防 .field input 全宽样式压过) */
+.wsopt input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  flex: none;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid var(--line);
+  border-radius: 4px;
+  background: var(--card);
+  cursor: pointer;
+  position: relative;
+}
+.wsopt input[type='checkbox']:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.wsopt input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--accent-ink);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.wsopt input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .seg {
@@ -372,6 +498,20 @@ body {
   background: var(--accent-weak);
   color: var(--ink);
   font-weight: 600;
+}
+
+/* 侧栏底部语言切换(站内 pills · 替代原生 select) */
+.seg-lang {
+  display: flex;
+  width: 100%;
+  margin-top: 4px;
+}
+.seg-lang b {
+  flex: 1;
+  text-align: center;
+  padding: 4px 0;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .field {
@@ -566,15 +706,10 @@ body {
   font-size: 15px;
   margin-bottom: 16px;
 }
-.authcard .dot {
+.authcard .brand-icon {
   width: 26px;
   height: 26px;
   border-radius: 8px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  display: grid;
-  place-items: center;
-  font-size: 13px;
 }
 .authcard h1 {
   font-size: 17px;

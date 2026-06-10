@@ -73,6 +73,20 @@
     // 绑定 toggle 按钮
     document.querySelectorAll<HTMLElement>('.nav-group-toggle').forEach(function (btn) {
         btn.addEventListener('click', function () {
+            // 窄 rail 下点分组 = 先展开侧栏并打开该组(Claude 式 · 2026-06-10)
+            if (document.body.classList.contains('sidebar-collapsed')) {
+                document.body.classList.remove('sidebar-collapsed');
+                try {
+                    localStorage.setItem('mrpilot_sidebar_collapsed', '0');
+                } catch (e) {
+                    /* 私有模式等 LS 不可写 · 忽略 */
+                }
+                const state = _getState();
+                state[btn.dataset.toggleGroup!] = false;
+                _setState(state);
+                _applyState();
+                return;
+            }
             _toggle(btn.dataset.toggleGroup!);
         });
     });

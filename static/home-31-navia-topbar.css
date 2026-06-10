@@ -105,7 +105,7 @@ body.is-windows .topbar-search-kbd-win { display: inline; }
     background: var(--red-50); color: var(--danger);
 }
 .avatar-popup-item-danger:hover svg { color: var(--danger); }
-.avatar-popup-item span:not(.avatar-pill) {
+.avatar-popup-item span:not(.avatar-pill):not(.theme-sw) {
     flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .avatar-pill {

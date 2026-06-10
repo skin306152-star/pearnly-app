@@ -196,20 +196,33 @@ body.sidebar-collapsed .nav-divider { margin: 8px 6px; }
     width: 16px;
     height: 16px;
 }
-/* 收起态(全 sidebar 缩窄)· chevron 隐藏 · 子项缩进取消 · 折叠组强制全展开 · 组标题字隐藏(防竖排 BUG) */
+/* 收起态 = 窄 rail(2026-06-10 Zihao 拍板 · 对标 Claude):只留顶级/分组图标 · 子项全收 · hover 出组名 tooltip */
 body.sidebar-collapsed .nav-group-toggle .nav-chevron { display: none; }
-body.sidebar-collapsed .nav-group-toggle .nav-label { display: none; }
 body.sidebar-collapsed .nav-group-toggle {
     justify-content: center;
     padding: 10px;
+    position: relative;
+    overflow: visible;
 }
-/* v118.33.7.9 · 收起态 sub-item · 取消 38px padding 否则图标被挤出容器(黑方块 BUG) */
-body.sidebar-collapsed .nav-sub-item {
-    margin-left: 0 !important;
-    padding-left: 10px !important;
-    justify-content: center;
+body.sidebar-collapsed .nav-group-toggle .nav-label { display: none; }
+body.sidebar-collapsed .nav-group-toggle:hover .nav-label {
+    display: inline-block;
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--line-soft);
+    color: var(--ink);
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 999;
+    pointer-events: none;
+    flex: none;
 }
-body.sidebar-collapsed .nav-collapsible.collapsed .nav-sub { max-height: 800px; }
+body.sidebar-collapsed .nav-sub { max-height: 0; }
 
 /* 帮助反馈 modal · 联系卡列表 */
 .help-modal-tip {

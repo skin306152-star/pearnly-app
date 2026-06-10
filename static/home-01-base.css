@@ -336,7 +336,6 @@ body {
     padding-left: 20px;
     flex-shrink: 0;
     transition: width 180ms ease;
-    border-right: 1px solid var(--line);
     height: 100%;
 }
 body.sidebar-collapsed .topbar-left { width: var(--sidebar-w-collapsed); padding-left: 14px; }

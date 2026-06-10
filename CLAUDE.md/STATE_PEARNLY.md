@@ -8,6 +8,11 @@
 
 ## 🎯 状态卡（2026-06-11 · **🧪 真账号报税交叉核 E2E 落档**(本窗口·`d3945f04`)· 前序见下）
 
+- **🆕 本窗口(2026-06-11)· ⚡ 首屏 SQL 往返削减(鉴权+套账短 TTL 缓存)**(`810bdda7`·后端 only·授权自做自检):
+  - 接性能诊断结论(实测无 N+1·瓶颈=22 请求 × 跨区 69ms × 2-worker 串行)。两处进程级 TTL 缓存:`find_user_by_id_cached`(8s·仅鉴权热路径·返回副本·jti 不匹配强制 fresh 重取防误拒·create_access_token evict)+ `default_workspace_id` 结果缓存(60s·只缓存非 None)。隔离 WHERE 一字未改。
+  - 计数探针 prod 实测(warm·同用户连打 12 端点):**40→27 SQL(-32%)**;recon/vat_excel 各 -2,余 -1。8 新单测 + 全量 3192 绿。
+  - 配套 `db.py maxconn 30→15` + **uvicorn workers 2→4(systemd·待代码上线后改·保 4×15=60≤max_conn)**。⚠️ **未 push**(共享树报税窗口活跃·810bdda7 缺 RATCHET-EXEMPT 本 STATE commit 补);workers 待代码 deploy(maxconn=15 live)后才改,否则 4×30 超连接上限。
+
 - **🆕 本窗口(2026-06-11)· 🧪 真账号报税交叉核 E2E(验证欠账清账)**(`d3945f04`·纯 tests/ 零业务改动):
   - `tests/e2e/_tax_crosscheck_live_e2e.py`:pearnly_e2e_3 真租户全程 HTTP(本地 uvicorn × 真 Supabase)——真进销项→引擎凭证(auto_post·凭证 6 张)→账本 VAT 报告→结账挂点→PP30/PND53/PND3·数字三方交叉核(脚本期望 vs tax-reports vs 税表 breakdown:销 700/进 gross 315/缺税号剔 35/可抵 280/应缴 420/PND 75+30)·体检拦→补税号重算→提交→导出 zip/PDF→已报 409→隔离。**实跑 19/19 PASS**。
   - 残留治理:专用一次性套账承载 + 结尾直连库清 + information_schema 全表扫归零(连首轮中断孤儿套账 52 一并回收·`--cleanup N` 模式入脚本)。凭据走临时文件不落上下文,用完即删。

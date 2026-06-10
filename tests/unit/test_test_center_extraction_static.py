@@ -66,8 +66,12 @@ class TestCenterExtractionStaticTests(unittest.TestCase):
         REFACTOR-C1-home-batch9f:routeTo 路由分发 → core-boot.js。
         2026-06-08:routeTo 改用 ROUTE_LOADERS 映射 + 动态 winFns[loader]() 分发(不再逐个 window.loadXxx() 字面量)·
         改为验 test-center 仍在映射表里接上其 loader。
-        REFACTOR-C1-home-batch9g2:错误拦截器 IIFE(含 _tcOnNewLog 钩子)→ state.js · home.js 已删。"""
-        self.assertIn("'test-center': 'loadTestCenterPage'", self.core_boot_js)
+        REFACTOR-C1-home-batch9g2:错误拦截器 IIFE(含 _tcOnNewLog 钩子)→ state.js · home.js 已删。
+        2026-06-10:路由表抽到 route-table.ts(core-boot import 之)· 映射断言随迁。"""
+        with open(os.path.join(ROOT, "src", "home", "route-table.ts"), "r", encoding="utf-8") as f:
+            route_table = f.read()
+        self.assertIn("'test-center': 'loadTestCenterPage'", route_table)
+        self.assertIn("./route-table.js", self.core_boot_js)
         self.assertIn("window._tcOnNewLog(", self.state_js)
 
     def test_home_html_load_order(self):

@@ -14,6 +14,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional
 
+from services.accounting import hooks as acct_hooks
 from services.sales import archive
 from services.sales import document as doc_svc
 from services.sales import numbering
@@ -107,4 +108,12 @@ def create_note(
     note = doc_svc.get_document(cur, tenant_id=tenant_id, doc_id=note_id)
     # 红冲/补开也是正式票,同样留存档哈希(§E3);双方从继承的冻结快照渲染。
     archive.store_archival_hash(cur, tenant_id, note_id, note, note.get("parties_snapshot") or {})
+    acct_hooks.enqueue_posting(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=ws,
+        source_type="sale",
+        source_id=note_id,
+        created_by=created_by,
+    )
     return note, None

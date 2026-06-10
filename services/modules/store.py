@@ -30,6 +30,7 @@ KNOWN_MODULES = (
     "recon",
     "receivable",
     "knowledge",
+    "accounting",
 )
 
 # 无显式行时的回落:既有功能默认开(老租户导航不变 · 平台 onboarding 是 opt-in);
@@ -42,6 +43,8 @@ DEFAULT_ENABLED = {
     "knowledge": True,
     "inventory": False,
     "pos": False,
+    # 新模块默认关(opt-in):老租户不悄悄长出凭证数据,开通才记账
+    "accounting": False,
 }
 
 # 业态(business_type)持久化:复用本表的保留哨兵行,不新增表/迁移。

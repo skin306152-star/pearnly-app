@@ -15,6 +15,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Optional
 
 from core.pos_api import PosError
+from services.accounting import hooks as acct_hooks
 from services.pos import numbering, sales_store
 from services.pos.restaurant import order_store, store
 from services.sales.totals import compute_totals
@@ -298,6 +299,14 @@ def checkout(
     split = _split(grand, payload.get("ways")) if mode == "aa" else None
     full = sales_store.get_sale(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, sale_id=sale_id
+    )
+    acct_hooks.enqueue_posting(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        source_type="pos",
+        source_id=sale_id,
+        created_by=created_by,
     )
     return _checkout_result(
         cur, tenant_id=tenant_id, sale=full, session_id=session_id, split=split, deduped=False

@@ -250,6 +250,15 @@ async def run_startup() -> dict:
     except Exception as e:
         logger.warning(f"启动 POS schema 失败: {e}")
 
+    # 自动做账 schema(科目/映射/凭证/分录/设置/学习记忆 6 表 · docs/accounting/01)。
+    # NEW-DEBT-EXEMPT: 启动自愈式迁移,prod 无 alembic 钩子,与守门豁免口径一致。
+    try:
+        from services.accounting.schema import ensure_accounting_schema
+
+        ensure_accounting_schema()
+    except Exception as e:
+        logger.warning(f"启动 accounting schema 失败: {e}")
+
     # 商户采购(进项)schema 双跑(suppliers / purchase_docs+lines / categories+settings+
     # intake+attachments)· 与 alembic 0031-0033 同源幂等 DDL(docs/purchasing/01)。
     try:

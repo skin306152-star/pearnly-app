@@ -8,6 +8,14 @@
 
 ## 🎯 状态卡（2026-06-10 · **UI 整顿 S1-S4 大刀 + Claude 式导航全部上线** · HEAD `76865395`(?v=11850737)· 前序见下）
 
+- **🆕 本窗口(2026-06-10)· 🚀 做账引擎(Phase 2)后端全量上线**(Zihao 授权一次性建完·自检即 push):
+  - **图纸修订先行**:超越方案 C1 数据源分级(第一方100直通/OCR分流/银行只建议) + C3 错账安全带三件套(method 标注·unpost 撤销重做·粒度 opt-in 默认建议模式) + C4 六大行对账单解析复用 recon/importer → 并入 docs/accounting 01-05。
+  - **后端**:`services/accounting/`(schema ensure 6表双隔离+partial唯一防重复排除void / 泰标 NPAEs 科目+角色映射 seed / rules R1-R9 纯函数 / posting 置信分流+借贷平断言 / review 学习记忆 / hooks SAVEPOINT 包死)+`routes/accounting_routes.py` 17 端点(信封·owner 写·accounting 门控·**i18n 键前端窗口接**)·模块默认关 opt-in·预设全业态开。
+  - **挂点 6 处一行 enqueue**(进项 post/付款·销项 issue/红冲·POS 零售/餐厅)·业务主路径零影响(异常注入真库证明)。
+  - **验收**:新增 ~80 单测(全量 3038 绿)·真库 E2E `tests/e2e/_accounting_e2e.py` **28/28**(真挂点链路/待审→审+记忆→同类自动/撤销重做/跨套账隔离/不平拒绝)·守门全绿。
+  - **既有回归**:purchase isolation 16/18(2红=e2e_3残留数据·干净基线同样红·非本窗口)·POS 旧 E2E 卡商品被 06-08 重置清空(基线同样)·POS 路径已在做账 E2E 真 create_sale 补验·顺手关 e2e_3 残留开班(06-07)。
+  - **剩**:前端 5 屏(主屏/逐笔审/科目表/出账本/设置+银行对账)等 UI 统一窗口收尾后照 docs/accounting/04 接真·books/close-period 随出账本窗口。
+
 - **🆕 本窗口(2026-06-10 · Fable 5 接手 Opus 卡顿窗口)· UI 整顿 punch list 推进 + Claude 式导航**:
   - **唯一修复清单 = `docs/ui/UI_DESIGN_AUDIT_FINDINGS.md`**(逐项勾+commit)。已完:S1 蓝绿收口 `74a56a5a` / S2 暗夜换肤 `9efd4fed`+全局清零 `a1d58008` / S3 空态统一+暗夜表单 `179123b9` / S4 图标 Lucide `a49ad27f` / S6 激活态(并入导航)。
   - **Claude 式导航 `f72a10a5`**(Zihao 拍板·稿 `scripts/_mock/nav-claude.html`):logo 进侧栏/分区小字标题/淡绿激活 pill/三级拍平/底部 pinned 用户卡/窄 rail;后续修 rail 顶只留折叠键 `ac54f023`、弹窗随 `--sidebar-current-w` `5e8f00af`、/simplify 收口 `76865395`。

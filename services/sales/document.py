@@ -13,6 +13,7 @@ from typing import Optional
 
 from psycopg2.extras import Json
 
+from services.accounting import hooks as acct_hooks
 from services.sales import archive
 from services.sales import buyer as buyer_mod
 from services.sales import numbering
@@ -415,6 +416,14 @@ def finalize_issue(
     )
     doc = get_document(cur, tenant_id=tenant_id, doc_id=doc_id)
     archive.store_archival_hash(cur, tenant_id, doc_id, doc, snapshot)
+    acct_hooks.enqueue_posting(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=ws,
+        source_type="sale",
+        source_id=doc_id,
+        created_by=approved_by,
+    )
     return doc, None
 
 

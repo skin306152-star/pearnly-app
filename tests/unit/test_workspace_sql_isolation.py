@@ -32,6 +32,12 @@ OPERATIONAL_TABLES = {
     "recon_jobs",
     "vat_recon_tasks",
     "bank_recon_v2_task",
+    "chart_of_accounts",
+    "account_mappings",
+    "journal_vouchers",
+    "journal_lines",
+    "accounting_settings",
+    "review_learned",
 }
 
 # 已切到按套账隔离的 (源文件相对路径, 该文件负责的运营表) — 随每个 PO 追加。
@@ -62,6 +68,14 @@ CONVERTED: list[tuple[str, str]] = [
     ("services/sales/document.py", "sales_documents"),
     # PO-7b 连号计数器按主体(计号键含 ws · 唯一索引 uq_dns_ws · 每法人主体号段独立连续)
     ("services/sales/numbering.py", "document_number_sequences"),
+    # 做账(2026-06-10 建模即隔离 · 专属机械闸 test_accounting_sql_isolation 逐句扫)
+    ("services/accounting/store.py", "chart_of_accounts"),
+    ("services/accounting/store.py", "account_mappings"),
+    ("services/accounting/vouchers.py", "journal_vouchers"),
+    # journal_lines 经 voucher_id FK 归属(行表无 ws 列),读写全部走 vouchers.py 的凭证头过滤
+    ("services/accounting/vouchers.py", "journal_lines"),
+    ("services/accounting/settings.py", "accounting_settings"),
+    ("services/accounting/review.py", "review_learned"),
 ]
 
 # PO-8 完整性闸:尚未切隔离的运营表,必须在此显式登记理由(否则完整性测试 fail)。

@@ -12,6 +12,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from core.pos_api import PosError
+from services.accounting import hooks as acct_hooks
 from services.inventory import ledger, store as inv_store
 from services.purchase import docs as docs_svc
 
@@ -54,6 +55,14 @@ def post_doc(cur, *, tenant_id, workspace_client_id, doc_id, auto_stock_in, crea
         )
     doc = docs_svc.get_doc(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=doc_id
+    )
+    acct_hooks.enqueue_posting(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        source_type="purchase",
+        source_id=doc_id,
+        created_by=created_by,
     )
     return {**doc, "stock_applied": stock_applied}
 
@@ -121,6 +130,14 @@ def pay_doc(cur, *, tenant_id, workspace_client_id, doc_id, amount) -> dict:
         "UPDATE purchase_docs SET paid_amount = %s, payment_status = %s, updated_at = now() "
         "WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s",
         (new_paid, status, tenant_id, workspace_client_id, doc_id),
+    )
+    acct_hooks.enqueue_posting(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        source_type="payment",
+        source_id=str(acct_hooks.payment_event_id(doc_id, new_paid)),
+        context={"amount": amt, "direction": "out", "ref": "进项付款"},
     )
     return docs_svc.get_doc(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=doc_id

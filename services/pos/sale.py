@@ -13,6 +13,7 @@ from decimal import Decimal
 from typing import Optional
 
 from core.pos_api import PosError
+from services.accounting import hooks as acct_hooks
 from services.inventory import store as inv_store
 from services.pos import numbering, sales_store, stock
 from services.sales.totals import compute_totals
@@ -236,6 +237,14 @@ def create_sale(
             amount=p.get("amount", 0),
             ref=p.get("ref"),
         )
+    acct_hooks.enqueue_posting(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        source_type="pos",
+        source_id=sale_id,
+        created_by=created_by,
+    )
     return _sale_result(sale, deduped=False)
 
 

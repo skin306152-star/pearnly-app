@@ -17,13 +17,14 @@ from services.modules import store
 
 # business_type → 默认开的 module_key 列表(canonical 6 业态 · 02 表)。
 # sales 在所有业态都开(平台主线尖刀)。未列业态拒绝(onboarding 报 unknown_business_type)。
+# accounting(自动做账)全业态都开:经营动作即输入是平台主线(docs/product-vision/00)。
 BUSINESS_PRESETS: dict[str, list[str]] = {
-    "firm": ["sales", "expense", "recon", "knowledge"],
-    "retail": ["sales", "inventory", "pos"],
-    "pharmacy": ["sales", "inventory", "pos"],
-    "restaurant": ["sales", "inventory", "pos"],
-    "service": ["sales", "expense"],
-    "b2b": ["sales", "inventory", "receivable", "expense"],
+    "firm": ["sales", "expense", "recon", "knowledge", "accounting"],
+    "retail": ["sales", "inventory", "pos", "accounting"],
+    "pharmacy": ["sales", "inventory", "pos", "accounting"],
+    "restaurant": ["sales", "inventory", "pos", "accounting"],
+    "service": ["sales", "expense", "accounting"],
+    "b2b": ["sales", "inventory", "receivable", "expense", "accounting"],
 }
 
 

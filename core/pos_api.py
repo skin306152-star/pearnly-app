@@ -27,8 +27,20 @@ from fastapi.responses import JSONResponse
 
 # POS/库存/模块接口前缀:这些路径的请求体校验错误也要走信封(其余路由保持 FastAPI 默认)。
 # /api/me/modules 既匹配 GET(精确)也匹配 toggle 子路径(/api/me/modules/{key} 走前缀)。
-_POS_PREFIXES = ("/api/inventory", "/api/pos", "/api/me/modules", "/api/purchase")
+_POS_PREFIXES = (
+    "/api/inventory",
+    "/api/pos",
+    "/api/me/modules",
+    "/api/purchase",
+    "/api/accounting",
+)
 _POS_EXACT = ("/api/me/onboarding",)
+
+# 请求体校验错误的模块错误码(按前缀取首个命中;未列 → pos.line_invalid)。新模块加一行即可。
+_VALIDATION_CODES = {
+    "/api/purchase": "purchase.line_invalid",
+    "/api/accounting": "acct.unexpected",
+}
 
 
 def ok(data: Optional[dict] = None) -> dict:
@@ -78,7 +90,9 @@ async def _pos_validation_handler(request: Request, exc: RequestValidationError)
     """
     if _is_pos_path(request):
         path = str(request.url.path or "")
-        code = "purchase.line_invalid" if path.startswith("/api/purchase") else "pos.line_invalid"
+        code = next(
+            (c for p, c in _VALIDATION_CODES.items() if path.startswith(p)), "pos.line_invalid"
+        )
         return JSONResponse(status_code=422, content=_error_body(code, "invalid_request_body"))
     return await request_validation_exception_handler(request, exc)
 

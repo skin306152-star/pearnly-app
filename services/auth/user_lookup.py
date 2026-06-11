@@ -39,6 +39,12 @@ def find_user_by_username(username: str) -> Optional[Dict[str, Any]]:
         with db.get_cursor() as cur:
             cur.execute("SELECT * FROM users WHERE username = %s LIMIT 1", (username,))
             row = cur.fetchone()
+            if not row and "@" in username:
+                # 邮箱登录回退:用户名不含 @(注册校验保证),故 @ 必为邮箱 → 零歧义按 email 查
+                cur.execute(
+                    "SELECT * FROM users WHERE lower(email) = lower(%s) LIMIT 1", (username,)
+                )
+                row = cur.fetchone()
             return dict(row) if row else None
     except Exception as e:
         logger.error(f"查询用户失败 ({username}): {e}")

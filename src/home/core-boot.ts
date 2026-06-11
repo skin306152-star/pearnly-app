@@ -359,26 +359,6 @@ async function loadAll() {
         updateUploadHint();
         // REFACTOR-C1-home-batch5 · updateStartButton 已迁 upload-files.js(defer)· 用户初始化期守卫(未就绪跳过·后续 renderFileList 会再同步)
         if (typeof window.updateStartButton === 'function') window.updateStartButton();
-        // v118.11 · 员工首次登录强制改密(优先于 onboarding)
-        // v118.11.2 · 双保险:即使 sessionStorage 有标记也必须校验当前用户是 member && 非超管
-        // 防止跨账号 sessionStorage 污染让超管/老板被误弹(违反交接文档 §9.7 超管反向限制铁律)
-        try {
-            const mustChangePw = sessionStorage.getItem('pearnly_must_change_pw') === '1';
-            const isEmployee = u && u.role === 'member' && !u.is_super_admin;
-            if (mustChangePw && isEmployee) {
-                if (typeof window.showForceChangePasswordModal === 'function')
-                    window.showForceChangePasswordModal();
-                return; // 阻止继续渲染 onboarding 等 · 改完密码后会刷新页面
-            }
-            // 标记存在但用户不是员工 · 清掉残留(防止后续切回员工账号被错误触发)
-            if (mustChangePw && !isEmployee) {
-                try {
-                    sessionStorage.removeItem('pearnly_must_change_pw');
-                } catch (e) {}
-            }
-        } catch (e) {
-            console.error('force-pw init', e);
-        }
         // v110.7 · 检查是否需要弹欢迎向导(B 方案)
         try {
             if (typeof window.maybeShowOnboarding === 'function') window.maybeShowOnboarding(u);

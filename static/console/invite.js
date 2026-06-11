@@ -164,6 +164,17 @@
         );
         document.getElementById('f-go').onclick = function () {
             var btn = this;
+            var uVal = document.getElementById('f-user').value.trim();
+            var pVal = document.getElementById('f-pass').value;
+            var errBox = document.getElementById('f-err');
+            if (!/^[a-zA-Z0-9_.-]{3,50}$/.test(uVal)) {
+                if (errBox) errBox.textContent = window.ct('err_user_format');
+                return;
+            }
+            if (pVal.length < 8 || !/[a-zA-Z]/.test(pVal) || !/[0-9]/.test(pVal)) {
+                if (errBox) errBox.textContent = window.ct('err_pass_format');
+                return;
+            }
             btn.disabled = true;
             btn.textContent = t('joining');
             var emailEl = document.getElementById('f-email');

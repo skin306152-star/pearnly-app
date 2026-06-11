@@ -270,6 +270,8 @@
             err_invite_account_exists_other_tenant:
                 '此邮箱已注册并已归属一家公司,无法加入。请用其他邮箱接受邀请。',
             err_invalid_input: '输入格式不对,请检查用户名和密码',
+            err_user_format: '用户名 3-50 位 · 只能用字母、数字、下划线、点、横线(不能用邮箱)',
+            err_pass_format: '密码至少 8 位 · 且要同时包含字母和数字',
             err_pwd_too_short: '密码至少 8 位',
             err_pwd_too_weak: '密码需同时包含字母和数字',
             err_pwd_too_weak_numeric: '密码不能全是数字',
@@ -556,6 +558,8 @@
             err_invite_account_exists_other_tenant:
                 'This email is already registered and belongs to a company. Use a different email to accept the invite.',
             err_invalid_input: 'Invalid input — check the username and password format',
+            err_user_format: 'Username 3-50 chars · letters, numbers, _ . - only (not an email)',
+            err_pass_format: 'Password at least 8 characters · with both letters and numbers',
             err_pwd_too_short: 'Password must be at least 8 characters',
             err_pwd_too_weak: 'Password needs both letters and digits',
             err_pwd_too_weak_numeric: 'Password cannot be all digits',
@@ -840,6 +844,9 @@
             err_invite_account_exists_other_tenant:
                 'อีเมลนี้ลงทะเบียนแล้วและสังกัดบริษัทอยู่ ไม่สามารถเข้าร่วมได้ กรุณาใช้อีเมลอื่นเพื่อรับคำเชิญ',
             err_invalid_input: 'รูปแบบไม่ถูกต้อง ตรวจสอบชื่อผู้ใช้และรหัสผ่าน',
+            err_user_format:
+                'ชื่อผู้ใช้ 3-50 ตัว · ใช้ตัวอักษร ตัวเลข _ . - เท่านั้น (ไม่ใช่อีเมล)',
+            err_pass_format: 'รหัสผ่านอย่างน้อย 8 ตัว · มีทั้งตัวอักษรและตัวเลข',
             err_pwd_too_short: 'รหัสผ่านอย่างน้อย 8 ตัว',
             err_pwd_too_weak: 'รหัสผ่านต้องมีทั้งตัวอักษรและตัวเลข',
             err_pwd_too_weak_numeric: 'รหัสผ่านเป็นตัวเลขล้วนไม่ได้',
@@ -1125,6 +1132,8 @@
                 'このメールは登録済みで、既に会社に所属しています。別のメールで招待を承諾してください。',
             err_invalid_input:
                 '入力形式が正しくありません。ユーザー名とパスワードを確認してください',
+            err_user_format: 'ユーザー名は3〜50文字 · 英数字と _ . - のみ(メール不可)',
+            err_pass_format: 'パスワードは8文字以上 · 英字と数字の両方を含めてください',
             err_pwd_too_short: 'パスワードは 8 文字以上',
             err_pwd_too_weak: 'パスワードは英字と数字の両方が必要です',
             err_pwd_too_weak_numeric: 'パスワードを数字のみにはできません',

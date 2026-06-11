@@ -66,7 +66,6 @@ EXPECTED_USERINFO_FIELDS = {
     "phone",
     "line_verified",
     "profile_filled",
-    "must_change_password",
     "email",
     "invited_by",
     "is_billing_exempt",

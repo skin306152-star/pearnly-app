@@ -10,9 +10,8 @@ login_routes.py · 主登录路由 + 失败锁定 + 模型(REFACTOR-B1)
     - login 路由本体:
         - v109.3.2 同邮箱 5 次/30min → 429 account_locked
         - 用户名查找 / 密码校验 / is_active / expires_at
-        - v118.11 员工首次登录 must_change_password 标志
         - 成功登录:db.update_last_login + create_access_token + 清失败日志
-        - 返回 {token, access_token, user, must_change_password, is_super_admin}
+        - 返回 {token, access_token, user, is_super_admin}
 
 E2E 闸:spec 01(登录地基)+ spec 13(改密)+ spec 15(session 互踢)兜底。
 """
@@ -122,13 +121,6 @@ async def login(req: LoginRequest, request: Request):
         except Exception as e:
             logger.warning(f"[auth] 校验账户过期失败: {e}")
 
-    # v118.11 · 员工首次登录(role=member && 还没 last_login_at)→ 返回 must_change_password 让前端弹强制改密 modal
-    must_change_password = bool(
-        (user.get("role") == "member")
-        and (user.get("last_login_at") is None)
-        and (not user.get("is_super_admin"))
-    )
-
     db.update_last_login(str(user["id"]))
     # v118.11 · plan=NULL 防御兜底 · 防止 token payload 含 None 导致后续验证异常
     _safe_plan = user.get("plan") or "free"
@@ -164,7 +156,6 @@ async def login(req: LoginRequest, request: Request):
             "token": token,
             "access_token": token,
             "user": user_info,
-            "must_change_password": must_change_password,
             "is_super_admin": bool(user.get("is_super_admin")),
         }
     )

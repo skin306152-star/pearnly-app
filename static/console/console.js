@@ -1206,9 +1206,7 @@
         var presets = S.roles
             .map(function (r) {
                 return (
-                    '<div class="rrow"><div class="ic-r">' +
-                    esc(roleName(r.key).slice(0, 1)) +
-                    '</div><div class="rmain"><div class="rt">' +
+                    '<div class="rrow"><div class="rmain"><div class="rt">' +
                     esc(roleName(r.key)) +
                     ' <span class="badge-ro">' +
                     ct('badge_preset') +
@@ -1230,9 +1228,7 @@
             .map(function (c) {
                 var costHidden = (c.permissions || []).indexOf(FIELD_COST) < 0;
                 return (
-                    '<div class="rrow custom"><div class="ic-r">' +
-                    esc(c.name.slice(0, 1)) +
-                    '</div><div class="rmain"><div class="rt">' +
+                    '<div class="rrow custom"><div class="rmain"><div class="rt">' +
                     esc(c.name) +
                     (c.is_active ? '' : ' <span class="badge-ro">' + ct('status_off') + '</span>') +
                     '</div><div class="rchips"><span class="rchip">' +
@@ -1420,9 +1416,7 @@
                             (w.base === k ? ' on' : '') +
                             '" data-wbase="' +
                             k +
-                            '"><div class="ic-r">' +
-                            esc(roleName(k).slice(0, 1)) +
-                            '</div><div><div class="bt">' +
+                            '"><div><div class="bt">' +
                             esc(roleName(k)) +
                             '</div><div class="bd">' +
                             ct('roledesc_' + k) +

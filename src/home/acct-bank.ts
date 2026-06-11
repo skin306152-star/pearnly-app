@@ -69,6 +69,7 @@ async function load(): Promise<void> {
         ]);
         S.accounts = acc.accounts || [];
         S.bankAccounts = ba.accounts || [];
+        if (!S.accountId && S.bankAccounts.length) S.accountId = String(S.bankAccounts[0].id);
         S.summary = sm.summary || null;
         const path =
             '/api/accounting/bank/lines' +

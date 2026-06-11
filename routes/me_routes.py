@@ -100,8 +100,6 @@ class UserInfo(BaseModel):
     phone: Optional[str] = None
     line_verified: bool = False
     profile_filled: bool = True
-    # v118.11 · 员工首次登录强制改密
-    must_change_password: bool = False
     # v118.35.0.11 · credits 新加 4 字段
     email: Optional[str] = None
     invited_by: Optional[str] = None

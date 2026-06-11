@@ -257,7 +257,7 @@ def send_invite_email(target_email: str, invite_url: str, tenant_name: str, role
         </div>
         """
     try:
-        from app import _smtp_send_email
+        from routes.auth_email_code_routes import _smtp_send_email
 
         ok, err = _smtp_send_email(target_email, subject, html)
         if not ok:

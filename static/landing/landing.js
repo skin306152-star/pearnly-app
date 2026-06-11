@@ -265,11 +265,6 @@
             }
             localStorage.setItem('mrpilot_token', data.access_token);
             localStorage.setItem('mrpilot_lang', currentLang());
-            try {
-                sessionStorage.removeItem('pearnly_must_change_pw');
-                if (data.must_change_password)
-                    sessionStorage.setItem('pearnly_must_change_pw', '1');
-            } catch (_err) {}
             setMessage(T('loginSuccess'), 'success');
             window.setTimeout(() => {
                 window.location.href = data.is_super_admin ? '/admin/cost' : '/home';

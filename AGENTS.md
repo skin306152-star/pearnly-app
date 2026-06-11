@@ -69,7 +69,7 @@ npm run build                                     # 改前端才需(Vite)
 
 ## 5. 关键基础设施(少踩坑)
 
-- 服务器 `root@45.76.53.194` · `/opt/mrpilot/` · systemd `mrpilot` · uvicorn `--workers 2`。
+- 服务器 `root@66.42.49.213`(Vultr **新加坡** · 2026-06-11 迁同区 · DB RTT 1ms · 只 SSH key 登录) · `/opt/mrpilot/` · systemd `mrpilot` · uvicorn `--workers 2`。⚠️ **东京 `45.76.53.194` = 回滚兜底,保留至 ~06-18,勿动**(本文件下方及 CLAUDE.md 命令示例里的旧 IP 待东京退役后清)。
 - DB:Supabase Postgres(Pooler)· **生产不跑 `alembic upgrade`** → schema 靠启动 `ensure_*` 应用 · alembic/versions 仅留档。
 - 部署:`git push origin master` → GitHub webhook → `git-deploy.sh` pull+cp+restart(~20s)· 验证 `curl https://pearnly.com/api/version`(200)。
 - gh CLI:`C:\Program Files\GitHub CLI\gh.exe`(`gh run list --repo skin306152-star/pearnly-app --branch master`)。

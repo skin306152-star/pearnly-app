@@ -6,7 +6,14 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-11 · **🔐 权限完善前端窗口③全上线 + 🏦 银行对账后端 + 五阶段流程 · ⚠️workers=2**(多窗口)· 前序见下）
+## 🎯 状态卡（2026-06-11 · **🇸🇬 服务器迁新加坡同区 + 一批实测修复 + 首登改密彻底删 + 迁移收尾** · ⚠️workers=2 · 前序见下）
+
+- **🆕 本窗口(2026-06-11·主控)· 🇸🇬 迁新加坡 + 实测修复批 + 首登改密删除 + 迁移收尾完结**:
+  - **迁移已完结**:app 东京→新加坡 `66.42.49.213`(同区·DB RTT 69ms→1ms)·Cloudflare 切源站IP·哨兵231次vision干净·切流量后522(ufw挡80/443)即修·密钥轮换(Zihao已做)·**禁密码登录(仅key)·撤东京临时通道key·东京45.76.53.194回滚兜底留~06-18勿动**。runbook `docs/perf/01`·prod 200健康。
+  - **修复批 `fc4843a6`**(用户实测一路报):邮件邀请import断链(`_smtp_send_email`搬routes)/银行对账导入后自动选账户/角色卡去首字×3/邀请页提交前客户端校验+`err_user/pass_format`四语/**登录支持邮箱**(`find_user_by_username`含@回退email查·零歧义)。?v=11850751·console.js v8·invite.js v6。
+  - **首登强制改密彻底删**(v118.11废弃·邀请已自设密码):force-pw.ts整文件+main.js import+core-boot触发+landing标记+login·me字段+40行i18n+115行css死样式+测试·**grep零残留**·改密端点`/api/me/change_password`保留(设置改密复用)。
+  - **DB清理**:skin做账数据(3流水+1账户)清空+pizihao(12345@qq.com)测试用户清除·可重测。
+  - **派新窗口三件**:SPA缓存修复(/console·/invite加no-cache根治改了看不到)+个人事务/个人模式删除(图纸`docs/workspace-entry/00`·L档大改·core=workspace-switcher.ts)+对账中心tab卡顿(6-8s·真浏览器抓timing)。
 
 - **🆕 本窗口(2026-06-11)· 🏦 银行对账 + 手工凭证前端两屏【已上线 · 做账模块全闭环】**(`fad461c8` · ?v=11850750 · prod 真机验渲染2/2+导航+0错):
   - 交互 100% 照搬 `Pearnly_银行对账+手工凭证_UI预览/03-交互原型.html` · 真 API /api/accounting/bank/*。`acct-bank.ts`(三余额带+差额门控/账户·期间选择器/高置信+待人工+已对账+已排除四区/逐行候选建议阈值85对齐harvest/确认·全部确认·组合·改科目·新建交易·排除还原·撤销·导入sha256查重/空·完成·离线·模块未开通·无权限·未选套账门态)+ `acct-bank-modals.ts`(弹窗+工具栏+helper)+ `acct-manual.ts`(借贷表/配平门控/全键盘Enter·Alt=·Ctrl+S/自动补平/存草稿·过账二确·红冲·复制·模板CRUD/已结期lockbar)+ 逐笔审 `acct-review.ts` choice(服务/商品)控件。导航做账组「银行对账」排出账本前 · 手工凭证=做账主屏按钮 · CSS→home-46(scoped .ab/.mjx·bundle)· i18n acct-bank-*/acct-mj-*×4 · 视觉照搬闸登记两屏。

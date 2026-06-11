@@ -39,8 +39,8 @@ async function _loadVexTaskList() {
 
 const VEX_PAGE_SIZE = 10;
 
-function _applyVexSearch() {
-    var q = (
+function _vexSearchQuery() {
+    return (
         (
             (document.getElementById('vex-task-search') as HTMLInputElement | null) ||
             ({} as HTMLInputElement)
@@ -48,15 +48,25 @@ function _applyVexSearch() {
     )
         .trim()
         .toLowerCase();
-    S.vexPage = 1;
-    _renderVexTaskList(S.vexAllRows);
-    if (!q) return;
-    var tbody = document.getElementById('vex-task-tbody');
+}
+
+// 只按当前搜索词显隐已渲染的行 · 不重渲。
+// 供 _doRenderVexRows 收尾调用:render 末尾若调会重渲的 _applyVexSearch 会形成
+// render→search→render 死递归(爆栈 ~1s · 切 tab 卡顿真因),故收尾只过滤不重渲。
+function _applyVexFilter() {
+    const q = _vexSearchQuery();
+    const tbody = document.getElementById('vex-task-tbody');
     if (!tbody) return;
     tbody.querySelectorAll('tr').forEach(function (tr) {
         if (!tr.dataset.taskId) return;
-        tr.style.display = tr.textContent.toLowerCase().indexOf(q) >= 0 ? '' : 'none';
+        tr.style.display = !q || tr.textContent.toLowerCase().indexOf(q) >= 0 ? '' : 'none';
     });
+}
+
+// 搜索框输入处理:回第 1 页重渲(渲染收尾经 _applyVexFilter 应用当前搜索词)。
+function _applyVexSearch() {
+    S.vexPage = 1;
+    _renderVexTaskList(S.vexAllRows);
 }
 
 function _renderVexTaskList(rows?: any[]) {
@@ -195,7 +205,7 @@ function _doRenderVexRows(rows: any[]) {
             _confirmDeleteVatTask((btn as HTMLElement).dataset.taskId);
         });
     });
-    _applyVexSearch();
+    _applyVexFilter();
 }
 
 function _vexInitPager() {

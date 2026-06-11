@@ -40,6 +40,8 @@ const M = {
 
 const esc = (s: unknown) => escapeHtml(String(s == null ? '' : s));
 const N = (v: unknown) => Number(String(v).replace(/,/g, '')) || 0;
+// 行是否已填金额(借或贷)· validate 与 payload 同口径,避免漂移
+const hasAmt = (r: MjRow) => N(r.dr) > 0 || N(r.cr) > 0;
 const sec = () => document.getElementById('page-acct-manual');
 
 function freshRows(): MjRow[] {
@@ -251,7 +253,7 @@ function fill(): void {
 function validate(): boolean {
     let ok = true;
     M.rows.forEach((r) => {
-        if ((N(r.dr) > 0 || N(r.cr) > 0) && !r.acc) {
+        if (hasAmt(r) && !r.acc) {
             r.bad = true;
             ok = false;
         }
@@ -263,14 +265,12 @@ function validate(): boolean {
     return ok;
 }
 function payload(draft: boolean): Record<string, unknown> {
-    const lines = M.rows
-        .filter((r) => N(r.dr) > 0 || N(r.cr) > 0)
-        .map((r) => ({
-            account_id: r.acc,
-            dr_cr: N(r.dr) > 0 ? 'debit' : 'credit',
-            amount: N(r.dr) > 0 ? N(r.dr) : N(r.cr),
-            memo: r.memo || null,
-        }));
+    const lines = M.rows.filter(hasAmt).map((r) => ({
+        account_id: r.acc,
+        dr_cr: N(r.dr) > 0 ? 'debit' : 'credit',
+        amount: N(r.dr) > 0 ? N(r.dr) : N(r.cr),
+        memo: r.memo || null,
+    }));
     return { voucher_date: M.date, description: M.memo, lines, draft };
 }
 

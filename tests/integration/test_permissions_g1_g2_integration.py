@@ -23,11 +23,21 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from tests.integration._helpers import (  # noqa: E402
     auth_header,
     get_test_client,
-    login_for_token,
     mock_gmail_smtp,
     require_db,
     require_test_user,
 )
+
+
+def _login(client, username: str, password: str) -> str:
+    """本应用登录路径是 /api/login(返 {token});共享 helper 的 /api/auth/login 在本应用 404。"""
+    resp = client.post("/api/login", json={"username": username, "password": password}, timeout=20)
+    if resp.status_code != 200:
+        raise unittest.SkipTest(f"/api/login 返 {resp.status_code}:{resp.text[:160]}")
+    token = resp.json().get("token") or resp.json().get("access_token")
+    if not token:
+        raise unittest.SkipTest(f"/api/login 无 token:{resp.text[:160]}")
+    return token
 
 
 class _TeamE2EBase(unittest.TestCase):
@@ -35,9 +45,7 @@ class _TeamE2EBase(unittest.TestCase):
         require_db()
         creds = require_test_user()
         self.client = get_test_client()
-        self.token = login_for_token(
-            self.client, creds["PEARNLY_E2E_USER"], creds["PEARNLY_E2E_PASS"]
-        )
+        self.token = _login(self.client, creds["PEARNLY_E2E_USER"], creds["PEARNLY_E2E_PASS"])
         self.h = auth_header(self.token)
         self._created_invites: list[str] = []
 

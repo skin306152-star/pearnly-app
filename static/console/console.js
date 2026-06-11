@@ -16,11 +16,130 @@
         members: [],
         invites: [],
         roles: [],
+        customRoles: [],
         ws: [],
         seatsMax: 0,
+        seatsUsed: 0,
+        seatsPending: 0,
         secLoaded: false,
         expanded: null,
+        // 安全日志:游标分页累积 + 当前筛选
+        logEvents: [],
+        logCursor: null,
+        logMore: false,
+        logType: 'all',
+        logActor: 'all',
+        wiz: null,
     };
+    // 权限码目录(镜像 services/authz/registry · 62 模块码按域分组,2 字段码是底部敏感开关)。
+    // 组标题键:cross 用 pg_cross,其余复用 mod_*;每码标签 = pc_<码下划线化>。
+    var PERM_GROUPS = [
+        {
+            key: 'cross',
+            title: 'pg_cross',
+            codes: [
+                'team.member.view',
+                'team.member.invite',
+                'team.member.edit_role',
+                'team.member.scope',
+                'team.member.remove',
+                'team.member.toggle',
+                'billing.view',
+                'billing.manage',
+                'ownership.transfer',
+                'settings.org.view',
+                'settings.org.edit',
+                'settings.modules.manage',
+                'settings.workspace.manage',
+                'audit.log.view',
+            ],
+        },
+        {
+            key: 'sales',
+            title: 'mod_sales',
+            codes: [
+                'sales.doc.view',
+                'sales.doc.create',
+                'sales.doc.edit',
+                'sales.doc.delete',
+                'sales.doc.approve',
+                'sales.doc.export',
+                'sales.product.view',
+                'sales.product.manage',
+                'sales.settings.manage',
+            ],
+        },
+        {
+            key: 'purchase',
+            title: 'mod_purchase',
+            codes: [
+                'purchase.doc.view',
+                'purchase.doc.create',
+                'purchase.doc.edit',
+                'purchase.doc.delete',
+                'purchase.doc.approve',
+                'purchase.supplier.manage',
+                'purchase.settings.manage',
+            ],
+        },
+        {
+            key: 'acct',
+            title: 'mod_acct',
+            codes: [
+                'acct.entry.view',
+                'acct.entry.review',
+                'acct.entry.approve',
+                'acct.coa.manage',
+                'acct.ledger.export',
+                'acct.settings.manage',
+            ],
+        },
+        {
+            key: 'tax',
+            title: 'mod_tax',
+            codes: [
+                'tax.filing.view',
+                'tax.filing.create',
+                'tax.filing.approve',
+                'tax.settings.manage',
+            ],
+        },
+        {
+            key: 'recon',
+            title: 'mod_recon',
+            codes: ['recon.view', 'recon.create', 'recon.approve', 'recon.export'],
+        },
+        { key: 'ar', title: 'mod_ar', codes: ['ar.view', 'ar.create', 'ar.edit'] },
+        {
+            key: 'kb',
+            title: 'mod_kb',
+            codes: ['kb.doc.view', 'kb.doc.create', 'kb.doc.delete', 'kb.ask'],
+        },
+        {
+            key: 'inv',
+            title: 'mod_inv',
+            codes: ['inv.view', 'inv.create', 'inv.approve', 'inv.report.view'],
+        },
+        {
+            key: 'pos',
+            title: 'mod_pos',
+            codes: [
+                'pos.admin.manage',
+                'pos.report.view',
+                'pos.sale.operate',
+                'pos.shift.operate',
+                'pos.refund.approve',
+            ],
+        },
+        { key: 'intake', title: 'mod_intake', codes: ['intake.upload', 'intake.classify'] },
+    ];
+    // 连 admin 都没有的提权码 · 自定义角色禁选(后端 roles_store 同样剔除,前端只为显式禁灰)
+    var FORBIDDEN_CODES = ['billing.manage', 'ownership.transfer'];
+    var FIELD_COST = 'field.cost.view';
+    var FIELD_PAYROLL = 'field.payroll.view';
+    function pcKey(code) {
+        return 'pc_' + code.replace(/\./g, '_');
+    }
     // 角色「使用权」芯片(PEAK 吸收):业务模块逐个上色,管理类权限组并成一枚
     var MOD_ORDER = [
         'sales',
@@ -88,6 +207,12 @@
         return S.perms.indexOf('*') >= 0 || S.perms.indexOf(code) >= 0;
     }
     function roleName(k) {
+        if (k && k.indexOf('custom:') === 0) {
+            var c = S.customRoles.find(function (x) {
+                return x.key === k;
+            });
+            return c ? c.name : k;
+        }
         return ct('role_' + k);
     }
     function roleGroups(key) {
@@ -127,6 +252,31 @@
             ct('roledesc_' + r.key) +
             '</div>' +
             modChips(r.permission_groups) +
+            '</div>'
+        );
+    }
+    // 自定义角色的模块分组(后端 custom 行只返 permissions[],组芯片前端从前缀派生)
+    function customGroups(c) {
+        var seen = {};
+        (c.permissions || []).forEach(function (p) {
+            seen[p.split('.', 1)[0]] = 1;
+        });
+        return Object.keys(seen);
+    }
+    function customAssignCard(c, on) {
+        return (
+            '<div class="rolecard' +
+            (on ? ' on' : '') +
+            '" data-role="' +
+            esc(c.key) +
+            '"><div class="rn">' +
+            esc(c.name) +
+            '<span class="rc-count">' +
+            ct('rc_inuse', { n: c.member_count || 0 }) +
+            '</span></div><div class="rd">' +
+            ct('chip_n_perms', { n: c.permission_count }) +
+            '</div>' +
+            modChips(customGroups(c)) +
             '</div>'
         );
     }
@@ -227,7 +377,9 @@
             a.classList.toggle('on', a.getAttribute('data-view') === v);
         });
         $('view-members').style.display = v === 'members' ? '' : 'none';
+        $('view-roles').style.display = v === 'roles' ? '' : 'none';
         $('view-security').style.display = v === 'security' ? '' : 'none';
+        if (v === 'roles') renderRoles();
         if (v === 'security' && !S.secLoaded) loadSecurity();
     }
 
@@ -239,13 +391,17 @@
             api('GET', '/api/team/invitations'),
             api('GET', '/api/team/roles'),
             api('GET', '/api/workspace/clients'),
+            api('GET', '/api/team/roles/custom'),
         ])
             .then(function (rs) {
                 S.members = rs[0].members || [];
                 S.seatsMax = rs[0].seats_max || 0;
+                S.seatsUsed = rs[0].seats_used || 0;
+                S.seatsPending = rs[0].seats_pending || 0;
                 S.invites = rs[1].invitations || [];
                 S.roles = rs[2].roles || [];
                 S.ws = rs[3].clients || [];
+                S.customRoles = rs[4].roles || [];
                 renderAll();
             })
             .catch(function () {
@@ -261,22 +417,39 @@
         applyTexts();
         renderMembers();
         renderPending();
+        renderRoles();
         if (S.secLoaded) renderSecurity();
     }
 
     // ── 屏1 · 成员列表 + 行内展开
+    function seatFull() {
+        return S.seatsMax > 0 && S.seatsUsed >= S.seatsMax;
+    }
     function renderMembers() {
         // 席位计量(PEAK 吸收):有 seats_max 显「当前用户 N/M」,满员追加升级提示
+        var full = seatFull();
         $('teamStat').textContent = S.seatsMax
             ? ct('seats_count', { n: S.members.length, m: S.seatsMax })
             : ct('act_n_members', { n: S.members.length });
         var pending = ct('act_n_pending', { n: S.invites.length });
-        $('teamStat2').textContent =
-            S.seatsMax && S.members.length >= S.seatsMax
-                ? pending + ' · ' + ct('seats_full')
-                : pending;
+        $('teamStat2').textContent = full
+            ? pending + ' · ' + ct('seats_full')
+            : S.seatsMax
+              ? pending + ' · ' + ct('seat_remaining', { n: Math.max(0, S.seatsMax - S.seatsUsed) })
+              : pending;
+        // 满员警示条(G1 后端 422 enforce 的前端对位 · 释放席位/升级指引)
+        var upbar = full
+            ? '<div class="upbar"><span><b>' +
+              esc(ct('seat_full_short')) +
+              '</b> ' +
+              esc(ct('seat_full_banner', { u: S.seatsUsed, m: S.seatsMax })) +
+              '</span><button class="btn sec sm" id="seatUpgrade">' +
+              ct('seat_learn_more') +
+              '</button></div>'
+            : '';
         if (S.members.length <= 1 && !S.invites.length) {
             $('membersBox').innerHTML =
+                upbar +
                 '<div class="card">' +
                 S.members.map(rowHtml).join('') +
                 '</div>' +
@@ -287,8 +460,13 @@
                 '</div></div>';
         } else {
             $('membersBox').innerHTML =
-                '<div class="card">' + S.members.map(rowHtml).join('') + '</div>';
+                upbar + '<div class="card">' + S.members.map(rowHtml).join('') + '</div>';
         }
+        var up = $('seatUpgrade');
+        if (up)
+            up.onclick = function () {
+                location.href = '/home#billing';
+            };
         S.members.forEach(function (m) {
             var row = $('m-' + m.id);
             if (row)
@@ -372,14 +550,23 @@
         }
         if (m.is_self)
             return accessHtml + '<div class="hint">' + ct('err_team_cannot_modify_self') + '</div>';
-        var roleCards = S.roles
-            .filter(function (r) {
-                return r.assignable;
-            })
-            .map(function (r) {
-                return roleCardHtml(r, r.key === m.role_key);
-            })
-            .join('');
+        var roleCards =
+            S.roles
+                .filter(function (r) {
+                    return r.assignable;
+                })
+                .map(function (r) {
+                    return roleCardHtml(r, r.key === m.role_key);
+                })
+                .join('') +
+            S.customRoles
+                .filter(function (c) {
+                    return c.is_active;
+                })
+                .map(function (c) {
+                    return customAssignCard(c, c.key === m.role_key);
+                })
+                .join('');
         var scopable = (
             S.roles.find(function (r) {
                 return r.key === m.role_key;
@@ -478,8 +665,19 @@
                     };
                     $('a-roleok').onclick = function (e2) {
                         e2.stopPropagation();
-                        api('PUT', '/api/team/members/' + m.id + '/role', { role_key: rk })
-                            .then(loadAll)
+                        // 统一分配入口:系统预设与 custom:<slug> 同走 /role-assign
+                        api('PUT', '/api/team/members/' + m.id + '/role-assign', {
+                            role_key: rk,
+                        })
+                            .then(function () {
+                                toast(
+                                    ct('toast_role_assigned', {
+                                        nm: m.username,
+                                        role: roleName(rk),
+                                    })
+                                );
+                                loadAll();
+                            })
                             .catch(function (e) {
                                 toast(errMsg(e));
                             });
@@ -624,6 +822,11 @@
 
     // ── 屏2 · 邀请弹窗
     function openInvite() {
+        // 席位满:不发请求,直接人话拦(后端 422 team.seat_limit 为兜底)
+        if (seatFull()) {
+            toast(ct('err_team_seat_limit'));
+            return;
+        }
         var roleCards = S.roles
             .filter(function (r) {
                 return r.assignable;
@@ -894,18 +1097,614 @@
         };
     }
 
+    // ── 屏2 · 角色 tab(预设只读卡 + 自定义角色卡 + 三步向导入口)
+    // 预设码集镜像 registry(无后端目录端点);提交后端再 sanitize,镜像漂移安全。
+    var PRESET_CODES = {
+        viewer: [
+            'sales.doc.view',
+            'sales.doc.export',
+            'sales.product.view',
+            'purchase.doc.view',
+            'acct.entry.view',
+            'acct.ledger.export',
+            'tax.filing.view',
+            'recon.view',
+            'recon.export',
+            'ar.view',
+            'kb.doc.view',
+            'inv.view',
+            'inv.report.view',
+            'pos.report.view',
+        ],
+        clerk: [
+            'sales.doc.view',
+            'sales.doc.create',
+            'sales.doc.edit',
+            'sales.doc.delete',
+            'sales.product.view',
+            'purchase.doc.view',
+            'purchase.doc.create',
+            'purchase.doc.edit',
+            'purchase.doc.delete',
+            'acct.entry.view',
+            'tax.filing.view',
+            'tax.filing.create',
+            'recon.view',
+            'recon.create',
+            'ar.view',
+            'ar.create',
+            'ar.edit',
+            'kb.doc.view',
+            'kb.doc.create',
+            'kb.doc.delete',
+            'kb.ask',
+            'inv.view',
+            'inv.create',
+            'inv.report.view',
+            'intake.upload',
+            'intake.classify',
+        ],
+        accountant: [
+            'sales.doc.view',
+            'sales.doc.create',
+            'sales.doc.edit',
+            'sales.doc.delete',
+            'sales.doc.approve',
+            'sales.doc.export',
+            'sales.product.view',
+            'sales.product.manage',
+            'purchase.doc.view',
+            'purchase.doc.create',
+            'purchase.doc.edit',
+            'purchase.doc.delete',
+            'purchase.doc.approve',
+            'purchase.supplier.manage',
+            'acct.entry.view',
+            'acct.entry.review',
+            'acct.entry.approve',
+            'acct.coa.manage',
+            'acct.ledger.export',
+            'tax.filing.view',
+            'tax.filing.create',
+            'tax.filing.approve',
+            'recon.view',
+            'recon.create',
+            'recon.approve',
+            'recon.export',
+            'ar.view',
+            'ar.create',
+            'ar.edit',
+            'kb.doc.view',
+            'kb.doc.create',
+            'kb.doc.delete',
+            'kb.ask',
+            'inv.view',
+            'inv.create',
+            'inv.approve',
+            'inv.report.view',
+            'pos.report.view',
+            'intake.upload',
+            'intake.classify',
+        ],
+    };
+    function allModuleCodes() {
+        var out = [];
+        PERM_GROUPS.forEach(function (g) {
+            g.codes.forEach(function (c) {
+                if (FORBIDDEN_CODES.indexOf(c) < 0) out.push(c);
+            });
+        });
+        return out;
+    }
+    function presetCodes(base) {
+        return base === 'admin' ? allModuleCodes() : PRESET_CODES[base] || PRESET_CODES.clerk;
+    }
+
+    function renderRoles() {
+        var box = $('rolesBox');
+        if (!box) return;
+        var canManage = can('team.member.edit_role');
+        var presets = S.roles
+            .map(function (r) {
+                return (
+                    '<div class="rrow"><div class="ic-r">' +
+                    esc(roleName(r.key).slice(0, 1)) +
+                    '</div><div class="rmain"><div class="rt">' +
+                    esc(roleName(r.key)) +
+                    ' <span class="badge-ro">' +
+                    ct('badge_preset') +
+                    '</span></div><div class="rdsc">' +
+                    ct('roledesc_' + r.key) +
+                    '</div><div class="rchips"><span class="rchip">' +
+                    ct('chip_n_perms', { n: r.permission_count }) +
+                    '</span><span class="rchip">' +
+                    ct('rc_inuse', { n: r.member_count || 0 }) +
+                    '</span></div></div><div class="racts"><button class="btn sec sm" data-vrole="' +
+                    esc(r.key) +
+                    '">' +
+                    ct('btn_viewperm') +
+                    '</button></div></div>'
+                );
+            })
+            .join('');
+        var customCards = S.customRoles
+            .map(function (c) {
+                var costHidden = (c.permissions || []).indexOf(FIELD_COST) < 0;
+                return (
+                    '<div class="rrow custom"><div class="ic-r">' +
+                    esc(c.name.slice(0, 1)) +
+                    '</div><div class="rmain"><div class="rt">' +
+                    esc(c.name) +
+                    (c.is_active ? '' : ' <span class="badge-ro">' + ct('status_off') + '</span>') +
+                    '</div><div class="rchips"><span class="rchip">' +
+                    ct('chip_n_perms', { n: c.permission_count }) +
+                    '</span><span class="rchip">' +
+                    ct('rc_inuse', { n: c.member_count || 0 }) +
+                    '</span>' +
+                    (costHidden
+                        ? '<span class="rchip warn">' + ct('chip_cost_hidden') + '</span>'
+                        : '') +
+                    '</div></div>' +
+                    (canManage
+                        ? '<div class="racts"><button class="btn sec sm" data-erole="' +
+                          esc(c.id) +
+                          '">' +
+                          ct('btn_edit') +
+                          '</button><button class="btn danger sm" data-delrole="' +
+                          esc(c.id) +
+                          '">' +
+                          ct('btn_delrole') +
+                          '</button></div>'
+                        : '') +
+                    '</div>'
+                );
+            })
+            .join('');
+        box.innerHTML =
+            '<div class="card"><div class="sect-h">' +
+            ct('roletab_preset_h') +
+            ' · ' +
+            S.roles.length +
+            '</div>' +
+            presets +
+            '</div><div class="card"><div class="sect-h">' +
+            ct('roletab_custom_h') +
+            ' · ' +
+            S.customRoles.length +
+            (canManage
+                ? '<span class="spacer"></span><button class="btn pri sm" id="btnNewRole">' +
+                  ct('btn_newrole') +
+                  '</button>'
+                : '') +
+            '</div>' +
+            (S.customRoles.length
+                ? customCards
+                : '<div class="empty" style="border:0;margin:0"><div class="e1">' +
+                  ct('roles_empty') +
+                  '</div><div class="e2">' +
+                  ct('roles_empty2') +
+                  '</div></div>') +
+            '</div>';
+        box.querySelectorAll('[data-vrole]').forEach(function (b) {
+            b.onclick = function () {
+                openRoleView(b.getAttribute('data-vrole'));
+            };
+        });
+        box.querySelectorAll('[data-erole]').forEach(function (b) {
+            b.onclick = function () {
+                openWizard(b.getAttribute('data-erole'));
+            };
+        });
+        box.querySelectorAll('[data-delrole]').forEach(function (b) {
+            b.onclick = function () {
+                delRole(b, b.getAttribute('data-delrole'));
+            };
+        });
+        var nr = $('btnNewRole');
+        if (nr)
+            nr.onclick = function () {
+                openWizard(null);
+            };
+    }
+
+    function openRoleView(key) {
+        var r = S.roles.find(function (x) {
+            return x.key === key;
+        });
+        if (!r) return;
+        $('roleViewTitle').textContent = ct('viewrole_title', { name: roleName(key) });
+        $('roleViewBody').innerHTML =
+            '<div class="wizhint">' +
+            ct('viewrole_body', { d: ct('roledesc_' + key), n: r.permission_count }) +
+            '</div>' +
+            modChips(r.permission_groups) +
+            (can('team.member.edit_role')
+                ? '<div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn pri sm" id="rvNew">' +
+                  ct('viewrole_basenew') +
+                  '</button></div>'
+                : '');
+        $('roleViewMask').classList.add('open');
+        var nb = $('rvNew');
+        if (nb)
+            nb.onclick = function () {
+                $('roleViewMask').classList.remove('open');
+                openWizard(null, r.assignable ? key : 'accountant');
+            };
+    }
+
+    function delRole(btn, id) {
+        var c = S.customRoles.find(function (x) {
+            return String(x.id) === String(id);
+        });
+        if (!c) return;
+        // 在用拦截前移:有成员在用直接人话拦,不进二次确认(对齐原型「先转移」)
+        if (c.member_count > 0) {
+            toast(ct('err_team_role_in_use', { n: c.member_count }));
+            return;
+        }
+        // 删除走 console 既有两段式确认(同移除成员)
+        armConfirm(btn, function () {
+            api('DELETE', '/api/team/roles/' + id)
+                .then(function () {
+                    toast(ct('toast_role_deleted'));
+                    loadAll();
+                })
+                .catch(function (e) {
+                    // 兜底:并发下后端 422 {code,member_count}
+                    var detail = e && e.code;
+                    if (detail && typeof detail === 'object' && detail.code === 'team.role_in_use')
+                        toast(ct('err_team_role_in_use', { n: detail.member_count || 0 }));
+                    else toast(errMsg(e));
+                });
+        });
+    }
+
+    // ── 三步向导(新建 / 编辑自定义角色)
+    function openWizard(editId, baseKey) {
+        var edit = editId
+            ? S.customRoles.find(function (x) {
+                  return String(x.id) === String(editId);
+              })
+            : null;
+        var sel = {};
+        var base = baseKey || 'clerk';
+        var srcCodes = edit ? edit.permissions || [] : presetCodes(base);
+        allModuleCodes().forEach(function (c) {
+            sel[c] = srcCodes.indexOf(c) >= 0;
+        });
+        S.wiz = {
+            step: 1,
+            base: base,
+            name: edit ? edit.name : '',
+            cost: srcCodes.indexOf(FIELD_COST) >= 0,
+            payroll: srcCodes.indexOf(FIELD_PAYROLL) >= 0,
+            editId: editId || null,
+            version: edit ? edit.version : null,
+            sel: sel,
+            open: {},
+        };
+        $('wizTitle').textContent = ct(edit ? 'wiz_edit_title' : 'wiz_new_title');
+        $('wizardMask').classList.add('open');
+        renderWizard();
+    }
+    function wizCount() {
+        var n = 0;
+        Object.keys(S.wiz.sel).forEach(function (c) {
+            if (S.wiz.sel[c]) n++;
+        });
+        return n;
+    }
+    function applyBase(base) {
+        S.wiz.base = base;
+        var codes = presetCodes(base);
+        var sel = {};
+        allModuleCodes().forEach(function (c) {
+            sel[c] = codes.indexOf(c) >= 0;
+        });
+        S.wiz.sel = sel;
+        S.wiz.cost = codes.indexOf(FIELD_COST) >= 0;
+        S.wiz.payroll = codes.indexOf(FIELD_PAYROLL) >= 0;
+    }
+    function renderWizard() {
+        var w = S.wiz,
+            body,
+            foot;
+        if (w.step === 1) {
+            body =
+                '<div class="wizhint">' +
+                ct('wiz_step1_h') +
+                '</div>' +
+                ['admin', 'accountant', 'clerk', 'viewer']
+                    .map(function (k) {
+                        return (
+                            '<div class="basecard' +
+                            (w.base === k ? ' on' : '') +
+                            '" data-wbase="' +
+                            k +
+                            '"><div class="ic-r">' +
+                            esc(roleName(k).slice(0, 1)) +
+                            '</div><div><div class="bt">' +
+                            esc(roleName(k)) +
+                            '</div><div class="bd">' +
+                            ct('roledesc_' + k) +
+                            '</div></div></div>'
+                        );
+                    })
+                    .join('');
+        } else if (w.step === 2) {
+            body =
+                '<div class="wizhint">' +
+                ct('wiz_step2_h', { n: wizCount() }) +
+                '</div>' +
+                PERM_GROUPS.map(function (g) {
+                    var on = g.codes.filter(function (c) {
+                        return w.sel[c];
+                    }).length;
+                    var total = g.codes.length;
+                    var allOn = on === total;
+                    var cls = allOn ? 'on' : on ? 'half' : '';
+                    var codesHtml = g.codes
+                        .map(function (c) {
+                            var locked = FORBIDDEN_CODES.indexOf(c) >= 0;
+                            return (
+                                '<div class="pgcode' +
+                                (locked ? ' locked' : '') +
+                                '"' +
+                                (locked ? '' : ' data-wcode="' + c + '"') +
+                                '><span class="cbx' +
+                                (w.sel[c] ? ' on' : '') +
+                                '"></span>' +
+                                ct(pcKey(c)) +
+                                (locked
+                                    ? ' <span class="note">' + ct('wiz_forbidden_note') + '</span>'
+                                    : '') +
+                                '</div>'
+                            );
+                        })
+                        .join('');
+                    return (
+                        '<div class="permgrp' +
+                        (w.open[g.key] ? ' open' : '') +
+                        '"><div class="pgh" data-wgrp="' +
+                        g.key +
+                        '"><span class="cbx ' +
+                        cls +
+                        '" data-wgall="' +
+                        g.key +
+                        '"></span>' +
+                        ct(g.title) +
+                        '<span class="cnt">' +
+                        on +
+                        '/' +
+                        total +
+                        '</span><span class="car">▾</span></div><div class="pgcodes">' +
+                        codesHtml +
+                        '</div></div>'
+                    );
+                }).join('') +
+                '<div class="sens"><span class="sw' +
+                (w.cost ? ' on' : '') +
+                '" data-wsens="cost"></span><div><div class="st">' +
+                ct('wiz_sens_cost_t') +
+                '</div><div class="sd">' +
+                ct('wiz_sens_cost_d') +
+                '</div></div></div><div class="sens"><span class="sw' +
+                (w.payroll ? ' on' : '') +
+                '" data-wsens="payroll"></span><div><div class="st">' +
+                ct('wiz_sens_payroll_t') +
+                '</div><div class="sd">' +
+                ct('wiz_sens_payroll_d') +
+                '</div></div></div>';
+        } else {
+            body =
+                '<div class="wizhint">' +
+                ct('wiz_step3_h') +
+                '</div><div class="field"><label>' +
+                ct('wiz_name_label') +
+                '</label><input id="wizName" value="' +
+                esc(w.name) +
+                '" placeholder="' +
+                esc(ct('wiz_name_ph')) +
+                '"></div><div class="wizhint">' +
+                ct('wiz_confirm_base', { base: roleName(w.base), n: wizCount() }) +
+                (w.cost ? '' : ct('wiz_confirm_cost')) +
+                (w.payroll ? '' : ct('wiz_confirm_payroll')) +
+                '<br>' +
+                ct('wiz_confirm_apply') +
+                '</div>';
+        }
+        foot =
+            '<span class="steps">' +
+            ct('wiz_step_of', { s: w.step }) +
+            '</span>' +
+            (w.step > 1
+                ? '<button class="btn sec" id="wizPrev">' + ct('btn_prev') + '</button>'
+                : '') +
+            (w.step < 3
+                ? '<button class="btn pri" id="wizNext">' + ct('btn_next') + '</button>'
+                : '<button class="btn pri" id="wizDone">' +
+                  ct(w.editId ? 'btn_savechg' : 'btn_create') +
+                  '</button>');
+        $('wizBody').innerHTML = body;
+        $('wizFoot').innerHTML = foot;
+        bindWizard();
+    }
+    function bindWizard() {
+        var w = S.wiz;
+        $('wizBody')
+            .querySelectorAll('[data-wbase]')
+            .forEach(function (el) {
+                el.onclick = function () {
+                    applyBase(el.getAttribute('data-wbase'));
+                    renderWizard();
+                };
+            });
+        $('wizBody')
+            .querySelectorAll('[data-wgrp]')
+            .forEach(function (el) {
+                el.onclick = function (ev) {
+                    if (ev.target.hasAttribute('data-wgall')) return;
+                    var g = el.getAttribute('data-wgrp');
+                    w.open[g] = !w.open[g];
+                    renderWizard();
+                };
+            });
+        $('wizBody')
+            .querySelectorAll('[data-wgall]')
+            .forEach(function (el) {
+                el.onclick = function (ev) {
+                    ev.stopPropagation();
+                    var key = el.getAttribute('data-wgall');
+                    var grp = PERM_GROUPS.find(function (x) {
+                        return x.key === key;
+                    });
+                    var selectable = grp.codes.filter(function (c) {
+                        return FORBIDDEN_CODES.indexOf(c) < 0;
+                    });
+                    var allOn = selectable.every(function (c) {
+                        return w.sel[c];
+                    });
+                    selectable.forEach(function (c) {
+                        w.sel[c] = !allOn;
+                    });
+                    w.open[key] = true;
+                    renderWizard();
+                };
+            });
+        $('wizBody')
+            .querySelectorAll('[data-wcode]')
+            .forEach(function (el) {
+                el.onclick = function () {
+                    var c = el.getAttribute('data-wcode');
+                    w.sel[c] = !w.sel[c];
+                    var g = PERM_GROUPS.find(function (x) {
+                        return x.codes.indexOf(c) >= 0;
+                    });
+                    if (g) w.open[g.key] = true;
+                    renderWizard();
+                };
+            });
+        $('wizBody')
+            .querySelectorAll('[data-wsens]')
+            .forEach(function (el) {
+                el.onclick = function () {
+                    var k = el.getAttribute('data-wsens');
+                    w[k] = !w[k];
+                    renderWizard();
+                };
+            });
+        var nameEl = $('wizName');
+        if (nameEl)
+            nameEl.oninput = function () {
+                w.name = nameEl.value;
+            };
+        var prev = $('wizPrev');
+        if (prev)
+            prev.onclick = function () {
+                w.step--;
+                renderWizard();
+            };
+        var next = $('wizNext');
+        if (next)
+            next.onclick = function () {
+                w.step++;
+                renderWizard();
+            };
+        var done = $('wizDone');
+        if (done) done.onclick = submitWizard;
+    }
+    function submitWizard() {
+        var w = S.wiz;
+        var name = (w.name || '').trim();
+        if (!name) {
+            toast(ct('err_team_role_name_invalid'));
+            w.step = 3;
+            renderWizard();
+            return;
+        }
+        var codes = Object.keys(w.sel).filter(function (c) {
+            return w.sel[c];
+        });
+        if (w.cost) codes.push(FIELD_COST);
+        if (w.payroll) codes.push(FIELD_PAYROLL);
+        if (!codes.length) {
+            toast(ct('err_team_role_permissions_empty'));
+            return;
+        }
+        var done = $('wizDone');
+        if (done) done.disabled = true;
+        var req = w.editId
+            ? api('PATCH', '/api/team/roles/' + w.editId, {
+                  name: name,
+                  permissions: codes,
+                  version: w.version,
+              })
+            : api('POST', '/api/team/roles', { name: name, permissions: codes });
+        req.then(function () {
+            $('wizardMask').classList.remove('open');
+            toast(ct(w.editId ? 'toast_role_updated' : 'toast_role_created', { name: name }));
+            S.wiz = null;
+            loadAll();
+        }).catch(function (e) {
+            if (done) done.disabled = false;
+            toast(errMsg(e));
+        });
+    }
+
     // ── 屏3 · 安全日志
+    function logFiltered() {
+        return S.logType !== 'all' || S.logActor !== 'all';
+    }
+    function logQuery() {
+        var q = [];
+        if (S.logType !== 'all') q.push('type=' + encodeURIComponent(S.logType));
+        if (S.logActor !== 'all') q.push('actor=' + encodeURIComponent(S.logActor));
+        return q;
+    }
     function loadSecurity() {
+        S.logCursor = null;
+        S.logEvents = [];
         $('secBox').innerHTML = '<div class="skeleton"><i></i><i></i><i></i></div>';
-        api('GET', '/api/team/security-events?per_page=100')
+        fetchLogPage(true);
+    }
+    function fetchLogPage(reset) {
+        var q = logQuery();
+        if (!reset && S.logCursor) q.push('cursor=' + encodeURIComponent(S.logCursor));
+        api('GET', '/api/team/security-events' + (q.length ? '?' + q.join('&') : ''))
             .then(function (j) {
-                S.events = j.events || [];
+                S.logEvents = (reset ? [] : S.logEvents).concat(j.events || []);
+                S.logCursor = j.next_cursor || null;
+                S.logMore = !!j.next_cursor;
                 S.secLoaded = true;
                 renderSecurity();
             })
             .catch(function () {
-                $('secBox').innerHTML =
-                    '<div class="empty"><div class="e1">' + ct('load_fail') + '</div></div>';
+                if (reset)
+                    $('secBox').innerHTML =
+                        '<div class="empty"><div class="e1">' + ct('load_fail') + '</div></div>';
+            });
+    }
+    function exportLog() {
+        var q = logQuery();
+        fetch('/api/team/security-events/export' + (q.length ? '?' + q.join('&') : ''), {
+            headers: { Authorization: 'Bearer ' + S.token },
+        })
+            .then(function (r) {
+                if (!r.ok) throw 0;
+                return r.blob();
+            })
+            .then(function (b) {
+                var url = URL.createObjectURL(b);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = 'security-events.csv';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            })
+            .catch(function () {
+                toast(ct('err_generic'));
             });
     }
     function describeEvent(e) {
@@ -926,6 +1725,12 @@
                     f: roleName(d.role_from || ''),
                     r: roleName(d.role_to || ''),
                 });
+            case e.action === 'role.create':
+                return ct('ev_role_create', { a: a, t: t2 });
+            case e.action === 'role.update':
+                return ct('ev_role_update', { a: a, t: t2 });
+            case e.action === 'role.delete':
+                return ct('ev_role_delete', { a: a, t: t2 });
             case e.action === 'scope.change':
                 return ct('ev_scope_change', { a: a, t: t2 });
             case e.action === 'member.remove' || e.action === 'employee.remove':
@@ -943,28 +1748,117 @@
                 return ct('ev_employee_legacy', { a: a, t: t2, act: esc(e.action) });
         }
     }
-    function renderSecurity() {
-        var evs = S.events || [];
-        if (!evs.length) {
-            $('secBox').innerHTML =
-                '<div class="empty" style="border:0"><div class="e1">' +
-                ct('sec_empty') +
-                '</div><div class="e2">' +
-                ct('sec_empty2') +
-                '</div></div>';
-            return;
-        }
-        $('secBox').innerHTML = evs
-            .map(function (e) {
+    function logBar() {
+        var types = ['all', 'team', 'role', 'scope', 'ownership', 'member'];
+        var typeOpts = types
+            .map(function (t) {
                 return (
-                    '<div class="logrow"><span class="tm">' +
-                    (e.created_at || '').replace('T', ' ').slice(0, 16) +
-                    '</span><span class="desc">' +
-                    describeEvent(e) +
-                    '</span></div>'
+                    '<option value="' +
+                    t +
+                    '"' +
+                    (S.logType === t ? ' selected' : '') +
+                    '>' +
+                    ct('logf_type_' + t) +
+                    '</option>'
                 );
             })
             .join('');
+        var actorOpts =
+            '<option value="all"' +
+            (S.logActor === 'all' ? ' selected' : '') +
+            '>' +
+            ct('logf_actor_all') +
+            '</option>' +
+            S.members
+                .map(function (m) {
+                    return (
+                        '<option value="' +
+                        esc(m.username) +
+                        '"' +
+                        (S.logActor === m.username ? ' selected' : '') +
+                        '>' +
+                        esc(m.username) +
+                        '</option>'
+                    );
+                })
+                .join('');
+        return (
+            '<div class="logbar"><select id="logType">' +
+            typeOpts +
+            '</select><select id="logActor">' +
+            actorOpts +
+            '</select>' +
+            (logFiltered()
+                ? '<button class="btn ghost sm" id="logClear">' + ct('log_clear') + '</button>'
+                : '') +
+            '<span class="spacer"></span><button class="btn sec sm" id="logExport">' +
+            ct('log_export') +
+            '</button></div>'
+        );
+    }
+    function renderSecurity() {
+        var evs = S.logEvents || [];
+        var rows;
+        if (!evs.length) {
+            rows =
+                '<div class="empty" style="border:0"><div class="e1">' +
+                ct(logFiltered() ? 'log_filtered_empty' : 'sec_empty') +
+                '</div>' +
+                (logFiltered()
+                    ? '<button class="btn ghost sm" id="logClear2">' + ct('log_clear') + '</button>'
+                    : '<div class="e2">' + ct('sec_empty2') + '</div>') +
+                '</div>';
+        } else {
+            rows = evs
+                .map(function (e) {
+                    return (
+                        '<div class="logrow"><span class="tm">' +
+                        (e.created_at || '').replace('T', ' ').slice(0, 16) +
+                        '</span><span class="desc">' +
+                        describeEvent(e) +
+                        '</span></div>'
+                    );
+                })
+                .join('');
+        }
+        var pager =
+            '<div class="pager"><span>' +
+            ct('log_count_loaded', { n: evs.length }) +
+            '</span>' +
+            (S.logMore
+                ? '<button class="btn sec sm" id="logMore">' + ct('log_more') + '</button>'
+                : '') +
+            '</div>';
+        $('secBox').innerHTML = logBar() + rows + (evs.length ? pager : '');
+        var ts = $('logType');
+        if (ts)
+            ts.onchange = function () {
+                S.logType = ts.value;
+                loadSecurity();
+            };
+        var as = $('logActor');
+        if (as)
+            as.onchange = function () {
+                S.logActor = as.value;
+                loadSecurity();
+            };
+        ['logClear', 'logClear2'].forEach(function (id) {
+            var b = $(id);
+            if (b)
+                b.onclick = function () {
+                    S.logType = 'all';
+                    S.logActor = 'all';
+                    loadSecurity();
+                };
+        });
+        var ex = $('logExport');
+        if (ex) ex.onclick = exportLog;
+        var more = $('logMore');
+        if (more)
+            more.onclick = function () {
+                more.disabled = true;
+                fetchLogPage(false);
+            };
     }
 
     boot();

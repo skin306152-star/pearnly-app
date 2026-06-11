@@ -22,8 +22,10 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from core.route_helpers import _check_password_strength, _log_op
+from services.auth.signup_core import PLAN_CONFIG
 from services.authz.deps import require_perm
 from services.authz.registry import ASSIGNABLE_ROLE_KEYS
+from services.team import console_store
 from services.team import invitations as inv_store
 from services.team import ownership as ownership_store
 
@@ -70,6 +72,10 @@ async def create_invitation(req: InvitationCreate, request: Request):
         raise HTTPException(422, detail="team.scope_empty")
     if req.channel == "email" and "@" not in req.target:
         raise HTTPException(422, detail="invite.bad_email")
+    # 席位 enforce(G1):活跃成员 + 未决邀请 ≥ 套餐席位 → 拦;撤回/移除后可再邀。
+    plan = PLAN_CONFIG.get(str(user.get("plan") or ""), PLAN_CONFIG["credits"])
+    if console_store.seat_usage(str(user["tenant_id"]))["used"] >= int(plan["seats_max"]):
+        raise HTTPException(422, detail="team.seat_limit")
     created = inv_store.create_invitation(
         tenant_id=str(user["tenant_id"]),
         invited_by=str(user["id"]),

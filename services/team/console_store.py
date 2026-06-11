@@ -80,6 +80,30 @@ def role_member_counts(tenant_id: str) -> Dict[str, int]:
         return {r["role_key"]: int(r["c"]) for r in cur.fetchall()}
 
 
+def seat_usage(tenant_id: str) -> Dict[str, int]:
+    """席位计量(G1 enforce):活跃成员(含 owner)+ 未决邀请 = 已占席。
+
+    cashier 走 pos_cashiers 不进 memberships,天然不占席;撤回/移除后 used 立降可再邀。
+    两计数合一次往返(跨区 DB 省 RTT);返回 {members, pending, used}。
+    """
+    with db.get_cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                (SELECT COUNT(*) FROM memberships
+                   WHERE tenant_id = %s AND status = 'active') AS members,
+                (SELECT COUNT(*) FROM invitations
+                   WHERE tenant_id = %s AND accepted_at IS NULL AND revoked_at IS NULL
+                     AND expires_at > NOW()) AS pending
+            """,
+            (str(tenant_id), str(tenant_id)),
+        )
+        row = cur.fetchone() or {}
+    members = int(row.get("members") or 0)
+    pending = int(row.get("pending") or 0)
+    return {"members": members, "pending": pending, "used": members + pending}
+
+
 def get_member(tenant_id: str, user_id: str) -> Optional[Dict[str, Any]]:
     with db.get_cursor() as cur:
         cur.execute(

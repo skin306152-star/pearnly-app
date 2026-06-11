@@ -8,16 +8,19 @@ PUT  /api/team/members/{uid}/scope       配作用域(scope_mode + 套账全量�
 PATCH /api/team/members/{uid}/active     启停(全角色版 · 边界同上)
 DELETE /api/team/members/{uid}           移除(级联清理同 legacy)
 GET  /api/team/roles                     角色说明卡数据
-GET  /api/team/security-events           安全日志(team./role./scope./ownership.)
+GET  /api/team/security-events           安全日志(类型/操作者/时间筛选 + 游标分页)
+GET  /api/team/security-events/export    安全日志 CSV 导出(同筛选 · UTF-8 BOM)
 
-安全事件全部落 operation_logs 一等 action(Stripe Security history 形态)。
+安全事件全部落 operation_logs 一等 action(Stripe Security history 形态);
+域过滤/分页/导出逻辑在 services.team.security_log(SQL 层前缀过滤,不丢早期事件)。
 """
 
 from __future__ import annotations
 
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from core import db
@@ -25,11 +28,9 @@ from core.route_helpers import _log_op
 from services.auth.signup_core import PLAN_CONFIG
 from services.authz.deps import get_authz, require_perm
 from services.authz.registry import ASSIGNABLE_ROLE_KEYS, ROLE_PERMISSIONS, SCOPABLE_ROLE_KEYS
-from services.team import console_store
+from services.team import console_store, security_log
 
 router = APIRouter()
-
-SECURITY_ACTION_PREFIXES = ("team.", "role.", "scope.", "ownership.", "employee.", "member.")
 
 
 class RoleChangeRequest(BaseModel):
@@ -83,12 +84,16 @@ async def team_members(request: Request):
     for m in members:
         m["is_self"] = m["id"] == me
     # 席位计量(PEAK 吸收 · 套餐 seats_max,前端显「当前用户 N/M」+ 满员升级提示)
+    # seats_used 含未决邀请,与 G1 enforce 同口径(成员 + pending),满员判定一致。
     plan = PLAN_CONFIG.get(str(user.get("plan") or ""), PLAN_CONFIG["credits"])
+    usage = console_store.seat_usage(str(user["tenant_id"]))
     return {
         "ok": True,
         "members": members,
         "total": len(members),
         "seats_max": int(plan["seats_max"]),
+        "seats_used": usage["used"],
+        "seats_pending": usage["pending"],
     }
 
 
@@ -212,32 +217,49 @@ async def remove_member(uid: str, request: Request):
 
 @router.get("/api/team/security-events")
 async def security_events(
-    request: Request, page: int = 1, per_page: int = 50, q: Optional[str] = None
+    request: Request,
+    type: Optional[str] = None,
+    actor: Optional[str] = None,
+    from_: Optional[str] = Query(None, alias="from"),
+    to: Optional[str] = None,
+    cursor: Optional[str] = None,
+    limit: int = 50,
 ):
-    """operation_logs 过滤视图:团队与权限事件(含 legacy employee.* 读侧兼容)。"""
+    """operation_logs 过滤视图:团队与权限事件 + 类型/操作者/时间筛选 + 游标分页。"""
     user = require_perm(request, "audit.log.view")
-    # 安全事件占总日志的小头:取近 1000 条按前缀过滤后再分页(防业务日志把事件挤出首页)
-    data = db.list_operation_logs_paged(tenant_id=str(user["tenant_id"]), q=q, limit_all=1000)
-    matched = [
-        r
-        for r in data.get("rows", [])
-        if str(r.get("action") or "").startswith(SECURITY_ACTION_PREFIXES)
-    ]
-    page = max(1, page)
-    per_page = max(1, min(per_page, 200))
-    start = (page - 1) * per_page
-    rows = []
-    for r in matched[start : start + per_page]:
-        action = str(r.get("action") or "")
-        rows.append(
-            {
-                "id": r.get("id"),
-                "action": action,
-                "actor": r.get("actor_username"),
-                "target": r.get("target_name"),
-                "details": r.get("details"),
-                "ip": r.get("ip"),
-                "created_at": (r["created_at"].isoformat() if r.get("created_at") else None),
-            }
-        )
-    return {"ok": True, "events": rows, "page": page, "total": len(matched)}
+    return {
+        "ok": True,
+        **security_log.list_events(
+            tenant_id=str(user["tenant_id"]),
+            category=type,
+            actor=actor,
+            date_from=from_,
+            date_to=to,
+            cursor=cursor,
+            limit=limit,
+        ),
+    }
+
+
+@router.get("/api/team/security-events/export")
+async def security_events_export(
+    request: Request,
+    type: Optional[str] = None,
+    actor: Optional[str] = None,
+    from_: Optional[str] = Query(None, alias="from"),
+    to: Optional[str] = None,
+):
+    """同筛选参数导出 CSV(UTF-8 BOM · 上限 5000 行 · Excel 直开泰文不乱码)。"""
+    user = require_perm(request, "audit.log.view")
+    csv_text = security_log.export_events(
+        tenant_id=str(user["tenant_id"]),
+        category=type,
+        actor=actor,
+        date_from=from_,
+        date_to=to,
+    )
+    return Response(
+        content=csv_text,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="pearnly_security_events.csv"'},
+    )

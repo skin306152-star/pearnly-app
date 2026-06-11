@@ -196,7 +196,9 @@ try:
     check("种子后码集不变", perms == ["sales.doc.view"], perms)
     requests.delete(f"{BASE}/api/team/roles/{probe_id}", headers=H(owner))
 except Exception as e:  # noqa: BLE001
-    check("种子不覆盖(DB 段)", False, f"需 DATABASE_URL: {e}")
+    import traceback
+
+    check("种子不覆盖(DB 段)", False, f"{type(e).__name__}: {e}\n{traceback.format_exc()}")
 
 print("== 9. 清理")
 r = requests.delete(f"{BASE}/api/team/members/{member_uid}", headers=H(owner))

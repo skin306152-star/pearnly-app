@@ -1187,17 +1187,16 @@
             'intake.classify',
         ],
     };
-    function allModuleCodes() {
-        var out = [];
-        PERM_GROUPS.forEach(function (g) {
-            g.codes.forEach(function (c) {
-                if (FORBIDDEN_CODES.indexOf(c) < 0) out.push(c);
-            });
-        });
-        return out;
-    }
+    // 全模块码(去提权码)· 静态目录,算一次复用(向导初值/换基底/全选都读它)
+    var ALL_MODULE_CODES = PERM_GROUPS.reduce(function (acc, g) {
+        return acc.concat(
+            g.codes.filter(function (c) {
+                return FORBIDDEN_CODES.indexOf(c) < 0;
+            })
+        );
+    }, []);
     function presetCodes(base) {
-        return base === 'admin' ? allModuleCodes() : PRESET_CODES[base] || PRESET_CODES.clerk;
+        return base === 'admin' ? ALL_MODULE_CODES : PRESET_CODES[base] || PRESET_CODES.clerk;
     }
 
     function renderRoles() {
@@ -1369,7 +1368,7 @@
         var sel = {};
         var base = baseKey || 'clerk';
         var srcCodes = edit ? edit.permissions || [] : presetCodes(base);
-        allModuleCodes().forEach(function (c) {
+        ALL_MODULE_CODES.forEach(function (c) {
             sel[c] = srcCodes.indexOf(c) >= 0;
         });
         S.wiz = {
@@ -1398,7 +1397,7 @@
         S.wiz.base = base;
         var codes = presetCodes(base);
         var sel = {};
-        allModuleCodes().forEach(function (c) {
+        ALL_MODULE_CODES.forEach(function (c) {
             sel[c] = codes.indexOf(c) >= 0;
         });
         S.wiz.sel = sel;

@@ -185,7 +185,11 @@ function openHtml(v: Voucher): string {
 
 function shellHtml(): string {
     return `<div class="acct al"><div class="wrap">
-        <div class="ph"><div><div class="t">${escapeHtml(t('acct-title'))}</div><div class="sub">${escapeHtml(t('acct-subtitle'))}</div></div></div>
+        <div class="ph"><div><div class="t">${escapeHtml(t('acct-title'))}</div><div class="sub">${escapeHtml(t('acct-subtitle'))}</div></div>
+            <div style="display:flex;gap:8px;align-items:center;flex:none;">
+                <button class="btn" id="acct-bank-btn">${escapeHtml(t('acct-go-bank'))}</button>
+                <button class="btn primary" id="acct-manual-btn">${escapeHtml(t('acct-go-manual'))}</button>
+            </div></div>
         <div class="panel">
             <div class="band"><div class="star" id="acct-star">${starHtml()}</div><div id="acct-attn-slot">${attnHtml()}</div></div>
             <div class="toolbar">
@@ -380,6 +384,10 @@ window.loadAcctList = function () {
         };
     const books = document.getElementById('acct-books-btn');
     if (books) books.onclick = () => window.routeTo?.('acct-books');
+    const bankBtn = document.getElementById('acct-bank-btn');
+    if (bankBtn) bankBtn.onclick = () => window.routeTo?.('acct-bank');
+    const manualBtn = document.getElementById('acct-manual-btn');
+    if (manualBtn) manualBtn.onclick = () => window.routeTo?.('acct-manual');
     renderBody();
     load();
 };

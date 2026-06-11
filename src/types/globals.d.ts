@@ -305,6 +305,8 @@ interface Window {
     loadAcctReview?: () => void;
     loadAcctAccounts?: () => void;
     loadAcctSettings?: () => void;
+    loadAcctBank?: () => void;
+    loadAcctManual?: () => void;
     loadAcctBooks?: () => void;
     // 自动报税 Phase 3 · 路由页加载器
     loadTaxCenter?: () => void;

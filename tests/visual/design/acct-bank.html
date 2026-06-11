@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pearnly · 银行对账(设计稿快照 · home-01 令牌)</title>
+    <style>
+      :root {
+        --accent: #7c4dff;
+        --accent-ink: #fff;
+        --accent-deep: #6b3ff2;
+        --card: #ffffff;
+        --bg: #f7f5fc;
+        --ink: #231942;
+        --ink2: #5b5875;
+        --ink3: #8f8aa8;
+        --line: #ece8f6;
+        --line2: #f4f2fa;
+        --sh: 0 1px 2px rgba(11, 26, 43, 0.06);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+      }
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-size: 13.5px;
+        padding: 24px 26px;
+      }
+      .ab .ph {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+      }
+      .ab .ph .t {
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: -0.2px;
+      }
+      .ab .ph .sub {
+        color: var(--ink2);
+        font-size: 12.5px;
+        margin-top: 4px;
+      }
+      .ab .panel {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        box-shadow: var(--sh);
+        overflow: hidden;
+      }
+      .ab .btn {
+        height: 32px;
+        padding: 0 13px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--card);
+        font-size: 12.5px;
+        cursor: pointer;
+        color: var(--ink);
+      }
+      .ab .btn.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 650;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="ab">
+      <div class="ph">
+        <div>
+          <div class="t">银行对账</div>
+          <div class="sub">核对银行流水与账本,确保账面与银行一致</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div style="padding: 16px">
+          <button class="btn primary">确认</button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

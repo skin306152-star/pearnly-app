@@ -34,6 +34,9 @@ const PAGE_CSS = `
 .acct.ar .queue{padding:12px 22px;border-top:1px solid var(--line2);background:var(--line2);display:flex;align-items:center;gap:14px;font-size:12.5px;color:var(--ink2);flex-wrap:wrap;}
 .acct.ar .queue .q2{display:flex;align-items:center;gap:7px;}
 .acct.ar .queue .dotg{width:6px;height:6px;border-radius:50%;background:var(--amber);}
+.acct.ar .svcg{display:flex;align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap;}
+.acct.ar .svcg-lbl{font-size:12.5px;color:var(--ink2);}
+.acct.ar .btn.sm{height:32px;padding:0 14px;font-size:12.5px;}
 @media(max-width:600px){
   .acct.ar .foot{flex-direction:column;align-items:stretch;}
   .acct.ar .foot .btn{width:100%;}
@@ -43,6 +46,8 @@ const PAGE_CSS = `
 let queue: Voucher[] = [];
 let idx = 0;
 let postedCount = 0;
+// 服务/商品归类(review_reason=service_or_goods 时的二选一 · 纯重分类不重算 WHT · 进 choice 入参)
+let svcChoice: string | null = null;
 
 function cur(): Voucher | null {
     return queue[idx] || null;
@@ -59,11 +64,19 @@ function itemHtml(v: Voucher): string {
         ? `<div class="state" style="padding:18px;">${escapeHtml(t('acct-shell-hint'))}<br>
             <button class="btn" id="acct-goto-settings" style="margin-top:10px;">${escapeHtml(t('acct-goto-settings'))} →</button></div>`
         : ledgerTable(v);
+    const isSvcGoods = String(v.review_reason || '') === 'service_or_goods';
+    const confirmOff = isSvcGoods && !svcChoice;
+    const choiceCtl =
+        !shell && isSvcGoods
+            ? `<div class="svcg"><span class="svcg-lbl">${escapeHtml(t('acct-review-svcgoods-q'))}</span>
+            <button class="btn sm ${svcChoice === 'service' ? 'primary' : ''}" data-act="svcchoice" data-c="service">${escapeHtml(t('acct-review-svc'))}</button>
+            <button class="btn sm ${svcChoice === 'goods' ? 'primary' : ''}" data-act="svcchoice" data-c="goods">${escapeHtml(t('acct-review-goods'))}</button></div>`
+            : '';
     const actions = shell
         ? `<button class="btn" data-act="skip">${escapeHtml(t('acct-skip'))}</button>`
         : `<button class="btn" data-act="skip">${escapeHtml(t('acct-skip'))}</button>
            <button class="btn" data-act="override">${escapeHtml(t('acct-change-account'))}</button>
-           <button class="btn primary" data-act="confirm">${escapeHtml(t('acct-confirm-next'))}</button>`;
+           <button class="btn primary" data-act="confirm" ${confirmOff ? 'disabled' : ''}>${escapeHtml(t('acct-confirm-next'))}</button>`;
     const rest = queue
         .slice(idx + 1, idx + 3)
         .map(
@@ -80,6 +93,7 @@ function itemHtml(v: Voucher): string {
         <div class="body">
             <div class="evt">${escapeHtml(t('acct-evt-source'))}:${escapeHtml(t(srcKey(v.source_type)))} ${escapeHtml(v.source_ref || '')} · ${escapeHtml(v.voucher_date || '')} · <b>${escapeHtml(v.description || '—')} ${fmtBaht(v.total_debit)}</b></div>
             ${table}
+            ${choiceCtl}
             <div class="foot"><div class="human">${escapeHtml(v.human_note || '')}</div>${actions}</div>
         </div>
         ${rest ? `<div class="queue">${escapeHtml(t('acct-review-waiting'))}:${rest}</div>` : ''}`;
@@ -106,7 +120,11 @@ function bind(sec: HTMLElement): void {
             const act = btn.dataset.act!;
             const v = cur();
             if (!v) return;
-            if (act === 'skip') {
+            if (act === 'svcchoice') {
+                svcChoice = btn.dataset.c || null;
+                render();
+            } else if (act === 'skip') {
+                svcChoice = null;
                 idx += 1;
                 if (idx >= queue.length) idx = queue.length;
                 showToast(t('acct-skip-ok'), 'info');
@@ -127,8 +145,10 @@ function bind(sec: HTMLElement): void {
 async function submit(id: string, overrides: Record<string, string>): Promise<void> {
     const payload: Record<string, unknown> = { remember: true };
     if (Object.keys(overrides).length) payload.account_overrides = overrides;
+    if (svcChoice) payload.choice = svcChoice;
     try {
         await aapi('POST', withWs(`/api/accounting/vouchers/${id}/review`), payload);
+        svcChoice = null;
         showToast(t('acct-confirm-ok'), 'success');
         postedCount += 1;
         queue = queue.filter((q) => q.id !== id);

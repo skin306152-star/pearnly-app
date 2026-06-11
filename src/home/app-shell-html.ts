@@ -329,6 +329,7 @@ const SIDEBAR_HTML = `
                 </svg>
                 <span class="nav-label" data-i18n="nav-acct-settings">做账设置</span>
             </div>
+            <div class="nav-item nav-sub-item" data-route="acct-bank" data-module="accounting"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="14" height="9" rx="1.5"/><path d="M3 7l7-4 7 4M7 11h.01M10 11h.01M13 11h.01"/></svg><span class="nav-label" data-i18n="nav-acct-bank">银行对账</span></div>
             <div class="nav-item nav-sub-item" data-route="acct-books" data-module="accounting">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 3.5h9a2 2 0 012 2V17l-3.5-2-3 2-3-2L4 17V3.5z"/>

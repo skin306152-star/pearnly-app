@@ -227,6 +227,72 @@ const API = {
         },
     },
     '/api/accounting/learned': { ok: true, data: { items: [] } },
+    '/api/accounting/bank/accounts': {
+        ok: true,
+        data: {
+            accounts: [
+                {
+                    id: 'ba1',
+                    bank_code: 'KBANK',
+                    account_last4: '1234',
+                    coa_account_id: 'a1',
+                    is_active: true,
+                },
+            ],
+        },
+    },
+    '/api/accounting/bank/summary': {
+        ok: true,
+        data: {
+            summary: {
+                bank_balance: 412350,
+                book_balance: 400000,
+                difference: 12350,
+                balance_gap: 12350,
+                unmatched_net: 12350,
+                total_count: 5,
+                matched_count: 3,
+                unmatched_count: 2,
+                progress: 0.6,
+                done: false,
+            },
+        },
+    },
+    '/api/accounting/bank/lines': {
+        ok: true,
+        data: {
+            count: 1,
+            items: [
+                {
+                    id: 'l1',
+                    line_date: '2026-06-08',
+                    amount: 18190,
+                    direction: 'out',
+                    description: '向供应商转账',
+                    bank_ref: '转账',
+                    status: 'unmatched',
+                },
+            ],
+        },
+    },
+    '/api/accounting/bank/lines/l1/candidates': {
+        ok: true,
+        data: {
+            candidates: [
+                {
+                    kind: 'voucher',
+                    action: 'link',
+                    voucher_id: 'v1',
+                    label: '付款凭证 #0248',
+                    date: '2026-06-08',
+                    amount: 18190,
+                    score: 95,
+                    reason: '金额一致 · 日期差 0 天',
+                },
+            ],
+        },
+    },
+    '/api/accounting/voucher-templates': { ok: true, data: { templates: [] } },
 };
 
 // 映射表:稿 ↔ 生产路由 ↔ 关键选择器比对项。
@@ -580,6 +646,56 @@ const MAPPINGS = [
             },
         ],
         bluemust: '#acct-books-pack',
+    },
+    {
+        name: '银行对账(bank-recon-mj 01)',
+        design: 'acct-bank.html',
+        route: 'acct-bank',
+        ready: '#page-acct-bank .ab .band',
+        layout: { sel: '#page-acct-bank .ab', maxWidth: 'none', centered: false },
+        tokens: [
+            {
+                design: '.panel',
+                prod: '#page-acct-bank .ab .panel',
+                props: ['borderRadius', 'boxShadow'],
+            },
+            {
+                design: '.ph .t',
+                prod: '#page-acct-bank .ab .ph .t',
+                props: ['fontSize', 'fontWeight'],
+            },
+            {
+                design: '.btn.primary',
+                prod: '#page-acct-bank .ab .btn.primary',
+                props: ['backgroundColor', 'borderRadius', 'fontSize'],
+            },
+        ],
+        bluemust: '#page-acct-bank .ab .btn.primary',
+    },
+    {
+        name: '手工凭证(bank-recon-mj 02)',
+        design: 'acct-manual.html',
+        route: 'acct-manual',
+        ready: '#page-acct-manual .mjx table.mj',
+        layout: { sel: '#page-acct-manual .mjx', maxWidth: 'none', centered: false },
+        tokens: [
+            {
+                design: '.panel',
+                prod: '#page-acct-manual .mjx .panel',
+                props: ['borderRadius', 'boxShadow'],
+            },
+            {
+                design: '.ph .t',
+                prod: '#page-acct-manual .mjx .ph .t',
+                props: ['fontSize', 'fontWeight'],
+            },
+            {
+                // 过账按钮初始禁用(空/未配平)→ 灰底是正确禁用态;主色已由银行屏同一 .btn.primary 规则验证
+                design: '.btn.primary',
+                prod: '#page-acct-manual .mjx .btn.primary',
+                props: ['borderRadius', 'fontSize'],
+            },
+        ],
     },
 ];
 

@@ -58,6 +58,7 @@ const HOME_CSS = [
     'home-44-pos-cashiers.css',
     'erp-mrerp-connect.css',
     'home-45-kit.css',
+    'home-46-acct-bankmj.css',
 ];
 
 const ADMIN_CSS = [

@@ -25,6 +25,9 @@ EXPECTED = {
     ("PUT", "/api/accounting/settings"),
     ("GET", "/api/accounting/learned"),
     ("DELETE", "/api/accounting/learned/{learned_id}"),
+    ("GET", "/api/accounting/voucher-templates"),
+    ("POST", "/api/accounting/voucher-templates"),
+    ("DELETE", "/api/accounting/voucher-templates/{template_id}"),
 }
 
 # 批2:逐路由权限码(docs/permissions/02 矩阵接线 · 写档分 review/approve/coa/settings,读=view)
@@ -46,6 +49,9 @@ GATE_CODES = {
     "api_update_settings": "acct.settings.manage",
     "api_list_learned": "acct.entry.view",
     "api_delete_learned": "acct.coa.manage",
+    "api_list_templates": "acct.entry.view",
+    "api_create_template": "acct.entry.review",
+    "api_delete_template": "acct.coa.manage",
 }
 
 

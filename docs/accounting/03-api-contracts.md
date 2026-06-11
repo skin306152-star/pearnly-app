@@ -6,7 +6,7 @@
 ## 1. 凭证(主屏)
 - **GET /api/accounting/vouchers?period=&source_type=&status=&method=&q=** — 列表 + 汇总(本月 X 笔已自动做账 / 已过账 / 待审数)。`method` 筛自动/建议/人工(安全带①)。`data:{summary,items[]}`。
 - **GET /api/accounting/vouchers/{id}** — 详情(头 + 借贷行 + human_note + source 链接)。
-- **POST /api/accounting/vouchers/{id}/review** — 逐笔审定夺 `{choice|account_overrides|wht_rate, remember:true}` → 过账 + 写 `review_learned`。`data:{voucher}`。错误:`acct.unbalanced`(借贷不平·422)。
+- **POST /api/accounting/vouchers/{id}/review** — 逐笔审定夺 `{choice|account_overrides, remember:true}` → 过账 + 写 `review_learned`。`choice`(`goods`/`service`)= 纯重分类(改科目归类),WHT 沿用业务单已算好的 `wht_amount` 不重算(见 02)。`data:{voucher}`。错误:`acct.unbalanced`(借贷不平·422)。
 - **PATCH /api/accounting/vouchers/{id}** — 改科目/分录(仅 pending_review 或权限内·posted 改走调整分录)→ 重断言平。
 - **POST /api/accounting/vouchers/{id}/void** — 作废(反向调整凭证·留痕)。
 - **POST /api/accounting/vouchers/{id}/unpost** — 撤销重做(安全带②):原凭证置 void + 同 source 重新跑引擎(吃最新映射/记忆)。`data:{voucher}`(重判结果)。错误:`acct.period_closed`。

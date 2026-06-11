@@ -61,7 +61,10 @@ class SchemaDdlTests(unittest.TestCase):
         self.assertIn("source_tier text", ddl)
 
     def test_rls_covers_all_tables(self):
-        self.assertEqual(len(schema._RLS_TABLES), 6)
+        # 做账 6 表 + 银行对账 3 表(acct_bank_accounts/lines/voucher_templates)
+        self.assertEqual(len(schema._RLS_TABLES), 9)
+        for t in ("acct_bank_accounts", "acct_bank_lines", "acct_voucher_templates"):
+            self.assertIn(t, schema._RLS_TABLES)
 
 
 class CoaPresetTests(unittest.TestCase):

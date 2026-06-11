@@ -20,6 +20,7 @@ from routes.accounting_common import auth_member, gate, resolve_ws, uid
 from services.accounting import coa_preset, posting, review
 from services.accounting import settings as acct_settings
 from services.accounting import store as acct_store
+from services.accounting import templates as jv_templates
 from services.accounting import vouchers as jv
 
 router = APIRouter(prefix="/api/accounting", tags=["accounting"])
@@ -28,6 +29,7 @@ router = APIRouter(prefix="/api/accounting", tags=["accounting"])
 class ReviewIn(BaseModel):
     account_overrides: Optional[dict] = None
     remember: bool = False
+    choice: Optional[str] = None  # goods/service 归类定夺(纯重分类·WHT 不重算)
 
 
 class VoucherPatchIn(BaseModel):
@@ -45,6 +47,20 @@ class ManualVoucherIn(BaseModel):
     voucher_date: date
     description: str
     lines: list[ManualLineIn]
+    draft: bool = False
+    template_id: Optional[str] = None
+
+
+class TemplateLineIn(BaseModel):
+    account_id: str
+    dr_cr: str
+    memo: Optional[str] = None
+
+
+class TemplateIn(BaseModel):
+    name: str
+    lines: Optional[list[TemplateLineIn]] = None
+    from_voucher_id: Optional[str] = None
 
 
 class AccountIn(BaseModel):
@@ -131,8 +147,65 @@ async def api_manual_voucher(
             description=req.description,
             lines=[ln.model_dump() for ln in req.lines],
             created_by=uid(user),
+            draft=req.draft,
         )
+        if req.template_id:
+            jv_templates.bump_use_count(
+                cur, tenant_id=tid, workspace_client_id=ws, template_id=req.template_id
+            )
         return ok({"voucher": voucher})
+
+
+@router.get("/voucher-templates")
+async def api_list_templates(request: Request, workspace_client_id: Optional[int] = Query(None)):
+    _, tid = auth_member(request, "acct.entry.view")
+    with db.get_cursor_rls(tid, commit=False) as cur:
+        gate(cur, tid)
+        ws = resolve_ws(cur, request, tid, workspace_client_id)
+        return ok(
+            {"templates": jv_templates.list_templates(cur, tenant_id=tid, workspace_client_id=ws)}
+        )
+
+
+@router.post("/voucher-templates")
+async def api_create_template(
+    req: TemplateIn, request: Request, workspace_client_id: Optional[int] = Query(None)
+):
+    user, tid = auth_member(request, "acct.entry.review")
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        gate(cur, tid)
+        ws = resolve_ws(cur, request, tid, workspace_client_id)
+        if req.from_voucher_id:
+            lines = jv_templates.lines_from_voucher(
+                cur, tenant_id=tid, workspace_client_id=ws, voucher_id=req.from_voucher_id
+            )
+        else:
+            lines = [ln.model_dump() for ln in (req.lines or [])]
+        template = jv_templates.create_template(
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            name=req.name,
+            lines=lines,
+            created_by=uid(user),
+        )
+        return ok({"template": template})
+
+
+@router.delete("/voucher-templates/{template_id}")
+async def api_delete_template(
+    template_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
+):
+    _, tid = auth_member(request, "acct.coa.manage")
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        gate(cur, tid)
+        ws = resolve_ws(cur, request, tid, workspace_client_id)
+        deleted = jv_templates.delete_template(
+            cur, tenant_id=tid, workspace_client_id=ws, template_id=template_id
+        )
+        if deleted is None:
+            raise PosError("acct.unexpected", 404, detail="template_not_found")
+        return ok({"deleted": deleted})
 
 
 @router.post("/vouchers/{voucher_id}/review")
@@ -154,6 +227,7 @@ async def api_review_voucher(
             account_overrides=req.account_overrides,
             remember=req.remember,
             reviewed_by=uid(user),
+            choice=req.choice,
         )
         return ok({"voucher": voucher})
 

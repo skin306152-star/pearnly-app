@@ -237,8 +237,11 @@ def create_manual_voucher(
     description,
     lines: list,
     created_by=None,
+    draft: bool = False,
 ) -> dict:
-    """手工凭证:借贷自填,断言平,直接 posted(人录的 = method manual)。"""
+    """手工凭证:借贷自填,断言平。draft=True → 存草稿(pending_review,进待审列表,可逐笔审过账);
+    否则直接 posted(人录的 = method manual)。已结期间日期拦截(acct.period_closed)。"""
+    _assert_period_open(cur, tenant_id, workspace_client_id, voucher_date.strftime("%Y-%m"))
     coa_preset.ensure_seeded(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
     for ln in lines:
         acct = acct_store.get_account(
@@ -258,7 +261,8 @@ def create_manual_voucher(
         "confidence": 100,
         "source_tier": "manual",
         "method": "manual",
-        "status": "posted",
+        "status": "pending_review" if draft else "posted",
+        "review_reason": "manual_draft" if draft else None,
         "voucher_date": voucher_date,
         "created_by": created_by or "manual",
     }

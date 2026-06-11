@@ -26,6 +26,9 @@ def list_pending(cur, *, tenant_id: str, workspace_client_id: int, period=None) 
     return sorted(items, key=lambda v: (v["source_type"], str(v["created_at"])))
 
 
+_VALID_CHOICE = ("goods", "service")
+
+
 def review_voucher(
     cur,
     *,
@@ -35,11 +38,16 @@ def review_voucher(
     account_overrides: Optional[dict] = None,
     remember: bool = False,
     reviewed_by=None,
+    choice: Optional[str] = None,
 ) -> dict:
     """定夺一笔待审:可选逐行改科目(金额不动·平衡不变)→ posted + 记忆。
 
+    choice(goods/service)= 商品/服务归类定夺(解 item_type_guess);纯重分类,WHT 沿用业务单
+    已算好的 wht_amount 不重算(见 docs/accounting/02)。记忆里带上 item_type,下次同类自动归类。
     缺映射的待审壳(无行)不能直接过 → 先去配映射再 unpost 重判(acct.mapping_missing)。
     """
+    if choice is not None and choice not in _VALID_CHOICE:
+        raise PosError("acct.unexpected", 422, detail="invalid_choice")
     voucher = jv.get_voucher(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, voucher_id=voucher_id
     )
@@ -75,6 +83,7 @@ def review_voucher(
             voucher=voucher,
             overridden_account=overridden_account,
             created_by=reviewed_by,
+            choice=choice,
         )
     return jv.get_voucher(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, voucher_id=voucher_id
@@ -82,7 +91,7 @@ def review_voucher(
 
 
 def _remember_from_voucher(
-    cur, *, tenant_id, workspace_client_id, voucher, overridden_account, created_by
+    cur, *, tenant_id, workspace_client_id, voucher, overridden_account, created_by, choice=None
 ) -> None:
     """凭证 source → scope_key(供应商优先)。无可记 scope 的来源(销项/POS)静默跳过。"""
     scope_keys = _scope_keys_for_source(
@@ -97,6 +106,8 @@ def _remember_from_voucher(
     decision = {"confirmed_rule": voucher["rule_key"]}
     if overridden_account:
         decision["account_id"] = str(overridden_account)
+    if choice:
+        decision["item_type"] = choice
     write_learned(
         cur,
         tenant_id=tenant_id,

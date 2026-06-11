@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """自动做账 schema 双跑入口(启动调一次 · 幂等 DDL · docs/accounting/01)。
 
-prod 无自动迁移钩子 → startup 经 ensure_accounting_schema() 幂等建 6 表。隔离真正生效
+prod 无自动迁移钩子 → startup 经 ensure_accounting_schema() 幂等建 9 表(做账 6 + 银行对账 3)。
+隔离真正生效
 靠应用层 WHERE tenant_id + workspace_client_id;RLS policy 是兜底(prod 现 BYPASSRLS)。
 防重复唯一索引为 partial(排除 void):撤销重做(unpost)后允许同 source 重新生成凭证。
 """
@@ -111,6 +112,57 @@ _TABLES = (
         created_at timestamptz NOT NULL DEFAULT now()
     )
     """,
+    # 银行对账(docs/accounting/bank-recon-mj/04 §2):账户登记 + 持续流水池 + 凭证模板。
+    # 解析复用 services/recon,存储独立新表(旧 bank_recon 三表零接触)。
+    """
+    CREATE TABLE IF NOT EXISTS acct_bank_accounts (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id uuid NOT NULL,
+        workspace_client_id bigint NOT NULL,
+        bank_code text NOT NULL,
+        account_label text,
+        account_last4 text,
+        coa_account_id uuid,
+        last_closing_balance numeric(14,2),
+        last_closing_date date,
+        is_active boolean NOT NULL DEFAULT TRUE,
+        created_at timestamptz NOT NULL DEFAULT now()
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS acct_bank_lines (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id uuid NOT NULL,
+        workspace_client_id bigint NOT NULL,
+        bank_account_id uuid NOT NULL
+            REFERENCES acct_bank_accounts (id) ON DELETE CASCADE,
+        line_date date NOT NULL,
+        amount numeric(14,2) NOT NULL,
+        direction text NOT NULL,
+        description text,
+        bank_ref text,
+        import_batch_id uuid,
+        source_file_sha256 text,
+        status text NOT NULL DEFAULT 'unmatched',
+        matched_voucher_id uuid,
+        match_payload jsonb,
+        matched_at timestamptz,
+        matched_by uuid,
+        created_at timestamptz NOT NULL DEFAULT now()
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS acct_voucher_templates (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id uuid NOT NULL,
+        workspace_client_id bigint NOT NULL,
+        name text NOT NULL,
+        lines jsonb NOT NULL DEFAULT '[]'::jsonb,
+        use_count int NOT NULL DEFAULT 0,
+        created_by uuid,
+        created_at timestamptz NOT NULL DEFAULT now()
+    )
+    """,
 )
 
 _INDEXES = (
@@ -128,6 +180,22 @@ _INDEXES = (
     "ON journal_lines (tenant_id, voucher_id)",
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_review_learned_scope "
     "ON review_learned (tenant_id, workspace_client_id, scope_key)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_bank_account "
+    "ON acct_bank_accounts (tenant_id, workspace_client_id, bank_code, "
+    "COALESCE(account_last4, ''))",
+    # 防同批重复行:NULL 描述/ref 在唯一索引里视为可区分 → COALESCE 兜底
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_bank_line_dedup "
+    "ON acct_bank_lines (bank_account_id, line_date, amount, "
+    "COALESCE(description, ''), COALESCE(bank_ref, ''))",
+    "CREATE INDEX IF NOT EXISTS ix_bank_lines_status "
+    "ON acct_bank_lines (tenant_id, workspace_client_id, status)",
+    "CREATE INDEX IF NOT EXISTS ix_bank_lines_date "
+    "ON acct_bank_lines (tenant_id, workspace_client_id, line_date)",
+    # 候选查询 NOT EXISTS(凭证是否已被流水关联)走此索引
+    "CREATE INDEX IF NOT EXISTS ix_bank_lines_matched_voucher "
+    "ON acct_bank_lines (tenant_id, workspace_client_id, matched_voucher_id)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_voucher_template_name "
+    "ON acct_voucher_templates (tenant_id, workspace_client_id, name)",
 )
 
 _RLS_TABLES = (
@@ -137,11 +205,14 @@ _RLS_TABLES = (
     "journal_lines",
     "accounting_settings",
     "review_learned",
+    "acct_bank_accounts",
+    "acct_bank_lines",
+    "acct_voucher_templates",
 )
 
 
 def ensure_accounting_schema() -> None:
-    """幂等建做账 6 表 + 索引 + RLS(startup 调)。"""
+    """幂等建做账 9 表(做账 6 + 银行对账 3)+ 索引 + RLS(startup 调)。"""
     from core import db
 
     with db.get_cursor(commit=True) as cur:

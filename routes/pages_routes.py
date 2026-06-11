@@ -177,7 +177,10 @@ async def invite_page(token: str):
 
 @router.get("/reset", response_class=HTMLResponse)
 async def reset_page():
-    return FileResponse("static/reset.html", headers=_NO_CACHE)
+    # 内联 HTML(非 static 文件)· 见 routes/reset_page.py 头注:webhook 不拾取新增 static 根文件
+    from routes.reset_page import RESET_PAGE_HTML
+
+    return HTMLResponse(RESET_PAGE_HTML, headers=_NO_CACHE)
 
 
 @router.get("/terms", response_class=HTMLResponse)

@@ -25,11 +25,18 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPT_WHITELIST = (
     "/static/dist/",
     "/static/i18n-data.js",  # 715KB 纯数据 · 故意独立 · 见 build-home-js.mjs 注释
+    "/static/console/console-i18n.js",  # console 纯翻译数据(window.CI18N)· 同 i18n-data 故意独立
     "/static/admin/",  # admin SPA 专属 JS · 超管页防抄需求低 · 故意留独立(同 admin.html 不 minify)
     "cdnjs.cloudflare.com",  # jsPDF
     "cloudflareinsights.com",  # CF beacon(部署注入)
 )
-SOURCE_HTML = ["home.html", "login.html", "static/admin/admin.html"]
+SOURCE_HTML = [
+    "home.html",
+    "login.html",
+    "static/admin/admin.html",
+    "static/console/console.html",
+    "static/console/invite.html",
+]
 
 
 def check_source_html(fails):
@@ -81,6 +88,23 @@ def check_manifest_complete(fails):
             if f"landing/{f.name}" not in js_manifest:
                 fails.append(
                     f"static/landing/{f.name}: 不在 build-home-js.mjs 的 landing files — 加进去"
+                )
+
+    # 管理控制台:CSS 全进打包清单;JS 逻辑全进打包清单,console-i18n.js 是纯数据故意独立(白名单)。
+    console = ROOT / "static" / "console"
+    if console.exists():
+        for f in console.glob("*.css"):
+            if f"console/{f.name}" not in css_manifest:
+                fails.append(
+                    f"static/console/{f.name}: 不在 build-home-css.mjs 的 CONSOLE_CSS — 加进去"
+                )
+        for f in console.glob("*.js"):
+            if f.name == "console-i18n.js":
+                continue
+            if f"console/{f.name}" not in js_manifest:
+                fails.append(
+                    f"static/console/{f.name}: 不在 build-home-js.mjs 的打包清单 — "
+                    f"新 console JS 逻辑要进 bundle(否则裸发源码 view-source 退化)"
                 )
 
 

@@ -27,6 +27,10 @@ const BUNDLES = [
             'landing/mascot-scene.js',
         ],
     },
+    // 管理控制台 SPA · 邀请接受公开页:plain-script 逻辑 minify 进 dist(view-source 只见外壳)。
+    // console-i18n.js 是纯翻译数据(window.CI18N · 同 home 的 i18n-data.js),保留独立 raw 在 HTML 先加载。
+    { out: 'static/dist/console.js', files: ['console/console.js'] },
+    { out: 'static/dist/invite.js', files: ['console/invite.js'] },
 ];
 
 for (const b of BUNDLES) {

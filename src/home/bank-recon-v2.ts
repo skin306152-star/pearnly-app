@@ -426,10 +426,11 @@ window._loadBankReconV2Panel = function (containerId) {
     init();
 };
 
-// Auto-init when pane becomes visible
+// 仅当落地路由就是对账页时即时 init;否则等导航到对账页由 loadReconcilePage→_bankReconV2Init 触发,
+// 避免首屏在别的页(如 dashboard)也白拉一次 recon/bank-v2/tasks 跨区往返。
 document.addEventListener('DOMContentLoaded', () => {
-    // Init immediately if pane is active
-    if ($('brv2-run-btn')) init();
+    const pane = document.getElementById('page-reconcile');
+    if (pane && pane.classList.contains('active') && $('brv2-run-btn')) init();
 });
 
 // Also init when reconcile page is navigated to

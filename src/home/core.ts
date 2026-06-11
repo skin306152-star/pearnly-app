@@ -4,6 +4,46 @@
 // 共享状态(currentLang/_userInfo/token/I18N)仍是 home.js 顶层 let/const · 经全局词法环境裸名解析。
 /* global I18N, token, currentLang */
 
+// 首屏并发去重(2026-06-11):启动期多个模块各自 fetch 同一只读 GET(erp/endpoints ×3、
+//   exceptions/stats ×2)在缓存填好前同时打到后端 · 跨区 DB 每条往返 ~69ms · 纯浪费。在
+//   fetch 边界合并"同一时刻在飞的相同 GET":后到者复用在飞 Promise 的克隆响应 · 请求落地即
+//   从表移除 → 只去并发重复 · 不做持久缓存 · 对调用方语义零变化。仅作用于 home 页 bundle。
+(function coalesceConcurrentGets() {
+    const native = window.fetch.bind(window);
+    if ((native as { __coalesced?: boolean }).__coalesced) return;
+    const inflight = new Map<string, Promise<Response>>();
+    const wrapped = function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+        const req = input instanceof Request ? input : null;
+        const method = (init?.method || req?.method || 'GET').toUpperCase();
+        const url =
+            typeof input === 'string'
+                ? input
+                : input instanceof URL
+                  ? input.href
+                  : (req as Request).url;
+        // 仅合并无副作用 GET · 同源 /api · 无 AbortSignal(防一方 abort 误伤共享方)
+        if (method !== 'GET' || init?.signal || req?.signal || url.indexOf('/api/') < 0) {
+            return native(input as RequestInfo, init);
+        }
+        const headers = new Headers((init?.headers || req?.headers) ?? undefined);
+        const key =
+            url +
+            '|' +
+            (headers.get('Authorization') || '') +
+            '|' +
+            (headers.get('X-Workspace-Client-Id') || '');
+        const pending = inflight.get(key);
+        if (pending) return pending.then((r) => r.clone());
+        const p = native(input as RequestInfo, init);
+        const done = () => inflight.delete(key);
+        p.then(done, done);
+        inflight.set(key, p);
+        return p.then((r) => r.clone());
+    } as typeof window.fetch;
+    (wrapped as { __coalesced?: boolean }).__coalesced = true;
+    window.fetch = wrapped;
+})();
+
 // 单次批量上限:v118.27.8.1.15 后 trial 30 / monthly 500 / yearly 800 / lifetime 1000
 function getMaxFiles() {
     // v111.2 · 优先用后端 /api/me/plan 返回的 limits.max_upload_files

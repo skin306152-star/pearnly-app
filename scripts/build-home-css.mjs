@@ -116,10 +116,14 @@ const LANDING_CSS = [
     'landing/landing-interactions.css',
 ];
 
+// 管理控制台 SPA + 邀请页:主题令牌在前,组件样式在后(固化原 DOM 顺序)。
+const CONSOLE_CSS = ['console/console-theme.css', 'console/console.css'];
+
 const BUNDLES = [
     { list: HOME_CSS, out: 'static/dist/home.css' },
     { list: ADMIN_CSS, out: 'static/dist/admin.css' },
     { list: LANDING_CSS, out: 'static/dist/landing.css' },
+    { list: CONSOLE_CSS, out: 'static/dist/console.css' },
 ];
 
 async function buildOne(list, out) {

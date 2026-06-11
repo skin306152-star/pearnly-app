@@ -21,6 +21,7 @@ import logging
 
 from services.playwright_bootstrap import ensure_playwright_installed
 from services.background_loops import email_ingest_loop, erp_retry_loop
+from services.startup_lock import startup_ddl_lock
 from services.users.columns import ensure_user_profile_columns
 
 logger = logging.getLogger("mr-pilot")
@@ -156,29 +157,8 @@ exit 1
 """
 
 
-async def run_startup() -> dict:
-    """app 启动序列 · 返回 {email_task, erp_retry_task} 供 run_shutdown cancel。"""
-    logger.info("🚀 Pearnly 启动中...")
-
-    # v118.35.0.28 P0 安全 self-check (体检 2026-05-21)
-    # /internal/deploy 现在 fail-closed · secret 缺失会拒服务 ·
-    # 启动时早期告警 · 不要等到 GitHub webhook 来才发现没配。
-    if not os.environ.get("GITHUB_WEBHOOK_SECRET"):
-        logger.critical(
-            "⚠️ GITHUB_WEBHOOK_SECRET missing — /internal/deploy will return 503 · "
-            "auto-deploy via GitHub webhook is DISABLED until env var is set"
-        )
-
-    # v0.15.1 · 不再自动创建 demo 账号 · 账号由 Supabase 管理
-    #   (REFACTOR-I2 2026-05-28:已删 db.ensure_demo_account 死码 + 此处下线注释)
-    # v0.8.1 · 启动时清理过期历史
-    try:
-        cleaned = db.cleanup_expired_history(free_days=7, plus_days=90, pro_days=365)
-        if cleaned > 0:
-            logger.info(f"🧹 已清理 {cleaned} 条过期历史")
-    except Exception as e:
-        logger.warning(f"启动清理过期历史失败(不影响运行): {e}")
-
+def _boot_schema_ddl() -> None:
+    """启动期全部建表/补列(幂等)· 调用方负责套 startup_ddl_lock 跨 worker 串行。"""
     # 各域建表/补列:全部幂等 · 逐个独立 try/except(一处失败不拦其余)· 与 alembic 双跑兜底
     # (prod 无 alembic 钩子)。erp adapter/status CHECK 白名单含 mrerp/skipped_dup —— 历史漏
     # migration 致 500,函数幂等,已含则跳过。
@@ -286,6 +266,35 @@ async def run_startup() -> dict:
     except Exception as e:
         logger.warning(f"启动 采购 schema 失败(等 alembic 0031-0033): {e}")
 
+
+async def run_startup() -> dict:
+    """app 启动序列 · 返回 {email_task, erp_retry_task} 供 run_shutdown cancel。"""
+    logger.info("🚀 Pearnly 启动中...")
+
+    # v118.35.0.28 P0 安全 self-check (体检 2026-05-21)
+    # /internal/deploy 现在 fail-closed · secret 缺失会拒服务 ·
+    # 启动时早期告警 · 不要等到 GitHub webhook 来才发现没配。
+    if not os.environ.get("GITHUB_WEBHOOK_SECRET"):
+        logger.critical(
+            "⚠️ GITHUB_WEBHOOK_SECRET missing — /internal/deploy will return 503 · "
+            "auto-deploy via GitHub webhook is DISABLED until env var is set"
+        )
+
+    # v0.15.1 · 不再自动创建 demo 账号 · 账号由 Supabase 管理
+    #   (REFACTOR-I2 2026-05-28:已删 db.ensure_demo_account 死码 + 此处下线注释)
+    # v0.8.1 · 启动时清理过期历史
+    try:
+        cleaned = db.cleanup_expired_history(free_days=7, plus_days=90, pro_days=365)
+        if cleaned > 0:
+            logger.info(f"🧹 已清理 {cleaned} 条过期历史")
+    except Exception as e:
+        logger.warning(f"启动清理过期历史失败(不影响运行): {e}")
+
+    # 2026-06-11 · 启动 DDL 跨 worker 串行(文件锁):4-worker 并发 ensure 撞 Postgres
+    # 死锁(ensure_erp_oauth_tables · cef351bf 回退),串行化后 workers=4 才安全。
+    with startup_ddl_lock():
+        _boot_schema_ddl()
+
     # v118.34.4 · MR.ERP test-connection cache flush
     # On every restart, drop any cached test-connection entries so users
     # don't see stale "stub" responses from before the v118.34.x dispatch
@@ -331,7 +340,8 @@ async def run_startup() -> dict:
 
     # v110.7 · 启动确保 users 表有欢迎向导用的 profile 字段(幂等 · 已有字段无影响)
     try:
-        ensure_user_profile_columns()
+        with startup_ddl_lock():
+            ensure_user_profile_columns()
     except Exception as e:
         logger.warning(f"启动 users profile 字段补齐失败: {e}")
 
@@ -381,13 +391,15 @@ async def run_startup() -> dict:
         try:
             from services.recon_jobs import store as _recon_store, worker as _recon_worker
 
-            _recon_store.ensure_table()
+            with startup_ddl_lock():
+                _recon_store.ensure_table()
             _recon_worker.start_embedded()
             # ADR-006 · 模板学习层映射表(启动自动建 · 失败自愈)
             try:
                 from services.importer import template_store as _tmpl_store
 
-                _tmpl_store.ensure_table()
+                with startup_ddl_lock():
+                    _tmpl_store.ensure_table()
             except Exception as _te:
                 logger.warning(f"[importer] ensure_table 失败(不影响主服务): {_te}")
         except Exception as e:

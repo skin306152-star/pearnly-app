@@ -41,18 +41,16 @@ def get_pool() -> SimpleConnectionPool:
         # v118.35.0.21 · maxconn 5 → 30 · 修 v0.20 部署后全站超时的真因
         # 老 maxconn=5 在 v0.20 加 credits 检查后(每个 OCR 多 3 次 DB 查询)
         # 5 个并发 OCR 就把连接池打满 · 后续请求阻塞 → 累积 → 全站超时
-        # 性能窗口曾试 30→15 配 workers 2→4,但 4 worker 并发启动撞 ensure_erp_oauth_tables
-        # 等无 advisory lock 的启动 DDL deadlock → 回退 workers=2,maxconn 复原 30(总 2×30=60
-        # ≤ Postgres max_connections,且保留团队为防 OCR 并发打满刻意留的余量)。
-        # workers=4 待先给各 ensure_* 加 advisory lock 串行化启动 DDL 后再议。
+        # 2026-06-11 · maxconn 30→15 配 workers 2→4(总 4×15=60 维持原预算)。
+        # 之前 4-worker 撞启动 DDL deadlock 已由 services/startup_lock 文件锁串行化根治。
         _pool = SimpleConnectionPool(
             minconn=2,
-            maxconn=30,
+            maxconn=15,
             dsn=url,
             connect_timeout=10,
             sslmode="require",
         )
-        logger.info("✅ PostgreSQL 连接池已建立(minconn=2 maxconn=30)")
+        logger.info("✅ PostgreSQL 连接池已建立(minconn=2 maxconn=15)")
     return _pool
 
 

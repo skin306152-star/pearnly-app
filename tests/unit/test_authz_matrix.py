@@ -10,7 +10,8 @@ from services.authz import registry
 
 ALL = registry.ALL_CODES
 CROSS = set(registry.CROSS_CODES)
-BUSINESS = ALL - CROSS
+FIELD = set(registry.FIELD_CODES)
+BUSINESS = ALL - CROSS - FIELD
 POS = set(registry.POS_CODES)
 
 
@@ -20,6 +21,9 @@ def _verb(code):
 
 def _expected(role, code):
     """02 矩阵逐行规则 → 单元格期望。"""
+    if code in FIELD:
+        # G4:成本/工资可见性预设全开,唯收银员(POS 令牌)无(它根本进不了报表)
+        return role != "cashier"
     if role == "owner":
         return True
     if role == "admin":

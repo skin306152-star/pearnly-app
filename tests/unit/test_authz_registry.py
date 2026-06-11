@@ -28,6 +28,7 @@ class RegistryShapeTests(unittest.TestCase):
             + registry.INV_CODES
             + registry.POS_CODES
             + registry.INTAKE_CODES
+            + registry.FIELD_CODES
         )
         self.assertEqual(len(groups), len(registry.ALL_CODES))
 

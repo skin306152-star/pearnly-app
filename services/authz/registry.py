@@ -106,6 +106,13 @@ INTAKE_CODES = (
     "intake.classify",
 )
 
+# 敏感字段可见性(G4 · 字段级遮蔽,非模块动作)。缺码 → 成本/工资列读侧返 null。
+# 不挂任何模块开关(横切),预设角色除收银员外按现状全开;自定义角色可关。
+FIELD_CODES = (
+    "field.cost.view",
+    "field.payroll.view",
+)
+
 ALL_CODES: frozenset[str] = frozenset(
     CROSS_CODES
     + SALES_CODES
@@ -118,6 +125,7 @@ ALL_CODES: frozenset[str] = frozenset(
     + INV_CODES
     + POS_CODES
     + INTAKE_CODES
+    + FIELD_CODES
 )
 
 # ── 码前缀 → tenant_modules 模块键(模块关 = 整组 403 module_disabled)。
@@ -139,6 +147,7 @@ _PREFIX_MODULE = {
     "ownership": None,
     "settings": None,
     "audit": None,
+    "field": None,
 }
 
 MODULE_OF: dict[str, str | None] = {
@@ -168,6 +177,9 @@ _VIEW_EXPORT = (
     "inv.view",
     "inv.report.view",
     "pos.report.view",
+    # 预设角色按现状可见成本/工资(G4:默认全开,自定义角色才关)
+    "field.cost.view",
+    "field.payroll.view",
 )
 
 _CLERK = (
@@ -197,6 +209,8 @@ _CLERK = (
     "inv.report.view",
     "intake.upload",
     "intake.classify",
+    "field.cost.view",
+    "field.payroll.view",
 )
 
 _ACCOUNTANT = _CLERK + (

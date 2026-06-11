@@ -34,11 +34,17 @@ def inventory_report(
     date_from: date,
     date_to: date,
     near_expiry_days: int = 30,
+    mask_cost: bool = False,
 ) -> dict:
+    movement = _movement(cur, tenant_id, workspace_client_id, date_from, date_to)
+    near_expiry = _near_expiry_summary(cur, tenant_id, workspace_client_id, near_expiry_days)
+    if mask_cost:
+        # value_at_risk = SUM(qty × 单位成本)= 成本派生列,无 field.cost.view 一律遮蔽(G4)
+        near_expiry["value_at_risk"] = None
     return {
         "period": {"from": date_from.isoformat(), "to": date_to.isoformat()},
-        "movement": _movement(cur, tenant_id, workspace_client_id, date_from, date_to),
-        "near_expiry": _near_expiry_summary(cur, tenant_id, workspace_client_id, near_expiry_days),
+        "movement": movement,
+        "near_expiry": near_expiry,
     }
 
 

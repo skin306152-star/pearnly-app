@@ -30,11 +30,13 @@ def stock_overview(
     workspace_client_id: int,
     filter_: str = "all",
     q: Optional[str] = None,
+    mask_cost: bool = False,
 ) -> dict:
     """返回 {"items": [...], "summary": {...}}(04 §4 GET /api/inventory/stock)。
 
     items:每个在售商品的总在库(跨批求和)+ 阈值 + 均价 + 状态 low/ok/out + 批次明细。
     filter_:low|out|all(在库总量筛选)。q:商品名/条码 ILIKE。
+    mask_cost=True(无 field.cost.view 码):均价/库存货值列返 None(G4 成本遮蔽)。
     """
     # 批次均价用【预聚合子查询】join(每商品一行),不直接 join inventory_batches——
     # 否则 stock×batches 笛卡尔积会把 SUM(qty_on_hand) 按批次数重复计(实测 2 批 → 翻倍)。
@@ -102,14 +104,14 @@ def stock_overview(
                 "base_unit": r["base_unit"],
                 "qty_on_hand": _f(qty),
                 "min_stock": _f(r["min_stock"]),
-                "avg_cost": _f(r["avg_cost"]),
+                "avg_cost": None if mask_cost else _f(r["avg_cost"]),
                 "status": status,
                 "batches": batches_by_product.get(str(r["product_id"]), []),
             }
         )
     summary = {
         "sku_count": sku_count,
-        "stock_value": _f(stock_value),
+        "stock_value": None if mask_cost else _f(stock_value),
         "low_count": low_count,
         "out_count": out_count,
     }

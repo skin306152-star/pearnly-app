@@ -31,6 +31,19 @@ def _seed_roles(cur) -> None:
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_roles_system_key "
         "ON roles(key) WHERE tenant_id IS NULL"
     )
+    # 自定义角色(G3)落位:display_name 人话名 / is_active 停用位 / version 乐观锁。
+    # custom 行 name 走 custom:<tenant>:<slug> 命名空间(全局唯一 · 撞不上系统 name),
+    # (tenant_id, key) 唯一保每租户 slug 不重 + 分配时按 (key,tenant) 单行命中。零迁移,回滚即删。
+    cur.execute("ALTER TABLE roles ADD COLUMN IF NOT EXISTS display_name TEXT")
+    cur.execute(
+        "ALTER TABLE roles ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE"
+    )
+    cur.execute("ALTER TABLE roles ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0")
+    cur.execute("ALTER TABLE roles ADD COLUMN IF NOT EXISTS created_by UUID")
+    cur.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_roles_tenant_key "
+        "ON roles(tenant_id, key) WHERE tenant_id IS NOT NULL"
+    )
     # owner 存 {"all": true} 短路;其余角色存码数组。name 列有 UNIQUE,系统角色 name=key
     # (老库已有 name='owner' 行 → ON CONFLICT 走 UPDATE 补 key/刷 JSONB)。
     for key in ("owner", "admin", "accountant", "clerk", "viewer", "cashier"):

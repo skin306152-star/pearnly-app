@@ -14,6 +14,7 @@ from fastapi import APIRouter, Query, Request
 
 from core import db
 from core.pos_api import assert_module_enabled, ok, require_workspace
+from services.authz import field_mask
 from services.authz.deps import require_perm_pos_tid
 from services.inventory import reports as report_svc
 
@@ -52,5 +53,6 @@ async def api_inventory_report(
             date_from=d_from,
             date_to=d_to,
             near_expiry_days=near_expiry_days,
+            mask_cost=not field_mask.cost_visible(request),
         )
     return ok(data)

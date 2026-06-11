@@ -153,6 +153,16 @@ def get_authz(request: Optional[Request], user: dict) -> Authz:
     return _cached_authz(request, user)
 
 
+def peek_authz(request: Optional[Request]) -> Optional[Authz]:
+    """读本请求已缓存的权限快照(require_perm 走过后必有);无 user 不重解。
+
+    字段遮蔽等读侧只需「已判定的这个人能不能看某字段」,不该再触发一次查库;超管短路
+    不落快照(返 None),由调用方按超管全可见兜底。"""
+    state = getattr(request, "state", None) if request is not None else None
+    cached = getattr(state, _STATE_KEY, None) if state is not None else None
+    return cached[1] if cached is not None else None
+
+
 def is_owner_role(request: Optional[Request], user: dict) -> bool:
     """owner 视角判定(计费等 owner 专属读侧)。批5:invited_by IS NULL 语义退役,
     改读 membership 角色;无 tenant 时走存量映射兜底(与 resolver 同口径)。"""

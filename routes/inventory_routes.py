@@ -20,6 +20,7 @@ from core.pos_api import (
     ok,
     require_workspace,
 )
+from services.authz import field_mask
 from services.authz.deps import check_request_scope, require_perm_pos_tid
 from services.inventory import ledger, queries, store
 
@@ -140,7 +141,12 @@ async def api_stock(
         request,
         workspace_client_id,
         lambda cur, tid: queries.stock_overview(
-            cur, tenant_id=tid, workspace_client_id=workspace_client_id, filter_=filter, q=q
+            cur,
+            tenant_id=tid,
+            workspace_client_id=workspace_client_id,
+            filter_=filter,
+            q=q,
+            mask_cost=not field_mask.cost_visible(request),
         ),
     )
 

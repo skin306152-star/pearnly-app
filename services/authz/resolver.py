@@ -133,6 +133,19 @@ def _system_role_id(cur, role_key: str) -> Optional[str]:
     return str(row["id"]) if row else None
 
 
+def _assignable_role_id(cur, tenant_id: str, role_key: str) -> Optional[str]:
+    """分配目标角色 id:custom:<slug> 查本租户 active 自定义行,其余查系统预设行。"""
+    if role_key.startswith("custom:"):
+        cur.execute(
+            "SELECT id FROM roles WHERE key = %s AND tenant_id = %s "
+            "AND COALESCE(is_active, TRUE)",
+            (role_key, str(tenant_id)),
+        )
+        row = cur.fetchone()
+        return str(row["id"]) if row else None
+    return _system_role_id(cur, role_key)
+
+
 def create_membership(
     cur,
     *,
@@ -171,8 +184,9 @@ def set_membership_role(
     role_key: str,
     granted_by: Optional[str] = None,
 ) -> bool:
-    """改角色(批3 接口/转移流用)。membership 必须已存在且属本租户。"""
-    role_id = _system_role_id(cur, role_key)
+    """改角色(批3 接口/转移流用)。membership 必须已存在且属本租户。
+    role_key 可为系统预设或 custom:<slug>(G3 自定义角色 · 后者按本租户解析)。"""
+    role_id = _assignable_role_id(cur, str(tenant_id), role_key)
     if not role_id:
         return False
     cur.execute(

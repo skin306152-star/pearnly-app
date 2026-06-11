@@ -98,9 +98,6 @@ from routes.accounting_routes import (
 from routes.accounting_books_routes import (
     router as accounting_books_router,
 )  # 自动做账 出账本/报税材料/月末结账 · 2026-06-10
-from routes.accounting_bank_routes import (
-    router as accounting_bank_router,
-)  # 银行对账 账户/导入/匹配/收割 · 2026-06-11
 from routes.tax_routes import (
     router as tax_router,
 )  # 自动报税 税表/体检/提交/导出/设置 · 2026-06-10
@@ -260,7 +257,6 @@ app.include_router(purchase_intake_router)  # 商户采购 智能入口 intake/e
 app.include_router(purchase_config_router)  # 商户采购 配置后台 供应商/科目/设置(2026-06-08)
 app.include_router(accounting_router)  # 自动做账 凭证/逐笔审/科目/映射/设置(2026-06-10)
 app.include_router(accounting_books_router)  # 自动做账 出账本/报税/结账(2026-06-10)
-app.include_router(accounting_bank_router)  # 银行对账 账户/导入/匹配/收割(2026-06-11)
 app.include_router(tax_router)  # 自动报税 PP30/PND 税表/体检/提交/导出(2026-06-10)
 app.include_router(sales_router)  # 销项单据/开票 6 路由(PO-4 · 2026-06-06)
 app.include_router(sales_seller_router)  # 销项开票方资料 3 路由(PO-6 · 2026-06-06)

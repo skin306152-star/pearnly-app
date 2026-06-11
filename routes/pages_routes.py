@@ -31,6 +31,14 @@ from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 
 router = APIRouter()
 
+# 页面外壳统一 no-cache(防浏览器缓存旧壳 → 内部 ?v= bump 失效拿不到新版)。
+# 所有返回 HTML 页面入口的路由共用这一份,别再内联复制。
+_NO_CACHE = {
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
 
 # ============================================================
 # Health & Contact(公开)
@@ -98,39 +106,18 @@ async def v1_contact():
 @router.get("/", response_class=HTMLResponse)
 async def root():
     # v118.44.0.3 · login.html 也加 no-cache · 防浏览器 cache 老 login.html 让超管跳转逻辑失效
-    return FileResponse(
-        "static/dist/login.html",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-        },
-    )
+    return FileResponse("static/dist/login.html", headers=_NO_CACHE)
 
 
 @router.get("/login", response_class=HTMLResponse)
 async def login_page():
-    return FileResponse(
-        "static/dist/login.html",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-        },
-    )
+    return FileResponse("static/dist/login.html", headers=_NO_CACHE)
 
 
 @router.get("/home", response_class=HTMLResponse)
 async def home():
     # v118.27.5.4 · 强制 no-cache · 防 CDN/浏览器误缓存导致用户拿不到新版
-    return FileResponse(
-        "static/dist/home.html",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-        },
-    )
+    return FileResponse("static/dist/home.html", headers=_NO_CACHE)
 
 
 # v118.44.0.1 · NAV-IA Phase 8 hotfix · 老 /admin 永久重定向到 /admin/cost
@@ -149,14 +136,7 @@ async def admin_page():
 # 老的 /admin URL(L4209)仍返回 home.html · 作 PEARNLY_ADMIN_MODE 老逻辑兜底
 @router.get("/admin/{rest:path}", response_class=HTMLResponse)
 async def admin_layout_page(rest: str):
-    return FileResponse(
-        "static/admin/admin.html",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-        },
-    )
+    return FileResponse("static/admin/admin.html", headers=_NO_CACHE)
 
 
 # POS 收银前台 SPA(PO-B3 · 2026-06-07)· 独立 plain-script SPA(参考 admin layout)
@@ -164,14 +144,7 @@ async def admin_layout_page(rest: str):
 # (PIN 登录 + 收银员 token),非收银员偷进由 SPA boot 弹回——复用 admin SPA 的前端鉴权模式。
 # 登录分流(role=cashier → /pos)见 routes/oauth_routes.py:_login_redirect_path。
 def _pos_page() -> FileResponse:
-    return FileResponse(
-        "static/pos/pos.html",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-        },
-    )
+    return FileResponse("static/pos/pos.html", headers=_NO_CACHE)
 
 
 @router.get("/pos", response_class=HTMLResponse)
@@ -182,14 +155,6 @@ async def pos_page():
 @router.get("/pos/{rest:path}", response_class=HTMLResponse)
 async def pos_layout_page(rest: str):
     return _pos_page()
-
-
-# SPA 外壳统一 no-cache(防浏览器缓存旧壳拿不到新版)
-_NO_CACHE = {
-    "Cache-Control": "no-cache, no-store, must-revalidate",
-    "Pragma": "no-cache",
-    "Expires": "0",
-}
 
 
 # 管理控制台 SPA(权限批3 · 2026-06-10)· 照 /pos 套路:独立 static/console 自含,
@@ -212,14 +177,14 @@ async def invite_page(token: str):
 
 @router.get("/reset", response_class=HTMLResponse)
 async def reset_page():
-    return FileResponse("static/reset.html")
+    return FileResponse("static/reset.html", headers=_NO_CACHE)
 
 
 @router.get("/terms", response_class=HTMLResponse)
 async def terms_page():
-    return FileResponse("static/terms.html")
+    return FileResponse("static/terms.html", headers=_NO_CACHE)
 
 
 @router.get("/privacy", response_class=HTMLResponse)
 async def privacy_page():
-    return FileResponse("static/privacy.html")
+    return FileResponse("static/privacy.html", headers=_NO_CACHE)

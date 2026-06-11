@@ -6,7 +6,11 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-11 · **🏦 银行对账后端上线 + 五阶段流程定稿 + SG迁移runbook · ⚠️workers 仍=2**(主控窗口)· 前序见下）
+## 🎯 状态卡（2026-06-11 · **🔐 权限完善前端窗口③全上线 + 🏦 银行对账后端 + 五阶段流程 · ⚠️workers=2**(多窗口)· 前序见下）
+
+- **🆕 本窗口(2026-06-11)· 🔐 权限完善前端【窗口③ · 已全上线】**(`2d0fc410` console 四件 + `a8bc2218` 库存成本遮蔽 · prod 全守门绿):
+  - **角色 tab / 三步向导 / 日志筛选导出 / 席位满 + 库存成本列遮蔽显示**。照桌面原型 `Pearnly_权限完善_UI预览/01-交互原型.html` 行为/文案/状态 100% 照搬;工程形态走 console 既有 can()/api + console-i18n 四语(273 键×4 齐)。角色 tab=sidebar 第3视图(成员/角色/安全日志);向导 62 码按域勾选(提权码 billing.manage/ownership.transfer 禁选 · 两敏感开关 cost/payroll · 乐观锁 version→409);日志游标分页「加载更多」+ CSV 导出(同筛选);席位满条对位 G1 422;角色分配统一 `/role-assign`(预设+custom 同入口);`fmtCost(null)→「--」`(后端遮蔽目前仅库存读路径)。
+  - **坑**:console 已被 `b64b94cd` 打包收编进 dist → 改 `static/console/{console.js,console.css}` 必跑 `node scripts/build-home-js.mjs && build-home-css.mjs` 重建 `dist/console.*` 再提交;邀请只收 4 预设(后端 role_key max_length=20 拒 custom);向导预设码集前端镜像 registry(无目录端点·后端再 sanitize)。真机自检 27/27(`scripts/_console3_verify.cjs`·真 bundle+stub 真实契约·浅暗截图 `tests/visual/_shot/console3-*`·0 pageerror)+ fmtCost 6/6。?v= console.css/js 5→6·console-i18n 2→3·main.js 748→749。后端见权限①②;详见记忆 [[permissions-window3-frontend-shipped]]。
 
 - **🆕 本窗口(2026-06-11)· 🏦 银行对账 + 手工凭证后端【L 档首例·已上线】**(`85e9b35e`·**银行对账 API 已上线·前端窗口可接**):
   - **新增面收敛**:schema 扩 3 表(`acct_bank_accounts/lines/voucher_templates`·双隔离+RLS+`match_payload` 撤销还原)+ 4 薄层(`services/accounting/{bank_recon,bank_candidates,bank_match,templates}.py`)+ 独立 router `routes/accounting_bank_routes.py` 11 端点(`/api/accounting/bank/*`·复用 acct 六码不新增·view/review/approve/settings.manage)。复用解析(services/recon)/评分(bank_recon_scoring)/过账(vouchers.insert_voucher)/学习(review.write_learned)**零重写**;旧 bank_recon 三表零接触。

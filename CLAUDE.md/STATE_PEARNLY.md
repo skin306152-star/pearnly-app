@@ -6,7 +6,11 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-11 · **🧪 真账号报税交叉核 E2E 落档**(本窗口·`d3945f04`)· 前序见下）
+## 🎯 状态卡（2026-06-11 · **⚡ workers=4 上线 + 五阶段流程定稿 + SG迁移runbook**(主控窗口)· 前序见下）
+
+- **🆕 本窗口(2026-06-11 · 主控)· ⚡ workers 2→4 已上线 prod**(`eccc1727`):启动 DDL 文件锁串行化(`services/startup_lock.py` flock·worker 同机故不用 advisory lock=Supabase 事务池下会话语义不可靠;startup.py DDL 段 verbatim 抽 `_boot_schema_ddl` 入锁)+ maxconn 30→15(4×15=60 维持原预算)→ unit 改 `--workers 4` 重启实测:**4 worker DDL 串行证据 03:00:13/40/01:07/35 各隔27s·零 deadlock 零 ERROR·prod 200·内存 376MB/1.9G 健康**。3197 单测绿+flock 多进程互斥真测(CI Linux 跑)+接线契约测试防回退。回滚=unit 改回 2 即可。
+- **🆕 本窗口 · 📐 功能开发五阶段流程定稿**(`20ebe1b8`·治"聊得美好做出来小作坊"):`docs/FEATURE_PROCESS.md`(L/S 分级·五件套未经 Zihao 确认禁编码·存量功能体检排队制)。**首例五件套已产出待 Zihao 拍板**:`docs/accounting/bank-recon-mj/00-05`(银行对账+手工凭证·竞品 5 家实查带来源·复用清单硬约束·施工文案=00-KICKOFF.md)+ 桌面稿 `Pearnly_银行对账+手工凭证_UI预览/`。
+- **🆕 本窗口 · 🇸🇬 新加坡迁移 runbook 落档**(`d9c61f1a`·docs/perf/01):哨兵 104 条全 vision=403 零异常;**24h 门槛=06-11 17:26 UTC≈泰国 06-12 00:26**;Cloudflare 橙云→切换=改源站 IP 秒级;要搬数据仅 .env+storage+var+backups;收尾步含 .env 泄漏密钥轮换。等门槛+Zihao 拍机器规格(建议 2c4G)与切换时间。
 
 - **🆕 本窗口(2026-06-11)· ⚡ 首屏 SQL 往返削减(鉴权+套账短 TTL 缓存)**(`810bdda7`·后端 only·授权自做自检):
   - 接性能诊断结论(实测无 N+1·瓶颈=22 请求 × 跨区 69ms × 2-worker 串行)。两处进程级 TTL 缓存:`find_user_by_id_cached`(8s·仅鉴权热路径·返回副本·jti 不匹配强制 fresh 重取防误拒·create_access_token evict)+ `default_workspace_id` 结果缓存(60s·只缓存非 None)。隔离 WHERE 一字未改。

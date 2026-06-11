@@ -8,6 +8,10 @@
 
 ## 🎯 状态卡（2026-06-11 · **🔐 权限完善前端窗口③全上线 + 🏦 银行对账后端 + 五阶段流程 · ⚠️workers=2**(多窗口)· 前序见下）
 
+- **🆕 本窗口(2026-06-11)· 🏦 银行对账 + 手工凭证前端两屏【已上线 · 做账模块全闭环】**(`fad461c8` · ?v=11850750 · prod 真机验渲染2/2+导航+0错):
+  - 交互 100% 照搬 `Pearnly_银行对账+手工凭证_UI预览/03-交互原型.html` · 真 API /api/accounting/bank/*。`acct-bank.ts`(三余额带+差额门控/账户·期间选择器/高置信+待人工+已对账+已排除四区/逐行候选建议阈值85对齐harvest/确认·全部确认·组合·改科目·新建交易·排除还原·撤销·导入sha256查重/空·完成·离线·模块未开通·无权限·未选套账门态)+ `acct-bank-modals.ts`(弹窗+工具栏+helper)+ `acct-manual.ts`(借贷表/配平门控/全键盘Enter·Alt=·Ctrl+S/自动补平/存草稿·过账二确·红冲·复制·模板CRUD/已结期lockbar)+ 逐笔审 `acct-review.ts` choice(服务/商品)控件。导航做账组「银行对账」排出账本前 · 手工凭证=做账主屏按钮 · CSS→home-46(scoped .ab/.mjx·bundle)· i18n acct-bank-*/acct-mj-*×4 · 视觉照搬闸登记两屏。
+  - **★修真 bug**:金额输入 blur→change 重渲 balbar,在 mousedown/mouseup 间替换「存草稿/过账」按钮 → 真用户填完金额点保存丢点击。金额改走 input 不接 change。
+  - **验**:真后端 e2e_3 前端流程 E2E **7/7**(一次性造数→新建交易入账→差额归零→手工存草稿)·零残留;13 闸全绿(typecheck/build/i18n/ai_smell/file_size<500/uiD1D2/asset/ui_lint棘轮/eslint/视觉照搬闸/ratchet)。详见记忆 [[bank-recon-mj-frontend-shipped]]。
 - **🆕 本窗口(2026-06-11)· 🔐 权限完善前端【窗口③ · 已全上线】**(`2d0fc410` console 四件 + `a8bc2218` 库存成本遮蔽 · prod 全守门绿):
   - **角色 tab / 三步向导 / 日志筛选导出 / 席位满 + 库存成本列遮蔽显示**。照桌面原型 `Pearnly_权限完善_UI预览/01-交互原型.html` 行为/文案/状态 100% 照搬;工程形态走 console 既有 can()/api + console-i18n 四语(273 键×4 齐)。角色 tab=sidebar 第3视图(成员/角色/安全日志);向导 62 码按域勾选(提权码 billing.manage/ownership.transfer 禁选 · 两敏感开关 cost/payroll · 乐观锁 version→409);日志游标分页「加载更多」+ CSV 导出(同筛选);席位满条对位 G1 422;角色分配统一 `/role-assign`(预设+custom 同入口);`fmtCost(null)→「--」`(后端遮蔽目前仅库存读路径)。
   - **坑**:console 已被 `b64b94cd` 打包收编进 dist → 改 `static/console/{console.js,console.css}` 必跑 `node scripts/build-home-js.mjs && build-home-css.mjs` 重建 `dist/console.*` 再提交;邀请只收 4 预设(后端 role_key max_length=20 拒 custom);向导预设码集前端镜像 registry(无目录端点·后端再 sanitize)。真机自检 27/27(`scripts/_console3_verify.cjs`·真 bundle+stub 真实契约·浅暗截图 `tests/visual/_shot/console3-*`·0 pageerror)+ fmtCost 6/6。?v= console.css/js 5→6·console-i18n 2→3·main.js 748→749。后端见权限①②;详见记忆 [[permissions-window3-frontend-shipped]]。

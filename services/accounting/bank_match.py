@@ -14,7 +14,6 @@ from decimal import Decimal
 
 from core.pos_api import PosError
 from services.accounting import bank_candidates, bank_recon
-from services.accounting import settings as acct_settings
 from services.accounting import store as acct_store
 from services.accounting import vouchers as jv
 from services.accounting import posting, review
@@ -29,11 +28,21 @@ def _dec(v) -> Decimal:
 
 
 def _assert_open(cur, *, tenant_id, workspace_client_id, line_date) -> None:
-    settings = acct_settings.get_settings(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
-    )
-    if acct_settings.is_period_closed(settings, line_date.strftime("%Y-%m")):
-        raise PosError("acct.period_closed", 409)
+    """流水日期落已结期间 → acct.period_closed(复用 posting 的期间断言)。"""
+    posting._assert_period_open(cur, tenant_id, workspace_client_id, line_date.strftime("%Y-%m"))
+
+
+def _two_line_entry(bank_coa, counter, amount, *, bank_debit, memo_bank, memo_counter) -> list:
+    """银行侧 + 对方科目两行平衡分录。bank_debit=收款(借bank贷对方)否则付款(借对方贷bank)。"""
+    if bank_debit:
+        return [
+            {"account_id": bank_coa, "dr_cr": "debit", "amount": amount, "memo": memo_bank},
+            {"account_id": counter, "dr_cr": "credit", "amount": amount, "memo": memo_counter},
+        ]
+    return [
+        {"account_id": counter, "dr_cr": "debit", "amount": amount, "memo": memo_counter},
+        {"account_id": bank_coa, "dr_cr": "credit", "amount": amount, "memo": memo_bank},
+    ]
 
 
 def _bank_coa(cur, *, tenant_id, workspace_client_id, line, mappings) -> str:
@@ -219,16 +228,14 @@ def _match_combo(cur, *, tenant_id, workspace_client_id, line, doc_ids, created_
         raise PosError("acct.mapping_missing", 422, detail="ar" if income else "ap")
     amount = _dec(line["amount"])
     if income:
-        entries = [
-            {"account_id": bank_coa, "dr_cr": "debit", "amount": amount, "memo": "银行收款"},
-            {"account_id": counter, "dr_cr": "credit", "amount": amount, "memo": "冲应收"},
-        ]
+        entries = _two_line_entry(
+            bank_coa, counter, amount, bank_debit=True, memo_bank="银行收款", memo_counter="冲应收"
+        )
         desc = "银行收款冲应收"
     else:
-        entries = [
-            {"account_id": counter, "dr_cr": "debit", "amount": amount, "memo": "冲应付"},
-            {"account_id": bank_coa, "dr_cr": "credit", "amount": amount, "memo": "银行付款"},
-        ]
+        entries = _two_line_entry(
+            bank_coa, counter, amount, bank_debit=False, memo_bank="银行付款", memo_counter="冲应付"
+        )
         desc = "银行付款冲应付"
     voucher = _insert_bank_voucher(
         cur,
@@ -283,25 +290,23 @@ def _match_new_tx(cur, *, tenant_id, workspace_client_id, line, new_tx, created_
     # 银行侧借贷只看流水方向:IN→借bank(收) OUT→贷bank(付);income/expense/transfer 同此
     bank_debit = line["direction"] == "in"
     if bank_debit:
-        entries = [
-            {
-                "account_id": bank_coa,
-                "dr_cr": "debit",
-                "amount": amount,
-                "memo": memo or "银行收入",
-            },
-            {"account_id": account_id, "dr_cr": "credit", "amount": amount, "memo": memo},
-        ]
+        entries = _two_line_entry(
+            bank_coa,
+            account_id,
+            amount,
+            bank_debit=True,
+            memo_bank=memo or "银行收入",
+            memo_counter=memo,
+        )
     else:
-        entries = [
-            {
-                "account_id": account_id,
-                "dr_cr": "debit",
-                "amount": amount,
-                "memo": memo or "银行支出",
-            },
-            {"account_id": bank_coa, "dr_cr": "credit", "amount": amount, "memo": memo},
-        ]
+        entries = _two_line_entry(
+            bank_coa,
+            account_id,
+            amount,
+            bank_debit=False,
+            memo_bank=memo,
+            memo_counter=memo or "银行支出",
+        )
     desc = memo or ("银行收入" if bank_debit else "银行支出")
     voucher = _insert_bank_voucher(
         cur,

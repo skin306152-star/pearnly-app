@@ -8,6 +8,7 @@ import {
     activeWsId,
     localizedName,
     fmtMoney,
+    fmtCost,
     fmtQty,
     invErrMsg,
     NEAR_EXPIRY_DAYS,
@@ -47,7 +48,7 @@ function rowHtml(it: InvItem): string {
         <td class="tnum">${escapeHtml(it.barcode || '')}</td>
         <td>${escapeHtml(it.base_unit || '')}</td>
         <td class="num qty${qtyBad}">${fmtQty(it.qty_on_hand)}</td>
-        <td class="num">฿${fmtMoney(it.avg_cost)}</td>
+        <td class="num">${fmtCost(it.avg_cost)}</td>
         <td>${statusBadge(it)}</td>
     </tr>`;
 }
@@ -77,7 +78,7 @@ function bodyHtml(): string {
     const s = resp ? resp.summary : { sku_count: 0, stock_value: '0', low_count: 0, out_count: 0 };
     return `<div class="stats">
         <div class="stat"><div class="l">${escapeHtml(t('inv-stat-sku'))}</div><div class="v tnum">${s.sku_count}</div></div>
-        <div class="stat"><div class="l">${escapeHtml(t('inv-stat-value'))}</div><div class="v tnum">฿${fmtMoney(s.stock_value)}</div></div>
+        <div class="stat"><div class="l">${escapeHtml(t('inv-stat-value'))}</div><div class="v tnum">${fmtCost(s.stock_value)}</div></div>
         <div class="stat"><div class="l">${escapeHtml(t('inv-stat-low'))}</div><div class="v warn tnum">${s.low_count}</div></div>
         <div class="stat"><div class="l">${escapeHtml(t('inv-stat-out'))}</div><div class="v bad tnum">${s.out_count}</div></div>
     </div>
@@ -144,7 +145,7 @@ function exportCsv() {
         it.barcode || '',
         it.base_unit || '',
         fmtQty(it.qty_on_hand),
-        fmtMoney(it.avg_cost),
+        it.avg_cost == null ? '--' : fmtMoney(it.avg_cost),
         t('inv-st-' + it.status),
     ]);
     const esc = (v: string) => '"' + String(v).replace(/"/g, '""') + '"';

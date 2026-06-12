@@ -241,7 +241,7 @@ def build_excel(
     _build_sheet1(wb, invoices, L)
     _build_sheet2(wb, report_rows, period_year, period_month, L)
     n_total, n_ok, n_diff, diff_amount_total, task_rows = _build_sheet3(
-        wb, invoices, report_rows, client_name, period_year, period_month, L
+        wb, invoices, report_rows, client_name, period_year, period_month, L, lang
     )
     _build_sheet4(wb, lang, L)
     bio = io.BytesIO()

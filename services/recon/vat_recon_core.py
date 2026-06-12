@@ -80,7 +80,9 @@ def _get_rep_total(row: Dict) -> float:
         return 0.0
 
 
-def _build_recon_pairs(invoices: List[Dict], report_rows: List[Dict]) -> Dict[str, Any]:
+def _build_recon_pairs(
+    invoices: List[Dict], report_rows: List[Dict], lang: str = "th"
+) -> Dict[str, Any]:
     """v118.32.4.9.6 · 一对一配对引擎(Bug 2/3/4/5)
     多轮匹配 · 优先级从高到低:
       1) 发票号 normalize 一致 → matched
@@ -91,6 +93,7 @@ def _build_recon_pairs(invoices: List[Dict], report_rows: List[Dict]) -> Dict[st
       剩余:invoice_orphan / report_orphan
     返回: {pairs:[{inv_idx, rep_idx, kind, note}], unmatched_inv:[idx], unmatched_rep:[idx]}
     """
+    lab = diff_labels(lang)  # 配对备注本地化(散客匹配 / 税号疑似 · 跟用户语言)
     n_inv = len(invoices)
     n_rep = len(report_rows)
     used_inv: set = set()
@@ -167,7 +170,12 @@ def _build_recon_pairs(invoices: List[Dict], report_rows: List[Dict]) -> Dict[st
                 used_inv.add(ii)
                 used_rep.add(ri)
                 pairs.append(
-                    {"inv_idx": ii, "rep_idx": ri, "kind": "matched_cash", "note": "散客三重匹配"}
+                    {
+                        "inv_idx": ii,
+                        "rep_idx": ri,
+                        "kind": "matched_cash",
+                        "note": lab["cash_match"],
+                    }
                 )
                 break
 
@@ -204,7 +212,7 @@ def _build_recon_pairs(invoices: List[Dict], report_rows: List[Dict]) -> Dict[st
                     "inv_idx": ii,
                     "rep_idx": ri,
                     "kind": "fuzzy",
-                    "note": f"税号差 {d} 位 · 请人工确认",
+                    "note": lab["tax_fuzzy"].format(d=d),
                 }
             )
 
@@ -240,7 +248,7 @@ def _build_recon_pairs(invoices: List[Dict], report_rows: List[Dict]) -> Dict[st
                         "inv_idx": ii,
                         "rep_idx": ri,
                         "kind": "ocr_missing",
-                        "note": f"OCR 漏抽税号 · 实际应为 {rep_tax}",
+                        "note": lab["ocr_missing_tax"].format(tax=rep_tax),
                     }
                 )
                 break
@@ -256,22 +264,101 @@ def _build_recon_pairs(invoices: List[Dict], report_rows: List[Dict]) -> Dict[st
         # 双方都无税号 · 实为散客匹配
         if not inv_tax and not rep_tax:
             p["kind"] = "matched_cash"
-            p["note"] = "散客匹配"
+            p["note"] = lab["cash_match"]
             continue
         # 发票无税号 但 报告有 → OCR 漏抽(Bug 5)
         if not inv_tax and rep_tax:
             p["kind"] = "ocr_missing"
-            p["note"] = f"OCR 漏抽税号 · 实际应为 {rep_tax}"
+            p["note"] = lab["ocr_missing_tax"].format(tax=rep_tax)
 
     unmatched_inv = [i for i in range(n_inv) if i not in used_inv]
     unmatched_rep = [i for i in range(n_rep) if i not in used_rep]
     return {"pairs": pairs, "unmatched_inv": unmatched_inv, "unmatched_rep": unmatched_rep}
 
 
-def _diff_dims(inv: Dict, rep: Dict) -> Dict[str, str]:
+# 逐行差异文案 4 语标签(导出 Excel 跟用户语言走 · 泰语报告别冒中文)。
+_DIFF_LABELS = {
+    "th": {
+        "diff": "ต่าง",
+        "days": "วัน",
+        "date_one_missing": "วันที่ขาดด้านหนึ่ง",
+        "inv_empty": "(ใบกำกับว่าง)",
+        "rep_empty": "(รายงานว่าง)",
+        "inv": "ใบกำกับ",
+        "rep": "รายงาน",
+        "amt_pre_diff": "ต่างก่อนVAT",
+        "amt_vat_diff": "ต่างVAT",
+        "amt_pre_ok": "ก่อนVATตรง",
+        "amt_vat_ok": "VATตรง",
+        "ocr_incomplete": "โปรดตรวจสอบกับ PDF ต้นฉบับ",
+        "cash_match": "จับคู่ลูกค้าทั่วไป 3 จุด",
+        "tax_fuzzy": "เลขภาษีต่าง {d} หลัก · โปรดตรวจ",
+        "ocr_missing_tax": "เลขภาษีไม่ครบ · ที่ถูกคือ {tax}",
+    },
+    "en": {
+        "diff": "Diff",
+        "days": "d",
+        "date_one_missing": "Date missing on one side",
+        "inv_empty": "(invoice empty)",
+        "rep_empty": "(report empty)",
+        "inv": "inv",
+        "rep": "report",
+        "amt_pre_diff": "Pre-VAT diff",
+        "amt_vat_diff": "VAT diff",
+        "amt_pre_ok": "Pre-VAT ok",
+        "amt_vat_ok": "VAT ok",
+        "ocr_incomplete": "Please verify against the source PDF",
+        "cash_match": "Cash customer triple match",
+        "tax_fuzzy": "Tax ID differs {d} digit(s) · please verify",
+        "ocr_missing_tax": "Tax ID missing · should be {tax}",
+    },
+    "zh": {
+        "diff": "差",
+        "days": "天",
+        "date_one_missing": "日期一边缺",
+        "inv_empty": "(发票空)",
+        "rep_empty": "(报告空)",
+        "inv": "发",
+        "rep": "报",
+        "amt_pre_diff": "净额差",
+        "amt_vat_diff": "VAT 差",
+        "amt_pre_ok": "净额一致",
+        "amt_vat_ok": "VAT 一致",
+        "ocr_incomplete": "建议核对原 PDF 确认完整",
+        "cash_match": "散客三重匹配",
+        "tax_fuzzy": "税号差 {d} 位 · 请人工确认",
+        "ocr_missing_tax": "税号缺失 · 应为 {tax}",
+    },
+    "ja": {
+        "diff": "差",
+        "days": "日",
+        "date_one_missing": "日付が片方欠落",
+        "inv_empty": "(請求書空)",
+        "rep_empty": "(報告書空)",
+        "inv": "請求書",
+        "rep": "報告",
+        "amt_pre_diff": "税抜差",
+        "amt_vat_diff": "VAT差",
+        "amt_pre_ok": "税抜一致",
+        "amt_vat_ok": "VAT一致",
+        "ocr_incomplete": "元PDFとご照合ください",
+        "cash_match": "一般客3点照合",
+        "tax_fuzzy": "税番号 {d} 桁差 · 要確認",
+        "ocr_missing_tax": "税番号なし · 正しくは {tax}",
+    },
+}
+
+
+def diff_labels(lang: str) -> Dict[str, str]:
+    """取逐行差异/金额备注的本地化标签(未知语言回落 th)。"""
+    return _DIFF_LABELS.get(lang or "th", _DIFF_LABELS["th"])
+
+
+def _diff_dims(inv: Dict, rep: Dict, lang: str = "th") -> Dict[str, str]:
     """v118.32.4.9.6.1 · 6 维度差异检测(发票号 / 日期 / 期间 / 税号 / 分公司 / 客户名)
     tax_id 值以 '~' 开头表示 fuzzy(编辑距离 ≤2) · 不含 '~' 为硬差异
-    返回 dict · 值为空 = 无差异 · 非空 = 差异文案"""
+    返回 dict · 值为空 = 无差异 · 非空 = 差异文案(随 lang 本地化)"""
+    lab = diff_labels(lang)
     out = {"inv_no": "", "date": "", "period": "", "tax_id": "", "branch": "", "name": ""}
     # 发票号
     n1 = normalize_invoice_no(inv.get("invoice_no") or "")
@@ -283,9 +370,9 @@ def _diff_dims(inv: Dict, rep: Dict) -> Dict[str, str]:
     d2 = parse_date(rep.get("report_date"))
     if d1 and d2 and d1 != d2:
         delta = (d2 - d1).days
-        out["date"] = f"差 {delta:+d} 天"
+        out["date"] = f"{lab['diff']} {delta:+d} {lab['days']}"
     elif (d1 is None) != (d2 is None):
-        out["date"] = "日期一边缺"
+        out["date"] = lab["date_one_missing"]
     # 期间
     p1 = _derive_period(inv.get("invoice_date") or "", inv.get("period") or "")
     p2 = ""
@@ -300,9 +387,9 @@ def _diff_dims(inv: Dict, rep: Dict) -> Dict[str, str]:
         raw1 = inv.get("buyer_tax_id") or inv_tax
         raw2 = rep.get("report_buyer_tax_id") or rep_tax
         if not inv_tax:
-            out["tax_id"] = f"(发票空) · 报={raw2}"
+            out["tax_id"] = f"{lab['inv_empty']} · {lab['rep']}={raw2}"
         elif not rep_tax:
-            out["tax_id"] = f"发={raw1} · (报告空)"
+            out["tax_id"] = f"{lab['inv']}={raw1} · {lab['rep_empty']}"
         else:
             _td = tax_id_fuzzy_distance(inv_tax, rep_tax)
             if _td <= 2:

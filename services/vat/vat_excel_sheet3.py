@@ -14,6 +14,7 @@ from services.recon.vat_recon_core import (
     _get_inv_total,
     _get_rep_total,
     _diff_dims,
+    diff_labels,
 )
 from services.vat.vat_excel_styles import (
     FONT_NAME,
@@ -36,13 +37,14 @@ from services.vat.vat_excel_styles import (
 )
 
 
-def _build_sheet3(wb, invoices, report_rows, client_name, period_year, period_month, L):
+def _build_sheet3(wb, invoices, report_rows, client_name, period_year, period_month, L, lang="th"):
     # ════════════ Sheet 3 · 对账结果(一对一 15 列 · 后端预算结果)════════════
+    _lab = diff_labels(lang)  # 逐行差异/金额备注本地化标签(跟用户语言)
     ws3 = wb.create_sheet(L["sh3"])
     ws3.sheet_properties.tabColor = "D97706"  # Tab 橙
 
     # 跑配对(Bug 2/3/4/5 全在这里)
-    match_result = _build_recon_pairs(invoices, report_rows)
+    match_result = _build_recon_pairs(invoices, report_rows, lang)
     pairs = match_result["pairs"]
     unmatched_inv = match_result["unmatched_inv"]
     unmatched_rep = match_result["unmatched_rep"]
@@ -58,7 +60,7 @@ def _build_sheet3(wb, invoices, report_rows, client_name, period_year, period_mo
         if _p["kind"] == "matched_cash":
             n_ok += 1
         elif _p["kind"] == "matched":
-            _d = _diff_dims(_inv, _rep)
+            _d = _diff_dims(_inv, _rep, lang)
             if not any(_d.values()):
                 n_ok += 1
     n_diff = n_total - n_ok
@@ -195,7 +197,7 @@ def _build_sheet3(wb, invoices, report_rows, client_name, period_year, period_mo
         seq_no += 1
         inv = invoices[pair["inv_idx"]]
         rep = report_rows[pair["rep_idx"]]
-        dims = _diff_dims(inv, rep)
+        dims = _diff_dims(inv, rep, lang)
         # Bug 2 · 散客:不比较/不显示分公司和税号差
         if pair["kind"] == "matched_cash":
             dims["branch"] = ""
@@ -219,18 +221,21 @@ def _build_sheet3(wb, invoices, report_rows, client_name, period_year, period_mo
         vat_diff_ = round(amt_vat_inv - amt_vat_rep, 2)
         if not _eq_amount(amt_inv, amt_rep):
             if not _eq_amount(pre_diff, 0) and not _eq_amount(vat_diff_, 0):
-                _amt_note = f"净额差 {pre_diff:+,.2f} · VAT 差 {vat_diff_:+,.2f}"
+                _amt_note = (
+                    f"{_lab['amt_pre_diff']} {pre_diff:+,.2f} · "
+                    f"{_lab['amt_vat_diff']} {vat_diff_:+,.2f}"
+                )
             elif not _eq_amount(pre_diff, 0):
-                _amt_note = f"净额差 {pre_diff:+,.2f} · VAT 一致"
+                _amt_note = f"{_lab['amt_pre_diff']} {pre_diff:+,.2f} · {_lab['amt_vat_ok']}"
             else:
-                _amt_note = f"VAT 差 {vat_diff_:+,.2f} · 净额一致"
+                _amt_note = f"{_lab['amt_vat_diff']} {vat_diff_:+,.2f} · {_lab['amt_pre_ok']}"
         else:
             _amt_note = ""
 
         # v4.10.13 · ocr_missing · 备注追加提醒(dims 原样保留)
         _base_note = pair.get("note") or ""
         if pair["kind"] == "ocr_missing":
-            _base_note = (_base_note + " · OCR 抽取可能不完整 · 请核对原 PDF").lstrip(" · ")
+            _base_note = (_base_note + " · " + _lab["ocr_incomplete"]).lstrip(" · ")
         _note_val = " · ".join(filter(None, [_base_note, _amt_note]))
 
         values = [

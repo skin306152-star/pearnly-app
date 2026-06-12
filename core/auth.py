@@ -9,6 +9,8 @@ Pearnly · 认证模块
 import os
 import uuid
 import logging
+import hashlib
+import hmac
 import bcrypt
 import jwt
 from datetime import datetime, timedelta, timezone
@@ -31,11 +33,31 @@ def _jwt_secret() -> str:
     return s
 
 
+def hash_password(plain_password: str) -> str:
+    """bcrypt 哈希(与 verify_password 配对 · signup_core 优先取这只确保新注册必 bcrypt)。
+
+    截 72 字节:bcrypt 上限 72,长密码不截会抛 ValueError 让注册落到 sha256 弱兜底 →
+    那种哈希 bcrypt 又验不了 = 注册成功却登不上(已踩坑)。bcrypt 本身验证也只看前 72。
+    """
+    pw = plain_password.encode("utf-8")[:72]
+    return bcrypt.hashpw(pw, bcrypt.gensalt()).decode("utf-8")
+
+
 def verify_password(plain_password: str, password_hash: str) -> bool:
-    """验证密码"""
+    """验证密码。兼容历史 sha256 兜底哈希(`sha256$salt$hex` · 旧注册 fallback 产物)。"""
+    if not password_hash:
+        return False
     try:
+        if password_hash.startswith("sha256$"):
+            parts = password_hash.split("$")
+            if len(parts) != 3:
+                return False
+            actual = hashlib.sha256((parts[1] + plain_password).encode("utf-8")).hexdigest()
+            return hmac.compare_digest(actual, parts[2])
+        # 截 72 与 hash_password 一致:bcrypt 4.x 对 >72 字节抛错(非静默截)·
+        # passlib 历史也截 72,故对存量 $2b$ 用户零影响。
         return bcrypt.checkpw(
-            plain_password.encode("utf-8"),
+            plain_password.encode("utf-8")[:72],
             password_hash.encode("utf-8"),
         )
     except Exception as e:

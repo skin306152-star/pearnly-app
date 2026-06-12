@@ -6,9 +6,18 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-12 · **🖥️ 用户引导闭环+套账硬门前端全套上线 + ⚡加载根治(CF缓存)** · 前序见下）
+## 🎯 状态卡（2026-06-12 · **✨ 丝滑专项 + 打包收编(console/POS)+ 权限管理成品化 全上线** · 前序见下）
 
-- **🆕 本窗口(2026-06-12·前端)· 🖥️ 用户引导闭环 + 套账硬门【全套上线·Zihao真机验中】**（`3381fae5`引导闭环 + `336fea3b`套账硬门 + `3b26959f`表格修 + /simplify收口 · prod ver 11850755 · 13闸全绿）：
+- **🆕 本窗口(2026-06-12)· ✨ 丝滑+打包收编+权限管理成品化【全套上线·9 commit·b25d1d43】**（自检自推·健康 200·13闸全绿）：
+  - **铁律改**(`12adcba4`):Zihao 拍板**删「高敏区·Zihao在场」两档制**(整顿期产物)→ 铁律#26 整条改写 + #16 + AGENTS + 记忆 [[all-changes-self-check-push]]:**今后所有改动(含登录/计费/OCR/POS离线)自做自检 OK 即 push**,不分高敏不等谁在场。真闸=13闸绿+核心路径自跑真账号E2E+改坏自revert;保留硬线=不碰mrerp真余额/破坏git历史仍问。
+  - **A2 withLoading**(`34f26df4`+`df1126ce`+`89bf01a9`+`2a5f8149`):新全局 `src/home/with-loading.ts`(window桥·`.is-busy` currentColor转圈·复用home-03 spin·测试5行为)+ **16个高频动作按钮**接即时反馈(做账/报税/进项/库存/历史/POS·替手动disabled)→ 治 Zihao 原始抱怨"全站按钮卡顿"。
+  - **A1去重**已 live(别窗口 core.ts coalesceConcurrentGets);**A3/A4** 实查列表已容器级渲染→骨架/乐观判定迁同区后低ROI跳过;**A5/A6** 反馈构造性<16ms免测+严格闸噪声>价值跳过。
+  - **打包收编**:`e434b39c` /console·/invite 壳 minify→dist(view-source只见壳·**Zihao截图问题解决**);`c68a3ffc` POS 9JS→dist/pos.js+2CSS→dist/pos.css+壳minify+pos-sw CACHE bump+asset闸扩static/pos+GATES更新(本地boot冒烟0错验证)。
+  - **POS SW scope 修**(`123c1aa1`):原 sw 挂/static/pos/scope控不了/pos→断网重开起不来。改根路由 `GET /pos-sw.js`+`register({scope:'/pos'})`+注销旧→**离线重开 smoke PASS**(swControlled=true)。
+  - **退出登录按钮对齐 logo**(`b4bfbb75`):workspace-gate `.wsg-logout` absolute→`margin-left:auto` 回flex流与logo同垂直居中。?v= home.css 760/main.js 769/pos 767。
+  - **/simplify收口**(`b25d1d43`):tax confirmFile收形+asset闸console/pos去重抽`_check_spa_bundled`;跳过withBusy合并(.busy是bank/mj专屏居中转圈·比.is-busy精致·合并=降级)。
+
+- **本窗口(2026-06-12·前端)· 🖥️ 用户引导闭环 + 套账硬门【全套上线·Zihao真机验中】**（`3381fae5`引导闭环 + `336fea3b`套账硬门 + `3b26959f`表格修 + /simplify收口 · prod ver 11850755 · 13闸全绿）：
   - **引导闭环**(接 `docs/onboarding/00` 后端`ddb900bd`):注册向导(业态→主体三分支[税号带出/手动填/个人]→账务[财年/前缀真存]→**步④选套账**→完成清单)+ 公司资料行内编辑页(路由 company)+ 客户管理分派会计(复用 member_scopes)+ 受邀成员分流 + 个人模式整体退场 + logo 暗夜垫白 + i18n 4语~165键。新件 `onboarding-flow(.ts/-html)`/`subject-create`/`company-profile`/`client-assign`。
   - **套账硬门**(逐屏照 01-交互原型·补之前降级):**每次登录必选套账·1个也选·不可绕开**(`workspace-gate(.ts/-html)`+core-boot 经 module-nav.enforceWorkspaceGate);0套账/全删后→官方空态+**新建套账专屏(建好确定才进)**;**顶栏富下拉切换器 orgPop**(搜索/我管理的主体/勾选当前/创建/管理全部)替简陋 select;**全站建套账只有一个三分支专屏**(硬门0套账·orgPop创建·客户管理新增 统一·无冲突)。
   - **加载慢根治=CF 配置非代码**:压缩(Brotli)+immutable头都对,真因 Cloudflare 没缓存 /static/(`Cf-Cache-Status:DYNAMIC` 每次跨境回源)。**Zihao 已加 CF Cache Rule**(`URI Full contains /static/`→Eligible for cache)·实测 `DYNAMIC→HIT`·3分钟→秒开。**前端 i18n拆分/代码分割判定不做**(高风险且治不了根因·会破坏 plain-script eval 顺序)。**视觉照搬闸也判定不做**(overlay 不适合那套路由级闸·过度工程)。

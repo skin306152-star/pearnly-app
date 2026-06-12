@@ -109,14 +109,12 @@ function bind(sec: HTMLElement): void {
     const save = sec.querySelector<HTMLButtonElement>('#tax-set-save');
     if (save)
         save.onclick = async () => {
-            save.disabled = true;
             try {
-                await aapi('PUT', withWs('/api/tax/settings'), dirty);
+                await withLoading(save, () => aapi('PUT', withWs('/api/tax/settings'), dirty));
                 showToast(t('tax-set-saved'), 'success');
                 dirty = {};
                 load();
             } catch (e) {
-                save.disabled = false;
                 showToast(acctErrMsg(e, 'tax.unexpected'), 'error');
             }
         };

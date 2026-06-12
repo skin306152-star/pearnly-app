@@ -153,15 +153,13 @@ async function doSubmit(cfg: ModalCfg, submit: HTMLButtonElement) {
             showErr(cfg.maskId, t('inv-err-no-lines'));
             return;
         }
-        submit.disabled = true;
         try {
-            await invApi.postCount(wsId, lines);
+            await withLoading(submit, () => invApi.postCount(wsId, lines));
             showToast(t('inv-count-ok'), 'success');
             closeModal(cfg.maskId);
             window.reloadInventory?.();
         } catch (e) {
             showErr(cfg.maskId, invErrMsg(e, 'inv-submit-fail'));
-            submit.disabled = false;
         }
         return;
     }

@@ -181,16 +181,15 @@ function bind(sec: HTMLElement): void {
         const def = GROUPS.flatMap((g) => g.rows).find((r) => r.kind === rowEl.dataset.kind)!;
         rowEl.querySelectorAll<HTMLButtonElement>('[data-act]').forEach((btn) => {
             btn.onclick = async () => {
-                btn.disabled = true;
                 try {
-                    await openAcctFile(
-                        fileUrl(def, 'pdf'),
-                        btn.dataset.act === 'download' ? `${def.kind}_${period}.pdf` : undefined
+                    await withLoading(btn, () =>
+                        openAcctFile(
+                            fileUrl(def, 'pdf'),
+                            btn.dataset.act === 'download' ? `${def.kind}_${period}.pdf` : undefined
+                        )
                     );
                 } catch (e) {
                     showToast(acctErrMsg(e, 'acct.export_failed'), 'error');
-                } finally {
-                    btn.disabled = false;
                 }
             };
         });
@@ -198,16 +197,15 @@ function bind(sec: HTMLElement): void {
     const pack = sec.querySelector<HTMLButtonElement>('#acct-books-pack');
     if (pack)
         pack.onclick = async () => {
-            pack.disabled = true;
             try {
-                await openAcctFile(
-                    withWs(`/api/accounting/export-package?period=${period}`),
-                    `pearnly_books_${period}.zip`
+                await withLoading(pack, () =>
+                    openAcctFile(
+                        withWs(`/api/accounting/export-package?period=${period}`),
+                        `pearnly_books_${period}.zip`
+                    )
                 );
             } catch (e) {
                 showToast(acctErrMsg(e, 'acct.export_failed'), 'error');
-            } finally {
-                pack.disabled = false;
             }
         };
     const goReview = sec.querySelector<HTMLElement>('#acct-close-goreview');

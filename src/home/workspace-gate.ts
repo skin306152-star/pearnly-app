@@ -50,14 +50,24 @@ function close(): void {
     if (el) el.remove();
 }
 
-// 顶栏:选择屏给右上角逃生键(硬门=退出登录·不可逃;系统内=取消·回系统)。
-// 建套账屏不放右上角 —— 逃生键改放「确定」左侧做次级按钮(更醒目·见 createPane)。
+const ownerNow = (): boolean => (typeof window.isOwner === 'function' ? window.isOwner() : S.owner);
+
+// 逃生键路由(选择屏右上角 / 建套账屏「确定」左侧,二处共用):
+//   建套账屏有套账 → 返回选择列表;其余硬门 → 退出登录;系统内 → 取消回系统。
+function escapeAction(): { attr: string; label: string; back: boolean } {
+    if (S.view === 'create' && S.gated && S.subjects.length)
+        return { attr: 'data-wsg-back', label: t('wsg-back'), back: true };
+    if (S.gated) return { attr: 'data-wsg-logout', label: t('wsg-logout'), back: false };
+    return { attr: 'data-wsg-cancel', label: t('wsg-cancel'), back: false };
+}
+
+// 顶栏:选择屏右上角放逃生键(pill);建套账屏不放 —— 改放「确定」左侧(更醒目·见 createPane)。
 function topBar(): string {
     let exit = '';
-    if (S.view === 'pick')
-        exit = S.gated
-            ? `<button class="wsg-logout" data-wsg-logout="1">${esc(t('wsg-logout'))}</button>`
-            : `<button class="wsg-logout" data-wsg-cancel="1">${esc(t('wsg-cancel'))}</button>`;
+    if (S.view === 'pick') {
+        const e = escapeAction();
+        exit = `<button class="wsg-logout" ${e.attr}="1">${esc(e.label)}</button>`;
+    }
     return (
         '<div class="onb-top"><span class="onb-brand">' +
         '<img class="onb-logo" src="/static/brand/pwa-icon-192.png?v=1" alt="" />Pearnly</span>' +
@@ -85,14 +95,9 @@ function pickPane(): string {
 }
 
 function createPane(): string {
-    // 副操作(确定按钮左侧 · 次级按钮 · 醒目可点):
-    //   硬门有主体 → 返回(回选择列表);硬门 0 个 → 退出登录;系统内 → 取消(回系统)。
-    let back: string;
-    if (S.gated && S.subjects.length)
-        back = `<button class="onb-btn" data-wsg-back="1">${onbIcon('chev')}${esc(t('wsg-back'))}</button>`;
-    else if (S.gated)
-        back = `<button class="onb-btn" data-wsg-logout="1">${esc(t('wsg-logout'))}</button>`;
-    else back = `<button class="onb-btn" data-wsg-cancel="1">${esc(t('wsg-cancel'))}</button>`;
+    // 副操作(确定按钮左侧 · 次级按钮 · 醒目可点):返回列表 / 退出登录 / 取消(见 escapeAction)。
+    const e = escapeAction();
+    const back = `<button class="onb-btn" ${e.attr}="1">${e.back ? onbIcon('chev') : ''}${esc(e.label)}</button>`;
     return (
         `<div class="onb-h1">${esc(t('wsg-create-title'))}</div>` +
         `<div class="onb-sub">${esc(t('wsg-create-sub'))}</div>` +
@@ -201,7 +206,7 @@ window.showWorkspaceGate = async function () {
     S.view = 'pick';
     S.gated = true;
     S.onCreated = null;
-    S.owner = typeof window.isOwner === 'function' ? window.isOwner() : false;
+    S.owner = ownerNow();
     // 立即盖屏(loading 壳)· 别等 fetchWorkspaceClients · 防登录后系统 UI 闪 1-3s。
     S.loading = true;
     render();
@@ -210,7 +215,7 @@ window.showWorkspaceGate = async function () {
             ? ((await window.fetchWorkspaceClients()) as Subject[])
             : [];
     window._workspaceClientsCache = S.subjects as [];
-    S.owner = typeof window.isOwner === 'function' ? window.isOwner() : S.owner;
+    S.owner = ownerNow(); // fetch 等待期 _userInfo 可能才就绪 → 再校正一次
     S.loading = false;
     render();
 };
@@ -234,10 +239,13 @@ window.enforceWorkspaceGate = function () {
         // 门已开(core-boot 登录即早起的门壳)· 不重起防打断创建 · 但此刻 _userInfo 已就绪 →
         // 校正 owner 后重渲选择列表(0 套账空态的 owner/受邀成员分支此前可能算错)。
         if (!S.loading && S.view === 'pick') {
-            S.owner = typeof window.isOwner === 'function' ? window.isOwner() : S.owner;
+            S.owner = ownerNow();
             render();
         }
         return;
     }
     if (typeof window.showWorkspaceGate === 'function') window.showWorkspaceGate();
 };
+
+// 关门(暴露给 module-nav:新注册向导接管时顶掉早起的门壳)。
+window.closeWorkspaceGate = close;

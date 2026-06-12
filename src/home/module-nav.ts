@@ -93,8 +93,7 @@ function maybeAutoOnboard(data: { needs_onboarding?: boolean }): void {
     const owner = typeof window.isOwner === 'function' ? window.isOwner() : false;
     if (!owner) return;
     // 新注册:core-boot 早起的套账门壳要顶掉(向导末步=选/建套账,接管其职责)。
-    const gate = document.getElementById('workspace-gate-root');
-    if (gate) gate.remove();
+    if (typeof window.closeWorkspaceGate === 'function') window.closeWorkspaceGate();
     // 引导闭环向导(业态→主体→账务→完成);未就绪时兜底回退老业态选择器。
     if (typeof window.startOnboardingFlow === 'function') {
         autoPopped = true;

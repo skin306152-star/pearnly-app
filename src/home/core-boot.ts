@@ -269,6 +269,11 @@ function updateUploadHint() {
 // ============================================================
 async function loadAll() {
     try {
+        // 套账硬门:登录即盖屏(门的 loading 壳)· 不等下面一串 /api/me 等请求(手机端 1-3s)
+        // 才弹门 → 否则系统 UI 先渲染、门后到 = 闪一下别的界面。超管布局(admin.html)不起门;
+        // 新注册向导起来时会顶掉门壳(maybeAutoOnboard 里移除)。本会话已选过则 enforce 自放行。
+        if (!window.PEARNLY_ADMIN_LAYOUT && typeof window.enforceWorkspaceGate === 'function')
+            window.enforceWorkspaceGate();
         const [u, q, c, p] = await Promise.all([
             apiGet('/api/me'),
             apiGet('/api/ocr/quota'),

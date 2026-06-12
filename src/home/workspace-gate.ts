@@ -24,6 +24,7 @@ const S = {
     gated: true, // true=硬门(不可逃);false=系统内创建(可取消回系统)
     subjects: [] as Subject[],
     owner: false,
+    loading: false, // 套账列表加载中 → 门壳先盖屏(防系统 UI 闪 1-3s)
     subject: newSubjectState(),
     busy: false,
     onCreated: null as ((id: number) => void) | null,
@@ -49,11 +50,14 @@ function close(): void {
     if (el) el.remove();
 }
 
-// 顶栏:硬门只给「退出登录」(不可逃);系统内创建给「取消」(回系统)。
+// 顶栏:选择屏给右上角逃生键(硬门=退出登录·不可逃;系统内=取消·回系统)。
+// 建套账屏不放右上角 —— 逃生键改放「确定」左侧做次级按钮(更醒目·见 createPane)。
 function topBar(): string {
-    const exit = S.gated
-        ? `<button class="wsg-logout" data-wsg-logout="1">${esc(t('wsg-logout'))}</button>`
-        : `<button class="wsg-logout" data-wsg-cancel="1">${esc(t('wsg-cancel'))}</button>`;
+    let exit = '';
+    if (S.view === 'pick')
+        exit = S.gated
+            ? `<button class="wsg-logout" data-wsg-logout="1">${esc(t('wsg-logout'))}</button>`
+            : `<button class="wsg-logout" data-wsg-cancel="1">${esc(t('wsg-cancel'))}</button>`;
     return (
         '<div class="onb-top"><span class="onb-brand">' +
         '<img class="onb-logo" src="/static/brand/pwa-icon-192.png?v=1" alt="" />Pearnly</span>' +
@@ -63,6 +67,10 @@ function topBar(): string {
 }
 
 function pickPane(): string {
+    // 加载中:只显标题占位(壳已盖屏)· 列表回来再 render · 不闪系统 UI 也不闪空态。
+    if (S.loading) {
+        return `<div class="onb-h1">${esc(t('wsg-pick-title'))}</div><div class="wsg-loading" aria-hidden="true"></div>`;
+    }
     const active =
         typeof window.getActiveWorkspaceClientId === 'function'
             ? (window.getActiveWorkspaceClientId() as number | null)
@@ -77,11 +85,14 @@ function pickPane(): string {
 }
 
 function createPane(): string {
-    // 返回:硬门有主体 → 回选择列表;硬门 0 个 / 系统内 → 取消(回系统或退出走顶栏)。
-    const back =
-        S.gated && S.subjects.length
-            ? `<button class="onb-lnk" data-wsg-back="1">${onbIcon('chev')}${esc(t('wsg-back'))}</button>`
-            : '<span></span>';
+    // 副操作(确定按钮左侧 · 次级按钮 · 醒目可点):
+    //   硬门有主体 → 返回(回选择列表);硬门 0 个 → 退出登录;系统内 → 取消(回系统)。
+    let back: string;
+    if (S.gated && S.subjects.length)
+        back = `<button class="onb-btn" data-wsg-back="1">${onbIcon('chev')}${esc(t('wsg-back'))}</button>`;
+    else if (S.gated)
+        back = `<button class="onb-btn" data-wsg-logout="1">${esc(t('wsg-logout'))}</button>`;
+    else back = `<button class="onb-btn" data-wsg-cancel="1">${esc(t('wsg-cancel'))}</button>`;
     return (
         `<div class="onb-h1">${esc(t('wsg-create-title'))}</div>` +
         `<div class="onb-sub">${esc(t('wsg-create-sub'))}</div>` +
@@ -191,11 +202,16 @@ window.showWorkspaceGate = async function () {
     S.gated = true;
     S.onCreated = null;
     S.owner = typeof window.isOwner === 'function' ? window.isOwner() : false;
+    // 立即盖屏(loading 壳)· 别等 fetchWorkspaceClients · 防登录后系统 UI 闪 1-3s。
+    S.loading = true;
+    render();
     S.subjects =
         typeof window.fetchWorkspaceClients === 'function'
             ? ((await window.fetchWorkspaceClients()) as Subject[])
             : [];
     window._workspaceClientsCache = S.subjects as [];
+    S.owner = typeof window.isOwner === 'function' ? window.isOwner() : S.owner;
+    S.loading = false;
     render();
 };
 
@@ -212,8 +228,16 @@ window.openSubjectCreate = function (opts?: { onCreated?: (id: number) => void }
 // core-boot/module-nav 在用户就绪后调:每次登录强制选套账(任何非超管账号),本会话选过才放行。
 window.enforceWorkspaceGate = function () {
     if (window.PEARNLY_ADMIN_MODE) return; // 超管除外
-    if (document.getElementById('workspace-gate-root')) return; // 门已开 → 不重起(防打断创建)
     if (document.getElementById('onboarding-flow-root')) return; // 新注册向导优先(末步=选套账)
     if (_gateSatisfied) return; // 本会话已选过 → 放行(切模块/onboarding 也调到这,不重弹)
+    if (document.getElementById('workspace-gate-root')) {
+        // 门已开(core-boot 登录即早起的门壳)· 不重起防打断创建 · 但此刻 _userInfo 已就绪 →
+        // 校正 owner 后重渲选择列表(0 套账空态的 owner/受邀成员分支此前可能算错)。
+        if (!S.loading && S.view === 'pick') {
+            S.owner = typeof window.isOwner === 'function' ? window.isOwner() : S.owner;
+            render();
+        }
+        return;
+    }
     if (typeof window.showWorkspaceGate === 'function') window.showWorkspaceGate();
 };

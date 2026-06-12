@@ -104,8 +104,12 @@ export const WSG_CSS = `
 .wsg-empty-ic .wsg-i{width:28px;height:28px;}
 .wsg-empty-t{font-size:17px;font-weight:700;}
 .wsg-empty-d{color:var(--ink2);font-size:13px;line-height:1.7;max-width:min(380px,100%);margin-bottom:8px;}
-.wsg-logout{position:absolute;top:0;right:0;background:none;border:0;color:var(--ink3);font-size:12.5px;cursor:pointer;}
-.wsg-logout:hover{color:var(--accent);}
+.wsg-logout{position:absolute;top:-2px;right:0;background:var(--card);border:1px solid var(--line);border-radius:10px;
+  color:var(--ink2);font-size:13.5px;font-weight:600;padding:7px 14px;cursor:pointer;transition:.12s;}
+.wsg-logout:hover{border-color:var(--ink3);color:var(--accent);}
+.wsg-loading{width:30px;height:30px;margin:64px auto 0;border:3px solid var(--line);border-top-color:var(--accent);
+  border-radius:50%;animation:wsg-spin .8s linear infinite;}
+@keyframes wsg-spin{to{transform:rotate(360deg);}}
 /* 顶栏富下拉切换器(orgPop · 照 01) */
 .wsw{display:inline-flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:11px;
   height:36px;padding:0 8px 0 12px;background:var(--card);cursor:pointer;transition:.12s;color:var(--ink);}

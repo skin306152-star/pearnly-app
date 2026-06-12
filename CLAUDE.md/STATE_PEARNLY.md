@@ -6,7 +6,13 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-12 · **🧭 用户引导闭环【后端全闭环·已上线】** · 前序见下）
+## 🎯 状态卡（2026-06-12 · **🧭 用户引导闭环后端全闭环 + ⚡workers 2→4 上线** · 前序见下）
+
+- **🆕 本窗口(2026-06-12)· ⚡ workers 2→4【真修法+已上线·丝滑杠杆③】**（`4406aeda`·prod unit 已 `--workers 4`·4 进程零 deadlock·健康 200）：
+  - **死锁真因+真修**:`services/recon_jobs/worker.py:run_worker()` 内嵌 worker 启动那次 `store.ensure_table()` 在锁外 → 4 进程并发 `CREATE/ALTER IF NOT EXISTS` 抢 recon_jobs AccessExclusiveLock 互等死锁(此前 2 次回退 workers=2 的真因)。修=套 `with startup_ddl_lock():`(flock 跨进程串行·embedded/standalone 共用此函数故都被串)。守门 `test_recon_worker_ddl_lock`。
+  - **prod 切 workers=4 实证**:`/etc/systemd/system/mrpilot.service` ExecStart `--workers 2→4`(备份 `.bak-w2`)·重启后 4×`Application startup complete` + 4 个 embedded worker 全起 + 零 `ensure_table failed` + 零 deadlock + 健康 200。治 INTERACTION_AUDIT 首屏 22 请求 2-worker 串行化·叠加新加坡 RTT 1ms。回退=`sed 's/--workers 4/--workers 2/'`+reload+restart。
+  - **共享树坑+兜底**:引导窗口未提交 WIP 把 `src/home/app-shell-html.ts` 顶到 509(>500)拦我 push → **worktree 隔离单推**(detached HEAD·干净 app-shell=500)+ 给 worktree 联接 node_modules(否则 esbuild node 测试红)。详见记忆 [[startup-ddl-deadlock-recon-jobs]]。
+  - 丝滑 §6 前端修复(首屏瘦身/withLoading/innerHTML 局部化)= 撞引导窗口 src/home·未做;UI 1-bis 已治本/1-ter 图标闸=加 pre-push 闸会软撞·均略。
 
 - **🆕 本窗口(2026-06-12)· 🧭 用户引导闭环后端【全部闭环·已上线·迁移已跑】**（`f9860ed2` 主体 + `6a2128c9` /simplify 收口 · prod 健康 200 · 全闸绿）：
   - 按 `docs/onboarding/00` 施工后端,**前端 5 组件全部可对接**(逐项核对过)。新增很少、全 additive、低风险:

@@ -112,7 +112,8 @@ def _run_one(job: Dict) -> None:
         logger.info(f"[recon-worker] job {job_id} ({jtype}) done -> {result_table}:{result_id}")
     except Exception as e:  # noqa: BLE001
         logger.error(f"[recon-worker] job {job_id} ({jtype}) FAILED: {e}\n{traceback.format_exc()}")
-        store.fail(job_id, "processing_error")
+        # 真错存进 error_code(前端/库可见)· 别再吞成通用 processing_error 让人无从诊断。
+        store.fail(job_id, (str(e).strip()[:200] or "processing_error"))
     finally:
         if not keep_stage:
             _cleanup_stage(job_id)

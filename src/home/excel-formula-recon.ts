@@ -102,7 +102,9 @@ import {
                 (job as { status?: string }).status !== 'done' ||
                 !(job as { result_id?: string }).result_id
             ) {
-                throw new Error(t('vex-toast-fail') || '生成失败');
+                // 显示后端 error_code(已存真错·如"未上传 VAT 报告")· 别只给笼统"生成失败"
+                const ec = (job as { error_code?: string } | null)?.error_code;
+                throw new Error(ec || t('vex-toast-fail') || '生成失败');
             }
             const taskId = (job as { result_id: string }).result_id;
 

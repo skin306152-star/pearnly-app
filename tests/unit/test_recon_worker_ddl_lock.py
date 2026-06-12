@@ -40,5 +40,37 @@ class ReconWorkerDdlLockTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(order[:3], ["lock_acquired", "ensure", "lock_released"])
 
 
+class RunOneErrorCaptureTests(unittest.TestCase):
+    """handler 抛异常时存真错到 error_code(别吞成通用 processing_error · 真账号诊断用)。"""
+
+    def test_handler_exception_stores_real_message(self):
+        def boom(params, input_ref, cb):
+            raise ValueError("未上传 VAT 报告")
+
+        with (
+            mock.patch.dict(worker._HANDLERS, {"salesvat": boom}, clear=False),
+            mock.patch.object(worker.store, "fail") as m_fail,
+            mock.patch.object(worker, "_cleanup_stage"),
+        ):
+            worker._run_one({"id": "j1", "job_type": "salesvat", "params": {}, "input_ref": []})
+        m_fail.assert_called_once()
+        job_id, err = m_fail.call_args[0]
+        self.assertEqual(job_id, "j1")
+        self.assertIn("未上传 VAT 报告", err)
+        self.assertNotEqual(err, "processing_error")
+
+    def test_empty_message_falls_back_to_generic(self):
+        def boom(params, input_ref, cb):
+            raise RuntimeError("")
+
+        with (
+            mock.patch.dict(worker._HANDLERS, {"salesvat": boom}, clear=False),
+            mock.patch.object(worker.store, "fail") as m_fail,
+            mock.patch.object(worker, "_cleanup_stage"),
+        ):
+            worker._run_one({"id": "j2", "job_type": "salesvat", "params": {}, "input_ref": []})
+        self.assertEqual(m_fail.call_args[0][1], "processing_error")
+
+
 if __name__ == "__main__":
     unittest.main()

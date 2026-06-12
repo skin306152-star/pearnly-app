@@ -22,6 +22,9 @@ const OPTS = {
 const TARGETS = [
     { src: 'home.html', out: 'static/dist/home.html' },
     { src: 'login.html', out: 'static/dist/login.html' },
+    // 管理控制台 / 邀请接受页:壳成品化(JS/CSS 早已进 dist · 此处收口 HTML 外壳)。
+    { src: 'static/console/console.html', out: 'static/dist/console.html' },
+    { src: 'static/console/invite.html', out: 'static/dist/invite.html' },
 ];
 
 for (const t of TARGETS) {

@@ -69,16 +69,16 @@ class PagesRoutesContractTests(unittest.TestCase):
         self.assertIn("/api/version", app_paths)
 
     def test_console_routes_serve_console_assets(self):
-        """/console 双路由出 console.html · /invite/{token} 出 invite.html(防接错文件)"""
+        """/console 双路由出成品化 dist/console.html · /invite/{token} 出 dist/invite.html(防接错文件)"""
         import asyncio
 
         from routes import pages_routes
 
-        console = "static/console/console.html"
+        console = "static/dist/console.html"
         self.assertEqual(asyncio.run(pages_routes.console_page()).path, console)
         self.assertEqual(asyncio.run(pages_routes.console_layout_page("team")).path, console)
         self.assertEqual(
-            asyncio.run(pages_routes.invite_page("tok")).path, "static/console/invite.html"
+            asyncio.run(pages_routes.invite_page("tok")).path, "static/dist/invite.html"
         )
 
     def test_v1_aliases_delegate_to_base(self):

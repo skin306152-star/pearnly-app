@@ -161,18 +161,18 @@ async def pos_layout_page(rest: str):
 # 登录态前端鉴权(can(team.member.view) 不过 → 403 人话页)。紫色主题只作用 /console。
 @router.get("/console", response_class=HTMLResponse)
 async def console_page():
-    return FileResponse("static/console/console.html", headers=_NO_CACHE)
+    return FileResponse("static/dist/console.html", headers=_NO_CACHE)
 
 
 @router.get("/console/{rest:path}", response_class=HTMLResponse)
 async def console_layout_page(rest: str):
-    return FileResponse("static/console/console.html", headers=_NO_CACHE)
+    return FileResponse("static/dist/console.html", headers=_NO_CACHE)
 
 
 # 邀请接受公开页(无登录态 · token 在路径上由前端 JS 读取)
 @router.get("/invite/{token}", response_class=HTMLResponse)
 async def invite_page(token: str):
-    return FileResponse("static/console/invite.html", headers=_NO_CACHE)
+    return FileResponse("static/dist/invite.html", headers=_NO_CACHE)
 
 
 @router.get("/reset", response_class=HTMLResponse)

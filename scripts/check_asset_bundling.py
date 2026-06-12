@@ -27,6 +27,7 @@ SCRIPT_WHITELIST = (
     "/static/i18n-data.js",  # 715KB 纯数据 · 故意独立 · 见 build-home-js.mjs 注释
     "/static/console/console-i18n.js",  # console 纯翻译数据(window.CI18N)· 同 i18n-data 故意独立
     "/static/admin/",  # admin SPA 专属 JS · 超管页防抄需求低 · 故意留独立(同 admin.html 不 minify)
+    "/static/pos/pos-i18n.js",  # POS 纯翻译数据(window.POS_I18N)· 同 console-i18n 故意独立
     "cdnjs.cloudflare.com",  # jsPDF
     "cloudflareinsights.com",  # CF beacon(部署注入)
 )
@@ -36,6 +37,7 @@ SOURCE_HTML = [
     "static/admin/admin.html",
     "static/console/console.html",
     "static/console/invite.html",
+    "static/pos/pos.html",
 ]
 
 
@@ -105,6 +107,22 @@ def check_manifest_complete(fails):
                 fails.append(
                     f"static/console/{f.name}: 不在 build-home-js.mjs 的打包清单 — "
                     f"新 console JS 逻辑要进 bundle(否则裸发源码 view-source 退化)"
+                )
+
+    # POS 收银 SPA:CSS 全进打包清单;JS 逻辑全进 bundle。pos-i18n.js 是纯数据、
+    # pos-sw.js 是 Service Worker(按 URL 注册不可打包)— 二者故意独立。
+    pos = ROOT / "static" / "pos"
+    if pos.exists():
+        for f in pos.glob("*.css"):
+            if f"pos/{f.name}" not in css_manifest:
+                fails.append(f"static/pos/{f.name}: 不在 build-home-css.mjs 的 POS_CSS — 加进去")
+        for f in pos.glob("*.js"):
+            if f.name in ("pos-i18n.js", "pos-sw.js"):
+                continue
+            if f"pos/{f.name}" not in js_manifest:
+                fails.append(
+                    f"static/pos/{f.name}: 不在 build-home-js.mjs 的打包清单 — "
+                    f"新 POS JS 逻辑要进 bundle(否则裸发源码 view-source 退化)"
                 )
 
 

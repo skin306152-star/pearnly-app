@@ -144,7 +144,7 @@ async def admin_layout_page(rest: str):
 # (PIN 登录 + 收银员 token),非收银员偷进由 SPA boot 弹回——复用 admin SPA 的前端鉴权模式。
 # 登录分流(role=cashier → /pos)见 routes/oauth_routes.py:_login_redirect_path。
 def _pos_page() -> FileResponse:
-    return FileResponse("static/pos/pos.html", headers=_NO_CACHE)
+    return FileResponse("static/dist/pos.html", headers=_NO_CACHE)
 
 
 @router.get("/pos", response_class=HTMLResponse)

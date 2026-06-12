@@ -120,11 +120,15 @@ const LANDING_CSS = [
 // 管理控制台 SPA + 邀请页:主题令牌在前,组件样式在后(固化原 DOM 顺序)。
 const CONSOLE_CSS = ['console/console-theme.css', 'console/console.css'];
 
+// POS 收银 SPA:零售/药房基础样式在前,餐厅作用域样式在后(固化原 pos.html 顺序)。
+const POS_CSS = ['pos/pos.css', 'pos/pos-restaurant.css'];
+
 const BUNDLES = [
     { list: HOME_CSS, out: 'static/dist/home.css' },
     { list: ADMIN_CSS, out: 'static/dist/admin.css' },
     { list: LANDING_CSS, out: 'static/dist/landing.css' },
     { list: CONSOLE_CSS, out: 'static/dist/console.css' },
+    { list: POS_CSS, out: 'static/dist/pos.css' },
 ];
 
 async function buildOne(list, out) {

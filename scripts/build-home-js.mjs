@@ -31,6 +31,24 @@ const BUNDLES = [
     // console-i18n.js 是纯翻译数据(window.CI18N · 同 home 的 i18n-data.js),保留独立 raw 在 HTML 先加载。
     { out: 'static/dist/console.js', files: ['console/console.js'] },
     { out: 'static/dist/invite.js', files: ['console/invite.js'] },
+    // POS 收银 SPA(零售/药房/餐厅三业态):8 个 plain-script 逻辑文件按 DOM 顺序拼成一个
+    // bundle(pos.js 原是 defer · 整 bundle 在 pos.html 以 defer 加载,执行时序不变)。
+    // pos-i18n.js 是纯翻译数据(window.POSI18N · 同 console-i18n),保留独立 raw 先加载。
+    // 离线链路(pos-offline outbox / pos-totals 本地算价)只是被打包,逻辑零改;pos-sw
+    // cache-first 缓存此 bundle,bump CACHE 名即让旧的按文件缓存失效。
+    {
+        out: 'static/dist/pos.js',
+        files: [
+            'pos/pos-totals.js',
+            'pos/pos-data.js',
+            'pos/pos-offline.js',
+            'pos/pos-ops.js',
+            'pos/pos-cashier.js',
+            'pos/pos-restaurant.js',
+            'pos/pos-restaurant-ops.js',
+            'pos/pos.js',
+        ],
+    },
 ];
 
 for (const b of BUNDLES) {

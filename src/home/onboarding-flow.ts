@@ -15,15 +15,20 @@ import {
 } from './subject-create.js';
 import { injectStyle } from './acct-common.js';
 import { apiClient } from './clients-helpers.js';
+import { WSG_CSS, wsgListHtml } from './workspace-gate-html.js';
+
+type PickSubject = { id: number; name?: string; tax_id?: string; subject_type?: string };
 
 interface FlowState {
-    step: 1 | 2 | 3 | 4; // 4 = 完成清单
+    step: 1 | 2 | 3 | 4 | 5; // 4=选套账(硬门) 5=完成清单
     biz: string;
     subject: SubjectState;
     createdId: number | null;
     createdName: string;
     fy: number; // 财年起始月 1-12
     prefix: string; // 单据前缀(空=自动)
+    pickSubjects: PickSubject[];
+    pickSelectedId: number | null;
     busy: boolean;
 }
 
@@ -34,6 +39,7 @@ function root(): HTMLElement {
     let el = document.getElementById('onboarding-flow-root');
     if (!el) {
         injectStyle('onb-flow-css', ONB_CSS);
+        injectStyle('wsg-css', WSG_CSS);
         el = document.createElement('div');
         el.id = 'onboarding-flow-root';
         el.className = 'onb-root';
@@ -61,8 +67,13 @@ function topBar(showSkip: boolean): string {
     return `<div class="onb-top">${brandLogo()}${skip}</div>`;
 }
 
-function stepper(active: 0 | 1 | 2): string {
-    const labels = [t('onbf-step-biz'), t('onbf-step-subject'), t('onbf-step-acct')];
+function stepper(active: 0 | 1 | 2 | 3): string {
+    const labels = [
+        t('onbf-step-biz'),
+        t('onbf-step-subject'),
+        t('onbf-step-acct'),
+        t('onbf-step-pick'),
+    ];
     let h = '<div class="onb-steps">';
     labels.forEach((lb, i) => {
         const st = i < active ? 'done' : i === active ? 'on' : '';
@@ -70,9 +81,23 @@ function stepper(active: 0 | 1 | 2): string {
         h += `<div class="onb-step ${st}"><div class="dot">${inner}</div>`;
         h += i === active ? `<span class="lb">${esc(lb)}</span>` : '';
         h += '</div>';
-        if (i < 2) h += `<div class="onb-bar ${i < active ? 'done' : ''}"></div>`;
+        if (i < 3) h += `<div class="onb-bar ${i < active ? 'done' : ''}"></div>`;
     });
     return h + '</div>';
+}
+
+// 步④ · 选套账(硬门 · 渲染步②建的主体 + 新建 → 选 → 下一步进系统)。
+function step4(): string {
+    const list = wsgListHtml(S!.pickSubjects, S!.pickSelectedId);
+    return (
+        stepper(3) +
+        `<div class="onb-h1">${esc(t('onbf-pick-title'))}</div>` +
+        `<div class="onb-sub">${esc(t('onbf-pick-sub'))}</div>` +
+        list +
+        '<div class="onb-acts"><div class="grp">' +
+        `<button class="onb-btn pri" data-act="step4-next" ${S!.pickSelectedId != null ? '' : 'disabled'}>${esc(t('onbf-next'))}</button>` +
+        '</div></div>'
+    );
 }
 
 function step1(): string {
@@ -174,8 +199,18 @@ function done(): string {
 function render(): void {
     if (!S) return;
     const el = root();
-    const showSkip = S.step !== 1 && S.step !== 4;
-    const pane = S.step === 1 ? step1() : S.step === 2 ? step2() : S.step === 3 ? step3() : done();
+    // 业态/账务可跳过(skip→直奔选套账);选套账(步④)与完成页不给跳。
+    const showSkip = S.step === 2 || S.step === 3;
+    const pane =
+        S.step === 1
+            ? step1()
+            : S.step === 2
+              ? step2()
+              : S.step === 3
+                ? step3()
+                : S.step === 4
+                  ? step4()
+                  : done();
     el.innerHTML =
         topBar(showSkip) + `<div class="onb-body"><div class="onb-pane">${pane}</div></div>`;
 }
@@ -196,8 +231,17 @@ function syncInputs(): void {
 }
 
 async function onClick(e: Event): Promise<void> {
-    const target = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
-    if (!target || !S) return;
+    if (!S) return;
+    const t0 = e.target as HTMLElement;
+    // 步④ 选套账:卡片选中 / 新建(走全站统一专屏)。
+    const pickEl = t0.closest('[data-wsg-pick]') as HTMLElement | null;
+    if (pickEl) {
+        S.pickSelectedId = Number(pickEl.dataset.wsgPick);
+        return render();
+    }
+    if (t0.closest('[data-wsg-new]')) return openCreateFromStep4();
+    const target = t0.closest('[data-act]') as HTMLElement | null;
+    if (!target) return;
     const act = target.dataset.act;
     const s = S.subject;
     syncInputs();
@@ -232,17 +276,60 @@ async function onClick(e: Event): Promise<void> {
         case 'step2-next':
             return doCreate();
         case 'step3-skip':
-            S.step = 4;
-            return render();
+            return goToPick();
         case 'step3-done':
-            return saveAcctThenDone();
+            return saveAcctThenPick();
+        case 'step4-next':
+            return pickAndDone();
         case 'goto':
             return gotoAndClose(target.dataset.to || '');
         case 'go-system':
             return finish();
         case 'skip-all':
-            return finish();
+            return goToPick(); // 业态/账务可跳,但仍要过选套账硬门
     }
+}
+
+async function fetchSubjects(): Promise<PickSubject[]> {
+    if (typeof window.fetchWorkspaceClients !== 'function') return [];
+    return (await window.fetchWorkspaceClients()) as PickSubject[];
+}
+
+// 进步④:拉主体列表,预选刚建的(或唯一一个)。
+async function goToPick(): Promise<void> {
+    if (!S) return;
+    S.step = 4;
+    S.pickSubjects = await fetchSubjects();
+    if (S.pickSelectedId == null) {
+        if (S.createdId != null) S.pickSelectedId = S.createdId;
+        else if (S.pickSubjects.length === 1) S.pickSelectedId = Number(S.pickSubjects[0].id);
+    }
+    render();
+}
+
+// 步④「新建」→ 全站统一专屏;建好回来刷新列表 + 选中新建的。
+function openCreateFromStep4(): void {
+    if (typeof window.openSubjectCreate !== 'function') return;
+    window.openSubjectCreate({
+        onCreated: async (id) => {
+            if (!S) return;
+            S.pickSubjects = await fetchSubjects();
+            S.pickSelectedId = id;
+            render();
+        },
+    });
+}
+
+// 步④确认:设为当前账套 → 完成清单。
+function pickAndDone(): void {
+    if (!S || S.pickSelectedId == null) return;
+    const selId = S.pickSelectedId;
+    if (typeof window.setActiveWorkspaceClientId === 'function')
+        window.setActiveWorkspaceClientId(selId);
+    const sel = S.pickSubjects.find((x) => Number(x.id) === Number(selId));
+    if (sel && sel.name) S.createdName = sel.name;
+    S.step = 5;
+    render();
 }
 
 async function applyPresetThenNext(): Promise<void> {
@@ -298,8 +385,8 @@ async function doCreate(): Promise<void> {
     }
 }
 
-// 步③完成:把财年起始月 + 单据前缀存到刚建的主体(PATCH);失败不阻塞进系统(诚实提示)。
-async function saveAcctThenDone(): Promise<void> {
+// 步③完成:把财年起始月 + 单据前缀存到刚建的主体(PATCH)→ 进步④选套账。
+async function saveAcctThenPick(): Promise<void> {
     if (!S || S.busy) return;
     if (S.createdId != null) {
         S.busy = true;
@@ -317,8 +404,7 @@ async function saveAcctThenDone(): Promise<void> {
         }
         S.busy = false;
     }
-    S.step = 4;
-    render();
+    await goToPick();
 }
 
 function gotoAndClose(to: string): void {
@@ -351,6 +437,8 @@ window.startOnboardingFlow = function () {
         createdName: '',
         fy: 1,
         prefix: '',
+        pickSubjects: [],
+        pickSelectedId: null,
         busy: false,
     };
     render();

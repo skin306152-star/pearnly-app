@@ -187,3 +187,59 @@ function taxBranch(s: SubjectState): string {
 function note(text: string): string {
     return '<div class="onb-note">' + onbIcon('info', 'ic') + '<div>' + esc(text) + '</div></div>';
 }
+
+// 共享控制器(向导步② + 套账门新建专屏共用 · 防逻辑重复)。
+// 重渲前把当前输入收进状态(rerender 会重建 DOM)。
+export function syncSubjectInputs(s: SubjectState): void {
+    const tax = document.getElementById('onb-subj-tax') as HTMLInputElement | null;
+    if (tax) s.taxId = tax.value;
+    const name = document.getElementById('onb-subj-name') as HTMLInputElement | null;
+    if (name) s.name = name.value;
+    const addr = document.getElementById('onb-subj-addr') as HTMLInputElement | null;
+    if (addr) s.address = addr.value;
+}
+
+// 处理主体分支动作(纯状态变更)。返回 'rerender' 需重渲 / 'lookup' 需异步带出 / null 未处理。
+export function handleSubjectAct(
+    act: string,
+    dataM: string | undefined,
+    s: SubjectState
+): 'rerender' | 'lookup' | null {
+    switch (act) {
+        case 'subj-mode':
+            s.mode = dataM === 'person' ? 'person' : 'company';
+            s.manual = false;
+            s.pulled = null;
+            return 'rerender';
+        case 'subj-manual':
+            s.manual = true;
+            return 'rerender';
+        case 'subj-haveTax':
+            s.manual = false;
+            return 'rerender';
+        case 'subj-retax':
+            s.pulled = null;
+            return 'rerender';
+        case 'subj-vat':
+            s.vat = !s.vat;
+            return 'rerender';
+        case 'subj-pulltax':
+            return 'lookup';
+        default:
+            return null;
+    }
+}
+
+// 主体表单的动作行(税号带出 → 「获取企业信息」,否则主按钮 label 由调用方给)。
+// 供新建专屏复用(向导有自己的 stepper 壳,这里只给纯表单动作区可选用)。
+export function subjectActionsHtml(s: SubjectState, primaryLabel: string, busy: boolean): string {
+    const taxFetch = s.mode === 'company' && !s.manual && !s.pulled;
+    const manualLink =
+        s.mode === 'company' && s.manual
+            ? `<button class="onb-lnk" data-act="subj-haveTax">${esc(t('subj-to-tax'))} ${onbIcon('chev')}</button>`
+            : '';
+    const primary = taxFetch
+        ? `<button class="onb-btn pri" data-act="subj-pulltax" ${busy ? 'disabled' : ''}>${esc(t('subj-fetch'))}</button>`
+        : `<button class="onb-btn pri" data-act="subj-confirm" ${subjectNextEnabled(s) && !busy ? '' : 'disabled'}>${esc(primaryLabel)}</button>`;
+    return `<div class="grp">${manualLink}${primary}</div>`;
+}

@@ -105,6 +105,7 @@ import './home/pos-onboarding.js'; // POS PO-B1 · 开通收银(屏8 · window.l
 import './home/onboarding-business.js'; // 平台业态套餐 PO-PP2 · 业态选择器弹窗(window.openBusinessPicker · PUT /api/me/onboarding · 可开启功能/切换业态)
 import './home/onboarding-flow.js'; // 用户引导闭环 · 注册后向导(window.startOnboardingFlow · 业态→主体→账务→完成清单 · 复用 onboarding-business/subject-create)
 import './home/company-profile.js'; // 用户引导闭环 · 公司资料页(window.loadCompanyProfile · GET/PATCH /api/workspace/clients/{id} · 行内编辑)
+import './home/workspace-gate.js'; // 套账硬门 · 每次登录必选套账(window.showWorkspaceGate/enforceWorkspaceGate · 0套账→新建专屏 · 不可绕开)
 import './home/module-settings.js'; // 平台业态套餐 PO-PP3 · 设置·业务/模块页(window.loadModuleSettings · 7 toggle PUT /api/me/modules/{key} · bizbar 切换业态)
 import './home/pos-tables.js'; // 餐厅 POS · 桌台管理(window.openPosTables · 区域/桌台 CRUD · /api/pos/admin/restaurant/* · owner·餐厅·弹窗)
 import './home/pos-payment-settings.js'; // POS · 收款设置(window.openPosPayment · 现金/PromptPay/刷卡+服务费/VAT · owner·弹窗)

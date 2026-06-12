@@ -107,7 +107,11 @@ async function applyModuleNav() {
         const body = await apiGet('/api/me/modules');
         const data = (body && body.data) || {};
         apply(data.modules || {}, data.business_type);
-        maybeAutoOnboard(data);
+        if (data.needs_onboarding) {
+            maybeAutoOnboard(data); // 新注册 → 引导向导(末步=选套账)
+        } else if (typeof window.enforceWorkspaceGate === 'function') {
+            window.enforceWorkspaceGate(); // 老用户每次登录 → 无 active 套账则起硬门
+        }
     } catch (_) {
         // 取不到开关:保持默认隐藏(安全侧),不弹错、不阻塞其余导航。
     }

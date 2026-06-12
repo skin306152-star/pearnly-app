@@ -221,8 +221,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
     // ===== 账套主体 tab =====
+    // 「新增主体」走全站统一建套账专屏(三分支 · 与硬门/orgPop 同一界面);编辑仍用 modal。
     const sellerNew = document.getElementById('btn-seller-new');
-    if (sellerNew) sellerNew.addEventListener('click', () => openWsClientModal(null));
+    if (sellerNew)
+        sellerNew.addEventListener('click', () => {
+            if (typeof window.openSubjectCreate === 'function') {
+                window.openSubjectCreate({
+                    onCreated: () => loadSellerCache().then(renderSellerList),
+                });
+            } else {
+                openWsClientModal(null);
+            }
+        });
     const sellerTbody = document.getElementById('seller-tbody');
     if (sellerTbody) {
         sellerTbody.addEventListener('click', (e) => {

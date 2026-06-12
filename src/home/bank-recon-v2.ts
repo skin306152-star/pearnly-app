@@ -14,7 +14,12 @@ import {
     _brv2RestoreAnchorPrefill,
     _brv2UpdatePrefillBannerVisibility,
 } from './bank-recon-v2-anchor.js';
-import { renderResults, renderTable, showResultSections } from './bank-recon-v2-results.js';
+import {
+    renderResults,
+    renderTable,
+    showResultSections,
+    _brv2Export,
+} from './bank-recon-v2-results.js';
 import {
     loadHistory,
     renderHistory,
@@ -249,6 +254,8 @@ async function runRecon() {
                 showProgress(false);
                 renderResults(data);
                 loadHistory();
+                // 识别完成 → 自动下载对账报告一次(复用导出按钮逻辑 · 用户仍可手动再下)
+                void _brv2Export((S.currentTask as any).task_id);
                 const sc = $('brv2-summary-collapse');
                 if (sc) sc.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             } catch (e) {

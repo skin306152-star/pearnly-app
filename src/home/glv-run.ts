@@ -101,6 +101,8 @@ async function _run() {
         const rs = $('glv-result');
         if (rs) rs.style.display = '';
         _expandResults();
+        // 识别完成 → 自动下载对账报告一次(复用导出按钮逻辑 · 用户仍可手动再下)
+        void _export();
         if (status) {
             status.className = 'vex-action-info ok';
             status.style.color = '';

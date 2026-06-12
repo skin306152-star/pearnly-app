@@ -190,6 +190,39 @@ class AccountingSettingsTests(unittest.TestCase):
         self.assertIn("X", cur.last_params)
 
 
+class TaxIdDuplicateTests(unittest.TestCase):
+    """税号重复检测(向导步1 边界 · workspace-entry §五)。"""
+
+    def test_empty_tax_never_duplicate_no_db(self):
+        with patch_cursor_raises():  # 空税号直接返 False,绝不查库
+            self.assertFalse(ws.tax_id_in_use("u1", "t1", "   "))
+            self.assertFalse(ws.tax_id_in_use("u1", "t1", None))
+
+    def test_found_returns_true_tenant_scope(self):
+        cur = FakeCursor(fetchone={"?column?": 1})
+        with patch_cursor(cur):
+            self.assertTrue(ws.tax_id_in_use("u1", "t1", "  0105551234567 "))
+        self.assertIn("tax_id = %s", cur.last_sql)
+        self.assertIn("tenant_id = %s", cur.last_sql)
+        self.assertIn("0105551234567", cur.last_params)  # trim 后比对
+
+    def test_not_found_returns_false(self):
+        cur = FakeCursor(fetchone=None)
+        with patch_cursor(cur):
+            self.assertFalse(ws.tax_id_in_use("u1", "t1", "0105551234567"))
+
+    def test_exclude_id_for_self_on_update(self):
+        cur = FakeCursor(fetchone=None)
+        with patch_cursor(cur):
+            ws.tax_id_in_use("u1", "t1", "0105551234567", exclude_id=5)
+        self.assertIn("id <> %s", cur.last_sql)
+        self.assertIn(5, cur.last_params)
+
+    def test_check_failure_fails_open(self):
+        with patch_cursor_raises():  # 检查失败不阻塞建主体
+            self.assertFalse(ws.tax_id_in_use("u1", "t1", "0105551234567"))
+
+
 class GetTests(unittest.TestCase):
     def test_tenant_path(self):
         cur = FakeCursor(fetchone={"id": 5, "name": "W"})

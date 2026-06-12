@@ -194,6 +194,37 @@ def create_workspace_client(
         return None
 
 
+def tax_id_in_use(
+    user_id: str,
+    tenant_id: Optional[str],
+    tax_id: Optional[str],
+    exclude_id: Optional[int] = None,
+) -> bool:
+    """本 scope 是否已有在用主体占了这个税号(建/改主体防重复 · 空税号永不算重复)。
+
+    检查失败 fail-open(返 False 不阻塞建主体)· 这是 UX 防重不是安全边界。
+    """
+    norm = (tax_id or "").strip()[:30]
+    if not norm:
+        return False
+    try:
+        if tenant_id:
+            where = "tenant_id = %s AND tax_id = %s AND is_active = TRUE"
+            params: list = [tenant_id, norm]
+        else:
+            where = "user_id = %s AND tenant_id IS NULL AND tax_id = %s AND is_active = TRUE"
+            params = [str(user_id), norm]
+        if exclude_id is not None:
+            where += " AND id <> %s"
+            params.append(int(exclude_id))
+        with db.get_cursor() as cur:
+            cur.execute(f"SELECT 1 FROM workspace_clients WHERE {where} LIMIT 1", tuple(params))
+            return cur.fetchone() is not None
+    except Exception as e:
+        logger.warning(f"tax_id_in_use check failed: {e}")
+        return False
+
+
 def get_workspace_client(
     workspace_client_id: int,
     user_id: str,

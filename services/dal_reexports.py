@@ -225,6 +225,7 @@ _REEXPORTS = {
     "services.workspace.store": [
         "ensure_workspace_tables",
         "create_workspace_client",
+        "tax_id_in_use",
         "get_workspace_client",
         "list_workspace_clients",
         "list_workspace_clients_enriched",

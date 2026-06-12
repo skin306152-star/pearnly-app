@@ -128,5 +128,39 @@ class GetSingleScopeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.status_code, 404)
 
 
+class TaxIdDuplicateRouteTests(unittest.IsolatedAsyncioTestCase):
+    """建/改主体税号重复 → 422 人话拦(workspace-entry §五);个人主体跳过税号检测。"""
+
+    async def test_create_duplicate_company_tax_id_422(self):
+        from routes import workspace_routes as wr
+
+        req = wr.WorkspaceClientCreate(name="ACME", tax_id="0105551234567")
+        with (
+            mock.patch.object(wr, "require_perm", return_value={"id": "u1"}),
+            mock.patch.object(wr.db, "tax_id_in_use", return_value=True),
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.create_workspace_client(req, mock.Mock())
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.detail, "workspace.tax_id_duplicate")
+
+    async def test_create_personal_skips_tax_check(self):
+        from routes import workspace_routes as wr
+
+        req = wr.WorkspaceClientCreate(name="Me", tax_id="0105551234567", subject_type="personal")
+
+        def _boom(*a, **k):
+            raise AssertionError("personal 不应触发税号重复检测")
+
+        with (
+            mock.patch.object(wr, "require_perm", return_value={"id": "u1"}),
+            mock.patch.object(wr.db, "tax_id_in_use", side_effect=_boom),
+            mock.patch.object(wr.db, "create_workspace_client", return_value=42),
+            mock.patch.object(wr, "_log_op", return_value=None),
+        ):
+            out = await wr.create_workspace_client(req, mock.Mock())
+        self.assertEqual(out, {"ok": True, "id": 42})
+
+
 if __name__ == "__main__":
     unittest.main()

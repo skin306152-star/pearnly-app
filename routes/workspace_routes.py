@@ -148,6 +148,10 @@ async def create_workspace_client(req: WorkspaceClientCreate, request: Request):
     主体,并可绑定到一个**已存在**的 ERP endpoint。
     """
     user = require_perm(request, "settings.workspace.manage")
+    # 企业主体税号在本租户内不得重复(向导步1 杀手锏的边界 · workspace-entry §五)。
+    if (req.subject_type or "company") != "personal" and (req.tax_id or "").strip():
+        if db.tax_id_in_use(str(user["id"]), _tid(user), req.tax_id):
+            raise HTTPException(422, detail="workspace.tax_id_duplicate")
     wid = db.create_workspace_client(
         str(user["id"]),
         _tid(user),
@@ -203,6 +207,11 @@ async def update_workspace_client_route(
     payload = {k: v for k, v in raw.items() if v is not None}
     if not payload:
         raise HTTPException(400, detail="workspace.no_changes")
+    # 改税号时不得撞本租户其它主体(排除自身)。
+    if (req.tax_id or "").strip() and db.tax_id_in_use(
+        str(user["id"]), _tid(user), req.tax_id, exclude_id=workspace_client_id
+    ):
+        raise HTTPException(422, detail="workspace.tax_id_duplicate")
     ok = db.update_workspace_client(
         workspace_client_id,
         str(user["id"]),

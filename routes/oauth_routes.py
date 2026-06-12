@@ -7,8 +7,7 @@ oauth_routes.py · Google + LINE OAuth 2.0 登录(REFACTOR-B1)
     GET /api/auth/line/start         v118.28.4 LINE Login OAuth 入口
     GET /api/auth/line/callback      code→id_token→verify · 注册/登录 / 自动绑 line_uid
 
-共用模块状态(进程内 OAuth state TTL 10 分钟):
-    - _oauth_state_cache: Dict[str, float]
+共用 OAuth state(HMAC 无状态签名 · TTL 10 分钟 · 跨 worker 可验):
     - _gen_oauth_state() / _verify_oauth_state(s)
 
 E2E 闸:spec 01(普通邮箱登录)+ spec 14(LINE 绑定)间接覆盖。
@@ -16,12 +15,13 @@ E2E 闸:spec 01(普通邮箱登录)+ spec 14(LINE 绑定)间接覆盖。
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import logging
 import os
 import secrets as _secrets
 import time as _time
-from typing import Dict
 from urllib.parse import urlencode as _urlencode
 
 from fastapi import APIRouter, HTTPException
@@ -54,24 +54,36 @@ _GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
 _GOOGLE_REDIRECT_URI = os.getenv(
     "GOOGLE_OAUTH_REDIRECT_URI", "https://pearnly.com/api/auth/google/callback"
 )
-_oauth_state_cache: Dict[str, float] = {}
+# OAuth state 改 HMAC 无状态签名(2026-06-12)· 进程内缓存在 workers>1 时跨 worker 命中
+# 失败 → invalid_state 登不上(workers=4 后必坏)。state=nonce.ts.sig · 用 JWT_SECRET 签 ·
+# 任一 worker 都能验 · 10 分钟 TTL。无服务端存储 → 多 worker 天然兼容。
+_OAUTH_STATE_TTL = 600
+
+
+def _oauth_state_secret() -> bytes:
+    return (os.environ.get("JWT_SECRET", "") or "pearnly-oauth-fallback").encode("utf-8")
 
 
 def _gen_oauth_state() -> str:
-    s = _secrets.token_urlsafe(32)
-    _oauth_state_cache[s] = _time.time()
-    cutoff = _time.time() - 600
-    for k in list(_oauth_state_cache.keys()):
-        if _oauth_state_cache[k] < cutoff:
-            _oauth_state_cache.pop(k, None)
-    return s
+    payload = f"{_secrets.token_urlsafe(16)}.{int(_time.time())}"
+    sig = hmac.new(_oauth_state_secret(), payload.encode("utf-8"), hashlib.sha256).hexdigest()[:32]
+    return f"{payload}.{sig}"
 
 
 def _verify_oauth_state(s: str) -> bool:
-    if not s or s not in _oauth_state_cache:
+    parts = (s or "").split(".")
+    if len(parts) != 3:
         return False
-    ts = _oauth_state_cache.pop(s)
-    return _time.time() - ts < 600
+    nonce, ts, sig = parts
+    expected = hmac.new(
+        _oauth_state_secret(), f"{nonce}.{ts}".encode("utf-8"), hashlib.sha256
+    ).hexdigest()[:32]
+    if not hmac.compare_digest(sig, expected):
+        return False
+    try:
+        return _time.time() - int(ts) < _OAUTH_STATE_TTL
+    except ValueError:
+        return False
 
 
 @router.get("/api/auth/google/start")

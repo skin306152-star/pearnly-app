@@ -207,14 +207,14 @@ function bind(sec: HTMLElement): void {
     const save = sec.querySelector<HTMLButtonElement>('#acct-set-save');
     if (save)
         save.onclick = async () => {
-            save.disabled = true;
             try {
-                await aapi('PUT', withWs('/api/accounting/settings'), dirty);
+                await withLoading(save, () =>
+                    aapi('PUT', withWs('/api/accounting/settings'), dirty)
+                );
                 showToast(t('acct-save-ok'), 'success');
                 dirty = {};
                 load();
             } catch (e) {
-                save.disabled = false;
                 showToast(acctErrMsg(e, 'acct.unexpected'), 'error');
             }
         };

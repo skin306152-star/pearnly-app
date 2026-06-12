@@ -151,19 +151,19 @@ export function confirmFile(filing: Filing, onDone: () => void): void {
     const ok = mask.querySelector<HTMLButtonElement>('#taxm-file-ok');
     if (!ok) return;
     ok.onclick = async () => {
-        ok.disabled = true;
         try {
-            const data = (await aapi('POST', withWs(`/api/tax/filings/${filing.id}/file`), {
-                method: 'manual',
-            })) as { export_url?: string };
-            closeAcctModal();
-            if (data.export_url) {
-                await downloadExport(data.export_url, `${filing.kind}_${filing.period}.zip`);
-            }
+            await withLoading(ok, async () => {
+                const r = (await aapi('POST', withWs(`/api/tax/filings/${filing.id}/file`), {
+                    method: 'manual',
+                })) as { export_url?: string };
+                closeAcctModal();
+                if (r.export_url) {
+                    await downloadExport(r.export_url, `${filing.kind}_${filing.period}.zip`);
+                }
+            });
             showToast(t('tax-file-ok'), 'success');
             onDone();
         } catch (e) {
-            ok.disabled = false;
             showToast(acctErrMsg(e, 'tax.unexpected'), 'error');
             onDone();
         }
@@ -183,16 +183,16 @@ export function openReceiptModal(filing: Filing, onDone: () => void): void {
     if (!ok) return;
     ok.onclick = async () => {
         const input = mask.querySelector<HTMLInputElement>('#taxm-receipt');
-        ok.disabled = true;
         try {
-            await aapi('POST', withWs(`/api/tax/filings/${filing.id}/mark-filed`), {
-                receipt_no: (input?.value || '').trim() || null,
-            });
+            await withLoading(ok, () =>
+                aapi('POST', withWs(`/api/tax/filings/${filing.id}/mark-filed`), {
+                    receipt_no: (input?.value || '').trim() || null,
+                })
+            );
             closeAcctModal();
             showToast(t('tax-mark-ok'), 'success');
             onDone();
         } catch (e) {
-            ok.disabled = false;
             showToast(acctErrMsg(e, 'tax.unexpected'), 'error');
         }
     };
@@ -208,16 +208,15 @@ export function bindFileActions(sec: HTMLElement, filing: Filing, onDone: () => 
     const exportBtn = sec.querySelector<HTMLButtonElement>('[data-act="export"]');
     if (exportBtn)
         exportBtn.onclick = async () => {
-            exportBtn.disabled = true;
             try {
-                await downloadExport(
-                    `/api/tax/filings/${filing.id}/export?fmt=zip`,
-                    `${filing.kind}_${filing.period}.zip`
+                await withLoading(exportBtn, () =>
+                    downloadExport(
+                        `/api/tax/filings/${filing.id}/export?fmt=zip`,
+                        `${filing.kind}_${filing.period}.zip`
+                    )
                 );
             } catch (e) {
                 showToast(acctErrMsg(e, 'tax.export_failed'), 'error');
-            } finally {
-                exportBtn.disabled = false;
             }
         };
     const fileBtn = sec.querySelector<HTMLButtonElement>('[data-act="file"]');

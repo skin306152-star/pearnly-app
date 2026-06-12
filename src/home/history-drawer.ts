@@ -143,14 +143,15 @@ async function saveHistoryEdits() {
     }
 
     const btn = document.getElementById('btn-save-history') as HTMLButtonElement | null;
-    if (btn) btn.disabled = true;
     try {
-        const resp = await fetch(`/api/history/${encodeURIComponent(r._historyId as string)}`, {
-            method: 'PUT',
-            headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pages: newPages }),
+        await withLoading(btn, async () => {
+            const resp = await fetch(`/api/history/${encodeURIComponent(r._historyId as string)}`, {
+                method: 'PUT',
+                headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pages: newPages }),
+            });
+            if (!resp.ok) throw new Error('save failed');
         });
-        if (!resp.ok) throw new Error('save failed');
         showAlert('info', t('history-save-ok'));
         setTimeout(hideAlerts, 1500);
         closeDrawer();
@@ -160,7 +161,6 @@ async function saveHistoryEdits() {
         loadHistoryPage();
     } catch (e) {
         showAlert('error', t('history-save-fail'));
-        if (btn) btn.disabled = false;
     }
 }
 

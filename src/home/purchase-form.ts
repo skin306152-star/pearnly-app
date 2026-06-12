@@ -365,19 +365,18 @@ function bindShell(): void {
         genBtn.onclick = async () => {
             const id = st && st.id;
             if (!id) return showToast(t('pur-receipt-need-save'), 'error');
-            genBtn.disabled = true;
             try {
-                await papi('POST', `/api/purchase/docs/${id}/substitute-receipt`, {
-                    workspace_client_id: activeWsId(),
+                await withLoading(genBtn, async () => {
+                    await papi('POST', `/api/purchase/docs/${id}/substitute-receipt`, {
+                        workspace_client_id: activeWsId(),
+                    });
+                    showToast(t('pur-receipt-generated'), 'success');
+                    await openPurchasePdf(
+                        `/api/purchase/docs/${id}/document.pdf?kind=substitute_receipt`
+                    );
                 });
-                showToast(t('pur-receipt-generated'), 'success');
-                await openPurchasePdf(
-                    `/api/purchase/docs/${id}/document.pdf?kind=substitute_receipt`
-                );
             } catch (e) {
                 showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
-            } finally {
-                genBtn.disabled = false;
             }
         };
     const save = document.getElementById('pur-save-draft');

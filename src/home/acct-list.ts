@@ -274,14 +274,14 @@ async function toggleOpen(id: string): Promise<void> {
 }
 
 async function confirmVoucher(id: string, btn: HTMLButtonElement): Promise<void> {
-    btn.disabled = true;
     try {
-        await aapi('POST', withWs(`/api/accounting/vouchers/${id}/review`), { remember: true });
+        await withLoading(btn, () =>
+            aapi('POST', withWs(`/api/accounting/vouchers/${id}/review`), { remember: true })
+        );
         showToast(t('acct-confirm-ok'), 'success');
         openId = null;
         await load();
     } catch (e) {
-        btn.disabled = false;
         showToast(acctErrMsg(e, 'acct.unexpected'), 'error');
     }
 }

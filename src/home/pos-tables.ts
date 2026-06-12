@@ -433,18 +433,14 @@ function showDialog(title: string, bodyHtml: string, onOk: () => Promise<boolean
     d.querySelector('#ptbl-dcancel')!.addEventListener('click', () => d!.classList.remove('show'));
     const okBtn = d.querySelector('#ptbl-dok') as HTMLButtonElement;
     okBtn.addEventListener('click', async () => {
-        okBtn.disabled = true;
         try {
-            const done = await onOk();
+            const done = await withLoading(okBtn, () => onOk());
             if (done) {
                 d!.classList.remove('show');
                 showToast(t('rtbl.saved'), 'success');
                 await load();
-            } else {
-                okBtn.disabled = false;
             }
         } catch (e) {
-            okBtn.disabled = false;
             errToast(e);
         }
     });

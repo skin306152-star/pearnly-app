@@ -181,21 +181,21 @@ async function onboard(btn: HTMLButtonElement): Promise<void> {
     }
     const firstCashier =
         cashierOpen && name && pin.length >= 4 ? { display_name: name, pin } : null;
-    btn.disabled = true;
     try {
-        await putOnboard({
-            workspace_client_id: wsId,
-            business_type: ty.bt,
-            warehouse_name: null,
-            first_cashier: firstCashier,
-        });
+        await withLoading(btn, () =>
+            putOnboard({
+                workspace_client_id: wsId,
+                business_type: ty.bt,
+                warehouse_name: null,
+                first_cashier: firstCashier,
+            })
+        );
         if (typeof window.applyModuleNav === 'function') window.applyModuleNav();
         showToast(t('posob-done'), 'success');
         if (typeof routeTo === 'function') routeTo('inventory'); // 落到刚开通的库存后台
     } catch (e) {
         const code = (e as { code?: string }).code;
         showToast(posErrMsg(code, 'pos.unexpected'), 'error');
-        btn.disabled = false;
     }
 }
 

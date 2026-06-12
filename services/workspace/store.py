@@ -105,13 +105,17 @@ def ensure_workspace_tables():
                 "ALTER TABLE workspace_clients "
                 "ADD COLUMN IF NOT EXISTS subject_type TEXT NOT NULL DEFAULT 'company'"
             )
-            # 账务设置(引导步③)per-主体:财年起始月(1-12·默认 1=日历年)+ 单据前缀
-            # (开票连号 prefix 的主体级覆盖·空=回落租户级 sales_settings.number_prefix)。
+            # 账务设置(引导步③)per-主体:财年起始月(1-12)+ 单据前缀(开票连号主体级覆盖·空回落租户级)。
             cur.execute(
                 "ALTER TABLE workspace_clients "
                 "ADD COLUMN IF NOT EXISTS fiscal_year_start_month SMALLINT NOT NULL DEFAULT 1"
             )
             cur.execute("ALTER TABLE workspace_clients ADD COLUMN IF NOT EXISTS doc_prefix TEXT")
+            # 企业主体税号在用唯一(原子防重·补 tax_id 查重索引)。部分索引避空税号/归档冲突。
+            cur.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_workspace_clients_tax_active "
+                "ON workspace_clients(tenant_id, tax_id) WHERE is_active AND tax_id IS NOT NULL"
+            )
             # 每 scope 至多一个在用 personal 主体 → 建主体并发幂等 + 迁移可重入的 DB 兜底。
             # subject_type 为新列,无存量 personal 行,索引创建必成功。
             cur.execute(

@@ -149,9 +149,12 @@ async def create_workspace_client(req: WorkspaceClientCreate, request: Request):
     """
     user = require_perm(request, "settings.workspace.manage")
     # 企业主体税号在本租户内不得重复(向导步1 杀手锏的边界 · workspace-entry §五)。
-    if (req.subject_type or "company") != "personal" and (req.tax_id or "").strip():
-        if db.tax_id_in_use(str(user["id"]), _tid(user), req.tax_id):
-            raise HTTPException(422, detail="workspace.tax_id_duplicate")
+    if (
+        (req.subject_type or "company") != "personal"
+        and (req.tax_id or "").strip()
+        and db.tax_id_in_use(str(user["id"]), _tid(user), req.tax_id)
+    ):
+        raise HTTPException(422, detail="workspace.tax_id_duplicate")
     wid = db.create_workspace_client(
         str(user["id"]),
         _tid(user),

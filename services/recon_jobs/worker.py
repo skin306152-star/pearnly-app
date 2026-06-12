@@ -24,6 +24,7 @@ import traceback
 from typing import Callable, Dict, Optional
 
 from . import store
+from services.startup_lock import startup_ddl_lock
 
 logger = logging.getLogger("recon_jobs.worker")
 
@@ -120,7 +121,11 @@ def _run_one(job: Dict) -> None:
 async def run_worker(stop_event: Optional[asyncio.Event] = None) -> None:
     """工人主循环 · embedded 与 standalone 共用。"""
     try:
-        store.ensure_table()
+        # workers=N 时每个进程的内嵌 worker 都会跑到这里 · 并发 CREATE/ALTER IF NOT EXISTS
+        # 仍抢 recon_jobs 的 AccessExclusiveLock → 互相死锁(4-worker 首次建表实测回退过)。
+        # 套启动 DDL 文件锁串行化(表多由 startup.py 先建好 · 此处幂等多为无操作)。
+        with startup_ddl_lock():
+            store.ensure_table()
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[recon-worker] ensure_table at start failed: {e}")
     bootstrap_handlers()

@@ -6,7 +6,14 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-12 · **🧭 用户引导闭环后端全闭环 + ⚡workers 2→4 上线** · 前序见下）
+## 🎯 状态卡（2026-06-12 · **🧭 套账+引导后端全闭环 + ⚡workers 2→4 上线** · 前序见下）
+
+- **🆕 本窗口(2026-06-12)· 🧭 套账后端补全(账务设置+税号查重)【已上线】**（`ddb900bd`+`bf84dd87`+`de94c1a6` /simplify·prod 列/索引实测 live·健康 200）：
+  - 对 `docs/workspace-entry/00`(套账入口·与引导同功能)逐条核对后端,补两缺口:
+    - **账务设置(步③)per-主体**:`workspace_clients` 加 `fiscal_year_start_month`(1-12·记录属性·做账仍按日历月)+ `doc_prefix`(单据前缀)。**doc_prefix 真接连号**(非死字段):开票取号前缀优先级 显式>主体级>租户级 `sales_settings.number_prefix`>类型默认·解析落 `document.py:finalize_issue`(issue/approve 唯一汇合点·两路径一致)·helper 抽 `numbering.resolve_prefix`+`workspace_doc_prefix`。
+    - **税号重复 → 422**(workspace-entry §五):`store.tax_id_in_use`(本 scope 同税号查重·空税号永不算·fail-open)+ POST/PATCH 拦 `workspace.tax_id_duplicate`·个人主体跳过。**/simplify 升级**:加部分唯一索引 `uq_workspace_clients_tax_active(tenant_id,tax_id) WHERE is_active AND tax_id NOT NULL`(原子防重·prod 实测 0 重复方加)。
+  - 「记住上次套账」=前端 `X-Workspace-Client-Id` 头+localStorage(非后端)。**套账+引导后端全闭环**(前端别窗口在做)。坑:document.py/sales_routes 改前贴 500 限·抽 helper 进 numbering+压注释保 ≤500。
+  - 验:全量 3330 unittest OK + 22 新专测(财年/前缀归一·建改持久化·前缀优先级·税号查重 6 维·路由 422)+ 13 闸全绿。详见记忆 [[onboarding-loop-backend-shipped]]。
 
 - **🆕 本窗口(2026-06-12)· ⚡ workers 2→4【真修法+已上线·丝滑杠杆③】**（`4406aeda`·prod unit 已 `--workers 4`·4 进程零 deadlock·健康 200）：
   - **死锁真因+真修**:`services/recon_jobs/worker.py:run_worker()` 内嵌 worker 启动那次 `store.ensure_table()` 在锁外 → 4 进程并发 `CREATE/ALTER IF NOT EXISTS` 抢 recon_jobs AccessExclusiveLock 互等死锁(此前 2 次回退 workers=2 的真因)。修=套 `with startup_ddl_lock():`(flock 跨进程串行·embedded/standalone 共用此函数故都被串)。守门 `test_recon_worker_ddl_lock`。

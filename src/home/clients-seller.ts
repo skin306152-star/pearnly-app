@@ -78,7 +78,13 @@ function renderSellerList() {
             ? window.getActiveWorkspaceClientId()
             : null;
     if (!items.length) {
-        tb.innerHTML = `<div class="cust-empty">${escapeHtml(t(_sellerState.keyword ? 'cust-no-match' : 'seller-empty'))}</div>`;
+        // 受邀成员未被分派客户 → 友好空态「等管理员分配」(无新建入口);老板/管理员 → 引导建主体。
+        const emptyKey = _sellerState.keyword
+            ? 'cust-no-match'
+            : owner
+              ? 'seller-empty'
+              : 'ws-empty-employee';
+        tb.innerHTML = `<div class="cust-empty">${escapeHtml(t(emptyKey))}</div>`;
         return;
     }
     tb.innerHTML = items
@@ -90,6 +96,7 @@ function renderSellerList() {
             // S9 4-bis:行内最多 2 个按钮 · 归档(危险)收进 ⋯ 菜单(确认弹窗在 archiveWsClient)
             const ownerBtns = owner
                 ? `
+            <button class="cust-row-btn" data-saction="assign" data-wid="${c.id}"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 12v-1a2 2 0 00-2-2h-4a2 2 0 00-2 2v1"/><circle cx="5.5" cy="4.5" r="2"/><path d="M11 4.5h2.5M12.25 3.25v2.5"/></svg><span>${escapeHtml(t('casg-assign'))}</span></button>
             <button class="cust-row-btn" data-saction="edit" data-wid="${c.id}"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2l3 3-7 7H2v-3z"/></svg><span>${escapeHtml(t('client-card-edit'))}</span></button>
             <div class="more-wrap">
                 <button class="cust-row-btn" data-saction="more" data-wid="${c.id}" aria-label="more">${MORE_SVG}</button>
@@ -197,13 +204,13 @@ async function archiveWsClient() {
         const archivedId = S.editingWsClientId;
         await apiClient('/api/workspace/clients/' + archivedId, { method: 'DELETE' });
         showToast(t('wsclient-archived'), 'success');
-        // 归档的若正是当前账套 → 退回个人事务,避免悬空
+        // 归档的若正是当前账套 → 清空当前选择,避免悬空(个人模式已退场)
         if (
             typeof window.getActiveWorkspaceClientId === 'function' &&
             Number(window.getActiveWorkspaceClientId()) === Number(archivedId) &&
-            typeof window.enterPersonalMode === 'function'
+            typeof window.setActiveWorkspaceClientId === 'function'
         ) {
-            window.enterPersonalMode();
+            window.setActiveWorkspaceClientId(null);
         }
         closeWsClientModal();
         await loadSellerCache();

@@ -239,7 +239,6 @@ interface Window {
     renderWorkspaceControl?: () => void;
     navigateTo?: (route: string) => void;
     loadReconcilePage?: () => void;
-    enterPersonalMode?: () => void;
     _rerenderErpExceptions?: () => void;
     _reprocessFile?: LegacyBridge;
     _refreshErpEndpointsCache?: () => void;
@@ -287,6 +286,10 @@ interface Window {
     applyModuleNav?: () => void;
     // 平台业态套餐 PO-PP2 · 业态选择器弹窗(注册首次 / 设置切换业态 / 可开启功能)
     openBusinessPicker?: (opts?: { businessType?: string; onDone?: () => void }) => void;
+    // 用户引导闭环 · 注册后向导(业态→主体→账务→完成)+ 公司资料页 + 品牌 logo URL(暗夜垫底)
+    startOnboardingFlow?: () => void;
+    loadCompanyProfile?: () => void;
+    openClientAssign?: (client: { id: number; name: string }) => void;
     // 平台业态套餐 PO-PP3 · 设置「业务/模块」页加载(切到 modules tab 调)
     loadModuleSettings?: () => void;
     // 餐厅 POS · 桌台管理页(owner · 餐厅业态 · 路由 pos-tables · 平铺 section)
@@ -370,7 +373,6 @@ interface Window {
     requireWorkspace?: LegacyBridge;
     wsEmptyHtml?: (btnId: string) => string;
     fetchWorkspaceClients?: LegacyBridge;
-    getWorkMode?: () => unknown;
     _rerenderEmailIngest?: () => void;
     _rerenderArchiveAll?: () => void;
     loadArchiveSettings?: () => void;

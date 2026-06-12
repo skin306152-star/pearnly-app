@@ -6,7 +6,8 @@
 import { posErrMsg } from './inventory-common';
 
 // 业态 → 默认开的 module_key(docs/platform-onboarding/02 §1 的前端镜像 · 诚实预设)。
-const PRESETS: Record<string, string[]> = {
+// 引导闭环向导步① 复用 TYPES(同一份业态卡数据 · 单一来源 · 防漂移)。
+export const PRESETS: Record<string, string[]> = {
     firm: ['sales', 'expense', 'recon', 'knowledge'],
     retail: ['sales', 'inventory', 'pos'],
     pharmacy: ['sales', 'inventory', 'pos'],
@@ -16,7 +17,7 @@ const PRESETS: Record<string, string[]> = {
 };
 const ALL_MODULES = ['sales', 'expense', 'recon', 'inventory', 'pos', 'receivable', 'knowledge'];
 const BASE = ['product', 'client', 'workbench', 'ai'];
-const TYPES: { id: string; icon: string }[] = [
+export const TYPES: { id: string; icon: string }[] = [
     { id: 'firm', icon: 'M3 21h18M5 21V7l8-4v18M19 21V11l-6-4' },
     { id: 'retail', icon: 'M3 9l1-5h16l1 5M4 9v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9M9 21v-6h6v6' },
     { id: 'pharmacy', icon: 'M10.5 20.5 3.5 13.5a5 5 0 0 1 7-7l7 7a5 5 0 0 1-7 7zM8.5 8.5l7 7' },

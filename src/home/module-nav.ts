@@ -85,15 +85,21 @@ function apply(modules: Record<string, ModuleFlag>, businessType?: string | null
     show(document.getElementById('nav-enroll'), anyOff);
 }
 
-// 新注册首进自动弹业态选择(仅本次 page load 一次 · 老租户无 needs_onboarding 标记 → 永不弹)。
+// 新注册首进自动起引导向导(仅本次 page load 一次 · 老租户无 needs_onboarding 标记 → 永不起)。
 let autoPopped = false;
 
 function maybeAutoOnboard(data: { needs_onboarding?: boolean }): void {
     if (autoPopped || !data || !data.needs_onboarding) return;
     const owner = typeof window.isOwner === 'function' ? window.isOwner() : false;
-    if (!owner || typeof window.openBusinessPicker !== 'function') return;
-    autoPopped = true;
-    window.openBusinessPicker();
+    if (!owner) return;
+    // 引导闭环向导(业态→主体→账务→完成);未就绪时兜底回退老业态选择器。
+    if (typeof window.startOnboardingFlow === 'function') {
+        autoPopped = true;
+        window.startOnboardingFlow();
+    } else if (typeof window.openBusinessPicker === 'function') {
+        autoPopped = true;
+        window.openBusinessPicker();
+    }
 }
 
 async function applyModuleNav() {

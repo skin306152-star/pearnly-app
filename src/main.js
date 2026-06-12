@@ -78,6 +78,7 @@ import './home/bank-recon.js'; // REFACTOR-C1 · 银行对账模块(M10)
 import './home/page-clients.js'; // REFACTOR-WB-C3 · 客户页骨架运行期注入(home.html section 抽出 · 须在 clients.js 前)
 import './home/modal-client-edit.js'; // REFACTOR-WB-C3 · 客户/账套主体编辑弹窗 inner 注入(home.html 两空壳 · 须在 clients.js 前 · clients.js DOMContentLoaded 守卫绑定 client-modal-*/wsclient-modal-*)
 import './home/clients.js'; // REFACTOR-C1 · 客户实体前端
+import './home/client-assign.js'; // 用户引导闭环 · 客户管理「分派会计」弹窗(window.openClientAssign · 复用 /api/team/members + scope)
 import './home/page-exceptions.js'; // REFACTOR-WB-C3 · 异常栏页骨架运行期注入(home.html section 抽出 · 须在 exceptions.js 前)
 import './home/exceptions.js'; // REFACTOR-C1 · 异常栏列表页
 import './home/erp-exceptions.js'; // REFACTOR-WB-C1 · ERP 推送异常块(从 exceptions.js 抽出 · window 桥接 loadErpExceptions/_erpExcState)
@@ -102,6 +103,8 @@ import './home/inventory.js'; // POS PO-A4 · 库存后台主页(屏7 · window.
 import './home/inventory-modals.js'; // POS PO-A4 · 入库/盘点弹窗(window.openInventoryIn/openInventoryCount · POST /api/inventory/in|count · .modal)
 import './home/pos-onboarding.js'; // POS PO-B1 · 开通收银(屏8 · window.loadPosOnboardingPage · PUT /api/pos/admin/onboarding · 选业态/建收银员)
 import './home/onboarding-business.js'; // 平台业态套餐 PO-PP2 · 业态选择器弹窗(window.openBusinessPicker · PUT /api/me/onboarding · 可开启功能/切换业态)
+import './home/onboarding-flow.js'; // 用户引导闭环 · 注册后向导(window.startOnboardingFlow · 业态→主体→账务→完成清单 · 复用 onboarding-business/subject-create)
+import './home/company-profile.js'; // 用户引导闭环 · 公司资料页(window.loadCompanyProfile · GET/PATCH /api/workspace/clients/{id} · 行内编辑)
 import './home/module-settings.js'; // 平台业态套餐 PO-PP3 · 设置·业务/模块页(window.loadModuleSettings · 7 toggle PUT /api/me/modules/{key} · bizbar 切换业态)
 import './home/pos-tables.js'; // 餐厅 POS · 桌台管理(window.openPosTables · 区域/桌台 CRUD · /api/pos/admin/restaurant/* · owner·餐厅·弹窗)
 import './home/pos-payment-settings.js'; // POS · 收款设置(window.openPosPayment · 现金/PromptPay/刷卡+服务费/VAT · owner·弹窗)

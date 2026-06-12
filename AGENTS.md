@@ -52,7 +52,7 @@
 1. **workspace_client_id ≠ history.client_id**(账套主体 ≠ 发票买方)· 永不混用同字段 · 见 `docs/agent/BUSINESS_GLOSSARY.md`。
 2. **`erp_push_logs` 是推送状态唯一源**(铁律 #12)· 不建第二套状态表/字段 · 批次态从它派生。
 3. **rows=0 / needs_mapping / failed / blocked / retrying / ERR_* 绝不显示"完成/成功"** · 见 `docs/agent/ERROR_CODES_AND_STATES.md`。
-4. **未验收不 push master**(push=自动部署上线)· 改登录/注册/OCR/计费/推送主路径先报方案(铁律 #16)。
+4. **改完自跑对应真账号 E2E 验过再 push master**(push=自动部署上线)· 2026-06-12 起所有改动(含登录/注册/OCR/计费/推送)自做自检即 push,不再分高敏、不等谁在场(铁律 #26)。
 5. **schema 改动只走 Alembic + 启动 ensure 双跑**(生产不跑 `alembic upgrade` · 见 §5)。
 
 ## 4. 守门 6 道(改完必跑全绿才 commit)

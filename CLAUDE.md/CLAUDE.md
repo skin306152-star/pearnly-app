@@ -311,7 +311,7 @@ FastAPI async 路由调 sync 适配器(Playwright sync_api 等)· 单元 sync mo
    - `git push --no-verify` 或绕过 pre-commit hook
    - 大于 30 个文件改动的"重构级" commit(让 Zihao 先 review)
    - 涉及 `db.py` schema migration · 删表 / 删字段 / `DROP` 任何东西
-   - 部署后立刻能影响**所有用户**的破坏性改动(关键路径如登录 / 注册 / OCR / 计费的大改)· 改前先口头汇报方案
+   - (登录/注册/OCR/计费等核心路径**不再要求改前汇报**:2026-06-12 起按铁律 #26 自做自检即 push · 自己跑对应真账号 E2E 验过即可)
 3. **Claude 主动做的事**:
    - 每次 push 后 · 在回复里**告知用户 commit hash + 改了什么 + 部署 ETA**(约 15s 后用户能访问到新版本)
    - 失败的 webhook / 部署 · 主动检查 `/api/version` 看 cache_bust 是否更新 · 没更新就报警
@@ -596,41 +596,21 @@ db.py    9500 行(+250 容忍 · 严守 services/ 化)
 
 ---
 
-### 26. 无人值守自动修 bug + 自动合并(2026-05-28 Zihao 拍板 · 安全区自动 / 高敏保留闸)
+### 26. 所有改动自做自检即 push(2026-06-12 Zihao 拍板 · 取代旧「高敏区·Zihao 在场」两档制)
 
-**背景**:Zihao 2026-05-28 拍板开启「无人值守」能力 — 没人看着的窗口 / headless / CI 也能**自动修 bug 并合并到 master**,前提是落在「安全区」。本条统一铁律 #16 红线、#25 闭环、`BATCH_STRATEGY.md` §9.5 #4 的口径,**消除冲突**:此前那些「关键路径大改先汇报」「prod 写操作要 Zihao 点一下」「Zihao 在场才动」的措辞,自本条起一律按下面**两档制**精确化。
+**背景**:旧版本把改动分「🟢安全区自动 / 🔴高敏区永远需 Zihao 在场」两档,是整顿期(没真用户、怕动核心路径)的产物。Zihao 2026-06-12 拍板:**整顿已收官,这套在场闸不再需要 —— 所有改动一律自做、自检 OK 即 push,不分高敏低敏、不等任何人在场。**
 
-**🟢 安全区 — 无人值守可全自动(改 + 合并 + 上线 · 不需要任何人在场)**
-- **范围**:文案 / 翻译(i18n)/ 样式(CSS)/ 非核心普通业务逻辑 / 测试 / 文档 / 依赖绿 PR。
-- **放行条件(必须全部满足才自动合并)**:
-  1. CI 5 关全绿(lint+安全扫描 / import / i18n / 单测+覆盖率棘轮 / build / E2E)· 主控独立 `gh run list` 查真绿,不只信本地
-  2. 改动**不命中**下面🔴高敏文件 / 路径
-  3. 改动 < 30 文件(沿用铁律 #16)
-  4. 不删表 / 删字段 / DROP / schema migration(沿用铁律 #16)
-- 全过 → 直接 `git commit` + `git push origin master`,**无需 Zihao 在场**。
+**统一政策**:任何改动(含登录/注册/计费/OCR/auth/session/LINE/POS 离线等过去算「高敏」的)→ 自己写 → 自己跑全套自检 → 绿了直接 `git commit` + `git push origin master`。**不再「开 PR 留草稿等 Zihao 在场」。**
 
-**🔴 高敏区 — 永远需要 Zihao 在场(无人值守一律停 · 绝不自动合并)**
-- **范围**:登录 / 注册 / 计费扣费充值 / OCR 热路径(recognize)/ auth·JWT·session / RLS 基础设施 / LINE 绑定 / 改密码 / 账号合并。
-- **命中即高敏的文件 / 位置**:`auth.py` · `auth_signup.py` · `billing_routes.py` · `services/billing/*` · `line_binding_routes.py` · `line_client.py` · `db.py` 的 credits/charge_ocr/RLS(`get_cursor_rls` 等)· `app.py` 的 recognize 路由 · `services/ocr/*` · `home.js` 的 plans-plg-line / password-change / line-email-modal / session-heartbeat 块。
-- **无人值守碰到 → 立刻停**:开 PR / 留草稿 + 标注「待 Zihao 在场」,**绝不自动合并到 master**。
-- 要做必须:Zihao 在场点头 → 纯结构性 0 逻辑改 → **当轮真账号 E2E(含登录/充值弹窗)验** → 下一块。
+**自检标准(push 前必须真绿 · 这才是闸,不是「谁在场」)**:
+1. 13 道机械闸全绿(见 `docs/GATES.md` · pre-push 本地硬拦)
+2. 改了的核心路径**自己跑真账号 E2E**验过(登录/计费/OCR/POS 离线等改了就验对应流程,别只信单测)
+3. 改坏了**自己回滚**:E2E / 线上冒烟红 → `git revert` + push,绝不把红的留在 master
 
-**计费测试边界(2026-05-28 Zihao 澄清 · 修正旧「绝不真付」措辞)**:Pearnly **无自动支付通道** —— 充值 = 用户真实银行转账 + 上传截图 + SlipOK/Earn(超管)审核 → 只改内部额度台账(`tenant_credits` 数字)· 系统**不会自动移动任何真实金钱**,也无「自动退款」代码路径。因此测试**可自由跑充值/扣费/审核全流程**(只是改台账数字 · Earn 随时能重置)。**唯一边界**:只动**测试账号**的台账,绝不碰真付费用户(mrerp)的余额。(旧 BATCH_STRATEGY §9.5「绝不真付」是针对"若将来接真支付商"的预防 · 当前架构下不适用,已放开。)
-
-**🆕 例外 · 自主 BC 拆搬删 Loop(2026-05-28 Zihao 拍板 · 见 `docs/refactor/AUTONOMOUS_LOOP.md`)**:在「B/C 全阶段拆搬删」自主 loop 里,**🔴高敏块也允许无人值守自动拆/删/推送**,用下面 4 条「安全替身」替代「Zihao 在场」:
-- **A. 纯结构性 · 0 逻辑改**:只挪代码,绝不改任何业务逻辑 / 判定 / 字段。
-- **B. 真账号 E2E 闸**:推送部署后,用测试账号跑真账号 E2E(含登录 + 受影响流程)· 通过才算这块完成。
-- **C. 失败自动回滚**:CI 或 E2E 红 → `git revert` + push,绝不把红的留在 master。
-- **D. 永不真付**:测试绝不触发真实扣钱 / 退款(同上硬线)。
-- 适用边界:仅限「拆搬删」(结构性重构)· 不含任何功能/逻辑改动 · 测试账号凭据走环境变量绝不提交。此例外**只在自主 loop 场景成立**;手动改高敏仍按本条主体走(Zihao 在场)。
-
-**自检(无人值守每次自动合并前 · 内心 checklist)**:
-- [ ] 改动文件**全部在安全区**?(grep 是否命中上面🔴高敏文件)
-- [ ] CI 5 关是否全绿?(`gh run list` 查真绿)
-- [ ] < 30 文件 / 无 schema 改动?
-- 全过 → 自动合并;**任一不过 → 停 + 开 PR 等 Zihao**。
-
-> **怎么真正跑起来「无人值守」**:本条是**策略授权**,不是触发机制。真要让它半夜自己跑,还需要一个**调用入口**(headless `claude -p` 接 CI / 定时任务),那一步单独配 · 配的时候只读审查先行、安全区才开自动合并。派后台并行 agent 的标准操作见 `docs/refactor/BATCH_AGENT_DISPATCH_TEMPLATE.md`。
+**仍保留的少数硬线(与「在场」无关 · 是数据/历史安全)**:
+- **不碰真付费用户余额**:Pearnly 无自动支付通道,充值=真实银行转账+截图+人工审核→只改内部额度台账(`tenant_credits` 数字),系统不自动移动真实金钱、无自动退款路径。测试可自由跑充值/扣费/审核全流程(只改测试账号台账·Earn 可重置),**唯一边界=只动测试账号,绝不碰 mrerp 真余额**。
+- **破坏 git 历史的操作仍问**:`--force` 推 master / `git reset --hard` / 删 tag / 删 branch(沿用铁律 #16 红线)。
+- **删表/删字段/DROP 仍谨慎**:schema 改只走 ensure_*/Alembic 双跑(铁律 #5),删字段先 Optional 一版(铁律 #15)。
 
 ---
 

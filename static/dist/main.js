@@ -3692,7 +3692,7 @@ ${u.raw_text||u.text||""}`).join(`
 .wsg-empty-ic .wsg-i{width:28px;height:28px;}
 .wsg-empty-t{font-size:17px;font-weight:700;}
 .wsg-empty-d{color:var(--ink2);font-size:13px;line-height:1.7;max-width:min(380px,100%);margin-bottom:8px;}
-.wsg-logout{position:absolute;top:-2px;right:0;background:var(--card);border:1px solid var(--line);border-radius:10px;
+.wsg-logout{margin-left:auto;background:var(--card);border:1px solid var(--line);border-radius:10px;
   color:var(--ink2);font-size:13.5px;font-weight:600;padding:7px 14px;cursor:pointer;transition:.12s;}
 .wsg-logout:hover{border-color:var(--ink3);color:var(--accent);}
 .wsg-loading{width:30px;height:30px;margin:64px auto 0;border:3px solid var(--line);border-top-color:var(--accent);

@@ -100,8 +100,13 @@ function render(): void {
         `<div class="onb-body"><div class="onb-pane" style="position:relative">${pane}</div></div>`;
 }
 
+// 本会话是否已过套账门(选/建成一次)。每次页面加载(=每次登录 boot)重置为 false →
+// 强制弹门一次(忽略记住的 active);选定后本会话内 enforce 不再弹(切模块/onboarding 也调它)。
+let _gateSatisfied = false;
+
 // 硬门选定/建成 → 设为当前 → 关门进系统(active 变更发事件,core-boot 自动重载路由)。
 async function enter(id: number): Promise<void> {
+    _gateSatisfied = true; // 先置真:下方 applyModuleNav 会再调 enforce · 防选完又弹门
     if (typeof window.setActiveWorkspaceClientId === 'function')
         window.setActiveWorkspaceClientId(id);
     if (typeof window.fetchWorkspaceClients === 'function') {
@@ -204,15 +209,11 @@ window.openSubjectCreate = function (opts?: { onCreated?: (id: number) => void }
     render();
 };
 
-// core-boot/module-nav 在用户就绪后调:有 active 不弹;无 active 且非新注册引导期 → 起门。
+// core-boot/module-nav 在用户就绪后调:每次登录强制选套账(任何非超管账号),本会话选过才放行。
 window.enforceWorkspaceGate = function () {
-    if (window.PEARNLY_ADMIN_MODE) return;
+    if (window.PEARNLY_ADMIN_MODE) return; // 超管除外
     if (document.getElementById('workspace-gate-root')) return; // 门已开 → 不重起(防打断创建)
     if (document.getElementById('onboarding-flow-root')) return; // 新注册向导优先(末步=选套账)
-    const active =
-        typeof window.getActiveWorkspaceClientId === 'function'
-            ? window.getActiveWorkspaceClientId()
-            : null;
-    if (active != null) return;
+    if (_gateSatisfied) return; // 本会话已选过 → 放行(切模块/onboarding 也调到这,不重弹)
     if (typeof window.showWorkspaceGate === 'function') window.showWorkspaceGate();
 };

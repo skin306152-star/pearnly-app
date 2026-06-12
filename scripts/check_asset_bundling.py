@@ -69,6 +69,25 @@ def manifest(script_name):
     return set(re.findall(r"""['"]([\w./-]+\.(?:css|js))['"]""", s))
 
 
+def _check_spa_bundled(fails, css_manifest, js_manifest, name, skip_js):
+    """SPA 目录(console/pos)的 CSS/JS 必须都在打包清单里。skip_js = 故意独立的白名单
+    (纯翻译数据 *-i18n.js、按 URL 注册不可打包的 pos-sw.js)。"""
+    d = ROOT / "static" / name
+    if not d.exists():
+        return
+    for f in d.glob("*.css"):
+        if f"{name}/{f.name}" not in css_manifest:
+            fails.append(f"static/{name}/{f.name}: 不在 build-home-css.mjs 的打包清单 — 加进去")
+    for f in d.glob("*.js"):
+        if f.name in skip_js:
+            continue
+        if f"{name}/{f.name}" not in js_manifest:
+            fails.append(
+                f"static/{name}/{f.name}: 不在 build-home-js.mjs 的打包清单 — "
+                f"新 {name} JS 逻辑要进 bundle(否则裸发源码 view-source 退化)"
+            )
+
+
 def check_manifest_complete(fails):
     css_manifest = manifest("build-home-css.mjs")
     js_manifest = manifest("build-home-js.mjs")
@@ -92,38 +111,9 @@ def check_manifest_complete(fails):
                     f"static/landing/{f.name}: 不在 build-home-js.mjs 的 landing files — 加进去"
                 )
 
-    # 管理控制台:CSS 全进打包清单;JS 逻辑全进打包清单,console-i18n.js 是纯数据故意独立(白名单)。
-    console = ROOT / "static" / "console"
-    if console.exists():
-        for f in console.glob("*.css"):
-            if f"console/{f.name}" not in css_manifest:
-                fails.append(
-                    f"static/console/{f.name}: 不在 build-home-css.mjs 的 CONSOLE_CSS — 加进去"
-                )
-        for f in console.glob("*.js"):
-            if f.name == "console-i18n.js":
-                continue
-            if f"console/{f.name}" not in js_manifest:
-                fails.append(
-                    f"static/console/{f.name}: 不在 build-home-js.mjs 的打包清单 — "
-                    f"新 console JS 逻辑要进 bundle(否则裸发源码 view-source 退化)"
-                )
-
-    # POS 收银 SPA:CSS 全进打包清单;JS 逻辑全进 bundle。pos-i18n.js 是纯数据、
-    # pos-sw.js 是 Service Worker(按 URL 注册不可打包)— 二者故意独立。
-    pos = ROOT / "static" / "pos"
-    if pos.exists():
-        for f in pos.glob("*.css"):
-            if f"pos/{f.name}" not in css_manifest:
-                fails.append(f"static/pos/{f.name}: 不在 build-home-css.mjs 的 POS_CSS — 加进去")
-        for f in pos.glob("*.js"):
-            if f.name in ("pos-i18n.js", "pos-sw.js"):
-                continue
-            if f"pos/{f.name}" not in js_manifest:
-                fails.append(
-                    f"static/pos/{f.name}: 不在 build-home-js.mjs 的打包清单 — "
-                    f"新 POS JS 逻辑要进 bundle(否则裸发源码 view-source 退化)"
-                )
+    # SPA(console/pos):CSS 全进打包清单 + JS 逻辑全进 bundle;纯数据/SW 白名单跳过。
+    _check_spa_bundled(fails, css_manifest, js_manifest, "console", {"console-i18n.js"})
+    _check_spa_bundled(fails, css_manifest, js_manifest, "pos", {"pos-i18n.js", "pos-sw.js"})
 
 
 def main():

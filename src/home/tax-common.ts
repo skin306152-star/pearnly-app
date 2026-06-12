@@ -152,19 +152,17 @@ export function confirmFile(filing: Filing, onDone: () => void): void {
     if (!ok) return;
     ok.onclick = async () => {
         try {
-            await withLoading(ok, async () => {
-                const r = (await aapi('POST', withWs(`/api/tax/filings/${filing.id}/file`), {
-                    method: 'manual',
-                })) as { export_url?: string };
-                closeAcctModal();
-                if (r.export_url) {
-                    await downloadExport(r.export_url, `${filing.kind}_${filing.period}.zip`);
-                }
-            });
+            const r = (await withLoading(ok, () =>
+                aapi('POST', withWs(`/api/tax/filings/${filing.id}/file`), { method: 'manual' })
+            )) as { export_url?: string };
+            closeAcctModal();
+            if (r.export_url) {
+                await downloadExport(r.export_url, `${filing.kind}_${filing.period}.zip`);
+            }
             showToast(t('tax-file-ok'), 'success');
-            onDone();
         } catch (e) {
             showToast(acctErrMsg(e, 'tax.unexpected'), 'error');
+        } finally {
             onDone();
         }
     };

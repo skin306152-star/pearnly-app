@@ -43,6 +43,20 @@ def _norm_subject_type(value: Optional[str]) -> str:
     return v if v in SUBJECT_TYPES else "company"
 
 
+def _norm_fy_month(value: Optional[int]) -> int:
+    """归一财年起始月到 1-12(默认 1=日历年)。非法 → 1。"""
+    try:
+        m = int(value)
+    except (TypeError, ValueError):
+        return 1
+    return m if 1 <= m <= 12 else 1
+
+
+def _norm_doc_prefix(value: Optional[str]) -> Optional[str]:
+    """归一单据前缀:大写 · 去空白 · 截 20(对齐连号 prefix 列)· 空 → None(回落租户级)。"""
+    return (value or "").strip().upper()[:20] or None
+
+
 def _find_active_personal(cur, user_id: str, tenant_id: Optional[str]) -> Optional[int]:
     """查同 scope 在用的 personal 主体 id(幂等建主体用)。tenant 隔离同其余读路径。"""
     if tenant_id:
@@ -91,6 +105,13 @@ def ensure_workspace_tables():
                 "ALTER TABLE workspace_clients "
                 "ADD COLUMN IF NOT EXISTS subject_type TEXT NOT NULL DEFAULT 'company'"
             )
+            # 账务设置(引导步③)per-主体:财年起始月(1-12·默认 1=日历年)+ 单据前缀
+            # (开票连号 prefix 的主体级覆盖·空=回落租户级 sales_settings.number_prefix)。
+            cur.execute(
+                "ALTER TABLE workspace_clients "
+                "ADD COLUMN IF NOT EXISTS fiscal_year_start_month SMALLINT NOT NULL DEFAULT 1"
+            )
+            cur.execute("ALTER TABLE workspace_clients ADD COLUMN IF NOT EXISTS doc_prefix TEXT")
             # 每 scope 至多一个在用 personal 主体 → 建主体并发幂等 + 迁移可重入的 DB 兜底。
             # subject_type 为新列,无存量 personal 行,索引创建必成功。
             cur.execute(
@@ -125,6 +146,8 @@ def create_workspace_client(
     phone: Optional[str] = None,
     vat_registered: bool = True,
     subject_type: Optional[str] = None,
+    fiscal_year_start_month: Optional[int] = None,
+    doc_prefix: Optional[str] = None,
 ) -> Optional[int]:
     """新建账套主体(= 发票卖方)。返回新 id。name 必填,其余开票字段可空。
 
@@ -144,8 +167,9 @@ def create_workspace_client(
                 """
                 INSERT INTO workspace_clients
                     (user_id, tenant_id, name, tax_id, erp_endpoint_id,
-                     address, branch, phone, vat_registered, subject_type)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     address, branch, phone, vat_registered, subject_type,
+                     fiscal_year_start_month, doc_prefix)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
                 (
@@ -159,6 +183,8 @@ def create_workspace_client(
                     (phone or "").strip()[:50] or None,
                     bool(vat_registered),
                     stype,
+                    _norm_fy_month(fiscal_year_start_month),
+                    _norm_doc_prefix(doc_prefix),
                 ),
             )
             row = cur.fetchone()
@@ -241,11 +267,14 @@ def update_workspace_client(
     phone: Optional[str] = None,
     vat_registered: Optional[bool] = None,
     subject_type: Optional[str] = None,
+    fiscal_year_start_month: Optional[int] = None,
+    doc_prefix: Optional[str] = None,
 ) -> bool:
     """改账套主体的开票字段(P3-客户管理页编辑用)。tenant 隔离。
 
     只更新传入的字段(None=不动)。name 给空串视为不改(账套主体名不能清空)。
     subject_type 留作个人→企业升级入口(传入即归一后更新)。
+    doc_prefix 传空串=清空(回落租户级前缀);fiscal_year_start_month 传入即归一 1-12。
     """
     sets: list = []
     params: list = []
@@ -255,6 +284,12 @@ def update_workspace_client(
     if subject_type is not None:
         sets.append("subject_type = %s")
         params.append(_norm_subject_type(subject_type))
+    if fiscal_year_start_month is not None:
+        sets.append("fiscal_year_start_month = %s")
+        params.append(_norm_fy_month(fiscal_year_start_month))
+    if doc_prefix is not None:
+        sets.append("doc_prefix = %s")
+        params.append(_norm_doc_prefix(doc_prefix))
     if tax_id is not None:
         sets.append("tax_id = %s")
         params.append((tax_id or "").strip()[:30] or None)

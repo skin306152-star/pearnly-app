@@ -375,9 +375,10 @@ def finalize_issue(
     on: date,
     start: int = 1,
     approved_by=None,
+    tenant_prefix=None,
 ) -> tuple[Optional[dict], Optional[str]]:
-    """已锁行 → 完整性/收款闸 → 取连号 → status=issued + 冻结双方快照(不过闸不占号)。
-    approved_by 非空记审批人/时间(§F)。issue_document 与 approval.approve 共用,保证两路径一致。
+    """已锁行 → 完整性/收款闸 → 取连号(前缀走 numbering.resolve_prefix:显式>主体>租户>默认)
+    → status=issued + 冻结快照(不占号)。approved_by 非空记审批人/时间(§F)。issue/approve 共用。
     """
     berr = buyer_mod.validate_buyer(buyer_mod.from_row(row), row["doc_type"])
     if berr:
@@ -385,8 +386,10 @@ def finalize_issue(
     perr = _payment_gate(row)
     if perr:
         return None, perr
-    use_prefix = prefix or DEFAULT_PREFIX.get(row["doc_type"], "DOC")
     ws = workspace_for_numbering(cur, tenant_id, row)
+    ws_prefix = numbering.workspace_doc_prefix(cur, tenant_id, ws)
+    default_prefix = DEFAULT_PREFIX.get(row["doc_type"], "DOC")
+    use_prefix = numbering.resolve_prefix(prefix, ws_prefix, tenant_prefix, default_prefix)
     doc_number, _ = numbering.allocate(
         cur,
         tenant_id=tenant_id,
@@ -438,6 +441,7 @@ def issue_document(
     start: int = 1,
     approval_mode: str = "none",
     workspace_client_id: Optional[int] = None,
+    tenant_prefix=None,
 ) -> tuple[Optional[dict], Optional[str]]:
     """正式开出(直开路径 · approval_mode!=none 须走提交→审批 §F)。返回 (doc, error_code);
     买方完整性(§B)/收款(§J)在取号前校验,不过不占号。"""
@@ -457,6 +461,7 @@ def issue_document(
         reset=reset,
         on=on,
         start=start,
+        tenant_prefix=tenant_prefix,
     )
 
 

@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 """销项单据路由(PO-4 · docs/sales-module/docs/13)。
-
 薄层:鉴权 + 请求整形 + 状态错误映射(404/409);开票业务在 services/sales/document.py。
 开票=钱+合规高敏:草稿可改,正式开出走事务取连号+冻结,开出后改→409。金额按
 docs/04 一律字符串化传输(前端不做 float 运算)。
@@ -339,12 +338,13 @@ async def api_issue_document(doc_id: str, req: IssueIn, request: Request):
             cur,
             tenant_id=tid,
             doc_id=doc_id,
-            prefix=p.get("prefix") or st["number_prefix"],
+            prefix=p.get("prefix"),
             reset=p.get("reset") or st["number_reset"],
             on=on,
             start=st["number_start"],
             approval_mode=st["approval_mode"],
             workspace_client_id=ws,
+            tenant_prefix=st["number_prefix"],
         )
         if err:
             _fail(err)
@@ -401,10 +401,11 @@ async def api_approve_document(doc_id: str, req: IssueIn, request: Request):
             tenant_id=tid,
             doc_id=doc_id,
             approver=approver,
-            prefix=p.get("prefix") or st["number_prefix"],
+            prefix=p.get("prefix"),
             reset=p.get("reset") or st["number_reset"],
             on=on,
             start=st["number_start"],
+            tenant_prefix=st["number_prefix"],
         )
         if err:
             _fail(err)

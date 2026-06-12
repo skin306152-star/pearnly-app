@@ -36,7 +36,16 @@ def submit_for_approval(cur, *, tenant_id: str, doc_id) -> Optional[str]:
 
 
 def approve(
-    cur, *, tenant_id: str, doc_id, approver: Optional[str], prefix, reset: str, on: date, start=1
+    cur,
+    *,
+    tenant_id: str,
+    doc_id,
+    approver: Optional[str],
+    prefix,
+    reset: str,
+    on: date,
+    start=1,
+    tenant_prefix=None,
 ) -> tuple[Optional[dict], Optional[str]]:
     """审批通过:pending_approval → 取号开出 + 记审批人。返回 (doc, error_code)。"""
     row = doc_svc.lock_for_issue(cur, tenant_id, doc_id)
@@ -54,6 +63,7 @@ def approve(
         on=on,
         start=start,
         approved_by=approver or "",
+        tenant_prefix=tenant_prefix,
     )
 
 

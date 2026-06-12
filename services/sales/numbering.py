@@ -18,6 +18,23 @@ RESET_MONTHLY = "monthly"
 RESET_NEVER = "never"
 
 
+def workspace_doc_prefix(cur, tenant_id: str, ws_id) -> str | None:
+    """主体级单据前缀(引导步③ doc_prefix)。无/空 → None(调用方回落租户默认)。"""
+    if not ws_id:
+        return None
+    cur.execute(
+        "SELECT doc_prefix FROM workspace_clients WHERE id=%s AND tenant_id=%s",
+        (int(ws_id), tenant_id),
+    )
+    r = cur.fetchone()
+    return (r.get("doc_prefix") if r else None) or None
+
+
+def resolve_prefix(explicit, ws_prefix, tenant_prefix, default: str) -> str:
+    """连号前缀优先级:显式请求 > 主体级 doc_prefix > 租户级 number_prefix > 类型默认。"""
+    return explicit or ws_prefix or tenant_prefix or default
+
+
 def period_key(reset: str, on: date) -> str:
     """号码桶键(进 document_number_sequences 主键 · 决定何时重置归 1)。"""
     if reset == RESET_MONTHLY:

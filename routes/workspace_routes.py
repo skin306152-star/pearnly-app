@@ -39,6 +39,13 @@ class WorkspaceClientCreate(BaseModel):
     phone: Optional[str] = Field(None, max_length=50, description="电话")
     vat_registered: Optional[bool] = Field(None, description="是否注册 VAT")
     subject_type: Optional[str] = Field(None, description="主体类型 company|personal(默认 company)")
+    # 账务设置(引导步③ · per-主体)
+    fiscal_year_start_month: Optional[int] = Field(
+        None, ge=1, le=12, description="财年起始月 1-12(默认 1=日历年)"
+    )
+    doc_prefix: Optional[str] = Field(
+        None, max_length=20, description="单据前缀(空=回落租户级)· 覆盖开票连号前缀"
+    )
 
 
 class WorkspaceEndpointBind(BaseModel):
@@ -55,6 +62,10 @@ class WorkspaceClientUpdate(BaseModel):
     phone: Optional[str] = Field(None, max_length=50, description="电话")
     vat_registered: Optional[bool] = Field(None, description="是否注册 VAT")
     subject_type: Optional[str] = Field(None, description="主体类型 company|personal(升级用)")
+    fiscal_year_start_month: Optional[int] = Field(None, ge=1, le=12, description="财年起始月 1-12")
+    doc_prefix: Optional[str] = Field(
+        None, max_length=20, description="单据前缀(空串=清空回落租户级)"
+    )
 
 
 @router.get("/api/workspace/clients")
@@ -148,6 +159,8 @@ async def create_workspace_client(req: WorkspaceClientCreate, request: Request):
         phone=req.phone,
         vat_registered=req.vat_registered if req.vat_registered is not None else True,
         subject_type=req.subject_type,
+        fiscal_year_start_month=req.fiscal_year_start_month,
+        doc_prefix=req.doc_prefix,
     )
     if not wid:
         raise HTTPException(400, detail="workspace.create_failed")

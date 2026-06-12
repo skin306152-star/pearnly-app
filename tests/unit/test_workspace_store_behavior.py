@@ -121,13 +121,14 @@ class SubjectTypeTests(unittest.TestCase):
         self.assertEqual(wid, 7)
         self.assertIn("INSERT INTO workspace_clients", cur.last_sql)
         self.assertIn("subject_type", cur.last_sql)
-        self.assertEqual(cur.last_params[-1], "company")
+        # INSERT 列尾序:subject_type, fiscal_year_start_month, doc_prefix → subject_type 在 -3
+        self.assertEqual(cur.last_params[-3], "company")
 
     def test_unknown_subject_type_falls_back_company(self):
         cur = FakeCursor(fetchone={"id": 8})
         with patch_cursor(cur):
             ws.create_workspace_client("u1", "t1", "ACME", subject_type="weird")
-        self.assertEqual(cur.last_params[-1], "company")
+        self.assertEqual(cur.last_params[-3], "company")
 
     def test_personal_create_returns_existing_without_insert(self):
         # _find_active_personal 命中 → 幂等返回既有 id · 绝不再 INSERT。
@@ -145,6 +146,48 @@ class SubjectTypeTests(unittest.TestCase):
         self.assertTrue(ok)
         self.assertIn("subject_type = %s", cur.last_sql)
         self.assertIn("company", cur.last_params)
+
+
+class AccountingSettingsTests(unittest.TestCase):
+    """账务设置(引导步③):财年起始月 + 单据前缀 per-主体 持久化 + 归一。"""
+
+    def test_norm_fy_month(self):
+        self.assertEqual(ws._norm_fy_month(6), 6)
+        self.assertEqual(ws._norm_fy_month(1), 1)
+        self.assertEqual(ws._norm_fy_month(12), 12)
+        self.assertEqual(ws._norm_fy_month(0), 1)  # 越界归 1
+        self.assertEqual(ws._norm_fy_month(13), 1)
+        self.assertEqual(ws._norm_fy_month(None), 1)
+        self.assertEqual(ws._norm_fy_month("x"), 1)
+
+    def test_norm_doc_prefix(self):
+        self.assertEqual(ws._norm_doc_prefix("inv"), "INV")  # 大写
+        self.assertEqual(ws._norm_doc_prefix("  ab "), "AB")  # 去空白
+        self.assertEqual(ws._norm_doc_prefix("a" * 30), "A" * 20)  # 截 20
+        self.assertIsNone(ws._norm_doc_prefix(""))  # 空 → None(回落租户级)
+        self.assertIsNone(ws._norm_doc_prefix(None))
+
+    def test_create_persists_fiscal_and_prefix(self):
+        cur = FakeCursor(fetchone={"id": 5})
+        with patch_cursor(cur):
+            ws.create_workspace_client(
+                "u1", "t1", "ACME", fiscal_year_start_month=4, doc_prefix="ab"
+            )
+        self.assertIn("fiscal_year_start_month", cur.last_sql)
+        self.assertIn("doc_prefix", cur.last_sql)
+        self.assertEqual(cur.last_params[-2], 4)  # fy 归一后
+        self.assertEqual(cur.last_params[-1], "AB")  # 前缀大写
+
+    def test_update_persists_fiscal_and_prefix(self):
+        cur = FakeCursor(rowcount=1)
+        with patch_cursor(cur):
+            ws.update_workspace_client(
+                5, "u1", tenant_id="t1", fiscal_year_start_month=3, doc_prefix="x"
+            )
+        self.assertIn("fiscal_year_start_month = %s", cur.last_sql)
+        self.assertIn("doc_prefix = %s", cur.last_sql)
+        self.assertIn(3, cur.last_params)
+        self.assertIn("X", cur.last_params)
 
 
 class GetTests(unittest.TestCase):

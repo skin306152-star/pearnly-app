@@ -60,7 +60,7 @@
 }
 
 .cust-table-wrap {
-    border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--line); border-radius: 10px; overflow: visible;
     background: var(--card);
 }
 .cust-table-head, .cust-row {
@@ -68,7 +68,7 @@
     padding: 11px 14px;
 }
 .buyer-grid  { grid-template-columns: 36px 1fr 90px 140px 150px; }
-.seller-grid { grid-template-columns: 1fr 170px 90px 210px; }
+.seller-grid { grid-template-columns: minmax(240px, 520px) 170px 90px 1fr; }
 .cust-table-head {
     background: var(--bg); font-size: 12px; font-weight: 600;
     color: var(--ink-3); border-bottom: 1px solid var(--line);

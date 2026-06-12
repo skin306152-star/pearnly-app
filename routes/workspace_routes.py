@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 
 from core import db
 from core.auth import get_current_user_from_request
-from core.route_helpers import _tid
+from core.route_helpers import _tid, _log_op
 from services.authz.deps import get_authz, require_perm
 
 router = APIRouter()
@@ -37,6 +37,7 @@ class WorkspaceClientCreate(BaseModel):
     branch: Optional[str] = Field(None, max_length=120, description="总公司/分公司")
     phone: Optional[str] = Field(None, max_length=50, description="电话")
     vat_registered: Optional[bool] = Field(None, description="是否注册 VAT")
+    subject_type: Optional[str] = Field(None, description="主体类型 company|personal(默认 company)")
 
 
 class WorkspaceEndpointBind(BaseModel):
@@ -52,6 +53,7 @@ class WorkspaceClientUpdate(BaseModel):
     branch: Optional[str] = Field(None, max_length=120, description="总公司/分公司")
     phone: Optional[str] = Field(None, max_length=50, description="电话")
     vat_registered: Optional[bool] = Field(None, description="是否注册 VAT")
+    subject_type: Optional[str] = Field(None, description="主体类型 company|personal(升级用)")
 
 
 @router.get("/api/workspace/clients")
@@ -73,6 +75,46 @@ async def list_workspace_clients(request: Request, include_inactive: bool = Fals
     return {"clients": rows, "count": len(rows)}
 
 
+@router.get("/api/workspace/clients/{workspace_client_id}")
+async def get_workspace_client_detail(workspace_client_id: int, request: Request):
+    """取单个账套主体完整资料(公司资料页读 · 行内编辑前先拉)。
+
+    tenant 隔离 + 作用域:被分派成员只能读分配给自己的主体(fail-closed),
+    越权返 404(不泄漏存在性)。
+    """
+    user = get_current_user_from_request(request)
+    authz = get_authz(request, user)
+    if (
+        not user.get("is_super_admin")
+        and authz.scope_mode == "assigned"
+        and not authz.allows_workspace(workspace_client_id)
+    ):
+        raise HTTPException(404, detail="workspace.not_found")
+    client = db.get_workspace_client(workspace_client_id, str(user["id"]), tenant_id=_tid(user))
+    if not client:
+        raise HTTPException(404, detail="workspace.not_found")
+    return {"client": client}
+
+
+@router.get("/api/workspace/tax-lookup")
+async def workspace_tax_lookup(tax_id: str, request: Request, branch: int = 0):
+    """按 13 位税号查公司名+地址(建企业主体时自动带出)。仅老板/超管。
+
+    复用 RD VAT 服务(services.rd.rd_api.lookup_vat · 内置 7 天缓存 + 5s 超时 + 1 次
+    重试)。查到即证明该号已注册 VAT → 附 vat_registered=true 提示;查不到 / 格式错
+    诚实返 {ok:false,error},前端降级为手动填(不阻塞 onboarding)。
+    """
+    require_perm(request, "settings.workspace.manage")
+    from services.rd.rd_api import lookup_vat
+
+    result = lookup_vat(tax_id, branch or 0)
+    if not result.get("ok"):
+        return {"ok": False, "error": result.get("error") or "not_found"}
+    data = dict(result.get("data") or {})
+    data["vat_registered"] = True
+    return {"ok": True, "data": data, "cached": bool(result.get("cached"))}
+
+
 @router.post("/api/workspace/clients")
 async def create_workspace_client(req: WorkspaceClientCreate, request: Request):
     """新建账套主体。仅老板/超管(建账套主体是重大操作 · 区别于建买方)。
@@ -91,9 +133,19 @@ async def create_workspace_client(req: WorkspaceClientCreate, request: Request):
         branch=req.branch,
         phone=req.phone,
         vat_registered=req.vat_registered if req.vat_registered is not None else True,
+        subject_type=req.subject_type,
     )
     if not wid:
         raise HTTPException(400, detail="workspace.create_failed")
+    _log_op(
+        request,
+        user,
+        "workspace.client.create",
+        target_type="workspace_client",
+        target_id=str(wid),
+        target_name=req.name,
+        details={"subject_type": req.subject_type or "company"},
+    )
     return {"ok": True, "id": wid}
 
 
@@ -132,6 +184,14 @@ async def update_workspace_client_route(
     )
     if not ok:
         raise HTTPException(404, detail="workspace.not_found")
+    _log_op(
+        request,
+        user,
+        "workspace.client.update",
+        target_type="workspace_client",
+        target_id=str(workspace_client_id),
+        details={"fields": sorted(payload.keys())},
+    )
     return {"ok": True, "id": workspace_client_id}
 
 

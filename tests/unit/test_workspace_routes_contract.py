@@ -9,6 +9,9 @@
 """
 
 import unittest
+from unittest import mock
+
+from fastapi import HTTPException
 
 from routes.workspace_routes import router as workspace_router
 
@@ -32,6 +35,9 @@ class WorkspaceRouteContractTests(unittest.TestCase):
         # P3(2026-05-27 · Zihao 拍板)· 账套主体管理页:补编辑 + 归档(软删)路由
         self.assertIn(("PATCH", "/api/workspace/clients/{workspace_client_id}"), rs)
         self.assertIn(("DELETE", "/api/workspace/clients/{workspace_client_id}"), rs)
+        # 用户引导闭环(2026-06-11)· 公司资料页读单个 + 建企业主体税号带出
+        self.assertIn(("GET", "/api/workspace/clients/{workspace_client_id}"), rs)
+        self.assertIn(("GET", "/api/workspace/tax-lookup"), rs)
 
     def test_delete_is_soft_archive_only(self):
         # P3:DELETE 仅允许出现在单个账套主体的归档路由上(软删 is_active=False)·
@@ -52,6 +58,63 @@ class WorkspaceRouterMountedTests(unittest.TestCase):
 
         paths = {getattr(r, "path", None) for r in app.app.routes}
         self.assertIn("/api/workspace/clients", paths)
+
+
+class TaxLookupBehaviorTests(unittest.IsolatedAsyncioTestCase):
+    """税号带出:复用 RD lookup_vat · 命中加 vat_registered=true · 未命中诚实降级。"""
+
+    async def test_hit_adds_vat_registered(self):
+        from routes import workspace_routes as wr
+
+        with (
+            mock.patch.object(wr, "require_perm", return_value={"id": "u1"}),
+            mock.patch(
+                "services.rd.rd_api.lookup_vat",
+                return_value={
+                    "ok": True,
+                    "data": {"name": "ACME", "address": "BKK"},
+                    "cached": False,
+                },
+            ),
+        ):
+            out = await wr.workspace_tax_lookup("0105551234567", mock.Mock(), branch=0)
+        self.assertTrue(out["ok"])
+        self.assertEqual(out["data"]["name"], "ACME")
+        self.assertTrue(out["data"]["vat_registered"])
+
+    async def test_miss_returns_ok_false(self):
+        from routes import workspace_routes as wr
+
+        with (
+            mock.patch.object(wr, "require_perm", return_value={"id": "u1"}),
+            mock.patch(
+                "services.rd.rd_api.lookup_vat", return_value={"ok": False, "error": "not_found"}
+            ),
+        ):
+            out = await wr.workspace_tax_lookup("123", mock.Mock(), branch=0)
+        self.assertFalse(out["ok"])
+        self.assertEqual(out["error"], "not_found")
+
+
+class GetSingleScopeTests(unittest.IsolatedAsyncioTestCase):
+    """公司资料页读单个:被分派成员越权 → fail-closed 404(不泄漏存在性)。"""
+
+    async def test_assigned_member_out_of_scope_404(self):
+        from routes import workspace_routes as wr
+
+        authz = mock.Mock(scope_mode="assigned")
+        authz.allows_workspace.return_value = False
+        with (
+            mock.patch.object(
+                wr,
+                "get_current_user_from_request",
+                return_value={"id": "u1", "is_super_admin": False},
+            ),
+            mock.patch.object(wr, "get_authz", return_value=authz),
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.get_workspace_client_detail(123, mock.Mock())
+        self.assertEqual(ctx.exception.status_code, 404)
 
 
 if __name__ == "__main__":

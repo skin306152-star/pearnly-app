@@ -34,6 +34,32 @@ from services.workspace.seller_routing import (  # noqa: F401,E402
 
 logger = logging.getLogger(__name__)
 
+SUBJECT_TYPES = ("company", "personal")
+
+
+def _norm_subject_type(value: Optional[str]) -> str:
+    """归一主体类型。未知/空 → company(保守默认 · 不误判为个人零税号)。"""
+    v = (value or "").strip().lower()
+    return v if v in SUBJECT_TYPES else "company"
+
+
+def _find_active_personal(cur, user_id: str, tenant_id: Optional[str]) -> Optional[int]:
+    """查同 scope 在用的 personal 主体 id(幂等建主体用)。tenant 隔离同其余读路径。"""
+    if tenant_id:
+        cur.execute(
+            "SELECT id FROM workspace_clients WHERE tenant_id = %s "
+            "AND subject_type = 'personal' AND is_active = TRUE ORDER BY id LIMIT 1",
+            (tenant_id,),
+        )
+    else:
+        cur.execute(
+            "SELECT id FROM workspace_clients WHERE user_id = %s AND tenant_id IS NULL "
+            "AND subject_type = 'personal' AND is_active = TRUE ORDER BY id LIMIT 1",
+            (str(user_id),),
+        )
+    row = cur.fetchone()
+    return int(row["id"]) if row else None
+
 
 def ensure_workspace_tables():
     """建 workspace_clients 表 + 给 ocr_history 加 workspace_client_id 列 · 幂等。
@@ -59,6 +85,24 @@ def ensure_workspace_tables():
                 CREATE INDEX IF NOT EXISTS idx_workspace_clients_user
                     ON workspace_clients(user_id, is_active);
             """)
+            # 用户引导闭环(2026-06-11):主体类型 company|personal。个人/freelancer/未
+            # 注册小店走 personal(零税号 · 仅开收据)。存量行默认 company。
+            cur.execute(
+                "ALTER TABLE workspace_clients "
+                "ADD COLUMN IF NOT EXISTS subject_type TEXT NOT NULL DEFAULT 'company'"
+            )
+            # 每 scope 至多一个在用 personal 主体 → 建主体并发幂等 + 迁移可重入的 DB 兜底。
+            # subject_type 为新列,无存量 personal 行,索引创建必成功。
+            cur.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_workspace_clients_personal_tenant "
+                "ON workspace_clients(tenant_id) "
+                "WHERE subject_type = 'personal' AND is_active AND tenant_id IS NOT NULL"
+            )
+            cur.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_workspace_clients_personal_user "
+                "ON workspace_clients(user_id) "
+                "WHERE subject_type = 'personal' AND is_active AND tenant_id IS NULL"
+            )
             # ocr_history 加 workspace 归属列(可空 · 不动现有 client_id=买方)
             cur.execute("""
                 ALTER TABLE ocr_history ADD COLUMN IF NOT EXISTS workspace_client_id BIGINT;
@@ -80,18 +124,28 @@ def create_workspace_client(
     branch: Optional[str] = None,
     phone: Optional[str] = None,
     vat_registered: bool = True,
+    subject_type: Optional[str] = None,
 ) -> Optional[int]:
-    """新建账套主体(= 发票卖方)。返回新 id。name 必填,其余开票字段可空。"""
+    """新建账套主体(= 发票卖方)。返回新 id。name 必填,其余开票字段可空。
+
+    subject_type=personal 时幂等:同 scope 已有在用个人主体 → 返回既有 id 不重复建
+    (并发双提交 / 迁移重入安全 · DB 部分唯一索引兜底)。
+    """
     if not name or not name.strip():
         return None
+    stype = _norm_subject_type(subject_type)
     try:
         with db.get_cursor(commit=True) as cur:
+            if stype == "personal":
+                existing = _find_active_personal(cur, str(user_id), tenant_id)
+                if existing:
+                    return existing
             cur.execute(
                 """
                 INSERT INTO workspace_clients
                     (user_id, tenant_id, name, tax_id, erp_endpoint_id,
-                     address, branch, phone, vat_registered)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     address, branch, phone, vat_registered, subject_type)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
                 (
@@ -104,6 +158,7 @@ def create_workspace_client(
                     (branch or "").strip()[:120] or "สำนักงานใหญ่",
                     (phone or "").strip()[:50] or None,
                     bool(vat_registered),
+                    stype,
                 ),
             )
             row = cur.fetchone()
@@ -185,16 +240,21 @@ def update_workspace_client(
     branch: Optional[str] = None,
     phone: Optional[str] = None,
     vat_registered: Optional[bool] = None,
+    subject_type: Optional[str] = None,
 ) -> bool:
     """改账套主体的开票字段(P3-客户管理页编辑用)。tenant 隔离。
 
     只更新传入的字段(None=不动)。name 给空串视为不改(账套主体名不能清空)。
+    subject_type 留作个人→企业升级入口(传入即归一后更新)。
     """
     sets: list = []
     params: list = []
     if name is not None and name.strip():
         sets.append("name = %s")
         params.append(name.strip()[:200])
+    if subject_type is not None:
+        sets.append("subject_type = %s")
+        params.append(_norm_subject_type(subject_type))
     if tax_id is not None:
         sets.append("tax_id = %s")
         params.append((tax_id or "").strip()[:30] or None)

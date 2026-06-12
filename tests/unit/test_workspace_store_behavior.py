@@ -104,6 +104,49 @@ class CreateTests(unittest.TestCase):
             self.assertIsNone(ws.create_workspace_client("u1", "t1", "X"))
 
 
+class SubjectTypeTests(unittest.TestCase):
+    """用户引导闭环:subject_type company|personal + personal 幂等 + 归一。"""
+
+    def test_norm_subject_type(self):
+        self.assertEqual(ws._norm_subject_type("personal"), "personal")
+        self.assertEqual(ws._norm_subject_type("PERSONAL"), "personal")
+        self.assertEqual(ws._norm_subject_type("company"), "company")
+        self.assertEqual(ws._norm_subject_type("garbage"), "company")
+        self.assertEqual(ws._norm_subject_type(None), "company")
+
+    def test_company_create_passes_subject_type_param(self):
+        cur = FakeCursor(fetchone={"id": 7})
+        with patch_cursor(cur):
+            wid = ws.create_workspace_client("u1", "t1", "ACME", subject_type="company")
+        self.assertEqual(wid, 7)
+        self.assertIn("INSERT INTO workspace_clients", cur.last_sql)
+        self.assertIn("subject_type", cur.last_sql)
+        self.assertEqual(cur.last_params[-1], "company")
+
+    def test_unknown_subject_type_falls_back_company(self):
+        cur = FakeCursor(fetchone={"id": 8})
+        with patch_cursor(cur):
+            ws.create_workspace_client("u1", "t1", "ACME", subject_type="weird")
+        self.assertEqual(cur.last_params[-1], "company")
+
+    def test_personal_create_returns_existing_without_insert(self):
+        # _find_active_personal 命中 → 幂等返回既有 id · 绝不再 INSERT。
+        cur = FakeCursor(fetchone={"id": 99})
+        with patch_cursor(cur):
+            wid = ws.create_workspace_client("u1", "t1", "ME", subject_type="personal")
+        self.assertEqual(wid, 99)
+        self.assertNotIn("INSERT INTO workspace_clients", cur.all_sql())
+        self.assertIn("subject_type = 'personal'", cur.all_sql())
+
+    def test_update_passes_subject_type(self):
+        cur = FakeCursor(rowcount=1)
+        with patch_cursor(cur):
+            ok = ws.update_workspace_client(5, "u1", tenant_id="t1", subject_type="company")
+        self.assertTrue(ok)
+        self.assertIn("subject_type = %s", cur.last_sql)
+        self.assertIn("company", cur.last_params)
+
+
 class GetTests(unittest.TestCase):
     def test_tenant_path(self):
         cur = FakeCursor(fetchone={"id": 5, "name": "W"})

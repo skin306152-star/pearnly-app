@@ -6,9 +6,20 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-11 · **🇸🇬 服务器迁新加坡同区 + 一批实测修复 + 首登改密彻底删 + 迁移收尾** · ⚠️workers=2 · 前序见下）
+## 🎯 状态卡（2026-06-12 · **🧭 用户引导闭环【后端全闭环·已上线】** · 前序见下）
 
-- **🆕 本窗口(2026-06-11·主控)· 🇸🇬 迁新加坡 + 实测修复批 + 首登改密删除 + 迁移收尾完结**:
+- **🆕 本窗口(2026-06-12)· 🧭 用户引导闭环后端【全部闭环·已上线·迁移已跑】**（`f9860ed2` 主体 + `6a2128c9` /simplify 收口 · prod 健康 200 · 全闸绿）：
+  - 按 `docs/onboarding/00` 施工后端,**前端 5 组件全部可对接**(逐项核对过)。新增很少、全 additive、低风险:
+    - **schema**(ensure 自愈·`services/workspace/store.py`):`workspace_clients` 加 `subject_type`(company|personal·默认 company)+ 每 scope 至多一个在用 personal 主体的部分唯一索引(建主体幂等兜底·新列无存量 personal 行故索引创建必成功)。prod boot 日志证 `workspace_clients 已就绪`·零 deadlock。
+    - **routes**(`routes/workspace_routes.py`):POST/PATCH 透传 `subject_type` + 写 `operation_logs`;新增 `GET /api/workspace/clients/{id}`(公司资料页读·作用域 fail-closed 404 不泄漏存在性)+ `GET /api/workspace/tax-lookup?tax_id=`(复用 `services.rd.rd_api.lookup_vat` 税号带出·命中加 vat_registered·未命中/格式错诚实降级)。tax-lookup live 验证 401(路由在)。
+    - **store**:`create/update_workspace_client` 接 subject_type;建 personal 幂等(同 scope 已有则返既有 id)。
+    - **迁移脚本**(`scripts/migrate_personal_mode_to_subject.py`·dry-run/apply 幂等):**prod 已 --apply = 0 候选/0 回填**(近期 DB 已清理·真实租户都有主体·无遗留个人模式孤儿数据)。同时实证 prod `subject_type` 列可用。
+  - **零新建复用**:分派会计走既有 `PUT /api/team/members/{uid}/scope` + member_scopes;受邀成员分流走 `/api/me` role + `GET /clients` 做 0/1/N。
+  - **/simplify 收口**(`6a2128c9`):唯一采纳=tax-lookup 同步阻塞 SOAP 改 `await asyncio.to_thread` 不堵 event loop;其余建议(Literal 拒非法=行为变更/vat 抽函数=过度工程/migrate 合并循环=可读性反降/脚本重复=独立进程必要)判断后跳过。
+  - **验**:全量 3311 unittest OK + 17 新专测(store/契约/tax-lookup/迁移)+ 13 道闸全绿 + pre-push exit0。**下一步=前端**(`onboarding-flow/subject-create/company-profile.ts` + workspace-switcher 删个人模式分支·见 docs/onboarding/00 §三)。
+  - 顺手:清掉工作树脏的 `package.json`(误 npm install 污染·已 `git checkout` 还原);确认 `/console`·`/invite` no-cache 已收口上线(prod curl 实证三响应头)。
+
+- **本窗口(2026-06-11·主控)· 🇸🇬 迁新加坡 + 实测修复批 + 首登改密删除 + 迁移收尾完结**:
   - **迁移已完结**:app 东京→新加坡 `66.42.49.213`(同区·DB RTT 69ms→1ms)·Cloudflare 切源站IP·哨兵231次vision干净·切流量后522(ufw挡80/443)即修·密钥轮换(Zihao已做)·**禁密码登录(仅key)·撤东京临时通道key·东京45.76.53.194回滚兜底留~06-18勿动**。runbook `docs/perf/01`·prod 200健康。
   - **修复批 `fc4843a6`**(用户实测一路报):邮件邀请import断链(`_smtp_send_email`搬routes)/银行对账导入后自动选账户/角色卡去首字×3/邀请页提交前客户端校验+`err_user/pass_format`四语/**登录支持邮箱**(`find_user_by_username`含@回退email查·零歧义)。?v=11850751·console.js v8·invite.js v6。
   - **首登强制改密彻底删**(v118.11废弃·邀请已自设密码):force-pw.ts整文件+main.js import+core-boot触发+landing标记+login·me字段+40行i18n+115行css死样式+测试·**grep零残留**·改密端点`/api/me/change_password`保留(设置改密复用)。

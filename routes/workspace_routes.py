@@ -102,8 +102,11 @@ async def workspace_tax_lookup(tax_id: str, request: Request, branch: int = 0):
     """按 13 位税号查公司名+地址(建企业主体时自动带出)。仅老板/超管。
 
     复用 RD VAT 服务(services.rd.rd_api.lookup_vat · 内置 7 天缓存 + 5s 超时 + 1 次
-    重试)。查到即证明该号已注册 VAT → 附 vat_registered=true 提示;查不到 / 格式错
-    诚实返 {ok:false,error},前端降级为手动填(不阻塞 onboarding)。
+    重试 · 已拼好 name/address/branch_label)。查到即证明该号已注册 VAT → 附
+    vat_registered=true;查不到 / 格式错诚实返 {ok:false,error},前端降级为手动填。
+
+    只回主体登记绿卡要的归一字段(不透传 raw_fields 17 字段噪音):
+    {tax_id, name, address, branch_no, branch_label, post_code, province, vat_registered}。
     """
     require_perm(request, "settings.workspace.manage")
     from services.rd.rd_api import lookup_vat
@@ -112,8 +115,17 @@ async def workspace_tax_lookup(tax_id: str, request: Request, branch: int = 0):
     result = await asyncio.to_thread(lookup_vat, tax_id, branch or 0)
     if not result.get("ok"):
         return {"ok": False, "error": result.get("error") or "not_found"}
-    data = dict(result.get("data") or {})
-    data["vat_registered"] = True
+    src = result.get("data") or {}
+    data = {
+        "tax_id": src.get("tax_id"),
+        "name": src.get("name"),
+        "address": src.get("address"),
+        "branch_no": src.get("branch_no"),
+        "branch_label": src.get("branch_label"),
+        "post_code": src.get("post_code"),
+        "province": src.get("province"),
+        "vat_registered": True,  # 能在 VAT 服务查到 = 已注册 VAT
+    }
     return {"ok": True, "data": data, "cached": bool(result.get("cached"))}
 
 

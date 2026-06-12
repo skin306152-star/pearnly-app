@@ -63,7 +63,7 @@ class WorkspaceRouterMountedTests(unittest.TestCase):
 class TaxLookupBehaviorTests(unittest.IsolatedAsyncioTestCase):
     """税号带出:复用 RD lookup_vat · 命中加 vat_registered=true · 未命中诚实降级。"""
 
-    async def test_hit_adds_vat_registered(self):
+    async def test_hit_returns_clean_normalized_shape(self):
         from routes import workspace_routes as wr
 
         with (
@@ -72,15 +72,26 @@ class TaxLookupBehaviorTests(unittest.IsolatedAsyncioTestCase):
                 "services.rd.rd_api.lookup_vat",
                 return_value={
                     "ok": True,
-                    "data": {"name": "ACME", "address": "BKK"},
+                    "data": {
+                        "tax_id": "0105551234567",
+                        "name": "ACME CO LTD",
+                        "address": "123 Bangkok",
+                        "branch_label": "สำนักงานใหญ่",
+                        "raw_fields": {"BranchName": "ACME", "HouseNumber": "123"},
+                    },
                     "cached": False,
                 },
             ),
         ):
             out = await wr.workspace_tax_lookup("0105551234567", mock.Mock(), branch=0)
         self.assertTrue(out["ok"])
-        self.assertEqual(out["data"]["name"], "ACME")
+        # 归一字段直接可用(绿卡渲染)
+        self.assertEqual(out["data"]["name"], "ACME CO LTD")
+        self.assertEqual(out["data"]["address"], "123 Bangkok")
+        self.assertEqual(out["data"]["branch_label"], "สำนักงานใหญ่")
         self.assertTrue(out["data"]["vat_registered"])
+        # 不透传 raw_fields 17 字段噪音
+        self.assertNotIn("raw_fields", out["data"])
 
     async def test_miss_returns_ok_false(self):
         from routes import workspace_routes as wr

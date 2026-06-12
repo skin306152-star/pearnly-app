@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
@@ -107,7 +108,8 @@ async def workspace_tax_lookup(tax_id: str, request: Request, branch: int = 0):
     require_perm(request, "settings.workspace.manage")
     from services.rd.rd_api import lookup_vat
 
-    result = lookup_vat(tax_id, branch or 0)
+    # lookup_vat 是同步阻塞 SOAP(requests · 5s 超时)· 丢线程池跑,别堵 async worker 的 event loop。
+    result = await asyncio.to_thread(lookup_vat, tax_id, branch or 0)
     if not result.get("ok"):
         return {"ok": False, "error": result.get("error") or "not_found"}
     data = dict(result.get("data") or {})

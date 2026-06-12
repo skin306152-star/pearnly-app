@@ -11,6 +11,7 @@ import {
     subjectPaneInner,
     subjectLookup,
     subjectNextEnabled,
+    syncSubjectInputs,
     createSubject,
 } from './subject-create.js';
 import { injectStyle } from './acct-common.js';
@@ -218,12 +219,7 @@ function render(): void {
 // 重渲前把当前输入框的值收进状态(rerender 会重建 DOM)。
 function syncInputs(): void {
     if (!S) return;
-    const tax = document.getElementById('onb-subj-tax') as HTMLInputElement | null;
-    if (tax) S.subject.taxId = tax.value;
-    const name = document.getElementById('onb-subj-name') as HTMLInputElement | null;
-    if (name) S.subject.name = name.value;
-    const addr = document.getElementById('onb-subj-addr') as HTMLInputElement | null;
-    if (addr) S.subject.address = addr.value;
+    syncSubjectInputs(S.subject); // 主体三字段(tax/name/addr)复用 subject-create 共享读取
     const fy = document.getElementById('onb-acct-fy') as HTMLSelectElement | null;
     if (fy) S.fy = parseInt(fy.value, 10) || 1;
     const prefix = document.getElementById('onb-acct-prefix') as HTMLInputElement | null;

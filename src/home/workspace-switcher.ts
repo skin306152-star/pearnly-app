@@ -184,6 +184,10 @@ import { WSG_CSS, wsgIcon, wsgInitials } from './workspace-gate-html.js';
     }
 
     // 顶栏下拉的事件委托(单次绑定到 document)。
+    function _collapse() {
+        _popOpen = false;
+        renderWorkspaceControl();
+    }
     function _bindPop() {
         document.addEventListener('click', (e) => {
             const target = e.target as HTMLElement;
@@ -195,13 +199,11 @@ import { WSG_CSS, wsgIcon, wsgInitials } from './workspace-gate-html.js';
             const pick = target.closest('[data-orgpick]') as HTMLElement | null;
             if (pick) {
                 setActiveWorkspaceClientId(Number(pick.dataset.orgpick));
-                _popOpen = false;
-                renderWorkspaceControl();
+                _collapse();
                 return;
             }
             if (target.closest('[data-orgcreate]')) {
-                _popOpen = false;
-                renderWorkspaceControl();
+                _collapse();
                 // 系统内创建走统一专屏;建好切到新主体(active 变更发事件 → 自动重载)。
                 if (typeof window.openSubjectCreate === 'function') {
                     window.openSubjectCreate({
@@ -216,15 +218,13 @@ import { WSG_CSS, wsgIcon, wsgInitials } from './workspace-gate-html.js';
                 return;
             }
             if (target.closest('[data-orgmanage]')) {
-                _popOpen = false;
-                renderWorkspaceControl();
+                _collapse();
                 if (typeof window.routeTo === 'function') window.routeTo('clients');
                 return;
             }
             // 点下拉外 → 收起(搜索框内点击不收)。
             if (_popOpen && !target.closest('#orgsw-pop') && !target.closest('#ws-ctrl-btn')) {
-                _popOpen = false;
-                renderWorkspaceControl();
+                _collapse();
             }
         });
         document.addEventListener('input', (e) => {

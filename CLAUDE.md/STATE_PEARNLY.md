@@ -6,7 +6,14 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-12 · **🧭 套账+引导后端全闭环 + ⚡workers 2→4 上线** · 前序见下）
+## 🎯 状态卡（2026-06-12 · **🖥️ 用户引导闭环+套账硬门前端全套上线 + ⚡加载根治(CF缓存)** · 前序见下）
+
+- **🆕 本窗口(2026-06-12·前端)· 🖥️ 用户引导闭环 + 套账硬门【全套上线·Zihao真机验中】**（`3381fae5`引导闭环 + `336fea3b`套账硬门 + `3b26959f`表格修 + /simplify收口 · prod ver 11850755 · 13闸全绿）：
+  - **引导闭环**(接 `docs/onboarding/00` 后端`ddb900bd`):注册向导(业态→主体三分支[税号带出/手动填/个人]→账务[财年/前缀真存]→**步④选套账**→完成清单)+ 公司资料行内编辑页(路由 company)+ 客户管理分派会计(复用 member_scopes)+ 受邀成员分流 + 个人模式整体退场 + logo 暗夜垫白 + i18n 4语~165键。新件 `onboarding-flow(.ts/-html)`/`subject-create`/`company-profile`/`client-assign`。
+  - **套账硬门**(逐屏照 01-交互原型·补之前降级):**每次登录必选套账·1个也选·不可绕开**(`workspace-gate(.ts/-html)`+core-boot 经 module-nav.enforceWorkspaceGate);0套账/全删后→官方空态+**新建套账专屏(建好确定才进)**;**顶栏富下拉切换器 orgPop**(搜索/我管理的主体/勾选当前/创建/管理全部)替简陋 select;**全站建套账只有一个三分支专屏**(硬门0套账·orgPop创建·客户管理新增 统一·无冲突)。
+  - **加载慢根治=CF 配置非代码**:压缩(Brotli)+immutable头都对,真因 Cloudflare 没缓存 /static/(`Cf-Cache-Status:DYNAMIC` 每次跨境回源)。**Zihao 已加 CF Cache Rule**(`URI Full contains /static/`→Eligible for cache)·实测 `DYNAMIC→HIT`·3分钟→秒开。**前端 i18n拆分/代码分割判定不做**(高风险且治不了根因·会破坏 plain-script eval 顺序)。**视觉照搬闸也判定不做**(overlay 不适合那套路由级闸·过度工程)。
+  - **表格修**(`3b26959f`):账套主体 `seller-grid` 列左移(name minmax 限宽·操作 1fr 靠右)+ `.cust-table-wrap overflow hidden→visible`(⋯ 更多菜单不被裁)·改 home-29 CSS 需 build+bump home.css?v=。
+  - **真机**:`18685123459@163.com` 已腾空可重测(停泊法:改 email/username/email_normalized→parked·`get_cursor(commit=True)` 否则回滚)。坑:sed 改 home.html 会刷 CRLF→LF(用 Edit 工具)。详见记忆 [[onboarding-loop-frontend-shipped]]。
 
 - **🆕 本窗口(2026-06-12)· 🧭 套账后端补全(账务设置+税号查重)【已上线】**（`ddb900bd`+`bf84dd87`+`de94c1a6` /simplify·prod 列/索引实测 live·健康 200）：
   - 对 `docs/workspace-entry/00`(套账入口·与引导同功能)逐条核对后端,补两缺口:

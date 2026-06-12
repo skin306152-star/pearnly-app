@@ -457,9 +457,21 @@
             POS.setNet(false);
             POS.toast(POS.t('posui.net.toast.offline'));
         });
-        // PWA 外壳 SW(08 ADR-1)· 失败不影响在线使用
+        // PWA 外壳 SW(08 ADR-1)· 失败不影响在线使用。从根路径 /pos-sw.js 注册 + scope:/pos
+        // → SW 能控 /pos 导航(断网重开外壳)。旧 /static/pos/pos-sw.js(scope 卡 /static/pos/
+        // 控不了 /pos)顺手注销,免双注册残留。
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/static/pos/pos-sw.js?v=11850709').catch(() => {});
+            navigator.serviceWorker
+                .getRegistrations()
+                .then((regs) => {
+                    regs.forEach((r) => {
+                        if (r.scope.indexOf('/static/pos/') >= 0) r.unregister();
+                    });
+                })
+                .catch(() => {});
+            navigator.serviceWorker
+                .register('/pos-sw.js?v=11850767', { scope: '/pos' })
+                .catch(() => {});
         }
         tick();
         setInterval(tick, 10000);

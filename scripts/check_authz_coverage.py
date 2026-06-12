@@ -29,6 +29,7 @@ PUBLIC_ROUTES = {
     ("GET", "/admin/{rest:path}"),
     ("GET", "/pos"),
     ("GET", "/pos/{rest:path}"),
+    ("GET", "/pos-sw.js"),  # PWA Service Worker 脚本(公开静态 · 前端鉴权同 /pos)
     ("GET", "/console"),
     ("GET", "/console/{rest:path}"),
     ("GET", "/invite/{token}"),

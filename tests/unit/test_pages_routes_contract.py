@@ -29,6 +29,7 @@ EXPECTED = {
     ("GET", "/home"),
     ("GET", "/admin"),
     ("GET", "/admin/{rest:path}"),
+    ("GET", "/pos-sw.js"),
     ("GET", "/pos"),
     ("GET", "/pos/{rest:path}"),
     ("GET", "/console"),
@@ -42,7 +43,7 @@ EXPECTED = {
 
 class PagesRoutesContractTests(unittest.TestCase):
     def test_router_registers_expected_routes(self):
-        """18 条路由 path+method 契约 · 防搬迁丢路由 / 改 URL"""
+        """19 条路由 path+method 契约 · 防搬迁丢路由 / 改 URL"""
         got = set()
         for r in router.routes:
             for m in getattr(r, "methods", set()) or set():

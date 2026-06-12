@@ -147,6 +147,16 @@ def _pos_page() -> FileResponse:
     return FileResponse("static/dist/pos.html", headers=_NO_CACHE)
 
 
+@router.get("/pos-sw.js")
+async def pos_service_worker():
+    # 从根路径出 Service Worker 脚本:脚本在 / → 最大 scope 可达整站,注册时 scope=/pos
+    # 即能控 /pos 导航(断网重开外壳)。挂在 /static/pos/ 下则 scope 卡 /static/pos/ 控不了 /pos。
+    # no-cache:SW 字节变更要即时被浏览器拾取触发更新。
+    return FileResponse(
+        "static/pos/pos-sw.js", media_type="application/javascript", headers=_NO_CACHE
+    )
+
+
 @router.get("/pos", response_class=HTMLResponse)
 async def pos_page():
     return _pos_page()

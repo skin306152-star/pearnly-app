@@ -284,6 +284,8 @@ interface Window {
     routeTo?: (route: string) => void;
     // POS PO-A1/A4/B1 · 模块导航显隐 + 库存后台(屏7)+ 开通收银(屏8)桥
     applyModuleNav?: () => void;
+    // 丝滑专项 · 按钮即时反馈:点击→禁用+转圈→完成/失败必恢复
+    withLoading?: <T>(btn: HTMLElement | null | undefined, fn: () => Promise<T>) => Promise<T>;
     // 平台业态套餐 PO-PP2 · 业态选择器弹窗(注册首次 / 设置切换业态 / 可开启功能)
     openBusinessPicker?: (opts?: { businessType?: string; onDone?: () => void }) => void;
     // 用户引导闭环 · 注册后向导(业态→主体→账务→完成)+ 公司资料页 + 品牌 logo URL(暗夜垫底)

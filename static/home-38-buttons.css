@@ -256,3 +256,25 @@ button.btn-primary.btn-sm:hover:not(:disabled) {
 input[type="checkbox"] {
     accent-color: var(--btn-blue);
 }
+
+/* ============================================================
+   丝滑专项 · 按钮进行中态(JS withLoading 切 .is-busy)
+   currentColor 转圈 → 任意按钮配色自适应;dim + 禁交互防重复点。
+   复用 home-03 的全局 @keyframes spin。
+   ============================================================ */
+.is-busy {
+    pointer-events: none;
+    opacity: 0.75;
+}
+.is-busy::after {
+    content: "";
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-left: 8px;
+    vertical-align: -2px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}

@@ -138,16 +138,16 @@ export function openAcctAccountForm(acct: Account | null, onDone: () => void): v
             showToast(t('acct-form-required'), 'error');
             return;
         }
-        save.disabled = true;
         try {
-            if (isEdit)
-                await aapi('PATCH', withWs(`/api/accounting/accounts/${acct!.id}`), payload);
-            else await aapi('POST', withWs('/api/accounting/accounts'), payload);
+            await withLoading(save, async () => {
+                if (isEdit)
+                    await aapi('PATCH', withWs(`/api/accounting/accounts/${acct!.id}`), payload);
+                else await aapi('POST', withWs('/api/accounting/accounts'), payload);
+            });
             showToast(t('acct-save-ok'), 'success');
             closeAcctModal();
             onDone();
         } catch (e) {
-            save.disabled = false;
             showToast(acctErrMsg(e, 'acct.unexpected'), 'error');
         }
     };

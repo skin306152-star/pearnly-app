@@ -56,6 +56,7 @@ export default [
                 // 重新赋值它(home.js 顶层 let 是跨 realm 可写的词法绑定)· 否则 no-global-assign 红。
                 t: 'readonly',
                 showToast: 'readonly',
+                withLoading: 'readonly',
                 _userInfo: 'writable',
                 // currentRoute 标 writable:batch9f 起 core-boot.js 的 routeTo 重新赋值它
                 // (同 _userInfo · home.js 顶层 let 是跨 realm 可写的词法绑定)· 否则 no-global-assign 红。

@@ -198,19 +198,17 @@ function _renderCombo(onDone: () => void): void {
     const ok = mask.querySelector<HTMLButtonElement>('#combo-ok');
     if (ok)
         ok.onclick = async () => {
-            ok.disabled = true;
-            ok.classList.add('busy');
             const ids = docs.filter((_, i) => sel[i]).map((d) => String(d.doc_id));
             try {
-                await aapi('POST', withWs(`/api/accounting/bank/lines/${line.id}/match`), {
-                    doc_ids: ids,
-                });
+                await withLoading(ok, () =>
+                    aapi('POST', withWs(`/api/accounting/bank/lines/${line.id}/match`), {
+                        doc_ids: ids,
+                    })
+                );
                 closeAcctModal();
                 window.showToast?.(t('acct-bank-combo-done'), 'success');
                 onDone();
             } catch (e) {
-                ok.disabled = false;
-                ok.classList.remove('busy');
                 window.showToast?.(acctErrMsg(e, 'acct-bank-match-fail'), 'error');
             }
         };
@@ -239,24 +237,22 @@ export function openChAccModal(
     const sel = mask.querySelector<HTMLSelectElement>('#ch-acc');
     if (ok && sel)
         ok.onclick = async () => {
-            ok.disabled = true;
-            ok.classList.add('busy');
             const kind = (Number(line.amount) || 0) >= 0 ? 'income' : 'expense';
             try {
-                await aapi('POST', withWs(`/api/accounting/bank/lines/${line.id}/match`), {
-                    new_tx: {
-                        kind,
-                        account_id: sel.value,
-                        memo: line.description || '',
-                        remember: true,
-                    },
-                });
+                await withLoading(ok, () =>
+                    aapi('POST', withWs(`/api/accounting/bank/lines/${line.id}/match`), {
+                        new_tx: {
+                            kind,
+                            account_id: sel.value,
+                            memo: line.description || '',
+                            remember: true,
+                        },
+                    })
+                );
                 closeAcctModal();
                 window.showToast?.(t('acct-bank-chacc-done'), 'success');
                 onDone();
             } catch (e) {
-                ok.disabled = false;
-                ok.classList.remove('busy');
                 window.showToast?.(acctErrMsg(e, 'acct-bank-match-fail'), 'error');
             }
         };

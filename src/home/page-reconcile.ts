@@ -1,5 +1,4 @@
-import { RECON_HTML_1 } from './page-reconcile-panes-1.js'; // REFACTOR-WB-C1 · 对账中心壳 HTML 上半(head+tabs+银行对账 pane)
-import { RECON_HTML_2 } from './page-reconcile-panes-2.js'; // REFACTOR-WB-C1 · 对账中心壳 HTML 下半(销项税+GL-VAT pane)
+import { RCX_HTML } from './recon-center-x-html.js'; // 2026-06-14 · 对账中心重设计外壳(替代旧 panes-1/2 · design v2 落地)
 
 // ============================================================
 // REFACTOR-WB-C3 (2026-05-29) · page-reconcile 静态骨架从 home.html 抽出 · 运行期模板注入(R6 机制)
@@ -16,7 +15,7 @@ import { RECON_HTML_2 } from './page-reconcile-panes-2.js'; // REFACTOR-WB-C1 ·
     const sec = document.getElementById('page-reconcile');
     if (!sec || sec.dataset.wbInjected === '1') return;
     sec.classList.add('ui');
-    sec.innerHTML = '<div class="wrap">' + RECON_HTML_1 + RECON_HTML_2 + '</div>';
+    sec.innerHTML = '<div class="wrap">' + RCX_HTML + '</div>';
     sec.dataset.wbInjected = '1';
     try {
         const lang = window._currentLang || localStorage.getItem('mrpilot_lang') || 'th';

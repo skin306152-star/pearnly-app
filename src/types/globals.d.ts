@@ -160,6 +160,17 @@ interface Window {
     _currentLang?: string;
     // confirm dialog + money-visibility (migrated leaves expose these)
     pearnlyConfirm: (message: string, title?: string) => Promise<boolean>;
+    showConfirm?: (
+        msg?: string,
+        opts?: {
+            title?: string;
+            danger?: boolean;
+            okText?: string;
+            cancelText?: string;
+            hideCancel?: boolean;
+        }
+    ) => Promise<unknown>;
+    showToast?: (message: string, type?: string) => void;
     isMoneyHidden: (u?: AppUser | null) => boolean;
     // integration drawer + automation panel loaders
     openIntegrationDrawer: (tab?: string, title?: string) => void;

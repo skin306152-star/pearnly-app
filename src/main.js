@@ -148,6 +148,7 @@ import './home/erp-map-advanced.js'; // REFACTOR-C1 · ERP 字段映射高级 su
 import './home/erp-onboard.js'; // REFACTOR-C1 · ERP 对接新用户引导 modal
 import './home/recon-job-poll.js'; // REFACTOR-C1 · 对账异步任务前端轮询(window._reconPollJob)· 须在 bank-recon-v2 前
 import './home/bank-recon-v2.js'; // REFACTOR-C1 · 银行对账 v2(Statement vs GL)· 用 window._reconPollJob
+import './home/recon-center-x.js'; // 2026-06-14 · 对账中心重设计(统一三类型 · 覆盖旧 loadReconcilePage · 须在 recon-center/recon-job-poll/bank-recon-v2 之后)
 import './home/settings-general.js'; // REFACTOR-C1 · 设置→通用面板(语言 select + tz/date/number)
 import './home/sidebar-nav-group.js'; // REFACTOR-C1 · 侧栏可折叠业务流分组(window.expandNavGroupForRoute)
 import './home/modal-help.js';

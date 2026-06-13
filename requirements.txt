@@ -98,11 +98,15 @@ qrcode==8.2
 # ============================================================
 # === OCR / AI ===
 # ============================================================
-# 注:OCR 走 Gemini 云端(google-generativeai)· 不用本地 easyocr。
+# 注:OCR pipeline = Layer1 Google Cloud Vision(google-cloud-vision · 字符+坐标+置信)
+#     + Layer2 Gemini(google-generativeai · 读文字填 JSON)· 见 docs/ocr-migration/migration-plan.md。
+#     Layer1 凭据走 env GOOGLE_APPLICATION_CREDENTIALS 指向 Service Account JSON(prod 在
+#     /etc/pearnly/pearnly-vision-key.json · env 设在 systemd 单元 · 都在常规迁移目录之外)。
 # 2026-06-04 删 easyocr==1.7.2:全仓库零 import · 仅拖累镜像(拽 torch/torchvision/
 # opencv/scipy/numpy 整棵 ML 栈 · 镜像 5-7GB → 数百 MB)。见 STATE / adr-003。
 openai==2.32.0
 google-generativeai
+google-cloud-vision==3.14.0
 
 # ============================================================
 # === Browser automation (MR.ERP integration · v118.34.3) ===

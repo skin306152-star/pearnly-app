@@ -12,6 +12,7 @@
 | black | 改 .py | Python 格式 | `black --check <你的.py>`(直接 `black <file>` 修) | 无 |
 | import 冒烟 | 改 .py | 启动即崩(语法错/漏 import) | `python -c "import app"` | 无 |
 | check_imports | 改 .py | import 结构 | `python scripts/check_imports.py --quiet` | 无 |
+| check_tracked_imports | 改 .py | import 的本地模块必须 git 已跟踪(工作树有但 HEAD 没有=漏 add → clean clone/prod 崩) | `python scripts/check_tracked_imports.py --quiet` | 无;补 2026-06-11 部署崩盲区(check_imports 在工作树跑看不见未跟踪) |
 | check_i18n | 改 .py | 4 语翻译完整 | `python scripts/check_i18n.py --strict --quiet` | 加键必四语齐 |
 | 全量 unittest | 改 .py | 改一处崩别处 | `python -m unittest discover -s tests/unit -p "test_*.py"` | 无;**新文件≥1测试**是另一条家规 |
 | check_new_debt | 改 .py | 禁新增 ensure_*/app.py 巨石路由 | `python scripts/check_new_debt.py` | 真要新 ensure:commit 写 `NEW-DEBT-EXEMPT: <理由>` |

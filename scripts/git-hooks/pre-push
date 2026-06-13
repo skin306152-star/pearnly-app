@@ -83,6 +83,14 @@ if [ -n "$PY_CHANGED" ]; then
   echo "  · check_imports"
   python scripts/check_imports.py --quiet || fail "check_imports"
 
+  # 未跟踪 import 闸(2026-06-13 加 · 补 2026-06-11 部署崩盲区):check_imports/import app
+  # 都在工作树跑 · 看得见未 git add 的文件 → 本地全绿但 clean clone(=prod)缺文件 → 502。
+  # 本闸对照 HEAD 跟踪集(prod 视角):import 目标工作树存在但 HEAD 没有 = 漏 add = 拦。
+  echo "  · check_tracked_imports(import 的本地模块必须 git 已跟踪 · 防漏 add 上线崩)"
+  # shellcheck disable=SC2086
+  python scripts/check_tracked_imports.py --quiet $PY_EXIST \
+    || fail "未跟踪 import:某 .py import 了工作树存在但未 git add 的本地模块(clean clone/prod 会 ModuleNotFoundError) · git add 该文件一并提交,或删掉 import"
+
   echo "  · check_i18n(home.js 4 语完整)"
   python scripts/check_i18n.py --strict --quiet || fail "check_i18n(4 语缺翻译)"
 

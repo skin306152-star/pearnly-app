@@ -3,10 +3,10 @@ name: CI
 # 阶段 3-4 + REFACTOR-A1.2 · CI 自动化保险 · 防"v0.20 db pool 5 重演"
 # 每次 push / PR 跑 6 个 job(2026-05-30 WC 审计补齐机械闸后的真实清单):
 #   lint        : black + ruff + bandit + pip-audit + prettier + eslint + npm audit(格式/真bug/安全/CVE)
-#   lint-size   : 防屎山闸(REFACTOR-WC-P1)· 文件 ≤500 行 + 行数棘轮只降不升(铁律 #27)· 现 WARNING 模式
-#   lint-ui     : UI 一致性棘轮(REFACTOR-WC 审计#2)· 违规不许反弹超基线 · 现 WARNING 模式
+#   lint-size   : 防屎山闸(REFACTOR-WC-P1)· 文件 ≤500 行 + 行数棘轮只降不升(铁律 #27)· FAIL 模式(2026-06-03 整顿收官切硬门)
+#   lint-ui     : UI 一致性棘轮(REFACTOR-WC 审计#2)· 违规不许反弹超基线 · FAIL 模式(2026-06-05 拍板切硬门 · 存量 B 类视觉清理仍 Zihao-gated)
 #   lint-debt   : 新债 diff 闸(REFACTOR-WC 审计#3)· 禁新增 ensure_*/巨石路由(铁律 #5/#17)· FAIL 模式
-#   lint-routes : 新路由契约软闸(REFACTOR-WC 审计#4)· 新 *_routes.py 必带契约测试 · 现 WARNING 模式
+#   lint-routes : 新路由契约软闸(REFACTOR-WC 审计#4)· 新 *_routes.py 必带契约测试 · WARNING 模式(continue-on-error · 唯一仍软的闸)
 #   test        : 5 关 = import 静态检查 / home.js i18n 4 语完整 / unit+coverage(--fail-under=40)
 #                 / Vite build 跑通 / Playwright E2E smoke(pearnly.com 公开页 · 4 语切换 · 0 console error)
 # 不依赖生产 secret · 不调后端业务(integ contract tests 全部 stub · e2e 只 GET 公开页)
@@ -114,9 +114,9 @@ jobs:
           fi
 
   # REFACTOR-WC · UI 一致性闸(审计发现 #2:check_ui_consistency 没接 CI · 1787 违规无人棘轮)
-  #   棘轮:违规总数 > BASELINE_TOTAL(脚本内 · 现 1787)→ 非零退出。
-  #   当前 warning 模式(continue-on-error: true · 红但不挡 push)· 等窗口 B 把 B1/B2 降下来 ·
-  #   手动把 BASELINE_TOTAL 棘轮调小 → 谁让 UI 不一致反弹超基线,CI 当场报红。
+  #   棘轮:违规总数 > BASELINE_TOTAL(脚本内)→ 非零退出。
+  #   FAIL 模式(2026-06-05 Zihao 拍板切硬门 · 见下方 job 注释)· UI 一致性反弹超基线 → CI 当场报红挡合并。
+  #   注:存量 B 类 legacy 视觉清理(把 baseline 继续往下棘轮)仍 Zihao-gated · 见 docs/ui/THEME_FOLLOWUP_BACKLOG.md #6。
   lint-ui:
     name: lint-ui (UI 一致性 + 弹窗/按钮硬规 · FAIL mode)
     runs-on: ubuntu-latest

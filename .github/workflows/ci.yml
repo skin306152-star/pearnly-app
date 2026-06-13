@@ -245,6 +245,19 @@ jobs:
       - name: i18n completeness check (home.js · zh/en/th/ja)
         run: python scripts/check_i18n.py --strict --quiet
 
+      # Node deps must be installed BEFORE unit tests: the *_frontend node
+      # gates (format-date / ui-templates / with-loading) require esbuild to
+      # compile the src/home TS, else they fail with "Cannot find module
+      # 'esbuild'". Build step below reuses this same install.
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install Node deps (npm ci · 严格按 lockfile)
+        run: npm ci
+
       - name: Run unit tests (under coverage · REFACTOR-A8)
         run: coverage run -m unittest discover -s tests/unit -p "test_*.py"
 
@@ -255,15 +268,6 @@ jobs:
           # 棘轮 21 → 40(本地实测 46.6% · 留 6.6pt 余量 · 只升不降)
           coverage report --fail-under=40
           coverage xml
-
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-
-      - name: Install Node deps (npm ci · 严格按 lockfile)
-        run: npm ci
 
       - name: Vite build + 打包一致性闸① (REFACTOR-A1.2/E7 · 防本地 build 产物没提交)
         run: |

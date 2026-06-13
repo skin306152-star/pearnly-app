@@ -109,7 +109,7 @@ function renderResults() {
                 <td class="inv">${f.invoice_number ? escapeHtml(f.invoice_number) : emptyCell}</td>
                 <td class="date">${f.date ? escapeHtml(f.date) : emptyCell}</td>
                 <td class="amount">${f.total_amount ? Number(f.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : emptyCell}</td>
-                <td><span class="conf-badge ${r.confidence as string}" data-tip="${escapeHtml(confTip)}">${confLabel}</span></td>
+                <td><span class="conf-badge ${r.confidence as string}" title="${escapeHtml(confTip)}">${confLabel}</span></td>
             </tr>
         `;
         })

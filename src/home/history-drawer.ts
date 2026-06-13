@@ -180,6 +180,7 @@ function openHistoryMenu(historyId: string, anchor: HTMLElement) {
     menu.innerHTML = `
         <button data-act="copy-invno" ${invNo ? '' : 'disabled'}>${escapeHtml(t('history-menu-copy-invno'))}</button>
         <button data-act="download-pdf" ${hasPdf ? '' : 'disabled'}>${escapeHtml(t('history-menu-download-pdf'))}</button>
+        <button data-act="download-mrerp">${escapeHtml(t('btn-mrerp-xlsx'))}</button>
         <button data-act="delete" class="danger">${escapeHtml(t('history-menu-delete'))}</button>
     `;
     menu.style.top = rect.bottom + 4 + 'px';
@@ -249,6 +250,52 @@ function openHistoryMenu(historyId: string, anchor: HTMLElement) {
             } catch (err) {
                 dismissLoading();
                 showToast(t('history-download-pdf-fail'), 'error');
+            }
+        } else if (act === 'download-mrerp') {
+            // MR.ERP 批量导入格式 · 单张走批量端点(传 [historyId])· 复用 erp_export_routes。
+            // 后端 preflight 不合格回 422 + 错误码(缺客户映射等)→ 友好提示。
+            try {
+                const resp = await fetch('/api/erp/mrerp-xlsx-batch', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: 'Bearer ' + token,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ history_ids: [historyId] }),
+                });
+                if (!resp.ok) {
+                    let code = 'err.unknown';
+                    try {
+                        const d = await resp.json();
+                        if (d && d.detail) code = d.detail;
+                    } catch (_e) {
+                        /* 非 JSON 错误体 */
+                    }
+                    showToast(t('mrerp-xlsx-fail', { err: code }), 'error');
+                    return;
+                }
+                const blob = await resp.blob();
+                let fname = 'mrerp.xlsx';
+                const cd = resp.headers.get('Content-Disposition') || '';
+                const m = /filename\*=UTF-8''([^;]+)/.exec(cd);
+                if (m) {
+                    try {
+                        fname = decodeURIComponent(m[1]);
+                    } catch (_e) {
+                        /* RFC5987 decode 失败用默认名 */
+                    }
+                }
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fname;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+                showToast(t('mrerp-xlsx-ok'), 'success');
+            } catch (err) {
+                showToast(t('mrerp-xlsx-fail', { err: (err as Error).message }), 'error');
             }
         } else if (act === 'delete') {
             const ok = await showConfirm(t('history-confirm-delete'), { danger: true });

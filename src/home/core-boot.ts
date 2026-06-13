@@ -74,9 +74,9 @@ function applyLang(lang?: any) {
     const _genLangSel = document.getElementById('general-lang');
     if (_genLangSel) (_genLangSel as HTMLSelectElement).value = lang;
 
-    // 置信度列 tooltip
+    // 置信度列 tooltip · 原生 title(自定义 data-tip 在 overflow-x 表格里撑滚动条+盖字)
     const th = document.getElementById('col-conf-th');
-    if (th) th.setAttribute('data-tip', t('col-conf-tip'));
+    if (th) th.setAttribute('title', t('col-conf-tip'));
 
     if (_userInfo && typeof window.renderInfoBar === 'function') window.renderInfoBar();
     if (_quota) updateUploadHint();

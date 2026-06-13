@@ -83,6 +83,38 @@ function injectOcrPushButton() {
     } else {
         header.appendChild(btn);
     }
+
+    // 下载 MR.ERP 表格按钮(路径2 人工导入用)· 仅当有 mrerp 端点时显示
+    // (文件是 MR.ERP 专有格式 · 让不想存 MR.ERP 密码的用户自己下载后导入)。
+    const hasMrerp = enabledEps.some(function (ep: any) {
+        return (ep.adapter || '').toLowerCase() === 'mrerp';
+    });
+    if (hasMrerp) injectMrerpDownloadButton(header, historyId);
+}
+
+function injectMrerpDownloadButton(header: Element, historyId: any) {
+    if (document.getElementById('drawer-mrerp-xlsx-btn')) return;
+    const dl = document.createElement('button');
+    dl.id = 'drawer-mrerp-xlsx-btn';
+    dl.className = 'drawer-push-btn';
+    dl.title = t('btn-mrerp-xlsx');
+    dl.innerHTML = `
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 2v8M5 7l3 3 3-3M3 13h10"/>
+        </svg>
+        <span>${escapeHtml(t('btn-mrerp-xlsx'))}</span>
+    `;
+    dl.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        downloadMrerpXlsx(historyId);
+    });
+    const pushBtn = document.getElementById('drawer-ocr-push-btn');
+    if (pushBtn && pushBtn.parentNode) {
+        pushBtn.parentNode.insertBefore(dl, pushBtn.nextSibling);
+    } else {
+        header.appendChild(dl);
+    }
 }
 
 // v118.34.34 · 多 endpoint picker · 简单 popover · 复用 history-popover CSS.
@@ -188,6 +220,47 @@ async function pushOcrToErp(historyId: any, endpointId: any) {
         }
     } catch (e) {
         showToast(t('erp-push-fail', { err: (e as Error).message }), 'fail');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+// 下载 MR.ERP 批量导入 Excel · 带鉴权 fetch 取 blob 触发下载(普通 <a> 带不了 token)。
+// preflight 不合格后端回 422 + 错误码 → 提示用户缺什么(同推送那套友好文案)。
+async function downloadMrerpXlsx(historyId: any) {
+    const btn = document.getElementById('drawer-mrerp-xlsx-btn') as HTMLButtonElement;
+    if (btn) btn.disabled = true;
+    try {
+        const resp = await fetch('/api/erp/mrerp-xlsx/' + encodeURIComponent(historyId), {
+            headers: { Authorization: 'Bearer ' + token },
+        });
+        if (!resp.ok) {
+            let code = 'err.unknown';
+            try {
+                const data = await resp.json();
+                if (data && data.detail) code = data.detail;
+            } catch (_e) {
+                /* 非 JSON 错误体 · 用默认码 */
+            }
+            showToast(t('mrerp-xlsx-fail', { err: code }), 'fail');
+            return;
+        }
+        const blob = await resp.blob();
+        let fname = 'mrerp.xlsx';
+        const cd = resp.headers.get('Content-Disposition') || '';
+        const m = /filename\*=UTF-8''([^;]+)/.exec(cd);
+        if (m) fname = decodeURIComponent(m[1]);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fname;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showToast(t('mrerp-xlsx-ok'));
+    } catch (e) {
+        showToast(t('mrerp-xlsx-fail', { err: (e as Error).message }), 'fail');
     } finally {
         if (btn) btn.disabled = false;
     }

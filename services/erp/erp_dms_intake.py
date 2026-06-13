@@ -212,8 +212,6 @@ def push_idcard_fields_mrerp_dms(
     t0 = time.time()
 
     def _do(cl, adapter):
-        from datetime import date, timedelta
-        from services.erp.mrerp_dms_client import excel_serial
         from services.erp.mrerp_dms_models import BookingDefaults
 
         cid = cl.save_customer(fields=fields, mode=mode, customer_id=customer_id)
@@ -223,30 +221,22 @@ def push_idcard_fields_mrerp_dms(
         merged.update({k: v for k, v in (booking_overrides or {}).items() if v not in (None, "")})
         defaults = BookingDefaults.from_config({"booking_defaults": merged})
 
-        template = cl.download_booking_template()
+        # A1:走 DMS 原生订车单表单 → DMS autonum 出 BK 号(符合公司规则·零手填)。
         booking = cl.resolve_booking_payload(defaults, card)
-        today = date.today()
-        booking_id = cl.import_booking_from_xlsx(
-            template_bytes=template,
-            booking=booking,
-            card=card,
-            doc_date_serial=excel_serial(today),
-            delivery_date_serial=excel_serial(today + timedelta(days=defaults.delivery_days)),
-        )
-        cl.patch_booking_identity(
-            booking_id=booking_id, customer_id=cid, booking=booking, card=card
+        booking_id, booking_no = cl.create_booking_via_form(
+            customer_id=cid, booking=booking, card=card
         )
         return {
             "ok": True,
             "success": True,
             "customer_id": cid,
             "booking_id": booking_id,
-            "booking_no": booking.booking_no,
+            "booking_no": booking_no,
             "mode": mode,
             "elapsed_ms": int((time.time() - t0) * 1000),
             "response_body": {
                 "adapter": "mrerp_dms",
-                "booking_no": booking.booking_no,
+                "booking_no": booking_no,
                 "booking_id": booking_id,
                 "customer_id": cid,
                 "mode": mode,

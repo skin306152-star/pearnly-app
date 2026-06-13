@@ -20,6 +20,11 @@ from services.erp.mrerp_dms_models import (
 from services.erp.mrerp_dms_xlsx import BookingImportRow, DMSBookingImportXlsxBuilder
 from services.erp.mrerp_dms_client_base import DMSClientError, to_be_date
 
+# DMS 订车单(drfcbc)菜单 id/层级 —— autonum 自动编号的键(MR.ERP DMS 标准实例)。
+# 走原生表单建单时带上,让 new.php 推进对应 BK 流水计数器。
+_DRFCBC_IDMENU = "25"
+_DRFCBC_MENULV = "2"
+
 
 class DMSClientOpsMixin:
     def ensure_customer(self, card: ThaiIdCardPayload) -> str:
@@ -131,20 +136,18 @@ class DMSClientOpsMixin:
             )
         raise DMSClientError(f"booking import returned unexpected body: {code!r}", "ERR_DMS_IMPORT")
 
-    def patch_booking_identity(
+    def _apply_booking_form_fields(
         self,
+        data: Dict[str, str],
         *,
-        booking_id: str,
         customer_id: str,
         booking: DMSBookingPayload,
         card: ThaiIdCardPayload,
     ) -> None:
-        form_html = self._post_text("drfcbc/form.php", {"status": "e", "id": booking_id})
-        data = self._parse_form_defaults(form_html)
+        """填订车单业务字段(顾问/车/颜色/客户/身份/地址…)· 建(new)与改(edit)共用。
+        不含 stsel/idsel/txtdocno —— 由调用方按建/改设置。"""
         data.update(
             {
-                "stsel": "e",
-                "idsel": booking_id,
                 "usersval": booking.advisor.id,
                 "txtusers": booking.advisor.name,
                 "txtuserstel": booking.advisor.extra[0] if booking.advisor.extra else ".",
@@ -194,12 +197,76 @@ class DMSClientOpsMixin:
             }
         )
         self._apply_address_to_booking_form(data, card.address)
+
+    def patch_booking_identity(
+        self,
+        *,
+        booking_id: str,
+        customer_id: str,
+        booking: DMSBookingPayload,
+        card: ThaiIdCardPayload,
+    ) -> None:
+        form_html = self._post_text("drfcbc/form.php", {"status": "e", "id": booking_id})
+        data = self._parse_form_defaults(form_html)
+        data["stsel"] = "e"
+        data["idsel"] = booking_id
+        self._apply_booking_form_fields(data, customer_id=customer_id, booking=booking, card=card)
         resp = self.transport.post(self._url("drfcbc/edit.php"), data=data, timeout_ms=120000)
         if resp.status_code != 200 or resp.text.strip().startswith("err::"):
             raise DMSClientError(
                 f"booking patch failed: {resp.status_code} {resp.text[:300]!r}",
                 "ERR_DMS_BOOKING_PATCH",
             )
+
+    def create_booking_via_form(
+        self, *, customer_id: str, booking: DMSBookingPayload, card: ThaiIdCardPayload
+    ) -> tuple:
+        """A1:走 DMS 原生订车单表单建单 · DMS autonum 出 BK 号(符合公司规则·零手填)。
+        取代 Excel 导入 + patch 两步。返回 (booking_id, booking_no)。"""
+        form_html = self._post_text("drfcbc/form.php", {"status": "n"})
+        data = self._parse_form_defaults(form_html)
+        data["stsel"] = "n"
+        data["idsel"] = ""
+        data["idmenu"] = _DRFCBC_IDMENU
+        data["menulv"] = _DRFCBC_MENULV
+        docno = self._next_booking_docno(booking.branch.id) or booking.booking_no
+        data["txtdocno"] = docno
+        self._apply_booking_form_fields(data, customer_id=customer_id, booking=booking, card=card)
+        resp = self.transport.post(self._url("drfcbc/new.php"), data=data, timeout_ms=120000)
+        body = (resp.text or "").strip()
+        if resp.status_code != 200 or body.startswith("err::"):
+            raise DMSClientError(f"booking create failed: {body[:300]!r}", "ERR_DMS_IMPORT")
+        booking_id = self.search_booking(docno)
+        if not booking_id:
+            raise DMSClientError("booking create returned ok but search failed", "ERR_DMS_IMPORT")
+        return booking_id, docno
+
+    def _next_booking_docno(self, branch_id: str) -> str:
+        """取 DMS 订车单下一个自动编号(BK+期间+流水)。autonum 关/异常 → '' 让调用方兜底。"""
+        try:
+            cfg = json.loads(
+                self._post_text(
+                    "component/php/autonum.php",
+                    {"menulv": _DRFCBC_MENULV, "idmenu": _DRFCBC_IDMENU},
+                )
+            )
+            if not cfg or cfg[0] is None or str(cfg[1]) != "1":
+                return ""
+            det = json.loads(
+                self._post_text(
+                    "component/php/autonumdetail.php",
+                    {
+                        "idautonum": cfg[0],
+                        "prefixautonum": cfg[2],
+                        "digitautonum": cfg[3],
+                        "idautonumformat": cfg[4],
+                        "idbranch": branch_id or "",
+                    },
+                )
+            )
+            return str(det[2]) if len(det) > 2 and det[2] else ""
+        except Exception:
+            return ""
 
     def push_id_card_booking(
         self,

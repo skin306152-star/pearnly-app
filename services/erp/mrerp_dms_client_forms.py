@@ -56,21 +56,6 @@ class DMSClientFormsMixin:
                 data[name] = re.sub(r"<.*?>", "", match.group(2))
         return data
 
-    def _apply_address_to_customer_form(self, data: Dict[str, str], address) -> None:
-        for suffix in ("", "_ct", "_sd"):
-            data[f"txthousenum{suffix}"] = address.house_no
-            data[f"txtbuilding{suffix}"] = address.building
-            data[f"txtfloor{suffix}"] = address.floor
-            data[f"txtroom{suffix}"] = address.room
-            data[f"txtvillage{suffix}"] = address.village
-            data[f"txtmoo{suffix}"] = address.moo
-            data[f"txtsoi{suffix}"] = address.soi
-            data[f"txtroad{suffix}"] = address.road
-            data[f"selprovinces{suffix}"] = address.province_id
-            data[f"seldistricts{suffix}"] = address.district_id
-            data[f"selsubdistricts{suffix}"] = address.subdistrict_id
-            data[f"selzipcodes{suffix}"] = address.zipcode_id
-
     def _norm_geo(self, name: str) -> str:
         s = html.unescape(str(name or "")).strip()
         for prefix in self._GEO_PREFIXES:
@@ -174,19 +159,6 @@ class DMSClientFormsMixin:
     def _first_data_val(self, html_text: str) -> Optional[str]:
         match = re.search(r'data-val="([^"]+)"', html_text)
         return match.group(1) if match else None
-
-    def _select_label(self, page: str, select_name: str, value: str) -> str:
-        match = re.search(
-            rf'<select[^>]+name="{re.escape(select_name)}"[^>]*>(.*?)</select>',
-            page,
-            re.S,
-        )
-        if not match:
-            return ""
-        for attrs, label in re.findall(r"<option([^>]*)>(.*?)</option>", match.group(1), re.S):
-            if self._attr(attrs, "value") == str(value):
-                return html.unescape(re.sub(r"<.*?>", "", label).strip())
-        return ""
 
     def _selected_value(self, options_html: str) -> str:
         selected = re.search(

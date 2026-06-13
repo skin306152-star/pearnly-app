@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""DMS 客户/订单业务操作(ensure/import/patch/push/fetch/resolve/search)mixin.
+"""DMS 订车单业务操作(建单/编号/查询/主档解析/客户查找)mixin.
 
-从 mrerp_dms_client.py 抽出 · 方法体一字未改(verbatim)· self.* 经 MRO 解析回 DMSClient。
+从 mrerp_dms_client.py 抽出 · self.* 经 MRO 解析回 DMSClient。
 """
 
 from __future__ import annotations
@@ -14,10 +14,8 @@ from services.erp.mrerp_dms_models import (
     BookingDefaults,
     DMSBookingPayload,
     DMSMasterRef,
-    DMSPushResult,
     ThaiIdCardPayload,
 )
-from services.erp.mrerp_dms_xlsx import BookingImportRow, DMSBookingImportXlsxBuilder
 from services.erp.mrerp_dms_client_base import DMSClientError, to_be_date
 
 # DMS 订车单(drfcbc)菜单 id/层级 —— autonum 自动编号的键(MR.ERP DMS 标准实例)。
@@ -48,115 +46,6 @@ def _bump_docno(docno: str) -> str:
 
 
 class DMSClientOpsMixin:
-    def ensure_customer(self, card: ThaiIdCardPayload) -> str:
-        existing = self.search_customer(card.people_id)
-        if existing:
-            return existing
-
-        form_html = self._post_text("cus/form.php", {"status": "n"})
-        data = self._parse_form_defaults(form_html)
-        prefix_name = card.prefix_name or self._select_label(form_html, "selprefix", card.prefix_id)
-
-        data.update(
-            {
-                "stsel": "n",
-                "idsel": "",
-                "txtcuscode": card.people_id,
-                "selprefix": card.prefix_id,
-                "txtcusname": card.full_name,
-                "txttel": card.phone,
-                "txtbirthday": card.birthday_be,
-                "txtpeopleid": card.people_id,
-                "txttaxid": card.people_id,
-                "txtcreditday": "0",
-            }
-        )
-        if prefix_name:
-            data["txtprefix"] = prefix_name
-        resolved_address = self._resolve_address_geo(card.address, form_html)
-        self._apply_address_to_customer_form(data, resolved_address)
-        resp = self.transport.post(self._url("cus/new.php"), data=data, timeout_ms=60000)
-        if resp.status_code != 200 or resp.text.strip().startswith("err::"):
-            raise DMSClientError(
-                f"customer create failed: {resp.status_code} {resp.text[:300]!r}",
-                "ERR_DMS_CUSTOMER_CREATE",
-            )
-
-        customer_id = self.search_customer(card.people_id)
-        if not customer_id:
-            raise DMSClientError(
-                "customer create returned success but search could not find row",
-                "ERR_DMS_CUSTOMER_CREATE",
-            )
-        return customer_id
-
-    def import_booking_from_xlsx(
-        self,
-        *,
-        template_bytes: bytes,
-        booking: DMSBookingPayload,
-        card: ThaiIdCardPayload,
-        doc_date_serial: int,
-        delivery_date_serial: int,
-    ) -> str:
-        xlsx = DMSBookingImportXlsxBuilder().build(
-            template_bytes,
-            BookingImportRow(
-                booking_no=booking.booking_no,
-                advisor_code=booking.advisor.code,
-                advisor_name=booking.advisor.name,
-                doc_date_serial=doc_date_serial,
-                car_code=booking.car.code,
-                paint_code=booking.paint.code,
-                delivery_date_serial=delivery_date_serial,
-                customer_first_name=card.first_name,
-                customer_last_name=card.last_name,
-            ),
-        )
-
-        self.transport.get(self._url("impcarbookcon/formupload.php"))
-        upload = self.transport.post(
-            self._url("impcarbookcon/component/uploadexcel.php"),
-            files={
-                "uploadfile": (
-                    f"{booking.booking_no}.xlsx",
-                    xlsx,
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                )
-            },
-            timeout_ms=60000,
-        )
-        if upload.status_code != 200 or upload.text.strip().startswith("err::"):
-            raise DMSClientError(f"booking upload failed: {upload.text[:300]!r}", "ERR_DMS_IMPORT")
-
-        preview = self._post_text("impcarbookcon/formrdpc.php", {})
-        if booking.booking_no not in preview:
-            raise DMSClientError(
-                "booking upload preview did not contain booking_no", "ERR_DMS_IMPORT"
-            )
-
-        # cbimportdata[]=2 selects ONLY data row 2 (our row); the template's
-        # example rows 3-6 are not imported. Verify by reading back drfcbc.
-        result = self.transport.post(
-            self._url("impcarbookcon/component/importpc.php"),
-            data={"cballimportdata[]": "1", "cbimportdata[]": "2"},
-            timeout_ms=120000,
-        )
-        code = result.text.strip()
-        if code == "sc::1":
-            booking_id = self.search_booking(booking.booking_no)
-            if not booking_id:
-                raise DMSClientError(
-                    "booking import returned success but search failed", "ERR_DMS_IMPORT"
-                )
-            return booking_id
-        if code.startswith("ep::"):
-            # ep::1 means DMS produced an error report — never treat as success.
-            raise DMSClientError(
-                "booking import produced DMS error report", "ERR_DMS_IMPORT_REPORT"
-            )
-        raise DMSClientError(f"booking import returned unexpected body: {code!r}", "ERR_DMS_IMPORT")
-
     def _apply_booking_form_fields(
         self,
         data: Dict[str, str],
@@ -218,26 +107,6 @@ class DMSClientOpsMixin:
             }
         )
         self._apply_address_to_booking_form(data, card.address)
-
-    def patch_booking_identity(
-        self,
-        *,
-        booking_id: str,
-        customer_id: str,
-        booking: DMSBookingPayload,
-        card: ThaiIdCardPayload,
-    ) -> None:
-        form_html = self._post_text("drfcbc/form.php", {"status": "e", "id": booking_id})
-        data = self._parse_form_defaults(form_html)
-        data["stsel"] = "e"
-        data["idsel"] = booking_id
-        self._apply_booking_form_fields(data, customer_id=customer_id, booking=booking, card=card)
-        resp = self.transport.post(self._url("drfcbc/edit.php"), data=data, timeout_ms=120000)
-        if resp.status_code != 200 or resp.text.strip().startswith("err::"):
-            raise DMSClientError(
-                f"booking patch failed: {resp.status_code} {resp.text[:300]!r}",
-                "ERR_DMS_BOOKING_PATCH",
-            )
 
     def create_booking_via_form(
         self, *, customer_id: str, booking: DMSBookingPayload, card: ThaiIdCardPayload
@@ -301,45 +170,6 @@ class DMSClientOpsMixin:
             return str(det[2]) if len(det) > 2 and det[2] else ""
         except Exception:
             return ""
-
-    def push_id_card_booking(
-        self,
-        *,
-        card: ThaiIdCardPayload,
-        booking: DMSBookingPayload,
-        template_bytes: bytes,
-        doc_date_serial: int,
-        delivery_date_serial: int,
-    ) -> DMSPushResult:
-        """Orchestrate the full flow. Assumes the transport is already
-        authenticated (the adapter logged in via Playwright)."""
-        customer_id = self.ensure_customer(card)
-        booking_id = self.import_booking_from_xlsx(
-            template_bytes=template_bytes,
-            booking=booking,
-            card=card,
-            doc_date_serial=doc_date_serial,
-            delivery_date_serial=delivery_date_serial,
-        )
-        self.patch_booking_identity(
-            booking_id=booking_id,
-            customer_id=customer_id,
-            booking=booking,
-            card=card,
-        )
-        return DMSPushResult(
-            ok=True,
-            customer_id=customer_id,
-            booking_id=booking_id,
-            booking_no=booking.booking_no,
-            response_code="sc::1",
-        )
-
-    def download_booking_template(self) -> bytes:
-        resp = self.transport.get(self._url("impcarbookcon/example.xlsx"), timeout_ms=60000)
-        if resp.status_code != 200 or resp.content[:2] != b"PK":
-            raise DMSClientError("DMS booking example.xlsx download failed", "ERR_DMS_TEMPLATE")
-        return resp.content
 
     def fetch_masters(self) -> Dict[str, List[List[Any]]]:
         """Pull the dropdown lists the connect wizard needs. Best-effort:

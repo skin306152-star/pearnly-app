@@ -6,9 +6,14 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-12 · **✨ 丝滑专项 + 打包收编(console/POS)+ 权限管理成品化 全上线** · 前序见下）
+## 🎯 状态卡（2026-06-14 · **DMS 建订车单失败修复 + 旧一步式路径清死代码** · 前序见下）
 
-- **🆕 本窗口(2026-06-12)· ✨ 丝滑+打包收编+权限管理成品化【全套上线·9 commit·b25d1d43】**（自检自推·健康 200·13闸全绿）：
+- **🆕 本窗口(2026-06-14)· 🚗 DMS 建订车单失败修复 + 旧 xlsx 路径清死代码【全上线·真 DMS 验证】**：
+  - **建订车单失败真因(非 OCR·我先前误判)**:DMS autonum 单号计数器与全局唯一约束失步 → 一直回已占用号 `BK2606000001` → `err::"เลขที่ใบจอง" ซ้ำ`(单号重复)→ 每次推送必失败。修:`create_booking_via_form` 撞重复就顺号重试(`_bump_docno` 保位宽·最多 25 次·非重复错误不重试)。真账号 live DMS 验证建单成功(booking_id=28)。`23bb1cf7` + 单测 8 绿。详见 [[dms-booking-duplicate-docno-fixed]]。
+  - **/simplify 收尾·清死代码**(Zihao 拍板全删旧一步式路径):两步流(`/api/dms/id-card/recognize`+`/push`·2026-06-13 上线)已取代旧一步式自动推 `/api/dms/id-card-booking`。删整条 xlsx 导入建单路径:端点 + `push_mrerp_dms_id_card` + adapter/ops `push_id_card_booking` + `import_booking_from_xlsx`/`patch_booking_identity`/`download_booking_template`/`ensure_customer` + `mrerp_dms_xlsx.py` 模块 + `DMSPushResult` + 2 个孤儿地址 helper。改/删测试(geo 测试重指 `_resolve_address_geo` 直测)+ 4 处文档(route-map/handoff/external-ref/intake)。全量单测 + 13 闸绿。
+  - 共享树坑(同前):另一窗口并发 commit/churn master·走隔离 worktree 单推·见 [[dms-booking-duplicate-docno-fixed]] 末段。
+
+- **本窗口(2026-06-12)· ✨ 丝滑+打包收编+权限管理成品化【全套上线·9 commit·b25d1d43】**（自检自推·健康 200·13闸全绿）：
   - **铁律改**(`12adcba4`):Zihao 拍板**删「高敏区·Zihao在场」两档制**(整顿期产物)→ 铁律#26 整条改写 + #16 + AGENTS + 记忆 [[all-changes-self-check-push]]:**今后所有改动(含登录/计费/OCR/POS离线)自做自检 OK 即 push**,不分高敏不等谁在场。真闸=13闸绿+核心路径自跑真账号E2E+改坏自revert;保留硬线=不碰mrerp真余额/破坏git历史仍问。
   - **A2 withLoading**(`34f26df4`+`df1126ce`+`89bf01a9`+`2a5f8149`):新全局 `src/home/with-loading.ts`(window桥·`.is-busy` currentColor转圈·复用home-03 spin·测试5行为)+ **16个高频动作按钮**接即时反馈(做账/报税/进项/库存/历史/POS·替手动disabled)→ 治 Zihao 原始抱怨"全站按钮卡顿"。
   - **A1去重**已 live(别窗口 core.ts coalesceConcurrentGets);**A3/A4** 实查列表已容器级渲染→骨架/乐观判定迁同区后低ROI跳过;**A5/A6** 反馈构造性<16ms免测+严格闸噪声>价值跳过。

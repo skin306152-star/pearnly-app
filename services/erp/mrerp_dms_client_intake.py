@@ -138,7 +138,7 @@ class DMSClientIntakeMixin:
             v = f.get(fk)
             if v is not None:
                 data[dms] = str(v)
-        # 个人主体:税号留空时取身份证号(与 ensure_customer 同口径)
+        # 个人主体:税号留空时取身份证号(DMS 个人客户税号=身份证号)
         if not f.get("tax_id") and f.get("people_id"):
             data["txttaxid"] = str(f["people_id"])
         for sfx in _ADDR_SUFFIXES:

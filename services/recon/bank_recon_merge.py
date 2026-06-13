@@ -71,6 +71,17 @@ def merge_statements(
     if closing == 0.0 and all_rows:
         closing = all_rows[-1].balance
 
+    # Order-independent guard: imported Excel rows may not be chronological (user
+    # paste), which makes a row-order opening/closing wrong. all_rows is date-sorted
+    # above, so if opening/closing don't satisfy opening + Σ(deposit − withdrawal)
+    # = closing, re-derive from the balance chain (closing = latest-dated balance,
+    # opening = closing − net). No-op when already consistent (PDF / sorted input).
+    if all_rows and any(r.balance for r in all_rows):
+        net = round(sum(r.deposit - r.withdrawal for r in all_rows), 2)
+        if abs(opening + net - closing) > 0.05:
+            closing = all_rows[-1].balance
+            opening = round(closing - net, 2)
+
     return all_rows, opening, closing, bank_code
 
 

@@ -53,8 +53,10 @@ from routes.erp_push_log_routes import (  # noqa: F401
     ErpBatchRetryRequest,
     ErpBatchDeleteRequest,
 )
+from routes.erp_export_routes import router as _export_router  # noqa: F401
 
 router = APIRouter()
 router.include_router(_listing_router)
 router.include_router(_endpoints_router)
 router.include_router(_push_log_router)
+router.include_router(_export_router)

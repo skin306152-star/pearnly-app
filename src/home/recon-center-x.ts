@@ -54,19 +54,24 @@ function view(v: RxView) {
     showView(v, bannerHidden);
 }
 
+// 清本次对账的临时数据(切换类型/清空/返回共用)
+function resetRxData() {
+    RX.left = null;
+    RX.right = null;
+    RX.result = null;
+    RX.jobId = null;
+    RX.filter = 'all';
+    RX.page = 1;
+}
+
 // ── tab 切换:换配置 + 清残留(文件/结果/余额/筛选)──────────────
 function switchTab(tab: RxState['tab']) {
     if (tab === RX.tab) return;
     // 仅「有未保存的上传文件」才提醒;已完成/载入的结果已存历史可找回 → 不拦。
     const hasStaged = !!(RX.left || RX.right);
     const apply = () => {
+        resetRxData();
         RX.tab = tab;
-        RX.left = null;
-        RX.right = null;
-        RX.result = null;
-        RX.jobId = null;
-        RX.filter = 'all';
-        RX.page = 1;
         document.querySelectorAll('#rcx-tabs .rcx-seg').forEach((b) => {
             const on = (b as HTMLElement).dataset.rcxTab === tab;
             b.classList.toggle('active', on);
@@ -100,7 +105,6 @@ function handleFiles(side: RxSide, files: FileList | File[] | null | undefined) 
     if (files.length > 1 && window.showToast)
         window.showToast(tt('rcx-multi-one', '每个区域一次只读取一个文件，已取第一个'), 'info');
     const file = files[0];
-    const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
     if (!/\.(pdf|png|jpe?g|webp|tiff|xlsx|xls|csv|docx?)$/i.test(file.name)) {
         if (window.showToast) window.showToast(tt('rcx-bad-format', '不支持的文件格式'), 'error');
         return;
@@ -110,7 +114,6 @@ function handleFiles(side: RxSide, files: FileList | File[] | null | undefined) 
         return;
     }
     RX[side] = { file, method: rxClassify(file.name), ext: rxExt(file.name), size: file.size };
-    void ext;
     renderCard(side);
     updateReady();
 }
@@ -134,11 +137,7 @@ function previewFile(side: RxSide) {
 function clearAll() {
     const hasStaged = !!(RX.left || RX.right);
     const apply = () => {
-        RX.left = null;
-        RX.right = null;
-        RX.result = null;
-        RX.jobId = null;
-        RX.filter = 'all';
+        resetRxData();
         renderCard('left');
         renderCard('right');
         renderBalance();

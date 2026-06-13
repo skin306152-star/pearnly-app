@@ -151,10 +151,6 @@ interface Window {
     // i18n switch bus (home.js core); optional — callers guard with typeof check.
     subscribeI18n?: (key: string, rerender: () => void) => void;
     // gl-vat-recon bridges
-    GlVatRecon: { ensureInit: () => void };
-    _loadGlvHistory: () => void;
-    _glvRemoveFile: (...args: unknown[]) => void;
-    _glvPreviewFiles: (kind: string) => unknown;
     // i18n data + active language (home.js core)
     I18N: Record<string, Record<string, string>>;
     _currentLang?: string;
@@ -208,7 +204,6 @@ interface Window {
     jspdf: { jsPDF: new (...args: any[]) => any };
     // settings + reconcile subtab bridges
     _pearnlyGeneral?: { tz: string; date_format: string; number_format: string };
-    _bankReconV2Init?: () => void;
     closeSettingsModal?: () => void;
     // big-batch progress hooks
     _bigBatchStart?: (files?: unknown) => void;
@@ -218,8 +213,6 @@ interface Window {
     _erpEndpoints?: Array<{ id?: unknown; [key: string]: unknown }>;
     _dupQueue?: Array<Record<string, unknown>>;
     // gl-vat-recon collapse panel + preview-search clear bridge
-    _reconCollapse?: { renderGlvPreview?: () => void; [key: string]: unknown };
-    _glvClearPreviewSearch?: () => void;
     // DMS id-card result clear bridge
     clearDmsIdCardResult?: () => void;
     // ── C5 批9 桥(exceptions / erp / recon / workspace / ocr-doc-mode 等遗留边界)──
@@ -259,11 +252,7 @@ interface Window {
     __i18nSubs?: unknown[];
     getCurrentClientId?: () => unknown;
     _tcOnNewLog?: (entry: unknown) => void;
-    _onVexResultShown?: LegacyBridge;
-    _fillVexSummary?: LegacyBridge;
-    _fillVexDetail?: LegacyBridge;
     retryPushLog?: LegacyBridge;
-    _vexLastTask?: Record<string, unknown> | null;
     _quota?: Record<string, unknown> | null;
     _pearnlyTcPush?: LegacyBridge;
     _pearnlyTcLogs?: unknown[];
@@ -277,11 +266,9 @@ interface Window {
     bindDrawerClient?: LegacyBridge;
     _planState?: Record<string, unknown> | null;
     _erpExcOpenEdit?: LegacyBridge;
-    _brv2LoadHistory?: () => void;
     setActiveWorkspaceClientId?: LegacyBridge;
     openClientExportModal?: LegacyBridge;
     loadRecentTasks?: () => void;
-    _rerenderReconcile?: () => void;
     __reconcileBound?: boolean;
     setCurrentClientId?: LegacyBridge;
     loadClientsPage?: () => void;
@@ -370,7 +357,6 @@ interface Window {
     fillCategoryDatalist?: () => void;
     _tcApplyVisibility?: () => void;
     _rerenderNotifications?: () => void;
-    _loadBankReconV2Panel?: LegacyBridge;
     PEARNLY_ADMIN_MODE?: boolean;
     // ── C5 批12 桥(ocr/folder/erp/billing/avatar/workspace/archive/email 遗留边界)──
     _ocrCtrls?: Set<AbortController>;

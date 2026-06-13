@@ -15,36 +15,8 @@
 (function () {
     'use strict';
 
-    // ── 对账中心子 tab 切换(bank / sale-vat / gl-vat)──
-    function _setMainHeader(_pane: string) {
-        // L2 pane 各自有标题 · L1 永远保持 rc-page-title/rc-page-sub · 不随 tab 变
-        return;
-    }
-
-    function _initSubTabs() {
-        const tabs = document.querySelectorAll('[data-recon-tab]');
-        tabs.forEach((btn) => {
-            btn.addEventListener('click', () => {
-                tabs.forEach((b) => b.classList.remove('active'));
-                btn.classList.add('active');
-                const pane = (btn as HTMLElement).dataset.reconTab;
-                const paneBank = document.getElementById('recon-pane-bank');
-                const paneSv = document.getElementById('recon-pane-sale-vat');
-                const paneGlVat = document.getElementById('recon-pane-gl-vat');
-                if (paneBank) paneBank.style.display = pane === 'bank' ? '' : 'none';
-                if (paneSv) paneSv.style.display = pane === 'sale-vat' ? '' : 'none';
-                if (paneGlVat) paneGlVat.style.display = pane === 'gl-vat' ? '' : 'none';
-                _setMainHeader(pane as string);
-                // 销项税(sale-vat)数据加载由新 VEX 模块自绑(_loadVexKpi/_loadVexTaskList)
-                if (pane === 'gl-vat' && window.GlVatRecon) window.GlVatRecon.ensureInit();
-                if (pane === 'bank' && typeof window._bankReconV2Init === 'function') {
-                    window._bankReconV2Init();
-                }
-            });
-        });
-        const activeTab = document.querySelector('[data-recon-tab].active');
-        if (activeTab) _setMainHeader((activeTab as HTMLElement).dataset.reconTab as string);
-    }
+    // 2026-06-14 · 旧对账中心子 tab 切换(_initSubTabs)随重设计(recon-center-x)退场已删除;
+    // 本模块仅保留与对账无关、全站复用的「系统设置弹窗」。
 
     // ── 全站设置弹窗(历史上挂在本模块 · 与销项税流程无关 · 保留原样)──
     // v118.32.3 · 系统设置改为 modal 弹窗(参考 DeepSeek/ChatGPT/Linear)
@@ -130,11 +102,4 @@
     window.addEventListener('DOMContentLoaded', () => {
         if (location.hash === '#/settings') openSettingsModal();
     });
-
-    // ── init ──
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', _initSubTabs);
-    } else {
-        _initSubTabs();
-    }
 })();

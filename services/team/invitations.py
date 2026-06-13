@@ -246,11 +246,11 @@ def send_invite_email(target_email: str, invite_url: str, tenant_name: str, role
     html = f"""
         <div style="font-family:Inter,Sarabun,sans-serif;max-width:560px;margin:0 auto;padding:32px;background:#f8fafc;">
             <div style="background:#fff;border-radius:12px;padding:32px;box-shadow:0 4px 24px rgba(0,0,0,0.05);">
-                <div style="display:inline-block;padding:6px 14px;background:#0a0e27;color:#fff;border-radius:8px;font-weight:700;font-size:14px;margin-bottom:24px;">Pearnly</div>
+                <div style="margin-bottom:24px;"><img src="https://pearnly.com/static/brand/pwa-icon-192.png?v=1" width="32" height="32" alt="Pearnly" style="vertical-align:middle;border-radius:7px;display:inline-block;" /><span style="display:inline-block;vertical-align:middle;margin-left:8px;font-weight:800;font-size:18px;color:#4c1d95;">Pearnly</span></div>
                 <h1 style="font-size:22px;color:#0f172a;margin:0 0 12px 0;">{tenant_name} invites you</h1>
                 <p style="font-size:14px;color:#64748b;line-height:1.6;">{tenant_name} 邀请你以「{role_name}」身份加入 Pearnly(7 天内有效)。</p>
                 <div style="text-align:center;margin:28px 0;">
-                    <a href="{invite_url}" style="display:inline-block;padding:12px 32px;background:#1e3a8a;color:#fff;border-radius:10px;text-decoration:none;font-weight:600;font-size:14px;">Accept Invitation / 接受邀请</a>
+                    <a href="{invite_url}" style="display:inline-block;padding:12px 32px;background:#7c4dff;color:#fff;border-radius:10px;text-decoration:none;font-weight:600;font-size:14px;">Accept Invitation / 接受邀请</a>
                 </div>
                 <p style="font-size:12px;color:#94a3b8;line-height:1.6;">If the button doesn't work, copy this link:<br><span style="word-break:break-all;color:#475569;">{invite_url}</span></p>
             </div>

@@ -371,11 +371,13 @@ html.dark .brand-icon {
   display: flex;
   align-items: center;
   gap: 7px;
+  min-width: 0;
   border: 1px solid var(--line);
   background: var(--card);
   border-radius: 9px;
   padding: 7px 9px;
   font-size: 12px;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 .wsopt.on {
@@ -738,6 +740,9 @@ html.dark .brand-icon {
   .rrow .racts {
     width: 100%;
     justify-content: flex-start;
+  }
+  .wslist {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -123,10 +123,10 @@ def _build_verification_email_html(code: str, lang: str) -> tuple:
     html = f"""<!doctype html><html><body style="margin:0;padding:0;background:#f1f5f9;">
 <div style="font-family:Inter,-apple-system,'PingFang SC',Sarabun,'Hiragino Sans',sans-serif;max-width:560px;margin:0 auto;padding:32px 16px;">
   <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(15,23,42,0.08);">
-    <tr><td style="background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 60%,#2563eb 100%);padding:44px 40px 38px;text-align:center;">
+    <tr><td style="background:linear-gradient(135deg,#4c1d95 0%,#7c4dff 60%,#a974ff 100%);padding:44px 40px 38px;text-align:center;">
       <table border="0" cellpadding="0" cellspacing="0" align="center"><tr>
         <td style="vertical-align:middle;padding-right:10px;">
-          <div style="display:inline-block;width:36px;height:36px;background:#fff;border-radius:8px;text-align:center;line-height:36px;font-weight:800;font-size:18px;color:#1e3a8a;font-family:Inter,sans-serif;">P</div>
+          <img src="https://pearnly.com/static/brand/pwa-icon-192.png?v=1" width="40" height="40" alt="Pearnly" style="display:block;width:40px;height:40px;border-radius:9px;" />
         </td>
         <td style="vertical-align:middle;">
           <div style="font-weight:800;font-size:24px;color:#fff;letter-spacing:-0.3px;line-height:1;">Pearnly</div>
@@ -137,8 +137,8 @@ def _build_verification_email_html(code: str, lang: str) -> tuple:
     <tr><td style="padding:44px 40px 36px;">
       <h1 style="font-size:22px;color:#0f172a;margin:0 0 10px;font-weight:700;letter-spacing:-0.2px;">{tt["title"]}</h1>
       <p style="font-size:14px;color:#64748b;line-height:1.65;margin:0 0 28px;">{tt["lead"]}</p>
-      <div style="background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border:1px solid #bfdbfe;border-radius:12px;padding:32px 24px;text-align:center;">
-        <div style="font-size:38px;font-weight:700;letter-spacing:10px;color:#1e3a8a;font-family:'SF Mono','Roboto Mono',Consolas,monospace;line-height:1;">{code}</div>
+      <div style="background:linear-gradient(135deg,#f6f2ff 0%,#ede4ff 100%);border:1px solid #d9c7ff;border-radius:12px;padding:32px 24px;text-align:center;">
+        <div style="font-size:38px;font-weight:700;letter-spacing:10px;color:#6429d6;font-family:'SF Mono','Roboto Mono',Consolas,monospace;line-height:1;">{code}</div>
       </div>
       <p style="font-size:13px;color:#94a3b8;line-height:1.65;margin:28px 0 0;">{tt["ignore"]}</p>
     </td></tr>

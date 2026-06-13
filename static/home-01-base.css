@@ -440,3 +440,5 @@ body.sidebar-collapsed { --sidebar-current-w: var(--sidebar-w-collapsed); }
 /* 全站原生表单控件主题化(THEME #2/#3 · 2026-06-10):勾选/单选/下拉/滑块选中态统一品牌色,
    不再露浏览器默认蓝;重控件仍走各模块 .inp/.sw/.seg。此处兜底原生控件选中色。 */
 input[type="checkbox"], input[type="radio"], select, input[type="range"] { accent-color: var(--accent); }
+/* 兜底:勾选/单选框永远按内容宽,挡住各模块贪婪的 `input{width:100%}` 把它拉成全宽条(footgun 根治) */
+input[type="checkbox"], input[type="radio"] { width: auto; flex: none; }

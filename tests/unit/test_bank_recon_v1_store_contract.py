@@ -26,8 +26,6 @@ _MOVED = [
     "get_tx_candidates",
     "update_session_match_stats",
     "override_tx_match",
-    "seed_bank_recon_test_data",
-    "clear_bank_recon_test_data",
 ]
 
 

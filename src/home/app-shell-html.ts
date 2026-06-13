@@ -95,14 +95,6 @@ const TOPBAR_HTML = `
                     <span data-i18n="avatar-menu-admin">管理员后台</span>
                     <span class="avatar-pill avatar-pill-admin" data-i18n="avatar-menu-badge-admin">超管</span>
                 </button>
-                <button type="button" class="avatar-popup-item" data-action="test-center" data-show-if-test="1" id="avatar-menu-test" role="menuitem" style="display:none">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M8 3v5L4 15a1.5 1.5 0 001.4 2h9.2A1.5 1.5 0 0016 15l-4-7V3"/>
-                        <line x1="6.5" y1="3" x2="13.5" y2="3"/>
-                        <line x1="7" y1="11" x2="13" y2="11"/>
-                    </svg>
-                    <span data-i18n="avatar-menu-test">测试中心</span>
-                </button>
                 <div class="avatar-popup-sep"></div>
                 <button type="button" class="avatar-popup-item" data-action="theme" id="avatar-menu-theme" role="menuitem">
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

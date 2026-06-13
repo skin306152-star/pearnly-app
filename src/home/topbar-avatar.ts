@@ -17,16 +17,6 @@
 (function () {
     'use strict';
 
-    // ---- 测试白名单判定(复刻 test-center _isAllowed 同款 3 条件) ----
-    function _isInTestWhitelist(u: any) {
-        try {
-            if (location.search.indexOf('test_center=1') >= 0) return true;
-            if (localStorage.getItem('pearnly_test_mode') === '1') return true;
-            if (u && u.id && String(u.id) === '468b50c1-5593-4fd6-990d-515ce8085563') return true;
-        } catch (_) {}
-        return false;
-    }
-
     // ---- 角色显隐(暴露到 window · loadAll 在 9734 行会调) ----
     // v118.35.0.7 · 没 user info 时强制隐藏 admin/test/special · 不再 early-return
     // 让特权入口"默认看不见"(home.html 4 处也已 style=display:none 兜底)
@@ -47,7 +37,6 @@
                     ? shouldHideMoney(u)
                     : u.role === 'member' && !u.is_super_admin;
             isSuper = typeof isSuperAdmin === 'function' ? isSuperAdmin(u) : !!u.is_super_admin;
-            isTest = _isInTestWhitelist(u);
         }
 
         document.querySelectorAll<HTMLElement>('[data-show-if-team]').forEach(function (
@@ -199,9 +188,6 @@
                     // v118.44.0 NAV-IA Phase 8 · 跳新 admin SPA(独立 layout)· 不再走老 /admin = home.html
                     window.location.href = '/admin/cost';
                     break;
-                case 'test-center':
-                    if (typeof routeTo === 'function') routeTo('test-center');
-                    break;
                 case 'help':
                     var helpModal = document.getElementById('help-modal');
                     if (helpModal) helpModal.style.display = 'flex';
@@ -260,7 +246,7 @@
         var u = window._userInfo;
         var isSuper =
             typeof isSuperAdmin === 'function' ? isSuperAdmin(u) : !!(u && u.is_super_admin);
-        var isTest = _isInTestWhitelist(u);
+        var isTest = false;
 
         document.querySelectorAll<HTMLElement>('.cmdk-item').forEach(function (item: HTMLElement) {
             // 权限项硬过滤(不显在 cmdk 里 · 不参与计数)

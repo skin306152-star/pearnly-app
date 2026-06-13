@@ -14,8 +14,6 @@ Pearnly · 银行对账路由模块(M10 · 上传/会话/匹配/候选/客户绑
   POST   /api/bank-recon/tx/{tx_id}/override          · 手动指派匹配
   GET    /api/bank-recon/tx/{tx_id}/candidates        · 拉一条流水的候选发票
   PATCH  /api/bank-recon/sessions/{session_id}/client · 给会话绑客户(越权校验)
-  POST   /api/bank-recon/_dev/seed                    · skin 白名单 · 插 mock 数据
-  POST   /api/bank-recon/_dev/clear                   · skin 白名单 · 清 mock 数据
 
 依赖:
   - db.*(bank recon session / transactions / candidates / dev seed)
@@ -307,35 +305,3 @@ async def bank_recon_set_session_client(session_id: str, request: Request):
     if not ok:
         raise HTTPException(404, detail="bank_recon.session_not_found")
     return {"ok": True, "client_id": cid}
-
-
-# v118.26.2 · 测试中心专用 · 一键插入 mock 银行对账数据
-#   仅 skin OAuth 测试白名单可调 · 前端按钮也只对 skin 显示
-#   场景:v118.26.4 才做 Excel/CSV 解析 · 此前对账 UI 没数据可测
-_TEST_USER_IDS = {
-    "468b50c1-5593-4fd6-990d-515ce8085563",  # skin306152@gmail.com
-}
-
-
-@router.post("/api/bank-recon/_dev/seed")
-async def bank_recon_dev_seed(request: Request):
-    """skin 白名单 · 插一份 KBANK mock session(8 条流水)· 用于演示对账 UI"""
-    user = require_perm(request, "recon.create")
-    uid = str(user["id"])
-    if uid not in _TEST_USER_IDS:
-        raise HTTPException(403, detail="bank_recon.dev_not_allowed")
-    result = db.seed_bank_recon_test_data(uid)
-    if not result.get("ok"):
-        raise HTTPException(500, detail=f"bank_recon.seed_failed:{result.get('error','')[:80]}")
-    return result
-
-
-@router.post("/api/bank-recon/_dev/clear")
-async def bank_recon_dev_clear(request: Request):
-    """skin 白名单 · 清掉所有 _MOCK_ session"""
-    user = require_perm(request, "recon.create")
-    uid = str(user["id"])
-    if uid not in _TEST_USER_IDS:
-        raise HTTPException(403, detail="bank_recon.dev_not_allowed")
-    n = db.clear_bank_recon_test_data(uid)
-    return {"ok": True, "deleted": n}

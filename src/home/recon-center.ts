@@ -309,57 +309,11 @@
                 load();
                 return;
             }
-            // v118.26.2 · 测试中心专用 · 插 mock 数据 · 仅 skin 白名单
-            if ((e.target as HTMLElement).closest('#btn-reconcile-dev-seed')) {
-                _devSeedMock();
-                return;
-            }
         });
-    }
-
-    // v118.26.2 · 检测 skin 测试账号 · 显示「插测试流水」按钮
-    const _SKIN_USER_IDS = ['468b50c1-5593-4fd6-990d-515ce8085563'];
-    function _maybeShowDevSeed() {
-        const btn = document.getElementById('btn-reconcile-dev-seed');
-        if (!btn) return;
-        // v118.26.2.1 · _userInfo 在文件顶层 let · 不挂 window · 直接读
-        const u = typeof _userInfo !== 'undefined' ? _userInfo : null;
-        const isSkin = u && u.id && _SKIN_USER_IDS.indexOf(String(u.id)) >= 0;
-        btn.style.display = isSkin ? '' : 'none';
-    }
-
-    async function _devSeedMock() {
-        try {
-            const resp = await fetch('/api/bank-recon/_dev/seed', {
-                method: 'POST',
-                headers: { Authorization: 'Bearer ' + token },
-            });
-            if (!resp.ok) throw new Error('seed:' + resp.status);
-            const data = await resp.json();
-            const msg = (t('reconcile-dev-seed-ok') || '').replace('{n}', data.tx_count || 0);
-            showToast(msg, 'success');
-            // 跳到自动化模块的银行对账 tab + 直接打开新建的 session
-            if (typeof window.navigateTo === 'function') {
-                window.navigateTo('automation');
-            } else {
-                location.hash = '#/automation';
-            }
-            setTimeout(() => {
-                const tab = document.querySelector('[data-auto-tab="bank"]') as HTMLElement | null;
-                if (tab) tab.click();
-                if (data.session_id && typeof window._openBankSession === 'function') {
-                    window._openBankSession(data.session_id);
-                }
-            }, 300);
-        } catch (e) {
-            console.warn('[reconcile] dev seed failed', e);
-            showToast(t('reconcile-dev-seed-fail') || 'Seed failed', 'error');
-        }
     }
 
     window.loadReconcilePage = async function () {
         _bindOnce();
-        _maybeShowDevSeed();
         // v118.33.6 · init bank recon v2 on reconcile page load
         if (typeof window._bankReconV2Init === 'function') {
             window._bankReconV2Init();

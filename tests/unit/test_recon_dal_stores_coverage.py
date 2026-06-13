@@ -600,24 +600,6 @@ class BankReconV1StoreTests(unittest.TestCase):
         with patch_cursor(FakeCursor(rowcount=0)):
             self.assertFalse(brv1.override_tx_match("tx", USER, "h1", "matched"))
 
-    def test_clear_test_data_rowcount(self):
-        with patch_cursor(FakeCursor(rowcount=2)):
-            self.assertEqual(brv1.clear_bank_recon_test_data(USER), 2)
-        with boom_cursor():
-            self.assertEqual(brv1.clear_bank_recon_test_data(USER), 0)
-
-    def test_seed_test_data_ok_and_exception(self):
-        cur = FakeCursor(fetchone={"id": "seed-sess"})
-        with patch_cursor(cur):
-            res = brv1.seed_bank_recon_test_data(USER)
-        self.assertTrue(res["ok"])
-        self.assertEqual(res["tx_count"], 8)
-        # 8 条流水 INSERT
-        tx_inserts = [c for c in cur.calls if "INSERT INTO bank_reconcile_transactions" in c[0]]
-        self.assertEqual(len(tx_inserts), 8)
-        with boom_cursor():
-            self.assertFalse(brv1.seed_bank_recon_test_data(USER)["ok"])
-
 
 # ════════════════════════════════════════════════════════════
 # vat_recon_store(销项税三表 + client helper)

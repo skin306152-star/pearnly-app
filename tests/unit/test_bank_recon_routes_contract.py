@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-REFACTOR-B1 守门测试 · 银行对账 11 路由从 app.py 抽到 bank_recon_routes.py。
+REFACTOR-B1 守门测试 · 银行对账 9 路由从 app.py 抽到 bank_recon_routes.py。
 
 锁定(防搬迁回归 + 权限批2):
-  1. router 注册的 11 个路由 path+method 契约不变(防丢路由 / 改 URL / 改 method)
+  1. router 注册的 9 个路由 path+method 契约不变(防丢路由 / 改 URL / 改 method)
   2. app.py 通过 include_router 真挂上了(防漏挂)
-  3. dev seed/clear 的白名单常量 _TEST_USER_IDS 单一来源在 bank_recon_routes(防权限闸丢失)
-  4. 权限批2:路由入口统一执行点 require_perm(services/authz/deps 单一来源)·
+  3. 权限批2:路由入口统一执行点 require_perm(services/authz/deps 单一来源)·
      逐路由权限码契约(读=recon.view / 写=recon.create)· 防鉴权失踪 / 码漂移
 """
 
@@ -15,7 +14,7 @@ import re
 import unittest
 
 from routes import bank_recon_routes
-from routes.bank_recon_routes import _TEST_USER_IDS, router
+from routes.bank_recon_routes import router
 
 
 class BankReconRoutesContractTests(unittest.TestCase):
@@ -36,8 +35,6 @@ class BankReconRoutesContractTests(unittest.TestCase):
             ("POST", "/api/bank-recon/tx/{tx_id}/override"),
             ("GET", "/api/bank-recon/tx/{tx_id}/candidates"),
             ("PATCH", "/api/bank-recon/sessions/{session_id}/client"),
-            ("POST", "/api/bank-recon/_dev/seed"),
-            ("POST", "/api/bank-recon/_dev/clear"),
         }
         self.assertEqual(got, expected)
 
@@ -48,15 +45,10 @@ class BankReconRoutesContractTests(unittest.TestCase):
         paths = {r.path for r in app.app.routes if hasattr(r, "path")}
         self.assertIn("/api/bank-recon/upload", paths)
         self.assertIn("/api/bank-recon/sessions", paths)
-        self.assertIn("/api/bank-recon/_dev/seed", paths)
-
-    def test_dev_whitelist_constant_present(self):
-        """dev seed/clear 白名单单一来源 · skin uid 仍在闸内(防权限闸丢失)"""
-        self.assertIn("468b50c1-5593-4fd6-990d-515ce8085563", _TEST_USER_IDS)
 
     def test_routes_use_require_perm_with_expected_codes(self):
-        """权限批2:全部 11 路由入口走统一执行点 require_perm(deps 单一来源)·
-        逐路由码契约:读=recon.view / 写(含删/dev)=recon.create(防鉴权失踪 / 码漂移)"""
+        """权限批2:全部 9 路由入口走统一执行点 require_perm(deps 单一来源)·
+        逐路由码契约:读=recon.view / 写(含删)=recon.create(防鉴权失踪 / 码漂移)"""
         from services.authz import deps
 
         self.assertIs(bank_recon_routes.require_perm, deps.require_perm)
@@ -70,8 +62,6 @@ class BankReconRoutesContractTests(unittest.TestCase):
             ("POST", "/api/bank-recon/tx/{tx_id}/override"): "recon.create",
             ("GET", "/api/bank-recon/tx/{tx_id}/candidates"): "recon.view",
             ("PATCH", "/api/bank-recon/sessions/{session_id}/client"): "recon.create",
-            ("POST", "/api/bank-recon/_dev/seed"): "recon.create",
-            ("POST", "/api/bank-recon/_dev/clear"): "recon.create",
         }
         got = {}
         for r in router.routes:

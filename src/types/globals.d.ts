@@ -273,7 +273,6 @@ interface Window {
     _rerenderReconcile?: () => void;
     __reconcileBound?: boolean;
     setCurrentClientId?: LegacyBridge;
-    loadTestCenterPage?: () => void;
     loadClientsPage?: () => void;
     loadKnowledgePage?: () => void;
     loadSalesWorkbench?: () => void;

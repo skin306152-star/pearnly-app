@@ -51,3 +51,5 @@ pearnly_nav_prototype_final.html
 # 按钮/UI 一致性设计参考(buttons.html 视觉稿 + 审计清单 · 非 app 代码 · 永久豁免)
 design-preview/
 tests/visual/design/
+# 对账中心 UI 落地参考原型(视觉/交互事实来源 · 非 app 代码 · 不被 import · 永久豁免)
+design-reference/

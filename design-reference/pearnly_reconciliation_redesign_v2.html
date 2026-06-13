@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pearnly 对账中心 · 重新设计版</title>
+<style>
+:root{
+  --brand:#6C4CFF;
+  --brand-strong:#5D3DE8;
+  --brand-soft:#F1EDFF;
+  --brand-faint:#FAF8FF;
+  --text:#221D38;
+  --muted:#77718D;
+  --line:#E8E4F1;
+  --page:#F7F5FB;
+  --panel:#FFFFFF;
+  --green:#159766;
+  --green-soft:#EAF8F2;
+  --amber:#B76A13;
+  --amber-soft:#FFF7E8;
+  --red:#D45160;
+  --red-soft:#FFF0F2;
+  --blue:#4866D8;
+  --blue-soft:#EEF2FF;
+  --shadow:0 10px 30px rgba(48,35,97,.08);
+  --radius:16px;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif;
+  background:var(--page);
+  color:var(--text);
+  overflow:hidden;
+}
+button,input,select{font:inherit}
+button{cursor:pointer}
+.app{height:100%;display:grid;grid-template-columns:248px 1fr}
+.sidebar{
+  background:#fff;border-right:1px solid var(--line);
+  display:flex;flex-direction:column;min-width:0
+}
+.brand{
+  height:72px;padding:0 20px;display:flex;align-items:center;gap:10px;
+  color:var(--brand);font-size:20px;font-weight:800
+}
+.brand-logo{
+  width:34px;height:34px;border-radius:11px;
+  background:linear-gradient(145deg,#8A70FF,#5B3BE8);
+  color:#fff;display:grid;place-items:center;font-weight:900;
+  box-shadow:0 7px 18px rgba(108,76,255,.25)
+}
+.brand small{
+  font-size:10px;background:#F3EFFC;color:#9991AE;
+  border-radius:999px;padding:3px 7px
+}
+.nav{padding:8px 10px;overflow:auto}
+.nav-section{margin:13px 10px 6px;color:#AAA3B9;font-size:12px;font-weight:700}
+.nav-item{
+  height:40px;padding:0 12px;border-radius:10px;
+  display:flex;align-items:center;gap:10px;
+  color:#5C5670;font-size:14px;margin-bottom:3px
+}
+.nav-item svg{width:18px;height:18px;stroke:currentColor}
+.nav-item:hover{background:#F7F5FB}
+.nav-item.active{background:#ECE6FF;color:#5D3CE0;font-weight:800}
+.user{
+  margin-top:auto;border-top:1px solid var(--line);
+  padding:14px 16px;display:flex;align-items:center;gap:10px
+}
+.avatar{
+  width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+  background:var(--brand);color:#fff;font-weight:800;flex:0 0 auto
+}
+.user-meta{min-width:0}
+.user-meta b,.user-meta span{
+  display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+}
+.user-meta b{font-size:13px}
+.user-meta span{font-size:11px;color:#9A93AD;margin-top:3px}
+
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{
+  height:62px;background:#fff;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:flex-end;
+  padding:0 24px;gap:12px
+}
+.workspace-pill,.search{
+  height:38px;border:1px solid var(--line);border-radius:12px;background:#fff;
+  display:flex;align-items:center;gap:8px
+}
+.workspace-pill{padding:0 12px;font-size:13px;font-weight:700}
+.workspace-pill i{
+  width:24px;height:24px;border-radius:8px;background:#EEE9FF;
+  color:#6542E8;display:grid;place-items:center;font-style:normal
+}
+.search{width:290px;padding:0 12px;color:#AAA3B7;font-size:13px}
+.search kbd{
+  margin-left:auto;border:1px solid var(--line);border-bottom-width:2px;
+  border-radius:6px;background:#FAF9FD;padding:2px 6px;font-size:10px;color:#8B849B
+}
+
+.content{overflow:auto;padding:28px 30px 112px}
+.page-head{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  gap:16px;margin-bottom:16px
+}
+h1{font-size:27px;margin:0 0 6px;letter-spacing:-.4px}
+.subtitle{font-size:14px;color:var(--muted)}
+.actions{display:flex;gap:10px}
+.btn{
+  height:38px;border:1px solid var(--line);border-radius:11px;
+  background:#fff;color:#4F4864;padding:0 14px;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  font-size:13px;font-weight:700
+}
+.btn:hover{background:#FAF8FF;border-color:#D0C8E8}
+.btn.primary{
+  background:var(--brand);border-color:var(--brand);color:#fff;
+  box-shadow:0 8px 18px rgba(108,76,255,.22)
+}
+.btn.primary:hover{background:var(--brand-strong)}
+.btn.small{height:32px;border-radius:9px;padding:0 10px;font-size:12px}
+.btn.text{border:0;background:transparent;color:var(--brand);padding:0 7px}
+.btn:disabled{cursor:not-allowed;opacity:.46;box-shadow:none}
+.btn svg{width:16px;height:16px;stroke:currentColor}
+
+.segmented{
+  display:inline-flex;background:#EFECF6;border:1px solid #E1DCED;
+  padding:4px;border-radius:13px;margin-bottom:16px
+}
+.segmented button{
+  border:0;background:transparent;color:#827B96;
+  padding:9px 17px;border-radius:10px;font-size:13px;font-weight:700
+}
+.segmented button.active{
+  background:#fff;color:#2F2945;box-shadow:0 3px 10px rgba(39,27,79,.09)
+}
+
+/* 模板引导 */
+.template-banner{
+  display:grid;grid-template-columns:auto 1fr auto;
+  align-items:center;gap:14px;
+  background:linear-gradient(135deg,#F2EEFF 0%,#FCFBFF 100%);
+  border:1px solid #DED5FF;border-radius:15px;padding:15px 16px;margin-bottom:14px
+}
+.banner-icon{
+  width:42px;height:42px;border-radius:13px;background:#fff;color:var(--brand);
+  display:grid;place-items:center;box-shadow:0 5px 15px rgba(77,53,174,.10)
+}
+.banner-icon svg{width:21px;height:21px;stroke:currentColor}
+.banner-copy b{display:block;font-size:14px}
+.banner-copy p{margin:5px 0 0;color:#716A87;font-size:12px;line-height:1.55}
+.benefits{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+.benefit{
+  background:#fff;border:1px solid #E5DFFF;color:#685D83;
+  border-radius:999px;padding:4px 8px;font-size:10px;font-weight:700
+}
+.banner-actions{display:flex;gap:8px}
+
+/* 空状态流程 */
+.preflight{
+  background:#fff;border:1px solid var(--line);border-radius:15px;
+  padding:14px 16px;margin-bottom:14px
+}
+.preflight-head{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:12px
+}
+.preflight-head b{font-size:13px}
+.preflight-head span{font-size:11px;color:#9991AA}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.step{
+  display:flex;align-items:center;gap:10px;padding:10px 11px;
+  border-radius:11px;background:#FAF9FD;border:1px solid #F0EDF5
+}
+.step-no{
+  width:26px;height:26px;border-radius:9px;background:#EEE9FF;color:#6542E8;
+  display:grid;place-items:center;font-size:11px;font-weight:800;flex:0 0 auto
+}
+.step b{display:block;font-size:11px}
+.step span{display:block;font-size:10px;color:#9A93AA;margin-top:2px}
+
+/* 上传区 */
+.workspace{
+  background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px;box-shadow:0 1px 0 rgba(41,30,81,.02)
+}
+.workspace-head{
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:13px
+}
+.workspace-head b{font-size:14px}
+.status-badge{
+  border-radius:999px;padding:5px 8px;font-size:10px;font-weight:800;
+  background:#EEE9FF;color:#6542E8
+}
+.upload-grid{display:grid;grid-template-columns:1fr 42px 1fr;gap:10px;align-items:stretch}
+.plus{display:grid;place-items:center;color:#A69FBA;font-size:24px;font-weight:200}
+.upload-card{
+  min-height:236px;border:1.5px dashed #D6D0E5;border-radius:15px;
+  background:#FBFAFF;position:relative;padding:18px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+  transition:.18s ease;overflow:hidden
+}
+.upload-card:hover,.upload-card.drag{
+  border-color:#8A6CFF;background:#F8F5FF;
+  box-shadow:inset 0 0 0 1px rgba(108,76,255,.05)
+}
+.upload-card.loaded{
+  border-style:solid;border-color:#DDD7EB;background:#fff;
+  align-items:stretch;text-align:left;justify-content:flex-start
+}
+.drop-icon{
+  width:52px;height:52px;border-radius:15px;background:#F0EBFB;color:#3E3658;
+  display:grid;place-items:center;margin-bottom:11px
+}
+.drop-icon svg{width:25px;height:25px;stroke:currentColor}
+.upload-card h3{font-size:16px;margin:0 0 5px}
+.upload-card .hint{font-size:12px;color:#847D9A;margin-bottom:14px}
+.upload-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.recommend{
+  margin-top:14px;width:100%;max-width:410px;background:#F5F1FF;
+  border:1px solid #E4DDFF;border-radius:12px;padding:10px 12px;
+  display:flex;align-items:center;gap:10px;text-align:left
+}
+.recommend .spark{
+  width:32px;height:32px;border-radius:10px;background:#fff;
+  display:grid;place-items:center;color:var(--brand);flex:0 0 auto
+}
+.recommend b{display:block;font-size:12px}
+.recommend span{display:block;font-size:11px;color:#7D7694;margin-top:2px}
+.format-line{font-size:11px;color:#A19AB5;margin-top:10px}
+
+.file-head{
+  display:flex;gap:12px;align-items:center;padding-bottom:13px;
+  border-bottom:1px solid var(--line)
+}
+.file-type{
+  width:42px;height:42px;border-radius:12px;background:#F1EDFF;color:var(--brand);
+  display:grid;place-items:center;font-size:11px;font-weight:900;flex:0 0 auto
+}
+.file-meta{min-width:0;flex:1}
+.file-meta b,.file-meta span{display:block}
+.file-meta b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-meta span{font-size:11px;color:#948DA6;margin-top:4px}
+.file-remove{
+  border:0;background:#F7F5FB;width:30px;height:30px;border-radius:9px;color:#8E879F
+}
+.method-box{margin-top:13px;border-radius:12px;padding:12px;border:1px solid var(--line)}
+.method-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.method-top b{font-size:12px}
+.method-chip{font-size:10px;font-weight:800;padding:4px 7px;border-radius:999px}
+.method-chip.standard{background:var(--green-soft);color:var(--green)}
+.method-chip.table{background:var(--blue-soft);color:var(--blue)}
+.method-chip.scan{background:var(--amber-soft);color:var(--amber)}
+.check-list{margin-top:10px;display:grid;gap:7px}
+.check-row{display:flex;justify-content:space-between;font-size:11px;color:#7A738E}
+.check-row strong{font-size:11px;color:#443D59}
+.progress{height:7px;background:#EFEDF4;border-radius:99px;overflow:hidden;margin-top:12px}
+.progress i{
+  height:100%;display:block;background:linear-gradient(90deg,var(--brand),#9C83FF);
+  width:100%;border-radius:99px
+}
+.file-cta{display:flex;gap:8px;margin-top:auto;padding-top:13px}
+.file-cta .btn{flex:1}
+
+/* 余额预检 */
+.balance-panel{
+  margin-top:14px;background:#FAF9FD;border:1px solid var(--line);
+  border-radius:14px;padding:14px
+}
+.balance-head{display:flex;align-items:center;justify-content:space-between}
+.balance-head b{font-size:13px}
+.legend{display:flex;gap:12px;color:#8E879F;font-size:11px}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:4px}
+.dot.green{background:#2AB27B}.dot.yellow{background:#E2A440}
+.balance-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+.balance-item label{
+  display:flex;align-items:center;gap:5px;font-size:11px;color:#635C77;margin-bottom:6px
+}
+.balance-value{
+  background:#fff;border:1px solid #DFD9E9;border-radius:10px;height:42px;
+  padding:0 11px;display:flex;align-items:center;justify-content:flex-end;
+  font-size:13px;font-weight:800
+}
+.balance-value.warn{background:#FFFAF0;border-color:#F1CC8E;color:#9B5B0E}
+.source-tag{
+  font-size:9px;border-radius:999px;padding:3px 6px;font-weight:800;
+  background:#F0EDF7;color:#8B849B
+}
+.summary{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-top:12px;padding-top:12px;border-top:1px dashed #E5E0ED;font-size:12px
+}
+.summary strong{font-size:14px}
+.bottom-actions{
+  display:flex;align-items:center;justify-content:space-between;margin-top:14px
+}
+.bottom-actions .left{font-size:12px;color:#8E879F}
+
+/* 对账中 */
+.processing{
+  display:none;background:#fff;border:1px solid var(--line);border-radius:16px;
+  padding:22px;margin-top:14px;text-align:center
+}
+.processing.show{display:block}
+.processing-icon{
+  width:50px;height:50px;border-radius:15px;background:#F1EDFF;color:var(--brand);
+  display:grid;place-items:center;margin:0 auto 12px;font-size:20px
+}
+.processing h3{font-size:16px;margin:0 0 6px}
+.processing p{font-size:12px;color:#827B95;margin:0 0 14px}
+.processing .bar{
+  max-width:560px;height:9px;background:#EFEDF5;border-radius:99px;overflow:hidden;margin:0 auto
+}
+.processing .bar i{
+  height:100%;display:block;width:0;background:linear-gradient(90deg,var(--brand),#9C83FF);
+  transition:width .25s;border-radius:99px
+}
+.processing small{display:block;margin-top:9px;color:#9A93AA;font-size:11px}
+
+/* 结果区：默认隐藏 */
+.results{display:none;margin-top:14px}
+.results.show{display:block}
+.results-head{
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:10px
+}
+.results-head div b{display:block;font-size:16px}
+.results-head div span{display:block;font-size:12px;color:#827B95;margin-top:4px}
+.kpis{display:grid;grid-template-columns:1.25fr repeat(3,1fr);gap:10px}
+.kpi{
+  background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px;
+  cursor:pointer;transition:.16s
+}
+.kpi:hover{transform:translateY(-1px);box-shadow:var(--shadow);border-color:#D9D1EF}
+.kpi.primary{
+  background:linear-gradient(135deg,#6C4CFF,#8E73FF);color:#fff;border-color:transparent
+}
+.kpi label{display:block;font-size:11px;color:#8A839B}
+.kpi.primary label{color:rgba(255,255,255,.78)}
+.kpi strong{display:block;font-size:24px;margin-top:8px;letter-spacing:-.4px}
+.kpi p{font-size:10px;color:#9C95AA;margin:5px 0 0}
+.kpi.primary p{color:rgba(255,255,255,.75)}
+.kpi.active{outline:2px solid #9C87FF;outline-offset:2px}
+.result-body{
+  display:grid;grid-template-columns:1.08fr 1fr;gap:12px;margin-top:12px
+}
+.priority-card,.detail-card{
+  background:#fff;border:1px solid var(--line);border-radius:15px;padding:15px
+}
+.card-title{
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:11px
+}
+.card-title b{font-size:13px}
+.card-title span{font-size:10px;color:#9A93AA}
+.issue-list{display:grid;gap:8px}
+.issue{
+  display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;
+  padding:10px;border-radius:11px;background:#FAF9FD;border:1px solid #F0EDF5
+}
+.issue-icon{
+  width:30px;height:30px;border-radius:10px;display:grid;place-items:center;
+  background:var(--amber-soft);color:var(--amber);font-size:12px;font-weight:900
+}
+.issue b{display:block;font-size:11px}
+.issue span{display:block;font-size:10px;color:#948DA4;margin-top:2px}
+.issue-count{font-size:12px;font-weight:800}
+.table{width:100%;border-collapse:collapse;font-size:11px}
+.table th{text-align:left;color:#948DA4;font-weight:700;padding:8px;border-bottom:1px solid var(--line)}
+.table td{padding:9px 8px;border-bottom:1px solid #F0EDF5}
+.table tr:last-child td{border-bottom:0}
+.tag{
+  display:inline-block;border-radius:999px;padding:4px 7px;font-size:9px;font-weight:800
+}
+.tag.ok{background:var(--green-soft);color:var(--green)}
+.tag.wait{background:var(--amber-soft);color:var(--amber)}
+.tag.none{background:var(--red-soft);color:var(--red)}
+
+/* 抽屉和弹窗 */
+.overlay{
+  position:fixed;inset:0;background:rgba(29,22,47,.28);
+  opacity:0;visibility:hidden;transition:.2s;z-index:20
+}
+.overlay.show{opacity:1;visibility:visible}
+.drawer{
+  position:fixed;right:0;top:0;height:100%;width:430px;background:#fff;z-index:21;
+  box-shadow:-12px 0 42px rgba(28,20,50,.18);
+  transform:translateX(105%);transition:.24s ease;display:flex;flex-direction:column
+}
+.drawer.show{transform:translateX(0)}
+.drawer-head{
+  height:68px;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;padding:0 20px
+}
+.drawer-head h2{font-size:18px;margin:0}
+.icon-btn{
+  border:0;background:#F5F3F9;width:34px;height:34px;border-radius:10px;color:#6F687E
+}
+.drawer-body{padding:18px;overflow:auto}
+.drawer-intro{
+  background:#F4F0FF;border:1px solid #E1D8FF;border-radius:13px;
+  padding:13px;margin-bottom:14px
+}
+.drawer-intro b{font-size:13px}
+.drawer-intro p{font-size:12px;color:#716A84;margin:5px 0 0;line-height:1.55}
+.template-card{
+  border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px
+}
+.template-top{display:flex;align-items:flex-start;gap:11px}
+.template-icon{
+  width:42px;height:42px;border-radius:12px;background:#EDF8F3;color:var(--green);
+  display:grid;place-items:center;font-size:11px;font-weight:900;flex:0 0 auto
+}
+.template-meta{flex:1}
+.template-meta b{font-size:13px}
+.template-meta p{font-size:11px;color:#8B849B;margin:4px 0 0;line-height:1.5}
+.reco-tag{
+  font-size:9px;font-weight:800;border-radius:999px;padding:4px 6px;
+  background:var(--green-soft);color:var(--green)
+}
+.template-actions{display:flex;gap:8px;margin-top:12px}
+.version{
+  margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);
+  display:flex;justify-content:space-between;font-size:10px;color:#AAA3B7
+}
+.drawer-footer{margin-top:auto;border-top:1px solid var(--line);padding:14px 18px}
+
+.modal{
+  position:fixed;left:50%;top:50%;
+  transform:translate(-50%,-46%) scale(.98);
+  width:min(760px,calc(100% - 40px));max-height:82vh;
+  background:#fff;border-radius:18px;z-index:31;
+  opacity:0;visibility:hidden;transition:.2s;
+  box-shadow:0 24px 70px rgba(28,20,50,.24);
+  display:flex;flex-direction:column
+}
+.modal.show{opacity:1;visibility:visible;transform:translate(-50%,-50%) scale(1)}
+.modal-head{
+  padding:18px 20px;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between
+}
+.modal-head h2{font-size:17px;margin:0}
+.modal-body{padding:18px 20px;overflow:auto}
+.modal-foot{
+  padding:14px 20px;border-top:1px solid var(--line);
+  display:flex;justify-content:flex-end;gap:8px
+}
+.callout{
+  display:flex;gap:10px;border-radius:12px;padding:12px;
+  background:#F5F2FF;border:1px solid #E1D9FF;
+  font-size:12px;color:#655D78;margin-bottom:14px;line-height:1.5
+}
+.map-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
+.map-table th{
+  text-align:left;color:#8B849C;font-weight:700;padding:9px;border-bottom:1px solid var(--line)
+}
+.map-table td{padding:9px;border-bottom:1px solid #F0EDF5}
+.map-table select{
+  width:100%;height:34px;border:1px solid var(--line);
+  border-radius:8px;background:#fff;padding:0 8px;color:#4C455F
+}
+.check-option{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px}
+.review-table{width:100%;border-collapse:collapse;font-size:12px}
+.review-table th,.review-table td{
+  padding:10px;border-bottom:1px solid var(--line);text-align:left
+}
+.review-table th{color:#8B849B}
+.review-table input{
+  width:100%;height:34px;border:1px solid #F0C77D;
+  background:#FFFAF0;border-radius:8px;padding:0 8px
+}
+.score{font-weight:800;color:#B66B16}
+
+/* 底部演示 */
+.demo-bar{
+  position:fixed;left:50%;bottom:18px;transform:translateX(-50%);
+  z-index:12;background:rgba(255,255,255,.95);
+  border:1px solid var(--line);border-radius:14px;padding:8px;
+  box-shadow:0 12px 35px rgba(44,31,88,.14);
+  display:flex;gap:6px;backdrop-filter:blur(10px)
+}
+.demo-bar span{
+  font-size:11px;color:#8D859E;display:flex;align-items:center;padding:0 6px
+}
+.toast{
+  position:fixed;right:24px;bottom:24px;z-index:60;
+  background:#272138;color:#fff;border-radius:12px;padding:12px 15px;
+  font-size:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);
+  opacity:0;transform:translateY(12px);pointer-events:none;transition:.2s
+}
+.toast.show{opacity:1;transform:translateY(0)}
+
+@media(max-width:1160px){
+  .app{grid-template-columns:78px 1fr}
+  .brand{padding:0;justify-content:center}
+  .brand>span,.brand small,.nav-section,.nav-item span,.user-meta{display:none}
+  .nav-item{justify-content:center;padding:0}.user{justify-content:center}
+  .search{width:220px}
+  .balance-grid{grid-template-columns:repeat(2,1fr)}
+  .result-body{grid-template-columns:1fr}
+}
+@media(max-width:820px){
+  body{overflow:auto}.app{display:block}.sidebar,.topbar{display:none}
+  .main{min-height:100vh}.content{padding:18px 18px 110px}
+  .page-head{align-items:center}.actions .btn:first-child{display:none}
+  .template-banner{grid-template-columns:auto 1fr}.banner-actions{grid-column:1/-1}
+  .steps{grid-template-columns:repeat(2,1fr)}
+  .upload-grid{grid-template-columns:1fr}.plus{height:26px}
+  .balance-grid,.kpis{grid-template-columns:1fr}
+  .drawer{width:100%}
+  .demo-bar{left:10px;right:10px;transform:none;overflow:auto}
+  .demo-bar span{display:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">P</div><span>Pearnly</span><small>Prototype</small>
+    </div>
+    <div class="nav">
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M3 11 12 3l9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg><span>首页</span>
+      </div>
+      <div class="nav-section">销售开票</div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v4h4"/><path d="M9 11h6M9 15h6"/></svg><span>发票工作台</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 9h8M8 13h5"/></svg><span>账套 / 开票资料</span>
+      </div>
+      <div class="nav-section">事务所工具</div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v4h4"/></svg><span>上传识别</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg><span>识别记录</span>
+      </div>
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M4 20V9M9 20V4M14 20v-7M19 20V7"/></svg><span>对账中心</span>
+      </div>
+      <div class="nav-section">进货管理</div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M3 4h2l2.2 10.5a2 2 0 0 0 2 1.5h8.8a2 2 0 0 0 2-1.6L21 8H7"/></svg><span>采购 / 进项</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M4 8l8-4 8 4-8 4z"/><path d="M4 8v8l8 4 8-4V8"/></svg><span>待归类</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M4 7h16v13H4z"/><path d="M7 7V4h10v3M9 12h6"/></svg><span>供应商</span>
+      </div>
+      <div class="nav-section">收银业务</div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M12 3v18M5 8h10a4 4 0 1 1 0 8H7"/></svg><span>开通收银台</span>
+      </div>
+    </div>
+    <div class="user">
+      <div class="avatar">S</div>
+      <div class="user-meta"><b>skin306152</b><span>skin306152@gmail.com</span></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="workspace-pill"><i>Sk</i>Skin <span>›</span></div>
+      <div class="search">⌕ 搜索发票、客户、跳转… <kbd>Ctrl K</kbd></div>
+      <div class="avatar" style="background:#EEF1FF;color:#383E76;border:1px solid #DFE4FF">P</div>
+    </div>
+
+    <div class="content">
+      <div class="page-head">
+        <div>
+          <h1>对账中心</h1>
+          <div class="subtitle">上传原始文件，系统自动选择合适的读取方式，并集中提示需要确认的内容</div>
+        </div>
+        <div class="actions">
+          <button class="btn" id="guideBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M9.7 9a2.6 2.6 0 1 1 3.7 2.4c-.9.5-1.4 1.1-1.4 2.1"/><path d="M12 17h.01"/></svg>
+            导入说明
+          </button>
+          <button class="btn primary" id="templateBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v4h4"/><path d="M9 12h6M9 16h6"/></svg>
+            模板中心
+          </button>
+        </div>
+      </div>
+
+      <div class="segmented" id="mainTabs">
+        <button class="active" data-tab="bank">银行对账</button>
+        <button data-tab="tax">销项税报告核查</button>
+        <button data-tab="income">收入对账</button>
+      </div>
+
+      <section class="template-banner" id="templateBanner">
+        <div class="banner-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="m12 3 1.3 3.7L17 8l-3.7 1.3L12 13l-1.3-3.7L7 8l3.7-1.3z"/><path d="m18.5 13 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg>
+        </div>
+        <div class="banner-copy">
+          <b>优先使用 Pearnly 标准模板，导入更快、结果更稳定</b>
+          <p>标准模板可直接按字段读取，减少格式差异带来的重复确认。不是强制要求，您仍可上传现有文件。</p>
+          <div class="benefits">
+            <span class="benefit">更快完成导入</span>
+            <span class="benefit">减少人工确认</span>
+            <span class="benefit">字段完整性检查</span>
+            <span class="benefit">适合批量处理</span>
+          </div>
+        </div>
+        <div class="banner-actions">
+          <button class="btn small" data-download="bundle">下载本页模板</button>
+          <button class="btn text small" id="hideBanner">暂不提示</button>
+        </div>
+      </section>
+
+      <section class="preflight" id="preflight">
+        <div class="preflight-head">
+          <b>本次对账流程</b>
+          <span>结果指标将在对账完成后显示</span>
+        </div>
+        <div class="steps">
+          <div class="step"><div class="step-no">1</div><div><b>上传文件</b><span>支持常用格式</span></div></div>
+          <div class="step"><div class="step-no">2</div><div><b>导入前检查</b><span>确认字段与余额</span></div></div>
+          <div class="step"><div class="step-no">3</div><div><b>执行对账</b><span>匹配两侧记录</span></div></div>
+          <div class="step"><div class="step-no">4</div><div><b>处理差异</b><span>仅处理异常项</span></div></div>
+        </div>
+      </section>
+
+      <section class="workspace" id="workspace">
+        <div class="workspace-head">
+          <b id="taskTitle">银行对账 · 主操作</b>
+          <span class="status-badge">自动选择读取方式</span>
+        </div>
+
+        <div class="upload-grid">
+          <div class="upload-card" id="leftCard" data-side="left">
+            <div class="drop-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v4h4"/><path d="M9 12h6M9 16h4"/></svg>
+            </div>
+            <h3 id="leftTitle">银行账单</h3>
+            <div class="hint">拖拽文件到这里，或从本地选择文件</div>
+            <div class="upload-actions">
+              <button class="btn primary small choose-file">选择文件</button>
+              <button class="btn small" data-download="left">下载标准模板</button>
+            </div>
+            <div class="recommend">
+              <div class="spark">✦</div>
+              <div>
+                <b>推荐标准模板：更快、更准、更少确认</b>
+                <span>直接按字段读取，并在导入前检查格式完整性</span>
+              </div>
+            </div>
+            <div class="format-line">支持 PDF / 图片 / Excel / CSV / Word · 支持多文件</div>
+            <input class="file-input" type="file" hidden accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.csv,.doc,.docx" />
+          </div>
+
+          <div class="plus">＋</div>
+
+          <div class="upload-card" id="rightCard" data-side="right">
+            <div class="drop-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 4v16"/></svg>
+            </div>
+            <h3 id="rightTitle">总账（GL）</h3>
+            <div class="hint">拖拽文件到这里，或从本地选择文件</div>
+            <div class="upload-actions">
+              <button class="btn primary small choose-file">选择文件</button>
+              <button class="btn small" data-download="right">下载标准模板</button>
+            </div>
+            <div class="recommend">
+              <div class="spark">✦</div>
+              <div>
+                <b>推荐标准模板：更快、更准、更少确认</b>
+                <span>直接按字段读取，并在导入前检查格式完整性</span>
+              </div>
+            </div>
+            <div class="format-line">支持 PDF / 图片 / Excel / CSV / Word · 支持多文件</div>
+            <input class="file-input" type="file" hidden accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.csv,.doc,.docx" />
+          </div>
+        </div>
+
+        <div class="balance-panel">
+          <div class="balance-head">
+            <b>余额预检</b>
+            <div class="legend">
+              <span><i class="dot green"></i>已确认</span>
+              <span><i class="dot yellow"></i>需要确认</span>
+            </div>
+          </div>
+          <div class="balance-grid">
+            <div class="balance-item">
+              <label>GL 期末余额 <span class="source-tag" id="glSource">待上传</span></label>
+              <div class="balance-value" id="glEnd">—</div>
+            </div>
+            <div class="balance-item">
+              <label>Statement 期末余额 <span class="source-tag" id="stSource">待上传</span></label>
+              <div class="balance-value" id="stEnd">—</div>
+            </div>
+            <div class="balance-item">
+              <label>Statement 期初余额</label>
+              <div class="balance-value" id="stStart">—</div>
+            </div>
+            <div class="balance-item">
+              <label>GL 期初余额</label>
+              <div class="balance-value" id="glStart">—</div>
+            </div>
+          </div>
+          <div class="summary">
+            <span>期初差额（Statement 期初 − GL 期初）</span>
+            <strong id="openingDiff">—</strong>
+          </div>
+        </div>
+
+        <div class="bottom-actions">
+          <div class="left" id="readyText">请上传两份文件后开始对账</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn" id="clearBtn">清空</button>
+            <button class="btn primary" id="startBtn" disabled>开始对账</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="processing" id="processing">
+        <div class="processing-icon">↻</div>
+        <h3>正在执行对账</h3>
+        <p id="processingText">正在读取并匹配交易日期、金额、参考编号和摘要</p>
+        <div class="bar"><i id="processingBar"></i></div>
+        <small id="processingCount">已处理 0 / 1,286 条</small>
+      </section>
+
+      <section class="results" id="results">
+        <div class="results-head">
+          <div>
+            <b>对账完成</b>
+            <span>结果指标只在任务完成后展示，点击指标可筛选对应记录</span>
+          </div>
+          <button class="btn small" id="exportBtn">导出结果</button>
+        </div>
+
+        <div class="kpis">
+          <div class="kpi primary active" data-filter="all">
+            <label>匹配率</label>
+            <strong>97.0%</strong>
+            <p>1,248 / 1,286 条已完成匹配</p>
+          </div>
+          <div class="kpi" data-filter="matched">
+            <label>已匹配</label>
+            <strong>1,248</strong>
+            <p>无需继续处理</p>
+          </div>
+          <div class="kpi" data-filter="difference">
+            <label>待处理差异</label>
+            <strong>12</strong>
+            <p>建议优先确认</p>
+          </div>
+          <div class="kpi" data-filter="unmatched">
+            <label>未匹配</label>
+            <strong>26</strong>
+            <p>暂未找到对应记录</p>
+          </div>
+        </div>
+
+        <div class="result-body">
+          <div class="priority-card">
+            <div class="card-title">
+              <b>优先处理</b>
+              <span>按影响程度排序</span>
+            </div>
+            <div class="issue-list">
+              <div class="issue">
+                <div class="issue-icon">!</div>
+                <div><b>金额相同，但日期相差 1 天</b><span>可批量确认日期偏差规则</span></div>
+                <div class="issue-count">8 条</div>
+              </div>
+              <div class="issue">
+                <div class="issue-icon">?</div>
+                <div><b>原文件内容需要再次确认</b><span>系统已定位到具体字段</span></div>
+                <div class="issue-count">3 条</div>
+              </div>
+              <div class="issue">
+                <div class="issue-icon">×</div>
+                <div><b>没有找到对应总账记录</b><span>建议检查摘要或参考编号</span></div>
+                <div class="issue-count">26 条</div>
+              </div>
+            </div>
+            <button class="btn primary" style="width:100%;margin-top:12px" id="handleIssuesBtn">开始处理 12 项差异</button>
+          </div>
+
+          <div class="detail-card">
+            <div class="card-title">
+              <b id="detailTitle">结果明细</b>
+              <span id="detailCount">显示全部记录</span>
+            </div>
+            <table class="table">
+              <thead><tr><th>日期</th><th>参考编号</th><th>金额</th><th>状态</th></tr></thead>
+              <tbody id="detailRows">
+                <tr data-status="matched"><td>2026-06-01</td><td>TXN-00128</td><td>12,800.00</td><td><span class="tag ok">已匹配</span></td></tr>
+                <tr data-status="difference"><td>2026-06-02</td><td>TXN-00136</td><td>8,450.00</td><td><span class="tag wait">待确认</span></td></tr>
+                <tr data-status="unmatched"><td>2026-06-03</td><td>TXN-00142</td><td>3,260.00</td><td><span class="tag none">未匹配</span></td></tr>
+                <tr data-status="matched"><td>2026-06-04</td><td>TXN-00158</td><td>22,000.00</td><td><span class="tag ok">已匹配</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="demo-bar">
+  <span>快速体验：</span>
+  <button class="btn small" data-demo="standard">标准模板</button>
+  <button class="btn small" data-demo="excel">普通 Excel</button>
+  <button class="btn small" data-demo="scan">PDF / 图片</button>
+  <button class="btn small" data-demo="complete">直接查看结果</button>
+</div>
+
+<div class="overlay" id="drawerOverlay"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-head">
+    <h2 id="drawerTitle">银行对账模板</h2>
+    <button class="icon-btn" id="drawerClose">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="drawer-intro">
+      <b>标准模板为什么更适合高频对账？</b>
+      <p>字段位置统一，可直接读取并检查缺失内容。使用次数越多，越能减少重复整理和人工确认。</p>
+    </div>
+    <div id="templateList"></div>
+  </div>
+  <div class="drawer-footer">
+    <button class="btn primary" style="width:100%" data-download="bundle">下载当前对账所需全部模板</button>
+  </div>
+</aside>
+
+<div class="overlay" id="modalOverlay"></div>
+
+<div class="modal" id="mappingModal">
+  <div class="modal-head"><h2>确认字段对应关系</h2><button class="icon-btn modal-close">✕</button></div>
+  <div class="modal-body">
+    <div class="callout">
+      已读取为普通表格。首次确认列名后，系统会记住该企业或银行的文件结构，下次可直接使用。
+    </div>
+    <table class="map-table">
+      <thead><tr><th>原文件列名</th><th>Pearnly 字段</th><th>示例数据</th></tr></thead>
+      <tbody>
+        <tr><td>Transaction Date</td><td><select><option>交易日期</option><option>记账日期</option></select></td><td>2026-06-12</td></tr>
+        <tr><td>Description</td><td><select><option>交易摘要</option><option>对方名称</option></select></td><td>Transfer received</td></tr>
+        <tr><td>Debit</td><td><select><option>借方金额</option><option>支出金额</option></select></td><td>0.00</td></tr>
+        <tr><td>Credit</td><td><select><option>贷方金额</option><option>收入金额</option></select></td><td>12,800.00</td></tr>
+        <tr><td>Balance</td><td><select><option>账户余额</option><option>不导入</option></select></td><td>296,132.89</td></tr>
+      </tbody>
+    </table>
+    <label class="check-option"><input type="checkbox" checked /> 记住该企业 / 银行的字段设置</label>
+  </div>
+  <div class="modal-foot">
+    <button class="btn modal-close">取消</button>
+    <button class="btn primary" id="confirmMapping">确认并导入</button>
+  </div>
+</div>
+
+<div class="modal" id="reviewModal">
+  <div class="modal-head"><h2>确认需要关注的内容</h2><button class="icon-btn modal-close">✕</button></div>
+  <div class="modal-body">
+    <div class="callout" style="background:#FFF8EB;border-color:#F4D59E">
+      文件读取已完成。系统只列出 3 项需要确认的内容，其余 1,283 项已自动通过。
+    </div>
+    <table class="review-table">
+      <thead><tr><th>字段</th><th>读取结果</th><th>清晰度</th><th>来源页</th></tr></thead>
+      <tbody>
+        <tr><td>期末余额</td><td><input value="296132.89" /></td><td class="score">73%</td><td>第 1 页</td></tr>
+        <tr><td>交易金额</td><td><input value="12800.00" /></td><td class="score">69%</td><td>第 2 页</td></tr>
+        <tr><td>参考编号</td><td><input value="TXN-28013B" /></td><td class="score">66%</td><td>第 2 页</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="modal-foot">
+    <button class="btn modal-close">稍后处理</button>
+    <button class="btn primary" id="confirmReview">确认 3 项并导入</button>
+  </div>
+</div>
+
+<div class="modal" id="guideModal">
+  <div class="modal-head"><h2>三种导入方式</h2><button class="icon-btn modal-close">✕</button></div>
+  <div class="modal-body">
+    <div class="template-card">
+      <div class="template-top">
+        <div class="template-icon">推荐</div>
+        <div class="template-meta">
+          <b>标准模板导入</b>
+          <p>字段固定、直接读取、导入前检查。适合高频对账和批量处理，通常需要确认的内容最少。</p>
+        </div>
+      </div>
+    </div>
+    <div class="template-card">
+      <div class="template-top">
+        <div class="template-icon" style="background:#EEF2FF;color:#4866D8">表格</div>
+        <div class="template-meta">
+          <b>普通表格导入</b>
+          <p>适用于现有 Excel 或 CSV。首次确认字段对应关系后，下次可复用保存的设置。</p>
+        </div>
+      </div>
+    </div>
+    <div class="template-card">
+      <div class="template-top">
+        <div class="template-icon" style="background:#FFF7E8;color:#B76A13">文件</div>
+        <div class="template-meta">
+          <b>PDF、图片和文档导入</b>
+          <p>系统读取文件内容，只提示不清晰或有歧义的字段，不要求用户检查整份文件。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-foot"><button class="btn primary modal-close">知道了</button></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const state={tab:'bank',left:null,right:null,pendingSide:null};
+const config={
+  bank:{
+    task:'银行对账 · 主操作',left:'银行账单',right:'总账（GL）',drawer:'银行对账模板',
+    templates:[
+      ['银行账单标准模板','适用于银行流水、账户余额和交易明细','Bank_Statement_Template.xlsx'],
+      ['总账（GL）标准模板','适用于科目明细、借贷金额和期初期末余额','General_Ledger_Template.xlsx']
+    ]
+  },
+  tax:{
+    task:'销项税报告核查 · 主操作',left:'销项税报告',right:'销售发票明细',drawer:'销项税核查模板',
+    templates:[
+      ['销项税报告标准模板','适用于税务申报汇总与增值税字段','Output_VAT_Report_Template.xlsx'],
+      ['销售发票标准模板','适用于发票号码、税号、未税金额与增值税','Sales_Invoice_Template.xlsx']
+    ]
+  },
+  income:{
+    task:'收入对账 · 主操作',left:'收款流水',right:'销售收入明细',drawer:'收入对账模板',
+    templates:[
+      ['收款流水标准模板','适用于银行收款、渠道流水与付款方信息','Receipts_Template.xlsx'],
+      ['销售收入标准模板','适用于订单、客户和应收收入明细','Sales_Revenue_Template.xlsx']
+    ]
+  }
+};
+
+function svgFile(){
+  return `<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v4h4"/><path d="M9 12h6M9 16h4"/></svg>`;
+}
+function toast(text){
+  const el=document.getElementById('toast');
+  el.textContent=text;el.classList.add('show');
+  clearTimeout(toast.timer);
+  toast.timer=setTimeout(()=>el.classList.remove('show'),2200);
+}
+function openDrawer(){
+  document.getElementById('drawerOverlay').classList.add('show');
+  document.getElementById('drawer').classList.add('show');
+}
+function closeDrawer(){
+  document.getElementById('drawerOverlay').classList.remove('show');
+  document.getElementById('drawer').classList.remove('show');
+}
+function openModal(id){
+  document.getElementById('modalOverlay').classList.add('show');
+  document.getElementById(id).classList.add('show');
+}
+function closeModals(){
+  document.getElementById('modalOverlay').classList.remove('show');
+  document.querySelectorAll('.modal.show').forEach(m=>m.classList.remove('show'));
+}
+function renderTemplates(){
+  const c=config[state.tab];
+  document.getElementById('drawerTitle').textContent=c.drawer;
+  document.getElementById('templateList').innerHTML=c.templates.map(t=>`
+    <div class="template-card">
+      <div class="template-top">
+        <div class="template-icon">XLSX</div>
+        <div class="template-meta"><b>${t[0]}</b><p>${t[1]}</p></div>
+        <span class="reco-tag">推荐</span>
+      </div>
+      <div class="template-actions">
+        <button class="btn small" onclick="downloadTemplate('${t[2]}')">下载模板</button>
+        <button class="btn text small" onclick="toast('已打开填写示例（原型演示）')">查看填写示例</button>
+      </div>
+      <div class="version"><span>版本 V1.2</span><span>更新于 2026-06-10</span></div>
+    </div>`).join('');
+}
+function switchTab(tab){
+  state.tab=tab;state.left=null;state.right=null;
+  document.querySelectorAll('#mainTabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  const c=config[tab];
+  document.getElementById('taskTitle').textContent=c.task;
+  resetCard('left');resetCard('right');
+  renderTemplates();resetAllStates();
+}
+function resetAllStates(){
+  document.getElementById('processing').classList.remove('show');
+  document.getElementById('results').classList.remove('show');
+  document.getElementById('workspace').style.display='';
+  document.getElementById('preflight').style.display='';
+  updateReady();
+}
+function classify(name){
+  const lower=name.toLowerCase();
+  const ext=(lower.split('.').pop()||'').toUpperCase();
+  if((lower.includes('pearnly')||lower.includes('template')||lower.includes('标准模板')) && ['XLSX','XLS'].includes(ext)){
+    return {method:'standard',label:'标准模板读取',ext,rows:1286,issues:0};
+  }
+  if(['XLSX','XLS','CSV'].includes(ext)){
+    return {method:'table',label:'普通表格读取',ext,rows:1286,issues:0};
+  }
+  return {method:'scan',label:'文件内容读取',ext:ext||'PDF',rows:1286,issues:3};
+}
+function handleFile(side,fileOrName,forced){
+  const name=typeof fileOrName==='string'?fileOrName:fileOrName.name;
+  const size=typeof fileOrName==='string'?'1.8 MB':formatBytes(fileOrName.size);
+  const data=forced||classify(name);
+  data.name=name;data.size=size;
+  state[side]=data;
+  if(data.method==='table'){
+    data.pending=true;state.pendingSide=side;renderCard(side,data,true);openModal('mappingModal');
+  }else if(data.method==='scan'){
+    data.pending=true;state.pendingSide=side;renderCard(side,data,true);openModal('reviewModal');
+  }else{
+    data.pending=false;renderCard(side,data,false);
+    toast('已识别为标准模板，直接读取并完成格式检查');
+  }
+  updateReady();
+}
+function renderCard(side,data,pending){
+  const card=document.getElementById(side+'Card');
+  const methodText={
+    standard:['按字段直接读取','推荐'],
+    table:['按表格结构读取',pending?'待确认字段':'字段已确认'],
+    scan:['按文件内容读取',pending?'待确认 3 项':'已确认']
+  };
+  card.className='upload-card loaded';
+  card.innerHTML=`
+    <div class="file-head">
+      <div class="file-type">${data.ext||'FILE'}</div>
+      <div class="file-meta">
+        <b title="${data.name}">${data.name}</b>
+        <span>${data.size} · 上传完成</span>
+      </div>
+      <button class="file-remove" onclick="removeFile('${side}')">✕</button>
+    </div>
+    <div class="method-box">
+      <div class="method-top">
+        <b>${data.label}</b>
+        <span class="method-chip ${data.method}">${methodText[data.method][1]}</span>
+      </div>
+      <div class="check-list">
+        <div class="check-row"><span>读取方式</span><strong>${methodText[data.method][0]}</strong></div>
+        <div class="check-row"><span>数据行数</span><strong>${data.rows.toLocaleString()} 行</strong></div>
+        <div class="check-row"><span>需要确认</span><strong>${pending?data.issues+' 项':'0 项'}</strong></div>
+      </div>
+      <div class="progress"><i style="width:${pending?'78':'100'}%"></i></div>
+    </div>
+    <div class="file-cta">
+      ${data.method==='scan'?`<button class="btn small" onclick="state.pendingSide='${side}';openModal('reviewModal')">${pending?'确认 '+data.issues+' 项':'查看读取结果'}</button>`:''}
+      ${data.method==='table'?`<button class="btn small" onclick="state.pendingSide='${side}';openModal('mappingModal')">查看字段对应</button>`:''}
+      <button class="btn small" onclick="toast('文件预览已打开（原型演示）')">预览文件</button>
+    </div>`;
+}
+function resetCard(side){
+  const c=config[state.tab],title=side==='left'?c.left:c.right;
+  const card=document.getElementById(side+'Card');
+  card.className='upload-card';
+  card.innerHTML=`
+    <div class="drop-icon">${svgFile()}</div>
+    <h3>${title}</h3>
+    <div class="hint">拖拽文件到这里，或从本地选择文件</div>
+    <div class="upload-actions">
+      <button class="btn primary small choose-file">选择文件</button>
+      <button class="btn small" data-download="${side}">下载标准模板</button>
+    </div>
+    <div class="recommend">
+      <div class="spark">✦</div>
+      <div>
+        <b>推荐标准模板：更快、更准、更少确认</b>
+        <span>直接按字段读取，并在导入前检查格式完整性</span>
+      </div>
+    </div>
+    <div class="format-line">支持 PDF / 图片 / Excel / CSV / Word · 支持多文件</div>
+    <input class="file-input" type="file" hidden accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.csv,.doc,.docx" />`;
+  bindCard(card);
+}
+function removeFile(side){
+  state[side]=null;resetCard(side);updateReady();toast('已移除文件');
+}
+function formatBytes(bytes){
+  if(!bytes)return '0 KB';
+  const units=['B','KB','MB','GB'];let i=0,n=bytes;
+  while(n>=1024&&i<units.length-1){n/=1024;i++}
+  return `${n.toFixed(i?1:0)} ${units[i]}`;
+}
+function bindCard(card){
+  const input=card.querySelector('.file-input');
+  const choose=card.querySelector('.choose-file');
+  if(choose)choose.onclick=()=>input.click();
+  if(input)input.onchange=e=>e.target.files[0]&&handleFile(card.dataset.side,e.target.files[0]);
+  card.ondragover=e=>{e.preventDefault();card.classList.add('drag')};
+  card.ondragleave=()=>card.classList.remove('drag');
+  card.ondrop=e=>{
+    e.preventDefault();card.classList.remove('drag');
+    if(e.dataTransfer.files[0])handleFile(card.dataset.side,e.dataTransfer.files[0]);
+  };
+}
+function updateReady(){
+  const both=state.left&&state.right;
+  const pending=[state.left,state.right].some(x=>x&&x.pending);
+  const btn=document.getElementById('startBtn');
+  btn.disabled=!both||pending;
+  if(both){
+    document.getElementById('readyText').textContent=pending?'仍有内容需要确认':'两份文件均已通过导入前检查';
+    document.getElementById('stSource').textContent=sourceText(state.left.method);
+    document.getElementById('glSource').textContent=sourceText(state.right.method);
+    document.getElementById('stEnd').textContent='2,961,326.89';
+    document.getElementById('glEnd').textContent='2,152,092.66';
+    document.getElementById('stStart').textContent='845,642.55';
+    document.getElementById('glStart').textContent='0.00';
+    document.getElementById('openingDiff').textContent='845,642.55';
+  }else{
+    document.getElementById('readyText').textContent='请上传两份文件后开始对账';
+    ['stEnd','glEnd','stStart','glStart','openingDiff'].forEach(id=>document.getElementById(id).textContent='—');
+    document.getElementById('stSource').textContent='待上传';
+    document.getElementById('glSource').textContent='待上传';
+  }
+}
+function sourceText(method){
+  if(method==='standard')return '标准模板';
+  if(method==='table')return '表格读取';
+  return '文件读取';
+}
+function runProcess(){
+  document.getElementById('results').classList.remove('show');
+  document.getElementById('processing').classList.add('show');
+  document.getElementById('workspace').style.display='none';
+  document.getElementById('preflight').style.display='none';
+  let p=0;
+  const bar=document.getElementById('processingBar');
+  const count=document.getElementById('processingCount');
+  const text=document.getElementById('processingText');
+  const timer=setInterval(()=>{
+    p+=Math.floor(Math.random()*14)+8;
+    if(p>100)p=100;
+    bar.style.width=p+'%';
+    count.textContent=`已处理 ${Math.floor(1286*p/100).toLocaleString()} / 1,286 条`;
+    if(p>45)text.textContent='正在比较日期、金额、摘要和参考编号';
+    if(p>78)text.textContent='正在整理差异并生成结果';
+    if(p===100){
+      clearInterval(timer);
+      setTimeout(()=>{
+        document.getElementById('processing').classList.remove('show');
+        document.getElementById('results').classList.add('show');
+        toast('对账完成：1,248 条已匹配');
+      },450);
+    }
+  },220);
+}
+function showResultsDirect(){
+  document.getElementById('workspace').style.display='none';
+  document.getElementById('preflight').style.display='none';
+  document.getElementById('processing').classList.remove('show');
+  document.getElementById('results').classList.add('show');
+  toast('已切换到对账结果演示');
+}
+function downloadTemplate(filename){
+  const csv='\uFEFF日期,摘要,参考编号,借方金额,贷方金额,余额\n2026-06-01,示例交易,TXN-001,0.00,12800.00,296132.89\n';
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=filename.replace('.xlsx','.csv');
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('模板示例已下载');
+}
+function downloadBySide(side){
+  const c=config[state.tab],idx=side==='right'?1:0;
+  downloadTemplate(c.templates[idx][2]);
+}
+function runDemo(type){
+  state.left=null;state.right=null;
+  document.getElementById('workspace').style.display='';
+  document.getElementById('preflight').style.display='';
+  document.getElementById('results').classList.remove('show');
+  resetCard('left');resetCard('right');
+  if(type==='standard'){
+    handleFile('left','Pearnly_Bank_Statement_Template.xlsx',{method:'standard',label:'标准模板读取',ext:'XLSX',rows:1286,issues:0});
+    handleFile('right','Pearnly_GL_Template.xlsx',{method:'standard',label:'标准模板读取',ext:'XLSX',rows:974,issues:0});
+  }else if(type==='excel'){
+    handleFile('left','Kasikorn_Statement_June.xlsx',{method:'table',label:'普通表格读取',ext:'XLSX',rows:1286,issues:0});
+  }else if(type==='scan'){
+    handleFile('left','Bank_Statement_Scan.pdf',{method:'scan',label:'文件内容读取',ext:'PDF',rows:1286,issues:3});
+  }else if(type==='complete'){
+    showResultsDirect();
+  }
+}
+
+/* 事件 */
+document.querySelectorAll('#mainTabs button').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+document.getElementById('templateBtn').onclick=openDrawer;
+document.getElementById('drawerClose').onclick=closeDrawer;
+document.getElementById('drawerOverlay').onclick=closeDrawer;
+document.getElementById('guideBtn').onclick=()=>openModal('guideModal');
+document.getElementById('modalOverlay').onclick=closeModals;
+document.querySelectorAll('.modal-close').forEach(b=>b.onclick=closeModals);
+document.getElementById('hideBanner').onclick=()=>{
+  document.getElementById('templateBanner').style.display='none';
+  toast('已关闭本次提示');
+};
+document.getElementById('clearBtn').onclick=()=>{
+  state.left=null;state.right=null;resetCard('left');resetCard('right');updateReady();toast('已清空');
+};
+document.getElementById('startBtn').onclick=runProcess;
+document.getElementById('confirmMapping').onclick=()=>{
+  const side=state.pendingSide;
+  const d=state[side]||{name:'Imported.xlsx',size:'1.8 MB',method:'table',label:'普通表格读取',ext:'XLSX',rows:1286,issues:0};
+  d.pending=false;d.issues=0;state[side]=d;
+  renderCard(side,d,false);closeModals();updateReady();
+  toast('字段对应关系已保存，下次可直接使用');
+};
+document.getElementById('confirmReview').onclick=()=>{
+  const side=state.pendingSide;
+  const d=state[side]||{name:'Statement.pdf',size:'1.8 MB',method:'scan',label:'文件内容读取',ext:'PDF',rows:1286,issues:3};
+  d.pending=false;d.issues=0;state[side]=d;
+  renderCard(side,d,false);closeModals();updateReady();
+  toast('3 项已确认，其余内容已自动通过');
+};
+document.getElementById('exportBtn').onclick=()=>toast('对账结果已导出（原型演示）');
+document.getElementById('handleIssuesBtn').onclick=()=>toast('已进入差异处理流程（原型演示）');
+
+document.querySelectorAll('.kpi').forEach(k=>{
+  k.onclick=()=>{
+    document.querySelectorAll('.kpi').forEach(x=>x.classList.remove('active'));
+    k.classList.add('active');
+    const filter=k.dataset.filter;
+    const rows=[...document.querySelectorAll('#detailRows tr')];
+    rows.forEach(r=>r.style.display=(filter==='all'||r.dataset.status===filter)?'':'none');
+    const titleMap={all:'结果明细',matched:'已匹配记录',difference:'待处理差异',unmatched:'未匹配记录'};
+    const countMap={all:'显示全部记录',matched:'显示已匹配记录',difference:'显示需要确认的记录',unmatched:'显示未找到对应项的记录'};
+    document.getElementById('detailTitle').textContent=titleMap[filter];
+    document.getElementById('detailCount').textContent=countMap[filter];
+  };
+});
+
+document.addEventListener('click',e=>{
+  const d=e.target.closest('[data-download]');
+  if(d){
+    const side=d.dataset.download;
+    if(side==='bundle'){
+      downloadBySide('left');
+      setTimeout(()=>downloadBySide('right'),200);
+    }else downloadBySide(side);
+  }
+  const demo=e.target.closest('[data-demo]');
+  if(demo)runDemo(demo.dataset.demo);
+});
+
+renderTemplates();
+document.querySelectorAll('.upload-card').forEach(bindCard);
+updateReady();
+</script>
+</body>
+</html>

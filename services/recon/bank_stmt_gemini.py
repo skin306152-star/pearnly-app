@@ -31,7 +31,8 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
     Returns {ok, rows, opening, closing, bank_code}.
 
     v118.33.13.1 · Caches by SHA-256(file_bytes). Same PDF re-uploaded skips the
-    API call entirely. Uses gemini-2.5-flash-lite (faster + cheaper than 2.5-flash).
+    API call entirely. Primary model = flash_lite (cheap); on parse failure/empty
+    it escalates once to the stronger fallback model via try_with_fallback.
     """
     # Check cache first — instant return if same PDF was OCR'd before
     # v118.35.0.60 · 缓存键带提示词版本 · 改提示词后旧缓存自动失效(否则返回旧结果)

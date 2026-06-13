@@ -223,7 +223,8 @@ def refine_with_image(
             e.g. ["Vision confidence in 'total_amount' is 0.62 (< 0.85)",
                   "subtotal + vat (8516.13) != total_amount (8000.00)"]
         api_key: API key override; defaults to env GOOGLE_API_KEY then GEMINI_API_KEY
-        model_name: Gemini model id; defaults to env OCR_FLASH_MODEL or "gemini-2.5-flash"
+        model_name: Gemini model id; defaults to DEFAULT_MODEL (OCR_FALLBACK_MODEL,
+            i.e. gemini-3.5-flash — layer 3 is the strong-model escalation tier)
         max_retries: JSON-parse retries (default 1)
         timeout: per-API-call timeout in seconds (default 90)
 

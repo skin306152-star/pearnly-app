@@ -86,10 +86,28 @@
 
 ---
 
-## 七、未完成 / 受限 / 需人工验收
+## 六-bis、已上线 + 真 prod E2E(2026-06-14)
 
-1. **真后端端到端未在本窗口运行**:所有动作均接真实端点并复用经验证的现成组件(`_reconPollJob`/`ReconMapping`/`ReconReview`/export),但「登录态 + 真文件跑完整 submit→轮询→结果→导出」需在运行中的服务器人工验收。
-   - 路径:登录 → 对账中心(route `reconcile`)→ 银行对账:传 银行账单 + GL → 开始对账 → 查看四指标/优先处理/明细/导出;收入对账:GL + 税表VAT;销项税:税表VAT + 销项发票明细。
+合并 master → 自动部署(?v=11850802)。真账号 `pearnly_e2e_3` + 桌面真测试文件,
+Playwright 打真 pearnly.com 跑完整链路 **20/20 通过**(`scripts/_rcx_e2e_prod.cjs`,截图
+`product-audit/rcx-e2e/`):
+- 登录 → 过套账硬门 → 路由对账 → `getComputedStyle` 真渲染(非 grep)。
+- 模板中心抽屉 2 模板;**4 类模板真下载**(statement/gl/vat/invoice 均 200 + xlsx PK 签名
+  + 正确 mime,~6KB,非 CSV)。
+- 真传 银行账单+GL → 开始对账 → 诚实进度态 → **结果:匹配率 92.1% · 已匹配 927 ·
+  差异 0 · 未匹配 80 · 明细 50 行**;KPI 点击筛选生效;**导出真下载
+  `BankRecon_v2_271_GENERIC.xlsx`**;全程无 JS 错误。
+
+**上线时两处修复**:
+1. `fix(recon)` 旧 `excel-formula-recon._init` 加 DOM 早退守卫 —— 重设计替换 panes 后
+   `vex-*` DOM 没了,该模块 eval 期同步访问 `vex-build.disabled`(`excel-recon-files.ts:106`
+   未守卫)抛错,**中断整个 main.js bundle** → 其后模块(含我的控制器)未执行、新对账中心不渲染。
+2. `chore` bump `?v=11850802` 破缓存(main.js 内容变更须换 cache key,防 CF 回旧崩溃版)。
+
+## 七、未完成 / 受限 / 待续
+
+1. 收入对账 / 销项税核查两类:已上线接真端点,但本次 prod E2E 只跑了**银行对账**全链路
+   (代表性最强);另两类的真文件跑通建议补一轮(用桌面 税表VAT / 销项发票明细 文件)。
 2. **后端依赖(见 `00_CURRENT_STATE_AND_CORRECTIONS.md §四`)**:VAT 解析器 zh/ja 列头、销项发票 Excel 结构化路。任务交底为「后端已就绪」,前端按此实现;若该两项未落,**中/日界面税表模板** 或 **销项税发票侧** 可能在导入时静默失败 —— 列此为前置依赖。
 3. **有意的诚实取舍(非偷工)**:
    - 卡片不显假行数/假需确认项数(原型的 1286 行/3 项是 mock);真实判定在 submit。

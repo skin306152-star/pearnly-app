@@ -242,7 +242,9 @@ def _parse_generic_pages(tables: List) -> Tuple[List[StatementRow], float, float
 _COORD_WD_KW = ("ถอนเงิน", "ถอน", "withdrawal", "withdraw", "debit")
 _COORD_DEP_KW = ("ฝากเงิน", "ฝาก", "deposit", "credit")
 _COORD_BAL_KW = ("ยอดเงินในบัญชี", "ยอดคงเหลือ", "balance", "คงเหลือ")
-_COORD_DATE = re.compile(r"^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$")
+# 日期分隔符含「.」:TTB 等账单用 02.05.2026(点)· 非 02/05/2026。金额是单个小数点
+# (1,727.46)且带千分位逗号,不会被这个『数-分隔-数-分隔-数』模式误匹配。
+_COORD_DATE = re.compile(r"^\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4}$")
 _COORD_AMT = re.compile(r"^\(?-?[\d,]+\.\d{2}\)?-?$")
 
 

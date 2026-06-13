@@ -274,6 +274,9 @@ import {
 
     // ── init ──
     function _init() {
+        // 2026-06-14 · 对账中心重设计后旧销项税内测 pane(vex-*)已不在 DOM ·
+        // 其 DOM 不在即整模块早退(防 _renderFiles 等未守卫访问 vex-build 抛错中断 bundle)。
+        if (!document.getElementById('vex-build')) return;
         // 双拖拽
         _bindDropzone('vex-drop-invoice', 'vex-input-invoice', _addInvoices);
         _bindDropzone('vex-drop-report', 'vex-input-report', _addReports);

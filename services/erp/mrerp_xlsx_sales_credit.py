@@ -168,11 +168,21 @@ def _generate_xlsx_sales_credit_korn_clone(
     import re as _re
     from collections import OrderedDict
 
-    template_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "test_data_mrerp_sample_SC.xlsx"
-    )
-    if not os.path.exists(template_path):
-        raise FileNotFoundError(f"Korn template missing: {template_path}")
+    # 模板 git-tracked 在【仓库根】· 目录重组(d05cf6d)把本模块移入 services/erp/ 后,
+    # 原 os.path.dirname(__file__) 路径就找不到模板 → 静默回退 openpyxl 版 →
+    # MR.ERP 拒收(列数不足 18)→ 推送全失败。逐候选目录找,根目录优先(实测可 import)。
+    _here = os.path.dirname(os.path.abspath(__file__))
+    _root = os.path.dirname(os.path.dirname(_here))
+    template_path = None
+    for _cand in (
+        os.path.join(_root, "test_data_mrerp_sample_SC.xlsx"),
+        os.path.join(_here, "test_data_mrerp_sample_SC.xlsx"),
+    ):
+        if os.path.exists(_cand):
+            template_path = _cand
+            break
+    if not template_path:
+        raise FileNotFoundError("Korn template missing: test_data_mrerp_sample_SC.xlsx")
 
     with open(template_path, "rb") as f:
         template_bytes = f.read()

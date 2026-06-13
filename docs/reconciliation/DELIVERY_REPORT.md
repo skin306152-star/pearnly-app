@@ -1,6 +1,9 @@
 # 对账中心 UI 重设计 · 交付报告(2026-06-14)
 
-分支:`feat/recon-center-redesign`(未 push · 待验收)。后端契约一字未改;仅前端。
+> ⚠️ 本文档历史段落写于「分支待验收」阶段;**最新交接状态见文末「§交接状态(收尾)」**——
+> 已全部上线(master · prod ?v=11850806),含真机修复多轮。
+
+后端契约一字未改;仅前端。
 
 ---
 
@@ -116,3 +119,46 @@ Playwright 打真 pearnly.com 跑完整链路 **20/20 通过**(`scripts/_rcx_e2e
    - 单卡单文件(原型亦单文件);旧 brv2 的多文件/历史列表/多账户选择器未并入新外壳,如需可后续补(列为已知差距,非假装实现)。
    - 模板面板类名用 `rcx-tplpanel`(非 `drawer`):它是设计书明确要求的右侧模板面板,命名如实且不触发「禁新增 .drawer」闸。
 4. **未 push**:按铁律「未验收不 push master」,停在分支。
+
+---
+
+## §交接状态(收尾 · 2026-06-14 · 换窗口)
+
+**全部上线 master · prod `?v=11850806` · 真机验证通过。** 后端契约未改(纯前端 + i18n + 死代码清理)。
+
+### 已交付(全部 live)
+1. **对账中心 UI 重设计**:统一三类型(银行/收入/销项税)外壳——页头/segmented/模板引导横幅/
+   四步流程/双卡上传/余额预检/诚实进行中态/结果区(4KPI 点击筛选+优先处理+明细分页)/
+   模板中心抽屉/导入说明弹窗。复用 `_reconPollJob`/`ReconMapping`/`ReconReview`/template/export 端点。
+2. **真机修复多轮**(均 live):导入说明弹窗 X 生效、弹窗/抽屉对齐草稿(令牌作用域修复)、
+   **历史记录**(三类型各接真列表端点·点单条→载入新结果视图)、结果视图「返回」钮、完成后切换
+   不误提示清空、「开始处理差异」→「查看差异」、**暗夜模式标准化**(`.rcx` 令牌全引全站令牌·
+   零 `.dark` 补丁·随主题自动翻面)、**失败原因显真实后端码**(10 码四语提示)。
+3. **死代码清理**:删 23 个被替换的旧前端模块(bank-recon-v2*/glv*/excel*/recon-center/
+   recon-collapse/recon-batch/page-reconcile-panes-1/2)+ 6 个 main.js 死 import + 14 个死类型声明
+   + 3 个孤儿契约测试;`recon-subtab-settings` 删死 `_initSubTabs`(留全站 `openSettingsModal`)。
+
+### 真机 E2E(prod · 真账号 pearnly_e2e_3 · 真测试文件)
+- 银行对账:匹配率 92.1% · 导出 ✓ ;销项税核查:100% · 导出 ✓ ;历史点击载入 ✓ ;返回钮 ✓ ;暗夜 ✓ 。
+- 脚本:`scripts/_rcx_test.cjs`(组件 24/24)、`scripts/_rcx_e2e_all.cjs`(三类型 prod E2E)、
+  `scripts/_rcx_theme_verify.cjs`(亮/暗截图)、`scripts/_rcx_e2e_prod.cjs`。
+
+### 已澄清:收入对账「失败」不是 bug
+收入对账 = 拿总账**收入科目(科目代码以 4 开头)**勾稽税表 VAT。测试用的总账模板科目是
+`C1111`/`10003`(无 4 开头收入科目)→ 后端正确返回 `gl_no_revenue_rows`,前端现显
+「总账中没有收入科目(科目代码以 4 开头),无法做收入对账」。**换含真实收入科目的总账即可正常对账**
+(银行对账用同一总账文件已证 GL 解析正常)。曾偶发 `processing_error` = 部署重启时 worker 瞬时不稳,
+已稳定成明确失败码;属后端 worker 健壮性小项(非本次前端范围)。
+
+### 待办 / 下一窗口可做
+- 用**含 4 开头收入科目的总账**真机跑一遍收入对账确认对账通(本窗口因测试文件无收入科目未跑)。
+- 后端可选:`00_CURRENT_STATE_AND_CORRECTIONS.md §四` 的 VAT 解析器 zh/ja 列头、销项发票 Excel 路
+  (若要中/日界面税表模板 + 销项税发票侧完全可用);recon_jobs worker 部署重启瞬时 `processing_error` 健壮性。
+- 旧 CSS(home-21/29/32 的 `.recon-tab/.reconcile-/.recon-collapse-head`)经核已被 knowledge/clients/
+  home 等存活页复用,**保留不动**(非漏删)。
+
+### 关键文件(下一窗口入口)
+- 控制器:`src/home/recon-center-x.ts`(+ `-store/-render/-tpl/-results/-history/-drag/-html.ts`)
+- 样式:`static/home-48-recon-redesign.css`(作用域 `.rcx-` · 全令牌)
+- 注入:`src/home/page-reconcile.ts`(注入 `RCX_HTML`)· i18n:`static/i18n-data.js` 的 `rcx-*` 键
+- 后端端点全部既有未改;失败码映射见 `recon-center-x.ts` `failMsg()`。

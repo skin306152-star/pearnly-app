@@ -20,7 +20,10 @@ const TPL_INFO: Record<string, { name: [string, string]; desc: [string, string] 
     },
     invoice: {
         name: ['rcx-tpl-invoice', '销项发票明细标准模板'],
-        desc: ['rcx-tpl-invoice-d', '日期 · 发票号 · 买方名 · 买方税号 · 分支 · 税前 · 税额 · 合计'],
+        desc: [
+            'rcx-tpl-invoice-d',
+            '日期 · 发票号 · 买方名 · 买方税号 · 分支 · 税前 · 税额 · 合计',
+        ],
     },
 };
 const DRAWER_TITLE: Record<string, [string, string]> = {
@@ -41,10 +44,7 @@ export async function downloadTemplate(doc: string): Promise<boolean> {
         if (!resp.ok) {
             const err = await resp.json().catch(() => ({}));
             if (window.showToast)
-                window.showToast(
-                    (err as any).detail || tt('rcx-dl-fail', '模板下载失败'),
-                    'error'
-                );
+                window.showToast((err as any).detail || tt('rcx-dl-fail', '模板下载失败'), 'error');
             return false;
         }
         const blob = await resp.blob();
@@ -62,7 +62,10 @@ export async function downloadTemplate(doc: string): Promise<boolean> {
         return true;
     } catch (e) {
         if (window.showToast)
-            window.showToast(tt('rcx-dl-fail', '模板下载失败') + ': ' + (e as Error).message, 'error');
+            window.showToast(
+                tt('rcx-dl-fail', '模板下载失败') + ': ' + (e as Error).message,
+                'error'
+            );
         return false;
     }
 }

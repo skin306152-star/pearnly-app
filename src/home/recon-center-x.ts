@@ -294,9 +294,13 @@ function bindOnce() {
     const root = document;
 
     // tab
-    document.querySelectorAll('#rcx-tabs .rcx-seg').forEach((b) =>
-        b.addEventListener('click', () => switchTab((b as HTMLElement).dataset.rcxTab as RxState['tab']))
-    );
+    document
+        .querySelectorAll('#rcx-tabs .rcx-seg')
+        .forEach((b) =>
+            b.addEventListener('click', () =>
+                switchTab((b as HTMLElement).dataset.rcxTab as RxState['tab'])
+            )
+        );
 
     // 顶部 / 横幅 / 抽屉 / 弹窗 按钮
     const on = (id: string, fn: (e: Event) => void) => {
@@ -309,12 +313,18 @@ function bindOnce() {
     on('rcx-tplpanel-overlay', closeDrawer);
     on('rcx-modal-overlay', closeModals);
     on('rcx-banner-download', (e) => downloadPageTemplates(e.currentTarget as HTMLButtonElement));
-    on('rcx-tplpanel-download-all', (e) => downloadPageTemplates(e.currentTarget as HTMLButtonElement));
+    on('rcx-tplpanel-download-all', (e) =>
+        downloadPageTemplates(e.currentTarget as HTMLButtonElement)
+    );
     on('rcx-banner-hide', () => {
         bannerHidden = true;
         const b = $('rcx-banner');
         if (b) b.classList.add('rcx-hidden');
-        if (window.showToast) window.showToast(tt('rcx-banner-hidden', '已关闭本次提示，可在模板中心重新查看'), 'info');
+        if (window.showToast)
+            window.showToast(
+                tt('rcx-banner-hidden', '已关闭本次提示，可在模板中心重新查看'),
+                'info'
+            );
     });
     on('rcx-clear-btn', clearAll);
     on('rcx-start-btn', start);
@@ -327,11 +337,13 @@ function bindOnce() {
     on('rcx-fail-back', () => view('workspace'));
 
     // KPI 点击筛选
-    document.querySelectorAll('#rcx-kpis .rcx-kpi').forEach((k) =>
-        k.addEventListener('click', () =>
-            setFilter((k as HTMLElement).dataset.filter as RxState['filter'])
-        )
-    );
+    document
+        .querySelectorAll('#rcx-kpis .rcx-kpi')
+        .forEach((k) =>
+            k.addEventListener('click', () =>
+                setFilter((k as HTMLElement).dataset.filter as RxState['filter'])
+            )
+        );
 
     // 委托:卡片内按钮(choose/remove/preview/下载侧模板)、模板抽屉下载、分页
     root.addEventListener('click', (e) => {
@@ -339,7 +351,9 @@ function bindOnce() {
         const choose = tgt.closest('[data-rcx-choose]') as HTMLElement | null;
         if (choose) {
             const side = choose.dataset.rcxChoose as RxSide;
-            const input = document.querySelector(`[data-rcx-input="${side}"]`) as HTMLInputElement | null;
+            const input = document.querySelector(
+                `[data-rcx-input="${side}"]`
+            ) as HTMLInputElement | null;
             if (input) input.click();
             return;
         }

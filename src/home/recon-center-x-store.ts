@@ -18,7 +18,13 @@ export interface RxResult {
     total: number;
     headers: string[];
     rows: Array<{ cells: string[]; status: 'matched' | 'difference' | 'unmatched' }>;
-    issues: Array<{ icon: string; title: string; sub: string; count: number; tone: 'warn' | 'none' }>;
+    issues: Array<{
+        icon: string;
+        title: string;
+        sub: string;
+        count: number;
+        tone: 'warn' | 'none';
+    }>;
     exportKind: 'bank' | 'income' | 'tax';
     exportTaskId: string;
 }

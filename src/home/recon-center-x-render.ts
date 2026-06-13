@@ -19,10 +19,28 @@ const TAB_TITLES: Record<string, { left: [string, string]; right: [string, strin
     income: { left: ['rcx-doc-gl', '总账（GL）'], right: ['rcx-doc-vat', '税表（VAT 报告）'] },
     tax: { left: ['rcx-doc-vatreport', '销项税报告'], right: ['rcx-doc-invoice', '销售发票明细'] },
 };
-const METHOD: Record<RxFile['method'], { key: string; zh: string; chipKey: string; chipZh: string }> = {
-    standard: { key: 'rcx-method-std', zh: '标准模板读取', chipKey: 'rcx-recommend', chipZh: '推荐' },
-    table: { key: 'rcx-method-table', zh: '普通表格读取', chipKey: 'rcx-chip-table', chipZh: '导入前检查' },
-    scan: { key: 'rcx-method-file', zh: '文件内容读取', chipKey: 'rcx-chip-scan', chipZh: '导入前检查' },
+const METHOD: Record<
+    RxFile['method'],
+    { key: string; zh: string; chipKey: string; chipZh: string }
+> = {
+    standard: {
+        key: 'rcx-method-std',
+        zh: '标准模板读取',
+        chipKey: 'rcx-recommend',
+        chipZh: '推荐',
+    },
+    table: {
+        key: 'rcx-method-table',
+        zh: '普通表格读取',
+        chipKey: 'rcx-chip-table',
+        chipZh: '导入前检查',
+    },
+    scan: {
+        key: 'rcx-method-file',
+        zh: '文件内容读取',
+        chipKey: 'rcx-chip-scan',
+        chipZh: '导入前检查',
+    },
 };
 
 function docTitle(side: RxSide): string {
@@ -123,8 +141,7 @@ export function updateOpeningDiff() {
     const go = inNum('rcx-in-gl-opening');
     const el = $('rcx-opening-diff');
     if (!el) return;
-    el.textContent =
-        Number.isFinite(so) && Number.isFinite(go) ? rxFmt(so - go) : '—';
+    el.textContent = Number.isFinite(so) && Number.isFinite(go) ? rxFmt(so - go) : '—';
 }
 
 // 收集 anchor override(银行)→ 仅填了的才回传
@@ -158,8 +175,14 @@ export function updateReady() {
     // 余额来源标签
     const glS = $('rcx-gl-source');
     const stS = $('rcx-st-source');
-    if (glS) glS.textContent = RX.right ? tt('rcx-source-loaded', '已上传') : tt('rcx-await-upload', '待上传');
-    if (stS) stS.textContent = RX.left ? tt('rcx-source-loaded', '已上传') : tt('rcx-await-upload', '待上传');
+    if (glS)
+        glS.textContent = RX.right
+            ? tt('rcx-source-loaded', '已上传')
+            : tt('rcx-await-upload', '待上传');
+    if (stS)
+        stS.textContent = RX.left
+            ? tt('rcx-source-loaded', '已上传')
+            : tt('rcx-await-upload', '待上传');
 }
 
 // ── 状态机 A–G 显隐 ───────────────────────────────────────────────

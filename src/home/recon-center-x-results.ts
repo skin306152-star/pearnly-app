@@ -38,7 +38,8 @@ export function adaptBank(data: any): RxResult {
                     ? 'difference'
                     : 'matched'
                 : 'unmatched';
-        const amt = num(r.stmt_withdrawal) || num(r.stmt_deposit) || num(r.gl_debit) || num(r.gl_credit);
+        const amt =
+            num(r.stmt_withdrawal) || num(r.stmt_deposit) || num(r.gl_debit) || num(r.gl_credit);
         return {
             status,
             cells: [
@@ -50,18 +51,41 @@ export function adaptBank(data: any): RxResult {
     });
     const issues: RxResult['issues'] = [];
     if (difference > 0)
-        issues.push({ icon: '!', tone: 'warn', count: difference, title: tt('rcx-issue-fuzzy', '匹配上但金额或日期可能有差异'), sub: tt('rcx-issue-fuzzy-s', '建议确认后归档') });
+        issues.push({
+            icon: '!',
+            tone: 'warn',
+            count: difference,
+            title: tt('rcx-issue-fuzzy', '匹配上但金额或日期可能有差异'),
+            sub: tt('rcx-issue-fuzzy-s', '建议确认后归档'),
+        });
     if (unmatchedStmt > 0)
-        issues.push({ icon: '×', tone: 'none', count: unmatchedStmt, title: tt('rcx-issue-stmt-only', '账单有记录，总账未找到对应'), sub: tt('rcx-issue-check-ref', '请检查摘要或凭证号') });
+        issues.push({
+            icon: '×',
+            tone: 'none',
+            count: unmatchedStmt,
+            title: tt('rcx-issue-stmt-only', '账单有记录，总账未找到对应'),
+            sub: tt('rcx-issue-check-ref', '请检查摘要或凭证号'),
+        });
     if (unmatchedGl > 0)
-        issues.push({ icon: '×', tone: 'none', count: unmatchedGl, title: tt('rcx-issue-gl-only', '总账有记录，账单未找到对应'), sub: tt('rcx-issue-check-ref', '请检查摘要或凭证号') });
+        issues.push({
+            icon: '×',
+            tone: 'none',
+            count: unmatchedGl,
+            title: tt('rcx-issue-gl-only', '总账有记录，账单未找到对应'),
+            sub: tt('rcx-issue-check-ref', '请检查摘要或凭证号'),
+        });
     return {
         rate: total ? matchedClean / total : 0,
         matched: matchedClean,
         difference,
         unmatched,
         total,
-        headers: [tt('rcx-col-date', '日期'), tt('rcx-col-ref', '参考编号'), tt('rcx-col-amount', '金额'), tt('rcx-col-status', '状态')],
+        headers: [
+            tt('rcx-col-date', '日期'),
+            tt('rcx-col-ref', '参考编号'),
+            tt('rcx-col-amount', '金额'),
+            tt('rcx-col-status', '状态'),
+        ],
         rows,
         issues,
         exportKind: 'bank',
@@ -71,14 +95,22 @@ export function adaptBank(data: any): RxResult {
 
 export function adaptIncome(data: any, taskId: string): RxResult {
     const detail: any[] = data.detail || [];
-    const matched = detail.filter((r) => r.gl_amount != null && Math.abs(num(r.diff)) < 0.005).length;
-    const difference = detail.filter((r) => r.gl_amount != null && Math.abs(num(r.diff)) >= 0.005).length;
+    const matched = detail.filter(
+        (r) => r.gl_amount != null && Math.abs(num(r.diff)) < 0.005
+    ).length;
+    const difference = detail.filter(
+        (r) => r.gl_amount != null && Math.abs(num(r.diff)) >= 0.005
+    ).length;
     const unmatched = detail.filter((r) => r.gl_amount == null).length;
     const total = detail.length;
     const nf = tt('rcx-not-found', '未找到');
     const rows = detail.map((r) => {
         const status: RxResult['rows'][number]['status'] =
-            r.gl_amount == null ? 'unmatched' : Math.abs(num(r.diff)) >= 0.005 ? 'difference' : 'matched';
+            r.gl_amount == null
+                ? 'unmatched'
+                : Math.abs(num(r.diff)) >= 0.005
+                  ? 'difference'
+                  : 'matched';
         return {
             status,
             cells: [
@@ -92,16 +124,35 @@ export function adaptIncome(data: any, taskId: string): RxResult {
     });
     const issues: RxResult['issues'] = [];
     if (difference > 0)
-        issues.push({ icon: '!', tone: 'warn', count: difference, title: tt('rcx-issue-vat-diff', '税额与总账金额有差异'), sub: tt('rcx-issue-fuzzy-s', '建议确认后归档') });
+        issues.push({
+            icon: '!',
+            tone: 'warn',
+            count: difference,
+            title: tt('rcx-issue-vat-diff', '税额与总账金额有差异'),
+            sub: tt('rcx-issue-fuzzy-s', '建议确认后归档'),
+        });
     if (unmatched > 0)
-        issues.push({ icon: '×', tone: 'none', count: unmatched, title: tt('rcx-issue-vat-noGl', '报告有发票，总账无对应记录'), sub: tt('rcx-issue-check-ref', '请检查摘要或凭证号') });
+        issues.push({
+            icon: '×',
+            tone: 'none',
+            count: unmatched,
+            title: tt('rcx-issue-vat-noGl', '报告有发票，总账无对应记录'),
+            sub: tt('rcx-issue-check-ref', '请检查摘要或凭证号'),
+        });
     return {
         rate: total ? matched / total : 0,
         matched,
         difference,
         unmatched,
         total,
-        headers: [tt('rcx-col-invno', '发票号'), tt('rcx-col-date', '日期'), tt('rcx-col-customer', '客户'), tt('rcx-col-vat', '税额'), tt('rcx-col-gl', '总账金额'), tt('rcx-col-status', '状态')],
+        headers: [
+            tt('rcx-col-invno', '发票号'),
+            tt('rcx-col-date', '日期'),
+            tt('rcx-col-customer', '客户'),
+            tt('rcx-col-vat', '税额'),
+            tt('rcx-col-gl', '总账金额'),
+            tt('rcx-col-status', '状态'),
+        ],
         rows,
         issues,
         exportKind: 'income',
@@ -129,32 +180,62 @@ export function adaptTax(data: any, taskId: string): RxResult {
         const inv = row.invoice_no || '';
         if (row.kind === 'invoice_orphan') {
             unmatched++;
-            rows.push({ status: 'unmatched', cells: [inv, tt('rcx-tax-inv-only', '仅发票有'), '—', fmtA(row.amount_inv)] });
+            rows.push({
+                status: 'unmatched',
+                cells: [inv, tt('rcx-tax-inv-only', '仅发票有'), '—', fmtA(row.amount_inv)],
+            });
         } else if (row.kind === 'report_orphan') {
             unmatched++;
-            rows.push({ status: 'unmatched', cells: [inv, tt('rcx-tax-rep-only', '仅报告有'), fmtA(row.amount_rep), '—'] });
+            rows.push({
+                status: 'unmatched',
+                cells: [inv, tt('rcx-tax-rep-only', '仅报告有'), fmtA(row.amount_rep), '—'],
+            });
         } else if (row.dims && Object.keys(row.dims).length > 0) {
             Object.keys(row.dims).forEach((dim) => {
                 const parts = String(row.dims[dim] || '').split(' ≠ ');
-                rows.push({ status: 'difference', cells: [inv, dim, parts[0] || '', parts.length > 1 ? parts[1] : '—'] });
+                rows.push({
+                    status: 'difference',
+                    cells: [inv, dim, parts[0] || '', parts.length > 1 ? parts[1] : '—'],
+                });
             });
         } else {
-            rows.push({ status: 'matched', cells: [inv, tt('rcx-tax-matched', '已匹配'), '—', '—'] });
+            rows.push({
+                status: 'matched',
+                cells: [inv, tt('rcx-tax-matched', '已匹配'), '—', '—'],
+            });
         }
     });
     const total = num(raw.n_total) || matched + difference + unmatched;
     const issues: RxResult['issues'] = [];
     if (difference > 0)
-        issues.push({ icon: '!', tone: 'warn', count: difference, title: tt('rcx-issue-tax-diff', '报告与发票字段有差异'), sub: tt('rcx-issue-fuzzy-s', '建议确认后归档') });
+        issues.push({
+            icon: '!',
+            tone: 'warn',
+            count: difference,
+            title: tt('rcx-issue-tax-diff', '报告与发票字段有差异'),
+            sub: tt('rcx-issue-fuzzy-s', '建议确认后归档'),
+        });
     if (unmatched > 0)
-        issues.push({ icon: '×', tone: 'none', count: unmatched, title: tt('rcx-issue-tax-orphan', '报告与发票未能一一对应'), sub: tt('rcx-issue-check-ref', '请检查发票号') });
+        issues.push({
+            icon: '×',
+            tone: 'none',
+            count: unmatched,
+            title: tt('rcx-issue-tax-orphan', '报告与发票未能一一对应'),
+            sub: tt('rcx-issue-check-ref', '请检查发票号'),
+        });
     return {
         rate: total ? matched / total : 0,
         matched,
         difference,
         unmatched,
         total,
-        headers: [tt('rcx-col-invno', '发票号'), tt('rcx-col-item', '项目'), tt('rcx-col-report', '报告值'), tt('rcx-col-invoice', '发票值'), tt('rcx-col-status', '状态')],
+        headers: [
+            tt('rcx-col-invno', '发票号'),
+            tt('rcx-col-item', '项目'),
+            tt('rcx-col-report', '报告值'),
+            tt('rcx-col-invoice', '发票值'),
+            tt('rcx-col-status', '状态'),
+        ],
         rows,
         issues,
         exportKind: 'tax',
@@ -167,19 +248,25 @@ export async function fetchResult(kind: string, resultId: string): Promise<RxRes
     const auth = { Authorization: 'Bearer ' + rxToken() };
     try {
         if (kind === 'bank') {
-            const r = await fetch('/api/recon/bank-v2/' + encodeURIComponent(resultId), { headers: auth });
+            const r = await fetch('/api/recon/bank-v2/' + encodeURIComponent(resultId), {
+                headers: auth,
+            });
             const d = await r.json();
             if (!r.ok || !d || !d.ok) return null;
             return adaptBank(d);
         }
         if (kind === 'income') {
-            const r = await fetch('/api/recon/gl-vat/' + encodeURIComponent(resultId), { headers: auth });
+            const r = await fetch('/api/recon/gl-vat/' + encodeURIComponent(resultId), {
+                headers: auth,
+            });
             const d = await r.json();
             if (!r.ok || !d || !d.ok) return null;
             return adaptIncome(d, resultId);
         }
         // tax
-        const r = await fetch('/api/vat_excel/tasks/' + encodeURIComponent(resultId), { headers: auth });
+        const r = await fetch('/api/vat_excel/tasks/' + encodeURIComponent(resultId), {
+            headers: auth,
+        });
         const d = await r.json();
         if (!r.ok || !d) return null;
         return adaptTax(d, resultId);
@@ -190,8 +277,10 @@ export async function fetchResult(kind: string, resultId: string): Promise<RxRes
 
 // ── 渲染结果(KPI + 优先处理 + 明细)────────────────────────────
 function statusTag(status: string): string {
-    if (status === 'matched') return `<span class="rcx-tag ok">${tt('rcx-tag-matched', '已匹配')}</span>`;
-    if (status === 'difference') return `<span class="rcx-tag wait">${tt('rcx-tag-wait', '待确认')}</span>`;
+    if (status === 'matched')
+        return `<span class="rcx-tag ok">${tt('rcx-tag-matched', '已匹配')}</span>`;
+    if (status === 'difference')
+        return `<span class="rcx-tag wait">${tt('rcx-tag-wait', '待确认')}</span>`;
     return `<span class="rcx-tag none">${tt('rcx-tag-unmatched', '未匹配')}</span>`;
 }
 
@@ -261,7 +350,8 @@ export function renderDetail() {
     const res = RX.result;
     if (!res) return;
     const head = $('rcx-detail-head');
-    if (head) head.innerHTML = '<tr>' + res.headers.map((h) => `<th>${rxEsc(h)}</th>`).join('') + '</tr>';
+    if (head)
+        head.innerHTML = '<tr>' + res.headers.map((h) => `<th>${rxEsc(h)}</th>`).join('') + '</tr>';
 
     const all = res.rows.filter((r) => RX.filter === 'all' || r.status === RX.filter);
     const totalPages = Math.max(1, Math.ceil(all.length / RX.pageSize));
@@ -293,7 +383,8 @@ export function renderDetail() {
     const dt = $('rcx-detail-title');
     if (dt) dt.textContent = tt(titleMap[RX.filter][0], titleMap[RX.filter][1]);
     const dcnt = $('rcx-detail-count');
-    if (dcnt) dcnt.textContent = tt('rcx-detail-count', '共 {n} 条').replace('{n}', String(all.length));
+    if (dcnt)
+        dcnt.textContent = tt('rcx-detail-count', '共 {n} 条').replace('{n}', String(all.length));
 
     // 分页器
     const pager = $('rcx-pager');
@@ -319,14 +410,17 @@ export async function exportResult(btn?: HTMLButtonElement | null) {
     const auth = { Authorization: 'Bearer ' + rxToken() };
     const lang = rxLang();
     let url = '';
-    if (res.exportKind === 'bank') url = '/api/recon/bank-v2/' + res.exportTaskId + '/export?lang=' + lang;
-    else if (res.exportKind === 'income') url = '/api/recon/gl-vat/' + res.exportTaskId + '/export?lang=' + lang;
+    if (res.exportKind === 'bank')
+        url = '/api/recon/bank-v2/' + res.exportTaskId + '/export?lang=' + lang;
+    else if (res.exportKind === 'income')
+        url = '/api/recon/gl-vat/' + res.exportTaskId + '/export?lang=' + lang;
     else url = '/api/vat_excel/tasks/' + encodeURIComponent(res.exportTaskId) + '/download';
     try {
         const resp = await fetch(url, { headers: auth });
         if (!resp.ok) {
             const err = await resp.json().catch(() => ({}));
-            if (window.showToast) window.showToast((err as any).detail || tt('rcx-export-fail', '导出失败'), 'error');
+            if (window.showToast)
+                window.showToast((err as any).detail || tt('rcx-export-fail', '导出失败'), 'error');
             return;
         }
         const blob = await resp.blob();
@@ -342,7 +436,11 @@ export async function exportResult(btn?: HTMLButtonElement | null) {
         document.body.removeChild(a);
         URL.revokeObjectURL(dlUrl);
     } catch (e) {
-        if (window.showToast) window.showToast(tt('rcx-export-fail', '导出失败') + ': ' + (e as Error).message, 'error');
+        if (window.showToast)
+            window.showToast(
+                tt('rcx-export-fail', '导出失败') + ': ' + (e as Error).message,
+                'error'
+            );
     } finally {
         exportBusy = false;
         if (btn) btn.classList.remove('rcx-loading');

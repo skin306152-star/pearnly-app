@@ -40,7 +40,7 @@
 
     function _uploadCard() {
         var dz = document.getElementById('drop-zone');
-        return dz ? dz.closest('.card') : null;
+        return dz ? dz.closest('.panel') : null;
     }
 
     function _ensureControl() {
@@ -48,7 +48,7 @@
         if (!card) return null;
         var el = card.querySelector('#ocr-doc-mode');
         if (el) return el;
-        var head = card.querySelector('.section-head');
+        var head = card.querySelector('.ocr-card-head');
         el = document.createElement('div');
         el.id = 'ocr-doc-mode';
         el.className = 'ocr-doc-mode';

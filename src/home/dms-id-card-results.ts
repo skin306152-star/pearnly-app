@@ -20,14 +20,14 @@
     function _host() {
         var card = (function () {
             var dz = document.getElementById('drop-zone');
-            return dz ? dz.closest('.card') : null;
+            return dz ? dz.closest('.panel') : null;
         })();
         if (!card || !card.parentNode) return null;
         var el = document.getElementById('dms-id-card-result');
         if (el) return el;
         el = document.createElement('div');
         el.id = 'dms-id-card-result';
-        el.className = 'card';
+        el.className = 'panel box';
         el.style.cssText = 'display:none;margin-top:16px;';
         card.parentNode.insertBefore(el, card.nextSibling);
         return el;

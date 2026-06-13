@@ -321,7 +321,7 @@ export function renderResult() {
     const handle = $('rcx-handle-btn') as HTMLButtonElement | null;
     if (handle) {
         const n = res.difference + res.unmatched;
-        handle.textContent = tt('rcx-handle-n', '开始处理 {n} 项差异').replace('{n}', String(n));
+        handle.textContent = tt('rcx-handle-n', '查看 {n} 项差异').replace('{n}', String(n));
         handle.disabled = n === 0;
     }
 

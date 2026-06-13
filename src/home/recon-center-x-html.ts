@@ -199,7 +199,6 @@ export const RCX_HTML = `
       <button class="rcx-btn rcx-primary" id="rcx-fail-retry" type="button" data-i18n="rcx-fail-retry">重试</button>
     </div>
   </section>
-</div>
 
 <div class="rcx-overlay" id="rcx-tplpanel-overlay"></div>
 <aside class="rcx-tplpanel" id="rcx-tplpanel" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="rcx-tplpanel-title">
@@ -237,5 +236,6 @@ export const RCX_HTML = `
     </div>
   </div>
   <div class="rcx-modal-foot"><button class="rcx-btn rcx-primary rcx-modal-close" type="button" data-i18n="rcx-got-it">知道了</button></div>
+</div>
 </div>
 `;

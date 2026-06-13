@@ -2,12 +2,13 @@
 """
 erp_dms_push.py · MR.ERP DMS（车销 / 身份证→订车单）推送 + 连接测试
 
-从 erp_push.py 抽出（REFACTOR-WB-modularize E3 · verbatim 搬家 0 逻辑改）。
-DMS 全段：_DMS_DEFAULT_URL/_DMS_FRIENDLY/_dms_friendly/_dms_resolve_creds/
-_build_mrerp_dms_adapter/test_mrerp_dms_endpoint/_id_card_payload_from_dict/
-push_mrerp_dms_id_card/_mrerp_result_dict。零 erp_push 内部依赖（service import 全 lazy）。
-erp_push 顶部 re-export 回原命名空间 → dms_routes/erp_routes（_erp.push_mrerp_dms_id_card /
-_erp.test_mrerp_dms_endpoint）+ push_mrerp_history（用 _mrerp_result_dict）0 改动。
+DMS 连接测试 + 凭据解析 + 身份证字段映射：_DMS_DEFAULT_URL/_DMS_FRIENDLY/
+_dms_friendly/_dms_resolve_creds/_build_mrerp_dms_adapter/test_mrerp_dms_endpoint/
+_id_card_payload_from_dict。零 erp_push 内部依赖（service import 全 lazy）。
+erp_push 顶部 re-export 回原命名空间 → dms_routes/erp_routes（_erp.test_mrerp_dms_endpoint）
++ push_mrerp_history（用 _mrerp_result_dict）。
+身份证→订车单的实际建单走两步流 services/erp/erp_dms_intake.py（dms_routes 的
+/api/dms/id-card/recognize + /push），不在本模块。
 ⚠️ DMS 不是发票推送目标：push_to_endpoint 对 adapter=mrerp_dms 硬拒（防误推）· 此模块走
 自己的 dms_routes，与 push_to_endpoint 无关。
 """
@@ -241,63 +242,6 @@ def _id_card_payload_from_dict(id_card: Dict[str, Any]):
     )
 
 
-def push_mrerp_dms_id_card(endpoint: Dict[str, Any], id_card: Dict[str, Any]) -> Dict[str, Any]:
-    """Push one Thai ID card into DMS as customer + booking draft.
-
-    Called by dms_routes (NOT push_to_endpoint). Returns a dict shaped for an
-    erp_push_logs insert + the route response. NEVER raises. Sync — the route
-    wraps in asyncio.to_thread.
-
-    Shape:
-        {success, http_status, response_body(dict), error_msg, error_code,
-         elapsed_ms, adapter, customer_id, booking_id, booking_no}
-    """
-    import time as _time
-
-    t0 = _time.time()
-
-    def _resp_dict(ok, code=None, body=None, customer_id="", booking_id="", booking_no=""):
-        return {
-            "success": ok,
-            "http_status": 200 if ok else 0,
-            "response_body": body or {},
-            "error_msg": None if ok else (code or "ERR_DMS_UNEXPECTED"),
-            "error_code": None if ok else (code or "ERR_DMS_UNEXPECTED"),
-            "elapsed_ms": int((_time.time() - t0) * 1000),
-            "adapter": "mrerp_dms",
-            "customer_id": customer_id,
-            "booking_id": booking_id,
-            "booking_no": booking_no,
-        }
-
-    cfg = endpoint.get("config") or {}
-    adapter, build_err = _build_mrerp_dms_adapter(cfg)
-    if build_err:
-        return _resp_dict(False, build_err["error_code"], {"raw_error": build_err["raw"]})
-
-    try:
-        from services.erp.mrerp_dms_models import BookingDefaults
-
-        card = _id_card_payload_from_dict(id_card)
-        defaults = BookingDefaults.from_config(cfg)
-        with adapter:
-            result = adapter.push_id_card_booking(card, defaults)
-        body = result.to_response_body()
-        if result.ok:
-            return _resp_dict(
-                True,
-                body=body,
-                customer_id=result.customer_id or "",
-                booking_id=result.booking_id or "",
-                booking_no=result.booking_no or "",
-            )
-        body["raw_error"] = (result.error or "")[:300]
-        return _resp_dict(False, result.error_code or "ERR_DMS_UNEXPECTED", body)
-    except Exception as e:
-        logger.exception("push_mrerp_dms_id_card unexpected failure")
-        return _resp_dict(False, "ERR_DMS_UNEXPECTED", {"raw_error": f"{type(e).__name__}: {e}"})
-
-
 def _mrerp_result_dict(
     success: bool,
     http_status: int,
@@ -332,10 +276,10 @@ def push_mrerp_dms(
     membership only.
 
     The DMS adapter is NOT an invoice-history push target. The ID-card →
-    booking flow has its own route (POST /api/dms/id-card-booking →
-    push_mrerp_dms_id_card). `push_to_endpoint` early-rejects adapter=
-    'mrerp_dms' (ERR_DMS_NOT_INVOICE_ENDPOINT) so an invoice history can
-    never be misrouted into DMS. This stub exists only so endpoint creation
+    booking flow has its own route (POST /api/dms/id-card/recognize + /push).
+    `push_to_endpoint` early-rejects adapter='mrerp_dms'
+    (ERR_DMS_NOT_INVOICE_ENDPOINT) so an invoice history can never be
+    misrouted into DMS. This stub exists only so endpoint creation
     (which validates `adapter in ADAPTER_REGISTRY`) accepts mrerp_dms; if it
     is ever actually reached, that early-reject regressed.
 
@@ -344,5 +288,5 @@ def push_mrerp_dms(
     return (
         False,
         0,
-        "mrerp_dms is not an invoice push target; use POST /api/dms/id-card-booking",
+        "mrerp_dms is not an invoice push target; use POST /api/dms/id-card/push",
     )

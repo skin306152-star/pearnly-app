@@ -10,10 +10,11 @@ Architecture (CLAUDE.md/CLAUDE.md):
         external HTTP. After login the authenticated browser context's
         request API drives the verified DMS form contract (mrerp_dms_client),
         so business writes ride the real session cookies/origin.
-    §8  xlsx import clones DMS' official template byte-for-byte
-        (mrerp_dms_xlsx); never a regenerated workbook.
-    §9  import code "sc::1" is verified by reading drfcbc back; "ep::1"
-        (error report) is never treated as success.
+    §8  Customer + 订车单 writes go through DMS' native forms; create is
+        verified by reading the row back (search), never trusting the bare
+        submit response. (Booking creation lives in the two-step intake path
+        services/erp/erp_dms_intake.py — this adapter provides login +
+        session + master-data scrape for it.)
 
 Login flow (probed live 2026-05-31 on the DMS test tenant):
     GET  index.php → fill #txtusers / #txtpasswords → click #btnlogin →
@@ -29,7 +30,6 @@ Public surface:
     __enter__ / __exit__        # owns the browser session
     login() -> None             # idempotent
     test_connection() -> dict   # login + master-data scrape (wizard)
-    push_id_card_booking(card, defaults) -> DMSPushResult
 """
 
 from __future__ import annotations
@@ -41,8 +41,7 @@ from typing import Any, Dict, Optional
 from urllib.parse import urlsplit, urlunsplit
 
 from services.erp._browser import BrowserSession
-from services.erp.mrerp_dms_client import DMSClient, DMSClientError
-from services.erp.mrerp_dms_models import BookingDefaults, DMSPushResult, ThaiIdCardPayload
+from services.erp.mrerp_dms_client import DMSClient
 
 logger = logging.getLogger(__name__)
 
@@ -338,56 +337,6 @@ class MrerpDmsAdapter:
                 "regis_behalfs": [_ref_brief(r) for r in masters.get("regis_behalfs", [])],
             },
         }
-
-    def push_id_card_booking(
-        self, card: ThaiIdCardPayload, defaults: BookingDefaults
-    ) -> DMSPushResult:
-        """Full flow: login → resolve master refs → ensure customer →
-        import booking via official template → patch identity → verify."""
-        started = time.time()
-        try:
-            self.login()
-            client = self._client()
-            template = client.download_booking_template()
-            booking = client.resolve_booking_payload(defaults, card)
-            from services.erp.mrerp_dms_client import excel_serial
-            from datetime import date, timedelta
-
-            today = date.today()
-            doc_serial = excel_serial(today)
-            delivery_serial = excel_serial(today + timedelta(days=defaults.delivery_days))
-            result = client.push_id_card_booking(
-                card=card,
-                booking=booking,
-                template_bytes=template,
-                doc_date_serial=doc_serial,
-                delivery_date_serial=delivery_serial,
-            )
-            result.evidence["elapsed_ms"] = int((time.time() - started) * 1000)
-            return result
-        except (MrerpDmsAuthError, MrerpDmsTechnicalError) as e:
-            code = "ERR_DMS_AUTH" if isinstance(e, MrerpDmsAuthError) else "ERR_DMS_TECHNICAL"
-            return DMSPushResult(
-                ok=False,
-                error_code=code,
-                error=f"{type(e).__name__}: {e}",
-                evidence={"elapsed_ms": int((time.time() - started) * 1000)},
-            )
-        except DMSClientError as e:
-            return DMSPushResult(
-                ok=False,
-                error_code=e.error_code,
-                error=f"{type(e).__name__}: {e}",
-                evidence={"elapsed_ms": int((time.time() - started) * 1000)},
-            )
-        except Exception as e:  # never let an unexpected error escape the push
-            logger.exception("MrerpDmsAdapter.push_id_card_booking unexpected failure")
-            return DMSPushResult(
-                ok=False,
-                error_code="ERR_DMS_UNEXPECTED",
-                error=f"{type(e).__name__}: {str(e)[:300]}",
-                evidence={"elapsed_ms": int((time.time() - started) * 1000)},
-            )
 
 
 def _ref_brief(row) -> Dict[str, str]:

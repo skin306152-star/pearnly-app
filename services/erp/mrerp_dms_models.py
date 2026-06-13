@@ -99,36 +99,6 @@ class DMSBookingPayload:
     regis_behalf: DMSMasterRef
 
 
-@dataclass
-class DMSPushResult:
-    """Return value of the adapter's one-call push.
-
-    `ok` drives the erp_push_logs status (success/failed). evidence carries
-    timing + any DMS response codes for the log's response_body.
-    """
-
-    ok: bool
-    customer_id: Optional[str] = None
-    booking_id: Optional[str] = None
-    booking_no: Optional[str] = None
-    response_code: Optional[str] = None
-    error_code: Optional[str] = None  # ERR_* taxonomy for the UI
-    error: Optional[str] = None
-    evidence: Dict[str, Any] = field(default_factory=dict)
-
-    def to_response_body(self) -> Dict[str, Any]:
-        """Shape stored in erp_push_logs.response_body so external_ref.py's
-        _derive_mrerp_dms can lift booking_no → external_doc_no."""
-        return {
-            "adapter": "mrerp_dms",
-            "booking_no": self.booking_no or "",
-            "booking_id": self.booking_id or "",
-            "customer_id": self.customer_id or "",
-            "response_code": self.response_code or "",
-            "error_code": self.error_code or "",
-        }
-
-
 @dataclass(frozen=True)
 class BookingDefaults:
     """Per-endpoint booking defaults (from endpoint.config.booking_defaults).

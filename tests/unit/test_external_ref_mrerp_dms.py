@@ -5,9 +5,9 @@ tests/unit/test_external_ref_mrerp_dms.py
 
 DMS 集成(2026-05-31)· external_ref 派生器守门。
 
-push_mrerp_dms_id_card 把 booking_no/booking_id/customer_id 写进
-erp_push_logs.response_body。日志列表/详情靠 derive_external_ref 把
-booking_no 提到 external_doc_no 给用户看 + 提示去 DMS 订车单搜。
+身份证→订车单两步流(dms_routes /api/dms/id-card/push)把
+booking_no/booking_id/customer_id 写进 erp_push_logs.response_body。日志列表/详情靠
+derive_external_ref 把 booking_no 提到 external_doc_no 给用户看 + 提示去 DMS 订车单搜。
 这个测试钉死 mrerp_dms 派生器的契约,防回归。
 """
 

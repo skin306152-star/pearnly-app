@@ -29,14 +29,11 @@ import logging
 import re
 from typing import Any, Dict, Optional
 
-from services.ocr import layer1_vision
 from services.ocr.layer2_structure import (
-    DEFAULT_MAX_RETRIES,
     DEFAULT_MODEL,
     DEFAULT_TIMEOUT_SECONDS,
-    _call_gemini_with_retry,
-    _page_to_text,
 )
+from services.ocr.layer2_gemini import _get_model, _parse_json
 
 logger = logging.getLogger(__name__)
 
@@ -74,29 +71,52 @@ _ID_CARD_PROMPT = (
 
 
 def extract_thai_id_card(image_bytes: bytes, api_key: Optional[str] = None) -> Dict[str, Any]:
+    """身份证图 → 结构化字段。直接走 Gemini 多模态视觉(图→JSON),与发票 OCR
+    同一条 prod 可用路;不依赖 Google Vision(prod 未配 GOOGLE_APPLICATION_CREDENTIALS)。"""
     if not image_bytes:
         raise IdCardExtractError("empty image bytes")
+    data = _gemini_vision_extract(image_bytes, (api_key or "").strip() or None)
+    return _normalize(data if isinstance(data, dict) else {})
 
-    # Layer 1: Google Vision OCR text (shared infra; no invoice coupling).
-    l1 = layer1_vision.extract_from_image_bytes(image_bytes, page_number=1)
-    if not l1.pages:
-        raise IdCardExtractError("layer1 returned no pages")
-    text = _page_to_text(l1.pages[0]) or ""
-    if not text.strip():
-        raise IdCardExtractError("layer1 produced no text from the image")
 
-    # Layer 2: Gemini with the dedicated ID-card prompt (override → invoice
-    # prompt/schema untouched).
-    data, _meta = _call_gemini_with_retry(
-        text,
-        api_key=(api_key or "").strip() or None,
-        model_name=DEFAULT_MODEL,
-        max_retries=DEFAULT_MAX_RETRIES,
-        timeout=DEFAULT_TIMEOUT_SECONDS,
-        system_prompt_override=_ID_CARD_PROMPT,
-    )
-    data = data if isinstance(data, dict) else {}
-    return _normalize(data)
+def _detect_image_mime(b: bytes) -> str:
+    if b[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if b[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if b[:4] == b"RIFF" and b[8:12] == b"WEBP":
+        return "image/webp"
+    return "image/jpeg"
+
+
+def _gemini_vision_extract(image_bytes: bytes, api_key: Optional[str]) -> Dict[str, Any]:
+    """单次 Gemini 多模态调用:身份证图 + 专用 prompt → JSON dict。失败抛
+    IdCardExtractError(路由据此回 422 needs_review / 500)。"""
+    import os
+
+    key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+    if not key:
+        raise IdCardExtractError("no Gemini api key (GOOGLE_API_KEY / GEMINI_API_KEY)")
+    try:
+        model = _get_model(api_key=key.strip(), model_name=DEFAULT_MODEL)
+        resp = model.generate_content(
+            [
+                _ID_CARD_PROMPT,
+                {"mime_type": _detect_image_mime(bytes(image_bytes)), "data": bytes(image_bytes)},
+            ],
+            request_options={"timeout": DEFAULT_TIMEOUT_SECONDS},
+        )
+        raw = (getattr(resp, "text", "") or "").strip()
+    except Exception as e:
+        raise IdCardExtractError(
+            f"gemini vision call failed: {type(e).__name__}: {str(e)[:200]}"
+        ) from e
+    if not raw:
+        raise IdCardExtractError("gemini returned empty response")
+    try:
+        return _parse_json(raw)
+    except Exception as e:
+        raise IdCardExtractError(f"gemini returned non-JSON: {str(e)[:160]}") from e
 
 
 def _normalize(data: Dict[str, Any]) -> Dict[str, Any]:

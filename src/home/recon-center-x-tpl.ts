@@ -112,12 +112,12 @@ export function renderTemplates() {
             <b>${rxEsc(tt(info.name[0], info.name[1]))}</b>
             <p>${rxEsc(tt(info.desc[0], info.desc[1]))}</p>
           </div>
-          <span class="rcx-template-icon" style="background:#eaf8f2;color:#159766;width:auto;padding:0 8px;border-radius:999px;font-size:9px">${tt('rcx-recommend', '推荐')}</span>
+          <span class="rcx-reco-pill">${tt('rcx-recommend', '推荐')}</span>
         </div>
         <div class="rcx-template-actions">
           <button class="rcx-btn rcx-sm" data-rcx-dl-doc="${doc}" type="button">${tt('rcx-dl-template-btn', '下载模板')}</button>
         </div>
-        <p style="font-size:10px;color:#aaa3b7;margin:10px 0 0">${tt('rcx-tpl-note', '模板内含列头、示例行与填写说明')}</p>
+        <p class="rcx-tpl-hint">${tt('rcx-tpl-note', '模板内含列头、示例行与填写说明')}</p>
       </div>`;
         })
         .join('');

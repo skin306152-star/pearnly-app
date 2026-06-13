@@ -370,7 +370,7 @@ export function renderDetail() {
                           `<td>${statusTag(r.status)}</td></tr>`
                   )
                   .join('')
-            : `<tr><td colspan="${res.headers.length}" style="text-align:center;padding:20px;color:#9a93aa">${tt('rcx-no-rows', '无记录')}</td></tr>`;
+            : `<tr><td colspan="${res.headers.length}" class="rcx-empty-cell">${tt('rcx-no-rows', '无记录')}</td></tr>`;
     }
 
     // 标题/计数

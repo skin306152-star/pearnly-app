@@ -105,7 +105,7 @@
 .rcx-upload-card h3 { font-size: 16px; margin: 0 0 5px; }
 .rcx-upload-card .rcx-hint { font-size: 12px; color: #847d9a; margin-bottom: 14px; }
 .rcx-upload-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-.rcx-recommend { margin-top: 14px; width: 100%; max-width: 410px; background: #f5f1ff; border: 1px solid #e4ddff; border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; text-align: left; }
+.rcx-recommend { margin-top: 14px; width: 100%; max-width: 25.6rem; background: #f5f1ff; border: 1px solid #e4ddff; border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; text-align: left; }
 .rcx-recommend .rcx-spark { width: 32px; height: 32px; border-radius: 10px; background: #fff; display: grid; place-items: center; color: var(--rcx-brand); flex: 0 0 auto; }
 .rcx-recommend b { display: block; font-size: 12px; }
 .rcx-recommend span { display: block; font-size: 11px; color: #7d7694; margin-top: 2px; }
@@ -237,6 +237,9 @@
 .rcx-template-meta b { font-size: 13px; }
 .rcx-template-meta p { font-size: 11px; color: #8b849b; margin: 4px 0 0; line-height: 1.5; }
 .rcx-template-actions { display: flex; gap: 8px; margin-top: 12px; }
+.rcx-reco-pill { background: var(--rcx-green-soft); color: var(--rcx-green); border-radius: 999px; padding: 2px 8px; font-size: 9px; font-weight: 900; align-self: flex-start; flex: 0 0 auto; }
+.rcx-tpl-hint { font-size: 10px; color: #aaa3b7; margin: 10px 0 0; }
+.rcx-empty-cell { text-align: center; padding: 20px; color: #9a93aa; }
 .rcx-tplpanel-footer { margin-top: auto; border-top: 1px solid var(--rcx-line); padding: 14px 18px; flex: 0 0 auto; }
 
 /* 弹窗(导入说明) */
@@ -255,11 +258,11 @@
 .rcx-guide-meta p { font-size: 12px; color: #716a84; margin: 4px 0 0; line-height: 1.5; }
 
 /* 响应式 */
-@media (max-width: 1160px) {
+@media (max-width: 72.5em) {
   .rcx-balance-grid { grid-template-columns: repeat(2, 1fr); }
   .rcx-result-body { grid-template-columns: 1fr; }
 }
-@media (max-width: 820px) {
+@media (max-width: 51.25em) {
   .rcx-head { align-items: center; }
   .rcx-banner { grid-template-columns: auto 1fr; }
   .rcx-banner-actions { grid-column: 1 / -1; }
@@ -269,7 +272,7 @@
   .rcx-balance-grid, .rcx-kpis { grid-template-columns: 1fr; }
   .rcx-tplpanel { width: 100%; }
 }
-@media (max-width: 480px) {
+@media (max-width: 30em) {
   .rcx-h1 { font-size: 22px; }
   .rcx-actions .rcx-btn span { display: none; }
   .rcx-segmented { display: flex; width: 100%; }

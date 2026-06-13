@@ -271,7 +271,16 @@ function openHistoryMenu(historyId: string, anchor: HTMLElement) {
                     } catch (_e) {
                         /* 非 JSON 错误体 */
                     }
-                    showToast(t('mrerp-xlsx-fail', { err: code }), 'error');
+                    // 把后端 preflight 错误码翻成大白话 + 指引去哪配(缺映射/缺客户/信息不全)
+                    const fk =
+                        code === 'ERR_NO_CUSTOMER_MAPPING'
+                            ? 'mrerp-err-map'
+                            : code === 'ERR_NO_CLIENT'
+                              ? 'mrerp-err-client'
+                              : /^ERR_NO_(INVOICE_NO|INVOICE_DATE|TOTAL_AMOUNT)$/.test(code)
+                                ? 'mrerp-err-incomplete'
+                                : null;
+                    showToast(fk ? t(fk) : t('mrerp-xlsx-fail', { err: code }), 'error');
                     return;
                 }
                 const blob = await resp.blob();

@@ -4,7 +4,7 @@
 // 来源:home.js L11655-12065 · verbatim 0 改逻辑(仅 prettier 重排)。
 // 加载顺序:home.js(sync)暴露公共全局 → 本 module(Vite bundle · defer)后跑 · bare 调全局不 import。
 // ============================================================
-/* global applyLang, currentLang, I18N, openReportModal, _results, _historySelected */
+/* global applyLang, currentLang, I18N, openReportModal, _historySelected */
 // ============================================================
 // v109.1 · 报表模板系统 · 统一导出弹窗 · 4 处复用
 // ============================================================
@@ -228,8 +228,7 @@
     // ============================================================
     // 用法:
     //   openReportModal({
-    //     mode: 'records' | 'client' | 'history-batch',
-    //     records:    [...] (mode=records 时)
+    //     mode: 'client' | 'history-batch',
     //     clientId:   N     (mode=client 时)
     //     historyIds: [...] (mode=history-batch 时)
     //     clientName: 'X'   (可选 · 显示用)
@@ -298,23 +297,7 @@
             const tok = localStorage.getItem('mrpilot_token');
             let resp, defaultName;
 
-            if (ctx.mode === 'records') {
-                // 识别中心
-                resp = await fetch('/api/reports/export', {
-                    method: 'POST',
-                    headers: {
-                        Authorization: 'Bearer ' + tok,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        template,
-                        lang: currentLang,
-                        records: ctx.records || [],
-                        meta: ctx.meta || {},
-                    }),
-                });
-                defaultName = `mrpilot-${template}-${Date.now()}.xlsx`;
-            } else if (ctx.mode === 'client') {
+            if (ctx.mode === 'client') {
                 // 客户导出
                 const url = `/api/reports/clients/${ctx.clientId}/export?template=${encodeURIComponent(template)}&lang=${encodeURIComponent(currentLang)}&month=${encodeURIComponent(month)}`;
                 resp = await fetch(url, {
@@ -406,32 +389,9 @@
     }
 
     // ============================================================
-    // 改造:识别中心导出按钮
+    // 单据记录批量导出(上传识别页导出按钮已交还 export.ts 的下拉 · 那个带 MR.ERP 模板)
     // ============================================================
     document.addEventListener('DOMContentLoaded', () => {
-        const ocrExportBtn = document.getElementById('btn-export');
-        if (ocrExportBtn) {
-            // 用克隆移除老监听
-            const newBtn = ocrExportBtn.cloneNode(true);
-            ocrExportBtn.parentNode!.replaceChild(newBtn, ocrExportBtn);
-            newBtn.addEventListener('click', () => {
-                if (typeof _results === 'undefined' || !_results || _results.length === 0) {
-                    showToast(t('report-toast-no-selection'), 'info');
-                    return;
-                }
-                openReportModal({
-                    mode: 'records',
-                    records: _results.map((r) => ({
-                        filename: r.filename,
-                        merged_fields: r.merged_fields || {},
-                    })),
-                });
-            });
-        }
-
-        // ============================================================
-        // 改造:单据记录批量导出
-        // ============================================================
         const batchExportBtn = document.getElementById('history-batch-export');
         if (batchExportBtn) {
             batchExportBtn.addEventListener('click', () => {

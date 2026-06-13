@@ -150,8 +150,18 @@ async function _runExport(templateId?: any) {
             } catch (e) {
                 console.warn('[export] resp.json err.detail parse failed:', e);
             }
+            // MR.ERP preflight 错误码翻大白话(其它模板不返 ERR_NO_* · 不受影响)
+            const mrerpKey =
+                detail === 'ERR_NO_CUSTOMER_MAPPING'
+                    ? 'mrerp-err-map'
+                    : detail === 'ERR_NO_CLIENT'
+                      ? 'mrerp-err-client'
+                      : /^ERR_NO_(INVOICE_NO|INVOICE_DATE|TOTAL_AMOUNT)$/.test(detail)
+                        ? 'mrerp-err-incomplete'
+                        : null;
             const key =
-                typeof detail === 'string' && detail.indexOf('.') > 0 ? 'err.' + detail : null;
+                mrerpKey ||
+                (typeof detail === 'string' && detail.indexOf('.') > 0 ? 'err.' + detail : null);
             showToast(key ? t(key) : t('toast-export-error') + ' · ' + detail, 'error');
             return;
         }

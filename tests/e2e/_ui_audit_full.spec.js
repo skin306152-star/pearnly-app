@@ -68,6 +68,11 @@ async function esc(page) {
 }
 
 test('full surface audit', async ({ page }) => {
+    // 鉴权审计 · 无测试账号(CI 公开页 smoke)时优雅跳过(auth helper 约定 · 见 _helpers/auth.js)
+    test.skip(
+        !(process.env.PEARNLY_E2E_USER && process.env.PEARNLY_E2E_PASS),
+        '需测试账号 PEARNLY_E2E_USER/PASS · CI 无凭据时跳过'
+    );
     test.setTimeout(600000);
     const m = [];
     await page.setViewportSize({ width: 1440, height: 900 });

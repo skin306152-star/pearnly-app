@@ -37,6 +37,15 @@ def fallback() -> str:
     return os.environ.get("OCR_FALLBACK_MODEL", "gemini-3.5-flash").strip()
 
 
+def escalate() -> str:
+    """image-first 升级臂模型(低置信/关键字段缺时换更强模型重抽)。
+
+    默认 = fallback()(gemini-3.5-flash · 2026-06-13 实测稳抽 tiny 发票号+年份);
+    OCR_ESCALATE_MODEL 显式覆盖。与 fallback 同源,不另起一套档位。
+    """
+    return os.environ.get("OCR_ESCALATE_MODEL", "").strip() or fallback()
+
+
 def models_with_fallback(primary: Optional[str] = None) -> List[str]:
     """[主模型, 兜底模型](去重去空)。调用方按序尝试:前一个失败/空 → 用下一个。"""
     out = [primary or flash()]

@@ -28,8 +28,8 @@ from services.purchase import settings as settings_svc
 router = APIRouter(prefix="/api/purchase", tags=["purchase-intake"])
 
 
-def _run_ocr(user_fresh: dict, file_bytes: bytes, filename: str) -> tuple[dict, str]:
-    """计费 → OCR → (fields, confidence)。计费不过/无票 → PosError。"""
+def _run_ocr(user_fresh: dict, file_bytes: bytes, filename: str) -> tuple[dict, str, dict]:
+    """计费 → OCR → (fields, confidence_band, field_confidence)。计费不过/无票 → PosError。"""
     if not ocr.is_supported_ocr_file(filename):
         raise PosError("purchase.line_invalid", 422, detail="unsupported_file")
     api_key = (
@@ -49,7 +49,11 @@ def _run_ocr(user_fresh: dict, file_bytes: bytes, filename: str) -> tuple[dict, 
         raise PosError("purchase.unexpected", 422, detail="ocr_empty")
     _charge(user_fresh, quote)
     page = pages[0]
-    return intake_svc.fields_from_invoice(page.invoice), getattr(page, "confidence_band", "")
+    return (
+        intake_svc.fields_from_invoice(page.invoice),
+        getattr(page, "confidence_band", ""),
+        dict(getattr(page, "field_confidence", {}) or {}),
+    )
 
 
 def _charge(user_fresh: dict, quote: dict) -> None:
@@ -81,7 +85,9 @@ async def api_intake(
         if not file_bytes:
             raise PosError("purchase.line_invalid", 422, detail="empty_image")
         user_fresh = db.find_user_by_id(_uid(user)) or user
-        fields, confidence = _run_ocr(user_fresh, file_bytes, image.filename or "upload.jpg")
+        fields, confidence, field_conf = _run_ocr(
+            user_fresh, file_bytes, image.filename or "upload.jpg"
+        )
         # 票图落盘留底 → ref 进草稿,确认入账时挂成 bill 附件(C · 表单/详情可回看原票)。
         from services.ocr import pdf_storage
 
@@ -94,6 +100,7 @@ async def api_intake(
                 workspace_client_id=ws,
                 fields=fields,
                 confidence=confidence,
+                field_confidence=field_conf,
                 settings=cfg,
                 source="photo",
                 image_url=bill_ref,

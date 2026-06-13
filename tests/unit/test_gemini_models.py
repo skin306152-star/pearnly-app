@@ -15,7 +15,12 @@ class GeminiModelsTests(unittest.TestCase):
     def setUp(self):
         self._saved = {
             k: os.environ.get(k)
-            for k in ("OCR_FLASH_MODEL", "OCR_FLASHLITE_MODEL", "OCR_FALLBACK_MODEL")
+            for k in (
+                "OCR_FLASH_MODEL",
+                "OCR_FLASHLITE_MODEL",
+                "OCR_FALLBACK_MODEL",
+                "OCR_ESCALATE_MODEL",
+            )
         }
         for k in self._saved:
             os.environ.pop(k, None)
@@ -48,6 +53,18 @@ class GeminiModelsTests(unittest.TestCase):
         os.environ["OCR_FALLBACK_MODEL"] = ""
         self.assertEqual(gm.fallback(), "")
         self.assertEqual(gm.models_with_fallback(), ["gemini-2.5-flash"])
+
+    def test_escalate_defaults_to_fallback(self):
+        # image-first 升级臂默认 = fallback(3.5-flash),不另起档位。
+        self.assertEqual(gm.escalate(), "gemini-3.5-flash")
+
+    def test_escalate_explicit_env_overrides(self):
+        os.environ["OCR_ESCALATE_MODEL"] = "gemini-z"
+        self.assertEqual(gm.escalate(), "gemini-z")
+
+    def test_escalate_follows_fallback_when_unset(self):
+        os.environ["OCR_FALLBACK_MODEL"] = "gemini-fb"
+        self.assertEqual(gm.escalate(), "gemini-fb")
 
     def test_try_escalates_on_primary_failure(self):
         tried = []

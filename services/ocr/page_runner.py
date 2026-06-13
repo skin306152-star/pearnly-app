@@ -15,6 +15,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional
 
+from .confidence import check_field_in_l1_text, find_field_min_word_conf
 from .layer1_vision import extract_from_image_bytes as _l1_extract_image
 from .layer2_structure import extract_from_page as _l2_extract_page
 from .layer3_fallback import (
@@ -91,6 +92,27 @@ def _process_pages(
         return [by_page[i] for i in range(1, n_pages + 1)]
     # 串行(单页 / pattern_memory 学习路径)
     return [_run_page(i, ib) for i, ib in enumerate(page_image_bytes_list, start=1)]
+
+
+# 复核屏「需复核高亮」的关键字段(与触发 Rule 4 同集)。
+_FIELD_CONF_ATTRS = ("invoice_number", "total_amount", "seller_tax", "date")
+
+
+def _field_confidences(l1_page: Page, invoice) -> Dict[str, float]:
+    """关键字段词级最低置信(0-1),喂复核屏字段三态着色。不在 OCR 文本(幻觉/缺)→ 0.0;
+    在全文但无词级匹配(短值)→ 省略(不误标低)。"""
+    out: Dict[str, float] = {}
+    for attr in _FIELD_CONF_ATTRS:
+        val = str(getattr(invoice, attr, "") or "").strip()
+        if not val:
+            continue
+        if not check_field_in_l1_text(l1_page, val):
+            out[attr] = 0.0
+            continue
+        conf = find_field_min_word_conf(l1_page, val)
+        if conf is not None:
+            out[attr] = round(float(conf), 4)
+    return out
 
 
 # ============================================================
@@ -280,6 +302,10 @@ def _process_one_page(
     if confidence_band == "needs_review":
         needs_manual_review = True
 
+    field_confidence = (
+        _field_confidences(l1_page, invoice) if document_type in ("auto", "invoice") else {}
+    )
+
     return PipelinePageResult(
         page_number=page_number,
         invoice=invoice,
@@ -299,6 +325,7 @@ def _process_one_page(
         needs_manual_review=needs_manual_review,
         confidence_band=confidence_band,
         final_confidence=final_confidence,
+        field_confidence=field_confidence,
         validation_warnings=validation_warnings,
         error=error_msg,
     )

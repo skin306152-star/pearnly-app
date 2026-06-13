@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """OCR schemas · 各层结果包装(Layer2/Layer3/Pipeline 页结果与汇总)(REFACTOR-WA · R20 拆 · 0 逻辑改)。"""
 
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 from services.ocr.schemas_layer1 import BusinessDocumentType
@@ -154,6 +154,12 @@ class PipelinePageResult(BaseModel):
         ge=0.0,
         le=1.0,
         description="aggregate page confidence (min of critical-field confidences)",
+    )
+    field_confidence: Dict[str, float] = Field(
+        default_factory=dict,
+        description="per-critical-field min L1 word confidence (invoice_number / "
+        "total_amount / seller_tax / date) — feeds the review screen 'needs-check' "
+        "field highlight; field absent from OCR text (hallucinated/missing) → 0.0",
     )
     validation_warnings: List[str] = Field(
         default_factory=list,

@@ -182,16 +182,23 @@ def resolve_image_intake(
     settings,
     source="photo",
     image_url=None,
+    field_confidence=None,
 ) -> dict:
-    """图路:判方向 → 建草稿 → dedupe 提示;低置信/unknown → 落 inbox。返回分流信封 data。"""
+    """图路:判方向 → 建草稿 → dedupe 提示;低置信/unknown → 落 inbox。返回分流信封 data。
+
+    confidence_band + field_confidence(逐字段)透出给复核屏「需复核高亮」(契约 05 §1.1)。
+    """
     my_tax = _my_tax_id(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
     kind, route = judge_direction(fields, my_tax_id=my_tax)
     low_conf = str(confidence or "").lower() in ("needs_review", "low", "")
+    fc = dict(field_confidence or {})
 
     if route in ("sales", "recon"):
         return {
             "kind": kind,
             "confidence": confidence,
+            "confidence_band": confidence,
+            "field_confidence": fc,
             "route": route,
             "draft": None,
             "dedupe_hit": False,
@@ -218,6 +225,8 @@ def resolve_image_intake(
         return {
             "kind": kind,
             "confidence": confidence,
+            "confidence_band": confidence,
+            "field_confidence": fc,
             "route": "inbox",
             "draft": None,
             "dedupe_hit": False,
@@ -252,6 +261,8 @@ def resolve_image_intake(
     return {
         "kind": kind,
         "confidence": confidence,
+        "confidence_band": confidence,
+        "field_confidence": fc,
         "route": route,
         "draft": draft,
         "dedupe_hit": dup,

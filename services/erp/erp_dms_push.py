@@ -71,6 +71,41 @@ _DMS_FRIENDLY = {
         "zh_TW": "連線 DMS 逾時或網路異常 · 請稍後重試",
         "ja": "DMS への接続がタイムアウトまたはネットワーク異常です · しばらくしてから再試行してください",
     },
+    "ERR_DMS_CUSTOMER_SAVE": {
+        "zh": "保存客户到 DMS 失败 · 请检查字段后重试",
+        "en": "Failed to save the customer to DMS — check the fields and retry",
+        "th": "บันทึกลูกค้าเข้า DMS ไม่สำเร็จ — ตรวจสอบข้อมูลแล้วลองใหม่",
+        "zh_TW": "儲存客戶到 DMS 失敗 · 請檢查欄位後重試",
+        "ja": "DMS への顧客保存に失敗しました · 項目を確認して再試行してください",
+    },
+    "ERR_DMS_IMPORT": {
+        "zh": "建订车单失败 · 请稍后重试",
+        "en": "Failed to create the booking — please retry",
+        "th": "สร้างใบจองรถไม่สำเร็จ — กรุณาลองใหม่",
+        "zh_TW": "建立訂車單失敗 · 請稍後重試",
+        "ja": "予約の作成に失敗しました · 再試行してください",
+    },
+    "ERR_DMS_IMPORT_REPORT": {
+        "zh": "订车单导入被 DMS 拒绝 · 请检查订车资料",
+        "en": "DMS rejected the booking import — check the booking details",
+        "th": "DMS ปฏิเสธการนำเข้าใบจอง — ตรวจสอบรายละเอียดการจอง",
+        "zh_TW": "訂車單匯入被 DMS 拒絕 · 請檢查訂車資料",
+        "ja": "DMS が予約取込を拒否しました · 予約内容をご確認ください",
+    },
+    "ERR_DMS_BOOKING_PATCH": {
+        "zh": "回填订车单资料失败 · 请稍后重试",
+        "en": "Failed to fill in the booking details — please retry",
+        "th": "เติมข้อมูลใบจองไม่สำเร็จ — กรุณาลองใหม่",
+        "zh_TW": "回填訂車單資料失敗 · 請稍後重試",
+        "ja": "予約情報の入力に失敗しました · 再試行してください",
+    },
+    "ERR_DMS_TEMPLATE": {
+        "zh": "下载订车单模板失败 · 请稍后重试",
+        "en": "Failed to download the booking template — please retry",
+        "th": "ดาวน์โหลดเทมเพลตใบจองไม่สำเร็จ — กรุณาลองใหม่",
+        "zh_TW": "下載訂車單範本失敗 · 請稍後重試",
+        "ja": "予約テンプレートのダウンロードに失敗しました · 再試行してください",
+    },
 }
 
 

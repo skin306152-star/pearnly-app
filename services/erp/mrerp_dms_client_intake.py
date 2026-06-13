@@ -94,6 +94,12 @@ class DMSClientIntakeMixin:
         覆盖:载现表单 → 合并面板字段(非身份证字段原样保留)→ 提交。"""
         if mode not in ("create", "overwrite"):
             raise DMSClientError(f"bad save mode: {mode!r}", "ERR_DMS_CUSTOMER_SAVE")
+        # 幂等:一个身份证 = DMS 一个客户(编号/身份证号唯一)。create 前先按身份证号查,
+        # 已存在则转更新它 —— 修「撞客户编号重复」+ 自愈「建了客户但订车失败」后的重推。
+        if mode == "create":
+            existing = self.search_customer((fields.get("people_id") or "").strip())
+            if existing:
+                mode, customer_id = "overwrite", existing
         if mode == "overwrite" and not customer_id:
             raise DMSClientError("overwrite needs customer_id", "ERR_DMS_CUSTOMER_SAVE")
 

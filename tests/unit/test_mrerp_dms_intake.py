@@ -60,6 +60,7 @@ class FakeTransport:
     def __init__(self):
         self.posts = []
         self.search_hits = ["95"]
+        self._created = False  # new.php 后变 True · 模拟"建后能搜到"
 
     def get(self, url, timeout_ms=None):
         return _Resp("")
@@ -70,8 +71,12 @@ class FakeTransport:
             if (data or {}).get("status") == "e":
                 return _Resp(_edit_form(name=self._edit_name))
             return _Resp(_NEW_FORM)
+        if url.endswith("cus/new.php"):
+            self._created = True
+            return _Resp("")
         if url.endswith("cus/component/showdata.php"):
-            return _Resp('<a data-val="95">row</a>' if self.search_hits else "")
+            hit = bool(self.search_hits) or self._created
+            return _Resp('<a data-val="95">row</a>' if hit else "")
         if url.endswith("cus/component/listzipcodes.php"):
             return _Resp('<option value="6477">81120</option>')
         if url.endswith("listdistricts.php"):
@@ -110,6 +115,7 @@ class IntakeContractTests(unittest.TestCase):
         self.assertIsNone(out["customer_id"])
 
     def test_save_create_posts_new_php_and_maps_fields(self):
+        self.t.search_hits = []  # 不存在 → 真新建走 cus/new.php
         fields = {
             "prefix_id": "17",
             "name": "New Cust",
@@ -146,8 +152,25 @@ class IntakeContractTests(unittest.TestCase):
         self.assertEqual(save["stsel"], "e")
         self.assertEqual(save["idsel"], "95")
 
+    def test_save_create_idempotent_to_overwrite_when_exists(self):
+        """create 前先查身份证号 · 已存在则转 overwrite 更新它(防撞客户编号重复)。"""
+        self.t._edit_name = "Dup Person"  # 重读核对
+        fields = {
+            "name": "Dup Person",
+            "people_id": "1234567890123",
+            "province_id": "65",
+            "district_id": "804",
+            "subdistrict_id": "6472",
+            "zipcode_id": "6477",
+        }
+        cid = self.c.save_customer(fields=fields, mode="create")  # 默认 search_hits=['95']
+        self.assertEqual(cid, "95")
+        self.assertTrue([p for p in self.t.posts if p[0].endswith("cus/edit.php")], "应转 edit.php")
+        self.assertFalse([p for p in self.t.posts if p[0].endswith("cus/new.php")], "不应建新")
+
     def test_save_fills_empty_prefix_and_zipcode(self):
         """空 selprefix/selzipcodes 触发 DMS 误导性 'already in use' → 提交前兜底补全。"""
+        self.t.search_hits = []  # 真新建路径
         fields = {
             "name": "X",
             "people_id": "1234567890123",

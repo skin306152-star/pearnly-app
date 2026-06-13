@@ -30,5 +30,6 @@ const TARGETS = [
 ];
 
 for (const t of TARGETS) {
-    writeDist(t.out, await minify(readSource(t.src), OPTS));
+    const html = await minify(readSource(t.src), OPTS);
+    writeDist(t.out, html.trimEnd());
 }

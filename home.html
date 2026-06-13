@@ -11,12 +11,26 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png?v=1">
 <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon-180.png?v=1">
 <link rel="stylesheet" href="/static/dist/home.css?v=11850760">
+<style id="wsg-static-css">
+body.workspace-gate-preboot > :not(#workspace-gate-root):not(script):not(style){visibility:hidden;}
+#workspace-gate-root[data-wsg-boot]{position:fixed;inset:0;z-index:900;display:grid;place-items:center;background:var(--bg,Canvas);color:var(--ink,CanvasText);}
+#workspace-gate-root[data-wsg-boot] .wsg-boot-box{display:flex;flex-direction:column;align-items:center;gap:18px;width:min(84vw,320px);}
+#workspace-gate-root[data-wsg-boot] .wsg-boot-logo{width:44px;height:44px;border-radius:12px;}
+.wsg-boot-spin{width:28px;height:28px;border-radius:50%;border:3px solid var(--line,currentColor);border-top-color:var(--ink,CanvasText);animation:wsgBootSpin .8s linear infinite;}
+@keyframes wsgBootSpin{to{transform:rotate(360deg);}}
+</style>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 
 </head>
-<body>
-    
+<body class="workspace-gate-preboot">
+    <div id="workspace-gate-root" data-wsg-boot="1" role="status" aria-label="Preparing workspace">
+        <div class="wsg-boot-box" aria-hidden="true">
+            <img class="wsg-boot-logo" src="/static/brand/pwa-icon-192.png?v=1" alt="">
+            <div class="wsg-boot-spin"></div>
+        </div>
+    </div>
+
     <div id="chrome-only-banner" class="chrome-only-banner" style="display:none;">
         <span class="chrome-only-banner-icon" aria-hidden="true">
             <svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">

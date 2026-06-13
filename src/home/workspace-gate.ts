@@ -56,6 +56,8 @@ function root(): HTMLElement {
 function close(): void {
     const el = document.getElementById('workspace-gate-root');
     if (el) el.remove();
+    document.body.classList.remove('workspace-gate-preboot');
+    document.getElementById('wsg-static-css')?.remove();
 }
 
 const ownerNow = (): boolean => (typeof window.isOwner === 'function' ? window.isOwner() : S.owner);

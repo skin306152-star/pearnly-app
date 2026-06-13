@@ -16,11 +16,14 @@ import { ONB_CSS } from './onboarding-flow-html.js';
         if (document.getElementById('onboarding-flow-root')) return;
 
         window.__workspaceGateBootPending = true;
+        document.body.classList.add('workspace-gate-preboot');
         injectBootStyle('onb-flow-css', ONB_CSS);
-        injectBootStyle(
-            'wsg-boot-css',
-            '.wsg-boot-spin{width:28px;height:28px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--ink);animation:wsgBootSpin .8s linear infinite}@keyframes wsgBootSpin{to{transform:rotate(360deg)}}'
-        );
+        if (!document.getElementById('wsg-static-css')) {
+            injectBootStyle(
+                'wsg-boot-css',
+                '.wsg-boot-spin{width:28px;height:28px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--ink);animation:wsgBootSpin .8s linear infinite}@keyframes wsgBootSpin{to{transform:rotate(360deg)}}'
+            );
+        }
 
         let el = document.getElementById('workspace-gate-root');
         if (!el) {

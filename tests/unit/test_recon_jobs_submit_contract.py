@@ -43,6 +43,7 @@ class RouteContractTests(unittest.TestCase):
                 ("POST", "/api/vat_excel/submit"),
                 ("GET", "/api/recon/jobs/{job_id}"),
                 ("POST", "/api/recon/bank-v2/confirm-rows/{job_id}"),  # S8
+                ("GET", "/api/recon/template/{doc_type}"),  # 标准模板下载(随 UI 语言)
             },
         )
 
@@ -65,6 +66,7 @@ class RouteContractTests(unittest.TestCase):
             ("POST", "/api/vat_excel/submit"): "recon.create",
             ("GET", "/api/recon/jobs/{job_id}"): "recon.view",
             ("POST", "/api/recon/bank-v2/confirm-rows/{job_id}"): "recon.approve",
+            ("GET", "/api/recon/template/{doc_type}"): "recon.view",
         }
         got = {}
         for r in rjr.router.routes:

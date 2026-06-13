@@ -33,17 +33,24 @@ def parse_excel(file_bytes: bytes) -> Dict[str, Any]:
         wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
         ws = wb.active
 
+        # 语言无关表头检测(泰/英/中/日):用列头关键词映射判定,而非硬编码几个泰/英词。
+        # 真表头 = 命中日期列 + 至少一个(票号/参考号/任一金额列)· 数据行(值)不会命中列头关键词。
         header_idx = None
+        col_map: Dict[str, int] = {}
         for i, row in enumerate(ws.iter_rows(min_row=1, max_row=30, values_only=True), 1):
-            text = " ".join(str(c or "").lower() for c in row)
-            if "เลขที่" in text or "invoice no" in text or "วันที่" in text:
+            cm = _map_columns([str(c or "") for c in row])
+            if "date" in cm and (
+                "invoice_no" in cm
+                or "ref_no" in cm
+                or "amount_pre_vat" in cm
+                or "vat_amount" in cm
+                or "total_amount" in cm
+            ):
                 header_idx = i
+                col_map = cm
                 break
         if header_idx is None:
             return {"ok": False, "error": "找不到表头行", "rows": []}
-
-        headers = tuple(str(c.value or "") for c in ws[header_idx])
-        col_map = _map_columns(headers)
 
         row_no = 0
         for raw in ws.iter_rows(min_row=header_idx + 1, values_only=True):

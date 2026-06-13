@@ -133,28 +133,37 @@ async def build_excel_endpoint(
         f"{rep_result['row_count']} 行 · seller={rep_result.get('seller_tax_id')}"
     )
 
-    # 发票并行 OCR
-    invoice_files = []
+    # 发票分流:xlsx/csv(标准模板/系统导出)行项直读免 OCR;图片/PDF 走 OCR。
+    from services.vat.vat_report_parser import STRUCTURED_INVOICE_EXTS, parse_structured_invoices
+
+    struct_inv = []
+    ocr_files = []
     for f in invoices:
         b = await f.read()
-        invoice_files.append({"filename": f.filename or "invoice.pdf", "bytes": b})
+        fn = f.filename or "invoice.pdf"
+        if fn.lower().endswith(STRUCTURED_INVOICE_EXTS):
+            struct_inv.append((b, fn))
+        else:
+            ocr_files.append({"filename": fn, "bytes": b})
 
-    # v118.32.5 · 性能优化 B · 发票 ≥ 10 张时启用批量 OCR（5 张/批 · 4 路并行）
-    # 减少 5x API 调用，800 张从 ~27 分钟降到 ~3-5 分钟
-    if len(invoice_files) >= 10:
-        logger.info(f"[vex.build] 发票 {len(invoice_files)} 张 · 启用批量OCR(5/批 · 4并行)")
-        parsed_invoices = await loop.run_in_executor(
-            None,
-            lambda: extract_invoices_batched_parallel(
-                invoice_files,
-                api_key=api_key,
-                batch_size=5,
-                max_workers=4,
-            ),
-        )
-    else:
-        parsed_invoices = await loop.run_in_executor(
-            None, extract_invoices_parallel, invoice_files, api_key, 10
+    parsed_invoices = []
+    if ocr_files:
+        # v118.32.5 · 发票 ≥ 10 张启用批量 OCR(5/批 · 4 并行)· 减少 5x API 调用
+        if len(ocr_files) >= 10:
+            logger.info(f"[vex.build] 发票 {len(ocr_files)} 张 · 启用批量OCR(5/批 · 4并行)")
+            parsed_invoices += await loop.run_in_executor(
+                None,
+                lambda: extract_invoices_batched_parallel(
+                    ocr_files, api_key=api_key, batch_size=5, max_workers=4
+                ),
+            )
+        else:
+            parsed_invoices += await loop.run_in_executor(
+                None, extract_invoices_parallel, ocr_files, api_key, 10
+            )
+    if struct_inv:
+        parsed_invoices += await loop.run_in_executor(
+            None, parse_structured_invoices, struct_inv, api_key
         )
 
     ok_invoices = [r for r in parsed_invoices if r.get("ok")]

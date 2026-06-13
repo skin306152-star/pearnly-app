@@ -173,19 +173,30 @@ def run_salesvat(
     if not rep_result.get("ok"):
         raise ValueError(rep_result.get("error", "报告解析失败"))
 
-    # 发票并行 OCR(≥10 张走批量)
-    invoice_files = [{"filename": fn, "bytes": b} for b, fn in invoices]
-    progress_cb({"stage": "parse", "stage_done": 0, "stage_total": len(invoice_files)})
-    if len(invoice_files) >= 10:
-        parsed_invoices = extract_invoices_batched_parallel(
-            invoice_files, api_key=api_key, batch_size=5, max_workers=4
-        )
-    else:
-        parsed_invoices = extract_invoices_parallel(invoice_files, api_key, 10)
+    # 发票分流:xlsx/csv(标准模板/系统导出)走行项直读 —— 零成本零误差免 OCR;图片/PDF 走 OCR。
+    from services.vat.vat_report_parser import STRUCTURED_INVOICE_EXTS, parse_structured_invoices
+
+    struct_inv = [
+        (b, fn) for b, fn in invoices if (fn or "").lower().endswith(STRUCTURED_INVOICE_EXTS)
+    ]
+    ocr_inv = [
+        (b, fn) for b, fn in invoices if not (fn or "").lower().endswith(STRUCTURED_INVOICE_EXTS)
+    ]
+
+    parsed_invoices: List[dict] = []
+    if ocr_inv:
+        ocr_files = [{"filename": fn, "bytes": b} for b, fn in ocr_inv]
+        progress_cb({"stage": "parse", "stage_done": 0, "stage_total": len(ocr_files)})
+        if len(ocr_files) >= 10:
+            parsed_invoices += extract_invoices_batched_parallel(
+                ocr_files, api_key=api_key, batch_size=5, max_workers=4
+            )
+        else:
+            parsed_invoices += extract_invoices_parallel(ocr_files, api_key, 10)
+    if struct_inv:
+        parsed_invoices += parse_structured_invoices(struct_inv, api_key=api_key)
     ok_invoices = [r for r in parsed_invoices if r.get("ok")]
-    progress_cb(
-        {"stage": "parse", "stage_done": len(invoice_files), "stage_total": len(invoice_files)}
-    )
+    progress_cb({"stage": "parse", "stage_done": len(invoices), "stage_total": len(invoices)})
 
     # 异步扣费(原路由 create_task · 此处同步)· 失败发票不扣
     if not is_exempt:
@@ -264,9 +275,9 @@ def run_salesvat(
         "lang": lang,
         # P1-4(2026-05-25):解析层 OCR 计数 · 前端只读这些显示"OCR 失败"· 不再用对账差异
         #   (n_total-n_ok)误推。invoice_ocr_failed_count = 上传发票数 − OCR 成功数。
-        "invoice_file_count": len(invoice_files),
+        "invoice_file_count": len(invoices),
         "invoice_ocr_ok_count": len(ok_invoices),
-        "invoice_ocr_failed_count": max(0, len(invoice_files) - len(ok_invoices)),
+        "invoice_ocr_failed_count": max(0, len(invoices) - len(ok_invoices)),
         "invoice_failed_files": [
             (r.get("filename") or "?") for r in parsed_invoices if not r.get("ok")
         ],

@@ -175,3 +175,35 @@ def parse_vat_report(
         if before != len(result["rows"]):
             logger.info(f"[vat] 最终过滤 {before} → {len(result['rows'])} 行")
     return result
+
+
+# ── 销项发票:结构化(xlsx/csv 模板/导出)直读 · 免 OCR ───────────────────
+# 发票与 VAT 报告行项结构相同,复用 parse_vat_report 行项解析后转成发票记录形状,
+# 让 salesvat 两条路径(异步 worker / vat_excel /build)都能吃标准模板发票。
+STRUCTURED_INVOICE_EXTS = (".xlsx", ".xls", ".xlsm", ".csv", ".tsv")
+
+
+def report_row_to_invoice(row: Dict[str, Any], filename: str) -> Dict[str, Any]:
+    """行项解析结果(report_* 键)→ 发票 OCR 记录 shape(下游 build_excel/对账零改动)。"""
+    return {
+        "ok": True,
+        "filename": filename,
+        "buyer_tax_id": row.get("report_buyer_tax_id", ""),
+        "buyer_name": row.get("report_buyer_name", ""),
+        "buyer_branch": row.get("report_buyer_branch", ""),
+        "invoice_no": row.get("report_invoice_no", ""),
+        "invoice_date": row.get("report_date", ""),
+        "amount_pre_vat": row.get("report_amount_pre_vat"),
+        "vat_amount": row.get("report_vat_amount"),
+        "total_amount": row.get("report_amount"),
+    }
+
+
+def parse_structured_invoices(files, api_key: Optional[str] = None) -> List[Dict[str, Any]]:
+    """xlsx/csv 发票文件列表 [(bytes, filename)] → 发票记录列表(行项直读)。"""
+    out: List[Dict[str, Any]] = []
+    for b, fn in files:
+        rep = parse_vat_report(b, fn, api_key=api_key)
+        for row in rep.get("rows") or []:
+            out.append(report_row_to_invoice(row, fn))
+    return out

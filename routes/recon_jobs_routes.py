@@ -373,6 +373,29 @@ async def get_job(job_id: str, request: Request):
     }
 
 
+# ════ 标准模板下载(列头随 UI 语言)════
+@router.get("/api/recon/template/{doc_type}")
+async def download_recon_template(doc_type: str, request: Request, lang: str = "en"):
+    """下载对账标准模板 xlsx。doc_type ∈ {statement,gl,vat,invoice};lang ∈ {zh,en,th,ja}。
+    列头按 lang 出(用户下到自己语言的模板),且各解析器认全 4 语 → 填完即可导入。"""
+    from fastapi import Response
+    from services.recon.recon_templates import generate_template, template_filename
+
+    user = require_perm(request, "recon.view")
+    if not user:
+        raise HTTPException(401, "未登录")
+    try:
+        blob = generate_template(doc_type, (lang or "en").lower())
+    except ValueError:
+        raise HTTPException(404, f"未知模板类型 {doc_type}")
+    fn = template_filename(doc_type, (lang or "en").lower())
+    return Response(
+        content=blob,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{fn}"'},
+    )
+
+
 # ════ M4 银行对账 · S8 用户核对纠错后重对账 ════
 @router.post("/api/recon/bank-v2/confirm-rows/{job_id}")
 async def bank_v2_confirm_rows(job_id: str, request: Request):

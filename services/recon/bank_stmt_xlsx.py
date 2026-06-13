@@ -24,7 +24,17 @@ from services.recon.bank_stmt_balance import (
 )
 
 # v118.35.0.19 · 银行流水 xlsx 直读 fallback · 表头列名词典(4 语)
-_STMT_DATE_H = {"วันที่", "วัน", "date", "trans date", "transaction date", "日期", "交易日", "ngày"}
+_STMT_DATE_H = {
+    "วันที่",
+    "วัน",
+    "date",
+    "trans date",
+    "transaction date",
+    "日期",
+    "交易日",
+    "日付",
+    "ngày",
+}
 _STMT_DESC_H = {
     "รายการ",
     "รายละเอียด",
@@ -48,9 +58,11 @@ _STMT_WITHDRAW_H = {
     "out",
     "paid out",
     "取款",
+    "提款",
     "出账",
     "支出",
     "借方",
+    "出金",
     "rút",
 }
 _STMT_DEPOSIT_H = {
@@ -66,9 +78,19 @@ _STMT_DEPOSIT_H = {
     "入账",
     "收入",
     "贷方",
+    "入金",
     "gửi",
 }
-_STMT_BALANCE_H = {"ยอดคงเหลือ", "คงเหลือ", "balance", "running balance", "余额", "结余", "số dư"}
+_STMT_BALANCE_H = {
+    "ยอดคงเหลือ",
+    "คงเหลือ",
+    "balance",
+    "running balance",
+    "余额",
+    "结余",
+    "残高",
+    "số dư",
+}
 # v118.35.0.55 · 单一带符号金额列(KTB 等:正=存款 负=取款)· 无独立存/取列时用它
 _STMT_AMOUNT_H = {"amount", "จำนวนเงิน", "จำนวน", "金额", "金額", "số เงิน", "số tiền"}
 

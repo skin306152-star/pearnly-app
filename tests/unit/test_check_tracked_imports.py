@@ -21,8 +21,11 @@ def _exists(present):
 
 class TestExtractImports(unittest.TestCase):
     def test_collects_import_and_from(self):
+        # from pkg import name 既产出 pkg 也产出 pkg.name(覆盖"从已跟踪包 import 未跟踪子模块")
         src = "import os\nimport routes.x\nfrom services.a.b import c\n"
-        self.assertEqual(cti.extract_imports(src), ["os", "routes.x", "services.a.b"])
+        self.assertEqual(
+            cti.extract_imports(src), ["os", "routes.x", "services.a.b", "services.a.b.c"]
+        )
 
     def test_skips_relative_imports(self):
         # 相对 import 不跨模块边界 · 不参与跟踪判定
@@ -70,6 +73,21 @@ class TestFindUntrackedImports(unittest.TestCase):
     def test_third_party_ignored(self):
         src = "import fastapi\nfrom psycopg2 import connect\n"
         self.assertEqual(cti.find_untracked_imports(src, _exists(set()), set()), [])
+
+    def test_flags_from_tracked_pkg_import_untracked_submodule(self):
+        # 盲区修复:from 已跟踪包 import 未跟踪子模块文件(prod ModuleNotFoundError)
+        src = "from services.purchase import drive\n"
+        present = {"services/purchase/__init__.py", "services/purchase/drive.py"}
+        tracked = {"services/purchase/__init__.py"}  # drive.py 未 git add
+        bad = cti.find_untracked_imports(src, _exists(present), tracked)
+        self.assertEqual(bad, [("services.purchase.drive", "services/purchase/drive.py")])
+
+    def test_from_pkg_import_symbol_not_flagged(self):
+        # name 是符号(函数/类)而非子模块文件 → pkg.name 在项目无对应文件 → 零误报
+        src = "from services.purchase.totals import compute_purchase_totals\n"
+        present = {"services/purchase/totals.py"}
+        tracked = {"services/purchase/totals.py"}
+        self.assertEqual(cti.find_untracked_imports(src, _exists(present), tracked), [])
 
 
 if __name__ == "__main__":

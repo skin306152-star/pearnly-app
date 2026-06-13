@@ -28,7 +28,13 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def extract_imports(source: str):
-    """返回文件里所有绝对 import 的 module 路径(忽略相对 import · 它们不跨模块边界)。"""
+    """返回文件里所有绝对 import 的 module 路径(忽略相对 import · 它们不跨模块边界)。
+
+    `from pkg import name` 既产出 `pkg` 也产出 `pkg.name` —— 后者覆盖
+    "从已跟踪包 import 未跟踪子模块"(如 `from services.purchase import x`)
+    这一盲区:name 是符号则 `pkg.name` 在项目里没有对应文件 → resolve 返 None
+    不误伤;name 是未跟踪子模块文件则被解析到并拦下。
+    """
     tree = ast.parse(source)
     out = []
     for node in ast.walk(tree):
@@ -37,6 +43,7 @@ def extract_imports(source: str):
         elif isinstance(node, ast.ImportFrom):
             if (node.level or 0) == 0 and node.module:
                 out.append(node.module)
+                out.extend(f"{node.module}.{a.name}" for a in node.names)
     return out
 
 

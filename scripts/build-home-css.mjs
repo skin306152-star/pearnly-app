@@ -59,6 +59,7 @@ const HOME_CSS = [
     'erp-mrerp-connect.css',
     'home-45-kit.css',
     'home-46-acct-bankmj.css',
+    'home-47-dms-idcard.css',
 ];
 
 const ADMIN_CSS = [

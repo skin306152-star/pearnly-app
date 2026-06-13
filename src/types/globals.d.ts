@@ -174,8 +174,7 @@ interface Window {
     _refreshChromeBanner: () => void;
     // DMS id-card OCR bridges
     _dmsLastFile?: File;
-    _dmsRetryIdCard: () => void;
-    renderDmsIdCardResult?: (data: unknown) => void;
+    openDmsIdCardPanel?: (data: Record<string, unknown>) => void;
     // recon job polling + session + nav-group + settings panels
     _reconProgressText: (
         progress?: { stage?: string; stage_total?: number; stage_done?: number },

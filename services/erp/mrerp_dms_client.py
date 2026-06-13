@@ -38,9 +38,10 @@ from services.erp.mrerp_dms_client_base import (  # noqa: F401  public re-export
 )
 from services.erp.mrerp_dms_client_ops import DMSClientOpsMixin
 from services.erp.mrerp_dms_client_forms import DMSClientFormsMixin
+from services.erp.mrerp_dms_client_intake import DMSClientIntakeMixin
 
 
-class DMSClient(DMSClientOpsMixin, DMSClientFormsMixin):
+class DMSClient(DMSClientOpsMixin, DMSClientFormsMixin, DMSClientIntakeMixin):
     def __init__(self, transport: Any, base_url: str):
         # base_url ends with /dms/
         self.transport = transport

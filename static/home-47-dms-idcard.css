@@ -1,0 +1,318 @@
+/* DMS 身份证 → 可编辑面板(scoped .dic · 手机优先)。
+   桌面=上传卡下方内嵌卡;手机(≤640)=底部全屏 sheet,大触控目标,地址竖排。 */
+.dic-sheet {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(40, 20, 80, 0.1);
+  background: var(--card);
+}
+.dic-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--accent-weak);
+}
+.dic-ttl {
+  font-weight: 700;
+}
+.dic-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--accent-deep);
+  background: var(--card);
+  border-radius: 99px;
+  padding: 2px 8px;
+}
+.dic-x {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--ink3);
+  cursor: pointer;
+}
+.dic-body {
+  padding: 18px;
+  display: grid;
+  gap: 18px;
+}
+
+.dic-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 10px;
+}
+.dic-banner.exist {
+  background: var(--amber-weak);
+  border: 1px solid var(--amber);
+}
+.dic-banner.newc {
+  background: var(--green-weak);
+  border: 1px solid var(--green);
+}
+.dic-bt {
+  font-weight: 700;
+  font-size: 13px;
+}
+.dic-banner.exist .dic-bt {
+  color: var(--amber);
+}
+.dic-banner.newc .dic-bt {
+  color: var(--green);
+}
+.dic-choice {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.dic-choice label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+.dic-choice label.on {
+  border-color: var(--accent);
+  background: var(--accent-weak);
+  color: var(--accent-deep);
+  font-weight: 600;
+}
+.dic-hist {
+  flex-basis: 100%;
+  font-size: 12.5px;
+}
+.dic-hist summary {
+  cursor: pointer;
+  color: var(--accent-deep);
+  font-weight: 600;
+  list-style: none;
+}
+.dic-hist summary::-webkit-details-marker {
+  display: none;
+}
+.dic-hist .g {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 18px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+}
+.dic-hist .g .r {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.dic-hist .g .k {
+  color: var(--ink3);
+}
+.dic-hist .g .v {
+  font-weight: 600;
+  text-align: right;
+  word-break: break-all;
+}
+
+.dic-sec-t {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink3);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.dic-sec-t::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.dic-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px 14px;
+}
+.dic-grid.addr {
+  grid-template-columns: repeat(4, 1fr);
+}
+.dic-f {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.dic-f label {
+  font-size: 12px;
+  color: var(--ink2);
+  font-weight: 600;
+}
+.dic-f label .rq {
+  color: var(--accent);
+}
+.dic-f input,
+.dic-f select {
+  font: inherit;
+  font-size: 13.5px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--card);
+  color: var(--ink);
+  width: 100%;
+}
+.dic-f input:focus,
+.dic-f select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-weak);
+}
+.dic-f input.ocr {
+  background: var(--accent-weak);
+}
+.dic-sw {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--ink2);
+}
+.dic-toggle {
+  width: 38px;
+  height: 22px;
+  border-radius: 99px;
+  border: 0;
+  background: var(--line);
+  position: relative;
+  cursor: pointer;
+  padding: 0;
+  flex: none;
+  transition: 0.15s;
+}
+.dic-toggle.on {
+  background: var(--accent);
+}
+.dic-toggle .knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: 0.15s;
+}
+.dic-toggle.on .knob {
+  left: 18px;
+}
+
+.dic-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+.dic-foot .note {
+  font-size: 12px;
+  color: var(--ink3);
+}
+.dic-foot .sp {
+  flex: 1;
+}
+
+.dic-done {
+  border: 1px solid var(--green);
+  background: var(--green-weak);
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+}
+.dic-done .ic {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--green);
+  color: var(--accent-ink);
+  display: grid;
+  place-items: center;
+  margin: 0 auto 12px;
+}
+.dic-done .t {
+  font-weight: 800;
+  font-size: 18px;
+}
+.dic-done .m {
+  color: var(--ink2);
+  margin: 8px 0 16px;
+  font-size: 13.5px;
+}
+.dic-done .m b {
+  color: var(--ink);
+}
+.dic-err {
+  color: var(--red);
+  font-size: 12.5px;
+}
+
+/* 手机:底部全屏 sheet · 地址/字段竖排 · 触控 ≥44px */
+@media (width <= 640px) {
+  #dms-id-card-result {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    margin: 0 !important;
+    overflow: auto;
+    background: rgba(20, 12, 40, 0.35);
+    padding: 0;
+    display: block;
+  }
+  .dic-sheet {
+    border-radius: 16px 16px 0 0;
+    min-height: 100%;
+    margin-top: 24px;
+  }
+  .dic-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .dic-foot {
+    position: sticky;
+    bottom: 0;
+  }
+  .dic-grid,
+  .dic-grid.addr {
+    grid-template-columns: 1fr;
+  }
+  .dic-choice {
+    margin-left: 0;
+    width: 100%;
+  }
+  .dic-f input,
+  .dic-f select {
+    padding: 12px 12px;
+    font-size: 15px;
+  }
+  .dic-foot .btn {
+    flex: 1;
+  }
+}

@@ -27,6 +27,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from core import db
 from services.erp import erp_push as _erp
+from services.erp import erp_dms_intake as _dms_intake
 from core.auth import get_current_user_from_request
 from routes.erp_routes_access import _check_push_access
 from core.route_helpers import _tid
@@ -251,3 +252,203 @@ async def dms_id_card_booking(
         "error_code": result.get("error_code"),
     }
     return base_resp
+
+
+# ════════════════════════════════════════════════════════════════════════
+# 两步流(2026-06-13):识别 → 可编辑面板 → 确认推送。OCR 只识别 + 查 DMS,
+# 用户在面板核对/编辑(覆盖现有 / 另建新客户)后才推送。取代上面一步式自动推。
+# ════════════════════════════════════════════════════════════════════════
+
+
+async def _ocr_id_card(
+    request: Request, file: UploadFile, endpoint_id: Optional[str], user: Dict[str, Any]
+):
+    """读图 + 选 DMS 端点 + 身份证 OCR + 计费(鉴权由调用方先做)。
+    返回 (ep, ocr, elapsed_ms)。出错抛 HTTPException(空文件/超大/无端点/识别失败)。"""
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, detail="ocr.empty_file")
+    if len(content) > _MAX_ID_CARD_MB * 1024 * 1024:
+        raise HTTPException(400, detail={"code": "ocr.file_too_large", "mb": _MAX_ID_CARD_MB})
+    ep = _resolve_dms_endpoint(user["id"], endpoint_id)
+    if not ep:
+        raise HTTPException(400, detail="dms.no_endpoint")
+
+    own_key = (
+        user.get("gemini_api_key") or user.get("custom_gemini_api_key") or ""
+    ).strip() or None
+    image_bytes = await asyncio.to_thread(_ensure_image_bytes, content, file.content_type or "")
+    t0 = time.time()
+    try:
+        from services.ocr.id_card_extract import extract_thai_id_card
+
+        ocr = await asyncio.to_thread(extract_thai_id_card, image_bytes, own_key)
+    except Exception as e:
+        is_unreadable = type(e).__name__ == "IdCardExtractError"
+        if not is_unreadable:
+            logger.exception("dms id-card OCR failed")
+        raise HTTPException(
+            422 if is_unreadable else 500,
+            detail={
+                "code": "ocr.id_card_unreadable" if is_unreadable else "ocr.failed",
+                "msg": str(e)[:200] if is_unreadable else type(e).__name__,
+            },
+        )
+    elapsed = int((time.time() - t0) * 1000)
+    try:
+        asyncio.create_task(
+            asyncio.to_thread(
+                db.charge_ocr_async,
+                str(user.get("id")),
+                _tid(user),
+                "pdf",
+                1,
+                None,
+                f"DMS id-card OCR · {file.filename}",
+            )
+        )
+    except Exception as _be:
+        logger.warning(f"[dms] id-card billing fire failed (tolerated): {_be}")
+    return ep, ocr, elapsed
+
+
+def _editable_id_card(id_card: Dict[str, Any]) -> Dict[str, Any]:
+    """面板可编辑用的识别字段(完整 · 非遮蔽 · 用户自己的扫描件)。"""
+    addr = id_card.get("address") or {}
+    first = id_card.get("first_name", "")
+    last = id_card.get("last_name", "")
+    return {
+        "prefix_name": id_card.get("prefix_name", ""),
+        "first_name": first,
+        "last_name": last,
+        "name": f"{first} {last}".strip(),
+        "people_id": id_card.get("people_id", ""),
+        "birthday_be": id_card.get("birthday_be", ""),
+        "phone": "",
+        "address": {
+            "house_no": addr.get("house_no", ""),
+            "moo": addr.get("moo", ""),
+            "soi": addr.get("soi", ""),
+            "road": addr.get("road", ""),
+            "province": addr.get("province", ""),
+            "district": addr.get("district", ""),
+            "subdistrict": addr.get("subdistrict", ""),
+            "zipcode": addr.get("zipcode", ""),
+        },
+    }
+
+
+@router.post("/api/dms/id-card/recognize")
+async def dms_id_card_recognize(
+    request: Request,
+    file: UploadFile = File(...),
+    endpoint_id: Optional[str] = Form(None),
+):
+    """步1:身份证 OCR + 查 DMS 是否已有该客户 + 地址级联/称谓/订车主档。
+    不写任何东西 · 喂给前端可编辑面板。"""
+    user = get_current_user_from_request(request)
+    _check_push_access(user)
+    ep, ocr, elapsed = await _ocr_id_card(request, file, endpoint_id, user)
+    resp: Dict[str, Any] = {
+        "ok": True,
+        "filename": file.filename,
+        "document_type": "thai_id_card",
+        "elapsed_ms": elapsed,
+        "needs_review": ocr["needs_review"],
+        "missing_fields": ocr["missing_fields"],
+        "id_card": _editable_id_card(ocr["id_card"]),
+    }
+    if ocr["needs_review"]:
+        resp["dms"] = {"ok": False, "status": "needs_review"}
+        return resp
+    resp["dms"] = await asyncio.to_thread(
+        _dms_intake.recognize_lookup_mrerp_dms,
+        ep,
+        people_id=ocr["id_card"].get("people_id", ""),
+        ocr_address=ocr["id_card"].get("address") or {},
+    )
+    return resp
+
+
+@router.get("/api/dms/geo")
+async def dms_geo(
+    request: Request,
+    level: str = "provinces",
+    parent_id: str = "",
+    endpoint_id: Optional[str] = None,
+):
+    """地址四级联动选项(面板改地址时按需取)。"""
+    if level not in ("provinces", "districts", "subdistricts", "zipcodes"):
+        raise HTTPException(400, detail="dms.bad_geo_level")
+    user = get_current_user_from_request(request)
+    _check_push_access(user)
+    ep = _resolve_dms_endpoint(user["id"], endpoint_id)
+    if not ep:
+        raise HTTPException(400, detail="dms.no_endpoint")
+    return await asyncio.to_thread(_dms_intake.geo_mrerp_dms, ep, level=level, parent_id=parent_id)
+
+
+@router.post("/api/dms/id-card/push")
+async def dms_id_card_push(request: Request):
+    """步2:面板编辑后的字段 → 建/改客户(覆盖/新建)+ 建订车单 → 写 erp_push_logs。"""
+    user = get_current_user_from_request(request)
+    _check_push_access(user)
+    body = await request.json()
+    fields = body.get("fields") or {}
+    mode = (body.get("mode") or "create").strip()
+    customer_id = body.get("customer_id")
+    booking = body.get("booking") or {}
+    if mode not in ("create", "overwrite"):
+        raise HTTPException(400, detail="dms.bad_mode")
+    if mode == "overwrite" and not customer_id:
+        raise HTTPException(400, detail="dms.missing_customer_id")
+    if not (str(fields.get("people_id") or "").strip() and str(fields.get("name") or "").strip()):
+        raise HTTPException(422, detail={"code": "dms.required_fields"})
+    ep = _resolve_dms_endpoint(user["id"], body.get("endpoint_id"))
+    if not ep:
+        raise HTTPException(400, detail="dms.no_endpoint")
+
+    result = await asyncio.to_thread(
+        _dms_intake.push_idcard_fields_mrerp_dms,
+        ep,
+        fields=fields,
+        mode=mode,
+        customer_id=customer_id,
+        booking_overrides=booking,
+    )
+    status = "success" if result.get("success") else "failed"
+    log_id = await asyncio.to_thread(
+        db.insert_push_log,
+        user["id"],
+        str(ep["id"]),
+        None,
+        result.get("booking_no") or "",
+        str(fields.get("name") or "").strip(),
+        None,
+        status,
+        200 if result.get("success") else 0,
+        {
+            "adapter": "mrerp_dms",
+            "trigger": "id_card",
+            "mode": mode,
+            "people_id_tail": (str(fields.get("people_id") or ""))[-4:],
+        },
+        json.dumps(result.get("response_body") or {}, ensure_ascii=False),
+        result.get("error_code"),
+        1,
+        result.get("elapsed_ms", 0),
+        "id_card",
+    )
+    return {
+        "ok": bool(result.get("success")),
+        "dms_push": {
+            "status": status,
+            "log_id": log_id or "",
+            "customer_id": result.get("customer_id", ""),
+            "booking_id": result.get("booking_id", ""),
+            "booking_no": result.get("booking_no", ""),
+            "mode": mode,
+            "error_code": result.get("error_code"),
+            "error_friendly": result.get("error_friendly"),
+        },
+    }

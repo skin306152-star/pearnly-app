@@ -1,7 +1,8 @@
 // ============================================================
-// REFACTOR-WB-modularize · MR.ERP DMS 身份证订车流程 从 ocr-recognize.js 拆出
+// MR.ERP DMS 身份证订车流程(两步流 · 2026-06-13)
 //
-// 与发票热路径隔离:单张身份证 → POST /api/dms/id-card-booking → renderDmsIdCardResult。
+// 单张身份证 → POST /api/dms/id-card/recognize(只 OCR + 查 DMS)→ 打开可编辑面板
+// (dms-id-card-results.ts 的 openDmsIdCardPanel),用户核对/编辑后才推送。
 // btn-start(ocr-recognize.js)thai_id_card 模式经 ESM import 调 _runDmsIdCardFlow。
 // ============================================================
 /* global _selectedFiles, token, renderFileList, updateStartButton */
@@ -25,8 +26,7 @@ async function _runDmsIdCardFlow(forceFile?: File) {
     try {
         const form = new FormData();
         form.append('file', f.file, f.name);
-        form.append('push', 'true');
-        const resp = await fetch('/api/dms/id-card-booking', {
+        const resp = await fetch('/api/dms/id-card/recognize', {
             method: 'POST',
             headers: { Authorization: 'Bearer ' + token },
             body: form,
@@ -56,39 +56,31 @@ async function _runDmsIdCardFlow(forceFile?: File) {
             f.errorKey = 'err.' + code;
             f.canRetry = true;
             if (typeof renderFileList === 'function') renderFileList();
-            if (typeof window.renderDmsIdCardResult === 'function') {
-                window.renderDmsIdCardResult({
-                    ok: false,
-                    dms_push: { status: 'failed', error_code: String(code) },
-                });
-            }
+            const k = 'dms-err-' + String(code).toLowerCase();
+            const msg = t(k);
+            showToast(msg && msg !== k ? msg : t('dic-recognize-fail'), 'error');
             return;
         }
 
-        // OCR 成功(后端 ok 反映 DMS 推送是否成功 · needs_review 也是 ok:true)
-        f.status =
-            data.ok || (data.dms_push && data.dms_push.status === 'needs_review')
-                ? 'success'
-                : 'error';
+        // OCR 字段不全(缺身份证号/姓名)→ 提示重拍 · 不开面板
+        if (data.needs_review) {
+            f.status = 'error';
+            f.canRetry = true;
+            if (typeof renderFileList === 'function') renderFileList();
+            showToast(t('dic-needs-review'), 'warn');
+            return;
+        }
+
+        f.status = 'success';
         if (typeof renderFileList === 'function') renderFileList();
-        if (typeof window.renderDmsIdCardResult === 'function') window.renderDmsIdCardResult(data);
         if (typeof updateStartButton === 'function') updateStartButton();
+        if (typeof window.openDmsIdCardPanel === 'function') window.openDmsIdCardPanel(data);
     } catch (e) {
         f.status = 'error';
         f.canRetry = true;
         if (typeof renderFileList === 'function') renderFileList();
-        if (typeof window.renderDmsIdCardResult === 'function') {
-            window.renderDmsIdCardResult({
-                ok: false,
-                dms_push: { status: 'failed', error_code: 'network' },
-            });
-        }
+        showToast(t('dic-recognize-fail'), 'error');
     }
 }
-
-// 结果块「重试」按钮回调(dms-id-card-results.js 触发)· 复跑上一张身份证。
-window._dmsRetryIdCard = function () {
-    if (window._dmsLastFile) _runDmsIdCardFlow(window._dmsLastFile);
-};
 
 export { _runDmsIdCardFlow };

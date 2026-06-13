@@ -209,6 +209,13 @@ class MrerpDmsAdapter:
     def _client(self) -> DMSClient:
         return DMSClient(self._transport(), self.base_url)
 
+    def session_cookies(self) -> list:
+        """登录态 cookie · 供交互层缓存做只读级联提速(避免每次 dropdown 重登录)。"""
+        try:
+            return self._page.context.cookies()
+        except Exception:
+            return []
+
     # ----- login ------------------------------------------------------
 
     def login(self) -> None:

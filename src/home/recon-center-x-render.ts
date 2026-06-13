@@ -194,9 +194,11 @@ export function showView(view: RxView, bannerHidden: boolean) {
     const proc = $('rcx-processing');
     const res = $('rcx-results');
     const fail = $('rcx-fail');
+    const history = $('rcx-history');
     const wsShow = view === 'workspace';
     if (ws) ws.classList.toggle('rcx-hidden', !wsShow);
     if (pf) pf.style.display = wsShow ? '' : 'none';
+    if (history) history.classList.toggle('rcx-hidden', !wsShow);
     if (banner) banner.classList.toggle('rcx-hidden', !wsShow || bannerHidden);
     if (proc) proc.classList.toggle('rcx-show', view === 'processing');
     if (res) res.classList.toggle('rcx-show', view === 'results');

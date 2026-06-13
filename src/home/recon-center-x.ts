@@ -42,6 +42,8 @@ import {
     exportResult,
     handleDifferences,
 } from './recon-center-x-results.js';
+import { loadHistory, openHistory, deleteHistory } from './recon-center-x-history.js';
+import { bindGridDrop } from './recon-center-x-drag.js';
 
 const $ = (id: string) => document.getElementById(id);
 const MAX_BYTES = 25 * 1024 * 1024; // 25MB 单文件上限
@@ -55,7 +57,8 @@ function view(v: RxView) {
 // ── tab 切换:换配置 + 清残留(文件/结果/余额/筛选)──────────────
 function switchTab(tab: RxState['tab']) {
     if (tab === RX.tab) return;
-    const hasData = !!(RX.left || RX.right || RX.result);
+    // 仅「有未保存的上传文件」才提醒;已完成/载入的结果已存历史可找回 → 不拦。
+    const hasStaged = !!(RX.left || RX.right);
     const apply = () => {
         RX.tab = tab;
         RX.left = null;
@@ -76,8 +79,9 @@ function switchTab(tab: RxState['tab']) {
         renderTemplates();
         updateReady();
         view('workspace');
+        loadHistory();
     };
-    if (hasData && typeof window.showConfirm === 'function') {
+    if (hasStaged && typeof window.showConfirm === 'function') {
         window
             .showConfirm(tt('rcx-switch-msg', '切换后将清空当前已上传的文件和结果，确定继续吗？'), {
                 title: tt('rcx-switch-title', '切换对账类型'),
@@ -128,7 +132,7 @@ function previewFile(side: RxSide) {
 }
 
 function clearAll() {
-    const hasData = !!(RX.left || RX.right || RX.result);
+    const hasStaged = !!(RX.left || RX.right);
     const apply = () => {
         RX.left = null;
         RX.right = null;
@@ -141,7 +145,7 @@ function clearAll() {
         updateReady();
         view('workspace');
     };
-    if (hasData && typeof window.showConfirm === 'function') {
+    if (hasStaged && typeof window.showConfirm === 'function') {
         window
             .showConfirm(tt('rcx-clear-msg', '确定清空本次对账内容吗？未保存的修改将丢失。'), {
                 title: tt('rcx-clear-title', '清空本次对账'),
@@ -268,8 +272,22 @@ async function afterPoll(job: any, token: string, lang: string) {
         return;
     }
     RX.result = res;
+    // 结果已落库(可在历史找回)→ 清掉已消费的上传文件,使其后切换不再误提示「清空」。
+    RX.left = null;
+    RX.right = null;
+    renderCard('left');
+    renderCard('right');
+    updateReady();
+    loadHistory();
     view('results');
     renderResult();
+}
+
+// 结果视图「返回」:回工作区(结果已存历史 · 无数据丢失)
+function backToWorkspace() {
+    RX.result = null;
+    RX.filter = 'all';
+    view('workspace');
 }
 
 function failMsg(code: string | null | undefined): string {
@@ -335,6 +353,12 @@ function bindOnce() {
         else view('workspace');
     });
     on('rcx-fail-back', () => view('workspace'));
+    on('rcx-back-btn', backToWorkspace);
+
+    // 弹窗关闭按钮(X / 知道了 · 静态在 RCX_HTML 中)
+    document
+        .querySelectorAll('.rcx-modal-close')
+        .forEach((b) => b.addEventListener('click', closeModals));
 
     // KPI 点击筛选
     document
@@ -378,6 +402,17 @@ function bindOnce() {
             renderDetail();
             return;
         }
+        // 历史:删除按钮优先,否则点整行 → 载入该记录结果
+        const histDel = tgt.closest('[data-rcx-hist-del]') as HTMLElement | null;
+        if (histDel) {
+            void deleteHistory(histDel.dataset.rcxHistDel as string);
+            return;
+        }
+        const histRow = tgt.closest('[data-rcx-hist]') as HTMLElement | null;
+        if (histRow) {
+            void openHistory(histRow.dataset.rcxHist as string, () => view('results'));
+            return;
+        }
     });
 
     // 委托:卡片 file input change + 拖拽(选择/拖拽走同一 handleFiles)
@@ -389,9 +424,8 @@ function bindOnce() {
             (inp as HTMLInputElement).value = '';
         }
     });
-    document.querySelectorAll('.rcx-upload-card').forEach(bindDrop);
-    // 卡片重渲后(innerHTML 替换)拖拽事件丢失 → 用容器级委托补
-    bindGridDrop();
+    // 拖拽:容器级委托(卡片 innerHTML 重渲后仍生效)· 与「选择文件」走同一 handleFiles
+    bindGridDrop(handleFiles);
 
     // 键盘:Esc 关弹窗/抽屉
     document.addEventListener('keydown', (e) => {
@@ -413,42 +447,12 @@ function bindOnce() {
             renderBalance();
             renderTemplates();
             updateReady();
+            loadHistory();
             if (RX.result) {
                 renderResult();
             }
         });
     }
-}
-
-// 拖拽:容器级委托(卡片 innerHTML 重渲后仍生效)
-function bindGridDrop() {
-    const grid = document.querySelector('.rcx-upload-grid');
-    if (!grid) return;
-    const findCard = (t: EventTarget | null) =>
-        (t as HTMLElement)?.closest?.('.rcx-upload-card') as HTMLElement | null;
-    grid.addEventListener('dragover', (e) => {
-        const card = findCard(e.target);
-        if (!card) return;
-        e.preventDefault();
-        card.classList.add('rcx-drag');
-    });
-    grid.addEventListener('dragleave', (e) => {
-        const card = findCard(e.target);
-        if (card) card.classList.remove('rcx-drag');
-    });
-    grid.addEventListener('drop', (e) => {
-        const card = findCard(e.target);
-        if (!card) return;
-        e.preventDefault();
-        card.classList.remove('rcx-drag');
-        const side = card.dataset.side as RxSide;
-        const dt = (e as DragEvent).dataTransfer;
-        if (dt && dt.files && dt.files.length) handleFiles(side, dt.files);
-    });
-}
-
-function bindDrop(_card: Element) {
-    /* 拖拽统一走 bindGridDrop 容器委托 · 此处保留以兼容初始绑定调用点 */
 }
 
 function init() {
@@ -462,6 +466,7 @@ function init() {
     renderTemplates();
     updateReady();
     view('workspace');
+    loadHistory();
 }
 
 // 路由进对账页时初始化(覆盖旧 loadReconcilePage:旧统计首页 DOM 已被重设计替换)

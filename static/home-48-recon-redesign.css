@@ -278,3 +278,96 @@
   .rcx-segmented { display: flex; width: 100%; }
   .rcx-seg { flex: 1; padding: 9px 4px; font-size: 12px; text-align: center; line-height: 1.2; }
 }
+
+/* 最近对账历史 */
+.rcx-history { background: #fff; border: 1px solid var(--rcx-line); border-radius: 15px; padding: 14px 16px; margin-top: 14px; }
+.rcx-history.rcx-hidden { display: none; }
+.rcx-history-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.rcx-history-head b { font-size: 13px; }
+.rcx-history-head span { font-size: 11px; color: #9991aa; }
+.rcx-history-empty { font-size: 12px; color: #9a93aa; padding: 14px; text-align: center; }
+.rcx-history-list { display: grid; gap: 8px; }
+.rcx-hist-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 11px; background: #faf9fd; border: 1px solid #f0edf5; cursor: pointer; transition: 0.14s; }
+.rcx-hist-row:hover { border-color: #d9d1ef; background: #f6f3fc; }
+.rcx-hist-main { min-width: 0; }
+.rcx-hist-files { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rcx-hist-meta { font-size: 10px; color: #948da4; margin-top: 3px; }
+.rcx-hist-del { border: 0; background: transparent; width: 28px; height: 28px; border-radius: 8px; color: #b0a9c0; display: grid; place-items: center; opacity: 0; transition: 0.14s; }
+.rcx-hist-row:hover .rcx-hist-del { opacity: 1; }
+.rcx-hist-del:hover { background: var(--rcx-red-soft); color: var(--rcx-red); }
+.rcx-hist-del svg { width: 15px; height: 15px; }
+.rcx-hist-arrow { width: 15px; height: 15px; color: #b0a9c0; }
+.rcx-results-head-btns { display: flex; gap: 8px; }
+
+/* ── 暗夜模式（<html>.dark · 令牌驱动 · 镜像全站暗夜表面）── */
+:root.dark .rcx {
+  --rcx-brand: var(--brand);
+  --rcx-brand-strong: var(--brand-hover);
+  --rcx-text: var(--ink);
+  --rcx-muted: var(--ink2);
+  --rcx-line: var(--line);
+  --rcx-panel: var(--card);
+  --rcx-green: var(--green);
+  --rcx-green-soft: var(--green-weak);
+  --rcx-amber: var(--amber);
+  --rcx-amber-soft: var(--amber-weak);
+  --rcx-red: var(--red);
+  --rcx-red-soft: var(--red-weak);
+  --rcx-blue: #8aa0ff;
+  --rcx-blue-soft: #25243a;
+}
+:root.dark .rcx-btn { background: var(--card); color: var(--ink); border-color: var(--line); }
+:root.dark .rcx-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
+:root.dark .rcx-btn.rcx-primary { color: var(--accent-ink); }
+:root.dark .rcx-btn.rcx-text { background: transparent; color: var(--accent); }
+:root.dark .rcx-sub, :root.dark .rcx-hint, :root.dark .rcx-format-line,
+:root.dark .rcx-history-head span, :root.dark .rcx-preflight-head span { color: var(--ink3); }
+:root.dark .rcx-segmented { background: var(--bg); border-color: var(--line); }
+:root.dark .rcx-seg { color: var(--ink2); }
+:root.dark .rcx-seg.active { background: var(--card); color: var(--ink); box-shadow: none; }
+:root.dark .rcx-banner { background: var(--accent-soft); border-color: var(--line); }
+:root.dark .rcx-banner-icon { background: var(--card); }
+:root.dark .rcx-banner-copy p { color: var(--ink2); }
+:root.dark .rcx-benefit { background: var(--card); border-color: var(--line); color: var(--ink2); }
+:root.dark .rcx-preflight, :root.dark .rcx-workspace, :root.dark .rcx-processing,
+:root.dark .rcx-fail, :root.dark .rcx-priority-card, :root.dark .rcx-detail-card,
+:root.dark .rcx-kpi, :root.dark .rcx-template-card, :root.dark .rcx-modal,
+:root.dark .rcx-tplpanel, :root.dark .rcx-history { background: var(--card); border-color: var(--line); }
+:root.dark .rcx-step, :root.dark .rcx-balance, :root.dark .rcx-issue,
+:root.dark .rcx-hist-row { background: var(--bg); border-color: var(--line); }
+:root.dark .rcx-hist-row:hover { background: var(--accent-soft); border-color: var(--accent); }
+:root.dark .rcx-step span, :root.dark .rcx-step-no { color: var(--accent); }
+:root.dark .rcx-step-no, :root.dark .rcx-status-badge, :root.dark .rcx-drop-icon,
+:root.dark .rcx-icon-btn, :root.dark .rcx-source-tag, :root.dark .rcx-spark { background: var(--accent-soft); }
+:root.dark .rcx-status-badge { color: var(--accent); }
+:root.dark .rcx-drop-icon { color: var(--accent); }
+:root.dark .rcx-icon-btn { color: var(--ink2); }
+:root.dark .rcx-source-tag { color: var(--ink2); }
+:root.dark .rcx-upload-card { background: var(--bg); border-color: var(--line); }
+:root.dark .rcx-upload-card.rcx-loaded { background: var(--card); }
+:root.dark .rcx-upload-card:hover, :root.dark .rcx-upload-card.rcx-drag { background: var(--accent-soft); border-color: var(--accent); }
+:root.dark .rcx-recommend { background: var(--accent-soft); border-color: var(--line); }
+:root.dark .rcx-recommend .rcx-spark { color: var(--accent); }
+:root.dark .rcx-recommend span, :root.dark .rcx-file-meta span, :root.dark .rcx-check-row,
+:root.dark .rcx-hist-meta, :root.dark .rcx-hist-arrow, :root.dark .rcx-hist-del,
+:root.dark .rcx-card-title span, :root.dark .rcx-issue span, :root.dark .rcx-kpi p,
+:root.dark .rcx-tpl-hint, :root.dark .rcx-empty-cell, :root.dark .rcx-empty-issues,
+:root.dark .rcx-history-empty, :root.dark .rcx-pager { color: var(--ink3); }
+:root.dark .rcx-method-box, :root.dark .rcx-file-head { border-color: var(--line); }
+:root.dark .rcx-file-type, :root.dark .rcx-template-icon { background: var(--accent-soft); color: var(--accent); }
+:root.dark .rcx-file-remove { background: var(--bg); color: var(--ink2); }
+:root.dark .rcx-balance-value { background: var(--bg); border-color: var(--line); color: var(--ink); }
+:root.dark .rcx-bal-input { color: var(--ink); }
+:root.dark .rcx-balance-summary { border-color: var(--line); }
+:root.dark .rcx-table th { color: var(--ink3); border-color: var(--line); }
+:root.dark .rcx-table td { border-color: var(--line2); color: var(--ink); }
+:root.dark .rcx-kpi-primary { color: #fff; }
+:root.dark .rcx-modal-head, :root.dark .rcx-modal-foot,
+:root.dark .rcx-tplpanel-head, :root.dark .rcx-tplpanel-footer,
+:root.dark .rcx-results-head { border-color: var(--line); }
+:root.dark .rcx-tplpanel-intro, :root.dark .rcx-drawer-intro { background: var(--accent-soft); border-color: var(--line); }
+:root.dark .rcx-tplpanel-intro p, :root.dark .rcx-drawer-intro p { color: var(--ink2); }
+:root.dark .rcx-guide-card { border-color: var(--line); }
+:root.dark .rcx-guide-meta p { color: var(--ink2); }
+:root.dark .rcx-pager button { background: var(--card); border-color: var(--line); color: var(--ink2); }
+:root.dark .rcx-results-head span { color: var(--ink3); }

@@ -116,6 +116,15 @@ export const RCX_HTML = `
     </div>
   </section>
 
+  <section class="rcx-history" id="rcx-history">
+    <div class="rcx-history-head">
+      <b data-i18n="rcx-hist-title">最近对账</b>
+      <span data-i18n="rcx-hist-tip">点击任意记录可重新查看其对账结果</span>
+    </div>
+    <div class="rcx-history-empty" id="rcx-history-empty" style="display:none"></div>
+    <div class="rcx-history-list" id="rcx-history-list"></div>
+  </section>
+
   <section class="rcx-processing" id="rcx-processing" aria-live="polite">
     <div class="rcx-processing-icon">↻</div>
     <h3 data-i18n="rcx-processing-title">正在执行对账</h3>
@@ -129,7 +138,10 @@ export const RCX_HTML = `
         <b data-i18n="rcx-result-done">对账完成</b>
         <span data-i18n="rcx-result-hint">结果指标只在任务完成后展示，点击指标可筛选对应记录</span>
       </div>
-      <button class="rcx-btn rcx-sm" id="rcx-export-btn" type="button" data-i18n="rcx-export">导出结果</button>
+      <div class="rcx-results-head-btns">
+        <button class="rcx-btn rcx-sm" id="rcx-back-btn" type="button" data-i18n="rcx-back">返回</button>
+        <button class="rcx-btn rcx-sm" id="rcx-export-btn" type="button" data-i18n="rcx-export">导出结果</button>
+      </div>
     </div>
     <div class="rcx-kpis" id="rcx-kpis">
       <button class="rcx-kpi rcx-kpi-primary active" data-filter="all" type="button">

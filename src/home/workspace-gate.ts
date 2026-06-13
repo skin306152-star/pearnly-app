@@ -34,13 +34,21 @@ const esc = (s: unknown) => escapeHtml(String(s == null ? '' : s));
 function root(): HTMLElement {
     let el = document.getElementById('workspace-gate-root');
     if (!el) {
-        injectStyle('onb-flow-css', ONB_CSS);
-        injectStyle('wsg-css', WSG_CSS);
         el = document.createElement('div');
         el.id = 'workspace-gate-root';
-        el.className = 'onb-root';
         document.body.appendChild(el);
+    }
+    injectStyle('onb-flow-css', ONB_CSS);
+    injectStyle('wsg-css', WSG_CSS);
+    el.className = 'onb-root';
+    if ((el as HTMLElement).dataset.wsgBoot) {
+        el.removeAttribute('style');
+        delete (el as HTMLElement).dataset.wsgBoot;
+        document.getElementById('wsg-boot-css')?.remove();
+    }
+    if (!(el as HTMLElement).dataset.wsgBound) {
         el.addEventListener('click', onClick);
+        (el as HTMLElement).dataset.wsgBound = '1';
     }
     return el;
 }
@@ -249,3 +257,9 @@ window.enforceWorkspaceGate = function () {
 
 // 关门(暴露给 module-nav:新注册向导接管时顶掉早起的门壳)。
 window.closeWorkspaceGate = close;
+
+if ((window as unknown as { __workspaceGateBootPending?: boolean }).__workspaceGateBootPending) {
+    (window as unknown as { __workspaceGateBootPending?: boolean }).__workspaceGateBootPending =
+        false;
+    window.showWorkspaceGate();
+}

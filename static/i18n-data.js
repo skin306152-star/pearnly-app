@@ -1138,6 +1138,8 @@ window.I18N = {
         'export-tpl-standard-desc': '每张发票 1 行 · 字段一行打平',
         'export-tpl-sales-detail': '泰国销售明细',
         'export-tpl-sales-detail-desc': '每商品 1 行 · 含 Excel 公式 · 跟泰本会计习惯一致',
+        'export-tpl-mrerp': 'MR.ERP 表格',
+        'export-tpl-mrerp-desc': 'MR.ERP 批量导入格式 · 下载后自己上传 MR.ERP',
         'export-tpl-pick': '选导出模板',
         // v118.20.6 · 停止识别 + 错误分类 + 汇总
         'ocr-stop-toast': '已停止 · 等待当前请求结束',
@@ -5252,6 +5254,8 @@ window.I18N = {
         'export-tpl-standard-desc': 'One row per invoice · flat fields',
         'export-tpl-sales-detail': 'Thai sales detail',
         'export-tpl-sales-detail-desc': 'One row per item · Excel formulas · matches Thai accounting habit',
+        'export-tpl-mrerp': 'MR.ERP file',
+        'export-tpl-mrerp-desc': 'MR.ERP batch-import format · download then upload to MR.ERP yourself',
         'export-tpl-pick': 'Pick template',
         // v118.20.6 · stop + error categorization + summary
         'ocr-stop-toast': 'Stopped · waiting for current request to finish',
@@ -9346,6 +9350,8 @@ window.I18N = {
         'export-tpl-standard-desc': '1 แถวต่อ 1 ใบกำกับ · ข้อมูลเรียงในแถวเดียว',
         'export-tpl-sales-detail': 'รายละเอียดขายไทย',
         'export-tpl-sales-detail-desc': '1 แถวต่อสินค้า · มีสูตร Excel · ตามรูปแบบบัญชีไทย',
+        'export-tpl-mrerp': 'ไฟล์ MR.ERP',
+        'export-tpl-mrerp-desc': 'รูปแบบนำเข้า MR.ERP · ดาวน์โหลดแล้วอัปโหลดเข้า MR.ERP เอง',
         'export-tpl-pick': 'เลือกเทมเพลต',
         // v118.20.6 · หยุด + จัดประเภทข้อผิดพลาด + สรุป
         'ocr-stop-toast': 'หยุดแล้ว · กำลังรอคำขอปัจจุบันเสร็จ',
@@ -13431,6 +13437,8 @@ window.I18N = {
         'export-tpl-standard-desc': '1 請求書 1 行 · フィールドを横に並べる',
         'export-tpl-sales-detail': 'タイ販売明細',
         'export-tpl-sales-detail-desc': '商品ごと 1 行 · Excel 数式付き · タイ会計慣行に対応',
+        'export-tpl-mrerp': 'MR.ERP ファイル',
+        'export-tpl-mrerp-desc': 'MR.ERP 取込形式 · ダウンロードして自分で MR.ERP に取込',
         'export-tpl-pick': 'テンプレートを選ぶ',
         // v118.20.6 · 停止 + エラー分類 + サマリー
         'ocr-stop-toast': '停止しました · 現在のリクエスト完了を待機中',

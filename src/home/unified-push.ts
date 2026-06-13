@@ -386,9 +386,6 @@
         delete wrap.dataset.loading;
         // wrap 已在 placeholder 阶段 insertBefore · 这里只填内容 · 不重复插入
 
-        // 下载 MR.ERP 表格(路径2)· 有 mrerp 连接器才显示 · 逻辑在 ocr-push(拥有下载功能)
-        (window as any).injectMrerpDownloadIntoBar?.(saveBar, connectors, wrap);
-
         // 4. 绑事件
         const mainBtn = wrap.querySelector('#btn-push-default');
         if (mainBtn && hasAny) mainBtn.addEventListener('click', _onDefaultClick);

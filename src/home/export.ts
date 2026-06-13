@@ -28,6 +28,7 @@ const _EXPORT_TEMPLATES = [
         badge: 'new',
     },
     { id: 'print', nameKey: 'tpl-print', descKey: 'tpl-print-desc' },
+    { id: 'mrerp', nameKey: 'export-tpl-mrerp', descKey: 'export-tpl-mrerp-desc' },
 ];
 function _getCurrentExportTpl() {
     try {
@@ -86,6 +87,26 @@ async function _runExport(templateId?: any) {
                 lang: currentLang,
                 template: 'sales_detail_th',
             });
+        } else if (templateId === 'mrerp') {
+            // MR.ERP 批量导入格式 · 收 history_ids 发批量端点 · 后端逐张 preflight + 生成同款 xlsx。
+            // 用户下载后自己上传 MR.ERP 导入页(路径2 · 不想存 MR.ERP 密码时用)。
+            const historyIds = [];
+            for (const r of _results) {
+                if (r.history_ids && Array.isArray(r.history_ids))
+                    historyIds.push(...r.history_ids);
+                else if (r.history_id) historyIds.push(r.history_id);
+            }
+            if (historyIds.length === 0) {
+                showToast(t('toast-export-error'), 'error');
+                return;
+            }
+            const tok = localStorage.getItem('mrpilot_token');
+            resp = await fetch('/api/erp/mrerp-xlsx-batch', {
+                method: 'POST',
+                headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ history_ids: historyIds }),
+            });
+            defaultName = `pearnly-mrerp-${Date.now()}.xlsx`;
         } else {
             // input_vat / standard / print → /api/reports/history/batch_export(老接口 · reports_router)
             // 用 _results 里的 history_ids(OCR 完已自动入库)

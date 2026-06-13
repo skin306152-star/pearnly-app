@@ -54,7 +54,7 @@ class ErpRoutesContractTests(unittest.TestCase):
             ("POST", "/api/erp/logs/{log_id}/retry"),
             ("POST", "/api/erp/logs/batch-retry"),
             ("POST", "/api/erp/logs/batch-delete"),
-            ("GET", "/api/erp/mrerp-xlsx/{history_id}"),
+            ("POST", "/api/erp/mrerp-xlsx-batch"),
         }
         self.assertEqual(got, expected)
         self.assertEqual(len(router.routes), 21)

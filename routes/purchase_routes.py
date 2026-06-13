@@ -43,6 +43,9 @@ class DocIn(BaseModel):
     discount_total: float = 0
     rounding: float = 0
     grand_total: Optional[float] = None
+    # 手动改额「以票面为准」:{override_on, subtotal, discount_total, vat_amount, grand_total}
+    # override_on=True 时后端以这四项为权威(校验自洽 ±0.01,rounding 反算保借贷平)。
+    amount_override: Optional[dict] = None
     ocr_raw: Optional[dict] = None
     # 拍票留底 ref(intake 落盘)· 建单时挂成 bill 附件 · 仅新建草稿传(编辑不传)。
     bill_image_ref: Optional[str] = None
@@ -94,6 +97,8 @@ async def api_list_docs(
     status: Optional[str] = Query(None),
     unpaid: bool = Query(False),
     q: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
 ):
     _, tid = auth_member(request, "purchase.doc.view")
     with db.get_cursor_rls(tid, commit=False) as cur:
@@ -108,6 +113,8 @@ async def api_list_docs(
                 status=status,
                 unpaid=unpaid,
                 q=q,
+                date_from=date_from,
+                date_to=date_to,
             )
         )
 
@@ -286,14 +293,19 @@ async def api_document_pdf(
 
 @router.get("/docs/{doc_id}/bill-image")
 async def api_bill_image(
-    doc_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
+    doc_id: str,
+    request: Request,
+    workspace_client_id: Optional[int] = Query(None),
+    idx: int = Query(0),
 ):
-    """票图原图(拍票留底)· 鉴权 + 套账边界 · 落盘文件流式返回。"""
+    """票图原图(拍票留底)· 鉴权 + 套账边界 · 落盘文件流式返回。idx=第几张(多图相册)。"""
     _, tid = auth_member(request, "purchase.doc.view")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
-        ref = docs_svc.get_bill_image_ref(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)
+        ref = docs_svc.get_bill_image_ref(
+            cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id, idx=idx
+        )
     if not ref:
         raise PosError("purchase.unexpected", 404, detail="no_bill_image")
     from services.ocr import pdf_storage

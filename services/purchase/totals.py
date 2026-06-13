@@ -93,6 +93,40 @@ def compute_purchase_totals(lines, *, doc_discount=0, rounding=0) -> dict:
     }
 
 
+def override_totals(lines, *, doc_discount=0, rounding=0, override) -> tuple[dict, bool]:
+    """手动改额「以票面为准」(amount_override.override_on)。
+
+    用 override 的 小计/折扣/VAT/合计 覆盖行算的文档级合计(契约 04 §十三.2 / 05 §1.1:
+    override 仅携这四项,WHT 不随之改、仍按行权威计)。rounding 反算吸收余项,保证
+    含税合计 = (小计 − 折扣) + VAT + rounding 恒等 —— 过账走 doc 级金额,借贷必平。
+
+    返回 (calc, ok):ok=False = 票面数不自洽(|合计 − (净 + VAT)| > 0.01),调用方拒 422。
+    行明细(line_total 等)保持 qty×price 原值不动(票面以文档级为准,行是参考明细)。
+    """
+    calc = compute_purchase_totals(lines, doc_discount=doc_discount, rounding=rounding)
+    subtotal = _q(_d(override.get("subtotal", calc["subtotal"])))
+    disc = _q(_d(override.get("discount_total", calc["discount_total"])))
+    vat = _q(_d(override.get("vat_amount", calc["vat_amount"])))
+    grand = _q(_d(override.get("grand_total", calc["grand_total"])))
+    base = subtotal - disc
+    implied_round = grand - (base + vat)
+    if abs(implied_round) > _CENT:
+        return calc, False
+    wht = calc["wht_amount"]
+    out = dict(calc)
+    out.update(
+        {
+            "subtotal": subtotal,
+            "discount_total": disc,
+            "vat_amount": vat,
+            "rounding": _q(implied_round),
+            "grand_total": grand,
+            "net_payable": _q(grand - wht),
+        }
+    )
+    return out, True
+
+
 def dedupe_key(*, supplier_tax, doc_no, grand_total) -> str | None:
     """防重复票指纹 = hash(供应商税号 | 票号 | 含税合计)。无税号且无票号 → None(无身份不查重)。
 

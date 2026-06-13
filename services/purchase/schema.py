@@ -62,6 +62,7 @@ _TABLES = (
         ocr_raw jsonb,
         dedupe_key text,
         status text NOT NULL DEFAULT 'draft',
+        amount_override boolean NOT NULL DEFAULT FALSE,
         created_by uuid,
         created_at timestamptz NOT NULL DEFAULT now(),
         updated_at timestamptz NOT NULL DEFAULT now()
@@ -165,6 +166,12 @@ _INDEXES = (
     "ON purchase_attachments (tenant_id, purchase_doc_id)",
 )
 
+# 存量表补列(prod 已建表 → CREATE IF NOT EXISTS 不补列 · 须 ALTER 自愈幂等)。
+_ALTERS = (
+    "ALTER TABLE purchase_docs "
+    "ADD COLUMN IF NOT EXISTS amount_override boolean NOT NULL DEFAULT FALSE",
+)
+
 _RLS_TABLES = (
     "suppliers",
     "purchase_docs",
@@ -183,6 +190,8 @@ def ensure_purchase_schema() -> None:
     with db.get_cursor(commit=True) as cur:
         for ddl in _TABLES:
             cur.execute(ddl)
+        for alt in _ALTERS:
+            cur.execute(alt)
         for idx in _INDEXES:
             cur.execute(idx)
         apply_tenant_rls(cur, *_RLS_TABLES)

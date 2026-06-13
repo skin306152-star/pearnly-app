@@ -20,7 +20,7 @@ _DOC_COLS = (
     "currency, fx_rate, subtotal, discount_total, vat_amount, wht_amount, rounding, "
     "grand_total, net_payable, category_id, requester, requester_user_id, "
     "approval_status, payment_status, paid_amount, due_date, source, dedupe_key, "
-    "status, created_by, created_at, updated_at"
+    "status, amount_override, created_by, created_at, updated_at"
 )
 _LINE_COLS = (
     "id, line_no, item_type, product_id, description, qty, unit, unit_price, discount, "
@@ -78,6 +78,27 @@ def _validate_lines(norm_lines: list) -> None:
             raise PosError("purchase.line_invalid", 422, detail=f"line_{ln['line_no']}")
 
 
+def _effective_calc(data) -> tuple[dict, bool]:
+    """文档合计:常态走行算金标;override_on 以票面为准并校验自洽(不自洽 → 422)。"""
+    override = data.get("amount_override")
+    if override and override.get("override_on"):
+        calc, ok = totals_svc.override_totals(
+            data.get("lines"),
+            doc_discount=data.get("discount_total", 0),
+            rounding=data.get("rounding", 0),
+            override=override,
+        )
+        if not ok:
+            raise PosError("purchase.amount_mismatch", 422, detail="override_inconsistent")
+        return calc, True
+    calc = totals_svc.compute_purchase_totals(
+        data.get("lines"),
+        doc_discount=data.get("discount_total", 0),
+        rounding=data.get("rounding", 0),
+    )
+    return calc, False
+
+
 def create_doc(
     cur, *, tenant_id, workspace_client_id, created_by, data, settings, status="draft"
 ) -> dict:
@@ -86,16 +107,13 @@ def create_doc(
     if doc_kind not in _KINDS:
         raise PosError("purchase.line_invalid", 422, detail="bad_doc_kind")
 
-    calc = totals_svc.compute_purchase_totals(
-        data.get("lines"),
-        doc_discount=data.get("discount_total", 0),
-        rounding=data.get("rounding", 0),
-    )
+    calc, overridden = _effective_calc(data)
     _validate_lines(calc["lines"])
 
     expected = data.get("grand_total")
-    if expected is not None and totals_svc._q(totals_svc._d(expected)) != calc["grand_total"]:
-        raise PosError("purchase.amount_mismatch", 422)
+    if not overridden and expected is not None:
+        if totals_svc._q(totals_svc._d(expected)) != calc["grand_total"]:
+            raise PosError("purchase.amount_mismatch", 422)
 
     supplier_id = _resolve_supplier(
         cur,
@@ -125,9 +143,10 @@ def create_doc(
             (tenant_id, workspace_client_id, doc_kind, supplier_id, doc_no, doc_date,
              has_vat, currency, fx_rate, subtotal, discount_total, vat_amount, wht_amount,
              rounding, grand_total, net_payable, category_id, requester, requester_user_id,
-             approval_status, due_date, source, ocr_raw, dedupe_key, status, created_by)
+             approval_status, due_date, source, ocr_raw, dedupe_key, status,
+             amount_override, created_by)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s::jsonb, %s, %s, %s)
+                %s, %s, %s, %s::jsonb, %s, %s, %s, %s)
         RETURNING id
         """,
         (
@@ -156,6 +175,7 @@ def create_doc(
             json.dumps(data.get("ocr_raw")) if data.get("ocr_raw") is not None else None,
             dkey,
             status,
+            overridden,
             created_by,
         ),
     )
@@ -211,10 +231,16 @@ def _insert_lines(cur, *, tenant_id, doc_id, lines) -> None:
 
 
 def get_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> Optional[dict]:
-    """详情:头(带 supplier_name/tax_id)+ 行 + 附件。不存在/跨套账 → None。"""
+    """详情:头 + 行 + 附件 + supplier 完整详情(F2)。不存在/跨套账 → None。
+
+    F2:返回 supplier{name,tax_id,branch_type,branch_no,address,phone}(编辑屏回填
+    分店/地址 + 外流 Sheet 卖家列);保留扁平 supplier_name/tax_id 不破坏既有前端。
+    """
     sql = (
         f"SELECT d.{', d.'.join(_DOC_COLS.split(', '))}, "
-        "s.name AS supplier_name, s.tax_id AS supplier_tax_id "
+        "s.name AS supplier_name, s.tax_id AS supplier_tax_id, "
+        "s.branch_type AS supplier_branch_type, s.branch_no AS supplier_branch_no, "
+        "s.address AS supplier_address, s.phone AS supplier_phone "
         "FROM purchase_docs d "
         "LEFT JOIN suppliers s ON s.id = d.supplier_id AND s.tenant_id = d.tenant_id "
         "WHERE d.tenant_id = %s AND d.workspace_client_id = %s AND d.id = %s"
@@ -223,6 +249,19 @@ def get_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> Optional[dict]:
     doc = cur.fetchone()
     if doc is None:
         return None
+    supplier = (
+        {
+            "id": doc["supplier_id"],
+            "name": doc.get("supplier_name"),
+            "tax_id": doc.get("supplier_tax_id"),
+            "branch_type": doc.get("supplier_branch_type"),
+            "branch_no": doc.get("supplier_branch_no"),
+            "address": doc.get("supplier_address"),
+            "phone": doc.get("supplier_phone"),
+        }
+        if doc.get("supplier_id")
+        else None
+    )
     cur.execute(
         f"SELECT {_LINE_COLS} FROM purchase_lines "
         "WHERE tenant_id = %s AND purchase_doc_id = %s ORDER BY line_no",
@@ -235,33 +274,53 @@ def get_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> Optional[dict]:
         (tenant_id, doc_id),
     )
     attachments = cur.fetchall()
+    # bill 票图:DB 存的是落盘 ref(内部)· 对外只给鉴权 serving 端点(带 idx,喂 1/N 相册),
+    # 不暴露存储路径。idx 按 bill 子集 created_at ASC,与 get_bill_image_ref 同序。
+    bill_idx = 0
     for a in attachments:
-        # bill 票图:DB 存的是落盘 ref(内部)· 对外只给鉴权 serving 端点,不暴露存储路径。
         if a.get("kind") == "bill":
-            a["url"] = f"/api/purchase/docs/{doc_id}/bill-image"
-    return {"doc": doc, "lines": lines, "attachments": attachments}
+            a["url"] = f"/api/purchase/docs/{doc_id}/bill-image?idx={bill_idx}"
+            bill_idx += 1
+    return {"doc": doc, "lines": lines, "attachments": attachments, "supplier": supplier}
 
 
-def get_bill_image_ref(cur, *, tenant_id, workspace_client_id, doc_id) -> Optional[str]:
-    """取单据 bill 票图的落盘 ref(套账硬边界:join purchase_docs 过 ws)· 无则 None。"""
+def get_bill_image_ref(cur, *, tenant_id, workspace_client_id, doc_id, idx=0) -> Optional[str]:
+    """取第 idx 张 bill 票图落盘 ref(套账硬边界 join · created_at ASC · 喂 1/N 相册)。无→None。"""
+    try:
+        offset = max(0, int(idx))
+    except (TypeError, ValueError):
+        offset = 0
     cur.execute(
         "SELECT a.url FROM purchase_attachments a "
         "JOIN purchase_docs d ON d.id = a.purchase_doc_id AND d.tenant_id = a.tenant_id "
         "WHERE a.tenant_id = %s AND d.workspace_client_id = %s "
         "AND a.purchase_doc_id = %s AND a.kind = 'bill' "
-        "ORDER BY a.created_at DESC LIMIT 1",
-        (tenant_id, workspace_client_id, doc_id),
+        "ORDER BY a.created_at ASC OFFSET %s LIMIT 1",
+        (tenant_id, workspace_client_id, doc_id, offset),
     )
     row = cur.fetchone()
     return row["url"] if row else None
 
 
 def list_docs(
-    cur, *, tenant_id, workspace_client_id, kind=None, status=None, unpaid=False, q=None
+    cur,
+    *,
+    tenant_id,
+    workspace_client_id,
+    kind=None,
+    status=None,
+    unpaid=False,
+    q=None,
+    date_from=None,
+    date_to=None,
 ) -> dict:
-    """列单据 + 本月 KPI(进货/费用/可抵进项税/未付)。"""
+    """列单据 + 本月 KPI。date_from/to 按 doc_date 闭区间;每行带 attachment_count
+    (bill 张数·喂「+N」徽章);q 后端 ILIKE 搜供应商名/票号。"""
     sql = (
-        f"SELECT d.{', d.'.join(_DOC_COLS.split(', '))}, s.name AS supplier_name "
+        f"SELECT d.{', d.'.join(_DOC_COLS.split(', '))}, s.name AS supplier_name, "
+        "(SELECT COUNT(*) FROM purchase_attachments pa "
+        " WHERE pa.tenant_id = d.tenant_id AND pa.purchase_doc_id = d.id "
+        " AND pa.kind = 'bill') AS attachment_count "
         "FROM purchase_docs d "
         "LEFT JOIN suppliers s ON s.id = d.supplier_id AND s.tenant_id = d.tenant_id "
         "WHERE d.tenant_id = %s AND d.workspace_client_id = %s"
@@ -275,6 +334,12 @@ def list_docs(
         params.append(status)
     if unpaid:
         sql += " AND d.payment_status <> 'paid' AND d.status = 'posted'"
+    if date_from:
+        sql += " AND d.doc_date >= %s"
+        params.append(date_from)
+    if date_to:
+        sql += " AND d.doc_date <= %s"
+        params.append(date_to)
     if q:
         sql += " AND (s.name ILIKE %s OR d.doc_no ILIKE %s)"
         like = f"%{q.strip()}%"
@@ -330,11 +395,7 @@ def update_draft(
     if row["status"] != "draft":
         raise PosError("purchase.not_draft", 409)
 
-    calc = totals_svc.compute_purchase_totals(
-        data.get("lines"),
-        doc_discount=data.get("discount_total", 0),
-        rounding=data.get("rounding", 0),
-    )
+    calc, overridden = _effective_calc(data)
     _validate_lines(calc["lines"])
     supplier_id = _resolve_supplier(
         cur,
@@ -348,7 +409,8 @@ def update_draft(
             doc_kind = %s, supplier_id = %s, doc_no = %s, doc_date = %s, has_vat = %s,
             currency = %s, fx_rate = %s, subtotal = %s, discount_total = %s, vat_amount = %s,
             wht_amount = %s, rounding = %s, grand_total = %s, net_payable = %s,
-            category_id = %s, requester = %s, due_date = %s, updated_at = now()
+            category_id = %s, requester = %s, due_date = %s, amount_override = %s,
+            updated_at = now()
         WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s
         """,
         (
@@ -369,6 +431,7 @@ def update_draft(
             (data.get("category_id") or None),
             (data.get("requester") or None),
             (data.get("due_date") or None),
+            overridden,
             tenant_id,
             workspace_client_id,
             doc_id,

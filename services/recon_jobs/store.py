@@ -20,6 +20,9 @@ logger = logging.getLogger("recon_jobs")
 
 VALID_JOB_TYPES = ("bank", "glvat", "salesvat")
 
+# Params keys never written to the job row (secrets the worker re-resolves).
+_SECRET_PARAM_KEYS = frozenset({"api_key"})
+
 # Alembic 003 是 schema 单一权威源;下面 DDL 与之逐字一致,只为『工人/web 启动时自动建表』
 # (Zihao 2026-05-24 拍板:不手动跑 alembic · 启动即建)· 全 IF NOT EXISTS 幂等。
 _DDL = [
@@ -113,7 +116,11 @@ def enqueue(
     """
     if job_type not in VALID_JOB_TYPES:
         raise ValueError(f"unknown job_type: {job_type!r}")
-    p = _json.dumps(params or {}, ensure_ascii=False, default=str)
+    # Never persist secrets in the job row. The Gemini key is resolved fresh by
+    # the worker (env GEMINI_API_KEY / GOOGLE_API_KEY); keeping it out of params
+    # stops the plaintext key from sitting at rest in recon_jobs.params.
+    safe_params = {k: v for k, v in (params or {}).items() if k not in _SECRET_PARAM_KEYS}
+    p = _json.dumps(safe_params, ensure_ascii=False, default=str)
     ir = _json.dumps(input_ref or [], ensure_ascii=False, default=str)
     ma = int(max_attempts or 1)
     uid = str(user_id)

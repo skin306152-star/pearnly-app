@@ -41,6 +41,7 @@ from services.recon.bank_recon_utils import (  # noqa: F401  re-export + facade-
     _day_diff,
     _is_gl_skip_row,
     _detect_bank,
+    _bank_from_filename,
     _BANK_SIGNATURES,
 )
 
@@ -152,9 +153,16 @@ def parse_bank_statement_pdf(
     """
     import os as _os
 
+    # Filename is the high-precision bank signal (content detection drowns in
+    # interbank-transfer counterparty names); it overrides detected codes below.
+    fn_bank = _bank_from_filename(filename)
+
     ext = (filename or "").lower().rsplit(".", 1)[-1]
     if ext != "pdf":
-        return _parse_bank_stmt_via_pipeline(file_bytes, filename, tenant_id=tenant_id)
+        result = _parse_bank_stmt_via_pipeline(file_bytes, filename, tenant_id=tenant_id)
+        if fn_bank and result.get("ok"):
+            result["bank_code"] = fn_bank
+        return result
 
     # 2026-05-21: PDF bank statement defaults to new pipeline (document_type
     # =bank_statement + validators). Set OCR_PDF_STMT_LEGACY=true to opt back
@@ -162,6 +170,8 @@ def parse_bank_statement_pdf(
     if _os.environ.get("OCR_PDF_STMT_LEGACY", "").strip().lower() != "true":
         pipeline_result = _parse_bank_stmt_via_pipeline(file_bytes, filename, tenant_id=tenant_id)
         if pipeline_result.get("ok") and pipeline_result.get("rows"):
+            if fn_bank:
+                pipeline_result["bank_code"] = fn_bank
             return pipeline_result
         logger.warning(
             f"[parse_bank_statement] pipeline yielded "
@@ -172,7 +182,7 @@ def parse_bank_statement_pdf(
     # ── Step 1: extract text safely (immune to pdfplumber KeyError crash) ──
     page_texts = _pdf_extract_text_safe(file_bytes)
     all_text = "\n".join(page_texts)
-    bank_code = _detect_bank(all_text) if all_text.strip() else "generic"
+    bank_code = fn_bank or (_detect_bank(all_text) if all_text.strip() else "generic")
     # DEBUG v118.33.11.1
     logger.info(
         f"[stmt_parse][{filename}] pages={len(page_texts)} chars={len(all_text)} bank={bank_code}"
@@ -197,7 +207,7 @@ def parse_bank_statement_pdf(
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
             if not all_text.strip():
                 all_text = "\n".join(p.extract_text() or "" for p in pdf.pages)
-                bank_code = _detect_bank(all_text)
+                bank_code = fn_bank or _detect_bank(all_text)
             for p in pdf.pages:
                 try:
                     tbls = p.extract_tables() or []

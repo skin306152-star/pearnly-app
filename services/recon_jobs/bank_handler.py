@@ -4,10 +4,16 @@
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any, List, Optional, Tuple
 
-from ._handler_common import _read_inputs, _noop, _side_fail_signal, _parallel, ProgressCb
+from ._handler_common import (
+    _read_inputs,
+    _noop,
+    _side_fail_signal,
+    _parallel,
+    _resolve_api_key,
+    ProgressCb,
+)
 
 logger = logging.getLogger("recon_jobs.handlers")
 
@@ -37,7 +43,8 @@ def run_bank_recon(
 
     lang = params.get("lang") or "th"
     gl_account = params.get("gl_account") or ""
-    api_key = (params.get("api_key") or os.environ.get("GEMINI_API_KEY", "")).strip()
+    # api_key is no longer persisted in params (secret-at-rest); resolve from env.
+    api_key = _resolve_api_key(params)
     user_id = str(params.get("user_id"))
     tenant_id = params.get("tenant_id")
     workspace_client_id = params.get("workspace_client_id")  # PO-6d · 套账随 job 行存

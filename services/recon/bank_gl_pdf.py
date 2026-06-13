@@ -9,7 +9,6 @@ and the Gemini-vision fallback. Shared column recognition in bank_gl_common.
 
 import io
 import re
-import json
 import logging
 from datetime import date
 from typing import List, Dict, Any, Optional, Tuple
@@ -24,6 +23,8 @@ from services.recon.bank_recon_utils import (
 from services.recon.bank_table_io import _pdf_extract_text_safe
 from services.recon.bank_gl_common import _map_gl_cols, _extract_acct_code
 from services.recon.bank_gl_pdf_mrerp import _parse_gl_mrerp_table
+from services.recon.bank_gl_stacked import parse_gl_stacked_pdf
+from services.recon.bank_gl_gemini import gemini_parse_gl
 
 logger = logging.getLogger(__name__)
 
@@ -216,6 +217,17 @@ def parse_gl_pdf(
             opening = text_opening
             logger.info(f"[gl_parse][{filename}] step4 text-line: rows={len(rows)}")
 
+    # ── Step 4b: stacked-layout text parser (MR.ERP multi-line GL export) ──
+    # Each transaction spans several lines (date+doc / account / amount / blank
+    # / running balance) so neither the table nor the flat-text parser sees it.
+    if len(rows) < MIN_PLUMBER_ROWS:
+        st_rows, st_accts, st_open = parse_gl_stacked_pdf(file_bytes, account_code)
+        if len(st_rows) > len(rows):
+            rows = st_rows
+            accounts_seen = set(st_accts)
+            opening = st_open
+            logger.info(f"[gl_parse][{filename}] step4b stacked: rows={len(rows)}")
+
     # ── Step 5: Gemini fallback ──
     if len(rows) < MIN_PLUMBER_ROWS and api_key:
         return _gemini_parse_gl(file_bytes, filename, account_code, api_key)
@@ -391,79 +403,6 @@ def _parse_gl_text_lines(text: str, account_code: str = "") -> Tuple[List[GlRow]
     return rows, sorted(accounts_seen - {"?"}), opening
 
 
-def _gemini_parse_gl(
-    file_bytes: bytes, filename: str, account_code: str, api_key: str
-) -> Dict[str, Any]:
-    """Gemini fallback for GL PDF parsing."""
-    try:
-        import google.generativeai as genai
-        import base64
-
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.5-flash")
-
-        b64 = base64.b64encode(file_bytes).decode()
-        acct_hint = (
-            f" Filter to account code starting with '{account_code}'." if account_code else ""
-        )
-        prompt = (
-            "This is a General Ledger (GL) document.{hint} "
-            "Extract ALL transaction rows as JSON with keys:\n"
-            '  "opening_balance": number,\n'
-            '  "accounts": [list of account codes found],\n'
-            '  "rows": [{{date:"YYYY-MM-DD", doc_no:string, account_code:string, '
-            "description:string, debit:number, credit:number}}]\n"
-            "Return ONLY valid JSON."
-        ).format(hint=acct_hint)
-
-        # v118.35.0.62 · temperature=0 · GL 抽取同样要确定性(同源 PDF 每次结果一致)
-        resp = model.generate_content(
-            [{"mime_type": "application/pdf", "data": b64}, prompt],
-            generation_config={
-                "temperature": 0.0,
-                "top_p": 1.0,
-                "candidate_count": 1,
-                "max_output_tokens": 32768,
-            },
-        )
-        text = (resp.text or "").strip()
-        if text.startswith("```"):
-            text = re.sub(r"^```[a-z]*\n?", "", text).rstrip("`").strip()
-        data = json.loads(text)
-
-        raw_rows = data.get("rows") or []
-        rows = []
-        accounts_seen = set()
-        for r in raw_rows:
-            d = _parse_date(str(r.get("date", "")))
-            if d is None:
-                continue
-            acct = str(r.get("account_code", "")).strip()
-            if account_code and acct and not acct.startswith(account_code):
-                continue
-            accounts_seen.add(acct or "?")
-            rows.append(
-                GlRow(
-                    date=d,
-                    doc_no=str(r.get("doc_no", "")),
-                    account_code=acct,
-                    description=str(r.get("description", "")),
-                    debit=float(r.get("debit", 0) or 0),
-                    credit=float(r.get("credit", 0) or 0),
-                )
-            )
-
-        opening = float(data.get("opening_balance", 0) or 0)
-        closing = round(opening + sum(r.credit for r in rows) - sum(r.debit for r in rows), 2)
-        return {
-            "ok": True,
-            "rows": rows,
-            "accounts": sorted(accounts_seen - {"?"}),
-            "opening": opening,
-            "closing": closing,
-            "row_count": len(rows),
-        }
-
-    except Exception as e:
-        logger.warning(f"_gemini_parse_gl failed: {e}")
-        return {"ok": False, "rows": [], "error": str(e)}
+# Gemini fallback lives in bank_gl_gemini (chunked by page to survive long
+# ledgers); kept as a thin alias so existing call sites/tests stay unchanged.
+_gemini_parse_gl = gemini_parse_gl

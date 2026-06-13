@@ -28,6 +28,17 @@ def _noop(_p: dict) -> None:
     pass
 
 
+def _resolve_api_key(params: dict) -> str:
+    """Gemini key for the worker. The submit route no longer persists it in the
+    job row (secret-at-rest), so fall back to the environment — same precedence
+    as the submit route's _user_key."""
+    return (
+        (params.get("api_key") or "")
+        or os.environ.get("GEMINI_API_KEY", "")
+        or os.environ.get("GOOGLE_API_KEY", "")
+    ).strip()
+
+
 def _side_fail_signal(stmt_results, stmt_data, gl_results, gl_data, failed_id):
     """整侧解析全失败 → 给 worker 的非 done 信号(BUG-FIX-RECON-GLCSV · 失败分流)。
 

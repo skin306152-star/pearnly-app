@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from typing import Any, List, Optional, Tuple
 
-from ._handler_common import _read_inputs, _noop, _parallel, ProgressCb
+from ._handler_common import _read_inputs, _noop, _parallel, _resolve_api_key, ProgressCb
 from .bank_handler import run_bank_recon
 
 logger = logging.getLogger("recon_jobs.handlers")
@@ -35,7 +35,7 @@ def run_glvat(
     )
 
     revenue_prefix = params.get("revenue_prefix") or "4"
-    api_key = params.get("api_key")
+    api_key = _resolve_api_key(params)
     user_id = str(params.get("user_id"))
     tenant_id = params.get("tenant_id")
     is_exempt = bool(params.get("is_exempt", True))
@@ -156,7 +156,7 @@ def run_salesvat(
     from routes.vat_excel_routes import _save_excel_file
 
     lang = params.get("lang") or "th"
-    api_key = params.get("api_key")
+    api_key = _resolve_api_key(params)
     user_id = str(params.get("user_id"))
     tenant_id = params.get("tenant_id")
     workspace_client_id = params.get("workspace_client_id")  # PO-6d · 套账随 job 行存

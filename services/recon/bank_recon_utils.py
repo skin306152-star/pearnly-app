@@ -134,7 +134,7 @@ _BANK_SIGNATURES = {
     "ktb": ["กรุงไทย", "krungthai", "ktb"],
     "scb": ["ไทยพาณิชย์", "siam commercial", "scb"],
     "bay": ["กรุงศรี", "bank of ayudhya", "bay", "krungsri"],
-    "tmb": ["ทหารไทย", "tmbthanachart", "ttb"],
+    "ttb": ["ทหารไทย", "ธนชาต", "tmbthanachart", "tmb", "ttb"],
 }
 
 # GL skip rows
@@ -288,3 +288,24 @@ def _detect_bank(text: str) -> str:
         if any(kw.lower() in tl for kw in keywords):
             return bank_code
     return "generic"
+
+
+def _bank_from_filename(filename: str) -> str:
+    """Bank code from the filename, or "" if none.
+
+    Content-based detection is unreliable for statements full of interbank QR
+    transfers: a TTB statement can name "KBANK"/"SCB" hundreds of times (the
+    paying counterparties) while its own brand sits in a logo image, not text.
+    The user-supplied filename ("STM TTB.pdf") is the high-precision signal a
+    human reads, so it wins over content when present. ASCII keywords are
+    matched on word boundaries to avoid incidental substring hits.
+    """
+    name = (filename or "").lower()
+    for bank_code, keywords in _BANK_SIGNATURES.items():
+        for kw in keywords:
+            kw = kw.lower()
+            if not kw.isascii():
+                continue  # Thai brand names don't appear in filenames
+            if re.search(rf"(?<![a-z]){re.escape(kw)}(?![a-z])", name):
+                return bank_code
+    return ""

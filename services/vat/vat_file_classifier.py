@@ -13,6 +13,8 @@ import json
 import logging
 from typing import Dict, Any, Optional
 
+from services.ocr.gemini_models import flash as _flash
+
 logger = logging.getLogger(__name__)
 
 # 文件名关键词
@@ -146,7 +148,7 @@ def classify_with_gemini(
     try:
         genai.configure(api_key=key)
         model = genai.GenerativeModel(
-            "gemini-2.5-flash",
+            _flash(),
             generation_config={
                 "response_mime_type": "application/json",
                 "temperature": 0.0,

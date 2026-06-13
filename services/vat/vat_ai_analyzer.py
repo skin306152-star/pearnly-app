@@ -8,6 +8,8 @@ import json
 import logging
 from typing import Dict, Any, Optional
 
+from services.ocr.gemini_models import flash as _flash
+
 logger = logging.getLogger(__name__)
 
 _PROMPT = """You are a Thai accounting expert helping a senior accountant reconcile output VAT.
@@ -77,7 +79,7 @@ def analyze_diff(row: Dict[str, Any], api_key: Optional[str] = None) -> Dict[str
     try:
         genai.configure(api_key=key)
         model = genai.GenerativeModel(
-            "gemini-2.5-flash",
+            _flash(),
             generation_config={
                 "response_mime_type": "application/json",
                 "temperature": 0.3,

@@ -11,6 +11,7 @@ import logging
 import re
 from typing import Any, Dict
 
+from services.ocr.gemini_models import flash_lite, try_with_fallback
 from services.recon.bank_recon_types import StatementRow
 from services.recon.bank_recon_utils import (
     _parse_date,
@@ -71,8 +72,6 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
         import base64
 
         genai.configure(api_key=api_key)
-        # gemini-2.5-flash-lite: faster + cheaper for OCR tasks (~2x faster than 2.5-flash)
-        model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
         b64 = base64.b64encode(file_bytes).decode()
         # v118.33.13.0 · strict accounting-grade prompt — no guessing, no hallucination
@@ -121,22 +120,29 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
             "unclear characters. Mark confidence='medium' if mostly clear but you had "
             "minor doubts. Mark 'high' only when every digit is unambiguous."
         )
+
         # v118.35.0.62 · temperature=0 · 抽取任务要确定性,不要"创造性"。
         # 默认温度~1.0 导致同一扫描件每次识别结果不同(实测 BAY 行数 212↔274 飘)·
         # 设 0 后大幅稳定且通常更准 · top_p=1 candidate_count=1。
-        resp = model.generate_content(
-            [{"mime_type": "application/pdf", "data": b64}, prompt],
-            generation_config={
-                "temperature": 0.0,
-                "top_p": 1.0,
-                "candidate_count": 1,
-                "max_output_tokens": 32768,
-            },
-        )
-        text = (resp.text or "").strip()
-        if text.startswith("```"):
-            text = re.sub(r"^```[a-z]*\n?", "", text).rstrip("`").strip()
-        data = json.loads(text)
+        def _call(model_name):
+            resp = genai.GenerativeModel(model_name).generate_content(
+                [{"mime_type": "application/pdf", "data": b64}, prompt],
+                generation_config={
+                    "temperature": 0.0,
+                    "top_p": 1.0,
+                    "candidate_count": 1,
+                    "max_output_tokens": 32768,
+                },
+            )
+            text = (resp.text or "").strip()
+            if text.startswith("```"):
+                text = re.sub(r"^```[a-z]*\n?", "", text).rstrip("`").strip()
+            return json.loads(text)
+
+        # 主模型(flash-lite)解析失败/截断/空 → 升级到更强兜底模型重试一次(糊图扫描件救场)。
+        data = try_with_fallback(_call, primary=flash_lite(), label=f"gemini_stmt[{filename}]")
+        if data is None:
+            return {"ok": False, "rows": [], "error": "gemini statement parse failed (all models)"}
 
         raw_rows = data.get("rows") or []
         rows = []

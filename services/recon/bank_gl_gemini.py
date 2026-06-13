@@ -21,12 +21,12 @@ from typing import Any, Dict, List, Optional
 
 from services.recon.bank_recon_types import GlRow
 from services.recon.bank_recon_utils import _parse_date
+from services.ocr.gemini_models import try_with_fallback
 
 logger = logging.getLogger(__name__)
 
 # Few pages per request keeps each JSON reply well under Gemini's output cap.
 _PAGES_PER_CHUNK = 4
-_MODEL = "gemini-2.5-flash"
 
 _PROMPT = (
     "This is a General Ledger (GL) document.{hint} "
@@ -58,8 +58,11 @@ def _page_chunks(file_bytes: bytes, pages_per_chunk: int) -> List[bytes]:
     return chunks
 
 
-def _call_json(model, pdf_bytes: bytes, prompt: str) -> dict:
+def _call_json(model_name: str, pdf_bytes: bytes, prompt: str) -> dict:
     """One Gemini call returning parsed JSON (temperature 0 for determinism)."""
+    import google.generativeai as genai
+
+    model = genai.GenerativeModel(model_name)
     b64 = base64.b64encode(pdf_bytes).decode()
     resp = model.generate_content(
         [{"mime_type": "application/pdf", "data": b64}, prompt],
@@ -101,7 +104,6 @@ def gemini_parse_gl(
         import google.generativeai as genai
 
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(_MODEL)
         hint = f" Filter to account code starting with '{account_code}'." if account_code else ""
         prompt = _PROMPT.format(hint=hint)
 
@@ -115,11 +117,13 @@ def gemini_parse_gl(
         accounts_seen: set = set()
         opening = 0.0
         for idx, chunk in enumerate(chunks):
-            try:
-                data = _call_json(model, chunk, prompt)
-            except Exception as e:
+            # 主模型解析失败/截断 → 自动升级到更强兜底模型重试一次(糊图/长文档救场)。
+            data = try_with_fallback(
+                lambda m, c=chunk: _call_json(m, c, prompt), label=f"gemini_gl[{filename}]#{idx}"
+            )
+            if data is None:
                 # One truncated/failed chunk must not sink the rest.
-                logger.warning(f"[gemini_gl][{filename}] chunk {idx} failed: {e}")
+                logger.warning(f"[gemini_gl][{filename}] chunk {idx} failed (all models)")
                 continue
             if idx == 0:
                 opening = float(data.get("opening_balance", 0) or 0)

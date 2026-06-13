@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 
 from services.recon.field_comparator import parse_date
 from services.recon.vat_recon_core import _to_float, _derive_period
+from services.ocr.gemini_models import flash as _flash
 
 logger = logging.getLogger(__name__)
 
@@ -180,7 +181,7 @@ def extract_invoice_fields(
     try:
         genai.configure(api_key=key)
         model = genai.GenerativeModel(
-            "gemini-2.5-flash",
+            _flash(),
             generation_config={
                 "response_mime_type": "application/json",
                 "temperature": 0.0,

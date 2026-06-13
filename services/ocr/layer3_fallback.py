@@ -53,6 +53,7 @@ from typing import List, Optional, Tuple
 
 from pydantic import ValidationError
 
+from .gemini_models import fallback as _ocr_fallback
 from .schemas import (
     BusinessDocumentType,
     Layer3PageResult,
@@ -66,7 +67,9 @@ logger = logging.getLogger(__name__)
 # ============================================================
 # Constants
 # ============================================================
-DEFAULT_MODEL = os.environ.get("OCR_FLASH_MODEL", "gemini-2.5-flash")
+# Layer3 是 OCR pipeline 的升级兜底档(layer1+2 低置信才到此)· 用更强模型兜底
+# (默认 gemini-3.5-flash)· OCR_FALLBACK_MODEL="" 时退回 OCR_FLASH_MODEL。
+DEFAULT_MODEL = _ocr_fallback() or os.environ.get("OCR_FLASH_MODEL", "gemini-2.5-flash")
 DEFAULT_MAX_RETRIES = 1
 DEFAULT_TIMEOUT_SECONDS = 90  # longer than layer 2 — vision calls are slower
 # DEFAULT_TEMPERATURE / DEFAULT_MAX_OUTPUT_TOKENS → services/ocr/layer3_gemini.py(模块化深化)。

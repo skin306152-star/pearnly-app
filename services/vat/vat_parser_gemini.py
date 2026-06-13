@@ -9,6 +9,7 @@ import logging
 from typing import List, Dict, Any, Optional
 
 from services.recon.field_comparator import normalize_tax_id, normalize_branch
+from services.ocr.gemini_models import flash as _flash
 
 from services.vat.vat_parser_common import _to_float, PARSER_VERSION
 
@@ -292,7 +293,7 @@ def parse_with_gemini(
     try:
         genai.configure(api_key=key)
         model = genai.GenerativeModel(
-            "gemini-2.5-flash",
+            _flash(),
             generation_config={
                 "response_mime_type": "application/json",
                 "temperature": 0.1,

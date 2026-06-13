@@ -141,10 +141,11 @@ import { WSG_CSS, wsgIcon, wsgInitials } from './workspace-gate-html.js';
             ? filtered
                   .map((c) => {
                       const on = active != null && Number(active) === Number(c.id);
+                      const name = c.name || '#' + c.id;
                       return (
-                          `<button class="orgsw-item${on ? ' on' : ''}" data-orgpick="${c.id}">` +
-                          `<span class="oco">${wsgInitials(c.name || '#' + c.id)}</span>` +
-                          `<span class="oinfo"><span class="onm">${_esc(c.name || '#' + c.id)}</span>` +
+                          `<button class="orgsw-item${on ? ' on' : ''}" data-orgpick="${c.id}" title="${_esc(name)}">` +
+                          `<span class="oco">${wsgInitials(name)}</span>` +
+                          `<span class="oinfo"><span class="onm">${_esc(name)}</span>` +
                           `<span class="ocm">${_subline(c)}</span></span>` +
                           (on ? wsgIcon('check', 'ochk') : '') +
                           '</button>'
@@ -177,7 +178,7 @@ import { WSG_CSS, wsgIcon, wsgInitials } from './workspace-gate-html.js';
         const coInit = id != null && c ? wsgInitials(c.name || '#' + id) : wsgIcon('building');
         root.innerHTML =
             '<div class="orgsw">' +
-            `<button class="wsw" id="ws-ctrl-btn" type="button"><span class="wsw-co">${coInit}</span>` +
+            `<button class="wsw" id="ws-ctrl-btn" type="button" title="${_esc(label)}"><span class="wsw-co">${coInit}</span>` +
             `<span class="wsw-nm">${_esc(label)}</span>${wsgIcon('chev')}</button>` +
             (_popOpen ? _orgPopHtml() : '') +
             '</div>';

@@ -129,7 +129,10 @@ const WSCLIENT_HTML = `
                     <input type="text" id="wsclient-input-phone" maxlength="50">
                 </div>
                 <div class="form-row form-row-check">
-                    <label class="wsclient-check"><input type="checkbox" id="wsclient-input-vat" checked> <span data-i18n="wsclient-field-vat">已注册 VAT(可开税务发票)</span></label>
+                    <label class="wsclient-switch-row">
+                        <span class="wsclient-switch-title" data-i18n="wsclient-field-vat">已注册 VAT(可开税务发票)</span>
+                        <input type="checkbox" class="btn-toggle" id="wsclient-input-vat" checked>
+                    </label>
                 </div>
                 <div class="wsclient-modal-note" data-i18n="wsclient-note">账套主体 = 你的公司(发票卖方)。它和右上角切换器、登录弹窗共用,这里改了那边同步。</div>
             </div>

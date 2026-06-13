@@ -133,6 +133,46 @@
     font-size: 12px; color: var(--ink-3); line-height: 1.5;
     background: var(--bg); border-radius: 8px; padding: 8px 12px; margin-top: 4px;
 }
+.form-row-check {
+    margin-top: 2px;
+}
+.form-row-check .wsclient-switch-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    width: 100%;
+    min-height: 46px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg);
+    cursor: pointer;
+}
+.form-row-check .wsclient-switch-row:hover {
+    border-color: var(--ink-4);
+    background: var(--line2);
+}
+.form-row-check .wsclient-switch-title {
+    min-width: 0;
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+.form-row-check .wsclient-switch-row input.btn-toggle {
+    flex: 0 0 40px;
+    width: 40px;
+    min-width: 40px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: 11px;
+}
+.form-row-check .wsclient-switch-row input.btn-toggle:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(124, 87, 246, 0.18);
+}
 
 @media (max-width: 720px) {
     .buyer-grid  { grid-template-columns: 30px 1fr 56px 84px auto; }

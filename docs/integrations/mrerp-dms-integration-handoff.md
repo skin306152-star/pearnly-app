@@ -2,6 +2,12 @@
 
 最后更新:2026-05-31
 
+> ⚠️ 2026-06-14 更新:一步式自动推端点 `POST /api/dms/id-card-booking`(+ 旧 xlsx 导入
+> 建单路径 push_id_card_booking / import_booking_from_xlsx / mrerp_dms_xlsx)已删除,由
+> 2026-06-13 的两步流取代:`POST /api/dms/id-card/recognize`(识别+查 DMS)→ 可编辑面板 →
+> `POST /api/dms/id-card/push`(建/改客户 + 走 DMS 原生表单建订车单·DMS autonum 出号·撞单号
+> 重复自动顺号重试)。本文下方涉及一步式端点/xlsx 导入的段落仅作历史保留。
+
 ## 结论
 
 MR.ERP DMS 不要做成新页面,也不要塞进旧 Webhook 弹窗。它应该是一个新的 ERP 连接器:

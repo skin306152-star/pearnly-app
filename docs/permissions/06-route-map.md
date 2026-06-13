@@ -186,7 +186,9 @@ OCR 识别/上传、history、ERP push/endpoints、对账 v0 杂项、clients/ca
 | PATCH | `/api/team/roles/{role_id}` | require_perm | `team.member.edit_role` | routes/console_roles_routes.py |
 | DELETE | `/api/team/roles/{role_id}` | require_perm | `team.member.edit_role` | routes/console_roles_routes.py |
 | PUT | `/api/team/members/{uid}/role-assign` | require_perm | `team.member.edit_role` | routes/console_roles_routes.py |
-| POST | `/api/dms/id-card-booking` | login_only | — | routes/dms_routes.py |
+| POST | `/api/dms/id-card/recognize` | login_only | — | routes/dms_routes.py |
+| GET | `/api/dms/geo` | login_only | — | routes/dms_routes.py |
+| POST | `/api/dms/id-card/push` | login_only | — | routes/dms_routes.py |
 | DELETE | `/api/email-ingest/account` | login_only | — | routes/email_ingest_routes.py |
 | GET | `/api/email-ingest/account` | login_only | — | routes/email_ingest_routes.py |
 | PUT | `/api/email-ingest/account` | login_only | — | routes/email_ingest_routes.py |

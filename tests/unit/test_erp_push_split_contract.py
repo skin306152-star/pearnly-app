@@ -48,7 +48,6 @@ _E2 = (
 )
 _E3 = (
     "test_mrerp_dms_endpoint",
-    "push_mrerp_dms_id_card",
     "push_mrerp_dms",
     "_build_mrerp_dms_adapter",
     "_dms_friendly",

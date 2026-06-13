@@ -53,7 +53,6 @@ from services.erp.erp_dms_push import (  # noqa: E402,F401
     _id_card_payload_from_dict,
     _mrerp_result_dict,
     push_mrerp_dms,
-    push_mrerp_dms_id_card,
     test_mrerp_dms_endpoint,
 )
 
@@ -361,7 +360,7 @@ def push_to_endpoint(endpoint: Dict[str, Any], history_record: Dict[str, Any]) -
     # DMS guard (2026-05-31) · mrerp_dms is a car-sales ID-card→booking
     # adapter, NEVER an invoice-history target. Reject hard so the invoice
     # auto-push / manual-push paths can't misroute an invoice into DMS.
-    # The real DMS flow is POST /api/dms/id-card-booking. Named guard:
+    # The real DMS flow is POST /api/dms/id-card/recognize + /push. Named guard:
     #     test_push_to_endpoint_rejects_mrerp_dms_invoice
     if adapter == "mrerp_dms":
         return {

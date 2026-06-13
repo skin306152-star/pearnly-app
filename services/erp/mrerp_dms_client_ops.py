@@ -25,6 +25,27 @@ from services.erp.mrerp_dms_client_base import DMSClientError, to_be_date
 _DRFCBC_IDMENU = "25"
 _DRFCBC_MENULV = "2"
 
+# DMS autonum 计数器是按分店分段的,跟全局唯一约束会失步:它回的「下一个号」
+# 可能已被其它分店/历史单占用,提交即 err::"เลขที่ใบจอง" ซ้ำ(单号重复)。
+# 撞重复时往后顺号重试,跳过所有已占用号。
+_BOOKING_DOCNO_MAX_TRIES = 25
+
+
+def _is_duplicate_docno_error(body: str) -> bool:
+    """DMS 单号重复报错(err::"เลขที่ใบจอง" ซ้ำ)· ซ้ำ=泰语「重复」。"""
+    return body.startswith("err::") and "ซ้ำ" in body
+
+
+def _bump_docno(docno: str) -> str:
+    """末尾连续数字段 +1 并保持位宽:BK2606000001 → BK2606000002。无数字尾则补 1。"""
+    i = len(docno)
+    while i > 0 and docno[i - 1].isdigit():
+        i -= 1
+    head, tail = docno[:i], docno[i:]
+    if not tail:
+        return docno + "1"
+    return head + str(int(tail) + 1).zfill(len(tail))
+
 
 class DMSClientOpsMixin:
     def ensure_customer(self, card: ThaiIdCardPayload) -> str:
@@ -222,24 +243,37 @@ class DMSClientOpsMixin:
         self, *, customer_id: str, booking: DMSBookingPayload, card: ThaiIdCardPayload
     ) -> tuple:
         """A1:走 DMS 原生订车单表单建单 · DMS autonum 出 BK 号(符合公司规则·零手填)。
-        取代 Excel 导入 + patch 两步。返回 (booking_id, booking_no)。"""
+        取代 Excel 导入 + patch 两步。返回 (booking_id, booking_no)。
+
+        autonum 计数器与全局唯一约束失步时会回已占用号 → 提交即「单号重复」。
+        撞重复就往后顺号重试(_bump_docno),跳过被占用的号。"""
         form_html = self._post_text("drfcbc/form.php", {"status": "n"})
-        data = self._parse_form_defaults(form_html)
-        data["stsel"] = "n"
-        data["idsel"] = ""
-        data["idmenu"] = _DRFCBC_IDMENU
-        data["menulv"] = _DRFCBC_MENULV
+        base = self._parse_form_defaults(form_html)
+        base["stsel"] = "n"
+        base["idsel"] = ""
+        base["idmenu"] = _DRFCBC_IDMENU
+        base["menulv"] = _DRFCBC_MENULV
+        self._apply_booking_form_fields(base, customer_id=customer_id, booking=booking, card=card)
+
         docno = self._next_booking_docno(booking.branch.id) or booking.booking_no
-        data["txtdocno"] = docno
-        self._apply_booking_form_fields(data, customer_id=customer_id, booking=booking, card=card)
-        resp = self.transport.post(self._url("drfcbc/new.php"), data=data, timeout_ms=120000)
-        body = (resp.text or "").strip()
-        if resp.status_code != 200 or body.startswith("err::"):
-            raise DMSClientError(f"booking create failed: {body[:300]!r}", "ERR_DMS_IMPORT")
-        booking_id = self.search_booking(docno)
-        if not booking_id:
-            raise DMSClientError("booking create returned ok but search failed", "ERR_DMS_IMPORT")
-        return booking_id, docno
+        last_body = ""
+        for _ in range(_BOOKING_DOCNO_MAX_TRIES):
+            data = dict(base)
+            data["txtdocno"] = docno
+            resp = self.transport.post(self._url("drfcbc/new.php"), data=data, timeout_ms=120000)
+            last_body = (resp.text or "").strip()
+            if resp.status_code == 200 and not last_body.startswith("err::"):
+                booking_id = self.search_booking(docno)
+                if not booking_id:
+                    raise DMSClientError(
+                        "booking create returned ok but search failed", "ERR_DMS_IMPORT"
+                    )
+                return booking_id, docno
+            if resp.status_code == 200 and _is_duplicate_docno_error(last_body):
+                docno = _bump_docno(docno)
+                continue
+            break
+        raise DMSClientError(f"booking create failed: {last_body[:300]!r}", "ERR_DMS_IMPORT")
 
     def _next_booking_docno(self, branch_id: str) -> str:
         """取 DMS 订车单下一个自动编号(BK+期间+流水)。autonum 关/异常 → '' 让调用方兜底。"""

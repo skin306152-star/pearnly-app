@@ -26,14 +26,12 @@ import logging
 from fastapi import APIRouter, Request
 
 from core import db
-from services.line_binding import line_client, line_intake, line_postback
+from services.line_binding import line_client, line_expense, line_intake, line_postback
 
 logger = logging.getLogger(__name__)
 
 # 取链接命令引导去网页(集成中心连 Google 后取 Drive/Sheet 链接)。
 _WEB_INTEGRATIONS_URL = "https://pearnly.com/home#integrations"
-# 费用草稿网页编辑深链(doc 14 §6 · 前端复核屏接此 draft id · 泰语先行)。
-_EXPENSE_DRAFT_URL = "https://pearnly.com/home#expense-draft="
 
 router = APIRouter()
 
@@ -230,7 +228,7 @@ async def _handle_line_text(line_user_id: str, reply_token: str, text: str, ev: 
             return
         # 文本路 · doc 10 §2 分层路由(代码优先):记账意图(含金额)→ 解析→落草稿→确认卡。
         # 绝不静默入账(doc 10 §5 死穴),用户点卡上按钮才确认。
-        if _handle_expense_text(bound_user, reply_token, line_user_id, text, lang):
+        if line_expense.handle_expense_text(bound_user, reply_token, line_user_id, text, lang):
             return
         # 兜底(P0):认不出 → 功能提示。query/question/L2 LLM 路由 = P1。
         username = bound_user.get("username") or ""
@@ -258,7 +256,7 @@ async def _handle_line_postback(line_user_id: str, reply_token: str, data: str, 
     lang = bound.get("preferred_lang") or _ev_lang(ev)
     # 文本路费用草稿确认/丢弃(doc 10 §5)→ 与图片路 intake 分流分开处理。
     if action in (line_postback.ACTION_EXP_CONFIRM, line_postback.ACTION_EXP_DISCARD):
-        _handle_expense_postback(bound, reply_token, parsed, lang)
+        line_expense.handle_expense_postback(bound, reply_token, parsed, lang)
         return
     tid = str(bound["tenant_id"]) if bound.get("tenant_id") else None
     item_id = parsed.get("doc_id")
@@ -298,164 +296,6 @@ async def _handle_line_postback(line_user_id: str, reply_token: str, data: str, 
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[line postback] resolve failed: {e}")
         line_client.reply_text(reply_token, line_client.t_line(lang, "unsupported"))
-
-
-def _handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> bool:
-    """文本含金额 → 解析成 ExpenseDraft + 落草稿 + 回确认卡(doc 10/14 · 绝不静默入账)。
-
-    返回 True = 已处理(回了确认卡);False = 不是记账(回落功能提示)。
-    事务所(firm)/ 未开 expense / 无默认套账 / 无金额 / 异常 → False(LINE 主路径 + 事务所底线不破坏)。
-    """
-    try:
-        tid = bound_user.get("tenant_id")
-        if not tid:
-            return False
-        from services.expense import line_quick_entry as lqe
-
-        draft = lqe.parse_expense(text)
-        if not draft.has_amount():
-            return False
-
-        from core.workspace_context import default_workspace_id
-        from services.expense import expense_draft as draft_store
-        from services.line_binding import line_flex
-        from services.purchase import categories as cat_svc
-        from services.purchase import intake as intake_svc
-
-        with db.get_cursor_rls(str(tid), commit=True) as cur:
-            if not intake_svc.line_expense_gate_open(cur, tenant_id=str(tid)):
-                return False
-            ws = default_workspace_id(cur, str(tid))
-            if ws is None:
-                return False
-            # 归类:用本套账真实科目树(图/文共用·不分叉)。取业务主体名。
-            tree = cat_svc.get_tree(cur, tenant_id=str(tid), workspace_client_id=ws)
-            _fill_category(draft, text, tree)
-            business_name = _business_name(cur, tenant_id=str(tid), ws=ws)
-            created_by = str(bound_user["id"]) if bound_user.get("id") else None
-            draft_id = draft_store.insert_draft(
-                cur,
-                tenant_id=str(tid),
-                workspace_client_id=ws,
-                draft=draft,
-                line_user_id=line_user_id,
-                created_by=created_by,
-            )
-        labels = {
-            k: line_client.t_line(lang, f"exp_card_{k}")
-            for k in (
-                "head",
-                "doc_type",
-                "inv_no",
-                "exp_type",
-                "date",
-                "category",
-                "subcategory",
-                "business",
-                "detail",
-                "vendor",
-                "confirm",
-                "discard",
-                "edit",
-            )
-        }
-        card = line_flex.expense_confirm_flex(
-            draft={
-                "amount": str(draft.amount),
-                "currency": draft.currency,
-                "document_type": draft.document_type,
-                "invoice_number": draft.invoice_number,
-                "expense_type": draft.expense_type,
-                "doc_date": draft.doc_date,
-                "category": draft.category,
-                "subcategory": draft.subcategory,
-                "business_name": business_name,
-                "note": draft.note,
-                "vendor_name": draft.vendor_name,
-            },
-            draft_id=draft_id,
-            labels=labels,
-            edit_url=f"{_EXPENSE_DRAFT_URL}{draft_id}",
-        )
-        line_client.reply_messages(reply_token, [card])
-        return True
-    except Exception:
-        logger.exception("[line] expense draft failed; fall back to hint")
-        return False
-
-
-def _fill_category(draft, text, tree) -> None:
-    """据真实科目树把 draft 的 category/subcategory(名+id)填上(图/文共用 intake 匹配器)。"""
-    from services.purchase import intake as intake_svc
-
-    cat_id, sub_id = intake_svc._match_category(text, tree)
-    if not cat_id:
-        return
-    for parent in tree:
-        if parent["id"] == cat_id:
-            draft.category = parent["name"]
-            draft.category_id = str(cat_id)
-            for child in parent.get("children") or []:
-                if child["id"] == sub_id:
-                    draft.subcategory = child["name"]
-                    draft.subcategory_id = str(sub_id)
-            return
-
-
-def _business_name(cur, *, tenant_id, ws) -> str:
-    """套账主体名(确认卡「业务主体」栏)。"""
-    cur.execute(
-        "SELECT name FROM workspace_clients WHERE id = %s AND tenant_id = %s",
-        (ws, tenant_id),
-    )
-    row = cur.fetchone()
-    return (row["name"] or "") if row else ""
-
-
-def _handle_expense_postback(bound_user, reply_token, parsed, lang) -> None:
-    """费用草稿确认/丢弃(doc 10 §5)。确认 → status=confirmed + 回执;丢弃 → discarded(留痕不删)。"""
-    tid = str(bound_user["tenant_id"]) if bound_user.get("tenant_id") else None
-    draft_id = parsed.get("draft_id")
-    if not tid or not draft_id:
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_not_found"))
-        return
-    try:
-        from core.workspace_context import default_workspace_id
-        from services.expense import expense_draft as draft_store
-
-        with db.get_cursor_rls(tid, commit=True) as cur:
-            ws = default_workspace_id(cur, tid)
-            d = (
-                draft_store.get_draft(cur, tenant_id=tid, workspace_client_id=ws, draft_id=draft_id)
-                if ws is not None
-                else None
-            )
-            if not d:
-                line_client.reply_text(reply_token, line_client.t_line(lang, "exp_not_found"))
-                return
-            if parsed.get("action") == line_postback.ACTION_EXP_CONFIRM:
-                draft_store.set_status(
-                    cur,
-                    tenant_id=tid,
-                    workspace_client_id=ws,
-                    draft_id=draft_id,
-                    status="confirmed",
-                )
-                line_client.reply_text(
-                    reply_token, line_client.t_line(lang, "exp_confirmed", amount=d["amount"])
-                )
-            else:
-                draft_store.set_status(
-                    cur,
-                    tenant_id=tid,
-                    workspace_client_id=ws,
-                    draft_id=draft_id,
-                    status="discarded",
-                )
-                line_client.reply_text(reply_token, line_client.t_line(lang, "exp_discarded"))
-    except Exception:
-        logger.exception("[line postback] expense draft confirm failed")
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_not_found"))
 
 
 @router.post("/api/line/webhook")

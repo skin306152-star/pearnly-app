@@ -32,16 +32,30 @@
   - `archive_tree.py` Drive 归档树路径/命名纯逻辑(照逆向 schema·泰文月名·doc_id 三处串联)。
   - 共 35 单测(纯函数 + xlsx round-trip)。
 
-## 待做(需真凭据/真验收 · 我此环境无法真验)
+**阶段二 Google 外流(结构全建·已单测)**
+- 骨架(`42d0f875`):schema(凭据/state/归档台账 3 表+RLS)+ google_store(DAL·token base64)+
+  google_oauth(授权/换码/刷新/userinfo)+ drive.py(DriveClient 真适配 + ensure_folder_path/
+  archive_doc 编排)+ sheets.py(SheetsClient + rows_to_matrix + 双 tab sync)。
+- 闭环(`29b314f3`+`b84e254b`+`42d0f875`+`<chunkC>`):entries(source_id 反查分录)+ rows(一行
+  一明细+借贷列)+ excel(零授权 xlsx)+ archive_tree(归档树路径)+ archive(Excel 同步 +
+  Drive/Sheets 异步 handler·复用 recon_jobs 队列·**幂等只补未成功**)+ 路由(export +
+  集成 OAuth)+ 接线(app/authz/VALID_JOB_TYPES/startup)。
 
-1. **image-first 翻面验收**:prod 真 GEMINI key 跑 `scripts/_ocr_ab_probe.py` A/B 确认更准 →
-   翻 `OCR_IMAGE_FIRST=1`。
-2. **Google 实时集成(阶段二剩余)**:独立 OAuth(Drive 写入 + Sheets scope·非 userinfo 登录流)
-   + 凭据表(按 `(tenant, workspace_client)`·参照 `services/erp/oauth_store`·base64→P1 升 AES)
-   + `drive.py`(拿 archive_tree 路径段逐层 ensure 文件夹 + 上传原图/PDF)+ `sheets.py`(主体×年
-   双 tab·写 rows.COLUMNS·证据列超链)+ 导出路由 `POST /api/purchase/export` + 异步归档任务
-   (参照 recon job·幂等只补未成功)。**需产品 OAuth client + 真浏览器授权 + 写真 Drive 验收。**
-3. **阶段三 LINE**:Flex 卡 + 回调分流 + Rich Menu + LIFF 鉴权端点。**需真 channel 验收。**
+**阶段三 LINE(结构全建·已单测)**
+- `8f363913`:Flex 卡 + postback 回调分流(接 resolve_inbox)+ 取链接命令 + Rich Menu payload +
+  LIFF 鉴权端点(/api/line/liff/auth + /liff/purchase/{id})+ push_messages。LINE_FLEX_INTAKE
+  灰度默认关。
+
+## 待真验收(我此环境无真凭据 · 用户/有访问会话验)
+
+1. **image-first 翻面**:prod 真 GEMINI key 跑 `scripts/_ocr_ab_probe.py` A/B → 翻 `OCR_IMAGE_FIRST=1`。
+2. **Google 实时**:配产品 OAuth client(GOOGLE_EXPORT_CLIENT_ID/SECRET/REDIRECT_URI)→ 真浏览器
+   授权 → 跑导出/归档(写真 Drive/Sheet)。DriveClient/SheetsClient/真 OAuth 跳转此环境验不了。
+3. **LINE 实时**:配 LINE_LOGIN_CHANNEL_ID(LIFF)→ 开 `LINE_FLEX_INTAKE=1` 发图验 Flex 卡 +
+   按钮分流 + 取链接 + LIFF webview + Rich Menu(需传背景图 + setDefault)。需真 channel。
+
+> 全部「真层」(Google/LINE API 调用、OAuth/LIFF 跳转、真授权)都做成注入式适配器 + 编排分离,
+> 编排/DAL/HTTP 拼装/纯函数均已单测(阶段二三共 ~110 例);真 API 验收留用户。
 
 ## merge / push 前必做
 - 真账号 `pearnly_e2e_3` 真库 E2E + 跨套账隔离 E2E(本环境无 `DATABASE_URL` 跑不了)。

@@ -62,6 +62,15 @@ class ParseExpenseTests(unittest.TestCase):
         d = lqe.parse_expense("ค่าน้ำ 50 13/06/69")
         self.assertEqual(d.doc_date, "2026-06-13")
 
+    def test_date_digits_dont_pollute_amount(self):
+        # 日期里的 13/06/69 不能被当成金额(回归:prod E2E 抓到 amount 取成 69)
+        d = lqe.parse_expense("ค่าน้ำ 50 13/06/69")
+        self.assertEqual(d.amount, Decimal("50"))
+
+    def test_tax_id_digits_dont_pollute_amount(self):
+        d = lqe.parse_expense("0105546015062 ค่าน้ำ 50")
+        self.assertEqual(d.amount, Decimal("50"))
+
     def test_default_date_today(self):
         self.assertEqual(lqe.parse_expense("ค่าน้ำ 50").doc_date, date.today().isoformat())
 

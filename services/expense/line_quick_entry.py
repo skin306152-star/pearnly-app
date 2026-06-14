@@ -156,8 +156,10 @@ def _extract_amount(
         return _to_decimal(m.group(1) or m.group(2))
     if qty is not None and unit_price is not None:
         return qty * unit_price
-    # 裸数字兜底:排除被量词/单价/长串占用的,取剩下最大的当总额
-    nums = [_to_decimal(x) for x in re.findall(_NUM, re.sub(r"[A-Za-z]*\d[\d/\-]{8,}", " ", text))]
+    # 裸数字兜底:先抹掉日期(13/06/69)和长编号/税号,再排除量词/单价,取剩下最大的当总额。
+    cleaned = re.sub(r"\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}", " ", text)
+    cleaned = re.sub(r"[A-Za-z]*\d[\d/\-]{6,}", " ", cleaned)
+    nums = [_to_decimal(x) for x in re.findall(_NUM, cleaned)]
     nums = [n for n in nums if n is not None and n not in (qty, unit_price)]
     return max(nums) if nums else None
 

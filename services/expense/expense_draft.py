@@ -125,8 +125,9 @@ def insert_draft(
 def get_draft(cur, *, tenant_id: str, workspace_client_id: int, draft_id: str) -> Optional[dict]:
     """按 id 取草稿(作用域内);不存在 → None。"""
     cur.execute(
-        "SELECT id, status, amount, qty, unit_price, currency, category, subcategory, "
-        "vendor_name, vendor_tax_id, invoice_number, doc_date, document_type, note, raw_text "
+        "SELECT id, status, amount, qty, unit_price, currency, expense_type, category, subcategory, "
+        "vendor_name, vendor_tax_id, invoice_number, doc_date, document_type, "
+        "vat_amount, wht_amount, note, raw_text "
         "FROM expense_draft "
         "WHERE id = %s AND tenant_id = %s AND workspace_client_id = %s",
         (draft_id, tenant_id, workspace_client_id),
@@ -141,6 +142,7 @@ def get_draft(cur, *, tenant_id: str, workspace_client_id: int, draft_id: str) -
         "qty": r["qty"],
         "unit_price": r["unit_price"],
         "currency": r["currency"],
+        "expense_type": r["expense_type"],
         "category": r["category"],
         "subcategory": r["subcategory"],
         "vendor_name": r["vendor_name"],
@@ -148,6 +150,8 @@ def get_draft(cur, *, tenant_id: str, workspace_client_id: int, draft_id: str) -
         "invoice_number": r["invoice_number"],
         "doc_date": r["doc_date"].isoformat() if r["doc_date"] else None,
         "document_type": r["document_type"],
+        "vat_amount": r["vat_amount"],
+        "wht_amount": r["wht_amount"],
         "note": r["note"],
         "raw_text": r["raw_text"],
     }

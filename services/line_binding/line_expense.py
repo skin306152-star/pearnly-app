@@ -124,6 +124,16 @@ def handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> bo
         return False
 
 
+def _receipt_url(draft_id: str, tid: str, ws: int) -> str:
+    """替代收据 PDF 链接(签名 token · 外部浏览器可开)。"""
+    import time
+
+    from services.expense import receipt_token
+
+    tok = receipt_token.sign(draft_id=draft_id, tenant_id=tid, ws=ws, now_ts=int(time.time()))
+    return f"https://pearnly.com/api/expense/receipt/{draft_id}?t={tok}"
+
+
 def _dup_warn(bound_user, draft, ws) -> bool:
     """查重(图/文共用 check_duplicate_invoice)。命中已识别历史 → True(卡前提示)。任何异常 → False。"""
     try:
@@ -221,8 +231,13 @@ def handle_expense_postback(bound_user, reply_token, parsed, lang) -> None:
             draft_store.set_status(
                 cur, tenant_id=tid, workspace_client_id=ws, draft_id=draft_id, status=status
             )
-            key = "exp_confirmed" if status == "confirmed" else "exp_discarded"
-            line_client.reply_text(reply_token, line_client.t_line(lang, key, amount=d["amount"]))
+        if status == "confirmed":
+            # 确认后给替代收据 PDF 链接(签名 token · 外部浏览器可开 · doc 14 §7)。
+            body = line_client.t_line(lang, "exp_confirmed", amount=d["amount"])
+            body += "\n📄 " + _receipt_url(draft_id, tid, ws)
+            line_client.reply_text(reply_token, body)
+        else:
+            line_client.reply_text(reply_token, line_client.t_line(lang, "exp_discarded"))
     except Exception:
         logger.exception("[line postback] expense draft confirm failed")
         line_client.reply_text(reply_token, line_client.t_line(lang, "exp_not_found"))

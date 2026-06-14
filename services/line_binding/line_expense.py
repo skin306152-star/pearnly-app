@@ -66,6 +66,15 @@ def handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> bo
             # 确是记账但缺金额 → 反问一句(已存会话态),不静默丢(doc 10 §1.6)。
             line_client.reply_text(reply_token, line_client.t_line(lang, "exp_need_amount"))
             return True
+        if action == "query":  # 查账(本月花多少)→ DB 真查(doc 10 §1.4)
+            _reply_query(reply_token, lang, str(tid), ws)
+            return True
+        if action == "question":  # 问答 → 知识中心带出处,查不到诚实兜底(doc 10 §1.3)
+            _reply_question(reply_token, lang, str(tid), text)
+            return True
+        if action == "other":  # 越界/闲聊 → 礼貌挡回 + Quick Reply 引导(doc 10 §1.5)
+            _reply_scope_block(reply_token, lang)
+            return True
         if draft is None:
             return False
 
@@ -136,8 +145,11 @@ def _resolve_draft(bound_user, line_user_id, text, tid, ws):
     if not api_key or not _ocr_balance_ok(bound_user):
         return None, False, None
     data = line_l2.extract(text, api_key)
-    if not data or line_l2.intent_of(data) != "expense":
-        return None, False, None  # query/question/other → 批4
+    if not data:
+        return None, False, None
+    intent = line_l2.intent_of(data)
+    if intent != "expense":
+        return None, False, intent  # query / question / other → 下方分发(批4)
     draft = line_l2.to_draft(data, text)
     if draft.has_amount():
         return draft, True, ""
@@ -188,6 +200,59 @@ def handle_expense_postback(bound_user, reply_token, parsed, lang) -> None:
     except Exception:
         logger.exception("[line postback] expense draft confirm failed")
         line_client.reply_text(reply_token, line_client.t_line(lang, "exp_not_found"))
+
+
+def _reply_query(reply_token, lang, tid, ws) -> None:
+    """查账(本月花多少)· DB 真查 → 模板填数。"""
+    from services.expense import line_qa
+
+    try:
+        with db.get_cursor_rls(tid) as cur:
+            total = line_qa.month_spending(cur, tenant_id=tid, workspace_client_id=ws)
+        line_client.reply_text(
+            reply_token, line_client.t_line(lang, "exp_query_month", amount=total)
+        )
+    except Exception:
+        logger.exception("[line] query failed")
+        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_q_not_found"))
+
+
+def _reply_question(reply_token, lang, tid, question) -> None:
+    """问答 · 知识中心带出处;查不到诚实兜底 + 指路(绝不编造)。"""
+    from services.expense import line_qa
+
+    try:
+        with db.get_cursor_rls(tid) as cur:
+            res = line_qa.knowledge_answer(cur, tenant_id=tid, question=question)
+    except Exception:
+        logger.exception("[line] question failed")
+        res = None
+    if not res:
+        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_q_not_found"))
+        return
+    src = ", ".join(res["citations"]) if res.get("citations") else ""
+    body = res["answer"]
+    if src:
+        body += "\n\n" + line_client.t_line(lang, "exp_q_source", src=src)
+    line_client.reply_text(reply_token, body)
+
+
+def _reply_scope_block(reply_token, lang) -> None:
+    """越界/闲聊 → 礼貌挡回 + Quick Reply 引导(不硬答)。"""
+    items = [
+        _qr_item(line_client.t_line(lang, "qr_record"), "ค่าน้ำ 50"),
+        _qr_item(line_client.t_line(lang, "qr_query"), line_client.t_line(lang, "qr_query_text")),
+    ]
+    msg = {
+        "type": "text",
+        "text": line_client.t_line(lang, "exp_scope_block"),
+        "quickReply": {"items": items},
+    }
+    line_client.reply_messages(reply_token, [msg])
+
+
+def _qr_item(label: str, text: str) -> dict:
+    return {"type": "action", "action": {"type": "message", "label": label[:20], "text": text}}
 
 
 def _fill_category(cur, draft, text, tree, tid, ws) -> None:

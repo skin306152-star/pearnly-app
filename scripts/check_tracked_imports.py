@@ -60,14 +60,72 @@ def resolve_local_module(modpath: str, exists):
     return None
 
 
-def find_untracked_imports(source: str, exists, tracked: set):
-    """返回 [(modpath, 解析到的文件)] · 该文件工作树存在但不在 HEAD 跟踪集。"""
+def _resolve_stem(stem: str, exists):
+    """slash 形式 stem('services/ocr/x')→ 项目内文件路径,非本地返 None。"""
+    for cand in (f"{stem}.py", f"{stem}/__init__.py"):
+        if exists(cand):
+            return cand
+    return None
+
+
+def _relative_base(rel_path: str, level: int):
+    """importing 文件按 level 上溯得到的 package 目录组件列表;越过仓根返 None。
+
+    `from . import x`(level 1)= 当前包;`from .. import x`(level 2)= 上一层。
+    rel_path 是 importing 文件相对 ROOT 的 posix 路径。
+    """
+    pkg = rel_path.replace("\\", "/").split("/")[:-1]  # 去文件名 → package 目录
+    up = level - 1
+    if up > len(pkg):
+        return None
+    return pkg[: len(pkg) - up] if up else pkg
+
+
+def _relative_targets(source: str, rel_path: str):
+    """相对 import 指向的项目内文件 stem(覆盖 services/ 层盛行的 `from .x import`)。
+
+    返回 [(stem, 显示串)]。`from .mod import name` → mod 文件 + mod/name 文件两候选
+    (name 是子模块文件才命中,符号则无对应文件 → 后续 resolve 返 None 零误报)。
+    """
+    out = []
+    for node in ast.walk(ast.parse(source)):
+        if not (isinstance(node, ast.ImportFrom) and (node.level or 0) >= 1):
+            continue
+        base = _relative_base(rel_path, node.level)
+        if base is None:
+            continue
+        dots = "." * node.level
+        prefix = list(base) + (node.module.split(".") if node.module else [])
+        if node.module:
+            out.append(("/".join(prefix), f"from {dots}{node.module}"))
+        for a in node.names:
+            out.append(
+                ("/".join(prefix + [a.name]), f"from {dots}{node.module or ''} import {a.name}")
+            )
+    return [(s, d) for s, d in out if s]
+
+
+def find_untracked_imports(source: str, exists, tracked: set, rel_path: str = None):
+    """返回 [(modpath, 解析到的文件)] · 该文件工作树存在但不在 HEAD 跟踪集。
+
+    绝对 import 总查;给了 rel_path 还查相对 import(`from . import x`/`from .x import y`)——
+    services/ 层几乎全用相对 import,不解析它们 = 这层基本不设防。
+    """
     bad = []
     for modpath in extract_imports(source):
         local = resolve_local_module(modpath, exists)
         if local is not None and local not in tracked:
             bad.append((modpath, local))
-    return bad
+    if rel_path:
+        for stem, display in _relative_targets(source, rel_path):
+            local = _resolve_stem(stem, exists)
+            if local is not None and local not in tracked:
+                bad.append((display, local))
+    deduped = []
+    for b in bad:
+        if b not in deduped:
+            deduped.append(b)
+    return deduped
 
 
 def _tracked_files():
@@ -112,7 +170,7 @@ def main():
             parse_errs[rel] = str(e)
             continue
         try:
-            bad = find_untracked_imports(source, exists, tracked)
+            bad = find_untracked_imports(source, exists, tracked, rel_path=rel)
         except SyntaxError as e:
             parse_errs[rel] = f"SyntaxError: {e}"
             continue

@@ -321,20 +321,6 @@ const MAPPINGS = [
         nosvgemoji: '#page-dashboard .qa .qb svg',
     },
     {
-        name: '上传识别 OCR(A组屏)',
-        design: 'ocr.html',
-        route: 'ocr',
-        ready: '#page-ocr .panel',
-        layout: { sel: '#page-ocr .wrap', maxWidth: 'none', centered: true },
-        tokens: [
-            // #btn-start 开始时 disabled → home-38 .btn:disabled!important 覆盖背景色 → 测 panel 代替
-            { design: '.panel', prod: '#page-ocr .panel', props: ['borderRadius', 'boxShadow'] },
-            { design: '.h1', prod: '#page-ocr .pagehead .h1', props: ['fontSize', 'fontWeight'] },
-        ],
-        // 无 bluemust:所有操作按钮初始 disabled,颜色被 home-38 disabled!important 覆盖(正确行为)
-        nosvgemoji: '#page-ocr .drop-zone svg',
-    },
-    {
         name: '识别记录 history(A组屏)',
         design: 'history.html',
         route: 'history',

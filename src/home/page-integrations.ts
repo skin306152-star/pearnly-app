@@ -108,6 +108,21 @@
 
             <div class="integrations-section-title" data-firm-only="1" data-i18n="integrations-section-archive">归档交付</div>
 
+            <!-- Google 授权连接卡(外流归档 OAuth · purchase-google.ts 填状态/连接/断开)·
+                 一次授权覆盖 Drive + Sheets · 凭据按套账隔离 · 未连点「连接 Google」走整页导航。 -->
+            <div class="integration-row" id="int-google-card" data-firm-only="1">
+                <div class="int-icon ic-g">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M7 18a4 4 0 01-.5-7.97 5 5 0 019.6-1.5A4 4 0 0117 18z"/>
+                    </svg>
+                </div>
+                <div class="int-info">
+                    <div class="int-name"><span data-i18n="int-google-name">Google Drive / Sheets</span><span class="int-gst off" id="int-google-st" data-i18n="int-google-st-off">未连接</span></div>
+                    <div class="int-desc" id="int-google-desc" data-i18n="int-google-desc">把进项原图归档进 Drive(证据 + 交会计 PDF)· 并同步成可追溯的 Sheet 报表</div>
+                </div>
+                <div class="int-actions" id="int-google-act"></div>
+            </div>
+
             <div class="integration-row" data-firm-only="1" data-int-target="automation" data-int-anchor="google-drive">
                 <div class="int-icon ic-g">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">

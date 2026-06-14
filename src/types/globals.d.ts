@@ -310,6 +310,8 @@ interface Window {
     openPurchaseMatch?: (line: unknown, onDone?: (res: unknown) => void) => void;
     openPurchaseSupplierPicker?: (onPick: (s: unknown) => void) => void;
     openPurchaseExport?: () => void;
+    loadIntegrationGoogle?: () => void;
+    highlightGoogleCard?: () => void;
     isOwner?: (u?: AppUser | null) => boolean;
     reloadInventory?: () => void;
     openInventoryIn?: () => void;

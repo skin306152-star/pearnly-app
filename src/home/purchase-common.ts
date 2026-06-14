@@ -140,7 +140,7 @@ interface Envelope {
     error?: { code?: string };
 }
 
-function authHeaders(): Record<string, string> {
+export function authHeaders(): Record<string, string> {
     const h: Record<string, string> = {
         Authorization: 'Bearer ' + (typeof token === 'string' ? token : ''),
     };

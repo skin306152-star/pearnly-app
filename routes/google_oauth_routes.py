@@ -29,6 +29,19 @@ def _redirect_uri(request: Request) -> str:
     )
 
 
+def _inject_bearer_from_query(request: Request, token: str) -> None:
+    """整页浏览器导航(connect 走 location.href 触发 302)带不上 Authorization 头。
+
+    允许 ?t= 显式传同一个 Bearer,注入 scope 让既有鉴权链照常守门(权限码不放宽,
+    仍走 auth_member purchase.doc.approve)。token 只是换了传输位置,不是新口子。
+    """
+    raw = [(k, v) for k, v in request.scope.get("headers", []) if k.lower() != b"authorization"]
+    raw.append((b"authorization", f"Bearer {token}".encode()))
+    request.scope["headers"] = raw
+    if hasattr(request, "_headers"):
+        del request._headers
+
+
 @router.get("/status")
 async def api_status(request: Request, workspace_client_id: Optional[int] = Query(None)):
     _, tid = auth_member(request, "purchase.doc.view")
@@ -46,7 +59,13 @@ async def api_status(request: Request, workspace_client_id: Optional[int] = Quer
 
 
 @router.get("/connect")
-async def api_connect(request: Request, workspace_client_id: Optional[int] = Query(None)):
+async def api_connect(
+    request: Request,
+    workspace_client_id: Optional[int] = Query(None),
+    t: Optional[str] = Query(None),
+):
+    if t:
+        _inject_bearer_from_query(request, t)
     user, tid = auth_member(request, "purchase.doc.approve")
     if not google_oauth.is_configured():
         raise PosError("purchase.unexpected", 503, detail="google_oauth_not_configured")

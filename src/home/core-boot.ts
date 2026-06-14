@@ -242,6 +242,11 @@ function routeTo(route?: any) {
                 loadErpTodayStats();
             } catch (e) {}
         }
+        if (typeof window.loadIntegrationGoogle === 'function') {
+            try {
+                window.loadIntegrationGoogle();
+            } catch (e) {}
+        }
     }
 }
 

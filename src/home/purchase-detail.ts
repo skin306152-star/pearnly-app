@@ -4,7 +4,9 @@
 /* global t, escapeHtml, showToast */
 import {
     papi,
+    openPurchasePdf,
     purchaseErrMsg,
+    activeWsId,
     fmtMoney,
     fmtQty,
     srcLabelKey,
@@ -53,6 +55,8 @@ const PAGE_CSS = `
 .pur .img img{width:100%;height:100%;object-fit:cover;}
 .pur .stocknote{margin-top:10px;font-size:12px;color:var(--ink2);background:var(--green-weak);border:1px solid var(--green-weak);border-radius:9px;padding:9px 11px;}
 .pur.voided{opacity:.62;}
+.pur .vch{display:flex;flex-direction:column;gap:8px;}
+.pur .vch .btn{width:100%;justify-content:flex-start;}
 @media(max-width:600px){
   .pur .ph{flex-direction:column;} .pur .acts{width:100%;} .pur .acts .btn{flex:1;}
   .pur .grid{grid-template-columns:1fr;}
@@ -123,6 +127,32 @@ function payCard(d: DocDetail): string {
     </div></div>`;
 }
 
+// 凭证 surface(documents.py 已建):无原始票据 → 生成替代收据;WHT>0 → 生成扣缴凭证;
+// 已生成的凭证可下载(复用 openPurchasePdf 带 Bearer 取 PDF blob)。已作废单不显。
+function voucherCard(d: DocDetail): string {
+    if (d.status === 'void') return '';
+    const hasSub = d.attachments.some((a) => a.kind === 'substitute_receipt');
+    const hasWht = d.attachments.some((a) => a.kind === 'wht_cert');
+    const noBill = !d.bill_image_url;
+    const rows: string[] = [];
+    if (hasSub)
+        rows.push(
+            `<button class="btn" data-dl="substitute_receipt">${escapeHtml(t('pur-dl-substitute'))}</button>`
+        );
+    if (hasWht)
+        rows.push(`<button class="btn" data-dl="wht_cert">${escapeHtml(t('pur-dl-wht'))}</button>`);
+    if (noBill && !hasSub)
+        rows.push(
+            `<button class="btn" data-gen="substitute_receipt">${escapeHtml(t('pur-gen-substitute'))}</button>`
+        );
+    if (d.wht_amount > 0 && !hasWht)
+        rows.push(
+            `<button class="btn" data-gen="wht_cert">${escapeHtml(t('pur-gen-wht'))}</button>`
+        );
+    if (!rows.length) return '';
+    return `<div class="card"><div class="hd">${escapeHtml(t('pur-voucher'))}</div><div class="bd vch">${rows.join('')}</div></div>`;
+}
+
 function shell(d: DocDetail): string {
     const pay = d.status === 'void' ? 'void' : d.payment_status;
     const badge = `<span class="badge ${pay}">${escapeHtml(t(d.status === 'void' ? 'pur-status-void' : 'pur-pay-' + d.payment_status))}</span>`;
@@ -152,7 +182,7 @@ function shell(d: DocDetail): string {
                     <div class="img">${d.bill_image_url ? `<img src="${escapeHtml(d.bill_image_url)}" alt="">` : ICON_DOC}</div>
                     <button class="btn" style="width:100%;" id="pur-zoom">${escapeHtml(t('pur-zoom'))}</button>
                 </div></div>
-                ${amountCard(d)}${payCard(d)}${stock}${voidNote}
+                ${amountCard(d)}${payCard(d)}${voucherCard(d)}${stock}${voidNote}
             </div>
         </div>
     </div></div>`;
@@ -172,6 +202,35 @@ function bind(): void {
     document.querySelectorAll<HTMLElement>('[data-match]').forEach((el) => {
         el.onclick = () => window.openPurchaseMatch?.({}, () => load(cur!.id));
     });
+    document.querySelectorAll<HTMLElement>('[data-gen]').forEach((el) => {
+        el.onclick = () => genCredential(el.dataset.gen as string);
+    });
+    document.querySelectorAll<HTMLElement>('[data-dl]').forEach((el) => {
+        el.onclick = () => downloadDoc(el.dataset.dl as string);
+    });
+}
+
+async function genCredential(kind: string): Promise<void> {
+    const path = kind === 'wht_cert' ? 'wht-cert' : 'substitute-receipt';
+    try {
+        await papi('POST', `/api/purchase/docs/${cur!.id}/${path}`, {
+            workspace_client_id: activeWsId(),
+        });
+        showToast(t('pur-gen-ok'), 'success');
+        load(cur!.id);
+    } catch (e) {
+        showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
+    }
+}
+
+async function downloadDoc(kind: string): Promise<void> {
+    const ws = activeWsId();
+    const q = ws != null ? `&workspace_client_id=${ws}` : '';
+    try {
+        await openPurchasePdf(`/api/purchase/docs/${cur!.id}/document.pdf?kind=${kind}${q}`);
+    } catch (e) {
+        showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
+    }
 }
 
 async function doVoid(): Promise<void> {

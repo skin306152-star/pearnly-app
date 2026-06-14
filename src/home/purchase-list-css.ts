@@ -42,12 +42,12 @@ export const PURCHASE_LIST_CSS = `
 .pur.pl .fchip .custom.on{display:flex;}
 .pur.pl .fchip .custom label{font-size:11px;color:var(--ink2);}
 .pur.pl .fchip .custom input{border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:13px;background:var(--card);color:var(--ink);}
-.pur.pl .datetoggle{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink3);}
-.pur.pl .datetoggle b{color:var(--ink2);font-weight:600;}
-.pur.pl .sw{width:38px;height:22px;border-radius:999px;background:var(--line);position:relative;flex:none;cursor:pointer;transition:.15s;}
-.pur.pl .sw.on{background:var(--accent);}
-.pur.pl .sw::after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:var(--card);transition:.15s;}
-.pur.pl .sw.on::after{left:19px;}
+.pur.pl .fchip>.t .ic-chev{transition:transform .15s;}
+.pur.pl .fchip.open>.t .ic-chev{transform:rotate(180deg);}
+/* 票面/上传日期口径:两段式切换(非 on/off 开关)· 当前段高亮 */
+.pur.pl .datebasis{margin-left:auto;display:inline-flex;border:1px solid var(--line);border-radius:9px;padding:2px;background:var(--card);}
+.pur.pl .datebasis .o{padding:5px 12px;border-radius:7px;font-size:12px;color:var(--ink2);cursor:pointer;white-space:nowrap;}
+.pur.pl .datebasis .o.on{background:var(--accent-weak);color:var(--accent-deep);font-weight:600;}
 
 /* 批量条 + 月份分组 + 行勾选 */
 .pur.pl .bulkbar{display:none;align-items:center;gap:10px;background:var(--accent-weak);border-bottom:1px solid var(--accent);padding:9px 18px;font-size:13px;color:var(--accent-deep);font-weight:700;}
@@ -85,7 +85,7 @@ export const PURCHASE_LIST_CSS = `
   .pur.pl .acts{width:100%;} .pur.pl .acts .btn{flex:1;}
   .pur.pl .search{width:100%;margin-left:0;}
   .pur.pl .toolbar,.pur.pl .filterbar{flex-wrap:wrap;}
-  .pur.pl .datetoggle{margin-left:0;width:100%;}
+  .pur.pl .datebasis{margin-left:0;}
   .pur.pl .row{flex-wrap:wrap;} .pur.pl .row .amt{margin-left:auto;}
 }
 `;

@@ -94,7 +94,10 @@ export function filterBarHtml(cats: Category[]): string {
         ${chip('docType', 'pur-f-doctype', ddOptions('docType', DOC_TYPES, true))}
         ${chip('payment', 'pur-f-payment', ddOptions('payment', PAY_OPTS, true))}
         ${chip('category', 'pur-f-category', ddOptions('category', categoryOptions(cats), false))}
-        <div class="datetoggle"><b>${escapeHtml(t('pur-basis-doc'))}</b><span class="sw ${basis === 'upload' ? 'on' : ''}" id="pur-basis"></span>${escapeHtml(t('pur-basis-upload'))}</div>
+        <div class="datebasis" id="pur-datebasis">
+            <span class="o ${basis === 'doc' ? 'on' : ''}" data-basis="doc">${escapeHtml(t('pur-basis-doc'))}</span>
+            <span class="o ${basis === 'upload' ? 'on' : ''}" data-basis="upload">${escapeHtml(t('pur-basis-upload'))}</span>
+        </div>
     </div>`;
 }
 
@@ -117,16 +120,20 @@ export function bindFilterChips(onChange: () => void): void {
             if (F[key].has(val)) F[key].delete(val);
             else F[key].add(val);
             o.classList.toggle('sel', F[key].has(val));
-            const chipEl = o.closest('.fchip')!;
+            const tEl = o.closest('.fchip')!.querySelector('.t')!;
             const n = F[key].size;
-            chipEl.querySelector('.t')!.classList.toggle('active', n > 0);
-            const cntEl = chipEl.querySelector<HTMLElement>('.t .cnt');
-            if (cntEl) cntEl.textContent = String(n);
-            else if (n > 0) {
-                const sp = document.createElement('span');
-                sp.className = 'cnt';
-                sp.textContent = String(n);
-                chipEl.querySelector('.t')!.insertBefore(sp, chipEl.querySelector('.t .ic-chev'));
+            tEl.classList.toggle('active', n > 0);
+            // 计数徽章:仅 >0 时显;归零即移除(不显「0」· 符合直觉)。
+            let cntEl = tEl.querySelector<HTMLElement>('.cnt');
+            if (n > 0) {
+                if (!cntEl) {
+                    cntEl = document.createElement('span');
+                    cntEl.className = 'cnt';
+                    tEl.insertBefore(cntEl, tEl.querySelector('.ic-chev'));
+                }
+                cntEl.textContent = String(n);
+            } else if (cntEl) {
+                cntEl.remove();
             }
             if (key === 'date') {
                 const cust = document.getElementById('pur-date-custom');
@@ -147,13 +154,18 @@ export function bindFilterChips(onChange: () => void): void {
             customTo = ct.value;
             onChange();
         };
-    const sw = document.getElementById('pur-basis');
-    if (sw)
-        sw.onclick = () => {
-            basis = basis === 'doc' ? 'upload' : 'doc';
-            sw.classList.toggle('on', basis === 'upload');
+    // 票面/上传日期口径:两段式切换(非 on/off 开关)· 点哪段哪段高亮。
+    document.querySelectorAll<HTMLElement>('#pur-datebasis .o').forEach((el) => {
+        el.onclick = () => {
+            const next = el.dataset.basis as DateBasis;
+            if (next === basis) return;
+            basis = next;
+            document
+                .querySelectorAll<HTMLElement>('#pur-datebasis .o')
+                .forEach((x) => x.classList.toggle('on', x.dataset.basis === basis));
             onChange();
         };
+    });
     document.addEventListener('click', closeAllChips);
 }
 

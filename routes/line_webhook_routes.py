@@ -26,9 +26,12 @@ import logging
 from fastapi import APIRouter, Request
 
 from core import db
-from services.line_binding import line_client
+from services.line_binding import line_client, line_intake, line_postback
 
 logger = logging.getLogger(__name__)
+
+# 取链接命令引导去网页(集成中心连 Google 后取 Drive/Sheet 链接)。
+_WEB_INTEGRATIONS_URL = "https://pearnly.com/home#integrations"
 
 router = APIRouter()
 
@@ -77,6 +80,12 @@ async def _handle_line_event(ev: dict):
     # unfollow:用户删 Bot
     if ev_type == "unfollow":
         logger.info(f"[line] 用户 {line_user_id} 删除了 Bot 好友")
+        return
+
+    # postback:Flex 卡按钮([确认入采购]/[记为费用])→ 接 intake 分流
+    if ev_type == "postback":
+        data = (ev.get("postback") or {}).get("data", "")
+        await _handle_line_postback(line_user_id, reply_token, data, ev)
         return
 
     # message
@@ -210,6 +219,13 @@ async def _handle_line_text(line_user_id: str, reply_token: str, text: str, ev: 
     else:
         # v118.25.4 · 已绑定 · 优先用户偏好 · 兜底 LINE 语言
         lang = bound_user.get("preferred_lang") or ev_lang
+        # 取链接命令(ขอ link drive / ขอ sheet)→ 引导网页取 Drive/Sheet 链接(接阶段二外流)。
+        cmd = line_intake.parse_link_command(text)
+        if cmd:
+            line_client.reply_text(
+                reply_token, line_intake.link_reply(cmd, lang, web_url=_WEB_INTEGRATIONS_URL)
+            )
+            return
         # F10 · 商户(非 firm)+ 开 expense + 文本含金额 → 记一笔费用并回执;否则回功能提示(现状不变)。
         recorded = _maybe_record_line_expense(bound_user, text, lang)
         if recorded:
@@ -220,6 +236,62 @@ async def _handle_line_text(line_user_id: str, reply_token: str, text: str, ev: 
             reply_token,
             line_client.t_line(lang, "already_bound_hint", username=username),
         )
+
+
+async def _handle_line_postback(line_user_id: str, reply_token: str, data: str, ev: dict):
+    """Flex 卡按钮回调 → intake 分流(confirm=入采购 / redirect=指定方向)。
+
+    doc_id = 待归类 intake_item id(LINE_FLEX_INTAKE 开时由 OCR 落)。查 item 的套账 →
+    resolve_inbox 建草稿单。item 不存在/未开 staging → 友好回执,不报错。
+    """
+    if not reply_token or not line_user_id:
+        return
+    parsed = line_postback.parse(data)
+    action = parsed.get("action")
+    if not action:
+        return
+    bound = db.get_user_by_line_user_id(line_user_id)
+    if not bound:
+        return
+    lang = bound.get("preferred_lang") or _ev_lang(ev)
+    tid = str(bound["tenant_id"]) if bound.get("tenant_id") else None
+    item_id = parsed.get("doc_id")
+    inbox_action = (
+        "purchase"
+        if action == line_postback.ACTION_CONFIRM
+        else (parsed.get("direction") or "expense")
+    )
+    if inbox_action not in ("purchase", "expense"):
+        inbox_action = "expense"
+    try:
+        from services.purchase import intake as intake_svc
+        from services.purchase import settings as settings_svc
+
+        with db.get_cursor_rls(tid, commit=True) as cur:
+            cur.execute(
+                "SELECT workspace_client_id FROM intake_items "
+                "WHERE id = %s AND tenant_id = %s AND status = 'pending'",
+                (item_id, tid),
+            )
+            r = cur.fetchone()
+            if not r:
+                line_client.reply_text(reply_token, line_client.t_line(lang, "unsupported"))
+                return
+            ws = r["workspace_client_id"]
+            cfg = settings_svc.get_settings(cur, tenant_id=tid, workspace_client_id=ws)
+            intake_svc.resolve_inbox(
+                cur,
+                tenant_id=tid,
+                workspace_client_id=ws,
+                item_id=item_id,
+                action=inbox_action,
+                created_by=str(bound["id"]),
+                settings=cfg,
+            )
+        line_client.reply_text(reply_token, line_intake.ack_reply(inbox_action, lang))
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[line postback] resolve failed: {e}")
+        line_client.reply_text(reply_token, line_client.t_line(lang, "unsupported"))
 
 
 def _maybe_record_line_expense(bound_user: dict, text: str, lang: str):

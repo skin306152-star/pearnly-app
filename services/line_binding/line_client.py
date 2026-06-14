@@ -184,6 +184,50 @@ def push_text(to_line_user_id: str, text: str) -> bool:
         return False
 
 
+def create_rich_menu(payload: Dict[str, Any]) -> Optional[str]:
+    """建 Rich Menu(返 richMenuId · 整合用 · 需再 setDefault + 上传背景图)。失败 None。
+
+    payload 由 line_intake.rich_menu_payload 出。真生效还要传背景图 + setDefaultRichMenu,
+    属用户验收范围(需真 channel)。
+    """
+    token = _get_channel_token()
+    if not token:
+        return None
+    req = urllib.request.Request(
+        "https://api.line.me/v2/bot/richmenu",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read().decode("utf-8")).get("richMenuId")
+    except Exception as e:
+        logger.error(f"LINE createRichMenu 失败: {e}")
+        return None
+
+
+def push_messages(to_line_user_id: str, messages: List[Dict[str, Any]]) -> bool:
+    """用 userId 主动推送消息列表(Flex 卡 / 多消息)· OCR 异步结果用(镜像 push_text)。"""
+    token = _get_channel_token()
+    if not token or not to_line_user_id or not messages:
+        return False
+    url = "https://api.line.me/v2/bot/message/push"
+    payload = json.dumps({"to": to_line_user_id, "messages": messages[:5]}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.status == 200
+    except Exception as e:
+        logger.error(f"LINE push_messages 失败: {e}")
+        return False
+
+
 # ============================================================
 # 获取用户资料(拿昵称 / 头像)
 # ============================================================

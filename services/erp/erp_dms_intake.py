@@ -3,13 +3,14 @@
 
 dms_routes 的三个新端点调这里:
 - recognize_lookup_mrerp_dms:登录一次 → 查 DMS 客户 + 解析 OCR 地址为级联 ids +
-  府/县/区/邮编选项 + 称谓 + 订车主档 → 一次性喂面板。
+  府/县/区/邮编选项 + 称谓 → 一次性喂面板。
 - geo_mrerp_dms:面板改地址时的级联代理。优先用缓存 cookie + httpx(只读·快),
   失效再 Playwright 重登录并刷新缓存。
-- push_idcard_fields_mrerp_dms:用面板编辑后的字段建/改客户(save_customer)+ 建订车单。
+- push_idcard_fields_mrerp_dms:用面板编辑后的字段建/改客户(save_customer)。
+  只写客户库(ลูกค้า · cus/new.php·cus/edit.php),不建订车单。
 
 会话 cookie 缓存(进程级·短 TTL):登录成本高,级联只读复用 cookie 避免每次重登录。
-写操作(建/改客户、订车单)仍走 Playwright(铁律#7);cookie 只用于只读级联。
+写操作(建/改客户)仍走 Playwright(铁律#7);cookie 只用于只读级联。
 """
 
 from __future__ import annotations
@@ -21,7 +22,6 @@ from typing import Any, Dict, List, Optional
 from services.erp.erp_dms_push import (
     _build_mrerp_dms_adapter,
     _dms_friendly,
-    _id_card_payload_from_dict,
 )
 
 logger = logging.getLogger(__name__)
@@ -121,7 +121,7 @@ def _run_logged_in(endpoint: Dict[str, Any], fn):
 def recognize_lookup_mrerp_dms(
     endpoint: Dict[str, Any], *, people_id: str, ocr_address: Dict[str, Any]
 ) -> Dict[str, Any]:
-    """OCR 后:查 DMS 客户 + 解析 OCR 地址级联 + 选项 + 称谓 + 订车主档。"""
+    """OCR 后:查 DMS 客户 + 解析 OCR 地址级联 + 选项 + 称谓。"""
 
     def _do(cl, adapter):
         from services.erp.mrerp_dms_models import ThaiAddress
@@ -164,7 +164,6 @@ def recognize_lookup_mrerp_dms(
                 "road": addr.road,
             },
         }
-        masters = adapter.test_connection().get("masters", {})
         return {
             "ok": True,
             "match": {
@@ -174,7 +173,6 @@ def recognize_lookup_mrerp_dms(
             },
             "geo": geo,
             "prefixes": cl._select_options(form_html, "selprefix"),
-            "masters": masters,
         }
 
     return _run_logged_in(endpoint, _do)
@@ -206,38 +204,21 @@ def push_idcard_fields_mrerp_dms(
     fields: Dict[str, Any],
     mode: str,
     customer_id: Optional[str],
-    booking_overrides: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """面板编辑字段 → 建/改客户 + 建订车单。返回 dms_routes 写日志/响应用的 dict。"""
+    """面板编辑字段 → 建/改客户(只写 DMS 客户库 ลูกค้า,不建订车单)。
+    返回 dms_routes 写日志/响应用的 dict。"""
     t0 = time.time()
 
     def _do(cl, adapter):
-        from services.erp.mrerp_dms_models import BookingDefaults
-
         cid = cl.save_customer(fields=fields, mode=mode, customer_id=customer_id)
-        card = _id_card_payload_from_dict(_fields_to_idcard(fields))
-        cfg = endpoint.get("config") or {}
-        merged = dict(cfg.get("booking_defaults") or {})
-        merged.update({k: v for k, v in (booking_overrides or {}).items() if v not in (None, "")})
-        defaults = BookingDefaults.from_config({"booking_defaults": merged})
-
-        # A1:走 DMS 原生订车单表单 → DMS autonum 出 BK 号(符合公司规则·零手填)。
-        booking = cl.resolve_booking_payload(defaults, card)
-        booking_id, booking_no = cl.create_booking_via_form(
-            customer_id=cid, booking=booking, card=card
-        )
         return {
             "ok": True,
             "success": True,
             "customer_id": cid,
-            "booking_id": booking_id,
-            "booking_no": booking_no,
             "mode": mode,
             "elapsed_ms": int((time.time() - t0) * 1000),
             "response_body": {
                 "adapter": "mrerp_dms",
-                "booking_no": booking_no,
-                "booking_id": booking_id,
                 "customer_id": cid,
                 "mode": mode,
             },
@@ -248,31 +229,3 @@ def push_idcard_fields_mrerp_dms(
         out["success"] = False
         out["elapsed_ms"] = int((time.time() - t0) * 1000)
     return out
-
-
-def _fields_to_idcard(f: Dict[str, Any]) -> Dict[str, Any]:
-    name = (f.get("name") or "").strip()
-    parts = name.split(" ", 1)
-    return {
-        "people_id": f.get("people_id"),
-        "first_name": parts[0] if parts else "",
-        "last_name": parts[1] if len(parts) > 1 else "",
-        "birthday_be": f.get("birthday_be"),
-        "prefix_id": f.get("prefix_id") or "17",
-        "prefix_name": f.get("prefix_name") or "",
-        "phone": f.get("phone") or "0800000000",
-        "address": {
-            "house_no": f.get("house_no"),
-            "moo": f.get("moo"),
-            "soi": f.get("soi"),
-            "road": f.get("road"),
-            "province_id": f.get("province_id"),
-            "province": f.get("province_name"),
-            "district_id": f.get("district_id"),
-            "district": f.get("district_name"),
-            "subdistrict_id": f.get("subdistrict_id"),
-            "subdistrict": f.get("subdistrict_name"),
-            "zipcode_id": f.get("zipcode_id"),
-            "zipcode": f.get("zipcode"),
-        },
-    }

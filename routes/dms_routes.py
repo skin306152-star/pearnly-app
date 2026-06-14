@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-dms_routes.py · MR.ERP DMS 汽车销售 · 身份证识别 → 订车单推送(2026-05-31)
+dms_routes.py · MR.ERP DMS 汽车销售 · 身份证识别 → 客户库建/改(2026-05-31)
 
 两步流(2026-06-13):
   POST /api/dms/id-card/recognize  — 身份证 OCR + 查 DMS 客户 + 地址级联,喂可编辑面板。
   GET  /api/dms/geo                — 面板改地址时的四级联动选项。
-  POST /api/dms/id-card/push       — 面板核对后的字段 → 建/改客户 + 建订车单 → 写 erp_push_logs。
+  POST /api/dms/id-card/push       — 面板核对后的字段 → 建/改 DMS 客户(ลูกค้า)→ 写 erp_push_logs。
+                                     只写客户库(覆盖/新建)· 不建订车单(ใบจอง)。
 泰国身份证 OCR 走独立 prompt(不碰发票热路径);DMS 交互全经 Playwright(铁律#7)。
 
 铁律遵从:
@@ -219,14 +220,14 @@ async def dms_geo(
 
 @router.post("/api/dms/id-card/push")
 async def dms_id_card_push(request: Request):
-    """步2:面板编辑后的字段 → 建/改客户(覆盖/新建)+ 建订车单 → 写 erp_push_logs。"""
+    """步2:面板编辑后的字段 → 建/改 DMS 客户(覆盖/新建)→ 写 erp_push_logs。
+    只写客户库(ลูกค้า)· 不建订车单。"""
     user = get_current_user_from_request(request)
     _check_push_access(user)
     body = await request.json()
     fields = body.get("fields") or {}
     mode = (body.get("mode") or "create").strip()
     customer_id = body.get("customer_id")
-    booking = body.get("booking") or {}
     if mode not in ("create", "overwrite"):
         raise HTTPException(400, detail="dms.bad_mode")
     if mode == "overwrite" and not customer_id:
@@ -243,7 +244,6 @@ async def dms_id_card_push(request: Request):
         fields=fields,
         mode=mode,
         customer_id=customer_id,
-        booking_overrides=booking,
     )
     status = "success" if result.get("success") else "failed"
     log_id = await asyncio.to_thread(
@@ -251,7 +251,7 @@ async def dms_id_card_push(request: Request):
         user["id"],
         str(ep["id"]),
         None,
-        result.get("booking_no") or "",
+        result.get("customer_id") or "",
         str(fields.get("name") or "").strip(),
         None,
         status,
@@ -274,8 +274,6 @@ async def dms_id_card_push(request: Request):
             "status": status,
             "log_id": log_id or "",
             "customer_id": result.get("customer_id", ""),
-            "booking_id": result.get("booking_id", ""),
-            "booking_no": result.get("booking_no", ""),
             "mode": mode,
             "error_code": result.get("error_code"),
             "error_friendly": result.get("error_friendly"),

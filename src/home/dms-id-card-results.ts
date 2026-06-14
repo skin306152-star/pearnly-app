@@ -2,8 +2,8 @@
 // DMS 身份证 → 可编辑面板(2026-06-13 · 取代旧只读结果块)
 //
 // 两步流第 2 屏:openDmsIdCardPanel(recognize 响应)渲染可编辑面板
-//   → 用户核对/编辑(覆盖现有 / 另建新客户)+ 四级联动地址 + 订车单
-//   → 推送 POST /api/dms/id-card/push → 成功态(客户号 + 订车单号)。
+//   → 用户核对/编辑(覆盖现有 / 另建新客户)+ 四级联动地址
+//   → 推送 POST /api/dms/id-card/push → 成功态(客户号)。只写客户库,不建订车单。
 // 手机端 CSS(home-47)做底部全屏 sheet。全局桥:t / escapeHtml / showToast / token。
 // ============================================================
 /* global escapeHtml, token */
@@ -46,11 +46,6 @@
             )
             .join('');
     }
-    function masterOpts(arr: Array<{ id: string; name?: string; code?: string }>) {
-        return (arr || [])
-            .map((m) => `<option value="${esc(m.id)}">${esc(m.name || m.code || m.id)}</option>`)
-            .join('');
-    }
     function field(label: string, id: string, val: unknown, req: boolean, ocr: boolean) {
         return (
             `<div class="dic-f"><label>${esc(t(label))}${req ? ' <span class="rq">*</span>' : ''}</label>` +
@@ -81,7 +76,6 @@
         const geo = (dms.geo || {}) as Record<string, unknown>;
         const gsel = (geo.selected || {}) as Record<string, string>;
         const prefixes = (dms.prefixes || []) as Pair[];
-        const masters = (dms.masters || {}) as Record<string, Array<{ id: string; name?: string }>>;
 
         S.mode = match.found ? 'overwrite' : 'create';
         S.customerId = match.found ? (match.customer_id as string) : null;
@@ -142,14 +136,6 @@
                 false,
                 ''
             ) +
-            '</div></div>' +
-            // 订车单
-            `<div><div class="dic-sec-t">${esc(t('dic-sec-book'))}</div><div class="dic-grid">` +
-            sel('dic-l-advisor', 'dic-advisor', masterOpts(masters.advisors), true, '') +
-            sel('dic-l-car', 'dic-car', masterOpts(masters.car_models), true, '') +
-            sel('dic-l-place', 'dic-place', masterOpts(masters.place_books), false, '') +
-            sel('dic-l-term', 'dic-term', masterOpts(masters.term_sales), false, '') +
-            sel('dic-l-branch', 'dic-branch', masterOpts(masters.branches), false, '') +
             '</div></div>' +
             '</div>' + // body
             '<div class="dic-foot">' +
@@ -255,19 +241,12 @@
                 zipcode_id: v('dic-zip'),
                 zipcode: lbl('dic-zip'),
             },
-            booking: {
-                advisor_id: v('dic-advisor'),
-                car_id: v('dic-car'),
-                place_book_id: v('dic-place'),
-                term_sale_id: v('dic-term'),
-                branch_id: v('dic-branch'),
-            },
         };
     }
 
     async function doPush() {
         const btn = $('dic-push') as HTMLButtonElement | null;
-        const { fields, booking } = gather();
+        const { fields } = gather();
         if (!fields.people_id || !fields.name) {
             showToast(t('dic-need-fields'), 'error');
             return;
@@ -284,7 +263,6 @@
                     fields,
                     mode: S.mode,
                     customer_id: S.customerId,
-                    booking,
                 }),
             });
             const d = await r.json().catch(() => ({}));
@@ -312,8 +290,7 @@
             '<div class="dic-done"><div class="ic">' +
             '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5 11-11"/></svg></div>' +
             `<div class="t">${esc(t('dic-done-t'))}</div>` +
-            `<div class="m">${esc(t('dic-result-customer'))}: <b>#${esc(push.customer_id)}</b> · ${esc(modeTxt)}<br>` +
-            `${esc(t('dic-result-booking'))}: <b>${esc(push.booking_no)}</b></div>` +
+            `<div class="m">${esc(t('dic-result-customer'))}: <b>#${esc(push.customer_id)}</b> · ${esc(modeTxt)}</div>` +
             `<button class="btn" id="dic-again">${esc(t('dic-again'))}</button></div>`;
         el.scrollIntoView({ behavior: 'smooth' });
     }

@@ -224,7 +224,7 @@ _SYSTEM_PROMPT = """You are an accountant extracting structured data from Thai t
 Output ONE JSON object matching this schema (no markdown fences, no explanation, just JSON):
 
 {
-  "document_type": "tax_invoice" | "receipt" | "credit_note" | "other",
+  "document_type": "tax_invoice" | "simplified_tax_invoice" | "receipt" | "credit_note" | "other",
   "is_not_invoice": false,
   "is_copy_or_duplicate": false,
   "invoice_number": "string or null",
@@ -272,6 +272,17 @@ CRITICAL RULES:
 5. TAX IDs: Exactly 13 digits, no dashes/spaces. Empty string if not found.
 6. WHT (หัก ณ ที่จ่าย / ภ.ง.ด.3 / ภ.ง.ด.53): Common rates 1/2/3/5%. wht_rate is the number ONLY ("3" not "3%"). Only extract if printed; do NOT guess.
 7. is_not_invoice: true ONLY if the text is clearly not an invoice (letter, contract, blank page, signature page).
+7b. DOCUMENT TYPE (decides whether a legal invoice number is required downstream):
+   - "tax_invoice": a FULL Thai tax invoice (ใบกำกับภาษีเต็มรูป) — has a legal
+     invoice number (เลขที่) AND the seller's 13-digit tax ID. Only this type can
+     claim input VAT, so its invoice number + seller tax id matter.
+   - "simplified_tax_invoice": ใบกำกับภาษีอย่างย่อ / "ABB" / POS slip from a shop
+     (7-11, supermarkets). The R#/receipt running number is NOT a legal invoice
+     number — keep it as printed (with its R#/REF prefix) for de-dup, do not
+     invent or require a legal เลขที่.
+   - "is_not_invoice": true for non-tax documents like a fuel card / credit-card
+     SLIP (has TID / BATCH / TRACE / approval code, NO 13-digit seller tax id and
+     NO ใบกำกับภาษี header). Do not treat the card TID as a tax id or invoice no.
 8. is_copy_or_duplicate: true if the text contains สำเนา / COPY / DUPLICATE markers.
 9. MULTIPLE INVOICES ON ONE PAGE (CRITICAL — do not drop any):
    - A single page image often contains TWO OR MORE separate tax invoices stacked

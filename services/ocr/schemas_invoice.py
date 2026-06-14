@@ -95,9 +95,14 @@ class ThaiInvoice(BaseModel):
     arithmetic validation is needed.
     """
 
-    document_type: Literal["tax_invoice", "receipt", "credit_note", "other"] = Field(
+    document_type: Literal[
+        "tax_invoice", "simplified_tax_invoice", "receipt", "credit_note", "other"
+    ] = Field(
         default="tax_invoice",
-        description="document type classification",
+        description="document type. tax_invoice = full Thai tax invoice "
+        "(ใบกำกับภาษีเต็มรูป, can claim input VAT, legal invoice no required); "
+        "simplified_tax_invoice = ใบกำกับภาษีอย่างย่อ/ABB (POS slip, no legal "
+        "invoice no, cannot claim VAT); receipt/credit_note/other otherwise",
     )
     is_not_invoice: bool = Field(
         default=False,
@@ -202,7 +207,7 @@ class ThaiInvoice(BaseModel):
         """Gemini may return null or an unexpected value; fall back to tax_invoice."""
         if v is None:
             return "tax_invoice"
-        allowed = {"tax_invoice", "receipt", "credit_note", "other"}
+        allowed = {"tax_invoice", "simplified_tax_invoice", "receipt", "credit_note", "other"}
         return v if v in allowed else "other"
 
     @field_validator("source_refs", mode="before")

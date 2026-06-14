@@ -33,6 +33,7 @@ from .triggers import (
     _aggregate_page_confidence,
     _bucket_confidence,
     _count_invoice_no_candidates,
+    _evaluate_soft_flags,
     _evaluate_triggers,
 )
 from .validators import (
@@ -176,8 +177,12 @@ def _process_one_page(
         validation_warnings.extend(validate_invoice(l2_invoice, l1_page))
 
     # --- Trigger evaluation (invoice path only — non-invoice docs use validators) ---
+    # triggers gate the slow L3 visual re-read; soft_flags only lower confidence
+    # to yellow_confirm (low word-conf on values that are present in L1 text).
+    soft_flags: List[str] = []
     if document_type in ("auto", "invoice"):
         triggers = _evaluate_triggers(l1_page, l2_invoice, pattern_memory)
+        soft_flags = _evaluate_soft_flags(l1_page, l2_invoice)
     else:
         # For non-invoice doc types, Layer 3 visual fallback is not yet
         # implemented. Triggers come from validators only.
@@ -341,6 +346,7 @@ def _process_one_page(
         triggers=triggers,
         needs_manual_review=needs_manual_review,
         document_type=document_type,
+        soft_flags=soft_flags,
     )
     confidence_band = _bucket_confidence(final_confidence, needs_manual_review)
     if confidence_band == "needs_review":
@@ -356,7 +362,7 @@ def _process_one_page(
         document_type=document_type,
         document=document,
         layer_chain=layer_chain,
-        trigger_reasons=triggers,
+        trigger_reasons=triggers + soft_flags,
         layer1_avg_confidence=l1_page.avg_confidence,
         layer2_input_tokens=l2_result.input_tokens,
         layer2_output_tokens=l2_result.output_tokens,

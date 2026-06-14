@@ -41,17 +41,20 @@ def _aggregate_page_confidence(
     triggers: List[str],
     needs_manual_review: bool,
     document_type: BusinessDocumentType,
+    soft_flags: Optional[List[str]] = None,
 ) -> float:
     """Return a single 0..1 confidence for the page.
 
     - Start at L1 avg_confidence (1.0 for text/table paths).
-    - Subtract penalty per trigger/validation warning.
+    - Subtract penalty per trigger AND per soft_flag (low word-conf that didn't
+      escalate to L3 still lowers confidence into yellow_confirm so the user
+      eyeballs it — that's the whole point of moving Rule 4 here, doc 09 §3.1).
     - Floor at 0.0, cap at 1.0.
     """
     base = float(l1_page.avg_confidence or 0.0)
     if base <= 0.0:
         base = 0.85  # neutral starting point when L1 doesn't provide one
-    penalty = 0.05 * len(triggers)
+    penalty = 0.05 * (len(triggers) + len(soft_flags or []))
     if needs_manual_review:
         penalty += 0.10
     final = max(0.0, min(1.0, base - penalty))
@@ -127,34 +130,39 @@ def _evaluate_triggers(
     invoice: ThaiInvoice,
     pattern_memory: Optional[InvoicePatternMemory] = None,
 ) -> List[str]:
-    """Return list of trigger reason strings; empty list = layer 3 not needed.
+    """Return list of L3-escalation reasons; empty list = layer 3 not needed.
 
-    Exception: if invoice.is_not_invoice == True, return [] (no point sending
-    a non-invoice through layer 3 visual review).
+    L3 is the slow visual re-read arm — only fire it when a visual pass can
+    actually fix something. Low per-field word confidence on a value that DOES
+    appear in the L1 text is NOT escalated here (thermal/small-print receipts
+    read low-conf on nearly everything); that path goes to _evaluate_soft_flags
+    → yellow_confirm instead (doc 09 §3.1, speed fix).
 
-    Trigger rules (B1 fix replaces page-avg confidence with word-level
-    per-critical-field confidence + L1-text containment check + pattern
-    familiarity check):
-
-    1. Critical fields missing (invoice_number, total_amount)
-    2. Amount math fail (subtotal + vat != total)
-    3. seller_tax format invalid (non-empty but not 13 digits)
-    4. (NEW) Per-critical-field word-level confidence < threshold —
-       finds matching L1 words and checks their min confidence. Catches
-       things like Vision misreading `/` as `1` where the page average
-       still looks high.
-    5. (NEW) L1 text containment — extracted value does not appear in L1
-       full_text (suggests layer 2 hallucinated the value).
-    6. (NEW) Invoice pattern anomaly — extracted invoice_number prefix
-       differs from previously seen patterns for this seller_tax.
+    Escalation rules:
+    1. invoice_number missing — only for FULL tax invoices (a legal เลขที่ is
+       mandatory only there). Simplified / receipt / non-invoice keep their
+       R#/REF as-is and never escalate for a "missing" legal number (§3.2).
+       total_amount missing escalates for any doc (an expense with no total is
+       unusable).
+    2. Amount math fail (subtotal + vat != total).
+    3. seller_tax format invalid — only for FULL tax invoices (input-VAT claim
+       needs a real 13-digit seller id; a card SLIP's TID is not a tax id).
+    5. L1 containment — extracted value absent from L1 full_text (layer 2 likely
+       hallucinated it → a visual re-read is warranted).
+    6. Invoice pattern anomaly vs previously seen patterns for this seller_tax.
+    7. Same-page multi-invoice candidate count > extracted.
     """
     if invoice.is_not_invoice:
         return []
 
+    # Missing document_type → treat as full tax invoice (stricter default).
+    is_full_tax_invoice = getattr(invoice, "document_type", "tax_invoice") == "tax_invoice"
+
     triggers: List[str] = []
 
-    # Rule 1: critical fields missing
-    if not invoice.invoice_number:
+    # Rule 1: critical fields missing. Legal invoice number is required only on
+    # full tax invoices; simplified/receipt POS slips carry a non-legal R# only.
+    if not invoice.invoice_number and is_full_tax_invoice:
         triggers.append("invoice_number missing")
     if not invoice.total_amount:
         triggers.append("total_amount missing")
@@ -164,39 +172,11 @@ def _evaluate_triggers(
     if math_reason:
         triggers.append(math_reason)
 
-    # Rule 3: tax_id format
-    if invoice.seller_tax:
+    # Rule 3: tax_id format — only enforced on full tax invoices (input-VAT path)
+    if is_full_tax_invoice and invoice.seller_tax:
         if not invoice.seller_tax.isdigit() or len(invoice.seller_tax) != 13:
             triggers.append(
                 f"seller_tax format invalid: {invoice.seller_tax!r} " "(expected 13 digits)"
-            )
-
-    # Rule 4 (NEW): per-critical-field word-level confidence
-    # For each non-empty critical field, find matching L1 words and check
-    # their min confidence.
-    for field_name in CRITICAL_FIELDS:
-        value = getattr(invoice, field_name, None)
-        if not value:
-            continue  # missing was already caught by rule 1
-        min_conf = find_field_min_word_conf(page, value)
-        if min_conf is None:
-            # No L1 word matched — handled by rule 5 below
-            continue
-        if min_conf < CONFIDENCE_THRESHOLD:
-            triggers.append(
-                f"{field_name}={value!r} word min conf {min_conf:.3f} "
-                f"< threshold {CONFIDENCE_THRESHOLD}"
-            )
-
-    # Rule 4b: date — same check using date_raw (as printed) if available,
-    # else the normalized date string
-    date_val = invoice.date_raw or invoice.date
-    if date_val:
-        min_conf = find_field_min_word_conf(page, date_val)
-        if min_conf is not None and min_conf < CONFIDENCE_THRESHOLD:
-            triggers.append(
-                f"date={date_val!r} word min conf {min_conf:.3f} "
-                f"< threshold {CONFIDENCE_THRESHOLD}"
             )
 
     # Rule 5 (NEW): L1 containment — non-empty extracted critical fields
@@ -233,3 +213,43 @@ def _evaluate_triggers(
             )
 
     return triggers
+
+
+def _evaluate_soft_flags(page: Page, invoice: ThaiInvoice) -> List[str]:
+    """Low word-level confidence on a value that DOES appear in the L1 text.
+
+    Not a hallucination (Rule 5 escalates those) and not worth a slow L3 visual
+    re-read — just lower page confidence to yellow_confirm so the user eyeballs
+    the field. Thermal / small-print receipts read low-conf on nearly every
+    field; escalating that to L3 was the main speed killer (doc 09 §3.1).
+    Returns reasons that feed the confidence penalty but never gate L3.
+    """
+    if invoice.is_not_invoice:
+        return []
+
+    flags: List[str] = []
+
+    for field_name in CRITICAL_FIELDS:
+        value = getattr(invoice, field_name, None)
+        if not value:
+            continue
+        min_conf = find_field_min_word_conf(page, value)
+        if min_conf is None or min_conf >= CONFIDENCE_THRESHOLD:
+            continue
+        # value not in L1 text → Rule 5 already escalates it; don't double-handle
+        if check_field_in_l1_text(page, value):
+            flags.append(
+                f"{field_name}={value!r} low word conf {min_conf:.3f} "
+                f"< {CONFIDENCE_THRESHOLD} (in L1 text → confirm, no L3)"
+            )
+
+    date_val = invoice.date_raw or invoice.date
+    if date_val:
+        min_conf = find_field_min_word_conf(page, date_val)
+        if min_conf is not None and min_conf < CONFIDENCE_THRESHOLD:
+            flags.append(
+                f"date={date_val!r} low word conf {min_conf:.3f} "
+                f"< {CONFIDENCE_THRESHOLD} (confirm, no L3)"
+            )
+
+    return flags

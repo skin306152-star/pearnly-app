@@ -71,7 +71,10 @@ logger = logging.getLogger(__name__)
 # (默认 gemini-3.5-flash)· OCR_FALLBACK_MODEL="" 时退回 OCR_FLASH_MODEL。
 DEFAULT_MODEL = _ocr_fallback() or os.environ.get("OCR_FLASH_MODEL", "gemini-2.5-flash")
 DEFAULT_MAX_RETRIES = 1
-DEFAULT_TIMEOUT_SECONDS = 90  # longer than layer 2 — vision calls are slower
+# Capped at 15s (doc 09 §3.3): 90s was effectively unbounded (a real ticket ran
+# 61s). On timeout the caller falls back to L2 + needs_review (never silent).
+# Overridable via env for prod A/B without a code change.
+DEFAULT_TIMEOUT_SECONDS = int(os.environ.get("OCR_L3_TIMEOUT_SECONDS", "15"))
 # DEFAULT_TEMPERATURE / DEFAULT_MAX_OUTPUT_TOKENS → services/ocr/layer3_gemini.py(模块化深化)。
 
 # Truncate layer 1 OCR text to avoid bloating the prompt on large pages.

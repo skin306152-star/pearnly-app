@@ -93,6 +93,8 @@ def handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> bo
             )
         if used_l2:
             _charge_line_l2(bound_user, str(tid))
+        # 查重(图/文共用 check_duplicate_invoice·按套账隔离):命中 → 卡前提示,不阻断由用户定夺。
+        dup = _dup_warn(bound_user, draft, ws)
         labels = {k: line_client.t_line(lang, f"exp_card_{k}") for k in _CARD_LABEL_KEYS}
         card = line_flex.expense_confirm_flex(
             draft={
@@ -112,10 +114,34 @@ def handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> bo
             labels=labels,
             edit_url=f"{_EXPENSE_DRAFT_URL}{draft_id}",
         )
-        line_client.reply_messages(reply_token, [card])
+        msgs = [card]
+        if dup:
+            msgs = [{"type": "text", "text": line_client.t_line(lang, "exp_dup_warn")}, card]
+        line_client.reply_messages(reply_token, msgs)
         return True
     except Exception:
         logger.exception("[line] expense draft failed; fall back to hint")
+        return False
+
+
+def _dup_warn(bound_user, draft, ws) -> bool:
+    """查重(图/文共用 check_duplicate_invoice)。命中已识别历史 → True(卡前提示)。任何异常 → False。"""
+    try:
+        if not (draft.invoice_number or (draft.vendor_name and draft.amount)):
+            return False
+        from services.ocr_history.queries import check_duplicate_invoice
+
+        dup = check_duplicate_invoice(
+            str(bound_user["id"]),
+            draft.invoice_number or None,
+            draft.doc_date,
+            draft.vendor_name or None,
+            float(draft.amount) if draft.amount is not None else None,
+            workspace_client_id=ws,
+        )
+        return bool(dup)
+    except Exception:
+        logger.warning("[line] dup check failed; skip warning")
         return False
 
 

@@ -408,11 +408,16 @@ try {
     console.warn('[boot] routeTo failed', e);
 }
 
+// LIFF 引导期(?liff=purchase 且尚无 token):整个 home 引导交给 purchase-liff —— 它签 token 后
+// location.replace('/home') 重进走正常流。此处必须不跑 loadAll/路由加载,否则无 token 的
+// /api/me 先 401 → 跳登录页,把还在异步鉴权的 LIFF 流踢走(套账门也在 loadAll 内,一并跳过)。
+const _liffBootstrapping = !!window.__LIFF_BOOTSTRAP__; // home.html 早期置(?liff=purchase 且无 token)
+
 // defer 模块的 loader 注册晚于此处同步执行 → 初始进非首屏路由会空白(只剩侧栏);
 // 微任务后 sibling 已 eval,补调一次。原仅 reconcile 兜底,现泛化到所有路由。
-setTimeout(reloadCurrentRoute, 0);
+if (!_liffBootstrapping) setTimeout(reloadCurrentRoute, 0);
 
 // 切账套(右上角切换器 / 表单「切换公司」)→ 重载当前模块。单一收口,替代原各页分散订阅。
 window.addEventListener('pearnly:workspace-changed', reloadCurrentRoute);
 
-loadAll();
+if (!_liffBootstrapping) loadAll();

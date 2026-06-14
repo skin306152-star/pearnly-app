@@ -312,6 +312,7 @@ interface Window {
     openPurchaseExport?: () => void;
     loadIntegrationGoogle?: () => void;
     highlightGoogleCard?: () => void;
+    __LIFF_BOOTSTRAP__?: number;
     isOwner?: (u?: AppUser | null) => boolean;
     reloadInventory?: () => void;
     openInventoryIn?: () => void;

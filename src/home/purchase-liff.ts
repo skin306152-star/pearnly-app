@@ -19,6 +19,9 @@ function qp(name: string): string | null {
 }
 
 function mask(msg: string): void {
+    // 套账门 preboot 把 #workspace-gate-root 以外的元素 visibility:hidden → 会藏掉本 mask。
+    // LIFF 入口不需要选套账(直达指定单)· 摘掉 preboot 让 mask 可见 · z-index 盖过门(900)。
+    document.body.classList.remove('workspace-gate-preboot');
     let el = document.getElementById('liff-mask');
     if (!el) {
         el = document.createElement('div');
@@ -30,6 +33,16 @@ function mask(msg: string): void {
         document.body.appendChild(el);
     }
     el.innerHTML = escapeHtml(msg);
+}
+
+// i18n 早期可能未就绪(本模块在引导链前 eval)→ t 缺失时用兜底文案,不致空白。
+function tx(key: string, fallback: string): string {
+    try {
+        const s = typeof t === 'function' ? t(key) : '';
+        return s && s !== key ? s : fallback;
+    } catch (_) {
+        return fallback;
+    }
 }
 
 function loadLiffSdk(): Promise<LiffSdk | null> {
@@ -52,11 +65,11 @@ function liffErrKey(body: unknown): string {
 }
 
 async function liffEntry(doc: string | null): Promise<void> {
-    mask(t('liff-signing-in'));
+    mask(tx('liff-signing-in', '正在登录 LINE…'));
     const liffId = (window as unknown as { __PEARNLY_LIFF_ID__?: string }).__PEARNLY_LIFF_ID__;
     const liff = await loadLiffSdk();
     if (!liff || !liffId) {
-        mask(t('liff-open-in-line'));
+        mask(tx('liff-open-in-line', '请在 LINE 中打开此页面'));
         return;
     }
     try {
@@ -73,7 +86,7 @@ async function liffEntry(doc: string | null): Promise<void> {
         });
         const body = await r.json().catch(() => null);
         if (!body || !body.ok || !body.data || !body.data.token) {
-            mask(t(liffErrKey(body)));
+            mask(tx(liffErrKey(body), '登录失败,请重试'));
             return;
         }
         localStorage.setItem('mrpilot_token', body.data.token);
@@ -81,7 +94,7 @@ async function liffEntry(doc: string | null): Promise<void> {
         // 带 token 重进 /home(去掉 liff 参数)· 正常引导起来后 liffResume 打开复核屏。
         location.replace('/home');
     } catch (_) {
-        mask(t('liff-open-in-line'));
+        mask(tx('liff-open-in-line', '请在 LINE 中打开此页面'));
     }
 }
 

@@ -6,11 +6,12 @@
 <title>Pearnly</title>
 
 <script>if(!localStorage.getItem('mrpilot_token')&&!/[?&]liff=/.test(location.search))location.replace('/');</script>
+<script>if(/[?&]liff=purchase/.test(location.search)&&!localStorage.getItem('mrpilot_token'))window.__LIFF_BOOTSTRAP__=1;</script>
 <script>try{if(localStorage.getItem('pearnly_theme')==='dark')document.documentElement.classList.add('dark');}catch(e){}</script>
 <link rel="icon" href="/static/brand/favicon.ico?v=1" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png?v=1">
 <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon-180.png?v=1">
-<link rel="stylesheet" href="/static/dist/home.css?v=11850849">
+<link rel="stylesheet" href="/static/dist/home.css?v=11850850">
 <style id="wsg-static-css">
 body.workspace-gate-preboot > :not(#workspace-gate-root):not(script):not(style){visibility:hidden;}
 #workspace-gate-root[data-wsg-boot]{position:fixed;inset:0;z-index:900;display:grid;place-items:center;background:var(--bg,Canvas);color:var(--ink,CanvasText);}
@@ -295,12 +296,12 @@ body.workspace-gate-preboot > :not(#workspace-gate-root):not(script):not(style){
 <div class="modal-overlay" id="help-modal" style="display:none;"></div>
 
 
-<script src="/static/i18n-data.js?v=11850849"></script>
+<script src="/static/i18n-data.js?v=11850850"></script>
 
 <script src="/static/dist/pre.js?v=11850747" defer></script>
 
 
-<script type="module" src="/static/dist/main.js?v=11850849"></script>
+<script type="module" src="/static/dist/main.js?v=11850850"></script>
 
 <script src="/static/dist/post.js?v=11850747" defer></script>
 

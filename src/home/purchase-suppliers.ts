@@ -37,7 +37,8 @@ const PAGE_CSS = `
 .pur .smh{padding:16px 20px;border-bottom:1px solid var(--line2);font-weight:700;font-size:16px;}
 .pur .smb{padding:18px 20px;} .pur .smb label{display:block;font-size:12.5px;color:var(--ink2);margin-bottom:7px;}
 .pur .fld{height:44px;border:1px solid var(--line);border-radius:10px;padding:0 13px;display:flex;align-items:center;background:var(--line2);margin-bottom:14px;}
-.pur .fld input{border:0;outline:0;background:transparent;flex:1;font-size:14.5px;}
+.pur .fld input{border:0;outline:0;background:transparent;flex:1;font-size:14.5px;color:var(--ink);}
+.pur .fld select{border:0;outline:0;background:transparent;flex:1;font-size:14.5px;color:var(--ink);cursor:pointer;}
 .pur .smf{padding:0 20px 20px;display:flex;gap:10px;}
 .pur .smf .g{height:46px;padding:0 16px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink2);cursor:pointer;}
 .pur .smf .ok{flex:1;height:46px;border:0;border-radius:10px;background:var(--accent);color:var(--card);font-weight:700;font-size:15px;cursor:pointer;}
@@ -95,6 +96,9 @@ function shell(): string {
             <div class="smb">
                 <label>${escapeHtml(t('pur-supplier-name'))}</label><div class="fld"><input id="pur-sf-name" placeholder="บริษัท ... จำกัด"></div>
                 <label>${escapeHtml(t('pur-supplier-tax-opt'))}</label><div class="fld"><input id="pur-sf-tax" class="tnum" placeholder="13"></div>
+                <label>${escapeHtml(t('pur-branch'))}</label><div class="fld"><select id="pur-sf-branchtype"><option value="head_office">${escapeHtml(t('pur-branch-head'))}</option><option value="branch">${escapeHtml(t('pur-branch-sub'))}</option><option value="none">${escapeHtml(t('pur-branch-na'))}</option></select></div>
+                <div id="pur-sf-branchcode-wrap" style="display:none;"><label>${escapeHtml(t('pur-branch-code'))}</label><div class="fld"><input id="pur-sf-branchno" class="tnum" placeholder="00000"></div></div>
+                <label>${escapeHtml(t('pur-address'))}</label><div class="fld"><input id="pur-sf-address" placeholder="—"></div>
                 <label>${escapeHtml(t('pur-supplier-phone'))}</label><div class="fld"><input id="pur-sf-phone"></div>
             </div>
             <div class="smf"><button class="g" id="pur-sf-cancel">${escapeHtml(t('pur-cancel'))}</button><button class="ok" id="pur-sf-save">${escapeHtml(t('pur-save'))}</button></div>
@@ -126,7 +130,20 @@ function openModal(s: Supplier | null): void {
     (document.getElementById('pur-sf-name') as HTMLInputElement).value = s ? s.name : '';
     (document.getElementById('pur-sf-tax') as HTMLInputElement).value = (s && s.tax_id) || '';
     (document.getElementById('pur-sf-phone') as HTMLInputElement).value = (s && s.phone) || '';
+    const bt = document.getElementById('pur-sf-branchtype') as HTMLSelectElement;
+    bt.value = (s && s.branch_type) || 'none';
+    (document.getElementById('pur-sf-branchno') as HTMLInputElement).value =
+        (s && s.branch_no) || '';
+    (document.getElementById('pur-sf-address') as HTMLInputElement).value = (s && s.address) || '';
+    toggleBranchCode();
     mask.classList.add('show');
+}
+
+// 分店代码仅在「分店」时需要(总部=00000 / 无分支不需要)。
+function toggleBranchCode(): void {
+    const bt = document.getElementById('pur-sf-branchtype') as HTMLSelectElement | null;
+    const wrap = document.getElementById('pur-sf-branchcode-wrap');
+    if (bt && wrap) wrap.style.display = bt.value === 'branch' ? 'block' : 'none';
 }
 
 function bind(): void {
@@ -138,6 +155,7 @@ function bind(): void {
     document.getElementById('pur-sup-add')!.onclick = () => openModal(null);
     const mask = document.getElementById('pur-sup-mask')!;
     document.getElementById('pur-sf-cancel')!.onclick = () => mask.classList.remove('show');
+    (document.getElementById('pur-sf-branchtype') as HTMLSelectElement).onchange = toggleBranchCode;
     mask.onclick = (e) => {
         if (e.target === mask) mask.classList.remove('show');
     };
@@ -151,9 +169,18 @@ async function save(): Promise<void> {
         showToast(t('pur-supplier-name-req'), 'error');
         return;
     }
+    const branchType = (document.getElementById('pur-sf-branchtype') as HTMLSelectElement).value;
     const body = {
         name,
         tax_id: (document.getElementById('pur-sf-tax') as HTMLInputElement).value.trim() || null,
+        branch_type: branchType,
+        branch_no:
+            branchType === 'branch'
+                ? (document.getElementById('pur-sf-branchno') as HTMLInputElement).value.trim() ||
+                  null
+                : null,
+        address:
+            (document.getElementById('pur-sf-address') as HTMLInputElement).value.trim() || null,
         phone: (document.getElementById('pur-sf-phone') as HTMLInputElement).value.trim() || null,
     };
     try {

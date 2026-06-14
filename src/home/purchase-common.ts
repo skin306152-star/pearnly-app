@@ -17,12 +17,16 @@ export interface DocListItem {
     supplier_name: string | null;
     title: string | null; // 「进货 12 项」/「打车」等列表副标
     doc_kind: DocKind;
+    doc_type: string; // 精简文档类型:tax_invoice/simple_tax_receipt/receipt/purchase_order/substitute_receipt/other
     category_label: string | null;
     source: Source;
     grand_total: number;
     vat_amount: number;
+    has_vat: boolean;
     payment_status: PaymentStatus;
     status: DocStatus;
+    upload_date: string | null; // 上传/创建日期(票面/上传日期口径切换用)
+    attachment_count: number; // 附件张数(列表「+N」用)
 }
 
 export interface DocSummary {
@@ -83,6 +87,7 @@ export interface DocLine {
     category_id?: string | null;
     subcategory_id?: string | null;
     stock_in?: boolean;
+    discountOn?: boolean; // 行折扣开关(UI 态 · 控制是否显示/计折扣输入)
 }
 
 export interface DocAttachment {
@@ -294,19 +299,38 @@ export function normSummary(raw: Raw): DocSummary {
     };
 }
 
+// 精简文档类型:后端给 doc_type 用之,否则从 doc_kind + 有无税票推(列表筛选「文档类型」用)。
+function deriveDocType(raw: Raw, kind: DocKind, hasVat: boolean): string {
+    const given = (raw.doc_type as string) || '';
+    if (given) return given;
+    if (kind === 'purchase_order') return 'purchase_order';
+    if (hasVat) return kind === 'purchase_invoice' ? 'tax_invoice' : 'simple_tax_receipt';
+    return 'receipt';
+}
+
 export function normListItem(raw: Raw): DocListItem {
+    const kind = (raw.doc_kind as DocKind) || 'expense';
+    const hasVat = raw.has_vat != null ? !!raw.has_vat : numOf(raw.vat_amount) > 0;
     return {
         id: String(raw.id),
         doc_date: (raw.doc_date as string) || null,
         supplier_name: (raw.supplier_name as string) || null,
         title: (raw.title as string) || (raw.doc_no as string) || null,
-        doc_kind: (raw.doc_kind as DocKind) || 'expense',
+        doc_kind: kind,
+        doc_type: deriveDocType(raw, kind, hasVat),
         category_label: (raw.category_label as string) || null,
         source: (raw.source as Source) || 'manual',
         grand_total: numOf(raw.grand_total),
         vat_amount: numOf(raw.vat_amount),
+        has_vat: hasVat,
         payment_status: (raw.payment_status as PaymentStatus) || 'unpaid',
         status: (raw.status as DocStatus) || 'posted',
+        upload_date:
+            (raw.upload_date as string) ||
+            (raw.created_at as string) ||
+            (raw.doc_date as string) ||
+            null,
+        attachment_count: numOf(raw.attachment_count),
     };
 }
 

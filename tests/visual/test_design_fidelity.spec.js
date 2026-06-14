@@ -352,27 +352,10 @@ const MAPPINGS = [
         // 无 bluemust:history-main 初始隐藏,无可见主色按钮可验
         nosvgemoji: '#history-empty svg',
     },
-    {
-        name: '对账中心 reconcile(A组屏)',
-        design: 'reconcile.html',
-        route: 'reconcile',
-        ready: '#page-reconcile .pagehead',
-        layout: { sel: '#page-reconcile .wrap', maxWidth: 'none', centered: true },
-        tokens: [
-            {
-                design: '.h1',
-                prod: '#page-reconcile .pagehead .h1',
-                props: ['fontSize', 'fontWeight'],
-            },
-            {
-                design: '.recon-tab-btn.active',
-                prod: '.recon-tab-btn.active',
-                props: ['boxShadow', 'borderRadius'],
-            },
-        ],
-        // 无 bluemust:对账中心 tab 用中性色(白底·非主色)
-        nosvgemoji: '.recon-tab-btn.active svg',
-    },
+    // 对账中心 reconcile 映射已移除(2026-06-14):对账中心 6-14 重设计为 .rcx-* DOM(#rcx-root),
+    // 旧 .pagehead/.recon-tab-btn/.h1 与旧 reconcile.html 基线全失效;且 recon 文件不在 DESIGN_CHANGED
+    // 触发范围(正则仅 pos/inventory/purchase-)→ 此映射对新设计零真实覆盖,只会在别模块改动时误 fail。
+    // recon 团队若要恢复覆盖,请按新 .rcx 设计补 reconcile 基线 + 新选择器重加本映射。
     {
         name: '销售工作台 sales-invoices(A组屏)',
         design: 'sales-invoices.html',
@@ -488,7 +471,7 @@ const MAPPINGS = [
             { design: '.card', prod: '.pur .card', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .btn.primary',
-        nosvgemoji: '.pur .img svg',
+        nosvgemoji: '.pur .viewer .vtools svg',
     },
     {
         name: '单据详情(06)',
@@ -792,6 +775,10 @@ async function styleOf(page, sel, props) {
         await page.evaluate(() => {
             window.isOwner = () => true;
             window.getActiveWorkspaceClientId = () => 1;
+            // 套账硬门(2026-06-12 上线)对空 stub 一直 preboot · 把全站藏成 visibility:hidden →
+            // 本视觉闸所有路由都渲染失败。隔离渲染各页时绕开它(移除 preboot + 门覆盖层)。
+            document.body.classList.remove('workspace-gate-preboot');
+            document.getElementById('workspace-gate-root')?.remove();
             const st = document.createElement('style');
             st.textContent = '#ws-modal{display:none!important;}';
             document.head.appendChild(st);

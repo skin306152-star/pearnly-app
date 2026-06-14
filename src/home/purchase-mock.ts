@@ -66,7 +66,9 @@ const LIST: DocListItem[] = [
         'photo',
         18190,
         1190,
-        'unpaid'
+        'unpaid',
+        'tax_invoice',
+        3
     ),
     mkItem('doc-2', '2026-06-08', 'แท็กซี่', '打车', 'expense', '交通费', 'line', 200, 0, 'paid'),
     mkItem(
@@ -117,24 +119,39 @@ function mkItem(
     src: DocListItem['source'],
     grand: number,
     vat: number,
-    pay: DocListItem['payment_status']
+    pay: DocListItem['payment_status'],
+    docType?: string,
+    atts = 1
 ): DocListItem {
+    const hasVat = vat > 0;
     return {
         id,
         doc_date: date,
         supplier_name: sup,
         title,
         doc_kind: kind,
+        doc_type:
+            docType ||
+            (kind === 'purchase_order'
+                ? 'purchase_order'
+                : hasVat
+                  ? kind === 'purchase_invoice'
+                      ? 'tax_invoice'
+                      : 'simple_tax_receipt'
+                  : 'receipt'),
         category_label: cat,
         source: src,
         grand_total: grand,
         vat_amount: vat,
+        has_vat: hasVat,
         payment_status: pay,
         status: 'posted',
+        upload_date: date,
+        attachment_count: atts,
     };
 }
 
-// mock 是 common↔mock 循环导入的一端:不在模块顶层读 common 的运行时常量(TDZ),用本地字面量。
+// mock 是 common/mock 循环导入的一端:不在模块顶层读 common 的运行时常量(TDZ),用本地字面量。
 const SETTINGS: PurchaseSettings = {
     default_vat_rate: 7,
     auto_stock_in: true,
@@ -351,7 +368,7 @@ export function mockHandle(method: string, rawPath: string, payload?: unknown): 
         return wrapDetail(DETAILS[id] || fallbackDetail(id));
     }
 
-    // ── 行↔商品 ──
+    // ── 行/商品 ──
     if (path.includes('/lines/') && path.endsWith('/match-product')) {
         return {
             line_id: seg(path, 'lines'),
@@ -369,8 +386,8 @@ export function mockHandle(method: string, rawPath: string, payload?: unknown): 
             id: nid('sup'),
             name: String(body.name || ''),
             tax_id: (body.tax_id as string) || null,
-            branch_type: 'none',
-            branch_no: null,
+            branch_type: (body.branch_type as Supplier['branch_type']) || 'none',
+            branch_no: (body.branch_no as string) || null,
             address: (body.address as string) || null,
             phone: (body.phone as string) || null,
             note: (body.note as string) || null,

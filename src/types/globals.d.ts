@@ -324,6 +324,7 @@ interface Window {
     openPurchasePay?: (doc: unknown, onDone?: () => void) => void;
     openPurchaseMatch?: (line: unknown, onDone?: (res: unknown) => void) => void;
     openPurchaseSupplierPicker?: (onPick: (s: unknown) => void) => void;
+    openPurchaseExport?: () => void;
     isOwner?: (u?: AppUser | null) => boolean;
     reloadInventory?: () => void;
     openInventoryIn?: () => void;

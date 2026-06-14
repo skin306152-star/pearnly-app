@@ -9,6 +9,12 @@ const fs = require('fs');
 const OUT = 'scripts/_ui_audit_full';
 fs.mkdirSync(OUT, { recursive: true });
 
+// 视口维度:默认桌面;PEARNLY_AUDIT_MOBILE=1 切手机(iPhone 12 宽)· 文件名带 d-/m- 前缀防覆盖。
+// 两次跑(桌面 + 手机)× 脚本内浅/暗两遍 = 暗夜×移动端四象限,肉眼扫白底洗白/窄屏溢出。
+const MOBILE = !!process.env.PEARNLY_AUDIT_MOBILE;
+const VP = MOBILE ? { width: 390, height: 844 } : { width: 1440, height: 900 };
+const TAG = MOBILE ? 'm' : 'd';
+
 const ROUTES = [
     'dashboard',
     'ocr',
@@ -48,7 +54,7 @@ async function killWs(page) {
 }
 async function shot(page, name, m) {
     try {
-        await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
+        await page.screenshot({ path: `${OUT}/${TAG}-${name}.png`, fullPage: true });
         m.push({ name, ok: true });
     } catch (e) {
         m.push({ name, ok: false, err: String(e).slice(0, 80) });
@@ -75,7 +81,7 @@ test('full surface audit', async ({ page }) => {
     );
     test.setTimeout(600000);
     const m = [];
-    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.setViewportSize(VP);
     await doUiLogin(page);
     await page.waitForTimeout(2500);
 

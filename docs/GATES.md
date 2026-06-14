@@ -26,6 +26,7 @@
 | check_file_size | 任何改动 | 任何监控文件 >500 行 | `python scripts/check_file_size.py --quiet` | 先拆,无豁免 |
 | check_line_ratchet | 任何改动 | 监控文件行数净增 | `python scripts/check_line_ratchet.py --base origin/master --head HEAD --quiet` | 合理增长:commit 写 `RATCHET-EXEMPT: <file> +<N> · <理由>`;**新文件一律先豁免** |
 | check_ui_consistency | 任何改动 | D1 禁新抽屉(用 .modal)/D2 按钮禁黑底(用 var(--btn-blue)) | `python scripts/check_ui_consistency.py --quiet` | 只导航栏可黑 |
+| check_theme_responsive 棘轮 | 任何改动 | 暗夜不翻面的写死色(3位hex/white·black/不透明rgb·补 6 位 hex 闸的漏)+ 入口页 viewport 必须在,命中**只许降** | `python scripts/check_theme_responsive.py --gate --quiet` | 半透明 rgba(阴影/遮罩)豁免;颜色一律 var(--token);存量降了跑 `--update-baseline` 收紧;**手机端"合理"机械保证不了,真机验收见 docs/ui/THEME_RESPONSIVE_VERIFY.md** |
 | check_authz_coverage | 任何改动 | 每路由必声明权限或上公开白名单(第 8 道) | `PEARNLY_SKIP_HEAVY_INIT=1 python scripts/check_authz_coverage.py --quiet` | 公开路由进 PUBLIC_ROUTES 带注释;自定义门函数要登记进闸的 helper 清单(`_auth` 误判先例) |
 | 视觉照搬闸 | 改 POS/库存/采购照搬页 | 关键令牌 == 设计快照 | `node tests/visual/test_design_fidelity.spec.js` | 改设计=同步更新 tests/visual/design/ 快照 |
 

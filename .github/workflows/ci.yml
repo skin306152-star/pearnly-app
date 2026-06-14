@@ -142,6 +142,11 @@ jobs:
       - name: UI 一致性棘轮 · 违规不许反弹超基线(审计 #2)
         run: python scripts/check_ui_consistency.py
 
+      # 暗夜模式 + 移动端兜底棘轮(2026-06-15)· 暗夜不翻面的写死色(3位hex/white·black/
+      # 不透明rgb)各类只许降不许升 + 入口页 viewport 必须在 · 基线 scripts/theme_responsive_baseline.json
+      - name: 暗夜/移动端棘轮(--gate · FAIL mode)
+        run: python scripts/check_theme_responsive.py --gate
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:

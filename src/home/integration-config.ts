@@ -7,7 +7,7 @@
 // ============================================================
 
 // v118.32.5.5.37 NAV-IA Phase 5 收尾 · 集成页「配置」按钮 → 右侧抽屉(不再跳 automation 路由)
-// anchor→drawer tab 映射(google-drive/sheets 走原 inline 展开 · 不拦截)
+// anchor→drawer tab 映射(map 外的 anchor 不拦截 · 各自处理)
 (function () {
     const _anchorMap: Record<string, string> = {
         line: 'line',
@@ -28,6 +28,6 @@
                 window.openIntegrationDrawer(_anchorMap[anchor], title);
             }
         }
-        // google-drive / google-sheets 走原有 inline 展开逻辑 · 不拦截
+        // map 外的 anchor(如 Google 连接卡 · 自带按钮在 purchase-google.ts 处理)不拦截
     });
 })();

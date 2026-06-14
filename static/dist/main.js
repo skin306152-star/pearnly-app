@@ -953,36 +953,8 @@ This device has been logged out automatically.`,th:`บัญชีของค�
                 <div class="int-actions" id="int-google-act"></div>
             </div>
 
-            <div class="integration-row" data-firm-only="1" data-int-target="automation" data-int-anchor="google-drive">
-                <div class="int-icon ic-g">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 2L4 16h6l2-4h4l2 4h-6L12 2z"/>
-                    </svg>
-                </div>
-                <div class="int-info">
-                    <div class="int-name"><span data-i18n="int-name-drive">Google Drive</span></div>
-                    <div class="int-desc" data-i18n="int-desc-drive">发票/PV 审核后自动存入 Drive · 按客户和月份归档</div>
-                </div>
-                <div class="int-actions">
-                    <button class="int-btn-configure" data-route="automation" data-i18n="btn-configure">配置</button>
-                </div>
-            </div>
-
-            <div class="integration-row" data-firm-only="1" data-int-target="automation" data-int-anchor="google-sheets">
-                <div class="int-icon ic-gs">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                        <path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>
-                    </svg>
-                </div>
-                <div class="int-info">
-                    <div class="int-name"><span data-i18n="int-name-sheets">Google Sheets</span></div>
-                    <div class="int-desc" data-i18n="int-desc-sheets">识别结果实时同步到 Sheets · 老板/会计师在线查看</div>
-                </div>
-                <div class="int-actions">
-                    <button class="int-btn-configure" data-route="automation" data-i18n="btn-configure">配置</button>
-                </div>
-            </div>
+            <!-- 旧的 Google Drive / Google Sheets 两条描述行已删:被上方 OAuth 连接卡取代
+                 (一次授权覆盖 Drive + Sheets)· 对齐原型⑥单卡 · 去 3 条 Google 冗余。 -->
 
             <div class="sec-divider" data-firm-only="1"></div>
 

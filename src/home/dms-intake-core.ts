@@ -36,8 +36,13 @@ export const S = {
 };
 
 export const ID_KEYS = ['prefix_id', 'name', 'people_id', 'tax_id', 'birthday_be'];
+// 地址全字段(含楼/层/室/村庄)· 表单可编辑的都要进 payload,否则手动改了发不出去
 export const ADDR_KEYS = [
     'house_no',
+    'building',
+    'floor',
+    'room',
+    'village',
     'moo',
     'soi',
     'road',

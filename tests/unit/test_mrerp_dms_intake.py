@@ -258,11 +258,20 @@ class SaveSemanticTests(unittest.TestCase):
     def _posted(self, endpoint):
         return [p for p in self.t.posts if p[0].endswith(endpoint)][0][1]
 
-    def test_blank_value_does_not_clear_existing(self):
+    def test_present_empty_clears_absent_keeps(self):
+        """所见即所存:键【存在】=空串 → 真清空(手动清除生效);键【缺省】→ 保留 DMS 原值。"""
+        # phone 显式传空串(用户手动清空)→ 清空 DMS txttel
         self.t._edit_name = "Keep Name"
-        # phone 留空 → 不应把 DMS 现有 txttel 覆盖成空
         self.c.save_customer(
             fields={"name": "Keep Name", "people_id": "1234567890123", "phone": ""},
+            mode="overwrite",
+            customer_id="95",
+        )
+        self.assertEqual(self._posted("cus/edit.php")["txttel"], "")
+        # phone 键不传(用户没动)→ 保留 DMS 现有 txttel
+        self.t.posts.clear()
+        self.c.save_customer(
+            fields={"name": "Keep Name", "people_id": "1234567890123"},
             mode="overwrite",
             customer_id="95",
         )

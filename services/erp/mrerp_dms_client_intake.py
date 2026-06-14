@@ -231,11 +231,12 @@ class DMSClientIntakeMixin:
         f: Dict[str, Any],
         addresses: Optional[Dict[str, Dict[str, Any]]] = None,
     ) -> None:
-        # 空值跳过:不把面板里没填的字段写成空覆盖掉 DMS 原值。
+        # 所见即所存:字段【存在】(键在)就写,空串=真清空 DMS;字段【缺省】(键不在)
+        # 才保留载入的 DMS 原值。前端表单初值来自 DMS,没动的字段原样回写(=保留)、
+        # 手动清空的字段送空串(=清除)。需求:更新只动身份证有的、手动改的按用户来。
         for fk, dms in _IDENTITY_MAP.items():
-            v = f.get(fk)
-            if v not in (None, ""):
-                data[dms] = str(v)
+            if fk in f:
+                data[dms] = str(f.get(fk) or "")
         # 个人主体:税号留空时取身份证号(DMS 个人客户税号=身份证号)
         if not f.get("tax_id") and f.get("people_id"):
             data["txttaxid"] = str(f["people_id"])
@@ -245,9 +246,8 @@ class DMSClientIntakeMixin:
             if sfx not in _ADDR_SUFFIXES:
                 continue
             for fk, dms in _ADDR_MAP.items():
-                v = (blk or {}).get(fk)
-                if v not in (None, ""):
-                    data[dms + sfx] = str(v)
+                if fk in (blk or {}):
+                    data[dms + sfx] = str((blk or {}).get(fk) or "")
 
     def _guard_required_selects(self, data: Dict[str, str], form_html: str) -> None:
         """空必填 select 触发误导性 "already in use" → 补成有效值(实测坑)。"""

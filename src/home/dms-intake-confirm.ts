@@ -243,6 +243,12 @@ export async function doSave() {
     const { fields, addresses } = buildPayload();
     if (!fields.people_id || !fields.name) return showToast(t('dic-need-fields'), 'error');
     const mode = !existing() ? 'create' : S.decision;
+    // 新建客户:手机号必填(DMS 要求,不填进不了系统)
+    if (mode === 'create' && !String(fields.phone || '').trim()) {
+        S.tab = 'allfields';
+        renderConfirm();
+        return showToast(t('dx-need-phone'), 'error');
+    }
     S.busy = true;
     const okBtn = $('dx-m-ok') as HTMLButtonElement | null;
     if (okBtn) okBtn.disabled = true;

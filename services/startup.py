@@ -266,6 +266,17 @@ def _boot_schema_ddl() -> None:
     except Exception as e:
         logger.warning(f"启动 采购 schema 失败(等 alembic 0031-0033): {e}")
 
+    # 进项外流(Google 归档)schema + 注册 export 异步 handler(复用 recon_jobs worker)。
+    try:
+        from services.export.schema import ensure_export_schema
+
+        ensure_export_schema()
+        from services.export import archive as _export_archive
+
+        _export_archive.register()
+    except Exception as e:
+        logger.warning(f"启动 外流 schema/handler 失败: {e}")
+
 
 async def run_startup() -> dict:
     """app 启动序列 · 返回 {email_task, erp_retry_task} 供 run_shutdown cancel。"""

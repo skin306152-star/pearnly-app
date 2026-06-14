@@ -55,6 +55,7 @@ PUBLIC_ROUTES = {
     ("GET", "/api/auth/line/callback"),
     # OAuth 回调(state 即凭证)
     ("GET", "/api/erp/xero/auth/callback"),
+    ("GET", "/api/integrations/google/callback"),  # Google 外流授权回调 · state CSRF 即凭证
     # webhook(签名校验在实现内:LINE signature / GitHub secret)
     ("POST", "/api/line/webhook"),
     ("POST", "/internal/deploy"),

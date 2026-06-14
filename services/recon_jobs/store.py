@@ -18,7 +18,7 @@ from core.db import get_cursor
 
 logger = logging.getLogger("recon_jobs")
 
-VALID_JOB_TYPES = ("bank", "glvat", "salesvat")
+VALID_JOB_TYPES = ("bank", "glvat", "salesvat", "export")
 
 # Params keys never written to the job row (secrets the worker re-resolves).
 _SECRET_PARAM_KEYS = frozenset({"api_key"})

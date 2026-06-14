@@ -245,9 +245,10 @@ class DMSClientIntakeMixin:
         for sfx, blk in blocks.items():
             if sfx not in _ADDR_SUFFIXES:
                 continue
+            blk = blk or {}
             for fk, dms in _ADDR_MAP.items():
-                if fk in (blk or {}):
-                    data[dms + sfx] = str((blk or {}).get(fk) or "")
+                if fk in blk:
+                    data[dms + sfx] = str(blk.get(fk) or "")
 
     def _guard_required_selects(self, data: Dict[str, str], form_html: str) -> None:
         """空必填 select 触发误导性 "already in use" → 补成有效值(实测坑)。"""

@@ -120,8 +120,13 @@ export function buildNewVals() {
         people_id: ic.people_id || '',
         tax_id: ic.people_id || '',
         birthday_be: ic.birthday_be || '',
-        phone: '',
+        phone: '', // 身份证无电话 · 用户手填
         house_no: txt.house_no || addr.house_no || '',
+        // 楼/层/室/村庄:身份证不印 → 空(存量更新时 applyDecisionToForm 据此保留 DMS 原值)
+        building: '',
+        floor: '',
+        room: '',
+        village: '',
         moo: txt.moo || addr.moo || '',
         soi: txt.soi || addr.soi || '',
         road: txt.road || addr.road || '',

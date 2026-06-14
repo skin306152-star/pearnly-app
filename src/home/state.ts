@@ -241,7 +241,7 @@ window.subscribeI18n = function (name, fn) {
 // ============================================================
 window.currentLang = localStorage.getItem('mrpilot_lang') || 'th';
 window._currentLang = window.currentLang; // 历史别名 · 部分 IIFE 读它
-window.currentRoute = 'ocr';
+window.currentRoute = 'dms-intake';
 window._userInfo = null;
 window._quota = null;
 window._contact = null;

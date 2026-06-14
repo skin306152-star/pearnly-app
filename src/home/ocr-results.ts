@@ -1,5 +1,6 @@
 // ============================================================
-// REFACTOR-C1-home-batch1 (2026-05-31) · OCR 结果表 + 抽屉渲染 从 home.js 抽出为独立 ES module
+// 共享详情抽屉(openDrawer/closeDrawer + drawer-body 字段渲染)· 被识别记录(history-drawer)/对账(recon-drawer)复用。
+// (原 OCR 结果表/搜索/排序已随「上传识别」页删除 · 2026-06-15)
 //
 // 来源:home.js verbatim 0 改逻辑 · renderResults / 结果表排序+搜索监听 /
 //   updateResultsMatchCount / openDrawer / renderWhtBadge / renderField /
@@ -13,180 +14,7 @@
 // 仍在 home.js(后续批):RD 税务 API 簇(rdFetch/callRdVerify/callRdSync/openRdSyncModal)
 //   + drawer-body 事件委托 + onFieldEdit/updateDrawerEditCount。
 // ============================================================
-/* global escapeHtml, _results, _selectedFiles, _searchKeyword:writable, _sortKey:writable, _sortDir:writable, _drawerIdx:writable, onFieldEdit, updateDrawerEditCount, injectOcrPushButton */
-
-// ============================================================
-// 结果渲染
-// ============================================================
-type ResultRow = OcrResult & { _idx: number };
-
-function renderResults() {
-    const card = document.getElementById('results-card');
-    if (_results.length === 0) {
-        card!.classList.remove('show');
-        return;
-    }
-    card!.classList.add('show');
-
-    // 顶部统计条:发票数 · 识别成功率 · 合计金额(一行)
-    // v118.20.1.6 · 改用「识别成功率」语义(以前的「高置信」会误导用户跳过复核)
-    let totalSum = 0;
-    _results.forEach((r) => {
-        const v = parseFloat(r.merged_fields.total_amount as string);
-        if (!isNaN(v)) totalSum += v;
-    });
-    const totalFiles = (_selectedFiles && _selectedFiles.length) || _results.length;
-    const successCount = _results.length;
-    // @ts-expect-error TS6133 verbatim 占位
-    const successRate = totalFiles > 0 ? Math.round((successCount / totalFiles) * 100) : 0;
-    const totalFmt = totalSum.toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    });
-
-    document.getElementById('results-head-stats')!.innerHTML = `
-        <div class="rh-stat">
-            <span class="rh-stat-value">${successCount}</span>
-            <span class="rh-stat-label">${t('stats-invoices')}</span>
-        </div>
-        <div class="rh-stat">
-            <span class="rh-stat-label">${t('stats-total')}</span>
-            <span class="rh-stat-value">฿ ${totalFmt}</span>
-        </div>
-    `;
-
-    // 过滤 + 排序
-    let rows: ResultRow[] = _results.map((r, idx) => ({ ...r, _idx: idx }) as ResultRow);
-    if (_searchKeyword) {
-        const kw = _searchKeyword.toLowerCase();
-        rows = rows.filter(
-            (r) =>
-                ((r.filename as string) || '').toLowerCase().includes(kw) ||
-                ((r.merged_fields.invoice_number as string) || '').toLowerCase().includes(kw)
-        );
-    }
-    if (_sortKey) {
-        rows.sort((a, b) => {
-            let va: unknown, vb: unknown;
-            if (_sortKey === 'filename') {
-                va = a.filename;
-                vb = b.filename;
-            } else if (_sortKey === 'invoice_no') {
-                va = a.merged_fields.invoice_number;
-                vb = b.merged_fields.invoice_number;
-            } else if (_sortKey === 'invoice_date') {
-                va = a.merged_fields.date;
-                vb = b.merged_fields.date;
-            } else if (_sortKey === 'total') {
-                va = parseFloat(a.merged_fields.total_amount as string) || 0;
-                vb = parseFloat(b.merged_fields.total_amount as string) || 0;
-            } else if (_sortKey === 'confidence') {
-                va = a.confidence;
-                vb = b.confidence;
-            } else {
-                va = '';
-                vb = '';
-            }
-            if ((va as number) < (vb as number)) return _sortDir === 'asc' ? -1 : 1;
-            if ((va as number) > (vb as number)) return _sortDir === 'asc' ? 1 : -1;
-            return 0;
-        });
-    }
-
-    const tbody = document.getElementById('results-tbody');
-    tbody!.innerHTML = rows
-        .map((r, visibleIdx) => {
-            const f = r.merged_fields;
-            const emptyCell = `<span class="empty-cell">${t('empty-val')}</span>`;
-            const confTipKey = 'conf-tip-' + ((r.confidence as string) || 'low');
-            const confLabelKey = 'conf-' + ((r.confidence as string) || 'low');
-            const confTip = t(confTipKey);
-            const confLabel = t(confLabelKey);
-            return `
-            <tr data-idx="${r._idx}">
-                <td class="num">${visibleIdx + 1}</td>
-                <td class="fname" title="${escapeHtml(r.filename)}">${escapeHtml(r.filename)}</td>
-                <td class="inv">${f.invoice_number ? escapeHtml(f.invoice_number) : emptyCell}</td>
-                <td class="date">${f.date ? escapeHtml(f.date) : emptyCell}</td>
-                <td class="amount">${f.total_amount ? Number(f.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : emptyCell}</td>
-                <td><span class="conf-badge ${r.confidence as string}" title="${escapeHtml(confTip)}">${confLabel}</span></td>
-            </tr>
-        `;
-        })
-        .join('');
-
-    document.querySelectorAll('#results-table th').forEach((th) => {
-        th.classList.remove('sort-asc', 'sort-desc');
-        if ((th as HTMLElement).dataset.sort === _sortKey) th.classList.add('sort-' + _sortDir);
-    });
-
-    tbody!.querySelectorAll('tr').forEach((tr) => {
-        tr.addEventListener('click', () => {
-            const idx = parseInt(tr.dataset.idx!, 10);
-            openDrawer(idx);
-        });
-    });
-}
-
-// 排序点击
-document.querySelectorAll('#results-table th').forEach((th) => {
-    if (th.classList.contains('no-sort')) return;
-    th.addEventListener('click', () => {
-        const key = (th as HTMLElement).dataset.sort as string;
-        if (_sortKey === key) _sortDir = _sortDir === 'asc' ? 'desc' : 'asc';
-        else {
-            _sortKey = key;
-            _sortDir = 'asc';
-        }
-        renderResults();
-    });
-});
-
-// v0.11 · 识别页搜索:防抖 + 清除按钮 + 匹配计数
-let _resultsSearchTimer: ReturnType<typeof setTimeout> | null = null;
-document.getElementById('search-input')!.addEventListener('input', (e) => {
-    const val = (e.target as HTMLInputElement).value;
-    document.getElementById('search-clear')!.style.display = val ? '' : 'none';
-    clearTimeout(_resultsSearchTimer!);
-    _resultsSearchTimer = setTimeout(() => {
-        _searchKeyword = val.trim();
-        renderResults();
-        updateResultsMatchCount();
-    }, 200);
-});
-document.getElementById('search-clear')!.addEventListener('click', () => {
-    const input = document.getElementById('search-input') as HTMLInputElement;
-    input.value = '';
-    _searchKeyword = '';
-    document.getElementById('search-clear')!.style.display = 'none';
-    renderResults();
-    updateResultsMatchCount();
-    input.focus();
-});
-
-function updateResultsMatchCount() {
-    const el = document.getElementById('search-matches');
-    if (!el) return;
-    if (!_searchKeyword) {
-        el.textContent = '';
-        return;
-    }
-    const kw = _searchKeyword.toLowerCase();
-    let n = 0;
-    for (const r of _results) {
-        const hay = [
-            r.filename,
-            r.merged_fields?.invoice_number,
-            r.merged_fields?.seller_name,
-            r.merged_fields?.buyer_name,
-        ]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase();
-        if (hay.includes(kw)) n++;
-    }
-    el.textContent = t('search-matches', { n });
-}
+/* global escapeHtml, _results, _drawerIdx, onFieldEdit, updateDrawerEditCount, injectOcrPushButton */
 
 // ============================================================
 // 抽屉
@@ -483,6 +311,5 @@ function closeDrawer() {
 }
 
 // 桥回 home.js:bootstrap(applyLang 守卫)与多处 runtime 调用
-window.renderResults = renderResults;
 window.openDrawer = openDrawer;
 window.closeDrawer = closeDrawer;

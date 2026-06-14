@@ -80,9 +80,6 @@ function applyLang(lang?: any) {
 
     if (_userInfo && typeof window.renderInfoBar === 'function') window.renderInfoBar();
     if (_quota) updateUploadHint();
-    // renderFileList/renderResults 已迁 defer 模块 · bootstrap 同步调时 window 桥可能未就绪 → 守卫跳过(数据空 · 无害)
-    if (window.renderFileList) window.renderFileList();
-    if (window.renderResults) window.renderResults();
     if (currentRoute === 'settings' && typeof window.renderSettings === 'function')
         window.renderSettings();
 
@@ -205,7 +202,7 @@ import { VALID_ROUTES, ROUTE_LOADERS } from './route-table.js';
 
 function routeTo(route?: any) {
     // REFACTOR-C1 · 老 admin/admin-users/admin-cost 路由已下线(超管走独立 /admin SPA)· 落到 ocr
-    if (!VALID_ROUTES.includes(route)) route = 'ocr';
+    if (!VALID_ROUTES.includes(route)) route = 'dms-intake';
     currentRoute = route;
     // v118.33.5 NAV-IA Phase 5 · 进子项路由 · 自动展开所在折叠组(销项/进项)
     if (typeof window.expandNavGroupForRoute === 'function') {
@@ -257,7 +254,9 @@ function reloadCurrentRoute(): void {
 
 function updateUploadHint() {
     if (!_quota) return;
-    document.getElementById('upload-hint')!.textContent = t('upload-hint', {
+    const _hintEl = document.getElementById('upload-hint');
+    if (!_hintEl) return; // #page-ocr(上传识别页)已删 · 无此元素则跳过
+    _hintEl.textContent = t('upload-hint', {
         pages: getMaxPagesPerFile(), // v111.2 · 用 plan limits
         mb: getMaxMbPerFile(), // v111.2 · 用 plan limits
         files: getMaxFiles(),
@@ -400,8 +399,8 @@ try {
 
 // hash 路由初始化
 try {
-    const initialRoute = (location.hash || '#/ocr').replace(/^#\//, '');
-    routeTo(VALID_ROUTES.includes(initialRoute) ? initialRoute : 'ocr');
+    const initialRoute = (location.hash || '#/dms-intake').replace(/^#\//, '');
+    routeTo(VALID_ROUTES.includes(initialRoute) ? initialRoute : 'dms-intake');
 } catch (e) {
     console.warn('[boot] routeTo failed', e);
 }

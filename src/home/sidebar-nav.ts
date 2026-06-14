@@ -31,7 +31,7 @@ document.getElementById('sidebar-overlay')?.addEventListener('click', () => {
 });
 
 window.addEventListener('hashchange', () => {
-    const r = (location.hash || '#/ocr').replace(/^#\//, '');
+    const r = (location.hash || '#/dms-intake').replace(/^#\//, '');
     routeTo(r);
 });
 

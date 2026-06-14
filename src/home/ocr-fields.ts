@@ -9,7 +9,7 @@
  *   (home.js 顶层 · 全局解析 · 仅属性 mutation)· 调 renderResults(window 桥)。
  * - 全部调用点都在事件 / 异步 handler 内 → 无引导期裸调风险。
  */
-/* global _results, _drawerIdx, renderResults */
+/* global _results, _drawerIdx */
 
 function mergeFields(
     pages: Array<{ fields?: Record<string, unknown>; is_duplicate?: boolean; is_copy?: boolean }>
@@ -88,7 +88,6 @@ function onFieldEdit(e: Event) {
     const wrap = document.querySelector(`[data-field-wrap="${key}"]`);
     if (wrap) wrap.classList.toggle('edited', r.edits[key] !== undefined);
     updateDrawerEditCount();
-    renderResults();
 }
 
 function updateDrawerEditCount() {

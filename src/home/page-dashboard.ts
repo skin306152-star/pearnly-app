@@ -47,7 +47,7 @@
                     <div class="ch" data-i18n="dash-quick-title">快速操作</div>
                     <div class="cs" data-i18n="dash-quick-sub">3 步进入主流程</div>
                     <div class="qa">
-                        <div class="qb" onclick="window.routeTo && window.routeTo('ocr')">
+                        <div class="qb" onclick="window.routeTo && window.routeTo('dms-intake')">
                             <span class="qi"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M3 19h18"/></svg></span>
                             <span data-i18n="dash-quick-upload">上传发票</span>
                         </div>

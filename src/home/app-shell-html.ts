@@ -165,14 +165,6 @@ const SIDEBAR_HTML = `
             </svg>
         </div>
         <div class="nav-sub">
-            <div class="nav-item nav-sub-item" data-route="ocr" data-module="sales">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 4h8l4 4v8a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1z"/>
-                    <path d="M12 4v4h4"/>
-                    <path d="M7 12h6M7 15h4"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-ocr">上传识别</span>
-            </div>
             <div class="nav-item nav-sub-item" data-route="dms-intake" data-module="sales">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="3" y="5" width="14" height="11" rx="2"/>

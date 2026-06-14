@@ -10,7 +10,7 @@
  * - 读 token/_results/_drawerIdx(home.js 顶层 · 全局解析)· 调 _showSessionRevokedModal/
  *   updateDrawerEditCount/renderResults(经 window 桥)。_results[_drawerIdx] 仅属性 mutation。
  */
-/* global token, _showSessionRevokedModal, escapeHtml, _results, _drawerIdx, updateDrawerEditCount, renderResults */
+/* global token, _showSessionRevokedModal, escapeHtml, _results, _drawerIdx, updateDrawerEditCount */
 
 // 独立 fetch(不走 apiPost · 避免 403 被误踢)
 async function rdFetch(url: string, payload: unknown) {
@@ -236,7 +236,6 @@ function openRdSyncModal(side: string, official: any) {
                 if (wrap) wrap.classList.add('edited');
             });
             updateDrawerEditCount();
-            renderResults();
             closeModal();
         });
     }

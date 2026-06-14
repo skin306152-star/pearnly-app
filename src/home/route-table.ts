@@ -3,7 +3,6 @@
 
 // v118.32.5.5.37 NAV-IA Phase 5: automation 页面无侧边栏入口且不可路由 · 银行上传改为对账中心原地上传
 export const VALID_ROUTES = [
-    'ocr',
     'dms-intake',
     'dashboard',
     'history',

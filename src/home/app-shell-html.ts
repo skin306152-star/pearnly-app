@@ -150,47 +150,6 @@ const SIDEBAR_HTML = `
         <span class="nav-label" data-i18n="nav-dashboard">首页</span>
     </div>
 
-    <!-- 销项管理 ▼ 可折叠组(默认展开) -->
-    <div class="nav-group nav-collapsible" data-collapsible="sales">
-        <div class="nav-group-toggle" data-toggle-group="sales">
-            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M5 2h8l3 3v13H5z"/>
-                <path d="M8 8h5M8 11h5M8 14h3"/>
-                <path d="M13 2v3h3"/>
-            </svg>
-            <span class="nav-label" data-i18n="nav-group-sales">销售开票</span>
-            <svg class="nav-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M6 8l4 4 4-4"/>
-            </svg>
-        </div>
-        <div class="nav-sub">
-            <!-- 2026-06-10 五-bis:识别/对账 = 事务所代账工具 · 已移出到「事务所工具」组(business_type=firm 显)·
-                 销售开票组只留商户自己开票/收款相关:发票工作台 / 账套·开票资料 / 应收追踪 -->
-            <div class="nav-item nav-sub-item" data-route="sales-invoices" data-module="sales">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M5 2h8l3 3v13H5z"/>
-                    <path d="M8 8h5M8 11h5M8 14h3"/>
-                    <path d="M13 2v3h3"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-sales-workbench">发票工作台</span>
-            </div>
-            <div class="nav-item nav-sub-item" data-route="sales-account" data-module="sales">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="2.5" y="4.5" width="15" height="11" rx="1.5"/>
-                    <path d="M6 8.5h5M6 12h3"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-sales-account">账套 / 开票资料</span>
-            </div>
-            <div class="nav-item nav-sub-item" data-route="receivables" data-module="receivable">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M10 3v14"/>
-                    <path d="M14 6.5h-5a2.5 2.5 0 000 5h2a2.5 2.5 0 010 5h-5"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-receivables">应收追踪</span>
-            </div>
-        </div>
-    </div>
-
     <!-- 事务所工具 ▼ 可折叠组(2026-06-10 五-bis · 代账工具:上传识别/识别记录/对账中心)·
          business_type=firm 或未选(老租户兜底)显示 · 商户业态隐藏 · module-nav.ts apply() 控显隐 -->
     <div class="nav-group nav-collapsible" data-collapsible="firm" style="display:none;">
@@ -284,6 +243,47 @@ const SIDEBAR_HTML = `
                     <path d="M10 3.5v1.6M10 14.9v1.6M16.5 10h-1.6M5.1 10H3.5M14.6 5.4l-1.1 1.1M6.5 13.5l-1.1 1.1M14.6 14.6l-1.1-1.1M6.5 6.5L5.4 5.4"/>
                 </svg>
                 <span class="nav-label" data-i18n="nav-purchase-settings">采购设置</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 销项管理 ▼ 可折叠组(默认展开) -->
+    <div class="nav-group nav-collapsible" data-collapsible="sales">
+        <div class="nav-group-toggle" data-toggle-group="sales">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 2h8l3 3v13H5z"/>
+                <path d="M8 8h5M8 11h5M8 14h3"/>
+                <path d="M13 2v3h3"/>
+            </svg>
+            <span class="nav-label" data-i18n="nav-group-sales">销售开票</span>
+            <svg class="nav-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 8l4 4 4-4"/>
+            </svg>
+        </div>
+        <div class="nav-sub">
+            <!-- 2026-06-10 五-bis:识别/对账 = 事务所代账工具 · 已移出到「事务所工具」组(business_type=firm 显)·
+                 销售开票组只留商户自己开票/收款相关:发票工作台 / 账套·开票资料 / 应收追踪 -->
+            <div class="nav-item nav-sub-item" data-route="sales-invoices" data-module="sales">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 2h8l3 3v13H5z"/>
+                    <path d="M8 8h5M8 11h5M8 14h3"/>
+                    <path d="M13 2v3h3"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-sales-workbench">发票工作台</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="sales-account" data-module="sales">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2.5" y="4.5" width="15" height="11" rx="1.5"/>
+                    <path d="M6 8.5h5M6 12h3"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-sales-account">账套 / 开票资料</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="receivables" data-module="receivable">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10 3v14"/>
+                    <path d="M14 6.5h-5a2.5 2.5 0 000 5h2a2.5 2.5 0 010 5h-5"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-receivables">应收追踪</span>
             </div>
         </div>
     </div>

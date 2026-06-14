@@ -59,6 +59,7 @@ LINE_I18N = {
         "exp_confirmed": "✅ 已记一笔 · ฿{amount}\n在 pearnly.com 可查看或补全 🧾",
         "exp_discarded": "已取消这笔费用",
         "exp_not_found": "这笔草稿已失效 · 请重新发一句记账",
+        "exp_need_amount": "这笔多少钱?直接回一个数字就行,例如「50」",
     },
     "en": {
         "bind_invalid": "❌ Invalid or expired code\nGet a new one at pearnly.com",
@@ -114,6 +115,7 @@ LINE_I18N = {
         "exp_confirmed": "✅ Recorded · ฿{amount}\nView or complete it at pearnly.com 🧾",
         "exp_discarded": "Expense cancelled",
         "exp_not_found": "This draft has expired · please send the expense again",
+        "exp_need_amount": "How much was it? Just reply a number, e.g. '50'",
     },
     "th": {
         "bind_invalid": "❌ รหัสไม่ถูกต้องหรือหมดอายุ\nกรุณารับรหัสใหม่ที่ pearnly.com",
@@ -169,6 +171,7 @@ LINE_I18N = {
         "exp_confirmed": "✅ บันทึกแล้ว · ฿{amount}\nดูหรือแก้ไขเพิ่มได้ที่ pearnly.com 🧾",
         "exp_discarded": "ยกเลิกค่าใช้จ่ายนี้แล้ว",
         "exp_not_found": "รายการนี้หมดอายุแล้ว · กรุณาพิมพ์ใหม่อีกครั้ง",
+        "exp_need_amount": "รายการนี้กี่บาท? พิมพ์ตัวเลขกลับมาได้เลย เช่น '50'",
     },
     "ja": {
         "bind_invalid": "❌ コードが無効または期限切れです\npearnly.com で新しいコードを取得してください",
@@ -224,6 +227,7 @@ LINE_I18N = {
         "exp_confirmed": "✅ 記録しました · ฿{amount}\npearnly.com で確認・補完できます 🧾",
         "exp_discarded": "この費用をキャンセルしました",
         "exp_not_found": "この下書きは期限切れです · もう一度入力してください",
+        "exp_need_amount": "いくらでしたか?数字だけ返信してください(例:50)",
     },
 }
 

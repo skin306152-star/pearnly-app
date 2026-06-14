@@ -37,10 +37,10 @@ _CARD_LABEL_KEYS = (
 
 
 def handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> bool:
-    """文本含金额 → ExpenseDraft + 落草稿 + 回确认卡(doc 10/14 · 绝不静默入账)。
+    """文本 → 记账确认卡(doc 10/14 · 绝不静默入账)。支持多轮澄清(缺金额会反问)。
 
-    返回 True = 已处理(回了确认卡);False = 不是记账(回落功能提示)。
-    事务所(firm)/ 未开 expense / 无默认套账 / 无金额 / 异常 → False(主路径 + 事务所底线不破坏)。
+    返回 True = 已处理(回了卡或澄清);False = 不是记账(回落功能提示)。
+    事务所(firm)/ 未开 expense / 无默认套账 / 异常 → False(主路径 + 事务所底线不破坏)。
     """
     try:
         tid = bound_user.get("tenant_id")
@@ -48,12 +48,12 @@ def handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> bo
             return False
         from core.workspace_context import default_workspace_id
         from services.expense import expense_draft as draft_store
-        from services.expense import line_quick_entry as lqe
         from services.line_binding import line_flex
         from services.purchase import categories as cat_svc
-        from services.purchase import intake as intake_svc
 
         # 门控先行(读):事务所/未开 expense → 直接退,绝不为它跑付费 L2。
+        from services.purchase import intake as intake_svc
+
         with db.get_cursor_rls(str(tid)) as cur:
             if not intake_svc.line_expense_gate_open(cur, tenant_id=str(tid)):
                 return False
@@ -61,27 +61,17 @@ def handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> bo
         if ws is None:
             return False
 
-        # L1 确定性解析;兜不住(口语/长句·无金额)→ L2 LLM(有 key + 余额才调,扣 1 单位 OCR 费)。
-        draft = lqe.parse_expense(text)
-        used_l2 = False
-        if not draft.has_amount():
-            from services.expense import line_l2
-
-            api_key = line_l2.resolve_api_key(bound_user)
-            if not api_key or not _ocr_balance_ok(bound_user):
-                return False
-            data = line_l2.extract(text, api_key)
-            if not data or line_l2.intent_of(data) != "expense":
-                return False  # query/question/other → 批4 处理;此处回落功能提示
-            draft = line_l2.to_draft(data, text)
-            if not draft.has_amount():
-                return False
-            used_l2 = True
+        draft, used_l2, action = _resolve_draft(bound_user, line_user_id, text, str(tid), ws)
+        if action == "clarify":
+            # 确是记账但缺金额 → 反问一句(已存会话态),不静默丢(doc 10 §1.6)。
+            line_client.reply_text(reply_token, line_client.t_line(lang, "exp_need_amount"))
+            return True
+        if draft is None:
+            return False
 
         with db.get_cursor_rls(str(tid), commit=True) as cur:
-            # 归类:用本套账真实科目树(图/文共用·不分叉)。取业务主体名。
             tree = cat_svc.get_tree(cur, tenant_id=str(tid), workspace_client_id=ws)
-            _fill_category(draft, text, tree)
+            _fill_category(cur, draft, text, tree, str(tid), ws)
             business_name = _business_name(cur, tenant_id=str(tid), ws=ws)
             created_by = str(bound_user["id"]) if bound_user.get("id") else None
             draft_id = draft_store.insert_draft(
@@ -120,6 +110,50 @@ def handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> bo
         return False
 
 
+def _resolve_draft(bound_user, line_user_id, text, tid, ws):
+    """→ (draft, used_l2, action)。action: '' 正常出卡 / 'clarify' 已反问缺金额 / None 非记账。
+
+    顺序:① 有金额 → 若有待补会话态则合并(续接澄清),否则 L1 直接出 ② 无金额 → L2 兜底;
+    L2 判记账但仍缺金额 → 存会话态 + 反问;L2 判非记账 → None。
+    """
+    from services.expense import conversation
+    from services.expense import line_quick_entry as lqe
+
+    parsed = lqe.parse_expense(text)
+    if parsed.has_amount():
+        with db.get_cursor_rls(tid, commit=True) as cur:
+            pend = conversation.pop_pending(cur, line_user_id=line_user_id)
+        if pend:  # 续接:上一句缺金额存了半成品,这句补上金额 → 合并
+            merged = pend["draft"]
+            merged.amount = parsed.amount
+            return merged, False, ""
+        return parsed, False, ""
+
+    # 无金额 → L2(有 key + 余额才调)
+    from services.expense import line_l2
+
+    api_key = line_l2.resolve_api_key(bound_user)
+    if not api_key or not _ocr_balance_ok(bound_user):
+        return None, False, None
+    data = line_l2.extract(text, api_key)
+    if not data or line_l2.intent_of(data) != "expense":
+        return None, False, None  # query/question/other → 批4
+    draft = line_l2.to_draft(data, text)
+    if draft.has_amount():
+        return draft, True, ""
+    # 确是记账但 LLM 也没抽到金额 → 存会话态 + 反问(不静默丢)
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        conversation.save_pending(
+            cur,
+            line_user_id=line_user_id,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            draft=draft,
+            missing="amount",
+        )
+    return None, False, "clarify"
+
+
 def handle_expense_postback(bound_user, reply_token, parsed, lang) -> None:
     """费用草稿确认/丢弃(doc 10 §5)。确认 → status=confirmed + 回执;丢弃 → discarded(留痕不删)。"""
     tid = str(bound_user["tenant_id"]) if bound_user.get("tenant_id") else None
@@ -156,9 +190,18 @@ def handle_expense_postback(bound_user, reply_token, parsed, lang) -> None:
         line_client.reply_text(reply_token, line_client.t_line(lang, "exp_not_found"))
 
 
-def _fill_category(draft, text, tree) -> None:
-    """据真实科目树把 draft 的 category/subcategory(名+id)填上(图/文共用 intake 匹配器)。"""
+def _fill_category(cur, draft, text, tree, tid, ws) -> None:
+    """填 category/subcategory(名+id)。先查已学习词典(越用越省),再内置关键词匹配真实树。"""
+    from services.expense import conversation
     from services.purchase import intake as intake_svc
+
+    learned = conversation.lookup_learned(cur, tenant_id=tid, workspace_client_id=ws, text=text)
+    if learned and learned["category_id"]:
+        draft.category = learned["category_name"]
+        draft.category_id = learned["category_id"]
+        draft.subcategory = learned["subcategory_name"]
+        draft.subcategory_id = learned["subcategory_id"]
+        return
 
     cat_id, sub_id = intake_svc._match_category(text, tree)
     if not cat_id:

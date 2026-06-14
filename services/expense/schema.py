@@ -49,6 +49,33 @@ CREATE TABLE IF NOT EXISTS expense_draft (
 )
 """
 
+# 多轮澄清会话态(短 TTL):缺金额时存半成品,用户补一句后合并。每 LINE 用户至多一条(PK)。
+_PENDING_TABLE = """
+CREATE TABLE IF NOT EXISTS line_pending_entry (
+    line_user_id text PRIMARY KEY,
+    tenant_id uuid NOT NULL,
+    workspace_client_id bigint NOT NULL,
+    draft jsonb NOT NULL DEFAULT '{}'::jsonb,
+    missing text NOT NULL DEFAULT '',
+    created_at timestamptz NOT NULL DEFAULT now()
+)
+"""
+
+# 可学习归类词典:用户改过的 关键词→科目 记下,下次同词直接对(越用越省)。
+_LEARNED_TABLE = """
+CREATE TABLE IF NOT EXISTS expense_learned (
+    tenant_id uuid NOT NULL,
+    workspace_client_id bigint NOT NULL,
+    keyword text NOT NULL,
+    category_id uuid,
+    subcategory_id uuid,
+    category_name text NOT NULL DEFAULT '',
+    subcategory_name text NOT NULL DEFAULT '',
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (tenant_id, workspace_client_id, keyword)
+)
+"""
+
 _INDEXES = (
     "CREATE INDEX IF NOT EXISTS ix_expense_draft_ws_status "
     "ON expense_draft (tenant_id, workspace_client_id, status)",
@@ -64,13 +91,15 @@ _ALTERS = (
 
 
 def ensure_expense_schema() -> None:
-    """幂等建 expense_draft 表 + 补列 + 索引 + RLS(startup 调)。"""
+    """幂等建 expense_draft / line_pending_entry / expense_learned + 补列 + 索引 + RLS(startup 调)。"""
     from core import db
 
     with db.get_cursor(commit=True) as cur:
         cur.execute(_TABLE)
+        cur.execute(_PENDING_TABLE)
+        cur.execute(_LEARNED_TABLE)
         for alter in _ALTERS:
             cur.execute(alter)
         for idx in _INDEXES:
             cur.execute(idx)
-        apply_tenant_rls(cur, "expense_draft")
+        apply_tenant_rls(cur, "expense_draft", "line_pending_entry", "expense_learned")

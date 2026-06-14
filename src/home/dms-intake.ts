@@ -239,7 +239,7 @@ function selectTask(task: 'invoice' | 'identity') {
 
 // 查看记录:发票任务→识别记录;身份证任务→集成中心(推送日志 mrerp_dms)
 function openRecords() {
-    const route = S.task === 'invoice' ? 'history' : 'integration';
+    const route = S.task === 'invoice' ? 'history' : 'integrations';
     if (typeof window.routeTo === 'function') window.routeTo(route);
 }
 

@@ -167,9 +167,9 @@ const SIDEBAR_HTML = `
         <div class="nav-sub">
             <div class="nav-item nav-sub-item" data-route="dms-intake" data-module="sales">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="5" width="14" height="11" rx="2"/>
-                    <circle cx="8" cy="10" r="1.8"/>
-                    <path d="M12 9h3M12 12h3M5.5 13.5c.5-1 1.4-1.6 2.5-1.6s2 .6 2.5 1.6"/>
+                    <path d="M5 2.5h6.5L16 7v10.5H5z"/>
+                    <path d="M11.5 2.5V7H16"/>
+                    <path d="M8 11h5M8 14h4"/>
                 </svg>
                 <span class="nav-label" data-i18n="nav-dms-intake">录入工作台</span>
             </div>

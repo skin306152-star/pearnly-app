@@ -110,11 +110,7 @@
     margin-top: 2px;
 }
 
-/* ============ 结果表格 ============ */
-.results-card { display: none; }
-.results-card.show { display: block; }
-
-.search-row { margin-bottom: 12px; }
+/* ============ 搜索框(对账/历史等复用)============ */
 .search-input {
     width: 100%; padding: 8px 12px; font-size: 13px;
     border: 1px solid var(--line); border-radius: 6px;
@@ -123,73 +119,6 @@
 .search-input:focus { border-color: var(--accent); }
 
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
-table.results-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
-.results-table thead th {
-    padding: 10px 14px; background: var(--bg);
-    border-bottom: 1px solid var(--line);
-    text-align: left; font-size: 11px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.08em;
-    color: var(--ink-3); white-space: nowrap; cursor: pointer;
-    user-select: none; transition: background 100ms;
-    position: relative;
-}
-.results-table thead th:hover { background: var(--line-soft); color: var(--ink-2); }
-.results-table thead th.no-sort { cursor: default; }
-.results-table thead th .sort-indicator {
-    display: inline-block; width: 10px; margin-left: 3px;
-    color: var(--ink-4);
-}
-.results-table thead th.sort-asc .sort-indicator::before { content: "↑"; color: var(--brand); }
-.results-table thead th.sort-desc .sort-indicator::before { content: "↓"; color: var(--brand); }
-.results-table tbody td {
-    padding: 11px 14px; border-bottom: 1px solid var(--line-soft);
-    color: var(--ink-2); vertical-align: middle;
-}
-.results-table tbody tr { cursor: pointer; transition: background 100ms; }
-.results-table tbody tr:hover { background: var(--bg); }
-.results-table tbody tr:last-child td { border-bottom: none; }
-
-/* v106.2 · 列宽规整 · 防长文件名挤掉日期列 */
-.results-table thead th:nth-child(1),
-.results-table tbody td:nth-child(1) { width: 56px; }                    /* 序号 */
-.results-table thead th:nth-child(2),
-.results-table tbody td:nth-child(2) { width: auto; }                    /* 文件名 · 自适应 */
-.results-table thead th:nth-child(3),
-.results-table tbody td:nth-child(3) { width: 160px; }                   /* 发票号 */
-.results-table thead th:nth-child(4),
-.results-table tbody td:nth-child(4) { width: 110px; }                   /* 日期 */
-.results-table thead th:nth-child(5),
-.results-table tbody td:nth-child(5) { width: 120px; text-align: right; }/* 金额 */
-.results-table thead th:nth-child(6),
-.results-table tbody td:nth-child(6) { width: 100px; text-align: center; }/* 置信度 */
-
-.results-table .num { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); }
-.results-table .fname {
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    font-weight: 600; color: var(--ink);
-}
-.results-table .inv { font-family: var(--font-mono); font-size: 12px; color: var(--brand); font-weight: 600;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.results-table .date { font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); white-space: nowrap; }
-.results-table .amount { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--ink); text-align: right; white-space: nowrap; }
-.results-table .empty-cell { color: var(--ink-4); }
-
-/* v106.2 · 移动端横滚 · 不再挤压 */
-@media (max-width: 768px) {
-    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    table.results-table { min-width: 700px; }
-}
-
-.conf-badge {
-    display: inline-block; padding: 2px 8px; border-radius: 99px;
-    font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
-    text-transform: uppercase;
-}
-.conf-badge.high { background: var(--success-bg); color: var(--success); border: 1px solid var(--c-9ae6b4); }
-.conf-badge.medium { background: var(--c-fefcbf); color: var(--c-975a16); border: 1px solid var(--c-f6e05e); }
-.conf-badge.low { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--c-fbd38d); }
-
 [data-tip] { position: relative; }
 [data-tip]:hover::after {
     content: attr(data-tip);
@@ -208,18 +137,4 @@ table.results-table { width: 100%; border-collapse: collapse; font-size: 13px; t
     z-index: 10; pointer-events: none;
 }
 
-/* ── PO-UI 迁移 · OCR 屏 kit 补丁 ── */
-/* 面板内小标题(upload + results 两个 panel 共用) */
-.ocr-card-title { font-size: 14.5px; font-weight: 700; margin-bottom: 4px; }
-.ocr-card-sub { font-size: 12px; color: var(--ink2); margin-bottom: var(--s3); }
-
-/* export split 在 kit .ui 作用域内:防止 kit .ui .btn 的 border-radius 覆盖连接边 */
-.ui .export-split-wrap .btn.export-main {
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-}
-.ui .export-split-wrap .btn.export-arrow {
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
-}
 

@@ -434,11 +434,11 @@ export function onInvoiceClick(tg: HTMLElement): boolean {
         renderSubmit();
         return true;
     }
-    if (hit('dx-inv-go-int')) return (go('integration'), true);
+    if (hit('dx-inv-go-int')) return (go('integrations'), true);
     if (hit('dx-inv-sub-back')) return (renderReview(), true);
     if (hit('dx-inv-finish')) return (void doFinish(), true);
     if (hit('dx-inv-view-rec')) return (go('history'), true);
-    if (hit('dx-inv-view-push')) return (go('integration'), true);
+    if (hit('dx-inv-view-push')) return (go('integrations'), true);
     if (hit('dx-inv-new')) {
         resetInvoice();
         renderInvoiceUpload();

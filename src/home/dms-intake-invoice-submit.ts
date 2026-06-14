@@ -50,9 +50,10 @@ export function renderReview() {
                   ? `<b style="color:var(--dx-amber)">${esc(t('dxi-rev-need').replace('{n}', String(warns)))}</b>`
                   : `<b style="color:var(--dx-green)">${esc(t('dxi-rev-ok'))}</b>`;
             const sub =
-                r.invoice_count > 1
+                (r.invoice_count > 1
                     ? esc(t('dxi-multi').replace('{n}', String(r.invoice_count)))
-                    : esc(t(warns ? 'dxi-rev-only' : 'dxi-rev-noneed'));
+                    : esc(t(warns ? 'dxi-rev-only' : 'dxi-rev-noneed'))) +
+                (r.from_cache ? ' · ' + esc(t('cache-hit-badge')) : '');
             return (
                 `<div class="dx-frow${sel}" data-iv-sel="${i}"><div class="dx-file-ic">${esc(ext(r.filename))}</div>` +
                 `<div class="dx-file-c"><b>${esc(r.filename)}</b><span>${sub}</span></div>` +

@@ -8,14 +8,16 @@
 /* global t, token, showToast */
 import { S, esc, $, authHeaders } from './dms-intake-core.js';
 import { enterSubmit, renderSubmit, renderReview, doFinish } from './dms-intake-invoice-submit.js';
+import { imagesToPdf, analyzeImageQuality } from './camera-image-utils.js';
 
 export type Dict = Record<string, unknown>;
 export interface IvFile {
     file: File;
     name: string;
     size: number;
-    status: 'waiting' | 'processing' | 'success' | 'error';
+    status: 'waiting' | 'processing' | 'retrying' | 'success' | 'error';
     errorKey?: string;
+    canRetry?: boolean;
 }
 // 一张发票(后端 invoices[] 的一项)· 多页跨页发票已由后端合并为一张
 export interface IvInvoice {
@@ -50,8 +52,12 @@ export const IV = {
     endpoints: [] as Endpoint[],
     target: '' as string,
     busy: false,
+    aborted: false, // 用户点「停止」· worker 据此停拉队列
     view: 'upload' as 'upload' | 'review' | 'submit' | 'success',
 };
+// 在飞请求控制器集合(停止时一次性 abort)
+const ctrls = new Set<AbortController>();
+const IMG = /\.(png|jpe?g|webp|tiff?|bmp|gif)$/i;
 
 export const w = window as unknown as {
     getMaxFiles?: () => number;
@@ -150,14 +156,19 @@ function queueHtml() {
                     ? `<span class="dx-badge amber">${esc(t(f.errorKey || 'dxi-recognize-fail'))}</span>`
                     : f.status === 'success'
                       ? `<span class="dx-badge green">${esc(t('dxi-rev-ok'))}</span>`
-                      : f.status === 'processing'
-                        ? `<span class="dx-badge blue">…</span>`
+                      : f.status === 'processing' || f.status === 'retrying'
+                        ? `<span class="dx-badge blue">${esc(t('status-' + f.status))}</span>`
                         : `<span class="dx-badge blue">${esc(t('dx-up-ready'))}</span>`;
+            // 失败且可重试 → 重试按钮(网络/超时类已自动重试一次仍失败的)
+            const retry =
+                f.status === 'error' && f.canRetry
+                    ? `<button class="dx-qx" data-iv-retry="${i}" title="${esc(t('upload-retry-btn'))}">↻</button>`
+                    : '';
             return (
                 `<div class="dx-qrow"><div class="dx-file-ic">${esc(ext(f.name))}</div>` +
                 `<div class="dx-file-c"><b>${esc(f.name)}</b><span>${(f.size / 1048576).toFixed(1)} MB</span></div>` +
                 st +
-                `<button class="dx-qx" data-iv-rm="${i}" title="${esc(t('dx-up-replace'))}">✕</button></div>`
+                `<div class="dx-qacts">${retry}<button class="dx-qx" data-iv-rm="${i}" title="${esc(t('dx-up-replace'))}">✕</button></div></div>`
             );
         })
         .join('');
@@ -177,71 +188,125 @@ function sideHtml() {
         `<div class="dx-side-box"><b>${esc(t('dx-side-rule'))}</b><p>${esc(t('dxi-side-flow3'))}</p></div></div>`
     );
 }
-function addFiles(list: FileList | null | undefined) {
+async function addFiles(list: FileList | null | undefined) {
     if (!list || !list.length) return;
     const maxF = w.getMaxFiles?.() || 500;
     // 去重(name+size)· 防同一文件重复入队(用户多次选/拖同一文件)
     const seen = new Set(IV.files.map((f) => f.name + '_' + f.size));
-    for (const f of Array.from(list)) {
-        if (!SUPPORTED.test(f.name)) continue;
+    const push = (f: File) => {
         const key = f.name + '_' + f.size;
-        if (seen.has(key)) continue;
-        if (IV.files.length >= maxF) break;
+        if (seen.has(key) || IV.files.length >= maxF) return;
         seen.add(key);
         IV.files.push({ file: f, name: f.name, size: f.size, status: 'waiting' });
+    };
+    const arr = Array.from(list).filter((f) => SUPPORTED.test(f.name));
+    const isImg = (f: File) => IMG.test(f.name) || (f.type || '').startsWith('image/');
+    arr.filter((f) => !isImg(f)).forEach(push);
+    // 图片 → PDF(每张独立成 1 个 PDF · 与原页相册默认一致)· 质量分析提示糊图
+    const imgs = arr.filter(isImg);
+    let lowQ = 0;
+    for (const im of imgs) {
+        try {
+            const q = (await analyzeImageQuality(im)) as { warnings?: string[] };
+            if ((q.warnings || []).length) lowQ++;
+            const pdf = await imagesToPdf([im]);
+            push(pdf || im);
+        } catch {
+            push(im); // jspdf 未就绪/转换失败 → 原图直发(后端接全格式)
+        }
     }
+    if (lowQ) showToast(t('dxi-img-lowq').replace('{n}', String(lowQ)), 'warn');
     renderInvoiceUpload();
 }
 
-// ── 步骤 2:识别(6 路并发 · client_id 归属 · 多发票/警告透出)──
+// ── 步骤 2:识别(6 路并发 · 90s超时/中止 · 网络失败自动重试一次 · 可停止 · 多发票/警告透出)──
+const dupWarn: unknown[] = [];
+let autoPushed = 0;
+let cidCache: unknown = null;
+
+// 单张识别:AbortController + 90s 超时;网络/超时失败自动重试一次;用户停止则取消
+async function recognizeOne(f: IvFile, isRetry: boolean) {
+    f.status = isRetry ? 'retrying' : 'processing';
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 90000);
+    ctrls.add(ctrl);
+    let netErr = false;
+    try {
+        const form = new FormData();
+        form.append('file', f.file, f.name);
+        if (cidCache != null) form.append('client_id', String(cidCache));
+        const r = await fetch('/api/ocr/recognize', {
+            method: 'POST',
+            headers: authHeaders(),
+            body: form,
+            signal: ctrl.signal,
+        });
+        const d = (await r.json().catch(() => ({}))) as Dict;
+        if (!r.ok) {
+            const detail = (d.detail as { code?: string } | string) || 'unknown';
+            const code = typeof detail === 'string' ? detail : detail.code || 'unknown';
+            f.status = 'error';
+            f.errorKey = 'err.' + code;
+            f.canRetry =
+                !/file_too_large|too_many_pages|not_invoice|monthly_limit|need_api_key|not_pdf/.test(
+                    code
+                );
+            return;
+        }
+        f.status = 'success';
+        f.canRetry = false;
+        IV.results.push(ingestResult(d));
+        if (((d.duplicate_warnings as unknown[]) || []).length)
+            dupWarn.push(...(d.duplicate_warnings as unknown[]));
+        if (d.auto_pushed) autoPushed++;
+    } catch {
+        netErr = true;
+    } finally {
+        clearTimeout(timer);
+        ctrls.delete(ctrl);
+    }
+    if (netErr) {
+        if (IV.aborted) {
+            f.status = 'error';
+            f.errorKey = 'status-cancelled';
+            f.canRetry = false;
+            return;
+        }
+        if (!isRetry) return recognizeOne(f, true); // 网络/超时 → 静默重试一次
+        f.status = 'error';
+        f.errorKey = 'dxi-recognize-fail';
+        f.canRetry = true;
+    }
+}
+
 async function startRecognize() {
     const waiting = IV.files.filter((f) => f.status === 'waiting');
     if (!waiting.length || IV.busy) return;
     IV.busy = true;
+    IV.aborted = false;
+    ctrls.clear();
+    dupWarn.length = 0;
+    autoPushed = 0;
+    cidCache = typeof w.getCurrentClientId === 'function' ? w.getCurrentClientId() : null;
     const total = waiting.length;
     let done = 0;
     renderProcessing(0, total);
     showStepInv(2, 'dx-s-searching');
-    const cid = typeof w.getCurrentClientId === 'function' ? w.getCurrentClientId() : null;
     const queue = waiting.slice();
-    const dupWarn: unknown[] = [];
-    let autoPushed = 0;
     async function worker() {
         while (queue.length) {
             const f = queue.shift()!;
-            f.status = 'processing';
-            try {
-                const form = new FormData();
-                form.append('file', f.file, f.name);
-                if (cid != null) form.append('client_id', String(cid));
-                const r = await fetch('/api/ocr/recognize', {
-                    method: 'POST',
-                    headers: authHeaders(),
-                    body: form,
-                });
-                const d = (await r.json().catch(() => ({}))) as Dict;
-                if (!r.ok) {
-                    const detail = (d.detail as { code?: string } | string) || 'unknown';
-                    f.status = 'error';
-                    f.errorKey =
-                        'err.' + (typeof detail === 'string' ? detail : detail.code || 'unknown');
-                } else {
-                    f.status = 'success';
-                    IV.results.push(ingestResult(d));
-                    if (((d.duplicate_warnings as unknown[]) || []).length)
-                        dupWarn.push(...(d.duplicate_warnings as unknown[]));
-                    if (d.auto_pushed) autoPushed++;
-                }
-            } catch {
+            if (IV.aborted) {
                 f.status = 'error';
-                f.errorKey = 'dxi-recognize-fail';
+                f.errorKey = 'status-cancelled';
+            } else {
+                await recognizeOne(f, false);
             }
             done++;
             renderProcessing(done, total);
         }
     }
-    const PAR = Math.min(6, total);
-    await Promise.all(Array.from({ length: PAR }, () => worker()));
+    await Promise.all(Array.from({ length: Math.min(6, total) }, () => worker()));
     IV.busy = false;
     const failN = waiting.filter((f) => f.status === 'error').length;
     if (dupWarn.length) showToast(t('dxi-dup-warn').replace('{n}', String(dupWarn.length)), 'warn');
@@ -260,6 +325,23 @@ async function startRecognize() {
         );
     IV.sel = 0;
     renderReview();
+}
+function stopRecognize() {
+    IV.aborted = true;
+    ctrls.forEach((c) => {
+        try {
+            c.abort();
+        } catch {
+            /* already settled */
+        }
+    });
+}
+function retryFile(idx: number) {
+    const f = IV.files[idx];
+    if (!f || f.status !== 'error') return;
+    f.status = 'waiting';
+    f.errorKey = undefined;
+    void startRecognize();
 }
 function ingestResult(d: Dict): IvResult {
     const pages = (d.pages as unknown[]) || [];
@@ -296,7 +378,8 @@ function renderProcessing(done: number, total: number) {
     el.innerHTML =
         '<div class="dx-searching"><div class="dx-spin"></div>' +
         `<h3>${esc(t('dxi-proc-title'))}</h3><p>${esc(t('dxi-proc-sub'))}</p>` +
-        `<div class="dx-schips"><span class="dx-schip">${done}/${total} · ${pct}%</span></div></div>`;
+        `<div class="dx-schips"><span class="dx-schip">${done}/${total} · ${pct}%</span></div>` +
+        `<div style="margin-top:16px"><button class="btn" id="dx-inv-stop">${esc(t('btn-stop'))}</button></div></div>`;
 }
 
 // ── 事件入口(由 dms-intake.ts 单一委托转发)──────────────────
@@ -310,6 +393,8 @@ export function onInvoiceClick(tg: HTMLElement): boolean {
         return (click('dx-inv-file'), true);
     if (hit('dx-inv-camera')) return (click('dx-inv-cam'), true);
     if (hit('dx-inv-gallery')) return (click('dx-inv-gal'), true);
+    const rt = tg.closest('[data-iv-retry]') as HTMLElement | null;
+    if (rt) return (retryFile(+rt.dataset.ivRetry!), true);
     const rm = tg.closest('[data-iv-rm]') as HTMLElement | null;
     if (rm) {
         IV.files.splice(+rm.dataset.ivRm!, 1);
@@ -317,6 +402,7 @@ export function onInvoiceClick(tg: HTMLElement): boolean {
         return true;
     }
     if (hit('dx-inv-start')) return (void startRecognize(), true);
+    if (hit('dx-inv-stop')) return (stopRecognize(), true);
     const sel = tg.closest('[data-iv-sel]') as HTMLElement | null;
     if (sel) {
         IV.sel = +sel.dataset.ivSel!;

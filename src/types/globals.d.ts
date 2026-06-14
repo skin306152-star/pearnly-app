@@ -83,13 +83,6 @@ declare var _quota: Record<string, unknown> | null;
 declare var I18N: Record<string, Record<string, string>>;
 /** Open the OCR results drawer at a queue index (ocr-results module). */
 declare function openDrawer(idx: number): void;
-/** Sort/search lexical globals (home.js state.js), reachable bare or via window. */
-// eslint-disable-next-line no-var
-declare var _sortKey: string | null;
-// eslint-disable-next-line no-var
-declare var _sortDir: string;
-// eslint-disable-next-line no-var
-declare var _searchKeyword: string;
 /** Bare-callable legacy bridges (also exposed on window by their modules). */
 declare function openSettingsModal(): void;
 declare function openReportModal(...args: any[]): any;
@@ -99,8 +92,6 @@ declare function applyRoleVisibility(...args: any[]): any;
 declare function loadErpLogs(silent?: boolean): Promise<void>;
 declare function loadErpTodayStats(): Promise<void>;
 declare function loadErpEndpoints(): Promise<void>;
-/** OCR upload helpers (home.js core). */
-declare function handleCameraImages(imageFiles: File[], source: string): Promise<void>;
 declare function getMaxFiles(): number;
 /** One OCR result row in the results drawer. Dynamic field bags are kept as
  *  Record; the index signature covers the many per-stage extras. */
@@ -114,9 +105,6 @@ declare var _results: OcrResult[];
 // eslint-disable-next-line no-var
 declare var _drawerIdx: number;
 declare function svgIcon(name: string, size?: number): string;
-declare function renderResults(data?: unknown): void;
-declare function renderFileList(zone?: unknown): void;
-declare function updateStartButton(): void;
 declare function _showSessionRevokedModal(): void;
 /** Bearer token held globally by home.js core. */
 // eslint-disable-next-line no-var
@@ -146,8 +134,6 @@ declare var _contact: {
 // Window bridges exposed by migrated src/home modules. Extended per C5 batch as
 // modules move to TypeScript; consumers still on .js read these off window.
 interface Window {
-    startEnginePolling: () => void;
-    stopEnginePolling: () => void;
     // i18n switch bus (home.js core); optional — callers guard with typeof check.
     subscribeI18n?: (key: string, rerender: () => void) => void;
     // gl-vat-recon bridges
@@ -208,7 +194,6 @@ interface Window {
     // shared caches written by migrated modules, read elsewhere as bare window props
     _clientsCache?: Array<{ id?: unknown; [key: string]: unknown }>;
     _erpEndpoints?: Array<{ id?: unknown; [key: string]: unknown }>;
-    _dupQueue?: Array<Record<string, unknown>>;
     // ── C5 批9 桥(exceptions / erp / recon / workspace / ocr-doc-mode 等遗留边界)──
     // 零参/取值桥用精确类型;带参或多态的遗留桥用 LegacyBridge 避免逆变失配。
     loadExceptionsPage?: () => void;
@@ -219,6 +204,7 @@ interface Window {
     _rerenderExceptions?: () => void;
     loadLearnedRules?: () => void;
     activateIntegrationsLogsTab?: () => void;
+    setErpLogAdapter?: (adapter: string) => void;
     closeIntegrationDrawer?: () => void;
     maybeShowOnboarding?: LegacyBridge;
     __accessLogSearchTimer?: ReturnType<typeof setTimeout>;
@@ -234,7 +220,6 @@ interface Window {
     navigateTo?: (route: string) => void;
     loadReconcilePage?: () => void;
     _rerenderErpExceptions?: () => void;
-    _reprocessFile?: LegacyBridge;
     _refreshErpEndpointsCache?: () => void;
     _workspaceClientsCache?: unknown[];
     loadErpLogs?: (silent?: boolean) => Promise<void>;
@@ -353,8 +338,6 @@ interface Window {
     _rerenderNotifications?: () => void;
     PEARNLY_ADMIN_MODE?: boolean;
     // ── C5 批12 桥(ocr/folder/erp/billing/avatar/workspace/archive/email 遗留边界)──
-    _ocrCtrls?: Set<AbortController>;
-    _ocrAborted?: boolean;
     _pearnlyFolderUnloadAttached?: boolean;
     _erpLogPollTimer?: ReturnType<typeof setTimeout> | null;
     __langSyncTimer?: ReturnType<typeof setTimeout> | null;

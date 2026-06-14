@@ -16,16 +16,6 @@
 //   _erpEndpoints / _epEditingId / _logFilter / _erpSelected
 //   注:home.js 核心 + injectOcrPushButton 经 window._erpEndpoints 读取缓存 ·
 //   本模块每次 loadErpEndpoints 都写 window._erpEndpoints = _erpEndpoints 保持桥接。
-//
-// 留在 home.js 没搬的公共函数(本模块裸调):
-//   _humanizeBackendError(bank-recon-v2 也用)· showToast(全局)·
-//   humanizeError(exceptions.js 也用 · 非 ERP 专用)
-//
-// 重复定义去重:home.js 有两份 loadErpTodayStats(L5528 / L6048)· 二次定义
-//   (target #erp-today-stats)在运行时胜出(JS 函数声明提升后者覆盖前者)·
-//   本模块只保留 L6048 那份 · 丢弃 L5528 死代码(target #erp-logs-today-stats)。
-//
-// verbatim 搬迁 · 0 改逻辑(仅 prettier 重排格式)。
 // ============================================================
 
 /* global escapeHtml, token, showConfirm, humanizeError, currentLang, routeTo, switchAutomationTab, _showSessionRevokedModal */
@@ -497,3 +487,10 @@ async function retryPushLog(logId: any) {
 // ============================================================
 window.loadErpLogs = loadErpLogs;
 window.retryPushLog = retryPushLog;
+// 深链:外部(如录入工作台身份证「查看记录」)按 adapter 筛推送日志(如 mrerp_dms)· 设值+同步下拉UI+刷新
+window.setErpLogAdapter = function (adapter: string) {
+    _erpAdapter = adapter || '';
+    const sel = document.getElementById('erp-logs-erp-select') as HTMLSelectElement | null;
+    if (sel) sel.value = _erpAdapter;
+    loadErpLogs();
+};

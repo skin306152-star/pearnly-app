@@ -6,7 +6,6 @@ export const VALID_ROUTES = [
     'dms-intake',
     'dashboard',
     'history',
-    'integration',
     'integrations',
     'templates',
     'api-keys',

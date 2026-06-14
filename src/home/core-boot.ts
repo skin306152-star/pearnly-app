@@ -361,8 +361,6 @@ async function loadAll() {
             console.error('[nav-ia phase1] render avatar menu', e);
         }
         updateUploadHint();
-        // REFACTOR-C1-home-batch5 · updateStartButton 已迁 upload-files.js(defer)· 用户初始化期守卫(未就绪跳过·后续 renderFileList 会再同步)
-        if (typeof window.updateStartButton === 'function') window.updateStartButton();
         // v110.7 · 检查是否需要弹欢迎向导(B 方案)
         try {
             if (typeof window.maybeShowOnboarding === 'function') window.maybeShowOnboarding(u);

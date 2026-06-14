@@ -237,10 +237,19 @@ function selectTask(task: 'invoice' | 'identity') {
     resetFlow();
 }
 
-// 查看记录:发票任务→识别记录;身份证任务→集成中心(推送日志 mrerp_dms)
+// 查看记录:发票任务→识别记录;身份证任务→集成中心「推送日志」并按 DMS 适配器(mrerp_dms)筛选
 function openRecords() {
-    const route = S.task === 'invoice' ? 'history' : 'integrations';
-    if (typeof window.routeTo === 'function') window.routeTo(route);
+    if (S.task === 'invoice') {
+        if (typeof window.routeTo === 'function') window.routeTo('history');
+        return;
+    }
+    if (typeof window.activateIntegrationsLogsTab === 'function') {
+        window.activateIntegrationsLogsTab();
+        // 等 logs tab + 下拉渲染好再设筛选(activateIntegrationsLogsTab 内部 loadErpLogs 异步)
+        setTimeout(() => window.setErpLogAdapter?.('mrerp_dms'), 80);
+    } else if (typeof window.routeTo === 'function') {
+        window.routeTo('integrations');
+    }
 }
 
 // ── 事件委托 ──────────────────────────────────────────────────

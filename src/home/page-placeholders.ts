@@ -7,17 +7,6 @@
 (function () {
     'use strict';
     const PAGES = {
-        'page-integration': `
-        <div class="coming-soon">
-            <svg class="cs-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M18 14V8M30 14V8M14 40h20"/>
-                <rect x="12" y="14" width="24" height="26" rx="2"/>
-            </svg>
-            <div class="cs-title" data-i18n="cs-int-title">ERP 无缝对接</div>
-            <div class="cs-desc" data-i18n="cs-int-desc">把识别结果自动推送到你的 Mr.ERP,告别手动复制粘贴</div>
-            <div class="cs-coming" data-i18n="cs-coming-soon">即将上线</div>
-        </div>
-`,
         'page-templates': `
         <div class="coming-soon">
             <svg class="cs-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">

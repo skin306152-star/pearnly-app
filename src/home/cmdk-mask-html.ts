@@ -26,9 +26,9 @@ const HTML = `
             <div class="cmdk-section" data-cmdk-section data-i18n="cmdk-section-jump">跳转</div>
 
             <!-- 已实现路由 · 正常点击跳 -->
-            <div class="cmdk-item" data-cmdk-route="ocr" data-cmdk-text="ocr upload 上传识别 อัปโหลด">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13V4M6 7l4-3 4 3"/><path d="M3.5 13v2.5A1.5 1.5 0 005 17h10a1.5 1.5 0 001.5-1.5V13"/></svg>
-                <span data-i18n="nav-ocr">上传识别</span>
+            <div class="cmdk-item" data-cmdk-route="dms-intake" data-cmdk-text="intake ocr upload 录入工作台 上传识别 发票 บันทึก อัปโหลด">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 2.5h6.5L16 7v10.5H5z"/><path d="M11.5 2.5V7H16"/><path d="M8 11h5M8 14h4"/></svg>
+                <span data-i18n="nav-dms-intake">录入工作台</span>
             </div>
             <div class="cmdk-item" data-cmdk-route="history" data-cmdk-text="history records 单据记录 ประวัติ">
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3.5" width="14" height="13" rx="1.5"/><line x1="6" y1="7" x2="14" y2="7"/><line x1="6" y1="10" x2="14" y2="10"/><line x1="6" y1="13" x2="11" y2="13"/></svg>

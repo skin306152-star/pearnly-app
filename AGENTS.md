@@ -96,6 +96,7 @@ npm run build                                     # 改前端才需(Vite)
 | 拆巨石作战手册 | `docs/refactor/BATCH_STRATEGY.md` |
 | 业务概念 / 状态机 / 验收剧本 | `docs/agent/BUSINESS_GLOSSARY · ERROR_CODES_AND_STATES · ACCEPTANCE_PLAYBOOKS` |
 | 销项发票 · 开票模块规格 | `docs/sales-module/docs/15`(买方动态表单)· `16`(后端合规/折扣/纸张/留底/审批/日期/模板)· `13`(逐 PO 计划) |
+| **LINE 进票据识别 · 做后端前必读** | `docs/smart-intake/09-line-recognition-core.md`(识别核心施工单 · prod 实测:L3 过度触发致 9–61s · 含改哪里+泰国税票分类+验收)· 配 `14`(流程外壳) |
 | **产品北极星 · 模块化平台(防跑偏)** | `docs/PRODUCT_VISION_MODULAR.md`(身份一句话 + 底座/模块/出口三层 + 模块化六原则 + 业态套餐)· 加功能前先对一遍 |
 | 为啥这么决策 | `docs/refactor/adr-*.md`(ADR-001~011) |
 | 铁律全文细节 | `CLAUDE.md/CLAUDE.md`(30 铁律) |

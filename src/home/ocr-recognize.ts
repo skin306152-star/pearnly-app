@@ -9,7 +9,6 @@
 //   均经 window/bare 全局。属 OCR 热路径(铁律#26)· 真账号 E2E 严验。
 // ============================================================
 /* global _selectedFiles:writable, _results:writable, _quota, renderResults, renderFileList, updateStartButton, mergeFields, showDuplicateDialog, renderInfoBar, renderQuotaBanner, startEnginePolling, stopEnginePolling, _showSessionRevokedModal, getMaxFiles, token, showAlert, hideAlerts, escapeHtml, svgIcon */
-import { _runDmsIdCardFlow } from './ocr-dms-idcard.js'; // REFACTOR-WB-modularize · DMS 身份证流程拆出
 
 // ============================================================
 // 开始识别
@@ -17,21 +16,6 @@ import { _runDmsIdCardFlow } from './ocr-dms-idcard.js'; // REFACTOR-WB-modulari
 document.getElementById('btn-start')!.addEventListener('click', async () => {
     hideAlerts();
     (document.getElementById('btn-start') as HTMLButtonElement).disabled = true;
-
-    // MR.ERP DMS · 身份证订车模式分流(REFACTOR-DMS 2026-05-31)。
-    // 仅当 ocr-document-mode 报告当前是 thai_id_card 时走 DMS 接口;
-    // invoice 模式以下逻辑完全不变(发票热路径零改动)。
-    const _docMode =
-        typeof window.getOcrDocumentMode === 'function' ? window.getOcrDocumentMode() : 'invoice';
-    if (_docMode === 'thai_id_card') {
-        try {
-            await _runDmsIdCardFlow();
-        } finally {
-            const _b = document.getElementById('btn-start') as HTMLButtonElement | null;
-            if (_b) _b.disabled = false;
-        }
-        return;
-    }
 
     // 只有 Free 用户需要检查 EasyOCR 引擎是否就绪(Plus/Pro 走 Gemini 秒响应)
     if (_userInfo && _userInfo.plan === 'free') {

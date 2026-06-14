@@ -179,9 +179,6 @@ interface Window {
     _stopEmailLogAutoRefresh: () => void;
     _helpModalEscBound: boolean;
     _refreshChromeBanner: () => void;
-    // DMS id-card OCR bridges
-    _dmsLastFile?: File;
-    openDmsIdCardPanel?: (data: Record<string, unknown>) => void;
     // recon job polling + session + nav-group + settings panels
     _reconProgressText: (
         progress?: { stage?: string; stage_total?: number; stage_done?: number },
@@ -212,9 +209,6 @@ interface Window {
     _clientsCache?: Array<{ id?: unknown; [key: string]: unknown }>;
     _erpEndpoints?: Array<{ id?: unknown; [key: string]: unknown }>;
     _dupQueue?: Array<Record<string, unknown>>;
-    // gl-vat-recon collapse panel + preview-search clear bridge
-    // DMS id-card result clear bridge
-    clearDmsIdCardResult?: () => void;
     // ── C5 批9 桥(exceptions / erp / recon / workspace / ocr-doc-mode 等遗留边界)──
     // 零参/取值桥用精确类型;带参或多态的遗留桥用 LegacyBridge 避免逆变失配。
     loadExceptionsPage?: () => void;
@@ -224,9 +218,6 @@ interface Window {
     _excState?: Record<string, unknown>;
     _rerenderExceptions?: () => void;
     loadLearnedRules?: () => void;
-    getOcrDocumentMode?: () => string;
-    _refreshOcrDocMode?: () => void;
-    _dmsHasEndpoint?: boolean;
     activateIntegrationsLogsTab?: () => void;
     closeIntegrationDrawer?: () => void;
     maybeShowOnboarding?: LegacyBridge;
@@ -313,6 +304,8 @@ interface Window {
     loadAcctBank?: () => void;
     loadAcctManual?: () => void;
     loadAcctBooks?: () => void;
+    // 录入工作台(身份证 → DMS 客户)路由页加载器
+    loadDmsIntake?: () => void;
     // 自动报税 Phase 3 · 路由页加载器
     loadTaxCenter?: () => void;
     loadTaxPp30?: () => void;

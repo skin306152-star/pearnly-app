@@ -118,10 +118,35 @@ def _run_logged_in(endpoint: Dict[str, Any], fn):
         return _err("ERR_UNEXPECTED", f"{type(e).__name__}: {e}")
 
 
+def _score_candidates(
+    rows: List[Dict[str, str]], *, people_id: str, name: str
+) -> List[Dict[str, Any]]:
+    """给相似候选打分(0-100):身份证号完全一致=100;否则姓名相似为主、
+    身份证号相似为辅。按分降序。"""
+    import difflib
+
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        rname = r.get("name", "")
+        rpid = r.get("people_id", "")
+        name_ratio = difflib.SequenceMatcher(None, name or "", rname).ratio()
+        score = name_ratio
+        if people_id and rpid:
+            if people_id == rpid:
+                score = 1.0
+            else:
+                id_ratio = difflib.SequenceMatcher(None, people_id, rpid).ratio()
+                score = max(score, 0.6 * name_ratio + 0.4 * id_ratio)
+        out.append({**r, "score": round(score * 100)})
+    out.sort(key=lambda x: x["score"], reverse=True)
+    return out
+
+
 def recognize_lookup_mrerp_dms(
-    endpoint: Dict[str, Any], *, people_id: str, ocr_address: Dict[str, Any]
+    endpoint: Dict[str, Any], *, people_id: str, name: str = "", ocr_address: Dict[str, Any]
 ) -> Dict[str, Any]:
-    """OCR 后:查 DMS 客户 + 解析 OCR 地址级联 + 选项 + 称谓。"""
+    """OCR 后:查 DMS 客户 + 解析 OCR 地址级联 + 选项 + 称谓 + 相似候选。
+    scenario:exact(身份证号命中)/ similar(按姓名找到候选)/ none(都没有)。"""
 
     def _do(cl, adapter):
         from services.erp.mrerp_dms_models import ThaiAddress
@@ -164,15 +189,52 @@ def recognize_lookup_mrerp_dms(
                 "road": addr.road,
             },
         }
+        if look["found"]:
+            scenario = "exact"
+            fields = look["fields"]
+            candidates = [
+                {
+                    "customer_id": look["customer_id"],
+                    "cuscode": fields.get("cuscode", ""),
+                    "name": fields.get("name", ""),
+                    "people_id": fields.get("people_id", "") or people_id,
+                    "score": 100,
+                }
+            ]
+        else:
+            rows = cl.search_customers_detailed(name) if (name or "").strip() else []
+            candidates = _score_candidates(rows, people_id=people_id, name=name or "")
+            scenario = "similar" if candidates else "none"
+
         return {
             "ok": True,
+            "scenario": scenario,
             "match": {
                 "found": look["found"],
                 "customer_id": look["customer_id"],
                 "current_fields": look["fields"],
             },
+            "candidates": candidates,
             "geo": geo,
             "prefixes": cl._select_options(form_html, "selprefix"),
+        }
+
+    return _run_logged_in(endpoint, _do)
+
+
+def customer_fields_mrerp_dms(endpoint: Dict[str, Any], *, customer_id: str) -> Dict[str, Any]:
+    """载入指定 DMS 客户的全字段(供相似场景选定候选后填充全字段表单)。
+    返回 current_fields(含三套地址+下拉选中标签)+ 府选项 + 称谓。"""
+
+    def _do(cl, adapter):
+        page = cl._post_text("cus/form.php", {"status": "e", "id": customer_id})
+        data = cl._parse_form_defaults(page)
+        return {
+            "ok": True,
+            "customer_id": customer_id,
+            "current_fields": cl._extract_customer_fields(data, page),
+            "provinces": cl._select_options(page, "selprovinces"),
+            "prefixes": cl._select_options(page, "selprefix"),
         }
 
     return _run_logged_in(endpoint, _do)
@@ -204,13 +266,19 @@ def push_idcard_fields_mrerp_dms(
     fields: Dict[str, Any],
     mode: str,
     customer_id: Optional[str],
+    addresses: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """面板编辑字段 → 建/改客户(只写 DMS 客户库 ลูกค้า,不建订车单)。
-    返回 dms_routes 写日志/响应用的 dict。"""
+    """面板最终字段 → 建/改客户(只写 DMS 客户库 ลูกค้า,不建订车单)。
+    mode:create(新建)/ overwrite(覆盖可映射)/ update(只写差异字段)。
+    update 与 overwrite 在写库层一致(载现表单 + 空值跳过),差异在前端给的字段集;
+    update 只传选了「新值」的字段 → 其余保留 DMS 现值。返回写日志/响应用 dict。"""
     t0 = time.time()
+    save_mode = "create" if mode == "create" else "overwrite"
 
     def _do(cl, adapter):
-        cid = cl.save_customer(fields=fields, mode=mode, customer_id=customer_id)
+        cid = cl.save_customer(
+            fields=fields, mode=save_mode, customer_id=customer_id, addresses=addresses
+        )
         return {
             "ok": True,
             "success": True,

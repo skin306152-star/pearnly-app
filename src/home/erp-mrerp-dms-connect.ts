@@ -317,8 +317,6 @@
             _toast(t('dms-connect-ok'), 'success');
             await _loadEndpoint(true);
             _renderCard();
-            // OCR 页模式切换器需要知道现在有 DMS endpoint 了
-            if (typeof window._refreshOcrDocMode === 'function') window._refreshOcrDocMode();
         } catch (e) {
             _wizErr(t('dms-connect-fail-generic'));
             if (saveBtn) {
@@ -369,7 +367,6 @@
             _toast(enabling ? t('dms-enabled-toast') : t('dms-disabled-toast'), 'success');
             await _loadEndpoint(true);
             _renderCard();
-            if (typeof window._refreshOcrDocMode === 'function') window._refreshOcrDocMode();
         } catch (e) {
             _toast(t('dms-save-fail'), 'error');
         }

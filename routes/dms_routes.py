@@ -191,13 +191,33 @@ async def dms_id_card_recognize(
     if ocr["needs_review"]:
         resp["dms"] = {"ok": False, "status": "needs_review"}
         return resp
+    ic = ocr["id_card"]
+    full_name = f"{ic.get('first_name', '')} {ic.get('last_name', '')}".strip()
     resp["dms"] = await asyncio.to_thread(
         _dms_intake.recognize_lookup_mrerp_dms,
         ep,
-        people_id=ocr["id_card"].get("people_id", ""),
-        ocr_address=ocr["id_card"].get("address") or {},
+        people_id=ic.get("people_id", ""),
+        name=full_name,
+        ocr_address=ic.get("address") or {},
     )
     return resp
+
+
+@router.post("/api/dms/customer-fields")
+async def dms_customer_fields(request: Request):
+    """载入指定 DMS 客户全字段(相似场景选定候选后填充全字段表单/比对)。"""
+    user = get_current_user_from_request(request)
+    _check_push_access(user)
+    body = await request.json()
+    customer_id = str(body.get("customer_id") or "").strip()
+    if not customer_id:
+        raise HTTPException(400, detail="dms.missing_customer_id")
+    ep = _resolve_dms_endpoint(user["id"], body.get("endpoint_id"))
+    if not ep:
+        raise HTTPException(400, detail="dms.no_endpoint")
+    return await asyncio.to_thread(
+        _dms_intake.customer_fields_mrerp_dms, ep, customer_id=customer_id
+    )
 
 
 @router.get("/api/dms/geo")
@@ -228,9 +248,10 @@ async def dms_id_card_push(request: Request):
     fields = body.get("fields") or {}
     mode = (body.get("mode") or "create").strip()
     customer_id = body.get("customer_id")
-    if mode not in ("create", "overwrite"):
+    addresses = body.get("addresses") or None
+    if mode not in ("create", "overwrite", "update"):
         raise HTTPException(400, detail="dms.bad_mode")
-    if mode == "overwrite" and not customer_id:
+    if mode in ("overwrite", "update") and not customer_id:
         raise HTTPException(400, detail="dms.missing_customer_id")
     if not (str(fields.get("people_id") or "").strip() and str(fields.get("name") or "").strip()):
         raise HTTPException(422, detail={"code": "dms.required_fields"})
@@ -244,6 +265,7 @@ async def dms_id_card_push(request: Request):
         fields=fields,
         mode=mode,
         customer_id=customer_id,
+        addresses=addresses,
     )
     status = "success" if result.get("success") else "failed"
     log_id = await asyncio.to_thread(

@@ -47,8 +47,7 @@ import './home/history-drawer.js'; // REFACTOR-C1-home-batch4 · 发票记录页
 import './home/upload-files.js'; // REFACTOR-C1-home-batch5 · 上传拖拽区/文件列表/开始按钮(从 home.js 抽出 · 桥 renderFileList/updateStartButton · 与 upload-camera 互调)
 import './home/camera-tips-html.js'; // REFACTOR-WB-C3 · 拍照贴士弹窗 inner 注入(home.html 空壳 · 须在 upload-camera.js 前 · showCameraTips 用户点拍照时才读·带守卫)
 import './home/upload-camera.js'; // REFACTOR-C1-home-batch5 · 相机/相册→PDF(从 home.js 抽出 · 桥 handleCameraImages)
-import './home/ocr-document-mode.js'; // DMS集成 · OCR上传卡 发票/身份证订车 模式切换(须在 ocr-recognize 前 · 暴露 window.getOcrDocumentMode)
-import './home/dms-id-card-results.js'; // DMS集成 · 身份证可编辑面板(须在 ocr-recognize 前 · 暴露 window.openDmsIdCardPanel)
+import './home/dms-intake.js'; // 录入工作台(身份证→DMS 客户)4 步向导独立页 · window.loadDmsIntake(core/confirm 子模块经它 import)
 import './home/ocr-recognize.js'; // REFACTOR-C1-home-batch5 · OCR 识别主流程 btn-start(从 home.js 抽出 · OCR热路径 · 调 renderResults/mergeFields/showDuplicateDialog · 含 DMS 身份证分流)
 import './home/ocr-duplicate-dialog.js'; // REFACTOR-C1-home-batch5 · OCR 重复发票警告弹窗(从 home.js 抽出 · 桥 showDuplicateDialog)
 import './home/dashboard.js';

@@ -188,5 +188,103 @@ class IntakeContractTests(unittest.TestCase):
             self.c.save_customer(fields={"name": "x"}, mode="overwrite", customer_id=None)
 
 
+_SHOWDATA = (
+    'dt::<div data-val="59" data-allo="" data-cf="" onclick="ctllistdata(this);">'
+    '<div class="detaildata">'
+    "<div><p>0000ทดสอบ</p><p>ลูกค้า ทดสอบ ราย 1</p></div>"
+    "<div><p>1234567890123</p></div>"
+    '</div><div class="statuscf"><p><span>ผู้จัดทำ</span></p></div></div>'
+    '<div data-val="67" data-allo="" data-cf="" onclick="ctllistdata(this);">'
+    '<div class="detaildata">'
+    '<div><p class="colnodt">-</p><p>ทดสอบ เพียร์ลี่</p></div>'
+    '<div><p class="colnodt">-</p></div>'
+    '</div><div class="statuscf"><p><span>ผู้จัดทำ</span></p></div></div>'
+)
+
+
+class CustomerRowParseTests(unittest.TestCase):
+    def setUp(self):
+        self.c = DMSClient(FakeTransport(), "https://x/dms/")
+
+    def test_parse_rows_columns_and_placeholder(self):
+        rows = self.c._parse_customer_rows(_SHOWDATA)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(
+            rows[0],
+            {
+                "customer_id": "59",
+                "cuscode": "0000ทดสอบ",
+                "name": "ลูกค้า ทดสอบ ราย 1",
+                "people_id": "1234567890123",
+            },
+        )
+        # "-"/colnodt 占位归一为空
+        self.assertEqual(rows[1]["customer_id"], "67")
+        self.assertEqual(rows[1]["cuscode"], "")
+        self.assertEqual(rows[1]["name"], "ทดสอบ เพียร์ลี่")
+        self.assertEqual(rows[1]["people_id"], "")
+
+    def test_parse_empty_body(self):
+        self.assertEqual(self.c._parse_customer_rows("ndt::"), [])
+
+
+class ScoreCandidatesTests(unittest.TestCase):
+    def test_closer_name_ranks_first_and_exact_id_scores_100(self):
+        from services.erp.erp_dms_intake import _score_candidates
+
+        # 相似分支里身份证号通常都不同(完全一致会走 exact 路径)→ 姓名相似度主导排序
+        rows = [
+            {"customer_id": "1", "name": "อื่น คนละคน", "people_id": "9999999999999"},
+            {"customer_id": "2", "name": "สมชาย ใจดี", "people_id": "1234567890124"},
+        ]
+        out = _score_candidates(rows, people_id="1234567890123", name="สมชาย ใจดี")
+        self.assertEqual(out[0]["customer_id"], "2")
+        self.assertGreater(out[0]["score"], out[1]["score"])
+
+        # 边界:若候选身份证号恰好完全一致 → 100
+        exact = _score_candidates(
+            [{"customer_id": "9", "name": "x", "people_id": "1234567890123"}],
+            people_id="1234567890123",
+            name="สมชาย ใจดี",
+        )
+        self.assertEqual(exact[0]["score"], 100)
+
+
+class SaveSemanticTests(unittest.TestCase):
+    def setUp(self):
+        self.t = FakeTransport()
+        self.c = DMSClient(self.t, "https://x/dms/")
+
+    def _posted(self, endpoint):
+        return [p for p in self.t.posts if p[0].endswith(endpoint)][0][1]
+
+    def test_blank_value_does_not_clear_existing(self):
+        self.t._edit_name = "Keep Name"
+        # phone 留空 → 不应把 DMS 现有 txttel 覆盖成空
+        self.c.save_customer(
+            fields={"name": "Keep Name", "people_id": "1234567890123", "phone": ""},
+            mode="overwrite",
+            customer_id="95",
+        )
+        self.assertEqual(self._posted("cus/edit.php")["txttel"], "0811111111")
+
+    def test_three_address_blocks_written_separately(self):
+        self.t._edit_name = "Addr Cust"
+        self.c.save_customer(
+            fields={"name": "Addr Cust", "people_id": "1234567890123"},
+            mode="overwrite",
+            customer_id="95",
+            addresses={
+                "": {"house_no": "1"},
+                "_ct": {"house_no": "2"},
+                "_sd": {"house_no": "3"},
+            },
+        )
+        save = self._posted("cus/edit.php")
+        self.assertEqual(save["txthousenum"], "1")
+        self.assertEqual(save["txthousenum_ct"], "2")
+        self.assertEqual(save["txthousenum_sd"], "3")
+
+
 if __name__ == "__main__":
     unittest.main()

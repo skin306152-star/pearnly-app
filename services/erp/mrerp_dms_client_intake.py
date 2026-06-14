@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import html
 import re
 from typing import Any, Dict, List, Optional
 
@@ -31,10 +32,17 @@ _IDENTITY_MAP = {
     "tax_id": "txttaxid",
     "birthday_be": "txtbirthday",
     "phone": "txttel",
+    "tel_work": "txttelwork",
+    "tel_home": "txttelhome",
     "email": "txtemail",
     "line_id": "txtlineid",
+    "facebook": "txtfacebook",
     "credit_day": "txtcreditday",
 }
+# 分店(สาขา)= 隐藏 branchcusval(主档 id)+ txtbranchcus(显示码)配对的 typeahead。
+# 身份证录入不改分店:只读显示当前码,保存时由载入的表单默认值原样保留(不进可写映射)。
+_BRANCH_VAL = "branchcusval"
+_BRANCH_CODE = "txtbranchcus"
 # 地址友好键 → DMS 字段前缀(三段地址各加 ""/_ct/_sd 后缀)
 _ADDR_MAP = {
     "house_no": "txthousenum",
@@ -51,6 +59,13 @@ _ADDR_MAP = {
     "zipcode_id": "selzipcodes",
 }
 _ADDR_SUFFIXES = ("", "_ct", "_sd")
+# 地址下拉「选中标签」键 → DMS select 名(各加 ""/_ct/_sd 后缀)· 仅供显示现值
+_GEO_LABEL_MAP = {
+    "province_name": "selprovinces",
+    "district_name": "seldistricts",
+    "subdistrict_name": "selsubdistricts",
+    "zipcode_name": "selzipcodes",
+}
 
 
 class DMSClientIntakeMixin:
@@ -60,12 +75,66 @@ class DMSClientIntakeMixin:
         cid = self.search_customer(people_id) if (people_id or "").strip() else None
         if not cid:
             return {"found": False, "customer_id": None, "fields": {}}
-        html = self._post_text("cus/form.php", {"status": "e", "id": cid})
+        page = self._post_text("cus/form.php", {"status": "e", "id": cid})
         return {
             "found": True,
             "customer_id": cid,
-            "fields": self._extract_customer_fields(self._parse_form_defaults(html)),
+            "fields": self._extract_customer_fields(self._parse_form_defaults(page), page),
         }
+
+    def search_customers_detailed(self, text: str, limit: int = 10) -> List[Dict[str, str]]:
+        """按 码/姓名/证号 搜 DMS 客户,解析多行候选(给相似匹配)。
+        返回 [{customer_id, cuscode, name, people_id}, ...](命中顺序)。"""
+        term = (text or "").strip()
+        if not term:
+            return []
+        body = self._post_text(
+            "cus/component/showdata.php",
+            {
+                "sdtamt": str(limit),
+                "sdtpage": "1",
+                "sd": term,
+                "selcolsort": "1",
+                "selcolsorttype": "1",
+            },
+        )
+        return self._parse_customer_rows(body)
+
+    def _parse_customer_rows(self, body: str) -> List[Dict[str, str]]:
+        """解析 cus/component/showdata.php 的结果行。空结果体以 ndt:: 开头。
+        每行:<div data-val=客户号 onclick=ctllistdata> → detaildata 两列
+        (列1:客户码 + 姓名;列2:身份证号)· colnodt/"-" 占位视为空。"""
+        rows: List[Dict[str, str]] = []
+        for block in re.split(r'(?=<div\s+data-val=")', body):
+            m = re.match(r'<div\s+data-val="([^"]+)"[^>]*onclick="ctllistdata', block)
+            if not m:
+                continue
+            cid = m.group(1)
+            dd = re.search(
+                r'<div class="detaildata">(.*?)</div>\s*<div class="statuscf"', block, re.S
+            )
+            inner = dd.group(1) if dd else block
+            cols = re.findall(r"<div>(.*?)</div>", inner, re.S)
+            col0 = self._row_texts(cols[0]) if cols else []
+            col1 = self._row_texts(cols[1]) if len(cols) > 1 else []
+            rows.append(
+                {
+                    "customer_id": cid,
+                    "cuscode": col0[0] if len(col0) > 0 else "",
+                    "name": col0[1] if len(col0) > 1 else (col0[0] if col0 else ""),
+                    "people_id": col1[0] if col1 else "",
+                }
+            )
+        return rows
+
+    @staticmethod
+    def _row_texts(col_html: str) -> List[str]:
+        """取一列里各 <p> 的纯文本;占位 "-" 归一为空串。"""
+        out: List[str] = []
+        for pm in re.finditer(r"<p[^>]*>(.*?)</p>", col_html, re.S):
+            t = html.unescape(re.sub(r"<.*?>", "", pm.group(1))).strip()
+            out.append("" if t == "-" else t)
+        return out
 
     def list_prefixes(self) -> List[List[str]]:
         html = self._post_text("cus/form.php", {"status": "n"})
@@ -88,10 +157,17 @@ class DMSClientIntakeMixin:
 
     # ── 写 ──────────────────────────────────────────────────────────
     def save_customer(
-        self, *, fields: Dict[str, Any], mode: str, customer_id: Optional[str] = None
+        self,
+        *,
+        fields: Dict[str, Any],
+        mode: str,
+        customer_id: Optional[str] = None,
+        addresses: Optional[Dict[str, Dict[str, Any]]] = None,
     ) -> str:
         """建(mode='create')或覆盖(mode='overwrite')客户。返回 customer_id。
-        覆盖:载现表单 → 合并面板字段(非身份证字段原样保留)→ 提交。"""
+        覆盖:载现表单 → 合并面板字段(非身份证字段原样保留)→ 提交。
+        空值一律跳过(不清除 DMS 原值)。addresses 给 {""/_ct/_sd: 地址块} 时
+        三套地址分别写;不给则用 fields 里的单套地址写满三处(向后兼容)。"""
         if mode not in ("create", "overwrite"):
             raise DMSClientError(f"bad save mode: {mode!r}", "ERR_DMS_CUSTOMER_SAVE")
         # 幂等:一个身份证 = DMS 一个客户(编号/身份证号唯一)。create 前先按身份证号查,
@@ -112,7 +188,7 @@ class DMSClientIntakeMixin:
         if mode == "create" and not (fields.get("people_id") and data.get("txtcuscode")):
             data["txtcuscode"] = fields.get("people_id") or data.get("txtcuscode") or ""
 
-        self._apply_customer_fields(data, fields)
+        self._apply_customer_fields(data, fields, addresses)
         self._guard_required_selects(data, form_html)
 
         endpoint = "cus/new.php" if mode == "create" else "cus/edit.php"
@@ -126,25 +202,51 @@ class DMSClientIntakeMixin:
         return self._verify_saved(mode, fields, customer_id)
 
     # ── 内部 ────────────────────────────────────────────────────────
-    def _extract_customer_fields(self, data: Dict[str, str]) -> Dict[str, str]:
+    def _extract_customer_fields(self, data: Dict[str, str], form_html: str = "") -> Dict[str, str]:
         out = {fk: data.get(dms, "") for fk, dms in _IDENTITY_MAP.items()}
-        for fk, dms in _ADDR_MAP.items():
-            out[fk] = data.get(dms, "")
+        # 三套地址各自抽出(户籍 ""·联系 _ct·寄送 _sd),供全字段表单分区显示。
+        for sfx in _ADDR_SUFFIXES:
+            for fk, dms in _ADDR_MAP.items():
+                out[fk + sfx] = data.get(dms + sfx, "")
+            # 地址下拉的选中标签(显示现值用·id 不够):府/县/区/邮编
+            if form_html:
+                for fk, dms in _GEO_LABEL_MAP.items():
+                    out[fk + sfx] = self._geo_label(form_html, dms + sfx, data.get(dms + sfx, ""))
         out["cuscode"] = data.get("txtcuscode", "")
+        out["branch_id"] = data.get(_BRANCH_VAL, "")
+        out["branch_code"] = data.get(_BRANCH_CODE, "")
         return out
 
-    def _apply_customer_fields(self, data: Dict[str, str], f: Dict[str, Any]) -> None:
+    def _geo_label(self, form_html: str, select_name: str, value: str) -> str:
+        if not value:
+            return ""
+        for v, label in self._select_options(form_html, select_name):
+            if v == value:
+                return label
+        return ""
+
+    def _apply_customer_fields(
+        self,
+        data: Dict[str, str],
+        f: Dict[str, Any],
+        addresses: Optional[Dict[str, Dict[str, Any]]] = None,
+    ) -> None:
+        # 空值跳过:不把面板里没填的字段写成空覆盖掉 DMS 原值。
         for fk, dms in _IDENTITY_MAP.items():
             v = f.get(fk)
-            if v is not None:
+            if v not in (None, ""):
                 data[dms] = str(v)
         # 个人主体:税号留空时取身份证号(DMS 个人客户税号=身份证号)
         if not f.get("tax_id") and f.get("people_id"):
             data["txttaxid"] = str(f["people_id"])
-        for sfx in _ADDR_SUFFIXES:
+        # 三套地址:给了 addresses 就各套分别写;否则单套写满三处(向后兼容)。
+        blocks = addresses if addresses else {sfx: f for sfx in _ADDR_SUFFIXES}
+        for sfx, blk in blocks.items():
+            if sfx not in _ADDR_SUFFIXES:
+                continue
             for fk, dms in _ADDR_MAP.items():
-                v = f.get(fk)
-                if v is not None:
+                v = (blk or {}).get(fk)
+                if v not in (None, ""):
                     data[dms + sfx] = str(v)
 
     def _guard_required_selects(self, data: Dict[str, str], form_html: str) -> None:

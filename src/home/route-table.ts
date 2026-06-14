@@ -4,6 +4,7 @@
 // v118.32.5.5.37 NAV-IA Phase 5: automation 页面无侧边栏入口且不可路由 · 银行上传改为对账中心原地上传
 export const VALID_ROUTES = [
     'ocr',
+    'dms-intake',
     'dashboard',
     'history',
     'integration',
@@ -49,6 +50,7 @@ export const VALID_ROUTES = [
 // route → 页面加载函数名(window.*)· routeTo 进路由即调。数据驱动替原 if 链。
 export const ROUTE_LOADERS: Record<string, string> = {
     settings: 'renderSettings',
+    'dms-intake': 'loadDmsIntake',
     history: 'loadHistoryPage',
     clients: 'loadClientsPage',
     company: 'loadCompanyProfile',

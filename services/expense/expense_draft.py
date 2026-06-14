@@ -26,8 +26,10 @@ class ExpenseDraft(BaseModel):
     unit_price: Optional[Decimal] = Field(default=None)
     currency: str = Field(default="THB")
     expense_type: str = Field(default="", description="goods | service | ''")
-    category: str = Field(default="")
-    subcategory: str = Field(default="")
+    category: str = Field(default="", description="大类名(展示快照)")
+    subcategory: str = Field(default="", description="子类名(展示快照)")
+    category_id: Optional[str] = Field(default=None, description="链到 expense_categories 大类")
+    subcategory_id: Optional[str] = Field(default=None, description="链到 expense_categories 子类")
     vendor_name: str = Field(default="")
     vendor_tax_id: str = Field(default="")
     invoice_number: str = Field(default="", description="原样保留前缀,简式不强制(09 §5)")
@@ -58,6 +60,8 @@ _COLS = (
     "expense_type",
     "category",
     "subcategory",
+    "category_id",
+    "subcategory_id",
     "vendor_name",
     "vendor_tax_id",
     "invoice_number",
@@ -95,6 +99,8 @@ def insert_draft(
         "expense_type": draft.expense_type,
         "category": draft.category,
         "subcategory": draft.subcategory,
+        "category_id": draft.category_id,
+        "subcategory_id": draft.subcategory_id,
         "vendor_name": draft.vendor_name,
         "vendor_tax_id": draft.vendor_tax_id,
         "invoice_number": draft.invoice_number,

@@ -54,8 +54,10 @@ class PresetTreeTests(unittest.TestCase):
                 self.assertIsInstance(c, str)
 
     def test_preset_has_purchase_root(self):
+        # 齐全树:采购根 + 至少 10 个大类(进项常用全覆盖)。
         roots = [p for p, _ in cat._PRESET]
-        self.assertIn("ซื้อสินค้า", roots)
+        self.assertIn("ซื้อสินค้า/วัตถุดิบ", roots)
+        self.assertGreaterEqual(len(roots), 10)
 
 
 if __name__ == "__main__":

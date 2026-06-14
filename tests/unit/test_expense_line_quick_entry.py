@@ -17,12 +17,15 @@ class ParseExpenseTests(unittest.TestCase):
     def test_thai_water_bill(self):
         d = lqe.parse_expense("ค่าน้ำ 50")
         self.assertEqual(d.amount, Decimal("50"))
-        self.assertEqual(d.category, "ค่าสาธารณูปโภค")
 
     def test_amount_with_currency_word(self):
         d = lqe.parse_expense("โค้ก 30 บาท")
         self.assertEqual(d.amount, Decimal("30"))
-        self.assertEqual(d.category, "ค่าอาหาร")
+
+    def test_expense_type_service_vs_goods(self):
+        self.assertEqual(lqe.parse_expense("ค่าซ่อมรถ 500").expense_type, "service")
+        self.assertEqual(lqe.parse_expense("ค่าเช่า 8000").expense_type, "service")
+        self.assertEqual(lqe.parse_expense("โค้ก 30").expense_type, "goods")
 
     def test_baht_symbol(self):
         self.assertEqual(lqe.parse_expense("฿1,250.50").amount, Decimal("1250.50"))
@@ -36,7 +39,6 @@ class ParseExpenseTests(unittest.TestCase):
     def test_chinese_taxi(self):
         d = lqe.parse_expense("打车 120")
         self.assertEqual(d.amount, Decimal("120"))
-        self.assertEqual(d.category, "ค่าเดินทาง")
 
     def test_tax_id_and_invoice_number(self):
         d = lqe.parse_expense("0105546015062 IV69/00179 500 บาท")
@@ -120,6 +122,38 @@ class StoreTests(unittest.TestCase):
             set_status(
                 _FakeCursor(), tenant_id="t", workspace_client_id=1, draft_id="d", status="posted"
             )
+
+
+class CategoryTreeMatchTests(unittest.TestCase):
+    """LINE 归类走本套账真实科目树(intake._match_category + 共享关键词)· 不分叉。"""
+
+    TREE = [
+        {
+            "id": "p1",
+            "name": "ค่าสาธารณูปโภค",
+            "children": [{"id": "c1", "name": "ค่าน้ำประปา"}, {"id": "c2", "name": "ค่าไฟฟ้า"}],
+        },
+        {
+            "id": "p2",
+            "name": "ค่าเดินทางและขนส่ง",
+            "children": [{"id": "c3", "name": "ค่าแท็กซี่/แกร็บ"}],
+        },
+    ]
+
+    def test_thai_water_maps_to_subcategory(self):
+        from services.purchase import intake
+
+        self.assertEqual(intake._match_category("ค่าน้ำ 50", self.TREE), ("p1", "c1"))
+
+    def test_chinese_taxi_maps_to_subcategory(self):
+        from services.purchase import intake
+
+        self.assertEqual(intake._match_category("打车 120", self.TREE), ("p2", "c3"))
+
+    def test_unknown_leaves_empty(self):
+        from services.purchase import intake
+
+        self.assertEqual(intake._match_category("อะไรไม่รู้ 30", self.TREE), (None, None))
 
 
 class ModelTests(unittest.TestCase):

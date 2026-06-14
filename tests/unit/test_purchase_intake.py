@@ -91,7 +91,11 @@ class BuildDraftTests(unittest.TestCase):
 
 class ClassifyExpenseTests(unittest.TestCase):
     TREE = [
-        {"id": "p1", "name": "ค่าเดินทาง", "children": [{"id": "c1", "name": "ค่าแท็กซี่"}]},
+        {
+            "id": "p1",
+            "name": "ค่าเดินทางและขนส่ง",
+            "children": [{"id": "c1", "name": "ค่าแท็กซี่/แกร็บ"}],
+        },
         {"id": "p2", "name": "ค่าเช่า", "children": []},
     ]
 

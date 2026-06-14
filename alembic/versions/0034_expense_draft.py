@@ -52,6 +52,8 @@ def upgrade() -> None:
             expense_type text NOT NULL DEFAULT '',
             category text NOT NULL DEFAULT '',
             subcategory text NOT NULL DEFAULT '',
+            category_id uuid,
+            subcategory_id uuid,
             vendor_name text NOT NULL DEFAULT '',
             vendor_tax_id text NOT NULL DEFAULT '',
             invoice_number text NOT NULL DEFAULT '',

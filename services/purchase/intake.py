@@ -16,22 +16,10 @@ from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from services.purchase import totals as totals_svc
+from services.purchase.expense_keywords import EXPENSE_KEYWORDS as _EXPENSE_KEYWORDS
 
 _TAX_RE = re.compile(r"\d")
 _NUM_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
-
-# 费用文本 → 子科目关键词(打车→ค่าแท็กซี่ 等)· 命中即归类,未命中留空待用户选。
-_EXPENSE_KEYWORDS = {
-    "ค่าแท็กซี่": ("แท็กซี่", "taxi", "grab", "打车", "出租"),
-    "ค่าน้ำมัน": ("น้ำมัน", "ปตท", "fuel", "ptt", "油", "加油"),
-    "ค่าน้ำ": ("ค่าน้ำ", "ประปา", "water", "水费"),
-    "ค่าไฟ": ("ค่าไฟ", "ไฟฟ้า", "electric", "电费"),
-    "เครื่องเขียน": ("เครื่องเขียน", "stationery", "文具", "纸"),
-    "ค่าทำความสะอาด": ("ทำความสะอาด", "clean", "清洁", "洗"),
-    "ค่าเช่า": ("ค่าเช่า", "rent", "租"),
-    "ค่าโฆษณา": ("โฆษณา", "ads", "facebook", "广告"),
-    "ค่าซ่อมบำรุง": ("ซ่อม", "repair", "维修", "保养"),
-}
 
 
 def _norm_tax(v) -> str:

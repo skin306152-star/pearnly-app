@@ -16,53 +16,31 @@ from typing import Optional
 
 from services.expense.expense_draft import ExpenseDraft
 
-# 关键词 → (分类, 子分类) · 泰语优先,附中/英别名。P0 起步集;可学习词典 = P1。
-_CATEGORY_RULES: tuple[tuple[tuple[str, ...], str, str], ...] = (
-    (
-        ("ค่าน้ำ", "ค่าไฟ", "น้ำประปา", "ไฟฟ้า", "水电", "水费", "电费", "utility"),
-        "ค่าสาธารณูปโภค",
-        "",
-    ),
-    (
-        (
-            "กาแฟ",
-            "ข้าว",
-            "อาหาร",
-            "โค้ก",
-            "เครื่องดื่ม",
-            "咖啡",
-            "餐",
-            "饭",
-            "coffee",
-            "food",
-            "lunch",
-        ),
-        "ค่าอาหาร",
-        "",
-    ),
-    (
-        (
-            "แท็กซี่",
-            "แกร็บ",
-            "grab",
-            "taxi",
-            "น้ำมัน",
-            "เดินทาง",
-            "打车",
-            "出行",
-            "油费",
-            "fuel",
-            "travel",
-        ),
-        "ค่าเดินทาง",
-        "",
-    ),
-    (
-        ("กระดาษ", "ปากกา", "เครื่องเขียน", "文具", "办公", "stationery", "office"),
-        "ค่าเครื่องเขียน",
-        "",
-    ),
-    (("เช่า", "ค่าเช่า", "房租", "租金", "rent"), "ค่าเช่า", ""),
+# 分类不在此硬编码 —— 改由 webhook 拿本套账真实科目树(expense_categories)+ intake._match_category
+# 匹配(图/文共用同一套树,不分叉)。本文件只做与树无关的确定性字段抽取。
+
+# 服务类关键词(命中→service,否则默认 goods)· 泰语优先。
+_SERVICE_WORDS = (
+    "บริการ",
+    "ค่าจ้าง",
+    "ซ่อม",
+    "ค่าเช่า",
+    "ที่ปรึกษา",
+    "อบรม",
+    "โฆษณา",
+    "ขนส่ง",
+    "ทำความสะอาด",
+    "service",
+    "rent",
+    "repair",
+    "consult",
+    "服务",
+    "维修",
+    "咨询",
+    "租",
+    "培训",
+    "广告",
+    "运",
 )
 
 # 量词(数量信号)· 泰语优先。
@@ -107,12 +85,10 @@ def _parse_date(text: str) -> Optional[str]:
         return None
 
 
-def _match_category(text: str) -> tuple[str, str]:
+def _extract_expense_type(text: str) -> str:
+    """商品(goods)还是服务(service)· 命中服务关键词→service,否则默认 goods。"""
     low = text.lower()
-    for keys, cat, sub in _CATEGORY_RULES:
-        if any(k.lower() in low for k in keys):
-            return cat, sub
-    return "", ""
+    return "service" if any(w.lower() in low for w in _SERVICE_WORDS) else "goods"
 
 
 def _extract_qty(text: str) -> Optional[Decimal]:
@@ -176,14 +152,13 @@ def parse_expense(text: str) -> ExpenseDraft:
     unit_price = _extract_unit_price(text)
     amount = _extract_amount(text, qty, unit_price)
     tax_id, invoice_number = _extract_tax_and_invoice(text)
-    category, subcategory = _match_category(text)
     doc_date = _parse_date(text) or _today().isoformat()
+    # category/subcategory 由 webhook 拿真实科目树解析(图/文共用 · 不在此分叉)。
     return ExpenseDraft(
         amount=amount,
         qty=qty,
         unit_price=unit_price,
-        category=category,
-        subcategory=subcategory,
+        expense_type=_extract_expense_type(text),
         vendor_tax_id=tax_id,
         invoice_number=invoice_number,
         doc_date=doc_date,

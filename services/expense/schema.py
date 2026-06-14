@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS expense_draft (
     expense_type text NOT NULL DEFAULT '',
     category text NOT NULL DEFAULT '',
     subcategory text NOT NULL DEFAULT '',
+    category_id uuid,
+    subcategory_id uuid,
     vendor_name text NOT NULL DEFAULT '',
     vendor_tax_id text NOT NULL DEFAULT '',
     invoice_number text NOT NULL DEFAULT '',
@@ -54,13 +56,21 @@ _INDEXES = (
     "ON expense_draft (tenant_id, workspace_client_id, invoice_number)",
 )
 
+# 存量表补列(幂等):早于科目链接上线建的表无 category_id/subcategory_id。
+_ALTERS = (
+    "ALTER TABLE expense_draft ADD COLUMN IF NOT EXISTS category_id uuid",
+    "ALTER TABLE expense_draft ADD COLUMN IF NOT EXISTS subcategory_id uuid",
+)
+
 
 def ensure_expense_schema() -> None:
-    """幂等建 expense_draft 表 + 索引 + RLS(startup 调)。"""
+    """幂等建 expense_draft 表 + 补列 + 索引 + RLS(startup 调)。"""
     from core import db
 
     with db.get_cursor(commit=True) as cur:
         cur.execute(_TABLE)
+        for alter in _ALTERS:
+            cur.execute(alter)
         for idx in _INDEXES:
             cur.execute(idx)
         apply_tenant_rls(cur, "expense_draft")

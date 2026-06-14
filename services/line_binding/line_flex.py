@@ -95,23 +95,34 @@ def ocr_result_flex(
     }
 
 
-def expense_confirm_flex(*, draft: dict, draft_id: str, labels: dict, edit_url: str = "") -> dict:
-    """文本路一句话记账确认卡(doc 10 §5:提议确认,不静默)。与图片路共用卡范式。
+_EXPENSE_TYPE_LABEL = {"goods": "🛍 สินค้า", "service": "🔧 บริการ"}
 
-    labels 键:head/amount/category/vendor/date/confirm/discard/edit(调用方按语言填)。
-    金额永远显示算出的总额供一眼核对(doc 10 §3)。按钮走 postback(确认/丢弃),绝不自动入账。
+
+def expense_confirm_flex(*, draft: dict, draft_id: str, labels: dict, edit_url: str = "") -> dict:
+    """文本/图片路记账确认卡(doc 10 §5:提议确认,不静默)。字段对齐 Paypers(全字段)。
+
+    labels 键:head/amount/doc_type/inv_no/exp_type/date/category/subcategory/business/detail/
+    vendor/confirm/discard/edit(调用方按语言填)。金额永远显示算出的总额供一眼核对(doc 10 §3)。
+    空字段显示"-"。按钮走 postback(确认/丢弃),绝不自动入账。
     """
     d = draft or {}
     amount = d.get("amount")
     amount_str = f"{amount} {d.get('currency') or 'THB'}" if amount not in (None, "") else "-"
+    exp_type = _EXPENSE_TYPE_LABEL.get(d.get("expense_type") or "", d.get("expense_type") or "")
 
     body = [
         {"type": "text", "text": labels.get("head", ""), "weight": "bold", "size": "md"},
         {"type": "text", "text": amount_str, "weight": "bold", "size": "xl", "color": _INK},
         {"type": "separator", "margin": "md"},
-        _field_row(labels.get("category", ""), d.get("category"), False, ""),
-        _field_row(labels.get("vendor", ""), d.get("vendor_name"), False, ""),
+        _field_row(labels.get("doc_type", ""), d.get("document_type"), False, ""),
+        _field_row(labels.get("inv_no", ""), d.get("invoice_number"), False, ""),
+        _field_row(labels.get("exp_type", ""), exp_type, False, ""),
         _field_row(labels.get("date", ""), d.get("doc_date"), False, ""),
+        _field_row(labels.get("category", ""), d.get("category"), False, ""),
+        _field_row(labels.get("subcategory", ""), d.get("subcategory"), False, ""),
+        _field_row(labels.get("business", ""), d.get("business_name"), False, ""),
+        _field_row(labels.get("detail", ""), d.get("note"), False, ""),
+        _field_row(labels.get("vendor", ""), d.get("vendor_name"), False, ""),
     ]
     footer = [
         _btn(

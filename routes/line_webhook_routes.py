@@ -319,6 +319,7 @@ def _handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> b
         from core.workspace_context import default_workspace_id
         from services.expense import expense_draft as draft_store
         from services.line_binding import line_flex
+        from services.purchase import categories as cat_svc
         from services.purchase import intake as intake_svc
 
         with db.get_cursor_rls(str(tid), commit=True) as cur:
@@ -327,6 +328,10 @@ def _handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> b
             ws = default_workspace_id(cur, str(tid))
             if ws is None:
                 return False
+            # 归类:用本套账真实科目树(图/文共用·不分叉)。取业务主体名。
+            tree = cat_svc.get_tree(cur, tenant_id=str(tid), workspace_client_id=ws)
+            _fill_category(draft, text, tree)
+            business_name = _business_name(cur, tenant_id=str(tid), ws=ws)
             created_by = str(bound_user["id"]) if bound_user.get("id") else None
             draft_id = draft_store.insert_draft(
                 cur,
@@ -338,15 +343,35 @@ def _handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> b
             )
         labels = {
             k: line_client.t_line(lang, f"exp_card_{k}")
-            for k in ("head", "category", "vendor", "date", "confirm", "discard", "edit")
+            for k in (
+                "head",
+                "doc_type",
+                "inv_no",
+                "exp_type",
+                "date",
+                "category",
+                "subcategory",
+                "business",
+                "detail",
+                "vendor",
+                "confirm",
+                "discard",
+                "edit",
+            )
         }
         card = line_flex.expense_confirm_flex(
             draft={
                 "amount": str(draft.amount),
                 "currency": draft.currency,
-                "category": draft.category,
-                "vendor_name": draft.vendor_name,
+                "document_type": draft.document_type,
+                "invoice_number": draft.invoice_number,
+                "expense_type": draft.expense_type,
                 "doc_date": draft.doc_date,
+                "category": draft.category,
+                "subcategory": draft.subcategory,
+                "business_name": business_name,
+                "note": draft.note,
+                "vendor_name": draft.vendor_name,
             },
             draft_id=draft_id,
             labels=labels,
@@ -357,6 +382,34 @@ def _handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> b
     except Exception:
         logger.exception("[line] expense draft failed; fall back to hint")
         return False
+
+
+def _fill_category(draft, text, tree) -> None:
+    """据真实科目树把 draft 的 category/subcategory(名+id)填上(图/文共用 intake 匹配器)。"""
+    from services.purchase import intake as intake_svc
+
+    cat_id, sub_id = intake_svc._match_category(text, tree)
+    if not cat_id:
+        return
+    for parent in tree:
+        if parent["id"] == cat_id:
+            draft.category = parent["name"]
+            draft.category_id = str(cat_id)
+            for child in parent.get("children") or []:
+                if child["id"] == sub_id:
+                    draft.subcategory = child["name"]
+                    draft.subcategory_id = str(sub_id)
+            return
+
+
+def _business_name(cur, *, tenant_id, ws) -> str:
+    """套账主体名(确认卡「业务主体」栏)。"""
+    cur.execute(
+        "SELECT name FROM workspace_clients WHERE id = %s AND tenant_id = %s",
+        (ws, tenant_id),
+    )
+    row = cur.fetchone()
+    return (row["name"] or "") if row else ""
 
 
 def _handle_expense_postback(bound_user, reply_token, parsed, lang) -> None:

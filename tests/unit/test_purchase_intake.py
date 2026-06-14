@@ -267,23 +267,8 @@ class ResolveInboxTests(unittest.TestCase):
         self.assertEqual(r["status"], "resolved")
 
 
-class RecordLineExpenseTests(unittest.TestCase):
-    """F10:LINE 文字无金额(如「水」)→ 不记一笔(返 None),调用方回功能提示。"""
-
-    def test_no_amount_returns_none(self):
-        from unittest import mock
-
-        from services.purchase import categories as cs
-        from services.purchase import settings as ss
-
-        with (
-            mock.patch.object(ss, "get_settings", return_value={}),
-            mock.patch.object(cs, "get_tree", return_value=[]),
-        ):
-            r = ik.record_line_expense(
-                _FakeCur(), tenant_id="t", workspace_client_id=1, text="ค่าน้ำ", created_by="u"
-            )
-        self.assertIsNone(r)
+# 旧 F10「LINE 文字静默记一笔 posted 费用」已删(违反 doc 10 §5 死穴:绝不静默入账)。
+# 文本路改走 services/expense 引擎:解析→草稿→确认卡,覆盖见 test_expense_line_quick_entry.py。
 
 
 if __name__ == "__main__":

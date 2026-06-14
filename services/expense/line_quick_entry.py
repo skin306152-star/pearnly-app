@@ -1,0 +1,192 @@
+# -*- coding: utf-8 -*-
+"""LINE 一句话记账 · L1 确定性解析引擎(doc 10 §2/§3 · 代码优先)。
+
+只做确定性规则(正则 + 泰语字典):金额/数量/单价/日期/税号/发票号/分类/卖家。
+够清楚就直接出确认卡(0 成本/毫秒)。真自然语言兜底(L2 LLM)= P1,本文件不含。
+模型只"听懂"不"开口":本引擎纯产出 ExpenseDraft 数据,用户可见文案全在 line_i18n 模板。
+泰语优先。产出对齐 services/ocr ThaiInvoice 字段,图/文两路下游共用。
+"""
+
+from __future__ import annotations
+
+import re
+from datetime import date, timedelta
+from decimal import Decimal, InvalidOperation
+from typing import Optional
+
+from services.expense.expense_draft import ExpenseDraft
+
+# 关键词 → (分类, 子分类) · 泰语优先,附中/英别名。P0 起步集;可学习词典 = P1。
+_CATEGORY_RULES: tuple[tuple[tuple[str, ...], str, str], ...] = (
+    (
+        ("ค่าน้ำ", "ค่าไฟ", "น้ำประปา", "ไฟฟ้า", "水电", "水费", "电费", "utility"),
+        "ค่าสาธารณูปโภค",
+        "",
+    ),
+    (
+        (
+            "กาแฟ",
+            "ข้าว",
+            "อาหาร",
+            "โค้ก",
+            "เครื่องดื่ม",
+            "咖啡",
+            "餐",
+            "饭",
+            "coffee",
+            "food",
+            "lunch",
+        ),
+        "ค่าอาหาร",
+        "",
+    ),
+    (
+        (
+            "แท็กซี่",
+            "แกร็บ",
+            "grab",
+            "taxi",
+            "น้ำมัน",
+            "เดินทาง",
+            "打车",
+            "出行",
+            "油费",
+            "fuel",
+            "travel",
+        ),
+        "ค่าเดินทาง",
+        "",
+    ),
+    (
+        ("กระดาษ", "ปากกา", "เครื่องเขียน", "文具", "办公", "stationery", "office"),
+        "ค่าเครื่องเขียน",
+        "",
+    ),
+    (("เช่า", "ค่าเช่า", "房租", "租金", "rent"), "ค่าเช่า", ""),
+)
+
+# 量词(数量信号)· 泰语优先。
+_QTY_UNITS = ("ชิ้น", "จาน", "อัน", "ลัง", "กล่อง", "แก้ว", "个", "杯", "份", "件", "pcs", "pc")
+_CURRENCY_MARK = ("บาท", "฿", "thb", "元", "块")
+_TODAY_WORDS = ("วันนี้", "today", "今天")
+_YESTERDAY_WORDS = ("เมื่อวาน", "yesterday", "昨天")
+
+_NUM = r"\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?"
+
+
+def _to_decimal(s: str) -> Optional[Decimal]:
+    try:
+        return Decimal(s.replace(",", ""))
+    except (InvalidOperation, AttributeError):
+        return None
+
+
+def _today() -> date:
+    return date.today()
+
+
+def _parse_date(text: str) -> Optional[str]:
+    """相对词 + DD/MM/YY[YY](佛历 25xx−543) → YYYY-MM-DD。认不出 → None(调用方默认今天)。"""
+    low = text.lower()
+    if any(w in low for w in _TODAY_WORDS):
+        return _today().isoformat()
+    if any(w in low for w in _YESTERDAY_WORDS):
+        return (_today() - timedelta(days=1)).isoformat()
+    m = re.search(r"\b(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})\b", text)
+    if not m:
+        return None
+    d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    if y < 100:  # 2 位年:先试佛历 25YY-543,落在合理范围用它,否则公历 20YY
+        be = 2500 + y - 543
+        y = be if 2000 <= be <= _today().year + 1 else 2000 + y
+    elif y >= 2400:  # 4 位佛历
+        y -= 543
+    try:
+        return date(y, mo, d).isoformat()
+    except ValueError:
+        return None
+
+
+def _match_category(text: str) -> tuple[str, str]:
+    low = text.lower()
+    for keys, cat, sub in _CATEGORY_RULES:
+        if any(k.lower() in low for k in keys):
+            return cat, sub
+    return "", ""
+
+
+def _extract_qty(text: str) -> Optional[Decimal]:
+    m = re.search(r"[x×X]\s*(\d+(?:\.\d+)?)", text)
+    if m:
+        return _to_decimal(m.group(1))
+    units = "|".join(re.escape(u) for u in _QTY_UNITS)
+    m = re.search(rf"({_NUM})\s*(?:{units})", text)
+    return _to_decimal(m.group(1)) if m else None
+
+
+def _extract_unit_price(text: str) -> Optional[Decimal]:
+    m = re.search(rf"(?:@|ต่อหน่วย|单价)\s*({_NUM})", text)
+    return _to_decimal(m.group(1)) if m else None
+
+
+def _extract_tax_and_invoice(text: str) -> tuple[str, str]:
+    """13 位纯数字 → 卖家税号;字母前缀+数字码(如 IV69/00179)或其它长数字串 → 发票号(原样留前缀)。"""
+    m = re.search(r"\b\d{13}\b", text)
+    tax_id = m.group(0) if m else ""
+    invoice_number = ""
+    mm = re.search(r"\b[A-Za-z]{1,6}\d[\w/\-]*\b", text)  # 字母前缀编号
+    if mm:
+        invoice_number = mm.group(0)
+    else:
+        for run in re.finditer(r"\b\d{6,}\b", text):  # 兜底:长数字串(非税号)
+            if run.group(0) != tax_id:
+                invoice_number = run.group(0)
+                break
+    return tax_id, invoice_number
+
+
+def _extract_amount(
+    text: str, qty: Optional[Decimal], unit_price: Optional[Decimal]
+) -> Optional[Decimal]:
+    """金额(总额)。带币种标记的数优先;否则取剩余裸数字里最大的(排除已识别的数量)。"""
+    low = text.lower()
+    marks = "|".join(re.escape(m) for m in _CURRENCY_MARK)
+    m = re.search(rf"(?:฿)\s*({_NUM})|({_NUM})\s*(?:{marks})", low)
+    if m:
+        return _to_decimal(m.group(1) or m.group(2))
+    if qty is not None and unit_price is not None:
+        return qty * unit_price
+    # 裸数字兜底:排除被量词/单价/长串占用的,取剩下最大的当总额
+    nums = [_to_decimal(x) for x in re.findall(_NUM, re.sub(r"[A-Za-z]*\d[\d/\-]{8,}", " ", text))]
+    nums = [n for n in nums if n is not None and n not in (qty, unit_price)]
+    return max(nums) if nums else None
+
+
+def looks_like_expense(text: str) -> bool:
+    """有金额线索(币种标记 or 裸数字)即视为记账意图(doc 10 §2 L1)。"""
+    return parse_expense(text).has_amount()
+
+
+def parse_expense(text: str) -> ExpenseDraft:
+    """自由文本 → ExpenseDraft(确定性映射 · doc 10 §3)。无金额 → amount=None(调用方澄清)。"""
+    text = (text or "").strip()
+    qty = _extract_qty(text)
+    unit_price = _extract_unit_price(text)
+    amount = _extract_amount(text, qty, unit_price)
+    tax_id, invoice_number = _extract_tax_and_invoice(text)
+    category, subcategory = _match_category(text)
+    doc_date = _parse_date(text) or _today().isoformat()
+    return ExpenseDraft(
+        amount=amount,
+        qty=qty,
+        unit_price=unit_price,
+        category=category,
+        subcategory=subcategory,
+        vendor_tax_id=tax_id,
+        invoice_number=invoice_number,
+        doc_date=doc_date,
+        note=text,
+        raw_text=text,
+        source="line_text",
+        confidence=Decimal("0.90") if amount is not None else Decimal("0"),
+    )

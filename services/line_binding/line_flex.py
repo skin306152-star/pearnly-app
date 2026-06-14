@@ -93,3 +93,47 @@ def ocr_result_flex(
             "footer": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": footer},
         },
     }
+
+
+def expense_confirm_flex(*, draft: dict, draft_id: str, labels: dict, edit_url: str = "") -> dict:
+    """文本路一句话记账确认卡(doc 10 §5:提议确认,不静默)。与图片路共用卡范式。
+
+    labels 键:head/amount/category/vendor/date/confirm/discard/edit(调用方按语言填)。
+    金额永远显示算出的总额供一眼核对(doc 10 §3)。按钮走 postback(确认/丢弃),绝不自动入账。
+    """
+    d = draft or {}
+    amount = d.get("amount")
+    amount_str = f"{amount} {d.get('currency') or 'THB'}" if amount not in (None, "") else "-"
+
+    body = [
+        {"type": "text", "text": labels.get("head", ""), "weight": "bold", "size": "md"},
+        {"type": "text", "text": amount_str, "weight": "bold", "size": "xl", "color": _INK},
+        {"type": "separator", "margin": "md"},
+        _field_row(labels.get("category", ""), d.get("category"), False, ""),
+        _field_row(labels.get("vendor", ""), d.get("vendor_name"), False, ""),
+        _field_row(labels.get("date", ""), d.get("doc_date"), False, ""),
+    ]
+    footer = [
+        _btn(
+            labels.get("confirm", ""),
+            data=line_postback.expense_confirm_data(draft_id),
+            style="primary",
+        ),
+        _btn(
+            labels.get("discard", ""),
+            data=line_postback.expense_discard_data(draft_id),
+            style="secondary",
+        ),
+    ]
+    if edit_url:
+        footer.append(_btn(labels.get("edit", ""), uri=edit_url, style="secondary"))
+
+    return {
+        "type": "flex",
+        "altText": labels.get("head", "expense"),
+        "contents": {
+            "type": "bubble",
+            "body": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": body},
+            "footer": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": footer},
+        },
+    }

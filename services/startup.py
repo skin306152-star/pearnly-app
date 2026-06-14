@@ -257,6 +257,15 @@ def _boot_schema_ddl() -> None:
     except Exception as e:
         logger.warning(f"启动 tax schema 失败: {e}")
 
+    # 一句话记账捕获草稿表(LINE 文本/图片路共用 expense_draft · docs/smart-intake/14)。
+    # NEW-DEBT-EXEMPT: 启动自愈式迁移,prod 无 alembic 钩子,口径同 accounting/tax。
+    try:
+        from services.expense.schema import ensure_expense_schema
+
+        ensure_expense_schema()
+    except Exception as e:
+        logger.warning(f"启动 expense schema 失败: {e}")
+
     # 商户采购(进项)schema 双跑(suppliers / purchase_docs+lines / categories+settings+
     # intake+attachments)· 与 alembic 0031-0033 同源幂等 DDL(docs/purchasing/01)。
     try:

@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
@@ -298,7 +297,7 @@ def fields_from_invoice(inv) -> dict:
 def line_expense_gate_open(cur, *, tenant_id) -> bool:
     """LINE 记费用门控(单一来源 · 铁律#26 底线集中):商户(非 firm/未选业态)+ 开 expense → True。
     事务所 firm / 未 onboard(business_type=None)/ 未开 expense → False。图(route_line_image)与
-    文字(webhook _maybe_record_line_expense)共用,改门控只动这一处,防两路漂移。"""
+    文字(webhook _handle_expense_text)共用,改门控只动这一处,防两路漂移。"""
     from services.modules import store as modules_store
 
     bt = modules_store.get_business_type(cur, tenant_id=tenant_id)
@@ -336,55 +335,6 @@ def route_line_image(*, tenant_id, workspace_client_id, fields, confidence) -> b
             ai_guess={"kind": kind, "route": route, "confidence": confidence},
         )
         return True
-
-
-def record_line_expense(cur, *, tenant_id, workspace_client_id, text, created_by) -> Optional[dict]:
-    """LINE 文字一句话 → 归类 → 直接记一笔 posted 费用(F10)。无金额(<=0)→ None(不记·调用方回提示)。
-    复用 /api/purchase/expense 同一套 services,逐字对齐。失败由调用方 try/except 兜底(不破坏 LINE 回复)。"""
-    from services.purchase import categories as cat_svc
-    from services.purchase import docs as docs_svc
-    from services.purchase import posting as posting_svc
-    from services.purchase import settings as settings_svc
-
-    # 先归类(只需 cats)+ 金额闸:无金额(LINE 多数闲聊)→ 直接 None,省掉 settings 取数(在 LINE 回复热路径)。
-    cats = cat_svc.get_tree(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
-    parsed = classify_expense_text(text, cats)
-    if _to_decimal(parsed.get("amount")) <= 0:
-        return None
-    cfg = settings_svc.get_settings(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
-    )
-    data = {
-        "doc_kind": "expense",
-        "source": "line",
-        # LINE 一句话记账无日期 → 默认记账当天(否则 doc_date 空 · 永不进"本月花费"等按月统计)。
-        "doc_date": date.today().isoformat(),
-        "category_id": parsed["category_id"],
-        "lines": [expense_line(parsed)],
-    }
-    created = docs_svc.create_doc(
-        cur,
-        tenant_id=tenant_id,
-        workspace_client_id=workspace_client_id,
-        created_by=created_by,
-        data=data,
-        settings=cfg,
-        status="draft",
-    )
-    posted = posting_svc.post_doc(
-        cur,
-        tenant_id=tenant_id,
-        workspace_client_id=workspace_client_id,
-        doc_id=created["doc"]["id"],
-        auto_stock_in=False,
-        created_by=created_by,
-    )
-    return {
-        "doc": posted["doc"],
-        "amount": str(parsed["amount"]),
-        "description": parsed["description"],
-        "categorized": parsed["category_id"] is not None,
-    }
 
 
 def list_inbox(cur, *, tenant_id, workspace_client_id) -> list[dict]:

@@ -43,9 +43,16 @@ LINE_I18N = {
             "我能识别发票/收据:图片 / PDF / Excel / CSV / Word / TXT\n"
             "也可发一句文字记账,如「ค่าน้ำ 50」"
         ),
-        "expense_recorded": (
-            "✅ 已记一笔费用\n{desc} · ฿{amount}\n在 pearnly.com「采购 / 进项」可查看或补全 🧾"
-        ),
+        "exp_card_head": "请确认这笔费用",
+        "exp_card_category": "分类",
+        "exp_card_vendor": "卖家",
+        "exp_card_date": "日期",
+        "exp_card_confirm": "确认入账",
+        "exp_card_discard": "取消",
+        "exp_card_edit": "网页编辑",
+        "exp_confirmed": "✅ 已记一笔 · ฿{amount}\n在 pearnly.com 可查看或补全 🧾",
+        "exp_discarded": "已取消这笔费用",
+        "exp_not_found": "这笔草稿已失效 · 请重新发一句记账",
     },
     "en": {
         "bind_invalid": "❌ Invalid or expired code\nGet a new one at pearnly.com",
@@ -85,9 +92,16 @@ LINE_I18N = {
             "I can read invoices/receipts: photos / PDF / Excel / CSV / Word / TXT\n"
             "Or type an expense like 'Water 50'"
         ),
-        "expense_recorded": (
-            "✅ Expense recorded\n{desc} · ฿{amount}\nView or complete it at pearnly.com 'Purchases' 🧾"
-        ),
+        "exp_card_head": "Confirm this expense",
+        "exp_card_category": "Category",
+        "exp_card_vendor": "Vendor",
+        "exp_card_date": "Date",
+        "exp_card_confirm": "Confirm",
+        "exp_card_discard": "Cancel",
+        "exp_card_edit": "Edit on web",
+        "exp_confirmed": "✅ Recorded · ฿{amount}\nView or complete it at pearnly.com 🧾",
+        "exp_discarded": "Expense cancelled",
+        "exp_not_found": "This draft has expired · please send the expense again",
     },
     "th": {
         "bind_invalid": "❌ รหัสไม่ถูกต้องหรือหมดอายุ\nกรุณารับรหัสใหม่ที่ pearnly.com",
@@ -127,9 +141,16 @@ LINE_I18N = {
             "รองรับใบกำกับ/ใบเสร็จ: รูป / PDF / Excel / CSV / Word / TXT\n"
             "หรือพิมพ์บันทึกค่าใช้จ่าย เช่น 'ค่าน้ำ 50'"
         ),
-        "expense_recorded": (
-            "✅ บันทึกค่าใช้จ่ายแล้ว\n{desc} · ฿{amount}\nดูหรือแก้ไขได้ที่ pearnly.com 'จัดซื้อ' 🧾"
-        ),
+        "exp_card_head": "ยืนยันค่าใช้จ่ายนี้",
+        "exp_card_category": "หมวดหมู่",
+        "exp_card_vendor": "ผู้ขาย",
+        "exp_card_date": "วันที่",
+        "exp_card_confirm": "ยืนยัน",
+        "exp_card_discard": "ยกเลิก",
+        "exp_card_edit": "แก้ไขบนเว็บ",
+        "exp_confirmed": "✅ บันทึกแล้ว · ฿{amount}\nดูหรือแก้ไขเพิ่มได้ที่ pearnly.com 🧾",
+        "exp_discarded": "ยกเลิกค่าใช้จ่ายนี้แล้ว",
+        "exp_not_found": "รายการนี้หมดอายุแล้ว · กรุณาพิมพ์ใหม่อีกครั้ง",
     },
     "ja": {
         "bind_invalid": "❌ コードが無効または期限切れです\npearnly.com で新しいコードを取得してください",
@@ -169,9 +190,16 @@ LINE_I18N = {
             "対応: 請求書・領収書の 写真 / PDF / Excel / CSV / Word / TXT\n"
             "または「水道 50」のように入力して記帳"
         ),
-        "expense_recorded": (
-            "✅ 費用を記録しました\n{desc} · ฿{amount}\npearnly.com「仕入」で確認・補完できます 🧾"
-        ),
+        "exp_card_head": "この費用を確認",
+        "exp_card_category": "分類",
+        "exp_card_vendor": "取引先",
+        "exp_card_date": "日付",
+        "exp_card_confirm": "確認",
+        "exp_card_discard": "キャンセル",
+        "exp_card_edit": "Web で編集",
+        "exp_confirmed": "✅ 記録しました · ฿{amount}\npearnly.com で確認・補完できます 🧾",
+        "exp_discarded": "この費用をキャンセルしました",
+        "exp_not_found": "この下書きは期限切れです · もう一度入力してください",
     },
 }
 

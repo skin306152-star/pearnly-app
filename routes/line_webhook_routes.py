@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
 
 # 取链接命令引导去网页(集成中心连 Google 后取 Drive/Sheet 链接)。
 _WEB_INTEGRATIONS_URL = "https://pearnly.com/home#integrations"
+# 费用草稿网页编辑深链(doc 14 §6 · 前端复核屏接此 draft id · 泰语先行)。
+_EXPENSE_DRAFT_URL = "https://pearnly.com/home#expense-draft="
 
 router = APIRouter()
 
@@ -226,11 +228,11 @@ async def _handle_line_text(line_user_id: str, reply_token: str, text: str, ev: 
                 reply_token, line_intake.link_reply(cmd, lang, web_url=_WEB_INTEGRATIONS_URL)
             )
             return
-        # F10 · 商户(非 firm)+ 开 expense + 文本含金额 → 记一笔费用并回执;否则回功能提示(现状不变)。
-        recorded = _maybe_record_line_expense(bound_user, text, lang)
-        if recorded:
-            line_client.reply_text(reply_token, recorded)
+        # 文本路 · doc 10 §2 分层路由(代码优先):记账意图(含金额)→ 解析→落草稿→确认卡。
+        # 绝不静默入账(doc 10 §5 死穴),用户点卡上按钮才确认。
+        if _handle_expense_text(bound_user, reply_token, line_user_id, text, lang):
             return
+        # 兜底(P0):认不出 → 功能提示。query/question/L2 LLM 路由 = P1。
         username = bound_user.get("username") or ""
         line_client.reply_text(
             reply_token,
@@ -254,6 +256,10 @@ async def _handle_line_postback(line_user_id: str, reply_token: str, data: str, 
     if not bound:
         return
     lang = bound.get("preferred_lang") or _ev_lang(ev)
+    # 文本路费用草稿确认/丢弃(doc 10 §5)→ 与图片路 intake 分流分开处理。
+    if action in (line_postback.ACTION_EXP_CONFIRM, line_postback.ACTION_EXP_DISCARD):
+        _handle_expense_postback(bound, reply_token, parsed, lang)
+        return
     tid = str(bound["tenant_id"]) if bound.get("tenant_id") else None
     item_id = parsed.get("doc_id")
     inbox_action = (
@@ -294,38 +300,109 @@ async def _handle_line_postback(line_user_id: str, reply_token: str, data: str, 
         line_client.reply_text(reply_token, line_client.t_line(lang, "unsupported"))
 
 
-def _maybe_record_line_expense(bound_user: dict, text: str, lang: str):
-    """商户(business_type 非 firm/未选)+ 开 expense + 文本含金额 → 记一笔 posted 费用,返回回执文案。
-    事务所(firm/null)/ 未开 expense / 无默认套账 / 无金额 / 任何异常 → None(LINE 主路径 + 事务所底线一字不破坏)。"""
+def _handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> bool:
+    """文本含金额 → 解析成 ExpenseDraft + 落草稿 + 回确认卡(doc 10/14 · 绝不静默入账)。
+
+    返回 True = 已处理(回了确认卡);False = 不是记账(回落功能提示)。
+    事务所(firm)/ 未开 expense / 无默认套账 / 无金额 / 异常 → False(LINE 主路径 + 事务所底线不破坏)。
+    """
     try:
         tid = bound_user.get("tenant_id")
         if not tid:
-            return None
+            return False
+        from services.expense import line_quick_entry as lqe
+
+        draft = lqe.parse_expense(text)
+        if not draft.has_amount():
+            return False
+
         from core.workspace_context import default_workspace_id
+        from services.expense import expense_draft as draft_store
+        from services.line_binding import line_flex
         from services.purchase import intake as intake_svc
 
         with db.get_cursor_rls(str(tid), commit=True) as cur:
             if not intake_svc.line_expense_gate_open(cur, tenant_id=str(tid)):
-                return None
+                return False
             ws = default_workspace_id(cur, str(tid))
             if ws is None:
-                return None
+                return False
             created_by = str(bound_user["id"]) if bound_user.get("id") else None
-            res = intake_svc.record_line_expense(
+            draft_id = draft_store.insert_draft(
                 cur,
                 tenant_id=str(tid),
                 workspace_client_id=ws,
-                text=text,
+                draft=draft,
+                line_user_id=line_user_id,
                 created_by=created_by,
             )
-        if not res:
-            return None
-        return line_client.t_line(
-            lang, "expense_recorded", desc=res["description"], amount=res["amount"]
+        labels = {
+            k: line_client.t_line(lang, f"exp_card_{k}")
+            for k in ("head", "category", "vendor", "date", "confirm", "discard", "edit")
+        }
+        card = line_flex.expense_confirm_flex(
+            draft={
+                "amount": str(draft.amount),
+                "currency": draft.currency,
+                "category": draft.category,
+                "vendor_name": draft.vendor_name,
+                "doc_date": draft.doc_date,
+            },
+            draft_id=draft_id,
+            labels=labels,
+            edit_url=f"{_EXPENSE_DRAFT_URL}{draft_id}",
         )
+        line_client.reply_messages(reply_token, [card])
+        return True
     except Exception:
-        logger.exception("[line] expense record failed; fall back to hint")
-        return None
+        logger.exception("[line] expense draft failed; fall back to hint")
+        return False
+
+
+def _handle_expense_postback(bound_user, reply_token, parsed, lang) -> None:
+    """费用草稿确认/丢弃(doc 10 §5)。确认 → status=confirmed + 回执;丢弃 → discarded(留痕不删)。"""
+    tid = str(bound_user["tenant_id"]) if bound_user.get("tenant_id") else None
+    draft_id = parsed.get("draft_id")
+    if not tid or not draft_id:
+        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_not_found"))
+        return
+    try:
+        from core.workspace_context import default_workspace_id
+        from services.expense import expense_draft as draft_store
+
+        with db.get_cursor_rls(tid, commit=True) as cur:
+            ws = default_workspace_id(cur, tid)
+            d = (
+                draft_store.get_draft(cur, tenant_id=tid, workspace_client_id=ws, draft_id=draft_id)
+                if ws is not None
+                else None
+            )
+            if not d:
+                line_client.reply_text(reply_token, line_client.t_line(lang, "exp_not_found"))
+                return
+            if parsed.get("action") == line_postback.ACTION_EXP_CONFIRM:
+                draft_store.set_status(
+                    cur,
+                    tenant_id=tid,
+                    workspace_client_id=ws,
+                    draft_id=draft_id,
+                    status="confirmed",
+                )
+                line_client.reply_text(
+                    reply_token, line_client.t_line(lang, "exp_confirmed", amount=d["amount"])
+                )
+            else:
+                draft_store.set_status(
+                    cur,
+                    tenant_id=tid,
+                    workspace_client_id=ws,
+                    draft_id=draft_id,
+                    status="discarded",
+                )
+                line_client.reply_text(reply_token, line_client.t_line(lang, "exp_discarded"))
+    except Exception:
+        logger.exception("[line postback] expense draft confirm failed")
+        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_not_found"))
 
 
 @router.post("/api/line/webhook")

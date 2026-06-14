@@ -15,6 +15,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional
 
+from . import gemini_models, image_first
 from .confidence import check_field_in_l1_text, find_field_min_word_conf
 from .layer1_vision import extract_from_image_bytes as _l1_extract_image
 from .layer2_structure import extract_from_page as _l2_extract_page
@@ -204,7 +205,50 @@ def _process_one_page(
     if validation_warnings and document_type not in ("auto", "invoice"):
         needs_manual_review = True
 
-    if l3_eligible:
+    # image-first(OCR_IMAGE_FIRST 灰度 · 默认关):图直喂 2.5-flash 为主 → 低置信/关键
+    # 字段缺升 3.5-flash · 替代触发式 L3(二选一)。默认关 → 走下方原 L3 路径不变。
+    image_first_on = (
+        image_first.is_enabled()
+        and enable_layer3
+        and document_type in ("auto", "invoice")
+        and image_bytes
+    )
+
+    if image_first_on:
+        try:
+            res = image_first.run(
+                image_bytes=image_bytes,
+                l1_page=l1_page,
+                l2_invoice=l2_invoice,
+                trigger_reasons=triggers,
+                api_key=api_key,
+                document_type=document_type,
+                refine=_l3_refine_page,
+                field_conf_fn=_field_confidences,
+                primary_model=gemini_models.flash(),
+                escalate_model=gemini_models.escalate(),
+            )
+            invoice = res["invoice"]
+            layer_chain = [l1_layer_name, "L2", *res["layers"]]
+            l3_in_tokens = res["in_tokens"]
+            l3_out_tokens = res["out_tokens"]
+            l3_ms = res["ms"]
+        except Layer3AuthError:
+            raise
+        except (
+            Layer3FallbackError,
+            Layer3QuotaError,
+            Layer3TransientError,
+            Layer3Error,
+        ) as e:
+            error_msg = f"image-first error: {e}"
+            logger.warning("pipeline: image-first error on page %d: %s", page_number, e)
+            if fallback_to_layer2_on_layer3_error:
+                layer_chain = [l1_layer_name, "L2", "IF_failed"]
+                needs_manual_review = True
+            else:
+                raise
+    elif l3_eligible:
         try:
             l3_result = _l3_refine_page(
                 image_bytes=image_bytes,

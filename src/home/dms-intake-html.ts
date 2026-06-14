@@ -1,7 +1,7 @@
 // ============================================================
 // 录入工作台(身份证 → DMS 客户)· HTML 模板与纯构建函数
 // 设计稿 pearnly_identity_from_recognition_redesign.html · 作用域 .dmsx
-// 控制器在 dms-intake.ts。DMS 字段标签为领域名(泰/中双语字面量·非 i18n 键)。
+// 控制器在 dms-intake.ts。DMS 字段标签为 i18n 键(dxf-*)· 渲染时 t() · 跟随语言切换。
 // ============================================================
 /* global escapeHtml */
 
@@ -27,78 +27,79 @@ export interface DxFormSection {
     fields: DxFormField[];
 }
 
+// label 为 i18n 键(dxf-*)· 渲染时 t(label) · 跟随用户语言切换(不写死中泰字面量)。
 const ADDR_FIELDS = (sfx: string): DxFormField[] => [
-    { key: 'house_no' + sfx, label: 'เลขที่ / 房号', type: 'detected' },
-    { key: 'building' + sfx, label: 'อาคาร / 建筑', type: '' },
-    { key: 'floor' + sfx, label: 'ชั้น / 楼层', type: '' },
-    { key: 'room' + sfx, label: 'ห้อง / 房间', type: '' },
-    { key: 'village' + sfx, label: 'หมู่บ้าน / 村庄', type: '' },
-    { key: 'moo' + sfx, label: 'หมู่ที่ / 村组', type: 'detected' },
-    { key: 'soi' + sfx, label: 'ตรอก/ซอย / 巷', type: '' },
-    { key: 'road' + sfx, label: 'ถนน / 路', type: '' },
-    { key: 'province_id' + sfx, label: 'จังหวัด / 府', type: 'select-province' },
-    { key: 'district_id' + sfx, label: 'อำเภอ/เขต / 县·区', type: 'select-district' },
-    { key: 'subdistrict_id' + sfx, label: 'ตำบล/แขวง / 乡·分区', type: 'select-subdistrict' },
-    { key: 'zipcode_id' + sfx, label: 'รหัสไปรษณีย์ / 邮编', type: 'select-postcode' },
+    { key: 'house_no' + sfx, label: 'dxf-house', type: 'detected' },
+    { key: 'building' + sfx, label: 'dxf-building', type: '' },
+    { key: 'floor' + sfx, label: 'dxf-floor', type: '' },
+    { key: 'room' + sfx, label: 'dxf-room', type: '' },
+    { key: 'village' + sfx, label: 'dxf-village', type: '' },
+    { key: 'moo' + sfx, label: 'dxf-moo', type: 'detected' },
+    { key: 'soi' + sfx, label: 'dxf-soi', type: '' },
+    { key: 'road' + sfx, label: 'dxf-road', type: '' },
+    { key: 'province_id' + sfx, label: 'dxf-province', type: 'select-province' },
+    { key: 'district_id' + sfx, label: 'dxf-district', type: 'select-district' },
+    { key: 'subdistrict_id' + sfx, label: 'dxf-subdistrict', type: 'select-subdistrict' },
+    { key: 'zipcode_id' + sfx, label: 'dxf-zipcode', type: 'select-postcode' },
 ];
 
 export const DX_SECTIONS: DxFormSection[] = [
     {
         id: 'cust',
-        title: 'ข้อมูลลูกค้า / 客户资料',
-        note: '字段名称按 DMS 客户资料结构',
+        title: 'dxs-cust',
+        note: 'dxsn-cust',
         fields: [
-            { key: 'cuscode', label: 'รหัสลูกค้า / 客户代码', type: 'readonly' },
-            { key: 'prefix_id', label: 'คำนำหน้านาม / 称谓', type: 'select-title' },
-            { key: 'name', label: 'ชื่อ นามสกุลลูกค้า / 客户姓名', type: 'detected' },
-            { key: 'tel_work', label: 'เบอร์โทรศัพท์ที่ทำงาน / 工作电话', type: '' },
-            { key: 'tel_home', label: 'เบอร์โทรศัพท์ที่บ้าน / 家庭电话', type: '' },
-            { key: 'phone', label: 'เบอร์โทรศัพท์ / 手机号', type: '' },
-            { key: 'email', label: 'อีเมล / 邮箱', type: '' },
-            { key: 'line_id', label: 'Line', type: '' },
-            { key: 'facebook', label: 'Facebook', type: '' },
-            { key: 'birthday_be', label: 'วัน/เดือน/ปี เกิด / 出生日期', type: 'detected' },
-            { key: 'people_id', label: 'เลขประจำตัวประชาชน / 身份证号', type: 'detected' },
-            { key: 'tax_id', label: 'เลขประจำตัวผู้เสียภาษี / 纳税人编号', type: 'detected' },
-            { key: 'credit_day', label: 'เครดิต / 信用额度', type: '' },
-            { key: 'branch_code', label: 'สาขา / 分店代码', type: 'readonly' },
+            { key: 'cuscode', label: 'dxf-cuscode', type: 'readonly' },
+            { key: 'prefix_id', label: 'dxf-prefix', type: 'select-title' },
+            { key: 'name', label: 'dxf-name', type: 'detected' },
+            { key: 'tel_work', label: 'dxf-telwork', type: '' },
+            { key: 'tel_home', label: 'dxf-telhome', type: '' },
+            { key: 'phone', label: 'dxf-phone', type: '' },
+            { key: 'email', label: 'dxf-email', type: '' },
+            { key: 'line_id', label: 'dxf-line', type: '' },
+            { key: 'facebook', label: 'dxf-facebook', type: '' },
+            { key: 'birthday_be', label: 'dxf-birthday', type: 'detected' },
+            { key: 'people_id', label: 'dxf-pid', type: 'detected' },
+            { key: 'tax_id', label: 'dxf-tax', type: 'detected' },
+            { key: 'credit_day', label: 'dxf-credit', type: '' },
+            { key: 'branch_code', label: 'dxf-branch', type: 'readonly' },
         ],
     },
     {
         id: 'addr_id',
-        title: 'ที่อยู่ตามบัตรประชาชน / 身份证地址',
-        note: '本次身份证读取出的地址',
+        title: 'dxs-addr-id',
+        note: 'dxsn-addr-id',
         addr: '',
         fields: ADDR_FIELDS(''),
     },
     {
         id: 'addr_ct',
-        title: 'ที่อยู่สำหรับติดต่อ / 联系地址',
-        note: 'DMS 可编辑地址字段',
+        title: 'dxs-addr-ct',
+        note: 'dxsn-addr-ct',
         addr: '_ct',
         sameAs: true,
         fields: ADDR_FIELDS('_ct'),
     },
     {
         id: 'addr_sd',
-        title: 'ที่อยู่ติดต่อเอกสาร / 文件联系地址',
-        note: '用于邮寄或文件联系',
+        title: 'dxs-addr-sd',
+        note: 'dxsn-addr-sd',
         addr: '_sd',
         sameAs: true,
         fields: ADDR_FIELDS('_sd'),
     },
 ];
 
-// 比对行(领域字段·双语标签)。新值取自 OCR,DMS 值取自 current_fields。
+// 比对行 · label 为 i18n 键(复用 dxf-*)。新值取自 OCR,DMS 值取自 current_fields。
 export const DX_COMPARE: Array<{ key: string; label: string }> = [
-    { key: 'prefix_name', label: 'คำนำหน้านาม / 称谓' },
-    { key: 'name', label: 'ชื่อ นามสกุลลูกค้า / 姓名' },
-    { key: 'people_id', label: 'เลขประจำตัวประชาชน / 身份证号' },
-    { key: 'birthday_be', label: 'วัน/เดือน/ปี เกิด / 出生日期' },
-    { key: 'phone', label: 'เบอร์โทรศัพท์ / 手机号' },
-    { key: 'tax_id', label: 'เลขประจำตัวผู้เสียภาษี / 纳税人编号' },
-    { key: 'subdistrict_name', label: 'ตำบล/แขวง / 乡·分区' },
-    { key: 'address', label: 'ที่อยู่ / 完整地址' },
+    { key: 'prefix_name', label: 'dxf-prefix' },
+    { key: 'name', label: 'dxf-name' },
+    { key: 'people_id', label: 'dxf-pid' },
+    { key: 'birthday_be', label: 'dxf-birthday' },
+    { key: 'phone', label: 'dxf-phone' },
+    { key: 'tax_id', label: 'dxf-tax' },
+    { key: 'subdistrict_name', label: 'dxf-subdistrict' },
+    { key: 'address', label: 'dxf-address' },
 ];
 
 export function dxShell(t: (k: string) => string): string {
@@ -111,8 +112,7 @@ export function dxShell(t: (k: string) => string): string {
         '<div class="dx-card">' +
         '<div class="dx-flow-h"><div>' +
         `<b id="dx-flow-title">${dxEsc(t('dx-title'))}</b>` +
-        `<p id="dx-flow-sub">${dxEsc(t('dx-sub'))}</p></div>` +
-        `<span class="dx-badge blue" id="dx-flow-badge"></span></div>` +
+        `<p id="dx-flow-sub">${dxEsc(t('dx-sub'))}</p></div></div>` +
         '<div class="dx-stepper">' +
         step(1, 'dx-st1', 'dx-st1s') +
         step(2, 'dx-st2', 'dx-st2s') +

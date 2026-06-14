@@ -27,6 +27,7 @@ export const S = {
     newVals: {} as Dict,
     dmsVals: {} as Dict,
     pick: {} as Record<string, 'new' | 'dms'>,
+    prefixUnmappable: false,
     form: {} as Dict,
     sameAs: { _ct: true, _sd: true } as Record<string, boolean>,
     decision: 'update' as 'update' | 'overwrite',
@@ -87,15 +88,28 @@ export function showStep(step: number, stateId: string) {
         });
 }
 
+// 从级联选项 [[id,label]] 里按选中 id 取 label
+function geoLabel(list: unknown, id: string): string {
+    return (
+        ((list as Array<[string, string]>) || []).find((o) => String(o[0]) === String(id))?.[1] ||
+        ''
+    );
+}
+
 // ── OCR → 新值 ────────────────────────────────────────────────
 export function buildNewVals() {
     const ic = (S.ocr || {}) as Dict;
     const addr = ((S.ocr || {}).address || {}) as unknown as Dict;
     const sel = ((S.geo.selected as Dict) || {}) as Dict;
     const txt = ((S.geo.text as Dict) || {}) as Dict;
-    const prefId = (S.prefixes.find((p) => p[1] === ic.prefix_name) || S.prefixes[0] || [''])[0];
+    // 称谓:身份证已归一全称(后端)· 在 DMS 称谓主档里精确匹配;匹配不到 → 留空,
+    // 决不回落到第一项(否则把 น.ส. 客户写成 นาย 且永远显差异)。prefixUnmappable 透出给比对标注。
+    const hit = S.prefixes.find((p) => p[1] === ic.prefix_name);
+    S.prefixUnmappable = !!ic.prefix_name && !hit;
+    // 地址下拉标签优先取级联结果(与 DMS 写库口径一致)· 回落 OCR 文本。
+    // 邮编身份证常缺印 → 必须从级联补,否则地址串缺邮编恒显差异。
     S.newVals = {
-        prefix_id: prefId,
+        prefix_id: hit ? hit[0] : '',
         prefix_name: ic.prefix_name || '',
         name: ic.name || '',
         people_id: ic.people_id || '',
@@ -110,10 +124,11 @@ export function buildNewVals() {
         district_id: sel.district_id || '',
         subdistrict_id: sel.subdistrict_id || '',
         zipcode_id: sel.zipcode_id || '',
-        province_name: addr.province || '',
-        district_name: addr.district || '',
-        subdistrict_name: addr.subdistrict || '',
-        zipcode_name: addr.zipcode || '',
+        province_name: geoLabel(S.geo.provinces, sel.province_id) || addr.province || '',
+        district_name: geoLabel(S.geo.districts, sel.district_id) || addr.district || '',
+        subdistrict_name:
+            geoLabel(S.geo.subdistricts, sel.subdistrict_id) || addr.subdistrict || '',
+        zipcode_name: geoLabel(S.geo.zipcodes, sel.zipcode_id) || addr.zipcode || '',
     };
 }
 

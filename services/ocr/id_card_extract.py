@@ -126,7 +126,7 @@ def _normalize(data: Dict[str, Any]) -> Dict[str, Any]:
     first_name = str(data.get("first_name_th") or data.get("first_name") or "").strip()
     last_name = str(data.get("last_name_th") or data.get("last_name") or "").strip()
     birthday_be = _normalize_be_date(str(data.get("date_of_birth_be") or "").strip())
-    prefix_name = str(data.get("prefix") or "").strip()
+    prefix_name = _normalize_thai_prefix(str(data.get("prefix") or "").strip())
 
     address = {
         "house_no": str(data.get("house_no") or "").strip(),
@@ -181,6 +181,27 @@ def _normalize(data: Dict[str, Any]) -> Dict[str, Any]:
         "missing_fields": missing,
         "raw": data,
     }
+
+
+# 泰文称谓缩写 → 全称(身份证印缩写 น.ส.,但 DMS 称谓下拉是全称 นางสาว · 不归一会
+# 匹配不到回落错值 → 称谓写不进/恒显差异)。点号/空格容错。
+_THAI_PREFIX_ALIASES = {
+    "น.ส.": "นางสาว",
+    "นส.": "นางสาว",
+    "นส": "นางสาว",
+    "ด.ช.": "เด็กชาย",
+    "ดช.": "เด็กชาย",
+    "ด.ญ.": "เด็กหญิง",
+    "ดญ.": "เด็กหญิง",
+}
+
+
+def _normalize_thai_prefix(s: str) -> str:
+    """身份证称谓缩写归一为全称(与 DMS 称谓主档对齐)。非缩写原样返回。"""
+    if not s:
+        return ""
+    key = s.replace(" ", "")
+    return _THAI_PREFIX_ALIASES.get(key, s)
 
 
 def _normalize_be_date(s: str) -> str:

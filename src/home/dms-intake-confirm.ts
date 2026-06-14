@@ -89,15 +89,25 @@ function cmpRowHtml(c: { key: string; label: string }) {
     const dv = dmsCompareVal(c.key);
     const same = norm(nv) === norm(dv);
     const pick = S.pick[c.key] || 'dms';
+    // 称谓在 DMS 主档无此选项(如 น.ส. vs 只有 นาย)→ 不可写,标注 + 禁用「用新值」
+    const blocked = c.key === 'prefix_name' && S.prefixUnmappable;
+    const result = same
+        ? `<span class="dx-sbadge">${esc(t('dx-same'))}</span>`
+        : blocked
+          ? `<span class="dx-dbadge" title="${esc(t('dx-no-dms-opt'))}">${esc(t('dx-no-dms-opt'))}</span>`
+          : `<span class="dx-dbadge">${esc(t('dx-diff'))}</span>`;
+    const picker = blocked
+        ? `<span style="font-size:9px;color:#9a93a6">DMS</span>`
+        : `<div class="dx-pick" data-key="${esc(c.key)}">` +
+          `<button data-src="new" class="${pick === 'new' ? 'active' : ''}">${esc(t('dx-use-new'))}</button>` +
+          `<button data-src="dms" class="${pick === 'dms' ? 'active' : ''}">DMS</button></div>`;
     return (
-        `<div class="dx-row${same ? '' : ' diff'}">` +
-        `<div class="dx-cell"><b>${esc(c.label)}</b></div>` +
+        `<div class="dx-row${same || blocked ? '' : ' diff'}">` +
+        `<div class="dx-cell"><b>${esc(t(c.label))}</b></div>` +
         `<div class="dx-cell val">${esc(nv || '—')}</div>` +
         `<div class="dx-cell val">${esc(dv || '—')}</div>` +
-        `<div class="dx-cell">${same ? `<span class="dx-sbadge">${esc(t('dx-same'))}</span>` : `<span class="dx-dbadge">${esc(t('dx-diff'))}</span>`}</div>` +
-        `<div class="dx-cell"><div class="dx-pick" data-key="${esc(c.key)}">` +
-        `<button data-src="new" class="${pick === 'new' ? 'active' : ''}">${esc(t('dx-use-new'))}</button>` +
-        `<button data-src="dms" class="${pick === 'dms' ? 'active' : ''}">DMS</button></div></div></div>`
+        `<div class="dx-cell">${result}</div>` +
+        `<div class="dx-cell">${picker}</div></div>`
     );
 }
 function decisionHtml() {
@@ -150,7 +160,7 @@ function sectionHtml(scn: DxFormSection) {
             : '';
     return (
         '<div class="dx-fsec"><div class="dx-fsec-h"><div>' +
-        `<b>${esc(scn.title)}</b><div class="sub">${esc(scn.note)}</div></div>${tools}</div>` +
+        `<b>${esc(t(scn.title))}</b><div class="sub">${esc(t(scn.note))}</div></div>${tools}</div>` +
         `<div class="dx-fgrid">${scn.fields.map(fieldHtml).join('')}</div></div>`
     );
 }
@@ -167,7 +177,7 @@ function fieldHtml(f: { key: string; label: string; type: string }) {
         const roAttr = f.type === 'readonly' ? ' readonly' : '';
         control = `<input class="dx-in${det}${changed}${ro}" id="dx-f-${esc(f.key)}" data-fk="${esc(f.key)}" value="${esc(v)}"${roAttr}>`;
     }
-    return `<div class="dx-field${full}"><label>${esc(f.label)}</label>${control}</div>`;
+    return `<div class="dx-field${full}"><label>${esc(t(f.label))}</label>${control}</div>`;
 }
 function selectHtml(f: { key: string; label: string; type: string }, v: string) {
     const changed = existing() && isChanged(f.key) ? ' changed' : '';
@@ -275,7 +285,7 @@ function renderSuccess(push: Record<string, unknown>, mode: string) {
         `<div class="dx-sitem"><label>${esc(t('dx-result-customer'))}</label><strong>#${esc(cid)} · ${esc(S.form.name || '')}</strong></div>` +
         `<div class="dx-sitem"><label>${esc(t('dx-result-mode'))}</label><strong>${esc(modeTxt)}</strong></div>` +
         `<div class="dx-sitem"><label>${esc(t('dx-result-res'))}</label><strong>${esc(create ? t('dx-res-created') : t('dx-res-saved'))}</strong></div></div>` +
-        `<div class="dx-sact"><button class="btn" id="dx-restart">${esc(t('dx-next-id'))}</button></div></div>`;
+        `<div class="dx-sact"><button class="btn primary" id="dx-restart">${esc(t('dx-next-id'))}</button></div></div>`;
 }
 
 // 地址级联(府→县→区→邮编)· ID 块/联系/寄送各自联动

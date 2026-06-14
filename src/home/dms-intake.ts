@@ -29,6 +29,14 @@ import {
     doSave,
     onGeoChange,
 } from './dms-intake-confirm.js';
+import {
+    renderInvoiceUpload,
+    resetInvoice,
+    rerenderInvoice,
+    onInvoiceClick,
+    onInvoiceChange,
+    onInvoiceDrop,
+} from './dms-intake-invoice.js';
 
 // ── 步骤 1:上传 ──────────────────────────────────────────────
 function renderUpload() {
@@ -210,8 +218,29 @@ function resetFlow() {
     S.decision = 'update';
     S.tab = 'difference';
     S.sameAs = { _ct: true, _sd: true };
-    renderUpload();
+    if (S.task === 'invoice') {
+        resetInvoice();
+        renderInvoiceUpload();
+    } else {
+        renderUpload();
+    }
     showStep(1, 'dx-s-upload');
+}
+
+// 任务切换:重渲整壳(任务选择器高亮 + 标题/步骤条按任务)· 委托监听挂在 section 上,innerHTML 重写不丢
+function selectTask(task: 'invoice' | 'identity') {
+    if (S.task === task) return;
+    S.task = task;
+    const el = sec();
+    if (!el) return;
+    el.innerHTML = dxShell(t, S.task);
+    resetFlow();
+}
+
+// 查看记录:发票任务→识别记录;身份证任务→集成中心(推送日志 mrerp_dms)
+function openRecords() {
+    const route = S.task === 'invoice' ? 'history' : 'integration';
+    if (typeof window.routeTo === 'function') window.routeTo(route);
 }
 
 // ── 事件委托 ──────────────────────────────────────────────────
@@ -223,6 +252,15 @@ function bind() {
     el.addEventListener('click', (ev) => {
         const tg = ev.target as HTMLElement;
         const hit = (id: string) => tg.closest('#' + id);
+        // 任务选择器 + 查看记录(两任务共用)
+        const taskCard = tg.closest('[data-task]') as HTMLElement | null;
+        if (taskCard) return selectTask(taskCard.dataset.task as 'invoice' | 'identity');
+        if (hit('dx-records')) return openRecords();
+        // 发票任务:全部交给发票模块,不落入身份证处理器
+        if (S.task === 'invoice') {
+            onInvoiceClick(tg);
+            return;
+        }
         if (hit('dx-pick') || (tg.closest('#dx-drop') && !S.file)) return pickFile();
         if (hit('dx-replace')) {
             S.file = null;
@@ -285,10 +323,25 @@ function bind() {
             syncFormFromDom();
             return renderConfirm();
         }
+        // 全字段表单分组折叠(F)· switch 已在上面优先处理,这里只接标题区其余点击
+        const fsecH = tg.closest('.dx-fsec-h') as HTMLElement | null;
+        if (fsecH) {
+            const secEl = fsecH.closest('[data-sec]') as HTMLElement | null;
+            if (secEl) {
+                syncFormFromDom();
+                const id = secEl.dataset.sec!;
+                S.openSec[id] = !S.openSec[id];
+                return renderConfirm();
+            }
+        }
     });
 
     el.addEventListener('change', (ev) => {
         const tg = ev.target as HTMLElement;
+        if (S.task === 'invoice') {
+            onInvoiceChange(tg);
+            return;
+        }
         if (tg.id === 'dx-file') return onFile((tg as HTMLInputElement).files?.[0] || null);
         if (tg.matches('select[data-geo]')) return void onGeoChange(tg as HTMLSelectElement);
         const fk = (tg as HTMLElement).dataset?.fk;
@@ -298,21 +351,23 @@ function bind() {
     el.addEventListener('dragover', (ev) => {
         if (S.step !== 1) return;
         ev.preventDefault();
-        $('dx-drop')?.classList.add('over');
+        el.querySelector('.dx-drop')?.classList.add('over');
     });
-    el.addEventListener('dragleave', () => $('dx-drop')?.classList.remove('over'));
+    el.addEventListener('dragleave', () => el.querySelector('.dx-drop')?.classList.remove('over'));
     el.addEventListener('drop', (ev) => {
         if (S.step !== 1) return;
         ev.preventDefault();
-        $('dx-drop')?.classList.remove('over');
-        onFile((ev as DragEvent).dataTransfer?.files?.[0] || null);
+        el.querySelector('.dx-drop')?.classList.remove('over');
+        const files = (ev as DragEvent).dataTransfer?.files;
+        if (S.task === 'invoice') return void onInvoiceDrop(files);
+        onFile(files?.[0] || null);
     });
 }
 
 window.loadDmsIntake = function () {
     const el = sec();
     if (!el) return;
-    el.innerHTML = dxShell(t);
+    el.innerHTML = dxShell(t, S.task);
     bind();
     resetFlow();
 };
@@ -320,7 +375,8 @@ window.loadDmsIntake = function () {
 if (typeof window.subscribeI18n === 'function') {
     window.subscribeI18n('dms-intake', () => {
         if (!sec()?.querySelector('.dmsx')) return;
-        sec()!.innerHTML = dxShell(t);
+        sec()!.innerHTML = dxShell(t, S.task);
+        if (S.task === 'invoice') return rerenderInvoice();
         const map: Record<number, string> = {
             1: 'dx-s-upload',
             2: 'dx-s-match',

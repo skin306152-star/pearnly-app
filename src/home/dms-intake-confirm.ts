@@ -71,8 +71,41 @@ function diffViewHtml() {
         `<button class="btn small" id="dx-all-new">${esc(t('dx-all-new'))}</button>` +
         `<button class="btn small" id="dx-all-dms">${esc(t('dx-all-dms'))}</button></div></div>` +
         `<div class="dx-cmp">${cmpHeadHtml()}${DX_COMPARE.map(cmpRowHtml).join('')}</div>` +
+        `<div class="dx-cmp-cards">${cmpCardsHtml()}</div>` +
         decisionHtml() +
         footerHtml(false)
+    );
+}
+// 手机端:宽比对表 → 一字段一卡片(差异标黄 + new/dms + 取舍按钮)· 桌面 CSS 隐藏
+function cmpCardsHtml() {
+    const basic = DX_COMPARE.filter((c) => !c.addr)
+        .map(cmpCardHtml)
+        .join('');
+    const addr = DX_COMPARE.filter((c) => c.addr)
+        .map(cmpCardHtml)
+        .join('');
+    return basic + `<div class="dx-cmp-sub">${esc(t('dxs-addr-id'))}</div>` + addr;
+}
+function cmpCardHtml(c: { key: string; label: string }) {
+    const nv = newCompareVal(c.key);
+    const dv = dmsCompareVal(c.key);
+    const same = norm(nv) === norm(dv);
+    const pick = S.pick[c.key] || 'dms';
+    const blocked = c.key === 'prefix_name' && S.prefixUnmappable;
+    const res = same
+        ? `<span class="dx-sbadge">${esc(t('dx-same'))}</span>`
+        : `<span class="dx-dbadge">${esc(blocked ? t('dx-no-dms-opt') : t('dx-diff'))}</span>`;
+    const picker =
+        same || blocked
+            ? ''
+            : `<div class="dx-pick" data-key="${esc(c.key)}">` +
+              `<button data-src="new" class="${pick === 'new' ? 'active' : ''}">${esc(t('dx-use-new'))}</button>` +
+              `<button data-src="dms" class="${pick === 'dms' ? 'active' : ''}">DMS</button></div>`;
+    return (
+        `<div class="dx-ccard${same || blocked ? '' : ' diff'}"><div class="dx-ccard-h">` +
+        `<b>${esc(t(c.label))}</b>${res}</div><div class="dx-ccard-v">` +
+        `<div><label>${esc(t('dx-col-new'))}</label><strong>${esc(nv || '—')}</strong></div>` +
+        `<div><label>${esc(t('dx-col-dms'))}</label><strong>${esc(dv || '—')}</strong></div></div>${picker}</div>`
     );
 }
 function cmpHeadHtml() {
@@ -153,15 +186,19 @@ function formViewHtml() {
     return DX_SECTIONS.map(sectionHtml).join('') + footerHtml(!existing());
 }
 function sectionHtml(scn: DxFormSection) {
+    const open = S.openSec[scn.id] !== false;
     const tools =
         scn.addr && scn.sameAs
             ? `<div class="dx-addr-tools"><span>${esc(t('dx-same-addr'))}</span>` +
               `<div class="dx-switch${S.sameAs[scn.addr] ? ' on' : ''}" data-mirror="${esc(scn.addr)}"></div></div>`
             : '';
+    const caret =
+        '<div class="dx-fsec-caret"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></div>';
     return (
-        '<div class="dx-fsec"><div class="dx-fsec-h"><div>' +
-        `<b>${esc(t(scn.title))}</b><div class="sub">${esc(t(scn.note))}</div></div>${tools}</div>` +
-        `<div class="dx-fgrid">${scn.fields.map(fieldHtml).join('')}</div></div>`
+        `<div class="dx-fsec${open ? ' open' : ''}" data-sec="${esc(scn.id)}"><div class="dx-fsec-h"><div>` +
+        `<b>${esc(t(scn.title))}</b><div class="sub">${esc(t(scn.note))}</div></div>` +
+        `<div class="dx-fsec-tools">${tools}${caret}</div></div>` +
+        `<div class="dx-fsec-body"><div class="dx-fgrid">${scn.fields.map(fieldHtml).join('')}</div></div></div>`
     );
 }
 function fieldHtml(f: { key: string; label: string; type: string }) {

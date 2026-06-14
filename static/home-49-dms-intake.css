@@ -156,6 +156,26 @@
 .dmsx .dx-switch:after{content:"";position:absolute;width:16px;height:16px;left:2px;top:2px;border-radius:50%;background:var(--card);transition:.15s}
 .dmsx .dx-switch.on{background:var(--dx-brand)}
 .dmsx .dx-switch.on:after{left:16px}
+/* 分组折叠(F·全字段表单按分组折叠) */
+.dmsx .dx-fsec-h{cursor:pointer;min-height:44px}
+.dmsx .dx-fsec-tools{display:flex;align-items:center;gap:10px}
+.dmsx .dx-fsec-caret{display:grid;place-items:center;color:var(--ink2);transition:transform .18s;flex:0 0 auto}
+.dmsx .dx-fsec.open .dx-fsec-caret{transform:rotate(180deg)}
+.dmsx .dx-fsec-body{display:none}
+.dmsx .dx-fsec.open .dx-fsec-body{display:block}
+
+/* 比对卡片(手机端:一字段一卡片;桌面隐藏,用表格) */
+.dmsx .dx-cmp-cards{display:none}
+.dmsx .dx-cmp-sub{font-size:10px;font-weight:800;color:var(--ink2);margin:14px 2px 8px}
+.dmsx .dx-ccard{border:1px solid var(--dx-line);border-radius:12px;padding:11px;margin-bottom:9px}
+.dmsx .dx-ccard.diff{background:var(--dx-warm);border-color:var(--dx-amber-line)}
+.dmsx .dx-ccard-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px}
+.dmsx .dx-ccard-h b{font-size:12px}
+.dmsx .dx-ccard-v{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px}
+.dmsx .dx-ccard-v>div{background:var(--card);border:1px solid var(--dx-line);border-radius:9px;padding:8px}
+.dmsx .dx-ccard.diff .dx-ccard-v>div{background:var(--dx-amber-soft);border-color:var(--dx-amber-line)}
+.dmsx .dx-ccard-v label{display:block;font-size:8px;color:var(--ink2);margin-bottom:3px}
+.dmsx .dx-ccard-v strong{font-size:11px;word-break:break-word}
 
 /* 决策卡 / 警告 / footer */
 .dmsx .dx-decision{margin-top:14px}
@@ -201,10 +221,105 @@
 .dmsx .dx-mlist{margin:12px 0 0;padding:0;list-style:none;display:grid;gap:7px}
 .dmsx .dx-mlist li{font-size:10px;color:var(--ink2);background:var(--bg);border-radius:9px;padding:9px}
 
+/* ===== 发票/收据任务 ===== */
+.dmsx .dx-up-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:4px}
+.dmsx .dx-queue{display:grid;gap:8px}
+.dmsx .dx-frow{border:1px solid var(--dx-line);border-radius:12px;padding:10px 11px;display:grid;grid-template-columns:34px 1fr auto auto;gap:10px;align-items:center;cursor:pointer}
+.dmsx .dx-frow.sel{border-color:var(--dx-brand);background:var(--bg)}
+.dmsx .dx-fstatus{font-size:10px;text-align:right;white-space:nowrap}
+.dmsx .dx-review-card{border:1px solid var(--dx-line);border-radius:14px;padding:13px;margin-top:12px}
+.dmsx .dx-review-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:11px;flex-wrap:wrap}
+.dmsx .dx-review-h b{font-size:12px}
+.dmsx .dx-toggle{border:0;background:transparent;color:var(--dx-brand);font-size:11px;font-weight:800;cursor:pointer}
+.dmsx .dx-review-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+.dmsx .dx-rv{background:var(--bg);border-radius:10px;padding:9px}
+.dmsx .dx-rv.warn{background:var(--dx-amber-soft);border:1px solid var(--dx-amber-line)}
+.dmsx .dx-rv label{display:block;font-size:9px;color:var(--ink2);margin-bottom:5px}
+.dmsx .dx-rv-in{width:100%;height:32px;border:1px solid var(--dx-line-strong);border-radius:8px;background:var(--card);color:var(--ink);font-size:11px;padding:0 8px;outline:0}
+.dmsx .dx-rv.warn .dx-rv-in{border-color:var(--dx-amber-line)}
+.dmsx .dx-rv-in:focus{border-color:var(--dx-brand);box-shadow:0 0 0 3px var(--dx-brand-soft)}
+.dmsx .dx-ogrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.dmsx .dx-choice{border:1px solid var(--dx-line);border-radius:12px;padding:12px;cursor:pointer;background:var(--card)}
+.dmsx .dx-choice.active{border-color:var(--dx-brand);background:var(--bg)}
+.dmsx .dx-choice b{display:flex;align-items:center;gap:8px;font-size:11px}
+.dmsx .dx-choice p{font-size:9px;color:var(--ink2);line-height:1.45;margin:6px 0 0}
+.dmsx .dx-choice-chk{width:18px;height:18px;border-radius:5px;border:1px solid var(--dx-line-strong);display:grid;place-items:center;color:transparent;font-size:10px;font-weight:900;margin-left:auto}
+.dmsx .dx-choice.active .dx-choice-chk{background:var(--dx-brand);border-color:var(--dx-brand);color:#fff}
+.dmsx .dx-tpl-row{display:flex;align-items:center;gap:8px;margin-top:11px;flex-wrap:wrap}
+.dmsx .dx-tpl-row label{font-size:10px;color:var(--ink2);font-weight:750}
+.dmsx .dx-tpl-sel{height:34px;border:1px solid var(--dx-line-strong);border-radius:9px;background:var(--card);color:var(--ink);font-size:11px;padding:0 9px}
+.dmsx .dx-erps{display:grid;gap:9px;margin-top:11px}
+.dmsx .dx-erp{border:1px solid var(--dx-line);border-radius:12px;padding:11px 12px;display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center;cursor:pointer}
+.dmsx .dx-erp.active{border-color:var(--dx-brand);background:var(--bg)}
+.dmsx .dx-erp.dis{opacity:.55;cursor:not-allowed;background:var(--bg)}
+.dmsx .dx-erp-lg{width:34px;height:34px;border-radius:9px;background:var(--dx-blue-soft);color:var(--dx-blue);display:grid;place-items:center;font-size:10px;font-weight:900}
+.dmsx .dx-erp-c b{display:block;font-size:11px}
+.dmsx .dx-erp-c span{display:block;font-size:9px;color:var(--ink2);margin-top:3px}
+.dmsx .dx-erp-chk{width:18px;height:18px;border-radius:50%;border:1px solid var(--dx-line-strong);display:grid;place-items:center;color:transparent;font-size:10px;font-weight:900}
+.dmsx .dx-erp.active .dx-erp-chk{background:var(--dx-brand);border-color:var(--dx-brand);color:#fff}
+.dmsx .dx-erp-empty{border:1px dashed var(--dx-line-strong);background:var(--bg);border-radius:13px;padding:16px;text-align:center;margin-top:11px}
+.dmsx .dx-erp-empty-ic{width:42px;height:42px;border-radius:12px;background:var(--card);border:1px solid var(--dx-line);color:var(--ink2);display:grid;place-items:center;margin:0 auto 10px;font-size:18px}
+.dmsx .dx-erp-empty h4{font-size:12px;margin:0}
+.dmsx .dx-erp-empty p{font-size:10px;color:var(--ink2);margin:6px 0 12px;line-height:1.55}
+
+/* 平板:左右栏改上下、网格收一/两列、步骤条两行(仍保留四步) */
 @media(max-width:980px){
-  .dmsx .dx-two,.dmsx .dx-task-grid,.dmsx .dx-dgrid,.dmsx .dx-fgrid,.dmsx .dx-scan,.dmsx .dx-sgrid{grid-template-columns:1fr}
+  .dmsx .dx-two,.dmsx .dx-task-grid,.dmsx .dx-dgrid,.dmsx .dx-fgrid,.dmsx .dx-sgrid,.dmsx .dx-ogrid{grid-template-columns:1fr}
+  .dmsx .dx-scan,.dmsx .dx-review-grid{grid-template-columns:1fr 1fr}
   .dmsx .dx-stepper{grid-template-columns:repeat(2,1fr)}
   .dmsx .dx-step:not(:last-child):after{display:none}
   .dmsx .dx-cmp{overflow:auto}
-  .dmsx .dx-row{min-width:760px}
+  .dmsx .dx-row{min-width:680px}
+}
+
+/* ===== 手机端完整重做(F·15 条)· ≤700 320~430 ===== */
+@media(max-width:700px){
+  .dmsx .dx-wrap{padding:2px 0 92px}
+  .dmsx .dx-card{border-radius:14px}
+  .dmsx .dx-state{padding:13px}
+  .dmsx .dx-flow-h{flex-wrap:wrap}
+  .dmsx .dx-flow-h #dx-records{order:3}
+  /* 1) 简洁步骤条:只显当前步「第 N/4 步 + 步骤名」· 不横挤四项 */
+  .dmsx .dx-stepper{display:flex;grid-template-columns:none;gap:0;padding:11px 14px;justify-content:space-between;align-items:center}
+  .dmsx .dx-stepper:after{content:attr(data-frac);font-size:11px;font-weight:800;color:var(--ink2);white-space:nowrap;margin-left:8px}
+  .dmsx .dx-step{display:none}
+  .dmsx .dx-step.active{display:flex;width:auto;flex:1;min-width:0}
+  .dmsx .dx-step:after{display:none!important}
+  .dmsx .dx-step.active .dx-step-no{width:30px;height:30px;font-size:11px}
+  .dmsx .dx-step.active .dx-step-c b{font-size:12px}
+  .dmsx .dx-step.active .dx-step-c span{font-size:10px}
+  /* 2) 任务卡纵向、点击区足够大 */
+  .dmsx .dx-opt{min-height:60px}
+  /* 3) 宽比对表 → 一字段一卡片 */
+  .dmsx .dx-cmp,.dmsx .dx-cmp-top .dx-cmp-act{ }
+  .dmsx .dx-cmp{display:none}
+  .dmsx .dx-cmp-cards{display:block}
+  /* 4) 全字段分组折叠已就绪 · 加大标题点击区 */
+  .dmsx .dx-fsec-h{min-height:50px;padding:2px 0}
+  /* 5) 底部固定操作栏 */
+  .dmsx .dx-foot{position:fixed;left:0;right:0;bottom:0;margin:0;border-radius:0;background:var(--card);border-top:1px solid var(--dx-line);padding:9px 12px calc(9px + env(safe-area-inset-bottom));z-index:40;box-shadow:0 -8px 22px rgba(0,0,0,.10);flex-wrap:nowrap;gap:8px}
+  .dmsx .dx-foot .dx-note{display:none}
+  .dmsx .dx-foot>div:last-child{flex:1;display:flex;gap:8px}
+  .dmsx .dx-foot .btn{flex:1}
+  /* 6) 点击区 ≥44px · 不依赖 hover */
+  .dmsx .btn{min-height:44px}
+  .dmsx .btn.small{min-height:38px}
+  .dmsx .dx-pick{gap:6px}
+  .dmsx .dx-pick button{flex:1;min-height:40px;font-size:11px}
+  .dmsx .dx-tab{min-height:46px;font-size:12px}
+  .dmsx .dx-cand{min-height:56px}
+  /* 7) 上传:拍照/相册/文件按钮平铺 */
+  .dmsx .dx-up-btns{flex-direction:column}
+  .dmsx .dx-up-btns .btn{width:100%}
+  .dmsx .dx-drop{min-height:200px;padding:18px 14px}
+  /* 发票复核/导出网格收单列 */
+  .dmsx .dx-review-grid,.dmsx .dx-scan{grid-template-columns:1fr}
+  .dmsx .dx-frow{grid-template-columns:34px 1fr auto}
+  .dmsx .dx-frow .dx-fstatus{grid-column:1/-1;text-align:left}
+  .dmsx .dx-erp{grid-template-columns:34px 1fr auto}
+  /* 决策卡/成功网格单列 */
+  .dmsx .dx-dgrid,.dmsx .dx-sgrid{grid-template-columns:1fr}
+  .dmsx .dx-bar{flex-direction:column;align-items:stretch}
+  .dmsx .dx-bar>div:last-child{display:flex;gap:8px}
+  .dmsx .dx-bar .btn{flex:1}
 }

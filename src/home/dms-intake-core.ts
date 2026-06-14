@@ -15,6 +15,7 @@ export interface Cand {
 }
 
 export const S = {
+    task: 'invoice' as 'invoice' | 'identity',
     step: 1,
     file: null as File | null,
     ocr: null as Dict | null,
@@ -33,6 +34,11 @@ export const S = {
     decision: 'update' as 'update' | 'overwrite',
     tab: 'difference' as 'difference' | 'allfields',
     busy: false,
+    // 全字段表单分组折叠(F·手机端按分组折叠)· 客户资料/身份证地址默认展开,联系/寄送默认收起
+    openSec: { cust: true, addr_id: true, addr_ct: false, addr_sd: false } as Record<
+        string,
+        boolean
+    >,
 };
 
 export const ID_KEYS = ['prefix_id', 'name', 'people_id', 'tax_id', 'birthday_be'];
@@ -82,6 +88,10 @@ export function showStep(step: number, stateId: string) {
         ?.querySelectorAll('.dx-state')
         .forEach((s) => s.classList.remove('active'));
     $(stateId)?.classList.add('active');
+    // 手机端紧凑步骤条「第 N/4 步」· 桌面 ::after 隐藏
+    sec()
+        ?.querySelector('.dx-stepper')
+        ?.setAttribute('data-frac', step + ' / 4');
     sec()
         ?.querySelectorAll('.dx-step')
         .forEach((el, i) => {
@@ -165,6 +175,18 @@ function ocrFormDefaults(): Dict {
     o.tax_id = S.newVals.tax_id || '';
     return o;
 }
+// 地址写库 id 字段 → 比对行的 pick 键(E:逐子字段取舍)。house_no/moo/soi/road 自身即写库键。
+// building/floor/room/village 无身份证来源、无比对行 → 不在表内 = 保留 DMS 原值。
+const ADDR_PICK: Record<string, string> = {
+    house_no: 'house_no',
+    moo: 'moo',
+    soi: 'soi',
+    road: 'road',
+    province_id: 'province_name',
+    district_id: 'district_name',
+    subdistrict_id: 'subdistrict_name',
+    zipcode_id: 'zipcode_name',
+};
 export function applyDecisionToForm() {
     if (!existing()) return;
     const useNew = (picked: 'new' | 'dms') => S.decision === 'overwrite' || picked === 'new';
@@ -173,9 +195,17 @@ export function applyDecisionToForm() {
         const picked = S.pick[cmpKey] || 'dms';
         S.form[k] = useNew(picked) && S.newVals[k] ? S.newVals[k] : S.dmsVals[k] || '';
     });
-    const addrNew = S.decision === 'overwrite' || S.pick['address'] === 'new';
+    // 地址:逐子字段按各自 pick 取值(府/县/区/邮编同步写 id 与显示用 name)
     ADDR_KEYS.forEach((k) => {
-        S.form[k] = addrNew && S.newVals[k] ? S.newVals[k] : S.dmsVals[k] || '';
+        const pk = ADDR_PICK[k];
+        const picked = (pk && S.pick[pk]) || 'dms';
+        S.form[k] = useNew(picked) && S.newVals[k] ? S.newVals[k] : S.dmsVals[k] || '';
+    });
+    (['province', 'district', 'subdistrict', 'zipcode'] as const).forEach((b) => {
+        const nameKey = b + '_name';
+        const picked = S.pick[nameKey] || 'dms';
+        S.form[nameKey] =
+            useNew(picked) && S.newVals[nameKey] ? S.newVals[nameKey] : S.dmsVals[nameKey] || '';
     });
 }
 export function syncMirror() {
@@ -184,28 +214,11 @@ export function syncMirror() {
     });
 }
 export function dmsCompareVal(key: string): string {
-    if (key === 'address') return addrStr(S.dmsVals, '');
     if (key === 'prefix_name') return prefixLabel(S.dmsVals.prefix_id || '');
     return S.dmsVals[key] || '';
 }
 export function newCompareVal(key: string): string {
-    if (key === 'address') return addrStr(S.newVals, '');
     return S.newVals[key] || '';
-}
-function addrStr(v: Dict, sfx: string): string {
-    return [
-        v['house_no' + sfx],
-        v['moo' + sfx] ? 'ม.' + v['moo' + sfx] : '',
-        v['soi' + sfx],
-        v['road' + sfx],
-        v['subdistrict_name' + sfx],
-        v['district_name' + sfx],
-        v['province_name' + sfx],
-        v['zipcode_name' + sfx] || v['zipcode' + sfx],
-    ]
-        .filter(Boolean)
-        .join(' ')
-        .trim();
 }
 export function prefixLabel(id: string): string {
     return (S.prefixes.find((p) => p[0] === id) || ['', ''])[1] || '';

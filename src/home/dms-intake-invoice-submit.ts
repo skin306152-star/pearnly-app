@@ -1,14 +1,112 @@
 // ============================================================
-// 录入工作台 · 发票任务 步骤4 导出 / 推送 + 结果(从 dms-intake-invoice.ts 拆出控行数)
-//   导出复用 /api/ocr/export·/api/erp/mrerp-xlsx-batch·/api/reports/history/batch_export;
-//   推送复用 /api/erp/push;端点读 /api/erp/endpoints(排除 mrerp_dms · 非启用置灰)。
-// 状态/上传/复核/事件在 dms-intake-invoice.ts;本文件经 import 复用 IV / showStepInv / go。
+// 录入工作台 · 发票任务 复核(步骤3)+ 导出/推送/结果(步骤4)· 从 invoice.ts 拆出控行数
+//   复核按 invoices[] 逐张展示(一个 PDF N 张 = N 组),透出 needs_review;
+//   导出复用 /api/ocr/export·mrerp-xlsx-batch·reports/history/batch_export(多发票按 invoices 展平);
+//   推送复用 /api/erp/push;端点读 /api/erp/endpoints(排除 mrerp_dms)。
 // ============================================================
 /* global t, showToast, currentLang */
 import { esc, $, authHeaders } from './dms-intake-core.js';
-import { IV, showStepInv } from './dms-intake-invoice.js';
-import type { Dict, Endpoint } from './dms-intake-invoice.js';
+import { IV, ext, showStepInv } from './dms-intake-invoice.js';
+import type { Dict, Endpoint, IvInvoice } from './dms-intake-invoice.js';
 
+// 复核预览字段(复用 OCR 抽屉字段标签键)· warn=低置信常需确认
+const REV_CORE: Array<[string, string]> = [
+    ['seller_name', 'drawer-lbl-name'],
+    ['seller_tax', 'drawer-lbl-tax'],
+    ['invoice_number', 'drawer-lbl-invoice'],
+    ['date', 'drawer-lbl-date'],
+    ['subtotal', 'drawer-lbl-subtotal'],
+    ['vat', 'drawer-lbl-vat'],
+];
+const REV_MORE: Array<[string, string]> = [
+    ['total_amount', 'drawer-lbl-total'],
+    ['buyer_name', 'drawer-lbl-name'],
+    ['wht_amount', 'drawer-lbl-wht-amount'],
+];
+function warnFields(f: Dict): Set<string> {
+    const s = new Set<string>();
+    ['invoice_number', 'seller_tax', 'total_amount'].forEach((k) => {
+        if (!String(f[k] || '').trim()) s.add(k);
+    });
+    return s;
+}
+
+// ── 步骤 3:复核(逐文件 · 多发票逐张)──────────────────────────
+export function renderReview() {
+    IV.view = 'review';
+    const el = $('dx-s-inv-review');
+    if (!el) return;
+    const anyReview = IV.results.some((r) => r.needs_review);
+    const banner = anyReview
+        ? `<div class="dx-recheck-banner">${esc(t('dxi-needs-review'))}</div>`
+        : '';
+    const rows = IV.results
+        .map((r, i) => {
+            const sel = i === IV.sel ? ' sel' : '';
+            const warns = r.invoices.reduce((n, inv) => n + warnFields(inv.fields).size, 0);
+            const status = r.needs_review
+                ? `<b style="color:var(--dx-amber)">${esc(t('dxi-rev-recheck'))}</b>`
+                : warns > 0
+                  ? `<b style="color:var(--dx-amber)">${esc(t('dxi-rev-need').replace('{n}', String(warns)))}</b>`
+                  : `<b style="color:var(--dx-green)">${esc(t('dxi-rev-ok'))}</b>`;
+            const sub =
+                r.invoice_count > 1
+                    ? esc(t('dxi-multi').replace('{n}', String(r.invoice_count)))
+                    : esc(t(warns ? 'dxi-rev-only' : 'dxi-rev-noneed'));
+            return (
+                `<div class="dx-frow${sel}" data-iv-sel="${i}"><div class="dx-file-ic">${esc(ext(r.filename))}</div>` +
+                `<div class="dx-file-c"><b>${esc(r.filename)}</b><span>${sub}</span></div>` +
+                `<div class="dx-fstatus">${status}</div>` +
+                `<button class="btn small" data-iv-sel="${i}">${esc(t('dxi-rev-view'))}</button></div>`
+            );
+        })
+        .join('');
+    el.innerHTML =
+        banner + `<div class="dx-queue">${rows}</div>` + previewHtml() + reviewFootHtml();
+    showStepInv(3, 'dx-s-inv-review');
+}
+function previewHtml() {
+    const r = IV.results[IV.sel];
+    if (!r) return '';
+    const fields = IV.showAll ? REV_CORE.concat(REV_MORE) : REV_CORE;
+    // 每张发票一组(多发票 PDF → N 组,逐张可编辑)
+    const groups = r.invoices.map((inv, ii) => invoiceGroupHtml(ii, inv, fields)).join('');
+    return (
+        '<div class="dx-review-card"><div class="dx-review-h">' +
+        `<b>${esc(r.filename)} · ${esc(t('dxi-rev-h'))}</b>` +
+        `<button class="dx-toggle" id="dx-inv-toggle">${esc(t(IV.showAll ? 'dxi-rev-toggle-less' : 'dxi-rev-toggle-all'))}</button></div>` +
+        groups +
+        '</div>'
+    );
+}
+function invoiceGroupHtml(ii: number, inv: IvInvoice, fields: Array<[string, string]>) {
+    const warns = warnFields(inv.fields);
+    const head =
+        inv.total > 1
+            ? `<div class="dx-inv-head">${esc(t('dxi-inv-no').replace('{i}', String(inv.idx)).replace('{n}', String(inv.total)))}</div>`
+            : '';
+    const cells = fields
+        .map(([k, lk]) => {
+            const warn = warns.has(k) ? ' warn' : '';
+            const v = String(inv.fields[k] ?? '');
+            return (
+                `<div class="dx-rv${warn}"><label>${esc(t(lk))}</label>` +
+                `<input class="dx-rv-in" data-iv-field="${IV.sel}:${ii}:${esc(k)}" value="${esc(v)}"></div>`
+            );
+        })
+        .join('');
+    return head + `<div class="dx-review-grid">${cells}</div>`;
+}
+function reviewFootHtml() {
+    return (
+        `<div class="dx-foot"><div class="dx-note">${esc(t('dxi-rev-hint'))}</div>` +
+        '<div style="display:flex;gap:8px">' +
+        `<button class="btn" id="dx-inv-rev-back">${esc(t('dxi-rev-back'))}</button>` +
+        `<button class="btn primary" id="dx-inv-rev-next">${esc(t('dxi-rev-next'))}</button></div></div>`
+    );
+}
+
+// ── 步骤 4:导出 / 推送 ──────────────────────────────────────
 export async function enterSubmit() {
     await loadEndpoints();
     renderSubmit();
@@ -35,12 +133,14 @@ function targetName(): string {
     const e = IV.endpoints.find((x) => String(x.id) === IV.target);
     return e ? e.name || e.adapter || 'ERP' : t('dxi-target-export-only');
 }
+function totalInvoices(): number {
+    return IV.results.reduce((n, r) => n + (r.invoice_count || 1), 0);
+}
 
 export function renderSubmit() {
     IV.view = 'submit';
     const el = $('dx-s-inv-submit');
     if (!el) return;
-    const rowN = IV.results.reduce((n, r) => n + (r.invoice_count || 1), 0);
     el.innerHTML =
         '<div class="dx-panel"><div class="dx-panel-h">' +
         `<b>${esc(t('dxi-out-h'))}</b><span>${esc(t('dxi-out-s'))}</span></div>` +
@@ -51,7 +151,7 @@ export function renderSubmit() {
         (IV.output.excel ? tplRowHtml() : '') +
         (IV.output.erp ? erpTargetsHtml() : '') +
         '</div>' +
-        summaryHtml(rowN) +
+        summaryHtml() +
         submitFootHtml();
     showStepInv(4, 'dx-s-inv-submit');
 }
@@ -108,14 +208,14 @@ function erpTargetsHtml() {
         .join('');
     return `<div class="dx-erps">${cards}</div>`;
 }
-function summaryHtml(rowN: number) {
+function summaryHtml() {
     const item = (lk: string, v: string) =>
         `<div class="dx-chip"><label>${esc(t(lk))}</label><strong>${esc(v)}</strong></div>`;
     return (
         '<div class="dx-panel" style="margin-top:11px"><div class="dx-panel-h">' +
         `<b>${esc(t('dxi-sum-h'))}</b></div><div class="dx-scan">` +
         item('dxi-sum-files', String(IV.results.length)) +
-        item('dxi-sum-rows', String(rowN)) +
+        item('dxi-sum-rows', String(totalInvoices())) +
         item('dxi-sum-confirm', '0') +
         item('dxi-sum-target', IV.output.erp ? targetName() : t('dxi-target-export-only')) +
         '</div></div>'
@@ -159,10 +259,17 @@ async function doExport(): Promise<boolean> {
         let resp: Response;
         let name = `pearnly-${IV.tpl}-${stamp()}.xlsx`;
         if (IV.tpl === 'sales_detail_th') {
-            const records = IV.results.map((r) => ({
-                filename: r.filename,
-                merged_fields: r.merged,
-            }));
+            // 多发票按 invoices[] 逐张展平(一个 PDF N 张 = N 行)· 不再 mergeFields 压成一张
+            const records: Array<{ filename: string; merged_fields: Dict }> = [];
+            IV.results.forEach((r) => {
+                r.invoices.forEach((inv) => {
+                    records.push({
+                        filename:
+                            inv.total > 1 ? `${r.filename} #${inv.idx}/${inv.total}` : r.filename,
+                        merged_fields: inv.fields,
+                    });
+                });
+            });
             resp = await fetch('/api/ocr/export', {
                 method: 'POST',
                 headers: authHeaders(true),
@@ -237,11 +344,12 @@ function renderResult(excelOk: boolean, erpOk: number, erpFail: number) {
     IV.view = 'success';
     const el = $('dx-s-success');
     if (!el) return;
-    const rowN = IV.results.reduce((n, r) => n + (r.invoice_count || 1), 0);
     const exLine = IV.output.excel
         ? sitem(
               'dxi-res-excel',
-              excelOk ? t('dxi-res-excel-ok').replace('{n}', String(rowN)) : t('dxi-export-fail'),
+              excelOk
+                  ? t('dxi-res-excel-ok').replace('{n}', String(totalInvoices()))
+                  : t('dxi-export-fail'),
               excelOk
           )
         : sitem('dxi-res-excel', t('dxi-res-none'), null);

@@ -1,27 +1,36 @@
 // ============================================================
-// 录入工作台 · 发票/收据任务(精简流)· 复用现有 OCR 接口,不重写后端。
-//   上传 → /api/ocr/recognize → 复核(队列+可编辑)→ 导出/推送 → 结果。
-// 与 #page-ocr 完整发票页相互独立(本模块状态 IV 自持,不碰 window._results)。
-// 导出/推送/结果在 dms-intake-invoice-submit.ts(控行数);本文件管上传/识别/复核/事件分发。
+// 录入工作台 · 发票/收据任务 · 上传 + 识别(复用 /api/ocr/recognize 全套语义,不重写后端)
+//   多发票拆分:一个 PDF 可能 N 张发票 → 后端 invoice_grouper 已拆,响应给 invoices[];
+//   本流按 invoices[] 逐张展示/导出(不再 mergeFields 压成一张)。
+//   去重(name+size)/6 路并发/client_id 归属/needs_review·重复·自动推送 透出。
+//   复核/导出/结果在 dms-intake-invoice-submit.ts(控行数)。
 // ============================================================
 /* global t, token, showToast */
 import { S, esc, $, authHeaders } from './dms-intake-core.js';
-import { enterSubmit, renderSubmit, doFinish } from './dms-intake-invoice-submit.js';
+import { enterSubmit, renderSubmit, renderReview, doFinish } from './dms-intake-invoice-submit.js';
 
 export type Dict = Record<string, unknown>;
 export interface IvFile {
     file: File;
     name: string;
+    size: number;
     status: 'waiting' | 'processing' | 'success' | 'error';
     errorKey?: string;
 }
+// 一张发票(后端 invoices[] 的一项)· 多页跨页发票已由后端合并为一张
+export interface IvInvoice {
+    fields: Dict;
+    history_id: string | null;
+    idx: number; // 1-based 在本文件内第几张
+    total: number; // 本文件共几张
+}
 export interface IvResult {
     filename: string;
-    pages: unknown[];
-    merged: Dict;
+    invoices: IvInvoice[];
     history_ids: string[];
     invoice_count: number;
-    confidence: string;
+    needs_review: boolean; // 后端 missed_invoice_warnings 非空 = 可能漏票需人工核对
+    from_cache: boolean;
 }
 export interface Endpoint {
     id?: unknown;
@@ -34,7 +43,7 @@ export interface Endpoint {
 export const IV = {
     files: [] as IvFile[],
     results: [] as IvResult[],
-    sel: 0, // 复核中选中的结果下标
+    sel: 0, // 复核中选中的文件下标
     showAll: false,
     output: { excel: true, erp: false },
     tpl: 'input_vat',
@@ -47,28 +56,19 @@ export const IV = {
 export const w = window as unknown as {
     getMaxFiles?: () => number;
     getMaxMbPerFile?: () => number;
+    getCurrentClientId?: () => unknown;
     mergeFields?: (pages: unknown) => Dict;
     routeTo?: (r: string) => void;
 };
 
+// 触屏设备才显示「拍照/相册」· 桌面端走「选择文件」支持所有格式(拍照/相册是图片专用入口)
+const TOUCH =
+    (typeof navigator !== 'undefined' && (navigator.maxTouchPoints || 0) > 0) ||
+    'ontouchstart' in window;
+
 const UPLOAD_ACCEPT =
     '.pdf,.png,.jpg,.jpeg,.webp,.tiff,.tif,.bmp,.gif,.xlsx,.xls,.xlsm,.csv,.tsv,.docx,.doc,.txt';
 const SUPPORTED = /\.(pdf|png|jpe?g|webp|tiff?|bmp|gif|xlsx?|xlsm|csv|tsv|docx?|txt)$/i;
-
-// 复核预览字段(复用 OCR 抽屉的字段标签键)· warn=低置信常需确认
-const REV_CORE: Array<[string, string]> = [
-    ['seller_name', 'drawer-lbl-name'],
-    ['seller_tax', 'drawer-lbl-tax'],
-    ['invoice_number', 'drawer-lbl-invoice'],
-    ['date', 'drawer-lbl-date'],
-    ['subtotal', 'drawer-lbl-subtotal'],
-    ['vat', 'drawer-lbl-vat'],
-];
-const REV_MORE: Array<[string, string]> = [
-    ['total_amount', 'drawer-lbl-total'],
-    ['buyer_name', 'drawer-lbl-name'],
-    ['wht_amount', 'drawer-lbl-wht-amount'],
-];
 
 export function resetInvoice() {
     IV.files = [];
@@ -80,8 +80,6 @@ export function resetInvoice() {
     IV.busy = false;
     IV.view = 'upload';
 }
-
-// 语言切换时按当前视图重渲(由 dms-intake.ts 的 subscribeI18n 调)
 export function rerenderInvoice() {
     if (IV.view === 'review') renderReview();
     else if (IV.view === 'submit') renderSubmit();
@@ -90,12 +88,10 @@ export function rerenderInvoice() {
         showStepInv(1, 'dx-s-upload');
     }
 }
-
 export function ext(name: string) {
     const m = /\.([a-z0-9]+)$/i.exec(name);
     return (m ? m[1] : 'file').toUpperCase().slice(0, 4);
 }
-// 步骤条(发票 4 步)· 复用 core.showStep 的 DOM 操作
 export function showStepInv(step: number, stateId: string) {
     S.step = step;
     const sc = document.getElementById('page-dms-intake');
@@ -131,14 +127,18 @@ export function renderInvoiceUpload() {
         '<input type="file" id="dx-inv-gal" accept="image/*" multiple style="display:none">';
 }
 function dropHtml() {
+    const camBtns = TOUCH
+        ? `<button class="btn" id="dx-inv-camera">${esc(t('dxi-up-camera'))}</button>` +
+          `<button class="btn" id="dx-inv-gallery">${esc(t('dxi-up-gallery'))}</button>`
+        : '';
     return (
         '<div class="dx-drop" id="dx-inv-drop"><div>' +
         '<div class="dx-drop-g">↑</div>' +
         `<h3>${esc(t('dxi-up-title'))}</h3><p>${esc(t('dxi-up-hint'))}</p>` +
         '<div class="dx-up-btns">' +
         `<button class="btn primary" id="dx-inv-pick">${esc(t('dxi-up-pick'))}</button>` +
-        `<button class="btn" id="dx-inv-camera">${esc(t('dxi-up-camera'))}</button>` +
-        `<button class="btn" id="dx-inv-gallery">${esc(t('dxi-up-gallery'))}</button></div>` +
+        camBtns +
+        '</div>' +
         `<div class="dx-hint" style="margin-top:10px">${esc(t('dxi-up-drag'))}</div></div></div>`
     );
 }
@@ -150,21 +150,23 @@ function queueHtml() {
                     ? `<span class="dx-badge amber">${esc(t(f.errorKey || 'dxi-recognize-fail'))}</span>`
                     : f.status === 'success'
                       ? `<span class="dx-badge green">${esc(t('dxi-rev-ok'))}</span>`
-                      : `<span class="dx-badge blue">${esc(t('dx-up-ready'))}</span>`;
+                      : f.status === 'processing'
+                        ? `<span class="dx-badge blue">…</span>`
+                        : `<span class="dx-badge blue">${esc(t('dx-up-ready'))}</span>`;
             return (
-                `<div class="dx-file"><div class="dx-file-ic">${esc(ext(f.name))}</div>` +
-                `<div class="dx-file-c"><b>${esc(f.name)}</b><span>${(f.file.size / 1048576).toFixed(1)} MB</span></div>` +
+                `<div class="dx-qrow"><div class="dx-file-ic">${esc(ext(f.name))}</div>` +
+                `<div class="dx-file-c"><b>${esc(f.name)}</b><span>${(f.size / 1048576).toFixed(1)} MB</span></div>` +
                 st +
-                `<button class="btn small" data-iv-rm="${i}" title="${esc(t('dx-up-replace'))}">✕</button></div>`
+                `<button class="dx-qx" data-iv-rm="${i}" title="${esc(t('dx-up-replace'))}">✕</button></div>`
             );
         })
         .join('');
     return (
-        `<div class="dx-queue">${rows}</div>` +
-        `<div class="dx-bar"><div class="dx-note">${esc(t('dxi-side-flow1'))}</div>` +
+        `<div class="dx-qlist">${rows}</div>` +
+        `<div class="dx-bar"><div class="dx-note">${esc(t('dxi-side-flow1'))} · ${IV.files.length}</div>` +
         '<div style="display:flex;gap:8px">' +
         `<button class="btn" id="dx-inv-add">${esc(t('dxi-up-pick'))}</button>` +
-        `<button class="btn primary" id="dx-inv-start"${IV.busy ? ' disabled' : ''}>${esc(t('dx-up-start'))}</button></div></div>`
+        `<button class="btn primary" id="dx-inv-start"${IV.busy ? ' disabled' : ''}>${esc(t('btn-start'))}</button></div></div>`
     );
 }
 function sideHtml() {
@@ -178,71 +180,113 @@ function sideHtml() {
 function addFiles(list: FileList | null | undefined) {
     if (!list || !list.length) return;
     const maxF = w.getMaxFiles?.() || 500;
+    // 去重(name+size)· 防同一文件重复入队(用户多次选/拖同一文件)
+    const seen = new Set(IV.files.map((f) => f.name + '_' + f.size));
     for (const f of Array.from(list)) {
         if (!SUPPORTED.test(f.name)) continue;
+        const key = f.name + '_' + f.size;
+        if (seen.has(key)) continue;
         if (IV.files.length >= maxF) break;
-        IV.files.push({ file: f, name: f.name, status: 'waiting' });
+        seen.add(key);
+        IV.files.push({ file: f, name: f.name, size: f.size, status: 'waiting' });
     }
     renderInvoiceUpload();
 }
 
-// ── 步骤 2:识别(顺序 · 复用 /api/ocr/recognize)─────────────
+// ── 步骤 2:识别(6 路并发 · client_id 归属 · 多发票/警告透出)──
 async function startRecognize() {
     const waiting = IV.files.filter((f) => f.status === 'waiting');
     if (!waiting.length || IV.busy) return;
     IV.busy = true;
-    renderProcessing(0, waiting.length);
-    showStepInv(2, 'dx-s-searching');
+    const total = waiting.length;
     let done = 0;
-    for (const f of waiting) {
-        f.status = 'processing';
-        try {
-            const form = new FormData();
-            form.append('file', f.file, f.name);
-            const r = await fetch('/api/ocr/recognize', {
-                method: 'POST',
-                headers: authHeaders(),
-                body: form,
-            });
-            const d = (await r.json().catch(() => ({}))) as Dict;
-            if (!r.ok) {
-                const detail = (d.detail as { code?: string } | string) || 'unknown';
-                const code = typeof detail === 'string' ? detail : detail.code || 'unknown';
+    renderProcessing(0, total);
+    showStepInv(2, 'dx-s-searching');
+    const cid = typeof w.getCurrentClientId === 'function' ? w.getCurrentClientId() : null;
+    const queue = waiting.slice();
+    const dupWarn: unknown[] = [];
+    let autoPushed = 0;
+    async function worker() {
+        while (queue.length) {
+            const f = queue.shift()!;
+            f.status = 'processing';
+            try {
+                const form = new FormData();
+                form.append('file', f.file, f.name);
+                if (cid != null) form.append('client_id', String(cid));
+                const r = await fetch('/api/ocr/recognize', {
+                    method: 'POST',
+                    headers: authHeaders(),
+                    body: form,
+                });
+                const d = (await r.json().catch(() => ({}))) as Dict;
+                if (!r.ok) {
+                    const detail = (d.detail as { code?: string } | string) || 'unknown';
+                    f.status = 'error';
+                    f.errorKey =
+                        'err.' + (typeof detail === 'string' ? detail : detail.code || 'unknown');
+                } else {
+                    f.status = 'success';
+                    IV.results.push(ingestResult(d));
+                    if (((d.duplicate_warnings as unknown[]) || []).length)
+                        dupWarn.push(...(d.duplicate_warnings as unknown[]));
+                    if (d.auto_pushed) autoPushed++;
+                }
+            } catch {
                 f.status = 'error';
-                f.errorKey = 'err.' + code;
-            } else {
-                f.status = 'success';
-                IV.results.push(ingestResult(d));
+                f.errorKey = 'dxi-recognize-fail';
             }
-        } catch {
-            f.status = 'error';
-            f.errorKey = 'dxi-recognize-fail';
+            done++;
+            renderProcessing(done, total);
         }
-        done++;
-        renderProcessing(done, waiting.length);
     }
+    const PAR = Math.min(6, total);
+    await Promise.all(Array.from({ length: PAR }, () => worker()));
     IV.busy = false;
+    const failN = waiting.filter((f) => f.status === 'error').length;
+    if (dupWarn.length) showToast(t('dxi-dup-warn').replace('{n}', String(dupWarn.length)), 'warn');
+    if (autoPushed) showToast(t('dxi-auto-pushed').replace('{n}', String(autoPushed)), 'success');
     if (!IV.results.length) {
         showToast(t('dxi-rev-empty'), 'error');
         renderInvoiceUpload();
         return showStepInv(1, 'dx-s-upload');
     }
+    if (failN)
+        showToast(
+            t('dxi-batch-fail')
+                .replace('{ok}', String(IV.results.length))
+                .replace('{fail}', String(failN)),
+            'warn'
+        );
     IV.sel = 0;
     renderReview();
 }
 function ingestResult(d: Dict): IvResult {
     const pages = (d.pages as unknown[]) || [];
-    const merged = w.mergeFields ? w.mergeFields(pages) : (pages[0] as Dict) || {};
-    const hids = (d.history_ids as string[]) || (d.history_id ? [d.history_id as string] : []);
+    const raw = (d.invoices as Array<Record<string, unknown>>) || [];
+    const invoices: IvInvoice[] = raw.length
+        ? raw.map((x, i) => ({
+              fields: (x.fields as Dict) || {},
+              history_id: (x.history_id as string) || null,
+              idx: (x.source_index as number) || i + 1,
+              total: (x.source_total as number) || raw.length,
+          }))
+        : [
+              {
+                  fields: w.mergeFields ? w.mergeFields(pages) : (pages[0] as Dict) || {},
+                  history_id: (d.history_id as string) || null,
+                  idx: 1,
+                  total: 1,
+              },
+          ];
     return {
         filename: (d.filename as string) || '',
-        pages,
-        merged: merged || {},
-        history_ids: hids,
-        invoice_count: (d.invoice_count as number) || 1,
-        confidence:
-            (d.confidence as string) ||
-            (((merged?.items as unknown[]) || []).length ? 'high' : 'low'),
+        invoices,
+        history_ids: (d.history_ids as string[]) || (d.history_id ? [d.history_id as string] : []),
+        invoice_count: (d.invoice_count as number) || invoices.length,
+        needs_review:
+            !!d.needs_review || ((d.missed_invoice_warnings as unknown[]) || []).length > 0,
+        from_cache: !!d.from_cache,
     };
 }
 function renderProcessing(done: number, total: number) {
@@ -253,72 +297,6 @@ function renderProcessing(done: number, total: number) {
         '<div class="dx-searching"><div class="dx-spin"></div>' +
         `<h3>${esc(t('dxi-proc-title'))}</h3><p>${esc(t('dxi-proc-sub'))}</p>` +
         `<div class="dx-schips"><span class="dx-schip">${done}/${total} · ${pct}%</span></div></div>`;
-}
-
-// ── 步骤 3:复核 ─────────────────────────────────────────────
-export function warnFields(merged: Dict): Set<string> {
-    const s = new Set<string>();
-    ['invoice_number', 'seller_tax', 'total_amount'].forEach((k) => {
-        if (!String(merged[k] || '').trim()) s.add(k);
-    });
-    return s;
-}
-export function renderReview() {
-    IV.view = 'review';
-    const el = $('dx-s-inv-review');
-    if (!el) return;
-    const rows = IV.results
-        .map((r, i) => {
-            const sel = i === IV.sel ? ' sel' : '';
-            const warns = warnFields(r.merged);
-            const status =
-                warns.size > 0
-                    ? `<b style="color:var(--dx-amber)">${esc(t('dxi-rev-need').replace('{n}', String(warns.size)))}</b>`
-                    : `<b style="color:var(--dx-green)">${esc(t('dxi-rev-ok'))}</b>`;
-            const sub =
-                r.invoice_count > 1
-                    ? r.invoice_count + ' ' + esc(t('dxi-sum-files'))
-                    : esc(t(warns.size ? 'dxi-rev-only' : 'dxi-rev-noneed'));
-            return (
-                `<div class="dx-frow${sel}" data-iv-sel="${i}"><div class="dx-file-ic">${esc(ext(r.filename))}</div>` +
-                `<div class="dx-file-c"><b>${esc(r.filename)}</b><span>${sub}</span></div>` +
-                `<div class="dx-fstatus">${status}</div>` +
-                `<button class="btn small" data-iv-sel="${i}">${esc(t('dxi-rev-view'))}</button></div>`
-            );
-        })
-        .join('');
-    el.innerHTML = `<div class="dx-queue">${rows}</div>` + previewHtml() + reviewFootHtml();
-    showStepInv(3, 'dx-s-inv-review');
-}
-function previewHtml() {
-    const r = IV.results[IV.sel];
-    if (!r) return '';
-    const warns = warnFields(r.merged);
-    const fields = IV.showAll ? REV_CORE.concat(REV_MORE) : REV_CORE;
-    const cells = fields
-        .map(([k, lk]) => {
-            const warn = warns.has(k) ? ' warn' : '';
-            const v = String(r.merged[k] ?? '');
-            return (
-                `<div class="dx-rv${warn}"><label>${esc(t(lk))}</label>` +
-                `<input class="dx-rv-in" data-iv-field="${esc(k)}" value="${esc(v)}"></div>`
-            );
-        })
-        .join('');
-    return (
-        '<div class="dx-review-card"><div class="dx-review-h">' +
-        `<b>${esc(r.filename)} · ${esc(t('dxi-rev-h'))}</b>` +
-        `<button class="dx-toggle" id="dx-inv-toggle">${esc(t(IV.showAll ? 'dxi-rev-toggle-less' : 'dxi-rev-toggle-all'))}</button></div>` +
-        `<div class="dx-review-grid">${cells}</div></div>`
-    );
-}
-function reviewFootHtml() {
-    return (
-        `<div class="dx-foot"><div class="dx-note">${esc(t('dxi-rev-hint'))}</div>` +
-        '<div style="display:flex;gap:8px">' +
-        `<button class="btn" id="dx-inv-rev-back">${esc(t('dxi-rev-back'))}</button>` +
-        `<button class="btn primary" id="dx-inv-rev-next">${esc(t('dxi-rev-next'))}</button></div></div>`
-    );
 }
 
 // ── 事件入口(由 dms-intake.ts 单一委托转发)──────────────────
@@ -371,10 +349,7 @@ export function onInvoiceClick(tg: HTMLElement): boolean {
         return true;
     }
     if (hit('dx-inv-go-int')) return (go('integration'), true);
-    if (hit('dx-inv-sub-back')) {
-        renderReview();
-        return true;
-    }
+    if (hit('dx-inv-sub-back')) return (renderReview(), true);
     if (hit('dx-inv-finish')) return (void doFinish(), true);
     if (hit('dx-inv-view-rec')) return (go('history'), true);
     if (hit('dx-inv-view-push')) return (go('integration'), true);
@@ -397,10 +372,12 @@ export function onInvoiceChange(tg: HTMLElement): boolean {
         IV.tpl = (tg as HTMLSelectElement).value;
         return true;
     }
+    // 复核字段编辑:data-iv-field="fileIdx:invIdx:key"
     const fk = tg.getAttribute('data-iv-field');
     if (fk) {
-        const r = IV.results[IV.sel];
-        if (r) r.merged[fk] = (tg as HTMLInputElement).value;
+        const [fi, ii, key] = fk.split(':');
+        const inv = IV.results[+fi]?.invoices[+ii];
+        if (inv) inv.fields[key] = (tg as HTMLInputElement).value;
         return true;
     }
     return false;

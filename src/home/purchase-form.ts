@@ -22,6 +22,7 @@ import {
     validateInfo,
     markErrors,
     isReqEmpty,
+    mapConf,
     type MissingField,
 } from './purchase-form-info.js';
 import {
@@ -29,6 +30,7 @@ import {
     blankLine,
     computeForm,
     mountLines,
+    mergeLines,
     overrideConsistent,
 } from './purchase-form-lines.js';
 import { totalsCardHtml, totalsHtml, bindTotals } from './purchase-form-totals.js';
@@ -48,29 +50,6 @@ function todayIso(): string {
         '-' +
         String(n.getDate()).padStart(2, '0')
     );
-}
-
-// field_confidence(0~1)→ 三态:高(≥0.8)已识别绿;低请确认琥珀。键归一到信息卡字段名。
-function mapConf(fc: Record<string, number> | undefined): Record<string, 'ok' | 'fix'> {
-    const out: Record<string, 'ok' | 'fix'> = {};
-    if (!fc) return out;
-    // 后端 field_confidence 键 = OCR invoice 属性名(services/ocr/page_runner _FIELD_CONF_ATTRS)。
-    const alias: Record<string, string> = {
-        invoice_number: 'doc_no',
-        doc_no: 'doc_no',
-        seller_tax: 'tax_id',
-        tax_id: 'tax_id',
-        date: 'doc_date',
-        doc_date: 'doc_date',
-        seller_name: 'supplier',
-        supplier_name: 'supplier',
-        supplier: 'supplier',
-    };
-    for (const k in fc) {
-        const key = alias[k] || k;
-        out[key] = fc[k] >= 0.8 ? 'ok' : 'fix';
-    }
-    return out;
 }
 
 function fromDraft(d: DraftIn): FormState {
@@ -102,6 +81,7 @@ function fromDraft(d: DraftIn): FormState {
             ? d.lines
             : [blankLine(settings ? Number(settings.default_vat_rate) || 7 : 7)]
         ).map((l) => ({ ...l })),
+        mergeMode: false,
         priceMode: 'exclusive',
         manualOn: false,
         override: { subtotal: 0, discount: 0, vat: 0, grand: 0 },
@@ -159,7 +139,7 @@ function shell(): string {
             <div class="acts"><button class="btn" id="pur-save-draft">${escapeHtml(t('pur-save-draft'))}</button><button class="btn primary" id="pur-post">${escapeHtml(t('pur-post'))}</button></div>
         </div>
         ${dup}
-        <div class="wsbar">${escapeHtml(t('pur-ws-for'))} <b>${escapeHtml(wsName())}</b> · <span class="link" id="pur-ws-switch">${escapeHtml(t('pur-ws-switch'))}</span></div>
+        <div class="wsbar">${escapeHtml(t('pur-ws-for'))} <b>${escapeHtml(wsName())}</b></div>
         <div class="vbanner ${showBanner ? 'show' : ''}" id="pur-vbanner">${showBanner ? bannerInner(fx, 'pur-review-n') : ''}</div>
         <div class="etabs" id="pur-etabs"><button class="on" data-tab="doc">${escapeHtml(t('pur-tab-doc'))}</button><button data-tab="info">${escapeHtml(t('pur-tab-info'))}</button><button data-tab="items">${escapeHtml(t('pur-tab-items'))}</button></div>
         <div class="grid">
@@ -168,6 +148,7 @@ function shell(): string {
                 <div id="pane-info">${infoCardHtml(st!)}</div>
                 <div id="pane-items">
                     <div class="card"><div class="hd">${escapeHtml(t('pur-lines'))}</div><div class="bd">
+                        <div class="seg sm2" id="pur-linemode" style="margin-bottom:12px;"><div class="o ${st!.mergeMode ? '' : 'on'}" data-merge="0">${escapeHtml(t('pur-line-split'))}</div><div class="o ${st!.mergeMode ? 'on' : ''}" data-merge="1">${escapeHtml(t('pur-line-merge'))}</div></div>
                         <div class="infonote">${escapeHtml(t('pur-lines-note'))}</div>
                         <div id="pur-lines">${linesHtml(st!, cats)}</div>
                     </div></div>
@@ -197,10 +178,7 @@ function setTop(key: string, val: string): void {
 
 function bindShell(): void {
     document.getElementById('pur-back')!.onclick = () => window.routeTo?.('purchase');
-    const sw = document.getElementById('pur-ws-switch');
-    if (sw)
-        sw.onclick = () =>
-            document.getElementById('workspace-switcher-root')?.querySelector('button')?.click();
+    // 套账切换走顶栏现有切换器(不在表单内放第二个 · 防 ws 不同步)· wsbar 仅只读提示「记账给」。
     mountViewer(st!, rerender);
     mountLines(
         st!,
@@ -210,6 +188,16 @@ function bindShell(): void {
         refreshTotals
     );
     bindTotals(st!, rerender);
+    // 明细 拆分多条/合并记一条:合并 = 不逐项记一条(多行折成单行·净额求和)· 默认拆分。
+    document.querySelectorAll<HTMLElement>('#pur-linemode [data-merge]').forEach((el) => {
+        el.onclick = () => {
+            const merge = el.dataset.merge === '1';
+            if (merge === st!.mergeMode) return;
+            if (merge && st!.lines.length > 1) st!.lines = mergeLines(st!.lines);
+            st!.mergeMode = merge;
+            rerender();
+        };
+    });
 
     const supPick = document.getElementById('pur-supplier-pick');
     if (supPick)

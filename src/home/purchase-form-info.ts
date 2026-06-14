@@ -11,6 +11,29 @@ export interface MissingField {
     label: string;
 }
 
+// field_confidence(0~1)→ 三态映射:高(≥0.8)已识别;低请确认。键 = OCR invoice 属性名
+// (services/ocr/page_runner _FIELD_CONF_ATTRS)→ 归一到信息卡字段名。
+export function mapConf(fc: Record<string, number> | undefined): Record<string, 'ok' | 'fix'> {
+    const out: Record<string, 'ok' | 'fix'> = {};
+    if (!fc) return out;
+    const alias: Record<string, string> = {
+        invoice_number: 'doc_no',
+        doc_no: 'doc_no',
+        seller_tax: 'tax_id',
+        tax_id: 'tax_id',
+        date: 'doc_date',
+        doc_date: 'doc_date',
+        seller_name: 'supplier',
+        supplier_name: 'supplier',
+        supplier: 'supplier',
+    };
+    for (const k in fc) {
+        const key = alias[k] || k;
+        out[key] = fc[k] >= 0.8 ? 'ok' : 'fix';
+    }
+    return out;
+}
+
 // 给定当前 toggle 状态,该必填字段是否空(需补红 · 主动)。
 export function isReqEmpty(st: FormState, key: string): boolean {
     if (key === 'supplier') return !st.supplierName.trim();

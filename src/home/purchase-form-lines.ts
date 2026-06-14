@@ -31,6 +31,31 @@ export function blankLine(vatDefault = 7): DocLine {
     };
 }
 
+// 合并记一条:多行净额(qty×price−折扣)求和折成单行;沿用首行 VAT/科目/品名(不逐项·用户主动选)。
+export function mergeLines(lines: DocLine[]): DocLine[] {
+    const netSum = lines.reduce(
+        (s, l) => s + Math.max(0, Number(l.qty) * Number(l.unit_price) - Number(l.discount || 0)),
+        0
+    );
+    const first = lines[0];
+    return [
+        {
+            item_type: 'goods',
+            product_id: null,
+            product_matched: false,
+            description: first.description || t('pur-merge-desc'),
+            qty: 1,
+            unit: null,
+            unit_price: Number(netSum.toFixed(2)),
+            discount: 0,
+            vat_rate: first.vat_rate,
+            wht_rate: 0,
+            category_id: first.category_id || null,
+            subcategory_id: first.subcategory_id || null,
+        },
+    ];
+}
+
 // 价内(含税输入)时把每行单价反算为净额后调金标 · 价外直接用。手动改额则以票面四项为权威。
 export function computeForm(st: FormState): FormTotals {
     const lines =
@@ -131,10 +156,11 @@ function lineHtml(l: DocLine, i: number, cats: Category[]): string {
 }
 
 export function linesHtml(st: FormState, cats: Category[]): string {
-    return (
-        st.lines.map((l, i) => lineHtml(l, i, cats)).join('') +
-        `<button class="addline" id="pur-add-line">+ ${escapeHtml(t('pur-add-line'))}</button>`
-    );
+    // 合并记一条 = 单行不逐项 → 隐藏「加一行」。
+    const add = st.mergeMode
+        ? ''
+        : `<button class="addline" id="pur-add-line">+ ${escapeHtml(t('pur-add-line'))}</button>`;
+    return st.lines.map((l, i) => lineHtml(l, i, cats)).join('') + add;
 }
 
 // 明细绑定:数字/文本即时算 · 大类改→小类联动重渲 · 商品/服务切 WHT · 加/删/折扣开关重渲。

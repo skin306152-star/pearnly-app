@@ -79,6 +79,8 @@ export const PURCHASE_LIST_CSS = `
 .pur.pl .st{font-size:11px;padding:3px 10px;border-radius:7px;min-width:52px;text-align:center;}
 .pur.pl .st.paid{background:var(--line2);color:var(--ink2);}
 .pur.pl .st.unpaid,.pur.pl .st.partial{background:var(--amber-weak);color:var(--amber);font-weight:600;}
+.pur.pl .listfoot{text-align:center;color:var(--ink3);font-size:12px;padding:12px 0 4px;}
+.pur.pl .listfoot:empty{display:none;}
 @media(max-width:600px){
   .pur.pl .ph{flex-direction:column;align-items:flex-start;gap:11px;}
   .pur.pl .band{flex-direction:column;align-items:stretch;gap:14px;}

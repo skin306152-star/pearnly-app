@@ -162,6 +162,7 @@ function shell(): string {
             <div id="pur-filterbar"></div>
             <div class="bulkbar" id="pur-bulkbar">${escapeHtml(t('pur-bulk-selected'))} <b id="pur-bulk-n">0</b><span class="del" id="pur-bulk-del">${ICON_TRASH} ${escapeHtml(t('pur-bulk-delete'))}</span></div>
             <div id="pur-body"></div>
+            <div class="listfoot" id="pur-listfoot"></div>
         </div>
         <input type="file" id="pur-cam-input" accept="image/*,application/pdf" style="display:none">
     </div></div>`;
@@ -184,12 +185,14 @@ function renderBody(): void {
         if (al) al.onclick = () => setChip('unpaid');
     }
     const body = document.getElementById('pur-body');
+    const list = view();
     if (body) {
-        const list = view();
         body.innerHTML = list.length
             ? groupsHtml(list)
             : `<div class="state">${escapeHtml(t('pur-empty'))}</div>`;
     }
+    const foot = document.getElementById('pur-listfoot');
+    if (foot) foot.textContent = list.length ? t('pur-list-count', { n: String(list.length) }) : '';
     bindRows();
     updateBulk();
 }

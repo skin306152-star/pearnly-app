@@ -157,5 +157,29 @@ class CardTests(unittest.TestCase):
             self.assertIn(line_postback.ACTION_CONFIRM, self._actions(c))
 
 
+class DocTypeLabelTests(unittest.TestCase):
+    """单据类型显 4 语人话(PO-2):卡/详情不露 simplified_tax_invoice 等英文代号。"""
+
+    CODES = ("tax_invoice", "simplified_tax_invoice", "receipt", "credit_note", "other")
+
+    def test_all_codes_have_4_langs(self):
+        for code in self.CODES:
+            for lang in ("zh", "th", "en", "ja"):
+                label = line_card.doc_type_label(code, lang)
+                self.assertTrue(label and label != code, f"{code}/{lang} 未译")
+
+    def test_simplified_invoice_thai_and_zh(self):
+        self.assertEqual(
+            line_card.doc_type_label("simplified_tax_invoice", "th"), "ใบกำกับภาษีอย่างย่อ"
+        )
+        self.assertEqual(line_card.doc_type_label("simplified_tax_invoice", "zh"), "简式税票")
+
+    def test_empty_stays_empty(self):
+        self.assertEqual(line_card.doc_type_label("", "zh"), "")
+
+    def test_unknown_code_falls_back_to_raw(self):
+        self.assertEqual(line_card.doc_type_label("weird_type", "zh"), "weird_type")
+
+
 if __name__ == "__main__":
     unittest.main()

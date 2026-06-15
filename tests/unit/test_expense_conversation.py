@@ -57,12 +57,14 @@ class PendingTests(unittest.TestCase):
                 "tenant_id": "t1",
                 "workspace_client_id": 7,
                 "draft": draft_json,
+                "missing": "amount",
                 "fresh": True,
             }
         )
         out = conv.pop_pending(cur, line_user_id="U1")
         self.assertEqual(out["workspace_client_id"], 7)
         self.assertEqual(out["draft"].category, "ค่าอาหาร")
+        self.assertEqual(out["missing"], "amount")
         self.assertIn("DELETE FROM line_pending_entry", cur.calls[0][0])
 
     def test_pop_expired_returns_none(self):

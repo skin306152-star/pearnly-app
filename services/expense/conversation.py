@@ -59,7 +59,7 @@ def pop_pending(
     """取出并删除该用户未过期的会话态;过期/不存在 → None(过期行也删)。"""
     cur.execute(
         "DELETE FROM line_pending_entry WHERE line_user_id = %s "
-        "RETURNING tenant_id, workspace_client_id, draft, "
+        "RETURNING tenant_id, workspace_client_id, draft, missing, "
         "(created_at > now() - (%s || ' minutes')::interval) AS fresh",
         (line_user_id, str(int(ttl_minutes))),
     )
@@ -70,6 +70,28 @@ def pop_pending(
         "tenant_id": str(row["tenant_id"]),
         "workspace_client_id": row["workspace_client_id"],
         "draft": _draft_from_json(row["draft"]),
+        "missing": row["missing"],
+    }
+
+
+def peek_pending(
+    cur, *, line_user_id: str, ttl_minutes: int = PENDING_TTL_MINUTES
+) -> Optional[dict]:
+    """看一眼会话态(不删 · 带 missing 供分类型:补金额 vs 待确认更正);过期/无 → None。"""
+    cur.execute(
+        "SELECT tenant_id, workspace_client_id, draft, missing, "
+        "(created_at > now() - (%s || ' minutes')::interval) AS fresh "
+        "FROM line_pending_entry WHERE line_user_id = %s",
+        (str(int(ttl_minutes)), line_user_id),
+    )
+    row = cur.fetchone()
+    if not row or not row["fresh"]:
+        return None
+    return {
+        "tenant_id": str(row["tenant_id"]),
+        "workspace_client_id": row["workspace_client_id"],
+        "draft": _draft_from_json(row["draft"]),
+        "missing": row["missing"],
     }
 
 

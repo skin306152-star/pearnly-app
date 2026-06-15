@@ -50,6 +50,14 @@ def handle_expense_text(
         if ws is None:
             return False
 
+        # 0. 待确认的更正(上句"改成X吗")→ 这句 是/否 → 执行/取消(优先于记账/大脑/兜底·PO-13)
+        from services.expense import line_correct
+
+        if line_correct.try_confirm(
+            bound_user, reply_token, line_user_id, text, str(tid), ws, lang
+        ):
+            return True
+
         # 1. L1 快路:清晰记账(有金额 + 非问句 + 无其他 L1 意图)→ 直接记,零 LLM、零成本。
         parsed = lqe.parse_expense(text)
         si = lqe.l1_intent(text)
@@ -59,7 +67,8 @@ def handle_expense_text(
 
             with db.get_cursor_rls(str(tid), commit=True) as cur:
                 pend = conversation.pop_pending(cur, line_user_id=line_user_id)
-            if pend:  # 续接:上句缺金额存了半成品,这句补金额 → 合并
+            # 续接补金额(更正待确认 pending 不在此并:已在第 0 步处理)
+            if pend and not str(pend.get("missing") or "").startswith("correct:"):
                 merged = pend["draft"]
                 merged.amount = parsed.amount
                 parsed = merged
@@ -114,6 +123,14 @@ def _dispatch_agent(
         _reply_undo(bound_user, reply_token, lang, tid, ws)
         return True
     if intent == "edit":
+        amt = u.get("amount")
+        if amt not in (None, "", 0):
+            # 「上一笔改成 X」→ 更正:冲销原单 + 按新值重建草稿(请确认·绝不静默覆盖·PO-13)
+            from services.expense import line_correct
+
+            return line_correct.request_correct(
+                bound_user, reply_token, line_user_id, amt, lang, tid, ws
+            )
         line_client.reply_text(reply_token, line_client.t_line(lang, "exp_edit_web"))
         return True
     if line_agent.may_write(intent, u.get("speech_act")):

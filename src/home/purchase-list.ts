@@ -38,6 +38,8 @@ const ICON_CAM_SM =
     '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/></svg>';
 const ICON_TRASH =
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 7h14M9 7V5h6v2M7 7l1 13h8l1-13"/></svg>';
+const ICON_PEN =
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
 const CHECK_SVG =
     '<svg viewBox="0 0 24 24" fill="none" stroke-width="3"><path d="M5 12l5 5 9-11"/></svg>';
 const CHEV_SVG =
@@ -143,12 +145,13 @@ function shell(): string {
             <div class="band">
                 <div class="star" id="pur-star">${starHtml(summary)}</div>
                 <div class="acts">
-                    <button class="btn primary" id="pur-cam-btn">${ICON_CAM}${escapeHtml(t('pur-photo'))}</button>
+                    <button class="btn primary only-desk" id="pur-record-btn">${ICON_PEN}${escapeHtml(t('pur-record-purchase'))}</button>
+                    <button class="btn primary only-mob" id="pur-cam-btn">${ICON_CAM}${escapeHtml(t('pur-photo'))}</button>
                     <div class="more-wrap">
                         <button class="btn" id="pur-more-btn" aria-label="more">${MORE_SVG}</button>
                         <div class="more-menu right" id="pur-more-menu" hidden>
+                            <button class="mi only-mob" id="pur-manual-btn">${escapeHtml(t('pur-manual-new'))}</button>
                             <button class="mi" id="pur-export-btn">${escapeHtml(t('pur-export-archive'))}</button>
-                            <button class="mi" id="pur-manual-btn">${escapeHtml(t('pur-manual-new'))}</button>
                             <button class="mi" id="pur-line-btn">${escapeHtml(t('pur-line-expense'))}</button>
                         </div>
                     </div>
@@ -164,7 +167,7 @@ function shell(): string {
             <div id="pur-body"></div>
             <div class="listfoot" id="pur-listfoot"></div>
         </div>
-        <input type="file" id="pur-cam-input" accept="image/*,application/pdf" style="display:none">
+        <input type="file" id="pur-cam-input" accept="image/*,application/pdf" capture="environment" style="display:none">
     </div></div>`;
 }
 
@@ -300,9 +303,11 @@ function bindChrome(): void {
             window.openPurchaseExport
                 ? window.openPurchaseExport()
                 : showToast(t('nav-soon'), 'info');
+    const recordHandler = () => window.openPurchaseForm?.(null, { doc_kind: 'expense' });
     const manualBtn = document.getElementById('pur-manual-btn');
-    if (manualBtn)
-        manualBtn.onclick = () => window.openPurchaseForm?.(null, { doc_kind: 'expense' });
+    if (manualBtn) manualBtn.onclick = recordHandler;
+    const recordBtn = document.getElementById('pur-record-btn'); // 桌面主操作:记一笔(手动)
+    if (recordBtn) recordBtn.onclick = recordHandler;
     const lineBtn = document.getElementById('pur-line-btn');
     if (lineBtn) lineBtn.onclick = () => window.openPurchaseLine?.();
     const camBtn = document.getElementById('pur-cam-btn');

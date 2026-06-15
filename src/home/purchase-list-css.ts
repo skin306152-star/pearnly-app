@@ -81,10 +81,15 @@ export const PURCHASE_LIST_CSS = `
 .pur.pl .st.unpaid,.pur.pl .st.partial{background:var(--amber-weak);color:var(--amber);font-weight:600;}
 .pur.pl .listfoot{text-align:center;color:var(--ink3);font-size:12px;padding:12px 0 4px;}
 .pur.pl .listfoot:empty{display:none;}
+/* 主操作响应式:桌面=记一笔(手动)· 手机=拍照(调原生相机)· 见 purchase-list.ts */
+.pur.pl .only-mob{display:none;}
 @media(max-width:600px){
   .pur.pl .ph{flex-direction:column;align-items:flex-start;gap:11px;}
   .pur.pl .band{flex-direction:column;align-items:stretch;gap:14px;}
   .pur.pl .acts{width:100%;} .pur.pl .acts .btn{flex:1;}
+  .pur.pl .only-desk{display:none;}
+  .pur.pl .only-mob{display:inline-flex;}
+  .pur.pl .more-menu .only-mob{display:block;}
   .pur.pl .search{width:100%;margin-left:0;}
   .pur.pl .toolbar,.pur.pl .filterbar{flex-wrap:wrap;}
   .pur.pl .datebasis{margin-left:0;}

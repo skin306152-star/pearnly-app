@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import io
 from decimal import Decimal
+from typing import Optional
 
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
-from services.export.rows import COLUMNS
+from services.export import rows as rows_mod
+from services.export.rows import COLUMN_KEYS
 
 _HEADER_FONT = Font(bold=True)
 _LINK_FONT = Font(color="0563C1", underline="single")
@@ -28,16 +30,15 @@ def _cell_value(v):
     return v
 
 
-def build_workbook(rows: list, *, sheet_title: str = "进项明细") -> bytes:
-    """一行一明细导出行 → xlsx 字节流。表头取 rows.COLUMNS;evidence 是 URL 渲超链。"""
+def build_workbook(rows: list, *, sheet_title: Optional[str] = None, lang: str = "zh") -> bytes:
+    """一行一明细导出行 → xlsx 字节流。表头/证据文案随 lang;evidence 是 URL 渲超链。"""
     wb = Workbook()
     ws = wb.active
     # openpyxl sheet 标题上限 31 字符且禁 []:*?/\
-    ws.title = (sheet_title or "Sheet1")[:31]
+    ws.title = (sheet_title or rows_mod.sheet_title(lang) or "Sheet1")[:31]
 
-    keys = [k for k, _ in COLUMNS]
-    headers = [h for _, h in COLUMNS]
-    ws.append(headers)
+    keys = COLUMN_KEYS
+    ws.append(rows_mod.headers(lang))
     for cell in ws[1]:
         cell.font = _HEADER_FONT
 
@@ -49,7 +50,7 @@ def build_workbook(rows: list, *, sheet_title: str = "进项明细") -> bytes:
         if isinstance(ev, str) and ev.startswith(("http://", "https://", "/api/")):
             cell = ws.cell(row=r, column=evidence_col)
             cell.hyperlink = ev
-            cell.value = "查看"
+            cell.value = rows_mod.view_label(lang)
             cell.font = _LINK_FONT
 
     buf = io.BytesIO()

@@ -10,27 +10,33 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from services.export.rows import COLUMNS
+from services.export import rows as rows_mod
+from services.export.rows import COLUMN_KEYS
 
 ALL_YEAR_TAB = "全年"
+_ALL_YEAR_TAB = {"zh": "全年", "en": "Full year", "th": "ทั้งปี", "ja": "通年"}
 
 
-def _cell(key, value):
+def all_year_tab(lang: str = "zh") -> str:
+    """年汇总 tab 名(按 lang)。"""
+    return _ALL_YEAR_TAB.get(lang, _ALL_YEAR_TAB["zh"])
+
+
+def _cell(key, value, lang: str = "zh"):
     """单元格值:evidence URL → HYPERLINK 公式;Decimal → float;None → ""。"""
     if key == "evidence" and isinstance(value, str) and value.startswith(("http", "/api/")):
         safe = value.replace('"', "%22")
-        return f'=HYPERLINK("{safe}","查看")'
+        return f'=HYPERLINK("{safe}","{rows_mod.view_label(lang)}")'
     if isinstance(value, Decimal):
         return float(value)
     return "" if value is None else value
 
 
-def rows_to_matrix(rows: list) -> list:
-    """导出行 → 二维值矩阵([表头] + 每行按 COLUMNS 列序)。纯函数,喂 values API。"""
-    keys = [k for k, _ in COLUMNS]
-    matrix = [[h for _, h in COLUMNS]]
+def rows_to_matrix(rows: list, *, lang: str = "zh") -> list:
+    """导出行 → 二维值矩阵([表头] + 每行按列序)· 表头/证据文案随 lang。喂 values API。"""
+    matrix = [rows_mod.headers(lang)]
     for row in rows or []:
-        matrix.append([_cell(k, row.get(k)) for k in keys])
+        matrix.append([_cell(k, row.get(k), lang) for k in COLUMN_KEYS])
     return matrix
 
 
@@ -90,18 +96,20 @@ class SheetsClient:
         ).execute()
 
 
-def sync(client, *, folder_id: str, subject: str, year: int, month: int, rows: list) -> str:
+def sync(
+    client, *, folder_id: str, subject: str, year: int, month: int, rows: list, lang: str = "zh"
+) -> str:
     """主体×年表:写全年 tab + 当月 tab(各 overwrite 成最新明细)。返回 spreadsheet_id。
 
     编排注入 client → 可单测;真 API 在 SheetsClient。月行 = rows 里该月的子集由调用方传入
-    (archive 按月分组),全年 = 整年 rows。
+    (archive 按月分组),全年 = 整年 rows。列头/枚举值/全年 tab 名随 lang。
     """
     from services.export import archive_tree
 
     title = archive_tree.sheet_name(subject, year)
     ssid = client.find_or_create_spreadsheet(folder_id, title)
-    matrix = rows_to_matrix(rows)
-    for tab in (ALL_YEAR_TAB, month_tab(month)):
+    matrix = rows_to_matrix(rows, lang=lang)
+    for tab in (all_year_tab(lang), month_tab(month)):
         client.ensure_tab(ssid, tab)
         client.overwrite_tab(ssid, tab, matrix)
     return ssid

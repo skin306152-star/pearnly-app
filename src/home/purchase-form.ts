@@ -133,9 +133,8 @@ function shell(): string {
     const fx = reviewFields();
     const showBanner = st!.confidenceBand !== 'auto' && fx.length;
     return `<div class="pur f"><div class="wrap">
-        <div class="back" id="pur-back">‹ ${escapeHtml(t('pur-back'))}</div>
         <div class="ph">
-            <div><div class="t">${escapeHtml(t('pur-review-title'))}</div><div class="sub">${escapeHtml(st!.supplierName || t('pur-form-sub'))}</div></div>
+            <div class="phl"><span class="back" id="pur-back" title="${escapeHtml(t('pur-back'))}" aria-label="${escapeHtml(t('pur-back'))}">‹</span><div><div class="t">${escapeHtml(t('pur-review-title'))}</div><div class="sub">${escapeHtml(st!.supplierName || t('pur-form-sub'))}</div></div></div>
             <div class="acts"><button class="btn" id="pur-save-draft">${escapeHtml(t('pur-save-draft'))}</button><button class="btn primary" id="pur-post">${escapeHtml(t('pur-post'))}</button></div>
         </div>
         ${dup}

@@ -4,6 +4,8 @@ export const PURCHASE_FORM_CSS = `
 .pur .back{display:inline-flex;align-items:center;gap:6px;color:var(--ink2);font-size:12.5px;margin-bottom:11px;cursor:pointer;}
 .pur.f .wrap{width:100%;}
 .pur .ph{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:13px;}
+.pur.f .ph .phl{display:flex;align-items:center;gap:11px;}
+.pur.f .ph .back{margin-bottom:0;font-size:24px;line-height:1;color:var(--ink2);flex:none;}
 .pur .ph .t{font-size:20px;font-weight:700;}
 .pur .ph .sub{color:var(--ink2);font-size:12.5px;margin-top:3px;}
 .pur .acts{display:flex;gap:9px;flex-shrink:0;}
@@ -58,9 +60,9 @@ export const PURCHASE_FORM_CSS = `
 .pur .viewer .vph{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:var(--ink3);text-align:center;}
 .pur .viewer .vfile{position:absolute;top:10px;right:10px;background:var(--card);border:1px solid var(--line);color:var(--ink2);border-radius:7px;font-size:11px;padding:3px 9px;font-weight:600;}
 .pur .viewer .vhint{position:absolute;left:10px;top:10px;background:var(--card);border:1px solid var(--line);color:var(--ink3);border-radius:7px;font-size:11px;padding:3px 9px;}
-.pur .viewer .vtools{position:absolute;right:10px;bottom:10px;display:flex;gap:6px;}
-.pur .viewer .vtools button{background:var(--card);border:1px solid var(--line);color:var(--ink2);border-radius:8px;width:32px;height:32px;display:grid;place-items:center;cursor:pointer;}
-.pur .viewer .vzoom{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);background:var(--card);border:1px solid var(--line);border-radius:8px;font-size:12px;font-weight:700;padding:4px 10px;color:var(--ink2);}
+.pur .viewer .vtools{position:absolute;right:10px;bottom:10px;display:flex;gap:6px;align-items:center;}
+.pur .viewer .vtools button{background:var(--card);border:1px solid var(--line);color:var(--ink2);border-radius:8px;width:32px;height:32px;display:grid;place-items:center;cursor:pointer;flex:none;}
+.pur .viewer .vzoom{background:var(--card);border:1px solid var(--line);border-radius:8px;font-size:12px;font-weight:700;padding:0 10px;height:32px;display:flex;align-items:center;color:var(--ink2);}
 .pur .thumbs{display:flex;gap:8px;margin-top:10px;overflow:auto;}
 .pur .thumbs .t{width:50px;height:60px;border-radius:8px;border:1px solid var(--line);background:var(--line2);display:grid;place-items:center;flex:none;color:var(--ink3);cursor:pointer;overflow:hidden;}
 .pur .thumbs .t img{width:100%;height:100%;object-fit:cover;}

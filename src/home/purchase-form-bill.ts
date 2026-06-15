@@ -43,8 +43,7 @@ export function leftColHtml(st: FormState): string {
         <div class="card"><div class="hd">${escapeHtml(t('pur-bill'))}${aiMark}</div><div class="bd">
             <div class="viewer" id="pur-viewer">${inner}
                 <span class="vhint">${escapeHtml(t('pur-viewer-hint'))}</span>${fileTag}
-                <span class="vzoom" id="pur-vzoom">100%</span>
-                <div class="vtools"><button data-z="in" title="+">${I_PLUS}</button><button data-z="out" title="-">${I_MINUS}</button><button data-z="rot" title="rotate">${I_ROT}</button><button data-z="reset" title="reset">${I_RESET}</button><button data-z="full" title="${escapeHtml(t('pur-viewer-full'))}">${I_FULL}</button></div>
+                <div class="vtools"><span class="vzoom" id="pur-vzoom">100%</span><button data-z="in" title="+">${I_PLUS}</button><button data-z="out" title="-">${I_MINUS}</button><button data-z="rot" title="rotate">${I_ROT}</button><button data-z="reset" title="reset">${I_RESET}</button><button data-z="full" title="${escapeHtml(t('pur-viewer-full'))}">${I_FULL}</button></div>
             </div>
             <div class="thumbs">${thumbs}<div class="add" id="pur-add-file">${I_PLUS}</div></div>
         </div></div>

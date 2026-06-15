@@ -106,8 +106,10 @@ def _category_names(cur, *, tenant_id, workspace_client_id) -> dict:
     return flatten_categories(tree)
 
 
-def excel_bytes(cur, *, tenant_id, workspace_client_id, date_from=None, date_to=None) -> bytes:
-    """同步导出:范围内已入账明细 → xlsx 字节流(零授权兜底)。"""
+def excel_bytes(
+    cur, *, tenant_id, workspace_client_id, date_from=None, date_to=None, lang="zh"
+) -> bytes:
+    """同步导出:范围内已入账明细 → xlsx 字节流(零授权兜底)· 列头/枚举值随 lang。"""
     doc_ids = _posted_doc_ids(
         cur,
         tenant_id=tenant_id,
@@ -123,9 +125,9 @@ def excel_bytes(cur, *, tenant_id, workspace_client_id, date_from=None, date_to=
         evidence_mode="api",
     )
     cats = _category_names(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
-    rows = rows_svc.build_export_rows(items, category_names=cats)
+    rows = rows_svc.build_export_rows(items, category_names=cats, lang=lang)
     subject = _subject_name(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
-    return excel_svc.build_workbook(rows, sheet_title=subject or "进项明细")
+    return excel_svc.build_workbook(rows, sheet_title=subject or None, lang=lang)
 
 
 def _read_image(image_ref: Optional[str]) -> Optional[bytes]:
@@ -168,6 +170,7 @@ def run_export(job: dict) -> None:
     ws = job.get("workspace_client_id")
     params = job.get("params") or {}
     date_from, date_to = params.get("date_from"), params.get("date_to")
+    lang = params.get("lang") or "zh"
 
     with db.get_cursor(commit=False) as cur:
         token = google_oauth.valid_access_token(cur, tenant_id=tid, workspace_client_id=ws)
@@ -226,7 +229,7 @@ def run_export(job: dict) -> None:
         except Exception as e:  # noqa: BLE001
             logger.warning("export archive doc %s failed: %s", did, e)
 
-    sheet_url = _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to)
+    sheet_url = _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to, lang)
     jobs.finish(
         jid,
         "export_archived_docs",
@@ -235,7 +238,7 @@ def run_export(job: dict) -> None:
     )
 
 
-def _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to) -> str:
+def _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to, lang="zh") -> str:
     """归档后写主体×年 Sheet(全量明细·证据列回链 Drive 夹)。失败返空不阻断。"""
     try:
         with db.get_cursor(commit=False) as cur:
@@ -251,7 +254,7 @@ def _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to) -> s
             arch = {str(r["doc_id"]): r["drive_url"] for r in cur.fetchall()}
         for it in items:
             it["evidence_url"] = arch.get(str(it["doc"].get("id")), "")
-        rows = rows_svc.build_export_rows(items, category_names=cats)
+        rows = rows_svc.build_export_rows(items, category_names=cats, lang=lang)
         if not rows:
             return ""
         year = int(str(rows[0]["doc_date"])[:4])
@@ -263,7 +266,13 @@ def _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to) -> s
             drive_svc.DriveClient(token), archive_tree.subject_year_path(subject, year)
         )
         ssid = sheets_svc.sync(
-            sheets_client, folder_id=folder, subject=subject, year=year, month=month, rows=rows
+            sheets_client,
+            folder_id=folder,
+            subject=subject,
+            year=year,
+            month=month,
+            rows=rows,
+            lang=lang,
         )
         return f"https://docs.google.com/spreadsheets/d/{ssid}"
     except Exception as e:  # noqa: BLE001

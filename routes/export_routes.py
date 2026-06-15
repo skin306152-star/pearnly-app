@@ -28,6 +28,7 @@ class ExportIn(BaseModel):
     format: str = "excel"  # excel | drive | sheet
     date_from: Optional[str] = None
     date_to: Optional[str] = None
+    lang: str = "zh"  # 导出文件列头/枚举值跟随用户语言(zh/en/th/ja)
 
 
 @router.post("/export")
@@ -45,6 +46,7 @@ async def api_export(req: ExportIn, request: Request):
                 workspace_client_id=ws,
                 date_from=req.date_from,
                 date_to=req.date_to,
+                lang=req.lang,
             )
         return Response(
             content=xlsx,
@@ -69,7 +71,12 @@ async def api_export(req: ExportIn, request: Request):
         "export",
         user_id=_uid(user),
         tenant_id=tid,
-        params={"format": fmt, "date_from": req.date_from, "date_to": req.date_to},
+        params={
+            "format": fmt,
+            "date_from": req.date_from,
+            "date_to": req.date_to,
+            "lang": req.lang,
+        },
         workspace_client_id=ws,
     )
     if not job_id:

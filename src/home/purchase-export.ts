@@ -19,7 +19,7 @@ interface JobProgress {
 
 const PAGE_CSS = `
 .pur.pex .wrap{width:100%;}
-.pur.pex .ph{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+.pur.pex .ph{display:flex;align-items:center;justify-content:flex-start;gap:10px;margin-bottom:16px;}
 .pur.pex .back{cursor:pointer;color:var(--ink2);font-size:18px;line-height:1;}
 .pur.pex .ph .t{font-size:20px;font-weight:700;}
 .pur.pex .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh);padding:15px 16px;margin-bottom:14px;}
@@ -73,7 +73,9 @@ function basePayload(): Record<string, unknown> | null {
         showToast(t('workspace.required'), 'error');
         return null;
     }
-    return { workspace_client_id: ws, ...dateRangeParams() };
+    // 导出文件列头/枚举值跟随用户当前语言(后端按 lang 本地化)。
+    const lang = window._currentLang || localStorage.getItem('mrpilot_lang') || 'th';
+    return { workspace_client_id: ws, lang, ...dateRangeParams() };
 }
 
 async function doExcel(): Promise<void> {

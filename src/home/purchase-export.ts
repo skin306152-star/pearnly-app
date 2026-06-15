@@ -1,9 +1,9 @@
-// 商户采购 · 外流收拢面板(列表「⋯→导出/归档」调 window.openPurchaseExport)。
-// 收拢 .modal(不平铺):导出 Excel(免授权)/ 归档到 Drive / 同步 Sheet。范围复用列表当前日期筛选。
+// 商户采购 · 外流页(导出 / 归档到 Google)· 列表「⋯→导出/归档」routeTo 进来 · 照搬草稿⑤。
+// 三块:导出方式(Excel 免授权 / 归档 Drive / 同步 Sheet) + Drive 归档结构 + Sheet 列(末 4 列绿=Pearnly 独有)。
 // excel → xlsx blob 直下;drive/sheet 未连 Google(412 google_not_connected)→ 跳集成中心高亮卡;
 // 已连 → {job_id} 轮询进度(queued/running/done/failed)· 完成给 Sheet 直达链接 / 归档条数。
 /* global t, escapeHtml, showToast */
-import { authHeaders, activeWsId, injectStyle } from './purchase-common.js';
+import { authHeaders, activeWsId, injectPurBase, injectStyle } from './purchase-common.js';
 import { dateRangeParams } from './purchase-list-filters.js';
 
 type Fmt = 'excel' | 'drive' | 'sheet';
@@ -17,28 +17,25 @@ interface JobProgress {
     error: string;
 }
 
-const CSS = `
-.pux-scrim{position:fixed;inset:0;background:rgba(17,24,39,.42);display:flex;align-items:center;justify-content:center;padding:20px;z-index:1200;}
-.pux{background:var(--card);border-radius:16px;width:100%;max-width:460px;box-shadow:var(--sh2);overflow:hidden;color:var(--ink);font-size:13.5px;}
-.pux *{box-sizing:border-box;}
-.pux .mh{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
-.pux .mh .t{font-size:16px;font-weight:700;} .pux .mh .x{color:var(--ink3);font-size:20px;cursor:pointer;line-height:1;}
-.pux .mb{padding:18px 20px;}
-.pux .acts{display:flex;gap:9px;flex-wrap:wrap;}
-.pux .btn{height:42px;padding:0 15px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;}
-.pux .btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700;}
-.pux .btn.pri:hover{background:var(--accent-deep);}
-.pux .btn:disabled{opacity:.55;cursor:not-allowed;}
-.pux .ic{width:16px;height:16px;flex:none;}
-.pux .note{margin-top:14px;background:var(--accent-weak);border:1px solid var(--accent-weak);border-radius:10px;padding:10px 12px;font-size:12.5px;color:var(--accent-deep);display:flex;gap:8px;align-items:flex-start;}
-.pux .note .ic{margin-top:1px;}
-.pux .res{margin-top:14px;font-size:13px;color:var(--ink2);display:none;}
-.pux .res.on{display:block;}
-.pux .res a{color:var(--accent);font-weight:700;text-decoration:none;}
-@media(max-width:600px){
-  .pux{max-width:100%;border-radius:16px 16px 0 0;align-self:flex-end;}
-  .pux-scrim{align-items:flex-end;padding:0;}
-}
+const PAGE_CSS = `
+.pur.pex .wrap{width:100%;}
+.pur.pex .ph{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+.pur.pex .back{cursor:pointer;color:var(--ink2);font-size:18px;line-height:1;}
+.pur.pex .ph .t{font-size:20px;font-weight:700;}
+.pur.pex .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh);padding:15px 16px;margin-bottom:14px;}
+.pur.pex .panel h4{margin:0 0 13px;font-size:11px;color:var(--ink3);font-weight:700;letter-spacing:.05em;text-transform:uppercase;display:flex;align-items:center;gap:8px;}
+.pur.pex .panel h4 .r{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400;}
+.pur.pex .acts{display:flex;gap:9px;flex-wrap:wrap;}
+.pur.pex .acts .ic{width:16px;height:16px;flex:none;}
+.pur.pex .infonote{background:var(--bg);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--ink2);margin-top:12px;display:flex;gap:7px;align-items:flex-start;}
+.pur.pex .infonote .ic{width:16px;height:16px;flex:none;margin-top:1px;}
+.pur.pex .tree{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink2);white-space:pre;line-height:1.8;overflow:auto;}
+.pur.pex .cols{display:flex;flex-wrap:wrap;gap:6px;}
+.pur.pex .cols span{background:var(--line2);border-radius:7px;padding:4px 9px;font-size:11.5px;}
+.pur.pex .cols span.new{background:var(--green-weak);color:var(--green);font-weight:700;}
+.pur.pex .res{margin-top:12px;font-size:13px;color:var(--ink2);display:none;}
+.pur.pex .res.on{display:block;}
+.pur.pex .res a{color:var(--accent);font-weight:700;text-decoration:none;}
 `;
 
 const IC_DOWNLOAD =
@@ -49,18 +46,15 @@ const IC_GRID =
     '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16M15 4v16"/></svg>';
 const IC_LINK =
     '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6"/><path d="M8.5 12.5l-2 2a3 3 0 004.2 4.2l2-2M15.5 11.5l2-2a3 3 0 00-4.2-4.2l-2 2"/></svg>';
+const IC_BOOK =
+    '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a2 2 0 012 2v14H7a2 2 0 01-2-2z"/><path d="M5 18a2 2 0 012-2h11"/></svg>';
 
-let scrim: HTMLElement | null = null;
-
-function close(): void {
-    if (scrim) {
-        scrim.remove();
-        scrim = null;
-    }
+function sec(): HTMLElement | null {
+    return document.getElementById('page-purchase-export');
 }
 
 function setRes(html: string): void {
-    const res = scrim?.querySelector('.res') as HTMLElement | null;
+    const res = sec()?.querySelector('.res') as HTMLElement | null;
     if (res) {
         res.innerHTML = html;
         res.classList.add('on');
@@ -68,7 +62,9 @@ function setRes(html: string): void {
 }
 
 function setBusy(busy: boolean): void {
-    scrim?.querySelectorAll<HTMLButtonElement>('.btn').forEach((b) => (b.disabled = busy));
+    sec()
+        ?.querySelectorAll<HTMLButtonElement>('.acts .btn')
+        .forEach((b) => (b.disabled = busy));
 }
 
 function basePayload(): Record<string, unknown> | null {
@@ -101,7 +97,7 @@ async function doExcel(): Promise<void> {
         a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 60000);
         showToast(t('pur-export-excel-ok'), 'success');
-        close();
+        setRes(escapeHtml(t('pur-export-excel-ok')));
     } catch (_) {
         showToast(t('pur-export-failed'), 'error');
     } finally {
@@ -109,15 +105,14 @@ async function doExcel(): Promise<void> {
     }
 }
 
-// 跳集成中心高亮 Google 卡引导授权(未连 Drive/Sheet)。
+// 未连 Drive/Sheet → 跳集成中心高亮 Google 卡引导授权。
 function jumpToConnect(): void {
-    close();
     window.routeTo?.('integrations');
     setTimeout(() => window.highlightGoogleCard?.(), 120);
 }
 
 async function pollJob(jobId: string, fmt: Fmt, tries = 0): Promise<void> {
-    if (!scrim) return;
+    if (!sec()) return;
     if (tries > 40) {
         setRes(escapeHtml(t('pur-export-failed')));
         setBusy(false);
@@ -185,35 +180,65 @@ async function doArchive(fmt: Fmt): Promise<void> {
     }
 }
 
-function openPurchaseExport(): void {
-    injectStyle('pur-export-css', CSS);
-    close();
-    scrim = document.createElement('div');
-    scrim.className = 'pux-scrim';
-    scrim.innerHTML = `<div class="pux" role="dialog" aria-modal="true">
-        <div class="mh"><div class="t">${escapeHtml(t('pur-export-title'))}</div><div class="x" data-close>×</div></div>
-        <div class="mb">
+function colsHtml(): string {
+    const normal = t('pur-export-sheet-cols')
+        .split(',')
+        .map((c) => `<span>${escapeHtml(c.trim())}</span>`)
+        .join('');
+    const fresh = t('pur-export-sheet-cols-new')
+        .split(',')
+        .map((c) => `<span class="new">+ ${escapeHtml(c.trim())}</span>`)
+        .join('');
+    return normal + fresh;
+}
+
+function shell(): string {
+    return `<div class="pur pex"><div class="wrap">
+        <div class="ph"><span class="back" id="pex-back">‹</span><div class="t">${escapeHtml(t('pur-export-title'))}</div></div>
+        <div class="panel">
+            <h4>${escapeHtml(t('pur-export-p1'))}</h4>
             <div class="acts">
-                <button class="btn pri" data-fmt="excel">${IC_DOWNLOAD}${escapeHtml(t('pur-export-excel'))}</button>
+                <button class="btn primary" data-fmt="excel">${IC_DOWNLOAD}${escapeHtml(t('pur-export-excel'))}</button>
                 <button class="btn" data-fmt="drive">${IC_CLOUD}${escapeHtml(t('pur-export-drive'))}</button>
                 <button class="btn" data-fmt="sheet">${IC_GRID}${escapeHtml(t('pur-export-sheet'))}</button>
             </div>
-            <div class="note">${IC_LINK}<span>${escapeHtml(t('pur-export-note'))}</span></div>
+            <div class="infonote">${IC_LINK}<span>${escapeHtml(t('pur-export-note'))}</span></div>
             <div class="res"></div>
         </div>
-    </div>`;
-    document.body.appendChild(scrim);
-    scrim.onclick = (e) => {
-        if (e.target === scrim) close();
-    };
-    scrim.querySelector('[data-close]')?.addEventListener('click', close);
-    scrim.querySelectorAll<HTMLElement>('.btn[data-fmt]').forEach((b) => {
-        b.onclick = () => {
-            const fmt = b.dataset.fmt as Fmt;
-            if (fmt === 'excel') doExcel();
-            else doArchive(fmt);
-        };
-    });
+        <div class="panel">
+            <h4>${escapeHtml(t('pur-export-p2'))}</h4>
+            <div class="tree">${escapeHtml(t('pur-export-tree'))}</div>
+        </div>
+        <div class="panel">
+            <h4>${escapeHtml(t('pur-export-p3'))}</h4>
+            <div class="cols">${colsHtml()}</div>
+            <div class="infonote">${IC_BOOK}<span>${escapeHtml(t('pur-export-sheet-note'))}</span></div>
+        </div>
+    </div></div>`;
 }
 
-window.openPurchaseExport = openPurchaseExport;
+function bind(): void {
+    const back = document.getElementById('pex-back');
+    if (back) back.onclick = () => window.routeTo?.('purchase');
+    sec()
+        ?.querySelectorAll<HTMLElement>('.acts .btn[data-fmt]')
+        .forEach((b) => {
+            b.onclick = () => {
+                const fmt = b.dataset.fmt as Fmt;
+                if (fmt === 'excel') doExcel();
+                else doArchive(fmt);
+            };
+        });
+}
+
+window.openPurchaseExport = function () {
+    window.routeTo?.('purchase-export');
+};
+
+window.loadPurchaseExport = function () {
+    injectPurBase();
+    injectStyle('pur-export-css', PAGE_CSS);
+    const s = sec();
+    if (s) s.innerHTML = shell();
+    bind();
+};

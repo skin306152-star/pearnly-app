@@ -40,7 +40,9 @@ const PAGE_CSS = `
 .pur.ibx .phd .cnt .l{font-size:11.5px;color:var(--ink3,var(--ink3));margin-top:3px;}
 .pur.ibx .item{display:flex;gap:14px;padding:16px 20px;border-bottom:1px solid var(--line);}
 .pur.ibx .item:last-child{border-bottom:0;}
-.pur.ibx .thumb{width:56px;height:56px;flex:0 0 56px;border-radius:10px;background:var(--line2);border:1px solid var(--line,var(--line));object-fit:cover;display:flex;align-items:center;justify-content:center;color:var(--ink3,var(--ink3));}
+.pur.ibx .thumb{width:56px;height:56px;flex:0 0 56px;border-radius:10px;background:var(--line2);border:1px solid var(--line);overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--ink3);}
+.pur.ibx .thumb img{width:100%;height:100%;object-fit:cover;}
+.pur.ibx .thumb:empty::after{content:"≈";color:var(--ink3);}
 .pur.ibx .body{flex:1;min-width:0;}
 .pur.ibx .meta{font-size:13.5px;}
 .pur.ibx .meta .nm{font-weight:600;}
@@ -78,9 +80,10 @@ function itemHtml(it: InboxItem): string {
     const amt = amountOf(r);
     const date = r.date ? fmtMonthDay(r.date) : '';
     const srcKey = it.source === 'line' ? 'pur-src-line' : 'pur-src-photo';
-    const thumb = it.image_url
-        ? `<img class="thumb" src="${escapeHtml(it.image_url)}" alt="">`
-        : `<div class="thumb">≈</div>`;
+    // 票图缩略:破图(图缺失/404)→ onerror 移除 img,空 .thumb 经 :empty::after 回退「≈」(不显破图)。
+    const thumb = `<span class="thumb">${
+        it.image_url ? `<img src="${escapeHtml(it.image_url)}" alt="" onerror="this.remove()">` : ''
+    }</span>`;
     const nameHtml = name
         ? `<span class="nm">${escapeHtml(name)}</span>`
         : `<span class="nm miss">${escapeHtml(t('pur-inbox-unrecognized'))}</span>`;

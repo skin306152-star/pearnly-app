@@ -1,6 +1,7 @@
 // 商户采购 · 采集屏(记一笔采购)· 列表主按钮 routeTo 进来 · 照搬草稿 s-capture。
 // 桌面:拖拽区 + 上传文件 / 手工录入;手机:拍照(原生相机)/ 相册 / 文件 + 手工录入。
-// 文件 → 统一智能入口 /api/purchase/intake 分流(同原列表 onCapture):draft→复核屏,否则落待归类。
+// 文件 → 统一智能入口 /api/purchase/intake 分流:draft→复核屏,否则落待归类。
+// 识别阶段(可能 9~61s)有持久进度态:票据预览 + 转圈 + 文案 + 返回 · 失败可重试(不再 toast 一闪而过)。
 /* global t, escapeHtml, showToast */
 import { papi, activeWsId, purchaseErrMsg, injectPurBase, injectStyle } from './purchase-common.js';
 
@@ -25,6 +26,17 @@ const PAGE_CSS = `
 .pur.cap .srcrow button .si{width:26px;height:26px;}
 .pur.cap .only-desk{display:block;} .pur.cap .only-mob{display:none;}
 @media(max-width:600px){ .pur.cap .only-desk{display:none;} .pur.cap .only-mob{display:block;} }
+/* 识别进度态 / 失败态 */
+.pur.cap .recog{display:flex;flex-direction:column;align-items:center;text-align:center;padding:30px 20px;}
+.pur.cap .preview{width:132px;height:172px;border-radius:12px;border:1px solid var(--line);background:var(--line2);overflow:hidden;display:flex;align-items:center;justify-content:center;margin-bottom:20px;color:var(--ink3);}
+.pur.cap .preview img{width:100%;height:100%;object-fit:cover;}
+.pur.cap .spin{width:30px;height:30px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:pcapspin .8s linear infinite;margin-bottom:14px;}
+@keyframes pcapspin{to{transform:rotate(360deg);}}
+.pur.cap .rtitle{font-size:15px;font-weight:700;margin-bottom:6px;}
+.pur.cap .rhint{font-size:12.5px;color:var(--ink2);max-width:320px;line-height:1.6;}
+.pur.cap .recog.err .spin{display:none;}
+.pur.cap .recog.err .rtitle{color:var(--red);}
+.pur.cap .recog .acts{display:flex;gap:10px;margin-top:18px;}
 `;
 
 const IC_UP =
@@ -33,6 +45,8 @@ const IC_FILE =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/></svg>';
 const IC_DOC =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9 13h6M9 17h4"/></svg>';
+const IC_DOC_LG =
+    '<svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9 13h6M9 17h4"/></svg>';
 const IC_CAM =
     '<svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.2"/></svg>';
 const IC_IMG =
@@ -46,13 +60,57 @@ function sec(): HTMLElement | null {
     return document.getElementById('page-purchase-capture');
 }
 
-// 文件 → 统一智能入口分流(F12):draft→复核屏录入;否则按 route 提示 / 落待归类。
+function headHtml(): string {
+    return `<div class="ph"><span class="back" id="cap-back" title="${escapeHtml(t('pur-back'))}" aria-label="${escapeHtml(t('pur-back'))}">‹</span><div class="t">${escapeHtml(t('pur-record-purchase'))}</div></div>`;
+}
+
+function bindBack(): void {
+    const back = document.getElementById('cap-back');
+    if (back) back.onclick = () => window.routeTo?.('purchase');
+}
+
+// 识别中:持久进度态(票据预览 + 转圈 + 文案)· 破图回退图标。
+function renderRecognizing(f: File): void {
+    const s = sec();
+    if (!s) return;
+    const isImg = f.type.startsWith('image/');
+    const preview = isImg ? `<img src="${URL.createObjectURL(f)}" alt="">` : IC_DOC_LG;
+    s.innerHTML = `<div class="pur cap"><div class="wrap">${headHtml()}
+        <div class="panel"><div class="recog">
+            <div class="preview">${preview}</div>
+            <div class="spin"></div>
+            <div class="rtitle">${escapeHtml(t('pur-cap-recognizing'))}</div>
+            <div class="rhint">${escapeHtml(t('pur-cap-recog-hint'))}</div>
+        </div></div>
+    </div></div>`;
+    bindBack();
+}
+
+function renderError(f: File, msg: string): void {
+    const s = sec();
+    if (!s) return;
+    s.innerHTML = `<div class="pur cap"><div class="wrap">${headHtml()}
+        <div class="panel"><div class="recog err">
+            <div class="preview">${IC_DOC_LG}</div>
+            <div class="rtitle">${escapeHtml(t('pur-cap-recog-fail'))}</div>
+            <div class="rhint">${escapeHtml(msg)}</div>
+            <div class="acts"><button class="btn" id="cap-reselect">${escapeHtml(t('pur-cap-reselect'))}</button><button class="btn primary" id="cap-retry">${escapeHtml(t('pur-cap-retry'))}</button></div>
+        </div></div>
+    </div></div>`;
+    bindBack();
+    const re = document.getElementById('cap-retry');
+    if (re) re.onclick = () => intakeFile(f);
+    const rs = document.getElementById('cap-reselect');
+    if (rs) rs.onclick = () => renderShell();
+}
+
+// 文件 → 统一智能入口分流(F12):draft→复核屏录入;sales/recon→提示后回采集屏;否则落待归类。
 async function intakeFile(f: File): Promise<void> {
+    renderRecognizing(f);
     const ws = activeWsId();
     const fd = new FormData();
     fd.append('image', f);
     if (ws != null) fd.append('workspace_client_id', String(ws));
-    showToast(t('pur-intake-reading'), 'info');
     try {
         const res = (await papi('POST', '/api/purchase/intake', fd)) as {
             route?: string;
@@ -69,14 +127,18 @@ async function intakeFile(f: File): Promise<void> {
             return;
         }
         const route = (res && res.route) || 'inbox';
-        if (route === 'sales') showToast(t('pur-intake-sales'), 'error');
-        else if (route === 'recon') showToast(t('pur-intake-recon'), 'error');
-        else {
+        if (route === 'sales') {
+            showToast(t('pur-intake-sales'), 'error');
+            renderShell();
+        } else if (route === 'recon') {
+            showToast(t('pur-intake-recon'), 'error');
+            renderShell();
+        } else {
             showToast(t('pur-intake-inbox'), 'success');
             window.routeTo?.('purchase-inbox');
         }
     } catch (e) {
-        showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
+        renderError(f, purchaseErrMsg(e, 'purchase.unexpected'));
     }
 }
 
@@ -93,8 +155,7 @@ function pickFile(accept: string, capture?: string): void {
 }
 
 function shell(wsName: string): string {
-    return `<div class="pur cap"><div class="wrap">
-        <div class="ph"><span class="back" id="cap-back" title="${escapeHtml(t('pur-back'))}" aria-label="${escapeHtml(t('pur-back'))}">‹</span><div class="t">${escapeHtml(t('pur-record-purchase'))}</div></div>
+    return `<div class="pur cap"><div class="wrap">${headHtml()}
         <div class="panel">
             <div class="note">${IC_INFO}<span>${escapeHtml(t('pur-cap-booking-to'))} <b>${escapeHtml(wsName)}</b> · ${escapeHtml(t('pur-cap-switch-hint'))}</span></div>
             <div class="drop" id="cap-drop">${IC_UP}
@@ -118,9 +179,11 @@ function shell(wsName: string): string {
     </div></div>`;
 }
 
-function bind(): void {
-    const back = document.getElementById('cap-back');
-    if (back) back.onclick = () => window.routeTo?.('purchase');
+function renderShell(): void {
+    const s = sec();
+    if (!s) return;
+    s.innerHTML = shell(wsName());
+    bindBack();
     const manual = () => window.openPurchaseForm?.(null, { doc_kind: 'expense' });
     ['cap-manual-d', 'cap-manual-m'].forEach((id) => {
         const el = document.getElementById(id);
@@ -152,7 +215,6 @@ function bind(): void {
 }
 
 function wsName(): string {
-    // 当前套账主体名(同复核屏口径 · 取 _userInfo.company_name)。
     return (
         (window._userInfo && (window._userInfo as { company_name?: string }).company_name) ||
         t('pur-cap-current-ws')
@@ -162,7 +224,5 @@ function wsName(): string {
 window.loadPurchaseCapture = function () {
     injectPurBase();
     injectStyle('pur-capture-css', PAGE_CSS);
-    const s = sec();
-    if (s) s.innerHTML = shell(wsName());
-    bind();
+    renderShell();
 };

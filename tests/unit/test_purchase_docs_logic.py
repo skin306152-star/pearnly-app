@@ -129,5 +129,60 @@ class LineValidationTests(unittest.TestCase):
         docs_svc._validate_lines(ok)  # 不抛 = 通过
 
 
+class PostAutoPayTests(unittest.TestCase):
+    """PO-5 建单即付:post 时 payment_status='paid' → 自动补付款(复用 pay_doc)。"""
+
+    def _post(self, doc):
+        from unittest import mock
+
+        captured = {}
+
+        class Cur:
+            def execute(self, *a, **k):
+                return None
+
+            def fetchone(self):
+                return {
+                    "status": "draft",
+                    "doc_kind": "expense",
+                    "net_payable": 100,
+                    "paid_amount": 0,
+                }
+
+        def fake_pay(cur, **k):
+            captured.update(k)
+            return {**doc, "paid_amount": 100}
+
+        with (
+            mock.patch.object(posting_svc.docs_svc, "get_doc", return_value=doc),
+            mock.patch.object(posting_svc.acct_hooks, "enqueue_posting", return_value=None),
+            mock.patch.object(posting_svc, "pay_doc", side_effect=fake_pay),
+        ):
+            res = posting_svc.post_doc(
+                Cur(),
+                tenant_id="t",
+                workspace_client_id=1,
+                doc_id="D1",
+                auto_stock_in=False,
+                created_by="u",
+            )
+        return res, captured
+
+    def test_paid_doc_auto_pays(self):
+        from decimal import Decimal
+
+        res, captured = self._post(
+            {"id": "D1", "payment_status": "paid", "net_payable": 100, "paid_amount": 0}
+        )
+        self.assertEqual(captured.get("amount"), Decimal("100"))
+        self.assertEqual(res["paid_amount"], 100)
+
+    def test_unpaid_doc_no_auto_pay(self):
+        res, captured = self._post(
+            {"id": "D1", "payment_status": "unpaid", "net_payable": 100, "paid_amount": 0}
+        )
+        self.assertEqual(captured, {})
+
+
 if __name__ == "__main__":
     unittest.main()

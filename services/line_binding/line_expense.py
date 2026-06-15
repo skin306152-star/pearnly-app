@@ -265,6 +265,8 @@ def _to_purchase_data(d: dict) -> dict:
         "category_id": d.get("category_id"),
         "subcategory_id": d.get("subcategory_id"),
     }
+    from services.purchase import intake as _intake
+
     return {
         "doc_kind": "expense",
         "source": "line",
@@ -276,6 +278,7 @@ def _to_purchase_data(d: dict) -> dict:
         },
         "doc_no": (d.get("invoice_number") or "").strip() or None,
         "currency": d.get("currency") or "THB",
+        "payment_status": _intake.default_payment_status(d.get("document_type"), "expense"),
         "lines": [line],
     }
 

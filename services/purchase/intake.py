@@ -57,6 +57,19 @@ def judge_direction(fields: dict, *, my_tax_id) -> tuple[str, str]:
     return "unknown", "inbox"
 
 
+def default_payment_status(doc_type: str, doc_kind: str) -> str:
+    """智能默认付款态(PO-5):现金收据 → 已付;税务发票(多为赊账)→ 未付。用户可一键改。
+
+    无明确单据类型:费用单(快记/无 VAT 多为现金小额)默认已付,其余(进货)未付。
+    """
+    dt = (doc_type or "").strip().lower()
+    if dt == "receipt":
+        return "paid"
+    if dt in ("tax_invoice", "simplified_tax_invoice", "credit_note"):
+        return "unpaid"
+    return "paid" if doc_kind == "expense" else "unpaid"
+
+
 def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
     """OCR 抽取 → 进项录入草稿(屏10 预填)。行取自 items,无 items 则按总额单行兜底。"""
     has_vat = _to_decimal(fields.get("vat")) > 0
@@ -99,6 +112,7 @@ def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
         "doc_date": (fields.get("date") or "").strip() or None,
         "has_vat": has_vat,
         "currency": "THB",
+        "payment_status": default_payment_status(fields.get("document_type"), kind),
         "lines": lines,
     }
 

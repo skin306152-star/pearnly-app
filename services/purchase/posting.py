@@ -64,6 +64,17 @@ def post_doc(cur, *, tenant_id, workspace_client_id, doc_id, auto_stock_in, crea
         source_id=doc_id,
         created_by=created_by,
     )
+    # 建单即付(智能默认收据/用户手动设已付):购票过账后补记全额付款,
+    # 账本应付↔现金对平(pay_doc 同步记付款分录·做账关则 no-op)。
+    payable = Decimal(str(doc.get("net_payable") or 0))
+    if doc.get("payment_status") == "paid" and payable > 0:
+        doc = pay_doc(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            doc_id=doc_id,
+            amount=payable,
+        )
     return {**doc, "stock_applied": stock_applied}
 
 

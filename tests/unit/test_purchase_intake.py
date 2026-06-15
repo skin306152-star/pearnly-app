@@ -308,5 +308,31 @@ class ResolveInboxTests(unittest.TestCase):
 # 覆盖见 test_expense_line_quick_entry.py + test_line_expense_to_purchase.py。
 
 
+class PaymentDefaultTests(unittest.TestCase):
+    """PO-5 智能默认付款态:现金收据 → 已付;税务发票/赊账 → 未付。"""
+
+    def test_receipt_defaults_paid(self):
+        self.assertEqual(ik.default_payment_status("receipt", "expense"), "paid")
+
+    def test_tax_invoice_defaults_unpaid(self):
+        self.assertEqual(ik.default_payment_status("tax_invoice", "purchase_invoice"), "unpaid")
+        self.assertEqual(ik.default_payment_status("simplified_tax_invoice", "expense"), "unpaid")
+
+    def test_expense_no_type_defaults_paid(self):
+        self.assertEqual(ik.default_payment_status("", "expense"), "paid")
+
+    def test_purchase_no_type_defaults_unpaid(self):
+        self.assertEqual(ik.default_payment_status("", "purchase_invoice"), "unpaid")
+
+    def test_build_draft_carries_payment_status(self):
+        f = {
+            "document_type": "receipt",
+            "vat": "0",
+            "items": [{"name": "x", "qty": "1", "price": "50"}],
+        }
+        d = ik.build_draft_from_invoice(f, kind="expense")
+        self.assertEqual(d["payment_status"], "paid")
+
+
 if __name__ == "__main__":
     unittest.main()

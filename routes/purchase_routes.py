@@ -37,6 +37,7 @@ class DocIn(BaseModel):
     requester: Optional[str] = None
     requester_user_id: Optional[str] = None
     approval_status: Optional[str] = None
+    payment_status: Optional[str] = None
     due_date: Optional[str] = None
     source: Optional[str] = None
     lines: list[dict[str, Any]] = Field(default_factory=list)

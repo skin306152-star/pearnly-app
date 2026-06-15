@@ -116,8 +116,4 @@ export const PURCHASE_DETAIL_CSS = `
   .pur.d .meta .f:last-child{border-bottom:0;}
   .pur.d .bottom{grid-template-columns:1fr;}
 }
-@media print{
-  .pur.d .acts,.pur.d .back,.pur.d .view-btn{display:none!important;}
-  .pur.d .card,.pur.d .summary,.pur.d .ph{box-shadow:none;}
-}
 `;

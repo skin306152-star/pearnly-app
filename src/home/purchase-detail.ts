@@ -202,11 +202,10 @@ function voucherCard(d: DocDetail): string {
 }
 
 function actions(d: DocDetail): string {
-    const print = `<button class="btn" id="pur-print">${escapeHtml(t('pur-print'))}</button>`;
-    if (d.status === 'void') return print;
+    if (d.status === 'void') return '';
     if (d.status === 'draft')
-        return `<button class="btn" id="pur-edit-btn">${escapeHtml(t('pur-edit'))}</button>${print}`;
-    return `${print}<button class="btn danger" id="pur-void-btn">${escapeHtml(t('pur-void'))}</button><button class="btn primary" id="pur-pay-btn2"${d.payment_status === 'paid' ? ' disabled' : ''}>${escapeHtml(t('pur-pay'))}</button>`;
+        return `<button class="btn" id="pur-edit-btn">${escapeHtml(t('pur-edit'))}</button>`;
+    return `<button class="btn danger" id="pur-void-btn">${escapeHtml(t('pur-void'))}</button><button class="btn primary" id="pur-pay-btn2"${d.payment_status === 'paid' ? ' disabled' : ''}>${escapeHtml(t('pur-pay'))}</button>`;
 }
 
 function shell(d: DocDetail): string {
@@ -265,8 +264,6 @@ function openLightbox(): void {
 
 function bind(): void {
     document.getElementById('pur-back')!.onclick = () => window.routeTo?.('purchase');
-    const print = document.getElementById('pur-print');
-    if (print) print.onclick = () => window.print();
     const zoom = document.getElementById('pur-zoom');
     if (zoom) zoom.onclick = openLightbox;
     const edit = document.getElementById('pur-edit-btn');

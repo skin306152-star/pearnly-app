@@ -38,6 +38,7 @@ def ingest_line_image(
     settings = settings_svc.get_settings(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
     )
+    ws_name = ik.workspace_name(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
     res = ik.resolve_image_intake(
         cur,
         tenant_id=tenant_id,
@@ -85,6 +86,7 @@ def ingest_line_image(
             "amount": disp_amount,
             "card_fields": card_fields,
             "field_confidence": fc,
+            "workspace_name": ws_name,
         }
 
     amount = draft.get("grand_total") or "0"
@@ -143,4 +145,5 @@ def ingest_line_image(
         "amount": amount,
         "card_fields": card_fields,
         "field_confidence": fc,
+        "workspace_name": ws_name,
     }

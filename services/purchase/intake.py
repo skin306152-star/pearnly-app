@@ -159,6 +159,16 @@ def _my_tax_id(cur, *, tenant_id, workspace_client_id) -> str:
     return (row["tax_id"] or "") if row else ""
 
 
+def workspace_name(cur, *, tenant_id, workspace_client_id) -> str:
+    """套账(主体)名 —— 数据卡「套账」行显示用。取不到 → 空串(卡不显该行)。"""
+    cur.execute(
+        "SELECT name FROM workspace_clients WHERE id = %s AND tenant_id = %s",
+        (workspace_client_id, tenant_id),
+    )
+    row = cur.fetchone()
+    return (row["name"] or "") if row else ""
+
+
 def resolve_image_intake(
     cur,
     *,

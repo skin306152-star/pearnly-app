@@ -26,6 +26,7 @@ def _run(resolve_ret, *, band="high", auto_book=True):
     created = {"doc": {"id": "D1"}}
     with (
         mock.patch.object(ik, "resolve_image_intake", return_value=resolve_ret),
+        mock.patch.object(ik, "workspace_name", return_value="WS"),
         mock.patch(
             "services.purchase.settings.get_settings",
             return_value={"auto_stock_in": False, "auto_book": auto_book},

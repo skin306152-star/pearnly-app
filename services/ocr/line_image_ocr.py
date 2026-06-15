@@ -380,6 +380,7 @@ def _push_result_card(line_user_id: str, lang: str, ingest: dict, quote_token: s
             lang=lang,
             web_url="https://pearnly.com/home",
             can_post=bool(ingest.get("can_post", True)),
+            workspace_name=ingest.get("workspace_name") or "",
         )
         line_client.push_messages(line_user_id, [ack, card])
     except Exception as e:

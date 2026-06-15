@@ -81,6 +81,7 @@ def handle_expense_text(
             tree = cat_svc.get_tree(cur, tenant_id=str(tid), workspace_client_id=ws)
             _fill_category(cur, draft, text, tree, str(tid), ws)
             cfg = settings_svc.get_settings(cur, tenant_id=str(tid), workspace_client_id=ws)
+            ws_name = intake_svc.workspace_name(cur, tenant_id=str(tid), workspace_client_id=ws)
             is_dup = _dup_warn(bound_user, draft, ws)
             verdict = confidence.grade(
                 amount=draft.amount,
@@ -117,7 +118,7 @@ def handle_expense_text(
                 state = "dup" if verdict.dup else "confirm"
         if used_l2:
             _charge_line_l2(bound_user, str(tid))
-        _reply_card(reply_token, state, draft, doc_id, lang, quote_token)
+        _reply_card(reply_token, state, draft, doc_id, lang, quote_token, ws_name)
         return True
     except Exception:
         logger.exception("[line] expense record failed; fall back to hint")
@@ -138,7 +139,7 @@ def _card_fields_from_draft(draft) -> dict:
     }
 
 
-def _reply_card(reply_token, state, draft, doc_id, lang, quote_token) -> None:
+def _reply_card(reply_token, state, draft, doc_id, lang, quote_token, workspace_name="") -> None:
     """回执 = 【引用原句的一行回执】+【Flex 数据卡】(Flex 不能被引用,故拆两条)。"""
     from services.line_binding import line_card
 
@@ -155,6 +156,7 @@ def _reply_card(reply_token, state, draft, doc_id, lang, quote_token) -> None:
         lang=lang,
         web_url=_WEB_PURCHASE_URL,
         source="text",
+        workspace_name=workspace_name,
     )
     line_client.reply_messages(reply_token, [ack, card])
 

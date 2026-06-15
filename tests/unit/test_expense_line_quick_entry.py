@@ -27,6 +27,11 @@ class ParseExpenseTests(unittest.TestCase):
         self.assertEqual(lqe.parse_expense("ค่าเช่า 8000").expense_type, "service")
         self.assertEqual(lqe.parse_expense("โค้ก 30").expense_type, "goods")
 
+    def test_utilities_are_service_not_goods(self):
+        # 修「水费=商品」误判:公用事业(水/电/网/话费)= 服务。
+        for t in ("水费 50", "电费 200", "ค่าน้ำ 50", "ค่าไฟ 300", "网费 600", "话费 100"):
+            self.assertEqual(lqe.parse_expense(t).expense_type, "service", t)
+
     def test_baht_symbol(self):
         self.assertEqual(lqe.parse_expense("฿1,250.50").amount, Decimal("1250.50"))
 

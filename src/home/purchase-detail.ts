@@ -12,6 +12,7 @@ import {
     srcLabelKey,
     kindLabelKey,
     normDetail,
+    fetchAuthedBlobUrl,
     injectPurBase,
     injectStyle,
     type DocDetail,
@@ -20,11 +21,15 @@ import {
 
 let pendingId: string | null = null;
 let cur: DocDetail | null = null;
+let billBlobUrl = '';
 
 const PAGE_CSS = `
 .pur.d .wrap{width:100%;}
-.pur .back{display:inline-flex;align-items:center;gap:6px;color:var(--ink2);font-size:12.5px;margin-bottom:12px;cursor:pointer;}
+/* 全宽 wrap(视觉闸要 maxWidth:none)· 内层 ph/grid 居中约束到可读宽度,详情字段才不在宽屏上散开。*/
+.pur.d .ph,.pur.d .grid{max-width:1120px;margin-left:auto;margin-right:auto;}
 .pur .ph{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px;}
+.pur.d .ph .phl{display:flex;align-items:center;gap:11px;}
+.pur.d .ph .back{font-size:24px;line-height:1;color:var(--ink2);flex:none;cursor:pointer;}
 .pur .ph .t{font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px;}
 .pur .ph .sub{color:var(--ink2);font-size:13px;margin-top:4px;}
 .pur .acts{display:flex;gap:9px;flex-shrink:0;}
@@ -51,8 +56,10 @@ const PAGE_CSS = `
 .pur .sum .tax{color:var(--green);}
 .pur .pay{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;font-size:13px;}
 .pur .pay .due{color:var(--amber);font-weight:700;}
-.pur .img{aspect-ratio:3/4;background:var(--line2);border:1px dashed var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--ink3);margin-bottom:10px;overflow:hidden;}
+.pur .img{aspect-ratio:3/4;background:var(--line2);border:1px dashed var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--ink3);margin-bottom:10px;overflow:hidden;cursor:zoom-in;}
 .pur .img img{width:100%;height:100%;object-fit:cover;}
+.pur-lightbox{position:fixed;inset:0;background:rgba(17,24,39,.86);z-index:1100;display:flex;align-items:center;justify-content:center;padding:32px;cursor:zoom-out;}
+.pur-lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;}
 .pur .stocknote{margin-top:10px;font-size:12px;color:var(--ink2);background:var(--green-weak);border:1px solid var(--green-weak);border-radius:9px;padding:9px 11px;}
 .pur.voided{opacity:.62;}
 .pur .vch{display:flex;flex-direction:column;gap:8px;}
@@ -169,18 +176,18 @@ function shell(d: DocDetail): string {
     const voidNote =
         d.status === 'void' ? `<div class="stocknote">${escapeHtml(t('pur-void-note'))}</div>` : '';
     return `<div class="pur d ${d.status === 'void' ? 'voided' : ''}"><div class="wrap">
-        <div class="back" id="pur-back">‹ ${escapeHtml(t('pur-back'))}</div>
         <div class="ph">
+            <div class="phl"><span class="back" id="pur-back" title="${escapeHtml(t('pur-back'))}" aria-label="${escapeHtml(t('pur-back'))}">‹</span>
             <div><div class="t">${escapeHtml(t('pur-detail-title'))} ${badge}</div>
-            <div class="sub">${escapeHtml((d.supplier && d.supplier.name) || '—')}${d.doc_no ? ' · ' + escapeHtml(d.doc_no) : ''}${d.doc_date ? ' · ' + escapeHtml(d.doc_date) : ''}</div></div>
+            <div class="sub">${escapeHtml((d.supplier && d.supplier.name) || '—')}${d.doc_no ? ' · ' + escapeHtml(d.doc_no) : ''}${d.doc_date ? ' · ' + escapeHtml(d.doc_date) : ''}</div></div></div>
             <div class="acts">${acts}</div>
         </div>
         <div class="grid">
             <div class="col">${metaCard(d)}${itemsCard(d)}</div>
             <div class="col">
                 <div class="card"><div class="hd">${escapeHtml(t('pur-bill'))}</div><div class="bd">
-                    <div class="img">${d.bill_image_url ? `<img src="${escapeHtml(d.bill_image_url)}" alt="">` : ICON_DOC}</div>
-                    <button class="btn" style="width:100%;" id="pur-zoom">${escapeHtml(t('pur-zoom'))}</button>
+                    <div class="img" id="pur-bill-img">${ICON_DOC}</div>
+                    <button class="btn" style="width:100%;" id="pur-zoom"${d.bill_image_url ? '' : ' disabled'}>${escapeHtml(t('pur-zoom'))}</button>
                 </div></div>
                 ${amountCard(d)}${payCard(d)}${voucherCard(d)}${stock}${voidNote}
             </div>
@@ -188,8 +195,34 @@ function shell(d: DocDetail): string {
     </div></div>`;
 }
 
+// 票图是鉴权端点(/api/purchase/docs/{id}/bill-image · 需 Bearer),不能直接塞 <img src> 否则 401 破图。
+// 先渲占位 svg(视觉闸要 .pur .img 内有 svg),再带令牌取 blob 换上;放大看复用同一 blob。
+async function loadBillImage(): Promise<void> {
+    billBlobUrl = '';
+    const url = cur && cur.bill_image_url;
+    const box = document.getElementById('pur-bill-img');
+    if (!url || !box) return;
+    try {
+        billBlobUrl = await fetchAuthedBlobUrl(url);
+        box.innerHTML = `<img src="${billBlobUrl}" alt="">`;
+    } catch (_) {
+        /* 取图失败 → 保留占位 svg,放大看按钮已 disabled */
+    }
+}
+
+function openLightbox(): void {
+    if (!billBlobUrl) return;
+    const ov = document.createElement('div');
+    ov.className = 'pur-lightbox';
+    ov.innerHTML = `<img src="${billBlobUrl}" alt="">`;
+    ov.onclick = () => ov.remove();
+    document.body.appendChild(ov);
+}
+
 function bind(): void {
     document.getElementById('pur-back')!.onclick = () => window.routeTo?.('purchase');
+    const zoom = document.getElementById('pur-zoom');
+    if (zoom) zoom.onclick = openLightbox;
     const edit = document.getElementById('pur-edit-btn');
     if (edit) edit.onclick = () => window.openPurchaseForm?.(cur!.id);
     const pay1 = document.getElementById('pur-pay-btn');
@@ -263,6 +296,7 @@ async function load(id: string): Promise<void> {
         const sec = document.getElementById('page-purchase-detail');
         if (sec) sec.innerHTML = shell(cur);
         bind();
+        loadBillImage();
     } catch (e) {
         showState(
             `${escapeHtml(purchaseErrMsg(e, 'purchase.unexpected'))}<br><button class="btn" id="pur-retry">${escapeHtml(t('pur-retry'))}</button>`

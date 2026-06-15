@@ -20,6 +20,7 @@ def ingest_line_image(
     created_by,
     field_confidence=None,
     image_ref=None,
+    api_key=None,
 ) -> dict:
     """LINE 图片 OCR → 置信驱动入账。
 
@@ -124,10 +125,17 @@ def ingest_line_image(
         card_fields["detail"] = " · ".join(descs[:3]) + (
             f" 等{len(descs)}项" if len(descs) > 3 else ""
         )
-    # 轻量自动归类(供应商名 + 首行)→ 填卡 + 提升 has_category(图路不强制)。
+    # 自动归类:先关键词命中(零成本),落空再 LLM 在真实科目里兜底(PO-9 · 仅图片路,省成本)。
     cats = cat_svc.get_tree(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
+    vendor_name = draft["supplier"].get("name") or ""
     first_desc = draft["lines"][0]["description"] if draft.get("lines") else ""
-    cat_id, sub_id = ik._match_category(f"{draft['supplier'].get('name') or ''} {first_desc}", cats)
+    cat_id, sub_id = ik._match_category(f"{vendor_name} {first_desc}", cats)
+    if not cat_id and api_key:
+        from services.expense import category_ai
+
+        cat_id, sub_id = category_ai.suggest_category(
+            vendor_name, " / ".join(descs[:5]), cats, api_key=api_key
+        )
     if cat_id:
         draft["category_id"] = cat_id
         for p in cats:

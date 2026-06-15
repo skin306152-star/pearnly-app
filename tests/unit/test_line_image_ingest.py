@@ -95,6 +95,66 @@ class IngestTests(unittest.TestCase):
         self.assertEqual(out["state"], "inbox")
         stash.assert_called_once()  # sales 不丢 → 落待归类安全网
 
+    def test_keyword_miss_falls_back_to_llm_category(self):
+        # PO-9:关键词未命中 + 有 key → LLM 兜底归类填进卡(海鲜票 → 餐饮)。
+        res = {"route": "purchase", "draft": _draft(), "dedupe_hit": False, "field_confidence": {}}
+        tree = [{"id": "p1", "name": "餐饮 & 招待", "children": [{"id": "c1", "name": "餐费"}]}]
+        created = {"doc": {"id": "D1"}}
+        with (
+            mock.patch.object(ik, "resolve_image_intake", return_value=res),
+            mock.patch.object(ik, "workspace_name", return_value="WS"),
+            mock.patch(
+                "services.purchase.settings.get_settings",
+                return_value={"auto_stock_in": False, "auto_book": False},
+            ),
+            mock.patch("services.purchase.categories.get_tree", return_value=tree),
+            mock.patch.object(ik, "_match_category", return_value=(None, None)),
+            mock.patch("services.purchase.docs.create_doc", return_value=created),
+            mock.patch("services.line_binding.line_action_nonce.mint", return_value="TOK"),
+            mock.patch(
+                "services.expense.category_ai.suggest_category", return_value=("p1", "c1")
+            ) as suggest,
+        ):
+            out = li.ingest_line_image(
+                object(),
+                tenant_id="t",
+                workspace_client_id=1,
+                fields={"document_type": "", "seller_name": "ACME"},
+                confidence="high",
+                created_by="u",
+                api_key="k",
+            )
+        suggest.assert_called_once()
+        self.assertEqual(out["card_fields"]["category"], "餐饮 & 招待")
+        self.assertEqual(out["card_fields"]["subcategory"], "餐费")
+
+    def test_no_api_key_no_llm_call(self):
+        # 无 key → 不调 LLM 兜底(省成本),分类留空。
+        res = {"route": "purchase", "draft": _draft(), "dedupe_hit": False, "field_confidence": {}}
+        tree = [{"id": "p1", "name": "餐饮", "children": [{"id": "c1", "name": "餐费"}]}]
+        with (
+            mock.patch.object(ik, "resolve_image_intake", return_value=res),
+            mock.patch.object(ik, "workspace_name", return_value="WS"),
+            mock.patch(
+                "services.purchase.settings.get_settings",
+                return_value={"auto_stock_in": False, "auto_book": False},
+            ),
+            mock.patch("services.purchase.categories.get_tree", return_value=tree),
+            mock.patch.object(ik, "_match_category", return_value=(None, None)),
+            mock.patch("services.purchase.docs.create_doc", return_value={"doc": {"id": "D1"}}),
+            mock.patch("services.line_binding.line_action_nonce.mint", return_value="TOK"),
+            mock.patch("services.expense.category_ai.suggest_category") as suggest,
+        ):
+            li.ingest_line_image(
+                object(),
+                tenant_id="t",
+                workspace_client_id=1,
+                fields={"document_type": "", "seller_name": "ACME"},
+                confidence="high",
+                created_by="u",
+            )
+        suggest.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

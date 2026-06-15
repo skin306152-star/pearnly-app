@@ -191,6 +191,8 @@ async def _handle_line_image_ocr(
 
                         _suffix = os.path.splitext(filename or "")[1] or ".jpg"
                         _img_ref, _ = _pstore.save_bytes(str(user_fresh["id"]), file_bytes, _suffix)
+                        from services.expense import line_l2
+
                         ingest = ingest_line_image(
                             cur,
                             tenant_id=tid_str,
@@ -200,6 +202,7 @@ async def _handle_line_image_ocr(
                             field_confidence=getattr(_pages_struct[0], "field_confidence", None),
                             image_ref=_img_ref,
                             created_by=str(user_fresh["id"]),
+                            api_key=line_l2.resolve_api_key(user_fresh),
                         )
         except Exception as _route_err:
             logger.warning(f"[line_ocr] 采购入账分流跳过(回落识别记录): {_route_err}")

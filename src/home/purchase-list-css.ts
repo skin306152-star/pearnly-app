@@ -5,11 +5,14 @@ export const PURCHASE_LIST_CSS = `
 .pur.pl .ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;}
 .pur.pl .ph .t{font-size:21px;font-weight:680;letter-spacing:-.2px;}
 .pur.pl .ph .sub{color:var(--ink2);font-size:13px;margin-top:5px;}
-.pur.pl .band{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 22px;border-bottom:1px solid var(--line2);}
-.pur.pl .star .lbl{color:var(--ink2);font-size:12.5px;margin-bottom:5px;}
-.pur.pl .star .num{font-size:30px;font-weight:740;letter-spacing:-1px;line-height:1;}
-.pur.pl .star .ctx{margin-top:8px;color:var(--ink2);font-size:12.5px;}
-.pur.pl .star .ctx .g{color:var(--green);font-weight:600;}
+.pur.pl .band{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;padding:20px 22px;border-bottom:1px solid var(--line2);flex-wrap:wrap;}
+.pur.pl .star{display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap;}
+.pur.pl .star .big{font-size:30px;font-weight:740;letter-spacing:-1px;line-height:1;}
+.pur.pl .star .big small{display:block;font-size:12.5px;color:var(--ink3);font-weight:600;margin-top:5px;letter-spacing:0;}
+.pur.pl .star .ctx{display:flex;gap:16px;padding-bottom:3px;}
+.pur.pl .star .ctx>div{font-size:12px;color:var(--ink2);}
+.pur.pl .star .ctx b{display:block;color:var(--ink);font-size:15px;font-weight:700;margin-top:2px;}
+.pur.pl .star .ctx b.g{color:var(--green);}
 .pur.pl .acts{display:flex;gap:9px;}
 .pur.pl .btn{border-radius:11px;}
 .pur.pl .btn.primary{font-weight:650;}

@@ -78,11 +78,16 @@ function typeLabel(d: DocListItem): string {
 }
 
 function starHtml(s: DocSummary | null): string {
+    // 照草稿 .northstar:大数字在左 +「本月花费」在其下 · 进货/费用/可抵 inline(label 上、值下)。
     const spend = s ? s.purchase_total + s.expense_total : 0;
+    const ci = (label: string, val: string, g?: boolean): string =>
+        `<div><span>${escapeHtml(label)}</span><b${g ? ' class="g"' : ''}>${val}</b></div>`;
     const ctx = s
-        ? `${escapeHtml(t('pur-chip-purchase'))} ${fmtBaht(s.purchase_total)} · ${escapeHtml(t('pur-chip-expense'))} ${fmtBaht(s.expense_total)} · <span class="g">${escapeHtml(t('pur-kpi-vat'))} ${fmtBaht(s.vat_creditable)}</span>`
-        : '—';
-    return `<div class="lbl">${escapeHtml(t('pur-month-spend'))}</div><div class="num tnum">${fmtBaht(spend)}</div><div class="ctx">${ctx}</div>`;
+        ? ci(t('pur-chip-purchase'), fmtBaht(s.purchase_total)) +
+          ci(t('pur-chip-expense'), fmtBaht(s.expense_total)) +
+          ci(t('pur-kpi-vat'), fmtBaht(s.vat_creditable), true)
+        : '';
+    return `<div class="big tnum">${fmtBaht(spend)}<small>${escapeHtml(t('pur-month-spend'))}</small></div><div class="ctx">${ctx}</div>`;
 }
 function alertHtml(s: DocSummary | null): string {
     if (!s || s.unpaid_total <= 0) return '';

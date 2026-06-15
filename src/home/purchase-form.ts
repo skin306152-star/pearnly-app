@@ -192,7 +192,16 @@ function bindShell(): void {
         el.onclick = () => {
             const merge = el.dataset.merge === '1';
             if (merge === st!.mergeMode) return;
-            if (merge && st!.lines.length > 1) st!.lines = mergeLines(st!.lines);
+            if (merge) {
+                // 进合并:先存原始逐项明细,再折成单行 → 切回拆分能恢复(此前直接覆盖 → 回不去)。
+                if (st!.lines.length > 1) {
+                    st!.splitLines = st!.lines.map((l) => ({ ...l }));
+                    st!.lines = mergeLines(st!.lines);
+                }
+            } else if (st!.splitLines && st!.splitLines.length) {
+                st!.lines = st!.splitLines;
+                st!.splitLines = undefined;
+            }
             st!.mergeMode = merge;
             rerender();
         };

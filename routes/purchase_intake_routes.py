@@ -207,3 +207,34 @@ async def api_inbox_resolve(item_id: str, req: InboxResolveIn, request: Request)
             settings=cfg,
         )
     return ok(data)
+
+
+@router.get("/inbox/{item_id}/image")
+async def api_inbox_image(
+    item_id: str, request: Request, workspace_client_id: Optional[int] = None
+):
+    """待归类项票图(落盘原图流式返回)· 鉴权 + 套账边界。无图/缺失 → 404。"""
+    _user, tid = auth_member(request, "intake.classify")
+    with db.get_cursor_rls(tid, commit=False) as cur:
+        gate(cur, tid)
+        ws = resolve_ws(cur, request, tid, workspace_client_id)
+        cur.execute(
+            "SELECT image_url FROM intake_items "
+            "WHERE id = %s AND tenant_id = %s AND workspace_client_id = %s",
+            (item_id, tid, ws),
+        )
+        r = cur.fetchone()
+    ref = (r and r.get("image_url")) or ""
+    if not ref:
+        raise PosError("purchase.unexpected", 404, detail="no_image")
+    from services.ocr import pdf_storage
+
+    abs_path = pdf_storage.get_pdf_abs_path(ref)
+    if not abs_path or not abs_path.exists():
+        raise PosError("purchase.unexpected", 404, detail="image_missing")
+    import mimetypes
+
+    from fastapi.responses import FileResponse
+
+    media = mimetypes.guess_type(str(abs_path))[0] or "image/jpeg"
+    return FileResponse(path=str(abs_path), media_type=media)

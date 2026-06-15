@@ -326,7 +326,7 @@ def resolve_inbox(
 
         raise PosError("purchase.line_invalid", 422, detail="bad_action")
     cur.execute(
-        "SELECT raw FROM intake_items "
+        "SELECT raw, image_url FROM intake_items "
         "WHERE id = %s AND tenant_id = %s AND workspace_client_id = %s AND status = 'pending'",
         (item_id, tenant_id, workspace_client_id),
     )
@@ -341,6 +341,9 @@ def resolve_inbox(
 
         kind = "purchase_invoice" if action == "purchase" else "expense"
         draft = build_draft_from_invoice(row["raw"] or {}, kind=kind)
+        # 票图闭环:待归类落盘的票图挂进 doc(create_doc 据 bill_image_ref 建 bill 附件)→
+        # 复核屏/详情可回看原票(此前 resolve 只取 raw 不取 image_url → 票图空)。
+        draft["bill_image_ref"] = row.get("image_url") or ""
         created = docs_svc.create_doc(
             cur,
             tenant_id=tenant_id,

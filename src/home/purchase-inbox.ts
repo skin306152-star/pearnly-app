@@ -7,6 +7,7 @@ import {
     papi,
     activeWsId,
     purchaseErrMsg,
+    fetchAuthedBlobUrl,
     fmtBaht,
     fmtMonthDay,
     injectPurBase,
@@ -80,10 +81,9 @@ function itemHtml(it: InboxItem): string {
     const amt = amountOf(r);
     const date = r.date ? fmtMonthDay(r.date) : '';
     const srcKey = it.source === 'line' ? 'pur-src-line' : 'pur-src-photo';
-    // 票图缩略:破图(图缺失/404)→ onerror 移除 img,空 .thumb 经 :empty::after 回退「≈」(不显破图)。
-    const thumb = `<span class="thumb">${
-        it.image_url ? `<img src="${escapeHtml(it.image_url)}" alt="" onerror="this.remove()">` : ''
-    }</span>`;
+    // 票图缩略:经鉴权端点取 blob(裸路径当 src 必 404)· data-thumb 标记 → loadThumbs 异步填;
+    // 取不到(缺失/404)→ 空 .thumb 经 :empty::after 回退「≈」,不显破图。
+    const thumb = `<span class="thumb"${it.image_url ? ` data-thumb="${escapeHtml(it.id)}"` : ''}></span>`;
     const nameHtml = name
         ? `<span class="nm">${escapeHtml(name)}</span>`
         : `<span class="nm miss">${escapeHtml(t('pur-inbox-unrecognized'))}</span>`;
@@ -140,6 +140,7 @@ async function resolve(
         const listEl = document.getElementById('ibx-list');
         if (listEl) listEl.innerHTML = listHtml();
         bindItems();
+        loadThumbs();
         if ((action === 'purchase' || action === 'expense') && res.doc_id) {
             showToast(t('pur-inbox-created'), 'success');
             window.openPurchaseForm?.(res.doc_id);
@@ -155,6 +156,21 @@ async function resolve(
         btns.forEach((b) => (b.disabled = false));
         showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
     }
+}
+
+// 异步取缩略图(鉴权 blob)· 失败留空 → ≈ 回退。
+function loadThumbs(): void {
+    document.querySelectorAll<HTMLElement>('#ibx-list .thumb[data-thumb]').forEach((el) => {
+        const id = el.dataset.thumb;
+        if (!id) return;
+        fetchAuthedBlobUrl(`/api/purchase/inbox/${id}/image`)
+            .then((url) => {
+                el.innerHTML = `<img src="${url}" alt="">`;
+            })
+            .catch(() => {
+                /* 缺失/404 → 留空 → :empty::after 回退 ≈ */
+            });
+    });
 }
 
 function bindItems(): void {
@@ -191,6 +207,7 @@ async function load(): Promise<void> {
     }
     sec.innerHTML = shell();
     bindItems();
+    loadThumbs();
 }
 
 window.loadPurchaseInbox = function () {

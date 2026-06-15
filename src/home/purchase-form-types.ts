@@ -49,6 +49,7 @@ export interface FormState {
     fxRate: string;
     lines: DocLine[];
     mergeMode: boolean; // 明细 拆分多条(false·默认)/ 合并记一条(true · 不逐项·单行)
+    splitLines?: DocLine[]; // 进合并前逐项明细备份 · 切回拆分恢复(防丢明细)
     priceMode: 'exclusive' | 'inclusive';
     manualOn: boolean;
     override: { subtotal: number; discount: number; vat: number; grand: number };

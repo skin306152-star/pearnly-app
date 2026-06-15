@@ -21,32 +21,28 @@ _WEB_PURCHASE_URL = "https://pearnly.com/home"
 def handle_expense_text(
     bound_user, reply_token, line_user_id, text, lang, quote_token=None
 ) -> bool:
-    """文本 → 智能解析 → 置信驱动入账(STP+HITL · docs/smart-intake/15)。
+    """文本 → LINE 大脑(LLM tool-calling)→ 工具执行(docs/smart-intake/15)。
 
-    所有账号统一走。闲聊→智能问候;有金额→按置信分流(高置信直接入正式账+撤销钮 /
-    其余入草稿请确认);缺金额→反问;查账/问答/跑题→对应智能回复 + 数据卡/引用。
-    返回 True=已处理;False=非记账(回落功能提示)。未开 expense / 无套账 / 异常 → False。
+    L1 快路:清晰记账(有金额+非问句)零 LLM 直接记。其余 → 大脑一次 LLM 听意图+抽槽+组织回复,
+    确定性代码执行工具(记账/查账/查明细/撤销/编辑→网页/闲聊)。金额与过账永不信 LLM;问句/否定/
+    假设永不写账。无 key/LLM 失败 → 回落确定性 L1。返回 True=已处理;未开 expense/无套账/异常 → False。
     """
     try:
         tid = bound_user.get("tenant_id")
         if not tid:
             return False
-        # 0. 闲聊(零成本 L1)→ 智能问候/感谢,不进 L2、不进记账(治复读)。
+        from services.expense import line_quick_entry as lqe
         from services.expense import replies
 
+        # 0. 闲聊(零成本 L1)→ 智能问候/感谢(治复读)。
         small = replies.detect_smalltalk(text)
         if small:
             _reply_pool(reply_token, small, text, lang)
             return True
 
         from core.workspace_context import default_workspace_id
-        from services.purchase import categories as cat_svc
-        from services.purchase import docs as docs_svc
         from services.purchase import intake as intake_svc
-        from services.purchase import posting as posting_svc
-        from services.purchase import settings as settings_svc
 
-        # 门控先行(读):未开 expense 模块 → 退(不按业态分·统一智能通道)。
         with db.get_cursor_rls(str(tid)) as cur:
             if not intake_svc.line_expense_gate_open(cur, tenant_id=str(tid)):
                 return False
@@ -54,75 +50,152 @@ def handle_expense_text(
         if ws is None:
             return False
 
-        draft, used_l2, action = _resolve_draft(bound_user, line_user_id, text, str(tid), ws)
-        if action == "clarify":
-            line_client.reply_text(reply_token, line_client.t_line(lang, "exp_need_amount"))
-            return True
-        if action == "query":
-            _reply_query(reply_token, lang, str(tid), ws)
-            return True
-        if action == "question":
-            _reply_question(reply_token, lang, str(tid), text)
-            return True
-        if action == "support":  # 求助/人工 → 诚实告知能力边界 + 引导(不敷衍)
-            _reply_pool(reply_token, "support", text, lang)
-            return True
-        if action == "other":  # 跑题 → 礼貌带回 + Quick Reply(轮选不复读)
-            _reply_pool(reply_token, "scope", text, lang)
-            return True
-        if draft is None:
-            return False
+        # 1. L1 快路:清晰记账(有金额 + 非问句 + 无其他 L1 意图)→ 直接记,零 LLM、零成本。
+        parsed = lqe.parse_expense(text)
+        if parsed.has_amount() and not lqe.is_question(text) and lqe.l1_intent(text) is None:
+            from services.expense import conversation
 
-        # 有金额 → 置信分流。高置信:create_doc(draft) → post_doc(正式入账);其余:留草稿请确认。
-        from services.expense import confidence
+            with db.get_cursor_rls(str(tid), commit=True) as cur:
+                pend = conversation.pop_pending(cur, line_user_id=line_user_id)
+            if pend:  # 续接:上句缺金额存了半成品,这句补金额 → 合并
+                merged = pend["draft"]
+                merged.amount = parsed.amount
+                parsed = merged
+            return _do_record(
+                bound_user, reply_token, text, str(tid), ws, parsed, False, quote_token, lang
+            )
 
-        created_by = str(bound_user["id"]) if bound_user.get("id") else None
-        with db.get_cursor_rls(str(tid), commit=True) as cur:
-            tree = cat_svc.get_tree(cur, tenant_id=str(tid), workspace_client_id=ws)
-            _fill_category(cur, draft, text, tree, str(tid), ws)
-            cfg = settings_svc.get_settings(cur, tenant_id=str(tid), workspace_client_id=ws)
-            ws_name = intake_svc.workspace_name(cur, tenant_id=str(tid), workspace_client_id=ws)
-            is_dup = _dup_warn(bound_user, draft, ws)
-            verdict = confidence.grade(
-                amount=draft.amount,
-                vendor_name=draft.vendor_name,
-                invoice_number=draft.invoice_number,
-                document_type=draft.document_type or "",
-                direction="expense",
-                confidence_band="high" if not used_l2 else "needs_review",
-                has_category=bool(draft.category_id),
-                is_duplicate=is_dup,
-                require_category=False,  # 文字记账不因没命中分类就拦(水费50 该直接入账·分类可后补)
-            )
-            created = docs_svc.create_doc(
-                cur,
-                tenant_id=str(tid),
-                workspace_client_id=ws,
-                created_by=created_by,
-                data=_to_purchase_data(draft.model_dump()),
-                settings=cfg,
-                status="draft",
-            )
-            doc_id = str(created["doc"]["id"])
-            if verdict.action == "post":
-                posting_svc.post_doc(
-                    cur,
-                    tenant_id=str(tid),
-                    workspace_client_id=ws,
-                    doc_id=doc_id,
-                    auto_stock_in=False,
-                    created_by=created_by,
-                )
-                state = "posted"
-            else:
-                state = "dup" if verdict.dup else "confirm"
-        if used_l2:
+        # 2. 大脑(一次 LLM):听意图 + 抽槽 + 自然回复 → 工具分发。
+        from services.expense import line_agent, line_l2
+
+        api_key = line_l2.resolve_api_key(bound_user)
+        u = (
+            line_agent.understand(text, api_key=api_key)
+            if (api_key and _ocr_balance_ok(bound_user))
+            else None
+        )
+        if u:
             _charge_line_l2(bound_user, str(tid))
-        _reply_card(reply_token, state, draft, doc_id, lang, quote_token, ws_name)
+            return _dispatch_agent(
+                bound_user, reply_token, line_user_id, text, lang, str(tid), ws, u, quote_token
+            )
+
+        # 3. 兜底(无 LLM):L1 查账/求助/问答(知识库),否则礼貌带回。
+        si = lqe.l1_intent(text)
+        if si == "query":
+            _reply_summary(reply_token, lang, str(tid), ws)
+        elif si == "support":
+            _reply_pool(reply_token, "support", text, lang)
+        elif lqe.is_question(text):
+            _reply_question(reply_token, lang, str(tid), text)
+        else:
+            _reply_pool(reply_token, "scope", text, lang)
         return True
     except Exception:
-        logger.exception("[line] expense record failed; fall back to hint")
+        logger.exception("[line] expense handle failed; fall back")
         return False
+
+
+def _dispatch_agent(
+    bound_user, reply_token, line_user_id, text, lang, tid, ws, u, quote_token
+) -> bool:
+    """大脑决策 → 确定性工具执行。写账闸由 may_write 裁决(问句/否定/假设不写)。"""
+    from services.expense import line_agent
+
+    intent = u.get("intent")
+    if intent == "query_summary":
+        _reply_summary(reply_token, lang, tid, ws)
+        return True
+    if intent == "query_detail":
+        _reply_detail(reply_token, lang, tid, ws)
+        return True
+    if intent == "undo":
+        _reply_undo(bound_user, reply_token, lang, tid, ws)
+        return True
+    if intent == "edit":
+        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_edit_web"))
+        return True
+    if line_agent.may_write(intent, u.get("speech_act")):
+        from services.expense import line_l2
+
+        draft = line_l2.to_draft(u, text)
+        if draft.has_amount():
+            return _do_record(
+                bound_user, reply_token, text, tid, ws, draft, True, quote_token, lang
+            )
+        from services.expense import conversation
+
+        with db.get_cursor_rls(tid, commit=True) as cur:
+            conversation.save_pending(
+                cur,
+                line_user_id=line_user_id,
+                tenant_id=tid,
+                workspace_client_id=ws,
+                draft=draft,
+                missing="amount",
+            )
+        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_need_amount"))
+        return True
+    # chat / out_of_scope / 含数字的问句否定假设 → 自然回复(无则礼貌带回)
+    reply = (u.get("reply") or "").strip()
+    if reply:
+        line_client.reply_text(reply_token, reply)
+    else:
+        _reply_pool(reply_token, "scope", text, lang)
+    return True
+
+
+def _do_record(bound_user, reply_token, text, tid, ws, draft, used_l2, quote_token, lang) -> bool:
+    """置信驱动入账(图/文同口径):建草稿 → 高置信 post_doc;回数据卡。计费由调用方管。"""
+    from services.expense import confidence
+    from services.purchase import categories as cat_svc
+    from services.purchase import docs as docs_svc
+    from services.purchase import intake as intake_svc
+    from services.purchase import posting as posting_svc
+    from services.purchase import settings as settings_svc
+
+    created_by = str(bound_user["id"]) if bound_user.get("id") else None
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        tree = cat_svc.get_tree(cur, tenant_id=tid, workspace_client_id=ws)
+        _fill_category(cur, draft, text, tree, tid, ws)
+        cfg = settings_svc.get_settings(cur, tenant_id=tid, workspace_client_id=ws)
+        ws_name = intake_svc.workspace_name(cur, tenant_id=tid, workspace_client_id=ws)
+        is_dup = _dup_warn(bound_user, draft, ws)
+        verdict = confidence.grade(
+            amount=draft.amount,
+            vendor_name=draft.vendor_name,
+            invoice_number=draft.invoice_number,
+            document_type=draft.document_type or "",
+            direction="expense",
+            confidence_band="high" if not used_l2 else "needs_review",
+            has_category=bool(draft.category_id),
+            is_duplicate=is_dup,
+            require_category=False,
+        )
+        created = docs_svc.create_doc(
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            created_by=created_by,
+            data=_to_purchase_data(draft.model_dump()),
+            settings=cfg,
+            status="draft",
+        )
+        doc_id = str(created["doc"]["id"])
+        if verdict.action == "post":
+            posting_svc.post_doc(
+                cur,
+                tenant_id=tid,
+                workspace_client_id=ws,
+                doc_id=doc_id,
+                auto_stock_in=False,
+                created_by=created_by,
+            )
+            state = "posted"
+        else:
+            state = "dup" if verdict.dup else "confirm"
+    _reply_card(reply_token, state, draft, doc_id, lang, quote_token, ws_name)
+    return True
 
 
 def _card_fields_from_draft(draft) -> dict:
@@ -227,72 +300,74 @@ def _dup_warn(bound_user, draft, ws) -> bool:
         return False
 
 
-def _resolve_draft(bound_user, line_user_id, text, tid, ws):
-    """→ (draft, used_l2, action)。action: '' 正常出卡 / 'clarify' 已反问缺金额 / None 非记账。
-
-    顺序:① 有金额 → 若有待补会话态则合并(续接澄清),否则 L1 直接出 ② 无金额 → L2 兜底;
-    L2 判记账但仍缺金额 → 存会话态 + 反问;L2 判非记账 → None。
-    """
-    from services.expense import conversation
-    from services.expense import line_quick_entry as lqe
-
-    # L1 零成本意图:求助/查账 优先 —— 即便句中有数字也不当记账(零 LLM 成本)。
-    si = lqe.l1_intent(text)
-    if si:
-        return None, False, si
-
-    parsed = lqe.parse_expense(text)
-    # 问句(吗/呢/?)即便含数字也不记账(防「我刚不是花了50吗」被误记)→ 落 L2/礼貌回。
-    if parsed.has_amount() and not lqe.is_question(text):
-        with db.get_cursor_rls(tid, commit=True) as cur:
-            pend = conversation.pop_pending(cur, line_user_id=line_user_id)
-        if pend:  # 续接:上一句缺金额存了半成品,这句补上金额 → 合并
-            merged = pend["draft"]
-            merged.amount = parsed.amount
-            return merged, False, ""
-        return parsed, False, ""
-
-    # 无金额 / 问句 → L2(有 key + 余额才调);L2 不可用且是问句 → 礼貌回(不静默丢)。
-    from services.expense import line_l2
-
-    api_key = line_l2.resolve_api_key(bound_user)
-    if not api_key or not _ocr_balance_ok(bound_user):
-        return None, False, ("other" if lqe.is_question(text) else None)
-    data = line_l2.extract(text, api_key)
-    if not data:
-        return None, False, ("other" if lqe.is_question(text) else None)
-    intent = line_l2.intent_of(data)
-    if intent != "expense":
-        return None, False, intent  # query / question / other → 下方分发(批4)
-    draft = line_l2.to_draft(data, text)
-    if draft.has_amount():
-        return draft, True, ""
-    # 确是记账但 LLM 也没抽到金额 → 存会话态 + 反问(不静默丢)
-    with db.get_cursor_rls(tid, commit=True) as cur:
-        conversation.save_pending(
-            cur,
-            line_user_id=line_user_id,
-            tenant_id=tid,
-            workspace_client_id=ws,
-            draft=draft,
-            missing="amount",
-        )
-    return None, False, "clarify"
-
-
-def _reply_query(reply_token, lang, tid, ws) -> None:
-    """查账(本月花多少)· DB 真查 → 模板填数。"""
+def _reply_summary(reply_token, lang, tid, ws) -> None:
+    """查账汇总(本月已入账 + 按分类拆解)· DB 真查,绝不让模型编数字。"""
     from services.expense import line_qa
 
     try:
         with db.get_cursor_rls(tid) as cur:
-            total = line_qa.month_spending(cur, tenant_id=tid, workspace_client_id=ws)
-        line_client.reply_text(
-            reply_token, line_client.t_line(lang, "exp_query_month", amount=total)
-        )
+            s = line_qa.month_summary(cur, tenant_id=tid, workspace_client_id=ws)
     except Exception:
-        logger.exception("[line] query failed")
+        logger.exception("[line] summary failed")
         line_client.reply_text(reply_token, line_client.t_line(lang, "exp_q_not_found"))
+        return
+    if s["count"] == 0:
+        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_sum_empty"))
+        return
+    lines = [line_client.t_line(lang, "exp_sum_head", amount=s["total"], n=s["count"])]
+    for c in s["by_category"][:6]:
+        name = c["name"] or line_client.t_line(lang, "exp_uncat")
+        lines.append(f"• {name}: ฿{c['amount']} ({c['count']})")
+    line_client.reply_text(reply_token, "\n".join(lines))
+
+
+def _reply_detail(reply_token, lang, tid, ws) -> None:
+    """查明细(本月逐笔)· DB 真查 → 列表。"""
+    from services.expense import line_qa
+
+    try:
+        with db.get_cursor_rls(tid) as cur:
+            rows = line_qa.month_detail(cur, tenant_id=tid, workspace_client_id=ws, limit=10)
+    except Exception:
+        logger.exception("[line] detail failed")
+        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_q_not_found"))
+        return
+    if not rows:
+        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_sum_empty"))
+        return
+    lines = [line_client.t_line(lang, "exp_detail_head", n=len(rows))]
+    for r in rows:
+        tail = f" · {r['vendor']}" if r["vendor"] else ""
+        cat = r["category"] or line_client.t_line(lang, "exp_uncat")
+        lines.append(f"• {r['date']} {cat} ฿{r['amount']}{tail}")
+    line_client.reply_text(reply_token, "\n".join(lines))
+
+
+def _reply_undo(bound_user, reply_token, lang, tid, ws) -> None:
+    """撤销上一笔(LINE 记的、已入账正式单)· void_doc 冲销,不物理删。无 → 诚实告知。"""
+    uid = str(bound_user["id"]) if bound_user.get("id") else None
+    try:
+        from services.purchase import posting as posting_svc
+
+        with db.get_cursor_rls(tid, commit=True) as cur:
+            cur.execute(
+                "SELECT id, grand_total FROM purchase_docs "
+                "WHERE tenant_id = %s AND workspace_client_id = %s AND source = 'line' "
+                "AND status = 'posted' ORDER BY created_at DESC LIMIT 1",
+                (tid, ws),
+            )
+            row = cur.fetchone()
+            if not row:
+                line_client.reply_text(reply_token, line_client.t_line(lang, "exp_undo_none"))
+                return
+            res = posting_svc.void_doc(
+                cur, tenant_id=tid, workspace_client_id=ws, doc_id=str(row["id"]), created_by=uid
+            )
+            amt = (res.get("doc") or {}).get("grand_total") or row["grand_total"]
+        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_undo_done", amount=amt))
+    except Exception:
+        logger.exception("[line] undo failed")
+        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_undo_none"))
 
 
 def _reply_question(reply_token, lang, tid, question) -> None:

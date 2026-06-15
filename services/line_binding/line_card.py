@@ -277,6 +277,18 @@ def _record_link(web_url: str, ref: str, state: str) -> str:
     return f"{base}/liff/{path}/{ref}"
 
 
+def _stack(primary: dict, view: list, danger: list) -> list:
+    """竖排装配:提交/查看·编辑/撤销·丢弃三组,每个按钮独占一行,组间分隔线(治同行挤压截断)。"""
+    out = []
+    for group in ([primary] if primary else [], view, danger):
+        if not group:
+            continue
+        if out:
+            out.append({"type": "separator", "margin": "md", "color": _SEP})
+        out.extend(group)
+    return out
+
+
 def _footer(
     state: str,
     ref: str,
@@ -286,54 +298,40 @@ def _footer(
     token: str = "",
     source: str = "doc",
 ) -> list:
-    """唯一实心主按钮=提交动作;复核/编辑/撤销/丢弃=link 文字链接(非按钮)。永不死路。
-
-    postback 动作带一次性防重放令牌(token · PO-12),uri 复核/编辑无需令牌。
-    已入账且无原票(source=text)→ 加「替代收据」链接,LIFF 落详情页出 PDF(PO-7)。
-    """
-    primary, links = None, []
+    """动作区:主按钮=提交;复核/编辑/替代收据=查看组;撤销/丢弃=危险组。竖排满宽永不死路。"""
     edit_uri = _record_link(web_url, ref, state)
-    discard = _btn(
-        t["btn_discard"],
-        primary=False,
-        postback=line_postback.discard_data(ref, token),
-        danger=True,
-    )
+    pb = line_postback
 
+    def link(label, uri):
+        return _btn(label, primary=False, uri=uri)
+
+    def kill(label, data):
+        return _btn(label, primary=False, postback=data, danger=True)
+
+    def main(label, data):
+        return _btn(label, primary=True, postback=data)
+
+    primary, view, danger = None, [], []
     if state == "posted":
-        undo = line_postback.undo_data(ref, token)
-        links = [_btn(t["btn_review"], primary=False, uri=edit_uri)]
+        view.append(link(t["btn_review"], edit_uri))
         if source == "text" and ref:
-            links.append(_btn(t["btn_receipt"], primary=False, uri=f"{edit_uri}?view=receipt"))
-        links.append(_btn(t["btn_undo"], primary=False, postback=undo, danger=True))
+            view.append(link(t["btn_receipt"], f"{edit_uri}?view=receipt"))
+        danger.append(kill(t["btn_undo"], pb.undo_data(ref, token)))
     elif state == "confirm":
-        primary = _btn(
-            t["btn_confirm"], primary=True, postback=line_postback.confirm_data(ref, token)
-        )
-        links = [_btn(t["btn_edit"], primary=False, uri=edit_uri), discard]
+        primary = main(t["btn_confirm"], pb.confirm_data(ref, token))
+        view.append(link(t["btn_edit"], edit_uri))
+        danger.append(kill(t["btn_discard"], pb.discard_data(ref, token)))
     elif state == "dup":
-        primary = _btn(
-            t["btn_post_anyway"], primary=True, postback=line_postback.confirm_data(ref, token)
-        )
-        links = [_btn(t["btn_open"], primary=False, uri=edit_uri), discard]
+        primary = main(t["btn_post_anyway"], pb.confirm_data(ref, token))
+        view.append(link(t["btn_open"], edit_uri))
+        danger.append(kill(t["btn_discard"], pb.discard_data(ref, token)))
     else:  # inbox
         if can_post and ref:
-            primary = _btn(
-                t["btn_post_anyway"],
-                primary=True,
-                postback=line_postback.inbox_post_data(ref, token),
-            )
-        links = [_btn(t["btn_fill"], primary=False, uri=edit_uri)]
+            primary = main(t["btn_post_anyway"], pb.inbox_post_data(ref, token))
+        view.append(link(t["btn_fill"], edit_uri))
         if ref:
-            drop = line_postback.inbox_drop_data(ref, token)
-            links.append(_btn(t["btn_discard"], primary=False, postback=drop, danger=True))
-    foot = []
-    if primary:
-        foot.append(primary)
-    foot.append(
-        {"type": "box", "layout": "horizontal", "justifyContent": "center", "contents": links}
-    )
-    return foot
+            danger.append(kill(t["btn_discard"], pb.inbox_drop_data(ref, token)))
+    return _stack(primary, view, danger)
 
 
 def result_card(

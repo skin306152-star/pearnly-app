@@ -108,6 +108,27 @@ class CardTests(unittest.TestCase):
         self.assertEqual(c["type"], "flex")
         self.assertEqual(c["contents"]["type"], "bubble")
 
+    def _footer_contents(self, card):
+        return card["contents"]["footer"]["contents"]
+
+    def test_buttons_stacked_vertically_not_crammed(self):
+        # 动作区每个按钮独占一行(footer 直接子元素),不再塞进 horizontal box(治截断)。
+        for state in ("posted", "confirm", "dup", "inbox"):
+            foot = self._footer_contents(self._card(state, source="text"))
+            for node in foot:
+                self.assertIn(
+                    node["type"], ("button", "separator"), f"{state} 动作区只许按钮/分隔线"
+                )
+                if node["type"] == "box":
+                    self.fail(f"{state} 动作区不应再有 box(横排挤压)")
+            self.assertTrue(any(n["type"] == "button" for n in foot))
+
+    def test_action_groups_separated_by_divider(self):
+        # 查看组与危险组之间有分隔线(按内容分组画线)。
+        for state in ("posted", "confirm", "dup", "inbox"):
+            foot = self._footer_contents(self._card(state, source="text"))
+            self.assertTrue(any(n["type"] == "separator" for n in foot), f"{state} 应有分组分隔线")
+
     def test_posted_has_undo_no_primary(self):
         c = self._card("posted")
         acts = self._actions(c)

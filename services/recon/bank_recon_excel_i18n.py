@@ -39,7 +39,6 @@ _I18N_EXPORT: Dict[str, Dict[str, str]] = {
     "col_gl_desc": {"th": "รายการ GL", "en": "GL Description", "zh": "GL摘要", "ja": "GL摘要"},
     "col_gl_debit": {"th": "เดบิต GL", "en": "GL Debit", "zh": "GL借方", "ja": "GL借方"},
     "col_gl_credit": {"th": "เครดิต GL", "en": "GL Credit", "zh": "GL贷方", "ja": "GL貸方"},
-    "col_gl_balance": {"th": "ยอดคงเหลือ GL", "en": "GL Balance", "zh": "GL余额", "ja": "GL残高"},
     "col_match_layer": {"th": "ชั้นจับคู่", "en": "Match Layer", "zh": "匹配层", "ja": "マッチ層"},
     "col_date_diff": {"th": "ต่างวัน", "en": "Day Diff", "zh": "日期差", "ja": "日付差"},
     "col_status": {"th": "สถานะ", "en": "Status", "zh": "状态", "ja": "状態"},

@@ -9,7 +9,6 @@ import openpyxl
 
 from services.recon.bank_recon_types import GlRow, StatementRow
 from services.recon.bank_recon_reconcile import reconcile
-from services.recon.bank_recon_excel import _build_match_results_sheet
 from services.recon.bank_recon_excel_i18n import _t
 
 
@@ -46,20 +45,6 @@ class ReconGlBalanceTests(unittest.TestCase):
         # GL 孤项也带余额
         gl_only = [r for r in rows if r.match_status in ("gl_debit_only", "gl_credit_only")]
         self.assertTrue(any(r.gl_balance == -1632.44 for r in gl_only))
-
-    def test_export_has_gl_balance_column_4lang(self):
-        rows, _ = self._rows()
-        for lang in ("zh", "en", "th", "ja"):
-            wb = openpyxl.Workbook()
-            _build_match_results_sheet(wb, rows, lang)
-            ws = wb.worksheets[-1]
-            hdr = [c.value for c in ws[1]]
-            label = _t("col_gl_balance", lang)
-            self.assertIn(label, hdr, f"{lang} 列头缺 GL 余额")
-            ci = hdr.index(label)
-            # 已配对行该列有值
-            vals = [ws.cell(r, ci + 1).value for r in range(2, ws.max_row + 1)]
-            self.assertIn(378232.56, vals, f"{lang} GL 余额列无值")
 
     def test_gl_detail_sheet_has_balance_column_4lang(self):
         # 「总账明细」sheet(รายละเอียดบัญชีแยกประเภท)也要有余额列 · 4 语跟随

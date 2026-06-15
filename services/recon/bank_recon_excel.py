@@ -67,7 +67,6 @@ def _build_match_results_sheet(wb, recon_rows: List[BankReconRow], lang: str) ->
         (_t("col_gl_desc", lang), 26),
         (_t("col_gl_debit", lang), 12),
         (_t("col_gl_credit", lang), 12),
-        (_t("col_gl_balance", lang), 13),
         (_t("col_date_diff", lang), 10),
         (_t("col_source_stmt", lang), 18),
         (_t("col_source_gl", lang), 18),
@@ -119,7 +118,6 @@ def _build_match_results_sheet(wb, recon_rows: List[BankReconRow], lang: str) ->
             row.gl_desc,
             row.gl_debit or "",
             row.gl_credit or "",
-            row.gl_balance or "",
             row.date_diff_days if row.date_diff_days is not None else "",
             row.source_stmt_file,
             row.source_gl_file,
@@ -152,7 +150,6 @@ def _build_match_results_sheet(wb, recon_rows: List[BankReconRow], lang: str) ->
             row.gl_desc,
             row.gl_debit or "",
             row.gl_credit or "",
-            row.gl_balance or "",
             "",  # date diff
             "",  # source stmt
             row.source_gl_file,
@@ -185,7 +182,6 @@ def _build_match_results_sheet(wb, recon_rows: List[BankReconRow], lang: str) ->
             "",  # gl desc
             "",  # gl debit
             "",  # gl credit
-            "",  # gl balance
             "",  # date diff
             row.source_stmt_file,
             "",  # source gl

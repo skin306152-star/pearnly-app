@@ -30,8 +30,6 @@ import {
 } from './purchase-list-filters.js';
 import { MORE_SVG } from './more-menu.js';
 
-const ICON_CAM =
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
 const ICON_SEARCH =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
 const ICON_CAM_SM =
@@ -145,12 +143,10 @@ function shell(): string {
             <div class="band">
                 <div class="star" id="pur-star">${starHtml(summary)}</div>
                 <div class="acts">
-                    <button class="btn primary only-desk" id="pur-record-btn">${ICON_PEN}${escapeHtml(t('pur-record-purchase'))}</button>
-                    <button class="btn primary only-mob" id="pur-cam-btn">${ICON_CAM}${escapeHtml(t('pur-photo'))}</button>
+                    <button class="btn primary" id="pur-record-btn">${ICON_PEN}${escapeHtml(t('pur-record-purchase'))}</button>
                     <div class="more-wrap">
                         <button class="btn" id="pur-more-btn" aria-label="more">${MORE_SVG}</button>
                         <div class="more-menu right" id="pur-more-menu" hidden>
-                            <button class="mi only-mob" id="pur-manual-btn">${escapeHtml(t('pur-manual-new'))}</button>
                             <button class="mi" id="pur-export-btn">${escapeHtml(t('pur-export-archive'))}</button>
                             <button class="mi" id="pur-line-btn">${escapeHtml(t('pur-line-expense'))}</button>
                         </div>
@@ -167,7 +163,6 @@ function shell(): string {
             <div id="pur-body"></div>
             <div class="listfoot" id="pur-listfoot"></div>
         </div>
-        <input type="file" id="pur-cam-input" accept="image/*,application/pdf" capture="environment" style="display:none">
     </div></div>`;
 }
 
@@ -303,57 +298,13 @@ function bindChrome(): void {
             window.openPurchaseExport
                 ? window.openPurchaseExport()
                 : showToast(t('nav-soon'), 'info');
-    const recordHandler = () => window.openPurchaseForm?.(null, { doc_kind: 'expense' });
-    const manualBtn = document.getElementById('pur-manual-btn');
-    if (manualBtn) manualBtn.onclick = recordHandler;
-    const recordBtn = document.getElementById('pur-record-btn'); // 桌面主操作:记一笔(手动)
-    if (recordBtn) recordBtn.onclick = recordHandler;
+    // 主操作:记一笔采购 → 采集屏(草稿 s-capture · 桌面上传/手工 · 手机拍照/相册/文件/手工)。
+    const recordBtn = document.getElementById('pur-record-btn');
+    if (recordBtn) recordBtn.onclick = () => window.routeTo?.('purchase-capture');
     const lineBtn = document.getElementById('pur-line-btn');
     if (lineBtn) lineBtn.onclick = () => window.openPurchaseLine?.();
-    const camBtn = document.getElementById('pur-cam-btn');
-    const camInput = document.getElementById('pur-cam-input') as HTMLInputElement | null;
-    if (camBtn && camInput) camBtn.onclick = () => camInput.click();
-    if (camInput) camInput.onchange = () => onCapture(camInput);
     const bulkDel = document.getElementById('pur-bulk-del');
     if (bulkDel) bulkDel.onclick = bulkDelete;
-}
-
-// 拍进项票 → 统一智能入口分流(F12)。后端返 {route,draft}:purchase/expense+draft→录入;
-// sales/recon→提示;inbox(低置信/糊图/拿不准)→ 安全落待归类。
-async function onCapture(input: HTMLInputElement): Promise<void> {
-    const f = input.files && input.files[0];
-    input.value = '';
-    if (!f) return;
-    const ws = activeWsId();
-    const fd = new FormData();
-    fd.append('image', f);
-    if (ws != null) fd.append('workspace_client_id', String(ws));
-    showToast(t('pur-intake-reading'), 'info');
-    try {
-        const res = (await papi('POST', '/api/purchase/intake', fd)) as {
-            route?: string;
-            draft?: Record<string, unknown> | null;
-            dedupe_hit?: boolean;
-        };
-        const d = res && res.draft;
-        if (d) {
-            window.openPurchaseForm?.(null, {
-                ...d,
-                dedupe_hit: res.dedupe_hit,
-                bill_image_local: URL.createObjectURL(f),
-            });
-            return;
-        }
-        const route = (res && res.route) || 'inbox';
-        if (route === 'sales') showToast(t('pur-intake-sales'), 'error');
-        else if (route === 'recon') showToast(t('pur-intake-recon'), 'error');
-        else {
-            showToast(t('pur-intake-inbox'), 'success');
-            window.routeTo?.('purchase-inbox');
-        }
-    } catch (e) {
-        showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
-    }
 }
 
 function showState(html: string): void {

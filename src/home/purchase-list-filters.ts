@@ -109,7 +109,17 @@ export function bindFilterChips(onChange: () => void): void {
             const c = tg.parentElement!;
             const open = c.classList.contains('open');
             document.querySelectorAll('.pur.pl .fchip').forEach((x) => x.classList.remove('open'));
-            if (!open) c.classList.add('open');
+            if (!open) {
+                c.classList.add('open');
+                // dd 是 fixed(逃 panel 裁剪)→ 按 chip 位置摆放;贴右边时左移防出屏。
+                const dd = c.querySelector<HTMLElement>('.dd');
+                if (dd) {
+                    const r = tg.getBoundingClientRect();
+                    const w = dd.offsetWidth || 210;
+                    dd.style.top = `${r.bottom + 6}px`;
+                    dd.style.left = `${Math.min(r.left, window.innerWidth - w - 12)}px`;
+                }
+            }
         };
     });
     document.querySelectorAll<HTMLElement>('.pur.pl .fchip .opt').forEach((o) => {
@@ -167,6 +177,8 @@ export function bindFilterChips(onChange: () => void): void {
         };
     });
     document.addEventListener('click', closeAllChips);
+    // dd 是 fixed,滚动会脱离 chip → 滚动即关(capture 抓全部滚动容器;同引用去重不漏)。
+    window.addEventListener('scroll', closeAllChips, true);
 }
 
 function closeAllChips(): void {

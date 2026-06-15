@@ -111,6 +111,7 @@ import './home/purchase-settings.js'; // 屏5 采购设置(window.loadPurchaseSe
 import './home/purchase-inbox.js'; // 待归类收件箱(window.loadPurchaseInbox · 长尾安全网 · 智能猜测 + 一点归类)
 import './home/purchase-google.js'; // 集成中心 Google Drive/Sheets 授权卡(window.loadIntegrationGoogle/highlightGoogleCard · 外流归档 OAuth)
 import './home/purchase-export.js'; // 外流收拢面板(window.openPurchaseExport · Excel 免授权 / Drive 归档 / Sheet 同步 · 412 未连跳集成中心)
+import './home/purchase-capture.js'; // 采集屏(window.loadPurchaseCapture · 记一笔采购 · 桌面上传/手工 · 手机拍照/相册/文件/手工 · 智能入口分流)
 import './home/purchase-liff.js'; // Phase 3 LIFF 复核屏入口(/home?liff=purchase&doc= → 签 token → 开 purchase-form · 真验留用户配 LIFF ID)
 // 自动做账 Phase 2 · 屏1 主屏(路由 vouchers)/ 屏2 逐笔审 / 屏3 科目表 / 屏5 设置 / 屏4 出账本(docs/accounting)
 import './home/acct-list.js'; // 屏1 主屏(window.loadAcctList · 北极星+待审行动卡+凭证列表行内展开借贷)

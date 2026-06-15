@@ -311,6 +311,7 @@ interface Window {
     openPurchaseSupplierPicker?: (onPick: (s: unknown) => void) => void;
     openPurchaseExport?: () => void;
     loadPurchaseExport?: () => void;
+    loadPurchaseCapture?: () => void;
     loadIntegrationGoogle?: () => void;
     highlightGoogleCard?: () => void;
     __LIFF_BOOTSTRAP__?: number;

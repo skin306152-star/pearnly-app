@@ -30,7 +30,8 @@ export const PURCHASE_LIST_CSS = `
 .pur.pl .fchip>.t{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:7px 11px;font-size:12.5px;font-weight:600;color:var(--ink2);cursor:pointer;}
 .pur.pl .fchip>.t.active{border-color:var(--accent);color:var(--accent-deep);background:var(--accent-weak);}
 .pur.pl .fchip>.t .cnt{font-size:10.5px;font-weight:800;background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:0 6px;line-height:16px;}
-.pur.pl .fchip .dd{position:absolute;top:calc(100% + 6px);left:0;z-index:25;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh2);padding:7px;min-width:210px;max-height:300px;overflow:auto;display:none;}
+/* fixed 定位 + JS 按 chip 位置摆放:逃出列表 panel 的 overflow:hidden(否则空列表时下拉被裁) */
+.pur.pl .fchip .dd{position:fixed;z-index:1000;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh2);padding:7px;min-width:210px;max-height:min(320px,60vh);overflow:auto;display:none;}
 .pur.pl .fchip.open .dd{display:block;}
 .pur.pl .fchip .opt{display:flex;align-items:center;gap:10px;padding:8px 9px;border-radius:8px;font-size:13px;cursor:pointer;color:var(--ink);}
 .pur.pl .fchip .opt:hover{background:var(--accent-weak);}

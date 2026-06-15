@@ -157,15 +157,16 @@ class LineDispatchFirmSafetyTests(unittest.TestCase):
             )
         return ret, stashed
 
-    def test_firm_is_noop(self):
+    # 2026-06-15 Zihao 拍板:统一智能通道·不按业态分。开 expense 即落采购(含 firm/未onboard)。
+    def test_firm_routes_when_expense_on(self):
         ret, stashed = self._run("firm")
-        self.assertFalse(ret)
-        self.assertEqual(stashed, [])  # 识别中心路径不落采购库
+        self.assertTrue(ret)
+        self.assertEqual(stashed, [1])  # 事务所也落采购(统一通道)
 
-    def test_unonboarded_is_noop(self):
+    def test_unonboarded_routes_when_expense_on(self):
         ret, stashed = self._run(None)
-        self.assertFalse(ret)
-        self.assertEqual(stashed, [])
+        self.assertTrue(ret)
+        self.assertEqual(stashed, [1])
 
     def test_expense_off_is_noop(self):
         ret, stashed = self._run("retail", expense_on=False)

@@ -283,14 +283,12 @@ def fields_from_invoice(inv) -> dict:
 
 
 def line_expense_gate_open(cur, *, tenant_id) -> bool:
-    """LINE 记费用门控(单一来源 · 铁律#26 底线集中):商户(非 firm/未选业态)+ 开 expense → True。
-    事务所 firm / 未 onboard(business_type=None)/ 未开 expense → False。图(route_line_image)与
-    文字(webhook _handle_expense_text)共用,改门控只动这一处,防两路漂移。"""
+    """LINE 记账门控(单一来源 · 2026-06-15 Zihao 拍板:统一智能通道·不按业态分)。
+
+    所有账号(含事务所 firm)统一走:开 expense 模块即放行。图(route_line_image)与文字
+    (line_expense.handle_expense_text)共用,改门控只动这一处,防两路漂移。"""
     from services.modules import store as modules_store
 
-    bt = modules_store.get_business_type(cur, tenant_id=tenant_id)
-    if bt in (None, "firm"):
-        return False
     return modules_store.is_enabled(cur, tenant_id=tenant_id, module_key="expense")
 
 

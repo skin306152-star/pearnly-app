@@ -37,23 +37,23 @@ _CARD_LABEL_KEYS = (
 
 
 def handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> bool:
-    """文本 → 记账确认卡(doc 10/14 · 绝不静默入账)。支持多轮澄清(缺金额会反问)。
+    """文本 → 智能解析 → 直接落采购进项草稿单(统一智能通道 · Zihao 2026-06-15 拍板)。
 
-    返回 True = 已处理(回了卡或澄清);False = 不是记账(回落功能提示)。
-    事务所(firm)/ 未开 expense / 无默认套账 / 异常 → False(主路径 + 事务所底线不破坏)。
+    所有账号(不分业态)统一走;有金额 → 直接入采购(不回确认卡);缺金额 → 反问;
+    查账/问答/越界 → 对应智能回复。返回 True=已处理;False=非记账(回落功能提示)。
+    未开 expense 模块 / 无默认套账 / 异常 → False。
     """
     try:
         tid = bound_user.get("tenant_id")
         if not tid:
             return False
         from core.workspace_context import default_workspace_id
-        from services.expense import expense_draft as draft_store
-        from services.line_binding import line_flex
         from services.purchase import categories as cat_svc
-
-        # 门控先行(读):事务所/未开 expense → 直接退,绝不为它跑付费 L2。
+        from services.purchase import docs as docs_svc
         from services.purchase import intake as intake_svc
+        from services.purchase import settings as settings_svc
 
+        # 门控先行(读):未开 expense 模块 → 退(不按业态分·统一智能通道)。
         with db.get_cursor_rls(str(tid)) as cur:
             if not intake_svc.line_expense_gate_open(cur, tenant_id=str(tid)):
                 return False
@@ -78,49 +78,31 @@ def handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> bo
         if draft is None:
             return False
 
+        # 有金额 → 直接落采购进项草稿单(统一智能通道 · 不回确认卡 · Zihao 2026-06-15 拍板)。
+        # 草稿状态:用户在「采购 · 待归类/进项」里复核/补全/推 ERP。
         with db.get_cursor_rls(str(tid), commit=True) as cur:
             tree = cat_svc.get_tree(cur, tenant_id=str(tid), workspace_client_id=ws)
             _fill_category(cur, draft, text, tree, str(tid), ws)
-            business_name = _business_name(cur, tenant_id=str(tid), ws=ws)
+            cfg = settings_svc.get_settings(cur, tenant_id=str(tid), workspace_client_id=ws)
             created_by = str(bound_user["id"]) if bound_user.get("id") else None
-            draft_id = draft_store.insert_draft(
+            docs_svc.create_doc(
                 cur,
                 tenant_id=str(tid),
                 workspace_client_id=ws,
-                draft=draft,
-                line_user_id=line_user_id,
                 created_by=created_by,
+                data=_to_purchase_data(draft.model_dump()),
+                settings=cfg,
+                status="draft",
             )
         if used_l2:
             _charge_line_l2(bound_user, str(tid))
-        # 查重(图/文共用 check_duplicate_invoice·按套账隔离):命中 → 卡前提示,不阻断由用户定夺。
-        dup = _dup_warn(bound_user, draft, ws)
-        labels = {k: line_client.t_line(lang, f"exp_card_{k}") for k in _CARD_LABEL_KEYS}
-        card = line_flex.expense_confirm_flex(
-            draft={
-                "amount": str(draft.amount),
-                "currency": draft.currency,
-                "document_type": draft.document_type,
-                "invoice_number": draft.invoice_number,
-                "expense_type": draft.expense_type,
-                "doc_date": draft.doc_date,
-                "category": draft.category,
-                "subcategory": draft.subcategory,
-                "business_name": business_name,
-                "note": draft.note,
-                "vendor_name": draft.vendor_name,
-            },
-            draft_id=draft_id,
-            labels=labels,
-            edit_url=f"{_EXPENSE_DRAFT_URL}{draft_id}",
-        )
-        msgs = [card]
-        if dup:
-            msgs = [{"type": "text", "text": line_client.t_line(lang, "exp_dup_warn")}, card]
-        line_client.reply_messages(reply_token, msgs)
+        body = line_client.t_line(lang, "exp_recorded_purchase", amount=draft.amount)
+        if _dup_warn(bound_user, draft, ws):
+            body = line_client.t_line(lang, "exp_dup_warn") + "\n\n" + body
+        line_client.reply_text(reply_token, body)
         return True
     except Exception:
-        logger.exception("[line] expense draft failed; fall back to hint")
+        logger.exception("[line] expense record failed; fall back to hint")
         return False
 
 

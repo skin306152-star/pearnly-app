@@ -270,7 +270,11 @@ function syncGroupChecks(): void {
 
 async function bulkDelete(): Promise<void> {
     if (!selected.size) return;
-    if (!window.confirm(t('pur-bulk-confirm', { n: String(selected.size) }))) return;
+    // 用 app 样式弹窗(showConfirm),不用浏览器原生 confirm(去 AI 味/统一设计语言)。
+    if (typeof window.showConfirm === 'function') {
+        const okc = await window.showConfirm(t('pur-bulk-confirm', { n: String(selected.size) }));
+        if (!okc) return;
+    }
     const ws = activeWsId();
     const ids = Array.from(selected);
     const q = ws != null ? '?workspace_client_id=' + ws : '';

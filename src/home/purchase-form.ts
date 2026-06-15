@@ -374,7 +374,10 @@ function onPost(): void {
 
 async function onDelete(): Promise<void> {
     if (!st!.id) return window.routeTo?.('purchase');
-    if (!window.confirm(t('pur-delete-confirm'))) return;
+    if (typeof window.showConfirm === 'function') {
+        const okc = await window.showConfirm(t('pur-delete-confirm'));
+        if (!okc) return;
+    }
     try {
         await papi('DELETE', `/api/purchase/docs/${st!.id}?workspace_client_id=${activeWsId()}`);
         showToast(t('pur-deleted-ok'), 'success');

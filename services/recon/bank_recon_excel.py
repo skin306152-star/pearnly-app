@@ -309,6 +309,7 @@ def _build_gl_detail_sheet(wb, recon_rows: List[BankReconRow], lang: str) -> Non
         (_t("col_desc", lang), 38),
         (_t("col_debit", lang), 14),
         (_t("col_credit", lang), 14),
+        (_t("col_balance", lang), 14),
         (_t("col_source_file", lang), 22),
     ]
     for ci, (hdr, width) in enumerate(gld_cols, 1):
@@ -336,6 +337,7 @@ def _build_gl_detail_sheet(wb, recon_rows: List[BankReconRow], lang: str) -> Non
             row.gl_desc,
             row.gl_debit if row.gl_debit else "",
             row.gl_credit if row.gl_credit else "",
+            row.gl_balance if row.gl_balance else "",
             row.source_gl_file,
         ]
         for ci, val in enumerate(vals, 1):

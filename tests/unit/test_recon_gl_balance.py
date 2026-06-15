@@ -61,6 +61,23 @@ class ReconGlBalanceTests(unittest.TestCase):
             vals = [ws.cell(r, ci + 1).value for r in range(2, ws.max_row + 1)]
             self.assertIn(378232.56, vals, f"{lang} GL 余额列无值")
 
+    def test_gl_detail_sheet_has_balance_column_4lang(self):
+        # 「总账明细」sheet(รายละเอียดบัญชีแยกประเภท)也要有余额列 · 4 语跟随
+        from services.recon.bank_recon_excel import export_bank_recon_excel
+        from services.recon.bank_recon_types import BankReconSummary
+        import io as _io
+
+        rows, _ = self._rows()
+        for lang in ("zh", "en", "th", "ja"):
+            blob = export_bank_recon_excel(rows, BankReconSummary(), lang)
+            wb = openpyxl.load_workbook(_io.BytesIO(blob))
+            ws = wb[_t("sh_gl_detail", lang)]
+            hdr = [c.value for c in ws[1]]
+            self.assertIn(_t("col_balance", lang), hdr, f"{lang} 总账明细缺余额列")
+            ci = hdr.index(_t("col_balance", lang))
+            vals = [ws.cell(r, ci + 1).value for r in range(2, ws.max_row + 1)]
+            self.assertIn(378232.56, vals, f"{lang} 总账明细余额无值")
+
     def test_running_balance_computed_from_opening(self):
         # parse 层逐行运行余额 = 期初 + 累计(借−贷)· 用 parse_gl_excel 验
         import io

@@ -58,14 +58,19 @@ const PRESET_CATS = [
     'pur-cat-repair',
     'pur-cat-outsource',
 ];
+const CAT_NONE = '__none__';
+
 function categoryOptions(cats: Category[]): [string, string][] {
     const tops = cats.filter((c) => !c.parent_id).map((c) => c.name);
     catNames = tops.length ? tops : PRESET_CATS.map((k) => t(k));
-    return catNames.map((n) => [n, n]);
+    const opts: [string, string][] = catNames.map((n) => [n, n]);
+    opts.push([CAT_NONE, t('pur-cat-none')]);
+    return opts;
 }
 
 function topCategory(d: DocListItem): string {
-    return (d.category_label || '').split('›')[0].trim();
+    const top = (d.category_label || '').split('›')[0].trim();
+    return top || CAT_NONE;
 }
 
 function ddOptions(key: keyof Filters, defs: [string, string][], translate: boolean): string {

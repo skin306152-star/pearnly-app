@@ -185,6 +185,12 @@ async def _handle_line_image_ocr(
             if _pages_struct and _ws_client_id and tid_str:
                 with db.get_cursor_rls(tid_str, commit=True) as cur:
                     if line_expense_gate_open(cur, tenant_id=tid_str):
+                        # 票图闭环:LINE 图持久化到 pdf_storage(同网页上传留底)→ image_ref 挂进单据,
+                        # 详情页才看得到原票。此前没传 image_ref → LINE 进来的单据票图恒空。
+                        from services.ocr import pdf_storage as _pstore
+
+                        _suffix = os.path.splitext(filename or "")[1] or ".jpg"
+                        _img_ref, _ = _pstore.save_bytes(str(user_fresh["id"]), file_bytes, _suffix)
                         ingest = ingest_line_image(
                             cur,
                             tenant_id=tid_str,
@@ -192,6 +198,7 @@ async def _handle_line_image_ocr(
                             fields=fields_from_invoice(_pages_struct[0].invoice),
                             confidence=result.get("confidence"),
                             field_confidence=getattr(_pages_struct[0], "field_confidence", None),
+                            image_ref=_img_ref,
                             created_by=str(user_fresh["id"]),
                         )
         except Exception as _route_err:

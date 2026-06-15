@@ -77,8 +77,8 @@ export const PURCHASE_DETAIL_CSS = `
 .pur.d .img{position:relative;overflow:hidden;border-radius:13px;background:var(--line2);aspect-ratio:4/4.65;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink3);cursor:zoom-in;}
 .pur.d .img img{width:100%;height:100%;object-fit:cover;display:block;}
 .pur.d .view-btn{width:100%;justify-content:center;margin-top:11px;}
-.pur-lightbox{position:fixed;inset:0;background:rgba(17,24,39,.86);z-index:1100;display:flex;align-items:center;justify-content:center;padding:32px;cursor:zoom-out;}
-.pur-lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;}
+.pur-lightbox{position:fixed;inset:0;background:rgba(17,24,39,.9);z-index:1100;display:flex;align-items:center;justify-content:center;padding:8px;cursor:zoom-out;}
+.pur-lightbox img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;border-radius:6px;}
 
 /* 处理记录(诚实推导 · 无假人名/时间)*/
 .pur.d .timeline{padding:16px 18px;}

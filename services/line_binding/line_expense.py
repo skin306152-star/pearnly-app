@@ -124,6 +124,53 @@ def handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> bo
         return False
 
 
+def _to_purchase_data(d: dict) -> dict:
+    """expense_draft → 采购进项建单 data(doc_kind=expense·单行=总额·带卖家/分类·source=line)。"""
+    line = {
+        "item_type": "service" if (d.get("expense_type") == "service") else "goods",
+        "description": (
+            d.get("note") or d.get("subcategory") or d.get("category") or "LINE บันทึก"
+        ).strip(),
+        "qty": "1",
+        "unit_price": str(d.get("amount") or "0"),
+        "vat_rate": 0,
+        "wht_rate": 0,
+        "category_id": d.get("category_id"),
+        "subcategory_id": d.get("subcategory_id"),
+    }
+    return {
+        "doc_kind": "expense",
+        "source": "line",
+        "doc_date": d.get("doc_date"),
+        "category_id": d.get("category_id"),
+        "supplier": {
+            "name": (d.get("vendor_name") or "").strip(),
+            "tax_id": (d.get("vendor_tax_id") or "").strip() or None,
+        },
+        "doc_no": (d.get("invoice_number") or "").strip() or None,
+        "currency": d.get("currency") or "THB",
+        "lines": [line],
+    }
+
+
+def _post_to_purchase(cur, tid: str, ws: int, d: dict, bound_user) -> None:
+    """LINE 确认入账 → 落一张采购进项草稿单(图/文同下游 · 用户可在进项采购看到/补全/推 ERP)。"""
+    from services.purchase import docs as docs_svc
+    from services.purchase import settings as settings_svc
+
+    cfg = settings_svc.get_settings(cur, tenant_id=tid, workspace_client_id=ws)
+    created_by = str(bound_user["id"]) if bound_user.get("id") else None
+    docs_svc.create_doc(
+        cur,
+        tenant_id=tid,
+        workspace_client_id=ws,
+        created_by=created_by,
+        data=_to_purchase_data(d),
+        settings=cfg,
+        status="draft",
+    )
+
+
 def _receipt_url(draft_id: str, tid: str, ws: int) -> str:
     """替代收据 PDF 链接(签名 token · 外部浏览器可开)。"""
     import time
@@ -223,14 +270,26 @@ def handle_expense_postback(bound_user, reply_token, parsed, lang) -> None:
             if not d:
                 line_client.reply_text(reply_token, line_client.t_line(lang, "exp_not_found"))
                 return
-            status = (
-                "confirmed"
-                if parsed.get("action") == line_postback.ACTION_EXP_CONFIRM
-                else "discarded"
-            )
-            draft_store.set_status(
-                cur, tenant_id=tid, workspace_client_id=ws, draft_id=draft_id, status=status
-            )
+            if parsed.get("action") == line_postback.ACTION_EXP_CONFIRM:
+                # 确认入账 = 落一张采购进项草稿单(LINE 记账的归宿 · 图/文同下游)。
+                _post_to_purchase(cur, tid, ws, d, bound_user)
+                draft_store.set_status(
+                    cur,
+                    tenant_id=tid,
+                    workspace_client_id=ws,
+                    draft_id=draft_id,
+                    status="confirmed",
+                )
+                status = "confirmed"
+            else:
+                draft_store.set_status(
+                    cur,
+                    tenant_id=tid,
+                    workspace_client_id=ws,
+                    draft_id=draft_id,
+                    status="discarded",
+                )
+                status = "discarded"
         if status == "confirmed":
             # 确认后给替代收据 PDF 链接(签名 token · 外部浏览器可开 · doc 14 §7)。
             body = line_client.t_line(lang, "exp_confirmed", amount=d["amount"])

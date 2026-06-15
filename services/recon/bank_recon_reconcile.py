@@ -98,6 +98,7 @@ def reconcile(
                     gl_desc=gr.description,
                     gl_debit=gr.debit,
                     gl_credit=gr.credit,
+                    gl_balance=gr.balance,
                     date_diff_days=0,
                     source_stmt_file=sr.source_file,
                     source_gl_file=gr.source_file,
@@ -132,6 +133,7 @@ def reconcile(
                     gl_desc=gr.description,
                     gl_debit=gr.debit,
                     gl_credit=gr.credit,
+                    gl_balance=gr.balance,
                     date_diff_days=dd,
                     source_stmt_file=sr.source_file,
                     source_gl_file=gr.source_file,
@@ -166,6 +168,7 @@ def reconcile(
                     gl_desc=gr.description,
                     gl_debit=gr.debit,
                     gl_credit=gr.credit,
+                    gl_balance=gr.balance,
                     date_diff_days=dd,
                     source_stmt_file=sr.source_file,
                     source_gl_file=gr.source_file,
@@ -208,6 +211,7 @@ def reconcile(
                 gl_desc=gr.description,
                 gl_debit=gr.debit,
                 gl_credit=gr.credit,
+                gl_balance=gr.balance,
                 source_gl_file=gr.source_file,
             )
         )

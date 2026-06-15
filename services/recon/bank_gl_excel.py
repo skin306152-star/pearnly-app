@@ -338,6 +338,11 @@ def parse_gl_excel(
     # Calculate opening/closing if not found
     if not gl_opening_found:
         opening = 0.0
+    # 逐行运行余额(期初+累计借−贷)· 给导出"总账余额列"· 不参与匹配 · 银行账 GL debit=存入抬升
+    _bal = opening
+    for _r in rows:
+        _bal = round(_bal + _r.debit - _r.credit, 2)
+        _r.balance = _bal
     # BUG-FIX-T2 v118.35.0.43 · closing 优先用 balance 列最后一笔(防方向算反 · 资产 vs 收入科目)
     # 老公式 opening + credit - debit 对收入科目正确 · 对资产科目反 · balance 列直接读最稳
     # 没识别 balance 列(老文件无 คงเหลือ header)走老公式 · 0 regression

@@ -163,12 +163,15 @@ def _parse_gl_mrerp_table(
         if len(toks) < 4:
             continue
 
-        # Collect contiguous numeric tokens at the RIGHT (strict check — NOT _to_float)
+        # Collect contiguous monetary tokens at the RIGHT (strict check — NOT _to_float).
+        # 金额必须带小数点或千分位(. 或 ,)· 裸整数(如泰文公司名/工号后缀「111」
+        # 「บริษัท แจแปน 111 227,418.00」)是描述的一部分,不是金额 · 否则会被当成借/贷误读。
         num_vals: List[float] = []
         cut_idx = len(toks)
         for i in range(len(toks) - 1, -1, -1):
-            if _is_numeric_tok(toks[i]):
-                num_vals.insert(0, _to_float(toks[i]))
+            tok = toks[i]
+            if _is_numeric_tok(tok) and ("." in tok or "," in tok):
+                num_vals.insert(0, _to_float(tok))
                 cut_idx = i
             else:
                 break

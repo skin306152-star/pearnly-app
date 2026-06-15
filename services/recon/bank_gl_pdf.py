@@ -236,6 +236,13 @@ def parse_gl_pdf(
         hint = " (PDF has no extractable text)" if not any(t.strip() for t in page_texts) else ""
         return {"ok": False, "error": f"No GL rows found in PDF{hint}", "rows": []}
 
+    # 逐行运行余额(期初+累计借−贷 · 借=存入抬升)· 给导出"总账余额列"· 原始顺序算好附在行上,
+    # 不参与匹配。实测等于源 คงเหลือ 列(借贷正确时);对无余额列的 GL 也能算。
+    _bal = opening
+    for _r in rows:
+        _bal = round(_bal + _r.debit - _r.credit, 2)
+        _r.balance = _bal
+
     total_credit = sum(r.credit for r in rows)
     total_debit = sum(r.debit for r in rows)
     closing = round(opening + total_debit - total_credit, 2)

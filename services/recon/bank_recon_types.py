@@ -50,6 +50,7 @@ class GlRow:
     debit: float  # money out (≥ 0)
     credit: float  # money in (≥ 0)
     source_file: str = ""
+    balance: float = 0.0  # 行运行余额(期初+累计借−贷)· 仅展示/导出 · 不参与匹配 · 不入 row_hash
     row_hash: str = ""
 
     def __post_init__(self):
@@ -78,6 +79,7 @@ class BankReconRow:
     gl_desc: str = ""
     gl_debit: float = 0.0
     gl_credit: float = 0.0
+    gl_balance: float = 0.0  # GL 行运行余额(透传自 GlRow.balance)· 仅展示
     # Meta
     date_diff_days: Optional[int] = None
     source_stmt_file: str = ""

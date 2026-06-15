@@ -65,3 +65,12 @@ def _map_gl_cols(header_row: List) -> Dict[str, int]:
 def _extract_acct_code(text: str) -> str:
     m = _ACCT_RE.search(str(text or ""))
     return m.group(1) if m else ""
+
+
+def attach_running_balance(rows, opening: float) -> None:
+    """给每行附运行余额(期初 + 累计借−贷 · 借=存入抬升)· 原始顺序就地写 row.balance。
+    PDF/Excel 两个 GL 解析器共用 · 单点维护舍入与方向约定。仅展示/导出 · 不参与匹配。"""
+    bal = opening
+    for r in rows:
+        bal = round(bal + r.debit - r.credit, 2)
+        r.balance = bal

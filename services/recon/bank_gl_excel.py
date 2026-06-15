@@ -13,7 +13,11 @@ from typing import Dict, Any, Optional
 from services.recon.bank_recon_types import GlRow
 from services.recon.bank_recon_utils import _to_float, _parse_date, _is_gl_skip_row
 from services.recon.bank_table_io import _load_csv_sheets
-from services.recon.bank_gl_common import _map_gl_cols, _extract_acct_code
+from services.recon.bank_gl_common import (
+    _map_gl_cols,
+    _extract_acct_code,
+    attach_running_balance,
+)
 
 # 期初余额行关键词(4 语 · 仅"期初/承前",不含"期末/结转")· 我们的固定模板把标签放在
 # 日期列(非描述列),故识别期初要扫该行前几格而非只看描述列。
@@ -338,11 +342,8 @@ def parse_gl_excel(
     # Calculate opening/closing if not found
     if not gl_opening_found:
         opening = 0.0
-    # 逐行运行余额(期初+累计借−贷)· 给导出"总账余额列"· 不参与匹配 · 银行账 GL debit=存入抬升
-    _bal = opening
-    for _r in rows:
-        _bal = round(_bal + _r.debit - _r.credit, 2)
-        _r.balance = _bal
+    # 逐行运行余额(给导出"总账余额列"· 不参与匹配)· 共用 helper(单点维护借贷方向/舍入)
+    attach_running_balance(rows, opening)
     # BUG-FIX-T2 v118.35.0.43 · closing 优先用 balance 列最后一笔(防方向算反 · 资产 vs 收入科目)
     # 老公式 opening + credit - debit 对收入科目正确 · 对资产科目反 · balance 列直接读最稳
     # 没识别 balance 列(老文件无 คงเหลือ header)走老公式 · 0 regression

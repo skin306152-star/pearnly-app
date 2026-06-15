@@ -164,12 +164,6 @@ def template_signature(doc_type: str) -> str:
     return f"Pearnly-{doc_type.upper()}"
 
 
-def _col_letter(idx_1based: int) -> str:
-    from openpyxl.utils import get_column_letter
-
-    return get_column_letter(idx_1based)
-
-
 def _balance_formula(doc_type: str, row: int) -> str:
     """末列余额 = 上一行余额 + 入账 − 出账。
     statement: 列 C=支出 D=存入 E=余额 → =E{r-1}+D{r}-C{r}

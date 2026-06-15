@@ -21,7 +21,11 @@ from services.recon.bank_recon_utils import (
     MIN_PLUMBER_ROWS,
 )
 from services.recon.bank_table_io import _pdf_extract_text_safe
-from services.recon.bank_gl_common import _map_gl_cols, _extract_acct_code
+from services.recon.bank_gl_common import (
+    _map_gl_cols,
+    _extract_acct_code,
+    attach_running_balance,
+)
 from services.recon.bank_gl_pdf_mrerp import _parse_gl_mrerp_table
 from services.recon.bank_gl_stacked import parse_gl_stacked_pdf
 from services.recon.bank_gl_gemini import gemini_parse_gl
@@ -236,12 +240,8 @@ def parse_gl_pdf(
         hint = " (PDF has no extractable text)" if not any(t.strip() for t in page_texts) else ""
         return {"ok": False, "error": f"No GL rows found in PDF{hint}", "rows": []}
 
-    # 逐行运行余额(期初+累计借−贷 · 借=存入抬升)· 给导出"总账余额列"· 原始顺序算好附在行上,
-    # 不参与匹配。实测等于源 คงเหลือ 列(借贷正确时);对无余额列的 GL 也能算。
-    _bal = opening
-    for _r in rows:
-        _bal = round(_bal + _r.debit - _r.credit, 2)
-        _r.balance = _bal
+    # 逐行运行余额(给导出"总账余额列"· 原始顺序算好附在行上 · 不参与匹配)· 共用 helper。
+    attach_running_balance(rows, opening)
 
     total_credit = sum(r.credit for r in rows)
     total_debit = sum(r.debit for r in rows)

@@ -298,6 +298,7 @@ OCR_RESULT_I18N = {
         "err_need_key": "⚠️ 请先到网站「设置 → API Key」填入您的 Gemini API Key",
         "err_plan": "⚠️ 账号暂不可用 · 请联系管理员",
         "view_on_web": "网页历史记录查看详情 👉 https://pearnly.com",
+        "routed_to_purchase": "✅ 已收到票据 · 已放入「采购 · 待归类」\n到 pearnly.com 采购里确认入账 🧾",
     },
     "en": {
         "processing": "📸 Image received · recognizing...",
@@ -314,6 +315,7 @@ OCR_RESULT_I18N = {
         "err_need_key": "⚠️ Please set your Gemini API Key at 'Settings → API Key' on the website",
         "err_plan": "⚠️ Account unavailable · please contact admin",
         "view_on_web": "View details in web history 👉 https://pearnly.com",
+        "routed_to_purchase": "✅ Receipt received · added to Purchases · To-sort\nConfirm & post it under Purchases at pearnly.com 🧾",
     },
     "th": {
         "processing": "📸 รับรูปแล้ว · กำลังอ่าน...",
@@ -330,6 +332,7 @@ OCR_RESULT_I18N = {
         "err_need_key": "⚠️ กรุณาตั้งค่า Gemini API Key ที่ 'การตั้งค่า → API Key' บนเว็บก่อน",
         "err_plan": "⚠️ บัญชีไม่พร้อมใช้งาน · กรุณาติดต่อผู้ดูแล",
         "view_on_web": "ดูรายละเอียดบนเว็บ 👉 https://pearnly.com",
+        "routed_to_purchase": "✅ รับใบเสร็จแล้ว · เข้า「จัดซื้อ · รอจัดประเภท」\nยืนยันและบันทึกที่เมนูจัดซื้อ pearnly.com 🧾",
     },
     "ja": {
         "processing": "📸 画像を受信 · 認識中...",
@@ -346,6 +349,7 @@ OCR_RESULT_I18N = {
         "err_need_key": "⚠️ Web の「設定 → API Key」で Gemini API Key を設定してください",
         "err_plan": "⚠️ アカウント利用不可 · 管理者にお問い合わせください",
         "view_on_web": "Web で履歴を確認 👉 https://pearnly.com",
+        "routed_to_purchase": "✅ 領収書を受信 · 「仕入 · 未分類」に追加\npearnly.com の仕入で確認・登録してください 🧾",
     },
 }
 

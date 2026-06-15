@@ -1,21 +1,24 @@
 """
 services/ocr/line_image_ocr.py · LINE Bot 图片/文件 OCR 后台任务
 
-LINE 收图 → OCR 识别 → 落「采购/进项 · 待归类」(route_line_image),让老板在采购 inbox 一点入账。
-2026-06-15(Zihao 拍板):LINE 图片识别的智能分流只保留「→ 采购进项」一条;不再写「识别记录」
-(ocr_history)、不再走识别中心的缓存命中 / 异常栏 hook。采购进项 / 录入工作台自己的上传 OCR
-识别是网页另一套代码,一字不动。计费仍按 credits 口径扣(与历史脱钩 · history_id=None)。
+从 app.py 抽出(REFACTOR-WB-app · 2026-06-01 · 纯搬家 0 逻辑改)。
+line_webhook_routes._handle_line_event 里 lazy import 调到;依赖的 _ocr_* helpers
+直接 from services.ocr.entrypoints import,不经 app.py → 解循环 import。
 """
 
-import logging
 import os
+import logging
 
 from core import db
 from core import workspace_context as wc
+from core.db import insert_ocr_history
+from services.exceptions.exception_checks import _async_run_exception_checks
 from services.ocr.entrypoints import (
     all_pages_not_invoice as _ocr_all_pages_not_invoice,
     billing_quote as _ocr_billing_quote,
     charge_successful_ocr as _ocr_charge_success,
+    content_hash as _ocr_content_hash,
+    get_cached_history as _ocr_get_cached,
     is_supported_ocr_file as _ocr_is_supported_file,
     run_pipeline_for_file as _ocr_run_pipeline_file,
 )
@@ -35,11 +38,16 @@ async def _handle_line_image_ocr(
     lang: str,
     filename: str = None,
 ):
-    """LINE 图片/文件 → OCR → 落采购待归类(不写识别记录)。
-
-    步骤:① 下载 ② credits 检查 ③ OCR pipeline ④ 智能分流落采购进项 ⑤ 扣费 ⑥ 回执。
+    """
+    异步处理 LINE 图片/文件消息:
+      1. 下载内容
+      2. 按网页上传同一支持清单喂 OCR pipeline
+      3. 插入 ocr_history(source='line_bot')
+      4. 非缓存成功识别后按 credits 定价扣费
+      5. push 结果给用户
     """
     try:
+        # 1. 下载
         file_bytes = line_client.download_message_content(message_id)
         filename = filename or f"line_{message_id}.jpg"
         if not file_bytes:
@@ -49,25 +57,85 @@ async def _handle_line_image_ocr(
             line_client.push_text(line_user_id, line_client.t_line(lang, "unsupported"))
             return
 
+        # 2. 用户 / credits 检查(复用网页入口的 credits 逻辑)
         user_fresh = db.find_user_by_id(bound_user["id"])
         if not user_fresh:
             line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_plan"))
             return
 
-        # LINE 无顶栏套账切换器 → 归 LINE 用户租户的默认套账(绑定店)。缺则 None(不拦)。
+        # PO-4 · LINE 上传套账分流(product-vision §三-bis):LINE 无顶栏切换器,
+        # 归 LINE 用户租户的默认套账(绑定店)。缺则 None(insert 内 NULL · 不拦上传)。
         _ws_client_id = wc.default_workspace_for_write(user_fresh.get("tenant_id"))
+
+        # 3. 文件指纹缓存查找:命中则跳 OCR + 跳扣费(缓存按套账隔离)
+        file_hash = _ocr_content_hash(file_bytes)
+        cached = _ocr_get_cached(user_fresh, file_hash, workspace_client_id=_ws_client_id)
+        if cached:
+            logger.info(f"[line_ocr] 命中文件缓存 (hash={file_hash[:12]}...) hid={cached['id']}")
+            # 跑异常 hook(同网页缓存命中分支 · 不重复扣配额)
+            try:
+                import asyncio as _asyncio_exc_lc
+
+                _cached_pages = cached.get("pages") or []
+                _primary = next(
+                    (
+                        p
+                        for p in _cached_pages
+                        if not p.get("is_duplicate") and not p.get("is_copy")
+                    ),
+                    None,
+                )
+                _primary = _primary or (_cached_pages[0] if _cached_pages else None)
+                _cf = (_primary or {}).get("fields") or {}
+                _exc_total_c = None
+                _raw_t_c = _cf.get("total_amount")
+                if _raw_t_c:
+                    try:
+                        _exc_total_c = float(str(_raw_t_c).replace(",", "").strip())
+                    except Exception as e:
+                        logger.warning(f"[line_cache] total_amount 解析失败: {e}")
+                _asyncio_exc_lc.create_task(
+                    _async_run_exception_checks(
+                        history_id=str(cached["id"]),
+                        user_id=str(user_fresh["id"]),
+                        tenant_id=(
+                            str(user_fresh.get("tenant_id"))
+                            if user_fresh.get("tenant_id")
+                            else None
+                        ),
+                        seller_name=_cf.get("seller_name"),
+                        invoice_no=_cf.get("invoice_number"),
+                        total_amount=_exc_total_c,
+                        confidence=cached.get("confidence"),
+                        duplicate=None,
+                        fields=_cf,
+                    )
+                )
+                logger.info(f"  🛡  [LINE Cache] 异常检测已入队 · hid={cached['id']}")
+            except Exception as _e_lc:
+                logger.warning(f"[line_ocr] 缓存异常检测入队失败: {_e_lc}")
+            # 推 cached 结果给用户(模拟 OCR 完成)
+            reply_txt = line_client.format_ocr_result_for_line(
+                lang, cached.get("pages") or [], invoice_count=len(cached.get("pages") or [])
+            )
+            line_client.push_text(line_user_id, reply_txt)
+            return
 
         quote = _ocr_billing_quote(user_fresh, file_bytes, filename, max_pages=50)
         if not quote.get("allowed"):
             code = quote.get("error_code")
-            key = "err_quota" if code == "insufficient_balance" else "err_ocr"
-            line_client.push_text(line_user_id, line_client.t_ocr(lang, key))
+            if code == "insufficient_balance":
+                line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_quota"))
+            else:
+                line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
             return
 
+        # 4. OCR · 新 pipeline 唯一路径
         own_key = (
             user_fresh.get("gemini_api_key") or user_fresh.get("custom_gemini_api_key") or ""
         ).strip()
         api_key = own_key or None
+        # 检查 API key 可用性(用户自带或系统默认)
         if not api_key and not os.environ.get("GEMINI_API_KEY", "").strip():
             line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_plan"))
             return
@@ -75,7 +143,12 @@ async def _handle_line_image_ocr(
         try:
             from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
 
-            _pipe_res = _ocr_run_pipeline_file(file_bytes, filename, api_key=api_key, max_pages=50)
+            _pipe_res = _ocr_run_pipeline_file(
+                file_bytes,
+                filename,
+                api_key=api_key,
+                max_pages=50,
+            )
             result = pipeline_result_to_legacy_dict(_pipe_res)
             _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
             logger.info(
@@ -88,46 +161,109 @@ async def _handle_line_image_ocr(
             return
 
         pages = result.get("pages") or []
-        if not pages or _ocr_all_pages_not_invoice(pages):
+        if not pages:
+            line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
+            return
+        if _ocr_all_pages_not_invoice(pages):
             line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
             return
 
-        # 智能分流:LINE 票 → 采购进项待归类(唯一去向 · 不再进识别记录)。
-        # 事务所 firm / 未开 expense / 无默认套账 / 异常 → route_line_image 内部早退,不影响回执。
+        # 智能分流(2026-06-15 改为按业态二选一):
+        #   商户(非 firm)+ 开 expense → 落采购进项待归类,【不进识别记录】,回执提示进采购。
+        #   事务所(firm)/ 未开 expense → 走下方识别记录原路(history + 异常栏 + 识别回执),一字不动。
+        routed_to_purchase = False
         try:
             from services.purchase.intake import fields_from_invoice, route_line_image
 
             _pages_struct = getattr(_pipe_res, "pages", None) or []
             if _pages_struct and _ws_client_id:
-                route_line_image(
-                    tenant_id=user_fresh.get("tenant_id"),
-                    workspace_client_id=_ws_client_id,
-                    fields=fields_from_invoice(_pages_struct[0].invoice),
-                    confidence=result.get("confidence"),
+                routed_to_purchase = bool(
+                    route_line_image(
+                        tenant_id=user_fresh.get("tenant_id"),
+                        workspace_client_id=_ws_client_id,
+                        fields=fields_from_invoice(_pages_struct[0].invoice),
+                        confidence=result.get("confidence"),
+                    )
                 )
         except Exception as _route_err:
             logger.warning(f"[line_ocr] 采购分流跳过: {_route_err}")
 
-        # 扣费(credits 口径 · 不写识别记录 → history_id=None)。
-        try:
-            import asyncio as _acharge
+        if routed_to_purchase:
+            # 商户:已进采购待归类 → 不写识别记录;计费与历史脱钩(history_id=None);回执指向采购。
+            try:
+                import asyncio as _acharge
 
-            _acharge.create_task(
-                _acharge.to_thread(
-                    _ocr_charge_success, user_fresh, quote, None, f"LINE OCR · {filename}"
+                _acharge.create_task(
+                    _acharge.to_thread(
+                        _ocr_charge_success, user_fresh, quote, None, f"LINE OCR · {filename}"
+                    )
                 )
-            )
-        except Exception as _chg_e:
-            logger.warning(f"[line_ocr] credits charge dispatch failed: {_chg_e}")
+            except Exception as _chg_e:
+                logger.warning(f"[line_ocr] credits charge dispatch failed: {_chg_e}")
+            try:
+                db.log_ocr_cost(
+                    user_id=str(user_fresh["id"]),
+                    tenant_id=(
+                        str(user_fresh.get("tenant_id")) if user_fresh.get("tenant_id") else None
+                    ),
+                    history_id=None,
+                    engine="pipeline_v1",
+                    pages=len(pages),
+                    input_tokens=sum(int(p.get("input_tokens") or 0) for p in pages),
+                    output_tokens=sum(int(p.get("output_tokens") or 0) for p in pages),
+                    cost_thb=_pipeline_cost_thb,
+                    elapsed_ms=int(result.get("elapsed_ms") or 0),
+                )
+            except Exception as _ce:
+                logger.warning(f"[line_ocr] cost log failed (non-blocking): {_ce}")
+            line_client.push_text(line_user_id, line_client.t_ocr(lang, "routed_to_purchase"))
+            logger.info(f"[line_ocr] 完成 · → 采购待归类 · user={user_fresh['id']}")
+            return
 
-        # cost 埋点(history_id=None)。
+        # 5. 写 history(source='line_bot')· 事务所/未开 expense 走识别记录
+        # file_hash 已在 3.5 计算(v118.22.0.3)
+        try:
+            hid = insert_ocr_history(
+                user_id=str(user_fresh["id"]),
+                tenant_id=str(user_fresh.get("tenant_id")) if user_fresh.get("tenant_id") else None,
+                filename=filename,
+                page_count=int(quote.get("page_count") or result.get("page_count") or len(pages)),
+                pages=pages,
+                confidence=result.get("confidence") or "unknown",
+                elapsed_ms=result.get("elapsed_ms") or 0,
+                file_size_kb=len(file_bytes) // 1024,
+                file_hash=file_hash,
+                source="line_bot",
+                source_ref=line_user_id,
+                workspace_client_id=_ws_client_id,  # PO-4 · 归 LINE 绑定店套账
+            )
+        except Exception as e:
+            logger.warning(f"[line_ocr] 写 history 失败(不影响回复): {e}")
+            hid = None
+        if hid:
+            try:
+                import asyncio as _asyncio_charge_l
+
+                _asyncio_charge_l.create_task(
+                    _asyncio_charge_l.to_thread(
+                        _ocr_charge_success,
+                        user_fresh,
+                        quote,
+                        str(hid),
+                        f"LINE OCR · {filename} · {str(hid)[:8]}",
+                    )
+                )
+            except Exception as _chg_e:
+                logger.warning(f"[line_ocr] credits charge dispatch failed: {_chg_e}")
+
+        # LINE 入口 cost 埋点(pipeline 唯一路径,100% 记录)
         try:
             _line_in = sum(int(p.get("input_tokens") or 0) for p in pages)
             _line_out = sum(int(p.get("output_tokens") or 0) for p in pages)
             db.log_ocr_cost(
                 user_id=str(user_fresh["id"]),
                 tenant_id=str(user_fresh.get("tenant_id")) if user_fresh.get("tenant_id") else None,
-                history_id=None,
+                history_id=hid,
                 engine="pipeline_v1",
                 pages=len(pages),
                 input_tokens=_line_in,
@@ -135,13 +271,72 @@ async def _handle_line_image_ocr(
                 cost_thb=_pipeline_cost_thb,
                 elapsed_ms=int(result.get("elapsed_ms") or 0),
             )
+            logger.info(f"💰 [line_ocr] cost log · ฿{_pipeline_cost_thb:.4f}")
         except Exception as _ce:
             logger.warning(f"[line_ocr] cost log failed (non-blocking): {_ce}")
 
-        # 回执:把识别到的字段回给用户(确认已收票 · 已进采购待归类)。
+        # 5.5 · 异常栏 hook(v118.22.0.2 修复 · LINE 入口此前漏挂 · 致 LINE 票据从不进 5 类规则)
+        # v118.22.0.3 · 增加 duplicate 预检 · 让 LINE 票据也享有「重复发票拦截」防护
+        if hid:
+            try:
+                import asyncio as _asyncio_exc_l
+
+                _primary = pages[0] if pages else {}
+                _f = _primary.get("fields") or {}
+                _exc_total = None
+                _raw_t = _f.get("total_amount")
+                if _raw_t:
+                    try:
+                        _exc_total = float(str(_raw_t).replace(",", "").strip())
+                    except Exception as e:
+                        logger.warning(f"[line_ocr_exc] total_amount 解析失败: {e}")
+                # duplicate 检测(同网页入口)
+                _dup = None
+                try:
+                    _dup_raw = db.check_duplicate_invoice(
+                        user_id=str(user_fresh["id"]),
+                        invoice_no=_f.get("invoice_number"),
+                        invoice_date=_f.get("invoice_date"),
+                        seller_name=_f.get("seller_name"),
+                        total_amount=_exc_total,
+                        exclude_id=str(hid),
+                        workspace_client_id=_ws_client_id,  # PO-4 · 重复检测限本套账
+                    )
+                    if _dup_raw:
+                        _dup = {
+                            "level": _dup_raw.get("level"),
+                            "matched_fields": _dup_raw.get("matched_fields"),
+                            "match": _dup_raw.get("match"),
+                        }
+                except Exception as _e_dup:
+                    logger.warning(f"[line_ocr] duplicate 检测失败(不影响 hook): {_e_dup}")
+                _asyncio_exc_l.create_task(
+                    _async_run_exception_checks(
+                        history_id=str(hid),
+                        user_id=str(user_fresh["id"]),
+                        tenant_id=(
+                            str(user_fresh.get("tenant_id"))
+                            if user_fresh.get("tenant_id")
+                            else None
+                        ),
+                        seller_name=_f.get("seller_name"),
+                        invoice_no=_f.get("invoice_number"),
+                        total_amount=_exc_total,
+                        confidence=result.get("confidence"),
+                        duplicate=_dup,
+                        fields=_f,
+                    )
+                )
+                logger.info(
+                    f"  🛡  [LINE] 异常检测已入队 · hid={hid} · dup={'有' if _dup else '无'}"
+                )
+            except Exception as _e:
+                logger.warning(f"[line_ocr] 异常检测入队失败(不影响推送): {_e}")
+
+        # 6. 推送识别结果
         reply_txt = line_client.format_ocr_result_for_line(lang, pages, invoice_count=len(pages))
         line_client.push_text(line_user_id, reply_txt)
-        logger.info(f"[line_ocr] 完成 · user={user_fresh['id']} · → 采购待归类")
+        logger.info(f"[line_ocr] 完成 · user={user_fresh['id']} · hid={hid}")
 
     except Exception as e:
         logger.exception(f"[line_ocr] 未知异常: {e}")

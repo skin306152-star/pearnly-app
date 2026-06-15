@@ -253,18 +253,29 @@ def _btn(label: str, *, primary: bool, postback: str = None, uri: str = None, da
     }
 
 
+def _record_link(web_url: str, ref: str, state: str) -> str:
+    """深链到该记录复核屏(在 LINE 里打开即走 LIFF 鉴权 + 定位该单):doc 态 → /liff/purchase/{id};
+    inbox → /liff/purchase-inbox/{id}(待归类页)。无 ref 回通用页(不死链)。"""
+    if not ref:
+        return web_url
+    base = web_url.split("/home")[0].rstrip("/") or "https://pearnly.com"
+    path = "purchase-inbox" if state == "inbox" else "purchase"
+    return f"{base}/liff/{path}/{ref}"
+
+
 def _footer(state: str, ref: str, web_url: str, t: dict, can_post: bool) -> list:
     """唯一实心主按钮=提交动作;复核/编辑/撤销/丢弃=link 文字链接(非按钮)。永不死路。"""
     primary, links = None, []
+    edit_uri = _record_link(web_url, ref, state)
     if state == "posted":
         links = [
-            _btn(t["btn_review"], primary=False, uri=web_url),
+            _btn(t["btn_review"], primary=False, uri=edit_uri),
             _btn(t["btn_undo"], primary=False, postback=line_postback.undo_data(ref), danger=True),
         ]
     elif state == "confirm":
         primary = _btn(t["btn_confirm"], primary=True, postback=line_postback.confirm_data(ref))
         links = [
-            _btn(t["btn_edit"], primary=False, uri=web_url),
+            _btn(t["btn_edit"], primary=False, uri=edit_uri),
             _btn(
                 t["btn_discard"],
                 primary=False,
@@ -275,7 +286,7 @@ def _footer(state: str, ref: str, web_url: str, t: dict, can_post: bool) -> list
     elif state == "dup":
         primary = _btn(t["btn_post_anyway"], primary=True, postback=line_postback.confirm_data(ref))
         links = [
-            _btn(t["btn_open"], primary=False, uri=web_url),
+            _btn(t["btn_open"], primary=False, uri=edit_uri),
             _btn(
                 t["btn_discard"],
                 primary=False,
@@ -288,7 +299,7 @@ def _footer(state: str, ref: str, web_url: str, t: dict, can_post: bool) -> list
             primary = _btn(
                 t["btn_post_anyway"], primary=True, postback=line_postback.inbox_post_data(ref)
             )
-        links = [_btn(t["btn_fill"], primary=False, uri=web_url)]
+        links = [_btn(t["btn_fill"], primary=False, uri=edit_uri)]
         if ref:
             links.append(
                 _btn(

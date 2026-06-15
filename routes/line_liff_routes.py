@@ -76,3 +76,9 @@ async def api_liff_auth(req: LiffAuthIn):
 async def liff_purchase_entry(doc_id: str, request: Request):
     """LIFF 页入口:跳 /home 复核屏(前端按 liff 参数走 LIFF 鉴权 + 打开该单)。"""
     return RedirectResponse(f"/home?liff=purchase&doc={doc_id}", status_code=302)
+
+
+@router.get("/liff/purchase-inbox/{item_id}")
+async def liff_purchase_inbox_entry(item_id: str, request: Request):
+    """LIFF 入口(待归类):跳 /home 待归类页(前端走 LIFF 鉴权 + 定位该待归类项)。"""
+    return RedirectResponse(f"/home?liff=purchase&inbox={item_id}", status_code=302)

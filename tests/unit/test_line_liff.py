@@ -74,5 +74,19 @@ class LiffAuthRouteTests(unittest.TestCase):
         self.assertEqual(res["data"]["token"], "JWT-XYZ")
 
 
+class LiffEntryRedirectTests(unittest.TestCase):
+    """LIFF 深链入口跳 /home 带参(PO-4):doc → 复核屏该单;inbox → 待归类该项。"""
+
+    def test_purchase_entry_redirects_with_doc(self):
+        res = asyncio.run(liff.liff_purchase_entry("D1", None))
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(res.headers["location"], "/home?liff=purchase&doc=D1")
+
+    def test_inbox_entry_redirects_with_item(self):
+        res = asyncio.run(liff.liff_purchase_inbox_entry("IT1", None))
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(res.headers["location"], "/home?liff=purchase&inbox=IT1")
+
+
 if __name__ == "__main__":
     unittest.main()

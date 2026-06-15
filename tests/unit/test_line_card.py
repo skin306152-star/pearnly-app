@@ -181,5 +181,38 @@ class DocTypeLabelTests(unittest.TestCase):
         self.assertEqual(line_card.doc_type_label("weird_type", "zh"), "weird_type")
 
 
+class RecordDeepLinkTests(unittest.TestCase):
+    """PO-4:卡按钮深链到该记录(LINE 打开即定位该单/待归类),不跳通用页。"""
+
+    WEB = "https://pearnly.com/home"
+
+    def test_doc_state_links_to_record(self):
+        self.assertEqual(
+            line_card._record_link(self.WEB, "D9", "confirm"),
+            "https://pearnly.com/liff/purchase/D9",
+        )
+
+    def test_inbox_links_to_inbox_page(self):
+        self.assertEqual(
+            line_card._record_link(self.WEB, "IT1", "inbox"),
+            "https://pearnly.com/liff/purchase-inbox/IT1",
+        )
+
+    def test_no_ref_falls_back_to_web(self):
+        self.assertEqual(line_card._record_link(self.WEB, "", "confirm"), self.WEB)
+
+    def test_card_footer_embeds_deep_link(self):
+        import json
+
+        c = line_card.result_card(
+            state="confirm",
+            amount="50",
+            fields={"document_type": "receipt"},
+            doc_id="D9",
+            lang="zh",
+        )
+        self.assertIn("/liff/purchase/D9", json.dumps(c, ensure_ascii=False))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -5,6 +5,7 @@
 /* global t, escapeHtml */
 
 const LIFF_DOC_KEY = 'pearnly_liff_doc';
+const LIFF_INBOX_KEY = 'pearnly_liff_inbox';
 const LIFF_SDK_SRC = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
 
 interface LiffSdk {
@@ -64,7 +65,7 @@ function liffErrKey(body: unknown): string {
     return 'liff-open-in-line';
 }
 
-async function liffEntry(doc: string | null): Promise<void> {
+async function liffEntry(doc: string | null, inbox: string | null): Promise<void> {
     mask(tx('liff-signing-in', '正在登录 LINE…'));
     const liffId = (window as unknown as { __PEARNLY_LIFF_ID__?: string }).__PEARNLY_LIFF_ID__;
     const liff = await loadLiffSdk();
@@ -91,25 +92,33 @@ async function liffEntry(doc: string | null): Promise<void> {
         }
         localStorage.setItem('mrpilot_token', body.data.token);
         if (doc) sessionStorage.setItem(LIFF_DOC_KEY, doc);
-        // 带 token 重进 /home(去掉 liff 参数)· 正常引导起来后 liffResume 打开复核屏。
+        if (inbox) sessionStorage.setItem(LIFF_INBOX_KEY, inbox);
+        // 带 token 重进 /home(去掉 liff 参数)· 正常引导起来后 liffResume 打开复核屏/待归类。
         location.replace('/home');
     } catch (_) {
         mask(tx('liff-open-in-line', '请在 LINE 中打开此页面'));
     }
 }
 
-// 回到带 token 的 /home 后:打开复核屏对应单(等 purchase-form 就绪)。
+// 回到带 token 的 /home 后:深链落点 —— doc 开复核屏对应单,inbox 开待归类页(等路由就绪)。
 function liffResume(): void {
     const doc = sessionStorage.getItem(LIFF_DOC_KEY);
-    if (!doc) return;
+    const inbox = sessionStorage.getItem(LIFF_INBOX_KEY);
+    if (!doc && !inbox) return;
     sessionStorage.removeItem(LIFF_DOC_KEY);
+    sessionStorage.removeItem(LIFF_INBOX_KEY);
     let tries = 0;
     const open = () => {
+        if (inbox) {
+            if (typeof window.routeTo === 'function') window.routeTo('purchase-inbox');
+            else if (tries++ < 40) setTimeout(open, 120);
+            return;
+        }
         if (typeof window.openPurchaseForm === 'function') window.openPurchaseForm(doc);
         else if (tries++ < 40) setTimeout(open, 120);
     };
     open();
 }
 
-if (qp('liff') === 'purchase') liffEntry(qp('doc'));
+if (qp('liff') === 'purchase') liffEntry(qp('doc'), qp('inbox'));
 else liffResume();

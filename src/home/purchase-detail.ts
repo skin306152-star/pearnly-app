@@ -78,6 +78,7 @@ function infoCard(d: DocDetail): string {
             ${field(t('pur-doc-no'), escapeHtml(d.doc_no || '—'))}
             ${field(t('pur-type'), `<span class="badge purple">${escapeHtml(t(kindLabelKey(d.doc_kind)))}</span>`)}
             ${field(t('pur-doc-date'), escapeHtml(d.doc_date || '—'), 'tnum')}
+            ${field(t('pur-due'), escapeHtml(d.due_date || '—'), 'tnum')}
             ${field(t('pur-currency-fx'), fx)}
             ${field(t('pur-col-source'), `<span class="badge neutral">${escapeHtml(t(srcLabelKey(d.source)))}</span>`)}
             ${field(t('pur-batch'), batch)}

@@ -3,7 +3,7 @@
 // 全引全站令牌(home-01-base :root + :root.dark)· 零硬编码 hex · 暗夜随翻面不反白。
 export const PURCHASE_DETAIL_CSS = `
 .pur.d .wrap{width:100%;}
-.pur.d .ph,.pur.d .summary,.pur.d .grid{max-width:1180px;margin-left:auto;margin-right:auto;}
+/* 满宽铺满到边(与列表/其它采购页一致)· 不限宽不居中 · 缩小/放大窗口都贴边 */
 
 /* 顶栏:面板卡 · 返回 + 标题 + 面包屑 + 右上动作 */
 .pur.d .ph{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:20px 22px;border:1px solid var(--line);border-radius:18px;background:var(--card);box-shadow:var(--sh);margin-bottom:18px;}

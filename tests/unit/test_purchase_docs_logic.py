@@ -82,6 +82,38 @@ class PostingGuardTests(unittest.TestCase):
         self.assertEqual(e.exception.code, "purchase.not_draft")
 
 
+def _update(row):
+    # 守卫在重算/写库前早退,故 data/settings 给空即可触发。
+    return docs_svc.update_draft(
+        FakeCursor(row),
+        tenant_id="t",
+        workspace_client_id=1,
+        created_by="u",
+        doc_id="d",
+        data={},
+        settings={},
+    )
+
+
+class UpdateDraftGuardTests(unittest.TestCase):
+    """编辑只针对草稿原地改(前端 PUT 修法前提):posted/void 拒改,缺单 404。"""
+
+    def test_update_missing_doc_404(self):
+        with self.assertRaises(PosError) as e:
+            _update(None)
+        self.assertEqual(e.exception.code, "purchase.unexpected")
+
+    def test_update_posted_blocked(self):
+        with self.assertRaises(PosError) as e:
+            _update({"status": "posted"})
+        self.assertEqual(e.exception.code, "purchase.not_draft")
+
+    def test_update_void_blocked(self):
+        with self.assertRaises(PosError) as e:
+            _update({"status": "void"})
+        self.assertEqual(e.exception.code, "purchase.not_draft")
+
+
 class LineValidationTests(unittest.TestCase):
     def test_empty_lines_invalid(self):
         with self.assertRaises(PosError):

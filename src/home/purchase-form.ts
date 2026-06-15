@@ -434,11 +434,13 @@ function payload(status: 'draft' | 'posted'): unknown {
 
 async function submit(status: 'draft' | 'posted'): Promise<void> {
     try {
-        const res = (await papi('POST', '/api/purchase/docs', payload(status))) as {
-            doc?: { id?: string };
-        };
-        const id = res.doc && res.doc.id;
-        if (status === 'posted' && id) await papi('POST', `/api/purchase/docs/${id}/post`, {});
+        const body = payload(status);
+        const path = st!.id ? `/api/purchase/docs/${st!.id}` : '/api/purchase/docs';
+        // 已存在草稿走 PUT 原地更新(防保存时新建重复单),新单才 POST。
+        const res = (await papi(st!.id ? 'PUT' : 'POST', path, body)) as { doc?: { id?: string } };
+        const docId = st!.id || (res.doc && res.doc.id);
+        if (status === 'posted' && docId)
+            await papi('POST', `/api/purchase/docs/${docId}/post`, {});
         showToast(t(status === 'posted' ? 'pur-posted-ok' : 'pur-draft-ok'), 'success');
         window.routeTo?.('purchase');
     } catch (e) {

@@ -112,6 +112,15 @@ function segHtml(): string {
         .join('');
 }
 
+// 行尾状态片:草稿(黄 · 可编辑补全)/ 已作废(灰)区别于已入账;已入账才显付款态(付款只对入账单有意义)。
+function statusChip(d: DocListItem): string {
+    if (d.status === 'draft')
+        return `<span class="st draft">${escapeHtml(t('pur-status-draft'))}</span>`;
+    if (d.status === 'void')
+        return `<span class="st void">${escapeHtml(t('pur-status-void'))}</span>`;
+    return `<span class="st ${d.payment_status}">${escapeHtml(t('pur-pay-' + d.payment_status))}</span>`;
+}
+
 function rowHtml(d: DocListItem): string {
     const sup = escapeHtml(d.supplier_name || '—');
     const vat =
@@ -125,7 +134,7 @@ function rowHtml(d: DocListItem): string {
         <span class="dt tnum">${escapeHtml(fmtMonthDay(d.doc_date))}</span>
         <div class="who"><div class="nm">${sup}</div><div class="meta">${srcChip(d)}<span>${escapeHtml(typeLabel(d))}</span>${att}</div></div>
         <div class="amt"><div class="v">${fmtBaht(d.grand_total)}</div>${vat}</div>
-        <span class="st ${d.payment_status}">${escapeHtml(t('pur-pay-' + d.payment_status))}</span>
+        ${statusChip(d)}
     </div>`;
 }
 
@@ -270,17 +279,24 @@ function syncGroupChecks(): void {
 
 async function bulkDelete(): Promise<void> {
     if (!selected.size) return;
+    // 仅草稿可删;已入账/已作废单据请走作废冲销(后端亦 not_draft 拦)。选中含非草稿则只删草稿。
+    const draftIds = Array.from(selected).filter(
+        (id) => allDocs.find((d) => d.id === id)?.status === 'draft'
+    );
+    if (!draftIds.length) {
+        showToast(t('purchase.not_draft'), 'error');
+        return;
+    }
     // 用 app 样式弹窗 showConfirm · 不用浏览器原生弹窗。
     if (typeof window.showConfirm === 'function') {
-        const okc = await window.showConfirm(t('pur-bulk-confirm', { n: String(selected.size) }));
+        const okc = await window.showConfirm(t('pur-bulk-confirm', { n: String(draftIds.length) }));
         if (!okc) return;
     }
     const ws = activeWsId();
-    const ids = Array.from(selected);
     const q = ws != null ? '?workspace_client_id=' + ws : '';
     try {
-        await Promise.all(ids.map((id) => papi('DELETE', `/api/purchase/docs/${id}${q}`)));
-        showToast(t('pur-bulk-deleted', { n: String(ids.length) }), 'success');
+        await Promise.all(draftIds.map((id) => papi('DELETE', `/api/purchase/docs/${id}${q}`)));
+        showToast(t('pur-bulk-deleted', { n: String(draftIds.length) }), 'success');
         selected.clear();
         load();
     } catch (e) {

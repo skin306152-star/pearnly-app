@@ -83,6 +83,8 @@ export const PURCHASE_LIST_CSS = `
 .pur.pl .st{font-size:11px;padding:3px 10px;border-radius:7px;min-width:52px;text-align:center;}
 .pur.pl .st.paid{background:var(--line2);color:var(--ink2);}
 .pur.pl .st.unpaid,.pur.pl .st.partial{background:var(--amber-weak);color:var(--amber);font-weight:600;}
+.pur.pl .st.draft{background:var(--amber-weak);color:var(--amber);font-weight:700;}
+.pur.pl .st.void{background:var(--line2);color:var(--ink3);text-decoration:line-through;}
 .pur.pl .listfoot{text-align:center;color:var(--ink3);font-size:12px;padding:12px 0 4px;}
 .pur.pl .listfoot:empty{display:none;}
 /* 主操作响应式:桌面=记一笔(手动)· 手机=拍照(调原生相机)· 见 purchase-list.ts */

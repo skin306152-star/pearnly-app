@@ -292,37 +292,6 @@ def line_expense_gate_open(cur, *, tenant_id) -> bool:
     return modules_store.is_enabled(cur, tenant_id=tenant_id, module_key="expense")
 
 
-def route_line_image(*, tenant_id, workspace_client_id, fields, confidence) -> bool:
-    """LINE 收图分流(纯加法):商户租户 → 落采购待办 intake_item(等用户在采购 inbox 一点)。
-
-    事务所(firm)/ 未选业态 / 未开 expense → 返回 False 不动,识别中心路径一字不变。自开游标。
-    调用方须用 try/except 包裹:本函数任何异常都不得影响既有 LINE 回复。
-    """
-    if not tenant_id or not workspace_client_id:
-        return False
-    from core import db
-
-    with db.get_cursor_rls(str(tenant_id), commit=True) as cur:
-        if not line_expense_gate_open(cur, tenant_id=str(tenant_id)):
-            return False
-        kind, route = judge_direction(
-            fields,
-            my_tax_id=_my_tax_id(
-                cur, tenant_id=str(tenant_id), workspace_client_id=workspace_client_id
-            ),
-        )
-        _stash_inbox(
-            cur,
-            tenant_id=str(tenant_id),
-            workspace_client_id=workspace_client_id,
-            source="line",
-            raw=fields,
-            image_url=None,
-            ai_guess={"kind": kind, "route": route, "confidence": confidence},
-        )
-        return True
-
-
 def list_inbox(cur, *, tenant_id, workspace_client_id) -> list[dict]:
     """待归类收件箱:本套账 status='pending' 的 intake_items(新→旧)。供前端一点归类。"""
     cur.execute(

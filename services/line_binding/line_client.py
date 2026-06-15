@@ -184,6 +184,31 @@ def push_text(to_line_user_id: str, text: str) -> bool:
         return False
 
 
+def start_loading(to_line_user_id: str, loading_seconds: int = 20) -> bool:
+    """显示「正在输入…」转圈动画(1:1 聊天 · ≤60s · docs/smart-intake/15 §2)。
+
+    收图/调 L2 前立即调,识别完发结果即自动消失。loadingSeconds 取 5 的倍数(API 约束)。
+    尽力而为,失败不抛(不得阻塞主流程)。
+    """
+    token = _get_channel_token()
+    if not token or not to_line_user_id:
+        return False
+    secs = max(5, min(60, (int(loading_seconds) // 5) * 5 or 5))
+    payload = json.dumps({"chatId": to_line_user_id, "loadingSeconds": secs}).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.line.me/v2/bot/chat/loading/start",
+        data=payload,
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return resp.status in (200, 202)
+    except Exception as e:
+        logger.warning(f"LINE start_loading 失败(不阻塞): {e}")
+        return False
+
+
 def create_rich_menu(payload: Dict[str, Any]) -> Optional[str]:
     """建 Rich Menu(返 richMenuId · 整合用 · 需再 setDefault + 上传背景图)。失败 None。
 

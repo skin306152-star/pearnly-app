@@ -133,50 +133,25 @@ class _FakeCM:
         return False
 
 
-class LineDispatchFirmSafetyTests(unittest.TestCase):
-    """LINE 底线(铁律 #26):事务所 firm / 未选业态 → route_line_image 不落库、返回 False。"""
+class LineGateTests(unittest.TestCase):
+    """LINE 入账门控(统一智能通道 · 2026-06-15):开 expense 即放行(不按业态分)。
 
-    def _run(self, business_type, expense_on=True):
+    置信驱动入账见 test_line_image_ingest.py(图)/ test_expense_confidence.py(判级)。
+    """
+
+    def _gate(self, expense_on):
         from unittest import mock
 
-        from core import db
         from services.modules import store as mstore
 
-        stashed = []
-        with (
-            mock.patch.object(db, "get_cursor_rls", return_value=_FakeCM()),
-            mock.patch.object(mstore, "get_business_type", return_value=business_type),
-            mock.patch.object(mstore, "is_enabled", return_value=expense_on),
-            mock.patch.object(ik, "_stash_inbox", side_effect=lambda *a, **k: stashed.append(1)),
-        ):
-            ret = ik.route_line_image(
-                tenant_id="t",
-                workspace_client_id=1,
-                fields={"document_type": "tax_invoice", "vat": "7"},
-                confidence="auto",
-            )
-        return ret, stashed
+        with mock.patch.object(mstore, "is_enabled", return_value=expense_on):
+            return ik.line_expense_gate_open(_FakeCur(), tenant_id="t")
 
-    # 2026-06-15 Zihao 拍板:统一智能通道·不按业态分。开 expense 即落采购(含 firm/未onboard)。
-    def test_firm_routes_when_expense_on(self):
-        ret, stashed = self._run("firm")
-        self.assertTrue(ret)
-        self.assertEqual(stashed, [1])  # 事务所也落采购(统一通道)
+    def test_open_when_expense_on(self):
+        self.assertTrue(self._gate(True))
 
-    def test_unonboarded_routes_when_expense_on(self):
-        ret, stashed = self._run(None)
-        self.assertTrue(ret)
-        self.assertEqual(stashed, [1])
-
-    def test_expense_off_is_noop(self):
-        ret, stashed = self._run("retail", expense_on=False)
-        self.assertFalse(ret)
-        self.assertEqual(stashed, [])
-
-    def test_merchant_stashes(self):
-        ret, stashed = self._run("retail", expense_on=True)
-        self.assertTrue(ret)
-        self.assertEqual(stashed, [1])  # 商户租户 → 落采购待办
+    def test_closed_when_expense_off(self):
+        self.assertFalse(self._gate(False))
 
 
 class ResolveImageIntakeTests(unittest.TestCase):

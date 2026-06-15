@@ -37,6 +37,7 @@ async def _handle_line_image_ocr(
     message_id: str,
     lang: str,
     filename: str = None,
+    quote_token: str = None,
 ):
     """
     异步处理 LINE 图片/文件消息:
@@ -168,28 +169,37 @@ async def _handle_line_image_ocr(
             line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
             return
 
-        # 智能分流(2026-06-15 改为按业态二选一):
-        #   商户(非 firm)+ 开 expense → 落采购进项待归类,【不进识别记录】,回执提示进采购。
-        #   事务所(firm)/ 未开 expense → 走下方识别记录原路(history + 异常栏 + 识别回执),一字不动。
-        routed_to_purchase = False
+        # 统一智能通道(docs/smart-intake/15):图片 → 置信驱动入账(post/confirm/inbox)+ 数据卡。
+        #   expense 开 → ingest_line_image(高置信直接入正式账,其余草稿/待归类);回执发数据卡。
+        #   expense 关 → 不入账,走下方识别记录原路(事务所等),一字不动。异常 → 同样回落识别记录。
+        ingest = None
+        tid_str = str(user_fresh["tenant_id"]) if user_fresh.get("tenant_id") else None
         try:
-            from services.purchase.intake import fields_from_invoice, route_line_image
+            from services.purchase.intake import (
+                fields_from_invoice,
+                line_expense_gate_open,
+            )
+            from services.purchase.line_ingest import ingest_line_image
 
             _pages_struct = getattr(_pipe_res, "pages", None) or []
-            if _pages_struct and _ws_client_id:
-                routed_to_purchase = bool(
-                    route_line_image(
-                        tenant_id=user_fresh.get("tenant_id"),
-                        workspace_client_id=_ws_client_id,
-                        fields=fields_from_invoice(_pages_struct[0].invoice),
-                        confidence=result.get("confidence"),
-                    )
-                )
+            if _pages_struct and _ws_client_id and tid_str:
+                with db.get_cursor_rls(tid_str, commit=True) as cur:
+                    if line_expense_gate_open(cur, tenant_id=tid_str):
+                        ingest = ingest_line_image(
+                            cur,
+                            tenant_id=tid_str,
+                            workspace_client_id=_ws_client_id,
+                            fields=fields_from_invoice(_pages_struct[0].invoice),
+                            confidence=result.get("confidence"),
+                            field_confidence=getattr(_pages_struct[0], "field_confidence", None),
+                            created_by=str(user_fresh["id"]),
+                        )
         except Exception as _route_err:
-            logger.warning(f"[line_ocr] 采购分流跳过: {_route_err}")
+            logger.warning(f"[line_ocr] 采购入账分流跳过(回落识别记录): {_route_err}")
+            ingest = None
 
-        if routed_to_purchase:
-            # 商户:已进采购待归类 → 不写识别记录;计费与历史脱钩(history_id=None);回执指向采购。
+        if ingest:
+            # 已入账/草稿/待归类 → 不写识别记录;计费与历史脱钩(history_id=None);回执发数据卡。
             try:
                 import asyncio as _acharge
 
@@ -203,9 +213,7 @@ async def _handle_line_image_ocr(
             try:
                 db.log_ocr_cost(
                     user_id=str(user_fresh["id"]),
-                    tenant_id=(
-                        str(user_fresh.get("tenant_id")) if user_fresh.get("tenant_id") else None
-                    ),
+                    tenant_id=tid_str,
                     history_id=None,
                     engine="pipeline_v1",
                     pages=len(pages),
@@ -216,8 +224,8 @@ async def _handle_line_image_ocr(
                 )
             except Exception as _ce:
                 logger.warning(f"[line_ocr] cost log failed (non-blocking): {_ce}")
-            line_client.push_text(line_user_id, line_client.t_ocr(lang, "routed_to_purchase"))
-            logger.info(f"[line_ocr] 完成 · → 采购待归类 · user={user_fresh['id']}")
+            _push_result_card(line_user_id, lang, ingest, quote_token)
+            logger.info(f"[line_ocr] 完成 · state={ingest['state']} · user={user_fresh['id']}")
             return
 
         # 5. 写 history(source='line_bot')· 事务所/未开 expense 走识别记录
@@ -344,3 +352,35 @@ async def _handle_line_image_ocr(
             line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
         except Exception as _pe:
             logger.warning(f"[line_ocr] err 通知 push_text 失败: {_pe}")
+
+
+def _push_result_card(line_user_id: str, lang: str, ingest: dict, quote_token: str = None) -> None:
+    """识别结果数据卡 push:【引用照片的一行回执】+【Flex 数据卡】。失败回落纯文字(不静默)。"""
+    state = ingest.get("state", "confirm")
+    ack_key = {
+        "posted": "exp_ack_posted",
+        "dup": "exp_ack_dup",
+        "inbox": "exp_ack_inbox",
+    }.get(state, "exp_ack_confirm")
+    try:
+        from services.line_binding import line_card
+
+        ack = {
+            "type": "text",
+            "text": line_client.t_line(lang, ack_key, amount=ingest.get("amount") or "—"),
+        }
+        if quote_token:
+            ack["quoteToken"] = quote_token
+        card = line_card.result_card(
+            state=state,
+            amount=ingest.get("amount"),
+            fields=ingest.get("card_fields") or {},
+            field_confidence=ingest.get("field_confidence") or {},
+            doc_id=ingest.get("doc_id") or "",
+            lang=lang,
+            web_url="https://pearnly.com/home",
+        )
+        line_client.push_messages(line_user_id, [ack, card])
+    except Exception as e:
+        logger.warning(f"[line_ocr] 数据卡 push 失败,回落纯文字: {e}")
+        line_client.push_text(line_user_id, line_client.t_ocr(lang, "routed_to_purchase"))

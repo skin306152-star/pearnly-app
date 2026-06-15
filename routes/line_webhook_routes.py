@@ -26,7 +26,7 @@ import logging
 from fastapi import APIRouter, Request
 
 from core import db
-from services.line_binding import line_client, line_expense, line_intake
+from services.line_binding import line_card_actions, line_client, line_expense, line_intake
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +82,18 @@ async def _handle_line_event(ev: dict):
         logger.info(f"[line] 用户 {line_user_id} 删除了 Bot 好友")
         return
 
+    # postback:数据卡按钮(撤销/确认)→ 做账安全带落地(docs/smart-intake/15 §4)
+    if ev_type == "postback":
+        if not reply_token or not line_user_id:
+            return
+        bound = db.get_user_by_line_user_id(line_user_id)
+        if not bound:
+            return
+        lang = bound.get("preferred_lang") or _ev_lang(ev)
+        data = (ev.get("postback") or {}).get("data", "")
+        line_card_actions.handle_postback(bound, reply_token, data, lang)
+        return
+
     # message
     if ev_type == "message":
         msg = ev.get("message") or {}
@@ -91,7 +103,9 @@ async def _handle_line_event(ev: dict):
         if msg_type == "text":
             text = (msg.get("text") or "").strip()
             # v118.25.4 · 把 ev 传过去 · 让 _handle_line_text 能拿到用户语言
-            await _handle_line_text(line_user_id, reply_token, text, ev)
+            await _handle_line_text(
+                line_user_id, reply_token, text, ev, quote_token=msg.get("quoteToken")
+            )
             return
 
         # 图片 / 文件消息:统一走 OCR 入口(支持 PDF / 图片 / Excel / CSV / Word / TXT)
@@ -113,16 +127,11 @@ async def _handle_line_event(ev: dict):
             # v118.25.4 · 已绑定用户 · 优先用 Pearnly 网站偏好语言 · 兜底用 LINE 语言(不再写死 zh)
             lang = bound_user.get("preferred_lang") or _ev_lang(ev)
 
-            # 立即 reply 告知"识别中"(replyToken 一分钟有效 · 必须快)
-            if reply_token:
-                line_client.reply_text(
-                    reply_token,
-                    line_client.t_ocr(lang, "processing"),
-                )
+            # 转圈「正在输入…」(docs/smart-intake/15 §2)· 识别完发数据卡即自动消失。
+            line_client.start_loading(line_user_id, 30)
 
-            # 启后台任务跑 OCR + push 结果
-            # _handle_line_image_ocr 已抽到 services/ocr/line_image_ocr.py
-            # (REFACTOR-WB-app · 2026-06-01)· 不再经 app.py · 无循环 import。
+            # 启后台任务跑 OCR + push 数据卡(引用此照片 · quoteToken)
+            # _handle_line_image_ocr 已抽到 services/ocr/line_image_ocr.py(无循环 import)。
             from services.ocr.line_image_ocr import _handle_line_image_ocr
 
             asyncio.create_task(
@@ -132,6 +141,7 @@ async def _handle_line_event(ev: dict):
                     message_id=message_id,
                     filename=filename,
                     lang=lang,
+                    quote_token=msg.get("quoteToken"),
                 )
             )
             return
@@ -148,7 +158,9 @@ async def _handle_line_event(ev: dict):
         return
 
 
-async def _handle_line_text(line_user_id: str, reply_token: str, text: str, ev: dict):
+async def _handle_line_text(
+    line_user_id: str, reply_token: str, text: str, ev: dict, quote_token: str = None
+):
     """处理 LINE 文字消息(v118.25.4 · ev 用于 fallback 拿 LINE 用户语言)"""
     if not reply_token or not line_user_id:
         return
@@ -220,9 +232,11 @@ async def _handle_line_text(line_user_id: str, reply_token: str, text: str, ev: 
                 reply_token, line_intake.link_reply(cmd, lang, web_url=_WEB_INTEGRATIONS_URL)
             )
             return
-        # 文本路 · doc 10 §2 分层路由(代码优先):记账意图(含金额)→ 解析→落草稿→确认卡。
-        # 绝不静默入账(doc 10 §5 死穴),用户点卡上按钮才确认。
-        if line_expense.handle_expense_text(bound_user, reply_token, line_user_id, text, lang):
+        # 文本路 · 置信驱动入账(docs/smart-intake/15):记账意图→解析→高置信直接入账+数据卡,
+        # 其余草稿请确认;闲聊/查账/问答→智能回复。回执引用原句(quoteToken)。
+        if line_expense.handle_expense_text(
+            bound_user, reply_token, line_user_id, text, lang, quote_token=quote_token
+        ):
             return
         # 兜底(P0):认不出 → 功能提示。query/question/L2 LLM 路由 = P1。
         username = bound_user.get("username") or ""

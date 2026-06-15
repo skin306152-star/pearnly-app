@@ -15,21 +15,35 @@ from services.line_binding import line_client
 logger = logging.getLogger(__name__)
 
 
-def handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> bool:
-    """文本 → 智能解析 → 直接落采购进项草稿单(统一智能通道 · Zihao 2026-06-15 拍板)。
+_WEB_PURCHASE_URL = "https://pearnly.com/home"
 
-    所有账号(不分业态)统一走;有金额 → 直接入采购(不回确认卡);缺金额 → 反问;
-    查账/问答/越界 → 对应智能回复。返回 True=已处理;False=非记账(回落功能提示)。
-    未开 expense 模块 / 无默认套账 / 异常 → False。
+
+def handle_expense_text(
+    bound_user, reply_token, line_user_id, text, lang, quote_token=None
+) -> bool:
+    """文本 → 智能解析 → 置信驱动入账(STP+HITL · docs/smart-intake/15)。
+
+    所有账号统一走。闲聊→智能问候;有金额→按置信分流(高置信直接入正式账+撤销钮 /
+    其余入草稿请确认);缺金额→反问;查账/问答/跑题→对应智能回复 + 数据卡/引用。
+    返回 True=已处理;False=非记账(回落功能提示)。未开 expense / 无套账 / 异常 → False。
     """
     try:
         tid = bound_user.get("tenant_id")
         if not tid:
             return False
+        # 0. 闲聊(零成本 L1)→ 智能问候/感谢,不进 L2、不进记账(治复读)。
+        from services.expense import replies
+
+        small = replies.detect_smalltalk(text)
+        if small:
+            _reply_pool(reply_token, small, text, lang)
+            return True
+
         from core.workspace_context import default_workspace_id
         from services.purchase import categories as cat_svc
         from services.purchase import docs as docs_svc
         from services.purchase import intake as intake_svc
+        from services.purchase import posting as posting_svc
         from services.purchase import settings as settings_svc
 
         # 门控先行(读):未开 expense 模块 → 退(不按业态分·统一智能通道)。
@@ -42,29 +56,40 @@ def handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> bo
 
         draft, used_l2, action = _resolve_draft(bound_user, line_user_id, text, str(tid), ws)
         if action == "clarify":
-            # 确是记账但缺金额 → 反问一句(已存会话态),不静默丢(doc 10 §1.6)。
             line_client.reply_text(reply_token, line_client.t_line(lang, "exp_need_amount"))
             return True
-        if action == "query":  # 查账(本月花多少)→ DB 真查(doc 10 §1.4)
+        if action == "query":
             _reply_query(reply_token, lang, str(tid), ws)
             return True
-        if action == "question":  # 问答 → 知识中心带出处,查不到诚实兜底(doc 10 §1.3)
+        if action == "question":
             _reply_question(reply_token, lang, str(tid), text)
             return True
-        if action == "other":  # 越界/闲聊 → 礼貌挡回 + Quick Reply 引导(doc 10 §1.5)
-            _reply_scope_block(reply_token, lang)
+        if action == "other":  # 跑题 → 礼貌带回 + Quick Reply(轮选不复读)
+            _reply_pool(reply_token, "scope", text, lang)
             return True
         if draft is None:
             return False
 
-        # 有金额 → 直接落采购进项草稿单(统一智能通道 · 不回确认卡 · Zihao 2026-06-15 拍板)。
-        # 草稿状态:用户在「采购 · 待归类/进项」里复核/补全/推 ERP。
+        # 有金额 → 置信分流。高置信:create_doc(draft) → post_doc(正式入账);其余:留草稿请确认。
+        from services.expense import confidence
+
+        created_by = str(bound_user["id"]) if bound_user.get("id") else None
         with db.get_cursor_rls(str(tid), commit=True) as cur:
             tree = cat_svc.get_tree(cur, tenant_id=str(tid), workspace_client_id=ws)
             _fill_category(cur, draft, text, tree, str(tid), ws)
             cfg = settings_svc.get_settings(cur, tenant_id=str(tid), workspace_client_id=ws)
-            created_by = str(bound_user["id"]) if bound_user.get("id") else None
-            docs_svc.create_doc(
+            is_dup = _dup_warn(bound_user, draft, ws)
+            verdict = confidence.grade(
+                amount=draft.amount,
+                vendor_name=draft.vendor_name,
+                invoice_number=draft.invoice_number,
+                document_type=draft.document_type or "",
+                direction="expense",
+                confidence_band="high" if not used_l2 else "needs_review",
+                has_category=bool(draft.category_id),
+                is_duplicate=is_dup,
+            )
+            created = docs_svc.create_doc(
                 cur,
                 tenant_id=str(tid),
                 workspace_client_id=ws,
@@ -73,16 +98,76 @@ def handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> bo
                 settings=cfg,
                 status="draft",
             )
+            doc_id = str(created["doc"]["id"])
+            if verdict.action == "post":
+                posting_svc.post_doc(
+                    cur,
+                    tenant_id=str(tid),
+                    workspace_client_id=ws,
+                    doc_id=doc_id,
+                    auto_stock_in=False,
+                    created_by=created_by,
+                )
+                state = "posted"
+            else:
+                state = "dup" if verdict.dup else "confirm"
         if used_l2:
             _charge_line_l2(bound_user, str(tid))
-        body = line_client.t_line(lang, "exp_recorded_purchase", amount=draft.amount)
-        if _dup_warn(bound_user, draft, ws):
-            body = line_client.t_line(lang, "exp_dup_warn") + "\n\n" + body
-        line_client.reply_text(reply_token, body)
+        _reply_card(reply_token, state, draft, doc_id, lang, quote_token)
         return True
     except Exception:
         logger.exception("[line] expense record failed; fall back to hint")
         return False
+
+
+def _card_fields_from_draft(draft) -> dict:
+    """ExpenseDraft → 数据卡归一字段。"""
+    return {
+        "document_type": draft.document_type or "",
+        "expense_type": draft.expense_type or "",
+        "date": draft.doc_date or "",
+        "category": draft.category or "",
+        "subcategory": draft.subcategory or "",
+        "vendor": draft.vendor_name or "",
+        "invoice_number": draft.invoice_number or "",
+        "detail": (draft.note or "").strip(),
+    }
+
+
+def _reply_card(reply_token, state, draft, doc_id, lang, quote_token) -> None:
+    """回执 = 【引用原句的一行回执】+【Flex 数据卡】(Flex 不能被引用,故拆两条)。"""
+    from services.line_binding import line_card
+
+    ack_key = {"posted": "exp_ack_posted", "dup": "exp_ack_dup"}.get(state, "exp_ack_confirm")
+    ack = {"type": "text", "text": line_client.t_line(lang, ack_key, amount=draft.amount)}
+    if quote_token:
+        ack["quoteToken"] = quote_token
+    card = line_card.result_card(
+        state=state,
+        amount=draft.amount,
+        fields=_card_fields_from_draft(draft),
+        field_confidence={},
+        doc_id=doc_id,
+        lang=lang,
+        web_url=_WEB_PURCHASE_URL,
+    )
+    line_client.reply_messages(reply_token, [ack, card])
+
+
+def _reply_pool(reply_token, kind, text, lang) -> None:
+    """问候/感谢/跑题 → 轮选回复 + Quick Reply 引导(不复读)。"""
+    from services.expense import replies
+
+    items = [
+        _qr_item(line_client.t_line(lang, "qr_record"), "ค่าน้ำ 50"),
+        _qr_item(line_client.t_line(lang, "qr_query"), line_client.t_line(lang, "qr_query_text")),
+    ]
+    msg = {
+        "type": "text",
+        "text": replies.pick(kind, text, lang),
+        "quickReply": {"items": items},
+    }
+    line_client.reply_messages(reply_token, [msg])
 
 
 def _to_purchase_data(d: dict) -> dict:
@@ -215,20 +300,6 @@ def _reply_question(reply_token, lang, tid, question) -> None:
     if src:
         body += "\n\n" + line_client.t_line(lang, "exp_q_source", src=src)
     line_client.reply_text(reply_token, body)
-
-
-def _reply_scope_block(reply_token, lang) -> None:
-    """越界/闲聊 → 礼貌挡回 + Quick Reply 引导(不硬答)。"""
-    items = [
-        _qr_item(line_client.t_line(lang, "qr_record"), "ค่าน้ำ 50"),
-        _qr_item(line_client.t_line(lang, "qr_query"), line_client.t_line(lang, "qr_query_text")),
-    ]
-    msg = {
-        "type": "text",
-        "text": line_client.t_line(lang, "exp_scope_block"),
-        "quickReply": {"items": items},
-    }
-    line_client.reply_messages(reply_token, [msg])
 
 
 def _qr_item(label: str, text: str) -> dict:

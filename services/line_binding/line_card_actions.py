@@ -21,24 +21,44 @@ logger = logging.getLogger(__name__)
 
 
 def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
-    """卡按钮回调 → 全套动作分发。任何异常都回执不抛(主路径不得崩)。"""
+    """卡按钮回调 → 全套动作分发。任何异常都回执不抛(主路径不得崩)。
+
+    带一次性令牌(PO-12)→ 原子消费防重放,目标记录取自令牌(不信客户端 doc_id);
+    旧卡无令牌 → 兼容链路(default_workspace_id + 客户端 ref,状态机仍防双击)。
+    """
     parsed = line_postback.parse(data)
-    action, ref = parsed["action"], parsed["doc_id"]
+    action, ref, token = parsed["action"], parsed["doc_id"], parsed["token"]
     tid = str(bound_user["tenant_id"]) if bound_user.get("tenant_id") else None
-    if not action or not ref or not tid:
+    if not action or not tid:
         line_client.reply_text(reply_token, line_client.t_line(lang, "card_action_stale"))
         return
     uid = str(bound_user["id"]) if bound_user.get("id") else None
     try:
         from core.workspace_context import default_workspace_id
+        from services.line_binding import line_action_nonce as nonce
         from services.purchase import docs as docs_svc
         from services.purchase import intake as intake_svc
         from services.purchase import posting as posting_svc
         from services.purchase import settings as settings_svc
 
         with db.get_cursor_rls(tid, commit=True) as cur:
-            ws = default_workspace_id(cur, tid)
-            if ws is None:
+            if token:
+                res = nonce.consume(cur, tenant_id=tid, token=token)
+                if res["status"] == "expired":
+                    line_client.reply_text(
+                        reply_token, line_client.t_line(lang, "card_action_expired")
+                    )
+                    return
+                if res["status"] != "ok":  # used(重放/双击) / missing → 已处理过
+                    line_client.reply_text(
+                        reply_token, line_client.t_line(lang, "card_action_stale")
+                    )
+                    return
+                ref = res["action_ref"]
+                ws = res["workspace_client_id"]
+            else:
+                ws = default_workspace_id(cur, tid)
+            if ws is None or not ref:
                 line_client.reply_text(reply_token, line_client.t_line(lang, "card_action_stale"))
                 return
             scope = {"tenant_id": tid, "workspace_client_id": ws}

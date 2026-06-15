@@ -273,52 +273,47 @@ def _record_link(web_url: str, ref: str, state: str) -> str:
     return f"{base}/liff/{path}/{ref}"
 
 
-def _footer(state: str, ref: str, web_url: str, t: dict, can_post: bool) -> list:
-    """唯一实心主按钮=提交动作;复核/编辑/撤销/丢弃=link 文字链接(非按钮)。永不死路。"""
+def _footer(state: str, ref: str, web_url: str, t: dict, can_post: bool, token: str = "") -> list:
+    """唯一实心主按钮=提交动作;复核/编辑/撤销/丢弃=link 文字链接(非按钮)。永不死路。
+
+    postback 动作带一次性防重放令牌(token · PO-12),uri 复核/编辑无需令牌。
+    """
     primary, links = None, []
     edit_uri = _record_link(web_url, ref, state)
+    discard = _btn(
+        t["btn_discard"],
+        primary=False,
+        postback=line_postback.discard_data(ref, token),
+        danger=True,
+    )
+
     if state == "posted":
+        undo = line_postback.undo_data(ref, token)
         links = [
             _btn(t["btn_review"], primary=False, uri=edit_uri),
-            _btn(t["btn_undo"], primary=False, postback=line_postback.undo_data(ref), danger=True),
+            _btn(t["btn_undo"], primary=False, postback=undo, danger=True),
         ]
     elif state == "confirm":
-        primary = _btn(t["btn_confirm"], primary=True, postback=line_postback.confirm_data(ref))
-        links = [
-            _btn(t["btn_edit"], primary=False, uri=edit_uri),
-            _btn(
-                t["btn_discard"],
-                primary=False,
-                postback=line_postback.discard_data(ref),
-                danger=True,
-            ),
-        ]
+        primary = _btn(
+            t["btn_confirm"], primary=True, postback=line_postback.confirm_data(ref, token)
+        )
+        links = [_btn(t["btn_edit"], primary=False, uri=edit_uri), discard]
     elif state == "dup":
-        primary = _btn(t["btn_post_anyway"], primary=True, postback=line_postback.confirm_data(ref))
-        links = [
-            _btn(t["btn_open"], primary=False, uri=edit_uri),
-            _btn(
-                t["btn_discard"],
-                primary=False,
-                postback=line_postback.discard_data(ref),
-                danger=True,
-            ),
-        ]
+        primary = _btn(
+            t["btn_post_anyway"], primary=True, postback=line_postback.confirm_data(ref, token)
+        )
+        links = [_btn(t["btn_open"], primary=False, uri=edit_uri), discard]
     else:  # inbox
         if can_post and ref:
             primary = _btn(
-                t["btn_post_anyway"], primary=True, postback=line_postback.inbox_post_data(ref)
+                t["btn_post_anyway"],
+                primary=True,
+                postback=line_postback.inbox_post_data(ref, token),
             )
         links = [_btn(t["btn_fill"], primary=False, uri=edit_uri)]
         if ref:
-            links.append(
-                _btn(
-                    t["btn_discard"],
-                    primary=False,
-                    postback=line_postback.inbox_drop_data(ref),
-                    danger=True,
-                )
-            )
+            drop = line_postback.inbox_drop_data(ref, token)
+            links.append(_btn(t["btn_discard"], primary=False, postback=drop, danger=True))
     foot = []
     if primary:
         foot.append(primary)
@@ -341,12 +336,14 @@ def result_card(
     source: str = "doc",
     workspace_name: str = "",
     dup_info: dict = None,
+    token: str = "",
 ) -> dict:
     """识别结果 Flex 卡(照搬定稿原型)。
 
     state ∈ posted|confirm|inbox|dup;doc_id=动作目标 id(草稿/已入账=purchase_doc,inbox=intake_item)。
     source ∈ text|doc|bank(金额右侧来源标);workspace_name 非空则显套账条;dup_info 显原记录红框。
     can_post:inbox 有可用金额才给「仍要入账」(糊图 ฿0 只给编辑/丢弃)。
+    token:postback 动作的一次性防重放令牌(PO-12),空则按钮不带令牌(旧卡兼容链路)。
     """
     t = _lang(lang)
     st = _STATES.get(state, _STATES["confirm"])
@@ -484,7 +481,7 @@ def result_card(
                 "type": "box",
                 "layout": "vertical",
                 "paddingAll": "12px",
-                "contents": _footer(state, doc_id, web_url, t, can_post),
+                "contents": _footer(state, doc_id, web_url, t, can_post, token),
             },
         },
     }

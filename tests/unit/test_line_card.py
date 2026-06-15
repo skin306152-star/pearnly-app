@@ -13,28 +13,41 @@ from services.line_binding import line_card, line_postback
 class PostbackTests(unittest.TestCase):
     def test_undo_roundtrip(self):
         out = line_postback.parse(line_postback.undo_data("D1"))
-        self.assertEqual(out, {"action": line_postback.ACTION_UNDO, "doc_id": "D1"})
+        self.assertEqual(out, {"action": line_postback.ACTION_UNDO, "doc_id": "D1", "token": ""})
 
     def test_confirm_roundtrip(self):
         out = line_postback.parse(line_postback.confirm_data("D9"))
-        self.assertEqual(out, {"action": line_postback.ACTION_CONFIRM, "doc_id": "D9"})
+        self.assertEqual(out, {"action": line_postback.ACTION_CONFIRM, "doc_id": "D9", "token": ""})
 
     def test_discard_roundtrip(self):
         out = line_postback.parse(line_postback.discard_data("D2"))
-        self.assertEqual(out, {"action": line_postback.ACTION_DISCARD, "doc_id": "D2"})
+        self.assertEqual(out, {"action": line_postback.ACTION_DISCARD, "doc_id": "D2", "token": ""})
 
     def test_inbox_post_roundtrip(self):
         out = line_postback.parse(line_postback.inbox_post_data("I7"))
-        self.assertEqual(out, {"action": line_postback.ACTION_INBOX_POST, "doc_id": "I7"})
+        self.assertEqual(
+            out, {"action": line_postback.ACTION_INBOX_POST, "doc_id": "I7", "token": ""}
+        )
 
     def test_inbox_drop_roundtrip(self):
         out = line_postback.parse(line_postback.inbox_drop_data("I7"))
-        self.assertEqual(out, {"action": line_postback.ACTION_INBOX_DROP, "doc_id": "I7"})
+        self.assertEqual(
+            out, {"action": line_postback.ACTION_INBOX_DROP, "doc_id": "I7", "token": ""}
+        )
 
     def test_bad_data_rejected(self):
         self.assertEqual(line_postback.parse("garbage")["action"], "")
         self.assertEqual(line_postback.parse("")["action"], "")
         self.assertEqual(line_postback.parse("a=bogus&doc=x")["action"], "")
+
+    def test_token_roundtrip(self):
+        out = line_postback.parse(line_postback.confirm_data("D1", token="TOK9"))
+        self.assertEqual(
+            out, {"action": line_postback.ACTION_CONFIRM, "doc_id": "D1", "token": "TOK9"}
+        )
+
+    def test_no_token_empty(self):
+        self.assertEqual(line_postback.parse(line_postback.confirm_data("D1"))["token"], "")
 
 
 class CardTests(unittest.TestCase):
@@ -147,6 +160,16 @@ class CardTests(unittest.TestCase):
         flat = str(c)
         self.assertIn("Bangkok Retail", flat)
         self.assertIn("来自文字", flat)
+
+    def test_token_embedded_in_postback_buttons(self):
+        c = self._card("confirm", token="TOK9")
+        toks = [
+            line_postback.parse(b["action"]["data"])["token"]
+            for b in self._buttons(c)
+            if b["action"]["type"] == "postback"
+        ]
+        self.assertTrue(toks)
+        self.assertTrue(all(t == "TOK9" for t in toks))
 
     def test_four_langs_render(self):
         for lang in ("zh", "th", "en", "ja"):

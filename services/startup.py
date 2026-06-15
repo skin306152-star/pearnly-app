@@ -266,6 +266,15 @@ def _boot_schema_ddl() -> None:
     except Exception as e:
         logger.warning(f"启动 expense schema 失败: {e}")
 
+    # LINE 卡片动作一次性令牌(防重放 · PO-12)· 与 alembic 0037 同源幂等 DDL。
+    # NEW-DEBT-EXEMPT: 启动自愈式迁移,prod 无 alembic 钩子,口径同 expense schema。
+    try:
+        from services.line_binding.line_action_nonce import ensure_table
+
+        ensure_table()
+    except Exception as e:
+        logger.warning(f"启动 LINE 动作令牌 schema 失败: {e}")
+
     # 商户采购(进项)schema 双跑(suppliers / purchase_docs+lines / categories+settings+
     # intake+attachments)· 与 alembic 0031-0033 同源幂等 DDL(docs/purchasing/01)。
     try:

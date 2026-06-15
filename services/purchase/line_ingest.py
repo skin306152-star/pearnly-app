@@ -30,6 +30,7 @@ def ingest_line_image(
     返回 {state, doc_id, amount, card_fields, field_confidence},调用方据此发数据卡。
     """
     from services.expense import confidence as conf
+    from services.line_binding import line_action_nonce as nonce
     from services.purchase import categories as cat_svc
     from services.purchase import docs as docs_svc
     from services.purchase import posting as posting_svc
@@ -92,6 +93,13 @@ def ingest_line_image(
             "card_fields": card_fields,
             "field_confidence": fc,
             "workspace_name": ws_name,
+            "token": nonce.mint(
+                cur,
+                tenant_id=tenant_id,
+                workspace_client_id=workspace_client_id,
+                action_ref=item_id or "",
+                user_id=created_by,
+            ),
         }
 
     amount = draft.get("grand_total") or "0"
@@ -161,4 +169,11 @@ def ingest_line_image(
         "card_fields": card_fields,
         "field_confidence": fc,
         "workspace_name": ws_name,
+        "token": nonce.mint(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            action_ref=doc_id,
+            user_id=created_by,
+        ),
     }

@@ -91,5 +91,56 @@ class CardActionTests(unittest.TestCase):
         self.assertTrue(sent[0].startswith("card_action_stale"))
 
 
+def _run_token(data, consume_res):
+    """带令牌路径:patch nonce.consume 返回受控结果,验证分发/友好回执。"""
+    sent = []
+    from core import db
+    from services.line_binding import line_action_nonce, line_client
+
+    doc = {"doc": {"grand_total": "190.00"}}
+    with (
+        mock.patch.object(db, "get_cursor_rls", return_value=_CM()),
+        mock.patch.object(line_action_nonce, "consume", return_value=consume_res) as consume,
+        mock.patch(
+            "services.purchase.settings.get_settings", return_value={"auto_stock_in": False}
+        ),
+        mock.patch("services.purchase.posting.post_doc", return_value=doc) as post_doc,
+        mock.patch.object(line_client, "reply_text", side_effect=lambda rt, b: sent.append(b)),
+        mock.patch.object(
+            line_client,
+            "t_line",
+            side_effect=lambda lang, key, **kw: f"{key}:{kw.get('amount','')}",
+        ),
+    ):
+        lca.handle_postback({"tenant_id": "t", "id": "u"}, "rt", data, "zh")
+    return sent, consume, post_doc
+
+
+class CardActionTokenTests(unittest.TestCase):
+    """PO-12:postback 带一次性令牌 → 原子消费防重放;目标记录取自令牌。"""
+
+    def test_token_confirm_consumes_and_posts_nonce_ref(self):
+        data = line_postback.confirm_data("ignored", token="TOK")
+        res = {"status": "ok", "action_ref": "D9", "workspace_client_id": 7, "user_id": "u"}
+        sent, consume, post_doc = _run_token(data, res)
+        consume.assert_called_once()
+        post_doc.assert_called_once()
+        # 服务端用令牌反查的 ref(D9),不信 postback 里的 doc(ignored)
+        self.assertEqual(post_doc.call_args.kwargs["doc_id"], "D9")
+        self.assertTrue(sent[0].startswith("card_confirmed:"))
+
+    def test_token_replay_used_blocks(self):
+        data = line_postback.confirm_data("D9", token="TOK")
+        sent, consume, post_doc = _run_token(data, {"status": "used"})
+        post_doc.assert_not_called()
+        self.assertTrue(sent[0].startswith("card_action_stale"))
+
+    def test_token_expired_friendly(self):
+        data = line_postback.confirm_data("D9", token="TOK")
+        sent, consume, post_doc = _run_token(data, {"status": "expired"})
+        post_doc.assert_not_called()
+        self.assertTrue(sent[0].startswith("card_action_expired"))
+
+
 if __name__ == "__main__":
     unittest.main()

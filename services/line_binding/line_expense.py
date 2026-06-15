@@ -149,6 +149,7 @@ def _dispatch_agent(
 def _do_record(bound_user, reply_token, text, tid, ws, draft, used_l2, quote_token, lang) -> bool:
     """置信驱动入账(图/文同口径):建草稿 → 高置信 post_doc;回数据卡。计费由调用方管。"""
     from services.expense import confidence
+    from services.line_binding import line_action_nonce as nonce
     from services.purchase import categories as cat_svc
     from services.purchase import docs as docs_svc
     from services.purchase import intake as intake_svc
@@ -195,7 +196,14 @@ def _do_record(bound_user, reply_token, text, tid, ws, draft, used_l2, quote_tok
             state = "posted"
         else:
             state = "dup" if verdict.dup else "confirm"
-    _reply_card(reply_token, state, draft, doc_id, lang, quote_token, ws_name)
+        token = nonce.mint(
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            action_ref=doc_id,
+            user_id=created_by,
+        )
+    _reply_card(reply_token, state, draft, doc_id, lang, quote_token, ws_name, token)
     return True
 
 
@@ -214,7 +222,9 @@ def _card_fields_from_draft(draft) -> dict:
     }
 
 
-def _reply_card(reply_token, state, draft, doc_id, lang, quote_token, workspace_name="") -> None:
+def _reply_card(
+    reply_token, state, draft, doc_id, lang, quote_token, workspace_name="", token=""
+) -> None:
     """回执 = 【引用原句的一行回执】+【Flex 数据卡】(Flex 不能被引用,故拆两条)。"""
     from services.line_binding import line_card
 
@@ -232,6 +242,7 @@ def _reply_card(reply_token, state, draft, doc_id, lang, quote_token, workspace_
         web_url=_WEB_PURCHASE_URL,
         source="text",
         workspace_name=workspace_name,
+        token=token,
     )
     line_client.reply_messages(reply_token, [ack, card])
 

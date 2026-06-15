@@ -35,6 +35,7 @@ def _run(resolve_ret, *, band="high", auto_book=True):
         mock.patch("services.purchase.docs.create_doc", return_value=created) as cdoc,
         mock.patch("services.purchase.posting.post_doc", return_value=created) as pdoc,
         mock.patch.object(ik, "_stash_inbox") as stash,
+        mock.patch("services.line_binding.line_action_nonce.mint", return_value="TOK"),
     ):
         out = li.ingest_line_image(
             object(),
@@ -64,6 +65,7 @@ class IngestTests(unittest.TestCase):
         cdoc.assert_called_once()
         pdoc.assert_called_once()
         self.assertEqual(out["doc_id"], "D1")
+        self.assertEqual(out["token"], "TOK")  # PO-12 卡片防重放令牌随结果带出
 
     def test_autobook_off_confirms_no_post(self):
         # 自动入账关(默认):即便高置信齐全也只建草稿发确认卡,不过账。

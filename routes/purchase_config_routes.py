@@ -209,6 +209,7 @@ class SettingsIn(BaseModel):
     pay_needs_approval: bool = False
     default_wht_service_rate: float = Field(3, ge=0, le=100)
     base_currency: str = "THB"
+    auto_book: bool = False
 
 
 @router.get("/settings")
@@ -238,5 +239,6 @@ async def api_save_settings(req: SettingsIn, request: Request):
                 pay_needs_approval=req.pay_needs_approval,
                 default_wht_service_rate=req.default_wht_service_rate,
                 base_currency=req.base_currency,
+                auto_book=req.auto_book,
             )
         )

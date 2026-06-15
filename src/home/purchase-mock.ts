@@ -160,6 +160,7 @@ const SETTINGS: PurchaseSettings = {
     pay_needs_approval: false,
     default_wht_service_rate: 3,
     base_currency: 'THB',
+    auto_book: false,
 };
 
 const CATEGORIES: Category[] = [

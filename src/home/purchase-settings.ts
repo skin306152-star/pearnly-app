@@ -69,6 +69,9 @@ function shell(): string {
     return `<div class="pur cfg"><div class="wrap">
         <div class="ph"><div class="t">${escapeHtml(t('pur-settings'))}</div><div class="sub">${escapeHtml(t('pur-settings-sub'))}</div></div>
         <div class="panel">
+            <div class="grp">${escapeHtml(t('pur-set-intake'))}</div>
+            ${toggleRow('auto_book', 'pur-set-autobook', 'pur-set-autobook-d')}
+
             <div class="grp">${escapeHtml(t('pur-set-tax-stock'))}</div>
             ${numRow('pur-set-vat', 'pur-set-vat', 'pur-set-vat-d', cfg.default_vat_rate, '%')}
             ${toggleRow('auto_stock_in', 'pur-set-stock', 'pur-set-stock-d')}

@@ -69,6 +69,7 @@ export interface PurchaseSettings {
     pay_needs_approval: boolean;
     default_wht_service_rate: number;
     base_currency: string;
+    auto_book: boolean;
 }
 
 export interface DocLine {
@@ -439,6 +440,7 @@ export const DEFAULT_PURCHASE_SETTINGS: PurchaseSettings = {
     pay_needs_approval: false,
     default_wht_service_rate: 3,
     base_currency: 'THB',
+    auto_book: false,
 };
 
 // ── 共享设计令牌(.pur 作用域 · 逐字搬自设计稿 :root + .btn + .card)──────

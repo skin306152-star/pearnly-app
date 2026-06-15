@@ -104,6 +104,7 @@ async def api_intake(
                 settings=cfg,
                 source="photo",
                 image_url=bill_ref,
+                created_by=_uid(user),
             )
         return ok(data)
 

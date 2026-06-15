@@ -18,6 +18,7 @@ _DEFAULTS = {
     "pay_needs_approval": False,
     "default_wht_service_rate": "3",
     "base_currency": "THB",
+    "auto_book": False,
 }
 
 
@@ -48,7 +49,7 @@ def get_settings(cur, *, tenant_id: str, workspace_client_id: int) -> dict:
     """返回本套账采购设置(无行回落默认)。"""
     cur.execute(
         "SELECT default_vat_rate, auto_stock_in, dedupe_block, default_due_days, "
-        "pay_needs_approval, default_wht_service_rate, base_currency "
+        "pay_needs_approval, default_wht_service_rate, base_currency, auto_book "
         "FROM purchase_settings "
         "WHERE tenant_id = %s AND workspace_client_id = %s",
         (tenant_id, workspace_client_id),
@@ -64,6 +65,7 @@ def get_settings(cur, *, tenant_id: str, workspace_client_id: int) -> dict:
         "pay_needs_approval": bool(row["pay_needs_approval"]),
         "default_wht_service_rate": _rate_str(row["default_wht_service_rate"]),
         "base_currency": (row["base_currency"] or "THB"),
+        "auto_book": bool(row["auto_book"]),
     }
 
 
@@ -79,6 +81,7 @@ def save_settings(
     pay_needs_approval: bool,
     default_wht_service_rate,
     base_currency: str,
+    auto_book: bool = False,
 ) -> dict:
     """upsert 采购设置。返回回读视图。"""
     cur.execute(
@@ -86,8 +89,8 @@ def save_settings(
         INSERT INTO purchase_settings
             (tenant_id, workspace_client_id, default_vat_rate, auto_stock_in,
              dedupe_block, default_due_days, pay_needs_approval,
-             default_wht_service_rate, base_currency)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+             default_wht_service_rate, base_currency, auto_book)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (tenant_id, workspace_client_id)
         DO UPDATE SET default_vat_rate = EXCLUDED.default_vat_rate,
                       auto_stock_in = EXCLUDED.auto_stock_in,
@@ -96,6 +99,7 @@ def save_settings(
                       pay_needs_approval = EXCLUDED.pay_needs_approval,
                       default_wht_service_rate = EXCLUDED.default_wht_service_rate,
                       base_currency = EXCLUDED.base_currency,
+                      auto_book = EXCLUDED.auto_book,
                       updated_at = now()
         """,
         (
@@ -108,6 +112,7 @@ def save_settings(
             bool(pay_needs_approval),
             _rate(default_wht_service_rate, "3"),
             (base_currency or "THB").strip()[:8] or "THB",
+            bool(auto_book),
         ),
     )
     return get_settings(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)

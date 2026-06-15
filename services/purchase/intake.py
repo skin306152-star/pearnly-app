@@ -170,6 +170,7 @@ def resolve_image_intake(
     source="photo",
     image_url=None,
     field_confidence=None,
+    created_by=None,
 ) -> dict:
     """图路:判方向 → 建草稿 → dedupe 提示;低置信/unknown → 落 inbox。返回分流信封 data。
 
@@ -245,6 +246,45 @@ def resolve_image_intake(
             "bill_image_ref": image_url,
         }
     )
+    # 自动入账(采购设置开关 · 默认关):高置信(已过 low_conf/too_empty)+ 有卖家 + 金额>0 + 无重复 →
+    # 直接建单并过账(复用表单确认链路 create_doc→post_doc),不用逐张复核。单照常可编辑/作废。
+    if (
+        bool(settings.get("auto_book"))
+        and not dup
+        and (draft["supplier"]["name"] or "").strip()
+        and calc["grand_total"] > 0
+        and created_by
+    ):
+        from services.purchase import docs as _docs, posting as _posting
+
+        created = _docs.create_doc(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            created_by=created_by,
+            data=draft,
+            settings=settings,
+            status="draft",
+        )
+        booked_id = created["doc"]["id"]
+        _posting.post_doc(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            doc_id=booked_id,
+            auto_stock_in=bool(settings.get("auto_stock_in")),
+            created_by=created_by,
+        )
+        return {
+            "kind": kind,
+            "confidence": confidence,
+            "confidence_band": confidence,
+            "field_confidence": fc,
+            "route": "booked",
+            "draft": None,
+            "dedupe_hit": False,
+            "doc_id": booked_id,
+        }
     return {
         "kind": kind,
         "confidence": confidence,

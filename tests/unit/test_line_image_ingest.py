@@ -22,12 +22,13 @@ def _draft():
     }
 
 
-def _run(resolve_ret, *, band="high"):
+def _run(resolve_ret, *, band="high", auto_book=True):
     created = {"doc": {"id": "D1"}}
     with (
         mock.patch.object(ik, "resolve_image_intake", return_value=resolve_ret),
         mock.patch(
-            "services.purchase.settings.get_settings", return_value={"auto_stock_in": False}
+            "services.purchase.settings.get_settings",
+            return_value={"auto_stock_in": False, "auto_book": auto_book},
         ),
         mock.patch("services.purchase.categories.get_tree", return_value=[]),
         mock.patch("services.purchase.docs.create_doc", return_value=created) as cdoc,
@@ -54,12 +55,21 @@ class IngestTests(unittest.TestCase):
         pdoc.assert_not_called()
 
     def test_high_complete_posts(self):
+        # 自动入账开 + 高置信齐全 → 直接过账(posted)。
         res = {"route": "purchase", "draft": _draft(), "dedupe_hit": False, "field_confidence": {}}
-        out, cdoc, pdoc, _ = _run(res, band="high")
+        out, cdoc, pdoc, _ = _run(res, band="high", auto_book=True)
         self.assertEqual(out["state"], "posted")
         cdoc.assert_called_once()
         pdoc.assert_called_once()
         self.assertEqual(out["doc_id"], "D1")
+
+    def test_autobook_off_confirms_no_post(self):
+        # 自动入账关(默认):即便高置信齐全也只建草稿发确认卡,不过账。
+        res = {"route": "purchase", "draft": _draft(), "dedupe_hit": False, "field_confidence": {}}
+        out, cdoc, pdoc, _ = _run(res, band="high", auto_book=False)
+        self.assertEqual(out["state"], "confirm")
+        cdoc.assert_called_once()
+        pdoc.assert_not_called()
 
     def test_duplicate_confirms_no_post(self):
         res = {"route": "purchase", "draft": _draft(), "dedupe_hit": True, "field_confidence": {}}

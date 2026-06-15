@@ -116,7 +116,14 @@ async function intakeFile(f: File): Promise<void> {
             route?: string;
             draft?: Record<string, unknown> | null;
             dedupe_hit?: boolean;
+            doc_id?: string;
         };
+        // 自动入账(设置开):直接记账 → 开详情(可看/改/撤销),不进复核屏。
+        if (res && res.route === 'booked' && res.doc_id) {
+            showToast(t('pur-cap-booked'), 'success');
+            window.openPurchaseDetail?.(res.doc_id);
+            return;
+        }
         const d = res && res.draft;
         if (d) {
             window.openPurchaseForm?.(null, {
@@ -124,6 +131,7 @@ async function intakeFile(f: File): Promise<void> {
                 dedupe_hit: res.dedupe_hit,
                 bill_image_local: URL.createObjectURL(f),
             });
+            maybeAutobookHint();
             return;
         }
         const route = (res && res.route) || 'inbox';
@@ -139,6 +147,17 @@ async function intakeFile(f: File): Promise<void> {
         }
     } catch (e) {
         renderError(f, purchaseErrMsg(e, 'purchase.unexpected'));
+    }
+}
+
+// 首次记账(走了复核屏=没开自动入账)→ 一次性提示可去采购设置开自动入账(省去逐张复核)。
+function maybeAutobookHint(): void {
+    try {
+        if (localStorage.getItem('pearnly_pur_autobook_hint')) return;
+        localStorage.setItem('pearnly_pur_autobook_hint', '1');
+        setTimeout(() => showToast(t('pur-cap-autobook-hint'), 'info'), 1400);
+    } catch (_) {
+        /* localStorage 不可用 → 跳过提示 */
     }
 }
 

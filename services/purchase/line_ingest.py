@@ -117,7 +117,8 @@ def ingest_line_image(
         status="draft",
     )
     doc_id = str(created["doc"]["id"])
-    if verdict.action == "post":
+    # 自动入账开关(采购设置 · 默认关)统管 LINE:关 → 即便高置信齐全也只建草稿发确认卡,不自动过账。
+    if verdict.action == "post" and bool(settings.get("auto_book")):
         posting_svc.post_doc(
             cur,
             tenant_id=tenant_id,

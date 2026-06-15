@@ -204,6 +204,27 @@ class ResolveImageIntakeTests(unittest.TestCase):
         self.assertEqual(data["route"], "sales")
         self.assertEqual(stashed, [])
 
+    def test_source_propagates_to_draft(self):
+        # 来源(line/photo)必须落到草稿,否则 create_doc 默认 manual → 列表显「手录」(PO-6)。
+        f = {
+            "document_type": "tax_invoice",
+            "buyer_tax": MY,
+            "vat": "7",
+            "subtotal": "1000",
+            "items": [{"name": "x", "qty": "1", "price": "1000"}],
+        }
+        data = ik.resolve_image_intake(
+            _FakeCur(),
+            tenant_id="t",
+            workspace_client_id=1,
+            fields=f,
+            confidence="high",
+            settings={},
+            source="line",
+        )
+        self.assertIsNotNone(data["draft"])
+        self.assertEqual(data["draft"]["source"], "line")
+
 
 class ResolveInboxTests(unittest.TestCase):
     """待归类一点归类:非法动作拒绝;dismiss/sales 移出收件箱(不建单)。"""
@@ -245,6 +266,41 @@ class ResolveInboxTests(unittest.TestCase):
             settings={},
         )
         self.assertEqual(r["status"], "resolved")
+
+    def test_resolve_preserves_source(self):
+        # 归类建单时保留待归类项的原始来源(line/photo),不退回「手录」(PO-6)。
+        from unittest import mock
+
+        from services.purchase import docs as docs_svc
+
+        captured = {}
+
+        class Cur:
+            def execute(self, *a, **k):
+                return None
+
+            def fetchone(self):
+                return {
+                    "source": "line",
+                    "raw": {"items": [{"name": "x", "qty": "1", "price": "100"}]},
+                    "image_url": "",
+                }
+
+        def fake_create(cur, **k):
+            captured.update(k.get("data") or {})
+            return {"doc": {"id": "d1"}}
+
+        with mock.patch.object(docs_svc, "create_doc", side_effect=fake_create):
+            ik.resolve_inbox(
+                Cur(),
+                tenant_id="t",
+                workspace_client_id=1,
+                item_id="x",
+                action="expense",
+                created_by="u",
+                settings={},
+            )
+        self.assertEqual(captured.get("source"), "line")
 
 
 # 旧 F10「LINE 文字静默记一笔 posted 费用」已删(违反 doc 10 §5 死穴:绝不静默入账)。

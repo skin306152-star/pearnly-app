@@ -206,6 +206,8 @@ def resolve_image_intake(
     calc = None
     if route in ("purchase", "expense"):
         draft = build_draft_from_invoice(fields, kind=kind)
+        # 来源透传到单据(line/photo),否则 create_doc 默认 manual 显「手录」
+        draft["source"] = source
         calc = totals_svc.compute_purchase_totals(draft["lines"])
 
     # 低置信 / unknown(draft 未建)/ 抽取过空(糊图税号"13"·金额฿0)→ 落待归类,绝不直接进可保存的 ฿0 表单(F5)。
@@ -377,7 +379,7 @@ def resolve_inbox(
 
         raise PosError("purchase.line_invalid", 422, detail="bad_action")
     cur.execute(
-        "SELECT raw, image_url FROM intake_items "
+        "SELECT source, raw, image_url FROM intake_items "
         "WHERE id = %s AND tenant_id = %s AND workspace_client_id = %s AND status = 'pending'",
         (item_id, tenant_id, workspace_client_id),
     )
@@ -392,6 +394,8 @@ def resolve_inbox(
 
         kind = "purchase_invoice" if action == "purchase" else "expense"
         draft = build_draft_from_invoice(row["raw"] or {}, kind=kind)
+        # 保留原始来源(line/photo),归类后不退回「手录」
+        draft["source"] = row.get("source") or "manual"
         # 票图闭环:待归类落盘的票图挂进 doc(create_doc 据 bill_image_ref 建 bill 附件)→
         # 复核屏/详情可回看原票(此前 resolve 只取 raw 不取 image_url → 票图空)。
         draft["bill_image_ref"] = row.get("image_url") or ""

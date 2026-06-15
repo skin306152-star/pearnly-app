@@ -2,12 +2,17 @@
 """对账标准模板生成(按 UI 语言出列头 · 供"下载模板"端点)。
 
 设计:列头跟随用户当前语言(zh/en/th/ja);生成的列正是各对账解析器认得的列,
-故"导出即模板、模板即可导入"闭环。每个模板:第 1 行列头 + 2 行示例 + 一个『说明』
-sheet;sheet 标题写 `Pearnly-<TYPE>` 作模板签名(前端"标准模板读取"可据此确定判定)。
+故"导出即模板、模板即可导入"闭环。每个模板:第 1 行列头 + 一个『说明』sheet;
+sheet 标题写 `Pearnly-<TYPE>` 作模板签名(前端"标准模板读取"可据此确定判定)。
+
+statement / gl 是银行对账两侧:
+  - 首行示例下有期初『ยอดยกมา』行(余额为字面值);明细行余额走公式自动累计
+    (statement = 上一行余额 + 存 − 取;gl = 上一行余额 + 借 − 贷)。
+  - gl 借/贷列头带『=存入/=取出』标注,帮用户对齐银行口径(借方=入账、贷方=出账)。
 
 doc_type:
   statement 银行账单 · gl 总账 · vat 税表(VAT 报告)· invoice 销项发票明细
-vat 与 invoice 列结构相同(行项)。statement/gl 用于银行对账(+gl 用于收入对账)。
+vat 与 invoice 列结构相同(行项 · 无期初/余额)。
 """
 
 import io
@@ -18,20 +23,34 @@ _COLS: Dict[str, List[Tuple[str, Dict[str, str]]]] = {
     "statement": [
         ("date", {"zh": "日期", "en": "Date", "th": "วันที่", "ja": "日付"}),
         ("desc", {"zh": "摘要", "en": "Description", "th": "รายละเอียด", "ja": "摘要"}),
-        ("withdrawal", {"zh": "提款", "en": "Withdrawal", "th": "ถอน", "ja": "出金"}),
-        ("deposit", {"zh": "存款", "en": "Deposit", "th": "ฝาก", "ja": "入金"}),
+        ("withdrawal", {"zh": "支出", "en": "Withdrawal", "th": "ถอน", "ja": "出金"}),
+        ("deposit", {"zh": "存入", "en": "Deposit", "th": "ฝาก", "ja": "入金"}),
         ("balance", {"zh": "余额", "en": "Balance", "th": "ยอดคงเหลือ", "ja": "残高"}),
     ],
+    # GL 6 列(无科目码 · 与银行口径对齐):借方=存入(入账)、贷方=取出(出账),末列累计余额。
     "gl": [
         ("date", {"zh": "日期", "en": "Date", "th": "วันที่", "ja": "日付"}),
         ("voucher", {"zh": "凭证号", "en": "Voucher No", "th": "เลขที่ใบสำคัญ", "ja": "伝票番号"}),
-        (
-            "account",
-            {"zh": "科目代码", "en": "Account Code", "th": "รหัสบัญชี", "ja": "勘定科目コード"},
-        ),
         ("desc", {"zh": "摘要", "en": "Description", "th": "รายละเอียด", "ja": "摘要"}),
-        ("debit", {"zh": "借方", "en": "Debit", "th": "เดบิต", "ja": "借方"}),
-        ("credit", {"zh": "贷方", "en": "Credit", "th": "เครดิต", "ja": "貸方"}),
+        (
+            "debit",
+            {
+                "zh": "借方=存入",
+                "en": "Debit = Money In",
+                "th": "เดบิต=ฝากเงิน",
+                "ja": "借方=入金",
+            },
+        ),
+        (
+            "credit",
+            {
+                "zh": "贷方=取出",
+                "en": "Credit = Money Out",
+                "th": "เครดิต=ถอนเงิน",
+                "ja": "貸方=出金",
+            },
+        ),
+        ("balance", {"zh": "余额", "en": "Balance", "th": "คงเหลือ", "ja": "残高"}),
     ],
     "vat": [
         ("date", {"zh": "日期", "en": "Date", "th": "วันที่", "ja": "日付"}),
@@ -57,15 +76,24 @@ _COLS: Dict[str, List[Tuple[str, Dict[str, str]]]] = {
 }
 _COLS["invoice"] = _COLS["vat"]
 
-# 两行示例(列对齐 _COLS 顺序)· 让用户照填;说明里提示删除示例行。
+# 期初余额行标签(放日期列 · 余额列填字面值)· 4 语跟随。
+_OPENING_LABEL = {
+    "zh": "期初余额",
+    "en": "Opening Balance",
+    "th": "ยอดยกมา",
+    "ja": "繰越残高",
+}
+_OPENING_VALUE = 100.0  # 示例期初(删示例行时一并删)
+
+# 明细示例行(不含余额列 · 余额由 generate 按公式补)。
 _SAMPLES: Dict[str, List[list]] = {
     "statement": [
-        ["02/05/2026", "QR / SCB X1234", "", 1727.46, 806157.82],
-        ["02/05/2026", "SIM fee", 107.00, "", 852770.35],
+        ["02/05/2026", "QR / SCB X1234", "", 1727.46],
+        ["02/05/2026", "ค่า SIM", 107.00, ""],
     ],
     "gl": [
-        ["02/05/2026", "SVTAX26004029", "C1111", "QR / SCB", 1727.46, ""],
-        ["02/05/2026", "FEE-SIM", "10003", "SIM fee", "", 107.00],
+        ["02/05/2026", "SVTAX26004029", "QR / SCB", 1727.46, ""],
+        ["02/05/2026", "FEE-SIM", "ค่า SIM", "", 107.00],
     ],
     "vat": [
         [
@@ -128,9 +156,28 @@ _NOTES = {
     ],
 }
 
+# 含期初行 + 余额累计列的银行对账两侧;vat/invoice 是纯行项无此结构。
+_BALANCE_DOCS = ("statement", "gl")
+
 
 def template_signature(doc_type: str) -> str:
     return f"Pearnly-{doc_type.upper()}"
+
+
+def _col_letter(idx_1based: int) -> str:
+    from openpyxl.utils import get_column_letter
+
+    return get_column_letter(idx_1based)
+
+
+def _balance_formula(doc_type: str, row: int) -> str:
+    """末列余额 = 上一行余额 + 入账 − 出账。
+    statement: 列 C=支出 D=存入 E=余额 → =E{r-1}+D{r}-C{r}
+    gl:        列 D=借方 E=贷方 F=余额 → =F{r-1}+D{r}-E{r}
+    """
+    if doc_type == "statement":
+        return f"=E{row - 1}+D{row}-C{row}"
+    return f"=F{row - 1}+D{row}-E{row}"
 
 
 def generate_template(doc_type: str, lang: str = "en") -> bytes:
@@ -145,13 +192,26 @@ def generate_template(doc_type: str, lang: str = "en") -> bytes:
 
     cols = _COLS[doc_type]
     headers = [c[1].get(lang) or c[1]["en"] for c in cols]
+    bal_idx = len(cols)  # 末列即余额列(仅 _BALANCE_DOCS)
 
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = template_signature(doc_type)  # 模板签名(前端可据 sheet 名确定判定)
     ws.append(headers)
-    for s in _SAMPLES[doc_type]:
-        ws.append(s)
+
+    if doc_type in _BALANCE_DOCS:
+        # 期初行:标签放日期列,期初额放余额列(字面值,识别层据此读期初)。
+        open_row = [""] * len(cols)
+        open_row[0] = _OPENING_LABEL.get(lang) or _OPENING_LABEL["en"]
+        open_row[bal_idx - 1] = _OPENING_VALUE
+        ws.append(open_row)
+        for s in _SAMPLES[doc_type]:
+            r = ws.max_row + 1
+            ws.append(list(s) + [_balance_formula(doc_type, r)])
+    else:
+        for s in _SAMPLES[doc_type]:
+            ws.append(s)
+
     hf = Font(bold=True, color="FFFFFF")
     fill = PatternFill("solid", fgColor="2563EB")
     for i in range(1, len(headers) + 1):

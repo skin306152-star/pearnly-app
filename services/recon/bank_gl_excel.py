@@ -15,6 +15,19 @@ from services.recon.bank_recon_utils import _to_float, _parse_date, _is_gl_skip_
 from services.recon.bank_table_io import _load_csv_sheets
 from services.recon.bank_gl_common import _map_gl_cols, _extract_acct_code
 
+# 期初余额行关键词(4 语 · 仅"期初/承前",不含"期末/结转")· 我们的固定模板把标签放在
+# 日期列(非描述列),故识别期初要扫该行前几格而非只看描述列。
+_GL_OPENING_KW = (
+    "ยอดยกมา",
+    "ยกมา",
+    "brought forward",
+    "balance forward",
+    "opening",
+    "b/f",
+    "期初",
+    "繰越残高",
+)
+
 
 def parse_gl_excel(
     file_bytes: bytes,
@@ -218,29 +231,28 @@ def parse_gl_excel(
         if not any(row):
             continue
         row_list = [str(c or "").strip() for c in row]
-        if _is_gl_skip_row(row_list):
-            # Check if this is an opening/closing balance row
-            desc_idx = col_map.get("description", col_map.get("doc_no", -1))
-            desc = row_list[desc_idx] if desc_idx >= 0 and desc_idx < len(row_list) else ""
-            if any(kw in desc.lower() for kw in ["ยอดยกมา", "brought forward", "opening"]):
-                # BUG-FIX-T2 v118.35.0.43 · 期初余额优先读 balance 列(如 Mr.erp 把期初放 คงเหลือ 列)
-                # 老逻辑只读 debit/credit · Row 2 期初 ยอดยกมา 借贷列空 → opening=0 → closing 全错
-                bal_idx = col_map.get("balance", -1)
-                if bal_idx >= 0 and bal_idx < len(row_list) and row_list[bal_idx]:
-                    opening = _to_float(row_list[bal_idx])
+        # 期初余额行 · 我们的固定模板把『期初』标签放日期列(4 语:期初/Opening/ยอดยกมา/繰越),
+        # 独立识别(不依赖 _GL_SKIP_KW 含各语 · zh/ja 不在该词典里 → 此前期初读 0 / closing 全错)。
+        if any(kw in " ".join(row_list[:4]).lower() for kw in _GL_OPENING_KW):
+            # BUG-FIX-T2 v118.35.0.43 · 期初优先读 balance 列(我们的模板/Mr.erp 把期初放 คงเหลือ 列)
+            bal_idx = col_map.get("balance", -1)
+            if bal_idx >= 0 and bal_idx < len(row_list) and row_list[bal_idx]:
+                opening = _to_float(row_list[bal_idx])
+                gl_opening_found = True
+            else:
+                # fallback · credit - debit(兼容期初放借贷列的格式)
+                cr_idx = col_map.get("credit", -1)
+                dr_idx = col_map.get("debit", -1)
+                if cr_idx >= 0 and cr_idx < len(row_list):
+                    cr = _to_float(row_list[cr_idx])
+                    dr = _to_float(
+                        row_list[dr_idx] if dr_idx >= 0 and dr_idx < len(row_list) else 0
+                    )
+                    opening = cr - dr  # net opening
                     gl_opening_found = True
-                else:
-                    # fallback · credit - debit(老逻辑保留 · 兼容期初放借贷列的格式)
-                    cr_idx = col_map.get("credit", -1)
-                    dr_idx = col_map.get("debit", -1)
-                    if cr_idx >= 0 and cr_idx < len(row_list):
-                        cr = _to_float(row_list[cr_idx])
-                        dr = _to_float(
-                            row_list[dr_idx] if dr_idx >= 0 and dr_idx < len(row_list) else 0
-                        )
-                        opening = cr - dr  # net opening
-                        gl_opening_found = True
             continue
+        if _is_gl_skip_row(row_list):
+            continue  # 其余汇总/结转行(ยอดยกไป/subtotal/总计)· 非交易 · 跳过
 
         # Extract fields
         d_str = (

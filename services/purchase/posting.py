@@ -155,6 +155,93 @@ def pay_doc(cur, *, tenant_id, workspace_client_id, doc_id, amount) -> dict:
     )
 
 
+def set_payment_status(cur, *, tenant_id, workspace_client_id, doc_id, status) -> dict:
+    """一键改付款态(列表/卡 · PO-5):paid → 付清未付额;unpaid → 撤销付款。仅 posted。"""
+    if status not in ("paid", "unpaid"):
+        raise PosError("purchase.line_invalid", 422, detail="bad_status")
+    if status == "unpaid":
+        return unpay_doc(
+            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=doc_id
+        )
+    row = _load_status(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=doc_id
+    )
+    if row is None:
+        raise PosError("purchase.unexpected", 404)
+    if row["status"] != "posted":
+        raise PosError("purchase.not_draft", 409, detail="not_posted")
+    remaining = Decimal(str(row["net_payable"] or 0)) - Decimal(str(row["paid_amount"] or 0))
+    if remaining > 0:
+        return pay_doc(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            doc_id=doc_id,
+            amount=remaining,
+        )
+    return docs_svc.get_doc(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=doc_id
+    )
+
+
+def unpay_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> dict:
+    """撤销付款:清 paid_amount/payment_status + void 该单付款凭证(账本应付恢复)。仅 posted。"""
+    row = _load_status(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=doc_id
+    )
+    if row is None:
+        raise PosError("purchase.unexpected", 404)
+    if row["status"] != "posted":
+        raise PosError("purchase.not_draft", 409, detail="not_posted")
+    paid = Decimal(str(row["paid_amount"] or 0))
+    if paid > 0:
+        _void_payment_voucher(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            doc_id=doc_id,
+            paid=paid,
+        )
+    cur.execute(
+        "UPDATE purchase_docs SET paid_amount = 0, payment_status = 'unpaid', updated_at = now() "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s",
+        (tenant_id, workspace_client_id, doc_id),
+    )
+    return docs_svc.get_doc(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=doc_id
+    )
+
+
+def _void_payment_voucher(cur, *, tenant_id, workspace_client_id, doc_id, paid) -> None:
+    """撤付款时 void 对应付款凭证(做账关/无凭证则 no-op·失败回滚该步不阻断 toggle)。"""
+    try:
+        cur.execute("SAVEPOINT unpay_void")
+        from services.accounting import vouchers as jv
+
+        ev_id = str(acct_hooks.payment_event_id(doc_id, paid))
+        v = jv.find_active_by_source(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            source_type="payment",
+            source_id=ev_id,
+        )
+        if v:
+            jv.set_status(
+                cur,
+                tenant_id=tenant_id,
+                workspace_client_id=workspace_client_id,
+                voucher_id=v["id"],
+                status="void",
+            )
+        cur.execute("RELEASE SAVEPOINT unpay_void")
+    except Exception:
+        try:
+            cur.execute("ROLLBACK TO SAVEPOINT unpay_void")
+        except Exception:
+            pass
+
+
 def void_doc(cur, *, tenant_id, workspace_client_id, doc_id, created_by) -> dict:
     """作废:posted→void。已入库逐笔取负回冲。draft 用 delete 而非 void。"""
     row = _load_status(

@@ -113,12 +113,26 @@ function segHtml(): string {
 }
 
 // 行尾状态片:草稿(黄 · 可编辑补全)/ 已作废(灰)区别于已入账;已入账才显付款态(付款只对入账单有意义)。
+// 已入账的付款片可一键切换 paid↔unpaid(PO-5),点击不触发行跳转(bindRows 里 stopPropagation)。
 function statusChip(d: DocListItem): string {
     if (d.status === 'draft')
         return `<span class="st draft">${escapeHtml(t('pur-status-draft'))}</span>`;
     if (d.status === 'void')
         return `<span class="st void">${escapeHtml(t('pur-status-void'))}</span>`;
-    return `<span class="st ${d.payment_status}">${escapeHtml(t('pur-pay-' + d.payment_status))}</span>`;
+    return `<span class="st ${d.payment_status} paytog" data-paytoggle="${escapeHtml(d.id)}" data-paycur="${d.payment_status}">${escapeHtml(t('pur-pay-' + d.payment_status))}</span>`;
+}
+
+async function togglePay(id: string, next: string): Promise<void> {
+    try {
+        const ws = activeWsId();
+        await papi('POST', `/api/purchase/docs/${id}/payment-status`, {
+            status: next,
+            workspace_client_id: ws,
+        });
+        load();
+    } catch (e) {
+        showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
+    }
 }
 
 function rowHtml(d: DocListItem): string {
@@ -241,6 +255,12 @@ function bindRows(): void {
             el.classList.toggle('on', selected.has(id));
             syncGroupChecks();
             updateBulk();
+        };
+    });
+    document.querySelectorAll<HTMLElement>('#pur-body [data-paytoggle]').forEach((el) => {
+        el.onclick = (e) => {
+            e.stopPropagation();
+            togglePay(el.dataset.paytoggle!, el.dataset.paycur === 'paid' ? 'unpaid' : 'paid');
         };
     });
     document.querySelectorAll<HTMLElement>('#pur-body [data-grpchk]').forEach((el) => {

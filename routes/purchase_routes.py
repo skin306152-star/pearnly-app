@@ -65,6 +65,11 @@ class PayIn(BaseModel):
     note: Optional[str] = None
 
 
+class PaymentStatusIn(BaseModel):
+    workspace_client_id: Optional[int] = None
+    status: str
+
+
 class MatchIn(BaseModel):
     workspace_client_id: Optional[int] = None
     product_id: Optional[str] = None
@@ -180,6 +185,19 @@ async def api_pay_doc(doc_id: str, req: PayIn, request: Request):
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)
         res = posting_svc.pay_doc(
             cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id, amount=req.amount
+        )
+        return ok(res)
+
+
+@router.post("/docs/{doc_id}/payment-status")
+async def api_set_payment_status(doc_id: str, req: PaymentStatusIn, request: Request):
+    """一键改付款态(列表/卡):paid 付清未付额 / unpaid 撤销付款(PO-5)。"""
+    _, tid = auth_member(request, "purchase.doc.approve")
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        gate(cur, tid)
+        ws = resolve_ws(cur, request, tid, req.workspace_client_id)
+        res = posting_svc.set_payment_status(
+            cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id, status=req.status
         )
         return ok(res)
 

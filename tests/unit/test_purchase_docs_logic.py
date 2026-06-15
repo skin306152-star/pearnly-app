@@ -184,5 +184,67 @@ class PostAutoPayTests(unittest.TestCase):
         self.assertEqual(captured, {})
 
 
+class PaymentStatusToggleTests(unittest.TestCase):
+    """PO-5 一键改付款态:paid 付清未付额 / unpaid 撤销付款 / 非法状态拒 / 仅 posted。"""
+
+    def _cur(self, paid_amount=0, status="posted"):
+        class Cur:
+            def execute(self, *a, **k):
+                return None
+
+            def fetchone(self):
+                return {
+                    "status": status,
+                    "doc_kind": "expense",
+                    "net_payable": 100,
+                    "paid_amount": paid_amount,
+                }
+
+        return Cur()
+
+    def test_bad_status_rejected(self):
+        with self.assertRaises(PosError) as e:
+            posting_svc.set_payment_status(
+                self._cur(), tenant_id="t", workspace_client_id=1, doc_id="D", status="weird"
+            )
+        self.assertEqual(e.exception.code, "purchase.line_invalid")
+
+    def test_paid_pays_remaining(self):
+        from decimal import Decimal
+        from unittest import mock
+
+        cap = {}
+
+        def fake_pay(cur, **k):
+            cap.update(k)
+            return {"id": "D", "payment_status": "paid"}
+
+        with mock.patch.object(posting_svc, "pay_doc", side_effect=fake_pay):
+            posting_svc.set_payment_status(
+                self._cur(0), tenant_id="t", workspace_client_id=1, doc_id="D", status="paid"
+            )
+        self.assertEqual(cap.get("amount"), Decimal("100"))
+
+    def test_unpaid_resets_doc(self):
+        from unittest import mock
+
+        with mock.patch.object(
+            posting_svc.docs_svc,
+            "get_doc",
+            return_value={"id": "D", "payment_status": "unpaid", "paid_amount": 0},
+        ):
+            res = posting_svc.set_payment_status(
+                self._cur(100), tenant_id="t", workspace_client_id=1, doc_id="D", status="unpaid"
+            )
+        self.assertEqual(res["payment_status"], "unpaid")
+
+    def test_unpay_only_posted(self):
+        with self.assertRaises(PosError) as e:
+            posting_svc.unpay_doc(
+                self._cur(status="draft"), tenant_id="t", workspace_client_id=1, doc_id="D"
+            )
+        self.assertEqual(e.exception.code, "purchase.not_draft")
+
+
 if __name__ == "__main__":
     unittest.main()

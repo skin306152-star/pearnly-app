@@ -1,33 +1,13 @@
 # -*- coding: utf-8 -*-
-"""LINE 阶段三纯模块:postback 编解码 / 取链接命令 / OCR Flex 卡(阶段三)。
+"""LINE 阶段三纯模块:取链接命令 / glue(取链接回复 + Rich Menu)。
 
-锁:postback 往返 + 非法拒 · 命令多写法归一 · Flex 结构 + 低置信着标 + 按钮带 postback/uri。
-真 push / webhook 分流 / Rich Menu / LIFF 真鉴权 = 用户验收(需真 channel)。
+锁:命令多写法归一 · 取链接回复带 URL · Rich Menu 6 格 + uri 填充。统一智能通道下图/文均
+直落采购,不再有 Flex 确认卡 / postback。真 push / webhook 分流 / LIFF 鉴权 = 用户验收。
 """
 
 import unittest
 
 from services.line_binding import line_commands as lc
-from services.line_binding import line_flex as lf
-from services.line_binding import line_postback as lp
-
-
-class PostbackTests(unittest.TestCase):
-    def test_confirm_roundtrip(self):
-        out = lp.parse(lp.confirm_data("D1"))
-        self.assertEqual(out, {"action": "confirm", "doc_id": "D1"})
-
-    def test_redirect_roundtrip(self):
-        out = lp.parse(lp.redirect_data("D1", "expense"))
-        self.assertEqual(out, {"action": "redirect", "doc_id": "D1", "direction": "expense"})
-
-    def test_redirect_invalid_direction_blanked(self):
-        out = lp.parse(lp.redirect_data("D1", "bogus"))
-        self.assertEqual(out["direction"], "")
-
-    def test_bad_data_rejected(self):
-        self.assertEqual(lp.parse("garbage")["action"], "")
-        self.assertEqual(lp.parse("")["action"], "")
 
 
 class CommandTests(unittest.TestCase):
@@ -48,112 +28,12 @@ class CommandTests(unittest.TestCase):
         self.assertIsNone(lc.parse_link_command(""))
 
 
-_LABELS = {
-    "head": "识别完成",
-    "vendor": "卖家",
-    "no": "票号",
-    "date": "日期",
-    "amount": "金额",
-    "confirm": "确认入采购",
-    "expense": "记为费用",
-    "edit": "修改",
-    "review_mark": "(请核对)",
-}
-
-
-class FlexTests(unittest.TestCase):
-    def _card(self, fc=None, liff=""):
-        return lf.ocr_result_flex(
-            fields={
-                "seller_name": "Cafe",
-                "invoice_number": "NZ01",
-                "date": "2026-06-01",
-                "total_amount": "110.00",
-            },
-            field_confidence=fc or {},
-            doc_id="D1",
-            labels=_LABELS,
-            liff_url=liff,
-        )
-
-    def test_flex_structure(self):
-        card = self._card()
-        self.assertEqual(card["type"], "flex")
-        self.assertEqual(card["contents"]["type"], "bubble")
-        # 两个 postback 按钮(确认/记费用),无 LIFF 时无第三个
-        footer = card["contents"]["footer"]["contents"]
-        self.assertEqual(len(footer), 2)
-        self.assertEqual(footer[0]["action"]["type"], "postback")
-
-    def test_low_confidence_field_marked_and_ambered(self):
-        card = self._card(fc={"invoice_number": 0.55})
-        body = card["contents"]["body"]["contents"]
-        no_row = body[3]  # head, separator, vendor, no
-        val_cell = no_row["contents"][1]
-        self.assertIn("(请核对)", val_cell["text"])
-        self.assertEqual(val_cell["color"], "#D97706")
-
-    def test_high_confidence_not_marked(self):
-        card = self._card(fc={"invoice_number": 0.97})
-        no_row = card["contents"]["body"]["contents"][3]
-        self.assertNotIn("(请核对)", no_row["contents"][1]["text"])
-
-    def test_liff_button_added_when_url(self):
-        card = self._card(liff="https://liff/x")
-        footer = card["contents"]["footer"]["contents"]
-        self.assertEqual(len(footer), 3)
-        self.assertEqual(footer[2]["action"]["type"], "uri")
-        self.assertEqual(footer[2]["action"]["uri"], "https://liff/x")
-
-    def test_confirm_button_carries_doc_postback(self):
-        card = self._card()
-        data = card["contents"]["footer"]["contents"][0]["action"]["data"]
-        self.assertEqual(lp.parse(data), {"action": "confirm", "doc_id": "D1"})
-
-
 class LineIntakeGlueTests(unittest.TestCase):
-    def test_ocr_labels_four_langs(self):
-        from services.line_binding import line_intake as li
-
-        for lang in ("zh", "th", "en", "ja"):
-            labels = li.ocr_labels(lang)
-            self.assertIn("confirm", labels)
-            self.assertIn("review_mark", labels)
-
-    def test_flex_disabled_by_default(self):
-        import os
-
-        from services.line_binding import line_intake as li
-
-        saved = os.environ.pop("LINE_FLEX_INTAKE", None)
-        try:
-            self.assertFalse(li.is_flex_enabled())
-            os.environ["LINE_FLEX_INTAKE"] = "1"
-            self.assertTrue(li.is_flex_enabled())
-        finally:
-            os.environ.pop("LINE_FLEX_INTAKE", None)
-            if saved is not None:
-                os.environ["LINE_FLEX_INTAKE"] = saved
-
     def test_link_reply_contains_url(self):
         from services.line_binding import line_intake as li
 
         msg = li.link_reply(li.line_commands.LINK_DRIVE, "en", web_url="https://x/y")
         self.assertIn("https://x/y", msg)
-
-    def test_ack_reply_langs(self):
-        from services.line_binding import line_intake as li
-
-        self.assertTrue(li.ack_reply("purchase", "th"))
-        self.assertTrue(li.ack_reply("expense", "ja"))
-
-    def test_build_ocr_flex_wraps_labels(self):
-        from services.line_binding import line_intake as li
-
-        card = li.build_ocr_flex(
-            lang="th", fields={"invoice_number": "X"}, field_confidence={}, doc_id="D1"
-        )
-        self.assertEqual(card["type"], "flex")
 
     def test_rich_menu_payload_six_areas(self):
         from services.line_binding import line_intake as li

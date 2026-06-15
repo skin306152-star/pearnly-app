@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
-"""LINE 一句话记账对话处理(文本路 · doc 10/14)。
+"""LINE 一句话记账对话处理(文本路 · 统一智能通道)。
 
-从 line_webhook_routes 抽出,保 webhook 薄(只路由)。两个入口:
-  handle_expense_text     文本含金额 → L1/L2 解析 → 落草稿 → 回确认卡(绝不静默入账)
-  handle_expense_postback 确认卡按钮 → 草稿置 confirmed/discarded(留痕)
-护栏(doc 10 §1):用户可见文案全走 line_i18n 模板;L2 只产结构化数据。
+handle_expense_text:文本 → 智能解析(L1 规则 + L2 LLM)→ 记账直接落采购进项草稿单;
+缺金额反问、查账、问答、越界挡回。护栏(doc 10 §1):用户可见文案全走 line_i18n 模板。
 """
 
 from __future__ import annotations
@@ -12,28 +10,9 @@ from __future__ import annotations
 import logging
 
 from core import db
-from services.line_binding import line_client, line_postback
+from services.line_binding import line_client
 
 logger = logging.getLogger(__name__)
-
-# 费用草稿网页编辑深链(doc 14 §6 · 前端复核屏接此 draft id · 泰语先行)。
-_EXPENSE_DRAFT_URL = "https://pearnly.com/home#expense-draft="
-
-_CARD_LABEL_KEYS = (
-    "head",
-    "doc_type",
-    "inv_no",
-    "exp_type",
-    "date",
-    "category",
-    "subcategory",
-    "business",
-    "detail",
-    "vendor",
-    "confirm",
-    "discard",
-    "edit",
-)
 
 
 def handle_expense_text(bound_user, reply_token, line_user_id, text, lang) -> bool:
@@ -135,34 +114,6 @@ def _to_purchase_data(d: dict) -> dict:
     }
 
 
-def _post_to_purchase(cur, tid: str, ws: int, d: dict, bound_user) -> None:
-    """LINE 确认入账 → 落一张采购进项草稿单(图/文同下游 · 用户可在进项采购看到/补全/推 ERP)。"""
-    from services.purchase import docs as docs_svc
-    from services.purchase import settings as settings_svc
-
-    cfg = settings_svc.get_settings(cur, tenant_id=tid, workspace_client_id=ws)
-    created_by = str(bound_user["id"]) if bound_user.get("id") else None
-    docs_svc.create_doc(
-        cur,
-        tenant_id=tid,
-        workspace_client_id=ws,
-        created_by=created_by,
-        data=_to_purchase_data(d),
-        settings=cfg,
-        status="draft",
-    )
-
-
-def _receipt_url(draft_id: str, tid: str, ws: int) -> str:
-    """替代收据 PDF 链接(签名 token · 外部浏览器可开)。"""
-    import time
-
-    from services.expense import receipt_token
-
-    tok = receipt_token.sign(draft_id=draft_id, tenant_id=tid, ws=ws, now_ts=int(time.time()))
-    return f"https://pearnly.com/api/expense/receipt/{draft_id}?t={tok}"
-
-
 def _dup_warn(bound_user, draft, ws) -> bool:
     """查重(图/文共用 check_duplicate_invoice)。命中已识别历史 → True(卡前提示)。任何异常 → False。"""
     try:
@@ -229,59 +180,6 @@ def _resolve_draft(bound_user, line_user_id, text, tid, ws):
             missing="amount",
         )
     return None, False, "clarify"
-
-
-def handle_expense_postback(bound_user, reply_token, parsed, lang) -> None:
-    """费用草稿确认/丢弃(doc 10 §5)。确认 → status=confirmed + 回执;丢弃 → discarded(留痕不删)。"""
-    tid = str(bound_user["tenant_id"]) if bound_user.get("tenant_id") else None
-    draft_id = parsed.get("draft_id")
-    if not tid or not draft_id:
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_not_found"))
-        return
-    try:
-        from core.workspace_context import default_workspace_id
-        from services.expense import expense_draft as draft_store
-
-        with db.get_cursor_rls(tid, commit=True) as cur:
-            ws = default_workspace_id(cur, tid)
-            d = (
-                draft_store.get_draft(cur, tenant_id=tid, workspace_client_id=ws, draft_id=draft_id)
-                if ws is not None
-                else None
-            )
-            if not d:
-                line_client.reply_text(reply_token, line_client.t_line(lang, "exp_not_found"))
-                return
-            if parsed.get("action") == line_postback.ACTION_EXP_CONFIRM:
-                # 确认入账 = 落一张采购进项草稿单(LINE 记账的归宿 · 图/文同下游)。
-                _post_to_purchase(cur, tid, ws, d, bound_user)
-                draft_store.set_status(
-                    cur,
-                    tenant_id=tid,
-                    workspace_client_id=ws,
-                    draft_id=draft_id,
-                    status="confirmed",
-                )
-                status = "confirmed"
-            else:
-                draft_store.set_status(
-                    cur,
-                    tenant_id=tid,
-                    workspace_client_id=ws,
-                    draft_id=draft_id,
-                    status="discarded",
-                )
-                status = "discarded"
-        if status == "confirmed":
-            # 确认后给替代收据 PDF 链接(签名 token · 外部浏览器可开 · doc 14 §7)。
-            body = line_client.t_line(lang, "exp_confirmed", amount=d["amount"])
-            body += "\n📄 " + _receipt_url(draft_id, tid, ws)
-            line_client.reply_text(reply_token, body)
-        else:
-            line_client.reply_text(reply_token, line_client.t_line(lang, "exp_discarded"))
-    except Exception:
-        logger.exception("[line postback] expense draft confirm failed")
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_not_found"))
 
 
 def _reply_query(reply_token, lang, tid, ws) -> None:
@@ -362,16 +260,6 @@ def _fill_category(cur, draft, text, tree, tid, ws) -> None:
                     draft.subcategory = child["name"]
                     draft.subcategory_id = str(sub_id)
             return
-
-
-def _business_name(cur, *, tenant_id, ws) -> str:
-    """套账主体名(确认卡「业务主体」栏)。"""
-    cur.execute(
-        "SELECT name FROM workspace_clients WHERE id = %s AND tenant_id = %s",
-        (ws, tenant_id),
-    )
-    row = cur.fetchone()
-    return (row["name"] or "") if row else ""
 
 
 def _ocr_balance_ok(bound_user) -> bool:

@@ -273,7 +273,8 @@ class ResolveInboxTests(unittest.TestCase):
 
 
 # 旧 F10「LINE 文字静默记一笔 posted 费用」已删(违反 doc 10 §5 死穴:绝不静默入账)。
-# 文本路改走 services/expense 引擎:解析→草稿→确认卡,覆盖见 test_expense_line_quick_entry.py。
+# 文本路改走 services/expense 引擎:解析→直接落采购草稿单(草稿态待复核,非 posted),
+# 覆盖见 test_expense_line_quick_entry.py + test_line_expense_to_purchase.py。
 
 
 if __name__ == "__main__":

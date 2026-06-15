@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""线 B · 一句话记账 L1 确定性解析(doc 10 §3)+ ExpenseDraft 模型/存取。
+"""线 B · 一句话记账 L1 确定性解析(doc 10 §3)+ ExpenseDraft 模型。
 
 锁:金额/数量/单价/税号/发票号/日期/分类 的确定性映射(泰语优先);裸数字=总额;
-@/单价 算总额;无金额→不当记账;store SQL 参数化 + 作用域隔离。
+@/单价 算总额;无金额→不当记账。统一智能通道下解析结果直接落采购草稿单(无独立草稿表)。
 """
 
 import unittest
@@ -10,7 +10,7 @@ from datetime import date
 from decimal import Decimal
 
 from services.expense import line_quick_entry as lqe
-from services.expense.expense_draft import ExpenseDraft, insert_draft, set_status
+from services.expense.expense_draft import ExpenseDraft
 
 
 class ParseExpenseTests(unittest.TestCase):
@@ -75,53 +75,6 @@ class ParseExpenseTests(unittest.TestCase):
 
     def test_default_date_today(self):
         self.assertEqual(lqe.parse_expense("ค่าน้ำ 50").doc_date, date.today().isoformat())
-
-
-class _FakeCursor:
-    """捕获 execute(sql, params) · rowcount/fetchone 可注入。"""
-
-    def __init__(self, fetch=None, rowcount=1):
-        self.calls = []
-        self._fetch = fetch
-        self.rowcount = rowcount
-
-    def execute(self, sql, params=None):
-        self.calls.append((sql, params))
-
-    def fetchone(self):
-        return self._fetch
-
-
-class StoreTests(unittest.TestCase):
-    def test_insert_is_parameterized_and_scoped(self):
-        cur = _FakeCursor(fetch={"id": "abc-123"})
-        draft = lqe.parse_expense("ค่าน้ำ 50")
-        new_id = insert_draft(
-            cur, tenant_id="t1", workspace_client_id=7, draft=draft, line_user_id="U1"
-        )
-        self.assertEqual(new_id, "abc-123")
-        sql, params = cur.calls[0]
-        self.assertIn("INSERT INTO expense_draft", sql)
-        self.assertIn("VALUES", sql)
-        self.assertNotIn("50", sql)  # 值走参数,不拼进 SQL
-        self.assertEqual(params[0], "t1")
-        self.assertEqual(params[1], 7)
-
-    def test_set_status_scoped_and_validated(self):
-        cur = _FakeCursor(rowcount=1)
-        ok = set_status(
-            cur, tenant_id="t1", workspace_client_id=7, draft_id="d1", status="confirmed"
-        )
-        self.assertTrue(ok)
-        sql, params = cur.calls[0]
-        self.assertIn("WHERE id = %s AND tenant_id = %s AND workspace_client_id = %s", sql)
-        self.assertEqual(params, ("confirmed", "d1", "t1", 7))
-
-    def test_set_status_rejects_bad_value(self):
-        with self.assertRaises(ValueError):
-            set_status(
-                _FakeCursor(), tenant_id="t", workspace_client_id=1, draft_id="d", status="posted"
-            )
 
 
 class CategoryTreeMatchTests(unittest.TestCase):

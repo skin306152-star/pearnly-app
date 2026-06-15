@@ -58,7 +58,6 @@ PUBLIC_ROUTES = {
     ("GET", "/api/integrations/google/callback"),  # Google 外流授权回调 · state CSRF 即凭证
     # webhook(签名校验在实现内:LINE signature / GitHub secret)
     ("POST", "/api/line/webhook"),
-    ("GET", "/api/expense/receipt/{draft_id}"),  # 替代收据 PDF · HMAC 签名 token 自带鉴权(无会话)
     ("POST", "/api/line/liff/auth"),  # LIFF id_token 即凭证(LINE verify 验签)
     ("GET", "/liff/purchase/{doc_id}"),  # LIFF 页入口·跳 /home 复核屏(前端 LIFF 鉴权)
     ("POST", "/internal/deploy"),

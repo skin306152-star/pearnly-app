@@ -1,7 +1,7 @@
 """一句话记账 · 多轮澄清会话态 line_pending_entry + 可学习词典 expense_learned。
 
 Revision ID: 0035_line_pending_learned
-Revises: 0034_expense_draft
+Revises: 0033_purchase_config
 Create Date: 2026-06-15
 
 line_pending_entry:缺金额时存半成品(短 TTL),用户补一句后合并出卡(每 LINE 用户一条)。
@@ -13,7 +13,7 @@ Dual-run:services/expense/schema.ensure_expense_schema()(prod 无 alembic 钩子
 from alembic import op
 
 revision = "0035_line_pending_learned"
-down_revision = "0034_expense_draft"
+down_revision = "0033_purchase_config"
 branch_labels = None
 depends_on = None
 

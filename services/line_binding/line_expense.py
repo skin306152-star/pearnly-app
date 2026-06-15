@@ -33,6 +33,13 @@ def handle_expense_text(
             return False
         from services.expense import line_quick_entry as lqe
         from services.expense import replies
+        from services.line_binding import line_chat_memory
+
+        # 对话记忆(PO-15):先取历史(不含本条)供大脑多轮连贯,再记本条用户消息。
+        history = line_chat_memory.recent(line_user_id=line_user_id, tenant_id=str(tid))
+        line_chat_memory.note(
+            line_user_id=line_user_id, tenant_id=str(tid), role="user", content=text
+        )
 
         # 0. 闲聊(零成本 L1)→ 智能问候/感谢(治复读)。
         small = replies.detect_smalltalk(text)
@@ -81,7 +88,7 @@ def handle_expense_text(
 
         api_key = line_l2.resolve_api_key(bound_user)
         u = (
-            line_agent.understand(text, api_key=api_key)
+            line_agent.understand(text, api_key=api_key, history=history)
             if (api_key and _ocr_balance_ok(bound_user))
             else None
         )
@@ -158,6 +165,9 @@ def _dispatch_agent(
     reply = (u.get("reply") or "").strip()
     if reply:
         line_client.reply_text(reply_token, reply)
+        from services.line_binding import line_chat_memory
+
+        line_chat_memory.note(line_user_id=line_user_id, tenant_id=tid, role="bot", content=reply)
     else:
         _reply_pool(reply_token, "scope", text, lang)
     return True

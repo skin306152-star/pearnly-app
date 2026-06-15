@@ -235,6 +235,18 @@ async def _handle_line_image_ocr(
             except Exception as _ce:
                 logger.warning(f"[line_ocr] cost log failed (non-blocking): {_ce}")
             _push_result_card(line_user_id, lang, ingest, quote_token)
+            # 对话记忆(PO-15):记图片轮的结果,让下一句文本问「为什么/需补啥」时大脑接得住。
+            from services.line_binding import line_chat_memory
+
+            line_chat_memory.note(
+                line_user_id=line_user_id, tenant_id=tid_str, role="user", content="[ส่งรูปใบเสร็จ]"
+            )
+            line_chat_memory.note(
+                line_user_id=line_user_id,
+                tenant_id=tid_str,
+                role="bot",
+                content=f"票据识别:{ingest.get('state', '')} {ingest.get('amount') or ''}".strip(),
+            )
             logger.info(f"[line_ocr] 完成 · state={ingest['state']} · user={user_fresh['id']}")
             return
 

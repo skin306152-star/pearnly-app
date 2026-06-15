@@ -275,6 +275,15 @@ def _boot_schema_ddl() -> None:
     except Exception as e:
         logger.warning(f"启动 LINE 动作令牌 schema 失败: {e}")
 
+    # LINE 短期对话记忆(喂大脑上下文 · PO-15)· 与 alembic 0038 同源幂等 DDL。
+    # NEW-DEBT-EXEMPT: 启动自愈式迁移,prod 无 alembic 钩子,口径同 expense schema。
+    try:
+        from services.line_binding.line_chat_memory import ensure_table as _ensure_chat_mem
+
+        _ensure_chat_mem()
+    except Exception as e:
+        logger.warning(f"启动 LINE 对话记忆 schema 失败: {e}")
+
     # 商户采购(进项)schema 双跑(suppliers / purchase_docs+lines / categories+settings+
     # intake+attachments)· 与 alembic 0031-0033 同源幂等 DDL(docs/purchasing/01)。
     try:

@@ -85,15 +85,39 @@ reply rules:
 - For record/query/undo/edit: leave reply as "" (the system composes those from real data)."""
 
 
-def understand(text: str, *, api_key: Optional[str], today: Optional[str] = None) -> Optional[dict]:
-    """一次 LLM 调用 → 路由决策 + 槽位 + 自然回复。无 key/失败/非法 → None(调用方回落)。"""
+def _history_block(history: Optional[list]) -> str:
+    """最近对话 → 上下文段(仅供大脑理解多轮·不是要分类的当前消息)。空 → 空串。"""
+    turns = [
+        f'{h.get("role", "")}: {h.get("content", "")}'.strip()
+        for h in (history or [])
+        if (h.get("content") or "").strip()
+    ]
+    if not turns:
+        return ""
+    return (
+        "\n\nRecent conversation (context only — classify ONLY the user's latest message that "
+        "follows; do NOT re-log or re-classify past turns):\n" + "\n".join(turns)
+    )
+
+
+def understand(
+    text: str,
+    *,
+    api_key: Optional[str],
+    today: Optional[str] = None,
+    history: Optional[list] = None,
+) -> Optional[dict]:
+    """一次 LLM 调用 → 路由决策 + 槽位 + 自然回复。无 key/失败/非法 → None(调用方回落)。
+
+    history=最近若干轮 [{role, content}](PO-15):喂作上下文 → 多轮连贯 + 接得住「上条为啥失败」。
+    """
     if not api_key or not (text or "").strip():
         return None
     try:
         from services.ocr import gemini_models
         from services.ocr.layer2_gemini import _call_gemini_with_retry
 
-        prompt = _PROMPT.format(today=today or date.today().isoformat())
+        prompt = _PROMPT.format(today=today or date.today().isoformat()) + _history_block(history)
         data, _meta = _call_gemini_with_retry(
             text,
             api_key=api_key,

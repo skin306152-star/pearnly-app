@@ -73,9 +73,13 @@ async def api_liff_auth(req: LiffAuthIn):
 
 
 @router.get("/liff/purchase/{doc_id}")
-async def liff_purchase_entry(doc_id: str, request: Request):
-    """LIFF 页入口:跳 /home 复核屏(前端按 liff 参数走 LIFF 鉴权 + 打开该单)。"""
-    return RedirectResponse(f"/home?liff=purchase&doc={doc_id}", status_code=302)
+async def liff_purchase_entry(doc_id: str, request: Request, view: str = ""):
+    """LIFF 页入口:跳 /home 复核屏(前端按 liff 参数走 LIFF 鉴权 + 打开该单)。
+
+    view=receipt(PO-7)→ 落只读详情页(出/下载替代收据),非编辑复核屏。
+    """
+    extra = "&view=receipt" if view == "receipt" else ""
+    return RedirectResponse(f"/home?liff=purchase&doc={doc_id}{extra}", status_code=302)
 
 
 @router.get("/liff/purchase-inbox/{item_id}")

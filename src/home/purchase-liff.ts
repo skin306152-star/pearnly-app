@@ -6,6 +6,7 @@
 
 const LIFF_DOC_KEY = 'pearnly_liff_doc';
 const LIFF_INBOX_KEY = 'pearnly_liff_inbox';
+const LIFF_VIEW_KEY = 'pearnly_liff_view';
 const LIFF_SDK_SRC = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
 
 interface LiffSdk {
@@ -65,7 +66,11 @@ function liffErrKey(body: unknown): string {
     return 'liff-open-in-line';
 }
 
-async function liffEntry(doc: string | null, inbox: string | null): Promise<void> {
+async function liffEntry(
+    doc: string | null,
+    inbox: string | null,
+    view: string | null
+): Promise<void> {
     mask(tx('liff-signing-in', '正在登录 LINE…'));
     const liffId = (window as unknown as { __PEARNLY_LIFF_ID__?: string }).__PEARNLY_LIFF_ID__;
     const liff = await loadLiffSdk();
@@ -93,6 +98,7 @@ async function liffEntry(doc: string | null, inbox: string | null): Promise<void
         localStorage.setItem('mrpilot_token', body.data.token);
         if (doc) sessionStorage.setItem(LIFF_DOC_KEY, doc);
         if (inbox) sessionStorage.setItem(LIFF_INBOX_KEY, inbox);
+        if (view) sessionStorage.setItem(LIFF_VIEW_KEY, view);
         // 带 token 重进 /home(去掉 liff 参数)· 正常引导起来后 liffResume 打开复核屏/待归类。
         location.replace('/home');
     } catch (_) {
@@ -104,13 +110,21 @@ async function liffEntry(doc: string | null, inbox: string | null): Promise<void
 function liffResume(): void {
     const doc = sessionStorage.getItem(LIFF_DOC_KEY);
     const inbox = sessionStorage.getItem(LIFF_INBOX_KEY);
+    const view = sessionStorage.getItem(LIFF_VIEW_KEY);
     if (!doc && !inbox) return;
     sessionStorage.removeItem(LIFF_DOC_KEY);
     sessionStorage.removeItem(LIFF_INBOX_KEY);
+    sessionStorage.removeItem(LIFF_VIEW_KEY);
     let tries = 0;
     const open = () => {
         if (inbox) {
             if (typeof window.routeTo === 'function') window.routeTo('purchase-inbox');
+            else if (tries++ < 40) setTimeout(open, 120);
+            return;
+        }
+        // view=receipt(PO-7)→ 只读详情页(看/出替代收据);否则编辑复核屏。
+        if (view === 'receipt') {
+            if (typeof window.openPurchaseDetail === 'function') window.openPurchaseDetail(doc!);
             else if (tries++ < 40) setTimeout(open, 120);
             return;
         }
@@ -120,5 +134,5 @@ function liffResume(): void {
     open();
 }
 
-if (qp('liff') === 'purchase') liffEntry(qp('doc'), qp('inbox'));
+if (qp('liff') === 'purchase') liffEntry(qp('doc'), qp('inbox'), qp('view'));
 else liffResume();

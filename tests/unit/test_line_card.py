@@ -171,6 +171,22 @@ class CardTests(unittest.TestCase):
         self.assertTrue(toks)
         self.assertTrue(all(t == "TOK9" for t in toks))
 
+    def test_posted_text_has_substitute_receipt_link(self):
+        # PO-7:文字录入(无原票)已入账卡 → 出「替代收据」深链(LIFF 落详情页 view=receipt)。
+        import json
+
+        s = json.dumps(self._card("posted", source="text"), ensure_ascii=False)
+        self.assertIn("替代收据", s)
+        self.assertIn("/liff/purchase/D1?view=receipt", s)
+
+    def test_posted_doc_no_receipt_link(self):
+        # 有原票(source=doc)→ 不给替代收据链接(本就有真凭证)。
+        import json
+
+        s = json.dumps(self._card("posted", source="doc"), ensure_ascii=False)
+        self.assertNotIn("替代收据", s)
+        self.assertNotIn("view=receipt", s)
+
     def test_four_langs_render(self):
         for lang in ("zh", "th", "en", "ja"):
             c = line_card.result_card(

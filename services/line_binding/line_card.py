@@ -69,6 +69,7 @@ _L = {
         "btn_undo": "撤销",
         "btn_discard": "丢弃",
         "btn_open": "打开原记录",
+        "btn_receipt": "替代收据",
         "dup_seen": "已存在记录",
     },
     "th": {
@@ -105,6 +106,7 @@ _L = {
         "btn_undo": "ยกเลิก",
         "btn_discard": "ทิ้ง",
         "btn_open": "เปิดรายการเดิม",
+        "btn_receipt": "ใบแทนใบเสร็จ",
         "dup_seen": "มีรายการอยู่แล้ว",
     },
     "en": {
@@ -141,6 +143,7 @@ _L = {
         "btn_undo": "Undo",
         "btn_discard": "Discard",
         "btn_open": "Open original",
+        "btn_receipt": "Substitute receipt",
         "dup_seen": "Existing record",
     },
     "ja": {
@@ -177,6 +180,7 @@ _L = {
         "btn_undo": "取消",
         "btn_discard": "破棄",
         "btn_open": "元の記録を開く",
+        "btn_receipt": "代替領収書",
         "dup_seen": "既存の記録",
     },
 }
@@ -273,10 +277,19 @@ def _record_link(web_url: str, ref: str, state: str) -> str:
     return f"{base}/liff/{path}/{ref}"
 
 
-def _footer(state: str, ref: str, web_url: str, t: dict, can_post: bool, token: str = "") -> list:
+def _footer(
+    state: str,
+    ref: str,
+    web_url: str,
+    t: dict,
+    can_post: bool,
+    token: str = "",
+    source: str = "doc",
+) -> list:
     """唯一实心主按钮=提交动作;复核/编辑/撤销/丢弃=link 文字链接(非按钮)。永不死路。
 
     postback 动作带一次性防重放令牌(token · PO-12),uri 复核/编辑无需令牌。
+    已入账且无原票(source=text)→ 加「替代收据」链接,LIFF 落详情页出 PDF(PO-7)。
     """
     primary, links = None, []
     edit_uri = _record_link(web_url, ref, state)
@@ -289,10 +302,10 @@ def _footer(state: str, ref: str, web_url: str, t: dict, can_post: bool, token: 
 
     if state == "posted":
         undo = line_postback.undo_data(ref, token)
-        links = [
-            _btn(t["btn_review"], primary=False, uri=edit_uri),
-            _btn(t["btn_undo"], primary=False, postback=undo, danger=True),
-        ]
+        links = [_btn(t["btn_review"], primary=False, uri=edit_uri)]
+        if source == "text" and ref:
+            links.append(_btn(t["btn_receipt"], primary=False, uri=f"{edit_uri}?view=receipt"))
+        links.append(_btn(t["btn_undo"], primary=False, postback=undo, danger=True))
     elif state == "confirm":
         primary = _btn(
             t["btn_confirm"], primary=True, postback=line_postback.confirm_data(ref, token)
@@ -481,7 +494,7 @@ def result_card(
                 "type": "box",
                 "layout": "vertical",
                 "paddingAll": "12px",
-                "contents": _footer(state, doc_id, web_url, t, can_post, token),
+                "contents": _footer(state, doc_id, web_url, t, can_post, token, source),
             },
         },
     }

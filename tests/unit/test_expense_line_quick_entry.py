@@ -77,6 +77,31 @@ class ParseExpenseTests(unittest.TestCase):
         self.assertEqual(lqe.parse_expense("ค่าน้ำ 50").doc_date, date.today().isoformat())
 
 
+class IntentGuardTests(unittest.TestCase):
+    """L1 意图 + 问句护栏:别把问题/查账/求助当记账(治「我刚不是花了50吗」被误记)。"""
+
+    def test_question_with_number_not_expense(self):
+        # 关键回归:含数字的问句不能当记账。
+        self.assertTrue(lqe.is_question("我刚刚不是花了50吗"))
+        self.assertTrue(lqe.is_question("这个对吗?"))
+
+    def test_plain_expense_not_question(self):
+        self.assertFalse(lqe.is_question("ค่าน้ำ 50"))
+        self.assertFalse(lqe.is_question("打车 120"))
+
+    def test_l1_intent_support(self):
+        self.assertEqual(lqe.l1_intent("人工客服"), "support")
+        self.assertEqual(lqe.l1_intent("转人工"), "support")
+
+    def test_l1_intent_query(self):
+        self.assertEqual(lqe.l1_intent("本月花了多少"), "query")
+        self.assertEqual(lqe.l1_intent("这个月花多少"), "query")
+
+    def test_l1_intent_none_for_expense(self):
+        self.assertIsNone(lqe.l1_intent("ค่าน้ำ 50"))
+        self.assertIsNone(lqe.l1_intent("打车 120"))
+
+
 class CategoryTreeMatchTests(unittest.TestCase):
     """LINE 归类走本套账真实科目树(intake._match_category + 共享关键词)· 不分叉。"""
 

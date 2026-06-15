@@ -34,6 +34,7 @@ class PickTests(unittest.TestCase):
             self.assertTrue(replies.pick("greeting", "hi", lang))
             self.assertTrue(replies.pick("thanks", "thx", lang))
             self.assertTrue(replies.pick("scope", "x", lang))
+            self.assertTrue(replies.pick("support", "x", lang))
 
     def test_unknown_kind_falls_to_scope(self):
         self.assertIn(replies.pick("bogus", "x", "zh"), replies._POOLS["scope"]["zh"])

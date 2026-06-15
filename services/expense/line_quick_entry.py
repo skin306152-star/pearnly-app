@@ -145,6 +145,53 @@ def looks_like_expense(text: str) -> bool:
     return parse_expense(text).has_amount()
 
 
+# L1 零成本意图(记账之外)——即便无 L2 也能正确分流,且即便句中有数字也不误记。
+_SUPPORT_KW = (
+    "人工",
+    "客服",
+    "转人工",
+    "投诉",
+    "真人",
+    "human",
+    "support agent",
+    "ติดต่อเจ้าหน้าที่",
+    "แอดมิน",
+    "คุยกับคน",
+)
+_QUERY_KW = (
+    "花了多少",
+    "花多少",
+    "本月花",
+    "这个月花",
+    "本月支出",
+    "支出多少",
+    "花销",
+    "用了多少",
+    "spent this month",
+    "how much",
+    "เดือนนี้จ่าย",
+    "เดือนนี้ใช้",
+    "ใช้ไปเท่าไหร่",
+)
+_QUESTION_MARK = ("吗", "呢", "嘛")
+
+
+def l1_intent(text: str) -> Optional[str]:
+    """记账之外的 L1 意图:support 求助 / query 查账。都不是 → None(交 L1 记账或 L2)。"""
+    low = (text or "").lower()
+    if any(k in low for k in _SUPPORT_KW):
+        return "support"
+    if any(k in low for k in _QUERY_KW):
+        return "query"
+    return None
+
+
+def is_question(text: str) -> bool:
+    """问句线索(吗/呢/嘛/?/?)→ 即便含数字也不当记账(防「我刚不是花了50吗」被误记)。"""
+    t = (text or "").strip()
+    return t.endswith(("?", "?")) or any(m in t for m in _QUESTION_MARK)
+
+
 def parse_expense(text: str) -> ExpenseDraft:
     """自由文本 → ExpenseDraft(确定性映射 · doc 10 §3)。无金额 → amount=None(调用方澄清)。"""
     text = (text or "").strip()

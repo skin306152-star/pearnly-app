@@ -64,6 +64,9 @@ def handle_expense_text(
         if action == "question":
             _reply_question(reply_token, lang, str(tid), text)
             return True
+        if action == "support":  # 求助/人工 → 诚实告知能力边界 + 引导(不敷衍)
+            _reply_pool(reply_token, "support", text, lang)
+            return True
         if action == "other":  # 跑题 → 礼貌带回 + Quick Reply(轮选不复读)
             _reply_pool(reply_token, "scope", text, lang)
             return True
@@ -88,6 +91,7 @@ def handle_expense_text(
                 confidence_band="high" if not used_l2 else "needs_review",
                 has_category=bool(draft.category_id),
                 is_duplicate=is_dup,
+                require_category=False,  # 文字记账不因没命中分类就拦(水费50 该直接入账·分类可后补)
             )
             created = docs_svc.create_doc(
                 cur,
@@ -229,8 +233,14 @@ def _resolve_draft(bound_user, line_user_id, text, tid, ws):
     from services.expense import conversation
     from services.expense import line_quick_entry as lqe
 
+    # L1 零成本意图:求助/查账 优先 —— 即便句中有数字也不当记账(零 LLM 成本)。
+    si = lqe.l1_intent(text)
+    if si:
+        return None, False, si
+
     parsed = lqe.parse_expense(text)
-    if parsed.has_amount():
+    # 问句(吗/呢/?)即便含数字也不记账(防「我刚不是花了50吗」被误记)→ 落 L2/礼貌回。
+    if parsed.has_amount() and not lqe.is_question(text):
         with db.get_cursor_rls(tid, commit=True) as cur:
             pend = conversation.pop_pending(cur, line_user_id=line_user_id)
         if pend:  # 续接:上一句缺金额存了半成品,这句补上金额 → 合并
@@ -239,15 +249,15 @@ def _resolve_draft(bound_user, line_user_id, text, tid, ws):
             return merged, False, ""
         return parsed, False, ""
 
-    # 无金额 → L2(有 key + 余额才调)
+    # 无金额 / 问句 → L2(有 key + 余额才调);L2 不可用且是问句 → 礼貌回(不静默丢)。
     from services.expense import line_l2
 
     api_key = line_l2.resolve_api_key(bound_user)
     if not api_key or not _ocr_balance_ok(bound_user):
-        return None, False, None
+        return None, False, ("other" if lqe.is_question(text) else None)
     data = line_l2.extract(text, api_key)
     if not data:
-        return None, False, None
+        return None, False, ("other" if lqe.is_question(text) else None)
     intent = line_l2.intent_of(data)
     if intent != "expense":
         return None, False, intent  # query / question / other → 下方分发(批4)

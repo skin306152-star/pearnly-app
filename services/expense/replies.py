@@ -74,6 +74,24 @@ _POOLS = {
             "👍 いつでも記録します",
         ],
     },
+    "support": {
+        "zh": [
+            "记账/查账我直接帮你🙌 其他事(开通/计费/对接)请到 pearnly.com 联系我们,会有人跟进",
+            "需要人工?记账查账这里就能办;账号/计费类问题到 pearnly.com 留言,团队会回你",
+        ],
+        "th": [
+            "เรื่องบันทึก/ดูค่าใช้จ่ายทำให้ได้เลย🙌 เรื่องบัญชี/ค่าบริการ ทักที่ pearnly.com เดี๋ยวมีทีมดูแล",
+            "ต้องการเจ้าหน้าที่? บันทึก/ดูยอดทำที่นี่ได้ ส่วนเรื่องบัญชี/บิล ฝากข้อความที่ pearnly.com",
+        ],
+        "en": [
+            "I handle logging & lookups right here 🙌 For account/billing, reach us at pearnly.com and the team will follow up",
+            "Need a human? Expenses I do here; for account/billing leave a note at pearnly.com",
+        ],
+        "ja": [
+            "記帳・照会はここで対応します🙌 アカウント/請求は pearnly.com からご連絡ください、担当が対応します",
+            "オペレーター希望ですか?経費はここで、アカウント/請求は pearnly.com へどうぞ",
+        ],
+    },
     "scope": {
         "zh": [
             "我专做记账和查账 · 试试发「ค่าน้ำ 50」或问「本月花了多少」",

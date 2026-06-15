@@ -16,10 +16,15 @@ logger = logging.getLogger(__name__)
 
 
 def month_spending(cur, *, tenant_id: str, workspace_client_id: int) -> Decimal:
-    """本月已确认支出合计(DB 真查 · 不让模型编数字)。"""
+    """本月已入账支出合计(DB 真查 · 不让模型编数字)。
+
+    查 purchase_docs 已过账(status='posted')的费用/进项单 —— expense_draft 表已废,LINE
+    记账现直落 purchase_docs(见 docs/smart-intake/15)。旧版查死表恒返 ฿0 是真 bug,已修。
+    """
     cur.execute(
-        "SELECT COALESCE(SUM(amount), 0) AS total FROM expense_draft "
-        "WHERE tenant_id = %s AND workspace_client_id = %s AND status = 'confirmed' "
+        "SELECT COALESCE(SUM(grand_total), 0) AS total FROM purchase_docs "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND status = 'posted' "
+        "AND doc_kind IN ('expense', 'purchase_invoice') "
         "AND doc_date >= date_trunc('month', now())::date",
         (tenant_id, workspace_client_id),
     )

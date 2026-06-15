@@ -90,6 +90,16 @@ def ingest_line_image(
         }
 
     amount = draft.get("grand_total") or "0"
+    # 逐条明细填进卡(对标竞品「รายการค่าใช้จ่าย」):取真实商品行(跳过卖家兜底单行),顶 3 条 + 「等N项」。
+    descs = [
+        (ln.get("description") or "").strip()
+        for ln in (draft.get("lines") or [])
+        if (ln.get("description") or "").strip() not in ("", "—")
+    ]
+    if descs:
+        card_fields["detail"] = " · ".join(descs[:3]) + (
+            f" 等{len(descs)}项" if len(descs) > 3 else ""
+        )
     # 轻量自动归类(供应商名 + 首行)→ 填卡 + 提升 has_category(图路不强制)。
     cats = cat_svc.get_tree(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
     first_desc = draft["lines"][0]["description"] if draft.get("lines") else ""

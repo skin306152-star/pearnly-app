@@ -60,6 +60,7 @@ class IngestTests(unittest.TestCase):
         res = {"route": "purchase", "draft": _draft(), "dedupe_hit": False, "field_confidence": {}}
         out, cdoc, pdoc, _ = _run(res, band="high", auto_book=True)
         self.assertEqual(out["state"], "posted")
+        self.assertEqual(out["card_fields"]["detail"], "x")  # 逐条明细填进卡
         cdoc.assert_called_once()
         pdoc.assert_called_once()
         self.assertEqual(out["doc_id"], "D1")

@@ -129,12 +129,7 @@ async def _handle_line_event(ev: dict):
 
             # 「识别中」处理卡(猫咪 + 引用收据 + 进度+时间预期)立即回(reply_token 1 分钟内有效)。
             # 比光秃秃原生 ••• 更有反馈;识别完由结果卡(push)接上。叠原生转圈补"活着"感。
-            # 识别中 = 原生 ••• 转圈(来新消息自动收起)+ 一句猫咪短句(留着也像助手随口说,
-            # 不像大卡杵着 · LINE 发出消息不能删/改)。识别完由结果卡接上。
-            if reply_token:
-                from services.line_binding import line_processing
-
-                line_client.reply_text(reply_token, line_processing.processing_text(lang))
+            # 识别中 = 只用 LINE 原生 ••• 转圈(来新消息自动收起,不留任何消息);识别完结果卡接上。
             line_client.start_loading(line_user_id, 30)
 
             # 启后台任务跑 OCR + push 数据卡(引用此照片 · quoteToken)

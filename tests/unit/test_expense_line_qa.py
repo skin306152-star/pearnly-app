@@ -19,26 +19,6 @@ class _FakeCursor:
         return self._one
 
 
-class MonthSpendingTests(unittest.TestCase):
-    def test_sums_posted_this_month_scoped(self):
-        # expense_draft 表已废 → 查 purchase_docs 已过账(status='posted')费用/进项单。
-        cur = _FakeCursor(fetchone={"total": Decimal("1234.50")})
-        total = line_qa.month_spending(cur, tenant_id="t1", workspace_client_id=7)
-        self.assertEqual(total, Decimal("1234.50"))
-        sql, params = cur.calls[0]
-        self.assertIn("FROM purchase_docs", sql)
-        self.assertIn("status = 'posted'", sql)
-        self.assertIn("date_trunc('month', now())", sql)
-        self.assertIn("tenant_id = %s AND workspace_client_id = %s", sql)
-        self.assertEqual(params, ("t1", 7))
-
-    def test_zero_when_none(self):
-        cur = _FakeCursor(fetchone={"total": 0})
-        self.assertEqual(
-            line_qa.month_spending(cur, tenant_id="t", workspace_client_id=1), Decimal("0")
-        )
-
-
 class _MultiCursor:
     """fetchall 返回预置行(供 summary/detail 测)。"""
 

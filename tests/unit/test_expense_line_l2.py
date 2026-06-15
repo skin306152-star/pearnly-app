@@ -35,15 +35,6 @@ class ToDraftTests(unittest.TestCase):
         self.assertEqual(d.invoice_number, "IV69/00179")
 
 
-class IntentTests(unittest.TestCase):
-    def test_valid_intent(self):
-        self.assertEqual(line_l2.intent_of({"intent": "query"}), "query")
-
-    def test_unknown_falls_to_other(self):
-        self.assertEqual(line_l2.intent_of({"intent": "xyz"}), "other")
-        self.assertEqual(line_l2.intent_of({}), "other")
-
-
 class ApiKeyTests(unittest.TestCase):
     def test_own_key_first(self):
         self.assertEqual(line_l2.resolve_api_key({"gemini_api_key": "k1"}), "k1")
@@ -55,17 +46,6 @@ class ApiKeyTests(unittest.TestCase):
     def test_none_when_absent(self):
         with mock.patch.dict(os.environ, {"GEMINI_API_KEY": ""}, clear=False):
             self.assertIsNone(line_l2.resolve_api_key({}))
-
-
-class GuardrailTests(unittest.TestCase):
-    def test_prompt_forbids_free_text(self):
-        # 护栏:prompt 明确只出 JSON 数据,不给用户写句子
-        p = line_l2._L2_PROMPT.lower()
-        self.assertIn("only one json", p)
-        self.assertIn("never write a sentence", p)
-
-    def test_extract_returns_none_without_key(self):
-        self.assertIsNone(line_l2.extract("ค่าน้ำ 50", ""))
 
 
 if __name__ == "__main__":

@@ -1,78 +1,24 @@
 # -*- coding: utf-8 -*-
-"""一句话记账 · L2 LLM 兜底(doc 10 §2/§4)· L1 规则兜不住的口语/长句才调。
+"""一句话记账 · L2 字段强转 + key 解析(供 LINE 大脑 line_agent 复用)。
 
-护栏(doc 10 §1 第一红线):模型只"听懂"不"开口" —— 只产结构化数据(固定意图枚举 + 固定字段),
-绝不产出给用户看的文案(用户可见文案全在 line_i18n)。复用 OCR 的 Gemini 传输层
-(_call_gemini_with_retry · 自带 JSON 解析/重试/计 token/错误分类)。计费走 OCR credits 口径
-(L1 命中零成本;L2 调用扣 · 见 webhook)。
+意图识别/槽位抽取已由 line_agent.understand 统一承担(一次 Gemini 调用)。本模块只留两件
+仍被复用的纯工具:resolve_api_key(取 Gemini key)、to_draft(LLM JSON → ExpenseDraft 强转)。
+计费走 OCR credits 口径(见 webhook / line_expense)。
 """
 
 from __future__ import annotations
 
-import logging
 import os
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from services.expense.expense_draft import ExpenseDraft
 
-logger = logging.getLogger(__name__)
-
-INTENTS = ("expense", "query", "question", "other")
-
-# 结构化输出 prompt:固定字段 + 固定意图枚举 · 严禁自由文本(护栏)。
-_L2_PROMPT = """You parse messages for a Thai SME accounting LINE bot. The user writes casually
-in Thai (primary), Chinese or English. Output ONLY one JSON object, no prose, no markdown:
-
-{
-  "intent": "expense" | "query" | "question" | "other",
-  "amount": number or null,
-  "qty": number or null,
-  "unit_price": number or null,
-  "vendor_name": string,
-  "vendor_tax_id": string,
-  "invoice_number": string,
-  "date": "YYYY-MM-DD" or "",
-  "expense_type": "goods" | "service" | "",
-  "note": string
-}
-
-Rules:
-- intent="expense" when the message records a spending (it has or implies an amount).
-- intent="query" when the user asks about THEIR OWN data (e.g. how much spent this month).
-- intent="question" when asking how the product or tax/VAT works.
-- otherwise intent="other".
-- amount = total including VAT. Buddhist year (>=2500) converted to Gregorian by -543.
-- vendor_tax_id = 13 digits or "". Keep invoice_number as printed (with prefix).
-- You output DATA only. Never write a sentence addressed to the user."""
-
 
 def resolve_api_key(user: dict) -> Optional[str]:
-    """用户自带 Gemini key 优先,否则平台 env key;都没有 → None(调用方跳过 L2)。"""
+    """用户自带 Gemini key 优先,否则平台 env key;都没有 → None(调用方跳过 LLM)。"""
     own = (user or {}).get("gemini_api_key") or (user or {}).get("custom_gemini_api_key")
     return (own or "").strip() or os.environ.get("GEMINI_API_KEY", "").strip() or None
-
-
-def extract(text: str, api_key: str) -> Optional[dict]:
-    """调 L2 抽结构化意图+字段。失败/无 key → None(调用方降级,不阻塞 LINE 回复)。"""
-    if not api_key:
-        return None
-    try:
-        from services.ocr import gemini_models
-        from services.ocr.layer2_gemini import _call_gemini_with_retry
-
-        data, _meta = _call_gemini_with_retry(
-            text,
-            api_key=api_key,
-            model_name=gemini_models.flash_lite(),
-            max_retries=1,
-            timeout=20,
-            system_prompt_override=_L2_PROMPT,
-        )
-        return data
-    except Exception as e:  # noqa: BLE001
-        logger.warning("[line l2] extract failed: %s", str(e)[:160])
-        return None
 
 
 def _dec(v) -> Optional[Decimal]:
@@ -85,7 +31,7 @@ def _dec(v) -> Optional[Decimal]:
 
 
 def to_draft(data: dict, raw_text: str) -> ExpenseDraft:
-    """L2 JSON → ExpenseDraft(数值强转 Decimal · category 仍由 webhook 走真实树解析)。"""
+    """LLM JSON → ExpenseDraft(数值强转 Decimal · category 由 webhook 走真实树解析)。"""
     d = data or {}
     et = d.get("expense_type") if d.get("expense_type") in ("goods", "service") else ""
     return ExpenseDraft(
@@ -102,8 +48,3 @@ def to_draft(data: dict, raw_text: str) -> ExpenseDraft:
         source="line_text_l2",
         confidence=Decimal("0.75"),
     )
-
-
-def intent_of(data: dict) -> str:
-    it = (data or {}).get("intent")
-    return it if it in INTENTS else "other"

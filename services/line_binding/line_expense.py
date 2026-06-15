@@ -52,7 +52,9 @@ def handle_expense_text(
 
         # 1. L1 快路:清晰记账(有金额 + 非问句 + 无其他 L1 意图)→ 直接记,零 LLM、零成本。
         parsed = lqe.parse_expense(text)
-        if parsed.has_amount() and not lqe.is_question(text) and lqe.l1_intent(text) is None:
+        si = lqe.l1_intent(text)
+        isq = lqe.is_question(text)
+        if parsed.has_amount() and not isq and si is None:
             from services.expense import conversation
 
             with db.get_cursor_rls(str(tid), commit=True) as cur:
@@ -80,13 +82,12 @@ def handle_expense_text(
                 bound_user, reply_token, line_user_id, text, lang, str(tid), ws, u, quote_token
             )
 
-        # 3. 兜底(无 LLM):L1 查账/求助/问答(知识库),否则礼貌带回。
-        si = lqe.l1_intent(text)
+        # 3. 兜底(无 LLM):L1 查账/求助/问答(知识库),否则礼貌带回(复用上面已算的 si/isq)。
         if si == "query":
             _reply_summary(reply_token, lang, str(tid), ws)
         elif si == "support":
             _reply_pool(reply_token, "support", text, lang)
-        elif lqe.is_question(text):
+        elif isq:
             _reply_question(reply_token, lang, str(tid), text)
         else:
             _reply_pool(reply_token, "scope", text, lang)
@@ -314,10 +315,10 @@ def _reply_summary(reply_token, lang, tid, ws) -> None:
     if s["count"] == 0:
         line_client.reply_text(reply_token, line_client.t_line(lang, "exp_sum_empty"))
         return
+    uncat = line_client.t_line(lang, "exp_uncat")
     lines = [line_client.t_line(lang, "exp_sum_head", amount=s["total"], n=s["count"])]
     for c in s["by_category"][:6]:
-        name = c["name"] or line_client.t_line(lang, "exp_uncat")
-        lines.append(f"• {name}: ฿{c['amount']} ({c['count']})")
+        lines.append(f"• {c['name'] or uncat}: ฿{c['amount']} ({c['count']})")
     line_client.reply_text(reply_token, "\n".join(lines))
 
 
@@ -335,11 +336,11 @@ def _reply_detail(reply_token, lang, tid, ws) -> None:
     if not rows:
         line_client.reply_text(reply_token, line_client.t_line(lang, "exp_sum_empty"))
         return
+    uncat = line_client.t_line(lang, "exp_uncat")
     lines = [line_client.t_line(lang, "exp_detail_head", n=len(rows))]
     for r in rows:
         tail = f" · {r['vendor']}" if r["vendor"] else ""
-        cat = r["category"] or line_client.t_line(lang, "exp_uncat")
-        lines.append(f"• {r['date']} {cat} ฿{r['amount']}{tail}")
+        lines.append(f"• {r['date']} {r['category'] or uncat} ฿{r['amount']}{tail}")
     line_client.reply_text(reply_token, "\n".join(lines))
 
 

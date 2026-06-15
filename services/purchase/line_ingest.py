@@ -51,6 +51,12 @@ def ingest_line_image(
         image_url=image_ref,
         field_confidence=field_confidence,
     )
+    # 明细从 OCR 逐条抽取填(需补全卡也显·不只 draft 卡):顶 3 + 「等N项」。draft 卡下方再以真行覆盖。
+    _item_names = [
+        str(it.get("name") or "").strip()
+        for it in (fields.get("items") or [])
+        if (it.get("name") or "").strip()
+    ]
     card_fields = {
         "document_type": fields.get("document_type") or "",
         "expense_type": "goods",
@@ -64,7 +70,12 @@ def ingest_line_image(
         "vat": fields.get("vat") or "",
         "wht": fields.get("wht_amount") or "",
         "invoice_number": fields.get("invoice_number") or "",
-        "detail": "",
+        "detail": (
+            " · ".join(_item_names[:3])
+            + (f" 等{len(_item_names)}项" if len(_item_names) > 3 else "")
+            if _item_names
+            else ""
+        ),
     }
     fc = res.get("field_confidence") or {}
     draft = res.get("draft")

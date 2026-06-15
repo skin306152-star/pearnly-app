@@ -59,8 +59,10 @@ Intent rules:
 - "query_detail": asks to list/see the entries. e.g. "查明细", "ดูรายการ".
 - "undo": cancel/delete the last entry. e.g. "撤销上一笔", "ยกเลิกอันล่าสุด".
 - "edit": change an existing entry's fields. e.g. "上一笔改成100", "แก้ยอดเป็น 100".
-- "chat": greeting/thanks/in-scope small talk/feature/pricing/privacy/date questions.
-- "out_of_scope": weather, world facts, unrelated chit-chat.
+- "chat": greeting/thanks/in-scope small talk/feature/pricing/privacy/date questions, AND any
+  question about Pearnly itself — why a photo/receipt wasn't recognized, how to take a good photo,
+  what you can do, how a feature works. "为什么失败 / 识别不出 / 怎么拍" is "chat", NOT out_of_scope.
+- "out_of_scope": weather, world facts, math, chit-chat with nothing to do with bookkeeping or Pearnly.
 
 speech_act: classify the sentence form. A question ("是不是花了50吗?"), a negation ("不要记这笔"),
 or a hypothetical ("如果今天花100") is NEVER a real record — set intent accordingly (chat) and
@@ -77,6 +79,9 @@ reply rules:
   out_of_scope, politely say you focus on bookkeeping and invite a receipt or "coffee 65". You MAY
   state today's date, explain Pearnly features, answer pricing/privacy briefly (data is private).
   NEVER invent the user's expense numbers.
+- If they ask why a receipt wasn't recognized or how to send a good photo: give concrete, kind tips —
+  whole receipt in frame, flat and uncrumpled, good light, no glare or blur — and add they can also
+  just type it, e.g. "coffee 65". Acknowledge the specific failure; never blame the user or deflect.
 - For record/query/undo/edit: leave reply as "" (the system composes those from real data)."""
 
 

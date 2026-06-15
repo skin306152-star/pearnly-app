@@ -195,7 +195,7 @@ def unpay_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> dict:
         raise PosError("purchase.not_draft", 409, detail="not_posted")
     paid = Decimal(str(row["paid_amount"] or 0))
     if paid > 0:
-        _void_payment_voucher(
+        _void_payment_vouchers(
             cur,
             tenant_id=tenant_id,
             workspace_client_id=workspace_client_id,
@@ -212,21 +212,30 @@ def unpay_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> dict:
     )
 
 
-def _void_payment_voucher(cur, *, tenant_id, workspace_client_id, doc_id, paid) -> None:
-    """撤付款时 void 对应付款凭证(做账关/无凭证则 no-op·失败回滚该步不阻断 toggle)。"""
+def _void_payment_vouchers(cur, *, tenant_id, workspace_client_id, doc_id, paid) -> None:
+    """撤付款时 void 该单【全部】付款凭证(含多次部分付款)。
+
+    付款凭证 source_id=event_id(单+累计已付)、total_debit=该笔金额,故沿累计链回退:
+    撤当前累计的凭证 → remaining -= 其单笔额 → 得上一笔累计 → 续撤,直到清零或断链。
+    做账关/无凭证则 no-op·失败回滚该步不阻断 toggle。
+    """
     try:
         cur.execute("SAVEPOINT unpay_void")
         from services.accounting import vouchers as jv
 
-        ev_id = str(acct_hooks.payment_event_id(doc_id, paid))
-        v = jv.find_active_by_source(
-            cur,
-            tenant_id=tenant_id,
-            workspace_client_id=workspace_client_id,
-            source_type="payment",
-            source_id=ev_id,
-        )
-        if v:
+        remaining = Decimal(str(paid or 0))
+        guard = 0
+        while remaining > 0 and guard < 200:
+            guard += 1
+            v = jv.find_active_by_source(
+                cur,
+                tenant_id=tenant_id,
+                workspace_client_id=workspace_client_id,
+                source_type="payment",
+                source_id=str(acct_hooks.payment_event_id(doc_id, remaining)),
+            )
+            if not v:
+                break
             jv.set_status(
                 cur,
                 tenant_id=tenant_id,
@@ -234,6 +243,7 @@ def _void_payment_voucher(cur, *, tenant_id, workspace_client_id, doc_id, paid) 
                 voucher_id=v["id"],
                 status="void",
             )
+            remaining -= Decimal(str(v["total_debit"] or 0))
         cur.execute("RELEASE SAVEPOINT unpay_void")
     except Exception:
         try:

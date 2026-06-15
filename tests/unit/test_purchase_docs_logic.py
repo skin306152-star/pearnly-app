@@ -245,6 +245,36 @@ class PaymentStatusToggleTests(unittest.TestCase):
             )
         self.assertEqual(e.exception.code, "purchase.not_draft")
 
+    def test_void_chain_voids_all_partial_payments(self):
+        # 多次部分付款(30 + 70 = 100)→ 撤付款应沿累计链 void 全部凭证。
+        from decimal import Decimal
+        from unittest import mock
+
+        from services.accounting import hooks as acct_hooks, vouchers as jv
+
+        store = {
+            str(acct_hooks.payment_event_id("D", Decimal("100"))): {"id": "v2", "total_debit": 70},
+            str(acct_hooks.payment_event_id("D", Decimal("30"))): {"id": "v1", "total_debit": 30},
+        }
+        voided = []
+
+        class Cur:
+            def execute(self, *a, **k):
+                return None
+
+        with (
+            mock.patch.object(
+                jv, "find_active_by_source", side_effect=lambda c, **k: store.get(k["source_id"])
+            ),
+            mock.patch.object(
+                jv, "set_status", side_effect=lambda c, **k: voided.append(k["voucher_id"])
+            ),
+        ):
+            posting_svc._void_payment_vouchers(
+                Cur(), tenant_id="t", workspace_client_id=1, doc_id="D", paid=Decimal("100")
+            )
+        self.assertEqual(voided, ["v2", "v1"])
+
 
 if __name__ == "__main__":
     unittest.main()

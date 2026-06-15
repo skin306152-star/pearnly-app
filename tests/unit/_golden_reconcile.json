@@ -4,6 +4,7 @@
     {
       "date_diff_days": 0,
       "gl_account_code": "1010",
+      "gl_balance": 0.0,
       "gl_credit": 0.0,
       "gl_date": "2024-01-05",
       "gl_debit": 1000.0,
@@ -25,6 +26,7 @@
     {
       "date_diff_days": 3,
       "gl_account_code": "5200",
+      "gl_balance": 0.0,
       "gl_credit": 50.0,
       "gl_date": "2024-01-11",
       "gl_debit": 0.0,
@@ -46,6 +48,7 @@
     {
       "date_diff_days": null,
       "gl_account_code": "",
+      "gl_balance": 0.0,
       "gl_credit": 0.0,
       "gl_date": null,
       "gl_debit": 0.0,
@@ -67,6 +70,7 @@
     {
       "date_diff_days": null,
       "gl_account_code": "1010",
+      "gl_balance": 0.0,
       "gl_credit": 500.0,
       "gl_date": "2024-01-25",
       "gl_debit": 0.0,

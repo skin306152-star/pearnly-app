@@ -290,7 +290,9 @@ def _build_stmt_detail_sheet(wb, recon_rows: List[BankReconRow], lang: str) -> N
     ws5.freeze_panes = "A2"
 
 
-def _build_gl_detail_sheet(wb, recon_rows: List[BankReconRow], lang: str) -> None:
+def _build_gl_detail_sheet(
+    wb, recon_rows: List[BankReconRow], lang: str, gl_opening: float = 0.0
+) -> None:
     # ══════════════════════════════════════════════════════════════════
     # SHEET 6: GL Detail (all GL rows reconstructed from recon_rows)
     # v118.34 · Mirrors Sheet 5 (Statement Detail) — same visual idiom
@@ -324,8 +326,18 @@ def _build_gl_detail_sheet(wb, recon_rows: List[BankReconRow], lang: str) -> Non
         key=lambda x: (x.gl_date or date.min, x.gl_doc_no or "", x.gl_account_code or "")
     )
 
+    # 余额列优先用行自带余额(parse 时算/源 คงเหลือ)· 旧任务存量无余额(早期序列化漏)→
+    # 用借贷+期初按当前顺序现算运行余额兜底 · 让旧任务重导出也有余额 · 不必重跑对账。
+    _has_bal = any(r.gl_balance for r in gl_data_rows)
+    _run_bal = gl_opening
+
     for ri, row in enumerate(gl_data_rows, 2):
         alt_fill = "F8F9FA" if ri % 2 == 0 else None
+        if _has_bal:
+            bal_val = row.gl_balance if row.gl_balance else ""
+        else:
+            _run_bal = round(_run_bal + (row.gl_debit or 0) - (row.gl_credit or 0), 2)
+            bal_val = _run_bal
         vals = [
             _fmt_date(row.gl_date),
             row.gl_doc_no,
@@ -333,7 +345,7 @@ def _build_gl_detail_sheet(wb, recon_rows: List[BankReconRow], lang: str) -> Non
             row.gl_desc,
             row.gl_debit if row.gl_debit else "",
             row.gl_credit if row.gl_credit else "",
-            row.gl_balance if row.gl_balance else "",
+            bal_val,
             row.source_gl_file,
         ]
         for ci, val in enumerate(vals, 1):
@@ -375,7 +387,7 @@ def export_bank_recon_excel(
     )
     _build_match_results_sheet(wb, recon_rows, lang)
     _build_stmt_detail_sheet(wb, recon_rows, lang)
-    _build_gl_detail_sheet(wb, recon_rows, lang)
+    _build_gl_detail_sheet(wb, recon_rows, lang, gl_opening=summary.gl_opening)
 
     buf = io.BytesIO()
     wb.save(buf)

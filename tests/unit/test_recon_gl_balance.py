@@ -63,6 +63,32 @@ class ReconGlBalanceTests(unittest.TestCase):
             vals = [ws.cell(r, ci + 1).value for r in range(2, ws.max_row + 1)]
             self.assertIn(378232.56, vals, f"{lang} 总账明细余额无值")
 
+    def test_serialize_roundtrip_keeps_gl_balance(self):
+        # 序列化/反序列化必须保住 gl_balance(否则存库再读回 → 导出空列)
+        from services.recon.bank_recon_serialize import rows_to_json, rows_from_json
+
+        rows, _ = self._rows()
+        back = rows_from_json(rows_to_json(rows))
+        matched = [r for r in back if r.match_status == "matched"]
+        self.assertEqual(matched[0].gl_balance, 378232.56)
+
+    def test_old_job_export_computes_running_balance_fallback(self):
+        # 旧任务存量无 gl_balance(早期序列化漏)→ 导出用借贷+期初现算 · 重导出即有余额
+        from services.recon.bank_recon_excel import export_bank_recon_excel
+        from services.recon.bank_recon_types import BankReconSummary
+        import io as _io
+
+        rows, _ = self._rows()
+        for r in rows:
+            r.gl_balance = 0.0  # 模拟旧任务
+        summ = BankReconSummary(gl_opening=150814.56)  # 期初 → 第一笔借 227418 → 378232.56
+        blob = export_bank_recon_excel(rows, summ, "th")
+        ws = openpyxl.load_workbook(_io.BytesIO(blob))[_t("sh_gl_detail", "th")]
+        hdr = [c.value for c in ws[1]]
+        ci = hdr.index(_t("col_balance", "th"))
+        vals = [ws.cell(r, ci + 1).value for r in range(2, ws.max_row + 1)]
+        self.assertIn(378232.56, vals)  # 现算出的运行余额
+
     def test_running_balance_computed_from_opening(self):
         # parse 层逐行运行余额 = 期初 + 累计(借−贷)· 用 parse_gl_excel 验
         import io

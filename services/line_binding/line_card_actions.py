@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
 """LINE 数据卡动作落地(postback → 做账安全带 · docs/smart-intake/15 §4)。
 
-confirm:草稿单 → post_doc(正式入账 + 做账 enqueue),镜像 web /docs/{id}/post。
-undo:已入账正式单 → void_doc(反过账 + 反库存),镜像 web /docs/{id}/void。
-作用域硬隔离(套账 ws),并发/状态错(非草稿确认 / 非 posted 撤销)友好回执不报错。
+全套动作,让用户「想干嘛干嘛」、永不卡死(均复用现有采购/做账服务,不另起逻辑):
+  confirm     草稿 → post_doc(入账 + 做账 enqueue),镜像 web /docs/{id}/post
+  undo        已入账 → void_doc(冲销 + 反库存),镜像 web /docs/{id}/void
+  discard     草稿 → delete_doc(仅草稿可删;正式单永不物理删,只能 undo)
+  inbox_post  待归类项 → resolve_inbox(expense)建草稿 → post_doc(仍要入账)
+  inbox_drop  待归类项 → resolve_inbox(dismiss)(留痕标记,不物理删)
+作用域硬隔离(套账 ws),并发/状态错友好回执不报错。
 """
 
 from __future__ import annotations
@@ -17,15 +21,18 @@ logger = logging.getLogger(__name__)
 
 
 def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
-    """卡按钮回调 → confirm / undo。任何异常都回执不抛(主路径不得崩)。"""
+    """卡按钮回调 → 全套动作分发。任何异常都回执不抛(主路径不得崩)。"""
     parsed = line_postback.parse(data)
-    action, doc_id = parsed["action"], parsed["doc_id"]
+    action, ref = parsed["action"], parsed["doc_id"]
     tid = str(bound_user["tenant_id"]) if bound_user.get("tenant_id") else None
-    if not action or not doc_id or not tid:
+    if not action or not ref or not tid:
         line_client.reply_text(reply_token, line_client.t_line(lang, "card_action_stale"))
         return
+    uid = str(bound_user["id"]) if bound_user.get("id") else None
     try:
         from core.workspace_context import default_workspace_id
+        from services.purchase import docs as docs_svc
+        from services.purchase import intake as intake_svc
         from services.purchase import posting as posting_svc
         from services.purchase import settings as settings_svc
 
@@ -34,33 +41,53 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
             if ws is None:
                 line_client.reply_text(reply_token, line_client.t_line(lang, "card_action_stale"))
                 return
+            scope = {"tenant_id": tid, "workspace_client_id": ws}
+
             if action == line_postback.ACTION_CONFIRM:
-                cfg = settings_svc.get_settings(cur, tenant_id=tid, workspace_client_id=ws)
+                cfg = settings_svc.get_settings(cur, **scope)
                 res = posting_svc.post_doc(
                     cur,
-                    tenant_id=tid,
-                    workspace_client_id=ws,
-                    doc_id=doc_id,
+                    **scope,
+                    doc_id=ref,
                     auto_stock_in=bool(cfg.get("auto_stock_in")),
-                    created_by=str(bound_user["id"]) if bound_user.get("id") else None,
+                    created_by=uid,
                 )
-                amt = (res.get("doc") or {}).get("grand_total")
-                line_client.reply_text(
-                    reply_token, line_client.t_line(lang, "card_confirmed", amount=amt)
+                _reply(reply_token, lang, "card_confirmed", res.get("doc"))
+
+            elif action == line_postback.ACTION_UNDO:
+                res = posting_svc.void_doc(cur, **scope, doc_id=ref, created_by=uid)
+                _reply(reply_token, lang, "card_undone", res.get("doc"))
+
+            elif action == line_postback.ACTION_DISCARD:
+                docs_svc.delete_doc(cur, **scope, doc_id=ref)  # 仅草稿可删(内部 status='draft' 守)
+                line_client.reply_text(reply_token, line_client.t_line(lang, "card_discarded"))
+
+            elif action == line_postback.ACTION_INBOX_POST:
+                cfg = settings_svc.get_settings(cur, **scope)
+                r = intake_svc.resolve_inbox(
+                    cur, **scope, item_id=ref, action="expense", created_by=uid, settings=cfg
                 )
-            else:  # ACTION_UNDO
-                res = posting_svc.void_doc(
+                posted = posting_svc.post_doc(
                     cur,
-                    tenant_id=tid,
-                    workspace_client_id=ws,
-                    doc_id=doc_id,
-                    created_by=str(bound_user["id"]) if bound_user.get("id") else None,
+                    **scope,
+                    doc_id=r["doc_id"],
+                    auto_stock_in=bool(cfg.get("auto_stock_in")),
+                    created_by=uid,
                 )
-                amt = (res.get("doc") or {}).get("grand_total")
-                line_client.reply_text(
-                    reply_token, line_client.t_line(lang, "card_undone", amount=amt)
+                _reply(reply_token, lang, "card_confirmed", posted.get("doc"))
+
+            elif action == line_postback.ACTION_INBOX_DROP:
+                cfg = settings_svc.get_settings(cur, **scope)
+                intake_svc.resolve_inbox(
+                    cur, **scope, item_id=ref, action="dismiss", created_by=uid, settings=cfg
                 )
+                line_client.reply_text(reply_token, line_client.t_line(lang, "card_discarded"))
     except Exception:
-        # 状态错(已入账再确认 / 草稿撤销)或并发 → 友好回执,不报错。
+        # 状态错(已入账再确认 / 草稿撤销 / 项已处理)或并发 → 友好回执,不报错。
         logger.warning("[line card] postback action failed", exc_info=True)
         line_client.reply_text(reply_token, line_client.t_line(lang, "card_action_stale"))
+
+
+def _reply(reply_token, lang, key, doc) -> None:
+    amt = (doc or {}).get("grand_total")
+    line_client.reply_text(reply_token, line_client.t_line(lang, key, amount=amt))

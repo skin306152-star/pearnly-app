@@ -154,6 +154,7 @@ def _reply_card(reply_token, state, draft, doc_id, lang, quote_token) -> None:
         doc_id=doc_id,
         lang=lang,
         web_url=_WEB_PURCHASE_URL,
+        source="text",
     )
     line_client.reply_messages(reply_token, [ack, card])
 

@@ -376,9 +376,10 @@ def _push_result_card(line_user_id: str, lang: str, ingest: dict, quote_token: s
             amount=ingest.get("amount"),
             fields=ingest.get("card_fields") or {},
             field_confidence=ingest.get("field_confidence") or {},
-            doc_id=ingest.get("doc_id") or "",
+            doc_id=ingest.get("ref") or ingest.get("doc_id") or "",
             lang=lang,
             web_url="https://pearnly.com/home",
+            can_post=bool(ingest.get("can_post", True)),
         )
         line_client.push_messages(line_user_id, [ack, card])
     except Exception as e:

@@ -201,7 +201,7 @@ def resolve_image_intake(
     # 低置信 / unknown(draft 未建)/ 抽取过空(糊图税号"13"·金额฿0)→ 落待归类,绝不直接进可保存的 ฿0 表单(F5)。
     too_empty = calc is not None and calc["grand_total"] <= 0
     if draft is None or low_conf or too_empty:
-        _stash_inbox(
+        item_id = _stash_inbox(
             cur,
             tenant_id=tenant_id,
             workspace_client_id=workspace_client_id,
@@ -218,6 +218,7 @@ def resolve_image_intake(
             "route": "inbox",
             "draft": None,
             "dedupe_hit": False,
+            "inbox_item_id": item_id,
         }
 
     dkey = totals_svc.dedupe_key(
@@ -410,12 +411,14 @@ def resolve_inbox(
     return {"status": new_status, "route": action}
 
 
-def _stash_inbox(cur, *, tenant_id, workspace_client_id, source, raw, image_url, ai_guess) -> None:
-    """低置信/拿不准落待归类(绝不静默丢错)。"""
+def _stash_inbox(
+    cur, *, tenant_id, workspace_client_id, source, raw, image_url, ai_guess
+) -> Optional[str]:
+    """低置信/拿不准落待归类(绝不静默丢错)。返回新建 intake_item id(供 LINE 卡片动作引用)。"""
     cur.execute(
         "INSERT INTO intake_items "
         "(tenant_id, workspace_client_id, source, raw, image_url, ai_guess, status) "
-        "VALUES (%s, %s, %s, %s::jsonb, %s, %s::jsonb, 'pending')",
+        "VALUES (%s, %s, %s, %s::jsonb, %s, %s::jsonb, 'pending') RETURNING id",
         (
             tenant_id,
             workspace_client_id,
@@ -425,3 +428,5 @@ def _stash_inbox(cur, *, tenant_id, workspace_client_id, source, raw, image_url,
             json.dumps(ai_guess, default=str),
         ),
     )
+    row = cur.fetchone()
+    return str(row["id"]) if row else None

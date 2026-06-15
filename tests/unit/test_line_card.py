@@ -19,6 +19,18 @@ class PostbackTests(unittest.TestCase):
         out = line_postback.parse(line_postback.confirm_data("D9"))
         self.assertEqual(out, {"action": line_postback.ACTION_CONFIRM, "doc_id": "D9"})
 
+    def test_discard_roundtrip(self):
+        out = line_postback.parse(line_postback.discard_data("D2"))
+        self.assertEqual(out, {"action": line_postback.ACTION_DISCARD, "doc_id": "D2"})
+
+    def test_inbox_post_roundtrip(self):
+        out = line_postback.parse(line_postback.inbox_post_data("I7"))
+        self.assertEqual(out, {"action": line_postback.ACTION_INBOX_POST, "doc_id": "I7"})
+
+    def test_inbox_drop_roundtrip(self):
+        out = line_postback.parse(line_postback.inbox_drop_data("I7"))
+        self.assertEqual(out, {"action": line_postback.ACTION_INBOX_DROP, "doc_id": "I7"})
+
     def test_bad_data_rejected(self):
         self.assertEqual(line_postback.parse("garbage")["action"], "")
         self.assertEqual(line_postback.parse("")["action"], "")
@@ -37,79 +49,112 @@ class CardTests(unittest.TestCase):
         "detail": "ค่าอาหาร",
     }
 
-    def _card(self, state, fc=None):
+    def _card(self, state, fc=None, **kw):
+        kw.setdefault("amount", "2,722.00")
         return line_card.result_card(
             state=state,
-            amount="2,722.00",
             fields=self.FIELDS,
             field_confidence=fc or {},
             doc_id="D1",
             lang="zh",
+            **kw,
         )
+
+    def _buttons(self, card):
+        """递归收集卡内所有 button 节点。"""
+        out = []
+
+        def walk(n):
+            if isinstance(n, dict):
+                if n.get("type") == "button":
+                    out.append(n)
+                for v in n.values():
+                    walk(v)
+            elif isinstance(n, list):
+                for x in n:
+                    walk(x)
+
+        walk(card)
+        return out
+
+    def _actions(self, card):
+        out = []
+        for b in self._buttons(card):
+            a = b["action"]
+            out.append(
+                line_postback.parse(a["data"])["action"] if a["type"] == "postback" else "uri"
+            )
+        return out
+
+    def _fields_box(self, card):
+        # body.contents: [状态条, 金额meta, separator, 字段表, ...]
+        return card["contents"]["body"]["contents"][3]["contents"]
 
     def test_flex_shape(self):
         c = self._card("posted")
         self.assertEqual(c["type"], "flex")
         self.assertEqual(c["contents"]["type"], "bubble")
 
-    def test_posted_has_undo_postback(self):
+    def test_posted_has_undo_no_primary(self):
         c = self._card("posted")
-        footer = c["contents"]["footer"]["contents"]
-        actions = [b["action"]["type"] for b in footer]
-        self.assertIn("postback", actions)
-        pb = next(b for b in footer if b["action"]["type"] == "postback")
-        self.assertEqual(
-            line_postback.parse(pb["action"]["data"])["action"], line_postback.ACTION_UNDO
-        )
+        acts = self._actions(c)
+        self.assertIn(line_postback.ACTION_UNDO, acts)
+        self.assertIn("uri", acts)  # 复核
+        # 已入账态无实心主按钮
+        self.assertFalse(any(b["style"] == "primary" for b in self._buttons(c)))
 
-    def test_confirm_has_confirm_postback(self):
+    def test_confirm_one_primary_plus_links(self):
         c = self._card("confirm")
-        footer = c["contents"]["footer"]["contents"]
-        pb = next(b for b in footer if b["action"]["type"] == "postback")
-        self.assertEqual(
-            line_postback.parse(pb["action"]["data"])["action"], line_postback.ACTION_CONFIRM
-        )
+        acts = self._actions(c)
+        self.assertIn(line_postback.ACTION_CONFIRM, acts)
+        self.assertIn("uri", acts)
+        self.assertIn(line_postback.ACTION_DISCARD, acts)
+        self.assertEqual(sum(1 for b in self._buttons(c) if b["style"] == "primary"), 1)
 
-    def test_inbox_only_uri_button(self):
-        c = self._card("inbox")
-        footer = c["contents"]["footer"]["contents"]
-        self.assertEqual(len(footer), 1)
-        self.assertEqual(footer[0]["action"]["type"], "uri")
+    def test_inbox_not_dead_end(self):
+        acts = self._actions(self._card("inbox"))
+        self.assertIn(line_postback.ACTION_INBOX_POST, acts)
+        self.assertIn("uri", acts)
+        self.assertIn(line_postback.ACTION_INBOX_DROP, acts)
+
+    def test_inbox_no_amount_no_post_button(self):
+        c = self._card("inbox", amount=None, can_post=False)
+        acts = self._actions(c)
+        self.assertNotIn(line_postback.ACTION_INBOX_POST, acts)
+        self.assertIn("uri", acts)
+        self.assertIn(line_postback.ACTION_INBOX_DROP, acts)
 
     def test_low_confidence_field_ambered_and_marked(self):
-        c = self._card("confirm", fc={"invoice_number": 0.5})
-        rows = c["contents"]["body"]["contents"][3]["contents"]
-        # 找到发票号行(label=发票号)
-        target = None
-        for r in rows:
-            cells = r["contents"]
-            if cells[1]["text"].startswith("F33"):
-                target = cells[1]
-        self.assertIsNotNone(target)
+        rows = self._fields_box(self._card("confirm", fc={"invoice_number": 0.5}))
+        target = next(r["contents"][1] for r in rows if r["contents"][1]["text"].startswith("F33"))
         self.assertIn("(请核对)", target["text"])
-        self.assertEqual(target["color"], "#D97706")
+        self.assertEqual(target["color"], "#B45309")
 
     def test_high_confidence_field_not_marked(self):
-        c = self._card("confirm", fc={"invoice_number": 0.99})
-        rows = c["contents"]["body"]["contents"][3]["contents"]
+        rows = self._fields_box(self._card("confirm", fc={"invoice_number": 0.99}))
         target = next(r["contents"][1] for r in rows if r["contents"][1]["text"].startswith("F33"))
         self.assertNotIn("(请核对)", target["text"])
 
-    def test_dup_state_renders(self):
-        c = self._card("dup")
-        # dup 也出确认按钮
-        footer = c["contents"]["footer"]["contents"]
-        pb = next(b for b in footer if b["action"]["type"] == "postback")
-        self.assertEqual(
-            line_postback.parse(pb["action"]["data"])["action"], line_postback.ACTION_CONFIRM
-        )
+    def test_dup_primary_and_note(self):
+        c = self._card("dup", dup_info={"amount": "2,722.00", "vendor": "X", "date": "2026-06-14"})
+        self.assertIn(line_postback.ACTION_CONFIRM, self._actions(c))
+        # 红框原记录(dup_seen 文案出现)
+        flat = str(c)
+        self.assertIn("已存在记录", flat)
+
+    def test_workspace_and_source_meta(self):
+        c = self._card("posted", source="text", workspace_name="Bangkok Retail")
+        flat = str(c)
+        self.assertIn("Bangkok Retail", flat)
+        self.assertIn("来自文字", flat)
 
     def test_four_langs_render(self):
         for lang in ("zh", "th", "en", "ja"):
             c = line_card.result_card(
-                state="posted", amount="50", fields=self.FIELDS, doc_id="D1", lang=lang
+                state="confirm", amount="50", fields=self.FIELDS, doc_id="D1", lang=lang
             )
             self.assertEqual(c["type"], "flex")
+            self.assertIn(line_postback.ACTION_CONFIRM, self._actions(c))
 
 
 if __name__ == "__main__":

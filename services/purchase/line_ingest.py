@@ -64,8 +64,9 @@ def ingest_line_image(
 
     # 低置信/糊图(resolve 已落 inbox)或 sales/recon(LINE 不建单)→ 待归类安全网(不丢)。
     if draft is None:
+        item_id = res.get("inbox_item_id")
         if res["route"] not in ("inbox",):
-            ik._stash_inbox(
+            item_id = ik._stash_inbox(
                 cur,
                 tenant_id=tenant_id,
                 workspace_client_id=workspace_client_id,
@@ -74,10 +75,14 @@ def ingest_line_image(
                 image_url=image_ref,
                 ai_guess={"route": res["route"], "confidence": confidence},
             )
+        # 待归类展示金额(供卡片 + 决定是否给「仍要入账」):有可用总额才让一键入账,糊图 ฿0 只给编辑/丢弃。
+        disp_amount = (fields.get("total_amount") or "").strip() or None
         return {
             "state": "inbox",
             "doc_id": "",
-            "amount": None,
+            "ref": item_id or "",
+            "can_post": bool(disp_amount),
+            "amount": disp_amount,
             "card_fields": card_fields,
             "field_confidence": fc,
         }
@@ -133,6 +138,8 @@ def ingest_line_image(
     return {
         "state": state,
         "doc_id": doc_id,
+        "ref": doc_id,
+        "can_post": True,
         "amount": amount,
         "card_fields": card_fields,
         "field_confidence": fc,

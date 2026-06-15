@@ -127,7 +127,12 @@ async def _handle_line_event(ev: dict):
             # v118.25.4 · 已绑定用户 · 优先用 Pearnly 网站偏好语言 · 兜底用 LINE 语言(不再写死 zh)
             lang = bound_user.get("preferred_lang") or _ev_lang(ev)
 
-            # 转圈「正在输入…」(docs/smart-intake/15 §2)· 识别完发数据卡即自动消失。
+            # 「识别中」处理卡(猫咪 + 引用收据 + 进度+时间预期)立即回(reply_token 1 分钟内有效)。
+            # 比光秃秃原生 ••• 更有反馈;识别完由结果卡(push)接上。叠原生转圈补"活着"感。
+            if reply_token:
+                from services.line_binding import line_processing
+
+                line_client.reply_messages(reply_token, [line_processing.processing_card(lang)])
             line_client.start_loading(line_user_id, 30)
 
             # 启后台任务跑 OCR + push 数据卡(引用此照片 · quoteToken)

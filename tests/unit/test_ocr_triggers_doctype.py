@@ -167,9 +167,12 @@ class SchemaAndTimeoutTests(unittest.TestCase):
         self.assertEqual(inv.document_type, "other")
 
     def test_l3_timeout_capped(self):
+        # 有界但不过紧:15s 太狠会掐断正经 L3 救场(Punthai 15.7s)→ 回退;放宽到 45s
+        # 既保速度(触发器已收紧·L3 罕跑)又救准确率(doc 09 §3.3 修正)。
         from services.ocr.layer3_fallback import DEFAULT_TIMEOUT_SECONDS
 
-        self.assertLessEqual(DEFAULT_TIMEOUT_SECONDS, 15)
+        self.assertLessEqual(DEFAULT_TIMEOUT_SECONDS, 60)
+        self.assertGreaterEqual(DEFAULT_TIMEOUT_SECONDS, 30)
 
 
 if __name__ == "__main__":

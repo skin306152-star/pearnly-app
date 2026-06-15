@@ -30,6 +30,10 @@ def _run(data, *, ws=1):
         ),
         mock.patch("services.purchase.posting.post_doc", return_value=doc) as post_doc,
         mock.patch("services.purchase.posting.void_doc", return_value=doc) as void_doc,
+        mock.patch("services.purchase.docs.delete_doc") as delete_doc,
+        mock.patch(
+            "services.purchase.intake.resolve_inbox", return_value={"doc_id": "D9"}
+        ) as resolve_inbox,
         mock.patch.object(line_client, "reply_text", side_effect=lambda rt, b: sent.append(b)),
         mock.patch.object(
             line_client,
@@ -38,29 +42,52 @@ def _run(data, *, ws=1):
         ),
     ):
         lca.handle_postback({"tenant_id": "t", "id": "u"}, "rt", data, "zh")
-        posting = mock.MagicMock(post_doc=post_doc, void_doc=void_doc)
-    return sent, posting
+        svc = mock.MagicMock(
+            post_doc=post_doc,
+            void_doc=void_doc,
+            delete_doc=delete_doc,
+            resolve_inbox=resolve_inbox,
+        )
+    return sent, svc
 
 
 class CardActionTests(unittest.TestCase):
     def test_confirm_posts(self):
-        sent, posting = _run(line_postback.confirm_data("D1"))
-        posting.post_doc.assert_called_once()
+        sent, svc = _run(line_postback.confirm_data("D1"))
+        svc.post_doc.assert_called_once()
         self.assertTrue(sent[0].startswith("card_confirmed:"))
 
     def test_undo_voids(self):
-        sent, posting = _run(line_postback.undo_data("D1"))
-        posting.void_doc.assert_called_once()
+        sent, svc = _run(line_postback.undo_data("D1"))
+        svc.void_doc.assert_called_once()
         self.assertTrue(sent[0].startswith("card_undone:"))
 
+    def test_discard_deletes_draft(self):
+        sent, svc = _run(line_postback.discard_data("D1"))
+        svc.delete_doc.assert_called_once()
+        svc.post_doc.assert_not_called()
+        self.assertTrue(sent[0].startswith("card_discarded"))
+
+    def test_inbox_post_resolves_then_posts(self):
+        sent, svc = _run(line_postback.inbox_post_data("I7"))
+        svc.resolve_inbox.assert_called_once()
+        svc.post_doc.assert_called_once()  # 仍要入账 = 建草稿后过账
+        self.assertTrue(sent[0].startswith("card_confirmed:"))
+
+    def test_inbox_drop_dismisses(self):
+        sent, svc = _run(line_postback.inbox_drop_data("I7"))
+        svc.resolve_inbox.assert_called_once()
+        svc.post_doc.assert_not_called()
+        self.assertTrue(sent[0].startswith("card_discarded"))
+
     def test_bad_data_stale_reply(self):
-        sent, posting = _run("garbage")
-        posting.post_doc.assert_not_called()
+        sent, svc = _run("garbage")
+        svc.post_doc.assert_not_called()
         self.assertTrue(sent[0].startswith("card_action_stale"))
 
     def test_no_workspace_stale(self):
-        sent, posting = _run(line_postback.confirm_data("D1"), ws=None)
-        posting.post_doc.assert_not_called()
+        sent, svc = _run(line_postback.confirm_data("D1"), ws=None)
+        svc.post_doc.assert_not_called()
         self.assertTrue(sent[0].startswith("card_action_stale"))
 
 

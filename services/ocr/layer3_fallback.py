@@ -71,10 +71,15 @@ logger = logging.getLogger(__name__)
 # (默认 gemini-3.5-flash)· OCR_FALLBACK_MODEL="" 时退回 OCR_FLASH_MODEL。
 DEFAULT_MODEL = _ocr_fallback() or os.environ.get("OCR_FLASH_MODEL", "gemini-2.5-flash")
 DEFAULT_MAX_RETRIES = 1
-# Capped at 15s (doc 09 §3.3): 90s was effectively unbounded (a real ticket ran
-# 61s). On timeout the caller falls back to L2 + needs_review (never silent).
+# L3 timeout. History (doc 09): 90s was effectively unbounded; §3.3 then cut it to
+# 15s for speed — but real L3 on thermal receipts needs 15–60s, so legitimate
+# rescues (Punthai amount-fix ran 15.7s; "total missing" re-reads) got cut off and
+# fell back to L2's wrong/empty value + needs_review = the accuracy regression.
+# Triggers are already tightened (most receipts never reach L3), so a generous
+# timeout only affects the few genuine rescues without slowing the common path.
+# On timeout the caller still falls back to L2 + needs_review (never silent).
 # Overridable via env for prod A/B without a code change.
-DEFAULT_TIMEOUT_SECONDS = int(os.environ.get("OCR_L3_TIMEOUT_SECONDS", "15"))
+DEFAULT_TIMEOUT_SECONDS = int(os.environ.get("OCR_L3_TIMEOUT_SECONDS", "45"))
 # DEFAULT_TEMPERATURE / DEFAULT_MAX_OUTPUT_TOKENS → services/ocr/layer3_gemini.py(模块化深化)。
 
 # Truncate layer 1 OCR text to avoid bloating the prompt on large pages.

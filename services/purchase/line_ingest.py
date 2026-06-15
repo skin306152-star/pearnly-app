@@ -57,6 +57,11 @@ def ingest_line_image(
         "category": "",
         "subcategory": "",
         "vendor": fields.get("seller_name") or "",
+        "seller_tax": fields.get("seller_tax") or "",
+        "seller_addr": fields.get("seller_addr") or "",
+        "subtotal": fields.get("subtotal") or "",
+        "vat": fields.get("vat") or "",
+        "wht": fields.get("wht_amount") or "",
         "invoice_number": fields.get("invoice_number") or "",
         "detail": "",
     }

@@ -75,6 +75,7 @@ function infoCard(d: DocDetail): string {
         <dl class="meta">
             ${field(t('pur-supplier'), escapeHtml((d.supplier && d.supplier.name) || '—'))}
             ${field(t('pur-tax-id'), escapeHtml((d.supplier && d.supplier.tax_id) || '—'), 'tnum')}
+            ${d.supplier && d.supplier.address ? field(t('pur-address'), escapeHtml(d.supplier.address)) : ''}
             ${field(t('pur-doc-no'), escapeHtml(d.doc_no || '—'))}
             ${field(t('pur-type'), `<span class="badge purple">${escapeHtml(t(kindLabelKey(d.doc_kind)))}</span>`)}
             ${field(t('pur-doc-date'), escapeHtml(d.doc_date || '—'), 'tnum')}

@@ -10,6 +10,7 @@ chrome 文案内联(LINE 域,不进 home.js i18n);纯构建无 IO,可单测。
 from __future__ import annotations
 
 from services.line_binding import line_postback
+from services.line_binding.line_card_doctype import doc_type_label
 
 _REVIEW_BELOW = 0.85
 
@@ -45,6 +46,9 @@ _L = {
         "category": "分类",
         "subcategory": "子分类",
         "vendor": "卖家",
+        "tax_id": "税号",
+        "address": "地址",
+        "subtotal": "税前",
         "inv_no": "发票号",
         "detail": "明细",
         "workspace": "套账",
@@ -78,6 +82,9 @@ _L = {
         "category": "หมวดหมู่",
         "subcategory": "หมวดย่อย",
         "vendor": "ผู้ขาย",
+        "tax_id": "เลขภาษี",
+        "address": "ที่อยู่",
+        "subtotal": "ก่อนภาษี",
         "inv_no": "เลขที่ใบกำกับ",
         "detail": "รายละเอียด",
         "workspace": "ชุดบัญชี",
@@ -111,6 +118,9 @@ _L = {
         "category": "Category",
         "subcategory": "Subcategory",
         "vendor": "Vendor",
+        "tax_id": "Tax ID",
+        "address": "Address",
+        "subtotal": "Subtotal",
         "inv_no": "Invoice no.",
         "detail": "Detail",
         "workspace": "Ledger",
@@ -144,6 +154,9 @@ _L = {
         "category": "分類",
         "subcategory": "サブ分類",
         "vendor": "取引先",
+        "tax_id": "税番号",
+        "address": "住所",
+        "subtotal": "税抜",
         "inv_no": "請求番号",
         "detail": "明細",
         "workspace": "帳簿",
@@ -173,38 +186,6 @@ def _lang(lang: str) -> dict:
     return _L.get((lang or "zh").lower(), _L["zh"])
 
 
-# OCR document_type 原始码 → 4 语人话(避免卡上显 simplified_tax_invoice 等英文代号);
-# 术语对齐网页 pur-dt-*。空 → 空;未知码 → 原值兜底(不编造)。
-_DOC_TYPE_LABELS = {
-    "tax_invoice": {"zh": "税务发票", "th": "ใบกำกับภาษี", "en": "Tax invoice", "ja": "税額票"},
-    "simplified_tax_invoice": {
-        "zh": "简式税票",
-        "th": "ใบกำกับภาษีอย่างย่อ",
-        "en": "Simplified tax invoice",
-        "ja": "簡易税額票",
-    },
-    "receipt": {"zh": "收据", "th": "ใบเสร็จรับเงิน", "en": "Receipt", "ja": "領収書"},
-    "credit_note": {
-        "zh": "贷项通知单",
-        "th": "ใบลดหนี้",
-        "en": "Credit note",
-        "ja": "クレジットノート",
-    },
-    "other": {"zh": "其他", "th": "อื่น ๆ", "en": "Other", "ja": "その他"},
-}
-
-
-def doc_type_label(code: str, lang: str) -> str:
-    """document_type 原始码 → 当前语言人话。"""
-    code = (code or "").strip()
-    if not code:
-        return ""
-    m = _DOC_TYPE_LABELS.get(code)
-    if not m:
-        return code
-    return m.get((lang or "zh").lower()) or m["en"]
-
-
 def _txt(text, *, size, color, **kw) -> dict:
     return {"type": "text", "text": str(text), "size": size, "color": color, **kw}
 
@@ -228,6 +209,35 @@ def _field_row(label: str, value: str, t: dict, *, low: bool, strong: bool) -> d
             ),
         ],
     }
+
+
+def _breakdown_rows(fields: dict, t: dict) -> list:
+    """税额拆解条(完整税票有税前/VAT/WHT 时):税前 ฿ · VAT ฿ · WHT ฿。无 → 空(不占位)。"""
+    sub = str(fields.get("subtotal") or "").strip()
+    vat = str(fields.get("vat") or "").strip()
+    wht = str(fields.get("wht") or "").strip()
+    parts = []
+    if sub:
+        parts.append(f"{t['subtotal']} ฿{sub}")
+    if vat:
+        parts.append(f"VAT ฿{vat}")
+    if wht and wht.replace(".", "").strip("0"):
+        parts.append(f"WHT ฿{wht}")
+    if not parts:
+        return []
+    return [_txt(" · ".join(parts), size="xxs", color=_LABEL, margin="sm", wrap=True)]
+
+
+def _seller_rows(fields: dict, t: dict) -> list:
+    """卖家税号/地址条件行(完整税票有值才显·空则不堆叠空行)。"""
+    rows = []
+    tax = str(fields.get("seller_tax") or "").strip()
+    addr = str(fields.get("seller_addr") or "").strip()
+    if tax:
+        rows.append(_field_row(t["tax_id"], tax, t, low=False, strong=False))
+    if addr:
+        rows.append(_field_row(t["address"], addr, t, low=False, strong=False))
+    return rows
 
 
 def _btn(label: str, *, primary: bool, postback: str = None, uri: str = None, danger=False) -> dict:
@@ -390,6 +400,7 @@ def result_card(
                 },
             ],
         },
+        *_breakdown_rows(fields, t),
         {"type": "separator", "margin": "lg", "color": _SEP},
         {  # 字段表
             "type": "box",
@@ -411,6 +422,7 @@ def result_card(
                 ),
                 _field_row(t["subcategory"], fields.get("subcategory"), t, low=False, strong=False),
                 _field_row(t["vendor"], fields.get("vendor"), t, low=low("vendor"), strong=False),
+                *_seller_rows(fields, t),
                 _field_row(
                     t["inv_no"],
                     fields.get("invoice_number"),

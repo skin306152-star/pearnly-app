@@ -214,5 +214,40 @@ class RecordDeepLinkTests(unittest.TestCase):
         self.assertIn("/liff/purchase/D9", json.dumps(c, ensure_ascii=False))
 
 
+class CardFieldEnrichTests(unittest.TestCase):
+    """PO-3:完整税票卡显 税号/地址/税额拆解(有值才显·无则不堆空行)。"""
+
+    def _json(self, fields):
+        import json
+
+        c = line_card.result_card(
+            state="confirm", amount="1070", fields=fields, doc_id="D", lang="zh"
+        )
+        return json.dumps(c, ensure_ascii=False)
+
+    def test_full_invoice_shows_tax_addr_breakdown(self):
+        s = self._json(
+            {
+                "document_type": "tax_invoice",
+                "vendor": "ACME",
+                "seller_tax": "0105551234567",
+                "seller_addr": "123 Bangkok",
+                "subtotal": "1000",
+                "vat": "70",
+                "wht": "30",
+            }
+        )
+        self.assertIn("0105551234567", s)
+        self.assertIn("123 Bangkok", s)
+        self.assertIn("税前 ฿1000", s)
+        self.assertIn("VAT ฿70", s)
+        self.assertIn("WHT ฿30", s)
+
+    def test_minimal_no_empty_seller_rows(self):
+        s = self._json({"vendor": "x"})
+        self.assertNotIn("税号", s)
+        self.assertNotIn("地址", s)
+
+
 if __name__ == "__main__":
     unittest.main()

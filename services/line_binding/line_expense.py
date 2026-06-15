@@ -208,6 +208,7 @@ def _card_fields_from_draft(draft) -> dict:
         "category": draft.category or "",
         "subcategory": draft.subcategory or "",
         "vendor": draft.vendor_name or "",
+        "seller_tax": getattr(draft, "vendor_tax_id", "") or "",
         "invoice_number": draft.invoice_number or "",
         "detail": (draft.note or "").strip(),
     }

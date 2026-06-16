@@ -11,7 +11,7 @@ import logging
 import re
 from typing import Any, Dict
 
-from services.ocr.gemini_models import flash_lite, try_with_fallback
+from services.ocr.gemini_models import best, try_with_fallback
 from services.recon.bank_recon_types import StatementRow
 from services.recon.bank_recon_utils import (
     _parse_date,
@@ -31,8 +31,8 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
     Returns {ok, rows, opening, closing, bank_code}.
 
     v118.33.13.1 · Caches by SHA-256(file_bytes). Same PDF re-uploaded skips the
-    API call entirely. Primary model = flash_lite (cheap); on parse failure/empty
-    it escalates once to the stronger fallback model via try_with_fallback.
+    API call entirely. Primary model = best (3.5-flash, strongest); on parse failure/
+    empty it retries via try_with_fallback.
     """
     # Check cache first — instant return if same PDF was OCR'd before
     # v118.35.0.60 · 缓存键带提示词版本 · 改提示词后旧缓存自动失效(否则返回旧结果)
@@ -140,8 +140,8 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
                 text = re.sub(r"^```[a-z]*\n?", "", text).rstrip("`").strip()
             return json.loads(text)
 
-        # 主模型(flash-lite)解析失败/截断/空 → 升级到更强兜底模型重试一次(糊图扫描件救场)。
-        data = try_with_fallback(_call, primary=flash_lite(), label=f"gemini_stmt[{filename}]")
+        # 主模型用最强(3.5-flash);失败/截断/空再走 try_with_fallback 重试(糊图扫描件救场)。
+        data = try_with_fallback(_call, primary=best(), label=f"gemini_stmt[{filename}]")
         if data is None:
             return {"ok": False, "rows": [], "error": "gemini statement parse failed (all models)"}
 

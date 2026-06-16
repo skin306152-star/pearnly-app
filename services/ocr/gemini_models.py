@@ -46,6 +46,14 @@ def escalate() -> str:
     return os.environ.get("OCR_ESCALATE_MODEL", "").strip() or fallback()
 
 
+def best() -> str:
+    """最强可用模型(3.5-flash 兜底档;关闭兜底时安全回落 2.5-flash)。
+
+    给【低频单次】调用求最准用:大脑意图/分类/银行单解析等(非每页 OCR·不怕慢/贵)。
+    """
+    return fallback() or flash()
+
+
 def models_with_fallback(primary: Optional[str] = None) -> List[str]:
     """[主模型, 兜底模型](去重去空)。调用方按序尝试:前一个失败/空 → 用下一个。"""
     out = [primary or flash()]

@@ -64,11 +64,11 @@ def suggest_category(
         from services.ocr import gemini_models
         from services.ocr.layer2_gemini import _call_gemini_with_retry
 
-        # 用 flash(非 flash-lite):分类要按业态+品名推理,lite 易判错(咖啡→打车)。
+        # 用最强模型(非 flash-lite):分类要按业态+品名推理,弱模型易判错(咖啡→打车)。
         data, _meta = _call_gemini_with_retry(
             payload,
             api_key=api_key,
-            model_name=gemini_models.flash(),
+            model_name=gemini_models.best(),
             max_retries=1,
             timeout=timeout,
             system_prompt_override=_PROMPT,

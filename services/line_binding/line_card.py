@@ -217,17 +217,17 @@ def result_card(
     has_amt = amount not in (None, "")
     amt_text = f"฿{amount}" if has_amt else "Amount —"
 
+    # 状态条 = bubble header:满宽贴边、跟随卡片顶部圆角(对标 Paypers·非浮动胶囊)。
+    status_header = {
+        "type": "box",
+        "layout": "vertical",
+        "paddingAll": "14px",
+        "paddingStart": "20px",
+        "backgroundColor": st["bg"],
+        "contents": [_txt(f"{st['icon']} {t[state]}", size="sm", color=st["color"], weight="bold")],
+    }
+
     body = [
-        {  # 状态条(浅底深字·非按钮)
-            "type": "box",
-            "layout": "vertical",
-            "contents": [
-                _txt(f"{st['icon']} {t[state]}", size="xs", color=st["color"], weight="bold")
-            ],
-            "backgroundColor": st["bg"],
-            "cornerRadius": "xl",
-            "paddingAll": "8px",
-        },
         {  # 金额 + 右侧来源 meta
             "type": "box",
             "layout": "horizontal",
@@ -287,9 +287,9 @@ def result_card(
             ],
         },
     ]
-    if warn_total:  # 明细加总与单据总额对不上 → 醒目橙条提示(紧跟状态条·对标 Paypers)
+    if warn_total:  # 明细加总与单据总额对不上 → 醒目橙条提示(置于卡顶·对标 Paypers)
         body.insert(
-            1,
+            0,
             {
                 "type": "box",
                 "layout": "vertical",
@@ -345,6 +345,7 @@ def result_card(
         "contents": {
             "type": "bubble",
             "size": "mega",
+            "header": status_header,
             "body": {"type": "box", "layout": "vertical", "paddingAll": "16px", "contents": body},
             "footer": {
                 "type": "box",

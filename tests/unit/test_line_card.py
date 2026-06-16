@@ -100,13 +100,23 @@ class CardTests(unittest.TestCase):
         return out
 
     def _fields_box(self, card):
-        # body.contents: [状态条, 金额meta, separator, 字段表, ...]
-        return card["contents"]["body"]["contents"][3]["contents"]
+        # 状态条移到 bubble.header 后,body.contents: [金额meta, separator, 字段表, ...]
+        return card["contents"]["body"]["contents"][2]["contents"]
 
     def test_flex_shape(self):
         c = self._card("posted")
         self.assertEqual(c["type"], "flex")
         self.assertEqual(c["contents"]["type"], "bubble")
+
+    def test_status_is_full_bleed_header(self):
+        # 状态条 = bubble.header(满宽贴边·带底色),不再是 body 内浮动圆角胶囊。
+        c = self._card("posted")
+        header = c["contents"]["header"]
+        self.assertIn("backgroundColor", header)
+        self.assertNotIn("cornerRadius", header)  # 不再是浮动胶囊
+        self.assertIn("已入账", str(header))
+        # body 第一项不应再是带 cornerRadius 的状态胶囊
+        self.assertNotIn("已入账", str(c["contents"]["body"]["contents"][0]))
 
     def _footer_contents(self, card):
         return card["contents"]["footer"]["contents"]

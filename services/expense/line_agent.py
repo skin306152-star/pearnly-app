@@ -121,7 +121,7 @@ def understand(
         data, _meta = _call_gemini_with_retry(
             text,
             api_key=api_key,
-            model_name=gemini_models.flash_lite(),
+            model_name=gemini_models.best(),
             max_retries=1,
             timeout=18,
             system_prompt_override=prompt,

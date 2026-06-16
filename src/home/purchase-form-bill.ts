@@ -20,12 +20,9 @@ const I_THUMB =
 const I_FULL =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
 
+// 左栏 = 吸顶票据预览(查看器)+ 凭证和附件(相册缩略图 + 替代收据)。所有查看器 id 保持原样供 mountViewer 复用。
 export function leftColHtml(st: FormState): string {
     const n = st.billUrls.length;
-    // 智能识别 N 项:绿徽章(照原型)· 不出现「AI」字样。
-    const aiMark = st.aiFields
-        ? `<span class="r tg tg-ok">${escapeHtml(t('pur-ai-read'))} ${st.aiFields}</span>`
-        : '';
     const fileTag =
         n > 1
             ? `<span class="vfile">${escapeHtml(t('pur-file'))} ${st.billIdx + 1} / ${n}</span>`
@@ -39,20 +36,20 @@ export function leftColHtml(st: FormState): string {
                 `<div class="t ${i === st.billIdx ? 'on' : ''}" data-thumb="${i}">${I_THUMB}</div>`
         )
         .join('');
-    return `<div class="col edit-left" id="pane-doc">
-        <div class="card"><div class="hd">${escapeHtml(t('pur-bill'))}${aiMark}</div><div class="bd">
+    return `<aside class="preview-pane" id="pane-doc">
+        <div class="card"><div class="hd">${escapeHtml(t('pur-bill'))}</div><div class="bd">
             <div class="viewer" id="pur-viewer">${inner}
                 <span class="vhint">${escapeHtml(t('pur-viewer-hint'))}</span>${fileTag}
                 <div class="vtools"><span class="vzoom" id="pur-vzoom">100%</span><button data-z="in" title="+">${I_PLUS}</button><button data-z="out" title="-">${I_MINUS}</button><button data-z="rot" title="rotate">${I_ROT}</button><button data-z="reset" title="reset">${I_RESET}</button><button data-z="full" title="${escapeHtml(t('pur-viewer-full'))}">${I_FULL}</button></div>
             </div>
-            <div class="thumbs">${thumbs}<div class="add" id="pur-add-file">${I_PLUS}</div></div>
         </div></div>
         <div class="card"><div class="hd">${escapeHtml(t('pur-vouchers-hd'))}</div><div class="bd">
             <div class="hint">${escapeHtml(t('pur-sub-receipt-hint'))}</div>
-            <button class="btn full ghost" id="pur-gen-receipt">+ ${escapeHtml(t('pur-gen-receipt'))}</button>
+            <div class="thumbs">${thumbs}<div class="add" id="pur-add-file">${I_PLUS}</div></div>
+            <button class="btn full ghost mt" id="pur-gen-receipt">+ ${escapeHtml(t('pur-gen-receipt'))}</button>
         </div></div>
         <input type="file" id="pur-addfile-input" accept="image/*,application/pdf" multiple style="display:none">
-    </div>`;
+    </aside>`;
 }
 
 let cleanup: (() => void) | null = null;

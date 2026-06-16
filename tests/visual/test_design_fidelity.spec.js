@@ -454,8 +454,8 @@ const MAPPINGS = [
                 prod: '.pur .btn.primary',
                 props: ['backgroundColor', 'borderRadius', 'fontSize'],
             },
-            // 复核屏左右两列各融成一张连续白卡(内部 .card 已去边框/阴影,改在 .rcol 承载圆角+阴影)。
-            { design: '.card', prod: '.pur.f .rcol', props: ['borderRadius', 'boxShadow'] },
+            // 一体化复核屏:整屏融成一张白卡(.sheet 承载圆角 16 + 阴影,内部 card 去壳)。
+            { design: '.card', prod: '.pur.f .sheet', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .btn.primary',
         nosvgemoji: '.pur .viewer .vtools svg',

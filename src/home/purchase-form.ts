@@ -126,31 +126,32 @@ function shell(): string {
         : '';
     const fx = reviewFields();
     const showBanner = st!.confidenceBand !== 'auto' && fx.length;
+    const badge = st!.aiFields ? `<span class="badge">${escapeHtml(t('pur-tag-read'))}</span>` : '';
     return `<div class="pur f"><div class="wrap">
         <div class="ph">
             <div class="phl"><span class="back" id="pur-back" title="${escapeHtml(t('pur-back'))}" aria-label="${escapeHtml(t('pur-back'))}">‹</span><div><div class="t">${escapeHtml(t('pur-review-title'))}</div><div class="sub">${escapeHtml(st!.supplierName || t('pur-form-sub'))}</div></div></div>
-            <div class="acts"><button class="btn" id="pur-save-draft">${escapeHtml(t('pur-save-draft'))}</button><button class="btn primary" id="pur-post">${escapeHtml(t('pur-post'))}</button></div>
+            ${badge}
         </div>
         ${dup}
         <div class="vbanner ${showBanner ? 'show' : ''}" id="pur-vbanner">${showBanner ? bannerInner(fx, 'pur-review-n') : ''}</div>
-        <div class="ctxbar" id="pur-ctx">
-            <div class="etabs" id="pur-etabs"><button class="on" data-tab="doc">${escapeHtml(t('pur-tab-doc'))}</button><button data-tab="info">${escapeHtml(t('pur-tab-info'))}</button><button data-tab="items">${escapeHtml(t('pur-tab-items'))}</button></div>
-        </div>
-        <div class="grid">
+        <div class="sheet">
             ${leftColHtml(st!)}
-            <div class="rcol">
-                <div id="pane-info">${infoCardHtml(st!)}</div>
-                <div id="pane-items">
-                    <div class="card"><div class="hd">${escapeHtml(t('pur-lines'))}</div><div class="bd">
-                        <div class="seg sm2" id="pur-linemode" style="margin-bottom:12px;"><div class="o ${st!.mergeMode ? '' : 'on'}" data-merge="0">${escapeHtml(t('pur-line-split'))}</div><div class="o ${st!.mergeMode ? 'on' : ''}" data-merge="1">${escapeHtml(t('pur-line-merge'))}</div></div>
-                        <div class="infonote">${escapeHtml(t('pur-lines-note'))}</div>
-                        <div id="pur-lines">${linesHtml(st!, cats)}</div>
-                    </div></div>
-                    ${totalsCardHtml(st!)}
+            <section class="form-pane">
+                <nav class="etabs" id="pur-etabs"><button class="on" data-tab="info">${escapeHtml(t('pur-doc-info'))}</button><button data-tab="items">${escapeHtml(t('pur-tab-items'))}</button></nav>
+                <div class="scroll">
+                    <section class="section" id="pane-info">${infoCardHtml(st!)}</section>
+                    <section class="section" id="pane-items">
+                        <div class="card"><div class="hd">${escapeHtml(t('pur-lines'))}</div><div class="bd">
+                            <div class="seg sm2" id="pur-linemode" style="margin-bottom:12px;"><div class="o ${st!.mergeMode ? '' : 'on'}" data-merge="0">${escapeHtml(t('pur-line-split'))}</div><div class="o ${st!.mergeMode ? 'on' : ''}" data-merge="1">${escapeHtml(t('pur-line-merge'))}</div></div>
+                            <div class="infonote">${escapeHtml(t('pur-lines-note'))}</div>
+                            <div id="pur-lines">${linesHtml(st!, cats)}</div>
+                        </div></div>
+                        ${totalsCardHtml(st!)}
+                    </section>
                 </div>
-            </div>
+                <div class="editfoot"><button class="btn danger" id="pur-delete">${escapeHtml(t('pur-delete'))}</button><button class="btn" id="pur-save-draft2">${escapeHtml(t('pur-save-draft'))}</button><button class="btn primary save" id="pur-post2">${escapeHtml(t('pur-post'))}</button></div>
+            </section>
         </div>
-        <div class="editfoot"><button class="btn danger" id="pur-delete">${escapeHtml(t('pur-delete'))}</button><button class="btn" id="pur-save-draft2">${escapeHtml(t('pur-save-draft'))}</button><button class="btn primary save" id="pur-post2">${escapeHtml(t('pur-post'))}</button></div>
     </div></div>`;
 }
 
@@ -275,9 +276,7 @@ function bindShell(): void {
     bindBannerJumps();
     bindMobileTabs();
     document.getElementById('pur-delete')!.onclick = () => onDelete();
-    document.getElementById('pur-save-draft')!.onclick = () => submit('draft');
     document.getElementById('pur-save-draft2')!.onclick = () => submit('draft');
-    document.getElementById('pur-post')!.onclick = () => onPost();
     document.getElementById('pur-post2')!.onclick = () => onPost();
 }
 
@@ -313,8 +312,8 @@ function bindBannerJumps(): void {
     });
 }
 
-// 手机:点 Tab 平滑滚到该段 + 滚动联动高亮(scroll-spy)。桌面 etabs 不显故无效。
-// 真 app 的滚动容器是 window/document(无 #content · 原型才有)→ 监听 window scroll。
+// 顶部 Tab:点击平滑滚到该段 + 滚动联动高亮(scroll-spy)· 桌面/手机同。
+// 真 app 的滚动容器是 window/document(无 #content)→ 监听 window scroll。
 let mobileSpy: (() => void) | null = null;
 function bindMobileTabs(): void {
     const tabs = document.getElementById('pur-etabs');
@@ -332,11 +331,11 @@ function bindMobileTabs(): void {
             if (mobileSpy) window.removeEventListener('scroll', mobileSpy);
             return;
         }
-        const ids = ['doc', 'info', 'items'];
-        let curId = 'doc';
+        const ids = ['info', 'items'];
+        let curId = 'info';
         for (const id of ids) {
             const r = document.getElementById('pane-' + id)?.getBoundingClientRect();
-            if (r && r.top < 160) curId = id;
+            if (r && r.top < 200) curId = id;
         }
         tb.querySelectorAll<HTMLElement>('button').forEach((x) =>
             x.classList.toggle('on', x.dataset.tab === curId)

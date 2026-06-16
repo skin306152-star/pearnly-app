@@ -67,16 +67,16 @@ def void_for_source(
     workspace_client_id,
     source_type: str,
     source_id,
+    created_by=None,
 ) -> None:
-    """源单作废 → 作废其做账凭证(账本 / ภ.พ.30 进项税同步对冲)。业务事务内调。
+    """源单作废 → 作废/红冲其做账凭证(账本 / ภ.พ.30 同步对冲)。业务事务内调。
 
-    与 enqueue_posting 的关键反差:**不吞错**。enqueue 用 SAVEPOINT 吞错是为护业务过账
-    路径;作废反过来——凭证作废失败(如期间已结账/已申报 acct.period_closed)必须让整个
-    作废事务回滚,绝不留「单已作废、账本/税表还在算」的不一致。模块未开通 / 无凭证 = no-op。
+    与 enqueue_posting 的关键反差:**不吞错**。enqueue 用 SAVEPOINT 吞错是为护业务过账路径;
+    作废反过来——凭证处理失败必须让整个作废事务回滚,绝不留「单已作废、账本/税表还在算」的不一致。
+    期间已结/已申报 → 走红冲(当期反向凭证)而非 void(见 void_or_reverse)。模块未开 / 无凭证 = no-op。
     """
     if not tenant_id or not workspace_client_id:
         return
-    from services.accounting import posting
     from services.accounting import vouchers as jv
     from services.modules import store as modules_store
 
@@ -91,27 +91,46 @@ def void_for_source(
     )
     if voucher is None:
         return
-    posting.void_voucher(
+    void_or_reverse(
         cur,
         tenant_id=tenant_id,
         workspace_client_id=int(workspace_client_id),
         voucher_id=voucher["id"],
+        created_by=created_by,
     )
 
 
-def void_voucher(cur, *, tenant_id: str, workspace_client_id, voucher_id) -> None:
-    """seam:作废指定凭证(带期间锁断言)。供业务模块整单作废逐张撤凭证用,不直连引擎。
+def void_or_reverse(
+    cur, *, tenant_id: str, workspace_client_id, voucher_id, created_by=None
+) -> None:
+    """seam:开放期 → 作废凭证;已结/已申报期 → 当期红冲(反向凭证·原凭证不动·docs/purchasing/04)。
 
-    与 void_for_source 同纪律:不吞错,period_closed 等透传 → 调用方整事务回滚。
+    供业务整单作废/更正逐张处理凭证用(不直连引擎)。已报历史绝不篡改,调整落当期。不吞错:
+    period_closed / no_open_period 等透传 → 调用方整事务回滚。已 void → no-op。
     """
     from services.accounting import posting
+    from services.accounting import settings as acct_settings
+    from services.accounting import vouchers as jv
 
-    posting.void_voucher(
-        cur,
-        tenant_id=tenant_id,
-        workspace_client_id=int(workspace_client_id),
-        voucher_id=voucher_id,
+    ws = int(workspace_client_id)
+    voucher = jv.get_voucher(
+        cur, tenant_id=tenant_id, workspace_client_id=ws, voucher_id=voucher_id
     )
+    if voucher is None or voucher["status"] == "void":
+        return
+    settings = acct_settings.get_settings(cur, tenant_id=tenant_id, workspace_client_id=ws)
+    if acct_settings.is_period_closed(settings, voucher["period"]):
+        posting.reverse_voucher(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=ws,
+            voucher_id=voucher_id,
+            created_by=created_by,
+        )
+    else:
+        posting.void_voucher(
+            cur, tenant_id=tenant_id, workspace_client_id=ws, voucher_id=voucher_id
+        )
 
 
 def payment_event_id(doc_id, paid_after) -> uuid.UUID:

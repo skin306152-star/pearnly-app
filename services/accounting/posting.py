@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import date
 from decimal import Decimal
 from typing import Optional
 
@@ -226,6 +227,68 @@ def void_voucher(cur, *, tenant_id: str, workspace_client_id: int, voucher_id) -
         status="void",
     )
     return {**voucher, "status": "void"}
+
+
+def reverse_voucher(
+    cur, *, tenant_id: str, workspace_client_id: int, voucher_id, created_by=None
+) -> dict:
+    """红冲(docs/purchasing/04):已结/已申报期凭证不可改 → 在【当前开放期间】插一张反向凭证
+    (借贷对调)冲销,原凭证留原期不动(合规:不篡改已报历史)。
+
+    当前期也已结(无开放期可落)→ acct.no_open_period(409·诚实拦)。反向凭证 source_type 加
+    `_reversal` 后缀(避 uq_jv_source 撞仍 posted 的原单);原凭证无行(待审壳)→ 原样返回不冲。
+    """
+    voucher = jv.get_voucher(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, voucher_id=voucher_id
+    )
+    if voucher is None:
+        raise PosError("acct.unexpected", 404, detail="voucher_not_found")
+    if voucher["status"] == "void":
+        return voucher
+    lines = voucher.get("lines") or []
+    if not lines:
+        return voucher
+
+    today = date.today()
+    period = today.strftime("%Y-%m")
+    settings = acct_settings.get_settings(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
+    )
+    if acct_settings.is_period_closed(settings, period):
+        raise PosError("acct.no_open_period", 409, detail="current_period_closed")
+
+    reversed_lines = [
+        {
+            "account_id": ln["account_id"],
+            "dr_cr": "credit" if ln["dr_cr"] == "debit" else "debit",
+            "amount": ln["amount"],
+            "memo": ln.get("memo"),
+        }
+        for ln in lines
+    ]
+    ref = voucher.get("source_ref") or voucher.get("voucher_no")
+    header = {
+        "source_type": f"{voucher['source_type']}_reversal",
+        "source_id": voucher.get("source_id"),
+        "source_ref": voucher.get("source_ref"),
+        "description": f"红冲 {ref}",
+        "human_note": f"红冲 {ref}:原单在已结/已申报期,按原票反向冲销,落当期。",
+        "rule_key": "reversal",
+        "confidence": 1,
+        "source_tier": "manual",
+        "voucher_date": today,
+        "status": "auto_posted",
+        "method": "auto",
+        "review_reason": None,
+        "created_by": created_by or "system",
+    }
+    return jv.insert_voucher(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        header=header,
+        lines=reversed_lines,
+    )
 
 
 def create_manual_voucher(

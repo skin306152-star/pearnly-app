@@ -338,14 +338,50 @@ class VoidReversalTests(unittest.TestCase):
 
 
 class StrictPaymentVoidTests(unittest.TestCase):
-    """strict=True(void_doc 用):走 acct void_voucher(带期间锁),period_closed 透传不吞。"""
+    """strict=True(void_doc 用):每张付款凭证走 seam void_or_reverse(开放期 void/已结期红冲),不吞错。"""
 
-    def test_strict_propagates_period_closed(self):
+    def test_strict_dispatches_each_to_void_or_reverse(self):
         from decimal import Decimal
         from unittest import mock
 
         from services.accounting import hooks as acct_hooks
-        from services.accounting import posting as acct_posting
+        from services.accounting import vouchers as jv
+
+        store = {
+            str(acct_hooks.payment_event_id("D", Decimal("100"))): {"id": "v1", "total_debit": 100},
+        }
+        handled = []
+
+        class Cur:
+            def execute(self, *a, **k):
+                return None
+
+        with (
+            mock.patch.object(
+                jv, "find_active_by_source", side_effect=lambda c, **k: store.get(k["source_id"])
+            ),
+            mock.patch.object(
+                posting_svc.acct_hooks,
+                "void_or_reverse",
+                side_effect=lambda *a, **k: handled.append(k["voucher_id"]),
+            ),
+        ):
+            posting_svc._void_payment_vouchers(
+                Cur(),
+                tenant_id="t",
+                workspace_client_id=1,
+                doc_id="D",
+                paid=Decimal("100"),
+                strict=True,
+                created_by="u",
+            )
+        self.assertEqual(handled, ["v1"])
+
+    def test_strict_propagates_errors(self):
+        from decimal import Decimal
+        from unittest import mock
+
+        from services.accounting import hooks as acct_hooks
         from services.accounting import vouchers as jv
 
         store = {
@@ -356,13 +392,14 @@ class StrictPaymentVoidTests(unittest.TestCase):
             def execute(self, *a, **k):
                 return None
 
-        # strict 经 seam acct_hooks.void_voucher → 引擎 posting.void_voucher;period_closed 透传不吞。
         with (
             mock.patch.object(
                 jv, "find_active_by_source", side_effect=lambda c, **k: store.get(k["source_id"])
             ),
             mock.patch.object(
-                acct_posting, "void_voucher", side_effect=PosError("acct.period_closed", 409)
+                posting_svc.acct_hooks,
+                "void_or_reverse",
+                side_effect=PosError("acct.period_closed", 409),
             ),
             self.assertRaises(PosError) as e,
         ):
@@ -373,6 +410,7 @@ class StrictPaymentVoidTests(unittest.TestCase):
                 doc_id="D",
                 paid=Decimal("100"),
                 strict=True,
+                created_by="u",
             )
         self.assertEqual(e.exception.code, "acct.period_closed")
 

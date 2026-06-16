@@ -239,13 +239,13 @@ def _each_payment_voucher(cur, *, tenant_id, workspace_client_id, doc_id, paid):
 
 
 def _void_payment_vouchers(
-    cur, *, tenant_id, workspace_client_id, doc_id, paid, strict=False
+    cur, *, tenant_id, workspace_client_id, doc_id, paid, strict=False, created_by=None
 ) -> None:
     """void 该单【全部】付款凭证(含多次部分付款 · 沿累计链回退)。做账关/无凭证则 no-op。
 
     strict=False(unpay 撤付款 · best-effort):SAVEPOINT 吞错不阻断 toggle,jv.set_status 直接置 void。
-    strict=True(void_doc 整单作废):走 acct void_voucher(带期间锁断言),period_closed 等透传
-    → 整作废事务回滚(不留半作废)。
+    strict=True(void_doc 整单作废):走 acct void_or_reverse(开放期 void / 已结期当期红冲),
+    异常透传 → 整作废事务回滚(不留半作废 · docs/purchasing/04)。
     """
     if strict:
         for v in _each_payment_voucher(
@@ -255,11 +255,12 @@ def _void_payment_vouchers(
             doc_id=doc_id,
             paid=paid,
         ):
-            acct_hooks.void_voucher(
+            acct_hooks.void_or_reverse(
                 cur,
                 tenant_id=tenant_id,
                 workspace_client_id=workspace_client_id,
                 voucher_id=v["id"],
+                created_by=created_by,
             )
         return
 
@@ -290,11 +291,11 @@ def _void_payment_vouchers(
 
 
 def void_doc(cur, *, tenant_id, workspace_client_id, doc_id, created_by) -> dict:
-    """作废:posted→void · 下游完整对冲(docs/purchasing/03)。draft 用 delete 而非 void。
+    """作废:posted→void · 下游完整对冲(docs/purchasing/03+04)。draft 用 delete 而非 void。
 
-    同一事务顺序:撤付款凭证 → 作废做账主凭证 → 库存逐笔回冲 → status=void。任一步抛错
-    (尤其期间已结账/已申报 acct.period_closed)→ 整事务回滚,绝不留「单已作废、账本/
-    ภ.พ.30 进项税还在算」的半作废。做账模块未开通时凭证步骤为 no-op,只反库存(老行为)。
+    同一事务顺序:撤付款凭证 → 处理做账主凭证 → 库存逐笔回冲 → status=void。做账凭证按期间:
+    开放期 void;已结/已申报期 **当期红冲**(反向凭证·原凭证不动·不篡改已报历史·04)。任一步抛错
+    → 整事务回滚不留半作废。当前期也已结(无开放期)→ acct.no_open_period 透传。做账未开=只反库存。
     """
     row = _load_status(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=doc_id
@@ -316,6 +317,7 @@ def void_doc(cur, *, tenant_id, workspace_client_id, doc_id, created_by) -> dict
             doc_id=doc_id,
             paid=row["paid_amount"],
             strict=True,
+            created_by=created_by,
         )
     acct_hooks.void_for_source(
         cur,
@@ -323,6 +325,7 @@ def void_doc(cur, *, tenant_id, workspace_client_id, doc_id, created_by) -> dict
         workspace_client_id=workspace_client_id,
         source_type="purchase",
         source_id=doc_id,
+        created_by=created_by,
     )
     _reverse_stock(
         cur,

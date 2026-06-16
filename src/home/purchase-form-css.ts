@@ -19,10 +19,18 @@ export const PURCHASE_FORM_CSS = `
 .pur .vbanner.show{display:flex;} .pur .vbanner b{color:var(--amber);} .pur .vbanner .j{color:var(--amber);font-weight:800;text-decoration:underline;cursor:pointer;}
 .pur .vbanner svg{color:var(--amber);flex:none;}
 
-/* 手机吸顶 Tab(scroll-spy)· 桌面不显(规则并入底部 @media)*/
-.pur .etabs{display:none;}
+/* 吸顶上下文条:左=套账(记账给 X) + 右=分类导航(scroll-spy)· 桌面/手机同款 */
+.pur .ctxbar{position:sticky;top:0;z-index:9;display:flex;align-items:center;gap:12px;background:var(--bg);padding:9px 0;margin-bottom:14px;border-bottom:1px solid var(--line);}
+.pur .ctxbar .wsbar{margin-bottom:0;flex:none;}
+.pur .etabs{display:flex;gap:6px;flex:1;overflow-x:auto;}
+.pur .etabs button{border:none;background:transparent;color:var(--ink2);padding:7px 14px;border-radius:999px;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap;}
+.pur .etabs button.on{background:var(--accent-weak);color:var(--accent-deep);}
 
 .pur .grid{display:grid;grid-template-columns:330px 1fr;gap:14px;align-items:start;}
+/* 右列融成一张连续白卡:内部各 card 去边框/阴影,区与区之间一条细横线(治「东一块西一块」) */
+.pur.f .rcol{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--sh);overflow:hidden;}
+.pur.f .rcol .card{border:0;border-radius:0;box-shadow:none;background:transparent;}
+.pur.f .rcol .card + .card,.pur.f .rcol > div + div .card:first-child{border-top:1px solid var(--line);}
 .pur .edit-left{position:sticky;top:0;align-self:start;}
 .pur .col{display:flex;flex-direction:column;gap:14px;}
 .pur .card>.hd{padding:12px 15px;border-bottom:1px solid var(--line);font-weight:600;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
@@ -100,12 +108,14 @@ export const PURCHASE_FORM_CSS = `
 .pur .consist{font-size:12px;border-radius:9px;padding:8px 11px;margin-top:8px;}
 .pur .consist.ok{background:var(--green-weak);color:var(--green);} .pur .consist.bad{background:var(--red-weak);color:var(--red);}
 
-.pur .editfoot{display:flex;gap:9px;padding:14px 2px 0;} .pur .editfoot .save{margin-left:auto;}
+/* 底部操作条:吸底 + 三个按钮均匀铺满 */
+.pur .editfoot{display:flex;gap:9px;padding:12px 0;position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);z-index:9;}
+.pur .editfoot .btn{flex:1;}
 @media(max-width:760px){
-  .pur .etabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:12px;position:sticky;top:0;z-index:8;}
-  .pur .etabs button{flex:1;border:none;background:transparent;color:var(--ink2);padding:9px;border-radius:9px;font-weight:700;font-size:12.5px;cursor:pointer;}
-  .pur .etabs button.on{background:var(--accent-weak);color:var(--accent-deep);}
-  .pur .ph{flex-direction:column;} .pur .acts{width:100%;} .pur .acts .btn{flex:1;}
+  .pur .ctxbar{flex-direction:column;align-items:stretch;}
+  .pur .ctxbar .wsbar{width:100%;}
+  .pur .etabs{flex:none;}
+  .pur .ph{flex-direction:column;}
   .pur .grid{grid-template-columns:1fr;} .pur .edit-left{position:static;}
   .pur .igrid{grid-template-columns:repeat(2,1fr);}
   .pur .irow1{flex-wrap:wrap;} .pur .irow1 .seg{flex:0 0 100%;order:3;} .pur .irow1 .iname{order:1;} .pur .irow1 .x{order:2;}

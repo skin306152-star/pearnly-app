@@ -219,6 +219,22 @@ function _wsHeader() {
     }
     return {};
 }
+
+async function revokeSessionToken() {
+    const tk = localStorage.getItem('mrpilot_token') || token || '';
+    if (!tk) return;
+    try {
+        await fetch('/api/logout', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + tk },
+            keepalive: true,
+        });
+    } catch (_) {
+        /* logout is best-effort; local cleanup still wins */
+    }
+}
+window.revokeSessionToken = revokeSessionToken;
+
 async function apiGet(url: string) {
     const resp = await fetch(url, {
         headers: { Authorization: 'Bearer ' + token, ..._wsHeader() } as HeadersInit,

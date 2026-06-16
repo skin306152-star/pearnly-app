@@ -193,17 +193,23 @@
                     if (helpModal) helpModal.style.display = 'flex';
                     break;
                 case 'logout':
-                    try {
-                        localStorage.removeItem('mrpilot_token');
-                    } catch (_) {
-                        /* silent · localStorage 私模/配额 */
-                    }
-                    try {
-                        localStorage.removeItem('mrpilot_user');
-                    } catch (_) {
-                        /* silent · localStorage 私模/配额 */
-                    }
-                    window.location.href = '/';
+                    Promise.resolve(
+                        typeof window.revokeSessionToken === 'function'
+                            ? window.revokeSessionToken()
+                            : undefined
+                    ).finally(function () {
+                        try {
+                            localStorage.removeItem('mrpilot_token');
+                        } catch (_) {
+                            /* silent · localStorage 私模/配额 */
+                        }
+                        try {
+                            localStorage.removeItem('mrpilot_user');
+                        } catch (_) {
+                            /* silent · localStorage 私模/配额 */
+                        }
+                        window.location.href = '/';
+                    });
                     break;
             }
         });

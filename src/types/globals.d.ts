@@ -106,6 +106,7 @@ declare var _results: OcrResult[];
 declare var _drawerIdx: number;
 declare function svgIcon(name: string, size?: number): string;
 declare function _showSessionRevokedModal(): void;
+declare function revokeSessionToken(): Promise<void>;
 /** Bearer token held globally by home.js core. */
 // eslint-disable-next-line no-var
 declare var token: string;
@@ -351,6 +352,7 @@ interface Window {
     closeCmdk?: () => void;
     openCmdk?: LegacyBridge;
     _closeAvatarPopup?: () => void;
+    revokeSessionToken?: () => Promise<void>;
     openWorkspaceChooserUI?: LegacyBridge;
     openWorkspaceChooser?: LegacyBridge;
     requireWorkspace?: LegacyBridge;

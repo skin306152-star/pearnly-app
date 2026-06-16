@@ -26,7 +26,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from core import db
-from core.auth import create_access_token, verify_password
+from core.auth import create_access_token, revoke_current_token, verify_password
 
 logger = logging.getLogger(__name__)
 
@@ -159,3 +159,14 @@ async def login(req: LoginRequest, request: Request):
             "is_super_admin": bool(user.get("is_super_admin")),
         }
     )
+
+
+@router.post("/api/logout")
+async def logout(request: Request):
+    revoke_current_token(request)
+    return {"ok": True}
+
+
+@router.post("/api/auth/logout")
+async def auth_logout(request: Request):
+    return await logout(request)

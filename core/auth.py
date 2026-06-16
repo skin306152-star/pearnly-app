@@ -20,8 +20,8 @@ from fastapi import HTTPException, Request, status
 logger = logging.getLogger(__name__)
 
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRE_DAYS = 7
-JWT_REMEMBER_DAYS = 30  # v0.17 · 勾选"记住我"时的长有效期
+JWT_EXPIRE_HOURS = int(os.environ.get("JWT_EXPIRE_HOURS", "12"))
+JWT_REMEMBER_DAYS = int(os.environ.get("JWT_REMEMBER_DAYS", "7"))
 POS_TOKEN_TTL_HOURS = 12  # POS 收银员 token 有效期(离线缓存窗口 · docs/pos/04 §1)
 POS_STORE_TOKEN_TTL_DAYS = 365  # 设备店铺令牌(绑定一次长期用 · docs/pos/04 §1b)
 
@@ -74,28 +74,23 @@ def create_access_token(
     is_super_admin: bool = False,
     remember_me: bool = False,
 ) -> str:
-    """生成 JWT 令牌
-    remember_me=True → 有效期 30 天(v0.17 · "记住我" 勾选时)
-    remember_me=False → 默认 7 天
+    """生成最小声明 JWT。
 
-    v22 多租户 · 新增字段:
-    - tenant_id:租户 id(数据隔离)
-    - role:owner / member
-    - is_super_admin:超级管理员标志
+    身份、租户、角色、套餐每次从 DB 取最新值,不再塞进浏览器可解码的 token 里。
+    remember_me=True → 默认 7 天;否则默认 12 小时。两者均可用 env 覆盖。
     """
-    days = JWT_REMEMBER_DAYS if remember_me else JWT_EXPIRE_DAYS
     # v118.32.5.5.10 · 1 账号 1 设备:每次签发新 jti · 注册为 active_jti · 旧 jti 自动失效
     jti = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+    expires_at = now + (
+        timedelta(days=JWT_REMEMBER_DAYS) if remember_me else timedelta(hours=JWT_EXPIRE_HOURS)
+    )
     payload = {
         "sub": user_id,
         "jti": jti,
-        "username": username,
-        "plan": plan,
-        "tenant_id": tenant_id,
-        "role": role,
-        "is_super_admin": is_super_admin,
-        "iat": datetime.now(timezone.utc),
-        "exp": datetime.now(timezone.utc) + timedelta(days=days),
+        "typ": "access",
+        "iat": now,
+        "exp": expires_at,
     }
     token = jwt.encode(payload, _jwt_secret(), algorithm=JWT_ALGORITHM)
     # 写入 users.active_jti(失败不阻塞登录 · 老用户兼容)
@@ -110,6 +105,34 @@ def create_access_token(
     except Exception as e:
         logger.warning(f"[session] set active_jti failed (non-blocking): {e}")
     return token
+
+
+def revoke_current_token(request: Request) -> bool:
+    """撤销当前 Bearer 会话。无 token/坏 token 按幂等 logout 处理为 False。"""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return False
+    payload = decode_access_token(auth[7:].strip())
+    if not payload:
+        return False
+    user_id = payload.get("sub")
+    jti = payload.get("jti")
+    if not user_id or not jti:
+        return False
+    try:
+        from core import db as _db
+
+        with _db.get_cursor(commit=True) as cur:
+            cur.execute(
+                "UPDATE users SET active_jti=NULL WHERE id=%s AND active_jti=%s",
+                (str(user_id), str(jti)),
+            )
+        _db.evict_user_cache(str(user_id))
+        logger.info("[session] logout revoked · user=%s jti=%s...", user_id, str(jti)[:8])
+        return True
+    except Exception as e:
+        logger.warning("[session] logout revoke failed: %s", e)
+        return False
 
 
 def create_pos_token(

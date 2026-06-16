@@ -10,7 +10,21 @@ import unittest
 from services.ocr.recognize.sanitize import strip_internal_fields
 
 # 内部标识子串黑名单(出现在 key 名里即视为泄漏)。
-_LEAK_SUBSTRINGS = ("engine", "typhoon", "layer", "gemini", "vision", "flash", "token")
+_LEAK_SUBSTRINGS = (
+    "engine",
+    "typhoon",
+    "layer",
+    "gemini",
+    "vision",
+    "flash",
+    "token",
+    "model",
+    "provider",
+    "prompt",
+    "raw",
+    "debug",
+    "traceback",
+)
 
 
 def _iter_keys(obj):
@@ -32,6 +46,13 @@ def _sample_main_response():
         "engine": "gemini",
         "engine_chain": ["pipeline_v1"],
         "fallback_used": False,
+        "model_name": "flash",
+        "provider": "google",
+        "system_prompt": "extract invoices",
+        "raw_text": "full OCR text",
+        "tenant_id": "t-1",
+        "workspace_client_id": 9,
+        "pdf_storage_path": "/tmp/internal.pdf",
         "typhoon_enhanced": False,
         "typhoon_pages": [],
         "pages": [
@@ -40,6 +61,8 @@ def _sample_main_response():
                 "fields": {"total": "100"},
                 "input_tokens": 1234,
                 "output_tokens": 567,
+                "debug_note": "internal",
+                "traceback": "stack",
                 "_layer_chain": ["text", "vision", "flash"],
                 "_trigger_reasons": ["low_conf"],
                 "_confidence_band": "mid",

@@ -201,7 +201,8 @@ async function doCreate(): Promise<void> {
     }
 }
 
-function doLogout(): void {
+async function doLogout(): Promise<void> {
+    if (typeof window.revokeSessionToken === 'function') await window.revokeSessionToken();
     try {
         localStorage.removeItem('mrpilot_token');
         localStorage.removeItem('mrpilot_user');

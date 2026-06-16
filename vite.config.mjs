@@ -12,7 +12,7 @@ export default defineConfig({
     build: {
         outDir: 'static/dist',
         emptyOutDir: true,
-        sourcemap: true,
+        sourcemap: false,
         minify: 'esbuild',
         target: 'es2020',
         rollupOptions: {

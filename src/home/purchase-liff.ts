@@ -133,11 +133,19 @@ function liffResume(): void {
     sessionStorage.removeItem(LIFF_INBOX_KEY);
     sessionStorage.removeItem(LIFF_VIEW_KEY);
     sessionStorage.removeItem(LIFF_WS_KEY);
-    // 该单只在自己的套账可见 → 自动切到它、放行套账门(否则硬门挡在编辑页前/按错套账存)。
-    if (ws && typeof window.satisfyWorkspaceGate === 'function')
-        window.satisfyWorkspaceGate(Number(ws));
     let tries = 0;
+    let wsApplied = !ws;
     const open = () => {
+        // 1) 先自动选该单套账(设 active + 放行套账门 + 摘门壳)· 等 satisfyWorkspaceGate 就绪再调。
+        //    该单只在自己的套账可见,不先选好会被套账门挡住 / 按错套账取存。
+        if (!wsApplied) {
+            if (typeof window.satisfyWorkspaceGate !== 'function') {
+                if (tries++ < 40) setTimeout(open, 120);
+                return;
+            }
+            window.satisfyWorkspaceGate(Number(ws));
+            wsApplied = true;
+        }
         if (inbox) {
             if (typeof window.routeTo === 'function') window.routeTo('purchase-inbox');
             else if (tries++ < 40) setTimeout(open, 120);

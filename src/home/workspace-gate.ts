@@ -241,12 +241,10 @@ window.openSubjectCreate = function (opts?: { onCreated?: (id: number) => void }
 };
 
 // LIFF 深链直达某单(带套账)→ liffResume 会自动选该单套账并满足门,别弹手选门(防闪/防按错套账)。
+// 读 home.html preboot 设的持久 window 标志,而非 sessionStorage:liffResume 会先删 key,
+// 门判断若在删 key 后才跑就读不到 → 误渲染门(本窗口真踩过的时序竞态)。
 function liffWsPending(): boolean {
-    try {
-        return !!sessionStorage.getItem('pearnly_liff_ws');
-    } catch (_) {
-        return false;
-    }
+    return !!(window as unknown as { __LIFF_WS__?: string }).__LIFF_WS__;
 }
 
 // LIFF 深链:该单已定套账 → 直接设为当前 + 满足门(不弹手选)。门壳若已起则摘掉。

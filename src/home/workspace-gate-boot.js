@@ -13,11 +13,8 @@ import { ONB_CSS } from './onboarding-flow-html.js';
 
     function liffWsPending() {
         // LIFF 深链直达某单(带套账)→ liffResume 会自动选该单套账,别起手选门壳(防闪)。
-        try {
-            return !!sessionStorage.getItem('pearnly_liff_ws');
-        } catch (_) {
-            return false;
-        }
+        // 读 home.html preboot 设的持久标志(非 sessionStorage:liffResume 会先删 key,时序不可靠)。
+        return !!window.__LIFF_WS__;
     }
 
     function mountBootGate() {

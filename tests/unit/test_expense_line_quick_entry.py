@@ -151,5 +151,22 @@ class ModelTests(unittest.TestCase):
         self.assertFalse(ExpenseDraft(amount=Decimal("0")).has_amount())
 
 
+class ParseMultiTests(unittest.TestCase):
+    def test_splits_multiple(self):
+        r = lqe.parse_multi("电费50 买菜40 电费10 吃饭50")
+        self.assertEqual(
+            [(i["name"], str(i["amount"])) for i in r],
+            [("电费", "50"), ("买菜", "40"), ("电费", "10"), ("吃饭", "50")],
+        )
+
+    def test_strips_currency_unit(self):
+        r = lqe.parse_multi("ค่าน้ำ50บาท ค่าไฟ100บาท")
+        self.assertEqual([i["name"] for i in r], ["ค่าน้ำ", "ค่าไฟ"])
+
+    def test_single_returns_none(self):
+        self.assertIsNone(lqe.parse_multi("吃饭150"))
+        self.assertIsNone(lqe.parse_multi("咖啡60"))
+
+
 if __name__ == "__main__":
     unittest.main()

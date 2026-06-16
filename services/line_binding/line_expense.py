@@ -66,10 +66,21 @@ def handle_expense_text(
         ):
             return True
 
-        # 1. L1 快路:清晰记账(有金额 + 非问句 + 无其他 L1 意图)→ 直接记,零 LLM、零成本。
-        parsed = lqe.parse_expense(text)
         si = lqe.l1_intent(text)
         isq = lqe.is_question(text)
+
+        # 1a. 多项一句话(电费50 买菜40 电费10 吃饭50)→ 拆多笔·逐项智能归类·合计入账·卡显逐条
+        #     (对标 Paypers)。问句/有其它 L1 意图不走(防误记)。
+        multi = lqe.parse_multi(text)
+        if multi and not isq and si is None:
+            from services.line_binding import line_expense_multi
+
+            return line_expense_multi.do_record_multi(
+                bound_user, reply_token, text, str(tid), ws, multi, quote_token, lang
+            )
+
+        # 1. L1 快路:清晰记账(有金额 + 非问句 + 无其他 L1 意图)→ 直接记,零 LLM、零成本。
+        parsed = lqe.parse_expense(text)
         if parsed.has_amount() and not isq and si is None:
             from services.expense import conversation
 

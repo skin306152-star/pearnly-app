@@ -235,3 +235,26 @@ def parse_expense(text: str) -> ExpenseDraft:
         source="line_text",
         confidence=Decimal("0.90") if amount is not None else Decimal("0"),
     )
+
+
+# 多项一句话:「电费50 买菜40 电费10 吃饭50」→ 多笔(名+额)·每项独立归类/合计(对标 Paypers)。
+_MULTI_RE = re.compile(r"([^\d฿]+?)\s*([\d,]+(?:\.\d+)?)")
+_UNIT_TAIL = re.compile(r"(?i)\s*(元|块|บาท|泰铢|thb|baht|฿|kip)+\s*$")
+_NAME_LEAD = re.compile(r"(?i)^[\s、,，/和跟加与及还有然后＋+]+|^(元|块|บาท|thb|baht|฿)\s*")
+
+
+def parse_multi(text: str) -> Optional[list]:
+    """一句话拆多项 → [{name, amount(Decimal)}];<2 项返 None(走单笔老路)。
+
+    名去首尾货币词/连接词(和/跟/加…)。确定性正则(不靠 LLM 拆·避免误拆)。
+    """
+    items = []
+    for m in _MULTI_RE.finditer((text or "").strip()):
+        name = _UNIT_TAIL.sub("", _NAME_LEAD.sub("", m.group(1).strip())).strip(" -·:、,，/")
+        try:
+            amt = Decimal(m.group(2).replace(",", ""))
+        except (InvalidOperation, ValueError):
+            continue
+        if name and amt > 0:
+            items.append({"name": name, "amount": amt})
+    return items if len(items) >= 2 else None

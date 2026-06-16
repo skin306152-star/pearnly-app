@@ -84,6 +84,58 @@ _PROMPT = (
 )
 
 
+_BATCH_PROMPT = (
+    "Categorize EACH Thai SMB expense item into ONE category number from the numbered list.\n"
+    "Rules: coffee/drinks/snacks/meals/groceries/any food → food & entertainment (NEVER travel);\n"
+    "taxi/Grab/fuel/flight/hotel/toll → travel & transport;\n"
+    "water/electric/internet/phone bill → utilities;\n"
+    "stationery/IT/software/office supplies → office; raw materials/goods for resale → cost of goods.\n"
+    "Pick the single closest number for EACH item; never invent. "
+    'Output ONLY JSON {"choices": [n1, n2, ...]} — same length and order as the items.'
+)
+
+
+def categorize_items(items: list, categories: list, *, api_key: Optional[str], timeout: int = 15):
+    """批量归类多项(确定性规则先行 → 剩余项一次 LLM 调用)。返回与 items 等长的 [(cat_id, sub_id)]。
+
+    多项一句话(电费/买菜/吃饭…)逐项归类:省成本(规则免 LLM·剩余批量一次)、避免 N 次串行调用。
+    """
+    out = [rule_category(it.get("name", ""), "", categories) for it in items]
+    options = _options(categories)
+    todo = [i for i, (c, _s) in enumerate(out) if not c]
+    if not (todo and api_key and options):
+        return out
+    listing = "\n".join(f"{i + 1}. {label}" for i, (_, _, label) in enumerate(options))
+    names = "\n".join(f"{j + 1}) {items[i].get('name', '')}" for j, i in enumerate(todo))
+    payload = f"Items:\n{names}\n\nCategories:\n{listing}"
+    try:
+        from services.ocr import gemini_models
+        from services.ocr.layer2_gemini import _call_gemini_with_retry
+
+        data, _meta = _call_gemini_with_retry(
+            payload,
+            api_key=api_key,
+            model_name=gemini_models.flash(),
+            max_retries=1,
+            timeout=timeout,
+            system_prompt_override=_BATCH_PROMPT,
+        )
+        choices = (data or {}).get("choices") or []
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[category_ai] batch suggest failed: %s", str(e)[:160])
+        return out
+    for j, i in enumerate(todo):
+        if j >= len(choices):
+            break
+        try:
+            ch = int(choices[j])
+        except (ValueError, TypeError):
+            continue
+        if 1 <= ch <= len(options):
+            out[i] = (options[ch - 1][0], options[ch - 1][1])
+    return out
+
+
 def _options(categories: list) -> list:
     """科目树 → [(category_id, subcategory_id, '大类 > 子类')] 扁平选项(仅含真实子科目)。"""
     out = []

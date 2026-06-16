@@ -115,11 +115,33 @@ async def _handle_line_image_ocr(
                 logger.info(f"  🛡  [LINE Cache] 异常检测已入队 · hid={cached['id']}")
             except Exception as _e_lc:
                 logger.warning(f"[line_ocr] 缓存异常检测入队失败: {_e_lc}")
-            # 推 cached 结果给用户(模拟 OCR 完成)
-            reply_txt = line_client.format_ocr_result_for_line(
-                lang, cached.get("pages") or [], invoice_count=len(cached.get("pages") or [])
-            )
-            line_client.push_text(line_user_id, reply_txt)
+            # 缓存命中也走数据卡(不重 OCR/扣费):用缓存字段重建 ingest → 推卡片。重发的票 ingest
+            # 自带查重 → 出「可能重复」卡。不再发老式纯文字回复(与新卡片大脑回复冲突)。
+            _tid_c = str(user_fresh["tenant_id"]) if user_fresh.get("tenant_id") else None
+            try:
+                from services.expense import line_l2
+                from services.purchase.intake import line_expense_gate_open
+                from services.purchase.line_ingest import ingest_line_image
+
+                _ci = None
+                if _cf and _ws_client_id and _tid_c:
+                    with db.get_cursor_rls(_tid_c, commit=True) as cur:
+                        if line_expense_gate_open(cur, tenant_id=_tid_c):
+                            _ci = ingest_line_image(
+                                cur,
+                                tenant_id=_tid_c,
+                                workspace_client_id=_ws_client_id,
+                                fields=_cf,
+                                confidence=cached.get("confidence"),
+                                field_confidence=(_primary or {}).get("field_confidence"),
+                                image_ref=None,
+                                created_by=str(user_fresh["id"]),
+                                api_key=line_l2.resolve_api_key(user_fresh),
+                            )
+                if _ci:
+                    _push_result_card(line_user_id, lang, _ci, quote_token, _ws_client_id)
+            except Exception as _ce_card:
+                logger.warning(f"[line_ocr] 缓存卡片重建失败: {_ce_card}")
             return
 
         quote = _ocr_billing_quote(user_fresh, file_bytes, filename, max_pages=50)

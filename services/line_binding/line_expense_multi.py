@@ -30,10 +30,8 @@ def do_record_multi(bound_user, reply_token, text, tid, ws, items, quote_token, 
     """每项独立行 + 智能归类(批量一次 LLM)·合计入账·卡显逐条明细。返回 True。"""
     from services.expense import category_ai, confidence, line_l2
     from services.expense.line_quick_entry import split_qty_price
-    from services.line_binding import line_action_nonce as nonce
-    from services.line_binding import line_card
+    from services.line_binding import line_booker, line_card
     from services.purchase import categories as cat_svc
-    from services.purchase import confidence_post
     from services.purchase import intake as intake_svc
     from services.purchase import settings as settings_svc
 
@@ -101,7 +99,7 @@ def do_record_multi(bound_user, reply_token, text, tid, ws, items, quote_token, 
             is_duplicate=False,
             require_category=False,
         )
-        doc_id, state = confidence_post.book_by_confidence(
+        doc_id, state, token = line_booker.book_and_mint(
             cur,
             tenant_id=tid,
             workspace_client_id=ws,
@@ -109,9 +107,6 @@ def do_record_multi(bound_user, reply_token, text, tid, ws, items, quote_token, 
             settings=cfg,
             verdict=verdict,
             created_by=created_by,
-        )
-        token = nonce.mint(
-            cur, tenant_id=tid, workspace_client_id=ws, action_ref=doc_id, user_id=created_by
         )
     names = [it["name"] for it in items]
     card_fields = {
@@ -124,8 +119,10 @@ def do_record_multi(bound_user, reply_token, text, tid, ws, items, quote_token, 
         "items": [{"name": _item_label(it), "amount": f"{it['amount']:,.2f}"} for it in items],
         "detail": " · ".join(names[:3]) + (f" 等{len(names)}项" if len(names) > 3 else ""),
     }
-    _ack_key = {"posted": "exp_ack_posted", "dup": "exp_ack_dup"}.get(state, "exp_ack_confirm")
-    ack = {"type": "text", "text": line_client.t_line(lang, _ack_key, amount=str(total))}
+    ack = {
+        "type": "text",
+        "text": line_client.t_line(lang, line_booker.ack_key(state), amount=str(total)),
+    }
     if quote_token:
         ack["quoteToken"] = quote_token
     card = line_card.result_card(

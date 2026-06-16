@@ -105,8 +105,7 @@ def ingest_line_image(
     返回 {state, doc_id, amount, card_fields, field_confidence},调用方据此发数据卡。
     """
     from services.expense import confidence as conf
-    from services.line_binding import line_action_nonce as nonce
-    from services.purchase import confidence_post
+    from services.line_binding import line_booker
     from services.purchase import settings as settings_svc
 
     settings = settings_svc.get_settings(
@@ -191,8 +190,8 @@ def ingest_line_image(
         is_duplicate=bool(res.get("dedupe_hit")),
         require_category=False,
     )
-    # 文/图共用置信入账编排(PO-11):auto_book 开(默认)则高置信齐全直接过账,关则确认优先。
-    doc_id, state = confidence_post.book_by_confidence(
+    # 文/图/多项共用入账编排(#10 line_booker):建草稿→按置信过账→铸 nonce token。
+    doc_id, state, token = line_booker.book_and_mint(
         cur,
         tenant_id=tenant_id,
         workspace_client_id=workspace_client_id,
@@ -210,11 +209,5 @@ def ingest_line_image(
         "field_confidence": fc,
         "workspace_name": ws_name,
         "warn_total": warn_total,
-        "token": nonce.mint(
-            cur,
-            tenant_id=tenant_id,
-            workspace_client_id=workspace_client_id,
-            action_ref=doc_id,
-            user_id=created_by,
-        ),
+        "token": token,
     }

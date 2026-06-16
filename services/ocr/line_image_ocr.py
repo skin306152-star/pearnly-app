@@ -445,16 +445,14 @@ def _push_result_card(
 ) -> None:
     """识别结果数据卡 push:【引用照片的一行回执】+【Flex 数据卡】。失败回落纯文字(不静默)。"""
     state = ingest.get("state", "confirm")
-    ack_key = {
-        "posted": "exp_ack_posted",
-        "dup": "exp_ack_dup",
-    }.get(state, "exp_ack_confirm")
     try:
-        from services.line_binding import line_card
+        from services.line_binding import line_booker, line_card
 
         ack = {
             "type": "text",
-            "text": line_client.t_line(lang, ack_key, amount=ingest.get("amount") or "—"),
+            "text": line_client.t_line(
+                lang, line_booker.ack_key(state), amount=ingest.get("amount") or "—"
+            ),
         }
         if quote_token:
             ack["quoteToken"] = quote_token

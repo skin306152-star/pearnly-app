@@ -200,9 +200,8 @@ def _dispatch_agent(
 def _do_record(bound_user, reply_token, text, tid, ws, draft, used_l2, quote_token, lang) -> bool:
     """置信驱动入账(图/文同口径):建草稿 → 高置信 post_doc;回数据卡。计费由调用方管。"""
     from services.expense import confidence
-    from services.line_binding import line_action_nonce as nonce
+    from services.line_binding import line_booker
     from services.purchase import categories as cat_svc
-    from services.purchase import confidence_post
     from services.purchase import intake as intake_svc
     from services.purchase import settings as settings_svc
 
@@ -227,8 +226,8 @@ def _do_record(bound_user, reply_token, text, tid, ws, draft, used_l2, quote_tok
             is_duplicate=is_dup,
             require_category=False,
         )
-        # 文/图共用置信入账编排(PO-11):auto_book 开则高置信直接过账,关则确认优先。
-        doc_id, state = confidence_post.book_by_confidence(
+        # 文/图/多项共用入账编排(#10 line_booker):建草稿→按置信过账→铸 nonce。
+        doc_id, state, token = line_booker.book_and_mint(
             cur,
             tenant_id=tid,
             workspace_client_id=ws,
@@ -236,13 +235,6 @@ def _do_record(bound_user, reply_token, text, tid, ws, draft, used_l2, quote_tok
             settings=cfg,
             verdict=verdict,
             created_by=created_by,
-        )
-        token = nonce.mint(
-            cur,
-            tenant_id=tid,
-            workspace_client_id=ws,
-            action_ref=doc_id,
-            user_id=created_by,
         )
     _reply_card(reply_token, state, draft, doc_id, lang, quote_token, ws_name, token, str(ws or ""))
     return True
@@ -267,10 +259,12 @@ def _reply_card(
     reply_token, state, draft, doc_id, lang, quote_token, workspace_name="", token="", ws=""
 ) -> None:
     """回执 = 【引用原句的一行回执】+【Flex 数据卡】(Flex 不能被引用,故拆两条)。"""
-    from services.line_binding import line_card
+    from services.line_binding import line_booker, line_card
 
-    ack_key = {"posted": "exp_ack_posted", "dup": "exp_ack_dup"}.get(state, "exp_ack_confirm")
-    ack = {"type": "text", "text": line_client.t_line(lang, ack_key, amount=draft.amount)}
+    ack = {
+        "type": "text",
+        "text": line_client.t_line(lang, line_booker.ack_key(state), amount=draft.amount),
+    }
     if quote_token:
         ack["quoteToken"] = quote_token
     card = line_card.result_card(

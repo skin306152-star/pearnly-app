@@ -2,7 +2,7 @@
 // 查看器:拖拽平移 + 滚轮缩放 + 旋转/复位 + 实时百分比(原生 transform,不自造图片编辑器)。
 // 多文件 1/N:billUrls 相册(翻页 + 缩略图 + 加附件);鉴权 serving url 取 blob 显示,本地 blob 直接用。
 /* global t, escapeHtml */
-import { fetchAuthedBlobUrl } from './purchase-common.js';
+import { resolveBillSrc } from './purchase-common.js';
 import type { FormState } from './purchase-form-types.js';
 
 const ICON_DOC =
@@ -31,7 +31,7 @@ export function leftColHtml(st: FormState): string {
     const thumbs = st.billUrls
         .map(
             (_, i) =>
-                `<div class="t ${i === st.billIdx ? 'on' : ''}" data-thumb="${i}"><img class="timg" data-tidx="${i}" alt=""></div>`
+                `<div class="t ${i === st.billIdx ? 'on' : ''}" data-thumb="${i}"><img alt=""></div>`
         )
         .join('');
     return `<aside class="preview-pane" id="pane-doc">
@@ -80,37 +80,22 @@ export async function mountViewer(st: FormState, refresh: () => void): Promise<v
     loadThumbs(st);
 }
 
-// 鉴权 serving url → blob object URL · 按 url 缓存(查看器与缩略图共用同一张图 · 去重取图 · 切页不重拉)。
-const blobCache = new Map<string, string>();
-async function resolveSrc(url: string): Promise<string | null> {
-    if (url.startsWith('blob:') || url.startsWith('data:')) return url;
-    const cached = blobCache.get(url);
-    if (cached) return cached;
-    try {
-        const src = await fetchAuthedBlobUrl(url);
-        blobCache.set(url, src);
-        return src;
-    } catch (_) {
-        return null;
-    }
-}
-
 async function loadCurrent(st: FormState): Promise<void> {
     const img = document.getElementById('pur-vimg') as HTMLImageElement | null;
     const url = st.billUrls[st.billIdx];
     if (!img || !url) return;
-    const src = await resolveSrc(url);
+    const src = await resolveBillSrc(url);
     if (src) img.src = src;
 }
 
-// 缩略图条逐张换真图小样(占位 <img> 取回鉴权 blob · 失败留 .t 底色)。
+// 缩略图条逐张换真图小样(.t 按 billUrls 顺序生成 → DOM 序即索引);失败留 .t 底色。
 async function loadThumbs(st: FormState): Promise<void> {
-    const imgs = document.querySelectorAll<HTMLImageElement>('#pane-doc .thumbs .t img[data-tidx]');
+    const imgs = document.querySelectorAll<HTMLImageElement>('#pane-doc .thumbs .t img');
     await Promise.all(
-        Array.from(imgs).map(async (img) => {
-            const url = st.billUrls[Number(img.dataset.tidx)];
+        Array.from(imgs).map(async (img, i) => {
+            const url = st.billUrls[i];
             if (!url) return;
-            const src = await resolveSrc(url);
+            const src = await resolveBillSrc(url);
             if (src) img.src = src;
         })
     );

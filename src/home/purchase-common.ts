@@ -219,6 +219,22 @@ export async function fetchAuthedBlobUrl(path: string): Promise<string> {
     return URL.createObjectURL(await r.blob());
 }
 
+// 票图 url → 可直接喂 <img src> 的源:本地 blob:/data: 原样返回,鉴权 serving url 取 blob 并按 url
+// 缓存(详情票图 + 复核查看器/缩略图共用 · 同图去重取图 · 切页/重渲不重拉)。取图失败 → null(留占位)。
+const billBlobCache = new Map<string, string>();
+export async function resolveBillSrc(url: string): Promise<string | null> {
+    if (url.startsWith('blob:') || url.startsWith('data:')) return url;
+    const cached = billBlobCache.get(url);
+    if (cached) return cached;
+    try {
+        const src = await fetchAuthedBlobUrl(url);
+        billBlobCache.set(url, src);
+        return src;
+    } catch (_) {
+        return null;
+    }
+}
+
 // 当前账套(进项按 workspace_client_id 隔离)· 个人模式/未选 → null(调用方提示选账套)。
 export function activeWsId(): number | null {
     try {
@@ -460,6 +476,7 @@ const PUR_BASE_CSS = `
 .pur .btn.primary:hover{background:var(--accent-deep);}
 .pur .btn.danger{color:var(--red);}
 .pur .btn:disabled{opacity:.55;cursor:not-allowed;}
+/* .pur .card 只给视觉(无 padding/margin)· 面板内嵌的无边框卡(.preview-pane/.section/.sheet 下)须自行 reset padding:0;margin:0,否则叠加各自 hd/bd 内边距=双重留白 */
 .pur .card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh);}
 /* 收拢版面板(钉死令牌:圆角16 + 卡阴影 --sh)· 单一来源 · 进项4屏(list/suppliers/settings/inbox)共用 */
 .pur .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh);overflow:hidden;}

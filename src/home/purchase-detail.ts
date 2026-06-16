@@ -12,7 +12,7 @@ import {
     srcLabelKey,
     kindLabelKey,
     normDetail,
-    fetchAuthedBlobUrl,
+    resolveBillSrc,
     injectPurBase,
     injectStyle,
     type DocDetail,
@@ -244,13 +244,11 @@ async function loadBillImage(): Promise<void> {
     const url = cur && cur.bill_image_url;
     const box = document.getElementById('pur-bill-img');
     if (!url || !box) return;
-    try {
-        billBlobUrl = await fetchAuthedBlobUrl(url);
-        box.innerHTML = `<img src="${billBlobUrl}" alt="">`;
-        box.classList.add('has-img');
-    } catch (_) {
-        /* 取图失败 → 保留占位 svg · 放大按钮已 disabled */
-    }
+    const src = await resolveBillSrc(url);
+    if (!src) return; // 取图失败 → 保留占位 svg · 放大按钮已 disabled
+    billBlobUrl = src;
+    box.innerHTML = `<img src="${billBlobUrl}" alt="">`;
+    box.classList.add('has-img');
 }
 
 function openLightbox(): void {

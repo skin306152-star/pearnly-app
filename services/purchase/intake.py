@@ -73,6 +73,18 @@ def default_payment_status(doc_type: str, doc_kind: str) -> str:
     return "paid" if doc_kind == "expense" else "unpaid"
 
 
+def _single_line(fields: dict, base: Decimal, vat_rate: int) -> dict:
+    """兜底/收敛单行:行额 = 票面税前小计或总额(卖家名作品名)。"""
+    return {
+        "item_type": "goods",
+        "description": (fields.get("seller_name") or "").strip() or "—",
+        "qty": "1",
+        "unit_price": str(base),
+        "vat_rate": vat_rate,
+        "wht_rate": 0,
+    }
+
+
 def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
     """OCR 抽取 → 进项录入草稿(屏10 预填)。行取自 items,无 items 则按总额单行兜底。"""
     has_vat = _to_decimal(fields.get("vat")) > 0
@@ -82,10 +94,10 @@ def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
         qty = _to_decimal(it.get("qty")) or Decimal("1")
         price = _to_decimal(it.get("price"))
         sub = _to_decimal(it.get("subtotal"))
-        # OCR 行小计可信(常对齐总额);qty/price 在加油/积分票常被误读(22 积分 × 39.85 = 876.70 ≠
-        # 真实 1780)。subtotal 与 qty×price 矛盾时信 subtotal(行额 = subtotal,qty=1),
-        # 别让瞎凑的乘积覆盖正确总额。一致或无 subtotal 则保留 qty/price 明细。
-        if sub > 0 and abs(qty * price - sub) > Decimal("0.5"):
+        # OCR 行小计(印刷值)可信;qty/price 在加油/积分票常被误读(22 积分 × 39.85 = 876.70 ≠
+        # 印刷小计 1780)。与印刷 subtotal 不符就信 subtotal(行额 = subtotal,qty=1),别让派生的
+        # qty×price 盖过印刷值。一致(差 < 0.05)或无 subtotal 才保留 qty/price 明细。
+        if sub > 0 and abs(qty * price - sub) > Decimal("0.05"):
             qty, price = Decimal("1"), sub
         lines.append(
             {
@@ -97,19 +109,16 @@ def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
                 "wht_rate": 0,
             }
         )
+    base = _to_decimal(fields.get("subtotal")) or _to_decimal(fields.get("total_amount"))
     if not lines:
         # 无明细:用税前小计或总额倒推单行,让用户在屏10 补全。
-        base = _to_decimal(fields.get("subtotal")) or _to_decimal(fields.get("total_amount"))
-        lines = [
-            {
-                "item_type": "goods",
-                "description": (fields.get("seller_name") or "").strip() or "—",
-                "qty": "1",
-                "unit_price": str(base),
-                "vat_rate": vat_rate,
-                "wht_rate": 0,
-            }
-        ]
+        lines = [_single_line(fields, base, vat_rate)]
+    elif base > 0:
+        # 行明细(税前)之和与票面小计/总额矛盾 → OCR 明细读错(多品项乱读/qty 误读·如 7-11 读成
+        # 845 ≠ 票面 110)→ 收敛成单行兜底(=票面值),别让错明细之和冒充总额。
+        line_sum = sum(_to_decimal(ln["qty"]) * _to_decimal(ln["unit_price"]) for ln in lines)
+        if abs(line_sum - base) > Decimal("1"):
+            lines = [_single_line(fields, base, vat_rate)]
     return {
         "doc_kind": kind,
         "supplier": {

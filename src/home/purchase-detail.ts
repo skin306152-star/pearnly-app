@@ -1,8 +1,6 @@
-// 商户采购 · 屏6 单据详情 · 布局照搬原型 pearnly_invoice_detail_preview
-// (顶栏面包屑 + 摘要条 + 左主右栏 360 + 逐行税率税额 + 诚实时间线)。
-// 右上动作:保留现有 作废/记付款(草稿=编辑)+ 新增 打印;不加复制/导出。
-// 处理记录按真实 status/payment_status 诚实推导(无审计轨迹 · 不编造人名/时间)。
-// 费用单(无 VAT)隐藏品项/进项税段;已作废 = 灰态 + 回冲提示。四态。
+// 商户采购 · 屏6 单据详情(顶栏面包屑 + 摘要条 + 左主右栏 + 逐行税率税额 + 诚实时间线)。
+// 处理记录按真实 status/payment_status 诚实推导(无审计轨迹 · 不编造人名/时间)。四态。
+// 费用单(无 VAT)隐藏品项/进项税段;已作废 = 灰态 + 回冲提示。
 /* global t, escapeHtml, showToast */
 import {
     papi,
@@ -155,7 +153,6 @@ function billCard(d: DocDetail): string {
         </div></article>`;
 }
 
-// 处理记录:无审计轨迹 → 按真实 status/payment_status 诚实推导(不编人名/时间戳)。
 function timelineCard(d: DocDetail): string {
     type Step = { title: string; dot: string };
     const steps: Step[] = [{ title: t('pur-step-created'), dot: 'ok' }];
@@ -265,22 +262,25 @@ function openLightbox(): void {
 }
 
 function bind(): void {
-    document.getElementById('pur-back')!.onclick = () => window.routeTo?.('purchase');
-    const zoom = document.getElementById('pur-zoom');
+    // 复核屏(DOM 在前)也有 #pur-back · 全局查询会命中那个隐藏的 → 必须在本 section 内取(否则返回键按不动)。
+    const root = document.getElementById('page-purchase-detail');
+    if (!root) return;
+    root.querySelector<HTMLElement>('#pur-back')!.onclick = () => window.routeTo?.('purchase');
+    const zoom = root.querySelector<HTMLElement>('#pur-zoom');
     if (zoom) zoom.onclick = openLightbox;
-    const edit = document.getElementById('pur-edit-btn');
+    const edit = root.querySelector<HTMLElement>('#pur-edit-btn');
     if (edit) edit.onclick = () => window.openPurchaseForm?.(cur!.id);
-    const pay2 = document.getElementById('pur-pay-btn2');
+    const pay2 = root.querySelector<HTMLElement>('#pur-pay-btn2');
     if (pay2) pay2.onclick = () => window.openPurchasePay?.(cur, () => load(cur!.id));
-    const voidBtn = document.getElementById('pur-void-btn');
+    const voidBtn = root.querySelector<HTMLElement>('#pur-void-btn');
     if (voidBtn) voidBtn.onclick = doVoid;
-    document.querySelectorAll<HTMLElement>('[data-match]').forEach((el) => {
+    root.querySelectorAll<HTMLElement>('[data-match]').forEach((el) => {
         el.onclick = () => window.openPurchaseMatch?.({}, () => load(cur!.id));
     });
-    document.querySelectorAll<HTMLElement>('[data-gen]').forEach((el) => {
+    root.querySelectorAll<HTMLElement>('[data-gen]').forEach((el) => {
         el.onclick = () => genCredential(el.dataset.gen as string);
     });
-    document.querySelectorAll<HTMLElement>('[data-dl]').forEach((el) => {
+    root.querySelectorAll<HTMLElement>('[data-dl]').forEach((el) => {
         el.onclick = () => downloadDoc(el.dataset.dl as string);
     });
 }

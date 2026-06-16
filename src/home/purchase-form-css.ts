@@ -19,8 +19,8 @@ export const PURCHASE_FORM_CSS = `
 .pur.f .sheet{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh);overflow:visible;display:grid;grid-template-columns:330px minmax(0,1fr);align-items:start;}
 .pur.f .preview-pane{position:sticky;top:calc(var(--topbar-h) + 14px);min-width:0;max-height:calc(100vh - var(--topbar-h) - 28px);overflow-y:auto;border-right:1px solid var(--line);background:var(--card);border-radius:16px 0 0 16px;display:flex;flex-direction:column;}
 .pur.f .preview-pane .card{border:0;border-radius:0;box-shadow:none;background:transparent;}
-.pur.f .preview-pane .card>.hd{padding:14px 18px;border-bottom:1px solid var(--line);font-weight:700;font-size:13.5px;}
-.pur.f .preview-pane .card>.bd{padding:16px 18px;} .pur.f .preview-pane .card + .card{border-top:1px solid var(--line);}
+.pur.f .preview-pane .card>.hd{padding:13px 18px;border-bottom:1px solid var(--line);font-weight:700;font-size:13.5px;}
+.pur.f .preview-pane .card>.bd{padding:12px 18px;} .pur.f .preview-pane .card + .card{border-top:1px solid var(--line);} .pur.f .preview-pane .viewer{height:288px;} .pur.f .preview-pane .viewer .vimg{max-width:92%;max-height:94%;}
 .pur.f .form-pane{min-width:0;display:flex;flex-direction:column;}
 .pur.f .etabs{position:sticky;top:var(--topbar-h);z-index:8;display:grid;grid-template-columns:1fr 1fr;height:60px;border-bottom:1px solid var(--line);background:var(--card);border-radius:0 16px 0 0;}
 .pur.f .etabs button{position:relative;border:0;background:transparent;color:var(--ink2);font-weight:700;font-size:14px;cursor:pointer;} .pur.f .etabs button.on{color:var(--accent-deep);}

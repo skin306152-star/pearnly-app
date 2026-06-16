@@ -39,6 +39,23 @@ def _total_mismatch(fields: dict) -> bool:
     return abs(recon - total) > tol
 
 
+def _card_items(fields: dict) -> list:
+    """OCR items → 卡片逐条明细 [{name, amount}](按票据全部显示·带价)。
+
+    amount 取行 subtotal,缺则 qty×price。无名称的行跳过。供数据卡 Paypers 式编号带价列表。
+    """
+    out = []
+    for it in fields.get("items") or []:
+        name = str(it.get("name") or "").strip()
+        if not name:
+            continue
+        amt = _dec(it.get("subtotal"))
+        if amt <= 0:
+            amt = _dec(it.get("qty") or 1) * _dec(it.get("price"))
+        out.append({"name": name, "amount": (f"{amt:,.2f}" if amt > 0 else "")})
+    return out
+
+
 def _smart_category(cur, *, tenant_id, workspace_client_id, vendor, descs, api_key):
     """智能归类(图片路 · LLM 优先 → 关键词兜底)。返回 (cat_id, sub_id, cat_name, sub_name)。
 
@@ -124,6 +141,7 @@ def ingest_line_image(
         "vat": fields.get("vat") or "",
         "wht": fields.get("wht_amount") or "",
         "invoice_number": fields.get("invoice_number") or "",
+        "items": _card_items(fields),
         "detail": (
             " · ".join(_item_names[:3])
             + (f" 等{len(_item_names)}项" if len(_item_names) > 3 else "")

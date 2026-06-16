@@ -30,7 +30,6 @@ _VALUE = "#344054"
 _LOW = "#B45309"
 _META_STRONG = "#475467"
 _SEP = "#EEF0F3"
-_WS_BG = "#F8FAFC"
 _LINK = "#4D607C"
 _LINK_DANGER = "#8F4A4A"
 
@@ -87,6 +86,72 @@ def _seller_rows(fields: dict, t: dict) -> list:
     if addr:
         rows.append(_field_row(t["address"], addr, t, low=False, strong=False))
     return rows
+
+
+def _seclabel(text: str) -> dict:
+    """分区小标题(灰·小号)。"""
+    return _txt(text, size="xxs", color=_LABEL, weight="bold")
+
+
+def _strip(text: str, bg: str, color: str) -> dict:
+    """贴顶满宽细色条(融入卡·非浮动圆角块):总额不符 / 可能重复。"""
+    return {
+        "type": "box",
+        "layout": "vertical",
+        "paddingTop": "10px",
+        "paddingBottom": "10px",
+        "paddingStart": "18px",
+        "paddingEnd": "18px",
+        "backgroundColor": bg,
+        "contents": [_txt(text, size="xxs", color=color, wrap=True)],
+    }
+
+
+def _items_rows(items: list, t: dict) -> list:
+    """逐条明细(编号 + 名称 + 右对齐价 · 全部按票据显示 · 对标 Paypers รายการค่าใช้จ่าย)。"""
+    rows = []
+    for i, it in enumerate(items or [], 1):
+        name = (str(it.get("name") or "").strip()) or t["na"]
+        amt = str(it.get("amount") or "").strip()
+        rows.append(
+            {
+                "type": "box",
+                "layout": "horizontal",
+                "contents": [
+                    _txt(f"{i}. {name}", size="xxs", color=_VALUE, flex=5, wrap=True),
+                    _txt(
+                        f"฿{amt}" if amt else "",
+                        size="xxs",
+                        color="#202939",
+                        weight="bold",
+                        flex=2,
+                        align="end",
+                        wrap=True,
+                    ),
+                ],
+            }
+        )
+    return rows
+
+
+def _sheet(sections: list) -> list:
+    """把各非空分区拼成一张连续白卡:区与区之间一条细横线(融入·按类分隔)。"""
+    out = []
+    for contents in sections:
+        if not contents:
+            continue
+        if out:
+            out.append({"type": "separator", "color": _SEP})
+        out.append(
+            {
+                "type": "box",
+                "layout": "vertical",
+                "paddingAll": "16px",
+                "spacing": "sm",
+                "contents": contents,
+            }
+        )
+    return out
 
 
 def _btn(label: str, *, primary: bool, postback: str = None, uri: str = None, danger=False) -> dict:
@@ -227,11 +292,22 @@ def result_card(
         "contents": [_txt(f"{st['icon']} {t[state]}", size="sm", color=st["color"], weight="bold")],
     }
 
-    body = [
-        {  # 金额 + 右侧来源 meta
+    # 顶部融入式提示细条(非浮动圆角块):总额不符(琥珀)/ 可能重复(红)。
+    strips = []
+    if warn_total:
+        strips.append(_strip(t["warn_total"], "#FEF7EC", "#B45309"))
+    if state == "dup" and dup_info:
+        dl = (
+            f"{t['dup_seen']} · ฿{dup_info.get('amount', '')} · "
+            f"{dup_info.get('vendor', '')} · {dup_info.get('date', '')}"
+        )
+        strips.append(_strip(dl, "#FDECEC", "#9F2830"))
+
+    # 金额区
+    amount_sec = [
+        {
             "type": "box",
             "layout": "horizontal",
-            "margin": "lg",
             "alignItems": "flex-end",
             "contents": [
                 _txt(
@@ -254,82 +330,64 @@ def result_card(
             ],
         },
         *_breakdown_rows(fields, t),
-        {"type": "separator", "margin": "lg", "color": _SEP},
-        {  # 字段表
-            "type": "box",
-            "layout": "vertical",
-            "margin": "md",
-            "spacing": "sm",
-            "contents": [
-                _field_row(
-                    t["doc_type"],
-                    doc_type_label(fields.get("document_type"), lang),
-                    t,
-                    low=low("document_type"),
-                    strong=True,
-                ),
-                _field_row(t["exp_type"], et_text, t, low=False, strong=False),
-                _field_row(t["date"], fields.get("date"), t, low=low("date"), strong=False),
-                _field_row(
-                    t["category"], fields.get("category"), t, low=low("category"), strong=True
-                ),
-                _field_row(t["subcategory"], fields.get("subcategory"), t, low=False, strong=False),
-                _field_row(t["vendor"], fields.get("vendor"), t, low=low("vendor"), strong=False),
-                *_seller_rows(fields, t),
+    ]
+
+    # 基本信息区
+    core_sec = [
+        _field_row(
+            t["doc_type"],
+            doc_type_label(fields.get("document_type"), lang),
+            t,
+            low=low("document_type"),
+            strong=True,
+        ),
+        _field_row(t["exp_type"], et_text, t, low=False, strong=False),
+        _field_row(t["date"], fields.get("date"), t, low=low("date"), strong=False),
+        _field_row(t["category"], fields.get("category"), t, low=low("category"), strong=True),
+        _field_row(t["subcategory"], fields.get("subcategory"), t, low=False, strong=False),
+    ]
+
+    # 卖家区(有值才显·各行自带标签·靠分隔线与基本信息分开,不另加冗余小标题)
+    seller_sec = []
+    if (str(fields.get("vendor") or "").strip()) or _seller_rows(fields, t):
+        seller_sec.append(
+            _field_row(t["vendor"], fields.get("vendor"), t, low=low("vendor"), strong=False)
+        )
+        seller_sec += _seller_rows(fields, t)
+        if str(fields.get("invoice_number") or "").strip():
+            seller_sec.append(
                 _field_row(
                     t["inv_no"],
                     fields.get("invoice_number"),
                     t,
                     low=low("invoice_number"),
                     strong=False,
-                ),
-                _field_row(t["detail"], fields.get("detail"), t, low=False, strong=False),
-            ],
-        },
-    ]
-    if warn_total:  # 明细加总与单据总额对不上 → 醒目橙条提示(置于卡顶·对标 Paypers)
-        body.insert(
-            0,
-            {
-                "type": "box",
-                "layout": "vertical",
-                "margin": "md",
-                "paddingAll": "10px",
-                "backgroundColor": "#FEF3E2",
-                "cornerRadius": "md",
-                "contents": [_txt(t["warn_total"], size="xxs", color="#B45309", wrap=True)],
-            },
-        )
-    if state == "dup" and dup_info:
-        body.append(
-            {
-                "type": "box",
-                "layout": "vertical",
-                "margin": "md",
-                "paddingAll": "8px",
-                "backgroundColor": "#FFF7F7",
-                "cornerRadius": "md",
-                "contents": [
-                    _txt(t["dup_seen"], size="xxs", color="#9F2830", weight="bold"),
-                    _txt(
-                        f"฿{dup_info.get('amount', '')} · {dup_info.get('vendor', '')} · {dup_info.get('date', '')}",
-                        size="xxs",
-                        color="#9F2830",
-                        wrap=True,
-                        margin="xs",
-                    ),
-                ],
-            }
-        )
+                )
+            )
+
+    # 明细区:逐条带价全部显示(无 items 退回 detail 单行)
+    items = fields.get("items") or []
+    items_sec = []
+    if items:
+        items_sec = [_seclabel(t["detail"]), *_items_rows(items, t)]
+    elif str(fields.get("detail") or "").strip():
+        items_sec = [
+            _seclabel(t["detail"]),
+            _txt(fields["detail"], size="xxs", color=_VALUE, wrap=True),
+        ]
+
+    body = strips + _sheet([amount_sec, core_sec, seller_sec, items_sec])
+    # 套账:满宽填色条(贴边·非浮动胶囊),置于字段区与动作区之间。
     if workspace_name:
         body.append(
             {
                 "type": "box",
                 "layout": "horizontal",
-                "margin": "md",
-                "paddingAll": "8px",
-                "backgroundColor": _WS_BG,
-                "cornerRadius": "md",
+                "paddingTop": "12px",
+                "paddingBottom": "12px",
+                "paddingStart": "18px",
+                "paddingEnd": "18px",
+                "backgroundColor": "#F4F6F9",
                 "contents": [
                     _txt(t["workspace"], size="xxs", color="#667085", flex=2),
                     _txt(
@@ -346,7 +404,7 @@ def result_card(
             "type": "bubble",
             "size": "mega",
             "header": status_header,
-            "body": {"type": "box", "layout": "vertical", "paddingAll": "16px", "contents": body},
+            "body": {"type": "box", "layout": "vertical", "paddingAll": "0px", "contents": body},
             "footer": {
                 "type": "box",
                 "layout": "vertical",

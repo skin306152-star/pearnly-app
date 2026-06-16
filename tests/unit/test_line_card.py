@@ -100,8 +100,29 @@ class CardTests(unittest.TestCase):
         return out
 
     def _fields_box(self, card):
-        # 状态条移到 bubble.header 后,body.contents: [金额meta, separator, 字段表, ...]
-        return card["contents"]["body"]["contents"][2]["contents"]
+        # 新版分区白卡:字段行散在各分区,递归收集所有「label+value 两列文本行」。
+        out = []
+
+        def walk(n):
+            if isinstance(n, dict):
+                c = n.get("contents")
+                if (
+                    n.get("type") == "box"
+                    and n.get("layout") == "horizontal"
+                    and isinstance(c, list)
+                    and len(c) == 2
+                    and all(isinstance(x, dict) and x.get("type") == "text" for x in c)
+                ):
+                    out.append(n)
+                if isinstance(c, list):
+                    for x in c:
+                        walk(x)
+            elif isinstance(n, list):
+                for x in n:
+                    walk(x)
+
+        walk(card["contents"]["body"])
+        return out
 
     def test_flex_shape(self):
         c = self._card("posted")
@@ -132,6 +153,40 @@ class CardTests(unittest.TestCase):
                 if node["type"] == "box":
                     self.fail(f"{state} 动作区不应再有 box(横排挤压)")
             self.assertTrue(any(n["type"] == "button" for n in foot))
+
+    def test_items_listed_all_with_prices(self):
+        # 明细按票据全部显示:逐条编号 + 名称 + 价(对标 Paypers)。
+        import json
+
+        c = line_card.result_card(
+            state="confirm",
+            amount="544",
+            fields={
+                "document_type": "receipt",
+                "items": [
+                    {"name": "Buffet Premium", "amount": "397.00"},
+                    {"name": "Drinks", "amount": "147.00"},
+                ],
+            },
+            doc_id="D",
+            lang="zh",
+        )
+        s = json.dumps(c, ensure_ascii=False)
+        self.assertIn("1. Buffet Premium", s)
+        self.assertIn("฿397.00", s)
+        self.assertIn("2. Drinks", s)
+        self.assertIn("฿147.00", s)
+
+    def test_ledger_is_full_bleed_bar(self):
+        # 套账 = 满宽填色条(带 backgroundColor),不再浮动胶囊。
+        c = self._card("posted", workspace_name="Bangkok Retail")
+        bars = [
+            n
+            for n in c["contents"]["body"]["contents"]
+            if isinstance(n, dict) and n.get("backgroundColor") and "Bangkok Retail" in str(n)
+        ]
+        self.assertTrue(bars, "套账应是带底色的满宽条")
+        self.assertNotIn("cornerRadius", str(bars[0]))
 
     def test_warn_total_shows_amber_hint(self):
         import json

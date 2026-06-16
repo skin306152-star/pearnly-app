@@ -66,11 +66,14 @@ def _smart_category(cur, *, tenant_id, workspace_client_id, vendor, descs, api_k
 
     cats = cat_svc.get_tree(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
     joined = " / ".join(d for d in descs[:5] if d)
-    cat_id = sub_id = None
-    if api_key:
-        from services.expense import category_ai
+    from services.expense import category_ai
 
+    # 1) 无歧义高频商户硬规则(瞬时·永远一致):加油站→燃油 / Grab→交通 / 水电→水电 / 电信→通讯。
+    cat_id, sub_id = category_ai.rule_category(vendor, joined, cats)
+    # 2) 没命中规则 → LLM(2.5-flash·temp=0·看品名+业态判,治便利店/餐厅这类有歧义的)。
+    if not cat_id and api_key:
         cat_id, sub_id = category_ai.suggest_category(vendor, joined, cats, api_key=api_key)
+    # 3) 还没有 → 关键词兜底。
     if not cat_id:
         cat_id, sub_id = ik._match_category(f"{vendor} {descs[0] if descs else ''}", cats)
     if not cat_id:

@@ -58,5 +58,45 @@ class SuggestTests(unittest.TestCase):
                 )
 
 
+class RuleCategoryTests(unittest.TestCase):
+    TREE = [
+        {
+            "id": "p1",
+            "name": "ค่าเดินทางและขนส่ง",
+            "children": [
+                {"id": "c1", "name": "ค่าน้ำมันเชื้อเพลิง"},
+                {"id": "c2", "name": "ค่าแท็กซี่/แกร็บ"},
+            ],
+        },
+        {
+            "id": "p2",
+            "name": "ค่าสาธารณูปโภค",
+            "children": [{"id": "c3", "name": "ค่าไฟฟ้า"}, {"id": "c4", "name": "ค่าน้ำประปา"}],
+        },
+    ]
+
+    def _r(self, v, d):
+        return category_ai.rule_category(v, d, self.TREE)
+
+    def test_fuel_station_to_fuel(self):
+        self.assertEqual(self._r("BANGCHAK BGN", "ไฮดีเซล S"), ("p1", "c1"))
+
+    def test_grab_to_taxi(self):
+        self.assertEqual(self._r("Grab", "ค่าโดยสาร"), ("p1", "c2"))
+
+    def test_electric_to_utility(self):
+        self.assertEqual(self._r("การไฟฟ้าส่วนภูมิภาค", "ค่าไฟฟ้า"), ("p2", "c3"))
+
+    def test_ambiguous_left_to_llm(self):
+        # 便利店/咖啡:看品名才知道商品 or 餐饮 → 规则不命中,交 LLM。
+        self.assertEqual(self._r("CP ALL, 7-Eleven", "อเมริกาโน่"), (None, None))
+        self.assertEqual(self._r("กาแฟพันธุ์ไทย", "กาแฟ"), (None, None))
+
+    def test_unknown_tree_name_falls_through(self):
+        self.assertEqual(
+            category_ai.rule_category("BANGCHAK", "diesel", [{"name": "X"}]), (None, None)
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

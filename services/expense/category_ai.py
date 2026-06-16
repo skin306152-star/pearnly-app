@@ -10,9 +10,58 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# 无歧义高频商户/品名 → (大类名, 子类名)的确定性规则:瞬时、零 LLM、永远一致、不可能判错。
+# 只放无歧义的(加油站=燃油、Grab=交通、水电费=水电、电信=通讯);便利店/餐厅这种「看品名
+# 才知道是商品还是餐饮」的有歧义项不进规则,留给 LLM 看品名判。名称对齐 categories._PRESET;
+# 老树没这些名 → _resolve 不命中 → 退 LLM(优雅降级)。英文 token 用 \b 防误配。
+_RULES: tuple = (
+    (
+        r"ไฮดีเซล|ดีเซล|เบนซิน|แก๊สโซฮอล|น้ำมันเชื้อเพลิง|gasohol|diesel|benzin|"
+        r"บางจาก|bangchak|ปตท|\bptt\b|เชลล์|\bshell\b|คาลเท็กซ์|caltex|เอสโซ่|\besso\b|ซัสโก้|susco",
+        "ค่าเดินทางและขนส่ง",
+        "ค่าน้ำมันเชื้อเพลิง",
+    ),
+    (
+        r"\bgrab\b|แกร็บ|\bbolt\b|โบลท์|lineman|ไลน์แมน|แท็กซี่|\btaxi\b|วินมอเตอร์ไซค์|ตุ๊กตุ๊ก",
+        "ค่าเดินทางและขนส่ง",
+        "ค่าแท็กซี่/แกร็บ",
+    ),
+    (r"การไฟฟ้า|กฟภ|กฟน|\bmea\b|\bpea\b|ค่าไฟฟ้า|ค่าไฟ", "ค่าสาธารณูปโภค", "ค่าไฟฟ้า"),
+    (r"การประปา|กปน|กปภ|ค่าน้ำประปา", "ค่าสาธารณูปโภค", "ค่าน้ำประปา"),
+    (
+        r"\bais\b|เอไอเอส|ทรูมูฟ|\btrue\b|\bdtac\b|ดีแทค|3bb|อินเทอร์เน็ต|internet|ค่าโทรศัพท์",
+        "ค่าสาธารณูปโภค",
+        "ค่าโทรศัพท์/อินเทอร์เน็ต",
+    ),
+)
+
+
+def _resolve(categories: list, parent_name: str, child_name: str):
+    """(大类名, 子类名) → 树里的 (cat_id, sub_id);名不在树里返 (None, None)。"""
+    for p in categories or []:
+        if p.get("name") == parent_name:
+            for c in p.get("children") or []:
+                if c.get("name") == child_name:
+                    return p["id"], c["id"]
+            return p["id"], None
+    return None, None
+
+
+def rule_category(vendor: str, descs: str, categories: list):
+    """无歧义高频商户/品名 → 确定性归类(瞬时·永远一致·零 LLM)。不命中 → (None, None) 交 LLM。"""
+    text = f"{vendor or ''} {descs or ''}"
+    for pattern, pname, cname in _RULES:
+        if re.search(pattern, text, re.IGNORECASE):
+            cid, sid = _resolve(categories, pname, cname)
+            if cid:
+                return cid, sid
+    return None, None
+
 
 _PROMPT = (
     "You categorize a Thai SMB business expense into ONE existing account category.\n"

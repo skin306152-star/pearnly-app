@@ -363,6 +363,10 @@ from services.observability.request_context import RequestContextMiddleware
 
 app.add_middleware(RequestContextMiddleware)
 
+from services.security.headers import SecurityHeadersMiddleware
+
+app.add_middleware(SecurityHeadersMiddleware)
+
 
 # v118.34.13 (Zihao 2026-05-19 拍板) · catch-all exception handler so
 # any uncaught exception writes a traceback snapshot into _last_500_event

@@ -20,6 +20,7 @@ from routes.purchase_common import auth_member, resolve_ws, uid as _uid
 from services.export import google_oauth, google_store
 
 router = APIRouter(prefix="/api/integrations/google", tags=["integrations-google"])
+_LAUNCH_PREFIX = "launch:"
 
 
 def _redirect_uri(request: Request) -> str:
@@ -29,17 +30,12 @@ def _redirect_uri(request: Request) -> str:
     )
 
 
-def _inject_bearer_from_query(request: Request, token: str) -> None:
-    """整页浏览器导航(connect 走 location.href 触发 302)带不上 Authorization 头。
+def _launch_state(ticket: str) -> str:
+    return _LAUNCH_PREFIX + ticket
 
-    允许 ?t= 显式传同一个 Bearer,注入 scope 让既有鉴权链照常守门(权限码不放宽,
-    仍走 auth_member purchase.doc.approve)。token 只是换了传输位置,不是新口子。
-    """
-    raw = [(k, v) for k, v in request.scope.get("headers", []) if k.lower() != b"authorization"]
-    raw.append((b"authorization", f"Bearer {token}".encode()))
-    request.scope["headers"] = raw
-    if hasattr(request, "_headers"):
-        del request._headers
+
+def _connect_launch_url(ticket: str) -> str:
+    return f"/api/integrations/google/connect?launch={ticket}"
 
 
 @router.get("/status")
@@ -58,25 +54,57 @@ async def api_status(request: Request, workspace_client_id: Optional[int] = Quer
     )
 
 
+@router.post("/connect/start")
+async def api_connect_start(request: Request, workspace_client_id: Optional[int] = Query(None)):
+    user, tid = auth_member(request, "purchase.doc.approve")
+    if not google_oauth.is_configured():
+        raise PosError("purchase.unexpected", 503, detail="google_oauth_not_configured")
+    ticket = secrets.token_urlsafe(24)
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        ws = resolve_ws(cur, request, tid, workspace_client_id)
+        google_store.save_state(
+            cur,
+            state=_launch_state(ticket),
+            tenant_id=tid,
+            workspace_client_id=ws,
+            user_id=_uid(user),
+        )
+    return ok({"url": _connect_launch_url(ticket)})
+
+
 @router.get("/connect")
 async def api_connect(
     request: Request,
     workspace_client_id: Optional[int] = Query(None),
-    t: Optional[str] = Query(None),
+    launch: Optional[str] = Query(None),
 ):
-    if t:
-        _inject_bearer_from_query(request, t)
-    user, tid = auth_member(request, "purchase.doc.approve")
+    state = secrets.token_urlsafe(24)
+
+    if launch:
+        with db.get_cursor(commit=True) as cur:
+            owner = google_store.consume_state(cur, state=_launch_state(launch))
+        if not owner:
+            raise PosError("purchase.forbidden", 403, detail="google_oauth_launch_expired")
+        tid = owner["tenant_id"]
+        ws = owner["workspace_client_id"]
+        user_id = owner["user_id"]
+    else:
+        user, tid = auth_member(request, "purchase.doc.approve")
+        with db.get_cursor_rls(tid, commit=False) as cur:
+            ws = resolve_ws(cur, request, tid, workspace_client_id)
+        user_id = _uid(user)
+
     if not google_oauth.is_configured():
         raise PosError("purchase.unexpected", 503, detail="google_oauth_not_configured")
-    state = secrets.token_urlsafe(24)
-    with db.get_cursor_rls(tid, commit=True) as cur:
-        ws = resolve_ws(cur, request, tid, workspace_client_id)
+    with db.get_cursor(commit=True) as cur:
         google_store.save_state(
-            cur, state=state, tenant_id=tid, workspace_client_id=ws, user_id=_uid(user)
+            cur, state=state, tenant_id=tid, workspace_client_id=ws, user_id=user_id
         )
     url = google_oauth.build_authorize_url(state=state, redirect=_redirect_uri(request))
-    return RedirectResponse(url, status_code=302)
+    resp = RedirectResponse(url, status_code=302)
+    resp.headers["Cache-Control"] = "no-store"
+    resp.headers["Referrer-Policy"] = "no-referrer"
+    return resp
 
 
 @router.get("/callback")

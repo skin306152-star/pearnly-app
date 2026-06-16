@@ -5,6 +5,8 @@
 验证:① 触发 needs_review + 返回 review 载荷 ② confirm-rows 用修正行重对账出结果。
 纯 API(打 pearnly.com · 跑的是部署后的真后端 + 真 OCR)· 不点 UI。
 """
+
+import os
 import sys
 import time
 
@@ -13,7 +15,9 @@ import requests
 sys.stdout.reconfigure(encoding="utf-8")
 
 BASE = "https://pearnly.com"
-AK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMDUwOTc5OS1lNGQ3LTQzOTktOWM0ZS0wNmMwOGFiYjRmMjYiLCJqdGkiOiIyNjEwYjFlMi00MzBkLTQ0YWEtYjliMy02MWY2ZDQ3NWFlOTAiLCJ1c2VybmFtZSI6ImFrc2FyYXBhay5hYUBnbWFpbC5jb20iLCJwbGFuIjoiY3JlZGl0cyIsInRlbmFudF9pZCI6IjQwNmUzZGM1LWVkMDAtNDJkOC1hYTI0LTczNWExNDQzZDQ5NiIsInJvbGUiOiJvd25lciIsImlzX3N1cGVyX2FkbWluIjpmYWxzZSwiaWF0IjoxNzc5NjI4NjI1LCJleHAiOjE3ODIyMjA2MjV9.c03YgD61yc7Mw-yWYXINwILpgwiHpDgFHIg6cX51v4E"
+AK = os.environ.get("PEARNLY_E2E_TOKEN", "").strip()
+if not AK:
+    raise SystemExit("Set PEARNLY_E2E_TOKEN to run this live probe.")
 H = {"Authorization": "Bearer " + AK}
 TPL = r"D:/Users/Skin/Desktop/银行对账需求/银行账单模板"
 STMT = TPL + "/BBL 2697.pdf"
@@ -38,18 +42,31 @@ def main():
     with open(STMT, "rb") as f1, open(GL, "rb") as f2:
         files = [
             ("stmt_files", ("BBL2697.pdf", f1.read(), "application/pdf")),
-            ("gl_files", ("gl.xlsx", f2.read(),
-                          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")),
+            (
+                "gl_files",
+                (
+                    "gl.xlsx",
+                    f2.read(),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                ),
+            ),
         ]
-    r = requests.post(f"{BASE}/api/recon/bank-v2/submit", headers=H, files=files,
-                      data={"gl_account": "1010", "lang": "th"}, timeout=120)
+    r = requests.post(
+        f"{BASE}/api/recon/bank-v2/submit",
+        headers=H,
+        files=files,
+        data={"gl_account": "1010", "lang": "th"},
+        timeout=120,
+    )
     print("   submit HTTP", r.status_code, "->", str(r.json())[:120])
     sub = r.json()
     if sub.get("needs_mapping"):
-        print("   (Excel 列映射面板 · 非本测目标)"); return
+        print("   (Excel 列映射面板 · 非本测目标)")
+        return
     job_id = sub.get("job_id")
     if not job_id:
-        print("   ❌ 无 job_id"); return
+        print("   ❌ 无 job_id")
+        return
 
     print("STEP 2 · 轮询到终态")
     j = poll(job_id)
@@ -61,17 +78,24 @@ def main():
             print("   ✅ 至少证明:PDF 对账流程线上跑通(只是这份没触发 S8 核对)")
         return
     review = j.get("review") or {}
-    print(f"   ✅ 触发 needs_review · 行数={review.get('row_count')} "
-          f"低信心={review.get('low_conf_count')} 完整性问题={len(review.get('completeness_issues') or [])}")
+    print(
+        f"   ✅ 触发 needs_review · 行数={review.get('row_count')} "
+        f"低信心={review.get('low_conf_count')} 完整性问题={len(review.get('completeness_issues') or [])}"
+    )
 
     print("STEP 3 · 模拟用户核对(原样确认)→ confirm-rows 重对账")
     rows = review.get("rows") or []
-    r = requests.post(f"{BASE}/api/recon/bank-v2/confirm-rows/{job_id}", headers=H,
-                      json={"rows": rows}, timeout=60)
+    r = requests.post(
+        f"{BASE}/api/recon/bank-v2/confirm-rows/{job_id}",
+        headers=H,
+        json={"rows": rows},
+        timeout=60,
+    )
     print("   confirm HTTP", r.status_code, "->", str(r.json())[:120])
     new_id = r.json().get("job_id")
     if not new_id:
-        print("   ❌ confirm 没返回新 job_id"); return
+        print("   ❌ confirm 没返回新 job_id")
+        return
 
     print("STEP 4 · 轮询重对账任务")
     j2 = poll(new_id)

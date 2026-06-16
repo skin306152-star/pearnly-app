@@ -7,6 +7,7 @@ auth_me_routes.py · /api/me/link_line(+dev)+ /api/me/plan
 """
 
 import logging
+import os
 import secrets
 import traceback
 from typing import Optional
@@ -79,7 +80,7 @@ def link_line(req: LineLinkRequest, request: Request):
         raise
     except Exception as e:
         logger.error(f"link_line: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="line.link_failed")
 
 
 # ============================================================
@@ -89,6 +90,8 @@ def link_line(req: LineLinkRequest, request: Request):
 @router.post("/api/me/link_line_dev")
 def link_line_dev(request: Request):
     """开发期间用 · 模拟绑定一个随机 LINE userId · 让 trial 配额解锁"""
+    if (os.environ.get("PEARNLY_ENV") or "").strip().lower() != "development":
+        raise HTTPException(status_code=404, detail="not_found")
     try:
         u = _get_user_safe(request)
         if not u:
@@ -119,7 +122,7 @@ def link_line_dev(request: Request):
         raise
     except Exception as e:
         logger.error(f"link_line_dev: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="line.dev_link_failed")
 
 
 # ============================================================
@@ -285,4 +288,4 @@ def get_my_plan(request: Request):
         raise
     except Exception as e:
         logger.error(f"get_my_plan failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="plan.load_failed")

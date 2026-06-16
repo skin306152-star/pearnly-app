@@ -1,6 +1,6 @@
 // 集成中心 · Google Drive/Sheets 授权卡(外流归档 OAuth)。
 // 骨架由 page-integrations.ts 注入(#int-google-card);本模块按 status 填连接态 + 绑连接/断开。
-// 连接走整页浏览器导航(connect 302 跳 Google · 鉴权头带不上 → ?t= 传同一 Bearer · 后端 B 方案网关)。
+// 连接走整页浏览器导航:先用 Authorization 换一次性启动票据,跳转 URL 不携带登录 token。
 // 凭据按套账隔离(workspace_client_id)· 个人模式/未选账套 → 提示先选公司。
 /* global t, token, showToast */
 import { papi, purchaseErrMsg, activeWsId, injectStyle } from './purchase-common.js';
@@ -24,11 +24,6 @@ const CSS = `
 #int-google-act .ig-btn:disabled{opacity:.55;cursor:not-allowed;}
 #int-google-card.hl{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak);}
 `;
-
-function connectUrl(ws: number): string {
-    const tk = typeof token === 'string' ? token : '';
-    return `/api/integrations/google/connect?workspace_client_id=${ws}&t=${encodeURIComponent(tk)}`;
-}
 
 function render(st: GoogleStatus): void {
     const badge = document.getElementById('int-google-st');
@@ -62,14 +57,22 @@ function render(st: GoogleStatus): void {
     if (btn) btn.onclick = connect;
 }
 
-function connect(): void {
+async function connect(): Promise<void> {
     const ws = activeWsId();
     if (ws == null) {
         showToast(t('workspace.required'), 'error');
         return;
     }
-    // 整页导航:鉴权 fetch 拿不到 302 跳转 → location.href 让浏览器直接走授权流。
-    window.location.href = connectUrl(ws);
+    const q = `?workspace_client_id=${ws}`;
+    try {
+        const res = (await papi('POST', `/api/integrations/google/connect/start${q}`)) as {
+            url?: string;
+        };
+        if (!res.url) throw new Error('missing_google_connect_url');
+        window.location.href = res.url;
+    } catch (e) {
+        showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
+    }
 }
 
 async function disconnect(): Promise<void> {

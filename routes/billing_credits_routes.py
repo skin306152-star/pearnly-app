@@ -436,4 +436,4 @@ async def credits_usage_report(
             )
     except Exception as e:
         logger.error(f"credits_usage_report build {fmt}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"build_failed: {e}")
+        raise HTTPException(status_code=500, detail="build_failed")

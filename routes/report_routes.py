@@ -71,7 +71,7 @@ def _get_user(request: Request):
         raise
     except Exception as e:
         logger.error(f"_get_user failed: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=401, detail=f"认证失败: {e}")
+        raise HTTPException(status_code=401, detail="auth.failed")
 
 
 def _safe_filename(name: str) -> str:
@@ -114,7 +114,7 @@ def get_templates(request: Request, lang: str = Query("zh", regex="^(zh|th|en|ja
         raise
     except Exception as e:
         logger.error(f"get_templates: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"模板列表失败: {e}")
+        raise HTTPException(status_code=500, detail="reports.templates_failed")
 
 
 # ============================================================
@@ -154,7 +154,7 @@ def export_records(req: ExportRequest, request: Request):
         raise
     except Exception as e:
         logger.error(f"export_records: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"导出失败: {e}")
+        raise HTTPException(status_code=500, detail="reports.export_failed")
 
 
 # ============================================================
@@ -222,7 +222,7 @@ def export_client_report(
         raise
     except Exception as e:
         logger.error(f"export_client_report client={client_id}: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"客户导出失败: {e}")
+        raise HTTPException(status_code=500, detail="reports.client_export_failed")
 
 
 # ============================================================
@@ -286,4 +286,4 @@ def batch_export_history(req: HistoryBatchExportRequest, request: Request):
         raise
     except Exception as e:
         logger.error(f"batch_export_history: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"批量导出失败: {e}")
+        raise HTTPException(status_code=500, detail="reports.batch_export_failed")

@@ -146,22 +146,30 @@ _PARSE_PROMPT = (
     "- choice: the category number from the list that best fits the item (food/drink/snack/groceries"
     " → food & entertainment; fuel → travel; water/electric/phone → utilities; goods → cost of goods"
     "; office supplies → office).\n"
-    'Output ONLY JSON {"items":[{"name":"...","amount":"...","choice":N}, ...]} in text order.'
+    "Also extract document-level:\n"
+    "- date: resolve relative dates against the given Today (yesterday/เมื่อวาน/昨天 → Today−1, "
+    "etc.) → YYYY-MM-DD; empty if none stated.\n"
+    "- vendor: the shop/seller name if stated (เซเว่น/7-Eleven/Starbucks/星巴克), else empty.\n"
+    'Output ONLY JSON {"date":"...","vendor":"...","items":[{"name":"...","amount":"...","choice":N}]}.'
 )
 
 
 def parse_and_categorize(text: str, categories: list, *, api_key: Optional[str], timeout: int = 15):
-    """口语多项 → 一次 LLM 拆成干净 items(名+额+分类)。返回 [{name, amount(Decimal), category_id,
-    subcategory_id}] 或 None(无 key/失败/空)。
+    """口语多项 → 一次 LLM 拆干净 items(名+额+分类)+ 文档级 date/vendor。返回
+    {"date": "YYYY-MM-DD"|"", "vendor": str, "items": [{name, amount(Decimal), category_id,
+    subcategory_id}]} 或 None(无 key/失败/空)。
 
-    治正则拆口语乱(「ฉันซื้อน้ำดื่มราคา」当项目名)。金额安全:LLM 给的额必须原文真出现的数字,
-    否则丢该项(不信 LLM 编金额·与单笔同护栏)。
+    治正则拆口语乱(「ฉันซื้อน้ำดื่มราคา」当项目名)。护栏:金额必须原文真出现的数字才采纳(不信
+    LLM 编额);date 必须合法 YYYY-MM-DD 否则丢(用今天)。
     """
     if not api_key:
         return None
     options = _options(categories)
     if not options:
         return None
+    from datetime import date as _date
+
+    today = _date.today().isoformat()
     nums = {n.replace(",", "") for n in re.findall(r"\d[\d,]*(?:\.\d+)?", text or "")}
     listing = "\n".join(f"{i + 1}. {label}" for i, (_, _, label) in enumerate(options))
     try:
@@ -169,7 +177,7 @@ def parse_and_categorize(text: str, categories: list, *, api_key: Optional[str],
         from services.ocr.layer2_gemini import _call_gemini_with_retry
 
         data, _meta = _call_gemini_with_retry(
-            f"Text: {text}\n\nCategories:\n{listing}",
+            f"Today: {today}\nText: {text}\n\nCategories:\n{listing}",
             api_key=api_key,
             model_name=gemini_models.flash(),
             max_retries=1,
@@ -179,8 +187,9 @@ def parse_and_categorize(text: str, categories: list, *, api_key: Optional[str],
     except Exception as e:  # noqa: BLE001
         logger.warning("[category_ai] multi-parse failed: %s", str(e)[:160])
         return None
-    out = []
-    for it in (data or {}).get("items") or []:
+    data = data or {}
+    items = []
+    for it in data.get("items") or []:
         name = str(it.get("name") or "").strip()
         amt_s = str(it.get("amount") or "").replace(",", "").strip()
         if not name or amt_s not in nums:  # 金额必须原文有(防 LLM 编造)
@@ -197,8 +206,13 @@ def parse_and_categorize(text: str, categories: list, *, api_key: Optional[str],
         except (ValueError, TypeError):
             pass
         if amt > 0:
-            out.append({"name": name, "amount": amt, "category_id": cid, "subcategory_id": sid})
-    return out or None
+            items.append({"name": name, "amount": amt, "category_id": cid, "subcategory_id": sid})
+    if not items:
+        return None
+    d = str(data.get("date") or "").strip()
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", d):  # 非法日期 → 用今天(不信 LLM 乱编)
+        d = ""
+    return {"date": d, "vendor": str(data.get("vendor") or "").strip(), "items": items}
 
 
 def _options(categories: list) -> list:

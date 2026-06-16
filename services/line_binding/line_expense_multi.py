@@ -32,12 +32,15 @@ def do_record_multi(bound_user, reply_token, text, tid, ws, items, quote_token, 
     today = date.today().isoformat()
     with db.get_cursor_rls(tid, commit=True) as cur:
         tree = cat_svc.get_tree(cur, tenant_id=tid, workspace_client_id=ws)
-        # 优先 LLM 智能拆(口语「ฉันซื้อน้ำดื่ม 10 บาท ทุเรียน 300」→ 干净项目名+额+分类·治正则乱拆);
-        # 无 key/失败 → 退正则项 + 批量归类(清晰空格分隔仍可用)。
-        llm_items = category_ai.parse_and_categorize(text, tree, api_key=api_key)
-        if llm_items:
-            items = llm_items
+        # 优先 LLM 智能拆(口语「ฉันซื้อน้ำดื่ม 10 บาท ทุเรียน 300」→ 干净项目名+额+分类+日期+卖家·
+        # 治正则乱拆);无 key/失败 → 退正则项 + 批量归类(清晰空格分隔仍可用)。
+        parsed = category_ai.parse_and_categorize(text, tree, api_key=api_key)
+        doc_date, vendor = today, ""
+        if parsed:
+            items = parsed["items"]
             cats = [(it["category_id"], it["subcategory_id"]) for it in items]
+            doc_date = parsed.get("date") or today
+            vendor = parsed.get("vendor") or ""
         else:
             cats = category_ai.categorize_items(items, tree, api_key=api_key)
         total = sum((it["amount"] for it in items), Decimal("0"))
@@ -67,16 +70,16 @@ def do_record_multi(bound_user, reply_token, text, tid, ws, items, quote_token, 
         data = {
             "doc_kind": "expense",
             "source": "line",
-            "doc_date": today,
+            "doc_date": doc_date,
             "category_id": doc_cat,
-            "supplier": {"name": ""},
+            "supplier": {"name": vendor},
             "currency": "THB",
             "payment_status": "paid",
             "lines": lines,
         }
         verdict = confidence.grade(
             amount=str(total),
-            vendor_name="",
+            vendor_name=vendor,
             invoice_number="",
             document_type="",
             direction="expense",
@@ -101,10 +104,10 @@ def do_record_multi(bound_user, reply_token, text, tid, ws, items, quote_token, 
     card_fields = {
         "document_type": "",
         "expense_type": "goods",
-        "date": today,
+        "date": doc_date,
         "category": cat_name,
         "subcategory": sub_name,
-        "vendor": "",
+        "vendor": vendor,
         "items": [{"name": it["name"], "amount": f"{it['amount']:,.2f}"} for it in items],
         "detail": " · ".join(names[:3]) + (f" 等{len(names)}项" if len(names) > 3 else ""),
     }

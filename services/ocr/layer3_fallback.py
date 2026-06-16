@@ -166,7 +166,8 @@ CRITICAL RULES (same as previous extraction; pay attention):
 5. TAX IDs: Exactly 13 digits, no dashes/spaces. Empty string if not found.
 6. WHT: Common rates 1/2/3/5%. wht_rate is the number ONLY ("3" not "3%").
 7. AMOUNT ARITHMETIC: When trigger reasons mention amount mismatch, look carefully at subtotal/vat/total in the image. The correct relationship is: subtotal + vat = total_amount (within rounding tolerance).
-8. is_not_invoice: true ONLY if the text is clearly not an invoice.
+8. is_not_invoice: true ONLY if clearly not an invoice. A FUEL/PETROL receipt (Bangchak/PTT/Shell ·
+   น้ำมัน/ดีเซล/liters+total) IS a receipt (TID/BATCH/TRACE = POS footer, NOT a reason to drop); is_not_invoice only for a bare card slip with no goods & no seller tax id.
 9. is_copy_or_duplicate: true if the text contains สำเนา / COPY / DUPLICATE markers.
 10. MULTIPLE INVOICES ON ONE PAGE (CRITICAL — a trigger reason may say a stacked
     invoice was missed): a single page image often contains TWO OR MORE separate

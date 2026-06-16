@@ -287,9 +287,16 @@ CRITICAL RULES:
      (7-11, supermarkets). The R#/receipt running number is NOT a legal invoice
      number — keep it as printed (with its R#/REF prefix) for de-dup, do not
      invent or require a legal เลขที่.
-   - "is_not_invoice": true for non-tax documents like a fuel card / credit-card
-     SLIP (has TID / BATCH / TRACE / approval code, NO 13-digit seller tax id and
-     NO ใบกำกับภาษี header). Do not treat the card TID as a tax id or invoice no.
+   - A FUEL / PETROL STATION receipt (Bangchak / PTT / Shell / Caltex / Susco —
+     shows น้ำมัน / ดีเซล / เบนซิน / ไฮดีเซล / liters x price + a total) IS a real
+     purchase receipt: classify "tax_invoice" if it has ใบกำกับภาษี + seller 13-digit
+     tax id, else "receipt". The TID / BATCH / TRACE / approval code printed on it are
+     just the POS terminal footer — NEVER set is_not_invoice on a fuel receipt because
+     of them, and do not treat the card TID as the seller tax id.
+   - "is_not_invoice": true ONLY for a BARE card-approval / payment slip that records
+     no goods and has NO seller 13-digit tax id and NO ใบกำกับภาษี header (just
+     merchant + card no + TID/TRACE/approval). If goods/fuel or a seller tax id are
+     present, it is a receipt — do NOT drop it.
    - "payment_evidence": a bank-transfer slip / mobile-banking transfer screenshot /
      PromptPay slip / QR-payment confirmation (โอนเงิน / สลิปโอน / shows from-acct,
      to-acct, ref/transaction id, amount, "โอนสำเร็จ"). It PROVES a payment but is

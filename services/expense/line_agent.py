@@ -73,6 +73,8 @@ Field rules:
 - date: resolve relative dates against Today (yesterday/เมื่อวาน/昨天 → Today−1; 前天/วานซืน →
   Today−2; "3天前/3 วันก่อน" → Today−3) → YYYY-MM-DD; "" if none stated.
 - vendor_name: the shop/seller if stated (Starbucks/星巴克/เซเว่น/Grab/ร้าน…), else "".
+- note: the CLEAN item bought (no amount/date/vendor/verb) — e.g. "coffee", "น้ำแร่", "牛奶";
+  for a record this is what shows in the detail line. Empty if none.
 - vendor_tax_id = 13 digits or "". invoice_number kept as printed (with prefix).
 - expense_type: utilities (water/electric/internet/phone), rent, repair, service work, consulting,
   transport = "service"; physical goods/food items = "goods"; else "".

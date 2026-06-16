@@ -135,6 +135,71 @@ def _parse_date(text: str) -> Optional[str]:
         return None
 
 
+# 动词/连接/介词噪声(抽干净物品名时剔除)· 泰中英 · 单笔「详情」结构化用。
+_NAME_NOISE = (
+    "ซื้อมา",
+    "ซื้อ",
+    "ดื่ม",
+    "กิน",
+    "รับประทาน",
+    "จ่าย",
+    "ที่",
+    "ใน",
+    "และ",
+    "กับ",
+    "แล้ว",
+    "买了",
+    "买",
+    "買",
+    "吃",
+    "喝",
+    "点了",
+    "点",
+    "订",
+    "消费",
+    "花了",
+    "花",
+    "付了",
+    "付",
+    "共",
+    "在",
+    "和",
+    "跟",
+    "价格",
+    "价",
+    "ราคา",
+    "bought",
+    "paid",
+    "spent",
+    "buy",
+)
+
+
+def _extract_item_name(text: str) -> str:
+    """一句话清出干净物品名(去 日期/金额/数量/币种/卖家/动词/连接词)· 单笔「详情」结构化(#10b)。
+
+    启发式(零 LLM·非完美·用户可改):清不出 → 空,调用方回落原文。
+    """
+    s = " " + (text or "").strip() + " "
+    for w in _TODAY_WORDS + _YESTERDAY_WORDS + _DAYBEFORE_WORDS:
+        s = s.replace(w, " ")
+    s = re.sub(r"\d+\s*(?:天前|วันก่อน|days?\s+ago)", " ", s, flags=re.IGNORECASE)
+    s = re.sub(r"\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}", " ", s)
+    for pat, _name in _VENDOR_BRANDS:  # 卖家品牌(已单列字段·不进物品名)
+        s = re.sub(pat, " ", s, flags=re.IGNORECASE)
+    units = "|".join(re.escape(u) for u in _QTY_UNITS)
+    s = re.sub(rf"\d+(?:\.\d+)?\s*(?:{units})", " ", s)  # 数量+单位
+    s = re.sub(r"[xX×]\s*\d+", " ", s)
+    s = re.sub(r"(?:@|ต่อหน่วย|单价)\s*\d+(?:\.\d+)?", " ", s)
+    marks = "|".join(re.escape(m) for m in _CURRENCY_MARK)
+    s = re.sub(rf"(?:{marks})", " ", s, flags=re.IGNORECASE)
+    s = re.sub(r"\d+(?:[,.]\d+)*", " ", s)  # 剩余裸数字(金额·日期/编号已先除)
+    for w in _NAME_NOISE:
+        s = s.replace(w, " ")
+    s = re.sub(r"[\s,，。、:：/·\-]+", " ", s).strip()
+    return s
+
+
 def _extract_vendor(text: str) -> str:
     """确定性抽卖家(#9·单笔路对齐多笔 LLM):品牌字典命中优先 → 中文「在X买」→ 否则空。"""
     low = (text or "").lower()
@@ -334,7 +399,8 @@ def parse_expense(text: str) -> ExpenseDraft:
         vendor_tax_id=tax_id,
         invoice_number=invoice_number,
         doc_date=doc_date,
-        note=text,
+        # note = 清出的干净物品名(供「详情」结构化 + 入账行描述);清不出回落原文。
+        note=_extract_item_name(text) or text,
         raw_text=text,
         source="line_text",
         confidence=Decimal("0.90") if amount is not None else Decimal("0"),

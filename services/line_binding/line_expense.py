@@ -241,7 +241,22 @@ def _do_record(bound_user, reply_token, text, tid, ws, draft, used_l2, quote_tok
 
 
 def _card_fields_from_draft(draft) -> dict:
-    """ExpenseDraft → 数据卡归一字段。"""
+    """ExpenseDraft → 数据卡归一字段。
+
+    详情结构化(#10b):单笔也出逐条 `物品 ×数量 ฿金额`(对齐多笔),不再回显整句原文。
+    物品名 = 清出的干净名(draft.note);数量>1 缀「×N」;金额=行总额。
+    """
+    item = (draft.note or "").strip()
+    items = []
+    if item and draft.amount is not None:
+        from decimal import Decimal
+
+        try:
+            q = Decimal(str(draft.qty)) if draft.qty not in (None, "", 0) else Decimal("1")
+        except Exception:
+            q = Decimal("1")
+        label = f"{item} ×{format(q.normalize(), 'f')}" if q > 1 else item
+        items = [{"name": label, "amount": f"{draft.amount:,.2f}"}]
     return {
         "document_type": draft.document_type or "",
         "expense_type": draft.expense_type or "",
@@ -251,7 +266,8 @@ def _card_fields_from_draft(draft) -> dict:
         "vendor": draft.vendor_name or "",
         "seller_tax": getattr(draft, "vendor_tax_id", "") or "",
         "invoice_number": draft.invoice_number or "",
-        "detail": (draft.note or "").strip(),
+        "items": items,
+        "detail": item,
     }
 
 

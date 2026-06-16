@@ -6,9 +6,16 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-14 · **DMS 建订车单失败修复 + 旧一步式路径清死代码** · 前序见下）
+## 🎯 状态卡（2026-06-16 · **进项采购 复核/详情屏 票图缩略图 + 全屏留白收紧 + /simplify 收口** · 前序见下）
 
-- **🆕 本窗口(2026-06-14)· 🚗 DMS 建订车单失败修复 + 旧 xlsx 路径清死代码【全上线·真 DMS 验证】**：
+- **🆕 本窗口(2026-06-16)· 🧾 进项采购 复核屏/详情屏 票图与布局收口【全上线·真浏览器 17/17·prod v11850890】**(自检自推·5 commit·全闸绿)：
+  - **详情屏**:票图框可点开大图(原只「放大看」按钮可点·光标是放大镜却无响应);无图时不显放大镜光标(`.img.has-img`)。
+  - **复核屏**:缩略图条(含「+」加附件)从「凭据(报税用)」卡挪到查看器正下方做胶片条,每张**渲染真实票图小样**(原占位文档图标);凭据卡只留提示 + 生成替代收据。
+  - **两屏留白收紧**(左栏 + 右侧内容区):内层无边框卡只 reset 了 border/shadow,漏 padding/margin → 继承全局 `.pur .card{padding:20px;margin:0 0 16px}` 叠加 hd/bd 内边距=双重留白(段间 71~150px)。三处补 `padding:0;margin:0`·实测左栏 GAP 71→15px、右侧段间大幅收窄。
+  - **/simplify 收口**:`resolveBillSrc`(url→缓存鉴权 blob)上提 `purchase-common` 给查看器/缩略图/详情共用;缩略图去冗余 data 属性按 DOM 序加载;全局 `.pur .card` 加注释标明内嵌卡须 reset padding/margin。
+  - **共享树**:期间他窗推了 LIFF 时序修(`abfed9c8`)+ LIFF 调试弹窗(`ac8e5fe7`·"验完即删")·我构建时确认那是已提交源、未夹带其未提交码;`?v=` 多窗口连环 bump 11850884→890。验证脚本留 `scripts/_pur_*_verify.cjs`/`_pur_*_geom.cjs`(未跟踪)。
+
+- **本窗口(2026-06-14)· 🚗 DMS 建订车单失败修复 + 旧 xlsx 路径清死代码【全上线·真 DMS 验证】**：
   - **建订车单失败真因(非 OCR·我先前误判)**:DMS autonum 单号计数器与全局唯一约束失步 → 一直回已占用号 `BK2606000001` → `err::"เลขที่ใบจอง" ซ้ำ`(单号重复)→ 每次推送必失败。修:`create_booking_via_form` 撞重复就顺号重试(`_bump_docno` 保位宽·最多 25 次·非重复错误不重试)。真账号 live DMS 验证建单成功(booking_id=28)。`23bb1cf7` + 单测 8 绿。详见 [[dms-booking-duplicate-docno-fixed]]。
   - **/simplify 收尾·清死代码**(Zihao 拍板全删旧一步式路径):两步流(`/api/dms/id-card/recognize`+`/push`·2026-06-13 上线)已取代旧一步式自动推 `/api/dms/id-card-booking`。删整条 xlsx 导入建单路径:端点 + `push_mrerp_dms_id_card` + adapter/ops `push_id_card_booking` + `import_booking_from_xlsx`/`patch_booking_identity`/`download_booking_template`/`ensure_customer` + `mrerp_dms_xlsx.py` 模块 + `DMSPushResult` + 2 个孤儿地址 helper。改/删测试(geo 测试重指 `_resolve_address_geo` 直测)+ 4 处文档(route-map/handoff/external-ref/intake)。全量单测 + 13 闸绿。
   - 共享树坑(同前):另一窗口并发 commit/churn master·走隔离 worktree 单推·见 [[dms-booking-duplicate-docno-fixed]] 末段。

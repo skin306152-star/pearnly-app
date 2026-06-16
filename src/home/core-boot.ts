@@ -400,10 +400,16 @@ try {
     console.warn('[boot] applyLang failed', e);
 }
 
+// LIFF 深链 resume(home.html preboot 据 sessionStorage 待处理项置)→ 由 purchase-liff.liffResume
+// 独自驱动路由到对应单/待归类;core-boot 不抢默认路由,否则跳 dms-intake 通用页(backlog #5)。
+const _liffResume = !!(window as unknown as { __LIFF_RESUME__?: boolean }).__LIFF_RESUME__;
+
 // hash 路由初始化
 try {
-    const initialRoute = (location.hash || '#/dms-intake').replace(/^#\//, '');
-    routeTo(VALID_ROUTES.includes(initialRoute) ? initialRoute : 'dms-intake');
+    if (!_liffResume) {
+        const initialRoute = (location.hash || '#/dms-intake').replace(/^#\//, '');
+        routeTo(VALID_ROUTES.includes(initialRoute) ? initialRoute : 'dms-intake');
+    }
 } catch (e) {
     console.warn('[boot] routeTo failed', e);
 }
@@ -415,7 +421,7 @@ const _liffBootstrapping = !!window.__LIFF_BOOTSTRAP__; // home.html 早期置(?
 
 // defer 模块的 loader 注册晚于此处同步执行 → 初始进非首屏路由会空白(只剩侧栏);
 // 微任务后 sibling 已 eval,补调一次。原仅 reconcile 兜底,现泛化到所有路由。
-if (!_liffBootstrapping) setTimeout(reloadCurrentRoute, 0);
+if (!_liffBootstrapping && !_liffResume) setTimeout(reloadCurrentRoute, 0);
 
 // 切账套(右上角切换器 / 表单「切换公司」)→ 重载当前模块。单一收口,替代原各页分散订阅。
 window.addEventListener('pearnly:workspace-changed', reloadCurrentRoute);

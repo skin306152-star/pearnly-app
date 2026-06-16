@@ -18,7 +18,15 @@ interface LiffSdk {
 }
 
 function qp(name: string): string | null {
-    return new URLSearchParams(location.search).get(name);
+    // LIFF v2 把深链 query 包进 liff.state(整串 URL 编码)→ 真实参数在它里面,先从它取。
+    // URLSearchParams.get 自动解码一层 → liff.state 值即 "?liff=purchase&doc=X&ws=Y"。
+    const sp = new URLSearchParams(location.search);
+    let state = sp.get('liff.state');
+    if (state) {
+        if (state.charAt(0) === '?') state = state.slice(1);
+        return new URLSearchParams(state).get(name);
+    }
+    return sp.get(name);
 }
 
 function mask(msg: string): void {
@@ -84,12 +92,6 @@ async function liffEntry(
     view: string | null,
     ws: string | null
 ): Promise<void> {
-    // TEMP-DEBUG(LIFF 套账门排查·验完删):弹真实入口 URL,看卡链接有没有带 &ws=。
-    try {
-        window.alert('LIFF入口\nURL: ' + location.href + '\ndoc=' + doc + ' · ws=' + ws);
-    } catch (_) {
-        /* noop */
-    }
     mask(tx('liff-signing-in', '正在登录 LINE…'));
     const liffId =
         (window as unknown as { __PEARNLY_LIFF_ID__?: string }).__PEARNLY_LIFF_ID__ ||
@@ -135,21 +137,6 @@ function liffResume(): void {
     const view = sessionStorage.getItem(LIFF_VIEW_KEY);
     const ws = sessionStorage.getItem(LIFF_WS_KEY);
     if (!doc && !inbox) return;
-    // TEMP-DEBUG(LIFF 套账门排查·验完删):看重进 /home 后拿到的深链状态。
-    try {
-        window.alert(
-            'LIFF重进\ndoc=' +
-                doc +
-                ' · ws=' +
-                ws +
-                '\n__LIFF_WS__=' +
-                (window as unknown as { __LIFF_WS__?: string }).__LIFF_WS__ +
-                '\nsatisfy=' +
-                typeof window.satisfyWorkspaceGate
-        );
-    } catch (_) {
-        /* noop */
-    }
     sessionStorage.removeItem(LIFF_DOC_KEY);
     sessionStorage.removeItem(LIFF_INBOX_KEY);
     sessionStorage.removeItem(LIFF_VIEW_KEY);

@@ -95,12 +95,6 @@ function fromDraft(d: DraftIn): FormState {
     };
 }
 
-function wsName(): string {
-    return (
-        (window._userInfo && (window._userInfo as { company_name?: string }).company_name) || '—'
-    );
-}
-
 const WARN_SVG =
     '<svg class="ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>';
 
@@ -135,11 +129,11 @@ function shell(): string {
     return `<div class="pur f"><div class="wrap">
         <div class="ph">
             <div class="phl"><span class="back" id="pur-back" title="${escapeHtml(t('pur-back'))}" aria-label="${escapeHtml(t('pur-back'))}">‹</span><div><div class="t">${escapeHtml(t('pur-review-title'))}</div><div class="sub">${escapeHtml(st!.supplierName || t('pur-form-sub'))}</div></div></div>
+            <div class="acts"><button class="btn" id="pur-save-draft">${escapeHtml(t('pur-save-draft'))}</button><button class="btn primary" id="pur-post">${escapeHtml(t('pur-post'))}</button></div>
         </div>
         ${dup}
         <div class="vbanner ${showBanner ? 'show' : ''}" id="pur-vbanner">${showBanner ? bannerInner(fx, 'pur-review-n') : ''}</div>
         <div class="ctxbar" id="pur-ctx">
-            <div class="wsbar">${escapeHtml(t('pur-ws-for'))} <b>${escapeHtml(wsName())}</b></div>
             <div class="etabs" id="pur-etabs"><button class="on" data-tab="doc">${escapeHtml(t('pur-tab-doc'))}</button><button data-tab="info">${escapeHtml(t('pur-tab-info'))}</button><button data-tab="items">${escapeHtml(t('pur-tab-items'))}</button></div>
         </div>
         <div class="grid">
@@ -178,7 +172,6 @@ function setTop(key: string, val: string): void {
 
 function bindShell(): void {
     document.getElementById('pur-back')!.onclick = () => window.routeTo?.('purchase');
-    // 套账切换走顶栏现有切换器(不在表单内放第二个 · 防 ws 不同步)· wsbar 仅只读提示「记账给」。
     mountViewer(st!, rerender);
     mountLines(
         st!,
@@ -282,7 +275,9 @@ function bindShell(): void {
     bindBannerJumps();
     bindMobileTabs();
     document.getElementById('pur-delete')!.onclick = () => onDelete();
+    document.getElementById('pur-save-draft')!.onclick = () => submit('draft');
     document.getElementById('pur-save-draft2')!.onclick = () => submit('draft');
+    document.getElementById('pur-post')!.onclick = () => onPost();
     document.getElementById('pur-post2')!.onclick = () => onPost();
 }
 

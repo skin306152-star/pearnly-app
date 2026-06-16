@@ -10,8 +10,6 @@ export const PURCHASE_FORM_CSS = `
 .pur .ph .sub{color:var(--ink2);font-size:12.5px;margin-top:3px;}
 .pur .acts{display:flex;gap:9px;flex-shrink:0;}
 .pur .btn.full{width:100%;} .pur .btn.ghost{border-style:dashed;color:var(--accent);} .pur .btn.sm{height:34px;font-size:12.5px;flex:1;}
-.pur .wsbar{background:var(--accent-weak);border:1px solid var(--accent-weak);border-radius:10px;padding:9px 13px;font-size:12.5px;color:var(--accent-deep);margin-bottom:14px;}
-.pur .wsbar .link{color:var(--accent-deep);font-weight:700;cursor:pointer;text-decoration:underline;}
 .pur .dupbar{background:var(--red-weak);border:1px solid var(--red-weak);border-radius:10px;padding:9px 13px;font-size:12.5px;color:var(--red);margin-bottom:14px;}
 
 /* 需复核横幅(消费 confidence_band/field_confidence)· 点字段名平滑滚 + 高亮 */
@@ -19,16 +17,15 @@ export const PURCHASE_FORM_CSS = `
 .pur .vbanner.show{display:flex;} .pur .vbanner b{color:var(--amber);} .pur .vbanner .j{color:var(--amber);font-weight:800;text-decoration:underline;cursor:pointer;}
 .pur .vbanner svg{color:var(--amber);flex:none;}
 
-/* 吸顶上下文条:左=套账(记账给 X) + 右=分类导航(scroll-spy)· 桌面/手机同款 */
-.pur .ctxbar{position:sticky;top:0;z-index:9;display:flex;align-items:center;gap:12px;background:var(--bg);padding:9px 0;margin-bottom:14px;border-bottom:1px solid var(--line);}
-.pur .ctxbar .wsbar{margin-bottom:0;flex:none;}
+/* 吸顶分类导航(scroll-spy)· 桌面/手机同款。top 须让到固定 .topbar 之下(否则被遮住=看不见「吸顶」)。 */
+.pur .ctxbar{position:sticky;top:var(--topbar-h);z-index:8;display:flex;align-items:center;gap:12px;background:var(--bg);padding:9px 0;margin-bottom:14px;border-bottom:1px solid var(--line);}
 .pur .etabs{display:flex;gap:6px;flex:1;overflow-x:auto;justify-content:space-between;}
 .pur .etabs button{border:none;background:transparent;color:var(--ink2);padding:7px 14px;border-radius:999px;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap;}
 .pur .etabs button.on{background:var(--accent-weak);color:var(--accent-deep);}
 
 .pur .grid{display:grid;grid-template-columns:330px 1fr;gap:14px;align-items:start;}
 /* 左右两列各融成一张连续白卡:内部 card 去边框/阴影,区与区之间一条细横线(治「东一块西一块」) */
-.pur.f .rcol,.pur.f .edit-left{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--sh);overflow:hidden;}
+.pur.f .rcol,.pur.f .edit-left{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh);overflow:hidden;}
 .pur.f .edit-left{gap:0;}
 .pur.f .rcol .card,.pur.f .edit-left .card{border:0;border-radius:0;box-shadow:none;background:transparent;}
 .pur.f .rcol .card + .card,.pur.f .rcol > div + div .card:first-child,.pur.f .edit-left .card + .card{border-top:1px solid var(--line);}
@@ -109,11 +106,10 @@ export const PURCHASE_FORM_CSS = `
 .pur .consist{font-size:12px;border-radius:9px;padding:8px 11px;margin-top:8px;}
 .pur .consist.ok{background:var(--green-weak);color:var(--green);} .pur .consist.bad{background:var(--red-weak);color:var(--red);}
 
-/* 底部操作条:不吸顶(滚到底才见)· 三个按钮聚右成组 */
-.pur .editfoot{display:flex;gap:10px;padding:18px 0 4px;justify-content:flex-end;}
+/* 底部操作条:不吸顶(滚到底才见)· 三个按钮沿底边均匀铺开(对标 Paypers) */
+.pur .editfoot{display:flex;gap:10px;padding:18px 0 4px;margin-top:8px;border-top:1px solid var(--line);justify-content:space-between;align-items:center;}
 @media(max-width:760px){
   .pur .ctxbar{flex-direction:column;align-items:stretch;}
-  .pur .ctxbar .wsbar{width:100%;}
   .pur .etabs{flex:none;}
   .pur .ph{flex-direction:column;}
   .pur .editfoot{justify-content:stretch;} .pur .editfoot .btn{flex:1;}

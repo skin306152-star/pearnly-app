@@ -95,8 +95,8 @@ class IngestTests(unittest.TestCase):
         self.assertEqual(out["state"], "inbox")
         stash.assert_called_once()  # sales 不丢 → 落待归类安全网
 
-    def test_keyword_miss_falls_back_to_llm_category(self):
-        # PO-9:关键词未命中 + 有 key → LLM 兜底归类填进卡(海鲜票 → 餐饮)。
+    def test_llm_first_category(self):
+        # 智能分类:有 key → LLM 优先选(治分类不对/空),填进卡(柴油 → 交通/餐饮)。
         res = {"route": "purchase", "draft": _draft(), "dedupe_hit": False, "field_confidence": {}}
         tree = [{"id": "p1", "name": "餐饮 & 招待", "children": [{"id": "c1", "name": "餐费"}]}]
         created = {"doc": {"id": "D1"}}
@@ -154,6 +154,38 @@ class IngestTests(unittest.TestCase):
                 created_by="u",
             )
         suggest.assert_not_called()
+
+    def test_inbox_item_gets_category_suggestion(self):
+        # 待归类项(draft None·如加油票)也给智能分类建议,不再恒空。
+        res = {"route": "inbox", "draft": None, "dedupe_hit": False, "field_confidence": {}}
+        tree = [{"id": "p1", "name": "交通", "children": [{"id": "c1", "name": "燃油"}]}]
+        with (
+            mock.patch.object(ik, "resolve_image_intake", return_value=res),
+            mock.patch.object(ik, "workspace_name", return_value="WS"),
+            mock.patch(
+                "services.purchase.settings.get_settings",
+                return_value={"auto_stock_in": False, "auto_book": False},
+            ),
+            mock.patch("services.purchase.categories.get_tree", return_value=tree),
+            mock.patch.object(ik, "_stash_inbox", return_value="I1"),
+            mock.patch("services.line_binding.line_action_nonce.mint", return_value="TOK"),
+            mock.patch(
+                "services.expense.category_ai.suggest_category", return_value=("p1", "c1")
+            ) as suggest,
+        ):
+            out = li.ingest_line_image(
+                object(),
+                tenant_id="t",
+                workspace_client_id=1,
+                fields={"document_type": "receipt", "seller_name": "BANGCHAK"},
+                confidence="high",
+                created_by="u",
+                api_key="k",
+            )
+        self.assertEqual(out["state"], "inbox")
+        suggest.assert_called_once()
+        self.assertEqual(out["card_fields"]["category"], "交通")
+        self.assertEqual(out["card_fields"]["subcategory"], "燃油")
 
 
 if __name__ == "__main__":

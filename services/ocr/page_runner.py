@@ -97,7 +97,10 @@ def _process_pages(
 
 
 # 复核屏「需复核高亮」的关键字段(与触发 Rule 4 同集)。
-_FIELD_CONF_ATTRS = ("invoice_number", "total_amount", "seller_tax", "date")
+# 日期不入逐字段置信:存的是已转公历(2026-06-13)而 L1 文本是泰国原始格式(13/06/26·佛历
+# 31.12.69)→ 恒不匹配 → 恒标「请核对」。佛历转换是确定性可靠的,日期不该靠像素置信复核
+# (迎合泰国票据日期格式 · Zihao 2026-06-16)。
+_FIELD_CONF_ATTRS = ("invoice_number", "total_amount", "seller_tax")
 
 
 def _field_confidences(l1_page: Page, invoice) -> Dict[str, float]:

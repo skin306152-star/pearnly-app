@@ -10,6 +10,32 @@ from __future__ import annotations
 from services.purchase import intake as ik
 
 
+def _smart_category(cur, *, tenant_id, workspace_client_id, vendor, descs, api_key):
+    """智能归类(图片路 · LLM 优先 → 关键词兜底)。返回 (cat_id, sub_id, cat_name, sub_name)。
+
+    很多泰文品名/供应商关键词命不中或误命中(分类不对/空)→ 有 key 时先让 LLM 在真实科目树里挑
+    (懂「ไฮดีเซล=柴油→交通」),挑不出/无 key 再退关键词。全空 → (None, None, '', '')。
+    """
+    from services.purchase import categories as cat_svc
+
+    cats = cat_svc.get_tree(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
+    joined = " / ".join(d for d in descs[:5] if d)
+    cat_id = sub_id = None
+    if api_key:
+        from services.expense import category_ai
+
+        cat_id, sub_id = category_ai.suggest_category(vendor, joined, cats, api_key=api_key)
+    if not cat_id:
+        cat_id, sub_id = ik._match_category(f"{vendor} {descs[0] if descs else ''}", cats)
+    if not cat_id:
+        return None, None, "", ""
+    for p in cats:
+        if p["id"] == cat_id:
+            sub_name = next((c["name"] for c in (p.get("children") or []) if c["id"] == sub_id), "")
+            return cat_id, sub_id, p["name"], sub_name
+    return cat_id, sub_id, "", ""
+
+
 def ingest_line_image(
     cur,
     *,
@@ -32,7 +58,6 @@ def ingest_line_image(
     """
     from services.expense import confidence as conf
     from services.line_binding import line_action_nonce as nonce
-    from services.purchase import categories as cat_svc
     from services.purchase import confidence_post
     from services.purchase import settings as settings_svc
 
@@ -93,6 +118,15 @@ def ingest_line_image(
                 image_url=image_ref,
                 ai_guess={"route": res["route"], "confidence": confidence},
             )
+        # 待归类也给智能分类建议(治加油票等 inbox 项分类恒空):
+        _, _, card_fields["category"], card_fields["subcategory"] = _smart_category(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            vendor=card_fields["vendor"],
+            descs=_item_names,
+            api_key=api_key,
+        )
         # 待归类展示金额(供卡片 + 决定是否给「仍要入账」):有可用总额才让一键入账,糊图 ฿0 只给编辑/丢弃。
         disp_amount = (fields.get("total_amount") or "").strip() or None
         return {
@@ -124,25 +158,20 @@ def ingest_line_image(
         card_fields["detail"] = " · ".join(descs[:3]) + (
             f" 等{len(descs)}项" if len(descs) > 3 else ""
         )
-    # 自动归类:先关键词命中(零成本),落空再 LLM 在真实科目里兜底(PO-9 · 仅图片路,省成本)。
-    cats = cat_svc.get_tree(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
+    # 智能归类(LLM 优先 → 关键词兜底):懂泰文品名,治「分类不对/空」。
     vendor_name = draft["supplier"].get("name") or ""
-    first_desc = draft["lines"][0]["description"] if draft.get("lines") else ""
-    cat_id, sub_id = ik._match_category(f"{vendor_name} {first_desc}", cats)
-    if not cat_id and api_key:
-        from services.expense import category_ai
-
-        cat_id, sub_id = category_ai.suggest_category(
-            vendor_name, " / ".join(descs[:5]), cats, api_key=api_key
-        )
+    cat_id, sub_id, _cat_name, _sub_name = _smart_category(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        vendor=vendor_name,
+        descs=descs,
+        api_key=api_key,
+    )
     if cat_id:
         draft["category_id"] = cat_id
-        for p in cats:
-            if p["id"] == cat_id:
-                card_fields["category"] = p["name"]
-                for c in p.get("children") or []:
-                    if c["id"] == sub_id:
-                        card_fields["subcategory"] = c["name"]
+        card_fields["category"] = _cat_name
+        card_fields["subcategory"] = _sub_name
 
     verdict = conf.grade(
         amount=amount,

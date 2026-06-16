@@ -64,11 +64,13 @@ def suggest_category(
         from services.ocr import gemini_models
         from services.ocr.layer2_gemini import _call_gemini_with_retry
 
-        # 用最强模型(非 flash-lite):分类要按业态+品名推理,弱模型易判错(咖啡→打车)。
+        # 用主力 flash(2.5-flash),非最强 3.5-flash:分类是「在选项里挑编号」的小任务,2.5-flash
+        # ~3s 且准(prod 实测咖啡→餐饮、加油→燃油、电费→水电全对);3.5-flash 慢、常超 12s →
+        # DeadlineExceeded 返空 → 分类全丢(这才是「分类一直空」的真因)。
         data, _meta = _call_gemini_with_retry(
             payload,
             api_key=api_key,
-            model_name=gemini_models.best(),
+            model_name=gemini_models.flash(),
             max_retries=1,
             timeout=timeout,
             system_prompt_override=_PROMPT,

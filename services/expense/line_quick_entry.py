@@ -292,6 +292,14 @@ def split_qty_price(amount, qty=None, unit_price=None) -> tuple[str, str]:
     return ("1", format(amt, "f"))
 
 
+def qty_label(name: str, qty=None) -> str:
+    """卡片明细名:数量>1 缀「×N」,否则原名(图/文单/多笔共用 · #10b)。"""
+    q = _to_decimal(str(qty)) if qty not in (None, "", 0) else None
+    if q is not None and q > 1:
+        return f"{name} ×{format(q.normalize(), 'f')}"
+    return name
+
+
 # L1 零成本意图(记账之外)——即便无 L2 也能正确分流,且即便句中有数字也不误记。
 _SUPPORT_KW = (
     "人工",

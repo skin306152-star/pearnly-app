@@ -17,19 +17,10 @@ from services.line_binding import line_client
 _WEB_PURCHASE_URL = "https://pearnly.com/home"
 
 
-def _item_label(it: dict) -> str:
-    """卡片明细名:数量>1 时后缀「×N」(#8),否则原名。"""
-    try:
-        q = Decimal(str(it.get("qty") or "1"))
-    except Exception:
-        q = Decimal("1")
-    return f"{it['name']} ×{format(q.normalize(), 'f')}" if q > 1 else it["name"]
-
-
 def do_record_multi(bound_user, reply_token, text, tid, ws, items, quote_token, lang) -> bool:
     """每项独立行 + 智能归类(批量一次 LLM)·合计入账·卡显逐条明细。返回 True。"""
     from services.expense import category_ai, confidence, line_l2
-    from services.expense.line_quick_entry import split_qty_price
+    from services.expense.line_quick_entry import qty_label, split_qty_price
     from services.line_binding import line_booker, line_card
     from services.purchase import categories as cat_svc
     from services.purchase import intake as intake_svc
@@ -116,7 +107,10 @@ def do_record_multi(bound_user, reply_token, text, tid, ws, items, quote_token, 
         "category": cat_name,
         "subcategory": sub_name,
         "vendor": vendor,
-        "items": [{"name": _item_label(it), "amount": f"{it['amount']:,.2f}"} for it in items],
+        "items": [
+            {"name": qty_label(it["name"], it.get("qty")), "amount": f"{it['amount']:,.2f}"}
+            for it in items
+        ],
         "detail": " · ".join(names[:3]) + (f" 等{len(names)}项" if len(names) > 3 else ""),
     }
     ack = {

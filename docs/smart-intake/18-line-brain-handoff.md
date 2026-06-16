@@ -3,6 +3,26 @@
 > 本页 = LINE「记账车道」本轮交接。先读 `~/.claude/.../memory/line-ocr-total-and-category-overhaul.md`
 > 和 `line-liff-edit-deeplink-complete.md`(全脉络),再读这页(待办 + 注意)。
 
+## ✅ 下一轮(2026-06-16 第二窗口)已交付(prod 真例逐条验过 · 别重做)
+- **#4 多图排队**:per-user FIFO 锁(`line_image_ocr.process_line_image_serial`)→ 图按到达顺序
+  一张张处理、一张卡发完再下一张;转圈移到轮到该图才发。单图路径不变。(锁进程内 · 覆盖 LINE
+  把同批图放进同一 POST events[] 主场景;真机多图顺序待 Zihao 手机验。)
+- **#7 收入 vs 支出**:`line_quick_entry.detect_income`(明确收入词【且】无购买动词才判,保守·零误挡
+  支出)→ 记账前拦下,回 `exp_income_guide`(不入账·引导网页)。prod 10 收入/12 支出 battery 全对。
+- **#8 数量**:`split_qty_price`(图/文共用)→「买2杯咖啡共120」qty=2 单价=60(per-line gross 量化
+  吸收·总额不漂,含不整除);多笔 LLM prompt 加 qty 输出、卡片明细显「×N」。prod LLM 实测对。
+- **#9 单笔路 date/vendor 平价**:L1 `_extract_vendor`(品牌字典 + 中文「在X买」)+ `_parse_date` 扩
+  前天/N天前;大脑 prompt 补 date/vendor 规则。prod L1 + 大脑双验。
+- **★大脑救活**:`line_agent.understand` 原用 `best()`=3.5-flash → prod 连续 504 → 大脑形同虚设
+  (查账/闲聊/编辑全退哑 L1)。改 `flash()`=2.5-flash → prod 实测 record/query/undo/chat 全答对。
+- **#10 /simplify**:抽 `services/line_binding/line_booker`(`book_and_mint` + `ack_key`)三路共用,
+  四文件净减;归类/总额/数量 prod 复验不变。**未做(下个窗口·风险较高故缓)**:卡片发射器统一
+  (`_reply_card` 收 items/detail override)、`_to_purchase_data` 泛化收 line 列表、category_ai
+  `_listing`/`_decode_choice`/prompt 常量抽取——字段形态单/多不同,需带真 booking E2E 再动。
+- **坑**:**webhook 偶尔不自动 deploy**(连续两次快推时第二次没触发)→ push 后必查 prod HEAD
+  (`ssh root@66.42.49.213 'cd /opt/mrpilot && git rev-parse --short HEAD'`),没跟上就手跑
+  `bash git-deploy.sh`(幂等·有健康检查回滚)。
+
 ## 0. 本轮已上线(prod 全部真票/真 LLM 验证过,别重做)
 - **LIFF 编辑深链**:点卡片「复核/编辑」直达该单可编辑页(治 `liff.state` 包裹坑)。
 - **总额修复**(`services/purchase/intake.py`):加油票 qty=积分×price 覆盖正确总额 → 行小计 subtotal 优先 + 多品项与票面对账收敛。7-11/加油/咖啡全对。

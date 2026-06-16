@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from services.line_binding import line_postback
 from services.line_binding.line_card_doctype import doc_type_label
+from services.line_binding.line_card_i18n import chrome as _lang
 
 _REVIEW_BELOW = 0.85
 
@@ -32,162 +33,6 @@ _SEP = "#EEF0F3"
 _WS_BG = "#F8FAFC"
 _LINK = "#4D607C"
 _LINK_DANGER = "#8F4A4A"
-
-# chrome 4 语(状态/字段名/来源/按钮)。
-_L = {
-    "zh": {
-        "posted": "已入账",
-        "confirm": "请确认",
-        "inbox": "需补全",
-        "dup": "可能重复",
-        "doc_type": "单据类型",
-        "exp_type": "支出类型",
-        "date": "日期",
-        "category": "分类",
-        "subcategory": "子分类",
-        "vendor": "卖家",
-        "tax_id": "税号",
-        "address": "地址",
-        "subtotal": "税前",
-        "inv_no": "发票号",
-        "detail": "明细",
-        "workspace": "套账",
-        "meta_expense": "支出",
-        "src_text": "来自文字",
-        "src_doc": "来自单据",
-        "src_bank": "付款证据",
-        "goods": "🛍 商品",
-        "service": "🧰 服务",
-        "evidence": "💳 付款证据",
-        "review": "(请核对)",
-        "na": "—",
-        "btn_confirm": "确认入账",
-        "btn_post_anyway": "仍要入账",
-        "btn_review": "复核 / 编辑",
-        "btn_edit": "编辑",
-        "btn_fill": "编辑补全",
-        "btn_undo": "撤销",
-        "btn_discard": "丢弃",
-        "btn_open": "打开原记录",
-        "btn_receipt": "替代收据",
-        "dup_seen": "已存在记录",
-    },
-    "th": {
-        "posted": "บันทึกแล้ว",
-        "confirm": "โปรดยืนยัน",
-        "inbox": "ต้องเพิ่มข้อมูล",
-        "dup": "อาจซ้ำ",
-        "doc_type": "ประเภทเอกสาร",
-        "exp_type": "ประเภทค่าใช้จ่าย",
-        "date": "วันที่",
-        "category": "หมวดหมู่",
-        "subcategory": "หมวดย่อย",
-        "vendor": "ผู้ขาย",
-        "tax_id": "เลขภาษี",
-        "address": "ที่อยู่",
-        "subtotal": "ก่อนภาษี",
-        "inv_no": "เลขที่ใบกำกับ",
-        "detail": "รายละเอียด",
-        "workspace": "ชุดบัญชี",
-        "meta_expense": "ค่าใช้จ่าย",
-        "src_text": "จากข้อความ",
-        "src_doc": "จากเอกสาร",
-        "src_bank": "หลักฐานชำระเงิน",
-        "goods": "🛍 สินค้า",
-        "service": "🧰 บริการ",
-        "evidence": "💳 หลักฐานชำระเงิน",
-        "review": "(โปรดตรวจ)",
-        "na": "—",
-        "btn_confirm": "ยืนยันบันทึก",
-        "btn_post_anyway": "บันทึกต่อ",
-        "btn_review": "ตรวจสอบ / แก้ไข",
-        "btn_edit": "แก้ไข",
-        "btn_fill": "แก้ไข / เติมข้อมูล",
-        "btn_undo": "ยกเลิก",
-        "btn_discard": "ทิ้ง",
-        "btn_open": "เปิดรายการเดิม",
-        "btn_receipt": "ใบแทนใบเสร็จ",
-        "dup_seen": "มีรายการอยู่แล้ว",
-    },
-    "en": {
-        "posted": "Recorded",
-        "confirm": "Confirm",
-        "inbox": "Needs info",
-        "dup": "Possible duplicate",
-        "doc_type": "Document",
-        "exp_type": "Type",
-        "date": "Date",
-        "category": "Category",
-        "subcategory": "Subcategory",
-        "vendor": "Vendor",
-        "tax_id": "Tax ID",
-        "address": "Address",
-        "subtotal": "Subtotal",
-        "inv_no": "Invoice no.",
-        "detail": "Detail",
-        "workspace": "Ledger",
-        "meta_expense": "Expense",
-        "src_text": "From text",
-        "src_doc": "From document",
-        "src_bank": "Payment evidence",
-        "goods": "🛍 Goods",
-        "service": "🧰 Service",
-        "evidence": "💳 Payment evidence",
-        "review": "(review)",
-        "na": "—",
-        "btn_confirm": "Confirm",
-        "btn_post_anyway": "Record anyway",
-        "btn_review": "Review / Edit",
-        "btn_edit": "Edit",
-        "btn_fill": "Edit / Complete",
-        "btn_undo": "Undo",
-        "btn_discard": "Discard",
-        "btn_open": "Open original",
-        "btn_receipt": "Substitute receipt",
-        "dup_seen": "Existing record",
-    },
-    "ja": {
-        "posted": "記帳済",
-        "confirm": "確認",
-        "inbox": "要入力",
-        "dup": "重複の可能性",
-        "doc_type": "書類種別",
-        "exp_type": "費用種別",
-        "date": "日付",
-        "category": "分類",
-        "subcategory": "サブ分類",
-        "vendor": "取引先",
-        "tax_id": "税番号",
-        "address": "住所",
-        "subtotal": "税抜",
-        "inv_no": "請求番号",
-        "detail": "明細",
-        "workspace": "帳簿",
-        "meta_expense": "支出",
-        "src_text": "テキストから",
-        "src_doc": "書類から",
-        "src_bank": "支払証憑",
-        "goods": "🛍 商品",
-        "service": "🧰 サービス",
-        "evidence": "💳 支払証憑",
-        "review": "(要確認)",
-        "na": "—",
-        "btn_confirm": "記帳する",
-        "btn_post_anyway": "このまま記帳",
-        "btn_review": "確認 / 編集",
-        "btn_edit": "編集",
-        "btn_fill": "編集 / 入力",
-        "btn_undo": "取消",
-        "btn_discard": "破棄",
-        "btn_open": "元の記録を開く",
-        "btn_receipt": "代替領収書",
-        "dup_seen": "既存の記録",
-    },
-}
-
-
-def _lang(lang: str) -> dict:
-    return _L.get((lang or "zh").lower(), _L["zh"])
 
 
 def _txt(text, *, size, color, **kw) -> dict:
@@ -347,6 +192,7 @@ def result_card(
     workspace_name: str = "",
     dup_info: dict = None,
     token: str = "",
+    warn_total: bool = False,
 ) -> dict:
     """识别结果 Flex 卡(照搬定稿原型)。
 
@@ -441,6 +287,19 @@ def result_card(
             ],
         },
     ]
+    if warn_total:  # 明细加总与单据总额对不上 → 醒目橙条提示(紧跟状态条·对标 Paypers)
+        body.insert(
+            1,
+            {
+                "type": "box",
+                "layout": "vertical",
+                "margin": "md",
+                "paddingAll": "10px",
+                "backgroundColor": "#FEF3E2",
+                "cornerRadius": "md",
+                "contents": [_txt(t["warn_total"], size="xxs", color="#B45309", wrap=True)],
+            },
+        )
     if state == "dup" and dup_info:
         body.append(
             {

@@ -25,6 +25,9 @@ _PROMPT = (
     "- stationery / IT / software / office supplies → office expense\n"
     "- taxi/Grab/flight/hotel/toll → travel & transport\n"
     "- raw materials / goods for resale → cost of goods\n"
+    "CRITICAL: coffee / drinks / snacks / meals / any food item (even bought at a convenience "
+    "store) → food & entertainment, NEVER travel. Travel/transport is ONLY taxi/Grab/fuel/flight/"
+    "hotel/toll — never food.\n"
     "ALWAYS pick the single closest-matching number — make a reasonable best guess. Choose 0 ONLY "
     "when the receipt is truly unrelated to EVERY listed category (never pick 0 just because it is "
     "a mix).\n"
@@ -61,10 +64,11 @@ def suggest_category(
         from services.ocr import gemini_models
         from services.ocr.layer2_gemini import _call_gemini_with_retry
 
+        # 用 flash(非 flash-lite):分类要按业态+品名推理,lite 易判错(咖啡→打车)。
         data, _meta = _call_gemini_with_retry(
             payload,
             api_key=api_key,
-            model_name=gemini_models.flash_lite(),
+            model_name=gemini_models.flash(),
             max_retries=1,
             timeout=timeout,
             system_prompt_override=_PROMPT,

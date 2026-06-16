@@ -7,7 +7,36 @@
 
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
+
 from services.purchase import intake as ik
+
+
+def _dec(v) -> Decimal:
+    try:
+        return Decimal(str(v).replace(",", "").strip() or "0")
+    except (InvalidOperation, ValueError, TypeError):
+        return Decimal("0")
+
+
+def _total_mismatch(fields: dict) -> bool:
+    """抽到的逐条明细加总 + VAT 与票面总额对不上(超 1 baht 且 2%)→ 提示明细可能不全/有误。
+
+    无明细 / 无总额 → 不判(不误报)。明细额取 subtotal,缺则 qty×price。这是软提示,不阻断。
+    """
+    items = fields.get("items") or []
+    total = _dec(fields.get("total_amount"))
+    if not items or total <= 0:
+        return False
+    items_sum = Decimal("0")
+    for it in items:
+        sub = _dec(it.get("subtotal"))
+        items_sum += sub if sub > 0 else (_dec(it.get("qty") or 1) * _dec(it.get("price")))
+    if items_sum <= 0:
+        return False
+    recon = items_sum + _dec(fields.get("vat"))
+    tol = max(Decimal("1"), total * Decimal("0.02"))
+    return abs(recon - total) > tol
 
 
 def _smart_category(cur, *, tenant_id, workspace_client_id, vendor, descs, api_key):
@@ -103,6 +132,7 @@ def ingest_line_image(
         ),
     }
     fc = res.get("field_confidence") or {}
+    warn_total = _total_mismatch(fields)
     draft = res.get("draft")
 
     # 低置信/糊图(resolve 已落 inbox)或 sales/recon(LINE 不建单)→ 待归类安全网(不丢)。
@@ -138,6 +168,7 @@ def ingest_line_image(
             "card_fields": card_fields,
             "field_confidence": fc,
             "workspace_name": ws_name,
+            "warn_total": warn_total,
             "token": nonce.mint(
                 cur,
                 tenant_id=tenant_id,
@@ -203,6 +234,7 @@ def ingest_line_image(
         "card_fields": card_fields,
         "field_confidence": fc,
         "workspace_name": ws_name,
+        "warn_total": warn_total,
         "token": nonce.mint(
             cur,
             tenant_id=tenant_id,

@@ -123,6 +123,26 @@ class CardTests(unittest.TestCase):
                     self.fail(f"{state} 动作区不应再有 box(横排挤压)")
             self.assertTrue(any(n["type"] == "button" for n in foot))
 
+    def test_warn_total_shows_amber_hint(self):
+        import json
+
+        s = json.dumps(self._card("confirm", warn_total=True), ensure_ascii=False)
+        self.assertIn("请核对", s)
+        self.assertIn("不符", s)
+
+    def test_no_warn_total_no_hint(self):
+        import json
+
+        s = json.dumps(self._card("confirm"), ensure_ascii=False)
+        self.assertNotIn("不符", s)
+
+    def test_buttons_each_separated_by_divider(self):
+        # 每个动作之间都有分隔线(posted: 复核·替代收据·撤销 三者两两之间)。
+        foot = self._footer_contents(self._card("posted", source="text"))
+        btns = sum(1 for n in foot if n["type"] == "button")
+        seps = sum(1 for n in foot if n["type"] == "separator")
+        self.assertEqual(seps, btns - 1)  # N 个按钮 → N-1 条线
+
     def test_action_groups_separated_by_divider(self):
         # 查看组与危险组之间有分隔线(按内容分组画线)。
         for state in ("posted", "confirm", "dup", "inbox"):
@@ -215,6 +235,23 @@ class CardTests(unittest.TestCase):
             )
             self.assertEqual(c["type"], "flex")
             self.assertIn(line_postback.ACTION_CONFIRM, self._actions(c))
+
+
+class CardChromeI18nTests(unittest.TestCase):
+    """卡片 chrome 文案 4 语键齐(抽出 line_card_i18n 后防漏键)。"""
+
+    def test_four_langs_same_keys(self):
+        from services.line_binding import line_card_i18n
+
+        keys = {lang: set(line_card_i18n.chrome(lang)) for lang in ("zh", "th", "en", "ja")}
+        for lang in ("th", "en", "ja"):
+            self.assertEqual(keys["zh"], keys[lang], f"{lang} 键与 zh 不一致")
+        self.assertIn("warn_total", keys["zh"])
+
+    def test_unknown_lang_falls_back_zh(self):
+        from services.line_binding import line_card_i18n
+
+        self.assertEqual(line_card_i18n.chrome("xx"), line_card_i18n.chrome("zh"))
 
 
 class DocTypeLabelTests(unittest.TestCase):

@@ -20,7 +20,7 @@ def _suggest(choice, **kw):
     with mock.patch(
         "services.ocr.layer2_gemini._call_gemini_with_retry", return_value=({"choice": choice}, {})
     ):
-        with mock.patch("services.ocr.gemini_models.flash_lite", return_value="m"):
+        with mock.patch("services.ocr.gemini_models.flash", return_value="m"):
             return category_ai.suggest_category(
                 "ร้านอาหารทะเล", "กุ้ง / ปลา", _TREE, api_key="k", **kw
             )
@@ -52,7 +52,7 @@ class SuggestTests(unittest.TestCase):
         with mock.patch(
             "services.ocr.layer2_gemini._call_gemini_with_retry", side_effect=RuntimeError("boom")
         ):
-            with mock.patch("services.ocr.gemini_models.flash_lite", return_value="m"):
+            with mock.patch("services.ocr.gemini_models.flash", return_value="m"):
                 self.assertEqual(
                     category_ai.suggest_category("v", "i", _TREE, api_key="k"), (None, None)
                 )

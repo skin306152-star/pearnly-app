@@ -188,5 +188,28 @@ class IngestTests(unittest.TestCase):
         self.assertEqual(out["card_fields"]["subcategory"], "燃油")
 
 
+class TotalMismatchTests(unittest.TestCase):
+    """总额不符提示:明细加总+VAT 与票面总额对不上才提示;对得上/无明细不误报。"""
+
+    def test_reconciles_no_warn(self):
+        f = {
+            "items": [{"qty": "1", "price": "1000"}],
+            "vat": "70",
+            "total_amount": "1070",
+        }
+        self.assertFalse(li._total_mismatch(f))
+
+    def test_mismatch_warns(self):
+        # 明细只抽到 1000,但总额 2722(漏行)→ 提示。
+        f = {"items": [{"subtotal": "1000"}], "vat": "0", "total_amount": "2722"}
+        self.assertTrue(li._total_mismatch(f))
+
+    def test_no_items_no_warn(self):
+        self.assertFalse(li._total_mismatch({"total_amount": "500", "items": []}))
+
+    def test_no_total_no_warn(self):
+        self.assertFalse(li._total_mismatch({"items": [{"subtotal": "100"}]}))
+
+
 if __name__ == "__main__":
     unittest.main()

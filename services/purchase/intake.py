@@ -17,13 +17,7 @@ from typing import Optional
 from services.purchase import totals as totals_svc
 from services.purchase.expense_keywords import EXPENSE_KEYWORDS as _EXPENSE_KEYWORDS
 
-_TAX_RE = re.compile(r"\d")
 _NUM_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
-
-
-def _norm_tax(v) -> str:
-    """税号归一 = 只留数字(挡空格/连字符差异)。"""
-    return "".join(_TAX_RE.findall(str(v or "")))
 
 
 def _to_decimal(v) -> Decimal:

@@ -77,6 +77,7 @@ def migrate(cur, apply: bool, drop_table: bool) -> dict:
         return report
 
     owner_cache: dict = {}
+    settings_cache: dict = {}
     for item in items:
         tid, ws, iid = item["tenant_id"], item["workspace_client_id"], str(item["id"])
         try:
@@ -86,7 +87,11 @@ def migrate(cur, apply: bool, drop_table: bool) -> dict:
             if not owner:
                 report["skipped"].append({"id": iid, "reason": "no_owner"})
                 continue
-            cfg = settings_svc.get_settings(cur, tenant_id=tid, workspace_client_id=ws)
+            if (tid, ws) not in settings_cache:
+                settings_cache[(tid, ws)] = settings_svc.get_settings(
+                    cur, tenant_id=tid, workspace_client_id=ws
+                )
+            cfg = settings_cache[(tid, ws)]
             created = docs_svc.create_doc(
                 cur,
                 tenant_id=tid,

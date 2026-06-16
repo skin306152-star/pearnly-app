@@ -278,14 +278,13 @@ def _record_link(web_url: str, ref: str, state: str) -> str:
 
 
 def _stack(primary: dict, view: list, danger: list) -> list:
-    """竖排装配:提交/查看·编辑/撤销·丢弃三组,每个按钮独占一行,组间分隔线(治同行挤压截断)。"""
+    """竖排装配:每个动作独占一行,行行之间画分隔线(对标 Paypers · 治同行挤压截断 + 视觉分隔)。"""
+    buttons = ([primary] if primary else []) + view + danger
     out = []
-    for group in ([primary] if primary else [], view, danger):
-        if not group:
-            continue
-        if out:
+    for i, btn in enumerate(buttons):
+        if i:
             out.append({"type": "separator", "margin": "md", "color": _SEP})
-        out.extend(group)
+        out.append(btn)
     return out
 
 

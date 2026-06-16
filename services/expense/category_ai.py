@@ -16,8 +16,18 @@ logger = logging.getLogger(__name__)
 
 _PROMPT = (
     "You categorize a Thai SMB business expense into ONE existing account category.\n"
-    "You are given the vendor, line items, and a NUMBERED list of allowed categories.\n"
-    "Pick the single best-matching number from the list. If none clearly fits, choose 0.\n"
+    "You get the vendor name, line items, and a NUMBERED list of allowed categories.\n"
+    "Reason from BOTH the vendor type AND the items together:\n"
+    "- convenience store (7-Eleven/CP ALL/Lotus/FamilyMart) / restaurant / cafe / food delivery, "
+    "or food & drink items → food & entertainment\n"
+    "- fuel / petrol station (Bangchak/PTT/Shell/Caltex) or fuel items → travel & transport / fuel\n"
+    "- water/electric/internet/phone bill → utilities\n"
+    "- stationery / IT / software / office supplies → office expense\n"
+    "- taxi/Grab/flight/hotel/toll → travel & transport\n"
+    "- raw materials / goods for resale → cost of goods\n"
+    "ALWAYS pick the single closest-matching number — make a reasonable best guess. Choose 0 ONLY "
+    "when the receipt is truly unrelated to EVERY listed category (never pick 0 just because it is "
+    "a mix).\n"
     'Never invent a category. Output ONLY JSON: {"choice": <number>} and nothing else.'
 )
 

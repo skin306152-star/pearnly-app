@@ -183,9 +183,12 @@ def _do_record(bound_user, reply_token, text, tid, ws, draft, used_l2, quote_tok
     from services.purchase import settings as settings_svc
 
     created_by = str(bound_user["id"]) if bound_user.get("id") else None
+    from services.expense import line_l2
+
+    api_key = line_l2.resolve_api_key(bound_user)
     with db.get_cursor_rls(tid, commit=True) as cur:
         tree = cat_svc.get_tree(cur, tenant_id=tid, workspace_client_id=ws)
-        _fill_category(cur, draft, text, tree, tid, ws)
+        _fill_category(cur, draft, text, tree, tid, ws, api_key)
         cfg = settings_svc.get_settings(cur, tenant_id=tid, workspace_client_id=ws)
         ws_name = intake_svc.workspace_name(cur, tenant_id=tid, workspace_client_id=ws)
         is_dup = _dup_warn(bound_user, draft, ws)
@@ -424,8 +427,12 @@ def _qr_item(label: str, text: str) -> dict:
     return {"type": "action", "action": {"type": "message", "label": label[:20], "text": text}}
 
 
-def _fill_category(cur, draft, text, tree, tid, ws) -> None:
-    """填 category/subcategory(名+id)。先查已学习词典(越用越省),再内置关键词匹配真实树。"""
+def _fill_category(cur, draft, text, tree, tid, ws, api_key=None) -> None:
+    """填 category/subcategory(名+id)。学习词典(越用越省)→ 关键词 → LLM 智能兜底。
+
+    关键词对中文/泰文混输或品名(「水费」「ทุเรียน」)常命不中 → 有 key 时让 LLM 在真实树里挑
+    (懂跨语言+品名),治文字路分类恒空。无 key 才止于关键词。
+    """
     from services.expense import conversation
     from services.purchase import intake as intake_svc
 
@@ -438,6 +445,12 @@ def _fill_category(cur, draft, text, tree, tid, ws) -> None:
         return
 
     cat_id, sub_id = intake_svc._match_category(text, tree)
+    if not cat_id and api_key:
+        from services.expense import category_ai
+
+        cat_id, sub_id = category_ai.suggest_category(
+            draft.vendor_name or "", text, tree, api_key=api_key
+        )
     if not cat_id:
         return
     for parent in tree:

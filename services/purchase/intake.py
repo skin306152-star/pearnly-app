@@ -81,6 +81,12 @@ def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
     for it in fields.get("items") or []:
         qty = _to_decimal(it.get("qty")) or Decimal("1")
         price = _to_decimal(it.get("price"))
+        sub = _to_decimal(it.get("subtotal"))
+        # OCR 行小计可信(常对齐总额);qty/price 在加油/积分票常被误读(22 积分 × 39.85 = 876.70 ≠
+        # 真实 1780)。subtotal 与 qty×price 矛盾时信 subtotal(行额 = subtotal,qty=1),
+        # 别让瞎凑的乘积覆盖正确总额。一致或无 subtotal 则保留 qty/price 明细。
+        if sub > 0 and abs(qty * price - sub) > Decimal("0.5"):
+            qty, price = Decimal("1"), sub
         lines.append(
             {
                 "item_type": "goods",
@@ -346,6 +352,7 @@ def fields_from_invoice(inv) -> dict:
                 "name": getattr(it, "name", ""),
                 "qty": getattr(it, "qty", ""),
                 "price": getattr(it, "price", ""),
+                "subtotal": getattr(it, "subtotal", ""),
             }
             for it in (getattr(inv, "items", None) or [])
         ],

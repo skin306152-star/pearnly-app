@@ -97,6 +97,20 @@ class BuildDraftTests(unittest.TestCase):
         self.assertEqual(len(d["lines"]), 1)
         self.assertEqual(d["lines"][0]["unit_price"], "1000")
 
+    def test_subtotal_trusted_when_qty_price_conflict(self):
+        # 加油票:qty=22(积分)× price=39.85 = 876.70 ≠ subtotal 1780 → 信 subtotal,行额=1780。
+        f = {"items": [{"name": "ไฮดีเซล", "qty": "22", "price": "39.85", "subtotal": "1780"}]}
+        ln = ik.build_draft_from_invoice(f, kind="expense")["lines"][0]
+        self.assertEqual(ln["qty"], "1")
+        self.assertEqual(ln["unit_price"], "1780")
+
+    def test_qty_price_kept_when_consistent(self):
+        # qty×price 与 subtotal 一致 → 保留明细(不动)。
+        f = {"items": [{"name": "x", "qty": "2", "price": "50", "subtotal": "100"}]}
+        ln = ik.build_draft_from_invoice(f, kind="expense")["lines"][0]
+        self.assertEqual(ln["qty"], "2")
+        self.assertEqual(ln["unit_price"], "50")
+
 
 class ClassifyExpenseTests(unittest.TestCase):
     TREE = [

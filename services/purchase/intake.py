@@ -3,7 +3,7 @@
 
 统一入口:图(OCR 结构化结果)/ 文字一句话 → 建草稿落采购列表。待归类已下线:识别完的票一律
 建成草稿(ฉบับร่าง),用户在列表里改方向/补金额/删,系统不再单独兜一个待归类桶。
-判方向:有 VAT → 进项票(可抵·route=purchase);无 VAT/截图证据 → 费用(route=expense)。销项分类
+判方向:完整税票且有 VAT → 进项票(可抵·route=purchase);其他票据/截图证据 → 费用(route=expense)。销项分类
 后期按上传前选业务类型单独做。判定 + 草稿构建 + 费用文本归类全做纯函数(可测),OCR 运行/计费
 在路由层复用 services/ocr/entrypoints。隔离=每句 WHERE tenant_id;调用方管事务。
 """
@@ -15,6 +15,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from services.purchase import totals as totals_svc
+from services.purchase.ocr_corrections import normalize_fields
 from services.purchase.expense_keywords import EXPENSE_KEYWORDS as _EXPENSE_KEYWORDS
 
 _NUM_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
@@ -31,14 +32,16 @@ def judge_direction(fields: dict) -> tuple[str, str]:
     """判 (kind, route)。fields = OCR 抽取(document_type/vat/...)。
 
     待归类已下线:识别完的票一律建草稿落采购列表(用户在列表改方向/删),不再判 inbox/销项分流。
-    有 VAT → 进项票(可抵进项税·route=purchase);无 VAT → 费用(route=expense)。
+    只有完整税票(tax_invoice)且有 VAT 才自动走进项票(可抵进项税·route=purchase)。
+    简式税票 / receipt 即便印了 VAT,也先按费用处理,避免把不可抵扣票据自动计入进项税。
     银行转账/电商订单截图(payment_evidence)非正规税票 → 一律费用、不抵 VAT(用户可改)。
     销项分类(我是卖方)后期按上传前选业务类型单独做,届时再引入主体税号比对。
     """
+    fields = normalize_ocr_fields(fields)
     dtype = (fields.get("document_type") or "").lower()
     if dtype in ("payment_evidence", "order_evidence"):
         return "expense", "expense"
-    if _to_decimal(fields.get("vat")) > 0:
+    if dtype == "tax_invoice" and _to_decimal(fields.get("vat")) > 0:
         return "purchase_invoice", "purchase"
     return "expense", "expense"
 
@@ -49,9 +52,9 @@ def default_payment_status(doc_type: str, doc_kind: str) -> str:
     无明确单据类型:费用单(快记/无 VAT 多为现金小额)默认已付,其余(进货)未付。
     """
     dt = (doc_type or "").strip().lower()
-    if dt == "receipt":
+    if dt in ("receipt", "simplified_tax_invoice"):
         return "paid"
-    if dt in ("tax_invoice", "simplified_tax_invoice", "credit_note"):
+    if dt in ("tax_invoice", "credit_note"):
         return "unpaid"
     return "paid" if doc_kind == "expense" else "unpaid"
 
@@ -68,11 +71,28 @@ def _single_line(fields: dict, base: Decimal, vat_rate: int) -> dict:
     }
 
 
+def normalize_ocr_fields(fields: dict | None) -> dict:
+    """Normalize deterministic OCR mistakes before routing/building drafts."""
+    return normalize_fields(fields)
+
+
+def _draft_base(fields: dict, *, kind: str, has_vat: bool) -> Decimal:
+    subtotal = _to_decimal(fields.get("subtotal"))
+    vat = _to_decimal(fields.get("vat"))
+    total = _to_decimal(fields.get("total_amount"))
+    if kind == "expense":
+        return total or subtotal
+    if has_vat and subtotal <= 0 and total > vat > 0:
+        return total - vat
+    return subtotal or total
+
+
 def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
     """OCR 抽取 → 进项录入草稿(屏10 预填)。行取自 items,无 items 则按总额单行兜底。
 
     费用类(kind=expense·含截图证据)不带可抵进项 VAT,即便 OCR 读到 vat 也归 0(进项票才抵)。
     """
+    fields = normalize_ocr_fields(fields)
     has_vat = kind != "expense" and _to_decimal(fields.get("vat")) > 0
     vat_rate = 7 if has_vat else 0
     lines = []
@@ -95,7 +115,7 @@ def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
                 "wht_rate": 0,
             }
         )
-    base = _to_decimal(fields.get("subtotal")) or _to_decimal(fields.get("total_amount"))
+    base = _draft_base(fields, kind=kind, has_vat=has_vat)
     if not lines:
         # 无明细:用税前小计或总额倒推单行,让用户在屏10 补全。
         lines = [_single_line(fields, base, vat_rate)]
@@ -195,6 +215,7 @@ def resolve_image_intake(
     待归类已下线:识别完一律建草稿(糊图/฿0 也建·用户在列表补全/删),不再落 inbox。
     confidence_band + field_confidence(逐字段)透出给复核屏「需复核高亮」(契约 05 §1.1)。
     """
+    fields = normalize_ocr_fields(fields)
     kind, route = judge_direction(fields)
     low_conf = str(confidence or "").lower() in ("needs_review", "low", "")
     fc = dict(field_confidence or {})
@@ -283,29 +304,31 @@ def resolve_image_intake(
 
 def fields_from_invoice(inv) -> dict:
     """ThaiInvoice(OCR 结构化结果)→ 判方向/建草稿用的扁平 fields。"""
-    return {
-        "document_type": getattr(inv, "document_type", ""),
-        "is_not_invoice": getattr(inv, "is_not_invoice", False),
-        "seller_name": getattr(inv, "seller_name", ""),
-        "seller_tax": getattr(inv, "seller_tax", ""),
-        "seller_addr": getattr(inv, "seller_addr", ""),
-        "buyer_name": getattr(inv, "buyer_name", ""),
-        "buyer_tax": getattr(inv, "buyer_tax", ""),
-        "invoice_number": getattr(inv, "invoice_number", ""),
-        "date": getattr(inv, "date", ""),
-        "subtotal": getattr(inv, "subtotal", ""),
-        "vat": getattr(inv, "vat", ""),
-        "total_amount": getattr(inv, "total_amount", ""),
-        "items": [
-            {
-                "name": getattr(it, "name", ""),
-                "qty": getattr(it, "qty", ""),
-                "price": getattr(it, "price", ""),
-                "subtotal": getattr(it, "subtotal", ""),
-            }
-            for it in (getattr(inv, "items", None) or [])
-        ],
-    }
+    return normalize_ocr_fields(
+        {
+            "document_type": getattr(inv, "document_type", ""),
+            "is_not_invoice": getattr(inv, "is_not_invoice", False),
+            "seller_name": getattr(inv, "seller_name", ""),
+            "seller_tax": getattr(inv, "seller_tax", ""),
+            "seller_addr": getattr(inv, "seller_addr", ""),
+            "buyer_name": getattr(inv, "buyer_name", ""),
+            "buyer_tax": getattr(inv, "buyer_tax", ""),
+            "invoice_number": getattr(inv, "invoice_number", ""),
+            "date": getattr(inv, "date", ""),
+            "subtotal": getattr(inv, "subtotal", ""),
+            "vat": getattr(inv, "vat", ""),
+            "total_amount": getattr(inv, "total_amount", ""),
+            "items": [
+                {
+                    "name": getattr(it, "name", ""),
+                    "qty": getattr(it, "qty", ""),
+                    "price": getattr(it, "price", ""),
+                    "subtotal": getattr(it, "subtotal", ""),
+                }
+                for it in (getattr(inv, "items", None) or [])
+            ],
+        }
+    )
 
 
 def line_expense_gate_open(cur, *, tenant_id) -> bool:

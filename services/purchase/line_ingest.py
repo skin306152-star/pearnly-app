@@ -56,6 +56,24 @@ def _card_items(fields: dict) -> list:
     return out
 
 
+def _draft_card_items(draft: dict) -> list:
+    """采购草稿行 → 卡片明细。
+
+    OCR 原始 items 可能已经被 build_draft_from_invoice 收敛成单行(例如小票行明细
+    加总和票面总额不符)。卡片必须显示收敛后的草稿行,否则用户会看到已经被系统丢弃的错明细。
+    """
+    out = []
+    for ln in draft.get("lines") or []:
+        name = str(ln.get("description") or "").strip()
+        if not name:
+            continue
+        amt = _dec(ln.get("line_total"))
+        if amt <= 0:
+            amt = _dec(ln.get("qty") or 1) * _dec(ln.get("unit_price"))
+        out.append({"name": name, "amount": (f"{amt:,.2f}" if amt > 0 else "")})
+    return out
+
+
 def _smart_category(cur, *, tenant_id, workspace_client_id, vendor, descs, api_key):
     """智能归类(图片路 · LLM 优先 → 关键词兜底)。返回 (cat_id, sub_id, cat_name, sub_name)。
 
@@ -104,6 +122,7 @@ def ingest_line_image(
       confirm/dup     → create_doc 草稿(落列表·卡片可一键确认)
     返回 {state, doc_id, amount, card_fields, field_confidence},调用方据此发数据卡。
     """
+    fields = ik.normalize_ocr_fields(fields)
     from services.expense import confidence as conf
     from services.line_binding import line_booker
     from services.purchase import settings as settings_svc
@@ -154,6 +173,9 @@ def ingest_line_image(
     warn_total = _total_mismatch(fields)
     draft = res["draft"]
     amount = draft.get("grand_total") or "0"
+    draft_items = _draft_card_items(draft)
+    if draft_items:
+        card_fields["items"] = draft_items
     # 逐条明细填进卡(对标竞品「รายการค่าใช้จ่าย」):取真实商品行(跳过卖家兜底单行),顶 3 条 + 「等N项」。
     descs = [
         (ln.get("description") or "").strip()

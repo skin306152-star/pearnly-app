@@ -22,6 +22,16 @@ class JudgeDirectionTests(unittest.TestCase):
         f = {"document_type": "receipt", "vat": "0"}
         self.assertEqual(ik.judge_direction(f), ("expense", "expense"))
 
+    def test_receipt_with_vat_stays_expense(self):
+        # 普通 receipt 即便印了 VAT,也不能自动当可抵进项税票。
+        f = {"document_type": "receipt", "vat": "178.08"}
+        self.assertEqual(ik.judge_direction(f), ("expense", "expense"))
+
+    def test_simplified_tax_invoice_with_vat_stays_expense(self):
+        # 简式税票/小票不能抵进项 VAT,先按费用入草稿。
+        f = {"document_type": "simplified_tax_invoice", "vat": "7"}
+        self.assertEqual(ik.judge_direction(f), ("expense", "expense"))
+
     def test_payment_evidence_to_expense_no_vat(self):
         # 银行转账截图非正规税票 → 一律费用、不抵 VAT(即便 OCR 读到 vat)。
         f = {"document_type": "payment_evidence", "vat": "70"}
@@ -31,9 +41,10 @@ class JudgeDirectionTests(unittest.TestCase):
         f = {"document_type": "order_evidence", "vat": "0"}
         self.assertEqual(ik.judge_direction(f), ("expense", "expense"))
 
-    def test_no_doctype_with_vat_to_purchase(self):
+    def test_no_doctype_with_vat_stays_expense(self):
+        # 票种未知时不把 VAT 当成可抵进项依据。
         f = {"vat": "7"}
-        self.assertEqual(ik.judge_direction(f)[1], "purchase")
+        self.assertEqual(ik.judge_direction(f), ("expense", "expense"))
 
 
 class BuildDraftTests(unittest.TestCase):
@@ -58,6 +69,22 @@ class BuildDraftTests(unittest.TestCase):
         d = ik.build_draft_from_invoice(f, kind="expense")
         self.assertFalse(d["has_vat"])
         self.assertEqual(d["lines"][0]["vat_rate"], 0)
+
+    def test_expense_receipt_uses_final_total_not_pre_vat_subtotal(self):
+        # 普通 receipt/simplified tax invoice 不能抵 VAT,但 VAT 仍是费用成本。
+        # 不能用税前 subtotal 2544 少记这张餐饮票,草稿金额应是最终实付 2722。
+        f = {
+            "document_type": "receipt",
+            "seller_name": "ร้านอาหาร",
+            "subtotal": "2544",
+            "vat": "178.08",
+            "total_amount": "2722",
+            "items": [{"name": "อาหาร", "qty": "1", "price": "2544", "subtotal": "2544"}],
+        }
+        d = ik.build_draft_from_invoice(f, kind="expense")
+        self.assertFalse(d["has_vat"])
+        self.assertEqual(d["lines"], [d["lines"][0]])
+        self.assertEqual(d["lines"][0]["unit_price"], "2722")
 
     def test_no_items_fallback_single_line(self):
         f = {
@@ -84,6 +111,47 @@ class BuildDraftTests(unittest.TestCase):
         ln = ik.build_draft_from_invoice(f, kind="expense")["lines"][0]
         self.assertEqual(ln["qty"], "2")
         self.assertEqual(ln["unit_price"], "50")
+
+    def test_tax_invoice_infers_subtotal_from_total_and_vat(self):
+        f = {
+            "document_type": "tax_invoice",
+            "vat": "70",
+            "total_amount": "1070",
+            "items": [],
+        }
+        d = ik.build_draft_from_invoice(f, kind="purchase_invoice")
+        self.assertTrue(d["has_vat"])
+        self.assertEqual(d["lines"][0]["unit_price"], "1000.00")
+
+
+class OcrCorrectionTests(unittest.TestCase):
+    def test_tax_id_normalized_from_labelled_text(self):
+        f = ik.normalize_ocr_fields({"seller_tax": "Tax#0107537002443"})
+        self.assertEqual(f["seller_tax"], "0107537002443")
+
+    def test_branch_number_not_used_as_invoice_no(self):
+        f = ik.normalize_ocr_fields(
+            {
+                "seller_name": "บริษัท เซ็นทรัลพัฒนา จำกัด (มหาชน) สาขาที่ 00016",
+                "invoice_number": "00016",
+            }
+        )
+        self.assertEqual(f["invoice_number"], "")
+        self.assertIn("invoice_number_branch_removed", f["_corrections"])
+
+    def test_date_normalized_from_thai_short_year(self):
+        f = ik.normalize_ocr_fields({"date": "14/06/26"})
+        self.assertEqual(f["date"], "2026-06-14")
+
+    def test_vat_inferred_from_total_subtotal_when_exact_7_percent(self):
+        f = ik.normalize_ocr_fields(
+            {"document_type": "tax_invoice", "subtotal": "2700", "total_amount": "2889"}
+        )
+        self.assertEqual(f["vat"], "189.00")
+
+    def test_total_inferred_from_subtotal_and_vat(self):
+        f = ik.normalize_ocr_fields({"subtotal": "1000", "vat": "70"})
+        self.assertEqual(f["total_amount"], "1070.00")
 
 
 class ClassifyExpenseTests(unittest.TestCase):
@@ -210,7 +278,7 @@ class PaymentDefaultTests(unittest.TestCase):
 
     def test_tax_invoice_defaults_unpaid(self):
         self.assertEqual(ik.default_payment_status("tax_invoice", "purchase_invoice"), "unpaid")
-        self.assertEqual(ik.default_payment_status("simplified_tax_invoice", "expense"), "unpaid")
+        self.assertEqual(ik.default_payment_status("simplified_tax_invoice", "expense"), "paid")
 
     def test_expense_no_type_defaults_paid(self):
         self.assertEqual(ik.default_payment_status("", "expense"), "paid")

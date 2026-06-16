@@ -22,7 +22,7 @@ def _draft():
     }
 
 
-def _run(resolve_ret, *, band="high", auto_book=True):
+def _run(resolve_ret, *, band="high", auto_book=True, fields=None):
     created = {"doc": {"id": "D1"}}
     with (
         mock.patch.object(ik, "resolve_image_intake", return_value=resolve_ret),
@@ -40,7 +40,7 @@ def _run(resolve_ret, *, band="high", auto_book=True):
             object(),
             tenant_id="t",
             workspace_client_id=1,
-            fields={"document_type": "", "seller_name": "ACME", "date": "2026-06-14"},
+            fields=fields or {"document_type": "", "seller_name": "ACME", "date": "2026-06-14"},
             confidence=band,
             created_by="u",
         )
@@ -54,6 +54,7 @@ class IngestTests(unittest.TestCase):
         out, cdoc, pdoc = _run(res, band="high", auto_book=True)
         self.assertEqual(out["state"], "posted")
         self.assertEqual(out["card_fields"]["detail"], "x")  # 逐条明细填进卡
+        self.assertEqual(out["card_fields"]["items"], [{"name": "x", "amount": "100.00"}])
         cdoc.assert_called_once()
         pdoc.assert_called_once()
         self.assertEqual(out["doc_id"], "D1")
@@ -140,6 +141,31 @@ class IngestTests(unittest.TestCase):
                 created_by="u",
             )
         suggest.assert_not_called()
+
+    def test_card_items_use_corrected_draft_lines(self):
+        # OCR 原始 items 可能荒腔走板(如 7-11 把商品码当 qty/price),草稿已收敛成
+        # 票面总额单行后,卡片也必须显示草稿行,不能继续展示已废弃的 OCR 原始明细。
+        draft = {
+            "doc_kind": "expense",
+            "supplier": {"name": "7-Eleven", "tax_id": None},
+            "doc_no": "R#1",
+            "lines": [{"description": "7-Eleven", "qty": "1", "unit_price": "110"}],
+            "grand_total": "110.00",
+        }
+        res = {"route": "expense", "draft": draft, "dedupe_hit": False, "field_confidence": {}}
+        fields = {
+            "document_type": "simplified_tax_invoice",
+            "seller_name": "7-Eleven",
+            "total_amount": "110",
+            "vat": "0",
+            "items": [{"name": "bad OCR item", "subtotal": "845"}],
+        }
+        out, _cdoc, _pdoc = _run(res, band="high", auto_book=False, fields=fields)
+        self.assertEqual(
+            out["card_fields"]["items"],
+            [{"name": "7-Eleven", "amount": "110.00"}],
+        )
+        self.assertTrue(out["warn_total"])
 
 
 class TotalMismatchTests(unittest.TestCase):

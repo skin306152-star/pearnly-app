@@ -30,8 +30,15 @@ _VERIFY_ENDPOINT = "https://api.line.me/oauth2/v2.1/verify"
 
 
 def _verify_id_token(id_token: str) -> Optional[dict]:
-    """LINE 验 LIFF id_token(audience = LINE Login channel)。返回 claims 或 None。"""
-    channel_id = os.getenv("LINE_LOGIN_CHANNEL_ID", "").strip()
+    """LINE 验 LIFF id_token。返回 claims 或 None。
+
+    audience = LIFF 所属 LINE Login 频道 = LINE_LIFF_ID 前缀(与网页登录频道 LINE_LOGIN_CHANNEL_ID
+    分开·别用错频道否则 aud 不匹配验签必败)。无 LIFF_ID 才回退网页登录频道。
+    """
+    liff_id = os.getenv("LINE_LIFF_ID", "").strip()
+    channel_id = (
+        liff_id.split("-")[0] if liff_id else os.getenv("LINE_LOGIN_CHANNEL_ID", "").strip()
+    )
     if not id_token or not channel_id:
         return None
     try:
@@ -70,6 +77,12 @@ async def api_liff_auth(req: LiffAuthIn):
         role=user.get("role") or "owner",
     )
     return ok({"token": token, "username": user.get("username") or ""})
+
+
+@router.get("/api/line/liff/config")
+async def api_liff_config():
+    """前端取 LIFF ID(公开·非密)→ liff.init。未配则空,前端走站内回退。"""
+    return ok({"liff_id": os.getenv("LINE_LIFF_ID", "").strip()})
 
 
 @router.get("/liff/purchase/{doc_id}")

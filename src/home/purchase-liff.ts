@@ -66,13 +66,26 @@ function liffErrKey(body: unknown): string {
     return 'liff-open-in-line';
 }
 
+async function fetchLiffId(): Promise<string> {
+    // LIFF ID 服务端配置(env LINE_LIFF_ID)· 公开端点;取不到返空 → 提示在 LINE 打开。
+    try {
+        const r = await fetch('/api/line/liff/config');
+        const b = await r.json();
+        return (b && b.data && b.data.liff_id) || '';
+    } catch (_) {
+        return '';
+    }
+}
+
 async function liffEntry(
     doc: string | null,
     inbox: string | null,
     view: string | null
 ): Promise<void> {
     mask(tx('liff-signing-in', '正在登录 LINE…'));
-    const liffId = (window as unknown as { __PEARNLY_LIFF_ID__?: string }).__PEARNLY_LIFF_ID__;
+    const liffId =
+        (window as unknown as { __PEARNLY_LIFF_ID__?: string }).__PEARNLY_LIFF_ID__ ||
+        (await fetchLiffId());
     const liff = await loadLiffSdk();
     if (!liff || !liffId) {
         mask(tx('liff-open-in-line', '请在 LINE 中打开此页面'));

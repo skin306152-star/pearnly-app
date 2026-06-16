@@ -405,6 +405,7 @@ def _push_result_card(line_user_id: str, lang: str, ingest: dict, quote_token: s
             workspace_name=ingest.get("workspace_name") or "",
             token=ingest.get("token") or "",
             warn_total=bool(ingest.get("warn_total")),
+            liff_id=os.getenv("LINE_LIFF_ID", "").strip(),
         )
         line_client.push_messages(line_user_id, [ack, card])
     except Exception as e:

@@ -177,14 +177,19 @@ def _btn(label: str, *, primary: bool, postback: str = None, uri: str = None, da
     }
 
 
-def _record_link(web_url: str, ref: str, state: str) -> str:
-    """深链到该记录复核屏(在 LINE 里打开即走 LIFF 鉴权 + 定位该单):doc 态 → /liff/purchase/{id};
-    inbox → /liff/purchase-inbox/{id}(待归类页)。无 ref 回通用页(不死链)。"""
+def _liff_link(liff_id: str, web_url: str, ref: str, state: str, view: str = "") -> str:
+    """深链到该记录复核屏。配了 LIFF ID → liff.line.me/{id}?...(LINE 用 LIFF webview 打开·自动
+    用 LINE 身份登录);未配 → 回退站内 /liff 路由(至少能打开)。无 ref → 通用页(不死链)。"""
     if not ref:
         return web_url
+    key = "inbox" if state == "inbox" else "doc"
+    if liff_id:
+        url = f"https://liff.line.me/{liff_id}?liff=purchase&{key}={ref}"
+        return f"{url}&view={view}" if view else url
     base = web_url.split("/home")[0].rstrip("/") or "https://pearnly.com"
     path = "purchase-inbox" if state == "inbox" else "purchase"
-    return f"{base}/liff/{path}/{ref}"
+    url = f"{base}/liff/{path}/{ref}"
+    return f"{url}?view={view}" if view else url
 
 
 def _stack(primary: dict, view: list, danger: list) -> list:
@@ -206,9 +211,10 @@ def _footer(
     can_post: bool,
     token: str = "",
     source: str = "doc",
+    liff_id: str = "",
 ) -> list:
     """动作区:主按钮=提交;复核/编辑/替代收据=查看组;撤销/丢弃=危险组。竖排满宽永不死路。"""
-    edit_uri = _record_link(web_url, ref, state)
+    edit_uri = _liff_link(liff_id, web_url, ref, state)
     pb = line_postback
 
     def link(label, uri):
@@ -224,7 +230,7 @@ def _footer(
     if state == "posted":
         view.append(link(t["btn_review"], edit_uri))
         if source == "text" and ref:
-            view.append(link(t["btn_receipt"], f"{edit_uri}?view=receipt"))
+            view.append(link(t["btn_receipt"], _liff_link(liff_id, web_url, ref, state, "receipt")))
         danger.append(kill(t["btn_undo"], pb.undo_data(ref, token)))
     elif state == "confirm":
         primary = main(t["btn_confirm"], pb.confirm_data(ref, token))
@@ -258,6 +264,7 @@ def result_card(
     dup_info: dict = None,
     token: str = "",
     warn_total: bool = False,
+    liff_id: str = "",
 ) -> dict:
     """识别结果 Flex 卡(照搬定稿原型)。
 
@@ -409,7 +416,7 @@ def result_card(
                 "type": "box",
                 "layout": "vertical",
                 "paddingAll": "12px",
-                "contents": _footer(state, doc_id, web_url, t, can_post, token, source),
+                "contents": _footer(state, doc_id, web_url, t, can_post, token, source, liff_id),
             },
         },
     }

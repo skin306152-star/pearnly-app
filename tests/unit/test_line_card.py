@@ -355,20 +355,32 @@ class RecordDeepLinkTests(unittest.TestCase):
 
     WEB = "https://pearnly.com/home"
 
-    def test_doc_state_links_to_record(self):
+    def test_doc_fallback_no_liffid(self):
+        # 未配 LIFF ID → 回退站内 /liff 路由。
         self.assertEqual(
-            line_card._record_link(self.WEB, "D9", "confirm"),
+            line_card._liff_link("", self.WEB, "D9", "confirm"),
             "https://pearnly.com/liff/purchase/D9",
         )
 
-    def test_inbox_links_to_inbox_page(self):
+    def test_inbox_fallback_no_liffid(self):
         self.assertEqual(
-            line_card._record_link(self.WEB, "IT1", "inbox"),
+            line_card._liff_link("", self.WEB, "IT1", "inbox"),
             "https://pearnly.com/liff/purchase-inbox/IT1",
         )
 
+    def test_liffid_builds_liff_line_me(self):
+        # 配了 LIFF ID → liff.line.me 链接(LINE 用 LIFF webview 打开)。
+        self.assertEqual(
+            line_card._liff_link("2010411313-K4TWQwYo", self.WEB, "D9", "confirm"),
+            "https://liff.line.me/2010411313-K4TWQwYo?liff=purchase&doc=D9",
+        )
+        self.assertEqual(
+            line_card._liff_link("LID", self.WEB, "D9", "posted", "receipt"),
+            "https://liff.line.me/LID?liff=purchase&doc=D9&view=receipt",
+        )
+
     def test_no_ref_falls_back_to_web(self):
-        self.assertEqual(line_card._record_link(self.WEB, "", "confirm"), self.WEB)
+        self.assertEqual(line_card._liff_link("", self.WEB, "", "confirm"), self.WEB)
 
     def test_card_footer_embeds_deep_link(self):
         import json

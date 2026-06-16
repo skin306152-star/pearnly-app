@@ -59,6 +59,7 @@ PUBLIC_ROUTES = {
     # webhook(签名校验在实现内:LINE signature / GitHub secret)
     ("POST", "/api/line/webhook"),
     ("POST", "/api/line/liff/auth"),  # LIFF id_token 即凭证(LINE verify 验签)
+    ("GET", "/api/line/liff/config"),  # 仅返回公开 LIFF ID(非密)· 前端 liff.init 用
     ("GET", "/liff/purchase/{doc_id}"),  # LIFF 页入口·跳 /home 复核屏(前端 LIFF 鉴权)
     ("GET", "/liff/purchase-inbox/{item_id}"),  # LIFF 入口·跳 /home 待归类页(前端 LIFF 鉴权)
     ("POST", "/internal/deploy"),

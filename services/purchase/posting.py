@@ -3,7 +3,8 @@
 
 post:draft→posted;进货入库开 → 按行 product_id 写 inventory(ref_type=purchase)。
 pay:累计 paid_amount + 派生 payment_status(部分付款);超未付余额拦。
-void:posted→void;已入库则逐笔取负回冲(精确反转 receive 写入的 base 量,含批次)。
+void:posted→void · 下游完整对冲(做账主凭证 + 付款凭证 + 库存逐笔回冲);已结账/已申报
+     期间拒绝(acct.period_closed)→ 整事务回滚不留半作废(docs/purchasing/03)。
 隔离=每句 WHERE tenant_id(+ workspace_client_id);钱 Decimal。调用方管事务。
 """
 
@@ -212,30 +213,67 @@ def unpay_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> dict:
     )
 
 
-def _void_payment_vouchers(cur, *, tenant_id, workspace_client_id, doc_id, paid) -> None:
-    """撤付款时 void 该单【全部】付款凭证(含多次部分付款)。
+def _each_payment_voucher(cur, *, tenant_id, workspace_client_id, doc_id, paid):
+    """沿累计链产出该单全部活跃付款凭证(新→旧)。
 
-    付款凭证 source_id=event_id(单+累计已付)、total_debit=该笔金额,故沿累计链回退:
-    撤当前累计的凭证 → remaining -= 其单笔额 → 得上一笔累计 → 续撤,直到清零或断链。
-    做账关/无凭证则 no-op·失败回滚该步不阻断 toggle。
+    付款凭证 source_id=event_id(单+累计已付)、total_debit=该笔金额:从当前累计找凭证 →
+    yield → 调用方作废后 remaining -= 其单笔额 → 得上一笔累计 → 续找,直到清零或断链。
     """
-    try:
-        cur.execute("SAVEPOINT unpay_void")
-        from services.accounting import vouchers as jv
+    from services.accounting import vouchers as jv
 
-        remaining = Decimal(str(paid or 0))
-        guard = 0
-        while remaining > 0 and guard < 200:
-            guard += 1
-            v = jv.find_active_by_source(
+    remaining = Decimal(str(paid or 0))
+    guard = 0
+    while remaining > 0 and guard < 200:
+        guard += 1
+        v = jv.find_active_by_source(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            source_type="payment",
+            source_id=str(acct_hooks.payment_event_id(doc_id, remaining)),
+        )
+        if not v:
+            return
+        yield v
+        remaining -= Decimal(str(v["total_debit"] or 0))
+
+
+def _void_payment_vouchers(
+    cur, *, tenant_id, workspace_client_id, doc_id, paid, strict=False
+) -> None:
+    """void 该单【全部】付款凭证(含多次部分付款 · 沿累计链回退)。做账关/无凭证则 no-op。
+
+    strict=False(unpay 撤付款 · best-effort):SAVEPOINT 吞错不阻断 toggle,jv.set_status 直接置 void。
+    strict=True(void_doc 整单作废):走 acct void_voucher(带期间锁断言),period_closed 等透传
+    → 整作废事务回滚(不留半作废)。
+    """
+    if strict:
+        for v in _each_payment_voucher(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            doc_id=doc_id,
+            paid=paid,
+        ):
+            acct_hooks.void_voucher(
                 cur,
                 tenant_id=tenant_id,
                 workspace_client_id=workspace_client_id,
-                source_type="payment",
-                source_id=str(acct_hooks.payment_event_id(doc_id, remaining)),
+                voucher_id=v["id"],
             )
-            if not v:
-                break
+        return
+
+    from services.accounting import vouchers as jv
+
+    try:
+        cur.execute("SAVEPOINT unpay_void")
+        for v in _each_payment_voucher(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            doc_id=doc_id,
+            paid=paid,
+        ):
             jv.set_status(
                 cur,
                 tenant_id=tenant_id,
@@ -243,7 +281,6 @@ def _void_payment_vouchers(cur, *, tenant_id, workspace_client_id, doc_id, paid)
                 voucher_id=v["id"],
                 status="void",
             )
-            remaining -= Decimal(str(v["total_debit"] or 0))
         cur.execute("RELEASE SAVEPOINT unpay_void")
     except Exception:
         try:
@@ -253,7 +290,12 @@ def _void_payment_vouchers(cur, *, tenant_id, workspace_client_id, doc_id, paid)
 
 
 def void_doc(cur, *, tenant_id, workspace_client_id, doc_id, created_by) -> dict:
-    """作废:posted→void。已入库逐笔取负回冲。draft 用 delete 而非 void。"""
+    """作废:posted→void · 下游完整对冲(docs/purchasing/03)。draft 用 delete 而非 void。
+
+    同一事务顺序:撤付款凭证 → 作废做账主凭证 → 库存逐笔回冲 → status=void。任一步抛错
+    (尤其期间已结账/已申报 acct.period_closed)→ 整事务回滚,绝不留「单已作废、账本/
+    ภ.พ.30 进项税还在算」的半作废。做账模块未开通时凭证步骤为 no-op,只反库存(老行为)。
+    """
     row = _load_status(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=doc_id
     )
@@ -266,6 +308,22 @@ def void_doc(cur, *, tenant_id, workspace_client_id, doc_id, created_by) -> dict
     if row["status"] != "posted":
         raise PosError("purchase.not_draft", 409, detail="only_posted_voidable")
 
+    if Decimal(str(row["paid_amount"] or 0)) > 0:
+        _void_payment_vouchers(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            doc_id=doc_id,
+            paid=row["paid_amount"],
+            strict=True,
+        )
+    acct_hooks.void_for_source(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        source_type="purchase",
+        source_id=doc_id,
+    )
     _reverse_stock(
         cur,
         tenant_id=tenant_id,

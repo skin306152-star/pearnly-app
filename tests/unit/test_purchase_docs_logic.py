@@ -276,5 +276,105 @@ class PaymentStatusToggleTests(unittest.TestCase):
         self.assertEqual(voided, ["v2", "v1"])
 
 
+class VoidReversalTests(unittest.TestCase):
+    """作废完整对冲(docs/purchasing/03):撤付款凭证 + 作废做账主凭证 + 反库存 + status=void。"""
+
+    def _void(self, *, paid_amount):
+        from unittest import mock
+
+        calls = []
+
+        class Cur:
+            def execute(self, *a, **k):
+                return None
+
+            def fetchone(self):
+                return {
+                    "status": "posted",
+                    "doc_kind": "expense",
+                    "net_payable": 100,
+                    "paid_amount": paid_amount,
+                }
+
+            def fetchall(self):
+                return []
+
+        with (
+            mock.patch.object(
+                posting_svc,
+                "_void_payment_vouchers",
+                side_effect=lambda *a, **k: calls.append(("pay", k.get("strict"))),
+            ),
+            mock.patch.object(
+                posting_svc.acct_hooks,
+                "void_for_source",
+                side_effect=lambda *a, **k: calls.append(("voucher", k.get("source_type"))),
+            ),
+            mock.patch.object(
+                posting_svc, "_reverse_stock", side_effect=lambda *a, **k: calls.append(("stock",))
+            ),
+            mock.patch.object(
+                posting_svc.docs_svc, "get_doc", return_value={"id": "D", "status": "void"}
+            ),
+        ):
+            res = posting_svc.void_doc(
+                Cur(), tenant_id="t", workspace_client_id=1, doc_id="D", created_by="u"
+            )
+        return res, calls
+
+    def test_paid_doc_full_reversal(self):
+        res, calls = self._void(paid_amount=100)
+        self.assertIn(("pay", True), calls)  # 撤付款走 strict
+        self.assertIn(("voucher", "purchase"), calls)  # 作废做账主凭证
+        self.assertIn(("stock",), calls)  # 反库存
+        self.assertEqual(res["status"], "void")
+
+    def test_unpaid_doc_skips_payment_void(self):
+        _res, calls = self._void(paid_amount=0)
+        self.assertNotIn(("pay", True), calls)  # 未付不撤付款
+        self.assertIn(("voucher", "purchase"), calls)  # 仍作废做账主凭证
+        self.assertIn(("stock",), calls)
+
+
+class StrictPaymentVoidTests(unittest.TestCase):
+    """strict=True(void_doc 用):走 acct void_voucher(带期间锁),period_closed 透传不吞。"""
+
+    def test_strict_propagates_period_closed(self):
+        from decimal import Decimal
+        from unittest import mock
+
+        from services.accounting import hooks as acct_hooks
+        from services.accounting import posting as acct_posting
+        from services.accounting import vouchers as jv
+
+        store = {
+            str(acct_hooks.payment_event_id("D", Decimal("100"))): {"id": "v1", "total_debit": 100},
+        }
+
+        class Cur:
+            def execute(self, *a, **k):
+                return None
+
+        # strict 经 seam acct_hooks.void_voucher → 引擎 posting.void_voucher;period_closed 透传不吞。
+        with (
+            mock.patch.object(
+                jv, "find_active_by_source", side_effect=lambda c, **k: store.get(k["source_id"])
+            ),
+            mock.patch.object(
+                acct_posting, "void_voucher", side_effect=PosError("acct.period_closed", 409)
+            ),
+            self.assertRaises(PosError) as e,
+        ):
+            posting_svc._void_payment_vouchers(
+                Cur(),
+                tenant_id="t",
+                workspace_client_id=1,
+                doc_id="D",
+                paid=Decimal("100"),
+                strict=True,
+            )
+        self.assertEqual(e.exception.code, "acct.period_closed")
+
+
 if __name__ == "__main__":
     unittest.main()

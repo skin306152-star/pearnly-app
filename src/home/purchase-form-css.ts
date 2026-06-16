@@ -27,7 +27,7 @@ export const PURCHASE_FORM_CSS = `
 .pur.f .etabs button.on::after{content:"";position:absolute;left:24px;right:24px;bottom:0;height:3px;border-radius:3px 3px 0 0;background:var(--accent);}
 .pur.f .scroll{padding:0 28px;}
 .pur.f .section{padding:6px 0;border-bottom:1px solid var(--line);scroll-margin-top:calc(var(--topbar-h) + 72px);} .pur.f .section:last-of-type{border-bottom:0;}
-.pur.f .section .card{border:0;border-radius:0;box-shadow:none;background:transparent;}
+.pur.f .section .card{border:0;border-radius:0;box-shadow:none;background:transparent;padding:0;margin:0;}
 .pur.f .section .card>.hd{padding:20px 0 4px;border-bottom:0;font-size:15px;font-weight:780;}
 .pur.f .section .card>.bd{padding:10px 0 20px;} .pur.f .section .card + .card{border-top:1px solid var(--line);}
 .pur.f .editfoot{position:sticky;bottom:0;z-index:7;height:72px;margin:0;padding:0 24px;border-top:1px solid var(--line);background:var(--card);border-radius:0 0 16px 0;display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;}

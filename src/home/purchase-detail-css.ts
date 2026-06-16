@@ -32,7 +32,7 @@ export const PURCHASE_DETAIL_CSS = `
 .pur.d .form-pane{min-width:0;display:flex;flex-direction:column;}
 .pur.d .scroll{padding:0 6px;}
 .pur.d .section{border-bottom:1px solid var(--line);} .pur.d .form-pane .section:last-of-type{border-bottom:0;}
-.pur.d .sheet .card{border:0;border-radius:0;box-shadow:none;background:transparent;}
+.pur.d .sheet .card{border:0;border-radius:0;box-shadow:none;background:transparent;padding:0;margin:0;}
 .pur.d .preview-pane .card + .card{border-top:1px solid var(--line);}
 .pur.d .card .hd{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:46px;padding:12px 18px 4px;}
 .pur.d .card .hd .ct{display:flex;align-items:center;gap:10px;font-weight:780;font-size:15px;}

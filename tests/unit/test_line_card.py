@@ -218,15 +218,22 @@ class CardTests(unittest.TestCase):
 
 
 class DocTypeLabelTests(unittest.TestCase):
-    """单据类型显 4 语人话(PO-2):卡/详情不露 simplified_tax_invoice 等英文代号。"""
-
-    CODES = ("tax_invoice", "simplified_tax_invoice", "receipt", "credit_note", "other")
+    """单据类型显 4 语人话(PO-2/PO-10):卡/详情不露 simplified_tax_invoice 等英文代号·扩到 ~26 类。"""
 
     def test_all_codes_have_4_langs(self):
-        for code in self.CODES:
+        from services.line_binding import line_card_doctype
+
+        codes = [c for c, *_ in line_card_doctype._DOC_TYPES]
+        self.assertGreaterEqual(len(codes), 26, "doc_type 应扩到 docs/16 §2 的 ~26 类")
+        for code in codes:
             for lang in ("zh", "th", "en", "ja"):
                 label = line_card.doc_type_label(code, lang)
                 self.assertTrue(label and label != code, f"{code}/{lang} 未译")
+
+    def test_evidence_codes_labeled(self):
+        # PO-10:银行/电商截图证据类型有人话标签(不显代号)。
+        self.assertEqual(line_card.doc_type_label("payment_evidence", "zh"), "付款证据")
+        self.assertEqual(line_card.doc_type_label("order_evidence", "th"), "หลักฐานคำสั่งซื้อ")
 
     def test_simplified_invoice_thai_and_zh(self):
         self.assertEqual(

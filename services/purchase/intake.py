@@ -43,6 +43,9 @@ def judge_direction(fields: dict, *, my_tax_id) -> tuple[str, str]:
     if fields.get("is_not_invoice"):
         return "unknown", "inbox"
     dtype = (fields.get("document_type") or "").lower()
+    # 银行转账/电商订单截图 = 付款/订单证据,不冒充税票、不直接过账 → 待归类(PO-10)。
+    if dtype in ("payment_evidence", "order_evidence"):
+        return "unknown", "inbox"
     mine = _norm_tax(my_tax_id)
     buyer = _norm_tax(fields.get("buyer_tax"))
     seller = _norm_tax(fields.get("seller_tax"))

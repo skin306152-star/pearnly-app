@@ -36,6 +36,15 @@ class JudgeDirectionTests(unittest.TestCase):
         f = {"is_not_invoice": True, "document_type": "other"}
         self.assertEqual(ik.judge_direction(f, my_tax_id=MY), ("unknown", "inbox"))
 
+    def test_payment_evidence_to_inbox_never_posts(self):
+        # PO-10:银行转账截图判付款证据 → 待归类,即便带金额/VAT 也不冒充税票、不建费用单。
+        f = {"document_type": "payment_evidence", "seller_tax": "", "vat": "70"}
+        self.assertEqual(ik.judge_direction(f, my_tax_id=MY), ("unknown", "inbox"))
+
+    def test_order_evidence_to_inbox(self):
+        f = {"document_type": "order_evidence", "seller_tax": "", "vat": "0"}
+        self.assertEqual(ik.judge_direction(f, my_tax_id=MY), ("unknown", "inbox"))
+
     def test_neither_matches_with_vat_defaults_purchase(self):
         # 商户拍收到的票,双方税号都没对上本主体 → 默认进项。
         f = {

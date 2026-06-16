@@ -224,7 +224,7 @@ _SYSTEM_PROMPT = """You are an accountant extracting structured data from Thai t
 Output ONE JSON object matching this schema (no markdown fences, no explanation, just JSON):
 
 {
-  "document_type": "tax_invoice" | "simplified_tax_invoice" | "receipt" | "credit_note" | "other",
+  "document_type": "tax_invoice" | "simplified_tax_invoice" | "receipt" | "credit_note" | "payment_evidence" | "order_evidence" | "other",
   "is_not_invoice": false,
   "is_copy_or_duplicate": false,
   "invoice_number": "string or null",
@@ -283,6 +283,13 @@ CRITICAL RULES:
    - "is_not_invoice": true for non-tax documents like a fuel card / credit-card
      SLIP (has TID / BATCH / TRACE / approval code, NO 13-digit seller tax id and
      NO ใบกำกับภาษี header). Do not treat the card TID as a tax id or invoice no.
+   - "payment_evidence": a bank-transfer slip / mobile-banking transfer screenshot /
+     PromptPay slip / QR-payment confirmation (โอนเงิน / สลิปโอน / shows from-acct,
+     to-acct, ref/transaction id, amount, "โอนสำเร็จ"). It PROVES a payment but is
+     NOT a tax invoice — never fabricate seller tax id / invoice number for it.
+   - "order_evidence": an e-commerce order/checkout screenshot (Shopee / Lazada /
+     TikTok Shop / online cart — order no., item list, "ชำระเงินแล้ว"/"to pay"). It
+     is an order record, NOT a tax invoice. Keep the order number in invoice_number.
 8. is_copy_or_duplicate: true if the text contains สำเนา / COPY / DUPLICATE markers.
 9. MULTIPLE INVOICES ON ONE PAGE (CRITICAL — do not drop any):
    - A single page image often contains TWO OR MORE separate tax invoices stacked

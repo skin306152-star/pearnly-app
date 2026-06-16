@@ -234,7 +234,7 @@ async def _handle_line_image_ocr(
                 )
             except Exception as _ce:
                 logger.warning(f"[line_ocr] cost log failed (non-blocking): {_ce}")
-            _push_result_card(line_user_id, lang, ingest, quote_token)
+            _push_result_card(line_user_id, lang, ingest, quote_token, _ws_client_id)
             # 对话记忆(PO-15):记图片轮的结果,让下一句文本问「为什么/需补啥」时大脑接得住。
             from services.line_binding import line_chat_memory
 
@@ -376,7 +376,9 @@ async def _handle_line_image_ocr(
             logger.warning(f"[line_ocr] err 通知 push_text 失败: {_pe}")
 
 
-def _push_result_card(line_user_id: str, lang: str, ingest: dict, quote_token: str = None) -> None:
+def _push_result_card(
+    line_user_id: str, lang: str, ingest: dict, quote_token: str = None, ws_client_id=""
+) -> None:
     """识别结果数据卡 push:【引用照片的一行回执】+【Flex 数据卡】。失败回落纯文字(不静默)。"""
     state = ingest.get("state", "confirm")
     ack_key = {
@@ -406,6 +408,7 @@ def _push_result_card(line_user_id: str, lang: str, ingest: dict, quote_token: s
             token=ingest.get("token") or "",
             warn_total=bool(ingest.get("warn_total")),
             liff_id=os.getenv("LINE_LIFF_ID", "").strip(),
+            workspace_client_id=str(ws_client_id or ""),
         )
         line_client.push_messages(line_user_id, [ack, card])
     except Exception as e:

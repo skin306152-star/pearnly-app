@@ -11,9 +11,19 @@ import { ONB_CSS } from './onboarding-flow-html.js';
         document.head.appendChild(st);
     }
 
+    function liffWsPending() {
+        // LIFF 深链直达某单(带套账)→ liffResume 会自动选该单套账,别起手选门壳(防闪)。
+        try {
+            return !!sessionStorage.getItem('pearnly_liff_ws');
+        } catch (_) {
+            return false;
+        }
+    }
+
     function mountBootGate() {
         if (window.PEARNLY_ADMIN_LAYOUT || window.PEARNLY_ADMIN_MODE) return;
         if (document.getElementById('onboarding-flow-root')) return;
+        if (liffWsPending()) return;
 
         window.__workspaceGateBootPending = true;
         document.body.classList.add('workspace-gate-preboot');

@@ -177,19 +177,24 @@ def _btn(label: str, *, primary: bool, postback: str = None, uri: str = None, da
     }
 
 
-def _liff_link(liff_id: str, web_url: str, ref: str, state: str, view: str = "") -> str:
+def _liff_link(
+    liff_id: str, web_url: str, ref: str, state: str, view: str = "", ws: str = ""
+) -> str:
     """深链到该记录复核屏。配了 LIFF ID → liff.line.me/{id}?...(LINE 用 LIFF webview 打开·自动
-    用 LINE 身份登录);未配 → 回退站内 /liff 路由(至少能打开)。无 ref → 通用页(不死链)。"""
+    用 LINE 身份登录);未配 → 回退站内 /liff 路由(至少能打开)。无 ref → 通用页(不死链)。
+
+    ws=该单所属套账 id:带上 → 复核屏自动切到该套账并跳过套账门(记录只在它自己的套账可见)。
+    """
     if not ref:
         return web_url
     key = "inbox" if state == "inbox" else "doc"
+    extra = (f"&view={view}" if view else "") + (f"&ws={ws}" if ws else "")
     if liff_id:
-        url = f"https://liff.line.me/{liff_id}?liff=purchase&{key}={ref}"
-        return f"{url}&view={view}" if view else url
+        return f"https://liff.line.me/{liff_id}?liff=purchase&{key}={ref}{extra}"
     base = web_url.split("/home")[0].rstrip("/") or "https://pearnly.com"
     path = "purchase-inbox" if state == "inbox" else "purchase"
-    url = f"{base}/liff/{path}/{ref}"
-    return f"{url}?view={view}" if view else url
+    qs = extra.lstrip("&")
+    return f"{base}/liff/{path}/{ref}" + (f"?{qs}" if qs else "")
 
 
 def _stack(primary: dict, view: list, danger: list) -> list:
@@ -212,9 +217,10 @@ def _footer(
     token: str = "",
     source: str = "doc",
     liff_id: str = "",
+    ws: str = "",
 ) -> list:
     """动作区:主按钮=提交;复核/编辑/替代收据=查看组;撤销/丢弃=危险组。竖排满宽永不死路。"""
-    edit_uri = _liff_link(liff_id, web_url, ref, state)
+    edit_uri = _liff_link(liff_id, web_url, ref, state, ws=ws)
     pb = line_postback
 
     def link(label, uri):
@@ -230,7 +236,9 @@ def _footer(
     if state == "posted":
         view.append(link(t["btn_review"], edit_uri))
         if source == "text" and ref:
-            view.append(link(t["btn_receipt"], _liff_link(liff_id, web_url, ref, state, "receipt")))
+            view.append(
+                link(t["btn_receipt"], _liff_link(liff_id, web_url, ref, state, "receipt", ws))
+            )
         danger.append(kill(t["btn_undo"], pb.undo_data(ref, token)))
     elif state == "confirm":
         primary = main(t["btn_confirm"], pb.confirm_data(ref, token))
@@ -265,6 +273,7 @@ def result_card(
     token: str = "",
     warn_total: bool = False,
     liff_id: str = "",
+    workspace_client_id="",
 ) -> dict:
     """识别结果 Flex 卡(照搬定稿原型)。
 
@@ -416,7 +425,17 @@ def result_card(
                 "type": "box",
                 "layout": "vertical",
                 "paddingAll": "12px",
-                "contents": _footer(state, doc_id, web_url, t, can_post, token, source, liff_id),
+                "contents": _footer(
+                    state,
+                    doc_id,
+                    web_url,
+                    t,
+                    can_post,
+                    token,
+                    source,
+                    liff_id,
+                    str(workspace_client_id or ""),
+                ),
             },
         },
     }

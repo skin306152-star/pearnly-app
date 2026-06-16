@@ -86,16 +86,18 @@ async def api_liff_config():
 
 
 @router.get("/liff/purchase/{doc_id}")
-async def liff_purchase_entry(doc_id: str, request: Request, view: str = ""):
+async def liff_purchase_entry(doc_id: str, request: Request, view: str = "", ws: str = ""):
     """LIFF 页入口:跳 /home 复核屏(前端按 liff 参数走 LIFF 鉴权 + 打开该单)。
 
     view=receipt(PO-7)→ 落只读详情页(出/下载替代收据),非编辑复核屏。
+    ws=该单所属套账 → 复核屏自动切到该套账并跳过套账门。
     """
-    extra = "&view=receipt" if view == "receipt" else ""
+    extra = ("&view=receipt" if view == "receipt" else "") + (f"&ws={ws}" if ws else "")
     return RedirectResponse(f"/home?liff=purchase&doc={doc_id}{extra}", status_code=302)
 
 
 @router.get("/liff/purchase-inbox/{item_id}")
-async def liff_purchase_inbox_entry(item_id: str, request: Request):
+async def liff_purchase_inbox_entry(item_id: str, request: Request, ws: str = ""):
     """LIFF 入口(待归类):跳 /home 待归类页(前端走 LIFF 鉴权 + 定位该待归类项)。"""
-    return RedirectResponse(f"/home?liff=purchase&inbox={item_id}", status_code=302)
+    extra = f"&ws={ws}" if ws else ""
+    return RedirectResponse(f"/home?liff=purchase&inbox={item_id}{extra}", status_code=302)

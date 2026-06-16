@@ -7,6 +7,7 @@
 const LIFF_DOC_KEY = 'pearnly_liff_doc';
 const LIFF_INBOX_KEY = 'pearnly_liff_inbox';
 const LIFF_VIEW_KEY = 'pearnly_liff_view';
+const LIFF_WS_KEY = 'pearnly_liff_ws';
 const LIFF_SDK_SRC = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
 
 interface LiffSdk {
@@ -80,7 +81,8 @@ async function fetchLiffId(): Promise<string> {
 async function liffEntry(
     doc: string | null,
     inbox: string | null,
-    view: string | null
+    view: string | null,
+    ws: string | null
 ): Promise<void> {
     mask(tx('liff-signing-in', '正在登录 LINE…'));
     const liffId =
@@ -112,6 +114,7 @@ async function liffEntry(
         if (doc) sessionStorage.setItem(LIFF_DOC_KEY, doc);
         if (inbox) sessionStorage.setItem(LIFF_INBOX_KEY, inbox);
         if (view) sessionStorage.setItem(LIFF_VIEW_KEY, view);
+        if (ws) sessionStorage.setItem(LIFF_WS_KEY, ws);
         // 带 token 重进 /home(去掉 liff 参数)· 正常引导起来后 liffResume 打开复核屏/待归类。
         location.replace('/home');
     } catch (_) {
@@ -124,10 +127,15 @@ function liffResume(): void {
     const doc = sessionStorage.getItem(LIFF_DOC_KEY);
     const inbox = sessionStorage.getItem(LIFF_INBOX_KEY);
     const view = sessionStorage.getItem(LIFF_VIEW_KEY);
+    const ws = sessionStorage.getItem(LIFF_WS_KEY);
     if (!doc && !inbox) return;
     sessionStorage.removeItem(LIFF_DOC_KEY);
     sessionStorage.removeItem(LIFF_INBOX_KEY);
     sessionStorage.removeItem(LIFF_VIEW_KEY);
+    sessionStorage.removeItem(LIFF_WS_KEY);
+    // 该单只在自己的套账可见 → 自动切到它、放行套账门(否则硬门挡在编辑页前/按错套账存)。
+    if (ws && typeof window.satisfyWorkspaceGate === 'function')
+        window.satisfyWorkspaceGate(Number(ws));
     let tries = 0;
     const open = () => {
         if (inbox) {
@@ -147,5 +155,5 @@ function liffResume(): void {
     open();
 }
 
-if (qp('liff') === 'purchase') liffEntry(qp('doc'), qp('inbox'), qp('view'));
+if (qp('liff') === 'purchase') liffEntry(qp('doc'), qp('inbox'), qp('view'), qp('ws'));
 else liffResume();

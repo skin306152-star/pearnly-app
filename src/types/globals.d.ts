@@ -266,6 +266,7 @@ interface Window {
     openClientAssign?: (client: { id: number; name: string }) => void;
     showWorkspaceGate?: () => void;
     enforceWorkspaceGate?: () => void;
+    satisfyWorkspaceGate?: (id: number) => void;
     closeWorkspaceGate?: () => void;
     openSubjectCreate?: (opts?: { onCreated?: (id: number) => void }) => void;
     // 平台业态套餐 PO-PP3 · 设置「业务/模块」页加载(切到 modules tab 调)

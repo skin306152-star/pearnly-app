@@ -240,11 +240,32 @@ window.openSubjectCreate = function (opts?: { onCreated?: (id: number) => void }
     render();
 };
 
+// LIFF 深链直达某单(带套账)→ liffResume 会自动选该单套账并满足门,别弹手选门(防闪/防按错套账)。
+function liffWsPending(): boolean {
+    try {
+        return !!sessionStorage.getItem('pearnly_liff_ws');
+    } catch (_) {
+        return false;
+    }
+}
+
+// LIFF 深链:该单已定套账 → 直接设为当前 + 满足门(不弹手选)。门壳若已起则摘掉。
+window.satisfyWorkspaceGate = function (id: number) {
+    if (!id) return;
+    _gateSatisfied = true;
+    if (typeof window.setActiveWorkspaceClientId === 'function')
+        window.setActiveWorkspaceClientId(id);
+    if (document.getElementById('workspace-gate-root')) close();
+    if (typeof window.applyModuleNav === 'function') window.applyModuleNav();
+    if (typeof window.renderWorkspaceControl === 'function') window.renderWorkspaceControl();
+};
+
 // core-boot/module-nav 在用户就绪后调:每次登录强制选套账(任何非超管账号),本会话选过才放行。
 window.enforceWorkspaceGate = function () {
     if (window.PEARNLY_ADMIN_MODE) return; // 超管除外
     if (document.getElementById('onboarding-flow-root')) return; // 新注册向导优先(末步=选套账)
     if (_gateSatisfied) return; // 本会话已选过 → 放行(切模块/onboarding 也调到这,不重弹)
+    if (liffWsPending()) return; // LIFF 深链待自动选套账 → 不弹手选门
     if (document.getElementById('workspace-gate-root')) {
         // 门已开(core-boot 登录即早起的门壳)· 不重起防打断创建 · 但此刻 _userInfo 已就绪 →
         // 校正 owner 后重渲选择列表(0 套账空态的 owner/受邀成员分支此前可能算错)。
@@ -260,7 +281,10 @@ window.enforceWorkspaceGate = function () {
 // 关门(暴露给 module-nav:新注册向导接管时顶掉早起的门壳)。
 window.closeWorkspaceGate = close;
 
-if ((window as unknown as { __workspaceGateBootPending?: boolean }).__workspaceGateBootPending) {
+if (
+    (window as unknown as { __workspaceGateBootPending?: boolean }).__workspaceGateBootPending &&
+    !liffWsPending()
+) {
     (window as unknown as { __workspaceGateBootPending?: boolean }).__workspaceGateBootPending =
         false;
     window.showWorkspaceGate();

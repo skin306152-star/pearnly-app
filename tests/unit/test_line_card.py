@@ -285,6 +285,22 @@ class CardTests(unittest.TestCase):
         self.assertIn("替代收据", s)
         self.assertIn("/liff/purchase/D1?view=receipt", s)
 
+    def test_workspace_id_threaded_into_deeplink(self):
+        # step③:该单套账 id 串进复核深链 → 复核屏自动选套账、跳过套账门。
+        import json
+
+        # 回退站内路由(无 LIFF ID)
+        s = json.dumps(
+            self._card("posted", source="text", workspace_client_id=7), ensure_ascii=False
+        )
+        self.assertIn("/liff/purchase/D1?ws=7", s)
+        self.assertIn("/liff/purchase/D1?view=receipt&ws=7", s)
+        # 真 LIFF 链(配了 LIFF ID)
+        s2 = json.dumps(
+            self._card("confirm", workspace_client_id=7, liff_id="L1"), ensure_ascii=False
+        )
+        self.assertIn("https://liff.line.me/L1?liff=purchase&doc=D1&ws=7", s2)
+
     def test_posted_doc_no_receipt_link(self):
         # 有原票(source=doc)→ 不给替代收据链接(本就有真凭证)。
         import json

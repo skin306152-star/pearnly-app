@@ -221,7 +221,7 @@ def _do_record(bound_user, reply_token, text, tid, ws, draft, used_l2, quote_tok
             action_ref=doc_id,
             user_id=created_by,
         )
-    _reply_card(reply_token, state, draft, doc_id, lang, quote_token, ws_name, token)
+    _reply_card(reply_token, state, draft, doc_id, lang, quote_token, ws_name, token, str(ws or ""))
     return True
 
 
@@ -241,7 +241,7 @@ def _card_fields_from_draft(draft) -> dict:
 
 
 def _reply_card(
-    reply_token, state, draft, doc_id, lang, quote_token, workspace_name="", token=""
+    reply_token, state, draft, doc_id, lang, quote_token, workspace_name="", token="", ws=""
 ) -> None:
     """回执 = 【引用原句的一行回执】+【Flex 数据卡】(Flex 不能被引用,故拆两条)。"""
     from services.line_binding import line_card
@@ -262,6 +262,7 @@ def _reply_card(
         workspace_name=workspace_name,
         token=token,
         liff_id=os.getenv("LINE_LIFF_ID", "").strip(),
+        workspace_client_id=ws,
     )
     line_client.reply_messages(reply_token, [ack, card])
 

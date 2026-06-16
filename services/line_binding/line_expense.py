@@ -178,9 +178,8 @@ def _do_record(bound_user, reply_token, text, tid, ws, draft, used_l2, quote_tok
     from services.expense import confidence
     from services.line_binding import line_action_nonce as nonce
     from services.purchase import categories as cat_svc
-    from services.purchase import docs as docs_svc
+    from services.purchase import confidence_post
     from services.purchase import intake as intake_svc
-    from services.purchase import posting as posting_svc
     from services.purchase import settings as settings_svc
 
     created_by = str(bound_user["id"]) if bound_user.get("id") else None
@@ -201,28 +200,16 @@ def _do_record(bound_user, reply_token, text, tid, ws, draft, used_l2, quote_tok
             is_duplicate=is_dup,
             require_category=False,
         )
-        created = docs_svc.create_doc(
+        # 文/图共用置信入账编排(PO-11):auto_book 开则高置信直接过账,关则确认优先。
+        doc_id, state = confidence_post.book_by_confidence(
             cur,
             tenant_id=tid,
             workspace_client_id=ws,
-            created_by=created_by,
             data=_to_purchase_data(draft.model_dump()),
             settings=cfg,
-            status="draft",
+            verdict=verdict,
+            created_by=created_by,
         )
-        doc_id = str(created["doc"]["id"])
-        if verdict.action == "post":
-            posting_svc.post_doc(
-                cur,
-                tenant_id=tid,
-                workspace_client_id=ws,
-                doc_id=doc_id,
-                auto_stock_in=False,
-                created_by=created_by,
-            )
-            state = "posted"
-        else:
-            state = "dup" if verdict.dup else "confirm"
         token = nonce.mint(
             cur,
             tenant_id=tid,

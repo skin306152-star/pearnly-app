@@ -115,7 +115,7 @@ _TABLES = (
         pay_needs_approval boolean NOT NULL DEFAULT FALSE,
         default_wht_service_rate numeric(5,2) NOT NULL DEFAULT 3,
         base_currency text NOT NULL DEFAULT 'THB',
-        auto_book boolean NOT NULL DEFAULT FALSE,
+        auto_book boolean NOT NULL DEFAULT TRUE,
         updated_at timestamptz NOT NULL DEFAULT now(),
         PRIMARY KEY (tenant_id, workspace_client_id)
     )
@@ -172,7 +172,7 @@ _ALTERS = (
     "ALTER TABLE purchase_docs "
     "ADD COLUMN IF NOT EXISTS amount_override boolean NOT NULL DEFAULT FALSE",
     "ALTER TABLE purchase_settings "
-    "ADD COLUMN IF NOT EXISTS auto_book boolean NOT NULL DEFAULT FALSE",
+    "ADD COLUMN IF NOT EXISTS auto_book boolean NOT NULL DEFAULT TRUE",
 )
 
 _RLS_TABLES = (

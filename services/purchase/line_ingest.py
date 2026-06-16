@@ -33,8 +33,7 @@ def ingest_line_image(
     from services.expense import confidence as conf
     from services.line_binding import line_action_nonce as nonce
     from services.purchase import categories as cat_svc
-    from services.purchase import docs as docs_svc
-    from services.purchase import posting as posting_svc
+    from services.purchase import confidence_post
     from services.purchase import settings as settings_svc
 
     settings = settings_svc.get_settings(
@@ -156,29 +155,16 @@ def ingest_line_image(
         is_duplicate=bool(res.get("dedupe_hit")),
         require_category=False,
     )
-    created = docs_svc.create_doc(
+    # 文/图共用置信入账编排(PO-11):auto_book 开(默认)则高置信齐全直接过账,关则确认优先。
+    doc_id, state = confidence_post.book_by_confidence(
         cur,
         tenant_id=tenant_id,
         workspace_client_id=workspace_client_id,
-        created_by=created_by,
         data=draft,
         settings=settings,
-        status="draft",
+        verdict=verdict,
+        created_by=created_by,
     )
-    doc_id = str(created["doc"]["id"])
-    # 自动入账开关(采购设置 · 默认关)统管 LINE:关 → 即便高置信齐全也只建草稿发确认卡,不自动过账。
-    if verdict.action == "post" and bool(settings.get("auto_book")):
-        posting_svc.post_doc(
-            cur,
-            tenant_id=tenant_id,
-            workspace_client_id=workspace_client_id,
-            doc_id=doc_id,
-            auto_stock_in=bool(settings.get("auto_stock_in")),
-            created_by=created_by,
-        )
-        state = "posted"
-    else:
-        state = "dup" if verdict.dup else "confirm"
     return {
         "state": state,
         "doc_id": doc_id,

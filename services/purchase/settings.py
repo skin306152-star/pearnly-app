@@ -18,7 +18,7 @@ _DEFAULTS = {
     "pay_needs_approval": False,
     "default_wht_service_rate": "3",
     "base_currency": "THB",
-    "auto_book": False,
+    "auto_book": True,  # 高置信默认直接入账(可撤销)· 决策1/PO-11;关掉则确认优先
 }
 
 
@@ -81,7 +81,7 @@ def save_settings(
     pay_needs_approval: bool,
     default_wht_service_rate,
     base_currency: str,
-    auto_book: bool = False,
+    auto_book: bool = True,
 ) -> dict:
     """upsert 采购设置。返回回读视图。"""
     cur.execute(

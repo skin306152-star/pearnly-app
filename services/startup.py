@@ -27,6 +27,24 @@ from services.users.columns import ensure_user_profile_columns
 logger = logging.getLogger("mr-pilot")
 
 
+def _flip_auto_book_default_on() -> None:
+    """auto_book 默认翻开(决策1/PO-11:高置信直接入账)· 仅列默认仍为旧值时一次性回填存量行 +
+    改默认(首启执行一次·之后空转·不覆盖用户后续主动关闭)。与 alembic 0039 同源。"""
+    from core import db
+
+    with db.get_cursor(commit=True) as cur:
+        cur.execute(
+            "SELECT pg_get_expr(d.adbin, d.adrelid) AS def FROM pg_attribute a "
+            "LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum "
+            "WHERE a.attrelid = 'purchase_settings'::regclass AND a.attname = 'auto_book'"
+        )
+        row = cur.fetchone()
+        if "true" in ((row and row["def"]) or "").lower():
+            return
+        cur.execute("UPDATE purchase_settings SET auto_book = TRUE WHERE auto_book = FALSE")
+        cur.execute("ALTER TABLE purchase_settings ALTER COLUMN auto_book SET DEFAULT TRUE")
+
+
 # v118.33.7 · 健壮版 git-deploy.sh(带回滚 + 健康检查 + 日志)· app 启动时写入磁盘
 _GIT_DEPLOY_SH = r"""#!/bin/bash
 # ============================================================
@@ -290,6 +308,7 @@ def _boot_schema_ddl() -> None:
         from services.purchase.schema import ensure_purchase_schema
 
         ensure_purchase_schema()
+        _flip_auto_book_default_on()
     except Exception as e:
         logger.warning(f"启动 采购 schema 失败(等 alembic 0031-0033): {e}")
 

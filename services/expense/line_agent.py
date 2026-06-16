@@ -121,10 +121,13 @@ def understand(
         from services.ocr.layer2_gemini import _call_gemini_with_retry
 
         prompt = _PROMPT.format(today=today or date.today().isoformat()) + _history_block(history)
+        # 大脑用 2.5-flash(flash)非 3.5-flash(best):3.5-flash 在 prod 实测连续 504
+        # DeadlineExceeded → understand 总返 None → 查账/闲聊/编辑/复杂意图全退回哑 L1(大脑形同
+        # 虚设)。2.5-flash ~3s 可靠且够强(对齐 category_ai 同样的 best→flash 切换)。
         data, _meta = _call_gemini_with_retry(
             text,
             api_key=api_key,
-            model_name=gemini_models.best(),
+            model_name=gemini_models.flash(),
             max_retries=1,
             timeout=18,
             system_prompt_override=prompt,

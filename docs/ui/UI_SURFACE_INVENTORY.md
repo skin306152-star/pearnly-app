@@ -4,7 +4,7 @@
 > 用法:设计评审 + 迁移**逐项打勾**;每个层都要:截图看设计 → 判合不合理 → 改 → 保真闸 + 暗夜 + 缩放。
 
 ## L0 · 顶层屏(~25)
-dashboard · ocr上传识别 · history识别记录 · reconcile对账 · automation · sales-invoices销售工作台 · sales-account账套 · sales-products商品 · sales-report销售报表 · receivables应收 · clients客户 · purchase进项主屏 · purchase-inbox待归类 · purchase-suppliers供应商 · purchase-settings采购设置 · vouchers · inventory库存 · pos-onboarding · pos-cashiers收银员 · pos-tables桌台 · pos-payment收款设置 · knowledge知识库 · exceptions异常 · integrations集成 · settings设置(弹窗形态)
+dashboard · ocr上传识别 · history识别记录 · reconcile对账 · automation · sales-invoices销售工作台 · sales-account账套 · sales-products商品 · sales-report销售报表 · receivables应收 · clients客户 · purchase进项主屏 · purchase-suppliers供应商 · purchase-settings采购设置 · vouchers · inventory库存 · pos-onboarding · pos-cashiers收银员 · pos-tables桌台 · pos-payment收款设置 · knowledge知识库 · exceptions异常 · integrations集成 · settings设置(弹窗形态)
 
 ## L1 · 弹窗 modal(~30 · 点按钮才弹)
 - **全局**:账套选择 `workspace-switcher`(ws-modal,到处弹)· 设置弹窗 `settings-panels`(多 tab)· 确认/删除 `confirm-modals-html`/`confirm-modal`/`pearnly-confirm` · 帮助 `modal-help`/`help-modal` · 新通知 `modal-notif-new` · 命令面板 Ctrl+K `openCmdk`

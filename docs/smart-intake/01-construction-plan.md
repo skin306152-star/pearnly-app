@@ -1,5 +1,9 @@
 # 统一智能入口 + 待归类 + 识别记录门控(F12-14)· 一页施工方案
 
+> **⚠️ 2026-06-16:本施工方案的「待归类(F13 · intake_items)」整模块已下线**(commit `54fc795f`)。
+> 识别完一律建草稿落采购列表,intake_items 表/端点/前端页全删(alembic 0040 DROP)。本文 F13
+> 段为历史记录,不再实施;统一入口(F12)与识别记录门控(F14)仍有效。
+>
 > 配 `00-unify-and-followups.md`。架构级三动作。**底线(铁律#26):事务所「上传识别 → 识别记录」路径一字不破坏。**
 > 进窗口实测发现:`/api/purchase/intake` 分流已建好(judge_direction 判方向 + 落 intake_items inbox),
 > 但 ① intake_items **没有 list/resolve 端点 + 没有前端入口**(F13 缺)② 识别记录(上传识别/单据记录)对所有业态显示(F14 缺)。

@@ -390,8 +390,6 @@ OCR 识别/上传、history、ERP push/endpoints、对账 v0 杂项、clients/ca
 | DELETE | `/api/purchase/suppliers/{supplier_id}` | auth_member | `purchase.supplier.manage` | routes/purchase_config_routes.py |
 | PATCH | `/api/purchase/suppliers/{supplier_id}` | auth_member | `purchase.supplier.manage` | routes/purchase_config_routes.py |
 | POST | `/api/purchase/expense` | auth_member | `purchase.doc.create` | routes/purchase_intake_routes.py |
-| GET | `/api/purchase/inbox` | auth_member | `intake.classify` | routes/purchase_intake_routes.py |
-| POST | `/api/purchase/inbox/{item_id}/resolve` | auth_member | `intake.classify` | routes/purchase_intake_routes.py |
 | POST | `/api/purchase/intake` | auth_member | `intake.upload` | routes/purchase_intake_routes.py |
 | DELETE | `/api/purchase/attachments/{attachment_id}` | auth_member | `purchase.doc.edit` | routes/purchase_routes.py |
 | GET | `/api/purchase/docs` | auth_member | `purchase.doc.create` `purchase.doc.view` | routes/purchase_routes.py |

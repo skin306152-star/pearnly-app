@@ -56,7 +56,7 @@ inventory:  inv.view  inv.create   # 入库/盘点录入
 pos:        pos.admin.manage   # 商品/收银员/桌台/收款设置/店铺码(老板后台)
             pos.report.view  pos.sale.operate  pos.shift.operate
             pos.refund.approve  # 退货/作废(POS 端不可逆)
-intake:     intake.upload  intake.classify   # 统一智能入口·待归类
+intake:     intake.upload   # 统一智能入口(识别完建草稿落列表·待归类已下线)
 ```
 
 注:`accounting/tax` 是已封板待施工模块(docs/accounting、docs/tax-filing),权限点现在就进 registry 占位——施工时直接 `require_perm`,不再返工加门。
@@ -78,7 +78,7 @@ intake:     intake.upload  intake.classify   # 统一智能入口·待归类
 | *.approve(不可逆层) | ✔ | ✔ | ✔ | ─ | ─ | ─ |
 | *.export | ✔ | ✔ | ✔ | ─ | ✔(拍板点#4) | ─ |
 | *.settings.manage / *.manage(模块配置) | ✔ | ✔ | ✔(仅 acct.coa / sales.product / purchase.supplier 主数据) | ─ | ─ | ─ |
-| intake.upload / classify | ✔ | ✔ | ✔ | ✔ | ─ | ─ |
+| intake.upload | ✔ | ✔ | ✔ | ✔ | ─ | ─ |
 | pos.admin.manage / pos.report.view | ✔ | ✔ | report.view | ─ | report.view | ─ |
 | pos.sale.operate / shift.operate | ✔ | ✔ | ─ | ─ | ─ | ✔ |
 | pos.refund.approve | ✔ | ✔ | ─ | ─ | ─ | ─(P2:经理输码放行) |

@@ -307,14 +307,20 @@ def _reply_pool(reply_token, kind, text, lang) -> None:
 
 
 def _to_purchase_data(d: dict) -> dict:
-    """expense_draft → 采购进项建单 data(doc_kind=expense·单行=总额·带卖家/分类·source=line)。"""
+    """expense_draft → 采购进项建单 data(doc_kind=expense·带卖家/分类·source=line)。
+
+    数量(#8):「买2杯咖啡共120」→ 行 qty=2、单价=60(split_qty_price·总额不漂);无数量 → qty=1。
+    """
+    from services.expense.line_quick_entry import split_qty_price
+
+    _qty, _unit_price = split_qty_price(d.get("amount"), d.get("qty"), d.get("unit_price"))
     line = {
         "item_type": "service" if (d.get("expense_type") == "service") else "goods",
         "description": (
             d.get("note") or d.get("subcategory") or d.get("category") or "LINE บันทึก"
         ).strip(),
-        "qty": "1",
-        "unit_price": str(d.get("amount") or "0"),
+        "qty": _qty,
+        "unit_price": _unit_price,
         "vat_rate": 0,
         "wht_rate": 0,
         "category_id": d.get("category_id"),

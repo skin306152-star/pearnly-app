@@ -166,6 +166,24 @@ def looks_like_expense(text: str) -> bool:
     return parse_expense(text).has_amount()
 
 
+def split_qty_price(amount, qty=None, unit_price=None) -> tuple[str, str]:
+    """(总额, 数量, 单价?) → 采购行的 (qty, unit_price) 字符串(图/文共用 · #8)。
+
+    「买2杯咖啡共120」→ qty=2、单价=60。单价缺省由 总额÷数量 算(全精度·下游 totals 的
+    gross=q(qty×price) 量化吸收·总额不漂);数量≤1 → qty=1、单价=总额(保持原行为)。
+    """
+    amt = _to_decimal(str(amount)) if amount not in (None, "") else None
+    if amt is None:
+        amt = Decimal("0")
+    q = _to_decimal(str(qty)) if qty not in (None, "", 0) else None
+    up = _to_decimal(str(unit_price)) if unit_price not in (None, "", 0) else None
+    if q is not None and q > 1:
+        if up is None or up <= 0:
+            up = amt / q
+        return (format(q.normalize(), "f"), format(up, "f"))
+    return ("1", format(amt, "f"))
+
+
 # L1 零成本意图(记账之外)——即便无 L2 也能正确分流,且即便句中有数字也不误记。
 _SUPPORT_KW = (
     "人工",

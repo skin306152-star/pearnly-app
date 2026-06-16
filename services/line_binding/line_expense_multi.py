@@ -17,9 +17,19 @@ from services.line_binding import line_client
 _WEB_PURCHASE_URL = "https://pearnly.com/home"
 
 
+def _item_label(it: dict) -> str:
+    """卡片明细名:数量>1 时后缀「×N」(#8),否则原名。"""
+    try:
+        q = Decimal(str(it.get("qty") or "1"))
+    except Exception:
+        q = Decimal("1")
+    return f"{it['name']} ×{format(q.normalize(), 'f')}" if q > 1 else it["name"]
+
+
 def do_record_multi(bound_user, reply_token, text, tid, ws, items, quote_token, lang) -> bool:
     """每项独立行 + 智能归类(批量一次 LLM)·合计入账·卡显逐条明细。返回 True。"""
     from services.expense import category_ai, confidence, line_l2
+    from services.expense.line_quick_entry import split_qty_price
     from services.line_binding import line_action_nonce as nonce
     from services.line_binding import line_card
     from services.purchase import categories as cat_svc
@@ -44,19 +54,22 @@ def do_record_multi(bound_user, reply_token, text, tid, ws, items, quote_token, 
         else:
             cats = category_ai.categorize_items(items, tree, api_key=api_key)
         total = sum((it["amount"] for it in items), Decimal("0"))
-        lines = [
-            {
-                "item_type": "goods",
-                "description": it["name"],
-                "qty": "1",
-                "unit_price": str(it["amount"]),
-                "vat_rate": 0,
-                "wht_rate": 0,
-                "category_id": cid,
-                "subcategory_id": sid,
-            }
-            for it, (cid, sid) in zip(items, cats)
-        ]
+        # 数量(#8):每项「2杯咖啡 120」→ 行 qty=2、单价=60(split_qty_price·总额不漂)。
+        lines = []
+        for it, (cid, sid) in zip(items, cats):
+            _q, _up = split_qty_price(it["amount"], it.get("qty"))
+            lines.append(
+                {
+                    "item_type": "goods",
+                    "description": it["name"],
+                    "qty": _q,
+                    "unit_price": _up,
+                    "vat_rate": 0,
+                    "wht_rate": 0,
+                    "category_id": cid,
+                    "subcategory_id": sid,
+                }
+            )
         doc_cat, doc_sub = next(((c, s) for c, s in cats if c), (None, None))
         cat_name = sub_name = ""
         for p in tree:
@@ -108,7 +121,7 @@ def do_record_multi(bound_user, reply_token, text, tid, ws, items, quote_token, 
         "category": cat_name,
         "subcategory": sub_name,
         "vendor": vendor,
-        "items": [{"name": it["name"], "amount": f"{it['amount']:,.2f}"} for it in items],
+        "items": [{"name": _item_label(it), "amount": f"{it['amount']:,.2f}"} for it in items],
         "detail": " · ".join(names[:3]) + (f" 等{len(names)}项" if len(names) > 3 else ""),
     }
     _ack_key = {"posted": "exp_ack_posted", "dup": "exp_ack_dup"}.get(state, "exp_ack_confirm")

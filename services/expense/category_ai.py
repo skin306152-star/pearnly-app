@@ -142,7 +142,10 @@ _PARSE_PROMPT = (
     "- name: the CLEAN item only (e.g. 'น้ำดื่ม', 'ทุเรียน', '榴莲', '咖啡') — DROP verbs (ซื้อ/买/"
     "ซื้อมา), the word price (ราคา/价/价格), store names (เซเว่น/7-Eleven/Lotus), connectors (และ/แ"
     "ละ/和/跟), and units (บาท/元/THB).\n"
-    "- amount: the THB number for that item, copied EXACTLY as digits from the text.\n"
+    "- amount: the TOTAL THB for that item (qty×unit price), copied EXACTLY as digits from the "
+    "text. For '买2杯咖啡共120' / '2 แก้ว 120' the amount is 120 (the total), NOT 60.\n"
+    "- qty: the quantity if stated (2杯/2 แก้ว/x2/买2个/2 ชิ้น → 2), else 1. Keep the whole "
+    "'qty units item total' as ONE item (do NOT split the qty number into a separate item).\n"
     "- choice: the category number from the list that best fits the item (food/drink/snack/groceries"
     " → food & entertainment; fuel → travel; water/electric/phone → utilities; goods → cost of goods"
     "; office supplies → office).\n"
@@ -150,7 +153,8 @@ _PARSE_PROMPT = (
     "- date: resolve relative dates against the given Today (yesterday/เมื่อวาน/昨天 → Today−1, "
     "etc.) → YYYY-MM-DD; empty if none stated.\n"
     "- vendor: the shop/seller name if stated (เซเว่น/7-Eleven/Starbucks/星巴克), else empty.\n"
-    'Output ONLY JSON {"date":"...","vendor":"...","items":[{"name":"...","amount":"...","choice":N}]}.'
+    'Output ONLY JSON {"date":"...","vendor":"...","items":[{"name":"...","amount":"...","qty":N,'
+    '"choice":N}]}.'
 )
 
 
@@ -205,8 +209,23 @@ def parse_and_categorize(text: str, categories: list, *, api_key: Optional[str],
                 cid, sid = options[ch - 1][0], options[ch - 1][1]
         except (ValueError, TypeError):
             pass
+        qty = Decimal("1")  # 数量(#8):缺省 1;非法值回落 1(总额仍按 amount 权威)
+        try:
+            _q = Decimal(str(it.get("qty") or "1"))
+            if _q > 0:
+                qty = _q
+        except (InvalidOperation, ValueError, TypeError):
+            pass
         if amt > 0:
-            items.append({"name": name, "amount": amt, "category_id": cid, "subcategory_id": sid})
+            items.append(
+                {
+                    "name": name,
+                    "amount": amt,
+                    "qty": qty,
+                    "category_id": cid,
+                    "subcategory_id": sid,
+                }
+            )
     if not items:
         return None
     d = str(data.get("date") or "").strip()

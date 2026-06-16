@@ -127,17 +127,13 @@ async def _handle_line_event(ev: dict):
             # v118.25.4 · 已绑定用户 · 优先用 Pearnly 网站偏好语言 · 兜底用 LINE 语言(不再写死 zh)
             lang = bound_user.get("preferred_lang") or _ev_lang(ev)
 
-            # 「识别中」处理卡(猫咪 + 引用收据 + 进度+时间预期)立即回(reply_token 1 分钟内有效)。
-            # 比光秃秃原生 ••• 更有反馈;识别完由结果卡(push)接上。叠原生转圈补"活着"感。
-            # 识别中 = 只用 LINE 原生 ••• 转圈(来新消息自动收起,不留任何消息);识别完结果卡接上。
-            line_client.start_loading(line_user_id, 30)
-
-            # 启后台任务跑 OCR + push 数据卡(引用此照片 · quoteToken)
-            # _handle_line_image_ocr 已抽到 services/ocr/line_image_ocr.py(无循环 import)。
-            from services.ocr.line_image_ocr import _handle_line_image_ocr
+            # 多图排队(#4):每张图启一个后台任务,但 per-user FIFO 锁让它们一张张串行处理、
+            # 一张卡发完再下一张、不乱序(转圈移到轮到该图时才发 · 见 process_line_image_serial)。
+            # _handle_line_image_ocr/串行包装已抽到 services/ocr/line_image_ocr.py(无循环 import)。
+            from services.ocr.line_image_ocr import process_line_image_serial
 
             asyncio.create_task(
-                _handle_line_image_ocr(
+                process_line_image_serial(
                     bound_user=bound_user,
                     line_user_id=line_user_id,
                     message_id=message_id,

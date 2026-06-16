@@ -64,6 +64,7 @@ def _prow(qty, avg_cost):
         "name_th": "ยา",
         "name_en": None,
         "name_zh": None,
+        "image_url": None,
         "barcode": None,
         "base_unit": "เม็ด",
         "min_stock": None,

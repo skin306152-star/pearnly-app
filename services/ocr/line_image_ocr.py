@@ -6,6 +6,7 @@ line_webhook_routes._handle_line_event 里 lazy import 调到;依赖的 _ocr_* h
 直接 from services.ocr.entrypoints import,不经 app.py → 解循环 import。
 """
 
+import asyncio
 import os
 import logging
 
@@ -29,6 +30,47 @@ except ImportError:
     line_client = None  # line_client.py 不在仓库 · 单独部署到服务器
 
 logger = logging.getLogger("mr-pilot")
+
+# 多图排队(#4):一次发多张图 = 多个 webhook event,各自 create_task 会并发 → 卡片乱序/交错。
+# 每个 LINE 用户一把 FIFO 锁,图按到达顺序一张张处理、一张卡发完再下一张。asyncio.Lock 的
+# 等待者按入队顺序唤醒 → 顺序即到达顺序。注:锁是进程内(per event-loop)· 同一 webhook POST
+# 的多 event 在同进程内必然串行;LINE 通常把"一起发的多张图"放进同一 POST 的 events[] → 覆盖主场景。
+_user_img_locks: dict[str, asyncio.Lock] = {}
+
+
+def _user_img_lock(line_user_id: str) -> asyncio.Lock:
+    lock = _user_img_locks.get(line_user_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _user_img_locks[line_user_id] = lock
+    return lock
+
+
+async def process_line_image_serial(
+    bound_user: dict,
+    line_user_id: str,
+    message_id: str,
+    lang: str,
+    filename: str = None,
+    quote_token: str = None,
+):
+    """多图排队入口:抢 per-user 锁 → 轮到这张才转圈 → 处理 → 发卡。下一张等本张发完卡再开始。"""
+    lock = _user_img_lock(line_user_id)
+    async with lock:
+        try:
+            # 轮到本张才转圈(队列里的图等到自己,避免一上来 N 个 loading 又各自超时)。
+            if line_client:
+                line_client.start_loading(line_user_id, 30)
+        except Exception as _e:
+            logger.warning(f"[line_ocr] start_loading 失败(不阻断): {_e}")
+        await _handle_line_image_ocr(
+            bound_user=bound_user,
+            line_user_id=line_user_id,
+            message_id=message_id,
+            lang=lang,
+            filename=filename,
+            quote_token=quote_token,
+        )
 
 
 async def _handle_line_image_ocr(

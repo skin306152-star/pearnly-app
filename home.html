@@ -6,7 +6,7 @@
 <title>Pearnly</title>
 
 <script>if(!localStorage.getItem('mrpilot_token')&&!/[?&]liff=/.test(location.search))location.replace('/');</script>
-<script>if(/[?&]liff=purchase/.test(location.search)&&!localStorage.getItem('mrpilot_token'))window.__LIFF_BOOTSTRAP__=1;</script>
+<script>if(/[?&]liff=purchase/.test(location.search))window.__LIFF_BOOTSTRAP__=1;</script>
 <script>try{if(sessionStorage.getItem('pearnly_liff_doc')||sessionStorage.getItem('pearnly_liff_inbox'))window.__LIFF_RESUME__=1;}catch(e){}</script>
 <script>try{if(localStorage.getItem('pearnly_theme')==='dark')document.documentElement.classList.add('dark');}catch(e){}</script>
 <link rel="icon" href="/static/brand/favicon.ico?v=1" sizes="any">
@@ -304,7 +304,7 @@ body.workspace-gate-preboot > :not(#workspace-gate-root):not(script):not(style){
 <script src="/static/dist/pre.js?v=11850747" defer></script>
 
 
-<script type="module" src="/static/dist/main.js?v=11850882"></script>
+<script type="module" src="/static/dist/main.js?v=11850883"></script>
 
 <script src="/static/dist/post.js?v=11850747" defer></script>
 

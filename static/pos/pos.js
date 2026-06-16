@@ -224,10 +224,34 @@
             $('shift-mask').classList.remove('show');
             enterMain();
         } catch (e) {
+            // 本收银台已有进行中班次(别人/上一班开的)→ 共享钱箱:接续该班进主屏,绝不卡死。
+            if (e.code === 'pos.shift_already_open' && (await resumeOpenShift())) return;
             POS.toast(POS.posErrMsg(e.code, 'pos.unexpected'), 'error');
         } finally {
             btn.disabled = false;
         }
+    }
+
+    // 取本收银台当前未结班次并接续(共享);成功进主屏返回 true。
+    async function resumeOpenShift() {
+        try {
+            const d = await POS.data.shiftSummary(); // 内部同步 state.shift
+            if (d && d.shift) {
+                state.shift = d.shift;
+                if (d.shift.terminal_id != null) state.terminalId = d.shift.terminal_id;
+                $('shift-mask').classList.remove('show');
+                await enterMain();
+                return true;
+            }
+        } catch (_) {
+            /* 取不到 → 回退通用提示 */
+        }
+        return false;
+    }
+
+    function cancelShiftModal() {
+        $('shift-mask').classList.remove('show');
+        resetPin(); // 回到 PIN 输入(可换收银员)
     }
 
     async function enterMain() {
@@ -257,6 +281,7 @@
             b.addEventListener('click', () => pinPress(b.dataset.pin));
         });
         $('shift-open-go').addEventListener('click', doOpenShift);
+        $('shift-open-cancel').addEventListener('click', cancelShiftModal);
     }
 
     // ── 全局返回主屏(屏3/4/5 顶栏 back)──

@@ -55,6 +55,31 @@ def open_shift(
     }
 
 
+def current_shift(cur, *, tenant_id: str, workspace_client_id: int) -> Optional[dict]:
+    """本收银台当前未结班次 + 实时汇总(交班屏用)。无 → None。
+    按套账(终端)取,与登录人无关 → 刷新/换人后仍能找到该班并交班(治"找不到地方交班")。"""
+    shift = cashier_dal.get_open_shift_for_workspace(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
+    )
+    if not shift:
+        return None
+    shift_id = str(shift["id"])
+    summary = _summary(cur, tenant_id=tenant_id, shift_id=shift_id)
+    cash_in = Decimal(str(summary["by_method"].get("cash", 0)))
+    change_out = Decimal(str(summary.get("change_total", 0)))
+    expected = Decimal(str(shift["opening_float"])) + cash_in - change_out
+    summary["expected_cash"] = _f(expected)
+    return {
+        "shift": {
+            "id": shift_id,
+            "terminal_id": shift["terminal_id"],
+            "opened_at": shift["opened_at"].isoformat() if shift.get("opened_at") else None,
+            "opening_float": _f(shift["opening_float"]),
+        },
+        "summary": summary,
+    }
+
+
 def _get_open_shift(cur, *, tenant_id: str, shift_id: str):
     cur.execute(
         "SELECT id, opening_float, status FROM pos_shifts WHERE tenant_id = %s AND id = %s",

@@ -340,6 +340,30 @@
         return CATS;
     };
 
+    // 商品图鉴权取图:收银员 token 不能放进 <img src>(浏览器不带 Authorization 头),
+    // 故 fetch 成 blob 再塞 objectURL。image_url 形如 /api/uploads/image/{tenant}/{name}
+    // (那条只认登录用户)→ POS 改走 /api/pos/products/image/{name}(认收银员 token)。
+    data.loadProdImg = async function (img, imageUrl) {
+        if (!img || !imageUrl) return;
+        const m = String(imageUrl).match(/\/api\/uploads\/image\/[^/]+\/([^/?#]+)/);
+        if (!m) {
+            img.src = imageUrl; // 外链:直接用
+            return;
+        }
+        const bearer = state.token || state.storeToken;
+        try {
+            const res = await fetch('/api/pos/products/image/' + encodeURIComponent(m[1]), {
+                headers: bearer ? { Authorization: 'Bearer ' + bearer } : {},
+            });
+            if (!res.ok) return;
+            const obj = URL.createObjectURL(await res.blob());
+            img.addEventListener('load', () => URL.revokeObjectURL(obj), { once: true });
+            img.src = obj;
+        } catch (_) {
+            /* 取图失败:留占位,不抛 */
+        }
+    };
+
     // 设备绑定:店铺码 → 店铺令牌(04 §1b)。无 mock 兜底:绑定必须真后端(隔离关键)。
     data.bind = async function (code) {
         return apiFetch('POST', '/api/pos/bind', { code: code });
@@ -532,13 +556,18 @@
         }
     };
 
-    // 班次汇总(交班屏)。B2 前回落 mock(对齐概念稿 05 数字)。
+    // 班次汇总(交班屏)。按收银台查当前未结班次(不依赖前端内存 → 刷新/换人仍可交班)。
+    // B2 前回落 mock(对齐概念稿 05 数字)。
     data.shiftSummary = async function () {
         try {
             const d = await apiFetch(
                 'GET',
-                '/api/pos/shifts/' + (state.shift ? state.shift.id : '') + '/summary'
+                '/api/pos/shifts/current' +
+                    (state.workspaceClientId
+                        ? '?workspace_client_id=' + state.workspaceClientId
+                        : '')
             );
+            if (d && d.shift) state.shift = d.shift; // 同步内存:交班 close 取 state.shift.id
             return d;
         } catch (e) {
             // 真租户绑定后端却缺 summary 端点时返 null(屏5 显诚实空态),绝不在真店渲染假财务数。

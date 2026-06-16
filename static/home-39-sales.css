@@ -748,6 +748,11 @@ table.sx-tbl tr.click:hover td {
 .sx-field-err:empty {
     display: none;
 }
+.sx-field-hint {
+    font-size: 11.5px;
+    color: var(--ink-3);
+    margin-top: 4px;
+}
 /* 图片上传字段 = 虚线投放框(商品图 / logo / 印章 / 签字 · 照草稿 .asset) */
 .sx-acc-assets {
     display: grid;

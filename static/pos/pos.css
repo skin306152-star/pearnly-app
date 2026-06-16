@@ -69,6 +69,7 @@ body { background: var(--bg); color: var(--ink); font-size: 14px; }
 .pos-view--login .om .inp input { border: 0; outline: 0; background: transparent; font: inherit; flex: 1; }
 .pos-view--login .om .go { width: 100%; height: 50px; border: 0; border-radius: 11px; background: var(--blue); color: #fff; font-weight: 700; font-size: 16px; cursor: pointer; }
 .pos-view--login .om .go:disabled { background: #c7cdd6; cursor: not-allowed; }
+.pos-view--login .om .ghost { width: 100%; height: 44px; margin-top: 10px; border: 0; background: transparent; color: var(--ink2); font-size: 14px; cursor: pointer; }
 
 /* ════════════════ 屏 1 · 收银主屏(概念稿 01)════════════════ */
 .pos-view--main.is-active { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
@@ -110,7 +111,8 @@ body { background: var(--bg); color: var(--ink); font-size: 14px; }
 .pos-view--main .prod:hover { box-shadow: var(--shadow); }
 .pos-view--main .prod:active { transform: scale(.97); }
 .pos-view--main .prod.out { opacity: .5; cursor: not-allowed; }
-.pos-view--main .prod .thumb { aspect-ratio: 1.5 / 1; background: linear-gradient(135deg, #f0f0ec, #e8e8e3); display: grid; place-items: center; color: var(--ink-3); position: relative; }
+.pos-view--main .prod .thumb { aspect-ratio: 1.5 / 1; background: linear-gradient(135deg, #f0f0ec, #e8e8e3); display: grid; place-items: center; color: var(--ink-3); position: relative; overflow: hidden; }
+.pos-view--main .prod .thumb .pimg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .pos-view--main .prod .stock { position: absolute; top: 8px; right: 8px; font-size: 11px; background: rgba(17, 24, 39, .72); color: #fff; padding: 2px 7px; border-radius: 6px; }
 .pos-view--main .prod .stock.low { background: rgba(220, 38, 38, .85); }
 .pos-view--main .prod .meta { padding: 9px 11px 11px; }

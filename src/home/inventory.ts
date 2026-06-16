@@ -16,6 +16,7 @@ import {
     type StockResp,
     type StockFilter,
 } from './inventory-common.js';
+import { loadAuthedImg } from './sales-common.js';
 
 const IC_PLUS =
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
@@ -43,8 +44,11 @@ function rowHtml(it: InvItem): string {
         ? `<span class="exp-dot" title="${escapeHtml(t('inv-near-expiry'))}"></span>`
         : '';
     const qtyBad = it.status === 'out' ? ' bad' : '';
+    const thumb = it.image_url
+        ? `<span class="thumb"><img data-aimg="${escapeHtml(it.image_url)}" alt="" style="width:100%;height:100%;border-radius:inherit;object-fit:cover"></span>`
+        : `<span class="thumb">${IC_BOX}</span>`;
     return `<tr>
-        <td><span class="nm"><span class="thumb">${IC_BOX}</span>${escapeHtml(localizedName(it.name))}${near}</span></td>
+        <td><span class="nm">${thumb}${escapeHtml(localizedName(it.name))}${near}</span></td>
         <td class="tnum">${escapeHtml(it.barcode || '')}</td>
         <td>${escapeHtml(it.base_unit || '')}</td>
         <td class="num qty${qtyBad}">${fmtQty(it.qty_on_hand)}</td>
@@ -128,6 +132,14 @@ function setBody(html: string) {
 function rerenderRows() {
     const tb = document.getElementById('inv-tbody');
     if (tb) tb.innerHTML = tbodyHtml();
+    hydrateThumbs();
+}
+
+// 缩略图经鉴权取图(行内 <img> 不能直接 src 鉴权 URL,否则 401)。
+function hydrateThumbs() {
+    document
+        .querySelectorAll<HTMLImageElement>('#inv-tbody [data-aimg]')
+        .forEach((im) => void loadAuthedImg(im, im.dataset.aimg || ''));
 }
 
 function exportCsv() {
@@ -161,6 +173,7 @@ function exportCsv() {
 }
 
 function bindBody() {
+    hydrateThumbs();
     const search = document.getElementById('inv-search') as HTMLInputElement | null;
     if (search)
         search.oninput = () => {

@@ -44,7 +44,7 @@ def stock_overview(
     # 也列出来(零库存)。批次均价子查询同步按套账,避免跨套账批次拉低/抬高本套账均价。
     sql = (
         "SELECT p.id AS product_id, p.name_th, p.name_en, p.name_zh, p.barcode, "
-        "p.base_unit, p.min_stock, p.default_cost, "
+        "p.image_url, p.base_unit, p.min_stock, p.default_cost, "
         "COALESCE(SUM(s.qty_on_hand), 0) AS qty_on_hand, "
         "COALESCE(MAX(b.avg_cost), p.default_cost) AS avg_cost "
         "FROM products p "
@@ -68,8 +68,8 @@ def stock_overview(
         like = f"%{q}%"
         params += [like, like, like]
     sql += (
-        " GROUP BY p.id, p.name_th, p.name_en, p.name_zh, p.barcode, p.base_unit, "
-        "p.min_stock, p.default_cost ORDER BY p.name_th"
+        " GROUP BY p.id, p.name_th, p.name_en, p.name_zh, p.barcode, p.image_url, "
+        "p.base_unit, p.min_stock, p.default_cost ORDER BY p.name_th"
     )
     cur.execute(sql, params)
     rows = cur.fetchall()
@@ -100,6 +100,7 @@ def stock_overview(
             {
                 "product_id": str(r["product_id"]),
                 "name": {"th": r["name_th"], "en": r["name_en"], "zh": r["name_zh"]},
+                "image_url": r["image_url"],
                 "barcode": r["barcode"],
                 "base_unit": r["base_unit"],
                 "qty_on_hand": _f(qty),

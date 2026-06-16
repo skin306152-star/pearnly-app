@@ -23,13 +23,14 @@ class FakeCursor:
         return self._alls.pop(0) if self._alls else []
 
 
-def _prow(qty, min_stock=None, avg_cost=None):
+def _prow(qty, min_stock=None, avg_cost=None, image_url=None):
     return {
         "product_id": "p1",
         "name_th": "ยา",
         "name_en": None,
         "name_zh": None,
         "barcode": None,
+        "image_url": image_url,
         "base_unit": "เม็ด",
         "min_stock": Decimal(str(min_stock)) if min_stock is not None else None,
         "default_cost": None,
@@ -58,11 +59,14 @@ class StockOverviewSqlTests(unittest.TestCase):
 
 class StatusAndSummaryTests(unittest.TestCase):
     def test_status_low_ok_out(self):
-        cur = FakeCursor([[_prow(80, min_stock=100, avg_cost=2)], []])
+        cur = FakeCursor(
+            [[_prow(80, min_stock=100, avg_cost=2, image_url="/api/uploads/image/t/x.jpg")], []]
+        )
         out = queries.stock_overview(cur, tenant_id="t", workspace_client_id=9)
         item = out["items"][0]
         self.assertEqual(item["status"], "low")
         self.assertEqual(item["qty_on_hand"], 80.0)
+        self.assertEqual(item["image_url"], "/api/uploads/image/t/x.jpg")  # 库存图随商品同步
         self.assertEqual(out["summary"]["low_count"], 1)
         self.assertEqual(out["summary"]["sku_count"], 1)
         self.assertEqual(out["summary"]["stock_value"], 160.0)  # 80×2 · 不翻倍

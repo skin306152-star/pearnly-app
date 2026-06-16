@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """POS 收银前台路由守门测试(POS 项目 · PO-B2)。
 
-锁定:14 条路由 path+method 契约 · app.py include · 路由用 POS 信封 + 模块守门。"""
+锁定:路由 path+method 契约 · app.py include · 路由用 POS 信封 + 模块守门。"""
 
 import unittest
 
@@ -11,8 +11,10 @@ from routes.pos_sales_routes import router
 EXPECTED = {
     ("GET", "/api/pos/bootstrap"),
     ("GET", "/api/pos/products"),
+    ("GET", "/api/pos/products/image/{name}"),
     ("GET", "/api/pos/products/by-barcode"),
     ("POST", "/api/pos/shifts/open"),
+    ("GET", "/api/pos/shifts/current"),
     ("POST", "/api/pos/shifts/{shift_id}/close"),
     ("POST", "/api/pos/sales"),
     ("POST", "/api/pos/sales/sync"),

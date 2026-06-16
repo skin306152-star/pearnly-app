@@ -16,6 +16,7 @@ export interface InvBatch {
 export interface InvItem {
     product_id: string;
     name: InvName;
+    image_url: string | null;
     barcode: string | null;
     base_unit: string | null;
     qty_on_hand: number | null;

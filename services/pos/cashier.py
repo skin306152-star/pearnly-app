@@ -275,3 +275,15 @@ def get_open_shift_for_cashier(cur, *, tenant_id: str, cashier_id: str):
         (tenant_id, cashier_id),
     )
     return cur.fetchone()
+
+
+def get_open_shift_for_workspace(cur, *, tenant_id: str, workspace_client_id: int):
+    """套账(收银台)当前的未结班次 —— 按终端唯一,与开班人无关。
+    收银台=共享钱箱:任何收银员登录都接续这一班、都能交班(避免第二人被锁死/重复开班)。"""
+    cur.execute(
+        "SELECT id, terminal_id, opened_at, opening_float FROM pos_shifts "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND status = 'open' "
+        "ORDER BY opened_at DESC LIMIT 1",
+        (tenant_id, workspace_client_id),
+    )
+    return cur.fetchone()

@@ -99,6 +99,9 @@
         items.forEach((p) => (POS.nameCache[p.id] = p.name)); // 供历史小票退货回查商品名
         $('main-grid').innerHTML = items.map(renderProd).join('');
         $('main-grid')
+            .querySelectorAll('img[data-pimg]')
+            .forEach((im) => POS.data.loadProdImg(im, im.dataset.pimg));
+        $('main-grid')
             .querySelectorAll('.prod')
             .forEach((el) => {
                 el.addEventListener('click', () => {
@@ -114,12 +117,19 @@
         const out = qty <= 0;
         const unit = (p.units || []).find((u) => u.default_sell) ||
             (p.units || [])[0] || { price: '0' };
+        const thumbInner = p.image_url
+            ? '<img class="pimg" alt="" data-pimg="' +
+              String(p.image_url).replace(/"/g, '&quot;').replace(/</g, '&lt;') +
+              '">'
+            : '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>';
         return (
             '<div class="prod' +
             (out ? ' out' : '') +
             '" data-pid="' +
             p.id +
-            '"><div class="thumb"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg><span class="stock' +
+            '"><div class="thumb">' +
+            thumbInner +
+            '<span class="stock' +
             (low ? ' low' : '') +
             '">' +
             qty +

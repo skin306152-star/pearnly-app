@@ -59,6 +59,16 @@ class CashierStoreTests(unittest.TestCase):
         self.assertIn("status = 'open'", sql)
         self.assertEqual(params, ("t", "c1"))
 
+    def test_open_shift_for_workspace_keyed_by_ws_not_cashier(self):
+        # 共享钱箱:按套账(终端)取未结班次 · 与开班人无关(第二个收银员也能接续/交班)。
+        cur = FakeCursor(ones=[{"id": "s1", "terminal_id": 3}])
+        cashier.get_open_shift_for_workspace(cur, tenant_id="t", workspace_client_id=9)
+        sql, params = cur.calls[0]
+        self.assertIn("status = 'open'", sql)
+        self.assertIn("workspace_client_id = %s", sql)
+        self.assertNotIn("cashier_id", sql)
+        self.assertEqual(params, ("t", 9))
+
     def test_resolve_tenant_for_workspace(self):
         cur = FakeCursor(ones=[{"tenant_id": "t-99"}])
         tid = cashier.resolve_tenant_for_workspace(cur, workspace_client_id=9)

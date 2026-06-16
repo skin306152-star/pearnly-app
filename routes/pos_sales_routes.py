@@ -11,11 +11,12 @@ from __future__ import annotations
 from typing import List, Optional
 
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from core import db
 from core.pos_api import PosError, assert_module_enabled, ok, pos_auth, require_workspace
+from services.imaging import image_store
 from services.pos import (
     catalog,
     refund as refund_svc,
@@ -91,6 +92,22 @@ async def api_products(
     )
 
 
+@router.get("/products/image/{name}")
+async def api_product_image(name: str, request: Request):
+    """商品图取图(收银台用)。POS token 取不到 /api/uploads(那条只认登录用户),
+    故走本路由:从 token 拿 tenant → 沙盒内回流本租户图片(uuid 文件名 + 沙盒路径双保险)。"""
+    _user, tid = _subject(request)
+    path = image_store.local_path(tid, name)
+    if not path:
+        raise PosError("pos.not_found", 404)
+    ext = path.suffix.lstrip(".").lower()
+    return FileResponse(
+        str(path),
+        media_type=image_store.media_type_for(ext),
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
+
+
 @router.get("/products/by-barcode")
 async def api_by_barcode(
     request: Request, code: str = Query(...), workspace_client_id: Optional[int] = Query(None)
@@ -134,6 +151,19 @@ async def api_open_shift(req: OpenShiftRequest, request: Request):
         }
 
     return _write(request, req.workspace_client_id, _fn)
+
+
+@router.get("/shifts/current")
+async def api_current_shift(request: Request, workspace_client_id: Optional[int] = Query(None)):
+    """本收银台当前未结班次 + 汇总(交班屏直查,不依赖前端内存 → 刷新/换人后仍能交班)。
+    无班次 → data:null(屏显诚实空态)。"""
+    return _read(
+        request,
+        workspace_client_id,
+        lambda cur, tid, ws, user: shift_svc.current_shift(
+            cur, tenant_id=tid, workspace_client_id=ws
+        ),
+    )
 
 
 @router.post("/shifts/{shift_id}/close")

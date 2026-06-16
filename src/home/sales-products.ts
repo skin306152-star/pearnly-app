@@ -131,13 +131,13 @@ function openEdit(p: Product | null) {
             <button class="modal-close" id="sx-p-close">${IC_X}</button></div>
         <div class="modal-body">
             <div class="form-row form-row-2col">
-                <div><label>${escapeHtml(t('sx-p-f-code'))}</label><input type="text" id="sx-pf-code" value="${htmlVal(p?.code)}" maxlength="100"><div class="sx-field-err" id="sx-pf-code-err"></div></div>
+                <div><label>${escapeHtml(t('sx-p-f-code'))}</label><input type="text" id="sx-pf-code" value="${htmlVal(p?.code)}" maxlength="25"><div class="sx-field-hint">${escapeHtml(t('sx-p-f-code-hint'))}</div><div class="sx-field-err" id="sx-pf-code-err"></div></div>
                 <div><label>${escapeHtml(t('sx-p-f-barcode'))}</label><input type="text" id="sx-pf-barcode" value="${htmlVal(p?.barcode)}" maxlength="100"></div>
             </div>
-            <div class="form-row"><label>${escapeHtml(t('sx-p-f-name-th'))} *</label><input type="text" id="sx-pf-th" value="${htmlVal(p?.name_th)}" maxlength="300"></div>
+            <div class="form-row"><label>${escapeHtml(t('sx-p-f-name-th'))} *</label><input type="text" id="sx-pf-th" value="${htmlVal(p?.name_th)}" maxlength="100"><div class="sx-field-hint">${escapeHtml(t('sx-p-f-name-hint'))}</div></div>
             <div class="form-row form-row-2col">
-                <div><label>${escapeHtml(t('sx-p-f-name-en'))}</label><input type="text" id="sx-pf-en" value="${htmlVal(p?.name_en)}" maxlength="300"></div>
-                <div><label>${escapeHtml(t('sx-p-f-name-zh'))}</label><input type="text" id="sx-pf-zh" value="${htmlVal(p?.name_zh)}" maxlength="300"></div>
+                <div><label>${escapeHtml(t('sx-p-f-name-en'))}</label><input type="text" id="sx-pf-en" value="${htmlVal(p?.name_en)}" maxlength="100"></div>
+                <div><label>${escapeHtml(t('sx-p-f-name-zh'))}</label><input type="text" id="sx-pf-zh" value="${htmlVal(p?.name_zh)}" maxlength="100"></div>
             </div>
             <div class="form-row form-row-2col">
                 <div><label>${escapeHtml(t('sx-p-f-unit'))}</label><input type="text" id="sx-pf-unit" value="${htmlVal(p?.unit)}" maxlength="50"></div>

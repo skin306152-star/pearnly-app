@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """商户采购智能入口路由 · /intake 分流 + /expense 文字记费用(docs/purchasing/02 §0/§4)。
 
-/intake:图 → OCR(复用 ocr/entrypoints·计费同网页/LINE)→ 判方向(买方=本主体→进项)→ 草稿/
-inbox;文字 → 费用归类草稿。OCR 在游标外跑(不长持事务)。/expense:文字一句话 → 直接记一笔
-posted 费用(LINE bot 复用此入口·替代收据 S2d 生成)。成员可用;套账隔离 + expense 门控。
+/intake:图 → OCR(复用 ocr/entrypoints·计费同网页/LINE)→ 判方向(有 VAT→进项·否则费用)→ 建
+草稿落列表(待归类已下线·高置信齐全且 auto_book 开则直接过账);文字 → 费用归类草稿。OCR 在游标
+外跑(不长持事务)。/expense:文字一句话 → 直接记一笔 posted 费用(LINE bot 复用此入口·替代收据
+S2d 生成)。成员可用;套账隔离 + expense 门控。
 """
 
 from __future__ import annotations
@@ -172,70 +173,3 @@ async def api_quick_expense(req: ExpenseIn, request: Request):
             created_by=_uid(user),
         )
         return ok({"doc": posted["doc"], "category": {"id": category_id}})
-
-
-@router.get("/inbox")
-async def api_inbox_list(request: Request, workspace_client_id: Optional[int] = None):
-    """待归类收件箱:本套账 pending intake_items(长尾安全网入口)。成员可读。"""
-    _user, tid = auth_member(request, "intake.classify")
-    with db.get_cursor_rls(tid, commit=False) as cur:
-        gate(cur, tid)
-        ws = resolve_ws(cur, request, tid, workspace_client_id)
-        items = intake_svc.list_inbox(cur, tenant_id=tid, workspace_client_id=ws)
-    return ok({"items": items})
-
-
-class InboxResolveIn(BaseModel):
-    workspace_client_id: Optional[int] = None
-    action: str = ""
-
-
-@router.post("/inbox/{item_id}/resolve")
-async def api_inbox_resolve(item_id: str, req: InboxResolveIn, request: Request):
-    """一点归类:purchase/expense → 建草稿单(返 doc_id);sales/recon → 移出;dismiss → 非票。"""
-    user, tid = auth_member(request, "intake.classify")
-    with db.get_cursor_rls(tid, commit=True) as cur:
-        gate(cur, tid)
-        ws = resolve_ws(cur, request, tid, req.workspace_client_id)
-        cfg = settings_svc.get_settings(cur, tenant_id=tid, workspace_client_id=ws)
-        data = intake_svc.resolve_inbox(
-            cur,
-            tenant_id=tid,
-            workspace_client_id=ws,
-            item_id=item_id,
-            action=req.action,
-            created_by=_uid(user),
-            settings=cfg,
-        )
-    return ok(data)
-
-
-@router.get("/inbox/{item_id}/image")
-async def api_inbox_image(
-    item_id: str, request: Request, workspace_client_id: Optional[int] = None
-):
-    """待归类项票图(落盘原图流式返回)· 鉴权 + 套账边界。无图/缺失 → 404。"""
-    _user, tid = auth_member(request, "intake.classify")
-    with db.get_cursor_rls(tid, commit=False) as cur:
-        gate(cur, tid)
-        ws = resolve_ws(cur, request, tid, workspace_client_id)
-        cur.execute(
-            "SELECT image_url FROM intake_items "
-            "WHERE id = %s AND tenant_id = %s AND workspace_client_id = %s",
-            (item_id, tid, ws),
-        )
-        r = cur.fetchone()
-    ref = (r and r.get("image_url")) or ""
-    if not ref:
-        raise PosError("purchase.unexpected", 404, detail="no_image")
-    from services.ocr import pdf_storage
-
-    abs_path = pdf_storage.get_pdf_abs_path(ref)
-    if not abs_path or not abs_path.exists():
-        raise PosError("purchase.unexpected", 404, detail="image_missing")
-    import mimetypes
-
-    from fastapi.responses import FileResponse
-
-    media = mimetypes.guess_type(str(abs_path))[0] or "image/jpeg"
-    return FileResponse(path=str(abs_path), media_type=media)

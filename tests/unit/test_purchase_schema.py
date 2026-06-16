@@ -18,15 +18,18 @@ _MIGRATIONS = (
 )
 _ENSURE = "services/purchase/schema.py"
 
+# 现役表(ensure 建·与迁移净结果一致)。
 _EXPECTED_TABLES = {
     "suppliers",
     "purchase_docs",
     "purchase_lines",
     "expense_categories",
     "purchase_settings",
-    "intake_items",
     "purchase_attachments",
 }
+
+# 历史表:0033 建、0040 下线(待归类模块删)。迁移史里有,ensure 不再建。
+_DROPPED_TABLES = {"intake_items"}
 
 _CREATE_RE = re.compile(r"CREATE TABLE IF NOT EXISTS\s+(\w+)", re.I)
 
@@ -44,7 +47,7 @@ class PurchaseSchemaParityTests(unittest.TestCase):
         migrated = set()
         for m in _MIGRATIONS:
             migrated |= _tables_in(m)
-        self.assertEqual(migrated, _EXPECTED_TABLES)
+        self.assertEqual(migrated, _EXPECTED_TABLES | _DROPPED_TABLES)
 
     def test_every_table_has_rls_in_ensure(self):
         text = (_ROOT / _ENSURE).read_text(encoding="utf-8")

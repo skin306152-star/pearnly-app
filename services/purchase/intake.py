@@ -1,16 +1,15 @@
 # -*- coding: utf-8 -*-
-"""智能分流 intake · AI 判类型 + 方向 + 去向(商户采购 ★ · docs/purchasing/02 §0 · product-vision §三-bis)。
+"""智能分流 intake · AI 判类型 + 建草稿(商户采购 ★ · docs/purchasing/02 §0 · product-vision §三-bis)。
 
-统一入口:图(OCR 结构化结果)/ 文字一句话 → 判「是什么 + 去哪」。
-判方向(P0a):比对 OCR 买卖双方税号 vs 本套账主体税号 —— 买方=我 → 进项票(route=purchase);
-卖方=我 → 销项(route=sales);非发票/银行单 → recon;低置信/拿不准 → inbox(落 intake_items
-待用户一点,绝不静默丢错)。判定 + 草稿构建 + 费用文本归类全做纯函数(可测),OCR 运行/计费
+统一入口:图(OCR 结构化结果)/ 文字一句话 → 建草稿落采购列表。待归类已下线:识别完的票一律
+建成草稿(ฉบับร่าง),用户在列表里改方向/补金额/删,系统不再单独兜一个待归类桶。
+判方向:有 VAT → 进项票(可抵·route=purchase);无 VAT/截图证据 → 费用(route=expense)。销项分类
+后期按上传前选业务类型单独做。判定 + 草稿构建 + 费用文本归类全做纯函数(可测),OCR 运行/计费
 在路由层复用 services/ocr/entrypoints。隔离=每句 WHERE tenant_id;调用方管事务。
 """
 
 from __future__ import annotations
 
-import json
 import re
 from decimal import Decimal, InvalidOperation
 from typing import Optional
@@ -34,30 +33,20 @@ def _to_decimal(v) -> Decimal:
         return Decimal("0")
 
 
-def judge_direction(fields: dict, *, my_tax_id) -> tuple[str, str]:
-    """判 (kind, route)。fields = OCR 抽取(document_type/seller_tax/buyer_tax/vat/...)。
+def judge_direction(fields: dict) -> tuple[str, str]:
+    """判 (kind, route)。fields = OCR 抽取(document_type/vat/...)。
 
-    买方=本主体 → 进项票;卖方=本主体 → 销项;非发票 → inbox(银行单交由 recon 上层另判)。
-    两边都不匹配但确是发票 → 默认进项(商户拍的是收到的票),置信下调由调用方据 confidence 决定。
+    待归类已下线:识别完的票一律建草稿落采购列表(用户在列表改方向/删),不再判 inbox/销项分流。
+    有 VAT → 进项票(可抵进项税·route=purchase);无 VAT → 费用(route=expense)。
+    银行转账/电商订单截图(payment_evidence)非正规税票 → 一律费用、不抵 VAT(用户可改)。
+    销项分类(我是卖方)后期按上传前选业务类型单独做,届时再引入主体税号比对。
     """
-    if fields.get("is_not_invoice"):
-        return "unknown", "inbox"
     dtype = (fields.get("document_type") or "").lower()
-    # 银行转账/电商订单截图 = 付款/订单证据,不冒充税票、不直接过账 → 待归类(PO-10)。
     if dtype in ("payment_evidence", "order_evidence"):
-        return "unknown", "inbox"
-    mine = _norm_tax(my_tax_id)
-    buyer = _norm_tax(fields.get("buyer_tax"))
-    seller = _norm_tax(fields.get("seller_tax"))
-    has_vat = _to_decimal(fields.get("vat")) > 0
-
-    if mine and seller == mine and buyer != mine:
-        return "sales", "sales"  # 我是卖方 → 销项,不归采购
-    if dtype in ("tax_invoice", "receipt") or has_vat:
-        # 买方=我,或两边都没匹配上(商户拍收到的票)→ 进项。
-        kind = "purchase_invoice" if has_vat else "expense"
-        return kind, ("purchase" if has_vat else "expense")
-    return "unknown", "inbox"
+        return "expense", "expense"
+    if _to_decimal(fields.get("vat")) > 0:
+        return "purchase_invoice", "purchase"
+    return "expense", "expense"
 
 
 def default_payment_status(doc_type: str, doc_kind: str) -> str:
@@ -86,8 +75,11 @@ def _single_line(fields: dict, base: Decimal, vat_rate: int) -> dict:
 
 
 def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
-    """OCR 抽取 → 进项录入草稿(屏10 预填)。行取自 items,无 items 则按总额单行兜底。"""
-    has_vat = _to_decimal(fields.get("vat")) > 0
+    """OCR 抽取 → 进项录入草稿(屏10 预填)。行取自 items,无 items 则按总额单行兜底。
+
+    费用类(kind=expense·含截图证据)不带可抵进项 VAT,即便 OCR 读到 vat 也归 0(进项票才抵)。
+    """
+    has_vat = kind != "expense" and _to_decimal(fields.get("vat")) > 0
     vat_rate = 7 if has_vat else 0
     lines = []
     for it in fields.get("items") or []:
@@ -181,16 +173,6 @@ def _match_category(text: str, categories: list) -> tuple[Optional[str], Optiona
     return None, None
 
 
-def _my_tax_id(cur, *, tenant_id, workspace_client_id) -> str:
-    """本套账主体税号(方向判定基准)。"""
-    cur.execute(
-        "SELECT tax_id FROM workspace_clients WHERE id = %s AND tenant_id = %s",
-        (workspace_client_id, tenant_id),
-    )
-    row = cur.fetchone()
-    return (row["tax_id"] or "") if row else ""
-
-
 def workspace_name(cur, *, tenant_id, workspace_client_id) -> str:
     """套账(主体)名 —— 数据卡「套账」行显示用。取不到 → 空串(卡不显该行)。"""
     cur.execute(
@@ -214,56 +196,19 @@ def resolve_image_intake(
     field_confidence=None,
     created_by=None,
 ) -> dict:
-    """图路:判方向 → 建草稿 → dedupe 提示;低置信/unknown → 落 inbox。返回分流信封 data。
+    """图路:判方向 → 建草稿 → dedupe 提示;高置信齐全且 auto_book 开 → 直接过账。返回分流信封 data。
 
+    待归类已下线:识别完一律建草稿(糊图/฿0 也建·用户在列表补全/删),不再落 inbox。
     confidence_band + field_confidence(逐字段)透出给复核屏「需复核高亮」(契约 05 §1.1)。
     """
-    my_tax = _my_tax_id(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
-    kind, route = judge_direction(fields, my_tax_id=my_tax)
+    kind, route = judge_direction(fields)
     low_conf = str(confidence or "").lower() in ("needs_review", "low", "")
     fc = dict(field_confidence or {})
 
-    if route in ("sales", "recon"):
-        return {
-            "kind": kind,
-            "confidence": confidence,
-            "confidence_band": confidence,
-            "field_confidence": fc,
-            "route": route,
-            "draft": None,
-            "dedupe_hit": False,
-        }
-
-    draft = None
-    calc = None
-    if route in ("purchase", "expense"):
-        draft = build_draft_from_invoice(fields, kind=kind)
-        # 来源透传到单据(line/photo),否则 create_doc 默认 manual 显「手录」
-        draft["source"] = source
-        calc = totals_svc.compute_purchase_totals(draft["lines"])
-
-    # 低置信 / unknown(draft 未建)/ 抽取过空(糊图税号"13"·金额฿0)→ 落待归类,绝不直接进可保存的 ฿0 表单(F5)。
-    too_empty = calc is not None and calc["grand_total"] <= 0
-    if draft is None or low_conf or too_empty:
-        item_id = _stash_inbox(
-            cur,
-            tenant_id=tenant_id,
-            workspace_client_id=workspace_client_id,
-            source=source,
-            raw=fields,
-            image_url=image_url,
-            ai_guess={"kind": kind, "confidence": confidence, "route": route},
-        )
-        return {
-            "kind": kind,
-            "confidence": confidence,
-            "confidence_band": confidence,
-            "field_confidence": fc,
-            "route": "inbox",
-            "draft": None,
-            "dedupe_hit": False,
-            "inbox_item_id": item_id,
-        }
+    draft = build_draft_from_invoice(fields, kind=kind)
+    # 来源透传到单据(line/photo),否则 create_doc 默认 manual 显「手录」
+    draft["source"] = source
+    calc = totals_svc.compute_purchase_totals(draft["lines"])
 
     dkey = totals_svc.dedupe_key(
         supplier_tax=draft["supplier"]["tax_id"],
@@ -291,10 +236,11 @@ def resolve_image_intake(
             "bill_image_ref": image_url,
         }
     )
-    # 自动入账(采购设置开关 · 默认关):高置信(已过 low_conf/too_empty)+ 有卖家 + 金额>0 + 无重复 →
-    # 直接建单并过账(复用表单确认链路 create_doc→post_doc),不用逐张复核。单照常可编辑/作废。
+    # 自动入账(采购设置开关 · 默认开):高置信 + 有卖家 + 金额>0 + 无重复 → 直接建单并过账(复用
+    # 表单确认链路 create_doc→post_doc),不用逐张复核。低置信/糊图不自动过账,只回草稿等用户复核。
     if (
-        bool(settings.get("auto_book"))
+        not low_conf
+        and bool(settings.get("auto_book"))
         and not dup
         and (draft["supplier"]["name"] or "").strip()
         and calc["grand_total"] > 0
@@ -376,104 +322,3 @@ def line_expense_gate_open(cur, *, tenant_id) -> bool:
     from services.modules import store as modules_store
 
     return modules_store.is_enabled(cur, tenant_id=tenant_id, module_key="expense")
-
-
-def list_inbox(cur, *, tenant_id, workspace_client_id) -> list[dict]:
-    """待归类收件箱:本套账 status='pending' 的 intake_items(新→旧)。供前端一点归类。"""
-    cur.execute(
-        "SELECT id, source, raw, image_url, ai_guess, created_at FROM intake_items "
-        "WHERE tenant_id = %s AND workspace_client_id = %s AND status = 'pending' "
-        "ORDER BY created_at DESC",
-        (tenant_id, workspace_client_id),
-    )
-    return [
-        {
-            "id": str(r["id"]),
-            "source": r["source"],
-            "raw": r["raw"] or {},
-            "image_url": r["image_url"],
-            "ai_guess": r["ai_guess"] or {},
-            "created_at": r["created_at"].isoformat() if r["created_at"] else None,
-        }
-        for r in cur.fetchall()
-    ]
-
-
-_INBOX_ACTIONS = ("purchase", "expense", "sales", "recon", "dismiss")
-
-
-def resolve_inbox(
-    cur, *, tenant_id, workspace_client_id, item_id, action, created_by, settings
-) -> dict:
-    """一点归类。purchase/expense → 据 raw 建草稿单(返 doc_id 供前端开录入屏确认);
-    sales/recon → 移出收件箱(去对应模块处理);dismiss → 标记非票。绝不静默丢:全留痕。"""
-    if action not in _INBOX_ACTIONS:
-        from core.pos_api import PosError
-
-        raise PosError("purchase.line_invalid", 422, detail="bad_action")
-    cur.execute(
-        "SELECT source, raw, image_url FROM intake_items "
-        "WHERE id = %s AND tenant_id = %s AND workspace_client_id = %s AND status = 'pending'",
-        (item_id, tenant_id, workspace_client_id),
-    )
-    row = cur.fetchone()
-    if row is None:
-        from core.pos_api import PosError
-
-        raise PosError("purchase.forbidden", 404, detail="inbox_item_not_found")
-
-    if action in ("purchase", "expense"):
-        from services.purchase import docs as docs_svc
-
-        kind = "purchase_invoice" if action == "purchase" else "expense"
-        draft = build_draft_from_invoice(row["raw"] or {}, kind=kind)
-        # 保留原始来源(line/photo),归类后不退回「手录」
-        draft["source"] = row.get("source") or "manual"
-        # 票图闭环:待归类落盘的票图挂进 doc(create_doc 据 bill_image_ref 建 bill 附件)→
-        # 复核屏/详情可回看原票(此前 resolve 只取 raw 不取 image_url → 票图空)。
-        draft["bill_image_ref"] = row.get("image_url") or ""
-        created = docs_svc.create_doc(
-            cur,
-            tenant_id=tenant_id,
-            workspace_client_id=workspace_client_id,
-            created_by=created_by,
-            data=draft,
-            settings=settings,
-            status="draft",
-        )
-        doc_id = created["doc"]["id"]
-        cur.execute(
-            "UPDATE intake_items SET status = 'resolved', resolved_doc_id = %s "
-            "WHERE id = %s AND tenant_id = %s AND workspace_client_id = %s",
-            (doc_id, item_id, tenant_id, workspace_client_id),
-        )
-        return {"status": "resolved", "doc_id": str(doc_id), "doc_kind": kind}
-
-    new_status = "dismissed" if action == "dismiss" else "resolved"
-    cur.execute(
-        "UPDATE intake_items SET status = %s "
-        "WHERE id = %s AND tenant_id = %s AND workspace_client_id = %s",
-        (new_status, item_id, tenant_id, workspace_client_id),
-    )
-    return {"status": new_status, "route": action}
-
-
-def _stash_inbox(
-    cur, *, tenant_id, workspace_client_id, source, raw, image_url, ai_guess
-) -> Optional[str]:
-    """低置信/拿不准落待归类(绝不静默丢错)。返回新建 intake_item id(供 LINE 卡片动作引用)。"""
-    cur.execute(
-        "INSERT INTO intake_items "
-        "(tenant_id, workspace_client_id, source, raw, image_url, ai_guess, status) "
-        "VALUES (%s, %s, %s, %s::jsonb, %s, %s::jsonb, 'pending') RETURNING id",
-        (
-            tenant_id,
-            workspace_client_id,
-            source,
-            json.dumps(raw, default=str),
-            image_url,
-            json.dumps(ai_guess, default=str),
-        ),
-    )
-    row = cur.fetchone()
-    return str(row["id"]) if row else None

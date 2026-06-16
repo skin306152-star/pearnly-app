@@ -478,7 +478,7 @@ const PUR_BASE_CSS = `
 .pur .btn:disabled{opacity:.55;cursor:not-allowed;}
 /* .pur .card 只给视觉(无 padding/margin)· 面板内嵌的无边框卡(.preview-pane/.section/.sheet 下)须自行 reset padding:0;margin:0,否则叠加各自 hd/bd 内边距=双重留白 */
 .pur .card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh);}
-/* 收拢版面板(钉死令牌:圆角16 + 卡阴影 --sh)· 单一来源 · 进项4屏(list/suppliers/settings/inbox)共用 */
+/* 收拢版面板(钉死令牌:圆角16 + 卡阴影 --sh)· 单一来源 · 进项3屏(list/suppliers/settings)共用 */
 .pur .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh);overflow:hidden;}
 .pur .state{padding:48px 20px;text-align:center;color:var(--ink3);font-size:13px;}
 .pur .state .btn{margin-top:12px;}

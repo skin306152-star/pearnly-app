@@ -9,7 +9,7 @@ from services.modules.store import KNOWN_MODULES
 
 # 8 个收敛动词 + 图纸钦定特例(acct.entry.review 逐笔审 · kb.ask 问答)
 _VERBS = {"view", "create", "edit", "delete", "approve", "export", "manage", "operate"}
-_VERB_EXCEPTIONS = {"acct.entry.review", "kb.ask", "intake.upload", "intake.classify"}
+_VERB_EXCEPTIONS = {"acct.entry.review", "kb.ask", "intake.upload"}
 
 _CODE_RE = re.compile(r"^[a-z]+(\.[a-z_]+){1,2}$")
 

@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """置信分级判定(docs/smart-intake/15 §1)。
 
-锁:高置信齐全 → post;缺字段/低置信 → confirm;无金额/方向不明 → inbox;重复 → confirm+dup。
+锁:高置信齐全 → post;其余(缺字段/低置信/无金额/方向不明)→ confirm;重复 → confirm+dup。
+待归类已下线:不再有 inbox 动作,拿不准一律落草稿。
 """
 
 import unittest
@@ -48,17 +49,18 @@ class GradeTests(unittest.TestCase):
         v = self._full(has_category=False)
         self.assertEqual(v.action, "confirm")
 
-    def test_zero_amount_to_inbox(self):
+    def test_zero_amount_confirms(self):
+        # 待归类下线:金额 ฿0 也建草稿(confirm),用户补金额。
         v = self._full(amount="0")
-        self.assertEqual(v.action, "inbox")
+        self.assertEqual(v.action, "confirm")
 
-    def test_missing_amount_to_inbox(self):
-        self.assertEqual(self._full(amount=None).action, "inbox")
-        self.assertEqual(self._full(amount="").action, "inbox")
+    def test_missing_amount_confirms(self):
+        self.assertEqual(self._full(amount=None).action, "confirm")
+        self.assertEqual(self._full(amount="").action, "confirm")
 
-    def test_sales_direction_to_inbox(self):
+    def test_non_payable_direction_confirms(self):
         v = self._full(direction="sales")
-        self.assertEqual(v.action, "inbox")
+        self.assertEqual(v.action, "confirm")
 
     def test_duplicate_confirms_and_flags(self):
         v = self._full(is_duplicate=True)

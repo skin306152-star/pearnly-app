@@ -214,13 +214,6 @@ const SIDEBAR_HTML = `
                 </svg>
                 <span class="nav-label" data-i18n="nav-purchase">采购 / 进项</span>
             </div>
-            <div class="nav-item nav-sub-item" data-route="purchase-inbox" data-module="expense">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 12h4l2 3h2l2-3h4"/>
-                    <path d="M5 5h10l2 7v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3z"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-purchase-inbox">待归类</span>
-            </div>
             <div class="nav-item nav-sub-item" data-route="purchase-suppliers" data-module="expense">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M3 8l2-4h10l2 4"/>

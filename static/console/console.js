@@ -131,7 +131,7 @@
                 'pos.refund.approve',
             ],
         },
-        { key: 'intake', title: 'mod_intake', codes: ['intake.upload', 'intake.classify'] },
+        { key: 'intake', title: 'mod_intake', codes: ['intake.upload'] },
     ];
     // 连 admin 都没有的提权码 · 自定义角色禁选(后端 roles_store 同样剔除,前端只为显式禁灰)
     var FORBIDDEN_CODES = ['billing.manage', 'ownership.transfer'];
@@ -1142,7 +1142,6 @@
             'inv.create',
             'inv.report.view',
             'intake.upload',
-            'intake.classify',
         ],
         accountant: [
             'sales.doc.view',
@@ -1184,7 +1183,6 @@
             'inv.report.view',
             'pos.report.view',
             'intake.upload',
-            'intake.classify',
         ],
     };
     // 全模块码(去提权码)· 静态目录,算一次复用(向导初值/换基底/全选都读它)

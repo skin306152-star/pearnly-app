@@ -3,7 +3,7 @@
 
 视觉照搬定稿原型(Downloads/pearnly-line-flex-card-prototype.html 的 flexJson):
 状态条(浅底深字·非按钮)+ 金额&来源 meta + 字段表(低置信琥珀+「请核对」)+ 套账浅底条
-+ 重复时红框显示原记录 + 动作区(唯一实心主按钮=提交,其余 link 文字链接)。四态四语。
++ 重复时红框显示原记录 + 动作区(唯一实心主按钮=提交,其余 link 文字链接)。三态四语。
 chrome 文案内联(LINE 域,不进 home.js i18n);纯构建无 IO,可单测。
 """
 
@@ -15,11 +15,10 @@ from services.line_binding.line_card_i18n import chrome as _lang
 
 _REVIEW_BELOW = 0.85
 
-# 四态:状态字色 / 浅底 / 图标。
+# 三态:状态字色 / 浅底 / 图标(待归类已下线)。
 _STATES = {
     "posted": {"color": "#16A34A", "bg": "#E7F6EC", "icon": "✓"},
     "confirm": {"color": "#D97706", "bg": "#FEF3E2", "icon": "◷"},
-    "inbox": {"color": "#5B6470", "bg": "#F1F2F4", "icon": "↓"},
     "dup": {"color": "#DC2626", "bg": "#FDECEC", "icon": "!"},
 }
 _BRAND = "#2563EB"
@@ -177,9 +176,7 @@ def _btn(label: str, *, primary: bool, postback: str = None, uri: str = None, da
     }
 
 
-def _liff_link(
-    liff_id: str, web_url: str, ref: str, state: str, view: str = "", ws: str = ""
-) -> str:
+def _liff_link(liff_id: str, web_url: str, ref: str, view: str = "", ws: str = "") -> str:
     """深链到该记录复核屏。配了 LIFF ID → liff.line.me/{id}?...(LINE 用 LIFF webview 打开·自动
     用 LINE 身份登录);未配 → 回退站内 /liff 路由(至少能打开)。无 ref → 通用页(不死链)。
 
@@ -187,14 +184,12 @@ def _liff_link(
     """
     if not ref:
         return web_url
-    key = "inbox" if state == "inbox" else "doc"
     extra = (f"&view={view}" if view else "") + (f"&ws={ws}" if ws else "")
     if liff_id:
-        return f"https://liff.line.me/{liff_id}?liff=purchase&{key}={ref}{extra}"
+        return f"https://liff.line.me/{liff_id}?liff=purchase&doc={ref}{extra}"
     base = web_url.split("/home")[0].rstrip("/") or "https://pearnly.com"
-    path = "purchase-inbox" if state == "inbox" else "purchase"
     qs = extra.lstrip("&")
-    return f"{base}/liff/{path}/{ref}" + (f"?{qs}" if qs else "")
+    return f"{base}/liff/purchase/{ref}" + (f"?{qs}" if qs else "")
 
 
 def _stack(primary: dict, view: list, danger: list) -> list:
@@ -213,14 +208,13 @@ def _footer(
     ref: str,
     web_url: str,
     t: dict,
-    can_post: bool,
     token: str = "",
     source: str = "doc",
     liff_id: str = "",
     ws: str = "",
 ) -> list:
     """动作区:主按钮=提交;复核/编辑/替代收据=查看组;撤销/丢弃=危险组。竖排满宽永不死路。"""
-    edit_uri = _liff_link(liff_id, web_url, ref, state, ws=ws)
+    edit_uri = _liff_link(liff_id, web_url, ref, ws=ws)
     pb = line_postback
 
     def link(label, uri):
@@ -236,24 +230,16 @@ def _footer(
     if state == "posted":
         view.append(link(t["btn_review"], edit_uri))
         if source == "text" and ref:
-            view.append(
-                link(t["btn_receipt"], _liff_link(liff_id, web_url, ref, state, "receipt", ws))
-            )
+            view.append(link(t["btn_receipt"], _liff_link(liff_id, web_url, ref, "receipt", ws)))
         danger.append(kill(t["btn_undo"], pb.undo_data(ref, token)))
-    elif state == "confirm":
-        primary = main(t["btn_confirm"], pb.confirm_data(ref, token))
-        view.append(link(t["btn_edit"], edit_uri))
-        danger.append(kill(t["btn_discard"], pb.discard_data(ref, token)))
     elif state == "dup":
         primary = main(t["btn_post_anyway"], pb.confirm_data(ref, token))
         view.append(link(t["btn_open"], edit_uri))
         danger.append(kill(t["btn_discard"], pb.discard_data(ref, token)))
-    else:  # inbox
-        if can_post and ref:
-            primary = main(t["btn_post_anyway"], pb.inbox_post_data(ref, token))
-        view.append(link(t["btn_fill"], edit_uri))
-        if ref:
-            danger.append(kill(t["btn_discard"], pb.inbox_drop_data(ref, token)))
+    else:  # confirm(草稿请确认)
+        primary = main(t["btn_confirm"], pb.confirm_data(ref, token))
+        view.append(link(t["btn_edit"], edit_uri))
+        danger.append(kill(t["btn_discard"], pb.discard_data(ref, token)))
     return _stack(primary, view, danger)
 
 
@@ -266,7 +252,6 @@ def result_card(
     doc_id: str = "",
     lang: str = "zh",
     web_url: str = "https://pearnly.com/home",
-    can_post: bool = True,
     source: str = "doc",
     workspace_name: str = "",
     dup_info: dict = None,
@@ -277,9 +262,8 @@ def result_card(
 ) -> dict:
     """识别结果 Flex 卡(照搬定稿原型)。
 
-    state ∈ posted|confirm|inbox|dup;doc_id=动作目标 id(草稿/已入账=purchase_doc,inbox=intake_item)。
+    state ∈ posted|confirm|dup;doc_id=动作目标 purchase_doc id(待归类已下线·糊图/฿0 也建草稿)。
     source ∈ text|doc|bank(金额右侧来源标);workspace_name 非空则显套账条;dup_info 显原记录红框。
-    can_post:inbox 有可用金额才给「仍要入账」(糊图 ฿0 只给编辑/丢弃)。
     token:postback 动作的一次性防重放令牌(PO-12),空则按钮不带令牌(旧卡兼容链路)。
     """
     t = _lang(lang)
@@ -430,7 +414,6 @@ def result_card(
                     doc_id,
                     web_url,
                     t,
-                    can_post,
                     token,
                     source,
                     liff_id,

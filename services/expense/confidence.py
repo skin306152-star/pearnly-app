@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """录入置信分级(STP + HITL · docs/smart-intake/15 §1)。
 
-图路(OCR)与文路(一句话)解析后,据置信 + 字段完整度 + 查重判一个动作:
-  post    高置信 → 直接入正式账(可一键撤销)
-  confirm 中置信 → 入草稿「请确认」(已填好,点一下入账)
-  inbox   低置信/糊图/方向不明 → 待归类(真需要人)
+图路(OCR)与文路(一句话)解析后,据置信 + 字段完整度 + 查重判一个动作(待归类已下线):
+  post    高置信齐全 → 直接入正式账(可一键撤销)
+  confirm 其余(低置信/糊图/缺字段/方向不明)→ 入草稿「请确认」(落列表,用户补全/删)
   dup     疑似重复 → 不自动入账,落 confirm 并标红
 
 纯函数,无 IO,图文共用,可单测。判级输入归一为基本量,不耦合 ExpenseDraft / ThaiInvoice。
@@ -28,7 +27,7 @@ _FORMAL_DOCS = ("tax_invoice", "simplified_tax_invoice", "receipt", "credit_note
 
 @dataclass(frozen=True)
 class Verdict:
-    """判级结果。action ∈ {post, confirm, inbox};dup=疑似重复(action 必为 confirm)。"""
+    """判级结果。action ∈ {post, confirm};dup=疑似重复(action 必为 confirm)。"""
 
     action: str
     dup: bool
@@ -58,18 +57,19 @@ def grade(
 ) -> Verdict:
     """判一笔录入该走 post / confirm / inbox。
 
-    direction:judge_direction 给的 route(purchase/expense=可入账;sales/recon/unknown=不入账)。
+    direction:judge_direction 给的 route(purchase/expense=可入账)。非可入账 → 不自动过账,落草稿。
     confidence_band:OCR band(文路无图,传 'high' 视为 L1 确定解析)。
     require_category:文路要求命中分类才 post(关键词可靠);图路发票难自动归类,传 False 不拦。
     """
     reasons: list[str] = []
 
     if direction not in ("purchase", "expense"):
-        return Verdict("inbox", False, ("direction_not_payable",))
+        return Verdict("confirm", False, ("direction_not_payable",))
 
     amt = _to_amount(amount)
     if amt is None or amt <= 0:
-        return Verdict("inbox", False, ("amount_missing",))
+        # 糊图/金额未识别:不自动过账,建草稿落列表让用户补金额(待归类已下线)。
+        return Verdict("confirm", False, ("amount_missing",))
 
     # 重复:绝不静默自动入账,降到 confirm 并标红让人决定。
     if is_duplicate:

@@ -28,7 +28,6 @@ const ROUTES = [
     'receivables',
     'clients',
     'purchase',
-    'purchase-inbox',
     'purchase-suppliers',
     'purchase-settings',
     'vouchers',

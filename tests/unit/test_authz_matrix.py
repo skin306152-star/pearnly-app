@@ -40,7 +40,7 @@ def _expected(role, code):
             }
         )
     if role == "clerk":
-        if code in {"kb.ask", "intake.upload", "intake.classify"}:
+        if code in {"kb.ask", "intake.upload"}:
             return True
         return code in BUSINESS - POS and _verb(code) in {"view", "create", "edit", "delete"}
     if role == "accountant":

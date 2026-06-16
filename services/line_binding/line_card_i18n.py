@@ -11,7 +11,6 @@ _L = {
     "zh": {
         "posted": "已入账",
         "confirm": "请确认",
-        "inbox": "需补全",
         "dup": "可能重复",
         "doc_type": "单据类型",
         "exp_type": "支出类型",
@@ -38,7 +37,6 @@ _L = {
         "btn_post_anyway": "仍要入账",
         "btn_review": "复核 / 编辑",
         "btn_edit": "编辑",
-        "btn_fill": "编辑补全",
         "btn_undo": "撤销",
         "btn_discard": "丢弃",
         "btn_open": "打开原记录",
@@ -49,7 +47,6 @@ _L = {
     "th": {
         "posted": "บันทึกแล้ว",
         "confirm": "โปรดยืนยัน",
-        "inbox": "ต้องเพิ่มข้อมูล",
         "dup": "อาจซ้ำ",
         "doc_type": "ประเภทเอกสาร",
         "exp_type": "ประเภทค่าใช้จ่าย",
@@ -76,7 +73,6 @@ _L = {
         "btn_post_anyway": "บันทึกต่อ",
         "btn_review": "ตรวจสอบ / แก้ไข",
         "btn_edit": "แก้ไข",
-        "btn_fill": "แก้ไข / เติมข้อมูล",
         "btn_undo": "ยกเลิก",
         "btn_discard": "ทิ้ง",
         "btn_open": "เปิดรายการเดิม",
@@ -87,7 +83,6 @@ _L = {
     "en": {
         "posted": "Recorded",
         "confirm": "Confirm",
-        "inbox": "Needs info",
         "dup": "Possible duplicate",
         "doc_type": "Document",
         "exp_type": "Type",
@@ -114,7 +109,6 @@ _L = {
         "btn_post_anyway": "Record anyway",
         "btn_review": "Review / Edit",
         "btn_edit": "Edit",
-        "btn_fill": "Edit / Complete",
         "btn_undo": "Undo",
         "btn_discard": "Discard",
         "btn_open": "Open original",
@@ -125,7 +119,6 @@ _L = {
     "ja": {
         "posted": "記帳済",
         "confirm": "確認",
-        "inbox": "要入力",
         "dup": "重複の可能性",
         "doc_type": "書類種別",
         "exp_type": "費用種別",
@@ -152,7 +145,6 @@ _L = {
         "btn_post_anyway": "このまま記帳",
         "btn_review": "確認 / 編集",
         "btn_edit": "編集",
-        "btn_fill": "編集 / 入力",
         "btn_undo": "取消",
         "btn_discard": "破棄",
         "btn_open": "元の記録を開く",

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """LINE 图片置信驱动入账 ingest_line_image(docs/smart-intake/15 §1)。
 
-锁:低置信→inbox 不建单;高置信齐全→建单 + post_doc(已入账);重复→建草稿不过账(dup);
+锁(待归类已下线·一律建草稿):高置信齐全→建单 + post_doc(已入账);重复→建草稿不过账(dup);
 低 band→建草稿请确认(confirm)。create/post 是否被调按档位精确断言。
 """
 
@@ -34,7 +34,6 @@ def _run(resolve_ret, *, band="high", auto_book=True):
         mock.patch("services.purchase.categories.get_tree", return_value=[]),
         mock.patch("services.purchase.docs.create_doc", return_value=created) as cdoc,
         mock.patch("services.purchase.posting.post_doc", return_value=created) as pdoc,
-        mock.patch.object(ik, "_stash_inbox") as stash,
         mock.patch("services.line_binding.line_action_nonce.mint", return_value="TOK"),
     ):
         out = li.ingest_line_image(
@@ -45,21 +44,14 @@ def _run(resolve_ret, *, band="high", auto_book=True):
             confidence=band,
             created_by="u",
         )
-    return out, cdoc, pdoc, stash
+    return out, cdoc, pdoc
 
 
 class IngestTests(unittest.TestCase):
-    def test_inbox_no_doc(self):
-        res = {"route": "inbox", "draft": None, "dedupe_hit": False, "field_confidence": {}}
-        out, cdoc, pdoc, _ = _run(res)
-        self.assertEqual(out["state"], "inbox")
-        cdoc.assert_not_called()
-        pdoc.assert_not_called()
-
     def test_high_complete_posts(self):
         # 自动入账开 + 高置信齐全 → 直接过账(posted)。
         res = {"route": "purchase", "draft": _draft(), "dedupe_hit": False, "field_confidence": {}}
-        out, cdoc, pdoc, _ = _run(res, band="high", auto_book=True)
+        out, cdoc, pdoc = _run(res, band="high", auto_book=True)
         self.assertEqual(out["state"], "posted")
         self.assertEqual(out["card_fields"]["detail"], "x")  # 逐条明细填进卡
         cdoc.assert_called_once()
@@ -70,30 +62,24 @@ class IngestTests(unittest.TestCase):
     def test_autobook_off_confirms_no_post(self):
         # 自动入账关(默认):即便高置信齐全也只建草稿发确认卡,不过账。
         res = {"route": "purchase", "draft": _draft(), "dedupe_hit": False, "field_confidence": {}}
-        out, cdoc, pdoc, _ = _run(res, band="high", auto_book=False)
+        out, cdoc, pdoc = _run(res, band="high", auto_book=False)
         self.assertEqual(out["state"], "confirm")
         cdoc.assert_called_once()
         pdoc.assert_not_called()
 
     def test_duplicate_confirms_no_post(self):
         res = {"route": "purchase", "draft": _draft(), "dedupe_hit": True, "field_confidence": {}}
-        out, cdoc, pdoc, _ = _run(res, band="high")
+        out, cdoc, pdoc = _run(res, band="high")
         self.assertEqual(out["state"], "dup")
         cdoc.assert_called_once()
         pdoc.assert_not_called()
 
     def test_low_band_confirms_no_post(self):
         res = {"route": "purchase", "draft": _draft(), "dedupe_hit": False, "field_confidence": {}}
-        out, cdoc, pdoc, _ = _run(res, band="needs_review")
+        out, cdoc, pdoc = _run(res, band="needs_review")
         self.assertEqual(out["state"], "confirm")
         cdoc.assert_called_once()
         pdoc.assert_not_called()
-
-    def test_sales_route_stashed_inbox(self):
-        res = {"route": "sales", "draft": None, "dedupe_hit": False, "field_confidence": {}}
-        out, cdoc, pdoc, stash = _run(res)
-        self.assertEqual(out["state"], "inbox")
-        stash.assert_called_once()  # sales 不丢 → 落待归类安全网
 
     def test_llm_first_category(self):
         # 智能分类:有 key → LLM 优先选(治分类不对/空),填进卡(柴油 → 交通/餐饮)。
@@ -154,38 +140,6 @@ class IngestTests(unittest.TestCase):
                 created_by="u",
             )
         suggest.assert_not_called()
-
-    def test_inbox_item_gets_category_suggestion(self):
-        # 待归类项(draft None·如加油票)也给智能分类建议,不再恒空。
-        res = {"route": "inbox", "draft": None, "dedupe_hit": False, "field_confidence": {}}
-        tree = [{"id": "p1", "name": "交通", "children": [{"id": "c1", "name": "燃油"}]}]
-        with (
-            mock.patch.object(ik, "resolve_image_intake", return_value=res),
-            mock.patch.object(ik, "workspace_name", return_value="WS"),
-            mock.patch(
-                "services.purchase.settings.get_settings",
-                return_value={"auto_stock_in": False, "auto_book": False},
-            ),
-            mock.patch("services.purchase.categories.get_tree", return_value=tree),
-            mock.patch.object(ik, "_stash_inbox", return_value="I1"),
-            mock.patch("services.line_binding.line_action_nonce.mint", return_value="TOK"),
-            mock.patch(
-                "services.expense.category_ai.suggest_category", return_value=("p1", "c1")
-            ) as suggest,
-        ):
-            out = li.ingest_line_image(
-                object(),
-                tenant_id="t",
-                workspace_client_id=1,
-                fields={"document_type": "receipt", "seller_name": "BANGCHAK"},
-                confidence="high",
-                created_by="u",
-                api_key="k",
-            )
-        self.assertEqual(out["state"], "inbox")
-        suggest.assert_called_once()
-        self.assertEqual(out["card_fields"]["category"], "交通")
-        self.assertEqual(out["card_fields"]["subcategory"], "燃油")
 
 
 class TotalMismatchTests(unittest.TestCase):

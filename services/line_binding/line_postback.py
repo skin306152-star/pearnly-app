@@ -5,10 +5,7 @@
   exp_confirm  草稿 → 入账(post_doc)
   exp_undo     已入账 → 撤销(void_doc 冲销)
   exp_discard  草稿 → 丢弃(delete_doc,仅草稿)
-  exp_in_post  待归类项 → 仍要入账(resolve_inbox+post)
-  exp_in_drop  待归类项 → 丢弃(resolve_inbox dismiss)
-不做「去采购还是费用」的路由问询。data 用 querystring,纯函数可单测。
-doc 字段统一装 id(草稿为 doc_id,待归类为 intake_item id)。
+data 用 querystring,纯函数可单测。doc 字段装草稿/已入账的 purchase_doc id。
 可选 n 字段=一次性防重放令牌(PO-12);带 n 时服务端据令牌反查目标记录,旧卡无 n 走兼容链路。
 """
 
@@ -19,9 +16,7 @@ from urllib.parse import parse_qsl, urlencode
 ACTION_CONFIRM = "exp_confirm"
 ACTION_UNDO = "exp_undo"
 ACTION_DISCARD = "exp_discard"
-ACTION_INBOX_POST = "exp_in_post"
-ACTION_INBOX_DROP = "exp_in_drop"
-_ACTIONS = (ACTION_CONFIRM, ACTION_UNDO, ACTION_DISCARD, ACTION_INBOX_POST, ACTION_INBOX_DROP)
+_ACTIONS = (ACTION_CONFIRM, ACTION_UNDO, ACTION_DISCARD)
 
 
 def _data(action: str, ref_id: str, token: str = "") -> str:
@@ -44,16 +39,6 @@ def undo_data(doc_id: str, token: str = "") -> str:
 def discard_data(doc_id: str, token: str = "") -> str:
     """草稿单 → 丢弃(仅草稿可删)。"""
     return _data(ACTION_DISCARD, doc_id, token)
-
-
-def inbox_post_data(item_id: str, token: str = "") -> str:
-    """待归类项 → 仍要入账。"""
-    return _data(ACTION_INBOX_POST, item_id, token)
-
-
-def inbox_drop_data(item_id: str, token: str = "") -> str:
-    """待归类项 → 丢弃。"""
-    return _data(ACTION_INBOX_DROP, item_id, token)
 
 
 def parse(data: str) -> dict:

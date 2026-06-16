@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """识别结果数据卡 + postback 编解码(docs/smart-intake/15 §3/§4)。
 
-锁:四态外壳结构;低置信字段琥珀 +「请核对」;按状态出对应按钮(撤销/确认=postback,补全=uri);
-postback 往返 + 非法拒。
+锁(待归类已下线·三态):状态外壳结构;低置信字段琥珀 +「请核对」;按状态出对应按钮
+(撤销/确认=postback,编辑=uri);postback 往返 + 非法拒。
 """
 
 import unittest
@@ -22,18 +22,6 @@ class PostbackTests(unittest.TestCase):
     def test_discard_roundtrip(self):
         out = line_postback.parse(line_postback.discard_data("D2"))
         self.assertEqual(out, {"action": line_postback.ACTION_DISCARD, "doc_id": "D2", "token": ""})
-
-    def test_inbox_post_roundtrip(self):
-        out = line_postback.parse(line_postback.inbox_post_data("I7"))
-        self.assertEqual(
-            out, {"action": line_postback.ACTION_INBOX_POST, "doc_id": "I7", "token": ""}
-        )
-
-    def test_inbox_drop_roundtrip(self):
-        out = line_postback.parse(line_postback.inbox_drop_data("I7"))
-        self.assertEqual(
-            out, {"action": line_postback.ACTION_INBOX_DROP, "doc_id": "I7", "token": ""}
-        )
 
     def test_bad_data_rejected(self):
         self.assertEqual(line_postback.parse("garbage")["action"], "")
@@ -144,7 +132,7 @@ class CardTests(unittest.TestCase):
 
     def test_buttons_stacked_vertically_not_crammed(self):
         # 动作区每个按钮独占一行(footer 直接子元素),不再塞进 horizontal box(治截断)。
-        for state in ("posted", "confirm", "dup", "inbox"):
+        for state in ("posted", "confirm", "dup"):
             foot = self._footer_contents(self._card(state, source="text"))
             for node in foot:
                 self.assertIn(
@@ -210,7 +198,7 @@ class CardTests(unittest.TestCase):
 
     def test_action_groups_separated_by_divider(self):
         # 查看组与危险组之间有分隔线(按内容分组画线)。
-        for state in ("posted", "confirm", "dup", "inbox"):
+        for state in ("posted", "confirm", "dup"):
             foot = self._footer_contents(self._card(state, source="text"))
             self.assertTrue(any(n["type"] == "separator" for n in foot), f"{state} 应有分组分隔线")
 
@@ -229,19 +217,6 @@ class CardTests(unittest.TestCase):
         self.assertIn("uri", acts)
         self.assertIn(line_postback.ACTION_DISCARD, acts)
         self.assertEqual(sum(1 for b in self._buttons(c) if b["style"] == "primary"), 1)
-
-    def test_inbox_not_dead_end(self):
-        acts = self._actions(self._card("inbox"))
-        self.assertIn(line_postback.ACTION_INBOX_POST, acts)
-        self.assertIn("uri", acts)
-        self.assertIn(line_postback.ACTION_INBOX_DROP, acts)
-
-    def test_inbox_no_amount_no_post_button(self):
-        c = self._card("inbox", amount=None, can_post=False)
-        acts = self._actions(c)
-        self.assertNotIn(line_postback.ACTION_INBOX_POST, acts)
-        self.assertIn("uri", acts)
-        self.assertIn(line_postback.ACTION_INBOX_DROP, acts)
 
     def test_low_confidence_field_ambered_and_marked(self):
         rows = self._fields_box(self._card("confirm", fc={"invoice_number": 0.5}))
@@ -367,36 +342,30 @@ class DocTypeLabelTests(unittest.TestCase):
 
 
 class RecordDeepLinkTests(unittest.TestCase):
-    """PO-4:卡按钮深链到该记录(LINE 打开即定位该单/待归类),不跳通用页。"""
+    """PO-4:卡按钮深链到该记录(LINE 打开即定位该单),不跳通用页。"""
 
     WEB = "https://pearnly.com/home"
 
     def test_doc_fallback_no_liffid(self):
         # 未配 LIFF ID → 回退站内 /liff 路由。
         self.assertEqual(
-            line_card._liff_link("", self.WEB, "D9", "confirm"),
+            line_card._liff_link("", self.WEB, "D9"),
             "https://pearnly.com/liff/purchase/D9",
-        )
-
-    def test_inbox_fallback_no_liffid(self):
-        self.assertEqual(
-            line_card._liff_link("", self.WEB, "IT1", "inbox"),
-            "https://pearnly.com/liff/purchase-inbox/IT1",
         )
 
     def test_liffid_builds_liff_line_me(self):
         # 配了 LIFF ID → liff.line.me 链接(LINE 用 LIFF webview 打开)。
         self.assertEqual(
-            line_card._liff_link("2010411313-K4TWQwYo", self.WEB, "D9", "confirm"),
+            line_card._liff_link("2010411313-K4TWQwYo", self.WEB, "D9"),
             "https://liff.line.me/2010411313-K4TWQwYo?liff=purchase&doc=D9",
         )
         self.assertEqual(
-            line_card._liff_link("LID", self.WEB, "D9", "posted", "receipt"),
+            line_card._liff_link("LID", self.WEB, "D9", "receipt"),
             "https://liff.line.me/LID?liff=purchase&doc=D9&view=receipt",
         )
 
     def test_no_ref_falls_back_to_web(self):
-        self.assertEqual(line_card._liff_link("", self.WEB, "", "confirm"), self.WEB)
+        self.assertEqual(line_card._liff_link("", self.WEB, ""), self.WEB)
 
     def test_card_footer_embeds_deep_link(self):
         import json

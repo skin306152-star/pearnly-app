@@ -5,8 +5,6 @@
   confirm     草稿 → post_doc(入账 + 做账 enqueue),镜像 web /docs/{id}/post
   undo        已入账 → void_doc(冲销 + 反库存),镜像 web /docs/{id}/void
   discard     草稿 → delete_doc(仅草稿可删;正式单永不物理删,只能 undo)
-  inbox_post  待归类项 → resolve_inbox(expense)建草稿 → post_doc(仍要入账)
-  inbox_drop  待归类项 → resolve_inbox(dismiss)(留痕标记,不物理删)
 作用域硬隔离(套账 ws),并发/状态错友好回执不报错。
 """
 
@@ -37,7 +35,6 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
         from core.workspace_context import default_workspace_id
         from services.line_binding import line_action_nonce as nonce
         from services.purchase import docs as docs_svc
-        from services.purchase import intake as intake_svc
         from services.purchase import posting as posting_svc
         from services.purchase import settings as settings_svc
 
@@ -80,27 +77,6 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
 
             elif action == line_postback.ACTION_DISCARD:
                 docs_svc.delete_doc(cur, **scope, doc_id=ref)  # 仅草稿可删(内部 status='draft' 守)
-                line_client.reply_text(reply_token, line_client.t_line(lang, "card_discarded"))
-
-            elif action == line_postback.ACTION_INBOX_POST:
-                cfg = settings_svc.get_settings(cur, **scope)
-                r = intake_svc.resolve_inbox(
-                    cur, **scope, item_id=ref, action="expense", created_by=uid, settings=cfg
-                )
-                posted = posting_svc.post_doc(
-                    cur,
-                    **scope,
-                    doc_id=r["doc_id"],
-                    auto_stock_in=bool(cfg.get("auto_stock_in")),
-                    created_by=uid,
-                )
-                _reply(reply_token, lang, "card_confirmed", posted.get("doc"))
-
-            elif action == line_postback.ACTION_INBOX_DROP:
-                cfg = settings_svc.get_settings(cur, **scope)
-                intake_svc.resolve_inbox(
-                    cur, **scope, item_id=ref, action="dismiss", created_by=uid, settings=cfg
-                )
                 line_client.reply_text(reply_token, line_client.t_line(lang, "card_discarded"))
     except Exception:
         # 状态错(已入账再确认 / 草稿撤销 / 项已处理)或并发 → 友好回执,不报错。

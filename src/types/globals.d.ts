@@ -301,7 +301,6 @@ interface Window {
     loadPurchaseList?: () => void;
     loadPurchaseSuppliers?: () => void;
     loadPurchaseSettings?: () => void;
-    loadPurchaseInbox?: () => void;
     loadPurchaseForm?: () => void;
     loadPurchaseDetail?: () => void;
     openPurchaseForm?: (id?: string | null, draft?: unknown) => void;

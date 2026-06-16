@@ -108,7 +108,6 @@ import './home/purchase-detail.js'; // 屏6 详情(window.loadPurchaseDetail/ope
 import './home/purchase-modals.js'; // 屏7 记付款 / 屏8 商品匹配 / 屏9 供应商选择器 / 屏3 LINE 说明(桌面居中/手机底抽屉)
 import './home/purchase-suppliers.js'; // 屏4 供应商管理(window.loadPurchaseSuppliers · CRUD · 套账隔离)
 import './home/purchase-settings.js'; // 屏5 采购设置(window.loadPurchaseSettings · 默认VAT/进货入库/重复票拦/两级科目/账期/审批)
-import './home/purchase-inbox.js'; // 待归类收件箱(window.loadPurchaseInbox · 长尾安全网 · 智能猜测 + 一点归类)
 import './home/purchase-google.js'; // 集成中心 Google Drive/Sheets 授权卡(window.loadIntegrationGoogle/highlightGoogleCard · 外流归档 OAuth)
 import './home/purchase-export.js'; // 外流收拢面板(window.openPurchaseExport · Excel 免授权 / Drive 归档 / Sheet 同步 · 412 未连跳集成中心)
 import './home/purchase-capture.js'; // 采集屏(window.loadPurchaseCapture · 记一笔采购 · 桌面上传/手工 · 手机拍照/相册/文件/手工 · 智能入口分流)

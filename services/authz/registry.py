@@ -101,10 +101,7 @@ POS_CODES = (
     "pos.refund.approve",
 )
 
-INTAKE_CODES = (
-    "intake.upload",
-    "intake.classify",
-)
+INTAKE_CODES = ("intake.upload",)
 
 # 敏感字段可见性(G4 · 字段级遮蔽,非模块动作)。缺码 → 成本/工资列读侧返 null。
 # 不挂任何模块开关(横切),预设角色除收银员外按现状全开;自定义角色可关。
@@ -208,7 +205,6 @@ _CLERK = (
     "inv.create",
     "inv.report.view",
     "intake.upload",
-    "intake.classify",
     "field.cost.view",
     "field.payroll.view",
 )

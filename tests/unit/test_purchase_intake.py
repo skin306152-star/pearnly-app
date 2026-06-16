@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""智能分流纯逻辑单测(P0a 方向判定 + 草稿构建 + 费用归类 · docs/purchasing/02 §0)。
+"""智能分流纯逻辑单测(方向判定 + 草稿构建 + 费用归类 · docs/purchasing/02 §0)。
 
-判方向是进项模块灵魂:买方=本主体→进项,卖方=本主体→销项,非发票→inbox。税号比对要扛
-空格/连字符差异。草稿从 OCR items 取行、无 items 单行兜底。费用文本取末位金额 + 关键词归类。
+待归类已下线:识别完一律建草稿落采购列表。判方向只分 进项(有 VAT)/费用(无 VAT·含截图
+证据)。草稿从 OCR items 取行、无 items 单行兜底。费用文本取末位金额 + 关键词归类。
 """
 
 import unittest
@@ -14,59 +14,26 @@ MY = "1234567890123"
 
 
 class JudgeDirectionTests(unittest.TestCase):
-    def test_buyer_is_me_with_vat_to_purchase(self):
-        f = {
-            "document_type": "tax_invoice",
-            "buyer_tax": MY,
-            "seller_tax": "9999999999999",
-            "vat": "70",
-        }
-        self.assertEqual(ik.judge_direction(f, my_tax_id=MY), ("purchase_invoice", "purchase"))
+    def test_has_vat_to_purchase(self):
+        f = {"document_type": "tax_invoice", "vat": "70"}
+        self.assertEqual(ik.judge_direction(f), ("purchase_invoice", "purchase"))
 
-    def test_seller_is_me_to_sales(self):
-        f = {
-            "document_type": "tax_invoice",
-            "buyer_tax": "9999999999999",
-            "seller_tax": MY,
-            "vat": "70",
-        }
-        self.assertEqual(ik.judge_direction(f, my_tax_id=MY), ("sales", "sales"))
+    def test_no_vat_to_expense(self):
+        f = {"document_type": "receipt", "vat": "0"}
+        self.assertEqual(ik.judge_direction(f), ("expense", "expense"))
 
-    def test_not_invoice_to_inbox(self):
-        f = {"is_not_invoice": True, "document_type": "other"}
-        self.assertEqual(ik.judge_direction(f, my_tax_id=MY), ("unknown", "inbox"))
+    def test_payment_evidence_to_expense_no_vat(self):
+        # 银行转账截图非正规税票 → 一律费用、不抵 VAT(即便 OCR 读到 vat)。
+        f = {"document_type": "payment_evidence", "vat": "70"}
+        self.assertEqual(ik.judge_direction(f), ("expense", "expense"))
 
-    def test_payment_evidence_to_inbox_never_posts(self):
-        # PO-10:银行转账截图判付款证据 → 待归类,即便带金额/VAT 也不冒充税票、不建费用单。
-        f = {"document_type": "payment_evidence", "seller_tax": "", "vat": "70"}
-        self.assertEqual(ik.judge_direction(f, my_tax_id=MY), ("unknown", "inbox"))
+    def test_order_evidence_to_expense(self):
+        f = {"document_type": "order_evidence", "vat": "0"}
+        self.assertEqual(ik.judge_direction(f), ("expense", "expense"))
 
-    def test_order_evidence_to_inbox(self):
-        f = {"document_type": "order_evidence", "seller_tax": "", "vat": "0"}
-        self.assertEqual(ik.judge_direction(f, my_tax_id=MY), ("unknown", "inbox"))
-
-    def test_neither_matches_with_vat_defaults_purchase(self):
-        # 商户拍收到的票,双方税号都没对上本主体 → 默认进项。
-        f = {
-            "document_type": "tax_invoice",
-            "buyer_tax": "",
-            "seller_tax": "8888888888888",
-            "vat": "70",
-        }
-        self.assertEqual(ik.judge_direction(f, my_tax_id=MY), ("purchase_invoice", "purchase"))
-
-    def test_receipt_no_vat_to_expense(self):
-        f = {"document_type": "receipt", "buyer_tax": "", "seller_tax": "", "vat": "0"}
-        self.assertEqual(ik.judge_direction(f, my_tax_id=MY), ("expense", "expense"))
-
-    def test_tax_match_ignores_spacing(self):
-        f = {
-            "document_type": "tax_invoice",
-            "buyer_tax": "1-2345 67890123",
-            "seller_tax": "x",
-            "vat": "7",
-        }
-        self.assertEqual(ik.judge_direction(f, my_tax_id=MY)[1], "purchase")
+    def test_no_doctype_with_vat_to_purchase(self):
+        f = {"vat": "7"}
+        self.assertEqual(ik.judge_direction(f)[1], "purchase")
 
 
 class BuildDraftTests(unittest.TestCase):
@@ -84,6 +51,13 @@ class BuildDraftTests(unittest.TestCase):
         self.assertEqual(d["doc_no"], "INV-1")
         self.assertEqual(len(d["lines"]), 1)
         self.assertEqual(d["lines"][0]["vat_rate"], 7)
+
+    def test_expense_kind_forces_no_vat(self):
+        # 费用类(含截图证据)即便 OCR 读到 vat 也不带可抵进项 VAT(进项票才抵)。
+        f = {"vat": "70", "items": [{"name": "x", "qty": "1", "price": "100"}]}
+        d = ik.build_draft_from_invoice(f, kind="expense")
+        self.assertFalse(d["has_vat"])
+        self.assertEqual(d["lines"][0]["vat_rate"], 0)
 
     def test_no_items_fallback_single_line(self):
         f = {
@@ -178,152 +152,49 @@ class LineGateTests(unittest.TestCase):
 
 
 class ResolveImageIntakeTests(unittest.TestCase):
-    """F5/F12:糊图(抽取过空 ฿0)/ 低置信 → 落 inbox,绝不返回可保存的 ฿0 草稿。"""
+    """待归类下线:识别完一律建草稿(糊图/฿0/低置信也建),不再落 inbox。"""
 
-    def _resolve(self, fields, confidence):
-        from unittest import mock
+    def _resolve(self, fields, confidence, **kw):
+        return ik.resolve_image_intake(
+            _FakeCur(),
+            tenant_id="t",
+            workspace_client_id=1,
+            fields=fields,
+            confidence=confidence,
+            settings={},
+            **kw,
+        )
 
-        stashed = []
-        with mock.patch.object(ik, "_stash_inbox", side_effect=lambda *a, **k: stashed.append(k)):
-            data = ik.resolve_image_intake(
-                _FakeCur(),
-                tenant_id="t",
-                workspace_client_id=1,
-                fields=fields,
-                confidence=confidence,
-                settings={},
-            )
-        return data, stashed
+    def test_zero_amount_still_builds_draft(self):
+        # 糊图/金额 ฿0 也建草稿落列表(用户补全),不再兜 inbox。
+        f = {"document_type": "tax_invoice", "vat": "7", "subtotal": "0", "items": []}
+        data = self._resolve(f, "high")
+        self.assertEqual(data["route"], "purchase")
+        self.assertIsNotNone(data["draft"])
 
-    def test_zero_amount_goes_inbox(self):
-        # 买方=我 + 有 VAT 标志 → 方向 purchase,但抽取金额为 0 → 不进表单,落待归类。
+    def test_low_confidence_builds_draft_not_booked(self):
+        # 低置信:建草稿(route 非 booked),不自动过账。
         f = {
             "document_type": "tax_invoice",
-            "buyer_tax": MY,
-            "vat": "7",
-            "subtotal": "0",
-            "items": [],
-        }
-        data, stashed = self._resolve(f, "high")
-        self.assertEqual(data["route"], "inbox")
-        self.assertIsNone(data["draft"])
-        self.assertEqual(len(stashed), 1)
-
-    def test_low_confidence_goes_inbox(self):
-        f = {
-            "document_type": "tax_invoice",
-            "buyer_tax": MY,
             "vat": "7",
             "subtotal": "1000",
             "items": [{"name": "x", "qty": "1", "price": "1000"}],
         }
-        data, stashed = self._resolve(f, "needs_review")
-        self.assertEqual(data["route"], "inbox")
-        self.assertIsNone(data["draft"])
-
-    def test_sales_route_no_stash(self):
-        f = {"document_type": "tax_invoice", "seller_tax": MY, "buyer_tax": "9", "vat": "7"}
-        data, stashed = self._resolve(f, "high")
-        self.assertEqual(data["route"], "sales")
-        self.assertEqual(stashed, [])
+        data = self._resolve(f, "needs_review")
+        self.assertEqual(data["route"], "purchase")
+        self.assertIsNotNone(data["draft"])
 
     def test_source_propagates_to_draft(self):
         # 来源(line/photo)必须落到草稿,否则 create_doc 默认 manual → 列表显「手录」(PO-6)。
         f = {
             "document_type": "tax_invoice",
-            "buyer_tax": MY,
             "vat": "7",
             "subtotal": "1000",
             "items": [{"name": "x", "qty": "1", "price": "1000"}],
         }
-        data = ik.resolve_image_intake(
-            _FakeCur(),
-            tenant_id="t",
-            workspace_client_id=1,
-            fields=f,
-            confidence="high",
-            settings={},
-            source="line",
-        )
+        data = self._resolve(f, "high", source="line")
         self.assertIsNotNone(data["draft"])
         self.assertEqual(data["draft"]["source"], "line")
-
-
-class ResolveInboxTests(unittest.TestCase):
-    """待归类一点归类:非法动作拒绝;dismiss/sales 移出收件箱(不建单)。"""
-
-    def test_bad_action_raises(self):
-        from core.pos_api import PosError
-
-        with self.assertRaises(PosError):
-            ik.resolve_inbox(
-                _FakeCur(),
-                tenant_id="t",
-                workspace_client_id=1,
-                item_id="x",
-                action="bogus",
-                created_by="u",
-                settings={},
-            )
-
-    def test_dismiss_marks_dismissed(self):
-        r = ik.resolve_inbox(
-            _FakeCur(),
-            tenant_id="t",
-            workspace_client_id=1,
-            item_id="x",
-            action="dismiss",
-            created_by="u",
-            settings={},
-        )
-        self.assertEqual(r["status"], "dismissed")
-
-    def test_sales_marks_resolved(self):
-        r = ik.resolve_inbox(
-            _FakeCur(),
-            tenant_id="t",
-            workspace_client_id=1,
-            item_id="x",
-            action="sales",
-            created_by="u",
-            settings={},
-        )
-        self.assertEqual(r["status"], "resolved")
-
-    def test_resolve_preserves_source(self):
-        # 归类建单时保留待归类项的原始来源(line/photo),不退回「手录」(PO-6)。
-        from unittest import mock
-
-        from services.purchase import docs as docs_svc
-
-        captured = {}
-
-        class Cur:
-            def execute(self, *a, **k):
-                return None
-
-            def fetchone(self):
-                return {
-                    "source": "line",
-                    "raw": {"items": [{"name": "x", "qty": "1", "price": "100"}]},
-                    "image_url": "",
-                }
-
-        def fake_create(cur, **k):
-            captured.update(k.get("data") or {})
-            return {"doc": {"id": "d1"}}
-
-        with mock.patch.object(docs_svc, "create_doc", side_effect=fake_create):
-            ik.resolve_inbox(
-                Cur(),
-                tenant_id="t",
-                workspace_client_id=1,
-                item_id="x",
-                action="expense",
-                created_by="u",
-                settings={},
-            )
-        self.assertEqual(captured.get("source"), "line")
 
 
 # 旧 F10「LINE 文字静默记一笔 posted 费用」已删(违反 doc 10 §5 死穴:绝不静默入账)。

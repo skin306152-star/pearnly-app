@@ -134,17 +134,8 @@ async function intakeFile(f: File): Promise<void> {
             maybeAutobookHint();
             return;
         }
-        const route = (res && res.route) || 'inbox';
-        if (route === 'sales') {
-            showToast(t('pur-intake-sales'), 'error');
-            renderShell();
-        } else if (route === 'recon') {
-            showToast(t('pur-intake-recon'), 'error');
-            renderShell();
-        } else {
-            showToast(t('pur-intake-inbox'), 'success');
-            window.routeTo?.('purchase-inbox');
-        }
+        // 待归类已下线:/intake 必返 booked(已过账)或 draft(草稿)· 走到这说明意外空返,回壳防卡死。
+        renderShell();
     } catch (e) {
         renderError(f, purchaseErrMsg(e, 'purchase.unexpected'));
     }

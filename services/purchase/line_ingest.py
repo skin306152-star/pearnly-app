@@ -97,12 +97,11 @@ def ingest_line_image(
     image_ref=None,
     api_key=None,
 ) -> dict:
-    """LINE 图片 OCR → 置信驱动入账。
+    """LINE 图片 OCR → 置信驱动入账(待归类已下线:一律建草稿落列表)。
 
-    resolve_image_intake(判方向/建草稿/查重/低置信落 inbox)→ grade 决定:
+    resolve_image_intake(判方向/建草稿/查重)→ grade 决定:
       post 高置信齐全 → create_doc + post_doc(正式入账)
-      confirm/dup     → create_doc 草稿(等卡片确认)
-      inbox           → 已由 resolve_image_intake 落待归类(sales/recon 兜底再 stash)
+      confirm/dup     → create_doc 草稿(落列表·卡片可一键确认)
     返回 {state, doc_id, amount, card_fields, field_confidence},调用方据此发数据卡。
     """
     from services.expense import confidence as conf
@@ -154,51 +153,7 @@ def ingest_line_image(
     }
     fc = res.get("field_confidence") or {}
     warn_total = _total_mismatch(fields)
-    draft = res.get("draft")
-
-    # 低置信/糊图(resolve 已落 inbox)或 sales/recon(LINE 不建单)→ 待归类安全网(不丢)。
-    if draft is None:
-        item_id = res.get("inbox_item_id")
-        if res["route"] not in ("inbox",):
-            item_id = ik._stash_inbox(
-                cur,
-                tenant_id=tenant_id,
-                workspace_client_id=workspace_client_id,
-                source="line",
-                raw=fields,
-                image_url=image_ref,
-                ai_guess={"route": res["route"], "confidence": confidence},
-            )
-        # 待归类也给智能分类建议(治加油票等 inbox 项分类恒空):
-        _, _, card_fields["category"], card_fields["subcategory"] = _smart_category(
-            cur,
-            tenant_id=tenant_id,
-            workspace_client_id=workspace_client_id,
-            vendor=card_fields["vendor"],
-            descs=_item_names,
-            api_key=api_key,
-        )
-        # 待归类展示金额(供卡片 + 决定是否给「仍要入账」):有可用总额才让一键入账,糊图 ฿0 只给编辑/丢弃。
-        disp_amount = (fields.get("total_amount") or "").strip() or None
-        return {
-            "state": "inbox",
-            "doc_id": "",
-            "ref": item_id or "",
-            "can_post": bool(disp_amount),
-            "amount": disp_amount,
-            "card_fields": card_fields,
-            "field_confidence": fc,
-            "workspace_name": ws_name,
-            "warn_total": warn_total,
-            "token": nonce.mint(
-                cur,
-                tenant_id=tenant_id,
-                workspace_client_id=workspace_client_id,
-                action_ref=item_id or "",
-                user_id=created_by,
-            ),
-        }
-
+    draft = res["draft"]
     amount = draft.get("grand_total") or "0"
     # 逐条明细填进卡(对标竞品「รายการค่าใช้จ่าย」):取真实商品行(跳过卖家兜底单行),顶 3 条 + 「等N项」。
     descs = [
@@ -250,7 +205,6 @@ def ingest_line_image(
         "state": state,
         "doc_id": doc_id,
         "ref": doc_id,
-        "can_post": True,
         "amount": amount,
         "card_fields": card_fields,
         "field_confidence": fc,

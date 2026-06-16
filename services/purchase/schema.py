@@ -121,20 +121,6 @@ _TABLES = (
     )
     """,
     """
-    CREATE TABLE IF NOT EXISTS intake_items (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        tenant_id uuid NOT NULL,
-        workspace_client_id bigint NOT NULL,
-        source text,
-        raw jsonb,
-        image_url text,
-        ai_guess jsonb,
-        status text NOT NULL DEFAULT 'pending',
-        resolved_doc_id uuid,
-        created_at timestamptz NOT NULL DEFAULT now()
-    )
-    """,
-    """
     CREATE TABLE IF NOT EXISTS purchase_attachments (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         tenant_id uuid NOT NULL,
@@ -161,8 +147,6 @@ _INDEXES = (
     "ON purchase_lines (tenant_id, purchase_doc_id)",
     "CREATE INDEX IF NOT EXISTS ix_expense_categories_ws "
     "ON expense_categories (tenant_id, workspace_client_id)",
-    "CREATE INDEX IF NOT EXISTS ix_intake_items_ws "
-    "ON intake_items (tenant_id, workspace_client_id, status)",
     "CREATE INDEX IF NOT EXISTS ix_purchase_attachments_doc "
     "ON purchase_attachments (tenant_id, purchase_doc_id)",
 )
@@ -181,7 +165,6 @@ _RLS_TABLES = (
     "purchase_lines",
     "expense_categories",
     "purchase_settings",
-    "intake_items",
     "purchase_attachments",
 )
 

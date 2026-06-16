@@ -169,7 +169,7 @@ async def _handle_line_image_ocr(
             line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
             return
 
-        # 统一智能通道(docs/smart-intake/15):图片 → 置信驱动入账(post/confirm/inbox)+ 数据卡。
+        # 统一智能通道(docs/smart-intake/15):图片 → 置信驱动入账(建草稿/高置信直接入账)+ 数据卡。
         #   expense 开 → ingest_line_image(高置信直接入正式账,其余草稿/待归类);回执发数据卡。
         #   expense 关 → 不入账,走下方识别记录原路(事务所等),一字不动。异常 → 同样回落识别记录。
         ingest = None
@@ -384,7 +384,6 @@ def _push_result_card(
     ack_key = {
         "posted": "exp_ack_posted",
         "dup": "exp_ack_dup",
-        "inbox": "exp_ack_inbox",
     }.get(state, "exp_ack_confirm")
     try:
         from services.line_binding import line_card
@@ -403,7 +402,6 @@ def _push_result_card(
             doc_id=ingest.get("ref") or ingest.get("doc_id") or "",
             lang=lang,
             web_url="https://pearnly.com/home",
-            can_post=bool(ingest.get("can_post", True)),
             workspace_name=ingest.get("workspace_name") or "",
             token=ingest.get("token") or "",
             warn_total=bool(ingest.get("warn_total")),

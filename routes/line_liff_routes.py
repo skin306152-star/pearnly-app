@@ -94,10 +94,3 @@ async def liff_purchase_entry(doc_id: str, request: Request, view: str = "", ws:
     """
     extra = ("&view=receipt" if view == "receipt" else "") + (f"&ws={ws}" if ws else "")
     return RedirectResponse(f"/home?liff=purchase&doc={doc_id}{extra}", status_code=302)
-
-
-@router.get("/liff/purchase-inbox/{item_id}")
-async def liff_purchase_inbox_entry(item_id: str, request: Request, ws: str = ""):
-    """LIFF 入口(待归类):跳 /home 待归类页(前端走 LIFF 鉴权 + 定位该待归类项)。"""
-    extra = f"&ws={ws}" if ws else ""
-    return RedirectResponse(f"/home?liff=purchase&inbox={item_id}{extra}", status_code=302)

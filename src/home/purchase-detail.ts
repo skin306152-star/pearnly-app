@@ -198,7 +198,7 @@ function actions(d: DocDetail): string {
     if (d.status === 'void') return '';
     if (d.status === 'draft')
         return `<button class="btn" id="pur-edit-btn">${escapeHtml(t('pur-edit'))}</button>`;
-    return `<button class="btn danger" id="pur-void-btn">${escapeHtml(t('pur-void'))}</button><button class="btn primary" id="pur-pay-btn2"${d.payment_status === 'paid' ? ' disabled' : ''}>${escapeHtml(t('pur-pay'))}</button>`;
+    return `<button class="btn" id="pur-correct-btn">${escapeHtml(t('pur-correct'))}</button><button class="btn danger" id="pur-void-btn">${escapeHtml(t('pur-void'))}</button><button class="btn primary" id="pur-pay-btn2"${d.payment_status === 'paid' ? ' disabled' : ''}>${escapeHtml(t('pur-pay'))}</button>`;
 }
 
 function shell(d: DocDetail): string {
@@ -276,6 +276,8 @@ function bind(): void {
     if (pay2) pay2.onclick = () => window.openPurchasePay?.(cur, () => load(cur!.id));
     const voidBtn = root.querySelector<HTMLElement>('#pur-void-btn');
     if (voidBtn) voidBtn.onclick = doVoid;
+    const correctBtn = root.querySelector<HTMLElement>('#pur-correct-btn');
+    if (correctBtn) correctBtn.onclick = doCorrect;
     root.querySelectorAll<HTMLElement>('[data-match]').forEach((el) => {
         el.onclick = () => window.openPurchaseMatch?.({}, () => load(cur!.id));
     });
@@ -319,6 +321,25 @@ async function doVoid(): Promise<void> {
         await papi('POST', `/api/purchase/docs/${cur!.id}/void`, {});
         showToast(t(cur!.stock_applied ? 'pur-void-ok-stock' : 'pur-void-ok'), 'success');
         load(cur!.id);
+    } catch (e) {
+        showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
+    }
+}
+
+async function doCorrect(): Promise<void> {
+    // 更正 = 作废原单(下游完整对冲)+ 复制成可改新草稿 → 打开编辑(三步诚实·不原地改 posted)。
+    if (typeof window.showConfirm === 'function') {
+        const okc = await window.showConfirm(t('pur-correct-confirm'));
+        if (!okc) return;
+    }
+    try {
+        const res = (await papi('POST', `/api/purchase/docs/${cur!.id}/correct`, {
+            workspace_client_id: activeWsId(),
+        })) as { doc?: { id?: string } };
+        showToast(t('pur-correct-ok'), 'success');
+        const newId = res?.doc?.id;
+        if (newId) window.openPurchaseForm?.(newId);
+        else window.routeTo?.('purchase');
     } catch (e) {
         showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
     }

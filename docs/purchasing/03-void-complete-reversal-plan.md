@@ -40,9 +40,12 @@
 - `strict=False`(默认,`unpay_doc` 用):保持现有 best-effort(SAVEPOINT 吞错,不阻断付款 toggle)。
 - `strict=True`(`void_doc` 用):不吞错,让 `period_closed` 等透传以触发整事务回滚。
 
-## 3. 不做(留下一步)
+## 3. 已接(P1 · 同批后续提交)
+- **网页 posted「更正」入口**:`POST /api/purchase/docs/{id}/correct` → `posting.correct_doc` = `void_doc`(完整对冲)+ `docs.clone_as_draft`(逐列精确复制整单/全明细/bill 票图为新草稿 · 不重算金标口径 · `corrected_from` 审计链 · dedupe_key 置空避唯一约束)→ 前端详情「更正」按钮打开新草稿编辑(三步:作废→改→重新入账)。已结账/已申报期 → `acct.period_closed`(409)诚实拦。
+
+## 4. 不做(留下一步)
 - 已结账期间的**红冲**(reverse entry · 当期生成反向凭证替代直接作废):本步只做「拒绝 + 诚实提示」,红冲单独立项。
-- 网页 posted「更正」按钮 / 对话内改错扩面:站在本地基之上,下一步(P1)做。
+- 对话内(LINE)改错扩面到任意字段/第 N 笔:`line_correct` 现仅金额,后续接。
 
 ## 4. 验收
 - 单测:`void_doc` 已付单 → 调 strict 撤付款 + `void_for_source` + 反库存 + status;模块关 → `void_for_source` no-op;`period_closed` 透传不被吞。

@@ -8,6 +8,7 @@
 import unittest
 
 from core.pos_api import PosError
+from services.purchase import correct as correct_svc
 from services.purchase import docs as docs_svc
 from services.purchase import posting as posting_svc
 
@@ -374,6 +375,52 @@ class StrictPaymentVoidTests(unittest.TestCase):
                 strict=True,
             )
         self.assertEqual(e.exception.code, "acct.period_closed")
+
+
+class CorrectDocTests(unittest.TestCase):
+    """更正(docs/purchasing/03)= 作废原单(完整对冲)+ 克隆成可改新草稿,顺序固定。"""
+
+    def test_void_then_clone(self):
+        from unittest import mock
+
+        seq = []
+
+        class Cur:
+            def execute(self, *a, **k):
+                return None
+
+        with (
+            mock.patch.object(
+                correct_svc.posting_svc, "void_doc", side_effect=lambda *a, **k: seq.append("void")
+            ),
+            mock.patch.object(
+                correct_svc,
+                "clone_as_draft",
+                side_effect=lambda *a, **k: (seq.append("clone") or {"doc": {"id": "NEW"}}),
+            ),
+        ):
+            res = correct_svc.correct_doc(
+                Cur(), tenant_id="t", workspace_client_id=1, doc_id="D", created_by="u"
+            )
+        self.assertEqual(seq, ["void", "clone"])  # 先作废后克隆(原子)
+        self.assertEqual(res["doc"]["id"], "NEW")
+
+    def test_clone_none_raises(self):
+        from unittest import mock
+
+        class Cur:
+            def execute(self, *a, **k):
+                return None
+
+        with (
+            mock.patch.object(correct_svc.posting_svc, "void_doc", return_value={}),
+            mock.patch.object(correct_svc, "clone_as_draft", return_value=None),
+            self.assertRaises(PosError) as e,
+        ):
+            correct_svc.correct_doc(
+                Cur(), tenant_id="t", workspace_client_id=1, doc_id="D", created_by="u"
+            )
+        self.assertEqual(e.exception.code, "purchase.unexpected")
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from core import db
 from core.pos_api import PosError, ok
 from routes.purchase_common import auth_member, gate, resolve_ws, uid as _uid
+from services.purchase import correct as correct_svc
 from services.purchase import documents as documents_svc
 from services.purchase import docs as docs_svc
 from services.purchase import posting as posting_svc
@@ -214,6 +215,22 @@ async def api_void_doc(doc_id: str, req: PostIn, request: Request):
             workspace_client_id=ws,
             doc_id=doc_id,
             created_by=_uid(user),
+        )
+        return ok(res)
+
+
+@router.post("/docs/{doc_id}/correct")
+async def api_correct_doc(doc_id: str, req: PostIn, request: Request):
+    """更正已入账单:作废原单(下游完整对冲)+ 复制成可编辑新草稿(docs/purchasing/03)。
+
+    返回新草稿(前端打开编辑)。已结账/已申报期 → acct.period_closed(409)诚实拦,不破账。
+    """
+    user, tid = auth_member(request, "purchase.doc.approve")
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        gate(cur, tid)
+        ws = resolve_ws(cur, request, tid, req.workspace_client_id)
+        res = correct_svc.correct_doc(
+            cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id, created_by=_uid(user)
         )
         return ok(res)
 

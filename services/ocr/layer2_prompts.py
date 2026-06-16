@@ -267,7 +267,14 @@ validators will reject and force needs_review. Do NOT invent column names.
 CRITICAL RULES:
 1. DATE: Buddhist year (>= 2400) MUST be converted to Gregorian by subtracting 543. e.g. 2569 -> 2026. ALWAYS fill date_raw with the original text.
 2. NAMES & ADDRESSES: Copy EXACTLY as printed (Thai or English). Do NOT auto-correct or standardize. e.g. keep คะแฟ as คะแฟ, do NOT change to คาเฟ่.
-3. ITEMS: Extract all unique line items. If the same name+qty+price appears multiple times (delivery note + receipt are commonly merged in Thai invoices), keep ONE copy only.
+3. ITEMS: Extract EVERY distinct line item — do not stop early or drop rows. Thermal/POS
+   receipts wrap one item across 2-3 printed lines (name on one line, qty x unit-price and the
+   line total below); stitch those back into ONE item with its name, qty, price, subtotal. A row
+   counts as an item only if it has a product/service name; SKIP non-item rows (subtotal / VAT /
+   total / change / cash / discount / table no. / "ขอบคุณ"/thank-you footers). Self-check: the
+   item subtotals should add up toward the document subtotal — if you have far fewer items than
+   the receipt shows, look again for missed rows. If the SAME name+qty+price is genuinely
+   duplicated (delivery note + receipt merged in Thai invoices), keep ONE copy only.
 4. NUMBERS: No currency symbols, no commas (e.g., "12450.00").
 5. TAX IDs: Exactly 13 digits, no dashes/spaces. Empty string if not found.
 6. WHT (หัก ณ ที่จ่าย / ภ.ง.ด.3 / ภ.ง.ด.53): Common rates 1/2/3/5%. wht_rate is the number ONLY ("3" not "3%"). Only extract if printed; do NOT guess.

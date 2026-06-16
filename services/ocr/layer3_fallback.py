@@ -155,7 +155,13 @@ reject amounts sourced from Description / Remark / Address columns.
 CRITICAL RULES (same as previous extraction; pay attention):
 1. DATE: Buddhist year (>= 2400) MUST be converted to Gregorian by subtracting 543. e.g. 2569 -> 2026. ALWAYS fill date_raw with the original text.
 2. NAMES & ADDRESSES: Copy EXACTLY as printed (Thai or English). Do NOT auto-correct or standardize.
-3. ITEMS: Extract all unique line items. If same name+qty+price appears multiple times, keep ONE copy only.
+3. ITEMS: You can SEE the image — read EVERY line item top to bottom, miss none. Thermal/POS
+   receipts wrap one item over 2-3 lines (name, then qty x unit-price, then line total); stitch
+   them into ONE item (name, qty, price, subtotal). Count a row as an item only if it has a
+   product/service name; SKIP subtotal / VAT / total / change / cash / discount / table-no /
+   thank-you rows. Self-check: item subtotals should build toward the document subtotal — if you
+   have fewer items than the receipt visibly lists, re-scan for missed rows. Keep ONE copy if the
+   same name+qty+price is genuinely duplicated.
 4. NUMBERS: No currency symbols, no commas (e.g., "12450.00").
 5. TAX IDs: Exactly 13 digits, no dashes/spaces. Empty string if not found.
 6. WHT: Common rates 1/2/3/5%. wht_rate is the number ONLY ("3" not "3%").

@@ -2,10 +2,10 @@
 // 全引全站令牌(home-01-base :root + :root.dark)· 零硬编码 hex · 暗夜随翻面不反白。
 export const PURCHASE_DETAIL_CSS = `
 .pur.d .wrap{width:100%;}
-/* 顶栏:面板卡 · 返回 + 标题 + 面包屑 */
-.pur.d .ph{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:20px 22px;border:1px solid var(--line);border-radius:18px;background:var(--card);box-shadow:var(--sh);margin-bottom:18px;}
+/* 顶栏:不做成悬浮卡 · 直接贴页面(返回 + 标题 + 面包屑)· 内容紧跟其后 */
+.pur.d .ph{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:16px;}
 .pur.d .ph .phl{display:flex;align-items:flex-start;gap:14px;min-width:0;}
-.pur.d .ph .back{width:38px;height:38px;border-radius:11px;border:1px solid var(--line);background:var(--card);color:var(--ink2);display:grid;place-items:center;flex:none;cursor:pointer;font-size:20px;line-height:1;}
+.pur.d .ph .back{width:46px;height:46px;border-radius:13px;border:1px solid var(--line);background:var(--card);color:var(--ink2);display:grid;place-items:center;flex:none;cursor:pointer;font-size:26px;line-height:1;box-shadow:var(--sh);}
 .pur.d .ph .back:hover{border-color:var(--accent);background:var(--accent-weak);color:var(--accent-deep);}
 .pur.d .ph .t{font-size:23px;font-weight:740;letter-spacing:-.4px;display:flex;align-items:center;flex-wrap:wrap;gap:9px;line-height:1.2;}
 .pur.d .ph .crumb{margin-top:7px;color:var(--ink3);font-size:12.5px;} .pur.d .ph .crumb i{color:var(--ink-4);padding:0 6px;font-style:normal;}

@@ -129,7 +129,7 @@ function shell(): string {
     const badge = st!.aiFields ? `<span class="badge">${escapeHtml(t('pur-tag-read'))}</span>` : '';
     return `<div class="pur f"><div class="wrap">
         <div class="ph">
-            <div class="phl"><span class="back" id="pur-back" title="${escapeHtml(t('pur-back'))}" aria-label="${escapeHtml(t('pur-back'))}">‹</span><div><div class="t">${escapeHtml(t('pur-review-title'))}</div><div class="sub">${escapeHtml(st!.supplierName || t('pur-form-sub'))}</div></div></div>
+            <div class="phl"><span class="back" id="pur-back" title="${escapeHtml(t('pur-back'))}" aria-label="${escapeHtml(t('pur-back'))}">‹</span><div><div class="t">${escapeHtml(t('pur-review-title'))}</div><div class="sub">${escapeHtml(t('pur-form-sub'))}</div></div></div>
             ${badge}
         </div>
         ${dup}

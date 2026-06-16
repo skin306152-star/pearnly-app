@@ -5,7 +5,7 @@ export const PURCHASE_FORM_CSS = `
 .pur.f .wrap{width:100%;}
 .pur .ph{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:13px;}
 .pur.f .ph .phl{display:flex;align-items:center;gap:11px;}
-.pur.f .ph .back{margin-bottom:0;font-size:24px;line-height:1;color:var(--ink2);flex:none;}
+.pur.f .ph .back{margin-bottom:0;width:46px;height:46px;border:1px solid var(--line);border-radius:13px;background:var(--card);box-shadow:var(--sh);display:grid;place-items:center;font-size:26px;line-height:1;color:var(--ink2);flex:none;cursor:pointer;}
 .pur .ph .t{font-size:20px;font-weight:700;}
 .pur .ph .sub{color:var(--ink2);font-size:12.5px;margin-top:3px;}
 .pur .ph .badge{padding:7px 11px;border-radius:999px;background:var(--accent-weak);color:var(--accent-deep);font-size:12px;font-weight:700;white-space:nowrap;}
@@ -20,7 +20,7 @@ export const PURCHASE_FORM_CSS = `
 .pur.f .preview-pane{position:sticky;top:calc(var(--topbar-h) + 14px);min-width:0;max-height:calc(100vh - var(--topbar-h) - 28px);overflow-y:auto;border-right:1px solid var(--line);background:var(--card);border-radius:16px 0 0 16px;display:flex;flex-direction:column;}
 .pur.f .preview-pane .card{border:0;border-radius:0;box-shadow:none;background:transparent;}
 .pur.f .preview-pane .card>.hd{padding:13px 18px;border-bottom:1px solid var(--line);font-weight:700;font-size:13.5px;}
-.pur.f .preview-pane .card>.bd{padding:12px 18px;} .pur.f .preview-pane .card + .card{border-top:1px solid var(--line);} .pur.f .preview-pane .viewer{height:288px;} .pur.f .preview-pane .viewer .vimg{max-width:92%;max-height:94%;}
+.pur.f .preview-pane .card>.bd{padding:10px 12px 14px;} .pur.f .preview-pane .card + .card{border-top:1px solid var(--line);} .pur.f .preview-pane .viewer{height:400px;} .pur.f .preview-pane .viewer .vimg{max-width:100%;max-height:none;}
 .pur.f .form-pane{min-width:0;display:flex;flex-direction:column;}
 .pur.f .etabs{position:sticky;top:var(--topbar-h);z-index:8;display:grid;grid-template-columns:1fr 1fr;height:60px;border-bottom:1px solid var(--line);background:var(--card);border-radius:0 16px 0 0;}
 .pur.f .etabs button{position:relative;border:0;background:transparent;color:var(--ink2);font-weight:700;font-size:14px;cursor:pointer;} .pur.f .etabs button.on{color:var(--accent-deep);}

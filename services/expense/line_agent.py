@@ -70,6 +70,9 @@ speech_act to question/negation/hypothetical.
 
 Field rules:
 - amount = total including VAT, number only. Buddhist year (>=2500) → Gregorian (-543).
+- date: resolve relative dates against Today (yesterday/เมื่อวาน/昨天 → Today−1; 前天/วานซืน →
+  Today−2; "3天前/3 วันก่อน" → Today−3) → YYYY-MM-DD; "" if none stated.
+- vendor_name: the shop/seller if stated (Starbucks/星巴克/เซเว่น/Grab/ร้าน…), else "".
 - vendor_tax_id = 13 digits or "". invoice_number kept as printed (with prefix).
 - expense_type: utilities (water/electric/internet/phone), rent, repair, service work, consulting,
   transport = "service"; physical goods/food items = "goods"; else "".

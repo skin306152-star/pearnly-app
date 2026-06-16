@@ -427,9 +427,15 @@ async def _handle_line_image_ocr(
             except Exception as _e:
                 logger.warning(f"[line_ocr] 异常检测入队失败(不影响推送): {_e}")
 
-        # 6. 推送识别结果
-        reply_txt = line_client.format_ocr_result_for_line(lang, pages, invoice_count=len(pages))
-        line_client.push_text(line_user_id, reply_txt)
+        # 6. 推送识别结果:删老式字段 dump(Zihao 指明清掉)· 改干净一行(已识别 + 引导网页)。
+        # 到这里票已识别(认不出的在上方 all_pages_not_invoice 已拦);未开记账模块/入账分流失败
+        # 的兜底统一走此 —— 已写识别记录,网页可查,不再回显整段原始字段。
+        line_client.push_text(
+            line_user_id,
+            line_client.t_ocr(lang, "success_head")
+            + " · "
+            + line_client.t_ocr(lang, "view_on_web"),
+        )
         logger.info(f"[line_ocr] 完成 · user={user_fresh['id']} · hid={hid}")
 
     except Exception as e:

@@ -473,7 +473,8 @@ const MAPPINGS = [
                 prod: '.pur .btn.primary',
                 props: ['backgroundColor', 'borderRadius'],
             },
-            { design: '.card', prod: '.pur .card', props: ['borderRadius', 'boxShadow'] },
+            // 详情屏一体化:整屏融成一张白卡(.sheet 承载圆角 16 + 阴影,内部 card 去壳)。
+            { design: '.card', prod: '.pur.d .sheet', props: ['borderRadius', 'boxShadow'] },
         ],
         bluemust: '.pur .btn.primary',
         nosvgemoji: '.pur .img svg',

@@ -38,7 +38,6 @@ const ICON = {
 function field(label: string, value: string, cls = ''): string {
     return `<div class="f"><div class="l">${escapeHtml(label)}</div><div class="v ${cls}">${value}</div></div>`;
 }
-
 function statusBadges(d: DocDetail): string {
     if (d.status === 'void')
         return `<span class="badge void">${escapeHtml(t('pur-status-void'))}</span>`;
@@ -48,7 +47,6 @@ function statusBadges(d: DocDetail): string {
     const pay = `<span class="badge ${d.payment_status}">${escapeHtml(t('pur-pay-' + d.payment_status))}</span>`;
     return review + pay;
 }
-
 function summaryStrip(d: DocDetail): string {
     const items: [string, string, string][] = [
         [t('pur-supplier'), escapeHtml((d.supplier && d.supplier.name) || '—'), ''],
@@ -63,7 +61,6 @@ function summaryStrip(d: DocDetail): string {
         )
         .join('')}</section>`;
 }
-
 function infoCard(d: DocDetail): string {
     const batch = d.doc_date
         ? `${escapeHtml(d.doc_date.slice(0, 7))} · ${escapeHtml(t(kindLabelKey(d.doc_kind)))}`
@@ -83,7 +80,6 @@ function infoCard(d: DocDetail): string {
             ${field(t('pur-batch'), batch)}
         </dl></article>`;
 }
-
 function lineRow(l: DocLine, i: number, hasVat: boolean): string {
     const tag = l.product_matched
         ? `<span class="pill ok">${escapeHtml(t('pur-matched'))}</span>`
@@ -101,7 +97,6 @@ function lineRow(l: DocLine, i: number, hasVat: boolean): string {
         <td class="num">${fmtMoney(tax)}</td>
     </tr>`;
 }
-
 function itemsCard(d: DocDetail): string {
     if (d.doc_kind === 'expense' && !d.has_vat) return '';
     return `<article class="card"><div class="hd"><div class="ct"><span class="ico">${ICON.list}</span>${escapeHtml(t('pur-items'))}</div><span class="muted">${d.lines.length} ${escapeHtml(t('pur-unit-rows'))}</span></div>
@@ -115,7 +110,6 @@ function itemsCard(d: DocDetail): string {
             <th class="num">${escapeHtml(t('pur-tax-amt'))}</th>
         </tr></thead><tbody>${d.lines.map((l, i) => lineRow(l, i, d.has_vat)).join('')}</tbody></table></div></article>`;
 }
-
 function amountCard(d: DocDetail): string {
     if (d.doc_kind === 'expense' && !d.has_vat) {
         return `<article class="card"><div class="hd"><div class="ct"><span class="ico">${ICON.money}</span>${escapeHtml(t('pur-amount'))}</div></div>
@@ -214,26 +208,32 @@ function shell(d: DocDetail): string {
             : '';
     const voidNote =
         d.status === 'void' ? `<div class="stocknote">${escapeHtml(t('pur-void-note'))}</div>` : '';
+    const sect = (inner: string): string =>
+        inner ? `<section class="section">${inner}</section>` : '';
+    const acts = actions(d);
     return `<div class="pur d ${d.status === 'void' ? 'voided' : ''}"><div class="wrap">
         <header class="ph">
             <div class="phl"><span class="back" id="pur-back" title="${escapeHtml(t('pur-back'))}" aria-label="${escapeHtml(t('pur-back'))}">‹</span>
             <div><div class="t">${escapeHtml(t('pur-detail-title'))} ${statusBadges(d)}</div>
             <div class="crumb">${escapeHtml(t('pur-crumb-home'))} <i>/</i> ${escapeHtml(t('pur-crumb-list'))} <i>/</i> ${escapeHtml(t('pur-detail-title'))}</div></div></div>
-            <div class="acts">${actions(d)}</div>
         </header>
         ${summaryStrip(d)}
-        <div class="grid">
-            <div class="col">
-                ${infoCard(d)}
-                ${itemsCard(d)}
-                <div class="bottom">${amountCard(d)}${payCard(d)}</div>
-            </div>
-            <aside class="side">
+        <div class="sheet">
+            <aside class="preview-pane">
                 ${billCard(d)}
                 ${voucherCard(d)}
                 ${timelineCard(d)}
                 ${stock}${voidNote}
             </aside>
+            <section class="form-pane">
+                <div class="scroll">
+                    ${sect(infoCard(d))}
+                    ${sect(itemsCard(d))}
+                    ${sect(amountCard(d))}
+                    ${sect(payCard(d))}
+                </div>
+                ${acts ? `<div class="editfoot">${acts}</div>` : ''}
+            </section>
         </div>
     </div></div>`;
 }

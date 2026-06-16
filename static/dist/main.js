@@ -5443,7 +5443,7 @@ ${l.raw_text||l.text||""}`).join(`
 /* 一体化布局:整屏一张白卡 · 左 330 票据栏(吸顶)+ 右表单(顶 Tab 吸顶 / 滚动区分段 / 底部操作条吸底) */
 .pur.f .sheet{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh);overflow:visible;display:grid;grid-template-columns:330px minmax(0,1fr);align-items:start;}
 .pur.f .preview-pane{position:sticky;top:calc(var(--topbar-h) + 14px);min-width:0;max-height:calc(100vh - var(--topbar-h) - 28px);overflow-y:auto;border-right:1px solid var(--line);background:var(--card);border-radius:16px 0 0 16px;display:flex;flex-direction:column;}
-.pur.f .preview-pane .card{border:0;border-radius:0;box-shadow:none;background:transparent;}
+.pur.f .preview-pane .card{border:0;border-radius:0;box-shadow:none;background:transparent;padding:0;margin:0;}
 .pur.f .preview-pane .card>.hd{padding:13px 18px;border-bottom:1px solid var(--line);font-weight:700;font-size:13.5px;}
 .pur.f .preview-pane .card>.bd{padding:10px 12px 14px;} .pur.f .preview-pane .card + .card{border-top:1px solid var(--line);} .pur.f .preview-pane .viewer{height:400px;} .pur.f .preview-pane .viewer .vimg{max-width:100%;max-height:none;}
 .pur.f .form-pane{min-width:0;display:flex;flex-direction:column;}

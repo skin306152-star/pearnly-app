@@ -67,7 +67,8 @@ export const PURCHASE_DETAIL_CSS = `
 .pur.d .mrow.total strong{color:var(--accent-deep);font-size:20px;}
 
 /* 票图 */
-.pur.d .img{position:relative;overflow:hidden;border-radius:13px;background:var(--line2);aspect-ratio:4/3.3;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink3);cursor:zoom-in;}
+.pur.d .img{position:relative;overflow:hidden;border-radius:13px;background:var(--line2);aspect-ratio:4/3.3;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink3);}
+.pur.d .img.has-img{cursor:zoom-in;}
 .pur.d .img img{width:100%;height:100%;object-fit:cover;display:block;}
 .pur.d .view-btn{width:100%;justify-content:center;margin-top:11px;}
 .pur-lightbox{position:fixed;inset:0;background:rgba(17,24,39,.9);z-index:1100;display:flex;align-items:center;justify-content:center;padding:8px;cursor:zoom-out;}

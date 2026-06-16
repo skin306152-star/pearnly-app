@@ -247,6 +247,7 @@ async function loadBillImage(): Promise<void> {
     try {
         billBlobUrl = await fetchAuthedBlobUrl(url);
         box.innerHTML = `<img src="${billBlobUrl}" alt="">`;
+        box.classList.add('has-img');
     } catch (_) {
         /* 取图失败 → 保留占位 svg · 放大按钮已 disabled */
     }
@@ -268,6 +269,9 @@ function bind(): void {
     root.querySelector<HTMLElement>('#pur-back')!.onclick = () => window.routeTo?.('purchase');
     const zoom = root.querySelector<HTMLElement>('#pur-zoom');
     if (zoom) zoom.onclick = openLightbox;
+    // 票图框本身可点放大(光标已是 zoom-in)· 无图时 openLightbox 自守空 → 不响应。
+    const billBox = root.querySelector<HTMLElement>('#pur-bill-img');
+    if (billBox) billBox.onclick = openLightbox;
     const edit = root.querySelector<HTMLElement>('#pur-edit-btn');
     if (edit) edit.onclick = () => window.openPurchaseForm?.(cur!.id);
     const pay2 = root.querySelector<HTMLElement>('#pur-pay-btn2');

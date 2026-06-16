@@ -15,12 +15,10 @@ const I_ROT =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a9 9 0 11-2.6-6.4"/><path d="M21 4v4h-4"/></svg>';
 const I_RESET =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 4H4v4M16 4h4v4M16 20h4v-4M8 20H4v-4"/></svg>';
-const I_THUMB =
-    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1V2z"/></svg>';
 const I_FULL =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
 
-// 左栏 = 吸顶票据预览(查看器)+ 凭证和附件(相册缩略图 + 替代收据)。所有查看器 id 保持原样供 mountViewer 复用。
+// 左栏 = 票据查看器(下挂相册缩略图条 · 真图小样翻页)+ 凭据卡(替代收据)。查看器 id 保持原样供 mountViewer 复用。
 export function leftColHtml(st: FormState): string {
     const n = st.billUrls.length;
     const fileTag =
@@ -33,7 +31,7 @@ export function leftColHtml(st: FormState): string {
     const thumbs = st.billUrls
         .map(
             (_, i) =>
-                `<div class="t ${i === st.billIdx ? 'on' : ''}" data-thumb="${i}">${I_THUMB}</div>`
+                `<div class="t ${i === st.billIdx ? 'on' : ''}" data-thumb="${i}"><img class="timg" data-tidx="${i}" alt=""></div>`
         )
         .join('');
     return `<aside class="preview-pane" id="pane-doc">
@@ -42,10 +40,10 @@ export function leftColHtml(st: FormState): string {
                 <span class="vhint">${escapeHtml(t('pur-viewer-hint'))}</span>${fileTag}
                 <div class="vtools"><span class="vzoom" id="pur-vzoom">100%</span><button data-z="in" title="+">${I_PLUS}</button><button data-z="out" title="-">${I_MINUS}</button><button data-z="rot" title="rotate">${I_ROT}</button><button data-z="reset" title="reset">${I_RESET}</button><button data-z="full" title="${escapeHtml(t('pur-viewer-full'))}">${I_FULL}</button></div>
             </div>
+            <div class="thumbs">${thumbs}<div class="add" id="pur-add-file">${I_PLUS}</div></div>
         </div></div>
         <div class="card"><div class="hd">${escapeHtml(t('pur-vouchers-hd'))}</div><div class="bd">
             <div class="hint">${escapeHtml(t('pur-sub-receipt-hint'))}</div>
-            <div class="thumbs">${thumbs}<div class="add" id="pur-add-file">${I_PLUS}</div></div>
             <button class="btn full ghost mt" id="pur-gen-receipt">+ ${escapeHtml(t('pur-gen-receipt'))}</button>
         </div></div>
         <input type="file" id="pur-addfile-input" accept="image/*,application/pdf" multiple style="display:none">
@@ -79,21 +77,43 @@ export async function mountViewer(st: FormState, refresh: () => void): Promise<v
             if (files.length) st.billIdx = st.billUrls.length - 1;
             refresh();
         };
+    loadThumbs(st);
+}
+
+// 鉴权 serving url → blob object URL · 按 url 缓存(查看器与缩略图共用同一张图 · 去重取图 · 切页不重拉)。
+const blobCache = new Map<string, string>();
+async function resolveSrc(url: string): Promise<string | null> {
+    if (url.startsWith('blob:') || url.startsWith('data:')) return url;
+    const cached = blobCache.get(url);
+    if (cached) return cached;
+    try {
+        const src = await fetchAuthedBlobUrl(url);
+        blobCache.set(url, src);
+        return src;
+    } catch (_) {
+        return null;
+    }
 }
 
 async function loadCurrent(st: FormState): Promise<void> {
     const img = document.getElementById('pur-vimg') as HTMLImageElement | null;
     const url = st.billUrls[st.billIdx];
     if (!img || !url) return;
-    let src = url;
-    if (!src.startsWith('blob:') && !src.startsWith('data:')) {
-        try {
-            src = await fetchAuthedBlobUrl(url);
-        } catch (_) {
-            return;
-        }
-    }
-    img.src = src;
+    const src = await resolveSrc(url);
+    if (src) img.src = src;
+}
+
+// 缩略图条逐张换真图小样(占位 <img> 取回鉴权 blob · 失败留 .t 底色)。
+async function loadThumbs(st: FormState): Promise<void> {
+    const imgs = document.querySelectorAll<HTMLImageElement>('#pane-doc .thumbs .t img[data-tidx]');
+    await Promise.all(
+        Array.from(imgs).map(async (img) => {
+            const url = st.billUrls[Number(img.dataset.tidx)];
+            if (!url) return;
+            const src = await resolveSrc(url);
+            if (src) img.src = src;
+        })
+    );
 }
 
 function wireZoomPan(): void {

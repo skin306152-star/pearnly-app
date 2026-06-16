@@ -45,12 +45,12 @@ def _field_row(label: str, value: str, t: dict, *, low: bool, strong: bool) -> d
         "type": "box",
         "layout": "horizontal",
         "contents": [
-            _txt(label, size="xs", color=_LABEL, flex=2),
+            _txt(label, size="sm", color=_LABEL, flex=4, wrap=True),
             _txt(
                 val,
-                size="xs",
+                size="sm",
                 color=_LOW if low else (_VALUE if not strong else "#202939"),
-                flex=5,
+                flex=6,
                 wrap=True,
                 weight="bold" if strong else "regular",
             ),
@@ -89,7 +89,7 @@ def _seller_rows(fields: dict, t: dict) -> list:
 
 def _seclabel(text: str) -> dict:
     """分区小标题(灰·小号)。"""
-    return _txt(text, size="xxs", color=_LABEL, weight="bold")
+    return _txt(text, size="xs", color=_LABEL, weight="bold")
 
 
 def _strip(text: str, bg: str, color: str) -> dict:
@@ -117,10 +117,10 @@ def _items_rows(items: list, t: dict) -> list:
                 "type": "box",
                 "layout": "horizontal",
                 "contents": [
-                    _txt(f"{i}. {name}", size="xxs", color=_VALUE, flex=5, wrap=True),
+                    _txt(f"{i}. {name}", size="sm", color=_VALUE, flex=5, wrap=True),
                     _txt(
                         f"฿{amt}" if amt else "",
-                        size="xxs",
+                        size="sm",
                         color="#202939",
                         weight="bold",
                         flex=2,
@@ -198,7 +198,7 @@ def _stack(primary: dict, view: list, danger: list) -> list:
     out = []
     for i, btn in enumerate(buttons):
         if i:
-            out.append({"type": "separator", "margin": "sm", "color": _SEP})
+            out.append({"type": "separator", "margin": "xs", "color": _SEP})
         out.append(btn)
     return out
 
@@ -408,8 +408,8 @@ def result_card(
             "footer": {
                 "type": "box",
                 "layout": "vertical",
-                "paddingTop": "6px",
-                "paddingBottom": "8px",
+                "paddingTop": "2px",
+                "paddingBottom": "4px",
                 "paddingStart": "12px",
                 "paddingEnd": "12px",
                 "contents": _footer(

@@ -29,11 +29,18 @@ def do_record_multi(bound_user, reply_token, text, tid, ws, items, quote_token, 
 
     created_by = str(bound_user["id"]) if bound_user.get("id") else None
     api_key = line_l2.resolve_api_key(bound_user)
-    total = sum((it["amount"] for it in items), Decimal("0"))
     today = date.today().isoformat()
     with db.get_cursor_rls(tid, commit=True) as cur:
         tree = cat_svc.get_tree(cur, tenant_id=tid, workspace_client_id=ws)
-        cats = category_ai.categorize_items(items, tree, api_key=api_key)
+        # 优先 LLM 智能拆(口语「ฉันซื้อน้ำดื่ม 10 บาท ทุเรียน 300」→ 干净项目名+额+分类·治正则乱拆);
+        # 无 key/失败 → 退正则项 + 批量归类(清晰空格分隔仍可用)。
+        llm_items = category_ai.parse_and_categorize(text, tree, api_key=api_key)
+        if llm_items:
+            items = llm_items
+            cats = [(it["category_id"], it["subcategory_id"]) for it in items]
+        else:
+            cats = category_ai.categorize_items(items, tree, api_key=api_key)
+        total = sum((it["amount"] for it in items), Decimal("0"))
         lines = [
             {
                 "item_type": "goods",

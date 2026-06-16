@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import re
+from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -134,6 +135,70 @@ def categorize_items(items: list, categories: list, *, api_key: Optional[str], t
         if 1 <= ch <= len(options):
             out[i] = (options[ch - 1][0], options[ch - 1][1])
     return out
+
+
+_PARSE_PROMPT = (
+    "Extract EACH expense from the user's casual Thai/Chinese sentence. For EACH expense:\n"
+    "- name: the CLEAN item only (e.g. 'น้ำดื่ม', 'ทุเรียน', '榴莲', '咖啡') — DROP verbs (ซื้อ/买/"
+    "ซื้อมา), the word price (ราคา/价/价格), store names (เซเว่น/7-Eleven/Lotus), connectors (และ/แ"
+    "ละ/和/跟), and units (บาท/元/THB).\n"
+    "- amount: the THB number for that item, copied EXACTLY as digits from the text.\n"
+    "- choice: the category number from the list that best fits the item (food/drink/snack/groceries"
+    " → food & entertainment; fuel → travel; water/electric/phone → utilities; goods → cost of goods"
+    "; office supplies → office).\n"
+    'Output ONLY JSON {"items":[{"name":"...","amount":"...","choice":N}, ...]} in text order.'
+)
+
+
+def parse_and_categorize(text: str, categories: list, *, api_key: Optional[str], timeout: int = 15):
+    """口语多项 → 一次 LLM 拆成干净 items(名+额+分类)。返回 [{name, amount(Decimal), category_id,
+    subcategory_id}] 或 None(无 key/失败/空)。
+
+    治正则拆口语乱(「ฉันซื้อน้ำดื่มราคา」当项目名)。金额安全:LLM 给的额必须原文真出现的数字,
+    否则丢该项(不信 LLM 编金额·与单笔同护栏)。
+    """
+    if not api_key:
+        return None
+    options = _options(categories)
+    if not options:
+        return None
+    nums = {n.replace(",", "") for n in re.findall(r"\d[\d,]*(?:\.\d+)?", text or "")}
+    listing = "\n".join(f"{i + 1}. {label}" for i, (_, _, label) in enumerate(options))
+    try:
+        from services.ocr import gemini_models
+        from services.ocr.layer2_gemini import _call_gemini_with_retry
+
+        data, _meta = _call_gemini_with_retry(
+            f"Text: {text}\n\nCategories:\n{listing}",
+            api_key=api_key,
+            model_name=gemini_models.flash(),
+            max_retries=1,
+            timeout=timeout,
+            system_prompt_override=_PARSE_PROMPT,
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[category_ai] multi-parse failed: %s", str(e)[:160])
+        return None
+    out = []
+    for it in (data or {}).get("items") or []:
+        name = str(it.get("name") or "").strip()
+        amt_s = str(it.get("amount") or "").replace(",", "").strip()
+        if not name or amt_s not in nums:  # 金额必须原文有(防 LLM 编造)
+            continue
+        try:
+            amt = Decimal(amt_s)
+        except (InvalidOperation, ValueError):
+            continue
+        cid = sid = None
+        try:
+            ch = int(it.get("choice") or 0)
+            if 1 <= ch <= len(options):
+                cid, sid = options[ch - 1][0], options[ch - 1][1]
+        except (ValueError, TypeError):
+            pass
+        if amt > 0:
+            out.append({"name": name, "amount": amt, "category_id": cid, "subcategory_id": sid})
+    return out or None
 
 
 def _options(categories: list) -> list:

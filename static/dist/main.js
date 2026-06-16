@@ -5447,7 +5447,7 @@ ${l.raw_text||l.text||""}`).join(`
 /* 吸顶上下文条:左=套账(记账给 X) + 右=分类导航(scroll-spy)· 桌面/手机同款 */
 .pur .ctxbar{position:sticky;top:0;z-index:9;display:flex;align-items:center;gap:12px;background:var(--bg);padding:9px 0;margin-bottom:14px;border-bottom:1px solid var(--line);}
 .pur .ctxbar .wsbar{margin-bottom:0;flex:none;}
-.pur .etabs{display:flex;gap:6px;flex:1;overflow-x:auto;}
+.pur .etabs{display:flex;gap:6px;flex:1;overflow-x:auto;justify-content:space-between;}
 .pur .etabs button{border:none;background:transparent;color:var(--ink2);padding:7px 14px;border-radius:999px;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap;}
 .pur .etabs button.on{background:var(--accent-weak);color:var(--accent-deep);}
 
@@ -5533,14 +5533,14 @@ ${l.raw_text||l.text||""}`).join(`
 .pur .consist{font-size:12px;border-radius:9px;padding:8px 11px;margin-top:8px;}
 .pur .consist.ok{background:var(--green-weak);color:var(--green);} .pur .consist.bad{background:var(--red-weak);color:var(--red);}
 
-/* 底部操作条:吸底 + 三个按钮均匀铺满 */
-.pur .editfoot{display:flex;gap:9px;padding:12px 0;position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);z-index:9;}
-.pur .editfoot .btn{flex:1;}
+/* 底部操作条:不吸顶(滚到底才见)· 三个按钮聚右成组 */
+.pur .editfoot{display:flex;gap:10px;padding:18px 0 4px;justify-content:flex-end;}
 @media(max-width:760px){
   .pur .ctxbar{flex-direction:column;align-items:stretch;}
   .pur .ctxbar .wsbar{width:100%;}
   .pur .etabs{flex:none;}
   .pur .ph{flex-direction:column;}
+  .pur .editfoot{justify-content:stretch;} .pur .editfoot .btn{flex:1;}
   .pur .grid{grid-template-columns:1fr;} .pur .edit-left{position:static;}
   .pur .igrid{grid-template-columns:repeat(2,1fr);}
   .pur .irow1{flex-wrap:wrap;} .pur .irow1 .seg{flex:0 0 100%;order:3;} .pur .irow1 .iname{order:1;} .pur .irow1 .x{order:2;}

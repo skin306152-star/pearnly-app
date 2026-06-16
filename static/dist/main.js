@@ -5657,11 +5657,11 @@ ${l.raw_text||l.text||""}`).join(`
 .pur.d .section{border-bottom:1px solid var(--line);} .pur.d .form-pane .section:last-of-type{border-bottom:0;}
 .pur.d .sheet .card{border:0;border-radius:0;box-shadow:none;background:transparent;}
 .pur.d .preview-pane .card + .card{border-top:1px solid var(--line);}
-.pur.d .card .hd{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:56px;padding:0 18px;}
+.pur.d .card .hd{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:46px;padding:12px 18px 4px;}
 .pur.d .card .hd .ct{display:flex;align-items:center;gap:10px;font-weight:780;font-size:15px;}
 .pur.d .card .hd .ico{width:32px;height:32px;display:grid;place-items:center;border-radius:10px;background:var(--accent-weak);color:var(--accent-deep);flex:none;}
 .pur.d .card .hd .muted{color:var(--ink3);font-weight:500;font-size:12px;}
-.pur.d .card .bd{padding:14px 18px;}
+.pur.d .card .bd{padding:8px 18px 14px;}
 .pur.d .editfoot{position:sticky;bottom:0;z-index:7;border-top:1px solid var(--line);background:var(--card);border-radius:0 0 16px 0;display:flex;gap:10px;justify-content:flex-end;align-items:center;padding:14px 22px;}
 
 /* 基本信息字段网格 */
@@ -5690,7 +5690,7 @@ ${l.raw_text||l.text||""}`).join(`
 .pur.d .mrow.total strong{color:var(--accent-deep);font-size:20px;}
 
 /* 票图 */
-.pur.d .img{position:relative;overflow:hidden;border-radius:13px;background:var(--line2);aspect-ratio:4/4.4;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink3);cursor:zoom-in;}
+.pur.d .img{position:relative;overflow:hidden;border-radius:13px;background:var(--line2);aspect-ratio:4/3.3;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink3);cursor:zoom-in;}
 .pur.d .img img{width:100%;height:100%;object-fit:cover;display:block;}
 .pur.d .view-btn{width:100%;justify-content:center;margin-top:11px;}
 .pur-lightbox{position:fixed;inset:0;background:rgba(17,24,39,.9);z-index:1100;display:flex;align-items:center;justify-content:center;padding:8px;cursor:zoom-out;}

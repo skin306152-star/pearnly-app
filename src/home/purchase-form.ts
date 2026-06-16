@@ -172,7 +172,9 @@ function setTop(key: string, val: string): void {
 }
 
 function bindShell(): void {
-    document.getElementById('pur-back')!.onclick = () => window.routeTo?.('purchase');
+    // 复核屏与详情屏 DOM 里都有 #pur-back · 限定本 section 取(否则靠 DOM 顺序撞运气)。
+    document.querySelector<HTMLElement>('#page-purchase-form #pur-back')!.onclick = () =>
+        window.routeTo?.('purchase');
     mountViewer(st!, rerender);
     mountLines(
         st!,
@@ -257,21 +259,19 @@ function bindShell(): void {
         fxRate: 'fx',
         docDate: 'doc_date',
     };
-    document
-        .querySelectorAll<HTMLInputElement>('#pane-info [data-fld], #pane-doc [data-fld]')
-        .forEach((el) => {
-            const f = el.dataset.fld!;
-            if (['branchType', 'currency'].includes(f)) return;
-            el.oninput = () => {
-                setTop(f, el.value);
-                const key = reqKey[f];
-                if (!key) return;
-                const field = el.closest('.field');
-                const need = isReqEmpty(st!, key);
-                field?.classList.toggle('need', need);
-                if (!need) field?.querySelector('.tg-need')?.remove(); // 填了即去「需补」徽章(免文字滞留)
-            };
-        });
+    document.querySelectorAll<HTMLInputElement>('#pane-info [data-fld]').forEach((el) => {
+        const f = el.dataset.fld!;
+        if (['branchType', 'currency'].includes(f)) return;
+        el.oninput = () => {
+            setTop(f, el.value);
+            const key = reqKey[f];
+            if (!key) return;
+            const field = el.closest('.field');
+            const need = isReqEmpty(st!, key);
+            field?.classList.toggle('need', need);
+            if (!need) field?.querySelector('.tg-need')?.remove(); // 填了即去「需补」徽章(免文字滞留)
+        };
+    });
     bindGenReceipt();
     bindBannerJumps();
     bindMobileTabs();

@@ -45,10 +45,10 @@ def _field_row(label: str, value: str, t: dict, *, low: bool, strong: bool) -> d
         "type": "box",
         "layout": "horizontal",
         "contents": [
-            _txt(label, size="xxs", color=_LABEL, flex=2),
+            _txt(label, size="xs", color=_LABEL, flex=2),
             _txt(
                 val,
-                size="xxs",
+                size="xs",
                 color=_LOW if low else (_VALUE if not strong else "#202939"),
                 flex=5,
                 wrap=True,
@@ -198,7 +198,7 @@ def _stack(primary: dict, view: list, danger: list) -> list:
     out = []
     for i, btn in enumerate(buttons):
         if i:
-            out.append({"type": "separator", "margin": "md", "color": _SEP})
+            out.append({"type": "separator", "margin": "sm", "color": _SEP})
         out.append(btn)
     return out
 
@@ -408,7 +408,10 @@ def result_card(
             "footer": {
                 "type": "box",
                 "layout": "vertical",
-                "paddingAll": "12px",
+                "paddingTop": "6px",
+                "paddingBottom": "8px",
+                "paddingStart": "12px",
+                "paddingEnd": "12px",
                 "contents": _footer(
                     state,
                     doc_id,

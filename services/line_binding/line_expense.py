@@ -11,7 +11,7 @@ import logging
 import os
 
 from core import db
-from services.line_binding import line_client
+from services.line_binding import line_client, line_expense_qa
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +69,18 @@ def handle_expense_text(
         si = lqe.l1_intent(text)
         isq = lqe.is_question(text)
 
+        # #7 收入识别:明确「收款/卖出」且无购买动词 → 不误记为支出。LINE 暂无收入流 →
+        #    只识别 + 不入账 + 引导(保守:问句/已有 L1 意图不拦,宁漏勿误挡正常买东西)。
+        if lqe.detect_income(text) and not isq and si is None:
+            line_client.reply_text(reply_token, line_client.t_line(lang, "exp_income_guide"))
+            line_chat_memory.note(
+                line_user_id=line_user_id,
+                tenant_id=str(tid),
+                role="bot",
+                content="[收入·未记账·引导网页]",
+            )
+            return True
+
         # 1a. 多项一句话(电费50 买菜40 电费10 吃饭50)→ 拆多笔·逐项智能归类·合计入账·卡显逐条
         #     (对标 Paypers)。问句/有其它 L1 意图不走(防误记)。
         multi = lqe.parse_multi(text)
@@ -112,11 +124,11 @@ def handle_expense_text(
 
         # 3. 兜底(无 LLM):L1 查账/求助/问答(知识库),否则礼貌带回(复用上面已算的 si/isq)。
         if si == "query":
-            _reply_summary(reply_token, lang, str(tid), ws)
+            line_expense_qa.reply_summary(reply_token, lang, str(tid), ws)
         elif si == "support":
             _reply_pool(reply_token, "support", text, lang)
         elif isq:
-            _reply_question(reply_token, lang, str(tid), text)
+            line_expense_qa.reply_question(reply_token, lang, str(tid), text)
         else:
             _reply_pool(reply_token, "scope", text, lang)
         return True
@@ -133,13 +145,13 @@ def _dispatch_agent(
 
     intent = u.get("intent")
     if intent == "query_summary":
-        _reply_summary(reply_token, lang, tid, ws)
+        line_expense_qa.reply_summary(reply_token, lang, tid, ws)
         return True
     if intent == "query_detail":
-        _reply_detail(reply_token, lang, tid, ws)
+        line_expense_qa.reply_detail(reply_token, lang, tid, ws)
         return True
     if intent == "undo":
-        _reply_undo(bound_user, reply_token, lang, tid, ws)
+        line_expense_qa.reply_undo(bound_user, reply_token, lang, tid, ws)
         return True
     if intent == "edit":
         amt = u.get("amount")
@@ -345,96 +357,6 @@ def _dup_warn(bound_user, draft, ws) -> bool:
     except Exception:
         logger.warning("[line] dup check failed; skip warning")
         return False
-
-
-def _reply_summary(reply_token, lang, tid, ws) -> None:
-    """查账汇总(本月已入账 + 按分类拆解)· DB 真查,绝不让模型编数字。"""
-    from services.expense import line_qa
-
-    try:
-        with db.get_cursor_rls(tid) as cur:
-            s = line_qa.month_summary(cur, tenant_id=tid, workspace_client_id=ws)
-    except Exception:
-        logger.exception("[line] summary failed")
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_q_not_found"))
-        return
-    if s["count"] == 0:
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_sum_empty"))
-        return
-    uncat = line_client.t_line(lang, "exp_uncat")
-    lines = [line_client.t_line(lang, "exp_sum_head", amount=s["total"], n=s["count"])]
-    for c in s["by_category"][:6]:
-        lines.append(f"• {c['name'] or uncat}: ฿{c['amount']} ({c['count']})")
-    line_client.reply_text(reply_token, "\n".join(lines))
-
-
-def _reply_detail(reply_token, lang, tid, ws) -> None:
-    """查明细(本月逐笔)· DB 真查 → 列表。"""
-    from services.expense import line_qa
-
-    try:
-        with db.get_cursor_rls(tid) as cur:
-            rows = line_qa.month_detail(cur, tenant_id=tid, workspace_client_id=ws, limit=10)
-    except Exception:
-        logger.exception("[line] detail failed")
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_q_not_found"))
-        return
-    if not rows:
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_sum_empty"))
-        return
-    uncat = line_client.t_line(lang, "exp_uncat")
-    lines = [line_client.t_line(lang, "exp_detail_head", n=len(rows))]
-    for r in rows:
-        tail = f" · {r['vendor']}" if r["vendor"] else ""
-        lines.append(f"• {r['date']} {r['category'] or uncat} ฿{r['amount']}{tail}")
-    line_client.reply_text(reply_token, "\n".join(lines))
-
-
-def _reply_undo(bound_user, reply_token, lang, tid, ws) -> None:
-    """撤销上一笔(LINE 记的、已入账正式单)· void_doc 冲销,不物理删。无 → 诚实告知。"""
-    uid = str(bound_user["id"]) if bound_user.get("id") else None
-    try:
-        from services.purchase import posting as posting_svc
-
-        with db.get_cursor_rls(tid, commit=True) as cur:
-            cur.execute(
-                "SELECT id, grand_total FROM purchase_docs "
-                "WHERE tenant_id = %s AND workspace_client_id = %s AND source = 'line' "
-                "AND status = 'posted' ORDER BY created_at DESC LIMIT 1",
-                (tid, ws),
-            )
-            row = cur.fetchone()
-            if not row:
-                line_client.reply_text(reply_token, line_client.t_line(lang, "exp_undo_none"))
-                return
-            res = posting_svc.void_doc(
-                cur, tenant_id=tid, workspace_client_id=ws, doc_id=str(row["id"]), created_by=uid
-            )
-            amt = (res.get("doc") or {}).get("grand_total") or row["grand_total"]
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_undo_done", amount=amt))
-    except Exception:
-        logger.exception("[line] undo failed")
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_undo_none"))
-
-
-def _reply_question(reply_token, lang, tid, question) -> None:
-    """问答 · 知识中心带出处;查不到诚实兜底 + 指路(绝不编造)。"""
-    from services.expense import line_qa
-
-    try:
-        with db.get_cursor_rls(tid) as cur:
-            res = line_qa.knowledge_answer(cur, tenant_id=tid, question=question)
-    except Exception:
-        logger.exception("[line] question failed")
-        res = None
-    if not res:
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_q_not_found"))
-        return
-    src = ", ".join(res["citations"]) if res.get("citations") else ""
-    body = res["answer"]
-    if src:
-        body += "\n\n" + line_client.t_line(lang, "exp_q_source", src=src)
-    line_client.reply_text(reply_token, body)
 
 
 def _qr_item(label: str, text: str) -> dict:

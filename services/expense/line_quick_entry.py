@@ -213,6 +213,48 @@ def is_question(text: str) -> bool:
     return t.endswith(("?", "?")) or any(m in t for m in _QUESTION_MARK)
 
 
+# 收入信号(#7):「收到货款500 / ขายได้ / 卖了」是收入,别当支出记。LINE 暂无收入流 →
+# 只识别 + 不误记 + 引导。保守:须有明确收入词【且】无购买动词才判收入,宁漏勿误挡正常买东西。
+_INCOME_KW = (
+    # 泰语
+    "ขายได้",
+    "ขาย",
+    "รับเงิน",
+    "ได้รับเงิน",
+    "เงินเข้า",
+    "รายได้",
+    "ยอดขาย",
+    "ลูกค้าโอน",
+    # 中文
+    "收到货款",
+    "货款",
+    "收入",
+    "卖",
+    "销售",
+    "营业额",
+    "进账",
+    "收款",
+    "回款",
+    # 英文
+    "received payment",
+    "got paid",
+    "income",
+    "revenue",
+    "sold",
+    "sales",
+)
+# 购买/付款动词:出现即视为支出,收入判定让位(防把「买/付/ซื้อ/จ่าย」误挡)。
+_PURCHASE_VERB = ("ซื้อ", "จ่าย", "买", "付", "花", "bought", "paid", "spent", "buy")
+
+
+def detect_income(text: str) -> bool:
+    """疑似收入?仅当含明确收入词【且】无购买动词才 True(保守·宁漏勿误挡支出 · #7)。"""
+    low = (text or "").lower()
+    if not any(k.lower() in low for k in _INCOME_KW):
+        return False
+    return not any(v.lower() in low for v in _PURCHASE_VERB)
+
+
 def parse_expense(text: str) -> ExpenseDraft:
     """自由文本 → ExpenseDraft(确定性映射 · doc 10 §3)。无金额 → amount=None(调用方澄清)。"""
     text = (text or "").strip()

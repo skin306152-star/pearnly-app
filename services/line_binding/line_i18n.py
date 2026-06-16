@@ -44,6 +44,10 @@ LINE_I18N = {
             "也可发一句文字记账,如「ค่าน้ำ 50」"
         ),
         "exp_need_amount": "这笔多少钱?直接回一个数字就行,例如「50」",
+        "exp_income_guide": (
+            "这看起来是一笔收入(收款/卖出)。LINE 目前只记支出和采购,收入请到网页记账。"
+            "如果这其实是支出,带上「买/付」等说明再发一次即可。"
+        ),
         "exp_sum_head": "📊 本月已入账 ฿{amount} · 共 {n} 笔",
         "exp_sum_empty": "本月还没有已入账的支出哦,发张票或一句「ค่าน้ำ 50」记一笔吧",
         "exp_detail_head": "📋 本月明细(最近 {n} 笔):",
@@ -109,6 +113,11 @@ LINE_I18N = {
             "Or type an expense like 'Water 50'"
         ),
         "exp_need_amount": "How much was it? Just reply a number, e.g. '50'",
+        "exp_income_guide": (
+            "This looks like income (a sale / money received). LINE currently records expenses "
+            "and purchases only — please log income on the web. If it's actually a purchase, "
+            "resend with a word like 'bought/paid'."
+        ),
         "exp_sum_head": "📊 Recorded this month: ฿{amount} · {n} entries",
         "exp_sum_empty": "No recorded spending this month yet — send a receipt or type 'coffee 65'",
         "exp_detail_head": "📋 This month (latest {n}):",
@@ -174,6 +183,10 @@ LINE_I18N = {
             "หรือพิมพ์บันทึกค่าใช้จ่าย เช่น 'ค่าน้ำ 50'"
         ),
         "exp_need_amount": "รายการนี้กี่บาท? พิมพ์ตัวเลขกลับมาได้เลย เช่น '50'",
+        "exp_income_guide": (
+            "ดูเหมือนเป็นรายรับ (ขายได้/รับเงิน) ตอนนี้ LINE บันทึกเฉพาะรายจ่ายและการซื้อ "
+            "โปรดบันทึกรายรับบนเว็บ หากนี่คือรายจ่ายจริง พิมพ์ใหม่พร้อมคำว่า 'ซื้อ/จ่าย'"
+        ),
         "exp_sum_head": "📊 บันทึกเดือนนี้ ฿{amount} · {n} รายการ",
         "exp_sum_empty": "เดือนนี้ยังไม่มีรายการที่บันทึก ส่งใบเสร็จหรือพิมพ์ 'ค่าน้ำ 50' ได้เลย",
         "exp_detail_head": "📋 เดือนนี้ (ล่าสุด {n} รายการ):",
@@ -239,6 +252,10 @@ LINE_I18N = {
             "または「水道 50」のように入力して記帳"
         ),
         "exp_need_amount": "いくらでしたか?数字だけ返信してください(例:50)",
+        "exp_income_guide": (
+            "これは収入(売上/入金)のようです。LINE は現在、支出と仕入のみ記録します。"
+            "収入は Web で記録してください。もし支出なら「購入/支払」を付けて再送してください。"
+        ),
         "exp_sum_head": "📊 今月の記帳 ฿{amount} · {n} 件",
         "exp_sum_empty": "今月まだ記帳がありません。領収書か「水道 50」と送ってください",
         "exp_detail_head": "📋 今月(直近 {n} 件):",

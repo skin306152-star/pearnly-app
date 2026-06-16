@@ -5452,10 +5452,11 @@ ${l.raw_text||l.text||""}`).join(`
 .pur .etabs button.on{background:var(--accent-weak);color:var(--accent-deep);}
 
 .pur .grid{display:grid;grid-template-columns:330px 1fr;gap:14px;align-items:start;}
-/* 右列融成一张连续白卡:内部各 card 去边框/阴影,区与区之间一条细横线(治「东一块西一块」) */
-.pur.f .rcol{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--sh);overflow:hidden;}
-.pur.f .rcol .card{border:0;border-radius:0;box-shadow:none;background:transparent;}
-.pur.f .rcol .card + .card,.pur.f .rcol > div + div .card:first-child{border-top:1px solid var(--line);}
+/* 左右两列各融成一张连续白卡:内部 card 去边框/阴影,区与区之间一条细横线(治「东一块西一块」) */
+.pur.f .rcol,.pur.f .edit-left{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--sh);overflow:hidden;}
+.pur.f .edit-left{gap:0;}
+.pur.f .rcol .card,.pur.f .edit-left .card{border:0;border-radius:0;box-shadow:none;background:transparent;}
+.pur.f .rcol .card + .card,.pur.f .rcol > div + div .card:first-child,.pur.f .edit-left .card + .card{border-top:1px solid var(--line);}
 .pur .edit-left{position:sticky;top:0;align-self:start;}
 .pur .col{display:flex;flex-direction:column;gap:14px;}
 .pur .card>.hd{padding:12px 15px;border-bottom:1px solid var(--line);font-weight:600;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:8px;}

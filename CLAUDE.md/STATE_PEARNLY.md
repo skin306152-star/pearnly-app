@@ -6,9 +6,16 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-16 · **进项采购 复核/详情屏 票图缩略图 + 全屏留白收紧 + /simplify 收口** · 前序见下）
+## 🎯 状态卡（2026-06-16 · **「待归类(inbox)」整模块下线·识别完一律建草稿落采购列表** · 前序见下）
 
-- **🆕 本窗口(2026-06-16)· 🧾 进项采购 复核屏/详情屏 票图与布局收口【全上线·真浏览器 17/17·prod v11850890】**(自检自推·5 commit·全闸绿)：
+- **🆕 本窗口(2026-06-16)· 🗑️ 「待归类(intake_items/inbox)」整模块下线【全上线·prod验·v11850891】**（自检自推·worktree隔离推 4 commit·13闸全绿·见记忆 [[intake-inbox-retired]]）：
+  - **行为**：LINE/拍照/网页识别完**一律建采购草稿(ฉบับร่าง)落「จัดซื้อ」列表**(有VAT=进项·无VAT/截图证据=费用不抵VAT)，用户在列表改方向/补金额/删。不再单独兜待归类桶。销项分类(我是卖方)后期按上传前选业务类型单独做。
+  - **删干净**：`judge_direction`(去my_tax_id·只分进项/费用)/`resolve_image_intake`(删落inbox·永建草稿)/`grade`(去inbox动作)/`line_ingest`(删inbox分支)；LINE卡三态(去inbox卡态+inbox_post/drop两动作)；3个`/api/purchase/inbox`端点+`/liff/purchase-inbox`路由+`intake.classify`权限；前端`purchase-inbox.ts`/侧栏/路由/i18n(4语)；schema去intake_items；**alembic 0040 DROP**。死代码`_norm_tax`/`_TAX_RE`/`_my_tax_id`一并清。
+  - **prod 存量**：迁移脚本 24 pending → **18 转草稿 + 6 dup(已有真单冗余)跳过** → 手动 DROP intake_items 表。表已删·schema不再建·重启不复活。
+  - **真机验**(Zihao 19:09)：咖啡票฿59.99(有VAT)→confirm卡→列表「สั่งซื้อ进项·ภาษีซื้อ฿3.92·草稿」✓。**待跟进**：① 7-11票走旧纯文字回执(=dup命中已迁移的草稿·create_doc dedupe_block raise→fallback识别记录·pre-existing·dup卡不可达) ② 侧栏曾显待归类=CF缓存未bump(已bump v11850891修·刷新即没)。
+  - **坑**：共享.git撞另一窗口未推 commit `1219b159`(feat/category·只动categories.py)→隔离worktree cherry-pick只推我的(`git worktree add --detach <wt> origin/master`+PS junction node_modules+cherry-pick+push HEAD:master)·本地master与origin分叉是正常结果·没reset护它的commit。改src/home必bump?v=(CF按URL缓存/static·没bump=serve旧bundle·这次踩了补推)。
+
+- **本窗口(2026-06-16)· 🧾 进项采购 复核屏/详情屏 票图与布局收口【全上线·真浏览器 17/17·prod v11850890】**(自检自推·5 commit·全闸绿)：
   - **详情屏**:票图框可点开大图(原只「放大看」按钮可点·光标是放大镜却无响应);无图时不显放大镜光标(`.img.has-img`)。
   - **复核屏**:缩略图条(含「+」加附件)从「凭据(报税用)」卡挪到查看器正下方做胶片条,每张**渲染真实票图小样**(原占位文档图标);凭据卡只留提示 + 生成替代收据。
   - **两屏留白收紧**(左栏 + 右侧内容区):内层无边框卡只 reset 了 border/shadow,漏 padding/margin → 继承全局 `.pur .card{padding:20px;margin:0 0 16px}` 叠加 hd/bd 内边距=双重留白(段间 71~150px)。三处补 `padding:0;margin:0`·实测左栏 GAP 71→15px、右侧段间大幅收窄。

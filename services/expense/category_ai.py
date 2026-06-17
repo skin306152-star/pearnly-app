@@ -90,7 +90,8 @@ _ITEM_RULES: tuple[tuple[str, str]] = (
     (
         r"กาแฟ|คอฟฟี่|อเมริกาโน|ลาเต้|คาปู|มอคค่า|espresso|americano|latte|cappuccino|coffee|"
         r"ชา|เครื่องดื่ม|น้ำดื่ม|น้ำเปล่า|น้ำแข็ง|เบเกอรี่|เค้ก|ขนม|snack|drink|beverage|"
-        r"อาหาร|ข้าว|ก๋วยเตี๋ยว|ไก่|หมู|ปลา|เนื้อ|ผัด|ทอด|ต้ม|ยำ|แกง|meal|food",
+        r"อาหาร|ข้าว|ก๋วยเตี๋ยว|ไก่|หมู|ปลา|เนื้อ|ผัด|ทอด|ต้ม|ยำ|แกง|meal|food|"
+        r"บุฟเฟ่ต์|บุฟเฟต์|buffet|ซีฟู้ด|ทะเล|seafood",
         "food_drink",
     ),
     (r"ไฮดีเซล|ดีเซล|เบนซิน|แก๊สโซฮอล|น้ำมันเชื้อเพลิง|gasohol|diesel|benzin|petrol|fuel", "fuel"),
@@ -121,7 +122,11 @@ _ITEM_RULES: tuple[tuple[str, str]] = (
 
 _VENDOR_RULES: tuple[tuple[str, str]] = (
     (r"cafe amazon|amazon coffee|กาแฟพันธุ์ไทย|starbucks|คาเฟ่|cafe|coffee", "food_drink"),
-    (r"ร้านอาหาร|restaurant|little betong|foodstory|ภัตตาคาร|ครัว|kitchen", "food_drink"),
+    (
+        r"ร้านอาหาร|restaurant|little betong|foodstory|ภัตตาคาร|ครัว|kitchen|"
+        r"บุฟเฟ่ต์|บุฟเฟต์|buffet|ซีฟู้ด|seafood|cafe|คาเฟ่",
+        "food_drink",
+    ),
     (r"\bgrab\b|แกร็บ|\bbolt\b|โบลท์|lineman|ไลน์แมน|แท็กซี่|\btaxi\b", "taxi"),
     (
         r"บางจาก|bangchak|ปตท|\bptt\b|เชลล์|\bshell\b|คาลเท็กซ์|caltex|เอสโซ่|\besso\b|ซัสโก้|susco",

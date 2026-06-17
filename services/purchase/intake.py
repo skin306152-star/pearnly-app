@@ -120,38 +120,42 @@ def _draft_base(fields: dict, *, kind: str, has_vat: bool) -> Decimal:
     return subtotal or total
 
 
-def _matches_total_with_included_tax(fields: dict, line_sum: Decimal, base: Decimal) -> bool:
-    vat = _to_decimal(fields.get("vat"))
-    total = _to_decimal(fields.get("total_amount"))
-    if line_sum <= 0 or base <= 0:
-        return False
-    if abs(line_sum - base) <= Decimal("1"):
+def _line_net_sum(lines: list) -> Decimal:
+    return sum(
+        (_to_decimal(ln["qty"]) * _to_decimal(ln["unit_price"]) for ln in lines), Decimal("0")
+    )
+
+
+def _lines_match_receipt(fields: dict, lines: list, base: Decimal) -> bool:
+    """OCR 明细可信 = 行净额之和 ≈ 票面税前小计(餐饮含税票常态:行印税前)或 ≈ base(无 VAT 票)。
+
+    都不沾 = 明细乱读(qty 误读 / 多品项串行)→ 调用方收敛单行兜底。餐饮 receipt 行印税前,与含税
+    总额差一个 VAT 属正常,凭票面小计判可信,绝不当读错去 gross-up 覆盖票面行额。
+    """
+    line_sum = _line_net_sum(lines)
+    subtotal = _to_decimal(fields.get("subtotal"))
+    if subtotal > 0 and abs(line_sum - subtotal) <= Decimal("1"):
         return True
-    return vat > 0 and total > 0 and abs((line_sum + vat) - total) <= Decimal("1")
+    return base > 0 and abs(line_sum - base) <= Decimal("1")
 
 
-def _gross_up_expense_lines(lines: list, target: Decimal) -> list:
-    """Keep item names when the receipt prints tax-exclusive lines plus VAT."""
-    current = sum(_to_decimal(ln["qty"]) * _to_decimal(ln["unit_price"]) for ln in lines)
-    if current <= 0 or target <= 0:
-        return lines
-    ratio = target / current
-    out = []
-    allocated = Decimal("0")
-    last_idx = len(lines) - 1
-    for idx, ln in enumerate(lines):
-        q = _to_decimal(ln["qty"]) or Decimal("1")
-        raw_total = _to_decimal(ln["qty"]) * _to_decimal(ln["unit_price"])
-        new_total = (
-            (target - allocated)
-            if idx == last_idx
-            else (raw_total * ratio).quantize(Decimal("0.01"))
-        )
-        allocated += new_total
-        new_ln = dict(ln)
-        new_ln["unit_price"] = str((new_total / q).quantize(Decimal("0.01")))
-        out.append(new_ln)
-    return out
+def _printed_total_rounding(fields: dict, lines: list) -> Decimal:
+    """让入账含税合计尊重票面 Total:返回 rounding 使 grand = 票面 Total。
+
+    差额来源 = 票面凑整(rounding 行)或费用单不可抵 VAT(进项 expense·VAT 计入成本不单列)。
+    仅当票面 Total 与票面(税前小计 + VAT)自洽(差 ≤ 1 铢凑整)、或与行算合计接近时才采信,挡
+    OCR 乱读的总额。差额一律走 doc 级 rounding,绝不靠 VAT 分摊改写票面行额。
+    """
+    total = _to_decimal(fields.get("total_amount"))
+    if total <= 0:
+        return Decimal("0")
+    grand = _to_decimal(totals_svc.compute_purchase_totals(lines)["grand_total"])
+    subtotal = _to_decimal(fields.get("subtotal"))
+    vat = _to_decimal(fields.get("vat"))
+    receipt_consistent = subtotal > 0 and abs(total - (subtotal + vat)) <= Decimal("1")
+    if receipt_consistent or abs(total - grand) <= Decimal("1"):
+        return total - grand
+    return Decimal("0")
 
 
 def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
@@ -186,16 +190,11 @@ def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
     if not lines:
         # 无明细:用税前小计或总额倒推单行,让用户在屏10 补全。
         lines = [_single_line(fields, base, vat_rate)]
-    elif base > 0:
-        # 行明细(税前)之和与票面小计/总额矛盾 → OCR 明细读错(多品项乱读/qty 误读·如 7-11 读成
-        # 845 ≠ 票面 110)→ 收敛成单行兜底(=票面值),别让错明细之和冒充总额。
-        line_sum = sum(_to_decimal(ln["qty"]) * _to_decimal(ln["unit_price"]) for ln in lines)
-        if abs(line_sum - base) > Decimal("1"):
-            if kind == "expense" and _matches_total_with_included_tax(fields, line_sum, base):
-                lines = _gross_up_expense_lines(lines, base)
-            else:
-                lines = [_single_line(fields, base, vat_rate)]
-    return {
+    elif base > 0 and not _lines_match_receipt(fields, lines, base):
+        # 行明细之和既不合票面税前小计、也不合票面总额 → OCR 明细乱读(多品项串行/qty 误读·如 7-11
+        # 读成 845 ≠ 票面 110)→ 收敛成单行兜底(=票面值),别让错明细之和冒充总额。
+        lines = [_single_line(fields, base, vat_rate)]
+    draft = {
         "doc_kind": kind,
         "supplier": {
             "name": (fields.get("seller_name") or "").strip(),
@@ -209,6 +208,11 @@ def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
         "payment_status": default_payment_status(fields.get("document_type"), kind),
         "lines": lines,
     }
+    # 含税合计尊重票面 Total:差额(凑整 / 费用单不可抵 VAT)落 doc 级 rounding,明细保留票面行额。
+    rounding = _printed_total_rounding(fields, lines)
+    if rounding != 0:
+        draft["rounding"] = str(rounding)
+    return draft
 
 
 def classify_expense_text(text: str, categories: list) -> dict:
@@ -293,7 +297,9 @@ def resolve_image_intake(
     draft = build_draft_from_invoice(fields, kind=kind)
     # 来源透传到单据(line/photo),否则 create_doc 默认 manual 显「手录」
     draft["source"] = source
-    calc = totals_svc.compute_purchase_totals(draft["lines"])
+    calc = totals_svc.compute_purchase_totals(
+        draft["lines"], rounding=_to_decimal(draft.get("rounding", 0))
+    )
 
     dkey = totals_svc.dedupe_key(
         supplier_tax=draft["supplier"]["tax_id"],

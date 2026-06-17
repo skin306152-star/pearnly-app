@@ -9,6 +9,7 @@ import unittest
 from decimal import Decimal
 
 from services.purchase import intake as ik
+from services.purchase import totals as totals_svc
 
 MY = "1234567890123"
 
@@ -75,9 +76,9 @@ class BuildDraftTests(unittest.TestCase):
         self.assertFalse(d["has_vat"])
         self.assertEqual(d["lines"][0]["vat_rate"], 0)
 
-    def test_expense_receipt_uses_final_total_not_pre_vat_subtotal(self):
-        # 普通 receipt/simplified tax invoice 不能抵 VAT,但 VAT 仍是费用成本。
-        # 不能用税前 subtotal 2544 少记这张餐饮票,草稿金额应是最终实付 2722。
+    def test_expense_receipt_keeps_printed_line_and_honors_total(self):
+        # 普通 receipt 不能抵 VAT,但 VAT 仍是费用成本。明细保留票面税前行额(2544·不 gross-up),
+        # 含税合计经 rounding 尊重票面 Total 2722(差额=不可抵 VAT 计入成本)。
         f = {
             "document_type": "receipt",
             "seller_name": "ร้านอาหาร",
@@ -88,8 +89,55 @@ class BuildDraftTests(unittest.TestCase):
         }
         d = ik.build_draft_from_invoice(f, kind="expense")
         self.assertFalse(d["has_vat"])
-        self.assertEqual(d["lines"], [d["lines"][0]])
-        self.assertEqual(d["lines"][0]["unit_price"], "2722.00")
+        self.assertEqual(len(d["lines"]), 1)
+        self.assertEqual(d["lines"][0]["unit_price"], "2544")
+        calc = totals_svc.compute_purchase_totals(d["lines"], rounding=d.get("rounding", 0))
+        self.assertEqual(calc["grand_total"], Decimal("2722.00"))
+
+    def test_dining_buffet_multiline_honors_total_without_grossup(self):
+        # 16:22 真实餐饮票:Subtotal 2544 / VAT 178.08 / Rounding -0.08 / Total 2722。
+        # 明细必须保留票面行额(2397 / 147),绝不被 gross-up 改成 2564.70 / 157.29;
+        # 含税合计必须 = 票面 Total 2722.00,不得漂成 2721.99。
+        f = {
+            "document_type": "receipt",
+            "seller_name": "โคตรทะเล (Kodtalay Seafood Buffet)",
+            "subtotal": "2544",
+            "vat": "178.08",
+            "total_amount": "2722",
+            "items": [
+                {"name": "Buffet Premium", "qty": "3", "price": "799", "subtotal": "2397"},
+                {"name": "เครื่องดื่มรีฟิล", "qty": "1", "price": "147", "subtotal": "147"},
+            ],
+        }
+        d = ik.build_draft_from_invoice(f, kind="expense")
+        prices = [ln["unit_price"] for ln in d["lines"]]
+        self.assertEqual(prices, ["799", "147"])
+        self.assertNotIn("854.90", prices)
+        self.assertNotIn("157.29", prices)
+        calc = totals_svc.compute_purchase_totals(d["lines"], rounding=d.get("rounding", 0))
+        self.assertEqual(calc["grand_total"], Decimal("2722.00"))
+        self.assertNotEqual(calc["grand_total"], Decimal("2721.99"))
+
+    def test_vat_invoice_rounding_honors_printed_total(self):
+        # 进项票(可抵 VAT)同款:行印税前,VAT 7% 逐行算 2722.08,票面 Total 2722 → rounding -0.08。
+        f = {
+            "document_type": "tax_invoice",
+            "seller_name": "ACME",
+            "seller_tax": MY,
+            "subtotal": "2544",
+            "vat": "178.08",
+            "total_amount": "2722",
+            "items": [
+                {"name": "Buffet Premium", "qty": "3", "price": "799", "subtotal": "2397"},
+                {"name": "drink", "qty": "1", "price": "147", "subtotal": "147"},
+            ],
+        }
+        d = ik.build_draft_from_invoice(f, kind="purchase_invoice")
+        self.assertTrue(d["has_vat"])
+        self.assertEqual([ln["unit_price"] for ln in d["lines"]], ["799", "147"])
+        calc = totals_svc.compute_purchase_totals(d["lines"], rounding=d.get("rounding", 0))
+        self.assertEqual(calc["vat_amount"], Decimal("178.08"))
+        self.assertEqual(calc["grand_total"], Decimal("2722.00"))
 
     def test_summary_rows_are_not_items(self):
         f = {

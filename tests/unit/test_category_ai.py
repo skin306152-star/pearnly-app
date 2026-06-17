@@ -101,6 +101,14 @@ class RuleCategoryTests(unittest.TestCase):
     def test_restaurant_vendor_to_food(self):
         self.assertEqual(self._r("Little Betong", "ไก่ทอดเบตง"), ("p_food", "c_food"))
 
+    def test_buffet_item_to_food(self):
+        # 餐饮票:行品名含 Buffet → 确定性归餐饮/招待(不靠 LLM 兜底)。
+        self.assertEqual(self._r("", "Buffet Premium"), ("p_food", "c_food"))
+
+    def test_seafood_buffet_vendor_to_food(self):
+        # 商户名含 Seafood Buffet → 确定性归餐饮(16:22 真实票 Kodtalay Seafood Buffet)。
+        self.assertEqual(self._r("Kodtalay Seafood Buffet RCA", "x"), ("p_food", "c_food"))
+
     def test_unknown_tree_name_falls_through(self):
         self.assertEqual(
             category_ai.rule_category("BANGCHAK", "diesel", [{"name": "X"}]), (None, None)

@@ -131,6 +131,27 @@ def items_section(items: list, t: dict, *, cap: int = 5) -> list:
     return rows
 
 
+def prune_empty_text(node):
+    """递归剔除空/纯空白的 Flex text 节点(及因此清空的 box):LINE 拒收空 text(400)。
+
+    防整类「must be non-empty text」拒收(不只某一字段)。在卡片组装出口统一过一遍,任何漏网的
+    空文本都不会让整张卡被拒。返回清洗后的节点;整节点应删 → None。
+    """
+    if isinstance(node, dict):
+        if node.get("type") == "text" and not str(node.get("text") or "").strip():
+            return None
+        out = {k: prune_empty_text(v) for k, v in node.items()}
+        contents = out.get("contents")
+        if isinstance(contents, list):
+            out["contents"] = [c for c in contents if c is not None]
+            if out.get("type") == "box" and not out["contents"]:
+                return None
+        return out
+    if isinstance(node, list):
+        return [c for c in (prune_empty_text(i) for i in node) if c is not None]
+    return node
+
+
 def sheet(sections: list) -> list:
     """把各非空分区拼成一张连续白卡:区与区之间一条细横线(融入·按类分隔)。"""
     out = []

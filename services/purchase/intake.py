@@ -394,6 +394,7 @@ def fields_from_invoice(inv) -> dict:
             "subtotal": getattr(inv, "subtotal", ""),
             "vat": getattr(inv, "vat", ""),
             "total_amount": getattr(inv, "total_amount", ""),
+            "payment_method": getattr(inv, "payment_method", ""),
             "items": [
                 {
                     "name": getattr(it, "name", ""),

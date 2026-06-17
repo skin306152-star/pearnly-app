@@ -57,5 +57,26 @@ class IntroIntentTests(unittest.TestCase):
             self.assertEqual(lc.intro_intent(t), "")
 
 
+class DateQueryTests(unittest.TestCase):
+    def test_date_questions(self):
+        for t in ("วันนี้วันที่เท่าไหร่", "今天几号", "what's the date today", "今日は何日"):
+            self.assertTrue(lc.is_date_query(t), t)
+
+    def test_not_date(self):
+        for t in ("ค่าน้ำ 50", "买咖啡 60", "สวัสดี"):
+            self.assertFalse(lc.is_date_query(t), t)
+
+
+class PaymentNormalizeTests(unittest.TestCase):
+    def test_ocr_payment_values(self):
+        self.assertEqual(lc.normalize_payment_method("QRPayment(API)"), "promptpay")
+        self.assertEqual(lc.normalize_payment_method("พร้อมเพย์"), "promptpay")
+        self.assertEqual(lc.normalize_payment_method("เงินสด"), "cash")
+        self.assertEqual(lc.normalize_payment_method("card"), "card")
+        self.assertEqual(lc.normalize_payment_method("โอนเงิน"), "transfer")
+        self.assertEqual(lc.normalize_payment_method("xyz"), "")
+        self.assertEqual(lc.normalize_payment_method(""), "")
+
+
 if __name__ == "__main__":
     unittest.main()

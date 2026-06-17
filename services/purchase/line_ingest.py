@@ -62,6 +62,42 @@ def _total_mismatch(fields: dict) -> bool:
     return not _items_reconcile_total(fields)
 
 
+def _display_pretax(fields: dict) -> str:
+    """卡片「税前(ก่อนภาษี)」该显的净额 —— 不能把含税总额当税前。
+
+    票面 subtotal+vat≈total → subtotal 本就是税前,照显;subtotal≈total 且有 VAT(泰国含税小票
+    常把 VATable 印成与总额相同)→ 含税,税前 = total − vat。无 VAT/无 subtotal → 原样。
+    """
+    sub = _dec(fields.get("subtotal"))
+    vat = _dec(fields.get("vat"))
+    total = _dec(fields.get("total_amount"))
+    if sub > 0 and vat > 0 and total > 0:
+        tol = max(Decimal("1"), total * Decimal("0.02"))
+        if abs((sub + vat) - total) <= tol:
+            return f"{sub:,.2f}"
+        if abs(sub - total) <= tol:
+            return f"{(total - vat):,.2f}"
+    return str(fields.get("subtotal") or "")
+
+
+def _items_plausible_subset(fields: dict) -> bool:
+    """OCR 明细是「不全但像真」的子集(≥2 行且加总 ≤ 票面总额)→ 卡片仍照显原行(配「不全」提示),
+    而非塌成卖家单行。挡掉「乱读放大」(7-11 单行 845 ≫ 票面 110)那种 → 加总远超总额则不显。"""
+    items = [
+        it
+        for it in (fields.get("items") or [])
+        if str(it.get("name") or "").strip() and not ik._is_summary_item_name(it.get("name"))
+    ]
+    if len(items) < 2:
+        return False
+    total = _dec(fields.get("total_amount"))
+    items_sum = _items_sum(fields)
+    if total <= 0 or items_sum <= 0:
+        return False
+    tol = max(Decimal("1"), total * Decimal("0.02"))
+    return items_sum <= total + tol
+
+
 def _card_items(fields: dict) -> list:
     """OCR items → 卡片逐条明细 [{name, amount}](按票据全部显示·带价)。
 
@@ -219,7 +255,8 @@ def ingest_line_image(
         "vendor": fields.get("seller_name") or "",
         "seller_tax": fields.get("seller_tax") or "",
         "seller_addr": fields.get("seller_addr") or "",
-        "subtotal": fields.get("subtotal") or "",
+        # 税前净额:含税小票把含税值印成 subtotal 时换算为真税前(total − vat),不把含税当税前。
+        "subtotal": _display_pretax(fields),
         "vat": fields.get("vat") or "",
         "wht": fields.get("wht_amount") or "",
         "rounding": fields.get("rounding") or "",
@@ -242,7 +279,14 @@ def ingest_line_image(
     draft_items = _draft_card_items(draft)
     supplier_name = str(draft["supplier"].get("name") or "").strip()
     draft_is_vendor_fallback = len(draft_items) == 1 and draft_items[0]["name"] == supplier_name
-    if raw_items and draft_is_vendor_fallback and _items_reconcile_total(fields):
+    # 草稿因明细不对账塌成卖家单行时:只要 OCR 原行像真(对账 或 不全但加总≤总额)就照显原票多行明细
+    # (配「明细可能不全」提示),不让用户只看到一行卖家名。账务草稿仍收敛保票面总额,两不冲突。
+    use_raw_items = (
+        bool(raw_items)
+        and draft_is_vendor_fallback
+        and (_items_reconcile_total(fields) or _items_plausible_subset(fields))
+    )
+    if use_raw_items:
         card_fields["items"] = raw_items
     elif draft_items:
         card_fields["items"] = draft_items
@@ -253,7 +297,7 @@ def ingest_line_image(
         if (ln.get("description") or "").strip() not in ("", "—")
         and not ik._is_summary_item_name(ln.get("description"))
     ]
-    if raw_items and draft_is_vendor_fallback and _items_reconcile_total(fields):
+    if use_raw_items:
         descs = [it["name"] for it in raw_items]
     if descs:
         card_fields["detail"] = " · ".join(descs[:3]) + (
@@ -278,6 +322,11 @@ def ingest_line_image(
             fc = dict(fc)
             fc["category"] = float(cat_conf)
 
+    # 付款方式:OCR 票面读到的(QRPayment/เงินสด/บัตร…)归一成规范码 → 卡显「付款方式」。未读到 → 空。
+    from services.expense.line_classify import normalize_payment_method
+
+    _pay_raw = str(fields.get("payment_method") or "").strip()
+    card_fields["payment_method"] = normalize_payment_method(_pay_raw) or _pay_raw
     # 付款态(仅明确未付/部分付才在卡显·默认 paid 不显)+ 舍入(非 0 才显)→ 取自草稿。
     card_fields["rounding"] = card_fields["rounding"] or (draft.get("rounding") or "")
     card_fields["payment_status"] = draft.get("payment_status") or ""

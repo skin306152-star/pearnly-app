@@ -84,6 +84,24 @@ def detect_payment_method(text: str) -> str:
     return _first_match(text, _PAY_PATTERNS)
 
 
+# OCR 票面付款方式归一(只作用于 OCR 抽出的 payment_method 字段·比文本检测更宽:含 qr/card 裸词)。
+# 单独成表,避免把裸 qr/card 塞进 detect_payment_method 误判正常记账文本。
+_PAY_NORMALIZE = (
+    (
+        "promptpay",
+        ("พร้อมเพย์", "promptpay", "prompt pay", "qrpayment", "qr payment", "qr code", "qr"),
+    ),
+    ("transfer", ("โอนเงิน", "โอน", "transfer", "汇款", "转账")),
+    ("card", ("บัตรเครดิต", "บัตร", "credit", "debit", "card", "刷卡", "信用卡")),
+    ("cash", ("เงินสด", "cash", "现金", "付现")),
+)
+
+
+def normalize_payment_method(raw: str) -> str:
+    """OCR 票面付款文本(如 "QRPayment(API)" / "เงินสด" / "card")→ 卡片规范码;认不出 → ''。"""
+    return _first_match(raw, _PAY_NORMALIZE)
+
+
 # 引导类意图关键词(零成本·泰语优先):能力说明 / 如何上传 / 如何开始。
 _INTRO_PATTERNS = (
     (
@@ -151,6 +169,39 @@ _INTRO_PATTERNS = (
         ),
     ),
 )
+
+
+# 问日期(在范围内:日期与记账相关 → 答今天日期再引导,不当离题)。
+_DATE_PATTERNS = (
+    (
+        "date",
+        (
+            "วันนี้วันที่เท่าไหร่",
+            "วันที่เท่าไหร่",
+            "วันนี้วันที่อะไร",
+            "วันนี้วันอะไร",
+            "วันที่เท่าไร",
+            "今天几号",
+            "今天是几号",
+            "今天日期",
+            "现在几号",
+            "今天星期几",
+            "what date",
+            "today's date",
+            "todays date",
+            "what's the date",
+            "date today",
+            "今日は何日",
+            "今日の日付",
+            "何日ですか",
+        ),
+    ),
+)
+
+
+def is_date_query(text: str) -> bool:
+    """问「今天几号/วันนี้วันที่เท่าไหร่」→ True。日期与记账相关,答日期再引导,不当离题。"""
+    return _first_match(text, _DATE_PATTERNS) == "date"
 
 
 def intro_intent(text: str) -> str:

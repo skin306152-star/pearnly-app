@@ -46,5 +46,14 @@ class PickTests(unittest.TestCase):
         self.assertIn(replies.pick("bogus", "x", "zh"), replies._POOLS["support"]["zh"])
 
 
+class DetectSmalltalkTests(unittest.TestCase):
+    def test_date_query_detected(self):
+        self.assertEqual(replies.detect_smalltalk("วันนี้วันที่เท่าไหร่"), "date_query")
+        self.assertEqual(replies.detect_smalltalk("今天几号"), "date_query")
+
+    def test_record_not_smalltalk(self):
+        self.assertIsNone(replies.detect_smalltalk("ค่ากาแฟ 60"))
+
+
 if __name__ == "__main__":
     unittest.main()

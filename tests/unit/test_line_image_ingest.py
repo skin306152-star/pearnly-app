@@ -317,5 +317,92 @@ class TotalMismatchTests(unittest.TestCase):
         self.assertFalse(li._total_mismatch({"items": [{"subtotal": "100"}]}))
 
 
+class DisplayPretaxTests(unittest.TestCase):
+    """卡片税前净额:含税小票不能把含税总额当税前(B3)。"""
+
+    def test_inclusive_receipt_shows_net(self):
+        # subtotal 印成与含税总额相同(70=total) + 有 VAT → 税前 = 70 − 4.58 = 65.42。
+        f = {"subtotal": "70.00", "vat": "4.58", "total_amount": "70.00"}
+        self.assertEqual(li._display_pretax(f), "65.42")
+
+    def test_exclusive_receipt_keeps_subtotal(self):
+        # subtotal + vat ≈ total(130.84 + 9.16 = 140)→ subtotal 本就是税前,照显。
+        f = {"subtotal": "130.84", "vat": "9.16", "total_amount": "140.00"}
+        self.assertEqual(li._display_pretax(f), "130.84")
+
+    def test_no_vat_unchanged(self):
+        f = {"subtotal": "431.00", "vat": "0.00", "total_amount": "431.00"}
+        self.assertEqual(li._display_pretax(f), "431.00")
+
+
+class PlausibleSubsetTests(unittest.TestCase):
+    """OCR 明细不全但像真(≥2 行·加总≤总额)→ 卡片仍照显原行,不塌成卖家单行(B1)。"""
+
+    def test_incomplete_real_items_are_plausible(self):
+        # Little Betong:抽到 95/125/165/6 = 391 ≤ 票面 431(漏了 2 行)→ 仍照显。
+        f = {
+            "total_amount": "431",
+            "items": [
+                {"name": "a", "subtotal": "95"},
+                {"name": "b", "subtotal": "125"},
+                {"name": "c", "subtotal": "165"},
+                {"name": "d", "subtotal": "6"},
+            ],
+        }
+        self.assertTrue(li._items_plausible_subset(f))
+
+    def test_garbage_overshoot_not_plausible(self):
+        # 单行 845 ≫ 票面 110(乱读放大)→ 不照显(塌成卖家行兜底)。
+        f = {
+            "total_amount": "110",
+            "items": [{"name": "x", "subtotal": "845"}, {"name": "y", "subtotal": "10"}],
+        }
+        self.assertFalse(li._items_plausible_subset(f))
+
+    def test_single_item_not_subset(self):
+        f = {"total_amount": "110", "items": [{"name": "x", "subtotal": "100"}]}
+        self.assertFalse(li._items_plausible_subset(f))
+
+
+class IncompleteItemsCardTests(unittest.TestCase):
+    def test_collapsed_draft_still_shows_real_ocr_lines(self):
+        # 草稿因不对账塌成「卖家名单行」,但 OCR 原行像真(漏行非乱读)→ 卡片照显原多行 + 不全提示。
+        draft = {
+            "doc_kind": "expense",
+            "supplier": {"name": "Little Betong", "tax_id": None},
+            "doc_no": None,
+            "lines": [{"description": "Little Betong", "qty": "1", "unit_price": "431"}],
+            "grand_total": "431.00",
+        }
+        res = {"route": "expense", "draft": draft, "dedupe_hit": False, "field_confidence": {}}
+        fields = {
+            "document_type": "receipt",
+            "seller_name": "Little Betong",
+            "total_amount": "431",
+            "vat": "0",
+            "items": [
+                {"name": "ข้าวเนื้อ", "subtotal": "95"},
+                {"name": "ไก่ทอดเบตง", "subtotal": "125"},
+                {"name": "ข้าวเปล่า", "subtotal": "165"},
+                {"name": "น้ำแข็ง", "subtotal": "6"},
+            ],
+        }
+        out, _c, _p = _run(res, band="needs_review", auto_book=False, fields=fields)
+        names = [i["name"] for i in out["card_fields"]["items"]]
+        self.assertEqual(names, ["ข้าวเนื้อ", "ไก่ทอดเบตง", "ข้าวเปล่า", "น้ำแข็ง"])
+        self.assertTrue(out["warn_total"])
+
+    def test_payment_method_from_ocr_into_card(self):
+        # 票面 QRPayment → 归一 promptpay 进卡片付款方式。
+        res = {"route": "purchase", "draft": _draft(), "dedupe_hit": False, "field_confidence": {}}
+        fields = {
+            "document_type": "",
+            "seller_name": "ACME",
+            "payment_method": "QRPayment(API)",
+        }
+        out, _c, _p = _run(res, band="needs_review", auto_book=False, fields=fields)
+        self.assertEqual(out["card_fields"]["payment_method"], "promptpay")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -115,6 +115,7 @@ LINE_I18N = {
             "我还不确定你想处理什么。\n" "你可以发送票据、查看最近记录,或查询费用汇总。"
         ),
         "line_out_of_scope": "我主要负责记账和费用。你可以发送票据,或查询本月费用情况。",
+        "line_date_answer": "今天是 {date}。需要的话把票据发我,或直接打字记一笔费用就行。",
         "line_query_summary_intro": (
             "这是根据已记录数据整理的费用汇总。\n"
             "我会显示总额、记录数和主要分类;如果想看每一笔,可以继续查看明细。"
@@ -233,6 +234,7 @@ LINE_I18N = {
             "You can send a document, ask for recent records, or check an expense summary."
         ),
         "line_out_of_scope": "I focus on bookkeeping and expenses. You can send a document or ask about your spending.",
+        "line_date_answer": "Today is {date}. Send me a receipt, or just type an expense to record it.",
         "line_query_summary_intro": (
             "Here is the expense summary based on recorded entries.\n"
             "I'll show the total, number of records, and main categories. "
@@ -330,7 +332,7 @@ LINE_I18N = {
         "line_processing_receipt": "ได้รับเอกสารแล้วค่ะ กำลังอ่านยอด วันที่ ผู้ขาย VAT และรายการย่อยให้คุณตรวจสอบ",
         "line_ocr_failed_recovery": (
             "ฉันยังอ่านข้อมูลจากเอกสารนี้ได้ไม่ครบค่ะ\n"
-            "กรุณาลองส่งรูปที่เห็นทั้งใบ แสงชัด ไม่เบลอ และไม่บังยอดเงินหรือวันที่\n\n"
+            "กรุณาลองส่งรูปที่เห็นทั้งใบ แสงชัด ไม่เบลอ และไม่มีเงาบังยอดเงินหรือวันที่\n\n"
             "ถ้าต้องการบันทึกไว้ก่อน คุณสามารถพิมพ์วันที่ ร้านค้า ยอดเงิน และรายละเอียดค่าใช้จ่ายได้ค่ะ"
         ),
         "line_not_receipt_recovery": (
@@ -350,6 +352,7 @@ LINE_I18N = {
             "คุณสามารถส่งใบเสร็จให้ฉันอ่าน ขอรายละเอียดรายการล่าสุด หรือถามสรุปค่าใช้จ่ายได้ค่ะ"
         ),
         "line_out_of_scope": "ฉันดูแลเรื่องบันทึกบัญชีและค่าใช้จ่ายเป็นหลักค่ะ ส่งใบเสร็จหรือถามยอดค่าใช้จ่ายได้เลยนะคะ",
+        "line_date_answer": "วันนี้คือ {date} ค่ะ ส่งใบเสร็จหรือพิมพ์รายการค่าใช้จ่ายมาบันทึกต่อได้เลยนะคะ",
         "line_query_summary_intro": (
             "นี่คือสรุปค่าใช้จ่ายตามข้อมูลที่บันทึกไว้ค่ะ\n"
             "แสดงยอดรวม จำนวนรายการ และหมวดหมู่หลัก หากต้องการดูทีละรายการ ให้พิมพ์ขอดูรายละเอียดได้เลยค่ะ"
@@ -465,6 +468,7 @@ LINE_I18N = {
             "書類を送る、最近の記録を見る、経費サマリーを確認する、のいずれかを入力してください。"
         ),
         "line_out_of_scope": "経理と経費を専門にしています。書類を送るか、支出について尋ねてください。",
+        "line_date_answer": "本日は {date} です。レシートを送るか、経費を入力して記録できます。",
         "line_query_summary_intro": (
             "記録済みデータに基づく経費サマリーです。\n"
             "合計、記録数、主な分類を表示します。各明細を見たい場合は、詳細表示を依頼してください。"

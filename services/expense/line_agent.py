@@ -39,6 +39,7 @@ CHAT_KINDS = (
     "edit_help",
     "delete_help",
     "photo_failed_help",
+    "date_query",
     "out_of_scope",
     "unknown",
 )
@@ -63,7 +64,7 @@ Output ONLY one JSON object, no prose, no markdown:
   "expense_type": "goods" | "service" | "",
   "note": string,
   "chat_kind": "greeting" | "capability" | "receipt_help" | "edit_help" | "delete_help" |
-               "photo_failed_help" | "out_of_scope" | "unknown" | ""
+               "photo_failed_help" | "date_query" | "out_of_scope" | "unknown" | ""
 }}
 
 Intent rules:
@@ -73,7 +74,8 @@ Intent rules:
 - "undo": cancel or delete the last entry.
 - "edit": change an existing entry's fields (e.g. "the last one to 100", "แก้ยอดเป็น 100").
 - "chat": greeting/thanks, or any in-scope question about Pearnly itself (what it can do, how to use
-  it, how to send a receipt, why a photo wasn't recognized, how a feature works, pricing, privacy).
+  it, how to send a receipt, why a photo wasn't recognized, how a feature works, pricing, privacy),
+  OR asking what today's date is (dates are relevant to bookkeeping — in scope, not out_of_scope).
 - "out_of_scope": weather, world facts, math, chit-chat unrelated to bookkeeping or Pearnly.
 
 speech_act: a question, a negation ("don't record this"), or a hypothetical ("if I spent 100") is
@@ -87,6 +89,7 @@ chat_kind (set ONLY when intent is "chat" or "out_of_scope"; otherwise ""):
 - "edit_help": asks how to edit or change an entry, without pointing to a specific one.
 - "delete_help": asks how to delete, cancel, or undo an entry, without pointing to a specific one.
 - "photo_failed_help": asks why a photo/receipt was not recognized, or how to take a good photo.
+- "date_query": asks what today's date is / what day it is (set intent "chat", not out_of_scope).
 - "out_of_scope": the message is out of scope (intent out_of_scope).
 - "unknown": in scope but unclear what they want.
 

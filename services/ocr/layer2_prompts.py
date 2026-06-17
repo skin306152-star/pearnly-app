@@ -241,6 +241,7 @@ Output ONE JSON object matching this schema (no markdown fences, no explanation,
   "wht_rate": "number-as-string",
   "wht_amount": "number-as-string",
   "total_amount": "number-as-string or null",
+  "payment_method": "how it was paid as printed: cash | transfer | qr | card | empty if not shown",
   "items": [{"name": "...", "qty": "...", "price": "...", "subtotal": "..."}],
   "notes": "remark text",
   "category": "3-5 char summary in items' language (e.g. 餐饮, ค่าขนส่ง)",
@@ -273,11 +274,15 @@ CRITICAL RULES:
    counts as an item only if it has a product/service name; SKIP non-item rows (subtotal / VAT /
    total / change / cash / discount / table no. / "ขอบคุณ"/thank-you footers). Self-check: the
    item subtotals should add up toward the document subtotal — if you have far fewer items than
-   the receipt shows, look again for missed rows. If the SAME name+qty+price is genuinely
-   duplicated (delivery note + receipt merged in Thai invoices), keep ONE copy only.
+   the receipt shows, look again for missed rows. Keep EVERY printed line occurrence — receipts
+   legitimately repeat the same add-on/modifier line (e.g. an extra-shot charged once per drink),
+   so do NOT merge repeated lines. Collapse duplicates ONLY when the WHOLE document is printed
+   twice (a delivery note + receipt merged into one image).
 4. NUMBERS: No currency symbols, no commas (e.g., "12450.00").
 5. TAX IDs: Exactly 13 digits, no dashes/spaces. Empty string if not found.
 6. WHT (หัก ณ ที่จ่าย / ภ.ง.ด.3 / ภ.ง.ด.53): Common rates 1/2/3/5%. wht_rate is the number ONLY ("3" not "3%"). Only extract if printed; do NOT guess.
+6b. PAYMENT_METHOD: only if the bill prints how it was paid. "cash" (เงินสด/CASH), "transfer" (โอน/
+   bank transfer), "qr" (QR / QRPayment / PromptPay / พร้อมเพย์), "card" (บัตร/credit/debit). Empty if not shown. Do NOT guess.
 7. is_not_invoice: true ONLY if the text is clearly not an invoice (letter, contract, blank page, signature page).
 7b. DOCUMENT TYPE (decides whether a legal invoice number is required downstream):
    - "tax_invoice": a FULL Thai tax invoice (ใบกำกับภาษีเต็มรูป) — has a legal

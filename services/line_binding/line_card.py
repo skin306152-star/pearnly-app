@@ -353,7 +353,8 @@ def _bubble(*, alt: str, header: dict, body: list, footer: list = None) -> dict:
             "paddingEnd": "12px",
             "contents": footer,
         }
-    return {"type": "flex", "altText": alt, "contents": bubble}
+    # 出口统一剔空 text 节点:防任何漏网空文本让整张卡被 LINE 拒收(400 must be non-empty text)。
+    return s.prune_empty_text({"type": "flex", "altText": alt, "contents": bubble})
 
 
 def result_card(

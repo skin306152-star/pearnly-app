@@ -15,6 +15,13 @@ from services.line_binding import line_client, line_reply
 logger = logging.getLogger(__name__)
 
 
+def _today_th() -> str:
+    """今天日期(泰国时区 UTC+7·ISO)· 答「今天几号」用,与卡片日期口径一致。"""
+    from datetime import datetime, timedelta, timezone
+
+    return (datetime.now(timezone.utc) + timedelta(hours=7)).date().isoformat()
+
+
 def _qr_item(label: str, text: str) -> dict:
     return {"type": "action", "action": {"type": "message", "label": label[:20], "text": text}}
 
@@ -51,8 +58,12 @@ def reply_pool(
         _qr_item(line_client.t_line(lang, "qr_record"), start_txt),
         _qr_item(line_client.t_line(lang, "qr_query"), line_client.t_line(lang, "qr_query_text")),
     ]
-    key = _DIRECT_KEY.get(kind)
-    body = line_client.t_line(lang, key) if key else replies.pick(kind, text, lang)
+    if kind == "date_query":
+        # 日期与记账相关:答今天日期(确定性·泰国时区)再引导继续,不当离题。
+        body = line_client.t_line(lang, "line_date_answer", date=_today_th())
+    else:
+        key = _DIRECT_KEY.get(kind)
+        body = line_client.t_line(lang, key) if key else replies.pick(kind, text, lang)
     msg = {"type": "text", "text": body, "quickReply": {"items": items}}
     line_reply.reply_messages_context(
         reply_token, [msg], quote_token=quote_token, line_user_id=line_user_id, tenant_id=tenant_id

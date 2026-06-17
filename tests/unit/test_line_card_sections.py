@@ -78,5 +78,34 @@ class SellerRowsTests(unittest.TestCase):
         self.assertEqual(s.seller_rows({}, T), [])
 
 
+class PruneEmptyTextTests(unittest.TestCase):
+    """空 text 节点剔除:防 LINE 400 must be non-empty text(整类防护)。"""
+
+    def test_drops_empty_text_and_emptied_box(self):
+        card = {
+            "type": "flex",
+            "altText": "a",
+            "contents": {
+                "type": "bubble",
+                "body": {
+                    "type": "box",
+                    "contents": [
+                        {"type": "text", "text": "ok"},
+                        {"type": "text", "text": ""},
+                        {"type": "box", "contents": [{"type": "text", "text": "   "}]},
+                    ],
+                },
+            },
+        }
+        out = s.prune_empty_text(card)
+        body = out["contents"]["body"]["contents"]
+        self.assertEqual(len(body), 1)
+        self.assertEqual(body[0]["text"], "ok")
+
+    def test_keeps_non_empty(self):
+        node = {"type": "box", "contents": [{"type": "text", "text": "x"}]}
+        self.assertEqual(s.prune_empty_text(node), node)
+
+
 if __name__ == "__main__":
     unittest.main()

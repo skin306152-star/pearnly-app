@@ -88,6 +88,8 @@ def detect_smalltalk(text: str) -> Optional[str]:
         return "thanks"
     if any(w in low for w in _GREETING_WORDS):
         return "greeting"
+    if line_classify.is_date_query(low):
+        return "date_query"
     return line_classify.intro_intent(low) or None
 
 

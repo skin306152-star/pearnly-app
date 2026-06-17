@@ -134,6 +134,9 @@ class ThaiInvoice(BaseModel):
     wht_rate: str = Field(default="", description='number only, e.g. "3" not "3%"')
     wht_amount: str = Field(default="", description="number-as-string, no commas")
     total_amount: Optional[str] = Field(default=None)
+    payment_method: str = Field(
+        default="", description="how paid as printed: cash|transfer|qr|card, empty if not shown"
+    )
 
     items: List[LineItem] = Field(default_factory=list)
 

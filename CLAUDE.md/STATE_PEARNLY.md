@@ -6,17 +6,17 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-17 · **P1A 文案 + 16:22 金额归一化 + 取消死路修 + P1C 统一回复 全上线** · HEAD `1cc940f8`）
+## 🎯 状态卡（2026-06-17 · **LINE 采购卡片/OCR 真机收口 + OCR 弥补专项 全上线** · HEAD `944ea38d`）
 
-- **本窗口完成并上线**（5 commit · prod `1cc940f` 重启 11:05 UTC · `/api/version` 200 · 13 闸全绿）：
-  - `0d3a0f3` **P1A LINE 采购文案产品化**:卡片短徽章下加整句状态说明(confirm/posted/dup),撤销/丢弃回执完整文案,改错引导按场景分(目标不明→回复/引用不存在→查明细/多行→详情页/抽不出字段→教回复语法)。统一进 `line_card_i18n`/`line_i18n` 扁平键 4 语齐,删被取代旧键(无两套同义)。
-  - `8703512` **16:22 餐饮票金额归一化**(诊断确认非缓存·prod 09:22 UTC 全新识别):删 `_gross_up_expense_lines`;明细合票面税前小计即判可信、**保留票面行额**,含税合计经 doc 级 rounding **尊重票面 Total 2722**(费用单不可抵 VAT 计入成本·不单列进项税避免误 claim);分类加 buffet/seafood 规则。
-  - `d15bd24` **取消死路修**:对草稿回「取消/ยกเลิก」→ 丢弃(对齐「ทิ้ง」按钮)而非走 void 落「没有可撤销的」死路;已入账→照旧 void。
-  - `919e8a7` **P1C 统一回复体验**:新 `services/line_binding/line_reply.py`(reply_text/messages_context·push_*_context·begin_loading)集中 loading+quoteToken 注入+截断+失败日志+bot 记忆;webhook 入口对 text/postback/其它统一 loading(图片留自有);绑定/查账/问答/闲聊/改错/取消/失败/图片通知全走统一出口默认带引用;`_reply_pool` 迁 `line_expense_qa.reply_pool`(line_expense 回 493<500)。
-  - `1cc940f` **修 master 既存 authz 闸红**:`/api/logout`+`/api/auth/logout`(别窗口 SECURITY 引入·无守门)入 PUBLIC_ROUTES(登出本就公开)→ 解锁全员 push。
-- **验证**：全量 **3862 unit 绿**(skip 3);ruff/black/file_size/imports/tracked_imports/i18n--strict/new_debt/authz/ratchet 全绿。16:22 票样 + 餐饮分类 + reply_undo 草稿丢弃 + line_reply quote 注入/无 token fallback/传递 均有单测。
-- **在等 Zihao 真机验**(本窗无真 LINE channel)：① 发问候/费用文字/图片 → 回复前转圈 + 回执引用该消息;② reply 某记录删除/改错 → 确认引用该操作消息,确认/否定引用对应消息;③ 重发 16:22 餐饮票 → 含税合计 2722.00、明细保留 799×3/147(不再 2564.70/157.29)。
-- **剩余/待跟进**：① prod 旧错单 `bdb1405e`(2721.99)是历史草稿不回写·按「ทิ้ง」删后重发即对 ② `guide_open_detail` 本轮仅文案未接 LIFF 深链 ③ 登录页「会话已过期」仍中文(登录层默认语言·另排) ④ doc 19 P3 诚实回复契约未做 ⑤ 统一回复出口可继续把 line_booker 发卡/多笔路也收编(本轮未动·已有 quote)。
+- **本窗口完成并上线**（10 commit · prod `944ea38` health 200 · 13 闸全绿 · 真票四层 trace 驱动 [[line-card-ocr-fixes-and-ghost-dup]]）：
+  - **卡片真问题修**（`9f127d4`→`d4eef83`）：B1 明细诚实化(OCR 真行加总≤总额→照显多行+不全提示;乱读放大/0行→不显假卖家单行·出 items_unread「未能逐项识别·去详情页」)·B3 税前=total−VAT·**B4 付款方式**(ThaiInvoice 加 payment_method+L2 prompt 抽+normalize_payment_method 归一·QRPayment→promptpay)·空 text 递归兜底(整类防 LINE 400)。
+  - **A1/A2 文案**：「问日期」归范围内(答今天日期+引导·语言随输入 detect_text_lang)·糊图文案「ไม่มีเงาบัง」。**引用记录说「识别错了」→ 澄清改哪里**(前置拦截·非 photo_failed·`line_correct.maybe_clarify_feedback`)。
+  - **★回归修**(`fad884f`)：payment_method 漏进 `_str_coerce` → LLM 返 null 致整页 OCR 挂「ไม่ครบ」→ 修(None→'')。**4 位佛历年确定性减 543**(2569→2026·治 LLM 误算 2023)。**7% 确定性税额**(`_vat_breakdown`·OCR 把 9.16 读成 10 → 重算 130.84/9.16)。
+  - **明细与总额不符 → 卡片诚实降级**(`d48d0f8`)：主按钮「ยืนยันบันทึก」→「เปิดเพื่อตรวจสอบ」、入账降次按钮「บันทึกต่อ」(仍可存)·对账正常不变。**0 元 modifier/赠品作卡片备注**(不占主明细·`note_free_items`)。
+  - **OCR 弥补专项**(`4bd113c`)：P1 L1/L2 瞬态 504 重试 1 次(治误「识别失败」·`OCR_TRANSIENT_RETRY`)。P2 上采样 **A/B 实测否决**(无改善甚至更差·不上)。`/simplify` 收口(`944ea38`·复用 bangkok_today+抽 _item_amount+去双算死码·line_ingest 380→342)。
+  - **ghost duplicate**：清理测试租户 9 条卡片失败留库的 dedupe 草稿(成因=旧空 text 400·已修)。
+- **验证**：全量 **3939 unit 绿**(skip 3)·13 闸全绿·prod 真 pipeline 四层 trace 逐张确认(#20 65.42/4.58、#21 130.84/9.16、日期 2026、付款 promptpay)。真机 Zihao 多轮验收(本窗无真 channel)。
+- **剩余(OCR 模型/延迟极限·非代码可无损纠)**：LINE 压缩图偶发数字误读(已被佛历/7% 兜结构化字段)·复杂长票(Little Betong)偶发 L2 504(P1 治单次)·堆叠加料行逐行价错位。要再上台阶=换/加 OCR 引擎或要求原图(产品决策·需拍板)。
 
 ## 历史记录（旧状态卡 · 2026-06-17 · OCR 纠错 + LINE 费用卡片产品化 · HEAD `33142a1`）
 

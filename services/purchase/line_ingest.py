@@ -19,6 +19,34 @@ def _dec(v) -> Decimal:
         return Decimal("0")
 
 
+def _same_money(a: Decimal, b: Decimal, *, total: Decimal = Decimal("0")) -> bool:
+    tol = max(Decimal("1"), total * Decimal("0.02"))
+    return abs(a - b) <= tol
+
+
+def _items_sum(fields: dict) -> Decimal:
+    items_sum = Decimal("0")
+    for it in fields.get("items") or []:
+        name = str(it.get("name") or "").strip()
+        if name and ik._is_summary_item_name(name):
+            continue
+        sub = _dec(it.get("subtotal"))
+        items_sum += sub if sub > 0 else (_dec(it.get("qty") or 1) * _dec(it.get("price")))
+    return items_sum
+
+
+def _items_reconcile_total(fields: dict) -> bool:
+    total = _dec(fields.get("total_amount"))
+    if total <= 0:
+        return False
+    items_sum = _items_sum(fields)
+    if items_sum <= 0:
+        return False
+    if _same_money(items_sum, total, total=total):
+        return True
+    return _same_money(items_sum + _dec(fields.get("vat")), total, total=total)
+
+
 def _total_mismatch(fields: dict) -> bool:
     """抽到的逐条明细加总 + VAT 与票面总额对不上(超 1 baht 且 2%)→ 提示明细可能不全/有误。
 
@@ -28,15 +56,10 @@ def _total_mismatch(fields: dict) -> bool:
     total = _dec(fields.get("total_amount"))
     if not items or total <= 0:
         return False
-    items_sum = Decimal("0")
-    for it in items:
-        sub = _dec(it.get("subtotal"))
-        items_sum += sub if sub > 0 else (_dec(it.get("qty") or 1) * _dec(it.get("price")))
+    items_sum = _items_sum(fields)
     if items_sum <= 0:
         return False
-    recon = items_sum + _dec(fields.get("vat"))
-    tol = max(Decimal("1"), total * Decimal("0.02"))
-    return abs(recon - total) > tol
+    return not _items_reconcile_total(fields)
 
 
 def _card_items(fields: dict) -> list:
@@ -47,7 +70,7 @@ def _card_items(fields: dict) -> list:
     out = []
     for it in fields.get("items") or []:
         name = str(it.get("name") or "").strip()
-        if not name:
+        if ik._is_summary_item_name(name):
             continue
         amt = _dec(it.get("subtotal"))
         if amt <= 0:
@@ -65,7 +88,7 @@ def _draft_card_items(draft: dict) -> list:
     out = []
     for ln in draft.get("lines") or []:
         name = str(ln.get("description") or "").strip()
-        if not name:
+        if ik._is_summary_item_name(name):
             continue
         amt = _dec(ln.get("line_total"))
         if amt <= 0:
@@ -173,15 +196,23 @@ def ingest_line_image(
     warn_total = _total_mismatch(fields)
     draft = res["draft"]
     amount = draft.get("grand_total") or "0"
+    raw_items = _card_items(fields)
     draft_items = _draft_card_items(draft)
-    if draft_items:
+    supplier_name = str(draft["supplier"].get("name") or "").strip()
+    draft_is_vendor_fallback = len(draft_items) == 1 and draft_items[0]["name"] == supplier_name
+    if raw_items and draft_is_vendor_fallback and _items_reconcile_total(fields):
+        card_fields["items"] = raw_items
+    elif draft_items:
         card_fields["items"] = draft_items
     # 逐条明细填进卡(对标竞品「รายการค่าใช้จ่าย」):取真实商品行(跳过卖家兜底单行),顶 3 条 + 「等N项」。
     descs = [
         (ln.get("description") or "").strip()
         for ln in (draft.get("lines") or [])
         if (ln.get("description") or "").strip() not in ("", "—")
+        and not ik._is_summary_item_name(ln.get("description"))
     ]
+    if raw_items and draft_is_vendor_fallback and _items_reconcile_total(fields):
+        descs = [it["name"] for it in raw_items]
     if descs:
         card_fields["detail"] = " · ".join(descs[:3]) + (
             f" 等{len(descs)}项" if len(descs) > 3 else ""

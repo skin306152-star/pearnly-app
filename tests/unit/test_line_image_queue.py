@@ -13,10 +13,15 @@ from services.ocr import line_image_ocr as mod
 class MultiImageQueueTests(unittest.TestCase):
     def setUp(self):
         self._orig = mod._handle_line_image_ocr
+        self._orig_client = mod.line_client
+        self._orig_interval = mod._LOADING_REFRESH_INTERVAL
+        mod.line_client = None
         mod._user_img_locks.clear()
 
     def tearDown(self):
         mod._handle_line_image_ocr = self._orig
+        mod.line_client = self._orig_client
+        mod._LOADING_REFRESH_INTERVAL = self._orig_interval
         mod._user_img_locks.clear()
 
     def test_same_user_serial_fifo_no_overlap(self):
@@ -85,6 +90,32 @@ class MultiImageQueueTests(unittest.TestCase):
 
         asyncio.run(run())
         self.assertEqual(peak["max"], 3, "不同用户应能并发(锁须 per-user 而非全局)")
+
+    def test_loading_refreshes_until_result(self):
+        calls = []
+
+        class FakeLineClient:
+            def start_loading(self, user_id, seconds):
+                calls.append((user_id, seconds))
+                return True
+
+        async def fake_handle(
+            *, bound_user, line_user_id, message_id, lang, filename=None, quote_token=None
+        ):
+            await asyncio.sleep(0.025)
+
+        mod.line_client = FakeLineClient()
+        mod._LOADING_REFRESH_INTERVAL = 0.01
+        mod._handle_line_image_ocr = fake_handle
+
+        asyncio.run(
+            mod.process_line_image_serial(
+                bound_user={}, line_user_id="U1", message_id="m", lang="th"
+            )
+        )
+
+        self.assertGreaterEqual(len(calls), 2)
+        self.assertTrue(all(c == ("U1", 60) for c in calls))
 
 
 if __name__ == "__main__":

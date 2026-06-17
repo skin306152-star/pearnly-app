@@ -167,6 +167,46 @@ class IngestTests(unittest.TestCase):
         )
         self.assertTrue(out["warn_total"])
 
+    def test_pos_receipt_card_keeps_raw_items_when_they_match_total(self):
+        # POS 小票价格通常已含 VAT:商品行 60+10=总额 70,不要因为 VAT 表存在而压成供应商一行。
+        draft = {
+            "doc_kind": "expense",
+            "supplier": {"name": "Cafe Amazon", "tax_id": None},
+            "doc_no": "R#1",
+            "lines": [{"description": "Cafe Amazon", "qty": "1", "unit_price": "70"}],
+            "grand_total": "70.00",
+        }
+        res = {"route": "expense", "draft": draft, "dedupe_hit": False, "field_confidence": {}}
+        fields = {
+            "document_type": "receipt",
+            "seller_name": "Cafe Amazon",
+            "total_amount": "70",
+            "vat": "4.58",
+            "items": [
+                {"name": "TW แบล็คคอฟฟี่ เย็น", "subtotal": "60"},
+                {"name": "TW เพิ่มช็อตกาแฟ", "subtotal": "10"},
+            ],
+        }
+        out, _cdoc, _pdoc = _run(res, band="high", auto_book=False, fields=fields)
+        self.assertEqual(
+            out["card_fields"]["items"],
+            [
+                {"name": "TW แบล็คคอฟฟี่ เย็น", "amount": "60.00"},
+                {"name": "TW เพิ่มช็อตกาแฟ", "amount": "10.00"},
+            ],
+        )
+        self.assertFalse(out["warn_total"])
+
+    def test_summary_items_are_filtered_from_card(self):
+        f = {
+            "items": [
+                {"name": "ไก่ทอดเบตง", "subtotal": "165"},
+                {"name": "จำนวน 8", "subtotal": "131"},
+            ],
+            "total_amount": "165",
+        }
+        self.assertEqual(li._card_items(f), [{"name": "ไก่ทอดเบตง", "amount": "165.00"}])
+
 
 class TotalMismatchTests(unittest.TestCase):
     """总额不符提示:明细加总+VAT 与票面总额对不上才提示;对得上/无明细不误报。"""
@@ -176,6 +216,14 @@ class TotalMismatchTests(unittest.TestCase):
             "items": [{"qty": "1", "price": "1000"}],
             "vat": "70",
             "total_amount": "1070",
+        }
+        self.assertFalse(li._total_mismatch(f))
+
+    def test_pos_inclusive_vat_no_warn(self):
+        f = {
+            "items": [{"subtotal": "60"}, {"subtotal": "10"}],
+            "vat": "4.58",
+            "total_amount": "70",
         }
         self.assertFalse(li._total_mismatch(f))
 

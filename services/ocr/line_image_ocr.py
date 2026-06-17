@@ -9,6 +9,7 @@ line_webhook_routes._handle_line_event 里 lazy import 调到;依赖的 _ocr_* h
 import asyncio
 import os
 import logging
+import threading
 
 from core import db
 from core import workspace_context as wc
@@ -30,11 +31,10 @@ except ImportError:
     line_client = None  # line_client.py 不在仓库 · 单独部署到服务器
 
 logger = logging.getLogger("mr-pilot")
+_LOADING_SECONDS = 60
+_LOADING_REFRESH_INTERVAL = 50
 
-# 多图排队(#4):一次发多张图 = 多个 webhook event,各自 create_task 会并发 → 卡片乱序/交错。
-# 每个 LINE 用户一把 FIFO 锁,图按到达顺序一张张处理、一张卡发完再下一张。asyncio.Lock 的
-# 等待者按入队顺序唤醒 → 顺序即到达顺序。注:锁是进程内(per event-loop)· 同一 webhook POST
-# 的多 event 在同进程内必然串行;LINE 通常把"一起发的多张图"放进同一 POST 的 events[] → 覆盖主场景。
+# 多图排队:同一用户 FIFO 串行,避免多张图卡片乱序。
 _user_img_locks: dict[str, asyncio.Lock] = {}
 
 
@@ -44,6 +44,18 @@ def _user_img_lock(line_user_id: str) -> asyncio.Lock:
         lock = asyncio.Lock()
         _user_img_locks[line_user_id] = lock
     return lock
+
+
+def _keep_loading(line_user_id: str, stop: threading.Event) -> None:
+    """Keep LINE's loading indicator alive until the OCR task sends a result."""
+    if not line_client:
+        return
+    while not stop.is_set():
+        try:
+            line_client.start_loading(line_user_id, _LOADING_SECONDS)
+        except Exception as e:
+            logger.warning(f"[line_ocr] start_loading 失败(不阻断): {e}")
+        stop.wait(_LOADING_REFRESH_INTERVAL)
 
 
 async def process_line_image_serial(
@@ -57,20 +69,26 @@ async def process_line_image_serial(
     """多图排队入口:抢 per-user 锁 → 轮到这张才转圈 → 处理 → 发卡。下一张等本张发完卡再开始。"""
     lock = _user_img_lock(line_user_id)
     async with lock:
-        try:
-            # 轮到本张才转圈(队列里的图等到自己,避免一上来 N 个 loading 又各自超时)。
-            if line_client:
-                line_client.start_loading(line_user_id, 30)
-        except Exception as _e:
-            logger.warning(f"[line_ocr] start_loading 失败(不阻断): {_e}")
-        await _handle_line_image_ocr(
-            bound_user=bound_user,
-            line_user_id=line_user_id,
-            message_id=message_id,
-            lang=lang,
-            filename=filename,
-            quote_token=quote_token,
+        stop_loading = threading.Event()
+        loading_thread = threading.Thread(
+            target=_keep_loading,
+            args=(line_user_id, stop_loading),
+            name=f"line-loading-{line_user_id[-6:]}",
+            daemon=True,
         )
+        loading_thread.start()
+        try:
+            await _handle_line_image_ocr(
+                bound_user=bound_user,
+                line_user_id=line_user_id,
+                message_id=message_id,
+                lang=lang,
+                filename=filename,
+                quote_token=quote_token,
+            )
+        finally:
+            stop_loading.set()
+            loading_thread.join(timeout=1)
 
 
 async def _handle_line_image_ocr(
@@ -230,7 +248,7 @@ async def _handle_line_image_ocr(
             line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
             return
         if _ocr_all_pages_not_invoice(pages):
-            line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
+            line_client.push_text(line_user_id, line_client.t_ocr(lang, "not_receipt"))
             return
 
         # 统一智能通道(docs/smart-intake/15):图片 → 置信驱动入账(建草稿/高置信直接入账)+ 数据卡。
@@ -249,8 +267,7 @@ async def _handle_line_image_ocr(
             if _pages_struct and _ws_client_id and tid_str:
                 with db.get_cursor_rls(tid_str, commit=True) as cur:
                     if line_expense_gate_open(cur, tenant_id=tid_str):
-                        # 票图闭环:LINE 图持久化到 pdf_storage(同网页上传留底)→ image_ref 挂进单据,
-                        # 详情页才看得到原票。此前没传 image_ref → LINE 进来的单据票图恒空。
+                        # 票图闭环:LINE 图持久化到 pdf_storage → image_ref 挂进单据。
                         from services.ocr import pdf_storage as _pstore
 
                         _suffix = os.path.splitext(filename or "")[1] or ".jpg"

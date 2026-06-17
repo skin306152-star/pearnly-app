@@ -19,6 +19,14 @@ from services.purchase.ocr_corrections import normalize_fields
 from services.purchase.expense_keywords import EXPENSE_KEYWORDS as _EXPENSE_KEYWORDS
 
 _NUM_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
+_GENERIC_BUYER_RE = re.compile(
+    r"^(?:customer|no\.?\s*customer|cash|walk[-\s]?in|guest|ลูกค้า|เงินสด|สด|take\s*away)[:\s\d-]*$",
+    re.IGNORECASE,
+)
+_SUMMARY_ITEM_RE = re.compile(
+    r"(?:^|\s)(?:จำนวน|จํานวน|รวม|ยอดรวม|subtotal|sub\s*total|total|vat|net|payment|change|cash)(?:\s|$)",
+    re.IGNORECASE,
+)
 
 
 def _to_decimal(v) -> Decimal:
@@ -41,7 +49,11 @@ def judge_direction(fields: dict) -> tuple[str, str]:
     dtype = (fields.get("document_type") or "").lower()
     if dtype in ("payment_evidence", "order_evidence"):
         return "expense", "expense"
-    if dtype == "tax_invoice" and _to_decimal(fields.get("vat")) > 0:
+    if (
+        dtype == "tax_invoice"
+        and _to_decimal(fields.get("vat")) > 0
+        and _has_buyer_identity(fields)
+    ):
         return "purchase_invoice", "purchase"
     return "expense", "expense"
 
@@ -71,6 +83,27 @@ def _single_line(fields: dict, base: Decimal, vat_rate: int) -> dict:
     }
 
 
+def _has_buyer_identity(fields: dict) -> bool:
+    buyer_tax = (fields.get("buyer_tax") or "").strip()
+    if re.fullmatch(r"\d{13}", buyer_tax):
+        return True
+    buyer_name = (fields.get("buyer_name") or "").strip()
+    if not buyer_name or _GENERIC_BUYER_RE.match(buyer_name):
+        return False
+    return len(buyer_name) >= 3
+
+
+def _is_summary_item_name(name: str) -> bool:
+    n = (name or "").strip()
+    if not n:
+        return True
+    return bool(_SUMMARY_ITEM_RE.search(n))
+
+
+def _effective_items(fields: dict) -> list:
+    return [it for it in (fields.get("items") or []) if not _is_summary_item_name(it.get("name"))]
+
+
 def normalize_ocr_fields(fields: dict | None) -> dict:
     """Normalize deterministic OCR mistakes before routing/building drafts."""
     return normalize_fields(fields)
@@ -87,6 +120,40 @@ def _draft_base(fields: dict, *, kind: str, has_vat: bool) -> Decimal:
     return subtotal or total
 
 
+def _matches_total_with_included_tax(fields: dict, line_sum: Decimal, base: Decimal) -> bool:
+    vat = _to_decimal(fields.get("vat"))
+    total = _to_decimal(fields.get("total_amount"))
+    if line_sum <= 0 or base <= 0:
+        return False
+    if abs(line_sum - base) <= Decimal("1"):
+        return True
+    return vat > 0 and total > 0 and abs((line_sum + vat) - total) <= Decimal("1")
+
+
+def _gross_up_expense_lines(lines: list, target: Decimal) -> list:
+    """Keep item names when the receipt prints tax-exclusive lines plus VAT."""
+    current = sum(_to_decimal(ln["qty"]) * _to_decimal(ln["unit_price"]) for ln in lines)
+    if current <= 0 or target <= 0:
+        return lines
+    ratio = target / current
+    out = []
+    allocated = Decimal("0")
+    last_idx = len(lines) - 1
+    for idx, ln in enumerate(lines):
+        q = _to_decimal(ln["qty"]) or Decimal("1")
+        raw_total = _to_decimal(ln["qty"]) * _to_decimal(ln["unit_price"])
+        new_total = (
+            (target - allocated)
+            if idx == last_idx
+            else (raw_total * ratio).quantize(Decimal("0.01"))
+        )
+        allocated += new_total
+        new_ln = dict(ln)
+        new_ln["unit_price"] = str((new_total / q).quantize(Decimal("0.01")))
+        out.append(new_ln)
+    return out
+
+
 def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
     """OCR 抽取 → 进项录入草稿(屏10 预填)。行取自 items,无 items 则按总额单行兜底。
 
@@ -96,7 +163,7 @@ def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
     has_vat = kind != "expense" and _to_decimal(fields.get("vat")) > 0
     vat_rate = 7 if has_vat else 0
     lines = []
-    for it in fields.get("items") or []:
+    for it in _effective_items(fields):
         qty = _to_decimal(it.get("qty")) or Decimal("1")
         price = _to_decimal(it.get("price"))
         sub = _to_decimal(it.get("subtotal"))
@@ -124,7 +191,10 @@ def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
         # 845 ≠ 票面 110)→ 收敛成单行兜底(=票面值),别让错明细之和冒充总额。
         line_sum = sum(_to_decimal(ln["qty"]) * _to_decimal(ln["unit_price"]) for ln in lines)
         if abs(line_sum - base) > Decimal("1"):
-            lines = [_single_line(fields, base, vat_rate)]
+            if kind == "expense" and _matches_total_with_included_tax(fields, line_sum, base):
+                lines = _gross_up_expense_lines(lines, base)
+            else:
+                lines = [_single_line(fields, base, vat_rate)]
     return {
         "doc_kind": kind,
         "supplier": {

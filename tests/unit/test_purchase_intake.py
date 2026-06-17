@@ -15,8 +15,13 @@ MY = "1234567890123"
 
 class JudgeDirectionTests(unittest.TestCase):
     def test_has_vat_to_purchase(self):
-        f = {"document_type": "tax_invoice", "vat": "70"}
+        f = {"document_type": "tax_invoice", "vat": "70", "buyer_tax": MY}
         self.assertEqual(ik.judge_direction(f), ("purchase_invoice", "purchase"))
+
+    def test_tax_invoice_without_buyer_identity_stays_expense(self):
+        # POS 小票可能被 OCR 标成 tax_invoice;无买方身份不能自动抵进项 VAT。
+        f = {"document_type": "tax_invoice", "vat": "4.58", "buyer_name": "No.Customer:1"}
+        self.assertEqual(ik.judge_direction(f), ("expense", "expense"))
 
     def test_no_vat_to_expense(self):
         f = {"document_type": "receipt", "vat": "0"}
@@ -84,7 +89,19 @@ class BuildDraftTests(unittest.TestCase):
         d = ik.build_draft_from_invoice(f, kind="expense")
         self.assertFalse(d["has_vat"])
         self.assertEqual(d["lines"], [d["lines"][0]])
-        self.assertEqual(d["lines"][0]["unit_price"], "2722")
+        self.assertEqual(d["lines"][0]["unit_price"], "2722.00")
+
+    def test_summary_rows_are_not_items(self):
+        f = {
+            "total_amount": "165",
+            "items": [
+                {"name": "ไก่ทอดเบตง", "qty": "1", "price": "165", "subtotal": "165"},
+                {"name": "จำนวน 8", "qty": "1", "price": "131", "subtotal": "131"},
+            ],
+        }
+        d = ik.build_draft_from_invoice(f, kind="expense")
+        self.assertEqual(len(d["lines"]), 1)
+        self.assertEqual(d["lines"][0]["description"], "ไก่ทอดเบตง")
 
     def test_no_items_fallback_single_line(self):
         f = {
@@ -235,7 +252,13 @@ class ResolveImageIntakeTests(unittest.TestCase):
 
     def test_zero_amount_still_builds_draft(self):
         # 糊图/金额 ฿0 也建草稿落列表(用户补全),不再兜 inbox。
-        f = {"document_type": "tax_invoice", "vat": "7", "subtotal": "0", "items": []}
+        f = {
+            "document_type": "tax_invoice",
+            "buyer_tax": MY,
+            "vat": "7",
+            "subtotal": "0",
+            "items": [],
+        }
         data = self._resolve(f, "high")
         self.assertEqual(data["route"], "purchase")
         self.assertIsNotNone(data["draft"])
@@ -244,6 +267,7 @@ class ResolveImageIntakeTests(unittest.TestCase):
         # 低置信:建草稿(route 非 booked),不自动过账。
         f = {
             "document_type": "tax_invoice",
+            "buyer_tax": MY,
             "vat": "7",
             "subtotal": "1000",
             "items": [{"name": "x", "qty": "1", "price": "1000"}],
@@ -256,6 +280,7 @@ class ResolveImageIntakeTests(unittest.TestCase):
         # 来源(line/photo)必须落到草稿,否则 create_doc 默认 manual → 列表显「手录」(PO-6)。
         f = {
             "document_type": "tax_invoice",
+            "buyer_tax": MY,
             "vat": "7",
             "subtotal": "1000",
             "items": [{"name": "x", "qty": "1", "price": "1000"}],

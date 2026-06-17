@@ -147,8 +147,8 @@ def handle_expense_text(
         elif isq:
             line_expense_qa.reply_question(reply_token, lang, str(tid), text)
         elif is_edit:
-            # 改错但无 LLM 抽不出改什么字段 → 诚实引导去网页改(别瞎猜)。
-            line_client.reply_text(reply_token, line_client.t_line(lang, "exp_edit_web"))
+            # 改错但无 LLM 抽不出改什么字段 → 教 LINE 内回复语法,不瞎猜也不甩去网页。
+            line_client.reply_text(reply_token, line_client.t_line(lang, "guide_reply_to_record"))
         else:
             _reply_pool(reply_token, "scope", text, lang)
         return True

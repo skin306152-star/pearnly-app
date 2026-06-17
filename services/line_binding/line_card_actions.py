@@ -73,11 +73,13 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
 
             elif action == line_postback.ACTION_UNDO:
                 res = posting_svc.void_doc(cur, **scope, doc_id=ref, created_by=uid)
-                _reply(reply_token, lang, "card_undone", res.get("doc"))
+                _reply(reply_token, lang, "card_state_void_desc", res.get("doc"))
 
             elif action == line_postback.ACTION_DISCARD:
                 docs_svc.delete_doc(cur, **scope, doc_id=ref)  # 仅草稿可删(内部 status='draft' 守)
-                line_client.reply_text(reply_token, line_client.t_line(lang, "card_discarded"))
+                line_client.reply_text(
+                    reply_token, line_client.t_line(lang, "card_state_discarded_desc")
+                )
     except Exception:
         # 状态错(已入账再确认 / 草稿撤销 / 项已处理)或并发 → 友好回执,不报错。
         logger.warning("[line card] postback action failed", exc_info=True)

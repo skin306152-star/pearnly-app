@@ -52,13 +52,13 @@ class CardActionTests(unittest.TestCase):
     def test_undo_voids(self):
         sent, svc = _run(line_postback.undo_data("D1"))
         svc.void_doc.assert_called_once()
-        self.assertTrue(sent[0].startswith("card_undone:"))
+        self.assertTrue(sent[0].startswith("card_state_void_desc:"))
 
     def test_discard_deletes_draft(self):
         sent, svc = _run(line_postback.discard_data("D1"))
         svc.delete_doc.assert_called_once()
         svc.post_doc.assert_not_called()
-        self.assertTrue(sent[0].startswith("card_discarded"))
+        self.assertTrue(sent[0].startswith("card_state_discarded_desc"))
 
     def test_bad_data_stale_reply(self):
         sent, svc = _run("garbage")

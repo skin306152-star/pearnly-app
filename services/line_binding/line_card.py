@@ -25,6 +25,7 @@ _BRAND = "#2563EB"
 _AMOUNT = "#111827"
 _AMOUNT_MISS = "#98A2B3"
 _LABEL = "#98A2B3"
+_DESC = "#475467"
 _VALUE = "#344054"
 _LOW = "#B45309"
 _META_STRONG = "#475467"
@@ -297,6 +298,10 @@ def result_card(
     state_meta = _state_meta(state, t)
 
     # 状态条 = bubble header:满宽贴边、跟随卡片顶部圆角(对标 Paypers·非浮动胶囊)。
+    # 短徽章(彩色加粗·一眼可读)上,描述行(整句·中性深灰)下,状态既扫得到也读得懂。
+    desc_key = {"posted": "card_state_posted_desc", "dup": "card_state_dup_desc"}.get(
+        state, "card_state_confirm_desc"
+    )
     status_header = {
         "type": "box",
         "layout": "vertical",
@@ -310,7 +315,8 @@ def result_card(
                 color=st["color"],
                 weight="bold",
                 wrap=True,
-            )
+            ),
+            _txt(t[desc_key], size="xxs", color=_DESC, margin="xs", wrap=True),
         ],
     }
 

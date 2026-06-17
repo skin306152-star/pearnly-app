@@ -80,8 +80,8 @@ def _remember_detail_order(tid, ws, line_user_id, ids) -> None:
 
 
 _UNDO_ERR = {
-    "ambiguous": "exp_reply_to_record",
-    "ref_not_found": "exp_ref_not_found",
+    "ambiguous": "guide_need_reply_for_risk",
+    "ref_not_found": "guide_detail_list",
     "none": "exp_undo_none",
 }
 

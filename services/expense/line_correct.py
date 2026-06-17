@@ -91,8 +91,8 @@ def _summary(changes: dict) -> str:
 
 # 定位失败 → 文案 key(高风险动作对象不明确不执行,提示 reply,绝不默认改最近一笔)。
 _ERR_KEY = {
-    "ambiguous": "exp_reply_to_record",
-    "ref_not_found": "exp_ref_not_found",
+    "ambiguous": "guide_need_reply_for_risk",
+    "ref_not_found": "guide_detail_list",
     "none": "exp_correct_none",
 }
 
@@ -106,7 +106,7 @@ def request_correct(
 
     changes = _collect_changes(u)
     if not changes:
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_edit_web"))
+        line_client.reply_text(reply_token, line_client.t_line(lang, "guide_reply_to_record"))
         return True
 
     with db.get_cursor_rls(tid, commit=True) as cur:
@@ -127,10 +127,8 @@ def request_correct(
             line_client.reply_text(reply_token, line_client.t_line(lang, "exp_correct_none"))
             return True
         if "amount" in changes and len(detail.get("lines") or []) > 1:
-            # 多行票金额:不在 LINE 改(不重算/不摊销/不猜行)→ 引导网页明细逐行确认。
-            line_client.reply_text(
-                reply_token, line_client.t_line(lang, "exp_correct_multiline_amount")
-            )
+            # 多行票金额:不在 LINE 改(不重算/不摊销/不猜行)→ 引导到详情页逐行确认。
+            line_client.reply_text(reply_token, line_client.t_line(lang, "guide_open_detail"))
             return True
         changes_draft = ExpenseDraft(
             amount=changes.get("amount"),

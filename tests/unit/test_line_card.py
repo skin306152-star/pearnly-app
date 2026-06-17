@@ -524,6 +524,46 @@ class P1DCardTests(unittest.TestCase):
                 c = line_card.terminal_card(state=state, doc_id="D", lang=lang)
                 self.assertEqual(c["type"], "flex")
 
+    def test_warn_total_demotes_confirm_to_review_first(self):
+        # 明细与总额不符:confirm 卡主按钮降级为「打开核对」(uri·非确认入账 postback),
+        # 入账降为次按钮「บันทึกต่อ」(仍可继续)。不假装明细完整、不默认继续入账。
+        def primary(card):
+            for n in card["contents"]["footer"]["contents"]:
+                if n.get("type") == "button" and n.get("style") == "primary":
+                    return n["action"]
+            return None
+
+        warn = line_card.result_card(
+            state="confirm",
+            amount="431.00",
+            fields={"vendor": "X"},
+            doc_id="D1",
+            lang="th",
+            source="image",
+            warn_total=True,
+        )
+        self.assertEqual(primary(warn)["type"], "uri")  # 主=打开核对(去详情)
+        self.assertEqual(primary(warn)["label"], "เปิดเพื่อตรวจสอบ")
+        # 次按钮里仍有「继续入账」postback(允许继续保存)
+        labels = [
+            n["action"]["label"]
+            for n in warn["contents"]["footer"]["contents"]
+            if n.get("type") == "button"
+        ]
+        self.assertIn("บันทึกต่อ", labels)
+
+        ok = line_card.result_card(
+            state="confirm",
+            amount="70.00",
+            fields={"vendor": "X"},
+            doc_id="D1",
+            lang="th",
+            source="image",
+            warn_total=False,
+        )
+        self.assertEqual(primary(ok)["type"], "postback")  # 对账正常 → 主=确认入账
+        self.assertEqual(primary(ok)["label"], "ยืนยันบันทึก")
+
     def test_items_unread_hint_when_no_items(self):
         # OCR 没抽出明细:明细区出「未能逐项识别·去详情页」诚实提示,不显假的卖家名单行。
         c = line_card.result_card(

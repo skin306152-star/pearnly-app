@@ -304,6 +304,22 @@ class IngestTests(unittest.TestCase):
         )
         self.assertFalse(out["warn_total"])
 
+    def test_zero_modifier_items_dropped_from_main_detail(self):
+        # 0 元 modifier(ไม่หวาน 0%/แถมฟรี)不进主明细 · 只留有金额的主项。
+        f = {
+            "items": [
+                {"name": "TW กาแฟ", "subtotal": "120"},
+                {"name": "TW ไม่หวาน 0%", "subtotal": "0"},
+                {"name": "TW เพิ่มช็อต", "subtotal": "10"},
+                {"name": "แก้ว Mickey (แถมฟรี)", "subtotal": "0"},
+            ],
+            "total_amount": "130",
+        }
+        self.assertEqual(
+            li._card_items(f),
+            [{"name": "TW กาแฟ", "amount": "120.00"}, {"name": "TW เพิ่มช็อต", "amount": "10.00"}],
+        )
+
     def test_summary_items_are_filtered_from_card(self):
         f = {
             "items": [

@@ -160,10 +160,12 @@ def _footer(
     source: str = "doc",
     liff_id: str = "",
     ws: str = "",
+    review_first: bool = False,
 ) -> list:
     """动作区(按状态出合法动作 · 竖排满宽永不死路):
     confirm 确认入账(主)/编辑/丢弃;posted 查看详情(主)/修改/[替代收据]/撤销;
-    dup 查看重复(主)/仍要入账/丢弃。"""
+    dup 查看重复(主)/仍要入账/丢弃。review_first(明细与总额不符)= confirm 卡降级:
+    主按钮改「打开核对」(去详情),确认入账降为次按钮「บันทึกต่อ」——不假装明细完整、不默认继续入账。"""
     detail_uri = _liff_link(liff_id, web_url, ref, ws=ws)
     pb = line_postback
 
@@ -182,6 +184,10 @@ def _footer(
         danger.append(kill(t["btn_undo"], pb.undo_data(ref, token)))
     elif state == "dup":
         primary = _btn(t["btn_open"], primary=True, uri=detail_uri)
+        view.append(_btn(t["btn_post_anyway"], primary=False, postback=pb.confirm_data(ref, token)))
+        danger.append(kill(t["btn_discard"], pb.discard_data(ref, token)))
+    elif review_first:  # confirm 但明细与总额不符 → 引导核对优先,入账降次按钮(仍可继续)
+        primary = _btn(t["btn_review"], primary=True, uri=detail_uri)
         view.append(_btn(t["btn_post_anyway"], primary=False, postback=pb.confirm_data(ref, token)))
         danger.append(kill(t["btn_discard"], pb.discard_data(ref, token)))
     else:  # confirm(草稿请确认)
@@ -422,7 +428,15 @@ def result_card(
         header=_status_header(state, t),
         body=body,
         footer=_footer(
-            state, doc_id, web_url, t, token, source, liff_id, str(workspace_client_id or "")
+            state,
+            doc_id,
+            web_url,
+            t,
+            token,
+            source,
+            liff_id,
+            str(workspace_client_id or ""),
+            review_first=bool(warn_total),
         ),
     )
 

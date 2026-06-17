@@ -97,7 +97,9 @@ def _card_items(fields: dict) -> list:
         amt = _dec(it.get("subtotal"))
         if amt <= 0:
             amt = _dec(it.get("qty") or 1) * _dec(it.get("price"))
-        out.append({"name": _clean_item_name(name), "amount": (f"{amt:,.2f}" if amt > 0 else "")})
+        if amt <= 0:
+            continue  # 0 元 modifier(ไม่หวาน 0%/แถมฟรี)不进主明细 · 后续可放备注
+        out.append({"name": _clean_item_name(name), "amount": f"{amt:,.2f}"})
     return out
 
 

@@ -286,8 +286,13 @@ def ingest_line_image(
         and draft_is_vendor_fallback
         and (_items_reconcile_total(fields) or _items_plausible_subset(fields))
     )
+    # OCR 没抽出真明细、只剩卖家名兜底单行(且原行也不像真)→ 明细留空,不显「1. 卖家名 ฿总额」假行
+    # (那看着像 1 个叫店名的商品·误导)。卡片仍有金额/卖家/分类,逐项明细去详情页看。
+    no_real_items = draft_is_vendor_fallback and not use_raw_items
     if use_raw_items:
         card_fields["items"] = raw_items
+    elif no_real_items:
+        card_fields["items"] = []
     elif draft_items:
         card_fields["items"] = draft_items
     # 逐条明细填进卡(对标竞品「รายการค่าใช้จ่าย」):取真实商品行(跳过卖家兜底单行),顶 3 条 + 「等N项」。
@@ -299,6 +304,9 @@ def ingest_line_image(
     ]
     if use_raw_items:
         descs = [it["name"] for it in raw_items]
+    if no_real_items:
+        descs = []
+        card_fields["detail"] = ""
     if descs:
         card_fields["detail"] = " · ".join(descs[:3]) + (
             f" 等{len(descs)}项" if len(descs) > 3 else ""

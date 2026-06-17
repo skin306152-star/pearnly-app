@@ -220,9 +220,9 @@ class IngestTests(unittest.TestCase):
             )
         suggest.assert_not_called()
 
-    def test_card_items_use_corrected_draft_lines(self):
-        # OCR 原始 items 可能荒腔走板(如 7-11 把商品码当 qty/price),草稿已收敛成
-        # 票面总额单行后,卡片也必须显示草稿行,不能继续展示已废弃的 OCR 原始明细。
+    def test_garbage_ocr_collapses_to_no_items_not_fake_vendor_line(self):
+        # OCR 原始 items 荒腔走板(7-11 单行 845 ≫ 票面 110)→ 草稿收敛成卖家兜底单行;卡片不显
+        # 「1. 卖家名 ฿110」假行(那看着像 1 个叫店名的商品·误导)→ 明细留空,去详情页看。
         draft = {
             "doc_kind": "expense",
             "supplier": {"name": "7-Eleven", "tax_id": None},
@@ -239,11 +239,30 @@ class IngestTests(unittest.TestCase):
             "items": [{"name": "bad OCR item", "subtotal": "845"}],
         }
         out, _cdoc, _pdoc = _run(res, band="high", auto_book=False, fields=fields)
-        self.assertEqual(
-            out["card_fields"]["items"],
-            [{"name": "7-Eleven", "amount": "110.00"}],
-        )
+        self.assertEqual(out["card_fields"]["items"], [])
+        self.assertEqual(out["card_fields"]["detail"], "")
         self.assertTrue(out["warn_total"])
+
+    def test_no_ocr_items_shows_no_fake_line(self):
+        # OCR 一条明细都没抽出(旋转热敏票)→ 草稿卖家兜底单行 → 卡片明细留空,不显假的卖家名单行。
+        draft = {
+            "doc_kind": "expense",
+            "supplier": {"name": "Little Betong", "tax_id": None},
+            "doc_no": None,
+            "lines": [{"description": "Little Betong", "qty": "1", "unit_price": "431"}],
+            "grand_total": "431.00",
+        }
+        res = {"route": "expense", "draft": draft, "dedupe_hit": False, "field_confidence": {}}
+        fields = {
+            "document_type": "receipt",
+            "seller_name": "Little Betong",
+            "total_amount": "431",
+            "vat": "0",
+            "items": [],
+        }
+        out, _cdoc, _pdoc = _run(res, band="needs_review", auto_book=False, fields=fields)
+        self.assertEqual(out["card_fields"]["items"], [])
+        self.assertEqual(out["card_fields"]["detail"], "")
 
     def test_pos_receipt_card_keeps_raw_items_when_they_match_total(self):
         # POS 小票价格通常已含 VAT:商品行 60+10=总额 70,不要因为 VAT 表存在而压成供应商一行。

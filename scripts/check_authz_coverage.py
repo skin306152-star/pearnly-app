@@ -45,6 +45,8 @@ PUBLIC_ROUTES = {
     ("GET", "/api/version"),
     # 登录/注册/找回(登录前链路,自身就是发证点)
     ("POST", "/api/login"),
+    ("POST", "/api/logout"),  # 退出 = 清会话/吊销 token,无需权限(自身即注销点)
+    ("POST", "/api/auth/logout"),  # 同上 · /api/login 同源退出端点
     ("POST", "/api/auth/send_email_code"),
     ("POST", "/api/auth/verify_email_code"),
     ("POST", "/api/auth/forgot_password"),

@@ -284,23 +284,17 @@ def _boot_schema_ddl() -> None:
     except Exception as e:
         logger.warning(f"启动 expense schema 失败: {e}")
 
-    # LINE 卡片动作一次性令牌(防重放 · PO-12)· 与 alembic 0037 同源幂等 DDL。
-    # NEW-DEBT-EXEMPT: 启动自愈式迁移,prod 无 alembic 钩子,口径同 expense schema。
-    try:
-        from services.line_binding.line_action_nonce import ensure_table
-
-        ensure_table()
-    except Exception as e:
-        logger.warning(f"启动 LINE 动作令牌 schema 失败: {e}")
-
-    # LINE 短期对话记忆(喂大脑上下文 · PO-15)· 与 alembic 0038 同源幂等 DDL。
-    # NEW-DEBT-EXEMPT: 启动自愈式迁移,prod 无 alembic 钩子,口径同 expense schema。
-    try:
-        from services.line_binding.line_chat_memory import ensure_table as _ensure_chat_mem
-
-        _ensure_chat_mem()
-    except Exception as e:
-        logger.warning(f"启动 LINE 对话记忆 schema 失败: {e}")
+    # LINE 各表幂等建(prod 无 alembic 钩子 → 启动自愈式迁移,口径同 expense schema)。
+    # NEW-DEBT-EXEMPT: nonce 0037(防重放) / chat 0038(对话记忆) / msg_refs 0041(引用底座)。
+    for _mod, _label in (
+        ("services.line_binding.line_action_nonce", "动作令牌"),
+        ("services.line_binding.line_chat_memory", "对话记忆"),
+        ("services.line_binding.line_message_refs", "消息映射"),
+    ):
+        try:
+            __import__(_mod, fromlist=["ensure_table"]).ensure_table()
+        except Exception as e:
+            logger.warning(f"启动 LINE {_label} schema 失败: {e}")
 
     # 商户采购(进项)schema 双跑(suppliers / purchase_docs+lines / categories+settings+
     # intake+attachments)· 与 alembic 0031-0033 同源幂等 DDL(docs/purchasing/01)。

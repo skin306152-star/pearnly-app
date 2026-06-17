@@ -254,6 +254,66 @@ def push_messages(to_line_user_id: str, messages: List[Dict[str, Any]]) -> bool:
 
 
 # ============================================================
+# 带元数据发送(拿 sentMessages[].id · 引用底座 P1A)
+# 旧 reply_messages/push_messages 仍返 bool;这两个新方法返回已发消息列表 [{id, quoteToken}]。
+# ============================================================
+
+
+def _send_messages_meta(url: str, payload_obj: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """POST 发消息并解析 LINE 返回的 sentMessages(含每条消息 id)。失败 → []。"""
+    token = _get_channel_token()
+    if not token:
+        return []
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload_obj).encode("utf-8"),
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            if resp.status != 200:
+                return []
+            body = json.loads(resp.read().decode("utf-8") or "{}")
+            return body.get("sentMessages") or []
+    except urllib.error.HTTPError as e:
+        detail = ""
+        try:
+            detail = e.read().decode("utf-8", errors="replace")
+        except Exception:
+            pass
+        logger.error(f"LINE send(meta) 失败 {e.code}: {detail}")
+        return []
+    except Exception as e:
+        logger.error(f"LINE send(meta) 异常: {e}")
+        return []
+
+
+def reply_messages_with_meta(
+    reply_token: str, messages: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """reply 多条消息,返回 sentMessages [{id, quoteToken}](与 messages 同序)。失败 → []。"""
+    if not reply_token or not messages:
+        return []
+    return _send_messages_meta(
+        "https://api.line.me/v2/bot/message/reply",
+        {"replyToken": reply_token, "messages": messages[:5]},
+    )
+
+
+def push_messages_with_meta(
+    to_line_user_id: str, messages: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """push 多条消息,返回 sentMessages [{id, quoteToken}](与 messages 同序)。失败 → []。"""
+    if not to_line_user_id or not messages:
+        return []
+    return _send_messages_meta(
+        "https://api.line.me/v2/bot/message/push",
+        {"to": to_line_user_id, "messages": messages[:5]},
+    )
+
+
+# ============================================================
 # 获取用户资料(拿昵称 / 头像)
 # ============================================================
 

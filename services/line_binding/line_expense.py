@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def handle_expense_text(
-    bound_user, reply_token, line_user_id, text, lang, quote_token=None
+    bound_user, reply_token, line_user_id, text, lang, quote_token=None, quoted_message_id=None
 ) -> bool:
     """文本 → LINE 大脑(LLM tool-calling)→ 工具执行(docs/smart-intake/15)。
 
@@ -87,7 +87,7 @@ def handle_expense_text(
             from services.line_binding import line_expense_multi
 
             return line_expense_multi.do_record_multi(
-                bound_user, reply_token, text, str(tid), ws, multi, quote_token, lang
+                bound_user, reply_token, text, str(tid), ws, multi, quote_token, lang, line_user_id
             )
 
         # 1. L1 快路:清晰记账(有金额 + 非问句 + 无其他 L1 意图 + 非改错)→ 直接记,零 LLM、零成本。
@@ -103,7 +103,16 @@ def handle_expense_text(
                 merged.amount = parsed.amount
                 parsed = merged
             return _do_record(
-                bound_user, reply_token, text, str(tid), ws, parsed, False, quote_token, lang
+                bound_user,
+                reply_token,
+                text,
+                str(tid),
+                ws,
+                parsed,
+                False,
+                quote_token,
+                lang,
+                line_user_id,
             )
 
         # 2. 大脑(一次 LLM):听意图 + 抽槽 + 自然回复 → 工具分发。
@@ -118,7 +127,16 @@ def handle_expense_text(
         if u:
             _charge_line_l2(bound_user, str(tid))
             return _dispatch_agent(
-                bound_user, reply_token, line_user_id, text, lang, str(tid), ws, u, quote_token
+                bound_user,
+                reply_token,
+                line_user_id,
+                text,
+                lang,
+                str(tid),
+                ws,
+                u,
+                quote_token,
+                quoted_message_id,
             )
 
         # 3. 兜底(无 LLM):L1 查账/求助/问答(知识库),否则礼貌带回(复用上面已算的 si/isq)。
@@ -140,7 +158,16 @@ def handle_expense_text(
 
 
 def _dispatch_agent(
-    bound_user, reply_token, line_user_id, text, lang, tid, ws, u, quote_token
+    bound_user,
+    reply_token,
+    line_user_id,
+    text,
+    lang,
+    tid,
+    ws,
+    u,
+    quote_token,
+    quoted_message_id=None,
 ) -> bool:
     """大脑决策 → 确定性工具执行。写账闸由 may_write 裁决(问句/否定/假设不写)。"""
     from services.expense import line_agent
@@ -153,15 +180,18 @@ def _dispatch_agent(
         line_expense_qa.reply_detail(reply_token, lang, tid, ws, line_user_id)
         return True
     if intent == "undo":
-        line_expense_qa.reply_undo(bound_user, reply_token, lang, tid, ws)
+        # 撤销:引用某条回执→撤那张;明确「上一笔」→撤最近;对象不明确→提示 reply(不默认撤最近)。
+        line_expense_qa.reply_undo(
+            bound_user, reply_token, lang, tid, ws, line_user_id, quoted_message_id, text
+        )
         return True
     if intent == "edit":
-        # 改错:冲销原单 + 忠实克隆草稿 + 应用改动(金额/卖家/日期/科目)→ 请确认(绝不静默覆盖·
-        # PO-13)。target 按「第 N 笔」(查明细列表序号)或「上一笔」定位;line_correct 内判单/多行规则。
+        # 改错:定位目标(引用>第N笔>明确上一笔·不明确则提示 reply)→ 冲销原单 + 忠实克隆草稿 +
+        # 应用改动(金额/卖家/日期/科目)→ 请确认(绝不静默覆盖·PO-13)。单/多行规则在 line_correct。
         from services.expense import line_correct
 
         return line_correct.request_correct(
-            bound_user, reply_token, line_user_id, text, u, lang, tid, ws
+            bound_user, reply_token, line_user_id, text, u, quoted_message_id, lang, tid, ws
         )
     if line_agent.may_write(intent, u.get("speech_act")):
         from services.expense import line_l2
@@ -169,7 +199,16 @@ def _dispatch_agent(
         draft = line_l2.to_draft(u, text)
         if draft.has_amount():
             return _do_record(
-                bound_user, reply_token, text, tid, ws, draft, True, quote_token, lang
+                bound_user,
+                reply_token,
+                text,
+                tid,
+                ws,
+                draft,
+                True,
+                quote_token,
+                lang,
+                line_user_id,
             )
         from services.expense import conversation
 
@@ -196,7 +235,9 @@ def _dispatch_agent(
     return True
 
 
-def _do_record(bound_user, reply_token, text, tid, ws, draft, used_l2, quote_token, lang) -> bool:
+def _do_record(
+    bound_user, reply_token, text, tid, ws, draft, used_l2, quote_token, lang, line_user_id=""
+) -> bool:
     """置信驱动入账(图/文同口径):建草稿 → 高置信 post_doc;回数据卡。计费由调用方管。"""
     from services.expense import confidence
     from services.line_binding import line_booker
@@ -235,7 +276,19 @@ def _do_record(bound_user, reply_token, text, tid, ws, draft, used_l2, quote_tok
             verdict=verdict,
             created_by=created_by,
         )
-    _reply_card(reply_token, state, draft, doc_id, lang, quote_token, ws_name, token, str(ws or ""))
+    _reply_card(
+        reply_token,
+        state,
+        draft,
+        doc_id,
+        lang,
+        quote_token,
+        ws_name,
+        token,
+        str(ws or ""),
+        tenant_id=tid,
+        line_user_id=line_user_id,
+    )
     return True
 
 
@@ -266,7 +319,17 @@ def _card_fields_from_draft(draft) -> dict:
 
 
 def _reply_card(
-    reply_token, state, draft, doc_id, lang, quote_token, workspace_name="", token="", ws=""
+    reply_token,
+    state,
+    draft,
+    doc_id,
+    lang,
+    quote_token,
+    workspace_name="",
+    token="",
+    ws="",
+    tenant_id=None,
+    line_user_id="",
 ) -> None:
     """回执 = 引用原句一行 + Flex 数据卡(三路共用 line_booker.emit_result_card)。"""
     from services.line_binding import line_booker
@@ -282,6 +345,8 @@ def _reply_card(
         workspace_name=workspace_name,
         token=token,
         workspace_client_id=ws,
+        tenant_id=tenant_id,
+        line_user_id=line_user_id,
     )
 
 

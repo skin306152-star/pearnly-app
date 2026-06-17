@@ -199,7 +199,9 @@ async def _handle_line_image_ocr(
                                 api_key=line_l2.resolve_api_key(user_fresh),
                             )
                 if _ci:
-                    _push_result_card(line_user_id, lang, _ci, quote_token, _ws_client_id)
+                    _push_result_card(
+                        line_user_id, lang, _ci, quote_token, _ws_client_id, tenant_id=_tid_c
+                    )
             except Exception as _ce_card:
                 logger.warning(f"[line_ocr] 缓存卡片重建失败: {_ce_card}")
             return
@@ -315,7 +317,9 @@ async def _handle_line_image_ocr(
                 )
             except Exception as _ce:
                 logger.warning(f"[line_ocr] cost log failed (non-blocking): {_ce}")
-            _push_result_card(line_user_id, lang, ingest, quote_token, _ws_client_id)
+            _push_result_card(
+                line_user_id, lang, ingest, quote_token, _ws_client_id, tenant_id=tid_str
+            )
             # 对话记忆(PO-15):记图片轮的结果,让下一句文本问「为什么/需补啥」时大脑接得住。
             from services.line_binding import line_chat_memory
 
@@ -464,36 +468,21 @@ async def _handle_line_image_ocr(
 
 
 def _push_result_card(
-    line_user_id: str, lang: str, ingest: dict, quote_token: str = None, ws_client_id=""
+    line_user_id: str,
+    lang: str,
+    ingest: dict,
+    quote_token: str = None,
+    ws_client_id="",
+    tenant_id=None,
 ) -> None:
-    """识别结果数据卡 push:【引用照片的一行回执】+【Flex 数据卡】。失败回落纯文字(不静默)。"""
-    state = ingest.get("state", "confirm")
-    try:
-        from services.line_binding import line_booker, line_card
+    """识别结果数据卡 push(共用发卡口 line_booker.push_result_card · 发完绑消息 id 供引用改/删)。"""
+    from services.line_binding import line_booker
 
-        ack = {
-            "type": "text",
-            "text": line_client.t_line(
-                lang, line_booker.ack_key(state), amount=ingest.get("amount") or "—"
-            ),
-        }
-        if quote_token:
-            ack["quoteToken"] = quote_token
-        card = line_card.result_card(
-            state=state,
-            amount=ingest.get("amount"),
-            fields=ingest.get("card_fields") or {},
-            field_confidence=ingest.get("field_confidence") or {},
-            doc_id=ingest.get("ref") or ingest.get("doc_id") or "",
-            lang=lang,
-            web_url="https://pearnly.com/home",
-            workspace_name=ingest.get("workspace_name") or "",
-            token=ingest.get("token") or "",
-            warn_total=bool(ingest.get("warn_total")),
-            liff_id=os.getenv("LINE_LIFF_ID", "").strip(),
-            workspace_client_id=str(ws_client_id or ""),
-        )
-        line_client.push_messages(line_user_id, [ack, card])
-    except Exception as e:
-        logger.warning(f"[line_ocr] 数据卡 push 失败,回落纯文字: {e}")
-        line_client.push_text(line_user_id, line_client.t_ocr(lang, "routed_to_purchase"))
+    line_booker.push_result_card(
+        line_user_id,
+        lang,
+        ingest,
+        quote_token=quote_token,
+        ws_client_id=ws_client_id,
+        tenant_id=tenant_id,
+    )

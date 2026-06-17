@@ -13,7 +13,9 @@ from decimal import Decimal
 from core import db
 
 
-def do_record_multi(bound_user, reply_token, text, tid, ws, items, quote_token, lang) -> bool:
+def do_record_multi(
+    bound_user, reply_token, text, tid, ws, items, quote_token, lang, line_user_id=""
+) -> bool:
     """每项独立行 + 智能归类(批量一次 LLM)·合计入账·卡显逐条明细。返回 True。"""
     from services.expense import category_ai, confidence, line_l2
     from services.expense.line_quick_entry import qty_label, split_qty_price
@@ -116,5 +118,7 @@ def do_record_multi(bound_user, reply_token, text, tid, ws, items, quote_token, 
         workspace_name=ws_name,
         token=token,
         workspace_client_id=str(ws or ""),
+        tenant_id=tid,
+        line_user_id=line_user_id,
     )
     return True

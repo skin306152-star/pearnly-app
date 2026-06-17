@@ -114,8 +114,14 @@ def emit_result_card(
     workspace_client_id="",
     field_confidence=None,
     source="text",
+    tenant_id=None,
+    line_user_id="",
 ) -> None:
-    """三路共用发卡口:引用回执(text·可被引用)+ Flex 数据卡(不可引用 → 拆两条发)。"""
+    """三路共用发卡口:引用回执(text·可被引用)+ Flex 数据卡(不可引用 → 拆两条发)。
+
+    发完把两条消息 id 绑到该 doc(line_message_refs)→ 用户长按任一条 reply「删除/改成X」可
+    精确定位这张单(引用底座 P1A)。记映射 best-effort,失败不阻塞回执。
+    """
     import os
 
     from services.line_binding import line_card, line_client
@@ -137,4 +143,65 @@ def emit_result_card(
         liff_id=os.getenv("LINE_LIFF_ID", "").strip(),
         workspace_client_id=workspace_client_id,
     )
-    line_client.reply_messages(reply_token, [ack, card])
+    sent = line_client.reply_messages_with_meta(reply_token, [ack, card])
+    _bind_refs(tenant_id, workspace_client_id, line_user_id, sent, doc_id, state)
+
+
+def _bind_refs(tenant_id, workspace_client_id, line_user_id, sent, doc_id, state) -> None:
+    """把已发消息 id 绑到 doc(供 quote-reply 精确定位)。无 tenant/doc/消息 → 跳过。"""
+    if not (tenant_id and doc_id and sent):
+        return
+    from services.line_binding import line_message_refs
+
+    line_message_refs.record_safe(
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        line_user_id=line_user_id,
+        message_ids=[m.get("id") for m in sent if m.get("id")],
+        ref_id=doc_id,
+        state=state,
+    )
+
+
+def push_result_card(
+    line_user_id, lang, ingest, quote_token=None, ws_client_id="", tenant_id=None
+) -> None:
+    """图片路识别结果数据卡 push(异步·无 replyToken):引用照片回执 + Flex 卡。失败回落纯文字。
+
+    发完绑消息 id → doc(同 emit_result_card · 引用底座 P1A)。与 emit_result_card 同处共用发卡口。
+    """
+    import logging
+    import os
+
+    from services.line_binding import line_card, line_client
+
+    state = ingest.get("state", "confirm")
+    doc_id = ingest.get("ref") or ingest.get("doc_id") or ""
+    try:
+        ack = {
+            "type": "text",
+            "text": line_client.t_line(lang, ack_key(state), amount=ingest.get("amount") or "—"),
+        }
+        if quote_token:
+            ack["quoteToken"] = quote_token
+        card = line_card.result_card(
+            state=state,
+            amount=ingest.get("amount"),
+            fields=ingest.get("card_fields") or {},
+            field_confidence=ingest.get("field_confidence") or {},
+            doc_id=doc_id,
+            lang=lang,
+            web_url=_WEB_PURCHASE_URL,
+            workspace_name=ingest.get("workspace_name") or "",
+            token=ingest.get("token") or "",
+            warn_total=bool(ingest.get("warn_total")),
+            liff_id=os.getenv("LINE_LIFF_ID", "").strip(),
+            workspace_client_id=str(ws_client_id or ""),
+        )
+        sent = line_client.push_messages_with_meta(line_user_id, [ack, card])
+        if not sent:  # 退化:meta 失败也至少把卡发出去(不丢回执)
+            line_client.push_messages(line_user_id, [ack, card])
+        _bind_refs(tenant_id, ws_client_id, line_user_id, sent, doc_id, state)
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger(__name__).warning(f"[line_ocr] 数据卡 push 失败,回落纯文字: {e}")
+        line_client.push_text(line_user_id, line_client.t_ocr(lang, "routed_to_purchase"))

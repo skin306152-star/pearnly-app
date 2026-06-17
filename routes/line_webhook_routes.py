@@ -103,8 +103,14 @@ async def _handle_line_event(ev: dict):
         if msg_type == "text":
             text = (msg.get("text") or "").strip()
             # v118.25.4 · 把 ev 传过去 · 让 _handle_line_text 能拿到用户语言
+            # 引用底座(P1A):quotedMessageId = 用户长按 reply 的那条消息 id → 精确定位业务单。
             await _handle_line_text(
-                line_user_id, reply_token, text, ev, quote_token=msg.get("quoteToken")
+                line_user_id,
+                reply_token,
+                text,
+                ev,
+                quote_token=msg.get("quoteToken"),
+                quoted_message_id=msg.get("quotedMessageId"),
             )
             return
 
@@ -157,7 +163,12 @@ async def _handle_line_event(ev: dict):
 
 
 async def _handle_line_text(
-    line_user_id: str, reply_token: str, text: str, ev: dict, quote_token: str = None
+    line_user_id: str,
+    reply_token: str,
+    text: str,
+    ev: dict,
+    quote_token: str = None,
+    quoted_message_id: str = None,
 ):
     """处理 LINE 文字消息(v118.25.4 · ev 用于 fallback 拿 LINE 用户语言)"""
     if not reply_token or not line_user_id:
@@ -233,7 +244,13 @@ async def _handle_line_text(
         # 文本路 · 置信驱动入账(docs/smart-intake/15):记账意图→解析→高置信直接入账+数据卡,
         # 其余草稿请确认;闲聊/查账/问答→智能回复。回执引用原句(quoteToken)。
         if line_expense.handle_expense_text(
-            bound_user, reply_token, line_user_id, text, lang, quote_token=quote_token
+            bound_user,
+            reply_token,
+            line_user_id,
+            text,
+            lang,
+            quote_token=quote_token,
+            quoted_message_id=quoted_message_id,
         ):
             return
         # 兜底(P0):认不出 → 功能提示。query/question/L2 LLM 路由 = P1。

@@ -144,7 +144,9 @@ class EmitResultCardTests(unittest.TestCase):
             mock.patch(
                 "services.line_binding.line_card.result_card", return_value={"type": "flex"}
             ) as rc,
-            mock.patch("services.line_binding.line_client.reply_messages") as rm,
+            mock.patch(
+                "services.line_binding.line_client.reply_messages_with_meta", return_value=[]
+            ) as rm,
         ):
             line_booker.emit_result_card(
                 "RT",
@@ -170,12 +172,35 @@ class EmitResultCardTests(unittest.TestCase):
         with (
             mock.patch("services.line_binding.line_client.t_line", return_value="ACK"),
             mock.patch("services.line_binding.line_card.result_card", return_value={}),
-            mock.patch("services.line_binding.line_client.reply_messages") as rm,
+            mock.patch(
+                "services.line_binding.line_client.reply_messages_with_meta", return_value=[]
+            ) as rm,
         ):
             line_booker.emit_result_card(
                 "RT", state="confirm", amount="1", fields={}, doc_id="", lang="zh"
             )
         self.assertNotIn("quoteToken", rm.call_args.args[1][0])
+
+
+class BindRefsTests(unittest.TestCase):
+    """发完把消息 id 绑到 doc(引用底座):有 tenant+doc+消息才记;缺一不记。"""
+
+    def test_records_when_complete(self):
+        from services.line_binding import line_message_refs
+
+        with mock.patch.object(line_message_refs, "record_safe") as rec:
+            line_booker._bind_refs("t", 9, "U1", [{"id": "m1"}, {"id": "m2"}], "doc1", "posted")
+        self.assertEqual(rec.call_args.kwargs["message_ids"], ["m1", "m2"])
+        self.assertEqual(rec.call_args.kwargs["ref_id"], "doc1")
+
+    def test_skips_without_tenant_or_doc(self):
+        from services.line_binding import line_message_refs
+
+        with mock.patch.object(line_message_refs, "record_safe") as rec:
+            line_booker._bind_refs(None, 9, "U1", [{"id": "m1"}], "doc1", "posted")
+            line_booker._bind_refs("t", 9, "U1", [{"id": "m1"}], "", "posted")
+            line_booker._bind_refs("t", 9, "U1", [], "doc1", "posted")
+        rec.assert_not_called()
 
 
 if __name__ == "__main__":

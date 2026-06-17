@@ -79,28 +79,54 @@ def _remember_detail_order(tid, ws, line_user_id, ids) -> None:
         logger.warning("[line] remember detail order failed; 第N笔 定位将回落上一笔")
 
 
-def reply_undo(bound_user, reply_token, lang, tid, ws) -> None:
-    """撤销上一笔(LINE 记的、已入账正式单)· void_doc 冲销,不物理删。无 → 诚实告知。"""
+_UNDO_ERR = {
+    "ambiguous": "exp_reply_to_record",
+    "ref_not_found": "exp_ref_not_found",
+    "none": "exp_undo_none",
+}
+
+
+def reply_undo(
+    bound_user, reply_token, lang, tid, ws, line_user_id=None, quoted_message_id=None, text=""
+) -> None:
+    """撤销已入账单 · void_doc 冲销(不物理删)。目标定位:引用某条→撤那张;明确「上一笔」→撤最近;
+    对象不明确→提示 reply 某条记录(绝不默认撤最近一笔)。已结期 → 诚实引导网页。"""
+    from core.pos_api import PosError
+    from services.line_binding import line_message_refs
+
     uid = str(bound_user["id"]) if bound_user.get("id") else None
     try:
         from services.purchase import posting as posting_svc
 
         with db.get_cursor_rls(tid, commit=True) as cur:
-            cur.execute(
-                "SELECT id, grand_total FROM purchase_docs "
-                "WHERE tenant_id = %s AND workspace_client_id = %s AND source = 'line' "
-                "AND status = 'posted' ORDER BY created_at DESC LIMIT 1",
-                (tid, ws),
+            tgt = line_message_refs.resolve_target(
+                cur,
+                tenant_id=tid,
+                ws=ws,
+                line_user_id=line_user_id,
+                quoted_message_id=quoted_message_id,
+                text=text,
             )
-            row = cur.fetchone()
-            if not row:
-                line_client.reply_text(reply_token, line_client.t_line(lang, "exp_undo_none"))
+            if tgt["error"]:
+                line_client.reply_text(
+                    reply_token, line_client.t_line(lang, _UNDO_ERR[tgt["error"]])
+                )
                 return
             res = posting_svc.void_doc(
-                cur, tenant_id=tid, workspace_client_id=ws, doc_id=str(row["id"]), created_by=uid
+                cur,
+                tenant_id=tid,
+                workspace_client_id=tgt["ws"],
+                doc_id=tgt["doc_id"],
+                created_by=uid,
             )
-            amt = (res.get("doc") or {}).get("grand_total") or row["grand_total"]
+            amt = (res.get("doc") or {}).get("grand_total")
         line_client.reply_text(reply_token, line_client.t_line(lang, "exp_undo_done", amount=amt))
+    except PosError as e:
+        if (e.code or "") == "acct.period_closed":
+            line_client.reply_text(reply_token, line_client.t_line(lang, "exp_correct_closed"))
+            return
+        logger.warning("[line] undo blocked: %s", e.code)
+        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_undo_none"))
     except Exception:
         logger.exception("[line] undo failed")
         line_client.reply_text(reply_token, line_client.t_line(lang, "exp_undo_none"))

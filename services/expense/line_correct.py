@@ -49,16 +49,6 @@ def _affirmative(text: str) -> bool:
     return any(k in t for k in _YES)
 
 
-def _find_last_posted(cur, *, tenant_id, ws):
-    cur.execute(
-        "SELECT id, grand_total FROM purchase_docs "
-        "WHERE tenant_id = %s AND workspace_client_id = %s AND source = 'line' "
-        "AND status = 'posted' ORDER BY created_at DESC LIMIT 1",
-        (tenant_id, ws),
-    )
-    return cur.fetchone()
-
-
 def _collect_changes(u: dict) -> dict:
     """大脑槽位 → 要改的字段(canonical)。amount/vendor_name/doc_date/category(科目依据=note)。
 
@@ -99,49 +89,40 @@ def _summary(changes: dict) -> str:
     return " · ".join(parts)
 
 
-def _resolve_target(cur, *, line_user_id, text, tenant_id, ws):
-    """定位要改的单:有序号「第 N 笔」→ 查明细列表第 N 项;否则「上一笔」LINE 已入账单。
-
-    返回 (target_id, err_key, n)。err_key 非空表示无法定位(回该文案)。
-    """
-    n = None
-    try:
-        from services.expense import line_quick_entry as lqe
-
-        n = lqe.parse_ordinal(text)
-    except Exception:  # noqa: BLE001
-        n = None
-    if n:
-        pend = conversation.peek_pending(cur, line_user_id=line_user_id)
-        missing = str((pend or {}).get("missing") or "")
-        if not missing.startswith("detail:"):
-            return None, "exp_correct_no_list", n
-        ids = [x for x in missing[len("detail:") :].split(",") if x]
-        if 1 <= n <= len(ids):
-            return ids[n - 1], None, n
-        return None, "exp_correct_no_list", n
-    row = _find_last_posted(cur, tenant_id=tenant_id, ws=ws)
-    if not row:
-        return None, "exp_correct_none", None
-    return str(row["id"]), None, None
+# 定位失败 → 文案 key(高风险动作对象不明确不执行,提示 reply,绝不默认改最近一笔)。
+_ERR_KEY = {
+    "ambiguous": "exp_reply_to_record",
+    "ref_not_found": "exp_ref_not_found",
+    "none": "exp_correct_none",
+}
 
 
-def request_correct(bound_user, reply_token, line_user_id, text, u, lang, tid, ws) -> bool:
-    """edit 意图 → 收集改动 + 定位目标 + 单/多行规则 → 存待确认 + 回确认。无法处理时诚实兜底。"""
+def request_correct(
+    bound_user, reply_token, line_user_id, text, u, quoted_message_id, lang, tid, ws
+) -> bool:
+    """edit 意图 → 收集改动 + 定位目标(引用>第N笔>明确上一笔)+ 单/多行规则 → 存待确认 + 回确认。"""
+    from services.line_binding import line_message_refs
+    from services.purchase import docs as docs_svc
+
     changes = _collect_changes(u)
     if not changes:
         line_client.reply_text(reply_token, line_client.t_line(lang, "exp_edit_web"))
         return True
-    from services.purchase import docs as docs_svc
 
     with db.get_cursor_rls(tid, commit=True) as cur:
-        target_id, err_key, n = _resolve_target(
-            cur, line_user_id=line_user_id, text=text, tenant_id=tid, ws=ws
+        tgt = line_message_refs.resolve_target(
+            cur,
+            tenant_id=tid,
+            ws=ws,
+            line_user_id=line_user_id,
+            quoted_message_id=quoted_message_id,
+            text=text,
         )
-        if err_key:
-            line_client.reply_text(reply_token, line_client.t_line(lang, err_key, n=n))
+        if tgt["error"]:
+            line_client.reply_text(reply_token, line_client.t_line(lang, _ERR_KEY[tgt["error"]]))
             return True
-        detail = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=target_id)
+        target_id, ws_eff = tgt["doc_id"], tgt["ws"]
+        detail = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws_eff, doc_id=target_id)
         if not detail or (detail.get("doc") or {}).get("status") != "posted":
             line_client.reply_text(reply_token, line_client.t_line(lang, "exp_correct_none"))
             return True
@@ -161,9 +142,9 @@ def request_correct(bound_user, reply_token, line_user_id, text, u, lang, tid, w
             cur,
             line_user_id=line_user_id,
             tenant_id=tid,
-            workspace_client_id=ws,
+            workspace_client_id=ws_eff,
             draft=changes_draft,
-            missing=f"{_PREFIX}{target_id}:{'|'.join(sorted(changes))}",
+            missing=f"{_PREFIX}{ws_eff}:{target_id}:{'|'.join(sorted(changes))}",
         )
         old_total = (detail.get("doc") or {}).get("grand_total")
     if set(changes) == {"amount"}:
@@ -191,12 +172,12 @@ def try_confirm(bound_user, reply_token, line_user_id, text, tid, ws, lang) -> b
             conversation.clear_pending(cur, line_user_id=line_user_id)
         line_client.reply_text(reply_token, line_client.t_line(lang, "exp_correct_cancel"))
         return True
-    orig_id, keys = _parse_missing(pend["missing"])
+    ws_eff, orig_id, keys = _parse_missing(pend["missing"])
     changes_draft = pend["draft"]
     try:
         with db.get_cursor_rls(tid, commit=True) as cur:
             conversation.clear_pending(cur, line_user_id=line_user_id)
-            res = _apply(cur, bound_user, tid, ws, orig_id, changes_draft, keys)
+            res = _apply(cur, bound_user, tid, ws_eff, orig_id, changes_draft, keys)
     except PosError as e:
         if (e.code or "") == "acct.period_closed":
             line_client.reply_text(reply_token, line_client.t_line(lang, "exp_correct_closed"))
@@ -211,9 +192,16 @@ def try_confirm(bound_user, reply_token, line_user_id, text, tid, ws, lang) -> b
 
 
 def _parse_missing(missing: str):
+    """correct:<ws>:<doc_id>:<keys> → (ws:int, doc_id, [keys])。ws 编码进 missing,确认时按目标
+    单所在套账操作(支持引用跨套账的旧单)。"""
     body = str(missing)[len(_PREFIX) :]
-    orig_id, _, keys = body.partition(":")
-    return orig_id, [k for k in keys.split("|") if k]
+    ws_s, _, rest = body.partition(":")
+    orig_id, _, keys = rest.partition(":")
+    try:
+        ws = int(ws_s)
+    except (ValueError, TypeError):
+        ws = ws_s
+    return ws, orig_id, [k for k in keys.split("|") if k]
 
 
 def _apply(cur, bound_user, tid, ws, orig_id, changes_draft, keys) -> Optional[dict]:

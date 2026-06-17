@@ -22,10 +22,30 @@ from services.line_binding import line_client
 
 _PREFIX = "correct:"
 _YES = ("是", "对", "好", "确认", "ok", "yes", "ใช่", "ตกลง", "ถูก", "確認", "はい")
+# 否定词优先于肯定:治子串塌缩——泰文「ไม่ใช่(不是)」含「ใช่(是)」、中文「不对」含「对」、
+# 「不是」含「是」。漏了这条会把用户的「不」当成「是」照改账(真实事故:用户回 ไม่ใช่ 仍被改)。
+_NO = (
+    "不",
+    "别",
+    "取消",
+    "no",
+    "not",
+    "wrong",
+    "cancel",
+    "ไม่",
+    "ยกเลิก",
+    "ผิด",
+    "いいえ",
+    "ない",
+    "違",
+    "キャンセル",
+)
 
 
 def _affirmative(text: str) -> bool:
     t = (text or "").strip().lower()
+    if not t or any(n in t for n in _NO):
+        return False
     return any(k in t for k in _YES)
 
 

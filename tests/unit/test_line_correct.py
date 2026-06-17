@@ -27,7 +27,18 @@ class AffirmativeParseTests(unittest.TestCase):
     def test_affirmative(self):
         self.assertTrue(line_correct._affirmative("是"))
         self.assertTrue(line_correct._affirmative("ใช่"))
+        self.assertTrue(line_correct._affirmative("ตกลง"))
         self.assertFalse(line_correct._affirmative("咖啡 70"))
+
+    def test_negation_not_swallowed_as_yes(self):
+        # 真实事故:泰文「ไม่ใช่(不是)」含「ใช่(是)」子串,绝不能被当确认。
+        self.assertFalse(line_correct._affirmative("ไม่ใช่ กล่าวผิดไป"))
+        self.assertFalse(line_correct._affirmative("ไม่ใช่"))
+        self.assertFalse(line_correct._affirmative("ไม่เอา"))
+        self.assertFalse(line_correct._affirmative("不对"))
+        self.assertFalse(line_correct._affirmative("不是"))
+        self.assertFalse(line_correct._affirmative("不用了"))
+        self.assertFalse(line_correct._affirmative("no"))
 
     def test_parse_missing(self):
         self.assertEqual(

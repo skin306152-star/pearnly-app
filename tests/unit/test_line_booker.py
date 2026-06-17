@@ -112,5 +112,71 @@ class BookAndMintTests(unittest.TestCase):
                 )
 
 
+class ToPurchaseDataTests(unittest.TestCase):
+    """单/多项路共用建单组装:expense 默认已付(等于多项路原硬编码 'paid')+ 字段直传。"""
+
+    def test_expense_defaults_paid_and_shape(self):
+        data = line_booker.to_purchase_data(
+            lines=[{"description": "x"}],
+            doc_date="2026-06-17",
+            supplier={"name": "v"},
+            category_id="p1",
+        )
+        self.assertEqual((data["doc_kind"], data["source"]), ("expense", "line"))
+        self.assertEqual(data["payment_status"], "paid")  # 空单据类型费用 → 已付
+        self.assertEqual(data["currency"], "THB")
+        self.assertIsNone(data["doc_no"])
+        self.assertEqual(data["lines"], [{"description": "x"}])
+
+    def test_passthrough_doc_no_and_currency(self):
+        data = line_booker.to_purchase_data(
+            lines=[], doc_date=None, supplier={}, doc_no="INV1", currency="USD"
+        )
+        self.assertEqual((data["doc_no"], data["currency"]), ("INV1", "USD"))
+
+
+class EmitResultCardTests(unittest.TestCase):
+    """三路共用发卡口:引用回执(posted/dup/confirm 文案 key)+ Flex 卡 → 两条消息。"""
+
+    def test_builds_ack_and_card_two_messages(self):
+        with (
+            mock.patch("services.line_binding.line_client.t_line", return_value="ACK") as tl,
+            mock.patch(
+                "services.line_binding.line_card.result_card", return_value={"type": "flex"}
+            ) as rc,
+            mock.patch("services.line_binding.line_client.reply_messages") as rm,
+        ):
+            line_booker.emit_result_card(
+                "RT",
+                state="posted",
+                amount="120",
+                fields={"a": 1},
+                doc_id="d1",
+                lang="zh",
+                quote_token="q",
+                workspace_name="WS",
+                token="tok",
+                workspace_client_id="9",
+            )
+        self.assertEqual(tl.call_args.args[1], "exp_ack_posted")
+        self.assertEqual(rc.call_args.kwargs["state"], "posted")
+        self.assertEqual(rc.call_args.kwargs["amount"], "120")
+        msgs = rm.call_args.args[1]
+        self.assertEqual(len(msgs), 2)
+        self.assertEqual(msgs[0]["quoteToken"], "q")
+        self.assertEqual(msgs[1], {"type": "flex"})
+
+    def test_no_quote_token_omits_quote(self):
+        with (
+            mock.patch("services.line_binding.line_client.t_line", return_value="ACK"),
+            mock.patch("services.line_binding.line_card.result_card", return_value={}),
+            mock.patch("services.line_binding.line_client.reply_messages") as rm,
+        ):
+            line_booker.emit_result_card(
+                "RT", state="confirm", amount="1", fields={}, doc_id="", lang="zh"
+            )
+        self.assertNotIn("quoteToken", rm.call_args.args[1][0])
+
+
 if __name__ == "__main__":
     unittest.main()

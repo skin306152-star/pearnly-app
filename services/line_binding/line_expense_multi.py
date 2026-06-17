@@ -7,21 +7,17 @@
 
 from __future__ import annotations
 
-import os
 from datetime import date
 from decimal import Decimal
 
 from core import db
-from services.line_binding import line_client
-
-_WEB_PURCHASE_URL = "https://pearnly.com/home"
 
 
 def do_record_multi(bound_user, reply_token, text, tid, ws, items, quote_token, lang) -> bool:
     """每项独立行 + 智能归类(批量一次 LLM)·合计入账·卡显逐条明细。返回 True。"""
     from services.expense import category_ai, confidence, line_l2
     from services.expense.line_quick_entry import qty_label, split_qty_price
-    from services.line_binding import line_booker, line_card
+    from services.line_binding import line_booker
     from services.purchase import categories as cat_svc
     from services.purchase import intake as intake_svc
     from services.purchase import settings as settings_svc
@@ -69,16 +65,12 @@ def do_record_multi(bound_user, reply_token, text, tid, ws, items, quote_token, 
                 )
         cfg = settings_svc.get_settings(cur, tenant_id=tid, workspace_client_id=ws)
         ws_name = intake_svc.workspace_name(cur, tenant_id=tid, workspace_client_id=ws)
-        data = {
-            "doc_kind": "expense",
-            "source": "line",
-            "doc_date": doc_date,
-            "category_id": doc_cat,
-            "supplier": {"name": vendor},
-            "currency": "THB",
-            "payment_status": "paid",
-            "lines": lines,
-        }
+        data = line_booker.to_purchase_data(
+            lines=lines,
+            doc_date=doc_date,
+            category_id=doc_cat,
+            supplier={"name": vendor},
+        )
         verdict = confidence.grade(
             amount=str(total),
             vendor_name=vendor,
@@ -113,24 +105,16 @@ def do_record_multi(bound_user, reply_token, text, tid, ws, items, quote_token, 
         ],
         "detail": " · ".join(names[:3]) + (f" 等{len(names)}项" if len(names) > 3 else ""),
     }
-    ack = {
-        "type": "text",
-        "text": line_client.t_line(lang, line_booker.ack_key(state), amount=str(total)),
-    }
-    if quote_token:
-        ack["quoteToken"] = quote_token
-    card = line_card.result_card(
+    line_booker.emit_result_card(
+        reply_token,
         state=state,
         amount=str(total),
         fields=card_fields,
         doc_id=doc_id,
         lang=lang,
-        web_url=_WEB_PURCHASE_URL,
-        source="text",
+        quote_token=quote_token,
         workspace_name=ws_name,
         token=token,
-        liff_id=os.getenv("LINE_LIFF_ID", "").strip(),
         workspace_client_id=str(ws or ""),
     )
-    line_client.reply_messages(reply_token, [ack, card])
     return True

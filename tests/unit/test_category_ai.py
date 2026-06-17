@@ -107,5 +107,26 @@ class RuleCategoryTests(unittest.TestCase):
         )
 
 
+class DecodeChoiceTests(unittest.TestCase):
+    """编号 → (cat_id, sub_id) 共享解码(三处归类共用):越界/非数字一律 (None, None)。"""
+
+    OPTS = [("p1", "c1", "A > a"), ("p2", "c2", "B > b")]
+
+    def test_valid_int_and_str(self):
+        self.assertEqual(category_ai._decode_choice(1, self.OPTS), ("p1", "c1"))
+        self.assertEqual(category_ai._decode_choice("2", self.OPTS), ("p2", "c2"))
+
+    def test_zero_and_out_of_range(self):
+        self.assertEqual(category_ai._decode_choice(0, self.OPTS), (None, None))
+        self.assertEqual(category_ai._decode_choice(9, self.OPTS), (None, None))
+
+    def test_non_numeric_and_none(self):
+        self.assertEqual(category_ai._decode_choice("x", self.OPTS), (None, None))
+        self.assertEqual(category_ai._decode_choice(None, self.OPTS), (None, None))
+
+    def test_listing_numbered(self):
+        self.assertEqual(category_ai._listing(self.OPTS), "1. A > a\n2. B > b")
+
+
 if __name__ == "__main__":
     unittest.main()

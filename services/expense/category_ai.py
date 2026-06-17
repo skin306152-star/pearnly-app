@@ -233,7 +233,7 @@ def categorize_items(items: list, categories: list, *, api_key: Optional[str], t
     todo = [i for i, (c, _s) in enumerate(out) if not c]
     if not (todo and api_key and options):
         return out
-    listing = "\n".join(f"{i + 1}. {label}" for i, (_, _, label) in enumerate(options))
+    listing = _listing(options)
     names = "\n".join(f"{j + 1}) {items[i].get('name', '')}" for j, i in enumerate(todo))
     payload = f"Items:\n{names}\n\nCategories:\n{listing}"
     try:
@@ -255,12 +255,9 @@ def categorize_items(items: list, categories: list, *, api_key: Optional[str], t
     for j, i in enumerate(todo):
         if j >= len(choices):
             break
-        try:
-            ch = int(choices[j])
-        except (ValueError, TypeError):
-            continue
-        if 1 <= ch <= len(options):
-            out[i] = (options[ch - 1][0], options[ch - 1][1])
+        cid, sid = _decode_choice(choices[j], options)
+        if cid:
+            out[i] = (cid, sid)
     return out
 
 
@@ -302,7 +299,7 @@ def parse_and_categorize(text: str, categories: list, *, api_key: Optional[str],
 
     today = _date.today().isoformat()
     nums = {n.replace(",", "") for n in re.findall(r"\d[\d,]*(?:\.\d+)?", text or "")}
-    listing = "\n".join(f"{i + 1}. {label}" for i, (_, _, label) in enumerate(options))
+    listing = _listing(options)
     try:
         from services.ocr import gemini_models
         from services.ocr.layer2_gemini import _call_gemini_with_retry
@@ -329,13 +326,7 @@ def parse_and_categorize(text: str, categories: list, *, api_key: Optional[str],
             amt = Decimal(amt_s)
         except (InvalidOperation, ValueError):
             continue
-        cid = sid = None
-        try:
-            ch = int(it.get("choice") or 0)
-            if 1 <= ch <= len(options):
-                cid, sid = options[ch - 1][0], options[ch - 1][1]
-        except (ValueError, TypeError):
-            pass
+        cid, sid = _decode_choice(it.get("choice") or 0, options)
         qty = Decimal("1")  # 数量(#8):缺省 1;非法值回落 1(总额仍按 amount 权威)
         try:
             _q = Decimal(str(it.get("qty") or "1"))
@@ -370,6 +361,22 @@ def _options(categories: list) -> list:
     return out
 
 
+def _listing(options: list) -> str:
+    """扁平选项 → 编号清单文本(让 LLM 在真实编号里挑)。"""
+    return "\n".join(f"{i + 1}. {label}" for i, (_, _, label) in enumerate(options))
+
+
+def _decode_choice(choice, options: list) -> tuple:
+    """LLM 返回编号 → (category_id, subcategory_id);非数字/越界 → (None, None)。"""
+    try:
+        ch = int(choice)
+    except (ValueError, TypeError):
+        return None, None
+    if 1 <= ch <= len(options):
+        return options[ch - 1][0], options[ch - 1][1]
+    return None, None
+
+
 def suggest_category(
     vendor: str,
     descriptions: str,
@@ -384,7 +391,7 @@ def suggest_category(
     options = _options(categories)
     if not options:
         return None, None
-    listing = "\n".join(f"{i + 1}. {label}" for i, (_, _, label) in enumerate(options))
+    listing = _listing(options)
     payload = f"Vendor: {vendor or '-'}\nItems: {descriptions or '-'}\nCategories:\n{listing}"
     try:
         from services.ocr import gemini_models
@@ -401,13 +408,7 @@ def suggest_category(
             timeout=timeout,
             system_prompt_override=_PROMPT,
         )
-        choice = int((data or {}).get("choice") or 0)
-    except (ValueError, TypeError):
-        return None, None
     except Exception as e:  # noqa: BLE001
         logger.warning("[category_ai] suggest failed: %s", str(e)[:160])
         return None, None
-    if 1 <= choice <= len(options):
-        cat_id, sub_id, _ = options[choice - 1]
-        return cat_id, sub_id
-    return None, None
+    return _decode_choice((data or {}).get("choice"), options)

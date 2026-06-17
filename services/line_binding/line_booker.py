@@ -11,6 +11,8 @@ from __future__ import annotations
 # 回执文案 key:状态 → line_i18n 键(原散在 3 处,完全相同)。
 _ACK_KEYS = {"posted": "exp_ack_posted", "dup": "exp_ack_dup"}
 
+_WEB_PURCHASE_URL = "https://pearnly.com/home"
+
 
 def ack_key(state: str) -> str:
     """入账状态 → 引用回执的 i18n 文案 key(posted/dup/其余=confirm)。"""
@@ -76,3 +78,63 @@ def book_and_mint(
         else ""
     )
     return doc_id, state, token
+
+
+def to_purchase_data(
+    *, lines, doc_date, supplier, category_id=None, document_type="", doc_no=None, currency="THB"
+) -> dict:
+    """费用建单 data 组装(单笔/多项路共用)。付款态走 intake.default_payment_status:无单据类型的
+    费用单 → 已付(消除多项路硬编码 'paid' 漂移,二者本就等值)。doc_kind=expense·source=line。"""
+    from services.purchase import intake as _intake
+
+    return {
+        "doc_kind": "expense",
+        "source": "line",
+        "doc_date": doc_date,
+        "category_id": category_id,
+        "supplier": supplier,
+        "doc_no": doc_no,
+        "currency": currency,
+        "payment_status": _intake.default_payment_status(document_type, "expense"),
+        "lines": lines,
+    }
+
+
+def emit_result_card(
+    reply_token,
+    *,
+    state,
+    amount,
+    fields,
+    doc_id,
+    lang,
+    quote_token="",
+    workspace_name="",
+    token="",
+    workspace_client_id="",
+    field_confidence=None,
+    source="text",
+) -> None:
+    """三路共用发卡口:引用回执(text·可被引用)+ Flex 数据卡(不可引用 → 拆两条发)。"""
+    import os
+
+    from services.line_binding import line_card, line_client
+
+    ack = {"type": "text", "text": line_client.t_line(lang, ack_key(state), amount=amount)}
+    if quote_token:
+        ack["quoteToken"] = quote_token
+    card = line_card.result_card(
+        state=state,
+        amount=amount,
+        fields=fields,
+        field_confidence=field_confidence or {},
+        doc_id=doc_id,
+        lang=lang,
+        web_url=_WEB_PURCHASE_URL,
+        source=source,
+        workspace_name=workspace_name,
+        token=token,
+        liff_id=os.getenv("LINE_LIFF_ID", "").strip(),
+        workspace_client_id=workspace_client_id,
+    )
+    line_client.reply_messages(reply_token, [ack, card])

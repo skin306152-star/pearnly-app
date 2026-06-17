@@ -8,15 +8,11 @@ handle_expense_text:文本 → 智能解析(L1 规则 + L2 LLM)→ 记账直接�
 from __future__ import annotations
 
 import logging
-import os
 
 from core import db
 from services.line_binding import line_client, line_expense_qa
 
 logger = logging.getLogger(__name__)
-
-
-_WEB_PURCHASE_URL = "https://pearnly.com/home"
 
 
 def handle_expense_text(
@@ -269,30 +265,21 @@ def _card_fields_from_draft(draft) -> dict:
 def _reply_card(
     reply_token, state, draft, doc_id, lang, quote_token, workspace_name="", token="", ws=""
 ) -> None:
-    """回执 = 【引用原句的一行回执】+【Flex 数据卡】(Flex 不能被引用,故拆两条)。"""
-    from services.line_binding import line_booker, line_card
+    """回执 = 引用原句一行 + Flex 数据卡(三路共用 line_booker.emit_result_card)。"""
+    from services.line_binding import line_booker
 
-    ack = {
-        "type": "text",
-        "text": line_client.t_line(lang, line_booker.ack_key(state), amount=draft.amount),
-    }
-    if quote_token:
-        ack["quoteToken"] = quote_token
-    card = line_card.result_card(
+    line_booker.emit_result_card(
+        reply_token,
         state=state,
         amount=draft.amount,
         fields=_card_fields_from_draft(draft),
-        field_confidence={},
         doc_id=doc_id,
         lang=lang,
-        web_url=_WEB_PURCHASE_URL,
-        source="text",
+        quote_token=quote_token,
         workspace_name=workspace_name,
         token=token,
-        liff_id=os.getenv("LINE_LIFF_ID", "").strip(),
         workspace_client_id=ws,
     )
-    line_client.reply_messages(reply_token, [ack, card])
 
 
 def _reply_pool(reply_token, kind, text, lang) -> None:
@@ -312,11 +299,13 @@ def _reply_pool(reply_token, kind, text, lang) -> None:
 
 
 def _to_purchase_data(d: dict) -> dict:
-    """expense_draft → 采购进项建单 data(doc_kind=expense·带卖家/分类·source=line)。
+    """expense_draft → 采购进项建单 data(单笔路 · 单行)。
 
     数量(#8):「买2杯咖啡共120」→ 行 qty=2、单价=60(split_qty_price·总额不漂);无数量 → qty=1。
+    doc-level 组装走共享 line_booker.to_purchase_data(与多项路同口径)。
     """
     from services.expense.line_quick_entry import split_qty_price
+    from services.line_binding import line_booker
 
     _qty, _unit_price = split_qty_price(d.get("amount"), d.get("qty"), d.get("unit_price"))
     line = {
@@ -331,22 +320,18 @@ def _to_purchase_data(d: dict) -> dict:
         "category_id": d.get("category_id"),
         "subcategory_id": d.get("subcategory_id"),
     }
-    from services.purchase import intake as _intake
-
-    return {
-        "doc_kind": "expense",
-        "source": "line",
-        "doc_date": d.get("doc_date"),
-        "category_id": d.get("category_id"),
-        "supplier": {
+    return line_booker.to_purchase_data(
+        lines=[line],
+        doc_date=d.get("doc_date"),
+        category_id=d.get("category_id"),
+        supplier={
             "name": (d.get("vendor_name") or "").strip(),
             "tax_id": (d.get("vendor_tax_id") or "").strip() or None,
         },
-        "doc_no": (d.get("invoice_number") or "").strip() or None,
-        "currency": d.get("currency") or "THB",
-        "payment_status": _intake.default_payment_status(d.get("document_type"), "expense"),
-        "lines": [line],
-    }
+        document_type=d.get("document_type"),
+        doc_no=(d.get("invoice_number") or "").strip() or None,
+        currency=d.get("currency") or "THB",
+    )
 
 
 def _dup_warn(bound_user, draft, ws) -> bool:

@@ -123,9 +123,20 @@ class CardTests(unittest.TestCase):
         header = c["contents"]["header"]
         self.assertIn("backgroundColor", header)
         self.assertNotIn("cornerRadius", header)  # 不再是浮动胶囊
-        self.assertIn("已入账", str(header))
+        self.assertIn("费用已入账", str(header))
         # body 第一项不应再是带 cornerRadius 的状态胶囊
-        self.assertNotIn("已入账", str(c["contents"]["body"]["contents"][0]))
+        self.assertNotIn("费用已入账", str(c["contents"]["body"]["contents"][0]))
+
+    def test_product_copy_uses_receipt_card_language(self):
+        import json
+
+        s = json.dumps(self._card("confirm"), ensure_ascii=False)
+        self.assertIn("2,722.00 THB", s)
+        self.assertIn("请确认后入账", s)
+        self.assertIn("待确认", s)
+        self.assertIn("建议分类", s)
+        self.assertIn("费用明细", s)
+        self.assertNotIn("A" + "I", s)
 
     def _footer_contents(self, card):
         return card["contents"]["footer"]["contents"]

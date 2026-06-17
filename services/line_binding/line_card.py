@@ -37,6 +37,20 @@ def _txt(text, *, size, color, **kw) -> dict:
     return {"type": "text", "text": str(text), "size": size, "color": color, **kw}
 
 
+def _amount_text(amount, t: dict) -> tuple[bool, str]:
+    if amount in (None, ""):
+        return False, f"— {t['currency']}"
+    return True, f"{amount} {t['currency']}"
+
+
+def _state_meta(state: str, t: dict) -> str:
+    return {
+        "posted": t["state_saved"],
+        "confirm": t["state_pending"],
+        "dup": t["state_review"],
+    }.get(state, t["state_pending"])
+
+
 def _field_row(label: str, value: str, t: dict, *, low: bool, strong: bool) -> dict:
     val = (value or "").strip() or t["na"]
     if low and val != t["na"]:
@@ -279,8 +293,8 @@ def result_card(
         et, t["na"]
     )
     src_text = {"text": t["src_text"], "bank": t["src_bank"]}.get(source, t["src_doc"])
-    has_amt = amount not in (None, "")
-    amt_text = f"฿{amount}" if has_amt else "Amount —"
+    has_amt, amt_text = _amount_text(amount, t)
+    state_meta = _state_meta(state, t)
 
     # 状态条 = bubble header:满宽贴边、跟随卡片顶部圆角(对标 Paypers·非浮动胶囊)。
     status_header = {
@@ -289,7 +303,15 @@ def result_card(
         "paddingAll": "14px",
         "paddingStart": "20px",
         "backgroundColor": st["bg"],
-        "contents": [_txt(f"{st['icon']} {t[state]}", size="sm", color=st["color"], weight="bold")],
+        "contents": [
+            _txt(
+                f"{st['icon']} {t[state]}",
+                size="sm",
+                color=st["color"],
+                weight="bold",
+                wrap=True,
+            )
+        ],
     }
 
     # 顶部融入式提示细条(非浮动圆角块):总额不符(琥珀)/ 可能重复(红)。
@@ -312,10 +334,11 @@ def result_card(
             "contents": [
                 _txt(
                     amt_text,
-                    size="xxl",
+                    size="xl",
                     color=_AMOUNT if has_amt else _AMOUNT_MISS,
                     weight="bold",
-                    flex=4,
+                    flex=5,
+                    wrap=True,
                 ),
                 {
                     "type": "box",
@@ -324,6 +347,7 @@ def result_card(
                     "flex": 3,
                     "contents": [
                         _txt(t["meta_expense"], size="xs", color=_META_STRONG, weight="bold"),
+                        _txt(state_meta, size="xxs", color=_VALUE, margin="xs", weight="bold"),
                         _txt(src_text, size="xxs", color=_LABEL, margin="xs"),
                     ],
                 },

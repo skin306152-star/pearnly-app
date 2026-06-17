@@ -21,7 +21,7 @@ class _RecCur:
 
 
 class RecordTests(unittest.TestCase):
-    def test_inserts_each_message_id(self):
+    def test_batches_all_ids_in_one_insert(self):
         cur = _RecCur()
         refs.record(
             cur,
@@ -32,9 +32,10 @@ class RecordTests(unittest.TestCase):
             ref_id="D1",
             state="posted",
         )
-        self.assertEqual(len(cur.params), 2)
-        self.assertEqual(cur.params[0][0], "m1")  # line_message_id 是第一个参数
-        self.assertEqual(cur.params[1][0], "m2")
+        self.assertEqual(len(cur.params), 1)  # 单次多行 INSERT(非逐条往返)
+        flat = cur.params[0]
+        self.assertEqual(flat[0], "m1")  # 第 1 行的 line_message_id
+        self.assertEqual(flat[9], "m2")  # 第 2 行的 line_message_id(每行 9 参数)
 
     def test_skips_empty_ids_or_ref(self):
         cur = _RecCur()

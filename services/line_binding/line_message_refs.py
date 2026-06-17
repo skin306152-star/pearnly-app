@@ -74,32 +74,36 @@ def record(
     summary: str = "",
     ttl_days: int = DEFAULT_TTL_DAYS,
 ) -> None:
-    """把刚发出的若干 LINE 消息 id 绑到一张业务单(用户可引用其中任一条来操作)。best-effort。"""
-    if not ref_id or not message_ids:
+    """把刚发出的若干 LINE 消息 id 绑到一张业务单(用户可引用其中任一条来操作)。best-effort。
+
+    一条多行 INSERT(回执卡通常 2 条消息)→ 单次 round-trip,不在发卡路径上逐条往返。
+    """
+    ids = [str(m) for m in (message_ids or []) if m]
+    if not ref_id or not ids:
         return
-    for mid in message_ids:
-        if not mid:
-            continue
-        cur.execute(
-            "INSERT INTO line_message_refs "
-            "(line_message_id, tenant_id, workspace_client_id, line_user_id, ref_type, ref_id, "
-            " state, summary, expires_at) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, now() + make_interval(days => %s)) "
-            "ON CONFLICT (line_message_id) DO UPDATE SET "
-            " ref_id = EXCLUDED.ref_id, state = EXCLUDED.state, summary = EXCLUDED.summary, "
-            " expires_at = EXCLUDED.expires_at",
-            (
-                str(mid),
-                tenant_id,
-                workspace_client_id,
-                str(line_user_id or ""),
-                ref_type,
-                str(ref_id),
-                state or "",
-                summary or "",
-                int(ttl_days),
-            ),
-        )
+    base = [
+        tenant_id,
+        workspace_client_id,
+        str(line_user_id or ""),
+        ref_type,
+        str(ref_id),
+        state or "",
+        summary or "",
+        int(ttl_days),
+    ]
+    rows, params = [], []
+    for mid in ids:
+        rows.append("(%s, %s, %s, %s, %s, %s, %s, %s, now() + make_interval(days => %s))")
+        params.extend([mid, *base])
+    cur.execute(
+        "INSERT INTO line_message_refs "
+        "(line_message_id, tenant_id, workspace_client_id, line_user_id, ref_type, ref_id, "
+        " state, summary, expires_at) VALUES " + ", ".join(rows) + " "
+        "ON CONFLICT (line_message_id) DO UPDATE SET "
+        " ref_id = EXCLUDED.ref_id, state = EXCLUDED.state, summary = EXCLUDED.summary, "
+        " expires_at = EXCLUDED.expires_at",
+        params,
+    )
 
 
 def record_safe(

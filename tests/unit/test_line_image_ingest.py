@@ -22,7 +22,7 @@ def _draft():
     }
 
 
-def _run(resolve_ret, *, band="high", auto_book=True, fields=None):
+def _run(resolve_ret, *, band="high", auto_book=True, fields=None, tree=None):
     created = {"doc": {"id": "D1"}}
     with (
         mock.patch.object(ik, "resolve_image_intake", return_value=resolve_ret),
@@ -31,7 +31,7 @@ def _run(resolve_ret, *, band="high", auto_book=True, fields=None):
             "services.purchase.settings.get_settings",
             return_value={"auto_stock_in": False, "auto_book": auto_book},
         ),
-        mock.patch("services.purchase.categories.get_tree", return_value=[]),
+        mock.patch("services.purchase.categories.get_tree", return_value=tree or []),
         mock.patch("services.purchase.docs.create_doc", return_value=created) as cdoc,
         mock.patch("services.purchase.posting.post_doc", return_value=created) as pdoc,
         mock.patch("services.line_binding.line_action_nonce.mint", return_value="TOK"),
@@ -99,6 +99,10 @@ class IngestTests(unittest.TestCase):
             mock.patch("services.purchase.docs.create_doc", return_value=created),
             mock.patch("services.line_binding.line_action_nonce.mint", return_value="TOK"),
             mock.patch(
+                "services.expense.category_ai.categorize_items",
+                return_value=[(None, None)],
+            ),
+            mock.patch(
                 "services.expense.category_ai.suggest_category", return_value=("p1", "c1")
             ) as suggest,
         ):
@@ -114,6 +118,80 @@ class IngestTests(unittest.TestCase):
         suggest.assert_called_once()
         self.assertEqual(out["card_fields"]["category"], "餐饮 & 招待")
         self.assertEqual(out["card_fields"]["subcategory"], "餐费")
+
+    def test_food_item_overrides_fuel_vendor_category(self):
+        # PTT 体系小票如果买的是咖啡,按明细归餐饮,不能被卖家名带到燃油。
+        draft = {
+            "doc_kind": "expense",
+            "supplier": {"name": "บมจ. ปตท. น้ำมันและการค้าปลีก", "tax_id": None},
+            "doc_no": "R#1",
+            "lines": [
+                {"description": "บมจ. ปตท. น้ำมันและการค้าปลีก", "qty": "1", "unit_price": "70"}
+            ],
+            "grand_total": "70.00",
+        }
+        res = {"route": "expense", "draft": draft, "dedupe_hit": False, "field_confidence": {}}
+        tree = [
+            {
+                "id": "p_fuel",
+                "name": "ค่าเดินทางและขนส่ง",
+                "children": [{"id": "c_fuel", "name": "ค่าน้ำมันเชื้อเพลิง"}],
+            },
+            {
+                "id": "p_food",
+                "name": "ค่าอาหารและรับรอง",
+                "children": [{"id": "c_food", "name": "ค่าอาหาร/เครื่องดื่ม"}],
+            },
+        ]
+        fields = {
+            "document_type": "receipt",
+            "seller_name": "บมจ. ปตท. น้ำมันและการค้าปลีก",
+            "total_amount": "70",
+            "vat": "4.58",
+            "items": [
+                {"name": "TW แบล็คคอฟฟี่ เย็น", "subtotal": "60"},
+                {"name": "TW เพิ่มช็อตกาแฟ", "subtotal": "10"},
+            ],
+        }
+        out, _cdoc, _pdoc = _run(res, band="high", auto_book=False, fields=fields, tree=tree)
+        self.assertEqual(out["card_fields"]["category"], "ค่าอาหารและรับรอง")
+        self.assertEqual(out["card_fields"]["subcategory"], "ค่าอาหาร/เครื่องดื่ม")
+        self.assertNotIn("category", out["field_confidence"])
+
+    def test_mixed_receipt_dominant_category_marks_close_split_for_review(self):
+        # 混合小票按金额最大的类别显示;接近五五开时分类字段打低置信,卡片会提示核对。
+        draft = {
+            "doc_kind": "expense",
+            "supplier": {"name": "PTT", "tax_id": None},
+            "doc_no": "R#1",
+            "lines": [{"description": "PTT", "qty": "1", "unit_price": "110"}],
+            "grand_total": "110.00",
+        }
+        res = {"route": "expense", "draft": draft, "dedupe_hit": False, "field_confidence": {}}
+        tree = [
+            {
+                "id": "p_fuel",
+                "name": "ค่าเดินทางและขนส่ง",
+                "children": [{"id": "c_fuel", "name": "ค่าน้ำมันเชื้อเพลิง"}],
+            },
+            {
+                "id": "p_food",
+                "name": "ค่าอาหารและรับรอง",
+                "children": [{"id": "c_food", "name": "ค่าอาหาร/เครื่องดื่ม"}],
+            },
+        ]
+        fields = {
+            "document_type": "receipt",
+            "seller_name": "PTT",
+            "total_amount": "110",
+            "items": [
+                {"name": "ดีเซล", "subtotal": "60"},
+                {"name": "กาแฟ", "subtotal": "50"},
+            ],
+        }
+        out, _cdoc, _pdoc = _run(res, band="high", auto_book=False, fields=fields, tree=tree)
+        self.assertEqual(out["card_fields"]["category"], "ค่าเดินทางและขนส่ง")
+        self.assertEqual(out["field_confidence"]["category"], 0.82)
 
     def test_no_api_key_no_llm_call(self):
         # 无 key → 不调 LLM 兜底(省成本),分类留空。

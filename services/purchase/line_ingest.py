@@ -97,33 +97,72 @@ def _draft_card_items(draft: dict) -> list:
     return out
 
 
-def _smart_category(cur, *, tenant_id, workspace_client_id, vendor, descs, api_key):
-    """智能归类(图片路 · LLM 优先 → 关键词兜底)。返回 (cat_id, sub_id, cat_name, sub_name)。
+def _category_names(cats: list, cat_id, sub_id) -> tuple[str, str]:
+    for p in cats:
+        if p["id"] == cat_id:
+            sub_name = next((c["name"] for c in (p.get("children") or []) if c["id"] == sub_id), "")
+            return p["name"], sub_name
+    return "", ""
 
-    很多泰文品名/供应商关键词命不中或误命中(分类不对/空)→ 有 key 时先让 LLM 在真实科目树里挑
-    (懂「ไฮดีเซล=柴油→交通」),挑不出/无 key 再退关键词。全空 → (None, None, '', '')。
-    """
+
+def _dominant_item_category(cats: list, items: list, *, api_key):
+    from services.expense import category_ai
+
+    clean = [
+        {"name": str(it.get("name") or "").strip(), "amount": _dec(it.get("amount"))}
+        for it in (items or [])
+        if str(it.get("name") or "").strip()
+    ]
+    if not clean:
+        return None, None, Decimal("0")
+    choices = category_ai.categorize_items(clean, cats, api_key=api_key)
+    weights: dict[tuple, Decimal] = {}
+    total_weight = Decimal("0")
+    for it, pair in zip(clean, choices):
+        cat_id, sub_id = pair
+        weight = it["amount"] if it["amount"] > 0 else Decimal("1")
+        total_weight += weight
+        if not cat_id:
+            continue
+        weights[(cat_id, sub_id)] = weights.get((cat_id, sub_id), Decimal("0")) + weight
+    if not weights:
+        return None, None, Decimal("0")
+    (cat_id, sub_id), weight = max(weights.items(), key=lambda kv: kv[1])
+    share = (weight / total_weight) if total_weight > 0 else Decimal("0")
+    return cat_id, sub_id, share
+
+
+def _smart_category(cur, *, tenant_id, workspace_client_id, vendor, descs, items, api_key):
+    """图片路分类:逐项规则/批量判断 → 主金额分类 → 整票兜底 → 关键词兜底。"""
     from services.purchase import categories as cat_svc
 
     cats = cat_svc.get_tree(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
     joined = " / ".join(d for d in descs[:5] if d)
     from services.expense import category_ai
 
-    # 1) 无歧义高频商户硬规则(瞬时·永远一致):加油站→燃油 / Grab→交通 / 水电→水电 / 电信→通讯。
+    cat_id, sub_id, share = _dominant_item_category(cats, items, api_key=api_key)
+    if cat_id:
+        cat_name, sub_name = _category_names(cats, cat_id, sub_id)
+        conf = Decimal("0.96") if share >= Decimal("0.70") else Decimal("0.82")
+        return cat_id, sub_id, cat_name, sub_name, conf
+
     cat_id, sub_id = category_ai.rule_category(vendor, joined, cats)
-    # 2) 没命中规则 → LLM(2.5-flash·temp=0·看品名+业态判,治便利店/餐厅这类有歧义的)。
+    if cat_id:
+        cat_name, sub_name = _category_names(cats, cat_id, sub_id)
+        return cat_id, sub_id, cat_name, sub_name, Decimal("0.90")
+
     if not cat_id and api_key:
         cat_id, sub_id = category_ai.suggest_category(vendor, joined, cats, api_key=api_key)
-    # 3) 还没有 → 关键词兜底。
+        if cat_id:
+            cat_name, sub_name = _category_names(cats, cat_id, sub_id)
+            return cat_id, sub_id, cat_name, sub_name, Decimal("0.88")
+
     if not cat_id:
         cat_id, sub_id = ik._match_category(f"{vendor} {descs[0] if descs else ''}", cats)
     if not cat_id:
-        return None, None, "", ""
-    for p in cats:
-        if p["id"] == cat_id:
-            sub_name = next((c["name"] for c in (p.get("children") or []) if c["id"] == sub_id), "")
-            return cat_id, sub_id, p["name"], sub_name
-    return cat_id, sub_id, "", ""
+        return None, None, "", "", Decimal("0")
+    cat_name, sub_name = _category_names(cats, cat_id, sub_id)
+    return cat_id, sub_id, cat_name, sub_name, Decimal("0.76")
 
 
 def ingest_line_image(
@@ -219,18 +258,22 @@ def ingest_line_image(
         )
     # 智能归类(LLM 优先 → 关键词兜底):懂泰文品名,治「分类不对/空」。
     vendor_name = draft["supplier"].get("name") or ""
-    cat_id, sub_id, _cat_name, _sub_name = _smart_category(
+    cat_id, sub_id, _cat_name, _sub_name, cat_conf = _smart_category(
         cur,
         tenant_id=tenant_id,
         workspace_client_id=workspace_client_id,
         vendor=vendor_name,
         descs=descs,
+        items=card_fields.get("items") or [],
         api_key=api_key,
     )
     if cat_id:
         draft["category_id"] = cat_id
         card_fields["category"] = _cat_name
         card_fields["subcategory"] = _sub_name
+        if cat_conf and cat_conf < Decimal("0.85"):
+            fc = dict(fc)
+            fc["category"] = float(cat_conf)
 
     verdict = conf.grade(
         amount=amount,

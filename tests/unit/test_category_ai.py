@@ -69,6 +69,11 @@ class RuleCategoryTests(unittest.TestCase):
             ],
         },
         {
+            "id": "p_food",
+            "name": "ค่าอาหารและรับรอง",
+            "children": [{"id": "c_food", "name": "ค่าอาหาร/เครื่องดื่ม"}],
+        },
+        {
             "id": "p2",
             "name": "ค่าสาธารณูปโภค",
             "children": [{"id": "c3", "name": "ค่าไฟฟ้า"}, {"id": "c4", "name": "ค่าน้ำประปา"}],
@@ -87,10 +92,14 @@ class RuleCategoryTests(unittest.TestCase):
     def test_electric_to_utility(self):
         self.assertEqual(self._r("การไฟฟ้าส่วนภูมิภาค", "ค่าไฟฟ้า"), ("p2", "c3"))
 
-    def test_ambiguous_left_to_llm(self):
-        # 便利店/咖啡:看品名才知道商品 or 餐饮 → 规则不命中,交 LLM。
-        self.assertEqual(self._r("CP ALL, 7-Eleven", "อเมริกาโน่"), (None, None))
-        self.assertEqual(self._r("กาแฟพันธุ์ไทย", "กาแฟ"), (None, None))
+    def test_food_items_override_fuel_station_vendor(self):
+        self.assertEqual(
+            self._r("บมจ. ปตท. น้ำมันและการค้าปลีก", "TW แบล็คคอฟฟี่ เย็น"),
+            ("p_food", "c_food"),
+        )
+
+    def test_restaurant_vendor_to_food(self):
+        self.assertEqual(self._r("Little Betong", "ไก่ทอดเบตง"), ("p_food", "c_food"))
 
     def test_unknown_tree_name_falls_through(self):
         self.assertEqual(

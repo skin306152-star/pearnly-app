@@ -113,5 +113,38 @@ class RunOnImageWiringTest(unittest.TestCase):
         self.assertIs(captured["image_bytes"], small)
 
 
+class TransientRetryTest(unittest.TestCase):
+    """L1/L2 瞬态(504/网络)重试 1 次再失败 —— 治真票偶发 DeadlineExceeded 直接「识别失败」。"""
+
+    def test_retries_once_then_succeeds(self):
+        from services.ocr.layer2_gemini import Layer2TransientError
+
+        calls = {"n": 0}
+
+        def flaky(image_bytes, **kw):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise Layer2TransientError("layer2: transient (DeadlineExceeded): 504")
+            return SimpleNamespace()
+
+        with patch.object(pipeline, "_process_one_page", side_effect=flaky):
+            with patch.object(pipeline, "_compute_total_cost", return_value=0.0):
+                with patch.object(pipeline, "PipelineResult", lambda **kw: SimpleNamespace(**kw)):
+                    with patch.object(pipeline.time, "sleep", return_value=None):
+                        pipeline.run_on_image_bytes(_noise_png(800, 600), api_key="k")
+        self.assertEqual(calls["n"], 2)  # 第一次瞬态 → 重试 → 第二次成功
+
+    def test_persistent_transient_raises(self):
+        from services.ocr.layer2_gemini import Layer2TransientError
+
+        def always(image_bytes, **kw):
+            raise Layer2TransientError("layer2: transient (DeadlineExceeded): 504")
+
+        with patch.object(pipeline, "_process_one_page", side_effect=always):
+            with patch.object(pipeline.time, "sleep", return_value=None):
+                with self.assertRaises(Layer2TransientError):
+                    pipeline.run_on_image_bytes(_noise_png(800, 600), api_key="k")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

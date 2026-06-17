@@ -48,9 +48,11 @@ import time
 from pathlib import Path
 from typing import List, Optional, Union
 
+from .layer1_base import Layer1TransientError
 from .layer1_vision import (
     Layer1PDFError,
 )
+from .layer2_gemini import Layer2TransientError
 from .text_path import try_extract as _try_text_extract
 from .table_path import (
     SUPPORTED_TABLE_EXTENSIONS,
@@ -377,6 +379,29 @@ def run_on_pdf_bytes(
     )
 
 
+# L1/L2 瞬态(504 DeadlineExceeded / 5xx / 网络)重试次数。L3 瞬态已自回落 L2(page_runner),
+# 但 L1/L2 瞬态此前直接抛 →「识别失败」让用户重拍(真票偶发)。重试 1 次治这类误失败。
+OCR_TRANSIENT_RETRY = int(os.environ.get("OCR_TRANSIENT_RETRY", "1"))
+_TRANSIENT_RETRY_SLEEP_S = 1.0
+
+
+def _process_one_page_resilient(*args, **kwargs) -> PipelinePageResult:
+    """对 L1/L2 瞬态错误重试再失败(图片上传路径)。Auth/Quota/解析错不重试(非瞬态)。"""
+    for attempt in range(OCR_TRANSIENT_RETRY + 1):
+        try:
+            return _process_one_page(*args, **kwargs)
+        except (Layer1TransientError, Layer2TransientError) as e:
+            if attempt >= OCR_TRANSIENT_RETRY:
+                raise
+            logger.warning(
+                "pipeline: L1/L2 transient (attempt %d/%d) · retrying: %s",
+                attempt + 1,
+                OCR_TRANSIENT_RETRY + 1,
+                e,
+            )
+            time.sleep(_TRANSIENT_RETRY_SLEEP_S)
+
+
 def run_on_image_bytes(
     image_bytes: bytes,
     api_key: Optional[str] = None,
@@ -393,7 +418,7 @@ def run_on_image_bytes(
     # Step3(REFACTOR-WA-OCRPERF)· 仅图片上传:Layer1 Vision 用压缩版(最长边 cap)·
     # image_bytes 传原图全分辨率 → L3 兜底用原图。PDF 路径(run_on_pdf_bytes)不经此。
     _l1_img = downscale_image_bytes(image_bytes, OCR_IMG_MAX_LONG_EDGE)
-    pr = _process_one_page(
+    pr = _process_one_page_resilient(
         image_bytes,
         page_number=1,
         api_key=api_key,

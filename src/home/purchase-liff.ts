@@ -90,13 +90,13 @@ async function liffEntry(
     view: string | null,
     ws: string | null
 ): Promise<void> {
-    mask(tx('liff-signing-in', '正在登录 LINE…'));
+    mask(tx('liff-signing-in', 'กำลังเข้าสู่ระบบ LINE…'));
     const liffId =
         (window as unknown as { __PEARNLY_LIFF_ID__?: string }).__PEARNLY_LIFF_ID__ ||
         (await fetchLiffId());
     const liff = await loadLiffSdk();
     if (!liff || !liffId) {
-        mask(tx('liff-open-in-line', '请在 LINE 中打开此页面'));
+        mask(tx('liff-open-in-line', 'กรุณาเปิดหน้านี้ใน LINE'));
         return;
     }
     try {
@@ -113,7 +113,7 @@ async function liffEntry(
         });
         const body = await r.json().catch(() => null);
         if (!body || !body.ok || !body.data || !body.data.token) {
-            mask(tx(liffErrKey(body), '登录失败,请重试'));
+            mask(tx(liffErrKey(body), 'เข้าสู่ระบบไม่สำเร็จ ลองใหม่อีกครั้ง'));
             return;
         }
         localStorage.setItem('mrpilot_token', body.data.token);
@@ -123,7 +123,7 @@ async function liffEntry(
         // 带 token 重进 /home(去掉 liff 参数)· 正常引导起来后 liffResume 打开复核屏。
         location.replace('/home');
     } catch (_) {
-        mask(tx('liff-open-in-line', '请在 LINE 中打开此页面'));
+        mask(tx('liff-open-in-line', 'กรุณาเปิดหน้านี้ใน LINE'));
     }
 }
 

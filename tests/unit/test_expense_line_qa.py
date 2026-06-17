@@ -61,6 +61,7 @@ class MonthDetailTests(unittest.TestCase):
         cur = _MultiCursor(
             [
                 {
+                    "id": "D1",
                     "doc_date": datetime.date(2026, 6, 13),
                     "amt": Decimal("300"),
                     "cat": "X",
@@ -69,6 +70,7 @@ class MonthDetailTests(unittest.TestCase):
             ]
         )
         rows = line_qa.month_detail(cur, tenant_id="t", workspace_client_id=1)
+        self.assertEqual(rows[0]["id"], "D1")
         self.assertEqual(rows[0]["date"], "2026-06-13")
         self.assertEqual(rows[0]["amount"], Decimal("300"))
         self.assertEqual(rows[0]["vendor"], "V")

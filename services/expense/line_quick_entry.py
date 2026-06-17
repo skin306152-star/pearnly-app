@@ -347,6 +347,61 @@ def is_question(text: str) -> bool:
     return t.endswith(("?", "?")) or any(m in t for m in _QUESTION_MARK)
 
 
+# 改错信号(改错闭环 · P2):「上一笔改成X / 第1张改成Y / 卖家改成7-11」要走改错流,不能被 L1 当
+# 新记一笔(否则「上一笔改成550」会被当成新花 550)。保守取强改错词,漏判最多多走一次大脑(大脑
+# 再正确分 record/edit);误判风险低(这些词极少出现在正常记一笔里)。
+_EDIT_KW = (
+    "改成",
+    "改为",
+    "改回",
+    "改到",
+    "更正",
+    "修改",
+    "แก้ไข",
+    "แก้เป็น",
+    "แก้ยอด",
+    "เปลี่ยนเป็น",
+    "change to",
+    "edit it",
+    "correct it",
+)
+_CN_NUM = {
+    "一": 1,
+    "二": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+    "十": 10,
+}
+_ORDINAL_RE = re.compile(r"(?:第|รายการที่|item|no\.?|#)\s*([0-9０-９一二三四五六七八九十])")
+
+
+def is_edit_request(text: str) -> bool:
+    """疑似改错(改某笔字段)?命中强改错词即 True。用于 L1 记账前的分流守卫。"""
+    low = (text or "").lower()
+    return any(k.lower() in low for k in _EDIT_KW)
+
+
+def parse_ordinal(text: str) -> Optional[int]:
+    """抽序号:「第1张/第一笔/รายการที่ 2/item 3」→ N(≥1);无 → None。"""
+    m = _ORDINAL_RE.search(text or "")
+    if not m:
+        return None
+    ch = m.group(1)
+    if ch in _CN_NUM:
+        return _CN_NUM[ch]
+    digit = ch.translate(str.maketrans("０１２３４５６７８９", "0123456789"))
+    try:
+        n = int(digit)
+    except ValueError:
+        return None
+    return n if n >= 1 else None
+
+
 # 收入信号(#7):「收到货款500 / ขายได้ / 卖了」是收入,别当支出记。LINE 暂无收入流 →
 # 只识别 + 不误记 + 引导。保守:须有明确收入词【且】无购买动词才判收入,宁漏勿误挡正常买东西。
 _INCOME_KW = (

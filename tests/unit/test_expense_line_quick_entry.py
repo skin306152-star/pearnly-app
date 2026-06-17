@@ -107,6 +107,41 @@ class IntentGuardTests(unittest.TestCase):
         self.assertIsNone(lqe.l1_intent("打车 120"))
 
 
+class EditGuardTests(unittest.TestCase):
+    """改错分流守卫(P2):「改成X/第N笔」是改错,不能被 L1 当新记一笔。"""
+
+    def test_edit_phrases_detected(self):
+        for t in (
+            "上一笔改成550",
+            "卖家改成7-11",
+            "日期改成昨天",
+            "第1张改成100",
+            "แก้ยอดเป็น 200",
+        ):
+            self.assertTrue(lqe.is_edit_request(t), t)
+
+    def test_normal_record_not_edit(self):
+        for t in ("ค่าน้ำ 50", "打车 120", "咖啡 60", "买菜 40"):
+            self.assertFalse(lqe.is_edit_request(t), t)
+
+    def test_edit_amount_still_parses_amount(self):
+        # 守卫只负责分流;parse_expense 仍会抽出 550(由 handle 流程用 is_edit 跳过记账)。
+        self.assertEqual(lqe.parse_expense("上一笔改成550").amount, Decimal("550"))
+
+    def test_ordinal_digits(self):
+        self.assertEqual(lqe.parse_ordinal("第1张改成100"), 1)
+        self.assertEqual(lqe.parse_ordinal("รายการที่ 3 แก้เป็น 50"), 3)
+        self.assertEqual(lqe.parse_ordinal("item 2 change to 9"), 2)
+
+    def test_ordinal_chinese_numeral(self):
+        self.assertEqual(lqe.parse_ordinal("第一张改成100"), 1)
+        self.assertEqual(lqe.parse_ordinal("第三笔改成50"), 3)
+
+    def test_ordinal_absent(self):
+        self.assertIsNone(lqe.parse_ordinal("上一笔改成100"))
+        self.assertIsNone(lqe.parse_ordinal("改成100"))
+
+
 class CategoryTreeMatchTests(unittest.TestCase):
     """LINE 归类走本套账真实科目树(intake._match_category + 共享关键词)· 不分叉。"""
 

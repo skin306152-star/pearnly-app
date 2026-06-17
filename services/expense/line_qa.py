@@ -41,9 +41,12 @@ def month_summary(cur, *, tenant_id: str, workspace_client_id: int) -> dict:
 
 
 def month_detail(cur, *, tenant_id: str, workspace_client_id: int, limit: int = 10) -> list[dict]:
-    """本月已入账逐笔(对标竞品「查明细」)。新→旧,返回 [{date,amount,category,vendor}]。"""
+    """本月已入账逐笔(对标竞品「查明细」)。新→旧,返回 [{id,date,amount,category,vendor}]。
+
+    带 id 供「第 N 笔改成…」按序号定位(改错闭环 · P2)。
+    """
     cur.execute(
-        "SELECT d.doc_date, d.grand_total AS amt, c.name AS cat, s.name AS vendor "
+        "SELECT d.id, d.doc_date, d.grand_total AS amt, c.name AS cat, s.name AS vendor "
         "FROM purchase_docs d "
         "LEFT JOIN expense_categories c ON c.id = d.category_id AND c.tenant_id = d.tenant_id "
         "LEFT JOIN suppliers s ON s.id = d.supplier_id AND s.tenant_id = d.tenant_id "
@@ -55,6 +58,7 @@ def month_detail(cur, *, tenant_id: str, workspace_client_id: int, limit: int = 
     )
     return [
         {
+            "id": str(r["id"]),
             "date": r["doc_date"].isoformat() if r["doc_date"] else "",
             "amount": Decimal(str(r["amt"] or 0)),
             "category": r["cat"] or "",

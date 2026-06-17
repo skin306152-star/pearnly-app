@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
-"""LINE 更正流程单测(PO-13):确认机制 + 冲销+重建数据 + auto_book 过账。
+"""LINE 对话内改错单测(改错闭环 · P2):改什么字段 + 单/多行金额规则 + 编排顺序(mock svc)。
 
-真库行为(连号/隔离/做账)由真账号 E2E 守;这里锁纯逻辑 + 编排顺序(mock svc)。
+真库行为(克隆/连号/隔离/做账/已结期红冲)由真账号 E2E 守;这里锁纯逻辑 + 编排。
 """
 
 import unittest
+from decimal import Decimal
 from unittest import mock
 
 from services.expense import line_correct
+from services.expense.expense_draft import ExpenseDraft
 
 
 class _Ctx:
@@ -25,122 +27,277 @@ class AffirmativeParseTests(unittest.TestCase):
     def test_affirmative(self):
         self.assertTrue(line_correct._affirmative("是"))
         self.assertTrue(line_correct._affirmative("ใช่"))
-        self.assertTrue(line_correct._affirmative("YES"))
         self.assertFalse(line_correct._affirmative("咖啡 70"))
-        self.assertFalse(line_correct._affirmative(""))
 
-    def test_parse(self):
-        self.assertEqual(line_correct._parse("correct:D1:550"), ("D1", "550"))
+    def test_parse_missing(self):
+        self.assertEqual(
+            line_correct._parse_missing("correct:D1:amount|vendor_name"),
+            ("D1", ["amount", "vendor_name"]),
+        )
+        self.assertEqual(line_correct._parse_missing("correct:D9:category"), ("D9", ["category"]))
 
 
-class CorrectedDataTests(unittest.TestCase):
-    def test_copies_and_changes_amount(self):
-        detail = {
-            "doc": {
-                "doc_kind": "expense",
-                "category_id": "c1",
-                "payment_status": "paid",
-                "doc_date": "2026-06-16",
-            },
-            "supplier": {"name": "ACME", "tax_id": "123"},
-            "lines": [{"description": "coffee"}],
+class CollectChangesTests(unittest.TestCase):
+    def test_amount(self):
+        self.assertEqual(line_correct._collect_changes({"amount": 550}), {"amount": Decimal("550")})
+
+    def test_vendor_and_date(self):
+        c = line_correct._collect_changes({"vendor_name": "7-11", "date": "2026-06-16"})
+        self.assertEqual(c, {"vendor_name": "7-11", "doc_date": "2026-06-16"})
+
+    def test_category_only_when_no_other_signal(self):
+        # 「改成水电费」→ note 当科目;有金额/卖家/日期时 note 不当科目。
+        self.assertEqual(line_correct._collect_changes({"note": "水电费"}), {"category": "水电费"})
+        self.assertEqual(
+            line_correct._collect_changes({"amount": 50, "note": "50"}), {"amount": Decimal("50")}
+        )
+
+    def test_bad_date_and_zero_amount_dropped(self):
+        self.assertEqual(line_correct._collect_changes({"date": "昨天", "amount": 0}), {})
+
+
+class ApplyChangesTests(unittest.TestCase):
+    def _data(self):
+        return {"lines": [{"unit_price": Decimal("60"), "qty": Decimal("2"), "category_id": "old"}]}
+
+    def test_vendor(self):
+        data = self._data()
+        line_correct._apply_changes(
+            None, data, ExpenseDraft(vendor_name="7-11"), ["vendor_name"], "t", 1, {}
+        )
+        self.assertEqual(data["supplier"], {"name": "7-11", "tax_id": None})
+
+    def test_date(self):
+        data = self._data()
+        line_correct._apply_changes(
+            None, data, ExpenseDraft(doc_date="2026-06-16"), ["doc_date"], "t", 1, {}
+        )
+        self.assertEqual(data["doc_date"], "2026-06-16")
+
+    def test_amount_single_line_sets_unit_price_qty1(self):
+        data = self._data()
+        line_correct._apply_changes(
+            None, data, ExpenseDraft(amount=Decimal("550")), ["amount"], "t", 1, {}
+        )
+        self.assertEqual(data["lines"][0]["unit_price"], "550")
+        self.assertEqual(data["lines"][0]["qty"], "1")
+        self.assertIsNone(data["amount_override"])
+
+    def test_category_resolves_and_sets_lines(self):
+        data = {"lines": [{"category_id": "x"}, {"category_id": "y"}]}
+        with mock.patch.object(line_correct, "_resolve_category", return_value=("p1", "c1")):
+            line_correct._apply_changes(
+                None, data, ExpenseDraft(note="水电费"), ["category"], "t", 1, {}
+            )
+        self.assertEqual(data["category_id"], "p1")
+        self.assertTrue(
+            all(ln["category_id"] == "p1" and ln["subcategory_id"] == "c1" for ln in data["lines"])
+        )
+
+
+class CloneLineTests(unittest.TestCase):
+    def test_preserves_totals_fields(self):
+        ln = {
+            "item_type": "service",
+            "description": "x",
+            "qty": Decimal("2"),
+            "unit_price": Decimal("60"),
+            "discount": Decimal("0"),
+            "vat_rate": Decimal("7"),
+            "vat_applicable": True,
+            "wht_rate": Decimal("0"),
+            "category_id": "c",
+            "subcategory_id": "s",
         }
-        d = line_correct._corrected_data(detail, "550", "D1")
-        self.assertEqual(d["supplier"]["name"], "ACME")
-        self.assertEqual(d["category_id"], "c1")
-        self.assertEqual(d["payment_status"], "paid")
-        self.assertEqual(d["ocr_raw"]["corrected_from"], "D1")
-        self.assertEqual(d["lines"][0]["unit_price"], "550")
-        self.assertEqual(d["lines"][0]["description"], "coffee")
+        out = line_correct._clone_line(ln)
+        self.assertEqual(out["qty"], Decimal("2"))
+        self.assertEqual(out["unit_price"], Decimal("60"))
+        self.assertEqual(out["vat_rate"], Decimal("7"))
+        self.assertEqual(out["item_type"], "service")
 
 
 class ApplyTests(unittest.TestCase):
-    def test_voids_creates_posts_when_autobook(self):
-        from services.purchase import docs as docs_svc, posting as posting_svc
+    def test_voids_clones_updates_posts_when_autobook(self):
+        from services.purchase import correct as correct_svc
+        from services.purchase import docs as docs_svc
+        from services.purchase import posting as posting_svc
         from services.purchase import settings as settings_svc
 
-        detail = {"doc": {"status": "posted", "doc_kind": "expense"}, "supplier": {}, "lines": []}
+        orig = {"doc": {"status": "posted"}, "supplier": {}, "lines": []}
+        clone = {"doc": {"id": "new1"}, "supplier": {}, "lines": []}
         calls = []
         with (
-            mock.patch.object(docs_svc, "get_doc", return_value=detail),
+            mock.patch.object(docs_svc, "get_doc", return_value=orig),
             mock.patch.object(
-                posting_svc, "void_doc", side_effect=lambda *a, **k: calls.append("void")
+                correct_svc,
+                "correct_doc",
+                side_effect=lambda *a, **k: calls.append("clone") or clone,
+            ),
+            mock.patch.object(
+                docs_svc,
+                "update_draft",
+                side_effect=lambda *a, **k: calls.append("update")
+                or {"doc": {"grand_total": Decimal("550")}},
             ),
             mock.patch.object(settings_svc, "get_settings", return_value={"auto_book": True}),
-            mock.patch.object(docs_svc, "create_doc", return_value={"doc": {"id": "new1"}}),
             mock.patch.object(
                 posting_svc, "post_doc", side_effect=lambda *a, **k: calls.append("post")
             ),
         ):
-            res = line_correct._apply(object(), {"id": "u"}, "t", 1, "D1", "550")
-        self.assertEqual(res, {"new_id": "new1", "posted": True})
-        self.assertEqual(calls, ["void", "post"])  # 先冲销后过账
+            res = line_correct._apply(
+                object(), {"id": "u"}, "t", 1, "D1", ExpenseDraft(amount=Decimal("550")), ["amount"]
+            )
+        self.assertEqual(res, {"new_id": "new1", "posted": True, "total": Decimal("550")})
+        self.assertEqual(calls, ["clone", "update", "post"])  # 先克隆→改→过账
 
     def test_draft_when_autobook_off(self):
-        from services.purchase import docs as docs_svc, posting as posting_svc
+        from services.purchase import correct as correct_svc
+        from services.purchase import docs as docs_svc
+        from services.purchase import posting as posting_svc
         from services.purchase import settings as settings_svc
 
-        detail = {"doc": {"status": "posted"}, "supplier": {}, "lines": []}
+        orig = {"doc": {"status": "posted"}, "supplier": {}, "lines": []}
         with (
-            mock.patch.object(docs_svc, "get_doc", return_value=detail),
-            mock.patch.object(posting_svc, "void_doc"),
+            mock.patch.object(docs_svc, "get_doc", return_value=orig),
+            mock.patch.object(
+                correct_svc,
+                "correct_doc",
+                return_value={"doc": {"id": "n"}, "supplier": {}, "lines": []},
+            ),
+            mock.patch.object(
+                docs_svc, "update_draft", return_value={"doc": {"grand_total": Decimal("1")}}
+            ),
             mock.patch.object(settings_svc, "get_settings", return_value={"auto_book": False}),
-            mock.patch.object(docs_svc, "create_doc", return_value={"doc": {"id": "n"}}),
             mock.patch.object(posting_svc, "post_doc") as post,
         ):
-            res = line_correct._apply(object(), {"id": "u"}, "t", 1, "D1", "550")
-        self.assertEqual(res["posted"], False)
+            res = line_correct._apply(
+                object(), {"id": "u"}, "t", 1, "D1", ExpenseDraft(vendor_name="X"), ["vendor_name"]
+            )
+        self.assertFalse(res["posted"])
         post.assert_not_called()
 
     def test_none_when_original_not_posted(self):
         from services.purchase import docs as docs_svc
 
         with mock.patch.object(docs_svc, "get_doc", return_value={"doc": {"status": "void"}}):
-            self.assertIsNone(line_correct._apply(object(), {"id": "u"}, "t", 1, "D1", "550"))
+            self.assertIsNone(
+                line_correct._apply(object(), {"id": "u"}, "t", 1, "D1", ExpenseDraft(), ["amount"])
+            )
+
+
+class RequestCorrectTests(unittest.TestCase):
+    def _run(self, u, text, detail, last_posted=None, pending=None):
+        from services.purchase import docs as docs_svc
+
+        replies = []
+        saved = {}
+        with (
+            mock.patch.object(line_correct.db, "get_cursor_rls", return_value=_Ctx(object())),
+            mock.patch.object(docs_svc, "get_doc", return_value=detail),
+            mock.patch.object(line_correct, "_find_last_posted", return_value=last_posted),
+            mock.patch.object(line_correct.conversation, "peek_pending", return_value=pending),
+            mock.patch.object(
+                line_correct.conversation,
+                "save_pending",
+                side_effect=lambda *a, **k: saved.update(k),
+            ),
+            mock.patch.object(
+                line_correct.line_client,
+                "reply_text",
+                side_effect=lambda tok, msg: replies.append(msg),
+            ),
+            mock.patch.object(
+                line_correct.line_client, "t_line", side_effect=lambda lang, key, **k: key
+            ),
+        ):
+            line_correct.request_correct({"id": "u"}, "tok", "U1", text, u, "zh", "t", 1)
+        return replies, saved
+
+    def test_no_changes_guides_web(self):
+        replies, _ = self._run({}, "改一下", {"doc": {"status": "posted"}, "lines": []})
+        self.assertEqual(replies, ["exp_edit_web"])
+
+    def test_multiline_amount_guides_detail_page(self):
+        detail = {"doc": {"status": "posted", "grand_total": Decimal("100")}, "lines": [{}, {}]}
+        replies, _ = self._run(
+            {"amount": 500},
+            "改成500",
+            detail,
+            last_posted={"id": "D1", "grand_total": Decimal("100")},
+        )
+        self.assertEqual(replies, ["exp_correct_multiline_amount"])
+
+    def test_single_line_amount_saves_and_confirms(self):
+        detail = {"doc": {"status": "posted", "grand_total": Decimal("100")}, "lines": [{}]}
+        replies, saved = self._run(
+            {"amount": 550},
+            "上一笔改成550",
+            detail,
+            last_posted={"id": "D1", "grand_total": Decimal("100")},
+        )
+        self.assertEqual(saved["missing"], "correct:D1:amount")
+        self.assertEqual(replies, ["exp_correct_confirm"])
+
+    def test_ordinal_resolves_from_detail_list(self):
+        detail = {"doc": {"status": "posted", "grand_total": Decimal("9")}, "lines": [{}]}
+        replies, saved = self._run(
+            {"amount": 100}, "第2张改成100", detail, pending={"missing": "detail:A,B,C"}
+        )
+        self.assertEqual(saved["missing"], "correct:B:amount")  # 第2张 → B
+
+    def test_ordinal_without_list_guides(self):
+        replies, _ = self._run({"amount": 100}, "第2张改成100", None, pending={"missing": "amount"})
+        self.assertEqual(replies, ["exp_correct_no_list"])
 
 
 class TryConfirmTests(unittest.TestCase):
+    def _peek(self, missing):
+        return mock.patch.object(
+            line_correct.conversation,
+            "peek_pending",
+            return_value={"missing": missing, "draft": ExpenseDraft()},
+        )
+
     def test_ignores_amount_pending(self):
-        # 待补金额 pending 不被更正流程吞(返 False · 交给补金额快路)。
         with (
             mock.patch.object(line_correct.db, "get_cursor_rls", return_value=_Ctx(object())),
-            mock.patch.object(
-                line_correct.conversation, "peek_pending", return_value={"missing": "amount"}
-            ),
+            self._peek("amount"),
         ):
-            out = line_correct.try_confirm({"id": "u"}, "tok", "U1", "咖啡 70", "t", 1, "zh")
-        self.assertFalse(out)
+            self.assertFalse(
+                line_correct.try_confirm({"id": "u"}, "tok", "U1", "咖啡 70", "t", 1, "zh")
+            )
+
+    def test_ignores_detail_pending(self):
+        with (
+            mock.patch.object(line_correct.db, "get_cursor_rls", return_value=_Ctx(object())),
+            self._peek("detail:A,B"),
+        ):
+            self.assertFalse(line_correct.try_confirm({"id": "u"}, "tok", "U1", "是", "t", 1, "zh"))
 
     def test_executes_on_yes(self):
         applied = {}
         with (
             mock.patch.object(line_correct.db, "get_cursor_rls", return_value=_Ctx(object())),
-            mock.patch.object(
-                line_correct.conversation,
-                "peek_pending",
-                return_value={"missing": "correct:D1:550"},
-            ),
+            self._peek("correct:D1:amount"),
             mock.patch.object(line_correct.conversation, "clear_pending"),
             mock.patch.object(
                 line_correct,
                 "_apply",
-                side_effect=lambda c, bu, tid, ws, oid, amt: applied.update({"o": oid, "a": amt})
-                or {"new_id": "n", "posted": True},
+                side_effect=lambda c, bu, tid, ws, oid, draft, keys: applied.update(
+                    {"o": oid, "k": keys}
+                )
+                or {"new_id": "n", "posted": True, "total": Decimal("550")},
             ),
             mock.patch.object(line_correct.line_client, "reply_text"),
         ):
             out = line_correct.try_confirm({"id": "u"}, "tok", "U1", "是", "t", 1, "zh")
         self.assertTrue(out)
-        self.assertEqual(applied, {"o": "D1", "a": "550"})
+        self.assertEqual(applied, {"o": "D1", "k": ["amount"]})
 
     def test_cancels_on_no(self):
         with (
             mock.patch.object(line_correct.db, "get_cursor_rls", return_value=_Ctx(object())),
-            mock.patch.object(
-                line_correct.conversation,
-                "peek_pending",
-                return_value={"missing": "correct:D1:550"},
-            ),
+            self._peek("correct:D1:amount"),
             mock.patch.object(line_correct.conversation, "clear_pending") as clr,
             mock.patch.object(line_correct.line_client, "reply_text"),
             mock.patch.object(line_correct, "_apply") as ap,
@@ -149,6 +306,30 @@ class TryConfirmTests(unittest.TestCase):
         self.assertTrue(out)
         clr.assert_called_once()
         ap.assert_not_called()
+
+    def test_period_closed_guides(self):
+        from core.pos_api import PosError
+
+        replies = []
+        with (
+            mock.patch.object(line_correct.db, "get_cursor_rls", return_value=_Ctx(object())),
+            self._peek("correct:D1:amount"),
+            mock.patch.object(line_correct.conversation, "clear_pending"),
+            mock.patch.object(
+                line_correct, "_apply", side_effect=PosError("acct.period_closed", 409)
+            ),
+            mock.patch.object(
+                line_correct.line_client,
+                "reply_text",
+                side_effect=lambda tok, msg: replies.append(msg),
+            ),
+            mock.patch.object(
+                line_correct.line_client, "t_line", side_effect=lambda lang, key, **k: key
+            ),
+        ):
+            out = line_correct.try_confirm({"id": "u"}, "tok", "U1", "是", "t", 1, "zh")
+        self.assertTrue(out)
+        self.assertEqual(replies, ["exp_correct_closed"])
 
 
 if __name__ == "__main__":

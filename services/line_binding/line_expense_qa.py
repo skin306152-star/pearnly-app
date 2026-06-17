@@ -36,8 +36,8 @@ def reply_summary(reply_token, lang, tid, ws) -> None:
     line_client.reply_text(reply_token, "\n".join(lines))
 
 
-def reply_detail(reply_token, lang, tid, ws) -> None:
-    """查明细(本月逐笔)· DB 真查 → 列表。"""
+def reply_detail(reply_token, lang, tid, ws, line_user_id=None) -> None:
+    """查明细(本月逐笔)· DB 真查 → 列表。存有序 doc_id 入会话态供「第 N 笔改成…」定位(P2)。"""
     from services.expense import line_qa
 
     try:
@@ -52,10 +52,31 @@ def reply_detail(reply_token, lang, tid, ws) -> None:
         return
     uncat = line_client.t_line(lang, "exp_uncat")
     lines = [line_client.t_line(lang, "exp_detail_head", n=len(rows))]
-    for r in rows:
+    for i, r in enumerate(rows, 1):
         tail = f" · {r['vendor']}" if r["vendor"] else ""
-        lines.append(f"• {r['date']} {r['category'] or uncat} ฿{r['amount']}{tail}")
+        lines.append(f"{i}. {r['date']} {r['category'] or uncat} ฿{r['amount']}{tail}")
+    if line_user_id:
+        _remember_detail_order(tid, ws, line_user_id, [r["id"] for r in rows])
     line_client.reply_text(reply_token, "\n".join(lines))
+
+
+def _remember_detail_order(tid, ws, line_user_id, ids) -> None:
+    """把列表的 doc_id 顺序记进会话态(missing=detail:id1,id2,…),供下一句「第 N 笔改成…」定位。"""
+    from services.expense import conversation
+    from services.expense.expense_draft import ExpenseDraft
+
+    try:
+        with db.get_cursor_rls(tid, commit=True) as cur:
+            conversation.save_pending(
+                cur,
+                line_user_id=line_user_id,
+                tenant_id=tid,
+                workspace_client_id=ws,
+                draft=ExpenseDraft(),
+                missing="detail:" + ",".join(ids),
+            )
+    except Exception:
+        logger.warning("[line] remember detail order failed; 第N笔 定位将回落上一笔")
 
 
 def reply_undo(bound_user, reply_token, lang, tid, ws) -> None:

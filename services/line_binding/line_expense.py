@@ -64,6 +64,9 @@ def handle_expense_text(
 
         si = lqe.l1_intent(text)
         isq = lqe.is_question(text)
+        # 改错分流(P2):「上一笔改成X / 第1张改成Y」是改错,不能被 L1 当新记一笔 → 跳过 L1 记账,
+        # 交大脑判 edit 并抽字段(无 key 时下方兜底引导)。
+        is_edit = lqe.is_edit_request(text)
 
         # #7 收入识别:明确「收款/卖出」且无购买动词 → 不误记为支出。LINE 暂无收入流 →
         #    只识别 + 不入账 + 引导(保守:问句/已有 L1 意图不拦,宁漏勿误挡正常买东西)。
@@ -87,15 +90,15 @@ def handle_expense_text(
                 bound_user, reply_token, text, str(tid), ws, multi, quote_token, lang
             )
 
-        # 1. L1 快路:清晰记账(有金额 + 非问句 + 无其他 L1 意图)→ 直接记,零 LLM、零成本。
+        # 1. L1 快路:清晰记账(有金额 + 非问句 + 无其他 L1 意图 + 非改错)→ 直接记,零 LLM、零成本。
         parsed = lqe.parse_expense(text)
-        if parsed.has_amount() and not isq and si is None:
+        if parsed.has_amount() and not isq and si is None and not is_edit:
             from services.expense import conversation
 
             with db.get_cursor_rls(str(tid), commit=True) as cur:
                 pend = conversation.pop_pending(cur, line_user_id=line_user_id)
-            # 续接补金额(更正待确认 pending 不在此并:已在第 0 步处理)
-            if pend and not str(pend.get("missing") or "").startswith("correct:"):
+            # 续接补金额:仅「缺金额」会话态合并(correct/detail 等其它 pending 不当补金额用)。
+            if pend and str(pend.get("missing") or "") == "amount":
                 merged = pend["draft"]
                 merged.amount = parsed.amount
                 parsed = merged
@@ -125,6 +128,9 @@ def handle_expense_text(
             _reply_pool(reply_token, "support", text, lang)
         elif isq:
             line_expense_qa.reply_question(reply_token, lang, str(tid), text)
+        elif is_edit:
+            # 改错但无 LLM 抽不出改什么字段 → 诚实引导去网页改(别瞎猜)。
+            line_client.reply_text(reply_token, line_client.t_line(lang, "exp_edit_web"))
         else:
             _reply_pool(reply_token, "scope", text, lang)
         return True
@@ -144,22 +150,19 @@ def _dispatch_agent(
         line_expense_qa.reply_summary(reply_token, lang, tid, ws)
         return True
     if intent == "query_detail":
-        line_expense_qa.reply_detail(reply_token, lang, tid, ws)
+        line_expense_qa.reply_detail(reply_token, lang, tid, ws, line_user_id)
         return True
     if intent == "undo":
         line_expense_qa.reply_undo(bound_user, reply_token, lang, tid, ws)
         return True
     if intent == "edit":
-        amt = u.get("amount")
-        if amt not in (None, "", 0):
-            # 「上一笔改成 X」→ 更正:冲销原单 + 按新值重建草稿(请确认·绝不静默覆盖·PO-13)
-            from services.expense import line_correct
+        # 改错:冲销原单 + 忠实克隆草稿 + 应用改动(金额/卖家/日期/科目)→ 请确认(绝不静默覆盖·
+        # PO-13)。target 按「第 N 笔」(查明细列表序号)或「上一笔」定位;line_correct 内判单/多行规则。
+        from services.expense import line_correct
 
-            return line_correct.request_correct(
-                bound_user, reply_token, line_user_id, amt, lang, tid, ws
-            )
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_edit_web"))
-        return True
+        return line_correct.request_correct(
+            bound_user, reply_token, line_user_id, text, u, lang, tid, ws
+        )
     if line_agent.may_write(intent, u.get("speech_act")):
         from services.expense import line_l2
 

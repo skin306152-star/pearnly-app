@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 
 
 def _today_th() -> str:
-    """今天日期(泰国时区 UTC+7·ISO)· 答「今天几号」用,与卡片日期口径一致。"""
-    from datetime import datetime, timedelta, timezone
+    """今天日期(泰国本地·ISO)· 答「今天几号」用。复用开票历法叶子,口径与连号/票面一致。"""
+    from services.sales import dates
 
-    return (datetime.now(timezone.utc) + timedelta(hours=7)).date().isoformat()
+    return dates.bangkok_today().isoformat()
 
 
 def _qr_item(label: str, text: str) -> dict:

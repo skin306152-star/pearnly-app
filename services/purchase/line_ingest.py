@@ -24,14 +24,19 @@ def _same_money(a: Decimal, b: Decimal, *, total: Decimal = Decimal("0")) -> boo
     return abs(a - b) <= tol
 
 
+def _item_amount(it: dict) -> Decimal:
+    """单行金额:印刷 subtotal 优先,缺则 qty×price(三处明细取值共用一处口径)。"""
+    sub = _dec(it.get("subtotal"))
+    return sub if sub > 0 else _dec(it.get("qty") or 1) * _dec(it.get("price"))
+
+
 def _items_sum(fields: dict) -> Decimal:
     items_sum = Decimal("0")
     for it in fields.get("items") or []:
         name = str(it.get("name") or "").strip()
         if name and ik._is_summary_item_name(name):
             continue
-        sub = _dec(it.get("subtotal"))
-        items_sum += sub if sub > 0 else (_dec(it.get("qty") or 1) * _dec(it.get("price")))
+        items_sum += _item_amount(it)
     return items_sum
 
 
@@ -94,9 +99,7 @@ def _card_items(fields: dict) -> list:
         name = str(it.get("name") or "").strip()
         if ik._is_summary_item_name(name):
             continue
-        amt = _dec(it.get("subtotal"))
-        if amt <= 0:
-            amt = _dec(it.get("qty") or 1) * _dec(it.get("price"))
+        amt = _item_amount(it)
         if amt <= 0:
             continue  # 0 元 modifier(ไม่หวาน 0%/แถมฟรี)不进主明细 → 走 _free_modifier_names 进备注
         out.append({"name": _clean_item_name(name), "amount": f"{amt:,.2f}"})
@@ -110,10 +113,7 @@ def _free_modifier_names(fields: dict) -> list:
         name = str(it.get("name") or "").strip()
         if not name or ik._is_summary_item_name(name):
             continue
-        amt = _dec(it.get("subtotal"))
-        if amt <= 0:
-            amt = _dec(it.get("qty") or 1) * _dec(it.get("price"))
-        if amt <= 0:
+        if _item_amount(it) <= 0:
             out.append(_clean_item_name(name))
     return out
 
@@ -225,12 +225,7 @@ def ingest_line_image(
         image_url=image_ref,
         field_confidence=field_confidence,
     )
-    # 明细从 OCR 逐条抽取填(需补全卡也显·不只 draft 卡):顶 3 + 「等N项」。draft 卡下方再以真行覆盖。
-    _item_names = [
-        str(it.get("name") or "").strip()
-        for it in (fields.get("items") or [])
-        if (it.get("name") or "").strip()
-    ]
+    # items / detail 由下方明细策略统一决定(此处先占位,避免双算 _card_items)。
     _pretax, _vat = _vat_breakdown(fields)
     card_fields = {
         "document_type": fields.get("document_type") or "",
@@ -249,13 +244,8 @@ def ingest_line_image(
         "invoice_number": fields.get("invoice_number") or "",
         "payment_method": fields.get("payment_method") or "",
         "payment_status": "",  # 见下方:取自 draft 的付款态(仅明确未付/部分付才在卡上显)
-        "items": _card_items(fields),
-        "detail": (
-            " · ".join(_item_names[:3])
-            + (f" 等{len(_item_names)}项" if len(_item_names) > 3 else "")
-            if _item_names
-            else ""
-        ),
+        "items": [],  # 下方明细策略统一赋值(show_items/items_unread)
+        "detail": "",
     }
     fc = res.get("field_confidence") or {}
     draft = res["draft"]

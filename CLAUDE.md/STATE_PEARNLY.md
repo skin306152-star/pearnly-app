@@ -6,23 +6,22 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-17 · **OCR 纠错 + LINE 费用卡片产品化已上线** · HEAD `33142a1`）
+## 🎯 状态卡（2026-06-17 · **LINE 改错闭环 + 引用底座(Brain OS P1A)全上线** · HEAD `a5e39ae2`）
 
-- **本窗口完成并上线**：
-  - `62cb5338`：LINE 图片 OCR/采购入账收口。简式税票/收据无买方身份时不再自动当可抵进项；过滤 Total/VAT/Payment 等汇总行；VAT 已含税明细不再误触发总额不符；卡片可保留逐条明细；非票据图片回明确提示；LINE loading 按 60s/50s 循环续到出结果。
-  - `33142a1f`：LINE 费用/采购识别结果卡片文案产品化。金额显示 `431 THB`；状态改为“费用已入账 / 请确认后入账 / 可能重复 · 请核对”；“分类”改“建议分类”，“明细”改“费用明细”；卡片前回执改“费用已入账 / 已保存费用草稿”；未接 Excel/Drive/邀请员工流程。
-- **线上状态**：新加坡 `root@66.42.49.213` 已部署到 `33142a1`，`mrpilot` active，`/api/version` 200。生产环境确认 `OCR_FALLBACK_MODEL=gemini-2.5-pro`、`OCR_ESCALATE_MODEL=gemini-2.5-pro`（上一轮确认）。
-- **验证**：
-  - OCR 修复目标测试：本地/服务器 52 绿。
-  - 卡片目标测试：本地/服务器 40 绿。
-  - 全量 unit：3797 绿；`check_file_size` / `check_imports` / `check_i18n --strict` / `check_ai_smell` 绿。
-  - `npm run format:check` 仍被历史未跟踪 HTML/JSON/审计输出文件拦住（31 个），本次按 Zihao 指示不处理。
-- **剩余风险 / 待跟进**：
-  - OCR 仍需真实用户继续喂票观察，尤其泰文品名拼写与分类是否过度自信。
-  - 分类建议目前只显示为“建议分类”，没有单独展示分类置信度或原因。
-  - 580 个未跟踪文件确认多为历史审计/测试/截图/输出，本次不清理。
-- **下一步建议**：继续用 LINE 发真实票测试；若卡片方向满意，再做“分类可解释 / 低置信分类提示 / 更强的品名纠错”。
-- **在等 Zihao**：发 1-3 张真实 LINE 回执截图验收卡片文案与明细效果。
+- **本窗口完成并上线**（7 commit · prod `a5e39ae` · 4 worker 干净启动 · `/api/version` 200 · 13 闸全绿）：
+  - `10a0e874` /simplify:三路发卡口 `line_booker.emit_result_card`、共享建单 `to_purchase_data`、`category_ai._listing/_decode_choice` 去重（零行为变更·prompt 不动）。
+  - `f9346295` **P2 改错闭环扩面**:对话内改任意字段(金额/卖家/日期/科目)+「第N笔」定位 + 保多行(复用 web `correct_doc` 忠实克隆)；单行可改金额、多行金额引导网页；加 `is_edit_request` 守卫(治「上一笔改成550」被 L1 当新记一笔)。
+  - `a16ce679` **修数据完整性 bug**:泰文「ไม่ใช่(不是)」含「ใช่」被当确认照改账 → 否定词优先(`_NO`)。
+  - `73c9178a` LIFF 入口 4 处兜底文案中文→泰文(i18n 未就绪时不漏中文给泰国用户)。
+  - `887e7aee` **P1A 引用底座**:新表 `line_message_refs`(alembic 0041 + startup ensure + RLS·prod 已建)。发卡记消息id→doc；用户长按回执 reply「删除/改成X」→ `resolve_target`(引用>第N笔>明确上一笔>不明确则提示 reply,绝不默认改最近一笔)精确命中；`reply_undo` 不再无条件 LIMIT 1；`line_client.*_with_meta` 拿 sentMessages id。
+  - `00bd14fb`+`a5e39ae2` 引用提示去写死「430」例子+教长按引用；/simplify 删孤儿 `exp_correct_no_list` + record 单次批量 INSERT。
+- **验证**：全量 **3846 unit 绿**;file_size/imports/i18n--strict/ai_smell/ruff 全绿。`line_message_refs` 表已在 prod 真库建成。
+- **在等 Zihao 真机验**(本窗无真 LINE channel)：① 记 A=60、B=430 → 长按 **新卡**(改动后发的)回复「删除」只撤 A；② 长按 B「改成500」只问 B；③「ไม่ใช่」取消不动账；④ 不引用直接「删除」→ 回提示不乱删。**注:引用改动前的旧卡会回「找不到记录」=正常**(旧卡无映射)。
+- **剩余/待跟进**：① 纯「记账」消息被 LINE 重投仍可能多建草稿(既有·非本次引入·待排) ② 登录页「会话已过期」仍中文(登录层默认语言·另排) ③ doc 19 **P3 诚实回复契约**未做(全链路文案审计+谎报单测) ④ 引用机制可扩到销项/DMS(后续车道)。
+
+## 历史记录（旧状态卡 · 2026-06-17 · OCR 纠错 + LINE 费用卡片产品化 · HEAD `33142a1`）
+
+- `62cb5338` LINE 图片 OCR/采购入账收口(简式票无买方不当可抵进项/过滤汇总行/VAT 已含税不误判/卡留逐条明细/非票据明确提示/loading 续到出结果)；`33142a1f` 费用卡片文案产品化(金额 `431 THB`/三态文案/建议分类/费用明细)。prod `33142a1`·OCR_FALLBACK/ESCALATE=gemini-2.5-pro。
 
 ## 历史记录（旧状态卡 · 2026-06-16 · 「待归类(inbox)」整模块下线）
 

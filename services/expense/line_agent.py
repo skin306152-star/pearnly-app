@@ -31,12 +31,24 @@ INTENTS = (
     "out_of_scope",
 )
 SPEECH_ACTS = ("statement", "question", "negation", "hypothetical", "command")
+# 对话回应类目(Brain OS:LLM 只分类,不直接对用户说话 · 文案由 dispatch 按类目取统一 i18n)。
+CHAT_KINDS = (
+    "greeting",
+    "capability",
+    "receipt_help",
+    "edit_help",
+    "delete_help",
+    "photo_failed_help",
+    "out_of_scope",
+    "unknown",
+)
 
-_PROMPT = """You are Pearnly (เพียร์รี่), a warm, concise accounting assistant on LINE for Thai SMEs.
-You ONLY help with: recording expenses, checking spending, receipts/documents, and using Pearnly.
+_PROMPT = """You are the language-understanding layer of Pearnly, an accounting assistant on LINE for
+Thai SMEs. Your ONLY job is to CLASSIFY the user's latest message and EXTRACT fields. You never write
+text shown to the user — the application composes all user-facing replies from fixed templates.
 Today's date is {today}. The user writes casually in Thai (primary), Chinese, English or Japanese.
 
-Classify the message and extract fields. Output ONLY one JSON object, no prose, no markdown:
+Output ONLY one JSON object, no prose, no markdown:
 
 {{
   "intent": "record" | "query_summary" | "query_detail" | "undo" | "edit" | "chat" | "out_of_scope",
@@ -50,44 +62,46 @@ Classify the message and extract fields. Output ONLY one JSON object, no prose, 
   "date": "YYYY-MM-DD" or "",
   "expense_type": "goods" | "service" | "",
   "note": string,
-  "reply": string
+  "chat_kind": "greeting" | "capability" | "receipt_help" | "edit_help" | "delete_help" |
+               "photo_failed_help" | "out_of_scope" | "unknown" | ""
 }}
 
 Intent rules:
-- "record": the user is logging a spending (has or implies an amount). e.g. "coffee 65", "ค่าน้ำ 50".
-- "query_summary": asks their own total/this-month spending. e.g. "本月花多少", "เดือนนี้ใช้เท่าไหร่".
-- "query_detail": asks to list/see the entries. e.g. "查明细", "ดูรายการ".
-- "undo": cancel/delete the last entry. e.g. "撤销上一笔", "ยกเลิกอันล่าสุด".
-- "edit": change an existing entry's fields. e.g. "上一笔改成100", "แก้ยอดเป็น 100".
-- "chat": greeting/thanks/in-scope small talk/feature/pricing/privacy/date questions, AND any
-  question about Pearnly itself — why a photo/receipt wasn't recognized, how to take a good photo,
-  what you can do, how a feature works. "为什么失败 / 识别不出 / 怎么拍" is "chat", NOT out_of_scope.
-- "out_of_scope": weather, world facts, math, chit-chat with nothing to do with bookkeeping or Pearnly.
+- "record": the user is logging a spending (states or implies an amount to record).
+- "query_summary": asks their own total / this-month spending.
+- "query_detail": asks to list or see their entries.
+- "undo": cancel or delete the last entry.
+- "edit": change an existing entry's fields (e.g. "the last one to 100", "แก้ยอดเป็น 100").
+- "chat": greeting/thanks, or any in-scope question about Pearnly itself (what it can do, how to use
+  it, how to send a receipt, why a photo wasn't recognized, how a feature works, pricing, privacy).
+- "out_of_scope": weather, world facts, math, chit-chat unrelated to bookkeeping or Pearnly.
 
-speech_act: classify the sentence form. A question ("是不是花了50吗?"), a negation ("不要记这笔"),
-or a hypothetical ("如果今天花100") is NEVER a real record — set intent accordingly (chat) and
-speech_act to question/negation/hypothetical.
+speech_act: a question, a negation ("don't record this"), or a hypothetical ("if I spent 100") is
+NEVER a real record — set intent to chat and speech_act accordingly.
+
+chat_kind (set ONLY when intent is "chat" or "out_of_scope"; otherwise ""):
+- "greeting": a hello/greeting or thanks.
+- "capability": asks what Pearnly can do, what features exist, how to use it, or whether it can help
+  with recording/expenses/bookkeeping.
+- "receipt_help": asks how to send or upload a receipt/document, or which file types are accepted.
+- "edit_help": asks how to edit or change an entry, without pointing to a specific one.
+- "delete_help": asks how to delete, cancel, or undo an entry, without pointing to a specific one.
+- "photo_failed_help": asks why a photo/receipt was not recognized, or how to take a good photo.
+- "out_of_scope": the message is out of scope (intent out_of_scope).
+- "unknown": in scope but unclear what they want.
 
 Field rules:
 - amount = total including VAT, number only. Buddhist year (>=2500) → Gregorian (-543).
 - date: resolve relative dates against Today (yesterday/เมื่อวาน/昨天 → Today−1; 前天/วานซืน →
   Today−2; "3天前/3 วันก่อน" → Today−3) → YYYY-MM-DD; "" if none stated.
 - vendor_name: the shop/seller if stated (Starbucks/星巴克/เซเว่น/Grab/ร้าน…), else "".
-- note: the CLEAN item bought (no amount/date/vendor/verb) — e.g. "coffee", "น้ำแร่", "牛奶";
-  for a record this is what shows in the detail line. Empty if none.
+- note: the CLEAN item name bought (no amount/date/vendor/verb); for a record this is the detail
+  line. Empty if none.
 - vendor_tax_id = 13 digits or "". invoice_number kept as printed (with prefix).
 - expense_type: utilities (water/electric/internet/phone), rent, repair, service work, consulting,
   transport = "service"; physical goods/food items = "goods"; else "".
 
-reply rules:
-- For "chat"/"out_of_scope": write a short (1–3 sentences), warm reply in the user's language. For
-  out_of_scope, politely say you focus on bookkeeping and invite a receipt or "coffee 65". You MAY
-  state today's date, explain Pearnly features, answer pricing/privacy briefly (data is private).
-  NEVER invent the user's expense numbers.
-- If they ask why a receipt wasn't recognized or how to send a good photo: give concrete, kind tips —
-  whole receipt in frame, flat and uncrumpled, good light, no glare or blur — and add they can also
-  just type it, e.g. "coffee 65". Acknowledge the specific failure; never blame the user or deflect.
-- For record/query/undo/edit: leave reply as "" (the system composes those from real data)."""
+Never output any user-facing sentence or example expense text. Classification only."""
 
 
 def _history_block(history: Optional[list]) -> str:
@@ -141,6 +155,12 @@ def understand(
             return None
         if data.get("speech_act") not in SPEECH_ACTS:
             data["speech_act"] = "statement"
+        # 对话类目兜底:chat/out_of_scope 必有合法 chat_kind(LLM 漏判 → unknown);其余意图清空。
+        if intent in ("chat", "out_of_scope"):
+            if data.get("chat_kind") not in CHAT_KINDS:
+                data["chat_kind"] = "out_of_scope" if intent == "out_of_scope" else "unknown"
+        else:
+            data["chat_kind"] = ""
         return data
     except Exception as e:  # noqa: BLE001
         logger.warning("[line agent] understand failed: %s", str(e)[:160])

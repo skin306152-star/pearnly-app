@@ -256,12 +256,9 @@ def _dispatch_agent(
             )
         _say(line_client.t_line(lang, "exp_need_amount"))
         return True
-    # chat / out_of_scope / 含数字的问句否定假设 → 自然回复(无则礼貌带回)· 引用用户当前消息。
-    reply = (u.get("reply") or "").strip()
-    if reply:
-        _say(reply)
-    else:
-        line_expense_qa.reply_pool(reply_token, "scope", text, lang, **ctx)
+    # chat / out_of_scope(含数字的问句/否定/假设也落这里):Brain OS — LLM 只给 chat_kind 枚举,
+    # 确定性映射到统一 i18n 文案(LLM 绝不直接对用户说话,杜绝旧 demo/同义文案漂移)。
+    line_expense_qa.reply_pool(reply_token, u.get("chat_kind") or "unknown", text, lang, **ctx)
     return True
 
 

@@ -19,13 +19,20 @@ def _qr_item(label: str, text: str) -> dict:
     return {"type": "action", "action": {"type": "message", "label": label[:20], "text": text}}
 
 
-# 问候/引导/跑题文案收口到 line_i18n(P1E-1);感谢/求助仍走 replies 轮选池(治复读)。
+# 问候/引导/跑题 + 大脑 chat_kind 枚举 → 统一 line_i18n 文案(P1E-1·Brain OS);感谢/求助仍走
+# replies 轮选池(治复读)。L1 intro_intent 与 L2 chat_kind 共用此表,同义入口收敛到同一套文案。
 _DIRECT_KEY = {
     "greeting": "line_greeting",
     "scope": "line_unknown_intent",
     "capability": "line_intro_capability",
     "start": "line_start_hint",
     "upload": "line_upload_hint",
+    "receipt_help": "line_upload_hint",
+    "edit_help": "line_need_reply_record",
+    "delete_help": "line_need_reply_record",
+    "photo_failed_help": "line_ocr_failed_recovery",
+    "out_of_scope": "line_out_of_scope",
+    "unknown": "line_unknown_intent",
 }
 # 「记一笔」Quick Reply 不再发演示金额(会误记一笔),改触发「怎么开始」引导(line_start_hint)。
 _QR_START = {"zh": "怎么开始", "th": "เริ่มยังไง", "en": "How to start", "ja": "始め方"}

@@ -40,6 +40,18 @@ class IntroIntentTests(unittest.TestCase):
         self.assertEqual(lc.intro_intent("怎么上传"), "upload")
         self.assertEqual(lc.intro_intent("อัปโหลด"), "upload")
 
+    def test_capability_synonyms_unified(self):
+        # 验收:同义能力问句都收敛到 capability(不再绕过 P1E-1 文案 → 旧 demo)。
+        for p in (
+            "คุณทำอะไรได้บ้าง",
+            "คุณสามารถทำอะไรให้ฉันได้บ้าง",
+            "ช่วยบันทึกค่าใช้จ่ายได้ไหม",
+            "What can you do?",
+            "你能做什么",
+            "能帮我做什么",
+        ):
+            self.assertEqual(lc.intro_intent(p), "capability", p)
+
     def test_record_not_misread(self):
         for t in ("ค่าน้ำ 50", "买2杯咖啡120", "打车 120", "เมื่อวานกาแฟ 60"):
             self.assertEqual(lc.intro_intent(t), "")

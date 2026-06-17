@@ -94,9 +94,7 @@ LINE_I18N = {
             "你可以发送收据、税票或费用文件,图片、PDF 都可以。\n"
             "拍摄时请尽量完整、清晰,看清金额和日期,识别会更准。"
         ),
-        "line_processing_receipt": (
-            "已收到文件,我正在读取金额、日期、卖方、VAT 和明细,稍后给你核对。"
-        ),
+        "line_processing_receipt": "已收到文件,我正在读取金额、日期、卖方、VAT 和明细,稍后给你核对。",
         "line_ocr_failed_recovery": (
             "这张单据我还没有读完整。\n"
             "你可以重新发送一张完整、清晰、无遮挡的照片,尤其要看清金额和日期。\n\n"
@@ -107,8 +105,8 @@ LINE_I18N = {
             "你可以发送费用文件,或直接输入要记录的费用信息。"
         ),
         "line_need_reply_record": (
-            "为避免操作错记录,请先回复要处理的那条采购记录。\n"
-            "回复后再输入要执行的操作,例如删除、修改金额或撤销记录。"
+            "为避免操作错记录,请先长按要处理的那条 Pearnly 记录,选择「回复」,\n"
+            "再输入要执行的操作,例如「删除」或「修改金额为 …」。"
         ),
         "line_web_handoff": (
             "这一步需要在 Pearnly 页面里完整核对。\n" "我会带你打开正确页面继续处理。"
@@ -116,6 +114,7 @@ LINE_I18N = {
         "line_unknown_intent": (
             "我还不确定你想处理什么。\n" "你可以发送票据、查看最近记录,或查询费用汇总。"
         ),
+        "line_out_of_scope": "我主要负责记账和费用。你可以发送票据,或查询本月费用情况。",
         "line_query_summary_intro": (
             "这是根据已记录数据整理的费用汇总。\n"
             "我会显示总额、记录数和主要分类;如果想看每一笔,可以继续查看明细。"
@@ -222,8 +221,8 @@ LINE_I18N = {
             "You can send an expense document, or type the expense details you want to record."
         ),
         "line_need_reply_record": (
-            "To avoid changing the wrong entry, please reply to the exact purchase record first.\n"
-            "After replying, type the action you want, such as delete, change amount, or void."
+            "To avoid changing the wrong entry, long-press the Pearnly record, tap “Reply”,\n"
+            "then type the action — for example “delete” or “change amount to …”."
         ),
         "line_web_handoff": (
             "This step should be reviewed in Pearnly so you can see all details clearly.\n"
@@ -233,6 +232,7 @@ LINE_I18N = {
             "I'm not sure what you'd like to do yet.\n"
             "You can send a document, ask for recent records, or check an expense summary."
         ),
+        "line_out_of_scope": "I focus on bookkeeping and expenses. You can send a document or ask about your spending.",
         "line_query_summary_intro": (
             "Here is the expense summary based on recorded entries.\n"
             "I'll show the total, number of records, and main categories. "
@@ -327,9 +327,7 @@ LINE_I18N = {
             "ส่งใบเสร็จ ใบกำกับภาษี หรือไฟล์ค่าใช้จ่ายมาได้เลยค่ะ จะเป็นรูปภาพหรือ PDF ก็ได้\n"
             "ถ่ายให้เห็นเต็มใบ ชัดเจน เห็นยอดเงินและวันที่ จะอ่านได้แม่นยำขึ้นค่ะ"
         ),
-        "line_processing_receipt": (
-            "ได้รับเอกสารแล้วค่ะ กำลังอ่านยอด วันที่ ผู้ขาย VAT และรายการย่อยให้คุณตรวจสอบ"
-        ),
+        "line_processing_receipt": "ได้รับเอกสารแล้วค่ะ กำลังอ่านยอด วันที่ ผู้ขาย VAT และรายการย่อยให้คุณตรวจสอบ",
         "line_ocr_failed_recovery": (
             "ฉันยังอ่านข้อมูลจากเอกสารนี้ได้ไม่ครบค่ะ\n"
             "กรุณาลองส่งรูปที่เห็นทั้งใบ แสงชัด ไม่เบลอ และไม่บังยอดเงินหรือวันที่\n\n"
@@ -340,8 +338,8 @@ LINE_I18N = {
             "คุณสามารถส่งรูปเอกสารค่าใช้จ่าย หรือพิมพ์รายละเอียดรายการที่ต้องการบันทึกได้ค่ะ"
         ),
         "line_need_reply_record": (
-            "เพื่อป้องกันการแก้ผิดรายการ กรุณาตอบกลับข้อความของรายการที่ต้องการดำเนินการก่อนค่ะ\n"
-            "หลังจากตอบกลับแล้ว พิมพ์สิ่งที่ต้องการ เช่น ลบ แก้ยอด หรือยกเลิกรายการ"
+            "เพื่อป้องกันการแก้ผิดรายการ กรุณากดค้างที่ข้อความรายการของ Pearnly เลือก “ตอบกลับ”\n"
+            "แล้วพิมพ์สิ่งที่ต้องการ เช่น “ลบ” หรือ “แก้ไข …” ค่ะ"
         ),
         "line_web_handoff": (
             "ขั้นตอนนี้ควรตรวจในหน้า Pearnly เพื่อให้เห็นรายละเอียดครบถ้วนค่ะ\n"
@@ -351,6 +349,7 @@ LINE_I18N = {
             "ฉันยังไม่แน่ใจว่าคุณต้องการทำอะไรค่ะ\n"
             "คุณสามารถส่งใบเสร็จให้ฉันอ่าน ขอรายละเอียดรายการล่าสุด หรือถามสรุปค่าใช้จ่ายได้ค่ะ"
         ),
+        "line_out_of_scope": "ฉันดูแลเรื่องบันทึกบัญชีและค่าใช้จ่ายเป็นหลักค่ะ ส่งใบเสร็จหรือถามยอดค่าใช้จ่ายได้เลยนะคะ",
         "line_query_summary_intro": (
             "นี่คือสรุปค่าใช้จ่ายตามข้อมูลที่บันทึกไว้ค่ะ\n"
             "แสดงยอดรวม จำนวนรายการ และหมวดหมู่หลัก หากต้องการดูทีละรายการ ให้พิมพ์ขอดูรายละเอียดได้เลยค่ะ"
@@ -443,9 +442,7 @@ LINE_I18N = {
             "レシート、税金請求書、経費ファイルを送ってください。画像でも PDF でも大丈夫です。\n"
             "書類全体が写り、金額と日付が見えるよう鮮明に撮ると、より正確に読み取れます。"
         ),
-        "line_processing_receipt": (
-            "書類を受け取りました。金額、日付、取引先、VAT、明細を読み取っています。"
-        ),
+        "line_processing_receipt": "書類を受け取りました。金額、日付、取引先、VAT、明細を読み取っています。",
         "line_ocr_failed_recovery": (
             "この書類を完全には読み取れませんでした。\n"
             "全体が写り、明るく、ぼやけや影で金額や日付が隠れていない写真をもう一度送ってください。\n\n"
@@ -456,8 +453,8 @@ LINE_I18N = {
             "経費書類を送るか、記録したい経費内容を入力してください。"
         ),
         "line_need_reply_record": (
-            "誤って別の記録を変更しないよう、まず処理したい仕入れ記録に返信してください。\n"
-            "その後、削除、金額変更、取消などの操作を入力してください。"
+            "誤って別の記録を変更しないよう、対象の Pearnly 記録を長押しして「返信」を選び、\n"
+            "「削除」や「金額を…に変更」のように入力してください。"
         ),
         "line_web_handoff": (
             "この操作は Pearnly の画面で詳細を確認する必要があります。\n"
@@ -467,6 +464,7 @@ LINE_I18N = {
             "何をしたいのかまだ判断できません。\n"
             "書類を送る、最近の記録を見る、経費サマリーを確認する、のいずれかを入力してください。"
         ),
+        "line_out_of_scope": "経理と経費を専門にしています。書類を送るか、支出について尋ねてください。",
         "line_query_summary_intro": (
             "記録済みデータに基づく経費サマリーです。\n"
             "合計、記録数、主な分類を表示します。各明細を見たい場合は、詳細表示を依頼してください。"

@@ -70,6 +70,10 @@ def handle_expense_text(
         ):
             return True
 
+        # 引用某记录说「识别错了/不对」(无具体改动)→ 澄清改哪里(不当 OCR 失败让重拍·守卫见 line_correct)。
+        if line_correct.maybe_clarify_feedback(reply_token, text, lang, ws, quoted_message_id, ctx):
+            return True
+
         si = lqe.l1_intent(text)
         isq = lqe.is_question(text)
         # 改错分流(P2):「上一笔改成X / 第1张改成Y」是改错,不能被 L1 当新记一笔 → 跳过 L1 记账,
@@ -258,6 +262,7 @@ def _dispatch_agent(
         return True
     # chat / out_of_scope(含数字的问句/否定/假设也落这里):Brain OS — LLM 只给 chat_kind 枚举,
     # 确定性映射到统一 i18n 文案(LLM 绝不直接对用户说话,杜绝旧 demo/同义文案漂移)。
+    # 引用某记录说「识别错了」的已在文本入口前置拦截澄清(不到这里)。
     line_expense_qa.reply_pool(reply_token, u.get("chat_kind") or "unknown", text, lang, **ctx)
     return True
 

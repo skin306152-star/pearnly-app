@@ -170,6 +170,59 @@ def request_correct(
     return True
 
 
+# 引用记录说「识别错了/不对」但没给具体改成什么 → 澄清改哪里(显该记录金额·不改账)。语言跟随用户输入。
+# 本地 4 语(同 replies._POOLS 范式·非 line_i18n·避免 line_i18n 破 500),{amount} 为该记录含税合计。
+_CLARIFY = {
+    "zh": "我看到你说的是这张 {amount} THB 的记录。请告诉我哪里需要修改,例如「金额改成 70」「日期改成昨天」「卖家改成 ...」。如果是多行明细不准确,我会带你打开详情页检查。",
+    "th": "ฉันเห็นว่าคุณหมายถึงรายการ {amount} THB นี้ค่ะ กรุณาบอกส่วนที่ต้องการแก้ เช่น “แก้ยอดเป็น 70”, “แก้วันที่เป็นเมื่อวาน”, หรือ “แก้ชื่อผู้ขายเป็น ...” หากเป็นรายละเอียดหลายรายการ ฉันจะพาไปตรวจในหน้ารายละเอียดค่ะ",
+    "en": 'I see you mean this {amount} THB record. Tell me what to fix — e.g. "change amount to 70", "change date to yesterday", or "change seller to ...". If the line items are off, I\'ll open the detail page for you.',
+    "ja": "この {amount} THB の記録のことですね。修正したい箇所を教えてください。例:「金額を70に」「日付を昨日に」「販売者を…に」。明細が違う場合は詳細ページをご案内します。",
+}
+
+
+def maybe_clarify_feedback(reply_token, text, lang, ws, quoted_message_id, ctx) -> bool:
+    """引用某记录 + 「识别错了/不对」(无具体改成什么)→ 回澄清改哪里(显金额·不改账·语言随输入)。
+
+    守卫:须引用了记录 + 命中反馈词 + 非具体改动(改成X 留给 edit 流程)。定位到记录才回 True;
+    否则 False(交回上层正常流程,可走 photo_failed 等)。绝不直接改账。ctx 带 line_user_id/tenant_id/
+    quote_token(与 line_expense 回复出口同口径)。
+    """
+    from services.expense import line_classify
+    from services.expense import line_quick_entry as lqe
+
+    if not (
+        quoted_message_id
+        and line_classify.is_correction_feedback(text)
+        and not lqe.is_edit_request(text)
+    ):
+        return False
+    from services.line_binding import line_message_refs
+    from services.purchase import docs as docs_svc
+
+    tid = ctx.get("tenant_id")
+    with db.get_cursor_rls(tid) as cur:
+        tgt = line_message_refs.resolve_target(
+            cur,
+            tenant_id=tid,
+            ws=ws,
+            line_user_id=ctx.get("line_user_id"),
+            quoted_message_id=quoted_message_id,
+            text=text,
+        )
+        if tgt.get("error"):
+            return False
+        detail = docs_svc.get_doc(
+            cur, tenant_id=tid, workspace_client_id=tgt["ws"], doc_id=tgt["doc_id"]
+        )
+    amount = (detail.get("doc") or {}).get("grand_total") if detail else None
+    if amount is None:
+        return False
+    reply_lang = line_classify.detect_text_lang(text) or lang
+    body = _CLARIFY.get(reply_lang, _CLARIFY["zh"]).format(amount=amount)
+    line_reply.reply_text_context(reply_token, body, **ctx)
+    return True
+
+
 def try_confirm(
     bound_user, reply_token, line_user_id, text, tid, ws, lang, *, quote_token=""
 ) -> bool:

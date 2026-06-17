@@ -67,6 +67,25 @@ class DateQueryTests(unittest.TestCase):
             self.assertFalse(lc.is_date_query(t), t)
 
 
+class CorrectionFeedbackTests(unittest.TestCase):
+    def test_feedback_phrases(self):
+        for t in ("这个你识别错了", "金额错了", "อ่านผิด", "ไม่ถูก", "this is wrong", "incorrect"):
+            self.assertTrue(lc.is_correction_feedback(t), t)
+
+    def test_not_feedback(self):
+        for t in ("买咖啡 60", "金额改成 70", "สวัสดี"):
+            self.assertFalse(lc.is_correction_feedback(t), t)
+
+
+class TextLangTests(unittest.TestCase):
+    def test_script_detection(self):
+        self.assertEqual(lc.detect_text_lang("这个识别错了"), "zh")
+        self.assertEqual(lc.detect_text_lang("อ่านผิด"), "th")
+        self.assertEqual(lc.detect_text_lang("this is wrong"), "en")
+        self.assertEqual(lc.detect_text_lang("間違ってる"), "ja")
+        self.assertEqual(lc.detect_text_lang("123"), "")
+
+
 class PaymentNormalizeTests(unittest.TestCase):
     def test_ocr_payment_values(self):
         self.assertEqual(lc.normalize_payment_method("QRPayment(API)"), "promptpay")

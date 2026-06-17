@@ -204,6 +204,59 @@ def is_date_query(text: str) -> bool:
     return _first_match(text, _DATE_PATTERNS) == "date"
 
 
+# 「这条记录识别错了/不对」反馈(引用某条记录时用)→ 进澄清改哪里,不当 OCR 失败让重拍。
+# 词面宽(错了/ผิด/wrong),由调用方限「引用了记录」才触发,故不会误伤泛泛聊天。
+_FEEDBACK_PATTERNS = (
+    (
+        "wrong",
+        (
+            "识别错",
+            "认错",
+            "读错",
+            "记错",
+            "搞错",
+            "弄错",
+            "不对",
+            "错了",
+            "有误",
+            "อ่านผิด",
+            "อ่านไม่ถูก",
+            "ไม่ถูก",
+            "ไม่ตรง",
+            "ผิด",
+            "recognized wrong",
+            "recognised wrong",
+            "read it wrong",
+            "incorrect",
+            "wrong",
+        ),
+    ),
+)
+
+
+def is_correction_feedback(text: str) -> bool:
+    """「这张你识别错了/不对/อ่านผิด/wrong」→ True(指出记录有误·未必给出具体改成什么)。"""
+    return _first_match(text, _FEEDBACK_PATTERNS) == "wrong"
+
+
+def detect_text_lang(text: str) -> str:
+    """按字符脚本判输入语言(zh/th/en/ja)→ 回复跟随用户输入,不被账号主语言带偏。无字母 → ''。"""
+    s = text or ""
+    for ch in s:
+        o = ord(ch)
+        if 0x0E00 <= o <= 0x0E7F:
+            return "th"
+        if 0x3040 <= o <= 0x30FF:  # 平/片假名 → 日语(先于 CJK 汉字判)
+            return "ja"
+    for ch in s:
+        if 0x4E00 <= ord(ch) <= 0x9FFF:
+            return "zh"
+    for ch in s:
+        if ch.isascii() and ch.isalpha():
+            return "en"
+    return ""
+
+
 def intro_intent(text: str) -> str:
     """引导类意图(零成本):capability 能力说明 / upload 如何上传 / start 如何开始。无 → ''。
 

@@ -274,6 +274,55 @@ class RequestCorrectTests(unittest.TestCase):
         self.assertEqual(replies, ["exp_correct_confirm2"])
 
 
+class MaybeClarifyFeedbackTests(unittest.TestCase):
+    """引用某记录说「识别错了/不对」(无具体改动)→ 澄清改哪里(显金额·语言随输入·不改账)。"""
+
+    def _run(self, text, *, quoted="MID1", tgt=None, detail=None):
+        from services.line_binding import line_message_refs
+        from services.purchase import docs as docs_svc
+
+        tgt = tgt if tgt is not None else {"doc_id": "D1", "ws": 1, "error": None}
+        detail = detail if detail is not None else {"doc": {"grand_total": "70.00"}}
+        ctx = {"line_user_id": "U1", "tenant_id": "t", "quote_token": "q"}
+        sent = {}
+        with (
+            mock.patch.object(line_correct.db, "get_cursor_rls", return_value=_Ctx(object())),
+            mock.patch.object(line_message_refs, "resolve_target", return_value=tgt),
+            mock.patch.object(docs_svc, "get_doc", return_value=detail),
+            mock.patch.object(
+                line_correct.line_reply,
+                "reply_text_context",
+                side_effect=lambda tok, body, **k: sent.update(body=body) or True,
+            ),
+        ):
+            res = line_correct.maybe_clarify_feedback("tok", text, "th", 1, quoted, ctx)
+        return res, sent
+
+    def test_feedback_quoted_clarifies_in_input_lang(self):
+        res, sent = self._run("这个你识别错了")
+        self.assertTrue(res)
+        self.assertIn("70.00", sent["body"])
+        self.assertIn("请告诉我", sent["body"])  # 中文输入 → 中文澄清(不被泰语主语言带偏)
+
+    def test_thai_feedback_clarifies_in_thai(self):
+        res, sent = self._run("อ่านผิด")
+        self.assertTrue(res)
+        self.assertIn("กรุณาบอกส่วนที่ต้องการแก้", sent["body"])
+
+    def test_no_quote_falls_through(self):
+        res, sent = self._run("这个识别错了", quoted=None)
+        self.assertFalse(res)
+        self.assertEqual(sent, {})
+
+    def test_concrete_edit_falls_through_to_edit(self):
+        res, _ = self._run("金额改成 70")
+        self.assertFalse(res)
+
+    def test_unresolved_ref_falls_through(self):
+        res, _ = self._run("识别错了", tgt={"doc_id": None, "ws": 1, "error": "ref_not_found"})
+        self.assertFalse(res)
+
+
 class TryConfirmTests(unittest.TestCase):
     def _peek(self, missing):
         return mock.patch.object(

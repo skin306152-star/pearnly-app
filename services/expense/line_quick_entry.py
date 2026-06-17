@@ -15,54 +15,11 @@ from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from services.expense.expense_draft import ExpenseDraft
+from services.expense.line_classify import classify_expense_type
 
 # 分类不在此硬编码 —— 改由 webhook 拿本套账真实科目树(expense_categories)+ intake._match_category
 # 匹配(图/文共用同一套树,不分叉)。本文件只做与树无关的确定性字段抽取。
-
-# 服务类关键词(命中→service,否则默认 goods)· 泰语优先。
-# 含公用事业(水/电/网/话费):它们是服务,不是商品(修「水费=商品」误判)。
-_SERVICE_WORDS = (
-    "บริการ",
-    "ค่าจ้าง",
-    "ซ่อม",
-    "ค่าเช่า",
-    "ที่ปรึกษา",
-    "อบรม",
-    "โฆษณา",
-    "ขนส่ง",
-    "ทำความสะอาด",
-    "ค่าน้ำ",
-    "ค่าไฟ",
-    "ค่าไฟฟ้า",
-    "น้ำประปา",
-    "ค่าโทรศัพท์",
-    "ค่าอินเทอร์เน็ต",
-    "ค่าเน็ต",
-    "service",
-    "rent",
-    "repair",
-    "consult",
-    "utility",
-    "water",
-    "electric",
-    "internet",
-    "服务",
-    "维修",
-    "咨询",
-    "租",
-    "培训",
-    "广告",
-    "运",
-    "水费",
-    "电费",
-    "水电",
-    "网费",
-    "话费",
-    "电话费",
-    "燃气",
-    "煤气",
-    "宽带",
-)
+# 费用类型/付款方式 关键词归类抽到 line_classify(保本文件 <500)。
 
 # 量词(数量信号)· 泰语优先。
 _QTY_UNITS = ("ชิ้น", "จาน", "อัน", "ลัง", "กล่อง", "แก้ว", "个", "杯", "份", "件", "pcs", "pc")
@@ -215,9 +172,8 @@ def _extract_vendor(text: str) -> str:
 
 
 def _extract_expense_type(text: str) -> str:
-    """商品(goods)还是服务(service)· 命中服务关键词→service,否则默认 goods。"""
-    low = text.lower()
-    return "service" if any(w.lower() in low for w in _SERVICE_WORDS) else "goods"
+    """商品(goods)还是服务(service)· 委托 line_classify(图/文共用同一服务词表)。"""
+    return classify_expense_type(text)
 
 
 def _extract_qty(text: str) -> Optional[Decimal]:

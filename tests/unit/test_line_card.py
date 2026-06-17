@@ -213,13 +213,15 @@ class CardTests(unittest.TestCase):
             foot = self._footer_contents(self._card(state, source="text"))
             self.assertTrue(any(n["type"] == "separator" for n in foot), f"{state} 应有分组分隔线")
 
-    def test_posted_has_undo_no_primary(self):
+    def test_posted_detail_primary_modify_and_undo(self):
+        # P1D:已入账卡 主按钮=查看详情(实心 uri)·次=修改(uri)·危险=撤销(postback)。
         c = self._card("posted")
         acts = self._actions(c)
         self.assertIn(line_postback.ACTION_UNDO, acts)
-        self.assertIn("uri", acts)  # 复核
-        # 已入账态无实心主按钮
-        self.assertFalse(any(b["style"] == "primary" for b in self._buttons(c)))
+        self.assertIn("uri", acts)
+        primaries = [b for b in self._buttons(c) if b["style"] == "primary"]
+        self.assertEqual(len(primaries), 1)
+        self.assertEqual(primaries[0]["action"]["type"], "uri")  # 查看详情=深链非动作
 
     def test_confirm_one_primary_plus_links(self):
         c = self._card("confirm")
@@ -424,6 +426,120 @@ class CardFieldEnrichTests(unittest.TestCase):
         s = self._json({"vendor": "x"})
         self.assertNotIn("税号", s)
         self.assertNotIn("地址", s)
+
+
+class P1DCardTests(unittest.TestCase):
+    """P1D 成品化:来源/记录号/付款/舍入/费用类型/明细折叠/空行/引导/动作重排/终态卡。"""
+
+    def _json(self, **kw):
+        import json
+
+        kw.setdefault("state", "confirm")
+        kw.setdefault("amount", "120.00")
+        kw.setdefault("doc_id", "abc-123456-AABBCC")
+        kw.setdefault("lang", "zh")
+        kw.setdefault("fields", {})
+        return json.dumps(line_card.result_card(**kw), ensure_ascii=False)
+
+    def test_record_short_id_shown(self):
+        self.assertIn("记录 #AABBCC", self._json())
+
+    def test_sources_labeled(self):
+        self.assertIn("来自图片", self._json(source="image"))
+        self.assertIn("来自文件", self._json(source="file"))
+        self.assertIn("来自缓存", self._json(source="cache"))
+        self.assertIn("来自文字", self._json(source="text"))
+
+    def test_payment_method_shown_when_identified(self):
+        s = self._json(fields={"payment_method": "transfer"})
+        self.assertIn("付款方式", s)
+        self.assertIn("转账", s)
+
+    def test_payment_status_unpaid_shown(self):
+        s = self._json(fields={"payment_status": "unpaid"})
+        self.assertIn("付款状态", s)
+        self.assertIn("未付", s)
+
+    def test_default_paid_not_shown(self):
+        # 系统默认 paid → 不显示付款行(不把默认当真实付款)。
+        s = self._json(fields={"payment_status": "paid"})
+        self.assertNotIn("付款状态", s)
+        self.assertNotIn("付款方式", s)
+
+    def test_rounding_in_breakdown_when_nonzero(self):
+        s = self._json(fields={"subtotal": "100", "vat": "7", "rounding": "0.25"})
+        self.assertIn("舍入 ฿0.25", s)
+
+    def test_rounding_zero_hidden(self):
+        s = self._json(fields={"subtotal": "100", "rounding": "0.00"})
+        self.assertNotIn("舍入", s)
+
+    def test_expense_type_neutral_not_goods(self):
+        # 餐饮/服务类不粗暴显「商品」:expense → 中性「费用」。
+        s = self._json(fields={"expense_type": "expense"})
+        self.assertIn("费用", s)
+        self.assertNotIn("🛍 商品", s)
+
+    def test_empty_fields_no_blank_rows(self):
+        s = self._json(fields={})
+        for label in ("日期", "建议分类", "子分类", "单据类型", "支出类型"):
+            self.assertNotIn(label, s)
+
+    def test_items_capped_with_overflow_hint(self):
+        s = self._json(fields={"items": [{"name": f"x{i}", "amount": "1"} for i in range(8)]})
+        self.assertIn("x4", s)
+        self.assertNotIn("x5", s)  # 顶 5 行 = x0..x4
+        self.assertIn("还有 3 行", s)
+
+    def test_reply_guide_at_bottom(self):
+        self.assertIn("如需修改", self._json())
+
+    def test_dup_primary_is_view_not_post_anyway(self):
+        c = line_card.result_card(
+            state="dup", amount="99", fields={"document_type": "receipt"}, doc_id="D2", lang="zh"
+        )
+        primaries = [b for b in _walk_buttons(c) if b["style"] == "primary"]
+        self.assertEqual(len(primaries), 1)
+        # 主按钮=查看重复(uri 深链),不再是「仍要入账」postback。
+        self.assertEqual(primaries[0]["action"]["type"], "uri")
+
+    def test_terminal_voided_has_view_record(self):
+        import json
+
+        c = line_card.terminal_card(state="voided", amount="190", doc_id="D9", lang="zh")
+        s = json.dumps(c, ensure_ascii=False)
+        self.assertIn("已撤销", s)
+        self.assertIn("查看记录", s)
+        self.assertIn("footer", c["contents"])
+
+    def test_terminal_discarded_no_action(self):
+        # 草稿已删 → 无记录可看 → 不显示不可执行动作(无 footer)。
+        c = line_card.terminal_card(state="discarded", doc_id="D9", lang="zh")
+        self.assertIn("已丢弃", str(c))
+        self.assertNotIn("footer", c["contents"])
+
+    def test_terminal_four_langs(self):
+        for lang in ("zh", "th", "en", "ja"):
+            for state in ("voided", "discarded"):
+                c = line_card.terminal_card(state=state, doc_id="D", lang=lang)
+                self.assertEqual(c["type"], "flex")
+
+
+def _walk_buttons(card):
+    out = []
+
+    def walk(n):
+        if isinstance(n, dict):
+            if n.get("type") == "button":
+                out.append(n)
+            for v in n.values():
+                walk(v)
+        elif isinstance(n, list):
+            for x in n:
+                walk(x)
+
+    walk(card)
+    return out
 
 
 if __name__ == "__main__":

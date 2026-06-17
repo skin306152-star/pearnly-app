@@ -192,6 +192,7 @@ def push_result_card(
             doc_id=doc_id,
             lang=lang,
             web_url=_WEB_PURCHASE_URL,
+            source=ingest.get("source") or "image",
             workspace_name=ingest.get("workspace_name") or "",
             token=ingest.get("token") or "",
             warn_total=bool(ingest.get("warn_total")),

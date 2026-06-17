@@ -1,19 +1,19 @@
 # -*- coding: utf-8 -*-
-"""LINE 识别结果数据卡(Flex · docs/smart-intake/15 §3)。
+"""LINE 识别结果数据卡(Flex · docs/smart-intake/15 §3 · P1D 成品化)。
 
-视觉照搬定稿原型(Downloads/pearnly-line-flex-card-prototype.html 的 flexJson):
-状态条(浅底深字·非按钮)+ 金额&来源 meta + 字段表(低置信琥珀+「请核对」)+ 套账浅底条
-+ 重复时红框显示原记录 + 动作区(唯一实心主按钮=提交,其余 link 文字链接)。三态四语。
-chrome 文案内联(LINE 域,不进 home.js i18n);纯构建无 IO,可单测。
+一张卡让用户一眼看懂:状态徽章 + 整句说明(header)/ 金额 + 税额拆解 + 来源 + 记录号 /
+字段区(空字段不堆空行·低置信「请核对」)/ 明细(顶 5 行 + 「还有N行」)/ 套账 / 动作区
+(按状态出合法按钮·竖排满宽永不死路)/ 底部 reply 操作引导。终态(已撤销/已丢弃)走 terminal_card。
+
+Flex 原语与分区构建块在 line_card_sections;chrome 文案在 line_card_i18n。纯构建无 IO,可单测。
 """
 
 from __future__ import annotations
 
+from services.line_binding import line_card_sections as s
 from services.line_binding import line_postback
 from services.line_binding.line_card_doctype import doc_type_label
 from services.line_binding.line_card_i18n import chrome as _lang
-
-_REVIEW_BELOW = 0.85
 
 # 三态:状态字色 / 浅底 / 图标(待归类已下线)。
 _STATES = {
@@ -21,21 +21,11 @@ _STATES = {
     "confirm": {"color": "#D97706", "bg": "#FEF3E2", "icon": "◷"},
     "dup": {"color": "#DC2626", "bg": "#FDECEC", "icon": "!"},
 }
-_BRAND = "#2563EB"
-_AMOUNT = "#111827"
-_AMOUNT_MISS = "#98A2B3"
-_LABEL = "#98A2B3"
-_DESC = "#475467"
-_VALUE = "#344054"
-_LOW = "#B45309"
-_META_STRONG = "#475467"
-_SEP = "#EEF0F3"
-_LINK = "#4D607C"
-_LINK_DANGER = "#8F4A4A"
-
-
-def _txt(text, *, size, color, **kw) -> dict:
-    return {"type": "text", "text": str(text), "size": size, "color": color, **kw}
+# 终态:中性灰(已撤销/已丢弃 · 非告警非成功,只是收尾)。
+_TERMINAL = {
+    "voided": {"color": "#667085", "bg": "#F2F4F7", "icon": "↩"},
+    "discarded": {"color": "#667085", "bg": "#F2F4F7", "icon": "🗑"},
+}
 
 
 def _amount_text(amount, t: dict) -> tuple[bool, str]:
@@ -52,120 +42,63 @@ def _state_meta(state: str, t: dict) -> str:
     }.get(state, t["state_pending"])
 
 
-def _field_row(label: str, value: str, t: dict, *, low: bool, strong: bool) -> dict:
-    val = (value or "").strip() or t["na"]
-    if low and val != t["na"]:
-        val = f"{val} {t['review']}"
+def _short_id(doc_id) -> str:
+    """长 uuid → 短可读记录号(末 6 位大写)。无 → 空。"""
+    d = str(doc_id or "").strip().replace("-", "")
+    return d[-6:].upper() if d else ""
+
+
+# 来源标:文字/图片/文件/缓存/付款证据(银行)。未知 → 票据兜底。
+_SRC_KEYS = {
+    "text": "src_text",
+    "image": "src_image",
+    "file": "src_file",
+    "cache": "src_cache",
+    "bank": "src_bank",
+}
+
+# 付款方式规范码 → chrome key(真识别到方式时显「付款方式」)。
+_PAY_METHODS = {
+    "cash": "pay_cash",
+    "transfer": "pay_transfer",
+    "bank_transfer": "pay_transfer",
+    "promptpay": "pay_promptpay",
+    "card": "pay_card",
+    "credit_card": "pay_card",
+    "debit_card": "pay_card",
+    "other": "pay_other",
+}
+
+
+def _method_label(code: str, t: dict) -> str:
+    """付款方式码 → 人话。已知码取译;非空非已知码(真识别的自由文本)原样显(不丢真信息)。"""
+    key = _PAY_METHODS.get((code or "").strip().lower())
+    return t[key] if key else str(code or "").strip()
+
+
+def _payment_row(fields: dict, t: dict):
+    """付款行(条件):真识别到方式 → 「付款方式: X」;否则仅明确未付/部分付 → 「付款状态: …」;
+    系统默认 paid 或无法判断 → 不显示(绝不显「未说明」,不把默认 paid 当真实付款)。"""
+    method = str(fields.get("payment_method") or "").strip()
+    if method:
+        return s.field_row(t["pay_method"], _method_label(method, t), t, low=False, strong=False)
+    status = str(fields.get("payment_status") or "").strip().lower()
+    if status == "unpaid":
+        return s.field_row(t["pay_status"], t["pay_unpaid"], t, low=False, strong=False)
+    if status in ("partial", "partially_paid"):
+        return s.field_row(t["pay_status"], t["pay_partial"], t, low=False, strong=False)
+    return None
+
+
+def _expense_type_text(fields: dict, t: dict) -> str:
+    """费用类型人话。空/未知 → 空(由调用方略过整行,绝不粗暴显「商品」)。"""
+    et = (fields.get("expense_type") or "").strip().lower()
     return {
-        "type": "box",
-        "layout": "horizontal",
-        "contents": [
-            _txt(label, size="sm", color=_LABEL, flex=4, wrap=True),
-            _txt(
-                val,
-                size="sm",
-                color=_LOW if low else (_VALUE if not strong else "#202939"),
-                flex=6,
-                wrap=True,
-                weight="bold" if strong else "regular",
-            ),
-        ],
-    }
-
-
-def _breakdown_rows(fields: dict, t: dict) -> list:
-    """税额拆解条(完整税票有税前/VAT/WHT 时):税前 ฿ · VAT ฿ · WHT ฿。无 → 空(不占位)。"""
-    sub = str(fields.get("subtotal") or "").strip()
-    vat = str(fields.get("vat") or "").strip()
-    wht = str(fields.get("wht") or "").strip()
-    parts = []
-    if sub:
-        parts.append(f"{t['subtotal']} ฿{sub}")
-    if vat:
-        parts.append(f"VAT ฿{vat}")
-    if wht and wht.replace(".", "").strip("0"):
-        parts.append(f"WHT ฿{wht}")
-    if not parts:
-        return []
-    return [_txt(" · ".join(parts), size="xxs", color=_LABEL, margin="sm", wrap=True)]
-
-
-def _seller_rows(fields: dict, t: dict) -> list:
-    """卖家税号/地址条件行(完整税票有值才显·空则不堆叠空行)。"""
-    rows = []
-    tax = str(fields.get("seller_tax") or "").strip()
-    addr = str(fields.get("seller_addr") or "").strip()
-    if tax:
-        rows.append(_field_row(t["tax_id"], tax, t, low=False, strong=False))
-    if addr:
-        rows.append(_field_row(t["address"], addr, t, low=False, strong=False))
-    return rows
-
-
-def _seclabel(text: str) -> dict:
-    """分区小标题(灰·小号)。"""
-    return _txt(text, size="xs", color=_LABEL, weight="bold")
-
-
-def _strip(text: str, bg: str, color: str) -> dict:
-    """贴顶满宽细色条(融入卡·非浮动圆角块):总额不符 / 可能重复。"""
-    return {
-        "type": "box",
-        "layout": "vertical",
-        "paddingTop": "10px",
-        "paddingBottom": "10px",
-        "paddingStart": "18px",
-        "paddingEnd": "18px",
-        "backgroundColor": bg,
-        "contents": [_txt(text, size="xxs", color=color, wrap=True)],
-    }
-
-
-def _items_rows(items: list, t: dict) -> list:
-    """逐条明细(编号 + 名称 + 右对齐价 · 全部按票据显示 · 对标 Paypers รายการค่าใช้จ่าย)。"""
-    rows = []
-    for i, it in enumerate(items or [], 1):
-        name = (str(it.get("name") or "").strip()) or t["na"]
-        amt = str(it.get("amount") or "").strip()
-        rows.append(
-            {
-                "type": "box",
-                "layout": "horizontal",
-                "contents": [
-                    _txt(f"{i}. {name}", size="sm", color=_VALUE, flex=5, wrap=True),
-                    _txt(
-                        f"฿{amt}" if amt else "",
-                        size="sm",
-                        color="#202939",
-                        weight="bold",
-                        flex=2,
-                        align="end",
-                        wrap=True,
-                    ),
-                ],
-            }
-        )
-    return rows
-
-
-def _sheet(sections: list) -> list:
-    """把各非空分区拼成一张连续白卡:区与区之间一条细横线(融入·按类分隔)。"""
-    out = []
-    for contents in sections:
-        if not contents:
-            continue
-        if out:
-            out.append({"type": "separator", "color": _SEP})
-        out.append(
-            {
-                "type": "box",
-                "layout": "vertical",
-                "paddingAll": "16px",
-                "spacing": "sm",
-                "contents": contents,
-            }
-        )
-    return out
+        "service": t["service"],
+        "goods": t["goods"],
+        "evidence": t["evidence"],
+        "expense": t["expense"],
+    }.get(et, "")
 
 
 def _btn(label: str, *, primary: bool, postback: str = None, uri: str = None, danger=False) -> dict:
@@ -179,14 +112,14 @@ def _btn(label: str, *, primary: bool, postback: str = None, uri: str = None, da
             "type": "button",
             "style": "primary",
             "height": "sm",
-            "color": _BRAND,
+            "color": s.BRAND,
             "action": action,
         }
     return {
         "type": "button",
         "style": "link",
         "height": "sm",
-        "color": _LINK_DANGER if danger else _LINK,
+        "color": s.LINK_DANGER if danger else s.LINK,
         "action": action,
     }
 
@@ -213,7 +146,7 @@ def _stack(primary: dict, view: list, danger: list) -> list:
     out = []
     for i, btn in enumerate(buttons):
         if i:
-            out.append({"type": "separator", "margin": "xs", "color": _SEP})
+            out.append({"type": "separator", "margin": "xs", "color": s.SEP})
         out.append(btn)
     return out
 
@@ -228,34 +161,199 @@ def _footer(
     liff_id: str = "",
     ws: str = "",
 ) -> list:
-    """动作区:主按钮=提交;复核/编辑/替代收据=查看组;撤销/丢弃=危险组。竖排满宽永不死路。"""
-    edit_uri = _liff_link(liff_id, web_url, ref, ws=ws)
+    """动作区(按状态出合法动作 · 竖排满宽永不死路):
+    confirm 确认入账(主)/编辑/丢弃;posted 查看详情(主)/修改/[替代收据]/撤销;
+    dup 查看重复(主)/仍要入账/丢弃。"""
+    detail_uri = _liff_link(liff_id, web_url, ref, ws=ws)
     pb = line_postback
 
-    def link(label, uri):
-        return _btn(label, primary=False, uri=uri)
+    def link(label, uri, danger=False):
+        return _btn(label, primary=False, uri=uri, danger=danger)
 
     def kill(label, data):
         return _btn(label, primary=False, postback=data, danger=True)
 
-    def main(label, data):
-        return _btn(label, primary=True, postback=data)
-
     primary, view, danger = None, [], []
     if state == "posted":
-        view.append(link(t["btn_review"], edit_uri))
+        primary = _btn(t["btn_detail"], primary=True, uri=detail_uri)
+        view.append(link(t["btn_edit"], _liff_link(liff_id, web_url, ref, "edit", ws)))
         if source == "text" and ref:
             view.append(link(t["btn_receipt"], _liff_link(liff_id, web_url, ref, "receipt", ws)))
         danger.append(kill(t["btn_undo"], pb.undo_data(ref, token)))
     elif state == "dup":
-        primary = main(t["btn_post_anyway"], pb.confirm_data(ref, token))
-        view.append(link(t["btn_open"], edit_uri))
+        primary = _btn(t["btn_open"], primary=True, uri=detail_uri)
+        view.append(_btn(t["btn_post_anyway"], primary=False, postback=pb.confirm_data(ref, token)))
         danger.append(kill(t["btn_discard"], pb.discard_data(ref, token)))
     else:  # confirm(草稿请确认)
-        primary = main(t["btn_confirm"], pb.confirm_data(ref, token))
-        view.append(link(t["btn_edit"], edit_uri))
+        primary = _btn(t["btn_confirm"], primary=True, postback=pb.confirm_data(ref, token))
+        view.append(link(t["btn_edit"], detail_uri))
         danger.append(kill(t["btn_discard"], pb.discard_data(ref, token)))
     return _stack(primary, view, danger)
+
+
+def _status_header(state: str, t: dict) -> dict:
+    """状态条 = bubble header:满宽贴边、跟随卡片顶部圆角。短徽章(彩色加粗)上,整句说明(深灰)下。"""
+    st = _STATES.get(state, _STATES["confirm"])
+    desc_key = {"posted": "card_state_posted_desc", "dup": "card_state_dup_desc"}.get(
+        state, "card_state_confirm_desc"
+    )
+    return {
+        "type": "box",
+        "layout": "vertical",
+        "paddingAll": "14px",
+        "paddingStart": "20px",
+        "backgroundColor": st["bg"],
+        "contents": [
+            s.txt(
+                f"{st['icon']} {t[state]}", size="sm", color=st["color"], weight="bold", wrap=True
+            ),
+            s.txt(t[desc_key], size="xxs", color=s.DESC, margin="xs", wrap=True),
+        ],
+    }
+
+
+def _amount_section(amount, state: str, source: str, doc_id: str, fields: dict, t: dict) -> list:
+    """金额区:大号总额 + 右栏 meta(支出 / 状态 / 来源 / 记录号)+ 税额拆解(税前/VAT/WHT/舍入)。"""
+    has_amt, amt_text = _amount_text(amount, t)
+    src_text = t[_SRC_KEYS.get(source, "src_doc")]
+    meta = [
+        s.txt(t["meta_expense"], size="xs", color=s.META_STRONG, weight="bold"),
+        s.txt(_state_meta(state, t), size="xxs", color=s.VALUE, margin="xs", weight="bold"),
+        s.txt(src_text, size="xxs", color=s.LABEL, margin="xs"),
+    ]
+    short = _short_id(doc_id)
+    if short:
+        meta.append(s.txt(f"{t['record']} #{short}", size="xxs", color=s.LABEL, margin="xs"))
+    return [
+        {
+            "type": "box",
+            "layout": "horizontal",
+            "alignItems": "flex-end",
+            "contents": [
+                s.txt(
+                    amt_text,
+                    size="xl",
+                    color=s.AMOUNT if has_amt else s.AMOUNT_MISS,
+                    weight="bold",
+                    flex=5,
+                    wrap=True,
+                ),
+                {
+                    "type": "box",
+                    "layout": "vertical",
+                    "alignItems": "flex-end",
+                    "flex": 3,
+                    "contents": meta,
+                },
+            ],
+        },
+        *s.breakdown_rows(fields, t),
+    ]
+
+
+def _core_section(fields: dict, lang: str, t: dict, low) -> list:
+    """基本信息区:单据类型/费用类型/日期/分类/子分类/付款 —— 空字段不堆空行(逐行条件加入)。"""
+    rows = []
+    dt = doc_type_label(fields.get("document_type"), lang)
+    if dt:
+        rows.append(s.field_row(t["doc_type"], dt, t, low=low("document_type"), strong=True))
+    et = _expense_type_text(fields, t)
+    if et:
+        rows.append(s.field_row(t["exp_type"], et, t, low=False, strong=False))
+    if str(fields.get("date") or "").strip():
+        rows.append(s.field_row(t["date"], fields.get("date"), t, low=low("date"), strong=False))
+    if str(fields.get("category") or "").strip():
+        rows.append(
+            s.field_row(t["category"], fields.get("category"), t, low=low("category"), strong=True)
+        )
+    if str(fields.get("subcategory") or "").strip():
+        rows.append(
+            s.field_row(t["subcategory"], fields.get("subcategory"), t, low=False, strong=False)
+        )
+    pay = _payment_row(fields, t)
+    if pay:
+        rows.append(pay)
+    return rows
+
+
+def _seller_section(fields: dict, t: dict, low) -> list:
+    """卖家区(有值才显):卖家 + 税号 + 地址 + 单据号。"""
+    if not ((str(fields.get("vendor") or "").strip()) or s.seller_rows(fields, t)):
+        return []
+    rows = [s.field_row(t["vendor"], fields.get("vendor"), t, low=low("vendor"), strong=False)]
+    rows += s.seller_rows(fields, t)
+    if str(fields.get("invoice_number") or "").strip():
+        rows.append(
+            s.field_row(
+                t["inv_no"],
+                fields.get("invoice_number"),
+                t,
+                low=low("invoice_number"),
+                strong=False,
+            )
+        )
+    return rows
+
+
+def _items_section(fields: dict, t: dict) -> list:
+    """明细区:逐条带价(顶 5 行 + 「还有N行」)。无 items 退回 detail 单行。"""
+    items = fields.get("items") or []
+    if items:
+        return s.items_section(items, t, cap=5)
+    detail = str(fields.get("detail") or "").strip()
+    if detail:
+        return [s.seclabel(t["detail"]), s.txt(detail, size="xxs", color=s.VALUE, wrap=True)]
+    return []
+
+
+def _full_bleed_bar(label: str, value: str) -> dict:
+    """满宽填色条(贴边·非浮动胶囊):套账等 meta。"""
+    return {
+        "type": "box",
+        "layout": "horizontal",
+        "paddingTop": "12px",
+        "paddingBottom": "12px",
+        "paddingStart": "18px",
+        "paddingEnd": "18px",
+        "backgroundColor": "#F4F6F9",
+        "contents": [
+            s.txt(label, size="xxs", color="#667085", flex=2),
+            s.txt(value, size="xxs", color=s.VALUE, weight="bold", align="end", flex=5),
+        ],
+    }
+
+
+def _reply_guide_bar(t: dict) -> dict:
+    """卡底 reply 操作引导(亲切·非错误提示):回复这条记录即可改/删/撤。"""
+    return {
+        "type": "box",
+        "layout": "vertical",
+        "paddingTop": "10px",
+        "paddingBottom": "12px",
+        "paddingStart": "18px",
+        "paddingEnd": "18px",
+        "contents": [s.txt(t["reply_guide"], size="xxs", color=s.LABEL, wrap=True)],
+    }
+
+
+def _bubble(*, alt: str, header: dict, body: list, footer: list = None) -> dict:
+    bubble = {
+        "type": "bubble",
+        "size": "mega",
+        "header": header,
+        "body": {"type": "box", "layout": "vertical", "paddingAll": "0px", "contents": body},
+    }
+    if footer:
+        bubble["footer"] = {
+            "type": "box",
+            "layout": "vertical",
+            "paddingTop": "2px",
+            "paddingBottom": "4px",
+            "paddingStart": "12px",
+            "paddingEnd": "12px",
+            "contents": footer,
+        }
+    return {"type": "flex", "altText": alt, "contents": bubble}
 
 
 def result_card(
@@ -275,183 +373,100 @@ def result_card(
     liff_id: str = "",
     workspace_client_id="",
 ) -> dict:
-    """识别结果 Flex 卡(照搬定稿原型)。
+    """识别结果 Flex 卡(P1D)。
 
-    state ∈ posted|confirm|dup;doc_id=动作目标 purchase_doc id(待归类已下线·糊图/฿0 也建草稿)。
-    source ∈ text|doc|bank(金额右侧来源标);workspace_name 非空则显套账条;dup_info 显原记录红框。
-    token:postback 动作的一次性防重放令牌(PO-12),空则按钮不带令牌(旧卡兼容链路)。
+    state ∈ posted|confirm|dup;doc_id=动作目标 purchase_doc id。source ∈ text|image|file|cache|
+    bank|doc。workspace_name 非空显套账条;dup_info 显原记录红框;warn_total 显「请核对」琥珀条。
+    token:postback 一次性防重放令牌(空=旧卡兼容链路)。
     """
     t = _lang(lang)
-    st = _STATES.get(state, _STATES["confirm"])
     fc = field_confidence or {}
 
     def low(key):
         v = fc.get(key)
-        return v is not None and float(v) < _REVIEW_BELOW
+        return v is not None and float(v) < s.REVIEW_BELOW
 
-    et = (fields.get("expense_type") or "").lower()
-    et_text = {"service": t["service"], "goods": t["goods"], "evidence": t["evidence"]}.get(
-        et, t["na"]
-    )
-    src_text = {"text": t["src_text"], "bank": t["src_bank"]}.get(source, t["src_doc"])
-    has_amt, amt_text = _amount_text(amount, t)
-    state_meta = _state_meta(state, t)
+    # 顶部融入式提示细条:总额不符(琥珀)/ 可能重复(红)。
+    strips = []
+    if warn_total:
+        strips.append(s.strip(t["warn_total"], "#FEF7EC", "#B45309"))
+    if state == "dup" and dup_info:
+        dl = (
+            f"{t['dup_seen']} · ฿{dup_info.get('amount', '')} · "
+            f"{dup_info.get('vendor', '')} · {dup_info.get('date', '')}"
+        )
+        strips.append(s.strip(dl, "#FDECEC", "#9F2830"))
 
-    # 状态条 = bubble header:满宽贴边、跟随卡片顶部圆角(对标 Paypers·非浮动胶囊)。
-    # 短徽章(彩色加粗·一眼可读)上,描述行(整句·中性深灰)下,状态既扫得到也读得懂。
-    desc_key = {"posted": "card_state_posted_desc", "dup": "card_state_dup_desc"}.get(
-        state, "card_state_confirm_desc"
+    body = strips + s.sheet(
+        [
+            _amount_section(amount, state, source, doc_id, fields, t),
+            _core_section(fields, lang, t, low),
+            _seller_section(fields, t, low),
+            _items_section(fields, t),
+        ]
     )
-    status_header = {
+    if workspace_name:
+        body.append(_full_bleed_bar(t["workspace"], workspace_name))
+    body.append(_reply_guide_bar(t))
+
+    _, amt_text = _amount_text(amount, t)
+    return _bubble(
+        alt=f"{t[state]} · {amt_text}",
+        header=_status_header(state, t),
+        body=body,
+        footer=_footer(
+            state, doc_id, web_url, t, token, source, liff_id, str(workspace_client_id or "")
+        ),
+    )
+
+
+def terminal_card(
+    *,
+    state: str,
+    amount=None,
+    doc_id: str = "",
+    lang: str = "zh",
+    web_url: str = "https://pearnly.com/home",
+    workspace_name: str = "",
+    liff_id: str = "",
+    workspace_client_id="",
+) -> dict:
+    """终态卡(已撤销/已丢弃):徽章 + 整句说明 + 金额/记录号 + 仅「查看记录」(丢弃无记录可看 →
+    不出按钮)。不显示任何不可执行动作(验收 6)。state ∈ voided|discarded。"""
+    t = _lang(lang)
+    st = _TERMINAL.get(state, _TERMINAL["voided"])
+    desc = t["void_desc"] if state == "voided" else t["discard_desc"]
+    header = {
         "type": "box",
         "layout": "vertical",
         "paddingAll": "14px",
         "paddingStart": "20px",
         "backgroundColor": st["bg"],
         "contents": [
-            _txt(
-                f"{st['icon']} {t[state]}",
-                size="sm",
-                color=st["color"],
-                weight="bold",
-                wrap=True,
+            s.txt(
+                f"{st['icon']} {t[state]}", size="sm", color=st["color"], weight="bold", wrap=True
             ),
-            _txt(t[desc_key], size="xxs", color=_DESC, margin="xs", wrap=True),
+            s.txt(desc, size="xxs", color=s.DESC, margin="xs", wrap=True),
         ],
     }
-
-    # 顶部融入式提示细条(非浮动圆角块):总额不符(琥珀)/ 可能重复(红)。
-    strips = []
-    if warn_total:
-        strips.append(_strip(t["warn_total"], "#FEF7EC", "#B45309"))
-    if state == "dup" and dup_info:
-        dl = (
-            f"{t['dup_seen']} · ฿{dup_info.get('amount', '')} · "
-            f"{dup_info.get('vendor', '')} · {dup_info.get('date', '')}"
-        )
-        strips.append(_strip(dl, "#FDECEC", "#9F2830"))
-
-    # 金额区
-    amount_sec = [
-        {
-            "type": "box",
-            "layout": "horizontal",
-            "alignItems": "flex-end",
-            "contents": [
-                _txt(
-                    amt_text,
-                    size="xl",
-                    color=_AMOUNT if has_amt else _AMOUNT_MISS,
-                    weight="bold",
-                    flex=5,
-                    wrap=True,
-                ),
-                {
-                    "type": "box",
-                    "layout": "vertical",
-                    "alignItems": "flex-end",
-                    "flex": 3,
-                    "contents": [
-                        _txt(t["meta_expense"], size="xs", color=_META_STRONG, weight="bold"),
-                        _txt(state_meta, size="xxs", color=_VALUE, margin="xs", weight="bold"),
-                        _txt(src_text, size="xxs", color=_LABEL, margin="xs"),
-                    ],
-                },
-            ],
-        },
-        *_breakdown_rows(fields, t),
-    ]
-
-    # 基本信息区
-    core_sec = [
-        _field_row(
-            t["doc_type"],
-            doc_type_label(fields.get("document_type"), lang),
-            t,
-            low=low("document_type"),
-            strong=True,
-        ),
-        _field_row(t["exp_type"], et_text, t, low=False, strong=False),
-        _field_row(t["date"], fields.get("date"), t, low=low("date"), strong=False),
-        _field_row(t["category"], fields.get("category"), t, low=low("category"), strong=True),
-        _field_row(t["subcategory"], fields.get("subcategory"), t, low=False, strong=False),
-    ]
-
-    # 卖家区(有值才显·各行自带标签·靠分隔线与基本信息分开,不另加冗余小标题)
-    seller_sec = []
-    if (str(fields.get("vendor") or "").strip()) or _seller_rows(fields, t):
-        seller_sec.append(
-            _field_row(t["vendor"], fields.get("vendor"), t, low=low("vendor"), strong=False)
-        )
-        seller_sec += _seller_rows(fields, t)
-        if str(fields.get("invoice_number") or "").strip():
-            seller_sec.append(
-                _field_row(
-                    t["inv_no"],
-                    fields.get("invoice_number"),
-                    t,
-                    low=low("invoice_number"),
-                    strong=False,
-                )
-            )
-
-    # 明细区:逐条带价全部显示(无 items 退回 detail 单行)
-    items = fields.get("items") or []
-    items_sec = []
-    if items:
-        items_sec = [_seclabel(t["detail"]), *_items_rows(items, t)]
-    elif str(fields.get("detail") or "").strip():
-        items_sec = [
-            _seclabel(t["detail"]),
-            _txt(fields["detail"], size="xxs", color=_VALUE, wrap=True),
-        ]
-
-    body = strips + _sheet([amount_sec, core_sec, seller_sec, items_sec])
-    # 套账:满宽填色条(贴边·非浮动胶囊),置于字段区与动作区之间。
+    body_rows = []
+    has_amt, amt_text = _amount_text(amount, t)
+    if has_amt:
+        body_rows.append(s.txt(amt_text, size="lg", color=s.VALUE, weight="bold", wrap=True))
+    short = _short_id(doc_id)
+    if short:
+        body_rows.append(s.txt(f"{t['record']} #{short}", size="xxs", color=s.LABEL, margin="xs"))
+    body = s.sheet([body_rows]) if body_rows else []
     if workspace_name:
-        body.append(
-            {
-                "type": "box",
-                "layout": "horizontal",
-                "paddingTop": "12px",
-                "paddingBottom": "12px",
-                "paddingStart": "18px",
-                "paddingEnd": "18px",
-                "backgroundColor": "#F4F6F9",
-                "contents": [
-                    _txt(t["workspace"], size="xxs", color="#667085", flex=2),
-                    _txt(
-                        workspace_name, size="xxs", color=_VALUE, weight="bold", align="end", flex=5
-                    ),
-                ],
-            }
-        )
+        body.append(_full_bleed_bar(t["workspace"], workspace_name))
 
-    return {
-        "type": "flex",
-        "altText": f"{t[state]} · {amt_text}",
-        "contents": {
-            "type": "bubble",
-            "size": "mega",
-            "header": status_header,
-            "body": {"type": "box", "layout": "vertical", "paddingAll": "0px", "contents": body},
-            "footer": {
-                "type": "box",
-                "layout": "vertical",
-                "paddingTop": "2px",
-                "paddingBottom": "4px",
-                "paddingStart": "12px",
-                "paddingEnd": "12px",
-                "contents": _footer(
-                    state,
-                    doc_id,
-                    web_url,
-                    t,
-                    token,
-                    source,
-                    liff_id,
-                    str(workspace_client_id or ""),
-                ),
-            },
-        },
-    }
+    footer = None
+    if state == "voided" and doc_id:
+        uri = _liff_link(liff_id, web_url, doc_id, ws=str(workspace_client_id or ""))
+        footer = [_btn(t["btn_view_record"], primary=True, uri=uri)]
+    return _bubble(
+        alt=f"{t[state]} · {amt_text if has_amt else ''}".strip(" ·"),
+        header=header,
+        body=body,
+        footer=footer,
+    )

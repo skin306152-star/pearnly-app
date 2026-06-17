@@ -277,7 +277,10 @@ def _do_record(
 
     created_by = str(bound_user["id"]) if bound_user.get("id") else None
     from services.expense import line_l2
+    from services.expense.line_classify import detect_payment_method
 
+    # 付款方式:仅采纳一句话里真识别到的(转账/现金/刷卡)→ 卡显「付款方式」。未提 → 不猜不显。
+    draft.payment_method = draft.payment_method or detect_payment_method(text)
     api_key = line_l2.resolve_api_key(bound_user)
     with db.get_cursor_rls(tid, commit=True) as cur:
         tree = cat_svc.get_tree(cur, tenant_id=tid, workspace_client_id=ws)
@@ -343,6 +346,7 @@ def _card_fields_from_draft(draft) -> dict:
         "vendor": draft.vendor_name or "",
         "seller_tax": getattr(draft, "vendor_tax_id", "") or "",
         "invoice_number": draft.invoice_number or "",
+        "payment_method": getattr(draft, "payment_method", "") or "",
         "items": items,
         "detail": item,
     }

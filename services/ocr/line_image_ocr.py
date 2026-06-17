@@ -37,6 +37,7 @@ _LOADING_REFRESH_INTERVAL = 50
 
 # 多图排队:同一用户 FIFO 串行,避免多张图卡片乱序。
 _user_img_locks: dict[str, asyncio.Lock] = {}
+_IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".heic", ".heif")
 
 
 def _user_img_lock(line_user_id: str) -> asyncio.Lock:
@@ -210,6 +211,7 @@ async def _handle_line_image_ocr(
                                 api_key=line_l2.resolve_api_key(user_fresh),
                             )
                 if _ci:
+                    _ci["source"] = "cache"  # 缓存命中重建卡 → 来源标「来自缓存」
                     _push_result_card(
                         line_user_id, lang, _ci, quote_token, _ws_client_id, tenant_id=_tid_c
                     )
@@ -303,6 +305,8 @@ async def _handle_line_image_ocr(
             ingest = None
 
         if ingest:
+            _is_img = os.path.splitext(filename or "")[1].lower() in _IMAGE_EXTS
+            ingest["source"] = "image" if _is_img else "file"  # 来自图片 / 来自文件
             # 已入账/草稿/待归类 → 不写识别记录;计费与历史脱钩(history_id=None);回执发数据卡。
             try:
                 import asyncio as _acharge

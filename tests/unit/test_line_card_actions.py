@@ -37,6 +37,11 @@ def _run(data, *, ws=1):
             side_effect=lambda rt, b, **k: sent.append(b) or True,
         ),
         mock.patch.object(
+            lca.line_reply,
+            "reply_messages_context",
+            side_effect=lambda rt, msgs, **k: sent.append(msgs) or True,
+        ),
+        mock.patch.object(
             line_client,
             "t_line",
             side_effect=lambda lang, key, **kw: f"{key}:{kw.get('amount','')}",
@@ -53,16 +58,24 @@ class CardActionTests(unittest.TestCase):
         svc.post_doc.assert_called_once()
         self.assertTrue(sent[0].startswith("card_confirmed:"))
 
-    def test_undo_voids(self):
+    def test_undo_sends_voided_terminal_card(self):
+        # P1D:撤销后回「已撤销」终态卡(Flex·含查看记录),不再纯文字。
         sent, svc = _run(line_postback.undo_data("D1"))
         svc.void_doc.assert_called_once()
-        self.assertTrue(sent[0].startswith("card_state_void_desc:"))
+        card = sent[0][0]
+        self.assertEqual(card["type"], "flex")
+        self.assertIn("已撤销", str(card))
+        self.assertIn("查看记录", str(card))
 
-    def test_discard_deletes_draft(self):
+    def test_discard_sends_discarded_terminal_card(self):
+        # P1D:丢弃后回「已丢弃」终态卡(草稿已删→无可执行动作·无 footer)。
         sent, svc = _run(line_postback.discard_data("D1"))
         svc.delete_doc.assert_called_once()
         svc.post_doc.assert_not_called()
-        self.assertTrue(sent[0].startswith("card_state_discarded_desc"))
+        card = sent[0][0]
+        self.assertEqual(card["type"], "flex")
+        self.assertIn("已丢弃", str(card))
+        self.assertNotIn("footer", card["contents"])
 
     def test_bad_data_stale_reply(self):
         sent, svc = _run("garbage")

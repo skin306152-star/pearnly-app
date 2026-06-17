@@ -18,6 +18,23 @@ from services.line_binding import line_client, line_postback, line_reply
 logger = logging.getLogger(__name__)
 
 
+def _terminal_card(reply_token, state, ref, ws, amount, lang, tid, luid) -> None:
+    """动作后回终态卡(已撤销/已丢弃):一眼看懂收尾状态,不显示不可执行动作(P1D 验收6)。"""
+    import os
+
+    from services.line_binding import line_card
+
+    card = line_card.terminal_card(
+        state=state,
+        amount=amount,
+        doc_id=ref,
+        lang=lang,
+        liff_id=os.getenv("LINE_LIFF_ID", "").strip(),
+        workspace_client_id=str(ws or ""),
+    )
+    line_reply.reply_messages_context(reply_token, [card], line_user_id=luid, tenant_id=tid)
+
+
 def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
     """卡按钮回调 → 全套动作分发。任何异常都回执不抛(主路径不得崩)。
 
@@ -81,11 +98,22 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
 
             elif action == line_postback.ACTION_UNDO:
                 res = posting_svc.void_doc(cur, **scope, doc_id=ref, created_by=uid)
-                _say("card_state_void_desc", res.get("doc"))
+                # 终态卡(已撤销):徽章 + 整句 + 金额/记录号 + 仅「查看记录」(原单留存可查)。
+                _terminal_card(
+                    reply_token,
+                    "voided",
+                    ref,
+                    ws,
+                    (res.get("doc") or {}).get("grand_total"),
+                    lang,
+                    tid,
+                    luid,
+                )
 
             elif action == line_postback.ACTION_DISCARD:
                 docs_svc.delete_doc(cur, **scope, doc_id=ref)  # 仅草稿可删(内部 status='draft' 守)
-                _say("card_state_discarded_desc")
+                # 终态卡(已丢弃):草稿已删→无记录可看→不出「查看」死链(只显徽章+整句)。
+                _terminal_card(reply_token, "discarded", ref, ws, None, lang, tid, luid)
     except Exception:
         # 状态错(已入账再确认 / 草稿撤销 / 项已处理)或并发 → 友好回执,不报错。
         logger.warning("[line card] postback action failed", exc_info=True)

@@ -212,7 +212,7 @@ def ingest_line_image(
     ]
     card_fields = {
         "document_type": fields.get("document_type") or "",
-        "expense_type": "goods",
+        "expense_type": "",  # 见下方按分类/描述推导(不硬编码 goods,避免餐饮/服务误显「商品」)
         "date": fields.get("date") or "",
         "category": "",
         "subcategory": "",
@@ -222,7 +222,10 @@ def ingest_line_image(
         "subtotal": fields.get("subtotal") or "",
         "vat": fields.get("vat") or "",
         "wht": fields.get("wht_amount") or "",
+        "rounding": fields.get("rounding") or "",
         "invoice_number": fields.get("invoice_number") or "",
+        "payment_method": fields.get("payment_method") or "",
+        "payment_status": "",  # 见下方:取自 draft 的付款态(仅明确未付/部分付才在卡上显)
         "items": _card_items(fields),
         "detail": (
             " · ".join(_item_names[:3])
@@ -274,6 +277,17 @@ def ingest_line_image(
         if cat_conf and cat_conf < Decimal("0.85"):
             fc = dict(fc)
             fc["category"] = float(cat_conf)
+
+    # 付款态(仅明确未付/部分付才在卡显·默认 paid 不显)+ 舍入(非 0 才显)→ 取自草稿。
+    card_fields["rounding"] = card_fields["rounding"] or (draft.get("rounding") or "")
+    card_fields["payment_status"] = draft.get("payment_status") or ""
+    # 费用类型:命中服务关键词→服务,否则中性「费用」(OCR 票多为费用·不粗暴显「商品」)。
+    from services.expense.line_classify import classify_expense_type
+
+    _et_blob = " ".join([vendor_name or "", _cat_name or "", *descs])
+    card_fields["expense_type"] = (
+        "service" if classify_expense_type(_et_blob) == "service" else "expense"
+    )
 
     verdict = conf.grade(
         amount=amount,

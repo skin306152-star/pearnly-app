@@ -33,6 +33,9 @@ class ExpenseDraft(BaseModel):
     vat_amount: Optional[Decimal] = Field(default=None)
     wht_amount: Optional[Decimal] = Field(default=None)
     document_type: str = Field(default="")
+    payment_method: str = Field(
+        default="", description="真识别到的付款方式码:cash|transfer|promptpay|card"
+    )
     note: str = Field(default="")
     source: str = Field(default="line_text")
     raw_text: str = Field(default="")

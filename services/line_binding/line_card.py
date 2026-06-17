@@ -306,7 +306,13 @@ def _items_section(fields: dict, t: dict) -> list:
     否则退回 detail 单行;都没有 → 不显该区。"""
     items = fields.get("items") or []
     if items:
-        return s.items_section(items, t, cap=5)
+        rows = s.items_section(items, t, cap=5)
+        mods = str(fields.get("modifiers") or "").strip()
+        if mods:  # 0 元 modifier/赠品作备注(不占主明细)
+            rows.append(
+                s.txt(t["note_free_items"].format(x=mods), size="xxs", color=s.LABEL, wrap=True)
+            )
+        return rows
     if fields.get("items_unread"):
         return [
             s.seclabel(t["detail"]),

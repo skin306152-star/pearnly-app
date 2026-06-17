@@ -98,8 +98,23 @@ def _card_items(fields: dict) -> list:
         if amt <= 0:
             amt = _dec(it.get("qty") or 1) * _dec(it.get("price"))
         if amt <= 0:
-            continue  # 0 元 modifier(ไม่หวาน 0%/แถมฟรี)不进主明细 · 后续可放备注
+            continue  # 0 元 modifier(ไม่หวาน 0%/แถมฟรี)不进主明细 → 走 _free_modifier_names 进备注
         out.append({"name": _clean_item_name(name), "amount": f"{amt:,.2f}"})
+    return out
+
+
+def _free_modifier_names(fields: dict) -> list:
+    """0 元 modifier/赠品名(ไม่หวาน 0%/แถมฟรี):不占主金额明细,作卡片备注保留(信息不丢)。"""
+    out = []
+    for it in fields.get("items") or []:
+        name = str(it.get("name") or "").strip()
+        if not name or ik._is_summary_item_name(name):
+            continue
+        amt = _dec(it.get("subtotal"))
+        if amt <= 0:
+            amt = _dec(it.get("qty") or 1) * _dec(it.get("price"))
+        if amt <= 0:
+            out.append(_clean_item_name(name))
     return out
 
 
@@ -260,6 +275,8 @@ def ingest_line_image(
         card_fields["detail"] = " · ".join(descs[:3]) + (
             f" 等{len(descs)}项" if len(descs) > 3 else ""
         )
+        # 0 元 modifier/赠品 → 卡片备注(不占主明细·信息不丢)
+        card_fields["modifiers"] = " · ".join(_free_modifier_names(fields)[:8])
     else:
         card_fields["items"] = []
         card_fields["items_unread"] = True

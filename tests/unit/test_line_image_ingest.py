@@ -320,6 +320,18 @@ class IngestTests(unittest.TestCase):
             [{"name": "TW กาแฟ", "amount": "120.00"}, {"name": "TW เพิ่มช็อต", "amount": "10.00"}],
         )
 
+    def test_free_modifiers_collected_for_note(self):
+        # 0 元 modifier/赠品(去标记/破折号后)收进备注 · (original)/汇总行不算。
+        f = {
+            "items": [
+                {"name": "TW กาแฟ", "subtotal": "120"},
+                {"name": "- TW ไม่หวาน 0%", "subtotal": "0"},
+                {"name": "(original)", "subtotal": "0"},
+                {"name": "แก้ว Mickey (แถมฟรี)", "subtotal": "0"},
+            ],
+        }
+        self.assertEqual(li._free_modifier_names(f), ["TW ไม่หวาน 0%", "แก้ว Mickey (แถมฟรี)"])
+
     def test_summary_items_are_filtered_from_card(self):
         f = {
             "items": [

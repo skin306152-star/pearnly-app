@@ -564,6 +564,25 @@ class P1DCardTests(unittest.TestCase):
         self.assertEqual(primary(ok)["type"], "postback")  # 对账正常 → 主=确认入账
         self.assertEqual(primary(ok)["label"], "ยืนยันบันทึก")
 
+    def test_free_modifiers_shown_as_note_not_main_items(self):
+        import json
+
+        c = line_card.result_card(
+            state="confirm",
+            amount="140.00",
+            fields={
+                "vendor": "PTT",
+                "items": [{"name": "TW กาแฟ", "amount": "120.00"}],
+                "modifiers": "TW ไม่หวาน 0% · แก้ว Mickey (แถมฟรี)",
+            },
+            doc_id="X",
+            lang="th",
+            source="image",
+        )
+        s = json.dumps(c, ensure_ascii=False)
+        self.assertIn("หมายเหตุ", s)  # 备注前缀
+        self.assertIn("ไม่หวาน 0%", s)  # 赠品名进备注
+
     def test_items_unread_hint_when_no_items(self):
         # OCR 没抽出明细:明细区出「未能逐项识别·去详情页」诚实提示,不显假的卖家名单行。
         c = line_card.result_card(

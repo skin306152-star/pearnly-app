@@ -6,18 +6,17 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-17 · **LINE 改错闭环 + 引用底座(Brain OS P1A)全上线** · HEAD `a5e39ae2`）
+## 🎯 状态卡（2026-06-17 · **P1A 文案 + 16:22 金额归一化 + 取消死路修 + P1C 统一回复 全上线** · HEAD `1cc940f8`）
 
-- **本窗口完成并上线**（7 commit · prod `a5e39ae` · 4 worker 干净启动 · `/api/version` 200 · 13 闸全绿）：
-  - `10a0e874` /simplify:三路发卡口 `line_booker.emit_result_card`、共享建单 `to_purchase_data`、`category_ai._listing/_decode_choice` 去重（零行为变更·prompt 不动）。
-  - `f9346295` **P2 改错闭环扩面**:对话内改任意字段(金额/卖家/日期/科目)+「第N笔」定位 + 保多行(复用 web `correct_doc` 忠实克隆)；单行可改金额、多行金额引导网页；加 `is_edit_request` 守卫(治「上一笔改成550」被 L1 当新记一笔)。
-  - `a16ce679` **修数据完整性 bug**:泰文「ไม่ใช่(不是)」含「ใช่」被当确认照改账 → 否定词优先(`_NO`)。
-  - `73c9178a` LIFF 入口 4 处兜底文案中文→泰文(i18n 未就绪时不漏中文给泰国用户)。
-  - `887e7aee` **P1A 引用底座**:新表 `line_message_refs`(alembic 0041 + startup ensure + RLS·prod 已建)。发卡记消息id→doc；用户长按回执 reply「删除/改成X」→ `resolve_target`(引用>第N笔>明确上一笔>不明确则提示 reply,绝不默认改最近一笔)精确命中；`reply_undo` 不再无条件 LIMIT 1；`line_client.*_with_meta` 拿 sentMessages id。
-  - `00bd14fb`+`a5e39ae2` 引用提示去写死「430」例子+教长按引用；/simplify 删孤儿 `exp_correct_no_list` + record 单次批量 INSERT。
-- **验证**：全量 **3846 unit 绿**;file_size/imports/i18n--strict/ai_smell/ruff 全绿。`line_message_refs` 表已在 prod 真库建成。
-- **在等 Zihao 真机验**(本窗无真 LINE channel)：① 记 A=60、B=430 → 长按 **新卡**(改动后发的)回复「删除」只撤 A；② 长按 B「改成500」只问 B；③「ไม่ใช่」取消不动账；④ 不引用直接「删除」→ 回提示不乱删。**注:引用改动前的旧卡会回「找不到记录」=正常**(旧卡无映射)。
-- **剩余/待跟进**：① 纯「记账」消息被 LINE 重投仍可能多建草稿(既有·非本次引入·待排) ② 登录页「会话已过期」仍中文(登录层默认语言·另排) ③ doc 19 **P3 诚实回复契约**未做(全链路文案审计+谎报单测) ④ 引用机制可扩到销项/DMS(后续车道)。
+- **本窗口完成并上线**（5 commit · prod `1cc940f` 重启 11:05 UTC · `/api/version` 200 · 13 闸全绿）：
+  - `0d3a0f3` **P1A LINE 采购文案产品化**:卡片短徽章下加整句状态说明(confirm/posted/dup),撤销/丢弃回执完整文案,改错引导按场景分(目标不明→回复/引用不存在→查明细/多行→详情页/抽不出字段→教回复语法)。统一进 `line_card_i18n`/`line_i18n` 扁平键 4 语齐,删被取代旧键(无两套同义)。
+  - `8703512` **16:22 餐饮票金额归一化**(诊断确认非缓存·prod 09:22 UTC 全新识别):删 `_gross_up_expense_lines`;明细合票面税前小计即判可信、**保留票面行额**,含税合计经 doc 级 rounding **尊重票面 Total 2722**(费用单不可抵 VAT 计入成本·不单列进项税避免误 claim);分类加 buffet/seafood 规则。
+  - `d15bd24` **取消死路修**:对草稿回「取消/ยกเลิก」→ 丢弃(对齐「ทิ้ง」按钮)而非走 void 落「没有可撤销的」死路;已入账→照旧 void。
+  - `919e8a7` **P1C 统一回复体验**:新 `services/line_binding/line_reply.py`(reply_text/messages_context·push_*_context·begin_loading)集中 loading+quoteToken 注入+截断+失败日志+bot 记忆;webhook 入口对 text/postback/其它统一 loading(图片留自有);绑定/查账/问答/闲聊/改错/取消/失败/图片通知全走统一出口默认带引用;`_reply_pool` 迁 `line_expense_qa.reply_pool`(line_expense 回 493<500)。
+  - `1cc940f` **修 master 既存 authz 闸红**:`/api/logout`+`/api/auth/logout`(别窗口 SECURITY 引入·无守门)入 PUBLIC_ROUTES(登出本就公开)→ 解锁全员 push。
+- **验证**：全量 **3862 unit 绿**(skip 3);ruff/black/file_size/imports/tracked_imports/i18n--strict/new_debt/authz/ratchet 全绿。16:22 票样 + 餐饮分类 + reply_undo 草稿丢弃 + line_reply quote 注入/无 token fallback/传递 均有单测。
+- **在等 Zihao 真机验**(本窗无真 LINE channel)：① 发问候/费用文字/图片 → 回复前转圈 + 回执引用该消息;② reply 某记录删除/改错 → 确认引用该操作消息,确认/否定引用对应消息;③ 重发 16:22 餐饮票 → 含税合计 2722.00、明细保留 799×3/147(不再 2564.70/157.29)。
+- **剩余/待跟进**：① prod 旧错单 `bdb1405e`(2721.99)是历史草稿不回写·按「ทิ้ง」删后重发即对 ② `guide_open_detail` 本轮仅文案未接 LIFF 深链 ③ 登录页「会话已过期」仍中文(登录层默认语言·另排) ④ doc 19 P3 诚实回复契约未做 ⑤ 统一回复出口可继续把 line_booker 发卡/多笔路也收编(本轮未动·已有 quote)。
 
 ## 历史记录（旧状态卡 · 2026-06-17 · OCR 纠错 + LINE 费用卡片产品化 · HEAD `33142a1`）
 

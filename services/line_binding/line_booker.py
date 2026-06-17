@@ -122,29 +122,41 @@ def emit_result_card(
     发完把两条消息 id 绑到该 doc(line_message_refs)→ 用户长按任一条 reply「删除/改成X」可
     精确定位这张单(引用底座 P1A)。记映射 best-effort,失败不阻塞回执。
     """
+    import logging
     import os
 
-    from services.line_binding import line_card, line_client
+    from services.line_binding import line_client
 
-    ack = {"type": "text", "text": line_client.t_line(lang, ack_key(state), amount=amount)}
-    if quote_token:
-        ack["quoteToken"] = quote_token
-    card = line_card.result_card(
-        state=state,
-        amount=amount,
-        fields=fields,
-        field_confidence=field_confidence or {},
-        doc_id=doc_id,
-        lang=lang,
-        web_url=_WEB_PURCHASE_URL,
-        source=source,
-        workspace_name=workspace_name,
-        token=token,
-        liff_id=os.getenv("LINE_LIFF_ID", "").strip(),
-        workspace_client_id=workspace_client_id,
-    )
-    sent = line_client.reply_messages_with_meta(reply_token, [ack, card])
-    _bind_refs(tenant_id, workspace_client_id, line_user_id, sent, doc_id, state)
+    try:
+        # line_card import 放 try 内:模块未部署/渲染失败都在此兜底,不冒泡成上层兜底误判。
+        from services.line_binding import line_card
+
+        ack = {"type": "text", "text": line_client.t_line(lang, ack_key(state), amount=amount)}
+        if quote_token:
+            ack["quoteToken"] = quote_token
+        card = line_card.result_card(
+            state=state,
+            amount=amount,
+            fields=fields,
+            field_confidence=field_confidence or {},
+            doc_id=doc_id,
+            lang=lang,
+            web_url=_WEB_PURCHASE_URL,
+            source=source,
+            workspace_name=workspace_name,
+            token=token,
+            liff_id=os.getenv("LINE_LIFF_ID", "").strip(),
+            workspace_client_id=workspace_client_id,
+        )
+        sent = line_client.reply_messages_with_meta(reply_token, [ack, card])
+        _bind_refs(tenant_id, workspace_client_id, line_user_id, sent, doc_id, state)
+    except Exception as e:  # noqa: BLE001
+        # 记录已建好 · 仅卡片发送失败 → 明确告知卡片问题,不让上层当成未处理。
+        logging.getLogger(__name__).warning(f"[line] 数据卡发送失败: {e}")
+        line_client.reply_messages(
+            reply_token,
+            [{"type": "text", "text": line_client.t_ocr(lang, "card_render_failed")}],
+        )
 
 
 def _bind_refs(tenant_id, workspace_client_id, line_user_id, sent, doc_id, state) -> None:
@@ -173,11 +185,14 @@ def push_result_card(
     import logging
     import os
 
-    from services.line_binding import line_card, line_client
+    from services.line_binding import line_client
 
     state = ingest.get("state", "confirm")
     doc_id = ingest.get("ref") or ingest.get("doc_id") or ""
     try:
+        # line_card import 放 try 内:即便拆分模块未部署(ImportError)也在此兜底,绝不冒泡成「读取失败」。
+        from services.line_binding import line_card
+
         ack = {
             "type": "text",
             "text": line_client.t_line(lang, ack_key(state), amount=ingest.get("amount") or "—"),
@@ -204,5 +219,6 @@ def push_result_card(
             line_client.push_messages(line_user_id, [ack, card])
         _bind_refs(tenant_id, ws_client_id, line_user_id, sent, doc_id, state)
     except Exception as e:  # noqa: BLE001
-        logging.getLogger(__name__).warning(f"[line_ocr] 数据卡 push 失败,回落纯文字: {e}")
-        line_client.push_text(line_user_id, line_client.t_ocr(lang, "routed_to_purchase"))
+        # OCR 已成功 · 仅卡片渲染/发送失败(含模块未部署)→ 明确告知卡片问题,绝不谎报「读取失败」。
+        logging.getLogger(__name__).warning(f"[line_ocr] 数据卡 push 失败: {e}")
+        line_client.push_text(line_user_id, line_client.t_ocr(lang, "card_render_failed"))

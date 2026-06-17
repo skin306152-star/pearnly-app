@@ -26,6 +26,7 @@ OCR_RESULT_I18N = {
         "err_plan": "⚠️ 账号暂不可用 · 请联系管理员",
         "view_on_web": "网页历史记录查看详情 👉 https://pearnly.com",
         "routed_to_purchase": "✅ 已收到票据 · 已放入「采购 · 草稿」\n到 pearnly.com 采购里确认入账 🧾",
+        "card_render_failed": "已读到内容,但卡片显示失败,请打开 Pearnly 检查记录。",
     },
     "en": {
         "processing": "📸 Image received · recognizing...",
@@ -44,6 +45,7 @@ OCR_RESULT_I18N = {
         "err_plan": "⚠️ Account unavailable · please contact admin",
         "view_on_web": "View details in web history 👉 https://pearnly.com",
         "routed_to_purchase": "✅ Receipt received · added to Purchases · Draft\nConfirm & post it under Purchases at pearnly.com 🧾",
+        "card_render_failed": "I read the document, but the result card failed to display. Please open Pearnly to check the entry.",
     },
     "th": {
         "processing": "📸 รับรูปแล้ว · กำลังอ่าน...",
@@ -62,6 +64,7 @@ OCR_RESULT_I18N = {
         "err_plan": "⚠️ บัญชีไม่พร้อมใช้งาน · กรุณาติดต่อผู้ดูแล",
         "view_on_web": "ดูรายละเอียดบนเว็บ 👉 https://pearnly.com",
         "routed_to_purchase": "✅ รับใบเสร็จแล้ว · เข้า「จัดซื้อ · ฉบับร่าง」\nยืนยันและบันทึกที่เมนูจัดซื้อ pearnly.com 🧾",
+        "card_render_failed": "อ่านข้อมูลได้แล้วค่ะ แต่การ์ดแสดงผลมีปัญหา กรุณาเปิด Pearnly เพื่อตรวจรายการ",
     },
     "ja": {
         "processing": "📸 画像を受信 · 認識中...",
@@ -80,6 +83,7 @@ OCR_RESULT_I18N = {
         "err_plan": "⚠️ アカウント利用不可 · 管理者にお問い合わせください",
         "view_on_web": "Web で履歴を確認 👉 https://pearnly.com",
         "routed_to_purchase": "✅ 領収書を受信 · 「仕入 · 下書き」に追加\npearnly.com の仕入で確認・登録してください 🧾",
+        "card_render_failed": "内容は読み取れましたが、結果カードの表示に失敗しました。Pearnly を開いて記録をご確認ください。",
     },
 }
 

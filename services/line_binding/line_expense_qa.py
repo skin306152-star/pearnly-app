@@ -112,6 +112,21 @@ def reply_undo(
                     reply_token, line_client.t_line(lang, _UNDO_ERR[tgt["error"]])
                 )
                 return
+            from services.purchase import docs as docs_svc
+
+            detail = docs_svc.get_doc(
+                cur, tenant_id=tid, workspace_client_id=tgt["ws"], doc_id=tgt["doc_id"]
+            )
+            status = (detail.get("doc") or {}).get("status") if detail else None
+            if status == "draft":
+                # 草稿未入账,「取消」= 丢弃(对齐卡片「ทิ้ง」按钮),不走 void(只撤已入账)→ 永不死路。
+                docs_svc.delete_doc(
+                    cur, tenant_id=tid, workspace_client_id=tgt["ws"], doc_id=tgt["doc_id"]
+                )
+                line_client.reply_text(
+                    reply_token, line_client.t_line(lang, "card_state_discarded_desc")
+                )
+                return
             res = posting_svc.void_doc(
                 cur,
                 tenant_id=tid,

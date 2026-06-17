@@ -215,8 +215,10 @@ def push_result_card(
             workspace_client_id=str(ws_client_id or ""),
         )
         sent = line_client.push_messages_with_meta(line_user_id, [ack, card])
-        if not sent:  # 退化:meta 失败也至少把卡发出去(不丢回执)
-            line_client.push_messages(line_user_id, [ack, card])
+        if not sent and not line_client.push_messages(line_user_id, [ack, card]):
+            # 卡被 LINE 拒(如 Flex 校验失败)且非异常 → 明确告知,不让卡片静默消失。
+            line_client.push_text(line_user_id, line_client.t_ocr(lang, "card_render_failed"))
+            return
         _bind_refs(tenant_id, ws_client_id, line_user_id, sent, doc_id, state)
     except Exception as e:  # noqa: BLE001
         # OCR 已成功 · 仅卡片渲染/发送失败(含模块未部署)→ 明确告知卡片问题,绝不谎报「读取失败」。

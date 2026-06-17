@@ -102,30 +102,29 @@ def strip(text: str, bg: str, color: str) -> dict:
 
 
 def items_section(items: list, t: dict, *, cap: int = 5) -> list:
-    """明细分区:小标题 + 逐条(编号 + 名称 + 右对齐价)。超 cap 行 → 截断 + 「还有N行,去详情页」。"""
+    """明细分区:小标题 + 逐条(编号 + 名称 + 右对齐价)。超 cap 行 → 截断 + 「还有N行,去详情页」。
+
+    免费/无价品项(amount 空)不渲染价格节点:LINE Flex 的 text 必须非空,空字符串会让整卡被拒(400)。
+    """
     items = items or []
     rows = [seclabel(t["detail"])]
     for i, it in enumerate(items[:cap], 1):
         name = (str(it.get("name") or "").strip()) or t["na"]
         amt = str(it.get("amount") or "").strip()
-        rows.append(
-            {
-                "type": "box",
-                "layout": "horizontal",
-                "contents": [
-                    txt(f"{i}. {name}", size="sm", color=VALUE, flex=5, wrap=True),
-                    txt(
-                        f"฿{amt}" if amt else "",
-                        size="sm",
-                        color=VALUE_STRONG,
-                        weight="bold",
-                        flex=2,
-                        align="end",
-                        wrap=True,
-                    ),
-                ],
-            }
-        )
+        row = [txt(f"{i}. {name}", size="sm", color=VALUE, flex=5, wrap=True)]
+        if amt:
+            row.append(
+                txt(
+                    f"฿{amt}",
+                    size="sm",
+                    color=VALUE_STRONG,
+                    weight="bold",
+                    flex=2,
+                    align="end",
+                    wrap=True,
+                )
+            )
+        rows.append({"type": "box", "layout": "horizontal", "contents": row})
     extra = len(items) - cap
     if extra > 0:
         rows.append(txt(t["items_more"].format(n=extra), size="xxs", color=LABEL, wrap=True))

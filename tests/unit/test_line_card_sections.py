@@ -52,6 +52,24 @@ class ItemsSectionTests(unittest.TestCase):
         rows = s.items_section([{"name": "a", "amount": "1"}], T, cap=5)
         self.assertNotIn("还有", str(rows))
 
+    def test_free_item_no_empty_text_node(self):
+        # 免费/无价品项(amount 空)不渲染价格文本节点:LINE Flex text 必须非空,空串会让整卡被拒(400)。
+        rows = s.items_section(
+            [{"name": "Coffee", "amount": "60"}, {"name": "Free toy (แถมฟรี)", "amount": ""}], T
+        )
+
+        def has_empty_text(node):
+            if isinstance(node, dict):
+                if node.get("type") == "text" and node.get("text", "") == "":
+                    return True
+                return any(has_empty_text(v) for v in node.values())
+            if isinstance(node, list):
+                return any(has_empty_text(x) for x in node)
+            return False
+
+        self.assertFalse(has_empty_text(rows), "免费品项不应产生空 text 节点")
+        self.assertIn("Free toy", str(rows))  # 免费品项名仍显示
+
 
 class SellerRowsTests(unittest.TestCase):
     def test_only_present_fields(self):

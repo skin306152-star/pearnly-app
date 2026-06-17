@@ -23,7 +23,6 @@ def _qr_item(label: str, text: str) -> dict:
 # replies 轮选池(治复读)。L1 intro_intent 与 L2 chat_kind 共用此表,同义入口收敛到同一套文案。
 _DIRECT_KEY = {
     "greeting": "line_greeting",
-    "scope": "line_unknown_intent",
     "capability": "line_intro_capability",
     "start": "line_start_hint",
     "upload": "line_upload_hint",

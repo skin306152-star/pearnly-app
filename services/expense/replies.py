@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from services.expense import line_classify
+
 _GREETING_WORDS = (
     "你好",
     "您好",
@@ -79,8 +81,6 @@ def detect_smalltalk(text: str) -> Optional[str]:
 
     引导意图复用 line_classify.intro_intent,与问候同走 reply_pool(各取 line_i18n 收口文案 + 引导)。
     """
-    from services.expense import line_classify
-
     low = (text or "").strip().lower()
     if not low:
         return None

@@ -62,6 +62,17 @@ _PAY_PATTERNS = (
 )
 
 
+def _first_match(text: str, patterns) -> str:
+    """规范化文本 → 命中的 (key, 关键词组) 里第一个 key;无命中 → ''(付款方式/引导意图共用)。"""
+    low = (text or "").strip().lower()
+    if not low:
+        return ""
+    for key, words in patterns:
+        if any(w.lower() in low for w in words):
+            return key
+    return ""
+
+
 def classify_expense_type(text: str) -> str:
     """商品(goods)还是服务(service)· 命中服务关键词→service,否则默认 goods(图/文共用·防重复词表)。"""
     low = (text or "").lower()
@@ -70,11 +81,7 @@ def classify_expense_type(text: str) -> str:
 
 def detect_payment_method(text: str) -> str:
     """一句话里真识别到的付款方式(规范码 promptpay/transfer/card/cash)。无信号 → ''(不猜)。"""
-    low = (text or "").lower()
-    for code, words in _PAY_PATTERNS:
-        if any(w.lower() in low for w in words):
-            return code
-    return ""
+    return _first_match(text, _PAY_PATTERNS)
 
 
 # 引导类意图关键词(零成本·泰语优先):能力说明 / 如何上传 / 如何开始。
@@ -151,10 +158,4 @@ def intro_intent(text: str) -> str:
 
     用在记账解析前的分流,避免「怎么开始」被当成记一笔(这些短语极少出现在正常记一笔里)。
     """
-    low = (text or "").strip().lower()
-    if not low:
-        return ""
-    for kind, words in _INTRO_PATTERNS:
-        if any(w.lower() in low for w in words):
-            return kind
-    return ""
+    return _first_match(text, _INTRO_PATTERNS)

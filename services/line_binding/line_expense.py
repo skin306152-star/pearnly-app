@@ -157,7 +157,7 @@ def handle_expense_text(
             # 改错但无 LLM 抽不出改什么字段 → 教 LINE 内回复语法,不瞎猜也不甩去网页。
             _say(line_client.t_line(lang, "line_need_reply_record"))
         else:
-            _pool("scope")
+            _pool("unknown")
         return True
     except Exception:
         logger.exception("[line] expense handle failed; fall back")

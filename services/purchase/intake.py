@@ -27,6 +27,8 @@ _SUMMARY_ITEM_RE = re.compile(
     r"(?:^|\s)(?:จำนวน|จํานวน|รวม|ยอดรวม|subtotal|sub\s*total|total|vat|net|payment|change|cash)(?:\s|$)",
     re.IGNORECASE,
 )
+# 重印/副本标记行(非商品·收据上单独印一行):"(original)" / "(copy)" / "(สำเนา)" / "ต้นฉบับ"。
+_MARKER_ITEM_RE = re.compile(r"^(?:original|copy|duplicate|สำเนา|ต้นฉบับ)$", re.IGNORECASE)
 
 
 def _to_decimal(v) -> Decimal:
@@ -97,7 +99,10 @@ def _is_summary_item_name(name: str) -> bool:
     n = (name or "").strip()
     if not n:
         return True
-    return bool(_SUMMARY_ITEM_RE.search(n))
+    if _SUMMARY_ITEM_RE.search(n):
+        return True
+    # 去前导项目符号/括号后若只剩 original/copy 等重印标记 → 非商品行。
+    return bool(_MARKER_ITEM_RE.match(n.strip("-–•·() ")))
 
 
 def _effective_items(fields: dict) -> list:

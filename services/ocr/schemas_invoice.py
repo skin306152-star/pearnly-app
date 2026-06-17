@@ -182,6 +182,7 @@ class ThaiInvoice(BaseModel):
         "wht_amount",
         "notes",
         "category",
+        "payment_method",
         mode="before",
     )(_coerce_to_str)
 

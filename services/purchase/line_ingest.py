@@ -63,21 +63,21 @@ def _total_mismatch(fields: dict) -> bool:
 
 
 def _display_pretax(fields: dict) -> str:
-    """卡片「税前(ก่อนภาษี)」该显的净额 —— 不能把含税总额当税前。
+    """卡片「税前(ก่อนภาษี)」该显的净额 = 票面总额 − VAT(恒一致:税前 + VAT = 总额)。
 
-    票面 subtotal+vat≈total → subtotal 本就是税前,照显;subtotal≈total 且有 VAT(泰国含税小票
-    常把 VATable 印成与总额相同)→ 含税,税前 = total − vat。无 VAT/无 subtotal → 原样。
+    用 total−vat 而非票面 subtotal:含税小票把 VATable 印成 = 总额(#20: subtotal=total=70)、或
+    subtotal 略读偏(#21: 130 vs 130.84)时都给出与总额自洽的税前(65.42 / 130.84)。无 VAT/无总额 → 原样。
     """
-    sub = _dec(fields.get("subtotal"))
     vat = _dec(fields.get("vat"))
     total = _dec(fields.get("total_amount"))
-    if sub > 0 and vat > 0 and total > 0:
-        tol = max(Decimal("1"), total * Decimal("0.02"))
-        if abs((sub + vat) - total) <= tol:
-            return f"{sub:,.2f}"
-        if abs(sub - total) <= tol:
-            return f"{(total - vat):,.2f}"
+    if vat > 0 and total > vat:
+        return f"{(total - vat):,.2f}"
     return str(fields.get("subtotal") or "")
+
+
+def _clean_item_name(name) -> str:
+    """明细名去前导项目符号/破折号(「- TW ไม่หวาน」→「TW ไม่หวาน」),让卡片明细干净。"""
+    return str(name or "").strip().lstrip("-–•· ").strip()
 
 
 def _items_plausible_subset(fields: dict) -> bool:
@@ -111,7 +111,7 @@ def _card_items(fields: dict) -> list:
         amt = _dec(it.get("subtotal"))
         if amt <= 0:
             amt = _dec(it.get("qty") or 1) * _dec(it.get("price"))
-        out.append({"name": name, "amount": (f"{amt:,.2f}" if amt > 0 else "")})
+        out.append({"name": _clean_item_name(name), "amount": (f"{amt:,.2f}" if amt > 0 else "")})
     return out
 
 
@@ -129,7 +129,7 @@ def _draft_card_items(draft: dict) -> list:
         amt = _dec(ln.get("line_total"))
         if amt <= 0:
             amt = _dec(ln.get("qty") or 1) * _dec(ln.get("unit_price"))
-        out.append({"name": name, "amount": (f"{amt:,.2f}" if amt > 0 else "")})
+        out.append({"name": _clean_item_name(name), "amount": (f"{amt:,.2f}" if amt > 0 else "")})
     return out
 
 

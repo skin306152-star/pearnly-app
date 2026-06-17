@@ -13,6 +13,21 @@ import unittest
 from services.ocr.schemas import ThaiInvoice
 
 
+class PaymentMethodNullToleranceTests(unittest.TestCase):
+    """守门:LLM 常对没印付款方式的票返 payment_method=null。str 字段须容忍 None→''(否则整页 OCR 挂)。
+
+    真实事故(2026-06-17):新增 payment_method:str 漏进 _coerce_to_str → null 触发
+    ThaiInvoice schema 校验失败 → 整张票回「ไม่ครบ」让重拍。
+    """
+
+    def test_null_payment_method_coerced_to_empty(self):
+        inv = ThaiInvoice(seller_name="x", payment_method=None)
+        self.assertEqual(inv.payment_method, "")
+
+    def test_value_kept(self):
+        self.assertEqual(ThaiInvoice(seller_name="x", payment_method="qr").payment_method, "qr")
+
+
 class SourceRefsNullToleranceTests(unittest.TestCase):
     def test_whole_source_refs_null(self):
         """case 1:整个 source_refs = null → 不炸,变 {}。"""

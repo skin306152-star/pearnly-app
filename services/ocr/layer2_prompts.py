@@ -277,7 +277,10 @@ CRITICAL RULES:
    the receipt shows, look again for missed rows. Keep EVERY printed line occurrence — receipts
    legitimately repeat the same add-on/modifier line (e.g. an extra-shot charged once per drink),
    so do NOT merge repeated lines. Collapse duplicates ONLY when the WHOLE document is printed
-   twice (a delivery note + receipt merged into one image).
+   twice (a delivery note + receipt merged into one image). A bare reprint marker on its own line —
+   "(original)" / "(copy)" / "(สำเนา)" — is NOT an item; skip it. A line beginning with "-" is a
+   modifier/option of the item above; keep it as an item only if it has its own price, and drop the
+   leading "-" from its name.
 4. NUMBERS: No currency symbols, no commas (e.g., "12450.00").
 5. TAX IDs: Exactly 13 digits, no dashes/spaces. Empty string if not found.
 6. WHT (หัก ณ ที่จ่าย / ภ.ง.ด.3 / ภ.ง.ด.53): Common rates 1/2/3/5%. wht_rate is the number ONLY ("3" not "3%"). Only extract if printed; do NOT guess.

@@ -524,6 +524,37 @@ class P1DCardTests(unittest.TestCase):
                 c = line_card.terminal_card(state=state, doc_id="D", lang=lang)
                 self.assertEqual(c["type"], "flex")
 
+    def test_items_unread_hint_when_no_items(self):
+        # OCR 没抽出明细:明细区出「未能逐项识别·去详情页」诚实提示,不显假的卖家名单行。
+        c = line_card.result_card(
+            state="confirm",
+            amount="431.00",
+            fields={"vendor": "Little Betong", "items": [], "items_unread": True},
+            doc_id="X",
+            lang="th",
+            source="image",
+        )
+
+        def texts(node):
+            out = []
+
+            def w(n):
+                if isinstance(n, dict):
+                    if n.get("type") == "text":
+                        out.append(n.get("text", ""))
+                    for v in n.values():
+                        w(v)
+                elif isinstance(n, list):
+                    for x in n:
+                        w(x)
+
+            w(node)
+            return out
+
+        joined = " ".join(texts(c))
+        self.assertIn("ยังอ่านรายการย่อยไม่ได้", joined)
+        self.assertNotIn("1. Little Betong", joined)
+
 
 def _walk_buttons(card):
     out = []

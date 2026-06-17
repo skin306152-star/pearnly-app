@@ -62,40 +62,26 @@ def _total_mismatch(fields: dict) -> bool:
     return not _items_reconcile_total(fields)
 
 
-def _display_pretax(fields: dict) -> str:
-    """卡片「税前(ก่อนภาษี)」该显的净额 = 票面总额 − VAT(恒一致:税前 + VAT = 总额)。
+def _vat_breakdown(fields: dict) -> tuple[str, str]:
+    """卡片税额拆解 (税前 ก่อนภาษี, VAT) —— 税额用确定性算,不信 OCR 误读的位数(铁律)。
 
-    用 total−vat 而非票面 subtotal:含税小票把 VATable 印成 = 总额(#20: subtotal=total=70)、或
-    subtotal 略读偏(#21: 130 vs 130.84)时都给出与总额自洽的税前(65.42 / 130.84)。无 VAT/无总额 → 原样。
+    泰国 VAT 固定 7%。OCR 的 vat 若接近含税值 total×7/107(即 7% 含税票)→ 按 7% 确定性重算 vat 与税前
+    (治 #21 把 9.16 读成 10 → 仍出 130.84/9.16)。非 7%/读偏太多 → 退回 total−vat(仍与总额自洽)。
+    无 VAT/无总额 → 用票面 subtotal、VAT 留空。
     """
     vat = _dec(fields.get("vat"))
     total = _dec(fields.get("total_amount"))
     if vat > 0 and total > vat:
-        return f"{(total - vat):,.2f}"
-    return str(fields.get("subtotal") or "")
+        seven = total * Decimal("7") / Decimal("107")
+        if abs(vat - seven) <= max(Decimal("1"), seven * Decimal("0.12")):
+            vat = seven.quantize(Decimal("0.01"))
+        return f"{(total - vat):,.2f}", f"{vat:,.2f}"
+    return str(fields.get("subtotal") or ""), str(fields.get("vat") or "")
 
 
 def _clean_item_name(name) -> str:
     """明细名去前导项目符号/破折号(「- TW ไม่หวาน」→「TW ไม่หวาน」),让卡片明细干净。"""
     return str(name or "").strip().lstrip("-–•· ").strip()
-
-
-def _items_plausible_subset(fields: dict) -> bool:
-    """OCR 明细是「不全但像真」的子集(≥2 行且加总 ≤ 票面总额)→ 卡片仍照显原行(配「不全」提示),
-    而非塌成卖家单行。挡掉「乱读放大」(7-11 单行 845 ≫ 票面 110)那种 → 加总远超总额则不显。"""
-    items = [
-        it
-        for it in (fields.get("items") or [])
-        if str(it.get("name") or "").strip() and not ik._is_summary_item_name(it.get("name"))
-    ]
-    if len(items) < 2:
-        return False
-    total = _dec(fields.get("total_amount"))
-    items_sum = _items_sum(fields)
-    if total <= 0 or items_sum <= 0:
-        return False
-    tol = max(Decimal("1"), total * Decimal("0.02"))
-    return items_sum <= total + tol
 
 
 def _card_items(fields: dict) -> list:
@@ -111,24 +97,6 @@ def _card_items(fields: dict) -> list:
         amt = _dec(it.get("subtotal"))
         if amt <= 0:
             amt = _dec(it.get("qty") or 1) * _dec(it.get("price"))
-        out.append({"name": _clean_item_name(name), "amount": (f"{amt:,.2f}" if amt > 0 else "")})
-    return out
-
-
-def _draft_card_items(draft: dict) -> list:
-    """采购草稿行 → 卡片明细。
-
-    OCR 原始 items 可能已经被 build_draft_from_invoice 收敛成单行(例如小票行明细
-    加总和票面总额不符)。卡片必须显示收敛后的草稿行,否则用户会看到已经被系统丢弃的错明细。
-    """
-    out = []
-    for ln in draft.get("lines") or []:
-        name = str(ln.get("description") or "").strip()
-        if ik._is_summary_item_name(name):
-            continue
-        amt = _dec(ln.get("line_total"))
-        if amt <= 0:
-            amt = _dec(ln.get("qty") or 1) * _dec(ln.get("unit_price"))
         out.append({"name": _clean_item_name(name), "amount": (f"{amt:,.2f}" if amt > 0 else "")})
     return out
 
@@ -246,6 +214,7 @@ def ingest_line_image(
         for it in (fields.get("items") or [])
         if (it.get("name") or "").strip()
     ]
+    _pretax, _vat = _vat_breakdown(fields)
     card_fields = {
         "document_type": fields.get("document_type") or "",
         "expense_type": "",  # 见下方按分类/描述推导(不硬编码 goods,避免餐饮/服务误显「商品」)
@@ -255,9 +224,9 @@ def ingest_line_image(
         "vendor": fields.get("seller_name") or "",
         "seller_tax": fields.get("seller_tax") or "",
         "seller_addr": fields.get("seller_addr") or "",
-        # 税前净额:含税小票把含税值印成 subtotal 时换算为真税前(total − vat),不把含税当税前。
-        "subtotal": _display_pretax(fields),
-        "vat": fields.get("vat") or "",
+        # 税额拆解确定性算(7% 不信 OCR 误读位数·见 _vat_breakdown):税前 = total−VAT,VAT 按 7% 含税。
+        "subtotal": _pretax,
+        "vat": _vat,
         "wht": fields.get("wht_amount") or "",
         "rounding": fields.get("rounding") or "",
         "invoice_number": fields.get("invoice_number") or "",
@@ -272,45 +241,29 @@ def ingest_line_image(
         ),
     }
     fc = res.get("field_confidence") or {}
-    warn_total = _total_mismatch(fields)
     draft = res["draft"]
     amount = draft.get("grand_total") or "0"
+    # 卡片明细只显 OCR 真行(已滤汇总/标记·去前导符号)。规则:加总 ≤ 票面总额 → 照显(全/不全都行,
+    # 不全则「明细可能不全」提示);乱读放大(7-11 单行 845 ≫ 110)或一行没抽到 → 不显假行/卖家名行,
+    # 标 items_unread 让卡出「未能逐项识别·去详情页」。账务草稿仍收敛保票面总额,与卡片展示两不冲突。
     raw_items = _card_items(fields)
-    draft_items = _draft_card_items(draft)
-    supplier_name = str(draft["supplier"].get("name") or "").strip()
-    draft_is_vendor_fallback = len(draft_items) == 1 and draft_items[0]["name"] == supplier_name
-    # 草稿因明细不对账塌成卖家单行时:只要 OCR 原行像真(对账 或 不全但加总≤总额)就照显原票多行明细
-    # (配「明细可能不全」提示),不让用户只看到一行卖家名。账务草稿仍收敛保票面总额,两不冲突。
-    use_raw_items = (
-        bool(raw_items)
-        and draft_is_vendor_fallback
-        and (_items_reconcile_total(fields) or _items_plausible_subset(fields))
-    )
-    # OCR 没抽出真明细、只剩卖家名兜底单行(且原行也不像真)→ 明细留空,不显「1. 卖家名 ฿总额」假行
-    # (那看着像 1 个叫店名的商品·误导)。卡片仍有金额/卖家/分类,逐项明细去详情页看。
-    no_real_items = draft_is_vendor_fallback and not use_raw_items
-    if use_raw_items:
+    items_sum = _items_sum(fields)
+    total = _dec(fields.get("total_amount"))
+    tol = max(Decimal("1"), total * Decimal("0.02"))
+    show_items = bool(raw_items) and total > 0 and 0 < items_sum <= total + tol
+    if show_items:
         card_fields["items"] = raw_items
-    elif no_real_items:
-        card_fields["items"] = []
-    elif draft_items:
-        card_fields["items"] = draft_items
-    # 逐条明细填进卡(对标竞品「รายการค่าใช้จ่าย」):取真实商品行(跳过卖家兜底单行),顶 3 条 + 「等N项」。
-    descs = [
-        (ln.get("description") or "").strip()
-        for ln in (draft.get("lines") or [])
-        if (ln.get("description") or "").strip() not in ("", "—")
-        and not ik._is_summary_item_name(ln.get("description"))
-    ]
-    if use_raw_items:
+        warn_total = _total_mismatch(fields)
         descs = [it["name"] for it in raw_items]
-    if no_real_items:
-        descs = []
-        card_fields["detail"] = ""
-    if descs:
         card_fields["detail"] = " · ".join(descs[:3]) + (
             f" 等{len(descs)}项" if len(descs) > 3 else ""
         )
+    else:
+        card_fields["items"] = []
+        card_fields["items_unread"] = True
+        card_fields["detail"] = ""
+        warn_total = False
+        descs = []
     # 智能归类(LLM 优先 → 关键词兜底):懂泰文品名,治「分类不对/空」。
     vendor_name = draft["supplier"].get("name") or ""
     cat_id, sub_id, _cat_name, _sub_name, cat_conf = _smart_category(

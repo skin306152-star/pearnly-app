@@ -49,9 +49,16 @@ def _run(resolve_ret, *, band="high", auto_book=True, fields=None, tree=None):
 
 class IngestTests(unittest.TestCase):
     def test_high_complete_posts(self):
-        # 自动入账开 + 高置信齐全 → 直接过账(posted)。
+        # 自动入账开 + 高置信齐全 → 直接过账(posted)。卡片明细取自 OCR items(加总≤总额)。
         res = {"route": "purchase", "draft": _draft(), "dedupe_hit": False, "field_confidence": {}}
-        out, cdoc, pdoc = _run(res, band="high", auto_book=True)
+        fields = {
+            "document_type": "",
+            "seller_name": "ACME",
+            "date": "2026-06-14",
+            "total_amount": "100",
+            "items": [{"name": "x", "subtotal": "100"}],
+        }
+        out, cdoc, pdoc = _run(res, band="high", auto_book=True, fields=fields)
         self.assertEqual(out["state"], "posted")
         self.assertEqual(out["card_fields"]["detail"], "x")  # 逐条明细填进卡
         self.assertEqual(out["card_fields"]["items"], [{"name": "x", "amount": "100.00"}])
@@ -241,7 +248,9 @@ class IngestTests(unittest.TestCase):
         out, _cdoc, _pdoc = _run(res, band="high", auto_book=False, fields=fields)
         self.assertEqual(out["card_fields"]["items"], [])
         self.assertEqual(out["card_fields"]["detail"], "")
-        self.assertTrue(out["warn_total"])
+        # 不显明细时不再报「明细可能不全」(矛盾)→ 改出 items_unread 提示,warn 关。
+        self.assertFalse(out["warn_total"])
+        self.assertTrue(out["card_fields"].get("items_unread"))
 
     def test_no_ocr_items_shows_no_fake_line(self):
         # OCR 一条明细都没抽出(旋转热敏票)→ 草稿卖家兜底单行 → 卡片明细留空,不显假的卖家名单行。
@@ -263,6 +272,7 @@ class IngestTests(unittest.TestCase):
         out, _cdoc, _pdoc = _run(res, band="needs_review", auto_book=False, fields=fields)
         self.assertEqual(out["card_fields"]["items"], [])
         self.assertEqual(out["card_fields"]["detail"], "")
+        self.assertTrue(out["card_fields"].get("items_unread"))
 
     def test_pos_receipt_card_keeps_raw_items_when_they_match_total(self):
         # POS 小票价格通常已含 VAT:商品行 60+10=总额 70,不要因为 VAT 表存在而压成供应商一行。
@@ -336,51 +346,28 @@ class TotalMismatchTests(unittest.TestCase):
         self.assertFalse(li._total_mismatch({"items": [{"subtotal": "100"}]}))
 
 
-class DisplayPretaxTests(unittest.TestCase):
-    """卡片税前净额:含税小票不能把含税总额当税前(B3)。"""
+class VatBreakdownTests(unittest.TestCase):
+    """税额拆解确定性算(7% · 不信 OCR 误读位数):税前 = total−VAT,VAT 按 7% 含税重算。"""
 
-    def test_inclusive_receipt_shows_net(self):
-        # subtotal 印成与含税总额相同(70=total) + 有 VAT → 税前 = 70 − 4.58 = 65.42。
-        f = {"subtotal": "70.00", "vat": "4.58", "total_amount": "70.00"}
-        self.assertEqual(li._display_pretax(f), "65.42")
+    def test_inclusive_70(self):
+        # 70 含税:VAT 4.58、税前 65.42。
+        self.assertEqual(
+            li._vat_breakdown({"subtotal": "70.00", "vat": "4.58", "total_amount": "70.00"}),
+            ("65.42", "4.58"),
+        )
 
-    def test_exclusive_receipt_keeps_subtotal(self):
-        # subtotal + vat ≈ total(130.84 + 9.16 = 140)→ subtotal 本就是税前,照显。
-        f = {"subtotal": "130.84", "vat": "9.16", "total_amount": "140.00"}
-        self.assertEqual(li._display_pretax(f), "130.84")
+    def test_vat_misread_recomputed_to_7pct(self):
+        # OCR 把 140 的 VAT 读成 10(应 9.16)→ 按 7% 确定性重算 → 130.84 / 9.16。
+        self.assertEqual(
+            li._vat_breakdown({"subtotal": "130", "vat": "10", "total_amount": "140"}),
+            ("130.84", "9.16"),
+        )
 
-    def test_no_vat_unchanged(self):
-        f = {"subtotal": "431.00", "vat": "0.00", "total_amount": "431.00"}
-        self.assertEqual(li._display_pretax(f), "431.00")
-
-
-class PlausibleSubsetTests(unittest.TestCase):
-    """OCR 明细不全但像真(≥2 行·加总≤总额)→ 卡片仍照显原行,不塌成卖家单行(B1)。"""
-
-    def test_incomplete_real_items_are_plausible(self):
-        # Little Betong:抽到 95/125/165/6 = 391 ≤ 票面 431(漏了 2 行)→ 仍照显。
-        f = {
-            "total_amount": "431",
-            "items": [
-                {"name": "a", "subtotal": "95"},
-                {"name": "b", "subtotal": "125"},
-                {"name": "c", "subtotal": "165"},
-                {"name": "d", "subtotal": "6"},
-            ],
-        }
-        self.assertTrue(li._items_plausible_subset(f))
-
-    def test_garbage_overshoot_not_plausible(self):
-        # 单行 845 ≫ 票面 110(乱读放大)→ 不照显(塌成卖家行兜底)。
-        f = {
-            "total_amount": "110",
-            "items": [{"name": "x", "subtotal": "845"}, {"name": "y", "subtotal": "10"}],
-        }
-        self.assertFalse(li._items_plausible_subset(f))
-
-    def test_single_item_not_subset(self):
-        f = {"total_amount": "110", "items": [{"name": "x", "subtotal": "100"}]}
-        self.assertFalse(li._items_plausible_subset(f))
+    def test_no_vat_keeps_subtotal(self):
+        self.assertEqual(
+            li._vat_breakdown({"subtotal": "431.00", "vat": "0.00", "total_amount": "431.00"}),
+            ("431.00", "0.00"),
+        )
 
 
 class IncompleteItemsCardTests(unittest.TestCase):

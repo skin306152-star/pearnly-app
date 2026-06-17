@@ -296,10 +296,16 @@ def _seller_section(fields: dict, t: dict, low) -> list:
 
 
 def _items_section(fields: dict, t: dict) -> list:
-    """明细区:逐条带价(顶 5 行 + 「还有N行」)。无 items 退回 detail 单行。"""
+    """明细区:逐条带价(顶 5 行 + 「还有N行」)。无 items:OCR 未能逐项识别时给诚实提示(去详情页),
+    否则退回 detail 单行;都没有 → 不显该区。"""
     items = fields.get("items") or []
     if items:
         return s.items_section(items, t, cap=5)
+    if fields.get("items_unread"):
+        return [
+            s.seclabel(t["detail"]),
+            s.txt(t["items_unread"], size="xxs", color=s.LABEL, wrap=True),
+        ]
     detail = str(fields.get("detail") or "").strip()
     if detail:
         return [s.seclabel(t["detail"]), s.txt(detail, size="xxs", color=s.VALUE, wrap=True)]

@@ -30,6 +30,25 @@ def _fix_two_digit_year_date(date_raw: str, model_date: Optional[str], today_yea
     return f"{year:04d}{model_date[4:]}"
 
 
+_BE_YEAR_RE = re.compile(r"(?<!\d)(\d{4})(?!\d)")
+
+
+def _fix_buddhist_year_date(date_raw: str, model_date: Optional[str], today_year: int):
+    """4 位佛历年确定性减 543(不信 LLM 算术 · 铁律:换算用确定性代码)。
+
+    票面印 4 位年(date_raw 如 "17/06/2569")时,以印出的年份为准做 BE−543,覆盖模型 date 的年(保留
+    -MM-DD)。治模型把 2569 误算成 2023 这类。仅当结果落 [2000, 今年+1] 才采信。无 4 位佛历年 → 原样。"""
+    if not model_date or not re.match(r"^\d{4}-\d{2}-\d{2}$", model_date):
+        return model_date
+    for m in _BE_YEAR_RE.finditer(date_raw or ""):
+        be = int(m.group(1))
+        if 2400 <= be <= 2700:
+            ce = be - 543
+            if 2000 <= ce <= today_year + 1:
+                return f"{ce:04d}{model_date[4:]}"
+    return model_date
+
+
 # ============================================================
 # Layer 2 schemas (Flash-Lite field extraction)
 # ============================================================
@@ -236,9 +255,11 @@ class ThaiInvoice(BaseModel):
         return [] if v is None else v
 
     @model_validator(mode="after")
-    def _normalize_two_digit_year(self):
-        """2 位年(DD/MM/YY)模型常猜错年份 → 确定性重算(见 _fix_two_digit_year_date)。"""
-        self.date = _fix_two_digit_year_date(self.date_raw, self.date, date.today().year)
+    def _normalize_year(self):
+        """年份确定性重算(不信 LLM 算术):2 位年消歧 + 4 位佛历减 543(治 2569 被误算成 2023)。"""
+        ty = date.today().year
+        self.date = _fix_two_digit_year_date(self.date_raw, self.date, ty)
+        self.date = _fix_buddhist_year_date(self.date_raw, self.date, ty)
         return self
 
 

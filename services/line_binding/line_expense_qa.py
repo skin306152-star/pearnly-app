@@ -10,45 +10,75 @@ from __future__ import annotations
 import logging
 
 from core import db
-from services.line_binding import line_client
+from services.line_binding import line_client, line_reply
 
 logger = logging.getLogger(__name__)
 
 
-def reply_summary(reply_token, lang, tid, ws) -> None:
-    """查账汇总(本月已入账 + 按分类拆解)· DB 真查,绝不让模型编数字。"""
+def _qr_item(label: str, text: str) -> dict:
+    return {"type": "action", "action": {"type": "message", "label": label[:20], "text": text}}
+
+
+def reply_pool(
+    reply_token, kind, text, lang, *, quote_token="", line_user_id="", tenant_id=None
+) -> None:
+    """问候/感谢/跑题 → 轮选回复 + Quick Reply 引导(不复读)· 引用用户当前消息。"""
+    from services.expense import replies
+
+    items = [
+        _qr_item(line_client.t_line(lang, "qr_record"), "ค่าน้ำ 50"),
+        _qr_item(line_client.t_line(lang, "qr_query"), line_client.t_line(lang, "qr_query_text")),
+    ]
+    msg = {"type": "text", "text": replies.pick(kind, text, lang), "quickReply": {"items": items}}
+    line_reply.reply_messages_context(
+        reply_token, [msg], quote_token=quote_token, line_user_id=line_user_id, tenant_id=tenant_id
+    )
+
+
+def reply_summary(reply_token, lang, tid, ws, *, quote_token="", line_user_id="") -> None:
+    """查账汇总(本月已入账 + 按分类拆解)· DB 真查,绝不让模型编数字。引用用户当前消息。"""
     from services.expense import line_qa
+
+    def _say(body):
+        line_reply.reply_text_context(
+            reply_token, body, quote_token=quote_token, line_user_id=line_user_id, tenant_id=tid
+        )
 
     try:
         with db.get_cursor_rls(tid) as cur:
             s = line_qa.month_summary(cur, tenant_id=tid, workspace_client_id=ws)
     except Exception:
         logger.exception("[line] summary failed")
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_q_not_found"))
+        _say(line_client.t_line(lang, "exp_q_not_found"))
         return
     if s["count"] == 0:
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_sum_empty"))
+        _say(line_client.t_line(lang, "exp_sum_empty"))
         return
     uncat = line_client.t_line(lang, "exp_uncat")
     lines = [line_client.t_line(lang, "exp_sum_head", amount=s["total"], n=s["count"])]
     for c in s["by_category"][:6]:
         lines.append(f"• {c['name'] or uncat}: ฿{c['amount']} ({c['count']})")
-    line_client.reply_text(reply_token, "\n".join(lines))
+    _say("\n".join(lines))
 
 
-def reply_detail(reply_token, lang, tid, ws, line_user_id=None) -> None:
+def reply_detail(reply_token, lang, tid, ws, line_user_id=None, *, quote_token="") -> None:
     """查明细(本月逐笔)· DB 真查 → 列表。存有序 doc_id 入会话态供「第 N 笔改成…」定位(P2)。"""
     from services.expense import line_qa
+
+    def _say(body):
+        line_reply.reply_text_context(
+            reply_token, body, quote_token=quote_token, line_user_id=line_user_id, tenant_id=tid
+        )
 
     try:
         with db.get_cursor_rls(tid) as cur:
             rows = line_qa.month_detail(cur, tenant_id=tid, workspace_client_id=ws, limit=10)
     except Exception:
         logger.exception("[line] detail failed")
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_q_not_found"))
+        _say(line_client.t_line(lang, "exp_q_not_found"))
         return
     if not rows:
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_sum_empty"))
+        _say(line_client.t_line(lang, "exp_sum_empty"))
         return
     uncat = line_client.t_line(lang, "exp_uncat")
     lines = [line_client.t_line(lang, "exp_detail_head", n=len(rows))]
@@ -57,7 +87,7 @@ def reply_detail(reply_token, lang, tid, ws, line_user_id=None) -> None:
         lines.append(f"{i}. {r['date']} {r['category'] or uncat} ฿{r['amount']}{tail}")
     if line_user_id:
         _remember_detail_order(tid, ws, line_user_id, [r["id"] for r in rows])
-    line_client.reply_text(reply_token, "\n".join(lines))
+    _say("\n".join(lines))
 
 
 def _remember_detail_order(tid, ws, line_user_id, ids) -> None:
@@ -87,12 +117,27 @@ _UNDO_ERR = {
 
 
 def reply_undo(
-    bound_user, reply_token, lang, tid, ws, line_user_id=None, quoted_message_id=None, text=""
+    bound_user,
+    reply_token,
+    lang,
+    tid,
+    ws,
+    line_user_id=None,
+    quoted_message_id=None,
+    text="",
+    *,
+    quote_token="",
 ) -> None:
     """撤销已入账单 · void_doc 冲销(不物理删)。目标定位:引用某条→撤那张;明确「上一笔」→撤最近;
-    对象不明确→提示 reply 某条记录(绝不默认撤最近一笔)。已结期 → 诚实引导网页。"""
+    对象不明确→提示 reply 某条记录(绝不默认撤最近一笔)。已结期 → 诚实引导网页。
+    回复引用用户当前消息(quoteToken·展示),业务定位仍走 quotedMessageId。"""
     from core.pos_api import PosError
     from services.line_binding import line_message_refs
+
+    def _say(body):
+        line_reply.reply_text_context(
+            reply_token, body, quote_token=quote_token, line_user_id=line_user_id, tenant_id=tid
+        )
 
     uid = str(bound_user["id"]) if bound_user.get("id") else None
     try:
@@ -108,9 +153,7 @@ def reply_undo(
                 text=text,
             )
             if tgt["error"]:
-                line_client.reply_text(
-                    reply_token, line_client.t_line(lang, _UNDO_ERR[tgt["error"]])
-                )
+                _say(line_client.t_line(lang, _UNDO_ERR[tgt["error"]]))
                 return
             from services.purchase import docs as docs_svc
 
@@ -123,9 +166,7 @@ def reply_undo(
                 docs_svc.delete_doc(
                     cur, tenant_id=tid, workspace_client_id=tgt["ws"], doc_id=tgt["doc_id"]
                 )
-                line_client.reply_text(
-                    reply_token, line_client.t_line(lang, "card_state_discarded_desc")
-                )
+                _say(line_client.t_line(lang, "card_state_discarded_desc"))
                 return
             res = posting_svc.void_doc(
                 cur,
@@ -135,21 +176,26 @@ def reply_undo(
                 created_by=uid,
             )
             amt = (res.get("doc") or {}).get("grand_total")
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_undo_done", amount=amt))
+        _say(line_client.t_line(lang, "exp_undo_done", amount=amt))
     except PosError as e:
         if (e.code or "") == "acct.period_closed":
-            line_client.reply_text(reply_token, line_client.t_line(lang, "exp_correct_closed"))
+            _say(line_client.t_line(lang, "exp_correct_closed"))
             return
         logger.warning("[line] undo blocked: %s", e.code)
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_undo_none"))
+        _say(line_client.t_line(lang, "exp_undo_none"))
     except Exception:
         logger.exception("[line] undo failed")
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_undo_none"))
+        _say(line_client.t_line(lang, "exp_undo_none"))
 
 
-def reply_question(reply_token, lang, tid, question) -> None:
-    """问答 · 知识中心带出处;查不到诚实兜底 + 指路(绝不编造)。"""
+def reply_question(reply_token, lang, tid, question, *, quote_token="", line_user_id="") -> None:
+    """问答 · 知识中心带出处;查不到诚实兜底 + 指路(绝不编造)。引用用户当前消息。"""
     from services.expense import line_qa
+
+    def _say(body):
+        line_reply.reply_text_context(
+            reply_token, body, quote_token=quote_token, line_user_id=line_user_id, tenant_id=tid
+        )
 
     try:
         with db.get_cursor_rls(tid) as cur:
@@ -158,10 +204,10 @@ def reply_question(reply_token, lang, tid, question) -> None:
         logger.exception("[line] question failed")
         res = None
     if not res:
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_q_not_found"))
+        _say(line_client.t_line(lang, "exp_q_not_found"))
         return
     src = ", ".join(res["citations"]) if res.get("citations") else ""
     body = res["answer"]
     if src:
         body += "\n\n" + line_client.t_line(lang, "exp_q_source", src=src)
-    line_client.reply_text(reply_token, body)
+    _say(body)

@@ -217,9 +217,9 @@ class RequestCorrectTests(unittest.TestCase):
                 side_effect=lambda *a, **k: saved.update(k),
             ),
             mock.patch.object(
-                line_correct.line_client,
-                "reply_text",
-                side_effect=lambda tok, msg: replies.append(msg),
+                line_correct.line_reply,
+                "reply_text_context",
+                side_effect=lambda tok, msg, **k: replies.append(msg) or True,
             ),
             mock.patch.object(
                 line_correct.line_client, "t_line", side_effect=lambda lang, key, **k: key
@@ -312,7 +312,7 @@ class TryConfirmTests(unittest.TestCase):
                 )
                 or {"new_id": "n", "posted": True, "total": Decimal("550")},
             ),
-            mock.patch.object(line_correct.line_client, "reply_text"),
+            mock.patch.object(line_correct.line_reply, "reply_text_context"),
         ):
             out = line_correct.try_confirm({"id": "u"}, "tok", "U1", "是", "t", 1, "zh")
         self.assertTrue(out)
@@ -323,7 +323,7 @@ class TryConfirmTests(unittest.TestCase):
             mock.patch.object(line_correct.db, "get_cursor_rls", return_value=_Ctx(object())),
             self._peek("correct:1:D1:amount"),
             mock.patch.object(line_correct.conversation, "clear_pending") as clr,
-            mock.patch.object(line_correct.line_client, "reply_text"),
+            mock.patch.object(line_correct.line_reply, "reply_text_context"),
             mock.patch.object(line_correct, "_apply") as ap,
         ):
             out = line_correct.try_confirm({"id": "u"}, "tok", "U1", "不用了", "t", 1, "zh")
@@ -343,9 +343,9 @@ class TryConfirmTests(unittest.TestCase):
                 line_correct, "_apply", side_effect=PosError("acct.period_closed", 409)
             ),
             mock.patch.object(
-                line_correct.line_client,
-                "reply_text",
-                side_effect=lambda tok, msg: replies.append(msg),
+                line_correct.line_reply,
+                "reply_text_context",
+                side_effect=lambda tok, msg, **k: replies.append(msg) or True,
             ),
             mock.patch.object(
                 line_correct.line_client, "t_line", side_effect=lambda lang, key, **k: key

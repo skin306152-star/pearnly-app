@@ -15,11 +15,16 @@ class _CM:
         return False
 
 
-def _run(status):
-    sent = []
+def _run(status, *, quote_token="QT"):
+    sent, kwargs = [], []
     from core import db
     from services.line_binding import line_client, line_message_refs
     from services.purchase import docs, posting
+
+    def _cap(rt, b, **k):
+        sent.append(b)
+        kwargs.append(k)
+        return True
 
     with (
         mock.patch.object(db, "get_cursor_rls", return_value=_CM()),
@@ -35,7 +40,7 @@ def _run(status):
         mock.patch.object(
             posting, "void_doc", return_value={"doc": {"grand_total": "100"}}
         ) as void,
-        mock.patch.object(line_client, "reply_text", side_effect=lambda rt, b: sent.append(b)),
+        mock.patch.object(qa.line_reply, "reply_text_context", side_effect=_cap),
         mock.patch.object(line_client, "t_line", side_effect=lambda lang, key, **kw: key),
     ):
         qa.reply_undo(
@@ -47,23 +52,29 @@ def _run(status):
             line_user_id="U1",
             quoted_message_id="m1",
             text="ยกเลิก",
+            quote_token=quote_token,
         )
-    return sent, delete_doc, void
+    return sent, delete_doc, void, kwargs
 
 
 class ReplyUndoTests(unittest.TestCase):
     def test_cancel_on_draft_discards(self):
         # 对草稿回「取消」→ 丢弃(delete_doc),不调 void,不落「没有可撤销的」死路。
-        sent, delete_doc, void = _run("draft")
+        sent, delete_doc, void, _ = _run("draft")
         delete_doc.assert_called_once()
         void.assert_not_called()
         self.assertEqual(sent, ["card_state_discarded_desc"])
 
     def test_cancel_on_posted_voids(self):
-        sent, delete_doc, void = _run("posted")
+        sent, delete_doc, void, _ = _run("posted")
         void.assert_called_once()
         delete_doc.assert_not_called()
         self.assertEqual(sent, ["exp_undo_done"])
+
+    def test_quote_token_propagates_to_reply(self):
+        # P1C:撤销回执引用用户当前消息(quoteToken 传到统一出口)。
+        _, _, _, kwargs = _run("posted", quote_token="QT")
+        self.assertEqual(kwargs[0].get("quote_token"), "QT")
 
 
 if __name__ == "__main__":

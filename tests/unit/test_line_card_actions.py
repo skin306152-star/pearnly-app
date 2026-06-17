@@ -31,7 +31,11 @@ def _run(data, *, ws=1):
         mock.patch("services.purchase.posting.post_doc", return_value=doc) as post_doc,
         mock.patch("services.purchase.posting.void_doc", return_value=doc) as void_doc,
         mock.patch("services.purchase.docs.delete_doc") as delete_doc,
-        mock.patch.object(line_client, "reply_text", side_effect=lambda rt, b: sent.append(b)),
+        mock.patch.object(
+            lca.line_reply,
+            "reply_text_context",
+            side_effect=lambda rt, b, **k: sent.append(b) or True,
+        ),
         mock.patch.object(
             line_client,
             "t_line",
@@ -85,7 +89,11 @@ def _run_token(data, consume_res):
             "services.purchase.settings.get_settings", return_value={"auto_stock_in": False}
         ),
         mock.patch("services.purchase.posting.post_doc", return_value=doc) as post_doc,
-        mock.patch.object(line_client, "reply_text", side_effect=lambda rt, b: sent.append(b)),
+        mock.patch.object(
+            lca.line_reply,
+            "reply_text_context",
+            side_effect=lambda rt, b, **k: sent.append(b) or True,
+        ),
         mock.patch.object(
             line_client,
             "t_line",

@@ -26,7 +26,13 @@ import logging
 from fastapi import APIRouter, Request
 
 from core import db
-from services.line_binding import line_card_actions, line_client, line_expense, line_intake
+from services.line_binding import (
+    line_card_actions,
+    line_client,
+    line_expense,
+    line_intake,
+    line_reply,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +95,7 @@ async def _handle_line_event(ev: dict):
         bound = db.get_user_by_line_user_id(line_user_id)
         if not bound:
             return
+        line_reply.begin_loading(line_user_id)
         lang = bound.get("preferred_lang") or _ev_lang(ev)
         data = (ev.get("postback") or {}).get("data", "")
         line_card_actions.handle_postback(bound, reply_token, data, lang)
@@ -124,9 +131,12 @@ async def _handle_line_event(ev: dict):
                 if reply_token:
                     # v118.25.4 · 用规范化后的 LINE 用户语言
                     lang = _ev_lang(ev)
-                    line_client.reply_text(
+                    line_reply.begin_loading(line_user_id)
+                    line_reply.reply_text_context(
                         reply_token,
                         line_client.t_line(lang, "image_not_bound"),
+                        quote_token=msg.get("quoteToken"),
+                        line_user_id=line_user_id,
                     )
                 return
 
@@ -155,9 +165,13 @@ async def _handle_line_event(ev: dict):
             # v118.25.4 · 已绑定取用户偏好 · 未绑定用规范化 LINE 语言(不再 zh fallback)
             bound_user = db.get_user_by_line_user_id(line_user_id) if line_user_id else None
             lang = (bound_user.get("preferred_lang") if bound_user else None) or _ev_lang(ev)
-            line_client.reply_text(
+            line_reply.begin_loading(line_user_id)
+            line_reply.reply_text_context(
                 reply_token,
                 line_client.t_line(lang, "unsupported"),
+                quote_token=msg.get("quoteToken"),
+                line_user_id=line_user_id,
+                tenant_id=(bound_user.get("tenant_id") if bound_user else None),
             )
         return
 
@@ -174,6 +188,9 @@ async def _handle_line_text(
     if not reply_token or not line_user_id:
         return
 
+    # 处理开始前转圈(P1C·best-effort):文本任意路径(绑定/记账/查账/闲聊)都先让用户看到正在处理。
+    line_reply.begin_loading(line_user_id)
+
     # v118.25.4 · 在最开头算出 ev_lang 备用 · 所有未确定身份的 fallback 都用它
     ev_lang = _ev_lang(ev)
 
@@ -182,9 +199,11 @@ async def _handle_line_text(
         user_id = db.consume_line_binding_code(text)
         if not user_id:
             # v118.25.4 · 绑定码无效 · 还不知道是哪个 Pearnly 用户 · 用 LINE 语言
-            line_client.reply_text(
+            line_reply.reply_text_context(
                 reply_token,
                 line_client.t_line(ev_lang, "bind_invalid"),
+                quote_token=quote_token,
+                line_user_id=line_user_id,
             )
             return
 
@@ -205,14 +224,16 @@ async def _handle_line_text(
             picture_url=picture_url,
         )
         if not ok:
-            line_client.reply_text(
+            line_reply.reply_text_context(
                 reply_token,
                 line_client.t_line(lang, "bind_conflict"),
+                quote_token=quote_token,
+                line_user_id=line_user_id,
             )
             return
 
         username = user.get("username") if user else ""
-        line_client.reply_text(
+        line_reply.reply_text_context(
             reply_token,
             line_client.t_line(
                 lang,
@@ -220,6 +241,8 @@ async def _handle_line_text(
                 username=username,
                 display_name=display_name or (line_user_id[:8] + "…"),
             ),
+            quote_token=quote_token,
+            line_user_id=line_user_id,
         )
         return
 
@@ -227,18 +250,25 @@ async def _handle_line_text(
     bound_user = db.get_user_by_line_user_id(line_user_id)
     if not bound_user:
         # v118.25.4 · 未绑定 · 用 LINE 用户语言(之前写死 zh · 是已知简化 bug · 现在修)
-        line_client.reply_text(
+        line_reply.reply_text_context(
             reply_token,
             line_client.t_line(ev_lang, "need_bind"),
+            quote_token=quote_token,
+            line_user_id=line_user_id,
         )
     else:
         # v118.25.4 · 已绑定 · 优先用户偏好 · 兜底 LINE 语言
         lang = bound_user.get("preferred_lang") or ev_lang
+        tid = bound_user.get("tenant_id")
         # 取链接命令(ขอ link drive / ขอ sheet)→ 引导网页取 Drive/Sheet 链接(接阶段二外流)。
         cmd = line_intake.parse_link_command(text)
         if cmd:
-            line_client.reply_text(
-                reply_token, line_intake.link_reply(cmd, lang, web_url=_WEB_INTEGRATIONS_URL)
+            line_reply.reply_text_context(
+                reply_token,
+                line_intake.link_reply(cmd, lang, web_url=_WEB_INTEGRATIONS_URL),
+                quote_token=quote_token,
+                line_user_id=line_user_id,
+                tenant_id=tid,
             )
             return
         # 文本路 · 置信驱动入账(docs/smart-intake/15):记账意图→解析→高置信直接入账+数据卡,
@@ -255,9 +285,12 @@ async def _handle_line_text(
             return
         # 兜底(P0):认不出 → 功能提示。query/question/L2 LLM 路由 = P1。
         username = bound_user.get("username") or ""
-        line_client.reply_text(
+        line_reply.reply_text_context(
             reply_token,
             line_client.t_line(lang, "already_bound_hint", username=username),
+            quote_token=quote_token,
+            line_user_id=line_user_id,
+            tenant_id=tid,
         )
 
 

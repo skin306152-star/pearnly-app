@@ -18,7 +18,7 @@ from typing import Optional
 from core import db
 from services.expense import conversation
 from services.expense.expense_draft import ExpenseDraft
-from services.line_binding import line_client
+from services.line_binding import line_client, line_reply
 
 _PREFIX = "correct:"
 _YES = ("是", "对", "好", "确认", "ok", "yes", "ใช่", "ตกลง", "ถูก", "確認", "はい")
@@ -98,15 +98,33 @@ _ERR_KEY = {
 
 
 def request_correct(
-    bound_user, reply_token, line_user_id, text, u, quoted_message_id, lang, tid, ws
+    bound_user,
+    reply_token,
+    line_user_id,
+    text,
+    u,
+    quoted_message_id,
+    lang,
+    tid,
+    ws,
+    *,
+    quote_token="",
 ) -> bool:
-    """edit 意图 → 收集改动 + 定位目标(引用>第N笔>明确上一笔)+ 单/多行规则 → 存待确认 + 回确认。"""
+    """edit 意图 → 收集改动 + 定位目标(引用>第N笔>明确上一笔)+ 单/多行规则 → 存待确认 + 回确认。
+
+    确认/失败/引导回复引用用户触发改错的那条消息(quoteToken·展示);业务定位仍走 quotedMessageId。
+    """
     from services.line_binding import line_message_refs
     from services.purchase import docs as docs_svc
 
+    def _say(body):
+        line_reply.reply_text_context(
+            reply_token, body, quote_token=quote_token, line_user_id=line_user_id, tenant_id=tid
+        )
+
     changes = _collect_changes(u)
     if not changes:
-        line_client.reply_text(reply_token, line_client.t_line(lang, "guide_reply_to_record"))
+        _say(line_client.t_line(lang, "guide_reply_to_record"))
         return True
 
     with db.get_cursor_rls(tid, commit=True) as cur:
@@ -119,16 +137,16 @@ def request_correct(
             text=text,
         )
         if tgt["error"]:
-            line_client.reply_text(reply_token, line_client.t_line(lang, _ERR_KEY[tgt["error"]]))
+            _say(line_client.t_line(lang, _ERR_KEY[tgt["error"]]))
             return True
         target_id, ws_eff = tgt["doc_id"], tgt["ws"]
         detail = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws_eff, doc_id=target_id)
         if not detail or (detail.get("doc") or {}).get("status") != "posted":
-            line_client.reply_text(reply_token, line_client.t_line(lang, "exp_correct_none"))
+            _say(line_client.t_line(lang, "exp_correct_none"))
             return True
         if "amount" in changes and len(detail.get("lines") or []) > 1:
             # 多行票金额:不在 LINE 改(不重算/不摊销/不猜行)→ 引导到详情页逐行确认。
-            line_client.reply_text(reply_token, line_client.t_line(lang, "guide_open_detail"))
+            _say(line_client.t_line(lang, "guide_open_detail"))
             return True
         changes_draft = ExpenseDraft(
             amount=changes.get("amount"),
@@ -146,20 +164,24 @@ def request_correct(
         )
         old_total = (detail.get("doc") or {}).get("grand_total")
     if set(changes) == {"amount"}:
-        line_client.reply_text(
-            reply_token,
-            line_client.t_line(lang, "exp_correct_confirm", old=old_total, new=changes["amount"]),
-        )
+        _say(line_client.t_line(lang, "exp_correct_confirm", old=old_total, new=changes["amount"]))
     else:
-        line_client.reply_text(
-            reply_token, line_client.t_line(lang, "exp_correct_confirm2", changes=_summary(changes))
-        )
+        _say(line_client.t_line(lang, "exp_correct_confirm2", changes=_summary(changes)))
     return True
 
 
-def try_confirm(bound_user, reply_token, line_user_id, text, tid, ws, lang) -> bool:
-    """有待确认更正 + 这句肯定 → 执行;否定/其他 → 取消。非更正 pending → False(不干预补金额流)。"""
+def try_confirm(
+    bound_user, reply_token, line_user_id, text, tid, ws, lang, *, quote_token=""
+) -> bool:
+    """有待确认更正 + 这句肯定 → 执行;否定/其他 → 取消。非更正 pending → False(不干预补金额流)。
+
+    回复引用用户确认/否定的那条消息(quoteToken)。"""
     from core.pos_api import PosError
+
+    def _say(body):
+        line_reply.reply_text_context(
+            reply_token, body, quote_token=quote_token, line_user_id=line_user_id, tenant_id=tid
+        )
 
     with db.get_cursor_rls(tid) as cur:
         pend = conversation.peek_pending(cur, line_user_id=line_user_id)
@@ -168,7 +190,7 @@ def try_confirm(bound_user, reply_token, line_user_id, text, tid, ws, lang) -> b
     if not _affirmative(text):
         with db.get_cursor_rls(tid, commit=True) as cur:
             conversation.clear_pending(cur, line_user_id=line_user_id)
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_correct_cancel"))
+        _say(line_client.t_line(lang, "exp_correct_cancel"))
         return True
     ws_eff, orig_id, keys = _parse_missing(pend["missing"])
     changes_draft = pend["draft"]
@@ -178,14 +200,14 @@ def try_confirm(bound_user, reply_token, line_user_id, text, tid, ws, lang) -> b
             res = _apply(cur, bound_user, tid, ws_eff, orig_id, changes_draft, keys)
     except PosError as e:
         if (e.code or "") == "acct.period_closed":
-            line_client.reply_text(reply_token, line_client.t_line(lang, "exp_correct_closed"))
+            _say(line_client.t_line(lang, "exp_correct_closed"))
             return True
         raise
     if not res:
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_correct_none"))
+        _say(line_client.t_line(lang, "exp_correct_none"))
         return True
     key = "exp_correct_posted" if res["posted"] else "exp_correct_draft"
-    line_client.reply_text(reply_token, line_client.t_line(lang, key, new=res["total"]))
+    _say(line_client.t_line(lang, key, new=res["total"]))
     return True
 
 

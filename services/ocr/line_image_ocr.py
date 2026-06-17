@@ -26,9 +26,10 @@ from services.ocr.entrypoints import (
 )
 
 try:
-    from services.line_binding import line_client
+    from services.line_binding import line_client, line_reply
 except ImportError:
     line_client = None  # line_client.py 不在仓库 · 单独部署到服务器
+    line_reply = None
 
 logger = logging.getLogger("mr-pilot")
 _LOADING_SECONDS = 60
@@ -107,21 +108,31 @@ async def _handle_line_image_ocr(
       4. 非缓存成功识别后按 credits 定价扣费
       5. push 结果给用户
     """
+
+    def _notify(body: str) -> None:
+        # 图片异步通知统一引用原图片(quoteToken·P1C),失败/成功都让用户知道在回应哪张图。
+        line_reply.push_text_context(
+            line_user_id,
+            body,
+            quote_token=quote_token,
+            tenant_id=(bound_user.get("tenant_id") if bound_user else None),
+        )
+
     try:
         # 1. 下载
         file_bytes = line_client.download_message_content(message_id)
         filename = filename or f"line_{message_id}.jpg"
         if not file_bytes:
-            line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_download"))
+            _notify(line_client.t_ocr(lang, "err_download"))
             return
         if not _ocr_is_supported_file(filename):
-            line_client.push_text(line_user_id, line_client.t_line(lang, "unsupported"))
+            _notify(line_client.t_line(lang, "unsupported"))
             return
 
         # 2. 用户 / credits 检查(复用网页入口的 credits 逻辑)
         user_fresh = db.find_user_by_id(bound_user["id"])
         if not user_fresh:
-            line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_plan"))
+            _notify(line_client.t_ocr(lang, "err_plan"))
             return
 
         # PO-4 · LINE 上传套账分流(product-vision §三-bis):LINE 无顶栏切换器,
@@ -210,9 +221,9 @@ async def _handle_line_image_ocr(
         if not quote.get("allowed"):
             code = quote.get("error_code")
             if code == "insufficient_balance":
-                line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_quota"))
+                _notify(line_client.t_ocr(lang, "err_quota"))
             else:
-                line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
+                _notify(line_client.t_ocr(lang, "err_ocr"))
             return
 
         # 4. OCR · 新 pipeline 唯一路径
@@ -222,7 +233,7 @@ async def _handle_line_image_ocr(
         api_key = own_key or None
         # 检查 API key 可用性(用户自带或系统默认)
         if not api_key and not os.environ.get("GEMINI_API_KEY", "").strip():
-            line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_plan"))
+            _notify(line_client.t_ocr(lang, "err_plan"))
             return
 
         try:
@@ -242,15 +253,15 @@ async def _handle_line_image_ocr(
             )
         except Exception as _pipe_err:
             logger.error(f"[line_ocr] pipeline 识别失败: {type(_pipe_err).__name__}: {_pipe_err}")
-            line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
+            _notify(line_client.t_ocr(lang, "err_ocr"))
             return
 
         pages = result.get("pages") or []
         if not pages:
-            line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
+            _notify(line_client.t_ocr(lang, "err_ocr"))
             return
         if _ocr_all_pages_not_invoice(pages):
-            line_client.push_text(line_user_id, line_client.t_ocr(lang, "not_receipt"))
+            _notify(line_client.t_ocr(lang, "not_receipt"))
             return
 
         # 统一智能通道(docs/smart-intake/15):图片 → 置信驱动入账(建草稿/高置信直接入账)+ 数据卡。
@@ -451,18 +462,15 @@ async def _handle_line_image_ocr(
         # 6. 推送识别结果:删老式字段 dump(Zihao 指明清掉)· 改干净一行(已识别 + 引导网页)。
         # 到这里票已识别(认不出的在上方 all_pages_not_invoice 已拦);未开记账模块/入账分流失败
         # 的兜底统一走此 —— 已写识别记录,网页可查,不再回显整段原始字段。
-        line_client.push_text(
-            line_user_id,
-            line_client.t_ocr(lang, "success_head")
-            + " · "
-            + line_client.t_ocr(lang, "view_on_web"),
+        _notify(
+            line_client.t_ocr(lang, "success_head") + " · " + line_client.t_ocr(lang, "view_on_web")
         )
         logger.info(f"[line_ocr] 完成 · user={user_fresh['id']} · hid={hid}")
 
     except Exception as e:
         logger.exception(f"[line_ocr] 未知异常: {e}")
         try:
-            line_client.push_text(line_user_id, line_client.t_ocr(lang, "err_ocr"))
+            _notify(line_client.t_ocr(lang, "err_ocr"))
         except Exception as _pe:
             logger.warning(f"[line_ocr] err 通知 push_text 失败: {_pe}")
 

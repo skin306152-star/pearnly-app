@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 
 from core import db
-from services.line_binding import line_client, line_expense_qa
+from services.line_binding import line_client, line_expense_qa, line_reply
 
 logger = logging.getLogger(__name__)
 
@@ -28,29 +28,37 @@ def handle_expense_text(
         tid = bound_user.get("tenant_id")
         if not tid:
             return False
+        stid = str(tid)
+        # 统一回复出口(P1C):闭包捕获本轮上下文,所有回复带 quoteToken + 记 bot 记忆。
+        ctx = dict(quote_token=quote_token, line_user_id=line_user_id, tenant_id=stid)
+
+        def _say(body):
+            line_reply.reply_text_context(reply_token, body, **ctx)
+
+        def _pool(kind):
+            line_expense_qa.reply_pool(reply_token, kind, text, lang, **ctx)
+
         from services.expense import line_quick_entry as lqe
         from services.expense import replies
         from services.line_binding import line_chat_memory
 
         # 对话记忆(PO-15):先取历史(不含本条)供大脑多轮连贯,再记本条用户消息。
-        history = line_chat_memory.recent(line_user_id=line_user_id, tenant_id=str(tid))
-        line_chat_memory.note(
-            line_user_id=line_user_id, tenant_id=str(tid), role="user", content=text
-        )
+        history = line_chat_memory.recent(line_user_id=line_user_id, tenant_id=stid)
+        line_chat_memory.note(line_user_id=line_user_id, tenant_id=stid, role="user", content=text)
 
-        # 0. 闲聊(零成本 L1)→ 智能问候/感谢(治复读)。
+        # 0. 闲聊(零成本 L1)→ 智能问候/感谢(治复读)。引用用户当前消息。
         small = replies.detect_smalltalk(text)
         if small:
-            _reply_pool(reply_token, small, text, lang)
+            _pool(small)
             return True
 
         from core.workspace_context import default_workspace_id
         from services.purchase import intake as intake_svc
 
-        with db.get_cursor_rls(str(tid)) as cur:
-            if not intake_svc.line_expense_gate_open(cur, tenant_id=str(tid)):
+        with db.get_cursor_rls(stid) as cur:
+            if not intake_svc.line_expense_gate_open(cur, tenant_id=stid):
                 return False
-            ws = default_workspace_id(cur, str(tid))
+            ws = default_workspace_id(cur, stid)
         if ws is None:
             return False
 
@@ -58,7 +66,7 @@ def handle_expense_text(
         from services.expense import line_correct
 
         if line_correct.try_confirm(
-            bound_user, reply_token, line_user_id, text, str(tid), ws, lang
+            bound_user, reply_token, line_user_id, text, stid, ws, lang, quote_token=quote_token
         ):
             return True
 
@@ -71,13 +79,7 @@ def handle_expense_text(
         # #7 收入识别:明确「收款/卖出」且无购买动词 → 不误记为支出。LINE 暂无收入流 →
         #    只识别 + 不入账 + 引导(保守:问句/已有 L1 意图不拦,宁漏勿误挡正常买东西)。
         if lqe.detect_income(text) and not isq and si is None:
-            line_client.reply_text(reply_token, line_client.t_line(lang, "exp_income_guide"))
-            line_chat_memory.note(
-                line_user_id=line_user_id,
-                tenant_id=str(tid),
-                role="bot",
-                content="[收入·未记账·引导网页]",
-            )
+            _say(line_client.t_line(lang, "exp_income_guide"))
             return True
 
         # 1a. 多项一句话(电费50 买菜40 电费10 吃饭50)→ 拆多笔·逐项智能归类·合计入账·卡显逐条
@@ -87,7 +89,7 @@ def handle_expense_text(
             from services.line_binding import line_expense_multi
 
             return line_expense_multi.do_record_multi(
-                bound_user, reply_token, text, str(tid), ws, multi, quote_token, lang, line_user_id
+                bound_user, reply_token, text, stid, ws, multi, quote_token, lang, line_user_id
             )
 
         # 1. L1 快路:清晰记账(有金额 + 非问句 + 无其他 L1 意图 + 非改错)→ 直接记,零 LLM、零成本。
@@ -95,7 +97,7 @@ def handle_expense_text(
         if parsed.has_amount() and not isq and si is None and not is_edit:
             from services.expense import conversation
 
-            with db.get_cursor_rls(str(tid), commit=True) as cur:
+            with db.get_cursor_rls(stid, commit=True) as cur:
                 pend = conversation.pop_pending(cur, line_user_id=line_user_id)
             # 续接补金额:仅「缺金额」会话态合并(correct/detail 等其它 pending 不当补金额用)。
             if pend and str(pend.get("missing") or "") == "amount":
@@ -106,7 +108,7 @@ def handle_expense_text(
                 bound_user,
                 reply_token,
                 text,
-                str(tid),
+                stid,
                 ws,
                 parsed,
                 False,
@@ -125,14 +127,14 @@ def handle_expense_text(
             else None
         )
         if u:
-            _charge_line_l2(bound_user, str(tid))
+            _charge_line_l2(bound_user, stid)
             return _dispatch_agent(
                 bound_user,
                 reply_token,
                 line_user_id,
                 text,
                 lang,
-                str(tid),
+                stid,
                 ws,
                 u,
                 quote_token,
@@ -140,17 +142,22 @@ def handle_expense_text(
             )
 
         # 3. 兜底(无 LLM):L1 查账/求助/问答(知识库),否则礼貌带回(复用上面已算的 si/isq)。
+        #    全部引用用户当前消息(quoteToken),让用户知道在回应哪句。
         if si == "query":
-            line_expense_qa.reply_summary(reply_token, lang, str(tid), ws)
+            line_expense_qa.reply_summary(
+                reply_token, lang, stid, ws, quote_token=quote_token, line_user_id=line_user_id
+            )
         elif si == "support":
-            _reply_pool(reply_token, "support", text, lang)
+            _pool("support")
         elif isq:
-            line_expense_qa.reply_question(reply_token, lang, str(tid), text)
+            line_expense_qa.reply_question(
+                reply_token, lang, stid, text, quote_token=quote_token, line_user_id=line_user_id
+            )
         elif is_edit:
             # 改错但无 LLM 抽不出改什么字段 → 教 LINE 内回复语法,不瞎猜也不甩去网页。
-            line_client.reply_text(reply_token, line_client.t_line(lang, "guide_reply_to_record"))
+            _say(line_client.t_line(lang, "guide_reply_to_record"))
         else:
-            _reply_pool(reply_token, "scope", text, lang)
+            _pool("scope")
         return True
     except Exception:
         logger.exception("[line] expense handle failed; fall back")
@@ -172,17 +179,34 @@ def _dispatch_agent(
     """大脑决策 → 确定性工具执行。写账闸由 may_write 裁决(问句/否定/假设不写)。"""
     from services.expense import line_agent
 
+    ctx = dict(quote_token=quote_token, line_user_id=line_user_id, tenant_id=tid)
+
+    def _say(body):
+        line_reply.reply_text_context(reply_token, body, **ctx)
+
     intent = u.get("intent")
     if intent == "query_summary":
-        line_expense_qa.reply_summary(reply_token, lang, tid, ws)
+        line_expense_qa.reply_summary(
+            reply_token, lang, tid, ws, quote_token=quote_token, line_user_id=line_user_id
+        )
         return True
     if intent == "query_detail":
-        line_expense_qa.reply_detail(reply_token, lang, tid, ws, line_user_id)
+        line_expense_qa.reply_detail(
+            reply_token, lang, tid, ws, line_user_id, quote_token=quote_token
+        )
         return True
     if intent == "undo":
         # 撤销:引用某条回执→撤那张;明确「上一笔」→撤最近;对象不明确→提示 reply(不默认撤最近)。
         line_expense_qa.reply_undo(
-            bound_user, reply_token, lang, tid, ws, line_user_id, quoted_message_id, text
+            bound_user,
+            reply_token,
+            lang,
+            tid,
+            ws,
+            line_user_id,
+            quoted_message_id,
+            text,
+            quote_token=quote_token,
         )
         return True
     if intent == "edit":
@@ -191,7 +215,16 @@ def _dispatch_agent(
         from services.expense import line_correct
 
         return line_correct.request_correct(
-            bound_user, reply_token, line_user_id, text, u, quoted_message_id, lang, tid, ws
+            bound_user,
+            reply_token,
+            line_user_id,
+            text,
+            u,
+            quoted_message_id,
+            lang,
+            tid,
+            ws,
+            quote_token=quote_token,
         )
     if line_agent.may_write(intent, u.get("speech_act")):
         from services.expense import line_l2
@@ -221,17 +254,14 @@ def _dispatch_agent(
                 draft=draft,
                 missing="amount",
             )
-        line_client.reply_text(reply_token, line_client.t_line(lang, "exp_need_amount"))
+        _say(line_client.t_line(lang, "exp_need_amount"))
         return True
-    # chat / out_of_scope / 含数字的问句否定假设 → 自然回复(无则礼貌带回)
+    # chat / out_of_scope / 含数字的问句否定假设 → 自然回复(无则礼貌带回)· 引用用户当前消息。
     reply = (u.get("reply") or "").strip()
     if reply:
-        line_client.reply_text(reply_token, reply)
-        from services.line_binding import line_chat_memory
-
-        line_chat_memory.note(line_user_id=line_user_id, tenant_id=tid, role="bot", content=reply)
+        _say(reply)
     else:
-        _reply_pool(reply_token, "scope", text, lang)
+        line_expense_qa.reply_pool(reply_token, "scope", text, lang, **ctx)
     return True
 
 
@@ -350,22 +380,6 @@ def _reply_card(
     )
 
 
-def _reply_pool(reply_token, kind, text, lang) -> None:
-    """问候/感谢/跑题 → 轮选回复 + Quick Reply 引导(不复读)。"""
-    from services.expense import replies
-
-    items = [
-        _qr_item(line_client.t_line(lang, "qr_record"), "ค่าน้ำ 50"),
-        _qr_item(line_client.t_line(lang, "qr_query"), line_client.t_line(lang, "qr_query_text")),
-    ]
-    msg = {
-        "type": "text",
-        "text": replies.pick(kind, text, lang),
-        "quickReply": {"items": items},
-    }
-    line_client.reply_messages(reply_token, [msg])
-
-
 def _to_purchase_data(d: dict) -> dict:
     """expense_draft → 采购进项建单 data(单笔路 · 单行)。
 
@@ -421,10 +435,6 @@ def _dup_warn(bound_user, draft, ws) -> bool:
     except Exception:
         logger.warning("[line] dup check failed; skip warning")
         return False
-
-
-def _qr_item(label: str, text: str) -> dict:
-    return {"type": "action", "action": {"type": "message", "label": label[:20], "text": text}}
 
 
 def _fill_category(cur, draft, text, tree, tid, ws, api_key=None) -> None:

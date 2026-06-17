@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 
 from core import db
-from services.line_binding import line_client, line_postback
+from services.line_binding import line_client, line_postback, line_reply
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +23,24 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
 
     带一次性令牌(PO-12)→ 原子消费防重放,目标记录取自令牌(不信客户端 doc_id);
     旧卡无令牌 → 兼容链路(default_workspace_id + 客户端 ref,状态机仍防双击)。
+    回执统一走 line_reply(postback 按钮无用户消息可引用 → 普通回复,不带 quoteToken)。
     """
     parsed = line_postback.parse(data)
     action, ref, token = parsed["action"], parsed["doc_id"], parsed["token"]
     tid = str(bound_user["tenant_id"]) if bound_user.get("tenant_id") else None
+    luid = bound_user.get("line_user_id") or ""
+
+    def _say(key, doc=None):
+        amt = (doc or {}).get("grand_total") if doc is not None else None
+        line_reply.reply_text_context(
+            reply_token,
+            line_client.t_line(lang, key, amount=amt),
+            line_user_id=luid,
+            tenant_id=tid,
+        )
+
     if not action or not tid:
-        line_client.reply_text(reply_token, line_client.t_line(lang, "card_action_stale"))
+        _say("card_action_stale")
         return
     uid = str(bound_user["id"]) if bound_user.get("id") else None
     try:
@@ -42,21 +54,17 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
             if token:
                 res = nonce.consume(cur, tenant_id=tid, token=token)
                 if res["status"] == "expired":
-                    line_client.reply_text(
-                        reply_token, line_client.t_line(lang, "card_action_expired")
-                    )
+                    _say("card_action_expired")
                     return
                 if res["status"] != "ok":  # used(重放/双击) / missing → 已处理过
-                    line_client.reply_text(
-                        reply_token, line_client.t_line(lang, "card_action_stale")
-                    )
+                    _say("card_action_stale")
                     return
                 ref = res["action_ref"]
                 ws = res["workspace_client_id"]
             else:
                 ws = default_workspace_id(cur, tid)
             if ws is None or not ref:
-                line_client.reply_text(reply_token, line_client.t_line(lang, "card_action_stale"))
+                _say("card_action_stale")
                 return
             scope = {"tenant_id": tid, "workspace_client_id": ws}
 
@@ -69,23 +77,16 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
                     auto_stock_in=bool(cfg.get("auto_stock_in")),
                     created_by=uid,
                 )
-                _reply(reply_token, lang, "card_confirmed", res.get("doc"))
+                _say("card_confirmed", res.get("doc"))
 
             elif action == line_postback.ACTION_UNDO:
                 res = posting_svc.void_doc(cur, **scope, doc_id=ref, created_by=uid)
-                _reply(reply_token, lang, "card_state_void_desc", res.get("doc"))
+                _say("card_state_void_desc", res.get("doc"))
 
             elif action == line_postback.ACTION_DISCARD:
                 docs_svc.delete_doc(cur, **scope, doc_id=ref)  # 仅草稿可删(内部 status='draft' 守)
-                line_client.reply_text(
-                    reply_token, line_client.t_line(lang, "card_state_discarded_desc")
-                )
+                _say("card_state_discarded_desc")
     except Exception:
         # 状态错(已入账再确认 / 草稿撤销 / 项已处理)或并发 → 友好回执,不报错。
         logger.warning("[line card] postback action failed", exc_info=True)
-        line_client.reply_text(reply_token, line_client.t_line(lang, "card_action_stale"))
-
-
-def _reply(reply_token, lang, key, doc) -> None:
-    amt = (doc or {}).get("grand_total")
-    line_client.reply_text(reply_token, line_client.t_line(lang, key, amount=amt))
+        _say("card_action_stale")

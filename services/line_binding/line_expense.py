@@ -46,7 +46,7 @@ def handle_expense_text(
         history = line_chat_memory.recent(line_user_id=line_user_id, tenant_id=stid)
         line_chat_memory.note(line_user_id=line_user_id, tenant_id=stid, role="user", content=text)
 
-        # 0. 闲聊(零成本 L1)→ 智能问候/感谢(治复读)。引用用户当前消息。
+        # 0. 闲聊/引导(零成本 L1)→ 问候/感谢/能力说明/开始/上传(治复读)。引用用户当前消息。
         small = replies.detect_smalltalk(text)
         if small:
             _pool(small)
@@ -155,7 +155,7 @@ def handle_expense_text(
             )
         elif is_edit:
             # 改错但无 LLM 抽不出改什么字段 → 教 LINE 内回复语法,不瞎猜也不甩去网页。
-            _say(line_client.t_line(lang, "guide_reply_to_record"))
+            _say(line_client.t_line(lang, "line_need_reply_record"))
         else:
             _pool("scope")
         return True

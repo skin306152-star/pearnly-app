@@ -28,5 +28,22 @@ class PaymentMethodTests(unittest.TestCase):
         self.assertEqual(lc.detect_payment_method("ค่าน้ำ 50"), "")
 
 
+class IntroIntentTests(unittest.TestCase):
+    """P1E-1:能力/开始/上传 引导意图(记账短语不误判)。"""
+
+    def test_capability_start_upload(self):
+        self.assertEqual(lc.intro_intent("你能做什么"), "capability")
+        self.assertEqual(lc.intro_intent("help"), "capability")
+        self.assertEqual(lc.intro_intent("ทำอะไรได้บ้าง"), "capability")
+        self.assertEqual(lc.intro_intent("怎么开始"), "start")
+        self.assertEqual(lc.intro_intent("เริ่มยังไง"), "start")
+        self.assertEqual(lc.intro_intent("怎么上传"), "upload")
+        self.assertEqual(lc.intro_intent("อัปโหลด"), "upload")
+
+    def test_record_not_misread(self):
+        for t in ("ค่าน้ำ 50", "买2杯咖啡120", "打车 120", "เมื่อวานกาแฟ 60"):
+            self.assertEqual(lc.intro_intent(t), "")
+
+
 if __name__ == "__main__":
     unittest.main()

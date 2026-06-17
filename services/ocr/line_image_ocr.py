@@ -255,15 +255,15 @@ async def _handle_line_image_ocr(
             )
         except Exception as _pipe_err:
             logger.error(f"[line_ocr] pipeline 识别失败: {type(_pipe_err).__name__}: {_pipe_err}")
-            _notify(line_client.t_ocr(lang, "err_ocr"))
+            _notify(line_client.t_line(lang, "line_ocr_failed_recovery"))
             return
 
         pages = result.get("pages") or []
         if not pages:
-            _notify(line_client.t_ocr(lang, "err_ocr"))
+            _notify(line_client.t_line(lang, "line_ocr_failed_recovery"))
             return
         if _ocr_all_pages_not_invoice(pages):
-            _notify(line_client.t_ocr(lang, "not_receipt"))
+            _notify(line_client.t_line(lang, "line_not_receipt_recovery"))
             return
 
         # 统一智能通道(docs/smart-intake/15):图片 → 置信驱动入账(建草稿/高置信直接入账)+ 数据卡。
@@ -474,7 +474,7 @@ async def _handle_line_image_ocr(
     except Exception as e:
         logger.exception(f"[line_ocr] 未知异常: {e}")
         try:
-            _notify(line_client.t_ocr(lang, "err_ocr"))
+            _notify(line_client.t_line(lang, "line_ocr_failed_recovery"))
         except Exception as _pe:
             logger.warning(f"[line_ocr] err 通知 push_text 失败: {_pe}")
 

@@ -234,13 +234,13 @@ class RequestCorrectTests(unittest.TestCase):
 
     def test_no_changes_guides_reply(self):
         replies, _ = self._run({}, {"doc": {"status": "posted"}, "lines": []}, self._OK)
-        self.assertEqual(replies, ["guide_reply_to_record"])
+        self.assertEqual(replies, ["line_need_reply_record"])
 
     def test_ambiguous_prompts_reply(self):
         replies, _ = self._run(
             {"amount": 500}, None, {"doc_id": None, "ws": 1, "error": "ambiguous"}
         )
-        self.assertEqual(replies, ["guide_need_reply_for_risk"])
+        self.assertEqual(replies, ["line_need_reply_record"])
 
     def test_ref_not_found_guides_detail_list(self):
         replies, _ = self._run(
@@ -251,7 +251,7 @@ class RequestCorrectTests(unittest.TestCase):
     def test_multiline_amount_guides_detail_page(self):
         detail = {"doc": {"status": "posted", "grand_total": Decimal("100")}, "lines": [{}, {}]}
         replies, _ = self._run({"amount": 500}, detail, self._OK)
-        self.assertEqual(replies, ["guide_open_detail"])
+        self.assertEqual(replies, ["line_web_handoff"])
 
     def test_single_line_amount_saves_with_ws_and_confirms(self):
         detail = {"doc": {"status": "posted", "grand_total": Decimal("100")}, "lines": [{}]}

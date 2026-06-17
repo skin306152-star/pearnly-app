@@ -143,6 +143,17 @@ async def _handle_line_event(ev: dict):
             # v118.25.4 · 已绑定用户 · 优先用 Pearnly 网站偏好语言 · 兜底用 LINE 语言(不再写死 zh)
             lang = bound_user.get("preferred_lang") or _ev_lang(ev)
 
+            # 收到票据即用 replyToken 回处理中 ack(P1E-1·有上下文):说明正在读取金额/日期/卖家/VAT/明细。
+            # 结果卡稍后异步 push;此处 replyToken 仅这一次用,不影响后续。
+            if reply_token:
+                line_reply.reply_text_context(
+                    reply_token,
+                    line_client.t_line(lang, "line_processing_receipt"),
+                    quote_token=msg.get("quoteToken"),
+                    line_user_id=line_user_id,
+                    tenant_id=bound_user.get("tenant_id"),
+                )
+
             # 多图排队(#4):每张图启一个后台任务,但 per-user FIFO 锁让它们一张张串行处理、
             # 一张卡发完再下一张、不乱序(转圈移到轮到该图时才发 · 见 process_line_image_serial)。
             # _handle_line_image_ocr/串行包装已抽到 services/ocr/line_image_ocr.py(无循环 import)。
@@ -283,11 +294,10 @@ async def _handle_line_text(
             quoted_message_id=quoted_message_id,
         ):
             return
-        # 兜底(P0):认不出 → 功能提示。query/question/L2 LLM 路由 = P1。
-        username = bound_user.get("username") or ""
+        # 兜底(P0):认不出 → 能力说明(P1E-1·专业引导,不再 demo 提示)。
         line_reply.reply_text_context(
             reply_token,
-            line_client.t_line(lang, "already_bound_hint", username=username),
+            line_client.t_line(lang, "line_intro_capability"),
             quote_token=quote_token,
             line_user_id=line_user_id,
             tenant_id=tid,

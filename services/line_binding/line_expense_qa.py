@@ -19,17 +19,35 @@ def _qr_item(label: str, text: str) -> dict:
     return {"type": "action", "action": {"type": "message", "label": label[:20], "text": text}}
 
 
+# 问候/引导/跑题文案收口到 line_i18n(P1E-1);感谢/求助仍走 replies 轮选池(治复读)。
+_DIRECT_KEY = {
+    "greeting": "line_greeting",
+    "scope": "line_unknown_intent",
+    "capability": "line_intro_capability",
+    "start": "line_start_hint",
+    "upload": "line_upload_hint",
+}
+# 「记一笔」Quick Reply 不再发演示金额(会误记一笔),改触发「怎么开始」引导(line_start_hint)。
+_QR_START = {"zh": "怎么开始", "th": "เริ่มยังไง", "en": "How to start", "ja": "始め方"}
+
+
 def reply_pool(
     reply_token, kind, text, lang, *, quote_token="", line_user_id="", tenant_id=None
 ) -> None:
-    """问候/感谢/跑题 → 轮选回复 + Quick Reply 引导(不复读)· 引用用户当前消息。"""
+    """问候/感谢/求助/跑题 → 回复 + Quick Reply 引导(不复读)· 引用用户当前消息。
+
+    问候(greeting)/跑题(scope)取 line_i18n 收口文案;感谢/求助走 replies 轮选池(治复读)。
+    """
     from services.expense import replies
 
+    start_txt = _QR_START.get((lang or "zh").lower(), _QR_START["th"])
     items = [
-        _qr_item(line_client.t_line(lang, "qr_record"), "ค่าน้ำ 50"),
+        _qr_item(line_client.t_line(lang, "qr_record"), start_txt),
         _qr_item(line_client.t_line(lang, "qr_query"), line_client.t_line(lang, "qr_query_text")),
     ]
-    msg = {"type": "text", "text": replies.pick(kind, text, lang), "quickReply": {"items": items}}
+    key = _DIRECT_KEY.get(kind)
+    body = line_client.t_line(lang, key) if key else replies.pick(kind, text, lang)
+    msg = {"type": "text", "text": body, "quickReply": {"items": items}}
     line_reply.reply_messages_context(
         reply_token, [msg], quote_token=quote_token, line_user_id=line_user_id, tenant_id=tenant_id
     )
@@ -55,7 +73,11 @@ def reply_summary(reply_token, lang, tid, ws, *, quote_token="", line_user_id=""
         _say(line_client.t_line(lang, "exp_sum_empty"))
         return
     uncat = line_client.t_line(lang, "exp_uncat")
-    lines = [line_client.t_line(lang, "exp_sum_head", amount=s["total"], n=s["count"])]
+    lines = [
+        line_client.t_line(lang, "line_query_summary_intro"),
+        "",
+        line_client.t_line(lang, "exp_sum_head", amount=s["total"], n=s["count"]),
+    ]
     for c in s["by_category"][:6]:
         lines.append(f"• {c['name'] or uncat}: ฿{c['amount']} ({c['count']})")
     _say("\n".join(lines))
@@ -81,7 +103,7 @@ def reply_detail(reply_token, lang, tid, ws, line_user_id=None, *, quote_token="
         _say(line_client.t_line(lang, "exp_sum_empty"))
         return
     uncat = line_client.t_line(lang, "exp_uncat")
-    lines = [line_client.t_line(lang, "exp_detail_head", n=len(rows))]
+    lines = [line_client.t_line(lang, "line_query_detail_intro"), ""]
     for i, r in enumerate(rows, 1):
         tail = f" · {r['vendor']}" if r["vendor"] else ""
         lines.append(f"{i}. {r['date']} {r['category'] or uncat} ฿{r['amount']}{tail}")
@@ -110,7 +132,7 @@ def _remember_detail_order(tid, ws, line_user_id, ids) -> None:
 
 
 _UNDO_ERR = {
-    "ambiguous": "guide_need_reply_for_risk",
+    "ambiguous": "line_need_reply_record",
     "ref_not_found": "guide_detail_list",
     "none": "exp_undo_none",
 }

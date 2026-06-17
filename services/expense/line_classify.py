@@ -75,3 +75,79 @@ def detect_payment_method(text: str) -> str:
         if any(w.lower() in low for w in words):
             return code
     return ""
+
+
+# 引导类意图关键词(零成本·泰语优先):能力说明 / 如何上传 / 如何开始。
+_INTRO_PATTERNS = (
+    (
+        "capability",
+        (
+            "ทำอะไรได้",
+            "ช่วยอะไร",
+            "ฟังก์ชัน",
+            "เมนู",
+            "ใช้งานยังไง",
+            "你能做什么",
+            "能做什么",
+            "能做啥",
+            "有什么功能",
+            "帮助",
+            "菜单",
+            "怎么用",
+            "what can you",
+            "help",
+            "menu",
+            "何ができ",
+            "ヘルプ",
+            "メニュー",
+            "使い方",
+        ),
+    ),
+    (
+        "upload",
+        (
+            "อัปโหลด",
+            "ส่งรูปยังไง",
+            "ส่งใบเสร็จยังไง",
+            "แนบไฟล์",
+            "上传",
+            "怎么拍",
+            "怎么发票据",
+            "拍照",
+            "upload",
+            "attach file",
+            "send photo",
+            "アップロード",
+            "送り方",
+        ),
+    ),
+    (
+        "start",
+        (
+            "เริ่มยังไง",
+            "เริ่มต้น",
+            "เริ่มใช้",
+            "怎么开始",
+            "如何开始",
+            "从哪开始",
+            "how to start",
+            "get started",
+            "始め方",
+            "はじめ方",
+        ),
+    ),
+)
+
+
+def intro_intent(text: str) -> str:
+    """引导类意图(零成本):capability 能力说明 / upload 如何上传 / start 如何开始。无 → ''。
+
+    用在记账解析前的分流,避免「怎么开始」被当成记一笔(这些短语极少出现在正常记一笔里)。
+    """
+    low = (text or "").strip().lower()
+    if not low:
+        return ""
+    for kind, words in _INTRO_PATTERNS:
+        if any(w.lower() in low for w in words):
+            return kind
+    return ""

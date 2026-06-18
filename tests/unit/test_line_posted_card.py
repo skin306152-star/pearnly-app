@@ -45,6 +45,48 @@ class FieldsFromDetailTests(unittest.TestCase):
         self.assertEqual(f["vendor"], "")
         self.assertEqual(f["items"], [])
 
+    def test_expense_with_taxid_reconstructs_vat(self):
+        # P1G bug:费用单按行落库 vat=0,但有税号(has_vat)→ 按 7% 票面拆解,不显「VAT 0」。
+        # Cafe Amazon 140 → 130.84 / 9.16(与确认前识别卡一致)。
+        detail = {
+            "doc": {
+                "grand_total": "140.00",
+                "subtotal": "140.00",
+                "vat_amount": "0",
+                "has_vat": True,
+            },
+            "supplier": {"tax_id": "0107561000013"},
+            "lines": [],
+        }
+        f = pc.fields_from_detail(detail)
+        self.assertEqual(f["subtotal"], "130.84")
+        self.assertEqual(f["vat"], "9.16")
+
+    def test_non_tax_expense_no_vat_line(self):
+        # 非税票(无税号/has_vat)→ 不强凑 VAT,不显拆解(也不显 VAT 0)。
+        detail = {
+            "doc": {"grand_total": "80.00", "subtotal": "80.00", "vat_amount": "0"},
+            "supplier": {},
+        }
+        f = pc.fields_from_detail(detail)
+        self.assertEqual(f["subtotal"], "")
+        self.assertEqual(f["vat"], "")
+
+    def test_real_vat_split_trusted(self):
+        # 真进项已拆 VAT 且自洽 → 采信 DB 值。
+        detail = {
+            "doc": {
+                "grand_total": "107.00",
+                "subtotal": "100.00",
+                "vat_amount": "7.00",
+                "has_vat": True,
+            },
+            "supplier": {},
+        }
+        f = pc.fields_from_detail(detail)
+        self.assertEqual(f["subtotal"], "100.00")
+        self.assertEqual(f["vat"], "7.00")
+
 
 class BuildTests(unittest.TestCase):
     def test_posted_card_has_status_amount_and_actions(self):

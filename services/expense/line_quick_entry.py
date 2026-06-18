@@ -461,14 +461,27 @@ def extract_inline_vendor(text: str) -> str:
     return ""
 
 
+def _in_hyphen_code(s: str, m) -> bool:
+    """金额匹配落在连字号数字串(7-11 / 02-99 等品牌/编号/区间)→ 非金额(P1E-3:店名「ที่ 7-11」
+    的 7 此前被当金额致总额 +7)。两侧任一紧贴 数字-连字号 即判定为编号片段,不计入。"""
+    a, b = m.start(2), m.end(2)
+    after = b + 1 < len(s) and s[b] == "-" and s[b + 1].isdigit()
+    before = a >= 2 and s[a - 1] == "-" and s[a - 2].isdigit()
+    return after or before
+
+
 def parse_multi(text: str) -> Optional[list]:
     """一句话拆多项 → [{name, amount(Decimal)}];<2 项返 None(走单笔老路)。
 
     名去首尾货币词/连接词(和/跟/加…)。确定性正则(不靠 LLM 拆·避免误拆)。字段声明词
-    (「ผู้ขาย 711」)是卖家标注非商品 → 不计入金额(P1E-3·总额不被内联卖家撑大)。
+    (「ผู้ขาย 711」)是卖家标注非商品 → 不计入金额(P1E-3·总额不被内联卖家撑大);连字号数字串
+    (店名「7-11」)是编号非金额 → 不计入(P1E-3·总额不被 7-11 的 7 撑大)。
     """
+    s = (text or "").strip()
     items = []
-    for m in _MULTI_RE.finditer((text or "").strip()):
+    for m in _MULTI_RE.finditer(s):
+        if _in_hyphen_code(s, m):
+            continue
         name = _UNIT_TAIL.sub("", _NAME_LEAD.sub("", m.group(1).strip())).strip(" -·:、,，/")
         try:
             amt = Decimal(m.group(2).replace(",", ""))

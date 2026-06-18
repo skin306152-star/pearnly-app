@@ -455,9 +455,11 @@ def terminal_card(
     workspace_name: str = "",
     liff_id: str = "",
     workspace_client_id="",
+    fields: dict = None,
 ) -> dict:
-    """终态卡(已撤销/已丢弃):徽章 + 整句说明 + 金额/记录号 + 仅「查看记录」(丢弃无记录可看 →
-    不出按钮)。不显示任何不可执行动作(验收 6)。state ∈ voided|discarded。"""
+    """终态卡(已撤销/已丢弃):徽章 + 整句说明 + 金额/税额拆解/记录号 + 仅「查看记录」(丢弃无记录可看
+    → 不出按钮)。不显示任何不可执行动作(验收 6)。fields 带税前/VAT → 撤销后与确认前后展示一致
+    (P1G·不置零 VAT)。state ∈ voided|discarded。"""
     t = _lang(lang)
     st = _TERMINAL.get(state, _TERMINAL["voided"])
     desc = t["void_desc"] if state == "voided" else t["discard_desc"]
@@ -478,6 +480,7 @@ def terminal_card(
     has_amt, amt_text = _amount_text(amount, t)
     if has_amt:
         body_rows.append(s.txt(amt_text, size="lg", color=s.VALUE, weight="bold", wrap=True))
+    body_rows += s.breakdown_rows(fields or {}, t)
     short = _short_id(doc_id)
     if short:
         body_rows.append(s.txt(f"{t['record']} #{short}", size="xxs", color=s.LABEL, margin="xs"))

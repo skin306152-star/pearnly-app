@@ -217,6 +217,7 @@ def reply_undo(
                     lang=lang,
                     tid=tid,
                     luid=line_user_id,
+                    detail=detail,
                 )
                 return
             res = posting_svc.void_doc(
@@ -236,6 +237,7 @@ def reply_undo(
             lang=lang,
             tid=tid,
             luid=line_user_id,
+            detail=res,
         )
     except PosError as e:
         if (e.code or "") == "acct.period_closed":

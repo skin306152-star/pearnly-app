@@ -405,6 +405,7 @@ def _delete_target(bound_user, reply_token, lang, tid, ws, doc_id, ctx) -> bool:
                     lang=lang,
                     tid=tid,
                     luid=luid,
+                    detail=detail,
                 )
                 return True
             if status in ("posted", "void"):
@@ -422,6 +423,7 @@ def _delete_target(bound_user, reply_token, lang, tid, ws, doc_id, ctx) -> bool:
                     lang=lang,
                     tid=tid,
                     luid=luid,
+                    detail=res,
                 )
                 return True
     except PosError as e:

@@ -18,12 +18,14 @@ from services.line_binding import line_client, line_postback, line_reply
 logger = logging.getLogger(__name__)
 
 
-def _terminal_card(reply_token, state, ref, ws, amount, lang, tid, luid) -> None:
-    """动作后回终态卡(已撤销/已丢弃):一眼看懂收尾状态,不显示不可执行动作(P1D 验收6)。"""
+def _terminal_card(reply_token, state, ref, ws, amount, lang, tid, luid, *, detail=None) -> None:
+    """动作后回终态卡(已撤销/已丢弃):一眼看懂收尾状态,不显示不可执行动作(P1D 验收6)。
+    detail 传入 → 带税前/VAT 拆解,撤销后与确认前后展示一致(P1G·不置零 VAT)。"""
     import os
 
-    from services.line_binding import line_card
+    from services.line_binding import line_card, line_posted_card
 
+    fields = line_posted_card.fields_from_detail(detail) if detail else None
     card = line_card.terminal_card(
         state=state,
         amount=amount,
@@ -31,13 +33,15 @@ def _terminal_card(reply_token, state, ref, ws, amount, lang, tid, luid) -> None
         lang=lang,
         liff_id=os.getenv("LINE_LIFF_ID", "").strip(),
         workspace_client_id=str(ws or ""),
+        fields=fields,
     )
     line_reply.reply_messages_context(reply_token, [card], line_user_id=luid, tenant_id=tid)
 
 
-def send_terminal(reply_token, *, state, doc_id, ws, amount, lang, tid, luid) -> None:
-    """对外:撤销/删除后回终态卡(已撤销/已丢弃·复用 _terminal_card·验收 #4)。"""
-    _terminal_card(reply_token, state, doc_id, ws, amount, lang, tid, luid)
+def send_terminal(reply_token, *, state, doc_id, ws, amount, lang, tid, luid, detail=None) -> None:
+    """对外:撤销/删除后回终态卡(已撤销/已丢弃·复用 _terminal_card·验收 #4)。
+    detail=作废/删除前的单据详情 → 终态卡带税额拆解(验收:撤销后税前/VAT 与确认前后一致)。"""
+    _terminal_card(reply_token, state, doc_id, ws, amount, lang, tid, luid, detail=detail)
 
 
 def send_detail_link(reply_token, text, *, doc_id, ws, lang, tid, luid, quote_token="") -> None:
@@ -103,6 +107,7 @@ def _reshow_current(cur, reply_token, *, ref, ws, lang, tid, luid) -> None:
             lang,
             tid,
             luid,
+            detail=detail,
         )
     else:
         line_reply.reply_text_context(
@@ -196,7 +201,7 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
 
             elif action == line_postback.ACTION_UNDO:
                 res = posting_svc.void_doc(cur, **scope, doc_id=ref, created_by=uid)
-                # 终态卡(已撤销):徽章 + 整句 + 金额/记录号 + 仅「查看记录」(原单留存可查)。
+                # 终态卡(已撤销):徽章 + 整句 + 金额/税额拆解/记录号 + 「查看记录」(原单留存可查)。
                 _terminal_card(
                     reply_token,
                     "voided",
@@ -206,6 +211,7 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
                     lang,
                     tid,
                     luid,
+                    detail=res,
                 )
 
             elif action == line_postback.ACTION_DISCARD:

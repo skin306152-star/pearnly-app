@@ -208,6 +208,17 @@ class ParseMultiTests(unittest.TestCase):
         self.assertEqual(len(r), 3)
         self.assertEqual(sum(i["amount"] for i in r), Decimal("150"))
 
+    def test_hyphen_store_name_not_counted(self):
+        # P1E-3:店名「ที่ 7-11」的 7/11 是编号不是金额 → 合计 550(非 557)。
+        r = lqe.parse_multi("กาแฟ 300 ขนม 250 ที่ 7-11")
+        self.assertEqual(sum(i["amount"] for i in r), Decimal("550"))
+        self.assertNotIn(Decimal("7"), [i["amount"] for i in r])
+
+    def test_hyphen_code_both_sides_excluded(self):
+        # 连字号数字串两端都不计:「02-99」→ 02、99 均非金额,真金额 500 不受影响。
+        r = lqe.parse_multi("ค่าโทร 500 เบอร์ 02-99 ค่าน้ำ 80")
+        self.assertEqual(sum(i["amount"] for i in r), Decimal("580"))
+
     def test_extract_inline_vendor(self):
         self.assertEqual(lqe.extract_inline_vendor("... ปากกา 20 ผู้ขาย 711"), "711")
         self.assertEqual(lqe.extract_inline_vendor("ร้านค้า 7-11 กาแฟ 30"), "7-11")  # 长词先匹配

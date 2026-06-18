@@ -512,6 +512,19 @@ class P1DCardTests(unittest.TestCase):
         self.assertIn("查看记录", s)
         self.assertIn("footer", c["contents"])
 
+    def test_terminal_voided_shows_vat_breakdown(self):
+        # P1G:撤销后终态卡带税前/VAT 拆解 → 与确认前/确认后展示一致(不置零 VAT)。
+        c = line_card.terminal_card(
+            state="voided",
+            amount="140",
+            doc_id="D9",
+            lang="zh",
+            fields={"subtotal": "130.84", "vat": "9.16"},
+        )
+        s = str(c)
+        self.assertIn("130.84", s)
+        self.assertIn("9.16", s)
+
     def test_terminal_discarded_no_action(self):
         # 草稿已删 → 无记录可看 → 不显示不可执行动作(无 footer)。
         c = line_card.terminal_card(state="discarded", doc_id="D9", lang="zh")

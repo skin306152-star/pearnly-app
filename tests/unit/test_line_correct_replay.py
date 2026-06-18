@@ -268,6 +268,16 @@ class ReplayScenarioTests(unittest.TestCase):
         self.assertTrue(steps[0][1])
         self.assertEqual(self.sim.docs["D1"]["supplier"]["name"], "tops")
 
+    def test_req5_low_risk_resends_card_not_text(self):
+        # Req5(Zihao 2026-06-18):active 草稿低风险改卖家 → 回当前状态卡(含「确认」状态标签 altText),
+        # 不再纯文字「已更新 X→Y」。reply_messages_context 在 harness 里捕 altText。
+        self._seed_active("D1")
+        steps = _run(self.sim, [("ร้านค้าเป็น 7-11", None)])
+        self.assertEqual(self.sim.docs["D1"]["supplier"]["name"], "7-11")
+        self.assertTrue(
+            any("ยืนยัน" in r for r in steps[0][2]), f"低风险改错未重发状态卡:{steps[0][2]}"
+        )
+
     def test_active_draft_low_risk_chain(self):
         # 验收 #5:active 草稿 seller→date→category→payment 连续低风险直改,不断、不确认。
         self._seed_active("D1")

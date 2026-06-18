@@ -332,6 +332,11 @@ class ApplyOrConfirmTests(unittest.TestCase):
                 side_effect=lambda tok, msg, **k: replies.append(msg) or True,
             ),
             mock.patch.object(
+                line_correct.line_reply,
+                "reply_messages_context",
+                side_effect=lambda tok, msgs, **k: replies.append("CARD") or True,
+            ),
+            mock.patch.object(
                 line_correct.line_client, "t_line", side_effect=lambda lang, key, **k: key
             ),
         ):
@@ -341,12 +346,12 @@ class ApplyOrConfirmTests(unittest.TestCase):
         return replies, saved, applied
 
     def test_draft_single_nonamount_executes_directly(self):
-        # 低风险:草稿改卖家 → 直接执行 + 完成回执,不存确认 pending。
+        # 低风险:草稿改卖家 → 直接执行 + 重发当前状态卡(Req5),不存确认 pending、不再纯文字。
         detail = {"doc": {"status": "draft"}, "supplier": {"name": "711"}, "lines": [{}]}
         replies, saved, applied = self._run({"vendor_name": "7-11"}, detail)
         self.assertEqual(len(applied), 1)  # 直接改
         self.assertEqual(saved, {})  # 不存确认态(active 续接由 _set_active 另存·此处 mock)
-        self.assertIn("7-11", replies[0])  # 完成回执(CHANGED_DONE)
+        self.assertIn("CARD", replies)  # Req5:回当前状态卡(草稿可确认卡)
 
     def test_posted_nonamount_executes_directly(self):
         # 验收 #1:已入账改卖家(低风险展示字段)→ 直接执行(void+克隆·可撤销),不再二次确认。
@@ -354,7 +359,7 @@ class ApplyOrConfirmTests(unittest.TestCase):
         replies, saved, applied = self._run({"vendor_name": "7-11"}, detail)
         self.assertEqual(len(applied), 1)  # 直接改
         self.assertEqual(saved, {})  # 不出确认 pending
-        self.assertIn("7-11", replies[0])
+        self.assertIn("CARD", replies)  # Req5:回当前状态卡(posted 数据卡)
 
     def test_draft_amount_confirms(self):
         # 高风险:改金额(税额重算)→ 即便草稿也确认。

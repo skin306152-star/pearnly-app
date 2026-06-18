@@ -197,5 +197,42 @@ class CardActionTokenTests(unittest.TestCase):
         self.assertTrue(sent[0].startswith("card_action_expired"))
 
 
+class SendStateCardReplyTests(unittest.TestCase):
+    """Req5:改错低风险直改后回当前状态卡(posted/draft/void),替代纯文字「已更新」。"""
+
+    def _run(self, status):
+        from services.expense import line_correct
+
+        sent = []
+        with (
+            mock.patch("services.purchase.docs.get_doc", return_value=_detail(status)),
+            mock.patch.object(line_correct, "_set_active"),
+            mock.patch.object(
+                lca.line_reply,
+                "reply_messages_context",
+                side_effect=lambda rt, msgs, **k: sent.append(msgs) or True,
+            ),
+        ):
+            ok = lca.send_state_card_reply(
+                object(), "rt", doc_id="D1", ws=1, lang="zh", tid="t", luid="u"
+            )
+        return ok, sent
+
+    def test_posted_sends_posted_card(self):
+        ok, sent = self._run("posted")
+        self.assertTrue(ok)
+        self.assertIn("已保存", str(sent[0][0]))
+
+    def test_draft_sends_confirm_card(self):
+        ok, sent = self._run("draft")
+        self.assertTrue(ok)
+        self.assertEqual(sent[0][0]["type"], "flex")
+
+    def test_void_sends_terminal_card(self):
+        ok, sent = self._run("void")
+        self.assertTrue(ok)
+        self.assertIn("已撤销", str(sent[0][0]))
+
+
 if __name__ == "__main__":
     unittest.main()

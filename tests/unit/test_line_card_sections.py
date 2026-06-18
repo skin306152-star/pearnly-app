@@ -135,5 +135,26 @@ class NoticesTests(unittest.TestCase):
         self.assertEqual(len(out), 2)  # 三个信号都在 → 只显最重要 2 条
 
 
+class GarbledItemNameTests(unittest.TestCase):
+    """OCR 读不出的泰文细品名(?????)展示成编号占位「项目 N」,不露乱码(Zihao 2026-06-18)。"""
+
+    def test_pure_question_marks_fall_back_to_numbered(self):
+        self.assertEqual(s._display_item_name("????", 1, T), "项目 1")
+        self.assertEqual(s._display_item_name("?? ??", 3, T), "项目 3")
+        self.assertEqual(s._display_item_name("��", 2, T), "项目 2")
+
+    def test_partial_readable_kept(self):
+        # 已读出的拉丁/泰文部分保留(只去问号),不强行换占位
+        self.assertEqual(s._display_item_name("TW ?????", 1, T), "TW")
+        self.assertEqual(s._display_item_name("Cake slice", 2, T), "Cake slice")
+
+    def test_section_renders_numbered_placeholder(self):
+        rows = s.items_section([{"name": "????", "amount": "30.00"}], T)
+        # rows[0]=小标题,rows[1]=第一行 box → 名称节点 text 含「项目 1」不含「?」
+        name_text = rows[1]["contents"][0]["text"]
+        self.assertIn("项目 1", name_text)
+        self.assertNotIn("?", name_text)
+
+
 if __name__ == "__main__":
     unittest.main()

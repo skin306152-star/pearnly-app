@@ -114,6 +114,43 @@ def _reshow_current(cur, reply_token, *, ref, ws, lang, tid, luid) -> None:
         )
 
 
+def send_state_card_reply(cur, reply_token, *, doc_id, ws, lang, tid, luid) -> bool:
+    """改错低风险直改后回当前状态卡(Req5 · reply 版):posted 数据卡 / draft 可确认卡 / void 终态卡。
+
+    替代原「已更新 X→Y」纯文字 —— 让用户看到改动后的整张卡(新卖家/日期/金额一目了然)。
+    token 留空走兼容动作链路(改错路径 cur 已在事务中·不另铸 nonce)。返回是否已发卡(否→调用方回文字)。
+    """
+    import os
+
+    from services.line_binding import line_card, line_posted_card
+    from services.purchase import docs as docs_svc
+
+    detail = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)
+    status = (detail.get("doc") or {}).get("status") if detail else None
+    if status == "posted":
+        _send_posted(cur, reply_token, detail, ref=doc_id, ws=ws, lang=lang, tid=tid, luid=luid)
+        return True
+    if status == "void":
+        _send_voided(reply_token, ref=doc_id, ws=ws, lang=lang, tid=tid, luid=luid, detail=detail)
+        return True
+    if status == "draft":
+        doc = detail.get("doc") or {}
+        card = line_card.result_card(
+            state="confirm",
+            amount=doc.get("grand_total"),
+            fields=line_posted_card.fields_from_detail(detail),
+            doc_id=str(doc_id),
+            lang=lang,
+            source="doc",
+            token="",
+            liff_id=os.getenv("LINE_LIFF_ID", "").strip(),
+            workspace_client_id=str(ws or ""),
+        )
+        line_reply.reply_messages_context(reply_token, [card], line_user_id=luid, tenant_id=tid)
+        return True
+    return False
+
+
 def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
     """卡按钮回调 → 全套动作分发。任何异常都回执不抛(主路径不得崩)。
 

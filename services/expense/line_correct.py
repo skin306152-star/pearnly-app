@@ -236,16 +236,30 @@ def _apply_or_confirm(
     # 即便已入账也直执行(void+克隆+重过账·可撤销·验收 #1)。
     high_risk = "amount" in changes or len(changes) > 1
     if not high_risk:  # 低风险:直接执行,不二次确认
+        sent = False
         with db.get_cursor_rls(tid, commit=True) as cur:
             res = _apply(cur, bound_user, tid, ws, doc_id, changes_draft, keys, detail=detail)
             if res:  # 续接同一张(验收 #2)·复用同一提交免再开游标
                 _set_active(tid, ws, res["new_id"], line_user_id, cur=cur)
+                # Req5:改完重发当前状态卡(posted/草稿),让改动在卡上可见,而非「已更新 X→Y」纯文字。
+                from services.line_binding import line_card_actions
+
+                sent = line_card_actions.send_state_card_reply(
+                    cur,
+                    reply_token,
+                    doc_id=res["new_id"],
+                    ws=ws,
+                    lang=lang,
+                    tid=tid,
+                    luid=line_user_id,
+                )
         if not res:
             _say(line_client.t_line(lang, "exp_correct_none"))
             return True
-        k = keys[0]
-        fl, nv = ci.key_label(k, lang), ci.disp(k, changes[k], lang)
-        _say(ci.t(ci.CHANGED_DONE, lang, field=fl, new=nv))
+        if not sent:  # 卡发送失败兜底:仍给文字确认(诚实·不静默)
+            k = keys[0]
+            fl, nv = ci.key_label(k, lang), ci.disp(k, changes[k], lang)
+            _say(ci.t(ci.CHANGED_DONE, lang, field=fl, new=nv))
         return True
     with db.get_cursor_rls(tid, commit=True) as cur:
         conversation.save_pending(

@@ -6,14 +6,15 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-18 · **采购 OCR 三误判修复 + P1E-2 LINE 改错对话闭环(统一 Correction Session)全上线** · HEAD `6705a6e0`）
+## 🎯 状态卡（2026-06-18 · **采购付款方式落库 + P1E-2 LINE 改错状态机多轮收口(真机 4 轮事故全修)+ 回放压测器** · HEAD `6e35bea8`）
 
-- **本窗口完成并上线**(7 commit·prod `6705a6e` health 200·13 闸全绿·全文件 ≤500·全量 **3981 unit 绿** skip3·见记忆 [[line-purchase-ocr-3fixes]]+[[line-correction-session-p1e2]])：
-  - **采购 OCR 三误判**(`ef233bf`/`dfa781a`/`42ba39e`·真票四层 trace·fixture 钉死 CP ALL/Seafood/Little Betong/Amazon 70&140):①CP ALL 把现金 200 当总额→OCR 加 cash_amount/change_amount/discount,确定性 cash−change 校正=净额 110;②Seafood 税额反推错→`_card_amounts` 票面 subtotal+VAT 自洽就采信(2544/178.08/-0.08·不按 7% 覆盖)·舍入=total−税前−VAT 不回退 draft 整额 VAT(178);③漏读小额行→`_same_money` 容差 2% 改固定 2 铢(任意票面抓漏行);④付款态不上卡(不把单据类型默认未付当事实)。
-  - **P1E-2 统一 Correction Session**(`8e0d365`→`6705a6e`·新 `line_correct_flow` 多轮态机·`line_correct_i18n` 4 语):引用卡片即进会话(pending TTL15min·锁 active_doc_id),三态 correctclar/correctval/correct。**执行三档(`_apply_or_confirm`)**:草稿+单非金额(date/seller/category)直接改回完成、已入账/改金额/多字段确认、多行金额→详情页。字段切换(等日期时改说卖家→切)、年首/ISO 日期(2026/6/18·下沉 lqe._parse_date)、全角冒号归一、否定填充剥空再问。「识别错了」绝不退化成 OCR 失败帮助。
-- **⏳ 下个窗口先做(Zihao 拍板)**:**给采购改付款方式加一列**(purchase_docs 无 payment_method 列·卡上付款方式仅 OCR 展示·LINE 改付款现路由详情页)→ schema 加列(ensure+alembic)+ create_doc/update_draft/_detail_to_data/_apply_changes 接线 + flow payment 从详情页改为可直接改。**做完等 Zihao 真机验证结果再决定下一步**。
-- **剩余/未做(记 backlog 非阻塞)**:多行 feasibility 门散 3 处可集中化·_STRIP_TOKENS 与 _FIELD_PATTERNS 词表可合并(漂移风险暂留)·问题2「无引用 ผิดแล้ว 软提示最近一张」未做(改账高风险·需拍板)·OCR 模型/延迟极限(压缩图偶发数字误读·复杂长票 L2 504)需换引擎/要原图(产品决策)。
-- **真机**:本窗无真 LINE channel·全靠 Zihao 多轮截图验收(OCR 三误判已逐张过·P1E-2 改错闭环最后一轮待验)。
+- **本窗口完成并上线**(6 commit·prod `6e35bea` health 200·13 闸全绿·全文件 ≤500·全量 **4026 unit 绿** skip3 + **回放压测器 30 场景全过**·见记忆 [[line-correction-session-p1e2]]+[[line-correction-replay-before-push]])：
+  - **采购付款方式落库**(`9aa416f`·schema `payment_method` 列 ensure+alembic0042 双跑·prod DB 实测列在·create_doc/update_draft/get_doc/intake/line_correct 接线·`payment_from_ocr` 单一源)。
+  - **P1E-2 状态机收口 4 轮**(`1bceb2e`→`6e35bea`):①不串线(confirm 阶段非是非否重问 CONFIRM_REPROMPT)/字段切换/明确目标直执行(「วันที่เป็น 2026/6/18」点字段不依赖大脑)/取消删除短路径(终态卡);②低风险(date/seller/category/payment)即便**已入账**也直改(void+克隆可撤销·去 high_risk 的 posted 维度)·改完续接 **active_doc_id**(correctactive 态·15min)·**no-op 不重建**(_is_noop)·删除回终态卡·多行详情页带真 deeplink 按钮;③**账务红线**:`route()` 加 `is_correction_like` 安全闸→correction-like 文本绝不进 auto_book(「ร้านค้าเป็น 7-11」不再新建 11 THB)·多行详情页保留 active·`_strip_prefix` 拉丁词边界剥(店名 tops 不被 to 吃成 ps);④再引用「已作废原单」跟随 active 续到克隆(_active_doc 兜底)。
+  - **回放压测器** `tests/unit/test_line_correct_replay.py`(内存模拟单据/pending/消息引用驱动真 flow.route·30 场景·`python` 直跑出报告)+ /simplify 收口(_current/_is_live 共享·_set_active 复用游标省 DB 往返·payment_from_ocr 单一源)。
+- **⏳ 下个窗口**:**等 Zihao 真机验收结果再决定**(本窗无真 LINE channel)。真机只验平台差异(quoteToken/卡片渲染/真 OCR)·核心逻辑已被 30 场景回放端到端兜住。
+- **🔴 流程铁律(Zihao 拍板·已写记忆 [[line-correction-replay-before-push]])**:P1E-2/LINE correction 改动**不许只跑单测就 push·必先跑 replay tester 全过**·第一轮验收不交用户真机·push 汇报含 replay 通过数+单测+commit+prod health。
+- **剩余/未做(backlog 非阻塞)**:`_delete_target↔reply_undo` 作废核心可抽共享 helper(碰做账 void 路径·留专项)·`line_message_refs` voided→clone 解析(active 过期后引用旧卡仍命中)·**P1E-3 文本拆单 parser**(「ที่ 7-11」的 7 被拆成金额致 557 应 550·Zihao 已记 backlog 不混入 P1E-2)·OCR 模型/延迟极限需换引擎或要原图(产品决策)。
 
 ## 历史记录（旧状态卡 · 2026-06-17 · OCR 纠错 + LINE 费用卡片产品化 · HEAD `33142a1`）
 

@@ -281,7 +281,10 @@ def ingest_line_image(
         "discount": fields.get("discount") or "",
         "invoice_number": fields.get("invoice_number") or "",
         "payment_method": fields.get("payment_method") or "",
-        "payment_status": "",  # 见下方:取自 draft 的付款态(仅明确未付/部分付才在卡上显)
+        # 付款态不上卡:OCR 无真实付款信号,draft 的 payment_status 只是按单据类型推断的默认值(税票默认
+        # 未付)。把推断当事实显「未付」会在已付的 QR/现金小票上误报(与文字路一致·只显真识别的付款方式)。
+        # 账务草稿仍保留 default_payment_status 供 AP 记账,与卡片展示分离。
+        "payment_status": "",
         "items": [],  # 下方明细策略统一赋值(show_items/items_unread)
         "detail": "",
     }
@@ -329,8 +332,6 @@ def ingest_line_image(
 
     _pay_raw = str(fields.get("payment_method") or "").strip()
     card_fields["payment_method"] = normalize_payment_method(_pay_raw) or _pay_raw
-    # 付款态:仅明确未付/部分付才在卡显·默认 paid 不显 → 取自草稿。
-    card_fields["payment_status"] = draft.get("payment_status") or ""
     # 费用类型:命中服务关键词→服务,否则中性「费用」(OCR 票多为费用·不粗暴显「商品」)。
     from services.expense.line_classify import classify_expense_type
 

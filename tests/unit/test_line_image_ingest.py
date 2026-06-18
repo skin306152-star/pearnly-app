@@ -445,6 +445,15 @@ class IncompleteItemsCardTests(unittest.TestCase):
         out, _c, _p = _run(res, band="needs_review", auto_book=False, fields=fields)
         self.assertEqual(out["card_fields"]["payment_method"], "promptpay")
 
+    def test_default_unpaid_status_not_shown_on_card(self):
+        # 税票默认推断「未付」只是启发式(非真实付款信号)→ 不上卡(治已付 QR/现金票误显「未付」)。
+        # 账务草稿仍可保留 unpaid 供 AP,卡片只显真识别到的付款方式(此处无 → 付款行整段不显)。
+        draft = dict(_draft(), payment_status="unpaid")
+        res = {"route": "purchase", "draft": draft, "dedupe_hit": False, "field_confidence": {}}
+        fields = {"document_type": "tax_invoice", "seller_name": "ACME", "total_amount": "100"}
+        out, _c, _p = _run(res, band="needs_review", auto_book=False, fields=fields)
+        self.assertEqual(out["card_fields"]["payment_status"], "")
+
 
 if __name__ == "__main__":
     unittest.main()

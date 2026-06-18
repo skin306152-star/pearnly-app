@@ -121,8 +121,19 @@ class DetailApiSmokeTests(unittest.TestCase):
             "supplier_branch_no": None,
             "supplier_address": None,
             "supplier_phone": None,
+            "has_vat": False,  # 存库 false → 验「有效税号是否强制翻 true」
         }
         return docs_svc.get_doc(self._Cur(row), tenant_id="t", workspace_client_id=1, doc_id="D1")
+
+    def test_valid_tax_forces_has_tax_invoice(self):  # 7-11:有税号 → has_vat 不得 false
+        res = self._get("0107542000011")
+        self.assertTrue(res["doc"]["has_vat"])  # 税务一致性:填了税号不允许显「ไม่มีใบกำกับ」
+        self.assertEqual(res["supplier"]["tax_id"], "0107542000011")  # 真税号保留(不清空)
+
+    def test_invalid_tax_does_not_fake_has_tax_invoice(self):  # Bangchak:13 无效 → 不强填·不造假税号
+        res = self._get("13")
+        self.assertIsNone(res["doc"]["supplier_tax_id"])  # 假税号清空(不留 13)
+        self.assertFalse(res["doc"]["has_vat"])  # 无有效税号 → 不强填 has_vat
 
     def test_bangchak_fixture_taxid_13_cleared(self):  # 票一:Bangchak 1780
         res = self._get("13")

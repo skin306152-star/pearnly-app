@@ -255,6 +255,10 @@ def get_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> Optional[dict]:
     # P1F:抽 supplier 并清洗税号/卖家(嵌套 + doc 扁平字段都清·详情页/编辑表单/卡片共用同一套 cleaned·
     # 异常值「13」/日期片段/纯金额 → None·前端显「—」/留空待补·原值仍在 suppliers 表)。
     supplier = field_clean.serialize_supplier(doc)
+    # 税务一致性(P1F):识别到有效税号 → 该单即税票,has_vat 不得为 false(治「填了税号却显
+    # ไม่มีใบกำกับภาษี」的矛盾)。仅置标记·不动 vat_amount/grand_total(金额在独立列·算法不变)。
+    if supplier and supplier.get("tax_id"):
+        doc["has_vat"] = True
     cur.execute(
         f"SELECT {_LINE_COLS} FROM purchase_lines "
         "WHERE tenant_id = %s AND purchase_doc_id = %s ORDER BY line_no",

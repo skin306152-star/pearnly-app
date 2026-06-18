@@ -123,6 +123,7 @@ class Sim:
         self.docs.pop(doc_id, None)
 
     def void_doc(self, cur, *, tenant_id, workspace_client_id, doc_id, created_by):
+        # 真 void_doc 幂等:已 void 直接返单,不二次冲销(P1G 验收 4)。
         self.docs[doc_id]["doc"]["status"] = "void"
         return self.docs[doc_id]
 
@@ -250,9 +251,7 @@ class ReplayScenarioTests(unittest.TestCase):
     def test_active_new_expense_sentence_not_swallowed(self):
         # P1E-3:active seller 后,明显新记账句(含「ผู้ขาย 711」)→ 不当 seller 新值吞掉,放行记账流。
         self._seed_active("D1")
-        steps = _run(
-            self.sim, [("วันนี้ใช้จ่าย: กาแฟ 30 ทุเรียน 100 ปากกา 20 ผู้ขาย 711", None)]
-        )
+        steps = _run(self.sim, [("วันนี้ใช้จ่าย: กาแฟ 30 ทุเรียน 100 ปากกา 20 ผู้ขาย 711", None)])
         self.assertFalse(steps[0][1])  # 放行(未被改错路由接管)→ 交记账流建新支出
         self.assertEqual(self.sim.docs["D1"]["supplier"]["name"], "ร้านเดิม")  # seller 没被改成整句
 
@@ -366,6 +365,17 @@ class ReplayScenarioTests(unittest.TestCase):
     def test_delete_in_session(self):
         steps = _run(self.sim, [("วันที่ผิด", "MID_D1"), ("删除", None)])
         self.assertNotIn("D1", self.sim.docs)
+
+    def test_repeat_delete_already_void_reshows_voided(self):
+        # 验收 4:已撤销的单再删 → 回「已撤销」终态卡(void_doc 幂等),绝不回「找不到记录」。
+        none_msg = line_client.t_line("th", "exp_correct_none")
+        self.sim.seed("D6", lines=1, status="void")
+        self._seed_active("D6")
+        steps = _run(self.sim, [("ลบ", None)])
+        self.assertTrue(steps[0][1])
+        self.assertEqual(self.sim.docs["D6"]["doc"]["status"], "void")  # 仍 void,没二次处理
+        for _, _, replies in steps:
+            self.assertNotIn(none_msg, replies)
 
     def test_vague_then_field_no_forbidden(self):
         # 笼统「识别错了」→ 列字段;答「卖家」→ 问新值;给「7-11」→ 改。全程无泛化指引。

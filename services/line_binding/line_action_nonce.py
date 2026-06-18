@@ -78,7 +78,7 @@ def consume(cur, *, tenant_id, token) -> dict:
     返回 {status, action_ref, workspace_client_id, user_id}:
       ok       首次有效消费 → 携目标记录(用它,不信客户端 doc_id)
       expired  过了 TTL
-      used     已消费过(重放/双击)
+      used     已消费过(重放/双击)→ 仍携目标记录,供按真实状态重发当前卡(P1G 验收 2)
       missing  无此 token(伪造/旧卡无 token)
     并发双击靠 `UPDATE ... WHERE consumed_at IS NULL` 行锁串行化,只一次命中 RETURNING。
     """
@@ -99,7 +99,8 @@ def consume(cur, *, tenant_id, token) -> dict:
             "user_id": row["user_id"],
         }
     cur.execute(
-        "SELECT consumed_at, (expires_at <= now()) AS expired FROM line_action_nonces "
+        "SELECT consumed_at, action_ref, workspace_client_id, "
+        "(expires_at <= now()) AS expired FROM line_action_nonces "
         "WHERE token = %s AND tenant_id = %s",
         (token, tenant_id),
     )
@@ -107,5 +108,9 @@ def consume(cur, *, tenant_id, token) -> dict:
     if info is None:
         return {"status": "missing"}
     if info["consumed_at"] is not None:
-        return {"status": "used"}
+        return {
+            "status": "used",
+            "action_ref": info["action_ref"],
+            "workspace_client_id": info["workspace_client_id"],
+        }
     return {"status": "expired"}

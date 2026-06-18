@@ -407,7 +407,8 @@ def _delete_target(bound_user, reply_token, lang, tid, ws, doc_id, ctx) -> bool:
                     luid=luid,
                 )
                 return True
-            if status == "posted":
+            if status in ("posted", "void"):
+                # void_doc 幂等(已 void 直接返单)→ 重复撤销也回「已撤销」终态卡,不二次处理(验收 4)。
                 res = posting_svc.void_doc(
                     cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id, created_by=uid
                 )

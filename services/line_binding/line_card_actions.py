@@ -69,6 +69,50 @@ def send_detail_link(reply_token, text, *, doc_id, ws, lang, tid, luid, quote_to
     )
 
 
+def _send_posted(cur, reply_token, detail, *, ref, ws, lang, tid, luid) -> None:
+    """入账成功 → posted 数据卡(状态/金额/日期/卖家/记录号 + 查看详情/撤销·验收 1),并续接
+    active_doc:入账后续低风险改错(seller/date/category/payment)无需引用即命中同一张(验收 5)。"""
+    from services.line_binding import line_posted_card
+
+    card = line_posted_card.build(detail, doc_id=ref, lang=lang, workspace_client_id=ws)
+    line_reply.reply_messages_context(reply_token, [card], line_user_id=luid, tenant_id=tid)
+    try:
+        from services.expense import line_correct
+
+        line_correct._set_active(tid, ws, ref, luid, cur=cur)
+    except Exception:  # noqa: BLE001 — 续接是增益,失败不影响已发的成功卡
+        logger.warning("[line card] set active after post failed", exc_info=True)
+
+
+def _reshow_current(cur, reply_token, *, ref, ws, lang, tid, luid) -> None:
+    """重复点击/已处理 → 按单据真实状态重发当前卡(验收 2/6):posted 重发 posted 卡(不重复入账)、
+    void 回终态卡;草稿/已删 → 友好回执(不报错、不跳登录)。"""
+    from services.purchase import docs as docs_svc
+
+    detail = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=ref)
+    status = (detail.get("doc") or {}).get("status") if detail else None
+    if status == "posted":
+        _send_posted(cur, reply_token, detail, ref=ref, ws=ws, lang=lang, tid=tid, luid=luid)
+    elif status == "void":
+        _terminal_card(
+            reply_token,
+            "voided",
+            ref,
+            ws,
+            (detail.get("doc") or {}).get("grand_total"),
+            lang,
+            tid,
+            luid,
+        )
+    else:
+        line_reply.reply_text_context(
+            reply_token,
+            line_client.t_line(lang, "card_action_stale"),
+            line_user_id=luid,
+            tenant_id=tid,
+        )
+
+
 def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
     """卡按钮回调 → 全套动作分发。任何异常都回执不抛(主路径不得崩)。
 
@@ -107,7 +151,16 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
                 if res["status"] == "expired":
                     _say("card_action_expired")
                     return
-                if res["status"] != "ok":  # used(重放/双击) / missing → 已处理过
+                if res["status"] == "used":  # 重放/双击 → 按真实状态重发当前卡(验收 2),不报错
+                    ref, ws = res.get("action_ref"), res.get("workspace_client_id")
+                    if ref and ws is not None:
+                        _reshow_current(
+                            cur, reply_token, ref=ref, ws=ws, lang=lang, tid=tid, luid=luid
+                        )
+                    else:
+                        _say("card_action_stale")
+                    return
+                if res["status"] != "ok":  # missing(伪造/旧卡无此 token)
                     _say("card_action_stale")
                     return
                 ref = res["action_ref"]
@@ -120,15 +173,26 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
             scope = {"tenant_id": tid, "workspace_client_id": ws}
 
             if action == line_postback.ACTION_CONFIRM:
+                from core.pos_api import PosError
+
                 cfg = settings_svc.get_settings(cur, **scope)
-                res = posting_svc.post_doc(
-                    cur,
-                    **scope,
-                    doc_id=ref,
-                    auto_stock_in=bool(cfg.get("auto_stock_in")),
-                    created_by=uid,
-                )
-                _say("card_confirmed", res.get("doc"))
+                try:
+                    res = posting_svc.post_doc(
+                        cur,
+                        **scope,
+                        doc_id=ref,
+                        auto_stock_in=bool(cfg.get("auto_stock_in")),
+                        created_by=uid,
+                    )
+                except PosError as e:
+                    # 重复点击(单已非草稿)→ 重发当前状态卡,不重复入账/不报错/不跳登录(验收 2)。
+                    if (e.code or "") == "purchase.not_draft":
+                        _reshow_current(
+                            cur, reply_token, ref=ref, ws=ws, lang=lang, tid=tid, luid=luid
+                        )
+                        return
+                    raise
+                _send_posted(cur, reply_token, res, ref=ref, ws=ws, lang=lang, tid=tid, luid=luid)
 
             elif action == line_postback.ACTION_UNDO:
                 res = posting_svc.void_doc(cur, **scope, doc_id=ref, created_by=uid)

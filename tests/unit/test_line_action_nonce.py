@@ -41,7 +41,12 @@ class FakeNonceCursor:
             token, tid = params
             r = self.rows.get(token)
             self._ret = (
-                {"consumed_at": (1 if r["consumed"] else None), "expired": r["expired"]}
+                {
+                    "consumed_at": (1 if r["consumed"] else None),
+                    "action_ref": r["action_ref"],
+                    "workspace_client_id": r["workspace_client_id"],
+                    "expired": r["expired"],
+                }
                 if r and r["tenant_id"] == str(tid)
                 else None
             )
@@ -82,7 +87,11 @@ class ConsumeTests(unittest.TestCase):
         cur = FakeNonceCursor()
         tok = self._mint(cur)
         self.assertEqual(nonce.consume(cur, tenant_id="t", token=tok)["status"], "ok")
-        self.assertEqual(nonce.consume(cur, tenant_id="t", token=tok)["status"], "used")
+        replay = nonce.consume(cur, tenant_id="t", token=tok)
+        self.assertEqual(replay["status"], "used")
+        # 重放仍携目标记录 → 据此按真实状态重发当前卡(P1G 验收 2)。
+        self.assertEqual(replay["action_ref"], "D9")
+        self.assertEqual(replay["workspace_client_id"], 7)
 
     def test_expired_token(self):
         cur = FakeNonceCursor()

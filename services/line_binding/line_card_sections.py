@@ -109,9 +109,9 @@ def missing_taxid(fields: dict) -> bool:
     seller_tax 已经 field_clean 清洗:invalid(短数字/日期片段)早成空 → 这里只看真有没有合法税号。"""
     if str(fields.get("seller_tax") or "").strip():
         return False
-    vat = str(fields.get("vat") or "").replace(",", "").strip().strip("0").rstrip(".")
+    vat_nonzero = bool(str(fields.get("vat") or "").replace(",", "").strip(" 0."))  # 剥空白/0/小数点
     dt = str(fields.get("document_type") or "").lower()
-    return bool(vat) or ("tax" in dt or "ภาษี" in dt or "กำกับ" in dt)
+    return vat_nonzero or "tax" in dt or "ภาษี" in dt or "กำกับ" in dt
 
 
 def notices(fields: dict, warn_total: bool, t: dict) -> list:

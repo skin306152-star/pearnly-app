@@ -88,19 +88,6 @@ def clean_invoice_no(raw) -> str:
     return s
 
 
-def clean_supplier_display(supplier: dict | None) -> dict | None:
-    """详情页/卡片展示用:清洗 supplier 的 name/tax_id(invalid → None,不展示假值)。
-
-    原值留在 DB(供调试/编辑补全)·仅清洗对外展示副本。supplier 为 None 原样返回。
-    """
-    if not supplier:
-        return supplier
-    out = dict(supplier)
-    out["tax_id"] = clean_tax_id(out.get("tax_id")) or None
-    out["name"] = clean_seller(out.get("name")) or None
-    return out
-
-
 def serialize_supplier(doc: dict) -> dict | None:
     """get_doc 用:从 doc 行抽 supplier(清洗税号/卖家)+ **同步清洗 doc 的扁平字段**。
 

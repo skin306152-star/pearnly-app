@@ -47,16 +47,6 @@ class CleanInvoiceTests(unittest.TestCase):
         self.assertEqual(fc.clean_invoice_no("13/06/26"), "")
 
 
-class SupplierDisplayTests(unittest.TestCase):
-    def test_bangchak_taxid_13_blanked_seller_kept(self):  # 样例 5:Bangchak 票 tax_id 不显 13
-        out = fc.clean_supplier_display({"name": "Bangchak", "tax_id": "13"})
-        self.assertIsNone(out["tax_id"])
-        self.assertEqual(out["name"], "Bangchak")
-
-    def test_none_passthrough(self):
-        self.assertIsNone(fc.clean_supplier_display(None))
-
-
 class OcrCorrectionsTaxIdTests(unittest.TestCase):
     """ingestion bug:invalid tax 旧实现不覆盖 → 「13」残留进库(详情页显 13)。修后应清空。"""
 

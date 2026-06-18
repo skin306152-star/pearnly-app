@@ -252,19 +252,9 @@ def get_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> Optional[dict]:
     doc = cur.fetchone()
     if doc is None:
         return None
-    supplier = field_clean.clean_supplier_display(  # P1F:异常税号/卖家不展示假值(详情页同卡片·原值留库)
-        {
-            "id": doc["supplier_id"],
-            "name": doc.get("supplier_name"),
-            "tax_id": doc.get("supplier_tax_id"),
-            "branch_type": doc.get("supplier_branch_type"),
-            "branch_no": doc.get("supplier_branch_no"),
-            "address": doc.get("supplier_address"),
-            "phone": doc.get("supplier_phone"),
-        }
-        if doc.get("supplier_id")
-        else None
-    )
+    # P1F:抽 supplier 并清洗税号/卖家(嵌套 + doc 扁平字段都清·详情页/编辑表单/卡片共用同一套 cleaned·
+    # 异常值「13」/日期片段/纯金额 → None·前端显「—」/留空待补·原值仍在 suppliers 表)。
+    supplier = field_clean.serialize_supplier(doc)
     cur.execute(
         f"SELECT {_LINE_COLS} FROM purchase_lines "
         "WHERE tenant_id = %s AND purchase_doc_id = %s ORDER BY line_no",

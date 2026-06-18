@@ -94,5 +94,53 @@ class AmountEditPreservesFieldsTests(unittest.TestCase):
         self.assertEqual(data["lines"][0]["unit_price"], "1500")  # 金额改了
 
 
+class DetailApiSmokeTests(unittest.TestCase):
+    """detail API(get_doc)冒烟:嵌套 supplier 与 doc 扁平字段都不得带 invalid 税号(编辑表单读扁平)。"""
+
+    class _Cur:
+        def __init__(self, row):
+            self.row = row
+
+        def execute(self, *a, **k):
+            pass
+
+        def fetchone(self):
+            return self.row
+
+        def fetchall(self):
+            return []
+
+    def _get(self, raw_tax):
+        from services.purchase import docs as docs_svc
+
+        row = {
+            "id": "D1",
+            "supplier_id": 5,
+            "supplier_tax_id": raw_tax,
+            "supplier_name": "Bangchak",
+            "supplier_branch_type": None,
+            "supplier_branch_no": None,
+            "supplier_address": None,
+            "supplier_phone": None,
+        }
+        return docs_svc.get_doc(self._Cur(row), tenant_id="t", workspace_client_id=1, doc_id="D1")
+
+    def test_invalid_tax_13_cleared_both_representations(self):  # Bangchak fixture
+        res = self._get("13")
+        self.assertIsNone(res["supplier"]["tax_id"])  # 嵌套
+        self.assertIsNone(res["doc"]["supplier_tax_id"])  # 扁平(编辑表单 initial state 读这个)
+        self.assertEqual(res["supplier"]["name"], "Bangchak")  # 卖家保留
+
+    def test_date_fragment_tax_cleared(self):
+        res = self._get("13/06/26")
+        self.assertIsNone(res["supplier"]["tax_id"])
+        self.assertIsNone(res["doc"]["supplier_tax_id"])
+
+    def test_valid_tax_preserved_both(self):
+        res = self._get("0107561000013")
+        self.assertEqual(res["supplier"]["tax_id"], "0107561000013")
+        self.assertEqual(res["doc"]["supplier_tax_id"], "0107561000013")
+
+
 if __name__ == "__main__":
     unittest.main()

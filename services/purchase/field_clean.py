@@ -99,3 +99,27 @@ def clean_supplier_display(supplier: dict | None) -> dict | None:
     out["tax_id"] = clean_tax_id(out.get("tax_id")) or None
     out["name"] = clean_seller(out.get("name")) or None
     return out
+
+
+def serialize_supplier(doc: dict) -> dict | None:
+    """get_doc 用:从 doc 行抽 supplier(清洗税号/卖家)+ **同步清洗 doc 的扁平字段**。
+
+    详情页/编辑表单(purchase-common.ts)优先读扁平 doc.supplier_tax_id/supplier_name(嵌套
+    supplier 是 doc 的兄弟节点·前端取 doc.supplier 取不到)→ 必须把扁平字段也清,否则编辑页仍显「13」。
+    无 supplier_id → None。会就地改 doc 的两个扁平字段(同一份 cleaned 供卡片/详情/保存共用)。
+    """
+    if not doc.get("supplier_id"):
+        return None
+    tax = clean_tax_id(doc.get("supplier_tax_id")) or None
+    name = clean_seller(doc.get("supplier_name")) or None
+    doc["supplier_tax_id"] = tax
+    doc["supplier_name"] = name
+    return {
+        "id": doc["supplier_id"],
+        "name": name,
+        "tax_id": tax,
+        "branch_type": doc.get("supplier_branch_type"),
+        "branch_no": doc.get("supplier_branch_no"),
+        "address": doc.get("supplier_address"),
+        "phone": doc.get("supplier_phone"),
+    }

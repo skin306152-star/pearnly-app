@@ -40,26 +40,27 @@ DETAIL_INCOMPLETE = {
 }
 
 
-# 草稿原地改(非冲销重记)的确认/结果文案——草稿未入账,不说「冲销原单」(那是 posted 更正才有)。
-CONFIRM_DRAFT = {
-    "zh": "把这张草稿金额从 ฿{old} 改成 ฿{new} 吗?回复「是」确认。",
-    "th": "แก้ยอดฉบับร่างนี้จาก ฿{old} เป็น ฿{new} ไหมคะ? ตอบ 'ใช่' เพื่อยืนยันค่ะ",
-    "en": "Change this draft's amount from ฿{old} to ฿{new}? Reply 'yes' to confirm.",
-    "ja": "この下書きの金額を ฿{old} から ฿{new} に変更しますか?「はい」で確定。",
-}
-
-CONFIRM_DRAFT_FIELDS = {
-    "zh": "把这张草稿改成 {changes} 吗?回复「是」确认。",
-    "th": "แก้ฉบับร่างนี้เป็น {changes} ไหมคะ? ตอบ 'ใช่' เพื่อยืนยันค่ะ",
-    "en": "Change this draft to {changes}? Reply 'yes' to confirm.",
-    "ja": "この下書きを {changes} に変更しますか?「はい」で確定。",
-}
-
 DRAFT_EDITED = {
     "zh": "已更新草稿:฿{new},待你确认入账。",
     "th": "อัปเดตฉบับร่างแล้วค่ะ: ฿{new} รอคุณยืนยันบันทึก",
     "en": "Draft updated: ฿{new}, awaiting your confirmation to record.",
     "ja": "下書きを更新しました:฿{new}、記帳の確認待ちです。",
+}
+
+# 低风险直接执行后的完成回执(草稿改 date/seller/category):保留卡片查看/撤销入口。
+CHANGED_DONE = {
+    "zh": "已将{field}改为 {new}。可在上方卡片查看或撤销。",
+    "th": "เปลี่ยน{field}เป็น {new} เรียบร้อยแล้วค่ะ ดูหรือยกเลิกได้ที่การ์ดด้านบน",
+    "en": "{field} changed to {new}. You can view or undo on the card above.",
+    "ja": "{field}を {new} に変更しました。上のカードで確認・取り消しできます。",
+}
+
+# 多字段一并改的确认(高风险走确认时·罕见):「把这笔改成 {changes} 吗?」。
+CONFIRM_MULTI = {
+    "zh": "把这笔改成 {changes} 吗?回复「是」确认。",
+    "th": "แก้รายการนี้เป็น {changes} ใช่ไหมคะ? ตอบ 'ใช่' เพื่อยืนยันค่ะ",
+    "en": "Change this entry to {changes}? Reply 'yes' to confirm.",
+    "ja": "この記録を {changes} に変更しますか?「はい」で確定。",
 }
 
 
@@ -82,6 +83,19 @@ CONFIRM_FIELD_CHANGE = {
 
 def field_label(field: str, lang: str) -> str:
     return FIELD_LABELS.get(field, {}).get(lang) or FIELD_LABELS.get(field, {}).get("zh", field)
+
+
+# 规范键(_apply_changes / changes dict 用)→ 字段标签语言。
+_KEY_TO_FIELD = {
+    "amount": "amount",
+    "vendor_name": "seller",
+    "doc_date": "date",
+    "category": "category",
+}
+
+
+def key_label(key: str, lang: str) -> str:
+    return field_label(_KEY_TO_FIELD.get(key, key), lang)
 
 
 def t(pool: dict, lang: str, **kw) -> str:

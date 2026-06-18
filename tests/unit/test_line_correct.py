@@ -233,21 +233,20 @@ class ApplyTests(unittest.TestCase):
 
 
 class RequestCorrectTests(unittest.TestCase):
-    """给定 resolver 的目标定位结果,验 request_correct 的规则(resolver 本身在 refs 测试里单独测)。"""
+    """request_correct:收集改动 + 定位目标 → 委托 _apply_or_confirm(风险三档在 ApplyOrConfirmTests 单测)。"""
 
-    def _run(self, u, detail, tgt, *, quoted_message_id=None, text="改"):
+    def _run(self, u, tgt, *, quoted_message_id=None, text="改"):
         from services.line_binding import line_message_refs
-        from services.purchase import docs as docs_svc
 
-        replies, saved = [], {}
+        replies, captured = [], {}
         with (
             mock.patch.object(line_correct.db, "get_cursor_rls", return_value=_Ctx(object())),
             mock.patch.object(line_message_refs, "resolve_target", return_value=tgt),
-            mock.patch.object(docs_svc, "get_doc", return_value=detail),
             mock.patch.object(
-                line_correct.conversation,
-                "save_pending",
-                side_effect=lambda *a, **k: saved.update(k),
+                line_correct,
+                "_apply_or_confirm",
+                side_effect=lambda *a, **k: captured.update(ws=a[4], doc_id=a[5], changes=a[6])
+                or True,
             ),
             mock.patch.object(
                 line_correct.line_reply,
@@ -261,73 +260,105 @@ class RequestCorrectTests(unittest.TestCase):
             line_correct.request_correct(
                 {"id": "u"}, "tok", "U1", text, u, quoted_message_id, "zh", "t", 1
             )
-        return replies, saved
+        return replies, captured
 
     _OK = {"doc_id": "D1", "ws": 1, "how": "last", "error": None}
 
     def test_no_changes_guides_reply(self):
-        replies, _ = self._run({}, {"doc": {"status": "posted"}, "lines": []}, self._OK)
+        replies, cap = self._run({}, self._OK)
         self.assertEqual(replies, ["line_need_reply_record"])
+        self.assertEqual(cap, {})  # 没抽出改动 → 不委托执行
 
     def test_ambiguous_prompts_reply(self):
-        replies, _ = self._run(
-            {"amount": 500}, None, {"doc_id": None, "ws": 1, "error": "ambiguous"}
-        )
+        replies, _ = self._run({"amount": 500}, {"doc_id": None, "ws": 1, "error": "ambiguous"})
         self.assertEqual(replies, ["line_need_reply_record"])
 
     def test_ref_not_found_guides_detail_list(self):
-        replies, _ = self._run(
-            {"amount": 500}, None, {"doc_id": None, "ws": 1, "error": "ref_not_found"}
-        )
+        replies, _ = self._run({"amount": 500}, {"doc_id": None, "ws": 1, "error": "ref_not_found"})
         self.assertEqual(replies, ["guide_detail_list"])
 
-    def test_multiline_amount_guides_detail_page(self):
-        detail = {"doc": {"status": "posted", "grand_total": Decimal("100")}, "lines": [{}, {}]}
-        replies, _ = self._run({"amount": 500}, detail, self._OK)
-        self.assertEqual(len(replies), 1)
-        self.assertIn("明细", replies[0])  # MULTILINE_EDIT(说明原因·非泛泛 line_web_handoff)
-
-    def test_single_line_amount_saves_with_ws_and_confirms(self):
-        detail = {"doc": {"status": "posted", "grand_total": Decimal("100")}, "lines": [{}]}
-        replies, saved = self._run(
-            {"amount": 550}, detail, {"doc_id": "D1", "ws": 7, "how": "last", "error": None}
+    def test_resolved_delegates_with_changes_and_ws(self):
+        _, cap = self._run(
+            {"vendor_name": "7-11"}, {"doc_id": "D9", "ws": 3, "how": "quoted", "error": None}
         )
-        self.assertEqual(saved["missing"], "correct:7:D1:amount")  # ws 编进 missing
-        self.assertEqual(replies, ["exp_correct_confirm"])
+        self.assertEqual((cap["ws"], cap["doc_id"]), (3, "D9"))
+        self.assertEqual(cap["changes"], {"vendor_name": "7-11"})
 
-    def test_draft_single_amount_saves_and_confirms(self):
-        # 草稿(confirm 卡)也能改:存待确认 + 出草稿专用确认文案(不说「冲销原单」)·不再回「没有已入账」。
-        detail = {"doc": {"status": "draft", "grand_total": Decimal("190")}, "lines": [{}]}
-        replies, saved = self._run(
-            {"amount": 200},
-            detail,
-            {"doc_id": "D1", "ws": 1, "how": "quoted", "error": None},
-            quoted_message_id="m1",
-        )
+
+class ApplyOrConfirmTests(unittest.TestCase):
+    """改错执行三档:草稿单非金额→直接改;已入账/金额/多字段→确认;多行金额→详情页。"""
+
+    def _run(self, changes, detail):
+        from services.purchase import docs as docs_svc
+
+        replies, saved, applied = [], {}, []
+        with (
+            mock.patch.object(line_correct.db, "get_cursor_rls", return_value=_Ctx(object())),
+            mock.patch.object(docs_svc, "get_doc", return_value=detail),
+            mock.patch.object(
+                line_correct.conversation,
+                "save_pending",
+                side_effect=lambda *a, **k: saved.update(k),
+            ),
+            mock.patch.object(line_correct.conversation, "clear_pending"),
+            mock.patch.object(
+                line_correct,
+                "_apply",
+                side_effect=lambda *a, **k: applied.append(a)
+                or {
+                    "new_id": "D1",
+                    "posted": False,
+                    "total": Decimal("1"),
+                    "mode": "draft_inplace",
+                },
+            ),
+            mock.patch.object(
+                line_correct.line_reply,
+                "reply_text_context",
+                side_effect=lambda tok, msg, **k: replies.append(msg) or True,
+            ),
+            mock.patch.object(
+                line_correct.line_client, "t_line", side_effect=lambda lang, key, **k: key
+            ),
+        ):
+            line_correct._apply_or_confirm(
+                "tok", {"id": "u"}, "zh", "t", 1, "D1", changes, line_user_id="U1"
+            )
+        return replies, saved, applied
+
+    def test_draft_single_nonamount_executes_directly(self):
+        # 低风险:草稿改卖家 → 直接执行 + 完成回执,不存确认 pending。
+        detail = {"doc": {"status": "draft"}, "supplier": {"name": "711"}, "lines": [{}]}
+        replies, saved, applied = self._run({"vendor_name": "7-11"}, detail)
+        self.assertEqual(len(applied), 1)  # 直接改
+        self.assertEqual(saved, {})  # 不存确认态
+        self.assertIn("7-11", replies[0])  # 完成回执(CHANGED_DONE)
+
+    def test_posted_nonamount_confirms(self):
+        # 高风险:已入账 → 确认(不直接改)。
+        detail = {"doc": {"status": "posted"}, "supplier": {"name": "711"}, "lines": [{}]}
+        replies, saved, applied = self._run({"vendor_name": "7-11"}, detail)
+        self.assertEqual(applied, [])  # 不直接改
+        self.assertEqual(saved["missing"], "correct:1:D1:vendor_name")
+        self.assertIn("7-11", replies[0])  # 确认含新值
+
+    def test_draft_amount_confirms(self):
+        # 高风险:改金额(税额重算)→ 即便草稿也确认。
+        detail = {"doc": {"status": "draft", "grand_total": "190"}, "lines": [{}]}
+        replies, saved, applied = self._run({"amount": Decimal("200")}, detail)
+        self.assertEqual(applied, [])
         self.assertEqual(saved["missing"], "correct:1:D1:amount")
-        self.assertEqual(len(replies), 1)
-        self.assertNotIn("exp_correct_none", replies[0])  # 草稿不再退「没有已入账记录」
-        self.assertIn("草稿", replies[0])  # 草稿专用确认措辞
 
-    def test_draft_multiline_amount_guides_detail_page(self):
-        detail = {"doc": {"status": "draft", "grand_total": Decimal("190")}, "lines": [{}, {}]}
-        replies, _ = self._run(
-            {"amount": 100}, detail, {"doc_id": "D1", "ws": 1, "how": "quoted", "error": None}
-        )
-        self.assertEqual(len(replies), 1)
+    def test_amount_multiline_guides_detail(self):
+        detail = {"doc": {"status": "draft"}, "lines": [{}, {}]}
+        replies, saved, applied = self._run({"amount": Decimal("110")}, detail)
+        self.assertEqual((applied, saved), ([], {}))
         self.assertIn("明细", replies[0])  # MULTILINE_EDIT
 
-    def test_quoted_vendor_change_on_multiline_ok(self):
-        # 多行票也能改整单字段(卖家),只是金额不行。
-        detail = {"doc": {"status": "posted", "grand_total": Decimal("100")}, "lines": [{}, {}]}
-        replies, saved = self._run(
-            {"vendor_name": "7-11"},
-            detail,
-            {"doc_id": "D9", "ws": 3, "how": "quoted", "error": None},
-            quoted_message_id="m1",
-        )
-        self.assertEqual(saved["missing"], "correct:3:D9:vendor_name")
-        self.assertEqual(replies, ["exp_correct_confirm2"])
+    def test_void_target_honest(self):
+        replies, saved, applied = self._run({"vendor_name": "x"}, {"doc": {"status": "void"}})
+        self.assertEqual((applied, saved), ([], {}))
+        self.assertEqual(replies, ["exp_correct_none"])
 
 
 class MaybeClarifyFeedbackTests(unittest.TestCase):

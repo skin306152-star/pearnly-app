@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 """LINE 对话内改错(改错闭环 · P1E-2 · 绝不静默覆盖)。
 
-支持:改金额(仅单行票)/ 改卖家 / 改日期 / 改科目;定位优先级 引用卡片(quote)> 第 N 笔 > 明确
-「上一笔」(绝不默认改最近一笔)。目标 = 草稿(confirm 卡)或已入账单:
-  草稿 → 原地 update_draft(不冲销·仍是草稿待卡片确认)
-  已入账 → correct_doc(void 原单 + DB 级照搬克隆,多行/总额/票图/已结期红冲全保留)→ 改 → auto_book 过账
-两轮确认复用 conversation.pending(missing=correct:<ws>:<id>:<keys>),不新建表。
-maybe_clarify_feedback:笼统「识别错了/不对/wrong/ผิด」或引用卡片点名字段 → 澄清/问新值/引导详情页,
-绝不退化成 OCR 失败帮助。金额/总额/过账永不信 LLM;多行金额不在 LINE 猜行 → 引导网页逐行确认。
+定位 引用卡片 > 第 N 笔 > 「上一笔」(绝不默认改最近一笔)。执行三档(_apply_or_confirm):草稿单非金额
+字段直接改;已入账/改金额/多字段确认;多行金额引导详情页。_apply:草稿原地 update_draft、已入账
+correct_doc(void+克隆,多行/票图/已结期红冲全保留)。会话态复用 conversation.pending,不新建表。
+金额/税额/过账永不信 LLM。maybe_clarify_feedback:笼统「识别错了/ผิด」或引用点名字段 → 澄清/问新值,
+绝不退化成 OCR 失败帮助。多轮态机在 line_correct_flow。
 """
 
 from __future__ import annotations
@@ -25,8 +23,7 @@ _PREFIX = "correct:"  # 待 是/否 确认(最终)
 _CLAR_PREFIX = "correctclar:"  # 待用户选「改哪个字段」(多轮·correctclar:<ws>:<doc>)
 _VAL_PREFIX = "correctval:"  # 待用户给「新值」(多轮·correctval:<ws>:<doc>:<field>)
 _YES = ("是", "对", "好", "确认", "ok", "yes", "ใช่", "ตกลง", "ถูก", "確認", "はい")
-# 否定词优先于肯定:治子串塌缩——泰文「ไม่ใช่(不是)」含「ใช่(是)」、中文「不对」含「对」、
-# 「不是」含「是」。漏了这条会把用户的「不」当成「是」照改账(真实事故:用户回 ไม่ใช่ 仍被改)。
+# 否定词优先于肯定:治子串塌缩(「ไม่ใช่」含「ใช่」、「不对」含「对」)→ 否则把「不」当「是」照改账。
 _NO = (
     "不",
     "别",
@@ -53,10 +50,7 @@ def _affirmative(text: str) -> bool:
 
 
 def _collect_changes(u: dict) -> dict:
-    """大脑槽位 → 要改的字段(canonical)。amount/vendor_name/doc_date/category(科目依据=note)。
-
-    科目只在「无金额/卖家/日期」时才从 note 取(「改成水电费」),避免把卖家/物品名误当科目。
-    """
+    """大脑槽位 → 要改字段(canonical)。科目只在无金额/卖家/日期时才从 note 取(避免误当科目)。"""
     changes: dict = {}
     amt = u.get("amount")
     if amt not in (None, "", 0):
@@ -100,6 +94,92 @@ _ERR_KEY = {
 }
 
 
+def _clear(tid, line_user_id) -> None:  # 清改错会话态(终态/直接执行前)
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        conversation.clear_pending(cur, line_user_id=line_user_id)
+
+
+def _field_old(detail: dict, key: str) -> str:
+    """单字段旧值(确认文案「从 旧 改成 新」用)。取不到 → —。"""
+    doc = detail.get("doc") or {}
+    sup = detail.get("supplier") or {}
+    val = {
+        "amount": doc.get("grand_total"),
+        "vendor_name": sup.get("name"),
+        "doc_date": doc.get("doc_date"),
+        "category": doc.get("category_name") or doc.get("category"),
+    }.get(key)
+    return str(val) if val not in (None, "") else "—"
+
+
+def _apply_or_confirm(
+    reply_token, bound_user, lang, tid, ws, doc_id, changes, *, quote_token="", line_user_id
+) -> bool:
+    """改错执行三档(产品原则):低风险(草稿 + 单个非金额字段)直接改回完成;高风险(已入账/改金额[税额
+    重算]/多字段)出确认;多行金额 → 详情页。作废/不存在 → 诚实兜底。changes = 规范键 dict。"""
+    from services.expense import line_correct_i18n as ci
+    from services.purchase import docs as docs_svc
+
+    def _say(body):
+        line_reply.reply_text_context(
+            reply_token, body, quote_token=quote_token, line_user_id=line_user_id, tenant_id=tid
+        )
+
+    with db.get_cursor_rls(tid) as cur:
+        detail = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)
+    status = (detail.get("doc") or {}).get("status") if detail else None
+    if status not in ("posted", "draft"):
+        _clear(tid, line_user_id)
+        _say(line_client.t_line(lang, "exp_correct_none"))
+        return True
+    if "amount" in changes and len(detail.get("lines") or []) > 1:
+        _clear(tid, line_user_id)
+        _say(ci.t(ci.MULTILINE_EDIT, lang))
+        return True
+    changes_draft = ExpenseDraft(
+        amount=changes.get("amount"),
+        vendor_name=changes.get("vendor_name") or "",
+        doc_date=changes.get("doc_date") or "",
+        note=changes.get("category") or "",
+    )
+    keys = sorted(changes)
+    # 高风险=已入账(void重建)/改金额(税额重算)/多字段;草稿单非金额=低风险直接改。
+    high_risk = status == "posted" or "amount" in changes or len(changes) > 1
+    if not high_risk:  # 低风险:直接执行,不二次确认
+        with db.get_cursor_rls(tid, commit=True) as cur:
+            conversation.clear_pending(cur, line_user_id=line_user_id)
+            res = _apply(cur, bound_user, tid, ws, doc_id, changes_draft, keys)
+        if not res:
+            _say(line_client.t_line(lang, "exp_correct_none"))
+            return True
+        k = keys[0]
+        _say(ci.t(ci.CHANGED_DONE, lang, field=ci.key_label(k, lang), new=changes[k]))
+        return True
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        conversation.save_pending(
+            cur,
+            line_user_id=line_user_id,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            draft=changes_draft,
+            missing=f"{_PREFIX}{ws}:{doc_id}:{'|'.join(keys)}",
+        )
+    if len(changes) == 1:
+        k = keys[0]
+        _say(
+            ci.t(
+                ci.CONFIRM_FIELD_CHANGE,
+                lang,
+                field=ci.key_label(k, lang),
+                old=_field_old(detail, k),
+                new=changes[k],
+            )
+        )
+    else:
+        _say(ci.t(ci.CONFIRM_MULTI, lang, changes=_summary(changes)))
+    return True
+
+
 def request_correct(
     bound_user,
     reply_token,
@@ -113,13 +193,9 @@ def request_correct(
     *,
     quote_token="",
 ) -> bool:
-    """edit 意图 → 收集改动 + 定位目标(引用>第N笔>明确上一笔)+ 单/多行规则 → 存待确认 + 回确认。
-
-    确认/失败/引导回复引用用户触发改错的那条消息(quoteToken·展示);业务定位仍走 quotedMessageId。
-    """
-    from services.expense import line_correct_i18n as ci
+    """edit 意图(一次说清「X改成Y」)→ 收集改动 + 定位目标 → 委托 _apply_or_confirm(风险三档)。
+    定位失败 → 提示 reply(绝不默认改最近一笔)。"""
     from services.line_binding import line_message_refs
-    from services.purchase import docs as docs_svc
 
     def _say(body):
         line_reply.reply_text_context(
@@ -130,8 +206,7 @@ def request_correct(
     if not changes:
         _say(line_client.t_line(lang, "line_need_reply_record"))
         return True
-
-    with db.get_cursor_rls(tid, commit=True) as cur:
+    with db.get_cursor_rls(tid) as cur:
         tgt = line_message_refs.resolve_target(
             cur,
             tenant_id=tid,
@@ -140,68 +215,27 @@ def request_correct(
             quoted_message_id=quoted_message_id,
             text=text,
         )
-        if tgt["error"]:
-            _say(line_client.t_line(lang, _ERR_KEY[tgt["error"]]))
-            return True
-        target_id, ws_eff = tgt["doc_id"], tgt["ws"]
-        detail = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws_eff, doc_id=target_id)
-        status = (detail.get("doc") or {}).get("status") if detail else None
-        # 草稿 与 已入账 都可改(草稿原地改·已入账冲销重记);作废/不存在 → 诚实兜底。
-        if status not in ("posted", "draft"):
-            _say(line_client.t_line(lang, "exp_correct_none"))
-            return True
-        if "amount" in changes and len(detail.get("lines") or []) > 1:
-            # 多行/明细金额:不在 LINE 猜哪一行 → 引导详情页逐行核对(说明原因·验收 #4)。
-            _say(ci.t(ci.MULTILINE_EDIT, lang))
-            return True
-        changes_draft = ExpenseDraft(
-            amount=changes.get("amount"),
-            vendor_name=changes.get("vendor_name") or "",
-            doc_date=changes.get("doc_date") or "",
-            note=changes.get("category") or "",
-        )
-        conversation.save_pending(
-            cur,
-            line_user_id=line_user_id,
-            tenant_id=tid,
-            workspace_client_id=ws_eff,
-            draft=changes_draft,
-            missing=f"{_PREFIX}{ws_eff}:{target_id}:{'|'.join(sorted(changes))}",
-        )
-        old_total = (detail.get("doc") or {}).get("grand_total")
-    # 确认文案按目标状态选:草稿用「改这张草稿」(不提冲销),已入账用既有「冲销重记」措辞。
-    is_draft = status == "draft"
-    if set(changes) == {"amount"}:
-        if is_draft:
-            _say(ci.t(ci.CONFIRM_DRAFT, lang, old=old_total, new=changes["amount"]))
-        else:
-            _say(
-                line_client.t_line(
-                    lang, "exp_correct_confirm", old=old_total, new=changes["amount"]
-                )
-            )
-    else:
-        pool = ci.CONFIRM_DRAFT_FIELDS if is_draft else None
-        if pool:
-            _say(ci.t(pool, lang, changes=_summary(changes)))
-        else:
-            _say(line_client.t_line(lang, "exp_correct_confirm2", changes=_summary(changes)))
-    return True
+    if tgt["error"]:
+        _say(line_client.t_line(lang, _ERR_KEY[tgt["error"]]))
+        return True
+    return _apply_or_confirm(
+        reply_token,
+        bound_user,
+        lang,
+        tid,
+        tgt["ws"],
+        tgt["doc_id"],
+        changes,
+        quote_token=quote_token,
+        line_user_id=line_user_id,
+    )
 
 
 def maybe_clarify_feedback(reply_token, text, lang, ws, quoted_message_id, ctx) -> bool:
-    """采购改错澄清(P1E-2)= 命中「识别错了/不对/wrong/ผิด」且非具体「改成X」→ 本层接管,绝不当
-    OCR 失败让重拍。优先级高于通用闲聊 / OCR 失败帮助 / 能力问答。按情形回(语言随输入):
-
-      引用解析到采购单 + 点名「明细」或复杂多行金额 → 引导详情页核对(验收 #4)
-      引用解析到采购单 + 点名「付款方式」→ 详情页改(LINE 不改付款)
-      引用解析到采购单 + 点名金额/日期/卖家/分类 → 问新值(验收 #3)
-      引用解析到采购单 + 没点名字段 → 列可改字段问改哪里(验收 #1)
-      没解析到记录 → 引导回复要改的那条记录(验收 #5);仅当无引用且像新记账(有金额)才放行记账流。
-
-    具体「改成X」交 edit 流(request_correct)·此处只澄清不改账。ctx 带 quote_token/line_user_id/
-    tenant_id → 所有回复带引用,让用户知道在回应哪条。
-    """
+    """采购改错澄清入口 = 命中「识别错了/ผิด」或引用卡片点名字段 → 本层接管,绝不退化成 OCR 失败重拍
+    (优先级高于闲聊/OCR 帮助/能力问答)。点名字段 → 问新值并存会话态(correctval);笼统 → 列字段问改哪里
+    并存 correctclar(下一句由 line_correct_flow 续接);明细/付款 → 详情页;没解析到记录 → 引导回复那条。
+    具体「改成X」(is_edit)交 request_correct。ctx 带 quote_token/line_user_id/tenant_id(回复带引用)。"""
     from services.expense import line_classify
     from services.expense import line_correct_i18n as ci
     from services.expense import line_quick_entry as lqe
@@ -280,9 +314,7 @@ def _save_state(tid, ws, doc_id, line_user_id, missing: str) -> None:
 def try_confirm(
     bound_user, reply_token, line_user_id, text, tid, ws, lang, *, quote_token=""
 ) -> bool:
-    """有待确认更正 + 这句肯定 → 执行;否定/其他 → 取消。非更正 pending → False(不干预补金额流)。
-
-    回复引用用户确认/否定的那条消息(quoteToken)。"""
+    """有待确认更正(correct:)+ 这句肯定 → 执行;否定 → 取消。非更正 pending → False。回复带引用。"""
     from core.pos_api import PosError
 
     def _say(body):
@@ -325,8 +357,7 @@ def try_confirm(
 
 
 def _parse_missing(missing: str):
-    """correct:<ws>:<doc_id>:<keys> → (ws:int, doc_id, [keys])。ws 编码进 missing,确认时按目标
-    单所在套账操作(支持引用跨套账的旧单)。"""
+    """correct:<ws>:<doc_id>:<keys> → (ws:int, doc_id, [keys])。ws 编码进 missing 支持跨套账旧单。"""
     body = str(missing)[len(_PREFIX) :]
     ws_s, _, rest = body.partition(":")
     orig_id, _, keys = rest.partition(":")
@@ -338,11 +369,8 @@ def _parse_missing(missing: str):
 
 
 def _apply(cur, bound_user, tid, ws, orig_id, changes_draft, keys) -> Optional[dict]:
-    """应用改动。已入账 → 冲销原单 + 忠实克隆草稿 + 改 + auto_book 过账;草稿 → 原地改(不冲销)。
-
-    返回 {new_id, posted, total, mode}(mode=posted_reclone|draft_inplace,供回执选措辞)。
-    目标作废/不存在 → None(诚实)。
-    """
+    """应用改动:已入账 → void 原单 + 克隆草稿 + 改 + auto_book 过账;草稿 → 原地改(不冲销)。
+    返回 {new_id, posted, total, mode}(mode 供回执选措辞);作废/不存在 → None。"""
     from services.purchase import correct as correct_svc
     from services.purchase import docs as docs_svc
     from services.purchase import posting as posting_svc

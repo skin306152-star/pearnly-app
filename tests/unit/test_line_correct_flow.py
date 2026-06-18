@@ -80,37 +80,61 @@ class ClarifyAnswerTests(_FlowBase):
         self.assertEqual(saved, {})  # 没听出字段 → 不进 correctval,重问
 
 
-class ValueAnswerTests(_FlowBase):
-    def test_seller_value_with_fullwidth_colon_confirms(self):
-        # 验收 #5:已问新卖家 → 用户「แก้ร้านค้าเป็น:7-11」(全角冒号已归一)→ 存 correct: + 出确认。
-        sent, saved = [], {}
-        pend = {"missing": "correctval:1:D1:seller"}
-        detail = {"doc": {"grand_total": "150"}, "supplier": {"name": "711"}, "lines": [{}]}
-        with self._patches(pend=pend, detail=detail, sent=sent, saved=saved):
-            res = flow.try_correction_state({}, "tok", "U1", "แก้ร้านค้าเป็น:7-11", "t", 1, "th")
-        self.assertTrue(res)
-        self.assertEqual(saved["missing"], "correct:1:D1:vendor_name")
-        self.assertEqual(saved["draft"].vendor_name, "7-11")
-        self.assertIn("711", sent[0])  # 确认含旧值
-        self.assertIn("7-11", sent[0])  # 与新值
+class ValueAnswerTests(unittest.TestCase):
+    """收新值 → 委托 line_correct._apply_or_confirm(风险三档/确认/执行在 line_correct 单测)。"""
+
+    def _run(self, pend_missing, text):
+        from services.expense import conversation
+
+        cap, sent, saved = {}, [], {}
+        with (
+            mock.patch.object(flow.db, "get_cursor_rls", return_value=_Ctx(object())),
+            mock.patch.object(conversation, "peek_pending", return_value={"missing": pend_missing}),
+            mock.patch.object(
+                conversation, "save_pending", side_effect=lambda *a, **k: saved.update(k)
+            ),
+            mock.patch.object(
+                line_correct,
+                "_apply_or_confirm",
+                side_effect=lambda *a, **k: cap.update(doc_id=a[5], changes=a[6]) or True,
+            ),
+            mock.patch.object(
+                flow.line_reply,
+                "reply_text_context",
+                side_effect=lambda tok, b, **k: sent.append(b),
+            ),
+        ):
+            flow.try_correction_state({}, "tok", "U1", text, "t", 1, "th")
+        return cap, sent, saved
+
+    def test_seller_value_with_fullwidth_colon(self):
+        # 验收 #5:已问新卖家 → 「แก้ร้านค้าเป็น:7-11」(全角冒号已归一)→ 委托改 vendor_name=7-11。
+        cap, _, _ = self._run("correctval:1:D1:seller", "แก้ร้านค้าเป็น:7-11")
+        self.assertEqual(cap["changes"], {"vendor_name": "7-11"})
 
     def test_bare_value_captured(self):
-        sent, saved = [], {}
-        pend = {"missing": "correctval:1:D1:seller"}
-        detail = {"doc": {}, "supplier": {"name": "711"}, "lines": [{}]}
-        with self._patches(pend=pend, detail=detail, sent=sent, saved=saved):
-            flow.try_correction_state({}, "tok", "U1", "7-11", "t", 1, "th")
-        self.assertEqual(saved["draft"].vendor_name, "7-11")
+        cap, _, _ = self._run("correctval:1:D1:seller", "7-11")
+        self.assertEqual(cap["changes"], {"vendor_name": "7-11"})
 
-    def test_amount_on_multiline_guides_detail(self):
-        # 验收 #3:文本多项卡改行金额 → 引导详情页(多行不猜),不进确认。
-        sent, saved = [], {}
-        pend = {"missing": "correctval:1:D1:amount"}
-        detail = {"doc": {}, "lines": [{}, {}, {}]}
-        with self._patches(pend=pend, detail=detail, sent=sent, saved=saved):
-            flow.try_correction_state({}, "tok", "U1", "90", "t", 1, "th")
-        self.assertEqual(saved, {})  # 不存确认态
-        self.assertIn("Pearnly", sent[0])  # 引导详情页
+    def test_amount_value_delegates(self):
+        cap, _, _ = self._run("correctval:1:D1:amount", "90")
+        self.assertEqual(cap["changes"], {"amount": Decimal("90")})
+
+    def test_date_year_first_parsed(self):
+        # 验收 #1:2026/6/18 / 2026-06-18 → 2026-06-18。
+        cap, _, _ = self._run("correctval:1:D1:date", "2026/6/18")
+        self.assertEqual(cap["changes"], {"doc_date": "2026-06-18"})
+
+    def test_field_switch_to_seller(self):
+        # 验收 #3:等日期时用户改说卖家 → 切到卖家,不再问日期。
+        cap, _, _ = self._run("correctval:1:D1:date", "แก้ร้านค้าเป็น 7-11")
+        self.assertEqual(cap["changes"], {"vendor_name": "7-11"})
+
+    def test_no_value_reasks_no_delegate(self):
+        # 没给真值(否定/指代填充)→ 不委托执行,存待值态再问。
+        cap, _, saved = self._run("correctval:1:D1:seller", "ไม่ใช่คนนี้")
+        self.assertEqual(cap, {})
+        self.assertTrue(saved["missing"].startswith("correctval:1:D1:seller"))
 
 
 class DispatchTests(_FlowBase):

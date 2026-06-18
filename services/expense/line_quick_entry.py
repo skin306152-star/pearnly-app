@@ -77,6 +77,16 @@ def _parse_date(text: str) -> Optional[str]:
         n = int(mrel.group(1))
         if 0 < n <= 366:
             return (_today() - timedelta(days=n)).isoformat()
+    # 年首/ISO(2026-06-18 · 2026/6/18 · 佛历 2569/6/18−543)先试,再回退 DD/MM/YY[YY]。
+    my = re.search(r"(?<!\d)(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})(?!\d)", text)
+    if my:
+        yy, mo, d = int(my.group(1)), int(my.group(2)), int(my.group(3))
+        if yy >= 2400:
+            yy -= 543
+        try:
+            return date(yy, mo, d).isoformat()
+        except ValueError:
+            pass
     m = re.search(r"\b(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})\b", text)
     if not m:
         return None

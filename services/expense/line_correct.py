@@ -148,7 +148,7 @@ def _apply_or_confirm(
     if not high_risk:  # 低风险:直接执行,不二次确认
         with db.get_cursor_rls(tid, commit=True) as cur:
             conversation.clear_pending(cur, line_user_id=line_user_id)
-            res = _apply(cur, bound_user, tid, ws, doc_id, changes_draft, keys)
+            res = _apply(cur, bound_user, tid, ws, doc_id, changes_draft, keys, detail=detail)
         if not res:
             _say(line_client.t_line(lang, "exp_correct_none"))
             return True
@@ -312,9 +312,9 @@ def _save_state(tid, ws, doc_id, line_user_id, missing: str) -> None:
 
 
 def try_confirm(
-    bound_user, reply_token, line_user_id, text, tid, ws, lang, *, quote_token=""
+    bound_user, reply_token, line_user_id, text, tid, ws, lang, *, quote_token="", pend=None
 ) -> bool:
-    """有待确认更正(correct:)+ 这句肯定 → 执行;否定 → 取消。非更正 pending → False。回复带引用。"""
+    """有待确认更正(correct:)+ 肯定 → 执行;否定 → 取消;非更正 pending → False。pend 可由调用方传入免重读。"""
     from core.pos_api import PosError
 
     def _say(body):
@@ -322,8 +322,9 @@ def try_confirm(
             reply_token, body, quote_token=quote_token, line_user_id=line_user_id, tenant_id=tid
         )
 
-    with db.get_cursor_rls(tid) as cur:
-        pend = conversation.peek_pending(cur, line_user_id=line_user_id)
+    if pend is None:
+        with db.get_cursor_rls(tid) as cur:
+            pend = conversation.peek_pending(cur, line_user_id=line_user_id)
     if not pend or not str(pend.get("missing") or "").startswith(_PREFIX):
         return False
     if not _affirmative(text):
@@ -368,15 +369,14 @@ def _parse_missing(missing: str):
     return ws, orig_id, [k for k in keys.split("|") if k]
 
 
-def _apply(cur, bound_user, tid, ws, orig_id, changes_draft, keys) -> Optional[dict]:
-    """应用改动:已入账 → void 原单 + 克隆草稿 + 改 + auto_book 过账;草稿 → 原地改(不冲销)。
-    返回 {new_id, posted, total, mode}(mode 供回执选措辞);作废/不存在 → None。"""
+def _apply(cur, bound_user, tid, ws, orig_id, changes_draft, keys, detail=None) -> Optional[dict]:
+    """应用改动:已入账 → void+克隆+改+auto_book 过账;草稿 → 原地改。detail 可传入免重 fetch。作废/无 → None。"""
     from services.purchase import correct as correct_svc
     from services.purchase import docs as docs_svc
     from services.purchase import posting as posting_svc
     from services.purchase import settings as settings_svc
 
-    detail = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=orig_id)
+    detail = detail or docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=orig_id)
     status = (detail.get("doc") or {}).get("status") if detail else None
     if status not in ("posted", "draft"):
         return None

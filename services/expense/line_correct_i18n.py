@@ -85,13 +85,15 @@ def field_label(field: str, lang: str) -> str:
     return FIELD_LABELS.get(field, {}).get(lang) or FIELD_LABELS.get(field, {}).get("zh", field)
 
 
-# 规范键(_apply_changes / changes dict 用)→ 字段标签语言。
-_KEY_TO_FIELD = {
+# 字段名(detect_correction_field 的 amount/date/seller/category)→ 规范键(_apply_changes / changes
+# dict)。唯一源,反向由它派生(防两份手维护漂移)。
+FIELD_TO_KEY = {
     "amount": "amount",
-    "vendor_name": "seller",
-    "doc_date": "date",
+    "date": "doc_date",
+    "seller": "vendor_name",
     "category": "category",
 }
+_KEY_TO_FIELD = {v: k for k, v in FIELD_TO_KEY.items()}
 
 
 def key_label(key: str, lang: str) -> str:

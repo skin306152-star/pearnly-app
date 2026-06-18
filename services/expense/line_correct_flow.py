@@ -12,8 +12,6 @@
 
 from __future__ import annotations
 
-import re
-from datetime import date
 from decimal import Decimal
 
 from core import db
@@ -22,14 +20,7 @@ from services.expense import line_correct_i18n as ci
 from services.expense import line_quick_entry as lqe
 from services.line_binding import line_reply
 
-# 改错字段 → 草稿/keys 的规范名(detect_correction_field 的 seller/date → vendor_name/doc_date)。
-_FIELD_KEY = {
-    "amount": "amount",
-    "date": "doc_date",
-    "seller": "vendor_name",
-    "category": "category",
-}
-
+# 字段→规范键映射唯一源在 line_correct_i18n.FIELD_TO_KEY(此处复用·不再各维护一份)。
 # 收新值时剥掉的前缀(命令词 + 连接词);标点已在入口 normalize_user_text 归一。
 _STRIP_TOKENS = (
     "แก้ไข",
@@ -99,9 +90,17 @@ def try_correction_state(
     with db.get_cursor_rls(tid) as cur:
         pend = conversation.peek_pending(cur, line_user_id=line_user_id)
     missing = str((pend or {}).get("missing") or "")
-    if missing.startswith(line_correct._PREFIX):  # 最终 是/否
+    if missing.startswith(line_correct._PREFIX):  # 最终 是/否(复用已 peek 的 pend·免重读)
         return line_correct.try_confirm(
-            bound_user, reply_token, line_user_id, text, tid, ws, lang, quote_token=quote_token
+            bound_user,
+            reply_token,
+            line_user_id,
+            text,
+            tid,
+            ws,
+            lang,
+            quote_token=quote_token,
+            pend=pend,
         )
     ctx = dict(quote_token=quote_token, line_user_id=line_user_id, tenant_id=tid)
     if missing.startswith(line_correct._VAL_PREFIX):
@@ -166,7 +165,7 @@ def _route_field(bound_user, reply_token, text, lang, tid, ws, doc_id, field, ct
         tid,
         ws,
         doc_id,
-        {_FIELD_KEY[field]: value},
+        {ci.FIELD_TO_KEY[field]: value},
         quote_token=ctx.get("quote_token", ""),
         line_user_id=luid,
     )
@@ -178,23 +177,9 @@ def _extract_value(text: str, field: str):
         amt = lqe.parse_expense(text).amount
         return amt if (amt and amt > Decimal("0")) else None
     if field == "date":
-        return _parse_date_value(text)
+        return lqe._parse_date(text)  # 相对词/年首/ISO/DD-MM 全在共用解析器
     cleaned = _strip_prefix(text)
     return cleaned or None
-
-
-def _parse_date_value(text: str):
-    """年首/ISO(2026-06-18 · 2026/6/18 · 佛历 2569/6/18−543)先试,再回退相对词 + DD/MM(lqe)。"""
-    m = re.search(r"(?<!\d)(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})(?!\d)", text)
-    if m:
-        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
-        if y >= 2400:
-            y -= 543
-        try:
-            return date(y, mo, d).isoformat()
-        except ValueError:
-            pass
-    return lqe._parse_date(text)
 
 
 def _strip_prefix(text: str) -> str:

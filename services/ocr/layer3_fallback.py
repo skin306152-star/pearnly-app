@@ -132,7 +132,10 @@ Output ONE JSON object matching this schema (no markdown, no explanation, just J
   "vat": "number-as-string",
   "wht_rate": "number-as-string",
   "wht_amount": "number-as-string",
-  "total_amount": "number-as-string or null",
+  "discount": "total discount as printed (ส่วนลด), number-as-string, empty if none",
+  "total_amount": "FINAL net payable (Total/NET/ยอดสุทธิ), number-as-string or null",
+  "cash_amount": "cash tendered (เงินสด/รับเงิน/CASH), empty if not printed",
+  "change_amount": "change returned (เงินทอน/ทอน), empty if none",
   "items": [{"name": "...", "qty": "...", "price": "...", "subtotal": "..."}],
   "notes": "remark text",
   "category": "3-5 char summary in items' language",
@@ -148,35 +151,32 @@ Output ONE JSON object matching this schema (no markdown, no explanation, just J
   }
 }
 
-PROVENANCE — fill source_refs for amount + tax-id + date fields with the
-exact printed column label of the cell the value came from. Validators
-reject amounts sourced from Description / Remark / Address columns.
+PROVENANCE — fill source_refs for amount + tax-id + date fields with the exact printed column
+label of the cell the value came from. Validators reject amounts from Description/Remark/Address.
 
 CRITICAL RULES (same as previous extraction; pay attention):
 1. DATE: Buddhist year (>= 2400) MUST be converted to Gregorian by subtracting 543. e.g. 2569 -> 2026. ALWAYS fill date_raw with the original text.
 2. NAMES & ADDRESSES: Copy EXACTLY as printed (Thai or English). Do NOT auto-correct or standardize.
-3. ITEMS: You can SEE the image — read EVERY line item top to bottom, miss none. Thermal/POS
-   receipts wrap one item over 2-3 lines (name, then qty x unit-price, then line total); stitch
-   them into ONE item (name, qty, price, subtotal). Count a row as an item only if it has a
-   product/service name; SKIP subtotal / VAT / total / change / cash / discount / table-no /
-   thank-you rows. Self-check: item subtotals should build toward the document subtotal — if you
-   have fewer items than the receipt visibly lists, re-scan for missed rows. Keep ONE copy if the
-   same name+qty+price is genuinely duplicated.
+3. ITEMS: read EVERY line item top to bottom, miss none. Thermal/POS receipts wrap one item over
+   2-3 lines (name, then qty x unit-price, then line total) — stitch into ONE item (name, qty,
+   price, subtotal). A row is an item only if it has a product/service name; SKIP subtotal / VAT /
+   total / change / cash / discount / table-no / thank-you rows. Self-check: item subtotals should
+   build toward the document subtotal. Keep ONE copy if the same name+qty+price is duplicated.
 4. NUMBERS: No currency symbols, no commas (e.g., "12450.00").
 5. TAX IDs: Exactly 13 digits, no dashes/spaces. Empty string if not found.
 6. WHT: Common rates 1/2/3/5%. wht_rate is the number ONLY ("3" not "3%").
 7. AMOUNT ARITHMETIC: When trigger reasons mention amount mismatch, look carefully at subtotal/vat/total in the image. The correct relationship is: subtotal + vat = total_amount (within rounding tolerance).
-8. is_not_invoice: true ONLY if clearly not an invoice. A FUEL/PETROL receipt (Bangchak/PTT/Shell ·
-   น้ำมัน/ดีเซล/liters+total) IS a receipt (TID/BATCH/TRACE = POS footer, NOT a reason to drop); is_not_invoice only for a bare card slip with no goods & no seller tax id.
+7b. TOTAL vs PAYMENT: total_amount = FINAL net payable (Total/NET/ยอดสุทธิ), AFTER discount, NEVER
+   the cash tendered or change. Cash (เงินสด/รับเงิน)→cash_amount, change (เงินทอน/ทอน)→change_amount,
+   discount (ส่วนลด)→discount. "ยอดสุทธิ 110 / เงินสด 200 / เงินทอน 90" → total_amount=110 (NOT 200).
+8. is_not_invoice: true ONLY if clearly not an invoice. A FUEL/PETROL receipt (Bangchak/PTT/Shell · น้ำมัน/ดีเซล/liters+total) IS a receipt (TID/BATCH/TRACE = POS footer); is_not_invoice only for a bare card slip with no goods & no seller tax id.
 9. is_copy_or_duplicate: true if the text contains สำเนา / COPY / DUPLICATE markers.
-10. MULTIPLE INVOICES ON ONE PAGE (CRITICAL — a trigger reason may say a stacked
-    invoice was missed): a single page image often contains TWO OR MORE separate
-    tax invoices stacked vertically, each with its OWN invoice number, buyer, and
-    total. Look at the WHOLE image top-to-bottom. Put the FIRST (topmost) invoice
-    in the top-level fields and EACH remaining invoice as a COMPLETE object in the
-    "additional_invoices" array. Every distinct invoice number visible on the page
-    MUST appear exactly once (top-level or in additional_invoices) — never merge or
-    drop one. Keep nested additional_invoices as []. Only one invoice → leave it [].
+10. MULTIPLE INVOICES ON ONE PAGE (CRITICAL — a trigger may say a stacked invoice was
+    missed): one page can hold TWO+ separate tax invoices stacked vertically, each with its
+    OWN invoice number, buyer, total. Scan the WHOLE image top-to-bottom; put the topmost in
+    top-level fields and EACH remaining one as a COMPLETE object in "additional_invoices".
+    Every distinct invoice number appears exactly once — never merge or drop. Nested
+    additional_invoices stay []; one invoice → leave it [].
 """
 
 

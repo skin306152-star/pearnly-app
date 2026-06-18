@@ -248,8 +248,9 @@ class IngestTests(unittest.TestCase):
         out, _cdoc, _pdoc = _run(res, band="high", auto_book=False, fields=fields)
         self.assertEqual(out["card_fields"]["items"], [])
         self.assertEqual(out["card_fields"]["detail"], "")
-        # 不显明细时不再报「明细可能不全」(矛盾)→ 改出 items_unread 提示,warn 关。
-        self.assertFalse(out["warn_total"])
+        # OCR 抽到了行却乱读放大(无法展示)→ 明细不可信 → items_unread 提示 + warn_total 引导核对
+        # (Issue 3:明细不准时主按钮降为「เปิดเพื่อตรวจสอบ」,不默认 ยืนยันบันทึก)。
+        self.assertTrue(out["warn_total"])
         self.assertTrue(out["card_fields"].get("items_unread"))
 
     def test_no_ocr_items_shows_no_fake_line(self):
@@ -374,27 +375,34 @@ class TotalMismatchTests(unittest.TestCase):
         self.assertFalse(li._total_mismatch({"items": [{"subtotal": "100"}]}))
 
 
-class VatBreakdownTests(unittest.TestCase):
-    """税额拆解确定性算(7% · 不信 OCR 误读位数):税前 = total−VAT,VAT 按 7% 含税重算。"""
+class CardAmountsTests(unittest.TestCase):
+    """卡片税额拆解 (税前, VAT, 舍入):票面齐全自洽用票面,否则 7% 确定性重算。"""
 
     def test_inclusive_70(self):
-        # 70 含税:VAT 4.58、税前 65.42。
+        # 含税 70(无独立税前·subtotal 即含税值,与 total 差 ≫1.5)→ 按 7% 重算 65.42/4.58。
         self.assertEqual(
-            li._vat_breakdown({"subtotal": "70.00", "vat": "4.58", "total_amount": "70.00"}),
-            ("65.42", "4.58"),
+            li._card_amounts({"subtotal": "70.00", "vat": "4.58", "total_amount": "70.00"}),
+            ("65.42", "4.58", ""),
         )
 
     def test_vat_misread_recomputed_to_7pct(self):
-        # OCR 把 140 的 VAT 读成 10(应 9.16)→ 按 7% 确定性重算 → 130.84 / 9.16。
+        # 含税票无印税前(subtotal 由 normalize 倒推)+ OCR 把 9.16 读成 10 → 7% 重算 130.84/9.16。
         self.assertEqual(
-            li._vat_breakdown({"subtotal": "130", "vat": "10", "total_amount": "140"}),
-            ("130.84", "9.16"),
+            li._card_amounts({"subtotal": "", "vat": "10", "total_amount": "140"}),
+            ("130.84", "9.16", ""),
+        )
+
+    def test_printed_consistent_breakdown_trusted(self):
+        # 票面印齐 subtotal+VAT 且与 total 自洽(±凑整)→ 直接采信票面,舍入 = total−税前−VAT。
+        self.assertEqual(
+            li._card_amounts({"subtotal": "2544", "vat": "178.08", "total_amount": "2722"}),
+            ("2,544.00", "178.08", "-0.08"),
         )
 
     def test_no_vat_keeps_subtotal(self):
         self.assertEqual(
-            li._vat_breakdown({"subtotal": "431.00", "vat": "0.00", "total_amount": "431.00"}),
-            ("431.00", "0.00"),
+            li._card_amounts({"subtotal": "431.00", "vat": "0.00", "total_amount": "431.00"}),
+            ("431.00", "0.00", ""),
         )
 
 

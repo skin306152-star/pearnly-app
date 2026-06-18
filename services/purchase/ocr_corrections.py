@@ -111,9 +111,20 @@ def normalize_fields(fields: dict | None) -> dict:
         out["date"] = norm_date
         corrections.append("date_normalized")
 
-    subtotal = _dec(src.get("subtotal"))
-    vat = _dec(src.get("vat"))
+    # total 误取「现金收款额」而非应付净额(POS 小票常把 เงินสด/Cash 当 total · 7-11 实票)。
+    # 票面同时印了 cash + change 且 total ≈ cash → 真应付 = cash − change,确定性校正(不信 LLM 选错列)。
+    cash = _dec(src.get("cash_amount"))
+    change = _dec(src.get("change_amount"))
     total = _dec(src.get("total_amount"))
+    if cash > 0 and change > 0 and total > 0:
+        net_paid = cash - change
+        if net_paid > 0 and abs(total - cash) <= max(Decimal("1"), cash * Decimal("0.02")):
+            total = net_paid
+            out["total_amount"] = _money(total)
+            corrections.append("total_fixed_from_cash_change")
+
+    subtotal = _dec(src.get("subtotal"))
+    vat = _dec(out.get("vat"))
 
     if subtotal <= 0 and total > 0 and vat > 0 and total >= vat:
         subtotal = total - vat

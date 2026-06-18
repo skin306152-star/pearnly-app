@@ -55,10 +55,13 @@ def breakdown_rows(fields: dict, t: dict) -> list:
     sub = str(fields.get("subtotal") or "").strip()
     vat = str(fields.get("vat") or "").strip()
     wht = str(fields.get("wht") or "").strip()
+    discount = str(fields.get("discount") or "").strip()
     rounding = str(fields.get("rounding") or "").strip()
     parts = []
     if sub:
         parts.append(f"{t['subtotal']} ฿{sub}")
+    if discount and discount.replace(".", "").replace("-", "").strip("0"):
+        parts.append(f"{t['discount']} ฿{discount}")
     if vat:
         parts.append(f"VAT ฿{vat}")
     if wht and wht.replace(".", "").strip("0"):

@@ -240,7 +240,10 @@ Output ONE JSON object matching this schema (no markdown fences, no explanation,
   "vat": "number-as-string",
   "wht_rate": "number-as-string",
   "wht_amount": "number-as-string",
-  "total_amount": "number-as-string or null",
+  "discount": "total discount as printed (ส่วนลด/discount), number-as-string, empty if none",
+  "total_amount": "FINAL net payable (Total/NET/ยอดสุทธิ/รวมสุทธิ), number-as-string or null",
+  "cash_amount": "cash tendered / amount received (เงินสด/รับเงิน/รับมา/CASH), empty if not printed",
+  "change_amount": "change returned (เงินทอน/ทอน/change), empty if none",
   "payment_method": "how it was paid as printed: cash | transfer | qr | card | empty if not shown",
   "items": [{"name": "...", "qty": "...", "price": "...", "subtotal": "..."}],
   "notes": "remark text",
@@ -282,6 +285,12 @@ CRITICAL RULES:
    modifier/option of the item above; keep it as an item only if it has its own price, and drop the
    leading "-" from its name.
 4. NUMBERS: No currency symbols, no commas (e.g., "12450.00").
+4b. TOTAL vs PAYMENT (critical — POS slips): total_amount is the FINAL net payable — the
+   Total / NET / Grand Total / ยอดสุทธิ / รวมสุทธิ / ยอดชำระ line, AFTER any discount. It is
+   NEVER the cash tendered or the change. Put cash tendered (เงินสด / รับเงิน / รับมา / CASH /
+   amount received) in cash_amount, and change returned (เงินทอน / ทอน / change) in change_amount.
+   Put any discount (ส่วนลด / discount) in discount. On a 7-Eleven/POS slip that prints
+   "ยอดรวม 115 / ส่วนลด 5 / ยอดสุทธิ 110 / เงินสด 200 / เงินทอน 90", total_amount = 110 (NOT 200).
 5. TAX IDs: Exactly 13 digits, no dashes/spaces. Empty string if not found.
 6. WHT (หัก ณ ที่จ่าย / ภ.ง.ด.3 / ภ.ง.ด.53): Common rates 1/2/3/5%. wht_rate is the number ONLY ("3" not "3%"). Only extract if printed; do NOT guess.
 6b. PAYMENT_METHOD: only if the bill prints how it was paid. "cash" (เงินสด/CASH), "transfer" (โอน/

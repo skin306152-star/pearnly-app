@@ -47,9 +47,13 @@ def _items_reconcile_total(fields: dict) -> bool:
     items_sum = _items_sum(fields)
     if items_sum <= 0:
         return False
-    if _same_money(items_sum, total, total=total):
-        return True
-    return _same_money(items_sum + _dec(fields.get("vat")), total, total=total)
+    vat = _dec(fields.get("vat"))
+    discount = _dec(fields.get("discount"))
+    # 行额合计可与票面 total 对上的几种自洽口径:原值 / 加 VAT(餐饮行印税前)/ 减折扣 / 两者兼有。
+    candidates = [items_sum, items_sum + vat]
+    if discount > 0:
+        candidates += [items_sum - discount, items_sum + vat - discount]
+    return any(_same_money(c, total, total=total) for c in candidates)
 
 
 def _total_mismatch(fields: dict) -> bool:
@@ -67,21 +71,52 @@ def _total_mismatch(fields: dict) -> bool:
     return not _items_reconcile_total(fields)
 
 
-def _vat_breakdown(fields: dict) -> tuple[str, str]:
-    """卡片税额拆解 (税前 ก่อนภาษี, VAT) —— 税额用确定性算,不信 OCR 误读的位数(铁律)。
+def _items_display_decision(fields: dict) -> tuple[list, bool, bool]:
+    """卡片明细展示与告警决策(纯函数·可单测)→ (raw_items, show_items, warn_total)。
 
-    泰国 VAT 固定 7%。OCR 的 vat 若接近含税值 total×7/107(即 7% 含税票)→ 按 7% 确定性重算 vat 与税前
-    (治 #21 把 9.16 读成 10 → 仍出 130.84/9.16)。非 7%/读偏太多 → 退回 total−vat(仍与总额自洽)。
-    无 VAT/无总额 → 用票面 subtotal、VAT 留空。
+    show_items:明细可信可展示(OCR 行加总 0 < sum ≤ 票面总额 + 2% 容差)。
+    warn_total:① 可展示但加总与总额对不上,② 或 OCR 抽到了行却乱读/放大无法展示 —— 两种都说明明细
+    不可信,卡片降级「请核对」、主按钮引导核对(诚实优先)。真没有逐项明细的小票不告警。
     """
+    raw_items = _card_items(fields)
+    items_sum = _items_sum(fields)
+    total = _dec(fields.get("total_amount"))
+    discount = _dec(fields.get("discount"))
+    # 行额合计上限放宽到「票面总额 + 折扣」:折扣前行额本就高于净应付(7-11 实票 115 行 → 110 净)。
+    tol = max(Decimal("1"), total * Decimal("0.02"))
+    show_items = bool(raw_items) and total > 0 and 0 < items_sum <= total + discount + tol
+    warn_total = _total_mismatch(fields) if show_items else bool(ik._effective_items(fields))
+    return raw_items, show_items, warn_total
+
+
+def _card_amounts(fields: dict) -> tuple[str, str, str]:
+    """卡片税额拆解 (税前 ก่อนภาษี, VAT, 舍入 ปัดเศษ)。
+
+    票面同时印了 subtotal + VAT 且与 total 自洽(差 ≤ 1.5 铢凑整)→ 直接采信票面值(舍入 =
+    total − subtotal − VAT,通常 ±凑整;治 Seafood 把 2544/178.08/-0.08 反推成 2543.93/178.07)。
+    否则按泰国 VAT 7% 确定性重算(治 #21 把 9.16 读成 10 → 仍出 130.84/9.16),不信 OCR 误读位数。
+    无 VAT/无总额 → 退回票面 subtotal、VAT 与舍入留空。
+    """
+    subtotal = _dec(fields.get("subtotal"))
     vat = _dec(fields.get("vat"))
     total = _dec(fields.get("total_amount"))
+    subtotal_printed = "subtotal_inferred_from_total_vat" not in (fields.get("_corrections") or [])
+    if (
+        subtotal_printed
+        and subtotal > 0
+        and vat > 0
+        and total > 0
+        and abs(subtotal + vat - total) <= Decimal("1.5")
+    ):
+        rnd = total - subtotal - vat
+        rnd_str = f"{rnd:,.2f}" if abs(rnd) >= Decimal("0.005") else ""
+        return f"{subtotal:,.2f}", f"{vat:,.2f}", rnd_str
     if vat > 0 and total > vat:
         seven = total * Decimal("7") / Decimal("107")
         if abs(vat - seven) <= max(Decimal("1"), seven * Decimal("0.12")):
             vat = seven.quantize(Decimal("0.01"))
-        return f"{(total - vat):,.2f}", f"{vat:,.2f}"
-    return str(fields.get("subtotal") or ""), str(fields.get("vat") or "")
+        return f"{(total - vat):,.2f}", f"{vat:,.2f}", ""
+    return str(fields.get("subtotal") or ""), str(fields.get("vat") or ""), ""
 
 
 def _clean_item_name(name) -> str:
@@ -226,7 +261,8 @@ def ingest_line_image(
         field_confidence=field_confidence,
     )
     # items / detail 由下方明细策略统一决定(此处先占位,避免双算 _card_items)。
-    _pretax, _vat = _vat_breakdown(fields)
+    # 税额拆解(税前/VAT/舍入):票面齐全自洽用票面,否则 7% 确定性重算(见 _card_amounts)。
+    _pretax, _vat, _rounding = _card_amounts(fields)
     card_fields = {
         "document_type": fields.get("document_type") or "",
         "expense_type": "",  # 见下方按分类/描述推导(不硬编码 goods,避免餐饮/服务误显「商品」)
@@ -236,11 +272,13 @@ def ingest_line_image(
         "vendor": fields.get("seller_name") or "",
         "seller_tax": fields.get("seller_tax") or "",
         "seller_addr": fields.get("seller_addr") or "",
-        # 税额拆解确定性算(7% 不信 OCR 误读位数·见 _vat_breakdown):税前 = total−VAT,VAT 按 7% 含税。
         "subtotal": _pretax,
         "vat": _vat,
         "wht": fields.get("wht_amount") or "",
-        "rounding": fields.get("rounding") or "",
+        # 舍入只来自票面(total−税前−VAT),不回退 draft 的账务调整额(费用单不可抵 VAT 会被折进 draft
+        # rounding=整额 VAT → 误显成「ปัดเศษ 178」· Seafood 实票踩过)。
+        "rounding": _rounding,
+        "discount": fields.get("discount") or "",
         "invoice_number": fields.get("invoice_number") or "",
         "payment_method": fields.get("payment_method") or "",
         "payment_status": "",  # 见下方:取自 draft 的付款态(仅明确未付/部分付才在卡上显)
@@ -253,14 +291,9 @@ def ingest_line_image(
     # 卡片明细只显 OCR 真行(已滤汇总/标记·去前导符号)。规则:加总 ≤ 票面总额 → 照显(全/不全都行,
     # 不全则「明细可能不全」提示);乱读放大(7-11 单行 845 ≫ 110)或一行没抽到 → 不显假行/卖家名行,
     # 标 items_unread 让卡出「未能逐项识别·去详情页」。账务草稿仍收敛保票面总额,与卡片展示两不冲突。
-    raw_items = _card_items(fields)
-    items_sum = _items_sum(fields)
-    total = _dec(fields.get("total_amount"))
-    tol = max(Decimal("1"), total * Decimal("0.02"))
-    show_items = bool(raw_items) and total > 0 and 0 < items_sum <= total + tol
+    raw_items, show_items, warn_total = _items_display_decision(fields)
     if show_items:
         card_fields["items"] = raw_items
-        warn_total = _total_mismatch(fields)
         descs = [it["name"] for it in raw_items]
         card_fields["detail"] = " · ".join(descs[:3]) + (
             f" 等{len(descs)}项" if len(descs) > 3 else ""
@@ -271,7 +304,6 @@ def ingest_line_image(
         card_fields["items"] = []
         card_fields["items_unread"] = True
         card_fields["detail"] = ""
-        warn_total = False
         descs = []
     # 智能归类(LLM 优先 → 关键词兜底):懂泰文品名,治「分类不对/空」。
     vendor_name = draft["supplier"].get("name") or ""
@@ -297,8 +329,7 @@ def ingest_line_image(
 
     _pay_raw = str(fields.get("payment_method") or "").strip()
     card_fields["payment_method"] = normalize_payment_method(_pay_raw) or _pay_raw
-    # 付款态(仅明确未付/部分付才在卡显·默认 paid 不显)+ 舍入(非 0 才显)→ 取自草稿。
-    card_fields["rounding"] = card_fields["rounding"] or (draft.get("rounding") or "")
+    # 付款态:仅明确未付/部分付才在卡显·默认 paid 不显 → 取自草稿。
     card_fields["payment_status"] = draft.get("payment_status") or ""
     # 费用类型:命中服务关键词→服务,否则中性「费用」(OCR 票多为费用·不粗暴显「商品」)。
     from services.expense.line_classify import classify_expense_type
@@ -319,6 +350,9 @@ def ingest_line_image(
         is_duplicate=bool(res.get("dedupe_hit")),
         require_category=False,
     )
+    # 明细与总额对不上(乱读/不全)→ 不自动入正式账,降为草稿请用户先核对(诚实优先·仍可保存)。
+    if warn_total and verdict.action == "post":
+        verdict = conf.Verdict("confirm", verdict.dup, verdict.reasons + ("items_total_mismatch",))
     # 文/图/多项共用入账编排(#10 line_booker):建草稿→按置信过账→铸 nonce token。
     doc_id, state, token = line_booker.book_and_mint(
         cur,

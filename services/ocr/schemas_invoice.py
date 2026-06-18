@@ -152,7 +152,25 @@ class ThaiInvoice(BaseModel):
     vat: str = Field(default="", description="number-as-string, no commas")
     wht_rate: str = Field(default="", description='number only, e.g. "3" not "3%"')
     wht_amount: str = Field(default="", description="number-as-string, no commas")
-    total_amount: Optional[str] = Field(default=None)
+    discount: str = Field(
+        default="",
+        description="total discount as printed (ส่วนลด/discount), number-as-string. "
+        "The amount subtracted before the net payable; empty if none.",
+    )
+    total_amount: Optional[str] = Field(
+        default=None,
+        description="final net payable (Total / NET / ยอดสุทธิ / รวมสุทธิ / grand total), "
+        "AFTER any discount. NEVER the cash tendered or change.",
+    )
+    cash_amount: str = Field(
+        default="",
+        description="cash tendered / amount received (เงินสด/รับเงิน/รับมา/CASH), "
+        "number-as-string. This is NOT the bill total; empty if not printed.",
+    )
+    change_amount: str = Field(
+        default="",
+        description="change returned (เงินทอน/ทอน/change), number-as-string; empty if none.",
+    )
     payment_method: str = Field(
         default="", description="how paid as printed: cash|transfer|qr|card, empty if not shown"
     )
@@ -199,6 +217,9 @@ class ThaiInvoice(BaseModel):
         "vat",
         "wht_rate",
         "wht_amount",
+        "discount",
+        "cash_amount",
+        "change_amount",
         "notes",
         "category",
         "payment_method",

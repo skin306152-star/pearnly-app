@@ -157,8 +157,11 @@ def _printed_total_rounding(fields: dict, lines: list) -> Decimal:
     grand = _to_decimal(totals_svc.compute_purchase_totals(lines)["grand_total"])
     subtotal = _to_decimal(fields.get("subtotal"))
     vat = _to_decimal(fields.get("vat"))
+    discount = _to_decimal(fields.get("discount"))
     receipt_consistent = subtotal > 0 and abs(total - (subtotal + vat)) <= Decimal("1")
-    if receipt_consistent or abs(total - grand) <= Decimal("1"):
+    # 折扣解释了行额合计与净应付之差(行额 − 折扣 = total)→ 折扣按 doc 级调整额落账(净应付保票面)。
+    discount_explains = discount > 0 and abs(total - (grand - discount)) <= Decimal("1")
+    if receipt_consistent or discount_explains or abs(total - grand) <= Decimal("1"):
         return total - grand
     return Decimal("0")
 
@@ -398,7 +401,10 @@ def fields_from_invoice(inv) -> dict:
             "date": getattr(inv, "date", ""),
             "subtotal": getattr(inv, "subtotal", ""),
             "vat": getattr(inv, "vat", ""),
+            "discount": getattr(inv, "discount", ""),
             "total_amount": getattr(inv, "total_amount", ""),
+            "cash_amount": getattr(inv, "cash_amount", ""),
+            "change_amount": getattr(inv, "change_amount", ""),
             "payment_method": getattr(inv, "payment_method", ""),
             "items": [
                 {

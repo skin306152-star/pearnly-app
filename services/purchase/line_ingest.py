@@ -7,11 +7,14 @@
 
 from __future__ import annotations
 
+import logging
 from decimal import Decimal, InvalidOperation
 
 from services.purchase import field_clean
 from services.purchase import intake as ik
 from services.purchase import totals as totals_svc
+
+logger = logging.getLogger("mr-pilot")
 
 
 def _dec(v) -> Decimal:
@@ -340,9 +343,7 @@ def ingest_line_image(
         items=card_fields.get("items") or [],
         api_key=api_key,
     )
-    import logging
-
-    logging.getLogger("mr-pilot").info("[line_ingest] category_source=%s", cat_source)
+    logger.info("[line_ingest] category_source=%s", cat_source)
     if cat_id:
         draft["category_id"] = cat_id
         card_fields["category"] = _cat_name

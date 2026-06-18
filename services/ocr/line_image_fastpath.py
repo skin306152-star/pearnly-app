@@ -13,7 +13,6 @@ handle_ocr_cache_hit 从 line_image_ocr 抽出(该文件 500 行顶格,新增 ea
 from __future__ import annotations
 
 import logging
-import os
 
 from core import db
 from services.exceptions.exception_checks import _async_run_exception_checks
@@ -75,45 +74,23 @@ def early_dup_short_circuit(
 def _push_state_card(cur, line_user_id, lang, detail, *, doc_id, ws, tid, created_by) -> None:
     """按单据真实状态 push 当前卡:posted 数据卡 / voided 终态卡 / draft 可确认卡。
 
-    posted/draft 铸新 nonce 供卡上动作(撤销/确认),并续接 active_doc(可直接说改错)。
+    状态→卡映射复用 line_posted_card.build_state_card(与改错重发卡同一处);posted/draft 铸新 nonce
+    供卡上动作(撤销/确认)并续接 active_doc(可直接说改错),void 终态无动作不铸不续。
     """
-    from services.line_binding import line_card, line_client, line_posted_card
+    from services.line_binding import line_client, line_posted_card
 
     status = (detail.get("doc") or {}).get("status")
-    liff = os.getenv("LINE_LIFF_ID", "").strip()
-    if status == "void":
-        card = line_card.terminal_card(
-            state="voided",
-            amount=(detail.get("doc") or {}).get("grand_total"),
-            doc_id=str(doc_id),
-            lang=lang,
-            liff_id=liff,
-            workspace_client_id=str(ws or ""),
-            fields=line_posted_card.fields_from_detail(detail),
-        )
-        line_client.push_messages(line_user_id, [card])
+    token = (
+        "" if status == "void" else _mint(cur, tid=tid, ws=ws, doc_id=doc_id, created_by=created_by)
+    )
+    card = line_posted_card.build_state_card(
+        detail, doc_id=doc_id, ws=ws, lang=lang, source="cache", token=token
+    )
+    if card is None:
         return
-
-    token = _mint(cur, tid=tid, ws=ws, doc_id=doc_id, created_by=created_by)
-    if status == "posted":
-        card = line_posted_card.build(
-            detail, doc_id=doc_id, lang=lang, workspace_client_id=ws, source="cache", token=token
-        )
-    else:  # draft → 可确认/编辑卡
-        doc = detail.get("doc") or {}
-        card = line_card.result_card(
-            state="confirm",
-            amount=doc.get("grand_total"),
-            fields=line_posted_card.fields_from_detail(detail),
-            doc_id=str(doc_id),
-            lang=lang,
-            source="cache",
-            token=token,
-            liff_id=liff,
-            workspace_client_id=str(ws or ""),
-        )
     line_client.push_messages(line_user_id, [card])
-    _set_active(tid, ws, doc_id, line_user_id, cur)
+    if status != "void":
+        _set_active(tid, ws, doc_id, line_user_id, cur)
 
 
 def _mint(cur, *, tid, ws, doc_id, created_by) -> str:

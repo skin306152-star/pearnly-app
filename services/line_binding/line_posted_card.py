@@ -93,3 +93,41 @@ def build(detail: dict, *, doc_id, lang, workspace_client_id="", source="doc", t
         liff_id=os.getenv("LINE_LIFF_ID", "").strip(),
         workspace_client_id=str(workspace_client_id or ""),
     )
+
+
+def build_state_card(detail: dict, *, doc_id, ws, lang, source, token):
+    """按单据真实状态构建当前状态卡(posted 数据卡 / void 终态卡 / draft 可确认卡)→ Flex dict。
+
+    纯构建、不发送:push(早期重复短路)与 reply(改错重发)各自按 transport 发,共用此处状态→卡映射
+    (消除 line_card_actions / line_image_fastpath 两处复制的三态分支)。未知状态/无 detail → None。
+    """
+    doc = (detail or {}).get("doc") or {}
+    status = doc.get("status")
+    if status == "posted":
+        return build(
+            detail, doc_id=doc_id, lang=lang, workspace_client_id=ws, source=source, token=token
+        )
+    liff = os.getenv("LINE_LIFF_ID", "").strip()
+    if status == "void":
+        return line_card.terminal_card(
+            state="voided",
+            amount=doc.get("grand_total"),
+            doc_id=str(doc_id),
+            lang=lang,
+            liff_id=liff,
+            workspace_client_id=str(ws or ""),
+            fields=fields_from_detail(detail),
+        )
+    if status == "draft":
+        return line_card.result_card(
+            state="confirm",
+            amount=doc.get("grand_total"),
+            fields=fields_from_detail(detail),
+            doc_id=str(doc_id),
+            lang=lang,
+            source=source,
+            token=token,
+            liff_id=liff,
+            workspace_client_id=str(ws or ""),
+        )
+    return None

@@ -127,6 +127,21 @@ def override_totals(lines, *, doc_discount=0, rounding=0, override) -> tuple[dic
     return out, True
 
 
+_VAT_INCL_NUM = Decimal("7")
+_VAT_INCL_DEN = Decimal("107")
+_VAT_FACE_TOL = Decimal("1.5")
+
+
+def vat_from_inclusive(total: Decimal) -> Decimal:
+    """含税总额反推 VAT(泰国 7% 票面拆解):total × 7/107(未量化·调用方按需 quantize)。"""
+    return total * _VAT_INCL_NUM / _VAT_INCL_DEN
+
+
+def vat_face_consistent(subtotal: Decimal, vat: Decimal, total: Decimal) -> bool:
+    """票面 税前+VAT 与总额是否自洽(差 ≤ 1.5 铢凑整容差)→ 可直接采信票面拆解。"""
+    return abs(subtotal + vat - total) <= _VAT_FACE_TOL
+
+
 def dedupe_key(*, supplier_tax, doc_no, grand_total) -> str | None:
     """防重复票指纹 = hash(供应商税号 | 票号 | 含税合计)。无税号且无票号 → None(无身份不查重)。
 

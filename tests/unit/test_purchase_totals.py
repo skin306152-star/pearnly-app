@@ -58,6 +58,24 @@ class GoldenTotalsTests(unittest.TestCase):
         self.assertEqual(_s(r["vat_amount"]), "0.00")
 
 
+class VatFaceTests(unittest.TestCase):
+    """票面 VAT 拆解原语(识别卡 + 入账后卡共用·避免税务展示口径两处漂移)。"""
+
+    def test_vat_from_inclusive_7pct(self):
+        # 140 含税 → VAT 9.158…(调用方 quantize 成 9.16)。
+        v = t.vat_from_inclusive(Decimal("140")).quantize(Decimal("0.01"))
+        self.assertEqual(v, Decimal("9.16"))
+
+    def test_face_consistent_within_tolerance(self):
+        self.assertTrue(t.vat_face_consistent(Decimal("130.84"), Decimal("9.16"), Decimal("140")))
+        self.assertTrue(
+            t.vat_face_consistent(Decimal("2543.93"), Decimal("178.07"), Decimal("2722"))
+        )
+
+    def test_face_inconsistent_beyond_tolerance(self):
+        self.assertFalse(t.vat_face_consistent(Decimal("100"), Decimal("7"), Decimal("140")))
+
+
 class DedupeKeyTests(unittest.TestCase):
     def test_no_identity_returns_none(self):
         self.assertIsNone(t.dedupe_key(supplier_tax=None, doc_no=None, grand_total=100))

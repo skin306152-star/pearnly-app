@@ -15,6 +15,7 @@ import os
 from decimal import Decimal, InvalidOperation
 
 from services.line_binding import line_card
+from services.purchase import totals as totals_svc
 
 _WEB = "https://pearnly.com/home"
 
@@ -41,11 +42,11 @@ def _breakdown(doc: dict) -> tuple[str, str, str]:
     sub = _dec(doc.get("subtotal"))
     vat = _dec(doc.get("vat_amount"))
     rnd = _dec(doc.get("rounding"))
-    if vat > 0 and total > 0 and abs(sub + vat - total) <= Decimal("1.5"):
+    if vat > 0 and total > 0 and totals_svc.vat_face_consistent(sub, vat, total):
         rnd_str = f"{rnd:,.2f}" if abs(rnd) >= Decimal("0.005") else ""
         return f"{sub:,.2f}", f"{vat:,.2f}", rnd_str
     if doc.get("has_vat") and total > 0:
-        v = (total * Decimal("7") / Decimal("107")).quantize(Decimal("0.01"))
+        v = totals_svc.vat_from_inclusive(total).quantize(Decimal("0.01"))
         return f"{(total - v):,.2f}", f"{v:,.2f}", ""
     return "", "", ""
 

@@ -437,7 +437,9 @@ def parse_expense(text: str) -> ExpenseDraft:
 
 
 # 多项一句话:「电费50 买菜40 电费10 吃饭50」→ 多笔(名+额)·每项独立归类/合计(对标 Paypers)。
-_MULTI_RE = re.compile(r"([^\d฿]+?)\s*([\d,]+(?:\.\d+)?)")
+# 数字两侧 lookaround:紧贴 数字-连字号(店名/编号「7-11」、区间「02-99」)的数字段不是金额 → 不匹配
+# (P1E-3:店名「ที่ 7-11」的 7 此前被当金额累加致总额 +7)。仅排连字号数字串,不误伤「100-เก่า」。
+_MULTI_RE = re.compile(r"([^\d฿]+?)\s*(?<!\d-)([\d,]+(?:\.\d+)?)(?!-\d)")
 _UNIT_TAIL = re.compile(r"(?i)\s*(元|块|บาท|泰铢|thb|baht|฿|kip)+\s*$")
 _NAME_LEAD = re.compile(r"(?i)^[\s、,，/和跟加与及还有然后＋+]+|^(元|块|บาท|thb|baht|฿)\s*")
 
@@ -461,27 +463,15 @@ def extract_inline_vendor(text: str) -> str:
     return ""
 
 
-def _in_hyphen_code(s: str, m) -> bool:
-    """金额匹配落在连字号数字串(7-11 / 02-99 等品牌/编号/区间)→ 非金额(P1E-3:店名「ที่ 7-11」
-    的 7 此前被当金额致总额 +7)。两侧任一紧贴 数字-连字号 即判定为编号片段,不计入。"""
-    a, b = m.start(2), m.end(2)
-    after = b + 1 < len(s) and s[b] == "-" and s[b + 1].isdigit()
-    before = a >= 2 and s[a - 1] == "-" and s[a - 2].isdigit()
-    return after or before
-
-
 def parse_multi(text: str) -> Optional[list]:
     """一句话拆多项 → [{name, amount(Decimal)}];<2 项返 None(走单笔老路)。
 
     名去首尾货币词/连接词(和/跟/加…)。确定性正则(不靠 LLM 拆·避免误拆)。字段声明词
     (「ผู้ขาย 711」)是卖家标注非商品 → 不计入金额(P1E-3·总额不被内联卖家撑大);连字号数字串
-    (店名「7-11」)是编号非金额 → 不计入(P1E-3·总额不被 7-11 的 7 撑大)。
+    (店名「7-11」)由 _MULTI_RE 的 lookaround 直接排除,不进 items。
     """
-    s = (text or "").strip()
     items = []
-    for m in _MULTI_RE.finditer(s):
-        if _in_hyphen_code(s, m):
-            continue
+    for m in _MULTI_RE.finditer((text or "").strip()):
         name = _UNIT_TAIL.sub("", _NAME_LEAD.sub("", m.group(1).strip())).strip(" -·:、,，/")
         try:
             amt = Decimal(m.group(2).replace(",", ""))

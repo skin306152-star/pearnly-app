@@ -88,6 +88,12 @@ def _send_posted(cur, reply_token, detail, *, ref, ws, lang, tid, luid) -> None:
         logger.warning("[line card] set active after post failed", exc_info=True)
 
 
+def _send_voided(reply_token, *, ref, ws, lang, tid, luid, detail) -> None:
+    """已撤销终态卡(带税额拆解·金额取自 detail):postback 撤销 / 重复点击重发 共用(去重复)。"""
+    amount = (detail.get("doc") or {}).get("grand_total") if detail else None
+    _terminal_card(reply_token, "voided", ref, ws, amount, lang, tid, luid, detail=detail)
+
+
 def _reshow_current(cur, reply_token, *, ref, ws, lang, tid, luid) -> None:
     """重复点击/已处理 → 按单据真实状态重发当前卡(验收 2/6):posted 重发 posted 卡(不重复入账)、
     void 回终态卡;草稿/已删 → 友好回执(不报错、不跳登录)。"""
@@ -98,17 +104,7 @@ def _reshow_current(cur, reply_token, *, ref, ws, lang, tid, luid) -> None:
     if status == "posted":
         _send_posted(cur, reply_token, detail, ref=ref, ws=ws, lang=lang, tid=tid, luid=luid)
     elif status == "void":
-        _terminal_card(
-            reply_token,
-            "voided",
-            ref,
-            ws,
-            (detail.get("doc") or {}).get("grand_total"),
-            lang,
-            tid,
-            luid,
-            detail=detail,
-        )
+        _send_voided(reply_token, ref=ref, ws=ws, lang=lang, tid=tid, luid=luid, detail=detail)
     else:
         line_reply.reply_text_context(
             reply_token,
@@ -202,17 +198,7 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
             elif action == line_postback.ACTION_UNDO:
                 res = posting_svc.void_doc(cur, **scope, doc_id=ref, created_by=uid)
                 # 终态卡(已撤销):徽章 + 整句 + 金额/税额拆解/记录号 + 「查看记录」(原单留存可查)。
-                _terminal_card(
-                    reply_token,
-                    "voided",
-                    ref,
-                    ws,
-                    (res.get("doc") or {}).get("grand_total"),
-                    lang,
-                    tid,
-                    luid,
-                    detail=res,
-                )
+                _send_voided(reply_token, ref=ref, ws=ws, lang=lang, tid=tid, luid=luid, detail=res)
 
             elif action == line_postback.ACTION_DISCARD:
                 docs_svc.delete_doc(cur, **scope, doc_id=ref)  # 仅草稿可删(内部 status='draft' 守)

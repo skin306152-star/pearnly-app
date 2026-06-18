@@ -11,6 +11,7 @@ from decimal import Decimal, InvalidOperation
 
 from services.purchase import field_clean
 from services.purchase import intake as ik
+from services.purchase import totals as totals_svc
 
 
 def _dec(v) -> Decimal:
@@ -111,13 +112,13 @@ def _card_amounts(fields: dict) -> tuple[str, str, str]:
         and subtotal > 0
         and vat > 0
         and total > 0
-        and abs(subtotal + vat - total) <= Decimal("1.5")
+        and totals_svc.vat_face_consistent(subtotal, vat, total)
     ):
         rnd = total - subtotal - vat
         rnd_str = f"{rnd:,.2f}" if abs(rnd) >= Decimal("0.005") else ""
         return f"{subtotal:,.2f}", f"{vat:,.2f}", rnd_str
     if vat > 0 and total > vat:
-        seven = total * Decimal("7") / Decimal("107")
+        seven = totals_svc.vat_from_inclusive(total)
         if abs(vat - seven) <= max(Decimal("1"), seven * Decimal("0.12")):
             vat = seven.quantize(Decimal("0.01"))
         return f"{(total - vat):,.2f}", f"{vat:,.2f}", ""

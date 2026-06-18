@@ -37,6 +37,12 @@ class StripAndExtractTests(unittest.TestCase):
         self.assertEqual(flow._extract_value("ไม่ใช่ตัวเลข", "amount"), None)
         self.assertEqual(flow._extract_value("711", "seller"), "711")
 
+    def test_extract_payment_normalizes(self):
+        # 付款方式按归一表子串匹配:「改成现金」→ cash、พร้อมเพย์ → promptpay;认不出 → None。
+        self.assertEqual(flow._extract_value("改成现金", "payment"), "cash")
+        self.assertEqual(flow._extract_value("พร้อมเพย์", "payment"), "promptpay")
+        self.assertEqual(flow._extract_value("不知道", "payment"), None)
+
 
 class _FlowBase(unittest.TestCase):
     @contextlib.contextmanager
@@ -124,6 +130,11 @@ class ValueAnswerTests(unittest.TestCase):
         # 验收 #1:2026/6/18 / 2026-06-18 → 2026-06-18。
         cap, _, _ = self._run("correctval:1:D1:date", "2026/6/18")
         self.assertEqual(cap["changes"], {"doc_date": "2026-06-18"})
+
+    def test_payment_value_delegates(self):
+        # 付款方式可直接改:已问新值 → 「改成现金」→ 委托 payment_method=cash(不再甩详情页)。
+        cap, _, _ = self._run("correctval:1:D1:payment", "改成现金")
+        self.assertEqual(cap["changes"], {"payment_method": "cash"})
 
     def test_field_switch_to_seller(self):
         # 验收 #3:等日期时用户改说卖家 → 切到卖家,不再问日期。

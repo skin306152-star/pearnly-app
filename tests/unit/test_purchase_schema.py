@@ -61,6 +61,15 @@ class PurchaseSchemaParityTests(unittest.TestCase):
             for t in _tables_in(m):
                 self.assertIn(f't="{t}"', text, f"{m}:{t} 缺 RLS policy 应用(_RLS.format)")
 
+    def test_payment_method_column_dual_run(self):
+        # purchase_docs.payment_method 须 ensure(CREATE/ALTER 自愈)+ alembic 0042 双跑(铁律 #5)。
+        ensure = (_ROOT / _ENSURE).read_text(encoding="utf-8")
+        self.assertIn("payment_method text", ensure)
+        mig = (_ROOT / "alembic/versions/0042_purchase_payment_method.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("payment_method", mig)
+
 
 if __name__ == "__main__":
     unittest.main()

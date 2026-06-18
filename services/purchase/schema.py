@@ -56,6 +56,7 @@ _TABLES = (
         requester_user_id uuid,
         approval_status text NOT NULL DEFAULT 'none',
         payment_status text NOT NULL DEFAULT 'unpaid',
+        payment_method text,
         paid_amount numeric(14,2) NOT NULL DEFAULT 0,
         due_date date,
         source text,
@@ -157,6 +158,7 @@ _ALTERS = (
     "ADD COLUMN IF NOT EXISTS amount_override boolean NOT NULL DEFAULT FALSE",
     "ALTER TABLE purchase_settings "
     "ADD COLUMN IF NOT EXISTS auto_book boolean NOT NULL DEFAULT TRUE",
+    "ALTER TABLE purchase_docs ADD COLUMN IF NOT EXISTS payment_method text",
 )
 
 _RLS_TABLES = (

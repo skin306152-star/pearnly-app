@@ -166,6 +166,14 @@ def _printed_total_rounding(fields: dict, lines: list) -> Decimal:
     return Decimal("0")
 
 
+def _ocr_payment_method(fields: dict) -> Optional[str]:
+    """OCR 票面付款方式 → 规范码落库(认不出留原文·与卡片 line_ingest 同口径)。无 → None。"""
+    from services.expense.line_classify import normalize_payment_method
+
+    raw = str(fields.get("payment_method") or "").strip()
+    return (normalize_payment_method(raw) or raw) or None
+
+
 def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
     """OCR 抽取 → 进项录入草稿(屏10 预填)。行取自 items,无 items 则按总额单行兜底。
 
@@ -214,6 +222,7 @@ def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
         "has_vat": has_vat,
         "currency": "THB",
         "payment_status": default_payment_status(fields.get("document_type"), kind),
+        "payment_method": _ocr_payment_method(fields),
         "lines": lines,
     }
     # 含税合计尊重票面 Total:差额(凑整 / 费用单不可抵 VAT)落 doc 级 rounding,明细保留票面行额。

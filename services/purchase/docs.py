@@ -19,8 +19,8 @@ _DOC_COLS = (
     "id, workspace_client_id, doc_kind, supplier_id, doc_no, doc_date, has_vat, "
     "currency, fx_rate, subtotal, discount_total, vat_amount, wht_amount, rounding, "
     "grand_total, net_payable, category_id, requester, requester_user_id, "
-    "approval_status, payment_status, paid_amount, due_date, source, dedupe_key, "
-    "status, amount_override, created_by, created_at, updated_at"
+    "approval_status, payment_status, payment_method, paid_amount, due_date, source, "
+    "dedupe_key, status, amount_override, created_by, created_at, updated_at"
 )
 _LINE_COLS = (
     "id, line_no, item_type, product_id, description, qty, unit, unit_price, discount, "
@@ -143,10 +143,10 @@ def create_doc(
             (tenant_id, workspace_client_id, doc_kind, supplier_id, doc_no, doc_date,
              has_vat, currency, fx_rate, subtotal, discount_total, vat_amount, wht_amount,
              rounding, grand_total, net_payable, category_id, requester, requester_user_id,
-             approval_status, payment_status, due_date, source, ocr_raw, dedupe_key, status,
-             amount_override, created_by)
+             approval_status, payment_status, payment_method, due_date, source, ocr_raw,
+             dedupe_key, status, amount_override, created_by)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s)
+                %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s)
         RETURNING id
         """,
         (
@@ -171,6 +171,7 @@ def create_doc(
             (data.get("requester_user_id") or None),
             (data.get("approval_status") or "none"),
             (data.get("payment_status") or "unpaid"),
+            (data.get("payment_method") or None),
             (data.get("due_date") or None),
             (data.get("source") or "manual"),
             json.dumps(data.get("ocr_raw")) if data.get("ocr_raw") is not None else None,
@@ -411,7 +412,7 @@ def update_draft(
             currency = %s, fx_rate = %s, subtotal = %s, discount_total = %s, vat_amount = %s,
             wht_amount = %s, rounding = %s, grand_total = %s, net_payable = %s,
             category_id = %s, requester = %s, due_date = %s, payment_status = %s,
-            amount_override = %s, updated_at = now()
+            payment_method = %s, amount_override = %s, updated_at = now()
         WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s
         """,
         (
@@ -433,6 +434,7 @@ def update_draft(
             (data.get("requester") or None),
             (data.get("due_date") or None),
             (data.get("payment_status") or "unpaid"),
+            (data.get("payment_method") or None),
             overridden,
             tenant_id,
             workspace_client_id,

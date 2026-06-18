@@ -69,6 +69,16 @@ class CollectChangesTests(unittest.TestCase):
     def test_bad_date_and_zero_amount_dropped(self):
         self.assertEqual(line_correct._collect_changes({"date": "昨天", "amount": 0}), {})
 
+    def test_payment_only_when_named_in_text(self):
+        # 点名付款方式才从原文归一;裸记账文本(无付款方式词)不误把「现金」当改付款。
+        self.assertEqual(
+            line_correct._collect_changes({}, "付款方式改成现金"), {"payment_method": "cash"}
+        )
+        self.assertEqual(
+            line_correct._collect_changes({"amount": 50}, "现金买咖啡 50"),
+            {"amount": Decimal("50")},
+        )
+
 
 class ApplyChangesTests(unittest.TestCase):
     def _data(self):
@@ -96,6 +106,13 @@ class ApplyChangesTests(unittest.TestCase):
         self.assertEqual(data["lines"][0]["unit_price"], "550")
         self.assertEqual(data["lines"][0]["qty"], "1")
         self.assertIsNone(data["amount_override"])
+
+    def test_payment_method_sets_doc_field(self):
+        data = {"lines": [{}]}
+        line_correct._apply_changes(
+            None, data, ExpenseDraft(payment_method="cash"), ["payment_method"], "t", 1, {}
+        )
+        self.assertEqual(data["payment_method"], "cash")
 
     def test_category_resolves_and_sets_lines(self):
         data = {"lines": [{"category_id": "x"}, {"category_id": "y"}]}
@@ -419,10 +436,12 @@ class MaybeClarifyFeedbackTests(unittest.TestCase):
         self.assertTrue(res)
         self.assertIn("详情页", body)
 
-    def test_payment_guides_web(self):
+    def test_payment_asks_for_value(self):
+        # 付款方式现可直接改(低风险)→ 点名但没给值 → 问新值(不再甩详情页/网页)。
         res, body = self._run("付款方式不对")
         self.assertTrue(res)
-        self.assertIn("Pearnly", body)  # line_web_handoff
+        self.assertIn("付款方式", body)
+        self.assertIn("改成", body)  # ASK_VALUE 引导语法
 
     def test_concrete_edit_falls_through_to_edit(self):
         # 「改成X」是具体编辑 → 交 edit 流(request_correct),本层不接管。

@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 """LINE 对话内改错(改错闭环 · P1E-2 · 绝不静默覆盖)。
 
-定位 引用卡片 > 第 N 笔 > 「上一笔」(绝不默认改最近一笔)。执行三档(_apply_or_confirm):草稿单非金额
-字段直接改;已入账/改金额/多字段确认;多行金额引导详情页。_apply:草稿原地 update_draft、已入账
-correct_doc(void+克隆,多行/票图/已结期红冲全保留)。会话态复用 conversation.pending,不新建表。
-金额/税额/过账永不信 LLM。maybe_clarify_feedback:笼统「识别错了/ผิด」或引用点名字段 → 澄清/问新值,
-绝不退化成 OCR 失败帮助。多轮态机在 line_correct_flow。
+定位 引用卡片 > 第 N 笔(绝不默认改最近一笔)。执行三档(_apply_or_confirm):草稿单非金额字段直接改;
+已入账/改金额/多字段确认;多行金额引导详情页。_apply:草稿原地 update_draft、已入账 correct_doc(void
++克隆,多行/票图/已结期红冲保留)。会话态复用 conversation.pending,不新建表。金额/税额/过账永不信 LLM。
+多轮态机在 line_correct_flow。
 """
 
 from __future__ import annotations
@@ -15,9 +14,11 @@ from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from core import db
-from services.expense import conversation
+from services.expense import conversation, line_classify
+from services.expense import line_correct_i18n as ci
 from services.expense.expense_draft import ExpenseDraft
-from services.line_binding import line_client, line_reply
+from services.line_binding import line_client, line_message_refs, line_reply
+from services.purchase import docs as docs_svc
 
 _PREFIX = "correct:"  # 待 是/否 确认(最终)
 _CLAR_PREFIX = "correctclar:"  # 待用户选「改哪个字段」(多轮·correctclar:<ws>:<doc>)
@@ -49,8 +50,9 @@ def _affirmative(text: str) -> bool:
     return any(k in t for k in _YES)
 
 
-def _collect_changes(u: dict) -> dict:
-    """大脑槽位 → 要改字段(canonical)。科目只在无金额/卖家/日期时才从 note 取(避免误当科目)。"""
+def _collect_changes(u: dict, text: str = "") -> dict:
+    """大脑槽位 → 要改字段(canonical)。科目只在无金额/卖家/日期时从 note 取;付款方式不在槽位,
+    仅当原文点名付款方式才归一(挡正常记账文本里的裸 cash/qr 误判)。"""
     changes: dict = {}
     amt = u.get("amount")
     if amt not in (None, "", 0):
@@ -66,14 +68,18 @@ def _collect_changes(u: dict) -> dict:
     d = (u.get("date") or "").strip()
     if re.fullmatch(r"\d{4}-\d{2}-\d{2}", d):
         changes["doc_date"] = d
+    if text and line_classify.detect_correction_field(text) == "payment":
+        pm = line_classify.normalize_payment_method(text)
+        if pm:
+            changes["payment_method"] = pm
     note = (u.get("note") or "").strip()
     if note and not changes:
         changes["category"] = note
     return changes
 
 
-def _summary(changes: dict) -> str:
-    """改动摘要(确认卡用 · emoji 前缀免逐字段翻译标签)。"""
+def _summary(changes: dict, lang: str) -> str:
+    """改动摘要(确认卡用 · emoji 前缀免逐字段翻译标签)。付款方式码本地化成人话。"""
     parts = []
     if "amount" in changes:
         parts.append(f"฿{changes['amount']}")
@@ -83,6 +89,8 @@ def _summary(changes: dict) -> str:
         parts.append(f"📅 {changes['doc_date']}")
     if "category" in changes:
         parts.append(f"🏷️ {changes['category']}")
+    if "payment_method" in changes:
+        parts.append(f"💳 {ci.pay_label(changes['payment_method'], lang)}")
     return " · ".join(parts)
 
 
@@ -99,8 +107,8 @@ def _clear(tid, line_user_id) -> None:  # 清改错会话态(终态/直接执行
         conversation.clear_pending(cur, line_user_id=line_user_id)
 
 
-def _field_old(detail: dict, key: str) -> str:
-    """单字段旧值(确认文案「从 旧 改成 新」用)。取不到 → —。"""
+def _field_old(detail: dict, key: str, lang: str) -> str:
+    """单字段旧值(确认文案「从 旧 改成 新」用)。付款方式码本地化成人话。取不到 → —。"""
     doc = detail.get("doc") or {}
     sup = detail.get("supplier") or {}
     val = {
@@ -108,8 +116,9 @@ def _field_old(detail: dict, key: str) -> str:
         "vendor_name": sup.get("name"),
         "doc_date": doc.get("doc_date"),
         "category": doc.get("category_name") or doc.get("category"),
+        "payment_method": doc.get("payment_method"),
     }.get(key)
-    return str(val) if val not in (None, "") else "—"
+    return ci.disp(key, val, lang) if val not in (None, "") else "—"
 
 
 def _apply_or_confirm(
@@ -117,8 +126,6 @@ def _apply_or_confirm(
 ) -> bool:
     """改错执行三档(产品原则):低风险(草稿 + 单个非金额字段)直接改回完成;高风险(已入账/改金额[税额
     重算]/多字段)出确认;多行金额 → 详情页。作废/不存在 → 诚实兜底。changes = 规范键 dict。"""
-    from services.expense import line_correct_i18n as ci
-    from services.purchase import docs as docs_svc
 
     def _say(body):
         line_reply.reply_text_context(
@@ -141,6 +148,7 @@ def _apply_or_confirm(
         vendor_name=changes.get("vendor_name") or "",
         doc_date=changes.get("doc_date") or "",
         note=changes.get("category") or "",
+        payment_method=changes.get("payment_method") or "",
     )
     keys = sorted(changes)
     # 高风险=已入账(void重建)/改金额(税额重算)/多字段;草稿单非金额=低风险直接改。
@@ -153,7 +161,8 @@ def _apply_or_confirm(
             _say(line_client.t_line(lang, "exp_correct_none"))
             return True
         k = keys[0]
-        _say(ci.t(ci.CHANGED_DONE, lang, field=ci.key_label(k, lang), new=changes[k]))
+        fl, nv = ci.key_label(k, lang), ci.disp(k, changes[k], lang)
+        _say(ci.t(ci.CHANGED_DONE, lang, field=fl, new=nv))
         return True
     with db.get_cursor_rls(tid, commit=True) as cur:
         conversation.save_pending(
@@ -171,12 +180,12 @@ def _apply_or_confirm(
                 ci.CONFIRM_FIELD_CHANGE,
                 lang,
                 field=ci.key_label(k, lang),
-                old=_field_old(detail, k),
-                new=changes[k],
+                old=_field_old(detail, k, lang),
+                new=ci.disp(k, changes[k], lang),
             )
         )
     else:
-        _say(ci.t(ci.CONFIRM_MULTI, lang, changes=_summary(changes)))
+        _say(ci.t(ci.CONFIRM_MULTI, lang, changes=_summary(changes, lang)))
     return True
 
 
@@ -195,14 +204,13 @@ def request_correct(
 ) -> bool:
     """edit 意图(一次说清「X改成Y」)→ 收集改动 + 定位目标 → 委托 _apply_or_confirm(风险三档)。
     定位失败 → 提示 reply(绝不默认改最近一笔)。"""
-    from services.line_binding import line_message_refs
 
     def _say(body):
         line_reply.reply_text_context(
             reply_token, body, quote_token=quote_token, line_user_id=line_user_id, tenant_id=tid
         )
 
-    changes = _collect_changes(u)
+    changes = _collect_changes(u, text)
     if not changes:
         _say(line_client.t_line(lang, "line_need_reply_record"))
         return True
@@ -234,15 +242,11 @@ def request_correct(
 def maybe_clarify_feedback(reply_token, text, lang, ws, quoted_message_id, ctx) -> bool:
     """采购改错澄清入口 = 命中「识别错了/ผิด」或引用卡片点名字段 → 本层接管,绝不退化成 OCR 失败重拍
     (优先级高于闲聊/OCR 帮助/能力问答)。点名字段 → 问新值并存会话态(correctval);笼统 → 列字段问改哪里
-    并存 correctclar(下一句由 line_correct_flow 续接);明细/付款 → 详情页;没解析到记录 → 引导回复那条。
+    并存 correctclar(下一句由 line_correct_flow 续接);明细 → 详情页;没解析到记录 → 引导回复那条。
     具体「改成X」(is_edit)交 request_correct。ctx 带 quote_token/line_user_id/tenant_id(回复带引用)。"""
-    from services.expense import line_classify
-    from services.expense import line_correct_i18n as ci
     from services.expense import line_quick_entry as lqe
 
-    # 触发:① 反馈词「识别错了/不对/wrong/ผิด」,或 ② 引用了卡片且点名了字段(如「ผู้ขายไม่ใช่คนนี้」)。
-    # 后者让「卖家不是这个」这类在记账/收入识别(「ผู้ขาย」含「ขาย」)之前先被改错澄清接住。
-    # 具体「改成X」(is_edit_request)交 edit 流(request_correct)·此处只澄清不改账。
+    # 引用卡片点名字段需先于收入识别接住(「ผู้ขาย」含「ขาย」);具体「改成X」交 edit 流,此处只澄清。
     field = line_classify.detect_correction_field(text)
     triggered = line_classify.is_correction_feedback(text) or (bool(quoted_message_id) and field)
     if not triggered or lqe.is_edit_request(text):
@@ -253,9 +257,6 @@ def maybe_clarify_feedback(reply_token, text, lang, ws, quoted_message_id, ctx) 
 
     def _say(body):
         line_reply.reply_text_context(reply_token, body, **ctx)
-
-    from services.line_binding import line_message_refs
-    from services.purchase import docs as docs_svc
 
     line_user_id = ctx.get("line_user_id")
     detail, doc_id, ws_eff = None, None, ws
@@ -285,10 +286,9 @@ def maybe_clarify_feedback(reply_token, text, lang, ws, quoted_message_id, ctx) 
     elif field == "items" or (field == "amount" and multiline):
         # 多行/明细行级改(总额或某行)→ 详情页(说明原因·非「明细可能不完整」OCR 文案·验收 #3/#4)
         _say(ci.t(ci.MULTILINE_EDIT, reply_lang))
-    elif field == "payment":
-        _say(line_client.t_line(reply_lang, "line_web_handoff"))
-    elif field in ("amount", "date", "seller", "category"):
-        # 点名了可改字段但没给值 → 存「待该字段新值」会话态,问新值(下一句直接答即可·验收 #3/#5)。
+    elif field in ("amount", "date", "seller", "category", "payment"):
+        # 点名可改字段但没给值 → 存「待该字段新值」态,问新值(下一句直接答·验收 #3/#5)。付款方式
+        # 同走此路(低风险展示属性·不动金额/税额),下一句给「现金/โอน」即归一直接改。
         _save_state(tid, ws_eff, doc_id, line_user_id, f"{_VAL_PREFIX}{ws_eff}:{doc_id}:{field}")
         _say(ci.t(ci.ASK_VALUE, reply_lang, field=ci.field_label(field, reply_lang)))
     else:
@@ -349,8 +349,6 @@ def try_confirm(
     if res["posted"]:
         _say(line_client.t_line(lang, "exp_correct_posted", new=res["total"]))
     elif res.get("mode") == "draft_inplace":
-        from services.expense import line_correct_i18n as ci
-
         _say(ci.t(ci.DRAFT_EDITED, lang, new=res["total"]))  # 草稿原地改·不提「冲销原单」
     else:
         _say(line_client.t_line(lang, "exp_correct_draft", new=res["total"]))
@@ -372,7 +370,6 @@ def _parse_missing(missing: str):
 def _apply(cur, bound_user, tid, ws, orig_id, changes_draft, keys, detail=None) -> Optional[dict]:
     """应用改动:已入账 → void+克隆+改+auto_book 过账;草稿 → 原地改。detail 可传入免重 fetch。作废/无 → None。"""
     from services.purchase import correct as correct_svc
-    from services.purchase import docs as docs_svc
     from services.purchase import posting as posting_svc
     from services.purchase import settings as settings_svc
 
@@ -433,6 +430,7 @@ def _detail_to_data(detail: dict) -> dict:
         "requester": doc.get("requester"),
         "due_date": doc.get("due_date"),
         "payment_status": doc.get("payment_status") or "unpaid",
+        "payment_method": doc.get("payment_method"),
         "amount_override": doc.get("amount_override"),
         "discount_total": doc.get("discount_total") or 0,
         "rounding": doc.get("rounding") or 0,
@@ -480,6 +478,8 @@ def _apply_changes(cur, data, changes_draft, keys, tid, ws, bound_user) -> None:
         for ln in data["lines"]:
             ln["category_id"] = cid
             ln["subcategory_id"] = sid
+    if "payment_method" in keys:
+        data["payment_method"] = changes_draft.payment_method or None
     if "amount" in keys:
         data["amount_override"] = None
         if data["lines"]:

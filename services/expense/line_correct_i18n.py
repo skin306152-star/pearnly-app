@@ -7,20 +7,21 @@
 
 from __future__ import annotations
 
-# 可在 LINE 内直接改的字段标签(填进「问新值」模板)。明细/付款方式不在此(改在详情页)。
+# 可在 LINE 内直接改的字段标签(填进「问新值」模板)。明细仍在详情页(行级);付款方式可直接改。
 FIELD_LABELS = {
     "amount": {"zh": "金额", "th": "ยอดเงิน", "en": "amount", "ja": "金額"},
     "date": {"zh": "日期", "th": "วันที่", "en": "date", "ja": "日付"},
     "seller": {"zh": "卖家", "th": "ร้านค้า", "en": "seller", "ja": "販売者"},
     "category": {"zh": "分类", "th": "หมวดหมู่", "en": "category", "ja": "分類"},
+    "payment": {"zh": "付款方式", "th": "วิธีชำระเงิน", "en": "payment method", "ja": "支払方法"},
 }
 
 # 验收 #1:笼统说「识别错了/不对」→ 列可改字段,问改哪里(不重拍·不当 OCR 失败)。
 CLARIFY_FIELDS = {
-    "zh": "我知道你想修改这张记录。你想改金额、日期、卖家、分类,还是明细?",
-    "th": "ฉันเห็นว่าคุณต้องการแก้รายการนี้ค่ะ ต้องการแก้ส่วนไหน: ยอดเงิน, วันที่, ร้านค้า, หมวดหมู่ หรือรายการย่อย?",
-    "en": "I see you want to correct this record. Which part should I change: amount, date, seller, category, or line items?",
-    "ja": "この記録を修正したいのですね。どの項目を変更しますか:金額、日付、販売者、分類、明細?",
+    "zh": "我知道你想修改这张记录。你想改金额、日期、卖家、分类、付款方式,还是明细?",
+    "th": "ฉันเห็นว่าคุณต้องการแก้รายการนี้ค่ะ ต้องการแก้ส่วนไหน: ยอดเงิน, วันที่, ร้านค้า, หมวดหมู่, วิธีชำระเงิน หรือรายการย่อย?",
+    "en": "I see you want to correct this record. Which part should I change: amount, date, seller, category, payment method, or line items?",
+    "ja": "この記録を修正したいのですね。どの項目を変更しますか:金額、日付、販売者、分類、支払方法、明細?",
 }
 
 # 验收 #3:指出了具体字段但没给新值 → 问新值,并引导用「改成」语法(下一句走既有 edit 流确认)。
@@ -85,19 +86,34 @@ def field_label(field: str, lang: str) -> str:
     return FIELD_LABELS.get(field, {}).get(lang) or FIELD_LABELS.get(field, {}).get("zh", field)
 
 
-# 字段名(detect_correction_field 的 amount/date/seller/category)→ 规范键(_apply_changes / changes
-# dict)。唯一源,反向由它派生(防两份手维护漂移)。
+# 字段名(detect_correction_field 的 amount/date/seller/category/payment)→ 规范键(_apply_changes /
+# changes dict)。唯一源,反向由它派生(防两份手维护漂移)。
 FIELD_TO_KEY = {
     "amount": "amount",
     "date": "doc_date",
     "seller": "vendor_name",
     "category": "category",
+    "payment": "payment_method",
 }
 _KEY_TO_FIELD = {v: k for k, v in FIELD_TO_KEY.items()}
 
 
 def key_label(key: str, lang: str) -> str:
     return field_label(_KEY_TO_FIELD.get(key, key), lang)
+
+
+def pay_label(code: str, lang: str) -> str:
+    """付款方式码 → 本地化标签(复用卡片同口径 line_card._method_label · 单一源)。"""
+    from services.line_binding import line_card, line_card_i18n
+
+    return line_card._method_label(code, line_card_i18n.chrome(lang))
+
+
+def disp(key: str, value, lang: str) -> str:
+    """字段值 → 展示文本(付款方式码本地化成人话·其余原样·回执/确认用)。"""
+    if key == "payment_method":
+        return pay_label(value, lang)
+    return str(value)
 
 
 def t(pool: dict, lang: str, **kw) -> str:

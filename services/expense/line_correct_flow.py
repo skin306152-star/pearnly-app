@@ -136,14 +136,15 @@ def _handle_value(bound_user, reply_token, text, lang, tid, missing, ctx) -> boo
 
 
 def _route_field(bound_user, reply_token, text, lang, tid, ws, doc_id, field, ctx) -> bool:
-    """统一字段处理(澄清/切换/收值共用):明细/付款 → 详情页;没值 → 存态问值;有值 → 交风险三档执行。
+    """统一字段处理(澄清/切换/收值共用):明细 → 详情页(行级);没值 → 存态问值;有值 → 交风险三档执行。
 
+    付款方式可直接改(低风险展示属性)→ 走收值路径,不再甩详情页。
     全程锁定 active_doc_id(从 pending 传入·不重新猜)→ 同一会话内不会回「找不到记录」(#5/#7)。
     有值后的「直接执行 / 确认 / 多行详情页」三档判定统一在 line_correct._apply_or_confirm。
     """
     reply_lang = line_classify.detect_text_lang(text) or lang
     luid = ctx["line_user_id"]
-    if field in ("items", "payment"):
+    if field == "items":
         line_correct._clear(tid, luid)
         _say(reply_token, ci.t(ci.MULTILINE_EDIT, reply_lang), ctx)
         return True
@@ -172,12 +173,21 @@ def _route_field(bound_user, reply_token, text, lang, tid, ws, doc_id, field, ct
 
 
 def _extract_value(text: str, field: str):
-    """用户答 → 字段值:金额取数字;日期(相对/年首/ISO/DD-MM);卖家/分类剥前缀+否定填充。无 → None。"""
+    """用户答 → 字段值:金额取数字;日期(相对/年首/ISO/DD-MM);付款方式归一码;卖家/分类剥前缀+否定填充。
+
+    付款方式用归一表子串匹配(「改成现金」含「现金」→ cash),认不出 → None 再问。无 → None。
+    """
     if field == "amount":
         amt = lqe.parse_expense(text).amount
         return amt if (amt and amt > Decimal("0")) else None
     if field == "date":
         return lqe._parse_date(text)  # 相对词/年首/ISO/DD-MM 全在共用解析器
+    if field == "payment":
+        return (
+            line_classify.normalize_payment_method(text)
+            or line_classify.detect_payment_method(text)
+            or None
+        )
     cleaned = _strip_prefix(text)
     return cleaned or None
 

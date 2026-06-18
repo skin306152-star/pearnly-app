@@ -76,6 +76,15 @@ class BuildDraftTests(unittest.TestCase):
         self.assertFalse(d["has_vat"])
         self.assertEqual(d["lines"][0]["vat_rate"], 0)
 
+    def test_payment_method_persisted_and_normalized(self):
+        # OCR 票面付款方式归一码落库;无信号 → None(不硬塞默认)。
+        f = {"items": [{"name": "x", "qty": "1", "price": "100"}], "payment_method": "QRPayment"}
+        self.assertEqual(
+            ik.build_draft_from_invoice(f, kind="expense")["payment_method"], "promptpay"
+        )
+        f2 = {"items": [{"name": "x", "qty": "1", "price": "100"}]}
+        self.assertIsNone(ik.build_draft_from_invoice(f2, kind="expense")["payment_method"])
+
     def test_expense_receipt_keeps_printed_line_and_honors_total(self):
         # 普通 receipt 不能抵 VAT,但 VAT 仍是费用成本。明细保留票面税前行额(2544·不 gross-up),
         # 含税合计经 rounding 尊重票面 Total 2722(差额=不可抵 VAT 计入成本)。

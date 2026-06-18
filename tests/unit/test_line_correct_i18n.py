@@ -15,9 +15,23 @@ class CorrectI18nTests(unittest.TestCase):
                 self.assertTrue(pool.get(lg), f"missing {lg}")
 
     def test_field_labels_four_langs(self):
-        for field in ("amount", "date", "seller", "category"):
+        for field in ("amount", "date", "seller", "category", "payment"):
             for lg in _LANGS:
                 self.assertTrue(ci.field_label(field, lg))
+
+    def test_payment_field_key_maps_to_payment_method(self):
+        self.assertEqual(ci.FIELD_TO_KEY["payment"], "payment_method")
+        self.assertEqual(ci.key_label("payment_method", "zh"), "付款方式")
+
+    def test_pay_label_localizes_code(self):
+        # 付款方式码 → 人话(复用卡片同口径);未知码原样保留不丢信息。
+        self.assertEqual(ci.pay_label("cash", "zh"), "现金")
+        self.assertEqual(ci.pay_label("promptpay", "en"), "PromptPay")
+        self.assertEqual(ci.pay_label("เก็บปลายทาง", "th"), "เก็บปลายทาง")
+
+    def test_disp_only_localizes_payment(self):
+        self.assertEqual(ci.disp("payment_method", "cash", "zh"), "现金")
+        self.assertEqual(ci.disp("vendor_name", "7-11", "zh"), "7-11")
 
     def test_ask_value_interpolates_field(self):
         body = ci.t(ci.ASK_VALUE, "zh", field=ci.field_label("seller", "zh"))

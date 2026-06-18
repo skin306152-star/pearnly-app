@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
-"""LINE 对话内改错 = 冲销原单 + 忠实克隆草稿 + 应用改动(改错闭环 · P2 · 绝不静默覆盖)。
+"""LINE 对话内改错(改错闭环 · P1E-2 · 绝不静默覆盖)。
 
-支持:改金额(仅单行票)/ 改卖家 / 改日期 / 改科目;按「第 N 笔」(查明细列表序号)或「上一笔」
-定位目标。大脑(line_agent.understand)抽出改什么字段→什么值,这层确定性执行:
-  请确认 → 用户回「是」→ correct_doc(void 原单 + DB 级照搬克隆,多行/总额/票图/已结期红冲全保留)
-  → 对克隆草稿 update_draft 应用改动 → 按 auto_book 决定过账。
-金额/总额永不信 LLM:单行票改金额=设该行单价;多行票金额不在 LINE 改(不重算/不摊销/不猜行)→
-引导网页明细页逐行确认。两轮确认复用 conversation.pending(missing=correct:<id>:<keys>),不新建表。
+支持:改金额(仅单行票)/ 改卖家 / 改日期 / 改科目;定位优先级 引用卡片(quote)> 第 N 笔 > 明确
+「上一笔」(绝不默认改最近一笔)。目标 = 草稿(confirm 卡)或已入账单:
+  草稿 → 原地 update_draft(不冲销·仍是草稿待卡片确认)
+  已入账 → correct_doc(void 原单 + DB 级照搬克隆,多行/总额/票图/已结期红冲全保留)→ 改 → auto_book 过账
+两轮确认复用 conversation.pending(missing=correct:<ws>:<id>:<keys>),不新建表。
+maybe_clarify_feedback:笼统「识别错了/不对/wrong/ผิด」或引用卡片点名字段 → 澄清/问新值/引导详情页,
+绝不退化成 OCR 失败帮助。金额/总额/过账永不信 LLM;多行金额不在 LINE 猜行 → 引导网页逐行确认。
 """
 
 from __future__ import annotations
@@ -114,6 +115,7 @@ def request_correct(
 
     确认/失败/引导回复引用用户触发改错的那条消息(quoteToken·展示);业务定位仍走 quotedMessageId。
     """
+    from services.expense import line_correct_i18n as ci
     from services.line_binding import line_message_refs
     from services.purchase import docs as docs_svc
 
@@ -141,11 +143,13 @@ def request_correct(
             return True
         target_id, ws_eff = tgt["doc_id"], tgt["ws"]
         detail = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws_eff, doc_id=target_id)
-        if not detail or (detail.get("doc") or {}).get("status") != "posted":
+        status = (detail.get("doc") or {}).get("status") if detail else None
+        # 草稿 与 已入账 都可改(草稿原地改·已入账冲销重记);作废/不存在 → 诚实兜底。
+        if status not in ("posted", "draft"):
             _say(line_client.t_line(lang, "exp_correct_none"))
             return True
         if "amount" in changes and len(detail.get("lines") or []) > 1:
-            # 多行票金额:不在 LINE 改(不重算/不摊销/不猜行)→ 引导到详情页逐行确认。
+            # 多行/明细金额:不在 LINE 猜哪一行 → 引导详情页逐行核对(草稿/已入账同此·验收 #4)。
             _say(line_client.t_line(lang, "line_web_handoff"))
             return True
         changes_draft = ExpenseDraft(
@@ -163,10 +167,23 @@ def request_correct(
             missing=f"{_PREFIX}{ws_eff}:{target_id}:{'|'.join(sorted(changes))}",
         )
         old_total = (detail.get("doc") or {}).get("grand_total")
+    # 确认文案按目标状态选:草稿用「改这张草稿」(不提冲销),已入账用既有「冲销重记」措辞。
+    is_draft = status == "draft"
     if set(changes) == {"amount"}:
-        _say(line_client.t_line(lang, "exp_correct_confirm", old=old_total, new=changes["amount"]))
+        if is_draft:
+            _say(ci.t(ci.CONFIRM_DRAFT, lang, old=old_total, new=changes["amount"]))
+        else:
+            _say(
+                line_client.t_line(
+                    lang, "exp_correct_confirm", old=old_total, new=changes["amount"]
+                )
+            )
     else:
-        _say(line_client.t_line(lang, "exp_correct_confirm2", changes=_summary(changes)))
+        pool = ci.CONFIRM_DRAFT_FIELDS if is_draft else None
+        if pool:
+            _say(ci.t(pool, lang, changes=_summary(changes)))
+        else:
+            _say(line_client.t_line(lang, "exp_correct_confirm2", changes=_summary(changes)))
     return True
 
 
@@ -187,7 +204,12 @@ def maybe_clarify_feedback(reply_token, text, lang, ws, quoted_message_id, ctx) 
     from services.expense import line_correct_i18n as ci
     from services.expense import line_quick_entry as lqe
 
-    if not (line_classify.is_correction_feedback(text) and not lqe.is_edit_request(text)):
+    # 触发:① 反馈词「识别错了/不对/wrong/ผิด」,或 ② 引用了卡片且点名了字段(如「ผู้ขายไม่ใช่คนนี้」)。
+    # 后者让「卖家不是这个」这类在记账/收入识别(「ผู้ขาย」含「ขาย」)之前先被改错澄清接住。
+    # 具体「改成X」(is_edit_request)交 edit 流(request_correct)·此处只澄清不改账。
+    field = line_classify.detect_correction_field(text)
+    triggered = line_classify.is_correction_feedback(text) or (bool(quoted_message_id) and field)
+    if not triggered or lqe.is_edit_request(text):
         return False
 
     reply_lang = line_classify.detect_text_lang(text) or lang
@@ -221,7 +243,6 @@ def maybe_clarify_feedback(reply_token, text, lang, ws, quoted_message_id, ctx) 
         _say(line_client.t_line(reply_lang, "line_need_reply_record"))
         return True
 
-    field = line_classify.detect_correction_field(text)
     multiline = len(detail.get("lines") or []) > 1
     if field == "items" or (field == "amount" and multiline):
         _say(ci.t(ci.DETAIL_INCOMPLETE, reply_lang))
@@ -270,8 +291,14 @@ def try_confirm(
     if not res:
         _say(line_client.t_line(lang, "exp_correct_none"))
         return True
-    key = "exp_correct_posted" if res["posted"] else "exp_correct_draft"
-    _say(line_client.t_line(lang, key, new=res["total"]))
+    if res["posted"]:
+        _say(line_client.t_line(lang, "exp_correct_posted", new=res["total"]))
+    elif res.get("mode") == "draft_inplace":
+        from services.expense import line_correct_i18n as ci
+
+        _say(ci.t(ci.DRAFT_EDITED, lang, new=res["total"]))  # 草稿原地改·不提「冲销原单」
+    else:
+        _say(line_client.t_line(lang, "exp_correct_draft", new=res["total"]))
     return True
 
 
@@ -289,21 +316,32 @@ def _parse_missing(missing: str):
 
 
 def _apply(cur, bound_user, tid, ws, orig_id, changes_draft, keys) -> Optional[dict]:
-    """冲销原单 + 忠实克隆草稿 + 应用改动 + auto_book 决定过账。原单非 posted → None(诚实)。"""
+    """应用改动。已入账 → 冲销原单 + 忠实克隆草稿 + 改 + auto_book 过账;草稿 → 原地改(不冲销)。
+
+    返回 {new_id, posted, total, mode}(mode=posted_reclone|draft_inplace,供回执选措辞)。
+    目标作废/不存在 → None(诚实)。
+    """
     from services.purchase import correct as correct_svc
     from services.purchase import docs as docs_svc
     from services.purchase import posting as posting_svc
     from services.purchase import settings as settings_svc
 
     detail = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=orig_id)
-    if not detail or (detail.get("doc") or {}).get("status") != "posted":
+    status = (detail.get("doc") or {}).get("status") if detail else None
+    if status not in ("posted", "draft"):
         return None
     uid = str(bound_user["id"]) if bound_user.get("id") else None
-    clone = correct_svc.correct_doc(
-        cur, tenant_id=tid, workspace_client_id=ws, doc_id=orig_id, created_by=uid
-    )
-    new_id = str(clone["doc"]["id"])
-    data = _detail_to_data(clone)
+    if status == "posted":
+        clone = correct_svc.correct_doc(
+            cur, tenant_id=tid, workspace_client_id=ws, doc_id=orig_id, created_by=uid
+        )
+        edit_id = str(clone["doc"]["id"])
+        data = _detail_to_data(clone)
+        mode = "posted_reclone"
+    else:  # 草稿:原地改(无需冲销·update_draft 直接重算重写行)
+        edit_id = str(orig_id)
+        data = _detail_to_data(detail)
+        mode = "draft_inplace"
     _apply_changes(cur, data, changes_draft, keys, tid, ws, bound_user)
     cfg = settings_svc.get_settings(cur, tenant_id=tid, workspace_client_id=ws)
     res = docs_svc.update_draft(
@@ -311,22 +349,23 @@ def _apply(cur, bound_user, tid, ws, orig_id, changes_draft, keys) -> Optional[d
         tenant_id=tid,
         workspace_client_id=ws,
         created_by=uid,
-        doc_id=new_id,
+        doc_id=edit_id,
         data=data,
         settings=cfg,
     )
     total = (res.get("doc") or {}).get("grand_total")
-    if cfg.get("auto_book"):
+    # 草稿原地改:保持草稿(待用户卡片确认),不自动过账;已入账更正:按 auto_book 决定是否重新过账。
+    if status == "posted" and cfg.get("auto_book"):
         posting_svc.post_doc(
             cur,
             tenant_id=tid,
             workspace_client_id=ws,
-            doc_id=new_id,
+            doc_id=edit_id,
             auto_stock_in=False,
             created_by=uid,
         )
-        return {"new_id": new_id, "posted": True, "total": total}
-    return {"new_id": new_id, "posted": False, "total": total}
+        return {"new_id": edit_id, "posted": True, "total": total, "mode": mode}
+    return {"new_id": edit_id, "posted": False, "total": total, "mode": mode}
 
 
 def _detail_to_data(detail: dict) -> dict:

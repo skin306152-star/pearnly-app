@@ -161,7 +161,10 @@ class ApplyTests(unittest.TestCase):
             res = line_correct._apply(
                 object(), {"id": "u"}, "t", 1, "D1", ExpenseDraft(amount=Decimal("550")), ["amount"]
             )
-        self.assertEqual(res, {"new_id": "new1", "posted": True, "total": Decimal("550")})
+        self.assertEqual(
+            res,
+            {"new_id": "new1", "posted": True, "total": Decimal("550"), "mode": "posted_reclone"},
+        )
         self.assertEqual(calls, ["clone", "update", "post"])  # 先克隆→改→过账
 
     def test_draft_when_autobook_off(self):
@@ -190,13 +193,43 @@ class ApplyTests(unittest.TestCase):
         self.assertFalse(res["posted"])
         post.assert_not_called()
 
-    def test_none_when_original_not_posted(self):
+    def test_none_when_target_void(self):
         from services.purchase import docs as docs_svc
 
         with mock.patch.object(docs_svc, "get_doc", return_value={"doc": {"status": "void"}}):
             self.assertIsNone(
                 line_correct._apply(object(), {"id": "u"}, "t", 1, "D1", ExpenseDraft(), ["amount"])
             )
+
+    def test_draft_edits_in_place_no_void_no_post(self):
+        # 草稿:原地 update_draft,不冲销(correct_doc 不调)、不过账,mode=draft_inplace。
+        from services.purchase import correct as correct_svc
+        from services.purchase import docs as docs_svc
+        from services.purchase import posting as posting_svc
+        from services.purchase import settings as settings_svc
+
+        draft = {"doc": {"status": "draft", "id": "D1"}, "supplier": {}, "lines": [{}]}
+        seen = {}
+        with (
+            mock.patch.object(docs_svc, "get_doc", return_value=draft),
+            mock.patch.object(correct_svc, "correct_doc") as clone,
+            mock.patch.object(
+                docs_svc,
+                "update_draft",
+                side_effect=lambda *a, **k: seen.update(doc_id=k.get("doc_id"))
+                or {"doc": {"grand_total": Decimal("200")}},
+            ),
+            mock.patch.object(settings_svc, "get_settings", return_value={"auto_book": True}),
+            mock.patch.object(posting_svc, "post_doc") as post,
+        ):
+            res = line_correct._apply(
+                object(), {"id": "u"}, "t", 1, "D1", ExpenseDraft(amount=Decimal("200")), ["amount"]
+            )
+        clone.assert_not_called()  # 草稿不冲销克隆
+        post.assert_not_called()  # 草稿不自动过账(仍待卡片确认)
+        self.assertEqual(seen["doc_id"], "D1")  # 原地改同一张
+        self.assertEqual(res["mode"], "draft_inplace")
+        self.assertFalse(res["posted"])
 
 
 class RequestCorrectTests(unittest.TestCase):
@@ -261,6 +294,27 @@ class RequestCorrectTests(unittest.TestCase):
         self.assertEqual(saved["missing"], "correct:7:D1:amount")  # ws 编进 missing
         self.assertEqual(replies, ["exp_correct_confirm"])
 
+    def test_draft_single_amount_saves_and_confirms(self):
+        # 草稿(confirm 卡)也能改:存待确认 + 出草稿专用确认文案(不说「冲销原单」)·不再回「没有已入账」。
+        detail = {"doc": {"status": "draft", "grand_total": Decimal("190")}, "lines": [{}]}
+        replies, saved = self._run(
+            {"amount": 200},
+            detail,
+            {"doc_id": "D1", "ws": 1, "how": "quoted", "error": None},
+            quoted_message_id="m1",
+        )
+        self.assertEqual(saved["missing"], "correct:1:D1:amount")
+        self.assertEqual(len(replies), 1)
+        self.assertNotIn("exp_correct_none", replies[0])  # 草稿不再退「没有已入账记录」
+        self.assertIn("草稿", replies[0])  # 草稿专用确认措辞
+
+    def test_draft_multiline_amount_guides_detail_page(self):
+        detail = {"doc": {"status": "draft", "grand_total": Decimal("190")}, "lines": [{}, {}]}
+        replies, _ = self._run(
+            {"amount": 100}, detail, {"doc_id": "D1", "ws": 1, "how": "quoted", "error": None}
+        )
+        self.assertEqual(replies, ["line_web_handoff"])
+
     def test_quoted_vendor_change_on_multiline_ok(self):
         # 多行票也能改整单字段(卖家),只是金额不行。
         detail = {"doc": {"status": "posted", "grand_total": Decimal("100")}, "lines": [{}, {}]}
@@ -315,6 +369,13 @@ class MaybeClarifyFeedbackTests(unittest.TestCase):
         self.assertTrue(res)
         self.assertIn("卖家", body)
         self.assertIn("改成", body)
+
+    def test_quoted_field_without_feedback_word_triggers(self):
+        # 「卖家不是这个 / ผู้ขายไม่ใช่คนนี้」无反馈词,但引用了卡片且点名字段 → 仍走改错澄清,
+        # 不被收入识别(ผู้ขาย 含 ขาย)劫持。
+        res, body = self._run("卖家不是这个", quoted="MID1")
+        self.assertTrue(res)
+        self.assertIn("卖家", body)
 
     def test_items_guides_detail_page(self):
         # 验收 #4:明细错了 → 引导详情页核对(不假装明细完整)。

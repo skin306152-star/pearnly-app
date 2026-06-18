@@ -6,17 +6,14 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-17 · **LINE 采购卡片/OCR 真机收口 + OCR 弥补专项 全上线** · HEAD `944ea38d`）
+## 🎯 状态卡（2026-06-18 · **采购 OCR 三误判修复 + P1E-2 LINE 改错对话闭环(统一 Correction Session)全上线** · HEAD `6705a6e0`）
 
-- **本窗口完成并上线**（10 commit · prod `944ea38` health 200 · 13 闸全绿 · 真票四层 trace 驱动 [[line-card-ocr-fixes-and-ghost-dup]]）：
-  - **卡片真问题修**（`9f127d4`→`d4eef83`）：B1 明细诚实化(OCR 真行加总≤总额→照显多行+不全提示;乱读放大/0行→不显假卖家单行·出 items_unread「未能逐项识别·去详情页」)·B3 税前=total−VAT·**B4 付款方式**(ThaiInvoice 加 payment_method+L2 prompt 抽+normalize_payment_method 归一·QRPayment→promptpay)·空 text 递归兜底(整类防 LINE 400)。
-  - **A1/A2 文案**：「问日期」归范围内(答今天日期+引导·语言随输入 detect_text_lang)·糊图文案「ไม่มีเงาบัง」。**引用记录说「识别错了」→ 澄清改哪里**(前置拦截·非 photo_failed·`line_correct.maybe_clarify_feedback`)。
-  - **★回归修**(`fad884f`)：payment_method 漏进 `_str_coerce` → LLM 返 null 致整页 OCR 挂「ไม่ครบ」→ 修(None→'')。**4 位佛历年确定性减 543**(2569→2026·治 LLM 误算 2023)。**7% 确定性税额**(`_vat_breakdown`·OCR 把 9.16 读成 10 → 重算 130.84/9.16)。
-  - **明细与总额不符 → 卡片诚实降级**(`d48d0f8`)：主按钮「ยืนยันบันทึก」→「เปิดเพื่อตรวจสอบ」、入账降次按钮「บันทึกต่อ」(仍可存)·对账正常不变。**0 元 modifier/赠品作卡片备注**(不占主明细·`note_free_items`)。
-  - **OCR 弥补专项**(`4bd113c`)：P1 L1/L2 瞬态 504 重试 1 次(治误「识别失败」·`OCR_TRANSIENT_RETRY`)。P2 上采样 **A/B 实测否决**(无改善甚至更差·不上)。`/simplify` 收口(`944ea38`·复用 bangkok_today+抽 _item_amount+去双算死码·line_ingest 380→342)。
-  - **ghost duplicate**：清理测试租户 9 条卡片失败留库的 dedupe 草稿(成因=旧空 text 400·已修)。
-- **验证**：全量 **3939 unit 绿**(skip 3)·13 闸全绿·prod 真 pipeline 四层 trace 逐张确认(#20 65.42/4.58、#21 130.84/9.16、日期 2026、付款 promptpay)。真机 Zihao 多轮验收(本窗无真 channel)。
-- **剩余(OCR 模型/延迟极限·非代码可无损纠)**：LINE 压缩图偶发数字误读(已被佛历/7% 兜结构化字段)·复杂长票(Little Betong)偶发 L2 504(P1 治单次)·堆叠加料行逐行价错位。要再上台阶=换/加 OCR 引擎或要求原图(产品决策·需拍板)。
+- **本窗口完成并上线**(7 commit·prod `6705a6e` health 200·13 闸全绿·全文件 ≤500·全量 **3981 unit 绿** skip3·见记忆 [[line-purchase-ocr-3fixes]]+[[line-correction-session-p1e2]])：
+  - **采购 OCR 三误判**(`ef233bf`/`dfa781a`/`42ba39e`·真票四层 trace·fixture 钉死 CP ALL/Seafood/Little Betong/Amazon 70&140):①CP ALL 把现金 200 当总额→OCR 加 cash_amount/change_amount/discount,确定性 cash−change 校正=净额 110;②Seafood 税额反推错→`_card_amounts` 票面 subtotal+VAT 自洽就采信(2544/178.08/-0.08·不按 7% 覆盖)·舍入=total−税前−VAT 不回退 draft 整额 VAT(178);③漏读小额行→`_same_money` 容差 2% 改固定 2 铢(任意票面抓漏行);④付款态不上卡(不把单据类型默认未付当事实)。
+  - **P1E-2 统一 Correction Session**(`8e0d365`→`6705a6e`·新 `line_correct_flow` 多轮态机·`line_correct_i18n` 4 语):引用卡片即进会话(pending TTL15min·锁 active_doc_id),三态 correctclar/correctval/correct。**执行三档(`_apply_or_confirm`)**:草稿+单非金额(date/seller/category)直接改回完成、已入账/改金额/多字段确认、多行金额→详情页。字段切换(等日期时改说卖家→切)、年首/ISO 日期(2026/6/18·下沉 lqe._parse_date)、全角冒号归一、否定填充剥空再问。「识别错了」绝不退化成 OCR 失败帮助。
+- **⏳ 下个窗口先做(Zihao 拍板)**:**给采购改付款方式加一列**(purchase_docs 无 payment_method 列·卡上付款方式仅 OCR 展示·LINE 改付款现路由详情页)→ schema 加列(ensure+alembic)+ create_doc/update_draft/_detail_to_data/_apply_changes 接线 + flow payment 从详情页改为可直接改。**做完等 Zihao 真机验证结果再决定下一步**。
+- **剩余/未做(记 backlog 非阻塞)**:多行 feasibility 门散 3 处可集中化·_STRIP_TOKENS 与 _FIELD_PATTERNS 词表可合并(漂移风险暂留)·问题2「无引用 ผิดแล้ว 软提示最近一张」未做(改账高风险·需拍板)·OCR 模型/延迟极限(压缩图偶发数字误读·复杂长票 L2 504)需换引擎/要原图(产品决策)。
+- **真机**:本窗无真 LINE channel·全靠 Zihao 多轮截图验收(OCR 三误判已逐张过·P1E-2 改错闭环最后一轮待验)。
 
 ## 历史记录（旧状态卡 · 2026-06-17 · OCR 纠错 + LINE 费用卡片产品化 · HEAD `33142a1`）
 

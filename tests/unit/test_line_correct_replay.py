@@ -127,15 +127,25 @@ class Sim:
         return self.docs[doc_id]
 
     def correct_doc(self, cur, *, tenant_id, workspace_client_id, doc_id, created_by):
+        # 真 correct_doc:作废原单 + 克隆为新草稿(更正审计链)。
         self._seq += 1
         nid = f"{doc_id}_c{self._seq}"
         self.docs[nid] = {
             k: (v.copy() if isinstance(v, dict) else list(v)) for k, v in self.docs[doc_id].items()
         }
         self.docs[nid]["doc"] = dict(self.docs[doc_id]["doc"], id=nid, status="draft")
+        self.docs[doc_id]["doc"]["status"] = "void"  # 原单作废(再引用应跟随 active 到克隆)
         return self.get_doc(
             cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=nid
         )
+
+    def _active_doc_date(self):
+        """当前 active 续接态指向那张单的日期(测续接命中)。"""
+        m = self.pending.get("u1", {}).get("missing", "")
+        if m.startswith("correctactive:"):
+            did = m.split(":")[-1]
+            return self.docs.get(did, {}).get("doc", {}).get("doc_date")
+        return None
 
     def resolve_target(self, cur, *, tenant_id, ws, line_user_id, quoted_message_id, text):
         if quoted_message_id and quoted_message_id in self.refs:
@@ -300,6 +310,39 @@ class ReplayScenarioTests(unittest.TestCase):
         self.assertTrue(steps[1][1])
         self.assertEqual(self.sim.docs["D1"]["doc"]["doc_date"], "2026-06-18")
         self._no_forbidden(steps)
+
+    def test_posted_requote_voided_original_follows_active(self):
+        # 真机 bug:已入账票改卖家(void+克隆)后,再次「引用原卡」改日期 → 原卡已作废,须跟随 active
+        # 续到克隆,不得回「ไม่มีรายการ…ให้แก้」(exp_correct_none)。
+        none_msg = line_client.t_line("th", "exp_correct_none")
+        steps = _run(
+            self.sim,
+            [
+                ("ร้านค้าเป็น 7-11", "MID_D3"),  # 已入账 → void+克隆,active=克隆
+                ("วันที่เป็น 2026/6/1", "MID_D3"),  # 再引用原卡(已作废)→ 跟随 active
+                ("วันที่เป็น 2026/6/18", "MID_D3"),  # 再来一次
+            ],
+        )
+        self.assertTrue(all(s[1] for s in steps))
+        for _, _, replies in steps:
+            self.assertNotIn(none_msg, replies)  # 绝不回「找不到记录」
+        self.assertEqual(self.sim._active_doc_date(), "2026-06-18")  # 续接那张日期改对
+
+    def test_posted_low_risk_chain_no_break(self):
+        # 已入账单:seller -> date -> category -> payment 连续低风险字段都续命中,不断。
+        none_msg = line_client.t_line("th", "exp_correct_none")
+        steps = _run(
+            self.sim,
+            [
+                ("ร้านค้าเป็น 7-11", "MID_D3"),
+                ("วันที่เป็น 2026/6/18", None),
+                ("หมวดหมู่เป็น ค่าอาหาร", None),
+                ("วิธีชำระเป็นเงินสด", None),
+            ],
+        )
+        self.assertTrue(all(s[1] for s in steps))
+        for _, _, replies in steps:
+            self.assertNotIn(none_msg, replies)
 
     def test_active_new_expense_not_hijacked(self):
         # active 续接态收到新记账「กาแฟ 70」→ route 放行(不接管、不劫持)。

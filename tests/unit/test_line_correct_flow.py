@@ -190,6 +190,7 @@ class MaybeClarifyTests(unittest.TestCase):
             mock.patch.object(docs_svc, "get_doc", return_value=detail),
             mock.patch.object(conversation, "save_pending"),
             mock.patch.object(conversation, "clear_pending"),
+            mock.patch.object(conversation, "peek_pending", return_value=None),  # 无 active 续接
             mock.patch.object(
                 line_correct, "_apply_or_confirm", side_effect=lambda *a, **k: applied.append(a[6])
             ),

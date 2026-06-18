@@ -214,7 +214,16 @@ def maybe_clarify_feedback(bound_user, reply_token, text, lang, ws, quoted_messa
             detail = line_correct.docs_svc.get_doc(
                 cur, tenant_id=tid, workspace_client_id=ws_eff, doc_id=doc_id
             )
-    if not detail:
+    # 引用解析失败 / 引用到已作废原单(刚被更正克隆)→ 跟随 active 续接到当前那张(验收:不掉「找不到」)。
+    if not detail or (detail.get("doc") or {}).get("status") not in ("posted", "draft"):
+        act = _active_doc(tid, luid)
+        if act:
+            ws_eff, doc_id = act
+            with db.get_cursor_rls(tid) as cur:
+                detail = line_correct.docs_svc.get_doc(
+                    cur, tenant_id=tid, workspace_client_id=ws_eff, doc_id=doc_id
+                )
+    if not detail or (detail.get("doc") or {}).get("status") not in ("posted", "draft"):
         # 无引用且像一句新记账(有金额)→ 放行给记账流,不劫持「买错了 50」这类。
         if not quoted_message_id and lqe.parse_expense(text).has_amount():
             return False
@@ -223,6 +232,14 @@ def maybe_clarify_feedback(bound_user, reply_token, text, lang, ws, quoted_messa
     return _route_field(
         bound_user, reply_token, text, lang, tid, ws_eff, doc_id, field, ctx, detail=detail
     )
+
+
+def _active_doc(tid, line_user_id):
+    """当前 active 续接态指向的 (ws, doc_id);无 active → None。"""
+    with db.get_cursor_rls(tid) as cur:
+        pend = conversation.peek_pending(cur, line_user_id=line_user_id)
+    m = str((pend or {}).get("missing") or "")
+    return _pend_target(m) if m.startswith(line_correct._ACTIVE_PREFIX) else None
 
 
 def _route_field(bound_user, reply_token, text, lang, tid, ws, doc_id, field, ctx, *, detail=None):

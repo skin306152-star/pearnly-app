@@ -275,14 +275,14 @@ class RequestCorrectTests(unittest.TestCase):
 
 
 class MaybeClarifyFeedbackTests(unittest.TestCase):
-    """引用某记录说「识别错了/不对」(无具体改动)→ 澄清改哪里(显金额·语言随输入·不改账)。"""
+    """采购改错澄清(P1E-2):命中「识别错了/不对/wrong/ผิด」→ 本层接管(绝不当 OCR 失败重拍)。"""
 
-    def _run(self, text, *, quoted="MID1", tgt=None, detail=None):
+    def _run(self, text, *, quoted="MID1", tgt=None, lines=None):
         from services.line_binding import line_message_refs
         from services.purchase import docs as docs_svc
 
         tgt = tgt if tgt is not None else {"doc_id": "D1", "ws": 1, "error": None}
-        detail = detail if detail is not None else {"doc": {"grand_total": "70.00"}}
+        detail = {"doc": {"grand_total": "70.00"}, "lines": lines if lines is not None else [{}]}
         ctx = {"line_user_id": "U1", "tenant_id": "t", "quote_token": "q"}
         sent = {}
         with (
@@ -296,30 +296,57 @@ class MaybeClarifyFeedbackTests(unittest.TestCase):
             ),
         ):
             res = line_correct.maybe_clarify_feedback("tok", text, "th", 1, quoted, ctx)
-        return res, sent
+        return res, sent.get("body", "")
 
-    def test_feedback_quoted_clarifies_in_input_lang(self):
-        res, sent = self._run("这个你识别错了")
+    def test_vague_quoted_clarifies_fields_in_input_lang(self):
+        # 验收 #1:笼统说错了 → 列可改字段(中文输入→中文,不被泰语主语言带偏)。
+        res, body = self._run("这个你识别错了")
         self.assertTrue(res)
-        self.assertIn("70.00", sent["body"])
-        self.assertIn("请告诉我", sent["body"])  # 中文输入 → 中文澄清(不被泰语主语言带偏)
+        self.assertIn("你想改金额", body)
 
-    def test_thai_feedback_clarifies_in_thai(self):
-        res, sent = self._run("อ่านผิด")
+    def test_thai_vague_clarifies_in_thai(self):
+        res, body = self._run("อ่านผิด")
         self.assertTrue(res)
-        self.assertIn("กรุณาบอกส่วนที่ต้องการแก้", sent["body"])
+        self.assertIn("ต้องการแก้ส่วนไหน", body)
 
-    def test_no_quote_falls_through(self):
-        res, sent = self._run("这个识别错了", quoted=None)
-        self.assertFalse(res)
-        self.assertEqual(sent, {})
+    def test_field_seller_asks_for_value(self):
+        # 验收 #3:点名卖家但没给新值 → 问新卖家(并引导「改成」语法)。
+        res, body = self._run("卖家不对")
+        self.assertTrue(res)
+        self.assertIn("卖家", body)
+        self.assertIn("改成", body)
+
+    def test_items_guides_detail_page(self):
+        # 验收 #4:明细错了 → 引导详情页核对(不假装明细完整)。
+        res, body = self._run("明细错了")
+        self.assertTrue(res)
+        self.assertIn("详情页", body)
+
+    def test_payment_guides_web(self):
+        res, body = self._run("付款方式不对")
+        self.assertTrue(res)
+        self.assertIn("Pearnly", body)  # line_web_handoff
 
     def test_concrete_edit_falls_through_to_edit(self):
+        # 「改成X」是具体编辑 → 交 edit 流(request_correct),本层不接管。
         res, _ = self._run("金额改成 70")
         self.assertFalse(res)
 
-    def test_unresolved_ref_falls_through(self):
-        res, _ = self._run("识别错了", tgt={"doc_id": None, "ws": 1, "error": "ref_not_found"})
+    def test_unresolved_quote_guides_reply(self):
+        # 验收 #5:引用过期/无法定位 → 引导回复要改的那条(不回 photo_failed)。
+        res, body = self._run("识别错了", tgt={"doc_id": None, "ws": 1, "error": "ref_not_found"})
+        self.assertTrue(res)
+        self.assertTrue(body)
+
+    def test_no_quote_no_amount_guides_reply(self):
+        # 验收 #5:无引用纯说错了 → 引导回复记录,而非 OCR 失败帮助。
+        res, body = self._run("这个识别错了", quoted=None, tgt={"error": "ambiguous"})
+        self.assertTrue(res)
+        self.assertTrue(body)
+
+    def test_no_quote_with_amount_passes_through(self):
+        # 「买错了 50」像新记账(有金额、无引用)→ 放行记账流,不劫持。
+        res, _ = self._run("买错了 50", quoted=None, tgt={"error": "ambiguous"})
         self.assertFalse(res)
 
 

@@ -239,6 +239,86 @@ def is_correction_feedback(text: str) -> bool:
     return _first_match(text, _FEEDBACK_PATTERNS) == "wrong"
 
 
+# 改错指向的字段(P1E-2):用户在改错澄清里点名要改哪项 → 据此问新值 / 引导详情页。
+# items / payment 顺位靠前(其专有词「明细/รายการย่อย/付款方式/วิธีชำระ」更具体,先于泛词命中)。
+_FIELD_PATTERNS = (
+    (
+        "items",
+        (
+            "明细",
+            "逐项",
+            "项目",
+            "条目",
+            "รายการย่อย",
+            "รายการสินค้า",
+            "line item",
+            "line items",
+            "items",
+            "明細",
+        ),
+    ),
+    (
+        "payment",
+        (
+            "付款方式",
+            "支付方式",
+            "付款",
+            "支付",
+            "วิธีชำระ",
+            "การชำระ",
+            "ชำระเงิน",
+            "payment",
+            "支払",
+        ),
+    ),
+    (
+        "amount",
+        (
+            "金额",
+            "钱",
+            "价钱",
+            "价格",
+            "总额",
+            "ยอดเงิน",
+            "ยอด",
+            "จำนวนเงิน",
+            "amount",
+            "total",
+            "金額",
+            "値段",
+        ),
+    ),
+    ("date", ("日期", "时间", "วันที่", "date", "日付")),
+    (
+        "seller",
+        (
+            "卖家",
+            "商家",
+            "店名",
+            "店家",
+            "供应商",
+            "ร้านค้า",
+            "ร้าน",
+            "ผู้ขาย",
+            "seller",
+            "vendor",
+            "shop",
+            "販売",
+            "店",
+        ),
+    ),
+    (
+        "category",
+        ("分类", "科目", "类别", "类型", "หมวดหมู่", "หมวด", "ประเภท", "category", "分類"),
+    ),
+)
+
+
+def detect_correction_field(text: str) -> str:
+    """改错澄清里点名的字段 → amount/date/seller/category/payment/items;没点名 → ''。"""
+    return _first_match(text, _FIELD_PATTERNS)
+
+
 def detect_text_lang(text: str) -> str:
     """按字符脚本判输入语言(zh/th/en/ja)→ 回复跟随用户输入,不被账号主语言带偏。无字母 → ''。"""
     s = text or ""

@@ -97,5 +97,24 @@ class PaymentNormalizeTests(unittest.TestCase):
         self.assertEqual(lc.normalize_payment_method(""), "")
 
 
+class CorrectionFieldTests(unittest.TestCase):
+    """改错点名字段(P1E-2):amount/date/seller/category/payment/items。"""
+
+    def test_each_field(self):
+        self.assertEqual(lc.detect_correction_field("金额不对"), "amount")
+        self.assertEqual(lc.detect_correction_field("ยอดเงินผิด"), "amount")
+        self.assertEqual(lc.detect_correction_field("日期错了"), "date")
+        self.assertEqual(lc.detect_correction_field("卖家不是这个"), "seller")
+        self.assertEqual(lc.detect_correction_field("ร้านค้าไม่ถูก"), "seller")
+        self.assertEqual(lc.detect_correction_field("分类改一下"), "category")
+        self.assertEqual(lc.detect_correction_field("付款方式不对"), "payment")
+        self.assertEqual(lc.detect_correction_field("明细错了"), "items")
+        self.assertEqual(lc.detect_correction_field("รายการย่อยไม่ครบ"), "items")
+
+    def test_no_field(self):
+        self.assertEqual(lc.detect_correction_field("这个识别错了"), "")
+        self.assertEqual(lc.detect_correction_field(""), "")
+
+
 if __name__ == "__main__":
     unittest.main()

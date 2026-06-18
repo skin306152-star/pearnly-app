@@ -210,6 +210,61 @@ class ReplayScenarioTests(unittest.TestCase):
             for r in replies:
                 self.assertNotIn(r, _FORBIDDEN, f"会话内吐了泛化指引:{r}")
 
+    def _seed_active(self, doc_id, ws=1):
+        """模拟「发卡即设 active」(line_booker._bind_refs):无需引用即可改当前那张。"""
+        self.sim.pending["u1"] = {
+            "missing": f"correctactive:{ws}:{doc_id}",
+            "draft": None,
+            "tenant_id": "t",
+            "workspace_client_id": ws,
+        }
+
+    def test_active_draft_seller_direct_no_quote(self):
+        # 验收(Zihao #1):发卡后 active draft「ร้านค้าเป็น 7-11」无引用 → 直接改,不确认/不再问/不请长按。
+        self._seed_active("D1")
+        steps = _run(self.sim, [("ร้านค้าเป็น 7-11", None)])
+        self.assertTrue(steps[0][1])
+        self.assertEqual(self.sim.docs["D1"]["supplier"]["name"], "7-11")
+        self._no_forbidden(steps)
+
+    def test_active_draft_seller_tops_direct_no_quote(self):
+        # 验收 #2:active draft「ร้านค้าเป็น tops」无引用 → 直接改(店名不被「to」截断)。
+        self._seed_active("D1")
+        steps = _run(self.sim, [("ร้านค้าเป็น tops", None)])
+        self.assertEqual(self.sim.docs["D1"]["supplier"]["name"], "tops")
+
+    def test_active_draft_seller_shorthand_direct(self):
+        # 真机:简写「ร้านเป็น」(无「ค้า」)此前未识别 → 落大脑确认/再问;现应直接改。
+        self._seed_active("D1")
+        steps = _run(self.sim, [("ร้านเป็น 7-11", None)])
+        self.assertTrue(steps[0][1])
+        self.assertEqual(self.sim.docs["D1"]["supplier"]["name"], "7-11")
+        self._no_forbidden(steps)
+
+    def test_active_draft_amount_confirms_then_applies(self):
+        # 验收 #3:active 单行草稿改总额 → 确认 → 「ใช่」→ 改(金额始终二次确认)。
+        self._seed_active("D1")
+        steps = _run(self.sim, [("จำนวนเงินรวมเปลี่ยนเป็น 110", None), ("ใช่", None)])
+        self.assertEqual(self.sim.docs["D1"]["doc"]["grand_total"], "110")
+
+    def test_active_draft_low_risk_chain(self):
+        # 验收 #5:active 草稿 seller→date→category→payment 连续低风险直改,不断、不确认。
+        self._seed_active("D1")
+        steps = _run(
+            self.sim,
+            [
+                ("ร้านเป็น 7-11", None),
+                ("วันที่เป็น 2026/6/18", None),
+                ("หมวดหมู่เป็น ค่าอาหาร", None),
+                ("วิธีชำระเป็นเงินสด", None),
+            ],
+        )
+        self.assertTrue(all(s[1] for s in steps))
+        self.assertEqual(self.sim.docs["D1"]["supplier"]["name"], "7-11")
+        self.assertEqual(self.sim.docs["D1"]["doc"]["doc_date"], "2026-06-18")
+        self.assertEqual(self.sim.docs["D1"]["doc"]["payment_method"], "cash")
+        self._no_forbidden(steps)
+
     def test_date_wrong_then_value(self):
         steps = _run(self.sim, [("วันที่ผิด", "MID_D1"), ("2026/6/18", None)])
         self.assertTrue(steps[0][1] and steps[1][1])
@@ -432,10 +487,38 @@ class SafetyGateTests(unittest.TestCase):
         self.assertEqual(self.sim.docs["D2"]["supplier"]["name"], "tops")
 
 
+class BindRefsActiveTests(unittest.TestCase):
+    """发卡即设 active 续接态的接线(line_booker._bind_refs):草稿/已入账设,dup/终态不设。"""
+
+    def _calls(self, state):
+        from services.line_binding import line_booker
+
+        seen = []
+        with (
+            mock.patch.object(line_message_refs, "record_safe", side_effect=lambda **k: None),
+            mock.patch.object(
+                line_correct, "_set_active", side_effect=lambda *a, **k: seen.append(a)
+            ),
+        ):
+            line_booker._bind_refs("t", 1, "u1", [{"id": "M1"}], "D9", state)
+        return seen
+
+    def test_confirm_sets_active(self):
+        self.assertEqual(self._calls("confirm"), [("t", 1, "D9", "u1")])
+
+    def test_posted_sets_active(self):
+        self.assertEqual(self._calls("posted"), [("t", 1, "D9", "u1")])
+
+    def test_dup_skips_active(self):
+        self.assertEqual(self._calls("dup"), [])  # 重复卡不抢 active
+
+
 def _report() -> str:
     """跑全部 scenario,产出 通过/失败 + 实际回复 报告(给人看)。"""
     load = unittest.TestLoader().loadTestsFromTestCase
-    suite = unittest.TestSuite([load(ReplayScenarioTests), load(SafetyGateTests)])
+    suite = unittest.TestSuite(
+        [load(ReplayScenarioTests), load(SafetyGateTests), load(BindRefsActiveTests)]
+    )
     buf = io.StringIO()
     with redirect_stdout(buf):
         result = unittest.TextTestRunner(stream=buf, verbosity=2).run(suite)

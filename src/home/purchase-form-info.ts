@@ -82,7 +82,7 @@ export function infoCardHtml(st: FormState): string {
             <div class="o ${k === 'purchase_order' ? 'on' : ''}" data-kind="purchase_order">${escapeHtml(t('pur-kind-order'))}</div></div></div>
         <div class="${cls(st, 'supplier')}" id="f-supplier"><label>${escapeHtml(t('pur-supplier'))}${req()} ${tag(st, 'supplier')}</label><div class="inp pick" id="pur-supplier-pick">${escapeHtml(st.supplierName || t('pur-supplier-choose'))} <span style="color:var(--ink3)">${escapeHtml(t('pur-switch'))} ▾</span></div><div class="et">${escapeHtml(t('pur-req-supplier'))}</div></div>
         <div class="two">
-            <div class="${cls(st, 'tax_id')}"><label>${escapeHtml(t('pur-tax-id'))} ${tag(st, 'tax_id')}</label><div class="inp"><input class="fin tnum" data-fld="taxId" value="${escapeHtml(st.taxId)}" placeholder="13"></div></div>
+            <div class="${cls(st, 'tax_id')}"><label>${escapeHtml(t('pur-tax-id'))} ${tag(st, 'tax_id')}</label><div class="inp"><input class="fin tnum" data-fld="taxId" value="${escapeHtml(st.taxId)}" placeholder="0000000000000"></div></div>
             <div class="field"><label>${escapeHtml(t('pur-branch'))}</label><div class="inp"><select class="fsel" id="pur-branchtype" data-fld="branchType"><option value="head_office" ${st.branchType === 'head_office' ? 'selected' : ''}>${escapeHtml(t('pur-branch-head'))}</option><option value="branch" ${st.branchType === 'branch' ? 'selected' : ''}>${escapeHtml(t('pur-branch-sub'))}</option><option value="none" ${st.branchType === 'none' ? 'selected' : ''}>${escapeHtml(t('pur-branch-na'))}</option></select></div></div>
         </div>
         <div class="two ${isBranch ? '' : 'hide'}" id="pur-branchfields">

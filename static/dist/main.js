@@ -5548,7 +5548,7 @@ ${l.raw_text||l.text||""}`).join(`
             <div class="o ${a==="purchase_order"?"on":""}" data-kind="purchase_order">${escapeHtml(t("pur-kind-order"))}</div></div></div>
         <div class="${$n(e,"supplier")}" id="f-supplier"><label>${escapeHtml(t("pur-supplier"))}${ps()} ${ds(e,"supplier")}</label><div class="inp pick" id="pur-supplier-pick">${escapeHtml(e.supplierName||t("pur-supplier-choose"))} <span style="color:var(--ink3)">${escapeHtml(t("pur-switch"))} ▾</span></div><div class="et">${escapeHtml(t("pur-req-supplier"))}</div></div>
         <div class="two">
-            <div class="${$n(e,"tax_id")}"><label>${escapeHtml(t("pur-tax-id"))} ${ds(e,"tax_id")}</label><div class="inp"><input class="fin tnum" data-fld="taxId" value="${escapeHtml(e.taxId)}" placeholder="13"></div></div>
+            <div class="${$n(e,"tax_id")}"><label>${escapeHtml(t("pur-tax-id"))} ${ds(e,"tax_id")}</label><div class="inp"><input class="fin tnum" data-fld="taxId" value="${escapeHtml(e.taxId)}" placeholder="0000000000000"></div></div>
             <div class="field"><label>${escapeHtml(t("pur-branch"))}</label><div class="inp"><select class="fsel" id="pur-branchtype" data-fld="branchType"><option value="head_office" ${e.branchType==="head_office"?"selected":""}>${escapeHtml(t("pur-branch-head"))}</option><option value="branch" ${e.branchType==="branch"?"selected":""}>${escapeHtml(t("pur-branch-sub"))}</option><option value="none" ${e.branchType==="none"?"selected":""}>${escapeHtml(t("pur-branch-na"))}</option></select></div></div>
         </div>
         <div class="two ${n?"":"hide"}" id="pur-branchfields">

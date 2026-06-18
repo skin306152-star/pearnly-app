@@ -13,10 +13,9 @@ from services.purchase import ocr_corrections
 
 
 class CleanTaxIdTests(unittest.TestCase):
-    def test_short_number_rejected(self):  # 样例 1:tax_id=13 → 空
-        self.assertEqual(fc.clean_tax_id("13"), "")
-        self.assertEqual(fc.clean_tax_id("2026"), "")
-        self.assertEqual(fc.clean_tax_id("06"), "")
+    def test_short_number_rejected(self):  # 样例 1:tax_id=13/15/2026/06 → 空
+        for bad in ("13", "15", "2026", "06", "736"):
+            self.assertEqual(fc.clean_tax_id(bad), "", bad)
 
     def test_date_fragment_rejected(self):  # 样例 2:13/06/26 → 空
         self.assertEqual(fc.clean_tax_id("13/06/26"), "")
@@ -125,11 +124,17 @@ class DetailApiSmokeTests(unittest.TestCase):
         }
         return docs_svc.get_doc(self._Cur(row), tenant_id="t", workspace_client_id=1, doc_id="D1")
 
-    def test_invalid_tax_13_cleared_both_representations(self):  # Bangchak fixture
+    def test_bangchak_fixture_taxid_13_cleared(self):  # 票一:Bangchak 1780
         res = self._get("13")
         self.assertIsNone(res["supplier"]["tax_id"])  # 嵌套
         self.assertIsNone(res["doc"]["supplier_tax_id"])  # 扁平(编辑表单 initial state 读这个)
         self.assertEqual(res["supplier"]["name"], "Bangchak")  # 卖家保留
+
+    def test_restaurant_fixture_taxid_cleared(self):  # 票二:餐厅桌单 736(日期 15/06/26·税号也误读)
+        for raw in ("13", "15", "15/06/26"):
+            res = self._get(raw)
+            self.assertIsNone(res["supplier"]["tax_id"], raw)
+            self.assertIsNone(res["doc"]["supplier_tax_id"], raw)
 
     def test_date_fragment_tax_cleared(self):
         res = self._get("13/06/26")

@@ -12,10 +12,11 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from services.purchase import field_clean
+
 _CENT = Decimal("0.01")
 _DATE_RE = re.compile(r"^\s*(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})\s*$")
 _ISO_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_TAX_RE = re.compile(r"\d{13}")
 _TH_BRANCH_RE = re.compile(r"(?:สาขา|branch|br\.?)\D{0,12}(\d{3,5})", re.I)
 
 
@@ -28,12 +29,6 @@ def _dec(v: Any) -> Decimal:
 
 def _money(v: Decimal) -> str:
     return format(v.quantize(_CENT), "f")
-
-
-def _clean_tax_id(value: Any) -> str:
-    text = str(value or "")
-    matches = _TAX_RE.findall(text.replace(" ", ""))
-    return matches[0] if len(matches) == 1 else ""
 
 
 def _year_from_two_digits(yy: int) -> int:
@@ -93,11 +88,16 @@ def normalize_fields(fields: dict | None) -> dict:
     out = dict(src)
     corrections: list[str] = list(src.get("_corrections") or [])
 
+    # 税号:有效 13 位规范化;短数字/日期片段/含字母噪声(「13」「13/06/26」)→ 置空,不再残留。
+    # 旧 bug:invalid 时返 '' 但「仅 truthy 才覆盖」→ 垃圾留在 out(详情页 เลขภาษี 显「13」)。
     for key in ("seller_tax", "buyer_tax"):
-        cleaned = _clean_tax_id(src.get(key))
-        if cleaned and cleaned != src.get(key):
+        raw = str(src.get(key) or "").strip()
+        if not raw:
+            continue
+        cleaned = field_clean.clean_tax_id(raw)
+        if cleaned != raw:
             out[key] = cleaned
-            corrections.append(f"{key}_normalized")
+            corrections.append(f"{key}_{'normalized' if cleaned else 'invalid_cleared'}")
 
     inv_no = str(src.get("invoice_number") or "").strip()
     if inv_no and _is_branch_number_as_invoice(src, inv_no):

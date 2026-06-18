@@ -12,6 +12,7 @@ import json
 from typing import Optional
 
 from core.pos_api import PosError
+from services.purchase import field_clean
 from services.purchase import suppliers as sup_svc
 from services.purchase import totals as totals_svc
 
@@ -251,7 +252,7 @@ def get_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> Optional[dict]:
     doc = cur.fetchone()
     if doc is None:
         return None
-    supplier = (
+    supplier = field_clean.clean_supplier_display(  # P1F:异常税号/卖家不展示假值(详情页同卡片·原值留库)
         {
             "id": doc["supplier_id"],
             "name": doc.get("supplier_name"),

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
 
+from services.purchase import field_clean
 from services.purchase import intake as ik
 
 
@@ -273,8 +274,10 @@ def ingest_line_image(
         "date": fields.get("date") or "",
         "category": "",
         "subcategory": "",
-        "vendor": fields.get("seller_name") or "",
-        "seller_tax": fields.get("seller_tax") or "",
+        # 展示清洗(P1F):卖家/税号/票号异常值(纯金额/标签/短数字/日期片段)不上卡(与详情页同一套
+        # field_clean 规则)。账务草稿与 OCR raw 不受影响,仅卡片展示。
+        "vendor": field_clean.clean_seller(fields.get("seller_name")),
+        "seller_tax": field_clean.clean_tax_id(fields.get("seller_tax")),
         "seller_addr": fields.get("seller_addr") or "",
         "subtotal": _pretax,
         "vat": _vat,
@@ -283,7 +286,7 @@ def ingest_line_image(
         # rounding=整额 VAT → 误显成「ปัดเศษ 178」· Seafood 实票踩过)。
         "rounding": _rounding,
         "discount": fields.get("discount") or "",
-        "invoice_number": fields.get("invoice_number") or "",
+        "invoice_number": field_clean.clean_invoice_no(fields.get("invoice_number")),
         "payment_method": fields.get("payment_method") or "",
         # 付款态不上卡:OCR 无真实付款信号,draft 的 payment_status 只是按单据类型推断的默认值(税票默认
         # 未付)。把推断当事实显「未付」会在已付的 QR/现金小票上误报(与文字路一致·只显真识别的付款方式)。

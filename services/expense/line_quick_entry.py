@@ -442,10 +442,30 @@ _UNIT_TAIL = re.compile(r"(?i)\s*(元|块|บาท|泰铢|thb|baht|฿|kip)+\s*
 _NAME_LEAD = re.compile(r"(?i)^[\s、,，/和跟加与及还有然后＋+]+|^(元|块|บาท|thb|baht|฿)\s*")
 
 
+# 句中字段声明词(「ผู้ขาย 711 / ร้านค้า 7-11」)是卖家/字段标注,不是商品项(P1E-3·多项句内联卖家)。
+# 长词在前(extract_inline_vendor 按序匹配·ร้านค้า 先于 ร้าน,免「ร้านค้า X」被 ร้าน 截成「ค้า」)。
+_VENDOR_DECL_WORDS = ("ผู้ขาย", "ชื่อร้าน", "ร้านค้า", "ร้าน", "卖家", "商家", "供应商", "店名")
+_FIELD_WORD_NAMES = frozenset(
+    {*_VENDOR_DECL_WORDS, "วันที่", "หมวดหมู่", "หมวด", "日期", "分类", "科目"}
+)
+
+
+def extract_inline_vendor(text: str) -> str:
+    """多项句里内联卖家声明「ผู้ขาย 711 / ร้านค้า 7-11 / 卖家 X」→ 卖家名;无 → ''(P1E-3)。"""
+    for kw in _VENDOR_DECL_WORDS:
+        m = re.search(re.escape(kw) + r"\s*[:：]?\s*([^\s,，]+)", text or "")
+        if m:
+            v = m.group(1).strip(" -·:、,，/")
+            if v and v not in _FIELD_WORD_NAMES:
+                return v
+    return ""
+
+
 def parse_multi(text: str) -> Optional[list]:
     """一句话拆多项 → [{name, amount(Decimal)}];<2 项返 None(走单笔老路)。
 
-    名去首尾货币词/连接词(和/跟/加…)。确定性正则(不靠 LLM 拆·避免误拆)。
+    名去首尾货币词/连接词(和/跟/加…)。确定性正则(不靠 LLM 拆·避免误拆)。字段声明词
+    (「ผู้ขาย 711」)是卖家标注非商品 → 不计入金额(P1E-3·总额不被内联卖家撑大)。
     """
     items = []
     for m in _MULTI_RE.finditer((text or "").strip()):
@@ -454,6 +474,6 @@ def parse_multi(text: str) -> Optional[list]:
             amt = Decimal(m.group(2).replace(",", ""))
         except (InvalidOperation, ValueError):
             continue
-        if name and amt > 0:
+        if name and name not in _FIELD_WORD_NAMES and amt > 0:
             items.append({"name": name, "amount": amt})
     return items if len(items) >= 2 else None

@@ -95,6 +95,35 @@ def _say(reply_token, body, ctx):
     line_reply.reply_text_context(reply_token, body, **ctx)
 
 
+# 明显新记账句的开头记账动词(P1E-3):即便在 active 续接态也打断 correction,放行记账解析。
+_NEW_EXPENSE_LEAD = (
+    "วันนี้ใช้จ่าย",
+    "วันนี้จ่าย",
+    "ใช้จ่าย",
+    "ซื้อ",
+    "จ่าย",
+    "spent",
+    "expense",
+    "今天花",
+    "今天买",
+    "买了",
+    "花了",
+)
+
+
+def _looks_like_new_expense(text: str) -> bool:
+    """明显新记账意图?(多组 item+amount,或记账动词开头)。
+
+    P1E-3:active 续接态遇此即放行给记账流(不被句中「ผู้ขาย/ร้าน」字段词误当卖家新值吞掉)。
+    correction-like 单字段「X เป็น Y」不在此列(parse_multi <2 且非动词开头)→ 仍优先 correction。
+    """
+    s = (text or "").strip()
+    low = s.lower()
+    if any(low.startswith(p.lower()) for p in _NEW_EXPENSE_LEAD):
+        return True
+    return lqe.parse_multi(s) is not None
+
+
 def is_correction_like(text: str) -> bool:
     """改错语义?(点名字段 / 编辑词 / 反馈词 / 取消 / 删除)。问句不算(交查账)。
 
@@ -138,7 +167,9 @@ def route(
         bound_user, reply_token, text, lang, tid, ws, line_user_id, quoted_message_id, qt
     ):
         return True
-    if is_correction_like(text):  # 改错语义但没定位到记录 → 提示回复记录,绝不记账(账务红线)
+    # 改错语义但没定位到记录 → 提示回复记录,绝不记账(账务红线)。但明显新记账句(多项/记账动词开头·
+    # 即便含「ผู้ขาย」字段词)不算改错 → 放行记账流(P1E-3:不被安全闸误拦成「请回复记录」)。
+    if is_correction_like(text) and not _looks_like_new_expense(text):
         _say(reply_token, line_client.t_line(lang, "line_need_reply_record"), ctx)
         return True
     return False
@@ -174,6 +205,10 @@ def try_correction_state(
 
     # 引用优先:active 完全让位;ask 阶段点名字段也让位(换单)→ 交 maybe_clarify 用引用定位。
     if quoted_message_id and (is_active or field):
+        return False
+    # P1E-3:active 续接态遇明显新记账句(多项/记账动词开头)→ 打断 correction,放行记账流
+    # (新卡会重设 active)。即便句中含「ผู้ขาย 711」也不当 seller 新值吞掉。
+    if is_active and _looks_like_new_expense(text):
         return False
     # 明确「取消/算了」→ 中止本次改错,不动单据(任何阶段·验收 #1/#7)。
     if line_classify.is_cancel_intent(text):

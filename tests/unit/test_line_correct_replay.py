@@ -247,6 +247,28 @@ class ReplayScenarioTests(unittest.TestCase):
         steps = _run(self.sim, [("จำนวนเงินรวมเปลี่ยนเป็น 110", None), ("ใช่", None)])
         self.assertEqual(self.sim.docs["D1"]["doc"]["grand_total"], "110")
 
+    def test_active_new_expense_sentence_not_swallowed(self):
+        # P1E-3:active seller 后,明显新记账句(含「ผู้ขาย 711」)→ 不当 seller 新值吞掉,放行记账流。
+        self._seed_active("D1")
+        steps = _run(
+            self.sim, [("วันนี้ใช้จ่าย: กาแฟ 30 ทุเรียน 100 ปากกา 20 ผู้ขาย 711", None)]
+        )
+        self.assertFalse(steps[0][1])  # 放行(未被改错路由接管)→ 交记账流建新支出
+        self.assertEqual(self.sim.docs["D1"]["supplier"]["name"], "ร้านเดิม")  # seller 没被改成整句
+
+    def test_active_multi_item_not_swallowed(self):
+        # P1E-3 #2:active 后「กาแฟ 30 ข้าว 60」多组 item+amount → 放行记账流(不接管)。
+        self._seed_active("D1")
+        steps = _run(self.sim, [("กาแฟ 30 ข้าว 60", None)])
+        self.assertFalse(steps[0][1])
+
+    def test_active_correction_like_still_corrects_after_newexpense_guard(self):
+        # P1E-3 #3/#4:新记账闸不误伤 correction-like —— active 后「ร้านค้าเป็น tops」仍继续改 seller。
+        self._seed_active("D1")
+        steps = _run(self.sim, [("ร้านค้าเป็น tops", None)])
+        self.assertTrue(steps[0][1])
+        self.assertEqual(self.sim.docs["D1"]["supplier"]["name"], "tops")
+
     def test_active_draft_low_risk_chain(self):
         # 验收 #5:active 草稿 seller→date→category→payment 连续低风险直改,不断、不确认。
         self._seed_active("D1")

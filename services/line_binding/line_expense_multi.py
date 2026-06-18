@@ -18,7 +18,7 @@ def do_record_multi(
 ) -> bool:
     """每项独立行 + 智能归类(批量一次 LLM)·合计入账·卡显逐条明细。返回 True。"""
     from services.expense import category_ai, confidence, line_l2
-    from services.expense.line_quick_entry import qty_label, split_qty_price
+    from services.expense.line_quick_entry import extract_inline_vendor, qty_label, split_qty_price
     from services.line_binding import line_booker
     from services.purchase import categories as cat_svc
     from services.purchase import intake as intake_svc
@@ -40,6 +40,7 @@ def do_record_multi(
             vendor = parsed.get("vendor") or ""
         else:
             cats = category_ai.categorize_items(items, tree, api_key=api_key)
+        vendor = vendor or extract_inline_vendor(text)  # 句内「ผู้ขาย 711」声明 → 卖家(P1E-3)
         total = sum((it["amount"] for it in items), Decimal("0"))
         # 数量(#8):每项「2杯咖啡 120」→ 行 qty=2、单价=60(split_qty_price·总额不漂)。
         lines = []

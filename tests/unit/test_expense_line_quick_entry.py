@@ -202,6 +202,17 @@ class ParseMultiTests(unittest.TestCase):
         self.assertIsNone(lqe.parse_multi("吃饭150"))
         self.assertIsNone(lqe.parse_multi("咖啡60"))
 
+    def test_inline_seller_not_counted_as_item(self):
+        # P1E-3:句中「ผู้ขาย 711」是卖家声明,不计入金额 → 3 项合计 150(非 4 项 861)。
+        r = lqe.parse_multi("วันนี้ใช้จ่าย: กาแฟ 30 ทุเรียน 100 ปากกา 20 ผู้ขาย 711")
+        self.assertEqual(len(r), 3)
+        self.assertEqual(sum(i["amount"] for i in r), Decimal("150"))
+
+    def test_extract_inline_vendor(self):
+        self.assertEqual(lqe.extract_inline_vendor("... ปากกา 20 ผู้ขาย 711"), "711")
+        self.assertEqual(lqe.extract_inline_vendor("ร้านค้า 7-11 กาแฟ 30"), "7-11")  # 长词先匹配
+        self.assertEqual(lqe.extract_inline_vendor("กาแฟ 30 ข้าว 60"), "")  # 无声明 → 空
+
 
 if __name__ == "__main__":
     unittest.main()

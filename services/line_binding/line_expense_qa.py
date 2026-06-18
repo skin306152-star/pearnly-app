@@ -200,12 +200,24 @@ def reply_undo(
                 cur, tenant_id=tid, workspace_client_id=tgt["ws"], doc_id=tgt["doc_id"]
             )
             status = (detail.get("doc") or {}).get("status") if detail else None
+            from services.line_binding import line_card_actions
+
             if status == "draft":
-                # 草稿未入账,「取消」= 丢弃(对齐卡片「ทิ้ง」按钮),不走 void(只撤已入账)→ 永不死路。
+                # 草稿未入账,「取消/删除」= 丢弃(对齐卡片「ทิ้ง」按钮),不走 void → 永不死路。
+                amt = (detail.get("doc") or {}).get("grand_total")
                 docs_svc.delete_doc(
                     cur, tenant_id=tid, workspace_client_id=tgt["ws"], doc_id=tgt["doc_id"]
                 )
-                _say(line_client.t_line(lang, "card_state_discarded_desc"))
+                line_card_actions.send_terminal(
+                    reply_token,
+                    state="discarded",
+                    doc_id=tgt["doc_id"],
+                    ws=tgt["ws"],
+                    amount=amt,
+                    lang=lang,
+                    tid=tid,
+                    luid=line_user_id,
+                )
                 return
             res = posting_svc.void_doc(
                 cur,
@@ -215,7 +227,16 @@ def reply_undo(
                 created_by=uid,
             )
             amt = (res.get("doc") or {}).get("grand_total")
-        _say(line_client.t_line(lang, "exp_undo_done", amount=amt))
+        line_card_actions.send_terminal(
+            reply_token,
+            state="voided",
+            doc_id=tgt["doc_id"],
+            ws=tgt["ws"],
+            amount=amt,
+            lang=lang,
+            tid=tid,
+            luid=line_user_id,
+        )
     except PosError as e:
         if (e.code or "") == "acct.period_closed":
             _say(line_client.t_line(lang, "exp_correct_closed"))

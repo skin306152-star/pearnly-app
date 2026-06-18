@@ -9,6 +9,7 @@ from decimal import Decimal
 from unittest import mock
 
 from services.expense import line_correct
+from services.expense import line_correct_data as lcd
 from services.expense.expense_draft import ExpenseDraft
 
 
@@ -86,40 +87,32 @@ class ApplyChangesTests(unittest.TestCase):
 
     def test_vendor(self):
         data = self._data()
-        line_correct._apply_changes(
-            None, data, ExpenseDraft(vendor_name="7-11"), ["vendor_name"], "t", 1, {}
-        )
+        lcd.apply_changes(None, data, ExpenseDraft(vendor_name="7-11"), ["vendor_name"], "t", 1, {})
         self.assertEqual(data["supplier"], {"name": "7-11", "tax_id": None})
 
     def test_date(self):
         data = self._data()
-        line_correct._apply_changes(
-            None, data, ExpenseDraft(doc_date="2026-06-16"), ["doc_date"], "t", 1, {}
-        )
+        lcd.apply_changes(None, data, ExpenseDraft(doc_date="2026-06-16"), ["doc_date"], "t", 1, {})
         self.assertEqual(data["doc_date"], "2026-06-16")
 
     def test_amount_single_line_sets_unit_price_qty1(self):
         data = self._data()
-        line_correct._apply_changes(
-            None, data, ExpenseDraft(amount=Decimal("550")), ["amount"], "t", 1, {}
-        )
+        lcd.apply_changes(None, data, ExpenseDraft(amount=Decimal("550")), ["amount"], "t", 1, {})
         self.assertEqual(data["lines"][0]["unit_price"], "550")
         self.assertEqual(data["lines"][0]["qty"], "1")
         self.assertIsNone(data["amount_override"])
 
     def test_payment_method_sets_doc_field(self):
         data = {"lines": [{}]}
-        line_correct._apply_changes(
+        lcd.apply_changes(
             None, data, ExpenseDraft(payment_method="cash"), ["payment_method"], "t", 1, {}
         )
         self.assertEqual(data["payment_method"], "cash")
 
     def test_category_resolves_and_sets_lines(self):
         data = {"lines": [{"category_id": "x"}, {"category_id": "y"}]}
-        with mock.patch.object(line_correct, "_resolve_category", return_value=("p1", "c1")):
-            line_correct._apply_changes(
-                None, data, ExpenseDraft(note="水电费"), ["category"], "t", 1, {}
-            )
+        with mock.patch.object(lcd, "_resolve_category", return_value=("p1", "c1")):
+            lcd.apply_changes(None, data, ExpenseDraft(note="水电费"), ["category"], "t", 1, {})
         self.assertEqual(data["category_id"], "p1")
         self.assertTrue(
             all(ln["category_id"] == "p1" and ln["subcategory_id"] == "c1" for ln in data["lines"])
@@ -140,7 +133,7 @@ class CloneLineTests(unittest.TestCase):
             "category_id": "c",
             "subcategory_id": "s",
         }
-        out = line_correct._clone_line(ln)
+        out = lcd._clone_line(ln)
         self.assertEqual(out["qty"], Decimal("2"))
         self.assertEqual(out["unit_price"], Decimal("60"))
         self.assertEqual(out["vat_rate"], Decimal("7"))
@@ -318,6 +311,10 @@ class ApplyOrConfirmTests(unittest.TestCase):
                 side_effect=lambda *a, **k: saved.update(k),
             ),
             mock.patch.object(line_correct.conversation, "clear_pending"),
+            mock.patch.object(line_correct, "_set_active"),  # 续接态(验收 #2)·本测不验持久化
+            mock.patch.object(
+                line_correct, "_say_detail", side_effect=lambda *a, **k: replies.append("DETAIL")
+            ),
             mock.patch.object(
                 line_correct,
                 "_apply",
@@ -348,16 +345,16 @@ class ApplyOrConfirmTests(unittest.TestCase):
         detail = {"doc": {"status": "draft"}, "supplier": {"name": "711"}, "lines": [{}]}
         replies, saved, applied = self._run({"vendor_name": "7-11"}, detail)
         self.assertEqual(len(applied), 1)  # 直接改
-        self.assertEqual(saved, {})  # 不存确认态
+        self.assertEqual(saved, {})  # 不存确认态(active 续接由 _set_active 另存·此处 mock)
         self.assertIn("7-11", replies[0])  # 完成回执(CHANGED_DONE)
 
-    def test_posted_nonamount_confirms(self):
-        # 高风险:已入账 → 确认(不直接改)。
+    def test_posted_nonamount_executes_directly(self):
+        # 验收 #1:已入账改卖家(低风险展示字段)→ 直接执行(void+克隆·可撤销),不再二次确认。
         detail = {"doc": {"status": "posted"}, "supplier": {"name": "711"}, "lines": [{}]}
         replies, saved, applied = self._run({"vendor_name": "7-11"}, detail)
-        self.assertEqual(applied, [])  # 不直接改
-        self.assertEqual(saved["missing"], "correct:1:D1:vendor_name")
-        self.assertIn("7-11", replies[0])  # 确认含新值
+        self.assertEqual(len(applied), 1)  # 直接改
+        self.assertEqual(saved, {})  # 不出确认 pending
+        self.assertIn("7-11", replies[0])
 
     def test_draft_amount_confirms(self):
         # 高风险:改金额(税额重算)→ 即便草稿也确认。
@@ -366,11 +363,18 @@ class ApplyOrConfirmTests(unittest.TestCase):
         self.assertEqual(applied, [])
         self.assertEqual(saved["missing"], "correct:1:D1:amount")
 
+    def test_noop_skips_apply(self):
+        # 验收 #3:目标值已等于当前值 → 不 void/不重建/不确认,诚实回执。
+        detail = {"doc": {"status": "draft", "doc_date": "2026-06-18"}, "lines": [{}]}
+        replies, saved, applied = self._run({"doc_date": "2026-06-18"}, detail)
+        self.assertEqual((applied, saved), ([], {}))
+        self.assertIn("2026-06-18", replies[0])  # CHANGED_NOOP
+
     def test_amount_multiline_guides_detail(self):
         detail = {"doc": {"status": "draft"}, "lines": [{}, {}]}
         replies, saved, applied = self._run({"amount": Decimal("110")}, detail)
         self.assertEqual((applied, saved), ([], {}))
-        self.assertIn("明细", replies[0])  # MULTILINE_EDIT
+        self.assertIn("DETAIL", replies)  # 走带按钮的详情页(_say_detail)
 
     def test_void_target_honest(self):
         replies, saved, applied = self._run({"vendor_name": "x"}, {"doc": {"status": "void"}})
@@ -408,6 +412,7 @@ class TryConfirmTests(unittest.TestCase):
             mock.patch.object(line_correct.db, "get_cursor_rls", return_value=_Ctx(object())),
             self._peek("correct:1:D1:amount"),
             mock.patch.object(line_correct.conversation, "clear_pending"),
+            mock.patch.object(line_correct, "_set_active"),  # 续接态(验收 #2)·本测不验持久化
             mock.patch.object(
                 line_correct,
                 "_apply",

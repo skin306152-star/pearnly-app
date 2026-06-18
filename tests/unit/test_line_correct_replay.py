@@ -22,9 +22,10 @@ from services.expense import (  # noqa: E402
     conversation,
     line_classify,
     line_correct,
+    line_correct_data,
     line_correct_flow as flow,
 )
-from services.line_binding import line_client, line_message_refs
+from services.line_binding import line_client, line_message_refs, line_reply
 from services.purchase import correct as correct_svc
 from services.purchase import docs as docs_svc
 from services.purchase import posting as posting_svc
@@ -160,12 +161,19 @@ def _run(sim, turns):
         mock.patch.object(posting_svc, "post_doc", side_effect=lambda *a, **k: None),
         mock.patch.object(correct_svc, "correct_doc", side_effect=sim.correct_doc),
         mock.patch.object(settings_svc, "get_settings", return_value={"auto_book": False}),
-        mock.patch.object(line_correct, "_resolve_category", return_value=("cat1", "sub1")),
+        mock.patch.object(line_correct_data, "_resolve_category", return_value=("cat1", "sub1")),
         mock.patch.object(line_message_refs, "resolve_target", side_effect=sim.resolve_target),
         mock.patch.object(
-            flow.line_reply,
+            line_reply,
             "reply_text_context",
             side_effect=lambda tok, body, **k: sim.replies.append(body),
+        ),
+        mock.patch.object(
+            line_reply,
+            "reply_messages_context",
+            side_effect=lambda tok, msgs, **k: sim.replies.extend(
+                m.get("altText", "") for m in msgs
+            ),
         ),
     ):
         for text, quoted in turns:
@@ -249,11 +257,11 @@ class ReplayScenarioTests(unittest.TestCase):
         self.assertEqual(len(self.sim.docs["D2"]["lines"]), 3)  # 行数没被动
 
     def test_yes_does_not_hit_stale_pending(self):
-        # 改完一笔(确认执行)后,旧 pending 已清;再单说「ใช่」不该命中旧动作。
+        # 改完一笔(确认执行)后只剩 active 续接态(非待确认);再单说「ใช่」不命中旧确认动作。
         _run(self.sim, [("จำนวนเงินเป็น 110", "MID_D1"), ("ใช่", None)])
-        self.assertNotIn("u1", self.sim.pending)  # pending 已清
+        self.assertTrue(self.sim.pending["u1"]["missing"].startswith("correctactive:"))
         steps = _run(self.sim, [("ใช่", None)])
-        self.assertFalse(steps[0][1])  # 无 pending → 改错路由不接管(交闲聊/大脑)
+        self.assertFalse(steps[0][1])  # active 态下「ใช่」非改错形 → 不接管(交闲聊/大脑)
 
     def test_cancel_aborts_pending(self):
         steps = _run(self.sim, [("จำนวนเงินเป็น 110", "MID_D1"), ("ยกเลิก", None)])
@@ -276,6 +284,44 @@ class ReplayScenarioTests(unittest.TestCase):
         # 笼统「识别错了」→ 列字段;答「卖家」→ 问新值;给「7-11」→ 改。全程无泛化指引。
         steps = _run(self.sim, [("识别错了", "MID_D1"), ("卖家", None), ("7-11", None)])
         self.assertEqual(self.sim.docs["D1"]["supplier"]["name"], "7-11")
+        self._no_forbidden(steps)
+
+    def test_noop_posted_no_rebuild(self):
+        # 验收 #3:已入账单日期已是 2026-06-18,再「วันที่เป็น 2026/6/18」→ no-op,不 void 不重建。
+        self.sim.seed("D4", lines=1, status="posted", doc_date="2026-06-18")
+        steps = _run(self.sim, [("วันที่เป็น 2026/6/18", "MID_D4")])
+        self.assertTrue(steps[0][1])
+        self.assertNotIn("D4_c1", self.sim.docs)  # 没 correct_doc 克隆重建
+        self.assertEqual(self.sim.docs["D4"]["doc"]["status"], "posted")  # 原单没动
+
+    def test_active_session_continues(self):
+        # 验收 #2:改完卖家后,无引用再「วันที่เป็น 2026/6/18」→ 续命中同一张(active)。
+        steps = _run(self.sim, [("ร้านค้าเป็น 7-11", "MID_D1"), ("วันที่เป็น 2026/6/18", None)])
+        self.assertTrue(steps[1][1])
+        self.assertEqual(self.sim.docs["D1"]["doc"]["doc_date"], "2026-06-18")
+        self._no_forbidden(steps)
+
+    def test_active_new_expense_not_hijacked(self):
+        # active 续接态收到新记账「กาแฟ 70」→ route 放行(不接管、不劫持)。
+        steps = _run(self.sim, [("ร้านค้าเป็น 7-11", "MID_D1"), ("กาแฟ 70", None)])
+        self.assertFalse(steps[1][1])
+
+    def test_chain_seller_date_seller_delete_multiline(self):
+        # 串联(Zihao 指定):seller -> date -> seller(no-op) -> delete -> 另一张多行总额拦截。
+        self.sim.seed("D5", lines=1)
+        steps = _run(
+            self.sim,
+            [
+                ("ร้านค้าเป็น 7-11", "MID_D5"),  # ① 改卖家(active D5)
+                ("วันที่เป็น 2026/6/18", None),  # ② 续接改日期(D5)
+                ("ร้านค้าเป็น 7-11", None),  # ③ 已是 7-11 → no-op,不重建
+                ("ลบ", None),  # ④ 删当前 active 草稿 D5
+                ("จำนวนเงินรวมเปลี่ยนเป็น 110", "MID_D2"),  # ⑤ 另一张多行 → 详情页
+            ],
+        )
+        self.assertTrue(all(s[1] for s in steps))  # 五步全被改错路由接管
+        self.assertNotIn("D5", self.sim.docs)  # ④ 真删了
+        self.assertEqual(self.sim.docs["D2"]["doc"]["grand_total"], "70.00")  # ⑤ 多行没乱改
         self._no_forbidden(steps)
 
 

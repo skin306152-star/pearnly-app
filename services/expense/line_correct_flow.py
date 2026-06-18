@@ -82,7 +82,12 @@ _NEG_FILLER = (
     "错",
 )
 
-_PREFIXES = (line_correct._PREFIX, line_correct._VAL_PREFIX, line_correct._CLAR_PREFIX)
+_PREFIXES = (
+    line_correct._PREFIX,
+    line_correct._VAL_PREFIX,
+    line_correct._CLAR_PREFIX,
+    line_correct._ACTIVE_PREFIX,
+)
 
 
 def _say(reply_token, body, ctx):
@@ -96,7 +101,15 @@ def route(
     任一接管 → True;都不接管 → False(交记账/大脑)。"""
     qt = ctx.get("quote_token", "")
     if try_correction_state(
-        bound_user, reply_token, line_user_id, text, tid, ws, lang, quote_token=qt
+        bound_user,
+        reply_token,
+        line_user_id,
+        text,
+        tid,
+        ws,
+        lang,
+        quoted_message_id=quoted_message_id,
+        quote_token=qt,
     ):
         return True
     if maybe_clarify_feedback(bound_user, reply_token, text, lang, ws, quoted_message_id, ctx):
@@ -107,9 +120,22 @@ def route(
 
 
 def try_correction_state(
-    bound_user, reply_token, line_user_id, text, tid, ws, lang, *, quote_token=""
+    bound_user,
+    reply_token,
+    line_user_id,
+    text,
+    tid,
+    ws,
+    lang,
+    *,
+    quoted_message_id=None,
+    quote_token="",
 ) -> bool:
-    """改错会话态分发(最高优先):有 correct/correctval/correctclar pending 才接管,否则 False。"""
+    """改错会话态分发(最高优先):有 correct/correctval/correctclar/correctactive pending 才接管。
+
+    correctactive=改完续接态:后续点名字段继续命中同一张(验收 #2);非改错形(新记账等)放行不劫持。
+    引用了具体卡片(换单)→ 让位 maybe_clarify 用引用重新定位。
+    """
     with db.get_cursor_rls(tid) as cur:
         pend = conversation.peek_pending(cur, line_user_id=line_user_id)
     missing = str((pend or {}).get("missing") or "")
@@ -118,7 +144,12 @@ def try_correction_state(
     ctx = dict(quote_token=quote_token, line_user_id=line_user_id, tenant_id=tid)
     reply_lang = line_classify.detect_text_lang(text) or lang
     p_ws, p_doc = _pend_target(missing)
+    is_active = missing.startswith(line_correct._ACTIVE_PREFIX)
+    field = line_classify.detect_correction_field(text)
 
+    # 引用优先:active 完全让位;ask 阶段点名字段也让位(换单)→ 交 maybe_clarify 用引用定位。
+    if quoted_message_id and (is_active or field):
+        return False
     # 明确「取消/算了」→ 中止本次改错,不动单据(任何阶段·验收 #1/#7)。
     if line_classify.is_cancel_intent(text):
         line_correct._clear(tid, line_user_id)
@@ -127,11 +158,12 @@ def try_correction_state(
     # 明确「删除/ลบ」→ 作废目标(草稿删 / 已入账 void·验收 #7)。
     if line_classify.is_delete_intent(text):
         return _delete_target(bound_user, reply_token, reply_lang, tid, p_ws, p_doc, ctx)
-    # 点名字段(确认阶段切换 / 收值改口 / 待选答字段)→ 统一路由(给了值就直接走风险三档·验收 #2/#3)。
-    field = line_classify.detect_correction_field(text)
+    # 点名字段(确认阶段切换 / 收值改口 / 待选答字段 / active 续接)→ 统一路由(给了值直走风险三档)。
     if field:
         return _route_field(bound_user, reply_token, text, lang, tid, p_ws, p_doc, field, ctx)
     # 无字段:按阶段处理。
+    if is_active:
+        return False  # 续接态收到非改错形(新记账/闲聊)→ 放行,不劫持
     if missing.startswith(line_correct._PREFIX):  # 最终 是/否(复用已 peek 的 pend·免重读)
         return line_correct.try_confirm(
             bound_user,
@@ -211,8 +243,10 @@ def _route_field(bound_user, reply_token, text, lang, tid, ws, doc_id, field, ct
         _say(reply_token, ci.t(ci.DETAIL_INCOMPLETE, reply_lang), ctx)  # 单行也只能去详情核对
         return True
     if field == "items" or (field == "amount" and multiline):
-        line_correct._clear(tid, luid)
-        _say(reply_token, ci.t(ci.MULTILINE_EDIT, reply_lang), ctx)  # 多行/明细行级 → 详情页
+        line_correct._clear(tid, luid)  # 多行/明细行级 → 详情页(带真按钮·验收 #5)
+        line_correct._say_detail(
+            reply_token, doc_id, ws, reply_lang, luid, tid, ctx.get("quote_token", "")
+        )
         return True
     value = _extract_value(text, field)
     if value in (None, ""):  # 点了字段没给值 → 存待值态,问新值(tier 1)
@@ -265,11 +299,14 @@ def try_void_quoted(
 
 
 def _delete_target(bound_user, reply_token, lang, tid, ws, doc_id, ctx) -> bool:
-    """改错会话内「删除/ลบ」→ 作废目标:草稿物理删、已入账 void(复用对账冲销)、已结期诚实引导。"""
+    """改错会话内「删除/ลบ」→ 作废目标:草稿物理删 / 已入账 void(复用对账冲销)→ 回终态卡(验收 #4);
+    已结期诚实引导。"""
     from core.pos_api import PosError
+    from services.line_binding import line_card_actions
     from services.purchase import posting as posting_svc
 
     line_correct._clear(tid, ctx["line_user_id"])
+    luid = ctx["line_user_id"]
     uid = str(bound_user["id"]) if bound_user.get("id") else None
     try:
         with db.get_cursor_rls(tid, commit=True) as cur:
@@ -278,17 +315,36 @@ def _delete_target(bound_user, reply_token, lang, tid, ws, doc_id, ctx) -> bool:
             )
             status = (detail.get("doc") or {}).get("status") if detail else None
             if status == "draft":
+                amt = (detail.get("doc") or {}).get("grand_total")
                 line_correct.docs_svc.delete_doc(
                     cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id
                 )
-                _say(reply_token, line_client.t_line(lang, "card_state_discarded_desc"), ctx)
+                line_card_actions.send_terminal(
+                    reply_token,
+                    state="discarded",
+                    doc_id=doc_id,
+                    ws=ws,
+                    amount=amt,
+                    lang=lang,
+                    tid=tid,
+                    luid=luid,
+                )
                 return True
             if status == "posted":
                 res = posting_svc.void_doc(
                     cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id, created_by=uid
                 )
                 amt = (res.get("doc") or {}).get("grand_total")
-                _say(reply_token, line_client.t_line(lang, "exp_undo_done", amount=amt), ctx)
+                line_card_actions.send_terminal(
+                    reply_token,
+                    state="voided",
+                    doc_id=doc_id,
+                    ws=ws,
+                    amount=amt,
+                    lang=lang,
+                    tid=tid,
+                    luid=luid,
+                )
                 return True
     except PosError as e:
         if (e.code or "") == "acct.period_closed":

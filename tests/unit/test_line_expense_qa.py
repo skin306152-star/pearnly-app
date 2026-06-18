@@ -15,16 +15,11 @@ class _CM:
         return False
 
 
-def _run(status, *, quote_token="QT"):
-    sent, kwargs = [], []
+def _run(status):
+    sent = []
     from core import db
-    from services.line_binding import line_client, line_message_refs
+    from services.line_binding import line_card_actions, line_client, line_message_refs
     from services.purchase import docs, posting
-
-    def _cap(rt, b, **k):
-        sent.append(b)
-        kwargs.append(k)
-        return True
 
     with (
         mock.patch.object(db, "get_cursor_rls", return_value=_CM()),
@@ -40,7 +35,9 @@ def _run(status, *, quote_token="QT"):
         mock.patch.object(
             posting, "void_doc", return_value={"doc": {"grand_total": "100"}}
         ) as void,
-        mock.patch.object(qa.line_reply, "reply_text_context", side_effect=_cap),
+        mock.patch.object(
+            line_card_actions, "send_terminal", side_effect=lambda rt, **k: sent.append(k)
+        ),
         mock.patch.object(line_client, "t_line", side_effect=lambda lang, key, **kw: key),
     ):
         qa.reply_undo(
@@ -52,29 +49,26 @@ def _run(status, *, quote_token="QT"):
             line_user_id="U1",
             quoted_message_id="m1",
             text="ยกเลิก",
-            quote_token=quote_token,
         )
-    return sent, delete_doc, void, kwargs
+    return sent, delete_doc, void
 
 
 class ReplyUndoTests(unittest.TestCase):
     def test_cancel_on_draft_discards(self):
-        # 对草稿回「取消」→ 丢弃(delete_doc),不调 void,不落「没有可撤销的」死路。
-        sent, delete_doc, void, _ = _run("draft")
+        # 对草稿回「取消/删除」→ 丢弃(delete_doc)+ 终态卡(discarded),不调 void,不落死路。
+        sent, delete_doc, void = _run("draft")
         delete_doc.assert_called_once()
         void.assert_not_called()
-        self.assertEqual(sent, ["card_state_discarded_desc"])
+        self.assertEqual(sent[0]["state"], "discarded")
+        self.assertEqual(sent[0]["amount"], "100")
 
     def test_cancel_on_posted_voids(self):
-        sent, delete_doc, void, _ = _run("posted")
+        # 已入账 → void + 终态卡(voided·含金额 + 查看记录)。
+        sent, delete_doc, void = _run("posted")
         void.assert_called_once()
         delete_doc.assert_not_called()
-        self.assertEqual(sent, ["exp_undo_done"])
-
-    def test_quote_token_propagates_to_reply(self):
-        # P1C:撤销回执引用用户当前消息(quoteToken 传到统一出口)。
-        _, _, _, kwargs = _run("posted", quote_token="QT")
-        self.assertEqual(kwargs[0].get("quote_token"), "QT")
+        self.assertEqual(sent[0]["state"], "voided")
+        self.assertEqual(sent[0]["amount"], "100")
 
 
 if __name__ == "__main__":

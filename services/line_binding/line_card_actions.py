@@ -35,6 +35,40 @@ def _terminal_card(reply_token, state, ref, ws, amount, lang, tid, luid) -> None
     line_reply.reply_messages_context(reply_token, [card], line_user_id=luid, tenant_id=tid)
 
 
+def send_terminal(reply_token, *, state, doc_id, ws, amount, lang, tid, luid) -> None:
+    """对外:撤销/删除后回终态卡(已撤销/已丢弃·复用 _terminal_card·验收 #4)。"""
+    _terminal_card(reply_token, state, doc_id, ws, amount, lang, tid, luid)
+
+
+def send_detail_link(reply_token, text, *, doc_id, ws, lang, tid, luid, quote_token="") -> None:
+    """多行/明细需详情页 → 文案 + 「打开详情」按钮(真 deeplink·不只文字·验收 #5)。"""
+    import os
+
+    from services.line_binding import line_card, line_card_i18n
+
+    uri = line_card._liff_link(
+        os.getenv("LINE_LIFF_ID", "").strip(),
+        "https://pearnly.com/home",
+        str(doc_id),
+        view="edit",
+        ws=str(ws or ""),
+    )
+    label = line_card_i18n.chrome(lang).get("btn_detail") or "Detail"
+    body = (text or "Pearnly")[:160]
+    msg = {
+        "type": "template",
+        "altText": body,
+        "template": {
+            "type": "buttons",
+            "text": body,
+            "actions": [{"type": "uri", "label": label[:20], "uri": uri}],
+        },
+    }
+    line_reply.reply_messages_context(
+        reply_token, [msg], line_user_id=luid, tenant_id=tid, quote_token=quote_token
+    )
+
+
 def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
     """卡按钮回调 → 全套动作分发。任何异常都回执不抛(主路径不得崩)。
 

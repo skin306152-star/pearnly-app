@@ -48,6 +48,14 @@ DRAFT_EDITED = {
     "ja": "下書きを更新しました:฿{new}、記帳の確認待ちです。",
 }
 
+# 目标值已等于当前值(如日期已是 2026-06-18)→ 不 void/不重建/不写审计,诚实告知(验收 #3)。
+CHANGED_NOOP = {
+    "zh": "{field}已经是 {value} 了,无需修改。",
+    "th": "{field}เป็น {value} อยู่แล้วค่ะ ไม่ต้องแก้ไข",
+    "en": "The {field} is already {value} — no change needed.",
+    "ja": "{field}はすでに {value} です。変更は不要です。",
+}
+
 # 低风险直接执行后的完成回执(草稿改 date/seller/category):保留卡片查看/撤销入口。
 CHANGED_DONE = {
     "zh": "已将{field}改为 {new}。可在上方卡片查看或撤销。",

@@ -15,6 +15,7 @@ from typing import Optional
 
 from core import db
 from services.expense import conversation, line_classify
+from services.expense import line_correct_data as lcd
 from services.expense import line_correct_i18n as ci
 from services.expense.expense_draft import ExpenseDraft
 from services.line_binding import line_client, line_message_refs, line_reply
@@ -23,6 +24,7 @@ from services.purchase import docs as docs_svc
 _PREFIX = "correct:"  # 待 是/否 确认(最终)
 _CLAR_PREFIX = "correctclar:"  # 待用户选「改哪个字段」(多轮·correctclar:<ws>:<doc>)
 _VAL_PREFIX = "correctval:"  # 待用户给「新值」(多轮·correctval:<ws>:<doc>:<field>)
+_ACTIVE_PREFIX = "correctactive:"  # 改完续接态(active_doc_id·后续字段编辑继续命中同一张·验收 #2)
 _YES = ("是", "对", "好", "确认", "ok", "yes", "ใช่", "ตกลง", "ถูก", "確認", "はい")
 # 否定词优先于肯定:治子串塌缩(「ไม่ใช่」含「ใช่」、「不对」含「对」)→ 否则把「不」当「是」照改账。
 _NO = (
@@ -107,6 +109,53 @@ def _clear(tid, line_user_id) -> None:  # 清改错会话态(终态/直接执行
         conversation.clear_pending(cur, line_user_id=line_user_id)
 
 
+def _say_detail(reply_token, doc_id, ws, lang, line_user_id, tid, quote_token="") -> None:
+    """多行/明细需详情页 → 文案 + 「打开详情」真按钮(复用 line_card_actions·验收 #5)。"""
+    from services.line_binding import line_card_actions
+
+    line_card_actions.send_detail_link(
+        reply_token,
+        ci.t(ci.MULTILINE_EDIT, lang),
+        doc_id=doc_id,
+        ws=ws,
+        lang=lang,
+        tid=tid,
+        luid=line_user_id,
+        quote_token=quote_token,
+    )
+
+
+def _set_active(tid, ws, doc_id, line_user_id) -> None:
+    """改完续接 active_doc_id(TTL 默认 15min):后续字段编辑无需再引用即命中同一张(验收 #2)。"""
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        conversation.save_pending(
+            cur,
+            line_user_id=line_user_id,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            draft=ExpenseDraft(),
+            missing=f"{_ACTIVE_PREFIX}{ws}:{doc_id}",
+        )
+
+
+def _is_noop(detail: dict, key: str, new) -> bool:
+    """目标值已等于当前值?(验收 #3:no-op 不 void/不重建/不写审计)。category 名↔id 不比,放行。"""
+    doc = detail.get("doc") or {}
+    sup = detail.get("supplier") or {}
+    if key == "doc_date":
+        return str(new or "") == str(doc.get("doc_date") or "")
+    if key == "vendor_name":
+        return (new or "") == (sup.get("name") or "")
+    if key == "payment_method":
+        return (new or "") == (doc.get("payment_method") or "")
+    if key == "amount":
+        try:
+            return Decimal(str(new)) == Decimal(str(doc.get("grand_total") or 0))
+        except (InvalidOperation, ValueError):
+            return False
+    return False
+
+
 def _field_old(detail: dict, key: str, lang: str) -> str:
     """单字段旧值(确认文案「从 旧 改成 新」用)。付款方式码本地化成人话。取不到 → —。"""
     doc = detail.get("doc") or {}
@@ -151,9 +200,17 @@ def _apply_or_confirm(
         _clear(tid, line_user_id)
         _say(line_client.t_line(lang, "exp_correct_none"))
         return True
+    # no-op:目标值已等于当前值 → 不 void/不重建/不写审计,诚实告知,续 active(验收 #3)。
+    noop = {k: v for k, v in changes.items() if _is_noop(detail, k, v)}
+    changes = {k: v for k, v in changes.items() if k not in noop}
+    if not changes:
+        _set_active(tid, ws, doc_id, line_user_id)
+        k, v = next(iter(noop.items()))
+        _say(ci.t(ci.CHANGED_NOOP, lang, field=ci.key_label(k, lang), value=ci.disp(k, v, lang)))
+        return True
     if "amount" in changes and len(detail.get("lines") or []) > 1:
         _clear(tid, line_user_id)
-        _say(ci.t(ci.MULTILINE_EDIT, lang))
+        _say_detail(reply_token, doc_id, ws, lang, line_user_id, tid, quote_token)
         return True
     changes_draft = ExpenseDraft(
         amount=changes.get("amount"),
@@ -163,15 +220,16 @@ def _apply_or_confirm(
         payment_method=changes.get("payment_method") or "",
     )
     keys = sorted(changes)
-    # 高风险=已入账(void重建)/改金额(税额重算)/多字段;草稿单非金额=低风险直接改。
-    high_risk = status == "posted" or "amount" in changes or len(changes) > 1
+    # 高风险=改金额(税额重算)/多字段 → 确认;低风险(单个 date/seller/category/payment)直接改,
+    # 即便已入账也直执行(void+克隆+重过账·可撤销·验收 #1)。
+    high_risk = "amount" in changes or len(changes) > 1
     if not high_risk:  # 低风险:直接执行,不二次确认
         with db.get_cursor_rls(tid, commit=True) as cur:
-            conversation.clear_pending(cur, line_user_id=line_user_id)
             res = _apply(cur, bound_user, tid, ws, doc_id, changes_draft, keys, detail=detail)
         if not res:
             _say(line_client.t_line(lang, "exp_correct_none"))
             return True
+        _set_active(tid, ws, res["new_id"], line_user_id)  # 续接同一张(验收 #2)
         k = keys[0]
         fl, nv = ci.key_label(k, lang), ci.disp(k, changes[k], lang)
         _say(ci.t(ci.CHANGED_DONE, lang, field=fl, new=nv))
@@ -304,6 +362,7 @@ def try_confirm(
     if not res:
         _say(line_client.t_line(lang, "exp_correct_none"))
         return True
+    _set_active(tid, ws_eff, res["new_id"], line_user_id)  # 续接同一张(验收 #2)
     if res["posted"]:
         _say(line_client.t_line(lang, "exp_correct_posted", new=res["total"]))
     elif res.get("mode") == "draft_inplace":
@@ -341,13 +400,13 @@ def _apply(cur, bound_user, tid, ws, orig_id, changes_draft, keys, detail=None) 
             cur, tenant_id=tid, workspace_client_id=ws, doc_id=orig_id, created_by=uid
         )
         edit_id = str(clone["doc"]["id"])
-        data = _detail_to_data(clone)
+        data = lcd.detail_to_data(clone)
         mode = "posted_reclone"
     else:  # 草稿:原地改(无需冲销·update_draft 直接重算重写行)
         edit_id = str(orig_id)
-        data = _detail_to_data(detail)
+        data = lcd.detail_to_data(detail)
         mode = "draft_inplace"
-    _apply_changes(cur, data, changes_draft, keys, tid, ws, bound_user)
+    lcd.apply_changes(cur, data, changes_draft, keys, tid, ws, bound_user)
     cfg = settings_svc.get_settings(cur, tenant_id=tid, workspace_client_id=ws)
     res = docs_svc.update_draft(
         cur,
@@ -371,88 +430,3 @@ def _apply(cur, bound_user, tid, ws, orig_id, changes_draft, keys, detail=None) 
         )
         return {"new_id": edit_id, "posted": True, "total": total, "mode": mode}
     return {"new_id": edit_id, "posted": False, "total": total, "mode": mode}
-
-
-def _detail_to_data(detail: dict) -> dict:
-    """get_doc 详情 → update_draft 入参(忠实:保多行 + 总额相关列原样,只待 _apply_changes 改指定字段)。"""
-    doc = detail.get("doc") or {}
-    sup = detail.get("supplier") or {}
-    return {
-        "doc_kind": doc.get("doc_kind") or "expense",
-        "doc_no": doc.get("doc_no"),
-        "doc_date": doc.get("doc_date"),
-        "has_vat": doc.get("has_vat"),
-        "currency": doc.get("currency") or "THB",
-        "fx_rate": doc.get("fx_rate") or 1,
-        "category_id": doc.get("category_id"),
-        "requester": doc.get("requester"),
-        "due_date": doc.get("due_date"),
-        "payment_status": doc.get("payment_status") or "unpaid",
-        "payment_method": doc.get("payment_method"),
-        "amount_override": doc.get("amount_override"),
-        "discount_total": doc.get("discount_total") or 0,
-        "rounding": doc.get("rounding") or 0,
-        "supplier": {
-            "name": sup.get("name") or "",
-            "tax_id": sup.get("tax_id"),
-            "branch_type": sup.get("branch_type"),
-            "branch_no": sup.get("branch_no"),
-            "address": sup.get("address"),
-            "phone": sup.get("phone"),
-        },
-        "lines": [_clone_line(ln) for ln in detail.get("lines") or []],
-    }
-
-
-def _clone_line(ln: dict) -> dict:
-    """purchase_lines 行 → update_draft 行入参(qty/单价/折扣/税率原样 · 总额不漂)。"""
-    return {
-        "item_type": ln.get("item_type") or "goods",
-        "product_id": ln.get("product_id"),
-        "description": ln.get("description") or "",
-        "qty": ln.get("qty"),
-        "unit": ln.get("unit"),
-        "unit_price": ln.get("unit_price"),
-        "discount": ln.get("discount"),
-        "vat_rate": ln.get("vat_rate"),
-        "vat_applicable": ln.get("vat_applicable"),
-        "wht_rate": ln.get("wht_rate"),
-        "category_id": ln.get("category_id"),
-        "subcategory_id": ln.get("subcategory_id"),
-        "batch_no": ln.get("batch_no"),
-        "expiry_date": ln.get("expiry_date"),
-    }
-
-
-def _apply_changes(cur, data, changes_draft, keys, tid, ws, bound_user) -> None:
-    """把改动落到克隆草稿 data。金额仅单行(多行已在 request 阶段拦),不让代码/LLM 重算多行明细。"""
-    if "vendor_name" in keys:
-        data["supplier"] = {"name": changes_draft.vendor_name or "", "tax_id": None}
-    if "doc_date" in keys:
-        data["doc_date"] = changes_draft.doc_date
-    if "category" in keys:
-        cid, sid = _resolve_category(cur, changes_draft.note or "", tid, ws, bound_user)
-        data["category_id"] = cid
-        for ln in data["lines"]:
-            ln["category_id"] = cid
-            ln["subcategory_id"] = sid
-    if "payment_method" in keys:
-        data["payment_method"] = changes_draft.payment_method or None
-    if "amount" in keys:
-        data["amount_override"] = None
-        if data["lines"]:
-            data["lines"][0]["unit_price"] = str(changes_draft.amount)
-            data["lines"][0]["qty"] = "1"
-
-
-def _resolve_category(cur, text, tid, ws, bound_user):
-    """新科目文本(「水电费」)→ 在本套账真实树里解析 (category_id, subcategory_id)(复用记账归类口径)。"""
-    from services.expense import line_l2
-    from services.line_binding import line_expense
-    from services.purchase import categories as cat_svc
-
-    tree = cat_svc.get_tree(cur, tenant_id=tid, workspace_client_id=ws)
-    tmp = ExpenseDraft(note=text)
-    api_key = line_l2.resolve_api_key(bound_user)
-    line_expense._fill_category(cur, tmp, text, tree, tid, ws, api_key)
-    return tmp.category_id, tmp.subcategory_id

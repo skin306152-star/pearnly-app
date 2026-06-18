@@ -102,6 +102,12 @@ def normalize_payment_method(raw: str) -> str:
     return _first_match(raw, _PAY_NORMALIZE)
 
 
+def payment_from_ocr(raw) -> str:
+    """OCR 票面付款字段 → 规范码;认不出留原文(卡片展示 line_ingest / 落库 intake 同口径)。空 → ''。"""
+    s = str(raw or "").strip()
+    return normalize_payment_method(s) or s
+
+
 # 引导类意图关键词(零成本·泰语优先):能力说明 / 如何上传 / 如何开始。
 _INTRO_PATTERNS = (
     (

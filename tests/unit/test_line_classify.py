@@ -96,6 +96,12 @@ class PaymentNormalizeTests(unittest.TestCase):
         self.assertEqual(lc.normalize_payment_method("xyz"), "")
         self.assertEqual(lc.normalize_payment_method(""), "")
 
+    def test_payment_from_ocr_keeps_raw_when_unknown(self):
+        # 卡片/落库同口径:认得出 → 规范码;认不出 → 留原文;空 → ''。
+        self.assertEqual(lc.payment_from_ocr("QRPayment(API)"), "promptpay")
+        self.assertEqual(lc.payment_from_ocr("เก็บปลายทาง"), "เก็บปลายทาง")
+        self.assertEqual(lc.payment_from_ocr(None), "")
+
 
 class CorrectionFieldTests(unittest.TestCase):
     """改错点名字段(P1E-2):amount/date/seller/category/payment/items。"""

@@ -167,7 +167,7 @@ def try_correction_state(
         return False
     ctx = dict(quote_token=quote_token, line_user_id=line_user_id, tenant_id=tid)
     reply_lang = line_classify.detect_text_lang(text) or lang
-    p_ws, p_doc = _pend_target(missing)
+    p_ws, p_doc, p_field = _pend_target(missing)
     is_active = missing.startswith(line_correct._ACTIVE_PREFIX)
     field = line_classify.detect_correction_field(text)
 
@@ -201,8 +201,7 @@ def try_correction_state(
             pend=pend,
         )
     if missing.startswith(line_correct._VAL_PREFIX):  # 等某字段新值 → 收值(无字段=纯值)
-        f = _parse_val(missing)[2]
-        return _route_field(bound_user, reply_token, text, lang, tid, p_ws, p_doc, f, ctx)
+        return _route_field(bound_user, reply_token, text, lang, tid, p_ws, p_doc, p_field, ctx)
     # correctclar 没听出字段 → 重问列字段(不退回泛化指引·验收 #5/#7)。
     _say(reply_token, ci.t(ci.CLARIFY_FIELDS, reply_lang), ctx)
     return True
@@ -239,7 +238,7 @@ def maybe_clarify_feedback(bound_user, reply_token, text, lang, ws, quoted_messa
                 cur, tenant_id=tid, workspace_client_id=ws_eff, doc_id=doc_id
             )
     # 引用解析失败 / 引用到已作废原单(刚被更正克隆)→ 跟随 active 续接到当前那张(验收:不掉「找不到」)。
-    if not detail or (detail.get("doc") or {}).get("status") not in ("posted", "draft"):
+    if not line_correct._is_live(detail):
         act = _active_doc(tid, luid)
         if act:
             ws_eff, doc_id = act
@@ -247,7 +246,7 @@ def maybe_clarify_feedback(bound_user, reply_token, text, lang, ws, quoted_messa
                 detail = line_correct.docs_svc.get_doc(
                     cur, tenant_id=tid, workspace_client_id=ws_eff, doc_id=doc_id
                 )
-    if not detail or (detail.get("doc") or {}).get("status") not in ("posted", "draft"):
+    if not line_correct._is_live(detail):
         # 无引用且像一句新记账(有金额)→ 放行给记账流,不劫持「买错了 50」这类。
         if not quoted_message_id and lqe.parse_expense(text).has_amount():
             return False
@@ -263,7 +262,7 @@ def _active_doc(tid, line_user_id):
     with db.get_cursor_rls(tid) as cur:
         pend = conversation.peek_pending(cur, line_user_id=line_user_id)
     m = str((pend or {}).get("missing") or "")
-    return _pend_target(m) if m.startswith(line_correct._ACTIVE_PREFIX) else None
+    return _pend_target(m)[:2] if m.startswith(line_correct._ACTIVE_PREFIX) else None
 
 
 def _route_field(bound_user, reply_token, text, lang, tid, ws, doc_id, field, ctx, *, detail=None):
@@ -440,21 +439,15 @@ def _strip_prefix(text: str) -> str:
 
 
 def _pend_target(missing: str):
-    """任意阶段 pending 的 (ws, doc_id)(三态前缀后都是 <ws>:<doc>:...)。"""
+    """任意阶段 pending 的 (ws, doc_id, field)(三态前缀后都是 <ws>:<doc>[:<field/keys>])。
+    field 仅 correctval 有意义,其余为附带值,调用方按需取。"""
     for pfx in _PREFIXES:
         if missing.startswith(pfx):
             body = missing[len(pfx) :]
             ws_s, _, rest = body.partition(":")
-            doc_id, _, _ = rest.partition(":")
-            return _int(ws_s), doc_id
-    return None, None
-
-
-def _parse_val(missing: str):
-    body = missing[len(line_correct._VAL_PREFIX) :]
-    ws_s, _, rest = body.partition(":")
-    doc_id, _, field = rest.partition(":")
-    return _int(ws_s), doc_id, field
+            doc_id, _, field = rest.partition(":")
+            return _int(ws_s), doc_id, field
+    return None, None, ""
 
 
 def _int(s):

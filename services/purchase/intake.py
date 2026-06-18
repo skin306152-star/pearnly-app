@@ -167,11 +167,10 @@ def _printed_total_rounding(fields: dict, lines: list) -> Decimal:
 
 
 def _ocr_payment_method(fields: dict) -> Optional[str]:
-    """OCR 票面付款方式 → 规范码落库(认不出留原文·与卡片 line_ingest 同口径)。无 → None。"""
-    from services.expense.line_classify import normalize_payment_method
+    """OCR 票面付款方式 → 规范码落库(认不出留原文·与卡片 line_ingest 同口径 payment_from_ocr)。无 → None。"""
+    from services.expense.line_classify import payment_from_ocr
 
-    raw = str(fields.get("payment_method") or "").strip()
-    return (normalize_payment_method(raw) or raw) or None
+    return payment_from_ocr(fields.get("payment_method")) or None
 
 
 def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:

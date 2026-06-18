@@ -332,10 +332,9 @@ def ingest_line_image(
             fc["category"] = float(cat_conf)
 
     # 付款方式:OCR 票面读到的(QRPayment/เงินสด/บัตร…)归一成规范码 → 卡显「付款方式」。未读到 → 空。
-    from services.expense.line_classify import normalize_payment_method
+    from services.expense.line_classify import payment_from_ocr
 
-    _pay_raw = str(fields.get("payment_method") or "").strip()
-    card_fields["payment_method"] = normalize_payment_method(_pay_raw) or _pay_raw
+    card_fields["payment_method"] = payment_from_ocr(fields.get("payment_method"))
     # 费用类型:命中服务关键词→服务,否则中性「费用」(OCR 票多为费用·不粗暴显「商品」)。
     from services.expense.line_classify import classify_expense_type
 

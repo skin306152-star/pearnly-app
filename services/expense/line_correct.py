@@ -125,11 +125,13 @@ def _say_detail(reply_token, doc_id, ws, lang, line_user_id, tid, quote_token=""
     )
 
 
-def _set_active(tid, ws, doc_id, line_user_id) -> None:
-    """改完续接 active_doc_id(TTL 默认 15min):后续字段编辑无需再引用即命中同一张(验收 #2)。"""
-    with db.get_cursor_rls(tid, commit=True) as cur:
+def _set_active(tid, ws, doc_id, line_user_id, *, cur=None) -> None:
+    """改完续接 active_doc_id(TTL 默认 15min):后续字段编辑无需再引用即命中同一张(验收 #2)。
+    cur 传入则复用调用方的提交游标(免再开一次连接)。"""
+
+    def _save(c):
         conversation.save_pending(
-            cur,
+            c,
             line_user_id=line_user_id,
             tenant_id=tid,
             workspace_client_id=ws,
@@ -137,36 +139,47 @@ def _set_active(tid, ws, doc_id, line_user_id) -> None:
             missing=f"{_ACTIVE_PREFIX}{ws}:{doc_id}",
         )
 
+    if cur is not None:
+        _save(cur)
+        return
+    with db.get_cursor_rls(tid, commit=True) as c:
+        _save(c)
 
-def _is_noop(detail: dict, key: str, new) -> bool:
-    """目标值已等于当前值?(验收 #3:no-op 不 void/不重建/不写审计)。category 名↔id 不比,放行。"""
+
+def _is_live(detail) -> bool:
+    """单据存在且可改(草稿/已入账)。void/不存在 → False。"""
+    return bool(detail) and (detail.get("doc") or {}).get("status") in ("posted", "draft")
+
+
+def _current(detail: dict, key: str):
+    """字段当前值(规范键 → detail 里的原始值)。_is_noop / _field_old 共用唯一映射(防漂移)。"""
     doc = detail.get("doc") or {}
     sup = detail.get("supplier") or {}
-    if key == "doc_date":
-        return str(new or "") == str(doc.get("doc_date") or "")
-    if key == "vendor_name":
-        return (new or "") == (sup.get("name") or "")
-    if key == "payment_method":
-        return (new or "") == (doc.get("payment_method") or "")
-    if key == "amount":
-        try:
-            return Decimal(str(new)) == Decimal(str(doc.get("grand_total") or 0))
-        except (InvalidOperation, ValueError):
-            return False
-    return False
-
-
-def _field_old(detail: dict, key: str, lang: str) -> str:
-    """单字段旧值(确认文案「从 旧 改成 新」用)。付款方式码本地化成人话。取不到 → —。"""
-    doc = detail.get("doc") or {}
-    sup = detail.get("supplier") or {}
-    val = {
+    return {
         "amount": doc.get("grand_total"),
         "vendor_name": sup.get("name"),
         "doc_date": doc.get("doc_date"),
         "category": doc.get("category_name") or doc.get("category"),
         "payment_method": doc.get("payment_method"),
     }.get(key)
+
+
+def _is_noop(detail: dict, key: str, new) -> bool:
+    """目标值已等于当前值?(验收 #3:no-op 不 void/不重建/不写审计)。category 名↔id 不比,放行。"""
+    cur = _current(detail, key)
+    if key == "amount":
+        try:
+            return Decimal(str(new)) == Decimal(str(cur or 0))
+        except (InvalidOperation, ValueError):
+            return False
+    if key in ("doc_date", "vendor_name", "payment_method"):
+        return str(new or "") == str(cur or "")
+    return False
+
+
+def _field_old(detail: dict, key: str, lang: str) -> str:
+    """单字段旧值(确认文案「从 旧 改成 新」用)。付款方式码本地化成人话。取不到 → —。"""
+    val = _current(detail, key)
     return ci.disp(key, val, lang) if val not in (None, "") else "—"
 
 
@@ -195,8 +208,7 @@ def _apply_or_confirm(
     if detail is None:
         with db.get_cursor_rls(tid) as cur:
             detail = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)
-    status = (detail.get("doc") or {}).get("status") if detail else None
-    if status not in ("posted", "draft"):
+    if not _is_live(detail):
         _clear(tid, line_user_id)
         _say(line_client.t_line(lang, "exp_correct_none"))
         return True
@@ -226,10 +238,11 @@ def _apply_or_confirm(
     if not high_risk:  # 低风险:直接执行,不二次确认
         with db.get_cursor_rls(tid, commit=True) as cur:
             res = _apply(cur, bound_user, tid, ws, doc_id, changes_draft, keys, detail=detail)
+            if res:  # 续接同一张(验收 #2)·复用同一提交免再开游标
+                _set_active(tid, ws, res["new_id"], line_user_id, cur=cur)
         if not res:
             _say(line_client.t_line(lang, "exp_correct_none"))
             return True
-        _set_active(tid, ws, res["new_id"], line_user_id)  # 续接同一张(验收 #2)
         k = keys[0]
         fl, nv = ci.key_label(k, lang), ci.disp(k, changes[k], lang)
         _say(ci.t(ci.CHANGED_DONE, lang, field=fl, new=nv))
@@ -354,6 +367,8 @@ def try_confirm(
         with db.get_cursor_rls(tid, commit=True) as cur:
             conversation.clear_pending(cur, line_user_id=line_user_id)
             res = _apply(cur, bound_user, tid, ws_eff, orig_id, changes_draft, keys)
+            if res:  # 续接同一张(验收 #2)·复用同一提交免再开游标
+                _set_active(tid, ws_eff, res["new_id"], line_user_id, cur=cur)
     except PosError as e:
         if (e.code or "") == "acct.period_closed":
             _say(line_client.t_line(lang, "exp_correct_closed"))
@@ -362,7 +377,6 @@ def try_confirm(
     if not res:
         _say(line_client.t_line(lang, "exp_correct_none"))
         return True
-    _set_active(tid, ws_eff, res["new_id"], line_user_id)  # 续接同一张(验收 #2)
     if res["posted"]:
         _say(line_client.t_line(lang, "exp_correct_posted", new=res["total"]))
     elif res.get("mode") == "draft_inplace":

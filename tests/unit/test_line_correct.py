@@ -378,94 +378,6 @@ class ApplyOrConfirmTests(unittest.TestCase):
         self.assertEqual(replies, ["exp_correct_none"])
 
 
-class MaybeClarifyFeedbackTests(unittest.TestCase):
-    """采购改错澄清(P1E-2):命中「识别错了/不对/wrong/ผิด」→ 本层接管(绝不当 OCR 失败重拍)。"""
-
-    def _run(self, text, *, quoted="MID1", tgt=None, lines=None):
-        from services.line_binding import line_message_refs
-        from services.purchase import docs as docs_svc
-
-        tgt = tgt if tgt is not None else {"doc_id": "D1", "ws": 1, "error": None}
-        detail = {"doc": {"grand_total": "70.00"}, "lines": lines if lines is not None else [{}]}
-        ctx = {"line_user_id": "U1", "tenant_id": "t", "quote_token": "q"}
-        sent = {}
-        with (
-            mock.patch.object(line_correct.db, "get_cursor_rls", return_value=_Ctx(object())),
-            mock.patch.object(line_message_refs, "resolve_target", return_value=tgt),
-            mock.patch.object(docs_svc, "get_doc", return_value=detail),
-            mock.patch.object(
-                line_correct.conversation, "save_pending"
-            ),  # 多轮态存储(本测不验持久化)
-            mock.patch.object(
-                line_correct.line_reply,
-                "reply_text_context",
-                side_effect=lambda tok, body, **k: sent.update(body=body) or True,
-            ),
-        ):
-            res = line_correct.maybe_clarify_feedback("tok", text, "th", 1, quoted, ctx)
-        return res, sent.get("body", "")
-
-    def test_vague_quoted_clarifies_fields_in_input_lang(self):
-        # 验收 #1:笼统说错了 → 列可改字段(中文输入→中文,不被泰语主语言带偏)。
-        res, body = self._run("这个你识别错了")
-        self.assertTrue(res)
-        self.assertIn("你想改金额", body)
-
-    def test_thai_vague_clarifies_in_thai(self):
-        res, body = self._run("อ่านผิด")
-        self.assertTrue(res)
-        self.assertIn("ต้องการแก้ส่วนไหน", body)
-
-    def test_field_seller_asks_for_value(self):
-        # 验收 #3:点名卖家但没给新值 → 问新卖家(并引导「改成」语法)。
-        res, body = self._run("卖家不对")
-        self.assertTrue(res)
-        self.assertIn("卖家", body)
-        self.assertIn("改成", body)
-
-    def test_quoted_field_without_feedback_word_triggers(self):
-        # 「卖家不是这个 / ผู้ขายไม่ใช่คนนี้」无反馈词,但引用了卡片且点名字段 → 仍走改错澄清,
-        # 不被收入识别(ผู้ขาย 含 ขาย)劫持。
-        res, body = self._run("卖家不是这个", quoted="MID1")
-        self.assertTrue(res)
-        self.assertIn("卖家", body)
-
-    def test_items_guides_detail_page(self):
-        # 验收 #4:明细错了 → 引导详情页核对(不假装明细完整)。
-        res, body = self._run("明细错了")
-        self.assertTrue(res)
-        self.assertIn("详情页", body)
-
-    def test_payment_asks_for_value(self):
-        # 付款方式现可直接改(低风险)→ 点名但没给值 → 问新值(不再甩详情页/网页)。
-        res, body = self._run("付款方式不对")
-        self.assertTrue(res)
-        self.assertIn("付款方式", body)
-        self.assertIn("改成", body)  # ASK_VALUE 引导语法
-
-    def test_concrete_edit_falls_through_to_edit(self):
-        # 「改成X」是具体编辑 → 交 edit 流(request_correct),本层不接管。
-        res, _ = self._run("金额改成 70")
-        self.assertFalse(res)
-
-    def test_unresolved_quote_guides_reply(self):
-        # 验收 #5:引用过期/无法定位 → 引导回复要改的那条(不回 photo_failed)。
-        res, body = self._run("识别错了", tgt={"doc_id": None, "ws": 1, "error": "ref_not_found"})
-        self.assertTrue(res)
-        self.assertTrue(body)
-
-    def test_no_quote_no_amount_guides_reply(self):
-        # 验收 #5:无引用纯说错了 → 引导回复记录,而非 OCR 失败帮助。
-        res, body = self._run("这个识别错了", quoted=None, tgt={"error": "ambiguous"})
-        self.assertTrue(res)
-        self.assertTrue(body)
-
-    def test_no_quote_with_amount_passes_through(self):
-        # 「买错了 50」像新记账(有金额、无引用)→ 放行记账流,不劫持。
-        res, _ = self._run("买错了 50", quoted=None, tgt={"error": "ambiguous"})
-        self.assertFalse(res)
-
-
 class TryConfirmTests(unittest.TestCase):
     def _peek(self, missing):
         return mock.patch.object(
@@ -522,6 +434,24 @@ class TryConfirmTests(unittest.TestCase):
         self.assertTrue(out)
         clr.assert_called_once()
         ap.assert_not_called()
+
+    def test_reprompts_on_ambiguous_no_silent_cancel(self):
+        # 验收 #1:确认待定时收到既非「是」也非「否」(误触/无关)→ 重问,不静默取消、不串旧动作。
+        replies = []
+        with (
+            mock.patch.object(line_correct.db, "get_cursor_rls", return_value=_Ctx(object())),
+            self._peek("correct:1:D1:amount"),
+            mock.patch.object(line_correct.conversation, "clear_pending") as clr,
+            mock.patch.object(
+                line_correct.line_reply,
+                "reply_text_context",
+                side_effect=lambda tok, msg, **k: replies.append(msg) or True,
+            ),
+        ):
+            out = line_correct.try_confirm({"id": "u"}, "tok", "U1", "随便说点啥", "t", 1, "zh")
+        self.assertTrue(out)
+        clr.assert_not_called()  # 仍待确认 · 不清 pending
+        self.assertTrue(replies)
 
     def test_period_closed_guides(self):
         from core.pos_api import PosError

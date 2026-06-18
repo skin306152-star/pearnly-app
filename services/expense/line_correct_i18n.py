@@ -82,6 +82,23 @@ CONFIRM_FIELD_CHANGE = {
 }
 
 
+# confirm 阶段收到既非「是」也非「否」的输入 → 重问(不静默取消、不串到旧动作·验收 #1)。
+CONFIRM_REPROMPT = {
+    "zh": "这次修改还没确认。回复「是」确认,或「取消」放弃。",
+    "th": "การแก้ไขนี้ยังไม่ได้ยืนยันค่ะ ตอบ 'ใช่' เพื่อยืนยัน หรือ 'ยกเลิก' เพื่อยกเลิก",
+    "en": "This change isn't confirmed yet. Reply 'yes' to confirm or 'cancel' to discard.",
+    "ja": "この変更はまだ確定していません。「はい」で確定、「キャンセル」で取り消し。",
+}
+
+# 听不懂改什么 → 列可改字段示例(产品化兜底·非报错·验收 #8)。泰语为主、四语补齐。
+EDIT_EXAMPLES = {
+    "zh": "你可以回复:改日期为 2026-06-18、改店名为 7-11、总额改为 200、分类改为餐饮、付款方式改为 PromptPay。",
+    "th": "พิมพ์บอกได้เลยค่ะ เช่น แก้วันที่เป็น 2026-06-18, แก้ร้านค้าเป็น 7-11, แก้ยอดเป็น 200, แก้หมวดหมู่เป็นค่าอาหาร, แก้วิธีชำระเป็น PromptPay",
+    "en": "You can reply: change date to 2026-06-18, change seller to 7-11, change total to 200, change category to dining, change payment to PromptPay.",
+    "ja": "例:日付を2026-06-18に、店名を7-11に、合計を200に、分類を飲食に、支払方法をPromptPayに変更、と返信できます。",
+}
+
+
 def field_label(field: str, lang: str) -> str:
     return FIELD_LABELS.get(field, {}).get(lang) or FIELD_LABELS.get(field, {}).get("zh", field)
 

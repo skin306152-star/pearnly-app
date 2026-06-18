@@ -64,16 +64,12 @@ def handle_expense_text(
         if ws is None:
             return False
 
-        # 0. 改错会话态(最高优先·#6):待选字段/待新值/待 是否确认 → 续接多轮(先于引用提醒/记账/大脑)。
-        from services.expense import line_correct, line_correct_flow
+        # 0. 改错路由(最高优先·#6):会话态续接 > 引用澄清/直接改 > 引用取消/删除(先于记账/大脑)。
+        from services.expense import line_correct_flow
 
-        if line_correct_flow.try_correction_state(
-            bound_user, reply_token, line_user_id, text, stid, ws, lang, quote_token=quote_token
+        if line_correct_flow.route(
+            bound_user, reply_token, line_user_id, text, lang, stid, ws, quoted_message_id, ctx
         ):
-            return True
-
-        # 引用某记录说「识别错了/不对」(无具体改动)→ 澄清改哪里(不当 OCR 失败让重拍·守卫见 line_correct)。
-        if line_correct.maybe_clarify_feedback(reply_token, text, lang, ws, quoted_message_id, ctx):
             return True
 
         si = lqe.l1_intent(text)
@@ -158,8 +154,10 @@ def handle_expense_text(
                 reply_token, lang, stid, text, quote_token=quote_token, line_user_id=line_user_id
             )
         elif is_edit:
-            # 改错但无 LLM 抽不出改什么字段 → 教 LINE 内回复语法,不瞎猜也不甩去网页。
-            _say(line_client.t_line(lang, "line_need_reply_record"))
+            # 无 LLM 抽不出改什么字段 → 列可改字段示例(产品化兜底·非报错·验收 #8)。
+            from services.expense import line_correct_i18n as ci
+
+            _say(ci.t(ci.EDIT_EXAMPLES, line_classify.detect_text_lang(text) or lang))
         else:
             _pool("unknown")
         return True

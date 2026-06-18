@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-"""LINE 改错多轮会话态机(P1E-2 二轮:字段澄清 → 收新值 → 确认)。
+"""LINE 改错多轮会话态机 + 澄清入口(P1E-2 收口)。
 
-接住「问了改哪个字段 / 问了新值」之后用户的下一句,把改错对话续成闭环(此前无状态 → 答案丢失,
-退回『请回复记录』)。优先级最高:active pending correction > 引用提醒 > 记账 > 大脑。
+统一决策(产业级·学 Paypers 的稳不学它的慢):任何改错 pending 在身,新一句按优先级裁决——
+取消(明确)> 删除(明确)> 点名字段(确认阶段切换 / 收值改口 / 待选答字段,带值即直接走风险三档)>
+按阶段(confirm 是/否、收值、待选重问)。绝不在 active_doc_id 内退回「请长按回复/找不到记录」。
 
 三个 pending 态(复用 conversation.line_pending_entry · 不新建表):
   correctclar:<ws>:<doc>          —— 已问「改哪个字段」,等用户答字段名
@@ -18,10 +19,9 @@ from core import db
 from services.expense import conversation, line_classify, line_correct
 from services.expense import line_correct_i18n as ci
 from services.expense import line_quick_entry as lqe
-from services.line_binding import line_reply
+from services.line_binding import line_client, line_message_refs, line_reply
 
-# 字段→规范键映射唯一源在 line_correct_i18n.FIELD_TO_KEY(此处复用·不再各维护一份)。
-# 收新值时剥掉的前缀(命令词 + 连接词);标点已在入口 normalize_user_text 归一。
+# 收新值时剥掉的前缀(命令词 + 连接词 + 字段名);标点已在入口 normalize_user_text 归一。
 _STRIP_TOKENS = (
     "แก้ไข",
     "แก้",
@@ -82,6 +82,29 @@ _NEG_FILLER = (
     "错",
 )
 
+_PREFIXES = (line_correct._PREFIX, line_correct._VAL_PREFIX, line_correct._CLAR_PREFIX)
+
+
+def _say(reply_token, body, ctx):
+    line_reply.reply_text_context(reply_token, body, **ctx)
+
+
+def route(
+    bound_user, reply_token, line_user_id, text, lang, tid, ws, quoted_message_id, ctx
+) -> bool:
+    """改错路由总入口(在记账/大脑之前):会话态续接 > 引用澄清/直接改 > 引用取消/删除。
+    任一接管 → True;都不接管 → False(交记账/大脑)。"""
+    qt = ctx.get("quote_token", "")
+    if try_correction_state(
+        bound_user, reply_token, line_user_id, text, tid, ws, lang, quote_token=qt
+    ):
+        return True
+    if maybe_clarify_feedback(bound_user, reply_token, text, lang, ws, quoted_message_id, ctx):
+        return True
+    return try_void_quoted(
+        bound_user, reply_token, text, lang, tid, ws, line_user_id, quoted_message_id, qt
+    )
+
 
 def try_correction_state(
     bound_user, reply_token, line_user_id, text, tid, ws, lang, *, quote_token=""
@@ -90,6 +113,25 @@ def try_correction_state(
     with db.get_cursor_rls(tid) as cur:
         pend = conversation.peek_pending(cur, line_user_id=line_user_id)
     missing = str((pend or {}).get("missing") or "")
+    if not missing.startswith(_PREFIXES):
+        return False
+    ctx = dict(quote_token=quote_token, line_user_id=line_user_id, tenant_id=tid)
+    reply_lang = line_classify.detect_text_lang(text) or lang
+    p_ws, p_doc = _pend_target(missing)
+
+    # 明确「取消/算了」→ 中止本次改错,不动单据(任何阶段·验收 #1/#7)。
+    if line_classify.is_cancel_intent(text):
+        line_correct._clear(tid, line_user_id)
+        _say(reply_token, line_client.t_line(reply_lang, "exp_correct_cancel"), ctx)
+        return True
+    # 明确「删除/ลบ」→ 作废目标(草稿删 / 已入账 void·验收 #7)。
+    if line_classify.is_delete_intent(text):
+        return _delete_target(bound_user, reply_token, reply_lang, tid, p_ws, p_doc, ctx)
+    # 点名字段(确认阶段切换 / 收值改口 / 待选答字段)→ 统一路由(给了值就直接走风险三档·验收 #2/#3)。
+    field = line_classify.detect_correction_field(text)
+    if field:
+        return _route_field(bound_user, reply_token, text, lang, tid, p_ws, p_doc, field, ctx)
+    # 无字段:按阶段处理。
     if missing.startswith(line_correct._PREFIX):  # 最终 是/否(复用已 peek 的 pend·免重读)
         return line_correct.try_confirm(
             bound_user,
@@ -102,54 +144,78 @@ def try_correction_state(
             quote_token=quote_token,
             pend=pend,
         )
-    ctx = dict(quote_token=quote_token, line_user_id=line_user_id, tenant_id=tid)
-    if missing.startswith(line_correct._VAL_PREFIX):
-        return _handle_value(bound_user, reply_token, text, lang, tid, missing, ctx)
-    if missing.startswith(line_correct._CLAR_PREFIX):
-        return _handle_clarify_answer(bound_user, reply_token, text, lang, tid, missing, ctx)
-    return False
+    if missing.startswith(line_correct._VAL_PREFIX):  # 等某字段新值 → 收值(无字段=纯值)
+        f = _parse_val(missing)[2]
+        return _route_field(bound_user, reply_token, text, lang, tid, p_ws, p_doc, f, ctx)
+    # correctclar 没听出字段 → 重问列字段(不退回泛化指引·验收 #5/#7)。
+    _say(reply_token, ci.t(ci.CLARIFY_FIELDS, reply_lang), ctx)
+    return True
 
 
-def _say(reply_token, body, ctx):
-    line_reply.reply_text_context(reply_token, body, **ctx)
+def maybe_clarify_feedback(bound_user, reply_token, text, lang, ws, quoted_message_id, ctx) -> bool:
+    """引用卡片说「识别错了」或点名字段 → 接管(澄清/直接改),绝不退化成 OCR 失败重拍。
 
-
-def _handle_clarify_answer(bound_user, reply_token, text, lang, tid, missing, ctx) -> bool:
-    """已问「改哪个字段」→ 用户答字段名(可同句带值):点名 → 走统一字段处理;没听出 → 再问一次。"""
-    ws, doc_id = _parse_clar(missing)
+    点名字段 + 给了值 → 直接走风险三档(如「วันที่เป็น 2026/6/18」·验收 #3);点名没给值 → 问新值;
+    笼统「识别错了」→ 列字段问改哪里(验收 #4)。没点字段的「改成X」(如「上一笔改成200」)→ 交大脑/
+    edit 流定位目标。ctx 带 quote_token/line_user_id/tenant_id(回复带引用)。"""
     field = line_classify.detect_correction_field(text)
-    if not field:
-        _say(
-            reply_token, ci.t(ci.CLARIFY_FIELDS, line_classify.detect_text_lang(text) or lang), ctx
+    triggered = line_classify.is_correction_feedback(text) or (bool(quoted_message_id) and field)
+    if not triggered:
+        return False
+    if lqe.is_edit_request(text) and not field:
+        return False  # 没点字段的「改成X」交 edit 流(大脑定位目标 + 抽字段)
+    reply_lang = line_classify.detect_text_lang(text) or lang
+    tid = ctx.get("tenant_id")
+    luid = ctx.get("line_user_id")
+    detail, doc_id, ws_eff = None, None, ws
+    with db.get_cursor_rls(tid) as cur:
+        tgt = line_message_refs.resolve_target(
+            cur,
+            tenant_id=tid,
+            ws=ws,
+            line_user_id=luid,
+            quoted_message_id=quoted_message_id,
+            text=text,
         )
+        if not tgt.get("error"):
+            doc_id, ws_eff = tgt["doc_id"], tgt["ws"]
+            detail = line_correct.docs_svc.get_doc(
+                cur, tenant_id=tid, workspace_client_id=ws_eff, doc_id=doc_id
+            )
+    if not detail:
+        # 无引用且像一句新记账(有金额)→ 放行给记账流,不劫持「买错了 50」这类。
+        if not quoted_message_id and lqe.parse_expense(text).has_amount():
+            return False
+        _say(reply_token, line_client.t_line(reply_lang, "line_need_reply_record"), ctx)
         return True
-    return _route_field(bound_user, reply_token, text, lang, tid, ws, doc_id, field, ctx)
+    return _route_field(
+        bound_user, reply_token, text, lang, tid, ws_eff, doc_id, field, ctx, detail=detail
+    )
 
 
-def _handle_value(bound_user, reply_token, text, lang, tid, missing, ctx) -> bool:
-    """已问某字段「新值」→ 收值。若用户改口说另一个字段(带不带值)→ 切到该字段,不再纠结旧字段(#3)。"""
-    ws, doc_id, field = _parse_val(missing)
-    named = line_classify.detect_correction_field(text)
-    if named and named != field:
-        field = named  # 字段切换:同一张单内换字段,active_doc_id 不变
-    return _route_field(bound_user, reply_token, text, lang, tid, ws, doc_id, field, ctx)
+def _route_field(bound_user, reply_token, text, lang, tid, ws, doc_id, field, ctx, *, detail=None):
+    """统一字段处理(澄清入口/会话内共用):明细 → 详情页(行级);没点字段 → 列字段问;点了字段没值 →
+    存待值态问值;给了值 → 交风险三档执行。付款方式可直接改(低风险展示属性·不动金额/税额)。
 
-
-def _route_field(bound_user, reply_token, text, lang, tid, ws, doc_id, field, ctx) -> bool:
-    """统一字段处理(澄清/切换/收值共用):明细 → 详情页(行级);没值 → 存态问值;有值 → 交风险三档执行。
-
-    付款方式可直接改(低风险展示属性)→ 走收值路径,不再甩详情页。
-    全程锁定 active_doc_id(从 pending 传入·不重新猜)→ 同一会话内不会回「找不到记录」(#5/#7)。
-    有值后的「直接执行 / 确认 / 多行详情页」三档判定统一在 line_correct._apply_or_confirm。
+    全程锁定 active_doc_id(不重新猜)→ 同一会话内不会回「找不到记录」(验收 #5/#7)。
     """
     reply_lang = line_classify.detect_text_lang(text) or lang
     luid = ctx["line_user_id"]
-    if field == "items":
+    if not field:
+        line_correct._save_state(tid, ws, doc_id, luid, f"{line_correct._CLAR_PREFIX}{ws}:{doc_id}")
+        _say(reply_token, ci.t(ci.CLARIFY_FIELDS, reply_lang), ctx)
+        return True
+    multiline = bool(detail) and len(detail.get("lines") or []) > 1
+    if field == "items" and detail is not None and not multiline:
         line_correct._clear(tid, luid)
-        _say(reply_token, ci.t(ci.MULTILINE_EDIT, reply_lang), ctx)
+        _say(reply_token, ci.t(ci.DETAIL_INCOMPLETE, reply_lang), ctx)  # 单行也只能去详情核对
+        return True
+    if field == "items" or (field == "amount" and multiline):
+        line_correct._clear(tid, luid)
+        _say(reply_token, ci.t(ci.MULTILINE_EDIT, reply_lang), ctx)  # 多行/明细行级 → 详情页
         return True
     value = _extract_value(text, field)
-    if value in (None, ""):  # 只点了字段没给值 → 存「待该字段值」态,问新值(tier 1)
+    if value in (None, ""):  # 点了字段没给值 → 存待值态,问新值(tier 1)
         line_correct._save_state(
             tid, ws, doc_id, luid, f"{line_correct._VAL_PREFIX}{ws}:{doc_id}:{field}"
         )
@@ -169,7 +235,68 @@ def _route_field(bound_user, reply_token, text, lang, tid, ws, doc_id, field, ct
         {ci.FIELD_TO_KEY[field]: value},
         quote_token=ctx.get("quote_token", ""),
         line_user_id=luid,
+        detail=detail,
     )
+
+
+def try_void_quoted(
+    bound_user, reply_token, text, lang, tid, ws, line_user_id, quoted_message_id, quote_token=""
+) -> bool:
+    """引用某条 + 明确「取消/删除/ลบ」→ 短路径作废(草稿丢弃 / 已入账 void·复用 reply_undo·验收 #7)。
+    无引用或非取消/删除意图 → False(交后续路由)。"""
+    if not quoted_message_id or not (
+        line_classify.is_cancel_intent(text) or line_classify.is_delete_intent(text)
+    ):
+        return False
+    from services.line_binding import line_expense_qa
+
+    line_expense_qa.reply_undo(
+        bound_user,
+        reply_token,
+        lang,
+        tid,
+        ws,
+        line_user_id,
+        quoted_message_id,
+        text,
+        quote_token=quote_token,
+    )
+    return True
+
+
+def _delete_target(bound_user, reply_token, lang, tid, ws, doc_id, ctx) -> bool:
+    """改错会话内「删除/ลบ」→ 作废目标:草稿物理删、已入账 void(复用对账冲销)、已结期诚实引导。"""
+    from core.pos_api import PosError
+    from services.purchase import posting as posting_svc
+
+    line_correct._clear(tid, ctx["line_user_id"])
+    uid = str(bound_user["id"]) if bound_user.get("id") else None
+    try:
+        with db.get_cursor_rls(tid, commit=True) as cur:
+            detail = line_correct.docs_svc.get_doc(
+                cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id
+            )
+            status = (detail.get("doc") or {}).get("status") if detail else None
+            if status == "draft":
+                line_correct.docs_svc.delete_doc(
+                    cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id
+                )
+                _say(reply_token, line_client.t_line(lang, "card_state_discarded_desc"), ctx)
+                return True
+            if status == "posted":
+                res = posting_svc.void_doc(
+                    cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id, created_by=uid
+                )
+                amt = (res.get("doc") or {}).get("grand_total")
+                _say(reply_token, line_client.t_line(lang, "exp_undo_done", amount=amt), ctx)
+                return True
+    except PosError as e:
+        if (e.code or "") == "acct.period_closed":
+            _say(reply_token, line_client.t_line(lang, "exp_correct_closed"), ctx)
+            return True
+        raise
+    _say(reply_token, line_client.t_line(lang, "exp_correct_none"), ctx)
+    return True
 
 
 def _extract_value(text: str, field: str):
@@ -183,11 +310,7 @@ def _extract_value(text: str, field: str):
     if field == "date":
         return lqe._parse_date(text)  # 相对词/年首/ISO/DD-MM 全在共用解析器
     if field == "payment":
-        return (
-            line_classify.normalize_payment_method(text)
-            or line_classify.detect_payment_method(text)
-            or None
-        )
+        return line_classify.normalize_payment_method(text) or None
     cleaned = _strip_prefix(text)
     return cleaned or None
 
@@ -212,10 +335,15 @@ def _strip_prefix(text: str) -> str:
     return s.strip(" :=")
 
 
-def _parse_clar(missing: str):
-    body = missing[len(line_correct._CLAR_PREFIX) :]
-    ws_s, _, doc_id = body.partition(":")
-    return _int(ws_s), doc_id
+def _pend_target(missing: str):
+    """任意阶段 pending 的 (ws, doc_id)(三态前缀后都是 <ws>:<doc>:...)。"""
+    for pfx in _PREFIXES:
+        if missing.startswith(pfx):
+            body = missing[len(pfx) :]
+            ws_s, _, rest = body.partition(":")
+            doc_id, _, _ = rest.partition(":")
+            return _int(ws_s), doc_id
+    return None, None
 
 
 def _parse_val(missing: str):

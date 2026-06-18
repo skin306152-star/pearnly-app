@@ -122,18 +122,30 @@ def _field_old(detail: dict, key: str, lang: str) -> str:
 
 
 def _apply_or_confirm(
-    reply_token, bound_user, lang, tid, ws, doc_id, changes, *, quote_token="", line_user_id
+    reply_token,
+    bound_user,
+    lang,
+    tid,
+    ws,
+    doc_id,
+    changes,
+    *,
+    quote_token="",
+    line_user_id,
+    detail=None,
 ) -> bool:
     """改错执行三档(产品原则):低风险(草稿 + 单个非金额字段)直接改回完成;高风险(已入账/改金额[税额
-    重算]/多字段)出确认;多行金额 → 详情页。作废/不存在 → 诚实兜底。changes = 规范键 dict。"""
+    重算]/多字段)出确认;多行金额 → 详情页。作废/不存在 → 诚实兜底。changes = 规范键 dict。
+    detail 可由调用方(已定位)传入免重 fetch。"""
 
     def _say(body):
         line_reply.reply_text_context(
             reply_token, body, quote_token=quote_token, line_user_id=line_user_id, tenant_id=tid
         )
 
-    with db.get_cursor_rls(tid) as cur:
-        detail = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)
+    if detail is None:
+        with db.get_cursor_rls(tid) as cur:
+            detail = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)
     status = (detail.get("doc") or {}).get("status") if detail else None
     if status not in ("posted", "draft"):
         _clear(tid, line_user_id)
@@ -239,65 +251,6 @@ def request_correct(
     )
 
 
-def maybe_clarify_feedback(reply_token, text, lang, ws, quoted_message_id, ctx) -> bool:
-    """采购改错澄清入口 = 命中「识别错了/ผิด」或引用卡片点名字段 → 本层接管,绝不退化成 OCR 失败重拍
-    (优先级高于闲聊/OCR 帮助/能力问答)。点名字段 → 问新值并存会话态(correctval);笼统 → 列字段问改哪里
-    并存 correctclar(下一句由 line_correct_flow 续接);明细 → 详情页;没解析到记录 → 引导回复那条。
-    具体「改成X」(is_edit)交 request_correct。ctx 带 quote_token/line_user_id/tenant_id(回复带引用)。"""
-    from services.expense import line_quick_entry as lqe
-
-    # 引用卡片点名字段需先于收入识别接住(「ผู้ขาย」含「ขาย」);具体「改成X」交 edit 流,此处只澄清。
-    field = line_classify.detect_correction_field(text)
-    triggered = line_classify.is_correction_feedback(text) or (bool(quoted_message_id) and field)
-    if not triggered or lqe.is_edit_request(text):
-        return False
-
-    reply_lang = line_classify.detect_text_lang(text) or lang
-    tid = ctx.get("tenant_id")
-
-    def _say(body):
-        line_reply.reply_text_context(reply_token, body, **ctx)
-
-    line_user_id = ctx.get("line_user_id")
-    detail, doc_id, ws_eff = None, None, ws
-    with db.get_cursor_rls(tid) as cur:
-        tgt = line_message_refs.resolve_target(
-            cur,
-            tenant_id=tid,
-            ws=ws,
-            line_user_id=line_user_id,
-            quoted_message_id=quoted_message_id,
-            text=text,
-        )
-        if not tgt.get("error"):
-            doc_id, ws_eff = tgt["doc_id"], tgt["ws"]
-            detail = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws_eff, doc_id=doc_id)
-
-    if not detail:
-        # 无引用且像一句新记账(有金额)→ 放行给记账流,不劫持「买错了 50」这类。
-        if not quoted_message_id and lqe.parse_expense(text).has_amount():
-            return False
-        _say(line_client.t_line(reply_lang, "line_need_reply_record"))
-        return True
-
-    multiline = len(detail.get("lines") or []) > 1
-    if field == "items" and not multiline:
-        _say(ci.t(ci.DETAIL_INCOMPLETE, reply_lang))  # 笼统「明细错了」(单行也只能去详情核对)
-    elif field == "items" or (field == "amount" and multiline):
-        # 多行/明细行级改(总额或某行)→ 详情页(说明原因·非「明细可能不完整」OCR 文案·验收 #3/#4)
-        _say(ci.t(ci.MULTILINE_EDIT, reply_lang))
-    elif field in ("amount", "date", "seller", "category", "payment"):
-        # 点名可改字段但没给值 → 存「待该字段新值」态,问新值(下一句直接答·验收 #3/#5)。付款方式
-        # 同走此路(低风险展示属性·不动金额/税额),下一句给「现金/โอน」即归一直接改。
-        _save_state(tid, ws_eff, doc_id, line_user_id, f"{_VAL_PREFIX}{ws_eff}:{doc_id}:{field}")
-        _say(ci.t(ci.ASK_VALUE, reply_lang, field=ci.field_label(field, reply_lang)))
-    else:
-        # 没点名字段 → 存「待选字段」会话态,列字段问改哪里(下一句答字段名即可续接·验收 #7)。
-        _save_state(tid, ws_eff, doc_id, line_user_id, f"{_CLAR_PREFIX}{ws_eff}:{doc_id}")
-        _say(ci.t(ci.CLARIFY_FIELDS, reply_lang))
-    return True
-
-
 def _save_state(tid, ws, doc_id, line_user_id, missing: str) -> None:
     """存改错多轮会话态(待选字段 correctclar / 待新值 correctval)。draft 占位空·目标编码进 missing。"""
     with db.get_cursor_rls(tid, commit=True) as cur:
@@ -328,6 +281,11 @@ def try_confirm(
     if not pend or not str(pend.get("missing") or "").startswith(_PREFIX):
         return False
     if not _affirmative(text):
+        # 明确「否」(不/ไม่/no/取消)→ 取消;既非是也非否(误触/无关)→ 重问,不静默取消、不串旧动作。
+        low = (text or "").lower()
+        if not (any(n in low for n in _NO) or line_classify.is_cancel_intent(text)):
+            _say(ci.t(ci.CONFIRM_REPROMPT, lang))
+            return True
         with db.get_cursor_rls(tid, commit=True) as cur:
             conversation.clear_pending(cur, line_user_id=line_user_id)
         _say(line_client.t_line(lang, "exp_correct_cancel"))

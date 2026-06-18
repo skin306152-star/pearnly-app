@@ -239,6 +239,35 @@ def is_correction_feedback(text: str) -> bool:
     return _first_match(text, _FEEDBACK_PATTERNS) == "wrong"
 
 
+# 改错会话里的控制意图(窄·明确):取消=中止本次改错(不动单据);删除=作废目标草稿。
+# 「ไม่ใช่/不/no」不算取消(那是 confirm 阶段的「否」、收值阶段的「不是这个」)→ 不放进来。
+_CANCEL_KW = (
+    "ยกเลิก",
+    "ไม่เอาแล้ว",
+    "ไม่ต้องแก้",
+    "取消",
+    "算了",
+    "不改了",
+    "不用改",
+    "cancel",
+    "never mind",
+    "nevermind",
+)
+_DELETE_KW = ("ลบทิ้ง", "ลบ", "删除", "删掉", "删了", "delete", "remove")
+
+
+def is_cancel_intent(text: str) -> bool:
+    """明确「取消/算了/ยกเลิก/cancel」→ 中止本次改错(不删单据)。"""
+    low = (text or "").strip().lower()
+    return any(k.lower() in low for k in _CANCEL_KW)
+
+
+def is_delete_intent(text: str) -> bool:
+    """明确「删除/ลบ/delete」→ 作废目标(草稿删/已入账 void)。"""
+    low = (text or "").strip().lower()
+    return any(k.lower() in low for k in _DELETE_KW)
+
+
 # 改错指向的字段(P1E-2):用户在改错澄清里点名要改哪项 → 据此问新值 / 引导详情页。
 # items / payment 顺位靠前(其专有词「明细/รายการย่อย/付款方式/วิธีชำระ」更具体,先于泛词命中)。
 _FIELD_PATTERNS = (
@@ -249,8 +278,14 @@ _FIELD_PATTERNS = (
             "逐项",
             "项目",
             "条目",
+            "拆成",
+            "拆分",
             "รายการย่อย",
             "รายการสินค้า",
+            "ข้อที่",
+            "รายการที่",
+            "แยกเป็น",
+            "แยกรายการ",
             "line item",
             "line items",
             "items",

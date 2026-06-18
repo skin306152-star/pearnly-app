@@ -168,5 +168,161 @@ class DispatchTests(_FlowBase):
         tc.assert_called_once()
 
 
+class MaybeClarifyTests(unittest.TestCase):
+    """引用澄清入口(P1E-2 收口):识别错了/字段=值 → 接管(澄清/直接改),绝不退化成 OCR 失败重拍。"""
+
+    def _run(self, text, *, quoted="MID1", tgt=None, lines=None):
+        from services.expense import conversation
+        from services.line_binding import line_message_refs
+        from services.purchase import docs as docs_svc
+
+        tgt = tgt if tgt is not None else {"doc_id": "D1", "ws": 1, "error": None}
+        detail = {
+            "doc": {"status": "draft", "grand_total": "70.00"},
+            "supplier": {"name": "711"},
+            "lines": lines if lines is not None else [{}],
+        }
+        ctx = {"line_user_id": "U1", "tenant_id": "t", "quote_token": "q"}
+        sent, applied = {}, []
+        with (
+            mock.patch.object(flow.db, "get_cursor_rls", return_value=_Ctx(object())),
+            mock.patch.object(line_message_refs, "resolve_target", return_value=tgt),
+            mock.patch.object(docs_svc, "get_doc", return_value=detail),
+            mock.patch.object(conversation, "save_pending"),
+            mock.patch.object(conversation, "clear_pending"),
+            mock.patch.object(
+                line_correct, "_apply_or_confirm", side_effect=lambda *a, **k: applied.append(a[6])
+            ),
+            mock.patch.object(
+                flow.line_reply,
+                "reply_text_context",
+                side_effect=lambda tok, body, **k: sent.update(body=body) or True,
+            ),
+        ):
+            res = flow.maybe_clarify_feedback({}, "tok", text, "th", 1, quoted, ctx)
+        return res, sent.get("body", ""), applied
+
+    def test_vague_quoted_clarifies_fields_in_input_lang(self):
+        res, body, applied = self._run("这个你识别错了")
+        self.assertTrue(res)
+        self.assertIn("你想改金额", body)
+        self.assertEqual(applied, [])
+
+    def test_thai_vague_clarifies_in_thai(self):
+        res, body, _ = self._run("อ่านผิด")
+        self.assertTrue(res)
+        self.assertIn("ต้องการแก้ส่วนไหน", body)
+
+    def test_field_seller_asks_for_value(self):
+        res, body, applied = self._run("卖家不对")
+        self.assertTrue(res)
+        self.assertIn("卖家", body)
+        self.assertIn("改成", body)
+        self.assertEqual(applied, [])
+
+    def test_items_guides_detail_page(self):
+        res, body, _ = self._run("明细错了")
+        self.assertTrue(res)
+        self.assertIn("详情页", body)
+
+    def test_payment_asks_for_value(self):
+        res, body, applied = self._run("付款方式不对")
+        self.assertTrue(res)
+        self.assertIn("付款方式", body)
+        self.assertEqual(applied, [])
+
+    def test_date_value_applies_directly(self):
+        # 验收 #3:「วันที่เป็น 2026/6/18」一句给了字段+值 → 直接走风险三档(不再多问)。
+        _, _, applied = self._run("วันที่เป็น 2026/6/18")
+        self.assertEqual(applied, [{"doc_date": "2026-06-18"}])
+
+    def test_seller_value_applies_directly(self):
+        _, _, applied = self._run("ร้านค้าเป็น 7-11")
+        self.assertEqual(applied, [{"vendor_name": "7-11"}])
+
+    def test_concrete_edit_with_field_applies(self):
+        # 「金额改成 70」点了字段 → 本层直接抽值执行,不再依赖大脑。
+        _, _, applied = self._run("金额改成 70")
+        self.assertEqual(applied, [{"amount": Decimal("70")}])
+
+    def test_edit_without_field_defers_to_brain(self):
+        # 「上一笔改成 200」没点字段 → 交大脑/edit 流定位目标(本层不接管)。
+        res, _, applied = self._run("上一笔改成 200")
+        self.assertFalse(res)
+        self.assertEqual(applied, [])
+
+    def test_unresolved_quote_guides_reply(self):
+        res, body, _ = self._run(
+            "识别错了", tgt={"doc_id": None, "ws": 1, "error": "ref_not_found"}
+        )
+        self.assertTrue(res)
+        self.assertTrue(body)
+
+    def test_no_quote_with_amount_passes_through(self):
+        res, _, _ = self._run("买错了 50", quoted=None, tgt={"error": "ambiguous"})
+        self.assertFalse(res)
+
+
+class ControlIntentTests(_FlowBase):
+    """会话态控制意图(P1E-2 收口):取消/删除/字段切换不串线、不掉回泛化指引。"""
+
+    def test_cancel_intent_clears_at_confirm(self):
+        # 验收 #1:确认待定时说「取消」→ 清 pending、回取消(不执行旧动作)。
+        sent, saved = [], {}
+        with self._patches(pend={"missing": "correct:1:D1:amount"}, sent=sent, saved=saved):
+            res = flow.try_correction_state({}, "tok", "U1", "取消", "t", 1, "zh")
+        self.assertTrue(res)
+        self.assertTrue(sent)
+
+    def test_field_switch_at_confirm_stage(self):
+        # 验收 #2:确认待定(改金额)时改说「ร้านค้าเป็น 7-11」→ 切到卖家,不当否定取消。
+        cap, sent = {}, []
+        with (
+            mock.patch.object(flow.db, "get_cursor_rls", return_value=_Ctx(object())),
+            mock.patch.object(
+                flow.conversation,
+                "peek_pending",
+                return_value={"missing": "correct:1:D1:amount"},
+            ),
+            mock.patch.object(flow.conversation, "save_pending"),
+            mock.patch.object(
+                line_correct,
+                "_apply_or_confirm",
+                side_effect=lambda *a, **k: cap.update(changes=a[6]) or True,
+            ),
+            mock.patch.object(
+                flow.line_reply, "reply_text_context", side_effect=lambda *a, **k: sent.append(1)
+            ),
+        ):
+            res = flow.try_correction_state({}, "tok", "U1", "ร้านค้าเป็น 7-11", "t", 1, "th")
+        self.assertTrue(res)
+        self.assertEqual(cap["changes"], {"vendor_name": "7-11"})
+
+    def test_delete_intent_voids_draft(self):
+        # 验收 #7:会话内说「删除」→ 作废目标草稿(delete_doc)。
+        from services.purchase import docs as docs_svc
+
+        deleted, sent = [], []
+        with (
+            mock.patch.object(flow.db, "get_cursor_rls", return_value=_Ctx(object())),
+            mock.patch.object(
+                flow.conversation,
+                "peek_pending",
+                return_value={"missing": "correctval:1:D1:seller"},
+            ),
+            mock.patch.object(flow.conversation, "clear_pending"),
+            mock.patch.object(docs_svc, "get_doc", return_value={"doc": {"status": "draft"}}),
+            mock.patch.object(
+                docs_svc, "delete_doc", side_effect=lambda *a, **k: deleted.append(1)
+            ),
+            mock.patch.object(
+                flow.line_reply, "reply_text_context", side_effect=lambda *a, **k: sent.append(1)
+            ),
+        ):
+            res = flow.try_correction_state({}, "tok", "U1", "删除", "t", 1, "zh")
+        self.assertTrue(res)
+        self.assertEqual(deleted, [1])
+
+
 if __name__ == "__main__":
     unittest.main()

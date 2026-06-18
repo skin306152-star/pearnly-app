@@ -1,0 +1,300 @@
+# -*- coding: utf-8 -*-
+"""LINE 改错状态机回放压测器(P1E-2 收口 · 本地模拟多轮对话 · 不碰真 LINE/OCR/DB)。
+
+在内存里模拟单据库 + pending + 消息引用,驱动真实 `line_correct_flow.route` 状态机跑批量场景,
+断言:动作类型(直接改/问缺失/确认/详情页/取消/删除/交大脑)、字段最终值、禁止文案不出现
+(请长按回复 / 找不到记录 / 重新拍照)、pending 不串线。__main__ 打 scenario 报告。
+"""
+
+from __future__ import annotations
+
+import io
+import os
+import sys
+import unittest
+from contextlib import redirect_stdout
+from unittest import mock
+
+if __package__ in (None, ""):  # 允许 `python tests/unit/..._replay.py` 直接出报告
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+from services.expense import (  # noqa: E402
+    conversation,
+    line_classify,
+    line_correct,
+    line_correct_flow as flow,
+)
+from services.line_binding import line_client, line_message_refs
+from services.purchase import correct as correct_svc
+from services.purchase import docs as docs_svc
+from services.purchase import posting as posting_svc
+from services.purchase import settings as settings_svc
+
+# 同一会话 active_doc_id 内绝不该再吐的泛化指引(中泰双语·按真实 i18n 取)。
+_FORBIDDEN = {
+    line_client.t_line(lg, key)
+    for lg in ("th", "zh")
+    for key in ("line_need_reply_record", "guide_detail_list", "photo_failed")
+}
+
+
+class _Cur:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+class Sim:
+    """内存账本:docs(单据)+ pending(会话态)+ refs(消息→单据)+ replies(机器人回复)。"""
+
+    def __init__(self):
+        self.docs: dict = {}
+        self.pending: dict = {}
+        self.refs: dict = {}
+        self.replies: list = []
+        self._seq = 0
+
+    def seed(self, doc_id, *, status="draft", lines=1, **doc):
+        base = {
+            "id": doc_id,
+            "status": status,
+            "grand_total": "70.00",
+            "doc_date": "2026-06-01",
+            "payment_method": None,
+            "category_id": None,
+        }
+        base.update(doc)
+        self.docs[doc_id] = {
+            "doc": base,
+            "supplier": {"name": doc.get("seller", "ร้านเดิม"), "tax_id": None},
+            "lines": [
+                {"unit_price": "70", "qty": "1", "description": f"x{i}"} for i in range(lines)
+            ],
+        }
+        self.refs[f"MID_{doc_id}"] = (1, doc_id)
+
+    # ---- conversation 桩(签名对齐真函数:cur 位置参 + 关键字) ----
+    def peek(self, cur, *, line_user_id, **k):
+        return self.pending.get(line_user_id)
+
+    def save(self, cur, *, line_user_id, tenant_id, workspace_client_id, draft, missing):
+        self.pending[line_user_id] = {
+            "missing": missing,
+            "draft": draft,
+            "tenant_id": tenant_id,
+            "workspace_client_id": workspace_client_id,
+        }
+
+    def clear(self, cur, *, line_user_id):
+        self.pending.pop(line_user_id, None)
+
+    # ---- docs/posting 桩 ----
+    def get_doc(self, cur, *, tenant_id, workspace_client_id, doc_id):
+        d = self.docs.get(doc_id)
+        return (
+            {k: (v.copy() if isinstance(v, dict) else list(v)) for k, v in d.items()} if d else None
+        )
+
+    def update_draft(
+        self, cur, *, tenant_id, workspace_client_id, created_by, doc_id, data, settings
+    ):
+        d = self.docs[doc_id]
+        if data.get("doc_date"):
+            d["doc"]["doc_date"] = data["doc_date"]
+        if data.get("supplier"):
+            d["supplier"]["name"] = data["supplier"]["name"]
+        if "payment_method" in data:
+            d["doc"]["payment_method"] = data["payment_method"]
+        if data.get("category_id"):
+            d["doc"]["category_id"] = data["category_id"]
+        if data.get("lines"):
+            d["lines"] = data["lines"]
+            d["doc"]["grand_total"] = str(
+                data["lines"][0].get("unit_price") or d["doc"]["grand_total"]
+            )
+        return self.get_doc(
+            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=doc_id
+        )
+
+    def delete_doc(self, cur, *, tenant_id, workspace_client_id, doc_id):
+        self.docs.pop(doc_id, None)
+
+    def void_doc(self, cur, *, tenant_id, workspace_client_id, doc_id, created_by):
+        self.docs[doc_id]["doc"]["status"] = "void"
+        return self.docs[doc_id]
+
+    def correct_doc(self, cur, *, tenant_id, workspace_client_id, doc_id, created_by):
+        self._seq += 1
+        nid = f"{doc_id}_c{self._seq}"
+        self.docs[nid] = {
+            k: (v.copy() if isinstance(v, dict) else list(v)) for k, v in self.docs[doc_id].items()
+        }
+        self.docs[nid]["doc"] = dict(self.docs[doc_id]["doc"], id=nid, status="draft")
+        return self.get_doc(
+            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=nid
+        )
+
+    def resolve_target(self, cur, *, tenant_id, ws, line_user_id, quoted_message_id, text):
+        if quoted_message_id and quoted_message_id in self.refs:
+            w, d = self.refs[quoted_message_id]
+            return {"ws": w, "doc_id": d, "error": None}
+        return {"ws": ws, "doc_id": None, "error": "ambiguous"}
+
+
+def _run(sim, turns):
+    """驱动一串用户消息 → 真 flow.route(每条返回是否被改错路由接管)。返回 [(text, handled)]。"""
+    bound = {"id": "u1", "tenant_id": "t"}
+    out = []
+    with (
+        mock.patch.object(flow.db, "get_cursor_rls", return_value=_Cur()),
+        mock.patch.object(line_correct.db, "get_cursor_rls", return_value=_Cur()),
+        mock.patch.object(conversation, "peek_pending", side_effect=sim.peek),
+        mock.patch.object(conversation, "save_pending", side_effect=sim.save),
+        mock.patch.object(conversation, "clear_pending", side_effect=sim.clear),
+        mock.patch.object(docs_svc, "get_doc", side_effect=sim.get_doc),
+        mock.patch.object(docs_svc, "update_draft", side_effect=sim.update_draft),
+        mock.patch.object(docs_svc, "delete_doc", side_effect=sim.delete_doc),
+        mock.patch.object(posting_svc, "void_doc", side_effect=sim.void_doc),
+        mock.patch.object(posting_svc, "post_doc", side_effect=lambda *a, **k: None),
+        mock.patch.object(correct_svc, "correct_doc", side_effect=sim.correct_doc),
+        mock.patch.object(settings_svc, "get_settings", return_value={"auto_book": False}),
+        mock.patch.object(line_correct, "_resolve_category", return_value=("cat1", "sub1")),
+        mock.patch.object(line_message_refs, "resolve_target", side_effect=sim.resolve_target),
+        mock.patch.object(
+            flow.line_reply,
+            "reply_text_context",
+            side_effect=lambda tok, body, **k: sim.replies.append(body),
+        ),
+    ):
+        for text, quoted in turns:
+            sim.replies.clear()
+            norm = line_classify.normalize_user_text(text)
+            ctx = {"quote_token": "q", "line_user_id": "u1", "tenant_id": "t"}
+            handled = flow.route(bound, "tok", "u1", norm, "th", "t", 1, quoted, ctx)
+            out.append((text, handled, list(sim.replies)))
+    return out
+
+
+class ReplayScenarioTests(unittest.TestCase):
+    def setUp(self):
+        self.sim = Sim()
+        self.sim.seed("D1", lines=1)  # 草稿单行
+        self.sim.seed("D2", lines=3)  # 草稿多行
+        self.sim.seed("D3", lines=1, status="posted")  # 已入账
+
+    def _last_reply(self, steps):
+        return steps[-1][2][-1] if steps[-1][2] else ""
+
+    def _no_forbidden(self, steps):
+        for _, _, replies in steps:
+            for r in replies:
+                self.assertNotIn(r, _FORBIDDEN, f"会话内吐了泛化指引:{r}")
+
+    def test_date_wrong_then_value(self):
+        steps = _run(self.sim, [("วันที่ผิด", "MID_D1"), ("2026/6/18", None)])
+        self.assertTrue(steps[0][1] and steps[1][1])
+        self.assertEqual(self.sim.docs["D1"]["doc"]["doc_date"], "2026-06-18")
+        self._no_forbidden(steps)
+
+    def test_date_today_one_shot(self):
+        steps = _run(self.sim, [("เปลี่ยนวันที่เป็นวันนี้", "MID_D1")])
+        self.assertTrue(steps[0][1])
+        from services.expense.line_quick_entry import _today
+
+        self.assertEqual(self.sim.docs["D1"]["doc"]["doc_date"], _today().isoformat())
+
+    def test_seller_one_shot(self):
+        steps = _run(self.sim, [("ร้านค้าเป็น 7-11", "MID_D1")])
+        self.assertEqual(self.sim.docs["D1"]["supplier"]["name"], "7-11")
+
+    def test_seller_fullwidth_colon(self):
+        steps = _run(self.sim, [("แก้ร้านค้าเป็น：7-11", "MID_D1")])  # 全角冒号
+        self.assertEqual(self.sim.docs["D1"]["supplier"]["name"], "7-11")
+
+    def test_field_switch_date_to_seller(self):
+        steps = _run(self.sim, [("วันที่ผิด", "MID_D1"), ("ร้านค้าเป็น 7-11", None)])
+        self.assertEqual(self.sim.docs["D1"]["supplier"]["name"], "7-11")  # 切到卖家
+        self.assertEqual(self.sim.docs["D1"]["doc"]["doc_date"], "2026-06-01")  # 日期未动
+        self._no_forbidden(steps)
+
+    def test_category_thai_and_zh(self):
+        _run(self.sim, [("หมวดหมู่เป็น ค่าอาหาร", "MID_D1")])
+        self.assertEqual(self.sim.docs["D1"]["doc"]["category_id"], "cat1")
+        self.sim.docs["D1"]["doc"]["category_id"] = None
+        _run(self.sim, [("分类改成餐饮", "MID_D1")])
+        self.assertEqual(self.sim.docs["D1"]["doc"]["category_id"], "cat1")
+
+    def test_payment_one_shot(self):
+        _run(self.sim, [("付款方式改成 PromptPay", "MID_D1")])
+        self.assertEqual(self.sim.docs["D1"]["doc"]["payment_method"], "promptpay")
+
+    def test_amount_single_line_confirms_then_applies(self):
+        steps = _run(self.sim, [("จำนวนเงินเป็น 110", "MID_D1"), ("ใช่", None)])
+        self.assertEqual(self.sim.docs["D1"]["doc"]["grand_total"], "110")
+
+    def test_amount_multiline_opens_detail_no_change(self):
+        steps = _run(self.sim, [("จำนวนเงินรวมเปลี่ยนเป็น 110", "MID_D2")])
+        self.assertIn("Pearnly", self._last_reply(steps))  # MULTILINE_EDIT 引导详情页
+        self.assertEqual(self.sim.docs["D2"]["doc"]["grand_total"], "70.00")  # 没乱改
+
+    def test_line_level_opens_detail(self):
+        steps = _run(self.sim, [("ข้อที่ 2 เปลี่ยนเป็น 90", "MID_D2")])
+        self.assertEqual(self.sim.docs["D2"]["doc"]["grand_total"], "70.00")  # 行级不乱改
+
+    def test_split_opens_detail(self):
+        steps = _run(self.sim, [("แยกเป็น 3 รายการ", "MID_D2")])
+        self.assertTrue(steps[0][1])
+        self.assertEqual(len(self.sim.docs["D2"]["lines"]), 3)  # 行数没被动
+
+    def test_yes_does_not_hit_stale_pending(self):
+        # 改完一笔(确认执行)后,旧 pending 已清;再单说「ใช่」不该命中旧动作。
+        _run(self.sim, [("จำนวนเงินเป็น 110", "MID_D1"), ("ใช่", None)])
+        self.assertNotIn("u1", self.sim.pending)  # pending 已清
+        steps = _run(self.sim, [("ใช่", None)])
+        self.assertFalse(steps[0][1])  # 无 pending → 改错路由不接管(交闲聊/大脑)
+
+    def test_cancel_aborts_pending(self):
+        steps = _run(self.sim, [("จำนวนเงินเป็น 110", "MID_D1"), ("ยกเลิก", None)])
+        self.assertNotIn("u1", self.sim.pending)
+        self.assertEqual(self.sim.docs["D1"]["doc"]["grand_total"], "70.00")  # 未改
+
+    def test_no_swallowed_as_yes_at_confirm(self):
+        steps = _run(self.sim, [("จำนวนเงินเป็น 110", "MID_D1"), ("ไม่ใช่", None)])
+        self.assertEqual(self.sim.docs["D1"]["doc"]["grand_total"], "70.00")  # 「否」未执行
+
+    def test_delete_quoted_draft(self):
+        steps = _run(self.sim, [("ลบ", "MID_D1")])
+        self.assertNotIn("D1", self.sim.docs)  # 草稿被删
+
+    def test_delete_in_session(self):
+        steps = _run(self.sim, [("วันที่ผิด", "MID_D1"), ("删除", None)])
+        self.assertNotIn("D1", self.sim.docs)
+
+    def test_vague_then_field_no_forbidden(self):
+        # 笼统「识别错了」→ 列字段;答「卖家」→ 问新值;给「7-11」→ 改。全程无泛化指引。
+        steps = _run(self.sim, [("识别错了", "MID_D1"), ("卖家", None), ("7-11", None)])
+        self.assertEqual(self.sim.docs["D1"]["supplier"]["name"], "7-11")
+        self._no_forbidden(steps)
+
+
+def _report() -> str:
+    """跑全部 scenario,产出 通过/失败 + 实际回复 报告(给人看)。"""
+    suite = unittest.TestLoader().loadTestsFromTestCase(ReplayScenarioTests)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        result = unittest.TextTestRunner(stream=buf, verbosity=2).run(suite)
+    lines = [
+        "== LINE 改错回放压测报告 ==",
+        f"场景 {result.testsRun} · 失败 {len(result.failures)} · 错误 {len(result.errors)}",
+    ]
+    for t, e in result.failures + result.errors:
+        lines.append(f"  ✗ {t._testMethodName}")
+    if not (result.failures or result.errors):
+        lines.append("  ✓ 全部场景通过")
+    return "\n".join(lines)
+
+
+if __name__ == "__main__":
+    print(_report())

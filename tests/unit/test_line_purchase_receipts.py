@@ -79,8 +79,8 @@ SEAFOOD = {
     ],
 }
 
-# 复杂小票:堆叠 qty/price 列被 OCR 乱读放大,行额合计远超票面 431(实物 6 行加总应为 431)。
-LITTLE_BETONG = {
+# 实物 6 行:95+125+165+20+20+6 = 431(含小额 6 铢那行)。OCR 读全 → 对账通过。
+LITTLE_BETONG_FULL = {
     "document_type": "receipt",
     "seller_name": "Little Betong",
     "total_amount": "431",
@@ -90,8 +90,16 @@ LITTLE_BETONG = {
         {"name": "ไก่ทอด", "qty": "1", "price": "165", "subtotal": "165"},
         {"name": "ข้าว", "qty": "1", "price": "20", "subtotal": "20"},
         {"name": "น้ำดื่ม", "qty": "1", "price": "20", "subtotal": "20"},
-        {"name": "พริกน้ำปลา", "qty": "3", "price": "200", "subtotal": "600"},
+        {"name": "พริกน้ำปลา", "qty": "3", "price": "2", "subtotal": "6"},
     ],
+}
+
+# 漏读小额 6 铢那行 → 行额 425 ≠ 票面 431。差 6 铢落在旧 2% 容差(8.62)内会被静默放过 → 必须告警。
+LITTLE_BETONG_MISSING = {
+    "document_type": "receipt",
+    "seller_name": "Little Betong",
+    "total_amount": "431",
+    "items": LITTLE_BETONG_FULL["items"][:5],
 }
 
 AMAZON_70 = {
@@ -178,8 +186,16 @@ class SeafoodBreakdownTests(unittest.TestCase):
 class LittleBetongWarnTests(unittest.TestCase):
     """Issue 3:明细对不上 → warn_total → 主按钮「เปิดเพื่อตรวจสอบ」。"""
 
-    def test_warn_total_true_when_items_unreliable(self):
-        n = ik.normalize_ocr_fields(LITTLE_BETONG)
+    def test_full_items_reconcile_no_warn(self):
+        # 6 行读全(含 6 铢)→ 合计 431 = 票面 → 正常确认,不告警。
+        n = ik.normalize_ocr_fields(LITTLE_BETONG_FULL)
+        _, show, warn = li._items_display_decision(n)
+        self.assertTrue(show)
+        self.assertFalse(warn)
+
+    def test_warn_when_small_line_missing(self):
+        # 漏读 6 铢那行(425 ≠ 431,差 6 铢)→ 必须告警(固定 2 铢容差·不被旧 2% 容差吃掉)。
+        n = ik.normalize_ocr_fields(LITTLE_BETONG_MISSING)
         _, _, warn = li._items_display_decision(n)
         self.assertTrue(warn)
 

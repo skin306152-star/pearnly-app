@@ -19,9 +19,13 @@ def _dec(v) -> Decimal:
         return Decimal("0")
 
 
-def _same_money(a: Decimal, b: Decimal, *, total: Decimal = Decimal("0")) -> bool:
-    tol = max(Decimal("1"), total * Decimal("0.02"))
-    return abs(a - b) <= tol
+def _same_money(a: Decimal, b: Decimal) -> bool:
+    """两金额视作同额的容差 = 固定 2 铢(覆盖凑整 ปัดเศษ + VAT 小数差)。
+
+    不用百分比:百分比在大票上会把几十铢的漏行也当「对得上」(2722×2%≈54 铢);固定小容差能在任意
+    票面金额下抓出漏读的小额行(如 Little Betong 漏 6 铢那行)→ 该警告就警告,不静默放过。
+    """
+    return abs(a - b) <= Decimal("2")
 
 
 def _item_amount(it: dict) -> Decimal:
@@ -53,7 +57,7 @@ def _items_reconcile_total(fields: dict) -> bool:
     candidates = [items_sum, items_sum + vat]
     if discount > 0:
         candidates += [items_sum - discount, items_sum + vat - discount]
-    return any(_same_money(c, total, total=total) for c in candidates)
+    return any(_same_money(c, total) for c in candidates)
 
 
 def _total_mismatch(fields: dict) -> bool:

@@ -91,6 +91,8 @@ _ITEM_RULES: tuple[tuple[str, str]] = (
         r"กาแฟ|คอฟฟี่|อเมริกาโน|ลาเต้|คาปู|มอคค่า|espresso|americano|latte|cappuccino|coffee|"
         r"ชา|เครื่องดื่ม|น้ำดื่ม|น้ำเปล่า|น้ำแข็ง|เบเกอรี่|เค้ก|ขนม|snack|drink|beverage|"
         r"อาหาร|ข้าว|ก๋วยเตี๋ยว|ไก่|หมู|ปลา|เนื้อ|ผัด|ทอด|ต้ม|ยำ|แกง|meal|food|"
+        r"สลัด|salad|ผัก|veggie|vegetable|สเต็ก|สเต๊ก|steak|เบอร์เกอร์|burger|พิซซ่า|pizza|"
+        r"พาสต้า|pasta|สปาเกตตี|spaghetti|เฟรนช์ฟราย|fries|ทรัฟเฟิล|truffle|วาซาบิ|wasabi|"
         r"บุฟเฟ่ต์|บุฟเฟต์|buffet|ซีฟู้ด|ทะเล|seafood",
         "food_drink",
     ),

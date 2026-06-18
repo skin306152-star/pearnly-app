@@ -136,5 +136,47 @@ class DecodeChoiceTests(unittest.TestCase):
         self.assertEqual(category_ai._listing(self.OPTS), "1. A > a\n2. B > b")
 
 
+class RestaurantNotFuelTests(unittest.TestCase):
+    """餐厅桌单(736·สลัด/ผัก/ไก่)必须归餐饮·绝不归燃油/交通(P1F·确定性规则·不靠 LLM·
+    不被上一张 Bangchak/น้ำมัน 油票污染——品名命中规则即不进 LLM 兜底)。"""
+
+    TREE = [
+        {
+            "id": "food",
+            "name": "ค่าอาหารและรับรอง",
+            "children": [{"id": "fb", "name": "ค่าอาหาร/เครื่องดื่ม"}],
+        },
+        {
+            "id": "trav",
+            "name": "ค่าเดินทางและขนส่ง",
+            "children": [{"id": "fuel", "name": "ค่าน้ำมันเชื้อเพลิง"}],
+        },
+    ]
+    ITEMS = [
+        "สลัดไก่กรอบ ชีส",
+        "สลัดสะโพก ทรัฟเฟิล เกรปฟรุ๊ต",
+        "สลัดอกไก่ ราชาวดี วาซาบิ",
+        "9'Veggies",
+    ]
+
+    def test_each_item_food_not_fuel(self):
+        for it in self.ITEMS:
+            self.assertEqual(category_ai.rule_category("", it, self.TREE), ("food", "fb"), it)
+
+    def test_batch_no_llm_all_food(self):
+        items = [{"name": n, "amount": a} for n, a in zip(self.ITEMS, [179, 189, 269, 99])]
+        out = category_ai.categorize_items(items, self.TREE, api_key=None)  # 无 key → 纯规则
+        self.assertTrue(all(p == ("food", "fb") for p in out), out)  # 736 全食物·绝不燃油
+
+    def test_unknown_person_vendor_still_food_via_items(self):
+        # 卖家是人名 จตุพร(无 vendor 规则)→ 仍靠品名归餐饮,不落燃油。
+        joined = " / ".join(self.ITEMS)
+        self.assertEqual(category_ai.rule_category("จตุพร", joined, self.TREE), ("food", "fb"))
+
+    def test_real_fuel_receipt_still_fuel(self):
+        # 反向回归:真油票(ไอดีเซล S / บางจาก)仍归燃油,没被「食物优先」误伤。
+        self.assertEqual(category_ai.rule_category("BANGCHAK", "ไอดีเซล S", self.TREE), ("trav", "fuel"))
+
+
 if __name__ == "__main__":
     unittest.main()

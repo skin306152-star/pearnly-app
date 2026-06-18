@@ -6,15 +6,15 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-18 · **P1G-Perf 图片票主路径性能止血(重复图早期短路 + L3 收紧/限时 + 分类不阻塞)** · HEAD `b289e172`）
+## 🎯 状态卡（2026-06-18 · **P1G-Perf 图片票性能止血 + 真机验过 + 乱码明细名兜底 + Req5 改错重发卡 + /simplify** · HEAD `f3860084`）
 
-- **本窗口完成并上线**(1 commit·prod `b289e172` health 200·deploy 502→200·`image_sha256` 列+索引落 prod DB 实证·13 闸全绿·全量 **4094 unit 绿** skip3 + replay/fixture 122 例绿·见记忆 [[line-p1g-perf-image-shortcut]])。慢因(上窗诊断日志 `d36fc236` 拉到)=三段 Gemini(L2 9–24s / L3 gemini-2.5-pro 45s 后 504 / category 7–14s)·Vision≈1s。Zihao 给细规格(=批准)·只做止血**不换引擎/不大重构**:
-  - **①重复图早期短路**(最大杀):`purchase_docs` 加 `image_sha256`(下载即算的图片字节指纹·区别内容指纹 `dedupe_key` 需先 OCR)。同图再发 → 找到已建单据直接重发当前状态卡(posted/voided/draft)→ **跳过 Vision/Gemini/分类**。新模块 `services/ocr/line_image_fastpath.py` + `services/purchase/image_dedup.py`。坑=成功入账 history_id=None **不写 ocr_history** → 旧文件缓存重发不命中(=慢真因)。
-  - **②L3 触发收紧** `triggers.py`:税号不合法不再升 L3(→ soft_flag·yellow_confirm);堆叠多票仅主金额不可靠才升。**③L3 限时** `OCR_L3_TIMEOUT_SECONDS` 45→**10s**(超时回落 L2+标「请核对」)。**④分类不阻塞** 图片路分类 LLM 硬上限 **3s**(`_CAT_LLM_TIMEOUT`·只 line_ingest 传·不改 category_ai 默认防伤文本路)。
-  - **架构**:`line_image_ocr.py` 500 顶格 → 抽缓存命中块进 fastpath(等价搬家)腾到 437。schema dual-run(ensure ALTER + alembic 0043)。日志 `l3_called/l3_skip`(page_runner)·`category_source`(line_ingest)·`early_dup_hit=true skipped_vision/l2/l3`(fastpath)。
-- **⏳ 下个窗口**:**等 Zihao 真机验**(本窗无真 LINE channel·同 P1G)。验:①同图连发两次·第二次 total<3s 且无 Gemini ②普通票不再同步等 L3 45s(现 10s 兜底)③grep `category_source`/`l3_skip`/`early_dup_hit` 摘要。
+- **本窗口完成并上线 + Zihao 真机验过**(3 commit·prod `f3860084` health 200·全量 **4101 unit 绿** skip3 + replay 全过·13 闸全绿·见记忆 [[line-p1g-perf-image-shortcut]])：
+  - **P1G-Perf 性能止血**(`b289e172`·`image_sha256` 列+索引落 prod DB 实证):①**重复图早期短路**(`purchase_docs.image_sha256`=下载即算图片字节指纹·非内容指纹 dedupe_key 需先 OCR·同图再发找已建单直接重发状态卡·跳过 Vision/Gemini/分类·新模块 `line_image_fastpath`+`image_dedup`·坑=成功入账 history_id=None 不写 ocr_history 致旧缓存不命中=慢真因)②**L3 收紧**(税号不合法→soft_flag 不升 L3·堆叠多票仅主金额不可靠才升)③**L3 限时** 45→**10s**④**分类不阻塞** LLM 硬上限 **3s**(只 line_ingest 传)。
+  - **🆕 真机结果**(6 张真票·prod 日志逐笔核):**L3 6/6 全未触发**·总耗时 **6–16s**(从 68–74s·P50≈10/P95≈16)·金额/总额/卖家/日期/VAT 6/6 全对。**early_dup 边界**:7-11「1-2s 内连发」没走 <3s 短路(两张落不同 worker·第二张早于第一张建单 → 无单可命中 → 走完整 OCR·靠内容查重出 dup 卡·**零重复入账**·~9s)→ **Zihao 拍板接受不补**(补需跨 worker「处理中」表·危害=0)。
+  - **乱码明细名兜底 + Req5**(`774c0c5c`):①OCR 读不出泰文品名「?????」→ 编号占位 `item_n`(4 语·**display-only·DB 留原值**)②**Req5** 改错低风险直改后回纯文字→改成**重发当前状态卡**(`line_card_actions.send_state_card_reply`)。
+  - **/simplify**(`f3860084`):三态卡构建(posted/void/draft)抽 `line_posted_card.build_state_card` 唯一源(push/reply 各按 transport 发)·消除 send_state_card_reply/_push_state_card 复制(净 -2 行)。
+- **⏳ 下个窗口 = 待 Zihao 定**(本任务已闭环上线验过)。可选 backlog:**①乱码明细名清到 ingest/抽取层**(现 render 层 display-only·DB 仍存「?????」·清到源头则 web/导出/exception 都干净)②泰文细品名识别准确率(=L2 极限·要换引擎/要原图·产品决策)③P1G 上轮真机三件仍未回执(三卡税额一致 130.84/9.16·双击不重复·「ที่ 7-11」不 +7)④`line_card.py` 已 500(再加先拆)。
 - **🔴 流程铁律 [[line-correction-replay-before-push]]**:LINE correction/卡片改动**必先跑 replay tester 全过再 push**·push 汇报含 replay 数+单测+commit+prod health。
-- **剩余/未做(backlog 非阻塞)**:普通清晰票 P50<10s 目标靠 L2 本身快(非本轮能改·要再快换引擎/要原图=产品决策);category_ai「异步补全」未做(本轮用短超时·spec 三选一已满足);P1G 真机三件仍待 Zihao(三卡税额一致 130.84/9.16·双击不重复·「ที่ 7-11」不 +7);`line_card.py` 已 500(再加先拆)。
 
 ## 历史记录（旧状态卡 · 2026-06-18 · P1G 入账后闭环 + 终态卡税额一致 + P1E-3 修 · HEAD `334337e2`）
 

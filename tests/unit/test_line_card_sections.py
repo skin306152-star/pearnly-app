@@ -107,5 +107,33 @@ class PruneEmptyTextTests(unittest.TestCase):
         self.assertEqual(s.prune_empty_text(node), node)
 
 
+class NoticesTests(unittest.TestCase):
+    """P1F-2 卡顶异常提示:缺税号/总额不符/明细不全·按重要性 ≤2 条·普通小票不堆警告。"""
+
+    T = {
+        "warn_total": "总额不符",
+        "no_taxid": "ไม่พบเลขภาษี",
+        "items_partial": "รายการอาจไม่ครบ",
+    }
+
+    def test_missing_taxid_only_when_expected(self):
+        self.assertTrue(s.missing_taxid({"vat": "34.27", "seller_tax": ""}))  # 有 VAT 无税号
+        self.assertTrue(s.missing_taxid({"document_type": "tax_invoice", "seller_tax": ""}))
+        self.assertFalse(s.missing_taxid({"vat": "", "seller_tax": ""}))  # 普通小票 → 不提示
+        self.assertFalse(s.missing_taxid({"vat": "34", "seller_tax": "0107561000013"}))  # 有税号
+
+    def test_notice_for_vat_receipt_without_tax(self):
+        out = s.notices({"vat": "34.27", "seller_tax": ""}, False, self.T)
+        self.assertEqual(len(out), 1)
+        self.assertIn("ไม่พบเลขภาษี", out[0]["contents"][0]["text"])
+
+    def test_plain_receipt_no_notice(self):
+        self.assertEqual(s.notices({"vat": "", "seller_tax": ""}, False, self.T), [])
+
+    def test_caps_at_two(self):
+        out = s.notices({"vat": "34", "seller_tax": "", "items_unread": True}, True, self.T)
+        self.assertEqual(len(out), 2)  # 三个信号都在 → 只显最重要 2 条
+
+
 if __name__ == "__main__":
     unittest.main()

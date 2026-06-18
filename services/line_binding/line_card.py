@@ -405,10 +405,8 @@ def result_card(
         v = fc.get(key)
         return v is not None and float(v) < s.REVIEW_BELOW
 
-    # 顶部融入式提示细条:总额不符(琥珀)/ 可能重复(红)。
-    strips = []
-    if warn_total:
-        strips.append(s.strip(t["warn_total"], "#FEF7EC", "#B45309"))
+    # 顶部融入式提示细条:异常提示(总额不符/缺税号/明细不全·按重要性 ≤2 条)+ 可能重复(红·状态级)。
+    strips = s.notices(fields, warn_total, t)
     if state == "dup" and dup_info:
         dl = (
             f"{t['dup_seen']} · ฿{dup_info.get('amount', '')} · "

@@ -104,6 +104,29 @@ def strip(text: str, bg: str, color: str) -> dict:
     }
 
 
+def missing_taxid(fields: dict) -> bool:
+    """应有税号却没有(有 VAT 或税票类型)却无有效 seller_tax → 温和提示。普通小票不提示(避免堆警告)。
+    seller_tax 已经 field_clean 清洗:invalid(短数字/日期片段)早成空 → 这里只看真有没有合法税号。"""
+    if str(fields.get("seller_tax") or "").strip():
+        return False
+    vat = str(fields.get("vat") or "").replace(",", "").strip().strip("0").rstrip(".")
+    dt = str(fields.get("document_type") or "").lower()
+    return bool(vat) or ("tax" in dt or "ภาษี" in dt or "กำกับ" in dt)
+
+
+def notices(fields: dict, warn_total: bool, t: dict) -> list:
+    """卡顶提示细条(产品级·按重要性·最多 2 条·不堆满):
+    金额/VAT 不自洽(琥珀)> 缺税号(琥珀)> 明细可能不全(灰)。各信号只在真异常时出现。"""
+    out = []
+    if warn_total:
+        out.append(strip(t["warn_total"], "#FEF7EC", "#B45309"))
+    if missing_taxid(fields):
+        out.append(strip(t["no_taxid"], "#FEF7EC", "#B45309"))
+    if fields.get("items_unread"):
+        out.append(strip(t["items_partial"], "#F4F6F9", "#667085"))
+    return out[:2]
+
+
 def items_section(items: list, t: dict, *, cap: int = 5) -> list:
     """明细分区:小标题 + 逐条(编号 + 名称 + 右对齐价)。超 cap 行 → 截断 + 「还有N行,去详情页」。
 

@@ -63,6 +63,23 @@ DRAFT_EDITED = {
 }
 
 
+# 多行/明细行级改(总额或某行金额)→ 不在 LINE 猜行,引导详情页。说明原因(多个明细),非泛泛。
+MULTILINE_EDIT = {
+    "zh": "这张有多条明细。要改总额或某一行的金额,需要先在 Pearnly 详情页核对明细,我带你打开。",
+    "th": "รายการนี้มีหลายรายการย่อยค่ะ หากต้องการแก้ยอดรวมหรือยอดของรายการใดรายการหนึ่ง ต้องตรวจรายการย่อยในหน้า Pearnly ก่อน ฉันจะพาไปเปิดให้ค่ะ",
+    "en": "This entry has multiple line items. To change the total or a line's amount, please check the line items on the Pearnly detail page first — I'll open it for you.",
+    "ja": "この記録には複数の明細があります。合計または特定の明細の金額を変更するには、まず Pearnly の詳細ページで明細をご確認ください。ページを開きます。",
+}
+
+# 字段值确认(收到新值后):「把{field}从{old}改成{new}吗?」——不提冲销(草稿/已入账通用)。
+CONFIRM_FIELD_CHANGE = {
+    "zh": "把{field}从 {old} 改成 {new} 吗?回复「是」确认。",
+    "th": "เปลี่ยน{field}จาก {old} เป็น {new} ใช่ไหมคะ? ตอบ 'ใช่' เพื่อยืนยันค่ะ",
+    "en": "Change {field} from {old} to {new}? Reply 'yes' to confirm.",
+    "ja": "{field}を {old} から {new} に変更しますか?「はい」で確定。",
+}
+
+
 def field_label(field: str, lang: str) -> str:
     return FIELD_LABELS.get(field, {}).get(lang) or FIELD_LABELS.get(field, {}).get("zh", field)
 

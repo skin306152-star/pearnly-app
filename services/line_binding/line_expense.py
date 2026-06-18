@@ -38,10 +38,12 @@ def handle_expense_text(
         def _pool(kind):
             line_expense_qa.reply_pool(reply_token, kind, text, lang, **ctx)
 
+        from services.expense import line_classify
         from services.expense import line_quick_entry as lqe
         from services.expense import replies
         from services.line_binding import line_chat_memory
 
+        text = line_classify.normalize_user_text(text)  # 全角标点归一(治全角冒号解析失败·#8)
         # 对话记忆(PO-15):先取历史(不含本条)供大脑多轮连贯,再记本条用户消息。
         history = line_chat_memory.recent(line_user_id=line_user_id, tenant_id=stid)
         line_chat_memory.note(line_user_id=line_user_id, tenant_id=stid, role="user", content=text)
@@ -62,10 +64,10 @@ def handle_expense_text(
         if ws is None:
             return False
 
-        # 0. 待确认的更正(上句"改成X吗")→ 这句 是/否 → 执行/取消(优先于记账/大脑/兜底·PO-13)
-        from services.expense import line_correct
+        # 0. 改错会话态(最高优先·#6):待选字段/待新值/待 是否确认 → 续接多轮(先于引用提醒/记账/大脑)。
+        from services.expense import line_correct, line_correct_flow
 
-        if line_correct.try_confirm(
+        if line_correct_flow.try_correction_state(
             bound_user, reply_token, line_user_id, text, stid, ws, lang, quote_token=quote_token
         ):
             return True
@@ -76,12 +78,10 @@ def handle_expense_text(
 
         si = lqe.l1_intent(text)
         isq = lqe.is_question(text)
-        # 改错分流(P2):「上一笔改成X / 第1张改成Y」是改错,不能被 L1 当新记一笔 → 跳过 L1 记账,
-        # 交大脑判 edit 并抽字段(无 key 时下方兜底引导)。
+        # 改错分流(P2):「上一笔改成X / 第1张改成Y」是改错 → 跳过 L1 记账,交大脑判 edit 抽字段。
         is_edit = lqe.is_edit_request(text)
 
-        # #7 收入识别:明确「收款/卖出」且无购买动词 → 不误记为支出。LINE 暂无收入流 →
-        #    只识别 + 不入账 + 引导(保守:问句/已有 L1 意图不拦,宁漏勿误挡正常买东西)。
+        # #7 收入识别:明确「收款/卖出」且无购买动词 → 不误记支出(保守·问句/已有 L1 意图不拦)。
         if lqe.detect_income(text) and not isq and si is None:
             _say(line_client.t_line(lang, "exp_income_guide"))
             return True

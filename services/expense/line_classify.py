@@ -314,6 +314,34 @@ def detect_correction_field(text: str) -> str:
     return _first_match(text, _FIELD_PATTERNS)
 
 
+# 全角/中日标点归一(治「แก้ร้านค้าเป็น:7-11」全角冒号解析失败)。只动标点·不动内容语言。
+_PUNCT_MAP = {
+    "：": ":",
+    "，": ",",
+    "。": ".",
+    "、": ",",
+    "「": "",
+    "」": "",
+    "『": "",
+    "』": "",
+    "“": "",
+    "”": "",
+    "‘": "",
+    "’": "",
+    "＝": "=",
+    "　": " ",  # 全角空格
+}
+
+
+def normalize_user_text(text: str) -> str:
+    """LINE 文本预处理:全角标点 → 半角,去成对引号。intent/值解析前统一,降低全角符号导致的解析失败。"""
+    s = text or ""
+    for fw, hw in _PUNCT_MAP.items():
+        if fw in s:
+            s = s.replace(fw, hw)
+    return s.strip()
+
+
 def detect_text_lang(text: str) -> str:
     """按字符脚本判输入语言(zh/th/en/ja)→ 回复跟随用户输入,不被账号主语言带偏。无字母 → ''。"""
     s = text or ""

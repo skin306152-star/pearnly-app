@@ -21,7 +21,9 @@ from services.expense import conversation
 from services.expense.expense_draft import ExpenseDraft
 from services.line_binding import line_client, line_reply
 
-_PREFIX = "correct:"
+_PREFIX = "correct:"  # 待 是/否 确认(最终)
+_CLAR_PREFIX = "correctclar:"  # 待用户选「改哪个字段」(多轮·correctclar:<ws>:<doc>)
+_VAL_PREFIX = "correctval:"  # 待用户给「新值」(多轮·correctval:<ws>:<doc>:<field>)
 _YES = ("是", "对", "好", "确认", "ok", "yes", "ใช่", "ตกลง", "ถูก", "確認", "はい")
 # 否定词优先于肯定:治子串塌缩——泰文「ไม่ใช่(不是)」含「ใช่(是)」、中文「不对」含「对」、
 # 「不是」含「是」。漏了这条会把用户的「不」当成「是」照改账(真实事故:用户回 ไม่ใช่ 仍被改)。
@@ -149,8 +151,8 @@ def request_correct(
             _say(line_client.t_line(lang, "exp_correct_none"))
             return True
         if "amount" in changes and len(detail.get("lines") or []) > 1:
-            # 多行/明细金额:不在 LINE 猜哪一行 → 引导详情页逐行核对(草稿/已入账同此·验收 #4)。
-            _say(line_client.t_line(lang, "line_web_handoff"))
+            # 多行/明细金额:不在 LINE 猜哪一行 → 引导详情页逐行核对(说明原因·验收 #4)。
+            _say(ci.t(ci.MULTILINE_EDIT, lang))
             return True
         changes_draft = ExpenseDraft(
             amount=changes.get("amount"),
@@ -221,20 +223,20 @@ def maybe_clarify_feedback(reply_token, text, lang, ws, quoted_message_id, ctx) 
     from services.line_binding import line_message_refs
     from services.purchase import docs as docs_svc
 
-    detail = None
+    line_user_id = ctx.get("line_user_id")
+    detail, doc_id, ws_eff = None, None, ws
     with db.get_cursor_rls(tid) as cur:
         tgt = line_message_refs.resolve_target(
             cur,
             tenant_id=tid,
             ws=ws,
-            line_user_id=ctx.get("line_user_id"),
+            line_user_id=line_user_id,
             quoted_message_id=quoted_message_id,
             text=text,
         )
         if not tgt.get("error"):
-            detail = docs_svc.get_doc(
-                cur, tenant_id=tid, workspace_client_id=tgt["ws"], doc_id=tgt["doc_id"]
-            )
+            doc_id, ws_eff = tgt["doc_id"], tgt["ws"]
+            detail = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws_eff, doc_id=doc_id)
 
     if not detail:
         # 无引用且像一句新记账(有金额)→ 放行给记账流,不劫持「买错了 50」这类。
@@ -244,15 +246,35 @@ def maybe_clarify_feedback(reply_token, text, lang, ws, quoted_message_id, ctx) 
         return True
 
     multiline = len(detail.get("lines") or []) > 1
-    if field == "items" or (field == "amount" and multiline):
-        _say(ci.t(ci.DETAIL_INCOMPLETE, reply_lang))
+    if field == "items" and not multiline:
+        _say(ci.t(ci.DETAIL_INCOMPLETE, reply_lang))  # 笼统「明细错了」(单行也只能去详情核对)
+    elif field == "items" or (field == "amount" and multiline):
+        # 多行/明细行级改(总额或某行)→ 详情页(说明原因·非「明细可能不完整」OCR 文案·验收 #3/#4)
+        _say(ci.t(ci.MULTILINE_EDIT, reply_lang))
     elif field == "payment":
         _say(line_client.t_line(reply_lang, "line_web_handoff"))
     elif field in ("amount", "date", "seller", "category"):
+        # 点名了可改字段但没给值 → 存「待该字段新值」会话态,问新值(下一句直接答即可·验收 #3/#5)。
+        _save_state(tid, ws_eff, doc_id, line_user_id, f"{_VAL_PREFIX}{ws_eff}:{doc_id}:{field}")
         _say(ci.t(ci.ASK_VALUE, reply_lang, field=ci.field_label(field, reply_lang)))
     else:
+        # 没点名字段 → 存「待选字段」会话态,列字段问改哪里(下一句答字段名即可续接·验收 #7)。
+        _save_state(tid, ws_eff, doc_id, line_user_id, f"{_CLAR_PREFIX}{ws_eff}:{doc_id}")
         _say(ci.t(ci.CLARIFY_FIELDS, reply_lang))
     return True
+
+
+def _save_state(tid, ws, doc_id, line_user_id, missing: str) -> None:
+    """存改错多轮会话态(待选字段 correctclar / 待新值 correctval)。draft 占位空·目标编码进 missing。"""
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        conversation.save_pending(
+            cur,
+            line_user_id=line_user_id,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            draft=ExpenseDraft(),
+            missing=missing,
+        )
 
 
 def try_confirm(

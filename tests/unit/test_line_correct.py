@@ -284,7 +284,8 @@ class RequestCorrectTests(unittest.TestCase):
     def test_multiline_amount_guides_detail_page(self):
         detail = {"doc": {"status": "posted", "grand_total": Decimal("100")}, "lines": [{}, {}]}
         replies, _ = self._run({"amount": 500}, detail, self._OK)
-        self.assertEqual(replies, ["line_web_handoff"])
+        self.assertEqual(len(replies), 1)
+        self.assertIn("明细", replies[0])  # MULTILINE_EDIT(说明原因·非泛泛 line_web_handoff)
 
     def test_single_line_amount_saves_with_ws_and_confirms(self):
         detail = {"doc": {"status": "posted", "grand_total": Decimal("100")}, "lines": [{}]}
@@ -313,7 +314,8 @@ class RequestCorrectTests(unittest.TestCase):
         replies, _ = self._run(
             {"amount": 100}, detail, {"doc_id": "D1", "ws": 1, "how": "quoted", "error": None}
         )
-        self.assertEqual(replies, ["line_web_handoff"])
+        self.assertEqual(len(replies), 1)
+        self.assertIn("明细", replies[0])  # MULTILINE_EDIT
 
     def test_quoted_vendor_change_on_multiline_ok(self):
         # 多行票也能改整单字段(卖家),只是金额不行。
@@ -343,6 +345,9 @@ class MaybeClarifyFeedbackTests(unittest.TestCase):
             mock.patch.object(line_correct.db, "get_cursor_rls", return_value=_Ctx(object())),
             mock.patch.object(line_message_refs, "resolve_target", return_value=tgt),
             mock.patch.object(docs_svc, "get_doc", return_value=detail),
+            mock.patch.object(
+                line_correct.conversation, "save_pending"
+            ),  # 多轮态存储(本测不验持久化)
             mock.patch.object(
                 line_correct.line_reply,
                 "reply_text_context",

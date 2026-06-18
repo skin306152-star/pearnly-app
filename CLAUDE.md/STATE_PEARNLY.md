@@ -6,15 +6,15 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-18 · **采购付款方式落库 + P1E-2 LINE 改错状态机多轮收口(真机 4 轮事故全修)+ 回放压测器** · HEAD `6e35bea8`）
+## 🎯 状态卡（2026-06-18 · **P1G 入账后闭环 + 终态卡税额一致(VAT 不置零)+ P1E-3 文本拆单修 + /simplify** · HEAD `334337e2`）
 
-- **本窗口完成并上线**(6 commit·prod `6e35bea` health 200·13 闸全绿·全文件 ≤500·全量 **4026 unit 绿** skip3 + **回放压测器 30 场景全过**·见记忆 [[line-correction-session-p1e2]]+[[line-correction-replay-before-push]])：
-  - **采购付款方式落库**(`9aa416f`·schema `payment_method` 列 ensure+alembic0042 双跑·prod DB 实测列在·create_doc/update_draft/get_doc/intake/line_correct 接线·`payment_from_ocr` 单一源)。
-  - **P1E-2 状态机收口 4 轮**(`1bceb2e`→`6e35bea`):①不串线(confirm 阶段非是非否重问 CONFIRM_REPROMPT)/字段切换/明确目标直执行(「วันที่เป็น 2026/6/18」点字段不依赖大脑)/取消删除短路径(终态卡);②低风险(date/seller/category/payment)即便**已入账**也直改(void+克隆可撤销·去 high_risk 的 posted 维度)·改完续接 **active_doc_id**(correctactive 态·15min)·**no-op 不重建**(_is_noop)·删除回终态卡·多行详情页带真 deeplink 按钮;③**账务红线**:`route()` 加 `is_correction_like` 安全闸→correction-like 文本绝不进 auto_book(「ร้านค้าเป็น 7-11」不再新建 11 THB)·多行详情页保留 active·`_strip_prefix` 拉丁词边界剥(店名 tops 不被 to 吃成 ps);④再引用「已作废原单」跟随 active 续到克隆(_active_doc 兜底)。
-  - **回放压测器** `tests/unit/test_line_correct_replay.py`(内存模拟单据/pending/消息引用驱动真 flow.route·30 场景·`python` 直跑出报告)+ /simplify 收口(_current/_is_live 共享·_set_active 复用游标省 DB 往返·payment_from_ocr 单一源)。
-- **⏳ 下个窗口**:**等 Zihao 真机验收结果再决定**(本窗无真 LINE channel)。真机只验平台差异(quoteToken/卡片渲染/真 OCR)·核心逻辑已被 30 场景回放端到端兜住。
-- **🔴 流程铁律(Zihao 拍板·已写记忆 [[line-correction-replay-before-push]])**:P1E-2/LINE correction 改动**不许只跑单测就 push·必先跑 replay tester 全过**·第一轮验收不交用户真机·push 汇报含 replay 通过数+单测+commit+prod health。
-- **剩余/未做(backlog 非阻塞)**:`_delete_target↔reply_undo` 作废核心可抽共享 helper(碰做账 void 路径·留专项)·`line_message_refs` voided→clone 解析(active 过期后引用旧卡仍命中)·**P1E-3 文本拆单 parser**(「ที่ 7-11」的 7 被拆成金额致 557 应 550·Zihao 已记 backlog 不混入 P1E-2)·OCR 模型/延迟极限需换引擎或要原图(产品决策)。
+- **本窗口完成并上线**(4 commit·prod `334337e` health 200·13 闸全绿·全量 **4080 unit 绿** skip3 + **回放压测器 42 场景全过**·见记忆 [[line-p1g-post-posting-closeloop]])：
+  - **P1G 入账后闭环**(`93557166`):卡片 postback **确认入账后回 posted 数据卡**(状态/金额/日期/卖家/记录号/ดูรายการ/ยกเลิก)+续接 active_doc;**重复点击幂等**(`_reshow_current` 单一重发当前状态卡·nonce used 补返 ref/ws·无令牌 not_draft 同走·不重复入账/不报错/不跳登录);**撤销幂等**(已作废再删 void_doc 幂等回终态卡)。新模块 `services/line_binding/line_posted_card.py`。
+  - **P1G polish**(`97f9e082`):**bug1** posted/voided 卡税前/VAT 置零(费用单按行落库 vat=0)→ `_breakdown` 改与识别卡同口径(有税号按 7% 票面拆·140→130.84/9.16);`terminal_card` 加 `fields` → 撤销后卡也带拆解;所有终态卡发送处传作废前 detail。**bug2(P1E-3)** parse_multi 把店名「ที่ 7-11」的 7 当金额(550→557)→ 修。
+  - **/simplify 收口**(`334337e2`):VAT 票面拆解抽 `totals.vat_from_inclusive/vat_face_consistent` 两处共用(识别卡+入账卡口径单一源);去重 `_send_voided`;「7-11 不计金额」从回填 helper 上移到 `_MULTI_RE` lookaround 根治。
+- **⏳ 下个窗口**:**等 Zihao 真机验收结果再决定**(本窗无真 LINE channel)。真机验:有 VAT 票走 确认前→确认→撤销 三卡税前/VAT 应都 130.84/9.16;双击不重复入账;文本带「ที่ 7-11」总额不 +7。
+- **🔴 流程铁律(已写记忆 [[line-correction-replay-before-push]])**:LINE correction/卡片改动**必先跑 replay tester 全过再 push**·push 汇报含 replay 数+单测+commit+prod health。
+- **剩余/未做(backlog 非阻塞)**:Req5 已入账低风险改错后仍回文字未升级成每次重发 posted 卡(spec「或更新后状态」已满足·升级需动 replay harness mock line_client);`line_card.py` 已 **500 行**(再加先拆);三机制(field-decl/inline-vendor/hyphen-code)未统一成 tokenizer 分类器(超本次范围);OCR 模型/延迟极限需换引擎或要原图(产品决策)。
 
 ## 历史记录（旧状态卡 · 2026-06-17 · OCR 纠错 + LINE 费用卡片产品化 · HEAD `33142a1`）
 

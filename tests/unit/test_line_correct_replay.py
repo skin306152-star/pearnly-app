@@ -368,9 +368,74 @@ class ReplayScenarioTests(unittest.TestCase):
         self._no_forbidden(steps)
 
 
+class SafetyGateTests(unittest.TestCase):
+    """账务红线:correction-like 文本绝不进 auto_book 记账(P1E-2 真机事故复现)。"""
+
+    def setUp(self):
+        self.sim = Sim()
+        self.sim.seed("D2", lines=3)  # 多行草稿(供详情页 + 续接用)
+        self.reply_key = line_client.t_line("th", "line_need_reply_record")
+
+    def test_seller_correction_no_target_never_records(self):
+        # 真机事故:无 active/引用「ร้านค้าเป็น 7-11」→ 绝不新建 11 THB,只提示回复记录。
+        before = set(self.sim.docs)
+        steps = _run(self.sim, [("ร้านค้าเป็น 7-11", None)])
+        self.assertTrue(steps[0][1])  # 被改错路由拦下(没落记账)
+        self.assertEqual(set(self.sim.docs), before)  # 没新建任何单
+        self.assertIn(self.reply_key, steps[0][2])  # 提示「回复要改的记录」
+
+    def test_date_correction_no_target_never_records(self):
+        before = set(self.sim.docs)
+        steps = _run(self.sim, [("วันที่เป็น 2026/6/18", None)])
+        self.assertTrue(steps[0][1])
+        self.assertEqual(set(self.sim.docs), before)
+
+    def test_multiline_total_no_target_never_records(self):
+        before = set(self.sim.docs)
+        steps = _run(self.sim, [("จำนวนเงินรวมเปลี่ยนเป็น 110", None)])
+        self.assertTrue(steps[0][1])
+        self.assertEqual(set(self.sim.docs), before)
+
+    def test_correction_like_batch_never_records(self):
+        # 一批 correction-like 语句(含数字)→ 全部不得落记账(route 接管 = 不进 auto_book)。
+        for t in [
+            "ร้านค้าเป็น 7-11",
+            "วันที่เป็น 2026/6/18",
+            "จำนวนเงินรวมเปลี่ยนเป็น 110",
+            "หมวดหมู่เป็น ค่าอาหาร",
+            "ยกเลิก",
+            "ลบ",
+        ]:
+            sim = Sim()  # 空账本·无 active·无引用
+            steps = _run(sim, [(t, None)])
+            self.assertTrue(steps[0][1], f"{t} 未被拦截 → 会落记账!")
+            self.assertEqual(sim.docs, {}, f"{t} 竟新建了单!")
+
+    def test_normal_expense_still_records(self):
+        # 普通记账「กาแฟ 70」非 correction → route 放行(False),交记账流。
+        steps = _run(self.sim, [("กาแฟ 70", None)])
+        self.assertFalse(steps[0][1])
+
+    def test_multiline_detail_keeps_active_then_seller(self):
+        # 验收 #6:多行总额→详情页后 active 仍保留,后续「ร้านค้าเป็น 7-11」继续命中同一张。
+        steps = _run(
+            self.sim,
+            [("จำนวนเงินรวมเปลี่ยนเป็น 110", "MID_D2"), ("ร้านค้าเป็น 7-11", None)],
+        )
+        self.assertTrue(all(s[1] for s in steps))
+        self.assertEqual(self.sim.docs["D2"]["supplier"]["name"], "7-11")  # 续命中 D2 改卖家
+        self.assertEqual(len(self.sim.docs["D2"]["lines"]), 3)  # 多行明细原样保留(没乱改/没拆)
+
+    def test_seller_value_tops_not_truncated(self):
+        # 验收 #5:店名「tops」不得被拉丁连接词「to」吃成「ps」。
+        steps = _run(self.sim, [("ร้านค้าเป็น tops", "MID_D2")])
+        self.assertEqual(self.sim.docs["D2"]["supplier"]["name"], "tops")
+
+
 def _report() -> str:
     """跑全部 scenario,产出 通过/失败 + 实际回复 报告(给人看)。"""
-    suite = unittest.TestLoader().loadTestsFromTestCase(ReplayScenarioTests)
+    load = unittest.TestLoader().loadTestsFromTestCase
+    suite = unittest.TestSuite([load(ReplayScenarioTests), load(SafetyGateTests)])
     buf = io.StringIO()
     with redirect_stdout(buf):
         result = unittest.TextTestRunner(stream=buf, verbosity=2).run(suite)

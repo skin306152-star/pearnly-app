@@ -94,11 +94,30 @@ def _say(reply_token, body, ctx):
     line_reply.reply_text_context(reply_token, body, **ctx)
 
 
+def is_correction_like(text: str) -> bool:
+    """改错语义?(点名字段 / 编辑词 / 反馈词 / 取消 / 删除)。问句不算(交查账)。
+
+    安全闸用:命中即绝不进 auto_book 记账(账务级红线·「ร้านค้าเป็น 7-11」不得新建 11 THB)。
+    """
+    if lqe.is_question(text):
+        return False
+    return bool(
+        line_classify.detect_correction_field(text)
+        or line_classify.is_correction_feedback(text)
+        or lqe.is_edit_request(text)
+        or line_classify.is_cancel_intent(text)
+        or line_classify.is_delete_intent(text)
+    )
+
+
 def route(
     bound_user, reply_token, line_user_id, text, lang, tid, ws, quoted_message_id, ctx
 ) -> bool:
     """改错路由总入口(在记账/大脑之前):会话态续接 > 引用澄清/直接改 > 引用取消/删除。
-    任一接管 → True;都不接管 → False(交记账/大脑)。"""
+
+    ★安全闸(账务红线):correction-like 文本绝不落记账。定位不到(无引用/无 active)→ 提示「回复要改
+    的那条记录」并 return True 拦在记账之前,绝不新建支出。任一接管 → True;非 correction → False。
+    """
     qt = ctx.get("quote_token", "")
     if try_correction_state(
         bound_user,
@@ -114,9 +133,14 @@ def route(
         return True
     if maybe_clarify_feedback(bound_user, reply_token, text, lang, ws, quoted_message_id, ctx):
         return True
-    return try_void_quoted(
+    if try_void_quoted(
         bound_user, reply_token, text, lang, tid, ws, line_user_id, quoted_message_id, qt
-    )
+    ):
+        return True
+    if is_correction_like(text):  # 改错语义但没定位到记录 → 提示回复记录,绝不记账(账务红线)
+        _say(reply_token, line_client.t_line(lang, "line_need_reply_record"), ctx)
+        return True
+    return False
 
 
 def try_correction_state(
@@ -256,11 +280,12 @@ def _route_field(bound_user, reply_token, text, lang, tid, ws, doc_id, field, ct
         return True
     multiline = bool(detail) and len(detail.get("lines") or []) > 1
     if field == "items" and detail is not None and not multiline:
-        line_correct._clear(tid, luid)
+        line_correct._set_active(tid, ws, doc_id, luid)  # 续接保留(验收 #6)
         _say(reply_token, ci.t(ci.DETAIL_INCOMPLETE, reply_lang), ctx)  # 单行也只能去详情核对
         return True
     if field == "items" or (field == "amount" and multiline):
-        line_correct._clear(tid, luid)  # 多行/明细行级 → 详情页(带真按钮·验收 #5)
+        # 多行/明细行级 → 详情页(带真按钮·验收 #5);active 续接保留 15min,后续 seller/date 仍命中(#6)。
+        line_correct._set_active(tid, ws, doc_id, luid)
         line_correct._say_detail(
             reply_token, doc_id, ws, reply_lang, luid, tid, ctx.get("quote_token", "")
         )
@@ -392,6 +417,7 @@ def _strip_prefix(text: str) -> str:
     """剥命令+字段+连接前缀 + 否定/指代填充,留真实值。
 
     「แก้ร้านค้าเป็น 7-11」→「7-11」;「ผู้ขายไม่ใช่คนนี้/卖家不是这个」→「」(没给真值·调用方据此再问)。
+    拉丁词须按词边界剥(后接字母不剥)→「to」不吃掉店名「tops」的前两字母(验收 #5)。
     """
     s = (text or "").strip()
     changed = True
@@ -402,9 +428,14 @@ def _strip_prefix(text: str) -> str:
             s, changed = s2, True
         low = s.lower()
         for tok in _STRIP_TOKENS + _NEG_FILLER:
-            if low.startswith(tok.lower()):
-                s, changed = s[len(tok) :].strip(), True
-                break
+            t = tok.lower()
+            if not low.startswith(t):
+                continue
+            rest = s[len(tok) :]
+            if t.isascii() and t.isalpha() and rest[:1].isalpha():
+                continue  # 拉丁词后紧跟字母 → 是值的一部分(「tops」≠「to」+「ps」)
+            s, changed = rest.strip(), True
+            break
     return s.strip(" :=")
 
 

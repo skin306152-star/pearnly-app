@@ -209,7 +209,7 @@ def _apply_or_confirm(
         _say(ci.t(ci.CHANGED_NOOP, lang, field=ci.key_label(k, lang), value=ci.disp(k, v, lang)))
         return True
     if "amount" in changes and len(detail.get("lines") or []) > 1:
-        _clear(tid, line_user_id)
+        _set_active(tid, ws, doc_id, line_user_id)  # 续接保留(验收 #6)·后续 seller/date 仍命中
         _say_detail(reply_token, doc_id, ws, lang, line_user_id, tid, quote_token)
         return True
     changes_draft = ExpenseDraft(

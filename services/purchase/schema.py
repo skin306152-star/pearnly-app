@@ -62,6 +62,7 @@ _TABLES = (
         source text,
         ocr_raw jsonb,
         dedupe_key text,
+        image_sha256 text,
         status text NOT NULL DEFAULT 'draft',
         amount_override boolean NOT NULL DEFAULT FALSE,
         created_by uuid,
@@ -144,6 +145,9 @@ _INDEXES = (
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_purchase_docs_dedupe "
     "ON purchase_docs (tenant_id, workspace_client_id, dedupe_key) "
     "WHERE dedupe_key IS NOT NULL",
+    "CREATE INDEX IF NOT EXISTS ix_purchase_docs_image_sha "
+    "ON purchase_docs (tenant_id, workspace_client_id, image_sha256) "
+    "WHERE image_sha256 IS NOT NULL",
     "CREATE INDEX IF NOT EXISTS ix_purchase_lines_doc "
     "ON purchase_lines (tenant_id, purchase_doc_id)",
     "CREATE INDEX IF NOT EXISTS ix_expense_categories_ws "
@@ -159,6 +163,7 @@ _ALTERS = (
     "ALTER TABLE purchase_settings "
     "ADD COLUMN IF NOT EXISTS auto_book boolean NOT NULL DEFAULT TRUE",
     "ALTER TABLE purchase_docs ADD COLUMN IF NOT EXISTS payment_method text",
+    "ALTER TABLE purchase_docs ADD COLUMN IF NOT EXISTS image_sha256 text",
 )
 
 _RLS_TABLES = (

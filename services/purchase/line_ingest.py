@@ -167,6 +167,12 @@ def _category_names(cats: list, cat_id, sub_id) -> tuple[str, str]:
     return "", ""
 
 
+# 分类 LLM 主路径短超时(P1G-Perf · Zihao 2026-06-18):分类是「在选项里挑编号」的小任务,
+# 不该把入账卡拖在 Gemini 上 7–14s(甚至 504)。规则先行,落空才调一次 LLM,且 3s 硬上限;
+# 超时即回落规则/中性分类(卡照常出·标「请核对」),绝不阻塞卡片。
+_CAT_LLM_TIMEOUT = 3
+
+
 def _dominant_item_category(cats: list, items: list, *, api_key):
     from services.expense import category_ai
 
@@ -177,7 +183,7 @@ def _dominant_item_category(cats: list, items: list, *, api_key):
     ]
     if not clean:
         return None, None, Decimal("0")
-    choices = category_ai.categorize_items(clean, cats, api_key=api_key)
+    choices = category_ai.categorize_items(clean, cats, api_key=api_key, timeout=_CAT_LLM_TIMEOUT)
     weights: dict[tuple, Decimal] = {}
     total_weight = Decimal("0")
     for it, pair in zip(clean, choices):
@@ -195,7 +201,11 @@ def _dominant_item_category(cats: list, items: list, *, api_key):
 
 
 def _smart_category(cur, *, tenant_id, workspace_client_id, vendor, descs, items, api_key):
-    """图片路分类:逐项规则/批量判断 → 主金额分类 → 整票兜底 → 关键词兜底。"""
+    """图片路分类:逐项规则/批量判断 → 主金额分类 → 整票兜底 → 关键词兜底。
+
+    返回 (cat_id, sub_id, cat_name, sub_name, conf, source)。source ∈ item|rule|ai|fallback|none
+    (喂主路径日志 category_source)。LLM 步骤走 3s 硬上限,超时回落规则/中性,不阻塞卡片。
+    """
     from services.purchase import categories as cat_svc
 
     cats = cat_svc.get_tree(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
@@ -206,25 +216,27 @@ def _smart_category(cur, *, tenant_id, workspace_client_id, vendor, descs, items
     if cat_id:
         cat_name, sub_name = _category_names(cats, cat_id, sub_id)
         conf = Decimal("0.96") if share >= Decimal("0.70") else Decimal("0.82")
-        return cat_id, sub_id, cat_name, sub_name, conf
+        return cat_id, sub_id, cat_name, sub_name, conf, "item"
 
     cat_id, sub_id = category_ai.rule_category(vendor, joined, cats)
     if cat_id:
         cat_name, sub_name = _category_names(cats, cat_id, sub_id)
-        return cat_id, sub_id, cat_name, sub_name, Decimal("0.90")
+        return cat_id, sub_id, cat_name, sub_name, Decimal("0.90"), "rule"
 
     if not cat_id and api_key:
-        cat_id, sub_id = category_ai.suggest_category(vendor, joined, cats, api_key=api_key)
+        cat_id, sub_id = category_ai.suggest_category(
+            vendor, joined, cats, api_key=api_key, timeout=_CAT_LLM_TIMEOUT
+        )
         if cat_id:
             cat_name, sub_name = _category_names(cats, cat_id, sub_id)
-            return cat_id, sub_id, cat_name, sub_name, Decimal("0.88")
+            return cat_id, sub_id, cat_name, sub_name, Decimal("0.88"), "ai"
 
     if not cat_id:
         cat_id, sub_id = ik._match_category(f"{vendor} {descs[0] if descs else ''}", cats)
     if not cat_id:
-        return None, None, "", "", Decimal("0")
+        return None, None, "", "", Decimal("0"), "none"
     cat_name, sub_name = _category_names(cats, cat_id, sub_id)
-    return cat_id, sub_id, cat_name, sub_name, Decimal("0.76")
+    return cat_id, sub_id, cat_name, sub_name, Decimal("0.76"), "fallback"
 
 
 def ingest_line_image(
@@ -238,6 +250,7 @@ def ingest_line_image(
     field_confidence=None,
     image_ref=None,
     api_key=None,
+    image_sha256=None,
 ) -> dict:
     """LINE 图片 OCR → 置信驱动入账(待归类已下线:一律建草稿落列表)。
 
@@ -318,7 +331,7 @@ def ingest_line_image(
         descs = []
     # 智能归类(LLM 优先 → 关键词兜底):懂泰文品名,治「分类不对/空」。
     vendor_name = draft["supplier"].get("name") or ""
-    cat_id, sub_id, _cat_name, _sub_name, cat_conf = _smart_category(
+    cat_id, sub_id, _cat_name, _sub_name, cat_conf, cat_source = _smart_category(
         cur,
         tenant_id=tenant_id,
         workspace_client_id=workspace_client_id,
@@ -327,6 +340,9 @@ def ingest_line_image(
         items=card_fields.get("items") or [],
         api_key=api_key,
     )
+    import logging
+
+    logging.getLogger("mr-pilot").info("[line_ingest] category_source=%s", cat_source)
     if cat_id:
         draft["category_id"] = cat_id
         card_fields["category"] = _cat_name
@@ -371,6 +387,18 @@ def ingest_line_image(
         verdict=verdict,
         created_by=created_by,
     )
+    # 图片指纹挂到单据(P1G-Perf):同张图再次发来时,line_image_fastpath 据此早期短路,
+    # 不再重跑 Vision/Gemini,直接重发该单当前状态卡。dup 命中已有单也照挂(便于下次短路)。
+    if doc_id and image_sha256:
+        from services.purchase import image_dedup
+
+        image_dedup.set_sha(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            doc_id=doc_id,
+            image_sha256=image_sha256,
+        )
     return {
         "state": state,
         "doc_id": doc_id,

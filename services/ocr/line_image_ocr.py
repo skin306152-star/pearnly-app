@@ -15,6 +15,7 @@ from core import db
 from core import workspace_context as wc
 from core.db import insert_ocr_history
 from services.exceptions.exception_checks import _async_run_exception_checks
+from services.ocr import line_image_fastpath as fastpath
 from services.ocr.entrypoints import (
     all_pages_not_invoice as _ocr_all_pages_not_invoice,
     billing_quote as _ocr_billing_quote,
@@ -140,83 +141,18 @@ async def _handle_line_image_ocr(
         # 归 LINE 用户租户的默认套账(绑定店)。缺则 None(insert 内 NULL · 不拦上传)。
         _ws_client_id = wc.default_workspace_for_write(user_fresh.get("tenant_id"))
 
-        # 3. 文件指纹缓存查找:命中则跳 OCR + 跳扣费(缓存按套账隔离)
+        # 3. OCR 前快速路径(P1G-Perf):同张图已建过单据 → 重发当前状态卡,跳过 Vision/Gemini/分类。
         file_hash = _ocr_content_hash(file_bytes)
+        if fastpath.early_dup_short_circuit(
+            user_fresh, line_user_id, file_hash, _ws_client_id, lang, quote_token
+        ):
+            return
+        # 3.5 文件指纹缓存(firm/未开记账路写过 ocr_history)→ 缓存字段重建卡(不重 OCR/扣费)。
         cached = _ocr_get_cached(user_fresh, file_hash, workspace_client_id=_ws_client_id)
         if cached:
-            logger.info(f"[line_ocr] 命中文件缓存 (hash={file_hash[:12]}...) hid={cached['id']}")
-            # 跑异常 hook(同网页缓存命中分支 · 不重复扣配额)
-            try:
-                import asyncio as _asyncio_exc_lc
-
-                _cached_pages = cached.get("pages") or []
-                _primary = next(
-                    (
-                        p
-                        for p in _cached_pages
-                        if not p.get("is_duplicate") and not p.get("is_copy")
-                    ),
-                    None,
-                )
-                _primary = _primary or (_cached_pages[0] if _cached_pages else None)
-                _cf = (_primary or {}).get("fields") or {}
-                _exc_total_c = None
-                _raw_t_c = _cf.get("total_amount")
-                if _raw_t_c:
-                    try:
-                        _exc_total_c = float(str(_raw_t_c).replace(",", "").strip())
-                    except Exception as e:
-                        logger.warning(f"[line_cache] total_amount 解析失败: {e}")
-                _asyncio_exc_lc.create_task(
-                    _async_run_exception_checks(
-                        history_id=str(cached["id"]),
-                        user_id=str(user_fresh["id"]),
-                        tenant_id=(
-                            str(user_fresh.get("tenant_id"))
-                            if user_fresh.get("tenant_id")
-                            else None
-                        ),
-                        seller_name=_cf.get("seller_name"),
-                        invoice_no=_cf.get("invoice_number"),
-                        total_amount=_exc_total_c,
-                        confidence=cached.get("confidence"),
-                        duplicate=None,
-                        fields=_cf,
-                    )
-                )
-                logger.info(f"  🛡  [LINE Cache] 异常检测已入队 · hid={cached['id']}")
-            except Exception as _e_lc:
-                logger.warning(f"[line_ocr] 缓存异常检测入队失败: {_e_lc}")
-            # 缓存命中也走数据卡(不重 OCR/扣费):用缓存字段重建 ingest → 推卡片。重发的票 ingest
-            # 自带查重 → 出「可能重复」卡。不再发老式纯文字回复(与新卡片大脑回复冲突)。
-            _tid_c = str(user_fresh["tenant_id"]) if user_fresh.get("tenant_id") else None
-            try:
-                from services.expense import line_l2
-                from services.purchase.intake import line_expense_gate_open
-                from services.purchase.line_ingest import ingest_line_image
-
-                _ci = None
-                if _cf and _ws_client_id and _tid_c:
-                    with db.get_cursor_rls(_tid_c, commit=True) as cur:
-                        if line_expense_gate_open(cur, tenant_id=_tid_c):
-                            _ci = ingest_line_image(
-                                cur,
-                                tenant_id=_tid_c,
-                                workspace_client_id=_ws_client_id,
-                                fields=_cf,
-                                confidence=cached.get("confidence"),
-                                field_confidence=(_primary or {}).get("field_confidence"),
-                                image_ref=None,
-                                created_by=str(user_fresh["id"]),
-                                api_key=line_l2.resolve_api_key(user_fresh),
-                            )
-                if _ci:
-                    _ci["source"] = "cache"  # 缓存命中重建卡 → 来源标「来自缓存」
-                    _push_result_card(
-                        line_user_id, lang, _ci, quote_token, _ws_client_id, tenant_id=_tid_c
-                    )
-            except Exception as _ce_card:
-                logger.warning(f"[line_ocr] 缓存卡片重建失败: {_ce_card}")
+            fastpath.handle_ocr_cache_hit(
+                user_fresh, file_hash, cached, line_user_id, lang, quote_token, _ws_client_id
+            )
             return
 
         quote = _ocr_billing_quote(user_fresh, file_bytes, filename, max_pages=50)
@@ -299,6 +235,7 @@ async def _handle_line_image_ocr(
                             image_ref=_img_ref,
                             created_by=str(user_fresh["id"]),
                             api_key=line_l2.resolve_api_key(user_fresh),
+                            image_sha256=file_hash,
                         )
         except Exception as _route_err:
             logger.warning(f"[line_ocr] 采购入账分流跳过(回落识别记录): {_route_err}")

@@ -311,14 +311,29 @@ def _process_one_page(
     total_ms = int((time.time() - t_total) * 1000)
     # 分段耗时(一行可 grep · 自带 request_id):定位 OCR 慢在哪层(L1 vision / L2 structure /
     # L3 fallback)。不记 OCR 文本(只记毫秒 + 层链),避免日志泄露票据内容。
+    # P1G-Perf:加 l3_called + l3_skip,印证「触发收紧后多数票不进 L3」(spec §2 日志要求)。
+    l3_called = any(c.startswith("L3") or c.startswith("IF") for c in layer_chain)
+    if l3_called:
+        l3_skip = "-"
+    elif not (enable_layer3 and document_type in ("auto", "invoice")):
+        l3_skip = "disabled"
+    elif not image_bytes:
+        l3_skip = "no_image"
+    elif not triggers:
+        l3_skip = "no_trigger"
+    else:
+        l3_skip = "not_eligible"
     logger.info(
-        "pipeline: page %d timing l1=%dms l2=%dms l3=%dms total=%dms chain=%s",
+        "pipeline: page %d timing l1=%dms l2=%dms l3=%dms total=%dms chain=%s "
+        "l3_called=%s l3_skip=%s",
         page_number,
         l1_ms,
         l2_ms,
         l3_ms,
         total_ms,
         "/".join(layer_chain),
+        l3_called,
+        l3_skip,
     )
 
     # P0 修 (2026-05-26) · 同页多票 · 人工兜底(最后手段)。

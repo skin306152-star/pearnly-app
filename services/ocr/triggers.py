@@ -172,12 +172,13 @@ def _evaluate_triggers(
     if math_reason:
         triggers.append(math_reason)
 
-    # Rule 3: tax_id format — only enforced on full tax invoices (input-VAT path)
-    if is_full_tax_invoice and invoice.seller_tax:
-        if not invoice.seller_tax.isdigit() or len(invoice.seller_tax) != 13:
-            triggers.append(
-                f"seller_tax format invalid: {invoice.seller_tax!r} " "(expected 13 digits)"
-            )
+    # Rule 3 (P1G-Perf · removed as an L3 trigger): a malformed/missing seller
+    # tax-id alone no longer escalates to the slow L3 visual re-read. Zihao
+    # 2026-06-18: an invalid 13-digit id is a tax-optional detail — the card
+    # shows the amount + "โปรดตรวจสอบ" and the user fixes the id on the web,
+    # which is far cheaper than a 10–45s visual pass that often can't read a
+    # blurry footer id anyway. The id is still surfaced for review via the
+    # soft-flag path (yellow_confirm) in _evaluate_soft_flags, not here.
 
     # Rule 5 (NEW): L1 containment — non-empty extracted critical fields
     # must appear in L1's full_text (after whitespace+comma normalization).
@@ -201,9 +202,12 @@ def _evaluate_triggers(
 
     # Rule 7 (P0 2026-05-26 · 同页多票):OCR 文本里的发票号候选数 > 已提取数 →
     # 大概率漏了一张堆叠发票。把它当作 L3 视觉复读的触发条件(先加强自身 OCR ·
-    # 让 Flash 看图把漏的那张补回来)· 而不是直接丢给人工。真正的人工兜底只在
-    # L3 复读后仍然短缺时才在 pipeline 末尾触发。
-    if invoice.invoice_number:
+    # 让 Flash 看图把漏的那张补回来)· 而不是直接丢给人工。
+    # P1G-Perf(Zihao 2026-06-18):只在【主金额不可靠】时才升 L3 —— 主金额齐全且自洽
+    # 的多行/多票票,主单据照常出卡,漏票交给 page_runner 末尾的 validation_warning
+    # 标「请核对」(needs_manual_review),不再为一张可能漏的堆叠票让用户多等 10s 视觉复读。
+    main_amount_reliable = bool(invoice.total_amount) and not math_reason
+    if invoice.invoice_number and not main_amount_reliable:
         extracted_n = 1 + len(invoice.additional_invoices or [])
         candidate_n = _count_invoice_no_candidates(page.full_text, invoice.invoice_number)
         if candidate_n > extracted_n:
@@ -250,6 +254,17 @@ def _evaluate_soft_flags(page: Page, invoice: ThaiInvoice) -> List[str]:
             flags.append(
                 f"date={date_val!r} low word conf {min_conf:.3f} "
                 f"< {CONFIDENCE_THRESHOLD} (confirm, no L3)"
+            )
+
+    # Malformed seller tax-id on a full tax invoice (P1G-Perf · was Rule 3 L3
+    # trigger): nudge the user to check it via yellow_confirm instead of a slow
+    # visual re-read (the VAT breakdown still derives from the amount).
+    is_full_tax_invoice = getattr(invoice, "document_type", "tax_invoice") == "tax_invoice"
+    if is_full_tax_invoice and invoice.seller_tax:
+        if not invoice.seller_tax.isdigit() or len(invoice.seller_tax) != 13:
+            flags.append(
+                f"seller_tax format invalid: {invoice.seller_tax!r} "
+                "(expected 13 digits → confirm, no L3)"
             )
 
     return flags

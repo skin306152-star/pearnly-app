@@ -4,7 +4,8 @@
 锁三件事:
   1. 缺号/税号触发按文档类型门控 —— 只完整税票较真,简式/收据/非税票不触发(§3.1/3.2)。
   2. 低词置信但值在 L1 文本 → 移出 L3 触发,改 soft_flag(降置信到 yellow_confirm,不跑 L3)。
-  3. soft_flag 计入置信 penalty;L3 超时默认收到 15s。
+     P1G-Perf:税号不合法亦同(不升 L3,改 soft_flag)。
+  3. soft_flag 计入置信 penalty;L3 超时默认收到 ~10s(P1G-Perf·超时回落 L2 标「请核对」)。
 """
 
 import unittest
@@ -67,22 +68,26 @@ class Rule1NumberGateTests(unittest.TestCase):
 
 
 class Rule3TaxIdGateTests(unittest.TestCase):
-    def test_full_tax_invoice_bad_taxid_escalates(self):
+    def test_full_tax_invoice_bad_taxid_is_soft_not_l3(self):
+        # P1G-Perf(Zihao 2026-06-18):税号不合法不再升 L3(tax_optional),改 soft_flag
+        # (yellow_confirm·标「请核对」),把 10–45s 视觉复读省给金额真不可靠的票。
         inv = ThaiInvoice(
             document_type="tax_invoice", invoice_number="X", total_amount="100", seller_tax="123"
         )
-        out = " ".join(_evaluate_triggers(_page([], "X 123"), inv))
-        self.assertIn("seller_tax format invalid", out)
+        page = _page([], "X 123")
+        self.assertNotIn("seller_tax format invalid", " ".join(_evaluate_triggers(page, inv)))
+        self.assertIn("seller_tax format invalid", " ".join(_evaluate_soft_flags(page, inv)))
 
-    def test_simplified_bad_taxid_does_not_escalate(self):
+    def test_simplified_bad_taxid_neither_l3_nor_soft(self):
         inv = ThaiInvoice(
             document_type="simplified_tax_invoice",
             invoice_number="X",
             total_amount="100",
             seller_tax="28232536",
         )
-        out = " ".join(_evaluate_triggers(_page([], "X 28232536"), inv))
-        self.assertNotIn("seller_tax format invalid", out)
+        page = _page([], "X 28232536")
+        self.assertNotIn("seller_tax format invalid", " ".join(_evaluate_triggers(page, inv)))
+        self.assertNotIn("seller_tax format invalid", " ".join(_evaluate_soft_flags(page, inv)))
 
 
 class SoftFlagTests(unittest.TestCase):
@@ -167,12 +172,12 @@ class SchemaAndTimeoutTests(unittest.TestCase):
         self.assertEqual(inv.document_type, "other")
 
     def test_l3_timeout_capped(self):
-        # 有界但不过紧:15s 太狠会掐断正经 L3 救场(Punthai 15.7s)→ 回退;放宽到 45s
-        # 既保速度(触发器已收紧·L3 罕跑)又救准确率(doc 09 §3.3 修正)。
+        # P1G-Perf(Zihao 2026-06-18):L3 同步硬上限收到 ~10s。超时回落 L2 + 标「请核对」
+        # (不静默),不让用户为一次视觉复读干等 45s。触发器已收紧 → L3 罕跑,代价可接受。
         from services.ocr.layer3_fallback import DEFAULT_TIMEOUT_SECONDS
 
-        self.assertLessEqual(DEFAULT_TIMEOUT_SECONDS, 60)
-        self.assertGreaterEqual(DEFAULT_TIMEOUT_SECONDS, 30)
+        self.assertLessEqual(DEFAULT_TIMEOUT_SECONDS, 15)
+        self.assertGreaterEqual(DEFAULT_TIMEOUT_SECONDS, 5)
 
 
 if __name__ == "__main__":

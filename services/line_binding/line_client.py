@@ -16,6 +16,7 @@ import hashlib
 import base64
 import json
 import logging
+import time
 import urllib.request
 import urllib.error
 from typing import Optional, List, Dict, Any
@@ -363,11 +364,20 @@ def download_message_content(message_id: str) -> Optional[bytes]:
         headers={"Authorization": f"Bearer {token}"},
         method="GET",
     )
+    t0 = time.monotonic()
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             if resp.status != 200:
                 return None
-            return resp.read()
+            data = resp.read()
+        # 分段耗时打点(自带 request_id):图片下载段。只记毫秒/大小,不记内容(防票据泄露)。
+        logger.info(
+            "line: download mid=%s %dms %dKB",
+            message_id,
+            int((time.monotonic() - t0) * 1000),
+            len(data) // 1024,
+        )
+        return data
     except Exception as e:
         logger.error(f"LINE download_message_content 异常: {e}")
         return None

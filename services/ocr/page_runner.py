@@ -309,6 +309,17 @@ def _process_one_page(
                 raise
 
     total_ms = int((time.time() - t_total) * 1000)
+    # 分段耗时(一行可 grep · 自带 request_id):定位 OCR 慢在哪层(L1 vision / L2 structure /
+    # L3 fallback)。不记 OCR 文本(只记毫秒 + 层链),避免日志泄露票据内容。
+    logger.info(
+        "pipeline: page %d timing l1=%dms l2=%dms l3=%dms total=%dms chain=%s",
+        page_number,
+        l1_ms,
+        l2_ms,
+        l3_ms,
+        total_ms,
+        "/".join(layer_chain),
+    )
 
     # P0 修 (2026-05-26) · 同页多票 · 人工兜底(最后手段)。
     # 顺序:① L2 文本提取(含 additional_invoices)→ ② 若候选>提取 · Rule 7 已让

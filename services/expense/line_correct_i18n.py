@@ -210,6 +210,20 @@ def pay_label(code: str, lang: str) -> str:
     return line_card._method_label(code, line_card_i18n.chrome(lang))
 
 
+def short_ref(doc_id) -> str:
+    """单据短记录号(末 6 位·与卡片 _short_id 同口径)。填 {ref} 占位(恢复/被更正提示共用)。"""
+    from services.line_binding import line_card
+
+    return line_card._short_id(doc_id)
+
+
+def money(v) -> str:
+    """金额展示文本(千分位 2 位·฿ 前缀由文案模板加)。填 {amt} 占位(恢复/被更正提示共用)。"""
+    from decimal import Decimal
+
+    return f"{Decimal(str(v or 0)):,.2f}"
+
+
 def disp(key: str, value, lang: str) -> str:
     """字段值 → 展示文本(付款方式码本地化成人话·其余原样·回执/确认用)。"""
     if key == "payment_method":

@@ -8,22 +8,12 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
-
 from core import db
 from core.pos_api import PosError
 from services.expense import line_classify, line_correct
 from services.expense import line_correct_i18n as ci
-from services.line_binding import line_card, line_message_refs, line_reply
+from services.line_binding import line_message_refs, line_reply
 from services.purchase import correct as correct_svc
-
-
-def _short(doc_id) -> str:
-    return line_card._short_id(doc_id)
-
-
-def _amt(v) -> str:
-    return f"{Decimal(str(v or 0)):,.2f}"
 
 
 def maybe_restore(
@@ -74,8 +64,8 @@ def maybe_restore(
                     ci.t(
                         ci.RESTORE_ALREADY,
                         reply_lang,
-                        ref=_short(d.get("id")),
-                        amt=_amt(d.get("grand_total")),
+                        ref=ci.short_ref(d.get("id")),
+                        amt=ci.money(d.get("grand_total")),
                     )
                 )
                 return True
@@ -95,8 +85,8 @@ def maybe_restore(
                     ci.t(
                         ci.RESTORE_ALREADY,
                         reply_lang,
-                        ref=_short(row["id"]),
-                        amt=_amt(row["grand_total"]),
+                        ref=ci.short_ref(row["id"]),
+                        amt=ci.money(row["grand_total"]),
                     )
                 )
                 return True
@@ -107,8 +97,8 @@ def maybe_restore(
                 ci.t(
                     ci.RESTORE_DONE,
                     reply_lang,
-                    amt=_amt(rdoc.get("grand_total")),
-                    ref=_short(new_id),
+                    amt=ci.money(rdoc.get("grand_total")),
+                    ref=ci.short_ref(new_id),
                 )
             )
             return True

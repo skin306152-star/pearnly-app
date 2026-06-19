@@ -19,6 +19,37 @@ def ack_key(state: str) -> str:
     return _ACK_KEYS.get(state, "exp_ack_confirm")
 
 
+def _amount_le_zero(amount) -> bool:
+    """金额 ≤ 0 或读不出(None/「—」/非数)→ True(不能当成功草稿)。"""
+    from decimal import Decimal, InvalidOperation
+
+    try:
+        return Decimal(str(amount or "0").replace(",", "").strip() or "0") <= 0
+    except (InvalidOperation, ValueError, TypeError):
+        return True
+
+
+def ack_message(lang: str, state: str, amount, fields: dict = None) -> str:
+    """引用回执文案:草稿态遇金额读不出/不可靠 → 警示口径(不显 ✅·不说「已保存草稿」),
+    否则照常(高置信 confirm 绿勾 / posted 已入账 / dup 可能重复)。
+
+    total≤0 → 「ยังอ่านยอดเงินไม่ได้ · 请核对」(不带金额);amount_unreliable 但 >0 → 「⚠️ {金额} · 请核对」。
+    文案放 line_card_i18n(line_i18n 已满 500)·与卡片 review 态同源同口径。
+    """
+    from services.line_binding import line_client
+
+    if state == "confirm" and ((fields or {}).get("amount_unreliable") or _amount_le_zero(amount)):
+        from services.line_binding.line_card_i18n import chrome
+
+        t = chrome(lang)
+        return (
+            t["ack_amount_unread"]
+            if _amount_le_zero(amount)
+            else t["ack_review"].format(amount=amount)
+        )
+    return line_client.t_line(lang, ack_key(state), amount=amount)
+
+
 def _find_dup_doc(cur, tenant_id, workspace_client_id, data):
     """撞 dup_invoice 后取已有单(与 create_doc 同口径算 dedupe_key)。LINE 路无 amount_override,
     故 grand_total 直接 compute_purchase_totals(lines) 即等于 create_doc 的 _effective_calc。"""
@@ -131,7 +162,7 @@ def emit_result_card(
         # line_card import 放 try 内:模块未部署/渲染失败都在此兜底,不冒泡成上层兜底误判。
         from services.line_binding import line_card
 
-        ack = {"type": "text", "text": line_client.t_line(lang, ack_key(state), amount=amount)}
+        ack = {"type": "text", "text": ack_message(lang, state, amount, fields)}
         if quote_token:
             ack["quoteToken"] = quote_token
         card = line_card.result_card(
@@ -207,7 +238,9 @@ def push_result_card(
 
         ack = {
             "type": "text",
-            "text": line_client.t_line(lang, ack_key(state), amount=ingest.get("amount") or "—"),
+            "text": ack_message(
+                lang, state, ingest.get("amount") or "—", ingest.get("card_fields") or {}
+            ),
         }
         if quote_token:
             ack["quoteToken"] = quote_token

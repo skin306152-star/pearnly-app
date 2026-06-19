@@ -18,6 +18,8 @@ from services.line_binding.line_card_i18n import chrome as _lang
 _STATES = {
     "posted": {"color": "#16A34A", "bg": "#E7F6EC", "icon": "✓"},
     "confirm": {"color": "#D97706", "bg": "#FEF3E2", "icon": "◷"},
+    # review = 金额不可靠/读不出(block_confirm):警示口径·非「请确认」成功态(无确认入账主按钮)。
+    "review": {"color": "#B45309", "bg": "#FEF3E2", "icon": "⚠"},
     "dup": {"color": "#DC2626", "bg": "#FDECEC", "icon": "!"},
 }
 # 终态:中性灰(已撤销/已丢弃 · 非告警非成功,只是收尾)。
@@ -37,6 +39,7 @@ def _state_meta(state: str, t: dict) -> str:
     return {
         "posted": t["state_saved"],
         "confirm": t["state_pending"],
+        "review": t["state_review"],
         "dup": t["state_review"],
     }.get(state, t["state_pending"])
 
@@ -103,9 +106,13 @@ def _expense_type_text(fields: dict, t: dict) -> str:
 def _status_header(state: str, t: dict) -> dict:
     """状态条 = bubble header:满宽贴边、跟随卡片顶部圆角。短徽章(彩色加粗)上,整句说明(深灰)下。"""
     st = _STATES.get(state, _STATES["confirm"])
-    desc_key = {"posted": "card_state_posted_desc", "dup": "card_state_dup_desc"}.get(
-        state, "card_state_confirm_desc"
-    )
+    desc_key = {
+        "posted": "card_state_posted_desc",
+        "dup": "card_state_dup_desc",
+        "review": "card_state_review_desc",
+    }.get(state, "card_state_confirm_desc")
+    # review 的标题键另起 review_title:「review」已被 field_row 占作低置信「(请核对)」后缀。
+    title = t["review_title"] if state == "review" else t[state]
     return {
         "type": "box",
         "layout": "vertical",
@@ -113,9 +120,7 @@ def _status_header(state: str, t: dict) -> dict:
         "paddingStart": "20px",
         "backgroundColor": st["bg"],
         "contents": [
-            s.txt(
-                f"{st['icon']} {t[state]}", size="sm", color=st["color"], weight="bold", wrap=True
-            ),
+            s.txt(f"{st['icon']} {title}", size="sm", color=st["color"], weight="bold", wrap=True),
             s.txt(t[desc_key], size="xxs", color=s.DESC, margin="xs", wrap=True),
         ],
     }
@@ -339,9 +344,13 @@ def result_card(
     body.append(_reply_guide_bar(t))
 
     _, amt_text = _amount_text(amount, t)
+    # 金额不可靠/读不出 → 卡头走 review 警示态(非「请确认」成功态),与 block_confirm(无确认主按钮)一致。
+    block_confirm = bool(fields.get("amount_unreliable"))
+    header_state = "review" if (state == "confirm" and block_confirm) else state
+    alt_title = t["review_title"] if header_state == "review" else t[header_state]
     return _bubble(
-        alt=f"{t[state]} · {amt_text}",
-        header=_status_header(state, t),
+        alt=f"{alt_title} · {amt_text}",
+        header=_status_header(header_state, t),
         body=body,
         footer=s.footer(
             state,
@@ -353,7 +362,7 @@ def result_card(
             liff_id,
             str(workspace_client_id or ""),
             review_first=bool(warn_total),
-            block_confirm=bool(fields.get("amount_unreliable")),
+            block_confirm=block_confirm,
         ),
     )
 

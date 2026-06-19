@@ -203,5 +203,36 @@ class BindRefsTests(unittest.TestCase):
         rec.assert_not_called()
 
 
+class AckMessageTests(unittest.TestCase):
+    """P2B:草稿态金额读不出/不可靠 → 引用回执不显 ✅、不说「已保存草稿」,改警示口径。"""
+
+    def test_confirm_reliable_keeps_green_draft(self):
+        m = line_booker.ack_message("th", "confirm", "58.00", {})
+        self.assertIn("✅", m)
+        self.assertIn("บันทึกฉบับร่างแล้ว", m)
+
+    def test_confirm_zero_amount_no_success(self):
+        m = line_booker.ack_message("th", "confirm", "0.00", {})
+        self.assertNotIn("✅", m)
+        self.assertNotIn("บันทึกฉบับร่างแล้ว", m)
+        self.assertIn("ยังอ่านยอดเงินไม่ได้", m)
+        self.assertNotIn("0.00", m)  # 0 金额不外显
+
+    def test_confirm_unreliable_amount_review(self):
+        m = line_booker.ack_message("th", "confirm", "2235.23", {"amount_unreliable": True})
+        self.assertNotIn("✅", m)
+        self.assertNotIn("บันทึกฉบับร่างแล้ว", m)
+        self.assertIn("2235.23", m)
+        self.assertIn("ตรวจสอบ", m)
+
+    def test_dash_amount_treated_as_unread(self):
+        m = line_booker.ack_message("th", "confirm", "—", {})
+        self.assertIn("ยังอ่านยอดเงินไม่ได้", m)
+
+    def test_posted_and_dup_unchanged(self):
+        self.assertIn("✅", line_booker.ack_message("th", "posted", "58.00", {}))
+        self.assertIn("⚠️", line_booker.ack_message("th", "dup", "58.00", {}))
+
+
 if __name__ == "__main__":
     unittest.main()

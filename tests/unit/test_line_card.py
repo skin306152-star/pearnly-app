@@ -721,5 +721,39 @@ def _walk_buttons(card):
     return out
 
 
+class AmountUnreliableReviewHeaderTests(unittest.TestCase):
+    """P2B:金额不可靠/读不出 → 卡头走 review 警示态(非「请确认」成功态)+ 无确认入账主按钮。"""
+
+    def _card(self, **fields):
+        f = {"document_type": "", "vendor": "X", "date": "2026-06-19"}
+        f.update(fields)
+        return line_card.result_card(
+            state="confirm",
+            amount=f.pop("_amt", "100.00"),
+            fields=f,
+            doc_id="D1",
+            lang="zh",
+            token="t",
+        )
+
+    def test_unreliable_header_is_review_not_confirm(self):
+        header = str(self._card(amount_unreliable=True)["contents"]["header"])
+        self.assertIn("请先核对", header)  # t["review"]
+        self.assertNotIn("请确认后入账", header)  # 不再「请确认」成功态
+
+    def test_reliable_header_stays_confirm(self):
+        self.assertIn("请确认后入账", str(self._card()["contents"]["header"]))
+
+    def test_unreliable_has_no_confirm_postback_button(self):
+        actions = []
+        for b in _walk_buttons(self._card(amount_unreliable=True)):
+            a = b["action"]
+            actions.append(
+                line_postback.parse(a["data"])["action"] if a["type"] == "postback" else "uri"
+            )
+        self.assertNotIn("confirm", actions)  # block_confirm:无确认入账主按钮
+        self.assertIn("uri", actions)  # 仅留「打开核对」去详情
+
+
 if __name__ == "__main__":
     unittest.main()

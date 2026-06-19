@@ -243,6 +243,33 @@ class VendorDigitNotAmountTests(unittest.TestCase):
         self.assertEqual(lqe._extract_amount("บางจาก 500", None, None), Decimal("500"))
 
 
+class AdjustAmountEditTests(unittest.TestCase):
+    """调整金额类(ปรับยอด/调整/调成)算改错;但绝不误伤罚款/空调/调味料等真实支出。"""
+
+    def test_adjust_is_edit(self):
+        for t in (
+            "ปรับยอดเป็น 150",
+            "调整金额150",
+            "调成200",
+            "ลดยอด 100",
+            "เปลี่ยนยอดเป็น 90",
+            "调到80",
+        ):
+            self.assertTrue(lqe.is_edit_request(t), t)
+
+    def test_product_names_not_edit(self):
+        # 罚款/空调/调味料/交通罚款 含「ปรับ/调」但非编辑词 → 仍当支出。
+        for t in (
+            "ค่าปรับ 150",
+            "ปรับอากาศ 1500",
+            "เครื่องปรับอากาศ 9000",
+            "空调 1500",
+            "调味料 50",
+            "ค่าปรับจราจร 500",
+        ):
+            self.assertFalse(lqe.is_edit_request(t), t)
+
+
 class HasItemContextTests(unittest.TestCase):
     def test_bare_number_no_context(self):
         # 纯裸数字(含币种词)无物品/卖家 → False(不该当可信费用入账)。

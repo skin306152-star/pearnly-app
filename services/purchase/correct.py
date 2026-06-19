@@ -109,17 +109,49 @@ def find_active_restored_child(cur, *, tenant_id, workspace_client_id, doc_id):
     return cur.fetchone()
 
 
-def restore_doc(cur, *, tenant_id, workspace_client_id, doc_id, created_by) -> dict:
-    """恢复已撤销单:克隆原单数据为新草稿(restored_from 审计)→ 重新过账成 posted。原死单不动。
+def discard_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> None:
+    """草稿软删:仅 draft → status='discarded' + 释放 dedupe_key(指纹·非金额/明细·留库可恢复)。
 
-    返回 {"not_voided": True}(原单非 void)/ {"already": row}(已恢复过·幂等)/ {"restored": detail}。
-    已结期:post_doc 经做账钩子抛 acct.period_closed → 整事务回滚,不留半张恢复单(诚实·不破账)。
+    ★软删后对所有活跃口径隐形(查明细/汇总/总额/查重/批量撤候选/网页列表均排除 discarded)——删了的
+    绝不还在账上。物理 delete_doc 保留(数据迁移等)但 LINE 四处删一律走此软删。非 draft → not_draft 409。
+    """
+    cur.execute(
+        "UPDATE purchase_docs SET status = 'discarded', dedupe_key = NULL, updated_at = now() "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s AND status = 'draft'",
+        (tenant_id, workspace_client_id, doc_id),
+    )
+    if cur.rowcount == 0:
+        raise PosError("purchase.not_draft", 409)
+
+
+def restore_doc(cur, *, tenant_id, workspace_client_id, doc_id, created_by) -> dict:
+    """恢复死单:已撤销(void)→ 克隆重过账成新 posted(restored_from 审计·原死单不动);草稿软删
+    (discarded)→ 原地翻回 draft(数据完整·不重过账·不重算金额)。返回其一:
+      {"gone": True}        查不到(旧物理删)→ 数据已不在,不可恢复
+      {"not_deleted": True} 活单(draft/posted)→ 没删没撤,无需恢复
+      {"already": row}      void 已恢复过(有活 restored_from 子单)→ 幂等不重建
+      {"restored": detail}  恢复成功(新 posted / 翻回 draft)
+    已结期:void 恢复重过账 post_doc 抛 acct.period_closed → 整事务回滚,不留半张(诚实·不破账)。
     """
     orig = docs_svc.get_doc(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=doc_id
     )
-    if not orig or (orig.get("doc") or {}).get("status") != "void":
-        return {"not_voided": True}
+    if orig is None:
+        return {"gone": True}
+    status = (orig.get("doc") or {}).get("status")
+    if status == "discarded":  # 草稿软删 → 原地翻回 draft(数据原样·不动金额/明细)
+        cur.execute(
+            "UPDATE purchase_docs SET status = 'draft', updated_at = now() "
+            "WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s AND status = 'discarded'",
+            (tenant_id, workspace_client_id, doc_id),
+        )
+        return {
+            "restored": docs_svc.get_doc(
+                cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=doc_id
+            )
+        }
+    if status != "void":
+        return {"not_deleted": True}
     existing = find_active_restored_child(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=doc_id
     )

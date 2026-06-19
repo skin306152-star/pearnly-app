@@ -19,7 +19,7 @@ def _run(status):
     sent = []
     from core import db
     from services.line_binding import line_card_actions, line_client, line_message_refs
-    from services.purchase import docs, posting
+    from services.purchase import correct, docs, posting
 
     with (
         mock.patch.object(db, "get_cursor_rls", return_value=_CM()),
@@ -31,7 +31,7 @@ def _run(status):
         mock.patch.object(
             docs, "get_doc", return_value={"doc": {"status": status, "grand_total": "100"}}
         ),
-        mock.patch.object(docs, "delete_doc") as delete_doc,
+        mock.patch.object(correct, "discard_doc") as discard_doc,
         mock.patch.object(
             posting, "void_doc", return_value={"doc": {"grand_total": "100"}}
         ) as void,
@@ -50,23 +50,23 @@ def _run(status):
             quoted_message_id="m1",
             text="ยกเลิก",
         )
-    return sent, delete_doc, void
+    return sent, discard_doc, void
 
 
 class ReplyUndoTests(unittest.TestCase):
     def test_cancel_on_draft_discards(self):
-        # 对草稿回「取消/删除」→ 丢弃(delete_doc)+ 终态卡(discarded),不调 void,不落死路。
-        sent, delete_doc, void = _run("draft")
-        delete_doc.assert_called_once()
+        # 对草稿回「取消/删除」→ 软删丢弃(discard_doc·status=discarded)+ 终态卡(discarded),不 void。
+        sent, discard_doc, void = _run("draft")
+        discard_doc.assert_called_once()
         void.assert_not_called()
         self.assertEqual(sent[0]["state"], "discarded")
         self.assertEqual(sent[0]["amount"], "100")
 
     def test_cancel_on_posted_voids(self):
         # 已入账 → void + 终态卡(voided·含金额 + 查看记录)。
-        sent, delete_doc, void = _run("posted")
+        sent, discard_doc, void = _run("posted")
         void.assert_called_once()
-        delete_doc.assert_not_called()
+        discard_doc.assert_not_called()
         self.assertEqual(sent[0]["state"], "voided")
         self.assertEqual(sent[0]["amount"], "100")
 

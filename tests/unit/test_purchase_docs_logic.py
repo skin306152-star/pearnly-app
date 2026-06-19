@@ -38,6 +38,70 @@ def _post(row):
     )
 
 
+class _SqlCur:
+    """记 SQL + 可控 rowcount;fetchall=[]、fetchone 给安全聚合默认(够测 SQL 守卫)。"""
+
+    def __init__(self, rowcount=1):
+        self.rowcount = rowcount
+        self.sql: list = []
+
+    def execute(self, sql, params=None):
+        self.sql.append(sql)
+
+    def fetchall(self):
+        return []
+
+    def fetchone(self):
+        return {"goods_total": 0, "expense_total": 0, "vat_claimable": 0, "unpaid_total": 0}
+
+
+class DiscardDocTests(unittest.TestCase):
+    def test_discard_draft_sets_discarded_and_frees_dedupe(self):
+        cur = _SqlCur(rowcount=1)
+        correct_svc.discard_doc(cur, tenant_id="t", workspace_client_id=1, doc_id="D1")
+        sql = cur.sql[0]
+        self.assertIn("status = 'discarded'", sql)
+        self.assertIn("dedupe_key = NULL", sql)  # 释放查重指纹
+        self.assertIn("AND status = 'draft'", sql)  # 仅 draft 可软删
+
+    def test_discard_non_draft_raises_not_draft(self):
+        cur = _SqlCur(rowcount=0)  # 无行被改 = 非 draft
+        with self.assertRaises(PosError) as e:
+            correct_svc.discard_doc(cur, tenant_id="t", workspace_client_id=1, doc_id="D1")
+        self.assertEqual(e.exception.code, "purchase.not_draft")
+
+
+class DiscardedInvisibilityTests(unittest.TestCase):
+    """★软删对所有活跃口径隐形:列表/查重/月汇总/明细 的 SQL 均排除 discarded。"""
+
+    def test_list_docs_excludes_discarded(self):
+        cur = _SqlCur()
+        docs_svc.list_docs(cur, tenant_id="t", workspace_client_id=1)
+        self.assertTrue(any("d.status <> 'discarded'" in s for s in cur.sql))
+
+    def test_find_by_dedupe_excludes_discarded(self):
+        cur = _SqlCur()
+        docs_svc.find_by_dedupe(cur, tenant_id="t", workspace_client_id=1, dedupe_key="k")
+        self.assertIn("status <> 'discarded'", cur.sql[0])
+
+    def test_month_summary_and_detail_posted_only(self):
+        from services.expense import line_qa
+
+        cur = _SqlCur()
+        line_qa.month_summary(cur, tenant_id="t", workspace_client_id=1)
+        line_qa.month_detail(cur, tenant_id="t", workspace_client_id=1)
+        self.assertTrue(
+            all("d.status = 'posted'" in s for s in cur.sql)
+        )  # posted-only → discarded 不入
+
+    def test_recent_line_docs_excludes_discarded(self):
+        from services.purchase import line_docs
+
+        cur = _SqlCur()
+        line_docs.find_recent_line_docs(cur, tenant_id="t", workspace_client_id=1, limit=5)
+        self.assertIn("status IN ('posted', 'draft')", cur.sql[0])  # discarded 不在其中
+
+
 class PostingGuardTests(unittest.TestCase):
     def test_post_missing_doc_404(self):
         with self.assertRaises(PosError) as e:

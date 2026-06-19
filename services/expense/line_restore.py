@@ -79,13 +79,14 @@ def maybe_restore(
                     )
                 )
                 return True
-            if state == line_message_refs.DISCARDED:  # 草稿删的恢复留 Slice 2b
-                _say(ci.t(ci.STALE_DISCARDED, reply_lang))
-                return True
+            # VOIDED(已撤)/ DISCARDED(草稿软删·或旧物理删)→ 尝试恢复(restore_doc 区分软删/已删)。
             res = correct_svc.restore_doc(
                 cur, tenant_id=tid, workspace_client_id=ws_eff, doc_id=doc_id, created_by=uid
             )
-            if res.get("not_voided"):
+            if res.get("gone"):  # 旧物理删·数据已不在 → 诚实引导重记
+                _say(ci.t(ci.RESTORE_GONE, reply_lang))
+                return True
+            if res.get("not_deleted"):  # 活单 → 没删没撤(幂等)
                 _say(ci.t(ci.RESTORE_NOT_VOIDED, reply_lang))
                 return True
             if res.get("already"):

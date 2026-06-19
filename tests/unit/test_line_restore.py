@@ -126,6 +126,24 @@ class MaybeRestoreTests(unittest.TestCase):
         self.assertTrue(res)
         self.assertIn("结账", body)
 
+    def test_discarded_soft_delete_restored(self):
+        # Slice 2b:引用软删草稿说「恢复」→ restore_doc 翻回 draft → RESTORE_DONE。
+        restored = {"restored": {"doc": {"id": "DEAD", "grand_total": "50.00"}}}
+        res, body, set_active, calls = self._run("恢复", state=refs.DISCARDED, restore_res=restored)
+        self.assertTrue(res)
+        self.assertIn("已恢复", body)
+        self.assertEqual(calls, ["DEAD"])
+        self.assertEqual(set_active[0][2], "DEAD")  # 续接同一张(翻回的草稿)
+
+    def test_discarded_physically_gone_says_gone(self):
+        # 旧物理删(数据没了)→ restore_doc 返 gone → 诚实「数据已不在」。
+        res, body, set_active, _ = self._run(
+            "恢复", state=refs.DISCARDED, restore_res={"gone": True}
+        )
+        self.assertTrue(res)
+        self.assertIn("不在", body)
+        self.assertEqual(set_active, [])  # 不重建、不续接
+
 
 class _FakeCur:
     """restore_doc 幂等查询用:execute 记 SQL,fetchone 吐预设。"""
@@ -148,22 +166,41 @@ class RestoreDocTests(unittest.TestCase):
 
         cur = _FakeCur(existing=existing)
         orig = {"doc": {"status": orig_status, "id": "O"}} if orig_status else None
+        # 恢复后回查:void→新 posted 克隆 / discarded→同一单翻回 draft
+        after = {
+            "doc": {
+                "id": "O" if orig_status == "discarded" else "O_r",
+                "status": "draft" if orig_status == "discarded" else "posted",
+                "grand_total": "70.00",
+            }
+        }
         clone = {"doc": {"id": "O_r", "grand_total": "70.00"}}
-        posted = {"doc": {"id": "O_r", "status": "posted", "grand_total": "70.00"}}
-        get_calls = iter([orig, posted])  # 1) 原单状态 2) 过账后回查
+        get_calls = iter([orig, after])  # 1) 原单状态 2) 恢复后回查
         with (
             mock.patch.object(docs_svc, "get_doc", side_effect=lambda *a, **k: next(get_calls)),
             mock.patch.object(correct_svc, "clone_as_draft", return_value=clone) as cl,
-            mock.patch.object(posting_svc, "post_doc", return_value=posted) as pd,
+            mock.patch.object(posting_svc, "post_doc", return_value=after) as pd,
         ):
             res = correct_svc.restore_doc(
                 cur, tenant_id="t", workspace_client_id=1, doc_id="O", created_by="u"
             )
         return res, cl, pd
 
-    def test_not_voided_when_original_live(self):
+    def test_not_deleted_when_original_live(self):
         res, cl, pd = self._run(orig_status="posted")
-        self.assertEqual(res, {"not_voided": True})
+        self.assertEqual(res, {"not_deleted": True})
+        cl.assert_not_called()
+        pd.assert_not_called()
+
+    def test_gone_when_missing(self):
+        res, cl, pd = self._run(orig_status=None)
+        self.assertEqual(res, {"gone": True})
+        cl.assert_not_called()
+
+    def test_discarded_flips_to_draft_no_clone(self):
+        # 草稿软删 → 原地翻回 draft(不克隆·不过账·数据原样)。
+        res, cl, pd = self._run(orig_status="discarded")
+        self.assertEqual(res["restored"]["doc"]["status"], "draft")
         cl.assert_not_called()
         pd.assert_not_called()
 
@@ -172,7 +209,7 @@ class RestoreDocTests(unittest.TestCase):
         self.assertEqual(res["already"]["id"], "O_r")
         cl.assert_not_called()  # 已有活子单 → 不重建
 
-    def test_restores_clone_then_posts(self):
+    def test_void_restores_clone_then_posts(self):
         res, cl, pd = self._run(orig_status="void", existing=None)
         self.assertEqual(res["restored"]["doc"]["status"], "posted")
         # 克隆走 restored_from 审计键(非 corrected_from)

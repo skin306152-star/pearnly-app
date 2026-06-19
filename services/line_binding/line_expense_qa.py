@@ -173,6 +173,7 @@ def _undo_resolved(
     幂等;已结期 → 诚实拦。reply_undo(引用/上一笔)与 reply_undo_last(裸撤最近)共用,消除两份撤销核。"""
     from core.pos_api import PosError
     from services.line_binding import line_card_actions
+    from services.purchase import correct as correct_svc
     from services.purchase import docs as docs_svc
     from services.purchase import posting as posting_svc
 
@@ -186,16 +187,16 @@ def _undo_resolved(
         with db.get_cursor_rls(tid, commit=True) as cur:
             detail = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)
             status = (detail.get("doc") or {}).get("status") if detail else None
-            if status is None:
-                # 单已被删除(草稿物理删/软删)→ 幂等回「已删除」,不报错、绝不碰别的单(05 账务安全)。
+            if status is None or status == "discarded":
+                # 单已删(物理删/软删 discarded)→ 幂等回「已删除」,不报错、绝不碰别的单(05 账务安全)。
                 from services.expense import line_correct_i18n as ci
 
                 _say(ci.t(ci.STALE_DISCARDED, lang))
                 return
             if status == "draft":
-                # 草稿未入账,「取消/删除」= 丢弃(对齐卡片「ทิ้ง」按钮),不走 void → 永不死路。
+                # 草稿未入账,「取消/删除」= 软删丢弃(status=discarded·留库可恢复),不走 void → 永不死路。
                 amt = (detail.get("doc") or {}).get("grand_total")
-                docs_svc.delete_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)
+                correct_svc.discard_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)
                 line_card_actions.send_terminal(
                     reply_token,
                     state="discarded",

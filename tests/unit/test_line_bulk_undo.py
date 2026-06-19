@@ -35,6 +35,7 @@ def _doc(status, total):
 
 class ExecuteTests(unittest.TestCase):
     def _run(self, docs_by_id, void_side=None):
+        from services.purchase import correct as correct_svc
         from services.purchase import docs as docs_svc
         from services.purchase import posting
 
@@ -43,7 +44,7 @@ class ExecuteTests(unittest.TestCase):
             mock.patch.object(
                 docs_svc, "get_doc", side_effect=lambda cur, **k: docs_by_id.get(k["doc_id"])
             ),
-            mock.patch.object(docs_svc, "delete_doc") as deleted,
+            mock.patch.object(correct_svc, "discard_doc") as deleted,
             mock.patch.object(
                 posting, "void_doc", side_effect=void_side or (lambda cur, **k: {})
             ) as voided,

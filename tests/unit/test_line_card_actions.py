@@ -40,7 +40,7 @@ def _run(data, *, ws=1, post_doc_side=None, get_doc_ret=None):
         ),
         mock.patch("services.purchase.posting.post_doc", **post_kw) as post_doc,
         mock.patch("services.purchase.posting.void_doc", return_value=doc) as void_doc,
-        mock.patch("services.purchase.docs.delete_doc") as delete_doc,
+        mock.patch("services.purchase.correct.discard_doc") as discard_doc,
         mock.patch("services.purchase.docs.get_doc", return_value=get_doc_ret or doc),
         mock.patch.object(line_correct, "_set_active"),
         mock.patch.object(
@@ -60,7 +60,7 @@ def _run(data, *, ws=1, post_doc_side=None, get_doc_ret=None):
         ),
     ):
         lca.handle_postback({"tenant_id": "t", "id": "u"}, "rt", data, "zh")
-        svc = mock.MagicMock(post_doc=post_doc, void_doc=void_doc, delete_doc=delete_doc)
+        svc = mock.MagicMock(post_doc=post_doc, void_doc=void_doc, discard_doc=discard_doc)
     return sent, svc
 
 
@@ -99,9 +99,9 @@ class CardActionTests(unittest.TestCase):
         self.assertIn("查看记录", str(card))
 
     def test_discard_sends_discarded_terminal_card(self):
-        # P1D:丢弃后回「已丢弃」终态卡(草稿已删→无可执行动作·无 footer)。
+        # P1D/Slice 2b:丢弃后回「已丢弃」终态卡;软删 discard_doc(留库可恢复·非物理删)。
         sent, svc = _run(line_postback.discard_data("D1"))
-        svc.delete_doc.assert_called_once()
+        svc.discard_doc.assert_called_once()
         svc.post_doc.assert_not_called()
         card = sent[0][0]
         self.assertEqual(card["type"], "flex")

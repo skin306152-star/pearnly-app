@@ -64,7 +64,7 @@ def find_by_dedupe(cur, *, tenant_id, workspace_client_id, dedupe_key) -> Option
     cur.execute(
         f"SELECT {_DOC_COLS} FROM purchase_docs "
         "WHERE tenant_id = %s AND workspace_client_id = %s AND dedupe_key = %s "
-        "LIMIT 1",
+        "AND status <> 'discarded' LIMIT 1",  # 软删草稿不占查重(已释放 dedupe_key·防误判重复)
         (tenant_id, workspace_client_id, dedupe_key),
     )
     return cur.fetchone()
@@ -323,7 +323,8 @@ def list_docs(
         " AND pa.kind = 'bill') AS attachment_count "
         "FROM purchase_docs d "
         "LEFT JOIN suppliers s ON s.id = d.supplier_id AND s.tenant_id = d.tenant_id "
-        "WHERE d.tenant_id = %s AND d.workspace_client_id = %s"
+        # 软删草稿(discarded)对列表隐形(void 仍显·合法终态);删了的绝不留账上(账务安全)
+        "WHERE d.tenant_id = %s AND d.workspace_client_id = %s AND d.status <> 'discarded'"
     )
     params: list = [tenant_id, workspace_client_id]
     if kind in _KINDS:

@@ -380,10 +380,11 @@ def try_void_quoted(
 
 
 def _delete_target(bound_user, reply_token, lang, tid, ws, doc_id, ctx) -> bool:
-    """改错会话内「删除/ลบ」→ 作废目标:草稿物理删 / 已入账 void(复用对账冲销)→ 回终态卡(验收 #4);
-    已结期诚实引导。"""
+    """改错会话内「删除/ลบ」→ 作废目标:草稿软删(discarded·可恢复)/ 已入账 void(复用对账冲销)→ 回
+    终态卡(验收 #4);已结期诚实引导。"""
     from core.pos_api import PosError
     from services.line_binding import line_card_actions
+    from services.purchase import correct as correct_svc
     from services.purchase import posting as posting_svc
 
     line_correct._clear(tid, ctx["line_user_id"])
@@ -397,9 +398,7 @@ def _delete_target(bound_user, reply_token, lang, tid, ws, doc_id, ctx) -> bool:
             status = (detail.get("doc") or {}).get("status") if detail else None
             if status == "draft":
                 amt = (detail.get("doc") or {}).get("grand_total")
-                line_correct.docs_svc.delete_doc(
-                    cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id
-                )
+                correct_svc.discard_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)
                 line_card_actions.send_terminal(
                     reply_token,
                     state="discarded",

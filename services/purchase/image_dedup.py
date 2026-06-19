@@ -38,6 +38,7 @@ def find_recent(cur, *, tenant_id, workspace_client_id, image_sha256) -> Optiona
     cur.execute(
         "SELECT id, status FROM purchase_docs "
         "WHERE tenant_id = %s AND workspace_client_id = %s AND image_sha256 = %s "
+        "AND status <> 'discarded' "  # 草稿软删=视同删除 → 同图重发回落正常 OCR(不短路重发已删卡)
         "AND created_at >= now() - make_interval(days => %s) "
         "ORDER BY created_at DESC LIMIT 1",
         (tenant_id, workspace_client_id, image_sha256, _RECENT_DAYS),

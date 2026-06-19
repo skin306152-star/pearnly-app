@@ -168,6 +168,7 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
     try:
         from core.workspace_context import default_workspace_id
         from services.line_binding import line_action_nonce as nonce
+        from services.purchase import correct as correct_svc
         from services.purchase import docs as docs_svc
         from services.purchase import posting as posting_svc
         from services.purchase import settings as settings_svc
@@ -227,8 +228,9 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
                 _send_voided(reply_token, ref=ref, ws=ws, lang=lang, tid=tid, luid=luid, detail=res)
 
             elif action == line_postback.ACTION_DISCARD:
-                docs_svc.delete_doc(cur, **scope, doc_id=ref)  # 仅草稿可删(内部 status='draft' 守)
-                # 终态卡(已丢弃):草稿已删→无记录可看→不出「查看」死链(只显徽章+整句)。
+                # 软删(status=discarded·留库可恢复)·仅草稿(内部 status='draft' 守)。
+                correct_svc.discard_doc(cur, **scope, doc_id=ref)
+                # 终态卡(已丢弃):仍显「已丢弃」徽章+整句(可引用该卡说「恢复」找回·Slice 2b)。
                 _terminal_card(reply_token, "discarded", ref, ws, None, lang, tid, luid)
     except Exception:
         # 状态错(已入账再确认 / 草稿撤销 / 项已处理)或并发 → 友好回执,不报错。

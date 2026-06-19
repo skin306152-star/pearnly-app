@@ -414,6 +414,7 @@ def _execute(bound_user, tid, ws, doc_ids) -> tuple[list, int]:
     返回 (已撤单详情列表, 已结期跳过数)。一笔异常只跳过该笔,不影响其余(per-doc commit)。
     """
     from core.pos_api import PosError
+    from services.purchase import correct as correct_svc
     from services.purchase import docs as docs_svc
     from services.purchase import posting as posting_svc
 
@@ -426,7 +427,7 @@ def _execute(bound_user, tid, ws, doc_ids) -> tuple[list, int]:
                 doc = (detail or {}).get("doc") or {}
                 status = doc.get("status")
                 if status == "draft":
-                    docs_svc.delete_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=did)
+                    correct_svc.discard_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=did)
                     undone.append(doc)
                 elif status == "posted":
                     posting_svc.void_doc(

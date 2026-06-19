@@ -122,6 +122,15 @@ class Sim:
     def delete_doc(self, cur, *, tenant_id, workspace_client_id, doc_id):
         self.docs.pop(doc_id, None)
 
+    def discard_doc(self, cur, *, tenant_id, workspace_client_id, doc_id):
+        # 真 discard_doc:仅 draft → status='discarded'(留库可恢复·非物理删)。
+        d = self.docs.get(doc_id)
+        if not d or d["doc"]["status"] != "draft":
+            from core.pos_api import PosError
+
+            raise PosError("purchase.not_draft", 409)
+        d["doc"]["status"] = "discarded"
+
     def void_doc(self, cur, *, tenant_id, workspace_client_id, doc_id, created_by):
         # 真 void_doc 幂等:已 void 直接返单,不二次冲销(P1G 验收 4)。
         self.docs[doc_id]["doc"]["status"] = "void"
@@ -143,10 +152,20 @@ class Sim:
         )
 
     def restore_doc(self, cur, *, tenant_id, workspace_client_id, doc_id, created_by):
-        # 真 restore_doc:原 void → 克隆为 posted 新单(restored_from 审计·原死单不动)·幂等。
+        # 真 restore_doc:void→克隆 posted 新单(原死单不动·幂等);discarded→翻回 draft;查不到→gone;活单→not_deleted。
         orig = self.docs.get(doc_id)
-        if not orig or orig["doc"]["status"] != "void":
-            return {"not_voided": True}
+        if orig is None:
+            return {"gone": True}
+        status = orig["doc"]["status"]
+        if status == "discarded":
+            orig["doc"]["status"] = "draft"
+            return {
+                "restored": self.get_doc(
+                    cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=doc_id
+                )
+            }
+        if status != "void":
+            return {"not_deleted": True}
         existing = next(
             (
                 x
@@ -227,10 +246,21 @@ class Sim:
 
 
 def _run(sim, turns):
-    """驱动一串用户消息 → 真 flow.route(每条返回是否被改错路由接管)。返回 [(text, handled)]。"""
+    """驱动一串用户消息 → 真 flow.route(每条返回是否被改错路由接管)。返回 [(text, handled)]。
+
+    用 ExitStack 扁平注册 patch(数量多·避免 `with (...)` 静态嵌套超 CPython 上限)。"""
+    import contextlib
+
     bound = {"id": "u1", "tenant_id": "t"}
     out = []
-    with (
+
+    def _text(tok, body, **k):
+        sim.replies.append(body)
+
+    def _msgs(tok, msgs, **k):
+        sim.replies.extend(m.get("altText", "") for m in msgs)
+
+    patches = [
         mock.patch.object(flow.db, "get_cursor_rls", return_value=_Cur()),
         mock.patch.object(line_correct.db, "get_cursor_rls", return_value=_Cur()),
         mock.patch.object(conversation, "peek_pending", side_effect=sim.peek),
@@ -239,6 +269,7 @@ def _run(sim, turns):
         mock.patch.object(docs_svc, "get_doc", side_effect=sim.get_doc),
         mock.patch.object(docs_svc, "update_draft", side_effect=sim.update_draft),
         mock.patch.object(docs_svc, "delete_doc", side_effect=sim.delete_doc),
+        mock.patch.object(correct_svc, "discard_doc", side_effect=sim.discard_doc),
         mock.patch.object(posting_svc, "void_doc", side_effect=sim.void_doc),
         mock.patch.object(posting_svc, "post_doc", side_effect=lambda *a, **k: None),
         mock.patch.object(correct_svc, "correct_doc", side_effect=sim.correct_doc),
@@ -250,19 +281,12 @@ def _run(sim, turns):
             line_message_refs, "resolve_card_state", side_effect=sim.resolve_card_state
         ),
         mock.patch.object(line_message_refs, "find_last_posted", side_effect=sim.find_last_posted),
-        mock.patch.object(
-            line_reply,
-            "reply_text_context",
-            side_effect=lambda tok, body, **k: sim.replies.append(body),
-        ),
-        mock.patch.object(
-            line_reply,
-            "reply_messages_context",
-            side_effect=lambda tok, msgs, **k: sim.replies.extend(
-                m.get("altText", "") for m in msgs
-            ),
-        ),
-    ):
+        mock.patch.object(line_reply, "reply_text_context", side_effect=_text),
+        mock.patch.object(line_reply, "reply_messages_context", side_effect=_msgs),
+    ]
+    with contextlib.ExitStack() as stack:
+        for p in patches:
+            stack.enter_context(p)
         for text, quoted in turns:
             sim.replies.clear()
             norm = line_classify.normalize_user_text(text)
@@ -446,11 +470,11 @@ class ReplayScenarioTests(unittest.TestCase):
 
     def test_delete_quoted_draft(self):
         steps = _run(self.sim, [("ลบ", "MID_D1")])
-        self.assertNotIn("D1", self.sim.docs)  # 草稿被删
+        self.assertEqual(self.sim.docs["D1"]["doc"]["status"], "discarded")  # 软删·留库可恢复
 
     def test_delete_in_session(self):
         steps = _run(self.sim, [("วันที่ผิด", "MID_D1"), ("删除", None)])
-        self.assertNotIn("D1", self.sim.docs)
+        self.assertEqual(self.sim.docs["D1"]["doc"]["status"], "discarded")  # 软删
 
     def test_repeat_delete_already_void_reshows_voided(self):
         # 验收 4:已撤销的单再删 → 回「已撤销」终态卡(void_doc 幂等),绝不回「找不到记录」。
@@ -552,6 +576,22 @@ class ReplayScenarioTests(unittest.TestCase):
         self.assertEqual(sim.docs, {})  # ★不新建支出
         self.assertIn(none_msg, steps[0][2])
 
+    def test_discard_draft_then_restore_flips_back(self):
+        # Slice 2b:草稿 → ลบ(软删 discarded)→ 引用说「กู้คืน」→ 翻回 draft(★数据完整·卖家不变)。
+        self.sim.seed("D10", lines=1, status="draft", seller="ร้านกาแฟ")
+        steps = _run(self.sim, [("ลบ", "MID_D10"), ("กู้คืน", "MID_D10")])
+        self.assertTrue(all(s[1] for s in steps))
+        self.assertEqual(self.sim.docs["D10"]["doc"]["status"], "draft")  # 翻回草稿(没物理删)
+        self.assertEqual(self.sim.docs["D10"]["supplier"]["name"], "ร้านกาแฟ")  # 数据原样
+
+    def test_restore_physically_gone_no_recreate(self):
+        # 旧版物理删(ref 仍在·数据没了)→ 引用恢复 → 不重建、诚实告知(gone)。
+        self.sim.seed("D11", lines=1, status="draft")
+        self.sim.docs.pop("D11")  # 模拟旧物理删
+        steps = _run(self.sim, [("กู้คืน", "MID_D11")])
+        self.assertTrue(steps[0][1])
+        self.assertNotIn("D11", self.sim.docs)  # 没复活
+
     def test_restore_live_card_says_not_voided(self):
         # 引用活单说「恢复」→ 不建单,回「没被撤销」。
         none_before = dict(self.sim.docs)
@@ -594,7 +634,7 @@ class ReplayScenarioTests(unittest.TestCase):
             ],
         )
         self.assertTrue(all(s[1] for s in steps))  # 五步全被改错路由接管
-        self.assertNotIn("D5", self.sim.docs)  # ④ 真删了
+        self.assertEqual(self.sim.docs["D5"]["doc"]["status"], "discarded")  # ④ 软删了
         self.assertEqual(self.sim.docs["D2"]["doc"]["grand_total"], "70.00")  # ⑤ 多行没乱改
         self._no_forbidden(steps)
 

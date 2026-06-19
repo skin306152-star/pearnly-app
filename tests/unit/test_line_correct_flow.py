@@ -300,10 +300,11 @@ class ControlIntentTests(_FlowBase):
         self.assertEqual(cap["changes"], {"vendor_name": "7-11"})
 
     def test_delete_intent_voids_draft(self):
-        # 验收 #7:会话内说「删除」→ 作废目标草稿(delete_doc)。
+        # 验收 #7:会话内说「删除」→ 软删目标草稿(discard_doc·status=discarded·可恢复)。
+        from services.purchase import correct as correct_svc
         from services.purchase import docs as docs_svc
 
-        deleted, sent = [], []
+        discarded, sent = [], []
         with (
             mock.patch.object(flow.db, "get_cursor_rls", return_value=_Ctx(object())),
             mock.patch.object(
@@ -314,7 +315,7 @@ class ControlIntentTests(_FlowBase):
             mock.patch.object(flow.conversation, "clear_pending"),
             mock.patch.object(docs_svc, "get_doc", return_value={"doc": {"status": "draft"}}),
             mock.patch.object(
-                docs_svc, "delete_doc", side_effect=lambda *a, **k: deleted.append(1)
+                correct_svc, "discard_doc", side_effect=lambda *a, **k: discarded.append(1)
             ),
             mock.patch.object(
                 flow.line_reply, "reply_text_context", side_effect=lambda *a, **k: sent.append(1)
@@ -322,7 +323,7 @@ class ControlIntentTests(_FlowBase):
         ):
             res = flow.try_correction_state({}, "tok", "U1", "删除", "t", 1, "zh")
         self.assertTrue(res)
-        self.assertEqual(deleted, [1])
+        self.assertEqual(discarded, [1])
 
 
 if __name__ == "__main__":

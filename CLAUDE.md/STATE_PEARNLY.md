@@ -6,15 +6,22 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-19 · **P2A 商户分类闭环 + 日期年漂修 + P2B 字段卫生 + /simplify** · HEAD `8ef38a1`）
+## 🎯 状态卡（2026-06-19 · **P2C 明细名 + P2B-2 异常票不绿勾 + P2D 身份防护 + P2E AI Gateway + /simplify** · HEAD `7e51c7d`）
 
-- **本窗口 4 项全上线·prod HEAD `8ef38a1` health 200·4 worker 起 0 错·全量 4167 unit 绿(skip3)·replay 43/43·全闸绿。⏳ 全部待 Zihao 真机验证结果再定下一步(做新任务 or 修问题)。**
-  - **P2A 商户/品类确定性分类闭环**(`14cd512b`·见 [[line-category-deterministic-p2a]]):`_smart_category` 优先级重排=用户学习(税号/归一卖家)→确定性规则(品名 item / 商户默认 vendor_default)→LLM 逐项→LLM 整票→留未分类。新模块 `services/expense/merchant.py`(canonical_merchant 各写法归一·curated 税号→别名)。商户词典扩(7-11/Makro/TOPS/Lotus/BigC→goods 目标)。学习闭环复用 `expense_learned` 前缀键 `tax:`/`seller:`(改错 `line_correct_data.learn_category`+详情 `docs.update_draft` 写回·全 try/except)。**真机审计(部署代码跑真票)5/5 过**:7-11→餐饮(品名)·Makro→采购商品·learned TOPS→办公·LLM 不越权。**7-11 口径铁律**:品名永远优先(咖啡→餐饮/笔→办公),不清才落商户默认·**绝不 vendor-first**(测试钉死)。
-  - **日期年漂修**(`7126e0b4`):票面印 4 位公历年(18/06/2026)被模型算成 2021 → `schemas_invoice._fix_gregorian_year_date` 以印出年覆盖(铁律#8 印出真值优先·佛历 25xx 仍先 -543·两段范围不重叠)。
-  - **P2B OCR 低置信字段治理**(`5577af5d` 重构 + `b1f1548d`):新 `services/purchase/field_quality.py` 统一质量层(seller 乱码/全?→unclear·date [2015,今天]不接受未来→suspect·tax 非13位→invalid·invoice/address 乱码→dirty);`card_signals` 脏字段喂 `field_confidence`(_REVIEW_CONF=0.5)→卡片 low()+详情 mapConf **自动同口径标黄**;`field_clean` 加 is_garbled/clean_address(posted 卡不显脏地址);卡片状态分级=**金额不可靠(总额≤0 或 total_amount<0.85)撤确认按钮只去详情**(footer block_confirm)/金额可靠明细不符保留「继续保存」(warn_total 文案改「金额可靠·明细需检查」);seller 全脏→「ผู้ขายไม่ชัดเจน」;脏数据不静默入账(降 confirm)。**前置重构**:`_footer/btn/liff_link` 抽到 `line_card_sections` 腾 line_card 500→413。
-  - **/simplify**(`8ef38a1`):invoice_status 去冗余 is_garbled·0.5 抽 `_REVIEW_CONF`·footer 合并 block_confirm/review_first 双分支。
-  - **测试草稿已清**:今天 8 张测试单(test 租户 ws69)删 7 草稿 + Makro void 清指纹·`remaining_with_hash=0` → 重发即全新识别(可重验 P2A+P2B+日期)。**注**:`expense_learned` 的 `seller:tops→办公` 保留(再发 TOPS 会沿用=学习生效)。
-- **🔴 流程铁律 [[line-correction-replay-before-push]]**:LINE correction/卡片改动**必先跑 replay tester 全过再 push**·push 汇报含 replay 数+单测+commit+prod health。
+- **本窗口 6 commit 全上线·prod HEAD `7e51c7d` health 200·全量 4215 unit 绿(skip3)·replay 43/43·13 闸全绿。⏳ 下个窗口做什么待 Zihao 定。**
+  - **P2C 明细名称可读性治理**(`b71aff1c`·见 [[line-item-name-p2c]]):新 `services/purchase/item_name.py`(clean 去 POS 噪声前缀 TW/T-/takeaway/original·分隔符守卫保护 TWG/T-Bone + 空数字括号 + 乱码;不可读→编号占位「รายการที่N」)·LINE 卡 items_section 任一名不清→尾部提示 items_name_unclear·get_doc 出库清洗 description(raw 留库)·前端详情占位。**真机留 Zihao 验**(4 张 Flex 渲染截图已发)。
+  - **P2B-2 0元/异常票不再绿勾**(`9131ce15`·见 [[line-item-name-p2c]] 同期):`line_booker.ack_message` 按金额态:total≤0→「ยังอ่านยอดเงินไม่ได้」无✅无金额·amount_unreliable>0→「⚠️{金额}·请核对」无✅·高置信仍绿勾。`line_card` 加 review 警示态卡头(block_confirm 时·非「请确认」)。真机已发 3 态截图。
+  - **P2D 身份层/模型泄露防护**(`3211f6fd`·见 [[line-identity-guard-p2d]]):新 `services/expense/line_identity.py` pre-router 跑在 L2 大脑前·身份/模型/系统提示/API key/越权→确定性四语 Pearnly 口径(零供应商泄露)·同句含业务(looks_like_expense)→放行记账。13 验收句真实路由模拟全过。
+  - **P2E-1/2 AI Gateway**(`f7a1937f`·见 [[ai-gateway-p2e]]):新 `services/ai_gateway/`(run_task 统一入口·gemini provider 懒加载包现有传输·error_kind 映射·logging 无原文·costing 复用 OCR 口径)·接 line_agent.understand + category_ai(suggest/categorize)·**默认行为不变·OCR L2/L3 未碰(留 P2E-3)**·parse_and_categorize 留后续。
+  - **闸修**(`7716032e`):pre-push 打包一致性闸短 `:!` 排除不存在 main.js.map 在 git 2.54 fatal → 改长 `:(exclude)`。**注:本 clone `core.hooksPath=.git/hooks` 无安装 hook → push 不被本地拦,须手动 `bash scripts/git-hooks/pre-push` 验。**
+  - **/simplify 收口**(`7e51c7d7`):明细名单次清洗(display_with_flag)·去死关键词·ack le_zero 单算·costing 复用。
+  - **测试草稿已清**:测试租户 ws69 近 12h 11 张 LINE 草稿全删(含刚验的 6 张)·`remaining=0` → 同图重发全新识别。
+- **🔴 流程铁律 [[line-correction-replay-before-push]]**:LINE correction/卡片改动**必先跑 replay 全过再 push**。
+- **可选 backlog**:P2E-3 接 OCR L2/L3(需先报方案·按红线)/ P2E-4 离线 A/B / 清 `line_ocr_i18n.err_need_key` 死键(含「Gemini」零引用)/ P2C 真机验。
+
+## 历史记录（旧状态卡 · 2026-06-19 早 · P2A 商户分类闭环 + 日期年漂修 + P2B 字段卫生 · HEAD `8ef38a1`）
+
+- **P2A 商户/品类确定性分类闭环**(`14cd512b`·见 [[line-category-deterministic-p2a]]):`_smart_category` 优先级=用户学习→确定性规则(品名 item/商户默认 vendor_default)→LLM→留未分类。新 `services/expense/merchant.py`。7-11 口径:品名永远优先·绝不 vendor-first。**日期年漂修** `7126e0b4`(印出 4 位公历年优先)。**P2B 字段卫生** `5577af5d`+`b1f1548d`:新 `field_quality.py`(seller/date/tax/invoice/address 质量层·脏字段标黄·金额不可靠撤确认)·line_card 500→413。真机审计 5/5。
 
 ## 历史记录（旧状态卡 · 2026-06-18 · P1G-Perf 图片票性能止血 + 真机验过 + 乱码明细名兜底 + Req5 + /simplify · HEAD `f3860084`）
 

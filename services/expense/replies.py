@@ -76,24 +76,24 @@ _POOLS = {
     # 语气层(P3A)没发挥时的回落话术:轮选治复读,仍带「记一笔/查账」钩子(reply_pool 注入)。
     "out_of_scope": {
         "th": [
-            "เรื่องนี้อาจช่วยไม่ได้ค่ะ😅 แต่บันทึกค่าใช้จ่าย ดูบัญชี หรืออ่านใบเสร็จ ถนัดเลยค่ะ",
-            "อันนี้ไม่ค่อยถนัดค่ะ~ แต่อยากบันทึกรายการหรือดูยอดเดือนนี้ บอกได้เลยนะคะ",
-            "เกินที่ช่วยได้นิดนึงค่ะ😊 Pearnly ดูแลเรื่องบัญชีให้ ส่งค่าใช้จ่ายหรือรูปใบเสร็จมาได้เลยค่ะ",
+            "อยู่เป็นเพื่อนเลยค่ะ😊 ว่างๆ ส่งค่าใช้จ่ายหรือใบเสร็จมาให้ดูแลได้นะคะ",
+            "ฟังอยู่ค่ะ~ พร้อมช่วยบันทึกค่าใช้จ่ายหรือดูยอดเดือนนี้ให้เสมอนะคะ",
+            "Pearnly อยู่ตรงนี้เสมอค่ะ😊 อยากบันทึกรายการหรือส่งรูปใบเสร็จ บอกได้เลยค่ะ",
         ],
         "zh": [
-            "这个我可能帮不上😅 不过记账、查账、识别票据最在行,随时找我~",
-            "哈哈这个我不太懂,但你要记一笔或看看这月花了多少,我马上帮😊",
-            "这超出我会的啦~ 我专门帮你管账,发笔费用或票据照片试试?",
+            "我在呢😊 想记账或发票据照片随时找我~",
+            "陪你聊两句~ 要记一笔或看看这月花了多少,我都在",
+            "Pearnly 一直在😊 发笔费用或票据给我都行",
         ],
         "en": [
-            "That's a bit outside what I do 😅 but expenses, your books and receipts — that's my thing!",
-            "Ha, not sure about that one~ but to log an expense or see this month's spending, I'm right here 😊",
-            "That's beyond me 🙈 I'm all about your bookkeeping — try sending an expense or a receipt photo?",
+            "I'm right here 😊 send an expense or a receipt whenever you like~",
+            "I'm listening~ ready to log an expense or show this month's spending anytime",
+            "Pearnly's always here 😊 just send an expense or a receipt photo",
         ],
         "ja": [
-            "それはちょっと苦手です😅 でも経費・帳簿・領収書のことならお任せください!",
-            "うーん分からないけど~ 経費の記録や今月の支出ならすぐできます😊",
-            "それは難しいです🙈 帳簿のことなら、経費や領収書の写真を送ってみてください?",
+            "そばにいますよ😊 経費や領収書、いつでも送ってくださいね",
+            "聞いてますよ~ 記録も今月の確認もいつでもどうぞ",
+            "Pearnlyはいつでもここに😊 経費や領収書を送ってください",
         ],
     },
     "unknown": {

@@ -52,9 +52,8 @@ def compose(text, lang, *, api_key, quota_ok=lambda: True) -> str | None:
         from services.ai_gateway import router as ai_gateway
         from services.expense import response_guard
 
-        res = ai_gateway.run_task(
-            "line_chat_reply", prompt=_PERSONA, text=text, api_key=api_key, timeout_s=3
-        )
+        # 超时用 task 默认(line_chat_reply=8s):大脑已先跑一次 Gemini,语气层留太短常超时退冷兜底。
+        res = ai_gateway.run_task("line_chat_reply", prompt=_PERSONA, text=text, api_key=api_key)
         if not res.ok or not isinstance(res.data, dict):
             return None
         reply = res.data.get("reply")

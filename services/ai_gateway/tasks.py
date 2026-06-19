@@ -31,7 +31,7 @@ TASKS: dict[str, dict] = {
     },
     "line_chat_reply": {
         "risk": "low",
-        "timeout_s": 3,
+        "timeout_s": 8,
         "max_retries": 0,
         "model_tier": "flash",
         "schema_version": "1",

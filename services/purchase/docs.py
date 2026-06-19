@@ -13,6 +13,7 @@ from typing import Optional
 
 from core.pos_api import PosError
 from services.purchase import field_clean
+from services.purchase import item_name
 from services.purchase import suppliers as sup_svc
 from services.purchase import totals as totals_svc
 
@@ -265,6 +266,8 @@ def get_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> Optional[dict]:
         (tenant_id, doc_id),
     )
     lines = cur.fetchall()
+    # P2C:明细名展示清洗(POS 噪声/乱码 → 清洗名;不可读 → '' + name_unclear)。raw 仍留库供调试。
+    item_name.clean_doc_lines(lines)
     cur.execute(
         "SELECT id, kind, url, generated, created_at FROM purchase_attachments "
         "WHERE tenant_id = %s AND purchase_doc_id = %s ORDER BY created_at",

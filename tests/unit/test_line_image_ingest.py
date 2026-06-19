@@ -299,8 +299,9 @@ class IngestTests(unittest.TestCase):
         self.assertEqual(
             out["card_fields"]["items"],
             [
-                {"name": "TW แบล็คคอฟฟี่ เย็น", "amount": "60.00"},
-                {"name": "TW เพิ่มช็อตกาแฟ", "amount": "10.00"},
+                # P2C:Cafe Amazon 外带前缀「TW」被 item_name.clean 剥除(只剩真品名)
+                {"name": "แบล็คคอฟฟี่ เย็น", "amount": "60.00"},
+                {"name": "เพิ่มช็อตกาแฟ", "amount": "10.00"},
             ],
         )
         self.assertFalse(out["warn_total"])
@@ -318,7 +319,7 @@ class IngestTests(unittest.TestCase):
         }
         self.assertEqual(
             li._card_items(f),
-            [{"name": "TW กาแฟ", "amount": "120.00"}, {"name": "TW เพิ่มช็อต", "amount": "10.00"}],
+            [{"name": "กาแฟ", "amount": "120.00"}, {"name": "เพิ่มช็อต", "amount": "10.00"}],
         )
 
     def test_free_modifiers_collected_for_note(self):
@@ -331,7 +332,7 @@ class IngestTests(unittest.TestCase):
                 {"name": "แก้ว Mickey (แถมฟรี)", "subtotal": "0"},
             ],
         }
-        self.assertEqual(li._free_modifier_names(f), ["TW ไม่หวาน 0%", "แก้ว Mickey (แถมฟรี)"])
+        self.assertEqual(li._free_modifier_names(f), ["ไม่หวาน 0%", "แก้ว Mickey (แถมฟรี)"])
 
     def test_summary_items_are_filtered_from_card(self):
         f = {

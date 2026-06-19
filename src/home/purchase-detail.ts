@@ -87,9 +87,15 @@ function lineRow(l: DocLine, i: number, hasVat: boolean): string {
     const net = Number(l.qty) * Number(l.unit_price) - Number(l.discount || 0);
     const rate = Number(l.vat_rate) || 0;
     const tax = hasVat ? (net * rate) / 100 : 0;
+    // P2C:整名读不出(后端清空 + name_unclear)→ 编号占位「รายการที่ N」,与 LINE 卡片同口径,不露乱码。
+    const name = l.description
+        ? `<span class="pname">${escapeHtml(l.description)}</span>`
+        : l.name_unclear
+          ? `<span class="pname muted">${escapeHtml(t('pur-line-itemn').replace('{n}', String(i + 1)))}</span>`
+          : '';
     return `<tr>
         <td>${i + 1}</td>
-        <td><span class="pname">${escapeHtml(l.description)}</span>${tag}</td>
+        <td>${name}${tag}</td>
         <td class="num">${rate}%</td>
         <td class="num">${fmtQty(l.qty)}</td>
         <td class="num">${fmtMoney(l.unit_price)}</td>

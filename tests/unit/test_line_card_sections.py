@@ -136,16 +136,19 @@ class NoticesTests(unittest.TestCase):
 
 
 class GarbledItemNameTests(unittest.TestCase):
-    """OCR 读不出的泰文细品名(?????)展示成编号占位「项目 N」,不露乱码(Zihao 2026-06-18)。"""
+    """OCR 读不出的泰文细品名(?????)/POS 噪声 → 编号占位或清洗名,不露乱码(P2C)。"""
 
     def test_pure_question_marks_fall_back_to_numbered(self):
         self.assertEqual(s._display_item_name("????", 1, T), "项目 1")
         self.assertEqual(s._display_item_name("?? ??", 3, T), "项目 3")
         self.assertEqual(s._display_item_name("��", 2, T), "项目 2")
 
-    def test_partial_readable_kept(self):
-        # 已读出的拉丁/泰文部分保留(只去问号),不强行换占位
-        self.assertEqual(s._display_item_name("TW ?????", 1, T), "TW")
+    def test_pos_prefix_only_falls_back(self):
+        # 「TW ?????」剥乱码+POS 前缀后仅剩前缀 → 编号占位,不再裸露「TW」(P2C 验收①)
+        self.assertEqual(s._display_item_name("TW ?????", 1, T), "项目 1")
+
+    def test_readable_kept(self):
+        self.assertEqual(s._display_item_name("TW Latte", 1, T), "Latte")
         self.assertEqual(s._display_item_name("Cake slice", 2, T), "Cake slice")
 
     def test_section_renders_numbered_placeholder(self):
@@ -154,6 +157,14 @@ class GarbledItemNameTests(unittest.TestCase):
         name_text = rows[1]["contents"][0]["text"]
         self.assertIn("项目 1", name_text)
         self.assertNotIn("?", name_text)
+
+    def test_section_appends_unclear_hint(self):
+        rows = s.items_section([{"name": "????", "amount": "30.00"}], T)
+        self.assertEqual(rows[-1]["text"], T["items_name_unclear"])
+
+    def test_section_no_hint_when_all_clear(self):
+        rows = s.items_section([{"name": "Latte", "amount": "30.00"}], T)
+        self.assertTrue(all(r.get("text") != T["items_name_unclear"] for r in rows if "text" in r))
 
 
 if __name__ == "__main__":

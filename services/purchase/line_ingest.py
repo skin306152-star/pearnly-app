@@ -12,6 +12,7 @@ from decimal import Decimal, InvalidOperation
 
 from services.purchase import field_clean
 from services.purchase import intake as ik
+from services.purchase import item_name
 from services.purchase import totals as totals_svc
 
 logger = logging.getLogger("mr-pilot")
@@ -129,8 +130,8 @@ def _card_amounts(fields: dict) -> tuple[str, str, str]:
 
 
 def _clean_item_name(name) -> str:
-    """明细名去前导项目符号/破折号(「- TW ไม่หวาน」→「TW ไม่หวาน」),让卡片明细干净。"""
-    return str(name or "").strip().lstrip("-–•· ").strip()
+    """明细名清洗:去前导符号 + POS 噪声前缀 + 乱码(收口到 item_name·卡片/详情/分类同一套)。"""
+    return item_name.clean(name)
 
 
 def _card_items(fields: dict) -> list:

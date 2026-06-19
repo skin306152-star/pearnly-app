@@ -272,19 +272,20 @@ def categorize_items(items: list, categories: list, *, api_key: Optional[str], t
     listing = _listing(options)
     names = "\n".join(f"{j + 1}) {items[i].get('name', '')}" for j, i in enumerate(todo))
     payload = f"Items:\n{names}\n\nCategories:\n{listing}"
+    # 经 AI Gateway 跑 expense_category_choose(P2E·批量挑编号)。ok=False → 保留规则结果(out)。
     try:
-        from services.ocr import gemini_models
-        from services.ocr.layer2_gemini import _call_gemini_with_retry
+        from services.ai_gateway import router as ai_gateway
 
-        data, _meta = _call_gemini_with_retry(
-            payload,
+        res = ai_gateway.run_task(
+            "expense_category_choose",
+            prompt=_BATCH_PROMPT,
+            text=payload,
             api_key=api_key,
-            model_name=gemini_models.flash(),
-            max_retries=1,
-            timeout=timeout,
-            system_prompt_override=_BATCH_PROMPT,
+            timeout_s=timeout,
         )
-        choices = (data or {}).get("choices") or []
+        if not res.ok:
+            return out
+        choices = (res.data or {}).get("choices") or []
     except Exception as e:  # noqa: BLE001
         logger.warning("[category_ai] batch suggest failed: %s", str(e)[:160])
         return out
@@ -429,22 +430,21 @@ def suggest_category(
         return None, None
     listing = _listing(options)
     payload = f"Vendor: {vendor or '-'}\nItems: {descriptions or '-'}\nCategories:\n{listing}"
+    # 经 AI Gateway 跑 expense_category_choose(P2E):档位 flash·只在真实编号里挑;ok=False(无 key/
+    # 超时/parse)→ (None, None) 让调用方走规则/留未分类。模型/超时由 task 规格定,与现状一致。
     try:
-        from services.ocr import gemini_models
-        from services.ocr.layer2_gemini import _call_gemini_with_retry
+        from services.ai_gateway import router as ai_gateway
 
-        # 用主力 flash(2.5-flash),非最强 3.5-flash:分类是「在选项里挑编号」的小任务,2.5-flash
-        # ~3s 且准(prod 实测咖啡→餐饮、加油→燃油、电费→水电全对);3.5-flash 慢、常超 12s →
-        # DeadlineExceeded 返空 → 分类全丢(这才是「分类一直空」的真因)。
-        data, _meta = _call_gemini_with_retry(
-            payload,
+        res = ai_gateway.run_task(
+            "expense_category_choose",
+            prompt=_PROMPT,
+            text=payload,
             api_key=api_key,
-            model_name=gemini_models.flash(),
-            max_retries=1,
-            timeout=timeout,
-            system_prompt_override=_PROMPT,
+            timeout_s=timeout,
         )
     except Exception as e:  # noqa: BLE001
         logger.warning("[category_ai] suggest failed: %s", str(e)[:160])
         return None, None
-    return _decode_choice((data or {}).get("choice"), options)
+    if not res.ok:
+        return None, None
+    return _decode_choice((res.data or {}).get("choice"), options)

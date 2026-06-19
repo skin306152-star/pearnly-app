@@ -217,7 +217,7 @@ def _money(x) -> str:
         return "0.00"
 
 
-def _doc_line(d, t) -> str:
+def _doc_line(d) -> str:
     """一笔简列:日期 · 卖家 · ฿金额。"""
     date = str(d.get("doc_date") or "").strip()
     vendor = str(d.get("supplier_name") or "").strip()
@@ -225,6 +225,56 @@ def _doc_line(d, t) -> str:
     return (
         f"{head} · ฿{_money(d.get('grand_total'))}" if head else f"฿{_money(d.get('grand_total'))}"
     )
+
+
+def _banner(icon, title, desc, *, bg, title_color) -> dict:
+    """卡头条:彩色徽章标题 + 灰色说明(确认卡/汇总卡共用)。"""
+    return {
+        "type": "box",
+        "layout": "vertical",
+        "paddingAll": "14px",
+        "paddingStart": "20px",
+        "backgroundColor": bg,
+        "contents": [
+            s.txt(f"{icon} {title}", size="sm", color=title_color, weight="bold", wrap=True),
+            s.txt(desc, size="xxs", color="#475467", margin="xs", wrap=True),
+        ],
+    }
+
+
+def _doc_rows(docs, t) -> list:
+    """逐笔简列(cap _LIST_CAP)+ 「还有 M 笔…」溢出行(两卡共用)。"""
+    rows = [
+        s.txt(f"• {_doc_line(d)}", size="xxs", color="#475467", wrap=True) for d in docs[:_LIST_CAP]
+    ]
+    if len(docs) > _LIST_CAP:
+        rows.append(s.txt(t["more"].format(m=len(docs) - _LIST_CAP), size="xxs", color="#98A2B3"))
+    return rows
+
+
+def _bubble(alt, header, rows, footer=None) -> dict:
+    """组装 mega bubble → flex(出口剔空 text 节点)。footer 非空才带动作区。"""
+    bubble = {
+        "type": "bubble",
+        "size": "mega",
+        "header": header,
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "paddingAll": "16px",
+            "spacing": "sm",
+            "contents": rows or [s.txt("—", size="xxs", color="#98A2B3")],
+        },
+    }
+    if footer:
+        bubble["footer"] = {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "paddingAll": "12px",
+            "contents": footer,
+        }
+    return s.prune_empty_text({"type": "flex", "altText": alt, "contents": bubble})
 
 
 def route(bound_user, reply_token, line_user_id, text, lang, tid, ws, ctx) -> bool:
@@ -275,12 +325,7 @@ def _confirm_card(docs, token, lang) -> dict:
     t = _t(lang)
     n = len(docs)
     total = sum(Decimal(str(d.get("grand_total") or 0)) for d in docs)
-    rows = [
-        s.txt(f"• {_doc_line(d, t)}", size="xxs", color="#475467", wrap=True)
-        for d in docs[:_LIST_CAP]
-    ]
-    if n > _LIST_CAP:
-        rows.append(s.txt(t["more"].format(m=n - _LIST_CAP), size="xxs", color="#98A2B3"))
+    rows = _doc_rows(docs, t)
     rows.append(
         s.txt(
             t["summary"].format(n=n, amount=_money(total)),
@@ -290,19 +335,9 @@ def _confirm_card(docs, token, lang) -> dict:
             margin="md",
         )
     )
-    header = {
-        "type": "box",
-        "layout": "vertical",
-        "paddingAll": "14px",
-        "paddingStart": "20px",
-        "backgroundColor": "#FEF3E2",
-        "contents": [
-            s.txt(f"⚠ {t['confirm_title']}", size="sm", color="#B45309", weight="bold", wrap=True),
-            s.txt(
-                t["confirm_desc"].format(n=n), size="xxs", color="#475467", margin="xs", wrap=True
-            ),
-        ],
-    }
+    header = _banner(
+        "⚠", t["confirm_title"], t["confirm_desc"].format(n=n), bg="#FEF3E2", title_color="#B45309"
+    )
     footer = [
         s.btn(
             t["btn_confirm"].format(n=n),
@@ -312,28 +347,7 @@ def _confirm_card(docs, token, lang) -> dict:
         ),
         s.btn(t["btn_cancel"], primary=False, postback=line_postback.bulk_cancel_data(token)),
     ]
-    bubble = {
-        "type": "bubble",
-        "size": "mega",
-        "header": header,
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "paddingAll": "16px",
-            "spacing": "sm",
-            "contents": rows,
-        },
-        "footer": {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "sm",
-            "paddingAll": "12px",
-            "contents": footer,
-        },
-    }
-    return s.prune_empty_text(
-        {"type": "flex", "altText": f"{t['confirm_title']} · {n}", "contents": bubble}
-    )
+    return _bubble(f"{t['confirm_title']} · {n}", header, rows, footer)
 
 
 def _summary_card(undone, skipped, lang) -> dict:
@@ -341,50 +355,21 @@ def _summary_card(undone, skipped, lang) -> dict:
     t = _t(lang)
     n = len(undone)
     total = sum(Decimal(str(d.get("grand_total") or 0)) for d in undone)
-    header = {
-        "type": "box",
-        "layout": "vertical",
-        "paddingAll": "14px",
-        "paddingStart": "20px",
-        "backgroundColor": "#F2F4F7",
-        "contents": [
-            s.txt(f"↩ {t['done_title']}", size="sm", color="#667085", weight="bold", wrap=True),
-            s.txt(
-                t["done_desc"].format(n=n, amount=_money(total)),
-                size="xxs",
-                color="#475467",
-                margin="xs",
-                wrap=True,
-            ),
-        ],
-    }
-    rows = [
-        s.txt(f"• {_doc_line(d, t)}", size="xxs", color="#475467", wrap=True)
-        for d in undone[:_LIST_CAP]
-    ]
-    if n > _LIST_CAP:
-        rows.append(s.txt(t["more"].format(m=n - _LIST_CAP), size="xxs", color="#98A2B3"))
+    header = _banner(
+        "↩",
+        t["done_title"],
+        t["done_desc"].format(n=n, amount=_money(total)),
+        bg="#F2F4F7",
+        title_color="#667085",
+    )
+    rows = _doc_rows(undone, t)
     if skipped:
         rows.append(
             s.txt(
                 t["skipped"].format(m=skipped), size="xxs", color="#B45309", margin="md", wrap=True
             )
         )
-    bubble = {
-        "type": "bubble",
-        "size": "mega",
-        "header": header,
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "paddingAll": "16px",
-            "spacing": "sm",
-            "contents": rows or [s.txt("—", size="xxs", color="#98A2B3")],
-        },
-    }
-    return s.prune_empty_text(
-        {"type": "flex", "altText": f"{t['done_title']} · {n}", "contents": bubble}
-    )
+    return _bubble(f"{t['done_title']} · {n}", header, rows)
 
 
 def handle_postback(bound_user, reply_token, action, token, lang) -> None:

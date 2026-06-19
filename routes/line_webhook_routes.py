@@ -296,6 +296,20 @@ async def _handle_line_text(
                 tenant_id=tid,
             )
             return
+        # ★ 强锚定(Slice 3 · Anchored Action):本轮引用了一张卡 → 整句只围绕它,在记账/大脑/语气层
+        # 之前拦截(永不另记一笔/操作别的单);无引用完全不变。
+        from services.expense import line_anchored
+
+        if line_anchored.maybe_dispatch(
+            bound_user,
+            reply_token,
+            line_user_id,
+            text,
+            lang,
+            quoted_message_id,
+            quote_token=quote_token,
+        ):
+            return
         # 文本路 · 置信驱动入账(docs/smart-intake/15):记账意图→解析→高置信直接入账+数据卡,
         # 其余草稿请确认;闲聊/查账/问答→智能回复。回执引用原句(quoteToken)。
         if line_expense.handle_expense_text(

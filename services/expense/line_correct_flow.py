@@ -150,9 +150,10 @@ def route(
     的那条记录」并 return True 拦在记账之前,绝不新建支出。任一接管 → True;非 correction → False。
     """
     qt = ctx.get("quote_token", "")
-    # 批量撤销(撤最近N笔/今天全部)最前判:明确范围才命中→确认卡;裸「取消」不命中,仍走改错取消。
-    if line_bulk_undo.route(bound_user, reply_token, line_user_id, text, lang, tid, ws, ctx):
-        return True
+    # 批量撤销(撤最近N笔/今天全部)。★引用 > 批量(06):引用某卡时「取消三条」也以那张为准 → 跳过批量。
+    if not quoted_message_id:
+        if line_bulk_undo.route(bound_user, reply_token, line_user_id, text, lang, tid, ws, ctx):
+            return True
     # 恢复(引用已撤卡说「恢复」)先于改字段判:引用了死卡说恢复不该被当成 correctval 的值吞掉。
     if line_restore.maybe_restore(
         bound_user, reply_token, line_user_id, text, lang, tid, ws, quoted_message_id, ctx
@@ -182,9 +183,9 @@ def route(
         bound_user, reply_token, line_user_id, text, lang, tid, ws, quoted_message_id, ctx
     ):
         return True
-    # 改错语义但没定位到记录 → 提示回复记录,绝不记账(账务红线)。但明显新记账句(多项/记账动词开头·
-    # 即便含「ผู้ขาย」字段词)不算改错 → 放行记账流(P1E-3:不被安全闸误拦成「请回复记录」)。
-    if is_correction_like(text) and not _looks_like_new_expense(text):
+    # 改错语义但没定位到记录(无引用)→ 提示回复记录,绝不记账(账务红线)。明显新记账句(多项/动词
+    # 开头·即便含字段词)不算改错 → 放行记账(P1E-3)。有引用走强锚定 → 不在此兜底(已经回复了一张卡)。
+    if is_correction_like(text) and not _looks_like_new_expense(text) and not quoted_message_id:
         _say(reply_token, line_client.t_line(lang, "line_need_reply_record"), ctx)
         return True
     return False

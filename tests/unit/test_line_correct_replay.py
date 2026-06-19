@@ -245,14 +245,10 @@ class Sim:
         return {"id": posted[-1]["id"], "grand_total": posted[-1]["grand_total"]}
 
 
-def _run(sim, turns):
-    """驱动一串用户消息 → 真 flow.route(每条返回是否被改错路由接管)。返回 [(text, handled)]。
+def _build_patches(sim):
+    """Sim → 全套 patch 列表(replay 与 anchored 两套测试共用·side_effect 绑定 sim)。
 
-    用 ExitStack 扁平注册 patch(数量多·避免 `with (...)` 静态嵌套超 CPython 上限)。"""
-    import contextlib
-
-    bound = {"id": "u1", "tenant_id": "t"}
-    out = []
+    用扁平 list + ExitStack 注册(数量多·避免 `with (...)` 静态嵌套超 CPython 上限)。"""
 
     def _text(tok, body, **k):
         sim.replies.append(body)
@@ -260,7 +256,7 @@ def _run(sim, turns):
     def _msgs(tok, msgs, **k):
         sim.replies.extend(m.get("altText", "") for m in msgs)
 
-    patches = [
+    return [
         mock.patch.object(flow.db, "get_cursor_rls", return_value=_Cur()),
         mock.patch.object(line_correct.db, "get_cursor_rls", return_value=_Cur()),
         mock.patch.object(conversation, "peek_pending", side_effect=sim.peek),
@@ -284,16 +280,35 @@ def _run(sim, turns):
         mock.patch.object(line_reply, "reply_text_context", side_effect=_text),
         mock.patch.object(line_reply, "reply_messages_context", side_effect=_msgs),
     ]
+
+
+def _drive(sim, turns, runner):
+    """共用驱动:装好全套 patch,逐条 normalize 后跑 runner(norm, quoted, ctx)→ handled。
+
+    返回 [(原文, handled, 本条回复列表)]。runner 由调用方传(flow.route / line_anchored.dispatch)。"""
+    import contextlib
+
+    out = []
     with contextlib.ExitStack() as stack:
-        for p in patches:
+        for p in _build_patches(sim):
             stack.enter_context(p)
         for text, quoted in turns:
             sim.replies.clear()
             norm = line_classify.normalize_user_text(text)
             ctx = {"quote_token": "q", "line_user_id": "u1", "tenant_id": "t"}
-            handled = flow.route(bound, "tok", "u1", norm, "th", "t", 1, quoted, ctx)
+            handled = runner(norm, quoted, ctx)
             out.append((text, handled, list(sim.replies)))
     return out
+
+
+def _run(sim, turns):
+    """驱动一串用户消息 → 真 flow.route(每条返回是否被改错路由接管)。返回 [(text, handled, replies)]。"""
+    bound = {"id": "u1", "tenant_id": "t"}
+    return _drive(
+        sim,
+        turns,
+        lambda norm, quoted, ctx: flow.route(bound, "tok", "u1", norm, "th", "t", 1, quoted, ctx),
+    )
 
 
 class ReplayScenarioTests(unittest.TestCase):

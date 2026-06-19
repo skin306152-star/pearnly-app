@@ -183,6 +183,32 @@ RESTORE_CLOSED = {
 }
 
 
+# 06 Slice 3 强锚定(Anchored Action):引用了一张卡 → 整句只围绕它,绝不另记一笔。
+# 看着像新记账 / 裸数字 → 把解析值当建议,问要不要用它更新这张(永不新建支出·{sug} 含金额)。
+ANCHOR_SUGGEST_EDIT = {
+    "zh": "你发的内容像是 {sug}。要用它更新这张记录(#{ref})吗?可回复:改金额 / 改分类、删除、查看详情。",
+    "th": "ข้อความที่ส่งมาดูเหมือน {sug} ค่ะ ต้องการใช้ค่านี้อัปเดตรายการนี้ (#{ref}) ไหมคะ? พิมพ์ได้เลย: แก้ยอด / แก้หมวดหมู่, ลบ, ดูรายละเอียด",
+    "en": "What you sent looks like {sug}. Update this record (#{ref}) with it? You can reply: change amount / category, delete, or view details.",
+    "ja": "送られた内容は {sug} のようです。この記録(#{ref})をこれで更新しますか?返信できます:金額・分類の変更、削除、詳細表示。",
+}
+
+# 引用了一张卡却发来闲聊 / 问候 / 全局查账 / 不明 → 不闲聊不查账,锚定追问要对这张做什么({who}=฿额·卖家)。
+ANCHOR_ASK = {
+    "zh": "你正在回复这张记录({who})。要对它做什么?可回复:改金额 / 改分类、删除、查看详情。",
+    "th": "คุณกำลังตอบกลับรายการนี้ ({who}) ค่ะ ต้องการทำอะไรกับรายการนี้? พิมพ์ได้เลย: แก้ยอด / แก้หมวดหมู่, ลบ, ดูรายละเอียด",
+    "en": "You're replying to this record ({who}). What would you like to do with it? You can reply: change amount / category, delete, or view details.",
+    "ja": "この記録({who})に返信しています。どうしますか?返信できます:金額・分類の変更、削除、詳細表示。",
+}
+
+# 引用过期 / 查不到 / 回复的不是记录卡 → 锚定失效,诚实请用户引用一张票据 / 费用卡(绝不落新单)。
+ANCHOR_EXPIRED = {
+    "zh": "这条引用已过期,或回复的不是一张记录卡。请长按一张票据 / 费用卡再回复要做的操作。",
+    "th": "การอ้างอิงนี้หมดอายุ หรือสิ่งที่ตอบกลับไม่ใช่การ์ดรายการค่ะ กรุณากดค้างที่การ์ดใบเสร็จ / ค่าใช้จ่าย แล้วตอบกลับสิ่งที่ต้องการทำ",
+    "en": "This reference has expired, or you replied to something that isn't a record card. Please long-press a receipt / expense card and reply with what you'd like to do.",
+    "ja": "この引用は期限切れか、返信先が記録カードではありません。領収書・経費カードを長押ししてから操作を返信してください。",
+}
+
+
 def field_label(field: str, lang: str) -> str:
     return FIELD_LABELS.get(field, {}).get(lang) or FIELD_LABELS.get(field, {}).get("zh", field)
 

@@ -6,15 +6,19 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-18 · **P1G-Perf 图片票性能止血 + 真机验过 + 乱码明细名兜底 + Req5 改错重发卡 + /simplify** · HEAD `f3860084`）
+## 🎯 状态卡（2026-06-19 · **P2A 商户分类闭环 + 日期年漂修 + P2B 字段卫生 + /simplify** · HEAD `8ef38a1`）
 
-- **本窗口完成并上线 + Zihao 真机验过**(3 commit·prod `f3860084` health 200·全量 **4101 unit 绿** skip3 + replay 全过·13 闸全绿·见记忆 [[line-p1g-perf-image-shortcut]])：
-  - **P1G-Perf 性能止血**(`b289e172`·`image_sha256` 列+索引落 prod DB 实证):①**重复图早期短路**(`purchase_docs.image_sha256`=下载即算图片字节指纹·非内容指纹 dedupe_key 需先 OCR·同图再发找已建单直接重发状态卡·跳过 Vision/Gemini/分类·新模块 `line_image_fastpath`+`image_dedup`·坑=成功入账 history_id=None 不写 ocr_history 致旧缓存不命中=慢真因)②**L3 收紧**(税号不合法→soft_flag 不升 L3·堆叠多票仅主金额不可靠才升)③**L3 限时** 45→**10s**④**分类不阻塞** LLM 硬上限 **3s**(只 line_ingest 传)。
-  - **🆕 真机结果**(6 张真票·prod 日志逐笔核):**L3 6/6 全未触发**·总耗时 **6–16s**(从 68–74s·P50≈10/P95≈16)·金额/总额/卖家/日期/VAT 6/6 全对。**early_dup 边界**:7-11「1-2s 内连发」没走 <3s 短路(两张落不同 worker·第二张早于第一张建单 → 无单可命中 → 走完整 OCR·靠内容查重出 dup 卡·**零重复入账**·~9s)→ **Zihao 拍板接受不补**(补需跨 worker「处理中」表·危害=0)。
-  - **乱码明细名兜底 + Req5**(`774c0c5c`):①OCR 读不出泰文品名「?????」→ 编号占位 `item_n`(4 语·**display-only·DB 留原值**)②**Req5** 改错低风险直改后回纯文字→改成**重发当前状态卡**(`line_card_actions.send_state_card_reply`)。
-  - **/simplify**(`f3860084`):三态卡构建(posted/void/draft)抽 `line_posted_card.build_state_card` 唯一源(push/reply 各按 transport 发)·消除 send_state_card_reply/_push_state_card 复制(净 -2 行)。
-- **⏳ 下个窗口 = 待 Zihao 定**(本任务已闭环上线验过)。可选 backlog:**①乱码明细名清到 ingest/抽取层**(现 render 层 display-only·DB 仍存「?????」·清到源头则 web/导出/exception 都干净)②泰文细品名识别准确率(=L2 极限·要换引擎/要原图·产品决策)③P1G 上轮真机三件仍未回执(三卡税额一致 130.84/9.16·双击不重复·「ที่ 7-11」不 +7)④`line_card.py` 已 500(再加先拆)。
+- **本窗口 4 项全上线·prod HEAD `8ef38a1` health 200·4 worker 起 0 错·全量 4167 unit 绿(skip3)·replay 43/43·全闸绿。⏳ 全部待 Zihao 真机验证结果再定下一步(做新任务 or 修问题)。**
+  - **P2A 商户/品类确定性分类闭环**(`14cd512b`·见 [[line-category-deterministic-p2a]]):`_smart_category` 优先级重排=用户学习(税号/归一卖家)→确定性规则(品名 item / 商户默认 vendor_default)→LLM 逐项→LLM 整票→留未分类。新模块 `services/expense/merchant.py`(canonical_merchant 各写法归一·curated 税号→别名)。商户词典扩(7-11/Makro/TOPS/Lotus/BigC→goods 目标)。学习闭环复用 `expense_learned` 前缀键 `tax:`/`seller:`(改错 `line_correct_data.learn_category`+详情 `docs.update_draft` 写回·全 try/except)。**真机审计(部署代码跑真票)5/5 过**:7-11→餐饮(品名)·Makro→采购商品·learned TOPS→办公·LLM 不越权。**7-11 口径铁律**:品名永远优先(咖啡→餐饮/笔→办公),不清才落商户默认·**绝不 vendor-first**(测试钉死)。
+  - **日期年漂修**(`7126e0b4`):票面印 4 位公历年(18/06/2026)被模型算成 2021 → `schemas_invoice._fix_gregorian_year_date` 以印出年覆盖(铁律#8 印出真值优先·佛历 25xx 仍先 -543·两段范围不重叠)。
+  - **P2B OCR 低置信字段治理**(`5577af5d` 重构 + `b1f1548d`):新 `services/purchase/field_quality.py` 统一质量层(seller 乱码/全?→unclear·date [2015,今天]不接受未来→suspect·tax 非13位→invalid·invoice/address 乱码→dirty);`card_signals` 脏字段喂 `field_confidence`(_REVIEW_CONF=0.5)→卡片 low()+详情 mapConf **自动同口径标黄**;`field_clean` 加 is_garbled/clean_address(posted 卡不显脏地址);卡片状态分级=**金额不可靠(总额≤0 或 total_amount<0.85)撤确认按钮只去详情**(footer block_confirm)/金额可靠明细不符保留「继续保存」(warn_total 文案改「金额可靠·明细需检查」);seller 全脏→「ผู้ขายไม่ชัดเจน」;脏数据不静默入账(降 confirm)。**前置重构**:`_footer/btn/liff_link` 抽到 `line_card_sections` 腾 line_card 500→413。
+  - **/simplify**(`8ef38a1`):invoice_status 去冗余 is_garbled·0.5 抽 `_REVIEW_CONF`·footer 合并 block_confirm/review_first 双分支。
+  - **测试草稿已清**:今天 8 张测试单(test 租户 ws69)删 7 草稿 + Makro void 清指纹·`remaining_with_hash=0` → 重发即全新识别(可重验 P2A+P2B+日期)。**注**:`expense_learned` 的 `seller:tops→办公` 保留(再发 TOPS 会沿用=学习生效)。
 - **🔴 流程铁律 [[line-correction-replay-before-push]]**:LINE correction/卡片改动**必先跑 replay tester 全过再 push**·push 汇报含 replay 数+单测+commit+prod health。
+
+## 历史记录（旧状态卡 · 2026-06-18 · P1G-Perf 图片票性能止血 + 真机验过 + 乱码明细名兜底 + Req5 + /simplify · HEAD `f3860084`）
+
+- **P1G-Perf 性能止血**(`b289e172`·`image_sha256` 列+索引落 prod·重复图早期短路 `line_image_fastpath`+`image_dedup`·L3 收紧/限时 45→10s·分类 LLM 硬上限 3s)·真机 6/6 L3 全未触发·6–16s(从 68–74s)金额全对·乱码明细名 `item_n` 占位(display-only)·Req5 改错回重发状态卡·见 [[line-p1g-perf-image-shortcut]]。
 
 ## 历史记录（旧状态卡 · 2026-06-18 · P1G 入账后闭环 + 终态卡税额一致 + P1E-3 修 · HEAD `334337e2`）
 

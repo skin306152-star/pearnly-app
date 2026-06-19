@@ -19,7 +19,8 @@ from core import db
 from services.expense import conversation, line_bulk_undo, line_classify, line_correct
 from services.expense import line_correct_i18n as ci
 from services.expense import line_quick_entry as lqe
-from services.line_binding import line_client, line_message_refs, line_reply
+from services.expense import line_stale_ref
+from services.line_binding import line_client, line_reply
 
 # 收新值时剥掉的前缀(命令词 + 连接词 + 字段名);标点已在入口 normalize_user_text 归一。
 _STRIP_TOKENS = (
@@ -251,7 +252,8 @@ def maybe_clarify_feedback(bound_user, reply_token, text, lang, ws, quoted_messa
 
     点名字段 + 给了值 → 直接走风险三档(如「วันที่เป็น 2026/6/18」·验收 #3);点名没给值 → 问新值;
     笼统「识别错了」→ 列字段问改哪里(验收 #4)。没点字段的「改成X」(如「上一笔改成200」)→ 交大脑/
-    edit 流定位目标。ctx 带 quote_token/line_user_id/tenant_id(回复带引用)。"""
+    edit 流定位目标。★用户引用了某张卡 → 只对那张当前真实状态负责(死单不改、被更正落最新活单·05),
+    绝不回落到别的活单。ctx 带 quote_token/line_user_id/tenant_id(回复带引用)。"""
     field = line_classify.detect_correction_field(text)
     triggered = line_classify.is_correction_feedback(text) or (bool(quoted_message_id) and field)
     if not triggered:
@@ -261,50 +263,38 @@ def maybe_clarify_feedback(bound_user, reply_token, text, lang, ws, quoted_messa
     reply_lang = line_classify.detect_text_lang(text) or lang
     tid = ctx.get("tenant_id")
     luid = ctx.get("line_user_id")
-    detail, doc_id, ws_eff = None, None, ws
-    with db.get_cursor_rls(tid) as cur:
-        tgt = line_message_refs.resolve_target(
-            cur,
-            tenant_id=tid,
-            ws=ws,
-            line_user_id=luid,
-            quoted_message_id=quoted_message_id,
-            text=text,
-        )
-        if not tgt.get("error"):
-            doc_id, ws_eff = tgt["doc_id"], tgt["ws"]
-            detail = line_correct.docs_svc.get_doc(
-                cur, tenant_id=tid, workspace_client_id=ws_eff, doc_id=doc_id
-            )
-    # 引用解析失败 / 引用到已作废原单(刚被更正克隆)→ 跟随 active 续接到当前那张(验收:不掉「找不到」)。
-    if not line_correct._is_live(detail):
-        act = _active_doc(tid, luid)
-        if act:
-            ws_eff, doc_id = act
-            with db.get_cursor_rls(tid) as cur:
-                detail = line_correct.docs_svc.get_doc(
-                    cur, tenant_id=tid, workspace_client_id=ws_eff, doc_id=doc_id
-                )
-    if not line_correct._is_live(detail):
-        # 无引用且像一句新记账(有金额)→ 放行给记账流,不劫持「买错了 50」这类。
-        if not quoted_message_id and lqe.parse_expense(text).has_amount():
-            return False
-        _say(reply_token, line_client.t_line(reply_lang, "line_need_reply_record"), ctx)
+    loc = line_stale_ref.locate_clarify_target(
+        tid,
+        ws,
+        luid,
+        text,
+        quoted_message_id,
+        reply_lang,
+        has_amount=lqe.parse_expense(text).has_amount(),
+    )
+    if loc.get("passthrough"):
+        return False
+    if loc.get("reply"):
+        _say(reply_token, loc["reply"], ctx)
         return True
     return _route_field(
-        bound_user, reply_token, text, lang, tid, ws_eff, doc_id, field, ctx, detail=detail
+        bound_user,
+        reply_token,
+        text,
+        lang,
+        tid,
+        loc["ws"],
+        loc["doc_id"],
+        field,
+        ctx,
+        detail=loc["detail"],
+        notice=loc.get("notice", ""),
     )
 
 
-def _active_doc(tid, line_user_id):
-    """当前 active 续接态指向的 (ws, doc_id);无 active → None。"""
-    with db.get_cursor_rls(tid) as cur:
-        pend = conversation.peek_pending(cur, line_user_id=line_user_id)
-    m = str((pend or {}).get("missing") or "")
-    return _pend_target(m)[:2] if m.startswith(line_correct._ACTIVE_PREFIX) else None
-
-
-def _route_field(bound_user, reply_token, text, lang, tid, ws, doc_id, field, ctx, *, detail=None):
+def _route_field(
+    bound_user, reply_token, text, lang, tid, ws, doc_id, field, ctx, *, detail=None, notice=""
+):
     """统一字段处理(澄清入口/会话内共用):明细 → 详情页(行级);没点字段 → 列字段问;点了字段没值 →
     存待值态问值;给了值 → 交风险三档执行。付款方式可直接改(低风险展示属性·不动金额/税额)。
 
@@ -350,6 +340,7 @@ def _route_field(bound_user, reply_token, text, lang, tid, ws, doc_id, field, ct
         quote_token=ctx.get("quote_token", ""),
         line_user_id=luid,
         detail=detail,
+        notice=notice,
     )
 
 

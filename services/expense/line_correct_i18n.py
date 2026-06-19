@@ -107,6 +107,32 @@ EDIT_EXAMPLES = {
 }
 
 
+# 05 Slice 1(账务安全):引用的旧卡片底层单据已死/已变 → 诚实文案,绝不悄悄改别的单。
+# 已撤销(void·无活后代)→ 不改死单,给「先恢复 / 重记」出路(恢复动作本身留 Slice 2)。
+STALE_VOIDED = {
+    "zh": "这笔已经撤销了,不能直接改。要先恢复它再改,还是重新记一笔?",
+    "th": "รายการนี้ถูกยกเลิกไปแล้ว แก้โดยตรงไม่ได้ค่ะ ต้องการกู้คืนก่อนแล้วค่อยแก้ หรือบันทึกใหม่คะ?",
+    "en": "This entry has been cancelled, so it can't be edited directly. Restore it first, or record a new one?",
+    "ja": "この記録は取り消し済みのため、直接編集できません。先に復元してから編集しますか、それとも新しく記録しますか?",
+}
+
+# 草稿已删(软删/物理删·查不到)→ 不改死单,给「恢复 / 重记」出路。
+STALE_DISCARDED = {
+    "zh": "这张草稿已经删除了。要恢复它,还是重新记一笔?",
+    "th": "ฉบับร่างนี้ถูกลบไปแล้วค่ะ ต้องการกู้คืน หรือบันทึกใหม่คะ?",
+    "en": "This draft has been deleted. Restore it, or record a new one?",
+    "ja": "この下書きは削除済みです。復元しますか、それとも新しく記録しますか?",
+}
+
+# 被引用单已被更正(SUPERSEDED)→ 落到最新活单前的提示前缀(后随确认/问值文案)。
+SUPERSEDED_PREFIX = {
+    "zh": "这张已更新为 ฿{amt}(记录 #{ref}),我帮你改当前这张。",
+    "th": "รายการนี้ถูกอัปเดตเป็น ฿{amt} (รายการ #{ref}) แล้วค่ะ จะแก้ที่รายการล่าสุดให้นะคะ",
+    "en": "This was updated to ฿{amt} (record #{ref}); I'll edit the current one.",
+    "ja": "この記録は ฿{amt}(記録 #{ref})に更新されています。最新のものを編集します。",
+}
+
+
 def field_label(field: str, lang: str) -> str:
     return FIELD_LABELS.get(field, {}).get(lang) or FIELD_LABELS.get(field, {}).get("zh", field)
 

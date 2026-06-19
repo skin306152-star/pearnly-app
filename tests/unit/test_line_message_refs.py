@@ -132,5 +132,85 @@ class ResolveTargetTests(unittest.TestCase):
         self.assertEqual((r["doc_id"], r["how"]), ("Q", "quoted"))
 
 
+class _SeqCur:
+    """按调用顺序吐 fetchone 结果(follow_corrected_from 链遍历用)。"""
+
+    def __init__(self, rows):
+        self._rows = list(rows)
+        self.params = []
+
+    def execute(self, sql, params):
+        self.params.append(params)
+
+    def fetchone(self):
+        return self._rows.pop(0) if self._rows else None
+
+
+class FollowChainTests(unittest.TestCase):
+    def test_multi_hop_to_live_leaf(self):
+        # O(void) → C1(void) → C2(posted·链尾活)→ 无后代。返回最新活后代 C2。
+        cur = _SeqCur(
+            [
+                {"id": "C1", "status": "void", "grand_total": 1},
+                {"id": "C2", "status": "posted", "grand_total": 2},
+                None,
+            ]
+        )
+        leaf = refs.follow_corrected_from_to_live_leaf(
+            cur, tenant_id="t", workspace_client_id=1, doc_id="O"
+        )
+        self.assertEqual(leaf["id"], "C2")
+
+    def test_no_successor_returns_none(self):
+        leaf = refs.follow_corrected_from_to_live_leaf(
+            _SeqCur([None]), tenant_id="t", workspace_client_id=1, doc_id="O"
+        )
+        self.assertIsNone(leaf)
+
+    def test_direct_live_successor(self):
+        cur = _SeqCur([{"id": "C1", "status": "draft", "grand_total": 9}, None])
+        leaf = refs.follow_corrected_from_to_live_leaf(
+            cur, tenant_id="t", workspace_client_id=1, doc_id="O"
+        )
+        self.assertEqual(leaf["id"], "C1")
+
+
+class ResolveCardStateTests(unittest.TestCase):
+    def _state(self, get_doc, leaf=None):
+        from services.purchase import docs as docs_svc
+
+        with (
+            mock.patch.object(docs_svc, "get_doc", side_effect=get_doc),
+            mock.patch.object(refs, "follow_corrected_from_to_live_leaf", return_value=leaf),
+        ):
+            return refs.resolve_card_state(object(), tid="t", ws=1, doc_id="D1")
+
+    def test_live_draft(self):
+        detail = {"doc": {"status": "draft"}}
+        state, live = self._state(lambda *a, **k: detail)
+        self.assertEqual((state, live), (refs.LIVE, detail))
+
+    def test_discarded_soft_delete(self):
+        state, live = self._state(lambda *a, **k: {"doc": {"status": "discarded"}})
+        self.assertEqual((state, live), (refs.DISCARDED, None))
+
+    def test_discarded_not_found(self):
+        state, live = self._state(lambda *a, **k: None)
+        self.assertEqual((state, live), (refs.DISCARDED, None))
+
+    def test_voided_no_descendant(self):
+        state, live = self._state(lambda *a, **k: {"doc": {"status": "void"}}, leaf=None)
+        self.assertEqual((state, live), (refs.VOIDED, None))
+
+    def test_superseded_returns_live_descendant(self):
+        # 原单 void·有更新活后代 → SUPERSEDED·live_doc = 后代 detail(绝不返原死单)。
+        dead = {"doc": {"status": "void"}}
+        live_doc = {"doc": {"status": "posted", "id": "D2"}}
+        calls = iter([dead, live_doc])
+        state, live = self._state(lambda *a, **k: next(calls), leaf={"id": "D2"})
+        self.assertEqual(state, refs.SUPERSEDED)
+        self.assertEqual(live, live_doc)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -195,14 +195,20 @@ def _apply_or_confirm(
     quote_token="",
     line_user_id,
     detail=None,
+    notice="",
 ) -> bool:
     """改错执行三档(产品原则):低风险(草稿 + 单个非金额字段)直接改回完成;高风险(已入账/改金额[税额
     重算]/多字段)出确认;多行金额 → 详情页。作废/不存在 → 诚实兜底。changes = 规范键 dict。
-    detail 可由调用方(已定位)传入免重 fetch。"""
+    detail 可由调用方(已定位)传入免重 fetch。notice 非空 → 作前缀并进同一条回复(SUPERSEDED 提示·
+    reply_token 单次性故不能另发)。"""
 
     def _say(body):
         line_reply.reply_text_context(
-            reply_token, body, quote_token=quote_token, line_user_id=line_user_id, tenant_id=tid
+            reply_token,
+            f"{notice}\n{body}" if notice else body,
+            quote_token=quote_token,
+            line_user_id=line_user_id,
+            tenant_id=tid,
         )
 
     if detail is None:

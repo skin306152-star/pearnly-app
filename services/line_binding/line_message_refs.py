@@ -208,3 +208,64 @@ def resolve_target(cur, *, tenant_id, ws, line_user_id, quoted_message_id, text)
         return {"doc_id": None, "ws": ws, "how": None, "error": "none"}
 
     return {"doc_id": None, "ws": ws, "how": None, "error": "ambiguous"}
+
+
+# 引用卡片对应单据的当前真实状态(卡片气泡是死快照·底层单会被改/撤/删·05 设计)。
+LIVE = "live"  # 草稿/已入账·链尾活单,可改
+SUPERSEDED = "superseded"  # 本单已撤,但更正链上有更新活单 → 解析到那张
+VOIDED = "voided"  # 已撤销且无活后代
+DISCARDED = "discarded"  # 草稿软删 / 查不到(物理删) → 同处理
+
+
+def follow_corrected_from_to_live_leaf(cur, *, tenant_id, workspace_client_id, doc_id):
+    """沿更正链(克隆单 ocr_raw.corrected_from = 原单 id)正向找最新活后代。只读·不改链。
+
+    更正 = 作废原单 + 克隆新草稿(services/purchase/correct);克隆把原 id 写进 ocr_raw.corrected_from。
+    一张原单顺序被多次更正即成链。返回链尾最新活(draft/posted)后代 row{id,status,grand_total};
+    无活后代 → None。环路守卫(seen)防脏数据死循环。"""
+    seen: set[str] = set()
+    cur_id = str(doc_id)
+    leaf = None
+    while cur_id and cur_id not in seen:
+        seen.add(cur_id)
+        cur.execute(
+            "SELECT id, status, grand_total FROM purchase_docs "
+            "WHERE tenant_id = %s AND workspace_client_id = %s "
+            "AND ocr_raw->>'corrected_from' = %s ORDER BY created_at DESC LIMIT 1",
+            (tenant_id, workspace_client_id, cur_id),
+        )
+        row = cur.fetchone()
+        if not row:
+            break
+        if row["status"] in ("draft", "posted"):
+            leaf = row
+        cur_id = str(row["id"])
+    return leaf
+
+
+def resolve_card_state(cur, *, tid, ws, doc_id):
+    """被引用单据的【当前真实状态】+ 最新活单(死单不改·绝不悄悄落别的单·05 账务安全)。
+
+    返回 (state, live_doc):
+      LIVE       → 本单可改,live_doc = 本单 detail
+      SUPERSEDED → 本单已撤但被更正过,live_doc = 最新活后代 detail
+      VOIDED     → 已撤无活后代,live_doc = None
+      DISCARDED  → 草稿软删 / 查不到,live_doc = None
+    """
+    from services.purchase import docs as docs_svc
+
+    detail = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)
+    if detail is None:
+        return DISCARDED, None
+    status = (detail.get("doc") or {}).get("status")
+    if status in ("draft", "posted"):
+        return LIVE, detail
+    if status == "discarded":
+        return DISCARDED, None
+    leaf = follow_corrected_from_to_live_leaf(
+        cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id
+    )
+    if leaf:
+        live = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=leaf["id"])
+        return SUPERSEDED, live
+    return VOIDED, None

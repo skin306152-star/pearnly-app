@@ -213,6 +213,12 @@ def reply_undo(
             status = (detail.get("doc") or {}).get("status") if detail else None
             from services.line_binding import line_card_actions
 
+            if status is None:
+                # 引用单已被删除(草稿物理删/软删)→ 幂等回「已删除」,不报错、绝不碰别的单(05 账务安全)。
+                from services.expense import line_correct_i18n as ci
+
+                _say(ci.t(ci.STALE_DISCARDED, lang))
+                return
             if status == "draft":
                 # 草稿未入账,「取消/删除」= 丢弃(对齐卡片「ทิ้ง」按钮),不走 void → 永不死路。
                 amt = (detail.get("doc") or {}).get("grand_total")

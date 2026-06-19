@@ -128,17 +128,48 @@ class Sim:
         return self.docs[doc_id]
 
     def correct_doc(self, cur, *, tenant_id, workspace_client_id, doc_id, created_by):
-        # 真 correct_doc:作废原单 + 克隆为新草稿(更正审计链)。
+        # 真 correct_doc:作废原单 + 克隆为新草稿(corrected_from 审计链·真 schema 存 ocr_raw)。
         self._seq += 1
         nid = f"{doc_id}_c{self._seq}"
         self.docs[nid] = {
             k: (v.copy() if isinstance(v, dict) else list(v)) for k, v in self.docs[doc_id].items()
         }
-        self.docs[nid]["doc"] = dict(self.docs[doc_id]["doc"], id=nid, status="draft")
-        self.docs[doc_id]["doc"]["status"] = "void"  # 原单作废(再引用应跟随 active 到克隆)
+        self.docs[nid]["doc"] = dict(
+            self.docs[doc_id]["doc"], id=nid, status="draft", corrected_from=doc_id
+        )
+        self.docs[doc_id]["doc"]["status"] = "void"  # 原单作废(再引用沿链解析到活克隆·SUPERSEDED)
         return self.get_doc(
             cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=nid
         )
+
+    def resolve_card_state(self, cur, *, tid, ws, doc_id):
+        # 引用单当前真实状态(对齐 line_message_refs.resolve_card_state·用内存账本沿 corrected_from 链)。
+        from services.line_binding import line_message_refs as r
+
+        d = self.docs.get(doc_id)
+        if not d:
+            return r.DISCARDED, None
+        status = d["doc"]["status"]
+        if status in ("draft", "posted"):
+            return r.LIVE, self.get_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)
+        if status == "discarded":
+            return r.DISCARDED, None
+        leaf, cur_id, seen = None, doc_id, set()
+        while cur_id and cur_id not in seen:
+            seen.add(cur_id)
+            nxt = next(
+                (x for x in self.docs.values() if x["doc"].get("corrected_from") == cur_id), None
+            )
+            if not nxt:
+                break
+            if nxt["doc"]["status"] in ("draft", "posted"):
+                leaf = nxt
+            cur_id = nxt["doc"]["id"]
+        if leaf:
+            return r.SUPERSEDED, self.get_doc(
+                cur, tenant_id=tid, workspace_client_id=ws, doc_id=leaf["doc"]["id"]
+            )
+        return r.VOIDED, None
 
     def _active_doc_date(self):
         """当前 active 续接态指向那张单的日期(测续接命中)。"""
@@ -174,6 +205,9 @@ def _run(sim, turns):
         mock.patch.object(settings_svc, "get_settings", return_value={"auto_book": False}),
         mock.patch.object(line_correct_data, "_resolve_category", return_value=("cat1", "sub1")),
         mock.patch.object(line_message_refs, "resolve_target", side_effect=sim.resolve_target),
+        mock.patch.object(
+            line_message_refs, "resolve_card_state", side_effect=sim.resolve_card_state
+        ),
         mock.patch.object(
             line_reply,
             "reply_text_context",
@@ -409,8 +443,8 @@ class ReplayScenarioTests(unittest.TestCase):
         self._no_forbidden(steps)
 
     def test_posted_requote_voided_original_follows_active(self):
-        # 真机 bug:已入账票改卖家(void+克隆)后,再次「引用原卡」改日期 → 原卡已作废,须跟随 active
-        # 续到克隆,不得回「ไม่มีรายการ…ให้แก้」(exp_correct_none)。
+        # 真机 bug:已入账票改卖家(void+克隆)后,再次「引用原卡」改日期 → 原卡已作废(SUPERSEDED),
+        # 沿 corrected_from 链解析到活克隆(05·非盲回落 active),不得回「ไม่มีรายการ…」(exp_correct_none)。
         none_msg = line_client.t_line("th", "exp_correct_none")
         steps = _run(
             self.sim,

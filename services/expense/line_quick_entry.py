@@ -143,10 +143,7 @@ _NAME_NOISE = (
 
 
 def _strip_vendor_brands(text: str) -> str:
-    """抹掉已识别的卖家品牌(连其中的数字一起去,如 7-11/711/7 eleven)。
-
-    物品名与金额提取共用:店号数字绝不当物品名,也绝不当总额(否则「ร้าน 711」被记成 711 THB)。
-    """
+    """抹掉已识别卖家品牌(连数字一起去·7-11/711)·物品名与金额共用:店号绝不当名/当价(否则记成 711 THB)。"""
     s = text or ""
     for pat, _name in _VENDOR_BRANDS:
         s = re.sub(pat, " ", s, flags=re.IGNORECASE)

@@ -140,8 +140,9 @@ if [ -n "$FE_CHANGED" ]; then
   npm run build >/dev/null 2>&1 || fail "vite build 失败"
 
   echo "  · 打包一致性(dist 必须 == 源的最新 build)"
-  # 排除 main.js* : vite 产物(有自己的 test-f)· sourcemap 含路径/时间戳跨 build 有 drift
-  git diff --quiet static/dist/ ':!static/dist/main.js' ':!static/dist/main.js.map' \
+  # 排除 main.js* : vite 产物(有自己的 test-f)· sourcemap 含路径/时间戳跨 build 有 drift。
+  # 用长格式 :(exclude):git 2.54+ 对短 :! 排除「不存在的路径」(sourcemap:false 故无 .map)会 fatal。
+  git diff --quiet static/dist/ ':(exclude)static/dist/main.js' ':(exclude)static/dist/main.js.map' \
     || fail "改了前端源但 dist 没重新打包 · 跑 npm run build 后 git add static/dist 一起提交(否则 prod 跑旧 bundle · 改动不生效)"
 
   echo "  · check_asset_bundling(源页只引 bundle · 新资产须进打包清单)"

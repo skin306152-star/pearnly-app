@@ -6,16 +6,16 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-19 · **P3A Pearnly Voice 自然对话 + 4 个记账修 + 批量撤销 + CI 绿勾恢复 + /simplify** · HEAD `28709503`）
+## 🎯 状态卡（2026-06-19 · **05 引用旧卡片状态闭环 全成立(死单不改+恢复+草稿软删恢复)+ 裸取消焦点锚定 + /simplify** · HEAD `f8c0d5f5`）
 
-- **本窗口 12 commit 全上线·prod HEAD `28709503` health 200·全量 4284 unit 绿(skip3)·本地 13 闸全绿。⏳ 全部待 Zihao 真机验证结果再定下一步。** 见 [[line-pearnly-voice-p3a]] [[line-undo-and-ci-greenup]]。
-  - **P3A Pearnly Voice 自然对话**(`b802f191`→`47fa6776`→`ba47ea00`):闲聊(chat_kind out_of_scope/unknown)从死模板升级成自然温暖泰语 LLM 回复。新 `response_guard`(确定性出口护栏·拦供应商名/api key/假执行)+ `line_voice`(persona·走 P2E run_task task `line_chat_reply` 8s)+ `line_voice_quota`(每日 30·alembic 0044)。接 `_dispatch_agent`·失败回落 4 语轮选池(`replies` out_of_scope/unknown)·不二次扣费。身份/模型问题仍 P2D 前置拦。
-  - **4 个记账修**(`cd7a6c7d`/`e4f1bf15`/`fd0655fc`/`8f920dcb`):① 裸数字「1/65」不直接入账→问记啥(`has_item_context`)② 店号「711」不当金额(`_strip_vendor_brands`)③「ปรับยอดเป็น/调整金额」改额命令不记成支出(`is_edit_request` 加结构识别 `_AMOUNT_NOUN_RE`+`_ADJUST_RE`·误伤守卫 ค่าปรับ/空调/调味料)④ **「空调 1500 记成 150」真因=`_NUM` 逗号分支 `*`→`+`**(findall 把裸 1500 切成 150+0·所有 4+ 位无逗号数中招)。
-  - **批量撤销**(`30cb5526`·见 [[line-undo-and-ci-greenup]]):新 `line_bulk_undo`(撤最近N笔/今天全部·确认卡 nonce 防误撤·逐笔独立事务·已结期跳过不破账)+ `line_docs` 查询·`detect_bulk_undo` 范围识别(裸「取消」不命中仍走改错取消)·`line_correct_flow.route` 最前判。
-  - **🟢 GitHub CI 绿勾恢复**(`44f8b870` black + `d388cf19` ci):CI 红 12+ 提交(早于本窗口·部署 webhook≠GitHub CI·pre-push≠CI)。black✓修(test_field_clean)+ vite 打包闸✓修(真因 git2.54 `:!` pathspec fatal·非 dist 过期·改 `:(exclude)` 无 churn)。**剩 `pip-audit`✗(14 依赖 CVE·cryptography/pypdf/python-multipart·Zihao-gated 未做)→ GitHub 整体仍红。**
-  - **/simplify 收口**(`28709503`):批量撤销两卡抽共用 `_banner/_doc_rows/_bubble`(459→444)·`_doc_line` 去未用参数。
-- **🔴 流程铁律 [[line-correction-replay-before-push]]**:LINE correction/卡片改动**必先跑 replay 全过再 push**(本窗口卡片为新增非改 correction·已全单测覆盖)。
-- **下个窗口先做**:① 收 Zihao 真机验证结果(P3A 暖回复占比/批量撤销/4 个记账修/调额命令)再定 ② 待拍:清 `pip-audit` 14 CVE(依赖 bump·让 GitHub 全绿)③ backlog:P2E-3 接 OCR L2/L3、清 `line_ocr_i18n.err_need_key` 死键。
+- **本窗口 6 commit 全上线·prod HEAD `f8c0d5f5` health 200·全量 4341 unit 绿(skip3)·replay 51/51·13 闸全绿。⏳ 全部待 Zihao 真机验证结果再定下一步。** 见 [[line-stale-card-ref-p0]] [[line-pm-ownership-mode]]。
+  - **05 Slice 1 死单不改**(`a0750ca3`·screenshot-29 账务事故):新 `line_message_refs.resolve_card_state`(LIVE/SUPERSEDED 沿 corrected_from 链落最新活后代/VOIDED/DISCARDED)+ 新模块 `line_stale_ref.locate_clarify_target`(★删「引用死单回落 _active_doc」红线·SUPERSEDED 带 notice 前缀)+ `reply_undo` 补 DISCARDED 幂等。引用死/变的卡绝不操作错记录。
+  - **05 Slice 2 恢复闭环**(`504e401f`):引用已撤(void)卡说「恢复/กู้คืน/restore」→ `correct.restore_doc` 克隆重过账成新 posted(restored_from 审计·原死单不动)。新 `line_restore.maybe_restore` + `line_classify.detect_restore`(带金额无引用不算恢复·防误伤)+ i18n 5 键。
+  - **05 Slice 2b 草稿软删**(`6f2e53c3`):草稿删物理删→软删 `status='discarded'`+释放 dedupe_key(留库可恢复)。★discarded 对所有活跃口径隐形(list_docs/find_by_dedupe 显式排除·summary/detail/KPI/archive posted-only·line_docs IN·image_dedup 排除·`status` 无 CHECK 无需迁移)。restore_doc 扩 discarded→翻 draft/gone/not_deleted。四处删改 `correct.discard_doc`。
+  - **裸取消/删除焦点锚定**(`14f37e56`+`4a70b0a9`):①「记完一笔裸取消」一次撤掉(非被续接态截成「取消编辑」·try_correction_state cancel 仅提问态)②「拍票出草稿卡裸 ลบ」删那张草稿(非误撤更早已入账)——`_bind_refs` 给 **dup** 卡也设焦点·`maybe_bare_undo` 焦点优先(`_active_target` 最近卡→`_undo_resolved` 草稿discard/已入账void)·无焦点才回落 find_last_posted。
+  - **/simplify 收口**(`f8c0d5f5`):金额/记录号格式化抽 `ci.money`/`ci.short_ref`(消 line_restore/line_stale_ref 两处复制)。其余评审发现经判断不动(见 commit·折叠 _delete_target 会改文案/双 get_doc 是正确性所需/correctactive 兼焦点 watch-don't-fix)。
+- **🔴 流程铁律 [[line-correction-replay-before-push]]**:LINE correction/卡片改动**必先跑 replay 全过再 push**(本窗口 correction 路径改动·replay 51/51 已全过)。
+- **下个窗口先做**:① 收 Zihao 真机验证(死卡不误操作/恢复出新卡/草稿删了能恢复/拍票出草稿裸 ลบ 删那张)再定 ② 可选 05 Slice 3(SUPERSEDED/VOIDED 查看文案打磨·锦上添花) ③ 待拍:清 `pip-audit` 14 CVE 让 GitHub 全绿 ④ backlog:P2E-3 接 OCR L2/L3、清 `line_ocr_i18n.err_need_key` 死键。
 
 ## 历史记录（旧状态卡 · 2026-06-19 早 · P2A 商户分类闭环 + 日期年漂修 + P2B 字段卫生 · HEAD `8ef38a1`）
 

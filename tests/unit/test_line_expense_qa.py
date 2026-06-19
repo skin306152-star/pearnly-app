@@ -109,5 +109,64 @@ class ReplyPoolOverrideTests(unittest.TestCase):
         self.assertEqual(msg["text"], "line_greeting")
 
 
+class MaybeBareUndoTests(unittest.TestCase):
+    """裸「取消/删除」(无引用·非批量)→ 撤最近一笔(find_last_posted);批量/引用 → 让位。"""
+
+    def _bare(self, text, *, quoted=None, last=None, bulk_ret=None):
+        from core import db
+        from services.expense import line_bulk_undo
+        from services.line_binding import line_client, line_message_refs
+
+        calls = {}
+        with (
+            mock.patch.object(db, "get_cursor_rls", return_value=_CM()),
+            mock.patch.object(line_bulk_undo, "detect_bulk_undo", return_value=bulk_ret),
+            mock.patch.object(line_message_refs, "find_last_posted", return_value=last),
+            mock.patch.object(
+                qa, "_undo_resolved", side_effect=lambda *a, **k: calls.setdefault("undo", a)
+            ),
+            mock.patch.object(line_client, "t_line", side_effect=lambda lang, key, **k: key),
+            mock.patch.object(
+                qa.line_reply,
+                "reply_text_context",
+                side_effect=lambda *a, **k: calls.setdefault("say", a),
+            ),
+        ):
+            res = qa.maybe_bare_undo(
+                {"id": "u"}, "rt", "U1", text, "th", "t", 1, quoted, {"quote_token": "q"}
+            )
+        return res, calls
+
+    def test_bare_cancel_undoes_last(self):
+        res, calls = self._bare("ยกเลิก", last={"id": "D9", "grand_total": "70"})
+        self.assertTrue(res)
+        self.assertEqual(calls["undo"][5], "D9")  # _undo_resolved(... doc_id=D9)
+
+    def test_bare_delete_undoes_last(self):
+        res, calls = self._bare("ลบ", last={"id": "D9", "grand_total": "70"})
+        self.assertTrue(res)
+        self.assertEqual(calls["undo"][5], "D9")
+
+    def test_bare_cancel_no_record_says_none(self):
+        res, calls = self._bare("ยกเลิก", last=None)
+        self.assertTrue(res)
+        self.assertNotIn("undo", calls)  # ★不撤、不新建
+        self.assertEqual(calls["say"][1], "exp_undo_none")
+
+    def test_quoted_cancel_not_bare(self):
+        res, calls = self._bare("ยกเลิก", quoted="m1")
+        self.assertFalse(res)  # 引用某卡 → 交 try_void_quoted
+        self.assertEqual(calls, {})
+
+    def test_bulk_cancel_not_bare(self):
+        res, calls = self._bare("取消最近3笔", bulk_ret={"scope": "recent", "n": 3})
+        self.assertFalse(res)  # 批量 → 交 line_bulk_undo
+        self.assertEqual(calls, {})
+
+    def test_non_cancel_text_not_bare(self):
+        res, _ = self._bare("กาแฟ 70")  # 普通记账 → 不接管
+        self.assertFalse(res)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -20,7 +20,7 @@ from services.expense import conversation, line_bulk_undo, line_classify, line_c
 from services.expense import line_correct_i18n as ci
 from services.expense import line_quick_entry as lqe
 from services.expense import line_restore, line_stale_ref
-from services.line_binding import line_client, line_reply
+from services.line_binding import line_client, line_expense_qa, line_reply
 
 # 收新值时剥掉的前缀(命令词 + 连接词 + 字段名);标点已在入口 normalize_user_text 归一。
 _STRIP_TOKENS = (
@@ -176,6 +176,12 @@ def route(
         bound_user, reply_token, text, lang, tid, ws, line_user_id, quoted_message_id, qt
     ):
         return True
+    # 裸「取消/删除」(无引用·非批量·提问态已被 try_correction_state 截走)→ 撤最近一笔已入账单
+    # (一次到位·可恢复故安全);无记录则诚实告知。绝不新建支出。
+    if line_expense_qa.maybe_bare_undo(
+        bound_user, reply_token, line_user_id, text, lang, tid, ws, quoted_message_id, ctx
+    ):
+        return True
     # 改错语义但没定位到记录 → 提示回复记录,绝不记账(账务红线)。但明显新记账句(多项/记账动词开头·
     # 即便含「ผู้ขาย」字段词)不算改错 → 放行记账流(P1E-3:不被安全闸误拦成「请回复记录」)。
     if is_correction_like(text) and not _looks_like_new_expense(text):
@@ -219,8 +225,9 @@ def try_correction_state(
     # (新卡会重设 active)。即便句中含「ผู้ขาย 711」也不当 seller 新值吞掉。
     if is_active and _looks_like_new_expense(text):
         return False
-    # 明确「取消/算了」→ 中止本次改错,不动单据(任何阶段·验收 #1/#7)。
-    if line_classify.is_cancel_intent(text):
+    # 明确「取消」→ 中止本次改错(仅【提问中】态)。被动续接态(correctactive)下的裸「取消」不当取消
+    # 编辑 → 放行到 route 兜底「撤最近一笔」(记完一笔说取消=撤那笔·修真机第一次没撤被续接态截走)。
+    if line_classify.is_cancel_intent(text) and not is_active:
         line_correct._clear(tid, line_user_id)
         _say(reply_token, line_client.t_line(reply_lang, "exp_correct_cancel"), ctx)
         return True
@@ -358,8 +365,6 @@ def try_void_quoted(
         line_classify.is_cancel_intent(text) or line_classify.is_delete_intent(text)
     ):
         return False
-    from services.line_binding import line_expense_qa
-
     line_expense_qa.reply_undo(
         bound_user,
         reply_token,

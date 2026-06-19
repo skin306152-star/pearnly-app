@@ -166,23 +166,15 @@ _UNDO_ERR = {
 }
 
 
-def reply_undo(
-    bound_user,
-    reply_token,
-    lang,
-    tid,
-    ws,
-    line_user_id=None,
-    quoted_message_id=None,
-    text="",
-    *,
-    quote_token="",
+def _undo_resolved(
+    bound_user, reply_token, lang, tid, ws, doc_id, line_user_id, quote_token
 ) -> None:
-    """撤销已入账单 · void_doc 冲销(不物理删)。目标定位:引用某条→撤那张;明确「上一笔」→撤最近;
-    对象不明确→提示 reply 某条记录(绝不默认撤最近一笔)。已结期 → 诚实引导网页。
-    回复引用用户当前消息(quoteToken·展示),业务定位仍走 quotedMessageId。"""
+    """对已定位的 (ws, doc_id) 执行撤销:草稿丢弃 / 已入账 void → 终态卡。查不到(已删)→ stale_discarded
+    幂等;已结期 → 诚实拦。reply_undo(引用/上一笔)与 reply_undo_last(裸撤最近)共用,消除两份撤销核。"""
     from core.pos_api import PosError
-    from services.line_binding import line_message_refs
+    from services.line_binding import line_card_actions
+    from services.purchase import docs as docs_svc
+    from services.purchase import posting as posting_svc
 
     def _say(body):
         line_reply.reply_text_context(
@@ -191,30 +183,11 @@ def reply_undo(
 
     uid = str(bound_user["id"]) if bound_user.get("id") else None
     try:
-        from services.purchase import posting as posting_svc
-
         with db.get_cursor_rls(tid, commit=True) as cur:
-            tgt = line_message_refs.resolve_target(
-                cur,
-                tenant_id=tid,
-                ws=ws,
-                line_user_id=line_user_id,
-                quoted_message_id=quoted_message_id,
-                text=text,
-            )
-            if tgt["error"]:
-                _say(line_client.t_line(lang, _UNDO_ERR[tgt["error"]]))
-                return
-            from services.purchase import docs as docs_svc
-
-            detail = docs_svc.get_doc(
-                cur, tenant_id=tid, workspace_client_id=tgt["ws"], doc_id=tgt["doc_id"]
-            )
+            detail = docs_svc.get_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)
             status = (detail.get("doc") or {}).get("status") if detail else None
-            from services.line_binding import line_card_actions
-
             if status is None:
-                # 引用单已被删除(草稿物理删/软删)→ 幂等回「已删除」,不报错、绝不碰别的单(05 账务安全)。
+                # 单已被删除(草稿物理删/软删)→ 幂等回「已删除」,不报错、绝不碰别的单(05 账务安全)。
                 from services.expense import line_correct_i18n as ci
 
                 _say(ci.t(ci.STALE_DISCARDED, lang))
@@ -222,14 +195,12 @@ def reply_undo(
             if status == "draft":
                 # 草稿未入账,「取消/删除」= 丢弃(对齐卡片「ทิ้ง」按钮),不走 void → 永不死路。
                 amt = (detail.get("doc") or {}).get("grand_total")
-                docs_svc.delete_doc(
-                    cur, tenant_id=tid, workspace_client_id=tgt["ws"], doc_id=tgt["doc_id"]
-                )
+                docs_svc.delete_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)
                 line_card_actions.send_terminal(
                     reply_token,
                     state="discarded",
-                    doc_id=tgt["doc_id"],
-                    ws=tgt["ws"],
+                    doc_id=doc_id,
+                    ws=ws,
                     amount=amt,
                     lang=lang,
                     tid=tid,
@@ -238,18 +209,14 @@ def reply_undo(
                 )
                 return
             res = posting_svc.void_doc(
-                cur,
-                tenant_id=tid,
-                workspace_client_id=tgt["ws"],
-                doc_id=tgt["doc_id"],
-                created_by=uid,
+                cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id, created_by=uid
             )
             amt = (res.get("doc") or {}).get("grand_total")
         line_card_actions.send_terminal(
             reply_token,
             state="voided",
-            doc_id=tgt["doc_id"],
-            ws=tgt["ws"],
+            doc_id=doc_id,
+            ws=ws,
             amount=amt,
             lang=lang,
             tid=tid,
@@ -265,6 +232,86 @@ def reply_undo(
     except Exception:
         logger.exception("[line] undo failed")
         _say(line_client.t_line(lang, "exp_undo_none"))
+
+
+def reply_undo(
+    bound_user,
+    reply_token,
+    lang,
+    tid,
+    ws,
+    line_user_id=None,
+    quoted_message_id=None,
+    text="",
+    *,
+    quote_token="",
+) -> None:
+    """撤销已入账单 · void_doc 冲销(不物理删)。目标定位:引用某条→撤那张;明确「上一笔」→撤最近;
+    对象不明确→提示 reply 某条记录(绝不默认撤最近一笔)。已结期 → 诚实引导网页。"""
+    from services.line_binding import line_message_refs
+
+    with db.get_cursor_rls(tid) as cur:
+        tgt = line_message_refs.resolve_target(
+            cur,
+            tenant_id=tid,
+            ws=ws,
+            line_user_id=line_user_id,
+            quoted_message_id=quoted_message_id,
+            text=text,
+        )
+    if tgt["error"]:
+        line_reply.reply_text_context(
+            reply_token,
+            line_client.t_line(lang, _UNDO_ERR[tgt["error"]]),
+            quote_token=quote_token,
+            line_user_id=line_user_id,
+            tenant_id=tid,
+        )
+        return
+    _undo_resolved(
+        bound_user, reply_token, lang, tid, tgt["ws"], tgt["doc_id"], line_user_id, quote_token
+    )
+
+
+def reply_undo_last(bound_user, reply_token, lang, tid, ws, line_user_id, quote_token="") -> None:
+    """裸「取消/删除」无引用 → 撤最近一笔 LINE 已入账单(find_last_posted)。无 → 诚实「没有可撤销的」。"""
+    from services.line_binding import line_message_refs
+
+    with db.get_cursor_rls(tid) as cur:
+        row = line_message_refs.find_last_posted(cur, tenant_id=tid, ws=ws)
+    if not row:
+        line_reply.reply_text_context(
+            reply_token,
+            line_client.t_line(lang, "exp_undo_none"),
+            quote_token=quote_token,
+            line_user_id=line_user_id,
+            tenant_id=tid,
+        )
+        return
+    _undo_resolved(
+        bound_user, reply_token, lang, tid, ws, str(row["id"]), line_user_id, quote_token
+    )
+
+
+def maybe_bare_undo(
+    bound_user, reply_token, line_user_id, text, lang, tid, ws, quoted_message_id, ctx
+) -> bool:
+    """裸「取消/删除」(无引用·非批量)→ 撤最近一笔 LINE 已入账单(一次到位·撤销可恢复故默认安全)。
+
+    批量(撤N条/全部)交 line_bulk_undo;引用某卡的取消交 try_void_quoted;提问中编辑的取消已被
+    try_correction_state 截走(本函数在其之后跑·此处 pending 必非提问态)。非此情形 → False。"""
+    from services.expense import line_bulk_undo, line_classify
+
+    if quoted_message_id or not (
+        line_classify.is_cancel_intent(text) or line_classify.is_delete_intent(text)
+    ):
+        return False
+    if line_bulk_undo.detect_bulk_undo(text) is not None:
+        return False
+    reply_undo_last(
+        bound_user, reply_token, lang, tid, ws, line_user_id, ctx.get("quote_token", "")
+    )
+    return True
 
 
 def reply_question(reply_token, lang, tid, question, *, quote_token="", line_user_id="") -> None:

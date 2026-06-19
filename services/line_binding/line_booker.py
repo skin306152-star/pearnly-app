@@ -201,18 +201,23 @@ def _bind_refs(tenant_id, workspace_client_id, line_user_id, sent, doc_id, state
         ref_id=doc_id,
         state=state,
     )
-    # 发卡即把该单设为「当前可改」目标(active 续接态·TTL 15min):用户无需长按引用,直接说
-    # 「ร้านเป็น 7-11 / วันที่เป็น …」就走改错直改(验收:active draft → 直接改,不再「请长按回复」)。
-    # 仅草稿(confirm)/已入账(posted)可改;dup/终态不设。best-effort,失败不阻塞回执。
-    if state in ("confirm", "posted") and line_user_id:
-        import logging
+    # 发卡即重置改错上下文:用户开了新一笔 → 上次编辑/恢复留的续接/提问态已死,清掉(别让残留的
+    # correctactive/correctval 截走后续「取消」误当「取消编辑」)。草稿(confirm)/已入账(posted)
+    # 再把本单设为「当前可改」目标(active 续接·TTL 15min):无需长按引用直接说「ร้านเป็น 7-11」即改;
+    # dup/终态只清不设。best-effort,失败不阻塞回执。
+    if not line_user_id:
+        return
+    import logging
 
-        try:
-            from services.expense import line_correct
+    try:
+        from services.expense import line_correct
 
+        if state in ("confirm", "posted"):
             line_correct._set_active(tenant_id, workspace_client_id, doc_id, line_user_id)
-        except Exception:  # noqa: BLE001
-            logging.getLogger(__name__).warning("[line refs] set active 失败;不阻塞回执")
+        else:
+            line_correct._clear(tenant_id, line_user_id)
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).warning("[line refs] reset active 失败;不阻塞回执")
 
 
 def push_result_card(

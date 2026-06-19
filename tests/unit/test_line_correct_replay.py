@@ -218,6 +218,13 @@ class Sim:
             return {"ws": w, "doc_id": d, "error": None}
         return {"ws": ws, "doc_id": None, "error": "ambiguous"}
 
+    def find_last_posted(self, cur, *, tenant_id, ws):
+        # 裸撤销定位最近一笔已入账(dict 保序 ≈ 创建序)。无 → None。
+        posted = [d["doc"] for d in self.docs.values() if d["doc"]["status"] == "posted"]
+        if not posted:
+            return None
+        return {"id": posted[-1]["id"], "grand_total": posted[-1]["grand_total"]}
+
 
 def _run(sim, turns):
     """驱动一串用户消息 → 真 flow.route(每条返回是否被改错路由接管)。返回 [(text, handled)]。"""
@@ -242,6 +249,7 @@ def _run(sim, turns):
         mock.patch.object(
             line_message_refs, "resolve_card_state", side_effect=sim.resolve_card_state
         ),
+        mock.patch.object(line_message_refs, "find_last_posted", side_effect=sim.find_last_posted),
         mock.patch.object(
             line_reply,
             "reply_text_context",
@@ -511,6 +519,39 @@ class ReplayScenarioTests(unittest.TestCase):
         self.assertEqual(len(restored), 1)  # 只建一张(幂等)
         self.assertEqual(restored[0]["doc"]["status"], "posted")
 
+    def test_record_then_bare_cancel_undoes_once(self):
+        # 真机修:记完一笔(active=该单)裸「ยกเลิก」→ 一次撤那笔(★不再回 exp_correct_cancel)。
+        cancel_msg = line_client.t_line("th", "exp_correct_cancel")
+        self.sim.seed("D8", lines=1, status="posted")
+        self._seed_active("D8")  # 模拟记账后 _bind_refs 设的续接态
+        steps = _run(self.sim, [("ยกเลิก", None)])
+        self.assertTrue(steps[0][1])
+        self.assertEqual(self.sim.docs["D8"]["doc"]["status"], "void")  # 撤了
+        for _, _, replies in steps:
+            self.assertNotIn(cancel_msg, replies)  # ★不再「取消了编辑」
+
+    def test_questioning_cancel_still_cancels_edit(self):
+        # 提问中(correctval 等新值)+「取消」→ 仍取消那次编辑,不撤记录。
+        cancel_msg = line_client.t_line("th", "exp_correct_cancel")
+        self.sim.seed("D1c", lines=1, status="posted")
+        self.sim.pending["u1"] = {
+            "missing": "correctval:1:D1c:amount",
+            "draft": None,
+            "tenant_id": "t",
+            "workspace_client_id": 1,
+        }
+        steps = _run(self.sim, [("ยกเลิก", None)])
+        self.assertEqual(self.sim.docs["D1c"]["doc"]["status"], "posted")  # 没撤
+        self.assertIn(cancel_msg, steps[0][2])  # 取消编辑
+
+    def test_no_record_bare_cancel_says_none(self):
+        none_msg = line_client.t_line("th", "exp_undo_none")
+        sim = Sim()  # 空账本
+        steps = _run(sim, [("ยกเลิก", None)])
+        self.assertTrue(steps[0][1])
+        self.assertEqual(sim.docs, {})  # ★不新建支出
+        self.assertIn(none_msg, steps[0][2])
+
     def test_restore_live_card_says_not_voided(self):
         # 引用活单说「恢复」→ 不建单,回「没被撤销」。
         none_before = dict(self.sim.docs)
@@ -623,29 +664,37 @@ class SafetyGateTests(unittest.TestCase):
 
 
 class BindRefsActiveTests(unittest.TestCase):
-    """发卡即设 active 续接态的接线(line_booker._bind_refs):草稿/已入账设,dup/终态不设。"""
+    """发卡即重置改错上下文(line_booker._bind_refs):草稿/已入账设新 active(覆盖旧);
+    dup/终态清旧上下文(别让残留续接/提问态截走新一笔后的「取消」)。"""
 
     def _calls(self, state):
         from services.line_binding import line_booker
 
-        seen = []
+        set_active, cleared = [], []
         with (
             mock.patch.object(line_message_refs, "record_safe", side_effect=lambda **k: None),
             mock.patch.object(
-                line_correct, "_set_active", side_effect=lambda *a, **k: seen.append(a)
+                line_correct, "_set_active", side_effect=lambda *a, **k: set_active.append(a)
+            ),
+            mock.patch.object(
+                line_correct, "_clear", side_effect=lambda *a, **k: cleared.append(a)
             ),
         ):
             line_booker._bind_refs("t", 1, "u1", [{"id": "M1"}], "D9", state)
-        return seen
+        return set_active, cleared
 
     def test_confirm_sets_active(self):
-        self.assertEqual(self._calls("confirm"), [("t", 1, "D9", "u1")])
+        set_active, cleared = self._calls("confirm")
+        self.assertEqual((set_active, cleared), ([("t", 1, "D9", "u1")], []))
 
     def test_posted_sets_active(self):
-        self.assertEqual(self._calls("posted"), [("t", 1, "D9", "u1")])
+        set_active, cleared = self._calls("posted")
+        self.assertEqual(set_active, [("t", 1, "D9", "u1")])  # 覆盖旧续接
 
-    def test_dup_skips_active(self):
-        self.assertEqual(self._calls("dup"), [])  # 重复卡不抢 active
+    def test_dup_clears_stale_context_not_active(self):
+        set_active, cleared = self._calls("dup")
+        self.assertEqual(set_active, [])  # 重复卡不抢 active
+        self.assertEqual(cleared, [("t", "u1")])  # 但清掉旧改错上下文
 
 
 def _report() -> str:

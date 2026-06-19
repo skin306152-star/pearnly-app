@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 
 from core import db
-from services.line_binding import line_client, line_postback, line_reply
+from services.line_binding import line_booker, line_client, line_postback, line_reply
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,11 @@ def _terminal_card(reply_token, state, ref, ws, amount, lang, tid, luid, *, deta
         workspace_client_id=str(ws or ""),
         fields=fields,
     )
-    line_reply.reply_messages_context(reply_token, [card], line_user_id=luid, tenant_id=tid)
+    # 终态卡(已撤销/已丢弃)也是"代表真单据"的卡 → 登记锚点(引用它仍可说「恢复」·06 可引用卡片契约)。
+    sent = line_client.reply_messages_with_meta(reply_token, [card])
+    if not sent:
+        line_reply.reply_messages_context(reply_token, [card], line_user_id=luid, tenant_id=tid)
+    line_booker.anchor_card(sent, tenant_id=tid, ws=ws, line_user_id=luid, doc_id=ref, state=state)
 
 
 def send_terminal(reply_token, *, state, doc_id, ws, amount, lang, tid, luid, detail=None) -> None:
@@ -79,13 +83,13 @@ def _send_posted(cur, reply_token, detail, *, ref, ws, lang, tid, luid) -> None:
     from services.line_binding import line_posted_card
 
     card = line_posted_card.build(detail, doc_id=ref, lang=lang, workspace_client_id=ws)
-    line_reply.reply_messages_context(reply_token, [card], line_user_id=luid, tenant_id=tid)
-    try:
-        from services.expense import line_correct
-
-        line_correct._set_active(tid, ws, ref, luid, cur=cur)
-    except Exception:  # noqa: BLE001 — 续接是增益,失败不影响已发的成功卡
-        logger.warning("[line card] set active after post failed", exc_info=True)
+    # 登记可引用锚点 + 续接 active_doc(state=posted·anchor_card 设焦点,免再单独 _set_active)。
+    sent = line_client.reply_messages_with_meta(reply_token, [card])
+    if not sent:
+        line_reply.reply_messages_context(reply_token, [card], line_user_id=luid, tenant_id=tid)
+    line_booker.anchor_card(
+        sent, tenant_id=tid, ws=ws, line_user_id=luid, doc_id=ref, state="posted", cur=cur
+    )
 
 
 def _send_voided(reply_token, *, ref, ws, lang, tid, luid, detail) -> None:
@@ -129,7 +133,18 @@ def send_state_card_reply(cur, reply_token, *, doc_id, ws, lang, tid, luid) -> b
     )
     if card is None:
         return False
-    line_reply.reply_messages_context(reply_token, [card], line_user_id=luid, tenant_id=tid)
+    sent = line_client.reply_messages_with_meta(reply_token, [card])
+    if not sent:
+        line_reply.reply_messages_context(reply_token, [card], line_user_id=luid, tenant_id=tid)
+    line_booker.anchor_card(
+        sent,
+        tenant_id=tid,
+        ws=ws,
+        line_user_id=luid,
+        doc_id=doc_id,
+        state=line_booker.state_from_status((detail.get("doc") or {}).get("status")),
+        cur=cur,
+    )
     return True
 
 
@@ -169,7 +184,6 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
         from core.workspace_context import default_workspace_id
         from services.line_binding import line_action_nonce as nonce
         from services.purchase import correct as correct_svc
-        from services.purchase import docs as docs_svc
         from services.purchase import posting as posting_svc
         from services.purchase import settings as settings_svc
 

@@ -77,7 +77,7 @@ def _push_state_card(cur, line_user_id, lang, detail, *, doc_id, ws, tid, create
     状态→卡映射复用 line_posted_card.build_state_card(与改错重发卡同一处);posted/draft 铸新 nonce
     供卡上动作(撤销/确认)并续接 active_doc(可直接说改错),void 终态无动作不铸不续。
     """
-    from services.line_binding import line_client, line_posted_card
+    from services.line_binding import line_booker, line_client, line_posted_card
 
     status = (detail.get("doc") or {}).get("status")
     token = (
@@ -88,9 +88,19 @@ def _push_state_card(cur, line_user_id, lang, detail, *, doc_id, ws, tid, create
     )
     if card is None:
         return
-    line_client.push_messages(line_user_id, [card])
-    if status != "void":
-        _set_active(tid, ws, doc_id, line_user_id, cur)
+    # 重发的也是"代表真单据"的卡 → 必须登记可引用锚点(否则引用即 ANCHOR_EXPIRED·06 可引用卡片契约)。
+    sent = line_client.push_messages_with_meta(line_user_id, [card])
+    if not sent:
+        line_client.push_messages(line_user_id, [card])
+    line_booker.anchor_card(
+        sent,
+        tenant_id=tid,
+        ws=ws,
+        line_user_id=line_user_id,
+        doc_id=doc_id,
+        state=line_booker.state_from_status(status),
+        cur=cur,
+    )
 
 
 def _mint(cur, *, tid, ws, doc_id, created_by) -> str:
@@ -102,15 +112,6 @@ def _mint(cur, *, tid, ws, doc_id, created_by) -> str:
         )
     except Exception:  # noqa: BLE001 — 无 token 卡仍可看,动作走兼容链路
         return ""
-
-
-def _set_active(tid, ws, doc_id, line_user_id, cur) -> None:
-    try:
-        from services.expense import line_correct
-
-        line_correct._set_active(tid, ws, doc_id, line_user_id, cur=cur)
-    except Exception:  # noqa: BLE001 — 续接是增益,失败不影响已发卡
-        logger.warning("[line_ocr] early_dup set active 失败", exc_info=True)
 
 
 def handle_ocr_cache_hit(

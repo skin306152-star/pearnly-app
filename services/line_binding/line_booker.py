@@ -220,6 +220,52 @@ def _bind_refs(tenant_id, workspace_client_id, line_user_id, sent, doc_id, state
         logging.getLogger(__name__).warning("[line refs] set focus 失败;不阻塞回执")
 
 
+# 单据 status → 卡片 state(锚点/焦点口径):草稿可改 → confirm,已入账 → posted,撤/删 → 终态。
+_STATUS_STATE = {"draft": "confirm", "posted": "posted", "void": "voided", "discarded": "discarded"}
+
+
+def state_from_status(status: str) -> str:
+    """purchase_docs.status → 卡片 state(reshow/终态卡登记锚点时用)。未知 → confirm(当可改草稿)。"""
+    return _STATUS_STATE.get(status or "", "confirm")
+
+
+def anchor_card(sent, *, tenant_id, ws, line_user_id, doc_id, state, cur=None) -> None:
+    """可引用卡片契约(06):凡"代表真单据"的卡发出后都调它 —— 把已发消息 id 绑到 doc(record·供
+    quote-reply 精确定位)+ 草稿/入账/可能重复卡设焦点(无需引用直接改·裸取消锚定·06 §2)。
+
+    cur 传入(调用方在事务中)→ 用它登记不另开连接;无 cur → record_safe 自开独立事务。终态卡
+    (voided/discarded)只登记锚点不动焦点(引用它仍可说「恢复」)。拿不到消息 id → 本次锚点缺
+    (best-effort·绝不阻塞回执)。reply 路登记仍走 emit_result_card 的 _bind_refs(不变)。"""
+    import logging
+
+    ids = [m.get("id") for m in (sent or []) if m and m.get("id")]
+    if tenant_id and doc_id and ids:
+        from services.line_binding import line_message_refs
+
+        try:
+            kw = dict(
+                tenant_id=tenant_id,
+                workspace_client_id=ws,
+                line_user_id=line_user_id,
+                message_ids=ids,
+                ref_id=doc_id,
+                state=state,
+            )
+            if cur is not None:
+                line_message_refs.record(cur, **kw)
+            else:
+                line_message_refs.record_safe(**kw)
+        except Exception:  # noqa: BLE001
+            logging.getLogger(__name__).warning("[line refs] anchor 登记失败;不阻塞回执")
+    if line_user_id and doc_id and state in ("confirm", "posted", "dup"):
+        try:
+            from services.expense import line_correct
+
+            line_correct._set_active(tenant_id, ws, doc_id, line_user_id, cur=cur)
+        except Exception:  # noqa: BLE001
+            logging.getLogger(__name__).warning("[line refs] set focus 失败;不阻塞回执")
+
+
 def push_result_card(
     line_user_id, lang, ingest, quote_token=None, ws_client_id="", tenant_id=None
 ) -> None:

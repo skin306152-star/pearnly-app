@@ -48,9 +48,9 @@ def send_detail_link(reply_token, text, *, doc_id, ws, lang, tid, luid, quote_to
     """多行/明细需详情页 → 文案 + 「打开详情」按钮(真 deeplink·不只文字·验收 #5)。"""
     import os
 
-    from services.line_binding import line_card, line_card_i18n
+    from services.line_binding import line_card_i18n, line_card_sections
 
-    uri = line_card._liff_link(
+    uri = line_card_sections.liff_link(
         os.getenv("LINE_LIFF_ID", "").strip(),
         "https://pearnly.com/home",
         str(doc_id),

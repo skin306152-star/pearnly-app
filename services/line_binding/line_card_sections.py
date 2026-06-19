@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import re
 
+from services.line_binding import line_postback
+
 # 颜色令牌(与定稿原型一致)。
 BRAND = "#2563EB"
 AMOUNT = "#111827"
@@ -191,6 +193,102 @@ def prune_empty_text(node):
     if isinstance(node, list):
         return [c for c in (prune_empty_text(i) for i in node) if c is not None]
     return node
+
+
+def btn(label: str, *, primary: bool, postback: str = None, uri: str = None, danger=False) -> dict:
+    action = (
+        {"type": "postback", "label": label[:20], "data": postback, "displayText": label}
+        if postback is not None
+        else {"type": "uri", "label": label[:20], "uri": uri}
+    )
+    if primary:
+        return {
+            "type": "button",
+            "style": "primary",
+            "height": "sm",
+            "color": BRAND,
+            "action": action,
+        }
+    return {
+        "type": "button",
+        "style": "link",
+        "height": "sm",
+        "color": LINK_DANGER if danger else LINK,
+        "action": action,
+    }
+
+
+def liff_link(liff_id: str, web_url: str, ref: str, view: str = "", ws: str = "") -> str:
+    """深链到该记录复核屏。配了 LIFF ID → liff.line.me/{id}?...(LINE 用 LIFF webview 打开·自动
+    用 LINE 身份登录);未配 → 回退站内 /liff 路由(至少能打开)。无 ref → 通用页(不死链)。
+
+    ws=该单所属套账 id:带上 → 复核屏自动切到该套账并跳过套账门(记录只在它自己的套账可见)。
+    """
+    if not ref:
+        return web_url
+    extra = (f"&view={view}" if view else "") + (f"&ws={ws}" if ws else "")
+    if liff_id:
+        return f"https://liff.line.me/{liff_id}?liff=purchase&doc={ref}{extra}"
+    base = web_url.split("/home")[0].rstrip("/") or "https://pearnly.com"
+    qs = extra.lstrip("&")
+    return f"{base}/liff/purchase/{ref}" + (f"?{qs}" if qs else "")
+
+
+def stack(primary: dict, view: list, danger: list) -> list:
+    """竖排装配:每个动作独占一行,行行之间画分隔线(对标 Paypers · 治同行挤压截断 + 视觉分隔)。"""
+    buttons = ([primary] if primary else []) + view + danger
+    out = []
+    for i, b in enumerate(buttons):
+        if i:
+            out.append({"type": "separator", "margin": "xs", "color": SEP})
+        out.append(b)
+    return out
+
+
+def footer(
+    state: str,
+    ref: str,
+    web_url: str,
+    t: dict,
+    token: str = "",
+    source: str = "doc",
+    liff_id: str = "",
+    ws: str = "",
+    review_first: bool = False,
+) -> list:
+    """动作区(按状态出合法动作 · 竖排满宽永不死路):
+    confirm 确认入账(主)/编辑/丢弃;posted 查看详情(主)/修改/[替代收据]/撤销;
+    dup 查看重复(主)/仍要入账/丢弃。review_first(明细与总额不符)= confirm 卡降级:
+    主按钮改「打开核对」(去详情),确认入账降为次按钮「บันทึกต่อ」——不假装明细完整、不默认继续入账。"""
+    detail_uri = liff_link(liff_id, web_url, ref, ws=ws)
+    pb = line_postback
+
+    def link(label, uri, danger=False):
+        return btn(label, primary=False, uri=uri, danger=danger)
+
+    def kill(label, data):
+        return btn(label, primary=False, postback=data, danger=True)
+
+    primary, view, danger = None, [], []
+    if state == "posted":
+        primary = btn(t["btn_detail"], primary=True, uri=detail_uri)
+        view.append(link(t["btn_edit"], liff_link(liff_id, web_url, ref, "edit", ws)))
+        if source == "text" and ref:
+            view.append(link(t["btn_receipt"], liff_link(liff_id, web_url, ref, "receipt", ws)))
+        danger.append(kill(t["btn_undo"], pb.undo_data(ref, token)))
+    elif state == "dup":
+        primary = btn(t["btn_open"], primary=True, uri=detail_uri)
+        view.append(btn(t["btn_post_anyway"], primary=False, postback=pb.confirm_data(ref, token)))
+        danger.append(kill(t["btn_discard"], pb.discard_data(ref, token)))
+    elif review_first:  # confirm 但明细与总额不符 → 引导核对优先,入账降次按钮(仍可继续)
+        primary = btn(t["btn_review"], primary=True, uri=detail_uri)
+        view.append(btn(t["btn_post_anyway"], primary=False, postback=pb.confirm_data(ref, token)))
+        danger.append(kill(t["btn_discard"], pb.discard_data(ref, token)))
+    else:  # confirm(草稿请确认)
+        primary = btn(t["btn_confirm"], primary=True, postback=pb.confirm_data(ref, token))
+        view.append(link(t["btn_edit"], detail_uri))
+        danger.append(kill(t["btn_discard"], pb.discard_data(ref, token)))
+    return stack(primary, view, danger)
 
 
 def sheet(sections: list) -> list:

@@ -7,7 +7,7 @@
 
 import unittest
 
-from services.line_binding import line_card, line_postback
+from services.line_binding import line_card, line_card_sections, line_postback
 
 
 class PostbackTests(unittest.TestCase):
@@ -362,23 +362,23 @@ class RecordDeepLinkTests(unittest.TestCase):
     def test_doc_fallback_no_liffid(self):
         # 未配 LIFF ID → 回退站内 /liff 路由。
         self.assertEqual(
-            line_card._liff_link("", self.WEB, "D9"),
+            line_card_sections.liff_link("", self.WEB, "D9"),
             "https://pearnly.com/liff/purchase/D9",
         )
 
     def test_liffid_builds_liff_line_me(self):
         # 配了 LIFF ID → liff.line.me 链接(LINE 用 LIFF webview 打开)。
         self.assertEqual(
-            line_card._liff_link("2010411313-K4TWQwYo", self.WEB, "D9"),
+            line_card_sections.liff_link("2010411313-K4TWQwYo", self.WEB, "D9"),
             "https://liff.line.me/2010411313-K4TWQwYo?liff=purchase&doc=D9",
         )
         self.assertEqual(
-            line_card._liff_link("LID", self.WEB, "D9", "receipt"),
+            line_card_sections.liff_link("LID", self.WEB, "D9", "receipt"),
             "https://liff.line.me/LID?liff=purchase&doc=D9&view=receipt",
         )
 
     def test_no_ref_falls_back_to_web(self):
-        self.assertEqual(line_card._liff_link("", self.WEB, ""), self.WEB)
+        self.assertEqual(line_card_sections.liff_link("", self.WEB, ""), self.WEB)
 
     def test_card_footer_embeds_deep_link(self):
         import json

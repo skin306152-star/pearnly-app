@@ -91,5 +91,52 @@ class ComposeTests(unittest.TestCase):
         self.assertIn("Pearnly", kwargs["prompt"])
 
 
+class TryReplyTests(unittest.TestCase):
+    """接线编排:仅 out_of_scope/unknown 调 compose;成功才 bump;无 key/失败 → None。"""
+
+    def test_guidance_kind_skips_compose(self):
+        with mock.patch.object(line_voice, "compose") as compose:
+            self.assertIsNone(
+                line_voice.try_reply({"id": "u"}, "U1", "hi", "en", "T1", "capability")
+            )
+            compose.assert_not_called()
+
+    def test_unknown_returns_reply_and_bumps(self):
+        from services.expense import line_l2, line_voice_quota
+
+        with (
+            mock.patch.object(line_l2, "resolve_api_key", return_value="k"),
+            mock.patch.object(line_voice, "compose", return_value="สวัสดีค่ะ"),
+            mock.patch.object(line_voice_quota, "within_cap", return_value=True),
+            mock.patch.object(line_voice_quota, "bump") as bump,
+        ):
+            out = line_voice.try_reply({"id": "u"}, "U1", "เหนื่อย", "th", "T1", "unknown")
+        self.assertEqual(out, "สวัสดีค่ะ")
+        bump.assert_called_once_with("U1", "T1")
+
+    def test_compose_none_no_bump(self):
+        from services.expense import line_l2, line_voice_quota
+
+        with (
+            mock.patch.object(line_l2, "resolve_api_key", return_value="k"),
+            mock.patch.object(line_voice, "compose", return_value=None),
+            mock.patch.object(line_voice_quota, "bump") as bump,
+        ):
+            out = line_voice.try_reply({"id": "u"}, "U1", "hi", "en", "T1", "out_of_scope")
+        self.assertIsNone(out)
+        bump.assert_not_called()
+
+    def test_no_key_returns_none(self):
+        from services.expense import line_l2
+
+        with (
+            mock.patch.object(line_l2, "resolve_api_key", return_value=None),
+            mock.patch.object(line_voice, "compose") as compose,
+        ):
+            out = line_voice.try_reply({"id": "u"}, "U1", "hi", "en", "T1", "unknown")
+        self.assertIsNone(out)
+        compose.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

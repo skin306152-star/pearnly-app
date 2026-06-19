@@ -71,5 +71,35 @@ class ReplyUndoTests(unittest.TestCase):
         self.assertEqual(sent[0]["amount"], "100")
 
 
+def _pool(**kw):
+    sent = {}
+    from services.line_binding import line_client, line_reply
+
+    with (
+        mock.patch.object(line_client, "t_line", side_effect=lambda lang, key, **k: key),
+        mock.patch.object(
+            line_reply,
+            "reply_messages_context",
+            side_effect=lambda rt, msgs, **k: sent.update(m=msgs),
+        ),
+    ):
+        qa.reply_pool("rt", kw.pop("kind", "unknown"), "hi", "th", **kw)
+    return sent["m"][0]
+
+
+class ReplyPoolOverrideTests(unittest.TestCase):
+    def test_override_body_used_with_quick_reply(self):
+        # P3A-2:自然语气正文直接采用,跳过模板;Quick Reply「记一笔/查账」钩子照常带上。
+        msg = _pool(override_body="สบายดีไหมคะ มีอะไรให้ช่วยบันทึกบอกได้เลยค่ะ")
+        self.assertEqual(msg["text"], "สบายดีไหมคะ มีอะไรให้ช่วยบันทึกบอกได้เลยค่ะ")
+        self.assertEqual(len(msg["quickReply"]["items"]), 2)
+
+    def test_no_override_falls_back_to_template(self):
+        # override_body=None → 走现有模板查表(unknown → line_unknown_intent),零回归。
+        msg = _pool(kind="unknown", override_body=None)
+        self.assertEqual(msg["text"], "line_unknown_intent")
+        self.assertIn("quickReply", msg)
+
+
 if __name__ == "__main__":
     unittest.main()

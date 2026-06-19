@@ -65,3 +65,31 @@ def compose(text, lang, *, api_key, quota_ok=lambda: True) -> str | None:
         return reply
     except Exception:  # noqa: BLE001 — 语气层绝不崩,调用方回落确定性模板
         return None
+
+
+def try_reply(bound_user, line_user_id, text, lang, tenant_id, chat_kind) -> str | None:
+    """接线编排:仅 out_of_scope/unknown 用自然语气;其余引导类目仍走调用方固定模板。
+
+    无 key/超额/护栏不过/失败 → None(调用方回落 line_out_of_scope / line_unknown_intent)。
+    成功才 bump 每日计数。compose 保持纯逻辑,此处负责 key/配额/计数编排。绝不崩主路径。
+    """
+    try:
+        if chat_kind not in ("out_of_scope", "unknown"):
+            return None
+        from services.expense import line_l2, line_voice_quota
+
+        api_key = line_l2.resolve_api_key(bound_user)
+        if not api_key:
+            return None
+        reply = compose(
+            text,
+            lang,
+            api_key=api_key,
+            quota_ok=lambda: line_voice_quota.within_cap(line_user_id, tenant_id),
+        )
+        if not reply:
+            return None
+        line_voice_quota.bump(line_user_id, tenant_id)
+        return reply
+    except Exception:  # noqa: BLE001
+        return None

@@ -258,10 +258,13 @@ def _dispatch_agent(
             )
         _say(line_client.t_line(lang, "exp_need_amount"))
         return True
-    # chat / out_of_scope(含数字的问句/否定/假设也落这里):Brain OS — LLM 只给 chat_kind 枚举,
-    # 确定性映射到统一 i18n 文案(LLM 绝不直接对用户说话,杜绝旧 demo/同义文案漂移)。
-    # 引用某记录说「识别错了」的已在文本入口前置拦截澄清(不到这里)。
-    line_expense_qa.reply_pool(reply_token, u.get("chat_kind") or "unknown", text, lang, **ctx)
+    # chat/out_of_scope(问句/否定/假设也落这):Brain OS LLM 只给 chat_kind,确定性映射 i18n(引用某条说
+    # 「识别错了」已入口前置澄清)。P3A-2:仅 out_of_scope/unknown 升级自然语气(护栏兜底·失败回落模板)。
+    chat_kind = u.get("chat_kind") or "unknown"
+    from services.expense import line_voice
+
+    voice = line_voice.try_reply(bound_user, line_user_id, text, lang, tid, chat_kind)
+    line_expense_qa.reply_pool(reply_token, chat_kind, text, lang, override_body=voice, **ctx)
     return True
 
 

@@ -45,11 +45,20 @@ _QR_START = {"zh": "怎么开始", "th": "เริ่มยังไง", "en":
 
 
 def reply_pool(
-    reply_token, kind, text, lang, *, quote_token="", line_user_id="", tenant_id=None
+    reply_token,
+    kind,
+    text,
+    lang,
+    *,
+    override_body=None,
+    quote_token="",
+    line_user_id="",
+    tenant_id=None,
 ) -> None:
     """问候/感谢/求助/跑题 → 回复 + Quick Reply 引导(不复读)· 引用用户当前消息。
 
     问候(greeting)/跑题(scope)取 line_i18n 收口文案;感谢/求助走 replies 轮选池(治复读)。
+    override_body 非空(P3A-2 自然语气层)→ 直接用它作正文,跳过模板查表;Quick Reply 钩子照常带上。
     """
     from services.expense import replies
 
@@ -58,7 +67,9 @@ def reply_pool(
         _qr_item(line_client.t_line(lang, "qr_record"), start_txt),
         _qr_item(line_client.t_line(lang, "qr_query"), line_client.t_line(lang, "qr_query_text")),
     ]
-    if kind == "date_query":
+    if override_body:
+        body = override_body
+    elif kind == "date_query":
         # 日期与记账相关:答今天日期(确定性·泰国时区)再引导继续,不当离题。
         body = line_client.t_line(lang, "line_date_answer", date=_today_th())
     else:

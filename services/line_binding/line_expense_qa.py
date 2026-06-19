@@ -297,11 +297,12 @@ def reply_undo_last(bound_user, reply_token, lang, tid, ws, line_user_id, quote_
 def maybe_bare_undo(
     bound_user, reply_token, line_user_id, text, lang, tid, ws, quoted_message_id, ctx
 ) -> bool:
-    """裸「取消/删除」(无引用·非批量)→ 撤最近一笔 LINE 已入账单(一次到位·撤销可恢复故默认安全)。
+    """裸「取消/删除」(无引用·非批量)→ 目标 = 最近展示给用户的那张卡(active 焦点·草稿或已入账·
+    implicit anchor·06 §2)→ 草稿丢弃(软删)/ 已入账 void。无焦点才回落 find_last_posted。
 
     批量(撤N条/全部)交 line_bulk_undo;引用某卡的取消交 try_void_quoted;提问中编辑的取消已被
     try_correction_state 截走(本函数在其之后跑·此处 pending 必非提问态)。非此情形 → False。"""
-    from services.expense import line_bulk_undo, line_classify
+    from services.expense import line_bulk_undo, line_classify, line_stale_ref
 
     if quoted_message_id or not (
         line_classify.is_cancel_intent(text) or line_classify.is_delete_intent(text)
@@ -309,9 +310,15 @@ def maybe_bare_undo(
         return False
     if line_bulk_undo.detect_bulk_undo(text) is not None:
         return False
-    reply_undo_last(
-        bound_user, reply_token, lang, tid, ws, line_user_id, ctx.get("quote_token", "")
-    )
+    qt = ctx.get("quote_token", "")
+    with db.get_cursor_rls(tid) as cur:
+        focus = line_stale_ref._active_target(cur, line_user_id)  # 最近一张卡的 (ws, doc)
+    if focus:  # 锚定到当前焦点卡(草稿/已入账·_undo_resolved 按状态丢弃或冲销),不再误撤更早的单
+        _undo_resolved(
+            bound_user, reply_token, lang, tid, focus[0], str(focus[1]), line_user_id, qt
+        )
+        return True
+    reply_undo_last(bound_user, reply_token, lang, tid, ws, line_user_id, qt)
     return True
 
 

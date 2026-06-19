@@ -554,6 +554,25 @@ class ReplayScenarioTests(unittest.TestCase):
         for _, _, replies in steps:
             self.assertNotIn(cancel_msg, replies)  # ★不再「取消了编辑」
 
+    def test_focus_draft_bare_delete_discards_that_draft(self):
+        # 真机 bug(06 §2):出草稿卡(焦点=该草稿)裸「ลบ」→ 丢弃【那张草稿】,★不去 void 更早的已入账
+        # (D3·setUp 已 posted)。焦点由发卡即设(_bind_refs·此处 _seed_active 模拟)。
+        self.sim.seed("DUP", lines=1, status="draft")
+        self._seed_active("DUP")
+        steps = _run(self.sim, [("ลบ", None)])
+        self.assertTrue(steps[0][1])
+        self.assertEqual(self.sim.docs["DUP"]["doc"]["status"], "discarded")  # 删焦点草稿
+        self.assertEqual(self.sim.docs["D3"]["doc"]["status"], "posted")  # ★更早已入账没被碰
+
+    def test_focus_draft_bare_cancel_discards_that_draft(self):
+        # 同上但用「ยกเลิก」(cancel·走 maybe_bare_undo 焦点路·非 _delete_target)。
+        self.sim.seed("FOC", lines=1, status="draft")
+        self._seed_active("FOC")
+        steps = _run(self.sim, [("ยกเลิก", None)])
+        self.assertTrue(steps[0][1])
+        self.assertEqual(self.sim.docs["FOC"]["doc"]["status"], "discarded")
+        self.assertEqual(self.sim.docs["D3"]["doc"]["status"], "posted")  # ★更早已入账没被碰
+
     def test_questioning_cancel_still_cancels_edit(self):
         # 提问中(correctval 等新值)+「取消」→ 仍取消那次编辑,不撤记录。
         cancel_msg = line_client.t_line("th", "exp_correct_cancel")
@@ -731,10 +750,11 @@ class BindRefsActiveTests(unittest.TestCase):
         set_active, cleared = self._calls("posted")
         self.assertEqual(set_active, [("t", 1, "D9", "u1")])  # 覆盖旧续接
 
-    def test_dup_clears_stale_context_not_active(self):
+    def test_dup_sets_focus_active(self):
+        # dup(可能重复)草稿卡也有真 doc·用户正看着它 → 设焦点(裸取消/删除锚定到它·06 §2)。
         set_active, cleared = self._calls("dup")
-        self.assertEqual(set_active, [])  # 重复卡不抢 active
-        self.assertEqual(cleared, [("t", "u1")])  # 但清掉旧改错上下文
+        self.assertEqual(set_active, [("t", 1, "D9", "u1")])
+        self.assertEqual(cleared, [])
 
 
 def _report() -> str:

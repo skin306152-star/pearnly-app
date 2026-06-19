@@ -112,15 +112,16 @@ class ReplyPoolOverrideTests(unittest.TestCase):
 class MaybeBareUndoTests(unittest.TestCase):
     """裸「取消/删除」(无引用·非批量)→ 撤最近一笔(find_last_posted);批量/引用 → 让位。"""
 
-    def _bare(self, text, *, quoted=None, last=None, bulk_ret=None):
+    def _bare(self, text, *, quoted=None, last=None, bulk_ret=None, focus=None):
         from core import db
-        from services.expense import line_bulk_undo
+        from services.expense import line_bulk_undo, line_stale_ref
         from services.line_binding import line_client, line_message_refs
 
         calls = {}
         with (
             mock.patch.object(db, "get_cursor_rls", return_value=_CM()),
             mock.patch.object(line_bulk_undo, "detect_bulk_undo", return_value=bulk_ret),
+            mock.patch.object(line_stale_ref, "_active_target", return_value=focus),
             mock.patch.object(line_message_refs, "find_last_posted", return_value=last),
             mock.patch.object(
                 qa, "_undo_resolved", side_effect=lambda *a, **k: calls.setdefault("undo", a)
@@ -137,13 +138,19 @@ class MaybeBareUndoTests(unittest.TestCase):
             )
         return res, calls
 
-    def test_bare_cancel_undoes_last(self):
-        res, calls = self._bare("ยกเลิก", last={"id": "D9", "grand_total": "70"})
+    def test_bare_delete_targets_focus_card(self):
+        # ★本 bug:焦点=最近一张卡(草稿 D11)→ 删那张,不回落 find_last_posted(更早的已入账)。
+        res, calls = self._bare("ลบ", focus=(1, "D11"), last={"id": "OLD", "grand_total": "20"})
         self.assertTrue(res)
-        self.assertEqual(calls["undo"][5], "D9")  # _undo_resolved(... doc_id=D9)
+        self.assertEqual(calls["undo"][5], "D11")  # 焦点卡·非 OLD 已入账
 
-    def test_bare_delete_undoes_last(self):
-        res, calls = self._bare("ลบ", last={"id": "D9", "grand_total": "70"})
+    def test_bare_cancel_falls_back_to_last_posted_when_no_focus(self):
+        res, calls = self._bare("ยกเลิก", focus=None, last={"id": "D9", "grand_total": "70"})
+        self.assertTrue(res)
+        self.assertEqual(calls["undo"][5], "D9")  # 无焦点 → 回落最近已入账
+
+    def test_bare_delete_no_focus_uses_last(self):
+        res, calls = self._bare("ลบ", focus=None, last={"id": "D9", "grand_total": "70"})
         self.assertTrue(res)
         self.assertEqual(calls["undo"][5], "D9")
 

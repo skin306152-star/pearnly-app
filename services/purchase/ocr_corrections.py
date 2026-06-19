@@ -68,6 +68,48 @@ def _is_branch_number_as_invoice(fields: dict, invoice_no: str) -> bool:
     return False
 
 
+# 加油票品名(任一命中即按加油票走升×单价兜底)。泰/英混排,长词在前。
+_FUEL_WORDS = (
+    "ไฮดีเซล",
+    "ดีเซล",
+    "เบนซิน",
+    "แก๊สโซฮอล",
+    "แก็สโซฮอล",
+    "โซฮอล",
+    "น้ำมัน",
+    "diesel",
+    "gasohol",
+    "benzine",
+    "benzin",
+    "petrol",
+    "fuel",
+)
+
+
+def _is_fuel_line(name: Any) -> bool:
+    low = str(name or "").lower()
+    return any(w.lower() in low for w in _FUEL_WORDS)
+
+
+def _fuel_total_from_lines(items: Any) -> Decimal:
+    """加油票真实总额 = 升 × 升价(地面真相)。只认【加油品名 + qty 含小数(真升数·非整数积分/件)
+    + 单价 > 0】的行;印刷行小计与升×单价一致(泵凑整 ≤ 1 铢)→ 取印刷小计(更准),否则取升×单价。
+
+    积分行(qty=22 整数·คะแนน)绝不当升数 → 跳过(防 22 × 39.85 = 876 冒充总额)。无加油行 → 0。
+    """
+    for it in items or []:
+        if not isinstance(it, dict) or not _is_fuel_line(it.get("name")):
+            continue
+        qty = _dec(it.get("qty"))
+        price = _dec(it.get("price"))
+        if qty <= 0 or price <= 0 or qty == qty.to_integral_value():
+            continue
+        calc = (qty * price).quantize(_CENT)
+        sub = _dec(it.get("subtotal"))
+        return sub if (sub > 0 and abs(sub - calc) <= Decimal("1")) else calc
+    return Decimal("0")
+
+
 def _is_vat_seven_percent(subtotal: Decimal, vat: Decimal) -> bool:
     if subtotal <= 0 or vat <= 0:
         return False
@@ -122,6 +164,16 @@ def normalize_fields(fields: dict | None) -> dict:
             total = net_paid
             out["total_amount"] = _money(total)
             corrections.append("total_fixed_from_cash_change")
+
+    # 加油票总额读飞兜底:升 × 升价 是地面真相,LLM 常把净额读成圆整错值(Bangchak 1,780 → 1000)。
+    # total 缺失或与升×单价偏差超容差 → 采信升×单价(印刷行小计一致时取印刷值更准)。积分行不计入。
+    fuel_total = _fuel_total_from_lines(src.get("items"))
+    if fuel_total > 0 and (
+        total <= 0 or abs(total - fuel_total) > max(Decimal("1"), fuel_total * Decimal("0.02"))
+    ):
+        total = fuel_total
+        out["total_amount"] = _money(total)
+        corrections.append("fuel_total_from_qty_price")
 
     subtotal = _dec(src.get("subtotal"))
     vat = _dec(out.get("vat"))

@@ -291,6 +291,14 @@ CRITICAL RULES:
    amount received) in cash_amount, and change returned (เงินทอน / ทอน / change) in change_amount.
    Put any discount (ส่วนลด / discount) in discount. On a 7-Eleven/POS slip that prints
    "ยอดรวม 115 / ส่วนลด 5 / ยอดสุทธิ 110 / เงินสด 200 / เงินทอน 90", total_amount = 110 (NOT 200).
+4c. FUEL / PETROL receipts (Bangchak / PTT / Shell / Caltex / Susco — น้ำมัน / ดีเซล / ไฮดีเซล /
+   เบนซิน / แก๊สโซฮอล): the fuel line carries the VOLUME in LITERS and the PRICE PER LITER — put
+   liters in items[].qty, baht-per-liter in items[].price, and items[].subtotal = liters x price.
+   total_amount is the printed NET (ยอดเงินสุทธิ / ยอดรวมสุทธิ / จำนวนเงิน / รวมเงิน) and MUST be
+   approximately liters x price. If you cannot read a clean net, leave total_amount empty rather
+   than inventing a rounded figure — NEVER output a made-up total. LOYALTY POINTS (คะแนน / แต้ม /
+   EARN, or a "22/785"-style points pair) are NOT money and NOT a quantity — never put them in
+   qty / price / subtotal / total_amount.
 5. TAX IDs: Exactly 13 digits, no dashes/spaces. Empty string if not found.
 6. WHT (หัก ณ ที่จ่าย / ภ.ง.ด.3 / ภ.ง.ด.53): Common rates 1/2/3/5%. wht_rate is the number ONLY ("3" not "3%"). Only extract if printed; do NOT guess.
 6b. PAYMENT_METHOD: only if the bill prints how it was paid. "cash" (เงินสด/CASH), "transfer" (โอน/

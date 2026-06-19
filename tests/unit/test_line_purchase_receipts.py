@@ -138,6 +138,69 @@ AMAZON_140 = {
 }
 
 
+# Bangchak 加油票(真票·真机 bug):净额 1,780·升 44.67·单价 39.85·积分 22/785。
+# 误读模式:LLM 把净额 1,780 读成圆整 1000(grand 误记 1000)。确定性兜底:升×单价(印刷行小计
+# 一致时取印刷值更准)覆盖飞掉的 total;积分行(整数 qty)绝不当金额。
+BANGCHAK_MISREAD = {
+    "document_type": "tax_invoice",
+    "seller_name": "BANGCHAK BGN-CHAARANSAN",
+    "subtotal": "",
+    "vat": "",
+    "total_amount": "1000",  # ★误读:净额 1,780 被读成 1000
+    "items": [
+        {"name": "ไฮดีเซล S", "qty": "44.67", "price": "39.85", "subtotal": "1780"},
+        {"name": "คะแนนสะสม", "qty": "22", "price": "39.85", "subtotal": "785"},  # 积分·绝不当金额
+    ],
+}
+
+# total 已被正确读为净额 1,780 的干净票:确定性层不得反过来覆盖(升×单价 1780.10 在容差内)。
+BANGCHAK_CLEAN = {
+    "document_type": "tax_invoice",
+    "seller_name": "BANGCHAK BGN-CHAARANSAN",
+    "subtotal": "",
+    "vat": "",
+    "total_amount": "1780.00",
+    "items": [
+        {"name": "ไฮดีเซล S", "qty": "44.67", "price": "39.85", "subtotal": "1780"},
+        {"name": "คะแนนสะสม", "qty": "22", "price": "39.85", "subtotal": "785"},
+    ],
+}
+
+
+class BangchakFuelTotalTests(unittest.TestCase):
+    """加油票总额读飞:升×单价兜底,grand=1,780(永不 1000·永不把积分 22 当金额)。"""
+
+    def test_misread_total_corrected_to_net(self):
+        n = ik.normalize_ocr_fields(BANGCHAK_MISREAD)
+        self.assertEqual(n["total_amount"], "1780.00")
+        self.assertIn("fuel_total_from_qty_price", n.get("_corrections") or [])
+
+    def test_booked_grand_is_fuel_net_not_1000(self):
+        n = ik.normalize_ocr_fields(BANGCHAK_MISREAD)
+        grand = _grand(n, "expense")
+        self.assertEqual(grand, Decimal("1780.00"))
+        self.assertNotEqual(grand, Decimal("1000.00"))  # ★永不 1000
+        self.assertNotEqual(grand, Decimal("876.70"))  # ★永不把积分 22×39.85 当额
+
+    def test_clean_total_not_overwritten(self):
+        # total 已正确读 1,780 → 升×单价 1780.10 在容差内,不反向覆盖(保印刷净额)。
+        n = ik.normalize_ocr_fields(BANGCHAK_CLEAN)
+        self.assertEqual(n["total_amount"], "1780.00")
+        self.assertNotIn("fuel_total_from_qty_price", n.get("_corrections") or [])
+        self.assertEqual(_grand(n, "expense"), Decimal("1780.00"))
+
+    def test_non_fuel_receipts_unaffected(self):
+        # 红线:加油兜底不碰其它票据(无加油品名 → 不触发)。
+        for fx, kind, want in (
+            (CP_ALL, "expense", "110.00"),
+            (SEAFOOD, "expense", "2722.00"),
+            (AMAZON_70, "expense", "70.00"),
+        ):
+            n = ik.normalize_ocr_fields(fx)
+            self.assertNotIn("fuel_total_from_qty_price", n.get("_corrections") or [])
+            self.assertEqual(_grand(n, kind), Decimal(want))
+
+
 class CpAllCashTotalTests(unittest.TestCase):
     """Issue 1:total 不得取 Cash 200。"""
 

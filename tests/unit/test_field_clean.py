@@ -73,9 +73,7 @@ class AmountEditPreservesFieldsTests(unittest.TestCase):
 
     def test_amount_edit_keeps_other_fields(self):
         data = lcd.detail_to_data(self._detail())
-        lcd.apply_changes(
-            None, data, ExpenseDraft(amount=Decimal("1500")), ["amount"], "t", 1, {}
-        )
+        lcd.apply_changes(None, data, ExpenseDraft(amount=Decimal("1500")), ["amount"], "t", 1, {})
         self.assertEqual(data["supplier"]["name"], "Bangchak")
         self.assertEqual(data["supplier"]["tax_id"], "0107561000013")
         self.assertEqual(data["doc_date"], "2026-06-13")
@@ -120,7 +118,9 @@ class DetailApiSmokeTests(unittest.TestCase):
         self.assertTrue(res["doc"]["has_vat"])  # 税务一致性:填了税号不允许显「ไม่มีใบกำกับ」
         self.assertEqual(res["supplier"]["tax_id"], "0107542000011")  # 真税号保留(不清空)
 
-    def test_invalid_tax_does_not_fake_has_tax_invoice(self):  # Bangchak:13 无效 → 不强填·不造假税号
+    def test_invalid_tax_does_not_fake_has_tax_invoice(
+        self,
+    ):  # Bangchak:13 无效 → 不强填·不造假税号
         res = self._get("13")
         self.assertIsNone(res["doc"]["supplier_tax_id"])  # 假税号清空(不留 13)
         self.assertFalse(res["doc"]["has_vat"])  # 无有效税号 → 不强填 has_vat

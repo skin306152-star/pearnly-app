@@ -21,6 +21,10 @@ _TARGETS = {
         ("ค่าอาหารและรับรอง", "餐饮", "อาหาร", "food", "meal", "entertainment"),
         ("ค่าอาหาร/เครื่องดื่ม", "餐费", "饮料", "อาหาร", "เครื่องดื่ม", "food", "drink"),
     ),
+    "goods": (
+        ("ซื้อสินค้า/วัตถุดิบ", "采购", "商品", "วัตถุดิบ", "goods", "purchase"),
+        ("สินค้าสำเร็จรูป", "成品", "商品", "merchandise", "finished goods"),
+    ),
     "fuel": (
         ("ค่าเดินทางและขนส่ง", "交通", "เดินทาง", "transport", "travel"),
         ("ค่าน้ำมันเชื้อเพลิง", "燃油", "น้ำมัน", "fuel", "petrol"),
@@ -129,6 +133,19 @@ _VENDOR_RULES: tuple[tuple[str, str]] = (
         r"บุฟเฟ่ต์|บุฟเฟต์|buffet|ซีฟู้ด|seafood|cafe|คาเฟ่",
         "food_drink",
     ),
+    # 批发/大卖场 → 采购商品默认(品名清楚时 _ITEM_RULES 已先归位:笔→办公、食品→餐饮;
+    # 只有品名识别不清才落到这里 = 调用方记 vendor_default)。
+    (
+        r"makro|แม็คโคร|แม็กโคร|\btops\b|ท็อปส์|lotus|โลตัส|tesco|เทสโก้|big ?c|บิ๊กซี|"
+        r"gourmet market|villa market|วิลล่า มาร์เก็ต|foodland|ฟู้ดแลนด์",
+        "goods",
+    ),
+    # 便利店 → 餐饮/便利店默认(同上:品名优先;不清才落此默认 = vendor_default)。
+    (
+        r"7-?eleven|seven ?eleven|เซเว่น|เซเว่นอีเลฟเว่น|7-?11|cp all|ซีพี ?ออลล์|"
+        r"familymart|แฟมิลี่มาร์ท|family mart|มินิ ?บิ๊กซี",
+        "food_drink",
+    ),
     (r"\bgrab\b|แกร็บ|\bbolt\b|โบลท์|lineman|ไลน์แมน|แท็กซี่|\btaxi\b", "taxi"),
     (
         r"บางจาก|bangchak|ปตท|\bptt\b|เชลล์|\bshell\b|คาลเท็กซ์|caltex|เอสโซ่|\besso\b|ซัสโก้|susco",
@@ -187,15 +204,27 @@ def _first_rule(text: str, rules: tuple[tuple[str, str]], categories: list):
     return None, None
 
 
-def rule_category(vendor: str, descs: str, categories: list):
-    """确定性归类:先看明细品名,再看商户。品名优先避免 PTT/Cafe Amazon 咖啡误分燃油。"""
+def classify_rules(vendor: str, descs: str, categories: list):
+    """确定性归类,返回 (cat_id, sub_id, layer)。layer ∈ 'item'|'vendor'|''。
+
+    品名优先(item)→ 商户(vendor)→ 商户+品名合并再过品名。品名优先避免 PTT/Cafe Amazon
+    咖啡误分燃油;7-11/Makro 等便利店/大卖场只在品名识别不清时落到商户默认(layer='vendor',
+    调用方据此记 category_source=vendor_default 便于观察)。
+    """
     cid, sid = _first_rule(descs or "", _ITEM_RULES, categories)
     if cid:
-        return cid, sid
+        return cid, sid, "item"
     cid, sid = _first_rule(vendor or "", _VENDOR_RULES, categories)
     if cid:
-        return cid, sid
-    return _first_rule(f"{vendor or ''} {descs or ''}", _ITEM_RULES, categories)
+        return cid, sid, "vendor"
+    cid, sid = _first_rule(f"{vendor or ''} {descs or ''}", _ITEM_RULES, categories)
+    return (cid, sid, "item") if cid else (None, None, "")
+
+
+def rule_category(vendor: str, descs: str, categories: list):
+    """确定性归类(2-tuple · 向后兼容多处调用)。命中层见 classify_rules。"""
+    cid, sid, _layer = classify_rules(vendor, descs, categories)
+    return cid, sid
 
 
 _PROMPT = (

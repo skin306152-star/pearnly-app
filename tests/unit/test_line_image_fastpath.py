@@ -198,28 +198,71 @@ class CategoryTimeoutTests(unittest.TestCase):
 
         self.assertLessEqual(_CAT_LLM_TIMEOUT, 3)
 
-    def test_rule_hit_source_and_no_llm(self):
+    def _call(self, **over):
+        from services.purchase import line_ingest as li
+
+        kw = dict(
+            tenant_id="T1",
+            workspace_client_id=7,
+            vendor="Cafe",
+            tax_id="",
+            descs=["latte"],
+            items=[],
+            api_key="k",
+        )
+        kw.update(over)
+        return li._smart_category(object(), **kw)
+
+    def test_learned_overrides_rules_and_llm(self):
+        from services.expense import category_ai
+        from services.purchase import line_ingest as li
+
+        learned = {
+            "category_id": "L1",
+            "subcategory_id": "LS1",
+            "category_name": "Food",
+            "subcategory_name": "Drink",
+        }
+        with (
+            mock.patch("services.purchase.categories.get_tree", return_value=[]),
+            mock.patch("services.expense.conversation.find_exact", return_value=learned),
+            mock.patch.object(category_ai, "classify_rules") as cr,
+            mock.patch.object(category_ai, "suggest_category") as sg,
+        ):
+            out = self._call(tax_id="1234567890123")
+        self.assertEqual((out[0], out[1], out[5]), ("L1", "LS1", "learned"))
+        cr.assert_not_called()  # 用户学习最高优先 → 不再跑规则/LLM
+        sg.assert_not_called()
+
+    def test_rule_item_layer_source_and_no_llm(self):
         from services.expense import category_ai
         from services.purchase import line_ingest as li
 
         with (
             mock.patch("services.purchase.categories.get_tree", return_value=[]),
-            mock.patch.object(category_ai, "categorize_items", return_value=[]),
-            mock.patch.object(category_ai, "rule_category", return_value=("C1", "S1")),
+            mock.patch("services.expense.conversation.find_exact", return_value=None),
+            mock.patch.object(category_ai, "classify_rules", return_value=("C1", "S1", "item")),
             mock.patch.object(li, "_category_names", return_value=("Food", "Coffee")),
             mock.patch.object(category_ai, "suggest_category") as sg,
         ):
-            out = li._smart_category(
-                object(),
-                tenant_id="T1",
-                workspace_client_id=7,
-                vendor="Cafe",
-                descs=["latte"],
-                items=[],
-                api_key="k",
-            )
+            out = self._call()
         self.assertEqual(out[5], "rule")
-        sg.assert_not_called()  # 规则命中 → 不再调 vendor-level LLM
+        sg.assert_not_called()  # 确定性规则命中 → 不再调 LLM
+
+    def test_vendor_layer_marks_vendor_default(self):
+        from services.expense import category_ai
+        from services.purchase import line_ingest as li
+
+        with (
+            mock.patch("services.purchase.categories.get_tree", return_value=[]),
+            mock.patch("services.expense.conversation.find_exact", return_value=None),
+            mock.patch.object(category_ai, "classify_rules", return_value=("C1", "S1", "vendor")),
+            mock.patch.object(li, "_category_names", return_value=("Food", "")),
+            mock.patch.object(category_ai, "suggest_category") as sg,
+        ):
+            out = self._call(vendor="7-Eleven", descs=["?????"])
+        self.assertEqual(out[5], "vendor_default")  # 品名不清 → 商户默认 → 日志可观察
+        sg.assert_not_called()
 
     def test_llm_fallback_uses_short_timeout(self):
         from services.expense import category_ai
@@ -227,20 +270,13 @@ class CategoryTimeoutTests(unittest.TestCase):
 
         with (
             mock.patch("services.purchase.categories.get_tree", return_value=[]),
+            mock.patch("services.expense.conversation.find_exact", return_value=None),
+            mock.patch.object(category_ai, "classify_rules", return_value=(None, None, "")),
             mock.patch.object(category_ai, "categorize_items", return_value=[]),
-            mock.patch.object(category_ai, "rule_category", return_value=(None, None)),
             mock.patch.object(category_ai, "suggest_category", return_value=("C2", "S2")) as sg,
             mock.patch.object(li, "_category_names", return_value=("Office", "Sw")),
         ):
-            out = li._smart_category(
-                object(),
-                tenant_id="T1",
-                workspace_client_id=7,
-                vendor="Acme",
-                descs=["thing"],
-                items=[],
-                api_key="k",
-            )
+            out = self._call(vendor="Acme", descs=["thing"])
         self.assertEqual(out[5], "ai")
         self.assertEqual(sg.call_args.kwargs.get("timeout"), li._CAT_LLM_TIMEOUT)
 

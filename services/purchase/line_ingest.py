@@ -203,39 +203,92 @@ def _dominant_item_category(cats: list, items: list, *, api_key):
     return cat_id, sub_id, share
 
 
-def _smart_category(cur, *, tenant_id, workspace_client_id, vendor, descs, items, api_key):
-    """图片路分类:逐项规则/批量判断 → 主金额分类 → 整票兜底 → 关键词兜底。
+def _learned_category(cur, tenant_id, workspace_client_id, *, tax_id, vendor):
+    """用户学习命中:税号键优先(tax:<税号>),其次归一卖家名键(seller:<归一名>)。无命中 → None。
 
-    返回 (cat_id, sub_id, cat_name, sub_name, conf, source)。source ∈ item|rule|ai|fallback|none
-    (喂主路径日志 category_source)。LLM 步骤走 3s 硬上限,超时回落规则/中性,不阻塞卡片。
+    用户在 LINE 改错或网页详情改过分类后写入(见 line_correct_data / docs.update_draft),此处读出,
+    优先级最高 —— 规则与 LLM 都不能覆盖用户明确选过的归类。
     """
+    from services.expense import conversation, merchant
+
+    t = (tax_id or "").strip()
+    keys = []
+    if t:
+        keys.append(f"tax:{t}")
+    nv = merchant.canonical_merchant(vendor, t)
+    if nv:
+        keys.append(f"seller:{nv}")
+    try:
+        for key in keys:
+            hit = conversation.find_exact(
+                cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, keyword=key
+            )
+            if hit and hit.get("category_id"):
+                return hit
+    except Exception as e:  # noqa: BLE001 — 学习查不到只回落规则,绝不拖垮入账
+        logger.warning("[line_ingest] learned lookup skipped: %s", str(e)[:160])
+    return None
+
+
+def _smart_category(cur, *, tenant_id, workspace_client_id, vendor, tax_id, descs, items, api_key):
+    """图片路分类(确定性优先 · LLM 仅补充 · 用户学习与规则永不被 LLM 覆盖)。
+
+    顺序:① 用户学习(税号/归一卖家名)② 确定性规则(品名 item → 商户默认 vendor_default)
+    ③ LLM 逐项主分类 ④ LLM 整票兜底 ⑤ 关键词兜底 / 太糊留未分类(不硬猜)。
+    返回 (cat_id, sub_id, cat_name, sub_name, conf, source);source 喂日志 category_source ∈
+    learned|rule|vendor_default|item|ai|fallback|none。LLM 步骤 3s 硬上限,超时回落规则/中性。
+    """
+    from services.expense import category_ai, merchant
     from services.purchase import categories as cat_svc
 
     cats = cat_svc.get_tree(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
     joined = " / ".join(d for d in descs[:5] if d)
-    from services.expense import category_ai
 
+    learned = _learned_category(cur, tenant_id, workspace_client_id, tax_id=tax_id, vendor=vendor)
+    if learned and learned.get("category_id"):
+        return (
+            learned["category_id"],
+            learned.get("subcategory_id"),
+            learned.get("category_name") or "",
+            learned.get("subcategory_name") or "",
+            Decimal("0.97"),
+            "learned",
+        )
+
+    # 糊名清税号 → curated 别名喂规则(仅身份解析,分类仍走品名优先)。
+    rule_vendor = vendor or merchant.merchant_alias_by_tax(tax_id)
+
+    # ① 确定性逐项主分类(纯规则 · 按金额加权 · 不调 LLM):混合票按金额最大类别,接近五五开打低置信。
+    cat_id, sub_id, share = _dominant_item_category(cats, items, api_key=None)
+    if cat_id:
+        cat_name, sub_name = _category_names(cats, cat_id, sub_id)
+        conf = Decimal("0.92") if share >= Decimal("0.70") else Decimal("0.82")
+        return cat_id, sub_id, cat_name, sub_name, conf, "rule"
+
+    # ② 整票规则:品名(item)落空 → 商户默认(vendor → vendor_default · 日志可观察)。
+    cat_id, sub_id, layer = category_ai.classify_rules(rule_vendor, joined, cats)
+    if cat_id:
+        cat_name, sub_name = _category_names(cats, cat_id, sub_id)
+        if layer == "vendor":
+            return cat_id, sub_id, cat_name, sub_name, Decimal("0.85"), "vendor_default"
+        return cat_id, sub_id, cat_name, sub_name, Decimal("0.90"), "rule"
+
+    # ③ LLM 逐项主分类(确定性全落空才补充)。
     cat_id, sub_id, share = _dominant_item_category(cats, items, api_key=api_key)
     if cat_id:
         cat_name, sub_name = _category_names(cats, cat_id, sub_id)
-        conf = Decimal("0.96") if share >= Decimal("0.70") else Decimal("0.82")
+        conf = Decimal("0.88") if share >= Decimal("0.70") else Decimal("0.80")
         return cat_id, sub_id, cat_name, sub_name, conf, "item"
 
-    cat_id, sub_id = category_ai.rule_category(vendor, joined, cats)
-    if cat_id:
-        cat_name, sub_name = _category_names(cats, cat_id, sub_id)
-        return cat_id, sub_id, cat_name, sub_name, Decimal("0.90"), "rule"
-
-    if not cat_id and api_key:
+    if api_key:
         cat_id, sub_id = category_ai.suggest_category(
-            vendor, joined, cats, api_key=api_key, timeout=_CAT_LLM_TIMEOUT
+            rule_vendor, joined, cats, api_key=api_key, timeout=_CAT_LLM_TIMEOUT
         )
         if cat_id:
             cat_name, sub_name = _category_names(cats, cat_id, sub_id)
-            return cat_id, sub_id, cat_name, sub_name, Decimal("0.88"), "ai"
+            return cat_id, sub_id, cat_name, sub_name, Decimal("0.80"), "ai"
 
-    if not cat_id:
-        cat_id, sub_id = ik._match_category(f"{vendor} {descs[0] if descs else ''}", cats)
+    cat_id, sub_id = ik._match_category(f"{rule_vendor} {descs[0] if descs else ''}", cats)
     if not cat_id:
         return None, None, "", "", Decimal("0"), "none"
     cat_name, sub_name = _category_names(cats, cat_id, sub_id)
@@ -334,16 +387,24 @@ def ingest_line_image(
         descs = []
     # 智能归类(LLM 优先 → 关键词兜底):懂泰文品名,治「分类不对/空」。
     vendor_name = draft["supplier"].get("name") or ""
+    seller_tax = card_fields.get("seller_tax") or ""
     cat_id, sub_id, _cat_name, _sub_name, cat_conf, cat_source = _smart_category(
         cur,
         tenant_id=tenant_id,
         workspace_client_id=workspace_client_id,
         vendor=vendor_name,
+        tax_id=seller_tax,
         descs=descs,
         items=card_fields.get("items") or [],
         api_key=api_key,
     )
-    logger.info("[line_ingest] category_source=%s", cat_source)
+    logger.info(
+        "[line_ingest] category_source=%s vendor=%r tax=%s cat=%s",
+        cat_source,
+        vendor_name[:40],
+        seller_tax,
+        cat_id,
+    )
     if cat_id:
         draft["category_id"] = cat_id
         card_fields["category"] = _cat_name

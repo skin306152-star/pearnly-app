@@ -441,6 +441,9 @@ def update_draft(
         (tenant_id, doc_id),
     )
     _insert_lines(cur, tenant_id=tenant_id, doc_id=doc_id, lines=calc["lines"])
+    from services.expense.line_correct_data import learn_from_doc_edit
+
+    learn_from_doc_edit(cur, tenant_id, workspace_client_id, data, calc["lines"])
     return get_doc(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=doc_id)
 
 

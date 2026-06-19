@@ -175,7 +175,70 @@ class RestaurantNotFuelTests(unittest.TestCase):
 
     def test_real_fuel_receipt_still_fuel(self):
         # 反向回归:真油票(ไอดีเซล S / บางจาก)仍归燃油,没被「食物优先」误伤。
-        self.assertEqual(category_ai.rule_category("BANGCHAK", "ไอดีเซล S", self.TREE), ("trav", "fuel"))
+        self.assertEqual(
+            category_ai.rule_category("BANGCHAK", "ไอดีเซล S", self.TREE), ("trav", "fuel")
+        )
+
+
+class MerchantRuleTests(unittest.TestCase):
+    """P2A 商户/便利店/大卖场:品名优先,识别不清才落商户默认(layer='vendor')。"""
+
+    TREE = [
+        {
+            "id": "food",
+            "name": "ค่าอาหารและรับรอง",
+            "children": [{"id": "fb", "name": "ค่าอาหาร/เครื่องดื่ม"}],
+        },
+        {
+            "id": "office",
+            "name": "ค่าใช้จ่ายสำนักงาน",
+            "children": [{"id": "stat", "name": "เครื่องเขียน/วัสดุสิ้นเปลือง"}],
+        },
+        {
+            "id": "goods",
+            "name": "ซื้อสินค้า/วัตถุดิบ",
+            "children": [{"id": "fin", "name": "สินค้าสำเร็จรูป"}],
+        },
+        {
+            "id": "trav",
+            "name": "ค่าเดินทางและขนส่ง",
+            "children": [{"id": "fuel", "name": "ค่าน้ำมันเชื้อเพลิง"}],
+        },
+    ]
+
+    def _layer(self, v, d):
+        return category_ai.classify_rules(v, d, self.TREE)
+
+    def test_seven_eleven_food_item_wins(self):
+        # 7-11 买咖啡 → 餐饮(品名优先 · layer=item)
+        self.assertEqual(self._layer("7-Eleven", "กาแฟเย็น"), ("food", "fb", "item"))
+
+    def test_seven_eleven_office_item_wins(self):
+        # 7-11 买笔 → 办公/耗材(品名优先,不被便利店默认吃成餐饮)
+        self.assertEqual(self._layer("7-Eleven", "ปากกา ลูกลื่น"), ("office", "stat", "item"))
+
+    def test_seven_eleven_unclear_item_vendor_default(self):
+        # 品名识别不清 → 落 7-11 商户默认餐饮 · layer=vendor(调用方记 vendor_default)
+        self.assertEqual(self._layer("7-Eleven สาขา 123", "?????"), ("food", "fb", "vendor"))
+
+    def test_makro_unclear_item_to_goods(self):
+        # Makro 杂货识别不清 → 采购商品默认(不泛化普通费用)· layer=vendor
+        self.assertEqual(self._layer("Makro", ""), ("goods", "fin", "vendor"))
+
+    def test_makro_office_item_wins(self):
+        self.assertEqual(self._layer("แม็คโคร", "กระดาษ A4"), ("office", "stat", "item"))
+
+    def test_tops_to_goods(self):
+        self.assertEqual(self._layer("TOPS Daily", ""), ("goods", "fin", "vendor"))
+
+    def test_cafe_amazon_to_food(self):
+        self.assertEqual(self._layer("Cafe Amazon", "")[:2], ("food", "fb"))
+
+    def test_bangchak_fuel_item_wins(self):
+        self.assertEqual(self._layer("บางจาก", "ไฮดีเซล S"), ("trav", "fuel", "item"))
+
+    def test_unknown_vendor_unclear_item_no_hit(self):
+        self.assertEqual(self._layer("ร้านป้าแดง", ""), (None, None, ""))
 
 
 if __name__ == "__main__":

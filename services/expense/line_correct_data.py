@@ -7,7 +7,11 @@
 
 from __future__ import annotations
 
+import logging
+
 from services.expense.expense_draft import ExpenseDraft
+
+logger = logging.getLogger(__name__)
 
 
 def detail_to_data(detail: dict) -> dict:
@@ -73,6 +77,7 @@ def apply_changes(cur, data, changes_draft, keys, tid, ws, bound_user) -> None:
         for ln in data["lines"]:
             ln["category_id"] = cid
             ln["subcategory_id"] = sid
+        learn_category(cur, tid=tid, ws=ws, supplier=data.get("supplier"), cid=cid, sid=sid)
     if "payment_method" in keys:
         data["payment_method"] = changes_draft.payment_method or None
     if "amount" in keys:
@@ -80,6 +85,62 @@ def apply_changes(cur, data, changes_draft, keys, tid, ws, bound_user) -> None:
         if data["lines"]:
             data["lines"][0]["unit_price"] = str(changes_draft.amount)
             data["lines"][0]["qty"] = "1"
+
+
+def learn_category(cur, *, tid, ws, supplier, cid, sid) -> None:
+    """用户改分类 → 记住 本单 卖家/税号 → 科目(下次同商户票优先沿用)。空分类/无卖家 → no-op。
+
+    键:税号(tax:<税号>)+ 归一卖家名(seller:<归一名>),复用 expense_learned 表前缀键,
+    `_smart_category` 据此精确命中(优先级最高,规则/LLM 不能覆盖)。
+    """
+    if not cid:
+        return
+    # 学习是附带收益:任何失败(树查不到/cursor 异常)都只能跳过,绝不能拖垮改错/保存主流程。
+    try:
+        from services.expense import conversation, merchant
+        from services.purchase import categories as cat_svc
+
+        name = (supplier or {}).get("name") or ""
+        tax = str((supplier or {}).get("tax_id") or "").strip()
+        cat_name = sub_name = ""
+        for p in cat_svc.get_tree(cur, tenant_id=tid, workspace_client_id=ws):
+            if p.get("id") == cid:
+                cat_name = p.get("name") or ""
+                for c in p.get("children") or []:
+                    if c.get("id") == sid:
+                        sub_name = c.get("name") or ""
+                break
+        keys = []
+        if tax:
+            keys.append(f"tax:{tax}")
+        nv = merchant.canonical_merchant(name, tax)
+        if nv:
+            keys.append(f"seller:{nv}")
+        for key in keys:
+            conversation.learn(
+                cur,
+                tenant_id=tid,
+                workspace_client_id=ws,
+                keyword=key,
+                category_id=cid,
+                subcategory_id=sid,
+                category_name=cat_name,
+                subcategory_name=sub_name,
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[learn_category] skipped: %s", str(e)[:160])
+
+
+def learn_from_doc_edit(cur, tid, ws, data, lines) -> None:
+    """网页详情改草稿保存 → 按本单 卖家/税号 记住头部科目(与 LINE 改错同口径 · UPSERT 幂等)。"""
+    cid = (data or {}).get("category_id")
+    if not cid:
+        return
+    sid = next(
+        (ln.get("subcategory_id") for ln in (lines or []) if ln.get("category_id") == cid),
+        None,
+    )
+    learn_category(cur, tid=tid, ws=ws, supplier=(data or {}).get("supplier"), cid=cid, sid=sid)
 
 
 def _resolve_category(cur, text, tid, ws, bound_user):

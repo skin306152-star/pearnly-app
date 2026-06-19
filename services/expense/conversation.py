@@ -118,6 +118,29 @@ def lookup_learned(cur, *, tenant_id: str, workspace_client_id: int, text: str) 
     return None
 
 
+def find_exact(cur, *, tenant_id: str, workspace_client_id: int, keyword: str) -> Optional[dict]:
+    """精确命中已学习键 → 该科目。用于前缀键(tax:<税号> / seller:<归一卖家名>)按身份精确查,
+    区别于 lookup_learned 的自由文本子串匹配。无命中 → None。"""
+    kw = (keyword or "").strip().lower()
+    if not kw:
+        return None
+    cur.execute(
+        "SELECT category_id, subcategory_id, category_name, subcategory_name "
+        "FROM expense_learned "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND keyword = %s",
+        (tenant_id, workspace_client_id, kw),
+    )
+    r = cur.fetchone()
+    if not r:
+        return None
+    return {
+        "category_id": str(r["category_id"]) if r["category_id"] else None,
+        "subcategory_id": str(r["subcategory_id"]) if r["subcategory_id"] else None,
+        "category_name": r["category_name"],
+        "subcategory_name": r["subcategory_name"],
+    }
+
+
 def learn(
     cur,
     *,

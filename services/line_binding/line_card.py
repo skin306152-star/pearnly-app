@@ -186,10 +186,19 @@ def _core_section(fields: dict, lang: str, t: dict, low) -> list:
 
 
 def _seller_section(fields: dict, t: dict, low) -> list:
-    """卖家区(有值才显):卖家 + 税号 + 地址 + 单据号。"""
-    if not ((str(fields.get("vendor") or "").strip()) or s.seller_rows(fields, t)):
+    """卖家区(有值才显):卖家 + 税号 + 地址 + 单据号。
+
+    P2B:卖家乱码/全问号(seller_unclear)→ 不展示为正式卖家,显「ผู้ขายไม่ชัดเจน / 待确认卖家」(琥珀)。"""
+    vendor = str(fields.get("vendor") or "").strip()
+    unclear = bool(fields.get("seller_unclear"))
+    if not (vendor or unclear or s.seller_rows(fields, t)):
         return []
-    rows = [s.field_row(t["vendor"], fields.get("vendor"), t, low=low("vendor"), strong=False)]
+    if vendor:
+        rows = [s.field_row(t["vendor"], vendor, t, low=low("vendor"), strong=False)]
+    elif unclear:
+        rows = [s.field_row(t["vendor"], t["seller_unclear"], t, low=True, strong=False)]
+    else:
+        rows = []
     rows += s.seller_rows(fields, t)
     if str(fields.get("invoice_number") or "").strip():
         rows.append(
@@ -344,6 +353,7 @@ def result_card(
             liff_id,
             str(workspace_client_id or ""),
             review_first=bool(warn_total),
+            block_confirm=bool(fields.get("amount_unreliable")),
         ),
     )
 

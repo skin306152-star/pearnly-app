@@ -348,7 +348,7 @@ def ingest_line_image(
         # field_clean 规则)。账务草稿与 OCR raw 不受影响,仅卡片展示。
         "vendor": field_clean.clean_seller(fields.get("seller_name")),
         "seller_tax": field_clean.clean_tax_id(fields.get("seller_tax")),
-        "seller_addr": fields.get("seller_addr") or "",
+        "seller_addr": field_clean.clean_address(fields.get("seller_addr")),
         "subtotal": _pretax,
         "vat": _vat,
         "wht": fields.get("wht_amount") or "",
@@ -413,6 +413,23 @@ def ingest_line_image(
             fc = dict(fc)
             fc["category"] = float(cat_conf)
 
+    # P2B 字段卫生:脏字段(乱码卖家/异常日期/非法税号·票号·地址)不裸露 → 喂 fc 让卡片+详情统一标黄,
+    # 金额不可靠 → 卡片撤确认按钮(field_quality.card_signals 单一接线点)。tax/invoice/address 已清空。
+    from services.purchase import field_quality
+
+    fc, _sig = field_quality.card_signals(fields, fc, _dec(amount))
+    date_suspect = _sig["date_suspect"]
+    amount_unreliable = _sig["amount_unreliable"]
+    card_fields["dirty_fields"] = _sig["dirty_fields"]
+    card_fields["seller_unclear"] = _sig["seller_unclear"]
+    card_fields["amount_unreliable"] = amount_unreliable
+    logger.info(
+        "[line_ingest] field_quality=%s dirty_fields=%s amount_unreliable=%s",
+        _sig["quality"],
+        _sig["dirty_fields"],
+        amount_unreliable,
+    )
+
     # 付款方式:OCR 票面读到的(QRPayment/เงินสด/บัตร…)归一成规范码 → 卡显「付款方式」。未读到 → 空。
     from services.expense.line_classify import payment_from_ocr
 
@@ -436,9 +453,14 @@ def ingest_line_image(
         is_duplicate=bool(res.get("dedupe_hit")),
         require_category=False,
     )
-    # 明细与总额对不上(乱读/不全)→ 不自动入正式账,降为草稿请用户先核对(诚实优先·仍可保存)。
-    if warn_total and verdict.action == "post":
-        verdict = conf.Verdict("confirm", verdict.dup, verdict.reasons + ("items_total_mismatch",))
+    # 不静默入账脏数据(诚实优先):明细与总额对不上 / 日期异常 / 金额不可靠 → 降为草稿请用户先核对。
+    if (warn_total or date_suspect or amount_unreliable) and verdict.action == "post":
+        reason = (
+            "items_total_mismatch"
+            if warn_total
+            else ("date_suspect" if date_suspect else "amount_unreliable")
+        )
+        verdict = conf.Verdict("confirm", verdict.dup, verdict.reasons + (reason,))
     # 文/图/多项共用入账编排(#10 line_booker):建草稿→按置信过账→铸 nonce token。
     doc_id, state, token = line_booker.book_and_mint(
         cur,

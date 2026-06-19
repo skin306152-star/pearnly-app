@@ -120,10 +120,30 @@ def missing_taxid(fields: dict) -> bool:
     return vat_nonzero or "tax" in dt or "ภาษี" in dt or "กำกับ" in dt
 
 
+_DIRTY_LABELS = {
+    "seller": "vendor",
+    "date": "date",
+    "tax_id": "tax_id",
+    "invoice": "inv_no",
+    "address": "address",
+}
+
+
+def _review_strip(fields: dict, t: dict):
+    """P2B:低置信字段汇总「请检查:卖家·日期·税号」(列出具体字段·琥珀)。无脏字段 → None。"""
+    names = [t[_DIRTY_LABELS[d]] for d in (fields.get("dirty_fields") or []) if d in _DIRTY_LABELS]
+    if not names:
+        return None
+    return strip(t["fields_review"].format(x=" · ".join(names)), "#FEF7EC", "#B45309")
+
+
 def notices(fields: dict, warn_total: bool, t: dict) -> list:
     """卡顶提示细条(产品级·按重要性·最多 2 条·不堆满):
-    金额/VAT 不自洽(琥珀)> 缺税号(琥珀)> 明细可能不全(灰)。各信号只在真异常时出现。"""
+    低置信字段需检查(琥珀·列字段)> 金额可靠明细不符(琥珀)> 缺税号(琥珀)> 明细可能不全(灰)。"""
     out = []
+    review = _review_strip(fields, t)
+    if review:
+        out.append(review)
     if warn_total:
         out.append(strip(t["warn_total"], "#FEF7EC", "#B45309"))
     if missing_taxid(fields):
@@ -255,11 +275,13 @@ def footer(
     liff_id: str = "",
     ws: str = "",
     review_first: bool = False,
+    block_confirm: bool = False,
 ) -> list:
     """动作区(按状态出合法动作 · 竖排满宽永不死路):
     confirm 确认入账(主)/编辑/丢弃;posted 查看详情(主)/修改/[替代收据]/撤销;
-    dup 查看重复(主)/仍要入账/丢弃。review_first(明细与总额不符)= confirm 卡降级:
-    主按钮改「打开核对」(去详情),确认入账降为次按钮「บันทึกต่อ」——不假装明细完整、不默认继续入账。"""
+    dup 查看重复(主)/仍要入账/丢弃。
+    block_confirm(金额不可靠)= 禁止入账:只给「打开核对」(去详情)+ 丢弃,**不出确认/继续按钮**。
+    review_first(金额可靠但明细不符)= 降级:主按钮「打开核对」,确认入账降为次按钮「บันทึกต่อ」(仍可继续)。"""
     detail_uri = liff_link(liff_id, web_url, ref, ws=ws)
     pb = line_postback
 
@@ -279,6 +301,9 @@ def footer(
     elif state == "dup":
         primary = btn(t["btn_open"], primary=True, uri=detail_uri)
         view.append(btn(t["btn_post_anyway"], primary=False, postback=pb.confirm_data(ref, token)))
+        danger.append(kill(t["btn_discard"], pb.discard_data(ref, token)))
+    elif block_confirm:  # 金额不可靠 → 不给确认/继续入账,只能去详情核对(永不静默入账坏金额)
+        primary = btn(t["btn_review"], primary=True, uri=detail_uri)
         danger.append(kill(t["btn_discard"], pb.discard_data(ref, token)))
     elif review_first:  # confirm 但明细与总额不符 → 引导核对优先,入账降次按钮(仍可继续)
         primary = btn(t["btn_review"], primary=True, uri=detail_uri)

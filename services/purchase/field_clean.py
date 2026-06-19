@@ -14,6 +14,7 @@ from __future__ import annotations
 import re
 
 _AMOUNT_RE = re.compile(r"^[\d,]+(?:\.\d+)?$")
+_GARBLE_RE = re.compile(r"[?�]")  # ? 与替换符 · 乱码标志
 # 完整日期(DD/MM/YY[YY] 或 ISO)→ 不得当卖家/票号。单段「13」「2026」由金额规则兜住。
 _FULL_DATE_RE = re.compile(r"^\d{1,4}[/\-.]\d{1,2}[/\-.]\d{2,4}$|^\d{4}-\d{2}-\d{2}$")
 _ALNUM_RE = re.compile(r"[0-9A-Za-z฀-๿]")  # 至少含一个数字/拉丁/泰文字符才算有内容
@@ -81,9 +82,32 @@ def clean_seller(raw) -> str:
 
 
 def clean_invoice_no(raw) -> str:
-    """票号:允许短号(与税号不同);剥空白;纯日期片段 → ''(日期不当票号)。"""
+    """票号:允许短号(与税号不同);剥空白;纯日期片段/乱码 → ''(日期不当票号·不露乱码)。"""
     s = str(raw or "").strip()
-    if not s or _FULL_DATE_RE.match(s):
+    if not s or _FULL_DATE_RE.match(s) or is_garbled(s):
+        return ""
+    return s
+
+
+def is_garbled(raw) -> bool:
+    """乱码判定:无真实字符 或 ?/替换符占可见字符 ≥ 一半。
+
+    「?????」→ True;「TW ?????」(部分可读)→ True(过半问号·卖家/地址按整体判);「บางจาก」→ False。
+    空串不算乱码(= 缺失·由调用方区分 absent vs dirty)。
+    """
+    s = str(raw or "").strip()
+    if not s:
+        return False
+    if not _ALNUM_RE.search(s):
+        return True
+    visible = [c for c in s if not c.isspace()]
+    return bool(visible) and len(_GARBLE_RE.findall(s)) >= max(2, len(visible) // 2)
+
+
+def clean_address(raw) -> str:
+    """地址:剥空白;乱码/无内容/过短(<4)→ ''(不污染卡片·详情页可补)。"""
+    s = str(raw or "").strip()
+    if len(s) < 4 or is_garbled(s) or not _ALNUM_RE.search(s):
         return ""
     return s
 
@@ -99,14 +123,16 @@ def serialize_supplier(doc: dict) -> dict | None:
         return None
     tax = clean_tax_id(doc.get("supplier_tax_id")) or None
     name = clean_seller(doc.get("supplier_name")) or None
+    addr = clean_address(doc.get("supplier_address")) or None
     doc["supplier_tax_id"] = tax
     doc["supplier_name"] = name
+    doc["supplier_address"] = addr
     return {
         "id": doc["supplier_id"],
         "name": name,
         "tax_id": tax,
         "branch_type": doc.get("supplier_branch_type"),
         "branch_no": doc.get("supplier_branch_no"),
-        "address": doc.get("supplier_address"),
+        "address": addr,
         "phone": doc.get("supplier_phone"),
     }

@@ -455,5 +455,44 @@ class IncompleteItemsCardTests(unittest.TestCase):
         self.assertEqual(out["card_fields"]["payment_status"], "")
 
 
+class P2BFieldHygieneIngestTests(unittest.TestCase):
+    """P2B:脏字段不裸露 + 金额不可靠不静默过账(端到端 ingest)。"""
+
+    def test_garbled_fields_cleaned_and_flagged(self):
+        draft = _draft()
+        draft["supplier"] = {"name": "?????????", "tax_id": None}
+        res = {"route": "purchase", "draft": draft, "dedupe_hit": False, "field_confidence": {}}
+        fields = {
+            "document_type": "receipt",
+            "seller_name": "?????????",
+            "date": "2027-01-01",  # 未来 → suspect
+            "seller_tax": "13",  # 非法税号
+            "invoice_number": "?????",  # 乱码票号
+            "seller_addr": "???????",  # 乱码地址
+            "total_amount": "100",
+        }
+        out, _c, _p = _run(res, band="needs_review", auto_book=False, fields=fields)
+        cf = out["card_fields"]
+        self.assertEqual(cf["vendor"], "")  # 乱码卖家不展示为正式卖家
+        self.assertTrue(cf["seller_unclear"])
+        self.assertEqual(
+            cf["seller_tax"], ""
+        )  # 非法税号不显(ocr_corrections 上游已清成空 → absent)
+        self.assertEqual(cf["invoice_number"], "")  # 乱码票号不显
+        self.assertEqual(cf["seller_addr"], "")  # 乱码地址不显
+        for f in ("seller", "invoice", "address", "date"):
+            self.assertIn(f, cf["dirty_fields"])
+
+    def test_zero_total_amount_unreliable_blocks_autopost(self):
+        draft = _draft()
+        draft["grand_total"] = "0"
+        res = {"route": "purchase", "draft": draft, "dedupe_hit": False, "field_confidence": {}}
+        fields = {"document_type": "receipt", "seller_name": "ACME", "date": "2026-06-14"}
+        out, _c, pdoc = _run(res, band="high", auto_book=True, fields=fields)
+        self.assertTrue(out["card_fields"]["amount_unreliable"])
+        self.assertEqual(out["state"], "confirm")  # 总额不可靠 → 不静默过账,降确认
+        pdoc.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

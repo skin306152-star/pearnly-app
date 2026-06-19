@@ -192,13 +192,13 @@ class CardTests(unittest.TestCase):
 
         s = json.dumps(self._card("confirm", warn_total=True), ensure_ascii=False)
         self.assertIn("请核对", s)
-        self.assertIn("不符", s)
+        self.assertIn("金额可靠", s)  # P2B:金额可靠 · 明细需检查(措辞明确)
 
     def test_no_warn_total_no_hint(self):
         import json
 
         s = json.dumps(self._card("confirm"), ensure_ascii=False)
-        self.assertNotIn("不符", s)
+        self.assertNotIn("金额可靠", s)
 
     def test_buttons_each_separated_by_divider(self):
         # 每个动作之间都有分隔线(posted: 复核·替代收据·撤销 三者两两之间)。
@@ -352,6 +352,82 @@ class DocTypeLabelTests(unittest.TestCase):
 
     def test_unknown_code_falls_back_to_raw(self):
         self.assertEqual(line_card.doc_type_label("weird_type", "zh"), "weird_type")
+
+
+class P2BHygieneCardTests(unittest.TestCase):
+    """P2B:卡片不裸露脏数据 + 金额不可靠禁入账 + 脏字段「请检查」提示。"""
+
+    def _card(self, fields, amount="100.00", **kw):
+        f = {"document_type": "receipt", **fields}
+        return line_card.result_card(
+            state="confirm", amount=amount, fields=f, doc_id="D1", lang="th", **kw
+        )
+
+    def _postback_actions(self, card):
+        out = []
+
+        def walk(n):
+            if isinstance(n, dict):
+                if n.get("type") == "button" and n["action"]["type"] == "postback":
+                    out.append(line_postback.parse(n["action"]["data"])["action"])
+                for v in n.values():
+                    walk(v)
+            elif isinstance(n, list):
+                for x in n:
+                    walk(x)
+
+        walk(card)
+        return out
+
+    def test_seller_unclear_shows_fallback_not_questionmarks(self):
+        import json
+
+        c = self._card({"vendor": "", "seller_unclear": True})
+        sdump = json.dumps(c, ensure_ascii=False)
+        self.assertIn("ผู้ขายไม่ชัดเจน", sdump)  # th seller_unclear
+        self.assertNotIn("?????", sdump)
+
+    def test_amount_unreliable_blocks_confirm_button(self):
+        c = self._card({"amount_unreliable": True})
+        acts = self._postback_actions(c)
+        self.assertNotIn(line_postback.ACTION_CONFIRM, acts)  # 禁确认/继续入账
+        self.assertIn(line_postback.ACTION_DISCARD, acts)  # 仅丢弃 + (uri)去详情
+
+    def test_amount_reliable_items_dirty_keeps_post_anyway(self):
+        # 金额可靠 + 明细不符(warn_total)→ 仍可「继续保存」(降级·非禁止)。
+        acts = self._postback_actions(self._card({}, warn_total=True))
+        self.assertIn(line_postback.ACTION_CONFIRM, acts)
+
+    def test_dirty_fields_review_notice_lists_fields(self):
+        import json
+
+        c = self._card({"dirty_fields": ["seller", "date", "tax_id"]})
+        sdump = json.dumps(c, ensure_ascii=False)
+        self.assertIn("โปรดตรวจสอบ", sdump)  # th fields_review
+
+    def test_garbled_items_show_placeholder_not_questionmarks(self):
+        import json
+
+        c = self._card(
+            {"items": [{"name": "?????", "amount": "45.00"}, {"name": "TW", "amount": "35.00"}]}
+        )
+        sdump = json.dumps(c, ensure_ascii=False)
+        self.assertNotIn("?????", sdump)
+        self.assertIn("รายการที่ 1", sdump)  # th item_n 占位
+
+
+class PostedCardNoDirtyTests(unittest.TestCase):
+    """P2B:posted/终态卡不显脏地址(serialize_supplier 已清·fields_from_detail 读清洗值)。"""
+
+    def test_fields_from_detail_drops_blank_address(self):
+        from services.line_binding import line_posted_card
+
+        detail = {
+            "doc": {"doc_date": "2026-06-18", "doc_no": "INV1", "grand_total": "100"},
+            "supplier": {"name": "บางจาก", "tax_id": "0107542000011", "address": None},
+        }
+        f = line_posted_card.fields_from_detail(detail)
+        self.assertFalse(str(f.get("seller_addr") or "").strip())  # 清洗后地址空 → 不上卡
 
 
 class RecordDeepLinkTests(unittest.TestCase):

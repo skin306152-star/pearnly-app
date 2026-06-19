@@ -225,6 +225,24 @@ class ParseMultiTests(unittest.TestCase):
         self.assertEqual(lqe.extract_inline_vendor("กาแฟ 30 ข้าว 60"), "")  # 无声明 → 空
 
 
+class VendorDigitNotAmountTests(unittest.TestCase):
+    """店名是数字(711/7-11)不当总额:剔除卖家品牌里的数字后再取金额。"""
+
+    def test_store_number_not_amount(self):
+        # 「昨天在 711 买榴莲」(没说价)→ 金额 None → 走「多少钱?」追问,不记 711 THB。
+        t = "เมื่อวานซื้อทุเรียนที่ร้าน 711"
+        self.assertIsNone(lqe._extract_amount(t, None, None))
+        self.assertFalse(lqe.parse_expense(t).has_amount())
+
+    def test_real_amount_kept_with_digit_vendor(self):
+        # 「7-11 买咖啡 65」→ 65 是真金额,不被误删;卖家仍识别 7-Eleven。
+        self.assertEqual(lqe._extract_amount("7-11 ซื้อกาแฟ 65", None, None), Decimal("65"))
+        self.assertEqual(lqe.parse_expense("7-11 ซื้อกาแฟ 65").amount, Decimal("65"))
+
+    def test_non_digit_vendor_unaffected(self):
+        self.assertEqual(lqe._extract_amount("บางจาก 500", None, None), Decimal("500"))
+
+
 class HasItemContextTests(unittest.TestCase):
     def test_bare_number_no_context(self):
         # 纯裸数字(含币种词)无物品/卖家 → False(不该当可信费用入账)。

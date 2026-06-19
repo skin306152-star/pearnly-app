@@ -142,6 +142,17 @@ _NAME_NOISE = (
 )
 
 
+def _strip_vendor_brands(text: str) -> str:
+    """抹掉已识别的卖家品牌(连其中的数字一起去,如 7-11/711/7 eleven)。
+
+    物品名与金额提取共用:店号数字绝不当物品名,也绝不当总额(否则「ร้าน 711」被记成 711 THB)。
+    """
+    s = text or ""
+    for pat, _name in _VENDOR_BRANDS:
+        s = re.sub(pat, " ", s, flags=re.IGNORECASE)
+    return s
+
+
 def _extract_item_name(text: str) -> str:
     """一句话清出干净物品名(去 日期/金额/数量/币种/卖家/动词/连接词)· 单笔「详情」结构化(#10b)。
 
@@ -152,8 +163,7 @@ def _extract_item_name(text: str) -> str:
         s = s.replace(w, " ")
     s = re.sub(r"\d+\s*(?:天前|วันก่อน|days?\s+ago)", " ", s, flags=re.IGNORECASE)
     s = re.sub(r"\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}", " ", s)
-    for pat, _name in _VENDOR_BRANDS:  # 卖家品牌(已单列字段·不进物品名)
-        s = re.sub(pat, " ", s, flags=re.IGNORECASE)
+    s = _strip_vendor_brands(s)  # 卖家品牌(已单列字段·不进物品名)
     units = "|".join(re.escape(u) for u in _QTY_UNITS)
     s = re.sub(rf"\d+(?:\.\d+)?\s*(?:{units})", " ", s)  # 数量+单位
     s = re.sub(r"[xX×]\s*\d+", " ", s)
@@ -227,9 +237,11 @@ def _extract_amount(
         return _to_decimal(m.group(1) or m.group(2))
     if qty is not None and unit_price is not None:
         return qty * unit_price
-    # 裸数字兜底:先抹掉日期(13/06/69)和长编号/税号,再排除量词/单价,取剩下最大的当总额。
+    # 裸数字兜底:先抹掉日期(13/06/69)、长编号/税号、卖家品牌里的数字(7-11/711·店号不是价),
+    # 再排除量词/单价,取剩下最大的当总额。
     cleaned = re.sub(r"\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}", " ", text)
     cleaned = re.sub(r"[A-Za-z]*\d[\d/\-]{6,}", " ", cleaned)
+    cleaned = _strip_vendor_brands(cleaned)
     nums = [_to_decimal(x) for x in re.findall(_NUM, cleaned)]
     nums = [n for n in nums if n is not None and n not in (qty, unit_price)]
     return max(nums) if nums else None

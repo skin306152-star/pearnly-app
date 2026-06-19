@@ -33,6 +33,20 @@ def _fix_two_digit_year_date(date_raw: str, model_date: Optional[str], today_yea
 _BE_YEAR_RE = re.compile(r"(?<!\d)(\d{4})(?!\d)")
 
 
+def _fix_gregorian_year_date(date_raw: str, model_date: Optional[str], today_year: int):
+    """票面印 4 位公历年(date_raw 如 "18/06/2026")→ 以印出的年为准覆盖模型 date 的年(保留 -MM-DD)。
+
+    治模型把印着 2026 的票算成 2021 这类年份漂移(铁律 #8:印出来的真值优先于模型推算)。仅当印出
+    年落 [2000, 今年+1] 公历范围才采信;佛历 25xx 由 _fix_buddhist_year_date 先处理(两段范围不重叠)。"""
+    if not model_date or not re.match(r"^\d{4}-\d{2}-\d{2}$", model_date):
+        return model_date
+    for m in _BE_YEAR_RE.finditer(date_raw or ""):
+        printed = int(m.group(1))
+        if 2000 <= printed <= today_year + 1:
+            return f"{printed:04d}{model_date[4:]}"
+    return model_date
+
+
 def _fix_buddhist_year_date(date_raw: str, model_date: Optional[str], today_year: int):
     """4 位佛历年确定性减 543(不信 LLM 算术 · 铁律:换算用确定性代码)。
 
@@ -281,6 +295,7 @@ class ThaiInvoice(BaseModel):
         ty = date.today().year
         self.date = _fix_two_digit_year_date(self.date_raw, self.date, ty)
         self.date = _fix_buddhist_year_date(self.date_raw, self.date, ty)
+        self.date = _fix_gregorian_year_date(self.date_raw, self.date, ty)
         return self
 
 

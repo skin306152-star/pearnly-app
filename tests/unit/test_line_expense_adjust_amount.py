@@ -57,6 +57,20 @@ class AdjustAmountRouteTests(unittest.TestCase):
         self.assertTrue(out["ret"])
         self.assertEqual(len(out["record"]), 1)  # 罚款正常记
 
+    def test_aircon_records_full_amount(self):
+        # #1 真因(_NUM)修好:空调 1500 记 1500(不再被切成 150),且确实入账。
+        from decimal import Decimal
+
+        out = _run("空调 1500")
+        self.assertEqual(len(out["record"]), 1)
+        self.assertEqual(out["record"][0][5].amount, Decimal("1500"))  # 第6位=draft
+
+    def test_adjust_synonym_not_recorded(self):
+        # #2 结构识别:ปรับจำนวนรวมเป็น 160(同义·非枚举词)→ 不记支出,回 need_reply。
+        out = _run("ปรับจำนวนรวมเป็น 160")
+        self.assertEqual(out["record"], [])
+        self.assertIn("line_need_reply_record", out["say"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -243,22 +243,40 @@ class VendorDigitNotAmountTests(unittest.TestCase):
         self.assertEqual(lqe._extract_amount("บางจาก 500", None, None), Decimal("500"))
 
 
+class FourDigitAmountTests(unittest.TestCase):
+    """裸 4+ 位金额不被 _NUM 逗号分支切碎(空调 1500→150 的真因·*→+ 修)。"""
+
+    def test_four_digit_bare(self):
+        for t, amt in (
+            ("空调 1500", "1500"),
+            ("เครื่องปรับอากาศ 9000", "9000"),
+            ("ค่าเช่า 8000", "8000"),
+        ):
+            self.assertEqual(lqe.parse_expense(t).amount, Decimal(amt), t)
+
+    def test_comma_grouped_still_parses(self):
+        self.assertEqual(lqe.parse_expense("฿1,250.50").amount, Decimal("1250.50"))
+        self.assertEqual(lqe.parse_expense("ค่าเช่า 12,000").amount, Decimal("12000"))
+
+
 class AdjustAmountEditTests(unittest.TestCase):
-    """调整金额类(ปรับยอด/调整/调成)算改错;但绝不误伤罚款/空调/调味料等真实支出。"""
+    """调整金额(关键词 + 结构识别)算改错;绝不误伤罚款/空调/调味料/普通记账。"""
 
     def test_adjust_is_edit(self):
         for t in (
             "ปรับยอดเป็น 150",
+            "ปรับจำนวนรวมเป็น 160",
+            "จำนวนรวมเปลี่ยนเป็น 200",
+            "金额改成150",
+            "总额调成200",
             "调整金额150",
-            "调成200",
             "ลดยอด 100",
-            "เปลี่ยนยอดเป็น 90",
             "调到80",
         ):
             self.assertTrue(lqe.is_edit_request(t), t)
 
     def test_product_names_not_edit(self):
-        # 罚款/空调/调味料/交通罚款 含「ปรับ/调」但非编辑词 → 仍当支出。
+        # 罚款/空调/调味料/交通罚款/普通记账 无「金额名词+改成数字」结构 → 仍当支出。
         for t in (
             "ค่าปรับ 150",
             "ปรับอากาศ 1500",
@@ -266,6 +284,8 @@ class AdjustAmountEditTests(unittest.TestCase):
             "空调 1500",
             "调味料 50",
             "ค่าปรับจราจร 500",
+            "เนื้อหมู 300",
+            "咖啡 60",
         ):
             self.assertFalse(lqe.is_edit_request(t), t)
 

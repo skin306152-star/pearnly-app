@@ -29,6 +29,13 @@ TASKS: dict[str, dict] = {
         "model_tier": "flash",
         "schema_version": "1",
     },
+    "line_chat_reply": {
+        "risk": "low",
+        "timeout_s": 3,
+        "max_retries": 0,
+        "model_tier": "flash",
+        "schema_version": "1",
+    },
 }
 
 

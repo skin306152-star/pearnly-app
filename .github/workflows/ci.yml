@@ -285,7 +285,8 @@ jobs:
           test -f static/dist/main.js || { echo "::error::vite build did not produce static/dist/main.js"; exit 1; }
           # 闸①打包一致性: CI 重 build 后 dist 必须 == 提交的 · 改前端源忘打包 = 这里红(防 prod 跑旧 bundle)
           # 排除 main.js* : vite 产物(上方已 test-f)· sourcemap 含路径/时间戳跨平台 build 有 drift
-          git diff --exit-code static/dist/ ':!static/dist/main.js' ':!static/dist/main.js.map' \
+          # 长格式 :(exclude):git 2.54+ 对短 :! 排除不存在的 main.js.map 会 fatal(同 pre-push 7716032e 修)。
+          git diff --exit-code static/dist/ ':(exclude)static/dist/main.js' ':(exclude)static/dist/main.js.map' \
             || { echo "::error::dist 与源的 build 不一致 · 改了前端源但没 git add static/dist · 跑 npm run build 后提交"; exit 1; }
 
       - name: 前端打包闸②③ (源页只引 bundle · 资产全在打包清单 · 防 view-source 退化)

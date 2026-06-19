@@ -26,6 +26,7 @@ import logging
 from fastapi import APIRouter, Request
 
 from core import db
+from services.expense import line_identity
 from services.line_binding import (
     line_card_actions,
     line_client,
@@ -277,6 +278,19 @@ async def _handle_line_text(
             line_reply.reply_text_context(
                 reply_token,
                 line_intake.link_reply(cmd, lang, web_url=_WEB_INTEGRATIONS_URL),
+                quote_token=quote_token,
+                line_user_id=line_user_id,
+                tenant_id=tid,
+            )
+            return
+        # P2D 身份层/模型泄露防护(跑在 L2 大脑前):身份/模型/系统提示/API key/越权问题(且不含业务
+        # 指令)→ Pearnly 产品身份层确定性四语回复,不进业务 LLM、不暴露底层供应商/系统信息。含业务
+        # 指令(如「你是不是 GPT,咖啡 65」)则放行,记账正常进行。
+        guard_reply = line_identity.guard(text, lang)
+        if guard_reply:
+            line_reply.reply_text_context(
+                reply_token,
+                guard_reply,
                 quote_token=quote_token,
                 line_user_id=line_user_id,
                 tenant_id=tid,

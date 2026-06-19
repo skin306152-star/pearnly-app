@@ -16,7 +16,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from core import db
-from services.expense import conversation, line_classify, line_correct
+from services.expense import conversation, line_bulk_undo, line_classify, line_correct
 from services.expense import line_correct_i18n as ci
 from services.expense import line_quick_entry as lqe
 from services.line_binding import line_client, line_message_refs, line_reply
@@ -149,6 +149,9 @@ def route(
     的那条记录」并 return True 拦在记账之前,绝不新建支出。任一接管 → True;非 correction → False。
     """
     qt = ctx.get("quote_token", "")
+    # 批量撤销(撤最近N笔/今天全部)最前判:明确范围才命中→确认卡;裸「取消」不命中,仍走改错取消。
+    if line_bulk_undo.route(bound_user, reply_token, line_user_id, text, lang, tid, ws, ctx):
+        return True
     if try_correction_state(
         bound_user,
         reply_token,

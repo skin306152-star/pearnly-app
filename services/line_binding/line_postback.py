@@ -16,7 +16,10 @@ from urllib.parse import parse_qsl, urlencode
 ACTION_CONFIRM = "exp_confirm"
 ACTION_UNDO = "exp_undo"
 ACTION_DISCARD = "exp_discard"
-_ACTIONS = (ACTION_CONFIRM, ACTION_UNDO, ACTION_DISCARD)
+# 批量撤销(确认/取消):目标 id 列表存于一次性令牌的 action_ref,data 只带 token(不带 doc)。
+ACTION_BULK_UNDO = "exp_bulk_undo"
+ACTION_BULK_CANCEL = "exp_bulk_cancel"
+_ACTIONS = (ACTION_CONFIRM, ACTION_UNDO, ACTION_DISCARD, ACTION_BULK_UNDO, ACTION_BULK_CANCEL)
 
 
 def _data(action: str, ref_id: str, token: str = "") -> str:
@@ -39,6 +42,16 @@ def undo_data(doc_id: str, token: str = "") -> str:
 def discard_data(doc_id: str, token: str = "") -> str:
     """草稿单 → 丢弃(仅草稿可删)。"""
     return _data(ACTION_DISCARD, doc_id, token)
+
+
+def bulk_undo_data(token: str) -> str:
+    """批量撤销确认(目标 id 列表在令牌 action_ref·data 只带 token)。"""
+    return urlencode({"a": ACTION_BULK_UNDO, "n": token})
+
+
+def bulk_cancel_data(token: str) -> str:
+    """批量撤销取消(作废令牌·不撤任何单)。"""
+    return urlencode({"a": ACTION_BULK_CANCEL, "n": token})
 
 
 def parse(data: str) -> dict:

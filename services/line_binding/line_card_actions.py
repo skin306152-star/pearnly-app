@@ -145,6 +145,13 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
     tid = str(bound_user["tenant_id"]) if bound_user.get("tenant_id") else None
     luid = bound_user.get("line_user_id") or ""
 
+    # 批量撤销自带令牌消费 + 逐笔执行,走独立模块(不进单条 doc 的 consume/reshow 逻辑)。
+    if action in (line_postback.ACTION_BULK_UNDO, line_postback.ACTION_BULK_CANCEL):
+        from services.expense import line_bulk_undo
+
+        line_bulk_undo.handle_postback(bound_user, reply_token, action, token, lang)
+        return
+
     def _say(key, doc=None):
         amt = (doc or {}).get("grand_total") if doc is not None else None
         line_reply.reply_text_context(

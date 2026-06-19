@@ -104,6 +104,10 @@ def handle_expense_text(
                 merged = pend["draft"]
                 merged.amount = parsed.amount
                 parsed = merged
+            elif not lqe.has_item_context(text):
+                # 只发裸数字(无物品/无卖家)且非补答缺金额 → 不入账,温柔问记啥(防 1/2/3 THB 垃圾条目)。
+                _pool("amount_no_item")
+                return True
             return _do_record(
                 bound_user,
                 reply_token,
@@ -329,11 +333,7 @@ def _do_record(
 
 
 def _card_fields_from_draft(draft) -> dict:
-    """ExpenseDraft → 数据卡归一字段。
-
-    详情结构化(#10b):单笔也出逐条 `物品 ×数量 ฿金额`(对齐多笔),不再回显整句原文。
-    物品名 = 清出的干净名(draft.note);数量>1 缀「×N」;金额=行总额。
-    """
+    """ExpenseDraft → 数据卡归一字段(#10b 详情结构化:逐条 `物品 ×数量 ฿金额`·物品名=draft.note 清出名)。"""
     from services.expense.line_quick_entry import qty_label
 
     item = (draft.note or "").strip()

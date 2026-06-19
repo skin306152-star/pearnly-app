@@ -225,5 +225,16 @@ class ParseMultiTests(unittest.TestCase):
         self.assertEqual(lqe.extract_inline_vendor("กาแฟ 30 ข้าว 60"), "")  # 无声明 → 空
 
 
+class HasItemContextTests(unittest.TestCase):
+    def test_bare_number_no_context(self):
+        # 纯裸数字(含币种词)无物品/卖家 → False(不该当可信费用入账)。
+        for t in ("1", "2", "65", "100 บาท", "3 THB"):
+            self.assertFalse(lqe.has_item_context(t), t)
+
+    def test_with_item_or_vendor(self):
+        for t in ("咖啡 65", "ค่าน้ำ 50", "Starbucks 100", "买菜 40"):
+            self.assertTrue(lqe.has_item_context(t), t)
+
+
 if __name__ == "__main__":
     unittest.main()

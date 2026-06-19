@@ -51,6 +51,13 @@ class PickTests(unittest.TestCase):
             for lang in ("zh", "th", "en", "ja"):
                 self.assertIn(replies.pick(kind, "x", lang), replies._POOLS[kind][lang])
 
+    def test_amount_no_item_pool(self):
+        # 裸数字无物品/卖家 → 问一句记啥(4 语·池内)。
+        for lang in ("zh", "th", "en", "ja"):
+            self.assertIn(
+                replies.pick("amount_no_item", "1", lang), replies._POOLS["amount_no_item"][lang]
+            )
+
     def test_voice_fallback_varies_by_text(self):
         # 同类不同句轮到不同条(治复读),4 语各验。
         for kind in ("out_of_scope", "unknown"):

@@ -240,6 +240,14 @@ def looks_like_expense(text: str) -> bool:
     return parse_expense(text).has_amount()
 
 
+def has_item_context(text) -> bool:
+    """有物品名或卖家即 True;纯裸数字(无物品/无卖家·如「1」「65」)→ False。
+
+    裸数字无「买了啥/在哪买」上下文,不该当可信费用直接入账(否则往账上灌 1/2/3 THB 垃圾条目)。
+    """
+    return bool(_extract_item_name(text)) or bool(_extract_vendor(text))
+
+
 def split_qty_price(amount, qty=None, unit_price=None) -> tuple[str, str]:
     """(总额, 数量, 单价?) → 采购行的 (qty, unit_price) 字符串(图/文共用 · #8)。
 

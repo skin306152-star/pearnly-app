@@ -167,8 +167,8 @@ def items_section(items: list, t: dict, *, cap: int = 5) -> list:
     rows = [seclabel(t["detail"])]
     any_unclear = False
     for i, it in enumerate(items[:cap], 1):
-        name = _display_item_name(it.get("name"), i, t)
-        any_unclear = any_unclear or item_name.is_unclear(it.get("name"))
+        name, unclear = item_name.display_with_flag(it.get("name"), i, t["item_n"])
+        any_unclear = any_unclear or unclear
         amt = str(it.get("amount") or "").strip()
         row = [txt(f"{i}. {name}", size="sm", color=VALUE, flex=5, wrap=True)]
         if amt:

@@ -46,7 +46,7 @@ _KEYWORDS = {
         "ลืมคำสั่งก่อน",
     ),
     "apikey": (
-        "apikey",
+        # 「apikey」「api key」由 _APIKEY_RE 先行命中(detect 内先查正则),此处不再列。
         "secret key",
         "access token",
         "密钥",

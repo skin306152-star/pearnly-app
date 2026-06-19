@@ -71,10 +71,16 @@ def is_unclear(raw) -> bool:
     return len(_MEANINGFUL_RE.findall(clean(raw))) < 2
 
 
+def display_with_flag(raw, i: int, placeholder: str) -> tuple[str, bool]:
+    """一次清洗 → (展示名, 是否不可读)。渲染循环用此一处,避免对同一 raw 跑两遍 clean()。"""
+    cleaned = clean(raw)
+    unclear = len(_MEANINGFUL_RE.findall(cleaned)) < 2
+    return (placeholder.format(n=i) if unclear else cleaned), unclear
+
+
 def display(raw, i: int, placeholder: str) -> str:
     """展示名:可读 → 清洗名;不可读 → 编号占位(placeholder 形如「รายการที่ {n}」,语言由调用方定)。"""
-    cleaned = clean(raw)
-    return cleaned if len(_MEANINGFUL_RE.findall(cleaned)) >= 2 else placeholder.format(n=i)
+    return display_with_flag(raw, i, placeholder)[0]
 
 
 def clean_doc_lines(lines: list) -> None:

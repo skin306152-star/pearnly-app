@@ -38,15 +38,12 @@ def ack_message(lang: str, state: str, amount, fields: dict = None) -> str:
     """
     from services.line_binding import line_client
 
-    if state == "confirm" and ((fields or {}).get("amount_unreliable") or _amount_le_zero(amount)):
+    le_zero = _amount_le_zero(amount)
+    if state == "confirm" and ((fields or {}).get("amount_unreliable") or le_zero):
         from services.line_binding.line_card_i18n import chrome
 
         t = chrome(lang)
-        return (
-            t["ack_amount_unread"]
-            if _amount_le_zero(amount)
-            else t["ack_review"].format(amount=amount)
-        )
+        return t["ack_amount_unread"] if le_zero else t["ack_review"].format(amount=amount)
     return line_client.t_line(lang, ack_key(state), amount=amount)
 
 

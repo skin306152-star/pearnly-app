@@ -45,6 +45,19 @@ class PickTests(unittest.TestCase):
     def test_unknown_kind_falls_to_support(self):
         self.assertIn(replies.pick("bogus", "x", "zh"), replies._POOLS["support"]["zh"])
 
+    def test_voice_fallback_pools_in_pool(self):
+        # P3A-2b:out_of_scope/unknown 回落话术从对应池取(4 语)。
+        for kind in ("out_of_scope", "unknown"):
+            for lang in ("zh", "th", "en", "ja"):
+                self.assertIn(replies.pick(kind, "x", lang), replies._POOLS[kind][lang])
+
+    def test_voice_fallback_varies_by_text(self):
+        # 同类不同句轮到不同条(治复读),4 语各验。
+        for kind in ("out_of_scope", "unknown"):
+            for lang in ("zh", "th", "en", "ja"):
+                outs = {replies.pick(kind, t, lang) for t in ("a", "bb", "ccc", "dddd", "eeeee")}
+                self.assertGreater(len(outs), 1)
+
 
 class DetectSmalltalkTests(unittest.TestCase):
     def test_date_query_detected(self):

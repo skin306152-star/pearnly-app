@@ -37,8 +37,8 @@ _DIRECT_KEY = {
     "edit_help": "line_need_reply_record",
     "delete_help": "line_need_reply_record",
     "photo_failed_help": "line_ocr_failed_recovery",
-    "out_of_scope": "line_out_of_scope",
-    "unknown": "line_unknown_intent",
+    # out_of_scope / unknown 不在此表 → 落 replies.pick 轮选池(P3A-2b·治复读·语气层回落话术)。
+    # 旧键 line_out_of_scope / line_unknown_intent 已无引用,留着无害(P3A-3 清)。
 }
 # 「记一笔」Quick Reply 不再发演示金额(会误记一笔),改触发「怎么开始」引导(line_start_hint)。
 _QR_START = {"zh": "怎么开始", "th": "เริ่มยังไง", "en": "How to start", "ja": "始め方"}

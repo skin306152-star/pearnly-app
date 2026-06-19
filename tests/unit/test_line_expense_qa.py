@@ -94,11 +94,19 @@ class ReplyPoolOverrideTests(unittest.TestCase):
         self.assertEqual(msg["text"], "สบายดีไหมคะ มีอะไรให้ช่วยบันทึกบอกได้เลยค่ะ")
         self.assertEqual(len(msg["quickReply"]["items"]), 2)
 
-    def test_no_override_falls_back_to_template(self):
-        # override_body=None → 走现有模板查表(unknown → line_unknown_intent),零回归。
-        msg = _pool(kind="unknown", override_body=None)
-        self.assertEqual(msg["text"], "line_unknown_intent")
-        self.assertIn("quickReply", msg)
+    def test_out_of_scope_and_unknown_fall_to_pool(self):
+        # P3A-2b:override_body=None 时 out_of_scope/unknown 落 replies 轮选池(非旧单模板)。
+        from services.expense import replies
+
+        for kind in ("out_of_scope", "unknown"):
+            msg = _pool(kind=kind, override_body=None)
+            self.assertIn(msg["text"], replies._POOLS[kind]["th"])
+            self.assertIn("quickReply", msg)
+
+    def test_guidance_kind_still_template(self):
+        # 引导类目仍走模板查表(greeting → line_greeting),零回归。
+        msg = _pool(kind="greeting", override_body=None)
+        self.assertEqual(msg["text"], "line_greeting")
 
 
 if __name__ == "__main__":

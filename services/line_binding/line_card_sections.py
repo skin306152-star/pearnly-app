@@ -302,12 +302,13 @@ def footer(
         primary = btn(t["btn_open"], primary=True, uri=detail_uri)
         view.append(btn(t["btn_post_anyway"], primary=False, postback=pb.confirm_data(ref, token)))
         danger.append(kill(t["btn_discard"], pb.discard_data(ref, token)))
-    elif block_confirm:  # 金额不可靠 → 不给确认/继续入账,只能去详情核对(永不静默入账坏金额)
+    elif block_confirm or review_first:  # 主按钮「打开核对」去详情
+        # block_confirm(金额不可靠)→ 禁确认/继续入账,只核对+丢弃;review_first(明细不符)→ 保留次按钮「继续保存」
         primary = btn(t["btn_review"], primary=True, uri=detail_uri)
-        danger.append(kill(t["btn_discard"], pb.discard_data(ref, token)))
-    elif review_first:  # confirm 但明细与总额不符 → 引导核对优先,入账降次按钮(仍可继续)
-        primary = btn(t["btn_review"], primary=True, uri=detail_uri)
-        view.append(btn(t["btn_post_anyway"], primary=False, postback=pb.confirm_data(ref, token)))
+        if review_first and not block_confirm:
+            view.append(
+                btn(t["btn_post_anyway"], primary=False, postback=pb.confirm_data(ref, token))
+            )
         danger.append(kill(t["btn_discard"], pb.discard_data(ref, token)))
     else:  # confirm(草稿请确认)
         primary = btn(t["btn_confirm"], primary=True, postback=pb.confirm_data(ref, token))

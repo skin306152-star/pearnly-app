@@ -21,6 +21,10 @@ from services.purchase import field_clean
 # 采购进项票合理日期下限(早于此 = OCR/年份解析错·不静默入账)。上限 = 今天(不接受未来日期)。
 MIN_DATE = _date(2015, 1, 1)
 
+# 确定性「需复核」标记写进 field_confidence 的值:稳定低于卡片(REVIEW_BELOW=0.85)与详情(0.8)两处
+# 显示阈值 → 脏字段必标黄。非像素置信,是质量层的复核信号(seller_name/date 无真实像素置信)。
+_REVIEW_CONF = 0.5
+
 _DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
 _DIGIT_ONLY_RE = re.compile(r"^[\d\s,.\-/]+$")
 
@@ -65,7 +69,7 @@ def invoice_status(raw) -> str:
     s = str(raw or "").strip()
     if not s:
         return "absent"
-    return "ok" if (field_clean.clean_invoice_no(s) and not field_clean.is_garbled(s)) else "dirty"
+    return "ok" if field_clean.clean_invoice_no(s) else "dirty"  # clean_invoice_no 已剔乱码
 
 
 def assess(fields: dict, *, today=None) -> dict:
@@ -96,9 +100,9 @@ def card_signals(fields: dict, fc: dict, amount_dec, *, today=None):
     quality, dirty = res["quality"], res["dirty"]
     fc = dict(fc or {})
     if quality["seller"] == "unclear":
-        fc["seller_name"] = 0.5  # 详情页 supplier 标「请确认」(卡片走 seller_unclear 兜底文案)
+        fc["seller_name"] = _REVIEW_CONF  # 详情页 supplier 标「请确认」(卡片走 seller_unclear 兜底)
     if quality["date"] == "suspect":
-        fc["date"] = 0.5  # 卡片 date 缀「请核对」+ 详情 doc_date 标黄
+        fc["date"] = _REVIEW_CONF  # 卡片 date 缀「请核对」+ 详情 doc_date 标黄
     total_conf = fc.get("total_amount")
     amount_unreliable = amount_dec <= 0 or (total_conf is not None and float(total_conf) < 0.85)
     return fc, {

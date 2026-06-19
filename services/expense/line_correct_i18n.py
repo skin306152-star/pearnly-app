@@ -133,6 +133,47 @@ SUPERSEDED_PREFIX = {
 }
 
 
+# 05 Slice 2(恢复闭环):引用已撤单说「恢复」→ 克隆数据重过账成新活单(原死单不动)。
+RESTORE_DONE = {
+    "zh": "↩️ 已恢复:฿{amt}(新记录 #{ref})。可继续在这里改它。",
+    "th": "↩️ กู้คืนแล้วค่ะ: ฿{amt} (รายการใหม่ #{ref}) แก้ต่อได้เลยค่ะ",
+    "en": "↩️ Restored: ฿{amt} (new record #{ref}). You can keep editing it here.",
+    "ja": "↩️ 復元しました:฿{amt}(新記録 #{ref})。このまま編集できます。",
+}
+
+# 引用的是活单 → 没被撤销,无需恢复。
+RESTORE_NOT_VOIDED = {
+    "zh": "这张没有被撤销哦,不用恢复。",
+    "th": "รายการนี้ไม่ได้ถูกยกเลิกค่ะ ไม่ต้องกู้คืน",
+    "en": "This entry wasn't cancelled — no need to restore.",
+    "ja": "この記録は取り消されていません。復元は不要です。",
+}
+
+# 已更正/已恢复过(链上已有更新活单)→ 给当前最新版本,不重复建。
+RESTORE_ALREADY = {
+    "zh": "这笔已经有最新版本了:记录 #{ref}(฿{amt})。",
+    "th": "รายการนี้มีเวอร์ชันล่าสุดอยู่แล้วค่ะ: รายการ #{ref} (฿{amt})",
+    "en": "This already has a current version: record #{ref} (฿{amt}).",
+    "ja": "この記録には最新版があります:記録 #{ref}(฿{amt})。",
+}
+
+# 裸「恢复」没引用具体卡片 → 请引用要恢复的那张。
+RESTORE_NEED_QUOTE = {
+    "zh": "请长按要恢复的那张卡片,回复「恢复」。",
+    "th": "กรุณากดค้างที่การ์ดที่ต้องการกู้คืน แล้วตอบ「กู้คืน」ค่ะ",
+    "en": "Please long-press the card you want to restore and reply 'restore'.",
+    "ja": "復元したいカードを長押しして「復元」と返信してください。",
+}
+
+# 所属期间已结账 → 不能在 LINE 恢复(重过账会触碰已结期),诚实引导网页。
+RESTORE_CLOSED = {
+    "zh": "这笔所属的账期已结账,无法在这里恢复,请在 Pearnly 网页处理。",
+    "th": "งวดบัญชีของรายการนี้ปิดแล้ว ไม่สามารถกู้คืนที่นี่ได้ กรุณาดำเนินการในเว็บ Pearnly ค่ะ",
+    "en": "This entry's accounting period is closed, so it can't be restored here — please use the Pearnly web app.",
+    "ja": "この記録の会計期間は締め済みのため、ここでは復元できません。Pearnly のウェブでご対応ください。",
+}
+
+
 def field_label(field: str, lang: str) -> str:
     return FIELD_LABELS.get(field, {}).get(lang) or FIELD_LABELS.get(field, {}).get("zh", field)
 

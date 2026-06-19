@@ -142,6 +142,39 @@ class Sim:
             cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=nid
         )
 
+    def restore_doc(self, cur, *, tenant_id, workspace_client_id, doc_id, created_by):
+        # 真 restore_doc:原 void → 克隆为 posted 新单(restored_from 审计·原死单不动)·幂等。
+        orig = self.docs.get(doc_id)
+        if not orig or orig["doc"]["status"] != "void":
+            return {"not_voided": True}
+        existing = next(
+            (
+                x
+                for x in self.docs.values()
+                if x["doc"].get("restored_from") == doc_id
+                and x["doc"]["status"] in ("draft", "posted")
+            ),
+            None,
+        )
+        if existing:
+            return {
+                "already": {
+                    "id": existing["doc"]["id"],
+                    "grand_total": existing["doc"]["grand_total"],
+                }
+            }
+        self._seq += 1
+        nid = f"{doc_id}_r{self._seq}"
+        self.docs[nid] = {
+            k: (v.copy() if isinstance(v, dict) else list(v)) for k, v in orig.items()
+        }
+        self.docs[nid]["doc"] = dict(orig["doc"], id=nid, status="posted", restored_from=doc_id)
+        return {
+            "restored": self.get_doc(
+                cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=nid
+            )
+        }
+
     def resolve_card_state(self, cur, *, tid, ws, doc_id):
         # 引用单当前真实状态(对齐 line_message_refs.resolve_card_state·用内存账本沿 corrected_from 链)。
         from services.line_binding import line_message_refs as r
@@ -202,6 +235,7 @@ def _run(sim, turns):
         mock.patch.object(posting_svc, "void_doc", side_effect=sim.void_doc),
         mock.patch.object(posting_svc, "post_doc", side_effect=lambda *a, **k: None),
         mock.patch.object(correct_svc, "correct_doc", side_effect=sim.correct_doc),
+        mock.patch.object(correct_svc, "restore_doc", side_effect=sim.restore_doc),
         mock.patch.object(settings_svc, "get_settings", return_value={"auto_book": False}),
         mock.patch.object(line_correct_data, "_resolve_category", return_value=("cat1", "sub1")),
         mock.patch.object(line_message_refs, "resolve_target", side_effect=sim.resolve_target),
@@ -458,6 +492,31 @@ class ReplayScenarioTests(unittest.TestCase):
         for _, _, replies in steps:
             self.assertNotIn(none_msg, replies)  # 绝不回「找不到记录」
         self.assertEqual(self.sim._active_doc_date(), "2026-06-18")  # 续接那张日期改对
+
+    def test_restore_voided_rebuilds_active_original_untouched(self):
+        # 05 Slice 2:撤一张已入账 → 引用死卡说「恢复」→ 建 posted 新活单(restored_from=原·★原死单不动);
+        # 第二次恢复幂等(不重建)。
+        self.sim.seed("D7", lines=1, status="posted")
+        steps = _run(
+            self.sim,
+            [
+                ("ลบ", "MID_D7"),  # 撤销 → void
+                ("กู้คืน", "MID_D7"),  # 引用死卡恢复 → 新活单
+                ("กู้คืน", "MID_D7"),  # 再恢复 → 幂等不重建
+            ],
+        )
+        self.assertTrue(all(s[1] for s in steps))
+        self.assertEqual(self.sim.docs["D7"]["doc"]["status"], "void")  # ★原死单不动
+        restored = [d for d in self.sim.docs.values() if d["doc"].get("restored_from") == "D7"]
+        self.assertEqual(len(restored), 1)  # 只建一张(幂等)
+        self.assertEqual(restored[0]["doc"]["status"], "posted")
+
+    def test_restore_live_card_says_not_voided(self):
+        # 引用活单说「恢复」→ 不建单,回「没被撤销」。
+        none_before = dict(self.sim.docs)
+        steps = _run(self.sim, [("กู้คืน", "MID_D1")])
+        self.assertTrue(steps[0][1])
+        self.assertEqual(set(self.sim.docs), set(none_before))  # 没新建
 
     def test_posted_low_risk_chain_no_break(self):
         # 已入账单:seller -> date -> category -> payment 连续低风险字段都续命中,不断。

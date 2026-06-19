@@ -19,7 +19,7 @@ from core import db
 from services.expense import conversation, line_bulk_undo, line_classify, line_correct
 from services.expense import line_correct_i18n as ci
 from services.expense import line_quick_entry as lqe
-from services.expense import line_stale_ref
+from services.expense import line_restore, line_stale_ref
 from services.line_binding import line_client, line_reply
 
 # 收新值时剥掉的前缀(命令词 + 连接词 + 字段名);标点已在入口 normalize_user_text 归一。
@@ -152,6 +152,11 @@ def route(
     qt = ctx.get("quote_token", "")
     # 批量撤销(撤最近N笔/今天全部)最前判:明确范围才命中→确认卡;裸「取消」不命中,仍走改错取消。
     if line_bulk_undo.route(bound_user, reply_token, line_user_id, text, lang, tid, ws, ctx):
+        return True
+    # 恢复(引用已撤卡说「恢复」)先于改字段判:引用了死卡说恢复不该被当成 correctval 的值吞掉。
+    if line_restore.maybe_restore(
+        bound_user, reply_token, line_user_id, text, lang, tid, ws, quoted_message_id, ctx
+    ):
         return True
     if try_correction_state(
         bound_user,

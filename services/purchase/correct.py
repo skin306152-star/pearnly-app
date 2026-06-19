@@ -36,13 +36,16 @@ def correct_doc(cur, *, tenant_id, workspace_client_id, doc_id, created_by) -> d
     return draft
 
 
-def clone_as_draft(cur, *, tenant_id, workspace_client_id, doc_id, created_by) -> Optional[dict]:
+def clone_as_draft(
+    cur, *, tenant_id, workspace_client_id, doc_id, created_by, audit_key="corrected_from"
+) -> Optional[dict]:
     """精确复制一张单为新草稿。原单不存在 → None。
 
     逐列照搬已存储值(不重算·不碰金标 totals 口径)+ 全明细 + bill 票图(证据保留),并改写:
     status=draft · approval_status 复位 'none' · paid 清零(列默认)· dedupe_key 置空
-    (uq_purchase_docs_dedupe 不排除 void · 原单仍占键 · 复制会撞唯一约束)· ocr_raw 记
-    corrected_from 审计链。生成件(替代收据/扣缴凭证)不复制(属原单·按需在新单重生成)。
+    (uq_purchase_docs_dedupe 不排除 void · 原单仍占键 · 复制会撞唯一约束)· ocr_raw 记审计链
+    (audit_key=corrected_from 更正 / restored_from 恢复)。生成件(替代收据/扣缴凭证)不复制
+    (属原单·按需在新单重生成)。
     """
     cur.execute(
         """
@@ -57,13 +60,13 @@ def clone_as_draft(cur, *, tenant_id, workspace_client_id, doc_id, created_by) -
             currency, fx_rate, subtotal, discount_total, vat_amount, wht_amount, rounding,
             grand_total, net_payable, category_id, requester, requester_user_id, 'none',
             payment_status, due_date, source,
-            COALESCE(ocr_raw, '{}'::jsonb) || jsonb_build_object('corrected_from', %s::text),
+            COALESCE(ocr_raw, '{}'::jsonb) || jsonb_build_object(%s, %s::text),
             NULL, 'draft', amount_override, %s
         FROM purchase_docs
         WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s
         RETURNING id
         """,
-        (doc_id, created_by, tenant_id, workspace_client_id, doc_id),
+        (audit_key, doc_id, created_by, tenant_id, workspace_client_id, doc_id),
     )
     row = cur.fetchone()
     if row is None:
@@ -92,3 +95,57 @@ def clone_as_draft(cur, *, tenant_id, workspace_client_id, doc_id, created_by) -
     return docs_svc.get_doc(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=new_id
     )
+
+
+def find_active_restored_child(cur, *, tenant_id, workspace_client_id, doc_id):
+    """该单是否已被恢复过(有活的 restored_from 子单)→ 返回 row{id,grand_total};无 → None。"""
+    cur.execute(
+        "SELECT id, grand_total FROM purchase_docs "
+        "WHERE tenant_id = %s AND workspace_client_id = %s "
+        "AND ocr_raw->>'restored_from' = %s AND status IN ('draft', 'posted') "
+        "ORDER BY created_at DESC LIMIT 1",
+        (tenant_id, workspace_client_id, str(doc_id)),
+    )
+    return cur.fetchone()
+
+
+def restore_doc(cur, *, tenant_id, workspace_client_id, doc_id, created_by) -> dict:
+    """恢复已撤销单:克隆原单数据为新草稿(restored_from 审计)→ 重新过账成 posted。原死单不动。
+
+    返回 {"not_voided": True}(原单非 void)/ {"already": row}(已恢复过·幂等)/ {"restored": detail}。
+    已结期:post_doc 经做账钩子抛 acct.period_closed → 整事务回滚,不留半张恢复单(诚实·不破账)。
+    """
+    orig = docs_svc.get_doc(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=doc_id
+    )
+    if not orig or (orig.get("doc") or {}).get("status") != "void":
+        return {"not_voided": True}
+    existing = find_active_restored_child(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=doc_id
+    )
+    if existing:
+        return {"already": existing}
+    draft = clone_as_draft(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        doc_id=doc_id,
+        created_by=created_by,
+        audit_key="restored_from",
+    )
+    if draft is None:
+        raise PosError("purchase.unexpected", 404)
+    new_id = str((draft.get("doc") or {})["id"])
+    posting_svc.post_doc(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        doc_id=new_id,
+        auto_stock_in=False,
+        created_by=created_by,
+    )
+    return {
+        "restored": docs_svc.get_doc(
+            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, doc_id=new_id
+        )
+    }

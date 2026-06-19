@@ -274,6 +274,35 @@ def is_delete_intent(text: str) -> bool:
     return any(k.lower() in low for k in _DELETE_KW)
 
 
+_RESTORE_KW = (
+    "恢复",
+    "恢復",
+    "还原",
+    "還原",
+    "复原",
+    "กู้คืน",
+    "ฟื้นฟู",
+    "คืนค่า",
+    "restore",
+    "undo the cancel",
+)
+
+
+def detect_restore(text: str, *, has_quote: bool = False) -> bool:
+    """恢复意图(恢复/还原/กู้คืน/ฟื้นฟู/restore)?★只在【明确引用了卡片】或【纯命令·无金额】时为真。
+
+    无引用又带金额(「ฟื้นฟูเครื่อง 500 / 修复机器 500」)是记账,不是恢复 → False(防误伤新支出)。
+    """
+    low = (text or "").strip().lower()
+    if not any(k.lower() in low for k in _RESTORE_KW):
+        return False
+    if has_quote:
+        return True
+    from services.expense import line_quick_entry as lqe
+
+    return not lqe.parse_expense(text).has_amount()
+
+
 # 改错指向的字段(P1E-2):用户在改错澄清里点名要改哪项 → 据此问新值 / 引导详情页。
 # items / payment 顺位靠前(其专有词「明细/รายการย่อย/付款方式/วิธีชำระ」更具体,先于泛词命中)。
 _FIELD_PATTERNS = (

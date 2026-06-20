@@ -49,10 +49,9 @@ window._erpExcOpenEdit = function (id) {
     const canPickProduct =
         it.category === 'product_mismatch' && !!it.history_id && !!it.endpoint_id;
     const reason = _erpExcFriendly(it as any);
-    const stateCls =
-        it.state === 'needs_action' ? 'needs' : it.state === 'retrying' ? 'retry' : 'fail';
-    const dRow = (lbl: string, val?: string) =>
-        `<div class="erp-exc-m-row"><span class="erp-exc-m-k">${escapeHtml(lbl)}</span><span class="erp-exc-m-v">${escapeHtml(val || '—')}</span></div>`;
+    // 草稿对齐:基本信息用与推送详情抽屉同款的 grid cell(label + strong)
+    const cell = (lbl: string, val?: string) =>
+        `<div class="erp-detail-cell"><label>${escapeHtml(lbl)}</label><strong>${escapeHtml(val || '—')}</strong></div>`;
 
     let fixHtml = '';
     if (canPickCustomer) {
@@ -88,27 +87,34 @@ window._erpExcOpenEdit = function (id) {
     drawer.className = 'erp-detail-drawer erp-exc-drawer';
     drawer.setAttribute('role', 'dialog');
     drawer.setAttribute('aria-modal', 'true');
+    const idRows = isId
+        ? cell(t('erp-log-col-idcard'), it.id_card_tail ? '••••' + it.id_card_tail : '—')
+        : cell(t('erp-exc-f-buyer'), it.ocr_buyer_name) +
+          cell(t('erp-exc-edit-field-current'), it.client_name);
     drawer.innerHTML = `
-            <div class="erp-exc-m-head">
-                <h3>${escapeHtml(t('erp-exc-edit-title'))}</h3>
-                <button class="erp-exc-m-close" type="button" id="erp-exc-m-close" aria-label="close">×</button>
+            <div class="erp-detail-head">
+                <div class="erp-detail-title">${escapeHtml(t('erp-exc-edit-title'))}</div>
+                <button class="erp-detail-close" type="button" id="erp-exc-m-close" aria-label="close">✕</button>
             </div>
-            <div class="erp-exc-m-body">
-                <div class="erp-exc-m-reason"><span class="erp-exc-state ${stateCls}">${escapeHtml(t('erp-exc-state-' + (it.state || 'failed')))}</span> ${escapeHtml(reason)}${it.error_code && !isId ? ` <span class="erp-exc-code">${escapeHtml(it.error_code)}</span>` : ''}</div>
-                ${dRow(isId ? t('erp-log-col-booking') : t('erp-exc-f-invoice'), it.invoice_no)}
-                ${dRow(isId ? t('erp-log-col-customer') : t('erp-exc-f-seller'), it.seller_name)}
-                ${
-                    isId
-                        ? dRow(
-                              t('erp-log-col-idcard'),
-                              it.id_card_tail ? '••••' + it.id_card_tail : '—'
-                          )
-                        : dRow(t('erp-exc-f-buyer'), it.ocr_buyer_name) +
-                          dRow(t('erp-exc-edit-field-current'), it.client_name)
-                }
-                ${fixHtml}
+            <div class="erp-detail-scroll">
+                <section class="erp-detail-sec">
+                    <h3>${escapeHtml(t('erp-detail-sec-basic'))}</h3>
+                    <div class="erp-detail-grid">
+                        ${cell(isId ? t('erp-log-col-booking') : t('erp-exc-f-invoice'), it.invoice_no)}
+                        ${cell(isId ? t('erp-log-col-customer') : t('erp-exc-f-seller'), it.seller_name)}
+                        ${idRows}
+                    </div>
+                </section>
+                <section class="erp-detail-sec">
+                    <h3>${escapeHtml(t('erp-receipt-fail-reason'))}</h3>
+                    <div class="erp-receipt-fail-box">
+                        ${it.error_code && !isId ? `<div class="erp-receipt-errcode">${escapeHtml(it.error_code)}</div>` : ''}
+                        <div class="erp-receipt-friendly">${escapeHtml(reason)}</div>
+                    </div>
+                </section>
+                <section class="erp-detail-sec">${fixHtml}</section>
             </div>
-            <div class="erp-exc-m-foot">
+            <div class="erp-detail-foot">
                 <button class="btn btn-sm btn-ghost" type="button" id="erp-exc-m-cancel">${escapeHtml(t('erp-exc-edit-close'))}</button>
                 <button class="btn btn-sm btn-primary" type="button" id="erp-exc-m-retry">${escapeHtml(t('erp-exc-edit-retry'))}</button>
                 ${canPickCustomer ? `<button class="btn btn-sm btn-primary" type="button" id="erp-exc-m-bind" disabled>${escapeHtml(t('erp-exc-edit-bind-retry'))}</button>` : ''}

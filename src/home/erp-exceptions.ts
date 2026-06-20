@@ -164,7 +164,11 @@ function renderErpExceptions() {
             <div class="erp-exc-card-main"><b title="${escapeHtml(it.invoice_no || '')}">${escapeHtml(it.invoice_no || '—')}</b><span>${escapeHtml(sub)}</span></div>
             <div class="erp-exc-card-reason"><label>${escapeHtml(t('erp-receipt-fail-reason'))}</label><p title="${escapeHtml(reason)}${it.error_code ? ' (' + escapeHtml(it.error_code) + ')' : ''}">${escapeHtml(reason)}</p></div>
             <div class="erp-exc-card-act">
-                ${canFix ? `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-fix="${escapeHtml(it.id)}">${escapeHtml(fixLbl)}</button>` : ''}
+                ${
+                    canFix
+                        ? `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-fix="${escapeHtml(it.id)}">${escapeHtml(fixLbl)}</button>`
+                        : `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-detail="${escapeHtml(it.id)}">${escapeHtml(t('erp-log-detail-btn'))}</button>`
+                }
                 <button class="btn btn-sm btn-primary" type="button" data-erpexc-retry="${escapeHtml(it.id)}">${escapeHtml(t('erp-exc-retry'))}</button>
             </div>
         </div>`;
@@ -286,7 +290,7 @@ function renderErpExceptions() {
     // 加载更多
     const more = document.getElementById('erp-exc-more');
     if (more) more.addEventListener('click', () => loadErpExceptions(true));
-    // 修复映射/确认客户按钮 → 编辑弹窗
+    // 修复映射/确认客户按钮 → 映射修复弹窗
     block.querySelectorAll('[data-erpexc-fix]').forEach((btn) => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -294,12 +298,20 @@ function renderErpExceptions() {
                 window._erpExcOpenEdit((btn as HTMLElement).dataset.erpexcFix);
         });
     });
-    // 单击卡(非 checkbox/按钮)→ 编辑弹窗
+    // 查看详情按钮 → 推送详情抽屉(与推送日志共用 showLogDetail)
+    block.querySelectorAll('[data-erpexc-detail]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof window.showLogDetail === 'function')
+                window.showLogDetail((btn as HTMLElement).dataset.erpexcDetail);
+        });
+    });
+    // 单击卡(非 checkbox/按钮)→ 推送详情抽屉(草稿:点异常即看详情/轨迹)
     block.querySelectorAll('.erp-exc-card').forEach((card) => {
         card.addEventListener('click', (e) => {
             if ((e.target as HTMLElement).closest('input,button')) return;
-            if (typeof window._erpExcOpenEdit === 'function')
-                window._erpExcOpenEdit((card as HTMLElement).dataset.erpexcId);
+            if (typeof window.showLogDetail === 'function')
+                window.showLogDetail((card as HTMLElement).dataset.erpexcId);
         });
     });
 }

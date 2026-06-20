@@ -204,6 +204,8 @@ interface Window {
     initHistoryFilters?: () => void;
     // erp-log-card 暴露:单条推送日志渲染成草稿卡片
     buildErpLogCard?: (log: unknown) => string;
+    // erp-log-detail 暴露:推送详情抽屉(日志/异常卡共用)
+    showLogDetail?: (logId: unknown) => void;
     // history-drawer-tabs 暴露:抽屉重排成 4-tab + 汇总条(openHistoryDrawer 调一次)
     historizeDrawer?: (detail: { [k: string]: unknown }) => void;
     // ── C5 批9 桥(exceptions / erp / recon / workspace / ocr-doc-mode 等遗留边界)──

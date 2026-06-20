@@ -58,28 +58,47 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 13px;
+    padding: 12px 13px;
     border: 1px solid var(--line);
-    border-radius: 8px;
-    margin-bottom: 8px;
-    transition: border-color 0.15s, background 0.15s;
+    border-radius: 13px;
+    margin-bottom: 10px;
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 .integration-row:hover {
     border-color: var(--ink-4);
-    background: var(--bg);
+    box-shadow: var(--shadow-sm);
 }
 .integration-row.connected {
     border-color: var(--green-300);
     background: var(--green-50);
 }
 .int-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+}
+/* 集成状态药丸(草稿对齐)· 只在有真实连接信号时显示(Google=int-gst·其余暂不臆造) */
+.int-status,
+.int-gst {
+    border-radius: 999px;
+    padding: 4px 8px;
+    font-size: 9px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+.int-status.connected,
+.int-gst.on {
+    background: var(--success-bg);
+    color: var(--success);
+}
+.int-status.off,
+.int-gst.off {
+    background: var(--bg);
+    color: var(--ink-3);
 }
 .int-icon svg { width: 18px; height: 18px; }
 .ic-g { background: var(--c-e8f0fe); color: var(--c-1a73e8); }

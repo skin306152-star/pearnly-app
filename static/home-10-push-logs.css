@@ -68,6 +68,30 @@
 }
 .erp-exc-chip.active { background: var(--blue); color: #fff; border-color: var(--blue); }
 .erp-exc-chip-count { font-size: 11px; opacity: .8; }
+/* 分类统计卡(草稿对齐 · 取代旧 chips · 点击按分类筛选) */
+.erp-exc-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+}
+.erp-exc-stat {
+    text-align: left;
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    padding: 13px;
+    background: var(--card);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.erp-exc-stat:hover { border-color: var(--brand-hover); box-shadow: var(--shadow-sm); }
+.erp-exc-stat.active { border-color: var(--brand); background: var(--accent-soft); }
+.erp-exc-stat-label { font-size: 10px; color: var(--ink-3); }
+.erp-exc-stat-num { font-size: 22px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.erp-exc-stat-sub { font-size: 9px; color: var(--ink-4); }
 /* 行/全选 复选框勾选态 → 品牌主色(局部·不动全局 --accent) */
 .erp-exc-cb, .erp-exc-cb-all { accent-color: var(--blue); width: 16px; height: 16px; cursor: pointer; }
 .erp-exc-search {

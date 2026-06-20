@@ -102,17 +102,20 @@ function renderErpExceptions() {
     }
     block.hidden = false;
 
-    // category chips(计数来自后端 · 当前搜索范围内)
+    // 分类统计卡(草稿对齐 · 计数来自后端当前搜索范围 · 点击按分类筛选)
     const cats = st.categories || {};
     const allCount = Object.keys(cats).reduce((s, k) => s + cats[k], 0);
-    let chipsHtml =
-        `<button class="erp-exc-chip ${st.cat === '' ? 'active' : ''}" data-erpexc-cat="">` +
-        `<span>${escapeHtml(t('erp-exc-cat-all'))}</span><span class="erp-exc-chip-count">${allCount}</span></button>`;
-    Object.keys(cats).forEach((c) => {
-        chipsHtml +=
-            `<button class="erp-exc-chip ${st.cat === c ? 'active' : ''}" data-erpexc-cat="${escapeHtml(c)}">` +
-            `<span>${escapeHtml(t('erp-exc-cat-' + c))}</span><span class="erp-exc-chip-count">${cats[c]}</span></button>`;
-    });
+    const statEntries: Array<[string, number]> = [['', allCount]];
+    Object.keys(cats).forEach((c) => statEntries.push([c, cats[c]]));
+    const chipsHtml = statEntries
+        .map(
+            ([c, n]) =>
+                `<button class="erp-exc-stat ${st.cat === c ? 'active' : ''}" data-erpexc-cat="${escapeHtml(c)}">` +
+                `<span class="erp-exc-stat-label">${escapeHtml(c === '' ? t('erp-exc-cat-all') : t('erp-exc-cat-' + c))}</span>` +
+                `<span class="erp-exc-stat-num">${n}</span>` +
+                `<span class="erp-exc-stat-sub">${escapeHtml(t('erp-exc-stat-pending'))}</span></button>`
+        )
+        .join('');
 
     const items = st.items || [];
     const allChecked = items.length > 0 && items.every((it) => st.selected.has(it.id));
@@ -181,7 +184,7 @@ function renderErpExceptions() {
             <select class="erp-logs-erp-select" id="erp-exc-erp-select" aria-label="ERP">${_erpOpts}</select>
             <input type="search" class="erp-exc-search" id="erp-exc-search" placeholder="${escapeHtml(t('erp-exc-search-ph'))}" value="${escapeHtml(st.q)}">
         </div>
-        <div class="erp-exc-chips">${chipsHtml}</div>
+        <div class="erp-exc-summary">${chipsHtml}</div>
         <div class="erp-exc-batch" id="erp-exc-batch" ${st.selected.size ? '' : 'hidden'}>
             <span class="erp-exc-batch-info"><span class="erp-exc-batch-count">${st.selected.size}</span> ${escapeHtml(t('erp-exc-batch-selected'))}</span>
             <button class="btn btn-sm btn-primary" type="button" data-erpexc-batch="retry">${escapeHtml(t('erp-exc-batch-retry'))}</button>
@@ -222,8 +225,8 @@ function renderErpExceptions() {
             st.focusSearch = false;
         });
     }
-    // chips
-    block.querySelectorAll('.erp-exc-chip').forEach((btn) => {
+    // 分类统计卡(点击按分类筛选)
+    block.querySelectorAll('.erp-exc-stat').forEach((btn) => {
         btn.addEventListener('click', () => {
             st.cat = (btn as HTMLElement).dataset.erpexcCat || '';
             loadErpExceptions(false);

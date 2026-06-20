@@ -25,7 +25,7 @@ _IMAGE_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     "static",
     "brand",
-    "line-richmenu-pearnly-illustrated-bg-v5b-card-soft-balanced-2500x1686.png",
+    "line-richmenu-pearnly-illustrated-bg-v6-2500x1686.jpg",
 )
 _W, _H = 2500, 1686
 # 三列精确覆盖 2500(中列 +1 补齐·无缝无重叠),两行各 843 覆盖 1686。
@@ -148,7 +148,8 @@ def setup_default_menu(image_path: str = None) -> Optional[str]:
     rid = line_client.create_rich_menu(build_payload())
     if not rid:
         return None
-    if not _upload_image(rid, image, "image/png"):
+    mime = "image/jpeg" if path.lower().endswith((".jpg", ".jpeg")) else "image/png"
+    if not _upload_image(rid, image, mime):
         return None
     if not _set_default(rid):
         return None

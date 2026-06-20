@@ -155,6 +155,22 @@ class SetupTests(unittest.TestCase):
         with mock.patch("builtins.open", side_effect=OSError("no file")):
             self.assertIsNone(rm.setup_default_menu())
 
+    def test_setup_jpeg_uploads_with_jpeg_mime(self):
+        captured = {}
+        with (
+            mock.patch.object(rm, "_list_menus", return_value=[]),
+            mock.patch.object(rm.line_client, "create_rich_menu", return_value="NEW"),
+            mock.patch.object(
+                rm,
+                "_upload_image",
+                side_effect=lambda rid, img, ct: captured.update(ct=ct) or True,
+            ),
+            mock.patch.object(rm, "_set_default", return_value=True),
+            mock.patch("builtins.open", mock.mock_open(read_data=b"JPEGDATA")),
+        ):
+            rm.setup_default_menu(image_path="/x/menu.jpg")
+        self.assertEqual(captured.get("ct"), "image/jpeg")
+
 
 if __name__ == "__main__":
     unittest.main()

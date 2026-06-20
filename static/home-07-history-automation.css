@@ -729,3 +729,112 @@
     .history-row-v2 .history-cell-menu { grid-column: 3; grid-row: 3; justify-self: end; }
 }
 
+/* ============================================================
+   识别记录抽屉 · 4-tab 重排(概览/明细/原始文件/修改记录)+ 顶部汇总条
+   ============================================================ */
+.hd-summary {
+    display: grid;
+    grid-template-columns: 1.3fr .8fr .9fr;
+    gap: 9px;
+    margin-bottom: 14px;
+}
+.hd-stat {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    padding: 9px 11px;
+    min-width: 0;
+}
+.hd-stat label { display: block; font-size: 9px; color: var(--ink-3); }
+.hd-stat strong {
+    display: block;
+    font-size: 12px;
+    margin-top: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.hd-tabs {
+    display: flex;
+    gap: 18px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 14px;
+}
+.hd-tab {
+    border: 0;
+    background: transparent;
+    color: var(--ink-3);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 0 2px 11px;
+    position: relative;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.hd-tab.active { color: var(--ink); }
+.hd-tab.active::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: -1px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--ink);
+}
+.hd-panel { display: none; }
+.hd-panel.active { display: block; }
+
+/* 原始文件面板 */
+.hd-file {
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    background: var(--bg);
+    padding: 30px 20px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+.hd-file-icon { width: 42px; height: 42px; color: var(--ink-3); }
+.hd-file-name { font-size: 13px; font-weight: 600; word-break: break-all; }
+.hd-file-meta { font-size: 11px; color: var(--ink-3); }
+.hd-file-hint { font-size: 10px; color: var(--ink-4); margin-top: 4px; }
+
+/* 修改记录时间线 */
+.hd-timeline { display: flex; flex-direction: column; }
+.hd-tl-item {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    gap: 10px;
+    position: relative;
+    padding-bottom: 16px;
+}
+.hd-tl-item:last-child { padding-bottom: 0; }
+.hd-tl-item::before {
+    content: "";
+    position: absolute;
+    left: 11px; top: 22px; bottom: 0;
+    width: 1px;
+    background: var(--line);
+}
+.hd-tl-item:last-child::before { display: none; }
+.hd-tl-dot {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    color: var(--ink-3);
+    display: grid;
+    place-items: center;
+    font-size: 10px;
+    z-index: 1;
+}
+.hd-tl-copy b { display: block; font-size: 11px; }
+.hd-tl-copy span { display: block; font-size: 10px; color: var(--ink-3); margin-top: 3px; }
+
+@media (max-width: 640px) {
+    .hd-summary { grid-template-columns: 1fr 1fr; }
+    .hd-stat:first-child { grid-column: 1 / -1; }
+    .hd-tabs { gap: 12px; overflow-x: auto; }
+}
+

@@ -41,6 +41,7 @@ import './home/ocr-push.js'; // REFACTOR-C1-home-batch2 · OCR 抽屉推 ERP 三
 import './home/page-history.js'; // REFACTOR-WB-C3 · 历史页骨架运行期注入(home.html section 抽出 · 须在 history-list.js 前 · 顶层自举/bootstrap 守卫调用都在其后)
 import './home/history-list.js'; // REFACTOR-C1-home-batch4 · 发票记录页列表侧(从 home.js 抽出 · 桥 loadHistoryPage 等 · _historyState 共享态留 home.js)
 import './home/history-drawer.js'; // REFACTOR-C1-home-batch4 · 发票记录页抽屉+菜单+事件绑定(从 home.js 抽出 · 桥 openHistoryDrawer · 与 history-list.js 互调)
+import './home/history-drawer-tabs.js'; // 销项重做 · 抽屉重排 4-tab+汇总条(history 模式 · 桥 historizeDrawer · openHistoryDrawer 调)
 import './home/dms-intake.js'; // 录入工作台(发票OCR + 身份证→DMS)· window.loadDmsIntake(invoice/core/confirm 子模块经它 import)
 import './home/dashboard.js';
 import './home/billing.js';

@@ -53,6 +53,10 @@ async function openHistoryDrawer(historyId: string) {
         // 额外加一个「保存修改」按钮(覆盖到抽屉底部)
         injectHistorySaveButton();
 
+        // 销项重做:把单滚动抽屉重排成 4-tab(概览/明细/原始文件/修改记录)+ 顶部汇总条 ·
+        // 只在 history 模式跑(搬 DOM 节点不重写逻辑)· 共享 openDrawer 与对账中心零影响。
+        if (typeof window.historizeDrawer === 'function') window.historizeDrawer(detail);
+
         // v107 · 绑定客户下拉(从 detail 拿当前 client_id)
         if (typeof window.bindDrawerClient === 'function') {
             window.bindDrawerClient(detail.id, detail.client_id || null);

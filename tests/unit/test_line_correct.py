@@ -111,12 +111,53 @@ class ApplyChangesTests(unittest.TestCase):
 
     def test_category_resolves_and_sets_lines(self):
         data = {"lines": [{"category_id": "x"}, {"category_id": "y"}]}
-        with mock.patch.object(lcd, "_resolve_category", return_value=("p1", "c1")):
-            lcd.apply_changes(None, data, ExpenseDraft(note="水电费"), ["category"], "t", 1, {})
+        with mock.patch.object(lcd, "_resolve_category", return_value=("p1", "c1", True)):
+            notice = lcd.apply_changes(
+                None, data, ExpenseDraft(note="水电费"), ["category"], "t", 1, {}
+            )
+        self.assertIsNone(notice)  # 对到准确科目 → 无诚实提示
         self.assertEqual(data["category_id"], "p1")
         self.assertTrue(
             all(ln["category_id"] == "p1" and ln["subcategory_id"] == "c1" for ln in data["lines"])
         )
+
+    def test_category_fallback_to_other_returns_notice(self):
+        # 真对不上 → _resolve_category 返回 (其他叶子, matched=False) → apply_changes 给诚实提示标记。
+        data = {"lines": [{}]}
+        with mock.patch.object(lcd, "_resolve_category", return_value=("other", "misc", False)):
+            notice = lcd.apply_changes(
+                None, data, ExpenseDraft(note="xyz"), ["category"], "t", 1, {}
+            )
+        self.assertEqual(notice, "cat_fallback_other")
+        self.assertEqual(data["category_id"], "other")  # 显式落其他·不静默留空 None
+
+    def test_resolve_category_synonym_wins_without_llm(self):
+        # 「商品」经确定性同义层直对到 goods 真叶子 → 不触发 _fill_category(LLM/记账归类)。
+        from services.expense import line_l2
+        from services.line_binding import line_expense
+        from tests.unit.test_category_ai import UserCategoryWordTests as U
+
+        with (
+            mock.patch("services.purchase.categories.get_tree", return_value=U.TREE),
+            mock.patch.object(line_expense, "_fill_category") as fill,
+            mock.patch.object(line_l2, "resolve_api_key", return_value="k"),
+        ):
+            out = lcd._resolve_category(None, "商品", "t", 1, {})
+        self.assertEqual(out, ("goods", "fin", True))
+        fill.assert_not_called()
+
+    def test_resolve_category_unmatched_falls_to_other(self):
+        from services.expense import line_l2
+        from services.line_binding import line_expense
+        from tests.unit.test_category_ai import UserCategoryWordTests as U
+
+        with (
+            mock.patch("services.purchase.categories.get_tree", return_value=U.TREE),
+            mock.patch.object(line_expense, "_fill_category", side_effect=lambda *a, **k: None),
+            mock.patch.object(line_l2, "resolve_api_key", return_value=None),
+        ):
+            out = lcd._resolve_category(None, "完全无关abc", "t", 1, {})
+        self.assertEqual(out, ("other", "misc", False))  # 同义层+记账归类都对不上 → 显式其他
 
 
 class CloneLineTests(unittest.TestCase):
@@ -173,7 +214,13 @@ class ApplyTests(unittest.TestCase):
             )
         self.assertEqual(
             res,
-            {"new_id": "new1", "posted": True, "total": Decimal("550"), "mode": "posted_reclone"},
+            {
+                "new_id": "new1",
+                "posted": True,
+                "total": Decimal("550"),
+                "mode": "posted_reclone",
+                "cat_notice": None,  # 改金额非分类 → 无诚实提示
+            },
         )
         self.assertEqual(calls, ["clone", "update", "post"])  # 先克隆→改→过账
 

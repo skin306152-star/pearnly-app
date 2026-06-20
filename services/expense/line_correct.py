@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from decimal import Decimal, InvalidOperation
 from typing import Optional
@@ -20,6 +21,25 @@ from services.expense import line_correct_i18n as ci
 from services.expense.expense_draft import ExpenseDraft
 from services.line_binding import line_client, line_message_refs, line_reply
 from services.purchase import docs as docs_svc
+
+logger = logging.getLogger(__name__)
+
+
+def _after_category_change(tid, ws, line_user_id, lang, res) -> None:
+    """分类落地后:对到准确科目 → 追发学习按钮(沉淀习惯);落「其他」兜底 → 诚实提示(先记其他·可改,
+    不学这条兜底)。两者均 best-effort,绝不拖垮改错主流程。"""
+    if res.get("cat_notice"):
+        try:
+            line_client.push_messages(
+                line_user_id, [{"type": "text", "text": ci.t(ci.CAT_FALLBACK_OTHER, lang)}]
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("[line correct] cat-fallback notice push failed", exc_info=True)
+        return
+    from services.expense import line_learn
+
+    line_learn.offer(tid, ws, line_user_id, lang, doc_id=res["new_id"])
+
 
 _PREFIX = "correct:"  # 待 是/否 确认(最终)
 _CLAR_PREFIX = "correctclar:"  # 待用户选「改哪个字段」(多轮·correctclar:<ws>:<doc>)
@@ -266,10 +286,8 @@ def _apply_or_confirm(
             k = keys[0]
             fl, nv = ci.key_label(k, lang), ci.disp(k, changes[k], lang)
             _say(ci.t(ci.CHANGED_DONE, lang, field=fl, new=nv))
-        if "category" in changes:  # Phase B-1:改分类后追发学习按钮(沉淀习惯·best-effort)
-            from services.expense import line_learn
-
-            line_learn.offer(tid, ws, line_user_id, lang, doc_id=res["new_id"])
+        if "category" in changes:  # 分类落地后:准确科目→学习按钮;落「其他」→诚实提示(不学兜底)
+            _after_category_change(tid, ws, line_user_id, lang, res)
         return True
     with db.get_cursor_rls(tid, commit=True) as cur:
         conversation.save_pending(
@@ -407,10 +425,8 @@ def try_confirm(
         _say(ci.t(ci.DRAFT_EDITED, lang, new=res["total"]))  # 草稿原地改·不提「冲销原单」
     else:
         _say(line_client.t_line(lang, "exp_correct_draft", new=res["total"]))
-    if "category" in keys:  # Phase B-1:确认型改动含分类 → 追发学习按钮(沉淀习惯·best-effort)
-        from services.expense import line_learn
-
-        line_learn.offer(tid, ws_eff, line_user_id, lang, doc_id=res["new_id"])
+    if "category" in keys:  # 确认型改动含分类:准确科目→学习按钮;落「其他」→诚实提示(不学兜底)
+        _after_category_change(tid, ws_eff, line_user_id, lang, res)
     return True
 
 
@@ -448,7 +464,7 @@ def _apply(cur, bound_user, tid, ws, orig_id, changes_draft, keys, detail=None) 
         edit_id = str(orig_id)
         data = lcd.detail_to_data(detail)
         mode = "draft_inplace"
-    lcd.apply_changes(cur, data, changes_draft, keys, tid, ws, bound_user)
+    cat_notice = lcd.apply_changes(cur, data, changes_draft, keys, tid, ws, bound_user)
     cfg = settings_svc.get_settings(cur, tenant_id=tid, workspace_client_id=ws)
     res = docs_svc.update_draft(
         cur,
@@ -460,6 +476,7 @@ def _apply(cur, bound_user, tid, ws, orig_id, changes_draft, keys, detail=None) 
         settings=cfg,
     )
     total = (res.get("doc") or {}).get("grand_total")
+    out = {"new_id": edit_id, "total": total, "mode": mode, "cat_notice": cat_notice}
     # 草稿原地改:保持草稿(待用户卡片确认),不自动过账;已入账更正:按 auto_book 决定是否重新过账。
     if status == "posted" and cfg.get("auto_book"):
         posting_svc.post_doc(
@@ -470,5 +487,5 @@ def _apply(cur, bound_user, tid, ws, orig_id, changes_draft, keys, detail=None) 
             auto_stock_in=False,
             created_by=uid,
         )
-        return {"new_id": edit_id, "posted": True, "total": total, "mode": mode}
-    return {"new_id": edit_id, "posted": False, "total": total, "mode": mode}
+        return {**out, "posted": True}
+    return {**out, "posted": False}

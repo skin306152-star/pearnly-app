@@ -241,5 +241,71 @@ class MerchantRuleTests(unittest.TestCase):
         self.assertEqual(self._layer("ร้านป้าแดง", ""), (None, None, ""))
 
 
+class UserCategoryWordTests(unittest.TestCase):
+    """用户改/教分类用词(跨语言)→ 科目树真叶子(治『改成商品』落『其他』·非 ต้นทุนสินค้า)。"""
+
+    TREE = [
+        {
+            "id": "goods",
+            "name": "ซื้อสินค้า/วัตถุดิบ",
+            "children": [
+                {"id": "fin", "name": "สินค้าสำเร็จรูป"},
+                {"id": "raw", "name": "วัตถุดิบ"},
+            ],
+        },
+        {
+            "id": "trav",
+            "name": "ค่าเดินทางและขนส่ง",
+            "children": [
+                {"id": "fuel", "name": "ค่าน้ำมันเชื้อเพลิง"},
+                {"id": "taxi", "name": "ค่าแท็กซี่/แกร็บ"},
+            ],
+        },
+        {
+            "id": "food",
+            "name": "ค่าอาหารและรับรอง",
+            "children": [{"id": "fb", "name": "ค่าอาหาร/เครื่องดื่ม"}],
+        },
+        {
+            "id": "other",
+            "name": "ค่าใช้จ่ายอื่น ๆ",
+            "children": [
+                {"id": "csr", "name": "ค่าบริจาค/CSR"},
+                {"id": "misc", "name": "ค่าใช้จ่ายเบ็ดเตล็ด"},
+            ],
+        },
+    ]
+
+    def _m(self, word):
+        return category_ai.match_user_category(word, self.TREE)
+
+    def test_goods_word_maps_to_goods_leaf(self):
+        self.assertEqual(self._m("商品"), ("goods", "fin"))  # ★非其他
+        self.assertEqual(self._m("goods"), ("goods", "fin"))
+        self.assertEqual(self._m("采购"), ("goods", "fin"))
+
+    def test_goods_word_in_phrase(self):
+        self.assertEqual(self._m("记成商品成本"), ("goods", "fin"))  # 用户词在短语里也命中
+
+    def test_fuel_word_maps_to_fuel_leaf(self):
+        self.assertEqual(self._m("油费"), ("trav", "fuel"))
+        self.assertEqual(self._m("fuel"), ("trav", "fuel"))
+
+    def test_food_word_maps_to_food_leaf(self):
+        self.assertEqual(self._m("餐饮"), ("food", "fb"))
+
+    def test_unmatched_word_returns_none(self):
+        self.assertEqual(self._m("随便瞎写abc"), (None, None))  # 对不上 → 交由调用方落其他
+
+    def test_short_word_not_guessed(self):
+        self.assertEqual(self._m("水"), (None, None))  # 单字不猜(避免误命中)
+
+    def test_other_category_resolves_misc_leaf(self):
+        self.assertEqual(category_ai.other_category(self.TREE), ("other", "misc"))
+
+    def test_other_category_none_when_absent(self):
+        self.assertEqual(category_ai.other_category([self.TREE[0]]), (None, None))
+
+
 if __name__ == "__main__":
     unittest.main()

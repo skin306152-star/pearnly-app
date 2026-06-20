@@ -294,7 +294,9 @@ def _build_patches(sim):
         mock.patch.object(correct_svc, "correct_doc", side_effect=sim.correct_doc),
         mock.patch.object(correct_svc, "restore_doc", side_effect=sim.restore_doc),
         mock.patch.object(settings_svc, "get_settings", return_value={"auto_book": False}),
-        mock.patch.object(line_correct_data, "_resolve_category", return_value=("cat1", "sub1")),
+        mock.patch.object(
+            line_correct_data, "_resolve_category", return_value=("cat1", "sub1", True)
+        ),
         mock.patch.object(line_message_refs, "resolve_target", side_effect=sim.resolve_target),
         mock.patch.object(
             line_message_refs, "resolve_card_state", side_effect=sim.resolve_card_state

@@ -275,6 +275,15 @@ LEARN_STALE = {
 }
 
 
+# 用户改/教的分类词对不上科目树任何准确科目 → 诚实告知先记「其他」、可再改(不静默落其他)。
+CAT_FALLBACK_OTHER = {
+    "zh": "没找到完全对应的科目,先记到「其他」了,你可以随时再改。",
+    "th": "ยังไม่พบหมวดหมู่ที่ตรงพอดี จึงบันทึกไว้ที่ “อื่น ๆ” ก่อน แก้ไขภายหลังได้ค่ะ",
+    "en": 'No exact category match — recorded under "Other" for now; you can change it anytime.',
+    "ja": "ぴったりの科目が見つからず、ひとまず「その他」に記録しました。いつでも変更できます。",
+}
+
+
 def field_label(field: str, lang: str) -> str:
     return FIELD_LABELS.get(field, {}).get(lang) or FIELD_LABELS.get(field, {}).get("zh", field)
 

@@ -22,12 +22,12 @@ _TARGETS = {
         ("ค่าอาหาร/เครื่องดื่ม", "餐费", "饮料", "อาหาร", "เครื่องดื่ม", "food", "drink"),
     ),
     "goods": (
-        ("ซื้อสินค้า/วัตถุดิบ", "采购", "商品", "วัตถุดิบ", "goods", "purchase"),
+        ("ซื้อสินค้า/วัตถุดิบ", "采购", "进货", "商品", "货物", "วัตถุดิบ", "goods", "purchase"),
         ("สินค้าสำเร็จรูป", "成品", "商品", "merchandise", "finished goods"),
     ),
     "fuel": (
         ("ค่าเดินทางและขนส่ง", "交通", "เดินทาง", "transport", "travel"),
-        ("ค่าน้ำมันเชื้อเพลิง", "燃油", "น้ำมัน", "fuel", "petrol"),
+        ("ค่าน้ำมันเชื้อเพลิง", "燃油", "油费", "汽油", "加油", "น้ำมัน", "fuel", "petrol"),
     ),
     "taxi": (
         ("ค่าเดินทางและขนส่ง", "交通", "เดินทาง", "transport", "travel"),
@@ -225,6 +225,40 @@ def rule_category(vendor: str, descs: str, categories: list):
     """确定性归类(2-tuple · 向后兼容多处调用)。命中层见 classify_rules。"""
     cid, sid, _layer = classify_rules(vendor, descs, categories)
     return cid, sid
+
+
+# 「其他/杂项」大类别名(用户改/教的词真对不上任何科目时显式落这里·不静默留空)。
+_OTHER_ALIASES = ("ค่าใช้จ่ายอื่น", "其他", "other", "เบ็ดเตล็ด", "miscellaneous", "杂项")
+
+
+def match_user_category(text: str, categories: list):
+    """用户改/教分类用词(跨语言)→ 科目树最接近真叶子 (cat_id, sub_id);无把握 → (None, None)。
+
+    复用 _TARGETS 跨语言别名(商品/goods→ซื้อสินค้า·油费/fuel→ค่าน้ำมันเชื้อเพลิง·餐饮→ค่าอาหาร):
+    先子类别名(更具体)再大类别名匹配用户词,命中即解析到本套账真叶子。改分类专用(记账走规则/LLM)。
+    短词(<2 字)不猜,避免单字误命中。
+    """
+    if len((t := (text or "").strip())) < 2:
+        return None, None
+    for use_child in (True, False):
+        for target, (parent_aliases, child_aliases) in _TARGETS.items():
+            if _alias_match(t, child_aliases if use_child else parent_aliases):
+                cid, sid = _resolve_target(categories, target)
+                if cid:
+                    return cid, sid
+    return None, None
+
+
+def other_category(categories: list):
+    """「其他/杂项」真叶子 (cat_id, sub_id):用户词对不上时显式落此(诚实·不留空)。无 → (None, None)。"""
+    for parent in categories or []:
+        if _alias_match(parent.get("name"), _OTHER_ALIASES):
+            for child in parent.get("children") or []:
+                if _alias_match(child.get("name"), ("เบ็ดเตล็ด", "杂项", "misc")):
+                    return parent["id"], child["id"]
+            kids = parent.get("children") or []
+            return parent["id"], (kids[0]["id"] if kids else None)
+    return None, None
 
 
 _PROMPT = (

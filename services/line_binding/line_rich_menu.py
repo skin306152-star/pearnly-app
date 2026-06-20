@@ -168,16 +168,18 @@ def handle_postback(
     tid = str(bound_user["tenant_id"]) if bound_user.get("tenant_id") else None
     if not tid:
         return True  # 已识别为菜单动作但无租户 → 吞掉,不漏给卡片分发
-    from core import db
-    from core.workspace_context import default_workspace_id
     from services.line_binding import line_expense_qa, line_proof, line_reply
 
-    with db.get_cursor_rls(tid) as cur:
-        ws = default_workspace_id(cur, tid)
-    if action == "rm_summary":
-        line_expense_qa.reply_summary(reply_token, lang, tid, ws, line_user_id=line_user_id)
-    elif action == "rm_detail":
-        line_expense_qa.reply_detail(reply_token, lang, tid, ws, line_user_id)
+    if action in ("rm_summary", "rm_detail"):  # 仅这两路需 ws(proof/help 自取或不需)
+        from core import db
+        from core.workspace_context import default_workspace_id
+
+        with db.get_cursor_rls(tid) as cur:
+            ws = default_workspace_id(cur, tid)
+        if action == "rm_summary":
+            line_expense_qa.reply_summary(reply_token, lang, tid, ws, line_user_id=line_user_id)
+        else:
+            line_expense_qa.reply_detail(reply_token, lang, tid, ws, line_user_id)
     elif action == "rm_proof":
         cmd = line_proof.parse_proof_command("ขอ pdf เดือนนี้")  # 等同发「ขอ PDF เดือนนี้」
         if cmd:

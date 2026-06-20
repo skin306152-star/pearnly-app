@@ -96,6 +96,11 @@ def _money(v) -> str:
     return f"{Decimal(str(v or 0)):,.2f}"
 
 
+def grand_total(summ: dict):
+    """期间合计(进货 + 费用)· 封面与下载卡共用同一口径(单一定义,不两处各算)。"""
+    return (summ.get("goods_total") or 0) + (summ.get("expense_total") or 0)
+
+
 def _period_label(period: str) -> str:
     """'2026-06' → 'มิ.ย. 2026'(泰文月缩写·公历年)。解析失败 → 原样。"""
     try:
@@ -187,7 +192,7 @@ def _cover_pdf(summ, rows, *, m, k, period, subject) -> bytes:
     kval = ParagraphStyle("kval", fontName=bold, fontSize=13, leading=16)
     foot = ParagraphStyle("foot", fontName=base, fontSize=8, textColor=colors.HexColor(_MUTED))
 
-    total = (summ.get("goods_total") or 0) + (summ.get("expense_total") or 0)
+    total = grand_total(summ)
     story = [
         Paragraph("Pearnly", brand),
         Paragraph(f"{_TITLE_TH} · {_TITLE_EN}", h1),
@@ -269,19 +274,20 @@ def _cover_pdf(summ, rows, *, m, k, period, subject) -> bytes:
 
 
 def build_monthly_proof_pdf(
-    cur, *, tenant_id, workspace_client_id, date_from, date_to, lang="th", period=""
+    cur, *, tenant_id, workspace_client_id, date_from, date_to, lang="th", period="", summ=None
 ) -> bytes:
     """整月已入账票 → 多页 PDF:封面(汇总卡+明细表)+ 每票所有票图页(页眉条标注对应笔)+ 全页页码。
 
     只含 status='posted';租户+套账隔离;无图的笔只在明细表标「—」不占图页(诚实)。lang 仅影响数据
-    取值上下文,标签固定泰语。"""
-    summ = reports_svc.summary(
-        cur,
-        tenant_id=tenant_id,
-        workspace_client_id=workspace_client_id,
-        date_from=date_from,
-        date_to=date_to,
-    )
+    取值上下文,标签固定泰语。summ 可由调用方传入复用(避免同一流程重复查汇总)。"""
+    if summ is None:
+        summ = reports_svc.summary(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            date_from=date_from,
+            date_to=date_to,
+        )
     doc_ids = archive._posted_doc_ids(
         cur,
         tenant_id=tenant_id,

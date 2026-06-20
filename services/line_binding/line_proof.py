@@ -158,15 +158,6 @@ def start(bound_user, reply_token, line_user_id, lang, cmd) -> bool:
 def _build_and_save(tid, ws, line_user_id, lang, cmd) -> dict:
     """同步:建 PDF + 落盘 + 签 token + 汇总(在线程池跑·不卡事件循环)。失败抛异常。"""
     with db.get_cursor_rls(tid, commit=False) as cur:
-        pdf = proof_pdf.build_monthly_proof_pdf(
-            cur,
-            tenant_id=tid,
-            workspace_client_id=ws,
-            date_from=cmd["date_from"],
-            date_to=cmd["date_to"],
-            lang=lang,
-            period=cmd["period"],
-        )
         summ = reports_svc.summary(
             cur,
             tenant_id=tid,
@@ -174,17 +165,26 @@ def _build_and_save(tid, ws, line_user_id, lang, cmd) -> dict:
             date_from=cmd["date_from"],
             date_to=cmd["date_to"],
         )
+        pdf = proof_pdf.build_monthly_proof_pdf(  # 复用上面的 summ,避免重复查汇总
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            date_from=cmd["date_from"],
+            date_to=cmd["date_to"],
+            lang=lang,
+            period=cmd["period"],
+            summ=summ,
+        )
     rel, _size = pdf_storage.save_bytes(line_user_id, pdf, ".pdf")
     if not rel:
         raise RuntimeError("save_bytes failed")
     token = proof_pdf.sign_token(
         tenant_id=tid, workspace_client_id=ws, period=cmd["period"], rel=rel
     )
-    total = (summ.get("goods_total") or 0) + (summ.get("expense_total") or 0)
     return {
         "url": f"{_base_url()}/api/purchase/proof-pdf/{token}",
         "n": summ.get("doc_count") or 0,
-        "total": total,
+        "total": proof_pdf.grand_total(summ),
         "period": cmd["period"],
     }
 

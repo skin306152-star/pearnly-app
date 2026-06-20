@@ -114,6 +114,77 @@ class EnqueueTests(unittest.TestCase):
         self.assertEqual(classify_push_status(r["success"], r["error_msg"]), "failed")
 
 
+_SALES_CONFIG = {
+    "account_set": "DATAT",
+    "revenue_acc": "41-01-00-00",
+    "vat_output_acc": "11-05-04-02",
+    "ar_acc": "11-02-01-00",
+}
+
+
+def _sales_endpoint(**over):
+    cfg = dict(_SALES_CONFIG)
+    cfg.update(over.pop("config", {}))
+    ep = {"id": "ep-s", "adapter": "express", "user_id": "u1", "enabled": True, "config": cfg}
+    ep.update(over)
+    return ep
+
+
+def _sales_history(confidence="high", direction="sales", **fover):
+    fields = {
+        "buyer_name": "บริษัท ลูกค้า จำกัด",
+        "buyer_tax": "0105551234567",
+        "subtotal": "23456.00",
+        "vat": "1641.92",
+        "invoice_number": "SO-9001",
+        "document_type": "tax_invoice",
+    }
+    fields.update(fover)
+    return {
+        "id": "hist-s1",
+        "invoice_date": "2015-12-15",
+        "invoice_no": "SO-9001",
+        "total_amount": "25097.92",
+        "confidence": confidence,
+        "direction": direction,
+        "pages": [{"fields": fields}],
+    }
+
+
+class DirectionRoutingTests(unittest.TestCase):
+    def setUp(self):
+        self._env = mock.patch.dict("os.environ", {"ERP_PUSH_ENABLED": "true"})
+        self._env.start()
+        self._tid = mock.patch("core.db.get_user_tenant_id", return_value=None)
+        self._tid.start()
+
+    def tearDown(self):
+        self._tid.stop()
+        self._env.stop()
+
+    def test_sales_routes_to_sales_mapper(self):
+        r = enqueue_express(_sales_endpoint(), _sales_history())
+        self.assertEqual(r["error_msg"], "EXPRESS_QUEUED")
+        body = r["request_body"]
+        self.assertEqual(body["direction"], "sales")
+        self.assertEqual(body["doctype"], "IV")
+        self.assertIn("customer", body)        # 销项产 customer 块
+        self.assertNotIn("supplier", body)
+
+    def test_purchase_routes_to_purchase_mapper(self):
+        r = enqueue_express(_endpoint(), _history())  # 无 direction → 缺省 purchase
+        self.assertEqual(r["error_msg"], "EXPRESS_QUEUED")
+        self.assertEqual(r["request_body"]["direction"], "purchase")
+        self.assertIn("supplier", r["request_body"])
+
+    def test_direction_not_enabled_manual(self):
+        # 本连接只处理进项 → 销项票留人工。
+        r = enqueue_express(_sales_endpoint(config={"directions": ["purchase"]}), _sales_history())
+        self.assertTrue(r["error_msg"].startswith("EXPRESS_MANUAL"))
+        self.assertIn("direction_not_enabled:sales", r["error_msg"])
+        self.assertEqual(classify_push_status(r["success"], r["error_msg"]), "manual")
+
+
 class FlagWhitelistTests(unittest.TestCase):
     def test_account_set_allowed(self):
         self.assertTrue(account_set_allowed("DATAT"))

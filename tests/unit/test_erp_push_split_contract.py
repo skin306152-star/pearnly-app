@@ -76,10 +76,11 @@ class ErpPushSplitContractTest(unittest.TestCase):
 
     def test_adapter_registry_intact(self) -> None:
         reg = _erp.ADAPTER_REGISTRY
-        self.assertEqual(set(reg), {"webhook", "flowaccount", "mrerp", "mrerp_dms"})
+        self.assertEqual(set(reg), {"webhook", "flowaccount", "mrerp", "mrerp_dms", "express"})
         self.assertIs(reg["webhook"], _payload.push_webhook)
         self.assertIs(reg["flowaccount"], _payload.push_flowaccount)
         self.assertIs(reg["mrerp_dms"], _dms.push_mrerp_dms)
+        self.assertIs(reg["express"], _erp.push_express)
 
     def test_anti_mispush_core_stays_in_erp_push(self) -> None:
         # 防误推核心绝不搬走:push_to_endpoint 硬拒 mrerp_dms 发票推送 + 加密凭据集

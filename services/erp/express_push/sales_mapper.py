@@ -1,0 +1,146 @@
+# -*- coding: utf-8 -*-
+"""扁平化 history → Express 销项(销售)记账载荷(镜像 mapper · 确定性纯函数)。
+
+销售一张赊销/现销发票 = 一笔销售日记账(JNLTYP=03)+ 销项税(喂 ภ.พ.30)+ 复式分录
+(借应收 AR = 贷销售收入 + 贷销项税,与采购相反)。共享纯函数在 common.py;这里只留
+销项特有(客户身份 + 销售分录装配)。
+
+载荷契约(与 companion `sales_adapter` 一字不差,消费方已建):
+  direction     "sales"
+  doctype        IV(赊销/未收 · 默认)| HS(现销/已收)
+  account_set    DATAT(白名单在 enqueue/agent 再校验)
+  docdate_be / vat_period_be   佛历 YYMMDD
+  ref_no         销售参考(幂等锚)
+  customer       {code,name,tax_id,prename,customer_new}
+  vat_rate       7.00 | 0.00
+  base_amount / vat_amount / total_amount
+  lines          [{acc,side(D/C),amount,desc}] · 借应收 = 贷收入 + 贷销项税 · 借贷必平
+"""
+
+from __future__ import annotations
+
+from decimal import Decimal
+from typing import Any, Dict, List, Optional
+
+from services.erp.express_push.common import (
+    ExpressMapResult,
+    _d,
+    _q,
+    _s,
+    _VAT_RATE,
+    amounts,
+    be_dates,
+    detect_prename,
+    fail,
+    payment_is_paid,
+    resolve_account,
+)
+from services.purchase.field_clean import clean_invoice_no, clean_seller, clean_tax_id
+
+
+def _resolve_customer(
+    clients: List[Dict[str, Any]], history: Dict[str, Any], name: str, tax_id: str
+) -> Dict[str, Any]:
+    """客户身份块。命中 erp_client_mappings(express)→ 带 code、customer_new=False;
+    否则 customer_new=True 让 Agent 在 ARMAS 建档。"""
+    code = ""
+    client_id = history.get("client_id")
+    if client_id is not None:
+        for c in clients or []:
+            if (
+                str(c.get("client_id")) == str(client_id)
+                and (c.get("erp_type") or "").lower() == "express"
+            ):
+                code = (c.get("erp_code") or "").strip()
+                break
+    return {
+        "code": code,
+        "name": name,
+        "tax_id": tax_id,
+        "prename": detect_prename(name),
+        "customer_new": not bool(code),
+    }
+
+
+def build_express_sales_payload(
+    history: Dict[str, Any],
+    *,
+    config: Dict[str, Any],
+    mappings: Optional[Dict[str, Any]] = None,
+    category: str = "",
+) -> ExpressMapResult:
+    """扁平化 history → Express 销项载荷。判脏/不自洽 → ok=False(留人工)。
+
+    config 键:account_set · revenue_acc(兜底收入科目)· vat_output_acc(销项税科目)·
+    ar_acc(应收科目)· default_doctype(IV/HS)。
+    """
+    mappings = mappings or {}
+    fields = history.get("fields") if isinstance(history.get("fields"), dict) else {}
+    fields = fields or {}
+
+    account_set = str(config.get("account_set") or "").strip()
+    if not account_set:
+        return fail("no_account_set")
+
+    dates = be_dates(history.get("invoice_date") or fields.get("date"))
+    if not dates:
+        return fail("bad_or_missing_date")
+    docdate_be, vat_period_be = dates
+
+    amts = amounts(fields, history)
+    if not amts:
+        return fail("amounts_not_consistent")
+    base, vat, total = amts
+
+    accounts = mappings.get("accounts") or []
+    revenue_acc = resolve_account(accounts, category, config.get("revenue_acc"))
+    if not revenue_acc:
+        return fail("no_revenue_account")
+    ar_acc = resolve_account(accounts, "accounts_receivable", config.get("ar_acc"))
+    if not ar_acc:
+        return fail("no_ar_account")
+
+    has_vat = vat > 0
+    if has_vat:
+        vat_acc = resolve_account(accounts, "output_vat", config.get("vat_output_acc"))
+        if not vat_acc:
+            return fail("no_output_vat_account")
+
+    name = clean_seller(fields.get("buyer_name") or fields.get("customer_name") or history.get("buyer_name"))
+    tax_id = clean_tax_id(fields.get("buyer_tax") or fields.get("buyer_tax_id") or fields.get("customer_tax"))
+    customer = _resolve_customer(mappings.get("clients") or [], history, name, tax_id)
+    ref_no = clean_invoice_no(history.get("invoice_no") or fields.get("invoice_number"))
+
+    # 分录反向:借 应收(含税) = 贷 销售收入(税前) + 贷 销项税。
+    lines: List[Dict[str, str]] = [
+        {"acc": ar_acc, "side": "D", "amount": _s(total), "desc": name or "ลูกหนี้การค้า"},
+        {"acc": revenue_acc, "side": "C", "amount": _s(base), "desc": "รายได้จากการขาย"},
+    ]
+    if has_vat:
+        lines.append({"acc": vat_acc, "side": "C", "amount": _s(vat), "desc": "ภาษีขาย"})
+
+    dr = sum((_d(ln["amount"]) for ln in lines if ln["side"] == "D"), Decimal("0"))
+    cr = sum((_d(ln["amount"]) for ln in lines if ln["side"] == "C"), Decimal("0"))
+    if _q(dr) != _q(cr):
+        return fail("entry_not_balanced")
+
+    paid = payment_is_paid(fields)
+    payload = {
+        "direction": "sales",
+        "doctype": "HS" if paid else "IV",  # 默认 IV 赊销(无信号/未收)
+        "account_set": account_set,
+        "docdate_be": docdate_be,
+        "vat_period_be": vat_period_be,
+        "ref_no": ref_no,
+        "customer": customer,
+        "vat_rate": float(_VAT_RATE) if has_vat else 0.0,
+        "base_amount": _s(base),
+        "vat_amount": _s(vat),
+        "total_amount": _s(total),
+        "lines": lines,
+        "source": {
+            "history_id": str(history.get("id") or ""),
+            "filename": history.get("filename"),
+        },
+    }
+    return ExpressMapResult(True, payload, "ok")

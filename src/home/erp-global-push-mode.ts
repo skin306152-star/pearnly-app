@@ -9,6 +9,10 @@
 (function () {
     'use strict';
 
+    // 账户级值只随用户改 select 变(change 处理器自己更新 dataset.prev)·拉到一次即可。
+    // 进入 connect sub-tab 的多个触发(nav 点击 / subtab 点击 / 首屏探测)因此都收敛成幂等。
+    let _loaded = false;
+
     function _toast(msg: any, kind?: any) {
         try {
             if (typeof showToast === 'function') showToast(msg, kind || 'info');
@@ -16,6 +20,7 @@
     }
 
     async function _load() {
+        if (_loaded) return;
         const sel = document.getElementById('erp-global-push-mode') as HTMLSelectElement | null;
         if (!sel) return;
         const tk = localStorage.getItem('mrpilot_token');
@@ -30,6 +35,7 @@
                     sel.value = d.mode;
                     sel.dataset.prev = d.mode;
                 }
+                _loaded = true;
             }
         } catch (e) {
             /* 静默 · 保留默认 smart */

@@ -25,12 +25,8 @@ router = APIRouter()
 
 @router.get("/api/erp/connectors/status")
 async def erp_connectors_status(request: Request):
-    """
-    统一返回当前用户/租户所有「已配置的 ERP 连接器」。
-
-    method:
-      - "webhook" → 走 /api/erp/push 接口(endpoint_id 必填)
-    """
+    """统一返回当前用户/租户所有「已配置的 ERP 连接器」(erp_endpoints 表)·
+    抽屉「1 个推送按钮」用。所有连接器均走 POST /api/erp/push(endpoint_id 必填)。"""
     user = get_current_user_from_request(request)
     connectors: List[Dict[str, Any]] = []
 
@@ -56,7 +52,6 @@ async def erp_connectors_status(request: Request):
                     "method": "webhook",
                     "status": "connected",
                     "is_default": bool(ep.get("is_default")),
-                    "push_endpoint": "/api/erp/push",
                     "meta": {
                         "auto_push": bool(ep.get("auto_push")),
                     },

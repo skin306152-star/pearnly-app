@@ -34,6 +34,7 @@ from services.line_binding import (
     line_intake,
     line_proof,
     line_reply,
+    line_rich_menu,
 )
 
 logger = logging.getLogger(__name__)
@@ -100,6 +101,9 @@ async def _handle_line_event(ev: dict):
         line_reply.begin_loading(line_user_id)
         lang = bound.get("preferred_lang") or _ev_lang(ev)
         data = (ev.get("postback") or {}).get("data", "")
+        # Rich Menu 区(rm_*)→ 路由到现有汇总/明细/PDF/能力说明;非菜单 postback 交卡片动作分发。
+        if line_rich_menu.handle_postback(bound, reply_token, data, lang, line_user_id):
+            return
         line_card_actions.handle_postback(bound, reply_token, data, lang)
         return
 

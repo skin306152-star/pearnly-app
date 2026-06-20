@@ -84,6 +84,20 @@ def push_mrerp(endpoint_config: Dict[str, Any], payload: Dict[str, Any]) -> Tupl
     )
 
 
+def push_express(endpoint_config: Dict[str, Any], payload: Dict[str, Any]) -> Tuple[bool, int, str]:
+    """Express push entry · stub kept for ADAPTER_REGISTRY membership.
+
+    Express 走出站拉取:真实"推送"= enqueue_express 把载荷写进队列,由
+    push_to_endpoint 对 adapter='express' 早返直接分派(绕过 (config, payload)
+    形态)。本桩仅让 ADAPTER_REGISTRY 含 'express' —— 端点创建路由用它做白名单
+    成员校验(否则建 express 连接被判 unknown_adapter)。与 push_mrerp 同范式。"""
+    return (
+        False,
+        0,
+        "express push is enqueued via push_to_endpoint early-return; this stub must not run",
+    )
+
+
 def load_mrerp_mappings(tenant_id: Optional[str]) -> Dict[str, Any]:
     """P1c · 取该 tenant 的 MR.ERP 主数据映射 bundle(clients/products/accounts/taxes)。
     无 tenant → 空 bundle(行为不变 · 从 push_mrerp_history 抽出)。"""
@@ -331,6 +345,8 @@ ADAPTER_REGISTRY = {
     "flowaccount": push_flowaccount,
     "mrerp": push_mrerp,
     "mrerp_dms": push_mrerp_dms,
+    # express 早返于 push_to_endpoint;此桩仅供成员校验(端点创建白名单)。
+    "express": push_express,
 }
 
 # Adapters whose endpoint.config carries Fernet-encrypted credentials.

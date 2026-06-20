@@ -94,8 +94,9 @@ function renderErpExceptions() {
     const block = document.getElementById('erp-exc-block');
     if (!block) return;
     const st = _erpExcState;
-    // 真正空(无异常 + 无搜索/筛选)→ 隐藏整块;搜索/筛选 0 结果 → 显示空态(留搜索框)
-    const show = st.total > 0 || !!st.q || !!st.cat;
+    // 真正空(无异常 + 无任何筛选)→ 隐藏整块;搜索/分类/ERP 筛选 0 结果 → 仍渲染面板
+    // (留下拉/搜索/统计卡 + 空态文案)· 否则选了空 ERP 会把能切回去的下拉也藏掉 → 困死。
+    const show = st.total > 0 || !!st.q || !!st.cat || !!st.adapter;
     if (!show) {
         block.hidden = true;
         block.innerHTML = '';

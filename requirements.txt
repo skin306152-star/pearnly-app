@@ -22,10 +22,14 @@
 # ============================================================
 fastapi
 uvicorn
+# starlette 是 fastapi 的传递依赖(fastapi 0.136 要 starlette>=0.46)· 显式钉死
+# 到最低修复版以清 CVE-2026-48817/48818/54282/54283(pip-audit 闸)。
+starlette==1.3.1
 # FastAPI Form/File 字段需要(recon_routes.py /upload_report 用 Form
 # 字段触发 ensure_multipart_is_installed)· 本机靠传递依赖装上了
 # 但 CI 干净 venv 不装 · run #4 import app 直接挂。
-python-multipart
+# 0.0.31 修 CVE-2026-53538/53539/53540(pip-audit 闸)。
+python-multipart==0.0.31
 
 # ============================================================
 # === 数据库 ===
@@ -68,7 +72,7 @@ python-dotenv==1.2.2
 # 2026-05-24 · 1.20.2(无 py3.12 wheel)每次部署强制源码编译→失败→中断 pip install→
 # 后续包(python-docx 等)装不上。钉到生产实跑且有 py3.12 预编译 wheel 的 1.24.10。
 PyMuPDF==1.24.10
-pypdf==6.12.0  # 6.12.0 修 CVE-2026-48155/48156(pip-audit 闸)
+pypdf==6.13.3  # 6.13.3 修 6 项 CVE(48735/49460/49461/54530/54531+GHSA-jm82·pip-audit 闸)
 pdfplumber==0.11.9
 pdfminer.six==20251230
 

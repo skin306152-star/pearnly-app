@@ -51,7 +51,7 @@ PyJWT
 # 48.0.1 修 GHSA-537c-gmf6-5ccf(pip-audit 闸)。本仓库仅用 Fernet(core/kms_helper.py
 # 对称加密 ERP 凭据);JWT 走 HS256、LINE webhook 走 stdlib hmac · 均不经 cryptography。
 # 46→48 breaking(去二进制椭圆曲线/OpenSSL1.1/Py3.8/CRL 校验收紧)均不触及上述用法。
-cryptography==48.0.1
+cryptography==49.0.0
 
 # ============================================================
 # === 数据模型 ===

@@ -95,7 +95,6 @@ async function showLogDetail(logId: any) {
         const epName =
             log.endpoint_name ||
             (ep ? ep.name : log.endpoint_id ? t('erp-log-endpoint-deleted') : '-');
-        // @ts-expect-error TS6133 verbatim 保留 · 0 改逻辑(派生但当前模板未引用)
         const adapter = (log.endpoint_adapter || (ep && ep.adapter) || '').toLowerCase();
 
         const time = new Date(log.created_at).toLocaleString();
@@ -271,6 +270,12 @@ async function showLogDetail(logId: any) {
         const cell = (label: string, val: string) =>
             `<div class="erp-detail-cell"><label>${escapeHtml(label)}</label><strong>${escapeHtml(val)}</strong></div>`;
 
+        // Express 分录预览(P3b · 最小 adapter=='express' 分支)· 其它 adapter expSec 恒为 ''(零影响)。
+        const expSec =
+            adapter === 'express' && (window as any).ExpressDetail
+                ? (window as any).ExpressDetail.section(log)
+                : '';
+
         drawer.querySelector('.erp-detail-body')!.innerHTML = `
             <div class="erp-detail-head">
                 <div class="erp-detail-title">${escapeHtml(t('erp-detail-title'))}</div>
@@ -288,10 +293,14 @@ async function showLogDetail(logId: any) {
                         ${cell(t('erp-detail-f-total'), (log.elapsed_ms != null ? log.elapsed_ms : '-') + 'ms')}
                     </div>
                 </section>
-                <section class="erp-detail-sec">
+                ${
+                    // express:自带识别字段 + 分录预览 + 诚实时间线(expSec)· 其它 adapter:通用时间线。
+                    expSec ||
+                    `<section class="erp-detail-sec">
                     <h3>${escapeHtml(t('erp-detail-sec-timeline'))}</h3>
                     <div class="erp-detail-timeline">${tl.join('')}</div>
-                </section>
+                </section>`
+                }
                 ${isOk && extDocNo ? `<section class="erp-detail-sec"><h3>${escapeHtml(t('erp-receipt-doc-no'))}</h3><div class="erp-detail-docno"><strong>${escapeHtml(extDocNo)}</strong><button class="erp-receipt-copy-btn" type="button" data-receipt-copy="${escapeHtml(extDocNo)}">${escapeHtml(t('erp-receipt-copy-btn'))}</button></div>${hintHtml}</section>` : ''}
                 ${failBlockHtml ? `<section class="erp-detail-sec"><h3>${escapeHtml(t('erp-receipt-fail-reason'))}</h3>${failBlockHtml}</section>` : ''}
                 ${adviceText ? `<section class="erp-detail-sec"><h3>${escapeHtml(t('erp-receipt-suggest'))}</h3><div class="erp-detail-advice">${escapeHtml(adviceText)}</div></section>` : ''}

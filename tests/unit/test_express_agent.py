@@ -125,30 +125,45 @@ class LeaseAckTests(unittest.TestCase):
         self.assertTrue(res.get("idempotent"))
 
     def test_ack_failed_increments_then_manual(self):
-        # attempt 0 → 1 · 仍 pending(可重领)
+        # 队列行起始 attempt=1(通用落库约定)= 0 次 Agent 失败。
+        # 第 1 次失败:attempt 1 → 2 · agent_failures=1 · 仍 pending(可重领)。
         row1 = {
             "id": "log-1",
             "status": "pending",
-            "attempt": 0,
+            "attempt": 1,
             "lease_owner": "agentA",
             "response_body": None,
         }
         with _patch_cursor(FakeCursor(one=row1)):
             res = agent_store.ack("ep-1", "log-1", "agentA", False, error="rpa timeout")
         self.assertEqual(res["status"], "pending")
-        self.assertEqual(res["attempt"], 1)
-        # attempt 2 → 3 · 置 manual(留人工)
-        row3 = {
+        self.assertEqual(res["agent_failures"], 1)
+        self.assertEqual(res["attempt"], 2)
+        # 第 2 次失败:attempt 2 → 3 · agent_failures=2 · 仍 pending(不提前 manual)。
+        row2 = {
             "id": "log-1",
             "status": "pending",
             "attempt": 2,
             "lease_owner": "agentA",
             "response_body": None,
         }
+        with _patch_cursor(FakeCursor(one=row2)):
+            res = agent_store.ack("ep-1", "log-1", "agentA", False, error="rpa timeout")
+        self.assertEqual(res["status"], "pending")
+        self.assertEqual(res["agent_failures"], 2)
+        # 第 3 次失败:attempt 3 → 4 · agent_failures=3 · 置 manual(满 3 次)。
+        row3 = {
+            "id": "log-1",
+            "status": "pending",
+            "attempt": 3,
+            "lease_owner": "agentA",
+            "response_body": None,
+        }
         with _patch_cursor(FakeCursor(one=row3)):
             res = agent_store.ack("ep-1", "log-1", "agentA", False, error="rpa timeout")
         self.assertEqual(res["status"], "manual")
-        self.assertEqual(res["attempt"], 3)
+        self.assertEqual(res["agent_failures"], 3)
+        self.assertEqual(res["attempt"], 4)
 
     def test_ack_log_not_found(self):
         with _patch_cursor(FakeCursor(one=None)):

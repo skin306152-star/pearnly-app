@@ -135,15 +135,15 @@ def main():
         check("log 变 success", d1b and d1b.get("status") == "success")
         check("回填 express_docnum", "RR690001-001" in str((d1b or {}).get("response_body") or ""))
 
-        # 4) ack failed × 3 → manual
+        # 4) ack failed:满 3 次才 manual(队列行起始 attempt=1 · 前 2 次仍 pending)
         log2, st2 = _push_and_log(ep, _history(invoice_number="RR581231-003"))
         check("第二单入队 pending", st2 == "pending")
-        st = None
+        seq = []
         for i in range(3):
             agent_store.lease_pending(ep_id, "agentE2E", 10)  # 重新领(上次失败已释放租约)
             r = agent_store.ack(ep_id, log2, "agentE2E", False, error="rpa timeout")
-            st = r.get("status")
-        check("ack failed×3 → manual", st == "manual")
+            seq.append(r.get("status"))
+        check("ack failed:前2次 pending、第3次才 manual", seq == ["pending", "pending", "manual"])
 
         # 5) 低置信 → 直接 manual,不进队列
         log3, st3 = _push_and_log(ep, _history(confidence="low", invoice_number="RR581231-004"))

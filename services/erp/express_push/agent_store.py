@@ -171,7 +171,9 @@ def ack(
     """Agent 回报一条领取结果。
 
     success → status='success' + response_body.express_docnum,清租约(终态幂等)。
-    failed  → attempt+1;< 3 次 → 回 pending 释放租约可重领;≥ 3 次 → 'manual' 留人工。
+    failed  → Agent 录入失败累计:第 1、2 次 → 回 pending 释放租约可重领;**满 3 次**
+              (_MAX_ATTEMPTS)→ 'manual' 留人工。队列行起始 attempt=1(通用落库约定)= 0
+              次失败,故按起始 1 校正阈值(否则 2 次就误转 manual)。
     校验 lease_owner 一致(防越权 ack 别人的租约)。
     """
     try:
@@ -203,8 +205,14 @@ def ack(
                 )
                 return {"ok": True, "status": "success", "express_docnum": express_docnum}
 
-            attempt = int(log.get("attempt") or 0) + 1
-            new_status = "manual" if attempt >= _MAX_ATTEMPTS else "pending"
+            # Express 队列行由通用落库约定起始 attempt=1(= 0 次 Agent 录入失败)。
+            # 本次失败 = 第 `prior` 次 Agent 录入失败(prior=1→第1次 … prior=3→第3次);
+            # 满 _MAX_ATTEMPTS(3) 次才转 manual,与 docstring 一致(off-by-one 修复)。
+            # 起始按 1 兜底,既贴合现有写库约定,也对偶发 0 基线鲁棒。
+            prior = int(log.get("attempt") or 1)
+            agent_failures = prior
+            new_attempt = prior + 1
+            new_status = "manual" if agent_failures >= _MAX_ATTEMPTS else "pending"
             cur.execute(
                 """
                 UPDATE erp_push_logs
@@ -213,9 +221,14 @@ def ack(
                     lease_owner = NULL, lease_expires_at = NULL
                 WHERE id = %s
                 """,
-                (new_status, attempt, (error or "")[:500] or "agent_failed", log_id),
+                (new_status, new_attempt, (error or "")[:500] or "agent_failed", log_id),
             )
-            return {"ok": True, "status": new_status, "attempt": attempt}
+            return {
+                "ok": True,
+                "status": new_status,
+                "attempt": new_attempt,
+                "agent_failures": agent_failures,
+            }
     except Exception as e:
         logger.error(f"ack failed: {e}")
         return {"ok": False, "reason": f"db_error: {type(e).__name__}"}

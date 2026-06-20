@@ -58,6 +58,24 @@ class CanonicalMerchantTests(unittest.TestCase):
         self.assertEqual(merchant.canonical_merchant("?????", "0107542000011"), "7-eleven")
 
 
+class IsKnownBrandTests(unittest.TestCase):
+    """B-2:纯数字店号(711/7-11)及大连锁名归一命中 → 供 field_clean 守卫不当金额清。"""
+
+    def test_numeric_store_numbers(self):
+        self.assertTrue(merchant.is_known_brand("711"))  # ★裸数字店号
+        self.assertTrue(merchant.is_known_brand("7-11"))
+        self.assertTrue(merchant.is_known_brand("7-Eleven"))
+
+    def test_real_amounts_not_brand(self):
+        self.assertFalse(merchant.is_known_brand("1780.00"))
+        self.assertFalse(merchant.is_known_brand("65"))
+        self.assertFalse(merchant.is_known_brand(""))
+
+    def test_named_chains(self):
+        self.assertTrue(merchant.is_known_brand("Makro"))
+        self.assertTrue(merchant.is_known_brand("บางจาก"))
+
+
 class MerchantAliasByTaxTests(unittest.TestCase):
     def test_known_tax(self):
         self.assertEqual(merchant.merchant_alias_by_tax("0107542000011"), "7-eleven cp all")

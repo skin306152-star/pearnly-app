@@ -40,6 +40,13 @@ class CleanSellerTests(unittest.TestCase):
         for ok in ("Bangchak", "บางจาก", "7-11", "Total Tools", "ร้านกาแฟ"):
             self.assertEqual(fc.clean_seller(ok), ok, ok)
 
+    def test_numeric_store_number_kept(self):  # B-2:裸「711」实为店号 → 不当金额清空
+        self.assertEqual(fc.clean_seller("711"), "711")
+
+    def test_real_amount_still_blanked(self):  # 真金额仍清(非店号)
+        self.assertEqual(fc.clean_seller("1780.00"), "")
+        self.assertEqual(fc.clean_seller("65"), "")
+
 
 class CleanInvoiceTests(unittest.TestCase):
     def test_short_no_kept_date_rejected(self):  # 票号允许短号;纯日期不当票号

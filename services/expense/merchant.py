@@ -79,6 +79,12 @@ def merchant_alias_by_tax(tax_id: str) -> str:
     return _TAX_ALIASES.get((tax_id or "").strip(), "")
 
 
+def is_known_brand(name: str) -> bool:
+    """名字归一命中已知大连锁(含纯数字店号 711/7-11)→ True。供 field_clean 守卫:像金额的纯数字
+    若实为店号则当店名保留、不当金额清空。"""
+    return any(re.search(pattern, name or "", re.IGNORECASE) for pattern, _key in _BRAND_ALIASES)
+
+
 def canonical_merchant(name: str, tax_id: str = "") -> str:
     """商户唯一键(学习键用):识别已知大连锁 → 规范品牌键(各写法归一);否则归一名。空 → ''。"""
     blob = f"{name or ''} {merchant_alias_by_tax(tax_id)}"

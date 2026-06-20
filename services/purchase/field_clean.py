@@ -69,14 +69,18 @@ def clean_tax_id(raw) -> str:
 def clean_seller(raw) -> str:
     """卖家清洗:剥空白;纯金额/字段标签/完整日期/无内容/过短(<2)→ ''(不展示假值)。
 
-    「1780.00」「Total」「VAT」「13」「13/06/26」→ '';「Bangchak」「บางจาก」「7-11」→ 保留。
+    「1780.00」「Total」「VAT」「13」「13/06/26」→ '';「Bangchak」「บางจาก」「7-11」「711」→ 保留。
     """
     s = str(raw or "").strip()
     if len(s) < 2 or not _ALNUM_RE.search(s):
         return ""
     if s.lower() in _SELLER_STOPWORDS:
         return ""
-    if _AMOUNT_RE.match(s) or _FULL_DATE_RE.match(s):
+    if _AMOUNT_RE.match(s):  # 纯数字:实为店号(711/7-11)当店名保留,否则当金额清空(B-2)
+        from services.expense import merchant
+
+        return s if merchant.is_known_brand(s) else ""
+    if _FULL_DATE_RE.match(s):
         return ""
     return s
 

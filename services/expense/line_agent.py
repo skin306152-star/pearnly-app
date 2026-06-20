@@ -97,9 +97,11 @@ Field rules:
 - amount = total including VAT, number only. Buddhist year (>=2500) → Gregorian (-543).
 - date: resolve relative dates against Today (yesterday/เมื่อวาน/昨天 → Today−1; 前天/วานซืน →
   Today−2; "3天前/3 วันก่อน" → Today−3) → YYYY-MM-DD; "" if none stated.
-- vendor_name: the shop/seller if stated (Starbucks/星巴克/เซเว่น/Grab/ร้าน…), else "".
-- note: the CLEAN item name bought (no amount/date/vendor/verb); for a record this is the detail
-  line. Empty if none.
+- vendor_name: the shop/brand/store if named ANYWHERE in the message, even without "at/ที่/在"
+  (Starbucks/星巴克/เซเว่น/7-Eleven/Tops/ท็อปส์/Villa Market/Foodland/Makro/Grab/ร้าน…). A bare store
+  number like "711" or "7-11" IS a store name (7-Eleven), NOT an amount. else "".
+- note: the CLEAN item name bought — MUST NOT contain the amount/date/verb OR the vendor/store name
+  ("tops 水"→note "水"; for a record this is the detail line). Empty if none.
 - vendor_tax_id = 13 digits or "". invoice_number kept as printed (with prefix).
 - expense_type: utilities (water/electric/internet/phone), rent, repair, service work, consulting,
   transport = "service"; physical goods/food items = "goods"; else "".

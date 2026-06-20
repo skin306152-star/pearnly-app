@@ -45,6 +45,18 @@ _VENDOR_BRANDS = (
     (r"เชลล์|\bshell\b", "Shell"),
     (r"แมคโดนัลด์|mcdonald'?s?|麦当劳|麦记", "McDonald's"),
     (r"เคเอฟซี|\bkfc\b|肯德基", "KFC"),
+    # 主流商超/便利/药妆(泰英中别名·精确不误伤)。供应商单列 + 从品名剥除(_strip_vendor_brands)。
+    # 拉丁词用 (?<![a-z])X(?![a-z]) 边界(非 \b):\b 在 CJK 紧邻时失效(「在tops买」中 在|t 皆 \w
+    # 无边界);此守卫只把 ASCII 字母算边界,故 CJK 紧邻也命中、laptops 不误伤。
+    (r"(?<![a-z])tops(?![a-z])|ท็อปส์|ท็อป มาร์เก็ต", "Tops"),
+    (r"villa\s?market|วิลล่า\s?มาร์เก็ต|วิลลามาร์เก็ต|维拉超市", "Villa Market"),
+    (r"foodland|ฟู้ดแลนด์|ฟู้ดแลน", "Foodland"),
+    (r"maxvalu|แม็กซ์แวลู|แมกซ์แวลู", "MaxValu"),
+    (r"gourmet\s?market|กูร์เมต์\s?มาร์เก็ต|กูร์เมต์", "Gourmet Market"),
+    (r"robinson|โรบินสัน|รอบินสัน", "Robinson"),
+    (r"watsons?|วัตสัน", "Watsons"),
+    (r"(?<![a-z])boots(?![a-z])|บู๊ทส์|บูทส์", "Boots"),
+    (r"cp\s?fresh\s?mart|ซีพี\s?เฟรช\s?มาร์ท", "CP Fresh Mart"),
 )
 # 中文「在X买/吃/喝/付…」→ X 为卖家(泰文 ที่ 歧义大·不走介词只靠品牌字典)。
 _ZH_AT_VENDOR = re.compile(r"在([^\d,，。、\s]{1,12}?)(?:买|買|吃|喝|付|消费|花|刷|订|點|点)")

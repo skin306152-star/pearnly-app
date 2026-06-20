@@ -93,9 +93,11 @@
 .erp-exc-stat-num { font-size: 22px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.1; }
 .erp-exc-stat-sub { font-size: 9px; color: var(--ink-4); }
 
-/* 推送日志卡片(草稿对齐 · 取代密集表格行) */
-.erp-logs-list { display: flex; flex-direction: column; gap: 8px; }
+/* 推送日志卡片(草稿对齐 · 取代密集表格行)·
+   覆盖上面旧 .erp-logs-list 的 max-height:400px(flex column 下会把卡压扁裁掉 reason/meta) */
+.erp-logs-list { display: flex; flex-direction: column; gap: 8px; max-height: none; overflow: visible; }
 .erp-log-card {
+    flex: 0 0 auto;
     border: 1px solid var(--line);
     border-radius: 13px;
     background: var(--card);

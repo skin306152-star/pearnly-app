@@ -6,16 +6,21 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-20 · **06 强锚定 Slice 3 + 可引用卡片契约 + 加油票总额修 + /simplify** · HEAD `e47870eb`）
+## 🎯 状态卡（2026-06-20 晚 · **B-1/B-2 分类学习 + 改错保卖家 + C-1/C-1b 凭证PDF + 诚实待办卡 + Rich Menu** · HEAD `eb3fae71`）
 
-- **本窗口 4 commit 全上线·prod HEAD `e47870eb` health 200·全量 4366 unit 绿(skip3)·replay 52/52·13 闸全绿。⏳ 全部待 Zihao 真机验证。** 见 [[line-anchored-action-and-card-contract]] [[line-pm-ownership-mode]]。
-  - **06 Slice 3 强锚定(Anchored Action)**(`4e623165`):本轮有 quoted_message_id → `_handle_line_text` 在 smalltalk/记账/大脑/语气层**之前**进 `line_anchored.maybe_dispatch`,整句只围绕被引用那张卡——卡片动作交 `line_correct_flow.route`;非卡片动作(像新记账/裸数字 → ANCHOR_SUGGEST_EDIT·闲聊/全局查账/不明 → ANCHOR_ASK·过期/非记录卡 → ANCHOR_EXPIRED·死单 → STALE_*)**绝不另记一笔**。route 加「引用 > 批量」+ 兜底 `not quoted` 门。新 `line_anchored` + 3 i18n 键。无引用路径完全不变。
-  - **可引用卡片契约**(`dbc5ddb`·真机 bug):图片/push/终态卡发出**没登记锚点 → 引用即 ANCHOR_EXPIRED**。立契约:凡代表真单据的卡发出即登记 message_id→doc + 焦点(终态卡也登记 → 引用可「恢复」)。修 `line_image_fastpath._push_state_card`(裸 push)、`_terminal_card`/`_send_posted`/`send_state_card_reply`。doc 06 §7。
-  - **加油票总额修**(`e68d8028`·Bangchak 1,780 误记 1000):`ocr_corrections` 加油票兜底——升(小数 qty)×单价覆盖飞掉的 total(印刷行小计一致取印刷值)·积分(整数 qty)绝不当额;`layer2_prompts` 加 rule 4c。fixture 钉 1780.00(永不 1000/876)·红线不碰其它票。
-  - **/simplify**(`e47870eb`):抽 `line_booker.send_doc_card` 出卡口(发卡+登记一步到位)·4 处发卡收一处·`_bind_refs` 委托 `anchor_card`。
-- **🧹 测试账号已清**:`18685123459@163.com`/tenant `ed9a0d5a`(LINE「Skin」)交易+缓存全清(docs/vouchers/ocr_history/image_sha256/refs/chat/suppliers·账号本体保留)→ 可干净重测。**真相**:库里 Bangchak 实际读 **1780**(无 1000 doc),用户看到的 1000 是修复前的**死气泡/重发同图命中 image_sha256 reshow**。
-- **🔴 流程铁律 [[line-correction-replay-before-push]]**:correction/卡片改动**必先跑 replay 再 push**(本窗口 replay 52/52 全过)。
-- **下个窗口先做**:① 收 Zihao 真机(发**新** Bangchak 照片看是否 1780·引用图片卡打字不再 ANCHOR_EXPIRED·引用已撤卡说恢复)再定 ② 若加油仍错:从清空后的新记录拉 OCR 真抽取(图片路 ocr_raw 空·我兜底**假设** OCR 给小数升数·没真证据)对症修 ③ 06 Phase B(学习按钮)/Slice 4(无引用置信度猜) ④ 待拍:`pip-audit` 14 CVE。
+- **本窗口 9 commit 全上线·prod health 200·全量 4531 unit 绿(skip3)·replay 52/52·13 闸全绿(唯 `authz` 仍红=并行窗口 `erp_agent.py` 3 条未登记·非我·见下)。⏳ 全部待 Zihao 真机验证。** 见 [[line-category-deterministic-p2a]] [[line-proof-pdf-c1]] [[line-rich-menu-shipped]] [[line-pm-ownership-mode]]。
+  - **B-1 学习真生效**(`217061d4`):文字路 `_fill_category` 改走新 `conversation.lookup_learned_for_text`——先 `canonical_merchant` 归一出商户键 `find_exact(seller:)`(与图片路同一把),治「以后711都记X」后「711 水」仍命中(子串桥不了 711→7-eleven)。
+  - **改/教分类对到真叶子**(`3309d897`):新 `category_ai.match_user_category`(跨语言同义层·复用 `_TARGETS`)·`_resolve_category` 重排 ①同义层②`_fill_category`③显式落「其他」+matched 标·诚实提示「先记其他·可改」。治「改成商品」掉「ค่าใช้จ่ายอื่นๆ」。
+  - **改错克隆保卖家**(`368cabcc`):`detail_to_data` 带 `supplier_id` → `_resolve_supplier` 有 id 即沿用·改分类/字段不丢卖家(P1F 清洗把纯数字「711」名清空 + 无 id 重解析致丢)。学习按钮恢复「以后这家都记」。
+  - **B-2 供应商消歧**(`d378f3cd`):`_VENDOR_BRANDS` 扩 Tops/Villa/Foodland… + 拉丁词 `(?<![a-z])X(?![a-z])` 边界(治「在tops买」CJK 紧邻)·`merchant.is_known_brand` 守卫纯数字店号(711 不当金额清)·`line_agent` 提示句中店名抽 vendor。
+  - **C-1 凭证PDF**(`e74e66c8`)+ **C-1b 美化**(`e39c30a9`):整月已入账票打包(封面汇总+票图)·LINE「ขอ PDF เดือนนี้」→ 异步生成推下载卡·签名 token 下载路由。字体修=**嵌入 Sarabun**(prod 无系统泰文字体致只剩数字)·reportlab Table 专业封面+票图页眉条+页码。新 `services/export/proof_pdf.py`+`line_proof.py`+`static/brand/*.png`+`fonts/Sarabun`。
+  - **Phase B 诚实待办卡**(`13ca4b74`):修「✅已入账绿 + 请核对前」矛盾——posted 绿只中性提示·needs-review 列「ต้องตรวจ N เรื่อง:①…」具体待办(取自 field_quality 信号·不编造)。proof ภาพ 列 ✓→「มี」(Sarabun 无 ✓)。
+  - **Rich Menu 上线**(`985a8025`):插画底图 6 区全映射现有功能(相机/汇总/PDF/明细/帮助/官网)·新 `line_rich_menu.py`·**已 prod 跑 setup·default 生效·1 菜单无堆叠**。`scripts/setup_rich_menu.py` 上线入口。
+  - **/simplify**(`eb3fae71`):proof 抽 `grand_total` 单一口径·build 收 summ 入参去重复查·菜单按需取 ws。
+- **🧹 测试账号 `18685123459@163.com`/tenant `ed9a0d5a`(LINE「Skin」)交易+学习规则全清**(本窗口 ssh prod 清·脏规则 seller:tops→罚款/seller:7-eleven→其他 已除)→ 干净重测。
+- **🔴 流程铁律 [[line-correction-replay-before-push]]**:correction/卡片改动**必先跑 replay 再 push**(本窗口 52/52)。
+- **⚠️ 并行窗口(集成/Express Push)同期在跑·勿冲突**:它们动 `src/home/*`、`routes/integrations*`、`routes/erp_agent.py`、`services/erp/*`、集成卡;我只动 LINE/采购/导出(services/expense·line_binding·purchase·export + line_webhook/purchase routes)。push 前 `git pull --rebase`(只 stash AGENTS.md+docs/00 两个预存改动)·只 add 自己文件。**`authz` 闸预存红 = 它们的 `erp_agent.py` 未登记 PUBLIC/DELEGATED·留它们按 Bearer 模型补·我没碰。**
+- **下个窗口先做(待定)**:① 收 Zihao 真机(B-1/B-2 分类·改错保卖家·凭证 PDF·待办卡·Rich Menu)再定 ② /simplify skip 的后续:跨语言同义层推全路(记账/图片路也用·属行为变更)/proof token 改用 core.auth PyJWT/`_all_bill_refs` 批量查 ③ 待拍:`pip-audit` 14 CVE。
 
 ## 历史记录（旧状态卡 · 2026-06-19 · 05 引用旧卡片状态闭环 全成立 + 裸取消焦点锚定 · HEAD `f8c0d5f5`）
 

@@ -196,13 +196,25 @@
                             <!-- DMS 推送可视化闭环(Zihao 2026-06-01)· ERP 系统筛选改【下拉】·
                                  只列真实配置的 ERP 端点(loadErpLogs 运行期填充)· 选一个看一个 · 不再硬编码三件套混在一起. -->
                             <span class="erp-logs-filter-sep" aria-hidden="true">|</span>
+                            <!-- 业务类型下拉(草稿「全部业务」)· 发票单据 / 身份证订车 -->
+                            <select id="erp-logs-business-select" class="erp-logs-erp-select" aria-label="business">
+                                <option value="" data-i18n="erp-logs-biz-all">全部业务</option>
+                                <option value="invoice" data-i18n="erp-logs-biz-invoice">发票 / 单据</option>
+                                <option value="id_card" data-i18n="erp-logs-biz-idcard">身份证订车</option>
+                            </select>
                             <select id="erp-logs-erp-select" class="erp-logs-erp-select" aria-label="ERP">
                                 <option value="" data-i18n="erp-logs-erp-all">全部 ERP</option>
                             </select>
                         </div>
-                        <button class="btn btn-ghost btn-tiny" id="btn-refresh-logs" title="刷新">
-                            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 7a4.5 4.5 0 11-1.3-3.2M12 2v3h-3"/></svg>
-                        </button>
+                        <div class="erp-logs-toolbar-right">
+                            <div class="erp-logs-search">
+                                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
+                                <input type="search" id="erp-logs-search" data-i18n-placeholder="erp-logs-search-ph" placeholder="搜索单据号 / 客户 / 任务">
+                            </div>
+                            <button class="btn btn-ghost btn-tiny" id="btn-refresh-logs" title="刷新">
+                                <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 7a4.5 4.5 0 11-1.3-3.2M12 2v3h-3"/></svg>
+                            </button>
+                        </div>
                     </div>
 
                     <div id="erp-logs-batch-bar" class="erp-logs-batch-bar" style="display:none;">

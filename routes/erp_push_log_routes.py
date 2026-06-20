@@ -243,8 +243,11 @@ async def erp_logs(
     adapter: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
+    keyword: Optional[str] = None,
+    push_type: Optional[str] = None,
 ):
-    """批 3 改动 6 (v118.34.34) · 新增 adapter 参数 · 让前端按 ERP 类型筛日志."""
+    """批 3 改动 6 (v118.34.34) · 新增 adapter 参数 · 让前端按 ERP 类型筛日志.
+    + 草稿对齐:keyword 搜索(单据号/卖方)· push_type 业务类型(全部业务下拉)。"""
     user = get_current_user_from_request(request)
     _check_push_access(user)
     return db.list_push_logs(
@@ -256,6 +259,8 @@ async def erp_logs(
         adapter_filter=adapter,
         limit=min(limit, 200),
         offset=max(0, offset),
+        keyword=keyword.strip() if keyword else None,
+        push_type=push_type if push_type in ("id_card", "invoice") else None,
     )
 
 

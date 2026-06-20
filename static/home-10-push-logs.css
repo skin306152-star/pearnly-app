@@ -93,6 +93,21 @@
 .erp-exc-stat-num { font-size: 22px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.1; }
 .erp-exc-stat-sub { font-size: 9px; color: var(--ink-4); }
 
+/* 推送日志工具栏:业务/ERP 下拉 + 搜索框(草稿对齐) */
+.erp-logs-toolbar-right { display: flex; align-items: center; gap: 8px; }
+.erp-logs-search {
+    display: flex; align-items: center; gap: 7px;
+    height: 34px; padding: 0 10px;
+    border: 1px solid var(--line); border-radius: 9px; background: var(--bg);
+    width: 230px; max-width: 38vw;
+}
+.erp-logs-search svg { width: 14px; height: 14px; color: var(--ink-3); flex: 0 0 auto; }
+.erp-logs-search input {
+    border: 0; outline: 0; background: transparent; width: 100%;
+    font-size: 11px; color: var(--ink); font-family: inherit;
+}
+.erp-logs-search input::placeholder { color: var(--ink-4); }
+
 /* 推送日志卡片(草稿对齐 · 取代密集表格行)·
    覆盖上面旧 .erp-logs-list 的 max-height:400px(flex column 下会把卡压扁裁掉 reason/meta) */
 .erp-logs-list { display: flex; flex-direction: column; gap: 8px; max-height: none; overflow: visible; }

@@ -136,6 +136,8 @@ def list_push_logs(
     adapter_filter: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
+    keyword: Optional[str] = None,
+    push_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     """查询推送日志(P2-B 折叠版),支持按 history/endpoint/status/trigger/adapter 过滤.
 
@@ -190,6 +192,18 @@ def list_push_logs(
             if adapter_filter:
                 outer.append("LOWER(e.adapter) = LOWER(%s)")
                 params.append(adapter_filter)
+            # 业务类型(草稿「全部业务」下拉)· 身份证订车 = DMS endpoint 或 id_card trigger
+            if push_type == "id_card":
+                outer.append("(LOWER(e.adapter) = 'mrerp_dms' OR l.trigger = 'id_card')")
+            elif push_type == "invoice":
+                outer.append(
+                    "(COALESCE(LOWER(e.adapter),'') <> 'mrerp_dms' AND COALESCE(l.trigger,'') <> 'id_card')"
+                )
+            # 关键字搜索(草稿「搜索单据号、客户或任务」)· 单据号 / 卖方
+            if keyword:
+                outer.append("(l.invoice_no ILIKE %s OR l.seller_name ILIKE %s)")
+                _kw = f"%{keyword.strip()}%"
+                params.extend([_kw, _kw])
             outer_sql = " AND ".join(outer)
 
             # COUNT(折叠后) · JOIN erp_endpoints 供 adapter filter(无 filter 时无害).

@@ -24,6 +24,8 @@ let _logFilter = { key: 'all', val: '' };
 // DMS 推送可视化闭环(Zihao 2026-06-01)· ERP 系统筛选 = 下拉(adapter)· 独立于 status/trigger chip ·
 // 选中 mrerp_dms(身份证订车)时表头/行切到 DMS 字段(订车单号/客户)· 不再用发票字段框。
 let _erpAdapter = '';
+let _erpLogBusiness = ''; // 业务类型下拉(全部业务 / id_card / invoice)
+let _erpLogKeyword = ''; // 日志搜索(单据号 / 卖方)
 let _erpSelectReady = false;
 // v118.25.1 · 推送日志多选状态(批量重推)
 let _erpSelected = new Set();
@@ -88,6 +90,8 @@ async function loadErpLogs(silent?: boolean) {
         if (_logFilter.key === 'trigger') params.set('trigger', _logFilter.val);
         // DMS 推送可视化闭环 · ERP 系统筛选改下拉(_erpAdapter)· 与 status/trigger chip 独立组合
         if (_erpAdapter) params.set('adapter', _erpAdapter);
+        if (_erpLogBusiness) params.set('push_type', _erpLogBusiness);
+        if (_erpLogKeyword) params.set('keyword', _erpLogKeyword);
         const resp = await fetch(`/api/erp/logs?${params}`, {
             headers: { Authorization: 'Bearer ' + token },
         });
@@ -291,11 +295,25 @@ async function retryPushLog(logId: any) {
         }
     });
 
-    // DMS 推送可视化闭环 · ERP 系统下拉切换 → 重新拉对应 ERP 的日志(不混)
+    // ERP 系统下拉 / 业务类型下拉切换 → 重新拉日志
     document.addEventListener('change', (e) => {
-        if (e.target && (e.target as HTMLElement).id === 'erp-logs-erp-select') {
-            _erpAdapter = (e.target as HTMLInputElement).value || '';
+        const el = e.target as HTMLElement;
+        if (el && el.id === 'erp-logs-erp-select') {
+            _erpAdapter = (el as HTMLInputElement).value || '';
             loadErpLogs();
+        } else if (el && el.id === 'erp-logs-business-select') {
+            _erpLogBusiness = (el as HTMLInputElement).value || '';
+            loadErpLogs();
+        }
+    });
+    // 日志搜索框(草稿「搜索单据号、客户或任务」)· debounce
+    let _logSearchTimer: ReturnType<typeof setTimeout> | null = null;
+    document.addEventListener('input', (e) => {
+        const el = e.target as HTMLElement;
+        if (el && el.id === 'erp-logs-search') {
+            _erpLogKeyword = (el as HTMLInputElement).value || '';
+            if (_logSearchTimer) clearTimeout(_logSearchTimer);
+            _logSearchTimer = setTimeout(() => loadErpLogs(), 350);
         }
     });
 })();

@@ -6,16 +6,20 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-19 · **05 引用旧卡片状态闭环 全成立(死单不改+恢复+草稿软删恢复)+ 裸取消焦点锚定 + /simplify** · HEAD `f8c0d5f5`）
+## 🎯 状态卡（2026-06-20 · **06 强锚定 Slice 3 + 可引用卡片契约 + 加油票总额修 + /simplify** · HEAD `e47870eb`）
 
-- **本窗口 6 commit 全上线·prod HEAD `f8c0d5f5` health 200·全量 4341 unit 绿(skip3)·replay 51/51·13 闸全绿。⏳ 全部待 Zihao 真机验证结果再定下一步。** 见 [[line-stale-card-ref-p0]] [[line-pm-ownership-mode]]。
-  - **05 Slice 1 死单不改**(`a0750ca3`·screenshot-29 账务事故):新 `line_message_refs.resolve_card_state`(LIVE/SUPERSEDED 沿 corrected_from 链落最新活后代/VOIDED/DISCARDED)+ 新模块 `line_stale_ref.locate_clarify_target`(★删「引用死单回落 _active_doc」红线·SUPERSEDED 带 notice 前缀)+ `reply_undo` 补 DISCARDED 幂等。引用死/变的卡绝不操作错记录。
-  - **05 Slice 2 恢复闭环**(`504e401f`):引用已撤(void)卡说「恢复/กู้คืน/restore」→ `correct.restore_doc` 克隆重过账成新 posted(restored_from 审计·原死单不动)。新 `line_restore.maybe_restore` + `line_classify.detect_restore`(带金额无引用不算恢复·防误伤)+ i18n 5 键。
-  - **05 Slice 2b 草稿软删**(`6f2e53c3`):草稿删物理删→软删 `status='discarded'`+释放 dedupe_key(留库可恢复)。★discarded 对所有活跃口径隐形(list_docs/find_by_dedupe 显式排除·summary/detail/KPI/archive posted-only·line_docs IN·image_dedup 排除·`status` 无 CHECK 无需迁移)。restore_doc 扩 discarded→翻 draft/gone/not_deleted。四处删改 `correct.discard_doc`。
-  - **裸取消/删除焦点锚定**(`14f37e56`+`4a70b0a9`):①「记完一笔裸取消」一次撤掉(非被续接态截成「取消编辑」·try_correction_state cancel 仅提问态)②「拍票出草稿卡裸 ลบ」删那张草稿(非误撤更早已入账)——`_bind_refs` 给 **dup** 卡也设焦点·`maybe_bare_undo` 焦点优先(`_active_target` 最近卡→`_undo_resolved` 草稿discard/已入账void)·无焦点才回落 find_last_posted。
-  - **/simplify 收口**(`f8c0d5f5`):金额/记录号格式化抽 `ci.money`/`ci.short_ref`(消 line_restore/line_stale_ref 两处复制)。其余评审发现经判断不动(见 commit·折叠 _delete_target 会改文案/双 get_doc 是正确性所需/correctactive 兼焦点 watch-don't-fix)。
-- **🔴 流程铁律 [[line-correction-replay-before-push]]**:LINE correction/卡片改动**必先跑 replay 全过再 push**(本窗口 correction 路径改动·replay 51/51 已全过)。
-- **下个窗口先做**:① 收 Zihao 真机验证(死卡不误操作/恢复出新卡/草稿删了能恢复/拍票出草稿裸 ลบ 删那张)再定 ② 可选 05 Slice 3(SUPERSEDED/VOIDED 查看文案打磨·锦上添花) ③ 待拍:清 `pip-audit` 14 CVE 让 GitHub 全绿 ④ backlog:P2E-3 接 OCR L2/L3、清 `line_ocr_i18n.err_need_key` 死键。
+- **本窗口 4 commit 全上线·prod HEAD `e47870eb` health 200·全量 4366 unit 绿(skip3)·replay 52/52·13 闸全绿。⏳ 全部待 Zihao 真机验证。** 见 [[line-anchored-action-and-card-contract]] [[line-pm-ownership-mode]]。
+  - **06 Slice 3 强锚定(Anchored Action)**(`4e623165`):本轮有 quoted_message_id → `_handle_line_text` 在 smalltalk/记账/大脑/语气层**之前**进 `line_anchored.maybe_dispatch`,整句只围绕被引用那张卡——卡片动作交 `line_correct_flow.route`;非卡片动作(像新记账/裸数字 → ANCHOR_SUGGEST_EDIT·闲聊/全局查账/不明 → ANCHOR_ASK·过期/非记录卡 → ANCHOR_EXPIRED·死单 → STALE_*)**绝不另记一笔**。route 加「引用 > 批量」+ 兜底 `not quoted` 门。新 `line_anchored` + 3 i18n 键。无引用路径完全不变。
+  - **可引用卡片契约**(`dbc5ddb`·真机 bug):图片/push/终态卡发出**没登记锚点 → 引用即 ANCHOR_EXPIRED**。立契约:凡代表真单据的卡发出即登记 message_id→doc + 焦点(终态卡也登记 → 引用可「恢复」)。修 `line_image_fastpath._push_state_card`(裸 push)、`_terminal_card`/`_send_posted`/`send_state_card_reply`。doc 06 §7。
+  - **加油票总额修**(`e68d8028`·Bangchak 1,780 误记 1000):`ocr_corrections` 加油票兜底——升(小数 qty)×单价覆盖飞掉的 total(印刷行小计一致取印刷值)·积分(整数 qty)绝不当额;`layer2_prompts` 加 rule 4c。fixture 钉 1780.00(永不 1000/876)·红线不碰其它票。
+  - **/simplify**(`e47870eb`):抽 `line_booker.send_doc_card` 出卡口(发卡+登记一步到位)·4 处发卡收一处·`_bind_refs` 委托 `anchor_card`。
+- **🧹 测试账号已清**:`18685123459@163.com`/tenant `ed9a0d5a`(LINE「Skin」)交易+缓存全清(docs/vouchers/ocr_history/image_sha256/refs/chat/suppliers·账号本体保留)→ 可干净重测。**真相**:库里 Bangchak 实际读 **1780**(无 1000 doc),用户看到的 1000 是修复前的**死气泡/重发同图命中 image_sha256 reshow**。
+- **🔴 流程铁律 [[line-correction-replay-before-push]]**:correction/卡片改动**必先跑 replay 再 push**(本窗口 replay 52/52 全过)。
+- **下个窗口先做**:① 收 Zihao 真机(发**新** Bangchak 照片看是否 1780·引用图片卡打字不再 ANCHOR_EXPIRED·引用已撤卡说恢复)再定 ② 若加油仍错:从清空后的新记录拉 OCR 真抽取(图片路 ocr_raw 空·我兜底**假设** OCR 给小数升数·没真证据)对症修 ③ 06 Phase B(学习按钮)/Slice 4(无引用置信度猜) ④ 待拍:`pip-audit` 14 CVE。
+
+## 历史记录（旧状态卡 · 2026-06-19 · 05 引用旧卡片状态闭环 全成立 + 裸取消焦点锚定 · HEAD `f8c0d5f5`）
+
+- 6 commit·prod `f8c0d5f5`·4341 unit·replay 51/51。Slice1 死单不改(`a0750ca3`·screenshot-29)·Slice2 恢复闭环(`504e401f`)·Slice2b 草稿软删(`6f2e53c3`)·裸取消焦点锚定(`14f37e56`+`4a70b0a9`)·/simplify 抽 ci.money/short_ref(`f8c0d5f5`)。见 [[line-stale-card-ref-p0]]。
 
 ## 历史记录（旧状态卡 · 2026-06-19 早 · P2A 商户分类闭环 + 日期年漂修 + P2B 字段卫生 · HEAD `8ef38a1`）
 

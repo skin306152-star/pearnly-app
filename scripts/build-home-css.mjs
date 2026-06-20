@@ -61,6 +61,7 @@ const HOME_CSS = [
     'home-46-acct-bankmj.css',
     'home-48-recon-redesign.css',
     'home-49-dms-intake.css',
+    'home-50-express.css',
 ];
 
 const ADMIN_CSS = [

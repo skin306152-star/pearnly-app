@@ -1,0 +1,369 @@
+/* ============================================================
+ * Express 接入(P3a)· 接通向导 + 连接卡
+ * 全部走全站设计令牌(暗夜随令牌)· 无裸 hex / 无 emoji / max-width 用 rem。
+ * 连接卡复用 integration-row / int-* / mrerp-card-pill(四态)· 这里只补向导专属。
+ * ============================================================ */
+
+/* 入口卡品牌色块(Express)· 用令牌不写死 */
+.int-icon.ic-express {
+    background: var(--success-bg);
+    color: var(--green-800);
+}
+
+/* 离线黄条:N 单等待 */
+.exp-offline-bar {
+    margin-top: 8px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: var(--amber-50);
+    border: 1px solid var(--amber-400);
+    color: var(--amber-500);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+/* 迷你统计(已推/待推/失败)· 排队中不算已推 */
+.exp-mini-stats {
+    display: flex;
+    gap: 14px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--ink-3);
+}
+.exp-mini-stats b {
+    color: var(--ink);
+    font-weight: 600;
+}
+
+/* ── 向导 overlay ─────────────────────────────────────────── */
+.exp-wiz-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 13000;
+    background: rgba(0, 0, 0, 0.42);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+.exp-wizard {
+    background: var(--card);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 34rem;
+    max-height: 90vh;
+    overflow: auto;
+    padding: 22px 24px 20px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+.exp-wiz-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 14px;
+}
+
+/* 步骤条 */
+.exp-stepper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+.exp-step-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--line2);
+    color: var(--ink-3);
+    flex-shrink: 0;
+}
+.exp-step-dot.active {
+    background: var(--success);
+    color: var(--card);
+}
+.exp-step-dot.done {
+    background: var(--success-bg);
+    color: var(--green-800);
+}
+.exp-step-line {
+    flex: 1;
+    height: 2px;
+    min-width: 8px;
+    background: var(--line2);
+}
+
+.exp-step-h {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 4px;
+}
+.exp-step-sub {
+    font-size: 13px;
+    color: var(--ink-3);
+    line-height: 1.55;
+    margin-bottom: 14px;
+}
+
+/* 选 ERP 网格 */
+.exp-erp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: 10px;
+}
+.exp-erp-opt {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 12px;
+    text-align: center;
+    cursor: pointer;
+    background: var(--card);
+    transition: border-color 0.15s, background 0.15s;
+}
+.exp-erp-opt.selected {
+    border-color: var(--success);
+    background: var(--success-bg);
+}
+.exp-erp-opt.soon {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.exp-erp-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+}
+.exp-erp-tag {
+    font-size: 11px;
+    color: var(--ink-3);
+    margin-top: 3px;
+}
+
+/* token 框 + 复制 */
+.exp-token-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: var(--bg);
+    margin: 6px 0 10px;
+}
+.exp-token-val {
+    flex: 1;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    color: var(--ink);
+    word-break: break-all;
+    user-select: all;
+}
+
+/* 等待 Agent(呼吸点) */
+.exp-wait {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 13px;
+    color: var(--ink-3);
+    margin-top: 10px;
+}
+.exp-wait-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: var(--amber-500);
+    flex-shrink: 0;
+    animation: exp-pulse 1.4s ease-in-out infinite;
+}
+.exp-wait.online {
+    color: var(--green-700);
+}
+.exp-wait.online .exp-wait-dot {
+    background: var(--success);
+}
+@keyframes exp-pulse {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 1; }
+}
+
+/* 账套列表(锁 DATAT) */
+.exp-acct-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.exp-acct-opt {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 11px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    cursor: pointer;
+}
+.exp-acct-opt.selected {
+    border-color: var(--success);
+    background: var(--success-bg);
+}
+.exp-acct-opt.locked {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.exp-acct-name {
+    font-size: 13px;
+    color: var(--ink);
+}
+.exp-acct-tag {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--ink-3);
+}
+
+/* 录入方式两卡 */
+.exp-method-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+.exp-method-card {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 13px;
+    cursor: pointer;
+    background: var(--card);
+}
+.exp-method-card.selected {
+    border-color: var(--success);
+    background: var(--success-bg);
+}
+.exp-method-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+}
+.exp-method-desc {
+    font-size: 12px;
+    color: var(--ink-3);
+    line-height: 1.5;
+    margin-top: 5px;
+}
+
+/* 通知条(info / warn / danger 三态 · 令牌) */
+.exp-notice {
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.55;
+    margin: 6px 0 12px;
+}
+.exp-notice.info {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    color: var(--ink);
+}
+.exp-notice.warn {
+    background: var(--amber-50);
+    border: 1px solid var(--amber-400);
+    color: var(--amber-500);
+}
+.exp-notice.danger {
+    background: var(--red-50);
+    border: 1px solid var(--red-200);
+    color: var(--red-800);
+}
+
+/* 测试清单 */
+.exp-checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin: 4px 0 12px;
+}
+.exp-check-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--ink);
+}
+.exp-check-mark {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: var(--green-700);
+}
+.exp-check-mark.pending {
+    color: var(--ink-3);
+}
+
+/* 完成页:自动推送开关(默认关) */
+.exp-finish-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin: 12px 0;
+}
+.exp-finish-toggle-label {
+    font-size: 13px;
+    color: var(--ink);
+}
+.exp-finish-toggle-hint {
+    font-size: 11px;
+    color: var(--ink-3);
+    margin-top: 2px;
+}
+
+/* DBF 风险弹窗(复用 overlay · 严肃不吓人) */
+.exp-risk-points {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 10px 0 14px;
+    font-size: 13px;
+    color: var(--ink);
+    line-height: 1.55;
+}
+.exp-risk-ack {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--ink);
+    margin-bottom: 14px;
+    cursor: pointer;
+}
+
+/* 向导底部按钮行 */
+.exp-wiz-foot {
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    margin-top: 16px;
+}
+.exp-wiz-foot-right {
+    display: flex;
+    gap: 10px;
+    margin-left: auto;
+}
+
+/* 手机视口 */
+@media (max-width: 30rem) {
+    .exp-method-grid {
+        grid-template-columns: 1fr;
+    }
+    .exp-wizard {
+        padding: 18px 16px 16px;
+    }
+}

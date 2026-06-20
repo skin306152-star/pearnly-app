@@ -108,13 +108,12 @@ class PruneEmptyTextTests(unittest.TestCase):
 
 
 class NoticesTests(unittest.TestCase):
-    """P1F-2 卡顶异常提示:缺税号/总额不符/明细不全·按重要性 ≤2 条·普通小票不堆警告。"""
+    """Phase B 诚实状态:posted(绿)中性提示不出「请核对前」;needs-review(琥珀)列待办清单。"""
 
-    T = {
-        "warn_total": "总额不符",
-        "no_taxid": "ไม่พบเลขภาษี",
-        "items_partial": "รายการอาจไม่ครบ",
-    }
+    T = T
+
+    def _text(self, out):
+        return out[0]["contents"][0]["text"] if out else ""
 
     def test_missing_taxid_only_when_expected(self):
         self.assertTrue(s.missing_taxid({"vat": "34.27", "seller_tax": ""}))  # 有 VAT 无税号
@@ -122,17 +121,33 @@ class NoticesTests(unittest.TestCase):
         self.assertFalse(s.missing_taxid({"vat": "", "seller_tax": ""}))  # 普通小票 → 不提示
         self.assertFalse(s.missing_taxid({"vat": "34", "seller_tax": "0107561000013"}))  # 有税号
 
-    def test_notice_for_vat_receipt_without_tax(self):
-        out = s.notices({"vat": "34.27", "seller_tax": ""}, False, self.T)
-        self.assertEqual(len(out), 1)
-        self.assertIn("ไม่พบเลขภาษี", out[0]["contents"][0]["text"])
-
     def test_plain_receipt_no_notice(self):
         self.assertEqual(s.notices({"vat": "", "seller_tax": ""}, False, self.T), [])
 
-    def test_caps_at_two(self):
-        out = s.notices({"vat": "34", "seller_tax": "", "items_unread": True}, True, self.T)
-        self.assertEqual(len(out), 2)  # 三个信号都在 → 只显最重要 2 条
+    def test_review_lists_concrete_todos(self):
+        # 需确认态:列出具体待办(金额/税号/明细/品名)·条目来自 field_quality 信号。
+        fields = {"vat": "34", "seller_tax": "", "amount_unreliable": True, "items_unread": True}
+        out = s.notices(fields, True, self.T, posted=False)
+        self.assertEqual(len(out), 1)
+        txt = self._text(out)
+        self.assertIn(self.T["review_todo_head"].format(n=4), txt)  # 需确认 4 件事
+        for k in ("todo_amount", "todo_tax", "todo_items", "todo_name"):
+            self.assertIn(self.T[k], txt)
+        self.assertIn("①", txt)  # 编号清单
+
+    def test_review_todos_from_field_quality(self):
+        todos = s.review_todos({"seller_unclear": True, "dirty_fields": ["date"]}, False, self.T)
+        self.assertEqual(todos, [self.T["todo_seller"], self.T["todo_date"]])
+
+    def test_posted_neutral_note_no_review_wording(self):
+        # 已入账绿卡有小瑕疵 → 仅中性提示,绝不含「请核对前 / ก่อนบันทึก」。
+        out = s.notices({"items_unread": True}, False, self.T, posted=True)
+        self.assertEqual(self._text(out), self.T["posted_note_neutral"])
+        self.assertNotIn("ก่อนบันทึก", self._text(out))
+        self.assertNotIn("请核对", self._text(out))
+
+    def test_posted_clean_no_note_when_no_issue(self):
+        self.assertEqual(s.notices({"vat": "", "seller_tax": ""}, False, self.T, posted=True), [])
 
 
 class GarbledItemNameTests(unittest.TestCase):
@@ -165,6 +180,12 @@ class GarbledItemNameTests(unittest.TestCase):
     def test_section_no_hint_when_all_clear(self):
         rows = s.items_section([{"name": "Latte", "amount": "30.00"}], T)
         self.assertTrue(all(r.get("text") != T["items_name_unclear"] for r in rows if "text" in r))
+
+    def test_section_posted_uses_neutral_hint(self):
+        # 已入账绿卡:名称不清用【中性】文案(不说「请核对前再保存」)。
+        rows = s.items_section([{"name": "????", "amount": "30.00"}], T, posted=True)
+        self.assertEqual(rows[-1]["text"], T["items_name_unclear_neutral"])
+        self.assertNotEqual(rows[-1]["text"], T["items_name_unclear"])
 
 
 if __name__ == "__main__":

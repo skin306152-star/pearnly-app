@@ -141,6 +141,8 @@ class BuildProofPdfTests(unittest.TestCase):
                 self.assertIn(col, cover, col)  # 明细表头
             self.assertIn("7-Eleven", cover)  # 卖家值进表
             self.assertIn("ยื่นภาษี", cover)  # 页脚诚实声明(非报税)
+            self.assertNotIn("✓", cover)  # Sarabun 无 ✓ glyph → 改用「มี」(不留 tofu)
+            self.assertIn("มี", cover)  # 有图标记渲染(Sarabun 可渲)
 
     def test_image_page_has_header_strip(self):
         with TemporaryDirectory() as d:

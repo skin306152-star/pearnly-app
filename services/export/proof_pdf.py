@@ -233,7 +233,9 @@ def _cover_pdf(summ, rows, *, m, k, period, subject) -> bytes:
                 Paragraph(r["seller"], cell),
                 Paragraph(r["category"], cell),
                 Paragraph(f"฿{_money(r['amount'])}", cellr),
-                Paragraph("✓" if r["has_img"] else "—", cellc),
+                Paragraph(
+                    "มี" if r["has_img"] else "—", cellc
+                ),  # Sarabun 无 ✓ glyph → 用泰文「มี」
             ]
         )
     table = Table(data, colWidths=[70, 160, 145, 90, 45], repeatRows=1)

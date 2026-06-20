@@ -76,6 +76,12 @@ class B2VendorItemDisambiguationTests(unittest.TestCase):
     def test_7_11_dash(self):
         self.assertEqual(_extract_vendor("7-11 咖啡30"), "7-Eleven")
 
+    def test_711_single_send_vendor_shows(self):
+        # Phase B 尾巴:纯数字「711」单发记账 → 卖家 7-Eleven 正常显示(is_known_brand 守卫·不回归)
+        self.assertEqual(_extract_vendor("711 咖啡"), "7-Eleven")
+        d = parse_expense("711 咖啡 35")
+        self.assertEqual(d.vendor_name, "7-Eleven")
+
     def test_chain_brands(self):
         self.assertEqual(_extract_vendor("Villa Market 牛奶80"), "Villa Market")
         self.assertEqual(_extract_vendor("foodland 牛奶80"), "Foodland")

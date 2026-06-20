@@ -218,12 +218,12 @@ def _seller_section(fields: dict, t: dict, low) -> list:
     return rows
 
 
-def _items_section(fields: dict, t: dict) -> list:
+def _items_section(fields: dict, t: dict, posted: bool = False) -> list:
     """明细区:逐条带价(顶 5 行 + 「还有N行」)。无 items:OCR 未能逐项识别时给诚实提示(去详情页),
-    否则退回 detail 单行;都没有 → 不显该区。"""
+    否则退回 detail 单行;都没有 → 不显该区。posted → 名称不清用中性文案(不说「请核对前」)。"""
     items = fields.get("items") or []
     if items:
-        rows = s.items_section(items, t, cap=5)
+        rows = s.items_section(items, t, cap=5, posted=posted)
         mods = str(fields.get("modifiers") or "").strip()
         if mods:  # 0 元 modifier/赠品作备注(不占主明细)
             rows.append(
@@ -322,8 +322,9 @@ def result_card(
         v = fc.get(key)
         return v is not None and float(v) < s.REVIEW_BELOW
 
-    # 顶部融入式提示细条:异常提示(总额不符/缺税号/明细不全·按重要性 ≤2 条)+ 可能重复(红·状态级)。
-    strips = s.notices(fields, warn_total, t)
+    # 顶部提示(诚实·两态不混):posted(绿)→ 中性提示;needs-review(琥珀)→ 待办清单。可能重复另加红条。
+    posted = state == "posted"
+    strips = s.notices(fields, warn_total, t, posted=posted)
     if state == "dup" and dup_info:
         dl = (
             f"{t['dup_seen']} · ฿{dup_info.get('amount', '')} · "
@@ -336,7 +337,7 @@ def result_card(
             _amount_section(amount, state, source, doc_id, fields, t),
             _core_section(fields, lang, t, low),
             _seller_section(fields, t, low),
-            _items_section(fields, t),
+            _items_section(fields, t, posted),
         ]
     )
     if workspace_name:

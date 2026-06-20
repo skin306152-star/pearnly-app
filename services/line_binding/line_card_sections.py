@@ -119,37 +119,49 @@ def missing_taxid(fields: dict) -> bool:
     return vat_nonzero or "tax" in dt or "ภาษี" in dt or "กำกับ" in dt
 
 
-_DIRTY_LABELS = {
-    "seller": "vendor",
-    "date": "date",
-    "tax_id": "tax_id",
-    "invoice": "inv_no",
-    "address": "address",
-}
+def _any_name_unclear(fields: dict, t: dict) -> bool:
+    """任一展示明细名只能编号占位(读不出)→ True(品名不清)。"""
+    for i, it in enumerate(fields.get("items") or [], 1):
+        if item_name.display_with_flag(it.get("name"), i, t["item_n"])[1]:
+            return True
+    return False
 
 
-def _review_strip(fields: dict, t: dict):
-    """P2B:低置信字段汇总「请检查:卖家·日期·税号」(列出具体字段·琥珀)。无脏字段 → None。"""
-    names = [t[_DIRTY_LABELS[d]] for d in (fields.get("dirty_fields") or []) if d in _DIRTY_LABELS]
-    if not names:
-        return None
-    return strip(t["fields_review"].format(x=" · ".join(names)), "#FEF7EC", "#B45309")
-
-
-def notices(fields: dict, warn_total: bool, t: dict) -> list:
-    """卡顶提示细条(产品级·按重要性·最多 2 条·不堆满):
-    低置信字段需检查(琥珀·列字段)> 金额可靠明细不符(琥珀)> 缺税号(琥珀)> 明细可能不全(灰)。"""
+def review_todos(fields: dict, warn_total: bool, t: dict) -> list:
+    """需确认卡的【具体待办项】(从 field_quality 信号取·不编造·不重写判定):金额读不准 / 卖家不清 /
+    日期可疑 / 税号不合法或缺 / 明细与总额不符 / 品名不清。复用现有脏字段标记(dirty_fields/各 flag)。"""
+    dirty = fields.get("dirty_fields") or []
     out = []
-    review = _review_strip(fields, t)
-    if review:
-        out.append(review)
+    if fields.get("amount_unreliable"):
+        out.append(t["todo_amount"])
+    if fields.get("seller_unclear") or "seller" in dirty:
+        out.append(t["todo_seller"])
+    if "date" in dirty:
+        out.append(t["todo_date"])
+    if missing_taxid(fields) or "tax_id" in dirty:
+        out.append(t["todo_tax"])
     if warn_total:
-        out.append(strip(t["warn_total"], "#FEF7EC", "#B45309"))
-    if missing_taxid(fields):
-        out.append(strip(t["no_taxid"], "#FEF7EC", "#B45309"))
-    if fields.get("items_unread"):
-        out.append(strip(t["items_partial"], "#F4F6F9", "#667085"))
-    return out[:2]
+        out.append(t["todo_items"])
+    if fields.get("items_unread") or _any_name_unclear(fields, t):
+        out.append(t["todo_name"])
+    return out
+
+
+_TODO_NUMS = "①②③④⑤⑥⑦⑧"
+
+
+def notices(fields: dict, warn_total: bool, t: dict, *, posted: bool = False) -> list:
+    """卡顶提示(诚实·两态绝不混):
+    posted(绿·已入账)→ 至多一条【中性】提示(部分信息可能不全·可在详情改),绝不出「请核对前 / ก่อนบันทึก」;
+    needs-review(琥珀·请确认)→ 一条【待办清单】「ต้องตรวจ N เรื่อง:① …」列出具体要确认的事。无问题 → []。"""
+    todos = review_todos(fields, warn_total, t)
+    if posted:
+        return [strip(t["posted_note_neutral"], "#F4F6F9", "#667085")] if todos else []
+    if not todos:
+        return []
+    lines = [t["review_todo_head"].format(n=len(todos))]
+    lines += [f"{_TODO_NUMS[i] if i < len(_TODO_NUMS) else '·'} {x}" for i, x in enumerate(todos)]
+    return [strip("\n".join(lines), "#FEF7EC", "#B45309")]
 
 
 def _display_item_name(raw, i: int, t: dict) -> str:
@@ -157,11 +169,12 @@ def _display_item_name(raw, i: int, t: dict) -> str:
     return item_name.display(raw, i, t["item_n"])
 
 
-def items_section(items: list, t: dict, *, cap: int = 5) -> list:
+def items_section(items: list, t: dict, *, cap: int = 5, posted: bool = False) -> list:
     """明细分区:小标题 + 逐条(编号 + 名称 + 右对齐价)。超 cap 行 → 截断 + 「还有N行,去详情页」。
 
-    任一展示行的名称读不出(只能编号占位)→ 尾部温和提示「明细名称不清楚·请核对」(P2C·金额仍可确认)。
-    免费/无价品项(amount 空)不渲染价格节点:LINE Flex 的 text 必须非空,空字符串会让整卡被拒(400)。
+    任一展示行的名称读不出(只能编号占位)→ 尾部提示;posted(已入账绿)用【中性】文案(可在详情改·不说
+    「请核对前」)、needs-review 用「请核对」文案(诚实·两态不混)。免费/无价品项(amount 空)不渲染价格
+    节点:LINE Flex 的 text 必须非空,空字符串会让整卡被拒(400)。
     """
     items = items or []
     rows = [seclabel(t["detail"])]
@@ -188,7 +201,8 @@ def items_section(items: list, t: dict, *, cap: int = 5) -> list:
     if extra > 0:
         rows.append(txt(t["items_more"].format(n=extra), size="xxs", color=LABEL, wrap=True))
     if any_unclear:
-        rows.append(txt(t["items_name_unclear"], size="xxs", color=LOW, wrap=True))
+        key = "items_name_unclear_neutral" if posted else "items_name_unclear"
+        rows.append(txt(t[key], size="xxs", color=LOW, wrap=True))
     return rows
 
 

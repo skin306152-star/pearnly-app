@@ -198,8 +198,8 @@ class CardTests(unittest.TestCase):
         import json
 
         s = json.dumps(self._card("confirm", warn_total=True), ensure_ascii=False)
-        self.assertIn("请核对", s)
-        self.assertIn("金额可靠", s)  # P2B:金额可靠 · 明细需检查(措辞明确)
+        self.assertIn("需确认", s)  # Phase B:待办清单头
+        self.assertIn("明细与总额不符", s)  # warn_total → todo 项
 
     def test_no_warn_total_no_hint(self):
         import json
@@ -410,7 +410,9 @@ class P2BHygieneCardTests(unittest.TestCase):
 
         c = self._card({"dirty_fields": ["seller", "date", "tax_id"]})
         sdump = json.dumps(c, ensure_ascii=False)
-        self.assertIn("โปรดตรวจสอบ", sdump)  # th fields_review
+        self.assertIn("ต้องตรวจ", sdump)  # Phase B 待办清单头
+        self.assertIn("ผู้ขายไม่ชัดเจน", sdump)  # 卖家不清
+        self.assertIn("วันที่น่าสงสัย", sdump)  # 日期可疑
 
     def test_garbled_items_show_placeholder_not_questionmarks(self):
         import json
@@ -760,6 +762,40 @@ class AmountUnreliableReviewHeaderTests(unittest.TestCase):
             )
         self.assertNotIn("confirm", actions)  # block_confirm:无确认入账主按钮
         self.assertIn("uri", actions)  # 仅留「打开核对」去详情
+
+
+class PhaseBHonestStateTests(unittest.TestCase):
+    """Phase B 诚实状态:posted(绿)不再「已记账+请核对」矛盾;needs-review(琥珀)列具体待办清单。"""
+
+    FIELDS = {
+        "document_type": "ใบกำกับภาษี",
+        "date": "2026-06-14",
+        "category": "ค่าอาหาร",
+        "vendor": "7-Eleven",
+        "vat": "2.0",
+        "seller_tax": "",
+        "items": [{"name": "????", "amount": "30"}],  # 名称读不出 → unclear
+    }
+
+    def _json(self, state, **extra):
+        import json
+
+        card = line_card.result_card(
+            state=state, amount="120.00", fields=dict(self.FIELDS, **extra), doc_id="D1", lang="th"
+        )
+        return json.dumps(card, ensure_ascii=False)
+
+    def test_posted_no_review_before_save_contradiction(self):
+        j = self._json("posted")
+        self.assertNotIn("กรุณาตรวจสอบก่อนบันทึก", j)  # ★绿卡不再带"请核对后再记"
+        self.assertIn("บันทึกบัญชีแล้ว", j)  # 干净"已入账"
+        self.assertIn("แก้ในรายละเอียดได้", j)  # 名称不清 → 中性提示(可在详情改)
+
+    def test_needs_review_lists_concrete_todos(self):
+        j = self._json("confirm", amount_unreliable=True)  # 低置信 → 需确认态
+        self.assertIn("ต้องตรวจ", j)  # 需确认 N 件事
+        self.assertIn("ยอดเงินอ่านไม่ชัด", j)  # 金额读不准
+        self.assertNotIn("บันทึกบัญชีแล้ว", j)  # needs-review 不显"已入账绿"
 
 
 if __name__ == "__main__":

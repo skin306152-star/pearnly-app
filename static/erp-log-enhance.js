@@ -65,7 +65,7 @@
         // from mrerp_business_friendly.py.
         const txt = (rowEl.textContent || '').slice(0, 600);
         // Light-touch: only enhance when we see a Thai MR.ERP signature
-        // (avoids messing with Xero / webhook rows).
+        // (avoids messing with webhook / other adapter rows).
         const hints = [
             'ไม่พบข้อมูลรหัสลูกค้า',
             'ไม่พบข้อมูลรหัสสินค้า',

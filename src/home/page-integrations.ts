@@ -141,7 +141,7 @@
                 </div>
                 <div class="int-info">
                     <div class="int-name"><span data-i18n="int-name-erp">ERP 对接</span></div>
-                    <div class="int-desc" data-i18n="int-desc-erp">Xero · MR.ERP · Webhook 等 · 识别完自动推到 ERP</div>
+                    <div class="int-desc" data-i18n="int-desc-erp">MR.ERP · Webhook 等 · 识别完自动推到 ERP</div>
                 </div>
                 <div class="int-actions">
                     <button class="int-btn-configure" data-route="automation" data-i18n="btn-configure">配置</button>

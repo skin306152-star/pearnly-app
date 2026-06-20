@@ -18,7 +18,7 @@
 }
 
 /* ============================================================
- * v118.27.4 · Xero 连接卡片(自动化 → ERP 对接 → 连接 & 推送日志 顶部)
+ * ERP 连接卡片(自动化 → ERP 对接 → 连接 & 推送日志 顶部 · MR.ERP / MR.ERP DMS 共用)
  * ============================================================ */
 .erp-connect-cards {
     display: grid;
@@ -112,20 +112,9 @@
     padding-top: 10px;
 }
 
-/* Xero 推按钮 · 跟 MR.ERP 按钮同款 disabled */
-#btn-xero-push.disabled,
-#btn-xero-push:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-}
-#btn-xero-push.loading {
-    pointer-events: none;
-    opacity: 0.7;
-}
-
 /* ============================================================
  * v118.27.5 · 统一推送按钮(抽屉)
- * 取代旧 3 按钮(btn-push-erp / btn-mrerp-download / btn-xero-push)
+ * 取代旧按钮(btn-push-erp / btn-mrerp-download)
  * 旧按钮在新按钮注入时被 hidden(向后兼容 · 不删 DOM)
  * ============================================================ */
 .pn-push-wrap {
@@ -403,7 +392,7 @@
 
 /* MR.ERP 连接卡片(自动化 → ERP 对接 → connect sub-tab) */
 .erp-connect-card.erp-connect-mrerp {
-    /* 跟 Xero 卡片同基类 · 只差 brand 标识 */
+    /* 复用 .erp-connect-card 基类 · 只差 brand 标识 */
 }
 
 .erp-cc-mrerp-meta {

@@ -143,7 +143,7 @@ def list_push_logs(
 
     P2-B (Zihao 2026-05-27 · ERP 收尾) · 折叠到每对 (history×endpoint) 最新一条,
     清「混合手动+自动推」遗留重复行,与 list_push_exceptions 同口径(单一状态源·铁律 #12).
-    NULL-safe:history_id/endpoint_id 任一为空(Xero/已删 endpoint 孤儿 log)→ 按行自身
+    NULL-safe:history_id/endpoint_id 任一为空(已删 endpoint 孤儿 log)→ 按行自身
     id 独立分区,永不被误合并. 状态/trigger/adapter 过滤作用于折叠后的当前态.
 
     批 3 改动 6 (Zihao 2026-05-19 · v118.34.34) · adapter_filter 按 erp_endpoints.adapter

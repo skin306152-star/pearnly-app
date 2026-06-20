@@ -4,9 +4,9 @@ services/erp/mrerp_business_friendly.py
 
 Friendly-message catalog for MR.ERP business failures.
 
-Mirrors the xero_pusher.XERO_ERROR_FRIENDLY shape but keyed on the patterns
-that show up in the report.php xlsx's `หมายเหตุ` column (or in our own
-ERR_* codes coming out of validate_history_for_sales_credit).
+Maps the patterns that show up in the report.php xlsx's `หมายเหตุ` column
+(or in our own ERR_* codes coming out of validate_history_for_sales_credit)
+to friendly, localized messages.
 
 The catalog has two layers:
 - ERR_* codes  : exact-string keys; cover everything our adapter can

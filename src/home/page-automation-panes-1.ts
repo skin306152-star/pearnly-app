@@ -138,10 +138,8 @@ export const AUTO_HTML_1 = `
                                 </select>
                                 <span data-i18n="pref-erp-mode-desc" style="font-size:12px;color:#6B7280;flex:1 1 200px;">上传识别后,系统如何把发票推送到 ERP</span>
                             </div>
-                            <!-- v118.27.4 · ERP 系统连接卡片区(Xero · MR.ERP) -->
-                            <div class="erp-connect-cards" id="erp-connect-cards">
-                                <!-- IIFE 渲染 Xero 卡片 + MR.ERP 卡片 -->
-                            </div>
+                            <!-- ERP 系统连接卡片区 · 各 adapter 模块 IIFE 渲染(MR.ERP / MR.ERP DMS) -->
+                            <div class="erp-connect-cards" id="erp-connect-cards"></div>
 
                             <div id="erp-endpoints-list"></div>
                             <button class="btn btn-primary btn-add-endpoint" id="btn-add-endpoint">

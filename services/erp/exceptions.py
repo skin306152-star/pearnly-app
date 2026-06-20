@@ -2,7 +2,7 @@
 """
 services/erp/exceptions.py
 
-Exception hierarchy for ERP adapters (MR.ERP first; FlowAccount / Xero later).
+Exception hierarchy for ERP adapters (MR.ERP first; other adapters later).
 
 Modeled on services/ocr/layer1_vision.py so the upstream push pipeline can
 dispatch identically across pipelines.

@@ -43,7 +43,6 @@ class RouteHelpersImportContractTests(unittest.TestCase):
         import app
         from routes import billing_routes
         from routes import erp_mappings_routes
-        from routes import erp_xero_routes
         from routes import workspace_routes
         from services.authz import deps
 
@@ -61,7 +60,7 @@ class RouteHelpersImportContractTests(unittest.TestCase):
         )
         # 权限批2(2026-06-10):路由旧门换成统一执行点 require_perm(services/authz/deps)·
         # workspace/erp_* 必须复用 deps 同一份对象(批5:旧门别名已删 · team_routes 整体处决)。
-        for mod in (workspace_routes, erp_mappings_routes, erp_xero_routes):
+        for mod in (workspace_routes, erp_mappings_routes):
             self.assertIs(mod.require_perm, deps.require_perm, f"{mod.__name__} require_perm 漂移")
 
 

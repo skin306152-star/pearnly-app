@@ -18,7 +18,7 @@
 - 通用优先:default 派生器认 response_body 里的通用键(external_doc_no /
   doc_no / document_number / id / url 等),所以新 webhook 适配器零改动即可受益。
 - adapter 专属覆盖:_DERIVERS 注册表按 adapter 名分发,MR.ERP 走专属逻辑
-  (mrerp_bill_no -> external_doc_no)。Xero / QuickBooks / custom 在此预留位,
+  (mrerp_bill_no -> external_doc_no)。未来 adapter 在此预留位,
   接入时只需补一个派生器函数,日志 API / 前端都不用改。
 - 永不抛异常:坏 JSON / None / failed log / 缺字段一律返回"全空"派生结果,
   调用方(日志列表 / 详情)绝不会因为派生失败而崩。
@@ -144,14 +144,10 @@ def _derive_default(body: Dict[str, Any], status: str) -> Dict[str, str]:
     return _result(doc_no=str(doc_no), doc_id=str(doc_id), url=str(url))
 
 
-# adapter 名(小写) -> 派生器。预留 xero / quickbooks / custom 位:
-# 接入新 ERP 时在这里加一行,日志 API 和前端都无需改动。
+# adapter 名(小写) -> 派生器。接入新 ERP 时在这里加一行,日志 API 和前端都无需改动。
 _DERIVERS = {
     "mrerp": _derive_mrerp,
     "mrerp_dms": _derive_mrerp_dms,
-    # "xero": _derive_xero,
-    # "quickbooks": _derive_quickbooks,
-    # "custom": _derive_custom,
 }
 
 
@@ -165,7 +161,7 @@ def derive_external_ref(
     返回固定 4 键 dict(见模块 docstring)。永不抛异常。
 
     Args:
-        adapter: erp_endpoints.adapter (mrerp/xero/webhook/...);端点已删时可能为 None。
+        adapter: erp_endpoints.adapter (mrerp/mrerp_dms/webhook/...);端点已删时可能为 None。
         response_body: erp_push_logs.response_body(JSON 字符串 / dict / 文本 / None)。
         status: erp_push_logs.status('success'/'failed'/...);仅用于派生器内部判断,
                 不改变状态机,也不参与"是否显示缺失提示"(那是前端职责)。

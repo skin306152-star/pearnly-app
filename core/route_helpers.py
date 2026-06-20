@@ -72,7 +72,7 @@ def _tid(user: dict) -> Optional[str]:
     没传 / NULL → fallback 单 user 老逻辑(向前兼容)
 
     REFACTOR-B1(2026-05-25):从 app.py 搬到 route_helpers ·
-    让 categories / connectors-status / erp-xero 等 router 抽出时可直接 import · 不再绑 app.py。
+    让 categories / connectors-status 等 router 抽出时可直接 import · 不再绑 app.py。
     """
     if not user:
         return None

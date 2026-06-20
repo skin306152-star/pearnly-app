@@ -5,11 +5,10 @@
 // 表头/各 select/加新行/数据行渲染。erp-mappings.js(控制层:fetch/save/delete/bind)ESM import。
 // ============================================================
 /* global escapeHtml */
-const ERP_OPTIONS = ['flowaccount', 'peak', 'xero', 'quickbooks', 'express'];
+const ERP_OPTIONS = ['flowaccount', 'peak', 'quickbooks', 'express'];
 const ERP_LABELS = {
     flowaccount: 'FlowAccount',
     peak: 'PEAK',
-    xero: 'Xero',
     quickbooks: 'QuickBooks',
     express: 'Express',
 };

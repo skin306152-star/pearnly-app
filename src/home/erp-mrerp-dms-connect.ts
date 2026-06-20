@@ -70,14 +70,17 @@
         }
 
         var ep = _ep;
-        var connected = !!(ep && ep.enabled !== false);
+        // 卡片状态机对齐 MR.ERP 财务卡(erp-mrerp-connect.js):configured=有端点·
+        // enabled=未停用。connected(绿框)随 configured · 停用叠 is-disabled 灰化。
+        var configured = !!ep;
+        var enabled = configured ? ep.enabled !== false : true;
         var pill;
-        if (!ep) {
+        if (!configured) {
             pill =
                 '<span class="mrerp-card-pill mrerp-pill-neutral">' +
                 _esc(t('dms-card-not-connected')) +
                 '</span>';
-        } else if (connected) {
+        } else if (enabled) {
             pill =
                 '<span class="mrerp-card-pill mrerp-pill-ok">' +
                 _esc(t('dms-card-connected')) +
@@ -90,13 +93,13 @@
         }
 
         var actions;
-        if (!ep) {
+        if (!configured) {
             actions =
                 '<button type="button" class="int-btn-configure" id="btn-dms-connect">' +
                 _esc(t('dms-card-connect')) +
                 '</button>';
         } else {
-            var toggleLabel = connected ? t('dms-card-disable') : t('dms-card-enable');
+            var toggleLabel = enabled ? t('dms-card-disable') : t('dms-card-enable');
             // 2026-06-01 · R7 视觉一致:按钮顺序对齐 MR.ERP 财务卡(修改在前 → 启用/停用在最后)。
             // 原顺序 测试→修改→停用 与财务卡的 修改→…→停用 不一致(Codex R2 复测 FAIL)。
             actions =
@@ -113,7 +116,8 @@
 
         zone.innerHTML =
             '<div class="integration-row erp-connect-mrerp-dms' +
-            (connected ? ' connected' : '') +
+            (configured ? ' connected' : '') +
+            (configured && !enabled ? ' is-disabled' : '') +
             '">' +
             '<div class="int-icon ic-mrerp-dms" style="background:#0a5c8a;color:#fff;">' +
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +

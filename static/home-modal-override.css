@@ -58,7 +58,7 @@
     max-height: min(85vh, calc(100vh - 64px)) !important;
 }
 
-/* v118.34.37 · Xero/MR.ERP/未来 ERP 卡片大小统一 · 用户拍板 (2026-05-20) */
+/* v118.34.37 · ERP 卡片大小统一(MR.ERP / MR.ERP DMS / 未来 ERP)· 用户拍板 (2026-05-20) */
 .erp-connect-cards .integration-row {
     min-height: 72px;
     align-items: center;

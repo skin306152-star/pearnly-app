@@ -124,9 +124,6 @@
 
     function _connectorIcon(c: any) {
         const tp = c && (c.type || c.id);
-        if (tp === 'xero') {
-            return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M5.5 8l2 2 3-3.5"/></svg>';
-        }
         if (tp === 'webhook') {
             return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="11.5" r="1.8"/><circle cx="11" cy="4.5" r="1.8"/><path d="M6.4 10l3.2-4M5 9.6V5.5a3 3 0 016 0"/></svg>';
         }
@@ -143,20 +140,15 @@
         }
         const tk = localStorage.getItem('mrpilot_token');
         try {
-            let url,
-                opts: any = { method: 'POST', headers: { Authorization: 'Bearer ' + tk } };
-            if (connector.type === 'xero') {
-                url = '/api/erp/xero/push/' + encodeURIComponent(historyId);
-            } else {
-                // webhook / flowaccount / 其他 · 走老 /api/erp/push 接口
-                url = '/api/erp/push';
-                opts.headers['Content-Type'] = 'application/json';
-                opts.body = JSON.stringify({
+            const opts: any = {
+                method: 'POST',
+                headers: { Authorization: 'Bearer ' + tk, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
                     history_id: historyId,
                     endpoint_id: connector.endpoint_id || undefined,
-                });
-            }
-            const resp = await fetch(url, opts);
+                }),
+            };
+            const resp = await fetch('/api/erp/push', opts);
 
             // A2 (Zihao 2026-05-19 拍板) · single source of truth: the
             // server's body.ok flag (mirrors result["success"] from
@@ -175,12 +167,7 @@
             if (!resp.ok) {
                 let detail = (body && body.detail) || 'unknown';
                 if (typeof detail === 'object') detail = detail.code || JSON.stringify(detail);
-                let friendly = String(detail || 'unknown');
-                if (connector.type === 'xero') {
-                    const k = friendly.replace(/^xero\./, '').toLowerCase();
-                    const tr = t('xero-' + k);
-                    if (tr && tr !== 'xero-' + k) friendly = tr;
-                }
+                const friendly = String(detail || 'unknown');
                 _toast(
                     t('unified-push-fail')
                         .replace('{name}', connector.name)
@@ -338,7 +325,7 @@
         saveBar.insertBefore(wrap, saveBar.firstChild);
 
         // 1. hide 老 3 按钮(向后兼容 · DOM 留着)· querySelectorAll 防 race 残留多个同 ID
-        ['btn-push-erp', 'btn-xero-push'].forEach((id) => {
+        ['btn-push-erp'].forEach((id) => {
             saveBar.querySelectorAll('#' + id).forEach((old) => {
                 (old as HTMLElement).style.display = 'none';
             });
@@ -431,7 +418,7 @@
         if (!saveBar) return;
         if (!saveBar.querySelector('#pn-push-wrap')) return;
         // 1. hide 所有旧按钮(querySelectorAll · race 导致 DOM 出现多个相同 ID 时全部 hide)
-        ['btn-push-erp', 'btn-xero-push'].forEach((id) => {
+        ['btn-push-erp'].forEach((id) => {
             saveBar.querySelectorAll('#' + id).forEach((old) => {
                 if ((old as HTMLElement).style.display !== 'none') {
                     (old as HTMLElement).style.display = 'none';

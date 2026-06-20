@@ -29,7 +29,7 @@
  * ============================================================ */
 
 .ic-mrerp {
-  /* MR.ERP 品牌色 · 深蓝偏紫 · 跟 Xero 的浅蓝拉开区分 */
+  /* MR.ERP 品牌色 · 深蓝偏紫 */
   background: #ebe9ff;
   color: #4338ca;
 }
@@ -38,12 +38,6 @@
   /* FlowAccount 品牌色 · 橙绿混合 (用绿色调更接近他们 logo) */
   background: #e6f5ea;
   color: #06834b;
-}
-
-.ic-xero {
-  /* Xero 品牌色 · 浅蓝 (跟官网视觉对齐) */
-  background: #e0f2fe;
-  color: #0284c7;
 }
 
 /* ============================================================
@@ -447,8 +441,8 @@
 
 /* ============================================================
  * C-6 (Zihao 2026-05-18 拍板) · HARD-DEPRECATE the legacy webhook UX.
- * Hides the visual surface; underlying HTML stays one more iteration
- * so the Xero flow doesn't get disturbed. Removal happens with C-6b.
+ * Hides the visual surface; underlying HTML stays for now to avoid
+ * disturbing other push flows. Removal happens with C-6b.
  * ============================================================ */
 #btn-add-endpoint,
 #erp-endpoints-list,

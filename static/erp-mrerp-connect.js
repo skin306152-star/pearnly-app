@@ -3,9 +3,9 @@
  *
  * C-2 + C-3 + C-4 (Zihao 2026-05-18 拍板).
  *
- * Adds MR.ERP / FlowAccount cards into #erp-connect-cards (alongside
- * the existing Xero card IIFE) + the 2-step connect wizard modal +
- * the sidebar push-log scaffold.
+ * Adds the MR.ERP financial card into #erp-connect-cards (the MR.ERP DMS
+ * card is rendered by its own IIFE in the same host) + the 2-step connect
+ * wizard modal + the sidebar push-log scaffold.
  *
  * Self-contained:
  *   - Does NOT touch home.js translations dict. All i18n lives in a
@@ -760,19 +760,17 @@
     // .integration-row + .int-icon + .int-info + .int-actions。
     // ─────────────────────────────────────────────────────────────
     function _renderCards(host, mrerpEp) {
-        // host 是 #erp-connect-cards · 我们渲染 MR.ERP 卡片。
-        // Xero 卡片由另一个 IIFE 在 host 内单独 prepend · 我们不动它,只 append 自己的。
-        // v118.34.35 · FlowAccount "即将上线" 空卡片移除
+        // host 是 #erp-connect-cards · 我们渲染 MR.ERP 财务卡片。
+        // MR.ERP DMS 卡由另一个 IIFE 在 host 内单独 append · 我们不动它,只管自己的 zone。
         const cardsHtml = [_renderMrerpCard(mrerpEp)].join('');
 
-        // Find or create our own append zone (not interfering with
-        // anything Xero IIFE put in there).
+        // Find or create our own append zone (scoped to this IIFE so we
+        // don't disturb the DMS card's zone in the same host).
         let zone = host.querySelector('[data-mrerp-zone]');
         if (!zone) {
             zone = document.createElement('div');
             zone.setAttribute('data-mrerp-zone', '1');
-            // Tiny top margin so we don't crowd whatever sits above
-            // (typically the Xero card or a section title).
+            // Tiny top margin so we don't crowd whatever sits above.
             zone.style.marginTop = '8px';
             host.appendChild(zone);
         }
@@ -1235,9 +1233,9 @@
     // C-5 (Zihao 2026-05-18 拍板) · "字段映射" sub-tab conditional
     // hide. Rule:
     //   • zero endpoints OR ALL endpoints adapter='mrerp' → hide
-    //   • any non-mrerp endpoint (xero / webhook / flowaccount /
-    //     other) → leave tab + advanced toolbar VISIBLE for the
-    //     legacy mapping workflow
+    //   • any non-mrerp endpoint (webhook / flowaccount / other) →
+    //     leave tab + advanced toolbar VISIBLE for the legacy
+    //     mapping workflow
     //   • client-mapping sub-tab inside is hidden when MR.ERP-only
     //     (sync preflight covers it)
     // Adapter-aware; safe to run repeatedly.
@@ -1283,7 +1281,7 @@
         // Inside the mappings tab, hide the "客户映射" sub-tab when
         // mrerp endpoints are present (sync preflight makes it
         // redundant). Other sub-tabs (accounts / taxes / products)
-        // are kept because Xero still needs them.
+        // are kept for the legacy webhook/flowaccount mapping workflow.
         const clientsSubTab = document.querySelector(
             '.erp-map-subtabs [data-erp-subtab="clients"]'
         );

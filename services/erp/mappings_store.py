@@ -386,7 +386,7 @@ def delete_erp_tax_mapping(tenant_id, mapping_id):
 
 def get_mrerp_mappings_bundle(tenant_id):
     """通用 ERP 映射束 · 一次拿 4 张映射表(clients / accounts / taxes / products)
-    供推送引擎(Xero 等)使用
+    供推送引擎使用
     """
     if not tenant_id:
         return {"clients": [], "accounts": [], "taxes": [], "products": []}

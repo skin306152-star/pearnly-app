@@ -5,18 +5,15 @@ Pearnly · ERP 自动推送编排(REFACTOR-WA-B1 · 2026-05-29 从 app.py L1748-
 纯搬家 · 0 逻辑改 · OCR 识别完成 hook(app.py ocr_recognize / _handle_line_image_ocr)
 后台异步触发。函数名保留下划线(内部互调 + 单测 patch 锚点 test_auto_push_smart_routing)。
 
-7 个函数:
+5 个函数:
   · _auto_push_history          逐张推 auto_push 端点(dedup + pending + 落库 + 失败入重试队列)
   · _erp_seller_routing_enabled ERP_SELLER_ROUTING 回滚开关(全局 / 灰度名单)
   · _persist_push_outcome       一条 push 结果落库(与 _auto_push_history 单张写库同源 · 铁律#12)
   · _auto_push_batch_for_endpoint  P1d · 一端点一批 · dedup → dispatch_endpoint_batch → 逐张落库
   · _auto_push_smart_routed     P1d · 按卖方账套绑定 endpoint 分组批量推 + 未匹配兜底
-  · _auto_push_xero_for_history v27.8.1.3 · Xero 后台自动推
-  · _trigger_auto_push_all      OCR hook 总入口 · 触发 Xero 自动推
 
 依赖:db(运行时 db.xxx · 保 tenant 隔离 patch 生效)· erp_push.push_to_endpoint ·
-services.erp.push_dispatch(批量 · 函数内 import)· erp_xero_routes._ensure_fresh_xero_token
-(Xero token · 函数内 lazy import 解循环)· xero_pusher(函数内 import)。
+services.erp.push_dispatch(批量 · 函数内 import)。
 """
 
 from typing import List, Dict, Any, Optional
@@ -413,24 +410,6 @@ async def _auto_push_smart_routed(user_id, history_ids, tenant_id, fallback_eps)
             logger.exception("[SmartPush] 兜底推送异常 history=%s: %s", str(h.get("id"))[:8], e)
 
 
-def _trigger_auto_push_all(user_id: str, tenant_id: Optional[str], history_id: str):
-    """v27.8.1.3 · 给 OCR hook 用 · 一次性触发 webhook + Xero 两类自动推
-    每类独立 task · 互不影响"""
-    if not tenant_id:
-        return
-    import asyncio
-
-    # Xero
-    try:
-        if db.get_xero_auto_push(tenant_id):
-            asyncio.create_task(_auto_push_xero_for_history(user_id, tenant_id, history_id))
-    except Exception as e:
-        logger.warning(f"[AutoPushAll] xero schedule failed: {e}")
-
-
 # ⚠️ `import db` / `import erp_push` 放 def 之后(解循环 import · 见 services/billing/charge.py 注释)
 from core import db  # noqa: E402
 from services.erp import erp_push  # noqa: E402
-
-# R19 · Xero 自动推路径下沉 auto_push_xero · 此处 re-import:_trigger_auto_push_all 调 + 契约 re-export
-from services.erp.auto_push_xero import _auto_push_xero_for_history  # noqa: E402,F401

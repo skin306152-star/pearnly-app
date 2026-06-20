@@ -1,10 +1,10 @@
 """
-services/ocr/recognize/autopush.py · OCR 识别·ERP/Xero 自动推送分发
+services/ocr/recognize/autopush.py · OCR 识别·ERP 自动推送分发
 
 从 app.py ocr_recognize 抽出(REFACTOR-WB-app · 2026-06-01 · 纯搬家 0 逻辑改)。
 仅对已归属(有 client_id)的 history 触发 auto-push(防 ERR_NO_CLIENT 空炸 retry 队列);
-ocr_only 模式跳过;ERP_SELLER_ROUTING 开+smart 走卖方账套分拣,否则每张推所有端点;
-另独立触发 Xero 自动推。返回 auto_pushed(布尔·进响应)。
+ocr_only 模式跳过;ERP_SELLER_ROUTING 开+smart 走卖方账套分拣,否则每张推所有端点。
+返回 auto_pushed(布尔·进响应)。
 """
 
 import logging
@@ -14,7 +14,6 @@ from core.route_helpers import _plan_permissions, _tid
 from services.erp.auto_push import (
     _auto_push_history,
     _auto_push_smart_routed,
-    _trigger_auto_push_all,
     _erp_seller_routing_enabled,
 )
 
@@ -27,7 +26,7 @@ def dispatch_auto_push(*, _erp_mode, history_ids, plan, user):
     # 没 client_id 的就交给「待归属」/「建议归属」UI 让用户确认 · 防止
     # auto-push 必炸 ERR_NO_CLIENT 浪费 retry 队列(对应 Zihao 截图里
     # 一直 retry 的混乱).
-    # P1b · ocr_only 模式 → 完全跳过 auto-push + Xero 触发(纯跳过 · 零风险)。
+    # P1b · ocr_only 模式 → 完全跳过 auto-push(纯跳过 · 零风险)。
     auto_pushed = False
     if _erp_mode == "ocr_only":
         logger.info("[P1b] ocr_only 模式 · 跳过 %d 张发票的自动推送", len(history_ids or []))
@@ -83,11 +82,5 @@ def dispatch_auto_push(*, _erp_mode, history_ids, plan, user):
                     )
         except Exception as e:
             logger.warning(f"自动推送入队失败(不影响识别): {e}")
-        # v27.8.1.3 · 同时触发 Xero 自动推(独立通道 · 跟 webhook 并存)
-        try:
-            for hid in history_ids:
-                _trigger_auto_push_all(str(user["id"]), _tid(user), hid)
-        except Exception as e:
-            logger.warning(f"xero 自动推入队失败: {e}")
 
     return auto_pushed

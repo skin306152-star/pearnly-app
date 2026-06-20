@@ -14,7 +14,6 @@ from services.exceptions.exception_checks import _async_run_exception_checks
 from services.erp.auto_push import (
     _auto_push_history,
     _auto_push_smart_routed,
-    _trigger_auto_push_all,
     _erp_seller_routing_enabled,
 )
 
@@ -52,11 +51,6 @@ def serve_cache_hit(cached, user, plan, _erp_mode, file, monthly_quota, file_has
                 logger.info(f"🚀 [Cache] 自动推送已入队 · history={cached['id']}")
         except Exception as e:
             logger.warning(f"[Cache] 自动推送入队失败: {e}")
-        # v27.8.1.3 · 同时触发 Xero 自动推(独立通道)
-        try:
-            _trigger_auto_push_all(str(user["id"]), _tid(user), cached["id"])
-        except Exception as e:
-            logger.warning(f"[Cache] xero 自动推入队失败: {e}")
 
     # v118.20.1.7 · 缓存命中也跑异常检测(unique index 保证幂等 · 不会重写)
     # 这是关键 · 否则:历史已识别 + 这次重传 → 缓存命中 → 异常栏永远收不到这张

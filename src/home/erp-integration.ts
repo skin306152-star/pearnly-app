@@ -32,7 +32,7 @@ let _erpSelected = new Set();
 window._erpSelected = _erpSelected;
 
 // DMS 推送可视化闭环(Zihao 2026-06-01)· 推送日志 ERP 筛选 = 下拉「真实配置的 ERP 端点」·
-// 不再硬编码 [MR.ERP/Xero/FlowAccount]。按 adapter 去重(后端按 adapter 过滤)· 标签用端点名。
+// 不再硬编码 adapter 列表。按 adapter 去重(后端按 adapter 过滤)· 标签用端点名。
 // 懒填一次(loadErpLogs 首次调)· 失败回滚允许重试。
 async function _ensureErpSelectOptions() {
     const sel = document.getElementById('erp-logs-erp-select');

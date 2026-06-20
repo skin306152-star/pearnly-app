@@ -17,8 +17,7 @@
 //   1 个启用 endpoint → 按钮 label = "推送到 {name}" · 单击直推
 //   ≥2 个启用 endpoint → 按钮 label = "推送到 ERP ▾" · 单击展开 endpoint 选择 popover
 //
-// 注意:_erpEndpoints 不包含 Xero · Xero 有独立按钮 (btn-xero-push)
-// 由 erp-xero IIFE 单独注入 · 我们这里只管 webhook / mrerp / flowaccount 系列.
+// 只处理 endpoint 系 adapter(webhook / mrerp / mrerp_dms / flowaccount)。
 function injectOcrPushButton() {
     const r = _results[_drawerIdx];
     if (!r || r._historyMode) return;

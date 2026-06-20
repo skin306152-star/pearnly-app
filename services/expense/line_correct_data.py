@@ -35,6 +35,10 @@ def detail_to_data(detail: dict) -> dict:
         "discount_total": doc.get("discount_total") or 0,
         "rounding": doc.get("rounding") or 0,
         "supplier": {
+            # ★带 supplier_id:更正克隆走 update_draft 重写时,_resolve_supplier 有 id 即直接沿用,
+            # 不按(清洗后可能为空的)名字重解析 → 改分类/日期等不丢卖家(纯数字「711」名被 P1F 清空
+            # 也不影响:id 仍在)。改卖家本身时 apply_changes 会另置 supplier(无 id)按新名重建。
+            "id": sup.get("id"),
             "name": sup.get("name") or "",
             "tax_id": sup.get("tax_id"),
             "branch_type": sup.get("branch_type"),

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import unittest
 from decimal import Decimal
+from unittest import mock
 
 from services.expense import line_correct_data as lcd
 from services.expense.expense_draft import ExpenseDraft
@@ -79,6 +80,59 @@ class AmountEditPreservesFieldsTests(unittest.TestCase):
         self.assertEqual(data["doc_date"], "2026-06-13")
         self.assertEqual(data["doc_no"], "IV69/00179")
         self.assertEqual(data["lines"][0]["unit_price"], "1500")  # 金额改了
+
+
+class CorrectionPreservesSupplierTests(unittest.TestCase):
+    """改错克隆 roundtrip 必须保留卖家(真机:711咖啡改分类→新单丢卖家·学习按钮缺「以后这家都记」)。
+
+    根因:detail_to_data 原只带卖家名(P1F 把纯数字「711」清成空)不带 supplier_id → update_draft 按
+    空名重解析 → supplier_id 被清。修:detail_to_data 带 id,_resolve_supplier 有 id 即沿用。
+    """
+
+    def _detail(self):
+        return {
+            "doc": {"doc_no": "X", "doc_date": "2026-06-13", "doc_kind": "expense"},
+            "supplier": {"id": "SUP1", "name": "7-Eleven", "tax_id": "0107542000011"},
+            "lines": [
+                {"unit_price": "55", "qty": "1", "description": "กาแฟ", "category_id": "old"}
+            ],
+        }
+
+    def test_detail_to_data_carries_supplier_id(self):
+        data = lcd.detail_to_data(self._detail())
+        self.assertEqual(data["supplier"]["id"], "SUP1")  # ★id 随单带过去
+        self.assertEqual(data["supplier"]["name"], "7-Eleven")
+
+    def test_category_change_keeps_supplier(self):
+        data = lcd.detail_to_data(self._detail())
+        with mock.patch.object(lcd, "_resolve_category", return_value=("goods", "fin", True)):
+            lcd.apply_changes(None, data, ExpenseDraft(note="商品"), ["category"], "t", 1, {})
+        self.assertEqual(data["supplier"]["id"], "SUP1")  # ★改分类不丢卖家
+        self.assertEqual(data["supplier"]["name"], "7-Eleven")
+        self.assertEqual(data["category_id"], "goods")
+
+    def test_date_change_keeps_supplier(self):
+        data = lcd.detail_to_data(self._detail())
+        lcd.apply_changes(None, data, ExpenseDraft(doc_date="2026-06-20"), ["doc_date"], "t", 1, {})
+        self.assertEqual(data["supplier"]["id"], "SUP1")  # 改其它字段同样不丢
+        self.assertEqual(data["doc_date"], "2026-06-20")
+
+    def test_vendor_change_rebuilds_without_id(self):
+        # 改卖家本身:故意丢 id → 按新名重建/匹配(不回归)。
+        data = lcd.detail_to_data(self._detail())
+        lcd.apply_changes(
+            None, data, ExpenseDraft(vendor_name="Makro"), ["vendor_name"], "t", 1, {}
+        )
+        self.assertEqual(data["supplier"], {"name": "Makro", "tax_id": None})
+
+    def test_resolve_supplier_id_wins_over_empty_name(self):
+        # 核心机制:有 supplier_id 即沿用,即便名被清成空(纯数字「711」)也不丢链接。
+        from services.purchase import docs
+
+        sid = docs._resolve_supplier(
+            None, tenant_id="t", workspace_client_id=1, supplier={"id": "SUP1", "name": ""}
+        )
+        self.assertEqual(sid, "SUP1")
 
 
 class DetailApiSmokeTests(unittest.TestCase):

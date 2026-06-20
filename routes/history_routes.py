@@ -64,12 +64,17 @@ async def history_list(
     limit: int = 50,
     offset: int = 0,
     client_id: Optional[int] = None,
+    source: Optional[str] = None,
+    status: Optional[str] = None,
 ):
     user = get_current_user_from_request(request)
     retention = _check_history_access(user)
     # 安全限制
     limit = max(1, min(int(limit), 100))
     offset = max(0, int(offset))
+    # 白名单收敛(防注入到派生 SQL 分支)
+    src = source if source in ("upload", "line", "email") else None
+    sts = status if status in ("confirmed", "pending", "failed") else None
     return list_ocr_history(
         user_id=str(user["id"]),
         retention_days=retention,
@@ -78,6 +83,8 @@ async def history_list(
         offset=offset,
         tenant_id=_tid(user),
         client_id=client_id,  # v118.28.0 · 顶栏客户切换器过滤
+        source_filter=src,
+        status_filter=sts,
         restrict_client_ids=db.get_visible_client_ids_for_user(user),  # v118.28.1 · 员工分配
         workspace_client_id=wc.active_workspace_for_request(
             request, _tid(user)

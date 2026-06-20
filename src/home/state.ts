@@ -255,6 +255,9 @@ window._historyState = {
     total: 0,
     keyword: '',
     range: 90,
+    statusFilter: 'all', // 汇总卡 / 状态下拉(all|confirmed|pending|failed)
+    sourceFilter: 'all', // 来源下拉(all|upload|line|email)
+    statusCounts: { all: 0, confirmed: 0, pending: 0, failed: 0 },
     items: [],
     loading: false,
 };

@@ -17,6 +17,7 @@ type HistoryRow = {
     confidence?: string;
     created_at: string;
     filename?: string;
+    page_count?: number;
     invoice_no?: string;
     seller_name?: string;
     category_tag?: string;
@@ -28,6 +29,9 @@ type HistoryRow = {
     edit_count?: number;
     smart_assigned_flag?: boolean;
     source?: string;
+    buyer_name?: string | null;
+    vat_amount?: string | null;
+    status?: string; // 后端派生:confirmed | pending | failed
 };
 
 function updateHistoryBatchBar() {
@@ -66,6 +70,26 @@ function clearHistorySelection() {
     updateHistoryBatchBar();
 }
 
+// 汇总卡:填充各状态计数(后端全量分布)+ 高亮当前选中卡
+function renderHistorySummary() {
+    const c = _historyState.statusCounts || { all: 0, confirmed: 0, pending: 0, failed: 0 };
+    const set = (id: string, n: number) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = String(n);
+    };
+    set('hist-count-all', c.all);
+    set('hist-count-confirmed', c.confirmed);
+    set('hist-count-pending', c.pending);
+    set('hist-count-failed', c.failed);
+    const active = _historyState.statusFilter || 'all';
+    document.querySelectorAll('#history-summary .hist-card').forEach((card) => {
+        card.classList.toggle(
+            'active',
+            (card as HTMLElement).dataset.statusFilter === active
+        );
+    });
+}
+
 async function loadHistoryPage() {
     if (!_userInfo) {
         setTimeout(() => loadHistoryPage(), 300);
@@ -95,6 +119,11 @@ async function loadHistoryPage() {
             offset: offset,
         } as unknown as Record<string, string>);
         if (_historyState.keyword) params.set('keyword', _historyState.keyword);
+        // 汇总卡 / 状态下拉 + 来源下拉(默认 all 不传 · 后端白名单收敛)
+        if (_historyState.statusFilter && _historyState.statusFilter !== 'all')
+            params.set('status', String(_historyState.statusFilter));
+        if (_historyState.sourceFilter && _historyState.sourceFilter !== 'all')
+            params.set('source', String(_historyState.sourceFilter));
         // v118.28.0 · 顶栏客户切换器过滤(唯一来源 · 14b.3 后删除了重复 UI)
         const cid =
             typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId() : null;
@@ -117,6 +146,12 @@ async function loadHistoryPage() {
         const data = await resp.json();
         _historyState.items = data.items || [];
         _historyState.total = data.total || 0;
+        _historyState.statusCounts = data.status_counts || {
+            all: 0,
+            confirmed: 0,
+            pending: 0,
+            failed: 0,
+        };
         // 拉到新一页后 · 只保留当前页里仍然存在的那些选中项
         const currentIds = new Set(
             (_historyState.items as HistoryRow[]).map((r: HistoryRow) => r.id)
@@ -169,6 +204,7 @@ function renderHistoryList() {
             <span class="rh-stat-label">${escapeHtml(t('history-avg-conf', { p: avgConfPct }))}</span>
         </div>
     `;
+    renderHistorySummary();
 
     // 列表
     const tbody = document.getElementById('history-tbody');
@@ -185,26 +221,48 @@ function renderHistoryList() {
                 const dateStr = `${mm}-${dd} ${hh}:${mi}`;
 
                 const origName = escapeHtml(r.filename || '');
-                const shortOrig = origName.length > 50 ? origName.substring(0, 50) + '…' : origName;
+                const shortOrig = origName.length > 46 ? origName.substring(0, 46) + '…' : origName;
                 // v89 · 主标题:发票号优先(会计最关心的业务标识)· 否则原文件名截断
-                //       归档名(archive_name)不在列表显示 · 只用于 ZIP 导出文件名
                 const mainName = r.invoice_no ? escapeHtml(r.invoice_no) : shortOrig;
-                const subtitleParts = [];
-                if (r.seller_name) subtitleParts.push(escapeHtml(r.seller_name));
-                // 如果主标题是发票号 · 副标题补上原文件名(截短版)· 方便用户仍能按文件名找
-                if (r.invoice_no && r.filename) subtitleParts.push(shortOrig);
-                const subtitle = subtitleParts.join(' · ') || '-';
+                // 销项口径 · 副标题=文件名 + 页数(卖方=自己 · 不显)
+                const subParts = [];
+                if (r.invoice_no && r.filename) subParts.push(shortOrig);
+                if (r.page_count)
+                    subParts.push(escapeHtml(t('history-pages-n', { n: r.page_count })));
+                const subtitle = subParts.join(' · ') || '-';
 
+                // 科目标签(有就显 · 我们没有可靠的"单据类型"字段 · 不臆造)
                 const categoryBadge = r.category_tag
                     ? `<span class="history-badge category">${escapeHtml(r.category_tag)}</span>`
                     : '';
-
-                // v0.11 · 多发票拆分角标(同一个 PDF 拆成 N 张时显示 "2/3")
+                // v0.11 · 多发票拆分角标
                 const multiBadge =
                     r.source_total && r.source_total > 1
                         ? `<span class="history-badge multi">${escapeHtml(t('invoice-part-of', { i: r.source_index || 1, n: r.source_total }))}</span>`
                         : '';
+                const smartBadge = r.smart_assigned_flag
+                    ? `<span class="history-badge smart-assigned" title="${escapeHtml(t('history-smart-assigned'))}">${svgIcon('sparkle', 11)}</span>`
+                    : '';
 
+                // 来源短标签(草稿口径:上传 / LINE / 邮件)· folder/api 退回邮件样式
+                const src = r.source || 'manual';
+                const srcMeta: Record<string, [string, string]> = {
+                    manual: ['upload', 'history-src-upload'],
+                    upload: ['upload', 'history-src-upload'],
+                    line: ['line', 'history-src-line'],
+                    email: ['email', 'history-src-email'],
+                    folder: ['email', 'history-source-folder'],
+                    api: ['email', 'history-source-api'],
+                };
+                const sm = srcMeta[src] || srcMeta.manual;
+                const sourceTag = `<span class="hist-src-tag src-${sm[0]}">${escapeHtml(t(sm[1]))}</span>`;
+
+                // 买方(卖方=自己不显)
+                const buyerCell = r.buyer_name
+                    ? escapeHtml(r.buyer_name)
+                    : `<span class="hist-buyer-empty">—</span>`;
+
+                // 金额 + 税额副行
                 const amount =
                     r.total_amount !== null && r.total_amount !== undefined
                         ? Number(r.total_amount).toLocaleString(undefined, {
@@ -212,62 +270,49 @@ function renderHistoryList() {
                               maximumFractionDigits: 2,
                           })
                         : `<span class="history-cell-amount-empty">—</span>`;
-
-                // v102 · 统一未识别指示 · 扫描关键字段缺失
-                const missingFields = [];
-                if (r.total_amount === null || r.total_amount === undefined)
-                    missingFields.push(t('field-amount'));
-                if (!r.invoice_no) missingFields.push(t('field-invoice-no'));
-                if (!r.invoice_date) missingFields.push(t('field-invoice-date'));
-                if (!r.seller_name) missingFields.push(t('field-seller-name'));
-                // @ts-expect-error TS6133 verbatim 未使用占位 · 0 改逻辑保留
-                const reviewBadge =
-                    missingFields.length > 0
-                        ? `<span class="history-needs-review" data-review="${escapeHtml(r.id)}" title="${escapeHtml(t('history-needs-review-tip') + ' · ' + missingFields.join(' · '))}" role="button" aria-label="${escapeHtml(t('history-needs-review-tip'))}">${svgIcon('alert', 14)}</span>`
-                        : '';
-
-                // @ts-expect-error TS6133 verbatim 未使用占位 · 0 改逻辑保留
-                const editedBadge = r.edited
-                    ? `<span class="history-badge edited">${escapeHtml(t('history-edited', { n: r.edit_count || 1 }))}</span>`
-                    : '';
-
-                const smartBadge = r.smart_assigned_flag
-                    ? `<span class="history-badge smart-assigned" title="${escapeHtml(t('history-smart-assigned'))}">${svgIcon('sparkle', 11)}</span>`
-                    : '';
-
-                const confClass =
-                    r.confidence === 'high' ? 'high' : r.confidence === 'medium' ? 'mid' : 'low';
-                const confLabel =
-                    r.confidence === 'high'
-                        ? t('conf-high')
-                        : r.confidence === 'medium'
-                          ? t('conf-medium')
-                          : t('conf-low');
-                const confBadge = `<span class="history-badge conf-${confClass}">${escapeHtml(confLabel)}</span>`;
-
-                // v95 · 来源标签 · 邮件抓取 / 文件夹监听 / API 显示 SVG · 默认 manual 不显示
-                let sourceBadge = '';
-                const src = r.source || 'manual';
-                if (src === 'email') {
-                    sourceBadge = `<span class="history-badge source source-email" title="${escapeHtml(t('history-source-email'))}">${svgIcon('mail', 11)}<span>${escapeHtml(t('history-source-email'))}</span></span>`;
-                } else if (src === 'folder') {
-                    sourceBadge = `<span class="history-badge source source-folder" title="${escapeHtml(t('history-source-folder'))}">${svgIcon('folder', 11)}<span>${escapeHtml(t('history-source-folder'))}</span></span>`;
-                } else if (src === 'api') {
-                    sourceBadge = `<span class="history-badge source source-api" title="${escapeHtml(t('history-source-api'))}">${svgIcon('api', 11)}<span>${escapeHtml(t('history-source-api'))}</span></span>`;
+                const st = r.status || 'pending';
+                const vatNum = r.vat_amount != null ? parseFloat(String(r.vat_amount)) : NaN;
+                let amountSub: string;
+                if (!Number.isNaN(vatNum) && vatNum > 0) {
+                    amountSub = t('history-amt-vat', {
+                        v: vatNum.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                        }),
+                    });
+                } else if (st === 'failed') {
+                    amountSub = t('history-amt-reprocess');
+                } else if (st === 'pending') {
+                    amountSub = t('history-amt-pending');
+                } else {
+                    amountSub = t('history-amt-novat');
                 }
 
+                // 状态药丸(后端派生 · 与汇总卡同口径)
+                const stLabelKey =
+                    st === 'confirmed'
+                        ? 'history-st-confirmed'
+                        : st === 'failed'
+                          ? 'history-st-failed'
+                          : 'history-st-pending';
+                const statusPill = `<span class="hist-status-pill ${st}">${escapeHtml(t(stLabelKey))}</span>`;
+
                 return `
-                <div class="history-row" data-hid="${escapeHtml(r.id)}">
+                <div class="history-row history-row-v2" data-hid="${escapeHtml(r.id)}">
                     <div class="history-cell-check">
                         <input type="checkbox" class="history-row-check" data-hid="${escapeHtml(r.id)}" ${_historySelected.has(r.id) ? 'checked' : ''} aria-label="select">
                     </div>
                     <div class="history-cell-date">${dateStr}</div>
                     <div class="history-cell-file">
-                        <div class="history-cell-filename">${mainName} ${categoryBadge} ${multiBadge} ${sourceBadge} ${smartBadge}</div>
+                        <div class="history-cell-filename">${mainName} ${categoryBadge} ${sourceTag} ${multiBadge} ${smartBadge}</div>
                         <div class="history-cell-subtitle">${subtitle}</div>
                     </div>
-                    <div class="history-cell-amount">${amount}</div>
-                    <div class="history-cell-conf">${confBadge}</div>
+                    <div class="history-cell-buyer">${buyerCell}</div>
+                    <div class="history-cell-amount">
+                        <strong>${amount}</strong>
+                        <span class="hist-amount-sub">${escapeHtml(amountSub)}</span>
+                    </div>
+                    <div class="history-cell-status">${statusPill}</div>
                     <div class="history-cell-menu">
                         <button class="history-menu-btn" data-hmenu="${escapeHtml(r.id)}" type="button" aria-label="menu">
                             <svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="13" cy="8" r="1.5"/></svg>
@@ -298,11 +343,47 @@ function renderHistoryList() {
         (_historyState.page + 1) * _historyState.pageSize >= _historyState.total;
 }
 
+// 汇总卡 / 状态下拉 / 来源下拉 / 上传按钮绑定(列表态归口在本 module)·
+// 由 history-drawer 的 initHistoryPage 经 window.initHistoryFilters 调一次。
+function initHistoryFilters() {
+    // 状态筛选:汇总卡 + 状态下拉互相同步(单一真值 _historyState.statusFilter)
+    const applyStatusFilter = (val: string) => {
+        _historyState.statusFilter = val;
+        _historyState.page = 0;
+        const sel = document.getElementById('history-status-select') as HTMLSelectElement | null;
+        if (sel && sel.value !== val) sel.value = val;
+        clearHistorySelection();
+        loadHistoryPage();
+    };
+    document.querySelectorAll('#history-summary .hist-card').forEach((card) => {
+        card.addEventListener('click', () =>
+            applyStatusFilter((card as HTMLElement).dataset.statusFilter || 'all')
+        );
+    });
+    document
+        .getElementById('history-status-select')
+        ?.addEventListener('change', (e) =>
+            applyStatusFilter((e.target as HTMLSelectElement).value)
+        );
+    // 来源筛选(上传 / LINE / 邮件)
+    document.getElementById('history-source-select')?.addEventListener('change', (e) => {
+        _historyState.sourceFilter = (e.target as HTMLSelectElement).value;
+        _historyState.page = 0;
+        clearHistorySelection();
+        loadHistoryPage();
+    });
+    // 上传新票据 → 回录入工作台
+    document.getElementById('history-act-upload')?.addEventListener('click', () => {
+        if (typeof window.routeTo === 'function') window.routeTo('dms-intake');
+    });
+}
+
 // 桥回 home.js + history-drawer.js
 window.loadHistoryPage = loadHistoryPage;
 window.renderHistoryList = renderHistoryList;
 window.updateHistoryBatchBar = updateHistoryBatchBar;
 window.clearHistorySelection = clearHistorySelection;
+window.initHistoryFilters = initHistoryFilters;
 
 // 自举:直接刷新落在 history 路由(routeTo 早于本 module 跑)→ 本 module 就绪后补加载一次
 if (typeof currentRoute !== 'undefined' && currentRoute === 'history') loadHistoryPage();

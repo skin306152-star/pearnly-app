@@ -49,7 +49,14 @@ class OcrHistoryBehaviorContract(unittest.TestCase):
         # retention_days==0 → 早返空,不应触库
         with mock.patch("core.db.get_cursor", side_effect=AssertionError("must not hit DB")):
             out = store.list_ocr_history("u1", retention_days=0)
-        self.assertEqual(out, {"items": [], "total": 0})
+        self.assertEqual(
+            out,
+            {
+                "items": [],
+                "total": 0,
+                "status_counts": {"all": 0, "confirmed": 0, "pending": 0, "failed": 0},
+            },
+        )
 
     def test_delete_with_pdf_paths_empty_ids_early_return(self):
         with mock.patch("core.db.get_cursor", side_effect=AssertionError("must not hit DB")):
@@ -57,16 +64,19 @@ class OcrHistoryBehaviorContract(unittest.TestCase):
 
     def test_list_builds_items_via_mocked_cursor(self):
         cur = mock.MagicMock()
-        # COUNT(*) then SELECT rows
-        cur.fetchone.return_value = {"c": 1}
         import datetime as _dt
 
+        # fetchone 三段:① 汇总卡状态聚合 ② 列表分页总数(SELECT rows 走 fetchall)
+        cur.fetchone.side_effect = [
+            {"all_c": 1, "confirmed_c": 1, "failed_c": 0},
+            {"c": 1},
+        ]
         cur.fetchall.return_value = [
             {
                 "id": "abc",
                 "filename": "f.pdf",
                 "page_count": 1,
-                "confidence": 0.9,
+                "confidence": "high",
                 "elapsed_ms": 10,
                 "invoice_no": "INV1",
                 "invoice_date": _dt.date(2026, 5, 1),
@@ -83,6 +93,10 @@ class OcrHistoryBehaviorContract(unittest.TestCase):
                 "source": None,
                 "source_ref": None,
                 "pdf_storage_path": None,
+                # 销项重做新增列(派生状态 + 从 pages 抽买方/税额)
+                "derived_status": "confirmed",
+                "buyer_name": "BuyerCo",
+                "vat_amount": "7.00",
             }
         ]
         ctx = mock.MagicMock()
@@ -94,6 +108,11 @@ class OcrHistoryBehaviorContract(unittest.TestCase):
         self.assertEqual(len(out["items"]), 1)
         self.assertEqual(out["items"][0]["invoice_no"], "INV1")
         self.assertFalse(out["items"][0]["has_pdf"])
+        # 销项重做契约:买方 / 派生状态 / 汇总卡分布
+        self.assertEqual(out["items"][0]["buyer_name"], "BuyerCo")
+        self.assertEqual(out["items"][0]["vat_amount"], "7.00")
+        self.assertEqual(out["items"][0]["status"], "confirmed")
+        self.assertEqual(out["status_counts"], {"all": 1, "confirmed": 1, "failed": 0, "pending": 0})
 
 
 if __name__ == "__main__":

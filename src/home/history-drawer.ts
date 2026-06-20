@@ -112,16 +112,13 @@ function injectHistorySaveButton() {
     `;
     body.appendChild(saveBar);
     document.getElementById('btn-save-history')!.addEventListener('click', saveHistoryEdits);
-    document.getElementById('btn-push-erp')!.addEventListener('click', pushHistoryToErp);
+    // 真 ERP 推送按钮装配(0/1/≥2 endpoint 智能行为)· 逻辑在 ocr-push(与识别页同口径)
+    if (typeof window.injectHistoryPushButton === 'function') window.injectHistoryPushButton();
 }
 
 // P0-2: 检查该发票是否已成功推送过 ERP
 async function _checkDrawerPushStatus(_historyId: string) {
     /* stub */
-}
-
-async function pushHistoryToErp() {
-    showToast(t('erp-push-coming-soon') || 'ERP 推送即将开放，敬请期待', 'info');
 }
 
 async function saveHistoryEdits() {
@@ -465,6 +462,10 @@ function openHistoryMenu(historyId: string, anchor: HTMLElement) {
         clearHistorySelection();
         loadHistoryPage();
     });
+
+    // 汇总卡 / 状态下拉 / 来源下拉 / 上传按钮的绑定收口在 history-list(它 owns 列表态)·
+    // initHistoryFilters 经 window 桥(history-list 提供 · 顺序无关)。
+    if (typeof window.initHistoryFilters === 'function') window.initHistoryFilters();
 
     document.getElementById('history-prev')!.addEventListener('click', () => {
         if (_historyState.page > 0) {

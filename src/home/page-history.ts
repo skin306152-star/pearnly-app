@@ -19,6 +19,48 @@
                     <div class="h1" data-i18n="history-title">识别历史</div>
                     <div class="sub" data-i18n="history-sub">保留近 90 天 · 点击行查看详情</div>
                 </div>
+                <div class="hist-pagehead-actions">
+                    <button class="btn btn-primary" id="history-act-upload" type="button">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V3M5 6l3-3 3 3M3 13h10"/></svg>
+                        <span data-i18n="history-act-upload">上传新票据</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 范围条:这页只展示销项发票/收据识别结果 -->
+            <div class="hist-scope">
+                <div class="hist-scope-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v4h4"/><path d="M9 11h6M9 15h6"/></svg>
+                </div>
+                <div class="hist-scope-copy">
+                    <b data-i18n="history-scope-title">这里只展示发票、收据和票据表格记录</b>
+                    <span data-i18n="history-scope-desc">身份证订车记录请在「录入工作台」或「集成 → 推送记录」中查看。</span>
+                </div>
+                <span class="hist-scope-tag" data-i18n="history-scope-tag">仅票据</span>
+            </div>
+
+            <!-- 汇总卡:点击按状态筛选(计数由 history-list 填充)-->
+            <div class="hist-summary" id="history-summary">
+                <button class="hist-card active" type="button" data-status-filter="all">
+                    <span class="hist-card-label" data-i18n="history-card-all">全部记录</span>
+                    <span class="hist-card-num" id="hist-count-all">—</span>
+                    <span class="hist-card-sub" data-i18n="history-card-all-sub">近 90 天</span>
+                </button>
+                <button class="hist-card confirmed" type="button" data-status-filter="confirmed">
+                    <span class="hist-card-label" data-i18n="history-card-confirmed">已确认</span>
+                    <span class="hist-card-num" id="hist-count-confirmed">—</span>
+                    <span class="hist-card-sub" data-i18n="history-card-confirmed-sub">可直接使用</span>
+                </button>
+                <button class="hist-card pending" type="button" data-status-filter="pending">
+                    <span class="hist-card-label" data-i18n="history-card-pending">待复核</span>
+                    <span class="hist-card-num" id="hist-count-pending">—</span>
+                    <span class="hist-card-sub" data-i18n="history-card-pending-sub">存在需要确认的字段</span>
+                </button>
+                <button class="hist-card failed" type="button" data-status-filter="failed">
+                    <span class="hist-card-label" data-i18n="history-card-failed">处理失败</span>
+                    <span class="hist-card-num" id="hist-count-failed">—</span>
+                    <span class="hist-card-sub" data-i18n="history-card-failed-sub">文件需要重新处理</span>
+                </button>
             </div>
 
             <div class="panel" id="history-free-block" style="display:none;">
@@ -48,6 +90,18 @@
                         <input type="text" class="search-input" id="history-search" data-i18n-placeholder="history-search-placeholder">
                         <button type="button" class="search-clear" id="history-search-clear" style="display:none;" aria-label="clear">✕</button>
                     </div>
+                    <select class="history-range" id="history-status-select">
+                        <option value="all" data-i18n="history-status-all">全部状态</option>
+                        <option value="confirmed" data-i18n="history-st-confirmed">已确认</option>
+                        <option value="pending" data-i18n="history-st-pending">待复核</option>
+                        <option value="failed" data-i18n="history-st-failed">处理失败</option>
+                    </select>
+                    <select class="history-range" id="history-source-select">
+                        <option value="all" data-i18n="history-source-all">全部来源</option>
+                        <option value="upload" data-i18n="history-src-upload">网页上传</option>
+                        <option value="line" data-i18n="history-src-line">LINE</option>
+                        <option value="email" data-i18n="history-src-email">邮件</option>
+                    </select>
                     <select class="history-range" id="history-range">
                         <option value="7" data-i18n="history-range-7">最近 7 天</option>
                         <option value="30" data-i18n="history-range-30">最近 30 天</option>
@@ -71,14 +125,15 @@
                             </button>
                         </div>
                     </div>
-                    <div class="history-table-head">
+                    <div class="history-table-head history-table-head-v2">
                         <div class="history-col-check">
                             <input type="checkbox" id="history-check-all" aria-label="select all">
                         </div>
                         <div data-i18n="history-col-date">日期</div>
-                        <div data-i18n="history-col-file">文件 · 发票号 · 供应商</div>
+                        <div data-i18n="history-col-doc">票据 / 文件</div>
+                        <div data-i18n="history-col-buyer">买方</div>
                         <div class="history-cell-amount align-right" data-i18n="history-col-amount">金额</div>
-                        <div class="history-cell-conf align-center" data-i18n="history-col-conf">置信</div>
+                        <div class="history-cell-status align-right" data-i18n="history-col-status">状态</div>
                         <div class="history-cell-menu"></div>
                     </div>
                     <div id="history-tbody"></div>

@@ -1,0 +1,75 @@
+"""识别记录列表的派生状态 SQL + 状态聚合 + 列表过滤(从 queries.list_ocr_history 抽出 · 控行数)。
+
+销项识别记录无 status 列 · 三态由 confidence + 关键字段齐全度派生:
+  failed   = 发票号/金额/卖方全空(基本没识别到内容)
+  confirmed= 高置信 且 发票号+金额齐全(可直接使用)
+  pending  = 其余(缺字段或非高置信 · 需复核)
+failed 与 confirmed 互斥(confirmed 要求金额非空 · failed 要求金额空)。
+"""
+
+from typing import Dict, List, Optional, Tuple
+
+FAILED_SQL = "(total_amount IS NULL AND invoice_no IS NULL AND seller_name IS NULL)"
+CONFIRMED_SQL = "(confidence = 'high' AND total_amount IS NOT NULL AND invoice_no IS NOT NULL)"
+STATUS_CASE_SQL = (
+    f"CASE WHEN {FAILED_SQL} THEN 'failed' "
+    f"WHEN {CONFIRMED_SQL} THEN 'confirmed' ELSE 'pending' END"
+)
+
+EMPTY_COUNTS = {"all": 0, "confirmed": 0, "pending": 0, "failed": 0}
+
+
+def _jsonb_first(field: str) -> str:
+    """从 pages jsonb 数组里抽第一条非空 fields.<field>(列表只读买方名/税额 · 省全量 pages 流量)。"""
+    return (
+        f"(SELECT elem->'fields'->>'{field}' "
+        f"FROM jsonb_array_elements("
+        f"CASE WHEN jsonb_typeof(pages) = 'array' THEN pages ELSE '[]'::jsonb END) elem "
+        f"WHERE COALESCE(elem->'fields'->>'{field}', '') <> '' LIMIT 1)"
+    )
+
+
+BUYER_NAME_SQL = _jsonb_first("buyer_name")
+VAT_AMOUNT_SQL = _jsonb_first("vat")
+
+
+def apply_list_filters(
+    where: List[str],
+    params: list,
+    source_filter: Optional[str],
+    status_filter: Optional[str],
+) -> Tuple[str, list]:
+    """在 base where 上叠加状态/来源过滤 · 只作用于列表与其分页总数(不影响汇总卡全量分布)。"""
+    list_where = list(where)
+    list_params = list(params)
+    if source_filter:
+        list_where.append("source = %s")
+        list_params.append("manual" if source_filter == "upload" else source_filter)
+    if status_filter == "confirmed":
+        list_where.append(CONFIRMED_SQL)
+    elif status_filter == "failed":
+        list_where.append(FAILED_SQL)
+    elif status_filter == "pending":
+        list_where.append(f"(NOT {FAILED_SQL} AND NOT {CONFIRMED_SQL})")
+    return " AND ".join(list_where), list_params
+
+
+def status_counts(cur, base_where_sql: str, params: list) -> Dict[str, int]:
+    """汇总卡:全量(不含状态/来源过滤)的三态分布。"""
+    cur.execute(
+        f"""SELECT COUNT(*) AS all_c,
+                   COUNT(*) FILTER (WHERE {CONFIRMED_SQL}) AS confirmed_c,
+                   COUNT(*) FILTER (WHERE {FAILED_SQL}) AS failed_c
+            FROM ocr_history WHERE {base_where_sql}""",
+        params,
+    )
+    crow = cur.fetchone()
+    all_c = int(crow["all_c"])
+    confirmed_c = int(crow["confirmed_c"])
+    failed_c = int(crow["failed_c"])
+    return {
+        "all": all_c,
+        "confirmed": confirmed_c,
+        "failed": failed_c,
+        "pending": max(0, all_c - confirmed_c - failed_c),
+    }

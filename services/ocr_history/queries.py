@@ -12,6 +12,7 @@ import logging
 from typing import Optional, Dict, Any, List
 
 from core import db
+from . import list_status as ls
 
 logger = logging.getLogger(__name__)
 
@@ -39,23 +40,16 @@ def list_ocr_history(
     client_id: Optional[int] = None,
     restrict_client_ids: Optional[List[int]] = None,
     workspace_client_id: Optional[int] = None,
+    source_filter: Optional[str] = None,
+    status_filter: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """
-    分页列表查询。
-    retention_days: None=自动从 user 表拉(向后兼容老调用方漏传)
-                    0=不可查 / 90=Plus 90 天 / -1=Pro 永久
-    keyword: 在 filename / invoice_no / seller_name 里模糊匹配
-    v118.14 · tenant_id 给了 → 多租户共享:看同 tenant 所有用户的发票(老板看员工的)
-              没给 → 老逻辑:只看自己的(向前兼容)
-    v118.28.0 · client_id 给了 → 仅看该客户的发票(顶栏客户切换器)· None 则不过滤
-    v118.28.1 · restrict_client_ids: List[int] = 员工只能看分到的客户;None = 不限制
-                空列表 = 没分到任何客户(只能看自己上传未归属的)
-    v118.27.7.1 · retention_days 改 Optional · 兼容 reports_router 等老调用方漏传
-                  None 时从 user 表 history_retention_days 字段自动拉(权限不被绕过)
-    PO-4 套账隔离 · workspace_client_id 给了 → 仅看本套账(+ 尚未归属套账的 NULL 行)的记录。
-                   这是"为哪家公司做账"的硬边界(顶栏套账切换器),与 client_id(买方)分层。
-                   rollout-safe:含 IS NULL —— ocr_history 多写入路径,部分(邮件/对账批)
-                   暂未归属套账,其 NULL 行须保持可见不丢;PO-8 收口后去掉 IS NULL。
+    """分页列表查询。
+    retention_days: None=自动从 user 表拉 / 0=不可查 / 90=Plus / -1=Pro 永久。
+    keyword: 在 filename / invoice_no / seller_name 模糊匹配。
+    tenant_id: 给了→看同 tenant 所有人(老板看员工)· 没给→只看自己。
+    client_id: 顶栏客户切换器过滤(买方)· restrict_client_ids: 员工只能看分到的客户(空=只看自己未归属)。
+    workspace_client_id: PO-4 套账硬边界(含未归属 NULL 行 · PO-8 后去掉 IS NULL)。
+    source_filter / status_filter: 见 list_status(只过滤列表 · 不影响汇总卡全量分布)。
     """
     # v118.27.7.1 · 自动 fallback:调用方漏传 retention_days 时从 user 表拉真实保留期
     if retention_days is None:
@@ -74,7 +68,7 @@ def list_ocr_history(
             retention_days = 90
 
     if retention_days == 0:
-        return {"items": [], "total": 0}
+        return {"items": [], "total": 0, "status_counts": ls.EMPTY_COUNTS}
 
     # v118.14 · 多租户过滤:tenant 视图(同 tenant 所有人共享)优先 · 否则 fallback 单 user
     if tenant_id:
@@ -113,15 +107,24 @@ def list_ocr_history(
             params.append([int(c) for c in restrict_client_ids])
             params.append(user_id)
 
-    where_sql = " AND ".join(where)
+    base_where_sql = " AND ".join(where)
+    # 派生状态 SQL / 状态聚合 / 列表过滤抽到 list_status(控行数 + 单一职责)。
+    list_where_sql, list_params = ls.apply_list_filters(
+        where, params, source_filter, status_filter
+    )
 
     try:
         with db.get_cursor() as cur:
-            # 总数
-            cur.execute(f"SELECT COUNT(*) AS c FROM ocr_history WHERE {where_sql}", params)
+            # 汇总卡:全量(base where · 不含状态/来源过滤)的状态分布
+            status_counts = ls.status_counts(cur, base_where_sql, params)
+
+            # 列表分页总数(含状态/来源过滤)
+            cur.execute(
+                f"SELECT COUNT(*) AS c FROM ocr_history WHERE {list_where_sql}", list_params
+            )
             total = cur.fetchone()["c"]
 
-            # 列表(不带 pages 字段,省流量)
+            # 列表(不带 pages 全量省流量 · 仅从 pages 抽买方名/税额 + 派生状态)
             cur.execute(
                 f"""
                 SELECT id, filename, page_count, confidence, elapsed_ms,
@@ -130,13 +133,16 @@ def list_ocr_history(
                        fields_edited_at, edit_count, created_at,
                        source_pdf_id, source_index, source_total,
                        source, source_ref,
-                       pdf_storage_path
+                       pdf_storage_path,
+                       {ls.STATUS_CASE_SQL} AS derived_status,
+                       {ls.BUYER_NAME_SQL} AS buyer_name,
+                       {ls.VAT_AMOUNT_SQL} AS vat_amount
                 FROM ocr_history
-                WHERE {where_sql}
+                WHERE {list_where_sql}
                 ORDER BY created_at DESC
                 LIMIT %s OFFSET %s
             """,
-                params + [limit, offset],
+                list_params + [limit, offset],
             )
             items = []
             for r in cur.fetchall():
@@ -152,6 +158,10 @@ def list_ocr_history(
                             r["invoice_date"].isoformat() if r["invoice_date"] else None
                         ),
                         "seller_name": r["seller_name"],
+                        # 销项列表新增:买方(卖方=自己)/ 票面税额 / 派生三态(从 pages+confidence)
+                        "buyer_name": r.get("buyer_name"),
+                        "vat_amount": r.get("vat_amount"),
+                        "status": r.get("derived_status") or "pending",
                         "total_amount": (
                             float(r["total_amount"]) if r["total_amount"] is not None else None
                         ),
@@ -160,23 +170,21 @@ def list_ocr_history(
                         "edited": r["fields_edited_at"] is not None,
                         "edit_count": r["edit_count"],
                         "created_at": r["created_at"].isoformat(),
-                        # v0.11 · 多发票拆分字段
+                        # 多发票拆分 / 来源标识 / 是否有 PDF 留底(前端决定「下载 PDF」是否可用)
                         "source_pdf_id": (
                             str(r["source_pdf_id"]) if r.get("source_pdf_id") else None
                         ),
                         "source_index": r.get("source_index"),
                         "source_total": r.get("source_total"),
-                        # v95 · 来源标识
                         "source": r.get("source") or "manual",
                         "source_ref": r.get("source_ref"),
-                        # v114 · 是否有 PDF 留底(前端用来决定是否显示「下载 PDF」按钮)
                         "has_pdf": bool(r.get("pdf_storage_path")),
                     }
                 )
-            return {"items": items, "total": total}
+            return {"items": items, "total": total, "status_counts": status_counts}
     except Exception as e:
         logger.error(f"查询历史失败 (user_id={user_id}): {e}")
-        return {"items": [], "total": 0}
+        return {"items": [], "total": 0, "status_counts": ls.EMPTY_COUNTS}
 
 
 def get_ocr_history_detail(

@@ -637,3 +637,95 @@
     .ep-actions { width: 100%; justify-content: flex-end; }
 }
 
+/* ============================================================
+   识别记录 · 销项重做(对齐交互草稿 v1)· 2026-06-20
+   范围条 / 汇总卡 / 状态药丸 / 来源标签 / 买方列 / 7 列栅格
+   ============================================================ */
+.hist-pagehead-actions { display: flex; gap: 8px; align-items: center; }
+
+/* 范围条:这页只展示销项发票/收据 */
+.hist-scope {
+    display: flex; align-items: center; gap: 11px;
+    min-height: 48px; padding: 10px 13px; margin-bottom: 12px;
+    border: 1px solid var(--accent-soft); background: var(--accent-soft);
+    border-radius: 13px;
+}
+.hist-scope-icon {
+    width: 30px; height: 30px; border-radius: 9px; flex: 0 0 auto;
+    display: grid; place-items: center; background: var(--card); color: var(--brand);
+}
+.hist-scope-icon svg { width: 16px; height: 16px; }
+.hist-scope-copy { flex: 1; min-width: 0; }
+.hist-scope-copy b { display: block; font-size: 12px; color: var(--ink); }
+.hist-scope-copy span { display: block; font-size: 11px; color: var(--ink-3); margin-top: 3px; }
+.hist-scope-tag {
+    flex: 0 0 auto; border-radius: 999px; padding: 5px 9px;
+    background: var(--card); color: var(--brand); font-size: 10px; font-weight: 800;
+}
+
+/* 汇总卡 · 点击按状态筛选 */
+.hist-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+.hist-card {
+    text-align: left; cursor: pointer;
+    border: 1px solid var(--line); background: var(--card); border-radius: 14px; padding: 13px;
+    display: flex; flex-direction: column; gap: 5px;
+    transition: border-color .15s, box-shadow .15s, background .15s;
+}
+.hist-card:hover { border-color: var(--brand-hover); box-shadow: var(--shadow-sm); }
+.hist-card.active { border-color: var(--brand); background: var(--accent-soft); }
+.hist-card-label { font-size: 11px; color: var(--ink-3); }
+.hist-card-num { font-size: 22px; font-weight: 800; line-height: 1.1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.hist-card.confirmed .hist-card-num { color: var(--success); }
+.hist-card.pending .hist-card-num { color: var(--amber); }
+.hist-card.failed .hist-card-num { color: var(--danger); }
+.hist-card-sub { font-size: 10px; color: var(--ink-4); }
+
+/* 7 列栅格:check / date / file / buyer / amount / status / menu
+   状态列给足宽度(泰文药丸「รอตรวจสอบ」较长 · 太窄会溢出压住金额)·
+   必须 #history-main 作用域 + !important —— home-30 有
+   `#history-main .history-row{grid-template-columns:… !important}` 的 6 列收紧规则要压过。*/
+#history-main .history-table-head.history-table-head-v2,
+#history-main .history-row.history-row-v2 {
+    grid-template-columns: 26px 58px minmax(190px, 1.4fr) minmax(110px, .85fr) 112px 108px 24px !important;
+}
+.history-row-v2 .history-cell-amount { min-width: 0; }
+.history-cell-status { min-width: 0; }
+.history-cell-buyer {
+    min-width: 0; font-size: 12px; color: var(--ink-2);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hist-buyer-empty { color: var(--ink-4); }
+
+/* 金额 + 税额副行 */
+.history-row-v2 .history-cell-amount { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.history-row-v2 .history-cell-amount strong { font-size: 12px; font-weight: 600; }
+.hist-amount-sub { font-size: 9px; color: var(--ink-3); font-weight: 400; }
+
+/* 状态药丸 */
+.history-cell-status { display: flex; justify-content: flex-end; }
+.history-table-head-v2 .history-cell-status { padding: 0; }
+.hist-status-pill { border-radius: 999px; padding: 4px 9px; font-size: 9px; font-weight: 800; white-space: nowrap; }
+.hist-status-pill.confirmed { background: var(--success-bg); color: var(--success); }
+.hist-status-pill.pending   { background: var(--amber-weak); color: var(--amber); }
+.hist-status-pill.failed    { background: var(--danger-bg); color: var(--danger); }
+
+/* 来源短标签 */
+.hist-src-tag { border-radius: 6px; padding: 2px 6px; font-size: 9px; font-weight: 750; flex: 0 0 auto; }
+.hist-src-tag.src-upload { background: var(--accent-soft); color: var(--brand); }
+.hist-src-tag.src-line   { background: var(--success-bg); color: var(--success); }
+.hist-src-tag.src-email  { background: var(--danger-bg); color: var(--danger); }
+
+/* 窄屏:卡片两列 + 行堆叠 */
+@media (max-width: 920px) {
+    .hist-summary { grid-template-columns: repeat(2, 1fr); }
+    #history-main .history-table-head.history-table-head-v2 { display: none !important; }
+    #history-main .history-row.history-row-v2 { grid-template-columns: 22px 1fr auto !important; row-gap: 6px; align-items: start; }
+    .history-row-v2 .history-cell-check { grid-column: 1; grid-row: 1; }
+    .history-row-v2 .history-cell-file { grid-column: 2; grid-row: 1; }
+    .history-row-v2 .history-cell-date { grid-column: 2; grid-row: 2; }
+    .history-row-v2 .history-cell-buyer { grid-column: 2; grid-row: 3; }
+    .history-row-v2 .history-cell-amount { grid-column: 3; grid-row: 1; }
+    .history-row-v2 .history-cell-status { grid-column: 3; grid-row: 2; justify-content: flex-end; }
+    .history-row-v2 .history-cell-menu { grid-column: 3; grid-row: 3; justify-self: end; }
+}
+

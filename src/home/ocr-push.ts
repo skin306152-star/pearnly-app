@@ -193,5 +193,36 @@ async function pushOcrToErp(historyId: any, endpointId: any) {
     }
 }
 
+// 识别记录抽屉(history-drawer)底部「推 ERP」按钮 · 复用 OCR 同一套真推送 + picker。
+// btn-push-erp 已在 history 的 saveBar 静态渲染(默认 display:none)· 这里按启用 endpoint
+// 数决定显示与行为:0 不显 · 1 直推 · ≥2 弹选择。与 injectOcrPushButton 同口径。
+function injectHistoryPushButton() {
+    const r = _results[_drawerIdx];
+    const hid = r && (r._historyId || r.history_id);
+    const btn = document.getElementById('btn-push-erp') as HTMLButtonElement | null;
+    if (!btn) return;
+    const canPush = !!(_userInfo && _userInfo.can_push_erp);
+    const eps = (window._erpEndpoints || _erpEndpoints || []).filter(function (ep: any) {
+        return ep && ep.enabled !== false && (ep.adapter || '').toLowerCase() !== 'mrerp_dms';
+    });
+    if (!hid || !canPush || eps.length === 0) {
+        btn.style.display = 'none';
+        return;
+    }
+    btn.style.display = '';
+    const label =
+        eps.length === 1
+            ? t('btn-push-to-name', { name: eps[0].name || eps[0].adapter || 'ERP' })
+            : t('btn-push-erp') + ' ▾';
+    btn.title = label;
+    const span = btn.querySelector('span');
+    if (span) span.textContent = label;
+    btn.onclick = function () {
+        if (eps.length === 1) pushOcrToErp(hid, eps[0].id);
+        else openOcrPushPicker(btn, hid, eps);
+    };
+}
+
 // 桥回 home.js:ocr-results.js 的 openDrawer 抽屉打开时调
 window.injectOcrPushButton = injectOcrPushButton;
+window.injectHistoryPushButton = injectHistoryPushButton;

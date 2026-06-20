@@ -226,6 +226,55 @@ PICK_NONE = {
 }
 
 
+# 06 Phase B-1 学习按钮:改分类成功后追发一条,问要不要把这次修正沉淀成规则。
+LEARN_ASK = {
+    "zh": "要我记住这次的分类吗?",
+    "th": "ให้จำหมวดหมู่นี้ไว้ไหมคะ?",
+    "en": "Want me to remember this category?",
+    "ja": "この分類を覚えますか?",
+}
+LEARN_BTN_ONCE = {"zh": "仅这次", "th": "เฉพาะครั้งนี้", "en": "Just this once", "ja": "今回のみ"}
+LEARN_BTN_VENDOR = {
+    "zh": "以后「{vendor}」都记{cat}",
+    "th": "「{vendor}」ลง{cat}ตลอด",
+    "en": '"{vendor}" → {cat} from now',
+    "ja": "今後「{vendor}」は{cat}",
+}
+LEARN_BTN_WS = {
+    "zh": "这个套账都这样",
+    "th": "ทั้งบัญชีนี้เลย",
+    "en": "All in this book",
+    "ja": "この帳簿すべて",
+}
+
+# 点按钮后的确认回执(诚实告知存了什么规则)。
+LEARN_ONCE = {
+    "zh": "好的,仅这次。",
+    "th": "ได้ค่ะ เฉพาะครั้งนี้",
+    "en": "Okay, just this once.",
+    "ja": "了解です、今回のみ。",
+}
+LEARN_VENDOR = {
+    "zh": "记住啦,以后「{vendor}」都记「{cat}」。",
+    "th": "จำแล้วค่ะ ต่อไป「{vendor}」จะลง「{cat}」ให้",
+    "en": 'Got it — "{vendor}" will go to "{cat}" from now on.',
+    "ja": "覚えました。今後「{vendor}」は「{cat}」にします。",
+}
+LEARN_WS = {
+    "zh": "记住啦,这个套账以后「{item}」都记「{cat}」。",
+    "th": "จำแล้วค่ะ ในบัญชีนี้ต่อไป「{item}」จะลง「{cat}」",
+    "en": 'Got it — "{item}" will go to "{cat}" in this book.',
+    "ja": "覚えました。この帳簿では今後「{item}」を「{cat}」にします。",
+}
+# 令牌已消费/失效(重复点同一组按钮)→ 友好幂等提示,不重复写规则。
+LEARN_STALE = {
+    "zh": "这个选择已经处理过了。",
+    "th": "ตัวเลือกนี้ดำเนินการไปแล้วค่ะ",
+    "en": "This choice was already handled.",
+    "ja": "この選択は処理済みです。",
+}
+
+
 def field_label(field: str, lang: str) -> str:
     return FIELD_LABELS.get(field, {}).get(lang) or FIELD_LABELS.get(field, {}).get("zh", field)
 

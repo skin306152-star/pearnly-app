@@ -174,6 +174,13 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
         line_bulk_undo.handle_postback(bound_user, reply_token, action, token, lang)
         return
 
+    # 学习按钮(Phase B-1):令牌自带学习 payload,按 scope 写 expense_learned,走独立模块。
+    if action == line_postback.ACTION_LEARN:
+        from services.expense import line_learn
+
+        line_learn.handle_postback(bound_user, reply_token, parsed["scope"], token, lang)
+        return
+
     def _say(key, doc=None):
         amt = (doc or {}).get("grand_total") if doc is not None else None
         line_reply.reply_text_context(

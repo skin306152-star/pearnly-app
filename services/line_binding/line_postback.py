@@ -19,7 +19,17 @@ ACTION_DISCARD = "exp_discard"
 # 批量撤销(确认/取消):目标 id 列表存于一次性令牌的 action_ref,data 只带 token(不带 doc)。
 ACTION_BULK_UNDO = "exp_bulk_undo"
 ACTION_BULK_CANCEL = "exp_bulk_cancel"
-_ACTIONS = (ACTION_CONFIRM, ACTION_UNDO, ACTION_DISCARD, ACTION_BULK_UNDO, ACTION_BULK_CANCEL)
+# 学习按钮(Phase B-1):改分类后追发 3 档「仅这次/这家/这套账」·scope 在 data 的 s 字段,
+# 学习 payload(科目/卖家/品名)存于一次性令牌 action_ref(JSON),data 只带 scope + token。
+ACTION_LEARN = "exp_learn"
+_ACTIONS = (
+    ACTION_CONFIRM,
+    ACTION_UNDO,
+    ACTION_DISCARD,
+    ACTION_BULK_UNDO,
+    ACTION_BULK_CANCEL,
+    ACTION_LEARN,
+)
 
 
 def _data(action: str, ref_id: str, token: str = "") -> str:
@@ -54,13 +64,24 @@ def bulk_cancel_data(token: str) -> str:
     return urlencode({"a": ACTION_BULK_CANCEL, "n": token})
 
 
+def learn_data(scope: str, token: str) -> str:
+    """学习按钮(scope=once/vendor/ws·学习 payload 在令牌 action_ref·data 只带 scope + token)。"""
+    return urlencode({"a": ACTION_LEARN, "s": scope, "n": token})
+
+
 def parse(data: str) -> dict:
-    """postback.data → {action, doc_id, token};非法 → 全空。"""
+    """postback.data → {action, doc_id, token, scope};非法 → 全空。"""
+    empty = {"action": "", "doc_id": "", "token": "", "scope": ""}
     try:
         kv = dict(parse_qsl(data or "", keep_blank_values=False))
     except (ValueError, TypeError):
-        return {"action": "", "doc_id": "", "token": ""}
+        return empty
     action = kv.get("a", "")
     if action not in _ACTIONS:
-        return {"action": "", "doc_id": "", "token": ""}
-    return {"action": action, "doc_id": kv.get("doc", ""), "token": kv.get("n", "")}
+        return empty
+    return {
+        "action": action,
+        "doc_id": kv.get("doc", ""),
+        "token": kv.get("n", ""),
+        "scope": kv.get("s", ""),
+    }

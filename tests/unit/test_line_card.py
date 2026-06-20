@@ -13,15 +13,21 @@ from services.line_binding import line_card, line_card_sections, line_postback
 class PostbackTests(unittest.TestCase):
     def test_undo_roundtrip(self):
         out = line_postback.parse(line_postback.undo_data("D1"))
-        self.assertEqual(out, {"action": line_postback.ACTION_UNDO, "doc_id": "D1", "token": ""})
+        self.assertEqual(
+            out, {"action": line_postback.ACTION_UNDO, "doc_id": "D1", "token": "", "scope": ""}
+        )
 
     def test_confirm_roundtrip(self):
         out = line_postback.parse(line_postback.confirm_data("D9"))
-        self.assertEqual(out, {"action": line_postback.ACTION_CONFIRM, "doc_id": "D9", "token": ""})
+        self.assertEqual(
+            out, {"action": line_postback.ACTION_CONFIRM, "doc_id": "D9", "token": "", "scope": ""}
+        )
 
     def test_discard_roundtrip(self):
         out = line_postback.parse(line_postback.discard_data("D2"))
-        self.assertEqual(out, {"action": line_postback.ACTION_DISCARD, "doc_id": "D2", "token": ""})
+        self.assertEqual(
+            out, {"action": line_postback.ACTION_DISCARD, "doc_id": "D2", "token": "", "scope": ""}
+        )
 
     def test_bad_data_rejected(self):
         self.assertEqual(line_postback.parse("garbage")["action"], "")
@@ -31,7 +37,8 @@ class PostbackTests(unittest.TestCase):
     def test_token_roundtrip(self):
         out = line_postback.parse(line_postback.confirm_data("D1", token="TOK9"))
         self.assertEqual(
-            out, {"action": line_postback.ACTION_CONFIRM, "doc_id": "D1", "token": "TOK9"}
+            out,
+            {"action": line_postback.ACTION_CONFIRM, "doc_id": "D1", "token": "TOK9", "scope": ""},
         )
 
     def test_no_token_empty(self):

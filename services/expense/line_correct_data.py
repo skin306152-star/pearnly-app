@@ -77,7 +77,8 @@ def apply_changes(cur, data, changes_draft, keys, tid, ws, bound_user) -> None:
         for ln in data["lines"]:
             ln["category_id"] = cid
             ln["subcategory_id"] = sid
-        learn_category(cur, tid=tid, ws=ws, supplier=data.get("supplier"), cid=cid, sid=sid)
+        # 不在此自动学(Phase B-1):改完追发「仅这次/这家/这套账」按钮,由用户显式确认是否沉淀成规则
+        # (line_learn.offer/handle_postback)。网页改草稿仍走 learn_from_doc_edit 自动学(另一 surface)。
     if "payment_method" in keys:
         data["payment_method"] = changes_draft.payment_method or None
     if "amount" in keys:

@@ -266,6 +266,10 @@ def _apply_or_confirm(
             k = keys[0]
             fl, nv = ci.key_label(k, lang), ci.disp(k, changes[k], lang)
             _say(ci.t(ci.CHANGED_DONE, lang, field=fl, new=nv))
+        if "category" in changes:  # Phase B-1:改分类后追发学习按钮(沉淀习惯·best-effort)
+            from services.expense import line_learn
+
+            line_learn.offer(tid, ws, line_user_id, lang, doc_id=res["new_id"])
         return True
     with db.get_cursor_rls(tid, commit=True) as cur:
         conversation.save_pending(
@@ -403,6 +407,10 @@ def try_confirm(
         _say(ci.t(ci.DRAFT_EDITED, lang, new=res["total"]))  # 草稿原地改·不提「冲销原单」
     else:
         _say(line_client.t_line(lang, "exp_correct_draft", new=res["total"]))
+    if "category" in keys:  # Phase B-1:确认型改动含分类 → 追发学习按钮(沉淀习惯·best-effort)
+        from services.expense import line_learn
+
+        line_learn.offer(tid, ws_eff, line_user_id, lang, doc_id=res["new_id"])
     return True
 
 

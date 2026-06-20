@@ -26,6 +26,7 @@ type ErpExcItem = {
     error_code?: string;
     error_msg?: string;
     category?: string;
+    endpoint_name?: string;
     error_friendly?: Record<string, string>;
 };
 let _erpExcState: {
@@ -118,36 +119,39 @@ function renderErpExceptions() {
         .join('');
 
     const items = st.items || [];
-    const allChecked = items.length > 0 && items.every((it) => st.selected.has(it.id));
+    // 异常 issue 卡(草稿对齐):分类图标 + 单据/类型 + 失败原因 + 修复映射/重试
     const rowsHtml = items
         .map((it) => {
-            const stateCls =
-                it.state === 'needs_action' ? 'needs' : it.state === 'retrying' ? 'retry' : 'fail';
-            const stateLbl = t('erp-exc-state-' + (it.state || 'failed'));
             const reason = _erpExcFriendly(it);
             const checked = st.selected.has(it.id) ? 'checked' : '';
-            // DMS 闭环修正 · 身份证订车异常按 DMS 字段:单据=订车单号、对方=客户、无买方;加类型标。
             const isId = it.push_type === 'id_card';
-            const idBadge = isId
-                ? `<span class="erp-exc-type-idcard">${escapeHtml(t('erp-log-type-idcard'))}</span> `
-                : '';
-            const invCell = isId
-                ? `<span class="ex-inv" title="${escapeHtml(t('erp-log-col-booking'))}">${idBadge}${escapeHtml(it.invoice_no || '—')}</span>`
-                : `<span class="ex-inv" title="${escapeHtml(it.invoice_no || '')}">${escapeHtml(it.invoice_no || '—')}</span>`;
-            const sellerCell = isId
-                ? `<span class="ex-seller" title="${escapeHtml(t('erp-log-col-customer'))}">${escapeHtml(it.seller_name || '—')}</span>`
-                : `<span class="ex-seller" title="${escapeHtml(it.seller_name || '')}">${escapeHtml(it.seller_name || '—')}</span>`;
-            const buyerCell = isId
-                ? `<span class="ex-buyer" title="${escapeHtml(t('erp-log-col-idcard'))}">${it.id_card_tail ? '••••' + escapeHtml(it.id_card_tail) : '—'}</span>`
-                : `<span class="ex-buyer" title="${escapeHtml(it.ocr_buyer_name || '')}">${escapeHtml(it.ocr_buyer_name || '—')}</span>`;
-            return `<div class="erp-exc-row" data-erpexc-id="${escapeHtml(it.id)}">
-            <span class="ex-cb"><input type="checkbox" class="erp-exc-cb" data-erpexc-cb="${escapeHtml(it.id)}" ${checked}></span>
-            ${invCell}
-            ${sellerCell}
-            ${buyerCell}
-            <span class="ex-state"><span class="erp-exc-state ${stateCls}">${escapeHtml(stateLbl)}</span></span>
-            <span class="ex-reason" title="${escapeHtml(reason)}${it.error_code ? ' (' + escapeHtml(it.error_code) + ')' : ''}">${escapeHtml(reason)}</span>
-            <span class="ex-act"><button class="btn btn-sm btn-secondary" type="button" data-erpexc-retry="${escapeHtml(it.id)}">${escapeHtml(t('erp-exc-retry'))}</button></span>
+            const cat = it.category || 'other';
+            let icoLetter = '!';
+            let icoCls = 'other';
+            if (isId) {
+                icoLetter = 'D';
+                icoCls = 'dms';
+            } else if (cat === 'product_mismatch') {
+                icoLetter = 'P';
+                icoCls = 'product';
+            } else if (cat === 'customer_mismatch' || cat === 'no_client') {
+                icoLetter = 'C';
+                icoCls = 'customer';
+            }
+            const typeLbl = isId ? t('erp-log-type-idcard') : t('erp-log-type-invoice');
+            const sub = typeLbl + (it.endpoint_name ? ' · ' + it.endpoint_name : '');
+            const canFix =
+                !isId && (cat === 'product_mismatch' || cat === 'customer_mismatch' || cat === 'no_client');
+            const fixLbl = cat === 'product_mismatch' ? t('erp-exc-fix-product') : t('erp-exc-fix-customer');
+            return `<div class="erp-exc-card" data-erpexc-id="${escapeHtml(it.id)}">
+            <span class="erp-exc-card-cb"><input type="checkbox" class="erp-exc-cb" data-erpexc-cb="${escapeHtml(it.id)}" ${checked}></span>
+            <div class="erp-exc-card-icon ${icoCls}">${icoLetter}</div>
+            <div class="erp-exc-card-main"><b title="${escapeHtml(it.invoice_no || '')}">${escapeHtml(it.invoice_no || '—')}</b><span>${escapeHtml(sub)}</span></div>
+            <div class="erp-exc-card-reason"><label>${escapeHtml(t('erp-exc-f-reason'))}</label><p title="${escapeHtml(reason)}${it.error_code ? ' (' + escapeHtml(it.error_code) + ')' : ''}">${escapeHtml(reason)}</p></div>
+            <div class="erp-exc-card-act">
+                ${canFix ? `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-fix="${escapeHtml(it.id)}">${escapeHtml(fixLbl)}</button>` : ''}
+                <button class="btn btn-sm btn-primary" type="button" data-erpexc-retry="${escapeHtml(it.id)}">${escapeHtml(t('erp-exc-retry'))}</button>
+            </div>
         </div>`;
         })
         .join('');
@@ -163,8 +167,7 @@ function renderErpExceptions() {
               ? `<div class="erp-exc-count">${escapeHtml(t('erp-exc-shown', { n: items.length, total: st.total }))}</div>`
               : '';
 
-    // DMS 闭环修正 · ERP 系统下拉(真实配置端点 · 按 adapter 去重)+ 选中 DMS 时表头切 订车单号/客户
-    const isDmsView = st.adapter === 'mrerp_dms';
+    // ERP 系统下拉(真实配置端点 · 按 adapter 去重)
     const _eps = Array.isArray(window._erpEndpoints) ? window._erpEndpoints : [];
     const _seenAd = new Set();
     let _erpOpts = `<option value="">${escapeHtml(t('erp-logs-erp-all'))}</option>`;
@@ -174,9 +177,6 @@ function renderErpExceptions() {
         _seenAd.add(ad);
         _erpOpts += `<option value="${escapeHtml(ad)}"${ad === st.adapter ? ' selected' : ''}>${escapeHtml((e && e.name) || ad)}</option>`;
     });
-    const colExcInv = isDmsView ? t('erp-log-col-booking') : t('erp-exc-f-invoice');
-    const colExcSeller = isDmsView ? t('erp-log-col-customer') : t('erp-exc-f-seller');
-    const colExcBuyer = isDmsView ? t('erp-log-col-idcard') : t('erp-exc-f-buyer');
     block.innerHTML = `
         <div class="erp-exc-head">
             <h2 class="erp-exc-title">${escapeHtml(t('erp-exc-title'))}</h2>
@@ -191,16 +191,7 @@ function renderErpExceptions() {
             <button class="btn btn-sm btn-danger" type="button" data-erpexc-batch="delete">${escapeHtml(t('erp-exc-batch-delete'))}</button>
             <button class="btn btn-sm btn-ghost" type="button" data-erpexc-batch="clear">${escapeHtml(t('erp-exc-batch-clear'))}</button>
         </div>
-        <div class="erp-exc-rows">
-            <div class="erp-exc-row erp-exc-row-head">
-                <span class="ex-cb"><input type="checkbox" class="erp-exc-cb-all" id="erp-exc-cb-all" ${allChecked ? 'checked' : ''}></span>
-                <span class="ex-inv">${escapeHtml(colExcInv)}</span>
-                <span class="ex-seller">${escapeHtml(colExcSeller)}</span>
-                <span class="ex-buyer">${escapeHtml(colExcBuyer)}</span>
-                <span class="ex-state">${escapeHtml(t('erp-exc-f-state'))}</span>
-                <span class="ex-reason">${escapeHtml(t('erp-exc-f-reason'))}</span>
-                <span class="ex-act"></span>
-            </div>
+        <div class="erp-exc-cards">
             ${rowsHtml}${emptyHtml}
         </div>
         <div class="erp-exc-foot">${moreHtml}</div>`;
@@ -279,12 +270,20 @@ function renderErpExceptions() {
     // 加载更多
     const more = document.getElementById('erp-exc-more');
     if (more) more.addEventListener('click', () => loadErpExceptions(true));
-    // 单击行(非 checkbox/按钮)→ 编辑弹窗(下一步)· 现暂留 hook
-    block.querySelectorAll('.erp-exc-row:not(.erp-exc-row-head)').forEach((row) => {
-        row.addEventListener('click', (e) => {
+    // 修复映射/确认客户按钮 → 编辑弹窗
+    block.querySelectorAll('[data-erpexc-fix]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof window._erpExcOpenEdit === 'function')
+                window._erpExcOpenEdit((btn as HTMLElement).dataset.erpexcFix);
+        });
+    });
+    // 单击卡(非 checkbox/按钮)→ 编辑弹窗
+    block.querySelectorAll('.erp-exc-card').forEach((card) => {
+        card.addEventListener('click', (e) => {
             if ((e.target as HTMLElement).closest('input,button')) return;
             if (typeof window._erpExcOpenEdit === 'function')
-                window._erpExcOpenEdit((row as HTMLElement).dataset.erpexcId);
+                window._erpExcOpenEdit((card as HTMLElement).dataset.erpexcId);
         });
     });
 }

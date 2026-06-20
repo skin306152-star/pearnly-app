@@ -373,6 +373,16 @@ def push_to_endpoint(endpoint: Dict[str, Any], history_record: Dict[str, Any]) -
             "adapter": adapter,
         }
 
+    # Express early-route(出站拉取架构)· Express 在客户内网,云端够不着 → 不跑
+    # 服务器 Playwright,改把记账载荷写进待领取队列(erp_push_logs status='pending'),
+    # 由客户本地 Agent lease 后录入。enqueue_express 不自己落库,返回标准 push 结果,
+    # 由调用方照常写一行(经 classify_push_status 的 express 哨兵落成 pending / manual)。
+    # 特性开关 ERP_PUSH_ENABLED off → enqueue 内部短路成 failed,对现有零影响。
+    if adapter == "express":
+        from services.erp.express_push.enqueue import enqueue_express
+
+        return enqueue_express(endpoint, history_record)
+
     # A1 (Zihao 2026-05-19 拍板) · MR.ERP early-route.
     #
     # The legacy (config, payload) adapter shape doesn't fit MR.ERP because

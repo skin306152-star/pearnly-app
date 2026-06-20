@@ -25,7 +25,7 @@ def ensure_erp_endpoints_adapter_constraint():
     白名单跟 erp_push.py ADAPTER_REGISTRY 对齐 · 增 adapter 时这里和
     那里一起改。
     """
-    canonical = ("webhook", "xero", "flowaccount", "mrerp", "mrerp_dms")
+    canonical = ("webhook", "xero", "flowaccount", "mrerp", "mrerp_dms", "express")
     try:
         with db.get_cursor(commit=True) as cur:
             # 1. 找 adapter 上现存的 CHECK constraint(可能没有 · 也可能多个)
@@ -72,7 +72,7 @@ def ensure_erp_push_logs_adapter_constraint():
     """同 erp_endpoints 但针对 erp_push_logs · 若它也有 adapter CHECK
     约束就同步加 mrerp。push log 表不一定带这个约束(取决于建表 DDL),
     所以查 pg_catalog 找到了再 drop+rebuild,没找到就跳过。"""
-    canonical = ("webhook", "xero", "flowaccount", "mrerp", "mrerp_dms")
+    canonical = ("webhook", "xero", "flowaccount", "mrerp", "mrerp_dms", "express")
     try:
         with db.get_cursor(commit=True) as cur:
             cur.execute("""
@@ -114,7 +114,7 @@ def ensure_erp_push_logs_status_constraint():
     """ERP-2 修(2026-05-25):若 erp_push_logs.status 有 CHECK 约束且不含 'skipped_dup' ·
     drop + rebuild 放开。此前重复推送写 status='skipped_dup' 被约束拒绝 → insert 抛异常被
     insert_push_log 吞 → 返回 None → 防重日志没落库(log_id=null)。没有该约束则跳过(无需迁移)。"""
-    canonical = ("success", "failed", "skipped_dup", "pending", "retrying")
+    canonical = ("success", "failed", "skipped_dup", "pending", "retrying", "manual")
     try:
         with db.get_cursor(commit=True) as cur:
             cur.execute("""
@@ -132,8 +132,12 @@ def ensure_erp_push_logs_status_constraint():
                 )
                 return
             current_def = " ".join((r["def"] or "").lower() for r in rows)
-            if "skipped_dup" in current_def:
-                logger.info("✅ erp_push_logs status CHECK already includes skipped_dup (skip)")
+            # 幂等:skipped_dup 与 manual(Express 留人工态)都在才跳过 ·
+            # 否则 drop+rebuild 把 canonical 全量补齐(存量库已有 skipped_dup 仍能补 manual)。
+            if "skipped_dup" in current_def and "manual" in current_def:
+                logger.info(
+                    "✅ erp_push_logs status CHECK already includes skipped_dup+manual (skip)"
+                )
                 return
             for r in rows:
                 name = r["conname"]
@@ -151,7 +155,12 @@ def ensure_erp_push_logs_status_constraint():
 
 
 def ensure_erp_retry_columns():
-    """启动时给 erp_push_logs 表加 retry 相关列 · 幂等(列已存在则跳过)"""
+    """启动时给 erp_push_logs 表加 retry / Express Agent 租约列 · 幂等(列已存在则跳过)。
+
+    Express 出站拉取(铁律 #12:不另立队列表 · 队列 = 本表 status='pending')需两列租约:
+    lease_owner / lease_expires_at —— Agent 安全领取、到期可重领防崩溃卡死。与 retry 列同
+    属本表运营列,合并一处幂等 ALTER(避免再加一个启动钩子)。
+    """
     try:
         with db.get_cursor(commit=True) as cur:
             cur.execute("""
@@ -161,11 +170,21 @@ def ensure_erp_retry_columns():
                     ADD COLUMN IF NOT EXISTS max_retries INTEGER NOT NULL DEFAULT 3;
                 ALTER TABLE erp_push_logs
                     ADD COLUMN IF NOT EXISTS next_retry_at TIMESTAMPTZ NULL;
+                ALTER TABLE erp_push_logs
+                    ADD COLUMN IF NOT EXISTS lease_owner TEXT;
+                ALTER TABLE erp_push_logs
+                    ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ NULL;
                 CREATE INDEX IF NOT EXISTS idx_erp_logs_retry_due
                     ON erp_push_logs(next_retry_at)
                     WHERE next_retry_at IS NOT NULL AND status = 'failed';
+                CREATE INDEX IF NOT EXISTS idx_erp_logs_pending_lease
+                    ON erp_push_logs(endpoint_id, status)
+                    WHERE status = 'pending';
             """)
-            logger.info("✅ erp_push_logs retry 列就绪(retry_count / max_retries / next_retry_at)")
+            logger.info(
+                "✅ erp_push_logs 运营列就绪(retry_count / max_retries / next_retry_at / "
+                "lease_owner / lease_expires_at)"
+            )
     except Exception as e:
         logger.warning(f"ensure_erp_retry_columns failed: {e}")
 

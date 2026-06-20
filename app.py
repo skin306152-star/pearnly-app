@@ -151,6 +151,9 @@ from routes.line_binding_routes import (
 from routes.erp_routes import (  # REFACTOR-B1 · ERP 推送 15 路由 · 2026-05-25
     router as erp_router,
 )
+from routes.erp_agent import (  # Express Push · 本地 Agent 出站拉取 + token 4 路由
+    router as erp_agent_router,
+)
 from routes.dms_routes import (  # MR.ERP DMS 汽车销售 · 身份证→订车单 1 路由 · 2026-05-31
     router as dms_router,
 )
@@ -292,6 +295,7 @@ app.include_router(pages_router)  # REFACTOR-B1 · 静态页面 + 公开 meta 12
 app.include_router(me_router)  # REFACTOR-B1 · /api/me 家族 3 路由(me/v1/me/profile)(2026-05-25)
 app.include_router(line_binding_router)  # REFACTOR-B1 · LINE 绑定 + 偏好语言 4 路由(2026-05-25)
 app.include_router(erp_router)  # REFACTOR-B1 · ERP 推送 15 路由(2026-05-25)
+app.include_router(erp_agent_router)  # Express Push · 本地 Agent 出站拉取 + token 4 路由
 app.include_router(dms_router)  # MR.ERP DMS · 身份证→订车单 1 路由(2026-05-31)
 app.include_router(admin_users_router)  # REFACTOR-B1 · 超管用户/员工 15 路由(2026-05-25)
 app.include_router(history_router)  # REFACTOR-B1 · OCR 历史 11 路由(含 assign_client)(2026-05-25)

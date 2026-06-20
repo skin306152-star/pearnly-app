@@ -1,0 +1,221 @@
+# -*- coding: utf-8 -*-
+"""Express 本地 Agent 出站拉取的数据访问层(token / heartbeat / lease / ack)。
+
+铁律 #12:状态唯一源 = erp_push_logs。Agent 不直连库,只走 routes/erp_agent.py
+的 Bearer token 接口,落到本模块的参数化 SQL。隔离沿用现有 ERP 模块约定
+(per user_id · 不为 express 另搞 RLS):token 只能取本连接 endpoint 的队列。
+
+token 形如 `exp_<endpoint_id>_<secret>`;库里只存 sha256(token)(明文仅生成时返回
+一次)。校验时从 token 解出 endpoint_id → 取该 express endpoint → 比对 hash。
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+import secrets
+from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+_LEASE_SECONDS = 120
+_MAX_ATTEMPTS = 3
+
+
+def hash_token(plaintext: str) -> str:
+    return hashlib.sha256((plaintext or "").encode("utf-8")).hexdigest()
+
+
+def get_express_endpoint(endpoint_id: str) -> Optional[Dict[str, Any]]:
+    """按 id 取 express 连接(不带 user 作用域 · 给 Agent token 校验用)。"""
+    if not endpoint_id:
+        return None
+    try:
+        from core import db
+
+        with db.get_cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, name, adapter, config, enabled, user_id
+                FROM erp_endpoints
+                WHERE id = %s AND adapter = 'express'
+                LIMIT 1
+                """,
+                (endpoint_id,),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+    except Exception as e:
+        logger.error(f"get_express_endpoint failed: {e}")
+        return None
+
+
+def set_agent_token(user_id: str, endpoint_id: str) -> Optional[str]:
+    """(重)生成 Agent token · 存 sha256 进 config.agent_token_hash · 明文只返一次。"""
+    try:
+        from core import db
+
+        ep = db.get_erp_endpoint(user_id, endpoint_id)
+        if not ep or (ep.get("adapter") or "") != "express":
+            return None
+        plaintext = f"exp_{endpoint_id}_{secrets.token_urlsafe(32)}"
+        cfg = dict(ep.get("config") or {})
+        cfg["agent_token_hash"] = hash_token(plaintext)
+        if not db.update_erp_endpoint(user_id, endpoint_id, config=cfg):
+            return None
+        return plaintext
+    except Exception as e:
+        logger.error(f"set_agent_token failed: {e}")
+        return None
+
+
+def authenticate(token: str) -> Optional[Dict[str, Any]]:
+    """校验 Bearer token → 返回 endpoint dict;失败返 None。常量时间比对防时序泄漏。"""
+    if not token or not token.startswith("exp_"):
+        return None
+    parts = token.split("_", 2)
+    if len(parts) != 3:
+        return None
+    endpoint_id = parts[1]
+    ep = get_express_endpoint(endpoint_id)
+    if not ep:
+        return None
+    stored = str((ep.get("config") or {}).get("agent_token_hash") or "")
+    if not stored or not secrets.compare_digest(stored, hash_token(token)):
+        return None
+    return ep
+
+
+def touch_heartbeat(endpoint_id: str) -> None:
+    """更新 config.agent_last_seen_at = NOW(UTC)。"""
+    try:
+        from core import db
+
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                """
+                UPDATE erp_endpoints
+                SET config = jsonb_set(
+                        COALESCE(config, '{}'::jsonb),
+                        '{agent_last_seen_at}', to_jsonb(NOW()::text), true)
+                WHERE id = %s AND adapter = 'express'
+                """,
+                (endpoint_id,),
+            )
+    except Exception as e:
+        logger.error(f"touch_heartbeat failed: {e}")
+
+
+def lease_pending(endpoint_id: str, owner: str, max_n: int) -> List[Dict[str, Any]]:
+    """领取该 endpoint 未被有效租约占用的 pending 日志(原子置租约)· 返回载荷列表。
+
+    SKIP LOCKED + 租约到期可重领:Agent 崩溃后队列不卡死。owner 标识领取者。
+    """
+    n = max(1, min(int(max_n or 1), 50))
+    try:
+        from core import db
+
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                """
+                WITH due AS (
+                    SELECT id FROM erp_push_logs
+                    WHERE endpoint_id = %s AND status = 'pending'
+                      AND (lease_owner IS NULL
+                           OR lease_expires_at IS NULL
+                           OR lease_expires_at < NOW())
+                    ORDER BY created_at ASC
+                    LIMIT %s
+                    FOR UPDATE SKIP LOCKED
+                )
+                UPDATE erp_push_logs l
+                SET lease_owner = %s,
+                    lease_expires_at = NOW() + (%s * INTERVAL '1 second')
+                FROM due
+                WHERE l.id = due.id
+                RETURNING l.id, l.history_id, l.invoice_no, l.request_body,
+                          l.lease_expires_at
+                """,
+                (endpoint_id, n, owner, _LEASE_SECONDS),
+            )
+            rows = cur.fetchall() or []
+            return [dict(r) for r in rows]
+    except Exception as e:
+        logger.error(f"lease_pending failed: {e}")
+        return []
+
+
+def _load_owned_log(cur, endpoint_id: str, log_id: str) -> Optional[Dict[str, Any]]:
+    cur.execute(
+        """
+        SELECT id, status, attempt, lease_owner, response_body
+        FROM erp_push_logs
+        WHERE id = %s AND endpoint_id = %s
+        FOR UPDATE
+        """,
+        (log_id, endpoint_id),
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def ack(
+    endpoint_id: str,
+    log_id: str,
+    owner: str,
+    success: bool,
+    express_docnum: Optional[str] = None,
+    error: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Agent 回报一条领取结果。
+
+    success → status='success' + response_body.express_docnum,清租约(终态幂等)。
+    failed  → attempt+1;< 3 次 → 回 pending 释放租约可重领;≥ 3 次 → 'manual' 留人工。
+    校验 lease_owner 一致(防越权 ack 别人的租约)。
+    """
+    try:
+        from core import db
+
+        with db.get_cursor(commit=True) as cur:
+            log = _load_owned_log(cur, endpoint_id, log_id)
+            if not log:
+                return {"ok": False, "reason": "log_not_found"}
+            # 终态幂等:已 success 的不再回退。
+            if log["status"] == "success":
+                return {"ok": True, "status": "success", "idempotent": True}
+            if (log.get("lease_owner") or "") != owner:
+                return {"ok": False, "reason": "lease_mismatch"}
+
+            if success:
+                body = json.dumps(
+                    {"ok": True, "express_docnum": express_docnum}, ensure_ascii=False
+                )
+                cur.execute(
+                    """
+                    UPDATE erp_push_logs
+                    SET status = 'success', http_status = 200,
+                        response_body = %s, error_msg = NULL,
+                        lease_owner = NULL, lease_expires_at = NULL
+                    WHERE id = %s
+                    """,
+                    (body, log_id),
+                )
+                return {"ok": True, "status": "success", "express_docnum": express_docnum}
+
+            attempt = int(log.get("attempt") or 0) + 1
+            new_status = "manual" if attempt >= _MAX_ATTEMPTS else "pending"
+            cur.execute(
+                """
+                UPDATE erp_push_logs
+                SET status = %s, attempt = %s,
+                    error_msg = %s,
+                    lease_owner = NULL, lease_expires_at = NULL
+                WHERE id = %s
+                """,
+                (new_status, attempt, (error or "")[:500] or "agent_failed", log_id),
+            )
+            return {"ok": True, "status": new_status, "attempt": attempt}
+    except Exception as e:
+        logger.error(f"ack failed: {e}")
+        return {"ok": False, "reason": f"db_error: {type(e).__name__}"}

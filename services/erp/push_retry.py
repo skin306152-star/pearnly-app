@@ -80,7 +80,18 @@ def is_already_pushed_error(error_msg: Optional[str]) -> bool:
 def classify_push_status(success: bool, error_msg: Optional[str]) -> str:
     """推送结果 → 单一权威 status(铁律 #12)。
     success → 'success';「发票号已存在」→ 'skipped_dup'(中性·已推送过);其余 → 'failed'。
+
+    Express 出站拉取:它的"推送"= 写待领取队列,不是即时成败。enqueue_express 在
+    error_msg 里带哨兵让这一行落成队列态(单一状态源 · 不另立队列表):
+      EXPRESS_QUEUED   → 'pending'(进队列等本地 Agent lease)
+      EXPRESS_MANUAL:* → 'manual' (低置信/判脏/账套拒 · 留人工)
+    其它 adapter 永不产生这两个哨兵,行为零变化。
     """
+    if not success and error_msg:
+        if "EXPRESS_QUEUED" in error_msg:
+            return "pending"
+        if "EXPRESS_MANUAL" in error_msg:
+            return "manual"
     if success:
         return "success"
     if is_already_pushed_error(error_msg):

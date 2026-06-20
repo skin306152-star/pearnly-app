@@ -78,6 +78,8 @@ PUBLIC_ROUTES = {
     ("POST", "/api/invitations/{token}/accept"),
     # 分享链接(token 即凭证)
     ("GET", "/api/sales/documents/shared/{token}/pdf"),
+    # 本月凭证打包下载(C-1)· token=时效签名(tenant+ws+period+落盘 rel+exp)即凭证 · verify_token 验签
+    ("GET", "/api/purchase/proof-pdf/{token}"),
 }
 
 # 别名/委托:endpoint 把请求原样转发给已守门的实现(委托点注明)。

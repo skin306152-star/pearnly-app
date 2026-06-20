@@ -32,6 +32,7 @@ from services.line_binding import (
     line_client,
     line_expense,
     line_intake,
+    line_proof,
     line_reply,
 )
 
@@ -282,6 +283,10 @@ async def _handle_line_text(
                 line_user_id=line_user_id,
                 tenant_id=tid,
             )
+            return
+        # 本月凭证 PDF 命令(C-1):0 笔回提示·有笔即回「生成中」+异步打包推下载卡。
+        proof_cmd = line_proof.parse_proof_command(text)
+        if proof_cmd and line_proof.start(bound_user, reply_token, line_user_id, lang, proof_cmd):
             return
         # P2D 身份层/模型泄露防护(跑在 L2 大脑前):身份/模型/系统提示/API key/越权问题(且不含业务
         # 指令)→ Pearnly 产品身份层确定性四语回复,不进业务 LLM、不暴露底层供应商/系统信息。含业务

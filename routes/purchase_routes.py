@@ -383,6 +383,26 @@ async def api_delete_attachment(
         return ok({"deleted": True})
 
 
+@router.get("/proof-pdf/{token}")
+async def api_proof_pdf(token: str):
+    """本月凭证打包 PDF 下载(C-1)· token=时效签名(tenant+ws+period+落盘 rel+exp)鉴权,不走登录态。
+
+    token 失效/伪造 → 403;落盘文件缺失 → 404;有效 → attachment 下载。"""
+    from fastapi.responses import FileResponse
+
+    from services.export import proof_pdf
+    from services.ocr import pdf_storage
+
+    body = proof_pdf.verify_token(token)
+    if not body:
+        raise PosError("purchase.unexpected", 403, detail="bad_token")
+    abs_path = pdf_storage.get_pdf_abs_path(body.get("r") or "")
+    if not abs_path or not abs_path.exists():
+        raise PosError("purchase.unexpected", 404, detail="proof_missing")
+    fname = f"proof-{body.get('w')}-{body.get('p')}.pdf"
+    return FileResponse(path=str(abs_path), media_type="application/pdf", filename=fname)
+
+
 @router.get("/summary")
 async def api_summary(
     request: Request,

@@ -445,15 +445,14 @@ def _dup_warn(bound_user, draft, ws) -> bool:
 
 
 def _fill_category(cur, draft, text, tree, tid, ws, api_key=None) -> None:
-    """填 category/subcategory(名+id)。学习词典(越用越省)→ 关键词 → LLM 智能兜底。
-
-    关键词对中文/泰文混输或品名(「水费」「ทุเรียน」)常命不中 → 有 key 时让 LLM 在真实树里挑
-    (懂跨语言+品名),治文字路分类恒空。无 key 才止于关键词。
-    """
+    """填 category/subcategory(名+id)。优先级:用户学习(商户身份键→关键词子串)→ 品名规则 → LLM。
+    商户键从卖家名/文本归一(merchant)查 seller: 键,治文字路「711 水」漏掉「以后『711』都记X」。"""
     from services.expense import conversation
     from services.purchase import intake as intake_svc
 
-    learned = conversation.lookup_learned(cur, tenant_id=tid, workspace_client_id=ws, text=text)
+    learned = conversation.lookup_learned_for_text(
+        cur, tenant_id=tid, workspace_client_id=ws, text=text, vendor=draft.vendor_name or ""
+    )
     if learned and learned["category_id"]:
         draft.category = learned["category_name"]
         draft.category_id = learned["category_id"]

@@ -10,11 +10,13 @@
 from __future__ import annotations
 
 import json
+import logging
 from decimal import Decimal
 from typing import Optional
 
 from services.expense.expense_draft import ExpenseDraft
 
+logger = logging.getLogger(__name__)
 PENDING_TTL_MINUTES = 15
 
 
@@ -139,6 +141,37 @@ def find_exact(cur, *, tenant_id: str, workspace_client_id: int, keyword: str) -
         "category_name": r["category_name"],
         "subcategory_name": r["subcategory_name"],
     }
+
+
+def lookup_learned_for_text(
+    cur, *, tenant_id: str, workspace_client_id: int, text: str, vendor: str = ""
+) -> Optional[dict]:
+    """文字路归类的学习命中(用户学习恒高于品名/商户默认规则)。无命中 → None。
+
+    ① 商户身份键:从卖家名/文本归一出商户(merchant.canonical_merchant)→ 精确查 seller:<归一名>,
+       与图片路 line_ingest._learned_category、与学习按钮存键同一把。治「711 水」漏掉「以后711都记X」
+       —— 子串匹配桥不了 711→7-eleven,品牌归一才能。
+    ② 关键词子串:品名/卖家裸词(lookup_learned)。"""
+    from services.expense import merchant
+
+    try:
+        for src in (vendor, text):
+            canon = merchant.canonical_merchant(src or "", "")
+            if not canon:
+                continue
+            hit = find_exact(
+                cur,
+                tenant_id=tenant_id,
+                workspace_client_id=workspace_client_id,
+                keyword=f"seller:{canon}",
+            )
+            if hit and hit.get("category_id"):
+                return hit
+    except Exception as e:  # noqa: BLE001 — 学习查不到只回落品名/LLM,绝不拖垮记账
+        logger.warning("[conversation] seller-key lookup skipped: %s", str(e)[:160])
+    return lookup_learned(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, text=text
+    )
 
 
 def learn(

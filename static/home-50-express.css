@@ -46,7 +46,94 @@
     justify-content: center;
     padding: 16px;
 }
+/* 双栏宽弹窗(照原型 .wizard:左栏步骤面板 260px + 右栏内容)· 尺寸用 rem 不触 lint */
 .exp-wizard {
+    width: min(65.625rem, 100%);
+    max-height: calc(100vh - 40px);
+    display: grid;
+    grid-template-columns: 16.25rem minmax(0, 1fr);
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 26px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+    overflow: hidden;
+}
+/* 左栏:竖排步骤面板 */
+.exp-wiz-side {
+    background: var(--bg);
+    border-right: 1px solid var(--line);
+    padding: 22px;
+    overflow: auto;
+}
+.exp-wiz-side-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 4px;
+}
+.exp-wiz-side-sub {
+    font-size: 12px;
+    color: var(--ink-3);
+    margin-bottom: 18px;
+}
+.exp-steps {
+    display: grid;
+    gap: 8px;
+}
+.exp-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 13px;
+    color: var(--ink-3);
+}
+.exp-step.active {
+    background: var(--card);
+    color: var(--ink);
+    font-weight: 700;
+}
+.exp-step.done {
+    color: var(--green-700);
+}
+.exp-step-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex: 0 0 auto;
+    background: var(--line2);
+    color: var(--ink-3);
+}
+.exp-step.active .exp-step-num {
+    background: var(--success);
+    color: var(--card);
+}
+.exp-step.done .exp-step-num {
+    background: var(--success-bg);
+    color: var(--green-700);
+}
+.exp-step-label {
+    font-size: 13px;
+}
+/* 右栏:内容 + 底栏 */
+.exp-wiz-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 41rem;
+}
+.exp-wiz-content {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 28px;
+}
+/* DBF 风险弹窗:单栏卡(独立 · 不随 .exp-wizard 变双栏)*/
+.exp-risk-modal {
     background: var(--card);
     border-radius: 14px;
     width: 100%;
@@ -56,47 +143,12 @@
     padding: 22px 24px 20px;
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
 }
+.exp-risk-modal .exp-wiz-title,
 .exp-wiz-title {
     font-size: 17px;
     font-weight: 700;
     color: var(--ink);
     margin-bottom: 14px;
-}
-
-/* 步骤条 */
-.exp-stepper {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 18px;
-    flex-wrap: wrap;
-}
-.exp-step-dot {
-    width: 22px;
-    height: 22px;
-    border-radius: 999px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    font-weight: 600;
-    background: var(--line2);
-    color: var(--ink-3);
-    flex-shrink: 0;
-}
-.exp-step-dot.active {
-    background: var(--success);
-    color: var(--card);
-}
-.exp-step-dot.done {
-    background: var(--success-bg);
-    color: var(--green-800);
-}
-.exp-step-line {
-    flex: 1;
-    height: 2px;
-    min-width: 8px;
-    background: var(--line2);
 }
 
 .exp-step-h {
@@ -345,12 +397,13 @@
     cursor: pointer;
 }
 
-/* 向导底部按钮行 */
-.exp-wiz-foot {
+/* 底栏(照原型 .wizard-footer):左保存草稿 · 右上一步/下一步 */
+.exp-wiz-footer {
+    border-top: 1px solid var(--line);
+    padding: 14px 18px;
     display: flex;
-    gap: 10px;
     justify-content: space-between;
-    margin-top: 16px;
+    gap: 10px;
 }
 .exp-wiz-foot-right {
     display: flex;
@@ -358,12 +411,30 @@
     margin-left: auto;
 }
 
-/* 手机视口 */
+/* 手机/窄屏:双栏降级成单栏(照原型 mobile · 步骤面板转横排可滚)*/
+@media (max-width: 48rem) {
+    .exp-wizard {
+        grid-template-columns: 1fr;
+        max-height: 92vh;
+    }
+    .exp-wiz-side {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+    }
+    .exp-steps {
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(8.5rem, 1fr);
+        overflow-x: auto;
+    }
+    .exp-wiz-main {
+        min-height: 32rem;
+    }
+}
 @media (max-width: 30rem) {
     .exp-method-grid {
         grid-template-columns: 1fr;
     }
-    .exp-wizard {
-        padding: 18px 16px 16px;
+    .exp-wiz-content {
+        padding: 18px 16px;
     }
 }

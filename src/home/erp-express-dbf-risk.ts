@@ -37,7 +37,7 @@
             ov.id = 'exp-dbf-overlay';
             ov.className = 'exp-wiz-overlay';
             ov.innerHTML =
-                '<div class="exp-wizard" role="dialog" aria-modal="true">' +
+                '<div class="exp-risk-modal" role="dialog" aria-modal="true">' +
                 '<div class="exp-wiz-title">' +
                 _esc(_t('exp-dbf-risk-title')) +
                 '</div>' +
@@ -51,7 +51,7 @@
                 '<span>' +
                 _esc(_t('exp-dbf-risk-ack')) +
                 '</span></label>' +
-                '<div class="exp-wiz-foot"><button type="button" class="btn btn-ghost" id="exp-dbf-cancel">' +
+                '<div class="exp-wiz-footer"><button type="button" class="btn btn-ghost" id="exp-dbf-cancel">' +
                 _esc(_t('exp-dbf-risk-back')) +
                 '</button><div class="exp-wiz-foot-right">' +
                 '<button type="button" class="btn btn-primary" id="exp-dbf-accept" disabled>' +

@@ -35,11 +35,16 @@ def _terminal_card(reply_token, state, ref, ws, amount, lang, tid, luid, *, deta
         workspace_client_id=str(ws or ""),
         fields=fields,
     )
-    # 终态卡(已撤销/已丢弃)也是"代表真单据"的卡 → 登记锚点(引用它仍可说「恢复」·06 可引用卡片契约)。
-    sent = line_client.reply_messages_with_meta(reply_token, [card])
-    if not sent:
-        line_reply.reply_messages_context(reply_token, [card], line_user_id=luid, tenant_id=tid)
-    line_booker.anchor_card(sent, tenant_id=tid, ws=ws, line_user_id=luid, doc_id=ref, state=state)
+    # 终态卡(已撤销/已丢弃)也是"代表真单据"的卡 → 出卡口登记锚点(引用它仍可说「恢复」·06)。
+    line_booker.send_doc_card(
+        card,
+        reply_token=reply_token,
+        tenant_id=tid,
+        ws=ws,
+        line_user_id=luid,
+        doc_id=ref,
+        state=state,
+    )
 
 
 def send_terminal(reply_token, *, state, doc_id, ws, amount, lang, tid, luid, detail=None) -> None:
@@ -83,12 +88,16 @@ def _send_posted(cur, reply_token, detail, *, ref, ws, lang, tid, luid) -> None:
     from services.line_binding import line_posted_card
 
     card = line_posted_card.build(detail, doc_id=ref, lang=lang, workspace_client_id=ws)
-    # 登记可引用锚点 + 续接 active_doc(state=posted·anchor_card 设焦点,免再单独 _set_active)。
-    sent = line_client.reply_messages_with_meta(reply_token, [card])
-    if not sent:
-        line_reply.reply_messages_context(reply_token, [card], line_user_id=luid, tenant_id=tid)
-    line_booker.anchor_card(
-        sent, tenant_id=tid, ws=ws, line_user_id=luid, doc_id=ref, state="posted", cur=cur
+    # 出卡口登记锚点 + 续接 active_doc(state=posted·设焦点,免再单独 _set_active)。
+    line_booker.send_doc_card(
+        card,
+        reply_token=reply_token,
+        tenant_id=tid,
+        ws=ws,
+        line_user_id=luid,
+        doc_id=ref,
+        state="posted",
+        cur=cur,
     )
 
 
@@ -133,11 +142,9 @@ def send_state_card_reply(cur, reply_token, *, doc_id, ws, lang, tid, luid) -> b
     )
     if card is None:
         return False
-    sent = line_client.reply_messages_with_meta(reply_token, [card])
-    if not sent:
-        line_reply.reply_messages_context(reply_token, [card], line_user_id=luid, tenant_id=tid)
-    line_booker.anchor_card(
-        sent,
+    line_booker.send_doc_card(
+        card,
+        reply_token=reply_token,
         tenant_id=tid,
         ws=ws,
         line_user_id=luid,

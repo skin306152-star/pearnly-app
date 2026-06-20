@@ -188,36 +188,25 @@ def emit_result_card(
 
 
 def _bind_refs(tenant_id, workspace_client_id, line_user_id, sent, doc_id, state) -> None:
-    """把已发消息 id 绑到 doc(供 quote-reply 精确定位)。无 tenant/doc/消息 → 跳过。"""
-    if not (tenant_id and doc_id and sent):
-        return
-    from services.line_binding import line_message_refs
-
-    line_message_refs.record_safe(
+    """reply / 图片主路发卡后登记锚点 + 焦点(emit_result_card / push_result_card 用)。复用 anchor_card;
+    非活跃态(未知 / 终态)额外清旧焦点(anchor_card 只设不清·不让残留态截后续取消)。"""
+    anchor_card(
+        sent,
         tenant_id=tenant_id,
-        workspace_client_id=workspace_client_id,
+        ws=workspace_client_id,
         line_user_id=line_user_id,
-        message_ids=[m.get("id") for m in sent if m.get("id")],
-        ref_id=doc_id,
+        doc_id=doc_id,
         state=state,
     )
-    # 发卡即把本单设为「当前焦点 / 可改目标」(active 续接·TTL 15min):无需长按引用直接说
-    # 「ร้านเป็น 7-11」即改;裸「取消/删除」也据此锚定到这张卡(06 §2·不再误撤更早的已入账)。
-    # 草稿(confirm)/已入账(posted)/可能重复草稿(dup)都有真 doc 且用户正看着它 → 设焦点;焦点覆盖
-    # 旧续接(等价清旧·不让残留态截后续取消)。未知态才只清不设。best-effort,失败不阻塞回执。
-    if not line_user_id:
-        return
-    import logging
+    if line_user_id and doc_id and state not in ("confirm", "posted", "dup"):
+        import logging
 
-    try:
-        from services.expense import line_correct
+        try:
+            from services.expense import line_correct
 
-        if state in ("confirm", "posted", "dup"):
-            line_correct._set_active(tenant_id, workspace_client_id, doc_id, line_user_id)
-        else:
             line_correct._clear(tenant_id, line_user_id)
-    except Exception:  # noqa: BLE001
-        logging.getLogger(__name__).warning("[line refs] set focus 失败;不阻塞回执")
+        except Exception:  # noqa: BLE001
+            logging.getLogger(__name__).warning("[line refs] clear focus 失败;不阻塞回执")
 
 
 # 单据 status → 卡片 state(锚点/焦点口径):草稿可改 → confirm,已入账 → posted,撤/删 → 终态。
@@ -235,7 +224,7 @@ def anchor_card(sent, *, tenant_id, ws, line_user_id, doc_id, state, cur=None) -
 
     cur 传入(调用方在事务中)→ 用它登记不另开连接;无 cur → record_safe 自开独立事务。终态卡
     (voided/discarded)只登记锚点不动焦点(引用它仍可说「恢复」)。拿不到消息 id → 本次锚点缺
-    (best-effort·绝不阻塞回执)。reply 路登记仍走 emit_result_card 的 _bind_refs(不变)。"""
+    (best-effort·绝不阻塞回执)。多数出卡口走 send_doc_card(发卡 + 登记一步到位)。"""
     import logging
 
     ids = [m.get("id") for m in (sent or []) if m and m.get("id")]
@@ -264,6 +253,37 @@ def anchor_card(sent, *, tenant_id, ws, line_user_id, doc_id, state, cur=None) -
             line_correct._set_active(tenant_id, ws, doc_id, line_user_id, cur=cur)
         except Exception:  # noqa: BLE001
             logging.getLogger(__name__).warning("[line refs] set focus 失败;不阻塞回执")
+
+
+def send_doc_card(
+    card, *, tenant_id, ws, line_user_id, doc_id, state, reply_token="", cur=None
+) -> None:
+    """可引用卡片契约(06)出卡口:发"代表真单据"的卡 + 登记锚点 + 焦点(一步到位·免每处漏登记)。
+
+    reply_token 有 → reply,否则 push;拿 sentMessages id 绑 message_id→doc。拿不到 id → 回落普通
+    发送(卡照显·本次锚点缺·best-effort)。重发卡 / 终态卡 / 入账卡 / 改错重发卡都走它(治
+    2026-06-20 图片/终态卡引用即 ANCHOR_EXPIRED)。"""
+    from services.line_binding import line_client, line_reply
+
+    if reply_token:
+        sent = line_client.reply_messages_with_meta(reply_token, [card])
+        if not sent:
+            line_reply.reply_messages_context(
+                reply_token, [card], line_user_id=line_user_id, tenant_id=tenant_id
+            )
+    else:
+        sent = line_client.push_messages_with_meta(line_user_id, [card])
+        if not sent:
+            line_client.push_messages(line_user_id, [card])
+    anchor_card(
+        sent,
+        tenant_id=tenant_id,
+        ws=ws,
+        line_user_id=line_user_id,
+        doc_id=doc_id,
+        state=state,
+        cur=cur,
+    )
 
 
 def push_result_card(

@@ -96,9 +96,12 @@ function buildErpLogCard(log: any): string {
             ? `<button class="btn btn-sm btn-secondary" data-log-retry="${escapeHtml(log.id)}">${escapeHtml(t('erp-exc-retry'))}</button>`
             : '';
 
+    // 失败摘要:优先友好原因(catalog)· 回落到去掉 ERR_ 码的原始 error_msg(失败卡始终有摘要)
+    const rawReason = (log.error_msg || '').replace(/^ERR_[A-Z0-9_]+:?\s*/, '').trim();
+    const reasonText = friendlyReason || rawReason;
     const reasonStrip =
-        statusClass === 'fail' && friendlyReason
-            ? `<div class="erp-log-reason"><b>${escapeHtml(t('erp-log-fail-summary'))}</b><span>${escapeHtml(friendlyReason)}</span></div>`
+        statusClass === 'fail' && reasonText
+            ? `<div class="erp-log-reason"><b>${escapeHtml(t('erp-log-fail-summary'))}</b><span>${escapeHtml(reasonText)}</span></div>`
             : '';
 
     return `

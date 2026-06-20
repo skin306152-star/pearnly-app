@@ -33,45 +33,48 @@ async function copyErpDocNo(docNo: any) {
 }
 
 async function showLogDetail(logId: any) {
-    // v0.10 · 立即弹窗显示 loading · 再请求
-    const modal = document.createElement('div');
-    modal.className = 'log-detail-modal';
-    modal.innerHTML = `
-        <div class="log-detail-box">
-            <div class="log-detail-loading">${escapeHtml(t('log-detail-loading'))}</div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-    modal.addEventListener('click', async (e) => {
-        if (
-            e.target === modal ||
-            (e.target as HTMLElement).classList.contains('log-detail-close')
-        ) {
-            modal.remove();
+    // 销项重做:推送详情从居中 modal → 右侧抽屉 + 推送轨迹 timeline(对齐草稿)
+    const overlay = document.createElement('div');
+    overlay.className = 'erp-detail-overlay';
+    const drawer = document.createElement('aside');
+    drawer.className = 'erp-detail-drawer';
+    drawer.innerHTML = `<div class="erp-detail-body"><div class="log-detail-loading">${escapeHtml(t('log-detail-loading'))}</div></div>`;
+    document.body.appendChild(overlay);
+    document.body.appendChild(drawer);
+    requestAnimationFrame(() => {
+        overlay.classList.add('show');
+        drawer.classList.add('show');
+    });
+    const closeAll = () => {
+        overlay.remove();
+        drawer.remove();
+    };
+    overlay.addEventListener('click', closeAll);
+    drawer.addEventListener('click', async (e) => {
+        const tgt = e.target as HTMLElement;
+        if (tgt.closest('.erp-detail-close')) {
+            closeAll();
             return;
         }
-        // 临时任务 (Zihao 2026-05-26) · 凭证弹窗里的复制 ERP 单号
-        const copyEl = (e.target as HTMLElement).closest(
-            '[data-receipt-copy]'
-        ) as HTMLElement | null;
+        const copyEl = tgt.closest('[data-receipt-copy]') as HTMLElement | null;
         if (copyEl) {
             copyErpDocNo(copyEl.dataset.receiptCopy);
             return;
         }
-        // 失败态建议动作 · 跳转后关弹窗
-        const actEl = (e.target as HTMLElement).closest(
-            '[data-receipt-action]'
-        ) as HTMLElement | null;
+        const actEl = tgt.closest('[data-receipt-action]') as HTMLElement | null;
         if (actEl) {
             const act = actEl.dataset.receiptAction;
-            if (act === 'retry') {
-                window.retryPushLog!(actEl.dataset.logId);
-            } else if (act === 'exceptions') {
+            if (act === 'copy-err') {
+                copyErpDocNo(actEl.dataset.errText);
+                return;
+            }
+            if (act === 'retry') window.retryPushLog!(actEl.dataset.logId);
+            else if (act === 'exceptions') {
                 if (typeof routeTo === 'function') routeTo('exceptions');
-            } else if (act === 'mappings') {
+            } else if (act === 'mappings' || act === 'source') {
                 if (typeof routeTo === 'function') routeTo('integrations');
             }
-            modal.remove();
+            closeAll();
             return;
         }
     });
@@ -81,7 +84,7 @@ async function showLogDetail(logId: any) {
             headers: { Authorization: 'Bearer ' + token },
         });
         if (!resp.ok) {
-            modal.remove();
+            closeAll();
             return;
         }
         const log = await resp.json();
@@ -128,7 +131,6 @@ async function showLogDetail(logId: any) {
 
         // 通用 ERP 单号字段(后端日志 API 派生 · 不写死 MR.ERP)
         const extDocNo = (log.external_doc_no || '').trim();
-        const extUrl = (log.external_url || '').trim();
         const extHint = (log.external_doc_hint || '').trim();
 
         // 发票买方(OCR 真买方名优先 · 退回已归属 client_name)+ 卖家 + 金额格式化
@@ -194,14 +196,6 @@ async function showLogDetail(logId: any) {
             escapeHtml((log.elapsed_ms != null ? log.elapsed_ms : '-') + 'ms')
         );
 
-        // 主操作按钮:有 external_url → 打开 ERP;否则有单号 → 复制 ERP 单号
-        let primaryActionHtml = '';
-        if (isOk && extUrl) {
-            primaryActionHtml = `<a class="erp-receipt-primary-btn" href="${escapeHtml(extUrl)}" target="_blank" rel="noopener">${escapeHtml(t('erp-receipt-open-erp'))}</a>`;
-        } else if (isOk && extDocNo) {
-            primaryActionHtml = `<button class="erp-receipt-primary-btn" type="button" data-receipt-copy="${escapeHtml(extDocNo)}">${escapeHtml(t('erp-receipt-copy-docno'))}</button>`;
-        }
-
         // adapter 专属提示(MR.ERP:去哪搜单号)· 仅成功 + 有单号 + 提示码时显示
         let hintHtml = '';
         if (isOk && extDocNo && extHint) {
@@ -254,44 +248,66 @@ async function showLogDetail(logId: any) {
                 <div class="erp-receipt-actions">${actionBtns.join('')}</div>`;
         }
 
-        modal.querySelector('.log-detail-box')!.innerHTML = `
-            <div class="log-detail-head">
-                <div class="log-detail-title">
-                    <span class="log-detail-status-icon ${isOk ? 'ok' : 'fail'}">${summaryIcon}</span>
-                    ${escapeHtml(summaryText)}
-                    <span class="log-tag ${log.trigger}">${escapeHtml(triggerText)}</span>
-                </div>
-                <button class="log-detail-close" type="button">✕</button>
+        const typeLabel = isIdCard ? t('erp-log-type-idcard') : t('erp-log-type-invoice');
+        const isRetrying2 =
+            log.status === 'failed' &&
+            log.next_retry_at &&
+            new Date(log.next_retry_at).getTime() > Date.now() - 60000;
+        // 推送轨迹(诚实:库里只有 创建/状态/重试次数 · 不伪造逐步事件)
+        const tlItem = (cls: string, dot: string, title: string, sub: string) =>
+            `<div class="erp-tl-row ${cls}"><div class="erp-tl-dot">${dot}</div><div class="erp-tl-copy"><b>${escapeHtml(title)}</b><span>${escapeHtml(sub)}</span></div></div>`;
+        const tl: string[] = [];
+        tl.push(tlItem('ok', '✓', t('erp-tl-created'), time));
+        tl.push(tlItem(isOk ? 'ok' : 'mid', '↗', t('erp-tl-pushed'), epName + ' · ' + triggerText));
+        if (isOk) tl.push(tlItem('ok', '✓', t('erp-tl-ok'), 'HTTP ' + (log.http_status || '200')));
+        else if (isRetrying2)
+            tl.push(
+                tlItem('mid', '↻', t('erp-tl-retrying'), t('erp-retry-attempt', { n: log.retry_count || 0, max: log.max_retries || 3 }))
+            );
+        else tl.push(tlItem('fail', '✗', t('erp-tl-fail'), 'HTTP ' + (log.http_status || '—')));
+
+        const foot = `<div class="erp-detail-foot">
+            ${!isOk && log.error_msg ? `<button class="btn btn-ghost" type="button" data-receipt-action="copy-err" data-err-text="${escapeHtml((log.error_msg || '').slice(0, 500))}">${escapeHtml(t('erp-detail-copy-err'))}</button>` : ''}
+            <button class="btn btn-ghost" type="button" data-receipt-action="source">${escapeHtml(t('erp-detail-open-source'))}</button>
+            ${log.history_id && log.endpoint_id ? `<button class="btn btn-primary" type="button" data-receipt-action="retry" data-log-id="${escapeHtml(log.id)}">${escapeHtml(t('erp-receipt-act-retry'))}</button>` : ''}
+        </div>`;
+
+        const cell = (label: string, val: string) =>
+            `<div class="erp-detail-cell"><label>${escapeHtml(label)}</label><strong>${escapeHtml(val)}</strong></div>`;
+
+        drawer.querySelector('.erp-detail-body')!.innerHTML = `
+            <div class="erp-detail-head">
+                <div class="erp-detail-title"><span class="log-detail-status-icon ${isOk ? 'ok' : 'fail'}">${summaryIcon}</span>${escapeHtml(summaryText)}</div>
+                <button class="erp-detail-close" type="button">✕</button>
             </div>
-
-            <div class="erp-receipt-body">
-                ${rowsHtml.join('')}
+            <div class="erp-detail-scroll">
+                <section class="erp-detail-sec">
+                    <h3>${escapeHtml(t('erp-detail-sec-basic'))}</h3>
+                    <div class="erp-detail-grid">
+                        ${cell(isIdCard ? t('erp-log-col-booking') : t('erp-receipt-invoice-no'), log.invoice_no || '-')}
+                        ${cell(t('erp-detail-f-type'), typeLabel)}
+                        ${cell(t('erp-receipt-erp-name'), epName)}
+                        ${cell(t('erp-detail-f-trigger'), triggerText)}
+                        ${cell(t('erp-receipt-time'), time)}
+                        ${cell(t('erp-receipt-elapsed'), (log.elapsed_ms != null ? log.elapsed_ms : '-') + 'ms')}
+                    </div>
+                </section>
+                <section class="erp-detail-sec">
+                    <h3>${escapeHtml(t('erp-detail-sec-timeline'))}</h3>
+                    <div class="erp-detail-timeline">${tl.join('')}</div>
+                </section>
+                ${isOk && extDocNo ? `<section class="erp-detail-sec"><h3>${escapeHtml(t('erp-receipt-doc-no'))}</h3><div class="erp-detail-docno"><strong>${escapeHtml(extDocNo)}</strong><button class="erp-receipt-copy-btn" type="button" data-receipt-copy="${escapeHtml(extDocNo)}">${escapeHtml(t('erp-receipt-copy-btn'))}</button></div>${hintHtml}</section>` : ''}
+                ${failBlockHtml ? `<section class="erp-detail-sec">${failBlockHtml}</section>` : ''}
+                <section class="erp-detail-sec">
+                    <h3>${escapeHtml(t('erp-receipt-tech-toggle'))}</h3>
+                    <pre class="erp-detail-code">${escapeHtml('HTTP ' + (log.http_status || '-') + ' · ' + (log.elapsed_ms != null ? log.elapsed_ms + 'ms' : '-') + '\n\nREQUEST\n' + reqJson + '\n\nRESPONSE\n' + respDisplay)}</pre>
+                </section>
             </div>
-
-            ${hintHtml}
-            ${primaryActionHtml ? `<div class="erp-receipt-primary-wrap">${primaryActionHtml}</div>` : ''}
-            ${failBlockHtml}
-
-            <details class="log-detail-collapsible">
-                <summary>${escapeHtml(t('erp-receipt-tech-toggle'))}</summary>
-                <div class="log-detail-meta" style="margin-top:8px;">
-                    <span>HTTP ${log.http_status || '-'}</span>
-                    <span>${log.elapsed_ms}ms</span>
-                    <span>${escapeHtml(t('log-detail-attempt', { n: log.attempt || 1 }))}</span>
-                </div>
-                <div class="log-detail-section" style="margin-top:12px;">
-                    <div class="log-detail-label">${escapeHtml(t('log-detail-request-human'))}</div>
-                    <pre>${escapeHtml(reqJson)}</pre>
-                </div>
-                <div class="log-detail-section">
-                    <div class="log-detail-label">${escapeHtml(t('log-detail-response-human'))}</div>
-                    <pre>${escapeHtml(respDisplay)}</pre>
-                </div>
-            </details>
+            ${foot}
         `;
     } catch (e) {
         console.error(e);
-        modal.remove();
+        closeAll();
     }
 }
 

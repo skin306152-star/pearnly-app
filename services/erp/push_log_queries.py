@@ -334,6 +334,7 @@ def list_push_exceptions(
     adapter: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
+    push_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     """ERP 推送异常队列(派生自 erp_push_logs · 铁律 #12 单一状态源,不另立异常表)。
 
@@ -422,21 +423,29 @@ def list_push_exceptions(
     if ad:
         base = [r for r in base if (r.get("endpoint_adapter") or "").lower() == ad]
 
-    # 3) category 计数(搜索后 · 过滤前 → chip 显当前搜索范围内各子类数)
+    # 3) category 计数 + 身份证订车(push_type)计数(搜索后 · 过滤前 → 统计卡显当前范围各类数)
     categories: Dict[str, int] = {}
     for r in base:
         c = r.get("category") or "other"
         categories[c] = categories.get(c, 0) + 1
+    id_card_count = sum(1 for r in base if r.get("push_type") == "id_card")
 
-    # 4) category 过滤 + 按时间倒序 + 分页
+    # 4) category / push_type 过滤 + 按时间倒序 + 分页
     if category:
         base = [r for r in base if (r.get("category") or "other") == category]
+    if push_type:
+        base = [r for r in base if r.get("push_type") == push_type]
     base.sort(key=lambda r: r.get("created_at") or "", reverse=True)
     total = len(base)
     off = max(0, int(offset or 0))
     lim = max(1, min(int(limit or 50), 200))
     page = base[off : off + lim]
-    return {"items": page, "total": total, "categories": categories}
+    return {
+        "items": page,
+        "total": total,
+        "categories": categories,
+        "id_card_count": id_card_count,
+    }
 
 
 def get_push_stats_today(user_id: str) -> Dict[str, Any]:

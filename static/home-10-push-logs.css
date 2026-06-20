@@ -207,6 +207,16 @@
     font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 9px; line-height: 1.6;
     padding: 11px; white-space: pre-wrap; word-break: break-all; margin: 0; max-height: 240px; overflow: auto;
 }
+/* 建议处理(草稿对齐 · 建议文案框 · 不是按钮) */
+.erp-detail-advice {
+    border: 1px solid var(--accent-soft);
+    background: var(--accent-soft);
+    border-radius: 12px;
+    padding: 11px 13px;
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--ink-2);
+}
 .erp-detail-foot {
     border-top: 1px solid var(--line); padding: 12px 18px; flex: 0 0 auto;
     display: flex; justify-content: flex-end; gap: 8px; background: var(--card);

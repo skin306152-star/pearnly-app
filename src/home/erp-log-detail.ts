@@ -148,8 +148,6 @@ async function showLogDetail(logId: any) {
             });
         }
 
-        const summaryText = isOk ? t('erp-receipt-title-ok') : t('erp-receipt-title-fail');
-        const summaryIcon = isOk ? '✓' : '✗';
 
         // 凭证主体:一行一项 key-value(label 固定宽 · value 自适应 · 见 .erp-receipt-row CSS)
         const rowsHtml: string[] = [];
@@ -208,44 +206,32 @@ async function showLogDetail(logId: any) {
             }
         }
 
-        // 失败态:错误码 + 友好原因 + 建议动作
+        // 失败态:错误码 + 友好原因(只放「失败原因」框)· 建议处理改成建议文案(草稿对齐)·
+        // 动作按钮统一收到抽屉页脚(复制错误/查看原始单据/重新推送)· 不再塞进建议处理区。
         let failBlockHtml = '';
+        let adviceText = '';
         if (!isOk) {
             const errCodeMatch = (log.error_msg || '').match(/ERR_[A-Z0-9_]+/);
             const errCode = errCodeMatch ? errCodeMatch[0] : '';
-            // P2-C (B7) · 优先后端 4 语友好原因(不裸透泰文)· 没命中再回退 humanizeError(网络错误)
             const _efLang =
                 (typeof currentLang === 'string' && currentLang) || window._currentLang || 'th';
             const _ef = log.error_friendly && log.error_friendly[_efLang];
             const friendly =
                 _ef || (log.error_msg ? humanizeError(log.error_msg) : t('erp-receipt-no-error'));
             const isMappingErr =
-                /ERR_NO_CUSTOMER_MAPPING|ERR_NO_CLIENT|ERR_NO_SEED_CUSTOMER|ERR_NO_SEED_PRODUCT/.test(
+                /ERR_NO_CUSTOMER_MAPPING|ERR_NO_CLIENT|ERR_NO_SEED_CUSTOMER|ERR_NO_SEED_PRODUCT|ERR_PRODUCT_NAME_MISMATCH|ERR_CUSTOMER_NAME_MISMATCH/.test(
                     log.error_msg || ''
                 );
-            const canRetry = !!(log.history_id && log.endpoint_id);
-            const actionBtns = [];
-            actionBtns.push(
-                `<button class="erp-receipt-action-btn" type="button" data-receipt-action="exceptions">${escapeHtml(t('erp-receipt-act-exceptions'))}</button>`
-            );
-            if (isMappingErr) {
-                actionBtns.push(
-                    `<button class="erp-receipt-action-btn" type="button" data-receipt-action="mappings">${escapeHtml(t('erp-receipt-act-mapping'))}</button>`
-                );
-            }
-            if (canRetry) {
-                actionBtns.push(
-                    `<button class="erp-receipt-action-btn primary" type="button" data-receipt-action="retry" data-log-id="${escapeHtml(log.id)}">${escapeHtml(t('erp-receipt-act-retry'))}</button>`
-                );
-            }
+            adviceText = isIdCard
+                ? t('erp-detail-advice-dms')
+                : isMappingErr
+                  ? t('erp-detail-advice-mapping')
+                  : t('erp-detail-advice-generic');
             failBlockHtml = `
-                <div class="erp-receipt-fail-reason-label">${escapeHtml(t('erp-receipt-fail-reason'))}</div>
                 <div class="erp-receipt-fail-box">
                     ${errCode ? `<div class="erp-receipt-errcode">${escapeHtml(errCode)}</div>` : ''}
                     <div class="erp-receipt-friendly">${escapeHtml(friendly)}</div>
-                </div>
-                <div class="erp-receipt-actions-label">${escapeHtml(t('erp-receipt-suggest'))}</div>
-                <div class="erp-receipt-actions">${actionBtns.join('')}</div>`;
+                </div>`;
         }
 
         const typeLabel = isIdCard ? t('erp-log-type-idcard') : t('erp-log-type-invoice');
@@ -253,18 +239,28 @@ async function showLogDetail(logId: any) {
             log.status === 'failed' &&
             log.next_retry_at &&
             new Date(log.next_retry_at).getTime() > Date.now() - 60000;
-        // 推送轨迹(诚实:库里只有 创建/状态/重试次数 · 不伪造逐步事件)
+        // 推送轨迹 · 诚实多步:数据里有的步骤就显,没有就退通用三步(不伪造)。
+        // 身份证订车(DMS):创建 → 客户资料写入(有 customer_id 才显)→ 订单创建。
         const tlItem = (cls: string, dot: string, title: string, sub: string) =>
             `<div class="erp-tl-row ${cls}"><div class="erp-tl-dot">${dot}</div><div class="erp-tl-copy"><b>${escapeHtml(title)}</b><span>${escapeHtml(sub)}</span></div></div>`;
         const tl: string[] = [];
-        tl.push(tlItem('ok', '✓', t('erp-tl-created'), time));
-        tl.push(tlItem(isOk ? 'ok' : 'mid', '↗', t('erp-tl-pushed'), epName + ' · ' + triggerText));
-        if (isOk) tl.push(tlItem('ok', '✓', t('erp-tl-ok'), 'HTTP ' + (log.http_status || '200')));
-        else if (isRetrying2)
-            tl.push(
-                tlItem('mid', '↻', t('erp-tl-retrying'), t('erp-retry-attempt', { n: log.retry_count || 0, max: log.max_retries || 3 }))
-            );
-        else tl.push(tlItem('fail', '✗', t('erp-tl-fail'), 'HTTP ' + (log.http_status || '—')));
+        tl.push(tlItem('ok', '✓', t('erp-tl-created'), time + ' · ' + t('erp-tl-created-sub')));
+        const rb = (log.request_body || {}) as Record<string, unknown>;
+        const dmsCustId = rb.customer_id || rb.dms_customer_id;
+        if (isIdCard && dmsCustId) {
+            // 客户写入步骤(数据里有 customer_id 才显)
+            tl.push(tlItem('ok', '✓', t('erp-tl-customer-ok'), t('erp-tl-dms-customer', { id: String(dmsCustId) })));
+            if (isOk) tl.push(tlItem('ok', '✓', t('erp-tl-order-ok'), t('erp-tl-ok')));
+            else if (isRetrying2)
+                tl.push(tlItem('mid', '↻', t('erp-tl-retrying'), t('erp-retry-attempt', { n: log.retry_count || 0, max: log.max_retries || 3 })));
+            else tl.push(tlItem('fail', '✗', t('erp-tl-order-fail'), 'HTTP ' + (log.http_status || '—')));
+        } else {
+            tl.push(tlItem(isOk ? 'ok' : 'mid', '↗', t('erp-tl-pushed'), epName + ' · ' + triggerText));
+            if (isOk) tl.push(tlItem('ok', '✓', t('erp-tl-ok'), 'HTTP ' + (log.http_status || '200')));
+            else if (isRetrying2)
+                tl.push(tlItem('mid', '↻', t('erp-tl-retrying'), t('erp-retry-attempt', { n: log.retry_count || 0, max: log.max_retries || 3 })));
+            else tl.push(tlItem('fail', '✗', t('erp-tl-fail'), 'HTTP ' + (log.http_status || '—')));
+        }
 
         const foot = `<div class="erp-detail-foot">
             ${!isOk && log.error_msg ? `<button class="btn btn-ghost" type="button" data-receipt-action="copy-err" data-err-text="${escapeHtml((log.error_msg || '').slice(0, 500))}">${escapeHtml(t('erp-detail-copy-err'))}</button>` : ''}
@@ -277,19 +273,19 @@ async function showLogDetail(logId: any) {
 
         drawer.querySelector('.erp-detail-body')!.innerHTML = `
             <div class="erp-detail-head">
-                <div class="erp-detail-title"><span class="log-detail-status-icon ${isOk ? 'ok' : 'fail'}">${summaryIcon}</span>${escapeHtml(summaryText)}</div>
+                <div class="erp-detail-title">${escapeHtml(t('erp-detail-title'))}</div>
                 <button class="erp-detail-close" type="button">✕</button>
             </div>
             <div class="erp-detail-scroll">
                 <section class="erp-detail-sec">
                     <h3>${escapeHtml(t('erp-detail-sec-basic'))}</h3>
                     <div class="erp-detail-grid">
-                        ${cell(isIdCard ? t('erp-log-col-booking') : t('erp-receipt-invoice-no'), log.invoice_no || '-')}
+                        ${cell(t('erp-detail-f-task'), (isIdCard ? typeLabel + ' · ' : '') + (log.invoice_no || '-'))}
                         ${cell(t('erp-detail-f-type'), typeLabel)}
-                        ${cell(t('erp-receipt-erp-name'), epName)}
+                        ${cell(t('erp-log-col-target'), epName)}
                         ${cell(t('erp-detail-f-trigger'), triggerText)}
-                        ${cell(t('erp-receipt-time'), time)}
-                        ${cell(t('erp-receipt-elapsed'), (log.elapsed_ms != null ? log.elapsed_ms : '-') + 'ms')}
+                        ${cell(t('erp-detail-f-start'), time)}
+                        ${cell(t('erp-detail-f-total'), (log.elapsed_ms != null ? log.elapsed_ms : '-') + 'ms')}
                     </div>
                 </section>
                 <section class="erp-detail-sec">
@@ -297,7 +293,8 @@ async function showLogDetail(logId: any) {
                     <div class="erp-detail-timeline">${tl.join('')}</div>
                 </section>
                 ${isOk && extDocNo ? `<section class="erp-detail-sec"><h3>${escapeHtml(t('erp-receipt-doc-no'))}</h3><div class="erp-detail-docno"><strong>${escapeHtml(extDocNo)}</strong><button class="erp-receipt-copy-btn" type="button" data-receipt-copy="${escapeHtml(extDocNo)}">${escapeHtml(t('erp-receipt-copy-btn'))}</button></div>${hintHtml}</section>` : ''}
-                ${failBlockHtml ? `<section class="erp-detail-sec">${failBlockHtml}</section>` : ''}
+                ${failBlockHtml ? `<section class="erp-detail-sec"><h3>${escapeHtml(t('erp-receipt-fail-reason'))}</h3>${failBlockHtml}</section>` : ''}
+                ${adviceText ? `<section class="erp-detail-sec"><h3>${escapeHtml(t('erp-receipt-suggest'))}</h3><div class="erp-detail-advice">${escapeHtml(adviceText)}</div></section>` : ''}
                 <section class="erp-detail-sec">
                     <h3>${escapeHtml(t('erp-receipt-tech-toggle'))}</h3>
                     <pre class="erp-detail-code">${escapeHtml('HTTP ' + (log.http_status || '-') + ' · ' + (log.elapsed_ms != null ? log.elapsed_ms + 'ms' : '-') + '\n\nREQUEST\n' + reqJson + '\n\nRESPONSE\n' + respDisplay)}</pre>

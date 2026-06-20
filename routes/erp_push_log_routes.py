@@ -267,6 +267,7 @@ async def erp_exceptions(
     adapter: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
+    push_type: Optional[str] = None,
 ):
     """ERP 推送异常队列(Zihao 2026-05-26)· 派生自 erp_push_logs(铁律 #12 单一源)。
 
@@ -284,6 +285,7 @@ async def erp_exceptions(
         adapter=adapter,
         limit=min(limit, 200),
         offset=max(0, offset),
+        push_type=push_type if push_type in ("id_card", "invoice") else None,
     )
 
 

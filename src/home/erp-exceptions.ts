@@ -33,10 +33,12 @@ let _erpExcState: {
     items: ErpExcItem[];
     q: string;
     cat: string;
+    pushType: string;
     adapter: string;
     selected: Set<string>;
     total: number;
     categories: Record<string, number>;
+    idCardCount: number;
     pageSize: number;
     loading: boolean;
     focusSearch: boolean;
@@ -45,10 +47,12 @@ let _erpExcState: {
     items: [],
     q: '',
     cat: '',
+    pushType: '', // 身份证订车失败统计卡筛选(push_type=id_card)
     adapter: '', // DMS 闭环修正(Zihao 2026-06-01)· 异常栏与推送日志同理:ERP 系统下拉筛选
     selected: new Set(),
     total: 0,
     categories: {},
+    idCardCount: 0,
     pageSize: 30,
     loading: false,
     focusSearch: false,
@@ -96,7 +100,7 @@ function renderErpExceptions() {
     const st = _erpExcState;
     // 真正空(无异常 + 无任何筛选)→ 隐藏整块;搜索/分类/ERP 筛选 0 结果 → 仍渲染面板
     // (留下拉/搜索/统计卡 + 空态文案)· 否则选了空 ERP 会把能切回去的下拉也藏掉 → 困死。
-    const show = st.total > 0 || !!st.q || !!st.cat || !!st.adapter;
+    const show = st.total > 0 || !!st.q || !!st.cat || !!st.adapter || !!st.pushType;
     if (!show) {
         block.hidden = true;
         block.innerHTML = '';
@@ -104,18 +108,25 @@ function renderErpExceptions() {
     }
     block.hidden = false;
 
-    // 分类统计卡(草稿对齐 · 计数来自后端当前搜索范围 · 点击按分类筛选)
+    // 统计卡(草稿对齐 · 固定 4 张:全部异常 / 商品不符 / 客户不符 / 身份证订车失败)·
+    // 计数来自后端当前搜索范围 · 点击按 category 或 push_type 筛选 · 各卡专属说明文案。
     const cats = st.categories || {};
     const allCount = Object.keys(cats).reduce((s, k) => s + cats[k], 0);
-    const statEntries: Array<[string, number]> = [['', allCount]];
-    Object.keys(cats).forEach((c) => statEntries.push([c, cats[c]]));
-    const chipsHtml = statEntries
+    const customerCount = (cats.customer_mismatch || 0) + (cats.no_client || 0);
+    // [label, num, sub, cat, kind, active]
+    const stats: Array<[string, number, string, string, string, boolean]> = [
+        [t('erp-exc-stat-all'), allCount, t('erp-exc-stat-sub-all'), '', '', !st.cat && !st.pushType],
+        [t('erp-exc-cat-product_mismatch'), cats.product_mismatch || 0, t('erp-exc-stat-sub-product'), 'product_mismatch', '', st.cat === 'product_mismatch'],
+        [t('erp-exc-cat-customer_mismatch'), customerCount, t('erp-exc-stat-sub-customer'), 'customer_mismatch', '', st.cat === 'customer_mismatch'],
+        [t('erp-exc-stat-dms'), st.idCardCount || 0, t('erp-exc-stat-sub-dms'), '', 'id_card', st.pushType === 'id_card'],
+    ];
+    const chipsHtml = stats
         .map(
-            ([c, n]) =>
-                `<button class="erp-exc-stat ${st.cat === c ? 'active' : ''}" data-erpexc-cat="${escapeHtml(c)}">` +
-                `<span class="erp-exc-stat-label">${escapeHtml(c === '' ? t('erp-exc-cat-all') : t('erp-exc-cat-' + c))}</span>` +
-                `<span class="erp-exc-stat-num">${n}</span>` +
-                `<span class="erp-exc-stat-sub">${escapeHtml(t('erp-exc-stat-pending'))}</span></button>`
+            ([label, num, sub, cat, kind, active]) =>
+                `<button class="erp-exc-stat ${active ? 'active' : ''}" data-erpexc-cat="${escapeHtml(cat)}" data-erpexc-kind="${escapeHtml(kind)}">` +
+                `<span class="erp-exc-stat-label">${escapeHtml(label)}</span>` +
+                `<span class="erp-exc-stat-num">${num}</span>` +
+                `<span class="erp-exc-stat-sub">${escapeHtml(sub)}</span></button>`
         )
         .join('');
 
@@ -139,8 +150,11 @@ function renderErpExceptions() {
                 icoLetter = 'C';
                 icoCls = 'customer';
             }
-            const typeLbl = isId ? t('erp-log-type-idcard') : t('erp-log-type-invoice');
-            const sub = typeLbl + (it.endpoint_name ? ' · ' + it.endpoint_name : '');
+            // 副行:身份证订车显「客户:姓名 · 端点」(seller_name 即客户名)· 发票显「发票推送 · 端点」
+            const ep = it.endpoint_name ? ' · ' + it.endpoint_name : '';
+            const sub = isId
+                ? t('erp-log-col-customer') + '：' + (it.seller_name || '—') + ep
+                : t('erp-log-type-invoice') + ep;
             const canFix =
                 !isId && (cat === 'product_mismatch' || cat === 'customer_mismatch' || cat === 'no_client');
             const fixLbl = cat === 'product_mismatch' ? t('erp-exc-fix-product') : t('erp-exc-fix-customer');
@@ -148,7 +162,7 @@ function renderErpExceptions() {
             <span class="erp-exc-card-cb"><input type="checkbox" class="erp-exc-cb" data-erpexc-cb="${escapeHtml(it.id)}" ${checked}></span>
             <div class="erp-exc-card-icon ${icoCls}">${icoLetter}</div>
             <div class="erp-exc-card-main"><b title="${escapeHtml(it.invoice_no || '')}">${escapeHtml(it.invoice_no || '—')}</b><span>${escapeHtml(sub)}</span></div>
-            <div class="erp-exc-card-reason"><label>${escapeHtml(t('erp-exc-f-reason'))}</label><p title="${escapeHtml(reason)}${it.error_code ? ' (' + escapeHtml(it.error_code) + ')' : ''}">${escapeHtml(reason)}</p></div>
+            <div class="erp-exc-card-reason"><label>${escapeHtml(t('erp-receipt-fail-reason'))}</label><p title="${escapeHtml(reason)}${it.error_code ? ' (' + escapeHtml(it.error_code) + ')' : ''}">${escapeHtml(reason)}</p></div>
             <div class="erp-exc-card-act">
                 ${canFix ? `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-fix="${escapeHtml(it.id)}">${escapeHtml(fixLbl)}</button>` : ''}
                 <button class="btn btn-sm btn-primary" type="button" data-erpexc-retry="${escapeHtml(it.id)}">${escapeHtml(t('erp-exc-retry'))}</button>
@@ -217,10 +231,11 @@ function renderErpExceptions() {
             st.focusSearch = false;
         });
     }
-    // 分类统计卡(点击按分类筛选)
+    // 统计卡(点击按 category 或 push_type 筛选 · 互斥)
     block.querySelectorAll('.erp-exc-stat').forEach((btn) => {
         btn.addEventListener('click', () => {
             st.cat = (btn as HTMLElement).dataset.erpexcCat || '';
+            st.pushType = (btn as HTMLElement).dataset.erpexcKind || '';
             loadErpExceptions(false);
         });
     });
@@ -406,6 +421,7 @@ async function loadErpExceptions(append?: boolean) {
         const params = new URLSearchParams();
         if (_erpExcState.q) params.set('q', _erpExcState.q);
         if (_erpExcState.cat) params.set('category', _erpExcState.cat);
+        if (_erpExcState.pushType) params.set('push_type', _erpExcState.pushType);
         if (_erpExcState.adapter) params.set('adapter', _erpExcState.adapter);
         params.set('limit', String(_erpExcState.pageSize));
         params.set('offset', String(append ? _erpExcState.items.length : 0));
@@ -423,6 +439,7 @@ async function loadErpExceptions(append?: boolean) {
         _erpExcState.items = append ? _erpExcState.items.concat(newItems) : newItems;
         _erpExcState.total = data.total || 0;
         _erpExcState.categories = data.categories || {};
+        _erpExcState.idCardCount = data.id_card_count || 0;
         renderErpExceptions();
     } catch (e) {
         if (!append) block.hidden = true;

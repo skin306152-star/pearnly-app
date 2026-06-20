@@ -202,6 +202,8 @@ interface Window {
     injectHistoryPushButton?: () => void;
     // history-list 暴露:汇总卡/状态·来源下拉/上传按钮绑定(drawer init 调一次)
     initHistoryFilters?: () => void;
+    // erp-log-card 暴露:单条推送日志渲染成草稿卡片
+    buildErpLogCard?: (log: unknown) => string;
     // history-drawer-tabs 暴露:抽屉重排成 4-tab + 汇总条(openHistoryDrawer 调一次)
     historizeDrawer?: (detail: { [k: string]: unknown }) => void;
     // ── C5 批9 桥(exceptions / erp / recon / workspace / ocr-doc-mode 等遗留边界)──

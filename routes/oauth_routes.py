@@ -70,17 +70,18 @@ def _oauth_state_secret() -> bytes:
 # 在系统浏览器里 Google 登录才合规。ext=1 守卫:外开后 UA 不再含 Line/ 且带 ext → 不二次突围。
 # 仅针对 Google;LINE Login 在 LINE 内置浏览器本就合规,无需突围。
 # ============================================================
-_PEARNLY_BASE = os.getenv("PEARNLY_BASE_URL", "https://pearnly.com").rstrip("/")
+# base url 取值对齐同范式(line_proof._base_url / pos_auth._pos_base_url):用 `or` 而非
+# getenv 默认值,这样 PEARNLY_BASE_URL 设为空串时仍回落到 pearnly.com(不致空 base)。
+_PEARNLY_BASE = (os.getenv("PEARNLY_BASE_URL") or "https://pearnly.com").rstrip("/")
 
 
 def _is_line_inapp(ua: str) -> bool:
     return "Line/" in (ua or "")
 
 
-def _external_browser_breakout(start_path: str) -> HTMLResponse:
-    url = f"{_PEARNLY_BASE}{start_path}?ext=1&openExternalBrowser=1"
-    safe = json.dumps(url)
-    return HTMLResponse(f"""<!doctype html>
+# 突围页内容在 import 时即完全确定(base + 固定入口)→ 预构建一次,冷登录路径不重复渲染。
+_BREAKOUT_URL = json.dumps(f"{_PEARNLY_BASE}/api/auth/google/start?ext=1&openExternalBrowser=1")
+_BREAKOUT_HTML = f"""<!doctype html>
 <html lang="th"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pearnly</title></head>
@@ -88,10 +89,14 @@ def _external_browser_breakout(start_path: str) -> HTMLResponse:
 <div>
 <p>กำลังเปิดเบราว์เซอร์เพื่อเข้าสู่ระบบด้วย Google…</p>
 <p style="opacity:.7;font-size:14px">Opening your browser to sign in with Google…</p>
-<p style="margin-top:20px"><a href={safe} style="color:#7aa2ff">แตะที่นี่ถ้าไม่เปิดอัตโนมัติ / Tap here</a></p>
+<p style="margin-top:20px"><a href={_BREAKOUT_URL} style="color:#7aa2ff">แตะที่นี่ถ้าไม่เปิดอัตโนมัติ / Tap here</a></p>
 </div>
-<script>location.replace({safe});</script>
-</body></html>""")
+<script>location.replace({_BREAKOUT_URL});</script>
+</body></html>"""
+
+
+def _external_browser_breakout() -> HTMLResponse:
+    return HTMLResponse(_BREAKOUT_HTML)
 
 
 def _gen_oauth_state() -> str:
@@ -122,7 +127,7 @@ async def google_oauth_start(request: Request, ext: int = 0):
         raise HTTPException(status_code=503, detail="oauth_not_configured")
     # LINE 内置浏览器里直接跳 Google 会 403(disallowed_useragent)→ 先弹到系统浏览器再登录。
     if not ext and _is_line_inapp(request.headers.get("user-agent", "")):
-        return _external_browser_breakout("/api/auth/google/start")
+        return _external_browser_breakout()
     state = _gen_oauth_state()
     params = {
         "client_id": _GOOGLE_CLIENT_ID,

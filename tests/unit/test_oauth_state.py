@@ -74,7 +74,7 @@ class LineInAppBreakoutTests(unittest.TestCase):
         self.assertFalse(_is_line_inapp(None))
 
     def test_breakout_url_carries_external_flags(self):
-        resp = _external_browser_breakout("/api/auth/google/start")
+        resp = _external_browser_breakout()
         body = resp.body.decode("utf-8")
         # 必须带 LINE 外开标志 + ext 守卫(防外开后死循环)
         self.assertIn("openExternalBrowser=1", body)

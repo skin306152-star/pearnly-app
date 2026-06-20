@@ -32,6 +32,9 @@ _W, _H = 2500, 1686
 _COLS = ((0, 833), (833, 834), (1667, 833))
 _ROWS = ((0, 843), (843, 843))
 _RM_ACTIONS = {"rm_summary", "rm_proof", "rm_detail", "rm_help"}
+# 官网入口:在 LINE 内置浏览器打开会让随后的 Google 登录被 disallowed_useragent 拦死。
+# openExternalBrowser=1 让 LINE 直接用系统浏览器(Safari/Chrome)打开 → Google 登录才合规、会话也持久。
+_WEB_URL = "https://pearnly.com?openExternalBrowser=1"
 
 
 def _area(col: int, row: int, action: dict) -> dict:
@@ -57,7 +60,7 @@ def build_payload() -> dict:
             ),
             _area(0, 1, {"type": "postback", "data": "a=rm_detail", "displayText": "รายการล่าสุด"}),
             _area(1, 1, {"type": "postback", "data": "a=rm_help", "displayText": "วิธีใช้"}),
-            _area(2, 1, {"type": "uri", "label": "เว็บไซต์", "uri": "https://pearnly.com"}),
+            _area(2, 1, {"type": "uri", "label": "เว็บไซต์", "uri": _WEB_URL}),
         ],
     }
 

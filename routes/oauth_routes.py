@@ -24,7 +24,7 @@ import secrets as _secrets
 import time as _time
 from urllib.parse import urlencode as _urlencode
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.responses import RedirectResponse as _RedirectResp
 
@@ -64,6 +64,36 @@ def _oauth_state_secret() -> bytes:
     return (os.environ.get("JWT_SECRET", "") or "pearnly-oauth-fallback").encode("utf-8")
 
 
+# ============================================================
+# in-app webview 突围 · Google OAuth 在 LINE 内置浏览器被 disallowed_useragent(403)拦死。
+# LINE 识别 openExternalBrowser=1 → 自动用系统浏览器(Safari/Chrome)重新打开当前入口,
+# 在系统浏览器里 Google 登录才合规。ext=1 守卫:外开后 UA 不再含 Line/ 且带 ext → 不二次突围。
+# 仅针对 Google;LINE Login 在 LINE 内置浏览器本就合规,无需突围。
+# ============================================================
+_PEARNLY_BASE = os.getenv("PEARNLY_BASE_URL", "https://pearnly.com").rstrip("/")
+
+
+def _is_line_inapp(ua: str) -> bool:
+    return "Line/" in (ua or "")
+
+
+def _external_browser_breakout(start_path: str) -> HTMLResponse:
+    url = f"{_PEARNLY_BASE}{start_path}?ext=1&openExternalBrowser=1"
+    safe = json.dumps(url)
+    return HTMLResponse(f"""<!doctype html>
+<html lang="th"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pearnly</title></head>
+<body style="font-family:-apple-system,sans-serif;background:#0a0e27;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:24px">
+<div>
+<p>กำลังเปิดเบราว์เซอร์เพื่อเข้าสู่ระบบด้วย Google…</p>
+<p style="opacity:.7;font-size:14px">Opening your browser to sign in with Google…</p>
+<p style="margin-top:20px"><a href={safe} style="color:#7aa2ff">แตะที่นี่ถ้าไม่เปิดอัตโนมัติ / Tap here</a></p>
+</div>
+<script>location.replace({safe});</script>
+</body></html>""")
+
+
 def _gen_oauth_state() -> str:
     payload = f"{_secrets.token_urlsafe(16)}.{int(_time.time())}"
     sig = hmac.new(_oauth_state_secret(), payload.encode("utf-8"), hashlib.sha256).hexdigest()[:32]
@@ -87,9 +117,12 @@ def _verify_oauth_state(s: str) -> bool:
 
 
 @router.get("/api/auth/google/start")
-async def google_oauth_start():
+async def google_oauth_start(request: Request, ext: int = 0):
     if not _GOOGLE_CLIENT_ID:
         raise HTTPException(status_code=503, detail="oauth_not_configured")
+    # LINE 内置浏览器里直接跳 Google 会 403(disallowed_useragent)→ 先弹到系统浏览器再登录。
+    if not ext and _is_line_inapp(request.headers.get("user-agent", "")):
+        return _external_browser_breakout("/api/auth/google/start")
     state = _gen_oauth_state()
     params = {
         "client_id": _GOOGLE_CLIENT_ID,

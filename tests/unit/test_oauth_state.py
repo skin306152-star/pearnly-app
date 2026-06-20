@@ -14,7 +14,13 @@ import unittest
 
 os.environ.setdefault("JWT_SECRET", "test-oauth-state-secret-1234567890")
 
-from routes.oauth_routes import _gen_oauth_state, _verify_oauth_state, _oauth_state_secret
+from routes.oauth_routes import (
+    _gen_oauth_state,
+    _verify_oauth_state,
+    _oauth_state_secret,
+    _is_line_inapp,
+    _external_browser_breakout,
+)
 
 
 class OAuthStateTests(unittest.TestCase):
@@ -49,6 +55,32 @@ class OAuthStateTests(unittest.TestCase):
             _oauth_state_secret(), old_payload.encode("utf-8"), hashlib.sha256
         ).hexdigest()[:32]
         self.assertFalse(_verify_oauth_state(old_payload + "." + sig))
+
+
+class LineInAppBreakoutTests(unittest.TestCase):
+    """Google OAuth 在 LINE 内置浏览器被 disallowed_useragent 拦 → 突围到系统浏览器。"""
+
+    def test_detect_line_inapp(self):
+        line_ua = (
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+            "AppleWebKit/605.1.15 Line/14.5.0"
+        )
+        self.assertTrue(_is_line_inapp(line_ua))
+
+    def test_normal_browser_not_inapp(self):
+        safari = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15"
+        self.assertFalse(_is_line_inapp(safari))
+        self.assertFalse(_is_line_inapp(""))
+        self.assertFalse(_is_line_inapp(None))
+
+    def test_breakout_url_carries_external_flags(self):
+        resp = _external_browser_breakout("/api/auth/google/start")
+        body = resp.body.decode("utf-8")
+        # 必须带 LINE 外开标志 + ext 守卫(防外开后死循环)
+        self.assertIn("openExternalBrowser=1", body)
+        self.assertIn("ext=1", body)
+        self.assertIn("/api/auth/google/start", body)
+        self.assertIn("location.replace", body)
 
 
 if __name__ == "__main__":

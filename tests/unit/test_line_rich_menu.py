@@ -65,7 +65,10 @@ class PayloadTests(unittest.TestCase):
 
     def test_uri_is_website(self):
         uri = next(a["action"]["uri"] for a in self.areas if a["action"]["type"] == "uri")
-        self.assertEqual(uri, "https://pearnly.com")
+        # 官网按钮必须带 openExternalBrowser=1:LINE 内置浏览器里 Google 登录会被
+        # disallowed_useragent 拦死 → 让 LINE 用系统浏览器直接打开。
+        self.assertTrue(uri.startswith("https://pearnly.com"))
+        self.assertIn("openExternalBrowser=1", uri)
 
 
 class PostbackRouteTests(unittest.TestCase):

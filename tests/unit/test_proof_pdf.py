@@ -14,7 +14,7 @@ from services.export import proof_pdf
 
 
 def _make_image(path: Path):
-    pix = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 40, 40))
+    pix = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 480, 640))  # 够宽:页眉条/页码不被窄页裁掉
     pix.clear_with(210)
     pix.save(str(path))
 
@@ -29,10 +29,15 @@ def _make_pdf(path: Path, pages: int):
 
 def _detail(did, seller="7-Eleven", total="100.00"):
     return {
-        "doc": {"id": did, "doc_date": "2026-06-10", "grand_total": total},
+        "doc": {"id": did, "doc_date": "2026-06-10", "grand_total": total, "category_id": "c1"},
         "supplier": {"name": seller},
         "lines": [],
     }
+
+
+_TREE = [
+    {"id": "c1", "name": "ค่าอาหาร", "children": [{"id": "s1", "name": "ค่าอาหาร/เครื่องดื่ม"}]}
+]
 
 
 class BuildProofPdfTests(unittest.TestCase):
@@ -70,6 +75,8 @@ class BuildProofPdfTests(unittest.TestCase):
             mock.patch.object(
                 proof_pdf.pdf_storage, "get_pdf_abs_path", side_effect=lambda r: files.get(r)
             ),
+            mock.patch.object(proof_pdf.cat_svc, "get_tree", return_value=_TREE),
+            mock.patch.object(proof_pdf.archive, "_subject_name", return_value="ร้านทดสอบ"),
         ):
             pdf = proof_pdf.build_monthly_proof_pdf(
                 object(),
@@ -117,6 +124,61 @@ class BuildProofPdfTests(unittest.TestCase):
     def test_workspace_isolation_passed_through(self):
         _, ws = self._build(doc_ids=[], refs_by_doc={}, files={})
         self.assertEqual(ws, 7)  # 只查本 ws(_posted_doc_ids 带 ws 作用域)
+
+    def test_cover_has_thai_labels_and_blocks(self):
+        # C-1b:字体修后泰文标签真渲染(不再裸数字)+ 各区块在(标题/汇总卡/明细表头/页脚)。
+        with TemporaryDirectory() as d:
+            p = Path(d) / "a.png"
+            _make_image(p)
+            pdf, _ = self._build(doc_ids=["D1"], refs_by_doc={"D1": ["r1"]}, files={"r1": p})
+        with fitz.open(stream=pdf, filetype="pdf") as doc:
+            cover = doc[0].get_text()
+            self.assertIn("Pearnly", cover)
+            self.assertIn("หลักฐานค่าใช้จ่าย", cover)  # ★泰文标题渲染
+            self.assertIn("รายการ", cover)  # 汇总卡标签
+            self.assertIn("VAT", cover)
+            for col in ("วันที่", "ผู้ขาย", "หมวดหมู่", "จำนวนเงิน", "ภาพ"):
+                self.assertIn(col, cover, col)  # 明细表头
+            self.assertIn("7-Eleven", cover)  # 卖家值进表
+            self.assertIn("ยื่นภาษี", cover)  # 页脚诚实声明(非报税)
+
+    def test_image_page_has_header_strip(self):
+        with TemporaryDirectory() as d:
+            p = Path(d) / "a.png"
+            _make_image(p)
+            pdf, _ = self._build(doc_ids=["D1"], refs_by_doc={"D1": ["r1"]}, files={"r1": p})
+        with fitz.open(stream=pdf, filetype="pdf") as doc:
+            strip = doc[1].get_text()  # 票图页
+            self.assertIn("#1", strip)  # 页眉条序号
+            self.assertIn("7-Eleven", strip)
+
+    def test_every_page_has_page_number(self):
+        with TemporaryDirectory() as d:
+            p = Path(d) / "a.png"
+            _make_image(p)
+            pdf, _ = self._build(doc_ids=["D1"], refs_by_doc={"D1": ["r1"]}, files={"r1": p})
+        with fitz.open(stream=pdf, filetype="pdf") as doc:
+            self.assertIn("1 / 2", doc[0].get_text())
+            self.assertIn("2 / 2", doc[1].get_text())
+
+
+class FontRegisterTests(unittest.TestCase):
+    def test_sarabun_registered_with_thai_glyphs(self):
+        base, bold = proof_pdf._register_thai_font()
+        self.assertEqual((base, bold), ("Sarabun", "Sarabun-Bold"))  # 嵌入字体注册成功
+        from reportlab.pdfbase import pdfmetrics
+
+        face = pdfmetrics.getFont("Sarabun").face
+        self.assertIn(0x0E01, face.charToGlyph)  # ก 泰文
+        self.assertIn(0x0E3F, face.charToGlyph)  # ฿
+        self.assertIn(0x41, face.charToGlyph)  # A 拉丁
+
+    def test_fitz_fontfile_exists(self):
+        self.assertIsNotNone(proof_pdf._fitz_fontfile())
+
+    def test_period_label_thai_month(self):
+        self.assertEqual(proof_pdf._period_label("2026-06"), "มิ.ย. 2026")
+        self.assertEqual(proof_pdf._period_label("bad"), "bad")
 
 
 class ProofTokenTests(unittest.TestCase):

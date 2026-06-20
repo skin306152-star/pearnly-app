@@ -32,8 +32,8 @@ type ExcProduct = { code?: string; name?: string };
 let _erpExcCustCache: Record<string, ExcCust[]> = {}; // endpoint_id → [{code,name,...}]
 
 function _erpExcCloseModal() {
-    const ov = document.getElementById('erp-exc-modal');
-    if (ov) ov.remove();
+    document.getElementById('erp-exc-modal')?.remove();
+    document.getElementById('erp-exc-modal-ov')?.remove();
 }
 
 window._erpExcOpenEdit = function (id) {
@@ -79,11 +79,16 @@ window._erpExcOpenEdit = function (id) {
         fixHtml = `<div class="erp-exc-m-hint">${escapeHtml(hint)}</div>`;
     }
 
+    // 草稿对齐:从居中弹窗 → 侧抽屉(复用推送详情抽屉的壳)· 内部 id/选商品·绑定·重试逻辑全不变。
     const ov = document.createElement('div');
-    ov.id = 'erp-exc-modal';
-    ov.className = 'erp-exc-modal-overlay';
-    ov.innerHTML = `
-        <div class="erp-exc-modal" role="dialog" aria-modal="true">
+    ov.id = 'erp-exc-modal-ov';
+    ov.className = 'erp-detail-overlay';
+    const drawer = document.createElement('aside');
+    drawer.id = 'erp-exc-modal';
+    drawer.className = 'erp-detail-drawer erp-exc-drawer';
+    drawer.setAttribute('role', 'dialog');
+    drawer.setAttribute('aria-modal', 'true');
+    drawer.innerHTML = `
             <div class="erp-exc-m-head">
                 <h3>${escapeHtml(t('erp-exc-edit-title'))}</h3>
                 <button class="erp-exc-m-close" type="button" id="erp-exc-m-close" aria-label="close">×</button>
@@ -108,13 +113,15 @@ window._erpExcOpenEdit = function (id) {
                 <button class="btn btn-sm btn-primary" type="button" id="erp-exc-m-retry">${escapeHtml(t('erp-exc-edit-retry'))}</button>
                 ${canPickCustomer ? `<button class="btn btn-sm btn-primary" type="button" id="erp-exc-m-bind" disabled>${escapeHtml(t('erp-exc-edit-bind-retry'))}</button>` : ''}
                 ${canPickProduct ? `<button class="btn btn-sm btn-primary" type="button" id="erp-exc-m-bind-prod" disabled>${escapeHtml(t('erp-exc-edit-bind-prod-retry'))}</button>` : ''}
-            </div>
-        </div>`;
+            </div>`;
     document.body.appendChild(ov);
-
-    ov.addEventListener('click', (e) => {
-        if (e.target === ov) _erpExcCloseModal();
+    document.body.appendChild(drawer);
+    requestAnimationFrame(() => {
+        ov.classList.add('show');
+        drawer.classList.add('show');
     });
+
+    ov.addEventListener('click', () => _erpExcCloseModal());
     document.getElementById('erp-exc-m-close')!.addEventListener('click', _erpExcCloseModal);
     document.getElementById('erp-exc-m-cancel')!.addEventListener('click', _erpExcCloseModal);
     document.getElementById('erp-exc-m-retry')!.addEventListener('click', () => {

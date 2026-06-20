@@ -338,6 +338,10 @@
 .erp-exc-m-loading, .erp-exc-m-empty { padding: 16px; text-align: center; font-size: 12px; color: var(--ink-3); }
 .erp-exc-m-hint { margin-top: 14px; padding: 10px 12px; background: var(--blue-100); color: var(--blue-800); border-radius: 8px; font-size: 12px; line-height: 1.6; }
 .erp-exc-m-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 18px; border-top: 1px solid var(--line); }
+/* 草稿对齐:修复映射/确认客户从居中弹窗 → 侧抽屉(复用 .erp-detail-drawer 壳 + 这里只排 flex)*/
+.erp-exc-drawer .erp-exc-m-head { flex: 0 0 auto; }
+.erp-exc-drawer .erp-exc-m-body { flex: 1 1 auto; min-height: 0; }
+.erp-exc-drawer .erp-exc-m-foot { flex: 0 0 auto; background: var(--card); }
 .log-time { color: var(--ink-3); min-width: 80px; }
 .log-status { min-width: 16px; text-align: center; }
 .log-tag { padding: 2px 6px; font-size: 10px; border-radius: 4px; font-family: sans-serif; }

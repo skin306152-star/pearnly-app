@@ -5,10 +5,7 @@
 取消(明确)> 删除(明确)> 点名字段(确认阶段切换 / 收值改口 / 待选答字段,带值即直接走风险三档)>
 按阶段(confirm 是/否、收值、待选重问)。绝不在 active_doc_id 内退回「请长按回复/找不到记录」。
 
-三个 pending 态(复用 conversation.line_pending_entry · 不新建表):
-  correctclar:<ws>:<doc>          —— 已问「改哪个字段」,等用户答字段名
-  correctval:<ws>:<doc>:<field>   —— 已问「新值是什么」,等用户给值
-  correct:<ws>:<doc>:<keys>       —— 已出「改成X吗」,等 是/否(在 line_correct.try_confirm)
+pending 态复用 conversation.line_pending_entry(不新建表):correctclar 待答字段 / correctval 待给新值 / correct 待是否确认 / correctactive 改完续接 / pick(Slice4)无引用列候选待选号。
 """
 
 from __future__ import annotations
@@ -19,7 +16,7 @@ from core import db
 from services.expense import conversation, line_bulk_undo, line_classify, line_correct
 from services.expense import line_correct_i18n as ci
 from services.expense import line_quick_entry as lqe
-from services.expense import line_restore, line_stale_ref
+from services.expense import line_pick, line_restore, line_stale_ref
 from services.line_binding import line_client, line_expense_qa, line_reply
 
 # 收新值时剥掉的前缀(命令词 + 连接词 + 字段名);标点已在入口 normalize_user_text 归一。
@@ -152,6 +149,9 @@ def route(
     qt = ctx.get("quote_token", "")
     # 批量撤销(撤最近N笔/今天全部)。★引用 > 批量(06):引用某卡时「取消三条」也以那张为准 → 跳过批量。
     if not quoted_message_id:
+        # Slice 4 无引用智能解析(候选答案继承 + 目标不明列候选)。排除批量/上一笔/第N → 仍 引用>批量>候选。
+        if line_pick.route(bound_user, reply_token, line_user_id, text, lang, tid, ws, ctx):
+            return True
         if line_bulk_undo.route(bound_user, reply_token, line_user_id, text, lang, tid, ws, ctx):
             return True
     # 恢复(引用已撤卡说「恢复」)先于改字段判:引用了死卡说恢复不该被当成 correctval 的值吞掉。

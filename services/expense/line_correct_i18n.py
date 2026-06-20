@@ -209,6 +209,23 @@ ANCHOR_EXPIRED = {
 }
 
 
+# 06 Slice 4 无引用智能解析:目标不明(≥2 近单 + 指示代词)→ 列候选追问要操作哪张(破坏性永不猜删)。
+PICK_WHICH = {
+    "zh": "你要操作哪一张?回复序号(如「第2张」)或卖家名即可:",
+    "th": "ต้องการจัดการรายการไหนคะ? ตอบลำดับ (เช่น “อันที่ 2”) หรือชื่อร้านได้เลย:",
+    "en": 'Which record do you mean? Reply with the number (e.g. "2") or the seller name:',
+    "ja": "どの記録ですか?番号(例:「2」)または販売者名で返信してください:",
+}
+
+# 删/撤/改但近期没有可操作的 LINE 记录 → 诚实告知(不猜不误删)。
+PICK_NONE = {
+    "zh": "目前没有可操作的记录。",
+    "th": "ตอนนี้ยังไม่มีรายการให้จัดการค่ะ",
+    "en": "There's no record to act on right now.",
+    "ja": "現在、操作できる記録はありません。",
+}
+
+
 def field_label(field: str, lang: str) -> str:
     return FIELD_LABELS.get(field, {}).get(lang) or FIELD_LABELS.get(field, {}).get("zh", field)
 

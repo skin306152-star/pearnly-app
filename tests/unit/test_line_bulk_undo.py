@@ -221,6 +221,7 @@ class RouteOrderingTests(unittest.TestCase):
         from services.expense import line_correct_flow as flow
 
         with (
+            mock.patch.object(flow.line_pick, "route", return_value=False),
             mock.patch.object(flow.line_bulk_undo, "route", return_value=True),
             mock.patch.object(flow, "try_correction_state") as tcs,
         ):
@@ -232,6 +233,7 @@ class RouteOrderingTests(unittest.TestCase):
         from services.expense import line_correct_flow as flow
 
         with (
+            mock.patch.object(flow.line_pick, "route", return_value=False),
             mock.patch.object(flow.line_bulk_undo, "route", return_value=False),
             mock.patch.object(flow, "try_correction_state", return_value=True) as tcs,
         ):

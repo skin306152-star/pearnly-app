@@ -28,6 +28,7 @@ from services.expense import (  # noqa: E402
 from services.line_binding import line_client, line_message_refs, line_reply
 from services.purchase import correct as correct_svc
 from services.purchase import docs as docs_svc
+from services.purchase import line_docs as line_docs_svc
 from services.purchase import posting as posting_svc
 from services.purchase import settings as settings_svc
 
@@ -244,6 +245,28 @@ class Sim:
             return None
         return {"id": posted[-1]["id"], "grand_total": posted[-1]["grand_total"]}
 
+    # ---- 近单查询桩(Slice 4 无引用列候选 · 最近优先 = seed 逆序) ----
+    def _row(self, d):
+        doc = d["doc"]
+        return {
+            "id": doc["id"],
+            "grand_total": doc["grand_total"],
+            "doc_date": doc["doc_date"],
+            "status": doc["status"],
+            "supplier_name": d["supplier"]["name"],
+        }
+
+    def find_recent(self, cur, *, tenant_id, workspace_client_id, limit):
+        rows = [
+            self._row(d)
+            for d in reversed(list(self.docs.values()))
+            if d["doc"]["status"] in ("posted", "draft")
+        ]
+        return rows[: int(limit)]
+
+    def find_by_ids(self, cur, *, tenant_id, workspace_client_id, ids):
+        return [self._row(self.docs[i]) for i in ids if i in self.docs]
+
 
 def _build_patches(sim):
     """Sim → 全套 patch 列表(replay 与 anchored 两套测试共用·side_effect 绑定 sim)。
@@ -279,6 +302,8 @@ def _build_patches(sim):
         mock.patch.object(line_message_refs, "find_last_posted", side_effect=sim.find_last_posted),
         mock.patch.object(line_reply, "reply_text_context", side_effect=_text),
         mock.patch.object(line_reply, "reply_messages_context", side_effect=_msgs),
+        mock.patch.object(line_docs_svc, "find_recent_line_docs", side_effect=sim.find_recent),
+        mock.patch.object(line_docs_svc, "find_line_docs_by_ids", side_effect=sim.find_by_ids),
     ]
 
 

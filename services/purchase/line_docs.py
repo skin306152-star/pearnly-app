@@ -27,6 +27,18 @@ def find_recent_line_docs(cur, *, tenant_id, workspace_client_id, limit) -> list
     return list(cur.fetchall())
 
 
+def find_line_docs_by_ids(cur, *, tenant_id, workspace_client_id, ids) -> list:
+    """按 id 列表取该套账 LINE 进项单(候选答案按卖家名匹配用·≤5 笔)。id 以文本比较容纳字符串入参。"""
+    if not ids:
+        return []
+    cur.execute(
+        f"SELECT {_COLS} {_FROM} "
+        "WHERE d.tenant_id = %s AND d.workspace_client_id = %s AND d.id::text = ANY(%s)",
+        (tenant_id, workspace_client_id, [str(i) for i in ids]),
+    )
+    return list(cur.fetchall())
+
+
 def find_today_line_docs(cur, *, tenant_id, workspace_client_id) -> list:
     """今天(泰国时区)该套账全部 LINE 进项单(posted/draft·created_at 倒序)。"""
     cur.execute(

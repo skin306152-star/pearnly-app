@@ -86,9 +86,10 @@ async def _handle_line_event(ev: dict):
     if ev_type == "follow":
         return
 
-    # unfollow:用户删 Bot
+    # unfollow:用户删 Bot 好友 → 清理绑定,避免残留(无法回复,LINE 限制)
     if ev_type == "unfollow":
-        logger.info(f"[line] 用户 {line_user_id} 删除了 Bot 好友")
+        removed = db.unbind_line_by_line_user_id(line_user_id) if line_user_id else False
+        logger.info(f"[line] 用户 {line_user_id} 删除了 Bot 好友 · 解绑={removed}")
         return
 
     # postback:数据卡按钮(撤销/确认)→ 做账安全带落地(docs/smart-intake/15 §4)

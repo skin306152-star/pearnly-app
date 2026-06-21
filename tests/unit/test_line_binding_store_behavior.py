@@ -196,5 +196,29 @@ class UnbindTests(unittest.TestCase):
             self.assertFalse(lb.unbind_line_by_user("u1"))
 
 
+class UnbindByLineUserIdTests(unittest.TestCase):
+    def test_deletes_row_returns_true(self):
+        cur = FakeCursor(rowcount=1)
+        with patch_cursor(cur):
+            self.assertTrue(lb.unbind_line_by_line_user_id("L1"))
+        self.assertIn("DELETE FROM line_bindings", cur.last_sql)
+        self.assertIn("line_user_id = %s", cur.last_sql)
+        self.assertEqual(cur.last_params, ("L1",))
+        self.assertEqual(cur.cm_kwargs[0].get("commit"), True)
+
+    def test_no_binding_returns_false(self):
+        cur = FakeCursor(rowcount=0)
+        with patch_cursor(cur):
+            self.assertFalse(lb.unbind_line_by_line_user_id("L1"))
+
+    def test_empty_id_skips_db(self):
+        with patch_cursor_raises():
+            self.assertFalse(lb.unbind_line_by_line_user_id(""))
+
+    def test_exception_false(self):
+        with patch_cursor_raises():
+            self.assertFalse(lb.unbind_line_by_line_user_id("L1"))
+
+
 if __name__ == "__main__":
     unittest.main()

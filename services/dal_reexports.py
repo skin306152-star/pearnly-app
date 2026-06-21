@@ -282,6 +282,7 @@ _REEXPORTS = {
         "get_line_binding_by_user",
         "get_user_by_line_user_id",
         "unbind_line_by_user",
+        "unbind_line_by_line_user_id",
     ],
     "services.credits.store": [
         "get_credits_revenue_overview",

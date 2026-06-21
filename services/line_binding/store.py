@@ -217,3 +217,19 @@ def unbind_line_by_user(user_id: str) -> bool:
     except Exception as e:
         logger.error(f"unbind_line_by_user failed: {e}")
         return False
+
+
+def unbind_line_by_line_user_id(line_user_id: str) -> bool:
+    """删 Bot 好友(unfollow)时清理绑定。返回是否真的删到一行。"""
+    if not line_user_id:
+        return False
+    try:
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                "DELETE FROM line_bindings WHERE line_user_id = %s",
+                (line_user_id,),
+            )
+            return cur.rowcount > 0
+    except Exception as e:
+        logger.error(f"unbind_line_by_line_user_id failed: {e}")
+        return False

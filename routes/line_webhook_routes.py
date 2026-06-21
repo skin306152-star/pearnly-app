@@ -87,11 +87,11 @@ def _reply_card_or_text(
     quote_token: str = "",
     tenant_id=None,
 ) -> None:
-    """泰语 → 发设计师图卡(line_imagemap),其他语言 → 回落文字版 text_msg。
+    """有设计图卡就发图卡(Zihao 定:只做泰语图卡,不发文字版);无图卡才回落 text_msg。
 
-    治"泰语图卡 = 主路径,非泰语回落文字"(设计师只出泰语图,不破 4 语)。
+    lang 仅用于回落文字(card_key 未交付图卡时)。
     """
-    if lang == "th" and line_imagemap.has_card(card_key):
+    if line_imagemap.has_card(card_key):
         line_reply.reply_messages_context(
             reply_token,
             [line_imagemap.card_message(card_key)],

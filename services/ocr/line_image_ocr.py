@@ -27,7 +27,7 @@ from services.ocr.entrypoints import (
 )
 
 try:
-    from services.line_binding import line_client, line_reply
+    from services.line_binding import line_client, line_imagemap, line_reply
 except ImportError:
     line_client = None  # line_client.py 不在仓库 · 单独部署到服务器
     line_reply = None
@@ -120,6 +120,18 @@ async def _handle_line_image_ocr(
             tenant_id=(bound_user.get("tenant_id") if bound_user else None),
         )
 
+    def _notify_card(card_key: str, fallback_body: str) -> None:
+        # 有设计图卡就发图卡(Zihao 定:只发图卡不发文字);无卡回落文字。
+        msg = line_imagemap.card_message(card_key)
+        if msg:
+            line_reply.push_messages_context(
+                line_user_id,
+                [msg],
+                tenant_id=(bound_user.get("tenant_id") if bound_user else None),
+            )
+            return
+        _notify(fallback_body)
+
     try:
         # 1. 下载
         file_bytes = line_client.download_message_content(message_id)
@@ -128,7 +140,7 @@ async def _handle_line_image_ocr(
             _notify(line_client.t_ocr(lang, "err_download"))
             return
         if not _ocr_is_supported_file(filename):
-            _notify(line_client.t_line(lang, "unsupported"))
+            _notify_card("unsupported", line_client.t_line(lang, "unsupported"))
             return
 
         # 2. 用户 / credits 检查(复用网页入口的 credits 逻辑)
@@ -159,7 +171,7 @@ async def _handle_line_image_ocr(
         if not quote.get("allowed"):
             code = quote.get("error_code")
             if code == "insufficient_balance":
-                _notify(line_client.t_ocr(lang, "err_quota"))
+                _notify_card("no_credit", line_client.t_ocr(lang, "err_quota"))
             else:
                 _notify(line_client.t_ocr(lang, "err_ocr"))
             return
@@ -191,12 +203,12 @@ async def _handle_line_image_ocr(
             )
         except Exception as _pipe_err:
             logger.error(f"[line_ocr] pipeline 识别失败: {type(_pipe_err).__name__}: {_pipe_err}")
-            _notify(line_client.t_line(lang, "line_ocr_failed_recovery"))
+            _notify_card("ocr_failed", line_client.t_line(lang, "line_ocr_failed_recovery"))
             return
 
         pages = result.get("pages") or []
         if not pages:
-            _notify(line_client.t_line(lang, "line_ocr_failed_recovery"))
+            _notify_card("ocr_failed", line_client.t_line(lang, "line_ocr_failed_recovery"))
             return
         if _ocr_all_pages_not_invoice(pages):
             _notify(line_client.t_line(lang, "line_not_receipt_recovery"))
@@ -411,7 +423,7 @@ async def _handle_line_image_ocr(
     except Exception as e:
         logger.exception(f"[line_ocr] 未知异常: {e}")
         try:
-            _notify(line_client.t_line(lang, "line_ocr_failed_recovery"))
+            _notify_card("ocr_failed", line_client.t_line(lang, "line_ocr_failed_recovery"))
         except Exception as _pe:
             logger.warning(f"[line_ocr] err 通知 push_text 失败: {_pe}")
 

@@ -278,6 +278,9 @@ async def line_oauth_start():
         "state": state,
         "scope": "openid profile email",  # v118.28.4.2 · email scope 已通过 · 自动拿邮箱
         "nonce": _secrets.token_urlsafe(16),
+        # P5b:登录页提示加 Pearnly Bot 为好友(成为好友后登录即可自动绑定 + 推欢迎卡)。
+        # 仅当 LINE Developers 后台把 OA 关联到本 Login 频道时才显示加好友勾选;未关联则被忽略,无副作用。
+        "bot_prompt": "aggressive",
     }
     url = "https://access.line.me/oauth2/v2.1/authorize?" + _urlencode(params)
     return _RedirectResp(url, status_code=302)
@@ -383,6 +386,15 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
             line_user_id=line_uid,
             display_name=line_name or None,
             picture_url=line_picture or None,
+        )
+        # P5b:已是 Bot 好友 → push 成功卡 + 新手轮播(=登录后 LINE 里"自动弹卡")。
+        # 非好友 push 会失败,best-effort 静默吞掉(用户加好友后发任意消息仍已连上)。
+        from services.line_binding import line_imagemap, line_reply
+
+        line_reply.push_messages_context(
+            line_uid,
+            [line_imagemap.card_message("bind_success"), line_imagemap.onboarding_carousel()],
+            tenant_id=str(user["tenant_id"]) if user.get("tenant_id") else None,
         )
     except Exception as e:
         logger.warning(f"[line_login] 自动绑定 Bot 跳过(不拦登录): {e}")

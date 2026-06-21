@@ -51,6 +51,20 @@ class CardMessageTests(unittest.TestCase):
         self.assertIn("B-banner-duplicate", im.banner_hero("dup")["url"])
         self.assertIsNone(im.banner_hero("nope"))
 
+    def test_onboarding_carousel_six_tappable_bubbles(self):
+        car = im.onboarding_carousel()
+        self.assertEqual(car["type"], "flex")
+        bubbles = car["contents"]["contents"]
+        self.assertEqual(len(bubbles), 6)
+        for i, b in enumerate(bubbles, 1):
+            hero = b["hero"]
+            self.assertIn(f"A12-onboard-{i}", hero["url"])
+            self.assertEqual(hero["action"]["type"], "uri")
+
+    def test_onboard_stems_in_route_whitelist(self):
+        for i in range(1, 7):
+            self.assertIn(f"A12-onboard-{i}", im.CARD_STEMS)
+
     def test_banner_stems_in_route_whitelist(self):
         for stem in (
             "B-banner-posted",

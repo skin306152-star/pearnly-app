@@ -117,6 +117,7 @@ CARD_STEMS = (
     frozenset(stem for stem, _h, _alt, _a in _CARDS.values())
     | frozenset(_BANNERS.values())
     | _EXTRA_BANNERS
+    | frozenset(f"A12-onboard-{i}" for i in range(1, 7))
 )
 
 
@@ -135,6 +136,34 @@ def banner_hero(state: str) -> Optional[dict]:
     """按 result_card 状态返回 Flex hero 图块(横幅皮肤)。无对应状态 → None。"""
     stem = _BANNERS.get(state)
     return hero(stem) if stem else None
+
+
+# A12 新手教程轮播(绑定成功后推):每张方形图卡 = 一个卖点,点开官网看示例。
+_ONBOARD_STEMS = tuple(f"A12-onboard-{i}" for i in range(1, 7))
+
+
+def onboarding_carousel() -> dict:
+    """新手轮播:Flex carousel·6 张方形图卡(hero 整图可点→官网)。一条消息横滑。"""
+    bubbles = [
+        {
+            "type": "bubble",
+            "size": "mega",
+            "hero": {
+                "type": "image",
+                "url": f"{_IMG_BASE}/{stem}/1040",
+                "size": "full",
+                "aspectRatio": "1:1",
+                "aspectMode": "cover",
+                "action": {"type": "uri", "uri": CONNECT_URL},
+            },
+        }
+        for stem in _ONBOARD_STEMS
+    ]
+    return {
+        "type": "flex",
+        "altText": "แนะนำการใช้งาน Pearnly",
+        "contents": {"type": "carousel", "contents": bubbles},
+    }
 
 
 def has_card(card_key: str) -> bool:

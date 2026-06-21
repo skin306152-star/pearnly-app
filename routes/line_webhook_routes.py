@@ -302,13 +302,12 @@ async def _handle_line_text(
             )
             return
 
-        _reply_card_or_text(
+        # 绑定成功 → A5 成功卡 + A12 新手轮播(一次发)。
+        line_reply.reply_messages_context(
             reply_token,
-            "bind_success",
-            line_bind_i18n.bind_success_msg(lang),
-            lang=lang,
+            [line_imagemap.card_message("bind_success"), line_imagemap.onboarding_carousel()],
             line_user_id=line_user_id,
-            quote_token=quote_token,
+            tenant_id=(user.get("tenant_id") if user else None),
         )
         return
 

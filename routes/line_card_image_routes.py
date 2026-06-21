@@ -20,8 +20,9 @@ router = APIRouter()
 _CARDS_DIR = Path(__file__).resolve().parent.parent / "static" / "line-cards"
 
 
-@router.get("/api/line/card/{card}/{size}")
-def get_line_card_image(card: str, size: str) -> FileResponse:
+@router.get("/api/line/card/{ver}/{card}/{size}")
+def get_line_card_image(ver: str, card: str, size: str) -> FileResponse:
+    # ver 仅用于改图破缓存(LINE/客户端按 URL 缓存图片);size 由 LINE 追加,统一返 1040 母图。
     if card not in CARD_STEMS:
         raise HTTPException(status_code=404, detail="unknown card")
     path = _CARDS_DIR / f"{card}.jpg"

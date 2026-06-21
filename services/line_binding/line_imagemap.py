@@ -15,7 +15,9 @@ from typing import Dict, List, Optional, Tuple
 from services.line_binding.line_bind_i18n import CONNECT_URL
 
 # 图片服务基址(LINE 会追加 /{size};见 line_card_image_routes)。
-_IMG_BASE = "https://pearnly.com/api/line/card"
+# _CARD_VER:改图后 bump 一位,破 LINE/客户端按 URL 的图片缓存(URL 变 = 强制重取)。
+_CARD_VER = "2"
+_IMG_BASE = f"https://pearnly.com/api/line/card/{_CARD_VER}"
 
 _URI = "uri"
 _MSG = "message"

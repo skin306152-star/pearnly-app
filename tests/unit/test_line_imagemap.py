@@ -81,21 +81,21 @@ class CardImageRouteTests(unittest.TestCase):
         cls.client = TestClient(app)
 
     def test_known_card_served(self):
-        r = self.client.get("/api/line/card/A1-welcome/1040")
+        r = self.client.get("/api/line/card/2/A1-welcome/1040")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.headers["content-type"], "image/jpeg")
 
     def test_size_segment_ignored(self):
         for size in ("240", "460", "700", "1040"):
             self.assertEqual(
-                self.client.get(f"/api/line/card/A3-need-connect-text/{size}").status_code, 200
+                self.client.get(f"/api/line/card/2/A3-need-connect-text/{size}").status_code, 200
             )
 
     def test_unknown_card_404(self):
-        self.assertEqual(self.client.get("/api/line/card/evil-path/1040").status_code, 404)
+        self.assertEqual(self.client.get("/api/line/card/2/evil-path/1040").status_code, 404)
 
     def test_path_traversal_blocked(self):
-        self.assertEqual(self.client.get("/api/line/card/..%2f..%2fsecret/1040").status_code, 404)
+        self.assertEqual(self.client.get("/api/line/card/2/..%2f..%2fsecret/1040").status_code, 404)
 
 
 if __name__ == "__main__":

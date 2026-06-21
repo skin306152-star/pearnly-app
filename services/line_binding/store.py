@@ -194,10 +194,14 @@ def get_user_by_line_user_id(line_user_id: str) -> Optional[Dict[str, Any]]:
                 return None
             user_id = str(row["user_id"])
 
-            # 查 mrpilot 用户
+            # 查 mrpilot 用户(带上 line_user_id·users 表本身无此列·postback 处理器要用它)
             cur.execute("SELECT * FROM users WHERE id = %s LIMIT 1", (user_id,))
             urow = cur.fetchone()
-            return dict(urow) if urow else None
+            if not urow:
+                return None
+            user = dict(urow)
+            user["line_user_id"] = line_user_id
+            return user
     except Exception as e:
         logger.error(f"get_user_by_line_user_id failed: {e}")
         return None

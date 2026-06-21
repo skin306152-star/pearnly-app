@@ -124,7 +124,8 @@ def handle_postback(bound_user, reply_token, action, token, lang) -> None:
                 reply_token, _CANCEL_REPLY, line_user_id=luid, tenant_id=tid
             )
             return
-        db.unbind_line_by_line_user_id(luid)
+        # 按 user_id 删(bound_user 是 users 行·一定有 id;line_user_id 字段不一定在 dict 里)。
+        db.unbind_line_by_user(str(bound_user["id"]))
         line_reply.reply_messages_context(reply_token, [success_card()], line_user_id=luid)
     except Exception:
         logger.warning("[line unbind] postback failed", exc_info=True)

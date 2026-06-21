@@ -46,12 +46,13 @@ class CardTests(unittest.TestCase):
 
 class PostbackTests(unittest.TestCase):
     def setUp(self):
-        self.bound = {"id": "u1", "tenant_id": "t1", "line_user_id": "L1"}
+        # 真实 bound_user = get_user_by_line_user_id 返回的 users 行(无 line_user_id 字段也要能解绑)。
+        self.bound = {"id": "u1", "tenant_id": "t1"}
         self.unbind = mock.Mock(return_value=True)
         self.reply_msgs = mock.Mock(return_value=True)
         self.reply_text = mock.Mock(return_value=True)
         self._p = [
-            mock.patch.object(line_unbind.db, "unbind_line_by_line_user_id", self.unbind),
+            mock.patch.object(line_unbind.db, "unbind_line_by_user", self.unbind),
             mock.patch.object(line_unbind.line_reply, "reply_messages_context", self.reply_msgs),
             mock.patch.object(line_unbind.line_reply, "reply_text_context", self.reply_text),
         ]
@@ -62,9 +63,10 @@ class PostbackTests(unittest.TestCase):
         for p in self._p:
             p.stop()
 
-    def test_confirm_unbinds_and_sends_success(self):
+    def test_confirm_unbinds_by_user_id_even_without_line_user_id(self):
+        # 回归:bound_user 无 line_user_id(真实 users 行)时,仍按 user_id 真删绑定。
         line_unbind.handle_postback(self.bound, "r", line_postback.ACTION_UNBIND_CONFIRM, "", "th")
-        self.unbind.assert_called_once_with("L1")
+        self.unbind.assert_called_once_with("u1")
         self.reply_msgs.assert_called_once()  # 成功卡
 
     def test_cancel_does_not_unbind(self):

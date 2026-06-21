@@ -112,12 +112,15 @@ _EXTRA_BANNERS = frozenset(
     {UNBIND_CONFIRM_BANNER, UNBIND_SUCCESS_BANNER, SUMMARY_BANNER, PROOF_BANNER}
 )
 
-# 已交付图卡 + 横幅的 stem 白名单(出图路由用)。
+# A12 新手教程轮播(绑定成功后推):每张方形图卡 = 一个卖点,点开官网看示例。
+_ONBOARD_STEMS = tuple(f"A12-onboard-{i}" for i in range(1, 7))
+
+# 已交付图卡 + 横幅 + 轮播的 stem 白名单(出图路由用·单一来源)。
 CARD_STEMS = (
     frozenset(stem for stem, _h, _alt, _a in _CARDS.values())
     | frozenset(_BANNERS.values())
     | _EXTRA_BANNERS
-    | frozenset(f"A12-onboard-{i}" for i in range(1, 7))
+    | frozenset(_ONBOARD_STEMS)
 )
 
 
@@ -136,10 +139,6 @@ def banner_hero(state: str) -> Optional[dict]:
     """按 result_card 状态返回 Flex hero 图块(横幅皮肤)。无对应状态 → None。"""
     stem = _BANNERS.get(state)
     return hero(stem) if stem else None
-
-
-# A12 新手教程轮播(绑定成功后推):每张方形图卡 = 一个卖点,点开官网看示例。
-_ONBOARD_STEMS = tuple(f"A12-onboard-{i}" for i in range(1, 7))
 
 
 def onboarding_carousel() -> dict:
@@ -164,6 +163,11 @@ def onboarding_carousel() -> dict:
         "altText": "แนะนำการใช้งาน Pearnly",
         "contents": {"type": "carousel", "contents": bubbles},
     }
+
+
+def welcome_messages() -> list:
+    """绑定成功欢迎:A5 成功卡 + A12 新手轮播。扫码绑/登录自动绑/用 LINE 连接 三处共用。"""
+    return [card_message("bind_success"), onboarding_carousel()]
 
 
 def has_card(card_key: str) -> bool:

@@ -29,7 +29,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.responses import RedirectResponse as _RedirectResp
 
 from core import db
-from core.auth import create_access_token
+from core.auth import create_access_token, get_current_user_from_request
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +119,50 @@ def _verify_oauth_state(s: str) -> bool:
         return _time.time() - int(ts) < _OAUTH_STATE_TTL
     except ValueError:
         return False
+
+
+# ── 「用 LINE 连接」(已登录用户补绑 LINE)· state 签入 user_id,复用登录 callback,按 state 分流 ──
+def _gen_connect_state(user_id: str) -> str:
+    payload = f"{user_id}~{_secrets.token_urlsafe(8)}~{int(_time.time())}"
+    sig = hmac.new(_oauth_state_secret(), payload.encode("utf-8"), hashlib.sha256).hexdigest()[:32]
+    return f"{payload}~{sig}"
+
+
+def _parse_connect_state(s: str):
+    """连接态 state → user_id;非连接态/无效/过期 → None。"""
+    parts = (s or "").split("~")
+    if len(parts) != 4:
+        return None
+    uid, nonce, ts, sig = parts
+    expected = hmac.new(
+        _oauth_state_secret(), f"{uid}~{nonce}~{ts}".encode("utf-8"), hashlib.sha256
+    ).hexdigest()[:32]
+    if not hmac.compare_digest(sig, expected):
+        return None
+    try:
+        if _time.time() - int(ts) >= _OAUTH_STATE_TTL:
+            return None
+    except ValueError:
+        return None
+    return uid
+
+
+@router.get("/api/me/connect-line/start")
+async def connect_line_start(request: Request):
+    """已登录用户(如 Google 登录)一键连接 LINE:返回授权 URL,前端跳转。state 签入当前 user_id。"""
+    user = get_current_user_from_request(request)
+    if not _LINE_LOGIN_CHANNEL_ID:
+        raise HTTPException(status_code=503, detail="line_oauth_not_configured")
+    params = {
+        "response_type": "code",
+        "client_id": _LINE_LOGIN_CHANNEL_ID,
+        "redirect_uri": _LINE_LOGIN_REDIRECT_URI,  # 复用已注册的登录 callback
+        "state": _gen_connect_state(str(user["id"])),
+        "scope": "openid profile",
+        "nonce": _secrets.token_urlsafe(16),
+        "bot_prompt": "aggressive",  # 顺带提示加好友
+    }
+    return {"url": "https://access.line.me/oauth2/v2.1/authorize?" + _urlencode(params)}
 
 
 @router.get("/api/auth/google/start")
@@ -285,10 +329,76 @@ async def line_oauth_start():
     return _RedirectResp(url, status_code=302)
 
 
+async def _handle_connect_line(user_id: str, code: str):
+    """已登录用户补绑 LINE:换 code 拿 sub → 绑当前账号 + 绑 Bot + 推欢迎卡 → 回集成页。"""
+    if not code or not _LINE_LOGIN_CHANNEL_ID or not _LINE_LOGIN_CHANNEL_SECRET:
+        return _RedirectResp("/home?line_connect=error#integrations", status_code=302)
+    try:
+        import httpx as _httpx
+
+        async with _httpx.AsyncClient(timeout=15) as client:
+            tr = await client.post(
+                "https://api.line.me/oauth2/v2.1/token",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                data={
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "redirect_uri": _LINE_LOGIN_REDIRECT_URI,
+                    "client_id": _LINE_LOGIN_CHANNEL_ID,
+                    "client_secret": _LINE_LOGIN_CHANNEL_SECRET,
+                },
+            )
+            if tr.status_code != 200:
+                return _RedirectResp("/home?line_connect=error#integrations", status_code=302)
+            id_token = tr.json().get("id_token")
+            vr = await client.post(
+                "https://api.line.me/oauth2/v2.1/verify",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                data={"id_token": id_token, "client_id": _LINE_LOGIN_CHANNEL_ID},
+            )
+            if vr.status_code != 200:
+                return _RedirectResp("/home?line_connect=error#integrations", status_code=302)
+            payload = vr.json()
+    except Exception as e:
+        logger.error(f"[line_connect] fetch failed: {e}")
+        return _RedirectResp("/home?line_connect=error#integrations", status_code=302)
+
+    sub = payload.get("sub")
+    user = db.find_user_by_id(user_id)
+    if not sub or not user:
+        return _RedirectResp("/home?line_connect=error#integrations", status_code=302)
+    try:
+        db.link_line_uid_to_user(user_id, sub)
+        ok = db.create_or_update_line_binding(
+            user_id=user_id,
+            line_user_id=sub,
+            display_name=(payload.get("name") or None),
+            picture_url=(payload.get("picture") or None),
+        )
+        if not ok:
+            # 该 LINE 已绑别的 Pearnly 账号 → 诚实提示,不假装成功。
+            return _RedirectResp("/home?line_connect=conflict#integrations", status_code=302)
+        from services.line_binding import line_imagemap, line_reply
+
+        line_reply.push_messages_context(
+            sub,
+            [line_imagemap.card_message("bind_success"), line_imagemap.onboarding_carousel()],
+            tenant_id=str(user["tenant_id"]) if user.get("tenant_id") else None,
+        )
+    except Exception as e:
+        logger.warning(f"[line_connect] 绑定/推送失败: {e}")
+        return _RedirectResp("/home?line_connect=error#integrations", status_code=302)
+    return _RedirectResp("/home?line_connect=ok#integrations", status_code=302)
+
+
 @router.get("/api/auth/line/callback")
 async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
     if error:
         return _RedirectResp(f"/login?oauth_error={error}", status_code=302)
+    # 「用 LINE 连接」分流:state 签入了 user_id → 补绑当前账号(不走登录建号),回集成页。
+    _connect_uid = _parse_connect_state(state)
+    if _connect_uid:
+        return await _handle_connect_line(_connect_uid, code)
     if not _verify_oauth_state(state):
         return _RedirectResp("/login?oauth_error=invalid_state", status_code=302)
     if not code:

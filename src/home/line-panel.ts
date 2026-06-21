@@ -246,6 +246,24 @@
         }
     }
 
+    // 一键「用 LINE 连接」(已登录用户补绑·如 Google 登录)→ 取授权 URL → 跳转。
+    async function connectLine() {
+        try {
+            const token = localStorage.getItem('mrpilot_token');
+            const resp = await fetch('/api/me/connect-line/start', {
+                headers: { Authorization: 'Bearer ' + token },
+            });
+            if (!resp.ok) {
+                showError(t('linebot-err-connect'));
+                return;
+            }
+            const data = await resp.json();
+            if (data.url) window.location.href = data.url;
+        } catch (e) {
+            showError(t('linebot-err-connect'));
+        }
+    }
+
     // 事件绑定
     document.addEventListener('click', (e) => {
         const refreshBtn = (e.target as HTMLElement).closest('#linebot-code-refresh');
@@ -260,6 +278,33 @@
             e.preventDefault();
             unbind();
             return;
+        }
+        const connectBtn = (e.target as HTMLElement).closest('#linebot-connect-line');
+        if (connectBtn) {
+            e.preventDefault();
+            hideError();
+            connectLine();
+            return;
+        }
+    });
+
+    // 「用 LINE 连接」回跳结果 toast(?line_connect=ok|conflict|error)· 清理 URL。
+    window.addEventListener('load', () => {
+        try {
+            const c = new URLSearchParams(location.search).get('line_connect');
+            if (!c) return;
+            const msg =
+                c === 'ok'
+                    ? t('linebot-connect-ok')
+                    : c === 'conflict'
+                      ? t('linebot-connect-conflict')
+                      : t('linebot-err-connect');
+            window.showToast?.(msg, c === 'ok' ? 'success' : 'error');
+            const u = new URL(location.href);
+            u.searchParams.delete('line_connect');
+            history.replaceState(null, '', u.pathname + u.search + u.hash);
+        } catch (e) {
+            /* noop */
         }
     });
 

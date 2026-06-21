@@ -1906,3 +1906,7 @@ tr.brv2-row-warn-soft:hover td { background: var(--danger-bg) !important; }
 /* 手机端「在 LINE 打开 Pearnly」一键深链(桌面隐藏·桌面走 QR)*/
 .linebot-open-line{display:none}
 @media (max-width:800px){.linebot-open-line{display:flex;align-items:center;justify-content:center;gap:6px;margin:0 0 12px;padding:12px;border-radius:10px;background:#06C755;color:#fff;font-weight:600;text-decoration:none}}
+/* 用 LINE 连接(一键·桌面+手机)*/
+.linebot-connect-btn{display:flex;align-items:center;justify-content:center;width:100%;gap:6px;margin:0 0 8px;padding:12px;border:0;border-radius:10px;background:#06C755;color:#fff;font-weight:600;font-size:14px;cursor:pointer}
+.linebot-connect-btn:hover{background:#05b34c}
+.linebot-or{text-align:center;color:#98A2B3;font-size:12px;margin:0 0 12px}

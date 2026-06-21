@@ -255,6 +255,8 @@ export const AUTO_HTML_2 = `                    <!-- Tab: 邮箱抓取 (v0.17 ·
                         <div id="linebot-unbound" style="display:none;">
                             <div class="card linebot-card">
                                 <div class="linebot-bind-intro" data-i18n="linebot-bind-intro">用 LINE 帐号登录 Pearnly 会自动绑定;用 Google 等其他方式登录,按下面 2 步绑定。</div>
+                                <button id="linebot-connect-line" class="linebot-connect-btn" type="button" data-i18n="linebot-connect-line">用 LINE 连接</button>
+                                <div class="linebot-or" data-i18n="linebot-or">或用 6 位码绑定</div>
                                 <a class="linebot-open-line" href="https://line.me/R/ti/p/@pearnly" target="_blank" rel="noopener" data-i18n="linebot-open-in-line">在 LINE 打开 Pearnly</a>
                                 <div class="linebot-steps">
                                     <div class="linebot-step">

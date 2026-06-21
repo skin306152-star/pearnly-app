@@ -84,5 +84,53 @@ class LineLoginAutoBindTests(unittest.TestCase):
         self.assertIn("mrpilot_token", r.text)
 
 
+class ConnectLineTests(unittest.TestCase):
+    """已登录用户「用 LINE 连接」:state 签 user_id → 补绑当前账号(不建新号)。"""
+
+    def setUp(self):
+        app = FastAPI()
+        app.include_router(oauth_routes.router)
+        self.client = TestClient(app)
+        self._patches = [
+            mock.patch.object(oauth_routes, "_LINE_LOGIN_CHANNEL_ID", "cid"),
+            mock.patch.object(oauth_routes, "_LINE_LOGIN_CHANNEL_SECRET", "sec"),
+            mock.patch("httpx.AsyncClient", _FakeAsyncClient),
+            mock.patch.object(oauth_routes.db, "find_user_by_id", lambda uid: dict(_USER, id=uid)),
+            mock.patch.object(oauth_routes.db, "link_line_uid_to_user", lambda *a: None),
+        ]
+        for p in self._patches:
+            p.start()
+
+    def tearDown(self):
+        for p in self._patches:
+            p.stop()
+
+    def test_state_roundtrip(self):
+        s = oauth_routes._gen_connect_state("u9")
+        self.assertEqual(oauth_routes._parse_connect_state(s), "u9")
+        self.assertIsNone(oauth_routes._parse_connect_state("x.y.z"))
+
+    def test_connect_binds_current_user_not_login(self):
+        bind = mock.Mock(return_value=True)
+        state = oauth_routes._gen_connect_state("u9")
+        with mock.patch.object(oauth_routes.db, "create_or_update_line_binding", bind):
+            r = self.client.get(
+                f"/api/auth/line/callback?code=c&state={state}", follow_redirects=False
+            )
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("line_connect=ok", r.headers["location"])
+        kw = bind.call_args.kwargs
+        self.assertEqual(kw["user_id"], "u9")  # 绑到 state 里的当前用户
+        self.assertEqual(kw["line_user_id"], "Uabc123")
+
+    def test_connect_conflict_redirects_honestly(self):
+        state = oauth_routes._gen_connect_state("u9")
+        with mock.patch.object(oauth_routes.db, "create_or_update_line_binding", lambda **k: False):
+            r = self.client.get(
+                f"/api/auth/line/callback?code=c&state={state}", follow_redirects=False
+            )
+        self.assertIn("line_connect=conflict", r.headers["location"])
+
+
 if __name__ == "__main__":
     unittest.main()

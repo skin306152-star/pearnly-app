@@ -106,7 +106,10 @@ def _base_url() -> str:
 
 
 def _download_card(result: dict, lang: str) -> dict:
-    """下载卡(template buttons·按钮 URI 直开签名链接)。"""
+    """凭证下载卡:B5 横幅 hero + 标题 + 下载按钮(URI 直开签名链接)。"""
+    from services.line_binding import line_card_sections as sec
+    from services.line_binding import line_imagemap
+
     title = _m(
         "card_title",
         lang,
@@ -114,15 +117,24 @@ def _download_card(result: dict, lang: str) -> dict:
         n=result["n"],
         total=f"{Decimal(str(result['total'] or 0)):,.2f}",
     )
-    return {
-        "type": "template",
-        "altText": title,
-        "template": {
-            "type": "buttons",
-            "text": title[:160],
-            "actions": [{"type": "uri", "label": _m("btn", lang)[:20], "uri": result["url"]}],
+    bubble = {
+        "type": "bubble",
+        "size": "mega",
+        "hero": line_imagemap.hero(line_imagemap.PROOF_BANNER),
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "paddingAll": "16px",
+            "contents": [sec.txt(title, size="sm", color="#111827", weight="bold", wrap=True)],
+        },
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "paddingAll": "12px",
+            "contents": [sec.btn(_m("btn", lang), primary=True, uri=result["url"])],
         },
     }
+    return sec.prune_empty_text({"type": "flex", "altText": title, "contents": bubble})
 
 
 def start(bound_user, reply_token, line_user_id, lang, cmd) -> bool:

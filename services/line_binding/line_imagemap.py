@@ -101,10 +101,14 @@ _BANNERS: Dict[str, str] = {
 }
 _BANNER_RATIO = "2132:738"
 
-# 其它横幅(非 result_card 状态):解绑确认/成功。
+# 其它横幅(非 result_card 状态):解绑确认/成功、查账汇总、凭证 PDF。
 UNBIND_CONFIRM_BANNER = "A8a-unbind-confirm-banner"
 UNBIND_SUCCESS_BANNER = "A8b-unbind-success-banner"
-_EXTRA_BANNERS = frozenset({UNBIND_CONFIRM_BANNER, UNBIND_SUCCESS_BANNER})
+SUMMARY_BANNER = "B-banner-summary"
+PROOF_BANNER = "B-banner-proof"
+_EXTRA_BANNERS = frozenset(
+    {UNBIND_CONFIRM_BANNER, UNBIND_SUCCESS_BANNER, SUMMARY_BANNER, PROOF_BANNER}
+)
 
 # 已交付图卡 + 横幅的 stem 白名单(出图路由用)。
 CARD_STEMS = (

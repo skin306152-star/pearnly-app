@@ -120,15 +120,65 @@ def reply_summary(reply_token, lang, tid, ws, *, quote_token="", line_user_id=""
     if s["count"] == 0:
         _say(line_client.t_line(lang, "exp_sum_empty"))
         return
+    line_reply.reply_messages_context(
+        reply_token,
+        [_summary_card(lang, s)],
+        quote_token=quote_token,
+        line_user_id=line_user_id,
+        tenant_id=tid,
+    )
+
+
+def _summary_card(lang, s) -> dict:
+    """查账汇总卡:B4 横幅 hero + 总额 + 分类拆解(数字均 DB 真查)。"""
+    from services.line_binding import line_card_sections as sec
+    from services.line_binding import line_imagemap
+
     uncat = line_client.t_line(lang, "exp_uncat")
-    lines = [
-        line_client.t_line(lang, "line_query_summary_intro"),
-        "",
-        line_client.t_line(lang, "exp_sum_head", amount=s["total"], n=s["count"]),
+    body = [
+        sec.txt(
+            line_client.t_line(lang, "line_query_summary_intro"),
+            size="xs",
+            color="#6B7280",
+            wrap=True,
+        ),
+        sec.txt(
+            line_client.t_line(lang, "exp_sum_head", amount=s["total"], n=s["count"]),
+            size="md",
+            color="#111827",
+            weight="bold",
+            wrap=True,
+            margin="sm",
+        ),
     ]
     for c in s["by_category"][:6]:
-        lines.append(f"• {c['name'] or uncat}: ฿{c['amount']} ({c['count']})")
-    _say("\n".join(lines))
+        body.append(
+            sec.txt(
+                f"• {c['name'] or uncat}: ฿{c['amount']} ({c['count']})",
+                size="sm",
+                color="#374151",
+                wrap=True,
+            )
+        )
+    bubble = {
+        "type": "bubble",
+        "size": "mega",
+        "hero": line_imagemap.hero(line_imagemap.SUMMARY_BANNER),
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "paddingAll": "16px",
+            "spacing": "sm",
+            "contents": body,
+        },
+    }
+    return sec.prune_empty_text(
+        {
+            "type": "flex",
+            "altText": line_client.t_line(lang, "exp_sum_head", amount=s["total"], n=s["count"]),
+            "contents": bubble,
+        }
+    )
 
 
 def reply_detail(reply_token, lang, tid, ws, line_user_id=None, *, quote_token="") -> None:

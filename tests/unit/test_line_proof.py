@@ -85,7 +85,7 @@ class StartTests(unittest.TestCase):
 
 
 class DownloadCardTests(unittest.TestCase):
-    def test_card_has_uri_button(self):
+    def test_card_has_hero_and_uri_button(self):
         card = line_proof._download_card(
             {
                 "url": "https://pearnly.com/api/purchase/proof-pdf/TOK",
@@ -95,9 +95,11 @@ class DownloadCardTests(unittest.TestCase):
             },
             "th",
         )
-        actions = card["template"]["actions"]
-        self.assertEqual(actions[0]["type"], "uri")
-        self.assertEqual(actions[0]["uri"], "https://pearnly.com/api/purchase/proof-pdf/TOK")
+        bubble = card["contents"]
+        self.assertIn("B-banner-proof", bubble["hero"]["url"])  # B5 横幅皮肤
+        btn = bubble["footer"]["contents"][0]["action"]
+        self.assertEqual(btn["type"], "uri")
+        self.assertEqual(btn["uri"], "https://pearnly.com/api/purchase/proof-pdf/TOK")
         self.assertIn("2026-06", card["altText"])
 
 

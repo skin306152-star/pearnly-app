@@ -298,7 +298,10 @@ _QUERY_KW = (
     "เดือนนี้ใช้",
     "ใช้ไปเท่าไหร่",
 )
-_QUESTION_MARK = ("吗", "呢", "嘛")
+# 问句/非陈述句标记(多语):L1 见到即不快路记账,交大脑判 speech_act(无 key 落澄清),
+# 防「จ่าย 50 ใช่ไหม」「ถ้าซื้อ 100」被 L1 直记。ไหม 用 contains(误伤「ผ้าไหม」仅改走大脑·仍会记)。
+_Q_WORDS = "ไหม มั้ย เหรอ หรอ ป่าว รึเปล่า หรือเปล่า ทำไม เท่าไหร่ เท่าไร เมื่อไหร่ ยังไง ที่ไหน กี่บาท กี่โมง 吗 呢 嘛".split()
+_HYPO_NEG = "ถ้า สมมติ หาก ไม่ต้อง ไม่เอา ไม่ใช่ 如果 假设 假如 别记 不要记 不用记".split()
 
 
 def l1_intent(text: str) -> Optional[str]:
@@ -312,9 +315,16 @@ def l1_intent(text: str) -> Optional[str]:
 
 
 def is_question(text: str) -> bool:
-    """问句线索(吗/呢/嘛/?/?)→ 即便含数字也不当记账(防「我刚不是花了50吗」被误记)。"""
+    """问句线索(?/吗呢嘛 + 泰语疑问词 ไหม/มั้ย/เหรอ/เท่าไหร่…)→ 含数字也不当记账。"""
     t = (text or "").strip()
-    return t.endswith(("?", "?")) or any(m in t for m in _QUESTION_MARK)
+    return t.endswith(("?", "?")) or any(w in t for w in _Q_WORDS)
+
+
+def is_nonassertive(text: str) -> bool:
+    """假设/否定记账标记(确定性·mirror 大脑 speech_act)→ L1 不快路记账
+    (防「ถ้าซื้อ100」「ไม่ต้องบันทึก100」被直记成支出)。"""
+    low = (text or "").lower()
+    return any(m in low for m in _HYPO_NEG)
 
 
 # 改错信号(P2):「上一笔改成X / 卖家改成7-11」走改错流,不被 L1 当新记一笔(「上一笔改成550」≠ 新花 550)。

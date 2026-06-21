@@ -73,7 +73,7 @@ def handle_expense_text(
             return True
 
         si = lqe.l1_intent(text)
-        isq = lqe.is_question(text)
+        isq = lqe.is_question(text) or lqe.is_nonassertive(text)
         # 改错分流(P2):「上一笔改成X / 第1张改成Y」是改错 → 跳过 L1 记账,交大脑判 edit 抽字段。
         is_edit = lqe.is_edit_request(text)
 

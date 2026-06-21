@@ -124,15 +124,16 @@ class CardTests(unittest.TestCase):
         self.assertEqual(c["type"], "flex")
         self.assertEqual(c["contents"]["type"], "bubble")
 
-    def test_status_is_full_bleed_header(self):
-        # 状态条 = bubble.header(满宽贴边·带底色),不再是 body 内浮动圆角胶囊。
+    def test_status_banner_hero_with_status_below(self):
+        # B 组皮肤:顶部 hero = 设计师状态横幅;状态徽章句移到 body 第一项(满宽带底色)。
         c = self._card("posted")
-        header = c["contents"]["header"]
-        self.assertIn("backgroundColor", header)
-        self.assertNotIn("cornerRadius", header)  # 不再是浮动胶囊
-        self.assertIn("费用已入账", str(header))
-        # body 第一项不应再是带 cornerRadius 的状态胶囊
-        self.assertNotIn("费用已入账", str(c["contents"]["body"]["contents"][0]))
+        bubble = c["contents"]
+        self.assertNotIn("header", bubble)  # 状态条不再占 header 槽
+        self.assertEqual(bubble["hero"]["type"], "image")
+        self.assertIn("B-banner-posted", bubble["hero"]["url"])  # 已入账 → 绿横幅
+        status = bubble["body"]["contents"][0]
+        self.assertIn("backgroundColor", status)
+        self.assertIn("费用已入账", str(status))
 
     def test_product_copy_uses_receipt_card_language(self):
         import json
@@ -745,13 +746,17 @@ class AmountUnreliableReviewHeaderTests(unittest.TestCase):
             token="t",
         )
 
+    def _status_box(self, card):
+        # 状态徽章句现为 body 第一项(顶部 hero 横幅之下)。
+        return str(card["contents"]["body"]["contents"][0])
+
     def test_unreliable_header_is_review_not_confirm(self):
-        header = str(self._card(amount_unreliable=True)["contents"]["header"])
-        self.assertIn("请先核对", header)  # t["review"]
-        self.assertNotIn("请确认后入账", header)  # 不再「请确认」成功态
+        status = self._status_box(self._card(amount_unreliable=True))
+        self.assertIn("请先核对", status)  # t["review"]
+        self.assertNotIn("请确认后入账", status)  # 不再「请确认」成功态
 
     def test_reliable_header_stays_confirm(self):
-        self.assertIn("请确认后入账", str(self._card()["contents"]["header"]))
+        self.assertIn("请确认后入账", self._status_box(self._card()))
 
     def test_unreliable_has_no_confirm_postback_button(self):
         actions = []

@@ -92,8 +92,33 @@ _CARDS: Dict[str, Tuple[str, int, str, List[dict]]] = {
     ),
 }
 
-# 已交付图卡的 stem 白名单(出图路由用)。
-CARD_STEMS = frozenset(stem for stem, _h, _alt, _a in _CARDS.values())
+# B 组动态卡的 hero 横幅(无文字·状态色皮肤)· result_card 顶部按状态贴。2132×738(≈2.9:1)。
+_BANNERS: Dict[str, str] = {
+    "posted": "B-banner-posted",
+    "confirm": "B-banner-review",
+    "review": "B-banner-incomplete",
+    "dup": "B-banner-duplicate",
+}
+_BANNER_RATIO = "2132:738"
+
+# 已交付图卡 + 横幅的 stem 白名单(出图路由用)。
+CARD_STEMS = frozenset(stem for stem, _h, _alt, _a in _CARDS.values()) | frozenset(
+    _BANNERS.values()
+)
+
+
+def banner_hero(state: str) -> Optional[dict]:
+    """按 result_card 状态返回 Flex hero 图块(横幅皮肤)。无对应状态 → None。"""
+    stem = _BANNERS.get(state)
+    if not stem:
+        return None
+    return {
+        "type": "image",
+        "url": f"{_IMG_BASE}/{stem}/1040",
+        "size": "full",
+        "aspectRatio": _BANNER_RATIO,
+        "aspectMode": "cover",
+    }
 
 
 def has_card(card_key: str) -> bool:

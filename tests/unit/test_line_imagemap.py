@@ -44,6 +44,22 @@ class CardMessageTests(unittest.TestCase):
         self.assertTrue(im.has_card("need_bind"))
         self.assertFalse(im.has_card("nope"))
 
+    def test_banner_hero_per_state(self):
+        self.assertIn("B-banner-posted", im.banner_hero("posted")["url"])
+        self.assertIn("B-banner-review", im.banner_hero("confirm")["url"])
+        self.assertIn("B-banner-incomplete", im.banner_hero("review")["url"])
+        self.assertIn("B-banner-duplicate", im.banner_hero("dup")["url"])
+        self.assertIsNone(im.banner_hero("nope"))
+
+    def test_banner_stems_in_route_whitelist(self):
+        for stem in (
+            "B-banner-posted",
+            "B-banner-review",
+            "B-banner-duplicate",
+            "B-banner-incomplete",
+        ):
+            self.assertIn(stem, im.CARD_STEMS)
+
     def test_all_actions_within_bounds(self):
         for key in ("welcome", "capability", "need_bind", "bind_conflict"):
             msg = im.card_message(key)

@@ -11,6 +11,7 @@ Flex 原语与分区构建块在 line_card_sections;chrome 文案在 line_card_i
 from __future__ import annotations
 
 from services.line_binding import line_card_sections as s
+from services.line_binding import line_imagemap
 from services.line_binding.line_card_doctype import doc_type_label
 from services.line_binding.line_card_i18n import chrome as _lang
 
@@ -271,13 +272,15 @@ def _reply_guide_bar(t: dict) -> dict:
     }
 
 
-def _bubble(*, alt: str, header: dict, body: list, footer: list = None) -> dict:
-    bubble = {
-        "type": "bubble",
-        "size": "mega",
-        "header": header,
-        "body": {"type": "box", "layout": "vertical", "paddingAll": "0px", "contents": body},
-    }
+def _bubble(
+    *, alt: str, header: dict = None, hero: dict = None, body: list, footer: list = None
+) -> dict:
+    bubble = {"type": "bubble", "size": "mega"}
+    if header:
+        bubble["header"] = header
+    if hero:
+        bubble["hero"] = hero
+    bubble["body"] = {"type": "box", "layout": "vertical", "paddingAll": "0px", "contents": body}
     if footer:
         bubble["footer"] = {
             "type": "box",
@@ -349,10 +352,14 @@ def result_card(
     block_confirm = bool(fields.get("amount_unreliable"))
     header_state = "review" if (state == "confirm" and block_confirm) else state
     alt_title = t["review_title"] if header_state == "review" else t[header_state]
+    # B 组皮肤:顶部贴设计师横幅(hero),状态徽章句移到横幅下方;无横幅则回落状态条 header。
+    hero = line_imagemap.banner_hero(header_state)
+    status = _status_header(header_state, t)
     return _bubble(
         alt=f"{alt_title} · {amt_text}",
-        header=_status_header(header_state, t),
-        body=body,
+        header=None if hero else status,
+        hero=hero,
+        body=([status] + body) if hero else body,
         footer=s.footer(
             state,
             doc_id,

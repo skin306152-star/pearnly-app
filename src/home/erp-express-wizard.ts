@@ -290,6 +290,41 @@
         if (el) el.innerHTML = '<div class="exp-notice ' + kind + '">' + _esc(msg) + '</div>';
     }
 
+    async function _downloadAgent() {
+        var btn = $('exp-download') as HTMLButtonElement;
+        if (btn) btn.disabled = true;
+        try {
+            var r = await fetch('/api/companion/installer', {
+                headers: { Authorization: 'Bearer ' + _tk() },
+            });
+            if (!r.ok) {
+                _toast(_t(r.status === 404 ? 'exp-download-not-ready' : 'exp-download-fail'));
+                if (btn) btn.disabled = false;
+                return;
+            }
+            var blob = await r.blob();
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'PearnlyCompanion-Setup.exe';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(function () {
+                URL.revokeObjectURL(url);
+            }, 4000);
+            S.downloaded = true;
+            updateUI();
+            _toast(_t('exp-toast-downloaded'));
+            setTimeout(function () {
+                _scrollToStep('exp-step2');
+            }, 200);
+        } catch (e) {
+            _toast(_t('exp-download-fail'));
+            if (btn) btn.disabled = false;
+        }
+    }
+
     async function _genToken() {
         if (!S.downloaded) {
             _toast(_t('exp-toast-need-download'));
@@ -399,12 +434,7 @@
         if (tg.closest('#exp-generate')) return _genToken();
         if (tg.closest('#exp-copy')) return _copy();
         if (tg.closest('#exp-download')) {
-            S.downloaded = true;
-            updateUI();
-            _toast(_t('exp-toast-downloaded'));
-            setTimeout(function () {
-                _scrollToStep('exp-step2');
-            }, 200);
+            _downloadAgent();
             return;
         }
         var link = tg.closest('.exp-step-link') as HTMLElement;

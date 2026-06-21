@@ -1,16 +1,15 @@
 // ============================================================
-// src/home/erp-express-wizard.js · Express 接通向导(P3a · 双栏七步 · 照原型 .wizard)
+// src/home/erp-express-wizard.js · Express 接通向导(单弹窗一屏 · 对齐桌面交互草稿)
 //
-// 左栏竖排步骤面板 + 右栏步骤内容:选 Express → 装 Agent/生成 token → 选账套[锁 DATAT]
-//   → 录入方式 RPA/DBF[+风险弹窗] → 字段映射[复用现有] → 测试 → 完成[自动推送默认关]。
-// 全站设计令牌(暗夜随令牌)· 泰语走 t() · token 接口 404 → 优雅提示"未启用"不白屏。
+// 一屏走完:装小助手 → 生成配对码 + 复制(粘进小助手回连)→ 连上后选账套
+//   (读小助手心跳上报的账套)→ 自动推送(默认开)→ 完成。后台默认直写(method=dbf),
+//   用户不看「录入方式」选择;字段映射/测试后台自动,异常进待确认,不在配置里出现。
+// 全站设计令牌(暗夜随令牌)· 泰语走 t() · token 接口 404 → 优雅提示「未启用」不白屏。
 // 由连接卡经 window.ExpressWizard.open(ep) 拉起 · 全局桥:t / escapeHtml / showToast。
 // ============================================================
 /* global escapeHtml */
 (function () {
     'use strict';
-
-    var TOTAL = 7;
 
     var S: any = null; // wizard state
 
@@ -52,16 +51,17 @@
 
     function open(ep?: any) {
         _close();
+        var cfg = (ep && ep.config) || {};
         S = {
-            step: 1,
             ep: ep || null,
             id: ep && ep.id ? ep.id : null,
-            method: (ep && ep.config && ep.config.method) || 'rpa',
-            dbfAck: false,
-            accountSet: 'DATAT',
-            autoPush: false,
+            accountSet: cfg.account_set || null,
+            accounts: cfg.account_set ? [String(cfg.account_set)] : [],
+            autoPush: ep && typeof ep.auto_push === 'boolean' ? ep.auto_push : true,
             token: '',
             online: false,
+            explainerOpen: false,
+            advancedOpen: false,
             poll: null,
         };
         var ov = document.createElement('div');
@@ -73,82 +73,49 @@
             if (e.target === ov) _close();
         });
         _render();
-    }
-
-    // ─── 左栏竖排步骤面板(照原型 .wizard-side · 令牌着色)─────
-    // prettier-ignore
-    var STEP_LABELS = ['exp-step-1','exp-step-2','exp-step-3','exp-step-4','exp-step-5','exp-step-6','exp-step-7'];
-    function _sideSteps() {
-        var out = '';
-        for (var i = 1; i <= TOTAL; i++) {
-            var cls = i === S.step ? 'active' : i < S.step ? 'done' : '';
-            var num = i < S.step ? '✓' : String(i);
-            out +=
-                '<div class="exp-step ' +
-                cls +
-                '"><span class="exp-step-num">' +
-                num +
-                '</span><span class="exp-step-label">' +
-                _esc(_t(STEP_LABELS[i - 1])) +
-                '</span></div>';
-        }
-        return out;
+        if (S.id) _startPoll(); // 编辑既有连接:进来即探小助手是否在线
     }
 
     function _body() {
         var st = (window as any).ExpressSteps;
-        return st ? st.render(S.step, { S: S, t: _t, esc: _esc }) : '';
+        return st ? st.render({ S: S, t: _t, esc: _esc }) : '';
     }
 
     function _foot() {
-        // 底栏:左「保存草稿」· 右「上一步 / 下一步」(照原型 .wizard-footer)。
-        var draft =
-            '<button type="button" class="btn btn-ghost" id="exp-save-draft">' +
-            _esc(_t('exp-save-draft')) +
+        var ready = !!(S.online && S.accountSet);
+        var cancel =
+            '<button type="button" class="btn btn-ghost" id="exp-cancel">' +
+            _esc(_t('exp-cancel')) +
             '</button>';
-        var back =
-            S.step > 1
-                ? '<button type="button" class="btn btn-ghost" id="exp-back">' +
-                  _esc(_t('exp-back')) +
-                  '</button>'
-                : '';
-        var nextKey = S.step === TOTAL ? 'exp-done' : 'exp-next';
-        var next =
-            '<button type="button" class="btn btn-primary" id="exp-next">' +
-            _esc(_t(nextKey)) +
+        var done =
+            '<button type="button" class="btn btn-primary" id="exp-finish"' +
+            (ready ? '' : ' disabled') +
+            '>' +
+            _esc(_t('exp-done')) +
             '</button>';
         return (
             '<div class="exp-wiz-footer">' +
-            draft +
+            cancel +
             '<div class="exp-wiz-foot-right">' +
-            back +
-            next +
+            done +
             '</div></div>'
         );
     }
 
     function _render() {
-        // 双栏宽弹窗(照原型 .wizard):左栏竖排步骤面板 + 右栏步骤内容 + 底栏。
+        // 单栏弹窗(复用 .exp-risk-modal 单栏卡):标题 + 引导 + 一屏内容 + 底栏。
         var ov = document.getElementById('exp-wiz-overlay');
         if (!ov) return;
         ov.innerHTML =
-            '<div class="exp-wizard" role="dialog" aria-modal="true">' +
-            '<div class="exp-wiz-side">' +
-            '<div class="exp-wiz-side-title">' +
-            _esc(_t('exp-wiz-side-title')) +
+            '<div class="exp-risk-modal" role="dialog" aria-modal="true">' +
+            '<div class="exp-wiz-title">' +
+            _esc(_t('exp-wizard-title')) +
+            '</div><div class="exp-step-sub">' +
+            _esc(_t('exp-s1-sub')) +
             '</div>' +
-            '<div class="exp-wiz-side-sub">' +
-            _esc(_t('exp-wiz-side-sub')) +
-            '</div>' +
-            '<div class="exp-steps">' +
-            _sideSteps() +
-            '</div></div>' +
-            '<div class="exp-wiz-main">' +
-            '<div class="exp-wiz-content">' +
             _body() +
-            '</div>' +
             _foot() +
-            '</div></div>';
+            '</div>';
     }
 
     // ─── actions ────────────────────────────────────────
@@ -161,7 +128,7 @@
                 body: JSON.stringify({
                     name: 'Express',
                     adapter: 'express',
-                    config: { account_set: 'DATAT', method: S.method },
+                    config: { account_set: 'DATAT', method: 'dbf' },
                     is_default: false,
                     auto_push: false,
                 }),
@@ -224,12 +191,19 @@
             var ep = ((d && d.items) || []).find(function (e: any) {
                 return e && (e.adapter || '').toLowerCase() === 'express';
             });
-            var seen = ep && ep.config && ep.config.agent_last_seen_at;
+            if (!ep) return;
+            var cfg = ep.config || {};
+            var seen = cfg.agent_last_seen_at;
             var online = seen ? Date.now() - new Date(seen).getTime() < 180000 : false;
-            if (online && !S.online) {
-                S.online = true;
-                if (S.step === 2) _render();
-            }
+            var acct = cfg.account_set ? String(cfg.account_set) : '';
+            var accounts = acct ? [acct] : [];
+            var changed =
+                online !== S.online || accounts.join(',') !== (S.accounts || []).join(',');
+            S.online = online;
+            S.accounts = accounts;
+            // 自动选中小助手心跳上报的账套(目前后台单账套 · 多账套探测是后续 companion 活)。
+            if (online && acct && !S.accountSet) S.accountSet = acct;
+            if (changed) _render();
         } catch (e) {}
     }
 
@@ -240,19 +214,6 @@
         } catch (e) {}
     }
 
-    function _dbfRiskGate(): Promise<boolean> {
-        // 录入方式 DBF 风险确认弹窗(brief P7)· 勾选"我已了解风险"才放行 · 独立文件。
-        var rk = (window as any).ExpressDbfRisk;
-        if (rk && typeof rk.confirm === 'function') return rk.confirm();
-        return Promise.resolve(false);
-    }
-
-    function _openMappings() {
-        _close();
-        var btn = document.querySelector('.erp-subtab[data-erp-subtab="mappings"]') as HTMLElement;
-        if (btn) btn.click();
-    }
-
     async function _finish() {
         var id = await _ensureEndpoint();
         if (id) {
@@ -261,7 +222,7 @@
                     method: 'PATCH',
                     headers: _auth(),
                     body: JSON.stringify({
-                        config: { account_set: 'DATAT', method: S.method },
+                        config: { account_set: S.accountSet || 'DATAT', method: 'dbf' },
                         auto_push: S.autoPush,
                     }),
                 });
@@ -279,59 +240,29 @@
         } catch (e) {}
     }
 
-    async function _next() {
-        if (S.step === TOTAL) {
-            _finish();
-            return;
-        }
-        S.step++;
-        _render();
-    }
-
-    async function _saveDraft() {
-        // 保存草稿:落一条未完成连接(已建则保留)· 关闭 · 刷新卡片(显「未完成」)。
-        await _ensureEndpoint();
-        _close();
-        _toast(_t('exp-draft-saved'), 'info');
-        _refreshCard();
-    }
-
     // ─── delegated events ───────────────────────────────
     document.addEventListener('click', function (ev) {
         var tg = ev.target as HTMLElement;
         if (!document.getElementById('exp-wiz-overlay')) return;
         if (tg.closest('#exp-cancel')) return _close();
-        if (tg.closest('#exp-save-draft')) return _saveDraft();
-        if (tg.closest('#exp-back')) {
-            S.step = Math.max(1, S.step - 1);
-            return _render();
-        }
-        if (tg.closest('#exp-next')) return _next();
+        if (tg.closest('#exp-finish')) return _finish();
         if (tg.closest('#exp-gen-token')) return _genToken();
         if (tg.closest('#exp-copy-token')) return _copyToken();
         if (tg.closest('#exp-dl-agent')) return _toast(_t('exp-download-soon'), 'info');
-        if (tg.closest('#exp-open-mappings')) return _openMappings();
-        var acct = tg.closest('.exp-acct-opt') as HTMLElement;
-        if (acct && !acct.classList.contains('locked')) {
-            S.accountSet = acct.getAttribute('data-acct') || 'DATAT';
+        if (tg.closest('#exp-how-toggle')) {
+            S.explainerOpen = !S.explainerOpen;
             return _render();
         }
-        var method = tg.closest('.exp-method-card') as HTMLElement;
-        if (method) {
-            var m = method.getAttribute('data-method') || 'rpa';
-            if (m === 'dbf') {
-                _dbfRiskGate().then(function (ok) {
-                    if (ok) {
-                        S.method = 'dbf';
-                        S.dbfAck = true;
-                        _render();
-                    }
-                });
-            } else {
-                S.method = 'rpa';
-                _render();
-            }
-            return;
+        if (tg.closest('#exp-adv-toggle')) {
+            S.advancedOpen = !S.advancedOpen;
+            return _render();
+        }
+        if (tg.closest('.exp-method-card[data-method="rpa-soon"]'))
+            return _toast(_t('exp-method-soon-note'), 'info');
+        var acct = tg.closest('.exp-acct-opt') as HTMLElement;
+        if (acct) {
+            S.accountSet = acct.getAttribute('data-acct') || S.accountSet;
+            return _render();
         }
     });
 

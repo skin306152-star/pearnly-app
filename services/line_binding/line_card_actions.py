@@ -174,6 +174,13 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
         line_bulk_undo.handle_postback(bound_user, reply_token, action, token, lang)
         return
 
+    # 主动解绑(确认/取消):令牌目标=用户,确认即解绑,走独立模块。
+    if action in (line_postback.ACTION_UNBIND_CONFIRM, line_postback.ACTION_UNBIND_CANCEL):
+        from services.line_binding import line_unbind
+
+        line_unbind.handle_postback(bound_user, reply_token, action, token, lang)
+        return
+
     # 学习按钮(Phase B-1):令牌自带学习 payload,按 scope 写 expense_learned,走独立模块。
     if action == line_postback.ACTION_LEARN:
         from services.expense import line_learn

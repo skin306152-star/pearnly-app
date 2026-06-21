@@ -22,6 +22,9 @@ ACTION_BULK_CANCEL = "exp_bulk_cancel"
 # 学习按钮(Phase B-1):改分类后追发 3 档「仅这次/这家/这套账」·scope 在 data 的 s 字段,
 # 学习 payload(科目/卖家/品名)存于一次性令牌 action_ref(JSON),data 只带 scope + token。
 ACTION_LEARN = "exp_learn"
+# LINE 端主动解绑(确认/取消):目标用户存于一次性令牌 action_ref,data 只带 token。
+ACTION_UNBIND_CONFIRM = "line_unbind_confirm"
+ACTION_UNBIND_CANCEL = "line_unbind_cancel"
 _ACTIONS = (
     ACTION_CONFIRM,
     ACTION_UNDO,
@@ -29,6 +32,8 @@ _ACTIONS = (
     ACTION_BULK_UNDO,
     ACTION_BULK_CANCEL,
     ACTION_LEARN,
+    ACTION_UNBIND_CONFIRM,
+    ACTION_UNBIND_CANCEL,
 )
 
 
@@ -62,6 +67,16 @@ def bulk_undo_data(token: str) -> str:
 def bulk_cancel_data(token: str) -> str:
     """批量撤销取消(作废令牌·不撤任何单)。"""
     return urlencode({"a": ACTION_BULK_CANCEL, "n": token})
+
+
+def unbind_confirm_data(token: str) -> str:
+    """解绑确认(目标用户在令牌 action_ref·data 只带 token)。"""
+    return urlencode({"a": ACTION_UNBIND_CONFIRM, "n": token})
+
+
+def unbind_cancel_data(token: str) -> str:
+    """解绑取消(作废令牌·不解绑)。"""
+    return urlencode({"a": ACTION_UNBIND_CANCEL, "n": token})
 
 
 def learn_data(scope: str, token: str) -> str:

@@ -101,17 +101,21 @@ _BANNERS: Dict[str, str] = {
 }
 _BANNER_RATIO = "2132:738"
 
+# 其它横幅(非 result_card 状态):解绑确认/成功。
+UNBIND_CONFIRM_BANNER = "A8a-unbind-confirm-banner"
+UNBIND_SUCCESS_BANNER = "A8b-unbind-success-banner"
+_EXTRA_BANNERS = frozenset({UNBIND_CONFIRM_BANNER, UNBIND_SUCCESS_BANNER})
+
 # 已交付图卡 + 横幅的 stem 白名单(出图路由用)。
-CARD_STEMS = frozenset(stem for stem, _h, _alt, _a in _CARDS.values()) | frozenset(
-    _BANNERS.values()
+CARD_STEMS = (
+    frozenset(stem for stem, _h, _alt, _a in _CARDS.values())
+    | frozenset(_BANNERS.values())
+    | _EXTRA_BANNERS
 )
 
 
-def banner_hero(state: str) -> Optional[dict]:
-    """按 result_card 状态返回 Flex hero 图块(横幅皮肤)。无对应状态 → None。"""
-    stem = _BANNERS.get(state)
-    if not stem:
-        return None
+def hero(stem: str) -> dict:
+    """任意横幅 stem → Flex hero 图块(2132:738 cover)。"""
     return {
         "type": "image",
         "url": f"{_IMG_BASE}/{stem}/1040",
@@ -119,6 +123,12 @@ def banner_hero(state: str) -> Optional[dict]:
         "aspectRatio": _BANNER_RATIO,
         "aspectMode": "cover",
     }
+
+
+def banner_hero(state: str) -> Optional[dict]:
+    """按 result_card 状态返回 Flex hero 图块(横幅皮肤)。无对应状态 → None。"""
+    stem = _BANNERS.get(state)
+    return hero(stem) if stem else None
 
 
 def has_card(card_key: str) -> bool:

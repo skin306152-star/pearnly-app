@@ -37,6 +37,7 @@ from services.line_binding import (
     line_proof,
     line_reply,
     line_rich_menu,
+    line_unbind,
 )
 
 logger = logging.getLogger(__name__)
@@ -353,6 +354,10 @@ async def _handle_line_text(
             return
         lang = line_lang.resolve_reply_lang(text, bound_user.get("preferred_lang"), ev_lang)
         tid = bound_user.get("tenant_id")
+        # 主动解绑命令(破坏性·先于业务):明确「解绑/unbind/ยกเลิกการเชื่อมต่อ」→ 出确认卡(非直解)。
+        if line_unbind.detect_unbind(text):
+            line_unbind.route(bound_user, reply_token, line_user_id, quote_token=quote_token)
+            return
         # 取链接命令(ขอ link drive / ขอ sheet)→ 引导网页取 Drive/Sheet 链接(接阶段二外流)。
         cmd = line_intake.parse_link_command(text)
         if cmd:

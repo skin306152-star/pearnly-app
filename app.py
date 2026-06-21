@@ -39,6 +39,7 @@ from routes.oauth_routes import (
 from routes.line_webhook_routes import (
     router as line_webhook_router,
 )  # REFACTOR-B1 · LINE Bot webhook · 2026-05-28
+from routes.line_card_image_routes import router as line_card_image_router
 from routes.login_routes import router as login_router  # REFACTOR-B1 · 主登录 · 2026-05-28
 from routes.meta_aliases_routes import (
     router as meta_aliases_router,
@@ -315,6 +316,7 @@ app.include_router(auth_email_code_router)  # REFACTOR-B1 · 邮箱验证码 2 �
 app.include_router(line_account_merge_router)  # REFACTOR-B1 · LINE 补邮箱+合并 2 路由(2026-05-28)
 app.include_router(oauth_router)  # REFACTOR-B1 · Google+LINE OAuth 4 路由(2026-05-28)
 app.include_router(line_webhook_router)  # REFACTOR-B1 · LINE Bot webhook · 2026-05-28
+app.include_router(line_card_image_router)  # 泰语图卡出图(公开)
 app.include_router(login_router)  # REFACTOR-B1 · 主登录 · 2026-05-28
 app.include_router(meta_aliases_router)  # REFACTOR-B1 · /api/version + v1 OCR 别名 · 2026-05-28
 app.include_router(ocr_export_router)  # REFACTOR-B1 · OCR 配额+导出 4 路由 · 2026-05-28

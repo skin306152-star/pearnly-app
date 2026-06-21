@@ -114,6 +114,35 @@ _COPY: Dict[str, Dict[str, str]] = {
             "アカウントを切り替える場合は、現在のアカウントで連携を解除してから、再度連携してください。"
         ),
     },
+    "follow_welcome": {
+        "th": (
+            "สวัสดีค่ะ ฉันคือผู้ช่วยบัญชีจาก Pearnly\n"
+            "คุณสามารถถ่ายบิล ส่งใบเสร็จ บันทึกค่าใช้จ่าย และค้นหาข้อมูลบัญชีได้ที่นี่ "
+            "ฉันจะช่วยจัดข้อมูลให้เป็นรายการบัญชีที่ตรวจสอบได้\n\n"
+            "ก่อนเริ่มใช้งาน กรุณาเชื่อมต่อบัญชี Pearnly ของคุณก่อน หลังจากเชื่อมต่อแล้ว "
+            "บิลและข้อมูลที่ส่งใน LINE จะถูกบันทึกเข้าแฟ้มบัญชีของบริษัทคุณ"
+        ),
+        "en": (
+            "Hi, I'm your Pearnly accounting assistant.\n"
+            "You can upload receipts, record expenses, and check accounting data here. "
+            "I'll help turn your messages and documents into reviewable accounting records.\n\n"
+            "Before getting started, please connect your Pearnly account. Once connected, "
+            "receipts and entries sent in LINE will be saved to your company workspace."
+        ),
+        "zh": (
+            "你好,我是 Pearnly 财税助手。\n"
+            "你可以在这里拍票、发收据、记费用、查账务,我会帮你整理成可复核的记账记录。\n\n"
+            "开始使用前,请先连接你的 Pearnly 账号。连接后,你在 LINE 里发送的票据和记账信息,"
+            "都会归到你的公司账套中。"
+        ),
+        "ja": (
+            "こんにちは、Pearnly 会計アシスタントです。\n"
+            "このLINEでレシート送信、領収書アップロード、経費記録、会計データの確認ができます。"
+            "送信された内容を、確認しやすい記帳データとして整理します。\n\n"
+            "利用を開始するには、まず Pearnly アカウントを連携してください。連携後、LINEで送信した"
+            "レシートや記帳情報は、会社のワークスペースに保存されます。"
+        ),
+    },
 }
 
 # Quick Reply 按钮文字(≤20 字符·LINE 硬限)。"connection status" 由原文 "View connection status"(22)缩短。
@@ -184,3 +213,8 @@ def bind_conflict_msg(lang: Optional[str]) -> dict:
 
 def bind_success_msg(lang: Optional[str]) -> dict:
     return _msg(t_bind(lang, "bind_success"))
+
+
+def follow_welcome_msg(lang: Optional[str]) -> dict:
+    """加好友欢迎(非泰语文字回落版;泰语走 line_imagemap 的 A1 图卡)。"""
+    return _msg(t_bind(lang, "follow_welcome"), [_qr_uri(lang, "connect")])

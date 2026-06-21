@@ -26,12 +26,13 @@ import logging
 from fastapi import APIRouter, Request
 
 from core import db
-from services.expense import line_identity
+from services.expense import line_classify, line_identity
 from services.line_binding import (
     line_bind_i18n,
     line_card_actions,
     line_client,
     line_expense,
+    line_imagemap,
     line_intake,
     line_proof,
     line_reply,
@@ -76,6 +77,37 @@ def _ev_lang(ev: dict) -> str:
     return _normalize_line_lang(raw)
 
 
+def _reply_card_or_text(
+    reply_token: str,
+    card_key: str,
+    text_msg: dict,
+    *,
+    lang: str,
+    line_user_id: str,
+    quote_token: str = "",
+    tenant_id=None,
+) -> None:
+    """泰语 → 发设计师图卡(line_imagemap),其他语言 → 回落文字版 text_msg。
+
+    治"泰语图卡 = 主路径,非泰语回落文字"(设计师只出泰语图,不破 4 语)。
+    """
+    if lang == "th" and line_imagemap.has_card(card_key):
+        line_reply.reply_messages_context(
+            reply_token,
+            [line_imagemap.card_message(card_key)],
+            line_user_id=line_user_id,
+            tenant_id=tenant_id,
+        )
+        return
+    line_reply.reply_messages_context(
+        reply_token,
+        [text_msg],
+        quote_token=quote_token,
+        line_user_id=line_user_id,
+        tenant_id=tenant_id,
+    )
+
+
 async def _handle_line_event(ev: dict):
     """单个 LINE 事件处理"""
     ev_type = ev.get("type")
@@ -83,8 +115,18 @@ async def _handle_line_event(ev: dict):
     line_user_id = src.get("userId")
     reply_token = ev.get("replyToken")
 
-    # follow:用户加 Bot 好友 · 欢迎语由 LINE OA Greeting 卡片负责(避免与机器人重复)· 机器人不回
+    # follow:用户加 Bot 好友 → 发欢迎卡(泰语图卡 A1 / 其他语言文字版)。
+    # ⚠️ 若 LINE 后台仍开着「加好友自动问候 Greeting」会双发,需在后台关掉(见交接说明)。
     if ev_type == "follow":
+        if reply_token:
+            lang = _ev_lang(ev)
+            _reply_card_or_text(
+                reply_token,
+                "welcome",
+                line_bind_i18n.follow_welcome_msg(lang),
+                lang=lang,
+                line_user_id=line_user_id,
+            )
         return
 
     # unfollow:用户删 Bot 好友 → 清理绑定,避免残留(无法回复,LINE 限制)
@@ -140,11 +182,13 @@ async def _handle_line_event(ev: dict):
                     # v118.25.4 · 用规范化后的 LINE 用户语言
                     lang = _ev_lang(ev)
                     line_reply.begin_loading(line_user_id)
-                    line_reply.reply_messages_context(
+                    _reply_card_or_text(
                         reply_token,
-                        [line_bind_i18n.image_not_bound_msg(lang)],
-                        quote_token=msg.get("quoteToken"),
+                        "image_not_bound",
+                        line_bind_i18n.image_not_bound_msg(lang),
+                        lang=lang,
                         line_user_id=line_user_id,
+                        quote_token=msg.get("quoteToken"),
                     )
                 return
 
@@ -185,11 +229,13 @@ async def _handle_line_event(ev: dict):
             bound_user = db.get_user_by_line_user_id(line_user_id) if line_user_id else None
             lang = (bound_user.get("preferred_lang") if bound_user else None) or _ev_lang(ev)
             line_reply.begin_loading(line_user_id)
-            line_reply.reply_text_context(
+            _reply_card_or_text(
                 reply_token,
-                line_client.t_line(lang, "unsupported"),
-                quote_token=msg.get("quoteToken"),
+                "unsupported",
+                {"type": "text", "text": line_client.t_line(lang, "unsupported")},
+                lang=lang,
                 line_user_id=line_user_id,
+                quote_token=msg.get("quoteToken"),
                 tenant_id=(bound_user.get("tenant_id") if bound_user else None),
             )
         return
@@ -218,11 +264,13 @@ async def _handle_line_text(
         user_id = db.consume_line_binding_code(text)
         if not user_id:
             # v118.25.4 · 绑定码无效 · 还不知道是哪个 Pearnly 用户 · 用 LINE 语言
-            line_reply.reply_messages_context(
+            _reply_card_or_text(
                 reply_token,
-                [line_bind_i18n.bind_invalid_msg(ev_lang)],
-                quote_token=quote_token,
+                "bind_invalid",
+                line_bind_i18n.bind_invalid_msg(ev_lang),
+                lang=ev_lang,
                 line_user_id=line_user_id,
+                quote_token=quote_token,
             )
             return
 
@@ -243,31 +291,48 @@ async def _handle_line_text(
             picture_url=picture_url,
         )
         if not ok:
-            line_reply.reply_messages_context(
+            _reply_card_or_text(
                 reply_token,
-                [line_bind_i18n.bind_conflict_msg(lang)],
-                quote_token=quote_token,
+                "bind_conflict",
+                line_bind_i18n.bind_conflict_msg(lang),
+                lang=lang,
                 line_user_id=line_user_id,
+                quote_token=quote_token,
             )
             return
 
-        line_reply.reply_messages_context(
+        _reply_card_or_text(
             reply_token,
-            [line_bind_i18n.bind_success_msg(lang)],
-            quote_token=quote_token,
+            "bind_success",
+            line_bind_i18n.bind_success_msg(lang),
+            lang=lang,
             line_user_id=line_user_id,
+            quote_token=quote_token,
         )
         return
 
     # 非绑定码 · 判断是否已绑定
     bound_user = db.get_user_by_line_user_id(line_user_id)
     if not bound_user:
+        # 未绑定也让用户先看「能做什么」(A2 能力卡 · 公开信息)→ 再引导连接。
+        if line_classify.intro_intent(text) == "capability":
+            _reply_card_or_text(
+                reply_token,
+                "capability",
+                {"type": "text", "text": line_client.t_line(ev_lang, "line_intro_capability")},
+                lang=ev_lang,
+                line_user_id=line_user_id,
+                quote_token=quote_token,
+            )
+            return
         # v118.25.4 · 未绑定 · 用 LINE 用户语言(之前写死 zh · 是已知简化 bug · 现在修)
-        line_reply.reply_messages_context(
+        _reply_card_or_text(
             reply_token,
-            [line_bind_i18n.need_bind_msg(ev_lang)],
-            quote_token=quote_token,
+            "need_bind",
+            line_bind_i18n.need_bind_msg(ev_lang),
+            lang=ev_lang,
             line_user_id=line_user_id,
+            quote_token=quote_token,
         )
     else:
         # 理解层第一步(line-language-follow-p0):先把语言判清楚,再进任何执行(记账/查账/闲聊)。

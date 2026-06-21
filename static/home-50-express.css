@@ -1,7 +1,7 @@
 /* ============================================================
- * Express 接入(P3a)· 接通向导 + 连接卡
- * 全部走全站设计令牌(暗夜随令牌)· 无裸 hex / 无 emoji / max-width 用 rem。
- * 连接卡复用 integration-row / int-* / mrerp-card-pill(四态)· 这里只补向导专属。
+ * Express 接入 · 连接卡 + 接通向导弹窗(重设计 v2 · 照搬结构布局)
+ * 全部走全站设计令牌(暗夜随 :root.dark)· 无裸 6 位 hex · max-width 用 rem。
+ * 连接卡复用 integration-row / int-* / mrerp-card-pill(四态)· 这里补卡专属 + 弹窗。
  * ============================================================ */
 
 /* 入口卡品牌色块(Express)· 用令牌不写死 */
@@ -35,104 +35,650 @@
     font-weight: 600;
 }
 
-/* ── 向导 overlay ─────────────────────────────────────────── */
+/* ── 遮罩 ─────────────────────────────────────────────────── */
 .exp-wiz-overlay {
     position: fixed;
     inset: 0;
     z-index: 13000;
-    background: rgba(0, 0, 0, 0.42);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-}
-/* 双栏宽弹窗(照原型 .wizard:左栏步骤面板 260px + 右栏内容)· 尺寸用 rem 不触 lint */
-.exp-wizard {
-    width: min(65.625rem, 100%);
-    max-height: calc(100vh - 40px);
+    background: rgba(18, 15, 28, 0.58);
     display: grid;
-    grid-template-columns: 16.25rem minmax(0, 1fr);
+    place-items: center;
+    padding: 28px;
+}
+
+/* ── 接通向导弹窗(双栏 980×760 · 照搬重设计 v2 结构 · 令牌着色)──────── */
+.exp-modal {
+    width: min(61.25rem, calc(100vw - 3rem));
+    height: min(47.5rem, calc(100vh - 3.375rem));
     background: var(--card);
     border: 1px solid var(--line);
-    border-radius: 26px;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
-    overflow: hidden;
-}
-/* 左栏:竖排步骤面板 */
-.exp-wiz-side {
-    background: var(--bg);
-    border-right: 1px solid var(--line);
-    padding: 22px;
-    overflow: auto;
-}
-.exp-wiz-side-title {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--ink);
-    margin-bottom: 4px;
-}
-.exp-wiz-side-sub {
-    font-size: 12px;
-    color: var(--ink-3);
-    margin-bottom: 18px;
-}
-.exp-steps {
+    border-radius: 24px;
+    box-shadow: var(--shadow-lg);
     display: grid;
-    gap: 8px;
+    grid-template-rows: auto 1fr auto;
+    overflow: hidden;
+    position: relative;
 }
-.exp-step {
+
+.exp-modal-header {
+    padding: 24px 28px 18px;
+    border-bottom: 1px solid var(--line);
+    background: var(--card);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 20px;
+    align-items: start;
+}
+.exp-mh-title {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    min-width: 0;
+}
+.exp-mh-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    flex: 0 0 auto;
+    background: linear-gradient(135deg, var(--brand), var(--purple-500));
+    box-shadow: var(--shadow);
+}
+.exp-mh-h2 {
+    margin: 0;
+    font-size: 22px;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+}
+.exp-mh-lead {
+    margin: 7px 0 0;
+    color: var(--ink-3);
+    font-size: 14px;
+    line-height: 1.55;
+    max-width: 42.5rem;
+}
+.exp-mh-actions {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 10px;
-    border-radius: 13px;
-    color: var(--ink-3);
 }
-.exp-step.active {
-    background: var(--card);
-    color: var(--ink);
-    font-weight: 700;
-}
-.exp-step.done {
-    color: var(--green-700);
-}
-.exp-step-num {
-    width: 24px;
-    height: 24px;
+.exp-topstatus {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 11px;
+    background: var(--purple-50);
+    border: 1px solid var(--line);
     border-radius: 999px;
+    color: var(--ink-3);
+    font-size: 12px;
+    white-space: nowrap;
+}
+.exp-pulse {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    background: var(--amber-500);
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.16);
+}
+.exp-topstatus.online .exp-pulse {
+    background: var(--success);
+    box-shadow: 0 0 0 4px rgba(20, 158, 98, 0.16);
+}
+.exp-iconbtn {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--ink-3);
     display: grid;
     place-items: center;
+    cursor: pointer;
+}
+.exp-iconbtn:hover {
+    border-color: var(--brand);
+    background: var(--purple-50);
+}
+
+.exp-modal-body {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: 0;
+}
+.exp-rail {
+    padding: 22px 20px;
+    border-right: 1px solid var(--line);
+    overflow: auto;
+    background: var(--bg);
+}
+.exp-rail-title {
     font-size: 12px;
-    font-weight: 700;
-    flex: 0 0 auto;
+    color: var(--ink-3);
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    margin: 0 0 14px;
+}
+.exp-step-link {
+    display: grid;
+    grid-template-columns: 32px 1fr;
+    gap: 11px;
+    padding: 11px 10px;
+    border: 1px solid transparent;
+    border-radius: 16px;
+    cursor: pointer;
+    margin-bottom: 8px;
+    transition: 0.16s ease;
+}
+.exp-step-link:hover {
+    background: var(--card);
+    border-color: var(--line);
+}
+.exp-step-link.active {
+    background: var(--card);
+    border-color: var(--brand);
+    box-shadow: var(--shadow);
+}
+.exp-step-num {
+    width: 32px;
+    height: 32px;
+    border-radius: 12px;
+    background: var(--purple-50);
+    color: var(--brand);
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 14px;
+}
+.exp-step-link.done .exp-step-num {
+    background: var(--success-bg);
+    color: var(--success);
+}
+.exp-step-link.waiting .exp-step-num {
+    background: var(--amber-50);
+    color: var(--amber-700);
+}
+.exp-step-name {
+    font-weight: 800;
+    font-size: 14px;
+    margin: 1px 0 4px;
+    color: var(--ink);
+}
+.exp-step-desc {
+    color: var(--ink-3);
+    font-size: 12px;
+    line-height: 1.35;
+}
+.exp-rail-card {
+    margin-top: 18px;
+    padding: 14px;
+    border-radius: 16px;
+    background: var(--card);
+    border: 1px solid var(--line);
+}
+.exp-rail-card b {
+    display: block;
+    font-size: 13px;
+    margin-bottom: 6px;
+    color: var(--ink);
+}
+.exp-rail-card p {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: 12px;
+    line-height: 1.55;
+}
+.exp-progress {
+    height: 8px;
+    border-radius: 999px;
+    overflow: hidden;
     background: var(--line2);
+    margin-top: 12px;
+}
+.exp-bar {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, var(--brand), var(--purple-500));
+    transition: 0.26s ease;
+}
+
+.exp-scroll {
+    overflow: auto;
+    padding: 22px 28px 40px;
+    scroll-behavior: smooth;
+    min-width: 0;
+}
+
+.exp-sec {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--card);
+    margin-bottom: 16px;
+    overflow: hidden;
+}
+.exp-sec-head {
+    padding: 18px 18px 14px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
+    align-items: start;
+    border-bottom: 1px solid var(--line);
+}
+.exp-sec-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 17px;
+    font-weight: 800;
+    margin: 0;
+    color: var(--ink);
+}
+.exp-sec-title span {
     color: var(--ink-3);
 }
-.exp-step.active .exp-step-num {
-    background: var(--success);
-    color: var(--card);
+.exp-badge {
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 5px 9px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
-.exp-step.done .exp-step-num {
-    background: var(--success-bg);
+.exp-badge.todo,
+.exp-badge.off {
+    color: var(--ink-3);
+    background: var(--line2);
+}
+.exp-badge.done {
     color: var(--green-700);
+    background: var(--success-bg);
 }
-.exp-step-label {
+.exp-badge.waiting {
+    color: var(--amber-700);
+    background: var(--amber-50);
+}
+.exp-sec-copy {
+    padding: 14px 18px 18px;
+    color: var(--ink-2);
+    font-size: 14px;
+    line-height: 1.7;
+}
+.exp-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-top: 14px;
+}
+.exp-primary,
+.exp-secondary,
+.exp-plain {
+    border: 0;
+    border-radius: 13px;
+    padding: 12px 16px;
+    font-weight: 800;
+    cursor: pointer;
+    font-size: 14px;
+    transition: 0.16s ease;
+}
+.exp-primary {
+    color: #fff;
+    background: linear-gradient(135deg, var(--brand), var(--purple-500));
+}
+.exp-primary:hover {
+    background: var(--brand-hover);
+}
+.exp-primary:disabled {
+    opacity: 0.48;
+    cursor: not-allowed;
+}
+.exp-secondary {
+    color: var(--ink);
+    background: var(--card);
+    border: 1px solid var(--line);
+}
+.exp-secondary:hover {
+    background: var(--purple-50);
+    border-color: var(--brand);
+}
+.exp-plain {
+    background: transparent;
+    color: var(--brand);
+    padding-inline: 6px;
+}
+.exp-help-text {
+    color: var(--ink-3);
+    font-size: 12px;
+}
+
+.exp-code-box {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 12px;
+    border: 1px dashed var(--brand);
+    background: var(--purple-50);
+    border-radius: 14px;
+}
+.exp-code-value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+    word-break: break-all;
+    user-select: all;
+}
+.exp-code-note {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--ink-3);
+}
+
+.exp-account-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 14px;
+}
+.exp-account-card {
+    border: 1px solid var(--line);
+    background: var(--card);
+    border-radius: 16px;
+    padding: 14px;
+    cursor: pointer;
+    transition: 0.16s ease;
+    min-height: 4.625rem;
+}
+.exp-account-card:hover {
+    border-color: var(--brand);
+    background: var(--purple-50);
+}
+.exp-account-card.selected {
+    border-color: var(--success);
+    background: var(--success-bg);
+    box-shadow: 0 0 0 3px rgba(20, 158, 98, 0.1);
+}
+.exp-account-card b {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--ink);
+}
+.exp-account-card span {
+    color: var(--ink-3);
+    font-size: 12px;
+}
+.exp-empty-account {
+    margin-top: 14px;
+    border: 1px dashed var(--line);
+    border-radius: 16px;
+    background: var(--bg);
+    padding: 18px;
+    color: var(--ink-3);
+    line-height: 1.6;
+}
+
+.exp-info-panel {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--bg);
+    margin-bottom: 16px;
+    overflow: hidden;
+}
+.exp-fold-head {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 18px;
+    font-weight: 800;
+    font-size: 16px;
+    text-align: left;
+}
+.exp-fold-title {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+.exp-chev {
+    transition: 0.16s ease;
+    display: inline-flex;
+}
+.exp-info-panel.collapsed .exp-chev {
+    transform: rotate(-90deg);
+}
+.exp-fold-body {
+    padding: 0 18px 18px;
+}
+.exp-info-panel.collapsed .exp-fold-body {
+    display: none;
+}
+.exp-answer-box {
+    border: 1px solid var(--line);
+    border-radius: 15px;
+    background: var(--card);
+    padding: 16px;
+    color: var(--ink);
+    line-height: 1.7;
+    font-size: 14px;
+}
+.exp-answer-box p {
+    margin: 0 0 14px;
+}
+.exp-answer-box p:last-child {
+    margin-bottom: 0;
+}
+
+.exp-toggle-card {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--card);
+    margin-bottom: 16px;
+    padding: 16px 18px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
+    align-items: center;
+}
+.exp-toggle-card b {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--ink);
+}
+.exp-toggle-card span {
+    color: var(--ink-3);
     font-size: 13px;
 }
-/* 右栏:内容 + 底栏 */
-.exp-wiz-main {
+.exp-switch {
+    position: relative;
+    width: 48px;
+    height: 28px;
+    flex: 0 0 auto;
+}
+.exp-switch input {
+    display: none;
+}
+.exp-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--line);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: 0.18s ease;
+}
+.exp-slider:before {
+    content: "";
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    left: 3px;
+    top: 3px;
+    background: var(--card);
+    border-radius: 50%;
+    transition: 0.18s ease;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+}
+.exp-switch input:checked + .exp-slider {
+    background: linear-gradient(135deg, var(--brand), var(--purple-500));
+}
+.exp-switch input:checked + .exp-slider:before {
+    transform: translateX(20px);
+}
+
+.exp-settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+.exp-choice {
+    min-height: 5.75rem;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--card);
+    padding: 16px;
+    cursor: pointer;
+    transition: 0.16s ease;
+}
+.exp-choice.active {
+    border-color: var(--success);
+    background: var(--success-bg);
+    box-shadow: 0 0 0 3px rgba(20, 158, 98, 0.08);
+}
+.exp-choice.disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background: var(--bg);
+}
+.exp-choice b {
+    display: block;
+    margin-bottom: 7px;
+    color: var(--ink);
+}
+.exp-choice span {
+    display: block;
+    color: var(--ink-3);
+    font-size: 13px;
+    line-height: 1.5;
+}
+.exp-choice.direct-choice {
+    cursor: default;
+}
+.exp-choice-main {
     display: flex;
-    flex-direction: column;
-    min-width: 0;
-    min-height: 41rem;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
 }
-.exp-wiz-content {
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
-    padding: 28px;
+.exp-choice-help-btn {
+    border: 1px solid var(--success);
+    background: var(--card);
+    color: var(--green-700);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-weight: 800;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex: 0 0 auto;
 }
-/* DBF 风险弹窗:单栏卡(独立 · 不随 .exp-wizard 变双栏)*/
+.exp-choice-help-btn:hover {
+    background: var(--success-bg);
+}
+.exp-choice-help-panel {
+    display: none;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    color: var(--ink);
+    line-height: 1.7;
+    font-size: 13px;
+}
+.exp-choice-help-panel.show {
+    display: block;
+}
+.exp-choice-help-panel p {
+    margin: 0 0 12px;
+}
+.exp-choice-help-panel p:last-child {
+    margin-bottom: 0;
+}
+
+.exp-footer {
+    padding: 16px 28px;
+    border-top: 1px solid var(--line);
+    background: var(--card);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+.exp-footer-note {
+    color: var(--ink-3);
+    font-size: 13px;
+    line-height: 1.45;
+}
+.exp-footer-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+/* 手机/窄屏:双栏降级单栏 · 流程轨隐藏(照搬源 mobile)*/
+@media (max-width: 53.75rem) {
+    .exp-modal {
+        width: 100vw;
+        height: 92vh;
+        border-radius: 24px 24px 0 0;
+    }
+    .exp-modal-header {
+        padding: 20px 18px 15px;
+    }
+    .exp-mh-icon,
+    .exp-topstatus {
+        display: none;
+    }
+    .exp-modal-body {
+        grid-template-columns: 1fr;
+    }
+    .exp-rail {
+        display: none;
+    }
+    .exp-scroll {
+        padding: 16px 16px 40px;
+    }
+    .exp-account-list,
+    .exp-settings-grid {
+        grid-template-columns: 1fr;
+    }
+    .exp-footer {
+        padding: 14px 16px;
+    }
+    .exp-footer-note {
+        display: none;
+    }
+    .exp-footer-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+    .exp-footer-actions button {
+        width: 100%;
+    }
+}
+
+/* ── DBF 风险弹窗(FE-1 起未启用 · 保留样式防 erp-express-dbf-risk 失样)── */
 .exp-risk-modal {
     background: var(--card);
     border-radius: 14px;
@@ -141,174 +687,14 @@
     max-height: 90vh;
     overflow: auto;
     padding: 22px 24px 20px;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+    box-shadow: var(--shadow-lg);
 }
-.exp-risk-modal .exp-wiz-title,
 .exp-wiz-title {
     font-size: 17px;
     font-weight: 700;
     color: var(--ink);
     margin-bottom: 14px;
 }
-
-.exp-step-h {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--ink);
-    margin-bottom: 4px;
-}
-.exp-step-sub {
-    font-size: 13px;
-    color: var(--ink-3);
-    line-height: 1.55;
-    margin-bottom: 14px;
-}
-
-/* 选 ERP 网格 */
-.exp-erp-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
-    gap: 10px;
-}
-.exp-erp-opt {
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 14px 12px;
-    text-align: center;
-    cursor: pointer;
-    background: var(--card);
-    transition: border-color 0.15s, background 0.15s;
-}
-.exp-erp-opt.selected {
-    border-color: var(--success);
-    background: var(--success-bg);
-}
-.exp-erp-opt.soon {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-.exp-erp-name {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--ink);
-}
-.exp-erp-tag {
-    font-size: 11px;
-    color: var(--ink-3);
-    margin-top: 3px;
-}
-
-/* token 框 + 复制 */
-.exp-token-box {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 8px 10px;
-    background: var(--bg);
-    margin: 6px 0 10px;
-}
-.exp-token-val {
-    flex: 1;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 12px;
-    color: var(--ink);
-    word-break: break-all;
-    user-select: all;
-}
-
-/* 等待 Agent(呼吸点) */
-.exp-wait {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    font-size: 13px;
-    color: var(--ink-3);
-    margin-top: 10px;
-}
-.exp-wait-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 999px;
-    background: var(--amber-500);
-    flex-shrink: 0;
-    animation: exp-pulse 1.4s ease-in-out infinite;
-}
-.exp-wait.online {
-    color: var(--green-700);
-}
-.exp-wait.online .exp-wait-dot {
-    background: var(--success);
-}
-@keyframes exp-pulse {
-    0%, 100% { opacity: 0.35; }
-    50% { opacity: 1; }
-}
-
-/* 账套列表(锁 DATAT) */
-.exp-acct-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-.exp-acct-opt {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    padding: 9px 11px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    cursor: pointer;
-}
-.exp-acct-opt.selected {
-    border-color: var(--success);
-    background: var(--success-bg);
-}
-.exp-acct-opt.locked {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-.exp-acct-name {
-    font-size: 13px;
-    color: var(--ink);
-}
-.exp-acct-tag {
-    margin-left: auto;
-    font-size: 11px;
-    color: var(--ink-3);
-}
-
-/* 录入方式两卡 */
-.exp-method-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-}
-.exp-method-card {
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 13px;
-    cursor: pointer;
-    background: var(--card);
-}
-.exp-method-card.selected {
-    border-color: var(--success);
-    background: var(--success-bg);
-}
-.exp-method-name {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--ink);
-}
-.exp-method-desc {
-    font-size: 12px;
-    color: var(--ink-3);
-    line-height: 1.5;
-    margin-top: 5px;
-}
-
-/* 通知条(info / warn / danger 三态 · 令牌) */
 .exp-notice {
     padding: 9px 12px;
     border-radius: 8px;
@@ -331,53 +717,6 @@
     border: 1px solid var(--red-200);
     color: var(--red-800);
 }
-
-/* 测试清单 */
-.exp-checklist {
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    margin: 4px 0 12px;
-}
-.exp-check-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--ink);
-}
-.exp-check-mark {
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-    color: var(--green-700);
-}
-.exp-check-mark.pending {
-    color: var(--ink-3);
-}
-
-/* 完成页:自动推送开关(默认关) */
-.exp-finish-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 12px 14px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    margin: 12px 0;
-}
-.exp-finish-toggle-label {
-    font-size: 13px;
-    color: var(--ink);
-}
-.exp-finish-toggle-hint {
-    font-size: 11px;
-    color: var(--ink-3);
-    margin-top: 2px;
-}
-
-/* DBF 风险弹窗(复用 overlay · 严肃不吓人) */
 .exp-risk-points {
     display: flex;
     flex-direction: column;
@@ -396,8 +735,6 @@
     margin-bottom: 14px;
     cursor: pointer;
 }
-
-/* 底栏(照原型 .wizard-footer):左保存草稿 · 右上一步/下一步 */
 .exp-wiz-footer {
     border-top: 1px solid var(--line);
     padding: 14px 18px;
@@ -409,32 +746,4 @@
     display: flex;
     gap: 10px;
     margin-left: auto;
-}
-
-/* 手机/窄屏:双栏降级成单栏(照原型 mobile · 步骤面板转横排可滚)*/
-@media (max-width: 48rem) {
-    .exp-wizard {
-        grid-template-columns: 1fr;
-        max-height: 92vh;
-    }
-    .exp-wiz-side {
-        border-right: 0;
-        border-bottom: 1px solid var(--line);
-    }
-    .exp-steps {
-        grid-auto-flow: column;
-        grid-auto-columns: minmax(8.5rem, 1fr);
-        overflow-x: auto;
-    }
-    .exp-wiz-main {
-        min-height: 32rem;
-    }
-}
-@media (max-width: 30rem) {
-    .exp-method-grid {
-        grid-template-columns: 1fr;
-    }
-    .exp-wiz-content {
-        padding: 18px 16px;
-    }
 }

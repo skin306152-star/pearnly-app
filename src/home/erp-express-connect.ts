@@ -44,7 +44,9 @@
         var tk = _tk();
         if (!tk) return;
         try {
-            var r = await fetch('/api/erp/endpoints', { headers: { Authorization: 'Bearer ' + tk } });
+            var r = await fetch('/api/erp/endpoints', {
+                headers: { Authorization: 'Bearer ' + tk },
+            });
             if (!r.ok) throw new Error('http_' + r.status);
             var d = await r.json();
             _ep =
@@ -79,6 +81,7 @@
     // 四态 → pill 类 + 文案 key
     function _state() {
         if (!_ep) return { pill: 'mrerp-pill-neutral', key: 'exp-pill-incomplete' };
+        if (_ep.enabled === false) return { pill: 'mrerp-pill-neutral', key: 'exp-pill-disabled' };
         if ((_ep.last_status || '') === 'failed')
             return { pill: 'mrerp-pill-err', key: 'exp-pill-error' };
         if (_isOnline(_ep)) return { pill: 'mrerp-pill-ok', key: 'exp-pill-connected' };
@@ -96,8 +99,7 @@
         }
 
         var st = _state();
-        var pill =
-            '<span class="mrerp-card-pill ' + st.pill + '">' + _esc(_t(st.key)) + '</span>';
+        var pill = '<span class="mrerp-card-pill ' + st.pill + '">' + _esc(_t(st.key)) + '</span>';
 
         var configured = !!_ep;
         var acct = (configured && _ep.config && _ep.config.account_set) || 'DATAT';
@@ -127,17 +129,30 @@
                   '</div>'
                 : '';
 
-        var actions = configured
-            ? '<button type="button" class="int-btn-configure" id="btn-express-edit">' +
-              _esc(_t('exp-card-edit')) +
-              '</button>'
-            : '<button type="button" class="int-btn-configure" id="btn-express-connect">' +
-              _esc(_t('exp-card-connect')) +
-              '</button>';
+        var enabled = !configured || _ep.enabled !== false;
+        var actions;
+        if (!configured) {
+            actions =
+                '<button type="button" class="int-btn-configure" id="btn-express-connect">' +
+                _esc(_t('exp-card-connect')) +
+                '</button>';
+        } else {
+            // 停用 → 编辑禁用(卡片不可改)· 启用/停用按钮对齐 MR.ERP DMS 卡。
+            actions =
+                '<button type="button" class="int-btn-configure" id="btn-express-edit"' +
+                (enabled ? '' : ' disabled') +
+                '>' +
+                _esc(_t('exp-card-edit')) +
+                '</button>' +
+                '<button type="button" class="int-btn-configure" id="btn-express-toggle">' +
+                _esc(_t(enabled ? 'exp-card-disable' : 'exp-card-enable')) +
+                '</button>';
+        }
 
         zone.innerHTML =
             '<div class="integration-row erp-connect-express' +
             (configured ? ' connected' : '') +
+            (configured && !enabled ? ' is-disabled' : '') +
             '">' +
             '<div class="int-icon ic-express">' +
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
@@ -168,8 +183,40 @@
     }
 
     function _open() {
+        if (_ep && _ep.enabled === false) return; // 停用 → 不可编辑
         var w = (window as any).ExpressWizard;
         if (w && w.open) w.open(_ep);
+    }
+
+    async function _toggle() {
+        if (!_ep || !_ep.id) return;
+        var enabling = _ep.enabled === false;
+        if (!enabling) {
+            try {
+                var ok = await window.pearnlyConfirm(_t('exp-confirm-disable'));
+                if (!ok) return;
+            } catch (e) {}
+        }
+        try {
+            var r = await fetch('/api/erp/endpoints/' + encodeURIComponent(_ep.id), {
+                method: 'PATCH',
+                headers: { Authorization: 'Bearer ' + _tk(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: enabling }),
+            });
+            if (!r.ok) throw new Error('http_' + r.status);
+            // 同步全局端点缓存 → OCR 推送 picker 立刻反映启停(铁律 #12 单一源)。
+            if (typeof window._refreshErpEndpointsCache === 'function')
+                window._refreshErpEndpointsCache();
+            try {
+                if (typeof showToast === 'function')
+                    showToast(_t(enabling ? 'exp-enabled-toast' : 'exp-disabled-toast'), 'success');
+            } catch (e) {}
+            await _refresh();
+        } catch (e) {
+            try {
+                if (typeof showToast === 'function') showToast(_t('exp-token-fail'), 'error');
+            } catch (e2) {}
+        }
     }
 
     document.addEventListener('click', function (ev) {
@@ -180,6 +227,11 @@
         }
         if (tg.closest('.auto-nav-item[data-auto-tab="erp"]')) {
             setTimeout(_refresh, 90);
+            return;
+        }
+        if (tg.closest('#btn-express-toggle')) {
+            ev.preventDefault();
+            _toggle();
             return;
         }
         if (tg.closest('#btn-express-connect') || tg.closest('#btn-express-edit')) {

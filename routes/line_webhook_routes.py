@@ -274,8 +274,23 @@ async def _handle_line_text(
             line_user_id=line_user_id,
         )
     else:
-        # v118.25.4 · 已绑定 · 优先用户偏好 · 兜底 LINE 语言
-        lang = bound_user.get("preferred_lang") or ev_lang
+        # 理解层第一步(line-language-follow-p0):先把语言判清楚,再进任何执行(记账/查账/闲聊)。
+        # 明说「说中文 / speak English」→ 锁定偏好 + 用新语言确认;否则按这条消息实际打的字跟随,
+        # 再回落账号偏好 / LINE 事件语言。治「中文求说中文却泰语顶回」+「同会话语言漂移」。
+        from services.expense import line_lang
+
+        switched = line_lang.detect_lang_switch(text)
+        if switched:
+            db.update_user_preferred_lang(bound_user.get("id"), switched)
+            line_reply.reply_text_context(
+                reply_token,
+                line_lang.switch_ack(switched),
+                quote_token=quote_token,
+                line_user_id=line_user_id,
+                tenant_id=bound_user.get("tenant_id"),
+            )
+            return
+        lang = line_lang.resolve_reply_lang(text, bound_user.get("preferred_lang"), ev_lang)
         tid = bound_user.get("tenant_id")
         # 取链接命令(ขอ link drive / ขอ sheet)→ 引导网页取 Drive/Sheet 链接(接阶段二外流)。
         cmd = line_intake.parse_link_command(text)

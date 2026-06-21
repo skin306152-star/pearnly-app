@@ -108,6 +108,19 @@ class ReplyPoolOverrideTests(unittest.TestCase):
         msg = _pool(kind="greeting", override_body=None)
         self.assertEqual(msg["text"], "line_greeting")
 
+    def test_time_query_deterministic_bangkok(self):
+        # 报时按曼谷时区确定性算(绝不让 LLM 编):含 HH:MM + 明确口径「泰国时间」(默认 th)。
+        from services.sales import dates
+
+        with mock.patch.object(
+            dates,
+            "bangkok_now",
+            return_value=dates.datetime(2026, 6, 20, 21, 44, tzinfo=dates._BANGKOK),
+        ):
+            msg = _pool(kind="time_query", override_body=None)
+        self.assertIn("21:44", msg["text"])
+        self.assertIn("ไทย", msg["text"])
+
 
 class MaybeBareUndoTests(unittest.TestCase):
     """裸「取消/删除」(无引用·非批量)→ 撤最近一笔(find_last_posted);批量/引用 → 让位。"""

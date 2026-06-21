@@ -76,6 +76,16 @@ class ComposeTests(unittest.TestCase):
         with mock.patch("services.ai_gateway.router.run_task", side_effect=RuntimeError("boom")):
             self.assertIsNone(line_voice.compose("hi", "en", api_key="k"))
 
+    def test_persona_pins_reply_language(self):
+        """compose 把解析出的 lang 写成硬约束(治中文用户被泰语顶回)。"""
+        with mock.patch(
+            "services.ai_gateway.router.run_task", return_value=_result(data={"reply": "你好"})
+        ) as rt:
+            line_voice.compose("你是谁", "zh", api_key="k")
+        prompt = rt.call_args.kwargs["prompt"]
+        self.assertIn("Chinese", prompt)
+        self.assertIn("ONLY", prompt)
+
     def test_only_user_text_no_history_or_receipt_context(self):
         """断言只把用户这句 text 给 Gateway:无 history/票据/税号/金额上下文。"""
         sentinel = "พรุ่งนี้ฝนจะตกไหมคะ"

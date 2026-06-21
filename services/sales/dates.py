@@ -21,6 +21,11 @@ def bangkok_today() -> date:
     return datetime.now(_BANGKOK).date()
 
 
+def bangkok_now() -> datetime:
+    """当前曼谷本地时间(UTC+7·无夏令时)。答「现在几点」用,绝不让模型编时间。"""
+    return datetime.now(_BANGKOK)
+
+
 def validate_issue_date(on: date, today: Optional[date] = None) -> Optional[str]:
     """开票日护栏。返回错误码或 None。today 默认曼谷当天(可注入便于测试)。"""
     ref = today or bangkok_today()

@@ -15,14 +15,29 @@ from __future__ import annotations
 
 _MAX_REPLY_LEN = 500
 
+# 回复语言由调用方解析的 lang 决定(line-language-follow-p0):硬约束,不再让模型自行选(原默认
+# 偏泰语 → 中文用户被泰语顶回)。
+_LANG_NAME = {
+    "zh": "Chinese (简体中文)",
+    "en": "English",
+    "th": "Thai (ภาษาไทย)",
+    "ja": "Japanese (日本語)",
+}
+
+
+def _persona(lang) -> str:
+    name = _LANG_NAME.get((lang or "th"), _LANG_NAME["th"])
+    rule = f"- Reply ONLY in {name}. Use no other language, regardless of what language the user wrote in."
+    return _PERSONA.replace("{LANG_RULE}", rule)
+
+
 _PERSONA = """You are Pearnly, a warm, friendly smart accounting assistant on LINE for Thai SMEs.
 The user just sent a small-talk / off-topic message. Reply to THAT message only, in a kind, human
 tone.
 
 Rules:
 - Keep it short: 1-2 sentences.
-- Reply in the user's language. Thai is the primary language; also support Chinese, English and
-  Japanese — match whatever the user wrote.
+{LANG_RULE}
 - The user may be tired, joking, venting, complimenting you, or just chatting about daily life.
   Respond warmly and naturally like a friendly coworker, and vary your wording — don't sound
   formulaic or reuse the same closing line.
@@ -53,7 +68,9 @@ def compose(text, lang, *, api_key, quota_ok=lambda: True) -> str | None:
         from services.expense import response_guard
 
         # 超时用 task 默认(line_chat_reply=8s):大脑已先跑一次 Gemini,语气层留太短常超时退冷兜底。
-        res = ai_gateway.run_task("line_chat_reply", prompt=_PERSONA, text=text, api_key=api_key)
+        res = ai_gateway.run_task(
+            "line_chat_reply", prompt=_persona(lang), text=text, api_key=api_key
+        )
         if not res.ok or not isinstance(res.data, dict):
             return None
         reply = res.data.get("reply")

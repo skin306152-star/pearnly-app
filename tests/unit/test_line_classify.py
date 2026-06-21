@@ -66,6 +66,14 @@ class DateQueryTests(unittest.TestCase):
         for t in ("ค่าน้ำ 50", "买咖啡 60", "สวัสดี"):
             self.assertFalse(lc.is_date_query(t), t)
 
+    def test_time_questions(self):
+        for t in ("现在几点了", "几点", "ตอนนี้กี่โมง", "what time is it now", "今何時"):
+            self.assertTrue(lc.is_time_query(t), t)
+
+    def test_time_not_confused_with_date_or_expense(self):
+        for t in ("今天几号", "ค่าน้ำ 50", "买咖啡 60"):
+            self.assertFalse(lc.is_time_query(t), t)
+
 
 class CorrectionFeedbackTests(unittest.TestCase):
     def test_feedback_phrases(self):

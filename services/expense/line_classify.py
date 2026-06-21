@@ -205,6 +205,34 @@ _DATE_PATTERNS = (
 )
 
 
+# 问时间(几点)→ 确定性答曼谷当前时间(绝不让 LLM 编时间)。与日期分开:「几点」是时间。
+_TIME_PATTERNS = (
+    (
+        "time",
+        (
+            "几点",
+            "现在时间",
+            "什么时间",
+            "กี่โมง",
+            "ตอนนี้กี่โมง",
+            "เวลาเท่าไหร่",
+            "what time",
+            "the time now",
+            "current time",
+            "time now",
+            "何時",
+            "なんじ",
+            "今何時",
+        ),
+    ),
+)
+
+
+def is_time_query(text: str) -> bool:
+    """问「现在几点/กี่โมง/what time」→ True。答曼谷当前时间(确定性),再引导继续。"""
+    return _first_match(text, _TIME_PATTERNS) == "time"
+
+
 def is_date_query(text: str) -> bool:
     """问「今天几号/วันนี้วันที่เท่าไหร่」→ True。日期与记账相关,答日期再引导,不当离题。"""
     return _first_match(text, _DATE_PATTERNS) == "date"

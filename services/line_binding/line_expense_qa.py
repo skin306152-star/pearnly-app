@@ -22,6 +22,23 @@ def _today_th() -> str:
     return dates.bangkok_today().isoformat()
 
 
+def _time_answer(lang: str) -> str:
+    """现在几点:确定性按曼谷时区(泰国主市场 · LINE 不提供用户所在国时区,统一以泰国时间为准)。
+
+    line_i18n 已满 500,这里内联 4 语一句轻量文案;时间用代码算,不进 LLM(防编时间)。
+    """
+    from services.sales import dates
+
+    hhmm = dates.bangkok_now().strftime("%H:%M")
+    pool = {
+        "zh": f"现在泰国时间 {hhmm} 😊 需要记一笔或查账随时找我。",
+        "th": f"ตอนนี้เวลาประเทศไทย {hhmm} น. 😊 อยากบันทึกหรือดูยอด บอกได้เลยค่ะ",
+        "en": f"It's {hhmm} in Thailand 😊 Need to log an expense or check your books?",
+        "ja": f"タイは今 {hhmm} です😊 経費の記録や照会はいつでもどうぞ。",
+    }
+    return pool.get((lang or "th").lower(), pool["th"])
+
+
 def _qr_item(label: str, text: str) -> dict:
     return {"type": "action", "action": {"type": "message", "label": label[:20], "text": text}}
 
@@ -69,6 +86,9 @@ def reply_pool(
     ]
     if override_body:
         body = override_body
+    elif kind == "time_query":
+        # 报时确定性按曼谷时区算(绝不让 LLM 编时间)。明确标「泰国时间」让用户知道口径。
+        body = _time_answer(lang)
     elif kind == "date_query":
         # 日期与记账相关:答今天日期(确定性·泰国时区)再引导继续,不当离题。
         body = line_client.t_line(lang, "line_date_answer", date=_today_th())

@@ -16,28 +16,6 @@ DEFAULT_LANG = "th"  # 主市场泰国 · 未知语言兜底(单一来源 · 改
 
 LINE_I18N = {
     "zh": {
-        "bind_invalid": "❌ 绑定码无效或已过期\n请回 pearnly.com 重新获取",
-        "bind_conflict": (
-            "❌ 绑定失败 · 此 LINE 账号可能已绑到其他 Pearnly 用户\n请先在原账号解绑再试"
-        ),
-        "bind_success": (
-            "✅ 绑定成功\n\n"
-            "Pearnly 账号:{username}\n"
-            "LINE:{display_name}\n\n"
-            "现在可以发送收据或税票照片让我读取,"
-            "也可以直接输入一笔费用,例如日期、商家、金额和用途。"
-        ),
-        "need_bind": (
-            "你好,我是 Pearnly 采购与费用助理。先绑定账号即可开始:\n"
-            "1. 登录 https://pearnly.com\n"
-            "2. 打开「集成 → LINE Bot」获取 6 位绑定码\n"
-            "3. 把绑定码发给我\n"
-            "绑定后,你可以发送票据让我读取,或直接输入费用记录。"
-        ),
-        "image_not_bound": (
-            "你还没有绑定 Pearnly 账号。\n"
-            "请到 pearnly.com「集成 → LINE Bot」获取 6 位绑定码并发给我,绑定后即可开始读取票据。"
-        ),
         "unsupported": (
             "我可以读取票据文件:图片、PDF、Excel、CSV、Word 或 TXT。\n"
             "你也可以直接输入一笔费用,例如日期、商家、金额和用途。"
@@ -126,29 +104,6 @@ LINE_I18N = {
         ),
     },
     "en": {
-        "bind_invalid": "❌ Invalid or expired code\nGet a new one at pearnly.com",
-        "bind_conflict": (
-            "❌ Binding failed · this LINE account may already be bound to another Pearnly user\n"
-            "Please unbind from the original account first"
-        ),
-        "bind_success": (
-            "✅ Linked successfully\n\n"
-            "Pearnly account: {username}\n"
-            "LINE: {display_name}\n\n"
-            "You can now send a receipt or tax invoice photo for me to read, "
-            "or type an expense with the date, vendor, amount, and purpose."
-        ),
-        "need_bind": (
-            "Hello, I'm Pearnly, your purchasing and expense assistant. Link your account to start:\n"
-            "1. Log in at https://pearnly.com\n"
-            "2. Open 'Integrations → LINE Bot' for your 6-digit code\n"
-            "3. Send the code to me\n"
-            "Once linked, you can send documents for me to read, or type an expense entry."
-        ),
-        "image_not_bound": (
-            "Your Pearnly account isn't linked yet.\n"
-            "Get a 6-digit code at pearnly.com 'Integrations → LINE Bot' and send it to me to start reading documents."
-        ),
         "unsupported": (
             "I can read expense documents: images, PDF, Excel, CSV, Word, or TXT.\n"
             "You can also type an expense with the date, vendor, amount, and purpose."
@@ -247,29 +202,6 @@ LINE_I18N = {
         ),
     },
     "th": {
-        "bind_invalid": "❌ รหัสไม่ถูกต้องหรือหมดอายุ\nกรุณารับรหัสใหม่ที่ pearnly.com",
-        "bind_conflict": (
-            "❌ ผูกบัญชีไม่สำเร็จ · LINE นี้อาจถูกผูกกับ Pearnly บัญชีอื่นแล้ว\n"
-            "กรุณายกเลิกที่บัญชีเดิมก่อน"
-        ),
-        "bind_success": (
-            "✅ ผูกบัญชีสำเร็จค่ะ\n\n"
-            "บัญชี Pearnly: {username}\n"
-            "LINE: {display_name}\n\n"
-            "ตอนนี้ส่งรูปใบเสร็จหรือใบกำกับภาษีมาให้ฉันอ่านได้เลยค่ะ "
-            "หรือพิมพ์รายการค่าใช้จ่าย พร้อมวันที่ ร้านค้า ยอดเงิน และรายละเอียดก็ได้"
-        ),
-        "need_bind": (
-            "สวัสดีค่ะ ฉันคือ Pearnly ผู้ช่วยงานจัดซื้อและค่าใช้จ่าย ผูกบัญชีก่อนเริ่มใช้งานได้เลยค่ะ\n"
-            "1. เข้าสู่ระบบที่ https://pearnly.com\n"
-            "2. เปิด 'การเชื่อมต่อ → LINE Bot' รับรหัส 6 หลัก\n"
-            "3. ส่งรหัสมาให้ฉัน\n"
-            "หลังผูกบัญชีแล้ว ส่งเอกสารมาให้อ่าน หรือพิมพ์บันทึกค่าใช้จ่ายได้เลยค่ะ"
-        ),
-        "image_not_bound": (
-            "ยังไม่ได้ผูกบัญชี Pearnly ค่ะ\n"
-            "ไปที่ pearnly.com 'การเชื่อมต่อ → LINE Bot' รับรหัส 6 หลักแล้วส่งมา เพื่อเริ่มอ่านเอกสารได้เลยค่ะ"
-        ),
         "unsupported": (
             "ฉันอ่านเอกสารค่าใช้จ่ายได้ค่ะ: รูปภาพ, PDF, Excel, CSV, Word หรือ TXT\n"
             "หรือจะพิมพ์รายการค่าใช้จ่าย พร้อมวันที่ ร้านค้า ยอดเงิน และรายละเอียดก็ได้ค่ะ"
@@ -364,29 +296,6 @@ LINE_I18N = {
         ),
     },
     "ja": {
-        "bind_invalid": "❌ コードが無効または期限切れです\npearnly.com で新しいコードを取得してください",
-        "bind_conflict": (
-            "❌ 紐付け失敗 · この LINE は別の Pearnly アカウントに紐付け済みの可能性があります\n"
-            "元のアカウントで先に解除してください"
-        ),
-        "bind_success": (
-            "✅ 連携完了\n\n"
-            "Pearnly アカウント: {username}\n"
-            "LINE: {display_name}\n\n"
-            "領収書や税金請求書の写真を送って読み取らせるか、"
-            "日付、店舗、金額、用途を入力して経費を記録できます。"
-        ),
-        "need_bind": (
-            "こんにちは。仕入れと経費のアシスタント Pearnly です。まずアカウント連携をしてください。\n"
-            "1. https://pearnly.com にログイン\n"
-            "2. 「連携 → LINE Bot」で 6 桁コードを取得\n"
-            "3. コードを送信\n"
-            "連携後は、書類を送って読み取らせるか、経費を入力して記録できます。"
-        ),
-        "image_not_bound": (
-            "Pearnly アカウントが未連携です。\n"
-            "pearnly.com「連携 → LINE Bot」で 6 桁コードを取得して送信すると、書類の読み取りを開始できます。"
-        ),
         "unsupported": (
             "経費書類を読み取れます: 画像、PDF、Excel、CSV、Word、TXT。\n"
             "日付、店舗、金額、用途を入力して経費を記録することもできます。"

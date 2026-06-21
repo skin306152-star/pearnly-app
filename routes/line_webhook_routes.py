@@ -28,6 +28,7 @@ from fastapi import APIRouter, Request
 from core import db
 from services.expense import line_identity
 from services.line_binding import (
+    line_bind_i18n,
     line_card_actions,
     line_client,
     line_expense,
@@ -139,9 +140,9 @@ async def _handle_line_event(ev: dict):
                     # v118.25.4 · 用规范化后的 LINE 用户语言
                     lang = _ev_lang(ev)
                     line_reply.begin_loading(line_user_id)
-                    line_reply.reply_text_context(
+                    line_reply.reply_messages_context(
                         reply_token,
-                        line_client.t_line(lang, "image_not_bound"),
+                        [line_bind_i18n.image_not_bound_msg(lang)],
                         quote_token=msg.get("quoteToken"),
                         line_user_id=line_user_id,
                     )
@@ -217,9 +218,9 @@ async def _handle_line_text(
         user_id = db.consume_line_binding_code(text)
         if not user_id:
             # v118.25.4 · 绑定码无效 · 还不知道是哪个 Pearnly 用户 · 用 LINE 语言
-            line_reply.reply_text_context(
+            line_reply.reply_messages_context(
                 reply_token,
-                line_client.t_line(ev_lang, "bind_invalid"),
+                [line_bind_i18n.bind_invalid_msg(ev_lang)],
                 quote_token=quote_token,
                 line_user_id=line_user_id,
             )
@@ -242,23 +243,17 @@ async def _handle_line_text(
             picture_url=picture_url,
         )
         if not ok:
-            line_reply.reply_text_context(
+            line_reply.reply_messages_context(
                 reply_token,
-                line_client.t_line(lang, "bind_conflict"),
+                [line_bind_i18n.bind_conflict_msg(lang)],
                 quote_token=quote_token,
                 line_user_id=line_user_id,
             )
             return
 
-        username = user.get("username") if user else ""
-        line_reply.reply_text_context(
+        line_reply.reply_messages_context(
             reply_token,
-            line_client.t_line(
-                lang,
-                "bind_success",
-                username=username,
-                display_name=display_name or (line_user_id[:8] + "…"),
-            ),
+            [line_bind_i18n.bind_success_msg(lang)],
             quote_token=quote_token,
             line_user_id=line_user_id,
         )
@@ -268,9 +263,9 @@ async def _handle_line_text(
     bound_user = db.get_user_by_line_user_id(line_user_id)
     if not bound_user:
         # v118.25.4 · 未绑定 · 用 LINE 用户语言(之前写死 zh · 是已知简化 bug · 现在修)
-        line_reply.reply_text_context(
+        line_reply.reply_messages_context(
             reply_token,
-            line_client.t_line(ev_lang, "need_bind"),
+            [line_bind_i18n.need_bind_msg(ev_lang)],
             quote_token=quote_token,
             line_user_id=line_user_id,
         )

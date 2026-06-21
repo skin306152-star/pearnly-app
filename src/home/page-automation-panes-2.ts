@@ -254,6 +254,7 @@ export const AUTO_HTML_2 = `                    <!-- Tab: 邮箱抓取 (v0.17 ·
                         <!-- 未绑定态 -->
                         <div id="linebot-unbound" style="display:none;">
                             <div class="card linebot-card">
+                                <div class="linebot-bind-intro" data-i18n="linebot-bind-intro">用 LINE 帐号登录 Pearnly 会自动绑定;用 Google 等其他方式登录,按下面 2 步绑定。</div>
                                 <div class="linebot-steps">
                                     <div class="linebot-step">
                                         <div class="linebot-step-no">1</div>

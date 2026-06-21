@@ -240,6 +240,7 @@
                 return;
             }
             await load();
+            window.showToast?.(t('linebot-unbind-ok'), 'success');
         } catch (e) {
             showError(t('linebot-err-unbind'));
         }

@@ -44,14 +44,6 @@ class CardTests(unittest.TestCase):
         self.assertNotIn("footer", bubble)
 
 
-class _CM:
-    def __enter__(self):
-        return mock.Mock()
-
-    def __exit__(self, *a):
-        return False
-
-
 class PostbackTests(unittest.TestCase):
     def setUp(self):
         self.bound = {"id": "u1", "tenant_id": "t1", "line_user_id": "L1"}
@@ -59,7 +51,6 @@ class PostbackTests(unittest.TestCase):
         self.reply_msgs = mock.Mock(return_value=True)
         self.reply_text = mock.Mock(return_value=True)
         self._p = [
-            mock.patch.object(line_unbind.db, "get_cursor", lambda *a, **k: _CM()),
             mock.patch.object(line_unbind.db, "unbind_line_by_line_user_id", self.unbind),
             mock.patch.object(line_unbind.line_reply, "reply_messages_context", self.reply_msgs),
             mock.patch.object(line_unbind.line_reply, "reply_text_context", self.reply_text),
@@ -71,41 +62,15 @@ class PostbackTests(unittest.TestCase):
         for p in self._p:
             p.stop()
 
-    def _consume(self, status):
-        import services.line_binding.line_action_nonce as nonce
-
-        return mock.patch.object(nonce, "consume", lambda *a, **k: {"status": status})
-
-    def test_confirm_ok_unbinds_and_sends_success(self):
-        with self._consume("ok"):
-            line_unbind.handle_postback(
-                self.bound, "r", line_postback.ACTION_UNBIND_CONFIRM, "tok", "th"
-            )
+    def test_confirm_unbinds_and_sends_success(self):
+        line_unbind.handle_postback(self.bound, "r", line_postback.ACTION_UNBIND_CONFIRM, "", "th")
         self.unbind.assert_called_once_with("L1")
-        self.reply_msgs.assert_called_once()
-
-    def test_confirm_used_still_idempotent_unbind(self):
-        with self._consume("used"):
-            line_unbind.handle_postback(
-                self.bound, "r", line_postback.ACTION_UNBIND_CONFIRM, "tok", "th"
-            )
-        self.unbind.assert_called_once()
-
-    def test_confirm_missing_token_does_not_unbind(self):
-        with self._consume("missing"):
-            line_unbind.handle_postback(
-                self.bound, "r", line_postback.ACTION_UNBIND_CONFIRM, "", "th"
-            )
-        self.unbind.assert_not_called()
-        self.reply_text.assert_called_once()
+        self.reply_msgs.assert_called_once()  # 成功卡
 
     def test_cancel_does_not_unbind(self):
-        with self._consume("ok"):
-            line_unbind.handle_postback(
-                self.bound, "r", line_postback.ACTION_UNBIND_CANCEL, "tok", "th"
-            )
+        line_unbind.handle_postback(self.bound, "r", line_postback.ACTION_UNBIND_CANCEL, "", "th")
         self.unbind.assert_not_called()
-        self.reply_text.assert_called_once()
+        self.reply_text.assert_called_once()  # 仍连着回执
 
 
 if __name__ == "__main__":

@@ -374,6 +374,19 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
             if not user:
                 return _RedirectResp("/login?oauth_error=line_signup_failed", status_code=302)
 
+    # 登录即自动绑定 Bot:Pearnly 三个 channel 同一 Provider → LINE 登录的 sub == Bot 的 userId,
+    # 直接写 line_bindings 免手输 6 位码。best-effort 静默(已绑/冲突/失败都不拦登录;欢迎卡走 follow,
+    # 非好友推不动故此处不推)。next 用户开 Bot 即已连上。
+    try:
+        db.create_or_update_line_binding(
+            user_id=str(user["id"]),
+            line_user_id=line_uid,
+            display_name=line_name or None,
+            picture_url=line_picture or None,
+        )
+    except Exception as e:
+        logger.warning(f"[line_login] 自动绑定 Bot 跳过(不拦登录): {e}")
+
     # 颁 JWT
     db.update_last_login(str(user["id"]))
     if line_picture:

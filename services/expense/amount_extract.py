@@ -30,6 +30,27 @@ def _dec(s: str) -> Optional[Decimal]:
         return None
 
 
+# 数字量级词(长在前不影响·均为互不包含的独立词)。
+_MULT = (("ล้าน", 1000000), ("แสน", 100000), ("หมื่น", 10000), ("พัน", 1000))
+
+
+def _scaled(num: str, mul: int) -> str:
+    d = _dec(num)
+    return format(d * mul, "f") if d is not None else num
+
+
+def normalize_words(text: str) -> str:
+    """数字简写归一(确定性):1k→1000 · 2หมื่น→20000 · 欧式 1.250,50→1250.50。供金额抽取/接地。"""
+    s = text or ""
+    s = re.sub(  # 欧式千分位(点分千·逗号分小数)
+        r"\d{1,3}(?:\.\d{3})+,\d+", lambda m: m.group(0).replace(".", "").replace(",", "."), s
+    )
+    s = re.sub(r"(\d+(?:\.\d+)?)\s*[kK](?![a-zA-Z])", lambda m: _scaled(m.group(1), 1000), s)
+    for word, mul in _MULT:
+        s = re.sub(rf"(\d+(?:\.\d+)?)\s*{word}", lambda m, mul=mul: _scaled(m.group(1), mul), s)
+    return s
+
+
 def strip_nonmoney(text: str) -> str:
     """剥掉"明显不是钱"的数字:负号数 / 时间 HH:MM / 百分比 / 单位后缀 / 标签前缀。"""
     s = " " + (text or "") + " "
@@ -52,15 +73,15 @@ def strip_nonmoney(text: str) -> str:
 
 def money_numbers(text: str) -> list:
     """原文里"有金钱语境"的数字(剥掉非金额数后)→ Decimal 列表。供金额接地核验(LLM 不编金额)。"""
-    nums = [_dec(x) for x in re.findall(_NUM, strip_nonmoney(text))]
+    nums = [_dec(x) for x in re.findall(_NUM, strip_nonmoney(normalize_words(text)))]
     return [n for n in nums if n is not None]
 
 
 def extract_amount(text, qty, unit_price):
-    """总额:币种标记数优先;否则剥噪声后取最大裸数(多数字时丢纯 5{3,} 笑声)。"""
+    """总额:数字简写归一 → 币种标记数优先;否则剥噪声后取最大裸数(多数字时丢纯 5{3,} 笑声)。"""
     from services.expense.line_quick_entry import _strip_vendor_brands
 
-    text = strip_nonmoney(text)
+    text = strip_nonmoney(normalize_words(text))
     low = text.lower()
     marks = "|".join(re.escape(m) for m in _CURRENCY)
     m = re.search(rf"(?:฿)\s*({_NUM})|({_NUM})\s*(?:{marks})", low)

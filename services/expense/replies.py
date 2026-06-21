@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from services.expense import line_classify
+from services.expense import line_classify, line_guards
 
 _GREETING_WORDS = (
     "你好",
@@ -153,6 +153,34 @@ _POOLS = {
             "申し訳ありませんが、偽の書類作成や数字の改ざんはお手伝いできません🙏 正しい帳簿と安心の申告のため、ありのまま記録します。"
         ],
     },
+    "fx_foreign": {
+        "th": [
+            "ตอนนี้ Pearnly บันทึกเป็นเงินบาท (THB) ค่ะ 🙂 ถ้าจ่ายเป็นสกุลอื่น บอกยอดเป็นบาทได้ไหมคะ เช่น 'ค่าโฆษณา 1800'"
+        ],
+        "zh": [
+            "目前 Pearnly 按泰铢(THB)记账哦🙂 如果是外币付的,告诉我折合多少泰铢就行,比如「广告费 1800」"
+        ],
+        "en": [
+            "Pearnly records in Thai Baht (THB) for now 🙂 If you paid in another currency, just tell me the THB amount, e.g. 'ad fee 1800'"
+        ],
+        "ja": [
+            "今はタイバーツ(THB)で記録します🙂 外貨で払った場合は、バーツ換算額を教えてください。例:「広告費 1800」"
+        ],
+    },
+    "deposit_clarify": {
+        "th": [
+            "นี่ดูเหมือนเงินมัดจำ/เงินประกันค่ะ ซึ่งไม่ใช่ค่าใช้จ่ายปกติ 🙂 ถ้าจะบันทึกเป็นรายจ่าย พิมพ์เป็นรายการชัดๆ เช่น 'ค่าเช่าล่วงหน้า 1000' ได้เลยค่ะ"
+        ],
+        "zh": [
+            "这看起来是押金/保证金哦,不算普通费用🙂 如果要记成支出,直接发清楚的条目就行,比如「预付租金 1000」"
+        ],
+        "en": [
+            "This looks like a deposit/security, not a regular expense 🙂 To record it as spending, send a clear item like 'prepaid rent 1000'"
+        ],
+        "ja": [
+            "これは保証金/手付金のようで、通常の経費ではありません🙂 費用として記録するなら、例:「前払家賃 1000」と明確に送ってください"
+        ],
+    },
 }
 
 
@@ -164,8 +192,12 @@ def detect_smalltalk(text: str) -> Optional[str]:
     low = (text or "").strip().lower()
     if not low:
         return None
-    if line_classify.is_fraud_request(text):  # 合规红线:伪造票据/逃税 → 拒绝(先于一切·绝不记账)
+    if line_guards.is_fraud_request(text):  # 合规红线:伪造票据/逃税 → 拒绝(先于一切·绝不记账)
         return "fraud_refuse"
+    if line_guards.is_fx(text):  # 外币 → 不静默当 THB 记·问 THB 金额
+        return "fx_foreign"
+    if line_guards.is_deposit(text):  # 押金/定金 → 非普通费用·澄清不静默入账
+        return "deposit_clarify"
     if any(w in low for w in _THANKS_WORDS):
         return "thanks"
     if any(w in low for w in _GREETING_WORDS):

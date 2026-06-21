@@ -8,7 +8,7 @@
 import unittest
 from unittest import mock
 
-from services.expense import line_classify, replies
+from services.expense import line_guards, replies
 from services.line_binding import line_expense as le
 
 
@@ -22,7 +22,7 @@ class FraudDetectTests(unittest.TestCase):
             "make a fake receipt for 5000",
             "help me evade tax",
         ]:
-            self.assertTrue(line_classify.is_fraud_request(t), t)
+            self.assertTrue(line_guards.is_fraud_request(t), t)
 
     def test_legit_not_flagged(self):
         # 买假货=合法消费;查账/假设/正常记账不得误伤。
@@ -33,7 +33,7 @@ class FraudDetectTests(unittest.TestCase):
             "ดูยอดเดือนนี้",
             "ถ้าซื้อกาแฟ 100",  # 假设(含「假」概念但中文才有"假"字)
         ]:
-            self.assertFalse(line_classify.is_fraud_request(t), t)
+            self.assertFalse(line_guards.is_fraud_request(t), t)
 
     def test_detect_smalltalk_routes_fraud_first(self):
         self.assertEqual(replies.detect_smalltalk("ทำใบเสร็จปลอม 5000"), "fraud_refuse")

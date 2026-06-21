@@ -1,0 +1,47 @@
+# -*- coding: utf-8 -*-
+"""记账前的确定性「拦截守卫」(在 L1 记账之前判·命中即不入账)。
+
+单一职责:把"绝不能当普通费用记"的输入挡在记账机器之前 —— 合规欺诈 / 外币 / 押金。
+都是零成本关键词判定,供 replies.detect_smalltalk 在最前调用,返回对应 reply 池 kind。
+"""
+
+from __future__ import annotations
+
+# 欺诈(合规红线):伪造票据/篡改金额/逃税。伪造词须与单据词同现 → 避免「买假货」「假设」误伤。
+_FRAUD_DOC = "ใบเสร็จ ใบกำกับ บิล เอกสาร ยอด receipt invoice 发票 票据 单据 账".split()
+_FRAUD_FAKE = "ปลอม fake forge fabricate falsify 假 伪造 做假".split()
+_FRAUD_EVADE = "โกงภาษี เลี่ยงภาษี หนีภาษี evadetax taxevasion 逃税 偷税 漏税 避税".split()
+# 外币(非 THB):符号/泰中文名 + 代码(分词避免「used」含「usd」误伤)。
+_FX_SYM = "$ ¥ € £ ₩ ดอลลาร์ ยูโร เยน หยวน วอน ริงกิต 美元 欧元 日元 韩元 人民币".split()
+_FX_CODE = {"usd", "eur", "cny", "jpy", "krw", "rmb", "sgd", "myr", "hkd"}
+# 押金/定金/保证金:不是普通费用。ดาวน์ 用「เงินดาวน์」避免「ดาวน์โหลด」下载误伤。
+_DEPOSIT = ("มัดจำ", "เงินดาวน์", "เงินประกัน", "deposit", "押金", "订金", "定金", "保证金")
+
+
+def _has_digit(s: str) -> bool:
+    return any(c.isdigit() for c in s or "")
+
+
+def is_fraud_request(text: str) -> bool:
+    """伪造单据/篡改金额/逃税请求?(合规红线)。伪造词须与单据词同现,避免买假货误伤。"""
+    low = "".join((text or "").lower().split())
+    if any(k in low for k in _FRAUD_EVADE):
+        return True
+    return any(w in low for w in _FRAUD_FAKE) and any(d in low for d in _FRAUD_DOC)
+
+
+def is_fx(text: str) -> bool:
+    """外币金额(非 THB)?符号/名/代码 + 数字 → 不静默把外币数字当 THB 记。"""
+    s = text or ""
+    if not _has_digit(s):
+        return False
+    if any(t in s for t in _FX_SYM):
+        return True
+    toks = set(s.lower().replace(",", " ").replace(".", " ").split())
+    return bool(toks & _FX_CODE)
+
+
+def is_deposit(text: str) -> bool:
+    """押金/定金请求?(带数字)→ 押金非普通费用·澄清不静默入账。"""
+    low = (text or "").lower()
+    return _has_digit(low) and any(t.lower() in low for t in _DEPOSIT)

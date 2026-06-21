@@ -266,6 +266,34 @@ SEEDS = [
 # 新增不变量(V2 盲区)。
 INV_REFUSE_FRAUD = "REFUSE_FRAUD"  # 伪造票据/帮逃税/篡改金额 → 必须拒绝·绝不照做·不建单
 INV_FX_HANDLED = "FX_HANDLED"  # 外币 → 标注/换算·不静默把数字当 THB 记
+# 调研定的"确定性层做不对"(分词难题·doc 10 §R4)→ 确定性层 SKIP·真大脑(Tier B)判对错。
+INV_BRAIN_DEFER = "BRAIN_DEFER"
+
+
+# ── V3:领域调研(doc 10)推导的用例 —— 泰数字 / 税票字段 / 分词残留归大脑。 ─────────────
+SEEDS_V3 = [
+    # 泰数字 ๐-๙(会计/正式文档常用·已支持)
+    ("กาแฟ ๖๕ บาท", "th", [INV_RECORD, INV_AMOUNT_GROUNDED], "泰数字65"),
+    ("ค่าเช่า ๒หมื่น", "th", [INV_RECORD, INV_AMOUNT_GROUNDED], "泰数字+量级=20000"),
+    ("ค่าของ 5ร้อย", "th", [INV_RECORD, INV_AMOUNT_GROUNDED], "数字+百=500"),
+    # 税票字段(§86):VAT 7% 与金额分列·税率不当金额
+    ("ราคา 100 vat 7%", "th", [INV_RECORD, INV_AMOUNT_GROUNDED], "含/外税100·不记7"),
+    ("ยอดรวม 107 vat 7", "th", [INV_RECORD, INV_AMOUNT_GROUNDED], "总107·VAT分列·不记7"),
+    (
+        "เลขภาษี 0105556012345 ค่าของ 500",
+        "th",
+        [INV_RECORD, INV_AMOUNT_GROUNDED],
+        "13位税号不当额·记500",
+    ),
+    # 简式票(7-11 小票):免买家/发票号·不能拿全票标准卡
+    ("เซเว่น กาแฟ 45", "th", [INV_RECORD, INV_AMOUNT_GROUNDED], "简式票·invoice/buyer 可空"),
+    # 分词残留(doc 10 §R4)→ 归大脑·确定性层 SKIP
+    ("ห้าสิบบาท", "th", [INV_BRAIN_DEFER], "拼写数字 ห้าสิบ=50·ห้า⊂ห้าง 正则不安全"),
+    ("สองร้อยห้าสิบ", "th", [INV_BRAIN_DEFER], "拼写250·分词难题"),
+    ("M150 2 ขวด 20", "th", [INV_BRAIN_DEFER], "型号150粘字母·分词难题·应记20"),
+    ("100พลัส 15", "th", [INV_BRAIN_DEFER], "型号100粘字母·应记15"),
+    ("สร้างบิลย้อนหลัง 500", "th", [INV_BRAIN_DEFER], "倒签语义歧义·大脑判语境"),
+]
 
 
 # ── V2 盲区种子(现有 14 类之外·大模型反推·测试窗口扩这批)。 ───────────────────────────────
@@ -357,8 +385,8 @@ def expand(seed_count_per_combo: int = 1):
     for frame in NONWRITE_FRAMES_TH:
         for a in AMOUNTS:
             out.append((frame.format(a=a), "th", [INV_NO_RECORD], "gen:nonwrite"))
-    # curated 硬种子(V1 + V2 盲区)
-    for row in SEEDS + SEEDS_V2:
+    # curated 硬种子(V1 + V2 盲区 + V3 调研推导)
+    for row in SEEDS + SEEDS_V2 + SEEDS_V3:
         if row[0] == "__MULTI__":
             out.append(("__MULTI__", row[1], row[2], row[3], "seed:multi"))
         else:

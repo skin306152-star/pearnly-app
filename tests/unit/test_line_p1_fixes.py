@@ -28,6 +28,14 @@ class NumberWordTests(unittest.TestCase):
     def test_eu_format(self):
         self.assertEqual(ae.extract_amount("ค่าของ 1.250,50", None, None), Decimal("1250.50"))
 
+    def test_thai_numerals(self):
+        # 泰数字(会计/正式文档常用)→ 阿拉伯。
+        self.assertEqual(ae.extract_amount("กาแฟ ๕๐ บาท", None, None), Decimal("50"))
+        self.assertEqual(ae.extract_amount("ค่าเช่า ๒หมื่น", None, None), Decimal("20000"))
+
+    def test_roi_hundred(self):
+        self.assertEqual(ae.extract_amount("ค่าของ 5ร้อย", None, None), Decimal("500"))
+
     def test_plain_unaffected(self):
         self.assertEqual(ae.extract_amount("กาแฟ 65", None, None), Decimal("65"))
 

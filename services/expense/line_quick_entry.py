@@ -458,7 +458,7 @@ _MULTI_DATE_RE = re.compile(
 # 长词在前(extract_inline_vendor 按序匹配·ร้านค้า 先于 ร้าน,免「ร้านค้า X」被 ร้าน 截成「ค้า」)。
 _VENDOR_DECL_WORDS = ("ผู้ขาย", "ชื่อร้าน", "ร้านค้า", "ร้าน", "卖家", "商家", "供应商", "店名")
 # 价标签段(「ราคา 50000 / ส่วนลด 50」)是金额标注·不是独立商品 → 不当一项(否则被加进总额)。
-_PRICE_LABELS = "ราคา ส่วนลด หัก ยอด รวม เป็นเงิน ภาษี 价 折扣 小计 合计".split()
+_PRICE_LABELS = "ราคา ส่วนลด หัก ยอด รวม เป็นเงิน ภาษี vat 价 折扣 小计 合计".split()
 _FIELD_WORD_NAMES = frozenset(
     {*_VENDOR_DECL_WORDS, *_PRICE_LABELS, "วันที่", "หมวดหมู่", "หมวด", "日期", "分类", "科目"}
 )
@@ -486,6 +486,7 @@ def parse_multi(text: str) -> Optional[list]:
     from services.expense import amount_extract
 
     clean = _MULTI_DATE_RE.sub(" ", amount_extract.strip_nonmoney(text or ""))
+    clean = re.sub(r"[A-Za-z]*\d[\d/\-]{6,}", " ", clean)  # 长编号/税号/发票号不是金额(与单笔路同)
     items = []
     for m in _MULTI_RE.finditer(clean.strip()):
         name = _UNIT_TAIL.sub("", _NAME_LEAD.sub("", m.group(1).strip())).strip(" -·:、,，/")

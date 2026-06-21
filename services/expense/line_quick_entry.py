@@ -205,29 +205,8 @@ def _extract_tax_and_invoice(text: str) -> tuple[str, str]:
     return tax_id, invoice_number
 
 
-def _extract_amount(
-    text: str, qty: Optional[Decimal], unit_price: Optional[Decimal]
-) -> Optional[Decimal]:
-    """金额(总额)。带币种标记的数优先;否则取剩余裸数字里最大的(排除已识别的数量)。"""
-    low = text.lower()
-    marks = "|".join(re.escape(m) for m in _CURRENCY_MARK)
-    m = re.search(rf"(?:฿)\s*({_NUM})|({_NUM})\s*(?:{marks})", low)
-    if m:
-        return _to_decimal(m.group(1) or m.group(2))
-    if qty is not None and unit_price is not None:
-        return qty * unit_price
-    # 裸数字兜底:先抹掉日期(13/06/69)、长编号/税号、卖家品牌里的数字(7-11/711·店号不是价),
-    # 再排除量词/单价,取剩下最大的当总额。
-    cleaned = re.sub(r"\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}", " ", text)
-    cleaned = re.sub(r"[A-Za-z]*\d[\d/\-]{6,}", " ", cleaned)
-    cleaned = _strip_vendor_brands(cleaned)
-    nums = [_to_decimal(x) for x in re.findall(_NUM, cleaned)]
-    nums = [n for n in nums if n is not None and n not in (qty, unit_price)]
-    return max(nums) if nums else None
-
-
 def text_numbers(text: str) -> list[Decimal]:
-    """原文里出现的数字(去逗号 · 确定性)→ Decimal 列表。供金额接地核验(铁律:LLM 不编金额)。"""
+    """原文里出现的所有数字(去逗号 · 确定性)→ Decimal 列表。供测试 harness 端状态核验。"""
     return [n for n in (_to_decimal(x) for x in re.findall(_NUM, text or "")) if n is not None]
 
 
@@ -429,10 +408,12 @@ def detect_income(text: str) -> bool:
 
 def parse_expense(text: str) -> ExpenseDraft:
     """自由文本 → ExpenseDraft(确定性映射 · doc 10 §3)。无金额 → amount=None(调用方澄清)。"""
+    from services.expense import amount_extract
+
     text = (text or "").strip()
     qty = _extract_qty(text)
     unit_price = _extract_unit_price(text)
-    amount = _extract_amount(text, qty, unit_price)
+    amount = amount_extract.extract_amount(text, qty, unit_price)
     tax_id, invoice_number = _extract_tax_and_invoice(text)
     doc_date = _parse_date(text) or _today().isoformat()
     # category/subcategory 由 webhook 拿真实科目树解析(图/文共用 · 不在此分叉)。

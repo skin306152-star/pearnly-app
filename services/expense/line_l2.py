@@ -36,11 +36,11 @@ def amount_grounded(amount, qty, unit_price, raw_text: str) -> bool:
     原文出现该数字 → 接地;或 qty×单价(两者都在原文)恰等于总额(确定性可复算)→ 接地;
     否则视为编造。供 to_draft 在 LLM 边界拦下凭空金额(治「接触绑定」被记成 50 THB)。
     """
-    from services.expense import line_quick_entry as lqe
+    from services.expense import amount_extract
 
     if amount is None:
         return False
-    nums = lqe.text_numbers(raw_text)
+    nums = amount_extract.money_numbers(raw_text)
     if any(amount == n for n in nums):
         return True
     if qty and unit_price and amount == qty * unit_price:

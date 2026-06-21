@@ -9,6 +9,7 @@ import unittest
 from datetime import date
 from decimal import Decimal
 
+from services.expense import amount_extract as ae
 from services.expense import line_quick_entry as lqe
 from services.expense.expense_draft import ExpenseDraft
 
@@ -231,16 +232,16 @@ class VendorDigitNotAmountTests(unittest.TestCase):
     def test_store_number_not_amount(self):
         # 「昨天在 711 买榴莲」(没说价)→ 金额 None → 走「多少钱?」追问,不记 711 THB。
         t = "เมื่อวานซื้อทุเรียนที่ร้าน 711"
-        self.assertIsNone(lqe._extract_amount(t, None, None))
+        self.assertIsNone(ae.extract_amount(t, None, None))
         self.assertFalse(lqe.parse_expense(t).has_amount())
 
     def test_real_amount_kept_with_digit_vendor(self):
         # 「7-11 买咖啡 65」→ 65 是真金额,不被误删;卖家仍识别 7-Eleven。
-        self.assertEqual(lqe._extract_amount("7-11 ซื้อกาแฟ 65", None, None), Decimal("65"))
+        self.assertEqual(ae.extract_amount("7-11 ซื้อกาแฟ 65", None, None), Decimal("65"))
         self.assertEqual(lqe.parse_expense("7-11 ซื้อกาแฟ 65").amount, Decimal("65"))
 
     def test_non_digit_vendor_unaffected(self):
-        self.assertEqual(lqe._extract_amount("บางจาก 500", None, None), Decimal("500"))
+        self.assertEqual(ae.extract_amount("บางจาก 500", None, None), Decimal("500"))
 
 
 class FourDigitAmountTests(unittest.TestCase):

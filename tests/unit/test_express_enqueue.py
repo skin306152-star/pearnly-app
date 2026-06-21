@@ -27,6 +27,10 @@ _CONFIG = {
     "ap_acc": "21-02-01-00",
 }
 
+OWN_TAX = "0994000333444"  # 账套自家公司税号(方向判定锚点)
+VENDOR_TAX = "0107561000013"
+CUSTOMER_TAX = "0105551234567"
+
 
 def _endpoint(**over):
     cfg = dict(_CONFIG)
@@ -37,9 +41,11 @@ def _endpoint(**over):
 
 
 def _history(confidence="high", **fover):
+    # 进项:自家是买方(buyer_tax==OWN_TAX) → 方向自动判 purchase。
     fields = {
         "seller_name": "บริษัท ปตท จำกัด (มหาชน)",
-        "seller_tax": "0107561000013",
+        "seller_tax": VENDOR_TAX,
+        "buyer_tax": OWN_TAX,
         "subtotal": "375347.20",
         "vat": "26274.30",
         "invoice_number": "RR581231-002",
@@ -52,6 +58,7 @@ def _history(confidence="high", **fover):
         "invoice_no": "RR581231-002",
         "total_amount": "401621.50",
         "confidence": confidence,
+        "workspace_client_id": 7,
         "pages": [{"fields": fields}],
     }
 
@@ -76,8 +83,12 @@ class EnqueueTests(unittest.TestCase):
         # tenant=None → 不查 mappings;mapper 用 config 兜底科目。
         self._tid = mock.patch("core.db.get_user_tenant_id", return_value=None)
         self._tid.start()
+        # 锚点:账套自家公司税号 = OWN_TAX(方向判定用)。
+        self._wc = mock.patch("core.db.get_workspace_client", return_value={"tax_id": OWN_TAX})
+        self._wc.start()
 
     def tearDown(self):
+        self._wc.stop()
         self._tid.stop()
         self._env.stop()
 
@@ -130,10 +141,12 @@ def _sales_endpoint(**over):
     return ep
 
 
-def _sales_history(confidence="high", direction="sales", **fover):
+def _sales_history(confidence="high", **fover):
+    # 销项:自家是卖方(seller_tax==OWN_TAX) → 方向自动判 sales(不靠显式标签)。
     fields = {
         "buyer_name": "บริษัท ลูกค้า จำกัด",
-        "buyer_tax": "0105551234567",
+        "buyer_tax": CUSTOMER_TAX,
+        "seller_tax": OWN_TAX,
         "subtotal": "23456.00",
         "vat": "1641.92",
         "invoice_number": "SO-9001",
@@ -146,7 +159,7 @@ def _sales_history(confidence="high", direction="sales", **fover):
         "invoice_no": "SO-9001",
         "total_amount": "25097.92",
         "confidence": confidence,
-        "direction": direction,
+        "workspace_client_id": 7,
         "pages": [{"fields": fields}],
     }
 
@@ -157,28 +170,56 @@ class DirectionRoutingTests(unittest.TestCase):
         self._env.start()
         self._tid = mock.patch("core.db.get_user_tenant_id", return_value=None)
         self._tid.start()
+        self._wc = mock.patch("core.db.get_workspace_client", return_value={"tax_id": OWN_TAX})
+        self._wc.start()
 
     def tearDown(self):
+        self._wc.stop()
         self._tid.stop()
         self._env.stop()
 
-    def test_sales_routes_to_sales_mapper(self):
+    def test_sales_detected_routes_to_sales_mapper(self):
+        # 自家=卖方 → 自动判 sales → 走 sales_mapper(产 customer 块)。
         r = enqueue_express(_sales_endpoint(), _sales_history())
         self.assertEqual(r["error_msg"], "EXPRESS_QUEUED")
         body = r["request_body"]
         self.assertEqual(body["direction"], "sales")
         self.assertEqual(body["doctype"], "IV")
-        self.assertIn("customer", body)        # 销项产 customer 块
+        self.assertIn("customer", body)  # 销项产 customer 块
         self.assertNotIn("supplier", body)
 
-    def test_purchase_routes_to_purchase_mapper(self):
-        r = enqueue_express(_endpoint(), _history())  # 无 direction → 缺省 purchase
+    def test_purchase_detected_routes_to_purchase_mapper(self):
+        # 自家=买方 → 自动判 purchase → 走 purchase_mapper(产 supplier 块)。
+        r = enqueue_express(_endpoint(), _history())
         self.assertEqual(r["error_msg"], "EXPRESS_QUEUED")
         self.assertEqual(r["request_body"]["direction"], "purchase")
         self.assertIn("supplier", r["request_body"])
 
+    def test_ambiguous_direction_to_manual(self):
+        # 自家税号与票面 seller/buyer 都对不上 → ambiguous → EXPRESS_MANUAL: direction_unknown。
+        h = _history(seller_tax=VENDOR_TAX, buyer_tax=CUSTOMER_TAX)
+        r = enqueue_express(_endpoint(), h)
+        self.assertTrue(r["error_msg"].startswith("EXPRESS_MANUAL"))
+        self.assertIn("direction_unknown", r["error_msg"])
+        self.assertEqual(classify_push_status(r["success"], r["error_msg"]), "manual")
+
+    def test_own_tax_unread_to_manual(self):
+        # 锚点(自家税号)读不到 → ambiguous → 留人工,绝不误推。
+        with mock.patch("core.db.get_workspace_client", return_value={"tax_id": ""}):
+            r = enqueue_express(_endpoint(), _history())
+        self.assertTrue(r["error_msg"].startswith("EXPRESS_MANUAL"))
+        self.assertIn("direction_unknown", r["error_msg"])
+
+    def test_explicit_direction_label_wins(self):
+        # 已带 sales 标签(用户确认)→ 即便缺锚点也按 sales。
+        with mock.patch("core.db.get_workspace_client", return_value=None):
+            h = _sales_history()
+            h["direction"] = "sales"
+            r = enqueue_express(_sales_endpoint(), h)
+        self.assertEqual(r["request_body"]["direction"], "sales")
+
     def test_direction_not_enabled_manual(self):
-        # 本连接只处理进项 → 销项票留人工。
+        # 本连接只处理进项 → 销项票(自家=卖方)留人工。
         r = enqueue_express(_sales_endpoint(config={"directions": ["purchase"]}), _sales_history())
         self.assertTrue(r["error_msg"].startswith("EXPRESS_MANUAL"))
         self.assertIn("direction_not_enabled:sales", r["error_msg"])

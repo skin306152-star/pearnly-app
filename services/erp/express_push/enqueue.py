@@ -19,6 +19,7 @@ import time
 from typing import Any, Dict, Optional
 
 from services.erp.express_push import account_set_allowed, express_push_enabled
+from services.erp.express_push import direction as direction_mod
 from services.erp.express_push.mapper import build_express_payload
 from services.erp.express_push.sales_mapper import build_express_sales_payload
 
@@ -65,10 +66,24 @@ def _category_of(flat: Dict[str, Any]) -> str:
     return str(flat.get("category") or (fields or {}).get("category") or "").strip()
 
 
-def _direction_of(flat: Dict[str, Any], history: Dict[str, Any]) -> str:
-    """方向由 Pearnly 识别/确认带下来(不靠 LLM 猜)· 缺省 purchase 保持现状。"""
-    d = str(flat.get("direction") or history.get("direction") or "purchase").strip().lower()
-    return "sales" if d in ("sales", "income") else "purchase"
+def _own_tax_id(endpoint: Dict[str, Any], flat: Dict[str, Any], tenant_id: Optional[str]) -> str:
+    """账套自家公司税号(方向判定锚点)= 该 history 所属 workspace 主体的 tax_id。
+
+    workspace_clients 即"卖方抬头/账套主体"(见 services/sales/seller_profile)。失败/缺
+    workspace_client_id → 返 ''(下游判 ambiguous,留人工,不误推)。
+    多公司扩展位:将来可返本 workspace 客户公司税号集合,匹配同时得出哪家账套 + 方向。
+    """
+    try:
+        wcid = flat.get("workspace_client_id")
+        if not wcid:
+            return ""
+        from core import db
+
+        wc = db.get_workspace_client(int(wcid), endpoint.get("user_id"), tenant_id=tenant_id)
+        return str((wc or {}).get("tax_id") or "").strip()
+    except Exception:
+        logger.exception("express own tax id resolve failed; direction will be ambiguous")
+        return ""
 
 
 def _allowed_directions(config: Dict[str, Any]) -> tuple:
@@ -116,8 +131,20 @@ def enqueue_express(endpoint: Dict[str, Any], history: Dict[str, Any]) -> Dict[s
         mappings = db.get_mrerp_mappings_bundle(tenant_id) if tenant_id else {}
         category = _category_of(flat)
 
-        # 方向第一类公民(09):标签定死走哪族表;本连接不处理该方向 → 留人工。
-        direction = _direction_of(flat, history)
+        # 自动判方向(确定性·税号锚点):显式标签优先,否则比对自家公司税号 × 票面 seller/buyer
+        # (自家=卖方→sales / 自家=买方→purchase)。判不出 → ambiguous,留人工不误推。
+        direction = direction_mod.resolve_direction(
+            flat, history, own_tax_id=_own_tax_id(endpoint, flat, tenant_id)
+        )
+        if direction is None:
+            return _manual(
+                "direction_unknown",
+                {"adapter": "express", "history_id": str(flat.get("id") or "")},
+                t0,
+            )
+        flat["direction"] = direction  # 写回 → 下游同口径分流(09 方向第一类公民)
+
+        # 本连接不处理该方向(进项/销项/两者)→ 留人工。
         if direction not in _allowed_directions(config):
             return _manual(
                 f"direction_not_enabled:{direction}",
@@ -126,7 +153,9 @@ def enqueue_express(endpoint: Dict[str, Any], history: Dict[str, Any]) -> Dict[s
             )
 
         if direction == "sales":
-            mres = build_express_sales_payload(flat, config=config, mappings=mappings, category=category)
+            mres = build_express_sales_payload(
+                flat, config=config, mappings=mappings, category=category
+            )
         else:
             mres = build_express_payload(flat, config=config, mappings=mappings, category=category)
         if not mres.ok:
@@ -164,8 +193,12 @@ def enqueue_express(endpoint: Dict[str, Any], history: Dict[str, Any]) -> Dict[s
         return _manual(f"enqueue_error:{type(e).__name__}", {"adapter": "express"}, t0)
 
 
-def _grade(history: Dict[str, Any], payload: Dict[str, Any], has_category: bool,
-           direction: str = "purchase"):
+def _grade(
+    history: Dict[str, Any],
+    payload: Dict[str, Any],
+    has_category: bool,
+    direction: str = "purchase",
+):
     """置信判级(复用 confidence.grade · 按实际方向传)。失败返 None 放行。"""
     try:
         from services.expense import confidence

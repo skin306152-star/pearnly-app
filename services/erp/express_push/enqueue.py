@@ -131,11 +131,11 @@ def enqueue_express(endpoint: Dict[str, Any], history: Dict[str, Any]) -> Dict[s
         mappings = db.get_mrerp_mappings_bundle(tenant_id) if tenant_id else {}
         category = _category_of(flat)
 
-        # 自动判方向(确定性·税号锚点):显式标签优先,否则比对自家公司税号 × 票面 seller/buyer
-        # (自家=卖方→sales / 自家=买方→purchase)。判不出 → ambiguous,留人工不误推。
-        direction = direction_mod.resolve_direction(
-            flat, history, own_tax_id=_own_tax_id(endpoint, flat, tenant_id)
-        )
+        # 自动判方向(确定性·税号锚点):显式标签优先(命中即跳过自家税号 DB 查询),否则比对
+        # 自家公司税号 × 票面 seller/buyer(自家=卖方→sales / 买方→purchase)。判不出 → ambiguous。
+        direction = direction_mod.explicit_direction(flat, history)
+        if direction is None:
+            direction = direction_mod.detect_by_tax(flat, _own_tax_id(endpoint, flat, tenant_id))
         if direction is None:
             return _manual(
                 "direction_unknown",

@@ -171,6 +171,95 @@ class LeaseAckTests(unittest.TestCase):
         self.assertEqual(res["reason"], "log_not_found")
 
 
+class AccountSetsReportTests(unittest.TestCase):
+    def test_sanitize_keeps_known_keys_only(self):
+        raw = [
+            {
+                "code": "test",
+                "name": "X",
+                "tax_id": "1",
+                "path": "p",
+                "writable": True,
+                "evil": "drop",
+            }
+        ]
+        out = agent_store._sanitize_account_sets(raw)
+        self.assertEqual(set(out[0]), {"code", "name", "tax_id", "path", "writable"})
+        self.assertIs(out[0]["writable"], True)
+
+    def test_sanitize_drops_empty_and_nonlist(self):
+        self.assertEqual(agent_store._sanitize_account_sets("nope"), [])
+        self.assertEqual(agent_store._sanitize_account_sets([{"tax_id": "1"}]), [])  # 无 code/name
+        # writable 总在(缺省 False · FE 恒拿到可写标志)。
+        self.assertEqual(
+            agent_store._sanitize_account_sets([{"code": "ok"}]),
+            [{"code": "ok", "writable": False}],
+        )
+
+    def test_sanitize_caps_count(self):
+        raw = [{"code": f"c{i}"} for i in range(80)]
+        self.assertEqual(len(agent_store._sanitize_account_sets(raw)), 50)
+
+    def test_store_account_sets_writes_reported(self):
+        cur = FakeCursor()
+        with _patch_cursor(cur):
+            n = agent_store.store_account_sets(
+                "ep-1", [{"code": "test", "name": "X", "writable": True}]
+            )
+        self.assertEqual(n, 1)
+        blob = " ".join(s for s, _ in cur.executed)
+        self.assertIn("reported_account_sets", blob)
+        self.assertIn("account_sets_seen_at", blob)
+        self.assertIn("adapter = 'express'", blob)
+
+
+class HeartbeatReceiveTests(unittest.TestCase):
+    def test_heartbeat_stores_account_sets(self):
+        import asyncio
+
+        from routes import erp_agent
+
+        class _Req:
+            headers = {"authorization": "Bearer exp_ep-1_x"}
+
+            async def json(self):
+                return {"account_sets": [{"code": "test", "name": "X"}], "method": "dbf"}
+
+        ep = {"id": "ep-1", "enabled": True, "config": {"account_set": "DATAT"}}
+        with (
+            mock.patch.object(erp_agent, "express_push_enabled", return_value=True),
+            mock.patch.object(erp_agent.agent_store, "authenticate", return_value=ep),
+            mock.patch.object(erp_agent.agent_store, "touch_heartbeat"),
+            mock.patch.object(erp_agent.agent_store, "store_account_sets", return_value=1) as store,
+        ):
+            res = asyncio.run(erp_agent.erp_agent_heartbeat(_Req()))
+        self.assertEqual(res["account_sets_received"], 1)
+        self.assertEqual(res["account_set"], "DATAT")
+        store.assert_called_once()
+
+    def test_heartbeat_empty_body_ok(self):
+        import asyncio
+
+        from routes import erp_agent
+
+        class _Req:
+            headers = {"authorization": "Bearer exp_ep-1_x"}
+
+            async def json(self):
+                raise ValueError("no body")
+
+        ep = {"id": "ep-1", "enabled": True, "config": {}}
+        with (
+            mock.patch.object(erp_agent, "express_push_enabled", return_value=True),
+            mock.patch.object(erp_agent.agent_store, "authenticate", return_value=ep),
+            mock.patch.object(erp_agent.agent_store, "touch_heartbeat"),
+            mock.patch.object(erp_agent.agent_store, "store_account_sets", return_value=0) as store,
+        ):
+            res = asyncio.run(erp_agent.erp_agent_heartbeat(_Req()))
+        self.assertEqual(res["account_sets_received"], 0)
+        store.assert_not_called()  # 空体不调存储
+
+
 class SchemaAndRouteTests(unittest.TestCase):
     def test_lease_columns_alter_sql(self):
         # 租约列折叠进已接线的 ensure_erp_retry_columns(同表运营列 · 不另加启动钩子)。

@@ -18,16 +18,12 @@ workspace_clients(账套主体 · 即"卖方抬头")解析后传入,本模块只
 
 from __future__ import annotations
 
-import re
 from typing import Any, Dict, Optional
+
+from services.purchase.field_clean import clean_tax_id
 
 _SALES_TOKENS = ("sales", "income")
 _PURCHASE_TOKENS = ("purchase", "expense")
-
-
-def _norm_tax(v: Any) -> str:
-    """税号归一:仅留数字(泰国法人税号 13 位)。空/无数字 → ''。"""
-    return re.sub(r"\D", "", str(v or ""))
 
 
 def _fields(flat: Dict[str, Any]) -> Dict[str, Any]:
@@ -51,13 +47,16 @@ def detect_by_tax(flat: Dict[str, Any], own_tax_id: Any) -> Optional[str]:
 
     多公司扩展:把 own_tax_id 换成集合并返回 (company, direction) —— 命中卖方那家即销项、
     命中买方那家即进项;v1 单公司锚点先返方向,company 由调用方已知账套给。
+
+    税号经 clean_tax_id 归一(恰好 13 位否则 ''·与 mapper/sales_mapper 同口径):弱信号
+    (OCR 残留如 '13')判 '' → 不匹配 → ambiguous,绝不靠脏税号误路由。
     """
-    own = _norm_tax(own_tax_id)
+    own = clean_tax_id(own_tax_id)
     if not own:
         return None
     fields = _fields(flat)
-    seller = _norm_tax(fields.get("seller_tax") or fields.get("seller_tax_id"))
-    buyer = _norm_tax(fields.get("buyer_tax") or fields.get("buyer_tax_id"))
+    seller = clean_tax_id(fields.get("seller_tax") or fields.get("seller_tax_id"))
+    buyer = clean_tax_id(fields.get("buyer_tax") or fields.get("buyer_tax_id"))
     match_seller = bool(seller) and seller == own
     match_buyer = bool(buyer) and buyer == own
     if match_seller and not match_buyer:

@@ -87,6 +87,58 @@ def authenticate(token: str) -> Optional[Dict[str, Any]]:
     return ep
 
 
+_ACCOUNT_SET_KEYS = ("code", "name", "name_en", "tax_id", "path", "writable")
+_MAX_ACCOUNT_SETS = 50
+
+
+def _sanitize_account_sets(raw: Any) -> List[Dict[str, Any]]:
+    """净化 Agent 上报的账套列表:只留已知键、限长限量,布尔归一(防被塞脏数据)。"""
+    if not isinstance(raw, list):
+        return []
+    out: List[Dict[str, Any]] = []
+    for item in raw[:_MAX_ACCOUNT_SETS]:
+        if not isinstance(item, dict):
+            continue
+        clean: Dict[str, Any] = {}
+        for k in _ACCOUNT_SET_KEYS:
+            v = item.get(k)
+            if k == "writable":
+                clean[k] = bool(v)
+            elif v is not None:
+                clean[k] = str(v)[:200]
+        if clean.get("code") or clean.get("name"):
+            out.append(clean)
+    return out
+
+
+def store_account_sets(endpoint_id: str, account_sets: Any) -> int:
+    """存 Agent 探测的可用账套列表进 config.reported_account_sets(供 FE「选账套」读)。
+
+    净化后整体替换(非累加),并记 account_sets_seen_at。返回存入条数。隔离沿用现有约定:
+    只更新本 express endpoint 自己的 config。
+    """
+    sets = _sanitize_account_sets(account_sets)
+    try:
+        from core import db
+
+        with db.get_cursor(commit=True) as cur:
+            # 两个顶层键 → || 合并(create-or-replace),比嵌套 jsonb_set 平。
+            cur.execute(
+                """
+                UPDATE erp_endpoints
+                SET config = COALESCE(config, '{}'::jsonb) || jsonb_build_object(
+                        'reported_account_sets', %s::jsonb,
+                        'account_sets_seen_at', to_jsonb(NOW()::text))
+                WHERE id = %s AND adapter = 'express'
+                """,
+                (json.dumps(sets, ensure_ascii=False), endpoint_id),
+            )
+        return len(sets)
+    except Exception as e:
+        logger.error(f"store_account_sets failed: {e}")
+        return 0
+
+
 def touch_heartbeat(endpoint_id: str) -> None:
     """更新 config.agent_last_seen_at = NOW(UTC)。"""
     try:

@@ -62,10 +62,21 @@ async def erp_agent_token(endpoint_id: str, request: Request):
 # ── Agent 出站拉取(Bearer)───────────────────────────────────────────────
 @router.post("/api/erp/agent/heartbeat")
 async def erp_agent_heartbeat(request: Request):
-    """心跳 · 更新 last_seen · 返回连接状态/账套/录入方式供 Agent 自检。"""
+    """心跳 · 更新 last_seen · 接收 Agent 上报的可用账套列表(供 FE「选账套」读)· 返回状态。
+
+    请求体可带 {account_sets:[{code,name,tax_id,path,writable}]};体为空也正常(旧 Agent
+    兼容)。账套列表存进 endpoint.config.reported_account_sets,前端经 GET /api/erp/endpoints 读到。
+    """
     _require_enabled()
     ep = _auth_agent(request)
     agent_store.touch_heartbeat(str(ep["id"]))
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    stored = 0
+    if isinstance(body, dict) and body.get("account_sets") is not None:
+        stored = agent_store.store_account_sets(str(ep["id"]), body.get("account_sets"))
     cfg = ep.get("config") or {}
     return {
         "ok": True,
@@ -73,6 +84,7 @@ async def erp_agent_heartbeat(request: Request):
         "connected": True,
         "account_set": cfg.get("account_set"),
         "method": cfg.get("method") or "rpa",
+        "account_sets_received": stored,
     }
 
 

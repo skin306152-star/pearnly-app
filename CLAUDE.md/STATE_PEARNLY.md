@@ -6,21 +6,23 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-20 晚 · **B-1/B-2 分类学习 + 改错保卖家 + C-1/C-1b 凭证PDF + 诚实待办卡 + Rich Menu** · HEAD `eb3fae71`）
+## 🎯 状态卡（2026-06-21 · **LINE 设计图卡全套 + 语言中枢 + 解绑闭环 + 登录自动绑/用LINE连接** · HEAD `1fb2fa50`）
 
-- **本窗口 9 commit 全上线·prod health 200·全量 4531 unit 绿(skip3)·replay 52/52·13 闸全绿(唯 `authz` 仍红=并行窗口 `erp_agent.py` 3 条未登记·非我·见下)。⏳ 全部待 Zihao 真机验证。** 见 [[line-category-deterministic-p2a]] [[line-proof-pdf-c1]] [[line-rich-menu-shipped]] [[line-pm-ownership-mode]]。
-  - **B-1 学习真生效**(`217061d4`):文字路 `_fill_category` 改走新 `conversation.lookup_learned_for_text`——先 `canonical_merchant` 归一出商户键 `find_exact(seller:)`(与图片路同一把),治「以后711都记X」后「711 水」仍命中(子串桥不了 711→7-eleven)。
-  - **改/教分类对到真叶子**(`3309d897`):新 `category_ai.match_user_category`(跨语言同义层·复用 `_TARGETS`)·`_resolve_category` 重排 ①同义层②`_fill_category`③显式落「其他」+matched 标·诚实提示「先记其他·可改」。治「改成商品」掉「ค่าใช้จ่ายอื่นๆ」。
-  - **改错克隆保卖家**(`368cabcc`):`detail_to_data` 带 `supplier_id` → `_resolve_supplier` 有 id 即沿用·改分类/字段不丢卖家(P1F 清洗把纯数字「711」名清空 + 无 id 重解析致丢)。学习按钮恢复「以后这家都记」。
-  - **B-2 供应商消歧**(`d378f3cd`):`_VENDOR_BRANDS` 扩 Tops/Villa/Foodland… + 拉丁词 `(?<![a-z])X(?![a-z])` 边界(治「在tops买」CJK 紧邻)·`merchant.is_known_brand` 守卫纯数字店号(711 不当金额清)·`line_agent` 提示句中店名抽 vendor。
-  - **C-1 凭证PDF**(`e74e66c8`)+ **C-1b 美化**(`e39c30a9`):整月已入账票打包(封面汇总+票图)·LINE「ขอ PDF เดือนนี้」→ 异步生成推下载卡·签名 token 下载路由。字体修=**嵌入 Sarabun**(prod 无系统泰文字体致只剩数字)·reportlab Table 专业封面+票图页眉条+页码。新 `services/export/proof_pdf.py`+`line_proof.py`+`static/brand/*.png`+`fonts/Sarabun`。
-  - **Phase B 诚实待办卡**(`13ca4b74`):修「✅已入账绿 + 请核对前」矛盾——posted 绿只中性提示·needs-review 列「ต้องตรวจ N เรื่อง:①…」具体待办(取自 field_quality 信号·不编造)。proof ภาพ 列 ✓→「มี」(Sarabun 无 ✓)。
-  - **Rich Menu 上线**(`985a8025`):插画底图 6 区全映射现有功能(相机/汇总/PDF/明细/帮助/官网)·新 `line_rich_menu.py`·**已 prod 跑 setup·default 生效·1 菜单无堆叠**。`scripts/setup_rich_menu.py` 上线入口。
-  - **/simplify**(`eb3fae71`):proof 抽 `grand_total` 单一口径·build 收 summ 入参去重复查·菜单按需取 ws。
-- **🧹 测试账号 `18685123459@163.com`/tenant `ed9a0d5a`(LINE「Skin」)交易+学习规则全清**(本窗口 ssh prod 清·脏规则 seller:tops→罚款/seller:7-eleven→其他 已除)→ 干净重测。
-- **🔴 流程铁律 [[line-correction-replay-before-push]]**:correction/卡片改动**必先跑 replay 再 push**(本窗口 52/52)。
-- **⚠️ 并行窗口(集成/Express Push)同期在跑·勿冲突**:它们动 `src/home/*`、`routes/integrations*`、`routes/erp_agent.py`、`services/erp/*`、集成卡;我只动 LINE/采购/导出(services/expense·line_binding·purchase·export + line_webhook/purchase routes)。push 前 `git pull --rebase`(只 stash AGENTS.md+docs/00 两个预存改动)·只 add 自己文件。**`authz` 闸预存红 = 它们的 `erp_agent.py` 未登记 PUBLIC/DELEGATED·留它们按 Bearer 模型补·我没碰。**
-- **下个窗口先做(待定)**:① 收 Zihao 真机(B-1/B-2 分类·改错保卖家·凭证 PDF·待办卡·Rich Menu)再定 ② /simplify skip 的后续:跨语言同义层推全路(记账/图片路也用·属行为变更)/proof token 改用 core.auth PyJWT/`_all_bill_refs` 批量查 ③ 待拍:`pip-audit` 14 CVE。
+- 本窗口 ~24 commit 全上线·prod 200·全量 **4590 unit 绿**(skip3·唯 `test_erp_push_split_contract::test_adapter_registry_intact` 红=并行窗口给 ADAPTER_REGISTRY 加 `express` 却没更新该 contract 测试·**非我**)。
+- **★解绑假成功 bug 已修**(`1fb2fa50`·真机抓):点确认出"已解绑"卡却还能记账=绑定没删。根因=`get_user_by_line_user_id` 返 users 行**无 line_user_id 字段**→handle_postback `luid=''`→删 0 行。修:解绑改按 `bound_user['id']` 用 `unbind_line_by_user`;`get_user_by_line_user_id` 把 line_user_id 塞进返回 dict(根因·所有 postback 处理器受益)。教训:写卡片/postback 测试别给 `bound_user` 塞真实没有的字段。
+- **语言中枢**(`55a187dd`):新 `services/expense/line_lang.py`(明说换语言→锁 preferred_lang+确认 / 按消息文本判语种自动跟随 / voice persona 锁 lang)+ 确定性报时 `dates.bangkok_now`。治"中文求说中文却死回泰语"。见 [[line-language-follow-p0]]。
+- **LINE 泰语图卡全套**(设计师交付·橙猫紫调):静态 A1-A11 走 **imagemap**(底部按钮切 tap 区·新 `line_imagemap.py`+出图路由 `/api/line/card/{ver}/{card}/{size}`·ver 破缓存·图 JPEG 存 `static/line-cards`)+ B 组动态卡(识别四态/汇总/凭证 = Flex **hero 横幅皮肤**·`line_card._bubble` 加 hero)+ A8 解绑卡 + A12 新手轮播(Flex carousel)。★坑:设计圆角外被压**纯黑**→imagemap 方角露黑三角→flood-fill 修白·复用脚本同款。
+- **绑定/解绑闭环**:`line_bind_i18n`(四语)+ 面板文案改对(去"即将上线")+ 手机「在 LINE 打开」深链(`line.me/R/ti/p/@pearnly`·mobile-only CSS)+ LINE 端解绑命令→A8 确认(`line_unbind`·postback·**无 nonce**:解绑幂等+解绑后 bound 查不到自然防重放)+ unfollow 清绑定(`unbind_line_by_line_user_id`)+ 网页解绑 toast。
+- **★登录自动绑 + 用 LINE 连接**:前提=登录频道与 Bot **同 provider**。prod 登录频道已切 **2010022630→2010411313**(`.env`·与 Bot 2010309291 同 provider「Pearnly」·旧备份 `.env.bak-line-login-20260621`)。LINE 登录→自动绑+`bot_prompt`+推 `welcome_messages()`(A5+轮播);Google/邮箱→集成页「用 LINE 连接」(`/api/me/connect-line/start` authed·state 签 user_id·复用 line callback 分流 `_handle_connect_line`)或 6 位码。Linked OA 已确认 @771hffyh/Pearnly。
+- **★LINE 平台硬墙(实证·别再绕)**:① 非 bot 好友 push 送不到(返 200 但丢弃)② 加好友勾选只在「手机+首次授权+非好友」才弹(电脑扫码/老用户不弹)③ 不能强制弹开对话 → "加好友"天生不能 100% 自动·靠深链/手动兜底。④ 2010411313 **email 权限未申请**→LINE 登录拿不到邮箱→弹补邮箱(可去 Apply)。⑤ 同 provider 下登录 sub==Bot userId(给 sub push 返 200=同 provider 实证)。详见新记忆 [[line-login-bind-provider-friend]]。
+- 测试数据已清空(Skin/U26139 等测试号·真用户 WAWA/Earn/Korn/mrerp 没碰)。
+- **🔴 流程铁律 [[line-correction-replay-before-push]]**:correction/卡片改动**必先跑 replay 再 push**(本窗口每轮过)。
+- **⚠️ 并行窗口(集成/Express)同跑**:push 前 `git pull --rebase`·只 stash AGENTS.md+docs/00·只 add 自己文件。`authz` 红(`erp_agent.py` 未登记)+ `erp_push.py` 507 行超限 = 它们的债·非我。
+- **defer(下窗口·/simplify 发现·碰已验证登录/卡渲染主路径故收尾没动)**:① oauth token 交换抽 `_exchange_line_code`(login+connect 重复一段)② 卡 bubble 统一走 `line_card._bubble`(`line_unbind`/`line_expense_qa`/`line_proof` 各写一份 hero bubble)③ `line_imagemap` 资产注册表(stem 散成多集合·`hero()` 不校验)④ `_reply_card_or_text` 文字回落死代码 + `line_bind_i18n` 未用构建器(先定非泰语是否保留文字回落)。另:email 权限 Apply / pip-audit。
+
+## 历史记录（旧状态卡 · 2026-06-20 晚 · B-1/B-2 分类学习 + 改错保卖家 + C-1 凭证PDF + 诚实待办卡 + Rich Menu · HEAD `eb3fae71`）
+
+- 9 commit·prod 200·4531 unit·replay 52/52。B-1 学习真生效(`217061d4`)·改/教分类对叶子(`3309d897`)·改错克隆保卖家(`368cabcc`)·B-2 供应商消歧(`d378f3cd`)·C-1/C-1b 凭证PDF(`e74e66c8`/`e39c30a9`·嵌 Sarabun)·诚实待办卡(`13ca4b74`)·Rich Menu(`985a8025`)。见 [[line-category-deterministic-p2a]] [[line-proof-pdf-c1]] [[line-rich-menu-shipped]]。
 
 ## 历史记录（旧状态卡 · 2026-06-19 · 05 引用旧卡片状态闭环 全成立 + 裸取消焦点锚定 · HEAD `f8c0d5f5`）
 

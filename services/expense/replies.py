@@ -181,7 +181,98 @@ _POOLS = {
             "これは保証金/手付金のようで、通常の経費ではありません🙂 費用として記録するなら、例:「前払家賃 1000」と明確に送ってください"
         ],
     },
+    # 引导框架(P2「听懂+对症引导」):没记账时按识别出的类别给贴身示例(确定性·非大脑临场编)。
+    "guide_vehicle": {
+        "th": [
+            "ดูเหมือนเป็นเลขทะเบียน/เลขรถ ไม่ใช่จำนวนเงินค่ะ 🙂 ถ้าจะบันทึกค่าใช้จ่ายเกี่ยวกับรถ พิมพ์เช่น 'ค่าน้ำมัน 500' หรือ 'ค่าต่อทะเบียน 1000' ได้เลยค่ะ"
+        ],
+        "zh": [
+            "这看起来是车牌/车辆编号,不是金额哦🙂 要记车相关支出,可以发「油费 500」或「续牌费 1000」"
+        ],
+        "en": [
+            "That looks like a plate/vehicle number, not an amount 🙂 For vehicle costs, try 'fuel 500' or 'registration 1000'"
+        ],
+        "ja": [
+            "ナンバープレート/車両番号のようで、金額ではありません🙂 車関連の費用なら、例:「ガソリン代 500」「車検代 1000」"
+        ],
+    },
+    "guide_phone": {
+        "th": [
+            "ดูเหมือนเป็นเบอร์โทร ไม่ใช่จำนวนเงินค่ะ 🙂 ถ้าจะบันทึกค่าโทรศัพท์ พิมพ์เช่น 'ค่าโทรศัพท์ 300' ได้เลยค่ะ"
+        ],
+        "zh": ["这看起来是电话号码,不是金额哦🙂 要记话费,可以发「话费 300」"],
+        "en": [
+            "That looks like a phone number, not an amount 🙂 For a phone bill, try 'phone bill 300'"
+        ],
+        "ja": ["電話番号のようで、金額ではありません🙂 電話代なら、例:「電話代 300」"],
+    },
+    "guide_numnotmoney": {
+        "th": [
+            "ตัวเลขนี้ดูเหมือนเวลา/จำนวน/อายุ ไม่ใช่จำนวนเงินค่ะ 🙂 ถ้าจะบันทึกค่าใช้จ่าย พิมพ์เป็น 'รายการ + จำนวนเงิน' เช่น 'กาแฟ 65' ได้เลยค่ะ"
+        ],
+        "zh": [
+            "这个数字看起来是时间/数量/年龄,不是金额哦🙂 要记账请发「项目 + 金额」,比如「咖啡 65」"
+        ],
+        "en": [
+            "That number looks like a time/quantity/age, not an amount 🙂 To record, send 'item + price', e.g. 'coffee 65'"
+        ],
+        "ja": [
+            "この数字は時刻/数量/年齢のようで、金額ではありません🙂 記録は「項目+金額」で、例:「コーヒー 65」"
+        ],
+    },
+    "guide_store": {
+        "th": [
+            "เลขนี้ดูเหมือนชื่อ/สาขาร้าน ไม่ใช่ราคาค่ะ 🙂 ถ้าซื้ออะไรมา บอกของกับราคาได้เลยนะคะ เช่น 'กาแฟ 50'"
+        ],
+        "zh": [
+            "这个数字看起来是店名/门店编号,不是价格哦🙂 买了啥告诉我东西和价钱就行,比如「咖啡 50」"
+        ],
+        "en": [
+            "That number looks like a store name/branch, not a price 🙂 If you bought something, tell me what and how much, e.g. 'coffee 50'"
+        ],
+        "ja": [
+            "これは店名/店舗番号のようで、価格ではありません🙂 何か買ったら、品名と金額を、例:「コーヒー 50」"
+        ],
+    },
 }
+
+# 引导分类:没记账时按"为什么不是金额"归类 → 贴身引导池(pick 在 unknown/out_of_scope 时路由)。
+_GUIDE_VEHICLE = ("ทะเบียน", "ป้ายทะเบียน", "เลขรถ", "มอเตอร์ไซค์", "车牌", "车辆", "牌照")
+_GUIDE_PHONE = ("เบอร์", "โทรหา", "เบอร์โทร", "phone number", "电话号", "号码")
+_GUIDE_NUM = (
+    "เวลา",
+    "โมง",
+    "นาที",
+    "ชั่วโมง",
+    "อายุ",
+    "คน",
+    "ห้อง",
+    "ชั้น",
+    "时间",
+    "分钟",
+    "小时",
+    "年龄",
+    "岁",
+    "房",
+    "层",
+)
+_GUIDE_STORE = ("711", "7-11", "7-eleven", "เซเว่น")
+
+
+def guided_kind(text: str) -> Optional[str]:
+    """没记账时按类别给贴身引导(确定性):车牌/电话/时间数量/店号 → guide_*;无明确类别 → None。"""
+    low = (text or "").lower()
+    if not any(c.isdigit() for c in low):  # 无数字 = 纯闲聊 → 不属引导类(走通用 unknown)
+        return None
+    if any(w in low for w in _GUIDE_VEHICLE):
+        return "guide_vehicle"
+    if any(w in low for w in _GUIDE_PHONE):
+        return "guide_phone"
+    if any(w in low for w in _GUIDE_STORE):
+        return "guide_store"
+    if any(w in low for w in _GUIDE_NUM):
+        return "guide_numnotmoney"
+    return None
 
 
 def detect_smalltalk(text: str) -> Optional[str]:
@@ -210,7 +301,12 @@ def detect_smalltalk(text: str) -> Optional[str]:
 
 
 def pick(kind: str, text: str, lang: str) -> str:
-    """从 kind 池按 hash(text) 轮选一条(确定但不复读)。kind 未知 → support。"""
+    """从 kind 池按 hash(text) 轮选一条(确定但不复读)。kind 未知 → support。
+
+    通用兜底(unknown/out_of_scope)先试按类别给贴身引导(guide_*),命中则替换 kind。
+    """
+    if kind in ("unknown", "out_of_scope"):
+        kind = guided_kind(text) or kind
     pool = _POOLS.get(kind) or _POOLS["support"]
     by_lang = pool.get((lang or "zh").lower()) or pool["zh"]
     idx = sum(ord(c) for c in (text or "x")) % len(by_lang)

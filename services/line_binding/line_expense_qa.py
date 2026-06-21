@@ -84,7 +84,11 @@ def reply_pool(
         _qr_item(line_client.t_line(lang, "qr_record"), start_txt),
         _qr_item(line_client.t_line(lang, "qr_query"), line_client.t_line(lang, "qr_query_text")),
     ]
-    if override_body:
+    guide = replies.guided_kind(text) if kind in ("unknown", "out_of_scope") else None
+    if guide:
+        # 噪声类(车牌/电话/时间/店号)贴身引导优先于语气层临场话术(竞品级「听懂+引导」)。
+        body = replies.pick(guide, text, lang)
+    elif override_body:
         body = override_body
     elif kind == "time_query":
         # 报时确定性按曼谷时区算(绝不让 LLM 编时间)。明确标「泰国时间」让用户知道口径。

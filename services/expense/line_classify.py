@@ -467,3 +467,18 @@ def intro_intent(text: str) -> str:
     用在记账解析前的分流,避免「怎么开始」被当成记一笔(这些短语极少出现在正常记一笔里)。
     """
     return _first_match(text, _INTRO_PATTERNS)
+
+
+# 欺诈请求(合规红线):伪造票据/篡改金额/逃税 → 必须拒绝·绝不照做·绝不记账。
+# 伪造词须与单据词同现 → 避免「ซื้อของปลอม 500」(买假货=合法消费)、「假设」误伤。
+_FRAUD_DOC = "ใบเสร็จ ใบกำกับ บิล เอกสาร ยอด receipt invoice 发票 票据 单据 账".split()
+_FRAUD_FAKE = "ปลอม fake forge fabricate falsify 假 伪造 做假".split()
+_FRAUD_EVADE = "โกงภาษี เลี่ยงภาษี หนีภาษี evadetax taxevasion 逃税 偷税 漏税 避税".split()
+
+
+def is_fraud_request(text: str) -> bool:
+    """伪造单据/篡改金额/逃税请求?(确定性·合规红线)。伪造词须与单据词同现,避免买假货误伤。"""
+    low = "".join((text or "").lower().split())
+    if any(k in low for k in _FRAUD_EVADE):
+        return True
+    return any(w in low for w in _FRAUD_FAKE) and any(d in low for d in _FRAUD_DOC)

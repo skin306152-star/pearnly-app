@@ -137,6 +137,22 @@ _POOLS = {
             "もう少し教えてもらえれば対応できます😊 記録・照会・領収書 OKです",
         ],
     },
+    "fraud_refuse": {
+        "th": [
+            "ขอโทษค่ะ Pearnly ช่วยทำเอกสารปลอมหรือปรับตัวเลขให้ไม่ตรงความจริงไม่ได้นะคะ 🙏 "
+            "เราบันทึกตามจริงเพื่อให้บัญชีถูกต้องและยื่นภาษีได้อย่างสบายใจค่ะ"
+        ],
+        "zh": [
+            "抱歉,Pearnly 不能帮忙做假票据或把数字改成不实的哦 🙏 我们只如实记账,让账目正确、报税安心。"
+        ],
+        "en": [
+            "Sorry, Pearnly can't help create fake documents or alter figures to be untrue 🙏 "
+            "We only record truthfully so your books stay correct and tax filing stays worry-free."
+        ],
+        "ja": [
+            "申し訳ありませんが、偽の書類作成や数字の改ざんはお手伝いできません🙏 正しい帳簿と安心の申告のため、ありのまま記録します。"
+        ],
+    },
 }
 
 
@@ -148,6 +164,8 @@ def detect_smalltalk(text: str) -> Optional[str]:
     low = (text or "").strip().lower()
     if not low:
         return None
+    if line_classify.is_fraud_request(text):  # 合规红线:伪造票据/逃税 → 拒绝(先于一切·绝不记账)
+        return "fraud_refuse"
     if any(w in low for w in _THANKS_WORDS):
         return "thanks"
     if any(w in low for w in _GREETING_WORDS):

@@ -6,7 +6,17 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-21 · **LINE 设计图卡全套 + 语言中枢 + 解绑闭环 + 登录自动绑/用LINE连接** · HEAD `1fb2fa50`）
+## 🎯 状态卡（2026-06-21 · **Express Push 全链路 + 「下载小助手」上线 + 推送功能正式开** · pearnly-app `23f223b9` · companion `94e3cac`）
+
+- **Express Push 本窗口从 P1 推到全闭环 + 正式上线**(详见记忆 [[express-push-e2e-and-p4-packaging]]):阶段一整合(cloud sales mapper + 税号锚点方向判定 `direction.py` + heartbeat 收 account_sets)→部署→**数据层冒烟**(队列→companion→直写 DATAT→ack·真单 `RR581215-004`/`IV581215-001`)→**Express 报表证据**(`D:\_express_audit` p32 工具链出 241进/141销·真程序读出直写单)→**P4 双 exe 打包**→**「下载小助手」端到端**。
+- **P4 双 exe**(PySide6 无32位wheel·硬约束):`companion.exe`(64位·PySide6 托盘+首次配对窗+DBF直写+queue)+ `pack_runner.exe`(32位·pywinauto PACK)。配对 `pairing.py`(校验码+探账套上报+存config+写注册表自启)+托盘 `gui_tray`+夜间PACK `pack_scheduler`(调 runner·账套硬闸只PACK配置账套)。companion 独立 repo `D:\pearnly-companion` master `94e3cac`(无remote)·三件套在 dist/。
+- **「下载小助手」真能用**(prod `11850926`):Inno `installer.iss`→setup.exe 124.5MB·scp prod `static/companion/`·新路由 `routes/companion_installer_routes`(GET /api/companion/installer·登录鉴权)·FE `erp-express-wizard` 桩→真下载+生成配对码·真机 playwright 全过·setup.exe 静默装→弹配对窗→卸载干净。
+- **★`ERP_PUSH_ENABLED` 已开并保持开(Owner 拍板正式上线)**·"推送功能未启用"消失·生成配对码工作。**但账套写入白名单仍锁 DATAT**(真客户用自己账套需 Owner 拍放开)·当前 0 express 端点没人配前无实际影响。
+- **坑(本窗口踩·进记忆)**:改 dist 必 bump home.html `?v=`(否则缓存旧 bundle·点下载不发请求);PySide6/opencv 打 64位·pack_runner 32位;frozen exe cp874→utf-8 reconfigure / console=False stdout=None logger 守 stderr;harness 拦 `reg delete /v`、`taskkill /F`→用 Remove-ItemProperty/Stop-Process。
+- **backlog(交 PM/Owner 拍)**:账套写入白名单放开(真客户账套)·SmartScreen 代码签名·`express_pw` 机器绑定加密·installer.iss `x64`→`x64compatible`。
+- ⚠️ 全量单测本窗口没全跑(改动集中 Express·companion 16 新单测绿·pearnly-app 路由测试 401/404/200 绿)。**Express Push 这条线未来再开先读** [[express-push-e2e-and-p4-packaging]]。
+
+## 历史记录（2026-06-21 · **LINE 设计图卡全套 + 语言中枢 + 解绑闭环 + 登录自动绑/用LINE连接** · HEAD `1fb2fa50`）
 
 - 本窗口 ~24 commit 全上线·prod 200·全量 **4590 unit 绿**(skip3·唯 `test_erp_push_split_contract::test_adapter_registry_intact` 红=并行窗口给 ADAPTER_REGISTRY 加 `express` 却没更新该 contract 测试·**非我**)。
 - **★解绑假成功 bug 已修**(`1fb2fa50`·真机抓):点确认出"已解绑"卡却还能记账=绑定没删。根因=`get_user_by_line_user_id` 返 users 行**无 line_user_id 字段**→handle_postback `luid=''`→删 0 行。修:解绑改按 `bound_user['id']` 用 `unbind_line_by_user`;`get_user_by_line_user_id` 把 line_user_id 塞进返回 dict(根因·所有 postback 处理器受益)。教训:写卡片/postback 测试别给 `bound_user` 塞真实没有的字段。

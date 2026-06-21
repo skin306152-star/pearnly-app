@@ -278,6 +278,8 @@ async def line_oauth_start():
         "state": state,
         "scope": "openid profile email",  # v118.28.4.2 · email scope 已通过 · 自动拿邮箱
         "nonce": _secrets.token_urlsafe(16),
+        # 登录页提示加 Pearnly Bot 为好友(登录频道已关联 OA·与 Bot 同 provider)。
+        "bot_prompt": "aggressive",
     }
     url = "https://access.line.me/oauth2/v2.1/authorize?" + _urlencode(params)
     return _RedirectResp(url, status_code=302)
@@ -374,9 +376,26 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
             if not user:
                 return _RedirectResp("/login?oauth_error=line_signup_failed", status_code=302)
 
-    # 注:不在登录回调里自动绑定 Bot —— LINE 登录频道与 Messaging Bot 不在同一 LINE Provider,
-    # 登录拿到的 sub ≠ Bot 看到的 userId(实证 U26139≠Ud6e2b),写进去 Bot 也认不到、网页却假显"已绑定"。
-    # Bot 绑定走集成页的 6 位码(消费在 Bot webhook,绑的是真 userId,可靠)。
+    # 登录即自动绑定 Bot:登录频道(2010411313)与 Messaging Bot 同一 Provider「Pearnly」→
+    # 登录拿到的 sub == Bot 看到的 userId → 直接写 line_bindings,免手输 6 位码。
+    # best-effort:已绑/冲突/失败都不拦登录。已是好友则 push 欢迎卡+新手轮播(=登录后 LINE 自动弹卡);
+    # 非好友 push 静默失败(用户加好友后发任意消息仍已连上)。
+    try:
+        db.create_or_update_line_binding(
+            user_id=str(user["id"]),
+            line_user_id=line_uid,
+            display_name=line_name or None,
+            picture_url=line_picture or None,
+        )
+        from services.line_binding import line_imagemap, line_reply
+
+        line_reply.push_messages_context(
+            line_uid,
+            [line_imagemap.card_message("bind_success"), line_imagemap.onboarding_carousel()],
+            tenant_id=str(user["tenant_id"]) if user.get("tenant_id") else None,
+        )
+    except Exception as e:
+        logger.warning(f"[line_login] 自动绑定 Bot 跳过(不拦登录): {e}")
 
     # 颁 JWT
     db.update_last_login(str(user["id"]))

@@ -1903,3 +1903,6 @@ tr.brv2-row-warn-soft:hover td { background: var(--danger-bg) !important; }
 .hist-pager-btn:disabled { opacity: 0.38; cursor: not-allowed; }
 .hist-pager-btn:not(:disabled):hover { background: var(--bg); border-color: var(--ink-4); }
 .hist-pager-info { font-size: 12px; color: var(--ink2); min-width: 72px; text-align: center; }
+/* 手机端「在 LINE 打开 Pearnly」一键深链(桌面隐藏·桌面走 QR)*/
+.linebot-open-line{display:none}
+@media (max-width:800px){.linebot-open-line{display:flex;align-items:center;justify-content:center;gap:6px;margin:0 0 12px;padding:12px;border-radius:10px;background:#06C755;color:#fff;font-weight:600;text-decoration:none}}

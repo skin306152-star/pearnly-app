@@ -14,8 +14,11 @@ from typing import Optional
 
 _NUM = r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?"
 _CURRENCY = "บาท ฿ thb 元 块".split()
-# 数字紧跟这些单位 = 不是钱(时长/计数/角度…量词 ชิ้น/แก้ว 归 qty·不在此)。
-_UNIT_AFTER = "นาที โมง ชั่วโมง วินาที คน เดือน กิโล กก ครั้ง รอบ องศา".split()
+# 数字紧跟这些单位 = 不是钱(时长/计数/重量/包装量词)→ 是数量不是金额(单笔/多笔共用)。
+_UNIT_AFTER = (
+    "นาที โมง ชั่วโมง วินาที คน เดือน กิโล กก โล ครั้ง รอบ องศา "
+    "โหล แพ็ค แพค ขวด ลิตร งวด กล่อง ถุง ห่อ ใบ"
+).split()
 # 这些标签后跟数字 = 不是钱(车牌/房号/年龄/电话/单据号/楼层/年份/型号/税表名)。
 _LABEL_BEFORE = "ทะเบียน ห้อง อายุ เบอร์ โทร เลขที่ ชั้น ปี รุ่น ภพ ภงด บ้านเลขที่".split()
 
@@ -36,8 +39,14 @@ def strip_nonmoney(text: str) -> str:
     after = "|".join(re.escape(w) for w in _UNIT_AFTER)
     s = re.sub(rf"({_NUM})\s*(?:{after})", " ", s, flags=re.IGNORECASE)
     before = "|".join(re.escape(w) for w in _LABEL_BEFORE)
+    # 标签前不被泰文字粘连(保护「ค่าโทร/ค่าห้อง/ค่าต่อทะเบียน」等 ค่า+X 费用·只剥独立标签);
     # 标签后可夹 1-2 个泰文辅音再到数字(车牌「ทะเบียน กข 1234」),不误伤「เลขที่บิล 500」。
-    s = re.sub(rf"(?:{before})\s*(?:[ก-ฮ]{{1,2}}\s*)?\.?\s*({_NUM})", " ", s, flags=re.IGNORECASE)
+    s = re.sub(
+        rf"(?<![ก-๎])(?:{before})\s*(?:[ก-ฮ]{{1,2}}\s*)?\.?\s*({_NUM})",
+        " ",
+        s,
+        flags=re.IGNORECASE,
+    )
     return s
 
 

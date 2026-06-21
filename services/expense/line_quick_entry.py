@@ -440,13 +440,20 @@ def parse_expense(text: str) -> ExpenseDraft:
 _MULTI_RE = re.compile(r"([^\d฿]+?)\s*(?<!\d-)([\d,]+(?:\.\d+)?)(?!-\d)")
 _UNIT_TAIL = re.compile(r"(?i)\s*(元|块|บาท|泰铢|thb|baht|฿|kip)+\s*$")
 _NAME_LEAD = re.compile(r"(?i)^[\s、,，/和跟加与及还有然后＋+]+|^(元|块|บาท|thb|baht|฿)\s*")
+# 日期(数字 + 泰文月缩写)不是商品也不是金额 → 多笔拆分前剥掉(否则 15 ม.ค. 68 被当两项)。
+_TH_MONTH = "ม\\.?ค|ก\\.?พ|มี\\.?ค|เม\\.?ย|พ\\.?ค|มิ\\.?ย|ก\\.?ค|ส\\.?ค|ก\\.?ย|ต\\.?ค|พ\\.?ย|ธ\\.?ค"
+_MULTI_DATE_RE = re.compile(
+    rf"\d{{1,2}}[/\-.]\d{{1,2}}[/\-.]\d{{2,4}}|\d{{1,2}}\s*(?:{_TH_MONTH})\.?\s*\d{{0,4}}"
+)
 
 
 # 句中字段声明词(「ผู้ขาย 711 / ร้านค้า 7-11」)是卖家/字段标注,不是商品项(P1E-3·多项句内联卖家)。
 # 长词在前(extract_inline_vendor 按序匹配·ร้านค้า 先于 ร้าน,免「ร้านค้า X」被 ร้าน 截成「ค้า」)。
 _VENDOR_DECL_WORDS = ("ผู้ขาย", "ชื่อร้าน", "ร้านค้า", "ร้าน", "卖家", "商家", "供应商", "店名")
+# 价标签段(「ราคา 50000 / ส่วนลด 50」)是金额标注·不是独立商品 → 不当一项(否则被加进总额)。
+_PRICE_LABELS = "ราคา ส่วนลด หัก ยอด รวม เป็นเงิน ภาษี 价 折扣 小计 合计".split()
 _FIELD_WORD_NAMES = frozenset(
-    {*_VENDOR_DECL_WORDS, "วันที่", "หมวดหมู่", "หมวด", "日期", "分类", "科目"}
+    {*_VENDOR_DECL_WORDS, *_PRICE_LABELS, "วันที่", "หมวดหมู่", "หมวด", "日期", "分类", "科目"}
 )
 
 
@@ -466,10 +473,14 @@ def parse_multi(text: str) -> Optional[list]:
 
     名去首尾货币词/连接词(和/跟/加…)。确定性正则(不靠 LLM 拆·避免误拆)。字段声明词
     (「ผู้ขาย 711」)是卖家标注非商品 → 不计入金额(P1E-3·总额不被内联卖家撑大);连字号数字串
-    (店名「7-11」)由 _MULTI_RE 的 lookaround 直接排除,不进 items。
+    (店名「7-11」)由 _MULTI_RE 的 lookaround 直接排除,不进 items。拆分前先剥非金额数字(单位/
+    日期/税率/型号邻接 · 与单笔路共用 strip_nonmoney)→ 型号/数量/日期不再被当独立项加进总额。
     """
+    from services.expense import amount_extract
+
+    clean = _MULTI_DATE_RE.sub(" ", amount_extract.strip_nonmoney(text or ""))
     items = []
-    for m in _MULTI_RE.finditer((text or "").strip()):
+    for m in _MULTI_RE.finditer(clean.strip()):
         name = _UNIT_TAIL.sub("", _NAME_LEAD.sub("", m.group(1).strip())).strip(" -·:、,，/")
         try:
             amt = Decimal(m.group(2).replace(",", ""))

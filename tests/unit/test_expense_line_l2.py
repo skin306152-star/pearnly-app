@@ -11,9 +11,10 @@ from services.expense import line_l2
 
 class ToDraftTests(unittest.TestCase):
     def test_coerces_numbers_to_decimal(self):
+        # 金额须在原文里有对应数字才保留(接地守卫);本例验逗号字符串→Decimal 强转。
         d = line_l2.to_draft(
             {"intent": "expense", "amount": "1,250.5", "qty": "3", "unit_price": "45"},
-            "ซื้อกาแฟ 3 แก้ว",
+            "ซื้อกาแฟ 1,250.5 บาท",
         )
         self.assertEqual(d.amount, Decimal("1250.5"))
         self.assertEqual(d.qty, Decimal("3"))

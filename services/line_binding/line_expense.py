@@ -235,6 +235,7 @@ def _dispatch_agent(
     if line_agent.may_write(intent, u.get("speech_act")):
         from services.expense import line_l2
 
+        # 金额接地在 to_draft 强制(铁律:LLM 不编金额):不接地金额被置空 → 落缺金额追问,不凭空入账。
         draft = line_l2.to_draft(u, text)
         if draft.has_amount():
             return _do_record(

@@ -226,6 +226,11 @@ def _extract_amount(
     return max(nums) if nums else None
 
 
+def text_numbers(text: str) -> list[Decimal]:
+    """原文里出现的数字(去逗号 · 确定性)→ Decimal 列表。供金额接地核验(铁律:LLM 不编金额)。"""
+    return [n for n in (_to_decimal(x) for x in re.findall(_NUM, text or "")) if n is not None]
+
+
 def looks_like_expense(text: str) -> bool:
     """有金额线索(币种标记 or 裸数字)即视为记账意图(doc 10 §2 L1)。"""
     return parse_expense(text).has_amount()

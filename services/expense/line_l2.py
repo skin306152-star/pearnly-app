@@ -30,14 +30,41 @@ def _dec(v) -> Optional[Decimal]:
         return None
 
 
+def amount_grounded(amount, qty, unit_price, raw_text: str) -> bool:
+    """大脑给的金额能否在用户原文里找到对应数字(铁律:LLM 不编金额)。
+
+    原文出现该数字 → 接地;或 qty×单价(两者都在原文)恰等于总额(确定性可复算)→ 接地;
+    否则视为编造。供 to_draft 在 LLM 边界拦下凭空金额(治「接触绑定」被记成 50 THB)。
+    """
+    from services.expense import line_quick_entry as lqe
+
+    if amount is None:
+        return False
+    nums = lqe.text_numbers(raw_text)
+    if any(amount == n for n in nums):
+        return True
+    if qty and unit_price and amount == qty * unit_price:
+        return any(qty == n for n in nums) and any(unit_price == n for n in nums)
+    return False
+
+
 def to_draft(data: dict, raw_text: str) -> ExpenseDraft:
-    """LLM JSON → ExpenseDraft(数值强转 Decimal · category 由 webhook 走真实树解析)。"""
+    """LLM JSON → ExpenseDraft(数值强转 Decimal · category 由 webhook 走真实树解析)。
+
+    金额接地守卫:LLM 声称的金额若在原文里找不到对应数字 → 置空(不信 LLM 编的钱),
+    调用方据 has_amount() 落入缺金额追问,绝不凭空入账。
+    """
     d = data or {}
     et = d.get("expense_type") if d.get("expense_type") in ("goods", "service") else ""
+    amount = _dec(d.get("amount"))
+    qty = _dec(d.get("qty"))
+    unit_price = _dec(d.get("unit_price"))
+    if not amount_grounded(amount, qty, unit_price, raw_text):
+        amount = None
     return ExpenseDraft(
-        amount=_dec(d.get("amount")),
-        qty=_dec(d.get("qty")),
-        unit_price=_dec(d.get("unit_price")),
+        amount=amount,
+        qty=qty,
+        unit_price=unit_price,
         expense_type=et,
         vendor_name=(d.get("vendor_name") or "").strip(),
         vendor_tax_id=(d.get("vendor_tax_id") or "").strip(),

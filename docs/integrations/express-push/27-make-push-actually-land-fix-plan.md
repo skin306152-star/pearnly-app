@@ -79,3 +79,17 @@
 4. 误导 UI 五项随手清。
 
 施工:后端(点1)+ 前端(点2)可由本窗口/施工窗口做;companion(点3 根治)交并行 companion 窗口。PM(本窗)出单 + 验收。
+
+---
+
+## companion 交接(仓库外 · 并行 companion 窗口做)
+让「科目映射」下拉有数据 + 账套对齐,companion 需:
+1. **上报科目表**:登录 Express 读科目 DBF(GLMAS 等)→ heartbeat body 带 `accounts:[{code,name,type}]`(云端 `store_reported_accounts` 已就绪,存 `config.reported_accounts`)。
+2. **账套对齐**:小助手当前默认选了 PDATAT(ASIA-SPORT·不可写),应让客户能选并默认/记住 DATAT(มานะชัยบริการ·可写)。
+3. **★th/zh i18n(Owner 2026-06-22 提醒)**:companion 所有新增 UI(选账套/科目相关提示)**必须中泰双语**,延用 doc 22 的 i18n 口径,**不准写死中文**。科目下拉里的科目【名字】用 Express 原文(多为泰文)按数据原样显示——这是数据,不翻译。
+
+## 本窗口已交付(分支 fix/express-direction-ws-null-clobber · 未推)
+- ✅ ① 方向 bug(persist 不再清空 workspace 归属)+ 5 测试。
+- ✅ ② 云端接收科目表(store_reported_accounts + heartbeat)+ 5 测试。
+- ✅ ② 前端科目映射 UI(下拉/文本兜底)+ 非破坏 merge 路由 + 四语 i18n + dist 重建 + ?v= 破缓存。
+- ⏳ 待做:失败码人话化(no_revenue_account/direction_unknown 等「看不懂」翻译)· 端点计数器口径 · 异常桶口径 · companion 上述三项。

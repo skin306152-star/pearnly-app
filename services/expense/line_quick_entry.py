@@ -485,9 +485,9 @@ def parse_multi(text: str) -> Optional[list]:
     """
     from services.expense import amount_extract
 
+    # 与单笔路共用金钱语境清洗:量级归一 + 剥非金额数 + 日期 + 长编号/税号(共用编译)。
     clean = amount_extract.strip_nonmoney(amount_extract.normalize_words(text or ""))
-    clean = _MULTI_DATE_RE.sub(" ", clean)
-    clean = re.sub(r"[A-Za-z]*\d[\d/\-]{6,}", " ", clean)  # 长编号/税号/发票号不是金额(与单笔路同)
+    clean = amount_extract._RE_LONG_ID.sub(" ", _MULTI_DATE_RE.sub(" ", clean))
     items = []
     for m in _MULTI_RE.finditer(clean.strip()):
         name = _UNIT_TAIL.sub("", _NAME_LEAD.sub("", m.group(1).strip())).strip(" -·:、,，/")

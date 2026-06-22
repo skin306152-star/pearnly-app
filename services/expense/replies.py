@@ -276,7 +276,7 @@ _GUIDE_STORE = ("711", "7-11", "7-eleven", "เซเว่น")
 def guided_kind(text: str) -> Optional[str]:
     """没记账时按类别给贴身引导(确定性):车牌/电话/时间数量/店号 → guide_*;无明确类别 → None。"""
     low = (text or "").lower()
-    if not any(c.isdigit() for c in low):  # 无数字 = 纯闲聊 → 不属引导类(走通用 unknown)
+    if not line_guards._has_digit(low):  # 无数字 = 纯闲聊 → 不属引导类(走通用 unknown)
         return None
     if any(w in low for w in _GUIDE_VEHICLE):
         return "guide_vehicle"

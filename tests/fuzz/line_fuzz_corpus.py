@@ -299,11 +299,11 @@ SEEDS_V3 = [
 # ── V2 盲区种子(现有 14 类之外·大模型反推·测试窗口扩这批)。 ───────────────────────────────
 SEEDS_V2 = [
     # O. 数字写法 / 数字词(确定性解析的盲区)
-    ("กาแฟ ห้าสิบ", "th", [INV_CLARIFY_AMOUNT], "纯文字金额(无数字)→问价不凭空记"),
-    ("จ่าย 1k", "th", [INV_RECORD, INV_AMOUNT_GROUNDED], "1k=1000?·要么解析要么问·别记 1"),
-    ("ค่าเช่า 2หมื่น", "th", [INV_CLARIFY_AMOUNT], "泰语万(2万)·当前解析不出→问价"),
+    ("กาแฟ ห้าสิบ", "th", [INV_BRAIN_DEFER], "拼写数字 ห้า⊂ห้าง·分词难题归大脑"),
+    ("จ่าย 1k", "th", [INV_RECORD, INV_AMOUNT_GROUNDED], "1k→1000(已支持)"),
+    ("ค่าเช่า 2หมื่น", "th", [INV_RECORD, INV_AMOUNT_GROUNDED], "2万→20000(已支持)"),
     ("กาแฟ 50บาทถ้วน", "th", [INV_RECORD, INV_AMOUNT_GROUNDED], "整50铢·ถ้วน不干扰"),
-    ("ค่าของ 1.250,50", "th", [INV_AMOUNT_GROUNDED], "欧式千分位·别切成1.25"),
+    ("ค่าของ 1.250,50", "th", [INV_RECORD, INV_AMOUNT_GROUNDED], "欧式千分位→1250.50(已支持)"),
     # P. 外币(不能静默当 THB)
     ("จ่าย $50", "th", [INV_FX_HANDLED], "美元·不是50THB"),
     ("ค่าโฆษณา USD 100", "th", [INV_FX_HANDLED], "USD标注"),

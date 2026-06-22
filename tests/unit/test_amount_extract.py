@@ -38,6 +38,24 @@ class NonMoneyNumberTests(unittest.TestCase):
     def test_negative_not_amount(self):
         self.assertIsNone(_amt("กาแฟ -50"))  # 负数不记
 
+    def test_house_number_slash_not_amount(self):
+        self.assertIsNone(_amt("บ้านเลขที่ 99/12"))  # 门牌 99/12 不记 12
+
+    def test_laughter_alone_not_amount(self):
+        # 笑声 555 即便剥完只剩它(无第二数字)也不当金额(治「รอ 15 นาที 555」)。
+        self.assertIsNone(ae.extract_amount("รอ 15 นาที 555", None, None))
+
+    def test_laughter_with_currency_is_amount(self):
+        # 555 后接币种 = 真额,不当笑声。
+        self.assertEqual(ae.extract_amount("ค่าไฟ 555 บาท", None, None), Decimal("555"))
+
+    def test_fullwidth_store_number_not_amount(self):
+        self.assertIsNone(_amt("ร้าน ７１１"))  # 全角店号
+
+    def test_buddhist_year_reference_not_amount(self):
+        self.assertIsNone(_amt("ปีนี้ 2567"))  # 佛历年引用
+        self.assertEqual(_amt("รายปี 5000"), Decimal("5000"))  # 年费不误剥
+
     def test_laughter_555_not_amount_when_other_number(self):
         self.assertEqual(_amt("กาแฟ 50 555"), Decimal("50"))  # 555 是笑声·真额 50
 
@@ -48,9 +66,11 @@ class NonMoneyNumberTests(unittest.TestCase):
         self.assertEqual(_amt("จ่าย 1,250.5"), Decimal("1250.5"))
         self.assertEqual(_amt("打车 50"), Decimal("50"))
 
-    def test_single_555_is_amount(self):
-        # 「ค่าไฟ 555」单数字 → 555 是真额(不当笑声丢)。
-        self.assertEqual(_amt("ค่าไฟ 555"), Decimal("555"))
+    def test_bare_555_is_laughter_currency_disambiguates(self):
+        # 裸 555(无币种)→ 当笑声剥(治「รอ…555」伤账);带币种 → 真额。
+        # 罕见的「恰好 555 铢」裸写会被当笑声 → 用户补「บาท」即可,代价小于把笑声记进账。
+        self.assertIsNone(_amt("ค่าไฟ 555"))
+        self.assertEqual(_amt("ค่าไฟ 555 บาท"), Decimal("555"))
 
     def test_qty_unit_price_product(self):
         self.assertEqual(

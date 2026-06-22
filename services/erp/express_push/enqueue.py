@@ -112,9 +112,9 @@ def enqueue_express(endpoint: Dict[str, Any], history: Dict[str, Any]) -> Dict[s
             t0=t0,
         )
 
-    # 账套白名单(代码级拒写非 DATAT)· 不入队,留人工。
+    # 账套白名单(逐端点 · 未审批回落 DATAT)· 拒写则留人工,不入队。
     account_set = str(config.get("account_set") or "").strip()
-    if not account_set_allowed(account_set):
+    if not account_set_allowed(account_set, endpoint):
         return _manual(
             f"account_set_not_allowed:{account_set or 'none'}",
             {"adapter": "express", "account_set": account_set},
@@ -163,7 +163,7 @@ def enqueue_express(endpoint: Dict[str, Any], history: Dict[str, Any]) -> Dict[s
         payload = mres.payload
 
         # 防御性复核白名单(mapper 已带 account_set · 这里再钉一次,与 Agent lease 同口径)。
-        if not account_set_allowed(payload.get("account_set")):
+        if not account_set_allowed(payload.get("account_set"), endpoint):
             return _manual("account_set_not_allowed", payload, t0)
 
         verdict = _grade(history, payload, bool(category), direction)

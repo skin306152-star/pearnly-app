@@ -112,8 +112,10 @@ class EnqueueTests(unittest.TestCase):
         self.assertTrue(r["error_msg"].startswith("EXPRESS_MANUAL"))
         self.assertIn("amounts_not_consistent", r["error_msg"])
 
-    def test_account_set_whitelist_reject(self):
-        r = enqueue_express(_endpoint(config={"account_set": "PDATAT"}), _history())
+    def test_account_set_reject_when_endpoint_unconfigured(self):
+        # 逐端点白名单:端点没配 account_set → 无授权账套 → 拒(留人工)。
+        # (配了具体账套的端点 = 被授权写该账套,见 FlagWhitelistTests。)
+        r = enqueue_express(_endpoint(config={"account_set": ""}), _history())
         self.assertTrue(r["error_msg"].startswith("EXPRESS_MANUAL"))
         self.assertIn("account_set_not_allowed", r["error_msg"])
         self.assertEqual(classify_push_status(r["success"], r["error_msg"]), "manual")
@@ -228,9 +230,11 @@ class DirectionRoutingTests(unittest.TestCase):
 
 class FlagWhitelistTests(unittest.TestCase):
     def test_account_set_allowed(self):
-        self.assertTrue(account_set_allowed("DATAT"))
-        self.assertFalse(account_set_allowed("PDATAT"))
-        self.assertFalse(account_set_allowed(""))
+        ep = {"config": {"account_set": "DATAT"}}
+        self.assertTrue(account_set_allowed("DATAT", ep))  # == 端点配置 → 放
+        self.assertFalse(account_set_allowed("PDATAT", ep))  # 不等 → 拒
+        self.assertFalse(account_set_allowed("", ep))  # 空 payload → 拒
+        self.assertFalse(account_set_allowed("DATAT", {"config": {}}))  # 端点缺配 → 拒
 
     def test_flag_default_off(self):
         with mock.patch.dict("os.environ", {}, clear=False):

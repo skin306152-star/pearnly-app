@@ -122,7 +122,8 @@ class ExpressSalesMapperTests(unittest.TestCase):
         from companion.sales_adapter import build_sales_entry, validate_sales_payload
 
         payload = build_express_sales_payload(_sales_history(), config=_CONFIG).payload
-        v = validate_sales_payload(payload)
+        # 账套白名单已是配置/所选驱动(非硬编码默认)→ 契约只验结构对齐,显式给所选账套。
+        v = validate_sales_payload(payload, allowed=("DATAT",))
         self.assertTrue(v.ok, f"companion rejected: {v.error_code} {v.detail}")
         entry = build_sales_entry(payload)
         self.assertEqual(entry.doctype, "IV")

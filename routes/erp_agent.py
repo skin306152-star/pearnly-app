@@ -107,8 +107,8 @@ async def erp_agent_lease(req: LeaseRequest, request: Request):
     for row in leased:
         payload = row.get("request_body") or {}
         pset = str(payload.get("account_set") or "")
-        # 账套白名单(双闸):必须 == 本连接账套 且 ∈ {DATAT}。
-        if pset != target_set or not account_set_allowed(pset):
+        # 账套白名单(双闸):载荷账套必须 == 本连接配置的 account_set(逐端点·防串账套)。
+        if pset != target_set or not account_set_allowed(pset, ep):
             logger.warning(
                 "[express-lease] 账套不符已跳过 · log=%s payload_set=%r target=%r",
                 str(row.get("id"))[:8],

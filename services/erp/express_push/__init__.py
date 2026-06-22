@@ -11,12 +11,11 @@ Agent 出站拉取(lease)、录入 Express、回报(ack)。
   · enqueue     置信闸门 → pending(入队)/ manual(留人工)· 不跑服务器 Playwright
   · agent_store Agent 出站拉取的 DAL(token 校验 / heartbeat / lease / ack)
 
-特性开关 ERP_PUSH_ENABLED(默认 off);账套白名单本期只允许 DATAT。
+特性开关 ERP_PUSH_ENABLED(默认 off);账套白名单 = 逐端点匹配建连接时配置的 account_set。
 """
 
 import os
-
-ALLOWED_ACCOUNT_SETS = ("DATAT",)
+from typing import Any, Dict
 
 
 def express_push_enabled() -> bool:
@@ -24,6 +23,14 @@ def express_push_enabled() -> bool:
     return (os.environ.get("ERP_PUSH_ENABLED") or "").strip().lower() in ("1", "true", "yes", "on")
 
 
-def account_set_allowed(account_set: str) -> bool:
-    """账套白名单(代码级)· 本期只允许 DATAT;真账套/空模板一律拒写。"""
-    return (account_set or "").strip() in ALLOWED_ACCOUNT_SETS
+def account_set_allowed(account_set: str, endpoint: Dict[str, Any]) -> bool:
+    """账套白名单(逐端点)· 只放行 == 本端点配置(建连接时客户选定)的 account_set。
+
+    `endpoint.config.account_set` 即该连接被授权写入的唯一账套 —— 跨账套写入是账务事故,
+    故只认配置那一个。不等 / 任一缺失 → 拒(fail-safe)。
+    """
+    s = (account_set or "").strip()
+    if not s:
+        return False
+    configured = str(((endpoint or {}).get("config") or {}).get("account_set") or "").strip()
+    return bool(configured) and s == configured

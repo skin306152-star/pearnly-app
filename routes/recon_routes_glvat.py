@@ -11,6 +11,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from core import db
+from core import workspace_context as wc
+from core.route_helpers import _tid
 from services.authz.deps import require_perm
 from services.vat.vat_report_parser import parse_vat_report
 from routes.recon_routes_shared import _user_key, _pdf_billing_units
@@ -274,6 +276,7 @@ async def gl_vat_run(
         matched_count=matched,
         unmatched_count=unmatched,
         diff_count=diff_cnt,
+        workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
     )
 
     return {
@@ -302,6 +305,7 @@ async def gl_vat_list_tasks(request: Request):
         user_id=str(user["id"]),
         tenant_id=user.get("tenant_id"),
         limit=50,
+        workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
     )
     return {"ok": True, "tasks": tasks}
 

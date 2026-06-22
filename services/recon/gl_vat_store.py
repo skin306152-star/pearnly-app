@@ -42,6 +42,10 @@ def ensure_gl_vat_task_table():
             cur.execute(
                 "CREATE INDEX IF NOT EXISTS idx_gl_vat_task_tenant ON gl_vat_task(tenant_id, created_at DESC)"
             )
+            # 套账归属(随账套切换过滤·与对账其它表对齐)· 纯加法幂等 · 存量行 NULL = 全账套可见。
+            cur.execute(
+                "ALTER TABLE gl_vat_task ADD COLUMN IF NOT EXISTS workspace_client_id BIGINT"
+            )
         logger.info("[v118.32.5] gl_vat_task 表就绪")
         return True
     except Exception as e:
@@ -61,6 +65,7 @@ def create_gl_vat_task(
     matched_count: int = 0,
     unmatched_count: int = 0,
     diff_count: int = 0,
+    workspace_client_id: Optional[int] = None,
 ) -> Optional[int]:
     """落库 GL 对账任务结果 · 返回 task_id"""
     import json as _j
@@ -73,10 +78,10 @@ def create_gl_vat_task(
                     user_id, tenant_id, gl_filename, vat_filename,
                     gl_row_count, vat_row_count,
                     matched_count, unmatched_count, diff_count,
-                    detail_json, summary_json, status
+                    detail_json, summary_json, status, workspace_client_id
                 ) VALUES (
                     %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s::jsonb, %s::jsonb, 'done'
+                    %s::jsonb, %s::jsonb, 'done', %s
                 )
                 RETURNING id
             """,
@@ -92,6 +97,7 @@ def create_gl_vat_task(
                     int(diff_count or 0),
                     _j.dumps(detail_json or [], ensure_ascii=False, default=str),
                     _j.dumps(summary_json or {}, ensure_ascii=False, default=str),
+                    int(workspace_client_id) if workspace_client_id is not None else None,
                 ),
             )
             row = cur.fetchone()
@@ -125,35 +131,35 @@ def get_gl_vat_task(task_id: int, user_id: str, tenant_id=None) -> Optional[Dict
         return None
 
 
-def list_gl_vat_tasks(user_id: str, tenant_id=None, limit: int = 50) -> List[Dict[str, Any]]:
-    """列出最近的 GL 对账任务（不返回 detail_json/summary_json 减小数据量）"""
+def list_gl_vat_tasks(
+    user_id: str, tenant_id=None, limit: int = 50, workspace_client_id: Optional[int] = None
+) -> List[Dict[str, Any]]:
+    """列出最近的 GL 对账任务（不返回 detail_json/summary_json 减小数据量）。
+
+    跟随账套:给了 workspace_client_id 则只列该账套 + 存量 NULL(与对账其它表同口径)。
+    """
+    cols = (
+        "id, user_id, tenant_id, gl_filename, vat_filename, gl_row_count, vat_row_count, "
+        "matched_count, unmatched_count, diff_count, status, created_at"
+    )
+    ws_clause = ""
+    ws_params: tuple = ()
+    if workspace_client_id is not None:
+        ws_clause = " AND (workspace_client_id = %s OR workspace_client_id IS NULL)"
+        ws_params = (int(workspace_client_id),)
     try:
         with db.get_cursor() as cur:
             if tenant_id:
                 cur.execute(
-                    """
-                    SELECT id, user_id, tenant_id, gl_filename, vat_filename,
-                           gl_row_count, vat_row_count,
-                           matched_count, unmatched_count, diff_count,
-                           status, created_at
-                    FROM gl_vat_task
-                    WHERE tenant_id = %s::uuid
-                    ORDER BY created_at DESC LIMIT %s
-                """,
-                    (str(tenant_id), int(limit)),
+                    f"SELECT {cols} FROM gl_vat_task WHERE tenant_id = %s::uuid{ws_clause} "
+                    "ORDER BY created_at DESC LIMIT %s",
+                    (str(tenant_id), *ws_params, int(limit)),
                 )
             else:
                 cur.execute(
-                    """
-                    SELECT id, user_id, tenant_id, gl_filename, vat_filename,
-                           gl_row_count, vat_row_count,
-                           matched_count, unmatched_count, diff_count,
-                           status, created_at
-                    FROM gl_vat_task
-                    WHERE user_id = %s::uuid
-                    ORDER BY created_at DESC LIMIT %s
-                """,
-                    (str(user_id), int(limit)),
+                    f"SELECT {cols} FROM gl_vat_task WHERE user_id = %s::uuid{ws_clause} "
+                    "ORDER BY created_at DESC LIMIT %s",
+                    (str(user_id), *ws_params, int(limit)),
                 )
             rows = cur.fetchall() or []
             return [dict(r) for r in rows]

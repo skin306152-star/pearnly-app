@@ -74,8 +74,13 @@ export async function loadHistory() {
     const empty = $('rcx-history-empty');
     if (!list) return;
     try {
+        // 跟随账套:带 X-Workspace-Client-Id 头(后端按 active workspace 过滤)。切账套→core-boot
+        // 全局 reloadCurrentRoute→loadReconcilePage→这里带新账套重拉。三个 tab 共用此 fetch。
         const res = await fetch(LIST_URL[tab], {
-            headers: { Authorization: 'Bearer ' + rxToken() },
+            headers: Object.assign(
+                { Authorization: 'Bearer ' + rxToken() },
+                typeof window._wsHeader === 'function' ? window._wsHeader() : {}
+            ),
         });
         const data = await res.json();
         const tasks: any[] = (data && (data.tasks || data.items)) || [];

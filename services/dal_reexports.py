@@ -218,10 +218,13 @@ _REEXPORTS = {
         "bind_workspace_endpoint",
         "get_workspace_endpoint_id",
         "match_workspace_for_seller",
-        "route_assigns_workspace",
         "update_history_workspace_client_id",
         "ensure_seller_route_table",
         "learn_seller_workspace_route",
+    ],
+    # route_assigns_workspace 不在 seller-routing 门面契约里(仅 db 门面用)→ 直接从定义模块取,不经 store 透传。
+    "services.workspace.seller_routing": [
+        "route_assigns_workspace",
     ],
     "services.membership.store": [
         "get_visible_client_ids_for_user",

@@ -337,7 +337,7 @@ interface Window {
     openSalesWizard?: () => void;
     editSalesDraft?: (doc: unknown) => void;
     openSalesSettings?: () => void;
-    _wsHeader?: () => Record<string, string | undefined>;
+    _wsHeader?: () => Record<string, string>;
     _knowledgeProbed?: boolean;
     _kbRenderDocs?: () => void;
     _kbRenderAsk?: () => void;

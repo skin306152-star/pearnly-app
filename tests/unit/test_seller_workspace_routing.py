@@ -12,7 +12,7 @@ import unittest
 from unittest import mock
 
 from core import db  # noqa: F401 — 先初始化 db 防 services.workspace.store 循环导入
-from services.workspace import store
+from services.workspace import store, seller_routing
 
 
 class KeywordCursor:
@@ -136,26 +136,32 @@ class RouteAssignsWorkspaceTests(unittest.TestCase):
 
     def test_assigned_returns_id(self):
         self.assertEqual(
-            store.route_assigns_workspace({"action": "assigned", "workspace_client_id": 10}), 10
+            seller_routing.route_assigns_workspace(
+                {"action": "assigned", "workspace_client_id": 10}
+            ),
+            10,
         )
 
     def test_unbound_returns_id(self):
         self.assertEqual(
-            store.route_assigns_workspace({"action": "unbound", "workspace_client_id": 11}), 11
+            seller_routing.route_assigns_workspace(
+                {"action": "unbound", "workspace_client_id": 11}
+            ),
+            11,
         )
 
     def test_none_returns_none_no_clobber(self):
         # 没命中 → None → 调用方保留 insert 归属,绝不回写 NULL
-        self.assertIsNone(store.route_assigns_workspace({"action": "none"}))
+        self.assertIsNone(seller_routing.route_assigns_workspace({"action": "none"}))
 
     def test_multi_returns_none_no_clobber(self):
         self.assertIsNone(
-            store.route_assigns_workspace({"action": "multi", "workspace_client_id": None})
+            seller_routing.route_assigns_workspace({"action": "multi", "workspace_client_id": None})
         )
 
     def test_empty_or_missing_action_returns_none(self):
-        self.assertIsNone(store.route_assigns_workspace(None))
-        self.assertIsNone(store.route_assigns_workspace({}))
+        self.assertIsNone(seller_routing.route_assigns_workspace(None))
+        self.assertIsNone(seller_routing.route_assigns_workspace({}))
 
 
 if __name__ == "__main__":

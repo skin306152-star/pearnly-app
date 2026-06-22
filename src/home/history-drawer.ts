@@ -19,16 +19,19 @@ type HistDrawerRow = {
     [key: string]: unknown;
 };
 
+// 详情/保存/删除/PDF 都按 active workspace 硬边界(PO-4)过滤 → 统一带鉴权 + 账套头(缺则记录被滤掉、抽屉静默打不开)。
+function _hdrAuthWs(): Record<string, string> {
+    return Object.assign(
+        { Authorization: 'Bearer ' + token },
+        typeof window._wsHeader === 'function' ? window._wsHeader() : {}
+    );
+}
+
 // 点击行 → 打开抽屉查看/编辑
 async function openHistoryDrawer(historyId: string) {
     try {
-        // 详情接口同样按 active workspace 硬边界过滤(PO-4)→ 必须带 X-Workspace-Client-Id 头,
-        // 否则记录被过滤掉、resp 非 200、抽屉静默打不开(与列表同账套口径)。
         const resp = await fetch(`/api/history/${encodeURIComponent(historyId)}`, {
-            headers: Object.assign(
-                { Authorization: 'Bearer ' + token },
-                typeof window._wsHeader === 'function' ? window._wsHeader() : {}
-            ),
+            headers: _hdrAuthWs(),
         });
         if (!resp.ok) return;
         const detail = await resp.json();
@@ -153,11 +156,7 @@ async function saveHistoryEdits() {
         await withLoading(btn, async () => {
             const resp = await fetch(`/api/history/${encodeURIComponent(r._historyId as string)}`, {
                 method: 'PUT',
-                headers: {
-                    Authorization: 'Bearer ' + token,
-                    'Content-Type': 'application/json',
-                    ...(typeof window._wsHeader === 'function' ? window._wsHeader() : {}),
-                },
+                headers: Object.assign(_hdrAuthWs(), { 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ pages: newPages }),
             });
             if (!resp.ok) throw new Error('save failed');
@@ -238,10 +237,7 @@ function openHistoryMenu(historyId: string, anchor: HTMLElement) {
             const dismissLoading = showToast(t('history-download-pdf-loading'), 'loading', 0);
             try {
                 const resp = await fetch(`/api/history/${encodeURIComponent(historyId)}/pdf`, {
-                    headers: Object.assign(
-                        { Authorization: 'Bearer ' + token },
-                        typeof window._wsHeader === 'function' ? window._wsHeader() : {}
-                    ),
+                    headers: _hdrAuthWs(),
                 });
                 if (!resp.ok) throw new Error('download failed');
                 const blob = await resp.blob();
@@ -325,10 +321,7 @@ function openHistoryMenu(historyId: string, anchor: HTMLElement) {
             try {
                 const resp = await fetch(`/api/history/${encodeURIComponent(historyId)}`, {
                     method: 'DELETE',
-                    headers: Object.assign(
-                        { Authorization: 'Bearer ' + token },
-                        typeof window._wsHeader === 'function' ? window._wsHeader() : {}
-                    ),
+                    headers: _hdrAuthWs(),
                 });
                 if (!resp.ok) throw new Error();
                 showAlert('info', t('history-delete-ok'));
@@ -434,11 +427,7 @@ function openHistoryMenu(historyId: string, anchor: HTMLElement) {
             try {
                 const resp = await fetch('/api/history/batch-delete', {
                     method: 'POST',
-                    headers: {
-                        Authorization: 'Bearer ' + token,
-                        'Content-Type': 'application/json',
-                        ...(typeof window._wsHeader === 'function' ? window._wsHeader() : {}),
-                    },
+                    headers: Object.assign(_hdrAuthWs(), { 'Content-Type': 'application/json' }),
                     body: JSON.stringify({ ids }),
                 });
                 if (!resp.ok) throw new Error('batch delete failed');

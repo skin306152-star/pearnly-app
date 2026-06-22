@@ -285,26 +285,21 @@
     async function _downloadAgent() {
         var btn = $('exp-download') as HTMLButtonElement;
         if (btn) btn.disabled = true;
+        // 走静态直链让浏览器原生下载(下载内容队列里有进度条)· 不再 fetch 成 blob 占内存后才弹出。
+        var SETUP_URL = '/static/companion/PearnlyCompanion-Setup.exe';
         try {
-            var r = await fetch('/api/companion/installer', {
-                headers: { Authorization: 'Bearer ' + _tk() },
-            });
-            if (!r.ok) {
-                _toast(_t(r.status === 404 ? 'exp-download-not-ready' : 'exp-download-fail'));
+            var head = await fetch(SETUP_URL, { method: 'HEAD' });
+            if (!head.ok) {
+                _toast(_t(head.status === 404 ? 'exp-download-not-ready' : 'exp-download-fail'));
                 if (btn) btn.disabled = false;
                 return;
             }
-            var blob = await r.blob();
-            var url = URL.createObjectURL(blob);
             var a = document.createElement('a');
-            a.href = url;
+            a.href = SETUP_URL;
             a.download = 'PearnlyCompanion-Setup.exe';
             document.body.appendChild(a);
             a.click();
             a.remove();
-            setTimeout(function () {
-                URL.revokeObjectURL(url);
-            }, 4000);
             S.downloaded = true;
             updateUI();
             _toast(_t('exp-toast-downloaded'));

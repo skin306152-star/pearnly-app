@@ -327,9 +327,10 @@ def persist_invoices(
             # 销项发票「卖方」= 账套主体 = workspace_client。归属**完全由 seller 决定**,
             # 右上角切换器只是查看过滤器、不再决定上传归属。
             #   匹配到(assigned/unbound)→ 写该 workspace_client_id(覆盖)
-            #   未匹配/多候选(none/multi)→ 置 NULL → 日志显「未归属/待确认卖方」
-            # 注:当前 workspace_client_id 仅供日志/视图显示消费(推送路由 P1d 再接);
-            #     故此处只影响"归属显示",安全。
+            #   未匹配/多候选(none/multi)→ 保留 insert 已写的归属(切换器/默认套账),不回写 NULL
+            # 注:workspace_client_id 现已被 Express 推送方向判定(以 workspace 主体税号当锚点)
+            #     消费 → none/multi 时清 NULL 会让采购票(卖方=供应商≠自家)失去自家锚点 →
+            #     direction_unknown。故仅命中具体主体才覆盖,否则保留 insert 归属。
             try:
                 _seller_match = db.match_workspace_for_seller(
                     seller_tax=(g_fields or {}).get("seller_tax"),
@@ -337,20 +338,17 @@ def persist_invoices(
                     user_id=str(user["id"]),
                     tenant_id=_tid(user),
                 )
-                _ws_assigned = (
-                    _seller_match.get("workspace_client_id")
-                    if _seller_match.get("action") in ("assigned", "unbound")
-                    else None
-                )
-                db.update_history_workspace_client_id(
-                    hid, _ws_assigned, str(user["id"]), tenant_id=_tid(user)
-                )
+                _ws_assigned = db.route_assigns_workspace(_seller_match)
+                if _ws_assigned is not None:
+                    db.update_history_workspace_client_id(
+                        hid, _ws_assigned, str(user["id"]), tenant_id=_tid(user)
+                    )
                 logger.info(
                     "[seller-route] %s history=%s seller=%r workspace_client_id=%s",
                     _seller_match.get("action"),
                     hid[:8],
                     ((g_fields or {}).get("seller_name") or "")[:40],
-                    _ws_assigned,
+                    _ws_assigned if _ws_assigned is not None else _ws_client_id,
                 )
             except Exception as _sre:
                 logger.warning(f"seller-route failed (history={hid[:8]}): {_sre}")

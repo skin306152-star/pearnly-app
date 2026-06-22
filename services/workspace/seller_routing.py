@@ -259,4 +259,18 @@ def update_history_workspace_client_id(
         return False
 
 
+def route_assigns_workspace(seller_match: Optional[Dict[str, Any]]) -> Optional[int]:
+    """卖方分拣结果 → 要【覆盖】账套归属用的 workspace_client_id;否则 None。
+
+    命中具体主体(assigned/unbound)才返其 id;none/multi(没命中/多候选)返 None →
+    调用方据此【保留】上传时已写的归属,**绝不用 None 回写清空**。否则采购票(卖方=
+    供应商≠自家)归属被清成 NULL → 下游 Express 方向判定(以自家主体税号当锚点)失锚 →
+    direction_unknown(2026-06-22 真机事故根因)。纯函数 · 无 DB。
+    """
+    m = seller_match or {}
+    if m.get("action") in ("assigned", "unbound"):
+        return m.get("workspace_client_id")
+    return None
+
+
 from core import db  # noqa: E402

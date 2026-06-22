@@ -218,6 +218,7 @@ _REEXPORTS = {
         "bind_workspace_endpoint",
         "get_workspace_endpoint_id",
         "match_workspace_for_seller",
+        "route_assigns_workspace",
         "update_history_workspace_client_id",
         "ensure_seller_route_table",
         "learn_seller_workspace_route",

@@ -127,5 +127,36 @@ class MatchWorkspaceForSellerTests(unittest.TestCase):
         self.assertEqual(d["match_source"], "seller_name")
 
 
+class RouteAssignsWorkspaceTests(unittest.TestCase):
+    """归属覆盖决策(persist 用):命中具体主体才覆盖;none/multi 不覆盖(保留 insert 归属·不清 NULL)。
+
+    回归 2026-06-22 真机事故:采购票卖方≠自家 → match=none → 旧码用 None 回写清空
+    workspace_client_id → Express 方向判定失锚 → direction_unknown。
+    """
+
+    def test_assigned_returns_id(self):
+        self.assertEqual(
+            store.route_assigns_workspace({"action": "assigned", "workspace_client_id": 10}), 10
+        )
+
+    def test_unbound_returns_id(self):
+        self.assertEqual(
+            store.route_assigns_workspace({"action": "unbound", "workspace_client_id": 11}), 11
+        )
+
+    def test_none_returns_none_no_clobber(self):
+        # 没命中 → None → 调用方保留 insert 归属,绝不回写 NULL
+        self.assertIsNone(store.route_assigns_workspace({"action": "none"}))
+
+    def test_multi_returns_none_no_clobber(self):
+        self.assertIsNone(
+            store.route_assigns_workspace({"action": "multi", "workspace_client_id": None})
+        )
+
+    def test_empty_or_missing_action_returns_none(self):
+        self.assertIsNone(store.route_assigns_workspace(None))
+        self.assertIsNone(store.route_assigns_workspace({}))
+
+
 if __name__ == "__main__":
     unittest.main()

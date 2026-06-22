@@ -126,13 +126,30 @@ function render(): void {
         `<div class="onb-body"><div class="onb-pane" style="position:relative">${pane}</div></div>`;
 }
 
-// 本会话是否已过套账门(选/建成一次)。每次页面加载(=每次登录 boot)重置为 false →
-// 强制弹门一次(忽略记住的 active);选定后本会话内 enforce 不再弹(切模块/onboarding 也调它)。
+// 套账门标志:_gateSatisfied 是本【页面加载】内的内存标志(同一 render 周期防重弹)。
+// 跨【刷新 F5】用 sessionStorage:同一登录会话(含刷新)已过门即放行;新登录(新会话)无此
+// 标志 → 强制选套账;logout 清掉 → 重新登录再强制。满足:登录强制选 + 进系统刷新不再弹门。
 let _gateSatisfied = false;
+const _GATE_SESSION_KEY = 'pearnly_gate_passed';
+function _markGatePassed(): void {
+    _gateSatisfied = true;
+    try {
+        sessionStorage.setItem(_GATE_SESSION_KEY, '1');
+    } catch (_) {
+        /* 私模/配额:退化为仅内存标志(本次刷新仍弹一次·可接受) */
+    }
+}
+function _gatePassedThisSession(): boolean {
+    try {
+        return sessionStorage.getItem(_GATE_SESSION_KEY) === '1';
+    } catch (_) {
+        return false;
+    }
+}
 
 // 硬门选定/建成 → 设为当前 → 关门进系统(active 变更发事件,core-boot 自动重载路由)。
 async function enter(id: number): Promise<void> {
-    _gateSatisfied = true; // 先置真:下方 applyModuleNav 会再调 enforce · 防选完又弹门
+    _markGatePassed(); // 过门:本会话(含刷新)后续 enforce 放行 · 防选完又弹门
     if (typeof window.setActiveWorkspaceClientId === 'function')
         window.setActiveWorkspaceClientId(id);
     if (typeof window.fetchWorkspaceClients === 'function') {
@@ -206,6 +223,7 @@ async function doLogout(): Promise<void> {
     try {
         localStorage.removeItem('mrpilot_token');
         localStorage.removeItem('mrpilot_user');
+        sessionStorage.removeItem(_GATE_SESSION_KEY); // 清会话过门标志 → 重新登录强制选套账
     } catch (_) {
         /* silent · localStorage 私模/配额 */
     }
@@ -251,7 +269,7 @@ function liffWsPending(): boolean {
 // LIFF 深链:该单已定套账 → 直接设为当前 + 满足门(不弹手选)。门壳若已起则摘掉。
 window.satisfyWorkspaceGate = function (id: number) {
     if (!id) return;
-    _gateSatisfied = true;
+    _markGatePassed();
     if (typeof window.setActiveWorkspaceClientId === 'function')
         window.setActiveWorkspaceClientId(id);
     if (document.getElementById('workspace-gate-root')) close();
@@ -265,24 +283,14 @@ window.enforceWorkspaceGate = function () {
     if (document.getElementById('onboarding-flow-root')) return; // 新注册向导优先(末步=选套账)
     if (_gateSatisfied) return; // 本会话已选过 → 放行(切模块/onboarding 也调到这,不重弹)
     if (liffWsPending()) return; // LIFF 深链待自动选套账 → 不弹手选门
-    // 刷新场景:已持久化【有效】active 账套 → 自动放行进系统(强制选套账只在没有有效 active 时,
-    // = 真·首次登录)。进系统后刷新不再弹手选门,靠右上角切换。判据 = 持久 active + 合法性
-    // (有 workspace 列表缓存就校验在册;无缓存=刚 boot 则信任持久值,stale 由切换器/loader 兜底)。
-    var _activeId =
-        typeof window.getActiveWorkspaceClientId === 'function'
-            ? window.getActiveWorkspaceClientId()
-            : null;
-    if (_activeId != null) {
-        var _cache = window._workspaceClientsCache as Array<{ id: number }> | undefined;
-        var _valid =
-            !Array.isArray(_cache) || _cache.some((c) => String(c.id) === String(_activeId));
-        if (_valid) {
-            _gateSatisfied = true;
-            if (document.getElementById('workspace-gate-root')) close();
-            if (typeof window.applyModuleNav === 'function') window.applyModuleNav();
-            if (typeof window.renderWorkspaceControl === 'function') window.renderWorkspaceControl();
-            return;
-        }
+    // 进系统后刷新(F5·同一登录会话已过门)→ 放行,用持久 active 进系统,不再弹手选门。
+    // 登录(新会话·无此标志)→ 不走这里 → 下面正常弹门强制选套账。
+    if (_gatePassedThisSession()) {
+        _gateSatisfied = true;
+        if (document.getElementById('workspace-gate-root')) close();
+        if (typeof window.applyModuleNav === 'function') window.applyModuleNav();
+        if (typeof window.renderWorkspaceControl === 'function') window.renderWorkspaceControl();
+        return;
     }
     if (document.getElementById('workspace-gate-root')) {
         // 门已开(core-boot 登录即早起的门壳)· 不重起防打断创建 · 但此刻 _userInfo 已就绪 →

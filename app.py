@@ -35,7 +35,10 @@ from routes.line_account_merge_routes import (
 )  # REFACTOR-B1 · 2026-05-28
 from routes.oauth_routes import (
     router as oauth_router,
-)  # REFACTOR-B1 · Google+LINE OAuth · 2026-05-28
+)  # REFACTOR-B1 · Google OAuth · 2026-05-28
+from routes.oauth_line_routes import (
+    router as oauth_line_router,
+)  # REFACTOR-B1 · LINE Login OAuth(拆自 oauth_routes)
 from routes.line_webhook_routes import (
     router as line_webhook_router,
 )  # REFACTOR-B1 · LINE Bot webhook · 2026-05-28
@@ -318,7 +321,8 @@ app.include_router(recon_jobs_router)  # ADR-005 #15 · 对账异步 submit + �
 app.include_router(import_router)  # ADR-006 · 通用模板学习层 列映射接口
 app.include_router(auth_email_code_router)  # REFACTOR-B1 · 邮箱验证码 2 路由(2026-05-28)
 app.include_router(line_account_merge_router)  # REFACTOR-B1 · LINE 补邮箱+合并 2 路由(2026-05-28)
-app.include_router(oauth_router)  # REFACTOR-B1 · Google+LINE OAuth 4 路由(2026-05-28)
+app.include_router(oauth_router)  # REFACTOR-B1 · Google OAuth 2 路由(2026-05-28)
+app.include_router(oauth_line_router)  # REFACTOR-B1 · LINE Login OAuth 3 路由(拆自 oauth_routes)
 app.include_router(line_webhook_router)  # REFACTOR-B1 · LINE Bot webhook · 2026-05-28
 app.include_router(line_card_image_router)  # 泰语图卡出图(公开)
 app.include_router(login_router)  # REFACTOR-B1 · 主登录 · 2026-05-28

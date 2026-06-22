@@ -6,7 +6,20 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-21 · **Express Push 全链路 + 「下载小助手」上线 + 推送功能正式开** · pearnly-app `23f223b9` · companion `94e3cac`）
+## 🎯 状态卡（2026-06-22 · **LINE 记账车道 · 全面反伤账加固 + 引导框架 + 调研驱动测试体系 + /simplify** · prod `88602dde`/ver `11850926`）
+
+- **起于真机事故「接触绑定 → 记 50 THB」**(大脑凭空编金额),一路扒成 LINE 记账车道**伤账面全封**。本窗口 ~22 commit 全上线·prod 200·全量 **4625 unit 绿**·replay 52/52。详见记忆 [[line-expense-anti-overcharge-hardening]]。
+- **护城河(金额永不信 LLM)**:`line_l2.to_draft` 金额接地守卫——大脑给的额必须在原文有对应数字(`amount_extract.money_numbers` 核验)否则置空。**Tier B 真大脑 75/75 零幻觉落地**。
+- **确定性层伤账全修**(新模块 `services/expense/amount_extract.py` 金钱语境抽取):噪声数字(车牌/电话/房号/年龄/时间/门牌99/12/佛历年)·笑声555·负数·全角/泰数字·型号粘数字(M150/100Plus 词典)·VAT税率/13位税号分列·多笔不再加总型号/数量/日期/折扣。
+- **早拦截守卫** `services/expense/line_guards.py`:伪造票据/逃税/**倒签造票带金额**(创建动词区分补记)·外币不当THB·押金澄清·**未来日期不静默记**。退货/找零归收入·泰语问句/假设/否定不被 L1 误记。
+- **引导框架(竞品 parity)**:没记账时按类别给贴身示例(车牌→油费/电话→话费/店号→物品+价)·全确定性(`replies.guided_kind`)不靠大脑临场编。
+- **调研驱动测试体系**:泰国税票§86/泰语数字/**泰语分词难题**/SROIE 字段级F1 → `docs/line-platform/TEST_MASTER.md`(单一入口·读这页就够)+ 08/09/10 + `tests/fuzz/line_fuzz_corpus.py`(~19,800变体)。**Tier A 确定性归零·Tier B 真大脑四护城河(安全/诚实/语言/反幻觉)全绿**。
+- **/simplify 收口**(`88602dde`):热路径正则模块级预编译(strip/normalize 每消息跑2-3次)+长编号正则去重+`_has_digit`复用·行为不变·14例端状态抽查全不变。
+- **残留(测试窗口认可·非伤账·归 Tier B 大脑)**:拼写泰语数字 `ห้าสิบ`(大脑问价=安全)·多轮补价·一句多意图·叠字typo `อาายุ`(罕见)。**分词难题正则不能硬解**(`ห้า`⊂`ห้าง`商场)→大脑/PyThaiNLP·doc 10 §R4 研究背书。
+- **defer(/simplify 标注·没动)**:每消息只清洗一次(改签名+动顶格 line_expense)·date/long-code 搬进 strip_nonmoney(改 money_numbers 行为)·`_NUM/_dec` 跨模块导入。
+- **⚠️ 并行窗口债(非我)**:`oauth_routes.py`(539)/`erp_push.py`(507)超 size 限 + `authz` 红。push 前 `git pull --rebase`。
+
+## 历史记录（2026-06-21 · **Express Push 全链路 + 「下载小助手」上线 + 推送功能正式开** · pearnly-app `23f223b9` · companion `94e3cac`）
 
 - **Express Push 本窗口从 P1 推到全闭环 + 正式上线**(详见记忆 [[express-push-e2e-and-p4-packaging]]):阶段一整合(cloud sales mapper + 税号锚点方向判定 `direction.py` + heartbeat 收 account_sets)→部署→**数据层冒烟**(队列→companion→直写 DATAT→ack·真单 `RR581215-004`/`IV581215-001`)→**Express 报表证据**(`D:\_express_audit` p32 工具链出 241进/141销·真程序读出直写单)→**P4 双 exe 打包**→**「下载小助手」端到端**。
 - **P4 双 exe**(PySide6 无32位wheel·硬约束):`companion.exe`(64位·PySide6 托盘+首次配对窗+DBF直写+queue)+ `pack_runner.exe`(32位·pywinauto PACK)。配对 `pairing.py`(校验码+探账套上报+存config+写注册表自启)+托盘 `gui_tray`+夜间PACK `pack_scheduler`(调 runner·账套硬闸只PACK配置账套)。companion 独立 repo `D:\pearnly-companion` master `94e3cac`(无remote)·三件套在 dist/。

@@ -66,7 +66,8 @@
             downloaded: false,
             generated: false,
             connected: false,
-            account: cfg && cfg.account_set ? String(cfg.account_set) : null, // 账套以小助手上报为准
+            account: cfg && cfg.account_set ? String(cfg.account_set) : null, // 账套唯一键 = PATH(小助手上报)
+            accountName: cfg && cfg.account_company ? String(cfg.account_company) : null, // 显示用真公司名
             push: !(ep && ep.auto_push === false), // 默认开启(照搬文案「默认开启」)
             token: '',
             poll: null,
@@ -221,7 +222,9 @@
         if (!el) return;
         if (S.account) {
             el.className = 'exp-account-mirror selected';
-            el.textContent = _t('exp-acct-selected-mirror').replace('{x}', String(S.account)) + ' ✓';
+            // 显示真公司名(account_company);account_set 现为账套 PATH·不适合给客户看。
+            var shown = S.accountName || S.account;
+            el.textContent = _t('exp-acct-selected-mirror').replace('{x}', String(shown)) + ' ✓';
         } else {
             el.className = 'exp-account-mirror waiting';
             el.textContent = _t('exp-acct-wait-select');
@@ -248,7 +251,8 @@
                 body: JSON.stringify({
                     name: 'Express',
                     adapter: 'express',
-                    config: { account_set: 'DATAT', method: 'dbf' },
+                    // account_set 不在此硬塞:唯一真相源 = 小助手所选账套(经 heartbeat 上报存入 config)。
+                    config: { method: 'dbf' },
                     is_default: false,
                     auto_push: false,
                 }),
@@ -354,15 +358,17 @@
             var cfg = ep.config || {};
             var seen = cfg.agent_last_seen_at;
             var online = seen ? Date.now() - new Date(seen).getTime() < 180000 : false;
-            // 账套唯一真相源 = 小助手上报的 cfg.account_set(网页只镜像,不可在网页选)。
+            // 账套唯一真相源 = 小助手上报的 cfg.account_set(= 账套 PATH·唯一键);显示用真公司名。
             var selected = cfg.account_set ? String(cfg.account_set) : null;
+            var selectedName = cfg.account_company ? String(cfg.account_company) : null;
             var changed = false;
             if (online && !S.connected) {
                 S.connected = true;
                 changed = true;
             }
-            if (selected !== S.account) {
+            if (selected !== S.account || selectedName !== S.accountName) {
                 S.account = selected;
+                S.accountName = selectedName;
                 changed = true;
             }
             if (changed) updateUI();

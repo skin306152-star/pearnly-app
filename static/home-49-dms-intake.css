@@ -115,7 +115,7 @@
 .dmsx .dx-tabs{height:46px;border-bottom:1px solid var(--dx-line);display:flex;align-items:flex-end;gap:20px;padding:0 3px;margin-bottom:12px}
 .dmsx .dx-tab{height:46px;border:0;background:transparent;color:var(--ink2);font-size:11px;font-weight:800;padding:0 2px 12px;position:relative;cursor:pointer}
 .dmsx .dx-tab.active{color:var(--ink)}
-.dmsx .dx-tab.active:after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;border-radius:2px;background:var(--ink)}
+.dmsx .dx-tab.active:after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;border-radius:2px;background:var(--btn-blue)}
 .dmsx .dx-tabview{display:none}
 .dmsx .dx-tabview.active{display:block}
 

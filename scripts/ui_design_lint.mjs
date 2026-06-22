@@ -24,8 +24,19 @@ const CHECKS = [
         re: /--(blue|rep-blue|c-blue|invp|pur-blue|brand-blue)\b/gi,
     },
     { key: 'emoji当图标(应换Lucide)', re: /\p{Extended_Pictographic}/gu, skipToken: false },
-    { key: '小固定max-width(查是否@media)', re: /max-width:\s*([1-9]\d{2})px/gi },
-    { key: '内联旧弹窗/抽屉', re: /class=["']modal["'][^>]*style=|\.drawer\b|class=["']drawer/gi },
+    // 只抓"固定 max-width"(非响应式):@media 查询里的 max-width 是正确的响应式断点,
+    // 类名"查是否@media"本就承诺只看 @media 之外的固定宽度 → skipLineRe 跳过 @media 行。
+    {
+        key: '小固定max-width(查是否@media)',
+        re: /max-width:\s*([1-9]\d{2})px/gi,
+        skipLineRe: /@media/i,
+    },
+    // `.drawer\b` 会误匹配 `.drawer-decision-zone` 等子元素选择器(已存在抽屉的内部结构,
+    // 非新弹窗)→ 收紧成"drawer 作为完整类名"(后面不接 - 或字母数字),只抓真正的抽屉容器。
+    {
+        key: '内联旧弹窗/抽屉',
+        re: /class=["']modal["'][^>]*style=|\.drawer(?![-\w])|class=["']drawer/gi,
+    },
     { key: '自曝/AI文案', re: /抽不准|อ่านไม่แม่น|人工智能/gi },
     { key: '原生弹窗(禁)', re: /(?<![.\w])(alert|confirm|prompt)\s*\(/g },
     { key: '超高z-index', re: /z-index:\s*9{3,}/gi },
@@ -69,6 +80,7 @@ for (const f of files) {
         let cnt = 0;
         const samples = [];
         lines.forEach((ln, i) => {
+            if (c.skipLineRe && c.skipLineRe.test(ln)) return;
             const m = ln.match(c.re);
             if (m) {
                 cnt += m.length;

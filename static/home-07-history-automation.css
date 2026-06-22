@@ -778,7 +778,7 @@
     left: 0; right: 0; bottom: -1px;
     height: 2px;
     border-radius: 2px;
-    background: var(--ink);
+    background: var(--btn-blue);
 }
 .hd-panel { display: none; }
 .hd-panel.active { display: block; }

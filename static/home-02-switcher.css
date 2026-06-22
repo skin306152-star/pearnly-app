@@ -32,7 +32,7 @@
 .ws-ctrl-btn:hover {
     background: var(--bg);
     border-color: var(--ink-4);
-    color: var(--ink, #111);
+    color: var(--ink);
 }
 .ws-ic { width: 15px; height: 15px; flex-shrink: 0; }
 .ws-ctrl-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -64,7 +64,7 @@
 .ws-modal-title {
     font-size: 15px;
     font-weight: 600;
-    color: var(--ink, #111);
+    color: var(--ink);
 }
 .ws-modal-close {
     background: none;
@@ -74,7 +74,7 @@
     color: var(--ink-3);
     padding: 0 4px;
 }
-.ws-modal-close:hover { color: var(--ink, #111); }
+.ws-modal-close:hover { color: var(--ink); }
 .ws-modal-list {
     padding: 4px 10px 8px;
     display: flex;
@@ -100,7 +100,7 @@
     border: 1px solid var(--line);
     border-radius: 8px;
     background: var(--card);
-    color: var(--ink, #111);
+    color: var(--ink);
     cursor: pointer;
 }
 .ws-modal-select:focus {
@@ -117,7 +117,7 @@
     border: 1px solid transparent;
     border-radius: 8px;
     font-size: 14px;
-    color: var(--ink, #111);
+    color: var(--ink);
     cursor: pointer;
     text-align: left;
     font-family: inherit;

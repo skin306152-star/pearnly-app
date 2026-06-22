@@ -97,6 +97,19 @@ _BRAIN_DEFER_AMOUNT = {
     "กาแฟ ห้าสิบ": Decimal(50),
 }
 
+# 型号词典扩充(commit 78500435)端到端回归:含数字品牌剥 / 无数字品牌不误剥 / 容器规格走单位。
+# (text, lang, 期望额)。验真大脑下端状态金额正确(品牌/规格数字不当价、普通价不被误剥)。
+_BRAND_CASES = [
+    ("M150 2 ขวด 20", "th", Decimal(20)),  # M-150 型号数字不当额
+    ("100พลัส 15", "th", Decimal(15)),  # 100Plus
+    ("7up 18", "th", Decimal(18)),  # 7Up
+    ("3 แม่ครัว 25", "th", Decimal(25)),  # 3 แม่ครัว 罐头
+    ("แลคตาซอย 125 ml 12", "th", Decimal(12)),  # 容器规格 125ml=尺寸不是价
+    ("ลีโอ 100", "th", Decimal(100)),  # 无数字品牌·100=价(不误剥)
+    ("คาราบาว 12", "th", Decimal(12)),  # 无数字品牌·12=价
+    ("กาแฟ 150", "th", Decimal(150)),  # 普通·150=价
+]
+
 
 def _texts(messages):
     return [
@@ -249,11 +262,14 @@ def _judge_b(text, lang, invariants, end):
             else:
                 out.append((inv, "pass" if det == lang else "fail"))
         elif inv == corpus.INV_BRAIN_DEFER:
+            # 记对额=pass · 记错额=fail(真伤账)· 问价不记=uncertain(安全兜底·真大脑也不解析拼写数字)。
             want = _BRAIN_DEFER_AMOUNT.get(text)
-            if want is None:
-                out.append((inv, "uncertain"))
+            if want is not None and amts == [want]:
+                out.append((inv, "pass"))
+            elif created:
+                out.append((inv, "fail"))
             else:
-                out.append((inv, "pass" if amts == [want] else "fail"))
+                out.append((inv, "uncertain"))
         elif inv == corpus.INV_CLARIFY_AMOUNT:
             out.append((inv, "pass" if not created else "fail"))
     # 幻觉硬底线:任何建单金额不在原文 money_numbers → INV-1 漏(对所有用例都查)。
@@ -327,6 +343,36 @@ def run_tier_b(real_key, limit=None, halluc_n=40, sleep_s=0.4):
     return cases, inv_stat, fails, errors
 
 
+def run_brand_cases(real_key, sleep_s=0.3):
+    """型号词典扩充端到端回归(真大脑):每条验记单金额 == 期望。返回 [(text, ok, 实记)]。"""
+    sim = Sim()
+    out = []
+    with ExitStack() as stack:
+        for p in _build_patches(sim) + _tier_b_patches(sim, real_key):
+            stack.enter_context(p)
+        for text, lang, want in _BRAND_CASES:
+            sim.pending.clear()
+            try:
+                end = _send_b(text, lang)
+            except Exception as e:  # noqa: BLE001
+                out.append((text, False, f"ERR {type(e).__name__}: {e}"))
+                continue
+            amts = [c["amount"] for c in end["created"]]
+            out.append((text, amts == [want], f"记{[str(a) for a in amts]}" if amts else "未建单"))
+            if sleep_s:
+                time.sleep(sleep_s)
+    return out
+
+
+def _print_brand_report(out):
+    print("\n================ Tier B · 型号词典扩充端到端(真大脑·commit 78500435)============")
+    bad = [r for r in out if not r[1]]
+    print(f"样本 {len(out)} · PASS {len(out) - len(bad)} · FAIL {len(bad)}")
+    for text, ok, detail in out:
+        want = dict((c[0], c[2]) for c in _BRAND_CASES).get(text)
+        print(f"  {'✓' if ok else '✗'} {text[:26]!r:28s} 期望 {str(want):>5s} · {detail}")
+
+
 def _print_report(cases, inv_stat, fails, errors):
     print("\n================ LINE fuzz Tier B(真大脑 ON · 回复内容侧)================")
     print(f"样本: {len(cases)} 条  ·  真 Gemini  ·  DB 全 mock(零落库)  ·  运行错误 {errors}")
@@ -363,15 +409,21 @@ def main():
     ap.add_argument("--sleep", type=float, default=0.4, help="每条间隔秒(Gemini 限速)")
     ap.add_argument("--tenant", default="", help="(记录用·DB 已 mock 不写真库)")
     ap.add_argument("--user", default="", help="(记录用·DB 已 mock 不写真库)")
+    ap.add_argument("--brands-only", action="store_true", help="只跑型号词典扩充端到端回归")
     args = ap.parse_args()
     real_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not real_key:
         print("✗ 缺 GEMINI_API_KEY 环境变量(从服务器拉:见 STATE / systemd mrpilot 环境)。")
         sys.exit(2)
+    if args.brands_only:
+        _print_brand_report(run_brand_cases(real_key, sleep_s=args.sleep))
+        print("\n（Tier B · 型号词典回归 · 真大脑 · 只产问题点 · 不改产品逻辑）")
+        return
     cases, inv_stat, fails, errors = run_tier_b(
         real_key, limit=args.limit, halluc_n=args.halluc, sleep_s=args.sleep
     )
     _print_report(cases, inv_stat, fails, errors)
+    _print_brand_report(run_brand_cases(real_key, sleep_s=args.sleep))
     print("\n（Tier B · 真大脑 ON · DB mock 零落库 · 确定性判 · 只产问题点 · 不改产品逻辑）")
 
 

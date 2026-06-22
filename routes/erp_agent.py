@@ -64,8 +64,9 @@ async def erp_agent_token(endpoint_id: str, request: Request):
 async def erp_agent_heartbeat(request: Request):
     """心跳 · 更新 last_seen · 接收 Agent 上报的可用账套列表(供 FE「选账套」读)· 返回状态。
 
-    请求体可带 {account_sets:[{code,name,tax_id,path,writable}]};体为空也正常(旧 Agent
-    兼容)。账套列表存进 endpoint.config.reported_account_sets,前端经 GET /api/erp/endpoints 读到。
+    请求体可带 {account_sets:[{code,name,tax_id,path,writable}]} 与 {accounts:[{code,name,type}]}
+    (科目表);体为空也正常(旧 Agent 兼容)。账套列表存进 config.reported_account_sets、科目表存进
+    config.reported_accounts,前端经 GET /api/erp/endpoints 读到(账套选择 / 科目映射下拉)。
     """
     _require_enabled()
     ep = _auth_agent(request)
@@ -76,10 +77,14 @@ async def erp_agent_heartbeat(request: Request):
         body = {}
     cfg = ep.get("config") or {}
     stored = 0
+    accts_stored = 0
     selected = None
     if isinstance(body, dict):
         if body.get("account_sets") is not None:
             stored = agent_store.store_account_sets(str(ep["id"]), body.get("account_sets"))
+        # 科目表上报(可选)→ 存 config.reported_accounts,供「科目映射」下拉读。
+        if body.get("accounts") is not None:
+            accts_stored = agent_store.store_reported_accounts(str(ep["id"]), body.get("accounts"))
         # 小助手上报客户【所选账套整组】→ 存 config(方法无关·直录/RPA 共用·见可扩展性契约)。
         # 仅在与已存不同时写,省稳态每拍无谓写库。
         selected = str(body.get("account_set") or "").strip() or None
@@ -92,6 +97,7 @@ async def erp_agent_heartbeat(request: Request):
         "account_set": selected or cfg.get("account_set"),
         "method": cfg.get("method") or "rpa",
         "account_sets_received": stored,
+        "accounts_received": accts_stored,
     }
 
 

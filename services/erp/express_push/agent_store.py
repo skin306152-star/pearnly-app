@@ -139,6 +139,58 @@ def store_account_sets(endpoint_id: str, account_sets: Any) -> int:
         return 0
 
 
+# ── 科目表(chart of accounts)· 供 FE「科目映射」下拉按名字选 ──────────────────
+# 小助手登录 Express 读科目 DBF(如 GLMAS)上报。科目表【可自定义·每账套不同】→ 必须按
+# 账套发现,不能在程序里写死默认码(Owner 2026-06-22 拍板)。
+_ACCOUNT_KEYS = ("code", "name", "type")
+_MAX_ACCOUNTS = 3000
+
+
+def _sanitize_accounts(raw: Any) -> List[Dict[str, Any]]:
+    """净化 Agent 上报的科目表:只留 code/name/type、限长限量。code 必填(科目码=记账锚)。"""
+    if not isinstance(raw, list):
+        return []
+    out: List[Dict[str, Any]] = []
+    for item in raw[:_MAX_ACCOUNTS]:
+        if not isinstance(item, dict):
+            continue
+        clean: Dict[str, Any] = {}
+        for k in _ACCOUNT_KEYS:
+            v = item.get(k)
+            if v is not None and str(v).strip() != "":
+                clean[k] = str(v).strip()[:120]
+        if clean.get("code"):
+            out.append(clean)
+    return out
+
+
+def store_reported_accounts(endpoint_id: str, accounts: Any) -> int:
+    """存小助手探测的【科目表】进 config.reported_accounts(供 FE「科目映射」下拉读)。
+
+    净化后整体替换 + 记 accounts_seen_at;返回存入条数。镜像 store_account_sets,只更新本
+    express endpoint。客户在下拉里按【名字】选科目,FE 存科目【码】进 config(revenue_acc 等)。
+    """
+    accs = _sanitize_accounts(accounts)
+    try:
+        from core import db
+
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                """
+                UPDATE erp_endpoints
+                SET config = COALESCE(config, '{}'::jsonb) || jsonb_build_object(
+                        'reported_accounts', %s::jsonb,
+                        'accounts_seen_at', to_jsonb(NOW()::text))
+                WHERE id = %s AND adapter = 'express'
+                """,
+                (json.dumps(accs, ensure_ascii=False), endpoint_id),
+            )
+        return len(accs)
+    except Exception as e:
+        logger.error(f"store_reported_accounts failed: {e}")
+        return 0
+
+
 # 所选账套【整组】· 方法无关(直录/RPA 共用 · 见 11-dispatch 可扩展性契约 §1/§2/§5)。
 # account_set 名(白名单)+ account_dir(DBF 写文件)+ account_company(公司名硬闸)
 # + account_set_row(RPA 登录后公司 grid 行)。客户选一次整组都推出,RPA 来零新增字段。

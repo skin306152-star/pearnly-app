@@ -213,7 +213,58 @@ class AccountSetsReportTests(unittest.TestCase):
         self.assertIn("adapter = 'express'", blob)
 
 
+class AccountsChartReportTests(unittest.TestCase):
+    def test_sanitize_keeps_known_keys_only(self):
+        raw = [{"code": "4100", "name": "รายได้", "type": "income", "evil": "drop"}]
+        out = agent_store._sanitize_accounts(raw)
+        self.assertEqual(set(out[0]), {"code", "name", "type"})
+
+    def test_sanitize_requires_code(self):
+        self.assertEqual(agent_store._sanitize_accounts("nope"), [])
+        self.assertEqual(agent_store._sanitize_accounts([{"name": "无码"}]), [])  # 无 code 丢
+        self.assertEqual(agent_store._sanitize_accounts([{"code": "1130"}]), [{"code": "1130"}])
+
+    def test_sanitize_caps_count(self):
+        raw = [{"code": f"c{i}"} for i in range(3200)]
+        self.assertEqual(len(agent_store._sanitize_accounts(raw)), 3000)
+
+    def test_store_reported_accounts_writes_config(self):
+        cur = FakeCursor()
+        with _patch_cursor(cur):
+            n = agent_store.store_reported_accounts("ep-1", [{"code": "4100", "name": "รายได้"}])
+        self.assertEqual(n, 1)
+        blob = " ".join(s for s, _ in cur.executed)
+        self.assertIn("reported_accounts", blob)
+        self.assertIn("accounts_seen_at", blob)
+        self.assertIn("adapter = 'express'", blob)
+
+
 class HeartbeatReceiveTests(unittest.TestCase):
+    def test_heartbeat_stores_accounts_chart(self):
+        import asyncio
+
+        from routes import erp_agent
+
+        class _Req:
+            headers = {"authorization": "Bearer exp_ep-1_x"}
+
+            async def json(self):
+                return {"accounts": [{"code": "4100", "name": "รายได้"}], "method": "dbf"}
+
+        ep = {"id": "ep-1", "enabled": True, "config": {}}
+        with (
+            mock.patch.object(erp_agent, "express_push_enabled", return_value=True),
+            mock.patch.object(erp_agent.agent_store, "authenticate", return_value=ep),
+            mock.patch.object(erp_agent.agent_store, "touch_heartbeat"),
+            mock.patch.object(erp_agent.agent_store, "store_account_sets", return_value=0),
+            mock.patch.object(
+                erp_agent.agent_store, "store_reported_accounts", return_value=1
+            ) as store_acc,
+        ):
+            res = asyncio.run(erp_agent.erp_agent_heartbeat(_Req()))
+        self.assertEqual(res["accounts_received"], 1)
+        store_acc.assert_called_once()
+
     def test_heartbeat_stores_account_sets(self):
         import asyncio
 

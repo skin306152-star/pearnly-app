@@ -72,6 +72,14 @@ class NonMoneyNumberTests(unittest.TestCase):
         self.assertIsNone(_amt("ค่าไฟ 555"))
         self.assertEqual(_amt("ค่าไฟ 555 บาท"), Decimal("555"))
 
+    def test_product_brand_number_not_amount(self):
+        # 型号/品牌里的数字是名不是价(治真大脑也把 M150→记150)。
+        self.assertEqual(ae.extract_amount("M150 2 ขวด 20", None, None), Decimal("20"))
+        self.assertEqual(ae.extract_amount("100พลัส 15", None, None), Decimal("15"))
+        # money_numbers 同剥 → 大脑编型号数字被接地拒。
+        self.assertNotIn(Decimal("150"), ae.money_numbers("M150 2 ขวด 20"))
+        self.assertNotIn(Decimal("100"), ae.money_numbers("100พลัส 15"))
+
     def test_qty_unit_price_product(self):
         self.assertEqual(
             ae.extract_amount("买2杯共120", Decimal("2"), Decimal("60")), Decimal("120")

@@ -50,9 +50,9 @@ class MultiSumNoiseTests(unittest.TestCase):
         self.assertEqual(_amt("ค่าต่อทะเบียน 1000"), Decimal("1000"))
         self.assertEqual(_amt("ค่าโทร 500 ค่าน้ำ 80"), Decimal("580"))
 
-    def test_known_residual_model_glued_number(self):
-        # 诚实标注:型号数字粘字母(M150)·max 分不出 → 仍错(待大脑/型号词典·非本次修)。
-        self.assertEqual(_amt("M150 2 ขวด 20"), Decimal("150"))  # 期望20·当前150(已知残留)
+    def test_model_glued_number_fixed_by_dictionary(self):
+        # 型号词典(amount_extract._PRODUCT_BRANDS)整剥 M150 → 记真价 20(原残留·Tier B 真大脑曾误记150)。
+        self.assertEqual(_amt("M150 2 ขวด 20"), Decimal("20"))
 
 
 if __name__ == "__main__":

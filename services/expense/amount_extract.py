@@ -21,6 +21,9 @@ _UNIT_AFTER = (
 ).split()
 # 这些标签后跟数字 = 不是钱(车牌/房号/年龄/电话/单据号/楼层/型号/税表名)。年份单独处理(见 strip)。
 _LABEL_BEFORE = "ทะเบียน ห้อง อายุ เบอร์ โทร เลขที่ ชั้น รุ่น ภพ ภงด บ้านเลขที่".split()
+# 品牌/型号里整体含数字(数字是名不是价)→ 整词剥(精确匹配·不碰 ห้าง 歧义·治真大脑也把 M150→记150)。
+# 词典可扩(泰国常见带数字饮料/型号)。剥后金额取真价;money_numbers 同剥 → 大脑编型号数字也被接地拒。
+_PRODUCT_BRANDS = (r"m\s?-?\s?150", r"เอ็ม\s?-?\s?150", r"100\s?พลัส", r"100\s?plus")
 
 
 def _dec(s: str) -> Optional[Decimal]:
@@ -56,6 +59,8 @@ def normalize_words(text: str) -> str:
 def strip_nonmoney(text: str) -> str:
     """剥掉"明显不是钱"的数字:负号数 / 时间 HH:MM / 百分比 / 单位后缀 / 标签前缀。"""
     s = " " + (text or "") + " "
+    for pat in _PRODUCT_BRANDS:  # 型号/品牌里的数字是名不是价(M150/100พลัส)→ 整词先剥
+        s = re.sub(pat, " ", s, flags=re.IGNORECASE)
     s = re.sub(r"(?<!\d)-\s*\d+(?:[.,]\d+)*", " ", s)  # 负数不是支出额
     s = re.sub(r"\d{1,2}:\d{2}", " ", s)  # 时间 14:30(别把分钟当钱)
     s = re.sub(rf"({_NUM})\s*%", " ", s)  # 百分比

@@ -26,9 +26,7 @@ from core import db
 from core.auth import create_access_token
 from services.auth.oauth_state import gen_oauth_state as _gen_oauth_state
 from services.auth.oauth_state import login_redirect_path as _login_redirect_path
-from services.auth.oauth_state import (  # noqa: F401 · test_oauth_state 经本模块 import
-    oauth_state_secret as _oauth_state_secret,
-)
+from services.auth.oauth_state import oauth_state_secret as _oauth_state_secret  # noqa: F401
 from services.auth.oauth_state import verify_oauth_state as _verify_oauth_state
 
 logger = logging.getLogger(__name__)

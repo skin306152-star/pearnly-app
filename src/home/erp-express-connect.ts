@@ -64,8 +64,12 @@
         if (!_ep) return;
         var tk = _tk();
         try {
+            // 计数跟随当前账套(与推送日志/识别记录同口径):带账套头,避免跨账套串数。
             var r = await fetch('/api/erp/logs?adapter=express&limit=200', {
-                headers: { Authorization: 'Bearer ' + tk },
+                headers: Object.assign(
+                    { Authorization: 'Bearer ' + tk },
+                    typeof window._wsHeader === 'function' ? window._wsHeader() : {}
+                ),
             });
             if (!r.ok) return;
             var d = await r.json();

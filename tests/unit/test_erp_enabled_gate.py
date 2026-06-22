@@ -52,9 +52,7 @@ class EnabledGateTests(unittest.TestCase):
             patch.object(erp_push_log_routes.db, "has_recent_successful_push") as dedup,
         ):
             with self._client() as client:
-                r = client.post(
-                    "/api/erp/push", json={"history_id": "h-1", "endpoint_id": "ep-x"}
-                )
+                r = client.post("/api/erp/push", json={"history_id": "h-1", "endpoint_id": "ep-x"})
         self.assertEqual(r.status_code, 400, r.text)
         self.assertEqual(r.json().get("detail"), "erp.endpoint_disabled")
         get_ep.assert_called_once()
@@ -67,7 +65,9 @@ class EnabledGateTests(unittest.TestCase):
             {"id": "ep-off", "adapter": "webhook", "enabled": False, "config": {}, "name": "Off"},
         ]
         with (
-            patch.object(erp_connectors_routes, "get_current_user_from_request", return_value=_USER),
+            patch.object(
+                erp_connectors_routes, "get_current_user_from_request", return_value=_USER
+            ),
             patch.object(erp_connectors_routes.db, "list_erp_endpoints", return_value=endpoints),
         ):
             with self._client() as client:

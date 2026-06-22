@@ -109,9 +109,7 @@ def list_ocr_history(
 
     base_where_sql = " AND ".join(where)
     # 派生状态 SQL / 状态聚合 / 列表过滤抽到 list_status(控行数 + 单一职责)。
-    list_where_sql, list_params = ls.apply_list_filters(
-        where, params, source_filter, status_filter
-    )
+    list_where_sql, list_params = ls.apply_list_filters(where, params, source_filter, status_filter)
 
     try:
         with db.get_cursor() as cur:

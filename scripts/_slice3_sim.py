@@ -40,7 +40,9 @@ def sim_fuel():
     before = misread["total_amount"]
     fixed = ik.normalize_ocr_fields(misread)
     print(f"  OCR 读到 total_amount = {before}(真机卡片显示 ฿1000)")
-    print(f"  确定性兜底后 total_amount = {fixed['total_amount']}  corrections={fixed.get('_corrections')}")
+    print(
+        f"  确定性兜底后 total_amount = {fixed['total_amount']}  corrections={fixed.get('_corrections')}"
+    )
     print(f"  入账 grand_total = {_grand(fixed)}  (期望 1780.00·永不 1000·积分 22 不计)")
 
 
@@ -83,7 +85,7 @@ def sim_anchor():
     sim = Sim()
     sim.seed("V1", lines=1, status="posted", seller="BANGCHAK")
     steps = _run_anchored(sim, [("ลบ", "MID_V1"), ("กู้คืน", "MID_V1")])
-    for (msg, _, replies) in steps:
+    for msg, _, replies in steps:
         print(f"  引用卡 + 「{msg}」→ {(replies[-1] if replies else '')[:56]}")
     restored = [d for d in sim.docs.values() if d["doc"].get("restored_from") == "V1"]
     print(f"  恢复结果:重建活单 {len(restored)} 张(原死单状态={sim.docs['V1']['doc']['status']})")

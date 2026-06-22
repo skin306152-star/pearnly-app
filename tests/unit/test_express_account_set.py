@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """T2-A 账套白名单(云端·逐端点):只放行 == 端点配置 account_set;不等拒、缺失拒。"""
+
 import json
 import unittest
 from unittest import mock
@@ -68,8 +69,11 @@ class StoreSelectedAccount(unittest.TestCase):
         cm = mock.MagicMock()
         cm.__enter__.return_value = cur
         body = {
-            "account_set": "DATAT", "account_dir": r"\\srv\70EXP\test",
-            "account_company": "บริษัท X", "account_set_row": 2, "method": "dbf",
+            "account_set": "DATAT",
+            "account_dir": r"\\srv\70EXP\test",
+            "account_company": "บริษัท X",
+            "account_set_row": 2,
+            "method": "dbf",
         }
         with mock.patch("core.db.get_cursor", return_value=cm):
             ok = agent_store.store_selected_account("ep1", body)
@@ -84,10 +88,19 @@ class StoreSelectedAccount(unittest.TestCase):
         self.assertEqual(params[1], "ep1")
 
     def test_changed_guard_skips_unchanged(self):
-        cur = {"account_set": "DATAT", "account_dir": "d", "account_company": "Co",
-               "account_set_row": 2}
-        same = {"account_set": "DATAT", "account_dir": "d", "account_company": "Co",
-                "account_set_row": 2, "method": "dbf"}  # 多带 method 不算变更
+        cur = {
+            "account_set": "DATAT",
+            "account_dir": "d",
+            "account_company": "Co",
+            "account_set_row": 2,
+        }
+        same = {
+            "account_set": "DATAT",
+            "account_dir": "d",
+            "account_company": "Co",
+            "account_set_row": 2,
+            "method": "dbf",
+        }  # 多带 method 不算变更
         self.assertFalse(agent_store.selected_account_changed(cur, same))
         self.assertTrue(agent_store.selected_account_changed(cur, {**same, "account_set": "58X"}))
         self.assertTrue(agent_store.selected_account_changed({}, same))  # 首次上报 = 变更

@@ -106,8 +106,12 @@ def build_express_sales_payload(
         if not vat_acc:
             return fail("no_output_vat_account")
 
-    name = clean_seller(fields.get("buyer_name") or fields.get("customer_name") or history.get("buyer_name"))
-    tax_id = clean_tax_id(fields.get("buyer_tax") or fields.get("buyer_tax_id") or fields.get("customer_tax"))
+    name = clean_seller(
+        fields.get("buyer_name") or fields.get("customer_name") or history.get("buyer_name")
+    )
+    tax_id = clean_tax_id(
+        fields.get("buyer_tax") or fields.get("buyer_tax_id") or fields.get("customer_tax")
+    )
     customer = _resolve_customer(mappings.get("clients") or [], history, name, tax_id)
     ref_no = clean_invoice_no(history.get("invoice_no") or fields.get("invoice_number"))
 

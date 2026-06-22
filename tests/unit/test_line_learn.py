@@ -51,7 +51,9 @@ class OfferTests(unittest.TestCase):
             mock.patch.object(docs_svc, "get_doc", return_value=detail),
             mock.patch.object(cat_svc, "get_tree", return_value=_TREE),
             mock.patch.object(line_action_nonce, "mint", side_effect=_mint),
-            mock.patch.object(line_client, "push_messages", side_effect=lambda u, m: pushed.append(m)),
+            mock.patch.object(
+                line_client, "push_messages", side_effect=lambda u, m: pushed.append(m)
+            ),
         ):
             line_learn.offer("t", 1, "u1", "zh", doc_id="D1")
         return pushed, minted
@@ -88,7 +90,9 @@ class PostbackTests(unittest.TestCase):
             mock.patch.object(line_action_nonce, "consume", side_effect=_consume),
             mock.patch.object(conversation, "learn", side_effect=lambda *a, **k: learned.append(k)),
             mock.patch.object(lcd, "learn_category", side_effect=lambda *a, **k: lcat.append(k)),
-            mock.patch.object(line_reply, "reply_text_context", side_effect=lambda t, b, **k: replies.append(b)),
+            mock.patch.object(
+                line_reply, "reply_text_context", side_effect=lambda t, b, **k: replies.append(b)
+            ),
         ):
             line_learn.handle_postback(
                 {"tenant_id": "t", "line_user_id": "u1"}, "rt", scope, "TOK", "zh"
@@ -96,8 +100,13 @@ class PostbackTests(unittest.TestCase):
         return learned, lcat, replies
 
     _PAYLOAD = {
-        "cid": "c1", "sid": "s1", "cat": "商品", "sub": "饮料",
-        "vendor": "tops", "item": "水", "tax": "",
+        "cid": "c1",
+        "sid": "s1",
+        "cat": "商品",
+        "sub": "饮料",
+        "vendor": "tops",
+        "item": "水",
+        "tax": "",
     }
 
     def test_vendor_writes_text_keyword_and_seller_key(self):
@@ -129,9 +138,13 @@ class PostbackTests(unittest.TestCase):
             mock.patch.object(line_learn.db, "get_cursor_rls", return_value=_Cur()),
             mock.patch.object(line_action_nonce, "consume", side_effect=_consume),
             mock.patch.object(conversation, "learn") as learn,
-            mock.patch.object(line_reply, "reply_text_context", side_effect=lambda t, b, **k: replies.append(b)),
+            mock.patch.object(
+                line_reply, "reply_text_context", side_effect=lambda t, b, **k: replies.append(b)
+            ),
         ):
-            line_learn.handle_postback({"tenant_id": "t", "line_user_id": "u1"}, "rt", "vendor", "TOK", "zh")
+            line_learn.handle_postback(
+                {"tenant_id": "t", "line_user_id": "u1"}, "rt", "vendor", "TOK", "zh"
+            )
         learn.assert_not_called()  # ★重复点不重复写
         self.assertEqual(replies, [line_learn.ci.t(line_learn.ci.LEARN_STALE, "zh")])
 
@@ -140,10 +153,16 @@ class PostbackTests(unittest.TestCase):
         with (
             mock.patch.object(line_learn.db, "get_cursor_rls", return_value=_Cur()),
             mock.patch.object(line_action_nonce, "consume", side_effect=RuntimeError("boom")),
-            mock.patch.object(line_reply, "reply_text_context", side_effect=lambda t, b, **k: replies.append(b)),
+            mock.patch.object(
+                line_reply, "reply_text_context", side_effect=lambda t, b, **k: replies.append(b)
+            ),
         ):
-            line_learn.handle_postback({"tenant_id": "t", "line_user_id": "u1"}, "rt", "ws", "TOK", "zh")
-        self.assertEqual(replies, [line_learn.ci.t(line_learn.ci.LEARN_STALE, "zh")])  # 不抛·友好兜底
+            line_learn.handle_postback(
+                {"tenant_id": "t", "line_user_id": "u1"}, "rt", "ws", "TOK", "zh"
+            )
+        self.assertEqual(
+            replies, [line_learn.ci.t(line_learn.ci.LEARN_STALE, "zh")]
+        )  # 不抛·友好兜底
 
 
 class LearnedAppliedNextTimeTests(unittest.TestCase):
@@ -160,16 +179,30 @@ class LearnedAppliedNextTimeTests(unittest.TestCase):
             return self._rows
 
     def test_vendor_keyword_matches_future_text(self):
-        rows = [{"keyword": "tops", "category_id": "c1", "subcategory_id": "s1",
-                 "category_name": "商品", "subcategory_name": "饮料"}]
+        rows = [
+            {
+                "keyword": "tops",
+                "category_id": "c1",
+                "subcategory_id": "s1",
+                "category_name": "商品",
+                "subcategory_name": "饮料",
+            }
+        ]
         hit = conversation.lookup_learned(
             self._LookCur(rows), tenant_id="t", workspace_client_id=1, text="tops 水 20"
         )
         self.assertEqual(hit["category_id"], "c1")  # 「tops 水 20」命中学到的 tops→商品
 
     def test_item_keyword_matches_across_vendors(self):
-        rows = [{"keyword": "水", "category_id": "c1", "subcategory_id": "s1",
-                 "category_name": "商品", "subcategory_name": "饮料"}]
+        rows = [
+            {
+                "keyword": "水",
+                "category_id": "c1",
+                "subcategory_id": "s1",
+                "category_name": "商品",
+                "subcategory_name": "饮料",
+            }
+        ]
         hit = conversation.lookup_learned(
             self._LookCur(rows), tenant_id="t", workspace_client_id=1, text="711 水 15"
         )

@@ -112,7 +112,9 @@ class OcrHistoryBehaviorContract(unittest.TestCase):
         self.assertEqual(out["items"][0]["buyer_name"], "BuyerCo")
         self.assertEqual(out["items"][0]["vat_amount"], "7.00")
         self.assertEqual(out["items"][0]["status"], "confirmed")
-        self.assertEqual(out["status_counts"], {"all": 1, "confirmed": 1, "failed": 0, "pending": 0})
+        self.assertEqual(
+            out["status_counts"], {"all": 1, "confirmed": 1, "failed": 0, "pending": 0}
+        )
 
 
 if __name__ == "__main__":

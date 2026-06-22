@@ -65,8 +65,9 @@ class ExpressSalesMapperTests(unittest.TestCase):
         self.assertEqual(len(dr), 1)
         self.assertEqual(dr[0]["acc"], "11-02-01-00")
         self.assertEqual(dr[0]["amount"], "25097.92")
-        self.assertEqual(sum(Decimal(ln["amount"]) for ln in dr),
-                         sum(Decimal(ln["amount"]) for ln in cr))
+        self.assertEqual(
+            sum(Decimal(ln["amount"]) for ln in dr), sum(Decimal(ln["amount"]) for ln in cr)
+        )
         self.assertEqual(len(p["lines"]), 3)
 
     def test_customer_new_when_unmapped(self):
@@ -80,7 +81,9 @@ class ExpressSalesMapperTests(unittest.TestCase):
             "accounts": [],
             "clients": [{"client_id": 7, "erp_type": "express", "erp_code": "ย001"}],
         }
-        r = build_express_sales_payload(_sales_history(client_id=7), config=_CONFIG, mappings=mappings)
+        r = build_express_sales_payload(
+            _sales_history(client_id=7), config=_CONFIG, mappings=mappings
+        )
         self.assertEqual(r.payload["customer"]["code"], "ย001")
         self.assertFalse(r.payload["customer"]["customer_new"])
 

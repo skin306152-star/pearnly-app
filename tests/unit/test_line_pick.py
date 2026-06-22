@@ -27,7 +27,9 @@ class AmbiguousTargetTests(unittest.TestCase):
             self.assertEqual(line_pick.detect_ambiguous_target(t), ("delete", "", ""), t)
 
     def test_demonstrative_edit_amount_is_ambiguous(self):
-        self.assertEqual(line_pick.detect_ambiguous_target("把那个改成200"), ("edit", "amount", "200"))
+        self.assertEqual(
+            line_pick.detect_ambiguous_target("把那个改成200"), ("edit", "amount", "200")
+        )
         self.assertEqual(
             line_pick.detect_ambiguous_target("那个金额改成 350"), ("edit", "amount", "350")
         )

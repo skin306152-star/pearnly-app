@@ -253,7 +253,14 @@ def store_selected_account(endpoint_id: str, fields: Dict[str, Any]) -> bool:
     return _merge_config(endpoint_id, sel)
 
 
-_MAPPING_KEYS = ("revenue_acc", "ar_acc", "vat_output_acc", "fallback_acc", "ap_acc", "vat_input_acc")
+_MAPPING_KEYS = (
+    "revenue_acc",
+    "ar_acc",
+    "vat_output_acc",
+    "fallback_acc",
+    "ap_acc",
+    "vat_input_acc",
+)
 
 
 def store_mapping(endpoint_id: str, mapping: Dict[str, Any]) -> bool:

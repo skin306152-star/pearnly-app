@@ -69,6 +69,16 @@
             account: cfg && cfg.account_set ? String(cfg.account_set) : null, // 账套唯一键 = PATH(小助手上报)
             accountName: cfg && cfg.account_company ? String(cfg.account_company) : null, // 显示用真公司名
             push: !(ep && ep.auto_push === false), // 默认开启(照搬文案「默认开启」)
+            // 科目映射:小助手上报的科目表(下拉数据源)+ 已存的 6 个科目码(预选)。
+            accounts: Array.isArray(cfg && cfg.reported_accounts) ? cfg.reported_accounts : [],
+            acc: {
+                revenue_acc: (cfg && cfg.revenue_acc) || '',
+                ar_acc: (cfg && cfg.ar_acc) || '',
+                vat_output_acc: (cfg && cfg.vat_output_acc) || '',
+                fallback_acc: (cfg && cfg.fallback_acc) || '',
+                ap_acc: (cfg && cfg.ap_acc) || '',
+                vat_input_acc: (cfg && cfg.vat_input_acc) || '',
+            },
             token: '',
             poll: null,
         };
@@ -393,6 +403,25 @@
                     method: 'PATCH',
                     headers: _auth(),
                     body: JSON.stringify({ auto_push: S.push }),
+                });
+                // 科目映射:走独立 merge 路由(只覆盖 6 个科目码·不动 account_set/token)。
+                var accKeys = [
+                    'revenue_acc',
+                    'ar_acc',
+                    'vat_output_acc',
+                    'fallback_acc',
+                    'ap_acc',
+                    'vat_input_acc',
+                ];
+                var accBody: any = {};
+                for (var i = 0; i < accKeys.length; i++) {
+                    var el = $('exp-acc-' + accKeys[i]) as HTMLInputElement | HTMLSelectElement;
+                    if (el) accBody[accKeys[i]] = el.value || '';
+                }
+                await fetch('/api/erp/endpoints/' + encodeURIComponent(id) + '/express-accounts', {
+                    method: 'PATCH',
+                    headers: _auth(),
+                    body: JSON.stringify(accBody),
                 });
             } catch (e) {}
         }

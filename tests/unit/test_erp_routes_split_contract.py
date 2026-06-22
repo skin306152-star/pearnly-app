@@ -31,6 +31,7 @@ ENDPOINT_PATHS = {
     ("PATCH", "/api/erp/endpoints/{endpoint_id}"),
     ("DELETE", "/api/erp/endpoints/{endpoint_id}"),
     ("PATCH", "/api/erp/endpoints/{endpoint_id}/seed"),
+    ("PATCH", "/api/erp/endpoints/{endpoint_id}/express-accounts"),
 }
 PUSH_PATHS = {
     ("POST", "/api/erp/push"),

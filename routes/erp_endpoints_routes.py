@@ -322,3 +322,51 @@ async def erp_endpoints_update_seed(endpoint_id: str, req: ErpSeedUpdate, reques
         "seed_product_code": cfg.get("seed_product_code"),
         "generic_product_code": cfg.get("generic_product_code"),
     }
+
+
+_EXPRESS_ACC_KEYS = (
+    "revenue_acc",
+    "ar_acc",
+    "vat_output_acc",
+    "fallback_acc",
+    "ap_acc",
+    "vat_input_acc",
+)
+
+
+class ExpressAccountMapping(BaseModel):
+    revenue_acc: Optional[str] = None
+    ar_acc: Optional[str] = None
+    vat_output_acc: Optional[str] = None
+    fallback_acc: Optional[str] = None
+    ap_acc: Optional[str] = None
+    vat_input_acc: Optional[str] = None
+
+
+@router.patch("/api/erp/endpoints/{endpoint_id}/express-accounts")
+async def erp_endpoints_express_accounts(
+    endpoint_id: str, req: ExpressAccountMapping, request: Request
+):
+    """Express「科目映射」· 服务端合并 6 个会计科目码进 config(销项 收入/应收/销项税 +
+    采购 采购/应付/进项税)· 让 mapper 拼得出分录(否则 no_revenue_account 留人工)。
+
+    **读 DB 原始 config 仅覆盖这 6 键**(同 /seed 套路 · 不碰 account_set/token/
+    reported_accounts/已加密凭据,避开整体替换 config 的破坏)。空串 = 清空(回落无映射)。
+    """
+    user = get_current_user_from_request(request)
+    _check_push_access(user)
+    ep = db.get_erp_endpoint(user["id"], endpoint_id)
+    if not ep:
+        raise HTTPException(404, detail="erp.endpoint_not_found")
+    if (ep.get("adapter") or "").lower() != "express":
+        raise HTTPException(400, detail="erp.not_express_endpoint")
+    cfg = dict(ep.get("config") or {})
+    data = req.dict(exclude_unset=True)
+    for k in _EXPRESS_ACC_KEYS:
+        if k in data:
+            v = str(data[k]).strip()[:40] if data[k] is not None else ""
+            cfg[k] = v or None
+    ok = db.update_erp_endpoint(user["id"], endpoint_id, config=cfg)
+    if not ok:
+        raise HTTPException(404, detail="erp.endpoint_not_found")
+    return {"ok": True, **{k: cfg.get(k) for k in _EXPRESS_ACC_KEYS}}

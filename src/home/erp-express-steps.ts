@@ -17,6 +17,7 @@
     function render(ctx: any) {
         var _t = ctx.t;
         var _esc = ctx.esc;
+        var S = ctx.S || {};
         var t = function (k: string) {
             return _esc(_t(k));
         };
@@ -168,6 +169,67 @@
             '</span></div>' +
             '</div></div></div></section>';
 
+        // 科目映射(销项 收入/应收/销项税 + 采购 采购/应付/进项税)。
+        // 有小助手上报的科目表 → 下拉按名字选;没有 → 文本兜底手填科目码。
+        var accts =
+            S.accounts && S.accounts.length
+                ? S.accounts
+                : [];
+        var ROW =
+            'style="display:flex;align-items:center;gap:10px;margin:7px 0"';
+        var LBL = 'style="min-width:128px;font-size:13px;color:var(--ink2)"';
+        var FLD =
+            'style="flex:1;padding:7px 9px;border:1px solid var(--border,#d1d5db);border-radius:8px;font-size:13px;background:#fff"';
+        function accField(key: string, labelK: string) {
+            var cur = (S.acc && S.acc[key]) || '';
+            var inner;
+            if (accts.length) {
+                var opts = '<option value="">' + t('exp-acc-none') + '</option>';
+                for (var i = 0; i < accts.length; i++) {
+                    var a = accts[i] || {};
+                    var code = _esc(a.code || '');
+                    var nm = _esc(a.name || '');
+                    var lbl = nm ? nm + ' (' + code + ')' : code;
+                    var sel = String(a.code) === String(cur) ? ' selected' : '';
+                    opts += '<option value="' + code + '"' + sel + '>' + lbl + '</option>';
+                }
+                inner = '<select ' + FLD + ' id="exp-acc-' + key + '">' + opts + '</select>';
+            } else {
+                inner =
+                    '<input ' +
+                    FLD +
+                    ' id="exp-acc-' +
+                    key +
+                    '" value="' +
+                    _esc(cur) +
+                    '" placeholder="' +
+                    t('exp-acc-manual-ph') +
+                    '">';
+            }
+            return '<label ' + ROW + '><span ' + LBL + '>' + t(labelK) + '</span>' + inner + '</label>';
+        }
+        var accmap =
+            '<section class="exp-sec" id="exp-step-accmap"><div class="exp-sec-head">' +
+            '<h3 class="exp-sec-title">' +
+            t('exp-accmap-title') +
+            '</h3></div><div class="exp-sec-copy"><div>' +
+            t('exp-accmap-hint') +
+            '</div>' +
+            (accts.length ? '' : '<div class="exp-help-text">' + t('exp-accmap-empty') + '</div>') +
+            '<div style="margin-top:10px"><b style="font-size:13px">' +
+            t('exp-accmap-sales') +
+            '</b>' +
+            accField('revenue_acc', 'exp-acc-revenue') +
+            accField('ar_acc', 'exp-acc-ar') +
+            accField('vat_output_acc', 'exp-acc-vat-out') +
+            '</div><div style="margin-top:10px"><b style="font-size:13px">' +
+            t('exp-accmap-purchase') +
+            '</b>' +
+            accField('fallback_acc', 'exp-acc-purchase') +
+            accField('ap_acc', 'exp-acc-ap') +
+            accField('vat_input_acc', 'exp-acc-vat-in') +
+            '</div></div></section>';
+
         return (
             '<div class="exp-modal-body">' +
             rail +
@@ -175,6 +237,7 @@
             step1 +
             step2 +
             step3 +
+            accmap +
             toggle +
             advanced +
             '</main></div>'

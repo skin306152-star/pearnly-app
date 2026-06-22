@@ -145,27 +145,8 @@ def store_account_sets(endpoint_id: str, account_sets: Any) -> int:
 _SELECTED_ACCOUNT_KEYS = ("account_set", "account_dir", "account_company", "account_set_row")
 
 
-def store_selected_account(endpoint_id: str, fields: Dict[str, Any]) -> bool:
-    """存小助手上报的【所选账套整组】→ config(方法无关·不按 method 阉割)。
-
-    账套选择唯一真相源 = 本地小助手(客户在那里选)。云端存整组、网页镜像账套名。
-    只写上报到的非空字段;`account_set` 名缺失 → 整体跳过(没选不覆盖)。只更新本 express endpoint。
-    """
-    if not isinstance(fields, dict):
-        return False
-    sel: Dict[str, Any] = {}
-    for k in _SELECTED_ACCOUNT_KEYS:
-        v = fields.get(k)
-        if k == "account_set_row":
-            if v is not None and str(v).strip() != "":
-                try:
-                    sel[k] = int(v)
-                except (TypeError, ValueError):
-                    pass
-        elif v is not None and str(v).strip() != "":
-            sel[k] = str(v).strip()
-    if not sel.get("account_set"):
-        return False
+def _merge_config(endpoint_id: str, patch: Dict[str, Any]) -> bool:
+    """把 patch 以 jsonb `||` 合并进本 express endpoint 的 config(顶层键 create-or-replace)。"""
     try:
         from core import db
 
@@ -176,12 +157,48 @@ def store_selected_account(endpoint_id: str, fields: Dict[str, Any]) -> bool:
                 SET config = COALESCE(config, '{}'::jsonb) || %s::jsonb
                 WHERE id = %s AND adapter = 'express'
                 """,
-                (json.dumps(sel, ensure_ascii=False), endpoint_id),
+                (json.dumps(patch, ensure_ascii=False), endpoint_id),
             )
         return True
     except Exception as e:
-        logger.error(f"store_selected_account failed: {e}")
+        logger.error(f"_merge_config failed: {e}")
         return False
+
+
+def _clean_selected(fields: Dict[str, Any]) -> Dict[str, Any]:
+    """从上报 dict 取所选账套整组的非空字段(account_set_row 转 int)。"""
+    sel: Dict[str, Any] = {}
+    for k in _SELECTED_ACCOUNT_KEYS:
+        v = (fields or {}).get(k)
+        if k == "account_set_row":
+            if v is not None and str(v).strip() != "":
+                try:
+                    sel[k] = int(v)
+                except (TypeError, ValueError):
+                    pass
+        elif v is not None and str(v).strip() != "":
+            sel[k] = str(v).strip()
+    return sel
+
+
+def selected_account_changed(current: Dict[str, Any], reported: Dict[str, Any]) -> bool:
+    """上报的所选账套整组是否与已存 config 不同(防每拍无谓写库)。"""
+    for k in _SELECTED_ACCOUNT_KEYS:
+        if str((reported or {}).get(k) or "").strip() != str((current or {}).get(k) or "").strip():
+            return True
+    return False
+
+
+def store_selected_account(endpoint_id: str, fields: Dict[str, Any]) -> bool:
+    """存小助手上报的【所选账套整组】→ config(方法无关·不按 method 阉割)。
+
+    账套选择唯一真相源 = 本地小助手(客户在那里选)。云端存整组、网页镜像账套名。
+    只写上报到的非空字段;`account_set` 名缺失 → 整体跳过(没选不覆盖)。只更新本 express endpoint。
+    """
+    sel = _clean_selected(fields if isinstance(fields, dict) else {})
+    if not sel.get("account_set"):
+        return False
+    return _merge_config(endpoint_id, sel)
 
 
 def touch_heartbeat(endpoint_id: str) -> None:

@@ -112,7 +112,7 @@ def enqueue_express(endpoint: Dict[str, Any], history: Dict[str, Any]) -> Dict[s
             t0=t0,
         )
 
-    # 账套白名单(逐端点 · 未审批回落 DATAT)· 拒写则留人工,不入队。
+    # 账套白名单(逐端点 · 须 == 本端点配置账套)· 拒写则留人工,不入队。
     account_set = str(config.get("account_set") or "").strip()
     if not account_set_allowed(account_set, endpoint):
         return _manual(

@@ -83,6 +83,15 @@ class StoreSelectedAccount(unittest.TestCase):
         self.assertNotIn("method", stored)  # 只存账套整组,不混入别的字段
         self.assertEqual(params[1], "ep1")
 
+    def test_changed_guard_skips_unchanged(self):
+        cur = {"account_set": "DATAT", "account_dir": "d", "account_company": "Co",
+               "account_set_row": 2}
+        same = {"account_set": "DATAT", "account_dir": "d", "account_company": "Co",
+                "account_set_row": 2, "method": "dbf"}  # 多带 method 不算变更
+        self.assertFalse(agent_store.selected_account_changed(cur, same))
+        self.assertTrue(agent_store.selected_account_changed(cur, {**same, "account_set": "58X"}))
+        self.assertTrue(agent_store.selected_account_changed({}, same))  # 首次上报 = 变更
+
 
 if __name__ == "__main__":
     unittest.main()

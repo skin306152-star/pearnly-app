@@ -74,16 +74,17 @@ async def erp_agent_heartbeat(request: Request):
         body = await request.json()
     except Exception:
         body = {}
+    cfg = ep.get("config") or {}
     stored = 0
     selected = None
     if isinstance(body, dict):
         if body.get("account_sets") is not None:
             stored = agent_store.store_account_sets(str(ep["id"]), body.get("account_sets"))
         # 小助手上报客户【所选账套整组】→ 存 config(方法无关·直录/RPA 共用·见可扩展性契约)。
+        # 仅在与已存不同时写,省稳态每拍无谓写库。
         selected = str(body.get("account_set") or "").strip() or None
-        if selected:
+        if selected and agent_store.selected_account_changed(cfg, body):
             agent_store.store_selected_account(str(ep["id"]), body)
-    cfg = ep.get("config") or {}
     return {
         "ok": True,
         "endpoint_id": str(ep["id"]),
@@ -113,8 +114,8 @@ async def erp_agent_lease(req: LeaseRequest, request: Request):
     for row in leased:
         payload = row.get("request_body") or {}
         pset = str(payload.get("account_set") or "")
-        # 账套白名单(双闸):载荷账套必须 == 本连接配置的 account_set(逐端点·防串账套)。
-        if pset != target_set or not account_set_allowed(pset, ep):
+        # 账套白名单:载荷账套须 == 本连接配置 account_set(account_set_allowed 已含此判·防串账套)。
+        if not account_set_allowed(pset, ep):
             logger.warning(
                 "[express-lease] 账套不符已跳过 · log=%s payload_set=%r target=%r",
                 str(row.get("id"))[:8],

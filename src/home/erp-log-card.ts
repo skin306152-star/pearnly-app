@@ -5,6 +5,31 @@
 // data-log-* 属性原样保留 → 现有点击委托(详情/重试/勾选/复制单号)不变。
 /* global t, escapeHtml, currentLang, _erpSelected */
 
+// Express 转人工/失败原因码 → 友好文案键(把「EXPRESS_MANUAL: no_revenue_account」这类
+// 看不懂的英文码显成人话)。后端若已带 error_friendly 优先用它;否则这里按码翻译。
+const _EXPRESS_REASON_I18N: Record<string, string> = {
+    no_revenue_account: 'erp-reason-no-revenue',
+    no_ar_account: 'erp-reason-no-ar',
+    no_output_vat_account: 'erp-reason-no-output-vat',
+    no_purchase_account: 'erp-reason-no-purchase',
+    no_ap_account: 'erp-reason-no-ap',
+    no_input_vat_account: 'erp-reason-no-input-vat',
+    no_account_set: 'erp-reason-no-account-set',
+    account_set_not_allowed: 'erp-reason-acct-not-allowed',
+    direction_unknown: 'erp-reason-direction-unknown',
+    amounts_not_consistent: 'erp-reason-amounts',
+    bad_or_missing_date: 'erp-reason-bad-date',
+    entry_not_balanced: 'erp-reason-unbalanced',
+};
+
+function _expressFriendlyReason(raw: string): string {
+    // raw 形如 "EXPRESS_MANUAL: no_revenue_account" 或 "account_set_not_allowed:DATAT"
+    const stripped = (raw || '').replace(/^EXPRESS_MANUAL:?\s*/i, '').trim();
+    const code = stripped.split(':')[0].trim();
+    const key = _EXPRESS_REASON_I18N[code];
+    return key ? t(key) : '';
+}
+
 function buildErpLogCard(log: any): string {
     const time = new Date(log.created_at);
     const p2 = (n: number) => String(n).padStart(2, '0');
@@ -98,7 +123,7 @@ function buildErpLogCard(log: any): string {
 
     // 失败摘要:优先友好原因(catalog)· 回落到去掉 ERR_ 码的原始 error_msg(失败卡始终有摘要)
     const rawReason = (log.error_msg || '').replace(/^ERR_[A-Z0-9_]+:?\s*/, '').trim();
-    const reasonText = friendlyReason || rawReason;
+    const reasonText = friendlyReason || _expressFriendlyReason(log.error_msg || '') || rawReason;
     const reasonStrip =
         statusClass === 'fail' && reasonText
             ? `<div class="erp-log-reason"><b>${escapeHtml(t('erp-log-fail-summary'))}</b><span>${escapeHtml(reasonText)}</span></div>`

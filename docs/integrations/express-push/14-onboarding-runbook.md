@@ -19,6 +19,7 @@
 
 ### 1. 装小助手 + 本地配对
 - 客户在那台能访问 Express 的机器装 `PearnlyCompanion-Setup.exe`,装完弹**配对窗**。
+- ⚠️ 安装包**未签名**(内部测试期):Windows SmartScreen 首次会拦「Windows 已保护你的电脑」→ 点**「更多信息」→「仍要运行」**即可继续安装。
 - 填:① Express 账套目录(浏览选,如 `\\accserver\ACCOUNT\70EXP\<账套>`)② **Express 登录账号 + 密码**(本机输入,DPAPI 加密存本机,永不上云 · 见 T1 `15-t1`)③ 粘贴配对码。点「配对」。
 - 配对成功 = 配对码有效 + 选的目录是真 Express 账套(有 `ISINFO.DBF`)+ 探测到的账套已上报云端。小助手转后台常驻。
 

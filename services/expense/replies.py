@@ -220,6 +220,20 @@ _POOLS = {
             "この数字は時刻/数量/年齢のようで、金額ではありません🙂 記録は「項目+金額」で、例:「コーヒー 65」"
         ],
     },
+    "future_date_clarify": {
+        "th": [
+            "ดูเหมือนวันที่ในอนาคต(เช่น พรุ่งนี้/ปีหน้า)ค่ะ 🙂 ปกติบันทึกเฉพาะที่จ่ายไปแล้ว ถ้าจ่ายแล้ววันนี้พิมพ์ใหม่ได้เลย เช่น 'กาแฟ 50' นะคะ"
+        ],
+        "zh": [
+            "这看起来是未来的日期(明天/明年)哦🙂 一般只记已经花掉的;如果今天已付,直接发『咖啡 50』就行"
+        ],
+        "en": [
+            "That looks like a future date (tomorrow/next year) 🙂 I record what's already spent — if you paid today, just send e.g. 'coffee 50'"
+        ],
+        "ja": [
+            "未来の日付(明日/来年)のようです🙂 記録は支払い済みのみ。今日払ったなら、例:「コーヒー 50」と送ってください"
+        ],
+    },
     "guide_store": {
         "th": [
             "เลขนี้ดูเหมือนชื่อ/สาขาร้าน ไม่ใช่ราคาค่ะ 🙂 ถ้าซื้ออะไรมา บอกของกับราคาได้เลยนะคะ เช่น 'กาแฟ 50'"
@@ -289,6 +303,8 @@ def detect_smalltalk(text: str) -> Optional[str]:
         return "fx_foreign"
     if line_guards.is_deposit(text):  # 押金/定金 → 非普通费用·澄清不静默入账
         return "deposit_clarify"
+    if line_guards.is_future_dated(text):  # 未来日期 → 尚未发生·先确认不静默记
+        return "future_date_clarify"
     if any(w in low for w in _THANKS_WORDS):
         return "thanks"
     if any(w in low for w in _GREETING_WORDS):

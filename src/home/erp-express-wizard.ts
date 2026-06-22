@@ -66,11 +66,9 @@
             downloaded: false,
             generated: false,
             connected: false,
-            account: null,
-            accounts: _accountsOf(cfg),
+            account: cfg && cfg.account_set ? String(cfg.account_set) : null, // 账套以小助手上报为准
             push: !(ep && ep.auto_push === false), // 默认开启(照搬文案「默认开启」)
             token: '',
-            acctFilled: false,
             poll: null,
         };
         var ov = document.createElement('div');
@@ -84,13 +82,6 @@
         _renderShell();
         updateUI();
         if (S.id) _startPoll(); // 编辑既有连接:进来即探在线
-    }
-
-    function _accountsOf(cfg: any): string[] {
-        var rep = cfg && cfg.reported_account_sets;
-        if (Array.isArray(rep) && rep.length) return rep.map(String);
-        if (cfg && cfg.account_set) return [String(cfg.account_set)];
-        return [];
     }
 
     function _renderShell() {
@@ -144,15 +135,19 @@
 
     function updateUI() {
         if (!S) return;
-        var completed = (S.downloaded ? 1 : 0) + (S.connected ? 1 : 0) + (S.account ? 1 : 0);
+        // 小助手连上(heartbeat)本身就证明装好了 → step1 不强制下载。
+        var step1done = !!(S.downloaded || S.connected);
+        var completed = (step1done ? 1 : 0) + (S.connected ? 1 : 0) + (S.account ? 1 : 0);
         var bar = $('exp-bar');
         if (bar) bar.style.width = (completed / 3) * 100 + '%';
 
-        if (S.downloaded) {
+        if (step1done) {
             _badge('exp-badge1', 'exp-badge-done', 'done');
             _rail('exp-rail1', 'done');
-            _txt('exp-download', _t('exp-download-done'));
-            _txt('exp-download-hint', _t('exp-download-hint-2'));
+            if (S.downloaded) {
+                _txt('exp-download', _t('exp-download-done'));
+                _txt('exp-download-hint', _t('exp-download-hint-2'));
+            }
             _badge(
                 'exp-badge2',
                 S.connected
@@ -171,6 +166,7 @@
         }
 
         var ts = $('exp-topstatus');
+        _fillAcctMirror();
         if (S.connected) {
             _badge(
                 'exp-badge3',
@@ -178,20 +174,10 @@
                 S.account ? 'done' : 'waiting'
             );
             _rail('exp-rail3', S.account ? 'done' : 'waiting');
-            _fillAccounts();
-            var hasAcct = S.accounts.length > 0;
-            var ea = $('exp-empty-account');
-            var al = $('exp-acctlist');
-            if (ea) ea.style.display = hasAcct ? 'none' : 'block';
-            if (al) al.style.display = hasAcct ? 'grid' : 'none';
             if (ts) ts.classList.add('online');
         } else {
             _badge('exp-badge3', 'exp-badge-wait-conn', 'todo');
             _rail('exp-rail3', '');
-            var ea2 = $('exp-empty-account');
-            var al2 = $('exp-acctlist');
-            if (ea2) ea2.style.display = 'block';
-            if (al2) al2.style.display = 'none';
             if (ts) ts.classList.remove('online');
         }
         if (ts) {
@@ -225,29 +211,21 @@
         _txt('exp-progress-text', _t(ptKey));
 
         var done = $('exp-done') as HTMLButtonElement;
-        var ready = !!(S.downloaded && S.connected && S.account);
+        var ready = !!(S.connected && S.account); // 下载不再是硬门;连上 + 账套已选即可完成
         if (done) done.disabled = !ready;
         _txt('exp-footer-note', _t(ready ? 'exp-footer-note-ready' : 'exp-footer-note-todo'));
     }
 
-    function _fillAccounts() {
-        if (S.acctFilled || !S.accounts.length) return;
-        var al = $('exp-acctlist');
-        if (!al) return;
-        al.innerHTML = S.accounts
-            .map(function (code: string, i: number) {
-                return (
-                    '<div class="exp-account-card" data-account="' +
-                    _esc(code) +
-                    '"><b>' +
-                    _esc(code) +
-                    '</b><span>' +
-                    _esc(_t(i === 0 ? 'exp-acct-default-tag' : 'exp-acct-tag')) +
-                    '</span></div>'
-                );
-            })
-            .join('');
-        S.acctFilled = true;
+    function _fillAcctMirror() {
+        var el = $('exp-acct-mirror');
+        if (!el) return;
+        if (S.account) {
+            el.className = 'exp-account-mirror selected';
+            el.textContent = _t('exp-acct-selected-mirror').replace('{x}', String(S.account)) + ' ✓';
+        } else {
+            el.className = 'exp-account-mirror waiting';
+            el.textContent = _t('exp-acct-wait-select');
+        }
     }
 
     function _scrollToStep(target: string) {
@@ -326,11 +304,7 @@
     }
 
     async function _genToken() {
-        if (!S.downloaded) {
-            _toast(_t('exp-toast-need-download'));
-            _scrollToStep('exp-step1');
-            return;
-        }
+        // 下载不再是硬门:已装客户(没点下载)也能直接生成密钥。
         var id = await _ensureEndpoint();
         if (!id) {
             _notice('danger', _t('exp-token-fail'));
@@ -380,17 +354,18 @@
             var cfg = ep.config || {};
             var seen = cfg.agent_last_seen_at;
             var online = seen ? Date.now() - new Date(seen).getTime() < 180000 : false;
-            var accts = _accountsOf(cfg);
-            if (accts.length && accts.join(',') !== S.accounts.join(',')) {
-                S.accounts = accts;
-                S.acctFilled = false;
-            }
+            // 账套唯一真相源 = 小助手上报的 cfg.account_set(网页只镜像,不可在网页选)。
+            var selected = cfg.account_set ? String(cfg.account_set) : null;
+            var changed = false;
             if (online && !S.connected) {
                 S.connected = true;
-                updateUI();
-            } else if (online && !S.acctFilled && S.accounts.length) {
-                updateUI();
+                changed = true;
             }
+            if (selected !== S.account) {
+                S.account = selected;
+                changed = true;
+            }
+            if (changed) updateUI();
         } catch (e) {}
     }
 
@@ -407,13 +382,11 @@
         var id = await _ensureEndpoint();
         if (id) {
             try {
+                // account_set 以小助手上报为准(heartbeat 已存),finish 只确认连接 + 自动推送开关。
                 await fetch('/api/erp/endpoints/' + encodeURIComponent(id), {
                     method: 'PATCH',
                     headers: _auth(),
-                    body: JSON.stringify({
-                        config: { account_set: S.account || 'DATAT', method: 'dbf' },
-                        auto_push: S.push,
-                    }),
+                    body: JSON.stringify({ auto_push: S.push }),
                 });
             } catch (e) {}
         }
@@ -437,18 +410,15 @@
             _downloadAgent();
             return;
         }
-        var link = tg.closest('.exp-step-link') as HTMLElement;
-        if (link) return _scrollToStep(link.getAttribute('data-target') || 'exp-step1');
-        var acct = tg.closest('.exp-account-card') as HTMLElement;
-        if (acct) {
-            var cards = document.querySelectorAll('.exp-account-card');
-            for (var i = 0; i < cards.length; i++) cards[i].classList.remove('selected');
-            acct.classList.add('selected');
-            S.account = acct.getAttribute('data-account');
+        if (tg.closest('#exp-skip-download')) {
+            // 已装客户:标记 step1 完成,不触发下载。
+            S.downloaded = true;
             updateUI();
-            _toast(_t('exp-toast-acct-selected').replace('{x}', String(S.account)));
+            _scrollToStep('exp-step2');
             return;
         }
+        var link = tg.closest('.exp-step-link') as HTMLElement;
+        if (link) return _scrollToStep(link.getAttribute('data-target') || 'exp-step1');
         var fold = tg.closest('[data-fold]') as HTMLElement;
         if (fold) {
             var panel = $(fold.getAttribute('data-fold') || '');

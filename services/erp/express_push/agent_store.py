@@ -139,6 +139,34 @@ def store_account_sets(endpoint_id: str, account_sets: Any) -> int:
         return 0
 
 
+def store_selected_account_set(endpoint_id: str, account_set: str) -> bool:
+    """存小助手上报的【所选账套】→ config.account_set。
+
+    账套选择的唯一真相源 = 本地小助手(客户在那里选)。云端存它、网页只镜像。空值不动
+    (不覆盖成空)。只更新本 express endpoint。
+    """
+    s = (account_set or "").strip()
+    if not s:
+        return False
+    try:
+        from core import db
+
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                """
+                UPDATE erp_endpoints
+                SET config = COALESCE(config, '{}'::jsonb)
+                             || jsonb_build_object('account_set', %s::jsonb)
+                WHERE id = %s AND adapter = 'express'
+                """,
+                (json.dumps(s, ensure_ascii=False), endpoint_id),
+            )
+        return True
+    except Exception as e:
+        logger.error(f"store_selected_account_set failed: {e}")
+        return False
+
+
 def touch_heartbeat(endpoint_id: str) -> None:
     """更新 config.agent_last_seen_at = NOW(UTC)。"""
     try:

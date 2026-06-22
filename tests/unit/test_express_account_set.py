@@ -3,7 +3,7 @@
 import unittest
 from unittest import mock
 
-from services.erp.express_push import account_set_allowed
+from services.erp.express_push import account_set_allowed, agent_store
 
 
 def _ep(configured):
@@ -52,6 +52,26 @@ class EnqueueGate(unittest.TestCase):
             res = enqueue_express(ep, {"id": "h1"})
         self.assertFalse(res["success"])
         self.assertEqual(res["error_msg"], "ERR_EXPRESS_DISABLED")
+
+
+class StoreSelectedAccountSet(unittest.TestCase):
+    """heartbeat 上报的所选账套 → 存 config.account_set(T8 后端小补)。"""
+
+    def test_empty_is_noop(self):
+        self.assertFalse(agent_store.store_selected_account_set("ep1", ""))
+        self.assertFalse(agent_store.store_selected_account_set("ep1", "   "))
+
+    def test_stores_selected(self):
+        cur = mock.MagicMock()
+        cm = mock.MagicMock()
+        cm.__enter__.return_value = cur
+        with mock.patch("core.db.get_cursor", return_value=cm):
+            ok = agent_store.store_selected_account_set("ep1", "58ASIASP")
+        self.assertTrue(ok)
+        sql, params = cur.execute.call_args[0]
+        self.assertIn("account_set", sql)
+        self.assertIn("58ASIASP", params[0])  # json.dumps 的所选账套
+        self.assertEqual(params[1], "ep1")
 
 
 if __name__ == "__main__":

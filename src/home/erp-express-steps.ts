@@ -62,6 +62,8 @@
             '</div><div class="exp-action-row">' +
             '<button class="exp-primary" id="exp-download">' +
             t('exp-download-agent') +
+            '</button><button class="exp-secondary" id="exp-skip-download">' +
+            t('exp-skip-download') +
             '</button><span class="exp-help-text" id="exp-download-hint">' +
             t('exp-download-hint-1') +
             '</span></div></div></section>';
@@ -86,17 +88,15 @@
             t('exp-gen-token') +
             '</button><div id="exp-agent-notice"></div></div></div></section>';
 
-        // step3 选账套
+        // step3 选账套(只读状态镜像 · 账套只在小助手里选,网页同步显示)
         var step3 =
             '<section class="exp-sec" id="exp-step3"><div class="exp-sec-head">' +
             '<h3 class="exp-sec-title"><span>3.</span> ' +
             t('exp-s3-h') +
             '</h3><span class="exp-badge todo" id="exp-badge3"></span></div>' +
             '<div class="exp-sec-copy"><div>' +
-            t('exp-acct-pending') +
-            '</div><div class="exp-empty-account" id="exp-empty-account">' +
-            t('exp-empty-account') +
-            '</div><div class="exp-account-list" id="exp-acctlist" style="display:none"></div>' +
+            t('exp-acct-mirror-hint') +
+            '</div><div class="exp-account-mirror waiting" id="exp-acct-mirror"></div>' +
             '</div></section>';
 
         // 自动推送

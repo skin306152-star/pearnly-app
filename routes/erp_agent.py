@@ -75,14 +75,20 @@ async def erp_agent_heartbeat(request: Request):
     except Exception:
         body = {}
     stored = 0
-    if isinstance(body, dict) and body.get("account_sets") is not None:
-        stored = agent_store.store_account_sets(str(ep["id"]), body.get("account_sets"))
+    selected = None
+    if isinstance(body, dict):
+        if body.get("account_sets") is not None:
+            stored = agent_store.store_account_sets(str(ep["id"]), body.get("account_sets"))
+        # 小助手上报客户【所选账套】→ 存 config.account_set(账套选择唯一真相源 = 小助手)。
+        selected = str(body.get("account_set") or "").strip() or None
+        if selected:
+            agent_store.store_selected_account_set(str(ep["id"]), selected)
     cfg = ep.get("config") or {}
     return {
         "ok": True,
         "endpoint_id": str(ep["id"]),
         "connected": True,
-        "account_set": cfg.get("account_set"),
+        "account_set": selected or cfg.get("account_set"),
         "method": cfg.get("method") or "rpa",
         "account_sets_received": stored,
     }

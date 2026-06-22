@@ -76,6 +76,15 @@ class NonMoneyNumberTests(unittest.TestCase):
         # 型号/品牌里的数字是名不是价(治真大脑也把 M150→记150)。
         self.assertEqual(ae.extract_amount("M150 2 ขวด 20", None, None), Decimal("20"))
         self.assertEqual(ae.extract_amount("100พลัส 15", None, None), Decimal("15"))
+        self.assertEqual(ae.extract_amount("7up 18", None, None), Decimal("18"))  # 7Up
+        self.assertEqual(ae.extract_amount("3 แม่ครัว 25", None, None), Decimal("25"))  # 三厨罐头
+        self.assertEqual(
+            ae.extract_amount("แลคตาซอย 125 ml 12", None, None), Decimal("12")
+        )  # 规格ml
+
+    def test_unnumbered_brand_amount_unaffected(self):
+        # 无数字品牌不在词典(不误删):ลีโอ 100 → 记 100。
+        self.assertEqual(ae.extract_amount("ลีโอ 100", None, None), Decimal("100"))
         # money_numbers 同剥 → 大脑编型号数字被接地拒。
         self.assertNotIn(Decimal("150"), ae.money_numbers("M150 2 ขวด 20"))
         self.assertNotIn(Decimal("100"), ae.money_numbers("100พลัส 15"))

@@ -265,6 +265,25 @@ window.enforceWorkspaceGate = function () {
     if (document.getElementById('onboarding-flow-root')) return; // 新注册向导优先(末步=选套账)
     if (_gateSatisfied) return; // 本会话已选过 → 放行(切模块/onboarding 也调到这,不重弹)
     if (liffWsPending()) return; // LIFF 深链待自动选套账 → 不弹手选门
+    // 刷新场景:已持久化【有效】active 账套 → 自动放行进系统(强制选套账只在没有有效 active 时,
+    // = 真·首次登录)。进系统后刷新不再弹手选门,靠右上角切换。判据 = 持久 active + 合法性
+    // (有 workspace 列表缓存就校验在册;无缓存=刚 boot 则信任持久值,stale 由切换器/loader 兜底)。
+    var _activeId =
+        typeof window.getActiveWorkspaceClientId === 'function'
+            ? window.getActiveWorkspaceClientId()
+            : null;
+    if (_activeId != null) {
+        var _cache = window._workspaceClientsCache as Array<{ id: number }> | undefined;
+        var _valid =
+            !Array.isArray(_cache) || _cache.some((c) => String(c.id) === String(_activeId));
+        if (_valid) {
+            _gateSatisfied = true;
+            if (document.getElementById('workspace-gate-root')) close();
+            if (typeof window.applyModuleNav === 'function') window.applyModuleNav();
+            if (typeof window.renderWorkspaceControl === 'function') window.renderWorkspaceControl();
+            return;
+        }
+    }
     if (document.getElementById('workspace-gate-root')) {
         // 门已开(core-boot 登录即早起的门壳)· 不重起防打断创建 · 但此刻 _userInfo 已就绪 →
         // 校正 owner 后重渲选择列表(0 套账空态的 owner/受邀成员分支此前可能算错)。

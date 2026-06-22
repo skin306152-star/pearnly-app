@@ -128,8 +128,13 @@ async function loadHistoryPage() {
         const cid =
             typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId() : null;
         if (cid) params.set('client_id', String(cid));
+        // 跟随账套主体:带 X-Workspace-Client-Id 头(后端 active_workspace_for_request 已按它过滤)。
+        // 原裸 fetch 不带此头 → 不跟随账套;切账套→core-boot 重载本页→带新 ws 重新拉数。
         const resp = await fetch(`/api/history?${params}`, {
-            headers: { Authorization: 'Bearer ' + token },
+            headers: Object.assign(
+                { Authorization: 'Bearer ' + token },
+                typeof window._wsHeader === 'function' ? window._wsHeader() : {}
+            ),
         });
         if (resp.status === 401) {
             localStorage.removeItem('mrpilot_token');

@@ -115,10 +115,38 @@ function renderErpExceptions() {
     const customerCount = (cats.customer_mismatch || 0) + (cats.no_client || 0);
     // [label, num, sub, cat, kind, active]
     const stats: Array<[string, number, string, string, string, boolean]> = [
-        [t('erp-exc-stat-all'), allCount, t('erp-exc-stat-sub-all'), '', '', !st.cat && !st.pushType],
-        [t('erp-exc-cat-product_mismatch'), cats.product_mismatch || 0, t('erp-exc-stat-sub-product'), 'product_mismatch', '', st.cat === 'product_mismatch'],
-        [t('erp-exc-cat-customer_mismatch'), customerCount, t('erp-exc-stat-sub-customer'), 'customer_mismatch', '', st.cat === 'customer_mismatch'],
-        [t('erp-exc-stat-dms'), st.idCardCount || 0, t('erp-exc-stat-sub-dms'), '', 'id_card', st.pushType === 'id_card'],
+        [
+            t('erp-exc-stat-all'),
+            allCount,
+            t('erp-exc-stat-sub-all'),
+            '',
+            '',
+            !st.cat && !st.pushType,
+        ],
+        [
+            t('erp-exc-cat-product_mismatch'),
+            cats.product_mismatch || 0,
+            t('erp-exc-stat-sub-product'),
+            'product_mismatch',
+            '',
+            st.cat === 'product_mismatch',
+        ],
+        [
+            t('erp-exc-cat-customer_mismatch'),
+            customerCount,
+            t('erp-exc-stat-sub-customer'),
+            'customer_mismatch',
+            '',
+            st.cat === 'customer_mismatch',
+        ],
+        [
+            t('erp-exc-stat-dms'),
+            st.idCardCount || 0,
+            t('erp-exc-stat-sub-dms'),
+            '',
+            'id_card',
+            st.pushType === 'id_card',
+        ],
     ];
     const chipsHtml = stats
         .map(
@@ -156,8 +184,10 @@ function renderErpExceptions() {
                 ? t('erp-log-col-customer') + '：' + (it.seller_name || '—') + ep
                 : t('erp-log-type-invoice') + ep;
             const canFix =
-                !isId && (cat === 'product_mismatch' || cat === 'customer_mismatch' || cat === 'no_client');
-            const fixLbl = cat === 'product_mismatch' ? t('erp-exc-fix-product') : t('erp-exc-fix-customer');
+                !isId &&
+                (cat === 'product_mismatch' || cat === 'customer_mismatch' || cat === 'no_client');
+            const fixLbl =
+                cat === 'product_mismatch' ? t('erp-exc-fix-product') : t('erp-exc-fix-customer');
             return `<div class="erp-exc-card" data-erpexc-id="${escapeHtml(it.id)}">
             <span class="erp-exc-card-cb"><input type="checkbox" class="erp-exc-cb" data-erpexc-cb="${escapeHtml(it.id)}" ${checked}></span>
             <div class="erp-exc-card-icon ${icoCls}">${icoLetter}</div>

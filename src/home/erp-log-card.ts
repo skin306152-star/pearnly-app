@@ -80,7 +80,10 @@ function buildErpLogCard(log: any): string {
     const mr = log.max_retries || 3;
     let retryInfo = '';
     if (isRetrying) {
-        const nextMin = Math.max(0, Math.round((new Date(log.next_retry_at).getTime() - Date.now()) / 60000));
+        const nextMin = Math.max(
+            0,
+            Math.round((new Date(log.next_retry_at).getTime() - Date.now()) / 60000)
+        );
         retryInfo = `${t('erp-retry-attempt', { n: rc, max: mr })} · ${nextMin <= 0 ? t('erp-retry-next-soon') : t('erp-retry-next-min', { n: nextMin })}`;
     } else if (log.status === 'failed' && rc >= mr && !log.next_retry_at) {
         retryInfo = t('erp-retry-exhausted', { n: rc });

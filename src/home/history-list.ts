@@ -83,10 +83,7 @@ function renderHistorySummary() {
     set('hist-count-failed', c.failed);
     const active = _historyState.statusFilter || 'all';
     document.querySelectorAll('#history-summary .hist-card').forEach((card) => {
-        card.classList.toggle(
-            'active',
-            (card as HTMLElement).dataset.statusFilter === active
-        );
+        card.classList.toggle('active', (card as HTMLElement).dataset.statusFilter === active);
     });
 }
 

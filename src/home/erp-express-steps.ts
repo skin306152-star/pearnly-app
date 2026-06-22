@@ -171,12 +171,8 @@
 
         // 科目映射(销项 收入/应收/销项税 + 采购 采购/应付/进项税)。
         // 有小助手上报的科目表 → 下拉按名字选;没有 → 文本兜底手填科目码。
-        var accts =
-            S.accounts && S.accounts.length
-                ? S.accounts
-                : [];
-        var ROW =
-            'style="display:flex;align-items:center;gap:10px;margin:7px 0"';
+        var accts = S.accounts && S.accounts.length ? S.accounts : [];
+        var ROW = 'style="display:flex;align-items:center;gap:10px;margin:7px 0"';
         var LBL = 'style="min-width:128px;font-size:13px;color:var(--ink2)"';
         var FLD =
             'style="flex:1;padding:7px 9px;border:1px solid var(--border,#d1d5db);border-radius:8px;font-size:13px;background:#fff"';
@@ -192,8 +188,15 @@
             var nm = _nameForCode(cur);
             var val = cur ? (nm ? _esc(nm) + ' (' + _esc(cur) + ')' : _esc(cur)) : '—';
             return (
-                '<div ' + ROW + '><span ' + LBL + '>' + t(labelK) +
-                '</span><b style="flex:1;font-size:13px">' + val + '</b></div>'
+                '<div ' +
+                ROW +
+                '><span ' +
+                LBL +
+                '>' +
+                t(labelK) +
+                '</span><b style="flex:1;font-size:13px">' +
+                val +
+                '</b></div>'
             );
         }
         var accmap =
@@ -201,7 +204,9 @@
             '<h3 class="exp-sec-title">' +
             t('exp-accmap-title') +
             '</h3></div><div class="exp-sec-copy">' +
-            '<div class="exp-help-text">' + t('exp-accmap-mirror-hint') + '</div>' +
+            '<div class="exp-help-text">' +
+            t('exp-accmap-mirror-hint') +
+            '</div>' +
             '<div style="margin-top:10px"><b style="font-size:13px">' +
             t('exp-accmap-sales') +
             '</b>' +

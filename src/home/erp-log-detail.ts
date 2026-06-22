@@ -147,7 +147,6 @@ async function showLogDetail(logId: any) {
             });
         }
 
-
         // 凭证主体:一行一项 key-value(label 固定宽 · value 自适应 · 见 .erp-receipt-row CSS)
         const rowsHtml: string[] = [];
         const addRow = (label: any, valueHtml: any) => {
@@ -248,16 +247,49 @@ async function showLogDetail(logId: any) {
         const dmsCustId = rb.customer_id || rb.dms_customer_id;
         if (isIdCard && dmsCustId) {
             // 客户写入步骤(数据里有 customer_id 才显)
-            tl.push(tlItem('ok', '✓', t('erp-tl-customer-ok'), t('erp-tl-dms-customer', { id: String(dmsCustId) })));
+            tl.push(
+                tlItem(
+                    'ok',
+                    '✓',
+                    t('erp-tl-customer-ok'),
+                    t('erp-tl-dms-customer', { id: String(dmsCustId) })
+                )
+            );
             if (isOk) tl.push(tlItem('ok', '✓', t('erp-tl-order-ok'), t('erp-tl-ok')));
             else if (isRetrying2)
-                tl.push(tlItem('mid', '↻', t('erp-tl-retrying'), t('erp-retry-attempt', { n: log.retry_count || 0, max: log.max_retries || 3 })));
-            else tl.push(tlItem('fail', '✗', t('erp-tl-order-fail'), 'HTTP ' + (log.http_status || '—')));
+                tl.push(
+                    tlItem(
+                        'mid',
+                        '↻',
+                        t('erp-tl-retrying'),
+                        t('erp-retry-attempt', {
+                            n: log.retry_count || 0,
+                            max: log.max_retries || 3,
+                        })
+                    )
+                );
+            else
+                tl.push(
+                    tlItem('fail', '✗', t('erp-tl-order-fail'), 'HTTP ' + (log.http_status || '—'))
+                );
         } else {
-            tl.push(tlItem(isOk ? 'ok' : 'mid', '↗', t('erp-tl-pushed'), epName + ' · ' + triggerText));
-            if (isOk) tl.push(tlItem('ok', '✓', t('erp-tl-ok'), 'HTTP ' + (log.http_status || '200')));
+            tl.push(
+                tlItem(isOk ? 'ok' : 'mid', '↗', t('erp-tl-pushed'), epName + ' · ' + triggerText)
+            );
+            if (isOk)
+                tl.push(tlItem('ok', '✓', t('erp-tl-ok'), 'HTTP ' + (log.http_status || '200')));
             else if (isRetrying2)
-                tl.push(tlItem('mid', '↻', t('erp-tl-retrying'), t('erp-retry-attempt', { n: log.retry_count || 0, max: log.max_retries || 3 })));
+                tl.push(
+                    tlItem(
+                        'mid',
+                        '↻',
+                        t('erp-tl-retrying'),
+                        t('erp-retry-attempt', {
+                            n: log.retry_count || 0,
+                            max: log.max_retries || 3,
+                        })
+                    )
+                );
             else tl.push(tlItem('fail', '✗', t('erp-tl-fail'), 'HTTP ' + (log.http_status || '—')));
         }
 

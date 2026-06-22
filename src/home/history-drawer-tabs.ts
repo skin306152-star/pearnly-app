@@ -152,9 +152,7 @@ function historizeDrawer(detail: HistDetail) {
         const btn = (e.target as HTMLElement).closest('.hd-tab') as HTMLElement | null;
         if (!btn) return;
         const v = btn.dataset.hdView;
-        tabsBar
-            .querySelectorAll('.hd-tab')
-            .forEach((b) => b.classList.toggle('active', b === btn));
+        tabsBar.querySelectorAll('.hd-tab').forEach((b) => b.classList.toggle('active', b === btn));
         panelWrap
             .querySelectorAll('.hd-panel')
             .forEach((p) => p.classList.toggle('active', (p as HTMLElement).dataset.hdPanel === v));

@@ -355,7 +355,11 @@ async function doLookup(): Promise<void> {
     const res = await subjectLookup(S.subject);
     S.busy = false;
     // 税号位数不对(subj-tax-len)= 输入错误 → 红色醒目提示(不再是易忽略的 info)。
-    if (!res.ok) showToast(t(res.code || 'subj-lookup-fail'), res.code === 'subj-tax-len' ? 'error' : 'info');
+    if (!res.ok)
+        showToast(
+            t(res.code || 'subj-lookup-fail'),
+            res.code === 'subj-tax-len' ? 'error' : 'info'
+        );
     render();
 }
 

@@ -22,8 +22,13 @@ type HistDrawerRow = {
 // 点击行 → 打开抽屉查看/编辑
 async function openHistoryDrawer(historyId: string) {
     try {
+        // 详情接口同样按 active workspace 硬边界过滤(PO-4)→ 必须带 X-Workspace-Client-Id 头,
+        // 否则记录被过滤掉、resp 非 200、抽屉静默打不开(与列表同账套口径)。
         const resp = await fetch(`/api/history/${encodeURIComponent(historyId)}`, {
-            headers: { Authorization: 'Bearer ' + token },
+            headers: Object.assign(
+                { Authorization: 'Bearer ' + token },
+                typeof window._wsHeader === 'function' ? window._wsHeader() : {}
+            ),
         });
         if (!resp.ok) return;
         const detail = await resp.json();
@@ -148,7 +153,11 @@ async function saveHistoryEdits() {
         await withLoading(btn, async () => {
             const resp = await fetch(`/api/history/${encodeURIComponent(r._historyId as string)}`, {
                 method: 'PUT',
-                headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+                headers: {
+                    Authorization: 'Bearer ' + token,
+                    'Content-Type': 'application/json',
+                    ...(typeof window._wsHeader === 'function' ? window._wsHeader() : {}),
+                },
                 body: JSON.stringify({ pages: newPages }),
             });
             if (!resp.ok) throw new Error('save failed');
@@ -229,7 +238,10 @@ function openHistoryMenu(historyId: string, anchor: HTMLElement) {
             const dismissLoading = showToast(t('history-download-pdf-loading'), 'loading', 0);
             try {
                 const resp = await fetch(`/api/history/${encodeURIComponent(historyId)}/pdf`, {
-                    headers: { Authorization: 'Bearer ' + token },
+                    headers: Object.assign(
+                        { Authorization: 'Bearer ' + token },
+                        typeof window._wsHeader === 'function' ? window._wsHeader() : {}
+                    ),
                 });
                 if (!resp.ok) throw new Error('download failed');
                 const blob = await resp.blob();
@@ -313,7 +325,10 @@ function openHistoryMenu(historyId: string, anchor: HTMLElement) {
             try {
                 const resp = await fetch(`/api/history/${encodeURIComponent(historyId)}`, {
                     method: 'DELETE',
-                    headers: { Authorization: 'Bearer ' + token },
+                    headers: Object.assign(
+                        { Authorization: 'Bearer ' + token },
+                        typeof window._wsHeader === 'function' ? window._wsHeader() : {}
+                    ),
                 });
                 if (!resp.ok) throw new Error();
                 showAlert('info', t('history-delete-ok'));
@@ -422,6 +437,7 @@ function openHistoryMenu(historyId: string, anchor: HTMLElement) {
                     headers: {
                         Authorization: 'Bearer ' + token,
                         'Content-Type': 'application/json',
+                        ...(typeof window._wsHeader === 'function' ? window._wsHeader() : {}),
                     },
                     body: JSON.stringify({ ids }),
                 });

@@ -79,10 +79,10 @@ async def erp_agent_heartbeat(request: Request):
     if isinstance(body, dict):
         if body.get("account_sets") is not None:
             stored = agent_store.store_account_sets(str(ep["id"]), body.get("account_sets"))
-        # 小助手上报客户【所选账套】→ 存 config.account_set(账套选择唯一真相源 = 小助手)。
+        # 小助手上报客户【所选账套整组】→ 存 config(方法无关·直录/RPA 共用·见可扩展性契约)。
         selected = str(body.get("account_set") or "").strip() or None
         if selected:
-            agent_store.store_selected_account_set(str(ep["id"]), selected)
+            agent_store.store_selected_account(str(ep["id"]), body)
     cfg = ep.get("config") or {}
     return {
         "ok": True,

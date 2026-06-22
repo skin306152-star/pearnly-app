@@ -139,14 +139,32 @@ def store_account_sets(endpoint_id: str, account_sets: Any) -> int:
         return 0
 
 
-def store_selected_account_set(endpoint_id: str, account_set: str) -> bool:
-    """存小助手上报的【所选账套】→ config.account_set。
+# 所选账套【整组】· 方法无关(直录/RPA 共用 · 见 11-dispatch 可扩展性契约 §1/§2/§5)。
+# account_set 名(白名单)+ account_dir(DBF 写文件)+ account_company(公司名硬闸)
+# + account_set_row(RPA 登录后公司 grid 行)。客户选一次整组都推出,RPA 来零新增字段。
+_SELECTED_ACCOUNT_KEYS = ("account_set", "account_dir", "account_company", "account_set_row")
 
-    账套选择的唯一真相源 = 本地小助手(客户在那里选)。云端存它、网页只镜像。空值不动
-    (不覆盖成空)。只更新本 express endpoint。
+
+def store_selected_account(endpoint_id: str, fields: Dict[str, Any]) -> bool:
+    """存小助手上报的【所选账套整组】→ config(方法无关·不按 method 阉割)。
+
+    账套选择唯一真相源 = 本地小助手(客户在那里选)。云端存整组、网页镜像账套名。
+    只写上报到的非空字段;`account_set` 名缺失 → 整体跳过(没选不覆盖)。只更新本 express endpoint。
     """
-    s = (account_set or "").strip()
-    if not s:
+    if not isinstance(fields, dict):
+        return False
+    sel: Dict[str, Any] = {}
+    for k in _SELECTED_ACCOUNT_KEYS:
+        v = fields.get(k)
+        if k == "account_set_row":
+            if v is not None and str(v).strip() != "":
+                try:
+                    sel[k] = int(v)
+                except (TypeError, ValueError):
+                    pass
+        elif v is not None and str(v).strip() != "":
+            sel[k] = str(v).strip()
+    if not sel.get("account_set"):
         return False
     try:
         from core import db
@@ -155,15 +173,14 @@ def store_selected_account_set(endpoint_id: str, account_set: str) -> bool:
             cur.execute(
                 """
                 UPDATE erp_endpoints
-                SET config = COALESCE(config, '{}'::jsonb)
-                             || jsonb_build_object('account_set', %s::jsonb)
+                SET config = COALESCE(config, '{}'::jsonb) || %s::jsonb
                 WHERE id = %s AND adapter = 'express'
                 """,
-                (json.dumps(s, ensure_ascii=False), endpoint_id),
+                (json.dumps(sel, ensure_ascii=False), endpoint_id),
             )
         return True
     except Exception as e:
-        logger.error(f"store_selected_account_set failed: {e}")
+        logger.error(f"store_selected_account failed: {e}")
         return False
 
 

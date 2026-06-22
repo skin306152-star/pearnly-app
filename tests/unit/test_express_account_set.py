@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """T2-A 账套白名单(云端·逐端点):只放行 == 端点配置 account_set;不等拒、缺失拒。"""
+import json
 import unittest
 from unittest import mock
 
@@ -54,23 +55,32 @@ class EnqueueGate(unittest.TestCase):
         self.assertEqual(res["error_msg"], "ERR_EXPRESS_DISABLED")
 
 
-class StoreSelectedAccountSet(unittest.TestCase):
-    """heartbeat 上报的所选账套 → 存 config.account_set(T8 后端小补)。"""
+class StoreSelectedAccount(unittest.TestCase):
+    """heartbeat 上报所选账套【整组】→ 存 config(方法无关·直录/RPA 共用·可扩展性契约)。"""
 
-    def test_empty_is_noop(self):
-        self.assertFalse(agent_store.store_selected_account_set("ep1", ""))
-        self.assertFalse(agent_store.store_selected_account_set("ep1", "   "))
+    def test_missing_account_set_is_noop(self):
+        self.assertFalse(agent_store.store_selected_account("ep1", {}))
+        self.assertFalse(agent_store.store_selected_account("ep1", {"account_set": "  "}))
+        self.assertFalse(agent_store.store_selected_account("ep1", {"account_dir": "x"}))  # 缺名
 
-    def test_stores_selected(self):
+    def test_stores_whole_group(self):
         cur = mock.MagicMock()
         cm = mock.MagicMock()
         cm.__enter__.return_value = cur
+        body = {
+            "account_set": "DATAT", "account_dir": r"\\srv\70EXP\test",
+            "account_company": "บริษัท X", "account_set_row": 2, "method": "dbf",
+        }
         with mock.patch("core.db.get_cursor", return_value=cm):
-            ok = agent_store.store_selected_account_set("ep1", "58ASIASP")
+            ok = agent_store.store_selected_account("ep1", body)
         self.assertTrue(ok)
-        sql, params = cur.execute.call_args[0]
-        self.assertIn("account_set", sql)
-        self.assertIn("58ASIASP", params[0])  # json.dumps 的所选账套
+        _sql, params = cur.execute.call_args[0]
+        stored = json.loads(params[0])
+        self.assertEqual(stored["account_set"], "DATAT")
+        self.assertEqual(stored["account_dir"], r"\\srv\70EXP\test")
+        self.assertEqual(stored["account_company"], "บริษัท X")
+        self.assertEqual(stored["account_set_row"], 2)  # RPA 用 · 整组带出 · 零返工
+        self.assertNotIn("method", stored)  # 只存账套整组,不混入别的字段
         self.assertEqual(params[1], "ep1")
 
 

@@ -144,10 +144,26 @@ def _derive_default(body: Dict[str, Any], status: str) -> Dict[str, str]:
     return _result(doc_no=str(doc_no), doc_id=str(doc_id), url=str(url))
 
 
+def _derive_express(body: Dict[str, Any], status: str) -> Dict[str, str]:
+    """Express · response_body.express_docnum → external_doc_no。
+
+    小助手 DBF 写完回读 Express 生成的单号(如 IV681220-001 / RR…),ack 时回 express_docnum。
+    通用派生器不认这个键 → 单号不显示("未生成 ERP 单号"),故 Express 专属映射。
+    - external_doc_no = express_docnum(给用户看 + 复制)
+    - external_url    = "" (Express 桌面软件无深链)
+    - external_doc_hint = "express_search"(前端提示去对应进/销项报表搜该单号)
+    """
+    docnum = str(body.get("express_docnum") or "").strip()
+    if not docnum:
+        return _EMPTY.copy()
+    return _result(doc_no=docnum, doc_id=docnum, url="", hint="express_search")
+
+
 # adapter 名(小写) -> 派生器。接入新 ERP 时在这里加一行,日志 API 和前端都无需改动。
 _DERIVERS = {
     "mrerp": _derive_mrerp,
     "mrerp_dms": _derive_mrerp_dms,
+    "express": _derive_express,
 }
 
 

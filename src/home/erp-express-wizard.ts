@@ -404,25 +404,7 @@
                     headers: _auth(),
                     body: JSON.stringify({ auto_push: S.push }),
                 });
-                // 科目映射:走独立 merge 路由(只覆盖 6 个科目码·不动 account_set/token)。
-                var accKeys = [
-                    'revenue_acc',
-                    'ar_acc',
-                    'vat_output_acc',
-                    'fallback_acc',
-                    'ap_acc',
-                    'vat_input_acc',
-                ];
-                var accBody: any = {};
-                for (var i = 0; i < accKeys.length; i++) {
-                    var el = $('exp-acc-' + accKeys[i]) as HTMLInputElement | HTMLSelectElement;
-                    if (el) accBody[accKeys[i]] = el.value || '';
-                }
-                await fetch('/api/erp/endpoints/' + encodeURIComponent(id) + '/express-accounts', {
-                    method: 'PATCH',
-                    headers: _auth(),
-                    body: JSON.stringify(accBody),
-                });
+                // 科目映射现由小助手选定并随心跳上报(网页只读镜像),finish 不再写科目。
             } catch (e) {}
         }
         _close();

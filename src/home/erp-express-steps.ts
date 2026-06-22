@@ -180,42 +180,28 @@
         var LBL = 'style="min-width:128px;font-size:13px;color:var(--ink2)"';
         var FLD =
             'style="flex:1;padding:7px 9px;border:1px solid var(--border,#d1d5db);border-radius:8px;font-size:13px;background:#fff"';
+        // 只读镜像:科目在小助手里选(和账套一样),这里只显示当前配置。code→name 由上报科目表查。
+        function _nameForCode(code: string) {
+            for (var i = 0; i < accts.length; i++) {
+                if (String((accts[i] || {}).code) === String(code)) return accts[i].name || '';
+            }
+            return '';
+        }
         function accField(key: string, labelK: string) {
             var cur = (S.acc && S.acc[key]) || '';
-            var inner;
-            if (accts.length) {
-                var opts = '<option value="">' + t('exp-acc-none') + '</option>';
-                for (var i = 0; i < accts.length; i++) {
-                    var a = accts[i] || {};
-                    var code = _esc(a.code || '');
-                    var nm = _esc(a.name || '');
-                    var lbl = nm ? nm + ' (' + code + ')' : code;
-                    var sel = String(a.code) === String(cur) ? ' selected' : '';
-                    opts += '<option value="' + code + '"' + sel + '>' + lbl + '</option>';
-                }
-                inner = '<select ' + FLD + ' id="exp-acc-' + key + '">' + opts + '</select>';
-            } else {
-                inner =
-                    '<input ' +
-                    FLD +
-                    ' id="exp-acc-' +
-                    key +
-                    '" value="' +
-                    _esc(cur) +
-                    '" placeholder="' +
-                    t('exp-acc-manual-ph') +
-                    '">';
-            }
-            return '<label ' + ROW + '><span ' + LBL + '>' + t(labelK) + '</span>' + inner + '</label>';
+            var nm = _nameForCode(cur);
+            var val = cur ? (nm ? _esc(nm) + ' (' + _esc(cur) + ')' : _esc(cur)) : '—';
+            return (
+                '<div ' + ROW + '><span ' + LBL + '>' + t(labelK) +
+                '</span><b style="flex:1;font-size:13px">' + val + '</b></div>'
+            );
         }
         var accmap =
             '<section class="exp-sec" id="exp-step-accmap"><div class="exp-sec-head">' +
             '<h3 class="exp-sec-title">' +
             t('exp-accmap-title') +
-            '</h3></div><div class="exp-sec-copy"><div>' +
-            t('exp-accmap-hint') +
-            '</div>' +
-            (accts.length ? '' : '<div class="exp-help-text">' + t('exp-accmap-empty') + '</div>') +
+            '</h3></div><div class="exp-sec-copy">' +
+            '<div class="exp-help-text">' + t('exp-accmap-mirror-hint') + '</div>' +
             '<div style="margin-top:10px"><b style="font-size:13px">' +
             t('exp-accmap-sales') +
             '</b>' +

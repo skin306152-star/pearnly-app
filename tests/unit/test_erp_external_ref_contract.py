@@ -29,6 +29,18 @@ class ExternalRefContractTests(unittest.TestCase):
             for v in ref.values():
                 self.assertIsInstance(v, str)
 
+    # ── Express 映射(回归 2026-06-22:express_docnum 没被通用派生器认出 → 单号不显示)──
+    def test_express_docnum_maps_to_external_doc_no(self):
+        body = json.dumps({"ok": True, "express_docnum": "IV681220-001"})
+        ref = derive_external_ref("express", body, "success")
+        self.assertEqual(ref["external_doc_no"], "IV681220-001")
+        self.assertEqual(ref["external_doc_id"], "IV681220-001")
+        self.assertEqual(ref["external_doc_hint"], "express_search")
+
+    def test_express_no_docnum_returns_empty(self):
+        ref = derive_external_ref("express", '{"ok": true}', "success")
+        self.assertEqual(ref["external_doc_no"], "")
+
     # ── 1. MR.ERP 映射 ────────────────────────────────────────
     def test_mrerp_bill_no_maps_to_external_doc_no(self):
         body = json.dumps(

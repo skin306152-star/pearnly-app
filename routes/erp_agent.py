@@ -70,11 +70,15 @@ async def erp_agent_heartbeat(request: Request):
     """
     _require_enabled()
     ep = _auth_agent(request)
-    agent_store.touch_heartbeat(str(ep["id"]))
     try:
         body = await request.json()
     except Exception:
         body = {}
+    # 优雅退出信号:立即标离线(不写 last_seen=now)→ Pearnly 实时显示断开。
+    if isinstance(body, dict) and body.get("offline"):
+        agent_store.mark_offline(str(ep["id"]))
+        return {"ok": True, "endpoint_id": str(ep["id"]), "connected": False}
+    agent_store.touch_heartbeat(str(ep["id"]))
     cfg = ep.get("config") or {}
     stored = 0
     accts_stored = 0
@@ -85,6 +89,9 @@ async def erp_agent_heartbeat(request: Request):
         # 科目表上报(可选)→ 存 config.reported_accounts,供「科目映射」下拉读。
         if body.get("accounts") is not None:
             accts_stored = agent_store.store_reported_accounts(str(ep["id"]), body.get("accounts"))
+        # 科目映射(小助手选的 6 个码)→ 存 config,网页只读镜像(小助手为唯一真相源)。
+        if body.get("mapping") is not None:
+            agent_store.store_mapping(str(ep["id"]), body.get("mapping"))
         # 小助手上报客户【所选账套整组】→ 存 config(方法无关·直录/RPA 共用·见可扩展性契约)。
         # 仅在与已存不同时写,省稳态每拍无谓写库。
         selected = str(body.get("account_set") or "").strip() or None

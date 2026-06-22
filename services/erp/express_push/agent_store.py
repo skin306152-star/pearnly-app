@@ -253,6 +253,43 @@ def store_selected_account(endpoint_id: str, fields: Dict[str, Any]) -> bool:
     return _merge_config(endpoint_id, sel)
 
 
+_MAPPING_KEYS = ("revenue_acc", "ar_acc", "vat_output_acc", "fallback_acc", "ap_acc", "vat_input_acc")
+
+
+def store_mapping(endpoint_id: str, mapping: Dict[str, Any]) -> bool:
+    """存小助手上报的【科目映射】6 个科目码 → config(网页只读镜像·小助手为唯一真相源)。
+
+    只合并非空码(避免未配置时的空上报清掉已存值)。镜像 store_selected_account 的语义。
+    """
+    patch: Dict[str, Any] = {}
+    for k in _MAPPING_KEYS:
+        v = str((mapping or {}).get(k) or "").strip()[:40]
+        if v:
+            patch[k] = v
+    if not patch:
+        return False
+    return _merge_config(endpoint_id, patch)
+
+
+def mark_offline(endpoint_id: str) -> None:
+    """小助手优雅退出 → 把 last_seen 置远古,令前端在线判定(now-seen<180s)立即失败 → 显示离线。"""
+    try:
+        from core import db
+
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                """
+                UPDATE erp_endpoints
+                SET config = COALESCE(config, '{}'::jsonb)
+                    || jsonb_build_object('agent_last_seen_at', '1970-01-01 00:00:00+00')
+                WHERE id = %s AND adapter = 'express'
+                """,
+                (endpoint_id,),
+            )
+    except Exception as e:
+        logger.error(f"mark_offline failed: {e}")
+
+
 def touch_heartbeat(endpoint_id: str) -> None:
     """更新 config.agent_last_seen_at = NOW(UTC)。"""
     try:

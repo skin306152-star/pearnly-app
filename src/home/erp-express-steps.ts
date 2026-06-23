@@ -207,6 +207,10 @@
             '<div class="exp-help-text">' +
             t('exp-accmap-mirror-hint') +
             '</div>' +
+            // 小助手未连/未上报科目表 → 科目无法解析,显式提示(别让用户以为配好了)。
+            (accts.length
+                ? ''
+                : '<div class="exp-help-text">⚠ ' + t('exp-accmap-offline-hint') + '</div>') +
             '<div style="margin-top:10px"><b style="font-size:13px">' +
             t('exp-accmap-sales') +
             '</b>' +

@@ -37,5 +37,27 @@ class PushLogQueriesContractTests(unittest.TestCase):
         self.assertIsNone(getattr(q, "push_store", None))
 
 
+class DerivePushAccountsTests(unittest.TestCase):
+    """response_body → 列表卡科目摘要(Express 队列响应的 accounts)。"""
+
+    def test_dict_body(self):
+        out = q._derive_push_accounts(
+            {"accounts": [{"acc": "41-01-00-00", "side": "C", "desc": "x"}]}
+        )
+        self.assertEqual(out, [{"acc": "41-01-00-00", "side": "C", "desc": "x"}])
+
+    def test_json_string_body(self):
+        import json
+
+        out = q._derive_push_accounts(json.dumps({"accounts": [{"acc": "21-02-01-00"}]}))
+        self.assertEqual(out, [{"acc": "21-02-01-00", "side": "", "desc": ""}])
+
+    def test_none_when_absent_or_bad(self):
+        self.assertIsNone(q._derive_push_accounts({"queued": True}))
+        self.assertIsNone(q._derive_push_accounts(None))
+        self.assertIsNone(q._derive_push_accounts("not json"))
+        self.assertIsNone(q._derive_push_accounts({"accounts": [{"side": "C"}]}))  # 无 acc 码
+
+
 if __name__ == "__main__":
     unittest.main()

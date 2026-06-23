@@ -120,6 +120,14 @@ function buildErpLogCard(log: any): string {
     else if (log.status === 'success')
         docMeta = `<span><b>${escapeHtml(t('erp-log-col-doc'))}</b><span class="log-doc-missing">${escapeHtml(t('erp-log-doc-missing'))}</span></span>`;
 
+    // 科目 at-a-glance(Express 队列响应派生 push_accounts)· 列表不展开也看到记到哪几个科目。
+    const acctMeta =
+        Array.isArray(log.push_accounts) && log.push_accounts.length
+            ? `<span class="log-accts"><b>${escapeHtml(t('erp-log-col-accounts'))}</b>${log.push_accounts
+                  .map((a: any) => escapeHtml(a.acc))
+                  .join(' · ')}</span>`
+            : '';
+
     const retryBtn =
         log.status === 'failed' && !isRetrying
             ? `<button class="btn btn-sm btn-secondary" data-log-retry="${escapeHtml(log.id)}">${escapeHtml(t('erp-exc-retry'))}</button>`
@@ -153,6 +161,7 @@ function buildErpLogCard(log: any): string {
             <div class="erp-log-meta">
                 <span><b>${escapeHtml(t('erp-log-col-time'))}</b>${escapeHtml(timeStr)}</span>
                 ${docMeta}
+                ${acctMeta}
                 <span><b>HTTP</b>${log.http_status || '—'}</span>
                 <span><b>${escapeHtml(t('erp-log-col-elapsed'))}</b>${log.elapsed_ms != null ? log.elapsed_ms + 'ms' : '—'}</span>
                 ${retryInfo ? `<span><b>${escapeHtml(t('erp-log-col-retry'))}</b>${escapeHtml(retryInfo)}</span>` : ''}

@@ -6,6 +6,7 @@
 push_store 顶部 re-import 当 facade · db.X/store.X/本模块.X 单一对象不变。
 """
 
+import json
 import re  # noqa: F401
 import logging
 from typing import Optional, Dict, Any, List  # noqa: F401
@@ -125,6 +126,32 @@ def delete_push_logs(user_id: str, log_ids: List[str]) -> int:
     except Exception as e:
         logger.error(f"delete_push_logs failed: {e}")
         return 0
+
+
+def _derive_push_accounts(resp_raw: Any) -> Optional[List[Dict[str, str]]]:
+    """从 response_body 取 Express 队列响应里的分录科目 → [{acc,side,desc}](列表卡科目列用)。
+
+    response_body 可能是 jsonb dict 或 JSON 字符串;无 accounts → None(只在有时带,保列表轻量)。
+    """
+    if not resp_raw:
+        return None
+    try:
+        body = resp_raw if isinstance(resp_raw, dict) else json.loads(resp_raw)
+    except (ValueError, TypeError):
+        return None
+    accs = body.get("accounts") if isinstance(body, dict) else None
+    if not isinstance(accs, list) or not accs:
+        return None
+    out: List[Dict[str, str]] = []
+    for a in accs:
+        if not isinstance(a, dict):
+            continue
+        code = str(a.get("acc") or "").strip()
+        if code:
+            out.append(
+                {"acc": code, "side": str(a.get("side") or ""), "desc": str(a.get("desc") or "")}
+            )
+    return out or None
 
 
 def list_push_logs(
@@ -255,10 +282,11 @@ def list_push_logs(
             # 不动状态机 · 不新增状态源 · 仅从已有 response_body+adapter 读出。
             # 派生后丢掉原始 response_body · 列表 payload 保持轻量(详情接口才回完整体)。
             for it in items:
-                ref = derive_external_ref(
-                    it.get("endpoint_adapter"), it.pop("response_body", None), it.get("status")
-                )
+                resp_raw = it.pop("response_body", None)
+                ref = derive_external_ref(it.get("endpoint_adapter"), resp_raw, it.get("status"))
                 it.update(ref)
+                # Express 队列响应带的分录科目(at-a-glance·列表科目列)· 无则不带,保持轻量。
+                it["push_accounts"] = _derive_push_accounts(resp_raw)
                 # DMS 推送可视化闭环(Zihao 2026-06-01)· 身份证→订车单 ≠ 发票推送:
                 # 标 push_type 让前端按 DMS 字段(订车单号/客户/身份证)渲染该行,
                 # 不再用发票字段框;并附 4 语友好错误(身份证订车码 friendly_for_ui 不覆盖)。

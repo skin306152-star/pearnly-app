@@ -120,16 +120,14 @@ function _erpExcClients(): Array<{ id: number; name?: string; tax_id?: string }>
 }
 
 // 异常页可能先于账套切换器加载 → 懒取一次主体(绑主体面板同步渲染前须有数据)。
+// 复用账套切换器的 canonical loader(带 workspace 作用域头 + 401 处理),不另起 fetch。
 async function _erpExcEnsureClients(): Promise<void> {
     if (_erpExcClients().length) return;
+    const fn = window.fetchWorkspaceClients;
+    if (typeof fn !== 'function') return;
     try {
-        const r = await fetch('/api/workspace/clients', {
-            headers: { Authorization: 'Bearer ' + _erpExcTok() },
-        });
-        if (r.ok) {
-            const d = await r.json();
-            window._workspaceClientsCache = (d && (d.clients || d.items)) || [];
-        }
+        const l = await fn();
+        if (Array.isArray(l)) window._workspaceClientsCache = l;
     } catch (_) {
         /* 退化为空面板 · 不致命 */
     }

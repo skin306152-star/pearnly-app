@@ -446,8 +446,8 @@ async function loadErpExceptions(append?: boolean) {
                 /* 下拉退化为仅「全部 ERP」· 不致命 */
             }
         }
-        // 绑主体面板的主体下拉数据(同步渲染前懒取一次 · 已有缓存则跳过)
-        await _erpExcEnsureClients();
+        // 绑主体面板的主体下拉数据(与异常 fetch 并发取 · render 前再 await · 已有缓存则跳过)
+        const clientsReady = _erpExcEnsureClients();
         const params = new URLSearchParams();
         if (_erpExcState.q) params.set('q', _erpExcState.q);
         if (_erpExcState.cat) params.set('category', _erpExcState.cat);
@@ -470,6 +470,7 @@ async function loadErpExceptions(append?: boolean) {
         _erpExcState.total = data.total || 0;
         _erpExcState.categories = data.categories || {};
         _erpExcState.idCardCount = data.id_card_count || 0;
+        await clientsReady;
         renderErpExceptions();
     } catch (e) {
         if (!append) block.hidden = true;

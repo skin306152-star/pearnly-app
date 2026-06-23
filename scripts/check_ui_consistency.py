@@ -75,10 +75,8 @@ def find_buttons(text: str):
 # CI 当场报红。
 BASELINE_TOTAL = 480
 
-# ── 硬规则基线(Zihao 2026-06-05 拍板 · 全站弹窗 + 按钮蓝不用黑)──
-# D1 抽屉:存量冻结,只许减不许增(新 UI 一律用 .modal 弹窗)。
-# D2 按钮/切换黑底:存量清零后 = 0,任何按钮/切换黑底即红(只导航栏可黑)。
-DRAWER_BASELINE = 120
+# ── 硬规则基线 · D2 按钮/切换黑底:存量清零后 = 0(只导航栏可黑)──
+# D1「禁新增抽屉」闸 2026-06-23 Zihao 拍板取消(实践下来抽屉比弹窗好用 · 当初加错了)。
 BLACK_BTN_BASELINE = 0
 
 
@@ -161,17 +159,6 @@ def main(argv=None):
                 legacy_css_def.append((f.name, "." + c))
     results["B4 旧按钮类的 CSS 定义未删"] = legacy_css_def
 
-    # ── 硬规则 D1:全站弹窗 · 禁新增抽屉(.drawer)──
-    # 现存抽屉冻结成基线(只许减不许增);新增 .drawer 用法/定义 = 红 · 新 UI 用 .modal 弹窗。
-    ts_files = sorted((ROOT / "src" / "home").glob("*.ts"))
-    drawer_hits = []
-    for f in HTML_FILES + JS_FILES + ts_files:
-        for m in re.finditer(r'class\s*=\s*"[^"]*\bdrawer[\w-]*\b[^"]*"', read(f)):
-            drawer_hits.append((f.name, m.group(0)[:60]))
-    for f in CSS_FILES:
-        for m in re.finditer(r"\.drawer[\w-]*\s*[{,]", read(f)):
-            drawer_hits.append((f.name, m.group(0)))
-
     # ── 硬规则 D2:交互控件激活态 黑底(只导航栏可黑)· 目标基线 0 ──
     # 2026-06-10 扩面(THEME #1-bis):从 .btn 扩到所有交互控件激活态 —— 分段/标签/芯片/胶囊/
     # 区域/开关(seg/tab/chip/pill/zone/toggle/switch/segment)+ .on/.active/.selected;且 background
@@ -234,14 +221,9 @@ def main(argv=None):
     ok, verdict = ratchet_verdict(total_violations, args.baseline)
     print(f"\n  基线:{args.baseline}  ·  {verdict}")
 
-    # ── 硬规则裁决(Zihao 2026-06-05)· 独立基线 · 任一回退即非零退出 ──
-    d1_ok = len(drawer_hits) <= DRAWER_BASELINE
+    # ── 硬规则裁决 · D2 黑底独立基线(D1 禁抽屉闸 2026-06-23 已取消)──
     d2_ok = len(black_btn) <= BLACK_BTN_BASELINE
     print("\n  ── 硬规则 ──")
-    print(
-        f"  {'✅' if d1_ok else '🔴'} D1 抽屉用法 {len(drawer_hits)}"
-        f"(基线 {DRAWER_BASELINE} · 禁新增 · 新 UI 用 .modal 弹窗)"
-    )
     print(
         f"  {'✅' if d2_ok else '🔴'} D2 按钮/切换黑底 {len(black_btn)}"
         f"(基线 {BLACK_BTN_BASELINE} · 改蓝 var(--btn-blue) · 只导航栏可黑)"
@@ -249,10 +231,8 @@ def main(argv=None):
     if not d2_ok:
         for nm, sel in black_btn:
             print(f"      · {nm}: {sel}")
-    if not d1_ok:
-        print("      D1 超基线 · 新 UI 别用 .drawer · 用 .modal 弹窗")
 
-    return 0 if (ok and d1_ok and d2_ok) else 1
+    return 0 if (ok and d2_ok) else 1
 
 
 if __name__ == "__main__":

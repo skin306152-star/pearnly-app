@@ -4652,6 +4652,9 @@ window.I18N = {
         'exc-fld-total': '总金额',
         // v118.20.7 · 抽屉 PDF 预览
         'exc-pdf-loading': 'PDF 加载中…',
+        'imgv-hint': '拖拽移动 · 滚轮缩放 · 按钮可旋转 / 全屏',
+        'imgv-loading': '原件加载中…',
+        'imgv-noimg': '原件不可用',
         'exc-pdf-empty-title': '无 PDF 留底',
         'exc-pdf-empty': '该单据无 PDF 留底(老数据可能未存)',
         'exc-pdf-error-title': '加载失败',
@@ -9548,6 +9551,9 @@ window.I18N = {
         'exc-fld-total': 'Total',
         // v118.20.7 · drawer PDF preview
         'exc-pdf-loading': 'Loading PDF…',
+        'imgv-hint': 'Drag to pan · scroll to zoom · buttons rotate / fullscreen',
+        'imgv-loading': 'Loading original…',
+        'imgv-noimg': 'Original unavailable',
         'exc-pdf-empty-title': 'No PDF backup',
         'exc-pdf-empty': 'No PDF backup for this record (legacy data may not have one)',
         'exc-pdf-error-title': 'Load failed',
@@ -14435,6 +14441,9 @@ window.I18N = {
         'exc-fld-total': 'ยอดรวม',
         // v118.20.7 · ตัวอย่าง PDF ในลิ้นชัก
         'exc-pdf-loading': 'กำลังโหลด PDF…',
+        'imgv-hint': 'ลากเพื่อเลื่อน · เลื่อนเพื่อซูม · ปุ่มหมุน / เต็มจอ',
+        'imgv-loading': 'กำลังโหลดต้นฉบับ…',
+        'imgv-noimg': 'ไม่มีต้นฉบับ',
         'exc-pdf-empty-title': 'ไม่มีไฟล์ PDF',
         'exc-pdf-empty': 'ไม่มีไฟล์ PDF สำรองสำหรับรายการนี้',
         'exc-pdf-error-title': 'โหลดล้มเหลว',
@@ -19318,6 +19327,9 @@ window.I18N = {
         'exc-fld-total': '合計',
         // v118.20.7 · ドロワー PDF プレビュー
         'exc-pdf-loading': 'PDF 読み込み中…',
+        'imgv-hint': 'ドラッグで移動 · スクロールでズーム · ボタンで回転 / 全画面',
+        'imgv-loading': '原本を読み込み中…',
+        'imgv-noimg': '原本は利用できません',
         'exc-pdf-empty-title': 'PDF バックアップなし',
         'exc-pdf-empty': 'この伝票の PDF バックアップはありません',
         'exc-pdf-error-title': '読み込み失敗',

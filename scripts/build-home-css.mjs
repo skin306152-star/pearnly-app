@@ -63,6 +63,7 @@ const HOME_CSS = [
     'home-49-dms-intake.css',
     'home-50-express.css',
     'home-51-express-detail.css',
+    'home-52-image-viewer.css',
 ];
 
 const ADMIN_CSS = [

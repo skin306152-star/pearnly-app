@@ -1,0 +1,19 @@
+/* 共用原图查看器(.pv-*) · 以采购「复核单据」票图查看器为标准(purchase-form-css.ts .viewer)·
+   识别记录抽屉 / 异常抽屉 引用 · 通用类不绑作用域 · 继承全局色令牌。
+   容器高度由各界面自定(那三处是整页发票 → 容器调大);图按比例居中铺开(非写死像素)。 */
+.pv-viewer { background: var(--line2); border: 1px solid var(--line); border-radius: 12px; height: 400px; position: relative; overflow: hidden; cursor: grab; touch-action: none; }
+.pv-viewer.grabbing { cursor: grabbing; }
+.pv-img { position: absolute; left: 50%; top: 50%; max-width: 94%; max-height: 94%; transform-origin: center; will-change: transform; user-select: none; -webkit-user-drag: none; }
+.pv-viewer.noimg .pv-img, .pv-viewer.loading .pv-img { display: none; }
+.pv-hint { position: absolute; left: 10px; top: 10px; background: var(--card); border: 1px solid var(--line); color: var(--ink3); border-radius: 7px; font-size: 11px; padding: 3px 9px; z-index: 2; }
+.pv-tools { position: absolute; right: 10px; bottom: 10px; display: flex; gap: 6px; align-items: center; z-index: 2; }
+.pv-tools button { background: var(--card); border: 1px solid var(--line); color: var(--ink2); border-radius: 8px; width: 32px; height: 32px; display: grid; place-items: center; cursor: pointer; flex: none; }
+.pv-tools button:hover { border-color: var(--accent); color: var(--accent); }
+.pv-zoom { background: var(--card); border: 1px solid var(--line); border-radius: 8px; font-size: 12px; font-weight: 700; padding: 0 10px; height: 32px; display: flex; align-items: center; color: var(--ink2); }
+.pv-empty, .pv-loading { display: none; position: absolute; inset: 0; place-items: center; gap: 9px; color: var(--ink3); font-size: 12px; text-align: center; padding: 20px; }
+.pv-viewer.noimg .pv-empty { display: grid; }
+.pv-viewer.loading .pv-loading { display: grid; grid-auto-flow: row; }
+.pv-spin { width: 26px; height: 26px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--accent); animation: pv-spin 0.8s linear infinite; }
+@keyframes pv-spin { to { transform: rotate(360deg); } }
+/* 抽屉左栏:查看器填满整栏高度(整页发票看得清) */
+.exc-pdf-pane .pv-viewer, .hd-imgpane .pv-viewer { flex: 1 1 auto; height: auto; min-height: 0; border: 0; border-radius: 0; }

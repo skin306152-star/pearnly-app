@@ -778,7 +778,7 @@ db.py    9500 行(+250 容忍 · 严守 services/ 化)
 - 不需要问 Zihao "PRD 跟 prototype 哪个对" · 默认 prototype 对
 
 **视觉对齐铁律(2026-05-15 v118.33.7.x 累积)**:
-- ~~主色:纯黑 `#111111`(不用深蓝)· active / 主按钮 / focus 都黑~~ **【2026-05-29 Zihao 改判·覆盖】全站统一按钮系统:主按钮 = 品牌蓝 `#2563EB`(hover `#1D4ED8`/active `#1E40AF`)· 强调=琥珀橙 `#F59E0B`(仅充值/升级 1 转化按钮)· 标准见中央 `static/home-38-buttons.css`(REFACTOR-WB-C)。**【2026-06-05 Zihao 拍板·定调】全站按钮/切换(.btn-primary / toggle / switch / filter active / .xxx-act-btn 等)一律品牌蓝 `var(--btn-blue)` `#2563EB`,不用黑;**只有左侧导航栏(sidebar)保黑作当前位置指示**。机械硬闸:`check_ui_consistency.py` D2(按钮/切换黑底基线 0)+ D1(禁新增抽屉 `.drawer` · 新 UI 用弹窗 `.modal`),进 pre-push 拦推送。**
+- ~~主色:纯黑 `#111111`(不用深蓝)· active / 主按钮 / focus 都黑~~ **【2026-05-29 Zihao 改判·覆盖】全站统一按钮系统:主按钮 = 品牌蓝 `#2563EB`(hover `#1D4ED8`/active `#1E40AF`)· 强调=琥珀橙 `#F59E0B`(仅充值/升级 1 转化按钮)· 标准见中央 `static/home-38-buttons.css`(REFACTOR-WB-C)。**【2026-06-05 Zihao 拍板·定调】全站按钮/切换(.btn-primary / toggle / switch / filter active / .xxx-act-btn 等)一律品牌蓝 `var(--btn-blue)` `#2563EB`,不用黑;**只有左侧导航栏(sidebar)保黑作当前位置指示**。机械硬闸:`check_ui_consistency.py` D2(按钮/切换黑底基线 0),进 pre-push 拦推送。**【2026-06-23 Zihao 拍板·覆盖】① D1「禁新增抽屉 `.drawer`」闸已取消(抽屉右侧滑出·边看原图边改字段·比弹窗好用·当初加错)·抽屉/弹窗按场景自由选。② 按钮/品牌色**以 CSS 令牌为准**:走 `var(--btn-blue)`/`var(--brand)`,**值看 `static/home-01-base.css`(当前主题是紫 `#7C4DFF`·暗色 `#A974FF`)**——上面写的 `#2563EB`(蓝)是早期标准、已过时,别再当真值引用,只认令牌不认写死 hex。**
 - 背景:暖灰 `#f4f4f0`(应用主背景)
 - 卡片:白 `#fff` + 淡边框 `#e8e8e3`(浮在暖灰背景)
 - 浅蓝 info 提示色保留 `#DBEAFE` + `#1E40AF`(prototype 也这样)· 其他蓝色一律去
@@ -1268,7 +1268,7 @@ python3 scripts/check_i18n.py static/home.js --strict
 
 | 用途 | 色值 |
 |---|---|
-| 主色 | #2563EB（蓝）|
+| 主色 | `var(--brand)`（当前紫 #7C4DFF · 值以 home-01-base.css 为准）|
 | 成功 | #16A34A（绿）|
 | 警告 | #D97706（橙）|
 | 危险 | #DC2626（红）|

@@ -100,6 +100,9 @@ async def _auto_push_history(
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(None, erp_push.push_to_endpoint, ep, history)
 
+            # Express 自治级别(仅自动推送路径):全人工 → 高置信本会入队的票降级转人工复核。
+            result = _express_autonomy.apply_autonomy_auto(result, ep)
+
             # P2-D(B8)· 「发票号已存在」= skipped_dup 中性态(不算失败)。
             final_status = db.classify_push_status(result["success"], result.get("error_msg"))
             # 把 pending 行原地更新成终态(没拿到 pending_id 才退回新插一行)。
@@ -192,6 +195,9 @@ def _persist_push_outcome(user_id, ep, history, result, trigger="auto", pending_
     pending_log_id(2026-05-26):若推送前已写「pending(推送中)」行,这里把它**更新**
     成 success/failed(不再新插一行),让用户识别后立刻看到的「推送中」原地变成最终态。"""
     history_id = str(history["id"])
+    # Express 自治级别(仅自动推送路径 · trigger=auto):全人工 → 降级转人工复核。
+    if trigger == "auto":
+        result = _express_autonomy.apply_autonomy_auto(result, ep)
     # P2-D(Zihao 2026-05-27 · B8)· 「发票号已存在」= skipped_dup 中性态(不算失败)。
     final_status = db.classify_push_status(result["success"], result.get("error_msg"))
     if pending_log_id:
@@ -413,3 +419,4 @@ async def _auto_push_smart_routed(user_id, history_ids, tenant_id, fallback_eps)
 # ⚠️ `import db` / `import erp_push` 放 def 之后(解循环 import · 见 services/billing/charge.py 注释)
 from core import db  # noqa: E402
 from services.erp import erp_push  # noqa: E402
+from services.erp.express_push import autonomy as _express_autonomy  # noqa: E402

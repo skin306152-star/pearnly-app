@@ -27,15 +27,17 @@ class RenderPagePngTests(unittest.TestCase):
         self.pdf = os.path.join(self.tmp, "doc.pdf")
         _make_pdf(self.pdf, pages=2)
 
-    def test_renders_png_bytes(self):
-        png = render_page_png(self.pdf, page=1)
-        self.assertIsNotNone(png)
-        # PNG magic number
+    def test_renders_png_bytes_and_count(self):
+        out = render_page_png(self.pdf, page=1)
+        self.assertIsNotNone(out)
+        png, total = out
+        # PNG magic number + 返回总页数(多页 PDF 前端翻页用)
         self.assertTrue(png.startswith(b"\x89PNG\r\n\x1a\n"))
+        self.assertEqual(total, 2)
 
     def test_page_out_of_range_clamps(self):
-        # 第 99 页不存在 → 钳到末页,仍出图(不抛 / 不 None)
-        self.assertIsNotNone(render_page_png(self.pdf, page=99))
+        # 第 99 页不存在 → 钳到末页,仍出图(不抛 / 不 None)· 总页数仍报真实值
+        self.assertEqual(render_page_png(self.pdf, page=99)[1], 2)
         self.assertIsNotNone(render_page_png(self.pdf, page=0))
 
     def test_missing_file_returns_none(self):

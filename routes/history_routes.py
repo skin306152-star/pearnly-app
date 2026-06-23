@@ -256,13 +256,17 @@ async def history_page_png(record_id: str, page: int, request: Request):
     abs_path = pdf_storage.get_pdf_abs_path(info["pdf_storage_path"])
     if not abs_path or not abs_path.exists():
         raise HTTPException(404, detail="history.pdf_missing")
-    png = render_page_png(str(abs_path), page=page)
-    if png is None:
+    rendered = render_page_png(str(abs_path), page=page)
+    if rendered is None:
         raise HTTPException(422, detail="history.render_failed")
+    png, total_pages = rendered
     return Response(
         content=png,
         media_type="image/png",
-        headers={"Cache-Control": "private, max-age=300"},
+        headers={
+            "Cache-Control": "private, max-age=300",
+            "X-Page-Count": str(total_pages),  # 多页 PDF → 前端翻页看每张
+        },
     )
 
 

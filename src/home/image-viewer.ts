@@ -2,8 +2,9 @@
 // 共用原图查看器 · 识别记录抽屉 / 异常抽屉 复用 —— 以采购「复核单据」票图查看器为标准
 //   (purchase-form-bill.ts wireZoomPan 同款:拖拽平移 + 滚轮缩放 + 触摸 pinch + 旋转/复位/
 //   全屏 + 实时百分比 · 原生 transform 作用在 <img>)。CSS 见 home-52-image-viewer.css(.pv-*)。
-//   单图源 = /api/history/{id}/page/1.png(PyMuPDF 渲页)· 留底 PDF 异步回填 → 首次 404
-//   轮询重试等就绪(加载中态),非 404 硬错/网络错不空等。容器高度各调用方按界面定。
+//   图源 = /api/history/{id}/page/{n}.png(PyMuPDF 渲页)· X-Page-Count 给总页数 →
+//   一份多页 PDF(装多张发票)可翻页看每页。留底 PDF 异步回填 → 首次 404 轮询重试等就绪
+//   (加载中态),非 404 硬错/网络错不空等。容器高度各调用方按界面定。
 //   每实例状态独立(闭包)· mount 返回 cleanup(解绑 window 监听 · 中止在飞重试)。
 //   文案由调用方传入(模块不绑 i18n)· 鉴权用 token 全局。
 // ============================================================
@@ -46,7 +47,11 @@ export function imageViewerHtml(o: ViewerText = {}): string {
         (o.hint ? `<span class="pv-hint">${e(o.hint)}</span>` : '') +
         `<div class="pv-empty">${e(o.noimg)}</div>` +
         `<div class="pv-loading"><span class="pv-spin"></span>${e(o.loading)}</div>` +
-        '<div class="pv-tools"><span class="pv-zoom">100%</span>' +
+        '<div class="pv-tools">' +
+        '<span class="pv-pager"><button data-z="prev" type="button" title="prev">‹</button>' +
+        '<span class="pv-pgnum">1/1</span>' +
+        '<button data-z="next" type="button" title="next">›</button></span>' +
+        '<span class="pv-zoom">100%</span>' +
         `<button data-z="in" type="button" title="+">${I_PLUS}</button>` +
         `<button data-z="out" type="button" title="-">${I_MINUS}</button>` +
         `<button data-z="rot" type="button" title="rotate">${I_ROT}</button>` +
@@ -69,10 +74,35 @@ export function mountImageViewer(root: HTMLElement, historyId: string | null): (
     let drag = false;
     let sx = 0;
     let sy = 0;
+    let alive = true; // mount 作废后置 false → 停在飞重试 / 翻页加载
     const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
     const apply = () => {
         img.style.transform = `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px)) scale(${scale}) rotate(${rot}deg)`;
         if (zl) zl.textContent = Math.round(scale * 100) + '%';
+    };
+    // 多页 PDF(一份装多张发票)翻页:第几页由 page.png 接口渲;总页数从 X-Page-Count 拿。
+    const pgEl = root.querySelector('.pv-pgnum');
+    let page = 1;
+    let total = 1;
+    const goPage = (p: number) => {
+        page = Math.trunc(clamp(p, 1, total));
+        scale = 1; // 翻页即复位变换(每页独立观看)
+        tx = 0;
+        ty = 0;
+        rot = 0;
+        apply();
+        void loadImage(
+            vp,
+            img,
+            historyId,
+            page,
+            () => alive,
+            (n) => {
+                total = n;
+                vp.classList.toggle('multi', n > 1);
+                if (pgEl) pgEl.textContent = page + '/' + n;
+            }
+        );
     };
     const onWheel = (e: WheelEvent) => {
         e.preventDefault();
@@ -131,6 +161,8 @@ export function mountImageViewer(root: HTMLElement, historyId: string | null): (
         if (!b) return;
         e.stopPropagation();
         const z = b.dataset.z;
+        if (z === 'prev') return goPage(page - 1);
+        if (z === 'next') return goPage(page + 1);
         if (z === 'in') scale = clamp(scale * 1.2, 0.4, 6);
         else if (z === 'out') scale = clamp(scale / 1.2, 0.4, 6);
         else if (z === 'rot') rot += 90;
@@ -156,9 +188,7 @@ export function mountImageViewer(root: HTMLElement, historyId: string | null): (
     vp.addEventListener('click', onTools);
     img.style.transformOrigin = 'center';
     apply();
-
-    let alive = true;
-    void loadImage(vp, img, historyId, () => alive);
+    goPage(1);
 
     return () => {
         alive = false;
@@ -184,13 +214,17 @@ async function loadImage(
     vp: HTMLElement,
     img: HTMLImageElement,
     historyId: string | null,
-    alive: () => boolean
+    page: number,
+    alive: () => boolean,
+    onTotal: (n: number) => void
 ) {
     if (!historyId) {
         vp.classList.add('noimg');
         return;
     }
-    const cached = ivCache.get(historyId);
+    vp.classList.remove('noimg');
+    const key = historyId + ':' + page; // 按页缓存(一份多页 PDF 翻页不重拉)
+    const cached = ivCache.get(key);
     if (cached) {
         img.src = cached;
         return;
@@ -199,15 +233,17 @@ async function loadImage(
     for (let i = 0; i < 8 && alive(); i++) {
         if (!vp.isConnected) return;
         try {
-            const r = await fetch(`/api/history/${encodeURIComponent(historyId)}/page/1.png`, {
-                headers: { Authorization: 'Bearer ' + token },
-            });
+            const r = await fetch(
+                `/api/history/${encodeURIComponent(historyId)}/page/${page}.png`,
+                { headers: { Authorization: 'Bearer ' + token } }
+            );
             if (r.ok) {
                 const u = URL.createObjectURL(await r.blob());
-                ivPut(historyId, u);
+                ivPut(key, u);
                 if (!alive()) return;
                 vp.classList.remove('loading');
                 img.src = u;
+                onTotal(parseInt(r.headers.get('X-Page-Count') || '1', 10) || 1);
                 return;
             }
             if (r.status !== 404) break; // 渲染失败等硬错 → 不再等

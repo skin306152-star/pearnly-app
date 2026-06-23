@@ -7,6 +7,10 @@
 .pv-viewer.noimg .pv-img, .pv-viewer.loading .pv-img { display: none; }
 .pv-hint { position: absolute; left: 10px; top: 10px; background: var(--card); border: 1px solid var(--line); color: var(--ink3); border-radius: 7px; font-size: 11px; padding: 3px 9px; z-index: 2; }
 .pv-tools { position: absolute; right: 10px; bottom: 10px; display: flex; gap: 6px; align-items: center; z-index: 2; }
+/* 多页 PDF 翻页器:仅 >1 页显示(.pv-viewer.multi) */
+.pv-pager { display: none; align-items: center; gap: 4px; }
+.pv-viewer.multi .pv-pager { display: flex; }
+.pv-pgnum { font-size: 11px; font-weight: 700; color: var(--ink2); min-width: 34px; text-align: center; }
 .pv-tools button { background: var(--card); border: 1px solid var(--line); color: var(--ink2); border-radius: 8px; width: 32px; height: 32px; display: grid; place-items: center; cursor: pointer; flex: none; }
 .pv-tools button:hover { border-color: var(--accent); color: var(--accent); }
 .pv-zoom { background: var(--card); border: 1px solid var(--line); border-radius: 8px; font-size: 12px; font-weight: 700; padding: 0 10px; height: 32px; display: flex; align-items: center; color: var(--ink2); }

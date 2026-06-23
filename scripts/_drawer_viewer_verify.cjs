@@ -108,11 +108,17 @@ async function stub(page) {
     let pngHits = 0;
     await page.route('**/api/**', async (route) => {
         const u = route.request().url();
-        if (/\/api\/history\/[^/]+\/page\/\d+\.png/.test(u)) {
+        if (/\/api\/history\/[^/]+\/page\/(\d+)\.png/.test(u)) {
             pngHits++;
             if (pngHits <= 2)
                 return route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
-            return route.fulfill({ status: 200, contentType: 'image/png', body: PNG });
+            // 模拟 2 页 PDF:回 X-Page-Count:2 → 前端显翻页器
+            return route.fulfill({
+                status: 200,
+                contentType: 'image/png',
+                headers: { 'X-Page-Count': '2' },
+                body: PNG,
+            });
         }
         if (/\/api\/history\/[^/]+\/pdf/.test(u))
             return route.fulfill({
@@ -227,6 +233,23 @@ async function run() {
             .locator('.hd-imgpane .pv-zoom')
             .innerText()
             .then((s) => s === '100%')
+    );
+    // ★ 多页 PDF:X-Page-Count:2 → 翻页器出现 · 点下一页到 2/2(修「多页只渲第一页」)
+    await chk('★多页·翻页器显示(.multi)', vis(page, '.hd-imgpane .pv-viewer.multi .pv-pager'));
+    await chk(
+        '★多页·页码 1/2',
+        page
+            .locator('.hd-imgpane .pv-pgnum')
+            .innerText()
+            .then((s) => s.trim() === '1/2')
+    );
+    await page.click('.hd-imgpane .pv-tools button[data-z="next"]');
+    await chk(
+        '★多页·下一页到 2/2',
+        page
+            .locator('.hd-imgpane .pv-pgnum')
+            .innerText()
+            .then((s) => s.trim() === '2/2')
     );
     await chk('识别记录·右栏内容(tab)在', vis(page, '.hd-twopane .hd-root .hd-tabs'));
     await page.screenshot({ path: path.join(ROOT, 'tests', 'visual', '_shot', 'hd-viewer.png') });

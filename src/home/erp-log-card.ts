@@ -26,9 +26,16 @@ const _EXPRESS_REASON_I18N: Record<string, string> = {
     account_not_in_chart: 'erp-reason-not-in-chart',
 };
 
+// 小助手(本地 Agent)ack 失败码 → 人话(error_msg 形如 "[SUPPLIER_DUP_SUSPECTED] dup")。
+const _AGENT_REASON_I18N: Record<string, string> = {
+    SUPPLIER_DUP_SUSPECTED: 'erp-reason-supplier-dup',
+};
+
 function _expressFriendlyReason(raw: string): string {
     // raw 形如 "EXPRESS_MANUAL: no_revenue_account" 或 "account_set_not_allowed:DATAT"
     const stripped = (raw || '').replace(/^EXPRESS_MANUAL:?\s*/i, '').trim();
+    const agent = stripped.match(/^\[([A-Z0-9_]+)\]/);
+    if (agent && _AGENT_REASON_I18N[agent[1]]) return t(_AGENT_REASON_I18N[agent[1]]);
     const code = stripped.split(':')[0].trim();
     const key = _EXPRESS_REASON_I18N[code];
     return key ? t(key) : '';

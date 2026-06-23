@@ -6,13 +6,14 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-23 晚 · **Express 推送状态诚实化 + 待补科目卡闭环 + 小助手托盘卡死修** · prod `c91b0577`/11850951 · companion 1.1.3）
+## 🎯 状态卡（2026-06-23 晚 · **Express 推送状态诚实化 + 待补科目卡闭环 + 小助手托盘卡死修 + 配对窗滚轮/提示修** · prod `c91b0577`/11850951 · companion **1.1.4**）
 
 - **① 推送状态诚实化(误导 UI · 违铁律 #3/#12 的幽灵 bug)**:`manual`(缺科目/低置信/账套拒)此前被端点计数器算成功 + 被异常页 `status!='failed'` 过滤双重隐身 → 异常页显 0、日志显失败,口径打架。修:抽 `push_retry.counts_as_endpoint_success` 单一口径(manual/failed 算失败·pending 不计·3 处重推同用);`list_push_exceptions` 纳入 manual;`classify_push_exception` 扩 account_missing/account_set/direction_unknown/low_confidence 桶;batch_view manual→needs_action。
 - **② 待补科目卡(UI 落点② · 残留②闭环)**:异常页加「待补科目」chip + 卡内科目下拉(选项=该账套 reported_accounts 代码·名字)+ 记住为账套默认 + 覆盖重推。新端点 `POST /api/erp/logs/{id}/express-account-fix`(写前 GLACC 白名单闸2 + 更新原行重推 + remember 并入 config·复用 /express-accounts 口径)·`derive_account_fix` 按失败码推该问哪些槽。
 - **③ 失败码人话(误导 UI ①)**:异常页复用日志卡 `_expressFriendlyReason`(经 `window`)不再裸露英文码 + 补 `direction_not_enabled/low_confidence/enqueue_error` 三码 4 语(此前漏)。
 - **④ 防屎山拆分(三文件本就超/近 500·此 clone 无 pre-push hook 致 `89fd3610` 起 CI 已红没人发现)**:拆 `push_log_friendly.py`(DMS catalog)/`erp_express_account_routes.py`(待补路由)/`erp-exc-actions.ts`(卡内动作 retry/batch/acctfix·ES import 互引)。清 `7d74943e` 遗留 `⚠` emoji→Lucide SVG(过 ui_design_lint)。**→ CI 自 `fb2aecbf` 后首次全绿**(`adbb4df9` 主 + `7dbea939` emoji + `c91b0577` /simplify)。
 - **⑤ ★小助手托盘卡死误报离线(companion 1.1.3·已 release 自动更新)**:Owner 截图托盘「离线·连不上网络」vs 网页「已连接」打架。**真因(prod 数据 + 代码双证·非猜)**:`on_poll_error` 一拍失败就 emit「离线」(无连续失败容忍)+ `on_connect`(emit idle)只循环启动跑一次 → 部署重启(我 13:34 push 那拍)/瞬时闪断必误报,且心跳仍继续成功上报云端(`agent_last_seen_at` 查 prod=59s 新鲜·success_count 9)→ **网页是对的、托盘谎报**。修:`run_poll_loop` 连续 `OFFLINE_AFTER_FAILS=3` 次才判离线 + poll 成功发 `on_poll_ok` 自动回在线(不必重配对)。+4 守门测试·240 passed(4 失败=既有 OCR 环境性)。
+- **⑥ 配对窗两修(companion `62bda93`·release 1.1.4)**:账套 + 6 科目下拉(QComboBox)在滚动区里抢滚轮 → 鼠标悬停滚页误改科目/账套(账错风险)·新增 `_NoScrollComboBox`(收起态 wheelEvent.ignore→冒泡滚页·点开列表内照常)。配对成功提示只说「已上报 N 账套」→ 加「当前会计科目映射 M 项也已上报·按账套+科目自动记账」(中泰·传 m=已选科目数)。
 - **/simplify 收口(`c91b0577`)**:`chart_codes` 提到 `services.erp.express_push` 包(去 enqueue/待补卡字节级重复)。（4 review agent 撞 529 过载·我据自知 diff 自审·主 reuse 项已修。）
 - **遗留(不挡)**:待补卡交互式 click-through 未真机走(需 seed 一条 manual no_revenue_account 票 + 测号 token)·已用 route TestClient + CI e2e + prod bundle 解析覆盖。Phase3 小瑕疵延后(税号字段级红字/向导账套显代码/详情抽屉显失败原因·都有兜底)。小助手科目仍可能全 `11-01-01-00` 占位(进托盘「打开设置」改)。
 - ⚠️ companion 独立仓 `D:\pearnly-companion`(无 remote)·发版 `packaging\release.ps1`(已发 1.1.3)·改前读 `docs/RELEASE.md`。详见 [[express-account-resolution-closed-loop]] [[express-push-sales-blocked-and-misleading-ui]] [[companion-ux-connection-honesty-2026-06-23]]。

@@ -287,7 +287,7 @@
         if (btn) btn.disabled = true;
         // 走静态直链让浏览器原生下载(下载内容队列里有进度条)· 不再 fetch 成 blob 占内存后才弹出。
         // ?v= 破 Cloudflare 边缘缓存(.exe 被 30 天 immutable 缓存)→ 换新安装包时 bump 此值。
-        var SETUP_URL = '/static/companion/PearnlyCompanion-Setup.exe?v=20260622b';
+        var SETUP_URL = '/static/companion/PearnlyCompanion-Setup.exe?v=20260623ux';
         try {
             var head = await fetch(SETUP_URL, { method: 'HEAD' });
             if (!head.ok) {

@@ -285,9 +285,16 @@
     async function _downloadAgent() {
         var btn = $('exp-download') as HTMLButtonElement;
         if (btn) btn.disabled = true;
-        // 走静态直链让浏览器原生下载(下载内容队列里有进度条)· 不再 fetch 成 blob 占内存后才弹出。
-        // ?v= 破 Cloudflare 边缘缓存(.exe 被 30 天 immutable 缓存)→ 换新安装包时 bump 此值。
+        // 下载地址以云端 latest.json 为唯一发布源(release 脚本更新它·小助手自动更新也读它)→
+        // 永远指向最新安装包,发版不必再手动 bump 前端 ?v=。取不到则回落到下方兜底直链。
         var SETUP_URL = '/static/companion/PearnlyCompanion-Setup.exe?v=20260623ux';
+        try {
+            var lr = await fetch('/static/companion/latest.json?t=' + Date.now());
+            if (lr.ok) {
+                var meta = await lr.json();
+                if (meta && meta.url) SETUP_URL = String(meta.url);
+            }
+        } catch (e) {}
         try {
             var head = await fetch(SETUP_URL, { method: 'HEAD' });
             if (!head.ok) {

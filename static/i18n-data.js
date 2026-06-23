@@ -4652,7 +4652,6 @@ window.I18N = {
         'exc-fld-total': '总金额',
         // v118.20.7 · 抽屉 PDF 预览
         'exc-pdf-loading': 'PDF 加载中…',
-        'exc-pdf-drag': '滚轮缩放 · 按住图片拖拽移动 · 双击放大',
         'exc-pdf-empty-title': '无 PDF 留底',
         'exc-pdf-empty': '该单据无 PDF 留底(老数据可能未存)',
         'exc-pdf-error-title': '加载失败',
@@ -9549,7 +9548,6 @@ window.I18N = {
         'exc-fld-total': 'Total',
         // v118.20.7 · drawer PDF preview
         'exc-pdf-loading': 'Loading PDF…',
-        'exc-pdf-drag': 'Scroll to zoom · hold and drag to pan · double-click to zoom in',
         'exc-pdf-empty-title': 'No PDF backup',
         'exc-pdf-empty': 'No PDF backup for this record (legacy data may not have one)',
         'exc-pdf-error-title': 'Load failed',
@@ -14437,7 +14435,6 @@ window.I18N = {
         'exc-fld-total': 'ยอดรวม',
         // v118.20.7 · ตัวอย่าง PDF ในลิ้นชัก
         'exc-pdf-loading': 'กำลังโหลด PDF…',
-        'exc-pdf-drag': 'เลื่อนเพื่อซูม · กดค้างแล้วลากเพื่อเลื่อน · ดับเบิลคลิกเพื่อขยาย',
         'exc-pdf-empty-title': 'ไม่มีไฟล์ PDF',
         'exc-pdf-empty': 'ไม่มีไฟล์ PDF สำรองสำหรับรายการนี้',
         'exc-pdf-error-title': 'โหลดล้มเหลว',
@@ -19321,7 +19318,6 @@ window.I18N = {
         'exc-fld-total': '合計',
         // v118.20.7 · ドロワー PDF プレビュー
         'exc-pdf-loading': 'PDF 読み込み中…',
-        'exc-pdf-drag': 'スクロールでズーム · 押しながらドラッグで移動 · ダブルクリックで拡大',
         'exc-pdf-empty-title': 'PDF バックアップなし',
         'exc-pdf-empty': 'この伝票の PDF バックアップはありません',
         'exc-pdf-error-title': '読み込み失敗',

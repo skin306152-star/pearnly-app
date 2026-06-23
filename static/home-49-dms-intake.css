@@ -251,7 +251,7 @@
 .dmsx .dx-acc-top-a{display:flex;gap:10px;flex-wrap:wrap}
 .dmsx .dx-rgrid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:13px;align-items:start}
 .dmsx .dx-rgrid.image-left .dx-fields{order:2}
-.dmsx .dx-rgrid.image-left .iv-card{order:1}
+.dmsx .dx-rgrid.image-left .dx-imgcard{order:1}
 .dmsx .dx-fields{min-width:0}
 .dmsx .dx-extra{display:none;margin-top:9px}
 .dmsx .dx-acc-panel.extra-on .dx-extra{display:block}
@@ -262,8 +262,23 @@
 .dmsx .dx-item-tbl td:last-child{text-align:right;font-weight:800}
 .dmsx .dx-fields-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;border-top:1px dashed var(--dx-line);padding-top:11px;flex-wrap:wrap}
 .dmsx .dx-fields-foot-a{display:flex;gap:8px}
-/* 原图查看器走共用 .iv-* (home-52-image-viewer.css) · 此处只定复核栅格内的高度 */
-.dmsx .dx-rgrid .iv-viewport{height:460px;min-height:0}
+.dmsx .dx-imgcard{border:1px solid var(--dx-line);border-radius:12px;background:var(--card);overflow:hidden}
+.dmsx .dx-vtoolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 11px;border-bottom:1px solid var(--dx-line)}
+.dmsx .dx-vtitle{font-size:10px;font-weight:800;color:var(--ink2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dmsx .dx-vctrls{display:flex;align-items:center;gap:5px}
+.dmsx .dx-icon-btn{width:28px;height:28px;border:1px solid var(--dx-line);border-radius:8px;background:var(--card);color:var(--ink);font-size:13px;font-weight:800;display:grid;place-items:center;cursor:pointer}
+.dmsx .dx-icon-btn:hover{border-color:var(--dx-brand);color:var(--dx-brand)}
+.dmsx .dx-zoom{min-width:42px;text-align:center;font-size:10px;color:var(--ink2);font-weight:800}
+.dmsx .dx-viewport{height:460px;position:relative;overflow:hidden;background:var(--bg);cursor:grab;touch-action:none}
+.dmsx .dx-viewport.dragging{cursor:grabbing}
+.dmsx .dx-canvas{position:absolute;left:50%;top:50%;transform-origin:center center;will-change:transform}
+.dmsx .dx-rimg{display:block;max-width:none;width:380px;border-radius:5px;box-shadow:var(--dx-shadow);user-select:none;pointer-events:none;background:var(--card)}
+.dmsx .dx-vempty,.dmsx .dx-vloading{display:none;position:absolute;inset:0;place-items:center;gap:9px;color:var(--ink2);font-size:11px;text-align:center;padding:20px}
+.dmsx .dx-imgcard.noimg .dx-canvas{display:none}
+.dmsx .dx-imgcard.noimg .dx-vempty{display:grid}
+.dmsx .dx-imgcard.loading .dx-vloading{display:grid;grid-auto-flow:row}
+.dmsx .dx-vspin{width:26px;height:26px;border-radius:50%;border:3px solid var(--dx-line);border-top-color:var(--dx-brand);animation:dxspin .8s linear infinite}
+.dmsx .dx-vhelp{position:absolute;left:11px;bottom:11px;background:var(--card);border:1px solid var(--dx-line);border-radius:9px;padding:6px 9px;font-size:9px;color:var(--ink2);max-width:78%}
 /* 上传队列:紧凑可滚动 + × 内联(防几十/上百文件硬堆、按钮被挤到底) */
 .dmsx .dx-two{align-items:start}
 .dmsx .dx-qlist{display:grid;gap:7px;max-height:340px;overflow:auto;padding-right:2px;margin-top:4px}
@@ -313,8 +328,8 @@
   .dmsx .dx-two,.dmsx .dx-task-grid,.dmsx .dx-dgrid,.dmsx .dx-fgrid,.dmsx .dx-sgrid,.dmsx .dx-ogrid{grid-template-columns:1fr}
   .dmsx .dx-scan,.dmsx .dx-review-grid{grid-template-columns:1fr 1fr}
   .dmsx .dx-rgrid,.dmsx .dx-rgrid.image-left{grid-template-columns:1fr}
-  .dmsx .dx-rgrid.image-left .dx-fields,.dmsx .dx-rgrid.image-left .iv-card{order:0}
-  .dmsx .dx-rgrid .iv-viewport{height:380px}
+  .dmsx .dx-rgrid.image-left .dx-fields,.dmsx .dx-rgrid.image-left .dx-imgcard{order:0}
+  .dmsx .dx-viewport{height:380px}
   .dmsx .dx-stepper{grid-template-columns:repeat(2,1fr)}
   .dmsx .dx-step:not(:last-child):after{display:none}
   .dmsx .dx-cmp{overflow:auto}

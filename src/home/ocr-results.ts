@@ -23,8 +23,6 @@ function openDrawer(idx: number) {
     _drawerIdx = idx;
     const r = _results[idx];
     if (!r) return;
-    // 默认窄抽屉;两栏加宽只在识别记录(historizeDrawer 再加 hd-wide)· 不影响对账/OCR 结果
-    document.getElementById('drawer')?.classList.remove('hd-wide');
 
     document.getElementById('drawer-title')!.textContent = r.filename as string;
 

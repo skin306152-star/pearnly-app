@@ -4,10 +4,6 @@
 // 只在 history 模式由 openHistoryDrawer 调一次 · 纯 DOM 搬运(节点连同事件/状态一起 append ·
 // 字段编辑/RD 校验/保存/推送逻辑全不改)· 共享抽屉的其它消费方(对账中心)完全不受影响。
 /* global escapeHtml, token, t, showToast */
-import { imageViewerHtml, mountImageViewer } from './image-viewer.js';
-
-// 识别记录抽屉左栏原图查看器实例(重开/换单前先清旧 · 防 window 监听泄漏)
-let _hdViewerCleanup: (() => void) | null = null;
 
 type HistDetail = {
     id?: string;
@@ -144,29 +140,12 @@ function historizeDrawer(detail: HistDetail) {
     panels.file.innerHTML = _filePanel(detail);
     panels.history.innerHTML = _timelinePanel(detail);
 
-    // 两栏(对齐异常布局):左原图查看器 + 右内容(summary + tabs + panels)· 加宽抽屉。
-    const content = document.createElement('div');
-    content.className = 'hd-root';
-    content.append(strip, tabsBar, panelWrap);
-    const imgpane = document.createElement('div');
-    imgpane.className = 'hd-imgpane';
-    imgpane.innerHTML = imageViewerHtml({
-        help: t('exc-pdf-drag'),
-        noimg: t('dxi-rev-noimg'),
-        loading: t('exc-pdf-loading'),
-    });
-    const twopane = document.createElement('div');
-    twopane.className = 'hd-twopane';
-    twopane.append(imgpane, content);
-    if (saveBar) body.insertBefore(twopane, saveBar);
-    else body.appendChild(twopane);
-    document.getElementById('drawer')?.classList.add('hd-wide');
-    if (_hdViewerCleanup) {
-        _hdViewerCleanup();
-        _hdViewerCleanup = null;
-    }
-    const ivCard = imgpane.querySelector('.iv-card') as HTMLElement | null;
-    if (ivCard) _hdViewerCleanup = mountImageViewer(ivCard, detail.id || null);
+    // 组装:summary + tabs + panels 插在 saveBar 前(saveBar 仍是末尾页脚)
+    const root = document.createElement('div');
+    root.className = 'hd-root';
+    root.append(strip, tabsBar, panelWrap);
+    if (saveBar) body.insertBefore(root, saveBar);
+    else body.appendChild(root);
 
     // tab 切换
     tabsBar.addEventListener('click', (e) => {

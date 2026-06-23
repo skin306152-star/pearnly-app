@@ -8,10 +8,9 @@
 //   从 invoice-submit.ts 拆出以控行数。
 // ============================================================
 /* global t, showToast */
-import { esc, $ } from './dms-intake-core.js';
+import { esc, $, authHeaders } from './dms-intake-core.js';
 import { IV, ext, showStepInv } from './dms-intake-invoice.js';
 import type { Dict, IvInvoice, IvResult } from './dms-intake-invoice.js';
-import { imageViewerHtml, mountImageViewer } from './image-viewer.js';
 
 // 复核预览字段(复用 OCR 抽屉字段标签键)
 const REV_CORE: Array<[string, string]> = [
@@ -43,8 +42,11 @@ function passable(r: IvResult): boolean {
     return !r.needs_review && fileWarns(r) === 0;
 }
 
-// 当前展开面板挂载的原图查看器清理函数(重渲/收起前先解绑)
+// 原图缓存(history_id → objectURL) + 查看器变换态(同一刻只一个面板展开)
+const imgCache = new Map<string, string>();
+let vstate = { x: 0, y: 0, scale: 1, rot: 0 };
 let viewerCleanup: (() => void) | null = null;
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 export function renderReview() {
     IV.view = 'review';
@@ -114,12 +116,7 @@ function accPanelHtml(r: IvResult, i: number): string {
         `<button class="dx-toggle dx-extra-toggle">${esc(t('dxi-rev-toggle-all'))}</button>` +
         `<button class="dx-toggle dx-collapse-one">${esc(t('dxi-rev-collapse'))}</button></div></div>` +
         `<div class="dx-rgrid${gridCls}"><div class="dx-fields">${groups}${fieldsFootHtml()}</div>` +
-        imageViewerHtml({
-            title: t('dxi-rev-viewer-title'),
-            help: t('dxi-rev-viewer-help'),
-            noimg: t('dxi-rev-noimg'),
-            loading: t('dxi-rev-loading'),
-        }) +
+        imageCardHtml(r) +
         '</div></div>'
     );
 }
@@ -174,6 +171,25 @@ function fieldsFootHtml(): string {
     );
 }
 
+function imageCardHtml(r: IvResult): string {
+    const noimg = !r.history_ids.length;
+    return (
+        `<div class="dx-imgcard${noimg ? ' noimg' : ''}"><div class="dx-vtoolbar">` +
+        `<div class="dx-vtitle">${esc(t('dxi-rev-viewer-title'))}</div><div class="dx-vctrls">` +
+        '<button class="dx-icon-btn dx-zoom-out" title="−">−</button>' +
+        '<span class="dx-zoom">100%</span>' +
+        '<button class="dx-icon-btn dx-zoom-in" title="+">＋</button>' +
+        '<button class="dx-icon-btn dx-rotate" title="↻">↻</button>' +
+        '<button class="dx-icon-btn dx-reset" title="⟲">⟲</button></div></div>' +
+        '<div class="dx-viewport"><div class="dx-canvas">' +
+        '<img class="dx-rimg" draggable="false" alt="">' +
+        '</div>' +
+        `<div class="dx-vempty">${esc(t('dxi-rev-noimg'))}</div>` +
+        `<div class="dx-vloading"><span class="dx-vspin"></span>${esc(t('dxi-rev-loading'))}</div>` +
+        `<div class="dx-vhelp">${esc(t('dxi-rev-viewer-help'))}</div></div></div>`
+    );
+}
+
 function footHtml(): string {
     return (
         `<div class="dx-foot"><div class="dx-note">${esc(t('dxi-rev-hint'))}</div>` +
@@ -216,6 +232,18 @@ export function onReviewClick(tg: HTMLElement): boolean {
         btn.textContent = t(on ? 'dxi-rev-toggle-less' : 'dxi-rev-toggle-all');
         return true;
     }
+    if (tg.closest('.dx-zoom-in')) return (zoomBy(0.15), true);
+    if (tg.closest('.dx-zoom-out')) return (zoomBy(-0.15), true);
+    if (tg.closest('.dx-rotate')) {
+        vstate.rot = (vstate.rot + 90) % 360;
+        applyViewer();
+        return true;
+    }
+    if (tg.closest('.dx-reset')) {
+        vstate = { x: 0, y: 0, scale: 1, rot: 0 };
+        applyViewer();
+        return true;
+    }
     if (tg.closest('.dx-save-one')) {
         showToast(t('dxi-rev-saved'), 'success');
         return true;
@@ -248,16 +276,114 @@ function nextUnconfirmed(from: number): number {
 function openPanel(): HTMLElement | null {
     return document.querySelector('.dx-acc-item.open .dx-acc-panel');
 }
+function zoomBy(d: number) {
+    vstate.scale = clamp(vstate.scale + d, 0.4, 3.4);
+    applyViewer();
+}
+function applyViewer() {
+    const panel = openPanel();
+    if (!panel) return;
+    const canvas = panel.querySelector('.dx-canvas') as HTMLElement | null;
+    const label = panel.querySelector('.dx-zoom');
+    if (canvas)
+        canvas.style.transform = `translate(calc(-50% + ${vstate.x}px), calc(-50% + ${vstate.y}px)) scale(${vstate.scale}) rotate(${vstate.rot}deg)`;
+    if (label) label.textContent = Math.round(vstate.scale * 100) + '%';
+}
 
-// 展开后:把共用查看器挂到面板的 .iv-card(原图 + 拖拽缩放)· 重渲/收起前先清旧实例
+// 展开后:加载原图 + 接拖拽/滚轮(只对当前展开面板 · 重渲先清旧 window 监听)
 function bindOpenViewer() {
     if (viewerCleanup) {
         viewerCleanup();
         viewerCleanup = null;
     }
     if (IV.openIdx < 0) return;
-    const card = document.querySelector('.dx-acc-item.open .iv-card') as HTMLElement | null;
+    const panel = openPanel();
     const r = IV.results[IV.openIdx];
-    if (!card || !r) return;
-    viewerCleanup = mountImageViewer(card, r.history_ids[0] || null);
+    if (!panel || !r) return;
+    vstate = { x: 0, y: 0, scale: 1, rot: 0 };
+    applyViewer();
+    void loadImage(panel, r);
+    const viewport = panel.querySelector('.dx-viewport') as HTMLElement | null;
+    if (!viewport) return;
+    let drag = false;
+    let sx = 0;
+    let sy = 0;
+    let ox = 0;
+    let oy = 0;
+    viewport.addEventListener('mousedown', (e) => {
+        drag = true;
+        sx = e.clientX;
+        sy = e.clientY;
+        ox = vstate.x;
+        oy = vstate.y;
+        viewport.classList.add('dragging');
+    });
+    const move = (e: MouseEvent) => {
+        if (!drag) return;
+        vstate.x = ox + (e.clientX - sx);
+        vstate.y = oy + (e.clientY - sy);
+        applyViewer();
+    };
+    const up = () => {
+        drag = false;
+        viewport.classList.remove('dragging');
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    viewport.addEventListener(
+        'wheel',
+        (e) => {
+            e.preventDefault();
+            zoomBy(e.deltaY < 0 ? 0.1 : -0.1);
+        },
+        { passive: false }
+    );
+    viewport.addEventListener('dblclick', () => {
+        vstate = { x: 0, y: 0, scale: 1.6, rot: 0 };
+        applyViewer();
+    });
+    viewerCleanup = () => {
+        window.removeEventListener('mousemove', move);
+        window.removeEventListener('mouseup', up);
+    };
+}
+
+async function loadImage(panel: HTMLElement, r: IvResult) {
+    const img = panel.querySelector('.dx-rimg') as HTMLImageElement | null;
+    const card = panel.querySelector('.dx-imgcard');
+    const hid = r.history_ids[0];
+    if (!img || !card) return;
+    if (!hid) {
+        card.classList.add('noimg');
+        return;
+    }
+    const cached = imgCache.get(hid);
+    if (cached) {
+        img.src = cached;
+        return;
+    }
+    // 留底 PDF 是识别返回后【异步后台】回填(几秒后才落盘)· 首次 404 = 还没就绪 →
+    // 轮询重试等它,别一次 404 就永久判「原图不可用」。面板被收起/重渲(isConnected=false)即放弃。
+    card.classList.add('loading');
+    for (let attempt = 0; attempt < 8; attempt++) {
+        if (!panel.isConnected) return;
+        try {
+            const resp = await fetch(`/api/history/${encodeURIComponent(hid)}/page/1.png`, {
+                headers: authHeaders(),
+            });
+            if (resp.ok) {
+                const url = URL.createObjectURL(await resp.blob());
+                imgCache.set(hid, url);
+                card.classList.remove('loading');
+                img.src = url;
+                return;
+            }
+            if (resp.status !== 404) break; // 渲染失败等硬错 → 不再等
+        } catch {
+            break; // 网络错 → 停
+        }
+        await new Promise((res) => setTimeout(res, 1200));
+    }
+    card.classList.remove('loading');
+    card.classList.add('noimg');
 }

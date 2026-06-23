@@ -6,10 +6,6 @@
 import { _drawer } from './exceptions-store.js';
 import { _v, _money, excRuleLabel } from './exceptions-helpers.js';
 import { _loadDrawerPdf, _extractFields, actionSaveFields } from './exceptions-drawer.js';
-import { imageViewerHtml, mountImageViewer } from './image-viewer.js';
-
-// 异常抽屉左栏原图查看器实例(重渲/换单前先清旧 · 防 window 监听泄漏)
-let _excViewerCleanup: (() => void) | null = null;
 
 type WhyDetail = {
     // 新引擎 finding 形状
@@ -360,7 +356,7 @@ function renderDrawer() {
                     </a>
                 </div>
             </div>
-            ${imageViewerHtml({ help: t('exc-pdf-drag'), noimg: t('exc-pdf-empty'), loading: t('exc-pdf-loading') })}
+            <iframe class="exc-pdf-frame" src="${url}#toolbar=0&navpanes=0" title="PDF preview"></iframe>
         `;
     })();
 
@@ -415,14 +411,6 @@ function renderDrawer() {
             </div>
         </div>
     `;
-
-    // 原图就绪后挂共用查看器(page.png · 拖拽/缩放)· 每次重渲先清旧实例
-    if (_excViewerCleanup) {
-        _excViewerCleanup();
-        _excViewerCleanup = null;
-    }
-    const ivCardEl = document.querySelector('.exc-pdf-pane .iv-card') as HTMLElement | null;
-    if (ivCardEl) _excViewerCleanup = mountImageViewer(ivCardEl, row.history_id || null);
 
     // v118.21.3 · 编辑模式按钮事件
     const editBtn = document.getElementById('exc-fld-edit');

@@ -732,18 +732,6 @@
 /* ============================================================
    识别记录抽屉 · 4-tab 重排(概览/明细/原始文件/修改记录)+ 顶部汇总条
    ============================================================ */
-/* 两栏(对齐异常):左原图查看器 + 右内容 · 仅 history 模式给已有抽屉加宽(ID 选择器·非新抽屉) */
-#drawer.hd-wide { width: 920px; }
-#drawer.hd-wide #drawer-body { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
-.hd-twopane { flex: 1 1 auto; display: grid; grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); min-height: 0; }
-.hd-imgpane { border-right: 1px solid var(--line); background: var(--bg); display: flex; flex-direction: column; min-height: 0; }
-.hd-twopane .hd-root { overflow: auto; min-height: 0; padding: 16px; }
-@media (max-width: 980px) {
-    #drawer.hd-wide { width: 92vw; }
-    .hd-twopane { grid-template-columns: 1fr; grid-template-rows: 320px auto; overflow: auto; }
-    .hd-imgpane { border-right: none; border-bottom: 1px solid var(--line); }
-    .hd-twopane .hd-root { overflow: visible; }
-}
 .hd-summary {
     display: grid;
     grid-template-columns: 1.3fr .8fr .9fr;

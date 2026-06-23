@@ -212,7 +212,8 @@ def enqueue_express(endpoint: Dict[str, Any], history: Dict[str, Any]) -> Dict[s
                     "doctype": payload.get("doctype"),
                     "account_set": payload.get("account_set"),
                     "total_amount": payload.get("total_amount"),
-                    # 推送日志可见性:这张票记到哪几个科目 + 来源(规则映射命中 / 账套默认兜底)。
+                    # 推送日志可见性:这张票记到哪几个科目。account_source 是粗略近似(有品类≈走规则
+                    # 映射·否则账套默认)· 非 mapper 真实解析路径(精确来源待 v2 schema 列)。
                     "accounts": [
                         {"acc": ln.get("acc"), "side": ln.get("side"), "desc": ln.get("desc")}
                         for ln in (payload.get("lines") or [])

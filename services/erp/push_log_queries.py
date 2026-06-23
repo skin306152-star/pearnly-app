@@ -11,7 +11,7 @@ import re  # noqa: F401
 import logging
 from typing import Optional, Dict, Any, List  # noqa: F401
 
-from services.erp.external_ref import derive_external_ref  # noqa: F401
+from services.erp.external_ref import _coerce_body, derive_external_ref  # noqa: F401
 from services.erp.mrerp_business_friendly import friendly_for_ui  # noqa: F401
 
 logger = logging.getLogger(__name__)
@@ -282,11 +282,12 @@ def list_push_logs(
             # 不动状态机 · 不新增状态源 · 仅从已有 response_body+adapter 读出。
             # 派生后丢掉原始 response_body · 列表 payload 保持轻量(详情接口才回完整体)。
             for it in items:
-                resp_raw = it.pop("response_body", None)
-                ref = derive_external_ref(it.get("endpoint_adapter"), resp_raw, it.get("status"))
+                # response_body 只解析一次(_coerce_body),派生器都收已解析 dict,避免逐行双重 json.loads。
+                body = _coerce_body(it.pop("response_body", None))
+                ref = derive_external_ref(it.get("endpoint_adapter"), body, it.get("status"))
                 it.update(ref)
                 # Express 队列响应带的分录科目(at-a-glance·列表科目列)· 无则不带,保持轻量。
-                it["push_accounts"] = _derive_push_accounts(resp_raw)
+                it["push_accounts"] = _derive_push_accounts(body)
                 # DMS 推送可视化闭环(Zihao 2026-06-01)· 身份证→订车单 ≠ 发票推送:
                 # 标 push_type 让前端按 DMS 字段(订车单号/客户/身份证)渲染该行,
                 # 不再用发票字段框;并附 4 语友好错误(身份证订车码 friendly_for_ui 不覆盖)。

@@ -50,10 +50,16 @@ const PNG = Buffer.from(
 );
 
 async function stub(page, epMode, recMode) {
+    // 模拟真实异步留底:前 2 次 page.png 还没回填 → 404,之后 200(验证前端重试不永久判「不可用」)
+    let pngHits = 0;
     await page.route('**/api/**', async (route) => {
         const u = route.request().url();
-        if (/\/api\/history\/[^/]+\/page\/\d+\.png/.test(u))
+        if (/\/api\/history\/[^/]+\/page\/\d+\.png/.test(u)) {
+            pngHits++;
+            if (pngHits <= 2)
+                return route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
             return route.fulfill({ status: 200, contentType: 'image/png', body: PNG });
+        }
         if (u.includes('/api/ocr/recognize')) {
             if (recMode === 'fail') return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ detail: 'server' }) });
             if (recMode === 'delay') await new Promise((r) => setTimeout(r, 900));
@@ -128,8 +134,8 @@ async function run() {
     await chk('第3张空税号标黄(warn)', vis(page, '.dx-rv.warn'));
     // ★ 原图查看器:图片卡 + 原图加载(page.png stub)+ 缩放
     await chk('★原图查看器可见', vis(page, '.dx-acc-item.open .dx-viewport'));
-    await page.waitForFunction(() => { const i = document.querySelector('.dx-acc-item.open .dx-rimg'); return i && i.src && i.src.startsWith('blob:'); }, { timeout: 5000 }).catch(() => {});
-    await chk('★原图加载成功(blob 非 noimg)', page.evaluate(() => { const c = document.querySelector('.dx-acc-item.open .dx-imgcard'); const i = document.querySelector('.dx-acc-item.open .dx-rimg'); return !!i && i.src.startsWith('blob:') && !c.classList.contains('noimg'); }));
+    await page.waitForFunction(() => { const i = document.querySelector('.dx-acc-item.open .dx-rimg'); return i && i.src && i.src.startsWith('blob:'); }, { timeout: 8000 }).catch(() => {});
+    await chk('★原图重试后加载成功(404→重试→blob · 非永久不可用)', page.evaluate(() => { const c = document.querySelector('.dx-acc-item.open .dx-imgcard'); const i = document.querySelector('.dx-acc-item.open .dx-rimg'); return !!i && i.src.startsWith('blob:') && !c.classList.contains('noimg'); }));
     await page.click('.dx-acc-item.open .dx-zoom-in');
     await chk('★放大按钮改变缩放标签', page.locator('.dx-acc-item.open .dx-zoom').innerText().then((s) => s !== '100%'));
     await page.click('.dx-acc-item.open .dx-reset');

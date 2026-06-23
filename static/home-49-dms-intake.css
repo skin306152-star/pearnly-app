@@ -273,9 +273,11 @@
 .dmsx .dx-viewport.dragging{cursor:grabbing}
 .dmsx .dx-canvas{position:absolute;left:50%;top:50%;transform-origin:center center;will-change:transform}
 .dmsx .dx-rimg{display:block;max-width:none;width:380px;border-radius:5px;box-shadow:var(--dx-shadow);user-select:none;pointer-events:none;background:var(--card)}
-.dmsx .dx-vempty{display:none;position:absolute;inset:0;place-items:center;color:var(--ink2);font-size:11px;text-align:center;padding:20px}
+.dmsx .dx-vempty,.dmsx .dx-vloading{display:none;position:absolute;inset:0;place-items:center;gap:9px;color:var(--ink2);font-size:11px;text-align:center;padding:20px}
 .dmsx .dx-imgcard.noimg .dx-canvas{display:none}
 .dmsx .dx-imgcard.noimg .dx-vempty{display:grid}
+.dmsx .dx-imgcard.loading .dx-vloading{display:grid;grid-auto-flow:row}
+.dmsx .dx-vspin{width:26px;height:26px;border-radius:50%;border:3px solid var(--dx-line);border-top-color:var(--dx-brand);animation:dxspin .8s linear infinite}
 .dmsx .dx-vhelp{position:absolute;left:11px;bottom:11px;background:var(--card);border:1px solid var(--dx-line);border-radius:9px;padding:6px 9px;font-size:9px;color:var(--ink2);max-width:78%}
 /* 上传队列:紧凑可滚动 + × 内联(防几十/上百文件硬堆、按钮被挤到底) */
 .dmsx .dx-two{align-items:start}

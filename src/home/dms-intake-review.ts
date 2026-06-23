@@ -185,6 +185,7 @@ function imageCardHtml(r: IvResult): string {
         '<img class="dx-rimg" draggable="false" alt="">' +
         '</div>' +
         `<div class="dx-vempty">${esc(t('dxi-rev-noimg'))}</div>` +
+        `<div class="dx-vloading"><span class="dx-vspin"></span>${esc(t('dxi-rev-loading'))}</div>` +
         `<div class="dx-vhelp">${esc(t('dxi-rev-viewer-help'))}</div></div></div>`
     );
 }
@@ -361,15 +362,28 @@ async function loadImage(panel: HTMLElement, r: IvResult) {
         img.src = cached;
         return;
     }
-    try {
-        const resp = await fetch(`/api/history/${encodeURIComponent(hid)}/page/1.png`, {
-            headers: authHeaders(),
-        });
-        if (!resp.ok) throw new Error('no image');
-        const url = URL.createObjectURL(await resp.blob());
-        imgCache.set(hid, url);
-        img.src = url;
-    } catch {
-        card.classList.add('noimg');
+    // 留底 PDF 是识别返回后【异步后台】回填(几秒后才落盘)· 首次 404 = 还没就绪 →
+    // 轮询重试等它,别一次 404 就永久判「原图不可用」。面板被收起/重渲(isConnected=false)即放弃。
+    card.classList.add('loading');
+    for (let attempt = 0; attempt < 8; attempt++) {
+        if (!panel.isConnected) return;
+        try {
+            const resp = await fetch(`/api/history/${encodeURIComponent(hid)}/page/1.png`, {
+                headers: authHeaders(),
+            });
+            if (resp.ok) {
+                const url = URL.createObjectURL(await resp.blob());
+                imgCache.set(hid, url);
+                card.classList.remove('loading');
+                img.src = url;
+                return;
+            }
+            if (resp.status !== 404) break; // 渲染失败等硬错 → 不再等
+        } catch {
+            break; // 网络错 → 停
+        }
+        await new Promise((res) => setTimeout(res, 1200));
     }
+    card.classList.remove('loading');
+    card.classList.add('noimg');
 }

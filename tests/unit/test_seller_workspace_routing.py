@@ -135,8 +135,9 @@ class MatchWorkspaceForBuyerTests(unittest.TestCase):
     """
 
     def _match(self, cur, tax="0735527000289", name="自家公司"):
+        # 买方分拣只经 db 门面/seller_routing 暴露(不经 store facade · store 已贴 500 行上限)
         with _patch(cur):
-            return store.match_workspace_for_buyer(tax, name, user_id="u1", tenant_id="t1")
+            return seller_routing.match_workspace_for_buyer(tax, name, user_id="u1", tenant_id="t1")
 
     def test_buyer_tax_exact_assigned(self):
         d = self._match(KeywordCursor(by_tax=[WS_BOUND]))

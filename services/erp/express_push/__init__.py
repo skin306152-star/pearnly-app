@@ -15,7 +15,7 @@ Agent 出站拉取(lease)、录入 Express、回报(ack)。
 """
 
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 def express_push_enabled() -> bool:
@@ -34,3 +34,17 @@ def account_set_allowed(account_set: str, endpoint: Dict[str, Any]) -> bool:
         return False
     configured = str(((endpoint or {}).get("config") or {}).get("account_set") or "").strip()
     return bool(configured) and s == configured
+
+
+def chart_codes(config: Dict[str, Any]) -> Optional[set]:
+    """账套上报的可记账科目码集合(写前白名单数据源)。
+
+    未上报(旧 Agent / 心跳还没带科目表)→ None:跳过校验,不阻塞;有上报才钉。
+    入队闸(enqueue)与待补科目卡重推(erp_express_account_routes)共用一份口径。
+    """
+    reported = (config or {}).get("reported_accounts")
+    if not isinstance(reported, list) or not reported:
+        return None
+    codes = {str((a or {}).get("code") or "").strip() for a in reported}
+    codes.discard("")
+    return codes or None

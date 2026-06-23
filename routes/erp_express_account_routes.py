@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Dict, Optional
+from typing import Dict
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -19,6 +19,7 @@ from core.auth import get_current_user_from_request
 from core.route_helpers import _tid
 from routes.erp_routes_access import _check_push_access
 from services.erp import erp_push as _erp
+from services.erp.express_push import chart_codes
 
 logger = logging.getLogger("mr-pilot")
 
@@ -33,16 +34,6 @@ _EXPRESS_ACC_SLOTS = {
     "ap_acc",
     "vat_input_acc",
 }
-
-
-def _express_chart_codes(config: Dict[str, Any]) -> Optional[set]:
-    """账套上报的可记账科目码集合(写前白名单)。未上报 → None(跳过校验,不阻塞)。"""
-    reported = config.get("reported_accounts")
-    if not isinstance(reported, list) or not reported:
-        return None
-    codes = {str((a or {}).get("code") or "").strip() for a in reported}
-    codes.discard("")
-    return codes or None
 
 
 class ErpExpressAccountFixRequest(BaseModel):
@@ -84,7 +75,7 @@ async def erp_express_account_fix(log_id: str, req: ErpExpressAccountFixRequest,
         raise HTTPException(400, detail="erp.no_account_chosen")
 
     cfg = dict(endpoint.get("config") or {})
-    chart = _express_chart_codes(cfg)
+    chart = chart_codes(cfg)
     if chart is not None:
         bad = next((c for c in chosen.values() if c not in chart), None)
         if bad:

@@ -18,7 +18,7 @@ import logging
 import time
 from typing import Any, Dict, Optional
 
-from services.erp.express_push import account_set_allowed, express_push_enabled
+from services.erp.express_push import account_set_allowed, chart_codes, express_push_enabled
 from services.erp.express_push import direction as direction_mod
 from services.erp.express_push.mapper import build_express_payload
 from services.erp.express_push.sales_mapper import build_express_sales_payload
@@ -84,19 +84,6 @@ def _own_tax_id(endpoint: Dict[str, Any], flat: Dict[str, Any], tenant_id: Optio
     except Exception:
         logger.exception("express own tax id resolve failed; direction will be ambiguous")
         return ""
-
-
-def _chart_codes(config: Dict[str, Any]) -> Optional[set]:
-    """账套上报的可记账科目码集合(写前白名单数据源)。
-
-    未上报(旧 Agent / 心跳还没带科目表)→ None:跳过校验,不阻塞;有上报才钉。
-    """
-    reported = config.get("reported_accounts")
-    if not isinstance(reported, list) or not reported:
-        return None
-    codes = {str((a or {}).get("code") or "").strip() for a in reported}
-    codes.discard("")
-    return codes or None
 
 
 def _unknown_account(payload: Dict[str, Any], codes: set) -> Optional[str]:
@@ -190,7 +177,7 @@ def enqueue_express(endpoint: Dict[str, Any], history: Dict[str, Any]) -> Dict[s
 
         # 写前科目白名单(闸2):分录每个科目须 ∈ 账套上报的可记账科目(GLACC)。
         # 挡死科目码 / AI 乱码 / 缓存过期。未上报科目表 → 跳过(不阻塞旧 Agent),由首次确认+小助手默认兜底。
-        chart = _chart_codes(config)
+        chart = chart_codes(config)
         if chart is not None:
             bad = _unknown_account(payload, chart)
             if bad:

@@ -286,8 +286,9 @@
         var btn = $('exp-download') as HTMLButtonElement;
         if (btn) btn.disabled = true;
         // 下载地址以云端 latest.json 为唯一发布源(release 脚本更新它·小助手自动更新也读它)→
-        // 永远指向最新安装包,发版不必再手动 bump 前端 ?v=。取不到则回落到下方兜底直链。
-        var SETUP_URL = '/static/companion/PearnlyCompanion-Setup.exe?v=20260623ux';
+        // 永远指向最新安装包,发版不必再手动 bump 前端 ?v=。取不到则回落到兜底直链;
+        // 兜底用时间戳破缓存(不留会过期的手动 ?v=),保证回落也取到当前已部署的安装包。
+        var SETUP_URL = '/static/companion/PearnlyCompanion-Setup.exe?t=' + Date.now();
         try {
             var lr = await fetch('/static/companion/latest.json?t=' + Date.now());
             if (lr.ok) {

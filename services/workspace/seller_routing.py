@@ -154,8 +154,14 @@ def _decide(rows: List[Dict[str, Any]], source: str) -> Optional[Dict[str, Any]]
 
 
 def _match_party_direct(
-    cur, tax: Optional[str], name: Optional[str], scope_sql: str, scope_val: str,
-    *, src_tax: str, src_name: str,
+    cur,
+    tax: Optional[str],
+    name: Optional[str],
+    scope_sql: str,
+    scope_val: str,
+    *,
+    src_tax: str,
+    src_name: str,
 ) -> Optional[Dict[str, Any]]:
     """按税号(13 位法定唯一 · 优先)→ 名字(精确)直配 active workspace_clients → _decide 或 None。
     卖方/买方分拣共用(只差 match_source 标签)· 在已开 cursor 上跑。"""
@@ -227,8 +233,13 @@ def match_workspace_for_seller(
 
             # 1+2) 税号精确(13 位法定唯一)→ 名字精确
             d = _match_party_direct(
-                cur, seller_tax, seller_name, scope_sql, scope_val,
-                src_tax="seller_tax", src_name="seller_name",
+                cur,
+                seller_tax,
+                seller_name,
+                scope_sql,
+                scope_val,
+                src_tax="seller_tax",
+                src_name="seller_name",
             )
             if d:
                 return d
@@ -258,8 +269,13 @@ def match_workspace_for_buyer(
     try:
         with db.get_cursor() as cur:
             d = _match_party_direct(
-                cur, buyer_tax, buyer_name, scope_sql, scope_val,
-                src_tax="buyer_tax", src_name="buyer_name",
+                cur,
+                buyer_tax,
+                buyer_name,
+                scope_sql,
+                scope_val,
+                src_tax="buyer_tax",
+                src_name="buyer_name",
             )
             if d:
                 return d

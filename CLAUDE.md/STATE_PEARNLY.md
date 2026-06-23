@@ -6,15 +6,15 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-23 · **体积闸 + lint-ui 全绿(托管过夜任务)** · prod `d7d92bd5`）
+## 🎯 状态卡（2026-06-23 · **CI 史上首次全 6 闸全绿（proof_pdf 红已清）** · prod `fb2aecbf`）
 
+- **✅ 本窗口清掉唯一剩红**:CI unit job 的 3 个 `test_proof_pdf` 红 = **pymupdf lock 漂移**(requirements.txt 早已 1.24.10·lock 仍钉 1.20.2·旧版嵌图 API 不同→票图页 0 页)。修(`fb2aecbf`)=手改 lock `pymupdf==1.20.2`→`1.24.10` + 补拆出的二进制基座 `pymupdfb==1.24.10`(不 pip-compile 重生成·避 py3.11 churn·见 [[pip-audit-14cve-repaid]] 同款做法)。验:本地 1.24.10 下 proof_pdf 16 + line_proof 7 + PDF/OCR 72 测试全绿·pip-audit lock 无新 CVE·**CI run 27997108740 全 6 闸全绿·prod 200**。
 - 承接 `docs/HANDOFF-2026-06-23-全检收口-未完成交接.md` 的 4 件未完成任务·Owner 托管过夜全做完。**4 commit 全上线·prod 200·登录 E2E 冒烟过**。完整交接 `docs/HANDOFF-2026-06-23-体积闸与lint-ui-已完成.md`。
 - **任务1/2 拆文件<500(`bb992db7`·纯搬迁0逻辑改)**:`oauth_routes.py` 539→213(LINE 段抽到 `routes/oauth_line_routes.py` + 共享 HMAC state 抽到 `services/auth/oauth_state.py`·`test_oauth_state` 经别名 import 零改);`erp_push.py` 507→410(`build_mrerp_adapter`/`load_mrerp_mappings` 抽到 `services/erp/erp_push_adapters.py` re-export)。**lint-size 红→绿**。
 - **任务3 lint-ui 三闸归零(`65f7008d`)**:① D2 黑底按钮(唯一真红·B1/C1/C4 合计220<基线480本就过)= `.hd-tab.active::after`/`.dx-tab.active:after` 下划线 `var(--ink)`→`var(--btn-blue)`;② 暗夜 3hex 251→246 = home-02 去 5 个 `var(--ink,#111)` 死兜底;③ **ui_design_lint 两 delta 全是误报**(max-width 增量=合法 @media 响应式·内联增量=`.drawer-子选择器`被误匹配)→ 正则兑现意图(@media 跳过 / `.drawer(?![-\w])`)+ 基线**往下收紧**(259→125/174→58)·非放水(/simplify altitude agent 独立确认)。**lint-ui 红→绿**。
 - **额外修 handoff 三处谎报**:① prettier「tracked全过」=假 → 8 个 `src/home/*.ts` 超 printWidth 长行 `prettier --write` 折行(`3ceee172`·dist minify 不变);② 单测「4638全过」=假 → 见下 proof_pdf;③ 桌面图标「已验证白底」=假(Owner 截图黑底·companion 仓库封装·遗留)。**lint(prettier) 红→绿**。
 - **/simplify 收口(`d7d92bd5`)**:noqa import 收一行 + 恢复 home-02 误翻的 CRLF。跳过 oauth_line token+verify 重复(pre-existing·碰登录回调·留 follow-up)。
-- **🔴 唯一剩红(pre-existing·非本窗口·不能盲改)**:CI 单测 job 的 3 个 `test_proof_pdf` 红 = **pymupdf lock 漂移**(本地 1.24.10 全绿·CI lock `pymupdf==1.20.2` 旧版嵌图 API 不同→票图页0页)。`ff70eb09` 那次 CI 就一模一样红·见记忆 [[pip-audit-14cve-repaid]]「将来重compile须验PDF OCR」。修法=重 pip-compile 升 pymupdf+验 PDF 功能·需 Owner/下窗口。
-- **遗留**:companion 图标黑底(清图标缓存/重打包) · proof_pdf lock 升级 · oauth_line `_exchange_line_code` follow-up · 新 oauth_line_routes 补契约测试(lint-routes WARNING)。
+- **遗留**:companion 图标黑底(清图标缓存/重打包·companion 独立仓库) · oauth_line `_exchange_line_code` follow-up(LINE token+verify 重复·碰登录回调) · 新 oauth_line_routes 补契约测试(lint-routes WARNING)。
 
 ## 历史记录（2026-06-21 · **Express Push 全链路 + 「下载小助手」上线 + 推送功能正式开** · pearnly-app `23f223b9` · companion `94e3cac`）
 

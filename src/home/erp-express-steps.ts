@@ -210,7 +210,9 @@
             // 小助手未连/未上报科目表 → 科目无法解析,显式提示(别让用户以为配好了)。
             (accts.length
                 ? ''
-                : '<div class="exp-help-text">⚠ ' + t('exp-accmap-offline-hint') + '</div>') +
+                : '<div class="exp-help-text"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;margin-right:4px"><path d="M8 1.8L1.5 13.5h13L8 1.8z"/><path d="M8 6.3v3.4M8 11.6h.01"/></svg>' +
+                  t('exp-accmap-offline-hint') +
+                  '</div>') +
             '<div style="margin-top:10px"><b style="font-size:13px">' +
             t('exp-accmap-sales') +
             '</b>' +

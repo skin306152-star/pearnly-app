@@ -6,15 +6,15 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-23 · **CI 史上首次全 6 闸全绿（proof_pdf 红已清）** · prod `fb2aecbf`）
+## 🎯 状态卡（2026-06-23 · **CI 全绿 + 小助手体验大修 + 自动更新落地** · prod `83fd174d`/11850945 · companion 1.1.0）
 
-- **✅ 本窗口清掉唯一剩红**:CI unit job 的 3 个 `test_proof_pdf` 红 = **pymupdf lock 漂移**(requirements.txt 早已 1.24.10·lock 仍钉 1.20.2·旧版嵌图 API 不同→票图页 0 页)。修(`fb2aecbf`)=手改 lock `pymupdf==1.20.2`→`1.24.10` + 补拆出的二进制基座 `pymupdfb==1.24.10`(不 pip-compile 重生成·避 py3.11 churn·见 [[pip-audit-14cve-repaid]] 同款做法)。验:本地 1.24.10 下 proof_pdf 16 + line_proof 7 + PDF/OCR 72 测试全绿·pip-audit lock 无新 CVE·**CI run 27997108740 全 6 闸全绿·prod 200**。
-- 承接 `docs/HANDOFF-2026-06-23-全检收口-未完成交接.md` 的 4 件未完成任务·Owner 托管过夜全做完。**4 commit 全上线·prod 200·登录 E2E 冒烟过**。完整交接 `docs/HANDOFF-2026-06-23-体积闸与lint-ui-已完成.md`。
-- **任务1/2 拆文件<500(`bb992db7`·纯搬迁0逻辑改)**:`oauth_routes.py` 539→213(LINE 段抽到 `routes/oauth_line_routes.py` + 共享 HMAC state 抽到 `services/auth/oauth_state.py`·`test_oauth_state` 经别名 import 零改);`erp_push.py` 507→410(`build_mrerp_adapter`/`load_mrerp_mappings` 抽到 `services/erp/erp_push_adapters.py` re-export)。**lint-size 红→绿**。
-- **任务3 lint-ui 三闸归零(`65f7008d`)**:① D2 黑底按钮(唯一真红·B1/C1/C4 合计220<基线480本就过)= `.hd-tab.active::after`/`.dx-tab.active:after` 下划线 `var(--ink)`→`var(--btn-blue)`;② 暗夜 3hex 251→246 = home-02 去 5 个 `var(--ink,#111)` 死兜底;③ **ui_design_lint 两 delta 全是误报**(max-width 增量=合法 @media 响应式·内联增量=`.drawer-子选择器`被误匹配)→ 正则兑现意图(@media 跳过 / `.drawer(?![-\w])`)+ 基线**往下收紧**(259→125/174→58)·非放水(/simplify altitude agent 独立确认)。**lint-ui 红→绿**。
-- **额外修 handoff 三处谎报**:① prettier「tracked全过」=假 → 8 个 `src/home/*.ts` 超 printWidth 长行 `prettier --write` 折行(`3ceee172`·dist minify 不变);② 单测「4638全过」=假 → 见下 proof_pdf;③ 桌面图标「已验证白底」=假(Owner 截图黑底·companion 仓库封装·遗留)。**lint(prettier) 红→绿**。
-- **/simplify 收口(`d7d92bd5`)**:noqa import 收一行 + 恢复 home-02 误翻的 CRLF。跳过 oauth_line token+verify 重复(pre-existing·碰登录回调·留 follow-up)。
-- **遗留**:companion 图标黑底(清图标缓存/重打包·companion 独立仓库) · oauth_line `_exchange_line_code` follow-up(LINE token+verify 重复·碰登录回调) · 新 oauth_line_routes 补契约测试(lint-routes WARNING)。
+- **① CI 史上首次全 6 闸全绿**:清掉唯一剩红 proof_pdf = **pymupdf lock 漂移**(requirements.txt 早 1.24.10·lock 钉 1.20.2)→ 手改 lock `pymupdf 1.24.10` + 补 `pymupdfb==1.24.10`(不 pip-compile·避 churn·`fb2aecbf`)。验:本地 proof_pdf/line_proof/OCR 95 测试 + pip-audit 无 CVE + CI 全绿。
+- **② 小助手「连接打架」根因 + 修(网页 prod·companion 1.1.0)**:Owner 真机托盘「离线·HTTPStatusError」vs 网页「已连接」打架。真因 = 网页 wizard `S.connected` 锁存(只 false→true·`1465907f` 改双向翻转)+ 离线真因是**网页点过「生成连接密钥」致旧密钥 401**(加二次确认防误触)。companion(`613771e`)修四坑:重新配对**预填**已填(账套/科目/账号·留空配对码密码=沿用)/ 离线**人话原因**(401=密钥失效请重配 等·泰中)/ 独立 **`activity.log` 泰语人话**(启动/连上/断开/录入/配对)/ 托盘加**「打开设置」**。
+- **③ 安装包发布 + 下载链接修**:重打 `PearnlyCompanion-Setup.exe`(ISCC 在 `~/AppData/Local/Programs/Inno Setup 6`)scp prod·.exe 走静态直链 Cloudflare 30天 immutable 缓存→**换包必 bump `?v=`**(否则下到缓存旧包)。
+- **④ ★小助手自动更新(改一次所有人自动拿到·companion `8263e14`)**:单一发布源 = prod `static/companion/latest.json`·网页下载(`_downloadAgent` fetch 它)+ 已装小助手(每小时拉·`updater.py` 比对·托盘弹「更新到最新版」一键静默装)**都读它**·发版只动这一个文件。`version.py`=版本真相源·**一键 `release.ps1`**(build→ISCC→scp→写 latest.json)·硬规则 `docs/RELEASE.md`。**真机端到端验过**(临时发 1.1.1→小助手记「发现新版本」→还原)。Owner 机已装 1.1.0(在线·心跳新鲜)。
+- **/simplify 收口(`83fd174d`)**:下载兜底直链去手动 `?v=` 改 `?t=Date.now()`(altitude agent 指出会 rot)。其余发现按理由跳过(window 强转=本文件统一风格 / 托盘双入口=有意 UX / 同步下载冻结=已知小限制)。
+- **遗留(都不挡·非紧急)**:小助手科目映射当前全 `11-01-01-00`(现金占位·要进「打开设置」改正确收入/应收/销项税科目·我可从已上报 225 科目筛代码给 Owner) · companion 桌面图标黑底(独立仓库) · oauth_line `_exchange_line_code` follow-up · SmartScreen 代码签名(backlog)。
+- ⚠️ companion 是**独立仓库** `D:\pearnly-companion`(无 remote·本地 commit)·发版走 `packaging\release.ps1`·改前读 `docs/RELEASE.md`。详见 [[companion-ux-connection-honesty-2026-06-23]]。
 
 ## 历史记录（2026-06-21 · **Express Push 全链路 + 「下载小助手」上线 + 推送功能正式开** · pearnly-app `23f223b9` · companion `94e3cac`）
 

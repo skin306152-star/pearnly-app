@@ -28,6 +28,7 @@ from services.workspace.seller_routing import (  # noqa: F401,E402
     ensure_seller_route_table,
     learn_seller_workspace_route,
     _match_seller_route_id,
+    match_workspace_for_buyer,
     match_workspace_for_seller,
     update_history_workspace_client_id,
 )

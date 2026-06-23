@@ -127,6 +127,49 @@ class MatchWorkspaceForSellerTests(unittest.TestCase):
         self.assertEqual(d["match_source"], "seller_name")
 
 
+class MatchWorkspaceForBuyerTests(unittest.TestCase):
+    """采购票分拣 match_workspace_for_buyer(2026-06-23 · 修 direction_unknown 根因)。
+
+    采购发票卖方=供应商≠自家 → 卖方分拣 none → 按买方=账套主体 直配。买方分拣不查 seller
+    路由记忆,只走税号精确 → 名字精确(同 _match_party_direct),判定 assigned/unbound/multi/none。
+    """
+
+    def _match(self, cur, tax="0735527000289", name="自家公司"):
+        with _patch(cur):
+            return store.match_workspace_for_buyer(tax, name, user_id="u1", tenant_id="t1")
+
+    def test_buyer_tax_exact_assigned(self):
+        d = self._match(KeywordCursor(by_tax=[WS_BOUND]))
+        self.assertEqual(d["action"], "assigned")
+        self.assertEqual(d["workspace_client_id"], 10)
+        self.assertEqual(d["match_source"], "buyer_tax")
+
+    def test_buyer_tax_unbound(self):
+        d = self._match(KeywordCursor(by_tax=[WS_UNBOUND]))
+        self.assertEqual(d["action"], "unbound")
+        self.assertIsNone(d["endpoint_id"])
+
+    def test_buyer_name_when_no_tax_match(self):
+        d = self._match(KeywordCursor(by_tax=[], by_name=[WS_BOUND]))
+        self.assertEqual(d["action"], "assigned")
+        self.assertEqual(d["match_source"], "buyer_name")
+
+    def test_buyer_multi_needs_disambiguation(self):
+        d = self._match(KeywordCursor(by_tax=[WS_BOUND, WS_UNBOUND]))
+        self.assertEqual(d["action"], "multi")
+        self.assertIsNone(d["workspace_client_id"])
+
+    def test_buyer_no_match_none(self):
+        self.assertEqual(self._match(KeywordCursor())["action"], "none")
+
+    def test_buyer_ignores_seller_route_memory(self):
+        # 即便存在 seller 路由记忆,买方分拣也不查它(route 不被消费)→ 仍按税号直配
+        cur = KeywordCursor(route={"workspace_client_id": 99}, by_tax=[WS_BOUND])
+        d = self._match(cur)
+        self.assertEqual(d["action"], "assigned")
+        self.assertEqual(d["match_source"], "buyer_tax")
+
+
 class RouteAssignsWorkspaceTests(unittest.TestCase):
     """归属覆盖决策(persist 用):命中具体主体才覆盖;none/multi 不覆盖(保留 insert 归属·不清 NULL)。
 

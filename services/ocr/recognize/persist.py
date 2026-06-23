@@ -331,6 +331,7 @@ def persist_invoices(
             # 注:workspace_client_id 现已被 Express 推送方向判定(以 workspace 主体税号当锚点)
             #     消费 → none/multi 时清 NULL 会让采购票(卖方=供应商≠自家)失去自家锚点 →
             #     direction_unknown。故仅命中具体主体才覆盖,否则保留 insert 归属。
+            _ws_assigned = None
             try:
                 _seller_match = db.match_workspace_for_seller(
                     seller_tax=(g_fields or {}).get("seller_tax"),
@@ -352,6 +353,32 @@ def persist_invoices(
                 )
             except Exception as _sre:
                 logger.warning(f"seller-route failed (history={hid[:8]}): {_sre}")
+
+            # 采购票兜底:卖方=供应商(≠自家)→ 卖方分拣不命中 → 按【买方】=账套主体 分拣,
+            # 否则采购票留在错误默认主体 → Express 方向判定失锚 → direction_unknown(本次根因)。
+            # 不命中(none/multi)仍保留 insert 归属(同卖方口径,绝不回写 NULL)。
+            if _ws_assigned is None:
+                try:
+                    _buyer_match = db.match_workspace_for_buyer(
+                        buyer_tax=(g_fields or {}).get("buyer_tax"),
+                        buyer_name=(g_fields or {}).get("buyer_name"),
+                        user_id=str(user["id"]),
+                        tenant_id=_tid(user),
+                    )
+                    _ws_buyer = db.route_assigns_workspace(_buyer_match)
+                    if _ws_buyer is not None:
+                        db.update_history_workspace_client_id(
+                            hid, _ws_buyer, str(user["id"]), tenant_id=_tid(user)
+                        )
+                        logger.info(
+                            "[buyer-route] %s history=%s buyer=%r workspace_client_id=%s",
+                            _buyer_match.get("action"),
+                            hid[:8],
+                            ((g_fields or {}).get("buyer_name") or "")[:40],
+                            _ws_buyer,
+                        )
+                except Exception as _bre:
+                    logger.warning(f"buyer-route failed (history={hid[:8]}): {_bre}")
 
             # v118.20.1 · 异常栏 · 异步跑零成本规则(不阻塞 OCR 主流程)
             try:

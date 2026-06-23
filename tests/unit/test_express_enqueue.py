@@ -7,6 +7,7 @@ EXPRESS_MANUAL(classify→manual);特性开关 off → 短路 failed;其它 adap
 
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -242,6 +243,53 @@ class FlagWhitelistTests(unittest.TestCase):
 
             os.environ.pop("ERP_PUSH_ENABLED", None)
             self.assertFalse(express_push_enabled())
+
+
+class ChartWhitelistTests(unittest.TestCase):
+    """写前 GLACC 白名单(闸2):分录科目须 ∈ 账套上报科目表;未上报则跳过。"""
+
+    def setUp(self):
+        self._env = mock.patch.dict("os.environ", {"ERP_PUSH_ENABLED": "true"})
+        self._env.start()
+        self._tid = mock.patch("core.db.get_user_tenant_id", return_value=None)
+        self._tid.start()
+        self._wc = mock.patch("core.db.get_workspace_client", return_value={"tax_id": OWN_TAX})
+        self._wc.start()
+
+    def tearDown(self):
+        self._wc.stop()
+        self._tid.stop()
+        self._env.stop()
+
+    @staticmethod
+    def _chart(codes):
+        return [{"code": c, "name": c, "type": "1"} for c in codes]
+
+    def test_all_accounts_in_chart_queued(self):
+        ep = _endpoint(
+            config={"reported_accounts": self._chart(["11-04-02-00", "11-05-04-01", "21-02-01-00"])}
+        )
+        self.assertEqual(enqueue_express(ep, _history())["error_msg"], "EXPRESS_QUEUED")
+
+    def test_unknown_account_to_manual(self):
+        # 上报科目表缺采购科目(11-04-02-00)→ 写前白名单挡 → manual,绝不写到死/错科目。
+        ep = _endpoint(config={"reported_accounts": self._chart(["11-05-04-01", "21-02-01-00"])})
+        r = enqueue_express(ep, _history())
+        self.assertTrue(r["error_msg"].startswith("EXPRESS_MANUAL"))
+        self.assertIn("account_not_in_chart:11-04-02-00", r["error_msg"])
+        self.assertEqual(classify_push_status(r["success"], r["error_msg"]), "manual")
+
+    def test_no_chart_reported_skips_validation(self):
+        # 未上报科目表(旧 Agent)→ 跳过白名单,不阻塞(由小助手默认 + 首次确认兜底)。
+        self.assertEqual(enqueue_express(_endpoint(), _history())["error_msg"], "EXPRESS_QUEUED")
+
+    def test_queued_response_carries_accounts(self):
+        body = json.loads(enqueue_express(_endpoint(), _history())["response_body"])
+        accs = [a["acc"] for a in body["accounts"]]
+        self.assertIn("11-04-02-00", accs)  # 采购
+        self.assertIn("11-05-04-01", accs)  # 进项税
+        self.assertIn("21-02-01-00", accs)  # 应付
+        self.assertEqual(body["account_source"], "config_default")
 
 
 if __name__ == "__main__":

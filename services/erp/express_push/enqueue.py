@@ -86,6 +86,28 @@ def _own_tax_id(endpoint: Dict[str, Any], flat: Dict[str, Any], tenant_id: Optio
         return ""
 
 
+def _chart_codes(config: Dict[str, Any]) -> Optional[set]:
+    """账套上报的可记账科目码集合(写前白名单数据源)。
+
+    未上报(旧 Agent / 心跳还没带科目表)→ None:跳过校验,不阻塞;有上报才钉。
+    """
+    reported = config.get("reported_accounts")
+    if not isinstance(reported, list) or not reported:
+        return None
+    codes = {str((a or {}).get("code") or "").strip() for a in reported}
+    codes.discard("")
+    return codes or None
+
+
+def _unknown_account(payload: Dict[str, Any], codes: set) -> Optional[str]:
+    """返回首个不在科目表白名单里的分录科目码(None=全部合法)。挡死码/AI 乱码/缓存过期。"""
+    for ln in payload.get("lines") or []:
+        acc = str((ln or {}).get("acc") or "").strip()
+        if acc and acc not in codes:
+            return acc
+    return None
+
+
 def _allowed_directions(config: Dict[str, Any]) -> tuple:
     """本连接处理的方向(进项/销项/两者)· 默认两者。"""
     raw = config.get("directions")
@@ -166,6 +188,14 @@ def enqueue_express(endpoint: Dict[str, Any], history: Dict[str, Any]) -> Dict[s
         if not account_set_allowed(payload.get("account_set"), endpoint):
             return _manual("account_set_not_allowed", payload, t0)
 
+        # 写前科目白名单(闸2):分录每个科目须 ∈ 账套上报的可记账科目(GLACC)。
+        # 挡死科目码 / AI 乱码 / 缓存过期。未上报科目表 → 跳过(不阻塞旧 Agent),由首次确认+小助手默认兜底。
+        chart = _chart_codes(config)
+        if chart is not None:
+            bad = _unknown_account(payload, chart)
+            if bad:
+                return _manual(f"account_not_in_chart:{bad}", payload, t0)
+
         verdict = _grade(history, payload, bool(category), direction)
         if verdict is not None and verdict.action != "post":
             reason = "low_confidence:" + ",".join(verdict.reasons)
@@ -182,6 +212,12 @@ def enqueue_express(endpoint: Dict[str, Any], history: Dict[str, Any]) -> Dict[s
                     "doctype": payload.get("doctype"),
                     "account_set": payload.get("account_set"),
                     "total_amount": payload.get("total_amount"),
+                    # 推送日志可见性:这张票记到哪几个科目 + 来源(规则映射命中 / 账套默认兜底)。
+                    "accounts": [
+                        {"acc": ln.get("acc"), "side": ln.get("side"), "desc": ln.get("desc")}
+                        for ln in (payload.get("lines") or [])
+                    ],
+                    "account_source": "category_map" if category else "config_default",
                 },
                 ensure_ascii=False,
             ),

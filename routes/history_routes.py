@@ -237,7 +237,10 @@ async def history_pdf_download(record_id: str, request: Request):
 async def history_page_png(record_id: str, page: int, request: Request):
     """复核时边看原票边改字段:把留底 PDF 的指定页渲成 PNG 供前端图查看器。
 
-    鉴权 / 路径解析 / 套账硬边界与 PDF 下载同源(get_history_pdf_info)。
+    授权按归属(user_id + tenant)· 不叠加活跃套账过滤:复核中的原图是用户刚上传、
+    自己拥有的记录的视觉辅助;记录的 workspace_client_id 常被打成发票对手方(买/卖方)
+    而非活跃套账,套用列表用的套账软过滤会把刚上传的票挡成 404。归属校验已足够,
+    且用户切套账本就能看到自己全部记录。
     """
     from fastapi.responses import Response
 
@@ -247,7 +250,6 @@ async def history_page_png(record_id: str, page: int, request: Request):
         str(user["id"]),
         record_id,
         tenant_id=_tid(user),
-        workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
     )
     if not info:
         raise HTTPException(404, detail="history.pdf_not_found")

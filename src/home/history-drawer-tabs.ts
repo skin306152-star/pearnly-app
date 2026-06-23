@@ -4,10 +4,7 @@
 // 只在 history 模式由 openHistoryDrawer 调一次 · 纯 DOM 搬运(节点连同事件/状态一起 append ·
 // 字段编辑/RD 校验/保存/推送逻辑全不改)· 共享抽屉的其它消费方(对账中心)完全不受影响。
 /* global escapeHtml, token, t, showToast */
-import { imageViewerHtml, mountImageViewer } from './image-viewer.js';
-
-// 识别记录抽屉左栏原图查看器实例(重开/换单前先清旧 · 防 window 监听泄漏)
-let _hdViewerCleanup: (() => void) | null = null;
+import { imageViewerHtml, remountImageViewer } from './image-viewer.js';
 
 type HistDetail = {
     id?: string;
@@ -162,12 +159,7 @@ function historizeDrawer(detail: HistDetail) {
     if (saveBar) body.insertBefore(twopane, saveBar);
     else body.appendChild(twopane);
     document.getElementById('drawer')?.classList.add('hd-wide');
-    if (_hdViewerCleanup) {
-        _hdViewerCleanup();
-        _hdViewerCleanup = null;
-    }
-    if (imgpane.querySelector('.pv-viewer'))
-        _hdViewerCleanup = mountImageViewer(imgpane, detail.id || null);
+    remountImageViewer('hd', imgpane, detail.id || null);
 
     // tab 切换
     tabsBar.addEventListener('click', (e) => {

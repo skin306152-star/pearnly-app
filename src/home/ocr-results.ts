@@ -300,7 +300,9 @@ function renderItems(items: Array<Record<string, unknown>>) {
 
 function closeDrawer() {
     document.getElementById('drawer-mask')!.classList.remove('show');
-    document.getElementById('drawer')!.classList.remove('show');
+    const dr = document.getElementById('drawer')!;
+    dr.classList.remove('show');
+    dr.classList.remove('hd-wide'); // 关抽屉即回窄态默认(识别记录两栏加宽的对称复位)
     // 清理抽屉底部的按钮栏(下次打开会重新注入)
     const existingHistoryBar = document.getElementById('drawer-history-save');
     if (existingHistoryBar) existingHistoryBar.remove();

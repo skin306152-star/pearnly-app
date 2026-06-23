@@ -9,7 +9,18 @@
 // ============================================================
 /* global token, escapeHtml */
 
-const ivCache = new Map<string, string>(); // history_id → objectURL · 跨开关复用不重拉
+// history_id → objectURL · 跨开关复用不重拉 · LRU 封顶,淘汰即 revoke(防 blob 无限驻留)
+const ivCache = new Map<string, string>();
+const IV_MAX = 20;
+function ivPut(id: string, url: string): void {
+    ivCache.set(id, url);
+    if (ivCache.size > IV_MAX) {
+        const oldest = ivCache.keys().next().value as string;
+        const u = ivCache.get(oldest);
+        ivCache.delete(oldest);
+        if (u) URL.revokeObjectURL(u);
+    }
+}
 
 const I_PLUS =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>';
@@ -156,6 +167,19 @@ export function mountImageViewer(root: HTMLElement, historyId: string | null): (
     };
 }
 
+// 抽屉重渲/换单常见模式:先清同 key 的旧实例,再挂新的。pane 为空(未渲查看器)= 只清不挂。
+const _mounts = new Map<string, () => void>();
+export function remountImageViewer(
+    key: string,
+    pane: HTMLElement | null,
+    historyId: string | null
+): void {
+    _mounts.get(key)?.();
+    _mounts.delete(key);
+    if (pane && pane.querySelector('.pv-viewer'))
+        _mounts.set(key, mountImageViewer(pane, historyId));
+}
+
 async function loadImage(
     vp: HTMLElement,
     img: HTMLImageElement,
@@ -180,7 +204,7 @@ async function loadImage(
             });
             if (r.ok) {
                 const u = URL.createObjectURL(await r.blob());
-                ivCache.set(historyId, u);
+                ivPut(historyId, u);
                 if (!alive()) return;
                 vp.classList.remove('loading');
                 img.src = u;

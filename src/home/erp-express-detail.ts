@@ -168,6 +168,33 @@
         );
     }
 
+    function _preflightWhy(reason: string): string {
+        if (reason === 'subject_unbound' || reason === 'ambiguous') {
+            return _t('erp-preflight-reason-' + reason);
+        }
+        var fr = (window as any)._expressFriendlyReason;
+        return (fr && fr(reason)) || '';
+    }
+
+    function _preflight(resp: any): string {
+        var pf = resp && resp.preflight;
+        if (!pf || !pf.length) return '';
+        var rows = '';
+        for (var i = 0; i < pf.length; i++) {
+            var c = pf[i];
+            var ok = c.status === 'ok';
+            var bad = c.status === 'blocked';
+            var cls = ok ? 'ok' : bad ? 'fail' : 'mid';
+            var dot = ok ? '✓' : bad ? '✗' : '◦';
+            var why = bad ? _preflightWhy(c.reason || '') : '';
+            rows += _tl(cls, dot, _t('erp-preflight-key-' + c.key), why);
+        }
+        return _sec(
+            _t('erp-preflight-title'),
+            '<div class="erp-detail-timeline">' + rows + '</div>'
+        );
+    }
+
     function section(log: any): string {
         var p = _parseJson(log && log.request_body);
         var resp = _parseJson(log && log.response_body);
@@ -176,10 +203,12 @@
         // 空态:无分录载荷(待人工复核 / 未过闸门)。
         if (!p.lines || !p.lines.length) {
             return (
+                _preflight(resp) +
                 _sec(
                     _t('expd-sec-entry'),
                     '<div class="exp-je-empty">' + _esc(_t('expd-empty')) + '</div>'
-                ) + _timeline(log, docnum)
+                ) +
+                _timeline(log, docnum)
             );
         }
 
@@ -196,7 +225,7 @@
                           '</button></div>'
                   )
                 : '';
-        return _fields(p) + _entry(p) + docSec + _timeline(log, docnum);
+        return _fields(p) + _preflight(resp) + _entry(p) + docSec + _timeline(log, docnum);
     }
 
     (window as any).ExpressDetail = { section: section };

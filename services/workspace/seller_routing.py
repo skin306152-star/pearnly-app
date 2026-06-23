@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
-"""卖方智能分拣路由 DAL(REFACTOR-WA-B1 · 2026-05-29 从 workspace/store 抽出 · 纯搬家 0 逻辑改)
+"""主体分拣路由 DAL(REFACTOR-WA-B1 · 2026-05-29 从 workspace/store 抽出)
 
-seller_workspace_routes 学习记忆表 + 按卖方税号/名 匹配账套(match_workspace_for_seller)+
-归属后回写 ocr_history.workspace_client_id。组内自洽(只依赖 db + 组内 _norm_tax/_match)·
-workspace/store 顶部 re-import 当 facade · db.X/store.X/本模块.X 单一对象不变。
+seller_workspace_routes 学习记忆表 + 按票面一方税号/名 匹配账套主体 + 归属后回写
+ocr_history.workspace_client_id。两个入口共用 _match_party_direct/_decide:
+  · match_workspace_for_seller — 销项票卖方=账套主体(含学习路由记忆)
+  · match_workspace_for_buyer  — 采购票买方=账套主体(2026-06-23 · 修 direction_unknown 根因)
+组内自洽(只依赖 db + 组内 helper)· workspace/store 顶部 re-import 当 facade。
 """
 
 import logging

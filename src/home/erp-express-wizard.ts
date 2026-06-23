@@ -314,6 +314,11 @@
     }
 
     async function _genToken() {
+        // 已配好的连接重新生成 = 旧密钥当场作废 → 现有小助手立刻掉线须重配,二次确认防误触。
+        if ((S.generated || S.connected) && (window as any).showConfirm) {
+            var ok = await (window as any).showConfirm(_t('exp-regen-warn'), { danger: true });
+            if (!ok) return;
+        }
         // 下载不再是硬门:已装客户(没点下载)也能直接生成密钥。
         var id = await _ensureEndpoint();
         if (!id) {
@@ -368,8 +373,8 @@
             var selected = cfg.account_set ? String(cfg.account_set) : null;
             var selectedName = cfg.account_company ? String(cfg.account_company) : null;
             var changed = false;
-            if (online && !S.connected) {
-                S.connected = true;
+            if (online !== S.connected) {
+                S.connected = online;
                 changed = true;
             }
             if (selected !== S.account || selectedName !== S.accountName) {

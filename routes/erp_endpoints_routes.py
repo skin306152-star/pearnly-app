@@ -370,3 +370,33 @@ async def erp_endpoints_express_accounts(
     if not ok:
         raise HTTPException(404, detail="erp.endpoint_not_found")
     return {"ok": True, **{k: cfg.get(k) for k in _EXPRESS_ACC_KEYS}}
+
+
+_AUTONOMY_LEVELS = ("manual", "standard", "auto")
+
+
+class ExpressAutonomy(BaseModel):
+    autonomy: str
+
+
+@router.patch("/api/erp/endpoints/{endpoint_id}/express-autonomy")
+async def erp_endpoints_express_autonomy(endpoint_id: str, req: ExpressAutonomy, request: Request):
+    """Express 自治级别(per 连接)· 服务端只合并 config.autonomy(manual/standard/auto),
+    不碰 account_set/科目/凭据。全人工=高置信也转人工复核 / 标准=高置信自动·低置信问 /
+    全托管=尽量自动。默认 standard(见 services/erp/express_push/autonomy)。"""
+    user = get_current_user_from_request(request)
+    _check_push_access(user)
+    level = str(req.autonomy or "").strip().lower()
+    if level not in _AUTONOMY_LEVELS:
+        raise HTTPException(400, detail="erp.bad_autonomy")
+    ep = db.get_erp_endpoint(user["id"], endpoint_id)
+    if not ep:
+        raise HTTPException(404, detail="erp.endpoint_not_found")
+    if (ep.get("adapter") or "").lower() != "express":
+        raise HTTPException(400, detail="erp.not_express_endpoint")
+    cfg = dict(ep.get("config") or {})
+    cfg["autonomy"] = level
+    ok = db.update_erp_endpoint(user["id"], endpoint_id, config=cfg)
+    if not ok:
+        raise HTTPException(404, detail="erp.endpoint_not_found")
+    return {"ok": True, "autonomy": level}

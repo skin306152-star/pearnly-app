@@ -20,6 +20,7 @@ const _EXPRESS_REASON_I18N: Record<string, string> = {
     amounts_not_consistent: 'erp-reason-amounts',
     bad_or_missing_date: 'erp-reason-bad-date',
     entry_not_balanced: 'erp-reason-unbalanced',
+    account_not_in_chart: 'erp-reason-not-in-chart',
 };
 
 function _expressFriendlyReason(raw: string): string {

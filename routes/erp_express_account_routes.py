@@ -36,6 +36,29 @@ _EXPRESS_ACC_SLOTS = {
 }
 
 
+async def _repush_and_finalize(log: dict, push_ep: dict, history: dict):
+    """重推一张已留人工的票 → 更新原日志行(不新建)+ 端点统计 + 历史状态 + 清重试。
+    待补科目卡 / 主体绑定卡共用(铁律 #12 单一落库口径)。返回 (final_status, result)。"""
+    result = await asyncio.to_thread(_erp.push_to_endpoint, push_ep, history)
+    final_status = db.classify_push_status(result["success"], result.get("error_msg"))
+    db.increment_retry_count(log["id"])
+    db.update_log_status_after_retry(
+        log_id=log["id"],
+        success=result["success"],
+        http_status=result.get("http_status"),
+        response_body=result.get("response_body"),
+        error_msg=result.get("error_msg"),
+        elapsed_ms=result.get("elapsed_ms", 0),
+        request_body=result.get("request_body"),
+        final_status=final_status,
+    )
+    db.update_endpoint_stats(push_ep["id"], db.counts_as_endpoint_success(final_status))
+    db.update_history_push_status(log["history_id"], final_status)
+    if log.get("next_retry_at"):
+        db.clear_retry_schedule(log["id"])
+    return final_status, result
+
+
 class ErpExpressAccountFixRequest(BaseModel):
     accounts: Dict[str, str] = Field(default_factory=dict, description="科目槽→科目码")
     remember: bool = Field(False, description="记住为账套默认(并入端点 config)")
@@ -89,23 +112,7 @@ async def erp_express_account_fix(log_id: str, req: ErpExpressAccountFixRequest,
     else:
         push_ep = {**endpoint, "config": {**cfg, **chosen}}
 
-    result = await asyncio.to_thread(_erp.push_to_endpoint, push_ep, history)
-    final_status = db.classify_push_status(result["success"], result.get("error_msg"))
-    db.increment_retry_count(log["id"])
-    db.update_log_status_after_retry(
-        log_id=log["id"],
-        success=result["success"],
-        http_status=result.get("http_status"),
-        response_body=result.get("response_body"),
-        error_msg=result.get("error_msg"),
-        elapsed_ms=result.get("elapsed_ms", 0),
-        request_body=result.get("request_body"),
-        final_status=final_status,
-    )
-    db.update_endpoint_stats(endpoint["id"], db.counts_as_endpoint_success(final_status))
-    db.update_history_push_status(log["history_id"], final_status)
-    if log.get("next_retry_at"):
-        db.clear_retry_schedule(log["id"])
+    final_status, result = await _repush_and_finalize(log, push_ep, history)
 
     return {
         "ok": final_status in ("pending", "success", "skipped_dup"),
@@ -155,23 +162,7 @@ async def erp_express_bind_subject(
     if not history:
         raise HTTPException(404, detail="erp.history_not_found")
 
-    result = await asyncio.to_thread(_erp.push_to_endpoint, endpoint, history)
-    final_status = db.classify_push_status(result["success"], result.get("error_msg"))
-    db.increment_retry_count(log["id"])
-    db.update_log_status_after_retry(
-        log_id=log["id"],
-        success=result["success"],
-        http_status=result.get("http_status"),
-        response_body=result.get("response_body"),
-        error_msg=result.get("error_msg"),
-        elapsed_ms=result.get("elapsed_ms", 0),
-        request_body=result.get("request_body"),
-        final_status=final_status,
-    )
-    db.update_endpoint_stats(endpoint["id"], db.counts_as_endpoint_success(final_status))
-    db.update_history_push_status(log["history_id"], final_status)
-    if log.get("next_retry_at"):
-        db.clear_retry_schedule(log["id"])
+    final_status, result = await _repush_and_finalize(log, endpoint, history)
 
     return {
         "ok": final_status in ("pending", "success", "skipped_dup"),

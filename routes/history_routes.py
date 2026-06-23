@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 from core import db
 from core import workspace_context as wc
 from services.ocr import pdf_storage
+from services.ocr.pdf_utils import render_page_png
 from core.db import (
     delete_ocr_history_with_pdf_paths,
     get_history_pdf_info,
@@ -229,6 +230,37 @@ async def history_pdf_download(record_id: str, request: Request):
         path=str(abs_path),
         media_type="application/pdf",
         filename=fn,
+    )
+
+
+@router.get("/api/history/{record_id}/page/{page}.png")
+async def history_page_png(record_id: str, page: int, request: Request):
+    """复核时边看原票边改字段:把留底 PDF 的指定页渲成 PNG 供前端图查看器。
+
+    鉴权 / 路径解析 / 套账硬边界与 PDF 下载同源(get_history_pdf_info)。
+    """
+    from fastapi.responses import Response
+
+    user = get_current_user_from_request(request)
+    _check_history_access(user)
+    info = get_history_pdf_info(
+        str(user["id"]),
+        record_id,
+        tenant_id=_tid(user),
+        workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
+    )
+    if not info:
+        raise HTTPException(404, detail="history.pdf_not_found")
+    abs_path = pdf_storage.get_pdf_abs_path(info["pdf_storage_path"])
+    if not abs_path or not abs_path.exists():
+        raise HTTPException(404, detail="history.pdf_missing")
+    png = render_page_png(str(abs_path), page=page)
+    if png is None:
+        raise HTTPException(422, detail="history.render_failed")
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={"Cache-Control": "private, max-age=300"},
     )
 
 

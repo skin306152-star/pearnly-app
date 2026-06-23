@@ -7,7 +7,8 @@
 // ============================================================
 /* global t, token, showToast */
 import { S, esc, $, authHeaders } from './dms-intake-core.js';
-import { enterSubmit, renderSubmit, renderReview, doFinish } from './dms-intake-invoice-submit.js';
+import { enterSubmit, renderSubmit, doFinish } from './dms-intake-invoice-submit.js';
+import { renderReview, onReviewClick } from './dms-intake-review.js';
 import { imagesToPdf, analyzeImageQuality } from './camera-image-utils.js';
 
 export type Dict = Record<string, unknown>;
@@ -47,6 +48,9 @@ export const IV = {
     results: [] as IvResult[],
     sel: 0, // 复核中选中的文件下标
     showAll: false,
+    openIdx: -1 as number, // 复核手风琴当前展开的文件下标(-1 全收起)
+    imgSide: 'right' as 'right' | 'left', // 原图位置(右/左)
+    confirmed: new Set<number>(), // 已确认文件(纯前端视觉态 · 不写后端)
     output: { excel: true, erp: false },
     tpl: 'input_vat',
     endpoints: [] as Endpoint[],
@@ -81,6 +85,8 @@ export function resetInvoice() {
     IV.results = [];
     IV.sel = 0;
     IV.showAll = false;
+    IV.openIdx = -1;
+    IV.confirmed = new Set<number>();
     IV.output = { excel: true, erp: false };
     IV.target = '';
     IV.busy = false;
@@ -324,6 +330,8 @@ async function startRecognize() {
             'warn'
         );
     IV.sel = 0;
+    IV.openIdx = IV.results.length ? 0 : -1;
+    IV.confirmed = new Set<number>();
     renderReview();
 }
 function stopRecognize() {
@@ -403,17 +411,8 @@ export function onInvoiceClick(tg: HTMLElement): boolean {
     }
     if (hit('dx-inv-start')) return (void startRecognize(), true);
     if (hit('dx-inv-stop')) return (stopRecognize(), true);
-    const sel = tg.closest('[data-iv-sel]') as HTMLElement | null;
-    if (sel) {
-        IV.sel = +sel.dataset.ivSel!;
-        renderReview();
-        return true;
-    }
-    if (hit('dx-inv-toggle')) {
-        IV.showAll = !IV.showAll;
-        renderReview();
-        return true;
-    }
+    // 复核区就地展开/查看器/确认 → 交给 review 模块(返回 true 即已处理)
+    if (IV.view === 'review' && onReviewClick(tg)) return true;
     if (hit('dx-inv-rev-back')) {
         renderInvoiceUpload();
         showStepInv(1, 'dx-s-upload');

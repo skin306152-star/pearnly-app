@@ -223,15 +223,60 @@
 
 /* ===== 发票/收据任务 ===== */
 .dmsx .dx-up-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:4px}
-.dmsx .dx-queue{display:grid;gap:8px}
-.dmsx .dx-frow{border:1px solid var(--dx-line);border-radius:12px;padding:10px 11px;display:grid;grid-template-columns:34px 1fr auto auto;gap:10px;align-items:center;cursor:pointer}
-.dmsx .dx-frow.sel{border-color:var(--dx-brand);background:var(--bg)}
-.dmsx .dx-fstatus{font-size:10px;text-align:right;white-space:nowrap}
-.dmsx .dx-review-card{border:1px solid var(--dx-line);border-radius:14px;padding:13px;margin-top:12px}
-.dmsx .dx-review-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:11px;flex-wrap:wrap}
-.dmsx .dx-review-h b{font-size:12px}
 .dmsx .dx-toggle{border:0;background:transparent;color:var(--dx-brand);font-size:11px;font-weight:800;cursor:pointer}
 .dmsx .dx-review-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+/* 复核 · 就地手风琴 + 原图查看器 */
+.dmsx .dx-rv-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:11px}
+.dmsx .dx-rv-bar-t b{font-size:12px}
+.dmsx .dx-rv-bar-t span{display:block;font-size:10px;color:var(--ink2);margin-top:3px}
+.dmsx .dx-rv-bar-a{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dmsx .dx-imgside-l{font-size:10px;color:var(--ink2)}
+.dmsx .dx-imgside{display:flex;border:1px solid var(--dx-line);border-radius:999px;padding:2px;background:var(--card)}
+.dmsx .dx-imgside-btn{border:0;background:transparent;color:var(--ink2);font-size:10px;font-weight:800;padding:4px 11px;border-radius:999px;cursor:pointer}
+.dmsx .dx-imgside-btn.active{background:var(--dx-brand);color:#fff}
+.dmsx .dx-acc{display:grid;gap:8px}
+.dmsx .dx-acc-item{border:1px solid var(--dx-line);border-radius:12px;background:var(--card);overflow:hidden}
+.dmsx .dx-acc-item.open{border-color:var(--dx-brand);box-shadow:var(--dx-shadow)}
+.dmsx .dx-acc-row{display:grid;grid-template-columns:34px minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:10px 12px;cursor:pointer}
+.dmsx .dx-acc-btn{border:1px solid var(--dx-line);background:var(--card);color:var(--dx-brand);font-size:11px;font-weight:800;border-radius:9px;padding:6px 11px;cursor:pointer;white-space:nowrap}
+.dmsx .dx-acc-btn:hover{background:var(--bg)}
+.dmsx .dx-pill{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:4px 9px;font-size:10px;font-weight:850;white-space:nowrap}
+.dmsx .dx-pill.ok{background:var(--dx-green-soft);color:var(--dx-green)}
+.dmsx .dx-pill.warn{background:var(--dx-amber-soft);color:var(--dx-amber)}
+.dmsx .dx-acc-panel{border-top:1px solid var(--dx-line);padding:14px;background:var(--bg);animation:dxslide .2s ease}
+@keyframes dxslide{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+.dmsx .dx-acc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:11px;flex-wrap:wrap}
+.dmsx .dx-acc-top b{font-size:12px}
+.dmsx .dx-acc-tip{display:block;font-size:10px;color:var(--ink2);margin-top:3px}
+.dmsx .dx-acc-top-a{display:flex;gap:10px;flex-wrap:wrap}
+.dmsx .dx-rgrid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:13px;align-items:start}
+.dmsx .dx-rgrid.image-left .dx-fields{order:2}
+.dmsx .dx-rgrid.image-left .dx-imgcard{order:1}
+.dmsx .dx-fields{min-width:0}
+.dmsx .dx-extra{display:none;margin-top:9px}
+.dmsx .dx-acc-panel.extra-on .dx-extra{display:block}
+.dmsx .dx-item-tbl{width:100%;border-collapse:collapse;font-size:11px;margin-top:9px}
+.dmsx .dx-item-tbl th{text-align:left;color:var(--ink2);font-size:9px;font-weight:750;padding:4px 7px}
+.dmsx .dx-item-tbl th.r,.dmsx .dx-item-tbl td.r{text-align:right}
+.dmsx .dx-item-tbl td{background:var(--card);border-top:1px solid var(--dx-line);border-bottom:1px solid var(--dx-line);padding:7px}
+.dmsx .dx-item-tbl td:last-child{text-align:right;font-weight:800}
+.dmsx .dx-fields-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;border-top:1px dashed var(--dx-line);padding-top:11px;flex-wrap:wrap}
+.dmsx .dx-fields-foot-a{display:flex;gap:8px}
+.dmsx .dx-imgcard{border:1px solid var(--dx-line);border-radius:12px;background:var(--card);overflow:hidden}
+.dmsx .dx-vtoolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 11px;border-bottom:1px solid var(--dx-line)}
+.dmsx .dx-vtitle{font-size:10px;font-weight:800;color:var(--ink2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dmsx .dx-vctrls{display:flex;align-items:center;gap:5px}
+.dmsx .dx-icon-btn{width:28px;height:28px;border:1px solid var(--dx-line);border-radius:8px;background:var(--card);color:var(--ink);font-size:13px;font-weight:800;display:grid;place-items:center;cursor:pointer}
+.dmsx .dx-icon-btn:hover{border-color:var(--dx-brand);color:var(--dx-brand)}
+.dmsx .dx-zoom{min-width:42px;text-align:center;font-size:10px;color:var(--ink2);font-weight:800}
+.dmsx .dx-viewport{height:460px;position:relative;overflow:hidden;background:var(--bg);cursor:grab;touch-action:none}
+.dmsx .dx-viewport.dragging{cursor:grabbing}
+.dmsx .dx-canvas{position:absolute;left:50%;top:50%;transform-origin:center center;will-change:transform}
+.dmsx .dx-rimg{display:block;max-width:none;width:380px;border-radius:5px;box-shadow:var(--dx-shadow);user-select:none;pointer-events:none;background:var(--card)}
+.dmsx .dx-vempty{display:none;position:absolute;inset:0;place-items:center;color:var(--ink2);font-size:11px;text-align:center;padding:20px}
+.dmsx .dx-imgcard.noimg .dx-canvas{display:none}
+.dmsx .dx-imgcard.noimg .dx-vempty{display:grid}
+.dmsx .dx-vhelp{position:absolute;left:11px;bottom:11px;background:var(--card);border:1px solid var(--dx-line);border-radius:9px;padding:6px 9px;font-size:9px;color:var(--ink2);max-width:78%}
 /* 上传队列:紧凑可滚动 + × 内联(防几十/上百文件硬堆、按钮被挤到底) */
 .dmsx .dx-two{align-items:start}
 .dmsx .dx-qlist{display:grid;gap:7px;max-height:340px;overflow:auto;padding-right:2px;margin-top:4px}
@@ -244,7 +289,7 @@
 .dmsx .dx-qx:hover{border-color:var(--dx-red);color:var(--dx-red)}
 /* 多发票分组头 + 漏票复核 banner */
 .dmsx .dx-inv-head{font-size:10px;font-weight:800;color:var(--dx-brand);margin:12px 2px 6px;padding-top:9px;border-top:1px dashed var(--dx-line)}
-.dmsx .dx-review-card .dx-inv-head:first-of-type{border-top:0;padding-top:0;margin-top:2px}
+.dmsx .dx-fields .dx-inv-head:first-of-type{border-top:0;padding-top:0;margin-top:2px}
 .dmsx .dx-recheck-banner{border:1px solid var(--dx-amber-line);background:var(--dx-amber-soft);color:var(--dx-amber);border-radius:11px;padding:10px 12px;font-size:11px;font-weight:700;margin-bottom:11px}
 .dmsx .dx-rv{background:var(--bg);border-radius:10px;padding:9px}
 .dmsx .dx-rv.warn{background:var(--dx-amber-soft);border:1px solid var(--dx-amber-line)}
@@ -280,6 +325,9 @@
 @media(max-width:980px){
   .dmsx .dx-two,.dmsx .dx-task-grid,.dmsx .dx-dgrid,.dmsx .dx-fgrid,.dmsx .dx-sgrid,.dmsx .dx-ogrid{grid-template-columns:1fr}
   .dmsx .dx-scan,.dmsx .dx-review-grid{grid-template-columns:1fr 1fr}
+  .dmsx .dx-rgrid,.dmsx .dx-rgrid.image-left{grid-template-columns:1fr}
+  .dmsx .dx-rgrid.image-left .dx-fields,.dmsx .dx-rgrid.image-left .dx-imgcard{order:0}
+  .dmsx .dx-viewport{height:380px}
   .dmsx .dx-stepper{grid-template-columns:repeat(2,1fr)}
   .dmsx .dx-step:not(:last-child):after{display:none}
   .dmsx .dx-cmp{overflow:auto}

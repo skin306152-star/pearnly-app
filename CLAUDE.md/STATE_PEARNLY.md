@@ -6,15 +6,16 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-23 · **CI 全绿 + 小助手体验大修 + 自动更新落地** · prod `83fd174d`/11850945 · companion 1.1.0）
+## 🎯 状态卡（2026-06-23 晚 · **Express 推送状态诚实化 + 待补科目卡闭环 + 小助手托盘卡死修** · prod `c91b0577`/11850951 · companion 1.1.3）
 
-- **① CI 史上首次全 6 闸全绿**:清掉唯一剩红 proof_pdf = **pymupdf lock 漂移**(requirements.txt 早 1.24.10·lock 钉 1.20.2)→ 手改 lock `pymupdf 1.24.10` + 补 `pymupdfb==1.24.10`(不 pip-compile·避 churn·`fb2aecbf`)。验:本地 proof_pdf/line_proof/OCR 95 测试 + pip-audit 无 CVE + CI 全绿。
-- **② 小助手「连接打架」根因 + 修(网页 prod·companion 1.1.0)**:Owner 真机托盘「离线·HTTPStatusError」vs 网页「已连接」打架。真因 = 网页 wizard `S.connected` 锁存(只 false→true·`1465907f` 改双向翻转)+ 离线真因是**网页点过「生成连接密钥」致旧密钥 401**(加二次确认防误触)。companion(`613771e`)修四坑:重新配对**预填**已填(账套/科目/账号·留空配对码密码=沿用)/ 离线**人话原因**(401=密钥失效请重配 等·泰中)/ 独立 **`activity.log` 泰语人话**(启动/连上/断开/录入/配对)/ 托盘加**「打开设置」**。
-- **③ 安装包发布 + 下载链接修**:重打 `PearnlyCompanion-Setup.exe`(ISCC 在 `~/AppData/Local/Programs/Inno Setup 6`)scp prod·.exe 走静态直链 Cloudflare 30天 immutable 缓存→**换包必 bump `?v=`**(否则下到缓存旧包)。
-- **④ ★小助手自动更新(改一次所有人自动拿到·companion `8263e14`)**:单一发布源 = prod `static/companion/latest.json`·网页下载(`_downloadAgent` fetch 它)+ 已装小助手(每小时拉·`updater.py` 比对·托盘弹「更新到最新版」一键静默装)**都读它**·发版只动这一个文件。`version.py`=版本真相源·**一键 `release.ps1`**(build→ISCC→scp→写 latest.json)·硬规则 `docs/RELEASE.md`。**真机端到端验过**(临时发 1.1.1→小助手记「发现新版本」→还原)。Owner 机已装 1.1.0(在线·心跳新鲜)。
-- **/simplify 收口(`83fd174d`)**:下载兜底直链去手动 `?v=` 改 `?t=Date.now()`(altitude agent 指出会 rot)。其余发现按理由跳过(window 强转=本文件统一风格 / 托盘双入口=有意 UX / 同步下载冻结=已知小限制)。
-- **遗留(都不挡·非紧急)**:小助手科目映射当前全 `11-01-01-00`(现金占位·要进「打开设置」改正确收入/应收/销项税科目·我可从已上报 225 科目筛代码给 Owner) · companion 桌面图标黑底(独立仓库) · oauth_line `_exchange_line_code` follow-up · SmartScreen 代码签名(backlog)。
-- ⚠️ companion 是**独立仓库** `D:\pearnly-companion`(无 remote·本地 commit)·发版走 `packaging\release.ps1`·改前读 `docs/RELEASE.md`。详见 [[companion-ux-connection-honesty-2026-06-23]]。
+- **① 推送状态诚实化(误导 UI · 违铁律 #3/#12 的幽灵 bug)**:`manual`(缺科目/低置信/账套拒)此前被端点计数器算成功 + 被异常页 `status!='failed'` 过滤双重隐身 → 异常页显 0、日志显失败,口径打架。修:抽 `push_retry.counts_as_endpoint_success` 单一口径(manual/failed 算失败·pending 不计·3 处重推同用);`list_push_exceptions` 纳入 manual;`classify_push_exception` 扩 account_missing/account_set/direction_unknown/low_confidence 桶;batch_view manual→needs_action。
+- **② 待补科目卡(UI 落点② · 残留②闭环)**:异常页加「待补科目」chip + 卡内科目下拉(选项=该账套 reported_accounts 代码·名字)+ 记住为账套默认 + 覆盖重推。新端点 `POST /api/erp/logs/{id}/express-account-fix`(写前 GLACC 白名单闸2 + 更新原行重推 + remember 并入 config·复用 /express-accounts 口径)·`derive_account_fix` 按失败码推该问哪些槽。
+- **③ 失败码人话(误导 UI ①)**:异常页复用日志卡 `_expressFriendlyReason`(经 `window`)不再裸露英文码 + 补 `direction_not_enabled/low_confidence/enqueue_error` 三码 4 语(此前漏)。
+- **④ 防屎山拆分(三文件本就超/近 500·此 clone 无 pre-push hook 致 `89fd3610` 起 CI 已红没人发现)**:拆 `push_log_friendly.py`(DMS catalog)/`erp_express_account_routes.py`(待补路由)/`erp-exc-actions.ts`(卡内动作 retry/batch/acctfix·ES import 互引)。清 `7d74943e` 遗留 `⚠` emoji→Lucide SVG(过 ui_design_lint)。**→ CI 自 `fb2aecbf` 后首次全绿**(`adbb4df9` 主 + `7dbea939` emoji + `c91b0577` /simplify)。
+- **⑤ ★小助手托盘卡死误报离线(companion 1.1.3·已 release 自动更新)**:Owner 截图托盘「离线·连不上网络」vs 网页「已连接」打架。**真因(prod 数据 + 代码双证·非猜)**:`on_poll_error` 一拍失败就 emit「离线」(无连续失败容忍)+ `on_connect`(emit idle)只循环启动跑一次 → 部署重启(我 13:34 push 那拍)/瞬时闪断必误报,且心跳仍继续成功上报云端(`agent_last_seen_at` 查 prod=59s 新鲜·success_count 9)→ **网页是对的、托盘谎报**。修:`run_poll_loop` 连续 `OFFLINE_AFTER_FAILS=3` 次才判离线 + poll 成功发 `on_poll_ok` 自动回在线(不必重配对)。+4 守门测试·240 passed(4 失败=既有 OCR 环境性)。
+- **/simplify 收口(`c91b0577`)**:`chart_codes` 提到 `services.erp.express_push` 包(去 enqueue/待补卡字节级重复)。（4 review agent 撞 529 过载·我据自知 diff 自审·主 reuse 项已修。）
+- **遗留(不挡)**:待补卡交互式 click-through 未真机走(需 seed 一条 manual no_revenue_account 票 + 测号 token)·已用 route TestClient + CI e2e + prod bundle 解析覆盖。Phase3 小瑕疵延后(税号字段级红字/向导账套显代码/详情抽屉显失败原因·都有兜底)。小助手科目仍可能全 `11-01-01-00` 占位(进托盘「打开设置」改)。
+- ⚠️ companion 独立仓 `D:\pearnly-companion`(无 remote)·发版 `packaging\release.ps1`(已发 1.1.3)·改前读 `docs/RELEASE.md`。详见 [[express-account-resolution-closed-loop]] [[express-push-sales-blocked-and-misleading-ui]] [[companion-ux-connection-honesty-2026-06-23]]。
 
 ## 历史记录（2026-06-21 · **Express Push 全链路 + 「下载小助手」上线 + 推送功能正式开** · pearnly-app `23f223b9` · companion `94e3cac`）
 

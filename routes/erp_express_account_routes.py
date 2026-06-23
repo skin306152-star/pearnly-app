@@ -113,3 +113,69 @@ async def erp_express_account_fix(log_id: str, req: ErpExpressAccountFixRequest,
         "error_msg": result.get("error_msg"),
         "remembered": bool(req.remember),
     }
+
+
+class ErpExpressBindSubjectRequest(BaseModel):
+    workspace_client_id: int = Field(..., description="账套主体 workspace_client id")
+
+
+@router.post("/api/erp/logs/{log_id}/express-bind-subject")
+async def erp_express_bind_subject(
+    log_id: str, req: ErpExpressBindSubjectRequest, request: Request
+):
+    """给方向判不出(主体没绑)的 Express 票绑定账套主体 → 重推。
+
+    主体(workspace_client)= 账套自家公司,提供方向判定锚点(自家税号)。绑定后重推时
+    preflight 重跑、税号锚点判出方向。重推走 push_to_endpoint 更新原行(同待补科目卡)。
+    """
+    user = get_current_user_from_request(request)
+    _check_push_access(user)
+
+    log = db.get_push_log_detail(user["id"], log_id)
+    if not log:
+        raise HTTPException(404, detail="erp.log_not_found")
+    if not log.get("history_id") or not log.get("endpoint_id"):
+        raise HTTPException(400, detail="erp.log_missing_refs")
+    endpoint = db.get_erp_endpoint(user["id"], log["endpoint_id"])
+    if not endpoint:
+        raise HTTPException(404, detail="erp.endpoint_not_found")
+    if (endpoint.get("adapter") or "").lower() != "express":
+        raise HTTPException(400, detail="erp.not_express_endpoint")
+
+    tid = _tid(user)
+    wc = db.get_workspace_client(req.workspace_client_id, user["id"], tenant_id=tid)
+    if not wc:
+        raise HTTPException(404, detail="erp.workspace_client_not_found")
+    if not db.update_history_workspace_client_id(
+        log["history_id"], req.workspace_client_id, user["id"], tenant_id=tid
+    ):
+        raise HTTPException(404, detail="erp.history_not_found")
+
+    history = db.get_ocr_history_detail(user["id"], log["history_id"], tenant_id=tid)
+    if not history:
+        raise HTTPException(404, detail="erp.history_not_found")
+
+    result = await asyncio.to_thread(_erp.push_to_endpoint, endpoint, history)
+    final_status = db.classify_push_status(result["success"], result.get("error_msg"))
+    db.increment_retry_count(log["id"])
+    db.update_log_status_after_retry(
+        log_id=log["id"],
+        success=result["success"],
+        http_status=result.get("http_status"),
+        response_body=result.get("response_body"),
+        error_msg=result.get("error_msg"),
+        elapsed_ms=result.get("elapsed_ms", 0),
+        request_body=result.get("request_body"),
+        final_status=final_status,
+    )
+    db.update_endpoint_stats(endpoint["id"], db.counts_as_endpoint_success(final_status))
+    db.update_history_push_status(log["history_id"], final_status)
+    if log.get("next_retry_at"):
+        db.clear_retry_schedule(log["id"])
+
+    return {
+        "ok": final_status in ("pending", "success", "skipped_dup"),
+        "status": final_status,
+        "error_msg": result.get("error_msg"),
+        "bound": True,
+    }

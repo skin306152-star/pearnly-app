@@ -6,7 +6,17 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-23 晚 · **Express 推送诚实化 + 待补科目卡 + 小助手托盘/配对/自动PACK 一串修** · prod `c91b0577`/11850951 · companion **1.1.6**）
+## 🎯 状态卡（2026-06-23 深夜 · **Express 异常卡「绑定主体」面板上线 + /simplify** · prod `9336930e`/11850964 · companion **1.1.8**）
+
+- **④ 前端绑主体面板上线**:推送异常页「方向判不出·主体没绑」(`direction_unknown` 且非 `direction_not_enabled`)的票,卡上加「绑定主体」主操作 → 展开下拉选账套主体 → 一键绑定并重推(后端 `POST express-bind-subject` 早就位·本窗只补 UI)。**刻意复用**待补科目卡 `erp-exc-acctfix` 样式 + `data-erpexc-acctfix`/`data-acctfix-cancel` 句柄(不新增 CSS),只 submit 新 `data-bindfix-submit`。主体下拉走 `window.fetchWorkspaceClients()`。`erp-bind-*` 8 键 4 语。erp-exc-actions 307 / erp-exceptions 496(<500)。
+- **真站 E2E 8 PASS · 0 FAIL**(pearnly.com·真浏览器·新 bundle 复跑仍过):卡渲染 + 面板 getComputedStyle 可见 + 下拉填 3 主体 + 提交真发 POST 带 workspace_client_id。验证设施入库 `scripts/_seed_express_bind_e2e.py`+`_express_bind_e2e.cjs`(仅测试号·prod 上 pearnly_e2e_3 留了一条 direction_unknown manual 日志可复验·要清删其 express 端点+log)。
+- **/simplify 收口**(`9336930e`):① 复用 — `_erpExcEnsureClients` 改调 canonical `window.fetchWorkspaceClients()`(带 workspace 头+401),不自起裸 fetch;② 效率 — 主体懒取与异常 fetch 并发(render 前再 await)。**defer 两项**(非阻塞):后端 `derive_bind_fix` 结构化提示(受 `push_log_queries.py` 492/500 闸·须先拆该文件)/ acctfix→通用 panel 句柄改名(低价值)。
+- **本窗 4 commit 全 CI 绿**:`72f47c0b`(feat)+`c047f185`(fix 漏 add dist/home.html)+`2d524a58`(test E2E)+`9336930e`(/simplify)。守门全绿(4696 单测/i18n 4×4823 平衡/lint-ui 三道/ratchet 透明豁免)。
+- **坑**:bump `?v=` 必须 `git add` **dist/home.html + dist/main.js 两个**(源 home.html 编译进 dist/home.html·漏一个→打包一致性闸红·本窗踩过)。详见 `docs/HANDOFF-2026-06-23-绑主体面板-收尾.md`。
+- **待办**(记忆 [[express-full-auto-provision-design]]):**S4 自建客户 ARMAS**(条件不具备·要 DATAT 空闲+Owner 真机+碰小助手发版协调)/ **S5 科目保守版收口**(可做)/ **S7 建账套**(极重·研究先行)。
+- ⚠️ companion 独立仓 `D:\pearnly-companion`(无 remote)·本窗口**没碰**。详见 [[express-full-auto-provision-design]] [[express-account-resolution-closed-loop]]。
+
+## 历史记录（2026-06-23 晚 · **Express 推送诚实化 + 待补科目卡 + 小助手托盘/配对/自动PACK 一串修** · prod `c91b0577`/11850951 · companion **1.1.6**）
 
 - **① 推送状态诚实化(误导 UI · 违铁律 #3/#12 的幽灵 bug)**:`manual`(缺科目/低置信/账套拒)此前被端点计数器算成功 + 被异常页 `status!='failed'` 过滤双重隐身 → 异常页显 0、日志显失败,口径打架。修:抽 `push_retry.counts_as_endpoint_success` 单一口径(manual/failed 算失败·pending 不计·3 处重推同用);`list_push_exceptions` 纳入 manual;`classify_push_exception` 扩 account_missing/account_set/direction_unknown/low_confidence 桶;batch_view manual→needs_action。
 - **② 待补科目卡(UI 落点② · 残留②闭环)**:异常页加「待补科目」chip + 卡内科目下拉(选项=该账套 reported_accounts 代码·名字)+ 记住为账套默认 + 覆盖重推。新端点 `POST /api/erp/logs/{id}/express-account-fix`(写前 GLACC 白名单闸2 + 更新原行重推 + remember 并入 config·复用 /express-accounts 口径)·`derive_account_fix` 按失败码推该问哪些槽。

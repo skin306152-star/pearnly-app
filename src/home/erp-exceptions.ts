@@ -13,6 +13,9 @@ import {
     _erpExcBatch,
     _erpExcAcctPanel,
     _erpExcAccountFix,
+    _erpExcBindPanel,
+    _erpExcEnsureClients,
+    _erpExcWireBind,
 } from './erp-exc-actions.js';
 
 // ─────────────────────────────────────────────────────────
@@ -225,23 +228,25 @@ function renderErpExceptions() {
             const fixLbl =
                 cat === 'product_mismatch' ? t('erp-exc-fix-product') : t('erp-exc-fix-customer');
             const isAcct = cat === 'account_missing';
-            // 待补科目:主操作=补科目(展开下拉);其余类:修复映射/详情 + 重推。
-            const actHtml = isAcct
-                ? `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-detail="${escapeHtml(it.id)}">${escapeHtml(t('erp-log-detail-btn'))}</button>
-                   <button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(it.id)}">${escapeHtml(t('erp-acctfix-open'))}</button>`
-                : `${
-                      canFix
-                          ? `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-fix="${escapeHtml(it.id)}">${escapeHtml(fixLbl)}</button>`
-                          : `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-detail="${escapeHtml(it.id)}">${escapeHtml(t('erp-log-detail-btn'))}</button>`
-                  }
+            // 方向判不出且主体可绑(主体没绑/税号没读到)→ 绑主体卡;direction_not_enabled
+            // (方向判出但该方向没在向导开)绑主体无用 → 走普通详情+重推。
+            const isBind =
+                cat === 'direction_unknown' && !/direction_not_enabled/.test(it.error_msg || '');
+            const detailBtn = `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-detail="${escapeHtml(it.id)}">${escapeHtml(t('erp-log-detail-btn'))}</button>`;
+            // 待补科目/绑主体:详情 + 展开同款下拉面板(复用 data-erpexc-acctfix 开关);其余:修复映射/详情 + 重推。
+            const actHtml =
+                isAcct || isBind
+                    ? `${detailBtn}
+                   <button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(it.id)}">${escapeHtml(t(isAcct ? 'erp-acctfix-open' : 'erp-bind-open'))}</button>`
+                    : `${canFix ? `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-fix="${escapeHtml(it.id)}">${escapeHtml(fixLbl)}</button>` : detailBtn}
                    <button class="btn btn-sm btn-primary" type="button" data-erpexc-retry="${escapeHtml(it.id)}">${escapeHtml(t('erp-exc-retry'))}</button>`;
-            return `<div class="erp-exc-card${isAcct ? ' has-acctfix' : ''}" data-erpexc-id="${escapeHtml(it.id)}">
+            return `<div class="erp-exc-card${isAcct || isBind ? ' has-acctfix' : ''}" data-erpexc-id="${escapeHtml(it.id)}">
             <span class="erp-exc-card-cb"><input type="checkbox" class="erp-exc-cb" data-erpexc-cb="${escapeHtml(it.id)}" ${checked}></span>
             <div class="erp-exc-card-icon ${icoCls}">${icoLetter}</div>
             <div class="erp-exc-card-main"><b title="${escapeHtml(it.invoice_no || '')}">${escapeHtml(it.invoice_no || '—')}</b><span>${escapeHtml(sub)}</span></div>
             <div class="erp-exc-card-reason"><label>${escapeHtml(t('erp-receipt-fail-reason'))}</label><p title="${escapeHtml(reason)}${it.error_code ? ' (' + escapeHtml(it.error_code) + ')' : ''}">${escapeHtml(reason)}</p></div>
             <div class="erp-exc-card-act">${actHtml}</div>
-            ${isAcct ? _erpExcAcctPanel(it) : ''}
+            ${isAcct ? _erpExcAcctPanel(it) : isBind ? _erpExcBindPanel(it) : ''}
         </div>`;
         })
         .join('');
@@ -410,6 +415,8 @@ function renderErpExceptions() {
             if (panel) _erpExcAccountFix(id, panel, btn as HTMLButtonElement);
         });
     });
+    // 绑主体:选主体后绑定并重推(开关/取消复用上面 acctfix 句柄)
+    _erpExcWireBind(block);
     // 单击卡(非 checkbox/按钮/下拉/补科目面板)→ 推送详情抽屉(草稿:点异常即看详情/轨迹)
     block.querySelectorAll('.erp-exc-card').forEach((card) => {
         card.addEventListener('click', (e) => {
@@ -439,6 +446,8 @@ async function loadErpExceptions(append?: boolean) {
                 /* 下拉退化为仅「全部 ERP」· 不致命 */
             }
         }
+        // 绑主体面板的主体下拉数据(同步渲染前懒取一次 · 已有缓存则跳过)
+        await _erpExcEnsureClients();
         const params = new URLSearchParams();
         if (_erpExcState.q) params.set('q', _erpExcState.q);
         if (_erpExcState.cat) params.set('category', _erpExcState.cat);

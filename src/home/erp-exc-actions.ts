@@ -113,6 +113,104 @@ async function _erpExcAccountFix(logId: string, panel: HTMLElement, btn: HTMLBut
     _erpExcRefreshBadge();
 }
 
+// 账套主体(workspace_clients)· 绑主体面板下拉的数据源(全站共用 _workspaceClientsCache)。
+function _erpExcClients(): Array<{ id: number; name?: string; tax_id?: string }> {
+    const c = window._workspaceClientsCache;
+    return Array.isArray(c) ? (c as Array<{ id: number; name?: string; tax_id?: string }>) : [];
+}
+
+// 异常页可能先于账套切换器加载 → 懒取一次主体(绑主体面板同步渲染前须有数据)。
+async function _erpExcEnsureClients(): Promise<void> {
+    if (_erpExcClients().length) return;
+    try {
+        const r = await fetch('/api/workspace/clients', {
+            headers: { Authorization: 'Bearer ' + _erpExcTok() },
+        });
+        if (r.ok) {
+            const d = await r.json();
+            window._workspaceClientsCache = (d && (d.clients || d.items)) || [];
+        }
+    } catch (_) {
+        /* 退化为空面板 · 不致命 */
+    }
+}
+
+// 绑主体卡的下拉面板(方向判不出·主体没绑 → 选账套主体后重推)· 复用待补科目卡样式与开关/取消句柄。
+function _erpExcBindPanel(it: ErpExcItem): string {
+    const clients = _erpExcClients();
+    if (!clients.length) {
+        return `<div class="erp-exc-acctfix" data-acctfix-panel="${escapeHtml(it.id)}" hidden>
+            <div class="erp-exc-acctfix-nochart">${escapeHtml(t('erp-bind-noclients'))}</div></div>`;
+    }
+    const opts = clients
+        .map(
+            (c) =>
+                `<option value="${escapeHtml(String(c.id))}">${escapeHtml(c.name || String(c.id))}${c.tax_id ? ' · ' + escapeHtml(c.tax_id) : ''}</option>`
+        )
+        .join('');
+    return `<div class="erp-exc-acctfix" data-acctfix-panel="${escapeHtml(it.id)}" hidden>
+        <div class="erp-exc-acctfix-slots"><label class="erp-exc-acctfix-slot"><span>${escapeHtml(t('erp-bind-subject'))}</span>
+        <select data-bindfix-select><option value="">${escapeHtml(t('erp-bind-pick'))}</option>${opts}</select></label></div>
+        <div class="erp-exc-acctfix-act">
+            <button class="btn btn-sm btn-primary" type="button" data-bindfix-submit="${escapeHtml(it.id)}">${escapeHtml(t('erp-bind-submit'))}</button>
+            <button class="btn btn-sm btn-ghost" type="button" data-acctfix-cancel="${escapeHtml(it.id)}">${escapeHtml(t('erp-acctfix-cancel'))}</button>
+        </div></div>`;
+}
+
+async function _erpExcBindSubject(
+    logId: string,
+    panel: HTMLElement,
+    btn: HTMLButtonElement | null
+) {
+    const sel = panel.querySelector('[data-bindfix-select]') as HTMLSelectElement | null;
+    const wcId = sel ? parseInt(sel.value, 10) : 0;
+    if (!wcId) {
+        showToast(t('erp-bind-need-pick'), 'error');
+        return;
+    }
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = t('erp-exc-retrying');
+    }
+    try {
+        const resp = await fetch(
+            '/api/erp/logs/' + encodeURIComponent(logId) + '/express-bind-subject',
+            {
+                method: 'POST',
+                headers: {
+                    Authorization: 'Bearer ' + _erpExcTok(),
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ workspace_client_id: wcId }),
+            }
+        );
+        const data = await resp.json().catch(() => ({}));
+        showToast(
+            resp.ok && data.ok ? t('erp-bind-ok') : t('erp-bind-fail'),
+            resp.ok && data.ok ? 'success' : 'error'
+        );
+    } catch (e) {
+        showToast(t('erp-bind-fail'), 'error');
+    }
+    _erpExcState.selected.delete(logId);
+    loadErpExceptions(false);
+    _erpExcRefreshBadge();
+}
+
+// 绑主体提交按钮(开关/取消复用 data-erpexc-acctfix / data-acctfix-cancel 既有句柄)。
+function _erpExcWireBind(block: HTMLElement) {
+    block.querySelectorAll('[data-bindfix-submit]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = (btn as HTMLElement).dataset.bindfixSubmit as string;
+            const panel = block.querySelector(
+                `[data-acctfix-panel="${CSS.escape(id)}"]`
+            ) as HTMLElement | null;
+            if (panel) _erpExcBindSubject(id, panel, btn as HTMLButtonElement);
+        });
+    });
+}
+
 async function _erpExcRetry(logId: string | undefined, btn: HTMLButtonElement | null) {
     if (!logId) return;
     if (btn) {
@@ -200,4 +298,12 @@ async function _erpExcBatch(action: string | undefined) {
     _erpExcRefreshBadge();
 }
 
-export { _erpExcRetry, _erpExcBatch, _erpExcAcctPanel, _erpExcAccountFix };
+export {
+    _erpExcRetry,
+    _erpExcBatch,
+    _erpExcAcctPanel,
+    _erpExcAccountFix,
+    _erpExcBindPanel,
+    _erpExcEnsureClients,
+    _erpExcWireBind,
+};

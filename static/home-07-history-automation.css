@@ -734,8 +734,8 @@
    ============================================================ */
 /* 两栏(对齐异常):左原图查看器(整页发票 → 容器调大)+ 右内容 · 仅 history 模式加宽 ·
    min() 自带窄屏降级(免单独 @media 设宽·过「固定大宽度」棘轮) */
-.drawer.hd-wide { width: min(960px, 94vw); }
-.drawer.hd-wide .drawer-body { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+#drawer.hd-wide { width: min(960px, 94vw); }
+#drawer.hd-wide #drawer-body { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
 .hd-twopane { flex: 1 1 auto; display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); min-height: 0; }
 .hd-imgpane { border-right: 1px solid var(--line); background: var(--line2); display: flex; flex-direction: column; min-height: 0; }
 .hd-twopane .hd-root { overflow: auto; min-height: 0; padding: 16px; }

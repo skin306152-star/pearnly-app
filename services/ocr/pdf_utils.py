@@ -50,9 +50,7 @@ def count_pdf_pages(pdf_bytes: bytes) -> int:
         return 0
 
 
-def render_page_png(
-    path: str, page: int = 1, dpi: int = 144
-) -> Optional[Tuple[bytes, int]]:
+def render_page_png(path: str, page: int = 1, dpi: int = 144) -> Optional[Tuple[bytes, int]]:
     """Rasterize one page of a stored PDF to PNG bytes for inline viewing.
 
     Args:

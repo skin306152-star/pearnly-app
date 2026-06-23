@@ -86,6 +86,7 @@ export function mountImageViewer(root: HTMLElement, historyId: string | null): (
     let total = 1;
     const goPage = (p: number) => {
         page = Math.trunc(clamp(p, 1, total));
+        if (pgEl) pgEl.textContent = page + '/' + total; // 立刻更新页码(不等图加载)
         scale = 1; // 翻页即复位变换(每页独立观看)
         tx = 0;
         ty = 0;

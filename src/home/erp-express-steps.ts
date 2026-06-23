@@ -101,14 +101,23 @@
             '</div></section>';
 
         // 自动推送
+        var _mc = function (v: string, lk: string, dk: string) {
+            return (
+                '<label class="exp-toggle-card exp-mode-card"><div><b>' +
+                t(lk) +
+                '</b><span>' +
+                t(dk) +
+                '</span></div><input type="radio" name="exp-pushmode" class="exp-mode-radio" value="' +
+                v +
+                '"></label>'
+            );
+        };
         var toggle =
-            '<section class="exp-toggle-card"><div><b>' +
-            t('exp-autopush-label') +
-            '</b><span>' +
-            t('exp-autopush-hint') +
-            '</span></div><label class="exp-switch" aria-label="' +
-            t('exp-autopush-label') +
-            '"><input type="checkbox" id="exp-pushtoggle"><span class="exp-slider"></span></label></section>';
+            '<div class="exp-pushmode-group">' +
+            _mc('manual', 'exp-pushmode-manual', 'exp-pushmode-manual-d') +
+            _mc('standard', 'exp-pushmode-standard', 'exp-pushmode-standard-d') +
+            _mc('full', 'exp-pushmode-full', 'exp-pushmode-full-d') +
+            '</div>';
 
         // 高级设置(录入方式:直录 + 查看说明 / 模拟录入占位)· 照搬源初始展开
         var help =

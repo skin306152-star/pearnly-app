@@ -69,6 +69,12 @@
             account: cfg && cfg.account_set ? String(cfg.account_set) : null, // 账套唯一键 = PATH(小助手上报)
             accountName: cfg && cfg.account_company ? String(cfg.account_company) : null, // 显示用真公司名
             push: !(ep && ep.auto_push === false), // 默认开启(照搬文案「默认开启」)
+            pushMode:
+                ep && ep.auto_push === false
+                    ? 'manual'
+                    : (cfg && cfg.autonomy) === 'auto'
+                      ? 'full'
+                      : 'standard',
             // 科目映射:小助手上报的科目表(下拉数据源)+ 已存的 6 个科目码(预选)。
             accounts: Array.isArray(cfg && cfg.reported_accounts) ? cfg.reported_accounts : [],
             acc: {
@@ -202,8 +208,10 @@
             if (cb) cb.style.display = 'grid';
         }
 
-        var pt = $('exp-pushtoggle') as HTMLInputElement;
-        if (pt) pt.checked = !!S.push;
+        var pm = document.querySelector(
+            'input[name="exp-pushmode"][value="' + S.pushMode + '"]'
+        ) as HTMLInputElement;
+        if (pm) pm.checked = true;
 
         var left = 3 - completed;
         _txt(
@@ -413,6 +421,18 @@
                     headers: _auth(),
                     body: JSON.stringify({ auto_push: S.push }),
                 });
+                if (S.push) {
+                    await fetch(
+                        '/api/erp/endpoints/' + encodeURIComponent(id) + '/express-autonomy',
+                        {
+                            method: 'PATCH',
+                            headers: _auth(),
+                            body: JSON.stringify({
+                                autonomy: S.pushMode === 'full' ? 'auto' : 'standard',
+                            }),
+                        }
+                    );
+                }
                 // 科目映射现由小助手选定并随心跳上报(网页只读镜像),finish 不再写科目。
             } catch (e) {}
         }
@@ -468,10 +488,11 @@
 
     document.addEventListener('change', function (ev) {
         var tg = ev.target as HTMLElement;
-        if (tg && tg.id === 'exp-pushtoggle' && S) {
-            S.push = (tg as HTMLInputElement).checked;
+        if (tg && (tg as HTMLInputElement).name === 'exp-pushmode' && S) {
+            S.pushMode = (tg as HTMLInputElement).value;
+            S.push = S.pushMode !== 'manual';
             updateUI();
-            _toast(_t(S.push ? 'exp-toast-push-on' : 'exp-toast-push-off'));
+            _toast(_t('exp-toast-mode-saved'));
         }
     });
 

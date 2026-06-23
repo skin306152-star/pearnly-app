@@ -76,6 +76,7 @@ _REEXPORTS = {
         "is_user_data_error",
         "is_already_pushed_error",
         "classify_push_status",
+        "counts_as_endpoint_success",
         "get_erp_retry_delay_sec",
         "schedule_log_retry",
         "clear_retry_schedule",

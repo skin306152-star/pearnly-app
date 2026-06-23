@@ -24,6 +24,18 @@ class ClassifyPushExceptionTests(unittest.TestCase):
         self.assertEqual(c("ERR_SOMETHING_ELSE"), "other")
         self.assertEqual(c(None), "other")
 
+    def test_express_manual_categories(self):
+        c = push_store.classify_push_exception
+        self.assertEqual(c("EXPRESS_MANUAL: no_revenue_account"), "account_missing")
+        self.assertEqual(c("EXPRESS_MANUAL: no_output_vat_account"), "account_missing")
+        self.assertEqual(c("EXPRESS_MANUAL: account_not_in_chart:11-99-00-00"), "account_missing")
+        # 账套配错先于科目判 · 不被 _account 子串误吞
+        self.assertEqual(c("EXPRESS_MANUAL: account_set_not_allowed:DATAT"), "account_set")
+        self.assertEqual(c("EXPRESS_MANUAL: direction_unknown"), "direction_unknown")
+        self.assertEqual(c("EXPRESS_MANUAL: direction_not_enabled:in"), "direction_unknown")
+        self.assertEqual(c("EXPRESS_MANUAL: low_confidence:amounts"), "low_confidence")
+        self.assertEqual(c("EXPRESS_MANUAL: enqueue_error:ValueError"), "other")
+
 
 class _Cur:
     def __init__(self, rows):
@@ -148,6 +160,38 @@ class ListPushExceptionsTests(unittest.TestCase):
         self.assertEqual({it["id"] for it in res["items"]}, {"l3"})
         # categories 计数在 category 过滤前算 → 仍含两类
         self.assertEqual(res["categories"].get("customer_mismatch"), 1)
+
+    def test_express_manual_row_enters_queue(self):
+        # Express 缺科目留人工(status='manual')必须进异常队列,不能当成功消失(铁律 #3/#12)。
+        rows = [
+            {
+                "id": "m1",
+                "history_id": "h9",
+                "endpoint_id": "e1",
+                "invoice_no": "IV9",
+                "seller_name": "卖方A",
+                "status": "manual",
+                "error_msg": "EXPRESS_MANUAL: no_revenue_account",
+                "next_retry_at": None,
+                "retry_count": 0,
+                "max_retries": 3,
+                "ocr_buyer_name": "买方M",
+                "client_name": None,
+                "endpoint_name": "Express",
+            }
+        ]
+        cur = _Cur(rows)
+        with mock.patch.object(push_store.db, "get_cursor", lambda *a, **k: _CM(cur)):
+            res = push_store.list_push_exceptions("u1")
+        self.assertEqual(res["total"], 1)
+        it = res["items"][0]
+        self.assertEqual(it["category"], "account_missing")
+        self.assertEqual(it["state"], "needs_action")
+        self.assertEqual(res["categories"].get("account_missing"), 1)
+        # 待补科目卡所需:该问哪些槽。no_revenue_account → 销项 revenue_acc。
+        self.assertEqual(it["account_fix"], {"direction": "sales", "slots": ["revenue_acc"]})
+        # request_body 用完即弃 · 不外泄到列表 payload。
+        self.assertNotIn("request_body", it)
 
     def test_pagination_limit_offset(self):
         res = self._call(limit=1, offset=0)

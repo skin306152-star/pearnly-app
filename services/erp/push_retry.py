@@ -99,6 +99,15 @@ def classify_push_status(success: bool, error_msg: Optional[str]) -> str:
     return "failed"
 
 
+def counts_as_endpoint_success(final_status: Optional[str]) -> bool:
+    """端点 success_count/failure_count 口径(单一源 · 铁律 #3/#12)。
+
+    success / skipped_dup(已推送过)记成功;failed / manual 记失败 —— manual = Express
+    缺科目/低置信/账套拒,留人工,绝不冒充成功。pending(排队中)按非失败处理,ack 落定时再计。
+    """
+    return (final_status or "") not in ("failed", "manual")
+
+
 def is_user_data_error(error_msg: Optional[str]) -> bool:
     """判断这条错误是不是"用户数据错"(不应该 retry).
     匹配 ERR_* code 前缀 OR 已知泰文 raw 模式.

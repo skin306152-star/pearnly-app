@@ -63,6 +63,9 @@ def classify_push_log(
         return "queued"
     if status == "running":
         return "running"
+    # Express 留人工(低置信/缺科目/账套拒)· 不重试,等用户补一次 → 展示成「待处理」。
+    if status == "manual":
+        return "needs_action"
     if status == "failed":
         next_retry_at = row.get("next_retry_at")
         retry_count = int(row.get("retry_count") or 0)

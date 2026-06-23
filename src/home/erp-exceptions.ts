@@ -8,6 +8,13 @@
 // ============================================================
 /* global escapeHtml, showConfirm, humanizeError, currentLang */
 
+import {
+    _erpExcRetry,
+    _erpExcBatch,
+    _erpExcAcctPanel,
+    _erpExcAccountFix,
+} from './erp-exc-actions.js';
+
 // ─────────────────────────────────────────────────────────
 // ERP 推送异常块(Zihao 2026-05-26 · 独立来源 · 派生自 erp_push_logs · 铁律 #12)
 // 暂塞 home.js(并入现有异常页 DOM · 与 _excState 同作用域共享 t/escapeHtml/showToast)·
@@ -26,9 +33,12 @@ type ErpExcItem = {
     error_code?: string;
     error_msg?: string;
     category?: string;
+    endpoint_id?: string;
     endpoint_name?: string;
     error_friendly?: Record<string, string>;
+    account_fix?: { direction?: string; slots?: string[]; bad_code?: string };
 };
+
 let _erpExcState: {
     items: ErpExcItem[];
     q: string;
@@ -74,6 +84,21 @@ function _erpExcFriendly(it: ErpExcItem) {
     const _efLang = (typeof currentLang === 'string' && currentLang) || window._currentLang || 'th';
     const _ef = it.error_friendly && it.error_friendly[_efLang];
     if (_ef) return _ef;
+    // Express 留人工码(EXPRESS_MANUAL: no_revenue_account 等)→ 复用日志卡的人话映射,
+    // 否则异常页会把英文技术码裸露给用户(此前不翻 Express 码)。
+    const _exFn = (window as any)._expressFriendlyReason;
+    if (
+        typeof _exFn === 'function' &&
+        it.error_msg &&
+        it.error_msg.indexOf('EXPRESS_MANUAL') >= 0
+    ) {
+        try {
+            const ex = _exFn(it.error_msg);
+            if (ex) return ex;
+        } catch (_) {
+            /* fall through */
+        }
+    }
     if (typeof humanizeError === 'function' && it.error_msg && !_erpExcLooksRaw(it.error_msg)) {
         try {
             const h = humanizeError(it.error_msg);
@@ -122,6 +147,14 @@ function renderErpExceptions() {
             '',
             '',
             !st.cat && !st.pushType,
+        ],
+        [
+            t('erp-exc-cat-account_missing'),
+            cats.account_missing || 0,
+            t('erp-exc-stat-sub-account'),
+            'account_missing',
+            '',
+            st.cat === 'account_missing',
         ],
         [
             t('erp-exc-cat-product_mismatch'),
@@ -177,6 +210,9 @@ function renderErpExceptions() {
             } else if (cat === 'customer_mismatch' || cat === 'no_client') {
                 icoLetter = 'C';
                 icoCls = 'customer';
+            } else if (cat === 'account_missing') {
+                icoLetter = 'A';
+                icoCls = 'account';
             }
             // 副行:身份证订车显「客户:姓名 · 端点」(seller_name 即客户名)· 发票显「发票推送 · 端点」
             const ep = it.endpoint_name ? ' · ' + it.endpoint_name : '';
@@ -188,19 +224,24 @@ function renderErpExceptions() {
                 (cat === 'product_mismatch' || cat === 'customer_mismatch' || cat === 'no_client');
             const fixLbl =
                 cat === 'product_mismatch' ? t('erp-exc-fix-product') : t('erp-exc-fix-customer');
-            return `<div class="erp-exc-card" data-erpexc-id="${escapeHtml(it.id)}">
+            const isAcct = cat === 'account_missing';
+            // 待补科目:主操作=补科目(展开下拉);其余类:修复映射/详情 + 重推。
+            const actHtml = isAcct
+                ? `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-detail="${escapeHtml(it.id)}">${escapeHtml(t('erp-log-detail-btn'))}</button>
+                   <button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(it.id)}">${escapeHtml(t('erp-acctfix-open'))}</button>`
+                : `${
+                      canFix
+                          ? `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-fix="${escapeHtml(it.id)}">${escapeHtml(fixLbl)}</button>`
+                          : `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-detail="${escapeHtml(it.id)}">${escapeHtml(t('erp-log-detail-btn'))}</button>`
+                  }
+                   <button class="btn btn-sm btn-primary" type="button" data-erpexc-retry="${escapeHtml(it.id)}">${escapeHtml(t('erp-exc-retry'))}</button>`;
+            return `<div class="erp-exc-card${isAcct ? ' has-acctfix' : ''}" data-erpexc-id="${escapeHtml(it.id)}">
             <span class="erp-exc-card-cb"><input type="checkbox" class="erp-exc-cb" data-erpexc-cb="${escapeHtml(it.id)}" ${checked}></span>
             <div class="erp-exc-card-icon ${icoCls}">${icoLetter}</div>
             <div class="erp-exc-card-main"><b title="${escapeHtml(it.invoice_no || '')}">${escapeHtml(it.invoice_no || '—')}</b><span>${escapeHtml(sub)}</span></div>
             <div class="erp-exc-card-reason"><label>${escapeHtml(t('erp-receipt-fail-reason'))}</label><p title="${escapeHtml(reason)}${it.error_code ? ' (' + escapeHtml(it.error_code) + ')' : ''}">${escapeHtml(reason)}</p></div>
-            <div class="erp-exc-card-act">
-                ${
-                    canFix
-                        ? `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-fix="${escapeHtml(it.id)}">${escapeHtml(fixLbl)}</button>`
-                        : `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-detail="${escapeHtml(it.id)}">${escapeHtml(t('erp-log-detail-btn'))}</button>`
-                }
-                <button class="btn btn-sm btn-primary" type="button" data-erpexc-retry="${escapeHtml(it.id)}">${escapeHtml(t('erp-exc-retry'))}</button>
-            </div>
+            <div class="erp-exc-card-act">${actHtml}</div>
+            ${isAcct ? _erpExcAcctPanel(it) : ''}
         </div>`;
         })
         .join('');
@@ -336,109 +377,47 @@ function renderErpExceptions() {
                 window.showLogDetail((btn as HTMLElement).dataset.erpexcDetail);
         });
     });
-    // 单击卡(非 checkbox/按钮)→ 推送详情抽屉(草稿:点异常即看详情/轨迹)
+    // 待补科目:展开/收起下拉面板(同卡内 · 不跳页)
+    block.querySelectorAll('[data-erpexc-acctfix]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = (btn as HTMLElement).dataset.erpexcAcctfix as string;
+            const panel = block.querySelector(
+                `[data-acctfix-panel="${CSS.escape(id)}"]`
+            ) as HTMLElement | null;
+            if (panel) panel.hidden = !panel.hidden;
+        });
+    });
+    // 待补科目:取消(收起)
+    block.querySelectorAll('[data-acctfix-cancel]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = (btn as HTMLElement).dataset.acctfixCancel as string;
+            const panel = block.querySelector(
+                `[data-acctfix-panel="${CSS.escape(id)}"]`
+            ) as HTMLElement | null;
+            if (panel) panel.hidden = true;
+        });
+    });
+    // 待补科目:补并重推
+    block.querySelectorAll('[data-acctfix-submit]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = (btn as HTMLElement).dataset.acctfixSubmit as string;
+            const panel = block.querySelector(
+                `[data-acctfix-panel="${CSS.escape(id)}"]`
+            ) as HTMLElement | null;
+            if (panel) _erpExcAccountFix(id, panel, btn as HTMLButtonElement);
+        });
+    });
+    // 单击卡(非 checkbox/按钮/下拉/补科目面板)→ 推送详情抽屉(草稿:点异常即看详情/轨迹)
     block.querySelectorAll('.erp-exc-card').forEach((card) => {
         card.addEventListener('click', (e) => {
-            if ((e.target as HTMLElement).closest('input,button')) return;
+            if ((e.target as HTMLElement).closest('input,button,select,.erp-exc-acctfix')) return;
             if (typeof window.showLogDetail === 'function')
                 window.showLogDetail((card as HTMLElement).dataset.erpexcId);
         });
     });
-}
-
-async function _erpExcRetry(logId: string | undefined, btn: HTMLButtonElement | null) {
-    if (!logId) return;
-    if (btn) {
-        btn.disabled = true;
-        btn.textContent = t('erp-exc-retrying');
-    }
-    try {
-        const resp = await fetch('/api/erp/logs/' + encodeURIComponent(logId) + '/retry', {
-            method: 'POST',
-            headers: { Authorization: 'Bearer ' + _erpExcTok() },
-        });
-        const data = await resp.json().catch(() => ({}));
-        showToast(
-            resp.ok && data.ok ? t('erp-exc-retry-ok') : t('erp-exc-retry-fail'),
-            resp.ok && data.ok ? 'success' : 'error'
-        );
-    } catch (e) {
-        showToast(t('erp-exc-retry-fail'), 'error');
-    }
-    // 单一源:重拉队列 · 成功的行自动消失 · 失败的换新原因(铁律 #12 · 不维护乐观态)
-    _erpExcState.selected.delete(logId);
-    loadErpExceptions(false);
-    if (typeof window.refreshExcBadge === 'function') {
-        try {
-            window.refreshExcBadge();
-        } catch (_) {}
-    }
-}
-
-async function _erpExcBatch(action: string | undefined) {
-    const ids = Array.from(_erpExcState.selected);
-    if (action === 'clear') {
-        _erpExcState.selected.clear();
-        renderErpExceptions();
-        return;
-    }
-    if (ids.length === 0) return;
-    if (action === 'delete') {
-        // 用产品风格确认弹窗替换浏览器原生 confirm()(2026-05-26 · 符合设计语言)
-        const ok = await showConfirm(t('erp-exc-batch-delete-confirm', { n: ids.length }), {
-            danger: true,
-        });
-        if (!ok) return;
-        try {
-            const resp = await fetch('/api/erp/logs/batch-delete', {
-                method: 'POST',
-                headers: {
-                    Authorization: 'Bearer ' + _erpExcTok(),
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ log_ids: ids.slice(0, 200) }),
-            });
-            const d = await resp.json().catch(() => ({}));
-            showToast(
-                resp.ok
-                    ? t('erp-exc-batch-delete-ok', { n: d.deleted || 0 })
-                    : t('erp-exc-retry-fail'),
-                resp.ok ? 'success' : 'error'
-            );
-        } catch (e) {
-            showToast(t('erp-exc-retry-fail'), 'error');
-        }
-    } else if (action === 'retry') {
-        try {
-            const resp = await fetch('/api/erp/logs/batch-retry', {
-                method: 'POST',
-                headers: {
-                    Authorization: 'Bearer ' + _erpExcTok(),
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ log_ids: ids.slice(0, 50) }),
-            });
-            const d = await resp.json().catch(() => ({}));
-            showToast(
-                resp.ok
-                    ? t('erp-exc-batch-retry-ok', {
-                          ok: d.succeeded || 0,
-                          fail: (d.failed || 0) + (d.skipped || 0),
-                      })
-                    : t('erp-exc-retry-fail'),
-                resp.ok ? 'success' : 'error'
-            );
-        } catch (e) {
-            showToast(t('erp-exc-retry-fail'), 'error');
-        }
-    }
-    _erpExcState.selected.clear();
-    loadErpExceptions(false);
-    if (typeof window.refreshExcBadge === 'function') {
-        try {
-            window.refreshExcBadge();
-        } catch (_) {}
-    }
 }
 
 async function loadErpExceptions(append?: boolean) {
@@ -490,7 +469,15 @@ async function loadErpExceptions(append?: boolean) {
     }
 }
 
-export { _erpExcState, _erpExcFriendly, _erpExcRetry, _erpExcTok };
+export type { ErpExcItem };
+export {
+    _erpExcState,
+    _erpExcFriendly,
+    _erpExcRetry,
+    _erpExcTok,
+    loadErpExceptions,
+    renderErpExceptions,
+};
 
 window._rerenderErpExceptions = renderErpExceptions;
 

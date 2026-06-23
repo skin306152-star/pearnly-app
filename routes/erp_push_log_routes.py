@@ -131,8 +131,8 @@ async def erp_push(req: ErpPushRequest, request: Request):
         elapsed_ms=result.get("elapsed_ms", 0),
     )
 
-    # 5) 更新 endpoint 统计 + history 推送状态(skipped_dup 视为非失败)
-    db.update_endpoint_stats(endpoint["id"], final_status != "failed")
+    # 5) 更新 endpoint 统计 + history 推送状态(口径见 _counts_as_endpoint_success)。
+    db.update_endpoint_stats(endpoint["id"], db.counts_as_endpoint_success(final_status))
     db.update_history_push_status(req.history_id, final_status)
 
     # v118.25 · 手动推送失败 · 也进重试队列(给用户"扔出去就不管"的体验)
@@ -353,8 +353,7 @@ async def erp_retry_push(log_id: str, request: Request):
         request_body=result.get("request_body"),
         final_status=final_status,
     )
-    # skipped_dup 视为非失败(已推送过)· 不计入端点失败数。
-    db.update_endpoint_stats(endpoint["id"], final_status != "failed")
+    db.update_endpoint_stats(endpoint["id"], db.counts_as_endpoint_success(final_status))
     db.update_history_push_status(log["history_id"], final_status)
 
     # 用户已亲自重试 · 把原 log 的自动重试队列摘掉(成功/失败/已存在都不再交给 worker)。
@@ -432,7 +431,7 @@ async def erp_batch_retry(req: ErpBatchRetryRequest, request: Request):
                 request_body=result.get("request_body"),
                 final_status=final_status,
             )
-            db.update_endpoint_stats(endpoint["id"], final_status != "failed")
+            db.update_endpoint_stats(endpoint["id"], db.counts_as_endpoint_success(final_status))
             db.update_history_push_status(log["history_id"], final_status)
             # 跟单个手动重推一样:用户已经亲自管了 · 把原 log 的自动重试队列摘掉
             if log.get("next_retry_at"):

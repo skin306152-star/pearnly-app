@@ -258,6 +258,7 @@
 .erp-exc-card-icon.product { background: var(--amber-weak); color: var(--amber); }
 .erp-exc-card-icon.customer { background: var(--accent-soft); color: var(--brand); }
 .erp-exc-card-icon.other { background: var(--bg); color: var(--ink-3); }
+.erp-exc-card-icon.account { background: var(--emerald-50); color: var(--emerald-700); }
 .erp-exc-card-main { min-width: 0; }
 .erp-exc-card-main b { display: block; font-size: 12px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .erp-exc-card-main span { display: block; font-size: 10px; color: var(--ink-3); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -268,6 +269,28 @@
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .erp-exc-card-act { display: flex; gap: 6px; justify-content: flex-end; flex-shrink: 0; }
+/* 待补科目卡:卡内展开的科目下拉面板(满宽 · 占整行) */
+.erp-exc-acctfix {
+    grid-column: 1 / -1;
+    margin-top: 12px; padding-top: 12px;
+    border-top: 1px dashed var(--line);
+    display: flex; flex-direction: column; gap: 10px; cursor: default;
+}
+.erp-exc-acctfix-slots { display: flex; flex-wrap: wrap; gap: 12px; }
+.erp-exc-acctfix-slot {
+    display: flex; flex-direction: column; gap: 4px;
+    font-size: 11px; color: var(--ink-3); flex: 1 1 200px; min-width: 180px;
+}
+.erp-exc-acctfix-slot select {
+    padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--card); color: var(--ink); font-size: 12px;
+}
+.erp-exc-acctfix-remember {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--ink-2); cursor: pointer;
+}
+.erp-exc-acctfix-act { display: flex; gap: 8px; }
+.erp-exc-acctfix-nochart { font-size: 11px; color: var(--ink-3); line-height: 1.5; }
 @media (max-width: 760px) {
     .erp-exc-card { grid-template-columns: 18px 40px minmax(0, 1fr); }
     .erp-exc-card-reason { grid-column: 2 / -1; }

@@ -17,6 +17,9 @@ const _EXPRESS_REASON_I18N: Record<string, string> = {
     no_account_set: 'erp-reason-no-account-set',
     account_set_not_allowed: 'erp-reason-acct-not-allowed',
     direction_unknown: 'erp-reason-direction-unknown',
+    direction_not_enabled: 'erp-reason-direction-not-enabled',
+    low_confidence: 'erp-reason-low-confidence',
+    enqueue_error: 'erp-reason-enqueue-error',
     amounts_not_consistent: 'erp-reason-amounts',
     bad_or_missing_date: 'erp-reason-bad-date',
     entry_not_balanced: 'erp-reason-unbalanced',
@@ -170,3 +173,5 @@ function buildErpLogCard(log: any): string {
 }
 
 window.buildErpLogCard = buildErpLogCard;
+// 异常页待补科目卡复用同一套人话映射(单一源 · 不另写一份)。
+(window as any)._expressFriendlyReason = _expressFriendlyReason;

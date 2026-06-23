@@ -62,6 +62,11 @@ class ClassifyTests(unittest.TestCase):
         }
         self.assertEqual(classify_push_log(row, is_user_data_error=_UDF), "failed")
 
+    def test_express_manual_needs_action(self):
+        # Express 留人工(缺科目/低置信)· 不重试 · 展示成待处理。
+        row = {"status": "manual", "error_msg": "EXPRESS_MANUAL: no_revenue_account"}
+        self.assertEqual(classify_push_log(row, is_user_data_error=_UDF), "needs_action")
+
 
 class SummarizeTests(unittest.TestCase):
     def test_counts_100(self):

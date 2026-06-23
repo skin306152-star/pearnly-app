@@ -12,94 +12,9 @@ import logging
 from typing import Optional, Dict, Any, List  # noqa: F401
 
 from services.erp.external_ref import _coerce_body, derive_external_ref  # noqa: F401
-from services.erp.mrerp_business_friendly import friendly_for_ui  # noqa: F401
+from services.erp.push_log_friendly import dms_push_friendly, friendly_any  # noqa: F401
 
 logger = logging.getLogger(__name__)
-
-
-# 身份证→订车单(adapter=mrerp_dms)推送/识别错误码的 4 语友好文案(zh/th/en/ja)。
-# 与 mrerp_business_friendly 的「发票推送」catalog 分开:这些码只在身份证订车流程产生,
-# friendly_for_ui 不覆盖 → 不补就在日志/详情里裸露 ERR_*(Zihao 2026-06-01 指出问题)。
-_DMS_PUSH_FRIENDLY: Dict[str, Dict[str, str]] = {
-    "ERR_ID_CARD_REQUIRED_FIELDS": {
-        "zh": "身份证关键字段未识别完整(身份证号或姓名)· 已暂停建单 · 请用清晰的正面照重新识别",
-        "en": "Key ID-card fields (ID number or name) were not fully recognized; booking was paused. Please rescan a clear front image.",
-        "th": "อ่านข้อมูลบัตรประชาชนหลัก (เลขบัตร/ชื่อ) ไม่ครบ จึงหยุดสร้างใบจอง กรุณาสแกนภาพด้านหน้าที่ชัดเจนอีกครั้ง",
-        "ja": "身分証の主要項目(番号・氏名)を完全に読み取れず、予約作成を停止しました。鮮明な表面の画像で再読み取りしてください。",
-    },
-    "ERR_DMS_CUSTOMER_CREATE": {
-        "zh": "在 DMS 建客户失败 · 请检查身份证上的地址信息后重试",
-        "en": "Failed to create the customer in DMS. Please check the address on the ID card and retry.",
-        "th": "สร้างลูกค้าใน DMS ไม่สำเร็จ กรุณาตรวจสอบที่อยู่บนบัตรประชาชนแล้วลองใหม่",
-        "ja": "DMS での顧客作成に失敗しました。身分証の住所をご確認のうえ再試行してください。",
-    },
-    "ERR_DMS_IMPORT_REPORT": {
-        "zh": "订车单导入 DMS 时被退回(数据校验未过)· 请核对身份证信息后重试",
-        "en": "DMS rejected the booking import (data validation failed). Please verify the ID-card data and retry.",
-        "th": "DMS ปฏิเสธการนำเข้าใบจอง (ตรวจสอบข้อมูลไม่ผ่าน) กรุณาตรวจสอบข้อมูลบัตรแล้วลองใหม่",
-        "ja": "DMS が予約の取り込みを拒否しました(データ検証エラー)。身分証データをご確認のうえ再試行してください。",
-    },
-    "ERR_DMS_IMPORT": {
-        "zh": "订车单导入 DMS 失败 · 请稍后重试",
-        "en": "Failed to import the booking into DMS. Please retry shortly.",
-        "th": "นำเข้าใบจองรถไปยัง DMS ไม่สำเร็จ กรุณาลองใหม่ภายหลัง",
-        "ja": "予約データの DMS への取り込みに失敗しました。しばらくしてから再試行してください。",
-    },
-    "ERR_DMS_BOOKING_PATCH": {
-        "zh": "订车单已建但补充资料失败 · 请到 DMS 后台核对该单",
-        "en": "The booking was created but updating its details failed. Please verify it in the DMS console.",
-        "th": "สร้างใบจองแล้วแต่บันทึกรายละเอียดเพิ่มเติมไม่สำเร็จ กรุณาตรวจสอบใบจองในระบบ DMS",
-        "ja": "予約は作成されましたが詳細の更新に失敗しました。DMS 管理画面でご確認ください。",
-    },
-    "ERR_DMS_TEMPLATE": {
-        "zh": "获取 DMS 订车单模板失败 · 请稍后重试",
-        "en": "Failed to fetch the DMS booking template. Please retry shortly.",
-        "th": "ดึงแม่แบบใบจองของ DMS ไม่สำเร็จ กรุณาลองใหม่ภายหลัง",
-        "ja": "DMS の予約テンプレート取得に失敗しました。しばらくしてから再試行してください。",
-    },
-    "ERR_DMS_AUTH": {
-        "zh": "DMS 登录失败 · 请到连接向导检查账号和密码",
-        "en": "DMS login failed. Please check the username and password in the connection wizard.",
-        "th": "เข้าสู่ระบบ DMS ไม่สำเร็จ กรุณาตรวจสอบชื่อผู้ใช้และรหัสผ่านในตัวช่วยเชื่อมต่อ",
-        "ja": "DMS へのログインに失敗しました。連携ウィザードでユーザー名とパスワードをご確認ください。",
-    },
-    "ERR_DMS_NOT_INVOICE_ENDPOINT": {
-        "zh": "该连接是身份证订车专用 · 不能用于推送发票",
-        "en": "This connection is for ID-card vehicle booking only and cannot push invoices.",
-        "th": "การเชื่อมต่อนี้ใช้สำหรับการจองรถด้วยบัตรประชาชนเท่านั้น ไม่สามารถส่งใบกำกับได้",
-        "ja": "この連携は身分証による車両予約専用で、請求書の送信には使用できません。",
-    },
-    "ERR_DMS_TECHNICAL": {
-        "zh": "连接 DMS 超时或网络异常 · 请稍后重试",
-        "en": "DMS connection timed out or a network error occurred. Please retry shortly.",
-        "th": "การเชื่อมต่อ DMS หมดเวลาหรือเครือข่ายขัดข้อง กรุณาลองใหม่ภายหลัง",
-        "ja": "DMS への接続がタイムアウトまたはネットワーク異常です。しばらくしてから再試行してください。",
-    },
-    "ERR_DMS_UNEXPECTED": {
-        "zh": "推送 DMS 时发生未知错误 · 请稍后重试或联系客服",
-        "en": "An unexpected error occurred while pushing to DMS. Please retry or contact support.",
-        "th": "เกิดข้อผิดพลาดที่ไม่คาดคิดขณะส่งไป DMS กรุณาลองใหม่หรือติดต่อฝ่ายสนับสนุน",
-        "ja": "DMS への送信中に予期しないエラーが発生しました。再試行するかサポートにお問い合わせください。",
-    },
-}
-
-
-def dms_push_friendly(error_msg: Optional[str]) -> Optional[Dict[str, str]]:
-    """命中身份证订车错误码 → 返回 {zh,th,en,ja} dict;否则 None。
-    按码长度降序匹配(长码先于其前缀短码,如 ERR_DMS_IMPORT_REPORT 先于 ERR_DMS_IMPORT)
-    防子串误命中 · 新增码进 _DMS_PUSH_FRIENDLY 即自动生效,无需再维护一份顺序列表。"""
-    if not error_msg:
-        return None
-    for code in sorted(_DMS_PUSH_FRIENDLY, key=len, reverse=True):
-        if code in error_msg:
-            return _DMS_PUSH_FRIENDLY[code]
-    return None
-
-
-def friendly_any(error_msg: Optional[str]) -> Optional[Dict[str, str]]:
-    """发票推送 catalog 优先(friendly_for_ui)· 未命中再退身份证订车映射。
-    给 push 日志/详情/异常统一用 · 任一命中即不裸露 ERR_*。"""
-    return friendly_for_ui(error_msg) or dms_push_friendly(error_msg)
 
 
 def _classify_push_type(row: Dict[str, Any]) -> str:
@@ -367,7 +282,59 @@ def classify_push_exception(error_msg: Optional[str]) -> str:
         return "no_client"
     if "VERIFY_UNAVAILABLE" in msg:
         return "verify_unavailable"
+    # Express 留人工(EXPRESS_MANUAL:<reason>)· 按可补救路径分桶。
+    # 账套配错(小助手连到不可写账套)先于科目判:account_set_not_allowed/no_account_set。
+    if "account_set" in msg:
+        return "account_set"
+    # 缺 收入/应收/销项税/采购/应付/进项税 科目,或科目不在该账套科目表 → 待补科目卡可救。
+    if "_account" in msg or "account_not_in_chart" in msg:
+        return "account_missing"
+    # 方向判不出:主体没绑 / 税号不齐 / 该方向未开。
+    if "direction_unknown" in msg or "direction_not_enabled" in msg:
+        return "direction_unknown"
+    if "low_confidence" in msg:
+        return "low_confidence"
     return "other"
+
+
+# Express 缺科目失败码 → (方向, 该补的 config 槽位)· 待补科目卡据此只问相关槽位。
+_SLOT_BY_ACCOUNT_REASON = {
+    "no_revenue_account": ("sales", "revenue_acc"),
+    "no_ar_account": ("sales", "ar_acc"),
+    "no_output_vat_account": ("sales", "vat_output_acc"),
+    "no_purchase_account": ("purchase", "fallback_acc"),
+    "no_ap_account": ("purchase", "ap_acc"),
+    "no_input_vat_account": ("purchase", "vat_input_acc"),
+}
+_SALES_SLOTS = ["revenue_acc", "ar_acc", "vat_output_acc"]
+_PURCHASE_SLOTS = ["fallback_acc", "ap_acc", "vat_input_acc"]
+
+
+def derive_account_fix(
+    error_msg: Optional[str], request_body: Any = None
+) -> Optional[Dict[str, Any]]:
+    """从 Express 缺科目失败推导「待补科目卡」要问哪些科目槽(direction + slots)。
+
+    单缺一科目(no_*_account)→ 只问那一槽;account_not_in_chart(某分录科目不在科目表)
+    → 按 request_body.payload 的 direction 问该方向全部槽,带上越界码 bad_code。非缺科目错 → None。
+    """
+    msg = error_msg or ""
+    for reason, (direction, slot) in _SLOT_BY_ACCOUNT_REASON.items():
+        if reason in msg:
+            return {"direction": direction, "slots": [slot]}
+    if "account_not_in_chart" in msg:
+        body = _coerce_body(request_body)
+        direction = str((body or {}).get("direction") or "") if isinstance(body, dict) else ""
+        m = re.search(r"account_not_in_chart:(\S+)", msg)
+        bad = m.group(1) if m else ""
+        if direction == "sales":
+            slots = list(_SALES_SLOTS)
+        elif direction == "purchase":
+            slots = list(_PURCHASE_SLOTS)
+        else:
+            slots = _SALES_SLOTS + _PURCHASE_SLOTS
+        return {"direction": direction, "slots": slots, "bad_code": bad}
+    return None
 
 
 def list_push_exceptions(
@@ -381,8 +348,8 @@ def list_push_exceptions(
 ) -> Dict[str, Any]:
     """ERP 推送异常队列(派生自 erp_push_logs · 铁律 #12 单一状态源,不另立异常表)。
 
-    取每个 (history, endpoint) **最近一条** log · 仅保留 status='failed'(已被后续
-    success/skipped_dup 解决的自动排除)。每条附:
+    取每个 (history, endpoint) **最近一条** log · 仅保留 status='failed' 或 'manual'
+    (Express 留人工)· 已被后续 success/skipped_dup 解决的自动排除。每条附:
       - state:batch_view 派生展示态(needs_action / retrying / failed)
       - category:错误码子类(customer_mismatch / product_mismatch / no_client /
         verify_unavailable / other)· 前端 chip 用
@@ -403,7 +370,7 @@ def list_push_exceptions(
                 SELECT DISTINCT ON (l.history_id, l.endpoint_id)
                     l.id, l.history_id, l.endpoint_id, l.invoice_no, l.seller_name,
                     l.total_amount, l.status, l.error_msg, l.trigger, l.created_at,
-                    l.retry_count, l.max_retries, l.next_retry_at,
+                    l.retry_count, l.max_retries, l.next_retry_at, l.request_body,
                     l.request_body->>'people_id_tail' AS id_card_tail,
                     h.client_id AS history_client_id,
                     c.name AS client_name,
@@ -431,10 +398,12 @@ def list_push_exceptions(
         logger.error(f"list_push_exceptions failed: {e}")
         return {"items": [], "total": 0, "categories": {}}
 
-    # 1) 仅留最近一条仍 failed 的(已解决的自动排除)+ 附 state/category/code
+    # 1) 仅留最近一条仍需人处理的(failed 或 Express manual=留人工)+ 附 state/category/code。
+    #    manual(缺科目/低置信/账套拒)和 failed 一样要用户处理,绝不能从异常页消失(铁律 #3/#12)。
+    #    success/skipped_dup/pending 不进异常。
     base: List[Dict[str, Any]] = []
     for r in rows:
-        if (r.get("status") or "") != "failed":
+        if (r.get("status") or "") not in ("failed", "manual"):
             continue
         # DMS 推送可视化闭环(Zihao 2026-06-01 · 修正:异常栏与推送日志【同理】· 保留身份证订车失败行,
         # 标 push_type 供前端按 DMS 字段(订车单号/客户)渲染 + ERP 下拉筛选 · 不再用发票字段框、不再误删)。
@@ -444,6 +413,11 @@ def list_push_exceptions(
         r["category"] = classify_push_exception(r.get("error_msg"))
         m = _re.search(r"ERR_[A-Z0-9_]+", r.get("error_msg") or "")
         r["error_code"] = m.group(0) if m else ""
+        # 待补科目卡(account_missing)· 算出该问哪些科目槽(direction + slots)。
+        # request_body 仅用于推 direction,用完丢弃,列表 payload 保持轻量。
+        if r["category"] == "account_missing":
+            r["account_fix"] = derive_account_fix(r.get("error_msg"), r.get("request_body"))
+        r.pop("request_body", None)
         # P2-C (B7) · 附友好原因 4 语 dict(命中 catalog 才有 · 否则 None)·
         # 异常卡片优先显本语言,不裸透泰文。
         r["error_friendly"] = friendly_any(r.get("error_msg"))

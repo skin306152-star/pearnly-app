@@ -21,6 +21,8 @@ import re
 from datetime import date
 from typing import Any, Dict, List, Optional
 
+from services.purchase.field_clean import clean_tax_id
+
 # 票面 currency 字段归一小写后,视为"泰铢/未标注"的取值(放行)。其余一律视外币。
 _THB_CURRENCY = {"", "thb", "บาท", "baht", "฿", "thai baht"}
 
@@ -61,12 +63,13 @@ def check_document(
     today: Optional[date] = None,
 ) -> Optional[str]:
     """跑单据防呆,返回规范 manual reason(命中)或 None(放行)。按严重度从高到低。"""
-    blob = _text_blob(fields)
-
     # 1 · 币种(最严重):非泰铢票不能当泰铢直接入账。
     currency = str(fields.get("currency") or "").strip().lower()
     if currency and currency not in _THB_CURRENCY:
         return f"currency_not_thb:{currency[:12]}"
+
+    # 票面自由文本(关键词匹配用)· 币种已早返不需,到此再建。
+    blob = _text_blob(fields)
 
     # 2 · 贷项/退货单:应走负向冲销。document_type 优先,措辞兜底。
     doc_type = str(fields.get("document_type") or "").strip().lower()
@@ -85,9 +88,10 @@ def check_document(
         return "date_reissued"
 
     # 5 · 对手方税号位数:采购看卖方、销项看买方;有值但非 13 位 → 标无效(轻)。
-    party_tax = fields.get("seller_tax") if direction != "sales" else fields.get("buyer_tax")
-    digits = re.sub(r"\D", "", str(party_tax or ""))
-    if digits and len(digits) != 13:
+    # clean_tax_id 是全包"恰好 13 位数字否则空"的权威口径(direction/mapper 同用),不重复实现。
+    raw_tax = fields.get("seller_tax") if direction != "sales" else fields.get("buyer_tax")
+    party_tax = str(raw_tax or "")
+    if any(ch.isdigit() for ch in party_tax) and not clean_tax_id(party_tax):
         return "tax_id_invalid"
 
     return None

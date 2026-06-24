@@ -1,12 +1,5 @@
 # -*- coding: utf-8 -*-
-"""LINE 改错多轮会话态机 + 澄清入口(P1E-2 收口)。
-
-统一决策(产业级·学 Paypers 的稳不学它的慢):任何改错 pending 在身,新一句按优先级裁决——
-取消(明确)> 删除(明确)> 点名字段(确认阶段切换 / 收值改口 / 待选答字段,带值即直接走风险三档)>
-按阶段(confirm 是/否、收值、待选重问)。绝不在 active_doc_id 内退回「请长按回复/找不到记录」。
-
-pending 态复用 conversation.line_pending_entry(不新建表):correctclar 待答字段 / correctval 待给新值 / correct 待是否确认 / correctactive 改完续接 / pick(Slice4)无引用列候选待选号。
-"""
+"""LINE correction routing and stale-reference cleanup."""
 
 from __future__ import annotations
 
@@ -110,22 +103,30 @@ _NEW_EXPENSE_LEAD = (
 
 
 def _looks_like_new_expense(text: str) -> bool:
-    s = (text or "").strip(); low = s.lower()
+    s = (text or "").strip()
+    low = s.lower()
     if any(low.startswith(p.lower()) for p in _NEW_EXPENSE_LEAD):
         return True
     cut = s.split("\u0e25\u0e1a", 1)[0]
-    if cut != s and lqe.parse_expense(cut).has_amount() and lqe.has_item_context(cut): return True
-    head = s.split("\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48", 1)[0] if "\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48" in s else s.split("date", 1)[0] if "date" in low else s.split("\u65e5\u671f", 1)[0]
+    if cut != s and lqe.parse_expense(cut).has_amount() and lqe.has_item_context(cut):
+        return True
+    head = (
+        s.split("\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48", 1)[0]
+        if "\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48" in s
+        else s.split("date", 1)[0] if "date" in low else s.split("\u65e5\u671f", 1)[0]
+    )
     if head != s and lqe.parse_expense(head).has_amount() and lqe.has_item_context(head):
-        return not (line_classify.is_correction_feedback(s) or lqe.is_edit_request(s) or line_classify.is_cancel_intent(s) or line_classify.is_delete_intent(s))
+        return not (
+            line_classify.is_correction_feedback(s)
+            or lqe.is_edit_request(s)
+            or line_classify.is_cancel_intent(s)
+            or line_classify.is_delete_intent(s)
+        )
     return lqe.parse_multi(s) is not None
 
 
 def is_correction_like(text: str) -> bool:
-    """改错语义?(点名字段 / 编辑词 / 反馈词 / 取消 / 删除)。问句不算(交查账)。
-
-    安全闸用:命中即绝不进 auto_book 记账(账务级红线·「ร้านค้าเป็น 7-11」不得新建 11 THB)。
-    """
+    """Return whether text should be handled as correction/delete/cancel."""
     if lqe.is_question(text):
         return False
     return bool(

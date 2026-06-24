@@ -169,7 +169,13 @@ def _reschedule(cur, row: dict, error: str) -> None:
            AND tenant_id = %s
            AND workspace_client_id = %s
         """,
-        (str(error or "")[:2000], delay, row["id"], row["tenant_id"], int(row["workspace_client_id"])),
+        (
+            str(error or "")[:2000],
+            delay,
+            row["id"],
+            row["tenant_id"],
+            int(row["workspace_client_id"]),
+        ),
     )
 
 

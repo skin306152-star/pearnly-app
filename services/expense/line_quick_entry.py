@@ -452,7 +452,10 @@ _TH_MONTH = "ม\\.?ค|ก\\.?พ|มี\\.?ค|เม\\.?ย|พ\\.?ค|มิ
 _MULTI_DATE_RE = re.compile(
     rf"\d{{1,2}}[/\-.]\d{{1,2}}[/\-.]\d{{2,4}}|\d{{1,2}}\s*(?:{_TH_MONTH})\.?\s*\d{{0,4}}"
 )
-_MULTI_FIELD_DATE_RE = re.compile("(?:date|\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48|\u65e5\u671f)\\s*\\d{1,2}(?![\\d.,])", re.IGNORECASE)
+_MULTI_FIELD_DATE_RE = re.compile(
+    "(?:date|\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48|\u65e5\u671f)\\s*\\d{1,2}(?![\\d.,])",
+    re.IGNORECASE,
+)
 
 # 句中字段声明词(「ผู้ขาย 711 / ร้านค้า 7-11」)是卖家/字段标注,不是商品项(P1E-3·多项句内联卖家)。
 # 长词在前(extract_inline_vendor 按序匹配·ร้านค้า 先于 ร้าน,免「ร้านค้า X」被 ร้าน 截成「ค้า」)。
@@ -476,18 +479,14 @@ def extract_inline_vendor(text: str) -> str:
 
 
 def parse_multi(text: str) -> Optional[list]:
-    """一句话拆多项 → [{name, amount(Decimal)}];<2 项返 None(走单笔老路)。
-
-    名去首尾货币词/连接词(和/跟/加…)。确定性正则(不靠 LLM 拆·避免误拆)。字段声明词
-    (「ผู้ขาย 711」)是卖家标注非商品 → 不计入金额(P1E-3·总额不被内联卖家撑大);连字号数字串
-    (店名「7-11」)由 _MULTI_RE 的 lookaround 直接排除,不进 items。拆分前先剥非金额数字(单位/
-    日期/税率/型号邻接 · 与单笔路共用 strip_nonmoney)→ 型号/数量/日期不再被当独立项加进总额。
-    """
+    """Parse one sentence into multiple deterministic expense items."""
     from services.expense import amount_extract
 
     # 与单笔路共用金钱语境清洗:量级归一 + 剥非金额数 + 日期 + 长编号/税号(共用编译)。
     clean = amount_extract.strip_nonmoney(amount_extract.normalize_words(text or ""))
-    clean = amount_extract._RE_LONG_ID.sub(" ", _MULTI_FIELD_DATE_RE.sub(" ", _MULTI_DATE_RE.sub(" ", clean)))
+    clean = amount_extract._RE_LONG_ID.sub(
+        " ", _MULTI_FIELD_DATE_RE.sub(" ", _MULTI_DATE_RE.sub(" ", clean))
+    )
     items = []
     for m in _MULTI_RE.finditer(clean.strip()):
         name = _UNIT_TAIL.sub("", _NAME_LEAD.sub("", m.group(1).strip())).strip(" -·:、,，/")

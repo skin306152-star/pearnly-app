@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-"""LINE 一句话记账对话处理(文本路 · 统一智能通道)。
-
-handle_expense_text:文本 → 智能解析(L1 规则 + L2 LLM)→ 记账直接落采购进项草稿单;
-缺金额反问、查账、问答、越界挡回。护栏(doc 10 §1):用户可见文案全走 line_i18n 模板。
-"""
+"""LINE text bookkeeping entrypoint."""
 
 from __future__ import annotations
 
@@ -18,12 +14,7 @@ logger = logging.getLogger(__name__)
 def handle_expense_text(
     bound_user, reply_token, line_user_id, text, lang, quote_token=None, quoted_message_id=None
 ) -> bool:
-    """文本 → LINE 大脑(LLM tool-calling)→ 工具执行(docs/smart-intake/15)。
-
-    L1 快路:清晰记账(有金额+非问句)零 LLM 直接记。其余 → 大脑一次 LLM 听意图+抽槽+组织回复,
-    确定性代码执行工具(记账/查账/查明细/撤销/编辑→网页/闲聊)。金额与过账永不信 LLM;问句/否定/
-    假设永不写账。无 key/LLM 失败 → 回落确定性 L1。返回 True=已处理;未开 expense/无套账/异常 → False。
-    """
+    """Handle one LINE text message and return whether it was consumed."""
     try:
         tid = bound_user.get("tenant_id")
         if not tid:
@@ -92,26 +83,41 @@ def handle_expense_text(
                 bound_user, reply_token, text, stid, ws, multi, quote_token, lang, line_user_id
             )
 
-        # 1. L1 快路:清晰记账(有金额 + 非问句 + 无其他 L1 意图 + 非改错)→ 直接记,零 LLM、零成本。
         parsed = lqe.parse_expense(text)
         from services.expense import conversation
 
         if parsed.has_amount() and not isq and si is None and not is_edit:
             with db.get_cursor_rls(stid, commit=True) as cur:
                 pend = conversation.pop_pending(cur, line_user_id=line_user_id)
-            # 续接补金额:仅「缺金额」会话态合并(correct/detail 等其它 pending 不当补金额用)。
             if pend and str(pend.get("missing") or "") == "amount":
                 merged = pend["draft"]
                 merged.amount = parsed.amount
                 parsed = merged
             elif not lqe.has_item_context(text):
-                # 只发裸数字(无物品/无卖家)且非补答缺金额 → 不入账,温柔问记啥(防 1/2/3 THB 垃圾条目)。
                 _pool("amount_no_item")
                 return True
-            return _do_record(bound_user, reply_token, text, stid, ws, parsed, False, quote_token, lang, line_user_id)
+            return _do_record(
+                bound_user,
+                reply_token,
+                text,
+                stid,
+                ws,
+                parsed,
+                False,
+                quote_token,
+                lang,
+                line_user_id,
+            )
         if not isq and si is None and not is_edit and lqe.has_item_context(text):
             with db.get_cursor_rls(stid, commit=True) as cur:
-                conversation.save_pending(cur, line_user_id=line_user_id, tenant_id=stid, workspace_client_id=ws, draft=parsed, missing="amount")
+                conversation.save_pending(
+                    cur,
+                    line_user_id=line_user_id,
+                    tenant_id=stid,
+                    workspace_client_id=ws,
+                    draft=parsed,
+                    missing="amount",
+                )
             _pool("amount_missing")
             return True
 

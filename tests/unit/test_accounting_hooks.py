@@ -36,9 +36,7 @@ class EnqueueSafetyTests(unittest.TestCase):
             side_effect=RuntimeError("engine down"),
         ):
             with mock.patch("services.modules.store.is_enabled", return_value=True):
-                with mock.patch(
-                    "services.accounting.posting_failures.record_failure"
-                ) as record:
+                with mock.patch("services.accounting.posting_failures.record_failure") as record:
                     hooks.enqueue_posting(
                         cur,
                         tenant_id="t1",
@@ -83,9 +81,7 @@ class EnqueueSafetyTests(unittest.TestCase):
             "services.accounting.posting.generate_for_source", return_value={"id": "v1"}
         ):
             with mock.patch("services.modules.store.is_enabled", return_value=True):
-                with mock.patch(
-                    "services.accounting.posting_failures.mark_resolved"
-                ) as resolved:
+                with mock.patch("services.accounting.posting_failures.mark_resolved") as resolved:
                     hooks.enqueue_posting(
                         cur,
                         tenant_id="t1",

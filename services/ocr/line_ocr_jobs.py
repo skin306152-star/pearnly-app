@@ -46,7 +46,7 @@ _INDEXES = (
 _DELAYS = (60, 300, 1800)
 
 
-def ensure_table() -> None:
+def prepare_table() -> None:
     from core.rls import apply_tenant_rls
 
     with db.get_cursor(commit=True) as cur:
@@ -126,7 +126,7 @@ def enqueue_job(
         )
     except Exception as e:
         try:
-            ensure_table()
+            prepare_table()
             return _insert_job(
                 bound_user=bound_user,
                 line_user_id=line_user_id,

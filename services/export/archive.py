@@ -157,26 +157,22 @@ def _image_to_pdf(image_bytes: bytes) -> Optional[bytes]:
         return None
 
 
-def run_export(job: dict) -> None:
+def run_export(params: dict, input_ref: Optional[list] = None, progress_cb=None) -> tuple:
     """异步归档 handler(recon_jobs worker 调度 · job_type='export')。
 
     凭据按套账取;逐单归档(已成功跳过=幂等);写 Sheet。进度/结果经 recon_jobs store
     回填(drive/sheet 链接进 progress)。无凭据/Google 故障 → 失败可重试,不污染主数据。
     """
-    from services.recon_jobs import store as jobs
-
-    jid = str(job.get("id"))
-    tid = job.get("tenant_id")
-    ws = job.get("workspace_client_id")
-    params = job.get("params") or {}
+    progress_cb = progress_cb or (lambda _p: None)
+    tid = params.get("tenant_id")
+    ws = params.get("workspace_client_id")
     date_from, date_to = params.get("date_from"), params.get("date_to")
     lang = params.get("lang") or "zh"
 
     with db.get_cursor(commit=False) as cur:
         token = google_oauth.valid_access_token(cur, tenant_id=tid, workspace_client_id=ws)
         if not token:
-            jobs.fail(jid, "google_not_connected")
-            return
+            return ("__failed__", {"error_code": "google_not_connected"})
         doc_ids = _posted_doc_ids(
             cur, tenant_id=tid, workspace_client_id=ws, date_from=date_from, date_to=date_to
         )
@@ -225,23 +221,21 @@ def run_export(job: dict) -> None:
                     drive_url=res.get("evidence_url"),
                 )
             done_n += 1
-            jobs.update_progress(jid, {"done_n": done_n, "skip_n": skip_n, "total": len(doc_ids)})
+            progress_cb({"done_n": done_n, "skip_n": skip_n, "total": len(doc_ids)})
         except Exception as e:  # noqa: BLE001
             logger.warning("export archive doc %s failed: %s", did, e)
 
     links = _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to, lang)
-    jobs.finish(
-        jid,
-        "export_archived_docs",
-        ws,
+    progress_cb(
         {
             "done_n": done_n,
             "skip_n": skip_n,
             "total": len(doc_ids),
             "sheet_url": links.get("sheet_url", ""),
             "drive_url": links.get("drive_url", ""),
-        },
+        }
     )
+    return ("export_archived_docs", ws)
 
 
 def _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to, lang="zh") -> dict:

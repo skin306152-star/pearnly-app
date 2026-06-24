@@ -81,7 +81,13 @@ def _run_one(job: Dict) -> None:
 
     keep_stage = False  # S8 · needs_review 时留暂存(confirm 重对账复用 gl 文件)
     try:
-        result = handler(job.get("params") or {}, job.get("input_ref") or [], progress_cb)
+        params = dict(job.get("params") or {})
+        for key in ("job_id", "user_id", "tenant_id", "workspace_client_id"):
+            row_key = "id" if key == "job_id" else key
+            if params.get(key) is None and job.get(row_key) is not None:
+                params[key] = job.get(row_key)
+
+        result = handler(params, job.get("input_ref") or [], progress_cb)
         # S8 · handler 返回 ("__needs_review__", payload) → 暂停等用户核对 OCR 行
         _sentinel = result[0] if isinstance(result, (tuple, list)) and len(result) == 2 else None
         if _sentinel == "__needs_review__":

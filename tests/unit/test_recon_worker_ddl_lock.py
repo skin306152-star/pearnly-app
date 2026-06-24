@@ -71,6 +71,36 @@ class RunOneErrorCaptureTests(unittest.TestCase):
             worker._run_one({"id": "j2", "job_type": "salesvat", "params": {}, "input_ref": []})
         self.assertEqual(m_fail.call_args[0][1], "processing_error")
 
+    def test_job_row_context_is_available_to_handler(self):
+        seen = {}
+
+        def handler(params, input_ref, cb):
+            seen.update(params)
+            return ("result", "1")
+
+        job = {
+            "id": "job-ctx",
+            "job_type": "export",
+            "user_id": "user-1",
+            "tenant_id": "tenant-1",
+            "workspace_client_id": 84,
+            "params": {"format": "sheet"},
+            "input_ref": [],
+        }
+        with (
+            mock.patch.dict(worker._HANDLERS, {"export": handler}, clear=False),
+            mock.patch.object(worker.store, "finish") as m_finish,
+            mock.patch.object(worker, "_cleanup_stage"),
+        ):
+            worker._run_one(job)
+
+        self.assertEqual(seen["job_id"], "job-ctx")
+        self.assertEqual(seen["user_id"], "user-1")
+        self.assertEqual(seen["tenant_id"], "tenant-1")
+        self.assertEqual(seen["workspace_client_id"], 84)
+        self.assertEqual(seen["format"], "sheet")
+        m_finish.assert_called_once_with("job-ctx", "result", "1")
+
 
 if __name__ == "__main__":
     unittest.main()

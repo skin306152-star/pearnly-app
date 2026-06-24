@@ -28,7 +28,12 @@ class RegistrationContractTests(unittest.TestCase):
     def test_signature(self):
         import inspect
 
-        for fn in (handlers.run_bank_recon, handlers.run_glvat, handlers.run_salesvat):
+        for fn in (
+            handlers.run_bank_recon,
+            handlers.run_glvat,
+            handlers.run_salesvat,
+            handlers.run_export,
+        ):
             params = list(inspect.signature(fn).parameters)
             self.assertEqual(params, ["params", "input_ref", "progress_cb"])
 
@@ -37,6 +42,7 @@ class RegistrationContractTests(unittest.TestCase):
         self.assertIs(worker._HANDLERS.get("bank"), handlers.run_bank_recon)
         self.assertIs(worker._HANDLERS.get("glvat"), handlers.run_glvat)
         self.assertIs(worker._HANDLERS.get("salesvat"), handlers.run_salesvat)
+        self.assertIs(worker._HANDLERS.get("export"), handlers.run_export)
 
 
 class HelperTests(unittest.TestCase):

@@ -13,6 +13,7 @@ from typing import Any, List, Optional, Tuple
 
 from ._handler_common import _read_inputs, _noop, _parallel, _resolve_api_key, ProgressCb
 from .bank_handler import run_bank_recon
+from services.export.archive import run_export
 
 logger = logging.getLogger("recon_jobs.handlers")
 
@@ -321,6 +322,7 @@ def _register() -> None:
     worker.register_handler("bank", run_bank_recon)
     worker.register_handler("glvat", run_glvat)
     worker.register_handler("salesvat", run_salesvat)
+    worker.register_handler("export", run_export)
 
 
 _register()

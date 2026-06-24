@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Callable, Optional
 
@@ -30,8 +30,19 @@ PAGE_W, PAGE_H = A4
 
 THAI_DIGITS = "๐๑๒๓๔๕๖๗๘๙"
 TH_MONTHS = [
-    "", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+    "",
+    "มกราคม",
+    "กุมภาพันธ์",
+    "มีนาคม",
+    "เมษายน",
+    "พฤษภาคม",
+    "มิถุนายน",
+    "กรกฎาคม",
+    "สิงหาคม",
+    "กันยายน",
+    "ตุลาคม",
+    "พฤศจิกายน",
+    "ธันวาคม",
 ]
 
 
@@ -59,8 +70,13 @@ CJK = register_cjk()
 
 def emoji_safe(s: str) -> str:
     """CJK 字体无彩色 emoji 字形 → 转纯文本标记,避免页脚出现缺字方块。"""
-    return (s.replace("✅", "[OK]").replace("⚠️", "[!]").replace("❌", "[X]")
-            .replace("⚠", "[!]").replace("️", ""))
+    return (
+        s.replace("✅", "[OK]")
+        .replace("⚠️", "[!]")
+        .replace("❌", "[X]")
+        .replace("⚠", "[!]")
+        .replace("️", "")
+    )
 
 
 def money(v, thai=False) -> str:
@@ -88,36 +104,75 @@ OWN = {
     "tax": OWN_TAX,
 }
 SUP = {
-    "office": {"name": "บริษัท ไทยสเตชันเนอรี่ ซัพพลาย จำกัด",
-               "addr": "88 ถนนพระราม 4 แขวงสีลม เขตบางรัก กรุงเทพฯ 10500", "tax": "0105556012345"},
-    "fuel": {"name": "บริษัท บางจาก ปิโตรเลียม จำกัด (มหาชน)",
-             "addr": "210 ถนนสุขุมวิท แขวงบางจาก เขตพระโขนง กรุงเทพฯ 10260", "tax": "0107536000269"},
-    "pos": {"name": "บริษัท ซีพี ออลล์ จำกัด (มหาชน) สาขา 00123",
-            "addr": "283 ถนนสีลม แขวงสีลม เขตบางรัก กรุงเทพฯ 10500", "tax": "0107542000011"},
-    "build": {"name": "บริษัท สยามวัสดุก่อสร้าง จำกัด",
-              "addr": "55 หมู่ 3 ถนนบางนา-ตราด ตำบลบางพลี อำเภอบางพลี สมุทรปราการ 10540", "tax": "0115551023456"},
-    "newA": {"name": "บริษัท นิวเทค โซลูชั่นส์ จำกัด",
-             "addr": "9/9 ถนนรัชดาภิเษก แขวงดินแดง เขตดินแดง กรุงเทพฯ 10400", "tax": "0105560099887"},
-    "newB": {"name": "ห้างหุ้นส่วนจำกัด รุ่งเรืองพาณิชย์",
-             "addr": "12 ถนนเพชรเกษม ตำบลหาดใหญ่ อำเภอหาดใหญ่ สงขลา 90110", "tax": "0903555044556"},
+    "office": {
+        "name": "บริษัท ไทยสเตชันเนอรี่ ซัพพลาย จำกัด",
+        "addr": "88 ถนนพระราม 4 แขวงสีลม เขตบางรัก กรุงเทพฯ 10500",
+        "tax": "0105556012345",
+    },
+    "fuel": {
+        "name": "บริษัท บางจาก ปิโตรเลียม จำกัด (มหาชน)",
+        "addr": "210 ถนนสุขุมวิท แขวงบางจาก เขตพระโขนง กรุงเทพฯ 10260",
+        "tax": "0107536000269",
+    },
+    "pos": {
+        "name": "บริษัท ซีพี ออลล์ จำกัด (มหาชน) สาขา 00123",
+        "addr": "283 ถนนสีลม แขวงสีลม เขตบางรัก กรุงเทพฯ 10500",
+        "tax": "0107542000011",
+    },
+    "build": {
+        "name": "บริษัท สยามวัสดุก่อสร้าง จำกัด",
+        "addr": "55 หมู่ 3 ถนนบางนา-ตราด ตำบลบางพลี อำเภอบางพลี สมุทรปราการ 10540",
+        "tax": "0115551023456",
+    },
+    "newA": {
+        "name": "บริษัท นิวเทค โซลูชั่นส์ จำกัด",
+        "addr": "9/9 ถนนรัชดาภิเษก แขวงดินแดง เขตดินแดง กรุงเทพฯ 10400",
+        "tax": "0105560099887",
+    },
+    "newB": {
+        "name": "ห้างหุ้นส่วนจำกัด รุ่งเรืองพาณิชย์",
+        "addr": "12 ถนนเพชรเกษม ตำบลหาดใหญ่ อำเภอหาดใหญ่ สงขลา 90110",
+        "tax": "0903555044556",
+    },
     # 同一供应商不同写法(测归一)
-    "varA": {"name": "บริษัท ที.ดับบลิว.จี. ที จำกัด",
-             "addr": "1 ถนนวิทยุ แขวงลุมพินี เขตปทุมวัน กรุงเทพฯ 10330", "tax": "0105549011223"},
-    "varB": {"name": "บ. ที.ดับบลิว.จี.ที จก.",
-             "addr": "1 ถ.วิทยุ ลุมพินี ปทุมวัน กทม. 10330", "tax": "0105549011223"},
-    "cn": {"name": "บริษัท เซี่ยงไฮ้ อิมพอร์ต (ประเทศไทย) จำกัด · 上海进出口",
-           "addr": "เลขที่ 7 อาคารเอ็มไพร์ ถนนสาทรใต้ กรุงเทพฯ 10120", "tax": "0105558077665"},
+    "varA": {
+        "name": "บริษัท ที.ดับบลิว.จี. ที จำกัด",
+        "addr": "1 ถนนวิทยุ แขวงลุมพินี เขตปทุมวัน กรุงเทพฯ 10330",
+        "tax": "0105549011223",
+    },
+    "varB": {
+        "name": "บ. ที.ดับบลิว.จี.ที จก.",
+        "addr": "1 ถ.วิทยุ ลุมพินี ปทุมวัน กทม. 10330",
+        "tax": "0105549011223",
+    },
+    "cn": {
+        "name": "บริษัท เซี่ยงไฮ้ อิมพอร์ต (ประเทศไทย) จำกัด · 上海进出口",
+        "addr": "เลขที่ 7 อาคารเอ็มไพร์ ถนนสาทรใต้ กรุงเทพฯ 10120",
+        "tax": "0105558077665",
+    },
 }
 CUS = {
-    "co": {"name": "บริษัท ลูกค้าสัมพันธ์ จำกัด",
-           "addr": "456 ถนนเพชรบุรีตัดใหม่ แขวงบางกะปิ เขตห้วยขวาง กรุงเทพฯ 10310", "tax": "0105557066778"},
-    "svc": {"name": "บริษัท เอเชีย โลจิสติกส์ จำกัด",
-            "addr": "77 ถนนวิภาวดีรังสิต แขวงจตุจักร เขตจตุจักร กรุงเทพฯ 10900", "tax": "0105559055443"},
+    "co": {
+        "name": "บริษัท ลูกค้าสัมพันธ์ จำกัด",
+        "addr": "456 ถนนเพชรบุรีตัดใหม่ แขวงบางกะปิ เขตห้วยขวาง กรุงเทพฯ 10310",
+        "tax": "0105557066778",
+    },
+    "svc": {
+        "name": "บริษัท เอเชีย โลจิสติกส์ จำกัด",
+        "addr": "77 ถนนวิภาวดีรังสิต แขวงจตุจักร เขตจตุจักร กรุงเทพฯ 10900",
+        "tax": "0105559055443",
+    },
     # S4 自建客户:newC 全新(应自动建 ARMAS);dupC 与 newC 核心名近似但税号不同(应转人工不建重复)。
-    "newC": {"name": "บริษัท เอ็มเพ็กซ์ เทรดดิ้ง จำกัด",
-             "addr": "159 ถนนสุขุมวิท 24 แขวงคลองตัน เขตคลองเตย กรุงเทพฯ 10110", "tax": "0105561033221"},
-    "dupC": {"name": "บริษัท เอ็มเพกซ์ เทรดดิ้ง จำกัด",
-             "addr": "160 ถนนสุขุมวิท 24 แขวงคลองตัน เขตคลองเตย กรุงเทพฯ 10110", "tax": "0105562044332"},
+    "newC": {
+        "name": "บริษัท เอ็มเพ็กซ์ เทรดดิ้ง จำกัด",
+        "addr": "159 ถนนสุขุมวิท 24 แขวงคลองตัน เขตคลองเตย กรุงเทพฯ 10110",
+        "tax": "0105561033221",
+    },
+    "dupC": {
+        "name": "บริษัท เอ็มเพกซ์ เทรดดิ้ง จำกัด",
+        "addr": "160 ถนนสุขุมวิท 24 แขวงคลองตัน เขตคลองเตย กรุงเทพฯ 10110",
+        "tax": "0105562044332",
+    },
 }
 
 
@@ -134,27 +189,27 @@ class Item:
 
 @dataclass
 class Invoice:
-    num: str          # 场景号 "01"
-    fname: str        # 文件名(不含扩展)
-    group: str        # 子目录
-    title: str        # 中文场景简述
-    expected: str     # 预期结果
-    chain: str        # 测哪条链路
+    num: str  # 场景号 "01"
+    fname: str  # 文件名(不含扩展)
+    group: str  # 子目录
+    title: str  # 中文场景简述
+    expected: str  # 预期结果
+    chain: str  # 测哪条链路
     seller: dict
     buyer: dict
     items: list
     inv_no: str
-    date: tuple       # (y,m,d) gregorian
+    date: tuple  # (y,m,d) gregorian
     doc_type: str = "ใบกำกับภาษี / ใบส่งของ"
-    payment: str = "เงินสด"          # 现金 / เงินเชื่อ 赊
-    vat_included: bool = False        # 含税价
-    vat_split: bool = True            # 税前+VAT 分列展示
+    payment: str = "เงินสด"  # 现金 / เงินเชื่อ 赊
+    vat_included: bool = False  # 含税价
+    vat_split: bool = True  # 税前+VAT 分列展示
     thai_digits: bool = False
     currency: str = "บาท"
     discount: Optional[Decimal] = None
     force_total: Optional[Decimal] = None  # 明细对不上时强制总额
-    note_extra: str = ""              # 票面额外标注(押金/退货等)
-    renderer: Optional[Callable] = None    # 特殊版式
+    note_extra: str = ""  # 票面额外标注(押金/退货等)
+    renderer: Optional[Callable] = None  # 特殊版式
 
     def totals(self):
         sub = sum((it.amount for it in self.items), Decimal("0"))
@@ -186,7 +241,9 @@ def _t(c, x, y, s, size=10, bold=False, right=False, center=False, color=(0, 0, 
 def _footer(c, inv: Invoice, w=PAGE_W):
     c.setFont(CJK, 7)
     c.setFillColorRGB(0.55, 0.55, 0.55)
-    c.drawString(15 * mm, 8 * mm, emoji_safe(f"【场景 {inv.num}】{inv.title} — 预期:{inv.expected}"))
+    c.drawString(
+        15 * mm, 8 * mm, emoji_safe(f"【场景 {inv.num}】{inv.title} — 预期:{inv.expected}")
+    )
     c.setFillColorRGB(0, 0, 0)
 
 
@@ -199,14 +256,16 @@ def _party(c, x, y, label, p: dict, w, td=False):
     lines, cur = [], ""
     for word in addr.split(" "):
         if c.stringWidth(cur + " " + word, FONT, 9) > w:
-            lines.append(cur); cur = word
+            lines.append(cur)
+            cur = word
         else:
             cur = (cur + " " + word).strip()
     if cur:
         lines.append(cur)
     yy = y - 28
     for ln in lines[:3]:
-        _t(c, x, yy, ln, 9, color=(0.2, 0.2, 0.2)); yy -= 12
+        _t(c, x, yy, ln, 9, color=(0.2, 0.2, 0.2))
+        yy -= 12
     _t(c, x, yy, f"เลขประจำตัวผู้เสียภาษี: {p['tax']}", 9, bold=True)  # 税号恒阿拉伯(真票惯例)
     return yy - 14
 
@@ -216,19 +275,36 @@ def render_standard(c, inv: Invoice):
     td = inv.thai_digits
     c.setFont(FONT_B, 18)
     _t(c, PAGE_W / 2, PAGE_H - 30 * mm, inv.doc_type, 17, bold=True, center=True)
-    _t(c, PAGE_W / 2, PAGE_H - 36 * mm, "(ต้นฉบับ / ORIGINAL)", 8, center=True, color=(0.4, 0.4, 0.4))
+    _t(
+        c,
+        PAGE_W / 2,
+        PAGE_H - 36 * mm,
+        "(ต้นฉบับ / ORIGINAL)",
+        8,
+        center=True,
+        color=(0.4, 0.4, 0.4),
+    )
 
     top = PAGE_H - 48 * mm
     _party(c, 15 * mm, top, "ผู้ขาย / ผู้ประกอบการ", inv.seller, 95 * mm, td)
     # 票号/日期 右上
     _t(c, PAGE_W - 15 * mm, top, "เลขที่ (No.):", 9, right=True, color=(0.3, 0.3, 0.3))
-    _t(c, PAGE_W - 15 * mm, top - 12, to_thai_digits(inv.inv_no) if td else inv.inv_no, 11, bold=True, right=True)
+    _t(
+        c,
+        PAGE_W - 15 * mm,
+        top - 12,
+        to_thai_digits(inv.inv_no) if td else inv.inv_no,
+        11,
+        bold=True,
+        right=True,
+    )
     _t(c, PAGE_W - 15 * mm, top - 28, "วันที่ (Date):", 9, right=True, color=(0.3, 0.3, 0.3))
     _t(c, PAGE_W - 15 * mm, top - 40, be_date(*inv.date, thai_digits=td), 11, bold=True, right=True)
 
     by = _party(c, 15 * mm, top - 60, "ผู้ซื้อ / ลูกค้า", inv.buyer, 120 * mm, td)
     if inv.note_extra:
-        _t(c, 15 * mm, by, inv.note_extra, 10, bold=True, color=(0.6, 0.2, 0.1)); by -= 16
+        _t(c, 15 * mm, by, inv.note_extra, 10, bold=True, color=(0.6, 0.2, 0.1))
+        by -= 16
 
     _items_table(c, inv, by - 6)
     _footer(c, inv)
@@ -237,7 +313,13 @@ def render_standard(c, inv: Invoice):
 def _items_table(c, inv: Invoice, top_y):
     td = inv.thai_digits
     x0, x1 = 15 * mm, PAGE_W - 15 * mm
-    cols = [x0 + 8 * mm, x0 + 14 * mm, x1 - 70 * mm, x1 - 35 * mm, x1]  # seq|desc start|qty|price|amount
+    cols = [
+        x0 + 8 * mm,
+        x0 + 14 * mm,
+        x1 - 70 * mm,
+        x1 - 35 * mm,
+        x1,
+    ]  # seq|desc start|qty|price|amount
     y = top_y
     c.setFillColorRGB(0.93, 0.95, 0.96)
     c.rect(x0, y - 16, x1 - x0, 16, fill=1, stroke=0)
@@ -254,8 +336,18 @@ def _items_table(c, inv: Invoice, top_y):
         y -= 18
         _t(c, x0 + 4, y + 4, to_thai_digits(str(i)) if td else str(i), 9)
         _t(c, cols[1], y + 4, it.desc, 9)
-        _t(c, cols[2] + 18 * mm, y + 4, money(it.qty, td) if it.qty != it.qty.to_integral() else
-           (to_thai_digits(str(int(it.qty))) if td else str(int(it.qty))), 9, right=True)
+        _t(
+            c,
+            cols[2] + 18 * mm,
+            y + 4,
+            (
+                money(it.qty, td)
+                if it.qty != it.qty.to_integral()
+                else (to_thai_digits(str(int(it.qty))) if td else str(int(it.qty)))
+            ),
+            9,
+            right=True,
+        )
         _t(c, cols[3] + 14 * mm, y + 4, money(it.price, td), 9, right=True)
         _t(c, cols[4], y + 4, money(it.amount, td), 9, right=True)
     y -= 8
@@ -265,12 +357,15 @@ def _items_table(c, inv: Invoice, top_y):
     y -= 18
     if inv.discount:
         _t(c, lblr, y + 4, "ส่วนลด:", 9, right=True)
-        _t(c, cols[4], y + 4, "-" + money(inv.discount, td), 9, right=True); y -= 16
+        _t(c, cols[4], y + 4, "-" + money(inv.discount, td), 9, right=True)
+        y -= 16
     label_sub = "มูลค่าสินค้า/บริการ (ก่อน VAT)" if inv.vat_split else "ราคารวมภาษีมูลค่าเพิ่ม"
     _t(c, lblr, y + 4, label_sub + ":", 9, right=True)
-    _t(c, cols[4], y + 4, money(sub, td) + f" {inv.currency}", 9, right=True); y -= 16
+    _t(c, cols[4], y + 4, money(sub, td) + f" {inv.currency}", 9, right=True)
+    y -= 16
     _t(c, lblr, y + 4, "ภาษีมูลค่าเพิ่ม 7%:", 9, right=True)
-    _t(c, cols[4], y + 4, money(vat, td) + f" {inv.currency}", 9, right=True); y -= 18
+    _t(c, cols[4], y + 4, money(vat, td) + f" {inv.currency}", 9, right=True)
+    y -= 18
     c.setFillColorRGB(0.93, 0.95, 0.96)
     c.rect(cols[4] - 98 * mm, y - 4, 98 * mm, 20, fill=1, stroke=0)
     c.setFillColorRGB(0, 0, 0)
@@ -289,18 +384,29 @@ def render_pos(c, inv: Invoice):
     _t(c, inv._w / 2, inv._h - 21 * mm, f"TAX ID {inv.seller['tax']}", 6, center=True)
     _t(c, inv._w / 2, inv._h - 26 * mm, "ใบกำกับภาษีอย่างย่อ / TAX INV(ABB)", 7, center=True)
     y = inv._h - 32 * mm
-    _t(c, 6 * mm, y, f"POS#0007 RC{inv.inv_no} {be_date(*inv.date)}", 6, color=(0.3, 0.3, 0.3)); y -= 12
+    _t(c, 6 * mm, y, f"POS#0007 RC{inv.inv_no} {be_date(*inv.date)}", 6, color=(0.3, 0.3, 0.3))
+    y -= 12
     for it in inv.items:
         _t(c, 6 * mm, y, f"{it.desc[:22]}", 7)
-        _t(c, inv._w - 6 * mm, y, money(it.amount), 7, right=True); y -= 11
+        _t(c, inv._w - 6 * mm, y, money(it.amount), 7, right=True)
+        y -= 11
     sub, vat, grand = inv.totals()
     y -= 4
-    c.line(6 * mm, y, inv._w - 6 * mm, y); y -= 12
-    _t(c, 6 * mm, y, "ยอดก่อนภาษี", 7); _t(c, inv._w - 6 * mm, y, money(sub), 7, right=True); y -= 11
-    _t(c, 6 * mm, y, "VAT 7%", 7); _t(c, inv._w - 6 * mm, y, money(vat), 7, right=True); y -= 11
-    _t(c, 6 * mm, y, "รวมสุทธิ", 8, bold=True); _t(c, inv._w - 6 * mm, y, money(grand), 8, bold=True, right=True); y -= 14
-    _t(c, 6 * mm, y, "เงินสด / CASH", 7); _t(c, inv._w - 6 * mm, y, money(grand), 7, right=True)
-    c.setFont(CJK, 5); c.setFillColorRGB(0.6, 0.6, 0.6)
+    c.line(6 * mm, y, inv._w - 6 * mm, y)
+    y -= 12
+    _t(c, 6 * mm, y, "ยอดก่อนภาษี", 7)
+    _t(c, inv._w - 6 * mm, y, money(sub), 7, right=True)
+    y -= 11
+    _t(c, 6 * mm, y, "VAT 7%", 7)
+    _t(c, inv._w - 6 * mm, y, money(vat), 7, right=True)
+    y -= 11
+    _t(c, 6 * mm, y, "รวมสุทธิ", 8, bold=True)
+    _t(c, inv._w - 6 * mm, y, money(grand), 8, bold=True, right=True)
+    y -= 14
+    _t(c, 6 * mm, y, "เงินสด / CASH", 7)
+    _t(c, inv._w - 6 * mm, y, money(grand), 7, right=True)
+    c.setFont(CJK, 5)
+    c.setFillColorRGB(0.6, 0.6, 0.6)
     c.drawCentredString(inv._w / 2, 6 * mm, emoji_safe(f"【{inv.num}】{inv.expected}"))
     c.setFillColorRGB(0, 0, 0)
 
@@ -312,13 +418,36 @@ def render_fuel(c, inv: Invoice):
 
 def render_noninvoice(c, inv: Invoice):
     """非发票:菜单/随手拍,无任何发票要素。"""
-    _t(c, PAGE_W / 2, PAGE_H - 40 * mm, "เมนูอาหาร · ร้านอาหารตามสั่งป้านิด", 16, bold=True, center=True)
-    items = [("ข้าวผัดกะเพราหมู", "60"), ("ต้มยำกุ้ง", "120"), ("ข้าวเปล่า", "10"),
-             ("น้ำเปล่า", "10"), ("ผัดไทย", "70")]
+    _t(
+        c,
+        PAGE_W / 2,
+        PAGE_H - 40 * mm,
+        "เมนูอาหาร · ร้านอาหารตามสั่งป้านิด",
+        16,
+        bold=True,
+        center=True,
+    )
+    items = [
+        ("ข้าวผัดกะเพราหมู", "60"),
+        ("ต้มยำกุ้ง", "120"),
+        ("ข้าวเปล่า", "10"),
+        ("น้ำเปล่า", "10"),
+        ("ผัดไทย", "70"),
+    ]
     y = PAGE_H - 60 * mm
     for n, p in items:
-        _t(c, 30 * mm, y, n, 13); _t(c, PAGE_W - 30 * mm, y, p + " บาท", 13, right=True); y -= 22
-    _t(c, PAGE_W / 2, y - 20, "เปิดทุกวัน 08.00 - 20.00 น. · โทร 02-123-4567", 10, center=True, color=(0.4, 0.4, 0.4))
+        _t(c, 30 * mm, y, n, 13)
+        _t(c, PAGE_W - 30 * mm, y, p + " บาท", 13, right=True)
+        y -= 22
+    _t(
+        c,
+        PAGE_W / 2,
+        y - 20,
+        "เปิดทุกวัน 08.00 - 20.00 น. · โทร 02-123-4567",
+        10,
+        center=True,
+        color=(0.4, 0.4, 0.4),
+    )
     _footer(c, inv)
 
 
@@ -326,39 +455,76 @@ def render_handwritten(c, inv: Invoice):
     """手写感收据:斜体近似 + 关键金额像手写。"""
     _t(c, PAGE_W / 2, PAGE_H - 35 * mm, "ใบเสร็จรับเงิน / บิลเงินสด", 16, bold=True, center=True)
     y = PAGE_H - 55 * mm
-    _t(c, 25 * mm, y, f"วันที่ ......{be_date(*inv.date)}......", 12); y -= 24
-    _t(c, 25 * mm, y, f"ได้รับเงินจาก {inv.buyer['name']}", 12); y -= 24
+    _t(c, 25 * mm, y, f"วันที่ ......{be_date(*inv.date)}......", 12)
+    y -= 24
+    _t(c, 25 * mm, y, f"ได้รับเงินจาก {inv.buyer['name']}", 12)
+    y -= 24
     for it in inv.items:
         _t(c, 25 * mm, y, f"- {it.desc}", 12)
-        _t(c, PAGE_W - 30 * mm, y, money(it.amount), 12, right=True); y -= 22
+        _t(c, PAGE_W - 30 * mm, y, money(it.amount), 12, right=True)
+        y -= 22
     _, _, grand = inv.totals()
     y -= 10
-    c.setLineWidth(1.2); c.line(25 * mm, y, PAGE_W - 25 * mm, y); y -= 22
+    c.setLineWidth(1.2)
+    c.line(25 * mm, y, PAGE_W - 25 * mm, y)
+    y -= 22
     # "手写"总额:用粗体 + 斜放近似
-    c.saveState(); c.translate(PAGE_W - 70 * mm, y); c.rotate(-4)
+    c.saveState()
+    c.translate(PAGE_W - 70 * mm, y)
+    c.rotate(-4)
     _t(c, 0, 0, "รวม " + money(grand) + " บาท", 16, bold=True, color=(0.05, 0.05, 0.4))
     c.restoreState()
-    _t(c, 25 * mm, y - 30, "ลงชื่อ ............................ ผู้รับเงิน", 11, color=(0.3, 0.3, 0.3))
+    _t(
+        c,
+        25 * mm,
+        y - 30,
+        "ลงชื่อ ............................ ผู้รับเงิน",
+        11,
+        color=(0.3, 0.3, 0.3),
+    )
     _footer(c, inv)
 
 
 def render_multipage(c, inv: Invoice):
     """多页长发票:25 行跨 2 页,合计在末页。"""
     per_page = 16
-    pages = [inv.items[i:i + per_page] for i in range(0, len(inv.items), per_page)]
+    pages = [inv.items[i : i + per_page] for i in range(0, len(inv.items), per_page)]
     total_pages = len(pages)
     for pi, chunk in enumerate(pages, 1):
         _t(c, PAGE_W / 2, PAGE_H - 28 * mm, inv.doc_type, 16, bold=True, center=True)
-        _t(c, PAGE_W - 15 * mm, PAGE_H - 28 * mm, f"หน้า {pi}/{total_pages}", 9, right=True, color=(0.3, 0.3, 0.3))
+        _t(
+            c,
+            PAGE_W - 15 * mm,
+            PAGE_H - 28 * mm,
+            f"หน้า {pi}/{total_pages}",
+            9,
+            right=True,
+            color=(0.3, 0.3, 0.3),
+        )
         top = PAGE_H - 40 * mm
         _party(c, 15 * mm, top, "ผู้ขาย", inv.seller, 95 * mm)
-        _t(c, PAGE_W - 15 * mm, top, f"เลขที่ {inv.inv_no}  วันที่ {be_date(*inv.date)}", 9, right=True)
+        _t(
+            c,
+            PAGE_W - 15 * mm,
+            top,
+            f"เลขที่ {inv.inv_no}  วันที่ {be_date(*inv.date)}",
+            9,
+            right=True,
+        )
         by = top - 56
         sub_inv = Invoice(**{**inv.__dict__, "items": chunk, "renderer": None})
         if pi < total_pages:
             # 仅画明细,不画合计
             _items_only(c, chunk, by, cont=True)
-            _t(c, PAGE_W / 2, 20 * mm, "(ยอดรวมแสดงในหน้าสุดท้าย)", 8, center=True, color=(0.5, 0.5, 0.5))
+            _t(
+                c,
+                PAGE_W / 2,
+                20 * mm,
+                "(ยอดรวมแสดงในหน้าสุดท้าย)",
+                8,
+                center=True,
+                color=(0.5, 0.5, 0.5),
+            )
         else:
             _items_table(c, inv, by)  # 末页带全票合计(收敛到票面)
         _footer(c, inv)
@@ -390,107 +556,356 @@ def _items(*triples):
 def build_scenarios() -> list:
     S = []
     # ---- 组 1 正确 happy path ----
-    S.append(Invoice("01", "01_purchase_credit_goods", "group1_correct",
-                     "采购·赊购·货品·单行", "✅ 采购 RR · 可推", "识别+方向+推送",
-                     SUP["build"], OWN, _items(("เหล็กเส้น SD40 ขนาด 12 มม.", 100, 185)),
-                     "RR581215-004", (2025, 12, 15), payment="เงินเชื่อ (เครดิต 30 วัน)"))
-    S.append(Invoice("02", "02_purchase_cash_expense_office", "group1_correct",
-                     "采购·现购·办公费用", "✅ 采购 HP · 走 DBF 费用", "识别+推送(费用)",
-                     SUP["office"], OWN, _items(("กระดาษ A4 80 แกรม (กล่อง)", 5, 480),
-                                                ("ปากกาลูกลื่น (โหล)", 3, 120)),
-                     "IV6812-0098", (2025, 12, 16), payment="เงินสด"))
-    S.append(Invoice("03", "03_sales_credit_service", "group1_correct",
-                     "销项·赊销·服务", "✅ 销项 IV · 服务项(RPA 路)", "识别+方向(销项)+推送",
-                     OWN, CUS["svc"], _items(("ค่าบริการที่ปรึกษาระบบบัญชี (เดือน ธ.ค.)", 1, 25000)),
-                     "INV6812-031", (2025, 12, 20), payment="เงินเชื่อ"))
-    S.append(Invoice("04", "04_sales_cash_goods", "group1_correct",
-                     "销项·现销·货品", "✅ 销项 HS", "识别+方向(销项)",
-                     OWN, CUS["co"], _items(("กล่องบรรจุภัณฑ์ ขนาด L", 200, 18),
-                                            ("เทปกาว OPP", 50, 22)),
-                     "INV6812-032", (2025, 12, 21), payment="เงินสด"))
-    S.append(Invoice("05", "05_purchase_multi_line_5", "group1_correct",
-                     "采购·多行货品(5 行)", "✅ 多行汇总收敛票面", "识别(多行收敛)",
-                     SUP["office"], OWN, _items(
-                         ("หมึกพิมพ์ HP 678 ดำ", 4, 650), ("หมึกพิมพ์ HP 678 สี", 4, 720),
-                         ("กระดาษการ์ดสี (รีม)", 10, 95), ("แฟ้มเอกสาร 2 ห่วง", 24, 35),
-                         ("ลวดเย็บกระดาษ (กล่อง)", 12, 18)),
-                     "IV6812-0101", (2025, 12, 18), payment="เงินเชื่อ"))
-    S.append(Invoice("06", "06_purchase_satang_decimals", "group1_correct",
-                     "采购·含小数 satang", "✅ 金额精度不丢", "识别(小数精度)",
-                     SUP["build"], OWN, _items(("ปูนซีเมนต์ปอร์ตแลนด์ (ถุง)", 33, 123.45),
-                                               ("ทรายหยาบ (คิว)", 2.5, 450.50)),
-                     "RR6812-0210", (2025, 12, 12), payment="เงินสด"))
-    S.append(Invoice("07", "07_purchase_vat_included", "group1_correct",
-                     "采购·含税价(VAT included)", "✅ 税前=total−vat 反算", "识别(含税反算)",
-                     SUP["office"], OWN, _items(("ชุดโต๊ะทำงานพร้อมเก้าอี้", 1, 8025)),
-                     "IV6812-0110", (2025, 12, 10), payment="เงินสด",
-                     vat_included=True, vat_split=False, force_total=8025))
-    S.append(Invoice("08", "08_purchase_vat_split", "group1_correct",
-                     "采购·税前+VAT 分列", "✅ 直接采信不反算", "识别(分列采信)",
-                     SUP["office"], OWN, _items(("เครื่องพิมพ์เลเซอร์ขาวดำ", 2, 4500)),
-                     "IV6812-0111", (2025, 12, 11), payment="เงินเชื่อ", vat_split=True))
-    S.append(Invoice("09", "09_purchase_new_supplier", "group1_correct",
-                     "采购·新供应商(Express 无此商)", "✅ 自动建档 APMAS", "推送(供应商建档)",
-                     SUP["newA"], OWN, _items(("บริการพัฒนาเว็บไซต์ (เฟส 1)", 1, 45000)),
-                     "NT6812-007", (2025, 12, 19), payment="เงินเชื่อ"))
+    S.append(
+        Invoice(
+            "01",
+            "01_purchase_credit_goods",
+            "group1_correct",
+            "采购·赊购·货品·单行",
+            "✅ 采购 RR · 可推",
+            "识别+方向+推送",
+            SUP["build"],
+            OWN,
+            _items(("เหล็กเส้น SD40 ขนาด 12 มม.", 100, 185)),
+            "RR581215-004",
+            (2025, 12, 15),
+            payment="เงินเชื่อ (เครดิต 30 วัน)",
+        )
+    )
+    S.append(
+        Invoice(
+            "02",
+            "02_purchase_cash_expense_office",
+            "group1_correct",
+            "采购·现购·办公费用",
+            "✅ 采购 HP · 走 DBF 费用",
+            "识别+推送(费用)",
+            SUP["office"],
+            OWN,
+            _items(("กระดาษ A4 80 แกรม (กล่อง)", 5, 480), ("ปากกาลูกลื่น (โหล)", 3, 120)),
+            "IV6812-0098",
+            (2025, 12, 16),
+            payment="เงินสด",
+        )
+    )
+    S.append(
+        Invoice(
+            "03",
+            "03_sales_credit_service",
+            "group1_correct",
+            "销项·赊销·服务",
+            "✅ 销项 IV · 服务项(RPA 路)",
+            "识别+方向(销项)+推送",
+            OWN,
+            CUS["svc"],
+            _items(("ค่าบริการที่ปรึกษาระบบบัญชี (เดือน ธ.ค.)", 1, 25000)),
+            "INV6812-031",
+            (2025, 12, 20),
+            payment="เงินเชื่อ",
+        )
+    )
+    S.append(
+        Invoice(
+            "04",
+            "04_sales_cash_goods",
+            "group1_correct",
+            "销项·现销·货品",
+            "✅ 销项 HS",
+            "识别+方向(销项)",
+            OWN,
+            CUS["co"],
+            _items(("กล่องบรรจุภัณฑ์ ขนาด L", 200, 18), ("เทปกาว OPP", 50, 22)),
+            "INV6812-032",
+            (2025, 12, 21),
+            payment="เงินสด",
+        )
+    )
+    S.append(
+        Invoice(
+            "05",
+            "05_purchase_multi_line_5",
+            "group1_correct",
+            "采购·多行货品(5 行)",
+            "✅ 多行汇总收敛票面",
+            "识别(多行收敛)",
+            SUP["office"],
+            OWN,
+            _items(
+                ("หมึกพิมพ์ HP 678 ดำ", 4, 650),
+                ("หมึกพิมพ์ HP 678 สี", 4, 720),
+                ("กระดาษการ์ดสี (รีม)", 10, 95),
+                ("แฟ้มเอกสาร 2 ห่วง", 24, 35),
+                ("ลวดเย็บกระดาษ (กล่อง)", 12, 18),
+            ),
+            "IV6812-0101",
+            (2025, 12, 18),
+            payment="เงินเชื่อ",
+        )
+    )
+    S.append(
+        Invoice(
+            "06",
+            "06_purchase_satang_decimals",
+            "group1_correct",
+            "采购·含小数 satang",
+            "✅ 金额精度不丢",
+            "识别(小数精度)",
+            SUP["build"],
+            OWN,
+            _items(("ปูนซีเมนต์ปอร์ตแลนด์ (ถุง)", 33, 123.45), ("ทรายหยาบ (คิว)", 2.5, 450.50)),
+            "RR6812-0210",
+            (2025, 12, 12),
+            payment="เงินสด",
+        )
+    )
+    S.append(
+        Invoice(
+            "07",
+            "07_purchase_vat_included",
+            "group1_correct",
+            "采购·含税价(VAT included)",
+            "✅ 税前=total−vat 反算",
+            "识别(含税反算)",
+            SUP["office"],
+            OWN,
+            _items(("ชุดโต๊ะทำงานพร้อมเก้าอี้", 1, 8025)),
+            "IV6812-0110",
+            (2025, 12, 10),
+            payment="เงินสด",
+            vat_included=True,
+            vat_split=False,
+            force_total=8025,
+        )
+    )
+    S.append(
+        Invoice(
+            "08",
+            "08_purchase_vat_split",
+            "group1_correct",
+            "采购·税前+VAT 分列",
+            "✅ 直接采信不反算",
+            "识别(分列采信)",
+            SUP["office"],
+            OWN,
+            _items(("เครื่องพิมพ์เลเซอร์ขาวดำ", 2, 4500)),
+            "IV6812-0111",
+            (2025, 12, 11),
+            payment="เงินเชื่อ",
+            vat_split=True,
+        )
+    )
+    S.append(
+        Invoice(
+            "09",
+            "09_purchase_new_supplier",
+            "group1_correct",
+            "采购·新供应商(Express 无此商)",
+            "✅ 自动建档 APMAS",
+            "推送(供应商建档)",
+            SUP["newA"],
+            OWN,
+            _items(("บริการพัฒนาเว็บไซต์ (เฟส 1)", 1, 45000)),
+            "NT6812-007",
+            (2025, 12, 19),
+            payment="เงินเชื่อ",
+        )
+    )
 
     # ---- 组 2 方向判定 ----
-    S.append(Invoice("10", "10_direction_own_as_seller", "group2_direction",
-                     "自家税号在卖方位", "✅ 判销项", "方向判定",
-                     OWN, CUS["co"], _items(("ค่าออกแบบบรรจุภัณฑ์", 1, 12000)),
-                     "INV6812-040", (2025, 12, 17), payment="เงินเชื่อ"))
-    S.append(Invoice("11", "11_direction_own_as_buyer", "group2_direction",
-                     "自家税号在买方位", "✅ 判采购", "方向判定",
-                     SUP["build"], OWN, _items(("อิฐมอญ (ก้อน)", 5000, 1.8)),
-                     "RR6812-0220", (2025, 12, 14), payment="เงินเชื่อ"))
-    amb_buyer = {"name": "บริษัท ทั่วไป จำกัด", "addr": "1 ถนนใดถนนหนึ่ง กรุงเทพฯ", "tax": "0100000000000"}
-    S.append(Invoice("12", "12_direction_ambiguous", "group2_direction",
-                     "两端都无自家税号/税号脏", "⚠️ ambiguous → 留人工(不乱推)", "方向判定(模糊)",
-                     SUP["office"], amb_buyer, _items(("สินค้าทั่วไป", 1, 1000)),
-                     "IV6812-0130", (2025, 12, 13), payment="เงินสด"))
+    S.append(
+        Invoice(
+            "10",
+            "10_direction_own_as_seller",
+            "group2_direction",
+            "自家税号在卖方位",
+            "✅ 判销项",
+            "方向判定",
+            OWN,
+            CUS["co"],
+            _items(("ค่าออกแบบบรรจุภัณฑ์", 1, 12000)),
+            "INV6812-040",
+            (2025, 12, 17),
+            payment="เงินเชื่อ",
+        )
+    )
+    S.append(
+        Invoice(
+            "11",
+            "11_direction_own_as_buyer",
+            "group2_direction",
+            "自家税号在买方位",
+            "✅ 判采购",
+            "方向判定",
+            SUP["build"],
+            OWN,
+            _items(("อิฐมอญ (ก้อน)", 5000, 1.8)),
+            "RR6812-0220",
+            (2025, 12, 14),
+            payment="เงินเชื่อ",
+        )
+    )
+    amb_buyer = {
+        "name": "บริษัท ทั่วไป จำกัด",
+        "addr": "1 ถนนใดถนนหนึ่ง กรุงเทพฯ",
+        "tax": "0100000000000",
+    }
+    S.append(
+        Invoice(
+            "12",
+            "12_direction_ambiguous",
+            "group2_direction",
+            "两端都无自家税号/税号脏",
+            "⚠️ ambiguous → 留人工(不乱推)",
+            "方向判定(模糊)",
+            SUP["office"],
+            amb_buyer,
+            _items(("สินค้าทั่วไป", 1, 1000)),
+            "IV6812-0130",
+            (2025, 12, 13),
+            payment="เงินสด",
+        )
+    )
 
     # ---- 组 3 识别难点 ----
-    S.append(Invoice("13", "13_ocr_buddhist_date", "group3_ocr_hard",
-                     "佛历日期 25xx", "✅ 转公历 2025", "识别(佛历转换)",
-                     SUP["office"], OWN, _items(("หมึกพิมพ์ (ชุด)", 2, 1200)),
-                     "IV6812-0140", (2025, 12, 9), payment="เงินสด"))
-    S.append(Invoice("14", "14_ocr_thai_numerals", "group3_ocr_hard",
-                     "泰文数字 ๑๒๓", "✅ 转阿拉伯数字", "识别(泰数字)",
-                     SUP["office"], OWN, _items(("กระดาษถ่ายเอกสาร (รีม)", 12, 105)),
-                     "IV6812-0141", (2025, 12, 8), payment="เงินสด", thai_digits=True))
-    S.append(Invoice("15", "15_ocr_fuel_liter_points", "group3_ocr_hard",
-                     "加油票(升数/积分)", "✅ 升数/积分不当金额·取真总额", "识别(噪声数字)",
-                     SUP["fuel"], OWN, _items(("น้ำมันดีเซล B7  22.00 ลิตร @ 31.94", 1, 702.68)),
-                     "BCP6812-5521", (2025, 12, 7), payment="เงินสด",
-                     note_extra="สะสมคะแนน Member 555  ·  เลขไมล์ 120,450 กม.",
-                     renderer=render_fuel))
-    pos = Invoice("16", "16_ocr_pos_convenience", "group3_ocr_hard",
-                  "7-11/便利店 POS 小票", "✅ 清洗 POS 噪声·总额对", "识别(POS 清洗)",
-                  SUP["pos"], OWN, _items(("TW#100 น้ำดื่ม 600ml", 2, 7),
-                                          ("T-BONE ขนมปัง", 1, 25),
-                                          ("ORIGINAL กาแฟกระป๋อง", 3, 18)),
-                  "0012345", (2025, 12, 6), payment="เงินสด", renderer=render_pos)
+    S.append(
+        Invoice(
+            "13",
+            "13_ocr_buddhist_date",
+            "group3_ocr_hard",
+            "佛历日期 25xx",
+            "✅ 转公历 2025",
+            "识别(佛历转换)",
+            SUP["office"],
+            OWN,
+            _items(("หมึกพิมพ์ (ชุด)", 2, 1200)),
+            "IV6812-0140",
+            (2025, 12, 9),
+            payment="เงินสด",
+        )
+    )
+    S.append(
+        Invoice(
+            "14",
+            "14_ocr_thai_numerals",
+            "group3_ocr_hard",
+            "泰文数字 ๑๒๓",
+            "✅ 转阿拉伯数字",
+            "识别(泰数字)",
+            SUP["office"],
+            OWN,
+            _items(("กระดาษถ่ายเอกสาร (รีม)", 12, 105)),
+            "IV6812-0141",
+            (2025, 12, 8),
+            payment="เงินสด",
+            thai_digits=True,
+        )
+    )
+    S.append(
+        Invoice(
+            "15",
+            "15_ocr_fuel_liter_points",
+            "group3_ocr_hard",
+            "加油票(升数/积分)",
+            "✅ 升数/积分不当金额·取真总额",
+            "识别(噪声数字)",
+            SUP["fuel"],
+            OWN,
+            _items(("น้ำมันดีเซล B7  22.00 ลิตร @ 31.94", 1, 702.68)),
+            "BCP6812-5521",
+            (2025, 12, 7),
+            payment="เงินสด",
+            note_extra="สะสมคะแนน Member 555  ·  เลขไมล์ 120,450 กม.",
+            renderer=render_fuel,
+        )
+    )
+    pos = Invoice(
+        "16",
+        "16_ocr_pos_convenience",
+        "group3_ocr_hard",
+        "7-11/便利店 POS 小票",
+        "✅ 清洗 POS 噪声·总额对",
+        "识别(POS 清洗)",
+        SUP["pos"],
+        OWN,
+        _items(
+            ("TW#100 น้ำดื่ม 600ml", 2, 7),
+            ("T-BONE ขนมปัง", 1, 25),
+            ("ORIGINAL กาแฟกระป๋อง", 3, 18),
+        ),
+        "0012345",
+        (2025, 12, 6),
+        payment="เงินสด",
+        renderer=render_pos,
+    )
     pos._w, pos._h = 80 * mm, 200 * mm
     S.append(pos)
-    long_items = _items(*[(f"รายการสินค้า ลำดับที่ {i} · อะไหล่รหัส P{i:03d}", i % 5 + 1, 50 + i * 7)
-                          for i in range(1, 26)])
-    S.append(Invoice("17", "17_ocr_multipage_long", "group3_ocr_hard",
-                     "多页长发票(>20 行)", "✅ 多页合并·收敛票面", "识别(跨页合并)",
-                     SUP["build"], OWN, long_items, "RR6812-0301", (2025, 12, 5),
-                     payment="เงินเชื่อ", renderer=render_multipage))
-    S.append(Invoice("18", "18_ocr_discount_line", "group3_ocr_hard",
-                     "含折扣行 ส่วนลด", "✅ 折扣正确处理", "识别(折扣)",
-                     SUP["office"], OWN, _items(("เก้าอี้สำนักงาน", 10, 1500)),
-                     "IV6812-0150", (2025, 12, 4), payment="เงินเชื่อ", discount=Decimal("1500")))
+    long_items = _items(
+        *[
+            (f"รายการสินค้า ลำดับที่ {i} · อะไหล่รหัส P{i:03d}", i % 5 + 1, 50 + i * 7)
+            for i in range(1, 26)
+        ]
+    )
+    S.append(
+        Invoice(
+            "17",
+            "17_ocr_multipage_long",
+            "group3_ocr_hard",
+            "多页长发票(>20 行)",
+            "✅ 多页合并·收敛票面",
+            "识别(跨页合并)",
+            SUP["build"],
+            OWN,
+            long_items,
+            "RR6812-0301",
+            (2025, 12, 5),
+            payment="เงินเชื่อ",
+            renderer=render_multipage,
+        )
+    )
+    S.append(
+        Invoice(
+            "18",
+            "18_ocr_discount_line",
+            "group3_ocr_hard",
+            "含折扣行 ส่วนลด",
+            "✅ 折扣正确处理",
+            "识别(折扣)",
+            SUP["office"],
+            OWN,
+            _items(("เก้าอี้สำนักงาน", 10, 1500)),
+            "IV6812-0150",
+            (2025, 12, 4),
+            payment="เงินเชื่อ",
+            discount=Decimal("1500"),
+        )
+    )
     bad_buyer = {"name": OWN["name"], "addr": OWN["addr"], "tax": OWN_TAX}
-    bad_seller = {"name": SUP["office"]["name"], "addr": SUP["office"]["addr"], "tax": "01055560123"}  # 11 位
-    S.append(Invoice("19", "19_ocr_invalid_taxid", "group3_ocr_hard",
-                     "税号非法(位数≠13)", "✅ 标税号无效·不显假值", "识别(税号校验)",
-                     bad_seller, bad_buyer, _items(("วัสดุสิ้นเปลือง", 1, 800)),
-                     "IV6812-0160", (2025, 12, 3), payment="เงินสด"))
+    bad_seller = {
+        "name": SUP["office"]["name"],
+        "addr": SUP["office"]["addr"],
+        "tax": "01055560123",
+    }  # 11 位
+    S.append(
+        Invoice(
+            "19",
+            "19_ocr_invalid_taxid",
+            "group3_ocr_hard",
+            "税号非法(位数≠13)",
+            "✅ 标税号无效·不显假值",
+            "识别(税号校验)",
+            bad_seller,
+            bad_buyer,
+            _items(("วัสดุสิ้นเปลือง", 1, 800)),
+            "IV6812-0160",
+            (2025, 12, 3),
+            payment="เงินสด",
+        )
+    )
 
     def render_blurry(c, inv):
-        c.saveState(); c.translate(PAGE_W / 2, PAGE_H / 2); c.rotate(3.5)
+        c.saveState()
+        c.translate(PAGE_W / 2, PAGE_H / 2)
+        c.rotate(3.5)
         c.translate(-PAGE_W / 2, -PAGE_H / 2)
         render_standard(c, inv)
         c.restoreState()
@@ -499,129 +914,432 @@ def build_scenarios() -> list:
         for yy in range(0, int(PAGE_H), 3):
             c.rect(0, yy, PAGE_W, 1.2, fill=1, stroke=0)
         c.setFillColorRGB(0, 0, 0)
-    blur = Invoice("20", "20_ocr_skew_blurry", "group3_ocr_hard",
-                   "模糊/倾斜扫描", "✅ 鲁棒 或 诚实低置信留人工", "识别(退化图鲁棒)",
-                   SUP["office"], OWN, _items(("อุปกรณ์สำนักงานรวม", 1, 3500)),
-                   "IV6812-0170", (2025, 12, 2), payment="เงินสด")
+
+    blur = Invoice(
+        "20",
+        "20_ocr_skew_blurry",
+        "group3_ocr_hard",
+        "模糊/倾斜扫描",
+        "✅ 鲁棒 或 诚实低置信留人工",
+        "识别(退化图鲁棒)",
+        SUP["office"],
+        OWN,
+        _items(("อุปกรณ์สำนักงานรวม", 1, 3500)),
+        "IV6812-0170",
+        (2025, 12, 2),
+        payment="เงินสด",
+    )
     blur.renderer = render_blurry
     S.append(blur)
-    S.append(Invoice("21", "21_ocr_handwritten", "group3_ocr_hard",
-                     "手写金额收据", "✅ 识别或低置信留人工", "识别(手写)",
-                     SUP["newB"], OWN, _items(("ค่าขนส่งสินค้า", 1, 1500),
-                                              ("ค่าแรงติดตั้ง", 1, 800)),
-                     "0456", (2025, 12, 1), payment="เงินสด", renderer=render_handwritten))
+    S.append(
+        Invoice(
+            "21",
+            "21_ocr_handwritten",
+            "group3_ocr_hard",
+            "手写金额收据",
+            "✅ 识别或低置信留人工",
+            "识别(手写)",
+            SUP["newB"],
+            OWN,
+            _items(("ค่าขนส่งสินค้า", 1, 1500), ("ค่าแรงติดตั้ง", 1, 800)),
+            "0456",
+            (2025, 12, 1),
+            payment="เงินสด",
+            renderer=render_handwritten,
+        )
+    )
 
     # ---- 组 4 反伤账(故意造错)----
-    S.append(Invoice("22", "22_block_not_invoice_menu", "group4_intercept",
-                     "不是发票(菜单/随手拍)", "❌ 不建账·提示非发票", "拦截(非发票)",
-                     SUP["office"], OWN, [], "-", (2025, 12, 1), renderer=render_noninvoice))
+    S.append(
+        Invoice(
+            "22",
+            "22_block_not_invoice_menu",
+            "group4_intercept",
+            "不是发票(菜单/随手拍)",
+            "❌ 不建账·提示非发票",
+            "拦截(非发票)",
+            SUP["office"],
+            OWN,
+            [],
+            "-",
+            (2025, 12, 1),
+            renderer=render_noninvoice,
+        )
+    )
     # 23 重复:与 01 同号同额(故意)
-    S.append(Invoice("23", "23_block_duplicate_of_01", "group4_intercept",
-                     "重复发票(同号同额再传)", "❌ 标重复·绝不重复记账", "拦截(幂等去重)",
-                     SUP["build"], OWN, _items(("เหล็กเส้น SD40 ขนาด 12 มม.", 100, 185)),
-                     "RR581215-004", (2025, 12, 15), payment="เงินเชื่อ (เครดิต 30 วัน)",
-                     note_extra="(สำเนาซ้ำ — เลขที่/ยอดตรงกับ 01)"))
-    S.append(Invoice("24", "24_flag_future_date", "group4_intercept",
-                     "未来日期发票(日期>今天)", "⚠️ 反造假·标记复核", "拦截(未来日期)",
-                     SUP["office"], OWN, _items(("บริการล่วงหน้า", 1, 5000)),
-                     "IV6906-0001", (2026, 12, 31), payment="เงินเชื่อ"))
-    S.append(Invoice("25", "25_flag_backdated_suspicious", "group4_intercept",
-                     "倒签/像伪造(编号日期异常)", "⚠️ 标记", "拦截(异常造票)",
-                     SUP["office"], OWN, _items(("ค่าบริการย้อนหลัง", 1, 30000)),
-                     "IV6512-9999", (2022, 1, 5), payment="เงินสด",
-                     note_extra="ออกใบแทน ณ วันที่ 2568 (เลขที่ไม่เรียงลำดับ)"))
-    S.append(Invoice("26", "26_flag_foreign_currency_usd", "group4_intercept",
-                     "外币发票(USD)", "⚠️ 标记·不当泰铢记", "拦截(外币)",
-                     SUP["newA"], OWN, _items(("Cloud hosting service (annual)", 1, 1200)),
-                     "INV-US-0091", (2025, 12, 1), payment="Wire transfer", currency="USD",
-                     vat_split=False, vat_included=True, force_total=1284))
-    S.append(Invoice("27", "27_flag_deposit_receipt", "group4_intercept",
-                     "押金/定金收据 เงินมัดจำ", "⚠️ 特殊处理·不当费用直推", "拦截(押金)",
-                     SUP["build"], OWN, _items(("เงินมัดจำค่าสินค้า (10%) ตามใบสั่งซื้อ PO-6812-1", 1, 20000)),
-                     "DEP6812-01", (2025, 12, 1), payment="เงินสด",
-                     note_extra="เงินมัดจำ / เงินประกัน — ยังไม่ส่งมอบสินค้า"))
-    mm_inv = Invoice("28", "28_flag_sum_mismatch", "group4_intercept",
-                     "明细加总 ≠ 总额", "⚠️ 标记复核", "拦截(对不上)",
-                     SUP["office"], OWN, _items(("สินค้า A", 2, 500), ("สินค้า B", 3, 300)),
-                     "IV6812-0180", (2025, 12, 1), payment="เงินสด", force_total=Decimal("9999"))
+    S.append(
+        Invoice(
+            "23",
+            "23_block_duplicate_of_01",
+            "group4_intercept",
+            "重复发票(同号同额再传)",
+            "❌ 标重复·绝不重复记账",
+            "拦截(幂等去重)",
+            SUP["build"],
+            OWN,
+            _items(("เหล็กเส้น SD40 ขนาด 12 มม.", 100, 185)),
+            "RR581215-004",
+            (2025, 12, 15),
+            payment="เงินเชื่อ (เครดิต 30 วัน)",
+            note_extra="(สำเนาซ้ำ — เลขที่/ยอดตรงกับ 01)",
+        )
+    )
+    S.append(
+        Invoice(
+            "24",
+            "24_flag_future_date",
+            "group4_intercept",
+            "未来日期发票(日期>今天)",
+            "⚠️ 反造假·标记复核",
+            "拦截(未来日期)",
+            SUP["office"],
+            OWN,
+            _items(("บริการล่วงหน้า", 1, 5000)),
+            "IV6906-0001",
+            (2026, 12, 31),
+            payment="เงินเชื่อ",
+        )
+    )
+    S.append(
+        Invoice(
+            "25",
+            "25_flag_backdated_suspicious",
+            "group4_intercept",
+            "倒签/像伪造(编号日期异常)",
+            "⚠️ 标记",
+            "拦截(异常造票)",
+            SUP["office"],
+            OWN,
+            _items(("ค่าบริการย้อนหลัง", 1, 30000)),
+            "IV6512-9999",
+            (2022, 1, 5),
+            payment="เงินสด",
+            note_extra="ออกใบแทน ณ วันที่ 2568 (เลขที่ไม่เรียงลำดับ)",
+        )
+    )
+    S.append(
+        Invoice(
+            "26",
+            "26_flag_foreign_currency_usd",
+            "group4_intercept",
+            "外币发票(USD)",
+            "⚠️ 标记·不当泰铢记",
+            "拦截(外币)",
+            SUP["newA"],
+            OWN,
+            _items(("Cloud hosting service (annual)", 1, 1200)),
+            "INV-US-0091",
+            (2025, 12, 1),
+            payment="Wire transfer",
+            currency="USD",
+            vat_split=False,
+            vat_included=True,
+            force_total=1284,
+        )
+    )
+    S.append(
+        Invoice(
+            "27",
+            "27_flag_deposit_receipt",
+            "group4_intercept",
+            "押金/定金收据 เงินมัดจำ",
+            "⚠️ 特殊处理·不当费用直推",
+            "拦截(押金)",
+            SUP["build"],
+            OWN,
+            _items(("เงินมัดจำค่าสินค้า (10%) ตามใบสั่งซื้อ PO-6812-1", 1, 20000)),
+            "DEP6812-01",
+            (2025, 12, 1),
+            payment="เงินสด",
+            note_extra="เงินมัดจำ / เงินประกัน — ยังไม่ส่งมอบสินค้า",
+        )
+    )
+    mm_inv = Invoice(
+        "28",
+        "28_flag_sum_mismatch",
+        "group4_intercept",
+        "明细加总 ≠ 总额",
+        "⚠️ 标记复核",
+        "拦截(对不上)",
+        SUP["office"],
+        OWN,
+        _items(("สินค้า A", 2, 500), ("สินค้า B", 3, 300)),
+        "IV6812-0180",
+        (2025, 12, 1),
+        payment="เงินสด",
+        force_total=Decimal("9999"),
+    )
     S.append(mm_inv)
     miss_seller = {"name": SUP["office"]["name"], "addr": SUP["office"]["addr"], "tax": ""}
-    S.append(Invoice("29", "29_flag_missing_fields", "group4_intercept",
-                     "缺关键字段(无税号/金额残缺)", "⚠️ 低置信→留人工", "拦截(残缺)",
-                     miss_seller, OWN, _items(("รายการไม่ระบุราคา", 1, 0)),
-                     "-", (2025, 12, 1), payment="", note_extra="(ไม่มีเลขประจำตัวผู้เสียภาษี / ยอดเงินไม่ชัด)"))
-    S.append(Invoice("30", "30_credit_note_return", "group4_intercept",
-                     "退货/贷项通知单 ใบลดหนี้", "✅/⚠️ 冲销负向处理·不当正常采购", "拦截(贷项)",
-                     SUP["build"], OWN, _items(("รับคืนสินค้า เหล็กเส้น (ชำรุด)", 20, 185)),
-                     "CN6812-0005", (2025, 12, 22), payment="หักลดหนี้",
-                     doc_type="ใบลดหนี้ (Credit Note)",
-                     note_extra="อ้างอิงใบกำกับภาษีเดิม RR581215-004 — มูลค่าลดลง"))
-    S.append(Invoice("31", "31_flag_zero_amount", "group4_intercept",
-                     "零金额 0.00", "⚠️ 标记·不建空账", "拦截(零额)",
-                     SUP["office"], OWN, _items(("ตัวอย่างสินค้า (แจกฟรี)", 1, 0)),
-                     "IV6812-0190", (2025, 12, 1), payment="-"))
+    S.append(
+        Invoice(
+            "29",
+            "29_flag_missing_fields",
+            "group4_intercept",
+            "缺关键字段(无税号/金额残缺)",
+            "⚠️ 低置信→留人工",
+            "拦截(残缺)",
+            miss_seller,
+            OWN,
+            _items(("รายการไม่ระบุราคา", 1, 0)),
+            "-",
+            (2025, 12, 1),
+            payment="",
+            note_extra="(ไม่มีเลขประจำตัวผู้เสียภาษี / ยอดเงินไม่ชัด)",
+        )
+    )
+    S.append(
+        Invoice(
+            "30",
+            "30_credit_note_return",
+            "group4_intercept",
+            "退货/贷项通知单 ใบลดหนี้",
+            "✅/⚠️ 冲销负向处理·不当正常采购",
+            "拦截(贷项)",
+            SUP["build"],
+            OWN,
+            _items(("รับคืนสินค้า เหล็กเส้น (ชำรุด)", 20, 185)),
+            "CN6812-0005",
+            (2025, 12, 22),
+            payment="หักลดหนี้",
+            doc_type="ใบลดหนี้ (Credit Note)",
+            note_extra="อ้างอิงใบกำกับภาษีเดิม RR581215-004 — มูลค่าลดลง",
+        )
+    )
+    S.append(
+        Invoice(
+            "31",
+            "31_flag_zero_amount",
+            "group4_intercept",
+            "零金额 0.00",
+            "⚠️ 标记·不建空账",
+            "拦截(零额)",
+            SUP["office"],
+            OWN,
+            _items(("ตัวอย่างสินค้า (แจกฟรี)", 1, 0)),
+            "IV6812-0190",
+            (2025, 12, 1),
+            payment="-",
+        )
+    )
 
     # ---- 组 5 推送 / ERP ----
-    S.append(Invoice("32a", "32a_push_expense_dbf", "group5_push",
-                     "费用发票→推送(非货品)", "✅ 走 DBF 直写 RR/HP", "推送(DBF 费用)",
-                     SUP["office"], OWN, _items(("ค่าบริการทำความสะอาดสำนักงาน (เดือน)", 1, 6000)),
-                     "IV6812-0200", (2025, 12, 1), payment="เงินสด"))
-    S.append(Invoice("32b", "32b_push_goods_route", "group5_push",
-                     "货品发票→推送(货品)", "✅ 销项 RPA 服务项/采购 DBF", "推送(货品路由)",
-                     SUP["build"], OWN, _items(("ท่อ PVC ขนาด 4 นิ้ว", 200, 95)),
-                     "RR6812-0400", (2025, 12, 1), payment="เงินเชื่อ"))
-    S.append(Invoice("33", "33_push_brand_new_supplier", "group5_push",
-                     "全新供应商发票(Express APMAS 无)", "✅ 自动建档", "推送(供应商建档)",
-                     SUP["newB"], OWN, _items(("ค่าที่ปรึกษากฎหมาย", 1, 15000)),
-                     "RR6812-0500", (2025, 12, 1), payment="เงินเชื่อ"))
+    S.append(
+        Invoice(
+            "32a",
+            "32a_push_expense_dbf",
+            "group5_push",
+            "费用发票→推送(非货品)",
+            "✅ 走 DBF 直写 RR/HP",
+            "推送(DBF 费用)",
+            SUP["office"],
+            OWN,
+            _items(("ค่าบริการทำความสะอาดสำนักงาน (เดือน)", 1, 6000)),
+            "IV6812-0200",
+            (2025, 12, 1),
+            payment="เงินสด",
+        )
+    )
+    S.append(
+        Invoice(
+            "32b",
+            "32b_push_goods_route",
+            "group5_push",
+            "货品发票→推送(货品)",
+            "✅ 销项 RPA 服务项/采购 DBF",
+            "推送(货品路由)",
+            SUP["build"],
+            OWN,
+            _items(("ท่อ PVC ขนาด 4 นิ้ว", 200, 95)),
+            "RR6812-0400",
+            (2025, 12, 1),
+            payment="เงินเชื่อ",
+        )
+    )
+    S.append(
+        Invoice(
+            "33",
+            "33_push_brand_new_supplier",
+            "group5_push",
+            "全新供应商发票(Express APMAS 无)",
+            "✅ 自动建档",
+            "推送(供应商建档)",
+            SUP["newB"],
+            OWN,
+            _items(("ค่าที่ปรึกษากฎหมาย", 1, 15000)),
+            "RR6812-0500",
+            (2025, 12, 1),
+            payment="เงินเชื่อ",
+        )
+    )
     # S4 自建客户(ARMAS):先推 S4a 建客户,再推 S4b 触发疑似重复转人工(顺序关键)。
-    S.append(Invoice("S4a", "S4a_sales_new_customer", "group5_push",
-                     "销项·全新客户(Express ARMAS 无)", "✅ 自动建档 ARMAS · 销项过账", "推送(客户建档)",
-                     OWN, CUS["newC"], _items(("ค่าบริการออกแบบและพิมพ์บรรจุภัณฑ์", 1, 32000)),
-                     "INV6812-041", (2025, 12, 22), payment="เงินเชื่อ"))
-    S.append(Invoice("S4b", "S4b_sales_dup_customer", "group5_push",
-                     "销项·疑似重复客户(名近·税号不同)", "⚠️ 疑似重复·转人工(不建重复 ARMAS 户)", "推送(客户去重守卫)",
-                     OWN, CUS["dupC"], _items(("ค่าบริการออกแบบสื่อโฆษณา", 1, 18000)),
-                     "INV6812-042", (2025, 12, 23), payment="เงินเชื่อ",
-                     note_extra="(ทดสอบ: ชื่อใกล้กับ เอ็มเพ็กซ์ เทรดดิ้ง แต่เลขภาษีต่างกัน)"))
+    S.append(
+        Invoice(
+            "S4a",
+            "S4a_sales_new_customer",
+            "group5_push",
+            "销项·全新客户(Express ARMAS 无)",
+            "✅ 自动建档 ARMAS · 销项过账",
+            "推送(客户建档)",
+            OWN,
+            CUS["newC"],
+            _items(("ค่าบริการออกแบบและพิมพ์บรรจุภัณฑ์", 1, 32000)),
+            "INV6812-041",
+            (2025, 12, 22),
+            payment="เงินเชื่อ",
+        )
+    )
+    S.append(
+        Invoice(
+            "S4b",
+            "S4b_sales_dup_customer",
+            "group5_push",
+            "销项·疑似重复客户(名近·税号不同)",
+            "⚠️ 疑似重复·转人工(不建重复 ARMAS 户)",
+            "推送(客户去重守卫)",
+            OWN,
+            CUS["dupC"],
+            _items(("ค่าบริการออกแบบสื่อโฆษณา", 1, 18000)),
+            "INV6812-042",
+            (2025, 12, 23),
+            payment="เงินเชื่อ",
+            note_extra="(ทดสอบ: ชื่อใกล้กับ เอ็มเพ็กซ์ เทรดดิ้ง แต่เลขภาษีต่างกัน)",
+        )
+    )
 
     # 组 5 · 批量混合(34):8 正常 + 1 重复 + 1 非发票,落 batch_34/
     for i in range(1, 9):
-        S.append(Invoice(f"34-{i:02d}", f"34_batch_normal_{i:02d}", "group5_push/batch_34",
-                         f"批量·正常票 {i}/8", "✅ 应正常识别(批量 8 成)", "批量韧性",
-                         SUP["office"] if i % 2 else SUP["build"], OWN,
-                         _items((f"สินค้าชุดที่ {i}", i + 1, 100 + i * 30)),
-                         f"BT6812-{i:03d}", (2025, 12, i), payment="เงินสด"))
-    S.append(Invoice("34-dup", "34_batch_duplicate", "group5_push/batch_34",
-                     "批量·重复票(撞 34-01)", "❌ 标重复·不重复记账", "批量韧性(去重)",
-                     SUP["office"], OWN, _items(("สินค้าชุดที่ 1", 2, 130)),
-                     "BT6812-001", (2025, 12, 1), payment="เงินสด",
-                     note_extra="(สำเนาซ้ำกับ BT6812-001)"))
-    S.append(Invoice("34-non", "34_batch_not_invoice", "group5_push/batch_34",
-                     "批量·非发票混入", "❌ 拦非发票·不卡死整批", "批量韧性(非发票)",
-                     SUP["office"], OWN, [], "-", (2025, 12, 1), renderer=render_noninvoice))
+        S.append(
+            Invoice(
+                f"34-{i:02d}",
+                f"34_batch_normal_{i:02d}",
+                "group5_push/batch_34",
+                f"批量·正常票 {i}/8",
+                "✅ 应正常识别(批量 8 成)",
+                "批量韧性",
+                SUP["office"] if i % 2 else SUP["build"],
+                OWN,
+                _items((f"สินค้าชุดที่ {i}", i + 1, 100 + i * 30)),
+                f"BT6812-{i:03d}",
+                (2025, 12, i),
+                payment="เงินสด",
+            )
+        )
+    S.append(
+        Invoice(
+            "34-dup",
+            "34_batch_duplicate",
+            "group5_push/batch_34",
+            "批量·重复票(撞 34-01)",
+            "❌ 标重复·不重复记账",
+            "批量韧性(去重)",
+            SUP["office"],
+            OWN,
+            _items(("สินค้าชุดที่ 1", 2, 130)),
+            "BT6812-001",
+            (2025, 12, 1),
+            payment="เงินสด",
+            note_extra="(สำเนาซ้ำกับ BT6812-001)",
+        )
+    )
+    S.append(
+        Invoice(
+            "34-non",
+            "34_batch_not_invoice",
+            "group5_push/batch_34",
+            "批量·非发票混入",
+            "❌ 拦非发票·不卡死整批",
+            "批量韧性(非发票)",
+            SUP["office"],
+            OWN,
+            [],
+            "-",
+            (2025, 12, 1),
+            renderer=render_noninvoice,
+        )
+    )
 
     # ---- 调研补充(Owner 可挑)----
-    S.append(Invoice("R1", "R1_large_amount_million", "group6_research",
-                     "大额(百万级)", "✅ 大额金额范围鲁棒", "识别(金额范围)",
-                     SUP["build"], OWN, _items(("เครื่องจักรสายการผลิต รุ่น X-900", 1, 1850000)),
-                     "RR6812-9001", (2025, 12, 1), payment="เงินเชื่อ"))
-    S.append(Invoice("R2", "R2_tiny_amount", "group6_research",
-                     "小额(几十铢)", "✅ 小额鲁棒", "识别(金额范围)",
-                     SUP["pos"], OWN, _items(("ถุงพลาสติก", 1, 12)),
-                     "IV6812-9002", (2025, 12, 1), payment="เงินสด"))
-    S.append(Invoice("R3a", "R3a_same_supplier_variant_A", "group6_research",
-                     "同供应商写法 A(测归一)", "✅ 与 R3b 归一同一供应商", "识别(供应商归一)",
-                     SUP["varA"], OWN, _items(("บริการที่ปรึกษา รอบที่ 1", 1, 8000)),
-                     "TWG6812-01", (2025, 12, 1), payment="เงินเชื่อ"))
-    S.append(Invoice("R3b", "R3b_same_supplier_variant_B", "group6_research",
-                     "同供应商写法 B(测归一)", "✅ 与 R3a 归一同一供应商", "识别(供应商归一)",
-                     SUP["varB"], OWN, _items(("บริการที่ปรึกษา รอบที่ 2", 1, 8000)),
-                     "TWG6812-02", (2025, 12, 2), payment="เงินเชื่อ"))
-    S.append(Invoice("R4", "R4_mixed_th_cn", "group6_research",
-                     "中泰混排发票", "✅ OCR 语言鲁棒", "识别(语言鲁棒)",
-                     SUP["cn"], OWN, _items(("เครื่องนำเข้า 进口设备 Model-220", 2, 35000)),
-                     "SH6812-0001", (2025, 12, 1), payment="เงินเชื่อ"))
+    S.append(
+        Invoice(
+            "R1",
+            "R1_large_amount_million",
+            "group6_research",
+            "大额(百万级)",
+            "✅ 大额金额范围鲁棒",
+            "识别(金额范围)",
+            SUP["build"],
+            OWN,
+            _items(("เครื่องจักรสายการผลิต รุ่น X-900", 1, 1850000)),
+            "RR6812-9001",
+            (2025, 12, 1),
+            payment="เงินเชื่อ",
+        )
+    )
+    S.append(
+        Invoice(
+            "R2",
+            "R2_tiny_amount",
+            "group6_research",
+            "小额(几十铢)",
+            "✅ 小额鲁棒",
+            "识别(金额范围)",
+            SUP["pos"],
+            OWN,
+            _items(("ถุงพลาสติก", 1, 12)),
+            "IV6812-9002",
+            (2025, 12, 1),
+            payment="เงินสด",
+        )
+    )
+    S.append(
+        Invoice(
+            "R3a",
+            "R3a_same_supplier_variant_A",
+            "group6_research",
+            "同供应商写法 A(测归一)",
+            "✅ 与 R3b 归一同一供应商",
+            "识别(供应商归一)",
+            SUP["varA"],
+            OWN,
+            _items(("บริการที่ปรึกษา รอบที่ 1", 1, 8000)),
+            "TWG6812-01",
+            (2025, 12, 1),
+            payment="เงินเชื่อ",
+        )
+    )
+    S.append(
+        Invoice(
+            "R3b",
+            "R3b_same_supplier_variant_B",
+            "group6_research",
+            "同供应商写法 B(测归一)",
+            "✅ 与 R3a 归一同一供应商",
+            "识别(供应商归一)",
+            SUP["varB"],
+            OWN,
+            _items(("บริการที่ปรึกษา รอบที่ 2", 1, 8000)),
+            "TWG6812-02",
+            (2025, 12, 2),
+            payment="เงินเชื่อ",
+        )
+    )
+    S.append(
+        Invoice(
+            "R4",
+            "R4_mixed_th_cn",
+            "group6_research",
+            "中泰混排发票",
+            "✅ OCR 语言鲁棒",
+            "识别(语言鲁棒)",
+            SUP["cn"],
+            OWN,
+            _items(("เครื่องนำเข้า 进口设备 Model-220", 2, 35000)),
+            "SH6812-0001",
+            (2025, 12, 1),
+            payment="เงินเชื่อ",
+        )
+    )
     return S
 
 
@@ -727,7 +1445,9 @@ def write_readme(scenarios: list):
         "",
     ]
     for gdir, gtitle in _GROUPS_PLAIN.items():
-        rows = [s for s in scenarios if s.group.split("/")[0] == gdir and "/batch_34" not in s.group]
+        rows = [
+            s for s in scenarios if s.group.split("/")[0] == gdir and "/batch_34" not in s.group
+        ]
         if not rows and gdir != "group5_push":
             continue
         lines += [f"## {gtitle}", "", "| 文件 | 这张是什么 · 上传后该看到什么 |", "|---|---|"]
@@ -735,9 +1455,11 @@ def write_readme(scenarios: list):
             rel = os.path.join(s.group, s.fname + ".pdf").replace("\\", "/")
             lines.append(f"| `{rel}` | {PLAIN.get(s.num, s.title)} |")
         if gdir == "group5_push":
-            lines.append("| `group5_push/batch_34/`(10 张) | "
-                         "**一次性把这 10 张全传上去**:里面 8 张正常 + 1 张重复 + 1 张不是发票。"
-                         "看系统能不能:正常的认出来、重复的拦掉、菜单那张拦掉,而且**不会因为坏的两张就整批卡死**。 |")
+            lines.append(
+                "| `group5_push/batch_34/`(10 张) | "
+                "**一次性把这 10 张全传上去**:里面 8 张正常 + 1 张重复 + 1 张不是发票。"
+                "看系统能不能:正常的认出来、重复的拦掉、菜单那张拦掉,而且**不会因为坏的两张就整批卡死**。 |"
+            )
         lines.append("")
     lines += [
         "---",

@@ -148,7 +148,7 @@ def ensure_credits_tables():
             # 9. 设置豁免账号
             cur.execute("""
                 UPDATE users SET is_billing_exempt = TRUE
-                WHERE email IN ('skin306152@gmail.com','mrerp@outlook.co.th')
+                WHERE email IN ('skin306152@gmail.com','mrerp@outlook.co.th','suthida_chatgpt@outlook.com')
             """)
 
         logger.info("[credits] 新表结构初始化完成")

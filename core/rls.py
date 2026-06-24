@@ -1,31 +1,84 @@
 # -*- coding: utf-8 -*-
-"""租户级 RLS policy 单一来源(POS 项目)。
+"""租户/账套级 RLS policy 单一来源(REFACTOR-B8)。
 
-prod 角色 postgres 带 BYPASSRLS,RLS 当前不强制(真隔离=应用层 WHERE tenant_id ·
-见 pos-rls-bypass 记忆);policy 作为未来最小权限角色的兜底。所有 POS/库存表的 ensure_*
-经此函数开 RLS,保证 tenant_isolation 谓词只此一处定义、不在多个 ensure_* 间漂移。
-alembic 迁移因须 standalone(不 import 应用代码)仍各自内联同样 DDL。
+设计见 docs/refactor/b8-rls-production-design.md。
+- policy 谓词只在此定义,不在各 ensure_*/alembic 间漂移(alembic 须 standalone,内联同款 DDL)。
+- 真隔离 = 应用层 WHERE(主) + RLS(第二道防线)。RLS 仅当业务连接走最小权限角色
+  (NOBYPASSRLS · 见 ensure_rls_app_role + get_cursor_rls 的 SET LOCAL ROLE)时强制生效;
+  owner/超管连接带 BYPASSRLS,policy 不拦(留 migration/admin 通道)。
 """
 
 from __future__ import annotations
 
-_POLICY = """
-CREATE POLICY tenant_isolation ON {table}
-FOR ALL
-USING (
-    tenant_id::text = current_setting('app.current_tenant_id', true)
-    OR current_setting('app.bypass_rls', true) = 'on'
-)
-WITH CHECK (
-    tenant_id::text = current_setting('app.current_tenant_id', true)
-    OR current_setting('app.bypass_rls', true) = 'on'
-)
-"""
+# 业务连接经 SET LOCAL ROLE 切到的最小权限角色名(NOBYPASSRLS)。
+RLS_APP_ROLE = "pearnly_app"
+
+_BYPASS = "current_setting('app.bypass_rls', true) = 'on'"
+_TENANT = "tenant_id::text = current_setting('app.current_tenant_id', true)"
+_WS = "current_setting('app.current_workspace_id', true)"
+_USER = "user_id::text = current_setting('app.current_user_id', true)"
+
+# 设了账套上下文则必须匹配账套;只设 tenant(账套上下文空)时看该 tenant 全部账套 —— 兼容大量
+# 只按 tenant 查询的老路径,同时让显式带账套的查询拿到强隔离。
+_WS_MATCH = f"({_WS} IS NULL OR {_WS} = '' OR workspace_client_id::text = {_WS})"
+
+_TPL = {
+    # 纯 tenant 隔离
+    "tenant": f"USING ({_TENANT} OR {_BYPASS}) WITH CHECK ({_TENANT} OR {_BYPASS})",
+    # tenant + 账套强隔离(表须含 workspace_client_id)
+    "tenant_ws": (
+        f"USING ((({_TENANT}) AND {_WS_MATCH}) OR {_BYPASS}) "
+        f"WITH CHECK ((({_TENANT}) AND {_WS_MATCH}) OR {_BYPASS})"
+    ),
+    # tenant 可空 + user 兜底(孤立用户存量行 tenant_id IS NULL · 表须含 user_id)
+    "tenant_or_user": (
+        f"USING ({_TENANT} OR (tenant_id IS NULL AND {_USER}) OR {_BYPASS}) "
+        f"WITH CHECK ({_TENANT} OR (tenant_id IS NULL AND {_USER}) OR {_BYPASS})"
+    ),
+}
 
 
-def apply_tenant_rls(cur, *tables: str) -> None:
-    """对每张表开 RLS + (重)建 tenant_isolation policy(幂等)。表名来自内部白名单常量,非用户输入。"""
+def _apply(cur, kind: str, tables, name: str = "tenant_isolation", force: bool = False) -> None:
+    body = _TPL[kind]
     for table in tables:
         cur.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
-        cur.execute(f"DROP POLICY IF EXISTS tenant_isolation ON {table}")
-        cur.execute(_POLICY.format(table=table))
+        if force:
+            # FORCE = 让 table owner 也受 RLS 约束;否则 owner 连接绕过(prod 缺陷根因之一)。
+            cur.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
+        cur.execute(f"DROP POLICY IF EXISTS {name} ON {table}")
+        cur.execute(f"CREATE POLICY {name} ON {table} FOR ALL {body}")
+
+
+def apply_tenant_rls(cur, *tables, force: bool = False) -> None:
+    """纯 tenant_id 隔离(幂等)。"""
+    _apply(cur, "tenant", tables, force=force)
+
+
+def apply_tenant_workspace_rls(cur, *tables, force: bool = False) -> None:
+    """tenant + 账套(workspace_client_id)强隔离(幂等)。表须含两列。"""
+    _apply(cur, "tenant_ws", tables, force=force)
+
+
+def apply_tenant_or_user_rls(cur, *tables, force: bool = False) -> None:
+    """tenant_id 可空 + user_id 兜底(幂等)。表须含 tenant_id + user_id。"""
+    _apply(cur, "tenant_or_user", tables, force=force)
+
+
+def ensure_rls_app_role(cur, role: str = RLS_APP_ROLE) -> None:
+    """建最小权限业务角色(NOBYPASSRLS · 幂等)+ 授 DML。业务连接 SET LOCAL ROLE 切到它后 RLS 才强制。"""
+    cur.execute(
+        "DO $$ BEGIN "
+        "  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = %(r)s) THEN "
+        "    EXECUTE format('CREATE ROLE %%I NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOLOGIN', %(r)s); "
+        "  END IF; "
+        "END $$;",
+        {"r": role},
+    )
+    for stmt in (
+        "GRANT USAGE ON SCHEMA public TO {r}",
+        "GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO {r}",
+        "GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO {r}",
+        "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO {r}",
+        "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE,SELECT ON SEQUENCES TO {r}",
+    ):
+        cur.execute(stmt.format(r=role))

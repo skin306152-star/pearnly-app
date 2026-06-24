@@ -5,6 +5,7 @@ Pearnly · 数据库模块(v3)
 """
 
 import os
+import re
 import logging
 from typing import Optional, Dict, Any
 from contextlib import contextmanager
@@ -100,22 +101,49 @@ def _is_rls_enabled() -> bool:
     return os.environ.get("ENABLE_RLS", "0").strip() == "1"
 
 
+_RLS_ROLE_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+
+
+def _rls_local_role() -> str:
+    """业务连接要 SET LOCAL ROLE 切到的最小权限角色(env RLS_ROLE)。
+    默认空 = 不切(prod 当前行为不变);校验标识符防 SET LOCAL ROLE 注入。"""
+    role = os.environ.get("RLS_ROLE", "").strip()
+    return role if role and _RLS_ROLE_RE.match(role) else ""
+
+
 @contextmanager
-def get_cursor_rls(tenant_id: Optional[str] = None, bypass: bool = False, commit: bool = False):
-    """v27.8.0 · 带 RLS 上下文的游标 · 自动 SET LOCAL session 变量
-    tenant_id:当前 user 所属 tenant · 用于 RLS policy 过滤
-    bypass:超管 / migration 操作跳过 RLS(SET app.bypass_rls = 'on')
-    commit:是否自动 commit
+def get_cursor_rls(
+    tenant_id: Optional[str] = None,
+    bypass: bool = False,
+    commit: bool = False,
+    *,
+    workspace_client_id: Optional[Any] = None,
+    user_id: Optional[Any] = None,
+):
+    """带 RLS 上下文的游标 · SET LOCAL 三维上下文(tenant + 账套 + user)。
+    tenant_id / workspace_client_id / user_id:RLS policy 过滤维度(谓词见 core/rls.py)。
+    bypass:超管 / migration 跳过 RLS(SET app.bypass_rls = 'on')。
+    RLS 仅当 env RLS_ROLE 指定了最小权限角色时(SET LOCAL ROLE)强制;未设则不切角色 · prod 行为不变。
     """
     conn = get_pool().getconn()
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         try:
+            role = _rls_local_role()
+            if role and not bypass:
+                cur.execute(f"SET LOCAL ROLE {role}")  # role 经 _rls_local_role 标识符校验
             if bypass:
                 cur.execute("SET LOCAL app.bypass_rls = 'on';")
-            elif tenant_id:
-                cur.execute("SET LOCAL app.current_tenant_id = %s;", (str(tenant_id),))
-            # 否则不 SET · 严格 policy 会拒绝(对 RLS 启用的表)
+            else:
+                if tenant_id:
+                    cur.execute("SET LOCAL app.current_tenant_id = %s;", (str(tenant_id),))
+                if workspace_client_id is not None:
+                    cur.execute(
+                        "SET LOCAL app.current_workspace_id = %s;", (str(workspace_client_id),)
+                    )
+                if user_id is not None:
+                    cur.execute("SET LOCAL app.current_user_id = %s;", (str(user_id),))
+            # tenant/ws/user 全空且未 bypass:不 SET · 严格 policy 拒绝(对 RLS 启用的表)
             yield cur
             if commit:
                 conn.commit()

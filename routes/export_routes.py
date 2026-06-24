@@ -28,7 +28,7 @@ class ExportIn(BaseModel):
     format: str = "excel"  # excel | drive | sheet
     date_from: Optional[str] = None
     date_to: Optional[str] = None
-    lang: str = "zh"  # 导出文件列头/枚举值跟随用户语言(zh/en/th/ja)
+    lang: str = "th"  # 导出文件列头/枚举值跟随用户语言(zh/en/th/ja)
 
 
 @router.post("/export")

@@ -3,7 +3,7 @@
 // excel → xlsx blob 直下;drive/sheet 未连 Google(412 google_not_connected)→ 跳集成中心高亮卡;
 // 已连 → {job_id} 轮询进度(queued/running/done/failed)· 完成给 Sheet 直达链接 / 归档条数。
 /* global t, escapeHtml, showToast */
-import { authHeaders, activeWsId, injectPurBase, injectStyle } from './purchase-common.js';
+import { authHeaders, activeWsId, injectPurBase, injectStyle, papi } from './purchase-common.js';
 import { dateRangeParams } from './purchase-list-filters.js';
 
 type Fmt = 'excel' | 'drive' | 'sheet';
@@ -18,6 +18,12 @@ interface JobProgress {
     error: string;
 }
 
+interface GoogleStatus {
+    configured: boolean;
+    connected: boolean;
+    email: string;
+}
+
 const PAGE_CSS = `
 .pur.pex .wrap{width:100%;}
 .pur.pex .ph{display:flex;align-items:center;justify-content:flex-start;gap:10px;margin-bottom:16px;}
@@ -29,6 +35,7 @@ const PAGE_CSS = `
 .pur.pex .acts{display:flex;gap:9px;flex-wrap:wrap;}
 .pur.pex .acts .ic{width:16px;height:16px;flex:none;}
 .pur.pex .infonote{background:var(--bg);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--ink2);margin-top:12px;display:flex;gap:7px;align-items:flex-start;}
+.pur.pex .infonote.ok{background:var(--green-weak);color:var(--green);}
 .pur.pex .infonote .ic{width:16px;height:16px;flex:none;margin-top:1px;}
 .pur.pex .tree{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink2);white-space:pre;line-height:1.8;overflow:auto;}
 .pur.pex .cols{display:flex;flex-wrap:wrap;gap:6px;}
@@ -68,6 +75,10 @@ function setBusy(busy: boolean): void {
         .forEach((b) => (b.disabled = busy));
 }
 
+function currentLang(): string {
+    return window._currentLang || localStorage.getItem('mrpilot_lang') || 'th';
+}
+
 function basePayload(): Record<string, unknown> | null {
     const ws = activeWsId();
     if (ws == null) {
@@ -75,8 +86,7 @@ function basePayload(): Record<string, unknown> | null {
         return null;
     }
     // 导出文件列头/枚举值跟随用户当前语言(后端按 lang 本地化)。
-    const lang = window._currentLang || localStorage.getItem('mrpilot_lang') || 'th';
-    return { workspace_client_id: ws, lang, ...dateRangeParams() };
+    return { workspace_client_id: ws, lang: currentLang(), ...dateRangeParams() };
 }
 
 async function doExcel(): Promise<void> {
@@ -114,6 +124,45 @@ function jumpToConnect(): void {
     setTimeout(() => window.highlightGoogleCard?.(), 120);
 }
 
+function renderGoogleNote(st: GoogleStatus): void {
+    const box = document.getElementById('pex-google-notebox');
+    const note = document.getElementById('pex-google-note');
+    if (!box || !note) return;
+    box.classList.toggle('ok', !!st.connected);
+    if (!st.configured) {
+        note.textContent = t('int-google-na-desc');
+        return;
+    }
+    note.textContent = st.connected
+        ? t('pur-export-note-connected', { email: st.email || 'Google' })
+        : t('pur-export-note-disconnected');
+}
+
+async function loadGoogleNote(): Promise<void> {
+    const ws = activeWsId();
+    if (ws == null) {
+        renderGoogleNote({ configured: true, connected: false, email: '' });
+        return;
+    }
+    try {
+        const st = (await papi(
+            'GET',
+            `/api/integrations/google/status?workspace_client_id=${ws}`
+        )) as GoogleStatus;
+        renderGoogleNote(st);
+    } catch (_) {
+        renderGoogleNote({ configured: true, connected: false, email: '' });
+    }
+}
+
+function countParams(p: JobProgress): Record<string, string> {
+    return {
+        done: String(p.done_n || 0),
+        skip: String(p.skip_n || 0),
+        total: String(p.total || 0),
+    };
+}
+
 async function pollJob(jobId: string, fmt: Fmt, tries = 0): Promise<void> {
     if (!sec()) return;
     if (tries > 40) {
@@ -143,7 +192,8 @@ async function pollJob(jobId: string, fmt: Fmt, tries = 0): Promise<void> {
             linkUrl && linkLabel
                 ? ` · <a href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener">${escapeHtml(linkLabel)}</a>`
                 : '';
-        setRes(escapeHtml(t('pur-export-done', { done: p.done_n })) + link);
+        const doneKey = fmt === 'sheet' ? 'pur-export-sheet-done' : 'pur-export-drive-done';
+        setRes(escapeHtml(t(doneKey, countParams(p))) + link);
         return;
     }
     if (p.status === 'failed') {
@@ -151,7 +201,15 @@ async function pollJob(jobId: string, fmt: Fmt, tries = 0): Promise<void> {
         setRes(escapeHtml(t('pur-export-failed')));
         return;
     }
-    setRes(escapeHtml(t('pur-export-running', { done: p.done_n, total: p.total || '—' })));
+    setRes(
+        escapeHtml(
+            t('pur-export-running', {
+                done: String(p.done_n || 0),
+                skip: String(p.skip_n || 0),
+                total: String(p.total || '—'),
+            })
+        )
+    );
     setTimeout(() => pollJob(jobId, fmt, tries + 1), 1500);
 }
 
@@ -171,6 +229,8 @@ async function doArchive(fmt: Fmt): Promise<void> {
             r.status === 412 ||
             (body && body.error && body.error.detail === 'google_not_connected')
         ) {
+            setBusy(false);
+            setRes(escapeHtml(t('pur-export-connect-first')));
             jumpToConnect();
             return;
         }
@@ -207,7 +267,7 @@ function shell(): string {
                 <button class="btn" data-fmt="drive">${IC_CLOUD}${escapeHtml(t('pur-export-drive'))}</button>
                 <button class="btn" data-fmt="sheet">${IC_GRID}${escapeHtml(t('pur-export-sheet'))}</button>
             </div>
-            <div class="infonote">${IC_LINK}<span>${escapeHtml(t('pur-export-note'))}</span></div>
+            <div class="infonote" id="pex-google-notebox">${IC_LINK}<span id="pex-google-note">${escapeHtml(t('pur-export-note'))}</span></div>
             <div class="res"></div>
         </div>
         <div class="panel">
@@ -246,4 +306,5 @@ window.loadPurchaseExport = function () {
     const s = sec();
     if (s) s.innerHTML = shell();
     bind();
+    loadGoogleNote();
 };

@@ -107,7 +107,7 @@ def _category_names(cur, *, tenant_id, workspace_client_id) -> dict:
 
 
 def excel_bytes(
-    cur, *, tenant_id, workspace_client_id, date_from=None, date_to=None, lang="zh"
+    cur, *, tenant_id, workspace_client_id, date_from=None, date_to=None, lang="th"
 ) -> bytes:
     """同步导出:范围内已入账明细 → xlsx 字节流(零授权兜底)· 列头/枚举值随 lang。"""
     doc_ids = _posted_doc_ids(
@@ -167,7 +167,7 @@ def run_export(params: dict, input_ref: Optional[list] = None, progress_cb=None)
     tid = params.get("tenant_id")
     ws = params.get("workspace_client_id")
     date_from, date_to = params.get("date_from"), params.get("date_to")
-    lang = params.get("lang") or "zh"
+    lang = params.get("lang") or "th"
 
     with db.get_cursor(commit=False) as cur:
         token = google_oauth.valid_access_token(cur, tenant_id=tid, workspace_client_id=ws)
@@ -209,6 +209,7 @@ def run_export(params: dict, input_ref: Optional[list] = None, progress_cb=None)
                     doc_date=doc.get("doc_date"),
                     supplier=supplier,
                     doc_id=did,
+                    lang=lang,
                     image_bytes=img,
                     pdf_bytes=_image_to_pdf(img) if img else None,
                 )
@@ -238,7 +239,7 @@ def run_export(params: dict, input_ref: Optional[list] = None, progress_cb=None)
     return ("export_archived_docs", ws)
 
 
-def _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to, lang="zh") -> dict:
+def _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to, lang="th") -> dict:
     """归档后写主体×年 Sheet(全量明细·证据列回链 Drive 夹)。失败返空不阻断。"""
     out = {"sheet_url": "", "drive_url": ""}
     try:
@@ -264,7 +265,7 @@ def _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to, lang
         from services.export import archive_tree
 
         folder = drive_svc.ensure_folder_path(
-            drive_svc.DriveClient(token), archive_tree.subject_year_path(subject, year)
+            drive_svc.DriveClient(token), archive_tree.subject_year_path(subject, year, lang)
         )
         out["drive_url"] = drive_svc.folder_web_link(folder)
         ssid = sheets_svc.sync(

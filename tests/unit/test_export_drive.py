@@ -60,10 +60,23 @@ class ArchiveDocTests(unittest.TestCase):
         )
         self.assertTrue(out["evidence_url"].startswith("https://drive.google.com/drive/folders/"))
         names = [u["name"] for u in c.uploads]
-        self.assertIn("原图.jpg", names)
+        self.assertIn("รูปต้นฉบับ.jpg", names)
         self.assertIn("2026-06-01_Cafe_D1.pdf", names)
         # PDF 进交会计夹,原图进证据子夹(不同 parent)
         self.assertEqual(len(c.uploads), 2)
+
+    def test_zh_image_name_still_supported(self):
+        c = FakeDriveClient()
+        drive.archive_doc(
+            c,
+            subject="主体X",
+            doc_date="2026-06-01",
+            supplier="Cafe",
+            doc_id="D1",
+            lang="zh",
+            image_bytes=b"img",
+        )
+        self.assertIn("原图.jpg", [u["name"] for u in c.uploads])
 
     def test_no_pdf_only_evidence(self):
         c = FakeDriveClient()

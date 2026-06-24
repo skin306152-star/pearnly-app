@@ -19,24 +19,58 @@ import re
 from datetime import date
 
 ROOT = "Pearnly"
-EVIDENCE_DIR = "证据"
-ACCOUNTANT_DIR = "交会计"
+
+_FALLBACK_SUBJECT = {"zh": "主体", "en": "entity", "th": "กิจการ", "ja": "主体"}
+_FALLBACK_SUPPLIER = {"zh": "供应商", "en": "supplier", "th": "ผู้ขาย", "ja": "仕入先"}
+_EVIDENCE_DIR = {"zh": "证据", "en": "Evidence", "th": "หลักฐาน", "ja": "証拠"}
+_ACCOUNTANT_DIR = {"zh": "交会计", "en": "For accountant", "th": "ส่งบัญชี", "ja": "会計用"}
 
 # 泰文月名(逆向 schema 月份夹 = "06_มิถุนายน")。
-_TH_MONTHS = [
-    "มกราคม",
-    "กุมภาพันธ์",
-    "มีนาคม",
-    "เมษายน",
-    "พฤษภาคม",
-    "มิถุนายน",
-    "กรกฎาคม",
-    "สิงหาคม",
-    "กันยายน",
-    "ตุลาคม",
-    "พฤศจิกายน",
-    "ธันวาคม",
-]
+_MONTHS = {
+    "zh": [
+        "一月",
+        "二月",
+        "三月",
+        "四月",
+        "五月",
+        "六月",
+        "七月",
+        "八月",
+        "九月",
+        "十月",
+        "十一月",
+        "十二月",
+    ],
+    "en": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    ],
+    "th": [
+        "มกราคม",
+        "กุมภาพันธ์",
+        "มีนาคม",
+        "เมษายน",
+        "พฤษภาคม",
+        "มิถุนายน",
+        "กรกฎาคม",
+        "สิงหาคม",
+        "กันยายน",
+        "ตุลาคม",
+        "พฤศจิกายน",
+        "ธันวาคม",
+    ],
+    "ja": ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"],
+}
 
 # Drive 文件/夹名禁字符(/ \ 控制符)+ 收尾空白点。
 _BAD = re.compile(r"[\\/\x00-\x1f]+")
@@ -49,16 +83,21 @@ def _safe(name: str, *, fallback: str = "_") -> str:
     return s or fallback
 
 
-def month_folder(month: int) -> str:
-    """月份夹名 "MM_泰文月名"(逆向格式)。month 越界 → 退 "MM"。"""
+def _lang(lang: str = "th") -> str:
+    return lang if lang in _MONTHS else "th"
+
+
+def month_folder(month: int, lang: str = "th") -> str:
+    """月份夹名 "MM_<month name>"。默认泰语;month 越界 → 退 "MM"。"""
     if 1 <= month <= 12:
-        return f"{month:02d}_{_TH_MONTHS[month - 1]}"
+        return f"{month:02d}_{_MONTHS[_lang(lang)][month - 1]}"
     return f"{int(month):02d}"
 
 
-def sheet_name(subject: str, year: int) -> str:
+def sheet_name(subject: str, year: int, lang: str = "th") -> str:
     """报表名 "<主体> - <年>"。"""
-    return f"{_safe(subject, fallback='主体')} - {year:04d}"
+    lg = _lang(lang)
+    return f"{_safe(subject, fallback=_FALLBACK_SUBJECT[lg])} - {year:04d}"
 
 
 def _parse_date(doc_date) -> date:
@@ -69,39 +108,46 @@ def _parse_date(doc_date) -> date:
     return date.fromisoformat(s)
 
 
-def doc_basename(doc_date, supplier: str, doc_id: str) -> str:
+def doc_basename(doc_date, supplier: str, doc_id: str, lang: str = "th") -> str:
     """单据基名 "<年-月-日>_<商户>_<id>"(证据夹名 / PDF 名共用 · doc_id 三处串联)。"""
     d = _parse_date(doc_date)
-    sup = _safe(supplier, fallback="供应商")
+    sup = _safe(supplier, fallback=_FALLBACK_SUPPLIER[_lang(lang)])
     did = _safe(doc_id, fallback="id")
     return f"{d.isoformat()}_{sup}_{did}"
 
 
-def _subject_year_base(subject: str, year: int) -> list:
-    return [ROOT, _safe(subject, fallback="主体"), f"{year:04d}"]
+def _subject_year_base(subject: str, year: int, lang: str = "th") -> list:
+    return [ROOT, _safe(subject, fallback=_FALLBACK_SUBJECT[_lang(lang)]), f"{year:04d}"]
 
 
-def evidence_folder_path(subject: str, doc_date, supplier: str, doc_id: str) -> list:
+def evidence_folder_path(
+    subject: str, doc_date, supplier: str, doc_id: str, lang: str = "th"
+) -> list:
     """证据原图子夹路径段:Pearnly/主体/年/月/证据/<日期_商户_id>(每票一夹)。"""
     d = _parse_date(doc_date)
-    return _subject_year_base(subject, d.year) + [
-        month_folder(d.month),
-        EVIDENCE_DIR,
-        doc_basename(d, supplier, doc_id),
+    lg = _lang(lang)
+    return _subject_year_base(subject, d.year, lg) + [
+        month_folder(d.month, lg),
+        _EVIDENCE_DIR[lg],
+        doc_basename(d, supplier, doc_id, lg),
     ]
 
 
-def accountant_dir_path(subject: str, doc_date) -> list:
+def accountant_dir_path(subject: str, doc_date, lang: str = "th") -> list:
     """交会计 PDF 所在夹路径段:Pearnly/主体/年/月/交会计(扁平·PDF 直放)。"""
     d = _parse_date(doc_date)
-    return _subject_year_base(subject, d.year) + [month_folder(d.month), ACCOUNTANT_DIR]
+    lg = _lang(lang)
+    return _subject_year_base(subject, d.year, lg) + [
+        month_folder(d.month, lg),
+        _ACCOUNTANT_DIR[lg],
+    ]
 
 
-def accountant_pdf_name(doc_date, supplier: str, doc_id: str) -> str:
+def accountant_pdf_name(doc_date, supplier: str, doc_id: str, lang: str = "th") -> str:
     """交会计 PDF 文件名 "<日期_商户_id>.pdf"。"""
-    return f"{doc_basename(doc_date, supplier, doc_id)}.pdf"
+    return f"{doc_basename(doc_date, supplier, doc_id, lang)}.pdf"
 
 
-def subject_year_path(subject: str, year: int) -> list:
+def subject_year_path(subject: str, year: int, lang: str = "th") -> list:
     """主体×年目录段 Pearnly/主体/年(Sheet 与各月夹的共同父)。"""
-    return _subject_year_base(subject, year)
+    return _subject_year_base(subject, year, lang)

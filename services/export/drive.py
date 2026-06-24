@@ -82,8 +82,9 @@ def archive_doc(
     doc_date,
     supplier: str,
     doc_id: str,
+    lang: str = "th",
     image_bytes: Optional[bytes] = None,
-    image_name: str = "原图.jpg",
+    image_name: str = "",
     image_mime: str = "image/jpeg",
     pdf_bytes: Optional[bytes] = None,
 ) -> dict:
@@ -93,17 +94,26 @@ def archive_doc(
     """
     out = {"evidence_folder_id": None, "evidence_url": "", "pdf_file_id": None}
 
-    ev_segs = archive_tree.evidence_folder_path(subject, doc_date, supplier, doc_id)
+    ev_segs = archive_tree.evidence_folder_path(subject, doc_date, supplier, doc_id, lang)
     ev_folder = ensure_folder_path(client, ev_segs)
     out["evidence_folder_id"] = ev_folder
     out["evidence_url"] = folder_web_link(ev_folder)
     if image_bytes:
-        client.upload(ev_folder, image_name, image_bytes, image_mime)
+        client.upload(ev_folder, image_name or _original_image_name(lang), image_bytes, image_mime)
 
     if pdf_bytes:
-        acct_segs = archive_tree.accountant_dir_path(subject, doc_date)
+        acct_segs = archive_tree.accountant_dir_path(subject, doc_date, lang)
         acct_folder = ensure_folder_path(client, acct_segs)
-        pdf_name = archive_tree.accountant_pdf_name(doc_date, supplier, doc_id)
+        pdf_name = archive_tree.accountant_pdf_name(doc_date, supplier, doc_id, lang)
         res = client.upload(acct_folder, pdf_name, pdf_bytes, "application/pdf")
         out["pdf_file_id"] = res.get("id")
     return out
+
+
+def _original_image_name(lang: str) -> str:
+    return {
+        "zh": "原图.jpg",
+        "en": "original.jpg",
+        "th": "รูปต้นฉบับ.jpg",
+        "ja": "原本.jpg",
+    }.get(lang, "รูปต้นฉบับ.jpg")

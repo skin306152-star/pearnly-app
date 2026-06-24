@@ -48,12 +48,18 @@ def _rows():
 
 class BuildWorkbookTests(unittest.TestCase):
     def setUp(self):
-        self.wb = load_workbook(io.BytesIO(build_workbook(_rows(), sheet_title="进项明细")))
+        self.wb = load_workbook(
+            io.BytesIO(build_workbook(_rows(), sheet_title="进项明细", lang="zh"))
+        )
         self.ws = self.wb.active
 
     def test_header_matches_columns(self):
         headers = [c.value for c in self.ws[1]]
         self.assertEqual(headers, [h for _, h in COLUMNS])
+
+    def test_default_header_is_thai(self):
+        wb = load_workbook(io.BytesIO(build_workbook(_rows(), sheet_title="รายละเอียดซื้อ")))
+        self.assertEqual(wb.active["A1"].value, "วันที่")
 
     def test_one_data_row(self):
         self.assertEqual(self.ws.max_row, 2)  # 1 表头 + 1 数据

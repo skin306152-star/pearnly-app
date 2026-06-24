@@ -17,6 +17,11 @@ class MonthAndSheetTests(unittest.TestCase):
         self.assertEqual(at.month_folder(1), "01_มกราคม")
         self.assertEqual(at.month_folder(12), "12_ธันวาคม")
 
+    def test_month_folder_follows_language(self):
+        self.assertEqual(at.month_folder(6, "zh"), "06_六月")
+        self.assertEqual(at.month_folder(6, "en"), "06_June")
+        self.assertEqual(at.month_folder(6, "ja"), "06_6月")
+
     def test_month_folder_out_of_range_falls_back(self):
         self.assertEqual(at.month_folder(13), "13")
 
@@ -36,19 +41,26 @@ class DocBasenameTests(unittest.TestCase):
         self.assertEqual(at.doc_basename("2026-06-01", "A/B Co", "D1"), "2026-06-01_A B Co_D1")
 
     def test_basename_empty_supplier_fallback(self):
-        self.assertEqual(at.doc_basename("2026-06-01", "", "D1"), "2026-06-01_供应商_D1")
+        self.assertEqual(at.doc_basename("2026-06-01", "", "D1"), "2026-06-01_ผู้ขาย_D1")
+        self.assertEqual(at.doc_basename("2026-06-01", "", "D1", "zh"), "2026-06-01_供应商_D1")
 
 
 class TreePathTests(unittest.TestCase):
     def test_evidence_folder_path(self):
         p = at.evidence_folder_path("主体X", "2026-06-01", "Cafe", "D1")
         self.assertEqual(
-            p, ["Pearnly", "主体X", "2026", "06_มิถุนายน", "证据", "2026-06-01_Cafe_D1"]
+            p, ["Pearnly", "主体X", "2026", "06_มิถุนายน", "หลักฐาน", "2026-06-01_Cafe_D1"]
         )
+        zh = at.evidence_folder_path("主体X", "2026-06-01", "Cafe", "D1", "zh")
+        self.assertEqual(zh, ["Pearnly", "主体X", "2026", "06_六月", "证据", "2026-06-01_Cafe_D1"])
 
     def test_accountant_dir_and_pdf(self):
         d = at.accountant_dir_path("主体X", "2026-06-01")
-        self.assertEqual(d, ["Pearnly", "主体X", "2026", "06_มิถุนายน", "交会计"])
+        self.assertEqual(d, ["Pearnly", "主体X", "2026", "06_มิถุนายน", "ส่งบัญชี"])
+        self.assertEqual(
+            at.accountant_dir_path("主体X", "2026-06-01", "en"),
+            ["Pearnly", "主体X", "2026", "06_June", "For accountant"],
+        )
         self.assertEqual(
             at.accountant_pdf_name("2026-06-01", "Cafe", "D1"), "2026-06-01_Cafe_D1.pdf"
         )

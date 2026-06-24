@@ -10,20 +10,32 @@ from datetime import date
 from decimal import Decimal
 
 from services.export import sheets
+from services.export import rows as rows_mod
 from services.export.rows import COLUMNS
 
 
 class RowsToMatrixTests(unittest.TestCase):
     def test_header_row(self):
-        m = sheets.rows_to_matrix([])
+        m = sheets.rows_to_matrix([], lang="zh")
         self.assertEqual(m[0], [h for _, h in COLUMNS])
+
+    def test_default_header_row_is_thai(self):
+        m = sheets.rows_to_matrix([])
+        self.assertEqual(m[0], rows_mod.headers("th"))
 
     def test_evidence_becomes_hyperlink_formula(self):
         row = {k: "" for k, _ in COLUMNS}
         row["evidence"] = "https://drive.google.com/folder/abc"
-        m = sheets.rows_to_matrix([row])
+        m = sheets.rows_to_matrix([row], lang="zh")
         ev_idx = [k for k, _ in COLUMNS].index("evidence")
         self.assertEqual(m[1][ev_idx], '=HYPERLINK("https://drive.google.com/folder/abc","查看")')
+
+    def test_default_evidence_label_is_thai(self):
+        row = {k: "" for k, _ in COLUMNS}
+        row["evidence"] = "https://drive.google.com/folder/abc"
+        m = sheets.rows_to_matrix([row])
+        ev_idx = [k for k, _ in COLUMNS].index("evidence")
+        self.assertEqual(m[1][ev_idx], '=HYPERLINK("https://drive.google.com/folder/abc","ดู")')
 
     def test_decimal_to_float(self):
         row = {k: "" for k, _ in COLUMNS}

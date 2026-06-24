@@ -13,13 +13,13 @@ from decimal import Decimal
 from services.export import rows as rows_mod
 from services.export.rows import COLUMN_KEYS
 
-ALL_YEAR_TAB = "全年"
+ALL_YEAR_TAB = "ทั้งปี"
 _ALL_YEAR_TAB = {"zh": "全年", "en": "Full year", "th": "ทั้งปี", "ja": "通年"}
 
 
-def all_year_tab(lang: str = "zh") -> str:
+def all_year_tab(lang: str = "th") -> str:
     """年汇总 tab 名(按 lang)。"""
-    return _ALL_YEAR_TAB.get(lang, _ALL_YEAR_TAB["zh"])
+    return _ALL_YEAR_TAB.get(lang, _ALL_YEAR_TAB["th"])
 
 
 def _cell(key, value, lang: str = "zh"):
@@ -34,7 +34,7 @@ def _cell(key, value, lang: str = "zh"):
     return "" if value is None else value
 
 
-def rows_to_matrix(rows: list, *, lang: str = "zh") -> list:
+def rows_to_matrix(rows: list, *, lang: str = "th") -> list:
     """导出行 → 二维值矩阵([表头] + 每行按列序)· 表头/证据文案随 lang。喂 values API。"""
     matrix = [rows_mod.headers(lang)]
     for row in rows or []:
@@ -42,11 +42,11 @@ def rows_to_matrix(rows: list, *, lang: str = "zh") -> list:
     return matrix
 
 
-def month_tab(month: int) -> str:
+def month_tab(month: int, lang: str = "th") -> str:
     """当月 tab 名(从 archive_tree 月名派生,保持一致)。"""
     from services.export import archive_tree
 
-    return archive_tree.month_folder(month)
+    return archive_tree.month_folder(month, lang)
 
 
 class SheetsClient:
@@ -99,7 +99,7 @@ class SheetsClient:
 
 
 def sync(
-    client, *, folder_id: str, subject: str, year: int, month: int, rows: list, lang: str = "zh"
+    client, *, folder_id: str, subject: str, year: int, month: int, rows: list, lang: str = "th"
 ) -> str:
     """主体×年表:写全年 tab + 当月 tab(各 overwrite 成最新明细)。返回 spreadsheet_id。
 
@@ -108,10 +108,10 @@ def sync(
     """
     from services.export import archive_tree
 
-    title = archive_tree.sheet_name(subject, year)
+    title = archive_tree.sheet_name(subject, year, lang)
     ssid = client.find_or_create_spreadsheet(folder_id, title)
     matrix = rows_to_matrix(rows, lang=lang)
-    for tab in (all_year_tab(lang), month_tab(month)):
+    for tab in (all_year_tab(lang), month_tab(month, lang)):
         client.ensure_tab(ssid, tab)
         client.overwrite_tab(ssid, tab, matrix)
     return ssid

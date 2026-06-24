@@ -56,9 +56,9 @@ _HEADERS = {
 COLUMNS = list(zip(COLUMN_KEYS, _HEADERS["zh"]))
 
 
-def headers(lang: str = "zh") -> list:
-    """表头(按 lang)· 未知语言回退 zh。"""
-    return _HEADERS.get(lang, _HEADERS["zh"])
+def headers(lang: str = "th") -> list:
+    """表头(按 lang)· 未知语言回退泰语。"""
+    return _HEADERS.get(_lang(lang), _HEADERS["th"])
 
 
 _DOC_KIND = {
@@ -92,17 +92,17 @@ _SHEET_TITLE = {
 
 
 def _lang(lang: str) -> str:
-    return lang if lang in _HEADERS else "zh"
+    return lang if lang in _HEADERS else "th"
 
 
-def view_label(lang: str = "zh") -> str:
+def view_label(lang: str = "th") -> str:
     """证据超链显示文案(按 lang)。"""
-    return _VIEW.get(_lang(lang), _VIEW["zh"])
+    return _VIEW.get(_lang(lang), _VIEW["th"])
 
 
-def sheet_title(lang: str = "zh") -> str:
+def sheet_title(lang: str = "th") -> str:
     """导出工作表默认标题(按 lang · 调用方有套账主体名时优先用主体名)。"""
-    return _SHEET_TITLE.get(_lang(lang), _SHEET_TITLE["zh"])
+    return _SHEET_TITLE.get(_lang(lang), _SHEET_TITLE["th"])
 
 
 def _d(v) -> Decimal:

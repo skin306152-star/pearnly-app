@@ -30,7 +30,7 @@ def _cell_value(v):
     return v
 
 
-def build_workbook(rows: list, *, sheet_title: Optional[str] = None, lang: str = "zh") -> bytes:
+def build_workbook(rows: list, *, sheet_title: Optional[str] = None, lang: str = "th") -> bytes:
     """一行一明细导出行 → xlsx 字节流。表头/证据文案随 lang;evidence 是 URL 渲超链。"""
     wb = Workbook()
     ws = wb.active

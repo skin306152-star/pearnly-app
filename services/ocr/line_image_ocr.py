@@ -308,7 +308,7 @@ async def _handle_line_image_ocr(
                 line_user_id=line_user_id, tenant_id=tid_str, role="user", content="[ส่งรูปใบเสร็จ]"
             )
             _summary = "; ".join(
-                f"{o.get('state', '')} {o.get('amount') or ''}".strip() for o in ingests
+                s for o in ingests if (s := f"{o.get('state', '')} {o.get('amount') or ''}".strip())
             )
             _bot_note = (
                 f"票据识别:{_summary}"

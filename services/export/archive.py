@@ -229,17 +229,24 @@ def run_export(job: dict) -> None:
         except Exception as e:  # noqa: BLE001
             logger.warning("export archive doc %s failed: %s", did, e)
 
-    sheet_url = _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to, lang)
+    links = _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to, lang)
     jobs.finish(
         jid,
         "export_archived_docs",
         ws,
-        {"done_n": done_n, "skip_n": skip_n, "total": len(doc_ids), "sheet_url": sheet_url},
+        {
+            "done_n": done_n,
+            "skip_n": skip_n,
+            "total": len(doc_ids),
+            "sheet_url": links.get("sheet_url", ""),
+            "drive_url": links.get("drive_url", ""),
+        },
     )
 
 
-def _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to, lang="zh") -> str:
+def _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to, lang="zh") -> dict:
     """归档后写主体×年 Sheet(全量明细·证据列回链 Drive 夹)。失败返空不阻断。"""
+    out = {"sheet_url": "", "drive_url": ""}
     try:
         with db.get_cursor(commit=False) as cur:
             items = gather_items(
@@ -256,7 +263,7 @@ def _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to, lang
             it["evidence_url"] = arch.get(str(it["doc"].get("id")), "")
         rows = rows_svc.build_export_rows(items, category_names=cats, lang=lang)
         if not rows:
-            return ""
+            return out
         year = int(str(rows[0]["doc_date"])[:4])
         month = int(str(rows[0]["doc_date"])[5:7])
         sheets_client = sheets_svc.SheetsClient(token)
@@ -265,6 +272,7 @@ def _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to, lang
         folder = drive_svc.ensure_folder_path(
             drive_svc.DriveClient(token), archive_tree.subject_year_path(subject, year)
         )
+        out["drive_url"] = drive_svc.folder_web_link(folder)
         ssid = sheets_svc.sync(
             sheets_client,
             folder_id=folder,
@@ -274,10 +282,10 @@ def _sync_sheet(tid, ws, token, subject, doc_ids, cats, date_from, date_to, lang
             rows=rows,
             lang=lang,
         )
-        return f"https://docs.google.com/spreadsheets/d/{ssid}"
+        out["sheet_url"] = f"https://docs.google.com/spreadsheets/d/{ssid}"
     except Exception as e:  # noqa: BLE001
         logger.warning("export sheet sync failed: %s", e)
-        return ""
+    return out
 
 
 def register() -> None:

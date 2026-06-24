@@ -100,6 +100,7 @@ async def api_export_status(job_id: str, request: Request):
             "skip_n": progress.get("skip_n", 0),
             "total": progress.get("total", 0),
             "sheet_url": progress.get("sheet_url", ""),
+            "drive_url": progress.get("drive_url", ""),
             "error": job.get("error_code"),
         }
     )

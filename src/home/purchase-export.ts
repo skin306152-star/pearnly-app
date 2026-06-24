@@ -14,6 +14,7 @@ interface JobProgress {
     skip_n: number;
     total: number;
     sheet_url: string;
+    drive_url: string;
     error: string;
 }
 
@@ -136,9 +137,11 @@ async function pollJob(jobId: string, fmt: Fmt, tries = 0): Promise<void> {
     }
     if (p.status === 'done') {
         setBusy(false);
+        const linkUrl = fmt === 'sheet' ? p.sheet_url : fmt === 'drive' ? p.drive_url : '';
+        const linkLabel = fmt === 'sheet' ? t('pur-export-sheet-open') : t('pur-export-drive-open');
         const link =
-            fmt === 'sheet' && p.sheet_url
-                ? ` · <a href="${escapeHtml(p.sheet_url)}" target="_blank" rel="noopener">${escapeHtml(t('pur-export-sheet-open'))}</a>`
+            linkUrl && linkLabel
+                ? ` · <a href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener">${escapeHtml(linkLabel)}</a>`
                 : '';
         setRes(escapeHtml(t('pur-export-done', { done: p.done_n })) + link);
         return;

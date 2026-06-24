@@ -11,6 +11,41 @@
 import unittest
 
 from services.ocr.schemas import ThaiInvoice
+from services.ocr.schemas_layer1 import FieldRef
+
+
+class FieldRefNullToleranceTests(unittest.TestCase):
+    """守门:FieldRef 内层标量字段 = null 须容忍(2026-06-24 真因 · LINE 清晰收据被误判「读不清」)。
+
+    真实事故:Gemini 对无表格列的简单收据返 source_refs.subtotal.source_column=null,
+    旧 _coerce_source_refs 只防「source_refs[key] 整个=null」,放行了合法 dict;FieldRef
+    构造时 source_column 显式 null 绕过 Field(default='') → ThaiInvoice 校验失败 → 整票回
+    ocr_failed「读不清」让重拍。
+    """
+
+    def test_inner_scalar_nulls_coerced_to_default(self):
+        f = FieldRef(
+            value="70.00", source_text=None, source_column=None, source_page=None, confidence=None
+        )
+        self.assertEqual(f.source_text, "")
+        self.assertEqual(f.source_column, "")
+        self.assertEqual(f.source_page, 0)
+        self.assertEqual(f.confidence, 0.0)
+
+    def test_normal_values_kept(self):
+        f = FieldRef(value="70.00", source_column="รวม", confidence=0.9)
+        self.assertEqual(f.source_column, "รวม")
+        self.assertEqual(f.confidence, 0.9)
+
+    def test_invoice_with_inner_null_source_column_does_not_400(self):
+        inv = ThaiInvoice(
+            invoice_number="IV1",
+            source_refs={
+                "subtotal": {"value": "70", "source_text": "70.00", "source_column": None}
+            },
+        )
+        self.assertIn("subtotal", inv.source_refs)
+        self.assertEqual(inv.source_refs["subtotal"].source_column, "")
 
 
 class PaymentMethodNullToleranceTests(unittest.TestCase):

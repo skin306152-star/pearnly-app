@@ -5,7 +5,7 @@
 
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # ============================================================
 # Document-type discriminator (2026-05-21 multi-schema refactor)
@@ -61,6 +61,18 @@ class FieldRef(BaseModel):
         "validators use this to reject mis-assigned amounts",
     )
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
+    @field_validator("source_text", "source_column", "source_page", "confidence", mode="before")
+    @classmethod
+    def _null_to_default(cls, v, info):
+        # Gemini returns explicit null for these on simple receipts (no table columns).
+        # An explicit null bypasses Field(default=...), so coerce it back to the default —
+        # null = "unknown", and downstream validators expect the typed default, not None.
+        if v is None:
+            return {"source_text": "", "source_column": "", "source_page": 0, "confidence": 0.0}[
+                info.field_name
+            ]
+        return v
 
 
 class BoundingBox(BaseModel):

@@ -6,6 +6,7 @@
 """
 
 import unittest
+from datetime import date
 from decimal import Decimal
 
 from services.export import sheets
@@ -30,6 +31,13 @@ class RowsToMatrixTests(unittest.TestCase):
         m = sheets.rows_to_matrix([row])
         net_idx = [k for k, _ in COLUMNS].index("line_net")
         self.assertEqual(m[1][net_idx], 120.0)
+
+    def test_date_to_iso_string(self):
+        row = {k: "" for k, _ in COLUMNS}
+        row["doc_date"] = date(2026, 6, 24)
+        m = sheets.rows_to_matrix([row])
+        date_idx = [k for k, _ in COLUMNS].index("doc_date")
+        self.assertEqual(m[1][date_idx], "2026-06-24")
 
     def test_none_becomes_empty(self):
         row = {k: None for k, _ in COLUMNS}

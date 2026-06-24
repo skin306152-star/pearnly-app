@@ -6,7 +6,17 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-24 晚 · **Express 推送防呆闸(币种/贷项/押金/日期/税号)全上线 + DATAT/DB 清空待 Owner 重跑批次** · prod `bc5e08f2`/11850971 · companion 1.1.11 未动）
+## 🎯 状态卡（2026-06-24 深夜 · **LINE 多页单据逐页入账(防双重记账)+ 全局文档诊断二次核对** · prod `d94fd2e5` · companion 未动）
+
+- **LINE 多页单据逐页入账**(prod `8164a77d`+`2d25a21e`+`d94fd2e5`·CI 6/6 绿·已部署 prod 验证):此前 LINE 图/PDF OCR 后**只取 page[0] 入账,多页 PDF 第 2..N 张票被静默丢弃(漏记/伤账)**→ 改逐页入账。
+- **核心=防双重记账安全闸**(money 红线):新 `services/ocr/line_multi_page.py` `select_bookable_pages`——第一张可入账页必记;其后页**须自带身份(卖家税号或票号·= 能参与 dedupe 指纹的页)才记**,无身份续页(长发票第 2/3 页常无表头)跳过 → **绝不把跨页长发票重复记成多笔**;同号续页再由 `dedupe_key` 指纹兜底(`find_by_dedupe` 同事务可见)。不同票各自建单+发卡(仅首张引用原图)。新单测 `test_line_image_multi_page` 7 例·全量 4839 绿。
+- **#2/#3 按建议保持现状**:#2(无引用 Slice4 置信度猜目标)= 破坏性动作「问不猜」是有意账安全设计·不改;#3(图片金额接地)= 已有 warn_total/amount_unreliable 兜底·盲加误伤无明细小票·不改。
+- **/simplify 收尾**:4 路审查·唯一就地应用=`_summary` 过滤空项(净零行)。**重要后续(记入交接·本次未做)**:`services/ocr/invoice_grouper.group_pages_to_invoices` 已实现更完整的多页→多票分组(同票号跨页合并行项·persist.py 已用);本窗 `select_bookable_pages` 是更保守的并行实现,**迁移到 grouper 会改入账金额(跨页行项合并)→ 行为变更·money 路·需真机多页样本独立验证**。
+- **⏳ 待验收**:真·LINE 多页 E2E(发含 2 张收据的 PDF→收 2 卡;发跨页长发票→只记 1 笔不双记)——需真多页 PDF 经 LINE Bot+Gemini 真跑·建议 Owner 真机验一次(安全逻辑已单测钉死)。
+- **全局文档诊断**:`docs/HANDOFF-2026-06-24-全局诊断-按文档交接分类.md`(5 条线 done/pending/won't-do 分类·**含二次核对实测纠错 6 条**:文档/STATE 落后于代码→防呆闸/P2E Gateway/销项前端/锚定 Slice3 等其实已上线·判完整度必翻代码别信文档手写数字)。
+- **坑**:`check_line_ratchet` 必须 commit 后跑才准(改动未提交时假绿)·改监控文件涨行先想好拆/豁免;`line_image_ocr.py` 472(近 500·新逻辑进独立模块别再塞)。
+
+## 历史记录（2026-06-24 晚 · **Express 推送防呆闸(币种/贷项/押金/日期/税号)全上线 + DATAT/DB 清空待 Owner 重跑批次** · prod `bc5e08f2`/11850971 · companion 1.1.11 未动）
 
 - **5 道单据防呆闸上线**(prod `adf53346` feat + `bc5e08f2` /simplify · CI 6/6 绿 · prod E2E 5 陷阱全 manual):全语料暴露的「陷阱票当普通票推成功」已封——外币当泰铢(最严重)/贷项退货当正向/押金当费用/未来日期/补开倒签/对手方税号非 13 位 → 命中即 `EXPRESS_MANUAL` 转人工(doc28 §8 deferred 的「转人工即可」)。
 - **实现**:新 `services/erp/express_push/doc_sanity.py` `check_document`(纯函数·只读票面·按严重度·空信号放行不误伤·税号闸复用 `clean_tax_id`)→ preflight 方向后/映射前加 `document` 体检项(契约序不变·正常票全 ok)→ `classify_push_exception` 加 `document_review` 桶 → `erp-log-card` 6 原因码人话 + i18n 4 语。**币种碰 OCR 主路径**:`ThaiInvoice` 加 `currency` 字段(加性·默认空=泰铢→零行为改动)+ layer2 prompt 仅明确非泰铢才填(无信号则币种闸不触发)·全量 455 OCR 测试无漂移。

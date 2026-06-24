@@ -49,6 +49,33 @@ def _user_img_lock(line_user_id: str) -> asyncio.Lock:
     return lock
 
 
+def select_bookable_pages(pages, file_hash, *, flatten):
+    """多页单据逐页入账的安全页序 → list[(fields, field_confidence, image_sha256)]。
+
+    防长单跨页重复记账(伤账红线):跳过非票页;第一张可入账页必记,其后页须自带身份(卖家税号或
+    票号·能参与去重的页)才记 —— 无身份续页跳过,否则同一发票会被重复记成多笔(同号续页另由 dedupe
+    指纹兜底)。图片指纹只挂第一张(供 fastpath 重发短路),其余传 None 避免同 sha 多单碰撞。flatten 注入便于单测。
+    """
+    out = []
+    booked = False
+    for pg in pages:
+        inv = getattr(pg, "invoice", None)
+        if inv is None or getattr(inv, "is_not_invoice", False):
+            continue
+        fields = flatten(inv)
+        has_identity = bool(
+            str(fields.get("seller_tax") or "").strip()
+            or str(fields.get("invoice_number") or "").strip()
+        )
+        if booked and not has_identity:
+            continue
+        out.append(
+            (fields, getattr(pg, "field_confidence", None), file_hash if not booked else None)
+        )
+        booked = True
+    return out
+
+
 def _keep_loading(line_user_id: str, stop: threading.Event) -> None:
     """Keep LINE's loading indicator alive until the OCR task sends a result."""
     if not line_client:
@@ -217,7 +244,7 @@ async def _handle_line_image_ocr(
         # 统一智能通道(docs/smart-intake/15):图片 → 置信驱动入账(建草稿/高置信直接入账)+ 数据卡。
         #   expense 开 → ingest_line_image(高置信直接入正式账,其余草稿/待归类);回执发数据卡。
         #   expense 关 → 不入账,走下方识别记录原路(事务所等),一字不动。异常 → 同样回落识别记录。
-        ingest = None
+        ingests = []
         tid_str = str(user_fresh["tenant_id"]) if user_fresh.get("tenant_id") else None
         try:
             from services.purchase.intake import (
@@ -237,25 +264,34 @@ async def _handle_line_image_ocr(
                         _img_ref, _ = _pstore.save_bytes(str(user_fresh["id"]), file_bytes, _suffix)
                         from services.expense import line_l2
 
-                        ingest = ingest_line_image(
-                            cur,
-                            tenant_id=tid_str,
-                            workspace_client_id=_ws_client_id,
-                            fields=fields_from_invoice(_pages_struct[0].invoice),
-                            confidence=result.get("confidence"),
-                            field_confidence=getattr(_pages_struct[0], "field_confidence", None),
-                            image_ref=_img_ref,
-                            created_by=str(user_fresh["id"]),
-                            api_key=line_l2.resolve_api_key(user_fresh),
-                            image_sha256=file_hash,
-                        )
+                        _api_key = line_l2.resolve_api_key(user_fresh)
+                        # 多页单据逐页入账:此前只取 page[0],2..N 张被静默丢弃(伤账)。
+                        # select_bookable_pages 防长单跨页重复记账;不同票各自建单/发卡。
+                        for _fields, _fc, _sha in select_bookable_pages(
+                            _pages_struct, file_hash, flatten=fields_from_invoice
+                        ):
+                            _one = ingest_line_image(
+                                cur,
+                                tenant_id=tid_str,
+                                workspace_client_id=_ws_client_id,
+                                fields=_fields,
+                                confidence=result.get("confidence"),
+                                field_confidence=_fc,
+                                image_ref=_img_ref,
+                                created_by=str(user_fresh["id"]),
+                                api_key=_api_key,
+                                image_sha256=_sha,
+                            )
+                            if _one:
+                                ingests.append(_one)
         except Exception as _route_err:
             logger.warning(f"[line_ocr] 采购入账分流跳过(回落识别记录): {_route_err}")
-            ingest = None
+            ingests = []
 
-        if ingest:
+        if ingests:
             _is_img = os.path.splitext(filename or "")[1].lower() in _IMAGE_EXTS
-            ingest["source"] = "image" if _is_img else "file"  # 来自图片 / 来自文件
+            for _one in ingests:
+                _one["source"] = "image" if _is_img else "file"  # 来自图片 / 来自文件
             # 已入账/草稿/待归类 → 不写识别记录;计费与历史脱钩(history_id=None);回执发数据卡。
             try:
                 import asyncio as _acharge
@@ -281,22 +317,34 @@ async def _handle_line_image_ocr(
                 )
             except Exception as _ce:
                 logger.warning(f"[line_ocr] cost log failed (non-blocking): {_ce}")
-            _push_result_card(
-                line_user_id, lang, ingest, quote_token, _ws_client_id, tenant_id=tid_str
-            )
+            # 多张票各自发一张卡(只第一张引用用户原图,避免 N 条都带引用)。
+            for _i, _one in enumerate(ingests):
+                _push_result_card(
+                    line_user_id,
+                    lang,
+                    _one,
+                    quote_token if _i == 0 else None,
+                    _ws_client_id,
+                    tenant_id=tid_str,
+                )
             # 对话记忆(PO-15):记图片轮的结果,让下一句文本问「为什么/需补啥」时大脑接得住。
             from services.line_binding import line_chat_memory
 
             line_chat_memory.note(
                 line_user_id=line_user_id, tenant_id=tid_str, role="user", content="[ส่งรูปใบเสร็จ]"
             )
-            line_chat_memory.note(
-                line_user_id=line_user_id,
-                tenant_id=tid_str,
-                role="bot",
-                content=f"票据识别:{ingest.get('state', '')} {ingest.get('amount') or ''}".strip(),
+            _summary = "; ".join(
+                f"{o.get('state', '')} {o.get('amount') or ''}".strip() for o in ingests
             )
-            logger.info(f"[line_ocr] 完成 · state={ingest['state']} · user={user_fresh['id']}")
+            _bot_note = (
+                f"票据识别:{_summary}"
+                if len(ingests) == 1
+                else f"票据识别 {len(ingests)} 张:{_summary}"
+            )
+            line_chat_memory.note(
+                line_user_id=line_user_id, tenant_id=tid_str, role="bot", content=_bot_note
+            )
+            logger.info(f"[line_ocr] 完成 · docs={len(ingests)} · user={user_fresh['id']}")
             return
 
         # 5. 写 history(source='line_bot')· 事务所/未开 expense 走识别记录

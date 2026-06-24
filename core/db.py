@@ -48,7 +48,7 @@ def get_pool() -> SimpleConnectionPool:
             maxconn=15,
             dsn=url,
             connect_timeout=10,
-            sslmode=os.environ.get("PGSSLMODE", "require"),  # prod Supabase Pooler 需 SSL · 本地容器无 SSL 经 PGSSLMODE 覆盖
+            sslmode=os.environ.get("PGSSLMODE", "require"),
         )
         logger.info("✅ PostgreSQL 连接池已建立(minconn=2 maxconn=15)")
     return _pool

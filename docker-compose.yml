@@ -44,6 +44,8 @@ services:
     environment:
       # 覆盖 .env.local · 指向容器内 postgres(服务名 db)
       DATABASE_URL: postgres://pearnly:pearnly_local_dev@db:5432/pearnly
+      # 本地 postgres 不支持 SSL · 关掉(prod 默认 require 不受影响)
+      PGSSLMODE: disable
       PORT: "7860"
       # 本地 staging 不跑邮件 worker · 避免误发
       EMAIL_INGEST_ENABLED: "0"

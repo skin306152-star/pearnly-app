@@ -79,17 +79,27 @@ docker compose down -v         # 连数据卷一起删(重置本地 DB)
 
 ---
 
-## ✅ 验证清单(装好 Docker Desktop 后跑一遍 · A3 完成判定)
+## ✅ 验证清单(A3 完成判定 · 2026-06-24 全部跑通)
 
-> 本机当前未装 Docker · 以下未验证 · Zihao 装 Docker Desktop 后逐项跑。
-> 任一步失败 → 贴报错 · 我接着调。
+> 2026-06-24:Docker Desktop 已就绪,逐项实跑全过 · A3 落地完成。
+> 过程中修了 3 个前端 bundle 化后留下的回归(见下"落地时修复")。
 
-- [ ] `docker compose config` —— compose 语法无误(秒级 · 不 build)
-- [ ] `docker compose build` —— 镜像能构建(首次慢 · 见下方"已知坑")
-- [ ] `docker compose up` 后 `curl http://localhost:7860/api/version` 返 JSON
-- [ ] 容器内 `import app` 不崩(`docker compose exec app python -c "import app"`)
-- [ ] postgres 起来(`docker compose exec db pg_isready -U pearnly`)
-- [ ] dev override 热重载:改一行 .py · 看日志是否 reload
+- [x] `docker compose config` —— compose 语法无误
+- [x] `docker compose build` —— 镜像能构建(删 Dockerfile 过时 `cp home.js` 后通过)
+- [x] `docker compose up` 后 `curl http://localhost:7860/api/version` 返 JSON
+- [x] 容器内 `import app` 不崩(uvicorn `Application startup complete`)
+- [x] postgres 起来(db healthcheck `healthy`)
+- [x] DB 真连通 `curl /api/ready` → `db.ok=true`(关本地 SSL 后)
+- [x] `/api/ready` 真实失败(硬门槛 #7):缺 GEMINI/SMTP/LINE 密钥时返 503 + 逐项 false
+- [x] dev override 热重载:`StatReload` watcher 启动 · 改 .py 触发重启
+
+## 🔧 落地时修复(2026-06-24 · 前端 bundle 化后的回归)
+
+1. **Dockerfile `cp home.html home.js home.css static/` 删除** —— home.js/home.css 巨石已在前端整顿中拆除(home.js 物理文件已不存在),该行使 build 失败。前端早已走 Vite 产物 `static/dist/`(已 commit · 随 COPY 进镜像),`/home` 直接 `FileResponse("static/dist/home.html")`,无需 cp。
+2. **本地 staging DB 连不上(`server does not support SSL, but SSL was required`)** —— `core/db.py` 硬编码 `sslmode="require"`(Supabase Pooler 需要),psycopg2 里该 kwarg 会盖过 DATABASE_URL/PGSSLMODE。改为 `sslmode=os.environ.get("PGSSLMODE", "require")`(**prod 默认 require 不变**),compose 给 staging 容器设 `PGSSLMODE: disable`。
+3. **验证清单路径笔误** —— 健康检查端点是 `/api/ready`(不是 `/ready`)。
+
+> 另发现(非 A3 · 已单独记录):`services/static_assets.py:read_frontend_version` 读 `static/home.html`(bundle 化后已不产出该文件)→ `/api/version` 的前端版本号恒为 `0`。应改读 `static/dist/home.html`。
 
 ---
 

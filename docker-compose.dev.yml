@@ -7,9 +7,8 @@
 # 用法:
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 #
-# 注意:前端 home.* 改动需重新 cp 到 static/(镜像 build 时做的)·
-# dev 下挂载了根目录 · 改 home.html 后在容器里跑:
-#   docker compose exec app cp home.html home.js home.css static/
+# 前端走 Vite 产物 static/dist/(已 commit · 随挂载可见)· 改前端源码需在宿主跑
+# npm run build 重生成 dist · 后端 .py 改动则由 --reload 自动生效。
 # ============================================================
 
 services:

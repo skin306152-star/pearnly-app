@@ -24,14 +24,12 @@ RUN pip install --no-cache-dir -r requirements.lock.txt
 
 # ── 应用代码 ────────────────────────────────────────────────
 # .dockerignore 已排除 node_modules / _pkg / 本地样本 / 缓存等。
-# static/dist/main.js(Vite 产物 · A1)已 commit 在仓库 · 随 COPY 进镜像 ·
-# 因此镜像内不需要 Node。
+# 前端走 Vite 产物 static/dist/(home.html / main.js 等已 commit · 随 COPY 进镜像)·
+# /home 路由直接 FileResponse("static/dist/home.html")· 镜像内不需要 Node。
 COPY . .
 
-# ── prod 同款:home.* → static/ ─────────────────────────────
-# 生产 git-deploy.sh 部署后会 cp home.* 到 static/ · 这里 build 时做掉 ·
-# 让运行期 static/home.html 等可被读到(_read_frontend_version 等用)。
-RUN cp home.html home.js home.css static/
+# 注:旧版这里有 `cp home.html home.js home.css static/`,是前端 bundle 化之前的部署假设。
+# home.js/home.css 巨石已在前端整顿中拆除(home.js 物理文件已不存在),该行会使 build 失败,故删除。
 
 # ── playwright chromium(MR.ERP 集成 · 默认不装 · 体积大)────
 # prod 是通过 /internal/install-playwright 端点单独装。本地若要测 ERP 推送 ·

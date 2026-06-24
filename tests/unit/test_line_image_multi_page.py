@@ -8,7 +8,7 @@
 import unittest
 from types import SimpleNamespace
 
-from services.ocr.line_image_ocr import select_bookable_pages
+from services.ocr.line_multi_page import select_bookable_pages
 
 
 def _page(*, not_invoice=False, tax="", inv_no="", fc=None):

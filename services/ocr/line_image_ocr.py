@@ -16,6 +16,7 @@ from core import workspace_context as wc
 from core.db import insert_ocr_history
 from services.exceptions.exception_checks import _async_run_exception_checks
 from services.ocr import line_image_fastpath as fastpath
+from services.ocr.line_multi_page import select_bookable_pages
 from services.ocr.entrypoints import (
     all_pages_not_invoice as _ocr_all_pages_not_invoice,
     billing_quote as _ocr_billing_quote,
@@ -47,33 +48,6 @@ def _user_img_lock(line_user_id: str) -> asyncio.Lock:
         lock = asyncio.Lock()
         _user_img_locks[line_user_id] = lock
     return lock
-
-
-def select_bookable_pages(pages, file_hash, *, flatten):
-    """多页单据逐页入账的安全页序 → list[(fields, field_confidence, image_sha256)]。
-
-    防长单跨页重复记账(伤账红线):跳过非票页;第一张可入账页必记,其后页须自带身份(卖家税号或
-    票号·能参与去重的页)才记 —— 无身份续页跳过,否则同一发票会被重复记成多笔(同号续页另由 dedupe
-    指纹兜底)。图片指纹只挂第一张(供 fastpath 重发短路),其余传 None 避免同 sha 多单碰撞。flatten 注入便于单测。
-    """
-    out = []
-    booked = False
-    for pg in pages:
-        inv = getattr(pg, "invoice", None)
-        if inv is None or getattr(inv, "is_not_invoice", False):
-            continue
-        fields = flatten(inv)
-        has_identity = bool(
-            str(fields.get("seller_tax") or "").strip()
-            or str(fields.get("invoice_number") or "").strip()
-        )
-        if booked and not has_identity:
-            continue
-        out.append(
-            (fields, getattr(pg, "field_confidence", None), file_hash if not booked else None)
-        )
-        booked = True
-    return out
 
 
 def _keep_loading(line_user_id: str, stop: threading.Event) -> None:

@@ -210,18 +210,31 @@ async def _handle_line_event(ev: dict):
             # 多图排队(#4):每张图启一个后台任务,但 per-user FIFO 锁让它们一张张串行处理、
             # 一张卡发完再下一张、不乱序(转圈移到轮到该图时才发 · 见 process_line_image_serial)。
             # _handle_line_image_ocr/串行包装已抽到 services/ocr/line_image_ocr.py(无循环 import)。
-            from services.ocr.line_image_ocr import process_line_image_serial
+            from services.ocr import line_ocr_jobs
 
-            asyncio.create_task(
-                process_line_image_serial(
-                    bound_user=bound_user,
-                    line_user_id=line_user_id,
-                    message_id=message_id,
-                    filename=filename,
-                    lang=lang,
-                    quote_token=msg.get("quoteToken"),
-                )
+            job = line_ocr_jobs.enqueue_job(
+                bound_user=bound_user,
+                line_user_id=line_user_id,
+                message_id=message_id,
+                filename=filename,
+                lang=lang,
+                quote_token=msg.get("quoteToken"),
             )
+            if job and job.get("status") in ("queued", "retrying", "failed"):
+                asyncio.create_task(line_ocr_jobs.process_job(job["id"], bound_user=bound_user))
+            elif not job:
+                from services.ocr.line_image_ocr import process_line_image_serial
+
+                asyncio.create_task(
+                    process_line_image_serial(
+                        bound_user=bound_user,
+                        line_user_id=line_user_id,
+                        message_id=message_id,
+                        filename=filename,
+                        lang=lang,
+                        quote_token=msg.get("quoteToken"),
+                    )
+                )
             return
 
         # 其他类型消息

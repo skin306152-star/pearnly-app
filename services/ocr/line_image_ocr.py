@@ -81,7 +81,7 @@ async def process_line_image_serial(
         )
         loading_thread.start()
         try:
-            await _handle_line_image_ocr(
+            return await _handle_line_image_ocr(
                 bound_user=bound_user,
                 line_user_id=line_user_id,
                 message_id=message_id,
@@ -138,16 +138,16 @@ async def _handle_line_image_ocr(
         filename = filename or f"line_{message_id}.jpg"
         if not file_bytes:
             _notify(line_client.t_ocr(lang, "err_download"))
-            return
+            return False
         if not _ocr_is_supported_file(filename):
             _notify_card("unsupported", line_client.t_line(lang, "unsupported"))
-            return
+            return False
 
         # 2. 用户 / credits 检查(复用网页入口的 credits 逻辑)
         user_fresh = db.find_user_by_id(bound_user["id"])
         if not user_fresh:
             _notify(line_client.t_ocr(lang, "err_plan"))
-            return
+            return False
 
         # PO-4 · LINE 上传套账分流(product-vision §三-bis):LINE 无顶栏切换器,
         # 归 LINE 用户租户的默认套账(绑定店)。缺则 None(insert 内 NULL · 不拦上传)。
@@ -158,14 +158,14 @@ async def _handle_line_image_ocr(
         if fastpath.early_dup_short_circuit(
             user_fresh, line_user_id, file_hash, _ws_client_id, lang, quote_token
         ):
-            return
+            return True
         # 3.5 文件指纹缓存(firm/未开记账路写过 ocr_history)→ 缓存字段重建卡(不重 OCR/扣费)。
         cached = _ocr_get_cached(user_fresh, file_hash, workspace_client_id=_ws_client_id)
         if cached:
             fastpath.handle_ocr_cache_hit(
                 user_fresh, file_hash, cached, line_user_id, lang, quote_token, _ws_client_id
             )
-            return
+            return True
 
         quote = _ocr_billing_quote(user_fresh, file_bytes, filename, max_pages=50)
         if not quote.get("allowed"):
@@ -174,7 +174,7 @@ async def _handle_line_image_ocr(
                 _notify_card("no_credit", line_client.t_ocr(lang, "err_quota"))
             else:
                 _notify(line_client.t_ocr(lang, "err_ocr"))
-            return
+            return False
 
         # 4. OCR · 新 pipeline 唯一路径
         own_key = (
@@ -184,7 +184,7 @@ async def _handle_line_image_ocr(
         # 检查 API key 可用性(用户自带或系统默认)
         if not api_key and not os.environ.get("GEMINI_API_KEY", "").strip():
             _notify(line_client.t_ocr(lang, "err_plan"))
-            return
+            return False
 
         try:
             from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
@@ -204,15 +204,15 @@ async def _handle_line_image_ocr(
         except Exception as _pipe_err:
             logger.error(f"[line_ocr] pipeline 识别失败: {type(_pipe_err).__name__}: {_pipe_err}")
             _notify_card("ocr_failed", line_client.t_line(lang, "line_ocr_failed_recovery"))
-            return
+            return False
 
         pages = result.get("pages") or []
         if not pages:
             _notify_card("ocr_failed", line_client.t_line(lang, "line_ocr_failed_recovery"))
-            return
+            return False
         if _ocr_all_pages_not_invoice(pages):
             _notify(line_client.t_line(lang, "line_not_receipt_recovery"))
-            return
+            return True
 
         # 统一智能通道(docs/smart-intake/15):图片 → 置信驱动入账(建草稿/高置信直接入账)+ 数据卡。
         #   expense 开 → ingest_line_image(高置信直接入正式账,其余草稿/待归类);回执发数据卡。
@@ -426,6 +426,7 @@ async def _handle_line_image_ocr(
             _notify_card("ocr_failed", line_client.t_line(lang, "line_ocr_failed_recovery"))
         except Exception as _pe:
             logger.warning(f"[line_ocr] err 通知 push_text 失败: {_pe}")
+        return False
 
 
 def _push_result_card(

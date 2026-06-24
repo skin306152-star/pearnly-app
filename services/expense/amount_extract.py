@@ -39,6 +39,7 @@ _PRODUCT_BRANDS = (
 _MULT = (("ล้าน", 1000000), ("แสน", 100000), ("หมื่น", 10000), ("พัน", 1000), ("ร้อย", 100))
 # 泰数字 + 全角数字 → 阿拉伯(会计/正式文档常用·数字符号非词子串·安全)。
 _NORM_DIGITS = str.maketrans("๐๑๒๓๔๕๖๗๘๙０１２３４５６７８９", "01234567890123456789")
+_RE_THAI_REPEAT_MARK = re.compile(r"([ะาิีึืุูเแโใไ])\1+")
 
 # ── 预编译(下面的模式都是常量·strip/normalize 每条消息跑多次,不能每次重建)。 ──────────────
 _RE_PRODUCT = tuple(re.compile(p, re.IGNORECASE) for p in _PRODUCT_BRANDS)
@@ -84,7 +85,7 @@ def _scaled(num: str, mul: int) -> str:
 
 def normalize_words(text: str) -> str:
     """数字简写归一(确定性):泰/全角数字→阿拉伯 · 1k→1000 · 2หมื่น→20000 · 欧式 1.250,50→1250.50。"""
-    s = (text or "").translate(_NORM_DIGITS)
+    s = _RE_THAI_REPEAT_MARK.sub(r"\1", text or "").translate(_NORM_DIGITS)
     s = _RE_EU.sub(lambda m: m.group(0).replace(".", "").replace(",", "."), s)
     s = _RE_K.sub(lambda m: _scaled(m.group(1), 1000), s)
     for rx, mul in _RE_MULT:

@@ -452,7 +452,7 @@ _TH_MONTH = "ม\\.?ค|ก\\.?พ|มี\\.?ค|เม\\.?ย|พ\\.?ค|มิ
 _MULTI_DATE_RE = re.compile(
     rf"\d{{1,2}}[/\-.]\d{{1,2}}[/\-.]\d{{2,4}}|\d{{1,2}}\s*(?:{_TH_MONTH})\.?\s*\d{{0,4}}"
 )
-
+_MULTI_FIELD_DATE_RE = re.compile("(?:date|\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48|\u65e5\u671f)\\s*\\d{1,2}(?![\\d.,])", re.IGNORECASE)
 
 # 句中字段声明词(「ผู้ขาย 711 / ร้านค้า 7-11」)是卖家/字段标注,不是商品项(P1E-3·多项句内联卖家)。
 # 长词在前(extract_inline_vendor 按序匹配·ร้านค้า 先于 ร้าน,免「ร้านค้า X」被 ร้าน 截成「ค้า」)。
@@ -487,7 +487,7 @@ def parse_multi(text: str) -> Optional[list]:
 
     # 与单笔路共用金钱语境清洗:量级归一 + 剥非金额数 + 日期 + 长编号/税号(共用编译)。
     clean = amount_extract.strip_nonmoney(amount_extract.normalize_words(text or ""))
-    clean = amount_extract._RE_LONG_ID.sub(" ", _MULTI_DATE_RE.sub(" ", clean))
+    clean = amount_extract._RE_LONG_ID.sub(" ", _MULTI_FIELD_DATE_RE.sub(" ", _MULTI_DATE_RE.sub(" ", clean)))
     items = []
     for m in _MULTI_RE.finditer(clean.strip()):
         name = _UNIT_TAIL.sub("", _NAME_LEAD.sub("", m.group(1).strip())).strip(" -·:、,，/")

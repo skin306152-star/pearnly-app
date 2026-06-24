@@ -36,15 +36,19 @@ class EnqueueSafetyTests(unittest.TestCase):
             side_effect=RuntimeError("engine down"),
         ):
             with mock.patch("services.modules.store.is_enabled", return_value=True):
-                hooks.enqueue_posting(
-                    cur,
-                    tenant_id="t1",
-                    workspace_client_id=1,
-                    source_type="purchase",
-                    source_id="d1",
-                )
+                with mock.patch(
+                    "services.accounting.posting_failures.record_failure"
+                ) as record:
+                    hooks.enqueue_posting(
+                        cur,
+                        tenant_id="t1",
+                        workspace_client_id=1,
+                        source_type="purchase",
+                        source_id="d1",
+                    )
         self.assertIn("SAVEPOINT acct_enqueue", cur.executed)
         self.assertIn("ROLLBACK TO SAVEPOINT acct_enqueue", cur.executed)
+        record.assert_called_once()
 
     def test_savepoint_failure_swallowed(self):
         cur = FakeCursor(fail_on="SAVEPOINT")
@@ -79,15 +83,19 @@ class EnqueueSafetyTests(unittest.TestCase):
             "services.accounting.posting.generate_for_source", return_value={"id": "v1"}
         ):
             with mock.patch("services.modules.store.is_enabled", return_value=True):
-                hooks.enqueue_posting(
-                    cur,
-                    tenant_id="t1",
-                    workspace_client_id=1,
-                    source_type="purchase",
-                    source_id="d1",
-                )
+                with mock.patch(
+                    "services.accounting.posting_failures.mark_resolved"
+                ) as resolved:
+                    hooks.enqueue_posting(
+                        cur,
+                        tenant_id="t1",
+                        workspace_client_id=1,
+                        source_type="purchase",
+                        source_id="d1",
+                    )
         self.assertIn("RELEASE SAVEPOINT acct_enqueue", cur.executed)
         self.assertNotIn("ROLLBACK TO SAVEPOINT acct_enqueue", cur.executed)
+        resolved.assert_called_once()
 
 
 class PaymentEventIdTests(unittest.TestCase):

@@ -255,6 +255,7 @@ def run_corpus(limit=None):
         for p in _build_patches(sim) + _record_path_patches(sim):
             stack.enter_context(p)
         for row in rows:
+            sim.pending.clear()
             if row[0] == "__MULTI__":
                 _multi, turns, lang, invariants, origin = row
                 end = None

@@ -48,6 +48,7 @@ async def run_erp_retry_tick():
     try:
         due = db.list_logs_due_for_retry(limit=20)
         if not due:
+            await run_recovery_tick()
             return
         logger.info(f"[erp_retry] 本轮到期重试 {len(due)} 条")
 
@@ -140,6 +141,33 @@ async def run_erp_retry_tick():
                 continue
     except Exception as e:
         logger.warning(f"[erp_retry] tick 整体异常: {e}")
+    await run_recovery_tick()
+
+
+async def run_recovery_tick():
+    """Run non-ERP recovery queues on the existing background cadence."""
+    try:
+        await run_accounting_posting_failure_tick()
+    except Exception as e:
+        logger.warning(f"[acct_recovery] tick failed: {e}")
+    try:
+        await run_line_ocr_job_tick()
+    except Exception as e:
+        logger.warning(f"[line_ocr_jobs] tick failed: {e}")
+
+
+async def run_accounting_posting_failure_tick():
+    import asyncio as _asyncio
+
+    from services.accounting import posting_failures
+
+    await _asyncio.to_thread(posting_failures.retry_due, limit=10)
+
+
+async def run_line_ocr_job_tick():
+    from services.ocr import line_ocr_jobs
+
+    await line_ocr_jobs.process_due(limit=3)
 
 
 async def email_ingest_loop():

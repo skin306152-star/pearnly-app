@@ -51,6 +51,18 @@ def enqueue_posting(
             created_by=created_by,
             context=context,
         )
+        try:
+            from services.accounting import posting_failures
+
+            posting_failures.mark_resolved(
+                cur,
+                tenant_id=tenant_id,
+                workspace_client_id=workspace_client_id,
+                source_type=source_type,
+                source_id=source_id,
+            )
+        except Exception as e:
+            logger.warning(f"accounting failure close failed source={source_type}:{source_id}: {e}")
         cur.execute("RELEASE SAVEPOINT acct_enqueue")
     except Exception as e:
         logger.warning(f"accounting enqueue failed source={source_type}:{source_id}: {e}")
@@ -58,6 +70,23 @@ def enqueue_posting(
             cur.execute("ROLLBACK TO SAVEPOINT acct_enqueue")
         except Exception:
             pass
+        try:
+            from services.accounting import posting_failures
+
+            posting_failures.record_failure(
+                cur,
+                tenant_id=tenant_id,
+                workspace_client_id=workspace_client_id,
+                source_type=source_type,
+                source_id=source_id,
+                error=str(e),
+                created_by=created_by,
+                context=context,
+            )
+        except Exception as rec_e:
+            logger.warning(
+                f"accounting failure record failed source={source_type}:{source_id}: {rec_e}"
+            )
 
 
 def void_for_source(

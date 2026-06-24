@@ -110,15 +110,14 @@ _NEW_EXPENSE_LEAD = (
 
 
 def _looks_like_new_expense(text: str) -> bool:
-    """明显新记账意图?(多组 item+amount,或记账动词开头)。
-
-    P1E-3:active 续接态遇此即放行给记账流(不被句中「ผู้ขาย/ร้าน」字段词误当卖家新值吞掉)。
-    correction-like 单字段「X เป็น Y」不在此列(parse_multi <2 且非动词开头)→ 仍优先 correction。
-    """
-    s = (text or "").strip()
-    low = s.lower()
+    s = (text or "").strip(); low = s.lower()
     if any(low.startswith(p.lower()) for p in _NEW_EXPENSE_LEAD):
         return True
+    cut = s.split("\u0e25\u0e1a", 1)[0]
+    if cut != s and lqe.parse_expense(cut).has_amount() and lqe.has_item_context(cut): return True
+    head = s.split("\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48", 1)[0] if "\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48" in s else s.split("date", 1)[0] if "date" in low else s.split("\u65e5\u671f", 1)[0]
+    if head != s and lqe.parse_expense(head).has_amount() and lqe.has_item_context(head):
+        return not (line_classify.is_correction_feedback(s) or lqe.is_edit_request(s) or line_classify.is_cancel_intent(s) or line_classify.is_delete_intent(s))
     return lqe.parse_multi(s) is not None
 
 
@@ -147,6 +146,8 @@ def route(
     的那条记录」并 return True 拦在记账之前,绝不新建支出。任一接管 → True;非 correction → False。
     """
     qt = ctx.get("quote_token", "")
+    if line_classify.is_delete_intent(text) and _looks_like_new_expense(text):
+        return False
     # 批量撤销(撤最近N笔/今天全部)。★引用 > 批量(06):引用某卡时「取消三条」也以那张为准 → 跳过批量。
     if not quoted_message_id:
         # Slice 4 无引用智能解析(候选答案继承 + 目标不明列候选)。排除批量/上一笔/第N → 仍 引用>批量>候选。
@@ -177,8 +178,6 @@ def route(
         bound_user, reply_token, text, lang, tid, ws, line_user_id, quoted_message_id, qt
     ):
         return True
-    # 裸「取消/删除」(无引用·非批量·提问态已被 try_correction_state 截走)→ 撤最近一笔已入账单
-    # (一次到位·可恢复故安全);无记录则诚实告知。绝不新建支出。
     if line_expense_qa.maybe_bare_undo(
         bound_user, reply_token, line_user_id, text, lang, tid, ws, quoted_message_id, ctx
     ):

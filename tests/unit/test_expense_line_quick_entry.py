@@ -220,6 +220,11 @@ class ParseMultiTests(unittest.TestCase):
         r = lqe.parse_multi("ค่าโทร 500 เบอร์ 02-99 ค่าน้ำ 80")
         self.assertEqual(sum(i["amount"] for i in r), Decimal("580"))
 
+    def test_field_date_not_counted_as_item(self):
+        text = "\u0e04\u0e48\u0e32\u0e44\u0e1f 500 \u0e27\u0e31\u0e19\u0e17\u0e35\u0e48 32"
+        self.assertIsNone(lqe.parse_multi(text))
+        self.assertEqual(lqe.parse_expense(text).amount, Decimal("500"))
+
     def test_extract_inline_vendor(self):
         self.assertEqual(lqe.extract_inline_vendor("... ปากกา 20 ผู้ขาย 711"), "711")
         self.assertEqual(lqe.extract_inline_vendor("ร้านค้า 7-11 กาแฟ 30"), "7-11")  # 长词先匹配

@@ -163,6 +163,26 @@ _TABLES = (
         created_at timestamptz NOT NULL DEFAULT now()
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS accounting_posting_failures (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id uuid NOT NULL,
+        workspace_client_id bigint NOT NULL,
+        operation text NOT NULL DEFAULT 'enqueue',
+        source_type text NOT NULL,
+        source_id text NOT NULL,
+        status text NOT NULL DEFAULT 'pending',
+        attempts int NOT NULL DEFAULT 0,
+        last_error text,
+        context jsonb NOT NULL DEFAULT '{}'::jsonb,
+        created_by text,
+        next_retry_at timestamptz,
+        first_failed_at timestamptz NOT NULL DEFAULT now(),
+        last_failed_at timestamptz NOT NULL DEFAULT now(),
+        resolved_at timestamptz,
+        updated_at timestamptz NOT NULL DEFAULT now()
+    )
+    """,
 )
 
 _INDEXES = (
@@ -196,6 +216,13 @@ _INDEXES = (
     "ON acct_bank_lines (tenant_id, workspace_client_id, matched_voucher_id)",
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_voucher_template_name "
     "ON acct_voucher_templates (tenant_id, workspace_client_id, name)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_acct_posting_failure_open "
+    "ON accounting_posting_failures "
+    "(tenant_id, workspace_client_id, operation, source_type, source_id) "
+    "WHERE status IN ('pending', 'retrying')",
+    "CREATE INDEX IF NOT EXISTS ix_acct_posting_failure_due "
+    "ON accounting_posting_failures (tenant_id, next_retry_at, first_failed_at) "
+    "WHERE status IN ('pending', 'retrying')",
 )
 
 _RLS_TABLES = (
@@ -208,6 +235,7 @@ _RLS_TABLES = (
     "acct_bank_accounts",
     "acct_bank_lines",
     "acct_voucher_templates",
+    "accounting_posting_failures",
 )
 
 

@@ -94,9 +94,9 @@ def handle_expense_text(
 
         # 1. L1 快路:清晰记账(有金额 + 非问句 + 无其他 L1 意图 + 非改错)→ 直接记,零 LLM、零成本。
         parsed = lqe.parse_expense(text)
-        if parsed.has_amount() and not isq and si is None and not is_edit:
-            from services.expense import conversation
+        from services.expense import conversation
 
+        if parsed.has_amount() and not isq and si is None and not is_edit:
             with db.get_cursor_rls(stid, commit=True) as cur:
                 pend = conversation.pop_pending(cur, line_user_id=line_user_id)
             # 续接补金额:仅「缺金额」会话态合并(correct/detail 等其它 pending 不当补金额用)。
@@ -108,18 +108,12 @@ def handle_expense_text(
                 # 只发裸数字(无物品/无卖家)且非补答缺金额 → 不入账,温柔问记啥(防 1/2/3 THB 垃圾条目)。
                 _pool("amount_no_item")
                 return True
-            return _do_record(
-                bound_user,
-                reply_token,
-                text,
-                stid,
-                ws,
-                parsed,
-                False,
-                quote_token,
-                lang,
-                line_user_id,
-            )
+            return _do_record(bound_user, reply_token, text, stid, ws, parsed, False, quote_token, lang, line_user_id)
+        if not isq and si is None and not is_edit and lqe.has_item_context(text):
+            with db.get_cursor_rls(stid, commit=True) as cur:
+                conversation.save_pending(cur, line_user_id=line_user_id, tenant_id=stid, workspace_client_id=ws, draft=parsed, missing="amount")
+            _pool("amount_missing")
+            return True
 
         # 2. 大脑(一次 LLM):听意图 + 抽槽 + 自然回复 → 工具分发。
         from services.expense import line_agent, line_l2

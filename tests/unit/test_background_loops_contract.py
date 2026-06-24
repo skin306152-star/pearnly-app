@@ -23,6 +23,9 @@ class BackgroundLoopsContractTests(unittest.TestCase):
         for name in (
             "erp_retry_loop",
             "run_erp_retry_tick",
+            "run_recovery_tick",
+            "run_accounting_posting_failure_tick",
+            "run_line_ocr_job_tick",
             "email_ingest_loop",
             "run_email_ingest_tick",
         ):
@@ -33,6 +36,9 @@ class BackgroundLoopsContractTests(unittest.TestCase):
         self.assertTrue(inspect.iscoroutinefunction(bl.erp_retry_loop))
         self.assertTrue(inspect.iscoroutinefunction(bl.email_ingest_loop))
         self.assertTrue(inspect.iscoroutinefunction(bl.run_erp_retry_tick))
+        self.assertTrue(inspect.iscoroutinefunction(bl.run_recovery_tick))
+        self.assertTrue(inspect.iscoroutinefunction(bl.run_accounting_posting_failure_tick))
+        self.assertTrue(inspect.iscoroutinefunction(bl.run_line_ocr_job_tick))
         self.assertTrue(inspect.iscoroutinefunction(bl.run_email_ingest_tick))
 
     def test_startup_uses_single_source_loops(self):

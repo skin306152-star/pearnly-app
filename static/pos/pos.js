@@ -495,7 +495,7 @@
                 })
                 .catch(() => {});
             navigator.serviceWorker
-                .register('/pos-sw.js?v=11850902', { scope: '/pos' })
+                .register('/pos-sw.js?v=11850964', { scope: '/pos' })
                 .catch(() => {});
         }
         tick();

@@ -362,10 +362,15 @@ body { background: var(--bg); color: var(--ink); font-size: 14px; }
 .pos-toast.error { background: #7f1d1d; }
 .pos-toast.error .ic { color: #fca5a5; }
 
+/* 移动端购物车 sheet 的把手与遮罩 —— 仅窄屏显示,桌面隐藏(不影响桌面横向布局/视觉照搬闸)。 */
+.pos-view--main .cart-peek,
+.pos-view--main .cart-scrim { display: none; }
+
 /* ════════════════ 窄屏自适应 · 收银主屏(屏1)════════════════
  * 收银员任意设备(手机 / 平板)离线可用,不锁桌面宽度。桌面=商品网格 + 380px 固定购物车
- * 横向并排;≤700px 单列堆叠:商品网格占主区内部滚动,购物车降为底部停靠、行项列表独立滚动,
- * 合计与「收款」键常驻可见(原固定 380px 购物车在手机上会顶满全宽、把网格挤成 0 宽并撑出右边界)。
+ * 横向并排;≤700px:商品网格占满主屏(才是收银员高频操作),购物车降为底部 sheet——默认只露
+ * 68px 把手(显件数 + 应收),点把手展开看明细/改量/收款,点遮罩收起。原方案(纯竖排堆叠)
+ * 购物车带商品后顶高、把商品网格挤成一条 → 改 sheet 让商品恒为主、结算按需展开。
  * 顶栏精简:只留品牌点 + 在线指示 + 语言 + 收银员头像,隐店名/时钟/收银员文字。
  * 仅作用于窄屏,桌面渲染不变(视觉照搬闸在桌面宽度比对,不受影响)。 */
 @media (max-width: 700px) {
@@ -378,8 +383,24 @@ body { background: var(--bg); color: var(--ink); font-size: 14px; }
     .pos-view--main .topbar-langs button { padding: 0 7px; }
     .pos-view--main .main { flex-direction: column; }
     .pos-view--main .left { min-height: 0; padding: 12px 12px 0; }
-    .pos-view--main .cart { flex: 0 0 auto; width: 100%; border-left: 0; border-top: 1px solid var(--line); }
-    .pos-view--main .lines { max-height: 30vh; }
+    .pos-view--main .grid { padding-bottom: 84px; }
+    .pos-view--main .cart { position: fixed; left: 0; right: 0; bottom: 0; z-index: 45; width: 100%;
+        max-height: 86vh; border-left: 0; border-radius: 16px 16px 0 0;
+        box-shadow: 0 -10px 30px rgba(17, 24, 39, .18);
+        transform: translateY(calc(100% - 68px)); transition: transform .26s cubic-bezier(.4, 0, .2, 1); }
+    .pos-view--main .cart.sheet-open { transform: translateY(0); }
+    .pos-view--main .cart-peek { display: flex; align-items: center; gap: 9px; width: 100%; height: 68px;
+        flex: 0 0 68px; padding: 0 18px; border: 0; background: var(--card);
+        border-radius: 16px 16px 0 0; cursor: pointer; }
+    .pos-view--main .cart-peek-ic { color: var(--ink); flex: 0 0 auto; }
+    .pos-view--main .cart-peek-count { color: var(--ink); font-size: 14px; font-weight: 700; }
+    .pos-view--main .cart-peek-total { margin-left: auto; font-size: 20px; font-weight: 800; color: var(--ink); }
+    .pos-view--main .cart-peek-chev { color: var(--ink2); flex: 0 0 auto; transition: transform .26s; }
+    .pos-view--main .cart.sheet-open .cart-peek-chev { transform: rotate(180deg); }
+    .pos-view--main .cart-scrim { display: block; position: fixed; inset: 0; z-index: 44;
+        background: rgba(17, 24, 39, .4); opacity: 0; pointer-events: none; transition: opacity .26s; }
+    .pos-view--main .cart-scrim.show { opacity: 1; pointer-events: auto; }
+    .pos-view--main .lines { max-height: 34vh; }
     .pos-view--main .grand .val { font-size: 26px; }
 }
 

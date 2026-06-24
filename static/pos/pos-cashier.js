@@ -167,7 +167,22 @@
     function clearCart() {
         cart = [];
         discount = 0;
+        closeSheet();
         renderCart();
+    }
+
+    // 移动端底部购物车 sheet(桌面 .cart-peek/.cart-scrim 为 display:none,这些类无副作用)
+    function openSheet() {
+        $('cart').classList.add('sheet-open');
+        $('cart-scrim').classList.add('show');
+    }
+    function closeSheet() {
+        $('cart').classList.remove('sheet-open');
+        $('cart-scrim').classList.remove('show');
+    }
+    function toggleSheet() {
+        if ($('cart').classList.contains('sheet-open')) closeSheet();
+        else openSheet();
     }
 
     function subtotalOf(list) {
@@ -218,6 +233,8 @@
         $('cart-disc-amt').textContent = fmt(disc);
         $('cart-grand').textContent = fmt(sub - disc);
         $('cart-pay-btn').disabled = cart.length === 0;
+        $('cart-peek-count').textContent = cart.reduce((s, c) => s + c.qty, 0);
+        $('cart-peek-grand').textContent = fmt(sub - disc);
     }
 
     function setDiscount() {
@@ -238,6 +255,7 @@
     }
     function openPay() {
         if (!cart.length) return;
+        closeSheet();
         const due = grandTotal();
         $('pay-due').textContent = fmt(due);
         $('pay-qr-amt').textContent = fmt(due);
@@ -669,6 +687,8 @@
                 loadGrid();
             }
         });
+        $('cart-peek').addEventListener('click', toggleSheet);
+        $('cart-scrim').addEventListener('click', closeSheet);
         $('cart-hold-btn').addEventListener('click', holdCurrent);
         $('cart-clear-btn').addEventListener('click', clearCart);
         $('cart-resume-btn').addEventListener('click', () => POS.showView('hold'));

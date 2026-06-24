@@ -6,15 +6,18 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-23 深夜 · **Express 异常卡「绑定主体」面板上线 + /simplify** · prod `9336930e`/11850964 · companion **1.1.8**）
+## 🎯 状态卡（2026-06-24 · **Express 全自动 v1 收口 S5/defer①/S4 + 全语料真机验证** · pearnly-app 我最后 `fb245dc9`(master `d8c7cd8f`含别窗口) · companion **1.1.11**）
 
-- **④ 前端绑主体面板上线**:推送异常页「方向判不出·主体没绑」(`direction_unknown` 且非 `direction_not_enabled`)的票,卡上加「绑定主体」主操作 → 展开下拉选账套主体 → 一键绑定并重推(后端 `POST express-bind-subject` 早就位·本窗只补 UI)。**刻意复用**待补科目卡 `erp-exc-acctfix` 样式 + `data-erpexc-acctfix`/`data-acctfix-cancel` 句柄(不新增 CSS),只 submit 新 `data-bindfix-submit`。主体下拉走 `window.fetchWorkspaceClients()`。`erp-bind-*` 8 键 4 语。erp-exc-actions 307 / erp-exceptions 496(<500)。
-- **真站 E2E 8 PASS · 0 FAIL**(pearnly.com·真浏览器·新 bundle 复跑仍过):卡渲染 + 面板 getComputedStyle 可见 + 下拉填 3 主体 + 提交真发 POST 带 workspace_client_id。验证设施入库 `scripts/_seed_express_bind_e2e.py`+`_express_bind_e2e.cjs`(仅测试号·prod 上 pearnly_e2e_3 留了一条 direction_unknown manual 日志可复验·要清删其 express 端点+log)。
-- **/simplify 收口**(`9336930e`):① 复用 — `_erpExcEnsureClients` 改调 canonical `window.fetchWorkspaceClients()`(带 workspace 头+401),不自起裸 fetch;② 效率 — 主体懒取与异常 fetch 并发(render 前再 await)。**defer 两项**(非阻塞):后端 `derive_bind_fix` 结构化提示(受 `push_log_queries.py` 492/500 闸·须先拆该文件)/ acctfix→通用 panel 句柄改名(低价值)。
-- **本窗 4 commit 全 CI 绿**:`72f47c0b`(feat)+`c047f185`(fix 漏 add dist/home.html)+`2d524a58`(test E2E)+`9336930e`(/simplify)。守门全绿(4696 单测/i18n 4×4823 平衡/lint-ui 三道/ratchet 透明豁免)。
-- **坑**:bump `?v=` 必须 `git add` **dist/home.html + dist/main.js 两个**(源 home.html 编译进 dist/home.html·漏一个→打包一致性闸红·本窗踩过)。详见 `docs/HANDOFF-2026-06-23-绑主体面板-收尾.md`。
-- **待办**(记忆 [[express-full-auto-provision-design]]):**S4 自建客户 ARMAS**(条件不具备·要 DATAT 空闲+Owner 真机+碰小助手发版协调)/ **S5 科目保守版收口**(可做)/ **S7 建账套**(极重·研究先行)。
-- ⚠️ companion 独立仓 `D:\pearnly-companion`(无 remote)·本窗口**没碰**。详见 [[express-full-auto-provision-design]] [[express-account-resolution-closed-loop]]。
+- **S5 科目保守版收口**(prod `62626323`+`29e22bb8`·E2E 5 PASS):科目来源诚实化——enqueue 不再猜来源,`common.resolve_account_sourced` 吐真来源(category_map/config_default),落账套默认标 `account_review` →详情卡「默认·待核」(`expd-acct-review` 4 语)。零入账行为改动。
+- **defer① 绑主体 bind_fix**(prod `8c79d556`·E2E 8 PASS):拆 `push_exception_classify.py`(从 492/500 的 push_log_queries 抽分类/派生·facade 保 `store.X is q.X`·回落 436 行)+ 新 `derive_bind_fix` → `list_push_exceptions` 派生 `bind_fix`,前端读结构化字段不解析裸串。
+- **S4 自建客户疑似重复转人工**(companion `a27cc82` 守卫 + 云端 `33582a24` 人话化·**真机暴露并修 dedup bug** `41418cc`):`suspected_customer_dup` 镜像 supplier 守卫。★bug=`_norm_match` 删泰文声调符致归一同名,`_find_suspected_dup` 的 `cand==target→continue` 漏判「同名不同税号」→ 改 `if not cand`(供应商侧同享)。**真机重测 PASS**:S4a 自动建客户+过账、S4b 正确转人工不建重复。companion 发版 **1.1.10→1.1.11**(`dd4f670` /simplify 微优未单发)。
+- **全语料真机测试**(Owner 上传 49 张·我查 prod 核实·46 push=41 success+5 manual):**核心稳**——去重无双记账(查 DATAT APTRN 实证·源单号在 REFNUM)、5 张正确转人工、自动建供应商/归一/加油防呆全对。**暴露防呆缺口**(陷阱票该拦没拦):**美元当泰铢记**(最严重)、押金/折让/未来日期当普通采购推 → 已列 backlog。
+- **Backlog**:① **防呆闸**(币种>折让>押金>日期·doc28 §8·多为转人工)② **S7 建账套**(极重·研究先行·Owner 拍板**暂缓存档**)③ defer② acctfix句柄改名(第三消费者再做)④ DATAT 本轮测试数据待清(Owner 定)。详见 **`docs/HANDOFF-2026-06-24-express-v1-S4S5-收尾.md`**。
+- **坑/资源**:DATAT 写盘只能走 **bash 拷出→本地 dbf 手术→bash 拷回**(原生 Win 进程无 \\accserver 认证·accserver 易掉线·Owner 关 Express 才拷得回);prod 查任意账号推送=SSH SG + psycopg2 查 erp_push_logs。companion 独立仓 `D:\pearnly-companion` 无 remote·发版 `release.ps1`。详见 [[express-full-auto-provision-design]] [[express-account-resolution-closed-loop]]。
+
+## 历史记录（2026-06-23 深夜 · **Express 异常卡「绑定主体」面板上线 + /simplify** · prod `9336930e`/11850964 · companion **1.1.8**）
+
+- **④ 前端绑主体面板上线**:推送异常页 `direction_unknown` 且非 `direction_not_enabled` 的票加「绑定主体」主操作 → 选账套主体一键绑定重推(后端 `POST express-bind-subject` 早就位·本窗只补 UI·复用待补科目卡样式与句柄)。真站 E2E 8 PASS。**defer① 后端 derive_bind_fix 结构化提示**(当时受 push_log_queries 492/500 闸 deferred)→ **已在 2026-06-24 窗口做完**(见上)。详见 `docs/HANDOFF-2026-06-23-绑主体面板-收尾.md`。
 
 ## 历史记录（2026-06-23 晚 · **Express 推送诚实化 + 待补科目卡 + 小助手托盘/配对/自动PACK 一串修** · prod `c91b0577`/11850951 · companion **1.1.6**）
 

@@ -6,7 +6,16 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-24 · **Express 全自动 v1 收口 S5/defer①/S4 + 全语料真机验证** · pearnly-app 我最后 `fb245dc9`(master `d8c7cd8f`含别窗口) · companion **1.1.11**）
+## 🎯 状态卡（2026-06-24 晚 · **Express 推送防呆闸(币种/贷项/押金/日期/税号)全上线 + DATAT/DB 清空待 Owner 重跑批次** · prod `bc5e08f2`/11850971 · companion 1.1.11 未动）
+
+- **5 道单据防呆闸上线**(prod `adf53346` feat + `bc5e08f2` /simplify · CI 6/6 绿 · prod E2E 5 陷阱全 manual):全语料暴露的「陷阱票当普通票推成功」已封——外币当泰铢(最严重)/贷项退货当正向/押金当费用/未来日期/补开倒签/对手方税号非 13 位 → 命中即 `EXPRESS_MANUAL` 转人工(doc28 §8 deferred 的「转人工即可」)。
+- **实现**:新 `services/erp/express_push/doc_sanity.py` `check_document`(纯函数·只读票面·按严重度·空信号放行不误伤·税号闸复用 `clean_tax_id`)→ preflight 方向后/映射前加 `document` 体检项(契约序不变·正常票全 ok)→ `classify_push_exception` 加 `document_review` 桶 → `erp-log-card` 6 原因码人话 + i18n 4 语。**币种碰 OCR 主路径**:`ThaiInvoice` 加 `currency` 字段(加性·默认空=泰铢→零行为改动)+ layer2 prompt 仅明确非泰铢才填(无信号则币种闸不触发)·全量 455 OCR 测试无漂移。
+- **测试/守门**:新 `test_express_doc_sanity` 16 + preflight/classify 契约扩充·全量 **4823 绿**·守门全绿(prettier/black/ruff/imports/i18n 4×4832/size/ui-consistency/ai-smell/ratchet 6 文件透明豁免)。
+- **数据已清(让 Owner 重跑批次)**:① DB 测试号 `0ac26816`(18685123459)ocr_history 58 + push_logs 51 **全删 0/0**(Express/DMS 端点 + 主体 + 科目映射**保留**·重跑要用)② **DATAT 从干净基线 `D:\datat_restore_src_20260623-201016` 镜像还原**(Express+companion 已关释放锁·写盘前全量备份 `Desktop\DATAT_backup_20260624-155805_pre-restore`)·本批 44 票验证全 0。
+- **下一步**:Owner 重新上传 51 张验防呆闸(6 张陷阱票=美元/贷项/押金/未来日期/倒签/坏税号 应转 manual 而非误推)。剩 backlog:S7 建账套(暂缓存档)/v2 科目全自动新建·WHT·存货·冲销。
+- **坑/资源**:DATAT 写盘只能 bash 走 `//accserver/ACCOUNT/70EXP/test`(原生 Win 进程无认证·Express+companion 须关释放文件锁)·prod 查推送=SSH SG + psycopg2 查 `erp_push_logs`/`ocr_history`。companion 独立仓 `D:\pearnly-companion` 无 remote(本窗未动)。详见 `docs/HANDOFF-2026-06-24-express-v1-S4S5-收尾.md` + 记忆 [[express-full-auto-provision-design]]。
+
+## 历史记录（2026-06-24 · **Express 全自动 v1 收口 S5/defer①/S4 + 全语料真机验证** · pearnly-app `fb245dc9` · companion **1.1.11**）
 
 - **S5 科目保守版收口**(prod `62626323`+`29e22bb8`·E2E 5 PASS):科目来源诚实化——enqueue 不再猜来源,`common.resolve_account_sourced` 吐真来源(category_map/config_default),落账套默认标 `account_review` →详情卡「默认·待核」(`expd-acct-review` 4 语)。零入账行为改动。
 - **defer① 绑主体 bind_fix**(prod `8c79d556`·E2E 8 PASS):拆 `push_exception_classify.py`(从 492/500 的 push_log_queries 抽分类/派生·facade 保 `store.X is q.X`·回落 436 行)+ 新 `derive_bind_fix` → `list_push_exceptions` 派生 `bind_fix`,前端读结构化字段不解析裸串。

@@ -192,6 +192,7 @@
     function renderCart() {
         const lines = $('cart-lines');
         const empty = $('cart-empty');
+        const itemCount = cart.reduce((s, c) => s + c.qty, 0);
         if (!cart.length) {
             lines.innerHTML = '';
             empty.style.display = 'flex';
@@ -224,17 +225,20 @@
             lines
                 .querySelectorAll('[data-inc]')
                 .forEach((b) => (b.onclick = () => changeQty(Number(b.dataset.inc), 1)));
-            const items = cart.reduce((s, c) => s + c.qty, 0);
-            $('cart-sub').textContent = POS.tf('posui.cart.items', { n: items, k: cart.length });
+            $('cart-sub').textContent = POS.tf('posui.cart.items', {
+                n: itemCount,
+                k: cart.length,
+            });
         }
         const sub = subtotalOf(cart);
         const disc = Math.min(discount, sub);
+        const grand = sub - disc;
         $('cart-subtotal').textContent = fmt(sub);
         $('cart-disc-amt').textContent = fmt(disc);
-        $('cart-grand').textContent = fmt(sub - disc);
+        $('cart-grand').textContent = fmt(grand);
         $('cart-pay-btn').disabled = cart.length === 0;
-        $('cart-peek-count').textContent = cart.reduce((s, c) => s + c.qty, 0);
-        $('cart-peek-grand').textContent = fmt(sub - disc);
+        $('cart-peek-count').textContent = itemCount;
+        $('cart-peek-grand').textContent = fmt(grand);
     }
 
     function setDiscount() {

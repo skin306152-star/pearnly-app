@@ -251,9 +251,20 @@
 
     (window as any).ExpressConnect = { refresh: _refresh };
 
+    function _visible() {
+        return (
+            !!document.querySelector('.auto-nav-item.active[data-auto-tab="erp"]') &&
+            !!document.querySelector('.erp-subtab.active[data-erp-subtab="connect"]')
+        );
+    }
+
     setTimeout(function () {
-        var a = document.querySelector('.auto-nav-item.active[data-auto-tab="erp"]');
-        var c = document.querySelector('.erp-subtab.active[data-erp-subtab="connect"]');
-        if (a && c) _refresh();
+        if (_visible()) _refresh();
     }, 260);
+
+    // 在线状态自愈:卡片本身无轮询(只在 tab 点击时刷新),会冻结在过期快照 →
+    // 端点卡显「Agent 离线」但向导/托盘已在线。可见时每 20s 重探心跳保持诚实(铁律 #12)。
+    setInterval(function () {
+        if (_visible()) _refresh();
+    }, 20000);
 })();

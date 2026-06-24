@@ -46,12 +46,22 @@
         return document.getElementById(id);
     }
 
+    // 连接卡(背后端点卡)无自轮询,只在 tab 点击时刷新;向导探到状态变化/关闭时主动同步,
+    // 免出现「向导已连接 / 端点卡仍离线」的过期快照打架(铁律 #12 状态诚实)。
+    function _syncCard() {
+        try {
+            var ec = (window as any).ExpressConnect;
+            if (ec && ec.refresh) ec.refresh();
+        } catch (e) {}
+    }
+
     function _close() {
         if (S && S.poll) clearInterval(S.poll);
         var ov = $('exp-wiz-overlay');
         if (ov) ov.remove();
         document.removeEventListener('keydown', _onEsc);
         S = null;
+        _syncCard();
     }
     function _onEsc(e: KeyboardEvent) {
         if (e.key === 'Escape') _close();
@@ -398,7 +408,10 @@
                 S.accountName = selectedName;
                 changed = true;
             }
-            if (changed) updateUI();
+            if (changed) {
+                updateUI();
+                _syncCard(); // 在线状态翻转 → 背后端点卡立即同步,不等用户重点 tab
+            }
         } catch (e) {}
     }
 
@@ -438,10 +451,6 @@
         }
         _close();
         _toast(_t('exp-setup-done'));
-        try {
-            var ec = (window as any).ExpressConnect;
-            if (ec && ec.refresh) ec.refresh();
-        } catch (e) {}
     }
 
     // ─── 事件(委托)─────────────────────────────────────────

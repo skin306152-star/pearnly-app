@@ -289,7 +289,9 @@ class ChartWhitelistTests(unittest.TestCase):
         self.assertIn("11-04-02-00", accs)  # 采购
         self.assertIn("11-05-04-01", accs)  # 进项税
         self.assertIn("21-02-01-00", accs)  # 应付
+        # 无品类映射 → 采购科目落账套默认 · 来源诚实标 config_default + 待核(非猜测)。
         self.assertEqual(body["account_source"], "config_default")
+        self.assertTrue(body["account_review"])
 
 
 if __name__ == "__main__":

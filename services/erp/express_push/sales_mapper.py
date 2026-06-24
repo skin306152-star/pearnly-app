@@ -34,6 +34,8 @@ from services.erp.express_push.common import (
     fail,
     payment_is_paid,
     resolve_account,
+    resolve_account_sourced,
+    SRC_DEFAULT,
 )
 from services.purchase.field_clean import clean_invoice_no, clean_seller, clean_tax_id
 
@@ -93,7 +95,7 @@ def build_express_sales_payload(
     base, vat, total = amts
 
     accounts = mappings.get("accounts") or []
-    revenue_acc = resolve_account(accounts, category, config.get("revenue_acc"))
+    revenue_acc, acc_source = resolve_account_sourced(accounts, category, config.get("revenue_acc"))
     if not revenue_acc:
         return fail("no_revenue_account")
     ar_acc = resolve_account(accounts, "accounts_receivable", config.get("ar_acc"))
@@ -142,6 +144,9 @@ def build_express_sales_payload(
         "vat_amount": _s(vat),
         "total_amount": _s(total),
         "lines": lines,
+        # 变动科目(收入)的真实解析来源 · config_default=落账套默认→待核(诚实状态)。
+        "account_source": acc_source,
+        "account_review": acc_source == SRC_DEFAULT,
         "source": {
             "history_id": str(history.get("id") or ""),
             "filename": history.get("filename"),

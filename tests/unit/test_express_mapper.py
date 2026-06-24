@@ -66,6 +66,9 @@ class ExpressMapperTests(unittest.TestCase):
         self.assertEqual(len(p["lines"]), 3)
         accs = {ln["acc"] for ln in p["lines"]}
         self.assertEqual(accs, {"11-04-02-00", "11-05-04-01", "21-02-01-00"})
+        # 采购科目落账套默认(无品类映射)→ 来源诚实标 config_default · 待核。
+        self.assertEqual(p["account_source"], "config_default")
+        self.assertTrue(p["account_review"])
 
     def test_paid_routes_to_hp(self):
         r = build_express_payload(_ptt_history(fields={"payment_status": "paid"}), config=_CONFIG)
@@ -106,6 +109,9 @@ class ExpressMapperTests(unittest.TestCase):
         self.assertTrue(r.ok, r.reason)
         purchase = [ln for ln in r.payload["lines"] if ln["side"] == "D"][0]
         self.assertEqual(purchase["acc"], "11-04-09-00")
+        # 品类映射命中 → 来源 category_map · 不待核(规则可信)。
+        self.assertEqual(r.payload["account_source"], "category_map")
+        self.assertFalse(r.payload["account_review"])
 
     def test_inconsistent_amounts_manual(self):
         h = _ptt_history(fields={"subtotal": "100.00", "vat": "7.00"}, total_amount="999.00")

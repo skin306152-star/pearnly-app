@@ -144,9 +144,13 @@
         var warn = balanced
             ? ''
             : '<div class="exp-je-warn">' + _esc(_t('expd-unbalanced')) + '</div>';
+        // 变动科目落账套默认(account_review)→ 柔和待核提示,提醒人核一眼(诚实状态)。
+        var review = p.account_review
+            ? '<div class="exp-je-note">' + _esc(_t('expd-acct-review')) + '</div>'
+            : '';
         return _sec(
             _t('expd-sec-entry'),
-            '<div class="exp-je">' + rows + totalRow + badge + '</div>' + warn
+            '<div class="exp-je">' + rows + totalRow + badge + '</div>' + review + warn
         );
     }
 

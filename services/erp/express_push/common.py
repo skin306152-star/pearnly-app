@@ -101,10 +101,19 @@ def be_dates(invoice_date: Any) -> Optional[tuple[str, str]]:
     return (f"{yy:02d}{month:02d}{day:02d}", f"{yy:02d}{month:02d}01")
 
 
-def resolve_account(
+# 科目来源标记(诚实状态 · 写进 push 日志 / 详情卡):
+#   category_map  品类→科目映射命中(规则/学习·可信)
+#   config_default 回落账套默认(ISINFO 默认)→ 标"默认·待核",提示人核一眼
+#   ""            未解出(留人工)
+SRC_CATEGORY = "category_map"
+SRC_DEFAULT = "config_default"
+
+
+def resolve_account_sourced(
     accounts: List[Dict[str, Any]], category: str, config_code: Optional[str]
-) -> Optional[str]:
-    """科目解析:先查映射束(erp_type=express · pearnly_category 命中),否则 config 兜底码。"""
+) -> tuple[Optional[str], str]:
+    """科目解析 + 来源。先查映射束(erp_type=express · pearnly_category 命中)→ category_map;
+    否则 config 兜底码 → config_default(账套默认 · 待核);都无 → (None, '')。"""
     cat = (category or "").strip()
     if cat:
         for a in accounts or []:
@@ -113,9 +122,16 @@ def resolve_account(
             ) == cat:
                 code = (a.get("erp_code") or "").strip()
                 if code:
-                    return code
+                    return code, SRC_CATEGORY
     code = (config_code or "").strip()
-    return code or None
+    return (code, SRC_DEFAULT) if code else (None, "")
+
+
+def resolve_account(
+    accounts: List[Dict[str, Any]], category: str, config_code: Optional[str]
+) -> Optional[str]:
+    """科目码(来源见 resolve_account_sourced)。固定项(AR/AP/VAT)不关心来源 · 用此瘦封装。"""
+    return resolve_account_sourced(accounts, category, config_code)[0]
 
 
 def amounts(fields: Dict[str, Any], history: Dict[str, Any]) -> Optional[tuple]:

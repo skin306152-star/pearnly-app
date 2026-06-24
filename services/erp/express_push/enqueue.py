@@ -95,13 +95,14 @@ def enqueue_express(endpoint: Dict[str, Any], history: Dict[str, Any]) -> Dict[s
                 "doctype": payload.get("doctype"),
                 "account_set": payload.get("account_set"),
                 "total_amount": payload.get("total_amount"),
-                # 推送日志可见性:这张票记到哪几个科目。account_source 是粗略近似(有品类≈走规则
-                # 映射·否则账套默认)· 非 mapper 真实解析路径(精确来源待 v2 schema 列)。
+                # 推送日志可见性:这张票记到哪几个科目 + 变动科目真实来源(mapper 解析路径,
+                # 非猜测)。account_review=True → 落账套默认,标"待核"提示人核一眼。
                 "accounts": [
                     {"acc": ln.get("acc"), "side": ln.get("side"), "desc": ln.get("desc")}
                     for ln in (payload.get("lines") or [])
                 ],
-                "account_source": "category_map" if pf.category else "config_default",
+                "account_source": payload.get("account_source") or "config_default",
+                "account_review": bool(payload.get("account_review")),
                 "preflight": checks,
             },
             ensure_ascii=False,

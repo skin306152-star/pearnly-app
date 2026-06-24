@@ -69,6 +69,9 @@ class ExpressSalesMapperTests(unittest.TestCase):
             sum(Decimal(ln["amount"]) for ln in dr), sum(Decimal(ln["amount"]) for ln in cr)
         )
         self.assertEqual(len(p["lines"]), 3)
+        # 收入科目落账套默认(无品类映射)→ 来源诚实标 config_default · 待核。
+        self.assertEqual(p["account_source"], "config_default")
+        self.assertTrue(p["account_review"])
 
     def test_customer_new_when_unmapped(self):
         r = build_express_sales_payload(_sales_history(), config=_CONFIG)

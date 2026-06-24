@@ -88,6 +88,16 @@
     font-size: 12px;
     font-weight: 600;
 }
+/* 科目落账套默认 · 待核提示(柔和琥珀 · 非错误红) */
+.exp-je-note {
+    margin-top: 8px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    background: var(--warn-bg);
+    border: 1px solid var(--amber-200);
+    color: var(--amber-700);
+    font-size: 12px;
+}
 /* 空态(无分录载荷) */
 .exp-je-empty {
     padding: 18px;

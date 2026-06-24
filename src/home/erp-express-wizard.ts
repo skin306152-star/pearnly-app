@@ -1,14 +1,6 @@
-// ============================================================
-// src/home/erp-express-wizard.js · Express 接通向导弹窗(重设计 v2 · 照搬结构/流程/交互)
-//
-// 照搬 pearnly_express_modal_redesign_v2.html:双栏弹窗(左流程轨 3 步 + 进度卡 / 右内容滚动
-// 区 step1-3 + 自动推送 + 高级折叠)+ 头部 mini-status + 底部完成 gating。结构/分步/交互/文案
-// 一字照搬,仅:CSS 走令牌、字符图标→线性 SVG、class 加 exp- 前缀、演示桩接真接口。
-//
-// 真接口:生成密钥 = POST /agent-token;连上 = 心跳轮询(agent_last_seen_at);账套 = 读
-// heartbeat 上报的 reported_account_sets;完成 = PATCH endpoint(account_set + auto_push)。
-// body 一次渲染,状态由 updateUI 定点更新(保平滑滚动);由连接卡 ExpressWizard.open(ep) 拉起。
-// ============================================================
+// src/home/erp-express-wizard.js · Express 接通向导弹窗(照搬 pearnly_express_modal_redesign_v2)
+// 双栏:左 3 步流程轨+进度卡 / 右 step1-3+自动推送+高级折叠。body 一次渲染·updateUI 定点更新。
+// 接口:生成密钥 POST /agent-token · 连上=心跳轮询 agent_last_seen_at · 账套=heartbeat 上报 · 完成=PATCH endpoint。由连接卡 ExpressWizard.open(ep) 拉起。
 /* global escapeHtml */
 (function () {
     'use strict';
@@ -46,8 +38,7 @@
         return document.getElementById(id);
     }
 
-    // 连接卡(背后端点卡)无自轮询,只在 tab 点击时刷新;向导探到状态变化/关闭时主动同步,
-    // 免出现「向导已连接 / 端点卡仍离线」的过期快照打架(铁律 #12 状态诚实)。
+    // 同步背后端点卡(它无自轮询·只 tab 点击刷新),免「向导已连接/卡仍离线」过期快照(铁律#12)。
     function _syncCard() {
         try {
             var ec = (window as any).ExpressConnect;

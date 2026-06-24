@@ -40,6 +40,13 @@ class ReconWorkerDdlLockTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(order[:3], ["lock_acquired", "ensure", "lock_released"])
 
 
+class BootstrapHandlersTests(unittest.TestCase):
+    def test_bootstrap_re_registers_after_registry_is_cleared(self):
+        with mock.patch.dict(worker._HANDLERS, {}, clear=True):
+            worker.bootstrap_handlers()
+            self.assertIn("export", worker._HANDLERS)
+
+
 class RunOneErrorCaptureTests(unittest.TestCase):
     """handler 抛异常时存真错到 error_code(别吞成通用 processing_error · 真账号诊断用)。"""
 

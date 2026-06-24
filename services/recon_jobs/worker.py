@@ -15,6 +15,7 @@ handler 签名:fn(params: dict, input_ref: list, progress_cb) -> (result_table, 
 from __future__ import annotations
 
 import asyncio
+import importlib
 import logging
 import os
 import shutil
@@ -47,7 +48,10 @@ def register_handler(job_type: str, fn: Callable) -> None:
 def bootstrap_handlers() -> None:
     """导入 handler 模块触发注册(run_* 在 #14 落地)· 缺失不致命。"""
     try:
-        import services.recon_jobs.handlers  # noqa: F401  (import 即注册)
+        handlers = importlib.import_module("services.recon_jobs.handlers")
+        register = getattr(handlers, "_register", None)
+        if callable(register):
+            register()
     except Exception as e:
         logger.warning(f"[recon-worker] handlers not loaded yet: {e}")
 

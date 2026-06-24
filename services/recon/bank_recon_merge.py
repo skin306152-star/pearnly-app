@@ -6,10 +6,46 @@ Merge multiple parsed statement / GL files into a single ordered row set
 before reconciliation.
 """
 
+import logging
 from datetime import date
 from typing import List, Dict, Any, Tuple
 
 from services.recon.bank_recon_types import StatementRow, GlRow
+
+logger = logging.getLogger(__name__)
+
+
+def _reconcile_gl_opening(opening: float, rows: List[GlRow]) -> float:
+    """用 GL 行运行余额反推真期初,修正 OCR 偶发的千分位截断。
+
+    真实事故(mrerp 2026-06-24):扫描版 GL 走 Gemini 兜底,把期初 215,228.06 读成
+    215.00(逗号后被砍)。GL 行带运行余额(balance = 期初 + Σ借 − Σ贷),用首笔
+    『余额 − (借 − 贷)』反推真期初。仅当整列运行余额自洽(反推期初 + Σ借 − Σ贷 ≈
+    末行余额)时才采信反推值 —— 否则连行余额也不可信,保留原值并告警(不瞎改)。
+    """
+    bal_rows = [r for r in rows if r.balance]
+    if not bal_rows:
+        return opening  # 无运行余额可校验 → 原样
+    first, last = bal_rows[0], bal_rows[-1]
+    derived = round(first.balance - ((first.debit or 0) - (first.credit or 0)), 2)
+    if abs(derived - (opening or 0)) <= 0.02:
+        return opening  # 已吻合
+    total_debit = sum(r.debit for r in rows)
+    total_credit = sum(r.credit for r in rows)
+    consistent = abs(round(derived + total_debit - total_credit, 2) - last.balance) <= 0.02
+    if consistent:
+        logger.warning(
+            "[gl_opening] OCR 期初 %.2f 与运行余额不符 → 反推修正为 %.2f(整列自洽)",
+            opening or 0,
+            derived,
+        )
+        return derived
+    logger.warning(
+        "[gl_opening] OCR 期初 %.2f 反推为 %.2f 但运行余额不自洽 → 保留原值(无法自动修·须人工核对)",
+        opening or 0,
+        derived,
+    )
+    return opening
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -110,6 +146,9 @@ def merge_gl_files(
             all_rows.append(r)
 
     all_rows.sort(key=lambda r: (r.date or date.min, r.doc_no or ""))
+
+    # 保险:OCR 偶发截断 GL 期初千分位 → 用首笔运行余额反推修正(整列自洽才采信)。
+    opening = _reconcile_gl_opening(opening, all_rows)
 
     # v118.33.13.5 · Cash-ledger formula (matches parse_gl_pdf v118.33.13.4):
     # debit = cash IN (balance increase), credit = cash OUT (balance decrease)

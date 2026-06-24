@@ -101,6 +101,27 @@ class RunOneErrorCaptureTests(unittest.TestCase):
         self.assertEqual(seen["format"], "sheet")
         m_finish.assert_called_once_with("job-ctx", "result", "1")
 
+    def test_missing_handler_bootstraps_once_before_failing(self):
+        def handler(params, input_ref, cb):
+            return ("result", "2")
+
+        def bootstrap():
+            worker._HANDLERS["export"] = handler
+
+        job = {"id": "job-bootstrap", "job_type": "export", "params": {}, "input_ref": []}
+        with (
+            mock.patch.dict(worker._HANDLERS, {}, clear=True),
+            mock.patch.object(worker, "bootstrap_handlers", side_effect=bootstrap) as m_bootstrap,
+            mock.patch.object(worker.store, "finish") as m_finish,
+            mock.patch.object(worker.store, "fail") as m_fail,
+            mock.patch.object(worker, "_cleanup_stage"),
+        ):
+            worker._run_one(job)
+
+        m_bootstrap.assert_called_once()
+        m_finish.assert_called_once_with("job-bootstrap", "result", "2")
+        m_fail.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

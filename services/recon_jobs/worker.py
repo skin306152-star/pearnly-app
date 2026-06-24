@@ -71,7 +71,13 @@ def _run_one(job: Dict) -> None:
     jtype = job.get("job_type")
     handler = _HANDLERS.get(jtype or "")
     if handler is None:
-        logger.error(f"[recon-worker] no handler for job_type={jtype!r} (job {job_id})")
+        bootstrap_handlers()
+        handler = _HANDLERS.get(jtype or "")
+    if handler is None:
+        known = ",".join(sorted(_HANDLERS)) or "-"
+        logger.error(
+            f"[recon-worker] no handler for job_type={jtype!r} (job {job_id}); known={known}"
+        )
         store.fail(job_id, "no_handler")
         _cleanup_stage(job_id)
         return

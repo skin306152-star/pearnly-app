@@ -29,6 +29,7 @@ const _EXPRESS_REASON_I18N: Record<string, string> = {
 // 小助手(本地 Agent)ack 失败码 → 人话(error_msg 形如 "[SUPPLIER_DUP_SUSPECTED] dup")。
 const _AGENT_REASON_I18N: Record<string, string> = {
     SUPPLIER_DUP_SUSPECTED: 'erp-reason-supplier-dup',
+    CUSTOMER_DUP_SUSPECTED: 'erp-reason-customer-dup',
 };
 
 function _expressFriendlyReason(raw: string): string {

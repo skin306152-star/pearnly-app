@@ -19,8 +19,8 @@
 
 - **根因**:POS 收银前台 `static/pos/pos.css` **无任何 @media**·收银主屏只有桌面横排(`.cart` 固定 380px)→ 手机上 380px 购物车顶满全宽撑出右边界(金额/挂单键被切)、商品网格挤成 0 宽消失,收银员手机无法收银(Owner 两次真机截图抓)。
 - **修(终态=底部 sheet)**:初版竖排堆叠(`e8b1a958`)被 Owner 指出「购物车带商品顶高、把商品网格挤成一条」→ 改 **≤700px 购物车降底部 sheet**(`0bf6f551`):默认只露 68px 把手(`.cart-peek` 件数+应收)、商品网格占满主屏;点把手展开看明细/改量/收款,点遮罩收起。桌面把手/遮罩 `display:none`、横排 380 不变(视觉照搬闸过)。JS 在 `pos-cashier.js`(open/close/toggleSheet·renderCart 刷把手·openPay/clearCart 自动收)。
-- **验证**:真浏览器 390×844 + 1280×800 双断言 10/10 PASS · prod 实机 /pos E2E PASS · 守门全绿。`/simplify` 收口(`8912b34e`·**本地未 push**·见下「未 push」):renderCart 件数/grand 各算 2 次 → 集约 1 次。
-- **⚠️ 未 push 提示**:`e8b1a958`+`0bf6f551`(底部 sheet 本体)**已在 origin/master·prod 已上线**;`8912b34e`(/simplify 微优)+ 本 STATE 更新**本地未 push**(当时 HEAD 叠在 export/docker 窗口的未 push 本地 commit 之上·不替它们公开未完成工作)→ 待那两窗口下次 push 时同携(像本体当初被携一样)。POS 本体功能不受影响(已 live)。
+- **验证**:真浏览器 390×844 + 1280×800 双断言 10/10 PASS · prod 实机 /pos E2E PASS · 守门全绿。`/simplify` 收口(`8912b34e`):renderCart 件数/grand 各算 2 次 → 集约 1 次。
+- **上线状态**:`e8b1a958`+`0bf6f551`(底部 sheet 本体)+ `8912b34e`(/simplify)**全已在 origin/master·prod 已上线**(prod /pos 实测 `pos.js?v=11850965`)。注:本窗口收尾时这几个 commit 由并行 export/docker 窗口的 push 一并携带上去(共享单一本地 master·任一窗口 push 即全栈上线)。
 - **改 POS 外壳必做**:bump pos.html 两处 `?v=`(css/js)+ pos.js 的 `pos-sw.js?v=` + pos-sw.js `CACHE` 名(离线外壳刷新)。`static/pos/*.js` 超 500 但不在 check_file_size 监控/ratchet(别误拆)。**未覆盖餐厅视图**(rtables/rorder/rkitchen·Owner 是零售/药房·该视图是否同桌面-only 待查)。详见记忆 [[pos-cashier-mobile-responsive]]。
 
 ## 历史记录（2026-06-23 深夜 · **Express 异常卡「绑定主体」面板上线 + /simplify** · prod `9336930e`/11850964 · companion **1.1.8**）

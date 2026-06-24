@@ -40,6 +40,7 @@ type ErpExcItem = {
     endpoint_name?: string;
     error_friendly?: Record<string, string>;
     account_fix?: { direction?: string; slots?: string[]; bad_code?: string };
+    bind_fix?: { can_bind?: boolean };
 };
 
 let _erpExcState: {
@@ -230,8 +231,8 @@ function renderErpExceptions() {
             const isAcct = cat === 'account_missing';
             // 方向判不出且主体可绑(主体没绑/税号没读到)→ 绑主体卡;direction_not_enabled
             // (方向判出但该方向没在向导开)绑主体无用 → 走普通详情+重推。
-            const isBind =
-                cat === 'direction_unknown' && !/direction_not_enabled/.test(it.error_msg || '');
+            // 后端 derive_bind_fix 派生 can_bind(单一口径),前端不再解析裸 error_msg。
+            const isBind = cat === 'direction_unknown' && !!(it.bind_fix && it.bind_fix.can_bind);
             const detailBtn = `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-detail="${escapeHtml(it.id)}">${escapeHtml(t('erp-log-detail-btn'))}</button>`;
             // 待补科目/绑主体:详情 + 展开同款下拉面板(复用 data-erpexc-acctfix 开关);其余:修复映射/详情 + 重推。
             const actHtml =

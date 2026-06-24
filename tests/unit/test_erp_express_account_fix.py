@@ -19,7 +19,22 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from core import db  # noqa: E402,F401 · 先 import db 再 import push_store(避免 partial-init 循环)
 from services.erp import erp_push as _erp  # noqa: E402
-from services.erp.push_store import derive_account_fix  # noqa: E402
+from services.erp.push_store import derive_account_fix, derive_bind_fix  # noqa: E402
+
+
+class DeriveBindFixTests(unittest.TestCase):
+    """direction_unknown 异常能否靠绑主体自助救(消前端 !/direction_not_enabled/ 正则)。"""
+
+    def test_subject_unbound_can_bind(self):
+        self.assertEqual(derive_bind_fix("EXPRESS_MANUAL: direction_unknown"), {"can_bind": True})
+
+    def test_direction_not_enabled_cannot_bind(self):
+        # 方向判出但该方向没在向导开 → 绑主体没用,得去向导开。
+        self.assertIsNone(derive_bind_fix("EXPRESS_MANUAL: direction_not_enabled:purchase"))
+
+    def test_non_direction_reason_is_none(self):
+        self.assertIsNone(derive_bind_fix("EXPRESS_MANUAL: no_revenue_account"))
+        self.assertIsNone(derive_bind_fix(None))
 
 
 class DeriveAccountFixTests(unittest.TestCase):

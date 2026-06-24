@@ -16,6 +16,14 @@
 - **全局文档诊断**:`docs/HANDOFF-2026-06-24-全局诊断-按文档交接分类.md`(5 条线 done/pending/won't-do 分类·**含二次核对实测纠错 6 条**:文档/STATE 落后于代码→防呆闸/P2E Gateway/销项前端/锚定 Slice3 等其实已上线·判完整度必翻代码别信文档手写数字)。
 - **坑**:`check_line_ratchet` 必须 commit 后跑才准(改动未提交时假绿)·改监控文件涨行先想好拆/豁免;`line_image_ocr.py` 472(近 500·新逻辑进独立模块别再塞)。
 
+## 历史记录（2026-06-24 · **整顿恢复:A3 完成 / A4 搁置 / B8 RLS → P2** · 我 `e8074817` · 全 push · prod 零影响 · 详细交接 `docs/HANDOFF-2026-06-24-整顿恢复-A3-A4-B8-RLS.md`）
+
+- **整顿现状**:核心(体积/结构/防屎山闸/目录重组/前端模块化/**C5 TS 实际 215.ts·3.js 已达标**·看板 stale)早收官;06-03 至今 944 commit/3 周 feature·体积闸全守住。真正未完成=B8 RLS(本窗推进)/lint-ui 视觉债(220+967 裸 hex·gated)/E 性能/F 存储/H 合规/D4 覆盖率。
+- **A3 本地 Docker 环境分级 ✅**(`6ace4f9d`):跑通验证 8 项 + 修 3 回归(Dockerfile `cp home.js` 死码删 / db.py `sslmode` 可配 `PGSSLMODE` / 健康检查是 `/api/ready`)。待办:`read_frontend_version` 读 `static/home.html`(已不产出)→ `/api/version` 本地版本号恒 0,应改读 `static/dist/home.html`。
+- **A4 Doppler ⏸️ 搁置**:CLI 装好 v3.76.0·剩 `doppler login`(Owner 认证)+ 生产切换(红线#16)·单人项目不急。
+- **B8 多租户 RLS · P0/P1/P2 ✅ 上线**(`b3ee95e7`设计/`1138b437`基建/`e8074817`测试矩阵):最小权限角色 `pearnly_app`(NOBYPASSRLS)+FORCE RLS+`SET LOCAL ROLE`+三维 context(tenant/账套/user)·`core/rls.py` 3 policy 模板。POC7/7+集成8/8+单测4761+CI绿。**默认全关(env `RLS_ROLE` 未设·表未 force)prod 零影响**。**待做 P3**=逐域真启用(唯一碰生产·前置审计 **457 处无上下文 `get_cursor`**·分域 POS→采购/销售/会计→对账/知识→老模块·每域本地恢复库→prod 建角色+设 `RLS_ROLE`(红线#16)+`apply_*(force=True)`+冒烟+回滚·**★Owner"没真实用户"→可大胆逐域上、秒回滚**)+**P4** 把 `12-rls-isolation.spec.js` 收紧 `passed===5`。
+- 坑:Docker 别强杀进程([[docker-desktop-kill-trap]])·db 容器 stopped(起 `docker compose start db`)·共享树 push 前 `git pull --rebase` 只 add 自己文件。
+
 ## 历史记录（2026-06-24 晚 · **Express 推送防呆闸(币种/贷项/押金/日期/税号)全上线 + DATAT/DB 清空待 Owner 重跑批次** · prod `bc5e08f2`/11850971 · companion 1.1.11 未动）
 
 - **5 道单据防呆闸上线**(prod `adf53346` feat + `bc5e08f2` /simplify · CI 6/6 绿 · prod E2E 5 陷阱全 manual):全语料暴露的「陷阱票当普通票推成功」已封——外币当泰铢(最严重)/贷项退货当正向/押金当费用/未来日期/补开倒签/对手方税号非 13 位 → 命中即 `EXPRESS_MANUAL` 转人工(doc28 §8 deferred 的「转人工即可」)。

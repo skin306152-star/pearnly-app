@@ -5,8 +5,9 @@
 真相源,不分叉);UI / 异常页消费它渲染"还差什么"的红绿灯清单。与 enqueue 旧行为同序、
 同 reason、同 request_body —— 由 test_express_enqueue 的 65 条契约钉死。
 
-体检序:特性开关 → 账套白名单 → 方向(税号锚点)→ 方向启用 → 映射(科目/金额/日期/借贷)
-→ 写前 GLACC 白名单 → 置信评级。任一不过即 blocked,其后未跑项标 pending。绝不写库。
+体检序:特性开关 → 账套白名单 → 方向(税号锚点)→ 方向启用 → 单据防呆(币种/贷项/押金/
+日期/税号)→ 映射(科目/金额/日期/借贷)→ 写前 GLACC 白名单 → 置信评级。任一不过即 blocked,
+其后未跑项标 pending。绝不写库。
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from typing import Any, Dict, List, Optional
 
 from services.erp.express_push import account_set_allowed, chart_codes, express_push_enabled
 from services.erp.express_push import direction as direction_mod
+from services.erp.express_push.doc_sanity import check_document
 from services.erp.express_push.mapper import build_express_payload
 from services.erp.express_push.sales_mapper import build_express_sales_payload
 
@@ -28,6 +30,7 @@ CHECK_KEYS = (
     "account_set",
     "direction",
     "direction_enabled",
+    "document",
     "mapping",
     "chart",
     "confidence",
@@ -224,6 +227,17 @@ def preflight_express(endpoint: Dict[str, Any], history: Dict[str, Any]) -> Pref
                 request_body={"adapter": "express", "direction": direction},
             )
         pf.checks.append(Check("direction_enabled", OK))
+
+        # 单据防呆(确定性):外币/贷项/押金/未来日期/坏税号等"不该当普通票直推"的单据 → 转人工。
+        doc_reason = check_document(flat.get("fields") or {}, flat, direction)
+        if doc_reason:
+            return _block(
+                pf,
+                "document",
+                reason=doc_reason,
+                request_body={"adapter": "express", "history_id": str(flat.get("id") or "")},
+            )
+        pf.checks.append(Check("document", OK))
 
         if direction == "sales":
             mres = build_express_sales_payload(

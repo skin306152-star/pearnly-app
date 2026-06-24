@@ -245,6 +245,7 @@ Output ONE JSON object matching this schema (no markdown fences, no explanation,
   "cash_amount": "cash tendered / amount received (เงินสด/รับเงิน/รับมา/CASH), empty if not printed",
   "change_amount": "change returned (เงินทอน/ทอน/change), empty if none",
   "payment_method": "how it was paid as printed: cash | transfer | qr | card | empty if not shown",
+  "currency": "currency as printed ONLY if clearly not Thai baht (USD / EUR / $ / ดอลลาร์); empty if THB/บาท or none shown",
   "items": [{"name": "...", "qty": "...", "price": "...", "subtotal": "..."}],
   "notes": "remark text",
   "category": "3-5 char summary in items' language (e.g. 餐饮, ค่าขนส่ง)",
@@ -303,6 +304,9 @@ CRITICAL RULES:
 6. WHT (หัก ณ ที่จ่าย / ภ.ง.ด.3 / ภ.ง.ด.53): Common rates 1/2/3/5%. wht_rate is the number ONLY ("3" not "3%"). Only extract if printed; do NOT guess.
 6b. PAYMENT_METHOD: only if the bill prints how it was paid. "cash" (เงินสด/CASH), "transfer" (โอน/
    bank transfer), "qr" (QR / QRPayment / PromptPay / พร้อมเพย์), "card" (บัตร/credit/debit). Empty if not shown. Do NOT guess.
+6c. CURRENCY: fill ONLY when the amounts are clearly in a NON-Thai currency (USD / US$ / $ /
+   ดอลลาร์ / EUR / € / etc.) — put the printed code or symbol. Leave EMPTY for Thai baht (บาท / THB /
+   ฿) or when no currency is shown. Do NOT guess; most Thai invoices are baht and stay empty.
 7. is_not_invoice: true ONLY if the text is clearly not an invoice (letter, contract, blank page, signature page).
 7b. DOCUMENT TYPE (decides whether a legal invoice number is required downstream):
    - "tax_invoice": a FULL Thai tax invoice (ใบกำกับภาษีเต็มรูป) — has a legal

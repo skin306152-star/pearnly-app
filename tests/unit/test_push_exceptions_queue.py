@@ -36,6 +36,15 @@ class ClassifyPushExceptionTests(unittest.TestCase):
         self.assertEqual(c("EXPRESS_MANUAL: low_confidence:amounts"), "low_confidence")
         self.assertEqual(c("EXPRESS_MANUAL: enqueue_error:ValueError"), "other")
 
+    def test_express_document_review_category(self):
+        c = push_store.classify_push_exception
+        self.assertEqual(c("EXPRESS_MANUAL: currency_not_thb:usd"), "document_review")
+        self.assertEqual(c("EXPRESS_MANUAL: credit_note"), "document_review")
+        self.assertEqual(c("EXPRESS_MANUAL: deposit_receipt"), "document_review")
+        self.assertEqual(c("EXPRESS_MANUAL: date_future"), "document_review")
+        self.assertEqual(c("EXPRESS_MANUAL: date_reissued"), "document_review")
+        self.assertEqual(c("EXPRESS_MANUAL: tax_id_invalid"), "document_review")
+
 
 class _Cur:
     def __init__(self, rows):

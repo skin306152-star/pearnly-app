@@ -139,6 +139,47 @@ class BlockedTests(PreflightBase):
         self.assertEqual(sm["confidence"], "blocked")
 
 
+class DocumentSanityTests(PreflightBase):
+    """单据防呆闸:外币/贷项/押金/未来日期/坏税号 → blocked 在 document 项,其后 pending。"""
+
+    def _assert_doc_blocked(self, pf, reason):
+        self.assertTrue(pf.blocked)
+        self.assertEqual(pf.reason, reason)
+        sm = _status_map(pf)
+        self.assertEqual(sm["direction_enabled"], "ok")
+        self.assertEqual(sm["document"], "blocked")
+        self.assertEqual(sm["mapping"], "pending")
+        self.assertEqual(sm["confidence"], "pending")
+
+    def test_foreign_currency_blocked(self):
+        pf = preflight_express(_endpoint(), _history(currency="USD"))
+        self._assert_doc_blocked(pf, "currency_not_thb:usd")
+
+    def test_credit_note_blocked(self):
+        pf = preflight_express(_endpoint(), _history(document_type="credit_note"))
+        self._assert_doc_blocked(pf, "credit_note")
+
+    def test_deposit_blocked(self):
+        pf = preflight_express(_endpoint(), _history(notes="เงินมัดจำ ยังไม่ส่งมอบ"))
+        self._assert_doc_blocked(pf, "deposit_receipt")
+
+    def test_invalid_tax_id_blocked(self):
+        pf = preflight_express(_endpoint(), _history(seller_tax="01055560123"))
+        self._assert_doc_blocked(pf, "tax_id_invalid")
+
+    def test_future_date_blocked(self):
+        h = _history()
+        h["invoice_date"] = "2099-12-31"
+        pf = preflight_express(_endpoint(), h)
+        self._assert_doc_blocked(pf, "date_future")
+
+    def test_clean_invoice_passes_document(self):
+        pf = preflight_express(_endpoint(), _history())
+        self.assertTrue(pf.ready)
+        sm = _status_map(pf)
+        self.assertEqual(sm["document"], "ok")
+
+
 class DisabledTests(unittest.TestCase):
     def test_disabled_short_circuit(self):
         with mock.patch.dict("os.environ", {"ERP_PUSH_ENABLED": "false"}):

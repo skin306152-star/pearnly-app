@@ -24,6 +24,13 @@ const _EXPRESS_REASON_I18N: Record<string, string> = {
     bad_or_missing_date: 'erp-reason-bad-date',
     entry_not_balanced: 'erp-reason-unbalanced',
     account_not_in_chart: 'erp-reason-not-in-chart',
+    // 单据防呆(doc_sanity · 须人工判断):外币/贷项/押金/未来日期/补开倒签/坏税号。
+    currency_not_thb: 'erp-reason-currency',
+    credit_note: 'erp-reason-credit-note',
+    deposit_receipt: 'erp-reason-deposit',
+    date_future: 'erp-reason-date-future',
+    date_reissued: 'erp-reason-date-reissued',
+    tax_id_invalid: 'erp-reason-tax-invalid',
 };
 
 // 小助手(本地 Agent)ack 失败码 → 人话(error_msg 形如 "[SUPPLIER_DUP_SUSPECTED] dup")。

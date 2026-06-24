@@ -188,6 +188,12 @@ class ThaiInvoice(BaseModel):
     payment_method: str = Field(
         default="", description="how paid as printed: cash|transfer|qr|card, empty if not shown"
     )
+    currency: str = Field(
+        default="",
+        description="currency code/word as printed ONLY if clearly NOT Thai baht "
+        "(e.g. USD, EUR, $, ดอลลาร์); empty when THB/บาท or no currency shown. "
+        "Downstream blocks foreign-currency invoices from auto-posting as baht.",
+    )
 
     items: List[LineItem] = Field(default_factory=list)
 
@@ -237,6 +243,7 @@ class ThaiInvoice(BaseModel):
         "notes",
         "category",
         "payment_method",
+        "currency",
         mode="before",
     )(_coerce_to_str)
 

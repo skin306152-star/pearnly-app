@@ -37,6 +37,19 @@ def classify_push_exception(error_msg: Optional[str]) -> str:
         return "direction_unknown"
     if "low_confidence" in msg:
         return "low_confidence"
+    # 单据防呆(preflight doc_sanity):外币/贷项/押金/未来日期/坏税号 → 须人工判断,无自助修。
+    if any(
+        k in msg
+        for k in (
+            "currency_not_thb",
+            "credit_note",
+            "deposit_receipt",
+            "date_future",
+            "date_reissued",
+            "tax_id_invalid",
+        )
+    ):
+        return "document_review"
     return "other"
 
 

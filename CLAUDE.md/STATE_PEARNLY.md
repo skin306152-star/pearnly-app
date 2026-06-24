@@ -15,6 +15,14 @@
 - **Backlog**:① **防呆闸**(币种>折让>押金>日期·doc28 §8·多为转人工)② **S7 建账套**(极重·研究先行·Owner 拍板**暂缓存档**)③ defer② acctfix句柄改名(第三消费者再做)④ DATAT 本轮测试数据待清(Owner 定)。详见 **`docs/HANDOFF-2026-06-24-express-v1-S4S5-收尾.md`**。
 - **坑/资源**:DATAT 写盘只能走 **bash 拷出→本地 dbf 手术→bash 拷回**(原生 Win 进程无 \\accserver 认证·accserver 易掉线·Owner 关 Express 才拷得回);prod 查任意账号推送=SSH SG + psycopg2 查 erp_push_logs。companion 独立仓 `D:\pearnly-companion` 无 remote·发版 `release.ps1`。详见 [[express-full-auto-provision-design]] [[express-account-resolution-closed-loop]]。
 
+## 历史记录（2026-06-24 · **POS 收银台手机自适应 = 底部购物车 sheet**(并行窗口·与 Express 无关)· prod `0bf6f551`/pos `?v=11850965`）
+
+- **根因**:POS 收银前台 `static/pos/pos.css` **无任何 @media**·收银主屏只有桌面横排(`.cart` 固定 380px)→ 手机上 380px 购物车顶满全宽撑出右边界(金额/挂单键被切)、商品网格挤成 0 宽消失,收银员手机无法收银(Owner 两次真机截图抓)。
+- **修(终态=底部 sheet)**:初版竖排堆叠(`e8b1a958`)被 Owner 指出「购物车带商品顶高、把商品网格挤成一条」→ 改 **≤700px 购物车降底部 sheet**(`0bf6f551`):默认只露 68px 把手(`.cart-peek` 件数+应收)、商品网格占满主屏;点把手展开看明细/改量/收款,点遮罩收起。桌面把手/遮罩 `display:none`、横排 380 不变(视觉照搬闸过)。JS 在 `pos-cashier.js`(open/close/toggleSheet·renderCart 刷把手·openPay/clearCart 自动收)。
+- **验证**:真浏览器 390×844 + 1280×800 双断言 10/10 PASS · prod 实机 /pos E2E PASS · 守门全绿。`/simplify` 收口(`8912b34e`·**本地未 push**·见下「未 push」):renderCart 件数/grand 各算 2 次 → 集约 1 次。
+- **⚠️ 未 push 提示**:`e8b1a958`+`0bf6f551`(底部 sheet 本体)**已在 origin/master·prod 已上线**;`8912b34e`(/simplify 微优)+ 本 STATE 更新**本地未 push**(当时 HEAD 叠在 export/docker 窗口的未 push 本地 commit 之上·不替它们公开未完成工作)→ 待那两窗口下次 push 时同携(像本体当初被携一样)。POS 本体功能不受影响(已 live)。
+- **改 POS 外壳必做**:bump pos.html 两处 `?v=`(css/js)+ pos.js 的 `pos-sw.js?v=` + pos-sw.js `CACHE` 名(离线外壳刷新)。`static/pos/*.js` 超 500 但不在 check_file_size 监控/ratchet(别误拆)。**未覆盖餐厅视图**(rtables/rorder/rkitchen·Owner 是零售/药房·该视图是否同桌面-only 待查)。详见记忆 [[pos-cashier-mobile-responsive]]。
+
 ## 历史记录（2026-06-23 深夜 · **Express 异常卡「绑定主体」面板上线 + /simplify** · prod `9336930e`/11850964 · companion **1.1.8**）
 
 - **④ 前端绑主体面板上线**:推送异常页 `direction_unknown` 且非 `direction_not_enabled` 的票加「绑定主体」主操作 → 选账套主体一键绑定重推(后端 `POST express-bind-subject` 早就位·本窗只补 UI·复用待补科目卡样式与句柄)。真站 E2E 8 PASS。**defer① 后端 derive_bind_fix 结构化提示**(当时受 push_log_queries 492/500 闸 deferred)→ **已在 2026-06-24 窗口做完**(见上)。详见 `docs/HANDOFF-2026-06-23-绑主体面板-收尾.md`。

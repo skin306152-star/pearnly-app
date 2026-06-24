@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
 from decimal import Decimal
 
 from services.export import rows as rows_mod
@@ -28,9 +27,7 @@ def _cell(key, value, lang: str = "zh"):
     if key == "evidence" and isinstance(value, str) and value.startswith(("http", "/api/")):
         safe = value.replace('"', "%22")
         return f'=HYPERLINK("{safe}","{rows_mod.view_label(lang)}")'
-    if isinstance(value, datetime):
-        return value.isoformat(sep=" ", timespec="seconds")
-    if isinstance(value, date):
+    if hasattr(value, "isoformat"):
         return value.isoformat()
     if isinstance(value, Decimal):
         return float(value)

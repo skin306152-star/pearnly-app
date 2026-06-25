@@ -59,6 +59,7 @@ class FakeCursor:
         return [c[1] for c in self.calls]
 
 
+@contextmanager
 def patch_cursor(cur):
     """把 db.get_cursor / get_cursor_rls 都换成 yield 给定假游标的上下文管理器。
     RLS 迁移后 store 改用 get_cursor_rls · 两者都拦才覆盖迁移前后实现。"""
@@ -67,14 +68,11 @@ def patch_cursor(cur):
     def _cm(*a, **k):
         yield cur
 
-    @contextmanager
-    def _both():
-        with mock.patch("core.db.get_cursor", _cm), mock.patch("core.db.get_cursor_rls", _cm):
-            yield
-
-    return _both()
+    with mock.patch("core.db.get_cursor", _cm), mock.patch("core.db.get_cursor_rls", _cm):
+        yield
 
 
+@contextmanager
 def boom_cursor():
     """db.get_cursor / get_cursor_rls 直接抛 → 验证各函数 except 分支的安全默认值"""
 
@@ -83,12 +81,8 @@ def boom_cursor():
         raise RuntimeError("db down")
         yield  # pragma: no cover
 
-    @contextmanager
-    def _both():
-        with mock.patch("core.db.get_cursor", _cm), mock.patch("core.db.get_cursor_rls", _cm):
-            yield
-
-    return _both()
+    with mock.patch("core.db.get_cursor", _cm), mock.patch("core.db.get_cursor_rls", _cm):
+        yield
 
 
 TENANT = "11111111-1111-1111-1111-111111111111"

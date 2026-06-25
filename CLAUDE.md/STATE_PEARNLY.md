@@ -6,9 +6,10 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-25 · **B8 多租户 RLS · P3 ready 域已 prod 真启用并验收** · prod `ae41277c` · companion 未动）
+## 🎯 状态卡（2026-06-25 · **B8 RLS · ready 域 prod 启用 + wave2 对账迁移进行中** · prod `a1e68aae` · companion 未动）
 
-- **B8 RLS P3 · ready 域 prod 真启用**(`8e88464e` 审计+回滚脚本 / `ae4556ec` worker 修 / `ae41277c` 文档·CI 全绿·`RLS_ROLE=pearnly_app` 入 `/opt/mrpilot/.env`):POS/库存/产品/采购/销售/会计/税/导出/modules/LINE-brain/expense **已真·多租户隔离**(get_cursor_rls 切 pearnly_app 角色·policy 拦死跨租户)。裸 get_cursor 留 owner 连接·force=False 绕过→老路径不破。
+- **B8 RLS P3 · ready 域 prod 真启用**(`8e88464e`/`ae4556ec`/`ae41277c`·`RLS_ROLE=pearnly_app` 入 `/opt/mrpilot/.env`):POS/库存/产品/采购/销售/会计/税/导出/modules/LINE-brain/expense **已真隔离**。裸 get_cursor 留 owner·force=False 绕过→老路径不破。
+- **wave2 对账迁移(进行中)**:3 个自包含 `tenant_or_user` task 表已迁 get_cursor_rls + enroll + prod 隔离验过——`vat_recon_tasks`(`cd6a3d7e`)/`gl_vat_task`(`8722b8b5`)/`bank_recon_v2_task`(`a1e68aae`)。**套路**:store 函数签名本有 tenant/user→换游标即可;按 user_id 删的函数补 tenant_id 参数(否则 RLS 下删不到 tenant 任务·静默 0 行·money 陷阱已修);受影响 mock-cursor 测试辅助改为同 patch 两游标;每域本地 2 租户真隔离+prod enroll 验证。**⏳ wave2 剩**:`vat_recon_store`(vat_report+reconciliation_task/row·13 处·JOIN ocr_history/clients=wave3 表)/`recon_resolve`/`field_override`/`bank_recon_v1`+`bank_recon_match`(JOIN ocr_history)/`recon_jobs` worker(bypass)/`knowledge_bridge`(读 wave3 表)——这些更大、跨 wave3 表,JOIN 隔离要等 wave3。
 - **前置审计**(486 处 get_cursor 四路并行分域):ready 域 227 处 get_cursor_rls 无一缺上下文·裸 get_cursor 在 enrolled 表只剩 DDL+会计 posting_failures worker(已修 claim_due bypass / retry_one 带行 tenant·`test_posting_failures_rls_contract`)。
 - **★ 两个 prod-only 坑(金丝雀抓到·见 [[rls-b8-p3-prod-enabled]])**:① Supabase postgres 非 BYPASSRLS·靠 owner 身份绕过→ready 域**别上 force=True**(会拦裸 get_cursor)。② SET ROLE 要成员资格·Supabase 经 pooler 授不了→**Owner 后台 SQL Editor 跑过 `GRANT pearnly_app TO postgres`**(没它设 env 全 500)。
 - **验收证据**:本地集成矩阵 8/8 + 回滚脚本端到端(32 表→0)+ prod 金丝雀(journal_vouchers 自己 19/假租户 0)+ 8 域多表隔离全 PASS + 真登录 `/api/me/modules` 正确返回 tenant_modules。

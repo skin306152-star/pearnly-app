@@ -171,6 +171,20 @@ class ExpressSalesMapperTests(unittest.TestCase):
         line_sum = sum(Decimal(it["amount"]) for it in r.payload["items"])
         self.assertEqual(line_sum, Decimal("3141.12"))  # 摊后逐行合计精确==税前额
 
+    def test_thai_pua_tone_mark_made_cp874_safe(self):
+        # OCR 把声调符吐成私用区浮动字形(U+F70B=ไม้โท)→ 必须映回标准泰文 U+0E49,
+        # 否则 Express DBF(cp874)写盘崩。品名含 U+F70B → 产物可 cp874 编码、且已映成标准。
+        items = [{"name": "ความรอน", "qty": "1", "subtotal": "3141.12"}]
+        h = _sales_history(
+            fields={"buyer_name": "เงินสด", "subtotal": "3141.12", "vat": "219.88", "items": items},
+            total_amount="3361.00",
+        )
+        r = build_express_sales_payload(h, config=_CONFIG)
+        self.assertTrue(r.ok, r.reason)
+        nm = r.payload["items"][0]["name"]
+        self.assertNotIn("", nm)
+        self.assertIn("้", nm)
+        nm.encode("cp874")  # 不抛即通过(可写进 Express DBF)
     def test_items_truly_unreconcilable_still_blocks(self):
         # 真读错(既≠税前也≠含税)→ 照旧 mismatch,不被新含税分支放过(安全没削弱)。
         items = [{"name": "X", "qty": "1", "subtotal": "12.34"}]

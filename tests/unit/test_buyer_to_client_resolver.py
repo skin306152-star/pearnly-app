@@ -140,21 +140,21 @@ class EmptyInputTests(unittest.TestCase):
 
     def test_empty_string_returns_none(self):
         cur = _LayeredCursor([])
-        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)):
+        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)), patch.object(db, "get_cursor_rls", lambda *a, **k: _CursorCM(cur)):
             r = db.try_resolve_buyer_to_client("", None, "user-1")
         self.assertIsNone(r)
         self.assertEqual(len(cur.executed), 0)
 
     def test_whitespace_only_returns_none(self):
         cur = _LayeredCursor([])
-        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)):
+        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)), patch.object(db, "get_cursor_rls", lambda *a, **k: _CursorCM(cur)):
             r = db.try_resolve_buyer_to_client("   ", None, "user-1")
         self.assertIsNone(r)
         self.assertEqual(len(cur.executed), 0)
 
     def test_none_returns_none(self):
         cur = _LayeredCursor([])
-        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)):
+        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)), patch.object(db, "get_cursor_rls", lambda *a, **k: _CursorCM(cur)):
             r = db.try_resolve_buyer_to_client(None, None, "user-1")
         self.assertIsNone(r)
         self.assertEqual(len(cur.executed), 0)
@@ -170,7 +170,7 @@ class LayerHitTests(unittest.TestCase):
                 {"client_id": 7, "client_name": "บริษัท X จำกัด"},
             ]
         )
-        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)):
+        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)), patch.object(db, "get_cursor_rls", lambda *a, **k: _CursorCM(cur)):
             r = db.try_resolve_buyer_to_client(
                 "บริษัท X จำกัด",
                 None,
@@ -189,7 +189,7 @@ class LayerHitTests(unittest.TestCase):
                 {"id": 42, "name": "Acme Co Ltd"},  # L2 tax_id hit
             ]
         )
-        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)):
+        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)), patch.object(db, "get_cursor_rls", lambda *a, **k: _CursorCM(cur)):
             r = db.try_resolve_buyer_to_client(
                 "Different Name Here",
                 "0105543123456",  # 13-digit tax → tax_clean ≥10 触发 L2
@@ -209,7 +209,7 @@ class LayerHitTests(unittest.TestCase):
                 [{"id": 88, "name": "Acme Co", "short_name": None}],  # L3-5 fetchall
             ]
         )
-        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)):
+        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)), patch.object(db, "get_cursor_rls", lambda *a, **k: _CursorCM(cur)):
             r = db.try_resolve_buyer_to_client(
                 "ACME CO",  # case-insensitive 完全匹配
                 None,
@@ -228,7 +228,7 @@ class LayerHitTests(unittest.TestCase):
                 [{"id": 99, "name": "Long Full Company Name Ltd", "short_name": "LFC"}],
             ]
         )
-        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)):
+        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)), patch.object(db, "get_cursor_rls", lambda *a, **k: _CursorCM(cur)):
             r = db.try_resolve_buyer_to_client("LFC", None, "user-1")
         self.assertIsNotNone(r)
         self.assertEqual(r["client_id"], 99)
@@ -243,7 +243,7 @@ class LayerHitTests(unittest.TestCase):
                 [{"id": 11, "name": "Acme", "short_name": None}],
             ]
         )
-        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)):
+        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)), patch.object(db, "get_cursor_rls", lambda *a, **k: _CursorCM(cur)):
             # "Acme Corporation Ltd" 含 "Acme" · 反向 substring
             r = db.try_resolve_buyer_to_client(
                 "Acme Corporation Ltd",
@@ -269,7 +269,7 @@ class NoMatchTests(unittest.TestCase):
                 [{"id": 1, "name": "Apple Inc", "short_name": None}],  # L3-5 rows
             ]
         )
-        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)):
+        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)), patch.object(db, "get_cursor_rls", lambda *a, **k: _CursorCM(cur)):
             r = db.try_resolve_buyer_to_client(
                 "Banana Co",  # 跟 Apple Inc 完全无关
                 None,
@@ -284,7 +284,7 @@ class NoMatchTests(unittest.TestCase):
                 [],  # L3-5 rows 空
             ]
         )
-        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)):
+        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cur)), patch.object(db, "get_cursor_rls", lambda *a, **k: _CursorCM(cur)):
             r = db.try_resolve_buyer_to_client(
                 "Whatever Co",
                 None,
@@ -307,7 +307,7 @@ class DbExceptionTests(unittest.TestCase):
             def fetchall(self):
                 return []
 
-        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(_ExplodingCursor())):
+        with patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(_ExplodingCursor())), patch.object(db, "get_cursor_rls", lambda *a, **k: _CursorCM(_ExplodingCursor())):
             r = db.try_resolve_buyer_to_client("Any Co", None, "user-1")
         self.assertIsNone(r)
 

@@ -323,7 +323,7 @@ class HistoryDetailExposesWorkspaceTests(unittest.TestCase):
             def __exit__(self, *a):
                 return False
 
-        with mock.patch.object(db, "get_cursor", lambda *a, **k: _CM()):
+        with mock.patch.object(db, "get_cursor_rls", lambda *a, **k: _CM()):
             out = db.get_ocr_history_detail("u1", "h1")
         self.assertIn("workspace_client_id", out)
         self.assertEqual(out["workspace_client_id"], 7)

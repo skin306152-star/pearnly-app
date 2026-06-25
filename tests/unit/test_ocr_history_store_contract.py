@@ -47,7 +47,10 @@ class OcrHistoryReexportContract(unittest.TestCase):
 class OcrHistoryBehaviorContract(unittest.TestCase):
     def test_list_retention_zero_returns_empty_without_db(self):
         # retention_days==0 → 早返空,不应触库
-        with mock.patch("core.db.get_cursor", side_effect=AssertionError("must not hit DB")):
+        with (
+            mock.patch("core.db.get_cursor", side_effect=AssertionError("must not hit DB")),
+            mock.patch("core.db.get_cursor_rls", side_effect=AssertionError("must not hit DB")),
+        ):
             out = store.list_ocr_history("u1", retention_days=0)
         self.assertEqual(
             out,
@@ -59,7 +62,10 @@ class OcrHistoryBehaviorContract(unittest.TestCase):
         )
 
     def test_delete_with_pdf_paths_empty_ids_early_return(self):
-        with mock.patch("core.db.get_cursor", side_effect=AssertionError("must not hit DB")):
+        with (
+            mock.patch("core.db.get_cursor", side_effect=AssertionError("must not hit DB")),
+            mock.patch("core.db.get_cursor_rls", side_effect=AssertionError("must not hit DB")),
+        ):
             self.assertEqual(store.delete_ocr_history_with_pdf_paths("u1", []), (0, []))
 
     def test_list_builds_items_via_mocked_cursor(self):
@@ -102,7 +108,7 @@ class OcrHistoryBehaviorContract(unittest.TestCase):
         ctx = mock.MagicMock()
         ctx.__enter__.return_value = cur
         ctx.__exit__.return_value = False
-        with mock.patch("core.db.get_cursor", return_value=ctx):
+        with mock.patch("core.db.get_cursor_rls", return_value=ctx):
             out = store.list_ocr_history("u1", retention_days=90)
         self.assertEqual(out["total"], 1)
         self.assertEqual(len(out["items"]), 1)

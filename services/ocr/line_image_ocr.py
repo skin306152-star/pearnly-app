@@ -402,6 +402,7 @@ async def _handle_line_image_ocr(
                         total_amount=_exc_total,
                         exclude_id=str(hid),
                         workspace_client_id=_ws_client_id,  # PO-4 · 重复检测限本套账
+                        tenant_id=tid_str,
                     )
                     if _dup_raw:
                         _dup = {

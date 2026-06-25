@@ -59,7 +59,12 @@ def ensure_clients_table():
                 ALTER TABLE ocr_history ADD COLUMN IF NOT EXISTS client_id BIGINT;
                 CREATE INDEX IF NOT EXISTS idx_ocr_history_client ON ocr_history(client_id) WHERE client_id IS NOT NULL;
             """)
-            logger.info("✅ clients 表 + ocr_history.client_id 已就绪")
+            # B8 RLS wave3:两表都含 tenant_id + user_id → tenant_or_user 隔离。
+            # force=False(owner 仍绕过→外围未迁的裸 get_cursor 不破);业务连接 SET ROLE 后强制。
+            from core.rls import apply_tenant_or_user_rls
+
+            apply_tenant_or_user_rls(cur, "clients", "ocr_history")
+            logger.info("✅ clients 表 + ocr_history.client_id + RLS policy 已就绪")
     except Exception as e:
         logger.error(f"ensure_clients_table failed: {e}")
 
@@ -231,7 +236,7 @@ def list_clients(
     v118.15 · tenant_id 给了 → 同 tenant 共享(老板员工看到同一份客户档案)
     """
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             if tenant_id:
                 where = "user_id IN (SELECT id FROM users WHERE tenant_id = %s)"
                 params = [tenant_id]
@@ -266,7 +271,7 @@ def get_client(
     v118.15 · tenant_id 给了 → 同 tenant 任意成员可查
     """
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             if tenant_id:
                 cur.execute(
                     """
@@ -293,7 +298,7 @@ def create_client(user_id: str, tenant_id: Optional[str], name: str, **kwargs) -
     if not name or not name.strip():
         return None
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO clients (user_id, tenant_id, name, short_name, tax_id,
@@ -384,7 +389,7 @@ def update_client(user_id: str, client_id: int, tenant_id: Optional[str] = None,
         where_sql = "id = %s AND user_id = %s"
         params.extend([client_id, user_id])
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 f"""
                 UPDATE clients SET {', '.join(updates)}
@@ -405,8 +410,8 @@ def delete_client(
     v118.15 · tenant_id 给了 → 同 tenant 任意成员可删
     """
     try:
-        with db.get_cursor(commit=True) as cur:
-            # 先解绑发票
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
+            # 先解绑发票(RLS 下只解绑本租户可见的 ocr_history 行)
             if cascade_unlink:
                 cur.execute(
                     """
@@ -444,7 +449,7 @@ def assign_invoice_to_client(
     v118.15 · tenant_id 给了 → 同 tenant 任意成员可标 · 客户和发票都按 tenant 过滤
     """
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             # 验证客户属于该用户/tenant(防越权)
             if client_id is not None:
                 if tenant_id:

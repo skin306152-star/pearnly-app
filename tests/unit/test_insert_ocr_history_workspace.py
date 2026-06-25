@@ -46,11 +46,12 @@ class _FakeCursor:
 
 def _run_insert(cur, **kwargs):
     @contextmanager
-    def _fake_get_cursor(commit=False):
+    def _fake_get_cursor(*a, **k):
         yield cur
 
     with (
         mock.patch("core.db.get_cursor", _fake_get_cursor),
+        mock.patch("core.db.get_cursor_rls", _fake_get_cursor),
         mock.patch(
             "services.ocr_history.store._extract_summary_fields",  # REFACTOR-B2 · 随 insert 搬到 store
             return_value={

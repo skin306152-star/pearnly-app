@@ -122,7 +122,7 @@ def try_resolve_buyer_to_client(
     tax = (buyer_tax or "").strip() or None
 
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             # Layer 1: 学习记忆完全匹配
             if tenant_id:
                 cur.execute(
@@ -406,7 +406,7 @@ def update_history_client_id(
     assign_invoice_to_client but skips visible_ids permission check
     (called from server-side auto-resolve hook · not from user click)."""
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             if tenant_id:
                 cur.execute(
                     """

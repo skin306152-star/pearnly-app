@@ -18,6 +18,7 @@
 import sys
 import types
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
@@ -102,8 +103,12 @@ class _ExplodingCursor:
         return []
 
 
+@contextmanager
 def _patch(cur):
-    return patch.object(db, "get_cursor", lambda *a, **k: _CM(cur))
+    # B8 RLS:clients/ocr_history 已 enroll · DAL 走 get_cursor_rls · 同 patch 两游标(wave2 范式)。
+    factory = lambda *a, **k: _CM(cur)  # noqa: E731
+    with patch.object(db, "get_cursor", factory), patch.object(db, "get_cursor_rls", factory):
+        yield
 
 
 class GetCategoryForSellerTests(unittest.TestCase):

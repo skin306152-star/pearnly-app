@@ -105,7 +105,7 @@ class UpdatePdfStorageTest(unittest.TestCase):
         captured = {}
 
         @contextmanager
-        def _gc(commit=False):
+        def _gc(*a, **k):
             cur = MagicMock()
             cur.rowcount = 2
 
@@ -116,7 +116,8 @@ class UpdatePdfStorageTest(unittest.TestCase):
             cur.execute.side_effect = _exec
             yield cur
 
-        with patch.object(mutations.db, "get_cursor", _gc):
+        # B8 RLS:update_ocr_history_pdf_storage 走 get_cursor_rls。
+        with patch.object(mutations.db, "get_cursor_rls", _gc):
             rc = mutations.update_ocr_history_pdf_storage(**kw)
         return rc, captured
 
@@ -149,7 +150,7 @@ class UpdatePdfStorageTest(unittest.TestCase):
     def test_empty_record_ids_returns_zero_no_db(self) -> None:
         # 不该碰 DB
         with patch.object(
-            mutations.db, "get_cursor", side_effect=AssertionError("must not touch DB")
+            mutations.db, "get_cursor_rls", side_effect=AssertionError("must not touch DB")
         ):
             self.assertEqual(mutations.update_ocr_history_pdf_storage([], "p", 1, "u1"), 0)
 
@@ -158,10 +159,10 @@ class UpdatePdfStorageTest(unittest.TestCase):
         self.assertEqual(mutations.update_ocr_history_pdf_storage(["id1"], None, 1, "u1"), 0)
 
     def test_db_exception_returns_zero_never_raises(self) -> None:
-        def _boom(commit=False):
+        def _boom(*a, **k):
             raise RuntimeError("db down")
 
-        with patch.object(mutations.db, "get_cursor", _boom):
+        with patch.object(mutations.db, "get_cursor_rls", _boom):
             self.assertEqual(
                 mutations.update_ocr_history_pdf_storage(["id1"], "p", 1, "u1", "t1"), 0
             )

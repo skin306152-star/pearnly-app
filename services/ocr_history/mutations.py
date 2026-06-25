@@ -107,7 +107,7 @@ def update_ocr_history_pages(
         logger.warning(f"重算归档名失败(不影响保存): {e}")
 
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             if tenant_id:
                 where_sql = "id = %s AND user_id IN (SELECT id FROM users WHERE tenant_id = %s)"
                 where_params = [record_id, tenant_id]
@@ -152,7 +152,7 @@ def delete_ocr_history(user_id: str, record_id: str, tenant_id: Optional[str] = 
     """v118.14 · tenant_id 给了 → 同 tenant 任意成员可删 · 否则只能删自己的
     v118.20.4.4 · 修 UUID cast(id 列是 UUID · 字符串需 ::uuid)"""
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             if tenant_id:
                 cur.execute(
                     "DELETE FROM ocr_history WHERE id = %s::uuid AND user_id IN (SELECT id FROM users WHERE tenant_id = %s::uuid)",
@@ -181,7 +181,7 @@ def delete_ocr_history_with_pdf_paths(
     if not record_ids:
         return 0, []
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             if tenant_id:
                 # 先查路径
                 cur.execute(
@@ -227,7 +227,7 @@ def update_ocr_history_pdf_storage(
     if not record_ids or not pdf_storage_path:
         return 0
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             if tenant_id:
                 cur.execute(
                     "UPDATE ocr_history SET pdf_storage_path = %s, pdf_size_bytes = %s "
@@ -284,7 +284,7 @@ def insert_ocr_history(
     if client_id is not None:
         try:
             cid = int(client_id)
-            with db.get_cursor() as cur:
+            with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
                 cur.execute(
                     """
                     SELECT id FROM clients
@@ -332,7 +332,7 @@ def insert_ocr_history(
                 f"(user_id={user_id}, workspace_client_id={workspace_client_id}): {e}"
             )
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO ocr_history (

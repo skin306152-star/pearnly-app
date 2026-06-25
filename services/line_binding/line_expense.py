@@ -125,11 +125,9 @@ def handle_expense_text(
         from services.expense import line_agent, line_l2
 
         api_key = line_l2.resolve_api_key(bound_user)
-        u = (
-            line_agent.understand(text, api_key=api_key, history=history)
-            if (api_key and _ocr_balance_ok(bound_user))
-            else None
-        )
+        u = None
+        if api_key and _ocr_balance_ok(bound_user):
+            u = line_agent.understand(text, api_key=api_key, history=history)
         if u:
             _charge_line_l2(bound_user, stid)
             return _dispatch_agent(
@@ -438,6 +436,7 @@ def _dup_warn(bound_user, draft, ws) -> bool:
             draft.vendor_name or None,
             float(draft.amount) if draft.amount is not None else None,
             workspace_client_id=ws,
+            tenant_id=bound_user.get("tenant_id"),
         )
         return bool(dup)
     except Exception:

@@ -112,7 +112,7 @@ def list_ocr_history(
     list_where_sql, list_params = ls.apply_list_filters(where, params, source_filter, status_filter)
 
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             # 汇总卡:全量(base where · 不含状态/来源过滤)的状态分布
             status_counts = ls.status_counts(cur, base_where_sql, params)
 
@@ -197,7 +197,7 @@ def get_ocr_history_detail(
     """
     ws_sql, ws_params = _workspace_clause(workspace_client_id)
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             if tenant_id:
                 cur.execute(
                     f"""
@@ -270,7 +270,7 @@ def get_history_pdf_info(
     """
     ws_sql, ws_params = _workspace_clause(workspace_client_id)
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             if tenant_id:
                 cur.execute(
                     f"""
@@ -331,7 +331,7 @@ def find_ocr_by_hash(
         scope_sql = "user_id = %s"
         scope_params = (user_id,)
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             cur.execute(
                 f"""
                 SELECT id, filename, page_count, confidence, elapsed_ms, pages,
@@ -375,6 +375,7 @@ def check_duplicate_invoice(
     total_amount: Optional[float],
     exclude_id: Optional[str] = None,
     workspace_client_id: Optional[int] = None,
+    tenant_id: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     v0.13 · 重复发票检测 · 仅当前用户的历史
@@ -388,10 +389,11 @@ def check_duplicate_invoice(
     第 1 层 · invoice_no 严格匹配(大小写不敏感)
     第 2 层 · 发票号缺失时 · 用 (date+seller+amount) 三字段匹配
     PO-4 · workspace_client_id 给了 → 重复检测限本套账(+ NULL 未归属行)· 跨套账不互判重复
+    B8 RLS · tenant_id 只喂 RLS 上下文(让 policy 放行本租户行)· WHERE 仍 user_id 保 per-user 去重语义。
     """
     ws_sql, ws_params = _workspace_clause(workspace_client_id)
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             # ─────────────────────────────────────────
             # 第 1 层 · 发票号严格匹配
             # ─────────────────────────────────────────

@@ -54,8 +54,13 @@ def _fake_cursor(cur):
 
 
 def _run(fn, **kwargs):
+    # B8 RLS:ocr_history 已 enroll · 读 DAL 走 get_cursor_rls · 同 patch 两游标。
     cur = _CaptureCursor()
-    with mock.patch("core.db.get_cursor", lambda *a, **k: _fake_cursor(cur)):
+    factory = lambda *a, **k: _fake_cursor(cur)  # noqa: E731
+    with (
+        mock.patch("core.db.get_cursor", factory),
+        mock.patch("core.db.get_cursor_rls", factory),
+    ):
         fn(**kwargs)
     return cur
 

@@ -13,17 +13,26 @@ logger = logging.getLogger(__name__)
 
 
 def find_invoice_candidates_for_tx(
-    user_id: str, amount: float, tx_date: str, amount_tol: float = 10.0, date_tol_days: int = 7
+    user_id: str,
+    amount: float,
+    tx_date: str,
+    amount_tol: float = 10.0,
+    date_tol_days: int = 7,
+    *,
+    tenant_id=None,
 ) -> List[Dict[str, Any]]:
     """
     匹配算法用 · 在 ocr_history 里粗筛候选发票(用索引高效过滤)
     条件:同用户 · 金额差 ≤ amount_tol · 日期差 ≤ date_tol_days
     返回:[{id, amount_total, invoice_date, vendor, invoice_no, category_tag}, ...]
+
+    B8 RLS:ocr_history 是 wave3 表 · 穿 tenant+user 上下文(应用层 h.user_id 仍是当前隔离),
+    wave3 给 ocr_history apply RLS 后本查询由 policy 兜底闭合。
     """
     if not amount or not tx_date:
         return []
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             # pages 字段里 JSON 可能保存了 amount / total / invoice_date / vendor
             # 我们从 history 表的标量字段取(status=success 的)· 容忍 JSONB 结构
             cur.execute(
@@ -55,12 +64,12 @@ def find_invoice_candidates_for_tx(
         # 如果 ocr_history 里没有这些标量字段(旧版),降级从 pages JSONB 查
         logger.warning(f"find_invoice_candidates_for_tx SQL 降级: {e}")
         return _find_candidates_from_pages_jsonb(
-            user_id, amount, tx_date, amount_tol, date_tol_days
+            user_id, amount, tx_date, amount_tol, date_tol_days, tenant_id=tenant_id
         )
 
 
 def _find_candidates_from_pages_jsonb(
-    user_id: str, amount: float, tx_date: str, amount_tol: float, date_tol_days: int
+    user_id: str, amount: float, tx_date: str, amount_tol: float, date_tol_days: int, *, tenant_id=None
 ) -> List[Dict[str, Any]]:
     """降级查询:从 pages JSONB 里找 · 效率稍低 · 适合历史数据少(< 5000)"""
     try:
@@ -70,7 +79,7 @@ def _find_candidates_from_pages_jsonb(
         d_start = (d - timedelta(days=date_tol_days)).isoformat()
         d_end = (d + timedelta(days=date_tol_days)).isoformat()
 
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             cur.execute(
                 """
                 SELECT id, pages, filename, category_tag, created_at
@@ -131,16 +140,24 @@ def _find_candidates_from_pages_jsonb(
 
 
 def save_match_result(
-    tx_id: str, scored: List[Dict[str, Any]], thresh_auto: float = 85, thresh_suggest: float = 60
+    tx_id: str,
+    scored: List[Dict[str, Any]],
+    thresh_auto: float = 85,
+    thresh_suggest: float = 60,
+    *,
+    user_id=None,
+    tenant_id=None,
 ) -> str:
     """
     写入匹配结果
     - 清空该 tx 之前的 candidates
     - 按分数阶梯决定 match_status
     返回:最终 match_status(matched / suggested / unmatched)
+
+    B8 RLS:bank_reconcile_* 是 user 维度表 · 穿 user 上下文(未 enroll 时无影响,enroll 后闭合)。
     """
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             # 清旧候选
             cur.execute("DELETE FROM bank_reconcile_candidates WHERE tx_id = %s", (tx_id,))
 
@@ -209,7 +226,7 @@ def save_match_result(
         return "unmatched"
 
 
-def get_tx_candidates(tx_id: str, user_id: str) -> List[Dict[str, Any]]:
+def get_tx_candidates(tx_id: str, user_id: str, *, tenant_id=None) -> List[Dict[str, Any]]:
     """
     返回这条流水匹配过后落库的全部候选(已按 score 降序 · 最多 5 个)
     每项:
@@ -219,9 +236,10 @@ def get_tx_candidates(tx_id: str, user_id: str) -> List[Dict[str, Any]]:
       is_auto_picked - True 表示这是 auto-picked 的(score >= THRESH_AUTO 时是 matched)
       invoice_no / vendor / amount_total / invoice_date / filename - 发票字段
     鉴权:tx 必须属于这个 user_id
+    B8 RLS:JOIN ocr_history(wave3)· 穿 tenant+user 上下文,wave3 enroll 后闭合。
     """
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             # 鉴权 + JOIN
             cur.execute(
                 """
@@ -252,10 +270,10 @@ def get_tx_candidates(tx_id: str, user_id: str) -> List[Dict[str, Any]]:
         return []
 
 
-def update_session_match_stats(session_id: str) -> bool:
-    """重算 session 的 matched_count / unmatched_count"""
+def update_session_match_stats(session_id: str, *, user_id=None, tenant_id=None) -> bool:
+    """重算 session 的 matched_count / unmatched_count(B8 RLS:user 维度表穿 user 上下文)"""
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 """
                 UPDATE bank_reconcile_sessions s
@@ -279,14 +297,16 @@ def update_session_match_stats(session_id: str) -> bool:
         return False
 
 
-def override_tx_match(tx_id: str, user_id: str, history_id: Optional[str], status: str) -> bool:
+def override_tx_match(
+    tx_id: str, user_id: str, history_id: Optional[str], status: str, *, tenant_id=None
+) -> bool:
     """用户手动重指派 · 或忽略一条流水
     status: matched / unmatched / ignored
     """
     if status not in ("matched", "unmatched", "ignored"):
         return False
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 """
                 UPDATE bank_reconcile_transactions

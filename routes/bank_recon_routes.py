@@ -108,13 +108,17 @@ async def bank_recon_upload(request: Request, file: UploadFile = File(...)):
         workspace_client_id=wc.active_workspace_for_request(
             request, _tid(user)
         ),  # PO-6a · 归当前套账
+        tenant_id=_tid(user),
     )
     if not session_id:
         raise HTTPException(500, detail="bank_recon.create_session_failed")
 
     if parsed.parse_method == "gemini_vision_pending":
         # 轮 2 未接通 vision · 标记 "scanned not supported yet"
-        db.mark_recon_parse_failed(session_id, "扫描件暂未支持 · 请上传带文字层的 PDF")
+        db.mark_recon_parse_failed(
+            session_id, "扫描件暂未支持 · 请上传带文字层的 PDF",
+            user_id=str(user["id"]), tenant_id=_tid(user),
+        )
         return {
             "session_id": session_id,
             "bank_code": parsed.bank_code,
@@ -124,7 +128,10 @@ async def bank_recon_upload(request: Request, file: UploadFile = File(...)):
         }
 
     if not parsed.transactions:
-        db.mark_recon_parse_failed(session_id, "没有解析到任何流水 · 可能格式不支持 · 请反馈给我们")
+        db.mark_recon_parse_failed(
+            session_id, "没有解析到任何流水 · 可能格式不支持 · 请反馈给我们",
+            user_id=str(user["id"]), tenant_id=_tid(user),
+        )
         return {
             "session_id": session_id,
             "bank_code": parsed.bank_code,
@@ -133,9 +140,13 @@ async def bank_recon_upload(request: Request, file: UploadFile = File(...)):
             "error": "no_transactions_parsed",
         }
 
-    ok = db.save_bank_recon_parse(session_id, parsed.as_dict())
+    ok = db.save_bank_recon_parse(
+        session_id, parsed.as_dict(), user_id=str(user["id"]), tenant_id=_tid(user)
+    )
     if not ok:
-        db.mark_recon_parse_failed(session_id, "落库失败")
+        db.mark_recon_parse_failed(
+            session_id, "落库失败", user_id=str(user["id"]), tenant_id=_tid(user)
+        )
         raise HTTPException(500, detail="bank_recon.save_failed")
 
     return {
@@ -166,6 +177,7 @@ async def bank_recon_list_sessions(request: Request, limit: int = 30):
         limit,
         restrict_client_ids=restrict,
         workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
+        tenant_id=_tid(user),
     )
 
 
@@ -184,7 +196,9 @@ async def bank_recon_stats(request: Request):
     """
     user = require_perm(request, "recon.view")
     return db.get_bank_recon_stats(
-        user["id"], workspace_client_id=wc.active_workspace_for_request(request, _tid(user))
+        user["id"],
+        workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
+        tenant_id=_tid(user),
     )
 
 
@@ -196,13 +210,14 @@ async def bank_recon_session_detail(session_id: str, request: Request, filter: s
         user["id"],
         session_id,
         workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
+        tenant_id=_tid(user),
     )
     if not session:
         raise HTTPException(404, detail="bank_recon.session_not_found")
 
     match_filter = filter if filter in ("matched", "suggested", "unmatched") else None
     txs = db.list_bank_recon_transactions(
-        session_id, user["id"], match_filter=match_filter, limit=2000
+        session_id, user["id"], match_filter=match_filter, limit=2000, tenant_id=_tid(user)
     )
     return {"session": session, "transactions": txs}
 
@@ -215,6 +230,7 @@ async def bank_recon_delete_session(session_id: str, request: Request):
         user["id"],
         session_id,
         workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
+        tenant_id=_tid(user),
     )
     if not ok:
         raise HTTPException(404, detail="bank_recon.session_not_found")
@@ -229,6 +245,7 @@ async def bank_recon_run_match(session_id: str, request: Request):
         user["id"],
         session_id,
         workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
+        tenant_id=_tid(user),
     )
     if not session:
         raise HTTPException(404, detail="bank_recon.session_not_found")
@@ -240,7 +257,9 @@ async def bank_recon_run_match(session_id: str, request: Request):
 
     try:
         stats = await asyncio.wait_for(
-            asyncio.to_thread(br.run_matching_for_session, session_id, str(user["id"])),
+            asyncio.to_thread(
+                br.run_matching_for_session, session_id, str(user["id"]), tenant_id=_tid(user)
+            ),
             timeout=60.0,
         )
     except asyncio.TimeoutError:
@@ -259,7 +278,8 @@ async def bank_recon_tx_override(tx_id: str, request: Request):
     if status not in ("matched", "unmatched", "ignored"):
         raise HTTPException(400, detail="bank_recon.invalid_status")
     ok = db.override_tx_match(
-        tx_id, str(user["id"]), history_id if status == "matched" else None, status
+        tx_id, str(user["id"]), history_id if status == "matched" else None, status,
+        tenant_id=_tid(user),
     )
     if not ok:
         raise HTTPException(404, detail="bank_recon.tx_not_found")
@@ -275,7 +295,7 @@ async def bank_recon_tx_candidates(tx_id: str, request: Request):
     没跑过匹配的流水返回空数组 · 前端显示「请先点开始匹配」
     """
     user = require_perm(request, "recon.view")
-    return {"candidates": db.get_tx_candidates(tx_id, str(user["id"]))}
+    return {"candidates": db.get_tx_candidates(tx_id, str(user["id"]), tenant_id=_tid(user))}
 
 
 # v118.26.2 · 给一份银行对账 session 绑客户(老板分客户给员工 → 流水进 client filter)
@@ -301,6 +321,7 @@ async def bank_recon_set_session_client(session_id: str, request: Request):
         session_id,
         cid,
         workspace_client_id=wc.active_workspace_for_request(request, _tid(user)),
+        tenant_id=_tid(user),
     )
     if not ok:
         raise HTTPException(404, detail="bank_recon.session_not_found")

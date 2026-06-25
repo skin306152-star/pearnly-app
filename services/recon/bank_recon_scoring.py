@@ -177,16 +177,17 @@ def match_one_tx(bank_tx: Dict[str, Any], candidates: List[Dict[str, Any]]) -> L
 # ============================================================
 # Session 级匹配:遍历所有流水 · 查候选 · 写结果
 # ============================================================
-def run_matching_for_session(session_id: str, user_id: str) -> Dict[str, Any]:
+def run_matching_for_session(session_id: str, user_id: str, *, tenant_id=None) -> Dict[str, Any]:
     """
     对一个对账会话下的所有流水跑匹配
     返回统计:{tx_total, matched, suggested, unmatched, elapsed_ms}
+    B8 RLS:穿 tenant+user 上下文(ocr_history 候选检索在 wave3 enroll 后闭合)。
     """
     import time
     from core import db
 
     t0 = time.time()
-    txs = db.list_bank_recon_transactions(session_id, user_id, limit=2000)
+    txs = db.list_bank_recon_transactions(session_id, user_id, limit=2000, tenant_id=tenant_id)
     if not txs:
         return {
             "tx_total": 0,
@@ -223,10 +224,13 @@ def run_matching_for_session(session_id: str, user_id: str) -> Dict[str, Any]:
             tx_date=tx_date_str,
             amount_tol=AMOUNT_TOL_MEDIUM,
             date_tol_days=DATE_TOL_DAYS,
+            tenant_id=tenant_id,
         )
 
         if not candidates:
-            db.save_match_result(tx["id"], [], THRESH_AUTO, THRESH_SUGGEST)
+            db.save_match_result(
+                tx["id"], [], THRESH_AUTO, THRESH_SUGGEST, user_id=user_id, tenant_id=tenant_id
+            )
             stat["unmatched"] += 1
             continue
 
@@ -241,11 +245,13 @@ def run_matching_for_session(session_id: str, user_id: str) -> Dict[str, Any]:
 
         # 写结果(算法内只保留 ≥ THRESH_SUGGEST 的)
         scored_kept = [s for s in scored if s["score"] >= THRESH_SUGGEST]
-        final_status = db.save_match_result(tx["id"], scored_kept, THRESH_AUTO, THRESH_SUGGEST)
+        final_status = db.save_match_result(
+            tx["id"], scored_kept, THRESH_AUTO, THRESH_SUGGEST, user_id=user_id, tenant_id=tenant_id
+        )
         stat[final_status] = stat.get(final_status, 0) + 1
 
     # 更新 session 头统计
-    db.update_session_match_stats(session_id)
+    db.update_session_match_stats(session_id, user_id=user_id, tenant_id=tenant_id)
 
     elapsed = int((time.time() - t0) * 1000)
     return {

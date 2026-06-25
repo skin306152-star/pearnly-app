@@ -61,10 +61,17 @@ def create_bank_recon_session(
     filename: str,
     pages: int,
     workspace_client_id: Optional[int] = None,
+    *,
+    tenant_id=None,
 ) -> Optional[str]:
-    """创建一条会话 · 返回 id。PO-6a:归当前套账(workspace_client_id · 缺则 NULL · 不拦)。"""
+    """创建一条会话 · 返回 id。PO-6a:归当前套账(workspace_client_id · 缺则 NULL · 不拦)。
+
+    B8 RLS:bank_reconcile_* 是 user 维度表 · 穿 user 上下文(应用层 user_id WHERE 仍是当前隔离)。
+    """
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(
+            tenant_id=tenant_id, user_id=user_id, workspace_client_id=workspace_client_id, commit=True
+        ) as cur:
             cur.execute(
                 """
                 INSERT INTO bank_reconcile_sessions
@@ -88,10 +95,12 @@ def create_bank_recon_session(
         return None
 
 
-def save_bank_recon_parse(session_id: str, parsed: Dict[str, Any]) -> bool:
-    """解析完成后把会话 + 流水批量落库"""
+def save_bank_recon_parse(
+    session_id: str, parsed: Dict[str, Any], *, user_id=None, tenant_id=None
+) -> bool:
+    """解析完成后把会话 + 流水批量落库(B8 RLS:user 维度表穿 user 上下文)"""
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             tx_n = len(parsed.get("transactions") or [])
             # 更新会话头信息
             # v118.26.1 · 补 unmatched_count = tx_n / matched_count = 0
@@ -167,9 +176,9 @@ def save_bank_recon_parse(session_id: str, parsed: Dict[str, Any]) -> bool:
         return False
 
 
-def mark_recon_parse_failed(session_id: str, error_msg: str) -> bool:
+def mark_recon_parse_failed(session_id: str, error_msg: str, *, user_id=None, tenant_id=None) -> bool:
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 """
                 UPDATE bank_reconcile_sessions
@@ -187,12 +196,14 @@ def mark_recon_parse_failed(session_id: str, error_msg: str) -> bool:
 
 
 def get_bank_recon_session(
-    user_id: str, session_id: str, workspace_client_id: Optional[int] = None
+    user_id: str, session_id: str, workspace_client_id: Optional[int] = None, *, tenant_id=None
 ) -> Optional[Dict[str, Any]]:
     """获取会话头(鉴权)。PO-6a:可选按套账过滤(rollout-safe)。"""
     ws_sql, ws_params = _ws_clause(workspace_client_id)
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(
+            tenant_id=tenant_id, user_id=user_id, workspace_client_id=workspace_client_id
+        ) as cur:
             cur.execute(
                 f"""
                 SELECT * FROM bank_reconcile_sessions
@@ -212,6 +223,8 @@ def list_bank_recon_sessions(
     limit: int = 30,
     restrict_client_ids: Optional[List[int]] = None,
     workspace_client_id: Optional[int] = None,
+    *,
+    tenant_id=None,
 ) -> List[Dict[str, Any]]:
     """列最近会话
     v118.26.2 · 加 restrict_client_ids 参数(v28.1 客户分配 filter)
@@ -222,7 +235,9 @@ def list_bank_recon_sessions(
     """
     ws_sql, ws_params = _ws_clause(workspace_client_id)
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(
+            tenant_id=tenant_id, user_id=user_id, workspace_client_id=workspace_client_id
+        ) as cur:
             base_sql = """
                 SELECT id, bank_code, account_last4, statement_month,
                        period_start, period_end, total_inflow, total_outflow,
@@ -259,6 +274,8 @@ def update_bank_recon_session_client(
     session_id: str,
     client_id: Optional[int],
     workspace_client_id: Optional[int] = None,
+    *,
+    tenant_id=None,
 ) -> bool:
     """
     更新 session 的 client_id · None 表示解绑
@@ -267,7 +284,9 @@ def update_bank_recon_session_client(
     """
     ws_sql, ws_params = _ws_clause(workspace_client_id)
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(
+            tenant_id=tenant_id, user_id=user_id, workspace_client_id=workspace_client_id, commit=True
+        ) as cur:
             cur.execute(
                 f"""
                 UPDATE bank_reconcile_sessions
@@ -283,7 +302,9 @@ def update_bank_recon_session_client(
 
 
 # v118.26.0 · 对账中心首页统计(当月 · BKK 时区)
-def get_bank_recon_stats(user_id: str, workspace_client_id: Optional[int] = None) -> Dict[str, Any]:
+def get_bank_recon_stats(
+    user_id: str, workspace_client_id: Optional[int] = None, *, tenant_id=None
+) -> Dict[str, Any]:
     """
     对账中心首页用 · 当月概览
     pending = suggested(系统推荐 · 等会计点确认)
@@ -314,7 +335,9 @@ def get_bank_recon_stats(user_id: str, workspace_client_id: Optional[int] = None
             ws_sql = " AND (s.workspace_client_id = %s OR s.workspace_client_id IS NULL)"
             ws_params = (int(workspace_client_id),)
 
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(
+            tenant_id=tenant_id, user_id=user_id, workspace_client_id=workspace_client_id
+        ) as cur:
             cur.execute(
                 f"""
                 SELECT
@@ -351,11 +374,16 @@ def get_bank_recon_stats(user_id: str, workspace_client_id: Optional[int] = None
 
 
 def list_bank_recon_transactions(
-    session_id: str, user_id: str, match_filter: Optional[str] = None, limit: int = 500
+    session_id: str,
+    user_id: str,
+    match_filter: Optional[str] = None,
+    limit: int = 500,
+    *,
+    tenant_id=None,
 ) -> List[Dict[str, Any]]:
     """列一个会话下的流水 · 可按 match_status 过滤"""
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             q = """
                 SELECT id, row_no, tx_date, value_date, direction, amount,
                        balance_after, description, counterparty, ref_no, channel,
@@ -377,11 +405,13 @@ def list_bank_recon_transactions(
 
 
 def delete_bank_recon_session(
-    user_id: str, session_id: str, workspace_client_id: Optional[int] = None
+    user_id: str, session_id: str, workspace_client_id: Optional[int] = None, *, tenant_id=None
 ) -> bool:
     ws_sql, ws_params = _ws_clause(workspace_client_id)
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(
+            tenant_id=tenant_id, user_id=user_id, workspace_client_id=workspace_client_id, commit=True
+        ) as cur:
             cur.execute(
                 f"""
                 DELETE FROM bank_reconcile_sessions

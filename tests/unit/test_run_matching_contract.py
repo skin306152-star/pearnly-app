@@ -49,7 +49,8 @@ def test_run_matching_passes_runtime_tolerance_and_wires_match():
     assert saved_tx_id == "tx1"
     assert saved_scored and saved_scored[0]["history_id"] == "inv1"
     # (3) stats shape + session header update
-    m_stats.assert_called_once_with("sess1")
+    # B8 RLS:session 统计更新带 user/tenant 上下文(user 维度表)
+    m_stats.assert_called_once_with("sess1", user_id="user1", tenant_id=None)
     assert result["tx_total"] == 1
     assert result["matched"] == 1
     assert set(result) == {"tx_total", "matched", "suggested", "unmatched", "elapsed_ms"}

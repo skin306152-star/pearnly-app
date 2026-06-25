@@ -46,7 +46,9 @@ def _fake(cur):
 
 def _run(fn, **kw):
     cur = _Cur()
-    with mock.patch("core.db.get_cursor", lambda *a, **k: _fake(cur)):
+    # B8 RLS:bank_recon store 改走 get_cursor_rls(穿 user/tenant 上下文)· 同 patch 两游标
+    cm = lambda *a, **k: _fake(cur)  # noqa: E731
+    with mock.patch("core.db.get_cursor", cm), mock.patch("core.db.get_cursor_rls", cm):
         fn(**kw)
     return cur
 

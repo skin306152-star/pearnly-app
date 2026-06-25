@@ -18,11 +18,15 @@ import json
 import time
 from typing import Any, Dict, List, Optional
 
+from services.erp.express_push.common import ITEMS_INCOMPLETE, ITEMS_MISMATCH
 from services.erp.express_push.preflight import preflight_express
 
 # error_msg 哨兵 · 让现有 classify_push_status 把这一行落成 pending / manual(单一状态源 · 铁律 #12)。
 QUEUED_SENTINEL = "EXPRESS_QUEUED"
 MANUAL_PREFIX = "EXPRESS_MANUAL"
+
+# 检测到明细行但不可信(对账失败/残缺)→ 转待确认而非静默 header-only(铁律:失败不显示成功)。
+_ITEMS_REVIEW_STATUSES = (ITEMS_MISMATCH, ITEMS_INCOMPLETE)
 
 
 def _result(
@@ -85,6 +89,13 @@ def enqueue_express(endpoint: Dict[str, Any], history: Dict[str, Any]) -> Dict[s
 
     # 高置信 + 映射成功 → 入队(pending)等本地 Agent。
     payload = pf.payload
+
+    # V2 状态诚实化:OCR 检测到明细行但对账失败(line_sum≠税前·mismatch)或行残缺(缺品名/
+    # 金额·incomplete)→ 不静默 header-only 冒充成功,转待确认(manual·reason 可识别)留人工。
+    # empty(无明细)/ ok(可信·落 STCRD)正常入队,行为不变。
+    if payload.get("items_status") in _ITEMS_REVIEW_STATUSES:
+        return _manual(f"items_{payload['items_status']}", payload, t0, checks=checks)
+
     return _result(
         success=False,
         error_msg=QUEUED_SENTINEL,

@@ -98,6 +98,27 @@ class LeaseAckTests(unittest.TestCase):
         self.assertEqual(res["express_docnum"], "RR581231-002")
         self.assertTrue(any("status = 'success'" in sql for sql, _ in cur.executed))
 
+    def test_ack_records_fallback_line_modes(self):
+        # V2 诚实化:回传逐行 mode,有行回落 direct_account → response_body 记 fallback_count+原因。
+        row = {
+            "id": "log-1", "status": "pending", "attempt": 0,
+            "lease_owner": "agentA", "response_body": None,
+        }
+        cur = FakeCursor(one=row)
+        line_modes = [
+            {"seq": 1, "name": "A", "mode": "non_stock_item", "stkcod": "PN00001", "reason": ""},
+            {"seq": 2, "name": "B", "mode": "direct_account", "stkcod": "41-01-00-00",
+             "reason": "ensure_item_failed: boom"},
+        ]
+        with _patch_cursor(cur):
+            res = agent_store.ack(
+                "ep-1", "log-1", "agentA", True, express_docnum="IV1", line_modes=line_modes
+            )
+        self.assertEqual(res["status"], "success")
+        body = next(p[0] for sql, p in cur.executed if "status = 'success'" in sql)
+        self.assertIn("fallback_count", body)
+        self.assertIn("ensure_item_failed", body)
+
     def test_ack_lease_mismatch_rejected(self):
         row = {
             "id": "log-1",

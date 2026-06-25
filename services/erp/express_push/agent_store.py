@@ -377,6 +377,7 @@ def ack(
     success: bool,
     express_docnum: Optional[str] = None,
     error: Optional[str] = None,
+    line_modes: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Agent 回报一条领取结果。
 
@@ -400,9 +401,15 @@ def ack(
                 return {"ok": False, "reason": "lease_mismatch"}
 
             if success:
-                body = json.dumps(
-                    {"ok": True, "express_docnum": express_docnum}, ensure_ascii=False
-                )
+                # V2 诚实化:回传逐行 mode → 记进日志。某些行从 non_stock 回落 direct_account
+                # (主档建/配失败)= 仍成功过账但明细降级,记 fallback_count + 原因供 UI 标注(不静默)。
+                body_obj: Dict[str, Any] = {"ok": True, "express_docnum": express_docnum}
+                if line_modes:
+                    body_obj["line_modes"] = line_modes
+                    fb = [m for m in line_modes if m.get("mode") == "direct_account" and m.get("reason")]
+                    if fb:
+                        body_obj["fallback_count"] = len(fb)
+                body = json.dumps(body_obj, ensure_ascii=False)
                 cur.execute(
                     """
                     UPDATE erp_push_logs

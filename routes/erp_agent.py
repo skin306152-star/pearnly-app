@@ -153,6 +153,8 @@ class AckRequest(BaseModel):
     express_docnum: Optional[str] = None
     error: Optional[str] = None
     agent_id: Optional[str] = None
+    # V2 逐行 mode 结果(companion DbfWriteResult.line_modes):记进日志供 UI 标注兜底行。
+    line_modes: Optional[list] = None
 
 
 @router.post("/api/erp/agent/ack")
@@ -170,6 +172,7 @@ async def erp_agent_ack(req: AckRequest, request: Request):
         success=(req.result == "success"),
         express_docnum=req.express_docnum,
         error=req.error,
+        line_modes=req.line_modes,
     )
     if not res.get("ok"):
         raise HTTPException(409, detail=f"erp.ack_{res.get('reason', 'failed')}")

@@ -121,6 +121,27 @@ class EnqueueTests(unittest.TestCase):
         self.assertIn("account_set_not_allowed", r["error_msg"])
         self.assertEqual(classify_push_status(r["success"], r["error_msg"]), "manual")
 
+    def test_items_mismatch_to_review_manual(self):
+        # OCR 给了明细但行合计对不上税前 → 不静默 header-only,转待确认(manual)。
+        items = [{"name": "ดีเซล", "qty": "1", "price": "100", "subtotal": "100.00"}]
+        r = enqueue_express(_endpoint(), _history(items=items))
+        self.assertTrue(r["error_msg"].startswith("EXPRESS_MANUAL"))
+        self.assertIn("items_mismatch", r["error_msg"])
+        self.assertEqual(classify_push_status(r["success"], r["error_msg"]), "manual")
+
+    def test_items_incomplete_to_review_manual(self):
+        # 行残缺(缺品名)→ 明细不可信 → 转待确认,不冒充成功。
+        items = [{"qty": "1", "price": "100", "subtotal": "375347.20"}]
+        r = enqueue_express(_endpoint(), _history(items=items))
+        self.assertTrue(r["error_msg"].startswith("EXPRESS_MANUAL"))
+        self.assertIn("items_incomplete", r["error_msg"])
+
+    def test_items_ok_still_queued(self):
+        # 行合计≈税前 → 明细可信 → 正常入队(pending),明细照写。
+        items = [{"name": "ดีเซล", "qty": "1", "price": "375347.20", "subtotal": "375347.20"}]
+        r = enqueue_express(_endpoint(), _history(items=items))
+        self.assertEqual(r["error_msg"], "EXPRESS_QUEUED")
+
     def test_flag_off_short_circuit(self):
         with mock.patch.dict("os.environ", {"ERP_PUSH_ENABLED": "false"}):
             r = enqueue_express(_endpoint(), _history())

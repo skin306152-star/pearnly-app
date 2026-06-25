@@ -39,6 +39,7 @@ from services.erp.express_push.common import (
     amounts,
     be_dates,
     detect_prename,
+    extract_line_items,
     fail,
     payment_is_paid,
     resolve_account,
@@ -145,6 +146,9 @@ def build_express_payload(
     if _q(dr) != _q(cr):
         return fail("entry_not_balanced")
 
+    # V1 安全明细(镜像销项):OCR 行过对账闸,挂采购科目作直接科目行,不碰库存/成本。
+    detail = extract_line_items(fields, base)
+
     payload = {
         "direction": "purchase",
         "doctype": "HP" if _is_paid(fields, config) else "RR",
@@ -158,6 +162,10 @@ def build_express_payload(
         "vat_amount": _s(vat),
         "total_amount": _s(total),
         "lines": lines,
+        "items": detail["items"],
+        "items_status": detail["status"],
+        "items_account": purchase_acc,  # 明细行挂的采购科目(直接科目行)
+        "items_line_sum": detail["line_sum"],
         # 变动科目(采购)的真实解析来源 · config_default=落账套默认→待核(诚实状态)。
         "account_source": acc_source,
         "account_review": acc_source == SRC_DEFAULT,

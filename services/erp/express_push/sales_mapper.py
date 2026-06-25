@@ -31,6 +31,7 @@ from services.erp.express_push.common import (
     amounts,
     be_dates,
     detect_prename,
+    extract_line_items,
     fail,
     payment_is_paid,
     resolve_account,
@@ -130,6 +131,10 @@ def build_express_sales_payload(
     if _q(dr) != _q(cr):
         return fail("entry_not_balanced")
 
+    # V1 安全明细:OCR 行项目过对账闸(行合计≈税前额才采信)。挂收入科目作直接科目行,
+    # 不碰库存/成本。status!=ok → companion 退回表头模式 + posted_partial(诚实)。
+    detail = extract_line_items(fields, base)
+
     paid = payment_is_paid(fields)
     payload = {
         "direction": "sales",
@@ -144,6 +149,10 @@ def build_express_sales_payload(
         "vat_amount": _s(vat),
         "total_amount": _s(total),
         "lines": lines,
+        "items": detail["items"],
+        "items_status": detail["status"],
+        "items_account": revenue_acc,  # 明细行挂的收入科目(直接科目行)
+        "items_line_sum": detail["line_sum"],
         # 变动科目(收入)的真实解析来源 · config_default=落账套默认→待核(诚实状态)。
         "account_source": acc_source,
         "account_review": acc_source == SRC_DEFAULT,

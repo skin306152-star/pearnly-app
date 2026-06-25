@@ -134,6 +134,72 @@ def resolve_account(
     return resolve_account_sourced(accounts, category, config_code)[0]
 
 
+# 明细行采信状态(诚实 · 写进 payload → 决定是否落 STCRD 明细 + posted_partial):
+#   ok          逐行齐全 + 行合计≈税前额 → 可落明细
+#   empty       OCR 无行项目 → 退回表头模式(非错误)
+#   incomplete  有行但缺金额/品名 → 不可信,退回表头
+#   mismatch    行合计 与税前额对不上 → 不可信,退回表头
+ITEMS_OK = "ok"
+ITEMS_EMPTY = "empty"
+ITEMS_INCOMPLETE = "incomplete"
+ITEMS_MISMATCH = "mismatch"
+
+_ITEMS_TOL = Decimal("1.00")  # 行合计 vs 税前额 容差(吸收 OCR 逐行四舍五入)
+
+
+def extract_line_items(fields: Dict[str, Any], base: Decimal) -> Dict[str, Any]:
+    """OCR 行项目 → 规整明细 + 对账闸。确定性纯函数,绝不为"好看"采信不自洽的明细。
+
+    入:fields.items = [{name, qty, price, subtotal}](OCR · 数值为字符串/可空);base=税前额。
+    出:{items, status, line_sum}。status 见上常量。仅 status==ok 时 items 应落 STCRD。
+    每行 items: {name, qty, unit, unit_price, amount}(amount=行净额,逐行求和须≈base)。
+    """
+    raw = fields.get("items")
+    if not isinstance(raw, list) or not raw:
+        return {"items": [], "status": ITEMS_EMPTY, "line_sum": _s(Decimal("0"))}
+
+    items: List[Dict[str, str]] = []
+    incomplete = False
+    for it in raw:
+        if not isinstance(it, dict):
+            incomplete = True
+            continue
+        name = str(it.get("name") or "").strip()
+        qty = _d(it.get("qty"))
+        price = _d(it.get("price") or it.get("unit_price"))
+        amount = _d(it.get("subtotal") or it.get("amount") or it.get("total"))
+        if amount is None and qty is not None and price is not None:
+            amount = _q(qty * price)
+        # 品名是行的身份;金额是对账依据。任一缺 → 整组不可信(不静默吞行/补 0)。
+        if not name or amount is None:
+            incomplete = True
+            continue
+        if qty is None or qty == 0:
+            qty = Decimal("1")
+        if price is None:
+            price = _q(amount / qty) if qty else amount
+        items.append(
+            {
+                "name": name[:50],
+                "qty": _s(qty),
+                "unit": str(it.get("unit") or it.get("uom") or "").strip()[:10],
+                "unit_price": _s(price),
+                "amount": _s(amount),
+            }
+        )
+
+    if incomplete or not items:
+        return {
+            "items": items,
+            "status": ITEMS_INCOMPLETE if raw else ITEMS_EMPTY,
+            "line_sum": _s(sum((_d(i["amount"]) for i in items), Decimal("0"))),
+        }
+
+    line_sum = sum((_d(i["amount"]) for i in items), Decimal("0"))
+    status = ITEMS_OK if abs(_q(line_sum) - _q(base)) <= _ITEMS_TOL else ITEMS_MISMATCH
+    return {"items": items, "status": status, "line_sum": _s(line_sum)}
+
+
 def amounts(fields: Dict[str, Any], history: Dict[str, Any]) -> Optional[tuple]:
     """从票面字段确定性求 (base, vat, total)。返回 None = 数不自洽/缺总额(留人工)。
 

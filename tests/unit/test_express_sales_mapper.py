@@ -118,6 +118,31 @@ class ExpressSalesMapperTests(unittest.TestCase):
         cr = sum(Decimal(ln["amount"]) for ln in r.payload["lines"] if ln["side"] == "C")
         self.assertEqual(dr, cr)
 
+    def test_items_in_payload_when_lines_reconcile(self):
+        # 行合计 = 税前 23456.00 → items_status=ok,挂收入科目作直接科目行。
+        items = [
+            {"name": "สินค้า A", "qty": "2", "price": "10000", "subtotal": "20000.00"},
+            {"name": "สินค้า B", "qty": "1", "price": "3456", "subtotal": "3456.00"},
+        ]
+        r = build_express_sales_payload(_sales_history(fields={"items": items}), config=_CONFIG)
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["items_status"], "ok")
+        self.assertEqual(len(r.payload["items"]), 2)
+        self.assertEqual(r.payload["items_account"], "41-01-00-00")
+
+    def test_items_mismatch_falls_back_honestly(self):
+        # 行合计与税前对不上 → items_status=mismatch,头/分录照常(由 companion 退回表头)。
+        items = [{"name": "X", "qty": "1", "price": "5", "subtotal": "5.00"}]
+        r = build_express_sales_payload(_sales_history(fields={"items": items}), config=_CONFIG)
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["items_status"], "mismatch")
+        self.assertEqual(len(r.payload["lines"]), 3)  # GL 分录不受明细影响
+
+    def test_no_items_empty_status(self):
+        r = build_express_sales_payload(_sales_history(), config=_CONFIG)
+        self.assertEqual(r.payload["items_status"], "empty")
+        self.assertEqual(r.payload["items"], [])
+
     def test_contract_alignment_with_companion_sales_adapter(self):
         """本 mapper 产物直接喂 companion sales_adapter:字段名/类型/doctype 一字不差能过。"""
         companion_src = Path("D:/pearnly-companion/src")

@@ -34,13 +34,15 @@ def _fields(items):
 
 class SanitizePushMetaTests(unittest.TestCase):
     def test_keeps_whitelisted_and_drops_unknown(self):
-        m = sanitize_push_meta({
-            "companion_version": "1.1.13",
-            "doc_type": "sales",
-            "created_customer": 1,
-            "tables_written": ["ARTRN", "STCRD", "ISVAT"],
-            "evil": "x" * 9999,  # 非白名单 → 丢
-        })
+        m = sanitize_push_meta(
+            {
+                "companion_version": "1.1.13",
+                "doc_type": "sales",
+                "created_customer": 1,
+                "tables_written": ["ARTRN", "STCRD", "ISVAT"],
+                "evil": "x" * 9999,  # 非白名单 → 丢
+            }
+        )
         self.assertEqual(m["companion_version"], "1.1.13")
         self.assertIs(m["created_customer"], True)
         self.assertEqual(m["tables_written"], ["ARTRN", "STCRD", "ISVAT"])

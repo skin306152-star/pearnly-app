@@ -101,14 +101,22 @@ class LeaseAckTests(unittest.TestCase):
     def test_ack_records_fallback_line_modes(self):
         # V2 诚实化:回传逐行 mode,有行回落 direct_account → response_body 记 fallback_count+原因。
         row = {
-            "id": "log-1", "status": "pending", "attempt": 0,
-            "lease_owner": "agentA", "response_body": None,
+            "id": "log-1",
+            "status": "pending",
+            "attempt": 0,
+            "lease_owner": "agentA",
+            "response_body": None,
         }
         cur = FakeCursor(one=row)
         line_modes = [
             {"seq": 1, "name": "A", "mode": "non_stock_item", "stkcod": "PN00001", "reason": ""},
-            {"seq": 2, "name": "B", "mode": "direct_account", "stkcod": "41-01-00-00",
-             "reason": "ensure_item_failed: boom"},
+            {
+                "seq": 2,
+                "name": "B",
+                "mode": "direct_account",
+                "stkcod": "41-01-00-00",
+                "reason": "ensure_item_failed: boom",
+            },
         ]
         with _patch_cursor(cur):
             res = agent_store.ack(
@@ -121,12 +129,21 @@ class LeaseAckTests(unittest.TestCase):
 
     def test_ack_waiting_lock_keeps_pending_no_attempt_burn(self):
         # Express 占用账套 → 保持 pending、不烧重试次数、可重领(不算失败)。
-        row = {"id": "log-1", "status": "pending", "attempt": 1,
-               "lease_owner": "agentA", "response_body": None}
+        row = {
+            "id": "log-1",
+            "status": "pending",
+            "attempt": 1,
+            "lease_owner": "agentA",
+            "response_body": None,
+        }
         cur = FakeCursor(one=row)
         with _patch_cursor(cur):
             res = agent_store.ack(
-                "ep-1", "log-1", "agentA", False, outcome="waiting_lock",
+                "ep-1",
+                "log-1",
+                "agentA",
+                False,
+                outcome="waiting_lock",
                 meta={"companion_version": "1.1.13", "account_dir": r"\\acc\X"},
             )
         self.assertEqual(res["status"], "pending")
@@ -141,23 +158,39 @@ class LeaseAckTests(unittest.TestCase):
         self.assertFalse(any("attempt =" in s for s, _ in cur.executed))
 
     def test_ack_needs_review_to_manual_immediately(self):
-        row = {"id": "log-1", "status": "pending", "attempt": 1,
-               "lease_owner": "agentA", "response_body": None}
+        row = {
+            "id": "log-1",
+            "status": "pending",
+            "attempt": 1,
+            "lease_owner": "agentA",
+            "response_body": None,
+        }
         cur = FakeCursor(one=row)
         with _patch_cursor(cur):
-            res = agent_store.ack("ep-1", "log-1", "agentA", False,
-                                  outcome="needs_review", error="dup suspected")
+            res = agent_store.ack(
+                "ep-1", "log-1", "agentA", False, outcome="needs_review", error="dup suspected"
+            )
         self.assertEqual(res["status"], "manual")
         self.assertEqual(res["stage"], "needs_review")
 
     def test_ack_rolled_back_stores_meta_and_retries(self):
-        row = {"id": "log-1", "status": "pending", "attempt": 1,
-               "lease_owner": "agentA", "response_body": None}
+        row = {
+            "id": "log-1",
+            "status": "pending",
+            "attempt": 1,
+            "lease_owner": "agentA",
+            "response_body": None,
+        }
         cur = FakeCursor(one=row)
         with _patch_cursor(cur):
             res = agent_store.ack(
-                "ep-1", "log-1", "agentA", False, outcome="rolled_back",
-                error="cdx failed", meta={"rolled_back": True, "doc_type": "sales"},
+                "ep-1",
+                "log-1",
+                "agentA",
+                False,
+                outcome="rolled_back",
+                error="cdx failed",
+                meta={"rolled_back": True, "doc_type": "sales"},
             )
         self.assertEqual(res["status"], "pending")  # 第1次失败回 pending 可重试
         params = next(p for s, p in cur.executed if "response_body = %s" in s and "attempt" in s)

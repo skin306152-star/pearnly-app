@@ -220,8 +220,11 @@ def ack(
 
             if eff == C.STAGE_SUCCESS:
                 body = _build_response_body(
-                    ok=True, stage=C.STAGE_SUCCESS, express_docnum=express_docnum,
-                    line_modes=line_modes, meta=clean_meta,
+                    ok=True,
+                    stage=C.STAGE_SUCCESS,
+                    express_docnum=express_docnum,
+                    line_modes=line_modes,
+                    meta=clean_meta,
                 )
                 cur.execute(
                     """
@@ -238,8 +241,11 @@ def ack(
             if eff == C.STAGE_WAITING_LOCK:
                 # Express 正占用账套 → 不算失败、不烧次数:保持 pending、放租约,稍后自动重领。
                 body = _build_response_body(
-                    ok=False, stage=C.STAGE_WAITING_LOCK, express_docnum=None,
-                    line_modes=None, meta=clean_meta,
+                    ok=False,
+                    stage=C.STAGE_WAITING_LOCK,
+                    express_docnum=None,
+                    line_modes=None,
+                    meta=clean_meta,
                 )
                 cur.execute(
                     """
@@ -250,12 +256,21 @@ def ack(
                     """,
                     (body, log_id),
                 )
-                return {"ok": True, "status": "pending", "stage": C.STAGE_WAITING_LOCK, "retry": True}
+                return {
+                    "ok": True,
+                    "status": "pending",
+                    "stage": C.STAGE_WAITING_LOCK,
+                    "retry": True,
+                }
 
             if eff in (C.STAGE_NEEDS_MAPPING, C.STAGE_NEEDS_REVIEW):
                 # 缺科目映射 / 对账失败·疑似重复 → 立即留人工(重试无益)。
                 body = _build_response_body(
-                    ok=False, stage=eff, express_docnum=None, line_modes=None, meta=clean_meta,
+                    ok=False,
+                    stage=eff,
+                    express_docnum=None,
+                    line_modes=None,
+                    meta=clean_meta,
                 )
                 cur.execute(
                     """
@@ -274,7 +289,11 @@ def ack(
             new_attempt = prior + 1
             new_status = "manual" if agent_failures >= _MAX_ATTEMPTS else "pending"
             body = _build_response_body(
-                ok=False, stage=eff, express_docnum=None, line_modes=None, meta=clean_meta,
+                ok=False,
+                stage=eff,
+                express_docnum=None,
+                line_modes=None,
+                meta=clean_meta,
             )
             cur.execute(
                 """

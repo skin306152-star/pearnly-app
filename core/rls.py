@@ -10,6 +10,10 @@
 
 from __future__ import annotations
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # 业务连接经 SET LOCAL ROLE 切到的最小权限角色名(NOBYPASSRLS)。
 RLS_APP_ROLE = "pearnly_app"
 
@@ -147,20 +151,16 @@ def disable_orphan_rls(cur) -> list[str]:
 
 
 def ensure_no_orphan_rls() -> list[str]:
-    """开自有 owner 连接跑 disable_orphan_rls(startup 末步用)。返回被关表名。
+    """开自有 owner 连接跑 disable_orphan_rls(startup DDL 全跑完后用)。返回被关表名。
 
     懒导入 core.db 避免与 get_cursor_rls 的模块级循环依赖。
     """
-    import logging
-
     from core import db
 
     with db.get_cursor(commit=True) as cur:
         orphans = disable_orphan_rls(cur)
     if orphans:
-        logging.getLogger(__name__).warning(
-            "RLS 自愈:DISABLE %d 张零-policy 孤儿表 %s", len(orphans), orphans
-        )
+        logger.warning("RLS 自愈:DISABLE %d 张零-policy 孤儿表 %s", len(orphans), orphans)
     return orphans
 
 

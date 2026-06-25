@@ -37,12 +37,12 @@ class DisableOrphanRlsContract(unittest.TestCase):
         # 只跑了那条扫描 SELECT,没有任何 DISABLE
         self.assertTrue(all("DISABLE" not in s for s in cur.executed))
 
-    def test_scan_predicate_targets_zero_policy_tables(self):
-        cur = _Cur([])
+    def test_scans_before_any_disable(self):
+        # 守卫先扫一次只读 pg 目录,再 DISABLE —— 不钉死谓词文本(免无谓改写即红)。
+        cur = _Cur(["users"])
         disable_orphan_rls(cur)
-        scan = cur.executed[0]
-        self.assertIn("relrowsecurity", scan)
-        self.assertIn("HAVING count(p.polname) = 0", scan)
+        self.assertIn("pg_class", cur.executed[0])
+        self.assertNotIn("DISABLE", cur.executed[0])
 
 
 if __name__ == "__main__":

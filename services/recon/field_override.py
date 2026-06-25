@@ -51,7 +51,9 @@ def parse_overrides(raw) -> Dict[str, Any]:
     return {}
 
 
-def record_field_override(row_id: int, field: str, user_value: Optional[str]) -> Dict[str, Any]:
+def record_field_override(
+    row_id: int, field: str, user_value: Optional[str], *, tenant_id, user_id
+) -> Dict[str, Any]:
     """
     记录用户对发票侧某字段的校正。
 
@@ -61,13 +63,15 @@ def record_field_override(row_id: int, field: str, user_value: Optional[str]) ->
 
     OCR 原值锁定逻辑(铁律 #15):该字段已有 override 时复用其 ocr · 否则取当前 OCR 值。
     返回 {"ok": bool, "field_overrides": <最新全量 dict>, "error": <可选>}
+
+    B8 RLS:reconciliation_row 经 task_id 传递式隔离 · 读改都带租户上下文,跨租户 row_id 查空。
     """
     from core import db  # 延迟 import 避免循环依赖
 
     if field not in ALLOWED_FIELDS:
         return {"ok": False, "error": "field_not_allowed"}
 
-    row = db.get_recon_row(row_id)
+    row = db.get_recon_row(row_id, tenant_id=tenant_id, user_id=user_id)
     if not row:
         return {"ok": False, "error": "row_not_found"}
 
@@ -89,15 +93,15 @@ def record_field_override(row_id: int, field: str, user_value: Optional[str]) ->
     else:
         existing[field] = {"ocr": ocr_original, "user": uv, "ts": _now_iso()}
 
-    ok = _write_overrides(row_id, existing)
+    ok = _write_overrides(row_id, existing, tenant_id=tenant_id, user_id=user_id)
     return {"ok": ok, "field_overrides": existing}
 
 
-def _write_overrides(row_id: int, overrides: Dict[str, Any]) -> bool:
+def _write_overrides(row_id: int, overrides: Dict[str, Any], *, tenant_id, user_id) -> bool:
     from core import db
 
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 "UPDATE reconciliation_row "
                 "SET field_overrides = %s, updated_at = NOW() WHERE id = %s",

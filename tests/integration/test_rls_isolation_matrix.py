@@ -34,7 +34,10 @@ class RlsIsolationMatrixTests(unittest.TestCase):
         cls.db, cls.rls = db, rls
         with db.get_cursor_rls(bypass=True, commit=True) as cur:
             rls.ensure_rls_app_role(cur)
-            cur.execute("DROP TABLE IF EXISTS rls_m_tenant, rls_m_ws, rls_m_user CASCADE")
+            cur.execute(
+                "DROP TABLE IF EXISTS rls_m_tenant, rls_m_ws, rls_m_user, "
+                "rls_m_child, rls_m_parent CASCADE"
+            )
             cur.execute(
                 "CREATE TABLE rls_m_tenant(id serial PRIMARY KEY, tenant_id text, name text)"
             )
@@ -45,23 +48,41 @@ class RlsIsolationMatrixTests(unittest.TestCase):
             cur.execute(
                 "CREATE TABLE rls_m_user(id serial PRIMARY KEY, tenant_id text, user_id text, name text)"
             )
+            # 传递式:子表仅 parent_id,经父表(tenant_or_user)间接隔离(hard point 1)
             cur.execute(
-                "GRANT SELECT,INSERT,UPDATE,DELETE ON rls_m_tenant,rls_m_ws,rls_m_user TO pearnly_app"
+                "CREATE TABLE rls_m_parent(id serial PRIMARY KEY, tenant_id text, user_id text, name text)"
+            )
+            cur.execute(
+                "CREATE TABLE rls_m_child(id serial PRIMARY KEY, parent_id int, name text)"
+            )
+            cur.execute(
+                "GRANT SELECT,INSERT,UPDATE,DELETE ON rls_m_tenant,rls_m_ws,rls_m_user,"
+                "rls_m_parent,rls_m_child TO pearnly_app"
             )
             cur.execute("GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO pearnly_app")
             rls.apply_tenant_rls(cur, "rls_m_tenant", force=True)
             rls.apply_tenant_workspace_rls(cur, "rls_m_ws", force=True)
             rls.apply_tenant_or_user_rls(cur, "rls_m_user", force=True)
+            rls.apply_tenant_or_user_rls(cur, "rls_m_parent", force=True)
+            rls.apply_tenant_via_parent_rls(
+                cur, "rls_m_child", parent="rls_m_parent", fk="parent_id", force=True
+            )
 
     @classmethod
     def tearDownClass(cls):
         if getattr(cls, "db", None):
             with cls.db.get_cursor_rls(bypass=True, commit=True) as cur:
-                cur.execute("DROP TABLE IF EXISTS rls_m_tenant, rls_m_ws, rls_m_user CASCADE")
+                cur.execute(
+                    "DROP TABLE IF EXISTS rls_m_tenant, rls_m_ws, rls_m_user, "
+                    "rls_m_child, rls_m_parent CASCADE"
+                )
 
     def setUp(self):
         with self.db.get_cursor_rls(bypass=True, commit=True) as cur:
-            cur.execute("TRUNCATE rls_m_tenant, rls_m_ws, rls_m_user RESTART IDENTITY")
+            cur.execute(
+                "TRUNCATE rls_m_tenant, rls_m_ws, rls_m_user, rls_m_child, rls_m_parent "
+                "RESTART IDENTITY"
+            )
             cur.execute(
                 "INSERT INTO rls_m_tenant(tenant_id,name) VALUES ('A','a1'),('A','a2'),('B','b1')"
             )
@@ -72,6 +93,16 @@ class RlsIsolationMatrixTests(unittest.TestCase):
             cur.execute(
                 "INSERT INTO rls_m_user(tenant_id,user_id,name) "
                 "VALUES ('A',NULL,'at'),(NULL,'u1','o1'),(NULL,'u2','o2')"
+            )
+            # 父行:id=1 属租户 A,id=2 属租户 B,id=3 属孤立用户 u1。子行挂在各自父下。
+            cur.execute(
+                "INSERT INTO rls_m_parent(id,tenant_id,user_id,name) "
+                "VALUES (1,'A',NULL,'pA'),(2,'B',NULL,'pB'),(3,NULL,'u1','pU')"
+            )
+            cur.execute("SELECT setval('rls_m_parent_id_seq', 3)")
+            cur.execute(
+                "INSERT INTO rls_m_child(parent_id,name) "
+                "VALUES (1,'cA'),(2,'cB'),(3,'cU')"
             )
 
     # ── 工具 ──
@@ -188,6 +219,53 @@ class RlsIsolationMatrixTests(unittest.TestCase):
             self._denied(
                 "INSERT INTO rls_m_user(tenant_id,user_id,name) VALUES(NULL,'u2','x')", user_id="u1"
             )
+        )
+
+    # ── 模板4 · 传递式(子表经父 task 隔离 · hard point 1)──
+    def test_via_parent_select(self):
+        q = "SELECT count(*) AS n FROM rls_m_child"
+        # 租户 A 只看到挂在 A 的父下的子行(cA)
+        self.assertEqual(self._count(q, tenant_id="A"), 1)
+        self.assertEqual(self._count(q, tenant_id="B"), 1)
+        # 孤立用户 u1 经父行 user 兜底看到 cU
+        self.assertEqual(self._count(q, user_id="u1"), 1)
+        # 无上下文 / 陌生租户 → 0;bypass → 全部
+        self.assertEqual(self._count(q), 0)
+        self.assertEqual(self._count(q, tenant_id="ZZZ"), 0)
+        self.assertEqual(self._count(q, bypass=True), 3)
+
+    def test_via_parent_no_cross_tenant_read_by_id(self):
+        # 用 row_id 直接点名也跨不过去:A 上下文读 B 的子行(parent_id=2)→ 0
+        q = "SELECT count(*) AS n FROM rls_m_child WHERE parent_id=2"
+        self.assertEqual(self._count(q, tenant_id="A"), 0)
+        self.assertEqual(self._count(q, tenant_id="B"), 1)
+
+    def test_via_parent_update_blocked_cross_tenant(self):
+        # A 改 B 的子行 → 看不到 → 改不到
+        self.assertEqual(
+            self._affected("UPDATE rls_m_child SET name='h' WHERE parent_id=2", tenant_id="A"), 0
+        )
+        # A 改自己的子行 → 1
+        self.assertEqual(
+            self._affected("UPDATE rls_m_child SET name='h' WHERE parent_id=1", tenant_id="A"), 1
+        )
+
+    def test_via_parent_insert_with_check(self):
+        # A 不能往 B 的父行下插子行(WITH CHECK 经父子查询拒)
+        self.assertTrue(
+            self._denied("INSERT INTO rls_m_child(parent_id,name) VALUES(2,'x')", tenant_id="A")
+        )
+        # A 能往自己父行下插
+        self.assertFalse(
+            self._denied("INSERT INTO rls_m_child(parent_id,name) VALUES(1,'ok')", tenant_id="A")
+        )
+
+    def test_via_parent_delete_blocked_cross_tenant(self):
+        self.assertEqual(
+            self._affected("DELETE FROM rls_m_child WHERE parent_id=2", tenant_id="A"), 0
+        )
+        self.assertEqual(
+            self._affected("DELETE FROM rls_m_child WHERE parent_id=1", tenant_id="A"), 1
         )
 
 

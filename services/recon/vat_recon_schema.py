@@ -7,6 +7,8 @@ vat_recon_store 顶部 re-import 回去当 facade · db.py / 调用点 / 契约�
 
 import logging
 
+from core.rls import apply_tenant_or_user_rls, apply_tenant_via_parent_rls
+
 logger = logging.getLogger(__name__)
 
 
@@ -20,6 +22,7 @@ def ensure_vat_recon_tables():
                 CREATE TABLE IF NOT EXISTS vat_report (
                     id              BIGSERIAL PRIMARY KEY,
                     tenant_id       UUID,
+                    user_id         UUID,
                     client_id       BIGINT REFERENCES clients(id) ON DELETE SET NULL,
                     period_year     INTEGER NOT NULL,
                     period_month    INTEGER NOT NULL CHECK (period_month BETWEEN 1 AND 12),
@@ -101,6 +104,26 @@ def ensure_vat_recon_tables():
                 CREATE INDEX IF NOT EXISTS idx_recon_row_invoice
                     ON reconciliation_row(invoice_id) WHERE invoice_id IS NOT NULL;
             """)
+
+            # B8 RLS wave2:vat_report 旧库补 user_id 列(单用户账号 tenant 为空,靠 user 兜底可见),
+            # 从已关联的 reconciliation_task 回填存量行(新行由 create_vat_report 直接写 user_id)。
+            cur.execute("ALTER TABLE vat_report ADD COLUMN IF NOT EXISTS user_id UUID")
+            cur.execute(
+                "UPDATE vat_report v SET user_id = t.user_id "
+                "FROM reconciliation_task t "
+                "WHERE t.vat_report_id = v.id AND v.user_id IS NULL"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_vat_report_user "
+                "ON vat_report(user_id) WHERE user_id IS NOT NULL"
+            )
+
+            # enroll:vat_report / reconciliation_task 含 tenant_id+user_id → tenant_or_user;
+            # reconciliation_row 仅 task_id → 经 task 传递式隔离(hard point 1)。
+            apply_tenant_or_user_rls(cur, "vat_report", "reconciliation_task")
+            apply_tenant_via_parent_rls(
+                cur, "reconciliation_row", parent="reconciliation_task", fk="task_id"
+            )
 
             logger.info(
                 "✅ vat_report + reconciliation_task + reconciliation_row 已就绪 (v118.32.0)"

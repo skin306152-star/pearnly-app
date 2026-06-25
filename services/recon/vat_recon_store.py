@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 def create_vat_report(
     tenant_id,
+    user_id: str,
     client_id: int,
     period_year: int,
     period_month: int,
@@ -44,16 +45,16 @@ def create_vat_report(
     import json as _j
 
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO vat_report (
-                    tenant_id, client_id, period_year, period_month,
+                    tenant_id, user_id, client_id, period_year, period_month,
                     source_file_ids, parsed_rows,
                     total_amount_pre_vat, total_vat, total_amount,
                     parser_version
                 ) VALUES (
-                    %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s,
                     %s::jsonb, %s::jsonb,
                     %s, %s, %s,
                     %s
@@ -61,6 +62,7 @@ def create_vat_report(
             """,
                 (
                     str(tenant_id) if tenant_id else None,
+                    str(user_id) if user_id else None,
                     client_id,
                     period_year,
                     period_month,
@@ -79,9 +81,9 @@ def create_vat_report(
         return None
 
 
-def get_vat_report(report_id: int) -> Optional[Dict[str, Any]]:
+def get_vat_report(report_id: int, *, tenant_id, user_id) -> Optional[Dict[str, Any]]:
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             cur.execute("SELECT * FROM vat_report WHERE id = %s", (report_id,))
             row = cur.fetchone()
             if not row:
@@ -105,7 +107,7 @@ def create_recon_task(
 ) -> Optional[int]:
     """创建对账任务 · 同 client+period 唯一约束失败时返回 None"""
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO reconciliation_task (
@@ -130,9 +132,9 @@ def create_recon_task(
         return None
 
 
-def get_recon_task(task_id: int) -> Optional[Dict[str, Any]]:
+def get_recon_task(task_id: int, *, tenant_id, user_id) -> Optional[Dict[str, Any]]:
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             cur.execute("SELECT * FROM reconciliation_task WHERE id = %s", (task_id,))
             row = cur.fetchone()
             return dict(row) if row else None
@@ -141,9 +143,9 @@ def get_recon_task(task_id: int) -> Optional[Dict[str, Any]]:
         return None
 
 
-def update_recon_task_status(task_id: int, status: str):
+def update_recon_task_status(task_id: int, status: str, *, tenant_id, user_id):
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 "UPDATE reconciliation_task SET status = %s WHERE id = %s", (status, task_id)
             )
@@ -151,9 +153,9 @@ def update_recon_task_status(task_id: int, status: str):
         logger.error(f"update_recon_task_status failed: {e}")
 
 
-def update_recon_task_completed(task_id: int, data: dict):
+def update_recon_task_completed(task_id: int, data: dict, *, tenant_id, user_id):
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 """
                 UPDATE reconciliation_task SET
@@ -186,7 +188,7 @@ def list_recon_tasks(
     tenant_id=None, user_id: str = None, client_id: int = None
 ) -> List[Dict[str, Any]]:
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             if tenant_id:
                 cur.execute(
                     """
@@ -219,13 +221,14 @@ def list_recon_tasks(
 # ── CRUD · reconciliation_row ──────────────────────────────
 
 
-def bulk_insert_recon_rows(rows: List[Dict[str, Any]]):
+def bulk_insert_recon_rows(rows: List[Dict[str, Any]], *, tenant_id, user_id):
     import json as _j
 
     if not rows:
         return
     try:
-        with db.get_cursor(commit=True) as cur:
+        # reconciliation_row 经 task_id 传递式隔离:INSERT 的 WITH CHECK 要求 task 属本租户。
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             for r in rows:
                 cur.execute(
                     """
@@ -249,9 +252,9 @@ def bulk_insert_recon_rows(rows: List[Dict[str, Any]]):
         logger.error(f"bulk_insert_recon_rows failed: {e}")
 
 
-def list_recon_rows(task_id: int) -> List[Dict[str, Any]]:
+def list_recon_rows(task_id: int, *, tenant_id, user_id) -> List[Dict[str, Any]]:
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             cur.execute(
                 """
                 SELECT r.*,
@@ -279,9 +282,9 @@ def list_recon_rows(task_id: int) -> List[Dict[str, Any]]:
 # ============================================================
 
 
-def get_recon_row(row_id: int) -> Optional[Dict[str, Any]]:
+def get_recon_row(row_id: int, *, tenant_id, user_id) -> Optional[Dict[str, Any]]:
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             cur.execute(
                 """
                 SELECT r.*,
@@ -329,11 +332,11 @@ def get_recon_row(row_id: int) -> Optional[Dict[str, Any]]:
         return None
 
 
-def update_recon_row_ai_analysis(row_id: int, analysis: dict) -> bool:
+def update_recon_row_ai_analysis(row_id: int, analysis: dict, *, tenant_id, user_id) -> bool:
     import json as _j
 
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 """
                 UPDATE reconciliation_row
@@ -348,12 +351,14 @@ def update_recon_row_ai_analysis(row_id: int, analysis: dict) -> bool:
         return False
 
 
-def update_recon_row_action(row_id: int, action: str, notes: str = "") -> bool:
+def update_recon_row_action(
+    row_id: int, action: str, notes: str = "", *, tenant_id, user_id
+) -> bool:
     """会计师操作:resolved/customer_issue/accepted_diff/pending"""
     if action not in ("pending", "resolved", "customer_issue", "accepted_diff"):
         return False
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 """
                 UPDATE reconciliation_row
@@ -368,12 +373,12 @@ def update_recon_row_action(row_id: int, action: str, notes: str = "") -> bool:
         return False
 
 
-def list_recon_rows_detailed(task_id: int) -> List[Dict[str, Any]]:
+def list_recon_rows_detailed(task_id: int, *, tenant_id, user_id) -> List[Dict[str, Any]]:
     """v118.32.x · 拉取完整明细 · 含发票字段 + 报告字段 · 给屏 C 用"""
     import json as _j
 
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             cur.execute(
                 """
                 SELECT t.vat_report_id FROM reconciliation_task t WHERE t.id = %s

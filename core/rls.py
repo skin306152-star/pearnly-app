@@ -64,6 +64,38 @@ def apply_tenant_or_user_rls(cur, *tables, force: bool = False) -> None:
     _apply(cur, "tenant_or_user", tables, force=force)
 
 
+def apply_tenant_via_parent_rls(
+    cur,
+    table: str,
+    *,
+    parent: str,
+    fk: str,
+    parent_pk: str = "id",
+    name: str = "tenant_isolation",
+    force: bool = False,
+) -> None:
+    """子表无 tenant_id/user_id → 经 fk→parent 间接按 parent 的 tenant_or_user 隔离(幂等)。
+
+    parent 须是已 tenant_or_user 隔离的表(含 tenant_id + user_id)。policy 谓词 = 对 parent 的
+    EXISTS 子查询(本租户可见的 parent 行才放行子行),复用 _TENANT/_USER 同款谓词(经别名 _p)。
+    WITH CHECK 同款:INSERT/UPDATE 子行其 fk 必须指向本租户可见的 parent → 不能往别租户父行塞子行。
+    用例:reconciliation_row(仅 task_id)→ reconciliation_task(tenant_id+user_id)。
+    """
+    t = f"_p.{_TENANT}"  # _p.tenant_id::text = current_setting(...)
+    u = f"_p.{_USER}"
+    pred = (
+        f"EXISTS (SELECT 1 FROM {parent} _p "
+        f"WHERE _p.{parent_pk} = {table}.{fk} "
+        f"AND ({t} OR (_p.tenant_id IS NULL AND {u})))"
+    )
+    body = f"USING (({pred}) OR {_BYPASS}) WITH CHECK (({pred}) OR {_BYPASS})"
+    cur.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
+    if force:
+        cur.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
+    cur.execute(f"DROP POLICY IF EXISTS {name} ON {table}")
+    cur.execute(f"CREATE POLICY {name} ON {table} FOR ALL {body}")
+
+
 def ensure_rls_app_role(cur, role: str = RLS_APP_ROLE) -> None:
     """建最小权限业务角色(NOBYPASSRLS · 幂等)+ 授 DML。业务连接 SET LOCAL ROLE 切到它后 RLS 才强制。"""
     cur.execute(

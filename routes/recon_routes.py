@@ -109,8 +109,8 @@ def _missing_fields(row: Dict, is_report: bool) -> List[str]:
     return miss
 
 
-def _run_match_and_save(task_id, invoice_rows, report_rows):
-    """跑配对 + 字段对比 + 写入 row · 返回 stats"""
+def _run_match_and_save(task_id, invoice_rows, report_rows, tenant_id, user_id):
+    """跑配对 + 字段对比 + 写入 row · 返回 stats(带租户上下文 · 经 task 传递式隔离子行)"""
     match = run_matching(invoice_rows, report_rows)
     to_insert = []
     for pair in match["pairs"]:
@@ -167,7 +167,7 @@ def _run_match_and_save(task_id, invoice_rows, report_rows):
                 "diff_categories": ",".join(cats),
             }
         )
-    db.bulk_insert_recon_rows(to_insert)
+    db.bulk_insert_recon_rows(to_insert, tenant_id=tenant_id, user_id=user_id)
     stats = match["stats"]
     db.update_recon_task_completed(
         task_id,
@@ -180,6 +180,8 @@ def _run_match_and_save(task_id, invoice_rows, report_rows):
             "invoice_count_archived": stats["total_invoices"],
             "report_row_count": stats["total_report_rows"],
         },
+        tenant_id=tenant_id,
+        user_id=user_id,
     )
     return stats
 
@@ -222,7 +224,8 @@ async def run_recon(
     user = require_perm(request, "recon.create")
     if not user:
         raise HTTPException(401, "未登录")
-    task = db.get_recon_task(task_id)
+    tid, uid = user.get("tenant_id"), str(user["id"])
+    task = db.get_recon_task(task_id, tenant_id=tid, user_id=uid)
     if not task:
         raise HTTPException(404, "任务不存在")
     # 套账隔离:取当前请求的活动主体,只对账本主体的识别记录(ocr_history 读侧已隔离,
@@ -246,9 +249,9 @@ async def run_recon(
             period_month=task["period_month"],
             workspace_client_id=ws,
         )
-    report = db.get_vat_report(task["vat_report_id"])
+    report = db.get_vat_report(task["vat_report_id"], tenant_id=tid, user_id=uid)
     report_rows = (report or {}).get("parsed_rows") or []
-    db.update_recon_task_status(task_id, "running")
+    db.update_recon_task_status(task_id, "running", tenant_id=tid, user_id=uid)
     try:
         # 上报当前正在匹配哪个客户
         if progress_id and progress_id in _progress_store:
@@ -260,7 +263,7 @@ async def run_recon(
 
         loop = asyncio.get_event_loop()
         stats = await loop.run_in_executor(
-            None, _run_match_and_save, task_id, invoice_rows, report_rows
+            None, _run_match_and_save, task_id, invoice_rows, report_rows, tid, uid
         )
         if progress_id and progress_id in _progress_store:
             cur = _progress_store[progress_id]
@@ -279,7 +282,7 @@ async def run_recon(
         return {"ok": True, "task_id": task_id, "stats": stats}
     except Exception as e:
         logger.error(f"run_recon: {e}")
-        db.update_recon_task_status(task_id, "failed")
+        db.update_recon_task_status(task_id, "failed", tenant_id=tid, user_id=uid)
         if progress_id and progress_id in _progress_store:
             _progress_update(progress_id, error=str(e)[:200])
         raise HTTPException(500, str(e))
@@ -290,10 +293,11 @@ async def get_result(task_id: int, request: Request):
     user = require_perm(request, "recon.view")
     if not user:
         raise HTTPException(401, "未登录")
-    task = db.get_recon_task(task_id)
+    tid, uid = user.get("tenant_id"), str(user["id"])
+    task = db.get_recon_task(task_id, tenant_id=tid, user_id=uid)
     if not task:
         raise HTTPException(404, "任务不存在")
-    rows = db.list_recon_rows_detailed(task_id)
+    rows = db.list_recon_rows_detailed(task_id, tenant_id=tid, user_id=uid)
     # v118.32.2.5 · 补 client 给屏 C 头部用
     client = db.get_client_by_id(task["client_id"]) if task.get("client_id") else {}
     return {"ok": True, "task": task, "rows": rows, "client": client or {}}
@@ -304,7 +308,8 @@ async def row_ai(row_id: int, request: Request):
     user = require_perm(request, "recon.create")
     if not user:
         raise HTTPException(401, "未登录")
-    row = db.get_recon_row(row_id)
+    tid, uid = user.get("tenant_id"), str(user["id"])
+    row = db.get_recon_row(row_id, tenant_id=tid, user_id=uid)
     if not row:
         raise HTTPException(404, "行不存在")
     if row.get("ai_analysis"):
@@ -319,7 +324,7 @@ async def row_ai(row_id: int, request: Request):
     result = analyze_diff(row, api_key=_user_key(user))
     if not result.get("ok"):
         raise HTTPException(status_code=500, detail=result.get("error", "AI 分析失败"))
-    db.update_recon_row_ai_analysis(row_id, result)
+    db.update_recon_row_ai_analysis(row_id, result, tenant_id=tid, user_id=uid)
     return {"ok": True, "analysis": result, "ai": result, "cached": False}
 
 
@@ -343,7 +348,13 @@ async def row_action(row_id: int, body: RowActionBody, request: Request):
     if body.source in ("invoice", "report", "both"):
         prefix = f"source={body.source}"
         notes_payload = prefix + (" · " + body.notes if body.notes else "")
-    db.update_recon_row_action(row_id, body.action, notes_payload or None)
+    db.update_recon_row_action(
+        row_id,
+        body.action,
+        notes_payload or None,
+        tenant_id=user.get("tenant_id"),
+        user_id=str(user["id"]),
+    )
     return {"ok": True}
 
 
@@ -360,7 +371,13 @@ async def row_field_override(row_id: int, body: FieldOverrideBody, request: Requ
         raise HTTPException(401, "未登录")
     if body.field not in _OVERRIDE_FIELDS:
         raise HTTPException(400, "field not allowed")
-    result = record_field_override(row_id, body.field, body.user_value)
+    result = record_field_override(
+        row_id,
+        body.field,
+        body.user_value,
+        tenant_id=user.get("tenant_id"),
+        user_id=str(user["id"]),
+    )
     if not result.get("ok"):
         err = result.get("error", "update failed")
         raise HTTPException(404 if err == "row_not_found" else 400, err)
@@ -391,11 +408,12 @@ async def export_excel(task_id: int, request: Request, lang: str = "th"):
         raise HTTPException(401, "未登录")
     if lang not in ("th", "zh", "en", "ja"):
         lang = "th"
-    task = db.get_recon_task(task_id)
+    tid, uid = user.get("tenant_id"), str(user["id"])
+    task = db.get_recon_task(task_id, tenant_id=tid, user_id=uid)
     if not task:
         raise HTTPException(404, "任务不存在")
 
-    rows = db.list_recon_rows_detailed(task_id)
+    rows = db.list_recon_rows_detailed(task_id, tenant_id=tid, user_id=uid)
     client = {}
     if task.get("client_id"):
         with db.get_cursor() as cur:
@@ -406,7 +424,11 @@ async def export_excel(task_id: int, request: Request, lang: str = "th"):
             if r:
                 client = dict(r)
 
-    vat_report = db.get_vat_report(task["vat_report_id"]) if task.get("vat_report_id") else {}
+    vat_report = (
+        db.get_vat_report(task["vat_report_id"], tenant_id=tid, user_id=uid)
+        if task.get("vat_report_id")
+        else {}
+    )
     excel_bytes = export_recon_task(task, rows, client, vat_report or {}, lang=lang)
 
     period_str = f"{task['period_year']}{task['period_month']:02d}"

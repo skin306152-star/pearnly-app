@@ -124,8 +124,10 @@ class VatWorkspaceTests(unittest.TestCase):
 class ReconJobsWorkspaceTests(unittest.TestCase):
     def test_enqueue_persists_workspace_on_row(self):
         cur = _Cur()
-        # recon_jobs/store 用 `from core.db import get_cursor`(模块级引用)→ patch 其本地名
-        with _patch("services.recon_jobs.store.get_cursor", cur):
+        # recon_jobs/store 用 `from core.db import get_cursor_rls`(模块级引用)→ patch 其本地名。
+        # B8 RLS:enqueue 用户面 INSERT 走 get_cursor_rls 穿 tenant+user。
+        cm = lambda *a, **k: _fake(cur)  # noqa: E731
+        with mock.patch("services.recon_jobs.store.get_cursor_rls", cm):
             jobs.enqueue("bank", "u1", "t1", {"a": 1}, [], job_id="j1", workspace_client_id=5)
         self.assertIn("workspace_client_id", cur.sql)
         self.assertIn(5, cur.params)

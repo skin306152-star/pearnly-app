@@ -105,6 +105,7 @@ async def batch_process(
             }
         report_id = db.create_vat_report(
             tenant_id=user.get("tenant_id"),
+            user_id=str(user["id"]),
             client_id=client_id,
             period_year=year,
             period_month=month,

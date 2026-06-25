@@ -613,20 +613,20 @@ class VatReconStoreTests(unittest.TestCase):
     def test_create_vat_report_returns_int(self):
         cur = FakeCursor(fetchone={"id": 9})
         with patch_cursor(cur):
-            rid = vrs.create_vat_report(TENANT, 1, 2026, 5, [{"r": 1}], {"total_vat": 7})
+            rid = vrs.create_vat_report(TENANT, USER, 1, 2026, 5, [{"r": 1}], {"total_vat": 7})
         self.assertEqual(rid, 9)
         with patch_cursor(FakeCursor(fetchone=None)):
-            self.assertIsNone(vrs.create_vat_report(None, 1, 2026, 5, [], {}))
+            self.assertIsNone(vrs.create_vat_report(None, USER, 1, 2026, 5, [], {}))
         with boom_cursor():
-            self.assertIsNone(vrs.create_vat_report(TENANT, 1, 2026, 5, [], {}))
+            self.assertIsNone(vrs.create_vat_report(TENANT, USER, 1, 2026, 5, [], {}))
 
     def test_get_vat_report_decodes_json_string(self):
         cur = FakeCursor(fetchone={"id": 1, "parsed_rows": '[{"row_no": 1}]'})
         with patch_cursor(cur):
-            r = vrs.get_vat_report(1)
+            r = vrs.get_vat_report(1, tenant_id=TENANT, user_id=USER)
         self.assertEqual(r["parsed_rows"], [{"row_no": 1}])  # str → list
         with patch_cursor(FakeCursor(fetchone=None)):
-            self.assertIsNone(vrs.get_vat_report(1))
+            self.assertIsNone(vrs.get_vat_report(1, tenant_id=TENANT, user_id=USER))
 
     def test_create_recon_task(self):
         with patch_cursor(FakeCursor(fetchone={"id": 3})):
@@ -637,9 +637,9 @@ class VatReconStoreTests(unittest.TestCase):
 
     def test_get_recon_task(self):
         with patch_cursor(FakeCursor(fetchone={"id": 1})):
-            self.assertEqual(vrs.get_recon_task(1), {"id": 1})
+            self.assertEqual(vrs.get_recon_task(1, tenant_id=TENANT, user_id=USER), {"id": 1})
         with patch_cursor(FakeCursor(fetchone=None)):
-            self.assertIsNone(vrs.get_recon_task(1))
+            self.assertIsNone(vrs.get_recon_task(1, tenant_id=TENANT, user_id=USER))
 
     def test_list_recon_tasks_branches(self):
         cur_t = FakeCursor(fetchall=[{"id": 1}])
@@ -656,7 +656,7 @@ class VatReconStoreTests(unittest.TestCase):
     def test_bulk_insert_recon_rows_noop_on_empty(self):
         # 空 list → 不进 DB(get_cursor 若被调用会炸,这里验证没调用)
         with boom_cursor():
-            vrs.bulk_insert_recon_rows([])  # 不应抛
+            vrs.bulk_insert_recon_rows([], tenant_id=TENANT, user_id=USER)  # 不应抛
 
     def test_bulk_insert_recon_rows_inserts_each(self):
         cur = FakeCursor()
@@ -665,24 +665,36 @@ class VatReconStoreTests(unittest.TestCase):
             {"task_id": 1, "invoice_id": "abc", "status": "mismatched", "diff_fields": {"x": 1}},
         ]
         with patch_cursor(cur):
-            vrs.bulk_insert_recon_rows(rows)
+            vrs.bulk_insert_recon_rows(rows, tenant_id=TENANT, user_id=USER)
         self.assertEqual(len(cur.calls), 2)
 
     def test_update_recon_row_action_whitelist(self):
-        self.assertFalse(vrs.update_recon_row_action(1, "not_allowed"))
+        self.assertFalse(
+            vrs.update_recon_row_action(1, "not_allowed", tenant_id=TENANT, user_id=USER)
+        )
         for act in ("pending", "resolved", "customer_issue", "accepted_diff"):
             with patch_cursor(FakeCursor(rowcount=1)):
-                self.assertTrue(vrs.update_recon_row_action(1, act))
+                self.assertTrue(
+                    vrs.update_recon_row_action(1, act, tenant_id=TENANT, user_id=USER)
+                )
         with patch_cursor(FakeCursor(rowcount=0)):
-            self.assertFalse(vrs.update_recon_row_action(1, "resolved"))
+            self.assertFalse(
+                vrs.update_recon_row_action(1, "resolved", tenant_id=TENANT, user_id=USER)
+            )
 
     def test_update_recon_row_ai_analysis(self):
         with patch_cursor(FakeCursor(rowcount=1)):
-            self.assertTrue(vrs.update_recon_row_ai_analysis(1, {"verdict": "ok"}))
+            self.assertTrue(
+                vrs.update_recon_row_ai_analysis(1, {"verdict": "ok"}, tenant_id=TENANT, user_id=USER)
+            )
         with patch_cursor(FakeCursor(rowcount=0)):
-            self.assertFalse(vrs.update_recon_row_ai_analysis(1, {}))
+            self.assertFalse(
+                vrs.update_recon_row_ai_analysis(1, {}, tenant_id=TENANT, user_id=USER)
+            )
         with boom_cursor():
-            self.assertFalse(vrs.update_recon_row_ai_analysis(1, {}))
+            self.assertFalse(
+                vrs.update_recon_row_ai_analysis(1, {}, tenant_id=TENANT, user_id=USER)
+            )
 
     def test_find_client_by_tax_id(self):
         # 空 tax_id 直接 None

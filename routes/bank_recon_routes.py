@@ -116,8 +116,10 @@ async def bank_recon_upload(request: Request, file: UploadFile = File(...)):
     if parsed.parse_method == "gemini_vision_pending":
         # 轮 2 未接通 vision · 标记 "scanned not supported yet"
         db.mark_recon_parse_failed(
-            session_id, "扫描件暂未支持 · 请上传带文字层的 PDF",
-            user_id=str(user["id"]), tenant_id=_tid(user),
+            session_id,
+            "扫描件暂未支持 · 请上传带文字层的 PDF",
+            user_id=str(user["id"]),
+            tenant_id=_tid(user),
         )
         return {
             "session_id": session_id,
@@ -129,8 +131,10 @@ async def bank_recon_upload(request: Request, file: UploadFile = File(...)):
 
     if not parsed.transactions:
         db.mark_recon_parse_failed(
-            session_id, "没有解析到任何流水 · 可能格式不支持 · 请反馈给我们",
-            user_id=str(user["id"]), tenant_id=_tid(user),
+            session_id,
+            "没有解析到任何流水 · 可能格式不支持 · 请反馈给我们",
+            user_id=str(user["id"]),
+            tenant_id=_tid(user),
         )
         return {
             "session_id": session_id,
@@ -278,7 +282,10 @@ async def bank_recon_tx_override(tx_id: str, request: Request):
     if status not in ("matched", "unmatched", "ignored"):
         raise HTTPException(400, detail="bank_recon.invalid_status")
     ok = db.override_tx_match(
-        tx_id, str(user["id"]), history_id if status == "matched" else None, status,
+        tx_id,
+        str(user["id"]),
+        history_id if status == "matched" else None,
+        status,
         tenant_id=_tid(user),
     )
     if not ok:

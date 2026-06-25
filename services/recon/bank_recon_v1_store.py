@@ -70,7 +70,10 @@ def create_bank_recon_session(
     """
     try:
         with db.get_cursor_rls(
-            tenant_id=tenant_id, user_id=user_id, workspace_client_id=workspace_client_id, commit=True
+            tenant_id=tenant_id,
+            user_id=user_id,
+            workspace_client_id=workspace_client_id,
+            commit=True,
         ) as cur:
             cur.execute(
                 """
@@ -176,7 +179,9 @@ def save_bank_recon_parse(
         return False
 
 
-def mark_recon_parse_failed(session_id: str, error_msg: str, *, user_id=None, tenant_id=None) -> bool:
+def mark_recon_parse_failed(
+    session_id: str, error_msg: str, *, user_id=None, tenant_id=None
+) -> bool:
     try:
         with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
@@ -285,7 +290,10 @@ def update_bank_recon_session_client(
     ws_sql, ws_params = _ws_clause(workspace_client_id)
     try:
         with db.get_cursor_rls(
-            tenant_id=tenant_id, user_id=user_id, workspace_client_id=workspace_client_id, commit=True
+            tenant_id=tenant_id,
+            user_id=user_id,
+            workspace_client_id=workspace_client_id,
+            commit=True,
         ) as cur:
             cur.execute(
                 f"""
@@ -410,7 +418,10 @@ def delete_bank_recon_session(
     ws_sql, ws_params = _ws_clause(workspace_client_id)
     try:
         with db.get_cursor_rls(
-            tenant_id=tenant_id, user_id=user_id, workspace_client_id=workspace_client_id, commit=True
+            tenant_id=tenant_id,
+            user_id=user_id,
+            workspace_client_id=workspace_client_id,
+            commit=True,
         ) as cur:
             cur.execute(
                 f"""

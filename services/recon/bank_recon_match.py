@@ -69,7 +69,13 @@ def find_invoice_candidates_for_tx(
 
 
 def _find_candidates_from_pages_jsonb(
-    user_id: str, amount: float, tx_date: str, amount_tol: float, date_tol_days: int, *, tenant_id=None
+    user_id: str,
+    amount: float,
+    tx_date: str,
+    amount_tol: float,
+    date_tol_days: int,
+    *,
+    tenant_id=None,
 ) -> List[Dict[str, Any]]:
     """降级查询:从 pages JSONB 里找 · 效率稍低 · 适合历史数据少(< 5000)"""
     try:

@@ -117,6 +117,7 @@ _REEXPORTS = {
     ],
     "services.recon.bank_recon_v1_store": [
         "ensure_bank_recon_client_id_column",
+        "ensure_bank_recon_rls",
         "create_bank_recon_session",
         "save_bank_recon_parse",
         "mark_recon_parse_failed",

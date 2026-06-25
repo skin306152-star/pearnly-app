@@ -36,7 +36,7 @@ class RlsIsolationMatrixTests(unittest.TestCase):
             rls.ensure_rls_app_role(cur)
             cur.execute(
                 "DROP TABLE IF EXISTS rls_m_tenant, rls_m_ws, rls_m_user, "
-                "rls_m_child, rls_m_parent CASCADE"
+                "rls_m_child, rls_m_parent, rls_m_uonly, rls_m_uchild CASCADE"
             )
             cur.execute(
                 "CREATE TABLE rls_m_tenant(id serial PRIMARY KEY, tenant_id text, name text)"
@@ -52,12 +52,15 @@ class RlsIsolationMatrixTests(unittest.TestCase):
             cur.execute(
                 "CREATE TABLE rls_m_parent(id serial PRIMARY KEY, tenant_id text, user_id text, name text)"
             )
+            cur.execute("CREATE TABLE rls_m_child(id serial PRIMARY KEY, parent_id int, name text)")
+            # 纯 user 维度(无 tenant_id)+ 经父表 user 传递(bank_reconcile_* 同款)
+            cur.execute("CREATE TABLE rls_m_uonly(id serial PRIMARY KEY, user_id text, name text)")
             cur.execute(
-                "CREATE TABLE rls_m_child(id serial PRIMARY KEY, parent_id int, name text)"
+                "CREATE TABLE rls_m_uchild(id serial PRIMARY KEY, parent_id int, name text)"
             )
             cur.execute(
                 "GRANT SELECT,INSERT,UPDATE,DELETE ON rls_m_tenant,rls_m_ws,rls_m_user,"
-                "rls_m_parent,rls_m_child TO pearnly_app"
+                "rls_m_parent,rls_m_child,rls_m_uonly,rls_m_uchild TO pearnly_app"
             )
             cur.execute("GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO pearnly_app")
             rls.apply_tenant_rls(cur, "rls_m_tenant", force=True)
@@ -67,6 +70,10 @@ class RlsIsolationMatrixTests(unittest.TestCase):
             rls.apply_tenant_via_parent_rls(
                 cur, "rls_m_child", parent="rls_m_parent", fk="parent_id", force=True
             )
+            rls.apply_user_rls(cur, "rls_m_uonly", force=True)
+            rls.apply_user_via_parent_rls(
+                cur, "rls_m_uchild", parent="rls_m_uonly", fk="parent_id", force=True
+            )
 
     @classmethod
     def tearDownClass(cls):
@@ -74,14 +81,14 @@ class RlsIsolationMatrixTests(unittest.TestCase):
             with cls.db.get_cursor_rls(bypass=True, commit=True) as cur:
                 cur.execute(
                     "DROP TABLE IF EXISTS rls_m_tenant, rls_m_ws, rls_m_user, "
-                    "rls_m_child, rls_m_parent CASCADE"
+                    "rls_m_child, rls_m_parent, rls_m_uonly, rls_m_uchild CASCADE"
                 )
 
     def setUp(self):
         with self.db.get_cursor_rls(bypass=True, commit=True) as cur:
             cur.execute(
-                "TRUNCATE rls_m_tenant, rls_m_ws, rls_m_user, rls_m_child, rls_m_parent "
-                "RESTART IDENTITY"
+                "TRUNCATE rls_m_tenant, rls_m_ws, rls_m_user, rls_m_child, rls_m_parent, "
+                "rls_m_uonly, rls_m_uchild RESTART IDENTITY"
             )
             cur.execute(
                 "INSERT INTO rls_m_tenant(tenant_id,name) VALUES ('A','a1'),('A','a2'),('B','b1')"
@@ -101,9 +108,15 @@ class RlsIsolationMatrixTests(unittest.TestCase):
             )
             cur.execute("SELECT setval('rls_m_parent_id_seq', 3)")
             cur.execute(
-                "INSERT INTO rls_m_child(parent_id,name) "
-                "VALUES (1,'cA'),(2,'cB'),(3,'cU')"
+                "INSERT INTO rls_m_child(parent_id,name) " "VALUES (1,'cA'),(2,'cB'),(3,'cU')"
             )
+            # 纯 user:u1 两行、u2 一行。uchild 经 uonly 父行的 user 传递。
+            cur.execute(
+                "INSERT INTO rls_m_uonly(id,user_id,name) "
+                "VALUES (1,'u1','s1'),(2,'u1','s2'),(3,'u2','s3')"
+            )
+            cur.execute("SELECT setval('rls_m_uonly_id_seq', 3)")
+            cur.execute("INSERT INTO rls_m_uchild(parent_id,name) VALUES (1,'tc1'),(3,'tc3')")
 
     # ── 工具 ──
     def _count(self, q, **ctx):
@@ -266,6 +279,55 @@ class RlsIsolationMatrixTests(unittest.TestCase):
         )
         self.assertEqual(
             self._affected("DELETE FROM rls_m_child WHERE parent_id=1", tenant_id="A"), 1
+        )
+
+    # ── 模板5 · 纯 user(bank_reconcile_* 同款)──
+    def test_user_only_select(self):
+        q = "SELECT count(*) AS n FROM rls_m_uonly"
+        self.assertEqual(self._count(q, user_id="u1"), 2)
+        self.assertEqual(self._count(q, user_id="u2"), 1)
+        self.assertEqual(self._count(q), 0)  # 无上下文
+        self.assertEqual(self._count(q, user_id="zzz"), 0)  # 陌生 user
+        self.assertEqual(self._count(q, tenant_id="A"), 0)  # 光给 tenant 看不到 user 表
+        self.assertEqual(self._count(q, bypass=True), 3)
+
+    def test_user_only_write_with_check(self):
+        # u1 能插自己的行,不能插 u2 的行;改去别人也被 WITH CHECK 拒
+        self.assertFalse(
+            self._denied("INSERT INTO rls_m_uonly(user_id,name) VALUES('u1','s1b')", user_id="u1")
+        )
+        self.assertTrue(
+            self._denied("INSERT INTO rls_m_uonly(user_id,name) VALUES('u2','x')", user_id="u1")
+        )
+        self.assertEqual(
+            self._affected("UPDATE rls_m_uonly SET name='h' WHERE user_id='u2'", user_id="u1"), 0
+        )
+        self.assertTrue(
+            self._denied("UPDATE rls_m_uonly SET user_id='u2' WHERE name='s1'", user_id="u1")
+        )
+
+    # ── 模板6 · 经父表 user 传递(bank_reconcile_candidates 同款)──
+    def test_user_via_parent_isolation(self):
+        q = "SELECT count(*) AS n FROM rls_m_uchild"
+        self.assertEqual(self._count(q, user_id="u1"), 1)  # 只见挂 u1 父下的 tc1
+        self.assertEqual(self._count(q, user_id="u2"), 1)  # 只见挂 u2 父下的 tc3
+        self.assertEqual(self._count(q), 0)
+        self.assertEqual(self._count(q, bypass=True), 2)
+        # 点名别人的子行也跨不过去
+        self.assertEqual(
+            self._count("SELECT count(*) AS n FROM rls_m_uchild WHERE parent_id=3", user_id="u1"), 0
+        )
+
+    def test_user_via_parent_write_blocked(self):
+        # u1 不能往 u2 的父行下插子行;改/删 u2 子行看不到
+        self.assertTrue(
+            self._denied("INSERT INTO rls_m_uchild(parent_id,name) VALUES(3,'x')", user_id="u1")
+        )
+        self.assertFalse(
+            self._denied("INSERT INTO rls_m_uchild(parent_id,name) VALUES(1,'ok')", user_id="u1")
+        )
+        self.assertEqual(
+            self._affected("DELETE FROM rls_m_uchild WHERE parent_id=3", user_id="u1"), 0
         )
 
 

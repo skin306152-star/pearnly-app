@@ -35,6 +35,8 @@ _TPL = {
         f"USING ({_TENANT} OR (tenant_id IS NULL AND {_USER}) OR {_BYPASS}) "
         f"WITH CHECK ({_TENANT} OR (tenant_id IS NULL AND {_USER}) OR {_BYPASS})"
     ),
+    # 纯 user 隔离(user 维度表 · 无 tenant_id · 表须含 user_id),如 bank_reconcile_*
+    "user": f"USING ({_USER} OR {_BYPASS}) WITH CHECK ({_USER} OR {_BYPASS})",
 }
 
 
@@ -64,6 +66,25 @@ def apply_tenant_or_user_rls(cur, *tables, force: bool = False) -> None:
     _apply(cur, "tenant_or_user", tables, force=force)
 
 
+def apply_user_rls(cur, *tables, force: bool = False) -> None:
+    """纯 user_id 隔离(幂等)。表须含 user_id。用于 user 维度表(无 tenant_id),如 bank_reconcile_*。"""
+    _apply(cur, "user", tables, force=force)
+
+
+def _apply_via_parent(cur, table, parent, fk, parent_pk, inner, name, force) -> None:
+    """子表经 fk→parent 的 EXISTS 子查询隔离(幂等)。inner = 对 parent(别名 _p)的可见性谓词。
+
+    WITH CHECK 同款:INSERT/UPDATE 子行时其 fk 必须指向可见的 parent → 不能往别人的父行塞子行。
+    """
+    pred = f"EXISTS (SELECT 1 FROM {parent} _p WHERE _p.{parent_pk} = {table}.{fk} AND ({inner}))"
+    body = f"USING (({pred}) OR {_BYPASS}) WITH CHECK (({pred}) OR {_BYPASS})"
+    cur.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
+    if force:
+        cur.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
+    cur.execute(f"DROP POLICY IF EXISTS {name} ON {table}")
+    cur.execute(f"CREATE POLICY {name} ON {table} FOR ALL {body}")
+
+
 def apply_tenant_via_parent_rls(
     cur,
     table: str,
@@ -76,24 +97,30 @@ def apply_tenant_via_parent_rls(
 ) -> None:
     """子表无 tenant_id/user_id → 经 fk→parent 间接按 parent 的 tenant_or_user 隔离(幂等)。
 
-    parent 须是已 tenant_or_user 隔离的表(含 tenant_id + user_id)。policy 谓词 = 对 parent 的
-    EXISTS 子查询(本租户可见的 parent 行才放行子行),复用 _TENANT/_USER 同款谓词(经别名 _p)。
-    WITH CHECK 同款:INSERT/UPDATE 子行其 fk 必须指向本租户可见的 parent → 不能往别租户父行塞子行。
+    parent 须是已 tenant_or_user 隔离的表(含 tenant_id + user_id)。复用 _TENANT/_USER 谓词(别名 _p)。
     用例:reconciliation_row(仅 task_id)→ reconciliation_task(tenant_id+user_id)。
     """
-    t = f"_p.{_TENANT}"  # _p.tenant_id::text = current_setting(...)
-    u = f"_p.{_USER}"
-    pred = (
-        f"EXISTS (SELECT 1 FROM {parent} _p "
-        f"WHERE _p.{parent_pk} = {table}.{fk} "
-        f"AND ({t} OR (_p.tenant_id IS NULL AND {u})))"
-    )
-    body = f"USING (({pred}) OR {_BYPASS}) WITH CHECK (({pred}) OR {_BYPASS})"
-    cur.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
-    if force:
-        cur.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
-    cur.execute(f"DROP POLICY IF EXISTS {name} ON {table}")
-    cur.execute(f"CREATE POLICY {name} ON {table} FOR ALL {body}")
+    inner = f"_p.{_TENANT} OR (_p.tenant_id IS NULL AND _p.{_USER})"
+    _apply_via_parent(cur, table, parent, fk, parent_pk, inner, name, force)
+
+
+def apply_user_via_parent_rls(
+    cur,
+    table: str,
+    *,
+    parent: str,
+    fk: str,
+    parent_pk: str = "id",
+    name: str = "tenant_isolation",
+    force: bool = False,
+) -> None:
+    """子表无 user_id → 经 fk→parent 间接按 parent 的 user_id 隔离(幂等)。
+
+    parent 须是已 user 隔离的表(含 user_id)。用例:bank_reconcile_candidates(仅 tx_id)→
+    bank_reconcile_transactions(user_id)。
+    """
+    inner = f"_p.{_USER}"
+    _apply_via_parent(cur, table, parent, fk, parent_pk, inner, name, force)
 
 
 def ensure_rls_app_role(cur, role: str = RLS_APP_ROLE) -> None:

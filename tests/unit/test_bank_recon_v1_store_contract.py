@@ -12,6 +12,7 @@ from services.recon import bank_recon_v1_store as store
 
 _MOVED = [
     "ensure_bank_recon_client_id_column",
+    "ensure_bank_recon_rls",
     "create_bank_recon_session",
     "save_bank_recon_parse",
     "mark_recon_parse_failed",

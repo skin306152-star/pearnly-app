@@ -45,6 +45,29 @@ def ensure_bank_recon_client_id_column():
         logger.warning(f"ensure_bank_recon_client_id_column failed: {e}")
 
 
+def ensure_bank_recon_rls():
+    """B8 RLS:给 bank_reconcile_* 三表上 policy(幂等 · 独立事务防 enroll 失败牵连别的 ensure)。
+
+    user 维度表(无 tenant_id):sessions / transactions 各有 user_id 列 → 纯 user 隔离;
+    candidates 仅 tx_id(FK→transactions)→ 经父表 user 传递。force=False:owner 连接仍绕过
+    (裸 get_cursor 的 DDL/ensure 不破),业务连接 SET ROLE pearnly_app 后强制。
+    """
+    from core.rls import apply_user_rls, apply_user_via_parent_rls
+
+    try:
+        with db.get_cursor(commit=True) as cur:
+            apply_user_rls(cur, "bank_reconcile_sessions", "bank_reconcile_transactions")
+            apply_user_via_parent_rls(
+                cur,
+                "bank_reconcile_candidates",
+                parent="bank_reconcile_transactions",
+                fk="tx_id",
+            )
+            logger.info("[B8] bank_reconcile_* RLS policy 已就绪")
+    except Exception as e:
+        logger.warning(f"ensure_bank_recon_rls failed: {e}")
+
+
 def _ws_clause(workspace_client_id: Optional[int]) -> tuple:
     """PO-6a 套账隔离过滤子句 + 参数。None → 不过滤(向后兼容);给了 → 限本套账 + NULL 未归属行
     (rollout-safe:bank_reconcile_sessions 列 PO-1 已回填,残留 NULL 仅废租户;PO-8 收口去 IS NULL)。"""

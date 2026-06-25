@@ -201,6 +201,7 @@ def _boot_schema_ddl() -> None:
         (db.ensure_erp_push_logs_adapter_constraint, "erp_push_logs adapter constraint"),
         (db.ensure_erp_push_logs_status_constraint, "erp_push_logs status constraint"),
         (db.ensure_bank_recon_client_id_column, "bank_reconcile_sessions.client_id 列"),
+        (db.ensure_bank_recon_rls, "bank_reconcile_* RLS policy"),
         (db.ensure_erp_mapping_tables, "erp_mapping 建表"),
         (db.ensure_vat_recon_tables, "vat_recon 建表"),
         (db.ensure_vat_recon_tasks_table, "vat_recon_tasks 建表"),

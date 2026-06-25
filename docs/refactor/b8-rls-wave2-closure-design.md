@@ -106,12 +106,18 @@ USING (
 **验证**:真 postgres 16/16 集成(矩阵 8 + 传递式 5 + 真 recon 表端到端 3)+ 全量单测 4877 passed。
 wave2 的 row-operation 裸 get_cursor 已全部迁 `get_cursor_rls`;recon 域残留裸 get_cursor 仅 DDL/ensure(owner)。
 
-**bank_reconcile_\* 表 enroll(明确的小 follow-on)**:这三张表是 **user 维度(无 tenant_id)**,本轮已把
-所有 row-op 穿 user 上下文(应用层 `user_id` WHERE 仍是当前隔离 · 无跨用户泄漏)。要给它们 DB 级
-policy,需:① `core/rls.py` 加 user-only 模板 `apply_user_rls`(`user_id = current_user`);② 在
-`ensure_bank_recon_client_id_column`(已 startup 跑)enroll `bank_reconcile_sessions`/`transactions`;
-③ `bank_reconcile_candidates`(经 tx_id→transactions)用 user-via-parent。穿线groundwork已就位,
-enroll 仅是补 apply_* 调用 + 真库穿透。**ocr_history JOIN 隔离随 wave3 ocr_history enroll 自动闭合**。
+**bank_reconcile_\* 表 enroll(✅ 已落地)**:这三张表是 **user 维度(无 tenant_id)**。
+
+| 表 | 模板 | 说明 |
+|---|---|---|
+| `bank_reconcile_sessions` / `bank_reconcile_transactions` | `apply_user_rls`(纯 user) | 两表各有 `user_id` 列 |
+| `bank_reconcile_candidates` | `apply_user_via_parent_rls`(经 tx_id→transactions) | candidates 无 user_id · INSERT 恒填 tx_id → 经父 tx 的 user 传递 |
+
+- `core/rls.py` 加 `user` 模板 + `apply_user_rls` / `apply_user_via_parent_rls`(via-parent EXISTS 抽出私有 `_apply_via_parent` 共享,tenant/user 两变体只换 inner 谓词)。
+- enroll 入口 = 新 `ensure_bank_recon_rls()`(独立事务 · startup 注册在 client_id 列 ensure 之后 · 失败不牵连别的 ensure)。
+- **enroll 前核实**:三表全部直接访问点(`bank_recon_v1_store`/`bank_recon_match`/`bank_recon_scoring`)的 `get_cursor_rls` 调用**无一漏穿 user_id**(漏穿会被 user-only policy 自拦);`owner_users` 的跨租户 purge/count 走裸 `get_cursor`(owner · 不受 force=False 约束 · admin 合法绕过)。
+- **验证**:矩阵集成新增模板5(纯 user)+ 模板6(user via-parent)穿透;`test_bank_recon_rls_real_tables.py` 用真 `ensure_bank_recon_rls` + 真 `create_bank_recon_session`/`get`/`list` 证 u1 建的 session/tx/candidate,u2 一概读不到、塞不进(WITH CHECK)。force=False(owner 仍绕过 · prod 靠 pearnly_app 角色)。
+- **ocr_history JOIN 隔离随 wave3 ocr_history enroll 自动闭合**(`find_invoice_candidates_for_tx` 已穿 tenant+user)。
 
 ## 6. 不开 RLS(设计已裁决 · 本轮明确不碰)
 

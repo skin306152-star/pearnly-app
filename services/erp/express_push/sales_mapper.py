@@ -154,7 +154,7 @@ def build_express_sales_payload(
 
     # V1 安全明细:OCR 行项目过对账闸(行合计≈税前额才采信)。挂收入科目作直接科目行,
     # 不碰库存/成本。status!=ok → companion 退回表头模式 + posted_partial(诚实)。
-    detail = extract_line_items(fields, base)
+    detail = extract_line_items(fields, base, total=total)
 
     paid = payment_is_paid(fields)
     payload = {

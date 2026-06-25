@@ -153,7 +153,11 @@ ITEM_MODE_DIRECT = "direct_account"  # 兜底:直接科目行(V1)
 
 
 def extract_line_items(
-    fields: Dict[str, Any], base: Decimal, *, item_mode: str = ITEM_MODE_NONSTOCK
+    fields: Dict[str, Any],
+    base: Decimal,
+    *,
+    total: Optional[Decimal] = None,
+    item_mode: str = ITEM_MODE_NONSTOCK,
 ) -> Dict[str, Any]:
     """OCR 行项目 → 规整明细 + 对账闸。确定性纯函数,绝不为"好看"采信不自洽的明细。
 
@@ -205,8 +209,44 @@ def extract_line_items(
         }
 
     line_sum = sum((_d(i["amount"]) for i in items), Decimal("0"))
-    status = ITEMS_OK if abs(_q(line_sum) - _q(base)) <= _ITEMS_TOL else ITEMS_MISMATCH
-    return {"items": items, "status": status, "line_sum": _s(line_sum)}
+    if abs(_q(line_sum) - _q(base)) <= _ITEMS_TOL:
+        return {"items": items, "status": ITEMS_OK, "line_sum": _s(line_sum)}
+    # 含税单价小票(泰国零售通例):逐行含税 · 合计≈含税总额 → 按比例摊回不含税(×base/total),
+    # 余数(逐行四舍五入漂移)落末行,摊后逐行合计精确==税前额。这是多认一个【合法】对账目标,
+    # 不放松容差、不跳过对账:真读错的明细两个目标都对不上,照旧 mismatch 转人工。
+    if total is not None and _q(total) > _q(base) and abs(_q(line_sum) - _q(total)) <= _ITEMS_TOL:
+        ex = _rescale_items_exvat(items, base, total)
+        if ex is not None:
+            return {"items": ex, "status": ITEMS_OK, "line_sum": _s(base)}
+    return {"items": items, "status": ITEMS_MISMATCH, "line_sum": _s(line_sum)}
+
+
+def _rescale_items_exvat(
+    items: List[Dict[str, str]], base: Decimal, total: Decimal
+) -> Optional[List[Dict[str, str]]]:
+    """逐行含税额按比例摊成不含税(×base/total)· 余数落末行 · 摊后逐行合计精确==base。
+    单价同步重算。摊后仍对不平(异常)→ None(退回 mismatch · 绝不硬采信)。"""
+    if not items:
+        return None
+    factor = base / total
+    scaled: List[tuple] = []
+    running = Decimal("0")
+    for it in items:
+        amt = _q(_d(it["amount"]) * factor)
+        running += amt
+        scaled.append((it, amt))
+    resid = _q(base) - _q(running)
+    scaled[-1] = (scaled[-1][0], _q(scaled[-1][1] + resid))
+    out: List[Dict[str, str]] = []
+    tot = Decimal("0")
+    for it, amt in scaled:
+        tot += amt
+        q = _d(it["qty"])
+        up = _q(amt / q) if q and q != 0 else amt
+        out.append({**it, "amount": _s(amt), "unit_price": _s(up)})
+    if abs(_q(tot) - _q(base)) > _ITEMS_TOL:
+        return None
+    return out
 
 
 # ── V3 推送阶段(细粒度状态)· 存 erp_push_logs.response_body.meta ────────────────

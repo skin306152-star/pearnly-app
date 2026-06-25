@@ -144,6 +144,44 @@ class ExpressSalesMapperTests(unittest.TestCase):
         self.assertEqual(len(r.payload["items"]), 2)
         self.assertEqual(r.payload["items_account"], "41-01-00-00")
 
+    def test_vat_inclusive_items_reconcile_to_total(self):
+        # 含税单价小票(泰国零售通例·真实油费票数据):12 行逐行含税,合计=含税总额 3361,
+        # 与税前 3141.12 差正好 219.88(VAT)→ 按比例摊回不含税 → items_status=ok,摊后合计==税前。
+        items = [
+            {"name": "58AUTOMAT", "qty": "1", "subtotal": "170.00"},
+            {"name": "58หัวเชื้อ", "qty": "7", "subtotal": "231.00"},
+            {"name": "58น้ำกลั่น", "qty": "7", "subtotal": "70.00"},
+            {"name": "58PERFORMA", "qty": "1", "subtotal": "625.00"},
+            {"name": "58PTT V120D", "qty": "4", "subtotal": "360.00"},
+            {"name": "58V120B", "qty": "1", "subtotal": "90.00"},
+            {"name": "58DYNAMIC", "qty": "3", "subtotal": "405.00"},
+            {"name": "58SEMISYN", "qty": "2", "subtotal": "390.00"},
+            {"name": "58COMMONRAIL", "qty": "1", "subtotal": "160.00"},
+            {"name": "58NGV", "qty": "3", "subtotal": "585.00"},
+            {"name": "58BRAKE", "qty": "1", "subtotal": "100.00"},
+            {"name": "58ลดความร้อน", "qty": "1", "subtotal": "175.00"},
+        ]  # Σ = 3361.00 (含税总额)
+        h = _sales_history(
+            fields={"buyer_name": "เงินสด", "subtotal": "3141.12", "vat": "219.88", "items": items},
+            total_amount="3361.00",
+        )
+        r = build_express_sales_payload(h, config=_CONFIG)
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["items_status"], "ok")  # 摊回不含税后对平
+        line_sum = sum(Decimal(it["amount"]) for it in r.payload["items"])
+        self.assertEqual(line_sum, Decimal("3141.12"))  # 摊后逐行合计精确==税前额
+
+    def test_items_truly_unreconcilable_still_blocks(self):
+        # 真读错(既≠税前也≠含税)→ 照旧 mismatch,不被新含税分支放过(安全没削弱)。
+        items = [{"name": "X", "qty": "1", "subtotal": "12.34"}]
+        h = _sales_history(
+            fields={"buyer_name": "เงินสด", "subtotal": "3141.12", "vat": "219.88", "items": items},
+            total_amount="3361.00",
+        )
+        r = build_express_sales_payload(h, config=_CONFIG)
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["items_status"], "mismatch")
+
     def test_items_mismatch_falls_back_honestly(self):
         # 行合计与税前对不上 → items_status=mismatch,头/分录照常(由 companion 退回表头)。
         items = [{"name": "X", "qty": "1", "price": "5", "subtotal": "5.00"}]

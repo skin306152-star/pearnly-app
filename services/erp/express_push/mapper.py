@@ -147,7 +147,7 @@ def build_express_payload(
         return fail("entry_not_balanced")
 
     # V1 安全明细(镜像销项):OCR 行过对账闸,挂采购科目作直接科目行,不碰库存/成本。
-    detail = extract_line_items(fields, base)
+    detail = extract_line_items(fields, base, total=total)
 
     payload = {
         "direction": "purchase",

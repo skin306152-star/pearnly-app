@@ -208,7 +208,7 @@ function _showSessionRevokedModal() {
 // B4 (2026-05-26) · 业务请求带上当前 workspace 账套主体(=在为哪家公司做账)。
 // 后端(B1)选读 X-Workspace-Client-Id · 带不上即 NULL · 不强制 · 不影响发票买方。
 // 个人模式 / 未选 → 不发头(返回 {})。
-function _wsHeader() {
+function _wsHeader(): Record<string, string> {
     try {
         if (typeof window.getActiveWorkspaceClientId === 'function') {
             const id = window.getActiveWorkspaceClientId();

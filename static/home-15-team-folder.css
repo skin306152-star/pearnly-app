@@ -502,29 +502,3 @@
     display: block;
 }
 
-/* v105.2 · 抽屉头部「推送 ERP」按钮 · 不再浮在内容上 · 永不遮挡 */
-.drawer-push-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--brand);
-    color: #fff;
-    border: none;
-    padding: 8px 14px;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.15s, transform 0.1s;
-    margin-right: 8px;
-    white-space: nowrap;
-}
-.drawer-push-btn:hover { background: var(--btn-blue-hover); }
-.drawer-push-btn:active { transform: scale(0.97); }
-.drawer-push-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-.drawer-push-btn svg { width: 14px; height: 14px; }
-@media (max-width: 600px) {
-    .drawer-push-btn span { display: none; }   /* 手机只显示图标 · 节省空间 */
-    .drawer-push-btn { padding: 8px; }
-}
-

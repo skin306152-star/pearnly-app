@@ -53,7 +53,7 @@ class UsersColumnsReExportTests(unittest.TestCase):
 
 
 class EnsureGoogleSubColumnTests(unittest.TestCase):
-    def test_adds_three_columns_and_index(self):
+    def test_adds_user_identity_columns_and_index(self):
         from services.users import columns
 
         cur = _FakeCursor()
@@ -64,7 +64,6 @@ class EnsureGoogleSubColumnTests(unittest.TestCase):
         self.assertTrue(any("google_sub TEXT" in s for s in sqls))
         self.assertTrue(any("idx_users_google_sub" in s for s in sqls))
         self.assertTrue(any("avatar_url TEXT" in s for s in sqls))
-        self.assertTrue(any("erp_push_mode TEXT DEFAULT 'smart'" in s for s in sqls))
 
     def test_db_error_returns_false(self):
         from services.users import columns

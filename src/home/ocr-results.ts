@@ -6,15 +6,14 @@
 //   updateResultsMatchCount / openDrawer / renderWhtBadge / renderField /
 //   renderRdActions / renderItems / closeDrawer。
 // 加载顺序:home.js(sync)先暴露公共全局(t/escapeHtml/_results/_drawerIdx/
-//   onFieldEdit/updateDrawerEditCount/injectOcrPushButton...)→ 本 module(Vite bundle
+//   onFieldEdit/updateDrawerEditCount...)→ 本 module(Vite bundle
 //   · defer)后跑 · bare 调全局不 import。
 // 桥回 home.js:window.renderResults / openDrawer / closeDrawer
 //   (home.js bootstrap 的 applyLang 守卫调 + 多处 runtime 调)。
-// ERP 推送三件套(injectOcrPushButton...)已迁 ocr-push.js(批2)· openDrawer 经 window.injectOcrPushButton 调。
 // 仍在 home.js(后续批):RD 税务 API 簇(rdFetch/callRdVerify/callRdSync/openRdSyncModal)
 //   + drawer-body 事件委托 + onFieldEdit/updateDrawerEditCount。
 // ============================================================
-/* global escapeHtml, _results, _drawerIdx, onFieldEdit, updateDrawerEditCount, injectOcrPushButton */
+/* global escapeHtml, _results, _drawerIdx, onFieldEdit, updateDrawerEditCount */
 
 // ============================================================
 // 抽屉
@@ -192,9 +191,6 @@ function openDrawer(idx: number) {
     document.getElementById('drawer-mask')!.classList.add('show');
     document.getElementById('drawer')!.classList.add('show');
 
-    // 识别页抽屉底部推 ERP 按钮(历史模式由另一个函数 injectHistorySaveButton 处理)
-    injectOcrPushButton();
-
     // v118.16 · 修 BUG · 识别中心抽屉打开时也填充客户下拉(之前漏调 · 单据记录抽屉有但识别中心没有)
     if (typeof window.bindDrawerClient === 'function') {
         const hid = r._historyId || r.history_id || null;
@@ -306,11 +302,6 @@ function closeDrawer() {
     // 清理抽屉底部的按钮栏(下次打开会重新注入)
     const existingHistoryBar = document.getElementById('drawer-history-save');
     if (existingHistoryBar) existingHistoryBar.remove();
-    const existingOcrBar = document.getElementById('drawer-ocr-push');
-    if (existingOcrBar) existingOcrBar.remove();
-    // v105.2 · 清掉头部推送按钮
-    const headerPushBtn = document.getElementById('drawer-ocr-push-btn');
-    if (headerPushBtn) headerPushBtn.remove();
     _drawerIdx = -1;
 }
 

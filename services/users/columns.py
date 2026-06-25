@@ -3,7 +3,7 @@
 services/users/columns.py · users 表启动期 ensure_* 列(REFACTOR-B2)
 
 从 db.py 抽出的 3 个用户表列幂等迁移(启动期幂等 ALTER ADD COLUMN IF NOT EXISTS):
-- ensure_google_sub_column   v118.27.5 google_sub + avatar_url + erp_push_mode 三列
+- ensure_google_sub_column   v118.27.5 google_sub + avatar_url
 - ensure_password_changed_at_column   v118.28.9 改密后旧 JWT 失效用
 - ensure_line_uid_column   v118.28.4 LINE OAuth sub claim
 
@@ -20,11 +20,7 @@ logger = logging.getLogger(__name__)
 
 def ensure_google_sub_column():
     """v118.27.5 · 启动时自动加 google_sub 列(幂等 · IF NOT EXISTS)
-    v118.27.5.3 · 同时加 avatar_url 列(Google OAuth picture URL)
-    P1b(2026-05-26)· 同时加 erp_push_mode 列(ERP 自动处理方式 · 账户级默认)·
-      复用本 users 多列 ensure(铁律 #21/#23:不新增 ensure_* · 进现有 ensure)·
-      值 smart(智能分拣) / fixed(固定当前账套) / ocr_only(只识别不推送)· 默认 smart。
-      留档迁移见 alembic/versions/006_users_erp_push_mode.py(生产不跑 alembic · 双跑范式)。"""
+    v118.27.5.3 · 同时加 avatar_url 列(Google OAuth picture URL)"""
     try:
         with db.get_cursor(commit=True) as cur:
             cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub TEXT")
@@ -32,10 +28,7 @@ def ensure_google_sub_column():
                 "CREATE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub) WHERE google_sub IS NOT NULL"
             )
             cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT")
-            cur.execute(
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS " "erp_push_mode TEXT DEFAULT 'smart'"
-            )
-        logger.info("[v118.27.5.3] users.google_sub + avatar_url + erp_push_mode 列就绪")
+        logger.info("[v118.27.5.3] users.google_sub + avatar_url 列就绪")
         return True
     except Exception as e:
         logger.error(f"[v118.27.5.3] 加列失败: {e}")

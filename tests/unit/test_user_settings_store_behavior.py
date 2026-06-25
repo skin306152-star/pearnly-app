@@ -3,7 +3,7 @@
 REFACTOR-WA 覆盖补强 · services/user_settings/store.py 行为单测(用户设置/偏好 DAL · 非高敏)
 
 补真实行为/边界/错误分支(原仅 contract 锁结构 · 行为覆盖 ~45%):
-dup_check 开关 / erp_push_mode(枚举校验)/ gemini_key(set/get/遮罩)/ preferred_lang(枚举校验)
+dup_check 开关 / gemini_key(set/get/遮罩)/ preferred_lang(枚举校验)
 的默认值 + 非法值拒写 + 遮罩逻辑(短/长 key)+ 异常吞咽兜底。
 全部 FakeCursor mock(隔离确定 · 不打真实 DB)。
 """
@@ -92,39 +92,6 @@ class DupCheckTests(unittest.TestCase):
     def test_set_exception_false(self):
         with patch_cursor_raises():
             self.assertFalse(us.set_user_dup_check_enabled("u1", True))
-
-
-class ErpPushModeTests(unittest.TestCase):
-    def test_no_row_defaults_smart(self):
-        with patch_cursor(FakeCursor(fetchone=None)):
-            self.assertEqual(us.get_erp_push_mode("u1"), "smart")
-
-    def test_valid_mode_returned(self):
-        with patch_cursor(FakeCursor(fetchone={"erp_push_mode": "fixed"})):
-            self.assertEqual(us.get_erp_push_mode("u1"), "fixed")
-
-    def test_invalid_mode_falls_back_smart(self):
-        with patch_cursor(FakeCursor(fetchone={"erp_push_mode": "garbage"})):
-            self.assertEqual(us.get_erp_push_mode("u1"), "smart")
-
-    def test_get_exception_smart(self):
-        with patch_cursor_raises():
-            self.assertEqual(us.get_erp_push_mode("u1"), "smart")
-
-    def test_set_invalid_rejected_without_db(self):
-        with patch_cursor_raises():
-            self.assertFalse(us.set_erp_push_mode("u1", "bogus"))
-
-    def test_set_valid_commits(self):
-        cur = FakeCursor()
-        with patch_cursor(cur):
-            self.assertTrue(us.set_erp_push_mode("u1", "ocr_only"))
-        self.assertEqual(cur.last_params[0], "ocr_only")
-        self.assertEqual(cur.cm_kwargs[0].get("commit"), True)
-
-    def test_set_exception_false(self):
-        with patch_cursor_raises():
-            self.assertFalse(us.set_erp_push_mode("u1", "smart"))
 
 
 class GeminiKeyTests(unittest.TestCase):

@@ -184,8 +184,6 @@
         var accts = S.accounts && S.accounts.length ? S.accounts : [];
         var ROW = 'style="display:flex;align-items:center;gap:10px;margin:7px 0"';
         var LBL = 'style="min-width:128px;font-size:13px;color:var(--ink2)"';
-        var FLD =
-            'style="flex:1;padding:7px 9px;border:1px solid var(--border,#d1d5db);border-radius:8px;font-size:13px;background:#fff"';
         // 只读镜像:科目在小助手里选(和账套一样),这里只显示当前配置。code→name 由上报科目表查。
         function _nameForCode(code: string) {
             for (var i = 0; i < accts.length; i++) {

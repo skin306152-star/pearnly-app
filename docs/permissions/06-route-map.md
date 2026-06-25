@@ -227,7 +227,6 @@ OCR 识别/上传、history、ERP push/endpoints、对账 v0 杂项、clients/ca
 | POST | `/api/erp/logs/{log_id}/retry` | login_only | — | routes/erp_push_log_routes.py |
 | POST | `/api/erp/push` | login_only | — | routes/erp_push_log_routes.py |
 | GET | `/api/erp/stats/today` | login_only | — | routes/erp_push_log_routes.py |
-| GET | `/api/erp/connectors/status` | login_only | — | routes/erp_xero_routes.py |
 | GET | `/api/erp/xero/auth/callback` | public | — | routes/erp_xero_routes.py |
 | GET | `/api/erp/xero/auth/start` | require_perm | `settings.org.edit` | routes/erp_xero_routes.py |
 | POST | `/api/erp/xero/auto-push` | require_perm | `settings.org.edit` | routes/erp_xero_routes.py |
@@ -471,8 +470,6 @@ OCR 识别/上传、history、ERP push/endpoints、对账 v0 杂项、clients/ca
 | PUT | `/api/archive/settings` | login_only | — | routes/settings_routes.py |
 | GET | `/api/settings/dup-check` | login_only | — | routes/settings_routes.py |
 | PUT | `/api/settings/dup-check` | login_only | — | routes/settings_routes.py |
-| GET | `/api/settings/erp-push-mode` | login_only | — | routes/settings_routes.py |
-| PUT | `/api/settings/erp-push-mode` | login_only | — | routes/settings_routes.py |
 | GET | `/api/admin/tenants` | super_admin | — | routes/tenant_routes.py |
 | POST | `/api/admin/tenants` | super_admin | — | routes/tenant_routes.py |
 | PATCH | `/api/admin/tenants/{tenant_id}/quota` | super_admin | — | routes/tenant_routes.py |

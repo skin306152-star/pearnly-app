@@ -11,7 +11,7 @@ canonical 已含 mrerp_dms)执行。本迁移留档 + 本地/未来钩子用。
 canonical 与 erp_push.py ADAPTER_REGISTRY 对齐:webhook/xero/flowaccount/mrerp/mrerp_dms。
 
 Revision ID: 007_erp_adapter_mrerp_dms
-Revises: 006_users_erp_push_mode
+Revises: 005_workspace_clients
 Create Date: 2026-05-31
 """
 
@@ -20,7 +20,7 @@ from typing import Sequence, Union
 from alembic import op
 
 revision: str = "007_erp_adapter_mrerp_dms"
-down_revision: Union[str, Sequence[str], None] = "006_users_erp_push_mode"
+down_revision: Union[str, Sequence[str], None] = "005_workspace_clients"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

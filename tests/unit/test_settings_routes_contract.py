@@ -16,7 +16,6 @@ from routes.settings_routes import (
     ArchivePreviewRequest,
     ArchiveSettingsPayload,
     DupCheckSettingPayload,
-    ErpPushModePayload,
     _check_archive_access,
     _check_archive_customize,
     router,
@@ -37,9 +36,6 @@ class SettingsRoutesContractTests(unittest.TestCase):
             ("POST", "/api/archive/rename-preview"),
             ("GET", "/api/settings/dup-check"),
             ("PUT", "/api/settings/dup-check"),
-            # P1b · ERP 自动处理方式
-            ("GET", "/api/settings/erp-push-mode"),
-            ("PUT", "/api/settings/erp-push-mode"),
         }
         self.assertEqual(got, expected)
 
@@ -70,15 +66,6 @@ class SettingsRoutesContractTests(unittest.TestCase):
         self.assertEqual(p.merged_fields, {})
         self.assertIsNone(p.name_template)
         self.assertEqual(set(DupCheckSettingPayload.model_fields.keys()), {"enabled"})
-        self.assertEqual(set(ErpPushModePayload.model_fields.keys()), {"mode"})
-
-    def test_erp_push_mode_dal_validates(self):
-        """P1b · get/set_erp_push_mode 默认 smart + 拒非法值(纯逻辑 · 不打 DB)"""
-        from core import db
-
-        self.assertEqual(db.ERP_PUSH_MODES, ("smart", "fixed", "ocr_only"))
-        # 非法 mode → set 拒写(返 False)· 不触 DB
-        self.assertFalse(db.set_erp_push_mode("u1", "garbage"))
 
 
 if __name__ == "__main__":

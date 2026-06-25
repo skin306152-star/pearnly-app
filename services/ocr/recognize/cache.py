@@ -20,22 +20,18 @@ from services.erp.auto_push import (
 logger = logging.getLogger("mr-pilot")
 
 
-def serve_cache_hit(cached, user, plan, _erp_mode, file, monthly_quota, file_hash):
+def serve_cache_hit(cached, user, plan, file, monthly_quota, file_hash):
     logger.info(f"  🎯 命中文件缓存 (hash={file_hash[:12]}..., 省额度)")
 
-    # v0.9 · 缓存命中也触发自动推送(用户的期待是"每次上传就推送")
-    # P1b · ocr_only 模式 → 完全跳过 auto-push(纯跳过 · 零风险)。
+    # 缓存命中也触发自动推送;是否参与自动推送只看 ERP endpoint 自身的 auto_push。
     cache_auto_pushed = False
-    if _erp_mode == "ocr_only":
-        logger.info("[Cache][P1b] ocr_only 模式 · 跳过自动推送")
-    elif _plan_permissions(plan).get("can_auto_push_erp"):
+    if _plan_permissions(plan).get("can_auto_push_erp"):
         try:
             auto_eps = db.list_erp_endpoints(str(user["id"]), auto_push_only=True)
             if auto_eps:
                 import asyncio
 
-                # P1d · 缓存命中也走同一分流(开+smart→分拣 · 否则现行为)。
-                if _erp_seller_routing_enabled(str(user["id"])) and _erp_mode == "smart":
+                if _erp_seller_routing_enabled(str(user["id"])):
                     asyncio.create_task(
                         _auto_push_smart_routed(
                             str(user["id"]), [cached["id"]], _tid(user), auto_eps

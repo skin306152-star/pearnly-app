@@ -45,7 +45,7 @@
 **真 punch list(按影响排):**
 1. **退役/重调旧蓝调色板**(根因·见上)——改 `home-01-base.css` --blue* 值为 emerald;复核 kit 里 --blue 残留。
 2. **漏迁的 src 屏(还在旧蓝/裸hex)**:`module-settings`(680 max-width也改流式)、`onboarding-business`、`pos-cashiers`、`rules-settings(-data)`、`sales-account`(COLORS 数组)。
-3. **弹窗/抽屉系统没统一**:① 旧 `.drawer` 应迁 `.modal`(`ocr-results`/`ocr-push`/exceptions drawer 等,home-05/08/12/16/18 的 .drawer-* 类)② 全站弹窗存在两套(旧 `.modal` vs kit `.ov`)——定一套、retone 对齐 kit(modal 自带 max-width 是对的,别动宽度,动的是视觉)。
+3. **弹窗/抽屉系统没统一**:① 旧 `.drawer` 应迁 `.modal`(`ocr-results`/exceptions drawer 等,home-05/08/12/16/18 的 .drawer-* 类)② 全站弹窗存在两套(旧 `.modal` vs kit `.ov`)——定一套、retone 对齐 kit(modal 自带 max-width 是对的,别动宽度,动的是视觉)。
 4. **真 emoji 当 UI 图标**(非注释/非i18n文本的少数):`page-reconcile-panes-2`(⏱/⚠ kpi图标)、`bank-recon-v2-results`、`excel-recon-tasklist` → Lucide。(注:i18n 文案里的 ✅/⚠ 多数是文字强调,非图标,可不动。)
 5. **原生弹窗**(真调用,非注释):`glv-history:168 confirm`、`glv-results:139 alert`、`sales-detail:436 confirm`、`sales-products:223 confirm`、`session-heartbeat:52 alert`、`test-center-base:171 alert` → kit modal/toast。
 6. **文案**:`OCR 抽不准` 在 `i18n-data.js:2883`(键 `brv2-anchor-title`,四语)+ `page-reconcile-panes-1:106` → 改中性。

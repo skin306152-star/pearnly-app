@@ -198,8 +198,6 @@ interface Window {
     // shared caches written by migrated modules, read elsewhere as bare window props
     _clientsCache?: Array<{ id?: unknown; [key: string]: unknown }>;
     _erpEndpoints?: Array<{ id?: unknown; [key: string]: unknown }>;
-    // ocr-push 暴露:识别记录抽屉底部真 ERP 推送按钮装配(0/1/≥2 endpoint 智能行为)
-    injectHistoryPushButton?: () => void;
     // history-list 暴露:汇总卡/状态·来源下拉/上传按钮绑定(drawer init 调一次)
     initHistoryFilters?: () => void;
     // erp-log-card 暴露:单条推送日志渲染成草稿卡片

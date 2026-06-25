@@ -43,9 +43,6 @@ async def ocr_recognize(
     # B1 相 1 (2026-05-26) · workspace 账套归属(在为哪家公司做账)· 可选 · Form 或 header
     # X-Workspace-Client-Id · 带不上 NULL · 非强制(缺失不拦上传)· 与 client_id(买方)独立。
     workspace_client_id: Optional[str] = Form(None),
-    # P1b (2026-05-26) · ERP 自动处理方式 · 临时覆盖本批(可空 · 缺省走账户级默认)。
-    # smart=智能分拣 / fixed=固定当前账套 / ocr_only=只识别不推送。
-    push_mode: Optional[str] = Form(None),
 ):
     user = get_current_user_from_request(request)
     client_ip = get_client_ip(request)
@@ -58,11 +55,6 @@ async def ocr_recognize(
     # 否则切套账后看不到本张票)。insert_ocr_history 内仍校验归属·非本租户→NULL·不拦上传。
     if _ws_client_id is None:
         _ws_client_id = wc.default_workspace_for_write(_tid(user))
-
-    # P1b · ERP 自动处理方式:本批 Form 覆盖优先,否则读账户级默认(容错 smart)。
-    # ocr_only → 下方两处 auto-push 直接跳过(零风险纯跳过);smart/fixed 的真正分流在 P1d。
-    _pm = (push_mode or "").strip()
-    _erp_mode = _pm if _pm in db.ERP_PUSH_MODES else db.get_erp_push_mode(str(user["id"]))
 
     # 1. 基本校验 (2026-05-21 multi-format refactor: PDF + image + Excel + CSV + Word)
     from services.ocr.pipeline import (
@@ -130,7 +122,6 @@ async def ocr_recognize(
                 cached=cached,
                 user=user,
                 plan=plan,
-                _erp_mode=_erp_mode,
                 file=file,
                 monthly_quota=monthly_quota,
                 file_hash=file_hash,
@@ -365,7 +356,6 @@ async def ocr_recognize(
     primary_category_tag = _persist["primary_category_tag"]
 
     auto_pushed = dispatch_auto_push(
-        _erp_mode=_erp_mode,
         history_ids=history_ids,
         plan=plan,
         user=user,

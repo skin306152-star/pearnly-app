@@ -127,17 +127,6 @@ export const AUTO_HTML_1 = `
 
                         <!-- 子面板 1:连接(纯卡片 · 不含日志、不含 today-stats · v118.34.5) -->
                         <div class="erp-subpanel active" data-erp-subpanel="connect">
-                            <!-- P1b · 全局「ERP 自动处理方式」(账户级 · 对所有 ERP 端点统一生效 ·
-                                 不是单个端点的设置 · 故放在卡片上方而非某张卡片内)。 -->
-                            <div class="erp-global-mode" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 16px;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:8px;">
-                                <span data-i18n="pref-erp-mode-title" style="font-weight:600;font-size:13px;">ERP 自动处理方式</span>
-                                <select id="erp-global-push-mode" class="folder-interval-select">
-                                    <option value="smart" data-i18n="pref-erp-mode-smart">智能分拣(推荐)</option>
-                                    <option value="fixed" data-i18n="pref-erp-mode-fixed">固定当前账套</option>
-                                    <option value="ocr_only" data-i18n="pref-erp-mode-ocr">只识别不推送</option>
-                                </select>
-                                <span data-i18n="pref-erp-mode-desc" style="font-size:12px;color:#6B7280;flex:1 1 200px;">上传识别后,系统如何把发票推送到 ERP</span>
-                            </div>
                             <!-- ERP 系统连接卡片区 · 各 adapter 模块 IIFE 渲染(MR.ERP / MR.ERP DMS) -->
                             <div class="erp-connect-cards" id="erp-connect-cards"></div>
 

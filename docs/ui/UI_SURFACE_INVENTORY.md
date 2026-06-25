@@ -17,7 +17,7 @@ dashboard · ocr上传识别 · history识别记录 · reconcile对账 · automa
 - **账户**:强制改密 `force-pw`/`openForgotCurrentPwModal` · 银行客户选择 `bank-client-picker`
 
 ## L1 · 抽屉 drawer(~12 · 侧拉)
-- **识别结果编辑抽屉** `ocr-results`+`ocr-fields`+`ocr-push`(点识别记录打开 · 核心高频)
+- **识别结果编辑抽屉** `ocr-results`+`ocr-fields`(点识别记录打开 · 核心高频；ERP 导出/推送统一走录入工作台第 4 步)
 - 历史抽屉 `history-drawer` · 异常抽屉 `exceptions-drawer`(+render)· 通知抽屉 `notifications`
 - 对账:`bank-recon-drawer`/`recon-drawer`/`bank-recon-detail` · 候选抽屉 `bank-cand-drawer`
 - 集成配置抽屉 `integration-drawer`/`integration-config` · LINE面板 `line-panel` · 客户抽屉 `clients`/`clients-buyer` · Xero推送 `erp-xero-push`

@@ -105,13 +105,6 @@ function injectHistorySaveButton() {
     saveBar.id = 'drawer-history-save';
     saveBar.className = 'drawer-history-save-bar';
     saveBar.innerHTML = `
-        <button class="btn btn-ghost" id="btn-push-erp" title="${escapeHtml(t('btn-push-erp'))}" style="display:none;">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M2 8h9M8 5l3 3-3 3"/>
-                <rect x="11" y="3" width="3" height="10" rx="1"/>
-            </svg>
-            <span>${escapeHtml(t('btn-push-erp'))}</span>
-        </button>
         <span id="drawer-erp-pushed-badge" style="display:none;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#059669;background:#D1FAE5;padding:3px 8px;border-radius:20px;white-space:nowrap;">
             <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px;flex-shrink:0;"><path d="M2 6l3 3 5-5"/></svg>
             ${escapeHtml(t('erp-pushed-badge'))}
@@ -124,8 +117,6 @@ function injectHistorySaveButton() {
     `;
     body.appendChild(saveBar);
     document.getElementById('btn-save-history')!.addEventListener('click', saveHistoryEdits);
-    // 真 ERP 推送按钮装配(0/1/≥2 endpoint 智能行为)· 逻辑在 ocr-push(与识别页同口径)
-    if (typeof window.injectHistoryPushButton === 'function') window.injectHistoryPushButton();
 }
 
 // P0-2: 检查该发票是否已成功推送过 ERP

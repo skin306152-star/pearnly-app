@@ -8,7 +8,7 @@
 // 推送日志组(loadErpLogs/showLogDetail/retryPushLog/批量)留 erp-integration.js。
 // 端点组对日志组 0 引用(干净切面);日志组+initAutomationPage 经 window 桥接调本模块
 //   (window.loadErpEndpoints/_erpEndpoints/loadErpTodayStats/openEndpointModal/.../_sanitizeUrl)。
-// home.js 核心 + injectOcrPushButton 经 window._erpEndpoints 读缓存(每次 loadErpEndpoints 重写)。
+// home.js 核心经 window._erpEndpoints 读缓存(每次 loadErpEndpoints 重写)。
 // ============================================================
 /* global escapeHtml, token, showConfirm, humanizeError, currentLang, routeTo, switchAutomationTab, _showSessionRevokedModal */
 

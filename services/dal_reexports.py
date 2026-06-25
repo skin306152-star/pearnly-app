@@ -259,11 +259,8 @@ _REEXPORTS = {
         "set_user_active_tenant",
     ],
     "services.user_settings.store": [
-        "ERP_PUSH_MODES",
         "get_user_dup_check_enabled",
         "set_user_dup_check_enabled",
-        "get_erp_push_mode",
-        "set_erp_push_mode",
         "set_user_gemini_key",
         "get_user_gemini_key",
         "get_user_gemini_key_masked",

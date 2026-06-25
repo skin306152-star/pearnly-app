@@ -14,7 +14,7 @@
 //
 // 自带内存(只被本组用 · 随函数搬进模块):
 //   _erpEndpoints / _epEditingId / _logFilter / _erpSelected
-//   注:home.js 核心 + injectOcrPushButton 经 window._erpEndpoints 读取缓存 ·
+//   注:home.js 核心经 window._erpEndpoints 读取缓存 ·
 //   本模块每次 loadErpEndpoints 都写 window._erpEndpoints = _erpEndpoints 保持桥接。
 // ============================================================
 

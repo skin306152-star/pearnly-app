@@ -3,7 +3,7 @@ services/ocr/recognize/autopush.py · OCR 识别·ERP 自动推送分发
 
 从 app.py ocr_recognize 抽出(REFACTOR-WB-app · 2026-06-01 · 纯搬家 0 逻辑改)。
 仅对已归属(有 client_id)的 history 触发 auto-push(防 ERR_NO_CLIENT 空炸 retry 队列);
-ocr_only 模式跳过;ERP_SELLER_ROUTING 开+smart 走卖方账套分拣,否则每张推所有端点。
+ERP_SELLER_ROUTING 开启时走卖方账套分拣,否则每张推所有自动推送端点。
 返回 auto_pushed(布尔·进响应)。
 """
 
@@ -20,17 +20,14 @@ from services.erp.auto_push import (
 logger = logging.getLogger("mr-pilot")
 
 
-def dispatch_auto_push(*, _erp_mode, history_ids, plan, user):
+def dispatch_auto_push(*, history_ids, plan, user):
     # v0.9 · 自动推送 ERP(异步 · 不阻塞返回)· 每张发票都推
     # 批 1 改动 1 (v118.34.33) · 只对有 client_id 的 history 触发 auto-push.
     # 没 client_id 的就交给「待归属」/「建议归属」UI 让用户确认 · 防止
     # auto-push 必炸 ERR_NO_CLIENT 浪费 retry 队列(对应 Zihao 截图里
     # 一直 retry 的混乱).
-    # P1b · ocr_only 模式 → 完全跳过 auto-push(纯跳过 · 零风险)。
     auto_pushed = False
-    if _erp_mode == "ocr_only":
-        logger.info("[P1b] ocr_only 模式 · 跳过 %d 张发票的自动推送", len(history_ids or []))
-    elif history_ids and _plan_permissions(plan).get("can_auto_push_erp"):
+    if history_ids and _plan_permissions(plan).get("can_auto_push_erp"):
         try:
             auto_eps = db.list_erp_endpoints(str(user["id"]), auto_push_only=True)
             if auto_eps:
@@ -52,9 +49,7 @@ def dispatch_auto_push(*, _erp_mode, history_ids, plan, user):
                 if pushable_ids:
                     import asyncio
 
-                    # P1d · ERP_SELLER_ROUTING 开 + smart → 按卖方账套路由分组批量推;
-                    # 否则(关 / fixed)走现行为:每张推所有 auto_push 端点。
-                    if _erp_seller_routing_enabled(str(user["id"])) and _erp_mode == "smart":
+                    if _erp_seller_routing_enabled(str(user["id"])):
                         asyncio.create_task(
                             _auto_push_smart_routed(
                                 str(user["id"]),

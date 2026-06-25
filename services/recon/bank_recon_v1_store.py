@@ -54,6 +54,13 @@ def ensure_bank_recon_rls():
     """
     from core.rls import apply_user_rls, apply_user_via_parent_rls
 
+    # 带外遗留:prod 三表此前由手动 SQL 加过 p_*_user(同款 user 谓词但缺 bypass 逃生 · 不在代码)。
+    # 标准 tenant_isolation 严格包含它们(user-match OR bypass)→ 删 legacy 去重,终态每表唯一 policy。
+    _legacy = {
+        "bank_reconcile_sessions": "p_sessions_user",
+        "bank_reconcile_transactions": "p_tx_user",
+        "bank_reconcile_candidates": "p_cand_user",
+    }
     try:
         with db.get_cursor(commit=True) as cur:
             apply_user_rls(cur, "bank_reconcile_sessions", "bank_reconcile_transactions")
@@ -63,6 +70,8 @@ def ensure_bank_recon_rls():
                 parent="bank_reconcile_transactions",
                 fk="tx_id",
             )
+            for table, pol in _legacy.items():
+                cur.execute(f"DROP POLICY IF EXISTS {pol} ON {table}")
             logger.info("[B8] bank_reconcile_* RLS policy 已就绪")
     except Exception as e:
         logger.warning(f"ensure_bank_recon_rls failed: {e}")

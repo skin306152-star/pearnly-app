@@ -44,8 +44,8 @@ from services.erp.express_push.common import (
     payment_is_paid,
     resolve_account,
     resolve_account_sourced,
+    sanitize_payload_cp874,
     SRC_DEFAULT,
-    thai_dbf_safe,
 )
 from services.purchase.field_clean import clean_invoice_no, clean_seller, clean_tax_id
 
@@ -129,7 +129,7 @@ def build_express_payload(
         if not vat_acc:
             return fail("no_input_vat_account")
 
-    name = thai_dbf_safe(clean_seller(fields.get("seller_name") or history.get("seller_name")))
+    name = clean_seller(fields.get("seller_name") or history.get("seller_name"))
     tax_id = clean_tax_id(fields.get("seller_tax") or fields.get("seller_tax_id"))
     supplier = _resolve_supplier(mappings.get("clients") or [], history, name, tax_id)
     ref_no = clean_invoice_no(history.get("invoice_no") or fields.get("invoice_number"))
@@ -175,4 +175,4 @@ def build_express_payload(
             "filename": history.get("filename"),
         },
     }
-    return ExpressMapResult(True, payload, "ok")
+    return ExpressMapResult(True, sanitize_payload_cp874(payload), "ok")

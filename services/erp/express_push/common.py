@@ -154,12 +154,18 @@ ITEM_MODE_DIRECT = "direct_account"  # 兜底:直接科目行(V1)
 # OCR 偶发把泰文声调符输出成 MS Thai「私用区」浮动字形(字体渲染用),Express DBF 是 cp874、
 # 编不了私用区字符 → 写盘崩(DBF_WRITE_FAILED 'charmap')。映回标准泰文声调符;其余仍编不了的
 # 残字兜底剔除(绝不让写盘因单个字符崩 · 透明:剔除项可后续补映射)。
+# U+F70A..U+F712 私用区组合符 → 标准泰文(U+0E31/47/48..4D)。权威 8 项与
+# services/recon/bank_gl_pdf_mrerp._norm_thai 同源(共享 util 去重是后续项)。
+# 用 chr(码点) 写键,避免私用区字符在源码里被工具/编辑器吞掉。
 _THAI_PUA_MAP = {
-    "": "่",  # MAI EK → ไม้เอก
-    "": "้",  # MAI THO → ไม้โท
-    "": "๊",  # MAI TRI → ไม้ตรี
-    "": "๋",  # MAI CHATTAWA → ไม้จัตวา
-    "": "์",  # THANTHAKHAT → การันต์
+    chr(0xF70A): "\u0e48",  # MAI EK
+    chr(0xF70B): "\u0e49",  # MAI THO
+    chr(0xF70C): "\u0e4a",  # MAI TRI
+    chr(0xF70D): "\u0e4b",  # MAI CHATTAWA
+    chr(0xF70E): "\u0e4c",  # THANTHAKHAT
+    chr(0xF710): "\u0e4d",  # NIKHAHIT
+    chr(0xF711): "\u0e31",  # MAI HAN-AKAT
+    chr(0xF712): "\u0e47",  # MAI TAIKHU
 }
 
 
@@ -176,6 +182,19 @@ def thai_dbf_safe(s: str) -> str:
             continue
         out.append(ch)
     return "".join(out)
+
+
+def sanitize_payload_cp874(obj: Any) -> Any:
+    """写盘前唯一收口:递归把 payload 里每个字符串字段过 thai_dbf_safe,文本字段只此一处
+    统一净化(不再逐字段散落 · 自动覆盖 desc/ref_no/prename 等现有及将来所有字段)。
+    非字符串原样返回。"""
+    if isinstance(obj, str):
+        return thai_dbf_safe(obj)
+    if isinstance(obj, dict):
+        return {k: sanitize_payload_cp874(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [sanitize_payload_cp874(v) for v in obj]
+    return obj
 
 
 def extract_line_items(
@@ -218,9 +237,9 @@ def extract_line_items(
             price = _q(amount / qty) if qty else amount
         items.append(
             {
-                "name": thai_dbf_safe(name)[:50],
+                "name": name[:50],
                 "qty": _s(qty),
-                "unit": thai_dbf_safe(str(it.get("unit") or it.get("uom") or "").strip())[:10],
+                "unit": str(it.get("unit") or it.get("uom") or "").strip()[:10],
                 "unit_price": _s(price),
                 "amount": _s(amount),
                 "item_mode": item_mode,

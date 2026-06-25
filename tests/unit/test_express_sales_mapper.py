@@ -186,6 +186,38 @@ class ExpressSalesMapperTests(unittest.TestCase):
         self.assertIn("้", nm)
         nm.encode("cp874")  # 不抛即通过(可写进 Express DBF)
 
+    def test_whole_payload_cp874_safe_covers_all_fields(self):
+        # 收口在 payload 层:私用区声调符塞进多个字段(买方名/票号/品名),含此前漏网的
+        # U+F710/F711/F712 → 递归净化后 payload 里每个字符串都可 cp874 编码、新增标记映成标准。
+        pua = chr(0xF710) + chr(0xF711) + chr(0xF712)  # nikhahit / mai-han-akat / mai-taikhu
+        items = [{"name": "SINKHA" + pua, "qty": "1", "subtotal": "3141.12"}]
+        h = _sales_history(
+            fields={
+                "buyer_name": "LUKKHA" + pua,
+                "invoice_number": "INV" + chr(0xF70B),
+                "subtotal": "3141.12",
+                "vat": "219.88",
+                "items": items,
+            },
+            total_amount="3361.00",
+        )
+        r = build_express_sales_payload(h, config=_CONFIG)
+        self.assertTrue(r.ok, r.reason)
+
+        def _all_strings(obj):
+            if isinstance(obj, str):
+                yield obj
+            elif isinstance(obj, dict):
+                for v in obj.values():
+                    yield from _all_strings(v)
+            elif isinstance(obj, list):
+                for v in obj:
+                    yield from _all_strings(v)
+
+        for s in _all_strings(r.payload):
+            s.encode("cp874")  # 任一字段残留私用区字符即抛 → 测试失败
+        self.assertIn(chr(0x0E4D), r.payload["items"][0]["name"])  # nikhahit 已映成标准
+
     def test_items_truly_unreconcilable_still_blocks(self):
         # 真读错(既≠税前也≠含税)→ 照旧 mismatch,不被新含税分支放过(安全没削弱)。
         items = [{"name": "X", "qty": "1", "subtotal": "12.34"}]

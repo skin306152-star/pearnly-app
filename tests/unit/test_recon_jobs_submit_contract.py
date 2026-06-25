@@ -84,7 +84,10 @@ class StoreEnqueueTests(unittest.TestCase):
         cur.fetchone.return_value = {"id": "fixed-uuid"}
         ctx = mock.MagicMock()
         ctx.__enter__.return_value = cur
-        with mock.patch("services.recon_jobs.store.get_cursor", return_value=ctx):
+        # enqueue 用户面 INSERT 走 get_cursor_rls(B8 RLS);DDL 自愈仍可能走 get_cursor。
+        with mock.patch("services.recon_jobs.store.get_cursor_rls", return_value=ctx), mock.patch(
+            "services.recon_jobs.store.get_cursor", return_value=ctx
+        ):
             rid = store.enqueue("bank", "u1", "t1", {"a": 1}, [{"path": "x"}], **kw)
         return rid, cur.execute.call_args
 

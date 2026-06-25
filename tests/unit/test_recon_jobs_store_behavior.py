@@ -9,6 +9,7 @@ finish / set_needs_review / set_needs_mapping / set_failed / fail / reclaim_stal
 全部 FakeCursor mock(隔离确定 · 不打真实 DB · 队列纯记录·无扣费)。
 """
 
+import contextlib
 import unittest
 from unittest import mock
 
@@ -60,6 +61,16 @@ class _CM:
         return False
 
 
+@contextlib.contextmanager
+def _patch_both(factory):
+    # B8 RLS:store 用户面走 get_cursor_rls、worker 走 get_cursor_rls(bypass)、DDL 留 get_cursor。
+    # 测试同 patch 两游标到同一 factory,行为断言与游标种类无关。
+    with mock.patch.object(rj, "get_cursor", factory), mock.patch.object(
+        rj, "get_cursor_rls", factory
+    ):
+        yield
+
+
 def patch_cursor(cur):
     cur.cm_kwargs = []
 
@@ -67,14 +78,14 @@ def patch_cursor(cur):
         cur.cm_kwargs.append(k)
         return _CM(cur)
 
-    return mock.patch.object(rj, "get_cursor", factory)
+    return _patch_both(factory)
 
 
 def patch_cursor_raises(exc=RuntimeError("boom")):
     def factory(*a, **k):
         raise exc
 
-    return mock.patch.object(rj, "get_cursor", factory)
+    return _patch_both(factory)
 
 
 class NormTests(unittest.TestCase):

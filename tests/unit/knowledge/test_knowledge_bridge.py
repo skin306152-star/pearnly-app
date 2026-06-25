@@ -216,7 +216,7 @@ def test_dedup_lookup_is_tenant_scoped_and_excludes_self():
     def _cursor(*a, **k):
         yield _Cur()
 
-    with patch.object(kb.db, "get_cursor", _cursor):
+    with patch.object(kb.db, "get_cursor_rls", _cursor):
         exact, _ = kb.make_dedup_lookups(
             user_id="u1", tenant_id="t1", exclude_history_id="self-id", seller_name="ACME"
         )

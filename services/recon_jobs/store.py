@@ -14,7 +14,8 @@ import json as _json
 import logging
 from typing import Any, Dict, List, Optional
 
-from core.db import get_cursor
+from core.db import get_cursor, get_cursor_rls
+from core.rls import apply_tenant_or_user_rls
 
 logger = logging.getLogger("recon_jobs")
 
@@ -77,6 +78,9 @@ def ensure_table() -> bool:
         with get_cursor(commit=True) as cur:
             for stmt in _DDL:
                 cur.execute(stmt)
+            # recon_jobs 有 tenant_id + user_id 列:tenant 隔离 + 孤立用户(tenant NULL)经 user 兜底。
+            # 用户面的 enqueue/get 走带上下文的 RLS 游标;worker 队列操作显式 bypass(见模块内登记)。
+            apply_tenant_or_user_rls(cur, "recon_jobs")
         return True
     except Exception as e:  # noqa: BLE001
         logger.error(f"ensure_table failed [{type(e).__name__}]: {e}")
@@ -131,7 +135,10 @@ def enqueue(
         # progress 不在 INSERT 里(可空 · 默认 NULL · 工人跑起来后 update_progress 再写)。
         # 列数必须与占位符/值严格一一对应 —— 此前误带了 progress 列却没传值 →
         # psycopg2 "tuple index out of range"(真站点 E2E 抓出的根因)。
-        with get_cursor(commit=True) as cur:
+        # 用户面 INSERT 走 RLS 上下文:WITH CHECK 要求 tenant 匹配 / 或 tenant 空时 user 匹配。
+        with get_cursor_rls(
+            tenant_id=tid, user_id=uid, workspace_client_id=ws, commit=True
+        ) as cur:
             if job_id:
                 cur.execute(
                     """
@@ -180,7 +187,8 @@ def claim_next(worker_id: str, lease_seconds: int = 600) -> Optional[Dict[str, A
     无可认领 → None。多工人并发安全:SKIP LOCKED 保证不会两个工人抢到同一单。
     """
     try:
-        with get_cursor(commit=True) as cur:
+        # bypass:后台 worker 跨租户认领队列(SKIP LOCKED),无 HTTP 单租户上下文。
+        with get_cursor_rls(bypass=True, commit=True) as cur:
             cur.execute(
                 """
                 UPDATE recon_jobs
@@ -212,7 +220,8 @@ def update_progress(
 ) -> bool:
     """写进度 + 续租(工人活着的心跳)。"""
     try:
-        with get_cursor(commit=True) as cur:
+        # bypass:worker 认领 job 后按 job_id 写心跳/进度,跑在 worker 进程无请求上下文。
+        with get_cursor_rls(bypass=True, commit=True) as cur:
             cur.execute(
                 """
                 UPDATE recon_jobs
@@ -236,7 +245,8 @@ def update_progress(
 def finish(job_id: str, result_table: str, result_id: Any, progress: Optional[dict] = None) -> bool:
     """任务成功 · 回填结果指针(指向现有结果表)。"""
     try:
-        with get_cursor(commit=True) as cur:
+        # bypass:worker 完成回填(按 job_id),无请求上下文。
+        with get_cursor_rls(bypass=True, commit=True) as cur:
             cur.execute(
                 """
                 UPDATE recon_jobs
@@ -267,7 +277,8 @@ def set_needs_review(job_id: str, payload: dict) -> bool:
     (复用 progress 列 · 暂停后无后续进度更新 · 零 schema 改动。)
     """
     try:
-        with get_cursor(commit=True) as cur:
+        # bypass:worker 暂停任务等用户核对(按 job_id),无请求上下文。
+        with get_cursor_rls(bypass=True, commit=True) as cur:
             cur.execute(
                 """
                 UPDATE recon_jobs
@@ -297,7 +308,8 @@ def set_needs_mapping(job_id: str, payload: dict) -> bool:
     """
     p = payload or {}
     try:
-        with get_cursor(commit=True) as cur:
+        # bypass:worker 暂停等用户确认列映射(按 job_id),无请求上下文。
+        with get_cursor_rls(bypass=True, commit=True) as cur:
             cur.execute(
                 """
                 UPDATE recon_jobs
@@ -338,7 +350,8 @@ def set_failed(
     前端按失败展示明确原因(绝不显示完成)。result_table/result_id 指向诊断任务(#16)。
     """
     try:
-        with get_cursor(commit=True) as cur:
+        # bypass:worker 终态失败回填(按 job_id),无请求上下文。
+        with get_cursor_rls(bypass=True, commit=True) as cur:
             cur.execute(
                 """
                 UPDATE recon_jobs
@@ -367,7 +380,8 @@ def set_failed(
 def fail(job_id: str, error_code: str) -> bool:
     """任务失败 · 还有重试次数则回 queued · 否则 failed。"""
     try:
-        with get_cursor(commit=True) as cur:
+        # bypass:worker 失败重试/置失败(按 job_id),无请求上下文。
+        with get_cursor_rls(bypass=True, commit=True) as cur:
             cur.execute(
                 """
                 UPDATE recon_jobs
@@ -395,7 +409,8 @@ def reclaim_stale() -> List[Dict[str, str]]:
     工人循环里定期调。返回被回收的 [{id, status}]。
     """
     try:
-        with get_cursor(commit=True) as cur:
+        # bypass:后台回收过期租约(扫全表跨租户),无请求上下文。
+        with get_cursor_rls(bypass=True, commit=True) as cur:
             cur.execute("""
                 UPDATE recon_jobs
                 SET status = CASE WHEN attempts < max_attempts THEN 'queued' ELSE 'failed' END,
@@ -418,7 +433,8 @@ def get(
 ) -> Optional[Dict[str, Any]]:
     """取单个任务(状态接口用)· 传 user_id/tenant_id 则做归属校验(防越权看别人任务)。"""
     try:
-        with get_cursor() as cur:
+        # 用户面状态查询:RLS 上下文 + 应用层 WHERE 双道(防越权看别人任务)。
+        with get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             where = ["id = %s::uuid"]
             args: List[Any] = [str(job_id)]
             if user_id is not None and tenant_id:
@@ -437,7 +453,8 @@ def get(
 def gc_old(done_days: int = 7, failed_days: int = 30) -> int:
     """清理老任务记录(暂存文件由工人单独清)· 返回删除行数。"""
     try:
-        with get_cursor(commit=True) as cur:
+        # bypass:后台 GC 清理老任务(扫全表跨租户),无请求上下文。
+        with get_cursor_rls(bypass=True, commit=True) as cur:
             cur.execute(
                 """
                 DELETE FROM recon_jobs

@@ -114,9 +114,17 @@ def _scope_sql(user_id: str, tenant_id: Optional[str]) -> tuple[str, list]:
     return "user_id = %s", [user_id]
 
 
-def _query_one_id(where: List[str], params: list) -> Optional[str]:
+# ocr_history / client_rules 是 wave3 表(尚未 enroll RLS)。这里先把游标换成带租户上下文的
+# get_cursor_rls(应用层 _scope_sql WHERE 仍是当前主隔离),待 wave3 给这两张表 apply RLS 后,
+# 数据库 policy 自动对这些查询强制生效、隔离闭合 —— 无需再回这里改。
+# TODO(wave3):ocr_history + client_rules enroll 后,本文件的隔离即由 policy 兜底。
+
+
+def _query_one_id(
+    where: List[str], params: list, *, tenant_id: Optional[str], user_id: str
+) -> Optional[str]:
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             cur.execute(
                 f"SELECT id FROM ocr_history WHERE {' AND '.join(where)} "
                 "ORDER BY created_at DESC LIMIT 1",
@@ -129,9 +137,11 @@ def _query_one_id(where: List[str], params: list) -> Optional[str]:
         return None
 
 
-def _query_ids(where: List[str], params: list, limit: int = 20) -> List[str]:
+def _query_ids(
+    where: List[str], params: list, *, tenant_id: Optional[str], user_id: str, limit: int = 20
+) -> List[str]:
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             cur.execute(
                 f"SELECT id FROM ocr_history WHERE {' AND '.join(where)} "
                 f"ORDER BY created_at DESC LIMIT {int(limit)}",
@@ -175,7 +185,7 @@ def make_dedup_lookups(
         if seller_name:
             where.append("seller_name IS NOT NULL AND LOWER(seller_name) = LOWER(%s)")
             params.append(seller_name)
-        return _query_one_id(where, params)
+        return _query_one_id(where, params, tenant_id=tenant_id, user_id=user_id)
 
     def find_suspected_duplicates(
         seller_tax_id: Optional[str], total_amount: Optional[float], invoice_date: Optional[str]
@@ -193,7 +203,7 @@ def make_dedup_lookups(
             "seller_name IS NOT NULL AND LOWER(seller_name) = LOWER(%s)",
         ]
         params = [*scope_params, exclude_history_id, float(total_amount), seller_name]
-        return _query_ids(where, params)
+        return _query_ids(where, params, tenant_id=tenant_id, user_id=user_id)
 
     return find_exact_duplicate, find_suspected_duplicates
 
@@ -206,7 +216,7 @@ def _load_ruleset(tenant_id: Optional[str], workspace_client_id: Optional[int]) 
     if not tenant_id or os.environ.get("KNOWLEDGE_ENABLED") != "1":
         return ClientRuleSet()
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, workspace_client_id=workspace_client_id) as cur:
             return load_client_rules(
                 cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
             )
@@ -222,7 +232,7 @@ def _resolve_workspace_client_id(
     # one, so resolve it from the history row (the call sites stay untouched).
     scope, params = _scope_sql(user_id, tenant_id)
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             cur.execute(
                 f"SELECT workspace_client_id FROM ocr_history WHERE id = %s::uuid AND {scope} LIMIT 1",
                 [history_id, *params],

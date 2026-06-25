@@ -65,8 +65,9 @@ class _CM:
 def _patch_both(factory):
     # B8 RLS:store 用户面走 get_cursor_rls、worker 走 get_cursor_rls(bypass)、DDL 留 get_cursor。
     # 测试同 patch 两游标到同一 factory,行为断言与游标种类无关。
-    with mock.patch.object(rj, "get_cursor", factory), mock.patch.object(
-        rj, "get_cursor_rls", factory
+    with (
+        mock.patch.object(rj, "get_cursor", factory),
+        mock.patch.object(rj, "get_cursor_rls", factory),
     ):
         yield
 

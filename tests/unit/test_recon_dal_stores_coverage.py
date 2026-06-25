@@ -674,9 +674,7 @@ class VatReconStoreTests(unittest.TestCase):
         )
         for act in ("pending", "resolved", "customer_issue", "accepted_diff"):
             with patch_cursor(FakeCursor(rowcount=1)):
-                self.assertTrue(
-                    vrs.update_recon_row_action(1, act, tenant_id=TENANT, user_id=USER)
-                )
+                self.assertTrue(vrs.update_recon_row_action(1, act, tenant_id=TENANT, user_id=USER))
         with patch_cursor(FakeCursor(rowcount=0)):
             self.assertFalse(
                 vrs.update_recon_row_action(1, "resolved", tenant_id=TENANT, user_id=USER)
@@ -685,7 +683,9 @@ class VatReconStoreTests(unittest.TestCase):
     def test_update_recon_row_ai_analysis(self):
         with patch_cursor(FakeCursor(rowcount=1)):
             self.assertTrue(
-                vrs.update_recon_row_ai_analysis(1, {"verdict": "ok"}, tenant_id=TENANT, user_id=USER)
+                vrs.update_recon_row_ai_analysis(
+                    1, {"verdict": "ok"}, tenant_id=TENANT, user_id=USER
+                )
             )
         with patch_cursor(FakeCursor(rowcount=0)):
             self.assertFalse(

@@ -123,6 +123,47 @@ def apply_user_via_parent_rls(
     _apply_via_parent(cur, table, parent, fk, parent_pk, inner, name, force)
 
 
+def disable_orphan_rls(cur) -> list[str]:
+    """关掉「RLS 已 ENABLE 但零 policy」的孤儿表 RLS,返回被关表名。
+
+    Postgres 规则:RLS 启用 + 零 policy = 对非 BYPASS 角色(pearnly_app)全拒(deny-all)。
+    带外手动 `ALTER TABLE x ENABLE RLS` 却没建 policy,会让走 get_cursor_rls 的查询读到 0 行
+    (或被 JOIN/子查询里的孤儿表静默拖空)。事故复盘见 docs/refactor/b8-rls-no-policy-orphans-INCIDENT.md。
+
+    幂等自愈,注册为 startup 最后一步:真 enroll 的表此时已有 policy(被排除,不误关),
+    只关残留孤儿。与按域 enroll 完全兼容(enroll 后有 policy → 不在孤儿集)。
+    """
+    cur.execute(
+        "SELECT c.relname FROM pg_class c "
+        "JOIN pg_namespace n ON n.oid = c.relnamespace "
+        "LEFT JOIN pg_policy p ON p.polrelid = c.oid "
+        "WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relrowsecurity "
+        "GROUP BY c.relname HAVING count(p.polname) = 0"
+    )
+    orphans = [r[0] for r in cur.fetchall()]
+    for table in orphans:
+        cur.execute(f'ALTER TABLE "{table}" DISABLE ROW LEVEL SECURITY')
+    return orphans
+
+
+def ensure_no_orphan_rls() -> list[str]:
+    """开自有 owner 连接跑 disable_orphan_rls(startup 末步用)。返回被关表名。
+
+    懒导入 core.db 避免与 get_cursor_rls 的模块级循环依赖。
+    """
+    import logging
+
+    from core import db
+
+    with db.get_cursor(commit=True) as cur:
+        orphans = disable_orphan_rls(cur)
+    if orphans:
+        logging.getLogger(__name__).warning(
+            "RLS 自愈:DISABLE %d 张零-policy 孤儿表 %s", len(orphans), orphans
+        )
+    return orphans
+
+
 def ensure_rls_app_role(cur, role: str = RLS_APP_ROLE) -> None:
     """建最小权限业务角色(NOBYPASSRLS · 幂等)+ 授 DML。业务连接 SET LOCAL ROLE 切到它后 RLS 才强制。"""
     cur.execute(

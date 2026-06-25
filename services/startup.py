@@ -257,32 +257,17 @@ def _boot_schema_ddl() -> None:
     except Exception as e:
         logger.warning(f"启动 authz schema 失败: {e}")
 
-    # 自动做账 schema(科目/映射/凭证/分录/设置/学习记忆 6 表 · docs/accounting/01)。
-    # NEW-DEBT-EXEMPT: 启动自愈式迁移,prod 无 alembic 钩子,与守门豁免口径一致。
-    try:
-        from services.accounting.schema import ensure_accounting_schema
-
-        ensure_accounting_schema()
-    except Exception as e:
-        logger.warning(f"启动 accounting schema 失败: {e}")
-
-    # 自动报税 schema(税表/明细/设置 3 表 · docs/tax-filing/01)。
-    # NEW-DEBT-EXEMPT: 启动自愈式迁移,口径同 accounting。
-    try:
-        from services.tax.schema import ensure_tax_schema
-
-        ensure_tax_schema()
-    except Exception as e:
-        logger.warning(f"启动 tax schema 失败: {e}")
-
-    # 一句话记账捕获草稿表(LINE 文本/图片路共用 expense_draft · docs/smart-intake/14)。
-    # NEW-DEBT-EXEMPT: 启动自愈式迁移,prod 无 alembic 钩子,口径同 accounting/tax。
-    try:
-        from services.expense.schema import ensure_expense_schema
-
-        ensure_expense_schema()
-    except Exception as e:
-        logger.warning(f"启动 expense schema 失败: {e}")
+    # 自动做账/报税/一句话记账 schema 双跑(accounting 6 表 / tax 3 表 / expense_draft ·
+    # docs accounting·tax-filing·smart-intake)。NEW-DEBT-EXEMPT: prod 无 alembic 钩子 → 启动自愈式迁移。
+    for _path, _fn, _label in (
+        ("services.accounting.schema", "ensure_accounting_schema", "accounting"),
+        ("services.tax.schema", "ensure_tax_schema", "tax"),
+        ("services.expense.schema", "ensure_expense_schema", "expense"),
+    ):
+        try:
+            getattr(__import__(_path, fromlist=[_fn]), _fn)()
+        except Exception as e:
+            logger.warning(f"启动 {_label} schema 失败: {e}")
 
     # LINE 各表幂等建(prod 无 alembic 钩子 → 启动自愈式迁移,口径同 expense schema)。
     # NEW-DEBT-EXEMPT: nonce 0037(防重放) / chat 0038(对话记忆) / msg_refs 0041(引用底座) /
@@ -318,6 +303,16 @@ def _boot_schema_ddl() -> None:
         _export_archive.register()
     except Exception as e:
         logger.warning(f"启动 外流 schema/handler 失败: {e}")
+
+    # 防复发自愈守卫(必须最后跑,所有 ensure_*/apply_* policy 已建好 → 真隔离表不被误关):
+    # 关掉「RLS 已开但零 policy」的孤儿表,杜绝 deny-all 把 get_cursor_rls 查询静默拖空。
+    # 复盘 docs/refactor/b8-rls-no-policy-orphans-INCIDENT.md。
+    try:
+        from core.rls import ensure_no_orphan_rls
+
+        ensure_no_orphan_rls()
+    except Exception as e:
+        logger.warning(f"启动 RLS 孤儿自愈失败: {e}")
 
 
 async def run_startup() -> dict:

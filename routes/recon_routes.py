@@ -240,6 +240,7 @@ async def run_recon(
         period_month=task["period_month"],
         source_ref=str(task_id),
         workspace_client_id=ws,
+        user_id=uid,
     )
     if not invoice_rows:
         invoice_rows = db.list_invoices_for_recon(
@@ -248,6 +249,7 @@ async def run_recon(
             period_year=task["period_year"],
             period_month=task["period_month"],
             workspace_client_id=ws,
+            user_id=uid,
         )
     report = db.get_vat_report(task["vat_report_id"], tenant_id=tid, user_id=uid)
     report_rows = (report or {}).get("parsed_rows") or []
@@ -255,7 +257,11 @@ async def run_recon(
     try:
         # 上报当前正在匹配哪个客户
         if progress_id and progress_id in _progress_store:
-            client = db.get_client_by_id(task["client_id"]) if task.get("client_id") else {}
+            client = (
+                db.get_client_by_id(task["client_id"], tenant_id=tid, user_id=uid)
+                if task.get("client_id")
+                else {}
+            )
             _progress_update(
                 progress_id, current_file=(client or {}).get("name", "") or f"task {task_id}"
             )
@@ -299,7 +305,11 @@ async def get_result(task_id: int, request: Request):
         raise HTTPException(404, "任务不存在")
     rows = db.list_recon_rows_detailed(task_id, tenant_id=tid, user_id=uid)
     # v118.32.2.5 · 补 client 给屏 C 头部用
-    client = db.get_client_by_id(task["client_id"]) if task.get("client_id") else {}
+    client = (
+        db.get_client_by_id(task["client_id"], tenant_id=tid, user_id=uid)
+        if task.get("client_id")
+        else {}
+    )
     return {"ok": True, "task": task, "rows": rows, "client": client or {}}
 
 

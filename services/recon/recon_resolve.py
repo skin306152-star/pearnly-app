@@ -19,6 +19,7 @@ def list_invoices_for_recon(
     period_month: int = None,
     source_ref: str = None,
     workspace_client_id: Optional[int] = None,
+    user_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     拉取指定客户 × 纳税期间内已归档发票
@@ -29,9 +30,14 @@ def list_invoices_for_recon(
     套账隔离 · workspace_client_id 给了 → 仅取本主体(+ 尚未归属套账的 NULL 行)的发票。
     ocr_history 读侧已按套账隔离(PO-4),本源查询是对账侧的同一过滤,防多主体把别套账的
     识别记录混进核对表(client_id 是买方维度,挡不住跨主体)。None → 旧行为(不过滤)。
+
+    B8 RLS:ocr_history 是 wave3 表,这里穿 tenant+user 上下文 + 应用层 user 过滤(下方 base_where),
+    wave3 给 ocr_history apply RLS 后,本查询的隔离由 policy 兜底闭合(无需再回来改)。
     """
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(
+            tenant_id=tenant_id, user_id=user_id, workspace_client_id=workspace_client_id
+        ) as cur:
             # 按 invoice_date 的年月过滤
             # v118.32.2.4 · 期间过滤宽容化 · invoice_date NULL 的发票也进对账
             # (OCR 没识别出日期不该把发票排除 · 让匹配引擎用发票号/金额/税号补救)
@@ -111,12 +117,12 @@ def list_invoices_for_recon(
         return []
 
 
-def find_client_by_tax_id(tenant_id, tax_id: str) -> Optional[Dict[str, Any]]:
-    """按税号找客户 · 跨 tenant 隔离"""
+def find_client_by_tax_id(tenant_id, tax_id: str, *, user_id=None) -> Optional[Dict[str, Any]]:
+    """按税号找客户 · 跨 tenant 隔离(B8 RLS:clients 是 wave3 表,穿上下文待 enroll 闭合)"""
     if not tax_id:
         return None
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             if tenant_id:
                 cur.execute(
                     """
@@ -140,7 +146,7 @@ def auto_create_client(
 ) -> Optional[int]:
     """v118.32.x · 屏 B 遇到陌生税号自动建客户 · 名字从发票/报告 OCR 出来"""
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO clients (
@@ -164,9 +170,11 @@ def auto_create_client(
         return None
 
 
-def get_client_by_id(client_id: int) -> Optional[Dict[str, Any]]:
+def get_client_by_id(client_id: int, *, tenant_id=None, user_id=None) -> Optional[Dict[str, Any]]:
+    # B8 RLS:clients 是 wave3 表 · 当前应用层仅按 id 查(无 scope)· 穿 tenant+user 上下文,
+    # wave3 给 clients apply RLS 后跨租户凭 client_id 直读被 policy 拦(闭合潜在越权读)。
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             cur.execute("SELECT * FROM clients WHERE id = %s", (client_id,))
             row = cur.fetchone()
             return dict(row) if row else None
@@ -182,7 +190,7 @@ def find_or_create_client_by_tax_id(
     if not tax_id or len(tax_id) != 13:
         return None
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             if tenant_id:
                 cur.execute(
                     "SELECT id FROM clients WHERE tenant_id = %s AND tax_id = %s "

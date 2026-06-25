@@ -69,6 +69,7 @@ class VatReconStoreContractTests(unittest.TestCase):
 
         with (
             mock.patch("core.db.get_cursor", _fake_cursor),
+            mock.patch("core.db.get_cursor_rls", _fake_cursor),
             mock.patch("core.db.create_client", return_value=4242) as m,
         ):
             rid = db.find_or_create_client_by_tax_id("u1", None, "1234567890123", "ACME")

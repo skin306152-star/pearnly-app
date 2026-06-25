@@ -45,9 +45,7 @@ def _capture(fetchone=None):
 
 
 def _no_bare():
-    return mock.patch(
-        "core.db.get_cursor", side_effect=AssertionError("must use get_cursor_rls")
-    )
+    return mock.patch("core.db.get_cursor", side_effect=AssertionError("must use get_cursor_rls"))
 
 
 def _assert_ctx(test, calls):

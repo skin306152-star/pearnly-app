@@ -47,8 +47,12 @@ def _fake(cur):
     yield cur
 
 
+@contextmanager
 def _patch(target, cur):
-    return mock.patch(target, lambda *a, **k: _fake(cur))
+    # RLS 迁移后 store 改走 get_cursor_rls · 连同传入 target 一并拦,覆盖迁移前后实现。
+    cm = lambda *a, **k: _fake(cur)  # noqa: E731
+    with mock.patch(target, cm), mock.patch("core.db.get_cursor_rls", cm):
+        yield
 
 
 class V2WorkspaceTests(unittest.TestCase):

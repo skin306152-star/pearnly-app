@@ -304,7 +304,7 @@ def run_salesvat(
         excel_path = _save_excel_file(tenant_id, task_id, xlsx_bytes)
         if excel_path:
             try:
-                with db.get_cursor(commit=True) as cur:
+                with db.get_cursor_rls(bypass=True, commit=True) as cur:
                     cur.execute(
                         "UPDATE vat_recon_tasks SET excel_path=%s WHERE id=%s::uuid",
                         (excel_path, task_id),

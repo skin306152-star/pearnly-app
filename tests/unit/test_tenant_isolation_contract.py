@@ -29,6 +29,7 @@ from __future__ import annotations
 import sys
 import types
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, List, Optional
 from unittest.mock import patch
@@ -132,9 +133,12 @@ class _CursorCM:
         return False
 
 
+@contextmanager
 def _patch_cursor(cursor: _Cursor):
-    """patch db.get_cursor 返我们的 mock · 每次 get_cursor() 都拿到同一个 cursor."""
-    return patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cursor))
+    """patch db.get_cursor / get_cursor_rls 返同一 mock cursor(RLS 迁移后 store 改走 rls 游标)。"""
+    cm = lambda *a, **k: _CursorCM(cursor)  # noqa: E731
+    with patch.object(db, "get_cursor", cm), patch.object(db, "get_cursor_rls", cm):
+        yield
 
 
 # 测试常量 (任意 uuid 字符串 · 不连 DB 不校验合法性)

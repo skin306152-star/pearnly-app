@@ -291,7 +291,9 @@ async def build_excel_endpoint(
             if excel_path:
                 # 更新 excel_path
                 try:
-                    with db.get_cursor(commit=True) as cur:
+                    with db.get_cursor_rls(
+                        tenant_id=tenant_id, user_id=user_id, commit=True
+                    ) as cur:
                         cur.execute(
                             "UPDATE vat_recon_tasks SET excel_path=%s WHERE id=%s::uuid",
                             (excel_path, task_id),
@@ -436,7 +438,7 @@ async def regenerate_task(task_id: str, request: Request):
     # 更新文件 + summary
     try:
         excel_path = _save_excel_file(tenant_id, task_id, xlsx_bytes)
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 """
                 UPDATE vat_recon_tasks

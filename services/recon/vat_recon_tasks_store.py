@@ -9,6 +9,7 @@ import logging
 from typing import Optional
 
 from core import db
+from core.rls import apply_tenant_or_user_rls
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,7 @@ def ensure_vat_recon_tasks_table():
                 CREATE INDEX IF NOT EXISTS idx_vrt_user
                     ON vat_recon_tasks(user_id);
             """)
+            apply_tenant_or_user_rls(cur, "vat_recon_tasks")
         logger.info("✅ vat_recon_tasks 表已就绪 (v118.32.4.10.0)")
     except Exception as e:
         logger.error(f"ensure_vat_recon_tasks_table failed: {e}")
@@ -83,7 +85,12 @@ def create_vat_recon_task(
     import json as _json
 
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            workspace_client_id=workspace_client_id,
+            commit=True,
+        ) as cur:
             cur.execute(
                 """
                 INSERT INTO vat_recon_tasks
@@ -149,7 +156,9 @@ def list_vat_recon_tasks(
         where_sql = "WHERE " + " AND ".join(where) if where else ""
         offset = (max(page, 1) - 1) * page_size
 
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(
+            tenant_id=tenant_id, user_id=user_id, workspace_client_id=workspace_client_id
+        ) as cur:
             cur.execute(f"SELECT COUNT(*) AS n FROM vat_recon_tasks {where_sql}", params)
             total = int(cur.fetchone()["n"] or 0)
             cur.execute(
@@ -176,7 +185,9 @@ def get_vat_recon_task(task_id: str, tenant_id, user_id: str, workspace_client_i
     """单条详情 · 含 raw_data_json · tenant 隔离(PO-6c:再叠套账过滤 rollout-safe)"""
     ws_sql, ws_params = _ws_clause(workspace_client_id)
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(
+            tenant_id=tenant_id, user_id=user_id, workspace_client_id=workspace_client_id
+        ) as cur:
             if tenant_id:
                 cur.execute(
                     f"SELECT * FROM vat_recon_tasks WHERE id = %s::uuid AND tenant_id = %s{ws_sql}",
@@ -197,7 +208,7 @@ def get_vat_recon_task(task_id: str, tenant_id, user_id: str, workspace_client_i
 def delete_vat_recon_task(task_id: str, tenant_id, user_id: str):
     """DELETE · 返回 excel_path 供调用方删文件"""
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             if tenant_id:
                 cur.execute(
                     "DELETE FROM vat_recon_tasks WHERE id = %s::uuid AND tenant_id = %s RETURNING excel_path",
@@ -218,7 +229,7 @@ def delete_vat_recon_task(task_id: str, tenant_id, user_id: str):
 def delete_vat_recon_tasks_older_than(days: int, tenant_id, user_id: str):
     """删除 days 天前的任务 · tenant 隔离 · 返回 (deleted_count, excel_paths[])"""
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             if tenant_id:
                 cur.execute(
                     """
@@ -251,7 +262,9 @@ def get_vat_recon_tasks_kpi(tenant_id, user_id: str, workspace_client_id=None):
     """本月 KPI: total / running / done / failed(PO-6c:再叠套账过滤 rollout-safe)"""
     ws_sql, ws_params = _ws_clause(workspace_client_id)
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(
+            tenant_id=tenant_id, user_id=user_id, workspace_client_id=workspace_client_id
+        ) as cur:
             if tenant_id:
                 cur.execute(
                     f"""

@@ -112,10 +112,10 @@ def mark_resolved(
 
 
 def claim_due(limit: int = 20) -> list[dict]:
-    """Claim due rows for this process. The UPDATE keeps multi-worker retries safe."""
+    """Claim due rows (multi-worker safe). Cross-tenant, so bypass=True (RLS would hide them); retry_one re-sets per-row tenant context."""
     from core import db
 
-    with db.get_cursor(commit=True) as cur:
+    with db.get_cursor_rls(bypass=True, commit=True) as cur:
         cur.execute(
             """
             UPDATE accounting_posting_failures f
@@ -187,7 +187,7 @@ def retry_one(row: dict) -> bool:
 
     tenant_id = str(row["tenant_id"])
     ws = int(row["workspace_client_id"])
-    with db.get_cursor(commit=True) as cur:
+    with db.get_cursor_rls(tenant_id=tenant_id, workspace_client_id=ws, commit=True) as cur:
         try:
             cur.execute("SAVEPOINT acct_failure_retry")
             if not modules_store.is_enabled(cur, tenant_id=tenant_id, module_key="accounting"):

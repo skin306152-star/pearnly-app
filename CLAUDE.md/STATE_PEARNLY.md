@@ -6,15 +6,15 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-25 · **B8 RLS · ready 域 prod 启用 + wave2 对账迁移收口(Phase 1-3 全做完·真库验证)** · 本地 `f1714ca1` 未 push · companion 未动 · 设计 `docs/refactor/b8-rls-wave2-closure-design.md`）
+## 🎯 状态卡（2026-06-25 · **B8 RLS · ready 域 prod 启用 + wave2 对账收口 + bank_reconcile_\* enroll(全 prod 验过)** · 已 push `ad5a1841` · companion 未动 · 设计 `docs/refactor/b8-rls-wave2-closure-design.md`）
 
-- **B8 RLS P3 · ready 域 prod 真启用**(`8e88464e`/`ae4556ec`/`ae41277c`·`RLS_ROLE=pearnly_app` 入 `/opt/mrpilot/.env`):POS/库存/产品/采购/销售/会计/税/导出/modules/LINE-brain/expense **已真隔离**。裸 get_cursor 留 owner·force=False 绕过→老路径不破。
-- **wave2 对账 row-op 裸 get_cursor 全清(本地 4 commit 未 push)**:Phase1 `9f7765c2`(recon_jobs enroll + worker bypass·knowledge_bridge 穿上下文)/ Phase2 `967e9fba`(**两个 hard point**)/ Phase3a `933e1681`(recon_resolve)/ Phase3b `f1714ca1`(bank_recon)。recon 域残留裸 get_cursor 仅 DDL/ensure(owner)。
-- **★ hard point 1(reconciliation_row 无 tenant_id)**:`core/rls.py` 加传递式模板 `apply_tenant_via_parent_rls`(经 task_id→reconciliation_task 的 EXISTS 子查询)·enroll vat_report/reconciliation_task=tenant_or_user、reconciliation_row=传递式·vat_report 补 user_id 列+回填。**hard point 2(只收主键函数)**:vat_recon_store 11 函数 + field_override + recon_resolve + bank_recon 全改签名带 tenant+user·调用方(recon_routes/v1_batch/bank_recon_routes/scoring)全穿上下文。
-- **真库验证**:docker pg 16/16 集成(矩阵 8 + 传递式 5 + 真 recon 表端到端 3·A 建 task/row,B 凭 id 读不到改不到·field_override 跨租户 row_not_found)+ 全量单测 4877 passed(1 flaky test_line_image_queue 隔离过·无关)。
+- **B8 RLS P3 · ready 域 prod 真启用**(`RLS_ROLE=pearnly_app` 入 `/opt/mrpilot/.env`):POS/库存/产品/采购/销售/会计/税/导出/modules/LINE-brain/expense **已真隔离**。裸 get_cursor 留 owner·force=False 绕过→老路径不破。
+- **wave2 对账 row-op 全清 + 两个 hard point**(`9f7765c2`→`f1714ca1`):hp1=`core/rls.py` 传递式 `apply_tenant_via_parent_rls`(reconciliation_row 经 task_id→task 的 EXISTS)·hp2=vat_recon_store/field_override/recon_resolve/bank_recon ~12 函数改签名带 tenant+user·调用方全穿上下文。recon 域残留裸 get_cursor 仅 DDL/ensure(owner)。
+- **★ bank_reconcile_\* enroll 上线 prod 验过**(`4404aaca` enroll + `ad5a1841` 清 legacy):user 维度表·`core/rls.py` 加 `user` 模板 + `apply_user_rls`/`apply_user_via_parent_rls`(via-parent EXISTS 抽 `_apply_via_parent` 共享)·sessions/transactions 纯 user、candidates 经 tx_id 传递·新 `ensure_bank_recon_rls()` startup 跑。**prod 发现三表有带外手动 SQL 加的 p_*_user(缺 bypass)→ ensure 一并 DROP 去重**(终态每表唯一 `tenant_isolation`)。**金丝雀 PASS**:真用户自见 3 sessions/40 tx,假用户全 0。
+- **验证**:docker pg 24/24 集成(矩阵 8+传递式 5+真 recon 端到端 3 + **新 user-only/via-parent 模板 4 + bank 真表端到端 4**)+ 全量 4882 单测。
 - **★ 两个 prod-only 坑(见 [[rls-b8-p3-prod-enabled]])**:① Supabase postgres 非 BYPASSRLS·靠 owner 绕过→ready 域**别上 force=True**。② SET ROLE 要成员资格·**Owner 后台 SQL Editor 跑过 `GRANT pearnly_app TO postgres`**(没它设 env 全 500)。
-- **回滚**(零数据风险):删 `.env` 的 RLS_ROLE 行+重启 / `scripts/rls_rollback.sql`。备份 prod `/opt/mrpilot/.env.bak_rls_*`。
-- **下一步**:① **bank_reconcile_\* enroll**(user 维度表·小 follow-on=加 `apply_user_rls` 模板+enroll·穿线已就位·见设计§5b)② **wave3** 老模块 clients/ocr_history/exceptions/notification/billing(~62·charge.py 钱路径·enroll ocr_history/clients 后 recon_resolve+bank_recon 的 JOIN 隔离自动闭合)③ **wave4** erp/email/import ④ **P4** `12-rls-isolation.spec.js` 断言收紧 `passed===5`+ready 域裸 get_cursor 清零后 force=True。
+- **回滚**(零数据风险):删 `.env` 的 RLS_ROLE 行+重启 / `scripts/rls_rollback.sql`。
+- **下一步(按序)**:① **wave3** 老模块 clients/ocr_history/exceptions/notification/billing(~62·charge.py 钱路径禁 bypass·credits/cost 超管聚合必 bypass·enroll ocr_history/clients 后 recon_resolve+bank_recon 的 JOIN 隔离自动闭合)② **wave4** erp/email/import(~30·后台 bypass vs 用户触发 RLS)③ **P4** `12-rls-isolation.spec.js` 断言收紧 `passed===5`+ready 域裸 get_cursor 清零后 force=True。
 - 坑:共享树 push 前只 `git add` 自己文件显式 pathspec;集成测试 `docker compose up -d db` + `PEARNLY_INTEGRATION_DB=1 RLS_ROLE=pearnly_app PGSSLMODE=disable`。
 
 ## 历史记录（2026-06-24 深夜 · **LINE 多页单据逐页入账(防双重记账)** · prod `d94fd2e5`）

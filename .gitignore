@@ -128,3 +128,18 @@ CLAUDE.md/STATE_PEARNLY.md.bak
 
 # DMS probe scratch (live-probe screenshots/html · never commit)
 _dms_probe/
+
+# ── 本地 scratch / 输出 / 审计产物(2026-06-26 · 收尾整理)──
+# 历次会话遗留的本地输出/审计产物 · 只本机用 · 从不入库。
+# 之前未忽略 → git status 噪声 + 污染本地 black 扫描。仅忽略不删除(文件仍在本地)。
+# 注:scripts/_*.py、scripts/probe/_*.py、scripts/_*.cjs、tests/e2e/_*.spec.js
+# 不在此忽略 —— 那些前缀里混着大量【已跟踪】的真 e2e/authz 工具,整忽略会埋坑。
+/outputs/
+/_ocr_test/
+/product-audit/
+/tmp_video_frames/
+tests/visual/_shot/
+tests/visual/playwright-output/
+# 根目录一次性截图 / 安装图标产物
+/_*.png
+/_*.ico

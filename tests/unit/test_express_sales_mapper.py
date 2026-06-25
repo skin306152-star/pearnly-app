@@ -90,6 +90,20 @@ class ExpressSalesMapperTests(unittest.TestCase):
         self.assertEqual(r.payload["customer"]["code"], "ย001")
         self.assertFalse(r.payload["customer"]["customer_new"])
 
+    def test_cash_buyer_maps_to_cash_customer(self):
+        # 现金零售:买方栏 OCR=「เงินสด」(被采购清洗器当噪声抹空的那种)→ 认 ERP 现成现金客户:
+        # code=name=「เงินสด」、customer_new=False(不新建)、desc 落现金客户名。
+        r = build_express_sales_payload(
+            _sales_history(fields={"buyer_name": "เงินสด", "buyer_tax": ""}), config=_CONFIG
+        )
+        self.assertTrue(r.ok, r.reason)
+        cust = r.payload["customer"]
+        self.assertEqual(cust["code"], "เงินสด")
+        self.assertEqual(cust["name"], "เงินสด")
+        self.assertFalse(cust["customer_new"])
+        dr = [ln for ln in r.payload["lines"] if ln["side"] == "D"]
+        self.assertEqual(dr[0]["desc"], "เงินสด")
+
     def test_paid_routes_to_hs(self):
         r = build_express_sales_payload(
             _sales_history(fields={"payment_status": "paid"}), config=_CONFIG

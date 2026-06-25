@@ -40,6 +40,18 @@ from services.erp.express_push.common import (
 )
 from services.purchase.field_clean import clean_invoice_no, clean_seller, clean_tax_id
 
+# 现金销售客户:ERP 真账套通行约定 —— CUSCOD=CUSNAM="เงินสด"(korn/test 套实测均已建档,
+# 应收走 ar_acc)。收现金零售单买方栏 OCR 即「เงินสด」,但被采购卖家清洗器(noise 黑名单含
+# "เงินสด"/"cash")误当噪声抹空 → 触发 confirm 的 vendor_missing。这里对销项直接认现金客户:
+# 用现成档(customer_new=False · 不新建 · 不冒重客户),让记账挂到固定现金客户名下。
+CASH_CUSTOMER_NAME = "เงินสด"
+_CASH_BUYER_TOKENS = frozenset({"เงินสด", "ขายสด", "cash"})
+
+
+def _is_cash_buyer(raw: Any) -> bool:
+    """买方是否为现金客人(销项专用判定)。"""
+    return str(raw or "").strip().lower() in _CASH_BUYER_TOKENS
+
 
 def _resolve_customer(
     clients: List[Dict[str, Any]], history: Dict[str, Any], name: str, tax_id: str
@@ -109,13 +121,22 @@ def build_express_sales_payload(
         if not vat_acc:
             return fail("no_output_vat_account")
 
-    name = clean_seller(
-        fields.get("buyer_name") or fields.get("customer_name") or history.get("buyer_name")
-    )
+    raw_buyer = fields.get("buyer_name") or fields.get("customer_name") or history.get("buyer_name")
     tax_id = clean_tax_id(
         fields.get("buyer_tax") or fields.get("buyer_tax_id") or fields.get("customer_tax")
     )
-    customer = _resolve_customer(mappings.get("clients") or [], history, name, tax_id)
+    if _is_cash_buyer(raw_buyer):
+        name = CASH_CUSTOMER_NAME
+        customer = {
+            "code": CASH_CUSTOMER_NAME,
+            "name": CASH_CUSTOMER_NAME,
+            "tax_id": tax_id,
+            "prename": "",
+            "customer_new": False,
+        }
+    else:
+        name = clean_seller(raw_buyer)
+        customer = _resolve_customer(mappings.get("clients") or [], history, name, tax_id)
     ref_no = clean_invoice_no(history.get("invoice_no") or fields.get("invoice_number"))
 
     # 分录反向:借 应收(含税) = 贷 销售收入(税前) + 贷 销项税。

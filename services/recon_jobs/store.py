@@ -136,9 +136,7 @@ def enqueue(
         # 列数必须与占位符/值严格一一对应 —— 此前误带了 progress 列却没传值 →
         # psycopg2 "tuple index out of range"(真站点 E2E 抓出的根因)。
         # 用户面 INSERT 走 RLS 上下文:WITH CHECK 要求 tenant 匹配 / 或 tenant 空时 user 匹配。
-        with get_cursor_rls(
-            tenant_id=tid, user_id=uid, workspace_client_id=ws, commit=True
-        ) as cur:
+        with get_cursor_rls(tenant_id=tid, user_id=uid, workspace_client_id=ws, commit=True) as cur:
             if job_id:
                 cur.execute(
                     """

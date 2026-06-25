@@ -6,7 +6,7 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-25 · **B8 RLS · ready 域 prod 启用 + wave2 对账迁移进行中** · prod `a1e68aae` · companion 未动）
+## 🎯 状态卡（2026-06-25 · **B8 RLS · ready 域 prod 启用 + wave2 对账迁移进行中** · prod `f860b984` · companion 未动 · 详细交接 `docs/HANDOFF-2026-06-25-B8-RLS-启用与wave2.md`）
 
 - **B8 RLS P3 · ready 域 prod 真启用**(`8e88464e`/`ae4556ec`/`ae41277c`·`RLS_ROLE=pearnly_app` 入 `/opt/mrpilot/.env`):POS/库存/产品/采购/销售/会计/税/导出/modules/LINE-brain/expense **已真隔离**。裸 get_cursor 留 owner·force=False 绕过→老路径不破。
 - **wave2 对账迁移(进行中)**:3 个自包含 `tenant_or_user` task 表已迁 get_cursor_rls + enroll + prod 隔离验过——`vat_recon_tasks`(`cd6a3d7e`)/`gl_vat_task`(`8722b8b5`)/`bank_recon_v2_task`(`a1e68aae`)。**套路**:store 函数签名本有 tenant/user→换游标即可;按 user_id 删的函数补 tenant_id 参数(否则 RLS 下删不到 tenant 任务·静默 0 行·money 陷阱已修);受影响 mock-cursor 测试辅助改为同 patch 两游标;每域本地 2 租户真隔离+prod enroll 验证。**⏳ wave2 剩**:`vat_recon_store`(vat_report+reconciliation_task/row·13 处·JOIN ocr_history/clients=wave3 表)/`recon_resolve`/`field_override`/`bank_recon_v1`+`bank_recon_match`(JOIN ocr_history)/`recon_jobs` worker(bypass)/`knowledge_bridge`(读 wave3 表)——这些更大、跨 wave3 表,JOIN 隔离要等 wave3。

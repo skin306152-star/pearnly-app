@@ -185,6 +185,7 @@ class ExpressSalesMapperTests(unittest.TestCase):
         self.assertNotIn("", nm)
         self.assertIn("้", nm)
         nm.encode("cp874")  # 不抛即通过(可写进 Express DBF)
+
     def test_items_truly_unreconcilable_still_blocks(self):
         # 真读错(既≠税前也≠含税)→ 照旧 mismatch,不被新含税分支放过(安全没削弱)。
         items = [{"name": "X", "qty": "1", "subtotal": "12.34"}]

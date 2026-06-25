@@ -71,5 +71,35 @@ class VatReconTasksRlsContractTests(unittest.TestCase):
         self.assertEqual(calls[0].get("user_id"), "usr-1")
 
 
+class GlVatTaskRlsContractTests(unittest.TestCase):
+    """gl_vat_task 同 tenant_or_user 模板;delete 此前只有 user_id,新增 tenant_id 参数,
+    否则 tenant 拥有的任务在 RLS 下不可见、删 0 行。"""
+
+    def test_delete_threads_tenant(self):
+        from services.recon import gl_vat_store as gl
+
+        calls, fake = _capture()
+        with (
+            mock.patch("core.db.get_cursor_rls", fake),
+            mock.patch("core.db.get_cursor", side_effect=AssertionError("must use get_cursor_rls")),
+        ):
+            gl.delete_gl_vat_task(7, "usr-1", "ten-1")
+        self.assertEqual(calls[0].get("tenant_id"), "ten-1")
+        self.assertEqual(calls[0].get("user_id"), "usr-1")
+
+    def test_create_passes_tenant_and_user(self):
+        from services.recon import gl_vat_store as gl
+
+        calls, fake = _capture()
+        with (
+            mock.patch("core.db.get_cursor_rls", fake),
+            mock.patch("core.db.get_cursor", side_effect=AssertionError("must use get_cursor_rls")),
+        ):
+            gl.create_gl_vat_task("usr-1", "ten-1", "g", "v", 1, 1, [], {}, workspace_client_id=3)
+        self.assertEqual(calls[0].get("tenant_id"), "ten-1")
+        self.assertEqual(calls[0].get("user_id"), "usr-1")
+        self.assertEqual(calls[0].get("workspace_client_id"), 3)
+
+
 if __name__ == "__main__":
     unittest.main()

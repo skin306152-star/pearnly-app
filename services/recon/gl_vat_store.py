@@ -9,6 +9,7 @@ import logging
 from typing import Optional, Dict, Any, List
 
 from core import db
+from core.rls import apply_tenant_or_user_rls
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,7 @@ def ensure_gl_vat_task_table():
             cur.execute(
                 "ALTER TABLE gl_vat_task ADD COLUMN IF NOT EXISTS workspace_client_id BIGINT"
             )
+            apply_tenant_or_user_rls(cur, "gl_vat_task")
         logger.info("[v118.32.5] gl_vat_task 表就绪")
         return True
     except Exception as e:
@@ -71,7 +73,12 @@ def create_gl_vat_task(
     import json as _j
 
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            workspace_client_id=workspace_client_id,
+            commit=True,
+        ) as cur:
             cur.execute(
                 """
                 INSERT INTO gl_vat_task (
@@ -113,7 +120,7 @@ def get_gl_vat_task(task_id: int, user_id: str, tenant_id=None) -> Optional[Dict
     现强制 caller 传 user_id · 可选 tenant_id 走 Dual-Key 模式 ·
     DB 层 fail-safe · caller 不传 scope 物理拿不到 row"""
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             if tenant_id:
                 cur.execute(
                     "SELECT * FROM gl_vat_task WHERE id = %s AND tenant_id = %s::uuid",
@@ -148,7 +155,9 @@ def list_gl_vat_tasks(
         ws_clause = " AND (workspace_client_id = %s OR workspace_client_id IS NULL)"
         ws_params = (int(workspace_client_id),)
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(
+            tenant_id=tenant_id, user_id=user_id, workspace_client_id=workspace_client_id
+        ) as cur:
             if tenant_id:
                 cur.execute(
                     f"SELECT {cols} FROM gl_vat_task WHERE tenant_id = %s::uuid{ws_clause} "
@@ -168,9 +177,9 @@ def list_gl_vat_tasks(
         return []
 
 
-def delete_gl_vat_task(task_id: int, user_id: str) -> bool:
+def delete_gl_vat_task(task_id: int, user_id: str, tenant_id=None) -> bool:
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 "DELETE FROM gl_vat_task WHERE id = %s AND user_id = %s::uuid",
                 (task_id, str(user_id)),
@@ -182,7 +191,7 @@ def delete_gl_vat_task(task_id: int, user_id: str) -> bool:
 
 
 # v118.32.5.5.20 · 批量删除 GL 对账任务
-def delete_gl_vat_tasks_batch(ids: list, user_id: str) -> int:
+def delete_gl_vat_tasks_batch(ids: list, user_id: str, tenant_id=None) -> int:
     """删除多个 GL 对账任务 · 返回成功删除条数。仅限本人任务。"""
     if not ids:
         return 0
@@ -190,7 +199,7 @@ def delete_gl_vat_tasks_batch(ids: list, user_id: str) -> int:
         clean_ids = [int(i) for i in ids if str(i).isdigit() or isinstance(i, int)]
         if not clean_ids:
             return 0
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 "DELETE FROM gl_vat_task WHERE id = ANY(%s) AND user_id = %s::uuid",
                 (clean_ids, str(user_id)),

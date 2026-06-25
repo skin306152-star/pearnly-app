@@ -376,7 +376,7 @@
     height: 32px;
     padding: 0;
     border: 1px solid var(--line);
-    background: #fff;
+    background: var(--card);
     border-radius: 8px;
     color: var(--ink-3);
     cursor: pointer;
@@ -386,18 +386,18 @@
 }
 /* 危险动作(重置密钥):红字描边·与主按钮区分,防误触 */
 .exp-danger {
-    color: var(--danger, #c0392b);
-    border-color: var(--danger, #c0392b);
-    background: #fff;
+    color: var(--danger);
+    border-color: var(--danger);
+    background: var(--card);
 }
 /* 推送失败行(与连接徽章分离) */
 .exp-failed-bar {
     margin-top: 8px;
     padding: 7px 10px;
     border-radius: 8px;
-    background: var(--red-50, #fdecec);
-    border: 1px solid var(--danger, #c0392b);
-    color: var(--danger, #c0392b);
+    background: var(--danger-bg);
+    border: 1px solid var(--danger);
+    color: var(--danger);
     font-size: 12px;
     line-height: 1.5;
 }

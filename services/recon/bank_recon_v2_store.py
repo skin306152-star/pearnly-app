@@ -9,6 +9,7 @@ import logging
 from typing import Optional, Dict, Any, List
 
 from core import db
+from core.rls import apply_tenant_or_user_rls
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,7 @@ def ensure_bank_recon_v2_table():
                 ON bank_recon_v2_task(tenant_id, created_at DESC)
                 WHERE tenant_id IS NOT NULL
             """)
+            apply_tenant_or_user_rls(cur, "bank_recon_v2_task")
             logger.info("[v118.33.6] bank_recon_v2_task 表已就绪")
     except Exception as e:
         logger.warning(f"ensure_bank_recon_v2_table failed: {e}")
@@ -89,7 +91,12 @@ def create_bank_recon_v2_task(
     import json as _j
 
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            workspace_client_id=workspace_client_id,
+            commit=True,
+        ) as cur:
             cur.execute(
                 """
                 INSERT INTO bank_recon_v2_task (
@@ -143,7 +150,9 @@ def get_bank_recon_v2_task(
     Dual-Key 模式 · DB 层 fail-safe。PO-6b:再叠套账过滤(rollout-safe)。"""
     ws_sql, ws_params = _ws_clause(workspace_client_id)
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(
+            tenant_id=tenant_id, user_id=user_id, workspace_client_id=workspace_client_id
+        ) as cur:
             if tenant_id:
                 cur.execute(
                     f"SELECT * FROM bank_recon_v2_task WHERE id = %s AND tenant_id = %s::uuid{ws_sql}",
@@ -166,7 +175,9 @@ def list_bank_recon_v2_tasks(
 ) -> List[Dict[str, Any]]:
     ws_sql, ws_params = _ws_clause(workspace_client_id)
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(
+            tenant_id=tenant_id, user_id=user_id, workspace_client_id=workspace_client_id
+        ) as cur:
             if tenant_id:
                 cur.execute(
                     f"""
@@ -204,9 +215,9 @@ def list_bank_recon_v2_tasks(
         return []
 
 
-def delete_bank_recon_v2_task(task_id: int, user_id: str) -> bool:
+def delete_bank_recon_v2_task(task_id: int, user_id: str, tenant_id=None) -> bool:
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 "DELETE FROM bank_recon_v2_task WHERE id = %s AND user_id = %s::uuid",
                 (task_id, str(user_id)),
@@ -217,14 +228,14 @@ def delete_bank_recon_v2_task(task_id: int, user_id: str) -> bool:
         return False
 
 
-def delete_bank_recon_v2_tasks_batch(ids: list, user_id: str) -> int:
+def delete_bank_recon_v2_tasks_batch(ids: list, user_id: str, tenant_id=None) -> int:
     if not ids:
         return 0
     try:
         clean_ids = [int(i) for i in ids if str(i).isdigit() or isinstance(i, int)]
         if not clean_ids:
             return 0
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 "DELETE FROM bank_recon_v2_task WHERE id = ANY(%s) AND user_id = %s::uuid",
                 (clean_ids, str(user_id)),

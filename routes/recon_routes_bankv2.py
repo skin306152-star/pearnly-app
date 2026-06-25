@@ -207,7 +207,7 @@ async def bank_v2_delete(task_id: int, request: Request):
     user = require_perm(request, "recon.create")
     if not user:
         raise HTTPException(401, "未登录")
-    ok = db.delete_bank_recon_v2_task(task_id, str(user["id"]))
+    ok = db.delete_bank_recon_v2_task(task_id, str(user["id"]), user.get("tenant_id"))
     if not ok:
         raise HTTPException(404, "任务不存在或无权删除")
     return {"ok": True}
@@ -224,7 +224,7 @@ async def bank_v2_batch_delete(body: _BankV2BatchDeleteBody, request: Request):
         raise HTTPException(401, "未登录")
     if not body.ids:
         return {"deleted": 0}
-    deleted = db.delete_bank_recon_v2_tasks_batch(body.ids, str(user["id"]))
+    deleted = db.delete_bank_recon_v2_tasks_batch(body.ids, str(user["id"]), user.get("tenant_id"))
     return {"deleted": int(deleted)}
 
 

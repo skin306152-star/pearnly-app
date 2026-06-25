@@ -63,19 +63,9 @@ function buildErpLogCard(log: any): string {
         log.status === 'failed' &&
         log.next_retry_at &&
         new Date(log.next_retry_at).getTime() > Date.now() - 60000;
-    // V3 细粒度态(meta.stage 派生进 push_stage)优先于粗粒度 status 显示诚实标。
     const stage = log.push_stage || '';
     let statusClass: string, statusIcon: string, statusLabel: string;
-    if (stage === 'waiting_lock') {
-        // Express 占用账套·稍后自动重领 → 当"等待中"而非失败(不吓用户)。
-        statusClass = 'retrying';
-        statusIcon = '⏳';
-        statusLabel = t('erp-status-waiting-lock');
-    } else if (log.status === 'manual' || stage === 'needs_review' || stage === 'needs_mapping') {
-        statusClass = 'fail';
-        statusIcon = '⚠';
-        statusLabel = t(stage === 'needs_mapping' ? 'erp-status-needs-mapping' : 'erp-status-needs-review');
-    } else if (log.status === 'pending') {
+    if (log.status === 'pending') {
         statusClass = 'retrying';
         statusIcon = '⟳';
         statusLabel = t('erp-status-pending');
@@ -95,6 +85,15 @@ function buildErpLogCard(log: any): string {
         statusClass = 'fail';
         statusIcon = '✗';
         statusLabel = t('erp-status-failed');
+    }
+    // V3 细粒度态(meta.stage 派生进 push_stage)只覆盖诚实标签 —— 复用既有图标,不新增 emoji:
+    // waiting_lock 落 pending 分支(⟳ 等待中·非失败,不吓用户)· manual/needs_* 落 fail 分支(✗)。
+    if (stage === 'waiting_lock') {
+        statusLabel = t('erp-status-waiting-lock');
+    } else if (stage === 'needs_mapping') {
+        statusLabel = t('erp-status-needs-mapping');
+    } else if (stage === 'needs_review' || log.status === 'manual') {
+        statusLabel = t('erp-status-needs-review');
     }
 
     const isId = log.push_type === 'id_card';

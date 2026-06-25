@@ -122,7 +122,6 @@ export const AUTO_HTML_1 = `
                         <!-- v118.34.19 (A4) · 「推送日志」subtab 已移到集成主页面顶部 tab · 这里仅留 连接 / 字段映射 -->
                         <div class="erp-subtabs" role="tablist">
                             <button class="erp-subtab active" type="button" data-erp-subtab="connect" data-i18n="auto-erp-subtab-connect-only">连接</button>
-                            <button class="erp-subtab" type="button" data-erp-subtab="mappings" data-i18n="auto-erp-subtab-mappings">字段映射</button>
                         </div>
 
                         <!-- 子面板 1:连接(纯卡片 · 不含日志、不含 today-stats · v118.34.5) -->
@@ -148,24 +147,6 @@ export const AUTO_HTML_1 = `
                              home.js 的 loadErpLogs() 等通过 id 仍然找得到 ·
                              不需要改. -->
 
-                        <!-- 子面板 2:字段映射(老板可写 / 员工只读 · IIFE 渲染) -->
-                        <div class="erp-subpanel" data-erp-subpanel="mappings">
-                            <div class="erp-map-sub-desc" data-i18n="erp-map-sub">把 Pearnly 的客户 / 科目 / 税码 翻译成你 ERP 系统的代码 · 后续推送 ERP 时会自动用这里的映射</div>
-                            <div class="erp-map-subtabs" id="erp-map-subtabs" role="tablist">
-                                <button class="erp-map-subtab active" type="button" data-erp-subtab="clients" data-i18n="erp-map-subtab-clients">客户映射</button>
-                                <button class="erp-map-subtab erp-map-subtab-advanced" type="button" data-erp-subtab="accounts" data-i18n="erp-map-subtab-accounts">科目映射</button>
-                                <button class="erp-map-subtab erp-map-subtab-advanced" type="button" data-erp-subtab="taxes" data-i18n="erp-map-subtab-taxes">税码映射</button>
-                                <button class="erp-map-subtab erp-map-subtab-advanced" type="button" data-erp-subtab="products" data-i18n="erp-map-subtab-products">商品映射</button>
-                                <button class="erp-map-show-advanced-btn" type="button" id="erp-map-show-advanced-btn" aria-pressed="false">
-                                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <line class="erp-map-adv-plus-h" x1="5" y1="10" x2="15" y2="10"/>
-                                        <line class="erp-map-adv-plus-v" x1="10" y1="5" x2="10" y2="15"/>
-                                    </svg>
-                                    <span class="erp-map-adv-btn-label" data-i18n="erp-map-show-advanced">显示高级映射</span>
-                                </button>
-                            </div>
-                            <div class="erp-map-pane-wrap" id="erp-map-pane-wrap"></div>
-                        </div>
                     </div>
 
                     <!-- Tab: 银行对账 (v0.18 · M10) -->

@@ -135,8 +135,6 @@ import './home/tax-settings.js'; // 屏4 报税设置(window.loadTaxSettings · 
 import './home/cmdk-mask-html.js'; // REFACTOR-WB-C3 · 命令面板(Cmd+K · #cmdk-mask)inner 注入(home.html 空壳 · 须在 topbar-avatar.js 前 · _initCmdk DOMContentLoaded 带守卫绑 cmdk-input/body/esc-btn · openCmdk 按需)
 import './home/topbar-avatar.js'; // REFACTOR-C1 · 顶栏三件套/头像菜单
 import './home/recon-subtab-settings.js'; // REFACTOR-C1 · 对账子tab+设置弹窗
-import './home/erp-mappings.js'; // REFACTOR-C1 · ERP 字段映射底座(客户/科目/税码 sub-tab)
-import './home/erp-map-advanced.js'; // REFACTOR-C1 · ERP 字段映射高级 sub-tab toggle
 import './home/erp-onboard.js'; // REFACTOR-C1 · ERP 对接新用户引导 modal
 import './home/recon-job-poll.js'; // REFACTOR-C1 · 对账异步任务前端轮询(window._reconPollJob)· 须在 bank-recon-v2 前
 import './home/recon-center-x.js'; // 2026-06-14 · 对账中心重设计(统一三类型 · 覆盖旧 loadReconcilePage · 须在 recon-center/recon-job-poll/bank-recon-v2 之后)

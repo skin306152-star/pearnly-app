@@ -2,7 +2,7 @@
 // REFACTOR-WB-C3 (2026-05-29) · page-integrations 静态骨架从 home.html 抽出 · 运行期模板注入(R6 机制)
 //
 // home.html <section id="page-integrations"> 现为空壳 · 本模块注入骨架 innerHTML(含内嵌 erp-logs-section)。
-// 集成页被 erp-integration / erp-mappings / integration-config 等模块 + home.js int-top-tab
+// 集成页被 erp-integration / integration-config 等模块 + home.js int-top-tab
 // IIFE(事件委托)渲染/绑定 → 本 import 置于 main.js 较前(随 page-reconcile)· eval 即注入 · 早于这些模块
 // eval/DOMContentLoaded · 元素恒在场。int-drawer 抽屉(home.js _initDrawerEvents 绑定)是 section 外兄弟 · 留 home.html。
 // home.js parse 期 0 处绑定 erp-logs-* 等 section 内元素(已核)。i18n 注入后子树补译(镜像 applyLang)· verbatim 0 改结构。

@@ -17,6 +17,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from services.erp.express_push.common import (  # noqa: E402
+    ITEM_MODE_DIRECT,
+    ITEM_MODE_NONSTOCK,
     ITEMS_EMPTY,
     ITEMS_INCOMPLETE,
     ITEMS_MISMATCH,
@@ -94,6 +96,17 @@ class ExtractLineItemsTests(unittest.TestCase):
         items = [{"name": "A", "qty": "4", "subtotal": "100"}]
         r = extract_line_items(_fields(items), Decimal("100"))
         self.assertEqual(r["items"][0]["unit_price"], "25.00")
+
+    def test_item_mode_default_nonstock(self):
+        # V2 默认每行带 item_mode=non_stock_item(companion 据此匹配/建非库存主档)。
+        items = [{"name": "A", "qty": "1", "price": "100", "subtotal": "100"}]
+        r = extract_line_items(_fields(items), Decimal("100"))
+        self.assertEqual(r["items"][0]["item_mode"], ITEM_MODE_NONSTOCK)
+
+    def test_item_mode_override(self):
+        items = [{"name": "A", "qty": "1", "price": "100", "subtotal": "100"}]
+        r = extract_line_items(_fields(items), Decimal("100"), item_mode=ITEM_MODE_DIRECT)
+        self.assertEqual(r["items"][0]["item_mode"], ITEM_MODE_DIRECT)
 
     def test_comma_amounts_parsed(self):
         items = [{"name": "A", "qty": "1", "price": "1,234.00", "subtotal": "1,234.00"}]

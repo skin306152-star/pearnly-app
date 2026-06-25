@@ -147,12 +147,20 @@ ITEMS_MISMATCH = "mismatch"
 _ITEMS_TOL = Decimal("1.00")  # 行合计 vs 税前额 容差(吸收 OCR 逐行四舍五入)
 
 
-def extract_line_items(fields: Dict[str, Any], base: Decimal) -> Dict[str, Any]:
+ITEM_MODE_NONSTOCK = "non_stock_item"  # V2 默认:非库存商品主档(不动库存/COGS)
+ITEM_MODE_DIRECT = "direct_account"  # 兜底:直接科目行(V1)
+# 注:stock_item(真实进销存)是 V2-b 开关后才走,本期 mapper 不发(禁默认建库存)。
+
+
+def extract_line_items(
+    fields: Dict[str, Any], base: Decimal, *, item_mode: str = ITEM_MODE_NONSTOCK
+) -> Dict[str, Any]:
     """OCR 行项目 → 规整明细 + 对账闸。确定性纯函数,绝不为"好看"采信不自洽的明细。
 
-    入:fields.items = [{name, qty, price, subtotal}](OCR · 数值为字符串/可空);base=税前额。
+    入:fields.items = [{name, qty, price, subtotal}](OCR · 数值为字符串/可空);base=税前额;
+    item_mode=每行写入模式(V2 默认 non_stock_item·companion 据此匹配/建非库存主档)。
     出:{items, status, line_sum}。status 见上常量。仅 status==ok 时 items 应落 STCRD。
-    每行 items: {name, qty, unit, unit_price, amount}(amount=行净额,逐行求和须≈base)。
+    每行 items: {name, qty, unit, unit_price, amount, item_mode}(amount=行净额,逐行求和须≈base)。
     """
     raw = fields.get("items")
     if not isinstance(raw, list) or not raw:
@@ -185,6 +193,7 @@ def extract_line_items(fields: Dict[str, Any], base: Decimal) -> Dict[str, Any]:
                 "unit": str(it.get("unit") or it.get("uom") or "").strip()[:10],
                 "unit_price": _s(price),
                 "amount": _s(amount),
+                "item_mode": item_mode,
             }
         )
 

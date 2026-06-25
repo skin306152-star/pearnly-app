@@ -6,15 +6,20 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-24 深夜 · **LINE 多页单据逐页入账(防双重记账)+ 全局文档诊断二次核对** · prod `d94fd2e5` · companion 未动）
+## 🎯 状态卡（2026-06-25 · **B8 多租户 RLS · P3 ready 域已 prod 真启用并验收** · prod `ae41277c` · companion 未动）
 
-- **LINE 多页单据逐页入账**(prod `8164a77d`+`2d25a21e`+`d94fd2e5`·CI 6/6 绿·已部署 prod 验证):此前 LINE 图/PDF OCR 后**只取 page[0] 入账,多页 PDF 第 2..N 张票被静默丢弃(漏记/伤账)**→ 改逐页入账。
-- **核心=防双重记账安全闸**(money 红线):新 `services/ocr/line_multi_page.py` `select_bookable_pages`——第一张可入账页必记;其后页**须自带身份(卖家税号或票号·= 能参与 dedupe 指纹的页)才记**,无身份续页(长发票第 2/3 页常无表头)跳过 → **绝不把跨页长发票重复记成多笔**;同号续页再由 `dedupe_key` 指纹兜底(`find_by_dedupe` 同事务可见)。不同票各自建单+发卡(仅首张引用原图)。新单测 `test_line_image_multi_page` 7 例·全量 4839 绿。
-- **#2/#3 按建议保持现状**:#2(无引用 Slice4 置信度猜目标)= 破坏性动作「问不猜」是有意账安全设计·不改;#3(图片金额接地)= 已有 warn_total/amount_unreliable 兜底·盲加误伤无明细小票·不改。
-- **/simplify 收尾**:4 路审查·唯一就地应用=`_summary` 过滤空项(净零行)。**重要后续(记入交接·本次未做)**:`services/ocr/invoice_grouper.group_pages_to_invoices` 已实现更完整的多页→多票分组(同票号跨页合并行项·persist.py 已用);本窗 `select_bookable_pages` 是更保守的并行实现,**迁移到 grouper 会改入账金额(跨页行项合并)→ 行为变更·money 路·需真机多页样本独立验证**。
-- **⏳ 待验收**:真·LINE 多页 E2E(发含 2 张收据的 PDF→收 2 卡;发跨页长发票→只记 1 笔不双记)——需真多页 PDF 经 LINE Bot+Gemini 真跑·建议 Owner 真机验一次(安全逻辑已单测钉死)。
-- **全局文档诊断**:`docs/HANDOFF-2026-06-24-全局诊断-按文档交接分类.md`(5 条线 done/pending/won't-do 分类·**含二次核对实测纠错 6 条**:文档/STATE 落后于代码→防呆闸/P2E Gateway/销项前端/锚定 Slice3 等其实已上线·判完整度必翻代码别信文档手写数字)。
-- **坑**:`check_line_ratchet` 必须 commit 后跑才准(改动未提交时假绿)·改监控文件涨行先想好拆/豁免;`line_image_ocr.py` 472(近 500·新逻辑进独立模块别再塞)。
+- **B8 RLS P3 · ready 域 prod 真启用**(`8e88464e` 审计+回滚脚本 / `ae4556ec` worker 修 / `ae41277c` 文档·CI 全绿·`RLS_ROLE=pearnly_app` 入 `/opt/mrpilot/.env`):POS/库存/产品/采购/销售/会计/税/导出/modules/LINE-brain/expense **已真·多租户隔离**(get_cursor_rls 切 pearnly_app 角色·policy 拦死跨租户)。裸 get_cursor 留 owner 连接·force=False 绕过→老路径不破。
+- **前置审计**(486 处 get_cursor 四路并行分域):ready 域 227 处 get_cursor_rls 无一缺上下文·裸 get_cursor 在 enrolled 表只剩 DDL+会计 posting_failures worker(已修 claim_due bypass / retry_one 带行 tenant·`test_posting_failures_rls_contract`)。
+- **★ 两个 prod-only 坑(金丝雀抓到·见 [[rls-b8-p3-prod-enabled]])**:① Supabase postgres 非 BYPASSRLS·靠 owner 身份绕过→ready 域**别上 force=True**(会拦裸 get_cursor)。② SET ROLE 要成员资格·Supabase 经 pooler 授不了→**Owner 后台 SQL Editor 跑过 `GRANT pearnly_app TO postgres`**(没它设 env 全 500)。
+- **验收证据**:本地集成矩阵 8/8 + 回滚脚本端到端(32 表→0)+ prod 金丝雀(journal_vouchers 自己 19/假租户 0)+ 8 域多表隔离全 PASS + 真登录 `/api/me/modules` 正确返回 tenant_modules。
+- **回滚**(零数据风险):删 `.env` 的 RLS_ROLE 行+重启 / `scripts/rls_rollback.sql`。备份 prod `/opt/mrpilot/.env.bak_rls_*`。
+- **下一步**:wave2 对账 recon(~48+9 worker bypass·store 多仅按主键 id 查最依赖上下文)→ wave3 老模块 clients/exceptions/notification/billing(~62·charge.py 钱路径)→ wave4 erp/email/import。**P4**:`12-rls-isolation.spec.js` 断言收紧 `passed===5`。完整 runbook=`docs/refactor/b8-rls-p3-rollout-readiness.md`。
+- 坑:共享树 push 前 pull --rebase 会因别窗口未跟踪改动报 unstaged·只 `git add` 自己文件显式 pathspec commit;改监控文件涨行先想拆/豁免。
+
+## 历史记录（2026-06-24 深夜 · **LINE 多页单据逐页入账(防双重记账)** · prod `d94fd2e5`）
+
+- **LINE 多页逐页入账**(`8164a77d`+`2d25a21e`+`d94fd2e5`):此前 OCR 后只取 page[0]·多页 PDF 第 2..N 票被静默丢(漏记)→ 改逐页。**防双重记账闸**(money):新 `services/ocr/line_multi_page.py` `select_bookable_pages`——首张可入账页必记·其后页须自带身份(税号/票号=能参与 dedupe)才记·无身份续页跳过→绝不把跨页长发票记多笔;同号续页 dedupe_key 兜底。`test_line_image_multi_page` 7 例。
+- **待验收**:真 LINE 多页 E2E(2 收据 PDF→2 卡;跨页长发票→1 笔)需 Owner 真机。**后续**:`invoice_grouper.group_pages_to_invoices` 是更完整的多页→多票分组(跨页合并行项·persist.py 已用)·迁过去会改入账金额(money 路·需真多页样本独立验)。详见全局诊断 `docs/HANDOFF-2026-06-24-全局诊断-按文档交接分类.md`。
 
 ## 历史记录（2026-06-24 · **整顿恢复:A3 完成 / A4 搁置 / B8 RLS → P2** · 我 `e8074817` · 全 push · prod 零影响 · 详细交接 `docs/HANDOFF-2026-06-24-整顿恢复-A3-A4-B8-RLS.md`）
 

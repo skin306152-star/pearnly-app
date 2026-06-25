@@ -81,9 +81,19 @@ P0 设计与交接写「457 处裸 `get_cursor` 碰到 enrolled 表会**查空 /
 
 ## 5. 后续 wave(未 enrolled·需先迁裸 get_cursor 才能开)
 
+### wave 2 进度(对账·进行中)
+**✅ 已上线**(2026-06-25·3 个自包含 `tenant_or_user` task 表·迁 get_cursor_rls + enroll + 本地真隔离 + prod 验证):`vat_recon_tasks`(`cd6a3d7e`)、`gl_vat_task`(`8722b8b5`)、`bank_recon_v2_task`(`a1e68aae`)。
+- 套路:store 签名本有 tenant/user → 换游标即可;按 user_id 删的函数补 `tenant_id` 参数(否则 RLS 下 tenant 任务删 0 行·money 陷阱);受影响 mock-cursor 测试辅助改为同 patch `get_cursor`+`get_cursor_rls`。
+
+**⏳ 剩余 = 两类更难的活(非机械迁移·需设计)**:
+1. **`vat_recon_store`(vat_report+reconciliation_task/row)+ `bank_recon_v1`/`bank_recon_match`** — 三个结构性障碍:
+   - `reconciliation_row` **无 tenant_id 列**(仅 task_id)→ 现有 3 模板套不上,需给 `core/rls.py` 加「经 task_id 子查询取租户」的**传递式 policy 模板**,或有意识地让它保持裸 get_cursor(owner 绕过·靠路由 authz + 父 task 已 enroll 间接保护)。
+   - `vat_report` **只有 tenant_id 没 user_id** → 只能纯 tenant 模板·孤立用户行(tenant 空)全员不可见(先确认 prod 无孤立 vat_report)。
+   - **~10 个函数只收 id 不收租户上下文**(`get_recon_row(row_id)`/`update_recon_row_action`/`get_recon_task(task_id)`/`update_recon_task_status`…)→ 要给一长串签名 + 路由/对账引擎调用方穿上下文。
+2. **`recon_jobs` worker**(claim/finish/fail/reclaim/gc 跨租户队列→`bypass=True`)+ **`knowledge_bridge`**(读 ocr_history/client_rules=wave3 表·纯游标迁移·隔离落 wave3)。
 | wave | 域 | 工作量 | 要点 |
 |---|---|---|---|
-| 2 | recon + recon_jobs + knowledge_bridge | ~48 改 + ~9 worker bypass + 4 | 大量 store 函数仅按主键 id 查、无应用层租户 WHERE → 最依赖上下文,优先 |
+| 2 剩 | recon 跨表 + recon_jobs + knowledge_bridge | ~40 改 + 设计 | 见上·需传递式 policy + 上下文穿线 |
 | 3 | 老模块 clients/exceptions/notification/billing/credits/cost/ocr_history/archive | ~62 | billing `charge.py` 钱路径最危险;credits/cost 超管聚合必须 `bypass=True`(否则报表归零);统一用 `tenant_or_user` 模板(遗留 NULL-tenant 行靠 user_id 兜底) |
 | 4 | erp/email_ingest/importer | ~30 | 后台扫描(push_retry/email list_enabled/agent get_express_endpoint)走 bypass |
 

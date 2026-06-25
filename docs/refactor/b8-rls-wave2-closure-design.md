@@ -94,6 +94,25 @@ USING (
 
 ---
 
+## 5b. 实施进度(2026-06-25)
+
+| Phase | 范围 | 状态 | commit |
+|---|---|---|---|
+| 1 | recon_jobs(enroll+worker bypass)+ knowledge_bridge(穿上下文) | ✅ | `9f7765c2` |
+| 2 | 两个 hard point:传递式 policy + reconciliation 三表穿上下文 + vat_report 补 user_id | ✅ 真库验证 | `967e9fba` |
+| 3a | recon_resolve(ocr_history/clients 读穿上下文) | ✅ | `933e1681` |
+| 3b | bank_recon(v1_store/match/scoring/routes 穿 tenant+user) | ✅ | `f1714ca1` |
+
+**验证**:真 postgres 16/16 集成(矩阵 8 + 传递式 5 + 真 recon 表端到端 3)+ 全量单测 4877 passed。
+wave2 的 row-operation 裸 get_cursor 已全部迁 `get_cursor_rls`;recon 域残留裸 get_cursor 仅 DDL/ensure(owner)。
+
+**bank_reconcile_\* 表 enroll(明确的小 follow-on)**:这三张表是 **user 维度(无 tenant_id)**,本轮已把
+所有 row-op 穿 user 上下文(应用层 `user_id` WHERE 仍是当前隔离 · 无跨用户泄漏)。要给它们 DB 级
+policy,需:① `core/rls.py` 加 user-only 模板 `apply_user_rls`(`user_id = current_user`);② 在
+`ensure_bank_recon_client_id_column`(已 startup 跑)enroll `bank_reconcile_sessions`/`transactions`;
+③ `bank_reconcile_candidates`(经 tx_id→transactions)用 user-via-parent。穿线groundwork已就位,
+enroll 仅是补 apply_* 调用 + 真库穿透。**ocr_history JOIN 隔离随 wave3 ocr_history enroll 自动闭合**。
+
 ## 6. 不开 RLS(设计已裁决 · 本轮明确不碰)
 
 | 表/域 | 为什么不开 |

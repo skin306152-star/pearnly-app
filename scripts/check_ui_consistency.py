@@ -35,8 +35,6 @@ LEGACY_BTN_CLASSES = [
     "ob-btn-skip",
     "ob-btn-next",
     "int-btn-view-logs",
-    "erp-map-show-advanced-btn",
-    "erp-map-adv-btn-label",
     "folder-alt-btn",
     "hist-batch-icon-btn",
     "history-pager-btns",

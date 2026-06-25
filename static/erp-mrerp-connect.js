@@ -1216,8 +1216,6 @@
             // pill 已固定显示「已停用」· 跑 check 反而会把它覆盖成 testing.
             _refreshCardHealth(mrerpEp.id, false);
         }
-        // C-5 · conditional hide of the 字段映射 sub-tab.
-        _applyMappingsTabVisibility(endpoints);
     }
 
     // v118.34.4 · localize the new "连接" tab. The new "推送日志" tab
@@ -1227,68 +1225,6 @@
     function _localizeSubtabs() {
         const connectTab = document.querySelector('.erp-subtab[data-erp-subtab="connect"]');
         if (connectTab) connectTab.textContent = t('auto-erp-subtab-connect-only');
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // C-5 (Zihao 2026-05-18 拍板) · "字段映射" sub-tab conditional
-    // hide. Rule:
-    //   • zero endpoints OR ALL endpoints adapter='mrerp' → hide
-    //   • any non-mrerp endpoint (webhook / flowaccount / other) →
-    //     leave tab + advanced toolbar VISIBLE for the legacy
-    //     mapping workflow
-    //   • client-mapping sub-tab inside is hidden when MR.ERP-only
-    //     (sync preflight covers it)
-    // Adapter-aware; safe to run repeatedly.
-    // ─────────────────────────────────────────────────────────────
-    function _applyMappingsTabVisibility(endpoints) {
-        const eps = (endpoints || []).filter(function (e) {
-            return e && e.enabled !== false;
-        });
-        const adapters = eps.map(function (e) {
-            return (e.adapter || '').toLowerCase();
-        });
-        const hasNonMrerp = adapters.some(function (a) {
-            return a && a !== 'mrerp';
-        });
-
-        // Tab pill in .erp-subtabs
-        const mappingsTabPill = document.querySelector('.erp-subtabs [data-erp-subtab="mappings"]');
-        // Sub-panel
-        const mappingsPanel = document.querySelector('.erp-subpanel[data-erp-subpanel="mappings"]');
-        if (!mappingsTabPill || !mappingsPanel) return;
-
-        const shouldHide = !hasNonMrerp;
-        mappingsTabPill.style.display = shouldHide ? 'none' : '';
-        mappingsPanel.style.display = shouldHide ? 'none' : '';
-        if (shouldHide) {
-            // If the mappings tab was active, switch back to connect.
-            const connectTab = document.querySelector('.erp-subtabs [data-erp-subtab="connect"]');
-            const connectPanel = document.querySelector(
-                '.erp-subpanel[data-erp-subpanel="connect"]'
-            );
-            if (mappingsPanel.classList.contains('active')) {
-                if (connectTab) {
-                    connectTab.classList.add('active');
-                    mappingsTabPill.classList.remove('active');
-                }
-                if (connectPanel) {
-                    connectPanel.classList.add('active');
-                    mappingsPanel.classList.remove('active');
-                }
-            }
-        }
-
-        // Inside the mappings tab, hide the "客户映射" sub-tab when
-        // mrerp endpoints are present (sync preflight makes it
-        // redundant). Other sub-tabs (accounts / taxes / products)
-        // are kept for the legacy webhook/flowaccount mapping workflow.
-        const clientsSubTab = document.querySelector(
-            '.erp-map-subtabs [data-erp-subtab="clients"]'
-        );
-        if (clientsSubTab) {
-            const hideClients = adapters.indexOf('mrerp') >= 0;
-            clientsSubTab.style.display = hideClients ? 'none' : '';
-        }
     }
 
     // Expose so home.js can re-invoke after page navigation.

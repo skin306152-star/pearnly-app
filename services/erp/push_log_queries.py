@@ -76,6 +76,25 @@ def _derive_push_accounts(resp_raw: Any) -> Optional[List[Dict[str, str]]]:
     return out or None
 
 
+def _derive_v3_meta(body: Any) -> Dict[str, Any]:
+    """从 response_body.meta 派生 V3 细粒度态标量进列表项(轻量·只取前端展示要的几个)。
+
+    push_stage = waiting_lock/rolled_back/needs_review/... (status 列的细化·见 common.STAGE_*);
+    rolled_back = 写了一半已恢复备份;fallback_count = 明细从非库存回落直接科目的行数。
+    """
+    out: Dict[str, Any] = {}
+    meta = body.get("meta") if isinstance(body, dict) else None
+    if isinstance(meta, dict):
+        stage = str(meta.get("stage") or "").strip()
+        if stage:
+            out["push_stage"] = stage
+        if meta.get("rolled_back"):
+            out["rolled_back"] = True
+    if isinstance(body, dict) and body.get("fallback_count"):
+        out["fallback_count"] = body.get("fallback_count")
+    return out
+
+
 def list_push_logs(
     user_id: str,
     history_id: Optional[str] = None,
@@ -210,6 +229,7 @@ def list_push_logs(
                 it.update(ref)
                 # Express 队列响应带的分录科目(at-a-glance·列表科目列)· 无则不带,保持轻量。
                 it["push_accounts"] = _derive_push_accounts(body)
+                it.update(_derive_v3_meta(body))  # V3 细粒度态(push_stage/rolled_back/fallback)
                 # DMS 推送可视化闭环(Zihao 2026-06-01)· 身份证→订车单 ≠ 发票推送:
                 # 标 push_type 让前端按 DMS 字段(订车单号/客户/身份证)渲染该行,
                 # 不再用发票字段框;并附 4 语友好错误(身份证订车码 friendly_for_ui 不覆盖)。

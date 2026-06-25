@@ -59,5 +59,24 @@ class DerivePushAccountsTests(unittest.TestCase):
         self.assertIsNone(q._derive_push_accounts({"accounts": [{"side": "C"}]}))  # 无 acc 码
 
 
+class DeriveV3MetaTests(unittest.TestCase):
+    """response_body.meta → 列表项 V3 细粒度态(push_stage/rolled_back/fallback_count)。"""
+
+    def test_stage_and_rolled_back(self):
+        out = q._derive_v3_meta({"meta": {"stage": "waiting_lock", "rolled_back": True}})
+        self.assertEqual(out["push_stage"], "waiting_lock")
+        self.assertTrue(out["rolled_back"])
+
+    def test_fallback_count_from_top_level(self):
+        out = q._derive_v3_meta({"meta": {"stage": "success"}, "fallback_count": 2})
+        self.assertEqual(out["push_stage"], "success")
+        self.assertEqual(out["fallback_count"], 2)
+
+    def test_empty_when_no_meta(self):
+        self.assertEqual(q._derive_v3_meta({"ok": True}), {})
+        self.assertEqual(q._derive_v3_meta(None), {})
+        self.assertEqual(q._derive_v3_meta("nope"), {})
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -18,6 +18,9 @@ const _EXPRESS_REASON_I18N: Record<string, string> = {
     account_set_not_allowed: 'erp-reason-acct-not-allowed',
     direction_unknown: 'erp-reason-direction-unknown',
     direction_not_enabled: 'erp-reason-direction-not-enabled',
+    // V2 明细对账(行合计与税前额对不上 / 缺品名金额)→ 退表头并转人工核对。
+    items_mismatch: 'erp-reason-items-mismatch',
+    items_incomplete: 'erp-reason-items-incomplete',
     low_confidence: 'erp-reason-low-confidence',
     enqueue_error: 'erp-reason-enqueue-error',
     amounts_not_consistent: 'erp-reason-amounts',
@@ -37,6 +40,8 @@ const _EXPRESS_REASON_I18N: Record<string, string> = {
 const _AGENT_REASON_I18N: Record<string, string> = {
     SUPPLIER_DUP_SUSPECTED: 'erp-reason-supplier-dup',
     CUSTOMER_DUP_SUSPECTED: 'erp-reason-customer-dup',
+    CDX_REINDEX_FAILED: 'erp-reason-cdx-failed',
+    ACCOUNT_BUSY_LOCKED: 'erp-reason-account-busy',
 };
 
 function _expressFriendlyReason(raw: string): string {
@@ -58,8 +63,19 @@ function buildErpLogCard(log: any): string {
         log.status === 'failed' &&
         log.next_retry_at &&
         new Date(log.next_retry_at).getTime() > Date.now() - 60000;
+    // V3 细粒度态(meta.stage 派生进 push_stage)优先于粗粒度 status 显示诚实标。
+    const stage = log.push_stage || '';
     let statusClass: string, statusIcon: string, statusLabel: string;
-    if (log.status === 'pending') {
+    if (stage === 'waiting_lock') {
+        // Express 占用账套·稍后自动重领 → 当"等待中"而非失败(不吓用户)。
+        statusClass = 'retrying';
+        statusIcon = '⏳';
+        statusLabel = t('erp-status-waiting-lock');
+    } else if (log.status === 'manual' || stage === 'needs_review' || stage === 'needs_mapping') {
+        statusClass = 'fail';
+        statusIcon = '⚠';
+        statusLabel = t(stage === 'needs_mapping' ? 'erp-status-needs-mapping' : 'erp-status-needs-review');
+    } else if (log.status === 'pending') {
         statusClass = 'retrying';
         statusIcon = '⟳';
         statusLabel = t('erp-status-pending');

@@ -67,6 +67,55 @@ class TokenAuthTests(unittest.TestCase):
             self.assertIsNone(agent_store.authenticate("exp_ep-1_tampered"))
 
 
+class DurableTokenTests(unittest.TestCase):
+    """长效密钥:配一次长期有效 · 重开不旋转(否则在跑的小助手 401)· reset 才重铸。"""
+
+    def _patch_db(self, ep_config):
+        saved = {"config": dict(ep_config)}
+
+        def _get(_uid, _eid):
+            return {"id": "ep-1", "adapter": "express", "config": dict(saved["config"])}
+
+        def _update(_uid, _eid, config=None, **_k):
+            saved["config"] = dict(config or {})
+            return True
+
+        return saved, mock.patch.multiple(
+            "core.db", get_erp_endpoint=_get, update_erp_endpoint=_update
+        )
+
+    def test_first_generate_mints_and_stores_tail(self):
+        saved, patch = self._patch_db({})
+        with patch:
+            res = agent_store.set_agent_token("u1", "ep-1")
+        self.assertEqual(res["status"], "created")
+        self.assertTrue(res["token"].startswith("exp_ep-1_"))
+        self.assertEqual(res["tail"], res["token"][-4:])
+        self.assertEqual(saved["config"]["agent_token_hash"], agent_store.hash_token(res["token"]))
+        self.assertEqual(saved["config"]["agent_token_tail"], res["token"][-4:])
+        self.assertIn("agent_token_created_at", saved["config"])
+
+    def test_reopen_does_not_rotate(self):
+        # 已有密钥 · 非 reset → 不旋转 · 不返明文 · 哈希原样(在跑的小助手不掉线)。
+        existing = {"agent_token_hash": "h0", "agent_token_tail": "ab12"}
+        saved, patch = self._patch_db(existing)
+        with patch:
+            res = agent_store.set_agent_token("u1", "ep-1")
+        self.assertEqual(res["status"], "exists")
+        self.assertEqual(res["tail"], "ab12")
+        self.assertNotIn("token", res)
+        self.assertEqual(saved["config"]["agent_token_hash"], "h0")  # 未被改写
+
+    def test_reset_rotates_to_new_token(self):
+        existing = {"agent_token_hash": "h0", "agent_token_tail": "ab12"}
+        saved, patch = self._patch_db(existing)
+        with patch:
+            res = agent_store.set_agent_token("u1", "ep-1", reset=True)
+        self.assertEqual(res["status"], "created")
+        self.assertNotEqual(saved["config"]["agent_token_hash"], "h0")
+        self.assertEqual(saved["config"]["agent_token_hash"], agent_store.hash_token(res["token"]))
+
+
 class LeaseAckTests(unittest.TestCase):
     def test_lease_returns_payloads(self):
         rows = [

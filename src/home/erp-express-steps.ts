@@ -75,13 +75,14 @@
             '<h3 class="exp-sec-title"><span>2.</span> ' +
             t('exp-pair-h') +
             '</h3><span class="exp-badge todo" id="exp-badge2"></span></div>' +
-            '<div class="exp-sec-copy"><div>' +
+            '<div class="exp-sec-copy"><div id="exp-pair-hint">' +
             t('exp-pair-hint') +
             '</div><div class="exp-code-box" id="exp-codebox" style="display:none">' +
-            '<div><div class="exp-code-value" id="exp-codeval">PEX-----</div>' +
-            '<div class="exp-code-note">' +
+            '<div><div class="exp-code-value" id="exp-codeval">PEX-••••</div>' +
+            '<div class="exp-code-note" id="exp-code-note">' +
             t('exp-code-note') +
             '</div></div>' +
+            '<button class="exp-iconbtn exp-eye" id="exp-eye" type="button" style="display:none"></button>' +
             '<button class="exp-secondary" id="exp-copy">' +
             t('exp-copy') +
             '</button></div>' +
@@ -250,5 +251,121 @@
         );
     }
 
-    (window as any).ExpressSteps = { render: render };
+    // ── 模态外壳 + 定点更新用的展示辅助(从 wizard 抽出 · 编排/展示分离 · wizard 只管流程)──
+    var IC_CLOSE =
+        '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
+    // 小眼睛(显/隐密钥)· SVG 非 emoji(过 lint-ui 棘轮)。
+    var IC_EYE =
+        '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+    var IC_EYE_OFF =
+        '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.5 10.5 0 0 1 12 19c-7 0-11-7-11-7a18.4 18.4 0 0 1 5.1-5.9M9.9 4.2A10.5 10.5 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.2 3.2M9.9 9.9a3 3 0 0 0 4.2 4.2M1 1l22 22"/></svg>';
+
+    function _g(id: string) {
+        return document.getElementById(id);
+    }
+
+    function renderShell(ctx: any) {
+        var _t = ctx.t;
+        var _esc = ctx.esc;
+        return (
+            '<section class="exp-modal" role="dialog" aria-modal="true" aria-labelledby="exp-modal-title">' +
+            '<header class="exp-modal-header"><div class="exp-mh-title">' +
+            '<div class="exp-mh-icon">Ex</div><div>' +
+            '<h2 class="exp-mh-h2" id="exp-modal-title">' +
+            _esc(_t('exp-wizard-title')) +
+            '</h2><p class="exp-mh-lead">' +
+            _esc(_t('exp-s1-sub')) +
+            '</p></div></div><div class="exp-mh-actions">' +
+            '<div class="exp-topstatus" id="exp-topstatus"><span class="exp-pulse"></span><span class="exp-ts-text"></span></div>' +
+            '<button class="exp-iconbtn" id="exp-close" aria-label="' +
+            _esc(_t('exp-cancel')) +
+            '">' +
+            IC_CLOSE +
+            '</button></div></header>' +
+            render(ctx) +
+            '<footer class="exp-footer"><div class="exp-footer-note" id="exp-footer-note"></div>' +
+            '<div class="exp-footer-actions">' +
+            '<button class="exp-secondary" id="exp-cancel">' +
+            _esc(_t('exp-cancel')) +
+            '</button><button class="exp-primary" id="exp-done" disabled>' +
+            _esc(_t('exp-done')) +
+            '</button></div></footer></section>'
+        );
+    }
+
+    // 密钥区(标准做法):刚生成=整串可显隐+复制+仅此一次;已配过=只掩码(只存哈希·无法再看)+重置;
+    // 从未配=显示「生成密钥」主按钮。已连接时配对说明改「已连接·无需操作」。
+    function renderKeyArea(S: any, t: any) {
+        var cb = _g('exp-codebox');
+        var gen = _g('exp-generate');
+        var eye = _g('exp-eye');
+        var copy = _g('exp-copy');
+        var val = _g('exp-codeval');
+        var note = _g('exp-code-note');
+        var hint = _g('exp-pair-hint');
+        var masked = 'PEX-••••' + (S.tail ? '-' + S.tail : '');
+        if (hint) hint.textContent = t(S.connected ? 'exp-pair-connected' : 'exp-pair-hint');
+        if (S.token) {
+            if (cb) cb.style.display = 'grid';
+            if (val) val.textContent = S.keyRevealed ? S.token : masked;
+            if (eye) {
+                eye.style.display = '';
+                eye.innerHTML = S.keyRevealed ? IC_EYE_OFF : IC_EYE;
+                eye.setAttribute('title', t(S.keyRevealed ? 'exp-key-hide' : 'exp-key-reveal'));
+            }
+            if (copy) copy.style.display = '';
+            if (note) note.textContent = t('exp-key-once');
+            if (gen) {
+                gen.textContent = t('exp-key-reset');
+                gen.className = 'exp-secondary exp-danger';
+            }
+        } else if (S.hasKey) {
+            if (cb) cb.style.display = 'grid';
+            if (val) val.textContent = masked;
+            if (eye) eye.style.display = 'none';
+            if (copy) copy.style.display = 'none';
+            if (note) note.textContent = t('exp-key-set-once');
+            if (gen) {
+                gen.textContent = t('exp-key-reset');
+                gen.className = 'exp-secondary exp-danger';
+            }
+        } else {
+            if (cb) cb.style.display = 'none';
+            if (gen) {
+                gen.textContent = t('exp-gen-token');
+                gen.className = 'exp-primary';
+            }
+        }
+    }
+
+    function fillAcctMirror(S: any, t: any) {
+        var el = _g('exp-acct-mirror');
+        if (!el) return;
+        if (S.account) {
+            el.className = 'exp-account-mirror selected';
+            var shown = S.accountName || S.account;
+            el.textContent = t('exp-acct-selected-mirror').replace('{x}', String(shown)) + ' ✓';
+        } else {
+            el.className = 'exp-account-mirror waiting';
+            el.textContent = t('exp-acct-wait-select');
+        }
+    }
+
+    function scrollToStep(target: string) {
+        var scroller = _g('exp-scroll');
+        var el = _g(target);
+        if (scroller && el) scroller.scrollTo({ top: el.offsetTop - 18, behavior: 'smooth' });
+        var links = document.querySelectorAll('.exp-step-link');
+        for (var i = 0; i < links.length; i++) links[i].classList.remove('active');
+        var active = document.querySelector('[data-target="' + target + '"]');
+        if (active) active.classList.add('active');
+    }
+
+    (window as any).ExpressSteps = {
+        render: render,
+        renderShell: renderShell,
+        renderKeyArea: renderKeyArea,
+        fillAcctMirror: fillAcctMirror,
+        scrollToStep: scrollToStep,
+    };
 })();

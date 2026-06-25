@@ -51,23 +51,42 @@ def get_express_endpoint(endpoint_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def set_agent_token(user_id: str, endpoint_id: str) -> Optional[str]:
-    """(重)生成 Agent token · 存 sha256 进 config.agent_token_hash · 明文只返一次。"""
+def set_agent_token(
+    user_id: str, endpoint_id: str, reset: bool = False
+) -> Optional[Dict[str, Any]]:
+    """长效密钥模型(配一次长期有效 · 不再每次生成就作废已配对的小助手)。
+
+    - 尚无密钥 / reset=True:铸新密钥 → 存 sha256 + 末 4 位(掩码显示)+ 生成时间;明文只返一次。
+    - 已有密钥且非 reset:**绝不旋转**(否则在跑的小助手立刻 401),返回 status=exists + 掩码尾段。
+
+    返回 {status: created|exists|none, token?, tail, created_at?}。reset=True 是危险动作:
+    旧密钥作废,所有已配对电脑须重新配对(调用方须已二次确认)。
+    """
     try:
         from core import db
 
         ep = db.get_erp_endpoint(user_id, endpoint_id)
         if not ep or (ep.get("adapter") or "") != "express":
             return None
-        plaintext = f"exp_{endpoint_id}_{secrets.token_urlsafe(32)}"
         cfg = dict(ep.get("config") or {})
+        if cfg.get("agent_token_hash") and not reset:
+            return {"status": "exists", "tail": cfg.get("agent_token_tail", "")}
+        plaintext = f"exp_{endpoint_id}_{secrets.token_urlsafe(32)}"
         cfg["agent_token_hash"] = hash_token(plaintext)
+        cfg["agent_token_tail"] = plaintext[-4:]  # 掩码显示 PEX-••••-tail(非敏感)
+        cfg["agent_token_created_at"] = _now_iso()
         if not db.update_erp_endpoint(user_id, endpoint_id, config=cfg):
             return None
-        return plaintext
+        return {"status": "created", "token": plaintext, "tail": plaintext[-4:]}
     except Exception as e:
         logger.error(f"set_agent_token failed: {e}")
         return None
+
+
+def _now_iso() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat()
 
 
 def authenticate(token: str) -> Optional[Dict[str, Any]]:

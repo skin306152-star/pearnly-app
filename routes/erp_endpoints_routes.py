@@ -44,6 +44,8 @@ def _strip_endpoint_for_response(ep: Dict[str, Any]) -> Dict[str, Any]:
     """返回前端时,把 token / 加密凭据 字段隐藏,避免泄漏"""
     out = dict(ep)
     cfg = dict(out.get("config") or {})
+    # Agent 密钥哈希永不出库到前端(掩码尾段 agent_token_tail / 生成时间保留供 UI 显示)。
+    cfg.pop("agent_token_hash", None)
     if "token" in cfg and cfg["token"]:
         t = str(cfg["token"])
         cfg["token"] = (t[:4] + "***" + t[-4:]) if len(t) > 10 else "***"

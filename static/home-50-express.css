@@ -359,13 +359,47 @@
 .exp-code-box {
     margin-top: 14px;
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr auto auto;
     gap: 10px;
     align-items: center;
     padding: 12px;
     border: 1px dashed var(--brand);
     background: var(--purple-50);
     border-radius: 14px;
+}
+/* 小眼睛(显/隐密钥)· 复用图标按钮外形 */
+.exp-eye {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 8px;
+    color: var(--ink-3);
+    cursor: pointer;
+}
+.exp-eye:hover {
+    color: var(--ink);
+}
+/* 危险动作(重置密钥):红字描边·与主按钮区分,防误触 */
+.exp-danger {
+    color: var(--danger, #c0392b);
+    border-color: var(--danger, #c0392b);
+    background: #fff;
+}
+/* 推送失败行(与连接徽章分离) */
+.exp-failed-bar {
+    margin-top: 8px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: var(--red-50, #fdecec);
+    border: 1px solid var(--danger, #c0392b);
+    color: var(--danger, #c0392b);
+    font-size: 12px;
+    line-height: 1.5;
 }
 .exp-code-value {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

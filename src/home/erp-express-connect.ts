@@ -82,12 +82,11 @@
         } catch (e) {}
     }
 
-    // 四态 → pill 类 + 文案 key
+    // 连接徽章 = 纯连接真相(心跳新鲜度),不再被推送失败染红。推送失败单独成行(_render 里)。
+    //   未配对 neutral / 停用 neutral / 已连接 ok / 离线·自动重连中 warn。
     function _state() {
         if (!_ep) return { pill: 'mrerp-pill-neutral', key: 'exp-pill-incomplete' };
         if (_ep.enabled === false) return { pill: 'mrerp-pill-neutral', key: 'exp-pill-disabled' };
-        if ((_ep.last_status || '') === 'failed')
-            return { pill: 'mrerp-pill-err', key: 'exp-pill-error' };
         if (_isOnline(_ep)) return { pill: 'mrerp-pill-ok', key: 'exp-pill-connected' };
         return { pill: 'mrerp-pill-warn', key: 'exp-pill-offline' };
     }
@@ -133,6 +132,14 @@
                   '</div>'
                 : '';
 
+        // 推送失败单独成行(与连接徽章分离·连接好也可能有失败票要处理)。
+        var failedBar =
+            configured && _stats.failed > 0
+                ? '<div class="exp-failed-bar">' +
+                  _esc(_t('exp-conn-failed-line').replace('{n}', String(_stats.failed))) +
+                  '</div>'
+                : '';
+
         var enabled = !configured || _ep.enabled !== false;
         var actions;
         if (!configured) {
@@ -171,9 +178,13 @@
             '<div class="int-desc">' +
             _esc(_t('exp-card-desc')) +
             (configured ? ' · ' + _esc(acct) : '') +
+            (configured && _isOnline(_ep) && _ep.config && _ep.config.agent_device_name
+                ? ' · ' + _esc(_ep.config.agent_device_name)
+                : '') +
             '</div>' +
             metaHtml +
             offlineBar +
+            failedBar +
             '</div>' +
             '<div class="int-actions">' +
             actions +
@@ -267,4 +278,12 @@
     setInterval(function () {
         if (_visible()) _refresh();
     }, 60000);
+
+    // 刚打开/小助手刚启动那阵:可见时前 ~30s 快查(每 5s),让网页几秒内自己变绿,不用等 60s 那拍。
+    var _fastN = 0;
+    var _fast = setInterval(function () {
+        if (!_visible()) return;
+        _refresh();
+        if (++_fastN >= 6) clearInterval(_fast); // 6×5s=30s 后回落常速
+    }, 5000);
 })();

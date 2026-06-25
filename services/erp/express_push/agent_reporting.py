@@ -222,21 +222,34 @@ def mark_offline(endpoint_id: str) -> None:
         logger.error(f"mark_offline failed: {e}")
 
 
-def touch_heartbeat(endpoint_id: str) -> None:
-    """更新 config.agent_last_seen_at = NOW(UTC)。"""
+def touch_heartbeat(endpoint_id: str, device: str = "") -> None:
+    """更新 config.agent_last_seen_at = NOW(UTC);附带本机名(供网页显示是哪台电脑在连)。
+
+    一次 UPDATE 同时写 last_seen + agent_device_name(有 device 才写),不额外加写库次数。
+    """
     try:
         from core import db
 
-        with db.get_cursor(commit=True) as cur:
-            cur.execute(
-                """
+        if device:
+            sql = """
+                UPDATE erp_endpoints
+                SET config = jsonb_set(
+                        jsonb_set(COALESCE(config, '{}'::jsonb),
+                                  '{agent_last_seen_at}', to_jsonb(NOW()::text), true),
+                        '{agent_device_name}', to_jsonb(%s::text), true)
+                WHERE id = %s AND adapter = 'express'
+            """
+            params = (device[:60], endpoint_id)
+        else:
+            sql = """
                 UPDATE erp_endpoints
                 SET config = jsonb_set(
                         COALESCE(config, '{}'::jsonb),
                         '{agent_last_seen_at}', to_jsonb(NOW()::text), true)
                 WHERE id = %s AND adapter = 'express'
-                """,
-                (endpoint_id,),
-            )
+            """
+            params = (endpoint_id,)
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(sql, params)
     except Exception as e:
         logger.error(f"touch_heartbeat failed: {e}")

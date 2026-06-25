@@ -5,9 +5,6 @@
 (function () {
     'use strict';
 
-    var IC_CLOSE =
-        '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
-
     var S: any = null;
 
     function _esc(s: any) {
@@ -86,7 +83,12 @@
                 ap_acc: (cfg && cfg.ap_acc) || '',
                 vat_input_acc: (cfg && cfg.vat_input_acc) || '',
             },
-            token: '',
+            token: '', // 本会话刚生成的明文(只此一次·可显隐复制)
+            // 长效密钥模型:配过的连接 config 带 agent_token_tail → 重开只显掩码,不诱导重置。
+            hasKey: !!(cfg && cfg.agent_token_tail),
+            tail: (cfg && cfg.agent_token_tail) || '',
+            device: (cfg && cfg.agent_device_name) || '', // 连上的电脑名(链接设备身份)
+            keyRevealed: true, // 刚生成时默认显示(便于复制),点眼睛切换
             poll: null,
         };
         var ov = document.createElement('div');
@@ -106,30 +108,7 @@
         var ov = $('exp-wiz-overlay');
         if (!ov) return;
         var st = (window as any).ExpressSteps;
-        var body = st ? st.render({ S: S, t: _t, esc: _esc }) : '';
-        ov.innerHTML =
-            '<section class="exp-modal" role="dialog" aria-modal="true" aria-labelledby="exp-modal-title">' +
-            '<header class="exp-modal-header"><div class="exp-mh-title">' +
-            '<div class="exp-mh-icon">Ex</div><div>' +
-            '<h2 class="exp-mh-h2" id="exp-modal-title">' +
-            _esc(_t('exp-wizard-title')) +
-            '</h2><p class="exp-mh-lead">' +
-            _esc(_t('exp-s1-sub')) +
-            '</p></div></div><div class="exp-mh-actions">' +
-            '<div class="exp-topstatus" id="exp-topstatus"><span class="exp-pulse"></span><span class="exp-ts-text"></span></div>' +
-            '<button class="exp-iconbtn" id="exp-close" aria-label="' +
-            _esc(_t('exp-cancel')) +
-            '">' +
-            IC_CLOSE +
-            '</button></div></header>' +
-            body +
-            '<footer class="exp-footer"><div class="exp-footer-note" id="exp-footer-note"></div>' +
-            '<div class="exp-footer-actions">' +
-            '<button class="exp-secondary" id="exp-cancel">' +
-            _esc(_t('exp-cancel')) +
-            '</button><button class="exp-primary" id="exp-done" disabled>' +
-            _esc(_t('exp-done')) +
-            '</button></div></footer></section>';
+        ov.innerHTML = st ? st.renderShell({ S: S, t: _t, esc: _esc }) : '';
     }
 
     // ─── updateUI(照搬源 · 定点更新)──────────────────────────
@@ -184,7 +163,7 @@
         }
 
         var ts = $('exp-topstatus');
-        _fillAcctMirror();
+        (window as any).ExpressSteps.fillAcctMirror(S, _t);
         if (S.connected) {
             _badge(
                 'exp-badge3',
@@ -200,14 +179,13 @@
         }
         if (ts) {
             var tx = ts.querySelector('.exp-ts-text');
-            if (tx)
-                tx.textContent = _t(S.connected ? 'exp-topstatus-online' : 'exp-topstatus-waiting');
+            if (tx) {
+                var base = _t(S.connected ? 'exp-topstatus-online' : 'exp-topstatus-waiting');
+                tx.textContent = S.connected && S.device ? base + ' · ' + S.device : base; // 显示连的是哪台电脑
+            }
         }
 
-        if (S.generated) {
-            var cb = $('exp-codebox');
-            if (cb) cb.style.display = 'grid';
-        }
+        _keyArea();
 
         var pm = document.querySelector(
             'input[name="exp-pushmode"][value="' + S.pushMode + '"]'
@@ -236,28 +214,17 @@
         _txt('exp-footer-note', _t(ready ? 'exp-footer-note-ready' : 'exp-footer-note-todo'));
     }
 
-    function _fillAcctMirror() {
-        var el = $('exp-acct-mirror');
-        if (!el) return;
-        if (S.account) {
-            el.className = 'exp-account-mirror selected';
-            // 显示真公司名(account_company);account_set 现为账套 PATH·不适合给客户看。
-            var shown = S.accountName || S.account;
-            el.textContent = _t('exp-acct-selected-mirror').replace('{x}', String(shown)) + ' ✓';
-        } else {
-            el.className = 'exp-account-mirror waiting';
-            el.textContent = _t('exp-acct-wait-select');
-        }
+    // 展示辅助(密钥区/账套镜像/滚动)抽到 ExpressSteps(编排/展示分离·见 erp-express-steps)。
+    function _keyArea() {
+        (window as any).ExpressSteps.renderKeyArea(S, _t);
     }
-
+    function _toggleEye() {
+        if (!S || !S.token) return;
+        S.keyRevealed = !S.keyRevealed;
+        _keyArea();
+    }
     function _scrollToStep(target: string) {
-        var scroller = $('exp-scroll');
-        var el = $(target);
-        if (scroller && el) scroller.scrollTo({ top: el.offsetTop - 18, behavior: 'smooth' });
-        var links = document.querySelectorAll('.exp-step-link');
-        for (var i = 0; i < links.length; i++) links[i].classList.remove('active');
-        var active = document.querySelector('[data-target="' + target + '"]');
-        if (active) active.classList.add('active');
+        (window as any).ExpressSteps.scrollToStep(target);
     }
 
     // ─── 真接口 ──────────────────────────────────────────────
@@ -331,8 +298,9 @@
     }
 
     async function _genToken() {
-        // 已配好的连接重新生成 = 旧密钥当场作废 → 现有小助手立刻掉线须重配,二次确认防误触。
-        if ((S.generated || S.connected) && (window as any).showConfirm) {
+        // 长效密钥:已配过 → 这是「重置」危险动作(旧密钥作废·所有已配电脑掉线),强确认。
+        var isReset = !!(S.hasKey || S.token);
+        if (isReset && (window as any).showConfirm) {
             var ok = await (window as any).showConfirm(_t('exp-regen-warn'), { danger: true });
             if (!ok) return;
         }
@@ -346,6 +314,7 @@
             var r = await fetch('/api/erp/endpoints/' + encodeURIComponent(id) + '/agent-token', {
                 method: 'POST',
                 headers: _auth(),
+                body: JSON.stringify({ reset: isReset }),
             });
             if (r.status === 404) {
                 _notice('warn', _t('exp-token-disabled'));
@@ -357,10 +326,12 @@
             }
             var d = await r.json();
             S.token = (d && d.token) || '';
-            _txt('exp-codeval', S.token);
+            S.tail = (d && d.tail) || S.tail;
+            S.hasKey = true;
             S.generated = true;
+            S.keyRevealed = true;
             updateUI();
-            _toast(_t('exp-toast-key-generated'));
+            _toast(_t(isReset ? 'exp-toast-key-reset' : 'exp-toast-key-generated'));
             _startPoll();
         } catch (e) {
             _notice('danger', _t('exp-token-fail'));
@@ -389,9 +360,14 @@
             // 账套唯一真相源 = 小助手上报的 cfg.account_set(= 账套 PATH·唯一键);显示用真公司名。
             var selected = cfg.account_set ? String(cfg.account_set) : null;
             var selectedName = cfg.account_company ? String(cfg.account_company) : null;
+            var dev = cfg.agent_device_name ? String(cfg.agent_device_name) : '';
             var changed = false;
             if (online !== S.connected) {
                 S.connected = online;
+                changed = true;
+            }
+            if (dev !== S.device) {
+                S.device = dev;
                 changed = true;
             }
             if (selected !== S.account || selectedName !== S.accountName) {
@@ -451,6 +427,7 @@
         if (tg.closest('#exp-close') || tg.closest('#exp-cancel')) return _close();
         if (tg.closest('#exp-done')) return _finish();
         if (tg.closest('#exp-generate')) return _genToken();
+        if (tg.closest('#exp-eye')) return _toggleEye();
         if (tg.closest('#exp-copy')) return _copy();
         if (tg.closest('#exp-download')) {
             _downloadAgent();

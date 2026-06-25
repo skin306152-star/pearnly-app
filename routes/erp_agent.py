@@ -49,14 +49,32 @@ def _auth_agent(request: Request) -> Dict[str, Any]:
 # ── token 生成(网页会话)────────────────────────────────────────────────
 @router.post("/api/erp/endpoints/{endpoint_id}/agent-token")
 async def erp_agent_token(endpoint_id: str, request: Request):
-    """(重)生成本连接的 Agent token · 存 sha256 · 明文只返一次(请勿外传)。"""
+    """连接密钥(长效模型)· 配一次长期有效。
+
+    - 默认:已有密钥则不旋转(返回 exists + 掩码尾段),避免在跑的小助手掉线。
+    - body/query `reset=true`:危险动作 · 作废旧密钥重铸(所有已配对电脑须重连)· 明文只返一次。
+    """
     _require_enabled()
     user = get_current_user_from_request(request)
     _check_push_access(user)
-    token = agent_store.set_agent_token(user["id"], endpoint_id)
-    if not token:
+    reset = False
+    try:
+        body = await request.json()
+        reset = bool(isinstance(body, dict) and body.get("reset"))
+    except Exception:
+        reset = str(request.query_params.get("reset", "")).lower() in ("1", "true")
+    res = agent_store.set_agent_token(user["id"], endpoint_id, reset=reset)
+    if not res:
         raise HTTPException(404, detail="erp.endpoint_not_found_or_not_express")
-    return {"ok": True, "token": token, "note": "shown once; store securely"}
+    if res.get("status") == "exists":
+        # 已有长效密钥 · 不返明文(只存了哈希)· 前端据此显示掩码 + 已连接状态。
+        return {"ok": True, "exists": True, "tail": res.get("tail", "")}
+    return {
+        "ok": True,
+        "token": res.get("token"),
+        "tail": res.get("tail", ""),
+        "note": "shown once; store securely",
+    }
 
 
 # ── Agent 出站拉取(Bearer)───────────────────────────────────────────────
@@ -78,7 +96,8 @@ async def erp_agent_heartbeat(request: Request):
     if isinstance(body, dict) and body.get("offline"):
         agent_store.mark_offline(str(ep["id"]))
         return {"ok": True, "endpoint_id": str(ep["id"]), "connected": False}
-    agent_store.touch_heartbeat(str(ep["id"]))
+    device = str(body.get("device") or "") if isinstance(body, dict) else ""
+    agent_store.touch_heartbeat(str(ep["id"]), device=device)
     cfg = ep.get("config") or {}
     stored = 0
     accts_stored = 0

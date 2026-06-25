@@ -209,6 +209,65 @@ def extract_line_items(
     return {"items": items, "status": status, "line_sum": _s(line_sum)}
 
 
+# ── V3 推送阶段(细粒度状态)· 存 erp_push_logs.response_body.meta ────────────────
+# erp_push_logs.status 仍粗粒度(pending/success/manual/failed),本组是其【细化】不替代:
+# 前端据 meta.stage 显诚实状态。queued/leased/writing/indexing/verifying 是流转,
+# 其余为落点。waiting_lock = Express 占用账套,稍后自动重领(不算失败、不烧重试次数)。
+STAGE_QUEUED = "queued"
+STAGE_LEASED = "leased"
+STAGE_WRITING = "writing"
+STAGE_INDEXING = "indexing"
+STAGE_VERIFYING = "verifying"
+STAGE_SUCCESS = "success"
+STAGE_WAITING_LOCK = "waiting_lock"
+STAGE_FAILED = "failed"
+STAGE_ROLLED_BACK = "rolled_back"  # 写了一半已恢复账套备份
+STAGE_NEEDS_MAPPING = "needs_mapping"  # 缺科目映射
+STAGE_NEEDS_REVIEW = "needs_review"  # 对账失败/疑似重复
+
+# Agent ack 上报的 outcome(覆盖 success 布尔 · 旧客户端不传则按布尔走,向后兼容)。
+ACK_OUTCOMES = (
+    STAGE_SUCCESS,
+    STAGE_WAITING_LOCK,
+    STAGE_FAILED,
+    STAGE_ROLLED_BACK,
+    STAGE_NEEDS_MAPPING,
+    STAGE_NEEDS_REVIEW,
+)
+
+# 富元数据白名单(Agent 上报 · 落 response_body.meta · 供前端诚实展示)。限键限长防脏。
+_META_STR_KEYS = (
+    "companion_version",
+    "account_dir",
+    "doc_type",
+    "docnum",
+    "stage",
+    "error_code",
+)
+_META_BOOL_KEYS = ("created_customer", "created_supplier", "index_requery", "rolled_back")
+_META_LIST_KEYS = ("tables_written", "created_masters", "cdx_failed_tables")
+_META_MAX_LIST = 40
+
+
+def sanitize_push_meta(raw: Any) -> Dict[str, Any]:
+    """净化 Agent 上报的富元数据:只留白名单键、限长限量、布尔归一(防被塞脏 jsonb)。"""
+    if not isinstance(raw, dict):
+        return {}
+    out: Dict[str, Any] = {}
+    for k in _META_STR_KEYS:
+        v = raw.get(k)
+        if v is not None and str(v).strip() != "":
+            out[k] = str(v).strip()[:200]
+    for k in _META_BOOL_KEYS:
+        if k in raw:
+            out[k] = bool(raw.get(k))
+    for k in _META_LIST_KEYS:
+        v = raw.get(k)
+        if isinstance(v, list):
+            out[k] = [str(x).strip()[:60] for x in v[:_META_MAX_LIST] if str(x).strip()]
+    return out
+
+
 def amounts(fields: Dict[str, Any], history: Dict[str, Any]) -> Optional[tuple]:
     """从票面字段确定性求 (base, vat, total)。返回 None = 数不自洽/缺总额(留人工)。
 

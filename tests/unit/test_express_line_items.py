@@ -24,11 +24,35 @@ from services.erp.express_push.common import (  # noqa: E402
     ITEMS_MISMATCH,
     ITEMS_OK,
     extract_line_items,
+    sanitize_push_meta,
 )
 
 
 def _fields(items):
     return {"items": items}
+
+
+class SanitizePushMetaTests(unittest.TestCase):
+    def test_keeps_whitelisted_and_drops_unknown(self):
+        m = sanitize_push_meta({
+            "companion_version": "1.1.13",
+            "doc_type": "sales",
+            "created_customer": 1,
+            "tables_written": ["ARTRN", "STCRD", "ISVAT"],
+            "evil": "x" * 9999,  # 非白名单 → 丢
+        })
+        self.assertEqual(m["companion_version"], "1.1.13")
+        self.assertIs(m["created_customer"], True)
+        self.assertEqual(m["tables_written"], ["ARTRN", "STCRD", "ISVAT"])
+        self.assertNotIn("evil", m)
+
+    def test_non_dict_returns_empty(self):
+        self.assertEqual(sanitize_push_meta("nope"), {})
+        self.assertEqual(sanitize_push_meta(None), {})
+
+    def test_str_value_length_capped(self):
+        m = sanitize_push_meta({"account_dir": "z" * 500})
+        self.assertLessEqual(len(m["account_dir"]), 200)
 
 
 class ExtractLineItemsTests(unittest.TestCase):

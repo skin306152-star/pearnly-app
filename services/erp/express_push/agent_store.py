@@ -87,234 +87,19 @@ def authenticate(token: str) -> Optional[Dict[str, Any]]:
     return ep
 
 
-_ACCOUNT_SET_KEYS = ("code", "name", "name_en", "tax_id", "path", "writable")
-_MAX_ACCOUNT_SETS = 50
-
-
-def _sanitize_account_sets(raw: Any) -> List[Dict[str, Any]]:
-    """净化 Agent 上报的账套列表:只留已知键、限长限量,布尔归一(防被塞脏数据)。"""
-    if not isinstance(raw, list):
-        return []
-    out: List[Dict[str, Any]] = []
-    for item in raw[:_MAX_ACCOUNT_SETS]:
-        if not isinstance(item, dict):
-            continue
-        clean: Dict[str, Any] = {}
-        for k in _ACCOUNT_SET_KEYS:
-            v = item.get(k)
-            if k == "writable":
-                clean[k] = bool(v)
-            elif v is not None:
-                clean[k] = str(v)[:200]
-        if clean.get("code") or clean.get("name"):
-            out.append(clean)
-    return out
-
-
-def store_account_sets(endpoint_id: str, account_sets: Any) -> int:
-    """存 Agent 探测的可用账套列表进 config.reported_account_sets(供 FE「选账套」读)。
-
-    净化后整体替换(非累加),并记 account_sets_seen_at。返回存入条数。隔离沿用现有约定:
-    只更新本 express endpoint 自己的 config。
-    """
-    sets = _sanitize_account_sets(account_sets)
-    try:
-        from core import db
-
-        with db.get_cursor(commit=True) as cur:
-            # 两个顶层键 → || 合并(create-or-replace),比嵌套 jsonb_set 平。
-            cur.execute(
-                """
-                UPDATE erp_endpoints
-                SET config = COALESCE(config, '{}'::jsonb) || jsonb_build_object(
-                        'reported_account_sets', %s::jsonb,
-                        'account_sets_seen_at', to_jsonb(NOW()::text))
-                WHERE id = %s AND adapter = 'express'
-                """,
-                (json.dumps(sets, ensure_ascii=False), endpoint_id),
-            )
-        return len(sets)
-    except Exception as e:
-        logger.error(f"store_account_sets failed: {e}")
-        return 0
-
-
-# ── 科目表(chart of accounts)· 供 FE「科目映射」下拉按名字选 ──────────────────
-# 小助手登录 Express 读科目 DBF(如 GLMAS)上报。科目表【可自定义·每账套不同】→ 必须按
-# 账套发现,不能在程序里写死默认码(Owner 2026-06-22 拍板)。
-_ACCOUNT_KEYS = ("code", "name", "type")
-_MAX_ACCOUNTS = 3000
-
-
-def _sanitize_accounts(raw: Any) -> List[Dict[str, Any]]:
-    """净化 Agent 上报的科目表:只留 code/name/type、限长限量。code 必填(科目码=记账锚)。"""
-    if not isinstance(raw, list):
-        return []
-    out: List[Dict[str, Any]] = []
-    for item in raw[:_MAX_ACCOUNTS]:
-        if not isinstance(item, dict):
-            continue
-        clean: Dict[str, Any] = {}
-        for k in _ACCOUNT_KEYS:
-            v = item.get(k)
-            if v is not None and str(v).strip() != "":
-                clean[k] = str(v).strip()[:120]
-        if clean.get("code"):
-            out.append(clean)
-    return out
-
-
-def store_reported_accounts(endpoint_id: str, accounts: Any) -> int:
-    """存小助手探测的【科目表】进 config.reported_accounts(供 FE「科目映射」下拉读)。
-
-    净化后整体替换 + 记 accounts_seen_at;返回存入条数。镜像 store_account_sets,只更新本
-    express endpoint。客户在下拉里按【名字】选科目,FE 存科目【码】进 config(revenue_acc 等)。
-    """
-    accs = _sanitize_accounts(accounts)
-    try:
-        from core import db
-
-        with db.get_cursor(commit=True) as cur:
-            cur.execute(
-                """
-                UPDATE erp_endpoints
-                SET config = COALESCE(config, '{}'::jsonb) || jsonb_build_object(
-                        'reported_accounts', %s::jsonb,
-                        'accounts_seen_at', to_jsonb(NOW()::text))
-                WHERE id = %s AND adapter = 'express'
-                """,
-                (json.dumps(accs, ensure_ascii=False), endpoint_id),
-            )
-        return len(accs)
-    except Exception as e:
-        logger.error(f"store_reported_accounts failed: {e}")
-        return 0
-
-
-# 所选账套【整组】· 方法无关(直录/RPA 共用 · 见 11-dispatch 可扩展性契约 §1/§2/§5)。
-# account_set 名(白名单)+ account_dir(DBF 写文件)+ account_company(公司名硬闸)
-# + account_set_row(RPA 登录后公司 grid 行)。客户选一次整组都推出,RPA 来零新增字段。
-_SELECTED_ACCOUNT_KEYS = ("account_set", "account_dir", "account_company", "account_set_row")
-
-
-def _merge_config(endpoint_id: str, patch: Dict[str, Any]) -> bool:
-    """把 patch 以 jsonb `||` 合并进本 express endpoint 的 config(顶层键 create-or-replace)。"""
-    try:
-        from core import db
-
-        with db.get_cursor(commit=True) as cur:
-            cur.execute(
-                """
-                UPDATE erp_endpoints
-                SET config = COALESCE(config, '{}'::jsonb) || %s::jsonb
-                WHERE id = %s AND adapter = 'express'
-                """,
-                (json.dumps(patch, ensure_ascii=False), endpoint_id),
-            )
-        return True
-    except Exception as e:
-        logger.error(f"_merge_config failed: {e}")
-        return False
-
-
-def _clean_selected(fields: Dict[str, Any]) -> Dict[str, Any]:
-    """从上报 dict 取所选账套整组的非空字段(account_set_row 转 int)。"""
-    sel: Dict[str, Any] = {}
-    for k in _SELECTED_ACCOUNT_KEYS:
-        v = (fields or {}).get(k)
-        if k == "account_set_row":
-            if v is not None and str(v).strip() != "":
-                try:
-                    sel[k] = int(v)
-                except (TypeError, ValueError):
-                    pass
-        elif v is not None and str(v).strip() != "":
-            sel[k] = str(v).strip()
-    return sel
-
-
-def selected_account_changed(current: Dict[str, Any], reported: Dict[str, Any]) -> bool:
-    """上报的所选账套整组是否与已存 config 不同(防每拍无谓写库)。"""
-    for k in _SELECTED_ACCOUNT_KEYS:
-        if str((reported or {}).get(k) or "").strip() != str((current or {}).get(k) or "").strip():
-            return True
-    return False
-
-
-def store_selected_account(endpoint_id: str, fields: Dict[str, Any]) -> bool:
-    """存小助手上报的【所选账套整组】→ config(方法无关·不按 method 阉割)。
-
-    账套选择唯一真相源 = 本地小助手(客户在那里选)。云端存整组、网页镜像账套名。
-    只写上报到的非空字段;`account_set` 名缺失 → 整体跳过(没选不覆盖)。只更新本 express endpoint。
-    """
-    sel = _clean_selected(fields if isinstance(fields, dict) else {})
-    if not sel.get("account_set"):
-        return False
-    return _merge_config(endpoint_id, sel)
-
-
-_MAPPING_KEYS = (
-    "revenue_acc",
-    "ar_acc",
-    "vat_output_acc",
-    "fallback_acc",
-    "ap_acc",
-    "vat_input_acc",
+# 心跳上报数据访问(账套/科目/所选/映射/在线)拆到 agent_reporting(单一职责+控行数)。
+# 此处 re-export 保 routes/tests 的 agent_store.<fn> 调用契约不变。
+from services.erp.express_push.agent_reporting import (  # noqa: E402,F401
+    _sanitize_account_sets,
+    _sanitize_accounts,
+    mark_offline,
+    selected_account_changed,
+    store_account_sets,
+    store_mapping,
+    store_reported_accounts,
+    store_selected_account,
+    touch_heartbeat,
 )
-
-
-def store_mapping(endpoint_id: str, mapping: Dict[str, Any]) -> bool:
-    """存小助手上报的【科目映射】6 个科目码 → config(网页只读镜像·小助手为唯一真相源)。
-
-    只合并非空码(避免未配置时的空上报清掉已存值)。镜像 store_selected_account 的语义。
-    """
-    patch: Dict[str, Any] = {}
-    for k in _MAPPING_KEYS:
-        v = str((mapping or {}).get(k) or "").strip()[:40]
-        if v:
-            patch[k] = v
-    if not patch:
-        return False
-    return _merge_config(endpoint_id, patch)
-
-
-def mark_offline(endpoint_id: str) -> None:
-    """小助手优雅退出 → 把 last_seen 置远古,令前端在线判定(now-seen<180s)立即失败 → 显示离线。"""
-    try:
-        from core import db
-
-        with db.get_cursor(commit=True) as cur:
-            cur.execute(
-                """
-                UPDATE erp_endpoints
-                SET config = COALESCE(config, '{}'::jsonb)
-                    || jsonb_build_object('agent_last_seen_at', '1970-01-01 00:00:00+00')
-                WHERE id = %s AND adapter = 'express'
-                """,
-                (endpoint_id,),
-            )
-    except Exception as e:
-        logger.error(f"mark_offline failed: {e}")
-
-
-def touch_heartbeat(endpoint_id: str) -> None:
-    """更新 config.agent_last_seen_at = NOW(UTC)。"""
-    try:
-        from core import db
-
-        with db.get_cursor(commit=True) as cur:
-            cur.execute(
-                """
-                UPDATE erp_endpoints
-                SET config = jsonb_set(
-                        COALESCE(config, '{}'::jsonb),
-                        '{agent_last_seen_at}', to_jsonb(NOW()::text), true)
-                WHERE id = %s AND adapter = 'express'
-                """,
-                (endpoint_id,),
-            )
-    except Exception as e:
-        logger.error(f"touch_heartbeat failed: {e}")
 
 
 def lease_pending(endpoint_id: str, owner: str, max_n: int) -> List[Dict[str, Any]]:
@@ -370,6 +155,31 @@ def _load_owned_log(cur, endpoint_id: str, log_id: str) -> Optional[Dict[str, An
     return dict(row) if row else None
 
 
+def _build_response_body(
+    *,
+    ok: bool,
+    stage: str,
+    express_docnum: Optional[str],
+    line_modes: Optional[List[Dict[str, Any]]],
+    meta: Dict[str, Any],
+) -> str:
+    """统一构造 response_body(所有 outcome 都带 meta·诚实展示)。"""
+    from services.erp.express_push import common as C
+
+    body_obj: Dict[str, Any] = {"ok": ok, "express_docnum": express_docnum}
+    if line_modes:
+        body_obj["line_modes"] = line_modes
+        fb = [m for m in line_modes if m.get("mode") == C.ITEM_MODE_DIRECT and m.get("reason")]
+        if fb:
+            body_obj["fallback_count"] = len(fb)
+    m = dict(meta or {})
+    m.setdefault("stage", stage)
+    if line_modes and "created_masters" not in m:
+        m["created_masters"] = [x["stkcod"] for x in line_modes if x.get("stkcod")]
+    body_obj["meta"] = m
+    return json.dumps(body_obj, ensure_ascii=False)
+
+
 def ack(
     endpoint_id: str,
     log_id: str,
@@ -378,15 +188,24 @@ def ack(
     express_docnum: Optional[str] = None,
     error: Optional[str] = None,
     line_modes: Optional[List[Dict[str, Any]]] = None,
+    meta: Optional[Dict[str, Any]] = None,
+    outcome: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Agent 回报一条领取结果。
+    """Agent 回报一条领取结果(V3:富元数据 + 细粒度 outcome)。
 
-    success → status='success' + response_body.express_docnum,清租约(终态幂等)。
-    failed  → Agent 录入失败累计:第 1、2 次 → 回 pending 释放租约可重领;**满 3 次**
-              (_MAX_ATTEMPTS)→ 'manual' 留人工。队列行起始 attempt=1(通用落库约定)= 0
-              次失败,故按起始 1 校正阈值(否则 2 次就误转 manual)。
-    校验 lease_owner 一致(防越权 ack 别人的租约)。
+    outcome(可选·覆盖 success 布尔·旧客户端不传则按布尔)取值见 common.ACK_OUTCOMES:
+      success      → status='success' + docnum,清租约(终态幂等)。
+      waiting_lock → Express 占用账套:保持 pending、释放租约可重领、**不烧重试次数**(不算失败)。
+      needs_mapping/needs_review → 立即 status='manual'(缺科目映射 / 对账失败·疑重),不重试。
+      failed/rolled_back → Agent 失败累计:第 1、2 次回 pending 重领,满 _MAX_ATTEMPTS 转
+                           'manual';rolled_back 仅多记"已恢复备份"诚实标(retry 逻辑同 failed)。
+    富元数据(companion 版本/账套/写了哪些表/建客户商品/CDX 回查等)落 response_body.meta。
+    校验 lease_owner 一致(防越权 ack 别人的租约)。status 列保持粗粒度,meta.stage 是其细化。
     """
+    from services.erp.express_push import common as C
+
+    eff = outcome if outcome in C.ACK_OUTCOMES else (C.STAGE_SUCCESS if success else C.STAGE_FAILED)
+    clean_meta = C.sanitize_push_meta(meta)
     try:
         from core import db
 
@@ -394,22 +213,16 @@ def ack(
             log = _load_owned_log(cur, endpoint_id, log_id)
             if not log:
                 return {"ok": False, "reason": "log_not_found"}
-            # 终态幂等:已 success 的不再回退。
-            if log["status"] == "success":
+            if log["status"] == "success":  # 终态幂等
                 return {"ok": True, "status": "success", "idempotent": True}
             if (log.get("lease_owner") or "") != owner:
                 return {"ok": False, "reason": "lease_mismatch"}
 
-            if success:
-                # V2 诚实化:回传逐行 mode → 记进日志。某些行从 non_stock 回落 direct_account
-                # (主档建/配失败)= 仍成功过账但明细降级,记 fallback_count + 原因供 UI 标注(不静默)。
-                body_obj: Dict[str, Any] = {"ok": True, "express_docnum": express_docnum}
-                if line_modes:
-                    body_obj["line_modes"] = line_modes
-                    fb = [m for m in line_modes if m.get("mode") == "direct_account" and m.get("reason")]
-                    if fb:
-                        body_obj["fallback_count"] = len(fb)
-                body = json.dumps(body_obj, ensure_ascii=False)
+            if eff == C.STAGE_SUCCESS:
+                body = _build_response_body(
+                    ok=True, stage=C.STAGE_SUCCESS, express_docnum=express_docnum,
+                    line_modes=line_modes, meta=clean_meta,
+                )
                 cur.execute(
                     """
                     UPDATE erp_push_logs
@@ -422,27 +235,61 @@ def ack(
                 )
                 return {"ok": True, "status": "success", "express_docnum": express_docnum}
 
-            # Express 队列行由通用落库约定起始 attempt=1(= 0 次 Agent 录入失败)。
-            # 本次失败 = 第 `prior` 次 Agent 录入失败(prior=1→第1次 … prior=3→第3次);
-            # 满 _MAX_ATTEMPTS(3) 次才转 manual,与 docstring 一致(off-by-one 修复)。
-            # 起始按 1 兜底,既贴合现有写库约定,也对偶发 0 基线鲁棒。
+            if eff == C.STAGE_WAITING_LOCK:
+                # Express 正占用账套 → 不算失败、不烧次数:保持 pending、放租约,稍后自动重领。
+                body = _build_response_body(
+                    ok=False, stage=C.STAGE_WAITING_LOCK, express_docnum=None,
+                    line_modes=None, meta=clean_meta,
+                )
+                cur.execute(
+                    """
+                    UPDATE erp_push_logs
+                    SET status = 'pending', response_body = %s,
+                        lease_owner = NULL, lease_expires_at = NULL
+                    WHERE id = %s
+                    """,
+                    (body, log_id),
+                )
+                return {"ok": True, "status": "pending", "stage": C.STAGE_WAITING_LOCK, "retry": True}
+
+            if eff in (C.STAGE_NEEDS_MAPPING, C.STAGE_NEEDS_REVIEW):
+                # 缺科目映射 / 对账失败·疑似重复 → 立即留人工(重试无益)。
+                body = _build_response_body(
+                    ok=False, stage=eff, express_docnum=None, line_modes=None, meta=clean_meta,
+                )
+                cur.execute(
+                    """
+                    UPDATE erp_push_logs
+                    SET status = 'manual', response_body = %s, error_msg = %s,
+                        lease_owner = NULL, lease_expires_at = NULL
+                    WHERE id = %s
+                    """,
+                    (body, (error or "")[:500] or eff, log_id),
+                )
+                return {"ok": True, "status": "manual", "stage": eff}
+
+            # failed / rolled_back:Agent 失败累计(off-by-one 见下),满 _MAX_ATTEMPTS 转 manual。
             prior = int(log.get("attempt") or 1)
             agent_failures = prior
             new_attempt = prior + 1
             new_status = "manual" if agent_failures >= _MAX_ATTEMPTS else "pending"
+            body = _build_response_body(
+                ok=False, stage=eff, express_docnum=None, line_modes=None, meta=clean_meta,
+            )
             cur.execute(
                 """
                 UPDATE erp_push_logs
                 SET status = %s, attempt = %s,
-                    error_msg = %s,
+                    error_msg = %s, response_body = %s,
                     lease_owner = NULL, lease_expires_at = NULL
                 WHERE id = %s
                 """,
-                (new_status, new_attempt, (error or "")[:500] or "agent_failed", log_id),
+                (new_status, new_attempt, (error or "")[:500] or "agent_failed", body, log_id),
             )
             return {
                 "ok": True,
                 "status": new_status,
+                "stage": eff,
                 "attempt": new_attempt,
                 "agent_failures": agent_failures,
             }

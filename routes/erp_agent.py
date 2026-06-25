@@ -155,11 +155,15 @@ class AckRequest(BaseModel):
     agent_id: Optional[str] = None
     # V2 逐行 mode 结果(companion DbfWriteResult.line_modes):记进日志供 UI 标注兜底行。
     line_modes: Optional[list] = None
+    # V3 细粒度 outcome(覆盖 result·见 common.ACK_OUTCOMES:waiting_lock/rolled_back/
+    # needs_mapping/needs_review)+ 富元数据(写了哪些表/建客户商品/CDX 回查等)。旧客户端不传。
+    outcome: Optional[str] = None
+    meta: Optional[dict] = None
 
 
 @router.post("/api/erp/agent/ack")
 async def erp_agent_ack(req: AckRequest, request: Request):
-    """回报录入结果 · success 回填 express_docnum;failed attempt+1,超 3 次置 manual。"""
+    """回报录入结果 · success 回填 docnum;waiting_lock 重领不烧次数;失败 attempt+1 超 3 转 manual。"""
     _require_enabled()
     ep = _auth_agent(request)
     if req.result not in ("success", "failed"):
@@ -173,6 +177,8 @@ async def erp_agent_ack(req: AckRequest, request: Request):
         express_docnum=req.express_docnum,
         error=req.error,
         line_modes=req.line_modes,
+        outcome=req.outcome,
+        meta=req.meta,
     )
     if not res.get("ok"):
         raise HTTPException(409, detail=f"erp.ack_{res.get('reason', 'failed')}")

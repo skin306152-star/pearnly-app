@@ -119,6 +119,50 @@ class LeaseAckTests(unittest.TestCase):
         self.assertIn("fallback_count", body)
         self.assertIn("ensure_item_failed", body)
 
+    def test_ack_waiting_lock_keeps_pending_no_attempt_burn(self):
+        # Express 占用账套 → 保持 pending、不烧重试次数、可重领(不算失败)。
+        row = {"id": "log-1", "status": "pending", "attempt": 1,
+               "lease_owner": "agentA", "response_body": None}
+        cur = FakeCursor(one=row)
+        with _patch_cursor(cur):
+            res = agent_store.ack(
+                "ep-1", "log-1", "agentA", False, outcome="waiting_lock",
+                meta={"companion_version": "1.1.13", "account_dir": r"\\acc\X"},
+            )
+        self.assertEqual(res["status"], "pending")
+        self.assertEqual(res["stage"], "waiting_lock")
+        self.assertTrue(res["retry"])
+        sql_params = [(s, p) for s, p in cur.executed if "status = 'pending'" in s]
+        self.assertTrue(sql_params)
+        body = sql_params[0][1][0]
+        self.assertIn("waiting_lock", body)
+        self.assertIn("1.1.13", body)
+        # 不烧次数:UPDATE 不应改 attempt
+        self.assertFalse(any("attempt =" in s for s, _ in cur.executed))
+
+    def test_ack_needs_review_to_manual_immediately(self):
+        row = {"id": "log-1", "status": "pending", "attempt": 1,
+               "lease_owner": "agentA", "response_body": None}
+        cur = FakeCursor(one=row)
+        with _patch_cursor(cur):
+            res = agent_store.ack("ep-1", "log-1", "agentA", False,
+                                  outcome="needs_review", error="dup suspected")
+        self.assertEqual(res["status"], "manual")
+        self.assertEqual(res["stage"], "needs_review")
+
+    def test_ack_rolled_back_stores_meta_and_retries(self):
+        row = {"id": "log-1", "status": "pending", "attempt": 1,
+               "lease_owner": "agentA", "response_body": None}
+        cur = FakeCursor(one=row)
+        with _patch_cursor(cur):
+            res = agent_store.ack(
+                "ep-1", "log-1", "agentA", False, outcome="rolled_back",
+                error="cdx failed", meta={"rolled_back": True, "doc_type": "sales"},
+            )
+        self.assertEqual(res["status"], "pending")  # 第1次失败回 pending 可重试
+        params = next(p for s, p in cur.executed if "response_body = %s" in s and "attempt" in s)
+        self.assertTrue(any("rolled_back" in str(x) for x in params))
+
     def test_ack_lease_mismatch_rejected(self):
         row = {
             "id": "log-1",

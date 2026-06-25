@@ -304,6 +304,16 @@ def _boot_schema_ddl() -> None:
     except Exception as e:
         logger.warning(f"启动 外流 schema/handler 失败: {e}")
 
+    # ⚠️ RLS 自愈守卫必须是本函数最后一步:上面所有 ensure_*/apply_* 已建好 policy → 真隔离表此时
+    # 有 policy 不被误关。新增任何 ensure_*_rls 务必加在它【之前】。关掉「RLS 已开但零 policy」的
+    # 孤儿表,杜绝 deny-all 把 get_cursor_rls 查询静默拖空。复盘 b8-rls-no-policy-orphans-INCIDENT.md。
+    try:
+        from core.rls import ensure_no_orphan_rls
+
+        ensure_no_orphan_rls()
+    except Exception as e:
+        logger.warning(f"启动 RLS 孤儿自愈失败: {e}")
+
 
 async def run_startup() -> dict:
     """app 启动序列 · 返回 {email_task, erp_retry_task} 供 run_shutdown cancel。"""
@@ -332,14 +342,6 @@ async def run_startup() -> dict:
     # 死锁(ensure_erp_oauth_tables · cef351bf 回退),串行化后 workers=4 才安全。
     with startup_ddl_lock():
         _boot_schema_ddl()
-        # 自愈守卫:DDL 全跑完(含将来追加的 ensure_*)后,关掉「RLS 已开但零 policy」的孤儿表
-        # —— 杜绝 deny-all 把 get_cursor_rls 查询静默拖空。复盘 b8-rls-no-policy-orphans-INCIDENT.md。
-        try:
-            from core.rls import ensure_no_orphan_rls
-
-            ensure_no_orphan_rls()
-        except Exception as e:
-            logger.warning(f"启动 RLS 孤儿自愈失败: {e}")
 
     # v118.34.4 · MR.ERP test-connection cache flush
     # On every restart, drop any cached test-connection entries so users

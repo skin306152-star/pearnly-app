@@ -363,6 +363,7 @@ from services.erp.push_schema import (  # noqa: F401,E402
     ensure_erp_endpoints_adapter_constraint,
     ensure_erp_push_logs_adapter_constraint,
     ensure_erp_push_logs_status_constraint,
+    ensure_erp_push_rls,
     ensure_erp_retry_columns,
     ensure_single_express_endpoint,
 )

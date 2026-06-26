@@ -363,10 +363,11 @@ async def erp_batch_retry(req: ErpBatchRetryRequest, request: Request):
     failed = 0
     skipped = 0  # 已成功 / 关联实体丢失等
     details: List[Dict[str, Any]] = []
+    tid = _tid(user)
 
     for log_id in req.log_ids:
         try:
-            log = db.get_push_log_detail(user["id"], log_id, tenant_id=_tid(user))
+            log = db.get_push_log_detail(user["id"], log_id, tenant_id=tid)
             if not log:
                 skipped += 1
                 details.append({"log_id": log_id, "result": "skipped", "reason": "not_found"})
@@ -380,7 +381,7 @@ async def erp_batch_retry(req: ErpBatchRetryRequest, request: Request):
                 details.append({"log_id": log_id, "result": "skipped", "reason": "missing_refs"})
                 continue
 
-            history = db.get_ocr_history_detail(user["id"], log["history_id"], tenant_id=_tid(user))
+            history = db.get_ocr_history_detail(user["id"], log["history_id"], tenant_id=tid)
             endpoint = db.get_erp_endpoint(user["id"], log["endpoint_id"])
             if not history or not endpoint:
                 skipped += 1

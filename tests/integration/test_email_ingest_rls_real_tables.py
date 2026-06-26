@@ -2,7 +2,7 @@
 """B8 RLS wave4 · email_ingest 三表真表隔离(REFACTOR-B8)。
 
 accounts/logs 纯 user(user_id);seen_uids 仅 account_id → 经父表 accounts 的 user-via-parent。
-直接调真 enroll_email_ingest_rls() 验 enroll 代码路径。worker/管线路径(list_enabled/
+直接调真 ensure_email_ingest_rls() 验 enroll 代码路径。worker/管线路径(list_enabled/
 update_status/is/mark_seen)保持裸 owner,本测试不碰。
 
 CI 默认 skip,本地跑:
@@ -63,7 +63,7 @@ class EmailIngestRlsTests(unittest.TestCase):
                 cur.execute(ddl)
             cur.execute(f"GRANT SELECT,INSERT,UPDATE,DELETE ON {', '.join(_TABLES)} TO pearnly_app")
         # 真 enroll 代码路径(force=False)
-        store.enroll_email_ingest_rls()
+        store.ensure_email_ingest_rls()
         with db.get_cursor_rls(bypass=True, commit=True) as cur:
             for t in _TABLES:
                 cur.execute(f"ALTER TABLE {t} FORCE ROW LEVEL SECURITY")

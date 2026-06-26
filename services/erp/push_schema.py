@@ -181,19 +181,28 @@ def ensure_erp_retry_columns():
                     ON erp_push_logs(endpoint_id, status)
                     WHERE status = 'pending';
             """)
-            # B8 RLS wave4:两表 user_id 全非空、访问纯 user scope(INSERT 不写 tenant_id)→
-            # 纯 user 隔离。本函数是 erp_push_logs 启动期必跑的 schema 钩子,顺带 enroll 两张推送表,
-            # 避免新增 ensure_*(触 new_debt 闸)。force=False:owner 仍绕过→worker/agent/by-id
-            # 记账等系统路径裸 get_cursor 不破;业务连接 SET ROLE 后强制。
-            from core.rls import apply_user_rls
-
-            apply_user_rls(cur, "erp_endpoints", "erp_push_logs")
             logger.info(
                 "✅ erp_push_logs 运营列就绪(retry_count / max_retries / next_retry_at / "
-                "lease_owner / lease_expires_at)+ erp_endpoints/erp_push_logs RLS policy"
+                "lease_owner / lease_expires_at)"
             )
     except Exception as e:
         logger.warning(f"ensure_erp_retry_columns failed: {e}")
+
+
+def ensure_erp_push_rls():
+    """B8 RLS wave4:给 erp_endpoints / erp_push_logs 上 policy(幂等 · 独立事务防牵连别的 ensure)。
+
+    两表 user_id 全非空、访问纯 user scope(INSERT 不写 tenant_id · prod tenant_id 大量 NULL)→
+    纯 user 隔离。force=False:owner 仍绕过 → worker(扫全用户)/agent(token scope)/by-id 记账
+    等系统路径裸 get_cursor 不破;业务连接 SET ROLE pearnly_app 后强制。这两张是 legacy 表无
+    CREATE 钩子,故独立 ensure_*_rls(对齐 ensure_bank_recon_rls 范式)。"""
+    from core.rls import apply_user_rls
+
+    try:
+        with db.get_cursor(commit=True) as cur:
+            apply_user_rls(cur, "erp_endpoints", "erp_push_logs")
+    except Exception as e:
+        logger.warning(f"ensure_erp_push_rls failed: {e}")
 
 
 def ensure_single_express_endpoint():

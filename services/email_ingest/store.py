@@ -332,15 +332,15 @@ def mark_email_uid_seen(
         return False
 
 
-def enroll_email_ingest_rls() -> None:
-    """B8 RLS wave4 enroll(legacy 表无 CREATE 钩子 → 这里只挂 policy,不建表)。
+def ensure_email_ingest_rls() -> None:
+    """B8 RLS wave4:给 email_ingest 三表上 policy(幂等 · 独立事务防牵连别的 ensure)。
 
+    legacy 表无 CREATE 钩子,故独立 ensure_*_rls(对齐 ensure_bank_recon_rls 范式)。
     accounts/logs 纯 user 隔离(user_id);seen_uids 仅 account_id 列 → 经父表
     email_ingest_accounts 的 user-via-parent EXISTS 隔离。force=False:worker 扫全用户
     (list_enabled_email_accounts)、按 account_id 记账(update_email_account_status)、
     抓取管线去重(is/mark_email_uid_seen)的裸 get_cursor(owner)不破。
-    fresh env 表不存在 → 整块吞掉(与各 ensure_* 一致),prod 表已存在。命名故意非
-    `ensure_*`:它不建表,只 enroll,语义准确且不触防屎山 new_debt 闸。
+    fresh env 表不存在 → 整块吞掉(与各 ensure_* 一致),prod 表已存在。
     """
     from core.rls import apply_user_rls, apply_user_via_parent_rls
 
@@ -354,4 +354,4 @@ def enroll_email_ingest_rls() -> None:
                 fk="account_id",
             )
     except Exception as e:
-        logger.warning(f"enroll_email_ingest_rls skipped: {e}")
+        logger.warning(f"ensure_email_ingest_rls skipped: {e}")

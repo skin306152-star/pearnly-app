@@ -26,6 +26,7 @@ _REEXPORTS = {
         "list_email_ingest_logs",
         "is_email_uid_seen",
         "mark_email_uid_seen",
+        "ensure_email_ingest_rls",
     ],
     "services.erp.mappings_store": [
         "ensure_erp_mapping_tables",
@@ -73,6 +74,7 @@ _REEXPORTS = {
         "ensure_erp_push_logs_adapter_constraint",
         "ensure_erp_push_logs_status_constraint",
         "ensure_erp_retry_columns",
+        "ensure_erp_push_rls",
         "ensure_single_express_endpoint",
         "is_user_data_error",
         "is_already_pushed_error",

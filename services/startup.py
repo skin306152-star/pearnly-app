@@ -202,9 +202,11 @@ def _boot_schema_ddl() -> None:
         (db.ensure_erp_push_logs_adapter_constraint, "erp_push_logs adapter constraint"),
         (db.ensure_erp_push_logs_status_constraint, "erp_push_logs status constraint"),
         (db.ensure_single_express_endpoint, "erp_endpoints 单 express 去重+唯一索引"),
+        (db.ensure_erp_push_rls, "erp_endpoints/erp_push_logs RLS policy"),
         (db.ensure_bank_recon_client_id_column, "bank_reconcile_sessions.client_id 列"),
         (db.ensure_bank_recon_rls, "bank_reconcile_* RLS policy"),
         (db.ensure_erp_mapping_tables, "erp_mapping 建表"),
+        (db.ensure_email_ingest_rls, "email_ingest_* RLS policy"),
         (db.ensure_vat_recon_tables, "vat_recon 建表"),
         (db.ensure_vat_recon_tasks_table, "vat_recon_tasks 建表"),
         (db.ensure_bank_recon_v2_table, "bank_recon_v2 建表"),
@@ -214,15 +216,6 @@ def _boot_schema_ddl() -> None:
             ensure_fn()
         except Exception as e:
             logger.warning(f"启动 {label} 失败: {e}")
-
-    # B8 RLS wave4 · email_ingest 三表 enroll(legacy 无 CREATE 钩子 · 只挂 policy 不建表 ·
-    # 必须在孤儿守卫 ensure_no_orphan_rls 前跑 · 见 services/email_ingest/store.py)
-    try:
-        from services.email_ingest.store import enroll_email_ingest_rls
-
-        enroll_email_ingest_rls()
-    except Exception as e:
-        logger.warning(f"启动 email_ingest RLS enroll 失败: {e}")
 
     # P1.1 BUG-FIX-P1.1 v118.35.0.41 · 4 模块 task/row 表加 field_overrides JSONB
     # 跟 alembic/versions/002_field_overrides_4_modules.py 双跑(prod 启动兼容)

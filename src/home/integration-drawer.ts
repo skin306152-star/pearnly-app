@@ -27,12 +27,6 @@
                 } catch (e) {}
             }
         }
-        // 切到 push-exc · 加载 ERP 推送异常块(原在异常页 · 搬来集成页独立 tab)
-        if (targetKey === 'push-exc' && typeof window.loadErpExceptions === 'function') {
-            try {
-                window.loadErpExceptions();
-            } catch (e) {}
-        }
     }
     // 暴露给 ERP 抽屉「看推送日志 →」按钮调用
     window.activateIntegrationsLogsTab = function () {

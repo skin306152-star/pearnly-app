@@ -17,7 +17,6 @@ _NAMES = [
     "list_push_logs",
     "get_push_log_detail",
     "classify_push_exception",
-    "list_push_exceptions",
     "get_push_stats_today",
 ]
 

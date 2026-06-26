@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """ERP 推送日志查询/明细/异常/统计 DAL(REFACTOR-WA-B1 · 2026-05-29 从 erp/push_store 抽出 · 纯搬家 0 逻辑改)
 
-推送日志列表/明细(含 UI 友好化 friendly_for_ui + 外部引用 derive_external_ref)+ 推送异常清单 +
-今日统计 + 批量删。组内自洽(只依赖 db + external_ref/business_friendly 叶子)·
+推送日志列表/明细(含 UI 友好化 friendly_for_ui + 外部引用 derive_external_ref · 失败行附
+异常子类 + 自助修复槽)+ 今日统计 + 批量删。组内自洽(只依赖 db + external_ref/business_friendly 叶子)·
 push_store 顶部 re-import 当 facade · db.X/store.X/本模块.X 单一对象不变。
 """
 
 import json
 import logging
+import re
 from typing import Optional, Dict, Any, List  # noqa: F401
 
 from services.erp.external_ref import _coerce_body, derive_external_ref  # noqa: F401
@@ -190,7 +191,7 @@ def list_push_logs(
                        l.seller_name, l.total_amount, l.status, l.http_status,
                        l.error_msg, l.attempt, l.elapsed_ms, l.trigger,
                        l.created_at, l.retry_count, l.max_retries,
-                       l.next_retry_at, l.response_body,
+                       l.next_retry_at, l.response_body, l.request_body,
                        l.request_body->>'people_id_tail' AS id_card_tail,
                        h.client_id AS history_client_id,
                        c.name AS client_name,
@@ -236,6 +237,20 @@ def list_push_logs(
                 # id_card_tail 已在 SELECT 用 request_body->>'people_id_tail' 取出(只取末4·不拉整个体)。
                 it["push_type"] = _classify_push_type(it)
                 it["error_friendly"] = friendly_any(it.get("error_msg"))
+                # 失败/留人工行附异常子类 + 自助修复槽(待补科目/绑主体)· 让推送日志失败卡
+                # 直接展示修复入口(原「推送异常」tab 已并入此处 · 同一状态源不另查)。
+                if (it.get("status") or "") in ("failed", "manual"):
+                    it["category"] = classify_push_exception(it.get("error_msg"))
+                    m = re.search(r"ERR_[A-Z0-9_]+", it.get("error_msg") or "")
+                    it["error_code"] = m.group(0) if m else ""
+                    if it["category"] == "account_missing":
+                        it["account_fix"] = derive_account_fix(
+                            it.get("error_msg"), it.get("request_body")
+                        )
+                    elif it["category"] == "direction_unknown":
+                        it["bind_fix"] = derive_bind_fix(it.get("error_msg"))
+                # request_body 仅用于派生 direction,用完丢弃,列表 payload 保持轻量。
+                it.pop("request_body", None)
             return {"items": items, "total": total}
     except Exception as e:
         logger.error(f"list_push_logs failed: {e}")
@@ -296,137 +311,6 @@ def get_push_log_detail(user_id: str, log_id: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"get_push_log_detail failed: {e}")
         return None
-
-
-def list_push_exceptions(
-    user_id: str,
-    q: Optional[str] = None,
-    category: Optional[str] = None,
-    adapter: Optional[str] = None,
-    limit: int = 50,
-    offset: int = 0,
-    push_type: Optional[str] = None,
-) -> Dict[str, Any]:
-    """ERP 推送异常队列(派生自 erp_push_logs · 铁律 #12 单一状态源,不另立异常表)。
-
-    取每个 (history, endpoint) **最近一条** log · 仅保留 status='failed' 或 'manual'
-    (Express 留人工)· 已被后续 success/skipped_dup 解决的自动排除。每条附:
-      - state:batch_view 派生展示态(needs_action / retrying / failed)
-      - category:错误码子类(customer_mismatch / product_mismatch / no_client /
-        verify_unavailable / other)· 前端 chip 用
-      - 发票号 / 发票卖方(seller_name)/ 发票买方(ocr_buyer_name)/ 已归属 Pearnly 客户
-        / ERP 端点名 / 错误码 / 原始 error_msg(前端转友好文案)
-
-    支持搜索(q:发票号/卖方/买方 模糊)+ category 过滤 + 分页(limit/offset)。
-    返回 {items: 当前页, total: 过滤后总数, categories: 各子类计数(供 chip)}。
-    通用层只认统一状态 + 错误码,不写 if adapter=='mrerp'。
-    """
-    from services.erp import batch_view
-    import re as _re
-
-    try:
-        with db.get_cursor() as cur:
-            cur.execute(
-                """
-                SELECT DISTINCT ON (l.history_id, l.endpoint_id)
-                    l.id, l.history_id, l.endpoint_id, l.invoice_no, l.seller_name,
-                    l.total_amount, l.status, l.error_msg, l.trigger, l.created_at,
-                    l.retry_count, l.max_retries, l.next_retry_at, l.request_body,
-                    l.request_body->>'people_id_tail' AS id_card_tail,
-                    h.client_id AS history_client_id,
-                    c.name AS client_name,
-                    COALESCE((
-                        SELECT pg->'fields'->>'buyer_name'
-                        FROM jsonb_array_elements(
-                            CASE WHEN jsonb_typeof(h.pages)='array'
-                                 THEN h.pages ELSE '[]'::jsonb END
-                        ) pg
-                        WHERE COALESCE(pg->'fields'->>'buyer_name','') <> ''
-                        LIMIT 1
-                    ), '') AS ocr_buyer_name,
-                    e.name AS endpoint_name, e.adapter AS endpoint_adapter
-                FROM erp_push_logs l
-                LEFT JOIN ocr_history h ON h.id = l.history_id
-                LEFT JOIN clients c ON c.id = h.client_id
-                LEFT JOIN erp_endpoints e ON e.id = l.endpoint_id
-                WHERE l.user_id = %s
-                ORDER BY l.history_id, l.endpoint_id, l.created_at DESC
-                """,
-                (str(user_id),),
-            )
-            rows = [dict(r) for r in (cur.fetchall() or [])]
-    except Exception as e:
-        logger.error(f"list_push_exceptions failed: {e}")
-        return {"items": [], "total": 0, "categories": {}}
-
-    # 1) 仅留最近一条仍需人处理的(failed 或 Express manual=留人工)+ 附 state/category/code。
-    #    manual(缺科目/低置信/账套拒)和 failed 一样要用户处理,绝不能从异常页消失(铁律 #3/#12)。
-    #    success/skipped_dup/pending 不进异常。
-    base: List[Dict[str, Any]] = []
-    for r in rows:
-        if (r.get("status") or "") not in ("failed", "manual"):
-            continue
-        # DMS 推送可视化闭环(Zihao 2026-06-01 · 修正:异常栏与推送日志【同理】· 保留身份证订车失败行,
-        # 标 push_type 供前端按 DMS 字段(订车单号/客户)渲染 + ERP 下拉筛选 · 不再用发票字段框、不再误删)。
-        # id_card_tail 已在 SELECT 用 request_body->>'people_id_tail' 取出(只取末4)。
-        r["push_type"] = _classify_push_type(r)
-        r["state"] = batch_view.classify_push_log(r)
-        r["category"] = classify_push_exception(r.get("error_msg"))
-        m = _re.search(r"ERR_[A-Z0-9_]+", r.get("error_msg") or "")
-        r["error_code"] = m.group(0) if m else ""
-        # 待补科目卡(account_missing)· 算出该问哪些科目槽(direction + slots)。
-        # request_body 仅用于推 direction,用完丢弃,列表 payload 保持轻量。
-        if r["category"] == "account_missing":
-            r["account_fix"] = derive_account_fix(r.get("error_msg"), r.get("request_body"))
-        # 绑主体卡(direction_unknown)· 派生能否自助绑主体重推(消前端 !/direction_not_enabled/ 正则)。
-        elif r["category"] == "direction_unknown":
-            r["bind_fix"] = derive_bind_fix(r.get("error_msg"))
-        r.pop("request_body", None)
-        # P2-C (B7) · 附友好原因 4 语 dict(命中 catalog 才有 · 否则 None)·
-        # 异常卡片优先显本语言,不裸透泰文。
-        r["error_friendly"] = friendly_any(r.get("error_msg"))
-        base.append(r)
-
-    # 2) 搜索(发票号/卖方/买方 · 大小写不敏感)
-    qq = (q or "").strip().lower()
-    if qq:
-        base = [
-            r
-            for r in base
-            if qq in (r.get("invoice_no") or "").lower()
-            or qq in (r.get("seller_name") or "").lower()
-            or qq in (r.get("ocr_buyer_name") or "").lower()
-        ]
-
-    # 2.5) ERP 系统筛选(下拉 · 与推送日志同维度 · Zihao 2026-06-01 异常栏同理)·
-    #      在 category 计数前应用 → chip 数反映所选 ERP 范围。
-    ad = (adapter or "").strip().lower()
-    if ad:
-        base = [r for r in base if (r.get("endpoint_adapter") or "").lower() == ad]
-
-    # 3) category 计数 + 身份证订车(push_type)计数(搜索后 · 过滤前 → 统计卡显当前范围各类数)
-    categories: Dict[str, int] = {}
-    for r in base:
-        c = r.get("category") or "other"
-        categories[c] = categories.get(c, 0) + 1
-    id_card_count = sum(1 for r in base if r.get("push_type") == "id_card")
-
-    # 4) category / push_type 过滤 + 按时间倒序 + 分页
-    if category:
-        base = [r for r in base if (r.get("category") or "other") == category]
-    if push_type:
-        base = [r for r in base if r.get("push_type") == push_type]
-    base.sort(key=lambda r: r.get("created_at") or "", reverse=True)
-    total = len(base)
-    off = max(0, int(offset or 0))
-    lim = max(1, min(int(limit or 50), 200))
-    page = base[off : off + lim]
-    return {
-        "items": page,
-        "total": total,
-        "categories": categories,
-        "id_card_count": id_card_count,
-    }
 
 
 def get_push_stats_today(user_id: str) -> Dict[str, Any]:

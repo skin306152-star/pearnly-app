@@ -74,8 +74,7 @@ import './home/clients.js'; // REFACTOR-C1 · 客户实体前端
 import './home/client-assign.js'; // 用户引导闭环 · 客户管理「分派会计」弹窗(window.openClientAssign · 复用 /api/team/members + scope)
 import './home/page-exceptions.js'; // REFACTOR-WB-C3 · 异常栏页骨架运行期注入(home.html section 抽出 · 须在 exceptions.js 前)
 import './home/exceptions.js'; // REFACTOR-C1 · 异常栏列表页
-import './home/erp-exceptions.js'; // REFACTOR-WB-C1 · ERP 推送异常块(从 exceptions.js 抽出 · window 桥接 loadErpExceptions/_erpExcState)
-import './home/erp-exceptions-edit.js'; // REFACTOR-WB-modularize · ERP 异常单条编辑弹窗(从 erp-exceptions 拆出 · window._erpExcOpenEdit)
+import './home/erp-exceptions-edit.js'; // ERP 失败卡「修复映射」picker(window._erpExcOpenEdit · 推送日志失败卡调)
 import './home/rules-settings.js'; // KNOWLEDGE · 客户风险规矩设置弹窗(window.openRulesSettings · 异常页「规矩设置」按钮调 · flag-gated 后端)
 import './home/page-knowledge.js'; // KNOWLEDGE · 客户知识中心页骨架注入(home.html #page-knowledge 空壳 · 须在 knowledge-center 前)
 import './home/knowledge-center.js'; // KNOWLEDGE · 知识中心页逻辑(tab 切换 + 账套上下文 + 探针门控侧栏入口 · window.loadKnowledgePage)

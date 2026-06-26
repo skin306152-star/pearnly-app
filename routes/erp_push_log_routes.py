@@ -264,36 +264,6 @@ async def erp_logs(
     )
 
 
-@router.get("/api/erp/exceptions")
-async def erp_exceptions(
-    request: Request,
-    q: Optional[str] = None,
-    category: Optional[str] = None,
-    adapter: Optional[str] = None,
-    limit: int = 50,
-    offset: int = 0,
-    push_type: Optional[str] = None,
-):
-    """ERP 推送异常队列(Zihao 2026-05-26)· 派生自 erp_push_logs(铁律 #12 单一源)。
-
-    每个 (history×endpoint) 最近一条仍 failed 的推送 → 一条可处理异常行:
-    带 state(needs_action/retrying/failed)+ category(customer_mismatch/product_mismatch/
-    no_client/verify_unavailable/other)+ 发票号/卖方/买方/已归属客户/端点名/错误码。
-    支持搜索(q)+ category 过滤 + 分页。返回 {items, total, categories}。通用层 · 不写死 MR.ERP。
-    """
-    user = get_current_user_from_request(request)
-    _check_push_access(user)
-    return db.list_push_exceptions(
-        user["id"],
-        q=q,
-        category=category,
-        adapter=adapter,
-        limit=min(limit, 200),
-        offset=max(0, offset),
-        push_type=push_type if push_type in ("id_card", "invoice") else None,
-    )
-
-
 @router.get("/api/erp/logs/{log_id}")
 async def erp_log_detail(log_id: str, request: Request):
     """单条日志完整详情 · 含请求体/响应体"""

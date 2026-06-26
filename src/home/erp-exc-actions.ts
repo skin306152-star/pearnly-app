@@ -1,19 +1,20 @@
 // ============================================================
-// ERP 推送异常卡 · 卡内动作(从 erp-exceptions.ts 拆出 · 保持两文件 <500 · 铁律 #27)
+// ERP 推送失败卡 · 自助修复动作(待补科目 / 绑主体)
 //
-// 单条重试 / 批量重试·删除 / 待补科目卡(选科目下拉 + 覆盖重推)。
-// 状态与数据层(_erpExcState / loadErpExceptions / renderErpExceptions)仍在 erp-exceptions.ts,
-// 这里按 ES import 取用(同 bundle · 调用期解析 · 无 init 期循环)。渲染里的 DOM 绑定调本模块函数。
+// 「推送异常」tab 并入「推送日志」后(2026-06-26)· 这些修复入口挂在推送日志的失败卡上。
+// 卡内下拉面板(科目槽 / 账套主体)+ 提交(补科目重推 / 绑主体重推)· 成功后重拉推送日志
+// (单一状态源 · 铁律 #12 · 修好的行自动翻态/消失,不维护乐观态)。面板 HTML 由 erp-log-card
+// 注入失败卡,事件在 erp-integration 的列表委托里绑定(调本模块函数)。
 // ============================================================
-/* global t, escapeHtml, showToast, showConfirm */
+/* global t, escapeHtml, showToast */
 
-import type { ErpExcItem } from './erp-exceptions.js';
-import {
-    _erpExcState,
-    _erpExcTok,
-    loadErpExceptions,
-    renderErpExceptions,
-} from './erp-exceptions.js';
+// 失败卡修复面板要用到的最小字段(由 list_push_logs 在失败行附带)。
+type RepairItem = {
+    id: string;
+    endpoint_id?: string;
+    account_fix?: { direction?: string; slots?: string[]; bad_code?: string };
+    bind_fix?: { can_bind?: boolean };
+};
 
 // 待补科目卡:科目槽 → 角色文案键(收入/应收/销项税 + 采购/应付/进项税)。
 const _ERP_ACCT_SLOT_LABEL: Record<string, string> = {
@@ -25,6 +26,10 @@ const _ERP_ACCT_SLOT_LABEL: Record<string, string> = {
     vat_input_acc: 'erp-acctfix-vat-input',
 };
 
+function _erpExcTok(): string {
+    return localStorage.getItem('mrpilot_token') || '';
+}
+
 // 该端点上报的账套科目表(GLACC)· 供待补科目卡下拉(显示 代码 · 名字)。
 function _erpExcChart(endpointId?: string): Array<{ code: string; name?: string }> {
     const eps = Array.isArray(window._erpEndpoints) ? window._erpEndpoints : [];
@@ -33,7 +38,13 @@ function _erpExcChart(endpointId?: string): Array<{ code: string; name?: string 
     return Array.isArray(ra) ? ra : [];
 }
 
-function _erpExcRefreshBadge() {
+// 修复成功后重拉推送日志 + 刷新侧栏异常红点(OCR 异常徽标 · 无害共用)。
+function _erpExcReload() {
+    if (typeof window.loadErpLogs === 'function') {
+        try {
+            window.loadErpLogs();
+        } catch (_) {}
+    }
     if (typeof window.refreshExcBadge === 'function') {
         try {
             window.refreshExcBadge();
@@ -42,7 +53,7 @@ function _erpExcRefreshBadge() {
 }
 
 // 待补科目卡的下拉面板(每个缺的科目槽一个下拉 · 选项=该账套上报科目表 代码·名字)。
-function _erpExcAcctPanel(it: ErpExcItem): string {
+function _erpExcAcctPanel(it: RepairItem): string {
     const slots = (it.account_fix && it.account_fix.slots) || [];
     const chart = _erpExcChart(it.endpoint_id);
     if (!chart.length) {
@@ -108,9 +119,7 @@ async function _erpExcAccountFix(logId: string, panel: HTMLElement, btn: HTMLBut
     } catch (e) {
         showToast(t('erp-acctfix-fail'), 'error');
     }
-    _erpExcState.selected.delete(logId);
-    loadErpExceptions(false);
-    _erpExcRefreshBadge();
+    _erpExcReload();
 }
 
 // 账套主体(workspace_clients)· 绑主体面板下拉的数据源(全站共用 _workspaceClientsCache)。
@@ -119,7 +128,7 @@ function _erpExcClients(): Array<{ id: number; name?: string; tax_id?: string }>
     return Array.isArray(c) ? (c as Array<{ id: number; name?: string; tax_id?: string }>) : [];
 }
 
-// 异常页可能先于账套切换器加载 → 懒取一次主体(绑主体面板同步渲染前须有数据)。
+// 列表可能先于账套切换器加载 → 懒取一次主体(绑主体面板同步渲染前须有数据)。
 // 复用账套切换器的 canonical loader(带 workspace 作用域头 + 401 处理),不另起 fetch。
 async function _erpExcEnsureClients(): Promise<void> {
     if (_erpExcClients().length) return;
@@ -134,7 +143,7 @@ async function _erpExcEnsureClients(): Promise<void> {
 }
 
 // 绑主体卡的下拉面板(方向判不出·主体没绑 → 选账套主体后重推)· 复用待补科目卡样式与开关/取消句柄。
-function _erpExcBindPanel(it: ErpExcItem): string {
+function _erpExcBindPanel(it: RepairItem): string {
     const clients = _erpExcClients();
     if (!clients.length) {
         return `<div class="erp-exc-acctfix" data-acctfix-panel="${escapeHtml(it.id)}" hidden>
@@ -190,118 +199,14 @@ async function _erpExcBindSubject(
     } catch (e) {
         showToast(t('erp-bind-fail'), 'error');
     }
-    _erpExcState.selected.delete(logId);
-    loadErpExceptions(false);
-    _erpExcRefreshBadge();
+    _erpExcReload();
 }
 
-// 绑主体提交按钮(开关/取消复用 data-erpexc-acctfix / data-acctfix-cancel 既有句柄)。
-function _erpExcWireBind(block: HTMLElement) {
-    block.querySelectorAll('[data-bindfix-submit]').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const id = (btn as HTMLElement).dataset.bindfixSubmit as string;
-            const panel = block.querySelector(
-                `[data-acctfix-panel="${CSS.escape(id)}"]`
-            ) as HTMLElement | null;
-            if (panel) _erpExcBindSubject(id, panel, btn as HTMLButtonElement);
-        });
-    });
-}
-
-async function _erpExcRetry(logId: string | undefined, btn: HTMLButtonElement | null) {
-    if (!logId) return;
-    if (btn) {
-        btn.disabled = true;
-        btn.textContent = t('erp-exc-retrying');
-    }
-    try {
-        const resp = await fetch('/api/erp/logs/' + encodeURIComponent(logId) + '/retry', {
-            method: 'POST',
-            headers: { Authorization: 'Bearer ' + _erpExcTok() },
-        });
-        const data = await resp.json().catch(() => ({}));
-        showToast(
-            resp.ok && data.ok ? t('erp-exc-retry-ok') : t('erp-exc-retry-fail'),
-            resp.ok && data.ok ? 'success' : 'error'
-        );
-    } catch (e) {
-        showToast(t('erp-exc-retry-fail'), 'error');
-    }
-    // 单一源:重拉队列 · 成功的行自动消失 · 失败的换新原因(铁律 #12 · 不维护乐观态)
-    _erpExcState.selected.delete(logId);
-    loadErpExceptions(false);
-    _erpExcRefreshBadge();
-}
-
-async function _erpExcBatch(action: string | undefined) {
-    const ids = Array.from(_erpExcState.selected);
-    if (action === 'clear') {
-        _erpExcState.selected.clear();
-        renderErpExceptions();
-        return;
-    }
-    if (ids.length === 0) return;
-    if (action === 'delete') {
-        // 用产品风格确认弹窗替换浏览器原生 confirm()(2026-05-26 · 符合设计语言)
-        const ok = await showConfirm(t('erp-exc-batch-delete-confirm', { n: ids.length }), {
-            danger: true,
-        });
-        if (!ok) return;
-        try {
-            const resp = await fetch('/api/erp/logs/batch-delete', {
-                method: 'POST',
-                headers: {
-                    Authorization: 'Bearer ' + _erpExcTok(),
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ log_ids: ids.slice(0, 200) }),
-            });
-            const d = await resp.json().catch(() => ({}));
-            showToast(
-                resp.ok
-                    ? t('erp-exc-batch-delete-ok', { n: d.deleted || 0 })
-                    : t('erp-exc-retry-fail'),
-                resp.ok ? 'success' : 'error'
-            );
-        } catch (e) {
-            showToast(t('erp-exc-retry-fail'), 'error');
-        }
-    } else if (action === 'retry') {
-        try {
-            const resp = await fetch('/api/erp/logs/batch-retry', {
-                method: 'POST',
-                headers: {
-                    Authorization: 'Bearer ' + _erpExcTok(),
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ log_ids: ids.slice(0, 50) }),
-            });
-            const d = await resp.json().catch(() => ({}));
-            showToast(
-                resp.ok
-                    ? t('erp-exc-batch-retry-ok', {
-                          ok: d.succeeded || 0,
-                          fail: (d.failed || 0) + (d.skipped || 0),
-                      })
-                    : t('erp-exc-retry-fail'),
-                resp.ok ? 'success' : 'error'
-            );
-        } catch (e) {
-            showToast(t('erp-exc-retry-fail'), 'error');
-        }
-    }
-    _erpExcState.selected.clear();
-    loadErpExceptions(false);
-    _erpExcRefreshBadge();
-}
-
+export type { RepairItem };
 export {
-    _erpExcRetry,
-    _erpExcBatch,
     _erpExcAcctPanel,
     _erpExcAccountFix,
     _erpExcBindPanel,
+    _erpExcBindSubject,
     _erpExcEnsureClients,
-    _erpExcWireBind,
 };

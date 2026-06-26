@@ -227,15 +227,14 @@ interface Window {
     // 仅被本批文件调用(定义在别处)的遗留桥
     _erpSelected?: Set<unknown>;
     getActiveWorkspaceClientId?: () => unknown;
-    _erpExcState?: Record<string, unknown>;
     renderWorkspaceControl?: () => void;
     navigateTo?: (route: string) => void;
     loadReconcilePage?: () => void;
-    _rerenderErpExceptions?: () => void;
     _refreshErpEndpointsCache?: () => void;
     _workspaceClientsCache?: unknown[];
     loadErpLogs?: (silent?: boolean) => Promise<void>;
-    loadErpExceptions?: (append?: boolean) => Promise<void>;
+    // 推送日志当前列表缓存(失败卡「修复映射」picker 按 id 取整条)
+    _erpLogsCache?: unknown[];
     // ── C5 批10 桥(state / history / test-center / vex / erp-log 遗留边界)──
     __i18nSubs?: unknown[];
     getCurrentClientId?: () => unknown;

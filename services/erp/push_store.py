@@ -20,7 +20,6 @@ from services.erp.push_log_queries import (  # noqa: F401,E402
     classify_push_exception,
     derive_account_fix,
     derive_bind_fix,
-    list_push_exceptions,
     get_push_stats_today,
 )
 
@@ -345,7 +344,8 @@ def update_endpoint_stats(endpoint_id: str, success: bool):
 def update_history_push_status(history_id: str, status: str):
     """更新 ocr_history 的 last_push_status / last_pushed_at"""
     try:
-        with db.get_cursor(commit=True) as cur:
+        # 后台/worker 路径:仅有 history_id(无单租户上下文)· 跨租户按 PK UPDATE → 显式 bypass。
+        with db.get_cursor_rls(bypass=True, commit=True) as cur:
             cur.execute(
                 """
                 UPDATE ocr_history

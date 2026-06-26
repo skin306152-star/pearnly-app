@@ -34,8 +34,6 @@ window.loadExceptionsPage = async function () {
     }
 };
 
-// ERP 推送异常块(原 L428-1089)已抽出 → src/home/erp-exceptions.js(REFACTOR-WB-C1)
-
 // 暴露红点刷新 · 启动时 + 周期调用
 window.refreshExcBadge = refreshExcBadge;
 // v118.21.0 · 客户列表加载完毕后给异常栏刷下拉
@@ -58,16 +56,6 @@ window._rerenderExceptions = function () {
     if (_excState.listCache && _excState.listCache.length) {
         renderList(_excState.listCache);
     }
-    // ERP 推送异常块也跟着切语言重渲(用缓存 · 不发请求)
-    try {
-        if (
-            window._erpExcState &&
-            window._erpExcState.items &&
-            (window._erpExcState.items as unknown[]).length &&
-            typeof window._rerenderErpExceptions === 'function'
-        )
-            window._rerenderErpExceptions();
-    } catch (_) {}
     // 抽屉打开时也跟着重渲
     if (_drawer.openExcId) renderDrawer();
 };

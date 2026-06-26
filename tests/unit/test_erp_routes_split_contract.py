@@ -39,7 +39,6 @@ PUSH_PATHS = {
     ("GET", "/api/erp/logs/{log_id}/debug-xlsx"),
     ("GET", "/api/erp/history/{history_id}/push_status"),
     ("GET", "/api/erp/logs"),
-    ("GET", "/api/erp/exceptions"),
     ("GET", "/api/erp/logs/{log_id}"),
     ("GET", "/api/erp/stats/today"),
     ("POST", "/api/erp/logs/{log_id}/retry"),

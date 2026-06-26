@@ -97,13 +97,13 @@ async def history_list(
 async def history_detail(record_id: str, request: Request):
     user = get_current_user_from_request(request)
     _check_history_access(user)
+    # 单条按主键查复核:授权按归属(user_id + tenant)· 不叠加活跃套账软过滤。
+    # 套账过滤是列表的视图收窄,异常单据的 workspace_client_id 常被打成发票对手方
+    # 而非活跃套账,叠加后会把列表里能看到的票挡成 404(与 page.png 同口径)。
     detail = get_ocr_history_detail(
         str(user["id"]),
         record_id,
         tenant_id=_tid(user),
-        workspace_client_id=wc.active_workspace_for_request(
-            request, _tid(user)
-        ),  # PO-4 · 套账硬边界
     )
     if not detail:
         raise HTTPException(404, detail="history.not_found")
@@ -191,9 +191,10 @@ async def history_delete(record_id: str, request: Request):
     for p in pdf_paths:
         try:
             still_used = False
-            from core.db import get_cursor
+            from core.db import get_cursor_rls
 
-            with get_cursor() as cur:
+            # 跨用户 PDF 引用计数(多发票共享同一 PDF)· 故意不按 RLS 收窄 → bypass。
+            with get_cursor_rls(bypass=True) as cur:
                 cur.execute("SELECT 1 FROM ocr_history WHERE pdf_storage_path = %s LIMIT 1", (p,))
                 still_used = cur.fetchone() is not None
             if not still_used:
@@ -210,13 +211,11 @@ async def history_pdf_download(record_id: str, request: Request):
 
     user = get_current_user_from_request(request)
     _check_history_access(user)
+    # 同 page.png · 单条复核按归属授权 · 不叠加活跃套账软过滤(否则对手方票 404)
     info = get_history_pdf_info(
         str(user["id"]),
         record_id,
         tenant_id=_tid(user),
-        workspace_client_id=wc.active_workspace_for_request(
-            request, _tid(user)
-        ),  # PO-4 · 套账硬边界
     )
     if not info:
         raise HTTPException(404, detail="history.pdf_not_found")
@@ -286,11 +285,12 @@ async def history_batch_delete(req: HistoryBatchDeleteRequest, request: Request)
     # v114 · 检查每个 PDF 是否还被其他记录引用 · 没人引用才物理删
     if pdf_paths:
         try:
-            from core.db import get_cursor
+            from core.db import get_cursor_rls
 
             for p in set(pdf_paths):
                 try:
-                    with get_cursor() as cur:
+                    # 跨用户 PDF 引用计数 · 故意不按 RLS 收窄 → bypass。
+                    with get_cursor_rls(bypass=True) as cur:
                         cur.execute(
                             "SELECT 1 FROM ocr_history WHERE pdf_storage_path = %s LIMIT 1", (p,)
                         )

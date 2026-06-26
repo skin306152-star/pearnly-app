@@ -20,6 +20,12 @@
 
 /* global escapeHtml, token, showConfirm, humanizeError, currentLang, routeTo, switchAutomationTab, _showSessionRevokedModal */
 
+import {
+    _erpExcAccountFix,
+    _erpExcBindSubject,
+    _erpExcEnsureClients,
+} from './erp-exc-actions.js';
+
 let _logFilter = { key: 'all', val: '' };
 // DMS 推送可视化闭环(Zihao 2026-06-01)· ERP 系统筛选 = 下拉(adapter)· 独立于 status/trigger chip ·
 // 选中 mrerp_dms(身份证订车)时表头/行切到 DMS 字段(订车单号/客户)· 不再用发票字段框。
@@ -120,6 +126,10 @@ async function loadErpLogs(silent?: boolean) {
             listEl.innerHTML = `<div class="erp-logs-empty">${escapeHtml(t('erp-logs-empty'))}</div>`;
             return;
         }
+        // 失败卡「修复映射」picker 按 id 从当前列表取整条 · 绑主体面板同步渲染前需账套主体下拉数据
+        // (cached 后即 no-op · 「推送异常」tab 并入推送日志后 · 自助修复入口挂在失败卡上)。
+        window._erpLogsCache = items;
+        await _erpExcEnsureClients();
         // 销项重做:日志行 → 草稿卡片(渲染搬到 erp-log-card.buildErpLogCard · data-log-* 不变)
         listEl.innerHTML = items
             .map((log: any) =>
@@ -248,10 +258,63 @@ async function retryPushLog(logId: any) {
             window._refreshErpBatchBar();
             return;
         }
+        // 失败卡自助修复(原「推送异常」tab 并入推送日志)· 补科目/绑主体展开面板 + 提交;
+        // 商品/客户不符走「修复映射」picker。面板 HTML 由 erp-log-card 注入失败卡,事件在此委托。
+        const _panelOf = (id: string) =>
+            document.querySelector(
+                `[data-acctfix-panel="${CSS.escape(id)}"]`
+            ) as HTMLElement | null;
+        const acctToggle = (e.target as HTMLElement).closest(
+            '[data-erpexc-acctfix]'
+        ) as HTMLElement | null;
+        if (acctToggle) {
+            e.stopPropagation();
+            const panel = _panelOf(acctToggle.dataset.erpexcAcctfix as string);
+            if (panel) panel.hidden = !panel.hidden;
+            return;
+        }
+        const acctCancel = (e.target as HTMLElement).closest(
+            '[data-acctfix-cancel]'
+        ) as HTMLElement | null;
+        if (acctCancel) {
+            e.stopPropagation();
+            const panel = _panelOf(acctCancel.dataset.acctfixCancel as string);
+            if (panel) panel.hidden = true;
+            return;
+        }
+        const acctSubmit = (e.target as HTMLElement).closest(
+            '[data-acctfix-submit]'
+        ) as HTMLElement | null;
+        if (acctSubmit) {
+            e.stopPropagation();
+            const id = acctSubmit.dataset.acctfixSubmit as string;
+            const panel = _panelOf(id);
+            if (panel) _erpExcAccountFix(id, panel, acctSubmit as HTMLButtonElement);
+            return;
+        }
+        const bindSubmit = (e.target as HTMLElement).closest(
+            '[data-bindfix-submit]'
+        ) as HTMLElement | null;
+        if (bindSubmit) {
+            e.stopPropagation();
+            const id = bindSubmit.dataset.bindfixSubmit as string;
+            const panel = _panelOf(id);
+            if (panel) _erpExcBindSubject(id, panel, bindSubmit as HTMLButtonElement);
+            return;
+        }
+        const mapFix = (e.target as HTMLElement).closest('[data-erpexc-fix]') as HTMLElement | null;
+        if (mapFix) {
+            e.stopPropagation();
+            if (typeof window._erpExcOpenEdit === 'function')
+                window._erpExcOpenEdit(mapFix.dataset.erpexcFix);
+            return;
+        }
         const logRow = (e.target as HTMLElement).closest('[data-log-detail]') as HTMLElement | null;
         if (logRow) {
             // 点 checkbox 不算点 row
             if ((e.target as HTMLElement).closest('[data-log-cb]')) return;
+            // 点修复面板(下拉/复选/标签)不算点 row · 不打开详情抽屉
+            if ((e.target as HTMLElement).closest('.erp-exc-acctfix')) return;
             // 临时任务 (Zihao 2026-05-26) · 点 ERP 单号 → 复制 · 不打开详情
             const copyDocEl = (e.target as HTMLElement).closest(
                 '[data-copy-doc]'

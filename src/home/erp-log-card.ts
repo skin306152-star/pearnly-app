@@ -3,7 +3,9 @@
 //   + 失败摘要条(失败时) + meta 页脚(时间/ERP单号/HTTP/耗时/重试)。
 // 从 erp-integration.ts 的表格行重排抽出(腾行数 + 单一职责)· 数据装配逻辑搬运 0 改 ·
 // data-log-* 属性原样保留 → 现有点击委托(详情/重试/勾选/复制单号)不变。
-/* global t, escapeHtml, currentLang, _erpSelected */
+/* global t, escapeHtml, currentLang */
+
+import { _erpExcAcctPanel, _erpExcBindPanel } from './erp-exc-actions.js';
 
 // Express 转人工/失败原因码 → 友好文案键(把「EXPRESS_MANUAL: no_revenue_account」这类
 // 看不懂的英文码显成人话)。后端若已带 error_friendly 优先用它;否则这里按码翻译。
@@ -125,7 +127,7 @@ function buildErpLogCard(log: any): string {
 
     const canSelect = !isRetrying;
     const cb = canSelect
-        ? `<input type="checkbox" class="erp-log-cb" data-log-cb="${escapeHtml(log.id)}" ${_erpSelected.has(log.id) ? 'checked' : ''}>`
+        ? `<input type="checkbox" class="erp-log-cb" data-log-cb="${escapeHtml(log.id)}" ${window._erpSelected?.has(log.id) ? 'checked' : ''}>`
         : `<span class="erp-log-cb-spacer"></span>`;
 
     // 买方/客户(身份证订车显末4)· 卖方
@@ -161,8 +163,33 @@ function buildErpLogCard(log: any): string {
                   .join(' · ')}</span>`
             : '';
 
+    // 失败卡自助修复入口(原「推送异常」tab 并入此处 · 由后端 list_push_logs 在失败行附
+    // category/account_fix/bind_fix)。补科目/绑主体卡用展开面板就地修复重推 → 不另给裸重试
+    // (重试只会再失败);商品/客户不符走修复映射 picker + 保留重试。其余失败只给重试。
+    const _cat = log.category || '';
+    const isAcctFix = statusClass === 'fail' && _cat === 'account_missing' && !!log.account_fix;
+    const isBindFix =
+        statusClass === 'fail' &&
+        _cat === 'direction_unknown' &&
+        !!(log.bind_fix && log.bind_fix.can_bind);
+    const canMapFix =
+        statusClass === 'fail' &&
+        (_cat === 'product_mismatch' || _cat === 'customer_mismatch' || _cat === 'no_client');
+    let repairBtn = '';
+    if (isAcctFix)
+        repairBtn = `<button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(log.id)}">${escapeHtml(t('erp-acctfix-open'))}</button>`;
+    else if (isBindFix)
+        repairBtn = `<button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(log.id)}">${escapeHtml(t('erp-bind-open'))}</button>`;
+    else if (canMapFix)
+        repairBtn = `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-fix="${escapeHtml(log.id)}">${escapeHtml(_cat === 'product_mismatch' ? t('erp-exc-fix-product') : t('erp-exc-fix-customer'))}</button>`;
+    const repairPanel = isAcctFix
+        ? _erpExcAcctPanel(log)
+        : isBindFix
+          ? _erpExcBindPanel(log)
+          : '';
+
     const retryBtn =
-        log.status === 'failed' && !isRetrying
+        log.status === 'failed' && !isRetrying && !isAcctFix && !isBindFix
             ? `<button class="btn btn-sm btn-secondary" data-log-retry="${escapeHtml(log.id)}">${escapeHtml(t('erp-exc-retry'))}</button>`
             : '';
 
@@ -175,7 +202,7 @@ function buildErpLogCard(log: any): string {
             : '';
 
     return `
-        <div class="erp-log-card ${statusClass}" data-log-detail="${escapeHtml(log.id)}">
+        <div class="erp-log-card ${statusClass}${repairPanel ? ' has-acctfix' : ''}" data-log-detail="${escapeHtml(log.id)}">
             <div class="erp-log-card-main">
                 <span class="erp-log-card-cb">${cb}</span>
                 <span class="erp-log-state ${statusClass}" title="${escapeHtml(statusLabel)}">${statusIcon}</span>
@@ -186,6 +213,7 @@ function buildErpLogCard(log: any): string {
                 <div class="erp-log-party"><label>${escapeHtml(partyLabel)}</label><span>${partyVal}</span></div>
                 <div class="erp-log-party"><label>${escapeHtml(t('erp-log-col-target'))}</label><span>${erpName}</span></div>
                 <div class="erp-log-act">
+                    ${repairBtn}
                     ${retryBtn}
                     <button class="btn btn-sm btn-ghost" data-log-detail="${escapeHtml(log.id)}">${escapeHtml(t('erp-log-detail-btn'))}</button>
                 </div>
@@ -199,6 +227,7 @@ function buildErpLogCard(log: any): string {
                 <span><b>${escapeHtml(t('erp-log-col-elapsed'))}</b>${log.elapsed_ms != null ? log.elapsed_ms + 'ms' : '—'}</span>
                 ${retryInfo ? `<span><b>${escapeHtml(t('erp-log-col-retry'))}</b>${escapeHtml(retryInfo)}</span>` : ''}
             </div>
+            ${repairPanel}
         </div>`;
 }
 

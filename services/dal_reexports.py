@@ -88,7 +88,6 @@ _REEXPORTS = {
         "list_push_logs",
         "get_push_log_detail",
         "get_push_stats_today",
-        "list_push_exceptions",
         "classify_push_exception",
     ],
     "services.recon.bank_recon_v2_store": [

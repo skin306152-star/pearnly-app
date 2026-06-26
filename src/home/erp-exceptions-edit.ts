@@ -1,11 +1,30 @@
 // ============================================================
-// REFACTOR-WB-modularize · ERP 推送异常【单条编辑弹窗】从 erp-exceptions.js 拆出
+// ERP 推送失败卡 ·「修复映射」单条编辑弹窗(选/绑 ERP 客户 + 商品 picker + 重试)
 //
-// _erpExcOpenEdit(选/绑 ERP 客户 + 商品 picker + 重试)· 共享状态/助手经 erp-exceptions.js import。
+// 「推送异常」tab 并入「推送日志」后(2026-06-26)· picker 从推送日志列表缓存(window._erpLogsCache)
+// 按 id 取整条;重试走推送日志的 window.retryPushLog(重拉列表)· 不再依赖已删的 erp-exceptions 模块。
 // ============================================================
 /* global escapeHtml */
 /* eslint-disable no-useless-assignment -- verbatim exceptions.js · 非 bug */
-import { _erpExcState, _erpExcFriendly, _erpExcRetry, _erpExcTok } from './erp-exceptions.js';
+
+const _tok = () => localStorage.getItem('mrpilot_token') || '';
+
+// 失败原因人话化:优先后端 4 语 friendly → Express 码人话 → 去掉 ERR_ 码的原始串。
+function _excFriendly(it: ExcItem): string {
+    const lang = ((window as any)._currentLang as string) || 'th';
+    const ef = (it.error_friendly && (it.error_friendly[lang] || it.error_friendly.en)) || '';
+    if (ef) return ef;
+    const exFn = (window as any)._expressFriendlyReason;
+    if (typeof exFn === 'function' && it.error_msg) {
+        const ex = exFn(it.error_msg);
+        if (ex) return ex;
+    }
+    return (it.error_msg || '').replace(/^ERR_[A-Z0-9_]+:?\s*/, '').trim();
+}
+
+async function _excRetry(id: string | number) {
+    if (typeof window.retryPushLog === 'function') await window.retryPushLog(id);
+}
 
 type ExcItem = {
     id: string | number;
@@ -22,6 +41,8 @@ type ExcItem = {
     id_card_tail?: string;
     ocr_buyer_name?: string;
     client_name?: string;
+    error_msg?: string;
+    error_friendly?: Record<string, string>;
 };
 type ExcCust = { code?: string; name?: string };
 type ExcProduct = { code?: string; name?: string };
@@ -37,9 +58,9 @@ function _erpExcCloseModal() {
 }
 
 window._erpExcOpenEdit = function (id) {
-    const it = ((_erpExcState.items as ExcItem[] | undefined) || []).find(
+    const it = (((window._erpLogsCache as ExcItem[] | undefined) || []).find(
         (x: ExcItem) => String(x.id) === String(id)
-    ) as ExcItem | undefined;
+    )) as ExcItem | undefined;
     if (!it) return;
     // DMS 闭环修正(Zihao 2026-06-01)· 身份证订车弹窗按 DMS 标签(订车单号/客户·无买方/无ERP客户)·
     // 不裸露 ERR_* 码(友好原因已在上方显示)。
@@ -48,7 +69,7 @@ window._erpExcOpenEdit = function (id) {
     // 商品不符 picker(对称客户 picker · Zihao 2026-05-26)· 通用 adapter · 不写死 MR.ERP。
     const canPickProduct =
         it.category === 'product_mismatch' && !!it.history_id && !!it.endpoint_id;
-    const reason = _erpExcFriendly(it as any);
+    const reason = _excFriendly(it);
     // 草稿对齐:基本信息用与推送详情抽屉同款的 grid cell(label + strong)
     const cell = (lbl: string, val?: string) =>
         `<div class="erp-detail-cell"><label>${escapeHtml(lbl)}</label><strong>${escapeHtml(val || '—')}</strong></div>`;
@@ -132,7 +153,7 @@ window._erpExcOpenEdit = function (id) {
     document.getElementById('erp-exc-m-cancel')!.addEventListener('click', _erpExcCloseModal);
     document.getElementById('erp-exc-m-retry')!.addEventListener('click', () => {
         _erpExcCloseModal();
-        _erpExcRetry(it.id as string, null);
+        _excRetry(it.id);
     });
 
     if (canPickCustomer) {
@@ -186,7 +207,7 @@ window._erpExcOpenEdit = function (id) {
                 const resp = await fetch(
                     '/api/erp/endpoints/' + encodeURIComponent(epId) + '/customers',
                     {
-                        headers: { Authorization: 'Bearer ' + _erpExcTok() },
+                        headers: { Authorization: 'Bearer ' + _tok() },
                     }
                 );
                 const data = await resp.json().catch(() => ({}));
@@ -220,7 +241,7 @@ window._erpExcOpenEdit = function (id) {
                     const mResp = await fetch('/api/erp/mappings/clients', {
                         method: 'POST',
                         headers: {
-                            Authorization: 'Bearer ' + _erpExcTok(),
+                            Authorization: 'Bearer ' + _tok(),
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
@@ -238,7 +259,7 @@ window._erpExcOpenEdit = function (id) {
                     showToast(t('erp-exc-edit-bound-ok'), 'success');
                     _erpExcCloseModal();
                     // 2) 重试(重新解析 → 用上新映射 → 推送)
-                    await _erpExcRetry(it.id as string, null);
+                    await _excRetry(it.id);
                 } catch (e) {
                     showToast(t('erp-exc-retry-fail'), 'error');
                     (bindBtn as HTMLButtonElement).disabled = false;
@@ -305,7 +326,7 @@ window._erpExcOpenEdit = function (id) {
         const loadAll = async () => {
             try {
                 const hResp = await fetch('/api/history/' + encodeURIComponent(it.history_id!), {
-                    headers: { Authorization: 'Bearer ' + _erpExcTok() },
+                    headers: { Authorization: 'Bearer ' + _tok() },
                 });
                 const hData = await hResp.json().catch(() => ({}));
                 const pages = (hData && hData.pages) || [];
@@ -324,7 +345,7 @@ window._erpExcOpenEdit = function (id) {
                 const pResp = await fetch(
                     '/api/erp/endpoints/' + encodeURIComponent(it.endpoint_id!) + '/products',
                     {
-                        headers: { Authorization: 'Bearer ' + _erpExcTok() },
+                        headers: { Authorization: 'Bearer ' + _tok() },
                     }
                 );
                 const pData = await pResp.json().catch(() => ({}));
@@ -351,7 +372,7 @@ window._erpExcOpenEdit = function (id) {
                         const mResp = await fetch('/api/erp/mappings/products', {
                             method: 'POST',
                             headers: {
-                                Authorization: 'Bearer ' + _erpExcTok(),
+                                Authorization: 'Bearer ' + _tok(),
                                 'Content-Type': 'application/json',
                             },
                             body: JSON.stringify({
@@ -370,7 +391,7 @@ window._erpExcOpenEdit = function (id) {
                     }
                     showToast(t('erp-exc-edit-prod-bound-ok'), 'success');
                     _erpExcCloseModal();
-                    await _erpExcRetry(it.id as string, null);
+                    await _excRetry(it.id);
                 } catch (e) {
                     showToast(t('erp-exc-retry-fail'), 'error');
                     (bindBtn as HTMLButtonElement).disabled = false;
@@ -379,3 +400,6 @@ window._erpExcOpenEdit = function (id) {
             });
     }
 };
+
+// ES module(隔离 _tok/_excFriendly/_excRetry 等本文件局部 · 不污染脚本全局作用域)。
+export {};

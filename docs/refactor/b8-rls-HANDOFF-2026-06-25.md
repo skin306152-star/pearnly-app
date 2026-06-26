@@ -1,7 +1,9 @@
-# B8 多租户 RLS · 交接(2026-06-25 收尾)
+# B8 多租户 RLS · 交接(2026-06-25 起 · 末次更新 2026-06-26)
 
 > 接手先读:本文件 + `b8-rls-no-policy-orphans-INCIDENT.md`(事故全程)+ 记忆 `rls-b8-p3-prod-enabled.md`。
 > 设计源:`b8-rls-production-design.md` / `b8-rls-wave2-closure-design.md`。实时数字跑 `scripts/refactor_progress.py`。
+>
+> **⚡ 2026-06-26 续:wave3 3b/3c/3d + 3a 外围收口已全部 prod live + CI 绿 + 金丝雀验过。最新进度见文末 §7「2026-06-26 收尾」——接手从那读起,§1~§3 是 06-25 基线快照(部分已被 §7 推进,以 §7 为准)。**
 
 ## 0. 一句话现状
 
@@ -75,3 +77,48 @@ ready 域 + wave2 对账 + bank_reconcile_* + wave3 3a 核心(ocr_history/client
 - 集成(docker pg):矩阵 8 + 传递式 5 + recon 端到端 3 + bank 真表 4 + clients/ocr_history 真表 3 + 模板 4。
 - prod 金丝雀:见 §5.3 套路(SET LOCAL ROLE pearnly_app + 真 user_id/tenant_id + 真 store 路径)。
 - 孤儿自检 SQL(owner)见 `INCIDENT.md` §3。
+
+## 7. 2026-06-26 收尾(wave3 3b/3c/3d + 3a 外围 · prod live + CI 绿)
+
+> 本节是当前权威进度。§1~§3 是 06-25 的基线快照,凡与本节冲突以本节为准。
+
+### 7.1 本窗口已完成(全 prod live · CI 全 6 闸绿 · 金丝雀验过)
+
+| commit | wave | 内容 | 金丝雀 |
+|---|---|---|---|
+| `fd847e54` | 3b | workspace/exceptions 域 enroll + DAL 穿上下文 | 真租户自见 / 假 0 |
+| `c0ef628b` | 3c | notification + archive(`archive_settings`)enroll;`update_ocr_history_pages` 迁 get_cursor_rls | 同上 |
+| `cfe232b8` | 3d | billing 钱表(`tenant_credits`/`credit_transactions`/`monthly_page_usage`/`topup_requests`)+ `ocr_cost_log` enroll;`charge.py` 3 游标穿 tenant**禁 bypass**;`account_status`/`cost.store` 迁 | 真租户 balance 99万(未被 RLS 清零)/ 假 0 |
+| `5e3917f8` | 3a 外围 | enroll 后裸 get_cursor 穿上下文:`auth_me`(OCR 计数)/`clients`(CSV 导出)/`billing_credits`(5 游标)/`erp/mappings_store`;超管路径(`admin_users_query`/`auth_admin_risk`/`auth_admin`/membership migration/`usage.store`/`owner_users`)→**显式 bypass=True** 带系统级理由注释 | auth_me ocr=21 / billing breakdown 21·credit_tx 57 / 假租户全 0 |
+| `0c930f4c` | /simplify 收口 | 抽 `tests/unit/_cursor_patch.py`(`patch_both` + `CursorPatchProxy`「双挂 get_cursor/get_cursor_rls」)· 6 个 contract 测试复用 · 纯测试基建净 −63 行 | 测试 only |
+
+**3c CI 历史坑(已向前盖绿)**:`c0ef628b` 当时 `archive/store.py +27` 漏 `RATCHET-EXEMPT` + 新 `ensure_archive_settings_table` 触 lint-debt,两道 **per-commit** 闸(push 用 `HEAD~1..HEAD`)红;豁免必须写进**同一 commit**,事后无法补(master 禁强推)。**3d/3a 外围干净 → head 已绿**,prod 不受影响。教训已并入 §5。
+
+### 7.2 钱路径纪律(本窗口落实 · 接手别破)
+
+- `services/billing/charge.py`:`charge_ocr` 读/写、`deduct_thb` 全走 `get_cursor_rls(tenant_id=..., commit=True)`,**绝不 bypass**(decimal·铁律·钱必经 RLS 二道闸)。
+- `services/billing/credits_schema.py` / `cost/store.py`:enroll + 业务读写穿上下文;**超管聚合**(账单总览跨租户)才 `bypass=True`,且每处带「为什么是系统级」注释。
+- 判据:**普通业务读自己租户 → 穿 tenant/user;跨租户聚合/迁移/后台任务 → 显式 bypass + 注释**。裸 get_cursor 仍是 owner 连接(force=False 不拦),老路径不破——所以 enroll 安全,迁移可逐函数推进。
+
+### 7.3 「patch both」测试范式(`tests/unit/_cursor_patch.py`)
+
+store 模块迁移期会同时存在 已迁(get_cursor_rls)/未迁(get_cursor)函数。测试用 `patch_both(value=cur)` 或 `patch_both(factory=...)` 把**两个游标都挂到同一 fake**,`CursorPatchProxy` 从「实际被调的那个」取 `call_args`(断言 `commit` kwarg)。坑:抽出 helper 后 membership/tenant 测试单跑会 `circular import`(**预存**,非本次引入——committed 版单跑也崩,只在成组跑时过),修法=文件顶 `from core import db  # noqa: F401` 先破环。
+
+### 7.4 仍未完成(交给下一窗口 · 按序)
+
+1. **★ 71 张孤儿表按域 re-enroll**(事故止血时全 DISABLE,proper 隔离待补)——优先级最高。模板分类见 `INCIDENT.md` §2。
+2. **wave4**:`erp_*`(endpoints/push_logs/mappings/oauth)、`email_ingest_*`、`import_template_*`。**`erp_push_logs` 的 JOIN 富化是难点**——`push_log_queries` + `mappings_store` 的 JOIN 只收 user_id,强转会丢富化,刻意留到此处与 push_logs 一起迁(见 §3 wave4)。
+3. **P4 收口**:`tests/e2e/12-rls-isolation.spec.js` 断言 `passed===5`(现 `>=2`);重写 `core/db.py:run_rls_isolation_tests` harness(别建临时 policy);ready/已 enroll 域裸 get_cursor 清零后才上 `force=True`(收尾,非启用前置)。
+4. **预存测试脆性**(非本窗口引入,记录备查):`test_billing_contract.py:100` 模块级 `_ensure_stub_bcrypt()` 往 `sys.modules` 装假 bcrypt(`hashpw` 返明文),仅当 bcrypt 未先导入时生效。全量套件 bcrypt 先被导入 → stub no-op → **4970 全绿**;但 `billing→tenant` 两文件单独成对跑会让 `test_create_owner_user...` 因密码未 hash 失败。**真闸是全量套件(绿)**,接手别被子集误导。彻底修=把 stub 改成 fixture 级 setUp/tearDown 或用真 bcrypt。
+
+### 7.5 验证记录(本窗口)
+
+- 全量单测 **4970 passed, 3 skipped**(`PYTHONUTF8=1 python -m pytest -q tests/unit`)。
+- CI 全 6 闸绿(run `28232941566`):lint-size / import+i18n+unit+vite+e2e / lint-ui / lint-routes / lint(black+ruff+prettier+eslint)/ lint-debt。
+- 三道 per-commit 闸本地复跑:ratchet PASS(净增 ≤0)、new_debt PASS、file_size PASS。
+- prod 金丝瓜见 7.1 表;套路同 §5.3(`SET LOCAL ROLE pearnly_app` + 真 user_id/tenant_id + 走真 store 函数,不止验 policy 谓词)。
+
+### 7.6 共享树事故(本窗口踩 · 接手引以为戒)
+
+1. **另一窗口 `git commit -a`/`git add .` 把我保存未提交的 `history_routes.py`/`push_store.py` 编辑卷进它的 `63c13b97`**(push_store bypass 后被 `822778c0` 还原——裸=owner bypass 安全)。**教训:共享树里改完立即提交自己文件,别留在工作树过夜。**
+2. **误 `git stash pop` 把另一窗口 `stash@{0}`(feat/express-fe-p3b)弹出**致 6 文件 UU 冲突。安全恢复=`git checkout --ours -- <files>`(取 pop 前工作树即 HEAD)+ `git reset -- <files>`(退回未暂存),**stash@{0} 完整保留在列表供其窗口正常 pop**。`git stash` 是仓库级共享栈,多窗口下危险——**别 stash,要么提交要么留工作树**。

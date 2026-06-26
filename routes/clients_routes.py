@@ -224,7 +224,7 @@ async def api_export_client_invoices(client_id: int, request: Request, month: Op
         else:
             user_filter_sql = "h.user_id = %s"
             user_filter_param = str(user["id"])
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tid or None, user_id=str(user["id"])) as cur:
             if month:
                 # 按月份过滤 · 同时兼容 invoice_date 为 NULL 的情况(用 created_at fallback)
                 cur.execute(

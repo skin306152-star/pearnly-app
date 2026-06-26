@@ -175,7 +175,8 @@ async def admin_user_detail(user_id: str, request: Request):
     try:
         from core import db as _db
 
-        with _db.get_cursor() as cur:
+        # 超管查任意用户的 ocr_history 计数 → 显式 bypass(跨租户 admin 通道)。
+        with _db.get_cursor_rls(bypass=True) as cur:
             cur.execute(
                 "SELECT COUNT(*) AS n, MAX(created_at) AS last FROM ocr_history WHERE user_id = %s",
                 (user_id,),

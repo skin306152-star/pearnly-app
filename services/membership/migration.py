@@ -156,7 +156,8 @@ def list_orphan_users() -> List[Dict[str, Any]]:
     给超管看清楚哪些用户需要补建 tenant
     """
     try:
-        with db.get_cursor() as cur:
+        # 跨租户孤儿用户清查(tenant_id IS NULL + ocr_history/clients 量统计)→ 显式 bypass。
+        with db.get_cursor_rls(bypass=True) as cur:
             cur.execute("""
                 SELECT
                     u.id, u.username, u.email, u.full_name, u.company_name,
@@ -393,8 +394,8 @@ def backfill_tenant_ids(dry_run: bool = True) -> Dict[str, Any]:
         # 2. 逐表回填(每表独立事务 · 一个失败不影响其他)
         for tbl in tables:
             try:
-                # 先统计待回填的行数
-                with db.get_cursor() as cur:
+                # 先统计待回填的行数(跨租户 backfill 迁移 → 显式 bypass)
+                with db.get_cursor_rls(bypass=True) as cur:
                     cur.execute(f"""
                         SELECT COUNT(*) AS n FROM {tbl}
                         WHERE tenant_id IS NULL
@@ -404,7 +405,7 @@ def backfill_tenant_ids(dry_run: bool = True) -> Dict[str, Any]:
                 info = {"table": tbl, "to_update": pending, "updated": 0}
 
                 if pending > 0 and not dry_run:
-                    with db.get_cursor(commit=True) as cur:
+                    with db.get_cursor_rls(bypass=True, commit=True) as cur:
                         cur.execute(f"""
                             UPDATE {tbl} SET tenant_id = u.tenant_id
                             FROM users u

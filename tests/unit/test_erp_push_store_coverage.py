@@ -14,6 +14,7 @@
 
 import sys
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from unittest import mock
 
@@ -82,14 +83,31 @@ def patch_cursor(cur):
         cur.cm_kwargs.append(k)
         return FakeCM(cur, None)
 
-    return mock.patch.object(store.db, "get_cursor", factory)
+    # update_history_push_status 走 get_cursor_rls(bypass);其余 endpoint CRUD 仍 get_cursor。两路同挂。
+    @contextmanager
+    def _both():
+        with (
+            mock.patch.object(store.db, "get_cursor", factory),
+            mock.patch.object(store.db, "get_cursor_rls", factory),
+        ):
+            yield
+
+    return _both()
 
 
 def patch_cursor_raises(exc=RuntimeError("boom")):
     def factory(*a, **k):
         raise exc
 
-    return mock.patch.object(store.db, "get_cursor", factory)
+    @contextmanager
+    def _both():
+        with (
+            mock.patch.object(store.db, "get_cursor", factory),
+            mock.patch.object(store.db, "get_cursor_rls", factory),
+        ):
+            yield
+
+    return _both()
 
 
 # ─────────────────────── 纯函数:重试延迟序列 ───────────────────────

@@ -128,7 +128,7 @@ def list_erp_client_mappings(tenant_id, restrict_client_ids=None):
     if not tenant_id:
         return []
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=str(tenant_id)) as cur:
             sql = """
                 SELECT m.id, m.tenant_id, m.client_id, m.erp_type, m.erp_code,
                        m.notes, m.created_at, m.updated_at,
@@ -163,7 +163,9 @@ def upsert_erp_client_mapping(tenant_id, client_id, erp_type, erp_code, notes, u
         return None
     notes_clean = (notes or "").strip()[:500]
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(
+            tenant_id=str(tenant_id), user_id=str(user_id) if user_id else None, commit=True
+        ) as cur:
             # 校验 client 属于 tenant
             cur.execute(
                 """

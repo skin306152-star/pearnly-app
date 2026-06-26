@@ -8,6 +8,7 @@ create_owner_user 内部走 db.find_user_by_username(留 db.py)· 经 db.* 调�
 """
 
 import unittest
+from contextlib import contextmanager
 from unittest import mock
 
 from services.tenant import store
@@ -65,12 +66,44 @@ class FakeCursor:
         return " ".join(c[0].upper() for c in self.calls)
 
 
+class _CursorPatchProxy:
+    """yield 给 `with _patch_cursor(cur) as p` · 暴露实际被调用那一路(get_cursor 或 get_cursor_rls)
+    的 call_args/called/call_count · 让断言 commit kwarg 不受双路 patch 影响。"""
+
+    def __init__(self, m1, m2):
+        self._m1, self._m2 = m1, m2
+
+    def _active(self):
+        return self._m2 if self._m2.called else self._m1
+
+    @property
+    def called(self):
+        return self._m1.called or self._m2.called
+
+    @property
+    def call_args(self):
+        return self._active().call_args
+
+    @property
+    def call_count(self):
+        return self._m1.call_count + self._m2.call_count
+
+
 def _patch_cursor(cur):
-    """让 db.get_cursor(...) 不管带不带 commit 都返回我们的 fake cursor。"""
+    """让 db.get_cursor / get_cursor_rls(任意 kwargs)都返回 fake cursor(超管级联走 rls bypass)。"""
     cm = mock.MagicMock()
     cm.__enter__ = mock.Mock(return_value=cur)
     cm.__exit__ = mock.Mock(return_value=False)
-    return mock.patch("core.db.get_cursor", return_value=cm)
+
+    @contextmanager
+    def _both():
+        with (
+            mock.patch("core.db.get_cursor", return_value=cm) as m1,
+            mock.patch("core.db.get_cursor_rls", return_value=cm) as m2,
+        ):
+            yield _CursorPatchProxy(m1, m2)
+
+    return _both()
 
 
 class TenantStoreContractTests(unittest.TestCase):

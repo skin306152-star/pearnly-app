@@ -24,7 +24,8 @@ def admin_suspicious_users(request: Request):
         _require_super_admin(request)
         from core import db as _db
 
-        with _db.get_cursor(commit=True) as cur:
+        # 超管跨租户风控聚合(全平台重度 OCR 用户)→ 显式 bypass。
+        with _db.get_cursor_rls(bypass=True, commit=True) as cur:
             # 1. 同 IP 注册多个账号
             cur.execute("""
                     SELECT signup_ip, COUNT(*) AS n,

@@ -30,7 +30,7 @@ class _FakeCursor:
 
 def _ctxmgr(cur):
     @contextmanager
-    def _gc(commit=False):
+    def _gc(*a, **k):
         yield cur
 
     return _gc
@@ -103,7 +103,7 @@ class CleanupExpiredHistoryTests(unittest.TestCase):
         from services.usage import store
 
         cur = _FakeCursor(rowcount=2)  # 每条 DELETE 删 2 行
-        with mock.patch.object(store.db, "get_cursor", _ctxmgr(cur)):
+        with mock.patch.object(store.db, "get_cursor_rls", _ctxmgr(cur)):
             total = store.cleanup_expired_history(free_days=5, plus_days=30, pro_days=120)
         self.assertEqual(len(cur.executed), 3, "应跑 3 条 DELETE(free/plus/pro 三档)")
         self.assertIn("plan = 'free'", cur.executed[0][0])
@@ -118,7 +118,7 @@ class CleanupExpiredHistoryTests(unittest.TestCase):
         from services.usage import store
 
         cur = _FakeCursor(raise_on_exec=True)
-        with mock.patch.object(store.db, "get_cursor", _ctxmgr(cur)):
+        with mock.patch.object(store.db, "get_cursor_rls", _ctxmgr(cur)):
             self.assertEqual(store.cleanup_expired_history(), 0)
 
 

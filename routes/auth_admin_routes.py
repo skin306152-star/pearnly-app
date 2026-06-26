@@ -87,7 +87,8 @@ def admin_cleanup_demo(request: Request):
         from core import db as _db
 
         deleted = {"users": 0, "ocr_history": 0, "clients": 0}
-        with _db.get_cursor(commit=True) as cur:
+        # 超管跨租户清理 demo 账号(含 ocr_history/clients/ocr_cost_log)→ 显式 bypass。
+        with _db.get_cursor_rls(bypass=True, commit=True) as cur:
             # 找出要删的用户(demo / demo_plus / 任何 username 以 demo_ 开头)
             cur.execute("""
                     SELECT id, username FROM users

@@ -145,7 +145,8 @@ def get_my_plan(request: Request):
         used = 0
         clients_count = 0
         line_verified = False
-        with _db.get_cursor(commit=True) as cur:
+        # ocr_history/clients 计数走 RLS 上下文(穿 tenant+user·users 子查询 owner 兜底)。
+        with _db.get_cursor_rls(tenant_id=u.get("tenant_id"), user_id=user_id, commit=True) as cur:
             # 取用户详情(包括 LINE 绑定状态)
             cur.execute(
                 """

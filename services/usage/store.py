@@ -66,7 +66,8 @@ def cleanup_expired_history(free_days: int = 7, plus_days: int = 90, pro_days: i
     """
     total = 0
     try:
-        with db.get_cursor(commit=True) as cur:
+        # 后台按 plan 跨租户清过期历史(无单租户上下文)→ 显式 bypass。
+        with db.get_cursor_rls(bypass=True, commit=True) as cur:
             cur.execute(
                 """
                 DELETE FROM ocr_history

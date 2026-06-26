@@ -51,7 +51,7 @@ async def get_my_credits(request: Request, response: Response):
         balance_thb = 0.0
         pages_this_month = 0
         try:
-            with db.get_cursor() as cur:
+            with db.get_cursor_rls(tenant_id=tid) as cur:
                 cur.execute("SELECT balance_thb FROM tenant_credits WHERE tenant_id = %s", (tid,))
                 row = cur.fetchone()
                 if row:
@@ -72,7 +72,7 @@ async def get_my_credits(request: Request, response: Response):
         # 按用户拆分本月识别量（从 ocr_history 统计）
         user_breakdown = []
         try:
-            with db.get_cursor() as cur:
+            with db.get_cursor_rls(tenant_id=tid) as cur:
                 cur.execute(
                     """
                     SELECT h.user_id::text,
@@ -111,7 +111,7 @@ async def get_my_credits(request: Request, response: Response):
         # 员工：只返回自己本月发票数，不暴露任何余额/金额信息
         my_count = 0
         try:
-            with db.get_cursor() as cur:
+            with db.get_cursor_rls(tenant_id=tid, user_id=user_id) as cur:
                 cur.execute(
                     """
                     SELECT COUNT(*) AS cnt
@@ -219,7 +219,7 @@ async def credits_usage_history(
     uid_sql = "AND ct.user_id = %s::uuid" if user_id else ""
     uid_params = [user_id] if user_id else []
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tid, user_id=user_id or None) as cur:
             cur.execute(
                 f"""
                 SELECT COUNT(*) AS n FROM credit_transactions ct
@@ -353,7 +353,7 @@ async def credits_usage_report(
     rows: list = []
     company = ""
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tid, user_id=user_id or None) as cur:
             cur.execute("SELECT name FROM tenants WHERE id = %s::uuid", (tid,))
             trow = cur.fetchone()
             if trow:

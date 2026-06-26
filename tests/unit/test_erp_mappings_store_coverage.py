@@ -14,6 +14,7 @@
 
 import sys
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from unittest import mock
 
@@ -66,15 +67,34 @@ class FakeCM:
         return False
 
 
+# list/upsert client mapping 走 get_cursor_rls(穿 tenant);其余 CRUD 仍 get_cursor。两路同挂同一 fake。
 def patch_cursor(cur):
-    return mock.patch.object(store.db, "get_cursor", lambda *a, **k: FakeCM(cur))
+    cm = lambda *a, **k: FakeCM(cur)  # noqa: E731
+
+    @contextmanager
+    def _both():
+        with (
+            mock.patch.object(store.db, "get_cursor", cm),
+            mock.patch.object(store.db, "get_cursor_rls", cm),
+        ):
+            yield
+
+    return _both()
 
 
 def patch_cursor_raises(exc=RuntimeError("boom")):
     def factory(*a, **k):
         raise exc
 
-    return mock.patch.object(store.db, "get_cursor", factory)
+    @contextmanager
+    def _both():
+        with (
+            mock.patch.object(store.db, "get_cursor", factory),
+            mock.patch.object(store.db, "get_cursor_rls", factory),
+        ):
+            yield
+
+    return _both()
 
 
 # ─────────────────────── 校验常量 + 归一化 helper ───────────────────────

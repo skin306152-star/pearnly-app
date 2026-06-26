@@ -123,7 +123,8 @@ def preview_owner_cascade(user_id: str) -> Optional[Dict[str, Any]]:
     v118.16.2 · 兼容孤立用户 tenant_id IS NULL(老注册流程遗留 · 只按 user_id 删)
     """
     try:
-        with db.get_cursor() as cur:
+        # 超管删号前预览级联(任意目标租户/用户的 ocr_history/clients)→ 显式 bypass。
+        with db.get_cursor_rls(bypass=True) as cur:
             # 取 tenant_id + 老板信息(role='owner' 或 NULL 都视为老板 · 兼容老数据)
             cur.execute(
                 """SELECT id, username, email, company_name, tenant_id, created_at
@@ -260,7 +261,8 @@ def delete_owner_user_cascade(user_id: str) -> bool:
     import traceback
 
     try:
-        with db.get_cursor(commit=True) as cur:
+        # 超管级联删号(任意目标租户/用户的 ocr_history/clients/ocr_cost_log·含 SAVEPOINT)→ 显式 bypass。
+        with db.get_cursor_rls(bypass=True, commit=True) as cur:
             # 取 tenant_id(role='owner' 或 NULL 都视为老板)
             cur.execute(
                 "SELECT tenant_id, username FROM users WHERE id = %s AND (role = 'owner' OR role IS NULL) LIMIT 1",

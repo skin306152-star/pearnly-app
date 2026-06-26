@@ -58,9 +58,9 @@ function _erpExcCloseModal() {
 }
 
 window._erpExcOpenEdit = function (id) {
-    const it = (((window._erpLogsCache as ExcItem[] | undefined) || []).find(
+    const it = ((window._erpLogsCache as ExcItem[] | undefined) || []).find(
         (x: ExcItem) => String(x.id) === String(id)
-    )) as ExcItem | undefined;
+    ) as ExcItem | undefined;
     if (!it) return;
     // DMS 闭环修正(Zihao 2026-06-01)· 身份证订车弹窗按 DMS 标签(订车单号/客户·无买方/无ERP客户)·
     // 不裸露 ERR_* 码(友好原因已在上方显示)。

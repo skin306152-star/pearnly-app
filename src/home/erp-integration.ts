@@ -20,11 +20,7 @@
 
 /* global escapeHtml, token, showConfirm, humanizeError, currentLang, routeTo, switchAutomationTab, _showSessionRevokedModal */
 
-import {
-    _erpExcAccountFix,
-    _erpExcBindSubject,
-    _erpExcEnsureClients,
-} from './erp-exc-actions.js';
+import { _erpExcAccountFix, _erpExcBindSubject, _erpExcEnsureClients } from './erp-exc-actions.js';
 
 let _logFilter = { key: 'all', val: '' };
 // DMS 推送可视化闭环(Zihao 2026-06-01)· ERP 系统筛选 = 下拉(adapter)· 独立于 status/trigger chip ·

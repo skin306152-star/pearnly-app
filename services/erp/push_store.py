@@ -344,8 +344,7 @@ def update_endpoint_stats(endpoint_id: str, success: bool):
 def update_history_push_status(history_id: str, status: str):
     """更新 ocr_history 的 last_push_status / last_pushed_at"""
     try:
-        # 后台/worker 路径:仅有 history_id(无单租户上下文)· 跨租户按 PK UPDATE → 显式 bypass。
-        with db.get_cursor_rls(bypass=True, commit=True) as cur:
+        with db.get_cursor(commit=True) as cur:
             cur.execute(
                 """
                 UPDATE ocr_history

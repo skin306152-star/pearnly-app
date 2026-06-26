@@ -182,11 +182,7 @@ function buildErpLogCard(log: any): string {
         repairBtn = `<button class="btn btn-sm btn-primary" type="button" data-erpexc-acctfix="${escapeHtml(log.id)}">${escapeHtml(t('erp-bind-open'))}</button>`;
     else if (canMapFix)
         repairBtn = `<button class="btn btn-sm btn-secondary" type="button" data-erpexc-fix="${escapeHtml(log.id)}">${escapeHtml(_cat === 'product_mismatch' ? t('erp-exc-fix-product') : t('erp-exc-fix-customer'))}</button>`;
-    const repairPanel = isAcctFix
-        ? _erpExcAcctPanel(log)
-        : isBindFix
-          ? _erpExcBindPanel(log)
-          : '';
+    const repairPanel = isAcctFix ? _erpExcAcctPanel(log) : isBindFix ? _erpExcBindPanel(log) : '';
 
     const retryBtn =
         log.status === 'failed' && !isRetrying && !isAcctFix && !isBindFix

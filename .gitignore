@@ -143,3 +143,15 @@ tests/visual/playwright-output/
 # 根目录一次性截图 / 安装图标产物
 /_*.png
 /_*.ico
+# 根目录一次性调试转储 / 验证脚本(同上思路 · 只本机用)
+/x
+/_*.cjs
+# 散落输出目录:output/(单数,与上面 /outputs/ 并存的另一处)+ 一次性 UI 审计/mock 产物
+output/
+scripts/_mock/
+scripts/_ui_audit/
+scripts/_ui_audit_full/
+# ★草稿垃圾桶约定(根治散落):各窗口的临时脚本/数据一律丢进 _scratch/,整目录忽略,
+# 不再散落到 scripts/ 根或仓库根。要留作正式工具的脚本才显式提交到 scripts/(不带 _scratch/)。
+/_scratch/
+scripts/_scratch/

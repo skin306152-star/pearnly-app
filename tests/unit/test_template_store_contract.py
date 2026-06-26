@@ -22,14 +22,20 @@ class FindMappingTests(unittest.TestCase):
     def test_hit_returns_mapping(self):
         cur = mock.MagicMock()
         cur.fetchone.return_value = {"mapping_json": {"date": 0, "balance": 4}}
-        with mock.patch.object(ts, "get_cursor", return_value=_ctx(cur)):
+        with (
+            mock.patch.object(ts, "get_cursor", return_value=_ctx(cur)),
+            mock.patch.object(ts, "get_cursor_rls", return_value=_ctx(cur)),
+        ):
             out = ts.find_mapping("t1", "statement", "sig123")
         self.assertEqual(out, {"date": 0, "balance": 4})
 
     def test_miss_returns_none(self):
         cur = mock.MagicMock()
         cur.fetchone.return_value = None
-        with mock.patch.object(ts, "get_cursor", return_value=_ctx(cur)):
+        with (
+            mock.patch.object(ts, "get_cursor", return_value=_ctx(cur)),
+            mock.patch.object(ts, "get_cursor_rls", return_value=_ctx(cur)),
+        ):
             self.assertIsNone(ts.find_mapping("t1", "statement", "sigX"))
 
     def test_bad_inputs(self):
@@ -48,7 +54,10 @@ class FindMappingTests(unittest.TestCase):
                 raise Exception('relation "import_template_mappings" does not exist')
             return _ctx(cur_ok)  # ensure_table 的几次 + 重试
 
-        with mock.patch.object(ts, "get_cursor", side_effect=fake_get_cursor):
+        with (
+            mock.patch.object(ts, "get_cursor", side_effect=fake_get_cursor),
+            mock.patch.object(ts, "get_cursor_rls", side_effect=fake_get_cursor),
+        ):
             out = ts.find_mapping("t1", "statement", "sig")
         self.assertEqual(out, {"date": 0})  # 建表后重试拿到
 
@@ -56,7 +65,10 @@ class FindMappingTests(unittest.TestCase):
 class SaveMappingTests(unittest.TestCase):
     def test_upsert_placeholder_param_match(self):
         cur = mock.MagicMock()
-        with mock.patch.object(ts, "get_cursor", return_value=_ctx(cur)):
+        with (
+            mock.patch.object(ts, "get_cursor", return_value=_ctx(cur)),
+            mock.patch.object(ts, "get_cursor_rls", return_value=_ctx(cur)),
+        ):
             ok = ts.save_mapping(
                 "t1",
                 "statement",
@@ -81,7 +93,10 @@ class SaveMappingTests(unittest.TestCase):
 class EnsureTableTests(unittest.TestCase):
     def test_runs_ddl(self):
         cur = mock.MagicMock()
-        with mock.patch.object(ts, "get_cursor", return_value=_ctx(cur)):
+        with (
+            mock.patch.object(ts, "get_cursor", return_value=_ctx(cur)),
+            mock.patch.object(ts, "get_cursor_rls", return_value=_ctx(cur)),
+        ):
             ok = ts.ensure_table()
         self.assertTrue(ok)
         stmts = [c.args[0] for c in cur.execute.call_args_list]

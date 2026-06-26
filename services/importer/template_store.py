@@ -13,7 +13,7 @@ import json as _json
 import logging
 from typing import Any, Dict, List, Optional
 
-from core.db import get_cursor
+from core.db import get_cursor, get_cursor_rls
 
 logger = logging.getLogger("importer.template_store")
 
@@ -53,6 +53,11 @@ def ensure_table() -> bool:
         with get_cursor(commit=True) as cur:
             cur.execute(_DDL_TABLE)
             cur.execute(_DDL_INDEX)
+            # B8 RLS wave4:tenant_id NOT NULL(无 user_id 列)→ 纯 tenant 隔离。
+            # force=False:owner DDL/超管级联删(owner_users bypass)不破;业务连接 SET ROLE 后强制。
+            from core.rls import apply_tenant_rls
+
+            apply_tenant_rls(cur, "import_template_mappings")
         return True
     except Exception as e:  # noqa: BLE001
         logger.error(f"ensure_table failed [{type(e).__name__}]: {e}")
@@ -67,7 +72,7 @@ def find_mapping(
         return None
 
     def _q():
-        with get_cursor() as cur:
+        with get_cursor_rls(tenant_id=str(tenant_id)) as cur:
             cur.execute(
                 """
                 SELECT mapping_json FROM import_template_mappings
@@ -113,7 +118,7 @@ def save_mapping(
         return False
 
     def _upsert():
-        with get_cursor(commit=True) as cur:
+        with get_cursor_rls(tenant_id=str(tenant_id), commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO import_template_mappings
@@ -161,7 +166,7 @@ def save_mapping(
 
 def list_mappings(tenant_id: str, document_type: Optional[str] = None) -> List[Dict[str, Any]]:
     try:
-        with get_cursor() as cur:
+        with get_cursor_rls(tenant_id=str(tenant_id)) as cur:
             if document_type:
                 cur.execute(
                     """
@@ -201,7 +206,7 @@ def list_mappings(tenant_id: str, document_type: Optional[str] = None) -> List[D
 
 def delete_mapping(tenant_id: str, mapping_id: str) -> bool:
     try:
-        with get_cursor(commit=True) as cur:
+        with get_cursor_rls(tenant_id=str(tenant_id), commit=True) as cur:
             cur.execute(
                 "DELETE FROM import_template_mappings WHERE id = %s::uuid AND tenant_id = %s::uuid",
                 (str(mapping_id), str(tenant_id)),

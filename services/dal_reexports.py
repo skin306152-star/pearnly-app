@@ -161,6 +161,7 @@ _REEXPORTS = {
         "find_or_create_client_by_tax_id",
     ],
     "services.archive.store": [
+        "ensure_archive_settings_table",
         "get_archive_settings",
         "get_archive_template",
         "upsert_archive_settings",

@@ -51,10 +51,14 @@ def _no_bare():
 
 
 def _assert_ctx(test, calls):
+    # 主 CRUD 游标穿 tenant+user。update_pages 会先嵌套开 archive_template 的 user-only 游标
+    # (wave3 3c 后 archive 也走 RLS),故按上下文匹配主游标,不死认 calls[0]。
     test.assertTrue(calls, "未走 get_cursor_rls")
-    test.assertEqual(calls[0].get("tenant_id"), TENANT)
-    test.assertEqual(calls[0].get("user_id"), USER)
-    test.assertNotEqual(calls[0].get("bypass"), True)
+    test.assertTrue(
+        any(c.get("tenant_id") == TENANT and c.get("user_id") == USER for c in calls),
+        "主游标未穿 tenant+user",
+    )
+    test.assertFalse(any(c.get("bypass") is True for c in calls), "不得 bypass")
 
 
 class ClientsStoreContext(unittest.TestCase):

@@ -10,6 +10,7 @@ from core import db
 from services.archive import store
 
 _MOVED = [
+    "ensure_archive_settings_table",
     "get_archive_settings",
     "get_archive_template",
     "upsert_archive_settings",

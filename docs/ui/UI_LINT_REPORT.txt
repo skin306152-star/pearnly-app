@@ -1,0 +1,496 @@
+# UI 设计合规扫描报告 · 321 个源文件全扫
+
+
+## 旧色/旧蓝(应改令牌) — 命中 8(8 文件)
+     1  static\pos\pos-cashier.js
+        └ 25: $('main-avatar').style.background = c.color || '#2563EB';
+     1  static\pos\pos-data.js
+        └ 312: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
+     1  static\pos\pos.js
+        └ 126: const color = c.color || '#2563EB';
+     1  static\admin\admin.css
+        └ 521: color: #2563eb;
+     1  static\admin\admin.js
+        └ 285: google_vision: { label: 'Google Vision', color: '#2563EB' },
+     1  static\pos\pos-cashier.js
+        └ 25: $('main-avatar').style.background = c.color || '#2563EB';
+     1  static\pos\pos-data.js
+        └ 312: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
+     1  static\pos\pos.js
+        └ 126: const color = c.color || '#2563EB';
+
+## 旧token名(应用全局emerald) — 命中 286(32 文件)
+    59  static\pos\pos.css
+        └ 12: --blue: #7C4DFF; --blue-d: #6B3FF2; --blue-l: #EEE5FF;
+        └ 39: .pos-view--login .brand .b .dot { width: 9px; height: 9px; border-radius: 50%; background:
+    59  static\pos\pos.css
+        └ 12: --blue: #7C4DFF; --blue-d: #6B3FF2; --blue-l: #EEE5FF;
+        └ 39: .pos-view--login .brand .b .dot { width: 9px; height: 9px; border-radius: 50%; background:
+    22  static\pos\pos-restaurant.css
+        └ 5: * 复用 pos.css 顶层 --blue/--ink/--bg 等令牌;厨房屏自带深色令牌。.prettierignore 豁免(同 home-*.css)。
+        └ 18: .pos-view--rtables .rtop .brand .dot { width: 9px; height: 9px; border-radius: 50%; backgr
+    22  static\pos\pos-restaurant.css
+        └ 5: * 复用 pos.css 顶层 --blue/--ink/--bg 等令牌;厨房屏自带深色令牌。.prettierignore 豁免(同 home-*.css)。
+        └ 18: .pos-view--rtables .rtop .brand .dot { width: 9px; height: 9px; border-radius: 50%; backgr
+    21  static\home-01-base.css
+        └ 39: /* 旧蓝调色板收口为 accent(S1 收编 · Purple v2 随令牌翻紫):238 处 --blue 引用一次性换肤 */
+        └ 40: --blue: #7C4DFF;
+    18  static\home-37-html-inline.css
+        └ 26: accent-color: var(--blue);
+        └ 38: border: 1px solid var(--blue-200);
+    13  src\home\rules-settings-data.ts
+        └ 6: // media query)· 不碰 CSS bundle。配色走全局令牌(--blue 系 · 选中黑)。
+        └ 282: .rs-tag{font-size:11px;font-weight:600;color:var(--blue);background:var(--blue-weak);borde
+    10  static\home-10-push-logs.css
+        └ 69: .erp-exc-chip.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+        └ 300: .erp-exc-cb, .erp-exc-cb-all { accent-color: var(--blue); width: 16px; height: 16px; curso
+     9  static\home-35-bankrecon-v2.css
+        └ 22: border-color: var(--accent); background: var(--blue-50);
+        └ 29: .brv2-zone-icon-gl { background: var(--blue-100); color: var(--blue-800); }
+     7  static\home-25-bankrecon-erpmapping.css
+        └ 197: .bank-cand-pane-body .bank-cand-hint.hint-suggested { background: var(--blue-100); color: 
+        └ 376: color: var(--blue-600);
+     6  static\home-29-vat-recon-clients.css
+        └ 86: .cust-col-check input, .cust-cell-check input { width: 16px; height: 16px; accent-color: v
+        └ 106: .cust-row-btn.primary { background: var(--blue); color: #fff; border-color: var(--blue); }
+     6  static\home-40-sales-wizard.css
+        └ 214: color: var(--blue-800);
+        └ 250: background: var(--blue-50);
+     5  static\home-39-sales.css
+        └ 285: background: var(--blue-100);
+        └ 286: color: var(--blue-800);
+     3  src\home\onboarding-business.ts
+        └ 76: .pbiz .type:hover{border-color:var(--blue-200);}
+        └ 77: .pbiz .type.on{border-color:var(--btn-blue,#0E7C66);background:var(--blue-weak);}
+     3  static\home-45-kit.css
+        └ 482: background: var(--blue-weak);
+        └ 483: border-color: var(--blue);
+     2  src\home\module-settings.ts
+        └ 54: .modset .bizbar .ico{width:40px;height:40px;border-radius:11px;background:var(--blue-weak)
+        └ 71: .modset .mod.lock .sw{background:var(--blue-200);cursor:not-allowed;}.modset .mod.lock .sw
+     2  static\erp-mrerp-connect.css
+        └ 79: background: var(--blue-weak);
+        └ 80: color: var(--blue-800);
+     2  static\home-12-drawer-search.css
+        └ 154: .archive-palette-btn.date:hover    { background: var(--blue-100); border-color: var(--line
+        └ 168: background: var(--blue-100);
+     2  static\home-14-gemini-admin.css
+        └ 216: #page-admin .tenant-type-shared  { background: var(--blue-100); color: var(--ink); }
+        └ 601: background: var(--blue-100);
+     2  static\home-15-team-folder.css
+        └ 219: .folder-recent-icon.dup  { background: var(--blue-100); color: var(--ink); }
+        └ 246: border: 1px solid var(--blue-100);
+     2  static\home-38-buttons.css
+        └ 246: background: var(--blue-300) !important;
+        └ 247: border-color: var(--blue-300) !important;
+     1  static\home-07-history-automation.css
+        └ 174: .history-badge.source-email  { background: var(--blue-100); color: var(--ink); }
+     1  static\home-08-pagehead-toast.css
+        └ 188: border-color: var(--blue-100);
+     1  static\home-11-automation-settings.css
+        └ 609: .archive-token.date    { background: var(--blue-100); color: var(--ink); border-color: var
+     1  static\home-17-aibalance-reports-trial.css
+        └ 490: .pay-copyable:hover { background: var(--blue-100); }
+     1  static\home-18-admin-users.css
+        └ 830: border-color: var(--blue-300);
+     1  static\home-20-banners-pushlogs.css
+        └ 190: accent-color: var(--blue);
+     1  static\home-26-erp-cards.css
+        └ 219: background: var(--blue-100);
+     1  static\home-27-erp-credentials.css
+        └ 396: background: var(--blue-100);
+     1  static\home-28-erp-banners-batch.css
+        └ 80: background: var(--blue-100);
+     1  static\home-30-settings-modal.css
+        └ 924: .badge-blue  { background: var(--blue-100); color: var(--ink); }
+     1  static\home-31-navia-topbar.css
+        └ 370: background: var(--blue-50);
+
+## emoji当图标(应换Lucide) — 命中 204(31 文件)
+    92  static\i18n-data.js
+        └ 1188: 'billing-accuracy-good': '✅ 准',
+        └ 1189: 'billing-accuracy-fair': '⚠ 一般',
+    35  static\erp-mrerp-connect.js
+        └ 275: zh: '⚙ 高级设置(自动创建买方/商品的模板 · 可不填)',
+        └ 276: en: '⚙ Advanced (templates for auto-creating buyers/products · optional)',
+    20  static\landing\landing-i18n.js
+        └ 7: welcomeSub: '准备好一起把工作推进吧 💗',
+        └ 8: bubble: '今天的工作<br />会很顺利 😊',
+     8  static\admin\admin-i18n.js
+        └ 106: 'tn-status-overdraft': '⚠ 透支',
+        └ 148: 'adm-risk-title': '⚠ 风控 · 可疑活动',
+     7  src\home\knowledge-fab.ts
+        └ 119: burst(['💛', '✨', '💙', '🐾']);
+        └ 171: const HELLO = [kbT('kb-fab-hi', '喵?'), kbT('kb-fab-ask', '问我呀!'), '🐾'];
+     5  static\admin\admin.js
+        └ 1812: ? '<span class="adm-drawer-pill adm-pill-danger">⚠ ' +
+        └ 1879: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
+     4  static\pos\pos-i18n.js
+        └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
+        └ 258: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
+     4  static\pos\pos-i18n.js
+        └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
+        └ 258: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
+     2  src\home\core.ts
+        └ 2: // 工具(t/escapeHtml/svgIcon)+ Session 被踢弹窗(🔴)+ 鉴权 API(🔴铁律#26)+ plan 上限 helper。
+     2  static\pos\pos-restaurant-ops.js
+        └ 83: const tm = (t.late ? '⚠ ' : '⏱ ') + (t.minutes || 0) + ' ' + POS.t('posui.rest.min');
+     2  static\home-12-drawer-search.css
+        └ 80: content: "▶";
+        └ 300: content: "📑";
+     2  static\home-38-buttons.css
+        └ 8: * ⚠ 覆盖 NAV-IA 旧视觉铁律「主按钮纯黑 #111111」(2026-05-29 Zihao 改蓝 · 已同步改铁律)。
+        └ 141: /* ── 禁用态(:disabled 原生 + .is-disabled 类)· 置灰 + 🚫 · hover 无反馈 ── */
+     2  static\landing\landing.js
+        └ 74: <div class="check-heart" aria-hidden="true">♥</div>
+        └ 176: <div class="copyright">© 2026 PEARNLY Co., Ltd. All rights reserved.</div>
+     2  static\pos\pos-restaurant-ops.js
+        └ 83: const tm = (t.late ? '⚠ ' : '⏱ ') + (t.minutes || 0) + ' ' + POS.t('posui.rest.min');
+     1  src\home\app-shell-html.ts
+        └ 410: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
+     1  src\home\dms-intake-invoice-submit.ts
+        └ 91: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
+     1  src\home\dms-intake.ts
+        └ 66: '<div class="dx-file"><div class="dx-file-ic">📄</div>' +
+     1  src\home\erp-log-card.ts
+        └ 80: statusIcon = '⏭';
+     1  src\home\erp-log-detail.ts
+        └ 277: tlItem(isOk ? 'ok' : 'mid', '↗', t('erp-tl-pushed'), epName + ' · ' + triggerText)
+     1  src\home\history-drawer.ts
+        └ 338: // v102 · 点统一「需复核」⚠ 直接打开抽屉(原 fill-amount 改名为 review)
+     1  src\home\line-panel.ts
+        └ 1: /* REFACTOR-C1-home-batch9d · LINE Bot 绑定面板(🔴高敏·铁律#26·Zihao 授权搬)
+     1  src\home\page-automation-panes-1.ts
+        └ 118: ⚠ data-erp-subpanel="connect" 的 panel 同时也是
+     1  src\home\page-automation-panes-2.ts
+        └ 322: <div class="linebot-tip-title" data-i18n="linebot-tip-title">你现在可以这样用 👇</div>
+     1  src\home\purchase-list.ts
+        └ 116: // 已入账的付款片可一键切换 paid↔unpaid(PO-5),点击不触发行跳转(bindRows 里 stopPropagation)。
+     1  src\home\recon-job-poll.ts
+        └ 14: * ⚠️ 暂塞 home.js(全局 window 工具 · 三个 recon IIFE 共用)· 迁出 deadline = REFACTOR-C1
+     1  src\home\sales-wizard-io.ts
+        └ 31: // 向导纸张选项 ↔ 后端 paper_size:pos = 80mm 热敏窄版。
+     1  src\home\settings-core.ts
+        └ 207: <tr><td style="color:#a0aec0; padding:8px 0;">${t('settings-role')}</td><td style="padding
+     1  static\admin\admin.html
+        └ 775: <h3 data-i18n="adm-risk-title">⚠ 风控 · 可疑活动</h3>
+     1  static\home-09-badges-locks.css
+        └ 147: content: "🔒";
+     1  static\home-14-gemini-admin.css
+        └ 125: display: none !important;  /* 移除 🔒 符号 */
+     1  static\home-37-html-inline.css
+        └ 153: /* v102 · 统一「需复核」⚠ icon · 替代原「缺金额 → 补金额」黄按钮 */
+
+## 小固定max-width(查是否@media) — 命中 124(63 文件)
+     8  src\home\sales-detail.ts
+        └ 115: detailMask().innerHTML = `<div class="modal" role="dialog" style="max-width:640px">
+        └ 160: actionMask().innerHTML = `<div class="modal" role="dialog" style="max-width:380px">
+     6  static\home-11-automation-settings.css
+        └ 168: max-width: 520px;
+        └ 173: max-width: 420px;
+     5  static\admin\admin.js
+        └ 1627: '<div class="cpw-forgot-modal" style="max-width:420px">' +
+        └ 1693: '<div class="cpw-forgot-modal" style="max-width:420px">' +
+     5  static\home-02-switcher.css
+        └ 17: max-width: 240px;
+        └ 53: max-width: 420px;
+     4  static\pos\pos.css
+        └ 193: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
+        └ 213: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
+     4  static\home-37-html-inline.css
+        └ 660: max-width: 420px;
+        └ 1201: max-width: 420px;
+     4  static\pos\pos.css
+        └ 193: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
+        └ 213: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
+     3  src\home\knowledge-ask.ts
+        └ 116: .kb-qa{background:var(--card,var(--card));border:1px solid var(--line,var(--line));border-
+        └ 142: .kb-qa-hint{font-size:12px;color:var(--ink-3,#999);margin-top:12px;max-width:760px;line-he
+     3  src\home\purchase-modals.ts
+        └ 15: .purm{background:var(--card);border-radius:16px;width:100%;max-width:440px;box-shadow:var(
+        └ 16: .purm.w480{max-width:480px;} .purm.w560{max-width:560px;}
+     3  src\home\sales-settings.ts
+        └ 75: mask().innerHTML = `<div class="modal" role="dialog" style="max-width:720px">
+        └ 222: mask().innerHTML = `<div class="modal" role="dialog" style="max-width:560px"><div class="m
+     3  static\admin\admin.css
+        └ 610: max-width: 260px;
+        └ 769: max-width: 200px;
+     3  static\home-16-cost-clients.css
+        └ 340: max-width: 520px;
+        └ 544: .modal.modal-lg { max-width: 640px; width: 92vw; }
+     3  static\home-18-admin-users.css
+        └ 289: .change-pw-form { display: flex; flex-direction: column; gap: 16px; max-width: 420px; }
+        └ 405: max-width: 420px;
+     3  static\home-23-test-center.css
+        └ 455: max-width: 160px;
+        └ 459: max-width: 320px;
+     3  static\home-28-erp-banners-batch.css
+        └ 195: max-width: 460px;
+        └ 294: max-width: 420px;
+     3  static\home-29-vat-recon-clients.css
+        └ 426: max-width: 120px; line-height: 1.4;
+        └ 473: max-width: 360px; overflow: hidden;
+     3  static\home-40-sales-wizard.css
+        └ 20: max-width: 880px;
+        └ 727: max-width: 330px;
+     2  src\home\acct-common.ts
+        └ 231: .acctm{background:var(--card);border-radius:16px;width:100%;max-width:460px;box-shadow:var
+        └ 232: .acctm.w560{max-width:560px;}
+     2  src\home\confirm-modals-html.ts
+        └ 13: <div class="modal" style="max-width:420px;">
+        └ 30: <div class="modal" style="max-width:420px;">
+     2  src\home\sales-products.ts
+        └ 129: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:560px">
+        └ 239: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
+     2  src\home\sales-wizard-steps.ts
+        └ 239: <div class="sw-row" style="max-width:580px">
+        └ 242: ${st.paper !== 'pos' ? `<div class="sw-field" style="max-width:580px;margin-top:4px"><labe
+     2  static\home-01-base.css
+        └ 387: max-width: 240px;
+        └ 393: .brand-workspace { font-size: 14px; max-width: 140px; }
+     2  static\home-05-overlays.css
+        └ 162: .modal-md { max-width: 620px; }
+        └ 301: font-size: 13px; color: var(--ink-3); max-width: 460px;
+     2  static\home-15-team-folder.css
+        └ 125: color: var(--ink2); font-size: 14px; margin-bottom: 24px; max-width: 480px; margin-left: a
+        └ 248: max-width: 580px; margin-left: auto; margin-right: auto;
+     2  static\home-17-aibalance-reports-trial.css
+        └ 178: width: 92%; max-width: 540px;
+        └ 392: width: 92%; max-width: 720px;
+     2  static\home-25-bankrecon-erpmapping.css
+        └ 214: max-width: 200px;
+        └ 245: max-width: 140px;
+     2  static\home-30-settings-modal.css
+        └ 126: .change-pw-form { display: flex; flex-direction: column; gap: 16px; max-width: 420px; }
+        └ 222: max-width: 420px;
+     2  static\home-41-inventory.css
+        └ 145: max-width: 320px;
+        └ 326: max-width: 640px;
+     2  static\recon-mapping.js
+        └ 127: '.rmap-box{background:#fff;border-radius:12px;max-width:920px;width:100%;max-height:88vh;d
+        └ 134: '.rmap-tbl th,.rmap-tbl td{border:1px solid #e8e8e3;padding:5px 8px;text-align:left;white-
+     1  src\home\bank-client-picker-html.ts
+        └ 12: <div class="modal" style="max-width: 420px;">
+     1  src\home\core.ts
+        └ 185: '<div style="background:var(--card);border-radius:14px;padding:32px 24px 24px;max-width:36
+     1  src\home\dms-intake-confirm.ts
+        └ 261: '<div class="modal dmsx" style="max-width:480px"><div class="modal-head"><b>' +
+     1  src\home\erp-mrerp-dms-connect.ts
+        └ 193: 'background:var(--card,#fff);border-radius:14px;max-width:440px;width:100%;' +
+     1  src\home\knowledge-fab.ts
+        └ 46: .kb-card-top .ws{font-size:11px;color:var(--ink-2,#555);background:rgba(255,255,255,.6);bo
+     1  src\home\line-email-modal.ts
+        └ 24: <div style="background:var(--card);border-radius:16px;padding:28px 24px;max-width:420px;wi
+     1  src\home\modal-archive-token.ts
+        └ 14: <div class="modal" style="max-width:420px;">
+     1  src\home\modal-client-edit.ts
+        └ 105: <div class="modal" role="dialog" style="max-width:440px;">
+     1  src\home\modal-help.ts
+        └ 6: <div class="modal" style="max-width:440px">
+     1  src\home\modal-notif-new.ts
+        └ 14: <div class="modal" style="max-width:520px;">
+     1  src\home\module-settings.ts
+        └ 52: .modset{max-width:680px;}
+     1  src\home\page-settings.ts
+        └ 419: <input type="text" class="form-input" id="access-log-search" data-i18n-placeholder="set-ac
+     1  src\home\purchase-capture.ts
+        └ 36: .pur.cap .rhint{font-size:12.5px;color:var(--ink2);max-width:320px;line-height:1.6;}
+     1  src\home\rules-settings.ts
+        └ 222: `<div class="rs-pop" style="max-width:460px;">` +
+     1  src\home\sales-wizard.ts
+        └ 312: m.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
+     1  static\erp-mrerp-connect.js
+        └ 916: '<div class="mrerp-wizard" style="max-width:520px">' +
+     1  static\home-06-responsive-rd.css
+        └ 144: max-width: 600px;
+     1  static\home-07-history-automation.css
+        └ 487: max-width: 600px;
+     1  static\home-08-pagehead-toast.css
+        └ 157: max-width: 320px;
+     1  static\home-10-push-logs.css
+        └ 578: max-width: 720px;
+     1  static\home-13-upgrade-dup-prefs.css
+        └ 67: max-width: 580px;
+     1  static\home-14-gemini-admin.css
+        └ 286: max-width: 460px;
+     1  static\home-21-recon-center.css
+        └ 175: max-width: 420px;
+     1  static\home-22-settings-mobile.css
+        └ 472: max-width: 320px;
+     1  static\home-24-logs-access-assign.css
+        └ 111: .access-log-toolbar .form-input { flex: 1 1 200px; max-width: 320px; }
+     1  static\home-26-erp-cards.css
+        └ 312: max-width: 520px;
+     1  static\home-27-erp-credentials.css
+        └ 287: max-width: 560px;
+     1  static\home-31-navia-topbar.css
+        └ 514: max-width: 280px;
+     1  static\home-35-bankrecon-v2.css
+        └ 79: overflow: hidden; max-width: 200px;
+     1  static\home-39-sales.css
+        └ 101: max-width: 300px;
+     1  static\home-49-dms-intake.css
+        └ 204: .dmsx .dx-sgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;text-align:left;m
+     1  static\landing\landing-static-bg.css
+        └ 212: max-width: 250px;
+     1  static\landing\mascot-scene.js
+        └ 9: this.mobileNoSound = window.matchMedia('(max-width: 720px)').matches;
+     1  static\recon-review.js
+        └ 126: '.rrv-modal{background:#fff;border-radius:12px;max-width:920px;width:100%;max-height:88vh;
+
+## 内联旧弹窗/抽屉 — 命中 58(14 文件)
+    33  src\home\ocr-results.ts
+        └ 38: <span class="drawer-edit-count" id="drawer-edit-count-sub"></span>
+        └ 51: <div class="drawer-readonly-banner">
+     8  src\home\sales-detail.ts
+        └ 115: detailMask().innerHTML = `<div class="modal" role="dialog" style="max-width:640px">
+        └ 160: actionMask().innerHTML = `<div class="modal" role="dialog" style="max-width:380px">
+     3  src\home\sales-settings.ts
+        └ 75: mask().innerHTML = `<div class="modal" role="dialog" style="max-width:720px">
+        └ 222: mask().innerHTML = `<div class="modal" role="dialog" style="max-width:560px"><div class="m
+     2  src\home\confirm-modals-html.ts
+        └ 13: <div class="modal" style="max-width:420px;">
+        └ 30: <div class="modal" style="max-width:420px;">
+     2  src\home\sales-products.ts
+        └ 129: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:560px">
+        └ 239: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
+     2  static\home-05-overlays.css
+        └ 9: .drawer {
+        └ 17: .drawer.show { transform: translateX(0); }
+     1  src\home\bank-client-picker-html.ts
+        └ 12: <div class="modal" style="max-width: 420px;">
+     1  src\home\inventory-modals.ts
+        └ 2: // 概念稿屏7 只画了列表;入库/盘点为「补交互」,用 .modal(D1 闸禁新增 .drawer),沿用 home-41 同套令牌。
+     1  src\home\modal-archive-token.ts
+        └ 14: <div class="modal" style="max-width:420px;">
+     1  src\home\modal-client-edit.ts
+        └ 105: <div class="modal" role="dialog" style="max-width:440px;">
+     1  src\home\modal-help.ts
+        └ 6: <div class="modal" style="max-width:440px">
+     1  src\home\modal-notif-new.ts
+        └ 14: <div class="modal" style="max-width:520px;">
+     1  src\home\sales-wizard.ts
+        └ 312: m.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
+     1  static\home-19-exceptions-alerts.css
+        └ 377: width: 920px;  /* 默认宽度覆盖 .drawer 的 480 */
+
+## 自曝/AI文案 — 命中 0(0 文件)
+  ✅ 无
+
+## 原生弹窗(禁) — 命中 5(5 文件)
+     1  src\home\confirm-modal.ts
+        └ 12: // 自定义确认对话框 · v0.15.6 · 替换浏览器原生 confirm()
+     1  src\home\purchase-settings.ts
+        └ 102: // F16 · 去原生 prompt():点「加科目」就地变行内输入框(Enter 存 / Esc 取消 / 失焦存)。
+     1  src\home\sales-detail.ts
+        └ 436: : confirm(t('sx-del-draft-confirm'));
+     1  src\home\sales-products.ts
+        └ 223: } else if (!confirm(t('sx-p-del-confirm'))) return;
+     1  src\home\session-heartbeat.ts
+        └ 52: alert('Session expired');
+
+## 超高z-index — 命中 13(12 文件)
+     2  static\home-03-layout.css
+        └ 124: z-index: 999;
+        └ 287: z-index: 9999;
+     1  src\home\core.ts
+        └ 183: 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.5);display:flex;align-items:c
+     1  src\home\line-email-modal.ts
+        └ 22: 'position:fixed;inset:0;background:rgba(10,14,39,0.85);z-index:99999;display:flex;align-it
+     1  static\admin\admin.css
+        └ 333: z-index: 9999;
+     1  static\admin\admin.js
+        └ 62: 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;
+     1  static\home-05-overlays.css
+        └ 13: z-index: 999; transform: translateX(100%);
+     1  static\home-17-aibalance-reports-trial.css
+        └ 523: z-index: 99999;
+     1  static\home-18-admin-users.css
+        └ 135: position: fixed; inset: 0; z-index: 99999;
+     1  static\home-22-settings-mobile.css
+        └ 236: z-index: 999;
+     1  static\home-30-settings-modal.css
+        └ 9: z-index: 9998;
+     1  static\home-34-navia-config-drawer.css
+        └ 13: position: fixed; inset: 0; z-index: 9999;
+     1  static\recon-mapping.js
+        └ 126: '.rmap-ov{position:fixed;inset:0;background:rgba(17,17,17,.45);z-index:99999;display:flex;
+
+## i18n原始键残留 — 命中 29(3 文件)
+    20  static\i18n-data.js
+        └ 998: 'time-min-ago-suffix': ' 分钟前',
+        └ 999: 'time-hour-ago-suffix': ' 小时前',
+     5  src\home\dashboard.ts
+        └ 39: if (s < 3600) return Math.floor(s / 60) + _t('time-min-ago-suffix', ' 分钟前')!;
+        └ 40: if (s < 86400) return Math.floor(s / 3600) + _t('time-hour-ago-suffix', ' 小时前')!;
+     4  static\admin\admin-i18n.js
+        └ 230: 'time-hours-ago': '{n} 小时前',
+        └ 231: 'time-days-ago': '{n} 天前',
+
+## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 962(66 文件)
+   157  static\home-18-admin-users.css
+    83  static\pos\pos.css
+    83  static\pos\pos.css
+    68  static\admin\admin.js
+    63  static\erp-mrerp-connect.css
+    51  static\pos\pos-restaurant.css
+    51  static\pos\pos-restaurant.css
+    39  static\landing\landing-auth.css
+    31  static\admin\admin.css
+    30  static\landing\landing.css
+    21  static\recon-review.js
+    20  static\home-30-settings-modal.css
+    17  static\home-38-buttons.css
+    17  static\landing\landing-static-bg-mobile.css
+    16  src\home\modal-client-edit.ts
+    15  static\pos\pos.html
+    15  static\pos\pos.html
+    12  static\home-40-sales-wizard.css
+    10  static\erp-mrerp-connect.js
+    10  static\home-49-dms-intake.css
+     9  src\home\sales-account.ts
+     9  src\home\sales-wizard-steps.ts
+     9  static\recon-mapping.js
+     7  src\home\onboarding-business.ts
+     7  static\home-39-sales.css
+     7  static\landing\landing-static-bg.css
+     7  static\landing\mascot.css
+     7  static\legal.css
+     6  src\home\pos-cashiers.ts
+     6  src\home\rules-settings-data.ts
+     6  src\home\settings-core.ts
+     6  static\home-37-html-inline.css
+     6  static\landing\auth-sso.css
+     4  src\home\core.ts
+     4  src\home\erp-mrerp-dms-connect.ts
+     4  src\home\line-panel.ts
+     4  src\home\module-settings.ts
+     3  static\pos\pos-data.js
+     3  static\landing\auth-modal.css
+     3  static\landing\responsive.css
+     3  static\pos\pos-data.js
+     2  src\home\bank-recon-drawer.ts
+     2  src\home\bank-recon-picker.ts
+     2  src\home\dashboard.ts
+     2  src\home\dms-intake-confirm.ts
+     2  src\home\history-drawer.ts
+     2  src\home\line-email-modal.ts
+     2  static\home-10-push-logs.css
+     2  static\landing\mascot-effects.css
+     1  src\home\app-shell-html.ts
+     1  src\home\clients-buyer.ts
+     1  src\home\clients-helpers.ts
+     1  src\home\confirm-modal.ts
+     1  src\home\dms-intake.ts
+     1  src\home\erp-exceptions-edit.ts
+     1  src\home\inventory.ts
+     1  src\home\knowledge-documents.ts
+     1  src\home\knowledge-fab.ts
+     1  src\home\notifications.ts
+     1  src\home\purchase-list.ts
+     1  static\pos\pos-cashier.js
+     1  static\pos\pos.js
+     1  static\home-15-team-folder.css
+     1  static\landing\landing-interactions.css
+     1  static\pos\pos-cashier.js
+     1  static\pos\pos.js

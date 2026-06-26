@@ -1,0 +1,2242 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>企业级财务经营 SaaS 技术架构图</title>
+  <script>
+    const ARCH = {
+      title: "企业级财务 / 经营管理 SaaS 技术架构图",
+      subtitle: "行业通用技术分层视图，强调先模块化单体、再按组织规模演进微服务的企业级落地路径。",
+      primary: "#2563EB",
+      searchPlaceholder: "搜索技术组件、选型、英文名或说明",
+      flowLabel: "请求链路、异步解耦与数据流向",
+      railLayerId: "security",
+      detailMode: "choices",
+      layers: [
+        {
+          id: "client",
+          title: "第 1 层 · 客户端",
+          en: "Client Layer",
+          accent: "#2563EB",
+          groups: [
+            {
+              title: "用户触点",
+              color: "#2563EB",
+              modules: [
+                {
+                  id: "web-frontend",
+                  name: "Web 前端",
+                  en: "Web Frontend",
+                  summary: "承载企业管理后台、财务录入、报表分析和管理员配置，是 SaaS 最核心的交互界面。",
+                  details: [
+                    { label: "框架", value: "React / Vue 3 + TypeScript", note: "生态成熟、类型约束强，适合多人协作和复杂表单。" },
+                    { label: "构建", value: "Vite / Webpack", note: "Vite 适合现代开发体验，Webpack 仍适合存量大型工程。" },
+                    { label: "状态与组件", value: "Redux / Pinia / Ant Design / Element Plus", note: "把复杂业务状态和企业级表单控件标准化。" },
+                    { label: "图表", value: "ECharts", note: "中文企业报表场景覆盖广，仪表盘和多维分析够用。" }
+                  ],
+                  links: ["api-gateway", "bff", "authn", "monitoring-tech"]
+                },
+                {
+                  id: "mobile-client",
+                  name: "移动端",
+                  en: "Mobile App",
+                  summary: "覆盖移动审批、拍照识票、门店 POS 和外勤场景，关键是离线与同步可靠性。",
+                  details: [
+                    { label: "跨平台", value: "Flutter / React Native", note: "一套团队覆盖 iOS 和 Android，适合 SaaS 产品快速迭代。" },
+                    { label: "原生", value: "Swift / Kotlin", note: "对设备能力、性能和离线可靠性要求高时使用。" },
+                    { label: "离线", value: "IndexedDB / SQLite + 同步队列", note: "POS 和仓库场景必须支持断网续作与冲突处理。" }
+                  ],
+                  links: ["api-gateway", "mq", "authn", "object-storage"]
+                },
+                {
+                  id: "desktop-client",
+                  name: "桌面端",
+                  en: "Desktop Client",
+                  summary: "可选形态，适合需要本地外设、打印控件、文件批处理或传统财务人员习惯的场景。",
+                  details: [
+                    { label: "桌面壳", value: "Electron / Tauri", note: "Electron 生态更大，Tauri 更轻；二者都能复用 Web 技术栈。" },
+                    { label: "本地能力", value: "本地打印 / 文件读写 / 外设桥接", note: "用于票据打印、扫码枪、税控设备或本地 Excel 批处理。" }
+                  ],
+                  links: ["file-conversion", "api-gateway", "authn", "logging"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          id: "access",
+          title: "第 2 层 · 接入层",
+          en: "Edge & Access",
+          accent: "#0EA5E9",
+          groups: [
+            {
+              title: "流量入口",
+              color: "#0EA5E9",
+              modules: [
+                {
+                  id: "cdn",
+                  name: "CDN",
+                  en: "Content Delivery Network",
+                  summary: "把静态资源、图片和下载文件缓存到边缘节点，降低延迟和源站压力。",
+                  details: [
+                    { label: "主流选型", value: "CloudFront / Cloudflare", note: "全球节点成熟，适合跨区域 SaaS 访问。" },
+                    { label: "用途", value: "静态资源加速 / TLS 终止 / 缓存控制", note: "前端资源和附件下载优先走边缘。" }
+                  ],
+                  links: ["web-frontend", "waf", "object-storage"]
+                },
+                {
+                  id: "waf",
+                  name: "WAF 防火墙",
+                  en: "Web Application Firewall",
+                  summary: "在应用入口拦截常见 Web 攻击、恶意爬取和异常流量。",
+                  details: [
+                    { label: "主流选型", value: "Cloudflare WAF / AWS WAF / 阿里云 WAF", note: "托管规则覆盖 SQL 注入、XSS 和扫描器特征。" },
+                    { label: "策略", value: "托管规则 + 自定义规则 + 速率限制", note: "财务系统要把登录、导出和 API 调用纳入保护。" }
+                  ],
+                  links: ["api-gateway", "injection-xss", "authn"]
+                },
+                {
+                  id: "load-balancer",
+                  name: "负载均衡",
+                  en: "Load Balancer",
+                  summary: "把请求分发到多台应用实例，并负责健康检查和故障摘除。",
+                  details: [
+                    { label: "主流选型", value: "Nginx / AWS ALB / 云负载均衡", note: "Nginx 灵活，云 LB 运维成本低。" },
+                    { label: "作用", value: "健康检查 / HTTPS / 会话转发", note: "让应用服务可以横向扩容和滚动发布。" }
+                  ],
+                  links: ["api-gateway", "microservices", "kubernetes"]
+                },
+                {
+                  id: "api-gateway",
+                  name: "API 网关",
+                  en: "API Gateway",
+                  summary: "统一承接外部 API，处理路由、鉴权、限流、审计和版本管理。",
+                  details: [
+                    { label: "主流选型", value: "Kong / APISIX", note: "插件生态成熟，适合作为多服务统一入口。" },
+                    { label: "关键能力", value: "路由 / 限流 / 鉴权 / 观测", note: "避免每个业务服务重复实现入口控制。" }
+                  ],
+                  links: ["backend-frameworks", "authn", "audit-log", "bff"]
+                },
+                {
+                  id: "bff",
+                  name: "BFF 聚合层",
+                  en: "Backend for Frontend",
+                  summary: "为不同端聚合后端接口，降低前端多次请求和页面组装复杂度。",
+                  details: [
+                    { label: "主流选型", value: "Node.js NestJS / Java Spring Boot / Go", note: "通常与业务后端同语言或前端团队熟悉语言一致。" },
+                    { label: "适用场景", value: "仪表盘聚合 / 移动端瘦接口 / 权限菜单拼装", note: "复杂页面多来源数据时收益最大。" }
+                  ],
+                  links: ["web-frontend", "mobile-client", "api-gateway", "cache"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          id: "application",
+          title: "第 3 层 · 应用服务层",
+          en: "Application Services",
+          accent: "#16A34A",
+          groups: [
+            {
+              title: "架构形态与后端框架",
+              color: "#16A34A",
+              modules: [
+                {
+                  id: "modular-monolith",
+                  name: "模块化单体",
+                  en: "Modular Monolith",
+                  summary: "中小团队首选架构，在一个部署单元内按领域模块隔离边界，开发快、治理成本低。",
+                  details: [
+                    { label: "主流形态", value: "单仓库 + 领域模块 + 清晰包边界", note: "先单体后拆是行业共识，避免过早微服务化。" },
+                    { label: "适用阶段", value: "0 到中型 SaaS 团队", note: "财务系统前期更需要一致性和快速迭代。" }
+                  ],
+                  links: ["backend-frameworks", "relational-db", "workflow-engine", "rules-engine-tech"]
+                },
+                {
+                  id: "microservices",
+                  name: "微服务",
+                  en: "Microservices",
+                  summary: "团队、租户量和业务边界变大后，把高并发或独立演进模块拆成独立服务。",
+                  details: [
+                    { label: "主流选型", value: "Spring Cloud / Kubernetes", note: "Java 生态在企业服务治理方面积累最深。" },
+                    { label: "拆分条件", value: "组织边界清晰 / 独立伸缩 / 独立发布", note: "不是为了好看而拆，而是为团队协作和容量服务。" }
+                  ],
+                  links: ["service-discovery", "rpc-grpc", "mq", "kubernetes"]
+                },
+                {
+                  id: "backend-frameworks",
+                  name: "后端框架",
+                  en: "Backend Frameworks",
+                  summary: "承载核心业务逻辑、交易一致性、权限控制和对外 API。",
+                  details: [
+                    { label: "大厂主流", value: "Java Spring Boot", note: "企业生态完整，适合复杂事务和大型团队。" },
+                    { label: "高效率", value: "Python FastAPI / Django", note: "适合 AI、数据处理和中小团队快速交付。" },
+                    { label: "全栈团队", value: "Node.js NestJS", note: "前后端语言统一，适合 BFF 和中台接口。" },
+                    { label: "性能轻量", value: "Go Gin", note: "适合网关、任务和高并发基础服务。" }
+                  ],
+                  links: ["api-gateway", "relational-db", "cache", "authz"]
+                }
+              ]
+            },
+            {
+              title: "服务治理与核心引擎",
+              color: "#22C55E",
+              modules: [
+                {
+                  id: "service-discovery",
+                  name: "注册发现",
+                  en: "Service Discovery",
+                  summary: "微服务场景下让服务实例自动注册、发现和摘除。",
+                  details: [
+                    { label: "主流选型", value: "Nacos / Consul", note: "Nacos 常见于 Java 体系，Consul 云原生兼容性好。" },
+                    { label: "作用", value: "实例发现 / 健康检查 / 服务路由", note: "减少硬编码地址和人工维护成本。" }
+                  ],
+                  links: ["microservices", "config-center", "kubernetes"]
+                },
+                {
+                  id: "config-center",
+                  name: "配置中心",
+                  en: "Configuration Center",
+                  summary: "集中管理服务配置、开关、限额和运行参数。",
+                  details: [
+                    { label: "主流选型", value: "Nacos Config / Apollo / Spring Cloud Config", note: "支持动态配置和环境隔离。" },
+                    { label: "作用", value: "灰度配置 / 密钥引用 / 环境参数", note: "避免配置散落在服务器和代码中。" }
+                  ],
+                  links: ["gray-release-tech", "service-discovery", "kms"]
+                },
+                {
+                  id: "rpc-grpc",
+                  name: "RPC 通信",
+                  en: "gRPC / RPC",
+                  summary: "服务间高性能通信协议，适合强类型接口和内部服务调用。",
+                  details: [
+                    { label: "主流选型", value: "gRPC / Dubbo", note: "gRPC 跨语言能力强，Dubbo 常见于 Java 企业体系。" },
+                    { label: "使用边界", value: "内部服务调用", note: "外部开放 API 仍优先 HTTP REST 或 GraphQL。" }
+                  ],
+                  links: ["microservices", "api-gateway", "apm"]
+                },
+                {
+                  id: "resilience",
+                  name: "熔断限流",
+                  en: "Resilience",
+                  summary: "保护核心服务免受突发流量、依赖故障和级联失败影响。",
+                  details: [
+                    { label: "主流选型", value: "Sentinel / Resilience4j", note: "Sentinel 在 Java 企业流控场景成熟。" },
+                    { label: "策略", value: "限流 / 熔断 / 降级 / 隔离", note: "财务核心接口要优先保护写入链路和审批链路。" }
+                  ],
+                  links: ["api-gateway", "monitoring-tech", "microservices"]
+                },
+                {
+                  id: "workflow-engine",
+                  name: "工作流引擎",
+                  en: "Workflow Engine",
+                  summary: "支撑采购、付款、报销、合同等可配置审批流程。",
+                  details: [
+                    { label: "主流选型", value: "Flowable / Camunda", note: "BPMN 生态成熟，适合复杂审批与流程追踪。" },
+                    { label: "选型说明", value: "先产品化流程模型，再接业务单据", note: "流程不能散落在业务代码条件分支里。" }
+                  ],
+                  links: ["backend-frameworks", "relational-db", "mq", "audit-log"]
+                },
+                {
+                  id: "rules-engine-tech",
+                  name: "规则引擎",
+                  en: "Rules Engine",
+                  summary: "承载价格、税率、风控、预算等经常变化的业务规则。",
+                  details: [
+                    { label: "主流选型", value: "Drools / 自研轻量规则", note: "复杂规则用 Drools，简单规则可先用可视化条件树。" },
+                    { label: "选型说明", value: "规则版本化和可回放", note: "财税规则必须能解释为什么算出这个结果。" }
+                  ],
+                  links: ["backend-frameworks", "config-center", "audit-log"]
+                },
+                {
+                  id: "report-engine",
+                  name: "报表引擎",
+                  en: "Report Engine",
+                  summary: "负责固定格式报表、经营分析和财务口径取数。",
+                  details: [
+                    { label: "主流选型", value: "JasperReports / 自研报表引擎", note: "固定报表可用成熟引擎，管理分析常需自研数据集。" },
+                    { label: "选型说明", value: "业务库与分析库分离", note: "避免报表拖慢在线交易。" }
+                  ],
+                  links: ["analytics-db", "file-conversion", "relational-db"]
+                },
+                {
+                  id: "document-number",
+                  name: "单据号生成",
+                  en: "Distributed ID",
+                  summary: "为订单、发票、凭证和流水生成全局唯一且可读的业务编号。",
+                  details: [
+                    { label: "主流选型", value: "数据库序列 / Redis INCR / 雪花算法", note: "低并发可用数据库序列，高并发再引入分布式发号器。" },
+                    { label: "选型说明", value: "按租户、业务类型、年月分段", note: "财务编号通常要兼顾合规可读和并发安全。" }
+                  ],
+                  links: ["relational-db", "cache", "audit-log"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          id: "middleware",
+          title: "第 4 层 · 中间件层",
+          en: "Middleware",
+          accent: "#F59E0B",
+          groups: [
+            {
+              title: "性能、异步与文件能力",
+              color: "#F59E0B",
+              modules: [
+                {
+                  id: "mq",
+                  name: "消息队列",
+                  en: "Message Queue",
+                  summary: "把开票、通知、报表、同步等耗时任务异步化，削峰填谷。",
+                  details: [
+                    { label: "主流选型", value: "Kafka / RabbitMQ", note: "Kafka 适合高吞吐事件流，RabbitMQ 适合业务任务队列。" },
+                    { label: "选型说明", value: "异步解耦 / 削峰 / 重试", note: "交易主流程只写可靠事件，后续动作异步消费。" }
+                  ],
+                  links: ["backend-frameworks", "scheduler", "logging", "audit-log"]
+                },
+                {
+                  id: "cache",
+                  name: "缓存",
+                  en: "Redis Cache",
+                  summary: "缓存会话、权限、热点数据，并提供分布式锁等基础能力。",
+                  details: [
+                    { label: "主流选型", value: "Redis", note: "生态成熟，适合会话、热点数据和短期状态。" },
+                    { label: "选型说明", value: "缓存旁路 + 明确失效策略", note: "财务金额结果不要只依赖缓存，必须能从主库重算。" }
+                  ],
+                  links: ["bff", "backend-frameworks", "document-number"]
+                },
+                {
+                  id: "search-engine",
+                  name: "搜索",
+                  en: "Search Engine",
+                  summary: "为单据、客户、供应商、凭证和附件提供全文检索。",
+                  details: [
+                    { label: "主流选型", value: "Elasticsearch / OpenSearch", note: "适合复杂筛选、高亮和全文检索。" },
+                    { label: "选型说明", value: "搜索索引不是事实来源", note: "搜索结果要能回到业务库做权限和详情校验。" }
+                  ],
+                  links: ["relational-db", "object-storage", "audit-log"]
+                },
+                {
+                  id: "scheduler",
+                  name: "任务调度",
+                  en: "Job Scheduler",
+                  summary: "调度月结、对账、报表跑批、数据同步和补偿任务。",
+                  details: [
+                    { label: "主流选型", value: "XXL-Job / Celery / Quartz", note: "Java 常用 XXL-Job 或 Quartz，Python 常用 Celery。" },
+                    { label: "选型说明", value: "幂等 + 可重跑 + 可观测", note: "财务批处理失败后必须能定位、补偿和重跑。" }
+                  ],
+                  links: ["mq", "analytics-db", "backup-dr", "monitoring-tech"]
+                },
+                {
+                  id: "object-storage",
+                  name: "对象存储",
+                  en: "Object Storage",
+                  summary: "保存票据影像、合同附件、导出文件和归档包。",
+                  details: [
+                    { label: "主流选型", value: "S3 / OSS / GCS", note: "容量弹性好，成本低，适合海量附件。" },
+                    { label: "选型说明", value: "私有桶 + 签名 URL + 生命周期", note: "财务附件必须控制访问权限和保留周期。" }
+                  ],
+                  links: ["cdn", "ocr-service", "backup-dr", "encryption-at-rest"]
+                },
+                {
+                  id: "file-conversion",
+                  name: "文件转换服务",
+                  en: "PDF / Excel Service",
+                  summary: "生成 PDF、Excel、打印版式文件和批量导入模板。",
+                  details: [
+                    { label: "主流选型", value: "LibreOffice Headless / Puppeteer / Apache POI / openpyxl", note: "按语言栈和版式复杂度选择。" },
+                    { label: "选型说明", value: "隔离运行", note: "文件转换容易耗 CPU 和内存，应与主应用隔离部署。" }
+                  ],
+                  links: ["report-engine", "object-storage", "scheduler"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          id: "data",
+          title: "第 5 层 · 数据层",
+          en: "Data Layer",
+          accent: "#0F766E",
+          groups: [
+            {
+              title: "交易主库",
+              color: "#0F766E",
+              modules: [
+                {
+                  id: "relational-db",
+                  name: "关系库",
+                  en: "RDBMS",
+                  summary: "财务系统主库，保存交易、凭证、余额和主数据，事务一致性优先。",
+                  details: [
+                    { label: "主流选型", value: "PostgreSQL / MySQL", note: "二者都成熟，PostgreSQL 在复杂查询和约束能力上更强。" },
+                    { label: "财务要求", value: "事务 + 外键 + DECIMAL", note: "金额必须用 DECIMAL，不能用浮点数。" }
+                  ],
+                  links: ["backend-frameworks", "tenant-row", "backup-dr", "audit-log"]
+                }
+              ]
+            },
+            {
+              title: "多租户隔离核心决策",
+              color: "#0D9488",
+              modules: [
+                {
+                  id: "tenant-row",
+                  name: "共享库 + 行级隔离",
+                  en: "Shared DB with tenant_id",
+                  summary: "所有租户共享一套表，通过 tenant_id 和数据权限隔离，是中小 SaaS 最常见起步方案。",
+                  details: [
+                    { label: "主流选型", value: "tenant_id + 复合索引 + RLS 可选", note: "成本最低，研发效率高，但权限守门必须非常严格。" },
+                    { label: "适用", value: "中小客户、多租户标准化产品", note: "行级隔离是中小 SaaS 主流。" }
+                  ],
+                  links: ["authz", "relational-db", "audit-log"]
+                },
+                {
+                  id: "tenant-schema",
+                  name: "独立 Schema",
+                  en: "Schema per Tenant",
+                  summary: "每个租户独立数据库 Schema，在隔离性和运维成本之间折中。",
+                  details: [
+                    { label: "主流选型", value: "PostgreSQL Schema / MySQL Database Namespace", note: "隔离性更好，迁移和批量升级复杂度上升。" },
+                    { label: "适用", value: "中型客户或强隔离行业", note: "适合租户数量可控且客户隔离诉求较强的阶段。" }
+                  ],
+                  links: ["relational-db", "backup-dr", "kubernetes"]
+                },
+                {
+                  id: "tenant-db",
+                  name: "独立库",
+                  en: "Database per Tenant",
+                  summary: "大客户独享数据库，隔离最强，也最容易做定制化运维。",
+                  details: [
+                    { label: "主流选型", value: "独立实例 / 独立数据库 / 专属集群", note: "隔离和合规最好，但成本、监控、升级都更重。" },
+                    { label: "适用", value: "集团客户、金融级客户、强合规客户", note: "通常作为高阶套餐或私有化形态。" }
+                  ],
+                  links: ["backup-dr", "cloud-platform", "kms"]
+                }
+              ]
+            },
+            {
+              title: "扩展、分析与容灾",
+              color: "#14B8A6",
+              modules: [
+                {
+                  id: "read-replica",
+                  name: "读写分离",
+                  en: "Read Replica",
+                  summary: "把报表查询和读请求分流到只读副本，保护主库写入性能。",
+                  details: [
+                    { label: "主流选型", value: "主从复制 / 云数据库只读实例", note: "上线简单，适合读多写少的报表查询。" },
+                    { label: "选型说明", value: "接受复制延迟", note: "关键财务状态读取仍应走主库或做延迟提示。" }
+                  ],
+                  links: ["relational-db", "report-engine", "monitoring-tech"]
+                },
+                {
+                  id: "sharding",
+                  name: "分库分表",
+                  en: "Sharding",
+                  summary: "当单库容量或写入吞吐达到瓶颈后，按租户、时间或业务域拆分数据。",
+                  details: [
+                    { label: "主流选型", value: "ShardingSphere / Vitess / 自研路由", note: "复杂度高，必须量大后再做。" },
+                    { label: "选型说明", value: "优先按租户或业务域拆", note: "财务跨期间、跨组织查询多，拆分键要谨慎。" }
+                  ],
+                  links: ["relational-db", "microservices", "apm"]
+                },
+                {
+                  id: "analytics-db",
+                  name: "分析库 / 数仓",
+                  en: "Analytics DB / Warehouse",
+                  summary: "承接 BI、经营驾驶舱和历史分析，和在线业务库解耦。",
+                  details: [
+                    { label: "主流选型", value: "ClickHouse / BigQuery / Snowflake / PostgreSQL 数仓", note: "ClickHouse 性价比高，云数仓托管能力强。" },
+                    { label: "选型说明", value: "报表与业务库分离", note: "经营分析不应直接压在线交易主库。" }
+                  ],
+                  links: ["report-engine", "scheduler", "vector-db"]
+                },
+                {
+                  id: "backup-dr",
+                  name: "备份与容灾",
+                  en: "Backup & DR",
+                  summary: "保证误删、故障、勒索和区域灾难下的数据可恢复。",
+                  details: [
+                    { label: "主流方案", value: "定时全量 + 增量 + 异地备份 + PITR", note: "PITR 时间点恢复是财务系统的底线能力。" },
+                    { label: "选型说明", value: "定期恢复演练", note: "没演练过的备份不算真的备份。" }
+                  ],
+                  links: ["relational-db", "object-storage", "monitoring-tech", "data-compliance"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          id: "ai",
+          title: "第 6 层 · 智能服务层",
+          en: "AI Services",
+          accent: "#7C3AED",
+          groups: [
+            {
+              title: "现代财务 SaaS 智能能力",
+              color: "#7C3AED",
+              modules: [
+                {
+                  id: "ocr-service",
+                  name: "OCR 识别",
+                  en: "OCR",
+                  summary: "识别票据、证件、合同和银行单据，减少人工录入。",
+                  details: [
+                    { label: "主流选型", value: "云 OCR API / PaddleOCR / Tesseract", note: "云 API 准确率和票据模板好，自建适合成本和数据控制诉求。" },
+                    { label: "选型说明", value: "结果必须可审阅", note: "财务识别不能黑盒直入账，必须保留原图和置信度。" }
+                  ],
+                  links: ["object-storage", "confidence-routing", "llm-api"]
+                },
+                {
+                  id: "llm-api",
+                  name: "大模型 API",
+                  en: "LLM API",
+                  summary: "用于智能记账、凭证解释、经营问答、文档理解和客服辅助。",
+                  details: [
+                    { label: "主流选型", value: "GPT / Claude / Gemini / 本地模型", note: "多供应商可切换，避免单点锁定。" },
+                    { label: "选型说明", value: "结构化输出 + 审计留痕", note: "模型建议必须能回放输入、输出和人工确认。" }
+                  ],
+                  links: ["vector-db", "confidence-routing", "kms", "audit-log"]
+                },
+                {
+                  id: "vector-db",
+                  name: "向量数据库",
+                  en: "Vector Database",
+                  summary: "支撑知识库检索增强，让制度、科目说明、税务口径可被问答系统引用。",
+                  details: [
+                    { label: "主流选型", value: "pgvector / Milvus", note: "pgvector 适合轻量起步，Milvus 适合更大规模向量检索。" },
+                    { label: "选型说明", value: "RAG 而非凭空回答", note: "财务问答要给出处和版本，减少幻觉风险。" }
+                  ],
+                  links: ["llm-api", "analytics-db", "object-storage"]
+                },
+                {
+                  id: "confidence-routing",
+                  name: "置信度分流框架",
+                  en: "Confidence Routing",
+                  summary: "按模型置信度和业务风险决定自动处理、人工复核或拒绝。",
+                  details: [
+                    { label: "主流方案", value: "阈值策略 + 人审队列 + 反馈学习", note: "高置信自动、低置信人审是财务 AI 的现实路径。" },
+                    { label: "选型说明", value: "风险分级", note: "付款、税务和凭证入账应比普通分类更保守。" }
+                  ],
+                  links: ["ocr-service", "llm-api", "workflow-engine", "audit-log"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          id: "security",
+          title: "第 7 层 · 安全合规层",
+          en: "Security & Compliance",
+          accent: "#DC2626",
+          groups: [
+            {
+              title: "横切所有层",
+              color: "#DC2626",
+              modules: [
+                {
+                  id: "authn",
+                  name: "认证",
+                  en: "Authentication",
+                  summary: "确认用户是谁，是所有访问控制的第一道门。",
+                  details: [
+                    { label: "主流选型", value: "OAuth2 / OIDC / JWT / SSO / MFA", note: "企业客户常要求 SSO 和多因素认证。" },
+                    { label: "选型说明", value: "短会话 + 刷新令牌 + 风险登录", note: "财务系统登录态要可撤销、可审计。" }
+                  ],
+                  links: ["api-gateway", "web-frontend", "audit-log"]
+                },
+                {
+                  id: "authz",
+                  name: "授权",
+                  en: "Authorization",
+                  summary: "控制用户能看什么、改什么、导出什么，财务系统必须默认拒绝。",
+                  details: [
+                    { label: "主流模型", value: "RBAC + 数据权限 + deny-by-default", note: "角色控制菜单，数据权限控制组织、账簿、客户和单据范围。" },
+                    { label: "选型说明", value: "权限集中守门", note: "不要把权限判断散落在页面和服务里。" }
+                  ],
+                  links: ["tenant-row", "backend-frameworks", "audit-log"]
+                },
+                {
+                  id: "tls",
+                  name: "传输加密",
+                  en: "TLS",
+                  summary: "保护客户端、网关、服务和第三方接口之间的数据传输。",
+                  details: [
+                    { label: "主流选型", value: "TLS 1.2+ / HSTS / mTLS 可选", note: "公网必须 HTTPS，服务间高安全场景可用 mTLS。" },
+                    { label: "选型说明", value: "证书自动续期", note: "证书过期会造成系统级事故。" }
+                  ],
+                  links: ["cdn", "api-gateway", "cloud-platform"]
+                },
+                {
+                  id: "encryption-at-rest",
+                  name: "落盘加密",
+                  en: "Encryption at Rest",
+                  summary: "保护数据库、对象存储、备份和日志中的敏感数据。",
+                  details: [
+                    { label: "主流方案", value: "数据库加密 / 存储桶加密 / 字段级加密", note: "敏感证件、银行账号和税号可做字段级加密。" },
+                    { label: "选型说明", value: "密钥独立管理", note: "加密强度取决于密钥管理，不只是算法。" }
+                  ],
+                  links: ["kms", "object-storage", "backup-dr"]
+                },
+                {
+                  id: "kms",
+                  name: "密钥管理",
+                  en: "KMS",
+                  summary: "集中管理加密密钥、轮换策略和访问权限。",
+                  details: [
+                    { label: "主流选型", value: "AWS KMS / GCP KMS / 阿里云 KMS / Vault", note: "云 KMS 运维简单，Vault 适合多云和自托管。" },
+                    { label: "选型说明", value: "密钥轮换和最小权限", note: "应用不应长期持有明文密钥。" }
+                  ],
+                  links: ["encryption-at-rest", "config-center", "llm-api"]
+                },
+                {
+                  id: "injection-xss",
+                  name: "注入与 XSS 防护",
+                  en: "Injection & XSS Protection",
+                  summary: "防止恶意输入破坏数据、窃取会话或执行脚本。",
+                  details: [
+                    { label: "主流方案", value: "参数化 SQL / ORM / CSP / 输出转义", note: "WAF 只是外层保护，代码层必须做正确防护。" },
+                    { label: "选型说明", value: "安全测试纳入 CI", note: "财务系统不能依赖上线后人工发现漏洞。" }
+                  ],
+                  links: ["waf", "backend-frameworks", "cicd"]
+                },
+                {
+                  id: "audit-log",
+                  name: "审计日志",
+                  en: "Audit Log",
+                  summary: "记录谁在何时对哪笔数据做了什么，是追责和合规的基础。",
+                  details: [
+                    { label: "主流方案", value: "不可篡改日志 / WORM 存储 / 日志归档", note: "关键财务操作、权限变更和导出必须留痕。" },
+                    { label: "选型说明", value: "业务语义日志", note: "只记录 HTTP 日志不够，要记录业务对象和结果。" }
+                  ],
+                  links: ["logging", "backup-dr", "authz"]
+                },
+                {
+                  id: "data-compliance",
+                  name: "数据合规",
+                  en: "GDPR / PDPA",
+                  summary: "满足个人信息、跨境传输、数据保留和删除请求等合规要求。",
+                  details: [
+                    { label: "主流框架", value: "GDPR / PDPA / 本地个资法", note: "跨国 SaaS 要按客户所在地处理个人数据。" },
+                    { label: "选型说明", value: "数据地图 + 保留策略", note: "知道数据在哪，才谈得上合规删除和导出。" }
+                  ],
+                  links: ["backup-dr", "tenant-db", "audit-log"]
+                },
+                {
+                  id: "pentest",
+                  name: "渗透测试",
+                  en: "Penetration Test",
+                  summary: "通过第三方或内部攻防验证系统安全边界。",
+                  details: [
+                    { label: "主流做法", value: "年度渗透测试 / 漏洞扫描 / SAST / DAST", note: "企业客户采购常要求安全报告。" },
+                    { label: "选型说明", value: "高危漏洞 SLA", note: "发现漏洞后要有修复时限、复测和留档。" }
+                  ],
+                  links: ["cicd", "waf", "monitoring-tech"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          id: "devops",
+          title: "第 8 层 · 基础设施与 DevOps",
+          en: "Infrastructure & DevOps",
+          accent: "#64748B",
+          groups: [
+            {
+              title: "云、交付与可观测",
+              color: "#64748B",
+              modules: [
+                {
+                  id: "cloud-platform",
+                  name: "云平台",
+                  en: "Cloud Platform",
+                  summary: "提供计算、网络、数据库、存储和托管安全能力。",
+                  details: [
+                    { label: "主流选型", value: "AWS / GCP / 阿里云 / 轻量 VPS 起步", note: "早期可低成本起步，客户规模上来后迁到托管云能力。" },
+                    { label: "选型说明", value: "优先托管服务", note: "小团队把精力放在产品和业务，而不是自建基础设施。" }
+                  ],
+                  links: ["load-balancer", "tenant-db", "kms"]
+                },
+                {
+                  id: "docker",
+                  name: "容器化",
+                  en: "Docker",
+                  summary: "把应用、依赖和运行环境打包，保证开发、测试、生产一致。",
+                  details: [
+                    { label: "主流选型", value: "Docker", note: "容器镜像是现代部署流水线的基础交付物。" },
+                    { label: "选型说明", value: "不可变镜像", note: "线上环境不手改代码，统一从镜像发布。" }
+                  ],
+                  links: ["cicd", "kubernetes", "cloud-platform"]
+                },
+                {
+                  id: "kubernetes",
+                  name: "Kubernetes",
+                  en: "K8s",
+                  summary: "用于大规模服务编排、滚动发布、弹性伸缩和故障自愈。",
+                  details: [
+                    { label: "主流选型", value: "Kubernetes / 托管 K8s", note: "团队和服务规模足够大时收益明显。" },
+                    { label: "选型说明", value: "Docker → Kubernetes", note: "不要在单体早期为 K8s 复杂度买单。" }
+                  ],
+                  links: ["microservices", "docker", "monitoring-tech"]
+                },
+                {
+                  id: "cicd",
+                  name: "CI · CD",
+                  en: "Continuous Delivery",
+                  summary: "把测试、构建、扫描和部署变成可重复流水线。",
+                  details: [
+                    { label: "主流选型", value: "GitHub Actions / GitLab CI", note: "与代码仓库集成紧密，适合自动化质量门禁。" },
+                    { label: "选型说明", value: "测试 → 构建 → 部署", note: "财务系统每次发布都要可追踪、可回滚。" }
+                  ],
+                  links: ["docker", "injection-xss", "pentest"]
+                },
+                {
+                  id: "iac",
+                  name: "IaC",
+                  en: "Infrastructure as Code",
+                  summary: "用代码描述云资源、网络、数据库和权限，减少手工配置漂移。",
+                  details: [
+                    { label: "主流选型", value: "Terraform / Pulumi", note: "Terraform 生态最广，适合多云和标准化环境。" },
+                    { label: "选型说明", value: "环境可重建", note: "灾备、测试和生产环境都应由代码生成。" }
+                  ],
+                  links: ["cloud-platform", "cicd", "backup-dr"]
+                },
+                {
+                  id: "monitoring-tech",
+                  name: "监控",
+                  en: "Monitoring",
+                  summary: "监控服务健康、延迟、错误率、队列积压和数据库水位。",
+                  details: [
+                    { label: "主流选型", value: "Prometheus + Grafana", note: "指标采集和可视化成熟，云原生生态标准。" },
+                    { label: "选型说明", value: "技术指标 + 业务指标", note: "除 CPU 外，还要监控开票失败率、跑批失败和对账积压。" }
+                  ],
+                  links: ["scheduler", "apm", "logging"]
+                },
+                {
+                  id: "logging",
+                  name: "日志",
+                  en: "Logging",
+                  summary: "集中收集应用日志、访问日志、任务日志和安全日志。",
+                  details: [
+                    { label: "主流选型", value: "ELK / Loki", note: "ELK 检索能力强，Loki 与 Grafana 组合轻量。" },
+                    { label: "选型说明", value: "结构化日志", note: "用 tenant_id、request_id、user_id 串起问题链路。" }
+                  ],
+                  links: ["audit-log", "apm", "monitoring-tech"]
+                },
+                {
+                  id: "sentry",
+                  name: "错误追踪",
+                  en: "Error Tracking",
+                  summary: "捕捉前后端异常，关联版本、用户、浏览器和堆栈。",
+                  details: [
+                    { label: "主流选型", value: "Sentry", note: "前后端覆盖完整，定位线上异常效率高。" },
+                    { label: "选型说明", value: "按版本聚合", note: "能快速判断错误来自哪次发布。" }
+                  ],
+                  links: ["web-frontend", "backend-frameworks", "cicd"]
+                },
+                {
+                  id: "apm",
+                  name: "APM 链路追踪",
+                  en: "Tracing",
+                  summary: "跨网关、服务、数据库和队列追踪一次请求的完整链路。",
+                  details: [
+                    { label: "主流选型", value: "OpenTelemetry / Jaeger / Datadog APM", note: "OpenTelemetry 是开放标准，商业 APM 运维省心。" },
+                    { label: "选型说明", value: "统一 trace_id", note: "微服务和异步任务下定位性能问题必须靠链路追踪。" }
+                  ],
+                  links: ["rpc-grpc", "mq", "logging"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          id: "third-party",
+          title: "第 9 层 · 第三方依赖",
+          en: "External Integrations",
+          accent: "#475569",
+          groups: [
+            {
+              title: "外部生态",
+              color: "#475569",
+              modules: [
+                {
+                  id: "payment-gateway",
+                  name: "支付网关",
+                  en: "Payment Gateway",
+                  summary: "连接线上收款、订阅扣费、退款和对账流水。",
+                  details: [
+                    { label: "主流选型", value: "Stripe / 本地银行 / PromptPay", note: "跨境选 Stripe，本地市场要接当地支付与银行体系。" },
+                    { label: "选型说明", value: "回调验签 + 幂等入账", note: "支付回调不能重复入账，也不能信任未验签请求。" }
+                  ],
+                  links: ["api-gateway", "audit-log", "relational-db"]
+                },
+                {
+                  id: "tax-interface",
+                  name: "税局接口",
+                  en: "Tax Authority API",
+                  summary: "对接电子发票、发票查验和纳税申报直连。",
+                  details: [
+                    { label: "主流形态", value: "税局官方 API / 认证服务商 API", note: "各地区差异大，通常需要适配器层隔离。" },
+                    { label: "选型说明", value: "状态回查 + 重试补偿", note: "税局接口不稳定时要能恢复和追踪。" }
+                  ],
+                  links: ["api-gateway", "mq", "audit-log"]
+                },
+                {
+                  id: "bank-interface",
+                  name: "银行接口",
+                  en: "Bank API",
+                  summary: "同步银行流水、付款回执和代发工资状态。",
+                  details: [
+                    { label: "主流形态", value: "银企直连 / Open Banking / 文件交换", note: "不同银行成熟度差异大，通常需要多适配器。" },
+                    { label: "选型说明", value: "强审计与双人复核", note: "付款类接口必须比查询类接口更严格。" }
+                  ],
+                  links: ["authz", "audit-log", "relational-db"]
+                },
+                {
+                  id: "sms-email",
+                  name: "短信邮件",
+                  en: "SMS & Email",
+                  summary: "发送验证码、账单、审批提醒、催收和运营通知。",
+                  details: [
+                    { label: "主流选型", value: "Twilio / SendGrid / 本地短信商", note: "全球业务选国际服务，本地业务接本地通道提升到达率。" },
+                    { label: "选型说明", value: "模板审核 + 退订机制", note: "通知触达也要满足合规和用户偏好。" }
+                  ],
+                  links: ["mq", "audit-log", "data-compliance"]
+                },
+                {
+                  id: "im-platform",
+                  name: "IM 平台",
+                  en: "LINE / WeChat API",
+                  summary: "把审批、提醒和智能问答接入企业常用聊天工具。",
+                  details: [
+                    { label: "主流选型", value: "LINE API / 微信 API / WhatsApp Business API", note: "根据目标市场选择高覆盖渠道。" },
+                    { label: "选型说明", value: "账号绑定与权限校验", note: "IM 消息入口也必须遵守系统权限。" }
+                  ],
+                  links: ["api-gateway", "authn", "llm-api"]
+                },
+                {
+                  id: "ecommerce-api",
+                  name: "电商平台 API",
+                  en: "E-commerce API",
+                  summary: "同步订单、商品、库存、退款和物流状态。",
+                  details: [
+                    { label: "主流形态", value: "Shopify / Shopee / Lazada / 平台开放 API", note: "跨平台订单同步是中小商贸 SaaS 常见需求。" },
+                    { label: "选型说明", value: "限流与断点续传", note: "平台 API 常有限额，必须支持增量同步和补偿。" }
+                  ],
+                  links: ["mq", "scheduler", "relational-db"]
+                },
+                {
+                  id: "fx-service",
+                  name: "汇率服务",
+                  en: "FX Rate Service",
+                  summary: "为多币种业务提供官方、银行或市场汇率。",
+                  details: [
+                    { label: "主流选型", value: "央行汇率 / Open Exchange Rates / 银行汇率", note: "财务口径通常优先官方或银行来源。" },
+                    { label: "选型说明", value: "来源和时间戳留痕", note: "汇兑损益需要能解释使用哪一天的哪个汇率。" }
+                  ],
+                  links: ["scheduler", "relational-db", "audit-log"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+  </script>
+  <style>
+    :root {
+      --primary: #2563EB;
+      --bg: #FAFAF8;
+      --card: #FFFFFF;
+      --text: #1F2937;
+      --muted: #6B7280;
+      --line: #E5E7EB;
+      --soft: #F4F4F1;
+      --shadow: 0 18px 48px rgba(15, 23, 42, 0.12);
+      --radius: 16px;
+      color-scheme: light;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+      line-height: 1.55;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .shell {
+      width: min(1540px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 32px 0 56px;
+    }
+
+    .hero {
+      display: grid;
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 46px);
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 10px 0 0;
+      max-width: 850px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .badge {
+      flex: 0 0 auto;
+      border: 1px solid rgba(37, 99, 235, 0.22);
+      color: var(--primary);
+      background: rgba(37, 99, 235, 0.08);
+      border-radius: 999px;
+      padding: 8px 13px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .lang-toggle {
+      min-width: 78px;
+      height: 36px;
+      border: 1px solid rgba(37, 99, 235, 0.26);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--primary);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 800;
+      transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+    }
+
+    .lang-toggle:hover {
+      background: rgba(37, 99, 235, 0.08);
+      box-shadow: 0 8px 22px rgba(37, 99, 235, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(0, 540px) auto;
+      gap: 14px;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.75);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px;
+      backdrop-filter: blur(8px);
+    }
+
+    .search-wrap {
+      position: relative;
+    }
+
+    .search-wrap::before {
+      content: "";
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #94A3B8;
+      border-radius: 50%;
+      transform: translateY(-50%);
+    }
+
+    .search-wrap::after {
+      content: "";
+      position: absolute;
+      left: 27px;
+      top: calc(50% + 7px);
+      width: 7px;
+      height: 2px;
+      background: #94A3B8;
+      transform: rotate(45deg);
+      transform-origin: left center;
+    }
+
+    #search {
+      width: 100%;
+      height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0 16px 0 44px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+    }
+
+    #search:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      text-align: right;
+    }
+
+    .diagram {
+      display: grid;
+      gap: 18px;
+    }
+
+    .diagram.with-rail {
+      grid-template-columns: minmax(0, 1fr) 300px;
+      align-items: start;
+    }
+
+    .main-stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    .rail-stack {
+      position: sticky;
+      top: 20px;
+    }
+
+    .layer {
+      display: grid;
+      grid-template-columns: 168px minmax(0, 1fr);
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: 0 12px 34px rgba(15, 23, 42, 0.06);
+    }
+
+    .rail-stack .layer {
+      display: block;
+      border-color: color-mix(in srgb, var(--layer-color) 26%, var(--line));
+      box-shadow: 0 16px 38px rgba(127, 29, 29, 0.12);
+    }
+
+    .layer-label {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 7px;
+      min-height: 180px;
+      padding: 18px 16px;
+      color: #fff;
+      background: linear-gradient(180deg, var(--layer-color), color-mix(in srgb, var(--layer-color) 72%, #111827));
+      writing-mode: horizontal-tb;
+      transform: none;
+      text-align: left;
+    }
+
+    .rail-stack .layer-label {
+      min-height: auto;
+      writing-mode: horizontal-tb;
+      transform: none;
+      justify-content: flex-start;
+      padding: 16px;
+    }
+
+    .layer-label strong {
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    .layer-label span {
+      opacity: 0.82;
+      font-size: 12px;
+      letter-spacing: 0;
+    }
+
+    .layer-body {
+      padding: 18px;
+    }
+
+    .rail-stack .layer-body {
+      padding: 14px;
+    }
+
+    .groups {
+      display: grid;
+      gap: 16px;
+    }
+
+    .group {
+      border: 1px solid color-mix(in srgb, var(--group-color) 24%, var(--line));
+      border-radius: 14px;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--group-color) 7%, #fff), #fff 58%);
+      padding: 14px;
+    }
+
+    .rail-stack .group {
+      padding: 12px;
+    }
+
+    .group-title {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 12px;
+      color: color-mix(in srgb, var(--group-color) 75%, #111827);
+      font-weight: 800;
+      font-size: 15px;
+    }
+
+    .group-title::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--group-color);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--group-color) 15%, transparent);
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+      gap: 10px;
+    }
+
+    .rail-stack .cards {
+      grid-template-columns: 1fr;
+    }
+
+    .card {
+      min-height: 106px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--card);
+      padding: 13px 12px;
+      text-align: left;
+      color: inherit;
+      cursor: pointer;
+      transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, opacity 160ms ease;
+      position: relative;
+    }
+
+    .card:hover,
+    .card:focus-visible {
+      transform: translateY(-4px);
+      border-color: color-mix(in srgb, var(--group-color) 50%, var(--primary));
+      box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
+      outline: none;
+    }
+
+    .card-name {
+      display: block;
+      font-weight: 800;
+      font-size: 15px;
+      color: #111827;
+    }
+
+    .card-en {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .card-summary {
+      display: block;
+      margin-top: 10px;
+      color: #64748B;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .card.match {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14), 0 14px 28px rgba(15, 23, 42, 0.10);
+    }
+
+    .card.dim {
+      opacity: 0.26;
+    }
+
+    .card.pulse {
+      animation: pulse 900ms ease;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.36); }
+      100% { box-shadow: 0 0 0 16px rgba(37, 99, 235, 0); }
+    }
+
+    .flow-arrow {
+      display: grid;
+      place-items: center;
+      min-height: 34px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .flow-arrow span {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      padding: 5px 12px;
+    }
+
+    .flow-arrow span::after {
+      content: "↓";
+      color: var(--primary);
+      font-weight: 900;
+      font-size: 16px;
+    }
+
+    .print-details {
+      display: none;
+    }
+
+    .modal-root[hidden] {
+      display: none;
+    }
+
+    .modal-root {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      padding: 22px;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(17, 24, 39, 0.42);
+      backdrop-filter: blur(6px);
+    }
+
+    .modal {
+      position: relative;
+      width: min(760px, 100%);
+      max-height: min(780px, calc(100vh - 44px));
+      overflow: auto;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 18px;
+      background: #fff;
+      box-shadow: var(--shadow);
+      padding: 24px;
+    }
+
+    .modal-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 36px;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .modal h2 {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+
+    .modal small {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+    }
+
+    .close {
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      color: #334155;
+      cursor: pointer;
+    }
+
+    .close:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .section-title {
+      margin: 22px 0 8px;
+      font-size: 13px;
+      color: #334155;
+      font-weight: 900;
+    }
+
+    .modal-summary {
+      margin: 16px 0 0;
+      padding: 13px 14px;
+      border-left: 4px solid var(--active-color, var(--primary));
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--active-color, var(--primary)) 8%, #fff);
+      color: #334155;
+    }
+
+    .choice-list {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 9px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .choice-list li {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #FAFAF8;
+      color: #334155;
+    }
+
+    .choice-list b {
+      display: block;
+      color: #111827;
+      font-size: 13px;
+    }
+
+    .choice-list span {
+      display: block;
+      margin-top: 3px;
+      color: color-mix(in srgb, var(--active-color, var(--primary)) 78%, #111827);
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .choice-list p {
+      margin: 4px 0 0;
+      color: #64748B;
+      font-size: 13px;
+    }
+
+    .related {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .related button {
+      border: 1px solid color-mix(in srgb, var(--active-color, var(--primary)) 28%, var(--line));
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--active-color, var(--primary)) 8%, #fff);
+      color: color-mix(in srgb, var(--active-color, var(--primary)) 78%, #111827);
+      padding: 7px 11px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .related button:hover {
+      border-color: var(--active-color, var(--primary));
+    }
+
+    @media (max-width: 1120px) {
+      .diagram.with-rail {
+        grid-template-columns: 1fr;
+      }
+
+      .rail-stack {
+        position: static;
+      }
+
+      .rail-stack .cards {
+        grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+      }
+    }
+
+    @media (max-width: 820px) {
+      .shell {
+        width: min(100% - 24px, 720px);
+        padding-top: 22px;
+      }
+
+      .title-row,
+      .toolbar {
+        grid-template-columns: 1fr;
+        display: grid;
+      }
+
+      .badge,
+      .hero-actions,
+      .hint {
+        justify-self: start;
+        text-align: left;
+      }
+
+      .layer {
+        display: block;
+      }
+
+      .layer-label {
+        min-height: auto;
+        writing-mode: horizontal-tb;
+        transform: none;
+        justify-content: flex-start;
+        padding: 14px 16px;
+      }
+
+      .cards {
+        grid-template-columns: 1fr;
+      }
+
+      .modal {
+        padding: 20px;
+      }
+    }
+
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      .shell {
+        width: 100%;
+        padding: 0;
+      }
+
+      .toolbar,
+      .flow-arrow,
+      .lang-toggle,
+      .modal-root {
+        display: none !important;
+      }
+
+      .hero {
+        margin-bottom: 12px;
+      }
+
+      .badge {
+        border-color: #CBD5E1;
+        color: #334155;
+        background: #fff;
+      }
+
+      .diagram.with-rail,
+      .main-stack {
+        display: block;
+      }
+
+      .rail-stack {
+        position: static;
+      }
+
+      .layer {
+        display: block;
+        break-inside: avoid;
+        box-shadow: none;
+        margin-bottom: 12px;
+      }
+
+      .layer-label,
+      .rail-stack .layer-label {
+        min-height: auto;
+        writing-mode: horizontal-tb;
+        transform: none;
+        justify-content: flex-start;
+        color: #111827;
+        background: #F1F5F9;
+        border-bottom: 1px solid #CBD5E1;
+      }
+
+      .cards,
+      .rail-stack .cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .card {
+        break-inside: avoid;
+        min-height: auto;
+        box-shadow: none;
+      }
+
+      .card-summary {
+        color: #334155;
+      }
+
+      .print-details {
+        display: block;
+        margin: 8px 0 0;
+        padding-left: 18px;
+        color: #334155;
+        font-size: 11px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div class="title-row">
+        <div>
+          <h1 id="page-title"></h1>
+          <p class="subtitle" id="page-subtitle"></p>
+        </div>
+        <div class="hero-actions">
+          <div class="badge" id="page-badge">Technical Architecture</div>
+          <button class="lang-toggle" id="lang-toggle" type="button">ไทย</button>
+        </div>
+      </div>
+      <div class="toolbar" role="search">
+        <div class="search-wrap">
+          <input id="search" type="search" autocomplete="off">
+        </div>
+        <div class="hint" id="search-hint">点击任意模块查看作用、选型与说明，ESC 或点击遮罩关闭弹窗。</div>
+      </div>
+    </header>
+    <section class="diagram" id="diagram" aria-label="技术架构分层图"></section>
+  </main>
+
+  <div class="modal-root" id="modal-root" hidden>
+    <div class="overlay" id="overlay"></div>
+    <article class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-head">
+        <div>
+          <h2 id="modal-title"></h2>
+          <small id="modal-en"></small>
+        </div>
+        <button class="close" id="close" type="button" aria-label="关闭">×</button>
+      </div>
+      <h3 class="section-title" id="summary-heading">作用</h3>
+      <p class="modal-summary" id="modal-summary"></p>
+      <h3 class="section-title" id="details-heading">主流选型与一句说明</h3>
+      <ul class="choice-list" id="modal-details"></ul>
+      <h3 class="section-title" id="related-heading">关联模块</h3>
+      <div class="related" id="modal-related"></div>
+    </article>
+  </div>
+
+  <script>
+    (() => {
+      const THAI_COPY = {
+        title: "แผนผังสถาปัตยกรรมเทคนิค SaaS การเงินและการบริหารธุรกิจ",
+        subtitle: "มุมมองสถาปัตยกรรมเทคนิคแบบแบ่งชั้น เน้นเริ่มจาก modular monolith แล้วค่อยขยายเป็น microservices ตามขนาดองค์กร",
+        searchPlaceholder: "ค้นหาคอมโพเนนต์เทคนิค เทคโนโลยี ชื่ออังกฤษ หรือคำอธิบาย",
+        flowLabel: "เส้นทางคำขอ การแยกงานแบบ async และการไหลของข้อมูล",
+        layers: {
+          client: { title: "ชั้นที่ 1 · ไคลเอนต์", en: "ไคลเอนต์" },
+          access: { title: "ชั้นที่ 2 · Edge และทางเข้า", en: "ทางเข้า" },
+          application: { title: "ชั้นที่ 3 · บริการแอปพลิเคชัน", en: "บริการแอป" },
+          middleware: { title: "ชั้นที่ 4 · มิดเดิลแวร์", en: "มิดเดิลแวร์" },
+          data: { title: "ชั้นที่ 5 · ข้อมูล", en: "ข้อมูล" },
+          ai: { title: "ชั้นที่ 6 · บริการอัจฉริยะ", en: "AI" },
+          security: { title: "ชั้นที่ 7 · ความปลอดภัยและกำกับดูแล", en: "ความปลอดภัย" },
+          devops: { title: "ชั้นที่ 8 · โครงสร้างพื้นฐานและ DevOps", en: "DevOps" },
+          "third-party": { title: "ชั้นที่ 9 · บริการภายนอก", en: "ระบบภายนอก" }
+        },
+        groups: {
+          "用户触点": "จุดสัมผัสผู้ใช้",
+          "流量入口": "ทางเข้าทราฟฟิก",
+          "架构形态与后端框架": "รูปแบบสถาปัตยกรรมและเฟรมเวิร์กหลังบ้าน",
+          "服务治理与核心引擎": "การกำกับบริการและเอนจินหลัก",
+          "性能、异步与文件能力": "ประสิทธิภาพ งาน async และไฟล์",
+          "交易主库": "ฐานข้อมูลธุรกรรมหลัก",
+          "多租户隔离核心决策": "การตัดสินใจหลักเรื่อง multi-tenant isolation",
+          "扩展、分析与容灾": "การขยาย วิเคราะห์ และกู้ภัย",
+          "现代财务 SaaS 智能能力": "ความสามารถอัจฉริยะของ SaaS การเงินยุคใหม่",
+          "横切所有层": "ครอบคลุมทุกชั้น",
+          "云、交付与可观测": "คลาวด์ การส่งมอบ และ observability",
+          "外部生态": "ระบบนิเวศภายนอก"
+        },
+        modules: {
+          "web-frontend": "เว็บฟรอนต์เอนด์",
+          "mobile-client": "แอปมือถือ",
+          "desktop-client": "เดสก์ท็อปไคลเอนต์",
+          cdn: "CDN",
+          waf: "WAF",
+          "load-balancer": "โหลดบาลานเซอร์",
+          "api-gateway": "API Gateway",
+          bff: "BFF",
+          "modular-monolith": "Modular Monolith",
+          microservices: "Microservices",
+          "backend-frameworks": "เฟรมเวิร์กหลังบ้าน",
+          "service-discovery": "Service Discovery",
+          "config-center": "ศูนย์คอนฟิก",
+          "rpc-grpc": "RPC / gRPC",
+          resilience: "Resilience",
+          "workflow-engine": "เอนจินเวิร์กโฟลว์",
+          "rules-engine-tech": "เอนจินกฎ",
+          "report-engine": "เอนจินรายงาน",
+          "document-number": "เลขเอกสาร",
+          mq: "Message Queue",
+          cache: "Redis Cache",
+          "search-engine": "Search Engine",
+          scheduler: "Job Scheduler",
+          "object-storage": "Object Storage",
+          "file-conversion": "บริการแปลงไฟล์",
+          "relational-db": "ฐานข้อมูลเชิงสัมพันธ์",
+          "tenant-row": "ฐานร่วม + แยกด้วย tenant_id",
+          "tenant-schema": "Schema แยกต่อผู้เช่า",
+          "tenant-db": "ฐานข้อมูลแยกต่อผู้เช่า",
+          "read-replica": "Read Replica",
+          sharding: "Sharding",
+          "analytics-db": "ฐานวิเคราะห์ / คลังข้อมูล",
+          "backup-dr": "สำรองและกู้ภัย",
+          "ocr-service": "OCR",
+          "llm-api": "LLM API",
+          "vector-db": "Vector Database",
+          "confidence-routing": "กรอบแยกงานตามความมั่นใจ",
+          authn: "Authentication",
+          authz: "Authorization",
+          tls: "TLS",
+          "encryption-at-rest": "เข้ารหัสข้อมูลพัก",
+          kms: "KMS",
+          "injection-xss": "ป้องกัน Injection และ XSS",
+          "audit-log": "Audit Log",
+          "data-compliance": "Data Compliance",
+          pentest: "Penetration Test",
+          "cloud-platform": "แพลตฟอร์มคลาวด์",
+          docker: "Docker",
+          kubernetes: "Kubernetes",
+          cicd: "CI / CD",
+          iac: "IaC",
+          "monitoring-tech": "Monitoring",
+          logging: "Logging",
+          sentry: "Error Tracking",
+          apm: "APM Tracing",
+          "payment-gateway": "Payment Gateway",
+          "tax-interface": "Tax Authority API",
+          "bank-interface": "Bank API",
+          "sms-email": "SMS และ Email",
+          "im-platform": "LINE / WeChat API",
+          "ecommerce-api": "E-commerce API",
+          "fx-service": "บริการอัตราแลกเปลี่ยน"
+        }
+      };
+
+      const UI_TEXT = {
+        zh: {
+          badge: "Technical Architecture",
+          toggle: "ไทย",
+          toggleLabel: "切换为泰语",
+          htmlLang: "zh-CN",
+          diagramLabel: "技术架构分层图",
+          summaryHeading: "作用",
+          detailsHeading: "主流选型与一句说明",
+          relatedHeading: "关联模块",
+          closeLabel: "关闭",
+          idleHint: "点击任意模块查看作用、选型与说明，ESC 或点击遮罩关闭弹窗。",
+          searchHint: (count) => `已高亮 ${count} 个匹配模块。点击模块查看作用与选型。`
+        },
+        th: {
+          badge: "สถาปัตยกรรมเทคนิค",
+          toggle: "จีน",
+          toggleLabel: "สลับเป็นภาษาจีน",
+          htmlLang: "th",
+          diagramLabel: "แผนภาพชั้นสถาปัตยกรรมเทคนิค",
+          summaryHeading: "บทบาท",
+          detailsHeading: "ตัวเลือกหลักและคำอธิบายสั้น",
+          relatedHeading: "โมดูลที่เกี่ยวข้อง",
+          closeLabel: "ปิด",
+          idleHint: "คลิกโมดูลเพื่อดูบทบาท ตัวเลือก และคำอธิบาย กด ESC หรือคลิกพื้นหลังเพื่อปิด",
+          searchHint: (count) => `ไฮไลต์โมดูลที่ตรงกัน ${count} รายการ คลิกโมดูลเพื่อดูบทบาทและตัวเลือก`
+        }
+      };
+
+      const THAI_TERM_RULES = [
+        ["主流选型", "ตัวเลือกหลัก"],
+        ["主流形态", "รูปแบบหลัก"],
+        ["选型说明", "ข้อแนะนำการเลือก"],
+        ["适用场景", "สถานการณ์ที่เหมาะ"],
+        ["适用阶段", "ระยะที่เหมาะ"],
+        ["关键能力", "ความสามารถหลัก"],
+        ["用途", "การใช้งาน"],
+        ["策略", "กลยุทธ์"],
+        ["作用", "บทบาท"],
+        ["框架", "เฟรมเวิร์ก"],
+        ["构建", "การบิลด์"],
+        ["状态", "สถานะ"],
+        ["组件", "คอมโพเนนต์"],
+        ["图表", "แผนภูมิ"],
+        ["跨平台", "ข้ามแพลตฟอร์ม"],
+        ["原生", "เนทีฟ"],
+        ["离线", "ออฟไลน์"],
+        ["同步", "ซิงก์"],
+        ["桌面壳", "เดสก์ท็อปเชลล์"],
+        ["本地能力", "ความสามารถในเครื่อง"],
+        ["打印", "พิมพ์"],
+        ["文件读写", "อ่านเขียนไฟล์"],
+        ["外设桥接", "เชื่อมอุปกรณ์ภายนอก"],
+        ["静态资源", "ไฟล์ static"],
+        ["加速", "เร่งความเร็ว"],
+        ["缓存", "แคช"],
+        ["控制", "ควบคุม"],
+        ["防火墙", "ไฟร์วอลล์"],
+        ["托管规则", "กฎที่จัดการให้"],
+        ["自定义规则", "กฎกำหนดเอง"],
+        ["速率限制", "จำกัดอัตรา"],
+        ["健康检查", "ตรวจสุขภาพ"],
+        ["会话转发", "ส่งต่อเซสชัน"],
+        ["路由", " routing"],
+        ["限流", "จำกัดอัตรา"],
+        ["鉴权", "ยืนยันสิทธิ์"],
+        ["观测", "observability"],
+        ["仪表盘", "แดชบอร์ด"],
+        ["聚合", "รวมข้อมูล"],
+        ["权限菜单", "เมนูสิทธิ์"],
+        ["拼装", "ประกอบข้อมูล"],
+        ["领域模块", "โมดูลโดเมน"],
+        ["清晰包边界", "ขอบเขตแพ็กเกจชัดเจน"],
+        ["团队", "ทีม"],
+        ["组织边界", "ขอบเขตองค์กร"],
+        ["独立伸缩", "ขยายแยกกันได้"],
+        ["独立发布", "ปล่อยแยกกันได้"],
+        ["交易一致性", "ความสอดคล้องของธุรกรรม"],
+        ["权限控制", "ควบคุมสิทธิ์"],
+        ["实例发现", "ค้นหา instance"],
+        ["服务路由", "routing บริการ"],
+        ["灰度配置", "คอนฟิกแบบ gray release"],
+        ["密钥引用", "อ้างอิงคีย์"],
+        ["环境参数", "พารามิเตอร์สภาพแวดล้อม"],
+        ["内部服务调用", "เรียกบริการภายใน"],
+        ["熔断", "circuit breaker"],
+        ["降级", "ลดระดับบริการ"],
+        ["隔离", "แยกส่วน"],
+        ["流程", "กระบวนการ"],
+        ["审批", "อนุมัติ"],
+        ["流程追踪", "ติดตามกระบวนการ"],
+        ["版本化", "ทำเวอร์ชัน"],
+        ["可回放", "เล่นย้อนหลังได้"],
+        ["固定格式报表", "รายงานรูปแบบคงที่"],
+        ["管理分析", "วิเคราะห์เพื่อบริหาร"],
+        ["数据集", "ชุดข้อมูล"],
+        ["全局唯一", "ไม่ซ้ำทั่วระบบ"],
+        ["可读", "อ่านได้"],
+        ["业务编号", "เลขธุรกิจ"],
+        ["异步化", "ทำงานแบบ async"],
+        ["削峰填谷", "ดูดซับ peak load"],
+        ["分布式锁", "distributed lock"],
+        ["全文检索", "ค้นหา full-text"],
+        ["任务调度", "ตั้งเวลางาน"],
+        ["补偿任务", "งานชดเชย"],
+        ["对象存储", "object storage"],
+        ["归档包", "แพ็กเก็บถาวร"],
+        ["批量导入模板", "เทมเพลตนำเข้าเป็นชุด"],
+        ["主库", "ฐานหลัก"],
+        ["事务一致性", "ความสอดคล้องธุรกรรม"],
+        ["共享", "ใช้ร่วมกัน"],
+        ["行级隔离", "แยกระดับแถว"],
+        ["中小 SaaS", "SaaS ขนาดเล็กถึงกลาง"],
+        ["起步方案", "แนวทางเริ่มต้น"],
+        ["独立数据库", "ฐานข้อมูลแยก"],
+        ["运维成本", "ต้นทุนปฏิบัติการ"],
+        ["定制化", "ปรับแต่งเฉพาะ"],
+        ["读写分离", "แยกอ่านเขียน"],
+        ["只读副本", "สำเนาอ่านอย่างเดียว"],
+        ["写入性能", "ประสิทธิภาพการเขียน"],
+        ["容量", "ความจุ"],
+        ["写入吞吐", "throughput การเขียน"],
+        ["按租户", "ตามผู้เช่า"],
+        ["时间", "เวลา"],
+        ["业务域", "โดเมนธุรกิจ"],
+        ["经营驾驶舱", "แดชบอร์ดบริหาร"],
+        ["历史分析", "วิเคราะห์ย้อนหลัง"],
+        ["在线业务库", "ฐานงานออนไลน์"],
+        ["误删", "ลบผิด"],
+        ["故障", "ขัดข้อง"],
+        ["勒索", "ransomware"],
+        ["区域灾难", "ภัยพิบัติระดับภูมิภาค"],
+        ["可恢复", "กู้คืนได้"],
+        ["识别", "รู้จำ"],
+        ["票据", "เอกสาร/ใบเสร็จ"],
+        ["证件", "เอกสารประจำตัว"],
+        ["合同", "สัญญา"],
+        ["银行单据", "เอกสารธนาคาร"],
+        ["智能记账", "บันทึกบัญชีอัจฉริยะ"],
+        ["凭证解释", "อธิบายเอกสารบัญชี"],
+        ["经营问答", "ถามตอบธุรกิจ"],
+        ["文档理解", "เข้าใจเอกสาร"],
+        ["客服辅助", "ช่วยบริการลูกค้า"],
+        ["知识库", "คลังความรู้"],
+        ["检索增强", "ค้นคืนเสริม"],
+        ["置信度", "ความมั่นใจ"],
+        ["人工复核", "ตรวจทานโดยคน"],
+        ["默认拒绝", "ปฏิเสธโดยปริยาย"],
+        ["传输加密", "เข้ารหัสระหว่างส่ง"],
+        ["落盘加密", "เข้ารหัสข้อมูลพัก"],
+        ["密钥", "คีย์"],
+        ["轮换", "หมุนเวียน"],
+        ["恶意输入", "อินพุตอันตราย"],
+        ["窃取会话", "ขโมยเซสชัน"],
+        ["执行脚本", "รันสคริปต์"],
+        ["审计", "ตรวจสอบ"],
+        ["追责", "ตรวจย้อนความรับผิด"],
+        ["合规", "กำกับดูแล"],
+        ["个人信息", "ข้อมูลส่วนบุคคล"],
+        ["跨境传输", "โอนข้ามประเทศ"],
+        ["数据保留", "เก็บรักษาข้อมูล"],
+        ["删除请求", "คำขอลบข้อมูล"],
+        ["攻防", "ทดสอบโจมตีป้องกัน"],
+        ["安全边界", "ขอบเขตความปลอดภัย"],
+        ["计算", "compute"],
+        ["网络", "เครือข่าย"],
+        ["存储", "storage"],
+        ["容器化", "containerization"],
+        ["运行环境", "runtime"],
+        ["滚动发布", "rolling release"],
+        ["弹性伸缩", "autoscaling"],
+        ["故障自愈", "self-healing"],
+        ["测试", "ทดสอบ"],
+        ["扫描", "สแกน"],
+        ["部署", " deploy"],
+        ["流水线", "pipeline"],
+        ["云资源", "ทรัพยากรคลาวด์"],
+        ["手工配置漂移", "configuration drift"],
+        ["服务健康", "สุขภาพบริการ"],
+        ["延迟", "latency"],
+        ["错误率", "อัตราข้อผิดพลาด"],
+        ["队列积压", "คิวค้าง"],
+        ["数据库水位", "ระดับฐานข้อมูล"],
+        ["应用日志", "log แอป"],
+        ["访问日志", "access log"],
+        ["任务日志", "task log"],
+        ["安全日志", "security log"],
+        ["异常", "exception"],
+        ["版本", "เวอร์ชัน"],
+        ["用户", "ผู้ใช้"],
+        ["浏览器", "เบราว์เซอร์"],
+        ["堆栈", "stack"],
+        ["请求", "คำขอ"],
+        ["网关", "gateway"],
+        ["数据库", "ฐานข้อมูล"],
+        ["队列", "คิว"],
+        ["支付", "ชำระเงิน"],
+        ["订阅扣费", "หักค่าสมาชิก"],
+        ["退款", "คืนเงิน"],
+        ["对账流水", "รายการกระทบยอด"],
+        ["电子发票", "e-Tax invoice"],
+        ["发票查验", "ตรวจใบกำกับภาษี"],
+        ["纳税申报", "ยื่นภาษี"],
+        ["银行流水", "รายการเดินบัญชีธนาคาร"],
+        ["付款回执", "ใบยืนยันการจ่าย"],
+        ["代发工资", "จ่ายเงินเดือนแทน"],
+        ["验证码", "รหัสยืนยัน"],
+        ["账单", "บิล"],
+        ["审批提醒", "เตือนอนุมัติ"],
+        ["催收", "ติดตามหนี้"],
+        ["运营通知", "แจ้งเตือนปฏิบัติการ"],
+        ["聊天工具", "เครื่องมือแชต"],
+        ["订单", "คำสั่งซื้อ"],
+        ["商品", "สินค้า"],
+        ["库存", "สต็อก"],
+        ["物流", "ขนส่ง"],
+        ["汇率", "อัตราแลกเปลี่ยน"],
+        ["官方", "ทางการ"],
+        ["银行", "ธนาคาร"],
+        ["市场", "ตลาด"],
+        ["来源", "แหล่งที่มา"],
+        ["时间戳", "timestamp"],
+        ["留痕", "เก็บร่องรอย"],
+        ["汇兑损益", "กำไรขาดทุนอัตราแลกเปลี่ยน"],
+        ["API", "API"],
+        ["TLS", "TLS"],
+        ["REST", "REST"],
+        ["GraphQL", "GraphQL"],
+        ["BPMN", "BPMN"],
+        ["PDF", "PDF"],
+        ["Excel", "Excel"],
+        ["BI", "BI"],
+        ["SaaS", "SaaS"]
+      ];
+
+      const title = document.getElementById("page-title");
+      const subtitle = document.getElementById("page-subtitle");
+      const badge = document.getElementById("page-badge");
+      const langToggle = document.getElementById("lang-toggle");
+      const search = document.getElementById("search");
+      const hint = document.getElementById("search-hint");
+      const diagram = document.getElementById("diagram");
+      const modalRoot = document.getElementById("modal-root");
+      const overlay = document.getElementById("overlay");
+      const close = document.getElementById("close");
+      const modalTitle = document.getElementById("modal-title");
+      const modalEn = document.getElementById("modal-en");
+      const modalSummary = document.getElementById("modal-summary");
+      const modalDetails = document.getElementById("modal-details");
+      const modalRelated = document.getElementById("modal-related");
+      const summaryHeading = document.getElementById("summary-heading");
+      const detailsHeading = document.getElementById("details-heading");
+      const relatedHeading = document.getElementById("related-heading");
+
+      const registry = new Map();
+      const cards = new Map();
+      let activeId = null;
+      let currentLang = "zh";
+      let currentArch = ARCH;
+
+      function hasHan(value) {
+        return /[\u3400-\u9FFF]/.test(String(value || ""));
+      }
+
+      function normalize(value) {
+        return String(value || "").toLowerCase().replace(/\s+/g, "");
+      }
+
+      function compactAscii(value) {
+        return String(value || "")
+          .replace(/[\u3400-\u9FFF\u3000-\u303F，。；、（）]/g, " ")
+          .replace(/[·]/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      function translateText(value, moduleName, index) {
+        const text = String(value || "");
+        if (!hasHan(text)) return text;
+        const parts = [];
+        THAI_TERM_RULES.forEach(([key, label]) => {
+          if (text.includes(key) && !parts.includes(label)) parts.push(label);
+        });
+        const ascii = compactAscii(text);
+        if (parts.length && ascii) return `${parts.join(" / ")} · ${ascii}`;
+        if (parts.length) return parts.join(" / ");
+        return `${moduleName} · รายการ ${index + 1}`;
+      }
+
+      function localizeDetail(item, moduleName, index) {
+        if (typeof item === "string") return translateText(item, moduleName, index);
+        return {
+          label: translateText(item.label, moduleName, index),
+          value: translateText(item.value, moduleName, index),
+          note: translateText(item.note, moduleName, index)
+        };
+      }
+
+      function buildThaiArch(source) {
+        return {
+          ...source,
+          title: THAI_COPY.title,
+          subtitle: THAI_COPY.subtitle,
+          searchPlaceholder: THAI_COPY.searchPlaceholder,
+          flowLabel: THAI_COPY.flowLabel,
+          layers: source.layers.map((layer, layerIndex) => {
+            const layerText = THAI_COPY.layers[layer.id] || {};
+            return {
+              ...layer,
+              title: layerText.title || `ชั้นที่ ${layerIndex + 1}`,
+              en: layerText.en || layer.en,
+              groups: layer.groups.map((group) => {
+                const groupTitle = THAI_COPY.groups[group.title] || translateText(group.title, layerText.title || "", 0);
+                return {
+                  ...group,
+                  title: groupTitle,
+                  modules: group.modules.map((module) => {
+                    const name = THAI_COPY.modules[module.id] || translateText(module.name, groupTitle, 0);
+                    return {
+                      ...module,
+                      name,
+                      summary: `${name}ช่วยกำหนดบทบาททางเทคนิคของระบบ SaaS การเงิน เชื่อมต่อกับชั้นอื่นเพื่อให้ระบบเสถียร ปลอดภัย และขยายได้`,
+                      details: (module.details || []).map((item, index) => localizeDetail(item, name, index))
+                    };
+                  })
+                };
+              })
+            };
+          })
+        };
+      }
+
+      const localizedArch = {
+        zh: ARCH,
+        th: buildThaiArch(ARCH)
+      };
+
+      function detailText(details) {
+        return (details || []).map((item) => {
+          if (typeof item === "string") return item;
+          return [item.label, item.value, item.note].join(" ");
+        }).join(" ");
+      }
+
+      function moduleText(module) {
+        return normalize([module.name, module.en, module.summary, detailText(module.details)].join(" "));
+      }
+
+      function createEl(tag, className, text) {
+        const el = document.createElement(tag);
+        if (className) el.className = className;
+        if (text !== undefined) el.textContent = text;
+        return el;
+      }
+
+      function register(module, meta) {
+        registry.set(module.id, { module, meta, searchText: moduleText(module) });
+      }
+
+      function rebuildRegistry() {
+        registry.clear();
+        currentArch.layers.forEach((layer, layerIndex) => {
+          layer.groups.forEach((group, groupIndex) => {
+            group.modules.forEach((module, moduleIndex) => {
+              register(module, { layer, group, layerIndex, groupIndex, moduleIndex });
+            });
+          });
+        });
+      }
+
+      function renderDetailPreview(module) {
+        const list = createEl("ul", "print-details");
+        (module.details || []).forEach((item) => {
+          const text = typeof item === "string" ? item : `${item.label}: ${item.value}。${item.note}`;
+          list.appendChild(createEl("li", "", text));
+        });
+        return list;
+      }
+
+      function renderLayer(layer, host, layerIndex, layerCount) {
+        const layerEl = createEl("section", "layer");
+        layerEl.style.setProperty("--layer-color", layer.accent || currentArch.primary);
+
+        const label = createEl("div", "layer-label");
+        const labelTitle = createEl("strong", "", layer.title);
+        const labelEn = createEl("span", "", layer.en);
+        label.append(labelTitle, labelEn);
+
+        const body = createEl("div", "layer-body");
+        const groups = createEl("div", "groups");
+
+        layer.groups.forEach((group) => {
+          const groupEl = createEl("div", "group");
+          groupEl.style.setProperty("--group-color", group.color || layer.accent || currentArch.primary);
+          groupEl.appendChild(createEl("div", "group-title", group.title));
+
+          const cardsEl = createEl("div", "cards");
+          group.modules.forEach((module) => {
+            const card = createEl("button", "card");
+            card.type = "button";
+            card.dataset.id = module.id;
+            card.style.setProperty("--group-color", group.color || layer.accent || currentArch.primary);
+            card.appendChild(createEl("span", "card-name", module.name));
+            card.appendChild(createEl("small", "card-en", module.en));
+            card.appendChild(createEl("span", "card-summary", module.summary));
+            card.appendChild(renderDetailPreview(module));
+            card.addEventListener("click", () => openModule(module.id, false));
+            cards.set(module.id, card);
+            cardsEl.appendChild(card);
+          });
+
+          groupEl.appendChild(cardsEl);
+          groups.appendChild(groupEl);
+        });
+
+        body.appendChild(groups);
+        layerEl.append(label, body);
+        host.appendChild(layerEl);
+
+        if (host.classList.contains("main-stack") && layerIndex < layerCount - 1) {
+          const arrow = createEl("div", "flow-arrow");
+          arrow.appendChild(createEl("span", "", currentArch.flowLabel || "调用与数据流向"));
+          host.appendChild(arrow);
+        }
+      }
+
+      function renderDiagram() {
+        diagram.replaceChildren();
+        diagram.classList.remove("with-rail");
+        cards.clear();
+        const railLayer = currentArch.layers.find((layer) => layer.id === currentArch.railLayerId);
+        const mainLayers = currentArch.layers.filter((layer) => layer.id !== currentArch.railLayerId);
+
+        if (railLayer) {
+          diagram.classList.add("with-rail");
+          const mainStack = createEl("div", "main-stack");
+          const railStack = createEl("aside", "rail-stack");
+          mainLayers.forEach((layer, index) => renderLayer(layer, mainStack, index, mainLayers.length));
+          renderLayer(railLayer, railStack, 0, 1);
+          diagram.append(mainStack, railStack);
+          return;
+        }
+
+        mainLayers.forEach((layer, index) => renderLayer(layer, diagram, index, mainLayers.length));
+      }
+
+      function relatedModules(id) {
+        const entry = registry.get(id);
+        if (!entry) return [];
+
+        const explicit = entry.module.links || [];
+        const ids = explicit.length ? [...explicit] : [];
+
+        if (!ids.length) {
+          const nextLayer = currentArch.layers[entry.meta.layerIndex + 1];
+          const prevLayer = currentArch.layers[entry.meta.layerIndex - 1];
+          [nextLayer, prevLayer].forEach((layer) => {
+            const first = layer?.groups?.[0]?.modules?.[0];
+            if (first) ids.push(first.id);
+          });
+        }
+
+        const sameGroup = entry.meta.group.modules
+          .filter((module) => module.id !== id)
+          .slice(0, 2)
+          .map((module) => module.id);
+
+        return [...new Set([...ids, ...sameGroup])]
+          .map((moduleId) => registry.get(moduleId)?.module)
+          .filter(Boolean)
+          .slice(0, 6);
+      }
+
+      function focusCard(id) {
+        const card = cards.get(id);
+        if (!card) return;
+        card.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+        card.classList.remove("pulse");
+        void card.offsetWidth;
+        card.classList.add("pulse");
+        card.focus({ preventScroll: true });
+      }
+
+      function appendChoice(item) {
+        const li = createEl("li");
+        if (typeof item === "string") {
+          li.textContent = item;
+          return li;
+        }
+
+        li.appendChild(createEl("b", "", item.label));
+        li.appendChild(createEl("span", "", item.value));
+        li.appendChild(createEl("p", "", item.note));
+        return li;
+      }
+
+      function openModule(id, jump) {
+        const entry = registry.get(id);
+        if (!entry) return;
+
+        activeId = id;
+        const module = entry.module;
+        const color = entry.meta.group.color || entry.meta.layer.accent || currentArch.primary;
+        modalRoot.style.setProperty("--active-color", color);
+        modalTitle.textContent = module.name;
+        modalEn.textContent = module.en;
+        modalSummary.textContent = module.summary;
+        modalDetails.replaceChildren();
+        modalRelated.replaceChildren();
+
+        (module.details || []).forEach((item) => {
+          modalDetails.appendChild(appendChoice(item));
+        });
+
+        relatedModules(id).forEach((related) => {
+          const button = createEl("button", "", `${related.name} · ${related.en}`);
+          button.type = "button";
+          button.addEventListener("click", () => {
+            openModule(related.id, true);
+          });
+          modalRelated.appendChild(button);
+        });
+
+        modalRoot.hidden = false;
+        document.body.style.overflow = "hidden";
+
+        if (jump) {
+          focusCard(id);
+        }
+      }
+
+      function closeModal() {
+        modalRoot.hidden = true;
+        document.body.style.overflow = "";
+        if (activeId) {
+          cards.get(activeId)?.focus({ preventScroll: true });
+        }
+      }
+
+      function applySearch() {
+        const query = normalize(search.value);
+        let count = 0;
+        const ui = UI_TEXT[currentLang];
+
+        registry.forEach((entry, id) => {
+          const card = cards.get(id);
+          const matched = !query || entry.searchText.includes(query);
+          card.classList.toggle("match", Boolean(query && matched));
+          card.classList.toggle("dim", Boolean(query && !matched));
+          if (query && matched) count += 1;
+        });
+
+        hint.textContent = query ? ui.searchHint(count) : ui.idleHint;
+      }
+
+      function setLanguage(lang, clearSearch) {
+        const openId = modalRoot.hidden ? null : activeId;
+        currentLang = lang;
+        currentArch = localizedArch[lang];
+        document.documentElement.lang = UI_TEXT[lang].htmlLang;
+        document.body.dataset.lang = lang;
+        document.title = currentArch.title;
+        document.documentElement.style.setProperty("--primary", currentArch.primary || "#2563EB");
+
+        const ui = UI_TEXT[lang];
+        title.textContent = currentArch.title;
+        subtitle.textContent = currentArch.subtitle;
+        badge.textContent = ui.badge;
+        langToggle.textContent = ui.toggle;
+        langToggle.setAttribute("aria-label", ui.toggleLabel);
+        langToggle.setAttribute("aria-pressed", String(lang === "th"));
+        close.setAttribute("aria-label", ui.closeLabel);
+        summaryHeading.textContent = ui.summaryHeading;
+        detailsHeading.textContent = ui.detailsHeading;
+        relatedHeading.textContent = ui.relatedHeading;
+        diagram.setAttribute("aria-label", ui.diagramLabel);
+        search.placeholder = currentArch.searchPlaceholder || "搜索模块";
+        if (clearSearch) search.value = "";
+
+        rebuildRegistry();
+        renderDiagram();
+        applySearch();
+        if (openId) openModule(openId, false);
+      }
+
+      setLanguage(currentLang, false);
+
+      langToggle.addEventListener("click", () => {
+        setLanguage(currentLang === "zh" ? "th" : "zh", true);
+      });
+      search.addEventListener("input", applySearch);
+      overlay.addEventListener("click", closeModal);
+      close.addEventListener("click", closeModal);
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !modalRoot.hidden) closeModal();
+      });
+    })();
+  </script>
+</body>
+</html>

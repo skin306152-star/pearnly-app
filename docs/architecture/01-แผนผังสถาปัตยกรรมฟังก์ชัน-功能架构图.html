@@ -1,0 +1,1892 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>企业级财务经营 SaaS 功能架构图</title>
+  <script>
+    const ARCH = {
+      title: "企业级财务 / 经营管理 SaaS 功能架构图",
+      subtitle: "行业通用分层视图，覆盖接入、门户、业务应用、共享中台、数据与运营支撑。",
+      primary: "#2563EB",
+      searchPlaceholder: "搜索模块、英文名、子功能或说明",
+      flowLabel: "业务入口、流程协同与数据沉淀",
+      detailMode: "features",
+      layers: [
+        {
+          id: "channels",
+          title: "第 1 层 · 接入渠道层",
+          en: "Access Channels",
+          accent: "#2563EB",
+          groups: [
+            {
+              title: "多端入口",
+              color: "#2563EB",
+              modules: [
+                {
+                  id: "web",
+                  name: "Web 端",
+                  en: "Web Portal",
+                  summary: "面向企业办公主场景的统一浏览器入口，承载高频录单、查询、报表与管理配置。",
+                  details: ["响应式页面与多浏览器适配", "单点登录入口", "权限菜单与收藏", "在线打印与导出", "批量录入与快捷键", "消息提醒与待办入口", "多语言界面切换", "安全水印与会话控制"],
+                  links: ["workbench", "global-search", "rbac", "report-center"]
+                },
+                {
+                  id: "mobile-app",
+                  name: "移动 App",
+                  en: "Mobile App",
+                  summary: "覆盖外勤、管理层与移动审批场景，让关键经营动作不依赖办公室电脑。",
+                  details: ["移动审批与催办", "拍照上传票据", "扫码入出库", "移动报表看板", "消息推送", "生物识别登录", "离线缓存", "定位与外勤打卡"],
+                  links: ["approval-center", "expense", "inventory", "dashboard"]
+                },
+                {
+                  id: "mini-app",
+                  name: "小程序 · 轻应用",
+                  en: "Mini App",
+                  summary: "提供低安装成本的轻量入口，适合临时协作、对账确认和移动消息触达。",
+                  details: ["轻量报销申请", "客户自助查询", "供应商对账确认", "扫码查单", "分享邀请", "审批提醒", "工单提交", "活动与通知触达"],
+                  links: ["portal", "message-center", "workflow", "ar"]
+                },
+                {
+                  id: "pos",
+                  name: "收银终端 POS",
+                  en: "Point of Sale",
+                  summary: "连接门店交易现场，把收款、开票、库存与会员数据实时回流总部。",
+                  details: ["销售开单", "收款与退款", "小票打印", "会员识别", "断网续卖", "班结交接", "库存同步", "门店价格策略"],
+                  links: ["sales", "inventory", "cash", "pricing"]
+                },
+                {
+                  id: "portal",
+                  name: "自助门户",
+                  en: "Vendor / Customer Portal",
+                  summary: "让供应商和客户在受控权限下自助完成对账、资料维护与单据跟进。",
+                  details: ["客户对账确认", "供应商发票上传", "付款进度查询", "订单交付进度", "基础资料维护", "争议工单提交", "合同与附件下载", "门户权限隔离"],
+                  links: ["ar", "ap", "invoice", "mdm"]
+                },
+                {
+                  id: "open-api",
+                  name: "开放 API",
+                  en: "Open API",
+                  summary: "面向生态伙伴、集团系统和客户自研系统提供标准化集成能力。",
+                  details: ["订单同步", "凭证同步", "库存同步", "主数据同步", "Webhook 事件订阅", "API 密钥管理", "调用限流", "接口审计"],
+                  links: ["mdm", "voucher-center", "audit", "etl"]
+                },
+                {
+                  id: "im",
+                  name: "IM 接入",
+                  en: "WeChat / LINE / WhatsApp",
+                  summary: "把财务提醒、审批和智能问答嵌入企业日常沟通工具。",
+                  details: ["费用拍照提交", "审批消息卡片", "逾期催收提醒", "智能问答", "任务派发", "异常通知", "业务快捷入口", "群组权限绑定"],
+                  links: ["message-center", "smart-service", "approval-center", "workflow"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          id: "portal-layer",
+          title: "第 2 层 · 统一门户层",
+          en: "Unified Portal",
+          accent: "#0EA5E9",
+          groups: [
+            {
+              title: "统一工作入口",
+              color: "#0EA5E9",
+              modules: [
+                {
+                  id: "workbench",
+                  name: "工作台",
+                  en: "Workspace",
+                  summary: "聚合待办、关键指标和常用入口，是企业用户每天打开系统后的第一屏。",
+                  details: ["待办事项聚合", "关键指标卡片", "常用功能收藏", "异常预警", "近期单据", "快捷录入", "个人视图配置", "多组织切换"],
+                  links: ["dashboard", "workflow", "org-center", "message-center"]
+                },
+                {
+                  id: "message-center",
+                  name: "消息中心",
+                  en: "Notification Center",
+                  summary: "统一承载系统通知、业务提醒、审批催办和外部渠道推送。",
+                  details: ["站内信", "邮件与短信推送", "IM 通知", "已读未读状态", "催办策略", "订阅偏好", "消息模板", "失败重试"],
+                  links: ["notification", "im", "workflow", "audit"]
+                },
+                {
+                  id: "approval-center",
+                  name: "审批中心",
+                  en: "Approval Hub",
+                  summary: "让预算、报销、采购、付款等审批动作在统一队列中处理。",
+                  details: ["待我审批", "我发起的流程", "审批意见", "加签与转交", "撤回与驳回", "移动审批", "超时提醒", "审批轨迹"],
+                  links: ["workflow", "expense", "purchase", "cash"]
+                },
+                {
+                  id: "report-center",
+                  name: "报表中心",
+                  en: "Report Center",
+                  summary: "集中管理财务报表、经营报表、税务报表和自助分析成果。",
+                  details: ["报表目录", "权限订阅", "定时生成", "Excel 导出", "穿透查询", "指标口径说明", "报表收藏", "版本留痕"],
+                  links: ["financial-statements", "bi", "data-warehouse", "budget"]
+                },
+                {
+                  id: "global-search",
+                  name: "全局搜索",
+                  en: "Global Search",
+                  summary: "跨单据、客户、供应商、凭证和附件提供统一检索入口。",
+                  details: ["单据全文检索", "主数据检索", "凭证检索", "附件索引", "最近访问", "权限过滤", "高级筛选", "搜索热词"],
+                  links: ["document-center", "mdm", "voucher-center", "business-db"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          id: "apps",
+          title: "第 3 层 · 业务应用层",
+          en: "Business Applications",
+          accent: "#16A34A",
+          groups: [
+            {
+              title: "财务会计",
+              color: "#2563EB",
+              modules: [
+                {
+                  id: "gl",
+                  name: "总账 GL",
+                  en: "General Ledger",
+                  summary: "企业财务核算的总账核心，统一承接各业务模块生成的会计凭证。",
+                  details: ["凭证录入", "自动凭证", "科目表", "账簿查询", "辅助核算", "期末结转", "关账与反关账", "多账簿核算"],
+                  links: ["voucher-center", "financial-statements", "costing", "audit"]
+                },
+                {
+                  id: "ar",
+                  name: "应收 AR",
+                  en: "Accounts Receivable",
+                  summary: "管理客户账款从销售开票、收款、核销到账龄分析的完整链路。",
+                  details: ["应收单管理", "收款登记", "发票匹配", "核销与反核销", "账龄分析", "催收计划", "坏账准备", "客户对账单"],
+                  links: ["sales", "invoice", "cash", "portal"]
+                },
+                {
+                  id: "ap",
+                  name: "应付 AP",
+                  en: "Accounts Payable",
+                  summary: "管理供应商往来、采购发票、付款申请和应付账龄。",
+                  details: ["应付单管理", "付款申请", "采购发票匹配", "三单匹配", "账龄分析", "预付款核销", "供应商对账", "付款排程"],
+                  links: ["purchase", "invoice", "cash", "portal"]
+                },
+                {
+                  id: "fixed-assets",
+                  name: "固定资产",
+                  en: "Fixed Assets",
+                  summary: "覆盖资产采购、入账、折旧、调拨、盘点和处置。",
+                  details: ["资产卡片", "资产入账", "折旧计提", "资产调拨", "盘点清查", "维修记录", "资产处置", "折旧报表"],
+                  links: ["gl", "cash", "document-center", "audit"]
+                },
+                {
+                  id: "expense",
+                  name: "费用报销",
+                  en: "Expense Management",
+                  summary: "标准化员工费用申请、票据识别、预算校验和报销入账。",
+                  details: ["费用申请", "差旅报销", "票据 OCR", "预算占用", "审批流", "付款联动", "费用分摊", "报销政策校验"],
+                  links: ["workflow", "smart-service", "budget", "cash"]
+                },
+                {
+                  id: "cash",
+                  name: "出纳 · 资金管理",
+                  en: "Cash & Treasury",
+                  summary: "管理银行账户、现金收付、资金计划和银行流水对账。",
+                  details: ["银行账户", "收付款登记", "银行流水导入", "银企直连", "资金计划", "现金日记账", "银行对账", "付款审批"],
+                  links: ["ar", "ap", "bank-interface", "audit"]
+                },
+                {
+                  id: "costing",
+                  name: "成本核算",
+                  en: "Cost Accounting",
+                  summary: "把采购、库存、生产和费用数据归集为产品、项目或部门成本。",
+                  details: ["成本对象", "费用归集", "成本分摊", "存货计价", "生产成本结转", "项目成本", "毛利分析", "成本差异分析"],
+                  links: ["inventory", "manufacturing-bom", "gl", "bi"]
+                },
+                {
+                  id: "financial-statements",
+                  name: "财务报表",
+                  en: "Financial Statements",
+                  summary: "输出资产负债表、利润表、现金流量表及管理口径报表。",
+                  details: ["资产负债表", "利润表", "现金流量表", "科目取数公式", "报表重算", "多期间对比", "穿透到凭证", "合规格式导出"],
+                  links: ["gl", "report-center", "data-warehouse", "consolidation"]
+                }
+              ]
+            },
+            {
+              title: "税务管理",
+              color: "#DC2626",
+              modules: [
+                {
+                  id: "invoice",
+                  name: "发票管理",
+                  en: "Invoice Management",
+                  summary: "统一处理发票开具、收取、查验、归档和业务单据匹配。",
+                  details: ["销项开票", "进项收票", "发票查验", "红字发票", "发票归档", "票据影像", "业务匹配", "异常发票预警"],
+                  links: ["sales", "purchase", "tax-calculation", "tax-bureau"]
+                },
+                {
+                  id: "tax-calculation",
+                  name: "进销项税核算",
+                  en: "Input / Output VAT",
+                  summary: "按税率、税目和业务类型归集进销项税额，支撑抵扣与申报。",
+                  details: ["销项税计算", "进项税认证", "抵扣规则", "税率维护", "税额差异处理", "税金结转", "税务台账", "异常税负分析"],
+                  links: ["invoice", "gl", "tax-filing", "rules-engine"]
+                },
+                {
+                  id: "tax-filing",
+                  name: "纳税申报",
+                  en: "Tax Filing",
+                  summary: "面向增值税、预扣税、所得税等税种生成申报底稿和申报文件。",
+                  details: ["增值税申报", "预扣税申报", "所得税申报", "申报底稿", "税表校验", "申报状态跟踪", "补退税处理", "申报档案"],
+                  links: ["tax-calculation", "tax-bureau", "report-center", "audit"]
+                },
+                {
+                  id: "tax-bureau",
+                  name: "电子发票对接税局",
+                  en: "E-Invoice Integration",
+                  summary: "连接税局或官方服务商，实现电子发票开具、回传和申报直连。",
+                  details: ["税局接口配置", "电子发票开具", "发票回传", "签章与版式文件", "开票状态同步", "接口重试", "税控设备适配", "合规留痕"],
+                  links: ["invoice", "tax-filing", "open-api", "audit"]
+                }
+              ]
+            },
+            {
+              title: "供应链",
+              color: "#F59E0B",
+              modules: [
+                {
+                  id: "purchase",
+                  name: "采购管理",
+                  en: "Procurement",
+                  summary: "覆盖请购、采购订单、收货、入库、发票和供应商对账。",
+                  details: ["请购申请", "采购订单", "收货入库", "采购退货", "三单匹配", "供应商对账", "采购价格", "到货计划"],
+                  links: ["ap", "inventory", "portal", "mdm"]
+                },
+                {
+                  id: "sales",
+                  name: "销售管理",
+                  en: "Sales Management",
+                  summary: "管理报价、订单、发货、开票、收款与客户履约。",
+                  details: ["销售报价", "销售订单", "发货通知", "销售出库", "开票申请", "客户信用", "销售退货", "订单毛利"],
+                  links: ["ar", "invoice", "inventory", "crm-customer"]
+                },
+                {
+                  id: "inventory",
+                  name: "库存管理",
+                  en: "Inventory",
+                  summary: "管理物料、仓库、批次效期、盘点和库存成本。",
+                  details: ["入库管理", "出库管理", "库存调拨", "盘点作业", "批次效期", "序列号管理", "安全库存", "库存成本"],
+                  links: ["purchase", "sales", "costing", "mdm"]
+                },
+                {
+                  id: "pricing",
+                  name: "价格与促销",
+                  en: "Pricing & Promotion",
+                  summary: "统一维护价目表、折扣、促销和客户等级价格策略。",
+                  details: ["价目表", "客户等级价", "促销规则", "折扣审批", "有效期控制", "组合优惠", "价格模拟", "毛利校验"],
+                  links: ["sales", "pos", "rules-engine", "crm-customer"]
+                }
+              ]
+            },
+            {
+              title: "生产制造",
+              color: "#7C3AED",
+              modules: [
+                {
+                  id: "manufacturing-bom",
+                  name: "BOM",
+                  en: "Bill of Materials",
+                  summary: "定义产品结构、物料用量、替代料和版本，为计划与成本提供基础。",
+                  details: ["物料清单", "版本管理", "替代料", "损耗率", "工艺路线", "BOM 展开", "成本卷算", "变更审批"],
+                  links: ["mdm", "mrp", "costing", "workflow"]
+                },
+                {
+                  id: "mrp",
+                  name: "MRP 计划",
+                  en: "Material Requirements Planning",
+                  summary: "根据销售预测、订单和库存计算采购与生产需求。",
+                  details: ["需求来源", "净需求计算", "采购建议", "生产建议", "缺料分析", "计划参数", "计划版本", "例外消息"],
+                  links: ["manufacturing-bom", "inventory", "purchase", "workshop"]
+                },
+                {
+                  id: "workshop",
+                  name: "车间执行",
+                  en: "Shop Floor Execution",
+                  summary: "记录工单、领料、报工、质检和完工入库。",
+                  details: ["生产工单", "领料退料", "工序报工", "质量检验", "完工入库", "工时采集", "异常停线", "在制品跟踪"],
+                  links: ["mrp", "inventory", "costing", "workflow"]
+                },
+                {
+                  id: "outsourcing",
+                  name: "委外",
+                  en: "Outsourcing",
+                  summary: "管理委外加工订单、发料、收货、结算和质量追踪。",
+                  details: ["委外订单", "委外发料", "加工收货", "委外退货", "加工费结算", "委外对账", "质量扣款", "供应商绩效"],
+                  links: ["purchase", "inventory", "ap", "costing"]
+                }
+              ]
+            },
+            {
+              title: "人力资源",
+              color: "#0891B2",
+              modules: [
+                {
+                  id: "org-hr",
+                  name: "组织人事",
+                  en: "HR Master Data",
+                  summary: "维护组织、岗位、员工、合同和任职信息。",
+                  details: ["组织架构", "岗位职级", "员工档案", "劳动合同", "入转调离", "证照资料", "人事报表", "组织变更"],
+                  links: ["org-center", "rbac", "payroll", "attendance"]
+                },
+                {
+                  id: "attendance",
+                  name: "考勤",
+                  en: "Attendance",
+                  summary: "管理排班、打卡、请假、加班和考勤异常。",
+                  details: ["班次排班", "打卡记录", "请假申请", "加班申请", "考勤异常", "补卡审批", "工时统计", "移动定位打卡"],
+                  links: ["workflow", "payroll", "mobile-app", "org-hr"]
+                },
+                {
+                  id: "payroll",
+                  name: "薪酬",
+                  en: "Payroll",
+                  summary: "完成薪资计算、发放、计提入账和薪资单推送。",
+                  details: ["薪资项目", "薪资计算", "社保公积金", "奖金绩效", "薪资审批", "银行代发", "薪资凭证", "薪资单发布"],
+                  links: ["attendance", "tax-personal", "cash", "gl"]
+                },
+                {
+                  id: "tax-personal",
+                  name: "个税",
+                  en: "Individual Income Tax",
+                  summary: "根据薪资与专项扣除生成个税计算与申报数据。",
+                  details: ["专项扣除", "累计预扣", "个税计算", "申报文件", "税款缴纳", "年度汇算", "个税报表", "员工确认"],
+                  links: ["payroll", "tax-filing", "report-center", "audit"]
+                }
+              ]
+            },
+            {
+              title: "客户关系 CRM",
+              color: "#DB2777",
+              modules: [
+                {
+                  id: "crm-customer",
+                  name: "客户 / 联系人",
+                  en: "Customer & Contact",
+                  summary: "统一维护客户档案、联系人、行业属性和客户分层。",
+                  details: ["客户档案", "联系人管理", "客户标签", "客户等级", "信用信息", "客户画像", "重复客户合并", "资料变更审批"],
+                  links: ["mdm", "sales", "ar", "contract"]
+                },
+                {
+                  id: "opportunity",
+                  name: "商机线索",
+                  en: "Lead & Opportunity",
+                  summary: "跟踪线索转化、销售阶段、赢率和预测金额。",
+                  details: ["线索池", "商机阶段", "跟进记录", "销售预测", "赢率管理", "竞争对手", "报价联动", "丢单原因"],
+                  links: ["sales", "crm-customer", "contract", "dashboard"]
+                },
+                {
+                  id: "contract",
+                  name: "合同",
+                  en: "Contract",
+                  summary: "管理合同文本、审批、履约节点、收付款计划和归档。",
+                  details: ["合同模板", "合同审批", "电子签章", "履约计划", "收付款计划", "合同变更", "到期提醒", "合同归档"],
+                  links: ["workflow", "sales", "ar", "document-center"]
+                },
+                {
+                  id: "after-sales",
+                  name: "售后",
+                  en: "After Sales",
+                  summary: "处理客户工单、服务派单、退换货和满意度反馈。",
+                  details: ["服务工单", "派工排班", "退换货申请", "维修记录", "服务 SLA", "客户评价", "知识库联动", "费用结算"],
+                  links: ["sales", "inventory", "portal", "smart-service"]
+                }
+              ]
+            },
+            {
+              title: "决策分析",
+              color: "#059669",
+              modules: [
+                {
+                  id: "dashboard",
+                  name: "经营驾驶舱",
+                  en: "Executive Dashboard",
+                  summary: "面向老板与管理层展示收入、利润、现金流、库存和风险指标。",
+                  details: ["收入利润总览", "现金流预警", "应收应付雷达", "库存周转", "销售漏斗", "费用趋势", "异常指标", "移动看板"],
+                  links: ["data-warehouse", "bi", "workbench", "budget"]
+                },
+                {
+                  id: "bi",
+                  name: "自助报表 BI",
+                  en: "Self-service BI",
+                  summary: "让业务人员按权限自助拖拽分析经营数据。",
+                  details: ["数据集管理", "拖拽分析", "图表组件", "指标口径", "维度筛选", "报表订阅", "权限隔离", "钻取分析"],
+                  links: ["data-warehouse", "report-center", "dashboard", "etl"]
+                },
+                {
+                  id: "budget",
+                  name: "预算管理",
+                  en: "Budgeting",
+                  summary: "覆盖预算编制、审批、执行控制、调整和分析。",
+                  details: ["预算模板", "预算编制", "预算审批", "预算占用", "执行控制", "预算调整", "滚动预测", "预算差异分析"],
+                  links: ["workflow", "expense", "dashboard", "gl"]
+                },
+                {
+                  id: "consolidation",
+                  name: "合并报表",
+                  en: "Group Consolidation",
+                  summary: "面向集团企业做多公司、多币种、内部交易抵消和合并出表。",
+                  details: ["合并范围", "报表上报", "内部交易抵消", "权益抵消", "外币折算", "合并调整", "合并底稿", "集团报表发布"],
+                  links: ["org-center", "currency", "financial-statements", "data-warehouse"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          id: "middle-platform",
+          title: "第 4 层 · 业务中台 · 共享服务层",
+          en: "Shared Business Platform",
+          accent: "#4F46E5",
+          groups: [
+            {
+              title: "企业级共享能力",
+              color: "#4F46E5",
+              modules: [
+                {
+                  id: "org-center",
+                  name: "组织中心",
+                  en: "Organization Center",
+                  summary: "统一管理多组织、多法人、多账簿与组织层级关系。",
+                  details: ["组织树", "法人主体", "利润中心", "成本中心", "多账簿", "组织隔离", "组织授权", "跨组织协同"],
+                  links: ["gl", "workbench", "consolidation", "rbac"]
+                },
+                {
+                  id: "rbac",
+                  name: "用户与权限中心",
+                  en: "RBAC / Data Permission / SSO",
+                  summary: "统一身份、角色、菜单、数据范围和单点登录。",
+                  details: ["用户账号", "角色权限", "菜单权限", "数据权限", "字段权限", "SSO 登录", "MFA 配置", "权限审计"],
+                  links: ["audit", "org-center", "web", "portal"]
+                },
+                {
+                  id: "workflow",
+                  name: "流程引擎",
+                  en: "Workflow Engine",
+                  summary: "用可配置审批流支撑费用、采购、合同、付款和主数据变更。",
+                  details: ["流程建模", "条件分支", "审批节点", "会签与或签", "加签转交", "超时升级", "流程版本", "流程监控"],
+                  links: ["approval-center", "expense", "purchase", "contract"]
+                },
+                {
+                  id: "rules-engine",
+                  name: "规则引擎",
+                  en: "Rules Engine",
+                  summary: "把价格、税率、预算、风控等可变规则从代码中抽出来配置。",
+                  details: ["规则条件", "规则优先级", "生效范围", "版本管理", "模拟测试", "冲突检测", "规则审计", "灰度生效"],
+                  links: ["pricing", "tax-calculation", "budget", "gray-release"]
+                },
+                {
+                  id: "mdm",
+                  name: "主数据 MDM",
+                  en: "Master Data Management",
+                  summary: "统一客户、供应商、物料、科目等基础资料口径。",
+                  details: ["客户主数据", "供应商主数据", "物料主数据", "科目主数据", "编码规范", "去重合并", "变更审批", "分发同步"],
+                  links: ["crm-customer", "purchase", "inventory", "gl"]
+                },
+                {
+                  id: "document-center",
+                  name: "单据中心",
+                  en: "Document Center",
+                  summary: "统一单据编码、模板、打印、附件与单据生命周期。",
+                  details: ["编码规则", "单据状态", "打印模板", "附件管理", "单据复制", "变更历史", "单据关系", "归档策略"],
+                  links: ["global-search", "invoice", "contract", "backup"]
+                },
+                {
+                  id: "notification",
+                  name: "消息与通知",
+                  en: "Messaging Service",
+                  summary: "统一消息模板、发送通道、订阅偏好和失败重试。",
+                  details: ["消息模板", "站内通知", "邮件短信", "IM 推送", "订阅配置", "发送队列", "失败重试", "触达统计"],
+                  links: ["message-center", "im", "monitoring", "audit"]
+                },
+                {
+                  id: "currency",
+                  name: "多币种与汇率",
+                  en: "Multi-currency",
+                  summary: "支撑外币业务、汇率维护、汇兑损益和集团合并折算。",
+                  details: ["币种档案", "汇率表", "外币核算", "汇兑损益", "折算规则", "币种重估", "多币种报表", "汇率来源"],
+                  links: ["gl", "consolidation", "cash", "fx-service"]
+                },
+                {
+                  id: "language",
+                  name: "多语言",
+                  en: "Localization",
+                  summary: "支撑跨区域团队使用本地语言操作系统和查看报表。",
+                  details: ["界面翻译", "字段翻译", "枚举翻译", "报表翻译", "时区格式", "日期格式", "币种格式", "翻译审核"],
+                  links: ["web", "mobile-app", "portal", "report-center"]
+                },
+                {
+                  id: "billing-center",
+                  name: "计费订阅中心",
+                  en: "Subscription & Entitlement",
+                  summary: "管理套餐、权益、计量、账单和订阅生命周期。",
+                  details: ["套餐配置", "模块权益", "用量计量", "试用管理", "订阅变更", "账单生成", "续费提醒", "欠费限制"],
+                  links: ["tenant-management", "metering", "operations-admin", "audit"]
+                },
+                {
+                  id: "audit",
+                  name: "审计日志中心",
+                  en: "Audit Log",
+                  summary: "记录关键操作、敏感数据访问、接口调用和合规追溯。",
+                  details: ["登录日志", "操作日志", "数据变更日志", "审批日志", "接口调用日志", "权限变更记录", "导出记录", "审计检索"],
+                  links: ["rbac", "invoice", "tax-filing", "backup"]
+                },
+                {
+                  id: "smart-service",
+                  name: "智能服务",
+                  en: "OCR / AI Assistant",
+                  summary: "通过 OCR、智能记账和问答助手提升财务处理效率。",
+                  details: ["票据 OCR", "证件识别", "智能记账建议", "异常识别", "智能问答", "知识库检索", "置信度分流", "人工复核"],
+                  links: ["expense", "invoice", "after-sales", "data-warehouse"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          id: "data",
+          title: "第 5 层 · 数据层",
+          en: "Data Layer",
+          accent: "#0F766E",
+          groups: [
+            {
+              title: "数据资产",
+              color: "#0F766E",
+              modules: [
+                {
+                  id: "business-db",
+                  name: "业务数据库",
+                  en: "Operational Database",
+                  summary: "保存交易单据、主数据、凭证和流程状态，是在线业务的事实来源。",
+                  details: ["交易单据表", "主数据表", "凭证与账簿", "流程状态", "租户隔离", "事务一致性", "索引优化", "审计字段"],
+                  links: ["gl", "document-center", "mdm", "backup"]
+                },
+                {
+                  id: "data-warehouse",
+                  name: "数据仓库",
+                  en: "Data Warehouse",
+                  summary: "面向报表、BI 和经营分析沉淀宽表、指标和历史快照。",
+                  details: ["主题域建模", "指标宽表", "历史快照", "维度表", "事实表", "权限数据集", "报表加速", "数据血缘"],
+                  links: ["bi", "dashboard", "report-center", "etl"]
+                },
+                {
+                  id: "etl",
+                  name: "数据集成 ETL",
+                  en: "Data Integration",
+                  summary: "负责从业务库、外部系统和文件中抽取、转换、加载数据。",
+                  details: ["增量抽取", "数据清洗", "字段映射", "主数据同步", "任务调度", "失败重跑", "数据校验", "集成监控"],
+                  links: ["open-api", "data-warehouse", "business-db", "monitoring"]
+                },
+                {
+                  id: "backup",
+                  name: "归档与备份",
+                  en: "Archive & Backup",
+                  summary: "保证历史单据长期可查、重要数据可恢复、合规档案可追溯。",
+                  details: ["冷热归档", "定时备份", "异地备份", "恢复演练", "保留策略", "加密存储", "归档检索", "合规销毁"],
+                  links: ["business-db", "audit", "document-center", "monitoring"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          id: "ops",
+          title: "第 6 层 · 运营支撑层",
+          en: "SaaS Operations",
+          accent: "#64748B",
+          groups: [
+            {
+              title: "厂商运营能力",
+              color: "#64748B",
+              modules: [
+                {
+                  id: "tenant-management",
+                  name: "租户管理",
+                  en: "Tenant Management",
+                  summary: "SaaS 厂商用于开通、停用、迁移和治理客户租户。",
+                  details: ["租户开通", "租户停用", "套餐绑定", "容量限制", "租户迁移", "租户健康度", "数据隔离检查", "租户配置快照"],
+                  links: ["billing-center", "business-db", "operations-admin", "monitoring"]
+                },
+                {
+                  id: "operations-admin",
+                  name: "运营后台",
+                  en: "Operations Console",
+                  summary: "支撑客服、实施、运营和管理员处理客户配置与问题定位。",
+                  details: ["客户列表", "工单处理", "配置检查", "数据修复审批", "公告发布", "权限代管", "操作留痕", "运营报表"],
+                  links: ["tenant-management", "audit", "message-center", "monitoring"]
+                },
+                {
+                  id: "metering",
+                  name: "计量计费",
+                  en: "Usage Metering",
+                  summary: "采集用户数、单据量、接口量、存储量等用量，驱动账单和限额。",
+                  details: ["用户数计量", "单据量计量", "接口调用量", "存储计量", "用量聚合", "账单明细", "超额提醒", "计费稽核"],
+                  links: ["billing-center", "open-api", "tenant-management", "audit"]
+                },
+                {
+                  id: "monitoring",
+                  name: "监控告警",
+                  en: "Monitoring & Alerting",
+                  summary: "监控系统可用性、接口性能、任务失败和业务异常。",
+                  details: ["服务健康检查", "接口延迟", "错误率", "任务失败", "资源水位", "业务异常", "告警路由", "值班升级"],
+                  links: ["etl", "notification", "operations-admin", "backup"]
+                },
+                {
+                  id: "gray-release",
+                  name: "灰度发布",
+                  en: "Canary Release",
+                  summary: "让新功能按租户、用户、地区或比例逐步开放，降低上线风险。",
+                  details: ["特性开关", "租户灰度", "用户白名单", "比例放量", "回滚策略", "版本对比", "实验指标", "发布审批"],
+                  links: ["rules-engine", "tenant-management", "monitoring", "operations-admin"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+  </script>
+  <style>
+    :root {
+      --primary: #2563EB;
+      --bg: #FAFAF8;
+      --card: #FFFFFF;
+      --text: #1F2937;
+      --muted: #6B7280;
+      --line: #E5E7EB;
+      --soft: #F4F4F1;
+      --shadow: 0 18px 48px rgba(15, 23, 42, 0.12);
+      --radius: 16px;
+      color-scheme: light;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+      line-height: 1.55;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .shell {
+      width: min(1480px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 32px 0 56px;
+    }
+
+    .hero {
+      display: grid;
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 46px);
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 10px 0 0;
+      max-width: 820px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .badge {
+      flex: 0 0 auto;
+      border: 1px solid rgba(37, 99, 235, 0.22);
+      color: var(--primary);
+      background: rgba(37, 99, 235, 0.08);
+      border-radius: 999px;
+      padding: 8px 13px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .lang-toggle {
+      min-width: 78px;
+      height: 36px;
+      border: 1px solid rgba(37, 99, 235, 0.26);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--primary);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 800;
+      transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+    }
+
+    .lang-toggle:hover {
+      background: rgba(37, 99, 235, 0.08);
+      box-shadow: 0 8px 22px rgba(37, 99, 235, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(0, 520px) auto;
+      gap: 14px;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.75);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px;
+      backdrop-filter: blur(8px);
+    }
+
+    .search-wrap {
+      position: relative;
+    }
+
+    .search-wrap::before {
+      content: "";
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #94A3B8;
+      border-radius: 50%;
+      transform: translateY(-50%);
+    }
+
+    .search-wrap::after {
+      content: "";
+      position: absolute;
+      left: 27px;
+      top: calc(50% + 7px);
+      width: 7px;
+      height: 2px;
+      background: #94A3B8;
+      transform: rotate(45deg);
+      transform-origin: left center;
+    }
+
+    #search {
+      width: 100%;
+      height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0 16px 0 44px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+    }
+
+    #search:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      text-align: right;
+    }
+
+    .diagram {
+      display: grid;
+      gap: 12px;
+    }
+
+    .layer {
+      display: grid;
+      grid-template-columns: 168px minmax(0, 1fr);
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: 0 12px 34px rgba(15, 23, 42, 0.06);
+    }
+
+    .layer-label {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 7px;
+      min-height: 180px;
+      padding: 18px 16px;
+      color: #fff;
+      background: linear-gradient(180deg, var(--layer-color), color-mix(in srgb, var(--layer-color) 72%, #111827));
+      writing-mode: horizontal-tb;
+      transform: none;
+      text-align: left;
+    }
+
+    .layer-label strong {
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    .layer-label span {
+      opacity: 0.82;
+      font-size: 12px;
+      letter-spacing: 0;
+    }
+
+    .layer-body {
+      padding: 18px;
+    }
+
+    .groups {
+      display: grid;
+      gap: 16px;
+    }
+
+    .group {
+      border: 1px solid color-mix(in srgb, var(--group-color) 24%, var(--line));
+      border-radius: 14px;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--group-color) 7%, #fff), #fff 58%);
+      padding: 14px;
+    }
+
+    .group-title {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 12px;
+      color: color-mix(in srgb, var(--group-color) 75%, #111827);
+      font-weight: 800;
+      font-size: 15px;
+    }
+
+    .group-title::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--group-color);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--group-color) 15%, transparent);
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+      gap: 10px;
+    }
+
+    .card {
+      min-height: 104px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--card);
+      padding: 13px 12px;
+      text-align: left;
+      color: inherit;
+      cursor: pointer;
+      transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, opacity 160ms ease;
+      position: relative;
+    }
+
+    .card:hover,
+    .card:focus-visible {
+      transform: translateY(-4px);
+      border-color: color-mix(in srgb, var(--group-color) 50%, var(--primary));
+      box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
+      outline: none;
+    }
+
+    .card-name {
+      display: block;
+      font-weight: 800;
+      font-size: 15px;
+      color: #111827;
+    }
+
+    .card-en {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .card-summary {
+      display: block;
+      margin-top: 10px;
+      color: #64748B;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .card.match {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14), 0 14px 28px rgba(15, 23, 42, 0.10);
+    }
+
+    .card.dim {
+      opacity: 0.26;
+    }
+
+    .card.pulse {
+      animation: pulse 900ms ease;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.36); }
+      100% { box-shadow: 0 0 0 16px rgba(37, 99, 235, 0); }
+    }
+
+    .flow-arrow {
+      display: grid;
+      place-items: center;
+      min-height: 34px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .flow-arrow span {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      padding: 5px 12px;
+    }
+
+    .flow-arrow span::after {
+      content: "↓";
+      color: var(--primary);
+      font-weight: 900;
+      font-size: 16px;
+    }
+
+    .print-details {
+      display: none;
+    }
+
+    .modal-root[hidden] {
+      display: none;
+    }
+
+    .modal-root {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      padding: 22px;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(17, 24, 39, 0.42);
+      backdrop-filter: blur(6px);
+    }
+
+    .modal {
+      position: relative;
+      width: min(720px, 100%);
+      max-height: min(760px, calc(100vh - 44px));
+      overflow: auto;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 18px;
+      background: #fff;
+      box-shadow: var(--shadow);
+      padding: 24px;
+    }
+
+    .modal-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 36px;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .modal h2 {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+
+    .modal small {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+    }
+
+    .close {
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      color: #334155;
+      cursor: pointer;
+    }
+
+    .close:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .section-title {
+      margin: 22px 0 8px;
+      font-size: 13px;
+      color: #334155;
+      font-weight: 900;
+    }
+
+    .modal-summary {
+      margin: 16px 0 0;
+      padding: 13px 14px;
+      border-left: 4px solid var(--active-color, var(--primary));
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--active-color, var(--primary)) 8%, #fff);
+      color: #334155;
+    }
+
+    .detail-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .detail-list li {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 9px 10px;
+      background: #FAFAF8;
+      color: #334155;
+      font-size: 14px;
+    }
+
+    .related {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .related button {
+      border: 1px solid color-mix(in srgb, var(--active-color, var(--primary)) 28%, var(--line));
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--active-color, var(--primary)) 8%, #fff);
+      color: color-mix(in srgb, var(--active-color, var(--primary)) 78%, #111827);
+      padding: 7px 11px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .related button:hover {
+      border-color: var(--active-color, var(--primary));
+    }
+
+    @media (max-width: 820px) {
+      .shell {
+        width: min(100% - 24px, 720px);
+        padding-top: 22px;
+      }
+
+      .title-row,
+      .toolbar {
+        grid-template-columns: 1fr;
+        display: grid;
+      }
+
+      .badge,
+      .hero-actions,
+      .hint {
+        justify-self: start;
+        text-align: left;
+      }
+
+      .layer {
+        display: block;
+      }
+
+      .layer-label {
+        min-height: auto;
+        writing-mode: horizontal-tb;
+        transform: none;
+        justify-content: flex-start;
+        padding: 14px 16px;
+      }
+
+      .cards,
+      .detail-list {
+        grid-template-columns: 1fr;
+      }
+
+      .modal {
+        padding: 20px;
+      }
+    }
+
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      .shell {
+        width: 100%;
+        padding: 0;
+      }
+
+      .toolbar,
+      .flow-arrow,
+      .lang-toggle,
+      .modal-root {
+        display: none !important;
+      }
+
+      .hero {
+        margin-bottom: 12px;
+      }
+
+      .badge {
+        border-color: #CBD5E1;
+        color: #334155;
+        background: #fff;
+      }
+
+      .layer {
+        display: block;
+        break-inside: avoid;
+        box-shadow: none;
+        margin-bottom: 12px;
+      }
+
+      .layer-label {
+        min-height: auto;
+        writing-mode: horizontal-tb;
+        transform: none;
+        justify-content: flex-start;
+        color: #111827;
+        background: #F1F5F9;
+        border-bottom: 1px solid #CBD5E1;
+      }
+
+      .cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .card {
+        break-inside: avoid;
+        min-height: auto;
+        box-shadow: none;
+      }
+
+      .card-summary {
+        color: #334155;
+      }
+
+      .print-details {
+        display: block;
+        margin: 8px 0 0;
+        padding-left: 18px;
+        color: #334155;
+        font-size: 11px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div class="title-row">
+        <div>
+          <h1 id="page-title"></h1>
+          <p class="subtitle" id="page-subtitle"></p>
+        </div>
+        <div class="hero-actions">
+          <div class="badge" id="page-badge">Functional Architecture</div>
+          <button class="lang-toggle" id="lang-toggle" type="button">ไทย</button>
+        </div>
+      </div>
+      <div class="toolbar" role="search">
+        <div class="search-wrap">
+          <input id="search" type="search" autocomplete="off">
+        </div>
+        <div class="hint" id="search-hint">点击任意模块查看明细，ESC 或点击遮罩关闭弹窗。</div>
+      </div>
+    </header>
+    <section class="diagram" id="diagram" aria-label="功能架构分层图"></section>
+  </main>
+
+  <div class="modal-root" id="modal-root" hidden>
+    <div class="overlay" id="overlay"></div>
+    <article class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-head">
+        <div>
+          <h2 id="modal-title"></h2>
+          <small id="modal-en"></small>
+        </div>
+        <button class="close" id="close" type="button" aria-label="关闭">×</button>
+      </div>
+      <p class="modal-summary" id="modal-summary"></p>
+      <h3 class="section-title" id="details-heading">典型子功能</h3>
+      <ul class="detail-list" id="modal-details"></ul>
+      <h3 class="section-title" id="related-heading">关联模块</h3>
+      <div class="related" id="modal-related"></div>
+    </article>
+  </div>
+
+  <script>
+    (() => {
+      const THAI_COPY = {
+        title: "แผนผังสถาปัตยกรรมฟังก์ชัน SaaS การเงินและการบริหารธุรกิจ",
+        subtitle: "มุมมองแบบแบ่งชั้นสำหรับระบบองค์กร ครอบคลุมช่องทางเข้าใช้งาน พอร์ทัล แอปธุรกิจ แพลตฟอร์มกลาง ข้อมูล และงานปฏิบัติการ SaaS",
+        searchPlaceholder: "ค้นหาโมดูล ชื่ออังกฤษ ฟังก์ชันย่อย หรือคำอธิบาย",
+        flowLabel: "ทางเข้างาน การประสานกระบวนการ และการสะสมข้อมูล",
+        layers: {
+          channels: { title: "ชั้นที่ 1 · ช่องทางเข้าใช้งาน", en: "ช่องทางเข้าใช้งาน" },
+          "portal-layer": { title: "ชั้นที่ 2 · พอร์ทัลรวม", en: "พอร์ทัลรวม" },
+          apps: { title: "ชั้นที่ 3 · แอปพลิเคชันธุรกิจ", en: "แอปธุรกิจ" },
+          "middle-platform": { title: "ชั้นที่ 4 · แพลตฟอร์มกลางธุรกิจ", en: "บริการกลางร่วม" },
+          data: { title: "ชั้นที่ 5 · ชั้นข้อมูล", en: "ข้อมูล" },
+          ops: { title: "ชั้นที่ 6 · งานปฏิบัติการ SaaS", en: "ปฏิบัติการ" }
+        },
+        groups: {
+          "多端入口": "ช่องทางหลายอุปกรณ์",
+          "统一工作入口": "ทางเข้างานกลาง",
+          "财务会计": "บัญชีการเงิน",
+          "税务管理": "ภาษี",
+          "供应链": "ซัพพลายเชน",
+          "生产制造": "การผลิต",
+          "人力资源": "ทรัพยากรบุคคล",
+          "客户关系 CRM": "ลูกค้าสัมพันธ์ CRM",
+          "决策分析": "วิเคราะห์เพื่อการตัดสินใจ",
+          "企业级共享能力": "ความสามารถกลางระดับองค์กร",
+          "数据资产": "สินทรัพย์ข้อมูล",
+          "厂商运营能力": "ความสามารถปฏิบัติการของผู้ให้บริการ"
+        },
+        modules: {
+          web: "เว็บพอร์ทัล",
+          "mobile-app": "แอปมือถือ",
+          "mini-app": "มินิแอปและแอปเบา",
+          pos: "เครื่องขายหน้าร้าน POS",
+          portal: "พอร์ทัลบริการตนเอง",
+          "open-api": "Open API",
+          im: "ช่องทางแชตองค์กร",
+          workbench: "เวิร์กเบนช์",
+          "message-center": "ศูนย์ข้อความ",
+          "approval-center": "ศูนย์อนุมัติ",
+          "report-center": "ศูนย์รายงาน",
+          "global-search": "ค้นหาทั่วระบบ",
+          gl: "บัญชีแยกประเภท GL",
+          ar: "ลูกหนี้ AR",
+          ap: "เจ้าหนี้ AP",
+          "fixed-assets": "สินทรัพย์ถาวร",
+          expense: "เบิกค่าใช้จ่าย",
+          cash: "แคชเชียร์และเงินสด",
+          costing: "บัญชีต้นทุน",
+          "financial-statements": "งบการเงิน",
+          invoice: "จัดการใบกำกับภาษี",
+          "tax-calculation": "คำนวณ VAT ซื้อขาย",
+          "tax-filing": "ยื่นภาษี",
+          "tax-bureau": "เชื่อมต่อ e-Tax กับกรมสรรพากร",
+          purchase: "จัดซื้อ",
+          sales: "ขาย",
+          inventory: "สต็อก",
+          pricing: "ราคาและโปรโมชัน",
+          "manufacturing-bom": "BOM",
+          mrp: "แผน MRP",
+          workshop: "ปฏิบัติการโรงงาน",
+          outsourcing: "จ้างผลิตภายนอก",
+          "org-hr": "องค์กรและบุคลากร",
+          attendance: "เวลาเข้างาน",
+          payroll: "เงินเดือน",
+          "tax-personal": "ภาษีบุคคล",
+          "crm-customer": "ลูกค้าและผู้ติดต่อ",
+          opportunity: "ลีดและโอกาสขาย",
+          contract: "สัญญา",
+          "after-sales": "บริการหลังการขาย",
+          dashboard: "แดชบอร์ดผู้บริหาร",
+          bi: "BI รายงานเอง",
+          budget: "งบประมาณ",
+          consolidation: "งบรวมกลุ่ม",
+          "org-center": "ศูนย์องค์กร",
+          rbac: "ศูนย์ผู้ใช้และสิทธิ์",
+          workflow: "เวิร์กโฟลว์",
+          "rules-engine": "เอนจินกฎ",
+          mdm: "ข้อมูลหลัก MDM",
+          "document-center": "ศูนย์เอกสาร",
+          notification: "ข้อความและแจ้งเตือน",
+          currency: "หลายสกุลเงินและอัตราแลกเปลี่ยน",
+          language: "หลายภาษา",
+          "billing-center": "ศูนย์แพ็กเกจและบิล",
+          audit: "ศูนย์บันทึกตรวจสอบ",
+          "smart-service": "บริการอัจฉริยะ",
+          "business-db": "ฐานข้อมูลธุรกิจ",
+          "data-warehouse": "คลังข้อมูล",
+          etl: "เชื่อมและแปลงข้อมูล ETL",
+          backup: "จัดเก็บและสำรอง",
+          "tenant-management": "จัดการผู้เช่า",
+          "operations-admin": "คอนโซลปฏิบัติการ",
+          metering: "วัดการใช้งานและคิดเงิน",
+          monitoring: "มอนิเตอร์และแจ้งเตือน",
+          "gray-release": "ปล่อยฟีเจอร์แบบค่อยเป็นค่อยไป"
+        }
+      };
+
+      const UI_TEXT = {
+        zh: {
+          badge: "Functional Architecture",
+          toggle: "ไทย",
+          toggleLabel: "切换为泰语",
+          htmlLang: "zh-CN",
+          diagramLabel: "功能架构分层图",
+          detailsHeading: "典型子功能",
+          relatedHeading: "关联模块",
+          closeLabel: "关闭",
+          idleHint: "点击任意模块查看明细，ESC 或点击遮罩关闭弹窗。",
+          searchHint: (count) => `已高亮 ${count} 个匹配模块。点击模块查看明细。`
+        },
+        th: {
+          badge: "สถาปัตยกรรมฟังก์ชัน",
+          toggle: "จีน",
+          toggleLabel: "สลับเป็นภาษาจีน",
+          htmlLang: "th",
+          diagramLabel: "แผนภาพชั้นสถาปัตยกรรมฟังก์ชัน",
+          detailsHeading: "ฟังก์ชันย่อย",
+          relatedHeading: "โมดูลที่เกี่ยวข้อง",
+          closeLabel: "ปิด",
+          idleHint: "คลิกโมดูลเพื่อดูรายละเอียด กด ESC หรือคลิกพื้นหลังเพื่อปิด",
+          searchHint: (count) => `ไฮไลต์โมดูลที่ตรงกัน ${count} รายการ คลิกโมดูลเพื่อดูรายละเอียด`
+        }
+      };
+
+      const THAI_TERM_RULES = [
+        ["单点登录", "เข้าสู่ระบบครั้งเดียว"],
+        ["多语言", "หลายภาษา"],
+        ["会话", "เซสชัน"],
+        ["权限", "สิทธิ์"],
+        ["菜单", "เมนู"],
+        ["收藏", "รายการโปรด"],
+        ["打印", "พิมพ์"],
+        ["导出", "ส่งออก"],
+        ["导入", "นำเข้า"],
+        ["快捷键", "ปุ่มลัด"],
+        ["消息", "ข้อความ"],
+        ["通知", "แจ้งเตือน"],
+        ["待办", "งานค้าง"],
+        ["安全", "ความปลอดภัย"],
+        ["水印", "ลายน้ำ"],
+        ["移动", "มือถือ"],
+        ["审批", "อนุมัติ"],
+        ["报销", "เบิกค่าใช้จ่าย"],
+        ["拍照", "ถ่ายรูป"],
+        ["上传", "อัปโหลด"],
+        ["扫码", "สแกนโค้ด"],
+        ["入库", "รับเข้าสต็อก"],
+        ["出库", "จ่ายออกสต็อก"],
+        ["推送", "ส่งแจ้งเตือน"],
+        ["生物识别", "ยืนยันตัวตนชีวมิติ"],
+        ["离线", "ออฟไลน์"],
+        ["定位", "ระบุตำแหน่ง"],
+        ["外勤", "งานภาคสนาม"],
+        ["客户", "ลูกค้า"],
+        ["供应商", "ซัพพลายเออร์"],
+        ["对账", "กระทบยอด"],
+        ["查询", "ค้นหา"],
+        ["工单", "ทิกเก็ตงาน"],
+        ["销售", "ขาย"],
+        ["收款", "รับชำระเงิน"],
+        ["退款", "คืนเงิน"],
+        ["小票", "ใบเสร็จย่อ"],
+        ["会员", "สมาชิก"],
+        ["库存", "สต็อก"],
+        ["价格", "ราคา"],
+        ["订单", "คำสั่งซื้อ"],
+        ["凭证", "เอกสารบัญชี"],
+        ["主数据", "ข้อมูลหลัก"],
+        ["密钥", "คีย์"],
+        ["限流", "จำกัดอัตรา"],
+        ["接口", "อินเทอร์เฟซ"],
+        ["审计", "ตรวจสอบ"],
+        ["费用", "ค่าใช้จ่าย"],
+        ["逾期", "เกินกำหนด"],
+        ["催收", "ติดตามหนี้"],
+        ["智能", "อัจฉริยะ"],
+        ["任务", "งาน"],
+        ["异常", "ข้อผิดปกติ"],
+        ["快捷入口", "ทางลัด"],
+        ["群组", "กลุ่ม"],
+        ["关键指标", "ตัวชี้วัดหลัก"],
+        ["预警", "เตือนล่วงหน้า"],
+        ["单据", "เอกสารธุรกิจ"],
+        ["配置", "ตั้งค่า"],
+        ["多组织", "หลายองค์กร"],
+        ["站内信", "ข้อความในระบบ"],
+        ["邮件", "อีเมล"],
+        ["短信", "SMS"],
+        ["订阅", "สมัครรับ"],
+        ["模板", "เทมเพลต"],
+        ["重试", "ลองใหม่"],
+        ["流程", "กระบวนการ"],
+        ["意见", "ความเห็น"],
+        ["转交", "โอนงาน"],
+        ["撤回", "ถอนกลับ"],
+        ["驳回", "ปฏิเสธ"],
+        ["超时", "เกินเวลา"],
+        ["轨迹", "ประวัติการทำงาน"],
+        ["目录", "สารบัญ"],
+        ["生成", "สร้าง"],
+        ["穿透", "เจาะดูรายละเอียด"],
+        ["指标", "ตัวชี้วัด"],
+        ["版本", "เวอร์ชัน"],
+        ["检索", "ค้นคืน"],
+        ["附件", "ไฟล์แนบ"],
+        ["筛选", "ตัวกรอง"],
+        ["搜索", "ค้นหา"],
+        ["总账", "บัญชีแยกประเภท"],
+        ["科目", "ผังบัญชี"],
+        ["账簿", "สมุดบัญชี"],
+        ["期末", "ปิดงวด"],
+        ["核销", "ตัดยอด"],
+        ["账龄", "อายุหนี้"],
+        ["坏账", "หนี้สูญ"],
+        ["付款", "จ่ายเงิน"],
+        ["采购", "จัดซื้อ"],
+        ["资产", "สินทรัพย์"],
+        ["折旧", "ค่าเสื่อม"],
+        ["盘点", "ตรวจนับ"],
+        ["维修", "ซ่อมบำรุง"],
+        ["处置", "จำหน่าย"],
+        ["预算", "งบประมาณ"],
+        ["银行", "ธนาคาร"],
+        ["流水", "รายการเดินบัญชี"],
+        ["资金", "เงินทุน"],
+        ["现金", "เงินสด"],
+        ["成本", "ต้นทุน"],
+        ["毛利", "กำไรขั้นต้น"],
+        ["差异", "ผลต่าง"],
+        ["资产负债表", "งบดุล"],
+        ["利润表", "งบกำไรขาดทุน"],
+        ["现金流量表", "งบกระแสเงินสด"],
+        ["发票", "ใบกำกับภาษี"],
+        ["票据", "เอกสาร/ใบเสร็จ"],
+        ["税", "ภาษี"],
+        ["申报", "ยื่นแบบ"],
+        ["抵扣", "เครดิตภาษี"],
+        ["税率", "อัตราภาษี"],
+        ["税局", "กรมสรรพากร"],
+        ["签章", "ลงนามอิเล็กทรอนิกส์"],
+        ["合规", "กำกับดูแล"],
+        ["请购", "ขอซื้อ"],
+        ["收货", "รับสินค้า"],
+        ["退货", "คืนสินค้า"],
+        ["发货", "จัดส่ง"],
+        ["促销", "โปรโมชัน"],
+        ["折扣", "ส่วนลด"],
+        ["物料", "วัสดุ"],
+        ["批次", "ล็อต"],
+        ["序列号", "หมายเลขซีเรียล"],
+        ["BOM", "BOM"],
+        ["替代料", "วัสดุทดแทน"],
+        ["工艺", "กระบวนการผลิต"],
+        ["需求", "ความต้องการ"],
+        ["生产", "ผลิต"],
+        ["缺料", "ขาดวัสดุ"],
+        ["工单", "ใบงาน"],
+        ["质量", "คุณภาพ"],
+        ["委外", "จ้างผลิตภายนอก"],
+        ["绩效", "ผลงาน"],
+        ["组织", "องค์กร"],
+        ["岗位", "ตำแหน่ง"],
+        ["员工", "พนักงาน"],
+        ["合同", "สัญญา"],
+        ["考勤", "เวลาเข้างาน"],
+        ["薪资", "เงินเดือน"],
+        ["社保", "ประกันสังคม"],
+        ["奖金", "โบนัส"],
+        ["个税", "ภาษีบุคคล"],
+        ["线索", "ลีด"],
+        ["商机", "โอกาสขาย"],
+        ["跟进", "ติดตาม"],
+        ["报价", "ใบเสนอราคา"],
+        ["售后", "บริการหลังการขาย"],
+        ["知识库", "คลังความรู้"],
+        ["看板", "แดชบอร์ด"],
+        ["分析", "วิเคราะห์"],
+        ["维度", "มิติ"],
+        ["钻取", "เจาะลึก"],
+        ["合并", "รวมงบ"],
+        ["币种", "สกุลเงิน"],
+        ["汇率", "อัตราแลกเปลี่ยน"],
+        ["租户", "ผู้เช่า"],
+        ["套餐", "แพ็กเกจ"],
+        ["用量", "การใช้งาน"],
+        ["账单", "บิล"],
+        ["监控", "มอนิเตอร์"],
+        ["告警", "แจ้งเตือน"],
+        ["灰度", "ค่อย ๆ เปิดใช้"],
+        ["回滚", "ย้อนกลับ"],
+        ["发布", "ปล่อยใช้งาน"],
+        ["归档", "จัดเก็บถาวร"],
+        ["备份", "สำรองข้อมูล"],
+        ["恢复", "กู้คืน"],
+        ["加密", "เข้ารหัส"],
+        ["销毁", "ทำลายข้อมูล"],
+        ["OCR", "OCR"],
+        ["AI", "AI"],
+        ["Webhook", "Webhook"],
+        ["API", "API"],
+        ["Excel", "Excel"],
+        ["IM", "IM"],
+        ["SSO", "SSO"],
+        ["MFA", "MFA"],
+        ["SLA", "SLA"]
+      ];
+
+      const title = document.getElementById("page-title");
+      const subtitle = document.getElementById("page-subtitle");
+      const badge = document.getElementById("page-badge");
+      const langToggle = document.getElementById("lang-toggle");
+      const search = document.getElementById("search");
+      const hint = document.getElementById("search-hint");
+      const diagram = document.getElementById("diagram");
+      const modalRoot = document.getElementById("modal-root");
+      const overlay = document.getElementById("overlay");
+      const close = document.getElementById("close");
+      const modalTitle = document.getElementById("modal-title");
+      const modalEn = document.getElementById("modal-en");
+      const modalSummary = document.getElementById("modal-summary");
+      const modalDetails = document.getElementById("modal-details");
+      const modalRelated = document.getElementById("modal-related");
+      const detailsHeading = document.getElementById("details-heading");
+      const relatedHeading = document.getElementById("related-heading");
+
+      const registry = new Map();
+      const cards = new Map();
+      let activeId = null;
+      let currentLang = "zh";
+      let currentArch = ARCH;
+
+      function hasHan(value) {
+        return /[\u3400-\u9FFF]/.test(String(value || ""));
+      }
+
+      function normalize(value) {
+        return String(value || "").toLowerCase().replace(/\s+/g, "");
+      }
+
+      function compactAscii(value) {
+        return String(value || "")
+          .replace(/[\u3400-\u9FFF\u3000-\u303F，。；、（）]/g, " ")
+          .replace(/[·]/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      function translateText(value, moduleName, index) {
+        const text = String(value || "");
+        if (!hasHan(text)) return text;
+        const parts = [];
+        THAI_TERM_RULES.forEach(([key, label]) => {
+          if (text.includes(key) && !parts.includes(label)) parts.push(label);
+        });
+        const ascii = compactAscii(text);
+        if (parts.length && ascii) return `${parts.join(" / ")} · ${ascii}`;
+        if (parts.length) return parts.join(" / ");
+        return `${moduleName} · รายการ ${index + 1}`;
+      }
+
+      function buildThaiArch(source) {
+        return {
+          ...source,
+          title: THAI_COPY.title,
+          subtitle: THAI_COPY.subtitle,
+          searchPlaceholder: THAI_COPY.searchPlaceholder,
+          flowLabel: THAI_COPY.flowLabel,
+          layers: source.layers.map((layer, layerIndex) => {
+            const layerText = THAI_COPY.layers[layer.id] || {};
+            return {
+              ...layer,
+              title: layerText.title || `ชั้นที่ ${layerIndex + 1}`,
+              en: layerText.en || layer.en,
+              groups: layer.groups.map((group) => {
+                const groupTitle = THAI_COPY.groups[group.title] || translateText(group.title, layerText.title || "", 0);
+                return {
+                  ...group,
+                  title: groupTitle,
+                  modules: group.modules.map((module) => {
+                    const name = THAI_COPY.modules[module.id] || translateText(module.name, groupTitle, 0);
+                    return {
+                      ...module,
+                      name,
+                      summary: `รองรับ${name}ในกลุ่ม${groupTitle} เชื่อมโยงข้อมูล กระบวนการ สิทธิ์ และรายงานให้ทำงานร่วมกันในระบบ SaaS เดียว`,
+                      details: (module.details || []).map((item, index) => translateText(item, name, index))
+                    };
+                  })
+                };
+              })
+            };
+          })
+        };
+      }
+
+      const localizedArch = {
+        zh: ARCH,
+        th: buildThaiArch(ARCH)
+      };
+
+      function moduleText(module) {
+        return normalize([module.name, module.en, module.summary, ...(module.details || [])].join(" "));
+      }
+
+      function createEl(tag, className, text) {
+        const el = document.createElement(tag);
+        if (className) el.className = className;
+        if (text !== undefined) el.textContent = text;
+        return el;
+      }
+
+      function register(module, meta) {
+        registry.set(module.id, { module, meta, searchText: moduleText(module) });
+      }
+
+      function rebuildRegistry() {
+        registry.clear();
+        currentArch.layers.forEach((layer, layerIndex) => {
+          layer.groups.forEach((group, groupIndex) => {
+            group.modules.forEach((module, moduleIndex) => {
+              register(module, { layer, group, layerIndex, groupIndex, moduleIndex });
+            });
+          });
+        });
+      }
+
+      function renderLayer(layer, layerIndex) {
+        const layerEl = createEl("section", "layer");
+        layerEl.style.setProperty("--layer-color", layer.accent || currentArch.primary);
+
+        const label = createEl("div", "layer-label");
+        const labelTitle = createEl("strong", "", layer.title);
+        const labelEn = createEl("span", "", layer.en);
+        label.append(labelTitle, labelEn);
+
+        const body = createEl("div", "layer-body");
+        const groups = createEl("div", "groups");
+
+        layer.groups.forEach((group) => {
+          const groupEl = createEl("div", "group");
+          groupEl.style.setProperty("--group-color", group.color || layer.accent || currentArch.primary);
+          groupEl.appendChild(createEl("div", "group-title", group.title));
+
+          const cardsEl = createEl("div", "cards");
+          group.modules.forEach((module) => {
+            const card = createEl("button", "card");
+            card.type = "button";
+            card.dataset.id = module.id;
+            card.style.setProperty("--group-color", group.color || layer.accent || currentArch.primary);
+            card.appendChild(createEl("span", "card-name", module.name));
+            card.appendChild(createEl("small", "card-en", module.en));
+            card.appendChild(createEl("span", "card-summary", module.summary));
+
+            const printDetails = createEl("ul", "print-details");
+            (module.details || []).forEach((item) => {
+              printDetails.appendChild(createEl("li", "", item));
+            });
+            card.appendChild(printDetails);
+
+            card.addEventListener("click", () => openModule(module.id, false));
+            cards.set(module.id, card);
+            cardsEl.appendChild(card);
+          });
+
+          groupEl.appendChild(cardsEl);
+          groups.appendChild(groupEl);
+        });
+
+        body.appendChild(groups);
+        layerEl.append(label, body);
+        diagram.appendChild(layerEl);
+
+        if (layerIndex < currentArch.layers.length - 1) {
+          const arrow = createEl("div", "flow-arrow");
+          arrow.appendChild(createEl("span", "", currentArch.flowLabel || "调用与数据流向"));
+          diagram.appendChild(arrow);
+        }
+      }
+
+      function renderDiagram() {
+        diagram.replaceChildren();
+        cards.clear();
+        currentArch.layers.forEach(renderLayer);
+      }
+
+      function relatedModules(id) {
+        const entry = registry.get(id);
+        if (!entry) return [];
+
+        const explicit = entry.module.links || [];
+        const ids = explicit.length ? [...explicit] : [];
+
+        if (!ids.length) {
+          const nextLayer = currentArch.layers[entry.meta.layerIndex + 1];
+          const prevLayer = currentArch.layers[entry.meta.layerIndex - 1];
+          [nextLayer, prevLayer].forEach((layer) => {
+            const first = layer?.groups?.[0]?.modules?.[0];
+            if (first) ids.push(first.id);
+          });
+        }
+
+        const sameGroup = entry.meta.group.modules
+          .filter((module) => module.id !== id)
+          .slice(0, 2)
+          .map((module) => module.id);
+
+        return [...new Set([...ids, ...sameGroup])]
+          .map((moduleId) => registry.get(moduleId)?.module)
+          .filter(Boolean)
+          .slice(0, 6);
+      }
+
+      function focusCard(id) {
+        const card = cards.get(id);
+        if (!card) return;
+        card.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+        card.classList.remove("pulse");
+        void card.offsetWidth;
+        card.classList.add("pulse");
+        card.focus({ preventScroll: true });
+      }
+
+      function openModule(id, jump) {
+        const entry = registry.get(id);
+        if (!entry) return;
+
+        activeId = id;
+        const module = entry.module;
+        const color = entry.meta.group.color || entry.meta.layer.accent || currentArch.primary;
+        modalRoot.style.setProperty("--active-color", color);
+        modalTitle.textContent = module.name;
+        modalEn.textContent = module.en;
+        modalSummary.textContent = module.summary;
+        modalDetails.replaceChildren();
+        modalRelated.replaceChildren();
+
+        (module.details || []).forEach((item) => {
+          modalDetails.appendChild(createEl("li", "", item));
+        });
+
+        relatedModules(id).forEach((related) => {
+          const button = createEl("button", "", `${related.name} · ${related.en}`);
+          button.type = "button";
+          button.addEventListener("click", () => {
+            openModule(related.id, true);
+          });
+          modalRelated.appendChild(button);
+        });
+
+        modalRoot.hidden = false;
+        document.body.style.overflow = "hidden";
+
+        if (jump) {
+          focusCard(id);
+        }
+      }
+
+      function closeModal() {
+        modalRoot.hidden = true;
+        document.body.style.overflow = "";
+        if (activeId) {
+          cards.get(activeId)?.focus({ preventScroll: true });
+        }
+      }
+
+      function applySearch() {
+        const query = normalize(search.value);
+        let count = 0;
+        const ui = UI_TEXT[currentLang];
+
+        registry.forEach((entry, id) => {
+          const card = cards.get(id);
+          const matched = !query || entry.searchText.includes(query);
+          card.classList.toggle("match", Boolean(query && matched));
+          card.classList.toggle("dim", Boolean(query && !matched));
+          if (query && matched) count += 1;
+        });
+
+        hint.textContent = query ? ui.searchHint(count) : ui.idleHint;
+      }
+
+      function setLanguage(lang, clearSearch) {
+        const openId = modalRoot.hidden ? null : activeId;
+        currentLang = lang;
+        currentArch = localizedArch[lang];
+        document.documentElement.lang = UI_TEXT[lang].htmlLang;
+        document.body.dataset.lang = lang;
+        document.title = currentArch.title;
+        document.documentElement.style.setProperty("--primary", currentArch.primary || "#2563EB");
+
+        const ui = UI_TEXT[lang];
+        title.textContent = currentArch.title;
+        subtitle.textContent = currentArch.subtitle;
+        badge.textContent = ui.badge;
+        langToggle.textContent = ui.toggle;
+        langToggle.setAttribute("aria-label", ui.toggleLabel);
+        langToggle.setAttribute("aria-pressed", String(lang === "th"));
+        close.setAttribute("aria-label", ui.closeLabel);
+        detailsHeading.textContent = ui.detailsHeading;
+        relatedHeading.textContent = ui.relatedHeading;
+        diagram.setAttribute("aria-label", ui.diagramLabel);
+        search.placeholder = currentArch.searchPlaceholder || "搜索模块";
+        if (clearSearch) search.value = "";
+
+        rebuildRegistry();
+        renderDiagram();
+        applySearch();
+        if (openId) openModule(openId, false);
+      }
+
+      setLanguage(currentLang, false);
+
+      langToggle.addEventListener("click", () => {
+        setLanguage(currentLang === "zh" ? "th" : "zh", true);
+      });
+      search.addEventListener("input", applySearch);
+      overlay.addEventListener("click", closeModal);
+      close.addEventListener("click", closeModal);
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !modalRoot.hidden) closeModal();
+      });
+    })();
+  </script>
+</body>
+</html>

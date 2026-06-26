@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>คู่มือ: ส่งข้อมูลจาก Pearnly เข้า MR.ERP / Pearnly → MR.ERP 教程</title>
+<style>
+  :root{
+    --ink:#1a1d26; --sub:#6b7280; --faint:#9aa0ac; --line:#e4e7ee; --bg:#f4f5f8; --card:#fff;
+    --accent:#7c4dff; --accent-weak:#efe9ff; --blue:#0a99ff; --blue-weak:#e3f3ff;
+    --green:#16a34a; --green-bg:#e9f7ef; --red:#dc2626; --red-bg:#fdeaea; --amber:#d97706; --amber-bg:#fdf3e3;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Sarabun","Noto Sans Thai","PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+    font-size:16px;line-height:1.75;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:920px;margin:0 auto;padding:30px 20px 90px}
+  /* zh 辅助行 */
+  .zh{color:var(--sub);font-size:.82em;font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  h1{font-size:25px;margin:0 0 4px;line-height:1.4}
+  h1 .zh{display:block;font-size:15px;margin-top:2px}
+  .lead{background:var(--accent-weak);border:1px solid #ddd0ff;border-radius:14px;padding:16px 18px;margin:18px 0 26px}
+  .lead b{color:var(--accent)}
+  .pill{display:inline-block;background:var(--ink);color:#fff;border-radius:7px;padding:2px 9px;font-size:13px;font-weight:700}
+  h2{font-size:21px;margin:40px 0 6px;padding-top:14px;border-top:3px solid var(--line)}
+  h2 .zh{font-size:14px}
+  .h2note{color:var(--sub);font-size:14px;margin:0 0 14px}
+  h3{font-size:17px;margin:26px 0 4px}
+  h3 .zh{font-size:13px}
+  .choose{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+  @media(max-width:680px){.choose{grid-template-columns:1fr}}
+  .way{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;border-top:4px solid var(--accent)}
+  .way.b{border-top-color:var(--blue)}
+  .way h4{margin:0 0 4px;font-size:16px}
+  .way .who{font-size:13px;color:var(--sub);margin-top:8px}
+  ul.chk{list-style:none;padding:0;margin:10px 0}
+  ul.chk li{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px 12px 42px;margin-bottom:9px;position:relative}
+  ul.chk li::before{content:"✓";position:absolute;left:15px;top:11px;color:var(--green);font-weight:800}
+  .step{display:flex;gap:14px;margin:14px 0}
+  .step .n{flex:0 0 32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px}
+  .way-b .step .n,.step.bot .n{background:var(--blue)}
+  .step .body{flex:1;min-width:0}
+  .step .t{font-weight:600;font-size:16px}
+  .step .d{margin-top:3px}
+  .step .where{margin-top:7px;font-size:13px;color:#3a3f4b;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 11px;display:inline-block}
+  .step .where b{color:var(--accent)}
+  figure{margin:12px 0 6px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fbfbfd}
+  figure img{width:100%;display:block}
+  figcaption{font-size:13px;color:var(--sub);padding:8px 13px;border-top:1px solid var(--line)}
+  figcaption b{color:var(--accent)}
+  .note{border-radius:12px;padding:13px 16px;margin:12px 0;font-size:14px}
+  .note.tip{background:var(--blue-weak);border:1px solid #bfe3ff}
+  .note.warn{background:var(--amber-bg);border:1px solid #f3dca6}
+  .badge{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:6px;margin-left:6px}
+  .badge.new{background:var(--green-bg);color:var(--green)}
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:14px;margin:12px 0}
+  th,td{text-align:left;padding:11px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#fafafe;font-size:13px;color:var(--sub)}
+  tr:last-child td{border-bottom:none}
+  td.cat{font-weight:700;white-space:nowrap}
+  .verify{background:var(--green-bg);border:1px solid #bfe6cd;border-radius:14px;padding:16px 18px;margin-top:32px}
+  .verify h3{margin:0 0 6px;color:var(--green)}
+  .verify code{background:#fff;border:1px solid #cde9d6;border-radius:5px;padding:1px 6px;font-size:13px}
+  .foot{margin-top:22px;color:var(--faint);font-size:12px;text-align:center}
+  .prog{font-family:ui-monospace,Consolas,monospace;color:var(--accent);font-size:.9em}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>คู่มือ: ส่งข้อมูลจาก Pearnly เข้า MR.ERP
+    <span class="zh">教程:把数据从 Pearnly 送进 MR.ERP</span></h1>
+
+  <div class="lead">
+    <div>เนื่องจาก <b>MR.ERP ไม่มี API</b> ให้เชื่อมต่อโดยตรง การนำข้อมูลเข้า MR.ERP จึงทำผ่าน
+    <b>ไฟล์ Excel ตามรูปแบบของ MR.ERP</b> ที่ Pearnly สร้างให้ แล้วอัปโหลดเข้าหน้า "นำเข้าข้อมูล" ของ MR.ERP
+    มี <b>2 วิธี</b> ให้เลือก — ทั้งสองวิธีใช้ไฟล์รูปแบบเดียวกัน ต่างกันแค่ "ใครเป็นคนอัปโหลด"</div>
+    <div class="zh" style="margin-top:8px">MR.ERP 没有 API,所以数据进 MR.ERP 都是靠 Pearnly 生成 <b>MR.ERP 格式的 Excel</b>,再传进 MR.ERP 的「导入数据」页。有 <b>2 种方式</b>,用的是同一种文件,区别只在"谁来上传"。</div>
+  </div>
+
+  <!-- ============ เลือกวิธี ============ -->
+  <h2>เลือกวิธีไหนดี? <span class="zh">/ 选哪种?</span></h2>
+  <div class="choose">
+    <div class="way">
+      <h4>วิธีที่ 1 · ให้ Pearnly ส่งให้อัตโนมัติ <span class="zh">让 Pearnly 自动送</span></h4>
+      <div>Pearnly มี "หุ่นยนต์" ล็อกอิน MR.ERP และอัปโหลดให้เอง คุณแค่กดปุ่ม (หรือเปิดให้ส่งอัตโนมัติ)
+        <div class="zh">Pearnly 用"机器人"自动登录 MR.ERP 上传,你只需点一下(或开自动)。</div></div>
+      <div class="who">เหมาะกับ: อยากสะดวกที่สุด · ยอมให้ระบบเก็บรหัส MR.ERP ไว้<br>
+        <span class="zh">适合:想最省事 · 愿意让系统保存 MR.ERP 密码</span></div>
+    </div>
+    <div class="way b">
+      <h4>วิธีที่ 2 · ดาวน์โหลดไฟล์ไปอัปโหลดเอง <span class="zh">下载文件自己传</span></h4>
+      <div>Pearnly สร้างไฟล์ Excel ให้ดาวน์โหลด แล้วคุณนำไปอัปโหลดที่หน้านำเข้าของ MR.ERP เอง
+        <div class="zh">Pearnly 给你下载 Excel,你自己拿去 MR.ERP 导入页上传。</div></div>
+      <div class="who">เหมาะกับ: ไม่อยากให้ระบบเก็บรหัส MR.ERP · อยากตรวจก่อนนำเข้าเอง<br>
+        <span class="zh">适合:不想让系统存 MR.ERP 密码 · 想自己先核对再导入</span></div>
+    </div>
+  </div>
+
+  <!-- ============ เตรียมก่อน ============ -->
+  <h2>เตรียมก่อนเริ่ม (ทั้งสองวิธีต้องมี) <span class="zh">/ 开始前的准备(两种都需要)</span></h2>
+  <ul class="chk">
+    <li><b>ตั้งค่าการเชื่อมต่อ MR.ERP แล้ว</b> — ชื่อผู้ใช้ / รหัสผ่าน / เลือกบริษัท (เฉพาะวิธีที่ 1 ต้องกรอกรหัสในระบบ)
+      <div class="zh">已配置 MR.ERP 连接 — 账号/密码/选公司(只有方式1需要在系统里填密码)</div></li>
+    <li><b>ลูกค้าในใบกำกับมีรหัสลูกค้าใน MR.ERP แล้ว</b> (หรือเปิด "สร้างลูกค้าอัตโนมัติ") — ไม่งั้น MR.ERP จะไม่รู้จักลูกค้า
+      <div class="zh">发票客户在 MR.ERP 已有客户码(或开"自动建客户")—— 否则 MR.ERP 认不出客户</div></li>
+    <li><b>ใบกำกับข้อมูลครบ</b> — ระบุลูกค้าแล้ว, มีเลขที่เอกสาร, วันที่, ยอดเงิน
+      <div class="zh">发票字段齐全 —— 已分配客户、有发票号、日期、金额</div></li>
+  </ul>
+
+  <!-- ============ วิธีที่ 1 ============ -->
+  <h2>วิธีที่ 1 · ให้ Pearnly ส่งให้อัตโนมัติ <span class="zh">/ 方式1:让 Pearnly 自动推送</span></h2>
+  <p class="h2note">Pearnly จะใช้ระบบอัตโนมัติ (<span class="prog">Playwright</span>) ล็อกอิน MR.ERP, สร้างไฟล์ Excel, อัปโหลด และยืนยันให้เองทั้งหมด
+    <span class="zh"> · Pearnly 用自动化程序(Playwright)替你登录、生成 Excel、上传、确认,全程自动。</span></p>
+
+  <div class="way-b">
+  <h3>1.1 ตั้งค่าการเชื่อมต่อ MR.ERP (ทำครั้งเดียว) <span class="zh">配置 MR.ERP 连接(只做一次)</span></h3>
+  <div class="step">
+    <div class="n">1</div>
+    <div class="body">
+      <div class="t">เปิดเมนู "การเชื่อมต่อ (Integration)" ที่แถบซ้าย → การ์ด "เชื่อมต่อ ERP"</div>
+      <div class="d zh">点左侧栏「集成」→ 找到「ERP 对接」卡片</div>
+      <div class="where">แถบซ้ายล่าง <b>集成 / Integration</b> → ส่วน <b>ERP 系统</b> → การ์ด <b>ERP 对接</b> → ปุ่ม <b>配置 (ตั้งค่า)</b></div>
+    </div>
+  </div>
+  <figure>
+    <img src="shots/p2-config.png" alt="หน้า Integration ของ Pearnly" />
+    <figcaption><b>หน้า Integration</b> — เลื่อนลงไปส่วน "ERP 系统" จะเห็นการ์ด "ERP 对接" (Xero · MR.ERP · Webhook) กดปุ่ม "配置" ด้านขวาเพื่อตั้งค่า
+      <span class="zh"> / 集成页:下方「ERP 系统」有「ERP 对接」卡片,点右侧「配置」</span></figcaption>
+  </figure>
+  <div class="step">
+    <div class="n">2</div>
+    <div class="body">
+      <div class="t">กด "เพิ่ม Endpoint" แล้วเลือก MR.ERP · กรอกชื่อผู้ใช้ / รหัสผ่าน / เลือกบริษัท · กด "ทดสอบการเชื่อมต่อ" แล้วบันทึก</div>
+      <div class="d zh">点「新增端点」选 MR.ERP · 填账号/密码/选公司 · 点「测试连接」后保存</div>
+      <div class="where">ปุ่ม <b>新增端点 (เพิ่ม Endpoint)</b> · กรอกข้อมูล · <b>ทดสอบการเชื่อมต่อ</b> → <b>บันทึก</b></div>
+    </div>
+  </div>
+
+  <h3>1.2 ส่งข้อมูล — มี 2 แบบ <span class="zh">推送 —— 两种触发</span></h3>
+  <div class="step">
+    <div class="n">3</div>
+    <div class="body">
+      <div class="t">แบบกดเอง: เปิดใบกำกับที่อ่านเสร็จ → กดปุ่ม "ส่งเข้า ERP" มุมขวาบน</div>
+      <div class="d zh">手动:打开识别好的发票 → 右上角点「推送到 ERP」</div>
+      <div class="where">ในหน้ารายละเอียดใบกำกับ มุมขวาบน · ปุ่ม <b>ส่งเข้า ERP (推送到 ERP)</b> · ถ้ามีหลาย ERP จะให้เลือกปลายทาง</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="n">4</div>
+    <div class="body">
+      <div class="t">แบบอัตโนมัติ: เปิดสวิตช์ไว้ พออ่านใบกำกับเสร็จระบบส่งให้เลย ไม่ต้องกด</div>
+      <div class="d zh">自动:开开关后,识别完自动送,不用点</div>
+      <div class="where">ตั้งที่ <b>集成 → ERP 对接</b> · สวิตช์ <b>识别成功后自动推送 (ส่งอัตโนมัติหลังอ่านเสร็จ)</b> ของแต่ละ endpoint + โหมดด้านบน (智能分拣 / 固定账套 / 只识别不推送)</div>
+    </div>
+  </div>
+  <div class="note tip">ℹ️ <b>หลังกดส่ง</b> หุ่นยนต์จะทำให้เอง: ล็อกอิน MR.ERP → สร้าง Excel → อัปโหลดหน้านำเข้า → ยืนยัน → อ่านผลกลับมา · ดูผลได้ที่ <b>集成 → 推送日志 (บันทึกการส่ง)</b> ว่าสำเร็จ/ล้มเหลว
+    <div class="zh">点了之后机器人自动:登录→生成Excel→上传导入页→确认→读回结果 · 在「集成→推送日志」看成功/失败</div></div>
+  </div>
+
+  <!-- ============ วิธีที่ 2 ============ -->
+  <h2>วิธีที่ 2 · ดาวน์โหลดไฟล์แล้วนำเข้า MR.ERP เอง <span class="zh">/ 方式2:下载文件自己导入 MR.ERP</span></h2>
+  <p class="h2note">เหมาะถ้าไม่อยากเก็บรหัส MR.ERP ไว้ในระบบ · Pearnly สร้างไฟล์ให้ คุณนำไปอัปโหลดเองที่ MR.ERP
+    <span class="zh"> · 不想把 MR.ERP 密码存系统时用 · Pearnly 出文件,你自己上传。</span></p>
+
+  <div class="step">
+    <div class="n">1</div>
+    <div class="body">
+      <div class="t">ในหน้ารายละเอียดใบกำกับ กดปุ่ม "ดาวน์โหลดไฟล์ MR.ERP" <span class="badge new">ใหม่ / 新</span></div>
+      <div class="d zh">在发票详情页,点「下载 MR.ERP 表格」按钮</div>
+      <div class="where">ปุ่ม <b>下载 MR.ERP 表格 (ดาวน์โหลดไฟล์ MR.ERP)</b> · อยู่ข้างปุ่ม "ส่งเข้า ERP" · ได้ไฟล์ Excel รูปแบบ MR.ERP มา 1 ไฟล์</div>
+      <div class="note warn" style="margin-top:9px">⚠️ ถ้าใบกำกับยังไม่พร้อม (เช่น ลูกค้ายังไม่มีรหัสใน MR.ERP) ระบบจะบอกว่าขาดอะไร — แก้ให้ครบก่อนถึงจะดาวน์โหลดได้
+        <div class="zh">若发票没准备好(如客户没 MR.ERP 码),系统会提示缺什么,补齐才能下载。</div></div>
+    </div>
+  </div>
+  <div class="step bot">
+    <div class="n">2</div>
+    <div class="body">
+      <div class="t">ล็อกอินเข้า MR.ERP ด้วยบัญชีของคุณ</div>
+      <div class="d zh">用你的账号登录 MR.ERP</div>
+    </div>
+  </div>
+  <figure>
+    <img src="shots/01-login.png" alt="หน้าล็อกอิน MR.ERP" />
+    <figcaption><b>หน้าล็อกอิน MR.ERP</b> (www.mrerp4sme.com) <span class="zh">/ MR.ERP 登录页</span></figcaption>
+  </figure>
+  <div class="step bot">
+    <div class="n">3</div>
+    <div class="body">
+      <div class="t">เข้าเมนู "นำเข้าข้อมูล" → เลือกประเภท "ขายเชื่อ-รายได้ขายในประเทศ"</div>
+      <div class="d zh">进「数据导入(นำเข้าข้อมูล)」菜单 → 类型选「赊销-国内销售收入」</div>
+      <div class="where">เมนูบนสุด <b>นำเข้าข้อมูล</b> → หน้า "นำเข้าขายสินค้า"</div>
+    </div>
+  </div>
+  <figure>
+    <img src="shots/04-formupload.png" alt="หน้านำเข้าข้อมูล MR.ERP" />
+    <figcaption><b>หน้านำเข้าข้อมูลของ MR.ERP</b> — ช่อง "เลือกไฟล์" + เลือกประเภทเมนู + ปุ่ม "อัพโหลด"
+      <span class="zh"> / MR.ERP 批量导入页:选文件 + 选类型 + 上传按钮</span></figcaption>
+  </figure>
+  <div class="step bot">
+    <div class="n">4</div>
+    <div class="body">
+      <div class="t">กด "เลือกไฟล์" → เลือกไฟล์ที่ดาวน์โหลดจาก Pearnly → กด "อัพโหลด"</div>
+      <div class="d zh">点「选择文件」→ 选刚从 Pearnly 下载的文件 → 点「上传」</div>
+    </div>
+  </div>
+  <div class="step bot">
+    <div class="n">5</div>
+    <div class="body">
+      <div class="t">ตรวจรายการในหน้าพรีวิว → ติ๊กเลือก → กด "นำเข้าข้อมูล" เพื่อยืนยัน</div>
+      <div class="d zh">在预览页核对 → 勾选 → 点「นำเข้าข้อมูล(导入)」确认</div>
+      <div class="where">หน้าพรีวิวจะแสดง เลขที่ / วันที่ / รหัสลูกค้า / เลขที่บิล ให้ตรวจก่อนยืนยัน</div>
+    </div>
+  </div>
+  <figure>
+    <img src="shots/p2-02-preview.png" alt="หน้าพรีวิวก่อนนำเข้า MR.ERP" />
+    <figcaption><b>หน้าพรีวิว</b> — MR.ERP อ่านไฟล์แล้วแสดงรายการ (เลขที่ 690507-001 · ลูกค้า 01-อนุรักษ์-001) · ติ๊กแล้วกด "นำเข้าข้อมูล" มุมขวา
+      <span class="zh"> / 预览页:MR.ERP 解析出单据,勾选后点右侧「导入」</span></figcaption>
+  </figure>
+
+  <!-- ============ ส่งไม่สำเร็จ ============ -->
+  <h2>ถ้าส่ง/นำเข้าไม่สำเร็จ <span class="zh">/ 如果送不进去</span></h2>
+  <table>
+    <thead><tr><th>อาการ / 情况</th><th>สาเหตุ + วิธีแก้ / 原因+怎么办</th></tr></thead>
+    <tbody>
+      <tr><td class="cat">รหัสผ่านผิด<br><span class="zh">密码错</span></td>
+        <td>ชื่อผู้ใช้/รหัส MR.ERP ผิด หรือยังไม่กรอก → ไปแก้ที่หน้าตั้งค่า ERP <span class="zh">/ 去 ERP 设置改账号密码</span></td></tr>
+      <tr><td class="cat">ไม่รู้จักลูกค้า/สินค้า<br><span class="zh">客户/商品认不出</span></td>
+        <td>ลูกค้าหรือสินค้ายังไม่มีรหัสใน MR.ERP → เพิ่มรหัสใน MR.ERP ก่อน หรือเปิด "สร้างอัตโนมัติ" <span class="zh">/ 先在 MR.ERP 建码,或开自动建</span></td></tr>
+      <tr><td class="cat">ข้อมูลไม่ครบ<br><span class="zh">数据不全</span></td>
+        <td>ใบกำกับยังไม่ระบุลูกค้า / เลขที่ยาวเกิน 18 ตัว / ยอดเป็น 0 → แก้ในใบกำกับก่อน <span class="zh">/ 先补客户、发票号≤18字、金额≠0</span></td></tr>
+      <tr><td class="cat">เลขที่ซ้ำ<br><span class="zh">单号重复</span></td>
+        <td>ใบนี้เคยนำเข้า MR.ERP แล้ว → ระบบกันไว้ไม่ให้ซ้ำ ถ้าต้องแก้ให้ไปแก้ใน MR.ERP โดยตรง <span class="zh">/ 已导过,防重复;要改去 MR.ERP 改</span></td></tr>
+      <tr><td class="cat">MR.ERP ปิดปรับปรุง<br><span class="zh">MR.ERP维护</span></td>
+        <td>(วิธีที่ 1) ระบบลองใหม่อัตโนมัติ · (วิธีที่ 2) ลองอัปโหลดใหม่ภายหลัง <span class="zh">/ 方式1自动重试;方式2过会儿再传</span></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ============ ยืนยัน ============ -->
+  <div class="verify">
+    <h3>✅ ทดสอบจริงแล้ว / 已实测</h3>
+    <div>ทดสอบกับบัญชีทดสอบ MR.ERP <code>test01</code> (บริษัท 1010-01-000006 · ฐานข้อมูล <code>TEST2019</code>) เมื่อ 13 มิ.ย. 2026:
+      ไฟล์ที่ Pearnly สร้าง (รูปแบบ MR.ERP) อัปโหลดเข้าหน้านำเข้าได้สำเร็จ → ขึ้นหน้าพรีวิว → ไม่มี error · ภาพในคู่มือนี้คือภาพจริงจากการทดสอบ
+      <div class="zh" style="margin-top:6px">2026-06-13 用测试账号 test01 实测:Pearnly 生成的 MR.ERP 格式文件成功上传导入页、进预览、无报错。本教程截图均为实测真图。</div></div>
+  </div>
+
+  <div class="foot">Pearnly · คู่มือเชื่อมต่อ MR.ERP / MR.ERP 集成教程 · 2026-06-13</div>
+
+</div>
+</body>
+</html>

@@ -1,6 +1,7 @@
 # 00 · LINE 平台:方向 + 分层路由框架(做 LINE 活先读这一页)
 
-> 这是 LINE 平台的唯一权威入口。任何窗口动 LINE 相关代码,先读这页,再按 §6 文档地图取细节。
+> 这是 LINE 平台的方向入口。任何窗口动 LINE 相关代码,先读这页;做采购进项车道时,再读
+> `docs/line-platform/02-procurement-canon.md` 作为产品正本。
 > 设计来源:2026-06-16 Zihao 拍板「LINE = 统一对话前端」+ 逆向竞品 Paypers LINE 真机 + 「不可破产品边界」。
 > 与本页对应的记忆:`line-platform-direction` / `line-accounting-honest-status-boundary` / `paypers-line-reverse-engineering`。
 
@@ -83,12 +84,12 @@ per-user FIFO 串行(多图排队不乱序)→ OCR pipeline(L1 Google Vision →
 
 ## 5. 当前在做 / 未解决 backlog
 
-记账车道剩余工作的施工单 = `docs/smart-intake/19`。最高价值三项:
-- **P1** 草稿可见可编辑 / 入账锁定(逻辑反了:草稿应在网页列表可见可改,`posted` 才只读)。
-- **P2** 改错闭环扩面(改任意字段 / 按第 N 笔定位 / 改完保多行明细)。
-- **P3** 诚实回复契约(只陈述真发生的事,申报文案严守三态)。
+采购进项车道的产品正本 = `docs/line-platform/02-procurement-canon.md`。当前最高价值三项:
+- **P1E-2** 纠错 / 澄清 / 执行动作统一收口(“识别错了”进纠错闭环,不走拍照失败)。
+- **回归测试** 固定真票样本(Amazon/CP ALL/Seafood/Little Betong),防金额、VAT、rounding、按钮策略回归。
+- **诚实回复契约** 只陈述真发生的事,申报/过账文案严守三态。
 
-完整 backlog(单据类型显人话 / 逐条明细 OCR / 替代收据 PDF / doc_type 扩枚举等)见记忆 `line-agent-backlog`。
+`docs/smart-intake/19` 已折叠进产品正本,只作历史背景;完整 backlog 后续按 `02-procurement-canon` 拆。
 
 ---
 
@@ -97,12 +98,13 @@ per-user FIFO 串行(多图排队不乱序)→ OCR pipeline(L1 Google Vision →
 | 想干啥 | 读哪个 |
 |---|---|
 | LINE 方向 + 框架(本页) | `docs/line-platform/00`(本文件) |
-| 记账车道剩余施工单 | `docs/smart-intake/19`(改错闭环 + 草稿可编辑 + 诚实四态) |
+| 采购进项产品正本 / 冲突裁决 | `docs/line-platform/02-procurement-canon.md` |
 | 对话产业级设计正本 | `docs/smart-intake/15`(STP+HITL + 数据卡 + 引用/转圈) |
 | LINE 大脑交接 | `docs/smart-intake/18` |
 | 图片识别核心(L3 过度触发 / 触发器收紧) | `docs/smart-intake/09` |
 | 文本路意图路由 / 字段映射 | `docs/smart-intake/10` |
 | 竞品分类法 / 单据类型 / 字段对标 | `docs/smart-intake/16` |
+| smart-intake 旧稿怎么读 | `docs/smart-intake/README.md` |
 
 ---
 

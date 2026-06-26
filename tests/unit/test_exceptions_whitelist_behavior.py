@@ -58,14 +58,14 @@ def patch_cursor(cur):
         cur.cm_kwargs.append(k)
         return _CM(cur)
 
-    return mock.patch.object(wl.db, "get_cursor", factory)
+    return mock.patch.object(wl.db, "get_cursor_rls", factory)
 
 
 def patch_cursor_raises(exc=RuntimeError("boom")):
     def factory(*a, **k):
         raise exc
 
-    return mock.patch.object(wl.db, "get_cursor", factory)
+    return mock.patch.object(wl.db, "get_cursor_rls", factory)
 
 
 class IsWhitelistedTests(unittest.TestCase):

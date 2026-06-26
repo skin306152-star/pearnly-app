@@ -58,7 +58,7 @@ class _CM:
 
 
 def _patch(cur):
-    return mock.patch.object(store.db, "get_cursor", lambda *a, **k: _CM(cur))
+    return mock.patch.object(store.db, "get_cursor_rls", lambda *a, **k: _CM(cur))
 
 
 WS_BOUND = {"id": 10, "name": "卖方A", "erp_endpoint_id": "ep-A"}

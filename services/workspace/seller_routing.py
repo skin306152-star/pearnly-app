@@ -45,6 +45,11 @@ def ensure_seller_route_table():
                     ON seller_workspace_routes (seller_tax)
                     WHERE seller_tax IS NOT NULL AND length(seller_tax) >= 10;
             """)
+            # B8 RLS wave3 3b:含 tenant_id + user_id → tenant_or_user 隔离(带 user 兜底,
+            # 孤立用户的学习路由仍自见)。force=False(owner 绕过→未迁裸 get_cursor 不破)。
+            from core.rls import apply_tenant_or_user_rls
+
+            apply_tenant_or_user_rls(cur, "seller_workspace_routes")
         logger.info("✅ seller_workspace_routes 表已就绪")
     except Exception as e:
         logger.warning(f"ensure_seller_route_table failed: {e}")
@@ -65,7 +70,7 @@ def learn_seller_workspace_route(
     if not tax and not name:
         return False
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO seller_workspace_routes
@@ -219,7 +224,7 @@ def match_workspace_for_seller(
     """
     scope_sql, scope_val = _scope_clause(user_id, tenant_id)
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             # 0) 学习路由记忆(用户绑过的 seller→workspace · 税号优先 → 名字)
             route_wcid = _match_seller_route_id(cur, seller_tax, seller_name, scope_sql, scope_val)
             if route_wcid:
@@ -269,7 +274,7 @@ def match_workspace_for_buyer(
     """
     scope_sql, scope_val = _scope_clause(user_id, tenant_id)
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             d = _match_party_direct(
                 cur,
                 buyer_tax,
@@ -298,7 +303,7 @@ def update_history_workspace_client_id(
     镜像 clients.update_history_client_id(买方),tenant 隔离,不碰 client_id(买方)。
     """
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             if tenant_id:
                 cur.execute(
                     """

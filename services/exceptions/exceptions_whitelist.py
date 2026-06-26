@@ -19,7 +19,7 @@ def is_exception_whitelisted(
     if not seller_name or not seller_name.strip() or not rule_code:
         return False
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             if tenant_id:
                 cur.execute(
                     """
@@ -52,7 +52,7 @@ def add_exception_whitelist(
     if not seller_name or not seller_name.strip() or not rule_code:
         return False
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO exception_whitelist (user_id, tenant_id, seller_name, rule_code)
@@ -70,7 +70,7 @@ def add_exception_whitelist(
 def list_exception_whitelist(user_id: str, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """列出当前 user/tenant 下所有学过的白名单规则"""
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             if tenant_id:
                 cur.execute(
                     """
@@ -110,7 +110,7 @@ def list_exception_whitelist(user_id: str, tenant_id: Optional[str] = None) -> L
 def delete_exception_whitelist(user_id: str, wl_id: int, tenant_id: Optional[str] = None) -> bool:
     """删除一条白名单规则 · 同 tenant 内任意成员可删"""
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             if tenant_id:
                 cur.execute(
                     """
@@ -136,7 +136,7 @@ def delete_exception_whitelist(user_id: str, wl_id: int, tenant_id: Optional[str
 def count_whitelist_rules(user_id: str, tenant_id: Optional[str] = None) -> int:
     """统计当前已学习的「忽略此类」规则数 · 给 KPI 卡用"""
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             if tenant_id:
                 cur.execute(
                     "SELECT COUNT(*) AS n FROM exception_whitelist WHERE tenant_id = %s",

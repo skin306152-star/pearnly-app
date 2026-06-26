@@ -42,7 +42,7 @@ def insert_exception(
     """写入一条异常 · 同 history+rule 已有 pending 时直接 no-op(unique 索引保护)
     v118.20.1.6 · history_id 用 UUID 字符串(原 int 转换全失败)"""
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO exceptions
@@ -94,7 +94,7 @@ def list_exceptions(
     v118.28.1 · restrict_client_ids = 员工只看分到的客户;None = 不限制
     """
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             if tenant_id:
                 where = ["e.tenant_id = %s"]
                 params: list = [tenant_id]
@@ -181,7 +181,7 @@ def get_exception(
 ) -> Optional[Dict[str, Any]]:
     """取单条异常详情"""
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             if tenant_id:
                 cur.execute(
                     """
@@ -232,7 +232,7 @@ def resolve_exception(
     if new_status not in ("resolved", "ignored", "pending"):
         return False
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             if tenant_id:
                 cur.execute(
                     """
@@ -268,7 +268,7 @@ def delete_pending_exceptions_by_history(
     返回:删除的条数
     """
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             if tenant_id:
                 cur.execute(
                     """
@@ -304,7 +304,7 @@ def count_exceptions_by_status_and_rule(
     by_rule_status:控制 by_rule 字典统计哪个状态下的规则分布(默认 pending)
     """
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             if tenant_id:
                 where = "e.tenant_id = %s"
                 params: list = [tenant_id]
@@ -373,7 +373,7 @@ def batch_resolve_exceptions(
     if not safe_ids:
         return {"processed": 0, "ids_done": [], "whitelist_pairs": []}
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             # 先查满足条件的 (id, seller, rule) · 过滤掉跨 tenant 的(防越权)
             if tenant_id:
                 cur.execute(

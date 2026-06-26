@@ -67,6 +67,11 @@ def ensure_exceptions_tables():
                 CREATE INDEX IF NOT EXISTS idx_exc_wl_tenant ON exception_whitelist(tenant_id) WHERE tenant_id IS NOT NULL;
                 CREATE INDEX IF NOT EXISTS idx_exc_wl_user ON exception_whitelist(user_id);
             """)
+            # B8 RLS wave3 3b:两表都含 tenant_id + user_id → tenant_or_user 隔离。
+            # force=False(owner 仍绕过→外围未迁的裸 get_cursor 不破);业务连接 SET ROLE 后强制。
+            from core.rls import apply_tenant_or_user_rls
+
+            apply_tenant_or_user_rls(cur, "exceptions", "exception_whitelist")
             logger.info("✅ exceptions + exception_whitelist 表已就绪(history_id=UUID)")
     except Exception as e:
         logger.error(f"ensure_exceptions_tables failed: {e}")

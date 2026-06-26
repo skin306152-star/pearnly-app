@@ -94,7 +94,7 @@ class _ExplodingCursor:
 
 
 def _patch(cur):
-    return patch.object(db, "get_cursor", lambda *a, **k: _CM(cur))
+    return patch.object(db, "get_cursor_rls", lambda *a, **k: _CM(cur))
 
 
 class ListNotificationRulesTests(unittest.TestCase):

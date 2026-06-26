@@ -10,9 +10,7 @@
 ⚠️ Pearnly 不自动创建 ERP 账套主体:workspace 只**绑定已有** erp_endpoint;
    交易对象(买方/供应商/商品)才自动创建(见 mrerp_customer_sync)。
 
-迁移机制:生产不跑 `alembic upgrade`(git-deploy 无钩子)· schema 靠启动 ensure_*
-应用 → 本模块走"双跑"模式(alembic/versions/005 留档 + ensure_workspace_tables 真建)·
-与 002_field_overrides 同范式。纯加法 · 幂等 · 零破坏现有表。
+迁移机制:生产不跑 alembic · schema 靠启动 ensure_*(alembic/versions/005 留档双跑)· 幂等加法。
 
 tenant 隔离:有 tenant_id 按 tenant 共享(老板+员工同租户可见)· 否则按 user_id。
 """
@@ -99,8 +97,7 @@ def ensure_workspace_tables():
                 CREATE INDEX IF NOT EXISTS idx_workspace_clients_user
                     ON workspace_clients(user_id, is_active);
             """)
-            # 用户引导闭环(2026-06-11):主体类型 company|personal。个人/freelancer/未
-            # 注册小店走 personal(零税号 · 仅开收据)。存量行默认 company。
+            # 主体类型 company|personal(个人/未注册小店走 personal·零税号仅开收据)。存量默认 company。
             cur.execute(
                 "ALTER TABLE workspace_clients "
                 "ADD COLUMN IF NOT EXISTS subject_type TEXT NOT NULL DEFAULT 'company'"
@@ -116,8 +113,7 @@ def ensure_workspace_tables():
                 "CREATE UNIQUE INDEX IF NOT EXISTS uq_workspace_clients_tax_active "
                 "ON workspace_clients(tenant_id, tax_id) WHERE is_active AND tax_id IS NOT NULL"
             )
-            # 每 scope 至多一个在用 personal 主体 → 建主体并发幂等 + 迁移可重入的 DB 兜底。
-            # subject_type 为新列,无存量 personal 行,索引创建必成功。
+            # 每 scope 至多一个在用 personal 主体(并发幂等 + 迁移可重入的 DB 兜底·新列无存量行索引必成功)。
             cur.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS uq_workspace_clients_personal_tenant "
                 "ON workspace_clients(tenant_id) "
@@ -134,6 +130,10 @@ def ensure_workspace_tables():
                 CREATE INDEX IF NOT EXISTS idx_ocr_history_workspace
                     ON ocr_history(workspace_client_id) WHERE workspace_client_id IS NOT NULL;
             """)
+            # B8 RLS wave3 3b:tenant_or_user 隔离 · force=False(owner 绕过兜底)· 见 b8-rls-wave3-3b 补充。
+            from core.rls import apply_tenant_or_user_rls
+
+            apply_tenant_or_user_rls(cur, "workspace_clients")
         logger.info("✅ workspace_clients 表 + ocr_history.workspace_client_id 已就绪")
     except Exception as e:
         logger.error(f"ensure_workspace_tables failed: {e}")
@@ -162,7 +162,7 @@ def create_workspace_client(
         return None
     stype = _norm_subject_type(subject_type)
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             if stype == "personal":
                 existing = _find_active_personal(cur, str(user_id), tenant_id)
                 if existing:
@@ -221,7 +221,7 @@ def tax_id_in_use(
         if exclude_id is not None:
             where += " AND id <> %s"
             params.append(int(exclude_id))
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             cur.execute(f"SELECT 1 FROM workspace_clients WHERE {where} LIMIT 1", tuple(params))
             return cur.fetchone() is not None
     except Exception as e:
@@ -236,7 +236,7 @@ def get_workspace_client(
 ) -> Optional[Dict[str, Any]]:
     """取单个账套主体(tenant 隔离:同租户共享 · 否则仅自己)。"""
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             if tenant_id:
                 cur.execute(
                     "SELECT * FROM workspace_clients WHERE id = %s AND tenant_id = %s",
@@ -280,7 +280,7 @@ def list_workspace_clients(
         if restrict_ids is not None:
             where += " AND id = ANY(%s)"
             params.append([int(x) for x in restrict_ids])
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             cur.execute(
                 f"SELECT * FROM workspace_clients WHERE {where} ORDER BY name",
                 tuple(params),
@@ -344,7 +344,7 @@ def update_workspace_client(
         return False
     sets.append("updated_at = NOW()")
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             if tenant_id:
                 where = "id = %s AND tenant_id = %s"
                 params += [int(workspace_client_id), tenant_id]
@@ -373,7 +373,7 @@ def archive_workspace_client(
     硬删会留下悬空引用。归档后默认列表(active_only)看不到,但归属链完整。
     """
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             if tenant_id:
                 cur.execute(
                     "UPDATE workspace_clients SET is_active = %s, updated_at = NOW() "
@@ -414,7 +414,7 @@ def list_workspace_clients_enriched(
             join_user = ""
         if active_only:
             where += " AND wc.is_active = TRUE"
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             cur.execute(
                 f"""
                 SELECT wc.*,
@@ -454,7 +454,7 @@ def bind_workspace_endpoint(
     只绑定 · 绝不创建 ERP 账套(Pearnly 不自动建账套主体)。tenant 隔离。
     """
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             if tenant_id:
                 cur.execute(
                     "UPDATE workspace_clients SET erp_endpoint_id = %s, updated_at = NOW() "

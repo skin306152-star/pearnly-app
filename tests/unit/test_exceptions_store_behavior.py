@@ -65,14 +65,14 @@ def patch_cursor(cur):
         cur.cm_kwargs.append(k)
         return _CM(cur, None)
 
-    return mock.patch.object(exc.db, "get_cursor", factory)
+    return mock.patch.object(exc.db, "get_cursor_rls", factory)
 
 
 def patch_cursor_raises(exc_obj=RuntimeError("boom")):
     def factory(*a, **k):
         raise exc_obj
 
-    return mock.patch.object(exc.db, "get_cursor", factory)
+    return mock.patch.object(exc.db, "get_cursor_rls", factory)
 
 
 class InsertExceptionTests(unittest.TestCase):

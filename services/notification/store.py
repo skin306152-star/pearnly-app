@@ -57,6 +57,11 @@ def ensure_notification_tables():
                 CREATE INDEX IF NOT EXISTS idx_notif_logs_rule
                     ON notification_logs(rule_id, sent_at DESC) WHERE rule_id IS NOT NULL;
             """)
+            # B8 RLS wave3 3b:两表都含 tenant_id + user_id → tenant_or_user 隔离。
+            # force=False(owner 仍绕过→外围未迁的裸 get_cursor 不破);业务连接 SET ROLE 后强制。
+            from core.rls import apply_tenant_or_user_rls
+
+            apply_tenant_or_user_rls(cur, "notification_rules", "notification_logs")
             logger.info("✅ notification_rules + notification_logs 表已就绪")
     except Exception as e:
         logger.error(f"ensure_notification_tables failed: {e}")
@@ -65,7 +70,7 @@ def ensure_notification_tables():
 def list_notification_rules(user_id: str, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """列规则 · 同 tenant 共享视图(老板员工同租户共看共改)· 同异常栏隔离规则"""
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             if tenant_id:
                 cur.execute(
                     """
@@ -100,7 +105,7 @@ def get_notification_rule(
 ) -> Optional[Dict[str, Any]]:
     """取一条规则 · 鉴权:必须属于本人或本租户"""
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             if tenant_id:
                 cur.execute(
                     """
@@ -140,7 +145,7 @@ def create_notification_rule(
 ) -> Optional[int]:
     """新建规则 · 返回新 id"""
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO notification_rules
@@ -189,7 +194,7 @@ def update_notification_rule(
     sets.append("updated_at = NOW()")
     set_sql = ", ".join(sets)
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             if tenant_id:
                 cur.execute(
                     f"UPDATE notification_rules SET {set_sql} " f"WHERE id = %s AND tenant_id = %s",
@@ -210,8 +215,8 @@ def update_notification_rule(
 def delete_notification_rule(rule_id: int, user_id: str, tenant_id: Optional[str]) -> bool:
     """删规则 · 同 get 鉴权 · 同时删 logs 里的引用(SET NULL · 保留发送历史)"""
     try:
-        with db.get_cursor(commit=True) as cur:
-            # 先把 logs 的 rule_id 置空(保留历史发送记录)
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
+            # 先把 logs 的 rule_id 置空(保留历史发送记录)· RLS 下只动本租户可见 logs
             cur.execute(
                 "UPDATE notification_logs SET rule_id = NULL WHERE rule_id = %s",
                 (int(rule_id),),
@@ -246,7 +251,7 @@ def log_notification(
 ) -> Optional[int]:
     """写一条发送记录 · 失败也吞(不影响主流程)"""
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO notification_logs
@@ -279,7 +284,7 @@ def list_notification_logs(
 ) -> List[Dict[str, Any]]:
     """列发送日志 · 同 tenant 共享 · 默认最近 50 条"""
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             if tenant_id:
                 cur.execute(
                     """
@@ -309,9 +314,16 @@ def list_notification_logs(
 
 
 def list_active_notification_rules_by_template(template_code: str) -> List[Dict[str, Any]]:
-    """v118.22.1.1 hook 用 · 取所有启用的某模板规则(跨 user 全表 · 异步触发匹配)"""
+    """v118.22.1.1 hook 用 · 取所有启用的某模板规则(跨 user 全表 · 异步触发匹配)
+
+    B8 RLS bypass(系统级):本函数是 _notify_exception_high 后台 hook 的唯一数据源,从 LINE
+    webhook 等无 HTTP 单租户上下文的入口触发,故意跨租户取全表规则,再在 Python 端按
+    (user, tenant) 过滤(_rule_belongs_to)。enroll 后若走单租户上下文会只返本租户规则 → hook
+    漏推。因此显式 bypass=True。每条匹配规则的发送记录仍按该规则自带的 tenant/user 落库
+    (log_notification 带上下文,非 bypass)。
+    """
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(bypass=True) as cur:
             cur.execute(
                 """
                 SELECT id, user_id, tenant_id, name, template_code, params, enabled

@@ -162,7 +162,7 @@ def active_workspace_for_request(request: Request, tenant_id) -> Optional[int]:
     try:
         from core import db
 
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=str(tenant_id)) as cur:
             return resolve_active_workspace_id(cur, request, tenant_id=str(tenant_id))
     except HTTPException:
         raise
@@ -182,7 +182,7 @@ def default_workspace_for_write(tenant_id) -> Optional[int]:
     try:
         from core import db
 
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=str(tenant_id)) as cur:
             return default_workspace_id(cur, str(tenant_id))
     except Exception as e:
         logger.warning(f"default_workspace_for_write failed (tenant={tenant_id}): {e}")

@@ -6,10 +6,10 @@
 """
 
 import unittest
-from contextlib import contextmanager
-from unittest import mock
 
+from core import db  # noqa: F401  · 先 import 破 services.membership.store partial-init 循环
 from services.membership import store
+from tests.unit._cursor_patch import patch_both
 
 _MOVED = [
     "get_visible_client_ids_for_user",
@@ -61,37 +61,9 @@ class _FakeCursor:
         return " ".join(c[0] for c in self.calls)
 
 
-class _CursorPatchProxy:
-    """yield 给 `with _patch_cursor(cur) as m` · 暴露实际被调用那一路的 call_args/called
-    · 让断言 commit kwarg 不受双路 patch 影响。"""
-
-    def __init__(self, m1, m2):
-        self._m1, self._m2 = m1, m2
-
-    def _active(self):
-        return self._m2 if self._m2.called else self._m1
-
-    @property
-    def called(self):
-        return self._m1.called or self._m2.called
-
-    @property
-    def call_args(self):
-        return self._active().call_args
-
-
 def _patch_cursor(cur):
-    """patch db.get_cursor + get_cursor_rls 都返回同一 fake cursor(list_orphan/backfill 走 rls bypass)。"""
-
-    @contextmanager
-    def _both():
-        with (
-            mock.patch("core.db.get_cursor", return_value=cur) as m1,
-            mock.patch("core.db.get_cursor_rls", return_value=cur) as m2,
-        ):
-            yield _CursorPatchProxy(m1, m2)
-
-    return _both()
+    """get_cursor + get_cursor_rls 都返回同一 fake(list_orphan/backfill 走 rls bypass)。"""
+    return patch_both(value=cur)
 
 
 class MembershipStoreContractTests(unittest.TestCase):

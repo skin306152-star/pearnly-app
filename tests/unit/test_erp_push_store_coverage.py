@@ -14,15 +14,15 @@
 
 import sys
 import unittest
-from contextlib import contextmanager
 from pathlib import Path
-from unittest import mock
+from unittest import mock  # noqa: F401  · test_no_allowed_fields 仍直接用
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from core import db  # noqa: E402,F401  · 先 import db 避免 partial-init 循环
 from services.erp import push_store as store  # noqa: E402
+from tests.unit._cursor_patch import patch_both  # noqa: E402
 
 
 # ─────────────────────────── 假游标基建 ───────────────────────────
@@ -74,40 +74,23 @@ class FakeCM:
         return False
 
 
+# update_history_push_status 走 get_cursor_rls(bypass);其余 endpoint CRUD 仍 get_cursor。两路同挂。
 def patch_cursor(cur):
-    """返回一个 patch 对象:把 store.db.get_cursor 换成产出 cur 的工厂。
-    同时把每次调用的 kwargs 收集到 cur.cm_kwargs。"""
+    """每次调用收集 kwargs 到 cur.cm_kwargs · 产出 cur 的工厂同挂两路。"""
     cur.cm_kwargs = []
 
     def factory(*a, **k):
         cur.cm_kwargs.append(k)
         return FakeCM(cur, None)
 
-    # update_history_push_status 走 get_cursor_rls(bypass);其余 endpoint CRUD 仍 get_cursor。两路同挂。
-    @contextmanager
-    def _both():
-        with (
-            mock.patch.object(store.db, "get_cursor", factory),
-            mock.patch.object(store.db, "get_cursor_rls", factory),
-        ):
-            yield
-
-    return _both()
+    return patch_both(factory=factory)
 
 
 def patch_cursor_raises(exc=RuntimeError("boom")):
     def factory(*a, **k):
         raise exc
 
-    @contextmanager
-    def _both():
-        with (
-            mock.patch.object(store.db, "get_cursor", factory),
-            mock.patch.object(store.db, "get_cursor_rls", factory),
-        ):
-            yield
-
-    return _both()
+    return patch_both(factory=factory)
 
 
 # ─────────────────────── 纯函数:重试延迟序列 ───────────────────────

@@ -9,11 +9,10 @@ ensure_table / log_ocr_cost / get_cost_overview / get_cost_by_user / daily_trend
 """
 
 import unittest
-from contextlib import contextmanager
-from unittest import mock
 
 from core import db  # noqa: F401  · 先 import db 完成,避免 dal_reexports partial-init 循环
 from services.cost import store as cost
+from tests.unit._cursor_patch import patch_both
 
 
 class FakeCursor:
@@ -63,30 +62,14 @@ def patch_cursor(cur):
         cur.cm_kwargs.append(k)
         return _CM(cur)
 
-    @contextmanager
-    def _both():
-        with (
-            mock.patch.object(cost.db, "get_cursor", factory),
-            mock.patch.object(cost.db, "get_cursor_rls", factory),
-        ):
-            yield
-
-    return _both()
+    return patch_both(factory=factory)
 
 
 def patch_cursor_raises(exc=RuntimeError("boom")):
     def factory(*a, **k):
         raise exc
 
-    @contextmanager
-    def _both():
-        with (
-            mock.patch.object(cost.db, "get_cursor", factory),
-            mock.patch.object(cost.db, "get_cursor_rls", factory),
-        ):
-            yield
-
-    return _both()
+    return patch_both(factory=factory)
 
 
 class EnsureTableTests(unittest.TestCase):

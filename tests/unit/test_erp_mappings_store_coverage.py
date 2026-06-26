@@ -14,15 +14,15 @@
 
 import sys
 import unittest
-from contextlib import contextmanager
 from pathlib import Path
-from unittest import mock
+from unittest import mock  # noqa: F401  · 测试体内仍用
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from core import db  # noqa: E402,F401
 from services.erp import mappings_store as store  # noqa: E402
+from tests.unit._cursor_patch import patch_both  # noqa: E402
 
 
 class FakeCursor:
@@ -69,32 +69,14 @@ class FakeCM:
 
 # list/upsert client mapping 走 get_cursor_rls(穿 tenant);其余 CRUD 仍 get_cursor。两路同挂同一 fake。
 def patch_cursor(cur):
-    cm = lambda *a, **k: FakeCM(cur)  # noqa: E731
-
-    @contextmanager
-    def _both():
-        with (
-            mock.patch.object(store.db, "get_cursor", cm),
-            mock.patch.object(store.db, "get_cursor_rls", cm),
-        ):
-            yield
-
-    return _both()
+    return patch_both(factory=lambda *a, **k: FakeCM(cur))
 
 
 def patch_cursor_raises(exc=RuntimeError("boom")):
     def factory(*a, **k):
         raise exc
 
-    @contextmanager
-    def _both():
-        with (
-            mock.patch.object(store.db, "get_cursor", factory),
-            mock.patch.object(store.db, "get_cursor_rls", factory),
-        ):
-            yield
-
-    return _both()
+    return patch_both(factory=factory)
 
 
 # ─────────────────────── 校验常量 + 归一化 helper ───────────────────────

@@ -11,7 +11,7 @@
   account_set    DATAT(白名单在 enqueue/agent 再校验)
   docdate_be / vat_period_be   佛历 YYMMDD
   ref_no         销售参考(幂等锚)
-  customer       {code,name,tax_id,prename,customer_new}
+  customer       {code,name,tax_id,address,prename,customer_new}
   vat_rate       7.00 | 0.00
   base_amount / vat_amount / total_amount
   lines          [{acc,side(D/C),amount,desc}] · 借应收 = 贷收入 + 贷销项税 · 借贷必平
@@ -39,7 +39,12 @@ from services.erp.express_push.common import (
     sanitize_payload_cp874,
     SRC_DEFAULT,
 )
-from services.purchase.field_clean import clean_invoice_no, clean_seller, clean_tax_id
+from services.purchase.field_clean import (
+    clean_address,
+    clean_invoice_no,
+    clean_seller,
+    clean_tax_id,
+)
 
 # 现金销售客户:ERP 真账套通行约定 —— CUSCOD=CUSNAM="เงินสด"(korn/test 套实测均已建档,
 # 应收走 ar_acc)。收现金零售单买方栏 OCR 即「เงินสด」,但被采购卖家清洗器(noise 黑名单含
@@ -55,10 +60,14 @@ def _is_cash_buyer(raw: Any) -> bool:
 
 
 def _resolve_customer(
-    clients: List[Dict[str, Any]], history: Dict[str, Any], name: str, tax_id: str
+    clients: List[Dict[str, Any]],
+    history: Dict[str, Any],
+    name: str,
+    tax_id: str,
+    address: str = "",
 ) -> Dict[str, Any]:
     """客户身份块。命中 erp_client_mappings(express)→ 带 code、customer_new=False;
-    否则 customer_new=True 让 Agent 在 ARMAS 建档。"""
+    否则 customer_new=True 让 Agent 在 ARMAS 建档(带 tax_id+address 落档,开全额税票用)。"""
     code = ""
     client_id = history.get("client_id")
     if client_id is not None:
@@ -73,6 +82,7 @@ def _resolve_customer(
         "code": code,
         "name": name,
         "tax_id": tax_id,
+        "address": address,
         "prename": detect_prename(name),
         "customer_new": not bool(code),
     }
@@ -126,18 +136,21 @@ def build_express_sales_payload(
     tax_id = clean_tax_id(
         fields.get("buyer_tax") or fields.get("buyer_tax_id") or fields.get("customer_tax")
     )
+    address = clean_address(fields.get("buyer_addr"))
     if _is_cash_buyer(raw_buyer):
         name = CASH_CUSTOMER_NAME
+        # 现金/散客客户用现成档(不新建)→ 不带地址(简易税票无须买方地址)。
         customer = {
             "code": CASH_CUSTOMER_NAME,
             "name": CASH_CUSTOMER_NAME,
             "tax_id": tax_id,
+            "address": "",
             "prename": "",
             "customer_new": False,
         }
     else:
         name = clean_seller(raw_buyer)
-        customer = _resolve_customer(mappings.get("clients") or [], history, name, tax_id)
+        customer = _resolve_customer(mappings.get("clients") or [], history, name, tax_id, address)
     ref_no = clean_invoice_no(history.get("invoice_no") or fields.get("invoice_number"))
 
     # 分录反向:借 应收(含税) = 贷 销售收入(税前) + 贷 销项税。

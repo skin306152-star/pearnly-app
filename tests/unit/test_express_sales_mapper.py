@@ -79,6 +79,19 @@ class ExpressSalesMapperTests(unittest.TestCase):
         self.assertEqual(r.payload["customer"]["tax_id"], "0105551234567")
         self.assertEqual(r.payload["customer"]["prename"], "บริษัท")
 
+    def test_customer_address_carried_for_b2b(self):
+        # B2B 自建客户:买方地址进 payload → companion 落 ARMAS(开全额税票一致)。
+        addr = "เลขที่ 99 หมู่ 2 ถนนสุขุมวิท แขวงคลองเตย กรุงเทพฯ 10110"
+        r = build_express_sales_payload(_sales_history(fields={"buyer_addr": addr}), config=_CONFIG)
+        self.assertEqual(r.payload["customer"]["address"], addr)
+
+    def test_customer_address_garbled_dropped(self):
+        # 乱码/过短地址被 clean_address 清成空(不污染主档)。
+        r = build_express_sales_payload(
+            _sales_history(fields={"buyer_addr": "###"}), config=_CONFIG
+        )
+        self.assertEqual(r.payload["customer"]["address"], "")
+
     def test_customer_code_from_mapping(self):
         mappings = {
             "accounts": [],
@@ -100,6 +113,7 @@ class ExpressSalesMapperTests(unittest.TestCase):
         cust = r.payload["customer"]
         self.assertEqual(cust["code"], "เงินสด")
         self.assertEqual(cust["name"], "เงินสด")
+        self.assertEqual(cust["address"], "")  # 现金客户不带地址(简易税票)
         self.assertFalse(cust["customer_new"])
         dr = [ln for ln in r.payload["lines"] if ln["side"] == "D"]
         self.assertEqual(dr[0]["desc"], "เงินสด")

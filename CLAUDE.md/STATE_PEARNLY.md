@@ -6,7 +6,9 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-26 · **B8 RLS · wave4 erp 映射表 + erp_endpoints/erp_push_logs(含 JOIN 富化难点)全 enroll 上线** · 已 push `f4447662` · CI 绿 + prod 金丝雀 PASS · companion 未动 · 交接 `docs/refactor/b8-rls-HANDOFF-2026-06-25.md` §7.7/§7.8）
+## 🎯 状态卡（2026-06-26 · **B8 RLS · wave4 erp 映射表 + erp_endpoints/push_logs(JOIN 富化) + import_template_mappings 全 enroll 上线** · 已 push `05dfd10b` · CI 绿 + prod 金丝雀 PASS · companion 未动 · 交接 `docs/refactor/b8-rls-HANDOFF-2026-06-25.md` §7.7/§7.8/§7.9）
+
+- **★ wave4 第三棒 import_template_mappings enroll 上线 prod 验过**(`05dfd10b`):纯 tenant·`apply_tenant_rls` 落 `template_store.ensure_table`(startup 跑)·4 CRUD 穿 tenant。金丝雀真租户 758bea47 自见 2/假 0。集成 3 例 + 4970 单测 + CI 6 闸绿(`28237294792`)。**wave4 剩 legacy-无-DDL-钩子孤儿**(erp_oauth_*/mrerp_credentials/erp_connectors/email_ingest_*/excel_templates·都 0 暴露·守卫已 DISABLE·proper enroll 需先定方案重建 creator 或纯 DB 层·非纯机械迁移)。
 
 - **★ wave4 第二棒 erp_endpoints/erp_push_logs enroll 上线 prod 验过**(`f4447662`):两表 user_id 全非空、访问纯 user scope → `apply_user_rls`(纯 user·偏离 INCIDENT §2 的 tenant_or_user 建议·按访问现实+列填充定模板)落 `ensure_erp_retry_columns`(不新增 ensure_·避 new_debt)。push_store 8 函数 + push_log_queries delete/stats 穿 user_id。**★JOIN 富化难点解**:`list_push_logs`/`get_push_log_detail` JOIN ocr_history/clients/workspace_clients(tenant_or_user)只穿 user_id 会丢富化 → 加 tenant_id 参穿双上下文,路由 7 处穿 `_tid(user)`。保持裸 owner:update_endpoint_stats/history_push_status(by-id)、push_retry(worker)、express agent(token/endpoint scope)。金丝雀:两表 rls=on npol=1·角色直查真用户 42/假 0·**富化 client_name 穿tenant=5 vs 只穿user=0**(铁证)。集成 6 例 + 全量 4970 + CI 6 闸绿(run `28235744002`)。**剩 wave4**:`erp_oauth_*`/`mrerp_credentials`/`erp_connectors`(纯 prod 孤儿·代码树无 CREATE/访问点)、`email_ingest_*`、`import_template_*`。
 - **★ wave4 第一棒 erp 4 映射表 enroll**(`3f337517`):`erp_client/account/tax/product_mappings`(纯 tenant)`apply_tenant_rls` 落 `ensure_erp_mapping_tables`·11 访问点穿 tenant。金丝雀真租户自见 5 行/假 0。

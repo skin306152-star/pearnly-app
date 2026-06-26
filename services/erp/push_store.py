@@ -99,6 +99,17 @@ def get_default_erp_endpoint(user_id: str) -> Optional[Dict[str, Any]]:
 _last_create_endpoint_error: Optional[str] = None
 
 
+def _existing_express_id(cur, user_id: str) -> Optional[str]:
+    """该用户已有的 express 端点 id(有则复用 · 保 express 单例)。"""
+    cur.execute(
+        "SELECT id FROM erp_endpoints WHERE user_id = %s AND adapter = 'express' "
+        "ORDER BY created_at LIMIT 1",
+        (user_id,),
+    )
+    row = cur.fetchone()
+    return str(row["id"]) if row else None
+
+
 def create_erp_endpoint(
     user_id: str,
     name: str,
@@ -112,8 +123,15 @@ def create_erp_endpoint(
     import traceback as _tb
 
     global _last_create_endpoint_error
+    is_express = (adapter or "").strip().lower() == "express"
     try:
         with db.get_cursor(commit=True) as cur:
+            # express 单例:已有就复用,绝不建第二条(向导竞态/多标签会重复 POST)。
+            if is_express:
+                existing = _existing_express_id(cur, user_id)
+                if existing:
+                    _last_create_endpoint_error = None
+                    return existing
             if is_default:
                 cur.execute(
                     "UPDATE erp_endpoints SET is_default = false WHERE user_id = %s", (user_id,)
@@ -130,6 +148,16 @@ def create_erp_endpoint(
             _last_create_endpoint_error = None
             return str(row["id"]) if row else None
     except Exception as e:
+        # 并发越过上面的查重后撞唯一索引 → 复用已存在的 express,不当失败。
+        if is_express:
+            try:
+                with db.get_cursor() as cur:
+                    existing = _existing_express_id(cur, user_id)
+                if existing:
+                    _last_create_endpoint_error = None
+                    return existing
+            except Exception:
+                pass
         _last_create_endpoint_error = (
             f"{type(e).__name__}: {str(e)[:200]} | " + _tb.format_exc()[-400:]
         )
@@ -337,6 +365,7 @@ from services.erp.push_schema import (  # noqa: F401,E402
     ensure_erp_push_logs_adapter_constraint,
     ensure_erp_push_logs_status_constraint,
     ensure_erp_retry_columns,
+    ensure_single_express_endpoint,
 )
 from services.erp.push_retry import (  # noqa: F401,E402
     _ERP_RETRY_DELAYS_SEC,

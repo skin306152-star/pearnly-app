@@ -231,6 +231,19 @@
     async function _ensureEndpoint() {
         if (S.id) return S.id;
         try {
+            // 先认领已存在的 express(防连接卡误判未连接 → 重复 POST 出第二条)。
+            var lr = await fetch('/api/erp/endpoints', { headers: _auth() });
+            if (lr.ok) {
+                var ld = await lr.json();
+                var exist = ((ld && ld.items) || []).find(function (e: any) {
+                    return e && (e.adapter || '').toLowerCase() === 'express';
+                });
+                if (exist && exist.id) {
+                    S.id = exist.id;
+                    S.ep = exist;
+                    return S.id;
+                }
+            }
             var r = await fetch('/api/erp/endpoints', {
                 method: 'POST',
                 headers: _auth(),

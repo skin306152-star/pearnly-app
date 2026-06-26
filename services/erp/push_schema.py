@@ -189,4 +189,66 @@ def ensure_erp_retry_columns():
         logger.warning(f"ensure_erp_retry_columns failed: {e}")
 
 
+def ensure_single_express_endpoint():
+    """每用户至多一个 express 端点。
+
+    向导竞态(连接卡拉取失败 → 误判未连接 → 用户点连接 → 重新 POST)会建出第二条空壳 express,
+    在推送目标列表里显示成"2 个 Express"。这里自愈清理 + 部分唯一索引锁死源头:
+      1. 找出有 >1 express 的用户;保守删除多余的【0 条推送日志】端点(保留有历史/有推送的那条)。
+      2. 仍有用户残留多条带日志的 express → 不自动删、不建索引,告警交人工(防误删历史)。
+      3. 无残留 → 建 `WHERE adapter='express'` 部分唯一索引,DB 层堵住并发/多标签再建第二条。
+    幂等 · 不抛(失败不挡启动)。
+    """
+    try:
+        with db.get_cursor(commit=True) as cur:
+            cur.execute("""
+                SELECT user_id FROM erp_endpoints
+                WHERE adapter = 'express'
+                GROUP BY user_id HAVING count(*) > 1
+                """)
+            dup_users = [r["user_id"] for r in (cur.fetchall() or [])]
+            for uid in dup_users:
+                cur.execute(
+                    """
+                    SELECT e.id,
+                           (SELECT count(*) FROM erp_push_logs l
+                            WHERE l.endpoint_id = e.id) AS n_logs
+                    FROM erp_endpoints e
+                    WHERE e.adapter = 'express' AND e.user_id = %s
+                    ORDER BY (SELECT count(*) FROM erp_push_logs l
+                              WHERE l.endpoint_id = e.id) DESC,
+                             e.last_used_at DESC NULLS LAST, e.created_at DESC
+                    """,
+                    (uid,),
+                )
+                rows = cur.fetchall() or []
+                for r in rows[1:]:  # rows[0] = 保留(有推送优先 · 再按 last_used 最近)
+                    if int(r["n_logs"]) == 0:
+                        cur.execute("DELETE FROM erp_endpoints WHERE id = %s", (r["id"],))
+                        logger.info(
+                            "[express-dedup] 删除重复空端点 user=%s id=%s",
+                            str(uid)[:8],
+                            str(r["id"])[:8],
+                        )
+                    else:
+                        logger.warning(
+                            "[express-dedup] user=%s 有多个带推送历史的 express · 跳过自动删除 · 需人工",
+                            str(uid)[:8],
+                        )
+            cur.execute("""
+                SELECT 1 FROM erp_endpoints WHERE adapter = 'express'
+                GROUP BY user_id HAVING count(*) > 1 LIMIT 1
+                """)
+            if cur.fetchone():
+                logger.warning("[express-dedup] 仍有用户存在多条 express · 暂不建唯一索引")
+                return
+            cur.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_erp_endpoints_user_express "
+                "ON erp_endpoints (user_id) WHERE adapter = 'express'"
+            )
+            logger.info("erp_endpoints · 单 express 部分唯一索引就绪")
+    except Exception as e:
+        logger.warning(f"ensure_single_express_endpoint failed: {e}")
+
+
 from core import db  # noqa: E402

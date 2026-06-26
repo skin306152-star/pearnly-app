@@ -73,6 +73,7 @@ _REEXPORTS = {
         "ensure_erp_push_logs_adapter_constraint",
         "ensure_erp_push_logs_status_constraint",
         "ensure_erp_retry_columns",
+        "ensure_single_express_endpoint",
         "is_user_data_error",
         "is_already_pushed_error",
         "classify_push_status",

@@ -113,7 +113,18 @@ def ensure_erp_mapping_tables():
                 CREATE INDEX IF NOT EXISTS idx_erp_prod_map_erp ON erp_product_mappings(erp_type);
                 CREATE INDEX IF NOT EXISTS idx_erp_prod_map_norm ON erp_product_mappings(tenant_id, erp_type, item_name_norm);
             """)
-            logger.info("✅ v118.27.0 · erp_client/account/tax_mappings 三张映射表已就绪")
+            # B8 RLS wave4:4 张映射表均 tenant_id NOT NULL(无 user_id 列)→ 纯 tenant 隔离。
+            # force=False(owner 仍绕过→DDL/未迁裸 get_cursor 不破);业务连接 SET ROLE 后强制。
+            from core.rls import apply_tenant_rls
+
+            apply_tenant_rls(
+                cur,
+                "erp_client_mappings",
+                "erp_account_mappings",
+                "erp_tax_mappings",
+                "erp_product_mappings",
+            )
+            logger.info("✅ v118.27.0 · erp 4 张映射表 + RLS policy 已就绪")
     except Exception as e:
         logger.error(f"ensure_erp_mapping_tables failed: {e}")
 
@@ -209,7 +220,7 @@ def delete_erp_client_mapping(tenant_id, mapping_id):
     if not tenant_id or not mapping_id:
         return False
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=str(tenant_id), commit=True) as cur:
             cur.execute(
                 "DELETE FROM erp_client_mappings WHERE id = %s AND tenant_id = %s",
                 (str(mapping_id), str(tenant_id)),
@@ -225,7 +236,7 @@ def list_erp_account_mappings(tenant_id):
     if not tenant_id:
         return []
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=str(tenant_id)) as cur:
             cur.execute(
                 """
                 SELECT id, tenant_id, erp_type, pearnly_category, erp_code,
@@ -257,7 +268,7 @@ def upsert_erp_account_mapping(
     name_clean = (erp_name or "").strip()[:200]
     notes_clean = (notes or "").strip()[:500]
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=str(tenant_id), commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO erp_account_mappings
@@ -292,7 +303,7 @@ def delete_erp_account_mapping(tenant_id, mapping_id):
     if not tenant_id or not mapping_id:
         return False
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=str(tenant_id), commit=True) as cur:
             cur.execute(
                 "DELETE FROM erp_account_mappings WHERE id = %s AND tenant_id = %s",
                 (str(mapping_id), str(tenant_id)),
@@ -308,7 +319,7 @@ def list_erp_tax_mappings(tenant_id):
     if not tenant_id:
         return []
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=str(tenant_id)) as cur:
             cur.execute(
                 """
                 SELECT id, tenant_id, erp_type, pearnly_tax_kind, erp_code,
@@ -339,7 +350,7 @@ def upsert_erp_tax_mapping(tenant_id, erp_type, pearnly_tax_kind, erp_code, note
         return None
     notes_clean = (notes or "").strip()[:500]
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=str(tenant_id), commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO erp_tax_mappings
@@ -372,7 +383,7 @@ def delete_erp_tax_mapping(tenant_id, mapping_id):
     if not tenant_id or not mapping_id:
         return False
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=str(tenant_id), commit=True) as cur:
             cur.execute(
                 "DELETE FROM erp_tax_mappings WHERE id = %s AND tenant_id = %s",
                 (str(mapping_id), str(tenant_id)),

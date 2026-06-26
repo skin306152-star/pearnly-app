@@ -29,7 +29,7 @@ def list_erp_product_mappings(tenant_id, erp_type=None):
     if not tenant_id:
         return []
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=str(tenant_id)) as cur:
             if erp_type:
                 cur.execute(
                     """
@@ -78,7 +78,7 @@ def upsert_erp_product_mapping(tenant_id, erp_type, item_name, erp_code, erp_nam
     erp_name_clean = (erp_name or "").strip()[:256] if erp_name else None
     notes_clean = (notes or "").strip()[:500]
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=str(tenant_id), commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO erp_product_mappings
@@ -115,7 +115,7 @@ def delete_erp_product_mapping(tenant_id, mapping_id):
     if not tenant_id or not mapping_id:
         return False
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=str(tenant_id), commit=True) as cur:
             cur.execute(
                 "DELETE FROM erp_product_mappings WHERE id = %s AND tenant_id = %s",
                 (str(mapping_id), str(tenant_id)),
@@ -141,7 +141,7 @@ def find_erp_product_mappings_batch(tenant_id, erp_type, item_names):
     if not norms:
         return {}
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=str(tenant_id)) as cur:
             cur.execute(
                 """
                 SELECT item_name, item_name_norm, erp_code, erp_name

@@ -6,7 +6,9 @@
      ║  历史明细 → CLAUDE.md/STATE_ARCHIVE.md(按需查·不必每窗口读)   ║
      ╚═══════════════════════════════════════════════════════════════╝ -->
 
-## 🎯 状态卡（2026-06-25 · **B8 RLS · wave3 3a 上线后撞 P0 孤儿事故→已止血+落自愈守卫** · 已 push `bb33b7a5` · companion 未动 · 交接 `docs/refactor/b8-rls-HANDOFF-2026-06-25.md`）
+## 🎯 状态卡（2026-06-26 · **B8 RLS · wave4 第一棒 erp 4 映射表 enroll 上线** · 已 push `3f337517` · CI 绿 + prod 金丝雀 PASS · companion 未动 · 交接 `docs/refactor/b8-rls-HANDOFF-2026-06-25.md` §7.7）
+
+- **★ wave4 erp 映射表 enroll 上线 prod 验过**(`3f337517`):`erp_client/account/tax/product_mappings`(纯 tenant·4 表 tenant_id NOT NULL 无 user_id 列)`apply_tenant_rls` 落 `ensure_erp_mapping_tables`·11 个裸 get_cursor 访问点穿 `get_cursor_rls(tenant_id=...)`。金丝雀:真租户 040f012b… 经真 DAL 自见 5 行账户映射 / 假租户 0·4 表 rls=on npol=1。集成测试 5 例(docker pg·FORCE RLS)+ 全量 4970 单测 + CI 6 闸全绿(run `28234248951`)。**剩 wave4**:`erp_endpoints`/`erp_push_logs`(JOIN 富化难点·legacy 无 CREATE 钩子·INSERT 走 user_id→多半 apply_user_rls)/`erp_oauth_*`/`email_ingest_*`/`import_template_*`。
 
 - **★ P0 事故已闭环(本窗)**(`8ba73117`→`6b83e9b6`→`bb33b7a5`):wave3 把 ocr_history/clients 切 get_cursor_rls 后,role 上下文下 `list_ocr_history` 的 `user_id IN (SELECT id FROM users)` 子查询读**孤儿表 users**(prod 72 张表带外 ENABLE RLS 却零 policy=deny-all)返空→真机识别记录 0 条/LINE 记账断/推送断。**止血**=prod 全量 DISABLE 72 张零-policy 孤儿(61 张真隔离表未动)·业务恢复(OCR=21/ERP=2/LINE=4·跨租户 fake=0)。**防复发**=`core/rls.disable_orphan_rls`+`ensure_no_orphan_rls`(startup 末步幂等自愈·扫零-policy 孤儿全 DISABLE)。复盘 `docs/refactor/b8-rls-no-policy-orphans-INCIDENT.md` §6。**衍生新债=71 张孤儿按域 re-enroll(见交接 §2,优先级最高的剩余项)**。
 - **B8 RLS P3 · ready 域 prod 真启用**(`RLS_ROLE=pearnly_app` 入 `/opt/mrpilot/.env`):POS/库存/产品/采购/销售/会计/税/导出/modules/LINE-brain/expense **已真隔离**。裸 get_cursor 留 owner·force=False 绕过→老路径不破。

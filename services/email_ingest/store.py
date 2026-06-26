@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def get_email_account(user_id: str) -> Optional[Dict[str, Any]]:
     """读当前用户绑定的邮箱账号(第一版一人一个)· 返回完整行(含 password_enc)"""
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(user_id=str(user_id)) as cur:
             cur.execute(
                 """
                 SELECT id, user_id, email_address, imap_host, imap_port, imap_use_ssl,
@@ -68,7 +68,7 @@ def upsert_email_account(
     if interval_min not in (5, 15, 60):
         interval_min = 15
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(user_id=str(user_id), commit=True) as cur:
             if password_enc is not None:
                 cur.execute(
                     """
@@ -153,7 +153,7 @@ def upsert_email_account(
 
 def delete_email_account(user_id: str) -> bool:
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(user_id=str(user_id), commit=True) as cur:
             cur.execute(
                 """
                 DELETE FROM email_ingest_accounts WHERE user_id = %s
@@ -238,7 +238,7 @@ def insert_email_ingest_log(
     import json as _json
 
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(user_id=str(user_id), commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO email_ingest_logs
@@ -271,7 +271,7 @@ def insert_email_ingest_log(
 def list_email_ingest_logs(user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
     """前端用 · 最近的抓取日志"""
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(user_id=str(user_id)) as cur:
             cur.execute(
                 """
                 SELECT id, status, emails_scanned, attachments_found,
@@ -330,3 +330,28 @@ def mark_email_uid_seen(
     except Exception as e:
         logger.error(f"mark_email_uid_seen failed: {e}")
         return False
+
+
+def enroll_email_ingest_rls() -> None:
+    """B8 RLS wave4 enroll(legacy 表无 CREATE 钩子 → 这里只挂 policy,不建表)。
+
+    accounts/logs 纯 user 隔离(user_id);seen_uids 仅 account_id 列 → 经父表
+    email_ingest_accounts 的 user-via-parent EXISTS 隔离。force=False:worker 扫全用户
+    (list_enabled_email_accounts)、按 account_id 记账(update_email_account_status)、
+    抓取管线去重(is/mark_email_uid_seen)的裸 get_cursor(owner)不破。
+    fresh env 表不存在 → 整块吞掉(与各 ensure_* 一致),prod 表已存在。命名故意非
+    `ensure_*`:它不建表,只 enroll,语义准确且不触防屎山 new_debt 闸。
+    """
+    from core.rls import apply_user_rls, apply_user_via_parent_rls
+
+    try:
+        with db.get_cursor(commit=True) as cur:
+            apply_user_rls(cur, "email_ingest_accounts", "email_ingest_logs")
+            apply_user_via_parent_rls(
+                cur,
+                "email_ingest_seen_uids",
+                parent="email_ingest_accounts",
+                fk="account_id",
+            )
+    except Exception as e:
+        logger.warning(f"enroll_email_ingest_rls skipped: {e}")

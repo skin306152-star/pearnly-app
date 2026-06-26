@@ -104,7 +104,10 @@ class _ExplodingCursor:
 
 
 def _patch(cur):
-    return patch.object(db, "get_cursor", lambda *a, **k: _CM(cur))
+    # 迁移期 store 混用 get_cursor(裸 owner)/get_cursor_rls(穿 user)→ 双挂同一 fake。
+    from tests.unit._cursor_patch import patch_both
+
+    return patch_both(factory=lambda *a, **k: _CM(cur))
 
 
 class GetEmailAccountTests(unittest.TestCase):

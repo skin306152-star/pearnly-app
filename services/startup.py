@@ -215,6 +215,15 @@ def _boot_schema_ddl() -> None:
         except Exception as e:
             logger.warning(f"启动 {label} 失败: {e}")
 
+    # B8 RLS wave4 · email_ingest 三表 enroll(legacy 无 CREATE 钩子 · 只挂 policy 不建表 ·
+    # 必须在孤儿守卫 ensure_no_orphan_rls 前跑 · 见 services/email_ingest/store.py)
+    try:
+        from services.email_ingest.store import enroll_email_ingest_rls
+
+        enroll_email_ingest_rls()
+    except Exception as e:
+        logger.warning(f"启动 email_ingest RLS enroll 失败: {e}")
+
     # P1.1 BUG-FIX-P1.1 v118.35.0.41 · 4 模块 task/row 表加 field_overrides JSONB
     # 跟 alembic/versions/002_field_overrides_4_modules.py 双跑(prod 启动兼容)
     # 铁律 #21 ✅:新 schema 函数独立 services/db_migrations/ · 不进 db.py

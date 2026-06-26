@@ -53,3 +53,6 @@ design-preview/
 tests/visual/design/
 # 对账中心 UI 落地参考原型(视觉/交互事实来源 · 非 app 代码 · 不被 import · 永久豁免)
 design-reference/
+# 文档目录:设计简报 / 交接 / 原型 HTML / 架构图 —— 文档不是 app 代码 · 永久豁免
+# (.md 本就不在 prettier glob;此处豁免 docs 下的 html/json/css 等设计产物,免得收录文档就红 lint)
+docs/

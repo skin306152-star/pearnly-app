@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 def list_erp_endpoints(user_id: str, auto_push_only: bool = False) -> List[Dict[str, Any]]:
     """列出用户的所有 ERP 端点(默认排前面)· auto_push_only=True 时只返回开启自动推且 enabled 的"""
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(user_id=user_id) as cur:
             # ERP-1 修(2026-05-25):SELECT 补 user_id · 此前缺它 → 自动推送(_auto_push_history
             #   用本函数 auto_push_only=True 取端点)拿不到 user_id → tenant_id None → mappings 空
             #   → 误报 ERR_NO_CUSTOMER_MAPPING(手动推送走 get_erp_endpoint 含 user_id 故正常)。
@@ -52,7 +52,7 @@ def list_erp_endpoints(user_id: str, auto_push_only: bool = False) -> List[Dict[
 
 def get_erp_endpoint(user_id: str, endpoint_id: str) -> Optional[Dict[str, Any]]:
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(user_id=user_id) as cur:
             cur.execute(
                 """
                 SELECT id, name, adapter, config, is_default, auto_push, enabled,
@@ -74,7 +74,7 @@ def get_erp_endpoint(user_id: str, endpoint_id: str) -> Optional[Dict[str, Any]]
 def get_default_erp_endpoint(user_id: str) -> Optional[Dict[str, Any]]:
     """拿用户默认且启用的端点"""
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(user_id=user_id) as cur:
             cur.execute(
                 """
                 SELECT id, name, adapter, config, is_default, auto_push, enabled, user_id
@@ -124,7 +124,7 @@ def create_erp_endpoint(
     global _last_create_endpoint_error
     is_express = (adapter or "").strip().lower() == "express"
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(user_id=user_id, commit=True) as cur:
             # express 单例:已有就复用,绝不建第二条(向导竞态/多标签会重复 POST)。
             if is_express:
                 existing = _existing_express_id(cur, user_id)
@@ -150,7 +150,7 @@ def create_erp_endpoint(
         # 并发越过上面的查重后撞唯一索引 → 复用已存在的 express,不当失败。
         if is_express:
             try:
-                with db.get_cursor() as cur:
+                with db.get_cursor_rls(user_id=user_id) as cur:
                     existing = _existing_express_id(cur, user_id)
                 if existing:
                     _last_create_endpoint_error = None
@@ -186,7 +186,7 @@ def update_erp_endpoint(user_id: str, endpoint_id: str, **fields) -> bool:
     if not sets:
         return False
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(user_id=user_id, commit=True) as cur:
             # 如果设为默认,先取消其他默认
             if fields.get("is_default"):
                 cur.execute(
@@ -204,7 +204,7 @@ def update_erp_endpoint(user_id: str, endpoint_id: str, **fields) -> bool:
 
 def delete_erp_endpoint(user_id: str, endpoint_id: str) -> bool:
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(user_id=user_id, commit=True) as cur:
             # v118.25.0.2 · 删端点前 · 先把这个端点所有挂起的重试停掉(避免 worker 继续跑)
             cur.execute(
                 """
@@ -242,7 +242,7 @@ def insert_push_log(
     import json as _json
 
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(user_id=user_id, commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO erp_push_logs (
@@ -292,7 +292,7 @@ def has_recent_successful_push(
     if not history_id or not endpoint_id:
         return None
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(user_id=str(user_id)) as cur:
             cur.execute(
                 """
                 SELECT id, response_body, created_at, invoice_no

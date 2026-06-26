@@ -119,7 +119,10 @@ class HasRecentSuccessfulPushPositiveTests(unittest.TestCase):
                 "invoice_no": "INV2026030001",
             }
         )
-        with patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)):
+        with (
+            patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)),
+            patch.object(db, "get_cursor_rls", lambda *a, **k: _MockCursorCM(cursor)),
+        ):
             r = db.has_recent_successful_push(
                 history_id="hist-1",
                 endpoint_id="ep-1",
@@ -131,7 +134,10 @@ class HasRecentSuccessfulPushPositiveTests(unittest.TestCase):
 
     def test_sql_contains_status_success_filter(self):
         cursor = _MockCursor(result=None)
-        with patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)):
+        with (
+            patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)),
+            patch.object(db, "get_cursor_rls", lambda *a, **k: _MockCursorCM(cursor)),
+        ):
             db.has_recent_successful_push("h", "e", "u")
         self.assertEqual(len(cursor.executed), 1)
         sql, _ = cursor.executed[0]
@@ -144,7 +150,10 @@ class HasRecentSuccessfulPushPositiveTests(unittest.TestCase):
     def test_sql_filters_by_user_id(self):
         """user_id 必须出现在 WHERE · 否则跨账号读到他人 success log."""
         cursor = _MockCursor(result=None)
-        with patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)):
+        with (
+            patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)),
+            patch.object(db, "get_cursor_rls", lambda *a, **k: _MockCursorCM(cursor)),
+        ):
             db.has_recent_successful_push("h", "e", "user-X")
         sql, params = cursor.executed[0]
         self.assertIn("user_id = %s", sql)
@@ -153,7 +162,10 @@ class HasRecentSuccessfulPushPositiveTests(unittest.TestCase):
 
     def test_sql_filters_by_history_id_and_endpoint_id(self):
         cursor = _MockCursor(result=None)
-        with patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)):
+        with (
+            patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)),
+            patch.object(db, "get_cursor_rls", lambda *a, **k: _MockCursorCM(cursor)),
+        ):
             db.has_recent_successful_push("h-1", "e-2", "u-3")
         sql, params = cursor.executed[0]
         self.assertIn("history_id = %s", sql)
@@ -162,7 +174,10 @@ class HasRecentSuccessfulPushPositiveTests(unittest.TestCase):
 
     def test_sql_orders_by_created_at_desc_limit_1(self):
         cursor = _MockCursor(result=None)
-        with patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)):
+        with (
+            patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)),
+            patch.object(db, "get_cursor_rls", lambda *a, **k: _MockCursorCM(cursor)),
+        ):
             db.has_recent_successful_push("h", "e", "u")
         sql, _ = cursor.executed[0]
         # 必须 ORDER BY DESC · 拿最新一条 success(防长期累积里挑到旧的)
@@ -175,21 +190,30 @@ class HasRecentSuccessfulPushNegativeTests(unittest.TestCase):
 
     def test_returns_none_when_no_success_log(self):
         cursor = _MockCursor(result=None)
-        with patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)):
+        with (
+            patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)),
+            patch.object(db, "get_cursor_rls", lambda *a, **k: _MockCursorCM(cursor)),
+        ):
             r = db.has_recent_successful_push("h", "e", "u")
         self.assertIsNone(r)
 
     def test_returns_none_when_history_id_missing(self):
         # 没 history_id · 直接返 None · 不查 DB
         cursor = _MockCursor(result={"id": "x"})
-        with patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)):
+        with (
+            patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)),
+            patch.object(db, "get_cursor_rls", lambda *a, **k: _MockCursorCM(cursor)),
+        ):
             r = db.has_recent_successful_push("", "e", "u")
         self.assertIsNone(r)
         self.assertEqual(len(cursor.executed), 0)
 
     def test_returns_none_when_endpoint_id_missing(self):
         cursor = _MockCursor(result={"id": "x"})
-        with patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)):
+        with (
+            patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)),
+            patch.object(db, "get_cursor_rls", lambda *a, **k: _MockCursorCM(cursor)),
+        ):
             r = db.has_recent_successful_push("h", None, "u")
         self.assertIsNone(r)
         self.assertEqual(len(cursor.executed), 0)
@@ -197,7 +221,10 @@ class HasRecentSuccessfulPushNegativeTests(unittest.TestCase):
     def test_returns_none_on_db_exception_not_raises(self):
         """DB 挂了不能往上抛 · 否则 push 路由整个炸. 应吞掉返 None."""
         cursor = _MockCursor(result=None, raise_on_execute=True)
-        with patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)):
+        with (
+            patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cursor)),
+            patch.object(db, "get_cursor_rls", lambda *a, **k: _MockCursorCM(cursor)),
+        ):
             r = db.has_recent_successful_push("h", "e", "u")
         self.assertIsNone(r)
 

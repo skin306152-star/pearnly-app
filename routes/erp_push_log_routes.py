@@ -221,7 +221,9 @@ async def erp_history_push_status(history_id: str, request: Request):
     """P0-2 · 查询某张发票是否已成功推送到 ERP"""
     user = get_current_user_from_request(request)
     _check_push_access(user)
-    result = db.list_push_logs(user["id"], history_id=history_id, status_filter="success", limit=1)
+    result = db.list_push_logs(
+        user["id"], history_id=history_id, status_filter="success", limit=1, tenant_id=_tid(user)
+    )
     items = result.get("items", [])
     if items:
         item = items[0]
@@ -261,6 +263,7 @@ async def erp_logs(
         offset=max(0, offset),
         keyword=keyword.strip() if keyword else None,
         push_type=push_type if push_type in ("id_card", "invoice") else None,
+        tenant_id=_tid(user),
     )
 
 
@@ -269,7 +272,7 @@ async def erp_log_detail(log_id: str, request: Request):
     """单条日志完整详情 · 含请求体/响应体"""
     user = get_current_user_from_request(request)
     _check_push_access(user)
-    detail = db.get_push_log_detail(user["id"], log_id)
+    detail = db.get_push_log_detail(user["id"], log_id, tenant_id=_tid(user))
     if not detail:
         raise HTTPException(404, detail="log.not_found")
     return detail
@@ -288,7 +291,7 @@ async def erp_retry_push(log_id: str, request: Request):
     """一键重试失败的推送"""
     user = get_current_user_from_request(request)
     _check_push_access(user)
-    log = db.get_push_log_detail(user["id"], log_id)
+    log = db.get_push_log_detail(user["id"], log_id, tenant_id=_tid(user))
     if not log:
         raise HTTPException(404, detail="log.not_found")
     if log["status"] == "success":
@@ -363,7 +366,7 @@ async def erp_batch_retry(req: ErpBatchRetryRequest, request: Request):
 
     for log_id in req.log_ids:
         try:
-            log = db.get_push_log_detail(user["id"], log_id)
+            log = db.get_push_log_detail(user["id"], log_id, tenant_id=_tid(user))
             if not log:
                 skipped += 1
                 details.append({"log_id": log_id, "result": "skipped", "reason": "not_found"})

@@ -47,7 +47,9 @@ def _cm(cur):
 
 class CreateExpressReuseTests(unittest.TestCase):
     def _patch(self, cur):
-        return mock.patch.object(store.db, "get_cursor", lambda *a, **k: _cm(cur))
+        from tests.unit._cursor_patch import patch_both
+
+        return patch_both(factory=lambda *a, **k: _cm(cur))
 
     def test_reuse_existing_express(self):
         cur = SeqCursor(fetchone_seq=[{"id": "ex-existing"}])

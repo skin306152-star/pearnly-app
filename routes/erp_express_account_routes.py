@@ -75,7 +75,7 @@ async def erp_express_account_fix(log_id: str, req: ErpExpressAccountFixRequest,
     user = get_current_user_from_request(request)
     _check_push_access(user)
 
-    log = db.get_push_log_detail(user["id"], log_id)
+    log = db.get_push_log_detail(user["id"], log_id, tenant_id=_tid(user))
     if not log:
         raise HTTPException(404, detail="erp.log_not_found")
     if not log.get("history_id") or not log.get("endpoint_id"):
@@ -138,7 +138,7 @@ async def erp_express_bind_subject(
     user = get_current_user_from_request(request)
     _check_push_access(user)
 
-    log = db.get_push_log_detail(user["id"], log_id)
+    log = db.get_push_log_detail(user["id"], log_id, tenant_id=_tid(user))
     if not log:
         raise HTTPException(404, detail="erp.log_not_found")
     if not log.get("history_id") or not log.get("endpoint_id"):

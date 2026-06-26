@@ -102,7 +102,10 @@ class PushLogsFoldShapeTests(unittest.TestCase):
 
     def _run(self, **kwargs):
         cur = _MockCursor()
-        with patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cur)):
+        with (
+            patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cur)),
+            patch.object(db, "get_cursor_rls", lambda *a, **k: _MockCursorCM(cur)),
+        ):
             r = db.list_push_logs("user-X", **kwargs)
         return cur, r
 

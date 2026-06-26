@@ -106,7 +106,10 @@ class ListPushLogsEnrichTests(unittest.TestCase):
 
     def _call(self, **kw):
         cur = _Cur(self._rows())
-        with mock.patch.object(push_store.db, "get_cursor", lambda *a, **k: _CM(cur)):
+        with (
+            mock.patch.object(push_store.db, "get_cursor", lambda *a, **k: _CM(cur)),
+            mock.patch.object(push_store.db, "get_cursor_rls", lambda *a, **k: _CM(cur)),
+        ):
             return push_store.list_push_logs("u1", **kw)
 
     def test_failed_rows_get_repair_fields(self):

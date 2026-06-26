@@ -40,7 +40,7 @@ def delete_push_logs(user_id: str, log_ids: List[str]) -> int:
     if not log_ids:
         return 0
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(user_id=user_id, commit=True) as cur:
             cur.execute(
                 "DELETE FROM erp_push_logs WHERE user_id = %s AND id = ANY(%s::uuid[])",
                 (user_id, list(log_ids)),
@@ -107,6 +107,7 @@ def list_push_logs(
     offset: int = 0,
     keyword: Optional[str] = None,
     push_type: Optional[str] = None,
+    tenant_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """查询推送日志(P2-B 折叠版),支持按 history/endpoint/status/trigger/adapter 过滤.
 
@@ -119,7 +120,12 @@ def list_push_logs(
     过滤. 已删 endpoint join 不到 row (endpoint_adapter is NULL),自动不命中 adapter filter.
     """
     try:
-        with db.get_cursor() as cur:
+        # B8 RLS wave4:erp_push_logs 是 user 隔离(只看 user_id);但本查询 JOIN 的
+        # ocr_history/clients/workspace_clients 是 tenant_or_user 隔离——只穿 user_id 会让
+        # tenant_id 已落库的那些行在 role 上下文不可见 → 富化字段(客户名/账套名/买方名)丢。
+        # 故穿 tenant_id + user_id 双上下文:erp_push_logs 按 user 命中,JOIN 的 tenant 表按
+        # tenant 命中(孤立 tenant_id NULL 行回落 user)。tenant_id 缺省 None 时退化为纯 user。
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             # 折叠 CTE:每对 (history×endpoint) 取 created_at 最新一条(id 作 tie-break).
             # NULL-safe:任一 id 为空 → 'solo:'||id 独立分区 → _rn 恒为 1 → 全保留不合并.
             ranked_cte = """
@@ -257,7 +263,9 @@ def list_push_logs(
         return {"items": [], "total": 0}
 
 
-def get_push_log_detail(user_id: str, log_id: str) -> Optional[Dict[str, Any]]:
+def get_push_log_detail(
+    user_id: str, log_id: str, tenant_id: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
     """单条推送日志完整详情(含 request_body / response_body)
 
     临时任务 (Zihao 2026-05-26) · JOIN endpoints 拿 adapter + name,JOIN clients
@@ -266,7 +274,8 @@ def get_push_log_detail(user_id: str, log_id: str) -> Optional[Dict[str, Any]]:
     response_body 在详情接口里保留(弹窗"技术详情"折叠区要看原始体)。
     """
     try:
-        with db.get_cursor() as cur:
+        # 同 list_push_logs:JOIN ocr_history/clients 富化需 tenant 上下文,穿 tenant_id+user_id。
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
             cur.execute(
                 """
                 SELECT l.id, l.endpoint_id, l.history_id, l.invoice_no, l.seller_name,
@@ -316,7 +325,7 @@ def get_push_log_detail(user_id: str, log_id: str) -> Optional[Dict[str, Any]]:
 def get_push_stats_today(user_id: str) -> Dict[str, Any]:
     """今日推送统计(总数 · 成功 · 失败)"""
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(user_id=user_id) as cur:
             cur.execute(
                 """
                 SELECT

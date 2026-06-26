@@ -152,7 +152,18 @@ class _CursorCM:
 
 
 def _patch_cursor(cursor: _Cursor):
-    return patch.object(db, "get_cursor", lambda *a, **k: _CursorCM(cursor))
+    # 同一 fake cursor 同时挂到两路:get_billing_status_combined 先经 get_cursor 查 exempt,
+    # 再经 get_cursor_rls 查 balance(charge_ocr/deduct_thb 亦走 RLS 游标)· executed 累计不丢。
+    from contextlib import contextmanager
+
+    cm = lambda *a, **k: _CursorCM(cursor)  # noqa: E731
+
+    @contextmanager
+    def _both():
+        with patch.object(db, "get_cursor", cm), patch.object(db, "get_cursor_rls", cm):
+            yield
+
+    return _both()
 
 
 # 常量

@@ -54,6 +54,10 @@ def ensure_ocr_cost_log_table():
                 """)
             except Exception as _me:
                 logger.warning(f"ocr_cost_log.history_id 类型迁移失败(不致命): {_me}")
+            # enroll:tenant_id 可空 + user_id NOT NULL → tenant_or_user(孤立行回退 user 隔离)。
+            from core.rls import apply_tenant_or_user_rls
+
+            apply_tenant_or_user_rls(cur, "ocr_cost_log")
             logger.info("✅ ocr_cost_log 表已就绪")
     except Exception as e:
         logger.error(f"ensure_ocr_cost_log_table failed: {e}")
@@ -72,7 +76,11 @@ def log_ocr_cost(
 ) -> bool:
     """每次识别完写一条成本记录"""
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(
+            tenant_id=str(tenant_id) if tenant_id else None,
+            user_id=str(user_id),
+            commit=True,
+        ) as cur:
             cur.execute(
                 """
                 INSERT INTO ocr_cost_log

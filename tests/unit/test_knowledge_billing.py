@@ -45,6 +45,7 @@ class DeductThbTests(unittest.TestCase):
         fake_db = mock.Mock()
         fake_db.is_user_billing_exempt.return_value = exempt
         fake_db.get_cursor.return_value = _FakeCtx(cur)
+        fake_db.get_cursor_rls.return_value = _FakeCtx(cur)  # deduct_thb 走 RLS 游标
         with mock.patch.object(charge, "db", fake_db):
             res = charge.deduct_thb("u1", "t1", cost, "rag_answer", "test")
         return res, cur

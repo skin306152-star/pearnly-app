@@ -90,7 +90,7 @@ def get_billing_status_combined(user_id, tenant_id) -> dict:
         }
     try:
         ym = _bkk_year_month()
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=str(tenant_id)) as cur:
             # 一次 SELECT 合并两个 LEFT JOIN · 一次 DB roundtrip
             cur.execute(
                 """

@@ -151,6 +151,15 @@ def ensure_credits_tables():
                 WHERE email IN ('skin306152@gmail.com','mrerp@outlook.co.th','suthida_chatgpt@outlook.com')
             """)
 
+            # 10. enroll tenant 维度 RLS(钱表第二道防线 · force=False owner 兜底)。
+            #     user_company_roles 不 enroll:登录/多公司解析在租户上下文建立前就查它(鉴权基础表),
+            #     enroll 会让无上下文的成员解析 deny-all,同 users。
+            from core.rls import apply_tenant_rls
+
+            apply_tenant_rls(
+                cur, "tenant_credits", "credit_transactions", "monthly_page_usage", "topup_requests"
+            )
+
         logger.info("[credits] 新表结构初始化完成")
     except Exception as e:
         logger.error(f"ensure_credits_tables failed: {e}")

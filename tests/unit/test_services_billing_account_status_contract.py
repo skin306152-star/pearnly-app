@@ -29,7 +29,7 @@ class _FakeCursor:
 
 def _ctxmgr(cur):
     @contextmanager
-    def _gc(commit=False):
+    def _gc(*a, **k):
         yield cur
 
     return _gc
@@ -141,7 +141,7 @@ class GetBillingStatusCombinedTests(unittest.TestCase):
         # 简化路径:cache is_exempt=False 预填 · 跳过第一次查
         account_status._EXEMPT_CACHE["u1"] = (False, _time_far_future())
         cur = _FakeCursor(row={"balance_thb": 0, "pages_used": 5})
-        with mock.patch.object(account_status.db, "get_cursor", _ctxmgr(cur)):
+        with mock.patch.object(account_status.db, "get_cursor_rls", _ctxmgr(cur)):
             s = account_status.get_billing_status_combined("u1", "t1")
         self.assertFalse(s["allowed"])
         self.assertEqual(s["error_code"], "insufficient_balance")
@@ -153,7 +153,7 @@ class GetBillingStatusCombinedTests(unittest.TestCase):
 
         account_status._EXEMPT_CACHE["u1"] = (False, _time_far_future())
         cur = _FakeCursor(row={"balance_thb": 150.5, "pages_used": 12})
-        with mock.patch.object(account_status.db, "get_cursor", _ctxmgr(cur)):
+        with mock.patch.object(account_status.db, "get_cursor_rls", _ctxmgr(cur)):
             s = account_status.get_billing_status_combined("u1", "t1")
         self.assertTrue(s["allowed"])
         self.assertFalse(s["is_exempt"])
@@ -166,7 +166,7 @@ class GetBillingStatusCombinedTests(unittest.TestCase):
 
         account_status._EXEMPT_CACHE["u1"] = (False, _time_far_future())
         cur = _FakeCursor(raise_on_exec=True)
-        with mock.patch.object(account_status.db, "get_cursor", _ctxmgr(cur)):
+        with mock.patch.object(account_status.db, "get_cursor_rls", _ctxmgr(cur)):
             s = account_status.get_billing_status_combined("u1", "t1")
         # 失败时不阻塞 OCR(降级允许)· 但 error_code 标 lookup_error
         self.assertTrue(s["allowed"])

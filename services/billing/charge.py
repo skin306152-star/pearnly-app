@@ -103,7 +103,7 @@ def charge_ocr(
     if kind == "pdf":
         used = 0
         try:
-            with db.get_cursor() as _c:
+            with db.get_cursor_rls(tenant_id=str(tenant_id)) as _c:
                 _c.execute(
                     "SELECT COALESCE(pages_used, 0) AS u FROM monthly_page_usage "
                     "WHERE tenant_id = %s::uuid AND year_month = %s",
@@ -133,7 +133,7 @@ def charge_ocr(
 
     ym = db._bkk_year_month()
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=str(tenant_id), commit=True) as cur:
             new_bal = _debit_balance(cur, tenant_id, cost)  # 可扣到负数(OCR 已完成 · 后续充值补)
             cur.execute(
                 "INSERT INTO credit_transactions "
@@ -247,7 +247,7 @@ def deduct_thb(user_id, tenant_id, cost_thb, kind: str, description: str = "") -
     except Exception:
         pass
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=str(tenant_id) if tenant_id else None, commit=True) as cur:
             new_bal = _debit_balance(cur, tenant_id, cost)
             cur.execute(
                 "INSERT INTO credit_transactions "

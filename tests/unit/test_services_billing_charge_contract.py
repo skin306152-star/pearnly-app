@@ -38,7 +38,7 @@ class _FakeCursor:
 
 def _ctxmgr(cur):
     @contextmanager
-    def _gc(commit=False):
+    def _gc(*a, **k):
         yield cur
 
     return _gc
@@ -104,7 +104,7 @@ class ChargeOcrBranchTests(unittest.TestCase):
         with (
             mock.patch.object(charge.db, "is_user_billing_exempt", return_value=False),
             mock.patch.object(charge.db, "estimate_excel_cost_thb", return_value=Decimal("0.25")),
-            mock.patch.object(charge.db, "get_cursor", _ctxmgr(cur)),
+            mock.patch.object(charge.db, "get_cursor_rls", _ctxmgr(cur)),
         ):
             r = charge.charge_ocr("u1", "t1", "excel", 1000, description="test")
         self.assertTrue(r["ok"])

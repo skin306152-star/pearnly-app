@@ -24,7 +24,11 @@ ready 域 + wave2 对账 + bank_reconcile_* + wave3 3a 核心(ocr_history/client
 
 **prod 核验(role 上下文真数据)**:孤儿残留 0 · OCR 识别记录 app 角色可读 21 · `users` 根因表可读 1 · ERP 推送 2 · LINE 绑定 4 · 跨租户 fake=0 隔离仍在。
 
-## 2. ★事故衍生的新债:71 张孤儿表按域 re-enroll(优先级最高的剩余项)
+## 2. ★事故衍生的新债:孤儿表按域 re-enroll —— ✅ 全部收官(2026-06-27 · 见 §7.20)
+
+> **状态:已完结。** 所有数据隔离孤儿表已按域 enroll 上线 prod(金丝雀验真隔离)。明确不开的(审计日志
+> /计数器/根表/owner_id 非标准列的 excel_templates)维持 DISABLE 终态。**接手只剩 P4 收口(§7.15.5)。**
+> 下文为历史背景。
 
 事故里为止血把 72 张「RLS-on 零-policy」全 DISABLE 了。其中 `users`/`tenants`/`roles`/`rd_cache`/审计日志
 等本就是设计 §6「不开 RLS」→ DISABLE 即终态,**不用动**。但**数据隔离表**(`sales_documents`/`products`/
@@ -278,7 +282,7 @@ docs commit:`4bdd0465`/`0fa96777`/`09c4c7b3`/`0f915e5c`/`19e6a300`。**全 commi
 | ~~**etax**~~ ✅ | `etax_channel_settings`/`etax_submissions`/`invoice_risk_checks`(均纯 tenant) | — | **已收 §7.17(`51318414`)**。 |
 | ~~**settings 杂项**~~ ✅ | user_settings/api_keys(tou)·invitations/ownership_transfers(tenant)·client_assignments/payment_pending(user) enroll;operation_logs/rd_daily_usage 不开 | — | **已收 §7.18(`487a2d28`)**。 |
 | ~~**knowledge**~~ ✅ | 6 表(均纯 tenant) | — | **已收 §7.19(`661a5f1c`)**。子表自带 tenant_id 列·不需 via-parent。 |
-| **零暴露孤儿** | `erp_oauth_states`/`erp_oauth_tokens`/`mrerp_credentials`/`erp_connectors`/`excel_templates` | tenant/tenant_or_user | 代码树无访问点·纯 prod 孤儿·守卫已 DISABLE 无暴露 → **最低优先**。照 `ensure_sales_rls` 范式 enroll-only(逐表验存在),或维持 disabled。 |
+| ~~**零暴露孤儿**~~ ✅ | erp_oauth_states/erp_oauth_tokens/mrerp_credentials(tenant)enroll;excel_templates 不开;erp_connectors 不存在 | — | **已收 §7.20(`329b191d`)**。 |
 
 **明确不 enroll(DISABLE 即终态·设计裁决)**:`users`/`tenants`/`roles`/`memberships`/`user_company_roles`(超管/根表·见 §4)、`billing_balance_log`、`line_voice_quota`、订阅/付款/改密/登录失败/审计日志类(`subscription_log`/`payment_pending` 注意区分:payment_pending 是 user 维度待处理项可 enroll·纯日志不开)、`alembic_version`/`rd_cache`/`email_codes`/`ip_usage`。**钱表已在 wave3 3d enroll(charge.py 禁 bypass)·超管聚合必 bypass**。
 
@@ -325,6 +329,21 @@ docs commit:`4bdd0465`/`0fa96777`/`09c4c7b3`/`0f915e5c`/`19e6a300`。**全 commi
 - **enroll 落点**:新建 `services/knowledge/rls.py:ensure_knowledge_rls`。**零业务代码改动**:11 个访问点(`knowledge_routes` 7 + `knowledge_ask_routes` 4·含 pgvector 向量检索)已全走 `get_cursor_rls(tenant)`,ingest 内联请求事务无后台 worker → enroll-only。
 - **附带 /simplify 收口**:`startup.py` 抽 B8 纯 enroll 那组(11 个 ensure_*_rls)到 `services/rls_boot.py:run_rls_enrolls()`(从 boot_ensures 移出·建表 ensure 后 / ensure_no_orphan_rls 前统一跑)→ startup.py 净 -5 行(495·此前累积 enroll 注册触 500 上限)。**接手新增 RLS enroll 改 `rls_boot.py` 的 enrolls 元组,不再往 startup.boot_ensures 加。**
 - 测试:`tests/integration/test_knowledge_rls_real_tables.py` 4 例(6 表 tenant 隔离 / firm-wide NULL 可见回归守门 / WITH CHECK / owner bypass)本地 docker pg PASS;全量 4973 单测 + CI 6 闸绿(run `28283975958`)。
+
+## 7.20 2026-06-27 孤儿 re-enroll 全部收官 · 零暴露孤儿(prod live · CI 6 闸绿 · 金丝雀 PASS)
+
+| commit | enroll(tenant) | 不开/不存在 | 金丝雀(prod `329b191d`) |
+|---|---|---|---|
+| `329b191d` | erp_oauth_states/erp_oauth_tokens/mrerp_credentials | excel_templates 不开·erp_connectors 不存在 | 3 表 rls=on/npol=1·excel_templates rls=off·**erp_oauth_states 真 1 行假租户见 0** |
+
+- erp_oauth_*(已删 Xero 残留)/mrerp_credentials:repo 内零代码访问点(仅一处文档注释)、tenant_id NOT NULL → 纯 tenant·新建 `services/erp/credentials_rls.py:ensure_erp_credentials_rls`(注册进 `rls_boot.py` 元组)·防御纵深。
+- **excel_templates 不 enroll**(设计裁决):隔离列是 `owner_id`(非标准 `user_id`)且 `tenant_id` 恒 NULL,标准模板不匹配;零应用访问点 → 守卫维持 DISABLE。`erp_connectors` prod 不存在(幻影·existing_tables 自动跳过)。
+
+### ✅ B8 孤儿表按域 re-enroll —— 全部完结
+
+本会话(2026-06-27 单窗)连推 **9 棒**:sales / suppliers / line / tenant 批(products/client_rules/member_scopes)/ **automation / etax / settings 杂项 / knowledge RAG / 零暴露孤儿**,叠加此前 wave2/3/4。**所有数据隔离孤儿表已 enroll 上线 prod·金丝雀全验真隔离**(invitations 44 / knowledge_documents 37 / knowledge_answers 29 / erp_oauth_states 1 等真数据行·假租户一律见 0)。明确不开的(error_events/operation_logs 审计日志·rd_daily_usage 限流计数器·excel_templates owner_id 非标准列·users/tenants/roles 等根表)维持 DISABLE 终态。**剩唯一项 = P4 收口(§7.15.5)。**
+
+**沉淀的最强教训**:repo 无 CREATE DDL 的 legacy 孤儿,**必 SSH prod `\d <表>` 查真实列定模板**,别照搬 INCIDENT §2(本窗 automation/etax/settings/knowledge 模板分类均被纠偏)。判模板三看:① 列真实存在性 ② 列实际填充(tenant_id 大量 NULL→可能 tenant_or_user;恒 NULL+有 user_id→user)③ 读路径(`workspace_client_id IS NULL OR =`→不能 tenant_ws)。
 
 ### 7.15.5 P4 收口(全部域 enroll 后做)
 

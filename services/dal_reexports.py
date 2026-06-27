@@ -30,6 +30,9 @@ _REEXPORTS = {
     "services.knowledge.risk_check": [
         "ensure_risk_check_rls",
     ],
+    "services.knowledge.rls": [
+        "ensure_knowledge_rls",
+    ],
     "services.settings_misc.schema": [
         "ensure_settings_misc_rls",
     ],

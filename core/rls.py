@@ -127,6 +127,21 @@ def apply_user_via_parent_rls(
     _apply_via_parent(cur, table, parent, fk, parent_pk, inner, name, force)
 
 
+def existing_tables(cur, tables) -> list[str]:
+    """过滤出 public schema 中实际存在的表(保持入参顺序·单查询批量探测)。
+
+    legacy 孤儿表散落在不同 alembic 版本,某张未建(部分库)不应连累其余 enroll。
+    供各域 ensure_*_rls 复用,免得逐表 information_schema 探测各写一份。
+    """
+    cur.execute(
+        "SELECT table_name FROM information_schema.tables "
+        "WHERE table_schema = 'public' AND table_name = ANY(%s)",
+        (list(tables),),
+    )
+    present = {r["table_name"] for r in cur.fetchall()}
+    return [t for t in tables if t in present]
+
+
 def disable_orphan_rls(cur) -> list[str]:
     """关掉「RLS 已 ENABLE 但零 policy」的孤儿表 RLS,返回被关表名。
 

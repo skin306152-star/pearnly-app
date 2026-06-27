@@ -35,18 +35,10 @@ def ensure_sales_rls() -> None:
     (部分库)不连累其余。force=False:owner 仍绕过 → 回填迁移(workspace_backfill)、公开 share-token
     取件(sales_send_routes 走 bypass=True)等系统/无租户上下文路径不破;业务连接 SET ROLE 后强制。
     """
-    from core.rls import apply_tenant_rls
+    from core.rls import apply_tenant_rls, existing_tables
 
     try:
         with db.get_cursor(commit=True) as cur:
-            for table in _RLS_TABLES:
-                cur.execute(
-                    "SELECT 1 FROM information_schema.tables "
-                    "WHERE table_schema='public' AND table_name=%s",
-                    (table,),
-                )
-                if cur.fetchone() is None:
-                    continue
-                apply_tenant_rls(cur, table)
+            apply_tenant_rls(cur, *existing_tables(cur, _RLS_TABLES))
     except Exception as e:
         logger.warning(f"ensure_sales_rls skipped: {e}")

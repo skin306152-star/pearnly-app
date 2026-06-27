@@ -247,18 +247,10 @@ def ensure_line_binding_rls() -> None:
     force=False:本表全部访问是 owner(LINE webhook 无登录态·靠 line_user_id 反查·穿不进 user 上下文)
     → owner 绕过,store 全裸 get_cursor 不破;policy 仅作第二道防线。逐表先验存在防部分库整块失败。
     """
-    from core.rls import apply_user_rls
+    from core.rls import apply_user_rls, existing_tables
 
     try:
         with db.get_cursor(commit=True) as cur:
-            for table in ("line_bindings", "line_binding_codes"):
-                cur.execute(
-                    "SELECT 1 FROM information_schema.tables "
-                    "WHERE table_schema='public' AND table_name=%s",
-                    (table,),
-                )
-                if cur.fetchone() is None:
-                    continue
-                apply_user_rls(cur, table)
+            apply_user_rls(cur, *existing_tables(cur, ("line_bindings", "line_binding_codes")))
     except Exception as e:
         logger.warning(f"ensure_line_binding_rls skipped: {e}")

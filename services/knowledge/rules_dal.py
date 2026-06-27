@@ -9,6 +9,7 @@ query is tenant-scoped, and reads honour workspace-client visibility.
 
 from __future__ import annotations
 
+import logging
 from datetime import date
 from typing import Optional, Sequence
 
@@ -33,6 +34,8 @@ from services.knowledge.schema import (
     ClientRule,
 )
 from services.knowledge.access import AccessibleIds, workspace_filter
+
+logger = logging.getLogger(__name__)
 
 _CR_COLS = (
     "id, tenant_id, workspace_client_id, rule_type, subject_type, subject_key, "
@@ -287,18 +290,10 @@ def ensure_client_rules_rls() -> None:
     迁移路径裸 owner 不破。先验存在防部分库整块失败。
     """
     from core import db
-    from core.rls import apply_tenant_rls
+    from core.rls import apply_tenant_rls, existing_tables
 
     try:
         with db.get_cursor(commit=True) as cur:
-            cur.execute(
-                "SELECT 1 FROM information_schema.tables "
-                "WHERE table_schema='public' AND table_name='client_rules'"
-            )
-            if cur.fetchone() is None:
-                return
-            apply_tenant_rls(cur, "client_rules")
-    except Exception as e:  # noqa: BLE001
-        import logging
-
-        logging.getLogger(__name__).warning(f"ensure_client_rules_rls skipped: {e}")
+            apply_tenant_rls(cur, *existing_tables(cur, ("client_rules",)))
+    except Exception as e:
+        logger.warning(f"ensure_client_rules_rls skipped: {e}")

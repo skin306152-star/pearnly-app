@@ -32,6 +32,7 @@ def run_rls_enrolls() -> None:
         db.ensure_risk_check_rls,
         db.ensure_knowledge_rls,
         db.ensure_settings_misc_rls,
+        db.ensure_erp_credentials_rls,
     )
     for ensure_fn in enrolls:
         try:

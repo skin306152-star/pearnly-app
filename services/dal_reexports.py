@@ -33,6 +33,9 @@ _REEXPORTS = {
     "services.knowledge.rls": [
         "ensure_knowledge_rls",
     ],
+    "services.erp.credentials_rls": [
+        "ensure_erp_credentials_rls",
+    ],
     "services.settings_misc.schema": [
         "ensure_settings_misc_rls",
     ],

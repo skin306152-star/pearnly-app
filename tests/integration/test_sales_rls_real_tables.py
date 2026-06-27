@@ -40,6 +40,10 @@ _DDL = {
         "period text NOT NULL, next_number bigint NOT NULL DEFAULT 1, "
         "PRIMARY KEY (tenant_id, doc_type, prefix, period)"
     ),
+    "products": (
+        "id uuid PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id uuid NOT NULL, "
+        "code text, name text NOT NULL DEFAULT ''"
+    ),
 }
 
 
@@ -100,6 +104,7 @@ class SalesRlsTests(unittest.TestCase):
                 "VALUES (%s, 'invoice', 'IV', '2506')",
                 (tenant,),
             )
+            cur.execute("INSERT INTO products (tenant_id, name) VALUES (%s, 'P')", (tenant,))
 
     def test_tenant_sees_only_own_rows(self):
         self._seed_tenant(TA)

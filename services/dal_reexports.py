@@ -18,6 +18,9 @@ _REEXPORTS = {
     "services.sales.schema": [
         "ensure_sales_rls",
     ],
+    "services.knowledge.rules_dal": [
+        "ensure_client_rules_rls",
+    ],
     "services.email_ingest.store": [
         "get_email_account",
         "get_email_account_safe",

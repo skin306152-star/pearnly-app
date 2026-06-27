@@ -274,3 +274,31 @@ def increment_hit_counts(cur, *, tenant_id: str, rule_ids: Sequence[int]) -> Non
         "WHERE tenant_id = %s AND id = ANY(%s::bigint[])",
         (tenant_id, list(ids)),
     )
+
+
+def ensure_client_rules_rls() -> None:
+    """B8 RLS:给 client_rules 上 tenant policy(幂等 · 独立事务防牵连别的 ensure)。
+
+    tenant_id NOT NULL;workspace_client_id 可空(NULL = firm-wide 全所默认)。**必须纯 tenant
+    不能 tenant_ws**:load_client_rules 故意读 `workspace_client_id IS NULL OR = %s`(firm-wide
+    默认 + 当前账套),tenant_ws 的 _WS_MATCH 会隐藏 NULL 行 → firm-wide 规则全消失,业务破。
+    client_rules 只在 alembic 0003 建、无 startup CREATE 钩子,故独立 ensure_*_rls(对齐
+    ensure_sales_rls 范式)。force=False:knowledge 路由/风险引擎已全走 get_cursor_rls(tenant),
+    迁移路径裸 owner 不破。先验存在防部分库整块失败。
+    """
+    from core import db
+    from core.rls import apply_tenant_rls
+
+    try:
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema='public' AND table_name='client_rules'"
+            )
+            if cur.fetchone() is None:
+                return
+            apply_tenant_rls(cur, "client_rules")
+    except Exception as e:  # noqa: BLE001
+        import logging
+
+        logging.getLogger(__name__).warning(f"ensure_client_rules_rls skipped: {e}")

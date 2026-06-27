@@ -125,6 +125,12 @@ def _create_tables(cur) -> None:
         "CREATE INDEX IF NOT EXISTS ix_member_scopes_ws "
         "ON member_scopes(tenant_id, workspace_client_id)"
     )
+    # B8 RLS:member_scopes 是授权配置(某 membership 可访问哪些账套),隔离轴是 tenant 不是
+    # workspace(resolver 读它来构建账套上下文·先有鸡)→ 纯 tenant。force=False:resolver/团队
+    # 控制台/邀请全裸 owner(授权链建立前跑),owner 绕过不破·policy 仅作第二道防线。
+    from core.rls import apply_tenant_rls
+
+    apply_tenant_rls(cur, "member_scopes")
     cur.execute("""
         CREATE TABLE IF NOT EXISTS invitations (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

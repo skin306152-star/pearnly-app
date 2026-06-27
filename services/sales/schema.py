@@ -14,16 +14,17 @@ from core import db
 
 logger = logging.getLogger(__name__)
 
-# 全 5 张表 tenant_id NOT NULL、无 user_id → 纯 tenant 模板。
-# sales_documents 的账套列叫 seller_workspace_client_id(非 workspace_client_id),
-# document_number_sequences 的 workspace_client_id 运行时加且可空 → 都不用 tenant_ws(账套强隔离
-# 已由应用层 5 列唯一索引 uq_dns_ws 保证),统一 apply_tenant_rls。
+# 全部 tenant_id NOT NULL、无 user_id → 纯 tenant 模板。
+# sales_documents 的账套列叫 seller_workspace_client_id(非 workspace_client_id)、
+# document_number_sequences 与 products 的 workspace_client_id 运行时加且可空 → 都不用 tenant_ws
+# (账套强隔离已由应用层唯一索引保证·products 同源于 0006_sales_core 销项商品主数据),统一 apply_tenant_rls。
 _RLS_TABLES = (
     "sales_documents",
     "sales_document_lines",
     "sales_document_sends",
     "sales_settings",
     "document_number_sequences",
+    "products",
 )
 
 

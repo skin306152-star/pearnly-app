@@ -16,26 +16,35 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# 新增纯 enroll:把 ensure_*_rls 加进此清单 + 在 services/dal_reexports 注册成 db.*。
+# 按名字(非函数引用)登记:漏注册 dal_reexports 时只跳过该项(响亮告警),不连坐其余 enroll
+# 与末步 ensure_no_orphan_rls 自愈守卫。
+_ENROLLS = (
+    "ensure_erp_push_rls",
+    "ensure_bank_recon_rls",
+    "ensure_email_ingest_rls",
+    "ensure_sales_rls",
+    "ensure_line_binding_rls",
+    "ensure_client_rules_rls",
+    "ensure_automation_rls",
+    "ensure_etax_rls",
+    "ensure_risk_check_rls",
+    "ensure_knowledge_rls",
+    "ensure_settings_misc_rls",
+    "ensure_erp_credentials_rls",
+)
+
+
 def run_rls_enrolls() -> None:
     """跑全部纯 enroll 的 ensure_*_rls(各自独立事务·一个失败不连坐其余)。"""
     from core import db
 
-    enrolls = (
-        db.ensure_erp_push_rls,
-        db.ensure_bank_recon_rls,
-        db.ensure_email_ingest_rls,
-        db.ensure_sales_rls,
-        db.ensure_line_binding_rls,
-        db.ensure_client_rules_rls,
-        db.ensure_automation_rls,
-        db.ensure_etax_rls,
-        db.ensure_risk_check_rls,
-        db.ensure_knowledge_rls,
-        db.ensure_settings_misc_rls,
-        db.ensure_erp_credentials_rls,
-    )
-    for ensure_fn in enrolls:
+    for name in _ENROLLS:
+        ensure_fn = getattr(db, name, None)
+        if ensure_fn is None:
+            logger.warning(f"启动 RLS enroll {name} 未在 dal_reexports 注册 · 跳过")
+            continue
         try:
             ensure_fn()
         except Exception as e:
-            logger.warning(f"启动 RLS enroll {ensure_fn.__name__} 失败: {e}")
+            logger.warning(f"启动 RLS enroll {name} 失败: {e}")

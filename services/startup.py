@@ -215,9 +215,13 @@ def _boot_schema_ddl() -> None:
             logger.warning(f"启动 {label} 失败: {e}")
 
     # B8 RLS 孤儿表 enroll(纯 enroll·建表 ensure 之后、ensure_no_orphan_rls 之前·见 services/rls_boot)。
-    from services.rls_boot import run_rls_enrolls
+    # 包 try 与所有兄弟块一致:enroll 批异常绝不连坐后续 schema 块与末步 ensure_no_orphan_rls 自愈守卫。
+    try:
+        from services.rls_boot import run_rls_enrolls
 
-    run_rls_enrolls()
+        run_rls_enrolls()
+    except Exception as e:
+        logger.warning(f"启动 RLS enroll 批失败: {e}")
 
     # P1.1 BUG-FIX-P1.1 v118.35.0.41 · 4 模块 task/row 表加 field_overrides JSONB
     # 跟 alembic/versions/002_field_overrides_4_modules.py 双跑(prod 启动兼容)

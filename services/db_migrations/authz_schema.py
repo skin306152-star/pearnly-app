@@ -173,6 +173,10 @@ def _create_tables(cur) -> None:
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_ownership_transfers_token "
         "ON ownership_transfers(token_hash)"
     )
+    # B8 RLS:invitations/ownership_transfers 均 tenant_id NOT NULL、无 user_id → 纯 tenant。
+    # force=False:console 读/邀请创建走 owner、公开接受页(find_by_token/accept·无登录态)与
+    # ownership accept(by-token)裸 owner 绕过不破·policy 仅二道防线。
+    apply_tenant_rls(cur, "invitations", "ownership_transfers")
 
 
 def ensure_authz_schema() -> None:

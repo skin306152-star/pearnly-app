@@ -30,6 +30,9 @@ _REEXPORTS = {
     "services.knowledge.risk_check": [
         "ensure_risk_check_rls",
     ],
+    "services.settings_misc.schema": [
+        "ensure_settings_misc_rls",
+    ],
     "services.email_ingest.store": [
         "get_email_account",
         "get_email_account_safe",

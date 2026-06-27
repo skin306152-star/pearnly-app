@@ -78,6 +78,13 @@ def ensure_membership_tables():
                 CREATE INDEX IF NOT EXISTS idx_client_assign_client ON client_assignments(client_id);
             """)
 
+            # B8 RLS:client_assignments 是 user 维度(user_id NOT NULL·无 tenant_id)。force=False:
+            # 授权 resolver(get_visible_client_ids_for_user·先有鸡)、console 老板分配、建客户自动分配
+            # 全走 owner,绕过不破·policy 仅二道防线。roles/memberships 是根表(超管/授权基座)不 enroll。
+            from core.rls import apply_user_rls
+
+            apply_user_rls(cur, "client_assignments")
+
             # ── 4. tenants 加 tenant_type 列(区分事务所/SME/freelancer)
             cur.execute("""
                 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS tenant_type_v2 TEXT DEFAULT 'firm';

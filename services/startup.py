@@ -211,6 +211,8 @@ def _boot_schema_ddl() -> None:
         (db.ensure_line_binding_rls, "line_bindings/codes RLS policy"),
         (db.ensure_client_rules_rls, "client_rules RLS policy"),
         (db.ensure_automation_rls, "automation_rules RLS policy"),
+        (db.ensure_etax_rls, "etax_submissions/channel_settings RLS policy"),
+        (db.ensure_risk_check_rls, "invoice_risk_checks RLS policy"),
         (db.ensure_vat_recon_tables, "vat_recon 建表"),
         (db.ensure_vat_recon_tasks_table, "vat_recon_tasks 建表"),
         (db.ensure_bank_recon_v2_table, "bank_recon_v2 建表"),

@@ -24,6 +24,12 @@ _REEXPORTS = {
     "services.automation.schema": [
         "ensure_automation_rls",
     ],
+    "services.etax.schema": [
+        "ensure_etax_rls",
+    ],
+    "services.knowledge.risk_check": [
+        "ensure_risk_check_rls",
+    ],
     "services.email_ingest.store": [
         "get_email_account",
         "get_email_account_safe",

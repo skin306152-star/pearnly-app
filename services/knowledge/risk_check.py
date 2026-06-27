@@ -11,6 +11,7 @@ already proven in the engine tests.
 
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from psycopg2.extras import Json
@@ -21,6 +22,8 @@ from services.knowledge.access import AccessibleIds, workspace_filter
 from services.knowledge.rules.context import Finding, Invoice, RuleContext
 from services.knowledge.rules_engine import run_rules
 from services.knowledge.schema import CHECK_SUCCESS, InvoiceRiskCheck
+
+logger = logging.getLogger(__name__)
 
 _RC_COLS = (
     "id, tenant_id, workspace_client_id, history_id, risk_level, "
@@ -132,3 +135,22 @@ def get_latest_risk_check(
     )
     row = cur.fetchone()
     return _as_check(row) if row is not None else None
+
+
+def ensure_risk_check_rls() -> None:
+    """B8 RLS:给 invoice_risk_checks 上 tenant policy(幂等 · 独立事务防牵连别的 ensure)。
+
+    tenant_id NOT NULL;workspace_client_id 可空(NULL = firm-wide)。**纯 tenant 不能 tenant_ws**:
+    get_latest_risk_check 经 workspace_filter 读 `workspace_client_id IS NULL OR = ANY(...)`(故意含
+    firm-wide NULL 行),tenant_ws 的 _WS_MATCH 会隐藏 NULL 行 → 业务破(同 client_rules)。表只在
+    alembic 0005 建、无 startup CREATE 钩子 → 独立 ensure_*_rls。force=False:风险引擎两访问点已全走
+    get_cursor_rls(tenant)。先验存在防部分库整块失败。
+    """
+    from core import db
+    from core.rls import apply_tenant_rls, existing_tables
+
+    try:
+        with db.get_cursor(commit=True) as cur:
+            apply_tenant_rls(cur, *existing_tables(cur, ("invoice_risk_checks",)))
+    except Exception as e:
+        logger.warning(f"ensure_risk_check_rls skipped: {e}")

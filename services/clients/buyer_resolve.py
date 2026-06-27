@@ -42,7 +42,10 @@ def ensure_buyer_to_client_table():
                     ON buyer_to_client_memory (buyer_tax)
                     WHERE buyer_tax IS NOT NULL AND length(buyer_tax) >= 10;
             """)
-        logger.info("✅ buyer_to_client_memory table ensured")
+            from core.rls import apply_tenant_or_user_rls
+
+            apply_tenant_or_user_rls(cur, "buyer_to_client_memory")
+        logger.info("✅ buyer_to_client_memory table + tenant_or_user RLS policy ensured")
     except Exception as e:
         logger.warning(f"ensure_buyer_to_client_table failed: {e}")
 
@@ -67,7 +70,7 @@ def learn_buyer_to_client(
     name = buyer_name.strip()[:200]
     tax = (buyer_tax or "").strip()[:30] or None
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=str(user_id), commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO buyer_to_client_memory

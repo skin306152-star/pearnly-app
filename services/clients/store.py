@@ -95,7 +95,10 @@ def ensure_supplier_categories_table():
                 CREATE INDEX IF NOT EXISTS idx_supcat_tenant ON supplier_categories(tenant_id) WHERE tenant_id IS NOT NULL;
                 CREATE INDEX IF NOT EXISTS idx_supcat_user ON supplier_categories(user_id);
             """)
-            logger.info("✅ supplier_categories 表已就绪")
+            from core.rls import apply_tenant_or_user_rls
+
+            apply_tenant_or_user_rls(cur, "supplier_categories")
+            logger.info("✅ supplier_categories 表 + tenant_or_user RLS policy 已就绪")
     except Exception as e:
         logger.error(f"ensure_supplier_categories_table failed: {e}")
 
@@ -107,7 +110,7 @@ def get_category_for_seller(
     if not seller_name or not seller_name.strip():
         return None
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=str(user_id)) as cur:
             if tenant_id:
                 cur.execute(
                     """
@@ -147,7 +150,7 @@ def upsert_supplier_category(
     s = seller_name.strip()[:200]
     c = category.strip()[:80]
     try:
-        with db.get_cursor(commit=True) as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=str(user_id), commit=True) as cur:
             # 用 ON CONFLICT 利用 unique index
             if tenant_id:
                 cur.execute(
@@ -184,7 +187,7 @@ def list_used_categories(
 ) -> List[str]:
     """列出用户/tenant 用过的所有 category(去重 · 按使用次数倒序)· 给前端 datalist 自动补全"""
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=str(user_id)) as cur:
             if tenant_id:
                 cur.execute(
                     """
@@ -212,7 +215,7 @@ def list_used_categories(
 def count_supplier_mappings(user_id: str, tenant_id: Optional[str] = None) -> int:
     """统计已记忆的供应商→科目映射数量(给前端 '已记住 N 个供应商' 提示)"""
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=str(user_id)) as cur:
             if tenant_id:
                 cur.execute(
                     "SELECT COUNT(*) AS n FROM supplier_categories WHERE tenant_id = %s",

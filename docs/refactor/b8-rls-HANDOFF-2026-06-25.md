@@ -347,4 +347,5 @@ docs commit:`4bdd0465`/`0fa96777`/`09c4c7b3`/`0f915e5c`/`19e6a300`。**全 commi
 
 ### 7.15.5 P4 收口(全部域 enroll 后做)
 
-`tests/e2e/12-rls-isolation.spec.js` 断言 `passed===5`(现 `>=2`);重写 `core/db.py:run_rls_isolation_tests` harness(别建临时 policy);ready/已 enroll 域裸 get_cursor 清零后才上 `force=True`(收尾·非启用前置)。
+- ✅ **harness 重写 + e2e 收紧已上线**(2026-06-27 · `73f8f9a8`):`core/db.py:run_rls_isolation_tests` 重写——不再临时建/删 policy、不改表状态(只读对 clients 已 enroll 的真 `tenant_isolation` policy 跑 5 条);幂等清掉旧 harness 残留的 `tenant_isolation_test`;preflight 校验真 policy 在位 + RLS_ROLE 已配。`tests/e2e/12-rls-isolation.spec.js` 断言 `passed>=2`+缺陷 annotate → 收紧到 `passed===5`+`failed===0`+每条 `ok===true`。**prod 实证**:已直接清掉 prod 残留 `tenant_isolation_test`(clients 仅剩真 `tenant_isolation`);真 harness `db.run_rls_isolation_tests()` 在 prod 返回 `passed=5/failed=0/all_passed=True`(T1 不能看他人 / T2 看到自己 / T3 无上下文拒绝 / T4 bypass 看所有 / T5 伪造 tenant 返空)。e2e spec 需超管凭据(CI 无→skip),逻辑已 prod 实证。
+- ⏸️ **`force=True` 显式延后(设计裁决·非本期)**:Supabase `postgres` 非 BYPASSRLS,上 FORCE 会把 owner 也纳入 policy → 各域裸 `get_cursor`(DDL/迁移/超管聚合/worker)被拦查空。前置 = 逐 ready 域把裸 `get_cursor` 业务读写点清零(系统入口除外),是独立大审计,**不在 P4 范围**。当前 force=False 已是真隔离(get_cursor_rls 切 pearnly_app 角色强制 policy·owner 路径靠身份绕过保兼容)。见记忆 [[rls-b8-p3-prod-enabled]] 坑①。

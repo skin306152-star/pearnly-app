@@ -237,3 +237,28 @@ def unbind_line_by_line_user_id(line_user_id: str) -> bool:
     except Exception as e:
         logger.error(f"unbind_line_by_line_user_id failed: {e}")
         return False
+
+
+def ensure_line_binding_rls() -> None:
+    """B8 RLS:给 line_bindings/line_binding_codes 上 policy(幂等 · 独立事务防牵连别的 ensure)。
+
+    两表只有 user_id 列(无 tenant_id·INCIDENT §2 误归 tenant_or_user)→ 纯 user 隔离。
+    legacy 表无 CREATE 钩子,故独立 ensure_*_rls(对齐 ensure_email_ingest_rls 范式)。
+    force=False:本表全部访问是 owner(LINE webhook 无登录态·靠 line_user_id 反查·穿不进 user 上下文)
+    → owner 绕过,store 全裸 get_cursor 不破;policy 仅作第二道防线。逐表先验存在防部分库整块失败。
+    """
+    from core.rls import apply_user_rls
+
+    try:
+        with db.get_cursor(commit=True) as cur:
+            for table in ("line_bindings", "line_binding_codes"):
+                cur.execute(
+                    "SELECT 1 FROM information_schema.tables "
+                    "WHERE table_schema='public' AND table_name=%s",
+                    (table,),
+                )
+                if cur.fetchone() is None:
+                    continue
+                apply_user_rls(cur, table)
+    except Exception as e:
+        logger.warning(f"ensure_line_binding_rls skipped: {e}")

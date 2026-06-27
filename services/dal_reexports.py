@@ -15,6 +15,9 @@ _REEXPORTS:域模块路径 → 对外 re-export 名清单。元素为 str = 同�
 import importlib
 
 _REEXPORTS = {
+    "services.sales.schema": [
+        "ensure_sales_rls",
+    ],
     "services.email_ingest.store": [
         "get_email_account",
         "get_email_account_safe",

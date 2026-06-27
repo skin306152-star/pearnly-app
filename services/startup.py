@@ -207,6 +207,7 @@ def _boot_schema_ddl() -> None:
         (db.ensure_bank_recon_rls, "bank_reconcile_* RLS policy"),
         (db.ensure_erp_mapping_tables, "erp_mapping 建表"),
         (db.ensure_email_ingest_rls, "email_ingest_* RLS policy"),
+        (db.ensure_sales_rls, "sales_* / document_number_sequences RLS policy"),
         (db.ensure_vat_recon_tables, "vat_recon 建表"),
         (db.ensure_vat_recon_tasks_table, "vat_recon_tasks 建表"),
         (db.ensure_bank_recon_v2_table, "bank_recon_v2 建表"),

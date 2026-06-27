@@ -91,8 +91,8 @@ def get_cursor(commit: bool = False):
 # v118.27.8.0 · RLS 行级安全基础设施(P1 试点)· 留在 db.py(铁律 #26 硬线 #1 不许动)
 #   - ENABLE_RLS 环境变量:0 关 / 1 开(默认 0)
 #   - get_cursor_rls(tenant_id, bypass) · 自动 SET LOCAL app.current_tenant_id
-#   - run_rls_isolation_tests · 临时启用 clients 表 RLS 跑 5 条穿透测试 · 测完关
-#   - 不改任何现有 db 函数 · 现有代码继续工作 · v27.8.1 才永久启用
+#   - run_rls_isolation_tests · 对已 enroll 的 clients 真 policy 跑 5 条穿透测试(只读·不改表状态)
+#   - 不改任何现有 db 函数 · 现有代码继续工作
 # ============================================================
 
 
@@ -182,9 +182,12 @@ def get_clients_rls_status() -> Dict[str, Any]:
 
 
 def run_rls_isolation_tests() -> Dict[str, Any]:
-    """v27.8.0 · RLS 穿透测试 · 5 条
-    流程:临时启用 clients 表 RLS + policy → 跑测试 → 关 RLS 恢复(不论结果)
-    完整测试不影响线上现有代码(测前测后 RLS 状态一致 · 默认关)
+    """RLS 穿透测试 · 5 条(REFACTOR-B8 P4 重写)。
+
+    B8 后 clients 永久 enroll(ensure_clients_table 调 apply_tenant_or_user_rls),本 harness 复用真
+    `tenant_isolation` policy:不再临时建/删 policy、不改任何表 RLS 状态(纯只读跑测试)。顺带幂等清掉旧
+    harness 残留的 `tenant_isolation_test` policy。preflight 校验真 policy 在位 + 配了最小权限角色,
+    否则 owner 绕过 → 测试无意义,如实报失败。
     """
     out = {
         "passed": 0,
@@ -193,7 +196,33 @@ def run_rls_isolation_tests() -> Dict[str, Any]:
         "preflight": {},
         "rls_state_before": get_clients_rls_status(),
     }
-    rls_was_off_before = not out["rls_state_before"]["clients_rls_active"]
+    state = out["rls_state_before"]
+
+    # 幂等清掉旧 harness 残留的临时 policy(新 harness 不再建它)
+    if "tenant_isolation_test" in state.get("policies", []):
+        try:
+            with get_cursor(commit=True) as cur:
+                cur.execute("DROP POLICY IF EXISTS tenant_isolation_test ON clients;")
+            logger.info("[rls_test] 清掉旧 harness 残留 tenant_isolation_test policy")
+            out["rls_state_before"] = state = get_clients_rls_status()
+        except Exception as e:
+            logger.warning(f"[rls_test] 清 tenant_isolation_test 失败(不阻塞): {e}")
+
+    # preflight · 真 policy 必须在位 + 配了最小权限角色,否则 owner 绕过 policy,穿透测试没意义
+    if not state.get("clients_rls_active") or "tenant_isolation" not in state.get("policies", []):
+        out["preflight"] = {
+            "ok": False,
+            "reason": "clients 未 enroll RLS(应在 ensure_clients_table 调 apply_tenant_or_user_rls)",
+        }
+        out["failed"] = 1
+        return out
+    if not _rls_local_role():
+        out["preflight"] = {
+            "ok": False,
+            "reason": "RLS_ROLE 未配 · get_cursor_rls 不切最小权限角色 · owner 绕过 policy → 穿透测试无意义",
+        }
+        out["failed"] = 1
+        return out
 
     # 准备 · 找 2 个有 client 的 tenant
     try:
@@ -240,20 +269,8 @@ def run_rls_isolation_tests() -> Dict[str, Any]:
         out["failed"] = 1
         return out
 
-    # 临时启用 RLS(测完关)
+    # 直接对已 enroll 的真 tenant_isolation policy 跑(不建临时 policy、不改表状态)
     try:
-        with get_cursor(commit=True) as cur:
-            cur.execute("ALTER TABLE clients ENABLE ROW LEVEL SECURITY;")
-            cur.execute("DROP POLICY IF EXISTS tenant_isolation_test ON clients;")
-            cur.execute("""
-                CREATE POLICY tenant_isolation_test ON clients
-                FOR ALL
-                USING (
-                    tenant_id::text = current_setting('app.current_tenant_id', true)
-                    OR current_setting('app.bypass_rls', true) = 'on'
-                );
-            """)
-        logger.info("[v27.8.0 rls_test] 临时启用 clients RLS + tenant_isolation_test policy")
 
         def _record(name, ok, expected, actual):
             out["tests"].append({"name": name, "ok": ok, "expected": expected, "actual": actual})
@@ -344,19 +361,6 @@ def run_rls_isolation_tests() -> Dict[str, Any]:
             {"name": "fatal", "ok": False, "expected": "test 框架正常", "actual": str(e)[:300]}
         )
         out["failed"] += 1
-    finally:
-        # 永远关 RLS(无论测试结果) · 恢复测前状态
-        if rls_was_off_before:
-            try:
-                with get_cursor(commit=True) as cur:
-                    cur.execute("DROP POLICY IF EXISTS tenant_isolation_test ON clients;")
-                    cur.execute("ALTER TABLE clients DISABLE ROW LEVEL SECURITY;")
-                logger.info("[v27.8.0 rls_test] 测试完成 · 已关 clients RLS · 恢复测前状态")
-            except Exception as e:
-                logger.error(
-                    f"[v27.8.0 rls_test] 关 RLS 失败 · 需手动:ALTER TABLE clients DISABLE ROW LEVEL SECURITY; · 错误: {e}"
-                )
-                out["cleanup_error"] = str(e)[:200]
 
     out["rls_state_after"] = get_clients_rls_status()
     out["all_passed"] = out["failed"] == 0 and out["passed"] == 5

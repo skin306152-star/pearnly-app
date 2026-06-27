@@ -275,7 +275,7 @@ docs commit:`4bdd0465`/`0fa96777`/`09c4c7b3`/`0f915e5c`/`19e6a300`。**全 commi
 | 域 | 表 | §2 建议(需自验) | 打法要点 |
 |---|---|---|---|
 | ~~**automation**~~ ✅ | `automation_rules`(tenant_or_user)/ `error_events`(不开当日志) | — | **已收 §7.16(`aab5ff97`)**。 |
-| **etax** | `etax_channel_settings`、`etax_submissions`、`invoice_risk_checks` | tenant_ws/tenant_or_user | sales/e-tax 邻域。**重点验 workspace_client_id 列名+填充**(参考 sales 坑:列名可能不叫 workspace_client_id·或可空→落 tenant)。invoice_risk_checks 与 knowledge 风险引擎相关,查访问点是否已走 get_cursor_rls。 |
+| ~~**etax**~~ ✅ | `etax_channel_settings`/`etax_submissions`/`invoice_risk_checks`(均纯 tenant) | — | **已收 §7.17(`51318414`)**。 |
 | **settings 杂项** | `user_settings`/`api_keys`(tenant_or_user)、`invitations`/`ownership_transfers`/`operation_logs`(tenant)、`client_assignments`/`payment_pending`(user)、`rd_daily_usage`(tenant_or_user) | 混合 | 异构·按表分别落。`invitations` 有 `ensure_authz_schema` 钩子→内联(同 member_scopes)。`operation_logs` 验是否纯审计日志(是→不开/或 tenant)。`client_assignments`/`payment_pending` 纯 user。 |
 | **knowledge** | `knowledge_bases`/`knowledge_documents`/`knowledge_chunks`/`knowledge_embeddings`/`knowledge_answers`/`knowledge_ingest_jobs` | tenant_ws/tenant_or_user | **最复杂·留最后**。子表(chunks/embeddings)很可能只有 fk 指父(documents/bases)→ 走 `apply_tenant_via_parent_rls`(参考 reconciliation_row / email_ingest_seen_uids)。父表验 tenant_id/workspace_client_id。embeddings 行多·注意 force=False 别拖。访问点在 `services/knowledge/*`。 |
 | **零暴露孤儿** | `erp_oauth_states`/`erp_oauth_tokens`/`mrerp_credentials`/`erp_connectors`/`excel_templates` | tenant/tenant_or_user | 代码树无访问点·纯 prod 孤儿·守卫已 DISABLE 无暴露 → **最低优先**。照 `ensure_sales_rls` 范式 enroll-only(逐表验存在),或维持 disabled。 |
@@ -292,6 +292,17 @@ docs commit:`4bdd0465`/`0fa96777`/`09c4c7b3`/`0f915e5c`/`19e6a300`。**全 commi
 - **enroll 落点**:无 CREATE 钩子 → 新建独立 `services/automation/schema.py:ensure_automation_rls`(对齐 §7.10/§7.11 范式·独立事务·`existing_tables` 先验存在·force=False)进 boot_ensures(`ensure_no_orphan_rls` 之前)+ `dal_reexports` 暴露成 `db.ensure_automation_rls`。**零业务代码改动**:automation_rules 在 repo 内无 SELECT/INSERT 访问点(唯一访问=`services/tenant/owner_users.py` 级联删·owner bypass)→ enroll-only。
 - **error_events 设计裁决【不 enroll】**:纯系统错误日志(唯一消费者超管 `admin_diagnostics_routes`·SELECT 无 WHERE·走 owner `get_cursor`·INSERT 来自请求上下文常无租户 prod 31/48 NULL·fail-open)。enroll 反会让无 RLS 上下文的系统错误写入卡死,违 fail-open 设计 → 守卫 `ensure_no_orphan_rls` 维持其 DISABLE 终态。已并入 §7.15.4「明确不 enroll」口径。
 - 测试:`tests/integration/test_automation_rls_real_tables.py` 4 例(tenant 隔离 / user 兜底分支 / WITH CHECK 拦跨租户 / owner bypass)本地 docker pg PASS;全量 4973 单测 + CI 6 闸绿(run `28283031829`)。
+
+## 7.17 2026-06-27 孤儿 re-enroll · etax 域(prod live · CI 6 闸绿 · 金丝雀 PASS)
+
+| commit | 表(模板) | 金丝雀(prod `51318414`) |
+|---|---|---|
+| `51318414` | `etax_submissions`/`etax_channel_settings`/`invoice_risk_checks`(均**纯 tenant**) | 三表 rls=on/npol=1·假租户见 invoice_risk_checks 0 行 |
+
+- **模板纠偏(再证 §7.15.2)**:INCIDENT §2 标 etax 域 tenant_ws/tenant_or_user;prod `\d` 实测三表均 **tenant_id NOT NULL、无 user_id、workspace_client_id 可空** → 统一**纯 tenant**(不能 tenant_ws:`_WS_MATCH` 会隐藏 `workspace_client_id IS NULL` 的 firm-wide 行,业务破·同 client_rules)。
+- **enroll 落点**:etax 两表(alembic 0006 同源 sales·无 startup 钩子)→ 新建 `services/etax/schema.py:ensure_etax_rls`;`invoice_risk_checks`(knowledge 风险引擎·alembic 0005)→ `services/knowledge/risk_check.py` 就地加 `ensure_risk_check_rls`(与其 DAL co-located·命名诚实)。两 ensure 进 boot_ensures + dal_reexports。
+- **零业务代码改动**:etax 两表是 e-Tax 模块占位、repo 内无访问点(enroll-only);`invoice_risk_checks` 两访问点(`run_risk_check`/`get_latest_risk_check`)已全走 `get_cursor_rls(tenant)`(路由 `knowledge_risk_routes` 打开游标)→ 只补 policy。
+- 测试:`tests/integration/test_etax_rls_real_tables.py` 4 例(3 表 tenant 隔离 / firm-wide NULL 账套可见回归守门 / WITH CHECK 拦跨租户 / owner bypass)本地 docker pg PASS;全量 4973 单测 + CI 6 闸绿(run `28283335457`)。
 
 ### 7.15.5 P4 收口(全部域 enroll 后做)
 

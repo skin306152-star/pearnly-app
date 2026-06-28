@@ -8,6 +8,7 @@
 // 故不走 storageState helper,自带「登录 + 选公司」流程。
 // ============================================================
 
+/* global window, getComputedStyle */ // page.evaluate 回调在浏览器上下文执行
 const { test, expect } = require('@playwright/test');
 const { hasCreds, doUiLogin } = require('./_helpers/auth');
 

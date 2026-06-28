@@ -45,6 +45,7 @@ import './home/dms-intake.js'; // 录入工作台(发票OCR + 身份证→DMS)·
 import './home/dashboard.js';
 import './home/subscription.js'; // 首页订阅与计费主体(window.loadSubscription · 须在 dashboard.js 后 · billing.js 前)
 import './home/billing-records.js'; // 首页账单记录预览框(window.loadBillingRecords · 扣费/充值/识别 + 导出 · loadSubscription 触发)
+import './home/billing-export-modal.js'; // 导出区间选择弹窗(window._pickExportRange · billing-records 点导出时调)
 import './home/billing.js';
 import './home/workspace-switcher.js'; // B4 · workspace 工作模式切换器(取代旧 ClientSwitcher)
 import './home/access-log.js'; // REFACTOR-C1 · 客户访问日志 tab(自绑 · owner only)

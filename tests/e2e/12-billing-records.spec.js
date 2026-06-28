@@ -63,11 +63,16 @@ test.describe('账单记录预览框(首页)', () => {
         });
     });
 
-    test('导出 → 下载 xlsx', async ({ page }) => {
+    test('导出 → 弹区间选择 → 下载 xlsx', async ({ page }) => {
         await gotoDashboard(page);
+        await page.locator('#rec-export-btn').click();
+        // 先弹区间选择弹窗(起始/结束日期 · 默认近一个月~今天)
+        await expect(page.locator('.rec-xm-overlay'), '区间弹窗').toBeVisible({ timeout: 8000 });
+        await expect(page.locator('#rec-xm-from'), '起始日期').toBeVisible();
+        await expect(page.locator('#rec-xm-to'), '结束日期').toBeVisible();
         const [download] = await Promise.all([
             page.waitForEvent('download', { timeout: 20_000 }),
-            page.locator('#rec-export-btn').click(),
+            page.locator('#rec-xm-ok').click(),
         ]);
         expect(download.suggestedFilename(), '导出文件名为 .xlsx').toContain('.xlsx');
     });

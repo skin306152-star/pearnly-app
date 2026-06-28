@@ -379,6 +379,7 @@ interface Window {
     loadCreditsCard?: LegacyBridge;
     loadSubscription?: LegacyBridge;
     loadBillingRecords?: LegacyBridge;
+    _pickExportRange?: () => Promise<{ from: string; to: string } | null>;
     _userInfoForAdmin?: AppUser | null;
     PEARNLY_ADMIN_LAYOUT?: boolean;
 }

@@ -74,6 +74,21 @@ def _one_month_ago(d: "_dt.date") -> "_dt.date":
     return d.replace(year=y, month=m, day=min(d.day, calendar.monthrange(y, m)[1]))
 
 
+def _explicit_range(date_from: str | None, date_to: str | None):
+    """显式 [起始, 结束] 两个 YYYY-MM-DD → [start, end)(end 为排他上界=结束日+1天)。
+    任一缺失/不合法/起始晚于结束 → (None, None)(交由 _export_range 兜底)。"""
+    if not date_from or not date_to:
+        return None, None
+    try:
+        a = _dt.date.fromisoformat(date_from)
+        b = _dt.date.fromisoformat(date_to)
+    except Exception:
+        return None, None
+    if a > b:
+        return None, None
+    return a, b + _dt.timedelta(days=1)
+
+
 def _export_range(period: str, date_str: str | None):
     """导出区间:period=day/month/year → 该区间;all/缺省 → 默认近一个月(截止今天)。
     返回 [start, end) 两个 date(始终有界,导出不再全量)。"""
@@ -242,9 +257,17 @@ async def list_records(
 
 
 @router.get("/api/credits/billing-export")
-async def billing_export(request: Request, lang: str = "zh", period: str = "all", date: str = None):
+async def billing_export(
+    request: Request,
+    lang: str = "zh",
+    period: str = "all",
+    date: str = None,
+    date_from: str = None,
+    date_to: str = None,
+):
     """扣费/充值/识别 三类明细 → xlsx(三 sheet · 表头随 lang)。
-    按区间导出:period=day/month/year 用该区间;all/缺省 → 默认近一个月(截止今天)。"""
+    区间优先级:显式 date_from~date_to(弹窗选的年月日)> period=day/month/year >
+    缺省默认近一个月(截止今天)。"""
     user = get_current_user_from_request(request)
     tid = str(user.get("tenant_id") or "")
     if not tid:
@@ -253,7 +276,9 @@ async def billing_export(request: Request, lang: str = "zh", period: str = "all"
         lang = "zh"
     is_owner = is_owner_role(request, user)
     uid = None if is_owner else str(user["id"])
-    start, end = _export_range(period, date)
+    start, end = _explicit_range(date_from, date_to)
+    if not (start and end):
+        start, end = _export_range(period, date)
 
     company = ""
     usage_rows: list[dict] = []

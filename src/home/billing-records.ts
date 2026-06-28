@@ -63,6 +63,11 @@ function _todayStr(): string {
     const d = new Date();
     return d.getFullYear() + '-' + _pad(d.getMonth() + 1) + '-' + _pad(d.getDate());
 }
+function _oneMonthAgoStr(): string {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1); // JS 自动处理短月/跨年回退
+    return d.getFullYear() + '-' + _pad(d.getMonth() + 1) + '-' + _pad(d.getDate());
+}
 function _curLang(): string {
     return window._currentLang || localStorage.getItem('mrpilot_lang') || 'th';
 }
@@ -440,14 +445,19 @@ function mapOcr(r: Record<string, unknown>): RecRow {
     };
 }
 
-// 导出(三 sheet · 表头随系统语言 · 按当前筛选区间;全部时后端默认导出近一个月)
+// 点导出 → 先弹区间选择(年月日 ~ 年月日 · 默认近一个月截止今天)· 选定再下载。
 async function onExport() {
     if (_exporting) return;
+    const range = await pickExportRange();
+    if (!range) return; // 取消
     _exporting = true;
     renderExportBtn();
     try {
-        const qs = new URLSearchParams({ lang: _curLang(), period: _period });
-        if (_period !== 'all') qs.set('date', _date);
+        const qs = new URLSearchParams({
+            lang: _curLang(),
+            date_from: range.from,
+            date_to: range.to,
+        });
         const resp = await fetch('/api/credits/billing-export?' + qs.toString(), {
             headers: _auth(),
             cache: 'no-store',
@@ -475,4 +485,77 @@ async function onExport() {
         _exporting = false;
         renderExportBtn();
     }
+}
+
+// 区间选择弹窗:起始 / 结束 两个日期(默认近一个月~今天)· 确定返回 {from,to},取消返回 null。
+function pickExportRange(): Promise<{ from: string; to: string } | null> {
+    return new Promise((resolve) => {
+        const today = _todayStr();
+        const ov = document.createElement('div');
+        ov.className = 'modal-overlay ui rec-xm-overlay';
+        ov.innerHTML =
+            '<div class="modal rec-xm-card">' +
+            '<div class="modal-head"><div class="modal-title">' +
+            _esc(_t('rec-export', '导出明细')) +
+            '</div><button class="rec-xm-x" id="rec-xm-x" aria-label="' +
+            _esc(_t('confirm-cancel', '取消')) +
+            '">×</button></div>' +
+            '<div class="rec-xm-body"><div class="rec-xm-hint">' +
+            _esc(_t('rec-range-hint', '选择导出区间(年月日 ~ 年月日)')) +
+            '</div><div class="rec-xm-fields">' +
+            '<label class="rec-xm-field"><span>' +
+            _esc(_t('rec-range-from', '起始日期')) +
+            '</span><input type="date" class="fin rec-xm-date" id="rec-xm-from" max="' +
+            _esc(today) +
+            '" value="' +
+            _esc(_oneMonthAgoStr()) +
+            '"></label>' +
+            '<label class="rec-xm-field"><span>' +
+            _esc(_t('rec-range-to', '结束日期')) +
+            '</span><input type="date" class="fin rec-xm-date" id="rec-xm-to" max="' +
+            _esc(today) +
+            '" value="' +
+            _esc(today) +
+            '"></label></div>' +
+            '<div class="rec-xm-err" id="rec-xm-err"></div></div>' +
+            '<div class="rec-xm-foot"><button class="btn sec" id="rec-xm-cancel">' +
+            _esc(_t('confirm-cancel', '取消')) +
+            '</button><button class="btn pri" id="rec-xm-ok">' +
+            _esc(_t('rec-do-export', '导出')) +
+            '</button></div></div>';
+        document.body.appendChild(ov);
+
+        const fromEl = ov.querySelector('#rec-xm-from') as HTMLInputElement;
+        const toEl = ov.querySelector('#rec-xm-to') as HTMLInputElement;
+        const errEl = ov.querySelector('#rec-xm-err') as HTMLElement;
+        const done = (val: { from: string; to: string } | null) => {
+            document.removeEventListener('keydown', onKey);
+            ov.remove();
+            resolve(val);
+        };
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') done(null);
+        };
+        const confirm = () => {
+            const from = fromEl.value;
+            const to = toEl.value;
+            if (!from || !to) {
+                errEl.textContent = _t('rec-range-need', '请选择起始与结束日期');
+                return;
+            }
+            if (from > to) {
+                errEl.textContent = _t('rec-range-invalid', '结束日期不能早于起始日期');
+                return;
+            }
+            done({ from, to });
+        };
+        (ov.querySelector('#rec-xm-ok') as HTMLElement).onclick = confirm;
+        (ov.querySelector('#rec-xm-cancel') as HTMLElement).onclick = () => done(null);
+        (ov.querySelector('#rec-xm-x') as HTMLElement).onclick = () => done(null);
+        ov.onclick = (e) => {
+            if (e.target === ov) done(null);
+        };
+        document.addEventListener('keydown', onKey);
+        setTimeout(() => fromEl.focus(), 50);
+    });
 }

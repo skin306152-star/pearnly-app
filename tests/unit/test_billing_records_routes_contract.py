@@ -51,6 +51,23 @@ class BillingRecordsRoutesContractTests(unittest.TestCase):
         for fn in (rr._q_usage, rr._q_topup, rr._q_ocr):
             self.assertIn("offset", inspect.signature(fn).parameters, fn.__name__)
 
+    def test_explicit_range_valid(self):
+        start, end = rr._explicit_range("2026-06-01", "2026-06-28")
+        self.assertEqual(start, _dt.date(2026, 6, 1))
+        self.assertEqual(end, _dt.date(2026, 6, 29))  # 排他上界=结束日+1
+
+    def test_explicit_range_rejects_reversed_or_partial(self):
+        self.assertEqual(rr._explicit_range("2026-06-28", "2026-06-01"), (None, None))
+        self.assertEqual(rr._explicit_range("2026-06-01", None), (None, None))
+        self.assertEqual(rr._explicit_range("bad", "2026-06-01"), (None, None))
+
+    def test_export_endpoint_supports_explicit_dates(self):
+        import inspect
+
+        params = inspect.signature(rr.billing_export).parameters
+        self.assertIn("date_from", params)
+        self.assertIn("date_to", params)
+
     def test_period_all_is_unbounded(self):
         self.assertEqual(rr._period_range("all", None), (None, None))
         self.assertEqual(rr._period_range("bogus", "2026-06-28"), (None, None))

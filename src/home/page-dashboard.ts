@@ -42,25 +42,20 @@
                 <div class="sub-plans" id="sub-plans"></div>
             </div>
 
-            <div class="cols" style="grid-template-columns:1fr 1fr;margin-top:var(--s4)">
-                <div class="panel box">
-                    <div class="ch" data-i18n="sub-rules-title">计费规则</div>
-                    <div class="cs" data-i18n="sub-rules-sub">把最关心的计费逻辑讲清楚</div>
-                    <ol class="sub-rules">
-                        <li data-i18n="sub-rule-1">未订阅时,扫描按量计费(前 200 张 ฿1.50/张,之后 ฿0.75/张)。</li>
-                        <li data-i18n="sub-rule-2">订阅套餐后,每月优先使用套餐内额度。</li>
-                        <li data-i18n="sub-rule-3">套餐额度用完后,超出部分按套餐单价自动从余额扣费。</li>
-                        <li data-i18n="sub-rule-4">月费从账户余额扣;到期自动续订,余额不足则套餐失效转按量。</li>
-                        <li data-i18n="sub-rule-5">文档(Excel/Word/CSV)按字符成本折算成额度张数。</li>
-                    </ol>
-                </div>
-                <div class="panel box">
-                    <div class="ch" data-i18n="sub-records-title">最近账单</div>
-                    <div class="cs" data-i18n="sub-records-sub">扫描扣费 · 订阅 · 续订</div>
-                    <div id="sub-records">
-                        <div class="empty"><div class="t" data-i18n="sub-records-empty">暂无账单记录</div></div>
+            <div class="panel box rec-box" id="rec-box" style="margin-top:var(--s4)">
+                <div class="rec-head">
+                    <div>
+                        <div class="ch" data-i18n="rec-title">记录明细</div>
+                        <div class="cs" data-i18n="rec-sub">扣费 · 充值 · 识别 · 切换查看,导出全部明细</div>
                     </div>
+                    <button class="btn rec-export" id="rec-export-btn" data-i18n="rec-export">导出明细</button>
                 </div>
+                <div class="rec-bar">
+                    <div class="rec-tabs" id="rec-tabs"></div>
+                    <div class="rec-filter" id="rec-filter"></div>
+                </div>
+                <div class="rec-body" id="rec-body"></div>
+                <div class="rec-foot" id="rec-foot"></div>
             </div>
         </div>
 `;

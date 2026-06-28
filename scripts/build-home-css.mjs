@@ -65,6 +65,7 @@ const HOME_CSS = [
     'home-51-express-detail.css',
     'home-52-image-viewer.css',
     'home-53-subscription.css',
+    'home-54-records.css',
 ];
 
 const ADMIN_CSS = [

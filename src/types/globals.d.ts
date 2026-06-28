@@ -378,6 +378,7 @@ interface Window {
     loadDashboard?: LegacyBridge;
     loadCreditsCard?: LegacyBridge;
     loadSubscription?: LegacyBridge;
+    loadBillingRecords?: LegacyBridge;
     _userInfoForAdmin?: AppUser | null;
     PEARNLY_ADMIN_LAYOUT?: boolean;
 }

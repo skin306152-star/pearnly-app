@@ -81,7 +81,8 @@ async function loadSubscription() {
     _plans = (data && data.plans) || [];
     renderSummary((data && data.subscription) || null);
     renderPlans((data && data.subscription) || null);
-    loadRecords();
+    // 账单记录预览框(扣费/充值/识别 + 导出)由 billing-records.ts 负责。
+    if (typeof window.loadBillingRecords === 'function') window.loadBillingRecords();
 }
 window.loadSubscription = loadSubscription;
 
@@ -287,67 +288,4 @@ async function onCancel() {
     } catch (_) {
         _toast(_t('sub-failed', '操作失败 · 请稍后再试'), 'error');
     }
-}
-
-interface BillRow {
-    date: string | null;
-    type: string;
-    description: string;
-    filename: string;
-    pages: number;
-    cost_thb: number;
-}
-
-async function loadRecords() {
-    const el = document.getElementById('sub-records');
-    if (!el) return;
-    let rows: BillRow[] = [];
-    try {
-        const resp = await fetch('/api/credits/usage-history?per_page=8', {
-            headers: _auth(),
-            cache: 'no-store',
-        });
-        if (resp.ok) {
-            const data = await resp.json();
-            rows = (data && data.rows) || [];
-        }
-    } catch (_) {
-        /* 静默 · 渲染空态 */
-    }
-    if (!rows.length) {
-        el.innerHTML =
-            '<div class="empty"><div class="t">' +
-            _esc(_t('sub-records-empty', '暂无账单记录')) +
-            '</div></div>';
-        return;
-    }
-    el.innerHTML = rows.map(recordRow).join('');
-}
-
-function recordRow(r: BillRow): string {
-    const isSub = r.type === 'subscription';
-    let desc: string;
-    if (isSub) {
-        desc = r.description || _t('sub-rec-subscription', '订阅月费');
-    } else {
-        desc =
-            r.filename ||
-            (r.pages ? r.pages + ' ' + _t('sub-sheet', '张') : _t('sub-rec-scan', '扫描扣费'));
-    }
-    const cost = Number(r.cost_thb || 0);
-    const free = !isSub && cost === 0;
-    const amtTxt = free ? _t('sub-rec-free', '套餐内 · 免费') : _money(Math.abs(cost));
-    return (
-        '<div class="sub-rec"><div class="sub-rec-main"><div class="sub-rec-desc" title="' +
-        _esc(desc) +
-        '">' +
-        _esc(desc) +
-        '</div><div class="sub-rec-time">' +
-        _esc(_fmtDate(r.date)) +
-        '</div></div><div class="sub-rec-amt' +
-        (free ? ' free' : '') +
-        '">' +
-        _esc(amtTxt) +
-        '</div></div>'
-    );
 }

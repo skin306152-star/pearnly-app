@@ -206,55 +206,6 @@
     justify-content: center;
 }
 
-/* 计费规则 */
-.ui .sub-rules {
-    margin: 0;
-    padding-left: 18px;
-    display: grid;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--ink2);
-}
-
-/* 最近账单 */
-.ui .sub-rec {
-    display: flex;
-    align-items: center;
-    gap: var(--s3);
-    padding: var(--s3) 0;
-    border-bottom: 1px solid var(--line2);
-}
-.ui .sub-rec:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-}
-.ui .sub-rec-main {
-    min-width: 0;
-    flex: 1;
-}
-.ui .sub-rec-desc {
-    font-weight: 600;
-    font-size: 13px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.ui .sub-rec-time {
-    font-size: 11.5px;
-    color: var(--ink3);
-    margin-top: 2px;
-}
-.ui .sub-rec-amt {
-    margin-left: auto;
-    font-weight: 700;
-    font-size: 13.5px;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-.ui .sub-rec-amt.free {
-    color: var(--green);
-}
-
 @media (max-width: 800px) {
     .ui .sub-top {
         grid-template-columns: 1fr;

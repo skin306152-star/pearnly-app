@@ -1,0 +1,164 @@
+/* ============================================================
+   账单记录预览框 · 首页(section#page-dashboard · 作用域 .ui)
+   扣费 / 充值 / 识别 三 tab + 按天/月/年筛选 + 导出。
+   复用 kit 令牌(--accent/--line/--ink*/--green/--red/--amber 等)· 同 home-53 风格。
+   ============================================================ */
+
+.ui .rec-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--s3);
+}
+.ui .rec-export {
+    flex-shrink: 0;
+    height: 34px;
+    padding: 0 14px;
+    font-size: 13px;
+}
+
+/* tab + 筛选条同排(窄屏叠) */
+.ui .rec-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--s3);
+    margin-top: var(--s3);
+}
+.ui .rec-tabs {
+    display: flex;
+    gap: var(--s2);
+}
+.ui .rec-tab {
+    border: none;
+    background: transparent;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink2);
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        color 0.15s ease;
+}
+.ui .rec-tab:hover {
+    color: var(--ink);
+    background: var(--line2);
+}
+.ui .rec-tab.active {
+    color: var(--accent);
+    background: var(--accent-weak);
+}
+.ui .rec-filter {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+}
+.ui .rec-period,
+.ui .rec-date {
+    height: 32px;
+    border: 1px solid var(--line);
+    border-radius: var(--rs);
+    background: var(--card);
+    color: var(--ink);
+    font-size: 12.5px;
+    padding: 0 8px;
+}
+.ui .rec-period:focus,
+.ui .rec-date:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* 列表行 */
+.ui .rec-body {
+    margin-top: var(--s3);
+    min-height: 120px;
+}
+.ui .rec-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    padding: var(--s3) 0;
+    border-bottom: 1px solid var(--line2);
+}
+.ui .rec-row:last-child {
+    border-bottom: none;
+}
+.ui .rec-row-l {
+    min-width: 0;
+    flex: 1;
+}
+.ui .rec-row-title {
+    font-weight: 600;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ui .rec-row-meta {
+    font-size: 11.5px;
+    color: var(--ink3);
+    margin-top: 2px;
+}
+.ui .rec-row-r {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    flex-shrink: 0;
+}
+.ui .rec-badge {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 1px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.ui .rec-badge.ok,
+.ui .rec-badge.free {
+    color: var(--green);
+    border-color: var(--green);
+}
+.ui .rec-badge.warn {
+    color: var(--amber);
+    border-color: var(--amber);
+}
+.ui .rec-badge.bad {
+    color: var(--red);
+    border-color: var(--red);
+}
+.ui .rec-badge.neutral {
+    color: var(--ink2);
+}
+.ui .rec-amt {
+    font-weight: 700;
+    font-size: 13.5px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* 状态态 */
+.ui .rec-foot {
+    margin-top: var(--s3);
+    font-size: 11.5px;
+    color: var(--ink3);
+}
+.ui .rec-empty,
+.ui .rec-loading {
+    padding: var(--s5) 0;
+    text-align: center;
+    font-size: 13px;
+    color: var(--ink3);
+}
+
+@media (max-width: 800px) {
+    .ui .rec-bar {
+        align-items: stretch;
+    }
+    .ui .rec-filter {
+        justify-content: flex-end;
+    }
+}

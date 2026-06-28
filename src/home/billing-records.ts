@@ -22,7 +22,7 @@ let _date = ''; // YYYY-MM-DD 锚点(period!=all 时有效)
 let _owner = true;
 let _exporting = false;
 let _page = 1; // 1-based · 翻页
-let _totalPages = 1;
+let _total = 0; // 总条数(仅首页 offset=0 时由后端 COUNT 给,翻页沿用不重复 COUNT)
 
 function _t(k: string, fb?: string): string {
     try {
@@ -244,7 +244,7 @@ async function loadActive() {
         if (!resp.ok) throw new Error('http');
         const data = await resp.json();
         raw = (data && data.rows) || [];
-        total = Number((data && data.total) || raw.length);
+        total = data && typeof data.total === 'number' ? data.total : raw.length;
     } catch (_) {
         body.innerHTML =
             '<div class="rec-empty">' +
@@ -269,20 +269,21 @@ async function loadActive() {
         wireReceiptButtons();
         body.scrollTop = 0; // 翻页后回到列表顶部
     }
-    renderFoot(total);
+    if (total >= 0) _total = total; // 翻页时后端略过 COUNT 返 -1 → 沿用首页统计
+    renderFoot();
 }
 
 // 页脚:条数统计 + 翻页器(上一页 / p · tp / 下一页)· 单页时只显条数。
-function renderFoot(total: number) {
+function renderFoot() {
     const foot = document.getElementById('rec-foot');
     if (!foot) return;
-    _totalPages = Math.max(1, Math.ceil(total / PREVIEW));
-    if (_page > _totalPages) _page = _totalPages;
+    const totalPages = Math.max(1, Math.ceil(_total / PREVIEW));
+    if (_page > totalPages) _page = totalPages;
     const count =
         '<span class="rec-count">' +
-        _esc(_t('rec-total', '共') + ' ' + total + ' ' + _t('rec-items', '条')) +
+        _esc(_t('rec-total', '共') + ' ' + _total + ' ' + _t('rec-items', '条')) +
         '</span>';
-    if (_totalPages <= 1) {
+    if (totalPages <= 1) {
         foot.innerHTML = count;
         return;
     }
@@ -297,22 +298,20 @@ function renderFoot(total: number) {
         '<span class="rec-page-ind">' +
         _page +
         ' / ' +
-        _totalPages +
+        totalPages +
         '</span>' +
         '<button class="rec-page-btn" data-pg="next"' +
-        (_page >= _totalPages ? ' disabled' : '') +
+        (_page >= totalPages ? ' disabled' : '') +
         ' aria-label="' +
         _esc(_t('rec-next', '下一页')) +
         '">›</button>' +
         '</div>';
+    // 禁用态的按钮不绑事件 → 无需再判边界,翻页方向由 data-pg 决定。
     foot.querySelectorAll('.rec-page-btn[data-pg]').forEach((b) => {
         const btn = b as HTMLButtonElement;
         if (btn.disabled) return;
         btn.onclick = () => {
-            const dir = btn.getAttribute('data-pg');
-            if (dir === 'prev' && _page > 1) _page--;
-            else if (dir === 'next' && _page < _totalPages) _page++;
-            else return;
+            _page += btn.getAttribute('data-pg') === 'next' ? 1 : -1;
             loadActive();
         };
     });
@@ -443,11 +442,9 @@ function mapOcr(r: Record<string, unknown>): RecRow {
 // 点导出 → 先弹区间选择(年月日 ~ 年月日 · 默认近一个月截止今天 · billing-export-modal.ts)· 选定再下载。
 async function onExport() {
     if (_exporting) return;
-    const range =
-        typeof window._pickExportRange === 'function'
-            ? await window._pickExportRange()
-            : { from: '', to: '' };
-    if (!range || !range.from || !range.to) return; // 取消 / 弹窗不可用
+    if (typeof window._pickExportRange !== 'function') return;
+    const range = await window._pickExportRange();
+    if (!range || !range.from || !range.to) return; // 取消
     _exporting = true;
     renderExportBtn();
     try {

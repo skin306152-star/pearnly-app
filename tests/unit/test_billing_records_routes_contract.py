@@ -45,11 +45,15 @@ class BillingRecordsRoutesContractTests(unittest.TestCase):
         self.assertIn("offset", sig.parameters, "翻页 offset 参数丢失")
         self.assertEqual(sig.parameters["offset"].default, 0)
 
-    def test_query_helpers_accept_offset(self):
+    def test_query_helpers_accept_offset_and_count_toggle(self):
         import inspect
 
         for fn in (rr._q_usage, rr._q_topup, rr._q_ocr):
-            self.assertIn("offset", inspect.signature(fn).parameters, fn.__name__)
+            params = inspect.signature(fn).parameters
+            self.assertIn("offset", params, fn.__name__)
+            # 翻页时略过 COUNT 的开关(默认 True 不破坏导出/首页)
+            self.assertIn("with_count", params, fn.__name__)
+            self.assertTrue(params["with_count"].default)
 
     def test_explicit_range_valid(self):
         start, end = rr._explicit_range("2026-06-01", "2026-06-28")

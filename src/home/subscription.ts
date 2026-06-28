@@ -27,6 +27,10 @@ interface SubState {
 
 let _plans: SubPlan[] = [];
 
+// 当前套餐卡图标(Lucide crown)· 与账户余额卡的钱包图标对称。
+const _CROWN =
+    '<svg class="ic" viewBox="0 0 24 24"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg>';
+
 function _t(k: string, fb?: string): string {
     try {
         return (typeof window.t === 'function' ? window.t(k) : fb) || fb || k;
@@ -86,11 +90,19 @@ function renderSummary(sub: SubState | null) {
     if (!el) return;
     if (!sub) {
         el.innerHTML =
-            '<div class="ch">' +
+            '<div class="sub-card-ico">' +
+            _CROWN +
+            '</div><div class="sub-card-bd">' +
+            '<div class="sub-card-l">' +
+            _esc(_t('sub-current', '当前套餐')) +
+            '</div><div class="sub-card-n">' +
             _esc(_t('sub-none', '未订阅')) +
-            '</div><div class="cs" style="margin-bottom:0">' +
+            '</div><div class="sub-card-hint">' +
             _esc(_t('sub-none-sub', '当前按量计费 · 订阅套餐更省 · 在下方选择套餐')) +
-            '</div>';
+            '</div><a class="sub-link" id="sub-jump-plans">' +
+            _esc(_t('sub-view-plans', '查看套餐 →')) +
+            '</a></div>';
+        bindJumpPlans();
         return;
     }
     const used = sub.pages_used_this_cycle || 0;
@@ -105,13 +117,14 @@ function renderSummary(sub: SubState | null) {
               '</div>'
             : '';
     el.innerHTML =
-        '<div class="sub-cur-head">' +
-        '<div><div class="ch">' +
+        '<div class="sub-card-ico">' +
+        _CROWN +
+        '</div><div class="sub-card-bd">' +
+        '<div class="sub-card-l">' +
         _esc(_t('sub-current', '当前套餐')) +
-        ' · Package ' +
+        '</div><div class="sub-card-n">Package ' +
         _esc(sub.plan_code) +
-        '</div>' +
-        '<div class="cs" style="margin-bottom:0">' +
+        '</div><div class="sub-card-hint">' +
         _esc(_t('sub-over-rate', '超额单价')) +
         ' ' +
         _money(sub.over_rate) +
@@ -121,10 +134,7 @@ function renderSummary(sub: SubState | null) {
         _esc(_t('sub-cycle-ends', '周期至')) +
         ' ' +
         _esc(_fmtDate(sub.cycle_end)) +
-        '</div></div>' +
-        '<button class="btn" id="sub-cancel-btn">' +
-        _esc(_t('sub-cancel', '取消订阅')) +
-        '</button></div>' +
+        '</div>' +
         '<div class="sub-prog"><span style="width:' +
         pct +
         '%"></span></div>' +
@@ -141,9 +151,21 @@ function renderSummary(sub: SubState | null) {
         ' <b>' +
         remaining +
         '</b></div>' +
-        cancelledNote;
+        cancelledNote +
+        '<a class="sub-link sub-link-danger" id="sub-cancel-btn">' +
+        _esc(_t('sub-cancel', '取消订阅')) +
+        '</a></div>';
     const cb = document.getElementById('sub-cancel-btn');
-    if (cb) (cb as HTMLButtonElement).onclick = onCancel;
+    if (cb) (cb as HTMLAnchorElement).onclick = onCancel;
+}
+
+function bindJumpPlans() {
+    const j = document.getElementById('sub-jump-plans');
+    if (j)
+        j.onclick = () => {
+            const p = document.getElementById('sub-plans');
+            if (p) p.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        };
 }
 
 function renderPlans(sub: SubState | null) {

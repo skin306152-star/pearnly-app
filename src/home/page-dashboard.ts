@@ -1,11 +1,12 @@
 // ============================================================
 // page-dashboard 骨架 · 运行期注入(home.html 空壳 <section id="page-dashboard">)
 //
-// 2026-06-28 改版:首页 = 订阅与计费。保留账户余额带(余额卡 + 充值按钮 ·
-// billing.ts/dashboard.ts 依赖 dash-kpi-balance-card / dash-topup-btn /
-// dash-kpi-balance-sub 三个 id),其下换订阅区:
-//   当前套餐摘要 #sub-summary → 套餐卡 #sub-plans → 计费规则 + 最近账单 #sub-records。
-// 动态内容由 subscription.ts(window.loadSubscription)填充;静态文案走 data-i18n。
+// 2026-06-28 改版:首页 = 订阅与计费。顶部两张并排卡片:
+//   当前套餐 #sub-summary(subscription.ts 渲染)| 账户余额 #dash-kpi-balance-card
+//   (dashboard.ts loadCreditsCard 渲染 · 充值入口=卡内 #dash-kpi-balance-sub 的「充值 →」链接)。
+//   其下:套餐卡 #sub-plans → 计费规则 + 最近账单 #sub-records。
+// 余额卡 id(dash-kpi-balance-card / dash-kpi-balance / dash-kpi-balance-sub)被
+// dashboard.ts 依赖;充值弹窗经 window._openTopupModal(billing.ts)。静态文案走 data-i18n。
 // ============================================================
 (function () {
     'use strict';
@@ -21,21 +22,19 @@
                 </div>
             </div>
 
-            <div class="panel band" style="margin-top:var(--s4)">
-                <div class="bandtop">
-                    <div id="dash-kpi-balance-card" style="display:none">
-                        <div class="l" data-i18n="dash-kpi-balance">账户余额</div>
-                        <div class="n" id="dash-kpi-balance">—</div>
-                        <div class="help" id="dash-kpi-balance-sub" style="margin-top:4px">&nbsp;</div>
+            <div class="sub-top" style="margin-top:var(--s4)">
+                <div class="panel sub-card" id="sub-summary"></div>
+                <div class="panel sub-card" id="dash-kpi-balance-card" style="display:none">
+                    <div class="sub-card-ico">
+                        <svg class="ic" viewBox="0 0 24 24"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
                     </div>
-                    <button class="btn pri" id="dash-topup-btn" style="display:none" onclick="window._openTopupModal&&window._openTopupModal()">
-                        <svg class="ic" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                        <span data-i18n="dash-topup">充值</span>
-                    </button>
+                    <div class="sub-card-bd">
+                        <div class="sub-card-l" data-i18n="dash-kpi-balance">账户余额</div>
+                        <div class="n sub-card-n" id="dash-kpi-balance">—</div>
+                        <div id="dash-kpi-balance-sub">&nbsp;</div>
+                    </div>
                 </div>
             </div>
-
-            <div class="panel box" id="sub-summary" style="margin-top:var(--s4)"></div>
 
             <div class="panel box" style="margin-top:var(--s4)">
                 <div class="ch" data-i18n="sub-plans-title">选择套餐</div>

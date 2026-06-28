@@ -30,10 +30,9 @@ async function loadCreditsCard() {
     const balVal = document.getElementById('dash-kpi-balance');
     const balSub = document.getElementById('dash-kpi-balance-sub');
     if (!balCard) return;
-    const topupBtn = document.getElementById('dash-topup-btn');
+    // 余额卡整张随 owner 显隐(员工看不到余额)· 充值入口=卡内 #dash-kpi-balance-sub 的「充值 →」链接
     const showBalance = (on: boolean) => {
         balCard.style.display = on ? '' : 'none';
-        if (topupBtn) topupBtn.style.display = on ? '' : 'none';
     };
     try {
         const auth = { Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
@@ -54,7 +53,7 @@ async function loadCreditsCard() {
         if (isExempt) {
             if (balVal) {
                 balVal.textContent = '∞';
-                balVal.className = 'n dash-green';
+                balVal.className = 'n sub-card-n dash-green';
             }
             if (balSub) {
                 balSub.textContent =
@@ -68,12 +67,11 @@ async function loadCreditsCard() {
         if (balVal) {
             // ฿ 与数字间垫窄空格 · 泰铢符号字形偏宽与首位数字贴撞
             balVal.textContent = '฿ ' + bal.toFixed(2);
-            balVal.className = bal < 50 ? 'n dash-red' : 'n';
+            balVal.className = 'n sub-card-n' + (bal < 50 ? ' dash-red' : '');
         }
         if (balSub) {
             const linkTxt =
                 typeof window.t === 'function' ? window.t('dash-kpi-balance-topup') : 'Top up →';
-            const linkColor = bal < 50 ? '#dc2626' : '#6b7280';
             const esc = (s: string) =>
                 typeof window.escapeHtml === 'function'
                     ? window.escapeHtml(s)
@@ -88,10 +86,9 @@ async function loadCreditsCard() {
                                   "'": '&#39;',
                               })[c as '&' | '<' | '>' | '"' | "'"]
                       );
+            // 与「查看套餐 →」同款 .sub-link(紫色)· 低余额由数字变红已示警,链接不再变色
             balSub.innerHTML =
-                '<a href="#" id="kpi-balance-topup-link" style="color:' +
-                linkColor +
-                ';text-decoration:underline;cursor:pointer;" onclick="event.preventDefault();window._openTopupModal&&window._openTopupModal();return false;">' +
+                '<a class="sub-link" href="#" id="kpi-balance-topup-link" onclick="event.preventDefault();window._openTopupModal&&window._openTopupModal();return false;">' +
                 esc(linkTxt) +
                 '</a>';
         }

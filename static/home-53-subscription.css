@@ -4,13 +4,86 @@
    复用 kit 令牌(--accent/--line/--card/--ink* 等)· 与 home-33-dashboard 同风格。
    ============================================================ */
 
-/* 当前套餐摘要 */
-.ui .sub-cur-head {
+/* 顶部两卡:当前套餐 | 账户余额(并排 · 窄屏叠) */
+.ui .sub-top {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s4);
+}
+.ui .sub-card {
     display: flex;
     align-items: flex-start;
+    gap: var(--s4);
+    padding: var(--s5) var(--s5) var(--s4);
+}
+.ui .sub-card-ico {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    background: var(--accent-weak);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.ui .sub-card-ico .ic {
+    width: 22px;
+    height: 22px;
+}
+.ui .sub-card-bd {
+    flex: 1;
+    min-width: 0;
+}
+.ui .sub-card-l {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink2);
+}
+.ui .sub-card-n,
+.ui .n.sub-card-n {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+}
+.ui .sub-card-n.dash-red {
+    color: var(--red);
+}
+.ui .sub-card-n.dash-green {
+    color: var(--green);
+}
+.ui .sub-card-hint {
+    font-size: 12.5px;
+    color: var(--ink3);
+    margin-top: 4px;
+}
+.ui .sub-card-foot {
+    display: flex;
+    align-items: center;
     justify-content: space-between;
     gap: var(--s3);
+    margin-top: 10px;
 }
+.ui .sub-link {
+    display: inline-block;
+    margin-top: 8px;
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+}
+.ui .sub-link:hover {
+    text-decoration: underline;
+}
+.ui .sub-link-danger {
+    color: var(--red);
+}
+
+/* 当前套餐周期用量 */
 .ui .sub-prog {
     height: 8px;
     background: var(--line2);
@@ -54,10 +127,30 @@
     display: flex;
     flex-direction: column;
     gap: var(--s3);
+    transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease,
+        border-color 0.15s ease;
+}
+.ui .sub-plan:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--sh);
+    border-color: var(--accent);
 }
 .ui .sub-plan.cur {
     border-color: var(--accent);
     box-shadow: 0 0 0 1px var(--accent) inset;
+}
+/* 当前套餐不浮起(已是选中态)· 但保留轻微强调 */
+.ui .sub-plan.cur:hover {
+    transform: none;
+    box-shadow: 0 0 0 1px var(--accent) inset;
+}
+.ui .sub-plan-letter {
+    transition: transform 0.15s ease;
+}
+.ui .sub-plan:hover .sub-plan-letter {
+    transform: scale(1.06);
 }
 .ui .sub-plan-top {
     display: flex;
@@ -163,6 +256,9 @@
 }
 
 @media (max-width: 800px) {
+    .ui .sub-top {
+        grid-template-columns: 1fr;
+    }
     .ui .sub-plans {
         grid-template-columns: 1fr;
     }

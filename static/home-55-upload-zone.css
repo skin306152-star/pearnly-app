@@ -1,7 +1,8 @@
-/* home-55-upload-zone.css · 全站票据 / OCR 上传框统一外观与交互
-   单一来源:虚线框 → hover / 拖拽时实心强调色边 + 淡紫底 · 整框可点。
-   只负责「框 skin + 交互态」· 布局(min-height / padding / 内部元素)留各上传区原有类。
-   用法:上传框元素加 .up-dz;拖拽高亮统一切 .up-over(各上传区 JS toggle)。 */
+/* home-55-upload-zone.css · 票据 / OCR 录入上传框(对账中心风格)统一外观与交互
+   覆盖录入工作台(发票收据 / 身份证)、对账中心、采购拍照、客户知识 5 处票据/OCR 上传框。
+   虚线框 → hover / 拖拽实心强调色边 + 淡紫底 · 整框可点。单一来源:只负责「框 skin + 交互态」·
+   布局(min-height / padding / 内部元素)留各上传区原有类。拖拽高亮沿用全站约定 .drag-over。
+   注:VAT 导出 / VAT 对账(.vex-drop / .sv-dropzone / .bv-dropzone)是另一套视觉·未并入。 */
 .up-dz {
     border: 1.5px dashed var(--line);
     border-radius: 16px;
@@ -12,7 +13,7 @@
         background 0.18s ease;
 }
 .up-dz:hover,
-.up-dz.up-over {
+.up-dz.drag-over {
     border-color: var(--accent);
     background: var(--accent-soft);
 }

@@ -360,15 +360,15 @@ function bind() {
     el.addEventListener('dragover', (ev) => {
         if (S.step !== 1) return;
         ev.preventDefault();
-        el.querySelector('.dx-drop')?.classList.add('up-over');
+        el.querySelector('.dx-drop')?.classList.add('drag-over');
     });
     el.addEventListener('dragleave', () =>
-        el.querySelector('.dx-drop')?.classList.remove('up-over')
+        el.querySelector('.dx-drop')?.classList.remove('drag-over')
     );
     el.addEventListener('drop', (ev) => {
         if (S.step !== 1) return;
         ev.preventDefault();
-        el.querySelector('.dx-drop')?.classList.remove('up-over');
+        el.querySelector('.dx-drop')?.classList.remove('drag-over');
         const files = (ev as DragEvent).dataTransfer?.files;
         if (S.task === 'invoice') return void onInvoiceDrop(files);
         onFile(files?.[0] || null);

@@ -244,13 +244,13 @@ function ensureShell(): void {
     ['dragenter', 'dragover'].forEach((ev) =>
         up.addEventListener(ev, (e) => {
             e.preventDefault();
-            up.classList.add('up-over');
+            up.classList.add('drag-over');
         })
     );
     ['dragleave', 'drop'].forEach((ev) =>
         up.addEventListener(ev, (e) => {
             e.preventDefault();
-            up.classList.remove('up-over');
+            up.classList.remove('drag-over');
         })
     );
     up.addEventListener('drop', (e) => {

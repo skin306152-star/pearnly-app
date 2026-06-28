@@ -10,17 +10,17 @@ export function bindGridDrop(onFiles: (side: RxSide, files: FileList) => void) {
         const card = findCard(e.target);
         if (!card) return;
         e.preventDefault();
-        card.classList.add('up-over');
+        card.classList.add('drag-over');
     });
     grid.addEventListener('dragleave', (e) => {
         const card = findCard(e.target);
-        if (card) card.classList.remove('up-over');
+        if (card) card.classList.remove('drag-over');
     });
     grid.addEventListener('drop', (e) => {
         const card = findCard(e.target);
         if (!card) return;
         e.preventDefault();
-        card.classList.remove('up-over');
+        card.classList.remove('drag-over');
         const side = card.dataset.side as RxSide;
         const dt = (e as DragEvent).dataTransfer;
         if (dt && dt.files && dt.files.length) onFiles(side, dt.files);

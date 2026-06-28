@@ -211,12 +211,12 @@ function renderShell(): void {
         drop.onclick = () => pickFile('image/*,application/pdf');
         drop.ondragover = (e) => {
             e.preventDefault();
-            drop.classList.add('up-over');
+            drop.classList.add('drag-over');
         };
-        drop.ondragleave = () => drop.classList.remove('up-over');
+        drop.ondragleave = () => drop.classList.remove('drag-over');
         drop.ondrop = (e) => {
             e.preventDefault();
-            drop.classList.remove('up-over');
+            drop.classList.remove('drag-over');
             const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
             if (f) intakeFile(f);
         };

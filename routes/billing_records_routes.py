@@ -94,7 +94,7 @@ def _range_sql(col: str, start, end, params: list) -> str:
 # ── 取数(三类 · date 范围可选 · 用于预览 limit 小 / 导出 limit=_ROW_CAP)─────
 
 
-def _q_usage(cur, tid, uid, start, end, limit):
+def _q_usage(cur, tid, uid, start, end, limit, offset=0):
     uid_sql = "AND ct.user_id = %s::uuid" if uid else ""
     base = [tid] + ([uid] if uid else [])
     rng: list = []
@@ -115,9 +115,9 @@ def _q_usage(cur, tid, uid, start, end, limit):
             AND ct.description LIKE '%% · ' || LEFT(oh.id::text, 8)
         WHERE ct.tenant_id = %s::uuid AND ct.type IN ('usage','subscription') {uid_sql} {rsql}
         ORDER BY ct.created_at DESC
-        LIMIT %s
+        LIMIT %s OFFSET %s
     """,
-        base + rng + [limit],
+        base + rng + [limit, offset],
     )
     rows = [
         {
@@ -136,7 +136,7 @@ def _q_usage(cur, tid, uid, start, end, limit):
     return rows, total
 
 
-def _q_topup(cur, tid, start, end, limit):
+def _q_topup(cur, tid, start, end, limit, offset=0):
     rng: list = []
     rsql = _range_sql("created_at", start, end, rng)
     cur.execute(
@@ -147,9 +147,9 @@ def _q_topup(cur, tid, start, end, limit):
         f"""
         SELECT id, created_at, amount_thb, payer_name, status, review_note, reviewed_at, note
         FROM topup_requests WHERE tenant_id = %s {rsql}
-        ORDER BY created_at DESC LIMIT %s
+        ORDER BY created_at DESC LIMIT %s OFFSET %s
     """,
-        [tid] + rng + [limit],
+        [tid] + rng + [limit, offset],
     )
     rows = [
         {
@@ -166,7 +166,7 @@ def _q_topup(cur, tid, start, end, limit):
     return rows, total
 
 
-def _q_ocr(cur, tid, uid, start, end, limit):
+def _q_ocr(cur, tid, uid, start, end, limit, offset=0):
     """识别记录:ocr_history.tenant_id 多为 NULL → 按 user 归属过滤(owner 看本租户全员)。"""
     if uid:
         scope = "user_id = %s::uuid"
@@ -183,9 +183,9 @@ def _q_ocr(cur, tid, uid, start, end, limit):
         SELECT created_at, filename, invoice_no, seller_name, total_amount, page_count, source,
                {_ls.STATUS_CASE_SQL} AS status
         FROM ocr_history WHERE {scope} {rsql}
-        ORDER BY created_at DESC LIMIT %s
+        ORDER BY created_at DESC LIMIT %s OFFSET %s
     """,
-        sp + rng + [limit],
+        sp + rng + [limit, offset],
     )
     rows = [
         {
@@ -205,9 +205,14 @@ def _q_ocr(cur, tid, uid, start, end, limit):
 
 @router.get("/api/credits/records")
 async def list_records(
-    request: Request, tab: str = "usage", period: str = "all", date: str = None, limit: int = 10
+    request: Request,
+    tab: str = "usage",
+    period: str = "all",
+    date: str = None,
+    limit: int = 10,
+    offset: int = 0,
 ):
-    """三类记录预览(按 tab)· period=day/month/year/all · all=最新在前。"""
+    """三类记录预览(按 tab)· period=day/month/year/all · all=最新在前 · offset 翻页。"""
     user = get_current_user_from_request(request)
     tid = str(user.get("tenant_id") or "")
     if not tid:
@@ -215,20 +220,21 @@ async def list_records(
     if tab not in ("usage", "topup", "ocr"):
         raise HTTPException(status_code=400, detail="bad_tab")
     limit = min(_PREVIEW_MAX, max(1, int(limit)))
+    offset = max(0, int(offset))
     is_owner = is_owner_role(request, user)
     uid = None if is_owner else str(user["id"])
     start, end = _period_range(period, date)
     try:
         with db.get_cursor_rls(tenant_id=tid, user_id=uid) as cur:
             if tab == "usage":
-                rows, total = _q_usage(cur, tid, uid, start, end, limit)
+                rows, total = _q_usage(cur, tid, uid, start, end, limit, offset)
             elif tab == "topup":
                 if not is_owner:  # 充值是租户级(含余额信息)· 员工不可见
                     rows, total = [], 0
                 else:
-                    rows, total = _q_topup(cur, tid, start, end, limit)
+                    rows, total = _q_topup(cur, tid, start, end, limit, offset)
             else:
-                rows, total = _q_ocr(cur, tid, uid, start, end, limit)
+                rows, total = _q_ocr(cur, tid, uid, start, end, limit, offset)
     except Exception as e:
         logger.warning(f"list_records tab={tab} tenant={tid[:8]}: {e}")
         return {"rows": [], "total": 0, "tab": tab, "period": period}

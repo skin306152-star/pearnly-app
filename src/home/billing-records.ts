@@ -21,6 +21,8 @@ let _period: Period = 'all';
 let _date = ''; // YYYY-MM-DD 锚点(period!=all 时有效)
 let _owner = true;
 let _exporting = false;
+let _page = 1; // 1-based · 翻页
+let _totalPages = 1;
 
 function _t(k: string, fb?: string): string {
     try {
@@ -88,6 +90,7 @@ async function loadBillingRecords() {
     _owner = typeof window.isOwner === 'function' ? !!window.isOwner() : true;
     if (!_owner && _tab === 'topup') _tab = 'usage';
     if (!_date) _date = _todayStr();
+    _page = 1;
     renderTabs();
     renderFilter();
     renderExportBtn();
@@ -98,8 +101,8 @@ window.loadBillingRecords = loadBillingRecords;
 function _tabDefs(): { key: RecTab; label: string }[] {
     const all: { key: RecTab; label: string }[] = [
         { key: 'usage', label: _t('rec-tab-usage', '扣费记录') },
-        { key: 'topup', label: _t('rec-tab-topup', '充值记录') },
         { key: 'ocr', label: _t('rec-tab-ocr', '识别记录') },
+        { key: 'topup', label: _t('rec-tab-topup', '充值记录') },
     ];
     return _owner ? all : all.filter((t) => t.key !== 'topup');
 }
@@ -125,6 +128,7 @@ function renderTabs() {
             const next = btn.getAttribute('data-rec') as RecTab;
             if (next === _tab) return;
             _tab = next;
+            _page = 1;
             renderTabs();
             loadActive();
         };
@@ -188,6 +192,7 @@ function renderFilter() {
         sel.onchange = () => {
             _period = sel.value as Period;
             if (_period !== 'all' && !_date) _date = _todayStr();
+            _page = 1;
             renderFilter();
             loadActive();
         };
@@ -201,6 +206,7 @@ function renderFilter() {
             if (_period === 'day') _date = v;
             else if (_period === 'month') _date = v + '-01';
             else if (_period === 'year') _date = v + '-01-01';
+            _page = 1;
             loadActive();
         };
 }
@@ -224,7 +230,12 @@ async function loadActive() {
     let raw: Record<string, unknown>[] = [];
     let total = 0;
     try {
-        const qs = new URLSearchParams({ tab: _tab, period: _period, limit: String(PREVIEW) });
+        const qs = new URLSearchParams({
+            tab: _tab,
+            period: _period,
+            limit: String(PREVIEW),
+            offset: String((_page - 1) * PREVIEW),
+        });
         if (_period !== 'all') qs.set('date', _date);
         const resp = await fetch('/api/credits/records?' + qs.toString(), {
             headers: _auth(),
@@ -256,14 +267,55 @@ async function loadActive() {
     } else {
         body.innerHTML = rows.map(recRow).join('');
         wireReceiptButtons();
+        body.scrollTop = 0; // 翻页后回到列表顶部
     }
-    if (foot) {
-        foot.innerHTML =
-            '<span class="rec-count">' +
-            _esc(_t('rec-total', '共') + ' ' + total + ' ' + _t('rec-items', '条')) +
-            (total > rows.length ? ' · ' + _esc(_t('rec-export-hint', '导出查看全部')) : '') +
-            '</span>';
+    renderFoot(total);
+}
+
+// 页脚:条数统计 + 翻页器(上一页 / p · tp / 下一页)· 单页时只显条数。
+function renderFoot(total: number) {
+    const foot = document.getElementById('rec-foot');
+    if (!foot) return;
+    _totalPages = Math.max(1, Math.ceil(total / PREVIEW));
+    if (_page > _totalPages) _page = _totalPages;
+    const count =
+        '<span class="rec-count">' +
+        _esc(_t('rec-total', '共') + ' ' + total + ' ' + _t('rec-items', '条')) +
+        '</span>';
+    if (_totalPages <= 1) {
+        foot.innerHTML = count;
+        return;
     }
+    foot.innerHTML =
+        count +
+        '<div class="rec-pages">' +
+        '<button class="rec-page-btn" data-pg="prev"' +
+        (_page <= 1 ? ' disabled' : '') +
+        ' aria-label="' +
+        _esc(_t('rec-prev', '上一页')) +
+        '">‹</button>' +
+        '<span class="rec-page-ind">' +
+        _page +
+        ' / ' +
+        _totalPages +
+        '</span>' +
+        '<button class="rec-page-btn" data-pg="next"' +
+        (_page >= _totalPages ? ' disabled' : '') +
+        ' aria-label="' +
+        _esc(_t('rec-next', '下一页')) +
+        '">›</button>' +
+        '</div>';
+    foot.querySelectorAll('.rec-page-btn[data-pg]').forEach((b) => {
+        const btn = b as HTMLButtonElement;
+        if (btn.disabled) return;
+        btn.onclick = () => {
+            const dir = btn.getAttribute('data-pg');
+            if (dir === 'prev' && _page > 1) _page--;
+            else if (dir === 'next' && _page < _totalPages) _page++;
+            else return;
+            loadActive();
+        };
+    });
 }
 
 function recRow(r: RecRow): string {

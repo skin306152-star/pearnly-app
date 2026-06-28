@@ -38,6 +38,19 @@ class BillingRecordsRoutesContractTests(unittest.TestCase):
             RECORDS_PATHS <= got, f"记录路由未聚合进 billing_routes: {RECORDS_PATHS - got}"
         )
 
+    def test_records_endpoint_supports_offset_paging(self):
+        import inspect
+
+        sig = inspect.signature(rr.list_records)
+        self.assertIn("offset", sig.parameters, "翻页 offset 参数丢失")
+        self.assertEqual(sig.parameters["offset"].default, 0)
+
+    def test_query_helpers_accept_offset(self):
+        import inspect
+
+        for fn in (rr._q_usage, rr._q_topup, rr._q_ocr):
+            self.assertIn("offset", inspect.signature(fn).parameters, fn.__name__)
+
     def test_period_all_is_unbounded(self):
         self.assertEqual(rr._period_range("all", None), (None, None))
         self.assertEqual(rr._period_range("bogus", "2026-06-28"), (None, None))

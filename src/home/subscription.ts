@@ -111,13 +111,20 @@ function renderSummary(sub: SubState | null) {
     const remaining = Math.max(0, quota - used);
     const pct = quota ? Math.min(100, Math.round((used / quota) * 100)) : 0;
     const sheet = _esc(_t('sub-sheet', '张'));
-    const cancelledNote =
-        sub.status === 'cancelled'
-            ? '<div class="sub-note">' +
-              _esc(_t('sub-cancelled-note', '已取消 · 当前周期额度可用到到期')) +
-              '</div>'
-            : '';
+    const cancelled = sub.status === 'cancelled';
+    const cancelledNote = cancelled
+        ? '<div class="sub-note">' +
+          _esc(_t('sub-cancelled-note', '已取消 · 当前周期额度可用到到期')) +
+          '</div>'
+        : '';
+    const badge =
+        '<span class="sub-badge ' +
+        (cancelled ? 'warn' : 'ok') +
+        '">' +
+        _esc(cancelled ? _t('sub-status-cancelled', '已取消') : _t('sub-status-active', '生效中')) +
+        '</span>';
     el.innerHTML =
+        badge +
         '<div class="sub-card-ico">' +
         _CROWN +
         '</div><div class="sub-card-bd">' +
@@ -153,11 +160,14 @@ function renderSummary(sub: SubState | null) {
         remaining +
         '</b></div>' +
         cancelledNote +
-        '<a class="sub-link sub-link-danger" id="sub-cancel-btn">' +
-        _esc(_t('sub-cancel', '取消订阅')) +
-        '</a></div>';
+        (cancelled
+            ? ''
+            : '<button class="sub-cancel-btn" id="sub-cancel-btn">' +
+              _esc(_t('sub-cancel', '取消订阅')) +
+              '</button>') +
+        '</div>';
     const cb = document.getElementById('sub-cancel-btn');
-    if (cb) (cb as HTMLAnchorElement).onclick = onCancel;
+    if (cb) (cb as HTMLButtonElement).onclick = onCancel;
 }
 
 function bindJumpPlans() {

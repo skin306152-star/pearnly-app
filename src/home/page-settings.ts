@@ -55,10 +55,6 @@
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17V7l7-3 7 3v10"/><path d="M3 17h14M8 12h4M8 17v-4"/></svg>
                     <span>公司信息</span>
                 </button>
-                <button class="settings-tab settings-nav-item" data-tab="plan" data-i18n="set-tab-plan">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="10" rx="1.5"/><path d="M3 9h14M7 13h2"/></svg>
-                    <span>用量</span>
-                </button>
             </div>
             <div class="settings-nav-group">
                 <div class="settings-nav-group-title" data-i18n="set-group-workflow">工作流</div>
@@ -288,16 +284,6 @@
                             </label>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <!-- Tab 5 · 用量(CLEANUP-PLAN-03 · 2026-05-22 · 老"套餐 & 用量" 改) -->
-            <div class="settings-pane" data-pane="plan">
-                <div class="card">
-                    <div class="section-head">
-                        <div class="section-title" data-i18n="set-plan-title">用量</div>
-                    </div>
-                    <div id="settings-info"></div>
                 </div>
             </div>
 

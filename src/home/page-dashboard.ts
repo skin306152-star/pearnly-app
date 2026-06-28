@@ -31,7 +31,11 @@
                     <div class="sub-card-bd">
                         <div class="sub-card-l" data-i18n="dash-kpi-balance">账户余额</div>
                         <div class="n sub-card-n" id="dash-kpi-balance">—</div>
-                        <div id="dash-kpi-balance-sub">&nbsp;</div>
+                        <div class="sub-card-hint" id="dash-kpi-balance-sub" data-i18n="dash-balance-use">用于超额扣费 · 按量计费</div>
+                        <div class="sub-card-foot" id="dash-kpi-balance-foot" style="display:none">
+                            <span class="sub-foot-hint" data-i18n="dash-balance-low-hint">余额不足时将影响超额扣费</span>
+                            <button class="btn pri sub-topup-btn" id="dash-topup-btn" data-i18n="dash-topup">去充值</button>
+                        </div>
                     </div>
                 </div>
             </div>

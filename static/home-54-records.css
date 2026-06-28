@@ -15,6 +15,17 @@
     height: 34px;
     padding: 0 14px;
     font-size: 13px;
+    transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease;
+}
+.ui .rec-export:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: var(--sh);
+}
+.ui .rec-export:disabled {
+    opacity: 0.6;
+    cursor: default;
 }
 
 /* tab + 筛选条同排(窄屏叠) */
@@ -146,12 +157,69 @@
     font-size: 11.5px;
     color: var(--ink3);
 }
-.ui .rec-empty,
 .ui .rec-loading {
     padding: var(--s5) 0;
     text-align: center;
     font-size: 13px;
     color: var(--ink3);
+}
+/* 空态:插画 + 主副两行(对齐设计稿) */
+.ui .rec-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--s6) 0;
+    text-align: center;
+}
+.ui .rec-empty-ico {
+    width: 56px;
+    height: 56px;
+    color: var(--accent);
+    opacity: 0.45;
+    margin-bottom: var(--s3);
+}
+.ui .rec-empty-t {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink2);
+}
+.ui .rec-empty-d {
+    font-size: 12px;
+    color: var(--ink3);
+    margin-top: 4px;
+}
+
+/* 行末「下载凭证 PDF」图标钮(充值记录) */
+.ui .rec-dl {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--line);
+    border-radius: var(--rs);
+    background: var(--card);
+    color: var(--ink2);
+    cursor: pointer;
+    transition:
+        color 0.15s ease,
+        border-color 0.15s ease,
+        background 0.15s ease;
+}
+.ui .rec-dl svg {
+    width: 16px;
+    height: 16px;
+}
+.ui .rec-dl:hover:not(:disabled) {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-weak);
+}
+.ui .rec-dl:disabled,
+.ui .rec-dl.busy {
+    opacity: 0.5;
+    cursor: default;
 }
 
 @media (max-width: 800px) {

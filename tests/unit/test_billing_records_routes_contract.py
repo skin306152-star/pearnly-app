@@ -24,6 +24,7 @@ def _paths(r):
 RECORDS_PATHS = {
     ("GET", "/api/credits/records"),
     ("GET", "/api/credits/billing-export"),
+    ("GET", "/api/credits/topup/{topup_id}/receipt.pdf"),
 }
 
 
@@ -61,6 +62,26 @@ class BillingRecordsRoutesContractTests(unittest.TestCase):
         params: list = []
         self.assertEqual(rr._range_sql("created_at", None, None, params), "")
         self.assertEqual(params, [])
+
+    def test_one_month_ago(self):
+        self.assertEqual(rr._one_month_ago(_dt.date(2026, 6, 28)), _dt.date(2026, 5, 28))
+        # 月初跨年回退
+        self.assertEqual(rr._one_month_ago(_dt.date(2026, 1, 15)), _dt.date(2025, 12, 15))
+        # 短月夹到月末(3/31 → 2/28)
+        self.assertEqual(rr._one_month_ago(_dt.date(2026, 3, 31)), _dt.date(2026, 2, 28))
+
+    def test_export_range_period_uses_that_range(self):
+        # 指定 period 时导出该区间(不走默认近一个月)
+        s, e = rr._export_range("month", "2026-06-15")
+        self.assertEqual((s, e), (_dt.date(2026, 6, 1), _dt.date(2026, 7, 1)))
+
+    def test_export_range_all_is_bounded_not_fullscan(self):
+        # all/缺省 → 默认近一个月(有界 · 非全量),end 为排他上界(今天+1)
+        s, e = rr._export_range("all", None)
+        self.assertIsNotNone(s)
+        self.assertIsNotNone(e)
+        self.assertLess(s, e)
+        self.assertLessEqual((e - s).days, 32)  # 约一个月
 
     def test_range_sql_appends_params(self):
         params: list = []

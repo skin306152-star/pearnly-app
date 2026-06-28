@@ -1,6 +1,6 @@
 /* REFACTOR-C1-home-batch7 · 设置页 / 个人资料 / 公司信息
  * 从 home.js verbatim 抽出(0 逻辑改):switchSettingsTab / fillSettingsForms /
- * saveProfile / saveCompany / renderSettings(+ 私有 helper _renderCreditsSettings)。
+ * saveProfile / saveCompany / renderSettings(加载关于/首选项面板 + API Key 卡显隐)。
  *
  * 桥接说明:
  * - 5 个对外函数 window.X=X 挂出 —— home.js 的 initSettingsTabs/bindSettingsForms
@@ -19,11 +19,11 @@
 // v118.10 · 设置页 · 二级 tab 切换
 function switchSettingsTab(tabName: any) {
     if (!tabName) return;
-    // v118.12.3 · 员工守卫:阻止切到隐藏的 tab(api/plan/company · team 已下线)
+    // v118.12.3 · 员工守卫:阻止切到隐藏的 tab(api/company · team/plan 已下线)
     // 防止 localStorage 恢复把员工带到隐藏 panel
     try {
         if (typeof shouldHideMoney === 'function' && shouldHideMoney(_userInfo)) {
-            if (['api', 'plan', 'company'].indexOf(tabName) >= 0) {
+            if (['api', 'company'].indexOf(tabName) >= 0) {
                 tabName = 'profile';
                 try {
                     localStorage.setItem('mrpilot_settings_tab', 'profile');
@@ -51,9 +51,6 @@ function switchSettingsTab(tabName: any) {
         // v118.21.2 · 切到 learned tab 时加载学习规则
         if (tabName === 'learned' && typeof window.loadLearnedRules === 'function')
             window.loadLearnedRules();
-        // v118.35.0.14 · 切到 plan tab 时重渲 credits 计费卡 · 否则首次打开 modal
-        // 之后切 tab 来回 · #settings-info 内容会消失(原 bug: 套餐&用量 panel 空白)
-        if (tabName === 'plan' && typeof renderSettings === 'function') renderSettings();
         // 平台业态套餐 PO-PP3 · 切到「业务/模块」tab 时拉取并渲染开关
         if (tabName === 'modules' && typeof window.loadModuleSettings === 'function')
             window.loadModuleSettings();
@@ -187,75 +184,20 @@ async function saveCompany() {
     }
 }
 
-// 设置页
+// 设置页 · 进入时加载联系我们 + 首选项面板,并按账号类型显隐 API Key 卡片。
+// (原「用量」面板已删 · 计费说明移到充值弹窗 · 此处不再渲染 #settings-info)
 function renderSettings() {
     if (!_userInfo) return;
-
-    // v118.1 · 不论超管/普通用户都先加载联系我们 + 首选项(原 v118 放函数末尾 · 超管路径提前 return 跑不到)
     if (typeof window.loadAboutPanel === 'function') window.loadAboutPanel();
     if (typeof window.loadPrefsSettings === 'function') window.loadPrefsSettings();
 
-    const el = document.getElementById('settings-info');
-    if (!el) return;
-    const u = _userInfo;
-
-    // v85 · 超管不显示订阅/配额/有效期 · 只显示身份标识
-    if (u.is_super_admin) {
-        el.innerHTML = `
-            <table style="width:100%; font-size:13px; border-collapse: collapse;">
-                <tr><td style="color:#a0aec0; padding:8px 0; width:120px;">${t('settings-username')}</td><td style="padding:8px 0;">${escapeHtml(u.username)}</td></tr>
-                <tr><td style="color:#a0aec0; padding:8px 0;">${t('settings-role')}</td><td style="padding:8px 0;"><strong style="color:#d97706;">🛡️ ${escapeHtml(t('settings-role-super-admin'))}</strong></td></tr>
-            </table>
-        `;
-        // v118.10.3 · 超管也显示 API Key 卡片(测试 + 管理需要 · 即使本身不走 Gemini)
-        const apiKeyCard = document.getElementById('api-key-card');
-        if (apiKeyCard) apiKeyCard.style.display = '';
-        return;
-    }
-
-    // v118.35.0.9 · 所有非超管用户(包括 byo_api · monthly · yearly · lifetime · free)
-    // 全部走 credits 计费方式渲染 · DB 已批量迁移到 plan='credits'(v0.9 R6) ·
-    // 设置页只显示:用户名 + 计费方式 + 价格说明 · 不再显示订阅类型/配额/有效期表格
-    _renderCreditsSettings(u, el);
-
-    // v118.35.0.16 · BYO Gemini Key 已永久下线 · credits 系统接管
-
-    // v87 · API Key 卡片只对买断账号(tenant_type=byo_api)显示
-    // 月付(shared_api)共用系统 key · 不能也不需要填
-    // v118.10.2 · 超管(Earn)也能看(测试 + 管理需要)
+    // API Key 卡片:买断账号(tenant_type=byo_api)或超管可见(测试 + 管理需要)。
     const apiKeyCard = document.getElementById('api-key-card');
     if (apiKeyCard) {
         const showCard =
             (tt as unknown as string) === 'byo_api' || (_userInfo && _userInfo.is_super_admin);
         apiKeyCard.style.display = showCard ? '' : 'none';
     }
-}
-
-// ============================================================
-// v118.35.0.9 · credits 计费 · 设置页极简渲染
-// 只显示:用户名 + 计费方式 + 价格说明小字
-// 余额卡 / 充值按钮搬到首页 KPI 卡 · 这里不再重复
-// ============================================================
-function _renderCreditsSettings(u: any, el: HTMLElement) {
-    // v118.35.0.13 · 3 行: 用户名 + 计费方式 + 价格说明 · keys 跟用户规范命名对齐
-    const username = escapeHtml(u.username || u.email || '');
-    el.innerHTML = `
-        <table style="width:100%; font-size:13px; border-collapse: collapse;">
-            <tr>
-                <td style="color:#a0aec0; padding:8px 0; width:140px;">${escapeHtml(t('settings-username'))}</td>
-                <td style="padding:8px 0;">${username}</td>
-            </tr>
-            <tr>
-                <td style="color:#a0aec0; padding:8px 0;">${escapeHtml(t('settings-billing-mode-title'))}</td>
-                <td style="padding:8px 0;"><strong>${escapeHtml(t('settings-billing-mode'))}</strong></td>
-            </tr>
-            <tr>
-                <td colspan="2" style="color:#a0aec0; padding:8px 0; font-size:12px;">
-                    ${escapeHtml(t('settings-billing-pricing'))}
-                </td>
-            </tr>
-        </table>
-    `;
 }
 
 // ── window 桥(home.js 的 IIFE / 用户初始化 / applyLang / routeTo + 其它模块裸调解析)──

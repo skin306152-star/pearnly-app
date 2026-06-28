@@ -71,7 +71,16 @@ interface RecRow {
     badge: string;
     badgeCls: string; // ok | warn | bad | free | neutral
     amount: string;
+    receiptId?: string; // 有值 → 行末渲染「下载凭证 PDF」图标(仅充值记录)
 }
+
+// 下载箭头(与 history 批量导出同款 path)· 充值行末「下载凭证」按钮用。
+const _DL_ICON =
+    '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v10M6 9l4 4 4-4M4 15v2h12v-2"/></svg>';
+
+// 空态「发票/文档」插画(带折角 · 复用 history 风格)。
+const _EMPTY_ICON =
+    '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" class="rec-empty-ico"><path d="M12 6h16l8 8v28H12z"/><path d="M28 6v8h8"/><path d="M18 24h12M18 31h12M18 38h7"/></svg>';
 
 async function loadBillingRecords() {
     const box = document.getElementById('rec-box');
@@ -235,9 +244,17 @@ async function loadActive() {
     const mapper = _tab === 'usage' ? mapUsage : _tab === 'topup' ? mapTopup : mapOcr;
     const rows = raw.map(mapper);
     if (!rows.length) {
-        body.innerHTML = '<div class="rec-empty">' + _esc(_t('rec-empty', '暂无记录')) + '</div>';
+        body.innerHTML =
+            '<div class="rec-empty">' +
+            _EMPTY_ICON +
+            '<div class="rec-empty-t">' +
+            _esc(_t('rec-empty', '暂无记录')) +
+            '</div><div class="rec-empty-d">' +
+            _esc(_t('rec-empty-sub', '当前筛选条件下暂无任何记录')) +
+            '</div></div>';
     } else {
         body.innerHTML = rows.map(recRow).join('');
+        wireReceiptButtons();
     }
     if (foot) {
         foot.innerHTML =
@@ -249,6 +266,15 @@ async function loadActive() {
 }
 
 function recRow(r: RecRow): string {
+    const dl = r.receiptId
+        ? '<button class="rec-dl" data-receipt="' +
+          _esc(r.receiptId) +
+          '" title="' +
+          _esc(_t('rec-receipt', '下载凭证')) +
+          '">' +
+          _DL_ICON +
+          '</button>'
+        : '';
     return (
         '<div class="rec-row"><div class="rec-row-l"><div class="rec-row-title" title="' +
         _esc(r.title) +
@@ -259,8 +285,47 @@ function recRow(r: RecRow): string {
         '</div></div><div class="rec-row-r">' +
         (r.badge ? '<span class="rec-badge ' + r.badgeCls + '">' + _esc(r.badge) + '</span>' : '') +
         (r.amount ? '<span class="rec-amt">' + _esc(r.amount) + '</span>' : '') +
+        dl +
         '</div></div>'
     );
+}
+
+// 充值行末「下载凭证 PDF」· 单笔走 /api/credits/topup/{id}/receipt.pdf(带系统语言)。
+function wireReceiptButtons() {
+    document.querySelectorAll('.rec-dl[data-receipt]').forEach((b) => {
+        const btn = b as HTMLButtonElement;
+        btn.onclick = () => downloadReceipt(btn.getAttribute('data-receipt') || '', btn);
+    });
+}
+
+async function downloadReceipt(id: string, btn: HTMLButtonElement) {
+    if (!id || btn.disabled) return;
+    btn.disabled = true;
+    btn.classList.add('busy');
+    try {
+        const resp = await fetch(
+            '/api/credits/topup/' +
+                encodeURIComponent(id) +
+                '/receipt.pdf?lang=' +
+                encodeURIComponent(_curLang()),
+            { headers: _auth(), cache: 'no-store' }
+        );
+        if (!resp.ok) throw new Error('http');
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'pearnly_topup_' + id + '.pdf';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (_) {
+        _toast(_t('rec-receipt-failed', '凭证下载失败 · 请稍后再试'), 'error');
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('busy');
+    }
 }
 
 function mapUsage(r: Record<string, unknown>): RecRow {
@@ -300,6 +365,7 @@ function mapTopup(r: Record<string, unknown>): RecRow {
         badge: st[0],
         badgeCls: st[1],
         amount: '+ ' + _money(Number(r.amount_thb || 0)),
+        receiptId: r.id != null ? String(r.id) : undefined,
     };
 }
 
@@ -321,16 +387,18 @@ function mapOcr(r: Record<string, unknown>): RecRow {
     };
 }
 
-// 导出(三 sheet 全量 · 表头随系统语言 · 始终全量不受筛选影响)
+// 导出(三 sheet · 表头随系统语言 · 按当前筛选区间;全部时后端默认导出近一个月)
 async function onExport() {
     if (_exporting) return;
     _exporting = true;
     renderExportBtn();
     try {
-        const resp = await fetch(
-            '/api/credits/billing-export?lang=' + encodeURIComponent(_curLang()),
-            { headers: _auth(), cache: 'no-store' }
-        );
+        const qs = new URLSearchParams({ lang: _curLang(), period: _period });
+        if (_period !== 'all') qs.set('date', _date);
+        const resp = await fetch('/api/credits/billing-export?' + qs.toString(), {
+            headers: _auth(),
+            cache: 'no-store',
+        });
         if (!resp.ok) throw new Error('http');
         const blob = await resp.blob();
         const url = URL.createObjectURL(blob);

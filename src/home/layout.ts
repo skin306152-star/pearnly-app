@@ -137,10 +137,6 @@ function applySidebarVisibility() {
     const apiTab = document.querySelector('.settings-tab[data-tab="api"]') as HTMLElement | null;
     if (apiTab) apiTab.style.display = _canApiKey || isSuperAdmin(u) ? '' : 'none';
 
-    // 套餐 & 用量:员工隐藏
-    const planTab = document.querySelector('.settings-tab[data-tab="plan"]') as HTMLElement | null;
-    if (planTab) planTab.style.display = _hideMoney ? 'none' : '';
-
     // v118.12 · 公司信息 tab:员工隐藏(公司是事务所属性 · 跟员工无关)
     const companyTab = document.querySelector(
         '.settings-tab[data-tab="company"]'

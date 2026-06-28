@@ -11,10 +11,29 @@
     gap: var(--s4);
 }
 .ui .sub-card {
+    position: relative;
     display: flex;
     align-items: flex-start;
     gap: var(--s4);
     padding: var(--s5) var(--s5) var(--s4);
+}
+/* 状态徽章(生效中 / 已取消)· 卡片右上角 */
+.ui .sub-badge {
+    position: absolute;
+    top: var(--s4);
+    right: var(--s4);
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+}
+.ui .sub-badge.ok {
+    color: var(--accent);
+    background: var(--accent-weak);
+}
+.ui .sub-badge.warn {
+    color: var(--amber);
+    background: var(--amber-weak);
 }
 .ui .sub-card-ico {
     width: 46px;
@@ -81,6 +100,54 @@
 }
 .ui .sub-link-danger {
     color: var(--red);
+}
+
+/* 取消订阅 · 红框胶囊钮(对齐设计稿) */
+.ui .sub-cancel-btn {
+    margin-top: var(--s3);
+    align-self: flex-start;
+    padding: 5px 14px;
+    border: 1px solid var(--red);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--red);
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        transform 0.15s ease;
+}
+.ui .sub-cancel-btn:hover {
+    background: var(--red-weak);
+    transform: translateY(-1px);
+}
+
+/* 账户余额卡底:余额不足提示(左)+ 去充值钮(右) */
+.ui .sub-card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s3);
+    margin-top: var(--s4);
+}
+.ui .sub-foot-hint {
+    font-size: 12px;
+    color: var(--amber);
+}
+.ui .sub-foot-hint::before {
+    content: 'ⓘ ';
+}
+.ui .sub-topup-btn {
+    flex-shrink: 0;
+    padding: 7px 18px;
+    transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease;
+}
+.ui .sub-topup-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--sh);
 }
 
 /* 当前套餐周期用量 */

@@ -66,6 +66,24 @@ def _period_range(period: str, date_str: str | None):
     return start, start.replace(year=start.year + 1)
 
 
+def _one_month_ago(d: "_dt.date") -> "_dt.date":
+    """同日上个月(短月夹到月末)· 月初跨年回退。"""
+    import calendar
+
+    y, m = (d.year - 1, 12) if d.month == 1 else (d.year, d.month - 1)
+    return d.replace(year=y, month=m, day=min(d.day, calendar.monthrange(y, m)[1]))
+
+
+def _export_range(period: str, date_str: str | None):
+    """导出区间:period=day/month/year → 该区间;all/缺省 → 默认近一个月(截止今天)。
+    返回 [start, end) 两个 date(始终有界,导出不再全量)。"""
+    start, end = _period_range(period, date_str)
+    if start and end:
+        return start, end
+    today = _dt.datetime.now(_BKK).date()
+    return _one_month_ago(today), today + _dt.timedelta(days=1)
+
+
 def _range_sql(col: str, start, end, params: list) -> str:
     if not start or not end:
         return ""
@@ -127,7 +145,7 @@ def _q_topup(cur, tid, start, end, limit):
     total = int(cur.fetchone()["n"])
     cur.execute(
         f"""
-        SELECT created_at, amount_thb, payer_name, status, review_note, reviewed_at, note
+        SELECT id, created_at, amount_thb, payer_name, status, review_note, reviewed_at, note
         FROM topup_requests WHERE tenant_id = %s {rsql}
         ORDER BY created_at DESC LIMIT %s
     """,
@@ -135,6 +153,7 @@ def _q_topup(cur, tid, start, end, limit):
     )
     rows = [
         {
+            "id": r["id"],
             "created_at": _fmt_dt(r["created_at"]),
             "amount_thb": float(r["amount_thb"] or 0),
             "payer_name": r["payer_name"] or "",
@@ -217,8 +236,9 @@ async def list_records(
 
 
 @router.get("/api/credits/billing-export")
-async def billing_export(request: Request, lang: str = "zh"):
-    """扣费/充值/识别 三类全量明细 → xlsx(三 sheet · 表头随 lang)。导出始终全量。"""
+async def billing_export(request: Request, lang: str = "zh", period: str = "all", date: str = None):
+    """扣费/充值/识别 三类明细 → xlsx(三 sheet · 表头随 lang)。
+    按区间导出:period=day/month/year 用该区间;all/缺省 → 默认近一个月(截止今天)。"""
     user = get_current_user_from_request(request)
     tid = str(user.get("tenant_id") or "")
     if not tid:
@@ -227,6 +247,7 @@ async def billing_export(request: Request, lang: str = "zh"):
         lang = "zh"
     is_owner = is_owner_role(request, user)
     uid = None if is_owner else str(user["id"])
+    start, end = _export_range(period, date)
 
     company = ""
     usage_rows: list[dict] = []
@@ -237,10 +258,10 @@ async def billing_export(request: Request, lang: str = "zh"):
             cur.execute("SELECT name FROM tenants WHERE id = %s::uuid", (tid,))
             trow = cur.fetchone()
             company = (trow.get("name") if trow else "") or ""
-            usage_rows, u_total = _q_usage(cur, tid, uid, None, None, _ROW_CAP)
+            usage_rows, u_total = _q_usage(cur, tid, uid, start, end, _ROW_CAP)
             if is_owner:
-                topup_rows, _ = _q_topup(cur, tid, None, None, _ROW_CAP)
-            ocr_rows, o_total = _q_ocr(cur, tid, uid, None, None, _ROW_CAP)
+                topup_rows, _ = _q_topup(cur, tid, start, end, _ROW_CAP)
+            ocr_rows, o_total = _q_ocr(cur, tid, uid, start, end, _ROW_CAP)
             if u_total > _ROW_CAP or o_total > _ROW_CAP:
                 logger.warning(f"billing-export capped {_ROW_CAP} tenant={tid[:8]}")
     except Exception as e:
@@ -264,12 +285,73 @@ async def billing_export(request: Request, lang: str = "zh"):
     safe = (
         "".join(ch for ch in (company or "tenant") if ch.isalnum() or ch in "-_")[:24] or "tenant"
     )
-    stem = f"pearnly_billing_{safe}_{_dt.date.today().strftime('%Y%m%d')}"
+    last = end - _dt.timedelta(days=1)  # end 为排他上界 · 文件名用闭区间末日
+    stem = f"pearnly_billing_{safe}_{start.strftime('%Y%m%d')}_{last.strftime('%Y%m%d')}"
     return Response(
         content=data,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
             "Content-Disposition": f'attachment; filename="{stem}.xlsx"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.get("/api/credits/topup/{topup_id}/receipt.pdf")
+async def topup_receipt(topup_id: int, request: Request, lang: str = "zh"):
+    """单笔充值凭证 PDF。owner-only + tenant 归属双闸(防越权下载别家收据)。"""
+    user = get_current_user_from_request(request)
+    tid = str(user.get("tenant_id") or "")
+    if not tid:
+        raise HTTPException(status_code=400, detail="no_tenant")
+    if not is_owner_role(request, user):
+        raise HTTPException(status_code=403, detail="credits.owner_only")
+    if lang not in ("zh", "en", "th", "ja"):
+        lang = "zh"
+
+    try:
+        with db.get_cursor_rls(tenant_id=tid, user_id=None) as cur:
+            cur.execute(
+                """
+                SELECT tr.id, tr.tenant_id, tr.amount_thb, tr.payer_name, tr.note,
+                       tr.status, tr.created_at, tr.reviewed_at, t.name AS tenant_name
+                FROM topup_requests tr
+                LEFT JOIN tenants t ON t.id = tr.tenant_id
+                WHERE tr.id = %s AND tr.tenant_id = %s::uuid
+            """,
+                (topup_id, tid),
+            )
+            row = cur.fetchone()
+    except Exception as e:
+        logger.error(f"topup_receipt query id={topup_id} tenant={tid}: {e}")
+        raise HTTPException(status_code=500, detail="query_failed")
+    if not row:
+        raise HTTPException(status_code=404, detail="topup.not_found")
+
+    receipt = {
+        "id": row["id"],
+        "amount_thb": float(row["amount_thb"] or 0),
+        "payer_name": row["payer_name"] or "",
+        "note": row["note"] or "",
+        "status": row["status"] or "",
+        "created_at": _fmt_dt(row["created_at"]),
+        "reviewed_at": _fmt_dt(row["reviewed_at"]),
+    }
+    from services.billing.topup_receipt import build_topup_receipt_pdf
+
+    try:
+        data = build_topup_receipt_pdf(
+            lang=lang, tenant_name=row["tenant_name"] or "—", receipt=receipt
+        )
+    except Exception as e:
+        logger.error(f"topup_receipt build id={topup_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="build_failed")
+
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="pearnly_topup_{topup_id}.pdf"',
             "Cache-Control": "no-store",
         },
     )

@@ -50,47 +50,37 @@ async function loadCreditsCard() {
             return;
         }
         showBalance(true);
+        const foot = document.getElementById('dash-kpi-balance-foot');
         if (isExempt) {
             if (balVal) {
                 balVal.textContent = '∞';
                 balVal.className = 'n sub-card-n dash-green';
             }
             if (balSub) {
-                balSub.textContent =
-                    typeof window.t === 'function'
-                        ? window.t('dash-kpi-balance-exempt')
-                        : 'Billing exempt';
+                balSub.textContent = _t('dash-kpi-balance-exempt', 'Billing exempt') as string;
             }
+            if (foot) foot.style.display = 'none'; // 豁免账号无需充值
             return;
         }
         const bal = typeof data.balance_thb === 'number' ? data.balance_thb : 0;
+        const low = bal < 50;
         if (balVal) {
             // ฿ 与数字间垫窄空格 · 泰铢符号字形偏宽与首位数字贴撞
             balVal.textContent = '฿ ' + bal.toFixed(2);
-            balVal.className = 'n sub-card-n' + (bal < 50 ? ' dash-red' : '');
+            balVal.className = 'n sub-card-n' + (low ? ' dash-red' : '');
         }
-        if (balSub) {
-            const linkTxt =
-                typeof window.t === 'function' ? window.t('dash-kpi-balance-topup') : 'Top up →';
-            const esc = (s: string) =>
-                typeof window.escapeHtml === 'function'
-                    ? window.escapeHtml(s)
-                    : String(s).replace(
-                          /[&<>"']/g,
-                          (c) =>
-                              ({
-                                  '&': '&amp;',
-                                  '<': '&lt;',
-                                  '>': '&gt;',
-                                  '"': '&quot;',
-                                  "'": '&#39;',
-                              })[c as '&' | '<' | '>' | '"' | "'"]
-                      );
-            // 与「查看套餐 →」同款 .sub-link(紫色)· 低余额由数字变红已示警,链接不再变色
-            balSub.innerHTML =
-                '<a class="sub-link" href="#" id="kpi-balance-topup-link" onclick="event.preventDefault();window._openTopupModal&&window._openTopupModal();return false;">' +
-                esc(linkTxt) +
-                '</a>';
+        // 副标题固定说明用途(对齐设计稿);低余额提示 + 去充值钮在卡底 footer。
+        if (balSub)
+            balSub.textContent = _t('dash-balance-use', '用于超额扣费 · 按量计费') as string;
+        if (foot) {
+            foot.style.display = '';
+            const hint = foot.querySelector('.sub-foot-hint') as HTMLElement | null;
+            if (hint) hint.style.visibility = low ? 'visible' : 'hidden'; // 仅低余额示警
+            const btn = document.getElementById('dash-topup-btn') as HTMLButtonElement | null;
+            if (btn)
+                btn.onclick = () => {
+                    if (typeof window._openTopupModal === 'function') window._openTopupModal();
+                };
         }
     } catch (e) {
         showBalance(false);

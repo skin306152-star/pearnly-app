@@ -104,6 +104,7 @@ function _render() {
         '      </div>',
         '      <input id="tv2-amt" type="number" min="10" step="1" class="topup-v2-input" placeholder="฿ ...">',
         '      <div id="tv2-ae" class="topup-v2-err" style="display:none"></div>',
+        '      <div class="topup-v2-pricing" id="tv2-pricing"></div>',
         '    </div>',
         // Step 2
         '    <div id="tv2-s2" style="display:none">',
@@ -152,6 +153,7 @@ function _applyText() {
     setText('tv2-sl2', _bt('topup-step2'));
     setText('tv2-sl3', _bt('topup-step3'));
     setText('tv2-al', _bt('topup-amount-label'));
+    setText('tv2-pricing', _bt('topup-pricing-note'));
     setText('tv2-bl', _bt('topup-bank-label'));
     setText('tv2-copy', _bt('topup-copy-account'));
     setText('tv2-dt', _bt('topup-slip-drop'));

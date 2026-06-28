@@ -71,4 +71,20 @@ test.describe('账单记录预览框(首页)', () => {
         ]);
         expect(download.suggestedFilename(), '导出文件名为 .xlsx').toContain('.xlsx');
     });
+
+    test('充值记录行可下载凭证 PDF', async ({ page }) => {
+        await gotoDashboard(page);
+        await page.locator('.rec-tab[data-rec="topup"]').click();
+        await expect(page.locator('#rec-body .rec-loading'), '充值加载完成').toHaveCount(0, {
+            timeout: 15_000,
+        });
+        const dl = page.locator('.rec-dl[data-receipt]').first();
+        const has = await dl.isVisible({ timeout: 5000 }).catch(() => false);
+        test.skip(!has, '无充值记录 · 跳过凭证下载');
+        const [download] = await Promise.all([
+            page.waitForEvent('download', { timeout: 20_000 }),
+            dl.click(),
+        ]);
+        expect(download.suggestedFilename(), '凭证文件名为 .pdf').toContain('.pdf');
+    });
 });

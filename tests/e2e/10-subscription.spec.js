@@ -56,7 +56,7 @@ test.describe('订阅与计费(首页)', () => {
         // 套餐卡 S/M/L
         await expect(page.locator('#sub-plans .sub-plan'), '套餐卡三张').toHaveCount(3);
         await expect(page.locator('.sub-plan-btn').first(), '订阅按钮').toBeVisible();
-        await expect(page.locator('#sub-records'), '账单容器').toBeVisible();
+        await expect(page.locator('#rec-box'), '记录框容器').toBeVisible();
 
         // 旧 dashboard 主体应已撤掉
         await expect(page.locator('#dash-kpi-invoices'), '旧本月发票卡撤掉').toHaveCount(0);
@@ -70,7 +70,8 @@ test.describe('订阅与计费(首页)', () => {
 
     test('套餐卡 hover 有动态交互(translateY 上浮)', async ({ page }) => {
         await gotoDashboard(page);
-        const card = page.locator('#sub-plans .sub-plan').first();
+        // 用非「当前套餐」卡(当前套餐 .cur 设计上 hover 不上浮)· 已订阅账号下首卡可能是 .cur
+        const card = page.locator('#sub-plans .sub-plan:not(.cur)').last();
         await expect(card).toBeVisible({ timeout: 15_000 });
         const before = await card.evaluate((el) => getComputedStyle(el).transform);
         await card.hover();

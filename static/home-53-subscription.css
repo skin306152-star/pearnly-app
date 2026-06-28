@@ -99,9 +99,11 @@
     color: var(--red);
 }
 
-/* 取消订阅 · 复用充值按钮的框(.btn 基类 + 同 padding/圆角)· 红框红字白底 · 钉卡底与充值钮对齐 */
+/* 取消订阅 · 复用充值按钮的框(.btn 基类 + 同 padding/圆角)· 红框红字白底 ·
+   上下 auto 外边距 → 在用量文字与卡底边框之间垂直居中 */
 .ui .sub-cancel-btn {
     margin-top: auto;
+    margin-bottom: auto;
     align-self: flex-start;
     padding: 7px 18px;
     border: 1px solid var(--red);

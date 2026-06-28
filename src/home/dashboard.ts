@@ -69,9 +69,9 @@ async function loadCreditsCard() {
             balVal.textContent = '฿ ' + bal.toFixed(2);
             balVal.className = 'n sub-card-n' + (low ? ' dash-red' : '');
         }
-        // 副标题固定说明用途(对齐设计稿);低余额提示 + 去充值钮在卡底 footer。
+        // 副标题=计费说明(i18n 主供 topup-pricing-note);低余额提示 + 去充值钮在卡底 footer。
         if (balSub)
-            balSub.textContent = _t('dash-balance-use', '用于超额扣费 · 按量计费') as string;
+            balSub.textContent = _t('topup-pricing-note', '按量计费 · 文档按字符量折算') as string;
         if (foot) {
             foot.style.display = '';
             const hint = foot.querySelector('.sub-foot-hint') as HTMLElement | null;

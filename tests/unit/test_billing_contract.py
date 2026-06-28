@@ -271,6 +271,10 @@ class BillingStatusCombinedTests(unittest.TestCase):
 
     def setUp(self):
         _clear_exempt_cache()
+        # 本套契约锁定「无订阅」按量计费路径 · 订阅查询单独在 test_subscription 验。
+        _p = patch.object(db, "get_active_subscription", return_value=None)
+        _p.start()
+        self.addCleanup(_p.stop)
 
     def test_exempt_user_always_allowed_no_db_lookup_for_balance(self):
         """🟢 白名单: is_billing_exempt=True · 允许 · 不查 balance"""
@@ -366,6 +370,10 @@ class IsBillingExemptTests(unittest.TestCase):
 
     def setUp(self):
         _clear_exempt_cache()
+        # 本套契约锁定「无订阅」按量计费路径 · 订阅查询单独在 test_subscription 验。
+        _p = patch.object(db, "get_active_subscription", return_value=None)
+        _p.start()
+        self.addCleanup(_p.stop)
 
     def test_returns_true_when_user_flagged(self):
         cur = _Cursor(fetchone_results=[{"x": True}])
@@ -424,6 +432,10 @@ class ChargeOcrFailsCleanlyTests(unittest.TestCase):
 
     def setUp(self):
         _clear_exempt_cache()
+        # 本套契约锁定「无订阅」按量计费路径 · 订阅查询单独在 test_subscription 验。
+        _p = patch.object(db, "get_active_subscription", return_value=None)
+        _p.start()
+        self.addCleanup(_p.stop)
 
     def test_no_tenant_returns_error_no_db_write(self):
         cur = _Cursor()
@@ -480,6 +492,10 @@ class ChargeOcrSuccessPathTests(unittest.TestCase):
 
     def setUp(self):
         _clear_exempt_cache()
+        # 本套契约锁定「无订阅」按量计费路径 · 订阅查询单独在 test_subscription 验。
+        _p = patch.object(db, "get_active_subscription", return_value=None)
+        _p.start()
+        self.addCleanup(_p.stop)
 
     def test_pdf_charge_writes_all_three_tables(self):
         """PDF 100 页 (0 used) = ฿150 · 必写 tenant_credits + credit_transactions + monthly_page_usage"""
@@ -594,6 +610,10 @@ class DuplicateRequestSemanticsTests(unittest.TestCase):
 
     def setUp(self):
         _clear_exempt_cache()
+        # 本套契约锁定「无订阅」按量计费路径 · 订阅查询单独在 test_subscription 验。
+        _p = patch.object(db, "get_active_subscription", return_value=None)
+        _p.start()
+        self.addCleanup(_p.stop)
 
     def test_charge_ocr_twice_writes_two_transactions(self):
         """🔵 当前契约: charge_ocr(history_id='h-1') 调 2 次 → 2 笔流水 (锁定)
@@ -648,6 +668,10 @@ class ConcurrencySafetyContractTests(unittest.TestCase):
 
     def setUp(self):
         _clear_exempt_cache()
+        # 本套契约锁定「无订阅」按量计费路径 · 订阅查询单独在 test_subscription 验。
+        _p = patch.object(db, "get_active_subscription", return_value=None)
+        _p.start()
+        self.addCleanup(_p.stop)
 
     def test_charge_uses_for_update_lock(self):
         """SELECT FOR UPDATE 是单原子事务核心 · 必须存在"""
@@ -701,6 +725,10 @@ class CrossTenantBillingIsolationTests(unittest.TestCase):
 
     def setUp(self):
         _clear_exempt_cache()
+        # 本套契约锁定「无订阅」按量计费路径 · 订阅查询单独在 test_subscription 验。
+        _p = patch.object(db, "get_active_subscription", return_value=None)
+        _p.start()
+        self.addCleanup(_p.stop)
 
     def test_charge_uses_passed_tenant_id_for_all_writes(self):
         cur = _Cursor(

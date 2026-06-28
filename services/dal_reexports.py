@@ -330,6 +330,18 @@ _REEXPORTS = {
         "PDF_TIER2_PRICE_V21",
         "EXCEL_CHARS_PER_SATANG_V21",
         "EXCEL_SATANG_PRICE_V21",
+        "SUBSCRIPTION_PLANS",
+        "SUBSCRIPTION_CYCLE_DAYS",
+        "subscription_plan_spec",
+        "doc_quota_pages",
+    ],
+    "services.billing.subscription": [
+        "get_active_subscription",
+        "consume_subscription_quota",
+        "overage_cost",
+        "subscription_subscribe",
+        "subscription_cancel",
+        "subscription_catalog",
     ],
     "services.auth.user_lookup": [
         "find_user_by_username",

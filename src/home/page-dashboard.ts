@@ -1,12 +1,11 @@
 // ============================================================
 // page-dashboard 骨架 · 运行期注入(home.html 空壳 <section id="page-dashboard">)
 //
-// PO-UI 迁移(2026-06-09)· 套概览模板 + kit · 照搬 scripts/_mock/dashboard-final.html:
-//   信息带 .band(北极星=账户余额 + kpi 条)→ .cols(快捷 .qa | 最近动态 .act)。
-// 作用域 .ui(挂到 section)吃 kit 组件 + 模板原语。dashboard.ts 读写的 id 全保留:
-//   dash-kpi-{invoices,pending,exceptions,balance,usage} / dash-kpi-balance-card /
-//   dash-kpi-usage-card / dash-recent-list / dash-quick-exc-badge。
-// 注入后对子树补译(镜像 applyLang)· 切语言由 applyLang 全文扫描覆盖。
+// 2026-06-28 改版:首页 = 订阅与计费。保留账户余额带(余额卡 + 充值按钮 ·
+// billing.ts/dashboard.ts 依赖 dash-kpi-balance-card / dash-topup-btn /
+// dash-kpi-balance-sub 三个 id),其下换订阅区:
+//   当前套餐摘要 #sub-summary → 套餐卡 #sub-plans → 计费规则 + 最近账单 #sub-records。
+// 动态内容由 subscription.ts(window.loadSubscription)填充;静态文案走 data-i18n。
 // ============================================================
 (function () {
     'use strict';
@@ -17,8 +16,8 @@
         <div class="wrap">
             <div class="pagehead">
                 <div>
-                    <div class="h1" data-i18n="dash-title">首页</div>
-                    <div class="sub" id="dash-subtitle" data-i18n="dash-sub">今日工作概况</div>
+                    <div class="h1" data-i18n="sub-title">订阅与计费</div>
+                    <div class="sub" data-i18n="sub-subtitle">管理套餐 · 用量 · 余额</div>
                 </div>
             </div>
 
@@ -34,43 +33,33 @@
                         <span data-i18n="dash-topup">充值</span>
                     </button>
                 </div>
-                <div class="kpis">
-                    <div class="kpi"><div class="l" data-i18n="dash-kpi-month-invoices">本月发票</div><div class="n" id="dash-kpi-invoices">0</div></div>
-                    <div class="kpi"><div class="l" data-i18n="dash-kpi-pending">待处理</div><div class="n dash-amber" id="dash-kpi-pending">0</div></div>
-                    <div class="kpi"><div class="l" data-i18n="dash-kpi-exceptions">异常</div><div class="n dash-red" id="dash-kpi-exceptions">0</div></div>
-                    <div class="kpi" id="dash-kpi-usage-card"><div class="l" data-i18n="dash-kpi-usage">本月用量</div><div class="n" id="dash-kpi-usage">0</div><div class="help" id="dash-kpi-usage-sub">&nbsp;</div></div>
-                </div>
             </div>
 
-            <div class="cols" style="grid-template-columns:360px 1fr;margin-top:var(--s4)">
+            <div class="panel box" id="sub-summary" style="margin-top:var(--s4)"></div>
+
+            <div class="panel box" style="margin-top:var(--s4)">
+                <div class="ch" data-i18n="sub-plans-title">选择套餐</div>
+                <div class="cs" data-i18n="sub-plans-sub">无套餐按量计费 · 订阅后先用套餐额度,超额自动扣余额</div>
+                <div class="sub-plans" id="sub-plans"></div>
+            </div>
+
+            <div class="cols" style="grid-template-columns:1fr 1fr;margin-top:var(--s4)">
                 <div class="panel box">
-                    <div class="ch" data-i18n="dash-quick-title">快速操作</div>
-                    <div class="cs" data-i18n="dash-quick-sub">3 步进入主流程</div>
-                    <div class="qa">
-                        <div class="qb" onclick="window.routeTo && window.routeTo('dms-intake')">
-                            <span class="qi"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M3 19h18"/></svg></span>
-                            <span data-i18n="dash-quick-upload">上传发票</span>
-                        </div>
-                        <div class="qb" onclick="window.routeTo && window.routeTo('clients')">
-                            <span class="qi"><svg class="ic" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg></span>
-                            <span data-i18n="dash-quick-clients">查看客户</span>
-                        </div>
-                        <div class="qb" onclick="window.routeTo && window.routeTo('reconcile')">
-                            <span class="qi"><svg class="ic" viewBox="0 0 24 24"><line x1="12" y1="3" x2="12" y2="21"/><path d="M5 7h14"/><path d="M2 12l3-5 3 5a3 3 0 0 1-6 0z"/><path d="M16 12l3-5 3 5a3 3 0 0 1-6 0z"/></svg></span>
-                            <span data-i18n="dash-quick-reconcile">开始对账</span>
-                        </div>
-                        <div class="qb qb-warn" onclick="window.routeTo && window.routeTo('exceptions')">
-                            <span class="qi"><svg class="ic" viewBox="0 0 24 24"><path d="M10.3 3.8 1.8 18a2 2 0 0 0 1.7 3h16.9a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0Z"/><line x1="12" y1="9" x2="12" y2="13"/></svg></span>
-                            <span data-i18n="dash-quick-exceptions">处理异常</span>
-                            <span class="qb-badge" id="dash-quick-exc-badge" style="display:none">0</span>
-                        </div>
-                    </div>
+                    <div class="ch" data-i18n="sub-rules-title">计费规则</div>
+                    <div class="cs" data-i18n="sub-rules-sub">把最关心的计费逻辑讲清楚</div>
+                    <ol class="sub-rules">
+                        <li data-i18n="sub-rule-1">未订阅时,扫描按量计费(前 200 张 ฿1.50/张,之后 ฿0.75/张)。</li>
+                        <li data-i18n="sub-rule-2">订阅套餐后,每月优先使用套餐内额度。</li>
+                        <li data-i18n="sub-rule-3">套餐额度用完后,超出部分按套餐单价自动从余额扣费。</li>
+                        <li data-i18n="sub-rule-4">月费从账户余额扣;到期自动续订,余额不足则套餐失效转按量。</li>
+                        <li data-i18n="sub-rule-5">文档(Excel/Word/CSV)按字符成本折算成额度张数。</li>
+                    </ol>
                 </div>
                 <div class="panel box">
-                    <div class="ch" data-i18n="dash-recent-title">最近动态</div>
-                    <div class="cs" data-i18n="dash-recent-sub">最近 5 条识别</div>
-                    <div id="dash-recent-list">
-                        <div class="empty"><div class="t" data-i18n="dash-recent-empty">还没有识别记录 · 去上传第一张吧</div></div>
+                    <div class="ch" data-i18n="sub-records-title">最近账单</div>
+                    <div class="cs" data-i18n="sub-records-sub">扫描扣费 · 订阅 · 续订</div>
+                    <div id="sub-records">
+                        <div class="empty"><div class="t" data-i18n="sub-records-empty">暂无账单记录</div></div>
                     </div>
                 </div>
             </div>

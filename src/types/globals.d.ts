@@ -375,6 +375,9 @@ interface Window {
     _startCreditsPoll?: () => void;
     _stopCreditsPoll?: () => void;
     _openTopupModal?: LegacyBridge;
+    loadDashboard?: LegacyBridge;
+    loadCreditsCard?: LegacyBridge;
+    loadSubscription?: LegacyBridge;
     _userInfoForAdmin?: AppUser | null;
     PEARNLY_ADMIN_LAYOUT?: boolean;
 }

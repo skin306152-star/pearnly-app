@@ -43,6 +43,7 @@ import './home/history-drawer.js'; // REFACTOR-C1-home-batch4 · 发票记录页
 import './home/history-drawer-tabs.js'; // 销项重做 · 抽屉重排 4-tab+汇总条(history 模式 · 桥 historizeDrawer · openHistoryDrawer 调)
 import './home/dms-intake.js'; // 录入工作台(发票OCR + 身份证→DMS)· window.loadDmsIntake(invoice/core/confirm 子模块经它 import)
 import './home/dashboard.js';
+import './home/subscription.js'; // 首页订阅与计费主体(window.loadSubscription · 须在 dashboard.js 后 · billing.js 前)
 import './home/billing.js';
 import './home/workspace-switcher.js'; // B4 · workspace 工作模式切换器(取代旧 ClientSwitcher)
 import './home/access-log.js'; // REFACTOR-C1 · 客户访问日志 tab(自绑 · owner only)

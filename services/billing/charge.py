@@ -79,6 +79,63 @@ def _debit_balance(cur, tenant_id, cost: _Dec) -> _Dec:
 # 顺序无关。
 
 
+def _charge_with_subscription(
+    user_id, tenant_id, kind, units, quota_pages, history_id, description
+) -> dict | None:
+    """有有效订阅时扣费:先抵套餐额度(免费)· 超额按 over_rate 从余额扣 · 每次写一条流水。
+
+    返 None = 订阅被并发失效(调用方回落按量计费);其余返结果 dict(含错误)。
+    """
+    try:
+        with db.get_cursor_rls(tenant_id=str(tenant_id), commit=True) as cur:
+            res = db.consume_subscription_quota(cur, tenant_id, quota_pages)
+            if res is None:
+                return None
+            billable, over_rate = res
+            cost = db.overage_cost(billable, over_rate)
+            new_bal = _debit_balance(cur, tenant_id, cost)  # cost=0 时只读回当前余额
+            if billable > 0:
+                desc = description or (
+                    f"套餐外扫描(超额 {billable} 张) {kind} units={units} hid={history_id or ''}"
+                )
+            else:
+                desc = description or (
+                    f"套餐内扫描({quota_pages} 张) {kind} units={units} hid={history_id or ''}"
+                )
+            cur.execute(
+                "INSERT INTO credit_transactions "
+                "(tenant_id, user_id, type, amount_thb, pages, balance_after, description) "
+                "VALUES (%s::uuid, %s::uuid, 'usage', %s, %s, %s, %s) RETURNING id",
+                (
+                    str(tenant_id),
+                    str(user_id) if user_id else None,
+                    str(-cost),
+                    int(quota_pages),
+                    str(new_bal),
+                    desc,
+                ),
+            )
+            tx_id = cur.fetchone()["id"]
+        logger.info(
+            f"[charge_ocr] SUB tenant={str(tenant_id)[:8]} kind={kind} units={units} "
+            f"quota_pages={quota_pages} billable={billable} cost=฿{cost} bal_after=฿{new_bal}"
+        )
+        return {
+            "ok": True,
+            "charged_thb": float(cost),
+            "balance_after": float(new_bal),
+            "kind": kind,
+            "units": units,
+            "transaction_id": tx_id,
+            "subscription": True,
+            "quota_pages": int(quota_pages),
+            "billable_pages": int(billable),
+        }
+    except Exception as e:
+        logger.error(f"[charge_ocr] SUB FAIL tenant={tenant_id} kind={kind} units={units}: {e}")
+        return {"ok": False, "error": str(e)[:200]}
+
+
 def charge_ocr(
     user_id, tenant_id, kind: str, units: int, history_id: str = None, description: str = ""
 ) -> dict:
@@ -99,6 +156,22 @@ def charge_ocr(
             "transaction_id": None,
             "exempt": True,
         }
+
+    # 套餐额度折算:pdf 按物理页(1 页=1 张)· excel 文档按字符折算成张。
+    if kind == "pdf":
+        quota_pages = int(units)
+    elif kind == "excel":
+        quota_pages = db.doc_quota_pages(units)
+    else:
+        return {"ok": False, "error": f"unknown_kind:{kind}"}
+
+    # 有有效订阅 → 优先抵套餐额度(超额按 over_rate 扣余额);无订阅/并发失效落到下方按量计费。
+    if db.get_active_subscription(tenant_id) is not None:
+        sub_out = _charge_with_subscription(
+            user_id, tenant_id, kind, units, quota_pages, history_id, description
+        )
+        if sub_out is not None:
+            return sub_out
 
     if kind == "pdf":
         used = 0

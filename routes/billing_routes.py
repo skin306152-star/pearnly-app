@@ -16,6 +16,7 @@ from fastapi import APIRouter
 # 契约保留:billing_routes._require_super_admin is route_helpers._require_super_admin
 from core.route_helpers import _require_super_admin  # noqa: F401
 from routes.billing_credits_routes import router as _credits_router
+from routes.billing_subscription_routes import router as _subscription_router
 from routes.billing_topup_routes import router as _topup_router
 
 logger = logging.getLogger("mr-pilot")
@@ -23,3 +24,4 @@ logger = logging.getLogger("mr-pilot")
 router = APIRouter()
 router.include_router(_credits_router)
 router.include_router(_topup_router)
+router.include_router(_subscription_router)

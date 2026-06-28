@@ -223,7 +223,7 @@ async def credits_usage_history(
             cur.execute(
                 f"""
                 SELECT COUNT(*) AS n FROM credit_transactions ct
-                WHERE ct.tenant_id = %s::uuid AND ct.type = 'usage' {uid_sql}
+                WHERE ct.tenant_id = %s::uuid AND ct.type IN ('usage','subscription') {uid_sql}
             """,
                 [tid] + uid_params,
             )
@@ -232,6 +232,7 @@ async def credits_usage_history(
                 f"""
                 SELECT
                     ct.created_at, ct.pages, ct.amount_thb AS cost_thb, ct.balance_after,
+                    ct.type, ct.description,
                     u.email AS user_email, u.username AS user_name,
                     oh.filename
                 FROM credit_transactions ct
@@ -241,7 +242,7 @@ async def credits_usage_history(
                     AND ct.description LIKE '%% · ' || LEFT(oh.id::text, 8)
                     -- 2026-05-24 去掉 oh.tenant_id=ct.tenant_id:ocr_history.tenant_id 现为 NULL
                     -- (insert_ocr_history 未存)· user_id + 描述里 history_id 前8位已唯一
-                WHERE ct.tenant_id = %s::uuid AND ct.type = 'usage' {uid_sql}
+                WHERE ct.tenant_id = %s::uuid AND ct.type IN ('usage','subscription') {uid_sql}
                 ORDER BY ct.created_at DESC
                 LIMIT %s OFFSET %s
             """,
@@ -283,6 +284,8 @@ async def credits_usage_history(
                 "user_email": r["user_email"] or "",
                 "user_name": r["user_name"] or "",
                 "filename": r["filename"] or "",
+                "type": r["type"],
+                "description": r["description"] or "",
                 "pages": int(r["pages"] or 0),
                 "cost_thb": float(r["cost_thb"] or 0),
                 "balance_after": (

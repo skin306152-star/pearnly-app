@@ -108,12 +108,27 @@ def get_billing_status_combined(user_id, tenant_id) -> dict:
             row = cur.fetchone()
             bal = float(row["balance_thb"] if row else 0)
             used = int(row["pages_used"] if row else 0)
+
+        # 有有效订阅:套餐内有剩余额度即放行(额度免费 · 不看余额);额度耗尽才要余额>0 扣超额。
+        sub = db.get_active_subscription(tenant_id)
+        if sub is not None:
+            allowed = sub["remaining"] > 0 or bal > 0
+            return {
+                "allowed": allowed,
+                "is_exempt": False,
+                "balance_thb": bal,
+                "pages_used_this_month": used,
+                "subscription": sub,
+                "error_code": None if allowed else "insufficient_balance",
+            }
+
         if bal <= 0:
             return {
                 "allowed": False,
                 "is_exempt": False,
                 "balance_thb": bal,
                 "pages_used_this_month": used,
+                "subscription": None,
                 "error_code": "insufficient_balance",
             }
         return {
@@ -121,6 +136,7 @@ def get_billing_status_combined(user_id, tenant_id) -> dict:
             "is_exempt": False,
             "balance_thb": bal,
             "pages_used_this_month": used,
+            "subscription": None,
             "error_code": None,
         }
     except Exception as e:

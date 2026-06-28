@@ -86,6 +86,7 @@ class ChargeOcrBranchTests(unittest.TestCase):
         with (
             mock.patch.object(charge.db, "is_user_billing_exempt", return_value=False),
             mock.patch.object(charge.db, "estimate_excel_cost_thb", return_value=0),
+            mock.patch.object(charge.db, "get_active_subscription", return_value=None),
         ):
             r = charge.charge_ocr("u1", "t1", "excel", 0)
         self.assertTrue(r["ok"])
@@ -104,6 +105,7 @@ class ChargeOcrBranchTests(unittest.TestCase):
         with (
             mock.patch.object(charge.db, "is_user_billing_exempt", return_value=False),
             mock.patch.object(charge.db, "estimate_excel_cost_thb", return_value=Decimal("0.25")),
+            mock.patch.object(charge.db, "get_active_subscription", return_value=None),
             mock.patch.object(charge.db, "get_cursor_rls", _ctxmgr(cur)),
         ):
             r = charge.charge_ocr("u1", "t1", "excel", 1000, description="test")

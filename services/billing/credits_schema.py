@@ -3,10 +3,10 @@
 services/billing/credits_schema.py · Credits 系统建表 / 初始化(REFACTOR-B2)
 
 从 db.py 抽出的「Credits 计费系统」schema 初始化(启动期幂等):
-- ensure_credits_tables()  建 5 张表 + ALTER 2 列 + 迁移现有用户/公司:
+- ensure_credits_tables()  建 6 张表 + ALTER 2 列 + 迁移现有用户/公司:
     user_company_roles / tenant_credits / credit_transactions /
-    monthly_page_usage / topup_requests + users.is_billing_exempt /
-    users.active_tenant_id · 并把现有用户/公司迁入 + 设豁免名单。
+    monthly_page_usage / topup_requests / tenant_subscriptions +
+    users.is_billing_exempt / users.active_tenant_id · 并把现有用户/公司迁入 + 设豁免名单。
     advisory_xact_lock 906024 串行 DDL 防多 worker 启动 deadlock。
 - ensure_tenant_credits(tenant_id)  新建公司时初始化 0 余额 tenant_credits 行 · 幂等。
 
@@ -89,6 +89,38 @@ def ensure_credits_tables():
                 )
             """)
 
+            # 4b. credit_transactions.type 增补 'subscription'(订阅月费扣账)。
+            #     表早以内联 CHECK 建 · 改约束须 drop+add(IF EXISTS 幂等 · 默认约束名)。
+            cur.execute(
+                "ALTER TABLE credit_transactions "
+                "DROP CONSTRAINT IF EXISTS credit_transactions_type_check"
+            )
+            cur.execute(
+                "ALTER TABLE credit_transactions ADD CONSTRAINT credit_transactions_type_check "
+                "CHECK (type IN ('topup','usage','adjustment','subscription'))"
+            )
+
+            # 4c. 订阅套餐:一公司一行当前订阅(周期=订阅日起30天 · 到期自动从余额续)。
+            #     额度用量按周期计(pages_used_this_cycle)· 与按自然月的 monthly_page_usage 互不干扰:
+            #     有订阅走本表额度 · 无订阅走 monthly_page_usage 阶梯价。
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS tenant_subscriptions (
+                    tenant_id UUID PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
+                    plan_code TEXT NOT NULL CHECK (plan_code IN ('S','M','L')),
+                    status TEXT NOT NULL DEFAULT 'active'
+                        CHECK (status IN ('active','cancelled')),
+                    cycle_start TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    cycle_end TIMESTAMPTZ NOT NULL,
+                    quota INT NOT NULL,
+                    over_rate NUMERIC(12,2) NOT NULL,
+                    monthly_fee NUMERIC(12,2) NOT NULL,
+                    pages_used_this_cycle INT NOT NULL DEFAULT 0,
+                    auto_renew BOOLEAN NOT NULL DEFAULT TRUE,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+
             # 5. 充值申请表(用户上传转账截图)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS topup_requests (
@@ -157,7 +189,12 @@ def ensure_credits_tables():
             from core.rls import apply_tenant_rls
 
             apply_tenant_rls(
-                cur, "tenant_credits", "credit_transactions", "monthly_page_usage", "topup_requests"
+                cur,
+                "tenant_credits",
+                "credit_transactions",
+                "monthly_page_usage",
+                "topup_requests",
+                "tenant_subscriptions",
             )
 
         logger.info("[credits] 新表结构初始化完成")

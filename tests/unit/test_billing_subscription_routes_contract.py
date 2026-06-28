@@ -33,7 +33,8 @@ class BillingSubscriptionRoutesContractTests(unittest.TestCase):
     def test_aggregated_into_billing_router(self):
         got = _paths(billing_routes.router)
         self.assertTrue(
-            SUBSCRIPTION_PATHS <= got, f"订阅路由未聚合进 billing_routes: {SUBSCRIPTION_PATHS - got}"
+            SUBSCRIPTION_PATHS <= got,
+            f"订阅路由未聚合进 billing_routes: {SUBSCRIPTION_PATHS - got}",
         )
 
     def test_no_cycle(self):

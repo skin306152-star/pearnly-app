@@ -162,7 +162,7 @@ function renderSummary(sub: SubState | null) {
         cancelledNote +
         (cancelled
             ? ''
-            : '<button class="sub-cancel-btn" id="sub-cancel-btn">' +
+            : '<button class="btn sub-cancel-btn" id="sub-cancel-btn">' +
               _esc(_t('sub-cancel', '取消订阅')) +
               '</button>') +
         '</div>';

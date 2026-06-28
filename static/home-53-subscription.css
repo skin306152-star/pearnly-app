@@ -13,7 +13,7 @@
 .ui .sub-card {
     position: relative;
     display: flex;
-    align-items: flex-start;
+    align-items: stretch;
     gap: var(--s4);
     padding: var(--s5) var(--s5) var(--s4);
 }
@@ -45,6 +45,7 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    align-self: flex-start;
 }
 .ui .sub-card-ico .ic {
     width: 22px;
@@ -53,6 +54,8 @@
 .ui .sub-card-bd {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
 }
 .ui .sub-card-l {
     font-size: 12px;
@@ -79,15 +82,9 @@
     color: var(--ink3);
     margin-top: 4px;
 }
-.ui .sub-card-foot {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--s3);
-    margin-top: 10px;
-}
 .ui .sub-link {
     display: inline-block;
+    align-self: flex-start;
     margin-top: 8px;
     color: var(--accent);
     font-size: 13px;
@@ -102,34 +99,32 @@
     color: var(--red);
 }
 
-/* 取消订阅 · 红框胶囊钮(对齐设计稿) */
+/* 取消订阅 · 复用充值按钮的框(.btn 基类 + 同 padding/圆角)· 红框红字白底 · 钉卡底与充值钮对齐 */
 .ui .sub-cancel-btn {
-    margin-top: var(--s3);
+    margin-top: auto;
     align-self: flex-start;
-    padding: 5px 14px;
+    padding: 7px 18px;
     border: 1px solid var(--red);
-    border-radius: 999px;
-    background: transparent;
+    background: var(--card);
     color: var(--red);
-    font-size: 12.5px;
-    font-weight: 600;
-    cursor: pointer;
     transition:
         background 0.15s ease,
-        transform 0.15s ease;
+        transform 0.15s ease,
+        box-shadow 0.15s ease;
 }
 .ui .sub-cancel-btn:hover {
     background: var(--red-weak);
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+    box-shadow: var(--sh);
 }
 
-/* 账户余额卡底:余额不足提示(左)+ 去充值钮(右) */
+/* 账户余额卡底:余额不足提示(左)+ 去充值钮(右)· 钉卡底与取消订阅钮对齐 */
 .ui .sub-card-foot {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--s3);
-    margin-top: var(--s4);
+    margin-top: auto;
 }
 .ui .sub-foot-hint {
     font-size: 12px;

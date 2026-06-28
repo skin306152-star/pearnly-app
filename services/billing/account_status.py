@@ -110,7 +110,12 @@ def get_billing_status_combined(user_id, tenant_id) -> dict:
             used = int(row["pages_used"] if row else 0)
 
         # 有有效订阅:套餐内有剩余额度即放行(额度免费 · 不看余额);额度耗尽才要余额>0 扣超额。
-        sub = db.get_active_subscription(tenant_id)
+        # 单独 try:订阅查询失败按"无套餐"处理(走下方余额闸),不让它扩大外层异常→fail-open 放行的面。
+        try:
+            sub = db.get_active_subscription(tenant_id)
+        except Exception as _se:
+            logger.warning(f"get_active_subscription error tenant={tenant_id}: {_se}")
+            sub = None
         if sub is not None:
             allowed = sub["remaining"] > 0 or bal > 0
             return {

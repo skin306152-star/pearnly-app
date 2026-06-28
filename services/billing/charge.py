@@ -93,7 +93,17 @@ def _charge_with_subscription(
                 return None
             billable, over_rate = res
             cost = db.overage_cost(billable, over_rate)
-            new_bal = _debit_balance(cur, tenant_id, cost)  # cost=0 时只读回当前余额
+            if cost > 0:
+                new_bal = _debit_balance(cur, tenant_id, cost)
+            else:
+                # 套餐内(免费):不动余额 · 只读回当前值入账,避免对 tenant_credits 的无谓写锁(热路径)。
+                cur.execute(
+                    "SELECT COALESCE(balance_thb, 0) AS b FROM tenant_credits "
+                    "WHERE tenant_id = %s::uuid",
+                    (str(tenant_id),),
+                )
+                _r = cur.fetchone()
+                new_bal = _Dec(str(_r["b"])) if _r else _Dec("0")
             if billable > 0:
                 desc = description or (
                     f"套餐外扫描(超额 {billable} 张) {kind} units={units} hid={history_id or ''}"

@@ -104,6 +104,27 @@ async def _ocr_id_card(
     if not ep:
         raise HTTPException(400, detail="dms.no_endpoint")
 
+    # 余额闸 · 与其它 OCR 入口对齐(铁律 #26):余额不足且非豁免 → 402 拦下,绝不先识别再扣成负。
+    # 身份证 OCR 按 1 页计(charge kind='pdf' units=1)· 异常容错降级(不阻塞,与热路径一致)。
+    try:
+        _bill = db.get_billing_status_combined(str(user["id"]), _tid(user))
+        if not _bill.get("allowed") and not _bill.get("is_exempt"):
+            raise HTTPException(
+                402,
+                detail={
+                    "code": "insufficient_balance",
+                    "balance": _bill.get("balance_thb", 0.0),
+                    "estimated_cost": float(
+                        db.estimate_pdf_cost_thb(_bill.get("pages_used_this_month", 0), 1)
+                    ),
+                    "pages_used_this_month": _bill.get("pages_used_this_month", 0),
+                },
+            )
+    except HTTPException:
+        raise
+    except Exception as _be:
+        logger.warning(f"[dms] billing pre-check skip(error tolerated): {_be}")
+
     own_key = (
         user.get("gemini_api_key") or user.get("custom_gemini_api_key") or ""
     ).strip() or None

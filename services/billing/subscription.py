@@ -185,6 +185,12 @@ def subscription_subscribe(user_id, tenant_id, plan_code: str) -> dict:
     over_rate = spec["over_rate"]
     try:
         with db.get_cursor_rls(tenant_id=str(tenant_id), commit=True) as cur:
+            # 统一锁序:先锁订阅行再锁余额行(与 _renew_or_expire/consume 一致),消除 AB-BA 死锁。
+            # 首次订阅尚无订阅行,FOR UPDATE 空集无副作用;此时也不可能有并发续订(续订需已存在行)。
+            cur.execute(
+                "SELECT 1 FROM tenant_subscriptions WHERE tenant_id = %s::uuid FOR UPDATE",
+                (str(tenant_id),),
+            )
             cur.execute(
                 "SELECT balance_thb FROM tenant_credits WHERE tenant_id = %s::uuid FOR UPDATE",
                 (str(tenant_id),),

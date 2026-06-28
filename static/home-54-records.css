@@ -1,7 +1,7 @@
 /* ============================================================
    账单记录预览框 · 首页(section#page-dashboard · 作用域 .ui)
    扣费 / 充值 / 识别 三 tab + 按天/月/年筛选 + 导出。
-   复用 kit 令牌(--accent/--line/--ink*/--green/--red/--amber 等)· 同 home-53 风格。
+   复用 kit 令牌(accent/line/ink/green/red/amber 系列)· 同 home-53 风格。
    ============================================================ */
 
 .ui .rec-head {
@@ -12,12 +12,19 @@
 }
 .ui .rec-export {
     flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     height: 34px;
     padding: 0 14px;
     font-size: 13px;
     transition:
         transform 0.15s ease,
         box-shadow 0.15s ease;
+}
+.ui .rec-export svg {
+    width: 15px;
+    height: 15px;
 }
 .ui .rec-export:hover:not(:disabled) {
     transform: translateY(-2px);

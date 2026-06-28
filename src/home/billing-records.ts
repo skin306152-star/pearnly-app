@@ -208,7 +208,8 @@ function renderFilter() {
 function renderExportBtn() {
     const btn = document.getElementById('rec-export-btn') as HTMLButtonElement | null;
     if (!btn) return;
-    btn.textContent = _exporting ? _t('rec-exporting', '导出中…') : _t('rec-export', '导出明细');
+    const label = _exporting ? _t('rec-exporting', '导出中…') : _t('rec-export', '导出明细');
+    btn.innerHTML = (_exporting ? '' : _DL_ICON) + '<span>' + _esc(label) + '</span>';
     btn.disabled = _exporting;
     btn.onclick = onExport;
 }

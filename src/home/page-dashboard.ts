@@ -52,7 +52,7 @@
                         <div class="ch" data-i18n="rec-title">记录明细</div>
                         <div class="cs" data-i18n="rec-sub">扣费 · 充值 · 识别 · 切换查看,导出全部明细</div>
                     </div>
-                    <button class="btn sec rec-export" id="rec-export-btn">导出明细</button>
+                    <button class="btn rec-export" id="rec-export-btn">导出明细</button>
                 </div>
                 <div class="rec-bar">
                     <div class="rec-tabs" id="rec-tabs"></div>

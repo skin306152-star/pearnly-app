@@ -9,7 +9,10 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: var(--s3);
+    padding-bottom: var(--s4);
+    border-bottom: 1px solid var(--line);
 }
+/* 导出明细 · 淡紫填充钮(accent-weak 底 + accent 字/图标)· 见设计稿 */
 .ui .rec-export {
     flex-shrink: 0;
     display: inline-flex;
@@ -18,9 +21,13 @@
     height: 34px;
     padding: 0 14px;
     font-size: 13px;
+    background: var(--accent-weak);
+    color: var(--accent);
+    border-color: transparent;
     transition:
         transform 0.15s ease,
-        box-shadow 0.15s ease;
+        box-shadow 0.15s ease,
+        filter 0.15s ease;
 }
 .ui .rec-export svg {
     width: 15px;
@@ -29,6 +36,7 @@
 .ui .rec-export:hover:not(:disabled) {
     transform: translateY(-2px);
     box-shadow: var(--sh);
+    filter: brightness(0.97);
 }
 .ui .rec-export:disabled {
     opacity: 0.6;
@@ -42,16 +50,21 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: var(--s3);
-    margin-top: var(--s3);
+    margin-top: var(--s4);
 }
+/* 三 tab 分段控件:外层圆角边框包住 · 选中态填充淡紫胶囊(见设计稿) */
 .ui .rec-tabs {
-    display: flex;
-    gap: var(--s2);
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--card);
 }
 .ui .rec-tab {
     border: none;
     background: transparent;
-    padding: 6px 12px;
+    padding: 6px 14px;
     border-radius: 999px;
     font-size: 13px;
     font-weight: 600;
@@ -151,11 +164,14 @@
 .ui .rec-badge.neutral {
     color: var(--ink2);
 }
+/* 金额定宽右对齐 → 状态标签不被余额大小顶开,逐行上下对齐(三个 tab 同此结构) */
 .ui .rec-amt {
     font-weight: 700;
     font-size: 13.5px;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+    min-width: 104px;
+    text-align: right;
 }
 
 /* 状态态 */

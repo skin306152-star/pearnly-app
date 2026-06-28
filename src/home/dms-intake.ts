@@ -53,7 +53,7 @@ function renderUpload() {
 }
 function dropHtml() {
     return (
-        '<div class="dx-drop" id="dx-drop">' +
+        '<div class="dx-drop up-dz" id="dx-drop">' +
         `<div><div class="dx-drop-g">↑</div><h3>${esc(t('dx-up-title'))}</h3>` +
         `<p>${esc(t('dx-up-hint'))}</p>` +
         `<button class="btn primary" id="dx-pick">${esc(t('dx-up-pick'))}</button>` +
@@ -360,13 +360,15 @@ function bind() {
     el.addEventListener('dragover', (ev) => {
         if (S.step !== 1) return;
         ev.preventDefault();
-        el.querySelector('.dx-drop')?.classList.add('over');
+        el.querySelector('.dx-drop')?.classList.add('up-over');
     });
-    el.addEventListener('dragleave', () => el.querySelector('.dx-drop')?.classList.remove('over'));
+    el.addEventListener('dragleave', () =>
+        el.querySelector('.dx-drop')?.classList.remove('up-over')
+    );
     el.addEventListener('drop', (ev) => {
         if (S.step !== 1) return;
         ev.preventDefault();
-        el.querySelector('.dx-drop')?.classList.remove('over');
+        el.querySelector('.dx-drop')?.classList.remove('up-over');
         const files = (ev as DragEvent).dataTransfer?.files;
         if (S.task === 'invoice') return void onInvoiceDrop(files);
         onFile(files?.[0] || null);

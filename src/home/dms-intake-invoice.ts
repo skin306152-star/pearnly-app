@@ -144,7 +144,7 @@ function dropHtml() {
           `<button class="btn" id="dx-inv-gallery">${esc(t('dxi-up-gallery'))}</button>`
         : '';
     return (
-        '<div class="dx-drop" id="dx-inv-drop"><div>' +
+        '<div class="dx-drop up-dz" id="dx-inv-drop"><div>' +
         '<div class="dx-drop-g">↑</div>' +
         `<h3>${esc(t('dxi-up-title'))}</h3><p>${esc(t('dxi-up-hint'))}</p>` +
         '<div class="dx-up-btns">' +

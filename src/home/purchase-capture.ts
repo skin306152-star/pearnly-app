@@ -13,11 +13,10 @@ const PAGE_CSS = `
 .pur.cap .note{background:var(--bg);border-radius:10px;padding:10px 12px;font-size:12.5px;color:var(--ink2);margin-bottom:14px;display:flex;gap:7px;align-items:flex-start;}
 .pur.cap .note .ic{width:16px;height:16px;flex:none;margin-top:1px;}
 .pur.cap .note b{color:var(--ink);}
-.pur.cap .drop{border:2px dashed var(--accent);background:var(--accent-weak);border-radius:16px;padding:34px 16px;text-align:center;margin-bottom:14px;color:var(--accent-deep);cursor:pointer;}
-.pur.cap .drop.over{background:var(--accent);color:var(--accent-ink);}
+/* 框 skin(虚线 / hover / over / 整框可点)统一走 .up-dz(home-55)· 此处只留布局与文字色 */
+.pur.cap .drop{padding:34px 16px;text-align:center;margin-bottom:14px;color:var(--accent-deep);}
 .pur.cap .drop .di{width:26px;height:26px;}
 .pur.cap .drop .dt{font-weight:700;margin:8px 0 3px;color:var(--ink);}
-.pur.cap .drop.over .dt{color:var(--accent-ink);}
 .pur.cap .drop .dh{font-size:12px;color:var(--ink2);}
 .pur.cap .row2{display:flex;gap:10px;}
 .pur.cap .row2 .btn{flex:1;justify-content:center;}
@@ -168,7 +167,7 @@ function shell(wsName: string): string {
     return `<div class="pur cap"><div class="wrap">${headHtml()}
         <div class="panel">
             <div class="note">${IC_INFO}<span>${escapeHtml(t('pur-cap-booking-to'))} <b>${escapeHtml(wsName)}</b> · ${escapeHtml(t('pur-cap-switch-hint'))}</span></div>
-            <div class="drop" id="cap-drop">${IC_UP}
+            <div class="drop up-dz" id="cap-drop">${IC_UP}
                 <div class="dt only-desk">${escapeHtml(t('pur-cap-drop-desk'))}</div>
                 <div class="dt only-mob">${escapeHtml(t('pur-cap-drop-mob'))}</div>
                 <div class="dh">${escapeHtml(t('pur-cap-formats'))}</div>
@@ -212,12 +211,12 @@ function renderShell(): void {
         drop.onclick = () => pickFile('image/*,application/pdf');
         drop.ondragover = (e) => {
             e.preventDefault();
-            drop.classList.add('over');
+            drop.classList.add('up-over');
         };
-        drop.ondragleave = () => drop.classList.remove('over');
+        drop.ondragleave = () => drop.classList.remove('up-over');
         drop.ondrop = (e) => {
             e.preventDefault();
-            drop.classList.remove('over');
+            drop.classList.remove('up-over');
             const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
             if (f) intakeFile(f);
         };

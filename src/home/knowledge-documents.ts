@@ -174,8 +174,8 @@ function ensureShell(): void {
         const st = document.createElement('style');
         st.id = 'kb-docs-style';
         st.textContent = `
-.kb-up{border:1.5px dashed var(--line,var(--line));border-radius:12px;background:var(--card,var(--card));padding:22px;text-align:center;color:var(--ink-3,#999);margin-bottom:16px;cursor:pointer;transition:.15s}
-.kb-up:hover,.kb-up.drag{border-color:var(--brand,var(--ink));color:var(--ink-2,#555);background:var(--bg,var(--line2))}
+/* 框 skin(虚线 / hover / 拖拽 / 整框可点)统一走 .up-dz(home-55)· 此处只留布局与文字 */
+.kb-up{padding:22px;text-align:center;color:var(--ink-3,#999);margin-bottom:16px}
 .kb-up svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:1.5;margin-bottom:6px}
 .kb-up b{color:var(--btn-blue,var(--accent))}
 .kb-up .kb-up-types{font-size:11px;color:var(--ink-3,#999);margin-top:4px}
@@ -208,7 +208,7 @@ function ensureShell(): void {
     }
 
     pane.innerHTML = `
-        <div class="kb-up" id="kb-up">
+        <div class="kb-up up-dz" id="kb-up">
             <svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
             <div><span data-i18n="kb-upload-hint">把文档拖到这里，或</span> <b data-i18n="kb-upload">点击上传</b></div>
             <div class="kb-up-types" data-i18n="kb-upload-types">支持 PDF · Word · Excel · 图片 — 合同 / 政策 / 税务登记等客户私有资料</div>
@@ -244,13 +244,13 @@ function ensureShell(): void {
     ['dragenter', 'dragover'].forEach((ev) =>
         up.addEventListener(ev, (e) => {
             e.preventDefault();
-            up.classList.add('drag');
+            up.classList.add('up-over');
         })
     );
     ['dragleave', 'drop'].forEach((ev) =>
         up.addEventListener(ev, (e) => {
             e.preventDefault();
-            up.classList.remove('drag');
+            up.classList.remove('up-over');
         })
     );
     up.addEventListener('drop', (e) => {

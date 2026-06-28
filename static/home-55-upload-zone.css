@@ -1,0 +1,18 @@
+/* home-55-upload-zone.css · 全站票据 / OCR 上传框统一外观与交互
+   单一来源:虚线框 → hover / 拖拽时实心强调色边 + 淡紫底 · 整框可点。
+   只负责「框 skin + 交互态」· 布局(min-height / padding / 内部元素)留各上传区原有类。
+   用法:上传框元素加 .up-dz;拖拽高亮统一切 .up-over(各上传区 JS toggle)。 */
+.up-dz {
+    border: 1.5px dashed var(--line);
+    border-radius: 16px;
+    background: var(--bg);
+    cursor: pointer;
+    transition:
+        border-color 0.18s ease,
+        background 0.18s ease;
+}
+.up-dz:hover,
+.up-dz.up-over {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}

@@ -57,7 +57,7 @@ export function renderCard(side: RxSide) {
     if (!card) return;
     const data = RX[side];
     if (!data) {
-        card.className = 'rcx-upload-card';
+        card.className = 'rcx-upload-card up-dz';
         card.innerHTML = `
       <div class="rcx-drop-icon">${FILE_SVG}</div>
       <h3>${rxEsc(docTitle(side))}</h3>

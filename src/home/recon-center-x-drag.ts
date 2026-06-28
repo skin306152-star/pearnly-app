@@ -10,19 +10,29 @@ export function bindGridDrop(onFiles: (side: RxSide, files: FileList) => void) {
         const card = findCard(e.target);
         if (!card) return;
         e.preventDefault();
-        card.classList.add('rcx-drag');
+        card.classList.add('up-over');
     });
     grid.addEventListener('dragleave', (e) => {
         const card = findCard(e.target);
-        if (card) card.classList.remove('rcx-drag');
+        if (card) card.classList.remove('up-over');
     });
     grid.addEventListener('drop', (e) => {
         const card = findCard(e.target);
         if (!card) return;
         e.preventDefault();
-        card.classList.remove('rcx-drag');
+        card.classList.remove('up-over');
         const side = card.dataset.side as RxSide;
         const dt = (e as DragEvent).dataTransfer;
         if (dt && dt.files && dt.files.length) onFiles(side, dt.files);
+    });
+    // 整框可点:点空态卡内任意处(非按钮)→ 触发该侧文件选择(change 由 root 委托接走)
+    grid.addEventListener('click', (e) => {
+        const card = findCard(e.target);
+        if (!card || card.classList.contains('rcx-loaded')) return;
+        if ((e.target as HTMLElement).closest('button')) return;
+        const input = document.querySelector(
+            `[data-rcx-input="${card.dataset.side}"]`
+        ) as HTMLInputElement | null;
+        input?.click();
     });
 }

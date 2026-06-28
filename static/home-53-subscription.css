@@ -184,6 +184,7 @@
     margin-top: var(--s3);
 }
 .ui .sub-plan {
+    position: relative;
     border: 1px solid var(--line);
     border-radius: var(--rs);
     background: var(--card);
@@ -192,14 +193,19 @@
     flex-direction: column;
     gap: var(--s3);
     transition:
-        transform 0.15s ease,
-        box-shadow 0.15s ease,
-        border-color 0.15s ease;
+        transform 0.18s ease,
+        box-shadow 0.18s ease,
+        border-color 0.18s ease;
 }
+/* hover:卡片放大 + 背后冒紫光(对标 AWS 行业卡)· 当前套餐卡不放大 */
 .ui .sub-plan:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--sh);
+    transform: scale(1.035);
     border-color: var(--accent);
+    box-shadow:
+        0 0 0 1px var(--accent),
+        0 16px 40px -10px color-mix(in srgb, var(--accent) 55%, transparent),
+        0 0 26px 0 color-mix(in srgb, var(--accent) 38%, transparent);
+    z-index: 2;
 }
 .ui .sub-plan.cur {
     border-color: var(--accent);

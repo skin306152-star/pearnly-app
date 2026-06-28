@@ -97,12 +97,12 @@
 .rcx-status-badge { border-radius: 999px; padding: 5px 8px; font-size: 10px; font-weight: 800; background: var(--rcx-soft); color: var(--rcx-accent); }
 .rcx-upload-grid { display: grid; grid-template-columns: 1fr 42px 1fr; gap: 10px; align-items: stretch; }
 .rcx-plus { display: grid; place-items: center; color: var(--rcx-faint); font-size: 24px; font-weight: 200; }
+/* 空态框 skin(虚线 / hover / 整框可点)统一走 .up-dz(home-55)· 此处只留布局 */
 .rcx-upload-card {
-  min-height: 236px; border: 1.5px dashed var(--rcx-line); border-radius: 15px; background: var(--rcx-bg); position: relative; padding: 18px;
+  min-height: 236px; border-radius: 16px; position: relative; padding: 18px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; transition: 0.18s ease; overflow: hidden;
 }
-.rcx-upload-card:hover, .rcx-upload-card.rcx-drag { border-color: var(--rcx-accent); background: var(--rcx-soft); }
-.rcx-upload-card.rcx-loaded { border-style: solid; border-color: var(--rcx-line); background: var(--rcx-card); align-items: stretch; text-align: left; justify-content: flex-start; }
+.rcx-upload-card.rcx-loaded { border: 1.5px solid var(--rcx-line); background: var(--rcx-card); align-items: stretch; text-align: left; justify-content: flex-start; }
 .rcx-drop-icon { width: 52px; height: 52px; border-radius: 15px; background: var(--rcx-soft); color: var(--rcx-accent); display: grid; place-items: center; margin-bottom: 11px; }
 .rcx-drop-icon svg { width: 25px; height: 25px; stroke: currentColor; }
 .rcx-upload-card h3 { font-size: 16px; margin: 0 0 5px; color: var(--rcx-text); }

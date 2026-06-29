@@ -143,11 +143,15 @@ def update_ocr_history_pages(
                 ),
             )
             updated = cur.rowcount > 0
-        # 反馈闭环 ② · 编辑落库后捕获用户修正 → 沉淀按主体例库(非致命·绝不影响保存)
+        # 反馈闭环 ② · 编辑落库后捕获用户修正 → 沉淀按主体例库(非致命·绝不影响保存:
+        # 已 commit·捕获任何异常只告警,不让本函数返 False)
         if updated:
-            from services.ocr.feedback import store as _feedback
+            try:
+                from services.ocr.feedback import store as _feedback
 
-            _feedback.record_correction_from_edit(user_id, tenant_id, record_id, new_pages)
+                _feedback.record_correction_from_edit(user_id, tenant_id, record_id, new_pages)
+            except Exception as _fe:
+                logger.warning(f"反馈捕获跳过 (id={record_id}): {_fe}")
         return updated
     except Exception as e:
         logger.error(f"更新历史失败 (id={record_id}): {e}")

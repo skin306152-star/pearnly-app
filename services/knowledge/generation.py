@@ -12,8 +12,7 @@ from __future__ import annotations
 import os
 from typing import Optional
 
-MODEL = "gemini-2.5-flash"
-_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
+MODEL = "gemini-2.5-flash"  # 参考默认;实际模型由网关 tier=flash 解析(可随后端切换)
 
 
 class GenerationError(RuntimeError):
@@ -32,22 +31,21 @@ def _api_key() -> str:
 
 
 def generate(prompt: str, *, system: Optional[str] = None, temperature: float = 0.2) -> str:
-    """Generate a single text completion for the prompt."""
-    import httpx
+    """Generate a single text completion for the prompt(经网关 · 后端可切)。"""
+    from services.ai_gateway import transport
 
-    payload: dict = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": temperature},
-    }
-    if system:
-        payload["systemInstruction"] = {"parts": [{"text": system}]}
-    try:
-        resp = httpx.post(_URL, params={"key": _api_key()}, json=payload, timeout=120)
-        resp.raise_for_status()
-        candidates = resp.json().get("candidates", [])
-        if not candidates:
-            raise GenerationError("gemini returned no candidates")
-        parts = candidates[0].get("content", {}).get("parts", [])
-        return "".join(part.get("text", "") for part in parts).strip()
-    except httpx.HTTPError as exc:
-        raise GenerationError(f"gemini generation request failed: {exc}") from exc
+    key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    out = transport.text_to_text(
+        prompt,
+        system=system,
+        tier="flash",
+        api_key=key,
+        temperature=temperature,
+        timeout_s=120,
+        task="knowledge.generate",
+    )
+    if not out.ok or not out.data:
+        if out.error_kind == "auth":
+            raise GenerationError("no Gemini API key (set GEMINI_API_KEY)")
+        raise GenerationError(f"gemini generation failed: {out.error_kind or 'empty'}")
+    return out.data

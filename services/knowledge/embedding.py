@@ -17,11 +17,8 @@ from __future__ import annotations
 import os
 from typing import Sequence
 
-MODEL = "gemini-embedding-001"
+MODEL = "gemini-embedding-001"  # 经网关 embed;后端默认同模型(向量空间不漂)
 DIM = 768
-_TASK_QUERY = "RETRIEVAL_QUERY"
-_TASK_DOCUMENT = "RETRIEVAL_DOCUMENT"
-_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:batchEmbedContents"
 
 
 class EmbeddingError(RuntimeError):
@@ -40,29 +37,20 @@ def _api_key() -> str:
 
 
 def embed_texts(texts: Sequence[str], *, is_query: bool = False) -> list[list[float]]:
-    """Embed a batch of texts. Returns one 768-float vector per input, in order."""
+    """Embed a batch of texts. Returns one 768-float vector per input, in order(经网关 · 后端可切)。"""
     if not texts:
         return []
-    import httpx
+    from services.ai_gateway import transport
 
-    task = _TASK_QUERY if is_query else _TASK_DOCUMENT
-    payload = {
-        "requests": [
-            {
-                "model": f"models/{MODEL}",
-                "content": {"parts": [{"text": text}]},
-                "taskType": task,
-                "outputDimensionality": DIM,
-            }
-            for text in texts
-        ]
-    }
-    try:
-        resp = httpx.post(_URL, params={"key": _api_key()}, json=payload, timeout=120)
-        resp.raise_for_status()
-        return [row["values"] for row in resp.json()["embeddings"]]
-    except httpx.HTTPError as exc:
-        raise EmbeddingError(f"gemini embedding request failed: {exc}") from exc
+    key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    out = transport.embed(
+        list(texts), is_query=is_query, dim=DIM, api_key=key, task="knowledge.embed"
+    )
+    if not out.ok:
+        if out.error_kind == "auth":
+            raise EmbeddingError("no Gemini API key (set GEMINI_API_KEY)")
+        raise EmbeddingError(f"gemini embedding request failed: {out.error_kind}")
+    return out.data
 
 
 def to_pgvector(vector: Sequence[float]) -> str:

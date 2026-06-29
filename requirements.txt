@@ -113,6 +113,9 @@ qrcode==8.2
 # opencv/scipy/numpy 整棵 ML 栈 · 镜像 5-7GB → 数百 MB)。见 STATE / adr-003。
 openai==2.32.0
 google-generativeai
+# Vertex AI 后端(services/ai_gateway/providers/vertex)· OCR_LLM_BACKEND=vertex 时启用;
+# 默认 aistudio 不 import 它。同模型(gemini-*)换 GCP 服务账号门 → 企业配额/数据驻留。
+google-genai
 google-cloud-vision==3.14.0
 
 # ============================================================

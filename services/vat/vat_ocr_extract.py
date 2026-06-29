@@ -3,14 +3,12 @@
 
 import os
 import re
-import json
 import logging
 from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 
 from services.recon.field_comparator import parse_date
 from services.recon.vat_recon_core import _to_float, _derive_period
-from services.ocr.gemini_models import flash as _flash
 
 logger = logging.getLogger(__name__)
 
@@ -168,55 +166,43 @@ def extract_invoice_fields(
         #   映射成 VEX 8 字段 · 此前直接报"不支持的格式"(配合前端 UI 宣传支持但静默丢弃)。
         return _extract_invoice_via_pipeline(file_bytes, filename, api_key=api_key)
 
-    try:
-        import google.generativeai as genai
-    except ImportError:
-        return {"ok": False, "filename": filename, "error": "google-generativeai 未安装"}
-
     key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not key:
         return {"ok": False, "filename": filename, "error": "Gemini key 未配置"}
 
-    text = ""
-    try:
-        genai.configure(api_key=key)
-        model = genai.GenerativeModel(
-            _flash(),
-            generation_config={
-                "response_mime_type": "application/json",
-                "temperature": 0.0,
-            },
-        )
-        response = model.generate_content(
-            [_INVOICE_PROMPT, {"mime_type": mime, "data": file_bytes}],
-            request_options={"timeout": 30},
-        )
-        text = (response.text or "").strip()
-        data = json.loads(text)
-        _usage = getattr(response, "usage_metadata", None)
-        _in_tok = int(getattr(_usage, "prompt_token_count", 0) or 0)
-        _out_tok = int(getattr(_usage, "candidates_token_count", 0) or 0)
-        return {
-            "ok": True,
-            "filename": filename,
-            "buyer_tax_id": str(data.get("buyer_tax_id") or "").strip(),
-            "buyer_name": str(data.get("buyer_name") or "").strip(),
-            "buyer_branch": str(data.get("buyer_branch") or "").strip(),
-            "invoice_no": str(data.get("invoice_no") or "").strip(),
-            "invoice_date": str(data.get("invoice_date") or "").strip(),
-            "period": str(data.get("period") or "").strip(),
-            "amount_pre_vat": _to_float(data.get("amount_pre_vat")),
-            "vat_amount": _to_float(data.get("vat_amount")),
-            "total_amount": _to_float(data.get("total_amount")),
-            "_input_tokens": _in_tok,
-            "_output_tokens": _out_tok,
-        }
-    except json.JSONDecodeError as e:
-        logger.warning(f"[vex.extract] {filename} JSON 解析失败: {e} · raw={text[:200]}")
-        return {"ok": False, "filename": filename, "error": f"AI 返回格式异常: {str(e)[:60]}"}
-    except Exception as e:
-        logger.error(f"[vex.extract] {filename} 失败: {type(e).__name__}: {e}")
-        return {"ok": False, "filename": filename, "error": str(e)[:120]}
+    from services.ai_gateway import transport
+
+    out = transport.multimodal_to_json(
+        _INVOICE_PROMPT,
+        [(file_bytes, mime)],
+        tier="flash",
+        api_key=key,
+        temperature=0.0,
+        response_mime=True,
+        max_tokens=8192,
+        timeout_s=30,
+        max_retries=0,
+        task="vat.invoice_extract",
+    )
+    if not out.ok:
+        logger.warning(f"[vex.extract] {filename} 失败: {out.error_kind}")
+        return {"ok": False, "filename": filename, "error": f"AI 提取失败: {out.error_kind}"}
+    data = out.data
+    return {
+        "ok": True,
+        "filename": filename,
+        "buyer_tax_id": str(data.get("buyer_tax_id") or "").strip(),
+        "buyer_name": str(data.get("buyer_name") or "").strip(),
+        "buyer_branch": str(data.get("buyer_branch") or "").strip(),
+        "invoice_no": str(data.get("invoice_no") or "").strip(),
+        "invoice_date": str(data.get("invoice_date") or "").strip(),
+        "period": str(data.get("period") or "").strip(),
+        "amount_pre_vat": _to_float(data.get("amount_pre_vat")),
+        "vat_amount": _to_float(data.get("vat_amount")),
+        "total_amount": _to_float(data.get("total_amount")),
+        "_input_tokens": out.input_tokens,
+        "_output_tokens": out.output_tokens,
+    }
 
 
 # ════════════════════════════════════════════════════════════════════════

@@ -18,7 +18,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from services.importer.keys import _GL_KEYS, _STMT_KEYS, build_header_signature
@@ -141,10 +140,7 @@ def suggest_mapping_with_ai(
 
     result: Optional[Dict[str, int]] = None
     try:
-        import google.generativeai as genai
-
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(_AI_MAPPING_MODEL)
+        from services.ai_gateway import transport
 
         # 表头带列号 · 让 AI 直接回列号(稳健 · 不用再按名字猜位置)
         indexed_headers = [
@@ -185,19 +181,18 @@ def suggest_mapping_with_ai(
             + f"LOCAL_GUESS: {json.dumps(local_guess or {}, ensure_ascii=False)}\n"
             + 'Example output: {"date":0,"description":3,"withdrawal":4,"deposit":5,"balance":6}'
         )
-        resp = model.generate_content(
+        out = transport.text_to_json(
             prompt,
-            generation_config={
-                "temperature": 0.0,
-                "top_p": 1.0,
-                "candidate_count": 1,
-                "max_output_tokens": 1024,
-            },
+            tier="flash_lite",
+            api_key=api_key,
+            temperature=0.0,
+            response_mime=False,  # 沿用旧行为:不强制 mime · 靠 _parse_json 去栅栏
+            max_tokens=1024,
+            timeout_s=60,
+            max_retries=0,
+            task="importer.col_mapping",
         )
-        text = (getattr(resp, "text", "") or "").strip()
-        if text.startswith("```"):
-            text = re.sub(r"^```[a-z]*\n?", "", text).rstrip("`").strip()
-        result = _coerce_ai_cm(json.loads(text), document_type, n_cols)
+        result = _coerce_ai_cm(out.data, document_type, n_cols) if out.ok and out.data else None
     except Exception:
         result = None
 

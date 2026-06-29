@@ -9,11 +9,8 @@ v118.32.x · Pearnly · 屏 B 文件智能分类
 
 import os
 import re
-import json
 import logging
 from typing import Dict, Any, Optional
-
-from services.ocr.gemini_models import flash as _flash
 
 logger = logging.getLogger(__name__)
 
@@ -135,49 +132,37 @@ def classify_with_gemini(
     file_bytes: bytes, mime_type: str, api_key: Optional[str] = None
 ) -> Dict[str, Any]:
     """用 Gemini 看首页判断 · 返回 {type, confidence, tax_id, name, year, month}"""
-    try:
-        import google.generativeai as genai
-    except ImportError:
-        return {"ok": False, "error": "google-generativeai 未安装", "type": "unknown"}
-
     key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not key:
         return {"ok": False, "error": "Gemini key 未配置", "type": "unknown"}
 
-    text = ""
-    try:
-        genai.configure(api_key=key)
-        model = genai.GenerativeModel(
-            _flash(),
-            generation_config={
-                "response_mime_type": "application/json",
-                "temperature": 0.0,
-            },
-        )
-        response = model.generate_content(
-            [
-                _GEMINI_CLASSIFY_PROMPT,
-                {"mime_type": mime_type, "data": file_bytes},
-            ],
-            request_options={"timeout": 25},
-        )
-        text = (response.text or "").strip()
-        data = json.loads(text)
-        return {
-            "ok": True,
-            "type": data.get("type", "unknown"),
-            "confidence": float(data.get("confidence") or 0.5),
-            "tax_id": re.sub(r"[^0-9]", "", str(data.get("tax_id") or ""))[:13],
-            "name": str(data.get("name") or "").strip(),
-            "year": int(data.get("year") or 0) or None,
-            "month": int(data.get("month") or 0) or None,
-        }
-    except json.JSONDecodeError as e:
-        logger.warning(f"[classify] JSON fail: {e} · raw={text[:200]}")
-        return {"ok": False, "error": f"AI 格式异常: {str(e)[:50]}", "type": "unknown"}
-    except Exception as e:
-        logger.error(f"[classify] failed: {e}")
-        return {"ok": False, "error": str(e), "type": "unknown"}
+    from services.ai_gateway import transport
+
+    out = transport.multimodal_to_json(
+        _GEMINI_CLASSIFY_PROMPT,
+        [(file_bytes, mime_type)],
+        tier="flash",
+        api_key=key,
+        temperature=0.0,
+        response_mime=True,
+        max_tokens=8192,
+        timeout_s=25,
+        max_retries=0,
+        task="vat.file_classify",
+    )
+    if not out.ok:
+        logger.warning(f"[classify] failed: {out.error_kind}")
+        return {"ok": False, "error": f"AI 分类失败: {out.error_kind}", "type": "unknown"}
+    data = out.data
+    return {
+        "ok": True,
+        "type": data.get("type", "unknown"),
+        "confidence": float(data.get("confidence") or 0.5),
+        "tax_id": re.sub(r"[^0-9]", "", str(data.get("tax_id") or ""))[:13],
+        "name": str(data.get("name") or "").strip(),
+        "year": int(data.get("year") or 0) or None,
+        "month": int(data.get("month") or 0) or None,
+    }
 
 
 def classify_file(

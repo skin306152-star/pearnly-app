@@ -8,8 +8,6 @@ import json
 import logging
 from typing import Dict, Any, Optional
 
-from services.ocr.gemini_models import flash as _flash
-
 logger = logging.getLogger(__name__)
 
 _PROMPT = """You are a Thai accounting expert helping a senior accountant reconcile output VAT.
@@ -36,11 +34,6 @@ Row data:
 
 def analyze_diff(row: Dict[str, Any], api_key: Optional[str] = None) -> Dict[str, Any]:
     """对一行 reconciliation_row 跑 AI 分析 · 返回 {cause, action, email_th}"""
-    try:
-        import google.generativeai as genai
-    except ImportError:
-        return {"ok": False, "error": "google-generativeai 未安装"}
-
     key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not key:
         return {"ok": False, "error": "Gemini API key 未配置"}
@@ -75,29 +68,27 @@ def analyze_diff(row: Dict[str, Any], api_key: Optional[str] = None) -> Dict[str
         "field_diff": diff_fields,
     }
 
-    text = ""
-    try:
-        genai.configure(api_key=key)
-        model = genai.GenerativeModel(
-            _flash(),
-            generation_config={
-                "response_mime_type": "application/json",
-                "temperature": 0.3,
-            },
-        )
-        prompt = _PROMPT + json.dumps(summary, ensure_ascii=False, indent=2)
-        response = model.generate_content(prompt)
-        text = (response.text or "").strip()
-        data = json.loads(text)
-        return {
-            "ok": True,
-            "cause": data.get("cause", ""),
-            "action": data.get("action", ""),
-            "email_th": data.get("email_th", ""),
-        }
-    except json.JSONDecodeError as e:
-        logger.error(f"[ai_analyze] JSON 解析失败: {e} · raw: {text[:300]}")
-        return {"ok": False, "error": f"AI 返回格式错误: {str(e)[:100]}"}
-    except Exception as e:
-        logger.error(f"[ai_analyze] 失败: {e}")
-        return {"ok": False, "error": str(e)}
+    from services.ai_gateway import transport
+
+    prompt = _PROMPT + json.dumps(summary, ensure_ascii=False, indent=2)
+    out = transport.text_to_json(
+        prompt,
+        tier="flash",
+        api_key=key,
+        temperature=0.3,
+        response_mime=True,
+        max_tokens=4096,
+        timeout_s=120,
+        max_retries=0,
+        task="vat.diff_analyze",
+    )
+    if not out.ok:
+        logger.error(f"[ai_analyze] 失败: {out.error_kind}")
+        return {"ok": False, "error": f"AI 分析失败: {out.error_kind}"}
+    data = out.data
+    return {
+        "ok": True,
+        "cause": data.get("cause", ""),
+        "action": data.get("action", ""),
+        "email_th": data.get("email_th", ""),
+    }

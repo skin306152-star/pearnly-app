@@ -2,14 +2,12 @@
 """多发票批量 OCR(一次 Gemini 调用抽多张 · 减少 5x API)· vat_excel_export 拆分。"""
 
 import os
-import json
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 
 from services.recon.vat_recon_core import _to_float
 from services.vat.vat_ocr_extract import extract_invoice_fields, _VEX_OCR_PER_FILE_TIMEOUT
-from services.ocr.gemini_models import flash as _flash
 
 logger = logging.getLogger(__name__)
 
@@ -85,8 +83,8 @@ def extract_invoice_fields_batch(
         f = invoice_files[0]
         return [extract_invoice_fields(f["bytes"], f["filename"], api_key=api_key)]
 
-    # 校验 mime
-    parts: List[Any] = [_INVOICE_BATCH_PROMPT.format(n=n)]
+    # 校验 mime + 组装图片((bytes, mime) 列表 · 由 provider 决定如何编码)
+    images = []
     for f in invoice_files:
         mime = _mime_for(f.get("filename") or "")
         if not mime:
@@ -98,15 +96,7 @@ def extract_invoice_fields_batch(
                 }
                 for x in invoice_files
             ]
-        parts.append({"mime_type": mime, "data": f["bytes"]})
-
-    try:
-        import google.generativeai as genai
-    except ImportError:
-        return [
-            {"ok": False, "filename": f.get("filename"), "error": "google-generativeai 未安装"}
-            for f in invoice_files
-        ]
+        images.append((f["bytes"], mime))
 
     key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not key:
@@ -115,75 +105,63 @@ def extract_invoice_fields_batch(
             for f in invoice_files
         ]
 
-    text = ""
-    try:
-        genai.configure(api_key=key)
-        model = genai.GenerativeModel(
-            _flash(),
-            generation_config={
-                "response_mime_type": "application/json",
-                "temperature": 0.0,
-            },
-        )
-        response = model.generate_content(
-            parts,
-            request_options={"timeout": timeout},
-        )
-        text = (response.text or "").strip()
-        data = json.loads(text)
-        items = data.get("invoices") or []
-        _usage = getattr(response, "usage_metadata", None)
-        _in_tok = int(getattr(_usage, "prompt_token_count", 0) or 0)
-        _out_tok = int(getattr(_usage, "candidates_token_count", 0) or 0)
-        # token 均摊到每张
-        _in_per = _in_tok // max(n, 1)
-        _out_per = _out_tok // max(n, 1)
+    from services.ai_gateway import transport
 
-        out: List[Dict[str, Any]] = [None] * n  # type: ignore
-        for r in items:
-            try:
-                idx = int(r.get("index", 0)) - 1
-            except Exception:
-                continue
-            if not (0 <= idx < n):
-                continue
-            out[idx] = {
-                "ok": True,
-                "filename": invoice_files[idx].get("filename"),
-                "buyer_tax_id": str(r.get("buyer_tax_id") or "").strip(),
-                "buyer_name": str(r.get("buyer_name") or "").strip(),
-                "buyer_branch": str(r.get("buyer_branch") or "").strip(),
-                "invoice_no": str(r.get("invoice_no") or "").strip(),
-                "invoice_date": str(r.get("invoice_date") or "").strip(),
-                "period": str(r.get("period") or "").strip(),
-                "amount_pre_vat": _to_float(r.get("amount_pre_vat")),
-                "vat_amount": _to_float(r.get("vat_amount")),
-                "total_amount": _to_float(r.get("total_amount")),
-                "_input_tokens": _in_per,
-                "_output_tokens": _out_per,
-                "_batch_size": n,
+    res = transport.multimodal_to_json(
+        _INVOICE_BATCH_PROMPT.format(n=n),
+        images,
+        tier="flash",
+        api_key=key,
+        temperature=0.0,
+        response_mime=True,
+        max_tokens=16384,
+        timeout_s=timeout,
+        max_retries=0,
+        task="vat.invoice_batch",
+    )
+    if not res.ok:
+        logger.warning(f"[vex.batch] n={n} 失败: {res.error_kind}")
+        return [
+            {"ok": False, "filename": f.get("filename"), "error": f"AI 批量失败: {res.error_kind}"}
+            for f in invoice_files
+        ]
+    items = (res.data or {}).get("invoices") or []
+    _in_per = res.input_tokens // max(n, 1)
+    _out_per = res.output_tokens // max(n, 1)
+
+    out: List[Dict[str, Any]] = [None] * n  # type: ignore
+    for r in items:
+        try:
+            idx = int(r.get("index", 0)) - 1
+        except Exception:
+            continue
+        if not (0 <= idx < n):
+            continue
+        out[idx] = {
+            "ok": True,
+            "filename": invoice_files[idx].get("filename"),
+            "buyer_tax_id": str(r.get("buyer_tax_id") or "").strip(),
+            "buyer_name": str(r.get("buyer_name") or "").strip(),
+            "buyer_branch": str(r.get("buyer_branch") or "").strip(),
+            "invoice_no": str(r.get("invoice_no") or "").strip(),
+            "invoice_date": str(r.get("invoice_date") or "").strip(),
+            "period": str(r.get("period") or "").strip(),
+            "amount_pre_vat": _to_float(r.get("amount_pre_vat")),
+            "vat_amount": _to_float(r.get("vat_amount")),
+            "total_amount": _to_float(r.get("total_amount")),
+            "_input_tokens": _in_per,
+            "_output_tokens": _out_per,
+            "_batch_size": n,
+        }
+    # 漏掉的 index → 标 fail，调用方会 fallback 单张
+    for i in range(n):
+        if out[i] is None:
+            out[i] = {
+                "ok": False,
+                "filename": invoice_files[i].get("filename"),
+                "error": "batch_missing_index",
             }
-        # 漏掉的 index → 标 fail，调用方会 fallback 单张
-        for i in range(n):
-            if out[i] is None:
-                out[i] = {
-                    "ok": False,
-                    "filename": invoice_files[i].get("filename"),
-                    "error": "batch_missing_index",
-                }
-        return out  # type: ignore
-    except json.JSONDecodeError as e:
-        logger.warning(f"[vex.batch] JSON 解析失败 n={n}: {e} · raw={text[:200]}")
-        return [
-            {"ok": False, "filename": f.get("filename"), "error": f"AI 返回格式异常: {str(e)[:60]}"}
-            for f in invoice_files
-        ]
-    except Exception as e:
-        logger.error(f"[vex.batch] n={n} 失败: {type(e).__name__}: {e}")
-        return [
-            {"ok": False, "filename": f.get("filename"), "error": str(e)[:120]}
-            for f in invoice_files
-        ]
+    return out  # type: ignore
 
 
 def extract_invoices_batched_parallel(

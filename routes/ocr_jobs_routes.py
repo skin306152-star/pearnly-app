@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
 import uuid
 from typing import Optional
 
@@ -54,10 +53,10 @@ async def ocr_submit(
         with open(path, "wb") as out:
             out.write(content)
     except HTTPException:
-        _cleanup(job_id)
+        worker._cleanup_stage(job_id)
         raise
     except Exception as e:  # noqa: BLE001
-        _cleanup(job_id)
+        worker._cleanup_stage(job_id)
         logger.error(f"[ocr-submit] stage failed: {e}")
         raise HTTPException(500, detail="ocr.submit_failed")
 
@@ -76,7 +75,7 @@ async def ocr_submit(
         max_attempts=1,  # 不重试 → 任务至多执行一次 → 扣费/落库至多一次
     )
     if not rid:
-        _cleanup(job_id)
+        worker._cleanup_stage(job_id)
         raise HTTPException(500, detail="ocr.submit_failed")
     return {"ok": True, "job_id": rid}
 
@@ -99,12 +98,3 @@ async def get_ocr_job(job_id: str, request: Request):
         "created_at": job.get("created_at"),
         "finished_at": job.get("finished_at"),
     }
-
-
-def _cleanup(job_id: str) -> None:
-    try:
-        d = worker.stage_dir_for(job_id)
-        if os.path.isdir(d):
-            shutil.rmtree(d, ignore_errors=True)
-    except Exception:  # noqa: BLE001
-        pass

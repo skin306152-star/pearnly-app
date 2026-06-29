@@ -74,8 +74,8 @@ def handle_web_ocr(
     filename = str(params.get("filename") or os.path.basename(path) or "upload")
     file = _StagedFile(filename)
     client_id = params.get("client_id")
-    ws_raw = params.get("workspace_client_id")
-    ws_client_id = int(ws_raw) if (ws_raw is not None and str(ws_raw).strip().isdigit()) else None
+    # submit 已归一为 int|None 存入 params(JSONB 保型)→ 此处直取,无需复解析。
+    ws_client_id = params.get("workspace_client_id")
 
     progress_cb({"stage": "running", "filename": filename})
 

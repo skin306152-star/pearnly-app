@@ -26,6 +26,7 @@ export interface IvInvoice {
     history_id: string | null;
     idx: number; // 1-based 在本文件内第几张
     total: number; // 本文件共几张
+    fmtWarn?: boolean; // 后端判该张发票号格式偏离同卖家多数派(疑读错)→ 标黄核对
 }
 export interface IvResult {
     filename: string;
@@ -354,12 +355,19 @@ function retryFile(idx: number) {
 function ingestResult(d: Dict): IvResult {
     const pages = (d.pages as unknown[]) || [];
     const raw = (d.invoices as Array<Record<string, unknown>>) || [];
+    // 后端揪出的"发票号格式偏离多数派"张(1-based index)→ 标到对应票
+    const fmtWarnIdx = new Set(
+        ((d.invoice_format_warnings as Array<{ invoice_index?: number }>) || []).map(
+            (w0) => w0.invoice_index
+        )
+    );
     const invoices: IvInvoice[] = raw.length
         ? raw.map((x, i) => ({
               fields: (x.fields as Dict) || {},
               history_id: (x.history_id as string) || null,
               idx: (x.source_index as number) || i + 1,
               total: (x.source_total as number) || raw.length,
+              fmtWarn: fmtWarnIdx.has((x.source_index as number) || i + 1),
           }))
         : [
               {

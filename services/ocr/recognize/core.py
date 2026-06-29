@@ -30,6 +30,7 @@ from services.ocr.recognize.cache import serve_cache_hit
 from services.ocr.recognize.persist import persist_invoices
 from services.ocr.recognize.autopush import dispatch_auto_push
 from services.ocr.recognize.sanitize import strip_internal_fields
+from services.ocr.invoice_no import format_warnings_for_groups
 
 logger = logging.getLogger("mr-pilot")
 
@@ -340,6 +341,11 @@ def run_recognition_core(
             if isinstance(_w, str) and _w.startswith("possible_missed_invoice"):
                 missed_invoice_warnings.append({"page": _pg.get("page_number"), "reason": _w})
 
+    # 同卖家批内发票号格式一致性:多张里格式偏离多数派的那张大概率读错
+    # (同批 IV69100179/IV69100189 混进 IV69/00199)。揪出 → needs_review,
+    # 不静默满分放过。只揪不改值(瞎补分隔符会把对的票改错,交人工核对)。
+    invoice_format_warnings = format_warnings_for_groups(invoice_groups[:invoice_count])
+
     response = strip_internal_fields(
         {
             "filename": file.filename,
@@ -348,7 +354,8 @@ def run_recognition_core(
             "pages": result["pages"],
             "confidence": confidence,
             "missed_invoice_warnings": missed_invoice_warnings,
-            "needs_review": bool(missed_invoice_warnings),
+            "invoice_format_warnings": invoice_format_warnings,
+            "needs_review": bool(missed_invoice_warnings or invoice_format_warnings),
             "history_id": primary_history_id,
             "history_ids": history_ids,
             "invoice_count": invoice_count,

@@ -123,10 +123,13 @@ function accPanelHtml(r: IvResult, i: number): string {
 
 function invoiceGroupHtml(fi: number, ii: number, inv: IvInvoice): string {
     const warns = warnFields(inv.fields);
+    if (inv.fmtWarn) warns.add('invoice_number'); // 格式偏离多数派 → 标黄该张发票号
     const head =
         inv.total > 1
-            ? `<div class="dx-inv-head">${esc(t('dxi-inv-no').replace('{i}', String(inv.idx)).replace('{n}', String(inv.total)))}</div>`
-            : '';
+            ? `<div class="dx-inv-head">${esc(t('dxi-inv-no').replace('{i}', String(inv.idx)).replace('{n}', String(inv.total)))}${inv.fmtWarn ? `<span class="dx-inv-fmtwarn">${esc(t('dxi-fmt-warn'))}</span>` : ''}</div>`
+            : inv.fmtWarn
+              ? `<div class="dx-inv-head"><span class="dx-inv-fmtwarn">${esc(t('dxi-fmt-warn'))}</span></div>`
+              : '';
     const cell = ([k, lk]: [string, string]) => {
         const warn = warns.has(k) ? ' warn' : '';
         const v = String(inv.fields[k] ?? '');

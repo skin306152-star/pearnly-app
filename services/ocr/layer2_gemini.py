@@ -260,7 +260,14 @@ def _call_gemini_with_retry(
     metadata keys: input_tokens, output_tokens, retries
     """
     sys_prompt = system_prompt_override if system_prompt_override else _SYSTEM_PROMPT
-    base_prompt = sys_prompt + "\n\n" + _USER_PROMPT_PREFIX + text
+    # 反馈闭环 ② 消费侧:仅 invoice 路径(无 override)注入该主体历史修正 few-shot。
+    # OCR_FEWSHOT_ENABLED 关 / 无上下文 / 例库空 → 返空串 → base_prompt 字节级不变。
+    fewshot_hint = ""
+    if system_prompt_override is None:
+        from services.ocr.feedback import fewshot
+
+        fewshot_hint = fewshot.maybe_block_for_text(text)
+    base_prompt = sys_prompt + "\n\n" + fewshot_hint + _USER_PROMPT_PREFIX + text
 
     from services.ai_gateway import backends
 

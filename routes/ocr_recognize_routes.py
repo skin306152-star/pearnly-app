@@ -180,15 +180,18 @@ async def ocr_recognize(
             run_on_table_bytes as _pipeline_run_table,
         )
         from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+        from services.ocr.feedback.context import ocr_request_context
 
-        if _ext in PDF_EXTENSIONS:
-            _pipe_res = _pipeline_run_pdf(content, max_pages=max_pages, api_key=api_key)
-        elif _ext in IMAGE_EXTENSIONS:
-            _pipe_res = _pipeline_run_image(content, api_key=api_key)
-        else:  # TABLE_EXTENSIONS — Excel / CSV / Word / TXT
-            _pipe_res = _pipeline_run_table(
-                content, filename=file.filename or "upload", api_key=api_key
-            )
+        # 反馈闭环 ② · 设请求级上下文(L2 few-shot 按租户取例;flag 关时无副作用)
+        with ocr_request_context(str(user["id"]), _tid(user)):
+            if _ext in PDF_EXTENSIONS:
+                _pipe_res = _pipeline_run_pdf(content, max_pages=max_pages, api_key=api_key)
+            elif _ext in IMAGE_EXTENSIONS:
+                _pipe_res = _pipeline_run_image(content, api_key=api_key)
+            else:  # TABLE_EXTENSIONS — Excel / CSV / Word / TXT
+                _pipe_res = _pipeline_run_table(
+                    content, filename=file.filename or "upload", api_key=api_key
+                )
         result = pipeline_result_to_legacy_dict(_pipe_res)
         _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
         logger.info(

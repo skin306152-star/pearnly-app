@@ -38,12 +38,15 @@ from .schemas import Page, Word
 MIN_OVERLAP_CHARS = 4
 
 # Characters to normalize away when comparing words to field values.
-# Both Vision text and layer 2 extraction can introduce / strip these.
-_NORMALIZE_PATTERN = re.compile(r"[\s,]+")
+# 空格/逗号:Vision 与 L2 任一侧都可能增删。连字符/斜杠/货币符:税号(0-1055-...)、
+# 日期(28-02-2026)、金额(฿1,780.00)在 L1 文本与抽取值之间常以不同分隔呈现 —— 不剥就会
+# 把"正确但分隔不同"的值误判成 L2 幻觉,白白升 L3 视觉复读(速度根因 · 见
+# tests/unit/test_l1_containment_narrow.py)。真幻觉(数字本身不同)剥了也匹配不上,仍升 L3。
+_NORMALIZE_PATTERN = re.compile(r"[\s,\-–—/฿]+")
 
 
 def _normalize(s: str) -> str:
-    """Strip whitespace + commas for matching. Lowercase for case-insensitivity."""
+    """Strip whitespace/commas/分隔符/货币符 for matching. Lowercase for case-insensitivity."""
     return _NORMALIZE_PATTERN.sub("", s).lower()
 
 

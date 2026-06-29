@@ -294,8 +294,7 @@ def _boot_schema_ddl() -> None:
         except Exception as e:
             logger.warning(f"启动 LINE {_label} schema 失败: {e}")
 
-    # 商户采购(进项)schema 双跑(suppliers / purchase_docs+lines / categories+settings+
-    # intake+attachments)· 与 alembic 0031-0033 同源幂等 DDL(docs/purchasing/01)。
+    # 商户采购(进项)schema 双跑 · 与 alembic 0031-0033 同源幂等 DDL(docs/purchasing/01)。
     try:
         from services.purchase.schema import ensure_purchase_schema
 
@@ -432,11 +431,7 @@ async def run_startup() -> dict:
             "[email_ingest] 定时抓取已禁用(HF Space 不支持 IMAP 出站 · 迁 VPS 后设 EMAIL_INGEST_ENABLED=1)"
         )
 
-    # v118.25 · ERP 推送自动重试后台 worker(每 30 秒扫到期失败 log)
-    # PEARNLY_SKIP_HEAVY_INIT=1 时不启动 · 防止 unit test 用 TestClient
-    # 进 lifespan 时若再全局 patch asyncio.sleep,会把 30 秒 sleep 短路成
-    # CPU 死循环 → list_logs_due_for_retry 每秒被调几万次 → stderr 缓冲爆
-    # 内存(本机 OOM)。CI/生产不设这个 env,正常启动。
+    # v118.25 · ERP 推送自动重试 worker(每 30s 扫到期失败 log)· SKIP_HEAVY_INIT=1 不启(防 unit test patch asyncio.sleep 把 30s 短路成 CPU 死循环 → OOM)。
     erp_retry_task = None
     if os.environ.get("PEARNLY_SKIP_HEAVY_INIT", "").lower() not in ("1", "true", "yes"):
         erp_retry_task = asyncio.create_task(erp_retry_loop())
@@ -444,8 +439,7 @@ async def run_startup() -> dict:
     else:
         logger.info("[erp_retry] 跳过启动(PEARNLY_SKIP_HEAVY_INIT=1)")
 
-    # ADR-005 #15 · 对账异步后台工人(embedded)· 启动建表 + 起轮询任务
-    # RECON_ASYNC!=1 时 start_embedded 自己跳过(可秒回滚)· PEARNLY_SKIP_HEAVY_INIT 下不起
+    # ADR-005 #15 · 对账异步工人(embedded)· RECON_ASYNC!=1 自跳过 · SKIP_HEAVY_INIT 下不起
     if os.environ.get("PEARNLY_SKIP_HEAVY_INIT", "").lower() not in ("1", "true", "yes"):
         try:
             from services.recon_jobs import store as _recon_store, worker as _recon_worker
@@ -453,6 +447,10 @@ async def run_startup() -> dict:
             with startup_ddl_lock():
                 _recon_store.ensure_table()
             _recon_worker.start_embedded()
+            # 缺口④ · 网页 OCR 异步工人(flag OCR_ASYNC_WEB 默认 off · 表由 worker 自建/enqueue 自愈)
+            from services.ocr.jobs import worker as _ocr_jobs_worker
+
+            _ocr_jobs_worker.start_embedded()
             # ADR-006 · 模板学习层映射表(启动自动建 · 失败自愈)
             try:
                 from services.importer import template_store as _tmpl_store
@@ -474,8 +472,10 @@ async def run_shutdown(tasks: dict):
     # ADR-005 #15 · 停 embedded 工人
     try:
         from services.recon_jobs import worker as _recon_worker
+        from services.ocr.jobs import worker as _ocr_jobs_worker  # 缺口④
 
         await _recon_worker.stop_embedded()
+        await _ocr_jobs_worker.stop_embedded()
     except Exception:
         pass
     # 关闭时停定时

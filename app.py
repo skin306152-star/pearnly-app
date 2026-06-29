@@ -54,6 +54,9 @@ from routes.recon_routes import router as recon_router  # v118.32.0
 from routes.recon_jobs_routes import (
     router as recon_jobs_router,
 )  # ADR-005 #15 · 对账异步 submit/状态
+from routes.ocr_jobs_routes import (
+    router as ocr_jobs_router,
+)  # 缺口④ · 网页 OCR 上传异步 submit/状态
 from routes.import_routes import router as import_router  # ADR-006 · 通用模板学习层 列映射接口
 from routes.vat_excel_routes import router as vat_excel_router  # v118.32.4.9.5 · Excel 公式对账内测
 from routes.notification_routes import router as notification_router  # REFACTOR-B1 · 2026-05-24
@@ -314,6 +317,7 @@ app.include_router(
     admin_diagnostics_router
 )  # 阶段 5 Task 5.2 · admin diagnostics + internal/deploy* 5 路由(2026-05-22)
 app.include_router(recon_jobs_router)  # ADR-005 #15 · 对账异步 submit + 统一状态查询
+app.include_router(ocr_jobs_router)  # 缺口④ · 网页 OCR 上传异步 submit + 状态查询
 app.include_router(import_router)  # ADR-006 · 通用模板学习层 列映射接口
 app.include_router(auth_email_code_router)  # REFACTOR-B1 · 邮箱验证码 2 路由(2026-05-28)
 app.include_router(line_account_merge_router)  # REFACTOR-B1 · LINE 补邮箱+合并 2 路由(2026-05-28)

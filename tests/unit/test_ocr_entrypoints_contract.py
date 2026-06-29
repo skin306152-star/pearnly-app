@@ -90,10 +90,10 @@ class OcrEntrypointContractTests(unittest.TestCase):
         self.assertTrue(hasattr(entrypoints, "get_cached_history"))
 
     def test_web_upload_checks_cache_before_balance_gate(self):
-        # ocr_recognize 主路由 2026-06-01 抽到 ocr_recognize_routes.py(REFACTOR-WB-app);
-        # 缓存先于余额闸的顺序契约随之跟到新文件。
-        route_py = Path(__file__).resolve().parents[2] / "routes" / "ocr_recognize_routes.py"
-        src = route_py.read_text(encoding="utf-8")
+        # 识别核心 2026-06-30 抽到 services/ocr/recognize/core.py(缺口④ · 同步/异步单一事实源);
+        # 缓存先于余额闸的顺序契约随之跟到新文件,网页同步与异步 worker 同享此顺序。
+        core_py = Path(__file__).resolve().parents[2] / "services" / "ocr" / "recognize" / "core.py"
+        src = core_py.read_text(encoding="utf-8")
         cache_pos = src.index("cached = _ocr_get_cached(user, file_hash")
         billing_pos = src.index('db.get_billing_status_combined(str(user.get("id")), _tid(user))')
         self.assertLess(

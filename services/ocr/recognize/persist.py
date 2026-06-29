@@ -231,22 +231,31 @@ def persist_invoices(
                 # v118.46 · 扣费(成功识别 + 落库后 · 只扣一次 · 传 history_id 让 usage-history 显示文件名)
                 #   描述结尾带 history_id 前 8 位 → usage-history 的 LIKE join 能命中(修 filename 空)
                 if not _billing.get("is_exempt") and _chg_units > 0 and hid:
+                    _chg_args = (
+                        str(user.get("id")),
+                        _tid(user),
+                        _chg_kind,
+                        _chg_units,
+                        str(hid),
+                        f"OCR {_chg_kind} · {file.filename} · {str(hid)[:8]}",
+                    )
                     try:
                         import asyncio as _asyncio_chg
 
-                        _asyncio_chg.create_task(
-                            _asyncio_chg.to_thread(
-                                db.charge_ocr_async,
-                                str(user.get("id")),
-                                _tid(user),
-                                _chg_kind,
-                                _chg_units,
-                                str(hid),
-                                f"OCR {_chg_kind} · {file.filename} · {str(hid)[:8]}",
+                        try:
+                            _loop = _asyncio_chg.get_running_loop()
+                        except RuntimeError:
+                            _loop = None
+                        if _loop is not None:
+                            # 同步路由(async 上下文):后台线程扣费,不堵 event loop。
+                            _loop.create_task(
+                                _asyncio_chg.to_thread(db.charge_ocr_async, *_chg_args)
                             )
-                        )
+                        else:
+                            # 缺口④ worker 线程:无运行中事件循环 → 直接同步扣费(否则静默漏扣)。
+                            db.charge_ocr_async(*_chg_args)
                     except Exception as _ce:
-                        logger.warning(f"💳 async charge dispatch skip: {_ce}")
+                        logger.warning(f"💳 charge dispatch skip: {_ce}")
 
             # 买方→Pearnly client 闭环(Zihao 2026-05-26 拍板 · 税号优先·混合)。
             # 右上角客户切换器没选 client_id(常态)时,把发票买方解析/创建成 client:

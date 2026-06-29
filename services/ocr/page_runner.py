@@ -29,6 +29,7 @@ from .layer3_fallback import (
     refine_page as _l3_refine_page,
 )
 from .pattern_memory import InvoicePatternMemory
+from .sanity import evaluate_sanity
 from .schemas import BusinessDocumentType, Page, PipelinePageResult
 from .triggers import (
     _aggregate_page_confidence,
@@ -359,6 +360,15 @@ def _process_one_page(
                 f"{extracted_n} invoice(s) extracted after visual re-read — manual review needed"
             )
             validation_warnings.append(reason)
+            needs_manual_review = True
+
+    # 合理性硬闸(2026-06-29 · sanity.evaluate_sanity):对【最终】invoice 查结构上不可能的错
+    # (负数/卖买税号相同/总额<单行/缺VAT勾稽不平)。命中 → 强制转人工,绝不静默 auto。
+    # triggers 是「再看一眼」的软信号;这里是「这数不可能对」的硬信号。doc-type gate:只发票路。
+    if document_type in ("auto", "invoice") and not invoice.is_not_invoice:
+        sanity_reasons = evaluate_sanity(invoice)
+        if sanity_reasons:
+            validation_warnings.extend(sanity_reasons)
             needs_manual_review = True
 
     # Record final invoice pattern in pattern memory (after possible L3

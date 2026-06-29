@@ -108,10 +108,11 @@ class InsertWorkspaceTests(unittest.TestCase):
         # 末位 = ai_raw 的 JSON 串(写一次留底)
         self.assertIn("IV1", cur.insert_params[-1])
 
-    def test_ai_raw_default_null(self):
+    def test_ai_raw_defaults_to_pages(self):
+        # 不传 ai_raw → 缺省取 pages(全 OCR 入口普适留底·非 NULL)
         cur = _FakeCursor()
-        _run_insert(cur)  # 不传 ai_raw
-        self.assertIsNone(cur.insert_params[-1])
+        _run_insert(cur, pages=[{"fields": {"invoice_number": "IVX"}}])
+        self.assertIn("IVX", cur.insert_params[-1])
 
 
 if __name__ == "__main__":

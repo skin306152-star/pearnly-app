@@ -82,8 +82,12 @@ def _ingest_one_attachment(
 
     try:
         from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+        from services.ocr.feedback.context import ocr_request_context
 
-        _pipe_res = run_pipeline_for_file(content, filename, api_key=api_key, max_pages=50)
+        _ctx_tid = str(user.get("tenant_id")) if user.get("tenant_id") else None
+        # 反馈闭环 ② · 设请求级上下文(L2 few-shot 按租户取例;flag 关时无副作用)
+        with ocr_request_context(user_id, _ctx_tid):
+            _pipe_res = run_pipeline_for_file(content, filename, api_key=api_key, max_pages=50)
         result = pipeline_result_to_legacy_dict(_pipe_res)
         _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
         logger.info(

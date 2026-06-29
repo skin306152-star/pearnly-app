@@ -175,11 +175,17 @@ async def batch_process(
         try:
             from services.ocr.pipeline import run_on_pdf_bytes as _pipeline_run
             from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+            from services.ocr.feedback.context import ocr_request_context
+
+            _ctx_tid = str(user.get("tenant_id")) if user.get("tenant_id") else None
+
+            def _run_with_ctx():
+                # 反馈闭环 ② · 上下文须在 executor 线程内设(contextvar 不跨线程传)
+                with ocr_request_context(str(user["id"]), _ctx_tid):
+                    return _pipeline_run(content_b, max_pages=10, api_key=api_key)
 
             _pipe_res = await asyncio.wait_for(
-                loop.run_in_executor(
-                    None, lambda: _pipeline_run(content_b, max_pages=10, api_key=api_key)
-                ),
+                loop.run_in_executor(None, _run_with_ctx),
                 timeout=120.0,
             )
             _pipe_legacy = pipeline_result_to_legacy_dict(_pipe_res)

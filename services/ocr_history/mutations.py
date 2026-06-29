@@ -286,7 +286,8 @@ def insert_ocr_history(
     # B1 相 1 (2026-05-26) · workspace 账套主体归属(在为哪家公司做账)· 可选 · 带不上 NULL ·
     # 与 client_id(买方)是两个独立字段 · 非强制(缺失不报错·不拦上传)。
     workspace_client_id: Optional[int] = None,
-    # 反馈闭环 ② · AI/系统首存基线(永不改 · 用户编辑后据此算修正 diff)。缺省 NULL=老记录不参与。
+    # 反馈闭环 ② · AI/系统首存基线(永不改 · 用户编辑后据此算修正 diff)。
+    # 缺省 None → 落库时自动取 pages(= 各入口首存内容)→ 全 OCR 入口普适留底,无需逐调用方传。
     ai_raw: Optional[list] = None,
 ) -> Optional[str]:
     """写入一条历史记录,返回新记录的 id(失败返回 None,不影响主流程)"""
@@ -395,7 +396,7 @@ def insert_ocr_history(
                     pdf_size_bytes,
                     safe_client_id,
                     safe_workspace_client_id,
-                    _json.dumps(ai_raw, ensure_ascii=False) if ai_raw is not None else None,
+                    _json.dumps(ai_raw if ai_raw is not None else pages, ensure_ascii=False),
                 ),
             )
             row = cur.fetchone()

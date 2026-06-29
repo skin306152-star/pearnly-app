@@ -215,8 +215,7 @@ def persist_invoices(
             ),
             # B1 相 1 · workspace 账套归属(可选·校验在 insert_ocr_history 内·带不上 NULL)
             workspace_client_id=_ws_client_id,
-            # 反馈闭环 ② · 首存基线留底(= 此刻写入的 pages)·永不改·供后续用户修正算 diff
-            ai_raw=g_pages_for_save,
+            # 反馈闭环 ② · ai_raw 留底由 insert_ocr_history 缺省取 pages 自动写(全入口普适)
         )
         if hid:
             history_ids.append(hid)

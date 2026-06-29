@@ -202,6 +202,38 @@ function footHtml(): string {
     );
 }
 
+// 保存修改:把当前展开文件的每张发票(用户在输入框改过的 fields 已实时写入 IV.results)
+// 真持久化到各自 ocr_history 行 → 识别记录 / 导出 / 推 ERP 都用改后值。
+// 此前此按钮只弹 toast 不写库(假保存)→ 用户修正凭空蒸发,见问题 02。
+async function saveOpenFileEdits(btn: HTMLElement | null): Promise<void> {
+    const r = IV.results[IV.openIdx];
+    if (!r) return;
+    const targets = r.invoices.filter((iv) => iv.history_id);
+    if (!targets.length) {
+        showToast(t('dxi-rev-save-fail'), 'error');
+        return;
+    }
+    btn?.setAttribute('disabled', '1');
+    try {
+        await Promise.all(
+            targets.map((iv) =>
+                fetch(`/api/history/${encodeURIComponent(iv.history_id as string)}`, {
+                    method: 'PUT',
+                    headers: authHeaders(true),
+                    body: JSON.stringify({ pages: [{ fields: iv.fields }] }),
+                }).then((resp) => {
+                    if (!resp.ok) throw new Error(String(resp.status));
+                })
+            )
+        );
+        showToast(t('dxi-rev-saved'), 'success');
+    } catch {
+        showToast(t('dxi-rev-save-fail'), 'error');
+    } finally {
+        btn?.removeAttribute('disabled');
+    }
+}
+
 // ── 交互(由 onInvoiceClick 在 review 阶段优先转发)─────────────
 export function onReviewClick(tg: HTMLElement): boolean {
     const tog = tg.closest('[data-iv-toggle]') as HTMLElement | null;
@@ -248,7 +280,7 @@ export function onReviewClick(tg: HTMLElement): boolean {
         return true;
     }
     if (tg.closest('.dx-save-one')) {
-        showToast(t('dxi-rev-saved'), 'success');
+        void saveOpenFileEdits(tg.closest('.dx-save-one'));
         return true;
     }
     if (tg.closest('.dx-confirm-one')) {

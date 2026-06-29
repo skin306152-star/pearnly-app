@@ -74,6 +74,13 @@ class ScoreInvoiceTests(unittest.TestCase):
         r = sc.score_invoice({"total_amount": "100"}, {})
         self.assertFalse(r["fields"]["total_amount"]["match"])
 
+    def test_money_zero_equals_empty(self):
+        # 非税票无 VAT 行:真值 vat "0" 与抽取 "" 等价(没印VAT=VAT 0)。
+        self.assertTrue(sc.score_invoice({"vat": "0"}, {"vat": ""})["fields"]["vat"]["match"])
+        self.assertTrue(sc.score_invoice({"vat": ""}, {"vat": "0"})["fields"]["vat"]["match"])
+        # 但 0 不等于任意非零值。
+        self.assertFalse(sc.score_invoice({"vat": "0"}, {"vat": "5"})["fields"]["vat"]["match"])
+
     def test_items_count_completeness(self):
         # 三合一票漏掉两张:期望 3 行明细,实得 1 → 漏判(多票/多行信号)。
         gt = {"items_count": 3}

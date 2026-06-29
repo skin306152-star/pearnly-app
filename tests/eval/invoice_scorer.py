@@ -106,7 +106,9 @@ def _both_blank(a: str, b: str) -> Optional[bool]:
 def _match_field(kind: str, expected: Any, actual: Any) -> bool:
     if kind == "money":
         e, a = normalize_money(expected), normalize_money(actual)
-        if e is None and a is None:
+        # 0 与「缺/空」视为等价:票面没印金额 == 金额为 0(非税票无 VAT 行 vs VAT=0)。
+        # 只等价 0↔空,不放宽 0↔任意值。
+        if e in (None, 0.0) and a in (None, 0.0):
             return True
         if e is None or a is None:
             return False

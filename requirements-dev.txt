@@ -2,12 +2,12 @@
 # CI lint job 装这个 · 本地 `pip install -r requirements-dev.txt` 同款版本。
 # 升级时 black/ruff 同步 bump · 防 CI 与本地格式化结果漂移。
 black==26.5.1
-ruff==0.15.14
+ruff==0.15.20
 # REFACTOR-A8 · 测试覆盖率(coverage run -m unittest + fail_under 棘轮)
-coverage==7.14.0
+coverage==7.14.3
 # starlette>=1.3 的 fastapi.testclient.TestClient 改用 httpx2(不再用 httpx)·
 # 仅测试用 · 不进 prod lock(对标 coverage)。缺它则 TestClient 路由单测 RuntimeError。
-httpx2==2.4.0
+httpx2==2.5.0
 # REFACTOR-A6 · 安全扫描(bandit 静态 · pip-audit 依赖 CVE · npm audit 见 package.json)
 bandit[toml]==1.9.4
-pip-audit==2.10.0
+pip-audit==2.10.1

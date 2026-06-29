@@ -80,6 +80,7 @@ from services.recon.bank_stmt_text import (
     _parse_kbank_text_columns,
 )
 from services.recon.bank_stmt_gemini import _gemini_parse_statement
+from services.recon.bank_arbitration_guard import divergence_reasons
 
 # STATEMENT BALANCE VERIFY/REPAIR · moved to services/recon/bank_stmt_balance.py
 from services.recon.bank_stmt_balance import (
@@ -282,6 +283,7 @@ def parse_bank_statement_pdf(
             f"text_chars={len(all_text)} free_rows={len(rows)} free_bad={_free_bad:.2f}"
         )
     printed_totals = None  # v118.35.0.63 · 账单印刷页脚汇总(仅 Gemini 路径有)· 完整性交叉校验用
+    _arb_divergence: List[str] = []  # 两法分歧守门(根因③):两法都出行却对不上 → 标人工
     if _need_gemini and api_key:
         gemini_result = _gemini_parse_statement(file_bytes, filename, api_key)
         g_rows = gemini_result.get("rows") or []
@@ -291,6 +293,16 @@ def parse_bank_statement_pdf(
         if gemini_result.get("ok") and g_rows:
             g_op = gemini_result.get("opening", opening)
             g_bad = _stmt_bad_ratio(g_rows, g_op)
+            # 仲裁前先记两法分歧:免费解析与 Gemini 都出行却在期初/期末显著对不上,
+            # 无论后面选谁都不可静默(BBL2645:Gemini −114万自洽度更低被选中·真值 0.00)。
+            _arb_divergence = divergence_reasons(
+                _free_op,
+                _free_cl,
+                len(_free_rows),
+                g_op,
+                gemini_result.get("closing", _free_cl),
+                len(g_rows),
+            )
             # 免费行数不足 → 直接用 Gemini;否则谁的余额链更可信用谁
             if len(_free_rows) < MIN_PLUMBER_ROWS or g_bad < _free_bad:
                 logger.info(
@@ -364,6 +376,11 @@ def parse_bank_statement_pdf(
 
     # v118.35.0.63 · 完整性交叉校验(印刷合计/笔数 + 期末平衡)· 主动发现漏行
     completeness = _audit_completeness(rows, opening, closing, printed_totals)
+    # 两法分歧并入完整性问题 → 诚实化:对不上就别静默成功,标需人工核票面(根因③)。
+    if _arb_divergence:
+        completeness = dict(completeness)
+        completeness["ok"] = False
+        completeness["issues"] = list(completeness.get("issues") or []) + _arb_divergence
     if not completeness["ok"]:
         logger.info(f"[stmt_parse][{filename}] completeness issues: {completeness['issues']}")
 

@@ -17,6 +17,8 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
+from services.ocr.money import normalize_id, normalize_money  # 与 sanity 硬闸共用同一解析
+
 # 钱字段容差(泰铢):0.01 足够吸收浮点/四舍五入,又抓得住真错(pur05 差 1735 铢)。
 MONEY_TOL = 0.01
 
@@ -49,27 +51,6 @@ _FIELD_SPEC: Dict[str, tuple] = {
 _CRITICAL_WEIGHT = 3
 
 _THAI_BAHT_WORDS = ("บาท", "thb", "฿")
-
-
-def normalize_money(v: Any) -> Optional[float]:
-    """'฿1,780.00' / '1780' / 1780 → 1780.0;空/不可解 → None。
-
-    剥掉除数字、小数点、负号外的一切(币种符、空格、บาท)。逗号当千分位去掉。
-    """
-    if v is None:
-        return None
-    s = re.sub(r"[^\d.\-]", "", str(v).replace(",", "").strip())
-    if not s or s in ("-", ".", "-."):
-        return None
-    try:
-        return float(s)
-    except ValueError:
-        return None
-
-
-def normalize_id(v: Any) -> str:
-    """税号只留数字(票面常带空格/连字符:0-7355-27000-28-9)。"""
-    return re.sub(r"\D", "", str(v or ""))
 
 
 def normalize_invoice_no(v: Any) -> str:

@@ -65,15 +65,17 @@ def _expected_fields(gt: dict) -> dict:
     return {k: v for k, v in gt.items() if k not in _META_KEYS}
 
 
-def _find_sample(samples_dir, gt):
+def _find_sample(sample_files, gt):
+    """在【预缓存的】样本文件名里按 gt['file'] 精确/子串匹配(目录只 glob 一次·非每条 gt)。"""
     target = gt.get("file") or gt.get("name") or ""
     if not target:
         return None
-    cand = os.path.join(samples_dir, target)
-    if os.path.exists(cand):
-        return cand
-    for f in glob.glob(os.path.join(samples_dir, "*")):
-        if target.lower() in os.path.basename(f).lower():
+    for f in sample_files:
+        if os.path.basename(f) == target:
+            return f
+    tl = target.lower()
+    for f in sample_files:
+        if tl in os.path.basename(f).lower():
             return f
     return None
 
@@ -124,6 +126,8 @@ def main():
         extracted_map = json.load(open(args.extracted, encoding="utf-8"))
         print(f"离线模式 · 加载 {len(extracted_map)} 份抽取结果")
     api = os.environ.get("GEMINI_API_KEY", "")
+    # 样本目录只 glob 一次(线上模式),避免对每条真值重复扫盘。
+    sample_files = glob.glob(os.path.join(args.samples, "*")) if args.samples else []
     print(f"加载 {len(gts)} 份发票真值 · 模式={'离线' if args.extracted else '线上'}\n")
 
     report = {
@@ -140,7 +144,7 @@ def main():
                 continue
             actual = extracted_map[name]
         else:
-            sample = _find_sample(args.samples, gt)
+            sample = _find_sample(sample_files, gt)
             if not sample:
                 print(f"⊘ {name}: 样本文件未找到({gt.get('file')})· 跳过")
                 continue

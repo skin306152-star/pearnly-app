@@ -376,11 +376,15 @@ def parse_bank_statement_pdf(
 
     # v118.35.0.63 · 完整性交叉校验(印刷合计/笔数 + 期末平衡)· 主动发现漏行
     completeness = _audit_completeness(rows, opening, closing, printed_totals)
-    # 两法分歧并入完整性问题 → 诚实化:对不上就别静默成功,标需人工核票面(根因③)。
+    # 两法分歧(解析可靠性)与 completeness(数据完整性)是两种审计 → 详细原因走独立
+    # method_divergence 键;completeness 只标 not-ok + 一条指针,沿用既有 needs-review 路径而不
+    # 把分歧混进数据完整性问题列表(根因③:两法对不上就别静默成功)。
     if _arb_divergence:
         completeness = dict(completeness)
         completeness["ok"] = False
-        completeness["issues"] = list(completeness.get("issues") or []) + _arb_divergence
+        completeness["issues"] = list(completeness.get("issues") or []) + [
+            "两法分歧(详见 method_divergence)"
+        ]
     if not completeness["ok"]:
         logger.info(f"[stmt_parse][{filename}] completeness issues: {completeness['issues']}")
 
@@ -394,6 +398,7 @@ def parse_bank_statement_pdf(
         "balance_warn_count": balance_warn_count,
         "low_conf_count": low_conf_count,
         "completeness": completeness,  # v118.35.0.63
+        "method_divergence": _arb_divergence,  # 两法分歧原因(空=无)· 与 completeness 分开
     }
 
 

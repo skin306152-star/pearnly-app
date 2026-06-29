@@ -1,0 +1,15 @@
+{
+  "name": "example_invoice_synthetic",
+  "file": "__SYNTHETIC_DOES_NOT_EXIST__.pdf",
+  "_comment": "发票真值格式示例(假数据·零 PII·进 git)。真票真值放 tests/eval/ground_truth_local/invoices/(gitignored·隐私)。只需填要核对的字段;钱字段自洽 subtotal+vat=total。",
+  "document_type": "tax_invoice",
+  "invoice_number": "IV6912-001",
+  "date": "2025-12-24",
+  "seller_tax": "0735527000289",
+  "buyer_tax": "0105556700123",
+  "subtotal": "1000.00",
+  "vat": "70.00",
+  "total_amount": "1070.00",
+  "currency": "",
+  "items_count": 3
+}

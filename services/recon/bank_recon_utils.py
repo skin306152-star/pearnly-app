@@ -309,3 +309,26 @@ def _bank_from_filename(filename: str) -> str:
             if re.search(rf"(?<![a-z]){re.escape(kw)}(?![a-z])", name):
                 return bank_code
     return ""
+
+
+def gateway_pdf_to_json(model_name: str, pdf_bytes: bytes, prompt: str, task: str) -> dict:
+    """非 aistudio 后端(vertex/selfhost):银行 PDF→JSON 经网关 transport(GL/对账单共用)。
+    传原始 bytes(provider 自行编码)· 失败抛 RuntimeError 让 try_with_fallback 升档。
+    默认 aistudio 不走此函数(各调用点保留原 base64 路 · 字节级一致)。"""
+    from services.ai_gateway import transport
+    from services.ocr.gemini_models import tier_for_model
+
+    out = transport.multimodal_to_json(
+        prompt,
+        [(pdf_bytes, "application/pdf")],
+        tier=tier_for_model(model_name),
+        api_key=None,
+        response_mime=False,
+        max_tokens=32768,
+        temperature=0.0,
+        max_retries=0,
+        task=task,
+    )
+    if not out.ok:
+        raise RuntimeError(f"gateway {out.error_kind}")
+    return out.data

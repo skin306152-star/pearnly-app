@@ -129,23 +129,9 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
             from services.ai_gateway import backends
 
             if not backends.is_aistudio():  # vertex / selfhost 经网关;默认 aistudio 走原 base64 路
-                from services.ai_gateway import transport
-                from services.ocr.gemini_models import tier_for_model
+                from services.recon.bank_recon_utils import gateway_pdf_to_json
 
-                out = transport.multimodal_to_json(
-                    prompt,
-                    [(file_bytes, "application/pdf")],
-                    tier=tier_for_model(model_name),
-                    api_key=None,
-                    response_mime=False,
-                    max_tokens=32768,
-                    temperature=0.0,
-                    max_retries=0,
-                    task="bank.stmt",
-                )
-                if not out.ok:  # 让 try_with_fallback 升级到下一档模型
-                    raise RuntimeError(f"gateway {out.error_kind}")
-                return out.data
+                return gateway_pdf_to_json(model_name, file_bytes, prompt, "bank.stmt")
 
             resp = genai.GenerativeModel(model_name).generate_content(
                 [{"mime_type": "application/pdf", "data": b64}, prompt],

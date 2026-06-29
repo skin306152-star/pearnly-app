@@ -239,8 +239,7 @@ def _call_l3_via_gateway(
         last_kind = out.error_kind or "parse"
         if last_kind in ("auth", "quota", "timeout"):
             raise _l3_error_for_kind(last_kind, model_name)
-        if attempt < max_retries:
-            continue
+        # parse/empty:落入下一轮重试(预算用尽则退出循环抛下方错误)
     raise Layer3FallbackError(
         f"layer3: gateway returned no valid JSON after {max_retries + 1} attempts ({last_kind})"
     )

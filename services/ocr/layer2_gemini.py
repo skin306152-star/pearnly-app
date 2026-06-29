@@ -233,8 +233,7 @@ def _call_l2_via_gateway(
         last_kind = out.error_kind or "parse"
         if last_kind in ("auth", "quota", "timeout"):
             raise _l2_error_for_kind(last_kind, model_name)
-        if attempt < max_retries:
-            continue
+        # parse/empty:落入下一轮重试(预算用尽则退出循环抛下方 ValueError)
     raise ValueError(
         f"layer2: gateway returned no valid JSON after {max_retries + 1} attempts ({last_kind})"
     )

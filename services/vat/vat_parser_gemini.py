@@ -284,10 +284,8 @@ def parse_with_gemini(
 
     from services.ai_gateway import transport
 
-    # v118.32.4.9.6 · timeout 60 + 超时单次重试(真实国税局 PDF 504 修)· 经网关切后端
-    out = None
-    for attempt in range(2):
-        out = transport.multimodal_to_json(
+    def _call():
+        return transport.multimodal_to_json(
             _GEMINI_PROMPT,
             [(file_bytes, mime_type)],
             tier="flash",
@@ -299,12 +297,15 @@ def parse_with_gemini(
             max_retries=0,
             task="vat.report_parse",
         )
-        if out.ok or attempt == 1 or out.error_kind != "timeout":
-            break
-        logger.warning("[vat_gemini] 首次超时 · 2 秒后重试")
+
+    # v118.32.4.9.6 · 仅超时单次重试(真实国税局 PDF 504 修)· 经网关切后端
+    out = _call()
+    if not out.ok and out.error_kind == "timeout":
         import time
 
+        logger.warning("[vat_gemini] 首次超时 · 2 秒后重试")
         time.sleep(2)
+        out = _call()
 
     if not out.ok:
         err = (

@@ -92,60 +92,64 @@ function shell(): string {
     </div></div>`;
 }
 
-// 点科目名就地改:整 chip 换成行内输入框(Enter/失焦存 · Esc 取消)。改名是 id 稳定的
-// PATCH → 依赖该科目的下拉/归类按 id 取名,下次读自动显示新名(无需删旧建新)。
+// 行内输入框生命周期(加科目 / 改名共用):把 target 替换为输入框,Enter/失焦提交、
+// Esc 取消(refreshCats 还原)。commit 收到去空格的值;done 保证只提交一次。
+function inlineCatInput(
+    target: HTMLElement,
+    opts: { value?: string; placeholder?: string; commit: (value: string) => void | Promise<void> }
+): void {
+    const inp = document.createElement('input');
+    inp.className = 'addcat-input';
+    if (opts.placeholder) inp.placeholder = opts.placeholder;
+    if (opts.value != null) inp.value = opts.value;
+    target.replaceWith(inp);
+    inp.focus();
+    if (opts.value != null) inp.select();
+    let done = false;
+    const fire = (fn: () => void) => {
+        if (done) return;
+        done = true;
+        fn();
+    };
+    inp.onkeydown = (e) => {
+        if (e.key === 'Enter') fire(() => opts.commit(inp.value.trim()));
+        else if (e.key === 'Escape') fire(refreshCats);
+    };
+    inp.onblur = () => fire(() => opts.commit(inp.value.trim()));
+}
+
+// 点科目名就地改:整 chip 换成行内输入框。改名是 id 稳定的 PATCH → 依赖该科目的
+// 下拉/归类按 id 取名,下次读自动显示新名(无需删旧建新)。
 function startCatEdit(nameEl: HTMLElement): void {
     const id = nameEl.dataset.edit || '';
     const cat = cats.find((c) => c.id === id);
     if (!cat) return;
     const chip = nameEl.closest<HTMLElement>('.chip');
     if (!chip) return;
-    const inp = document.createElement('input');
-    inp.className = 'addcat-input';
-    inp.value = cat.name;
-    chip.replaceWith(inp);
-    inp.focus();
-    inp.select();
-    let done = false;
-    const commit = async () => {
-        const nm = inp.value.trim();
-        if (!nm || nm === cat.name) {
-            refreshCats();
-            return;
-        }
-        try {
-            if (id.startsWith('tmp-')) {
-                cat.name = nm; // 未落库的临时科目:仅本地改名
-            } else {
-                const res = (await papi(
-                    'PATCH',
-                    `/api/purchase/categories/${encodeURIComponent(id)}`,
-                    {
-                        name: nm,
-                    }
-                )) as { category?: Category };
-                cat.name = res.category?.name || nm;
+    inlineCatInput(chip, {
+        value: cat.name,
+        commit: async (nm) => {
+            if (!nm || nm === cat.name) {
+                refreshCats();
+                return;
             }
-        } catch (e) {
-            showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
-        }
-        refreshCats();
-    };
-    inp.onkeydown = (e) => {
-        if (e.key === 'Enter') {
-            done = true;
-            commit();
-        } else if (e.key === 'Escape') {
-            done = true;
+            try {
+                if (id.startsWith('tmp-')) {
+                    cat.name = nm; // 未落库的临时科目:仅本地改名
+                } else {
+                    const res = (await papi(
+                        'PATCH',
+                        `/api/purchase/categories/${encodeURIComponent(id)}`,
+                        { name: nm }
+                    )) as { category?: Category };
+                    cat.name = res.category?.name || nm;
+                }
+            } catch (e) {
+                showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
+            }
             refreshCats();
-        }
-    };
-    inp.onblur = () => {
-        if (!done) {
-            done = true;
-            commit();
-        }
-    };
+        },
+    });
 }
 
 function bindCats(): void {
@@ -165,46 +169,33 @@ function bindCats(): void {
     const add = document.getElementById('pur-addcat');
     // F16 · 去原生 prompt():点「加科目」就地变行内输入框(Enter 存 / Esc 取消 / 失焦存)。
     if (add)
-        add.onclick = () => {
-            const inp = document.createElement('input');
-            inp.className = 'addcat-input';
-            inp.placeholder = t('pur-add-cat');
-            add.replaceWith(inp);
-            inp.focus();
-            let done = false;
-            const commit = async () => {
-                const nm = inp.value.trim();
-                if (!nm) {
+        add.onclick = () =>
+            inlineCatInput(add, {
+                placeholder: t('pur-add-cat'),
+                commit: async (nm) => {
+                    if (!nm) {
+                        refreshCats();
+                        return;
+                    }
+                    try {
+                        const res = (await papi('POST', '/api/purchase/categories', {
+                            name: nm,
+                        })) as { category?: Category };
+                        if (res.category)
+                            cats.push({ ...res.category, is_active: true, children: [] });
+                        else
+                            cats.push({
+                                id: 'tmp-' + nm,
+                                parent_id: null,
+                                name: nm,
+                                is_active: true,
+                            });
+                    } catch (e) {
+                        showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
+                    }
                     refreshCats();
-                    return;
-                }
-                try {
-                    const res = (await papi('POST', '/api/purchase/categories', { name: nm })) as {
-                        category?: Category;
-                    };
-                    if (res.category) cats.push({ ...res.category, is_active: true, children: [] });
-                    else cats.push({ id: 'tmp-' + nm, parent_id: null, name: nm, is_active: true });
-                } catch (e) {
-                    showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
-                }
-                refreshCats();
-            };
-            inp.onkeydown = (e) => {
-                if (e.key === 'Enter') {
-                    done = true;
-                    commit();
-                } else if (e.key === 'Escape') {
-                    done = true;
-                    refreshCats();
-                }
-            };
-            inp.onblur = () => {
-                if (!done) {
-                    done = true;
-                    commit();
-                }
-            };
-        };
+                },
+            });
 }
 
 function refreshCats(): void {

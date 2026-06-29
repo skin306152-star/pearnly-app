@@ -30,17 +30,15 @@ def generate_json(
 ) -> ProviderOutcome:
     """结构化 JSON 调用。无 key/失败 → ok=False + 标准 error_kind(不抛,业务层据此走 fallback)。
 
-    非 aistudio 后端(vertex/selfhost)经统一 backends 开关转对应 provider —— LINE 记账大脑
-    (line_text_understand / expense_category_choose / line_chat_reply)随 OCR_LLM_BACKEND 一起
-    切到 Vertex。默认 aistudio 走下方原直连路径,行为零变化。system+text 合并为单 prompt(JSON
-    形态无独立 system_instruction,与 transport.multimodal 同口径)。
+    非 aistudio 后端随 OCR_LLM_BACKEND 转对应 provider(LINE 记账大脑一并切 Vertex);
+    默认 aistudio 走下方原直连路径,行为零变化。system+text 合并为单 prompt(JSON 形态无
+    独立 system_instruction,与 transport.multimodal 同口径)。
     """
     from services.ai_gateway import backends
 
     if not backends.is_aistudio():
-        provider = backends.get_provider()
         combined = (prompt + "\n\n" + text) if prompt else (text or "")
-        return provider.text_to_json(
+        return backends.get_provider().text_to_json(
             combined,
             tier=model_tier,
             api_key=api_key,

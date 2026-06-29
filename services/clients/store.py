@@ -54,10 +54,11 @@ def ensure_clients_table():
                 CREATE INDEX IF NOT EXISTS idx_clients_tenant ON clients(tenant_id, is_active);
                 CREATE INDEX IF NOT EXISTS idx_clients_tax_id ON clients(tax_id) WHERE tax_id IS NOT NULL;
             """)
-            # 2. ocr_history 加 client_id 字段
+            # 2. ocr_history 加 client_id 字段 + ai_raw 留底(反馈闭环 ②:首存基线·永不改·算用户修正 diff)
             cur.execute("""
                 ALTER TABLE ocr_history ADD COLUMN IF NOT EXISTS client_id BIGINT;
                 CREATE INDEX IF NOT EXISTS idx_ocr_history_client ON ocr_history(client_id) WHERE client_id IS NOT NULL;
+                ALTER TABLE ocr_history ADD COLUMN IF NOT EXISTS ai_raw JSONB;
             """)
             # B8 RLS wave3:两表都含 tenant_id + user_id → tenant_or_user 隔离。
             # force=False(owner 仍绕过→外围未迁的裸 get_cursor 不破);业务连接 SET ROLE 后强制。

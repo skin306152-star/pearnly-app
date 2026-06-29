@@ -293,6 +293,9 @@ _REEXPORTS = {
         "get_user_gemini_key_masked",
         "update_user_preferred_lang",
     ],
+    "services.ocr.feedback.schema": [
+        "ensure_ocr_feedback_table",
+    ],
     "services.ocr_history.store": [
         "list_ocr_history",
         "get_ocr_history_detail",

@@ -187,6 +187,7 @@ def _boot_schema_ddl() -> None:
         (db.ensure_seller_route_table, "seller_workspace_routes 建表"),
         (db.ensure_supplier_categories_table, "supplier_categories 建表"),
         (db.ensure_buyer_to_client_table, "buyer_to_client_memory 建表"),
+        (db.ensure_ocr_feedback_table, "ocr_correction_examples 建表+RLS"),
         (db.ensure_google_sub_column, "google_sub 列"),
         (db.ensure_line_uid_column, "line_uid 列"),
         (db.ensure_password_changed_at_column, "password_changed_at 列"),

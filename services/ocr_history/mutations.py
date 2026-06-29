@@ -142,7 +142,13 @@ def update_ocr_history_pages(
                     *where_params,
                 ),
             )
-            return cur.rowcount > 0
+            updated = cur.rowcount > 0
+        # 反馈闭环 ② · 编辑落库后捕获用户修正 → 沉淀按主体例库(非致命·绝不影响保存)
+        if updated:
+            from services.ocr.feedback import store as _feedback
+
+            _feedback.record_correction_from_edit(user_id, tenant_id, record_id, new_pages)
+        return updated
     except Exception as e:
         logger.error(f"更新历史失败 (id={record_id}): {e}")
         return False
@@ -276,6 +282,8 @@ def insert_ocr_history(
     # B1 相 1 (2026-05-26) · workspace 账套主体归属(在为哪家公司做账)· 可选 · 带不上 NULL ·
     # 与 client_id(买方)是两个独立字段 · 非强制(缺失不报错·不拦上传)。
     workspace_client_id: Optional[int] = None,
+    # 反馈闭环 ② · AI/系统首存基线(永不改 · 用户编辑后据此算修正 diff)。缺省 NULL=老记录不参与。
+    ai_raw: Optional[list] = None,
 ) -> Optional[str]:
     """写入一条历史记录,返回新记录的 id(失败返回 None,不影响主流程)"""
     summary = _extract_summary_fields(pages)
@@ -343,7 +351,7 @@ def insert_ocr_history(
                     source_pdf_id, source_page_indices, source_index, source_total,
                     source, source_ref,
                     pdf_storage_path, pdf_size_bytes,
-                    client_id, workspace_client_id
+                    client_id, workspace_client_id, ai_raw
                 ) VALUES (
                     %s, %s, %s, %s, %s, %s,
                     %s::jsonb, %s, %s,
@@ -352,7 +360,7 @@ def insert_ocr_history(
                     %s, %s::jsonb, %s, %s,
                     %s, %s,
                     %s, %s,
-                    %s, %s
+                    %s, %s, %s::jsonb
                 )
                 RETURNING id
             """,
@@ -383,6 +391,7 @@ def insert_ocr_history(
                     pdf_size_bytes,
                     safe_client_id,
                     safe_workspace_client_id,
+                    _json.dumps(ai_raw, ensure_ascii=False) if ai_raw is not None else None,
                 ),
             )
             row = cur.fetchone()

@@ -80,27 +80,38 @@ class InsertWorkspaceTests(unittest.TestCase):
         cur = _FakeCursor(workspace_valid=True)
         hid = _run_insert(cur, workspace_client_id=7)
         self.assertEqual(hid, "hist-1")
-        # 约定:INSERT tuple 末位=safe_workspace_client_id,倒二=safe_client_id
-        self.assertEqual(cur.insert_params[-1], 7)
+        # 约定:INSERT tuple 末位=ai_raw,倒二=safe_workspace_client_id,倒三=safe_client_id
+        self.assertEqual(cur.insert_params[-2], 7)
 
     def test_no_workspace_still_succeeds_null(self):
         cur = _FakeCursor()
         hid = _run_insert(cur)  # 不传 workspace_client_id
         self.assertEqual(hid, "hist-1")  # 旧逻辑照常成功
-        self.assertIsNone(cur.insert_params[-1])  # workspace 列 NULL
+        self.assertIsNone(cur.insert_params[-2])  # workspace 列 NULL
 
     def test_does_not_affect_buyer_client_id(self):
         cur = _FakeCursor(workspace_valid=True, client_valid=True)
         _run_insert(cur, client_id=55, workspace_client_id=7)
-        # 买方=倒二位=55,workspace=末位=7,互不串
-        self.assertEqual(cur.insert_params[-2], 55)
-        self.assertEqual(cur.insert_params[-1], 7)
+        # 买方=倒三位=55,workspace=倒二位=7,互不串(末位=ai_raw)
+        self.assertEqual(cur.insert_params[-3], 55)
+        self.assertEqual(cur.insert_params[-2], 7)
 
     def test_invalid_workspace_writes_null_not_error(self):
         cur = _FakeCursor(workspace_valid=False)  # 非本租户 → 校验不过
         hid = _run_insert(cur, workspace_client_id=999)
         self.assertEqual(hid, "hist-1")  # 不报错、不拦上传
-        self.assertIsNone(cur.insert_params[-1])  # 写 NULL
+        self.assertIsNone(cur.insert_params[-2])  # 写 NULL
+
+    def test_ai_raw_written_as_last_param(self):
+        cur = _FakeCursor(workspace_valid=True)
+        _run_insert(cur, ai_raw=[{"fields": {"invoice_number": "IV1"}}])
+        # 末位 = ai_raw 的 JSON 串(写一次留底)
+        self.assertIn("IV1", cur.insert_params[-1])
+
+    def test_ai_raw_default_null(self):
+        cur = _FakeCursor()
+        _run_insert(cur)  # 不传 ai_raw
+        self.assertIsNone(cur.insert_params[-1])
 
 
 if __name__ == "__main__":

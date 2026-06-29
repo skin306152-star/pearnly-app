@@ -28,7 +28,26 @@ def _resolve_model(model_tier: str) -> str:
 def generate_json(
     *, prompt: str, text: str, api_key, model_tier: str, timeout_s: int, max_retries: int
 ) -> ProviderOutcome:
-    """结构化 JSON 调用。无 key/失败 → ok=False + 标准 error_kind(不抛,业务层据此走 fallback)。"""
+    """结构化 JSON 调用。无 key/失败 → ok=False + 标准 error_kind(不抛,业务层据此走 fallback)。
+
+    非 aistudio 后端(vertex/selfhost)经统一 backends 开关转对应 provider —— LINE 记账大脑
+    (line_text_understand / expense_category_choose / line_chat_reply)随 OCR_LLM_BACKEND 一起
+    切到 Vertex。默认 aistudio 走下方原直连路径,行为零变化。system+text 合并为单 prompt(JSON
+    形态无独立 system_instruction,与 transport.multimodal 同口径)。
+    """
+    from services.ai_gateway import backends
+
+    if not backends.is_aistudio():
+        provider = backends.get_provider()
+        combined = (prompt + "\n\n" + text) if prompt else (text or "")
+        return provider.text_to_json(
+            combined,
+            tier=model_tier,
+            api_key=api_key,
+            response_mime=True,
+            timeout_s=timeout_s,
+            max_retries=max_retries,
+        )
     if not api_key:
         return ProviderOutcome(ok=False, error_kind="auth")
     model = _resolve_model(model_tier)

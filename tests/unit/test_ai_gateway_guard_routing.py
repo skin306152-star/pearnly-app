@@ -115,5 +115,76 @@ class GuardRoutingTests(unittest.TestCase):
         self.assertEqual(meta, {"input_tokens": 5, "output_tokens": 2, "retries": 0})
 
 
+class LineBrainProviderRoutingTests(unittest.TestCase):
+    """router 用的 providers.gemini.generate_json(LINE 记账大脑通道):
+    非 aistudio 后端必须转 backends.get_provider().text_to_json,prompt+text 合并为单 prompt。
+    """
+
+    def test_non_aistudio_routes_to_backend_provider(self):
+        from services.ai_gateway.providers import gemini
+
+        captured = {}
+
+        class _Prov:
+            def text_to_json(self, prompt, **kw):
+                captured["prompt"] = prompt
+                captured["tier"] = kw.get("tier")
+                captured["mime"] = kw.get("response_mime")
+                return ProviderOutcome(ok=True, data={"intent": "expense"})
+
+        with (
+            mock.patch("services.ai_gateway.backends.is_aistudio", return_value=False),
+            mock.patch("services.ai_gateway.backends.get_provider", return_value=_Prov()),
+        ):
+            out = gemini.generate_json(
+                prompt="SYS",
+                text="买咖啡 50",
+                api_key="k",
+                model_tier="flash",
+                timeout_s=12,
+                max_retries=1,
+            )
+        self.assertTrue(out.ok)
+        self.assertEqual(out.data, {"intent": "expense"})
+        self.assertEqual(captured["prompt"], "SYS\n\n买咖啡 50")
+        self.assertEqual(captured["tier"], "flash")
+        self.assertTrue(captured["mime"])
+
+    def test_non_aistudio_works_without_api_key(self):
+        """vertex 凭据走 SA·api_key 缺失也不该提前 auth 失败。"""
+        from services.ai_gateway.providers import gemini
+
+        class _Prov:
+            def text_to_json(self, prompt, **kw):
+                return ProviderOutcome(ok=True, data={})
+
+        with (
+            mock.patch("services.ai_gateway.backends.is_aistudio", return_value=False),
+            mock.patch("services.ai_gateway.backends.get_provider", return_value=_Prov()),
+        ):
+            out = gemini.generate_json(
+                prompt="", text="hi", api_key=None, model_tier="flash", timeout_s=8, max_retries=0
+            )
+        self.assertTrue(out.ok)
+
+    def test_aistudio_default_path_unchanged(self):
+        """默认 aistudio:不碰 backend provider,仍走原生 _call_gemini_with_retry。"""
+        from services.ai_gateway.providers import gemini
+
+        with (
+            mock.patch("services.ai_gateway.backends.is_aistudio", return_value=True),
+            mock.patch(
+                "services.ocr.layer2_gemini._call_gemini_with_retry",
+                return_value=({"ok": 1}, {"input_tokens": 2, "output_tokens": 1}),
+            ) as native,
+        ):
+            out = gemini.generate_json(
+                prompt="SYS", text="t", api_key="k", model_tier="flash", timeout_s=10, max_retries=1
+            )
+        self.assertTrue(out.ok)
+        self.assertEqual(out.data, {"ok": 1})
+        native.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -139,7 +139,9 @@ def build_express_payload(
         if not vat_acc:
             return fail("no_input_vat_account")
 
-    name = clean_seller(fields.get("seller_name") or history.get("seller_name"))
+    # ③ 官方名核验 · 已核验则优先用税局 RD 官方抬头(进账更干净)·否则回落 AI 名
+    official = history.get("seller_name_official") if history.get("seller_name_verified") else None
+    name = clean_seller(official or fields.get("seller_name") or history.get("seller_name"))
     tax_id = clean_tax_id(fields.get("seller_tax") or fields.get("seller_tax_id"))
     address = clean_address(fields.get("seller_addr"))
     supplier = _resolve_supplier(mappings.get("clients") or [], history, name, tax_id, address)

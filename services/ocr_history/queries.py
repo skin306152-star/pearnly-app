@@ -196,36 +196,28 @@ def get_ocr_history_detail(
     PO-4 · workspace_client_id 给了 → 限本套账(+ NULL 未归属行)· 见 list_ocr_history 说明
     """
     ws_sql, ws_params = _workspace_clause(workspace_client_id)
+    if tenant_id:
+        owner_sql, owner_params = "user_id IN (SELECT id FROM users WHERE tenant_id = %s)", [
+            tenant_id
+        ]
+    else:
+        owner_sql, owner_params = "user_id = %s", [user_id]
     try:
         with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id) as cur:
-            if tenant_id:
-                cur.execute(
-                    f"""
-                    SELECT id, filename, page_count, confidence, elapsed_ms,
-                           pages, invoice_no, invoice_date, seller_name, total_amount,
-                           archive_name, category_tag,
-                           fields_edited_at, edit_count, created_at, updated_at,
-                           client_id, workspace_client_id
-                    FROM ocr_history
-                    WHERE id = %s AND user_id IN (SELECT id FROM users WHERE tenant_id = %s){ws_sql}
-                    LIMIT 1
+            cur.execute(
+                f"""
+                SELECT id, filename, page_count, confidence, elapsed_ms,
+                       pages, invoice_no, invoice_date, seller_name, total_amount,
+                       archive_name, category_tag,
+                       fields_edited_at, edit_count, created_at, updated_at,
+                       client_id, workspace_client_id,
+                       seller_name_official, seller_name_verified
+                FROM ocr_history
+                WHERE id = %s AND {owner_sql}{ws_sql}
+                LIMIT 1
                 """,
-                    (record_id, tenant_id, *ws_params),
-                )
-            else:
-                cur.execute(
-                    f"""
-                    SELECT id, filename, page_count, confidence, elapsed_ms,
-                           pages, invoice_no, invoice_date, seller_name, total_amount,
-                           archive_name, category_tag,
-                           fields_edited_at, edit_count, created_at, updated_at,
-                           client_id, workspace_client_id
-                    FROM ocr_history
-                    WHERE id = %s AND user_id = %s{ws_sql}
-                    LIMIT 1
-                """,
-                    (record_id, user_id, *ws_params),
-                )
+                (record_id, *owner_params, *ws_params),
+            )
             r = cur.fetchone()
             if not r:
                 return None
@@ -252,6 +244,9 @@ def get_ocr_history_detail(
                 "workspace_client_id": (
                     int(r["workspace_client_id"]) if r.get("workspace_client_id") else None
                 ),
+                # ③ 官方名核验 · 税局 RD 官方抬头 + 已核验标(并存·前端可展示·记账/推送优先用)
+                "seller_name_official": r.get("seller_name_official"),
+                "seller_name_verified": bool(r.get("seller_name_verified")),
             }
     except Exception as e:
         logger.error(f"查询历史详情失败 (id={record_id}): {e}")

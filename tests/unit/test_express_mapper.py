@@ -70,6 +70,29 @@ class ExpressMapperTests(unittest.TestCase):
         self.assertEqual(p["account_source"], "config_default")
         self.assertTrue(p["account_review"])
 
+    def test_verified_official_name_preferred(self):
+        # ③ 官方名核验:已核验 → 行摘要用税局 RD 官方抬头(进账更干净)
+        r = build_express_payload(
+            _ptt_history(
+                seller_name_official="บริษัท ปตท จำกัด (มหาชน) [OFFICIAL]",
+                seller_name_verified=True,
+            ),
+            config=_CONFIG,
+        )
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["lines"][0]["desc"], "บริษัท ปตท จำกัด (มหาชน) [OFFICIAL]")
+
+    def test_unverified_official_name_ignored(self):
+        # 未核验 → 回落 AI 名(不冒用未确认的官方名)
+        r = build_express_payload(
+            _ptt_history(
+                seller_name_official="บริษัท ปตท จำกัด (มหาชน) [OFFICIAL]",
+                seller_name_verified=False,
+            ),
+            config=_CONFIG,
+        )
+        self.assertEqual(r.payload["lines"][0]["desc"], "บริษัท ปตท จำกัด (มหาชน)")
+
     def test_paid_routes_to_hp(self):
         r = build_express_payload(_ptt_history(fields={"payment_status": "paid"}), config=_CONFIG)
         self.assertTrue(r.ok)

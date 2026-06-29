@@ -158,6 +158,32 @@ def update_ocr_history_pages(
         return False
 
 
+def update_history_official_name(
+    record_id: str,
+    official_name: str,
+    user_id: str,
+    tenant_id: Optional[str] = None,
+) -> bool:
+    """官方名核验 ③ · 后台回填税局 RD 官方抬头(并存·不动 AI 名)。
+
+    专用窄更新:绝不走 update_ocr_history_pages(那会触发反馈捕获 + 冒充用户编辑 bump
+    edit_count)。仅写 seller_name_official + 置 seller_name_verified=TRUE。非致命。"""
+    if not official_name or not str(official_name).strip():
+        return False
+    try:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
+            cur.execute(
+                "UPDATE ocr_history "
+                "SET seller_name_official = %s, seller_name_verified = TRUE, updated_at = NOW() "
+                "WHERE id = %s::uuid",
+                (str(official_name).strip(), record_id),
+            )
+            return cur.rowcount > 0
+    except Exception as e:
+        logger.warning(f"update_history_official_name skip (id={record_id}): {e}")
+        return False
+
+
 def delete_ocr_history(user_id: str, record_id: str, tenant_id: Optional[str] = None) -> bool:
     """v118.14 · tenant_id 给了 → 同 tenant 任意成员可删 · 否则只能删自己的
     v118.20.4.4 · 修 UUID cast(id 列是 UUID · 字符串需 ::uuid)"""
@@ -400,7 +426,25 @@ def insert_ocr_history(
                 ),
             )
             row = cur.fetchone()
-            return str(row["id"]) if row else None
+            new_id = str(row["id"]) if row else None
+        # ③ 官方名核验 · 落库后后台按卖方税号查税局 RD 官方抬头回填(全 OCR 入口普适·
+        # 有运行 loop 才调度·无 loop 的线程优雅跳过·非致命)。
+        if new_id:
+            _schedule_official_name(new_id, pages, user_id, tenant_id)
+        return new_id
     except Exception as e:
         logger.error(f"写入历史记录失败 (user_id={user_id}, file={filename}): {e}")
         return None
+
+
+def _schedule_official_name(history_id: str, pages: list, user_id: str, tenant_id: Optional[str]):
+    try:
+        fields = (pages or [{}])[0].get("fields") or {}
+        seller_tax = fields.get("seller_tax")
+        if not seller_tax:
+            return
+        from services.rd import official_name
+
+        official_name.schedule([(history_id, seller_tax)], user_id, tenant_id)
+    except Exception as e:
+        logger.warning(f"official-name schedule skip (id={history_id}): {e}")

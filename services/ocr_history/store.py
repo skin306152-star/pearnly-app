@@ -25,4 +25,5 @@ from services.ocr_history.mutations import (  # noqa: F401
     delete_ocr_history_with_pdf_paths,
     insert_ocr_history,
     update_ocr_history_pdf_storage,
+    update_history_official_name,
 )

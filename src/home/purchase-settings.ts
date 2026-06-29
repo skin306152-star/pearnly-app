@@ -29,6 +29,8 @@ const PAGE_CSS = `
 .pur.cfg .inp .u{color:var(--ink3);}
 .pur.cfg .cats{padding:14px 22px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:9px;align-items:center;}
 .pur.cfg .chip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 13px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:12.5px;}
+.pur.cfg .chip .nm{cursor:text;border-radius:5px;padding:1px 4px;margin:-1px -2px;}
+.pur.cfg .chip .nm:hover{background:var(--line2);}
 .pur.cfg .chip .x{color:var(--ink3);cursor:pointer;}
 .pur.cfg .addcat{height:32px;padding:0 13px;border:1px dashed var(--accent);border-radius:999px;color:var(--accent);font-size:12.5px;background:var(--card);cursor:pointer;display:inline-flex;align-items:center;gap:5px;}
 .pur.cfg .addcat-input{height:32px;padding:0 13px;border:1px solid var(--accent);border-radius:999px;font-size:12.5px;outline:0;min-width:130px;}
@@ -58,7 +60,7 @@ function catsHtml(): string {
         cats
             .map(
                 (c) =>
-                    `<span class="chip" data-cat="${escapeHtml(c.id)}">${escapeHtml(c.name)} <span class="x" data-del="${escapeHtml(c.id)}">×</span></span>`
+                    `<span class="chip" data-cat="${escapeHtml(c.id)}"><span class="nm" data-edit="${escapeHtml(c.id)}">${escapeHtml(c.name)}</span> <span class="x" data-del="${escapeHtml(c.id)}">×</span></span>`
             )
             .join('') +
         `<span class="addcat" id="pur-addcat">${ICON_PLUS}${escapeHtml(t('pur-add-cat'))}</span>`
@@ -90,12 +92,74 @@ function shell(): string {
     </div></div>`;
 }
 
+// 点科目名就地改:整 chip 换成行内输入框(Enter/失焦存 · Esc 取消)。改名是 id 稳定的
+// PATCH → 依赖该科目的下拉/归类按 id 取名,下次读自动显示新名(无需删旧建新)。
+function startCatEdit(nameEl: HTMLElement): void {
+    const id = nameEl.dataset.edit || '';
+    const cat = cats.find((c) => c.id === id);
+    if (!cat) return;
+    const chip = nameEl.closest<HTMLElement>('.chip');
+    if (!chip) return;
+    const inp = document.createElement('input');
+    inp.className = 'addcat-input';
+    inp.value = cat.name;
+    chip.replaceWith(inp);
+    inp.focus();
+    inp.select();
+    let done = false;
+    const commit = async () => {
+        const nm = inp.value.trim();
+        if (!nm || nm === cat.name) {
+            refreshCats();
+            return;
+        }
+        try {
+            if (id.startsWith('tmp-')) {
+                cat.name = nm; // 未落库的临时科目:仅本地改名
+            } else {
+                const res = (await papi(
+                    'PATCH',
+                    `/api/purchase/categories/${encodeURIComponent(id)}`,
+                    {
+                        name: nm,
+                    }
+                )) as { category?: Category };
+                cat.name = res.category?.name || nm;
+            }
+        } catch (e) {
+            showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
+        }
+        refreshCats();
+    };
+    inp.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            done = true;
+            commit();
+        } else if (e.key === 'Escape') {
+            done = true;
+            refreshCats();
+        }
+    };
+    inp.onblur = () => {
+        if (!done) {
+            done = true;
+            commit();
+        }
+    };
+}
+
 function bindCats(): void {
     document.querySelectorAll<HTMLElement>('#pur-cats [data-del]').forEach((el) => {
         el.onclick = (e) => {
             e.stopPropagation();
             cats = cats.filter((c) => c.id !== el.dataset.del);
             refreshCats();
+        };
+    });
+    document.querySelectorAll<HTMLElement>('#pur-cats [data-edit]').forEach((el) => {
+        el.onclick = (e) => {
+            e.stopPropagation();
+            startCatEdit(el);
         };
     });
     const add = document.getElementById('pur-addcat');

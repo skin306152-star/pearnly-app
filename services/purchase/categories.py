@@ -167,7 +167,16 @@ def _insert(
 
 
 def seed_presets(cur, *, tenant_id: str, workspace_client_id: int) -> None:
-    """空树时插入预设两级科目(幂等:仅当本套账零科目才种)。"""
+    """空树时插入预设两级科目(幂等:仅当本套账零科目才种)。
+
+    防并发首读双播种:先取事务级 advisory lock(按 tenant+ws 串行化同套账的播种)。
+    两个并发首读会各自看到空树并都进到这里,锁让它们排队——第二个拿到锁时本套账已
+    非空(第一个已 commit)→ _count>0 直接返回,不再种第二棵树。锁随事务结束自动释放。
+    """
+    cur.execute(
+        "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+        (f"expcat_seed:{tenant_id}:{workspace_client_id}",),
+    )
     if _count(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id) > 0:
         return
     for i, (parent_name, children) in enumerate(_PRESET):

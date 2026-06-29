@@ -16,7 +16,9 @@ import unittest
 
 _DIRS = ("services/purchase",)
 _DML = re.compile(r"\b(SELECT|UPDATE|DELETE|INSERT)\b", re.I)
-_DDL = re.compile(r"\b(create|alter|drop|comment\s+on)\b|set\s+local", re.I)
+# 豁免:DDL / 会话与锁控制语句(非租户数据 DML)。pg_advisory_* 是事务级锁控制,
+# 锁 key 本身已内嵌 tenant_id(见 categories.seed_presets 防并发双播种)。
+_DDL = re.compile(r"\b(create|alter|drop|comment\s+on)\b|set\s+local|pg_advisory", re.I)
 _ALLOWED_INTERP = re.compile(r"^_?[A-Z][A-Z0-9_]*$")
 _ALLOWED_NAMES = {"placeholders", "set_clause", "cols", "sql"}
 

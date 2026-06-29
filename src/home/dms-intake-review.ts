@@ -3,8 +3,9 @@
 //   点文件行「查看结果」→ 识别结果就地展开在该行下方(只开一行);
 //   左字段卡可直接编辑(核心6 + 展开全部字段含明细行表) · 右原图卡边看边改
 //   (拖拽 / 滚轮缩放 / 放大缩小 / 旋转 / 重置 / 双击)。
-//   多发票 PDF → 同面板堆叠 N 组字段,共用一张原图(/api/history/{id}/page/1.png)。
-//   确认为纯前端视觉态(IV.confirmed) · 不写回后端 · 导出仍按 history_ids 全量走。
+//   多发票 PDF → 同面板堆叠 N 组字段,共用一个可翻页原图(按 X-Page-Count);每张票
+//   有「看此张原图」按钮跳到它所在物理页(page_indices),不再恒取第 1 页漏看后面的票。
+//   字段编辑经「保存修改」真持久化到各张 ocr_history;确认态(IV.confirmed)仍纯前端视觉。
 //   从 invoice-submit.ts 拆出以控行数。
 // ============================================================
 /* global t, showToast */
@@ -43,8 +44,10 @@ function passable(r: IvResult): boolean {
 }
 
 // 原图缓存(history_id → objectURL) + 查看器变换态(同一刻只一个面板展开)
-const imgCache = new Map<string, string>();
+const imgCache = new Map<string, string>(); // key: `${hid}:${page}` → objectURL
 let vstate = { x: 0, y: 0, scale: 1, rot: 0 };
+let vpage = 1; // 当前展开面板看的物理页(1-based)
+let vpageMax = 1; // 该 PDF 总页数(原图接口 X-Page-Count 回填)
 let viewerCleanup: (() => void) | null = null;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
@@ -124,11 +127,20 @@ function accPanelHtml(r: IvResult, i: number): string {
 function invoiceGroupHtml(fi: number, ii: number, inv: IvInvoice): string {
     const warns = warnFields(inv.fields);
     if (inv.fmtWarn) warns.add('invoice_number'); // 格式偏离多数派 → 标黄该张发票号
+    const fmtChip = inv.fmtWarn
+        ? `<span class="dx-inv-fmtwarn">${esc(t('dxi-fmt-warn'))}</span>`
+        : '';
+    // 多票:每张给"看此张原图"按钮 → 右侧原图跳到该张所在物理页(治"三票只显示两图")
+    const pg = inv.pageIndices && inv.pageIndices.length ? inv.pageIndices[0] : 0;
+    const viewBtn =
+        inv.total > 1 && pg
+            ? `<button class="dx-inv-viewpage" data-page="${pg}">${esc(t('dxi-rev-viewpage'))}</button>`
+            : '';
     const head =
         inv.total > 1
-            ? `<div class="dx-inv-head">${esc(t('dxi-inv-no').replace('{i}', String(inv.idx)).replace('{n}', String(inv.total)))}${inv.fmtWarn ? `<span class="dx-inv-fmtwarn">${esc(t('dxi-fmt-warn'))}</span>` : ''}</div>`
-            : inv.fmtWarn
-              ? `<div class="dx-inv-head"><span class="dx-inv-fmtwarn">${esc(t('dxi-fmt-warn'))}</span></div>`
+            ? `<div class="dx-inv-head">${esc(t('dxi-inv-no').replace('{i}', String(inv.idx)).replace('{n}', String(inv.total)))}${fmtChip}${viewBtn}</div>`
+            : fmtChip
+              ? `<div class="dx-inv-head">${fmtChip}</div>`
               : '';
     const cell = ([k, lk]: [string, string]) => {
         const warn = warns.has(k) ? ' warn' : '';
@@ -179,6 +191,10 @@ function imageCardHtml(r: IvResult): string {
     return (
         `<div class="dx-imgcard${noimg ? ' noimg' : ''}"><div class="dx-vtoolbar">` +
         `<div class="dx-vtitle">${esc(t('dxi-rev-viewer-title'))}</div><div class="dx-vctrls">` +
+        '<span class="dx-vpage" style="display:none">' +
+        '<button class="dx-icon-btn dx-page-prev" title="‹">‹</button>' +
+        '<span class="dx-vpageno">1/1</span>' +
+        '<button class="dx-icon-btn dx-page-next" title="›">›</button></span>' +
         '<button class="dx-icon-btn dx-zoom-out" title="−">−</button>' +
         '<span class="dx-zoom">100%</span>' +
         '<button class="dx-icon-btn dx-zoom-in" title="+">＋</button>' +
@@ -267,6 +283,10 @@ export function onReviewClick(tg: HTMLElement): boolean {
         btn.textContent = t(on ? 'dxi-rev-toggle-less' : 'dxi-rev-toggle-all');
         return true;
     }
+    const vp = tg.closest('.dx-inv-viewpage') as HTMLElement | null;
+    if (vp) return (gotoViewerPage(+(vp.dataset.page || '1')), true);
+    if (tg.closest('.dx-page-prev')) return (gotoViewerPage(vpage - 1), true);
+    if (tg.closest('.dx-page-next')) return (gotoViewerPage(vpage + 1), true);
     if (tg.closest('.dx-zoom-in')) return (zoomBy(0.15), true);
     if (tg.closest('.dx-zoom-out')) return (zoomBy(-0.15), true);
     if (tg.closest('.dx-rotate')) {
@@ -336,8 +356,10 @@ function bindOpenViewer() {
     const r = IV.results[IV.openIdx];
     if (!panel || !r) return;
     vstate = { x: 0, y: 0, scale: 1, rot: 0 };
+    vpage = 1;
+    vpageMax = 1;
     applyViewer();
-    void loadImage(panel, r);
+    void loadImage(panel, r, vpage);
     const viewport = panel.querySelector('.dx-viewport') as HTMLElement | null;
     if (!viewport) return;
     let drag = false;
@@ -383,7 +405,25 @@ function bindOpenViewer() {
     };
 }
 
-async function loadImage(panel: HTMLElement, r: IvResult) {
+function updatePageIndicator(panel: HTMLElement) {
+    const wrap = panel.querySelector('.dx-vpage') as HTMLElement | null;
+    const no = panel.querySelector('.dx-vpageno');
+    if (no) no.textContent = `${vpage}/${vpageMax}`;
+    if (wrap) wrap.style.display = vpageMax > 1 ? '' : 'none';
+}
+
+// 跳到指定物理页(翻页 / 每张票"看此张原图")· page 由后端 page_indices 给出,可信。
+function gotoViewerPage(page: number) {
+    const panel = openPanel();
+    const r = IV.results[IV.openIdx];
+    if (!panel || !r) return;
+    vpage = Math.max(1, page);
+    vstate = { x: 0, y: 0, scale: 1, rot: 0 };
+    applyViewer();
+    void loadImage(panel, r, vpage);
+}
+
+async function loadImage(panel: HTMLElement, r: IvResult, page: number) {
     const img = panel.querySelector('.dx-rimg') as HTMLImageElement | null;
     const card = panel.querySelector('.dx-imgcard');
     const hid = r.history_ids[0];
@@ -392,9 +432,11 @@ async function loadImage(panel: HTMLElement, r: IvResult) {
         card.classList.add('noimg');
         return;
     }
-    const cached = imgCache.get(hid);
+    const key = `${hid}:${page}`;
+    const cached = imgCache.get(key);
     if (cached) {
         img.src = cached;
+        updatePageIndicator(panel);
         return;
     }
     // 留底 PDF 是识别返回后【异步后台】回填(几秒后才落盘)· 首次 404 = 还没就绪 →
@@ -403,14 +445,17 @@ async function loadImage(panel: HTMLElement, r: IvResult) {
     for (let attempt = 0; attempt < 8; attempt++) {
         if (!panel.isConnected) return;
         try {
-            const resp = await fetch(`/api/history/${encodeURIComponent(hid)}/page/1.png`, {
+            const resp = await fetch(`/api/history/${encodeURIComponent(hid)}/page/${page}.png`, {
                 headers: authHeaders(),
             });
             if (resp.ok) {
+                const cnt = parseInt(resp.headers.get('X-Page-Count') || '1', 10);
+                if (cnt > 0) vpageMax = cnt; // PDF 总页数 → 决定是否显示翻页
                 const url = URL.createObjectURL(await resp.blob());
-                imgCache.set(hid, url);
+                imgCache.set(key, url);
                 card.classList.remove('loading');
                 img.src = url;
+                updatePageIndicator(panel);
                 return;
             }
             if (resp.status !== 404) break; // 渲染失败等硬错 → 不再等

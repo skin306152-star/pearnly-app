@@ -27,6 +27,7 @@ export interface IvInvoice {
     idx: number; // 1-based 在本文件内第几张
     total: number; // 本文件共几张
     fmtWarn?: boolean; // 后端判该张发票号格式偏离同卖家多数派(疑读错)→ 标黄核对
+    pageIndices?: number[]; // 该张发票在原 PDF 的物理页号(1-based)· 供原图跳到正确页
 }
 export interface IvResult {
     filename: string;
@@ -368,6 +369,7 @@ function ingestResult(d: Dict): IvResult {
               idx: (x.source_index as number) || i + 1,
               total: (x.source_total as number) || raw.length,
               fmtWarn: fmtWarnIdx.has((x.source_index as number) || i + 1),
+              pageIndices: (x.page_indices as number[]) || [],
           }))
         : [
               {

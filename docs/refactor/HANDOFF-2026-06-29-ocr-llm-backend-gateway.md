@@ -1,6 +1,15 @@
 # 交接 · OCR/LLM 后端收口网关(OCR_LLM_BACKEND 单一开关)
 
-> 日期:2026-06-29 · 署名 Opus 4.8 · 状态:**引擎+7站已迁已上线 prod(`1a6a982b`)· CI 全绿 · 余下按本档收尾**
+> **★ 当前生产态(2026-06-29 第三窗·已切 Vertex·下文"默认 aistudio"为历史框架,以此横幅为准)**
+> prod 已切 **Vertex@asia-southeast1**:`OCR_LLM_BACKEND=vertex`、`GCP_PROJECT=gen-lang-client-0165868422`、
+> 凭据 **新 A 账号钥匙 `/etc/pearnly/pearnly-vertex-key.json`**(SA `pearnly-vertex-ocr@gen-lang-client-0165868422`·Owner),
+> 全档位 `gemini-2.5-flash`,账单全进 **A 账号**(My Billing Account `0112F2-02A3FB-3747A9`)。
+> **OCR 通道 + LINE 记账大脑通道双双切**(LINE 大脑经 `providers/gemini.py` guard·commit `9de98d48`)。两通道金丝雀均 PASS。
+> ⛔ 已停用:旧默认 aistudio / 旧 `GEMINI_API_KEY` / 旧 P 项目 `pearnly` + `pearnly-vision-key.json`(仅留回滚)。
+> 回滚:systemd/.env 备份 `*.pre-vertex-20260629-143834`,或删 `.env` 的 `OCR_LLM_BACKEND` 行重启。
+> 下文 §18-22 的「Vertex 先停·统一 aistudio」旧决定**已被推翻**。
+>
+> 日期:2026-06-29 · 署名 Opus 4.8 · 状态(历史):**引擎+7站已迁已上线 prod(`1a6a982b`)· CI 全绿 · 余下按本档收尾**
 > 一句话:把全产品 ~15 处散落的 Gemini 调用收口到一个**可切后端**的网关,默认 `aistudio`(行为零变化),
 > 一拨 `OCR_LLM_BACKEND=vertex` 即整体切 Vertex AI,`=selfhost` 切自托管 Qwen2.5-VL。
 

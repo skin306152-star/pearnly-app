@@ -37,7 +37,7 @@ colorama==0.4.6
     #   click
     #   qrcode
     #   tqdm
-cryptography==48.0.1
+cryptography==49.0.0
     # via
     #   -r requirements.txt
     #   google-auth

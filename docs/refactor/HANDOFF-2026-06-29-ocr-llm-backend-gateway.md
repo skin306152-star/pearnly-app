@@ -233,3 +233,16 @@ AISTUDIO_EMBED_MODEL=gemini-embedding-001
 默认行为靠**构造等价**(aistudio provider 忠实复刻原 `configure+GenerativeModel+generate_content`,同模型/
 参数/JSON 解析)+ 9 例契约单测 + 全量回归保证;Vertex 后端已用真票实跑验过(§0)。
 **建议上线后立即 prod 金丝雀:** 用一张真票走一遍 OCR/VAT(默认 aistudio),确认字段与库存账一致再扩信心。
+
+### 8.1 Vertex 活体 E2E 结果 + 切换前必知坑(2026-06-29 实跑)
+经网关用 `OCR_LLM_BACKEND=vertex` 实打真模型,3 形态通过:
+- `embed`(经已迁移 `knowledge.embed_texts`)→ 2×768 维真向量 ✓
+- `text_to_json`(经 transport · tier=flash · max_tokens≥1024)→ `{"ok":true,"n":3}` 真解析 ✓
+- `multimodal_to_json`(早先)→ 发票字段全对 ✓
+
+**坑①(切 Vertex 前必处理):`gemini-2.5-flash-lite` 在 `asia-southeast1` 该项目不在目录 → 404 NOT_FOUND。**
+影响:用 `flash_lite` 档的站点(导入列映射 A5、未来 L2 若用 lite)切 Vertex 会 404。
+处置三选一:① 换有 lite 的区域(如 `us-central1`)② 给 Vertex 把 `flash_lite` 映射到 `flash`
+(改 `providers/vertex.py:_resolve_model`)③ 在 Vertex 模型花园启用该模型。**默认 aistudio 不受影响**。
+**坑②:`gemini-2.5-flash` 是 thinking 模型,`max_tokens` 给太小(如 64)思考预算吃光 → 输出空 → parse 错。**
+生产站点都是 16384/4096 不触发;仅探针需注意。

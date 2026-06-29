@@ -4,12 +4,10 @@
 import io
 import os
 import re
-import json
 import logging
 from typing import List, Dict, Any, Optional
 
 from services.recon.field_comparator import normalize_tax_id, normalize_branch
-from services.ocr.gemini_models import flash as _flash
 
 from services.vat.vat_parser_common import _to_float, PARSER_VERSION
 
@@ -280,62 +278,43 @@ def parse_with_gemini_image_smart(file_bytes: bytes, ext: str, api_key: Optional
 def parse_with_gemini(
     file_bytes: bytes, mime_type: str, api_key: Optional[str] = None
 ) -> Dict[str, Any]:
-    try:
-        import google.generativeai as genai
-    except ImportError:
-        return {"ok": False, "error": "google-generativeai 未安装", "rows": []}
-
     key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not key:
         return {"ok": False, "error": "Gemini API key 未配置", "rows": []}
 
-    text = ""
-    try:
-        genai.configure(api_key=key)
-        model = genai.GenerativeModel(
-            _flash(),
-            generation_config={
-                "response_mime_type": "application/json",
-                "temperature": 0.1,
-            },
-        )
-        # v118.32.4.9.6 · timeout 45→60 + 超时/网络错误单次重试(真实国税局 PDF 504 修)
-        response = None
-        last_err = None
-        for attempt in range(2):
-            try:
-                response = model.generate_content(
-                    [
-                        _GEMINI_PROMPT,
-                        {"mime_type": mime_type, "data": file_bytes},
-                    ],
-                    request_options={"timeout": 60},
-                )
-                break
-            except Exception as e:
-                last_err = e
-                err_name = type(e).__name__
-                err_msg = str(e).lower()
-                # 仅在超时/网络类错误上重试 · 4xx 业务错直接抛
-                if attempt == 0 and (
-                    "timeout" in err_msg
-                    or "deadline" in err_msg
-                    or "503" in err_msg
-                    or "504" in err_msg
-                    or err_name in ("DeadlineExceeded", "ServiceUnavailable")
-                ):
-                    logger.warning(f"[vat_gemini] 首次失败({err_name})· 2 秒后重试")
-                    import time
+    from services.ai_gateway import transport
 
-                    time.sleep(2)
-                    continue
-                raise
-        if response is None:
-            raise last_err or RuntimeError("Gemini 无响应")
-        text = (response.text or "").strip()
-        text = re.sub(r"^```(?:json)?\s*", "", text)
-        text = re.sub(r"\s*```$", "", text)
-        data = json.loads(text)
+    # v118.32.4.9.6 · timeout 60 + 超时单次重试(真实国税局 PDF 504 修)· 经网关切后端
+    out = None
+    for attempt in range(2):
+        out = transport.multimodal_to_json(
+            _GEMINI_PROMPT,
+            [(file_bytes, mime_type)],
+            tier="flash",
+            api_key=key,
+            temperature=0.1,
+            response_mime=True,
+            max_tokens=16384,
+            timeout_s=60,
+            max_retries=0,
+            task="vat.report_parse",
+        )
+        if out.ok or attempt == 1 or out.error_kind != "timeout":
+            break
+        logger.warning("[vat_gemini] 首次超时 · 2 秒后重试")
+        import time
+
+        time.sleep(2)
+
+    if not out.ok:
+        err = (
+            "Gemini 返回非 JSON" if out.error_kind == "parse" else f"Gemini 失败: {out.error_kind}"
+        )
+        logger.error(f"[vat_gemini] {err}")
+        return {"ok": False, "error": err, "rows": []}
+
+    try:
+        data = out.data
         raw_rows = data.get("rows", []) or []
 
         rows: List[Dict] = []
@@ -376,9 +355,6 @@ def parse_with_gemini(
                 continue
             rows.append(parsed)
 
-        _usage = getattr(response, "usage_metadata", None)
-        _in_tok = int(getattr(_usage, "prompt_token_count", 0) or 0)
-        _out_tok = int(getattr(_usage, "candidates_token_count", 0) or 0)
         return {
             "ok": True,
             "rows": rows,
@@ -387,12 +363,9 @@ def parse_with_gemini(
             "parser_version": PARSER_VERSION,
             "row_count": len(rows),
             "method": "gemini_ocr",
-            "_input_tokens": _in_tok,
-            "_output_tokens": _out_tok,
+            "_input_tokens": out.input_tokens,
+            "_output_tokens": out.output_tokens,
         }
-    except json.JSONDecodeError as e:
-        logger.error(f"[vat_gemini] JSON 解析失败: {e} · raw: {text[:300]}")
-        return {"ok": False, "error": f"Gemini 返回非 JSON: {str(e)[:100]}", "rows": []}
     except Exception as e:
-        logger.error(f"[vat_gemini] 失败: {e}")
+        logger.error(f"[vat_gemini] 后处理失败: {e}")
         return {"ok": False, "error": str(e), "rows": []}

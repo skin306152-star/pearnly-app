@@ -126,6 +126,27 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
         # 默认温度~1.0 导致同一扫描件每次识别结果不同(实测 BAY 行数 212↔274 飘)·
         # 设 0 后大幅稳定且通常更准 · top_p=1 candidate_count=1。
         def _call(model_name):
+            from services.ai_gateway import backends
+
+            if not backends.is_aistudio():  # vertex / selfhost 经网关;默认 aistudio 走原 base64 路
+                from services.ai_gateway import transport
+                from services.ocr.gemini_models import tier_for_model
+
+                out = transport.multimodal_to_json(
+                    prompt,
+                    [(file_bytes, "application/pdf")],
+                    tier=tier_for_model(model_name),
+                    api_key=None,
+                    response_mime=False,
+                    max_tokens=32768,
+                    temperature=0.0,
+                    max_retries=0,
+                    task="bank.stmt",
+                )
+                if not out.ok:  # 让 try_with_fallback 升级到下一档模型
+                    raise RuntimeError(f"gateway {out.error_kind}")
+                return out.data
+
             resp = genai.GenerativeModel(model_name).generate_content(
                 [{"mime_type": "application/pdf", "data": b64}, prompt],
                 generation_config={

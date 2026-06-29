@@ -54,6 +54,23 @@ def best() -> str:
     return fallback() or flash()
 
 
+def tier_for_model(model_name: str) -> str:
+    """Reverse of the tier→model resolution: classify a concrete model name back
+    into a tier bucket. Guard sites that already hold a model name (bank GL/stmt,
+    L2/L3 try_with_fallback) use this to route through the gateway transport,
+    which speaks tiers. Unknown names fall back to "flash"."""
+    name = (model_name or "").strip()
+    if name and name == fallback():
+        return "fallback"
+    if name == flash_lite():
+        return "flash_lite"
+    if name == flash():
+        return "flash"
+    if name and name == escalate():
+        return "escalate"
+    return "flash"
+
+
 def models_with_fallback(primary: Optional[str] = None) -> List[str]:
     """[主模型, 兜底模型](去重去空)。调用方按序尝试:前一个失败/空 → 用下一个。"""
     out = [primary or flash()]

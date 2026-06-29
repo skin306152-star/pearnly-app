@@ -60,6 +60,27 @@ def _page_chunks(file_bytes: bytes, pages_per_chunk: int) -> List[bytes]:
 
 def _call_json(model_name: str, pdf_bytes: bytes, prompt: str) -> dict:
     """One Gemini call returning parsed JSON (temperature 0 for determinism)."""
+    from services.ai_gateway import backends
+
+    if not backends.is_aistudio():  # vertex / selfhost 经网关;默认 aistudio 走下方原 base64 路
+        from services.ai_gateway import transport
+        from services.ocr.gemini_models import tier_for_model
+
+        out = transport.multimodal_to_json(
+            prompt,
+            [(pdf_bytes, "application/pdf")],
+            tier=tier_for_model(model_name),
+            api_key=None,
+            response_mime=False,
+            max_tokens=32768,
+            temperature=0.0,
+            max_retries=0,
+            task="bank.gl",
+        )
+        if not out.ok:  # 让 try_with_fallback 升级到下一档模型
+            raise RuntimeError(f"gateway {out.error_kind}")
+        return out.data
+
     import google.generativeai as genai
 
     model = genai.GenerativeModel(model_name)

@@ -6,8 +6,8 @@ Thai national ID card → structured identity fields, for the MR.ERP DMS
 car-sales intake flow (document_type = "thai_id_card").
 
 Deliberately SEPARATE from the invoice OCR hot path: it reuses the shared
-Layer-1 Vision text extraction and the Layer-2 Gemini transport, but with its
-OWN prompt and its OWN output shape. The invoice _SYSTEM_PROMPT / ThaiInvoice
+ai_gateway transport (multimodal → JSON), but with its OWN prompt and its OWN
+output shape. The invoice _SYSTEM_PROMPT / ThaiInvoice
 schema are never touched (CLAUDE.md/CLAUDE.md high-sensitivity OCR rule + the
 DMS handoff doc: "do not force Thai ID cards through the invoice fields").
 
@@ -29,11 +29,7 @@ import logging
 import re
 from typing import Any, Dict, Optional
 
-from services.ocr.layer2_structure import (
-    DEFAULT_MODEL,
-    DEFAULT_TIMEOUT_SECONDS,
-)
-from services.ocr.layer2_gemini import _get_model, _parse_json
+from services.ocr.layer2_structure import DEFAULT_TIMEOUT_SECONDS
 
 logger = logging.getLogger(__name__)
 
@@ -90,33 +86,33 @@ def _detect_image_mime(b: bytes) -> str:
 
 
 def _gemini_vision_extract(image_bytes: bytes, api_key: Optional[str]) -> Dict[str, Any]:
-    """单次 Gemini 多模态调用:身份证图 + 专用 prompt → JSON dict。失败抛
-    IdCardExtractError(路由据此回 422 needs_review / 500)。"""
+    """单次多模态调用:身份证图 + 专用 prompt → JSON dict。经 ai_gateway 网关
+    (默认 aistudio·随 OCR_LLM_BACKEND 整体切 vertex/selfhost),tier=flash_lite
+    复刻原 DEFAULT_MODEL。失败抛 IdCardExtractError(路由据此回 422 needs_review / 500)。"""
     import os
 
     key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
     if not key:
         raise IdCardExtractError("no Gemini api key (GOOGLE_API_KEY / GEMINI_API_KEY)")
-    try:
-        model = _get_model(api_key=key.strip(), model_name=DEFAULT_MODEL)
-        resp = model.generate_content(
-            [
-                _ID_CARD_PROMPT,
-                {"mime_type": _detect_image_mime(bytes(image_bytes)), "data": bytes(image_bytes)},
-            ],
-            request_options={"timeout": DEFAULT_TIMEOUT_SECONDS},
-        )
-        raw = (getattr(resp, "text", "") or "").strip()
-    except Exception as e:
-        raise IdCardExtractError(
-            f"gemini vision call failed: {type(e).__name__}: {str(e)[:200]}"
-        ) from e
-    if not raw:
-        raise IdCardExtractError("gemini returned empty response")
-    try:
-        return _parse_json(raw)
-    except Exception as e:
-        raise IdCardExtractError(f"gemini returned non-JSON: {str(e)[:160]}") from e
+    from services.ai_gateway import transport
+
+    out = transport.multimodal_to_json(
+        _ID_CARD_PROMPT,
+        [(bytes(image_bytes), _detect_image_mime(bytes(image_bytes)))],
+        tier="flash_lite",
+        api_key=key.strip(),
+        temperature=0.0,
+        response_mime=True,
+        max_tokens=16384,
+        timeout_s=DEFAULT_TIMEOUT_SECONDS,
+        max_retries=0,
+        task="ocr.id_card",
+    )
+    if not out.ok:
+        raise IdCardExtractError(f"gemini vision call failed: {out.error_kind}")
+    if not isinstance(out.data, dict):
+        raise IdCardExtractError("gemini returned non-dict id card data")
+    return out.data
 
 
 def _normalize(data: Dict[str, Any]) -> Dict[str, Any]:

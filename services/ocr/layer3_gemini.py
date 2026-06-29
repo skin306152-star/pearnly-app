@@ -165,3 +165,82 @@ def _get_model(api_key: str, model_name: str):
 
         logger.info("layer3: GenerativeModel initialized: %s", model_name)
         return model
+
+
+# ============================================================
+# ai_gateway 后端路由(vertex/selfhost · 默认 aistudio 不经此)
+# ============================================================
+# B2 fix: 重试时追加 JSON 卫生提示,降低长泰文序列化时的截断/坏 JSON 概率。
+_RETRY_HINT_BASE = (
+    "\n\nIMPORTANT — your previous response was invalid JSON. Common "
+    "failure modes:\n"
+    "  1. Unterminated string (missing closing double-quote)\n"
+    "  2. Unescaped newline inside a string value\n"
+    "  3. Missing comma between fields\n"
+    "  4. Trailing comma after last field\n"
+    "Output exactly ONE complete JSON object. Close every string with a "
+    "double-quote. Replace any literal newlines inside string values with "
+    "spaces. Do NOT use markdown code fences. Do NOT add commentary "
+    "before or after the JSON."
+)
+
+
+def _l3_error_for_kind(kind: str, model_name: str) -> Exception:
+    msg = f"layer3: gateway ({kind}) model={model_name}"
+    if kind == "auth":
+        return Layer3AuthError(msg)
+    if kind == "quota":
+        return Layer3QuotaError(msg)
+    return Layer3TransientError(msg)
+
+
+def _call_l3_via_gateway(
+    image_bytes: bytes,
+    mime: str,
+    system_prompt: str,
+    base_user_prompt: str,
+    api_key: str,
+    model_name: str,
+    max_retries: int,
+    timeout: int,
+):
+    """非 aistudio 后端(vertex/selfhost):L3 多模态→JSON 经网关 transport。保留
+    (data, meta) 元组契约 + 重试追加 JSON 卫生提示;auth/quota/transient 映射回
+    Layer3 异常,parse/empty 在重试预算内重试。默认 aistudio 不走此函数。"""
+    from services.ai_gateway import transport
+    from services.ocr.gemini_models import tier_for_model
+
+    tier = tier_for_model(model_name)
+    last_kind = "parse"
+    for attempt in range(max_retries + 1):
+        user_prompt = (
+            base_user_prompt
+            if attempt == 0
+            else base_user_prompt + _RETRY_HINT_BASE + f"\n\nPrevious parse error: {last_kind}"
+        )
+        out = transport.multimodal_to_json(
+            system_prompt + "\n\n" + user_prompt,
+            [(image_bytes, mime)],
+            tier=tier,
+            api_key=api_key,
+            temperature=DEFAULT_TEMPERATURE,
+            response_mime=True,
+            max_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
+            timeout_s=timeout,
+            max_retries=0,
+            task="ocr.layer3",
+        )
+        if out.ok:
+            return out.data, {
+                "input_tokens": out.input_tokens,
+                "output_tokens": out.output_tokens,
+                "retries": attempt,
+            }
+        last_kind = out.error_kind or "parse"
+        if last_kind in ("auth", "quota", "timeout"):
+            raise _l3_error_for_kind(last_kind, model_name)
+        if attempt < max_retries:
+            continue
+    raise Layer3FallbackError(
+        f"layer3: gateway returned no valid JSON after {max_retries + 1} attempts ({last_kind})"
+    )

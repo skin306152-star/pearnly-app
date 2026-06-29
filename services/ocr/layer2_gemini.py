@@ -176,6 +176,70 @@ def _get_model(api_key: str, model_name: str):
         return model
 
 
+def _record_gemini_call(success: bool, kind: Optional[str], ms: int) -> None:
+    """监控埋点:保留 record_gemini_call 口径(网关后端 provider 不自带此埋点)。"""
+    try:
+        from services.monitoring import record_gemini_call
+
+        http = 200 if success else (429 if kind == "quota" else 500)
+        record_gemini_call(success=success, http_status=http, latency_ms=ms)
+    except Exception:
+        pass
+
+
+def _l2_error_for_kind(kind: str, model_name: str) -> Exception:
+    msg = f"layer2: gateway ({kind}) model={model_name}"
+    if kind == "auth":
+        return Layer2AuthError(msg)
+    if kind == "quota":
+        return Layer2QuotaError(msg)
+    return Layer2TransientError(msg)
+
+
+def _call_l2_via_gateway(
+    base_prompt: str, api_key: str, model_name: str, max_retries: int, timeout: int
+) -> Tuple[dict, dict]:
+    """非 aistudio 后端(vertex/selfhost):L2 文本→JSON 经网关 transport。保留
+    record_gemini_call 埋点 + (data, meta) 元组契约;auth/quota/transient 映射回
+    Layer2 异常,parse/empty 在重试预算内追加 _RETRY_TRIM_HINT 再试(同原逻辑)。"""
+    import time as _t
+
+    from services.ai_gateway import transport
+    from services.ocr.gemini_models import tier_for_model
+
+    tier = tier_for_model(model_name)
+    last_kind = "parse"
+    for attempt in range(max_retries + 1):
+        prompt = base_prompt + (_RETRY_TRIM_HINT if attempt > 0 else "")
+        t0 = _t.time()
+        out = transport.text_to_json(
+            prompt,
+            tier=tier,
+            api_key=api_key,
+            temperature=DEFAULT_TEMPERATURE,
+            response_mime=True,
+            max_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
+            timeout_s=timeout,
+            max_retries=0,
+            task="ocr.layer2",
+        )
+        _record_gemini_call(out.ok, out.error_kind, int((_t.time() - t0) * 1000))
+        if out.ok:
+            return out.data, {
+                "input_tokens": out.input_tokens,
+                "output_tokens": out.output_tokens,
+                "retries": attempt,
+            }
+        last_kind = out.error_kind or "parse"
+        if last_kind in ("auth", "quota", "timeout"):
+            raise _l2_error_for_kind(last_kind, model_name)
+        if attempt < max_retries:
+            continue
+    raise ValueError(
+        f"layer2: gateway returned no valid JSON after {max_retries + 1} attempts ({last_kind})"
+    )
+
+
 def _call_gemini_with_retry(
     text: str,
     api_key: str,
@@ -196,9 +260,15 @@ def _call_gemini_with_retry(
     Returns (data: dict, metadata: dict)
     metadata keys: input_tokens, output_tokens, retries
     """
-    model = _get_model(api_key=api_key, model_name=model_name)
     sys_prompt = system_prompt_override if system_prompt_override else _SYSTEM_PROMPT
     base_prompt = sys_prompt + "\n\n" + _USER_PROMPT_PREFIX + text
+
+    from services.ai_gateway import backends
+
+    if not backends.is_aistudio():  # vertex / selfhost 经网关;默认 aistudio 走下方原路
+        return _call_l2_via_gateway(base_prompt, api_key, model_name, max_retries, timeout)
+
+    model = _get_model(api_key=api_key, model_name=model_name)
 
     last_parse_error: Optional[str] = None
     last_raw_preview: str = ""

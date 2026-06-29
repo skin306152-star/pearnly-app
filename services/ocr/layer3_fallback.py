@@ -90,8 +90,10 @@ from services.ocr.layer3_gemini import (  # noqa: F401 · re-export + refine 用
     Layer3AuthError,
     Layer3QuotaError,
     Layer3TransientError,
+    _RETRY_HINT_BASE,
     _parse_json,
     _classify_gemini_exception,
+    _call_l3_via_gateway,
     _get_model,
 )
 
@@ -398,28 +400,26 @@ def _call_gemini_with_retry(
         raise TypeError(f"layer3: image_bytes not a valid image: {type(e).__name__}: {e}") from e
 
     base_user_prompt = _build_user_prompt(layer1_text, layer2_invoice, trigger_reasons)
+
+    from services.ai_gateway import backends
+
+    if not backends.is_aistudio():  # vertex / selfhost 经网关;默认 aistudio 走下方原路
+        mime = f"image/{(pil_image.format or 'png').lower()}"
+        return _call_l3_via_gateway(
+            image_bytes,
+            mime,
+            _SYSTEM_PROMPT,
+            base_user_prompt,
+            api_key,
+            model_name,
+            max_retries,
+            timeout,
+        )
+
     model = _get_model(api_key=api_key, model_name=model_name)
 
     last_parse_error: Optional[str] = None
     last_raw_preview: str = ""
-
-    # B2 fix: retry prompt enhancement — on retry, append explicit JSON
-    # hygiene instructions to reduce chance of malformed JSON. Gemini Flash
-    # has been observed to emit unterminated strings mid-response,
-    # especially when serializing long Thai text. The retry hint tells the
-    # model what specifically went wrong.
-    _RETRY_HINT_BASE = (
-        "\n\nIMPORTANT — your previous response was invalid JSON. Common "
-        "failure modes:\n"
-        "  1. Unterminated string (missing closing double-quote)\n"
-        "  2. Unescaped newline inside a string value\n"
-        "  3. Missing comma between fields\n"
-        "  4. Trailing comma after last field\n"
-        "Output exactly ONE complete JSON object. Close every string with a "
-        "double-quote. Replace any literal newlines inside string values with "
-        "spaces. Do NOT use markdown code fences. Do NOT add commentary "
-        "before or after the JSON."
-    )
 
     for attempt in range(max_retries + 1):
         # B2 fix: on retry, augment the user prompt with JSON hygiene rules

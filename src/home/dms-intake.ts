@@ -30,6 +30,7 @@ import {
     onGeoChange,
 } from './dms-intake-confirm.js';
 import {
+    IV,
     renderInvoiceUpload,
     resetInvoice,
     rerenderInvoice,
@@ -37,6 +38,7 @@ import {
     onInvoiceChange,
     onInvoiceDrop,
 } from './dms-intake-invoice.js';
+import { readStep } from './step-resume.js';
 
 // ── 步骤 1:上传 ──────────────────────────────────────────────
 function renderUpload() {
@@ -375,12 +377,36 @@ function bind() {
     });
 }
 
+// 续步:软导航回来时复原到离开的那一步。只在内存态够复原该步时才复原,否则回落第 1 步
+// (硬刷新后内存态已空 → 守门不通过 → 干净从头)。成功页不复原。
+function resumeFlow(): boolean {
+    const memo = readStep('dms-intake');
+    if (!memo || (memo.ctx && memo.ctx !== S.task)) return false;
+    if (S.task === 'invoice') {
+        if (IV.view !== 'review' && IV.view !== 'submit') return false;
+        rerenderInvoice();
+        return true;
+    }
+    if (!S.ocr) return false; // 身份证步 2/3 都依赖识别结果
+    if (memo.step === 2) {
+        renderMatch();
+        showStep(2, 'dx-s-match');
+        return true;
+    }
+    if (memo.step === 3) {
+        renderConfirm();
+        showStep(3, 'dx-s-confirm');
+        return true;
+    }
+    return false;
+}
+
 window.loadDmsIntake = function () {
     const el = sec();
     if (!el) return;
     el.innerHTML = dxShell(t, S.task);
     bind();
-    resetFlow();
+    if (!resumeFlow()) resetFlow();
 };
 
 if (typeof window.subscribeI18n === 'function') {

@@ -4,6 +4,7 @@
 // ============================================================
 /* global escapeHtml, token */
 import { DX_COMPARE } from './dms-intake-html.js';
+import { saveStep } from './step-resume.js';
 
 export type Dict = Record<string, string>;
 export interface Cand {
@@ -84,6 +85,7 @@ export function existing() {
 
 export function showStep(step: number, stateId: string) {
     S.step = step;
+    saveStep('dms-intake', step, S.task);
     sec()
         ?.querySelectorAll('.dx-state')
         .forEach((s) => s.classList.remove('active'));

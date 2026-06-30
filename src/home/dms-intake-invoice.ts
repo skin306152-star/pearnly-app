@@ -7,6 +7,7 @@
 // ============================================================
 /* global t, showToast */
 import { S, esc, $ } from './dms-intake-core.js';
+import { saveStep } from './step-resume.js';
 import { enterSubmit, renderSubmit, doFinish } from './dms-intake-invoice-submit.js';
 import { renderReview, onReviewClick } from './dms-intake-review.js';
 import { imagesToPdf, analyzeImageQuality } from './camera-image-utils.js';
@@ -107,6 +108,7 @@ export function ext(name: string) {
 }
 export function showStepInv(step: number, stateId: string) {
     S.step = step;
+    saveStep('dms-intake', step, S.task);
     const sc = document.getElementById('page-dms-intake');
     sc?.querySelectorAll('.dx-state').forEach((s) => s.classList.remove('active'));
     document.getElementById(stateId)?.classList.add('active');

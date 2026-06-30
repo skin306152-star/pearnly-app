@@ -15,6 +15,7 @@ import {
 } from './sales-wizard-io.js';
 import { wt, wpack, setWizardLang } from './sales-wizard-i18n.js';
 import { ICO, pname, step1, step2, step3, step4, step5 } from './sales-wizard-steps.js';
+import { saveStep, readStep, clearStep } from './step-resume.js';
 
 function today(): string {
     const d = new Date();
@@ -68,6 +69,7 @@ function close() {
 }
 
 function render() {
+    saveStep('sales-wizard', cur + 1); // 续步:记 1-based 步号(cur=0 第1步即清记忆)
     const W = wpack();
     const stepper = W.steps
         .map((s, i) => {
@@ -399,6 +401,7 @@ async function doIssue() {
     }
 }
 function showSuccess(docId: string) {
+    clearStep('sales-wizard'); // 已开出 → 流程结束,下次重开是全新单据
     mask().innerHTML = `<div class="sw-okwrap"><div class="sw-okbox">
         <div class="sw-okic">${ICO.checkG}</div>
         <h3>${escapeHtml(wt('okTitle'))}</h3>
@@ -440,9 +443,21 @@ async function bootWizard() {
     await loadWizardData(); // 先载 sellers/products(docToState 要按 seller id 反查下标)
 }
 
+// 续步:重开「开票」时,同会话内若刚才有未开出的进度(st 仍在内存)→ 回到离开的那一步;
+// 硬刷新后 st 已空 → 守门不过 → 全新单据。开出成功 / 第1步均已清记忆。
+function resumeWizard(): boolean {
+    const memo = readStep('sales-wizard');
+    if (!memo || typeof st === 'undefined') return false;
+    cur = Math.min(Math.max(memo.step - 1, 0), 4);
+    return true;
+}
+
 window.openSalesWizard = async function () {
-    st = freshState();
-    cur = 0;
+    const resumed = resumeWizard();
+    if (!resumed) {
+        st = freshState();
+        cur = 0;
+    }
     await bootWizard();
     render();
 };

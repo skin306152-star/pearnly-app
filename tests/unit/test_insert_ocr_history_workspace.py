@@ -80,39 +80,48 @@ class InsertWorkspaceTests(unittest.TestCase):
         cur = _FakeCursor(workspace_valid=True)
         hid = _run_insert(cur, workspace_client_id=7)
         self.assertEqual(hid, "hist-1")
-        # 约定:INSERT tuple 末位=ai_raw,倒二=safe_workspace_client_id,倒三=safe_client_id
-        self.assertEqual(cur.insert_params[-2], 7)
+        # 约定:INSERT tuple 末位=staged,倒二=ai_raw,倒三=workspace,倒四=client_id
+        self.assertEqual(cur.insert_params[-3], 7)
 
     def test_no_workspace_still_succeeds_null(self):
         cur = _FakeCursor()
         hid = _run_insert(cur)  # 不传 workspace_client_id
         self.assertEqual(hid, "hist-1")  # 旧逻辑照常成功
-        self.assertIsNone(cur.insert_params[-2])  # workspace 列 NULL
+        self.assertIsNone(cur.insert_params[-3])  # workspace 列 NULL
 
     def test_does_not_affect_buyer_client_id(self):
         cur = _FakeCursor(workspace_valid=True, client_valid=True)
         _run_insert(cur, client_id=55, workspace_client_id=7)
-        # 买方=倒三位=55,workspace=倒二位=7,互不串(末位=ai_raw)
-        self.assertEqual(cur.insert_params[-3], 55)
-        self.assertEqual(cur.insert_params[-2], 7)
+        # 买方=倒四位=55,workspace=倒三位=7,互不串(倒二=ai_raw·末位=staged)
+        self.assertEqual(cur.insert_params[-4], 55)
+        self.assertEqual(cur.insert_params[-3], 7)
 
     def test_invalid_workspace_writes_null_not_error(self):
         cur = _FakeCursor(workspace_valid=False)  # 非本租户 → 校验不过
         hid = _run_insert(cur, workspace_client_id=999)
         self.assertEqual(hid, "hist-1")  # 不报错、不拦上传
-        self.assertIsNone(cur.insert_params[-2])  # 写 NULL
+        self.assertIsNone(cur.insert_params[-3])  # 写 NULL
 
-    def test_ai_raw_written_as_last_param(self):
+    def test_ai_raw_written_as_second_last_param(self):
         cur = _FakeCursor(workspace_valid=True)
         _run_insert(cur, ai_raw=[{"fields": {"invoice_number": "IV1"}}])
-        # 末位 = ai_raw 的 JSON 串(写一次留底)
-        self.assertIn("IV1", cur.insert_params[-1])
+        # 倒二 = ai_raw 的 JSON 串(写一次留底)· 末位让位给 staged
+        self.assertIn("IV1", cur.insert_params[-2])
 
     def test_ai_raw_defaults_to_pages(self):
         # 不传 ai_raw → 缺省取 pages(全 OCR 入口普适留底·非 NULL)
         cur = _FakeCursor()
         _run_insert(cur, pages=[{"fields": {"invoice_number": "IVX"}}])
-        self.assertIn("IVX", cur.insert_params[-1])
+        self.assertIn("IVX", cur.insert_params[-2])
+
+    def test_staged_defaults_false_is_last_param(self):
+        # 末位 = staged · 缺省 FALSE(存量 + LINE 等照旧即时可见)· 网页录入流才显式传 TRUE
+        cur = _FakeCursor()
+        _run_insert(cur)
+        self.assertEqual(cur.insert_params[-1], False)
+        cur2 = _FakeCursor()
+        _run_insert(cur2, staged=True)
+        self.assertEqual(cur2.insert_params[-1], True)
 
 
 if __name__ == "__main__":

@@ -158,6 +158,39 @@ def update_ocr_history_pages(
         return False
 
 
+def commit_staged_ocr_history(
+    user_id: str, record_ids: list, tenant_id: Optional[str] = None
+) -> int:
+    """第4步完成(无论仅完成 / 导出 / 推送)→ 把这批草稿翻成正式(staged=FALSE)→ 落进识别记录。
+
+    返回实际更新条数。只动本人 / 本租户、且仍是草稿的记录(幂等 · 重复调用安全)。
+    """
+    if not record_ids:
+        return 0
+    ids = [str(r) for r in record_ids if r]
+    if not ids:
+        return 0
+    try:
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=user_id, commit=True) as cur:
+            if tenant_id:
+                cur.execute(
+                    "UPDATE ocr_history SET staged = FALSE, updated_at = NOW() "
+                    "WHERE id = ANY(%s::uuid[]) AND staged = TRUE "
+                    "AND user_id IN (SELECT id FROM users WHERE tenant_id = %s::uuid)",
+                    (ids, tenant_id),
+                )
+            else:
+                cur.execute(
+                    "UPDATE ocr_history SET staged = FALSE, updated_at = NOW() "
+                    "WHERE id = ANY(%s::uuid[]) AND staged = TRUE AND user_id = %s::uuid",
+                    (ids, user_id),
+                )
+            return cur.rowcount
+    except Exception as e:
+        logger.error(f"commit_staged_ocr_history 失败 (user_id={user_id}): {e}")
+        return 0
+
+
 def update_history_official_name(
     record_id: str,
     official_name: str,
@@ -315,6 +348,9 @@ def insert_ocr_history(
     # 反馈闭环 ② · AI/系统首存基线(永不改 · 用户编辑后据此算修正 diff)。
     # 缺省 None → 落库时自动取 pages(= 各入口首存内容)→ 全 OCR 入口普适留底,无需逐调用方传。
     ai_raw: Optional[list] = None,
+    # 草稿态:网页录入识别后置 TRUE(不进识别记录列表)· 第4步完成/导出/推送才翻 FALSE。
+    # 默认 FALSE → 存量 + LINE 等其它入口照旧即时可见(只有网页录入流会显式传 TRUE)。
+    staged: bool = False,
 ) -> Optional[str]:
     """写入一条历史记录,返回新记录的 id(失败返回 None,不影响主流程)"""
     summary = _extract_summary_fields(pages)
@@ -382,7 +418,7 @@ def insert_ocr_history(
                     source_pdf_id, source_page_indices, source_index, source_total,
                     source, source_ref,
                     pdf_storage_path, pdf_size_bytes,
-                    client_id, workspace_client_id, ai_raw
+                    client_id, workspace_client_id, ai_raw, staged
                 ) VALUES (
                     %s, %s, %s, %s, %s, %s,
                     %s::jsonb, %s, %s,
@@ -391,7 +427,7 @@ def insert_ocr_history(
                     %s, %s::jsonb, %s, %s,
                     %s, %s,
                     %s, %s,
-                    %s, %s, %s::jsonb
+                    %s, %s, %s::jsonb, %s
                 )
                 RETURNING id
             """,
@@ -423,6 +459,7 @@ def insert_ocr_history(
                     safe_client_id,
                     safe_workspace_client_id,
                     _json.dumps(ai_raw if ai_raw is not None else pages, ensure_ascii=False),
+                    bool(staged),
                 ),
             )
             row = cur.fetchone()

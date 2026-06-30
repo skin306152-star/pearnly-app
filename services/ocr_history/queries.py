@@ -107,6 +107,8 @@ def list_ocr_history(
             params.append([int(c) for c in restrict_client_ids])
             params.append(user_id)
 
+    # 草稿态(网页录入识别后未完成第4步)不进识别记录列表 + 不计入汇总卡。
+    where.append("staged = FALSE")
     base_where_sql = " AND ".join(where)
     # 派生状态 SQL / 状态聚合 / 列表过滤抽到 list_status(控行数 + 单一职责)。
     list_where_sql, list_params = ls.apply_list_filters(where, params, source_filter, status_filter)

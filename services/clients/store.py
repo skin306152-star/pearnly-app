@@ -62,6 +62,9 @@ def ensure_clients_table():
                 ALTER TABLE ocr_history ADD COLUMN IF NOT EXISTS ai_raw JSONB;
                 ALTER TABLE ocr_history ADD COLUMN IF NOT EXISTS seller_name_official TEXT;
                 ALTER TABLE ocr_history ADD COLUMN IF NOT EXISTS seller_name_verified BOOLEAN NOT NULL DEFAULT FALSE;
+                -- 草稿态:网页录入识别后先 staged=TRUE(不进识别记录列表)·第4步完成/导出/推送才翻 FALSE 落库。
+                -- 默认 FALSE → 存量记录 + LINE 等其它入口照旧即时可见(只有网页录入流会置 TRUE)。
+                ALTER TABLE ocr_history ADD COLUMN IF NOT EXISTS staged BOOLEAN NOT NULL DEFAULT FALSE;
             """)
             # B8 RLS wave3:两表都含 tenant_id + user_id → tenant_or_user 隔离。
             # force=False(owner 仍绕过→外围未迁的裸 get_cursor 不破);业务连接 SET ROLE 后强制。

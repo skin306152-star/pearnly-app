@@ -30,6 +30,7 @@ from core import workspace_context as wc
 from services.ocr import pdf_storage
 from services.ocr.pdf_utils import render_page_png
 from core.db import (
+    commit_staged_ocr_history,
     delete_ocr_history_with_pdf_paths,
     get_history_pdf_info,
     get_ocr_history_detail,
@@ -108,6 +109,22 @@ async def history_detail(record_id: str, request: Request):
     if not detail:
         raise HTTPException(404, detail="history.not_found")
     return detail
+
+
+class OcrCommitRequest(BaseModel):
+    ids: List[str] = Field(..., min_length=1, max_length=500, description="待落库的草稿记录 id")
+
+
+@router.post("/api/ocr/commit")
+async def ocr_commit(req: OcrCommitRequest, request: Request):
+    """录入第4步完成(无论仅完成 / 导出 / 推送)→ 把草稿记录落进识别记录(staged→FALSE)。
+
+    幂等:已落库 / 非本人的 id 跳过,只翻仍属本人的草稿。前端任一终态动作都调,确保必落库。
+    """
+    user = get_current_user_from_request(request)
+    _check_history_access(user)
+    n = commit_staged_ocr_history(str(user["id"]), list(req.ids), tenant_id=_tid(user))
+    return {"ok": True, "committed": n}
 
 
 @router.put("/api/history/{record_id}")

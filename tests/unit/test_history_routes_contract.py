@@ -38,6 +38,7 @@ class HistoryRoutesContractTests(unittest.TestCase):
             ("GET", "/api/history/{record_id}/pdf"),
             ("GET", "/api/history/{record_id}/page/{page}.png"),
             ("POST", "/api/history/batch-delete"),
+            ("POST", "/api/ocr/commit"),
             ("GET", "/api/v1/history"),
             ("GET", "/api/v1/history/{record_id}"),
             ("PUT", "/api/v1/history/{record_id}"),
@@ -45,7 +46,7 @@ class HistoryRoutesContractTests(unittest.TestCase):
             ("POST", "/api/history/{history_id}/assign_client"),
         }
         self.assertEqual(got, expected)
-        self.assertEqual(len(router.routes), 12)
+        self.assertEqual(len(router.routes), 13)
 
     def test_app_includes_history_router(self):
         """防 include_router 漏挂 · app 必须能路由到 history"""

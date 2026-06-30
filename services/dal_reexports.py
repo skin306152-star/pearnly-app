@@ -300,6 +300,7 @@ _REEXPORTS = {
         "list_ocr_history",
         "get_ocr_history_detail",
         "update_ocr_history_pages",
+        "commit_staged_ocr_history",
         "delete_ocr_history",
         "delete_ocr_history_with_pdf_paths",
         "insert_ocr_history",

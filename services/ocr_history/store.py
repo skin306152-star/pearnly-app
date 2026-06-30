@@ -21,6 +21,7 @@ from services.ocr_history.queries import (  # noqa: F401
 from services.ocr_history.mutations import (  # noqa: F401
     _extract_summary_fields,
     update_ocr_history_pages,
+    commit_staged_ocr_history,
     delete_ocr_history,
     delete_ocr_history_with_pdf_paths,
     insert_ocr_history,

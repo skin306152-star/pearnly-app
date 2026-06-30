@@ -6,6 +6,7 @@
 // 本 spec 锁安全降级路径(确定性):新页面(内存无 st)即便有步号记忆,重开也必须从第 1 步开始
 //   + 清记忆。正向(关掉再开回到原步)依赖向导交互,走人工 live 截图验。
 // ============================================================
+/* global window */
 
 const { test, expect } = require('@playwright/test');
 const { hasCreds, ensureStorageState, STORAGE_STATE } = require('./_helpers/auth');

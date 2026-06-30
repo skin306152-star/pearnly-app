@@ -32,7 +32,9 @@ test.describe('销项开票向导 · 续步记忆守门', () => {
         );
 
         await page.evaluate(() => window.openSalesWizard && window.openSalesWizard());
-        await expect(page.locator('.sw-stepper'), '向导步骤条渲染').toBeVisible({ timeout: 15_000 });
+        await expect(page.locator('.sw-stepper'), '向导步骤条渲染').toBeVisible({
+            timeout: 15_000,
+        });
 
         const steps = page.locator('.sw-step');
         await expect(steps.nth(0), '第 1 步高亮(全新开始)').toHaveClass(/active/);

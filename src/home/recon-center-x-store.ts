@@ -171,3 +171,31 @@ export function rxFmtSize(bytes: number): string {
     }
     return `${n.toFixed(i ? 1 : 0)} ${units[i]}`;
 }
+
+// 后端真实失败码 → 用户能懂的原因(不再笼统「对账未完成」)。纯映射,就近用 tt。
+export function rxFailMsg(code: string | null | undefined): string {
+    const map: Record<string, string> = {
+        timeout: tt('rcx-err-timeout', '处理超时，请稍后重试'),
+        poll_unreachable: tt('rcx-err-network', '网络错误'),
+        gl_no_revenue_rows: tt(
+            'rcx-fc-gl-no-rev',
+            '总账中没有收入科目(科目代码以 4 开头),无法做收入对账'
+        ),
+        gl_parse_failed: tt('rcx-fc-gl-parse', '总账解析失败,请检查文件格式或换标准模板'),
+        gl_headers_not_found: tt('rcx-fc-gl-head', '认不出总账表头(需含 科目/借方/贷方 列)'),
+        vat_no_rows: tt('rcx-fc-vat-no-rows', '税表中没有可读取的数据行,请检查文件'),
+        vat_parse_failed: tt('rcx-fc-vat-parse', '税表解析失败,请检查文件格式或换标准模板'),
+        stmt_no_rows: tt('rcx-fc-stmt-no-rows', '银行账单中没有交易数据,请确认上传了正确的账单'),
+        stmt_headers_not_found: tt(
+            'rcx-fc-stmt-head',
+            '认不出银行账单表头(需含 日期/金额/余额 列)'
+        ),
+        file_unreadable: tt('rcx-fc-unreadable', '文件无法读取,可能已损坏或被加密'),
+        file_not_supported: tt(
+            'rcx-fc-unsupported',
+            '不支持此文件类型,请上传 PDF / 图片 / Excel / CSV'
+        ),
+        ocr_failed: tt('rcx-fc-ocr', '文件识别失败,请换更清晰的版本或转成 Excel / CSV 重传'),
+    };
+    return (code && map[code]) || tt('rcx-err-generic', '对账未能完成,请检查文件后重试');
+}

@@ -142,18 +142,22 @@
         if (p === '/admin/users' || p === '/admin/users/') return 'users';
         if (p === '/admin/topup' || p === '/admin/topup/') return 'topup';
         if (p === '/admin/monitor' || p === '/admin/monitor/') return 'monitor';
+        if (p === '/admin/settings' || p === '/admin/settings/') return 'settings';
         return 'cost';
     }
 
     function _switchView(route) {
-        const costPage = document.getElementById('page-admin-cost');
-        const usersPage = document.getElementById('page-admin-users');
-        const topupPage = document.getElementById('page-admin-topup');
-        const monitorPage = document.getElementById('page-admin-monitor');
-        if (costPage) costPage.classList.toggle('active', route === 'cost');
-        if (usersPage) usersPage.classList.toggle('active', route === 'users');
-        if (topupPage) topupPage.classList.toggle('active', route === 'topup');
-        if (monitorPage) monitorPage.classList.toggle('active', route === 'monitor');
+        const pages = {
+            cost: 'page-admin-cost',
+            users: 'page-admin-users',
+            topup: 'page-admin-topup',
+            monitor: 'page-admin-monitor',
+            settings: 'page-admin-settings',
+        };
+        Object.keys(pages).forEach(function (r) {
+            const el = document.getElementById(pages[r]);
+            if (el) el.classList.toggle('active', route === r);
+        });
         document
             .querySelectorAll('.admin-layout-nav-item[data-admin-route]')
             .forEach(function (el) {
@@ -163,6 +167,7 @@
         if (route === 'users') _renderUsersPage();
         if (route === 'topup') _renderTopupPage();
         if (route === 'monitor') _renderMonitorPage();
+        if (route === 'settings') _renderSettingsPage();
     }
 
     function _bindSidebar() {
@@ -252,6 +257,7 @@
                 if (_r === 'users') _renderUsersPage();
                 else if (_r === 'topup') _renderTopupPage();
                 else if (_r === 'monitor') _renderMonitorPage();
+                else if (_r === 'settings') _renderSettingsPage();
                 else _renderCostPage();
             });
         });
@@ -2869,6 +2875,115 @@
             const q = encodeURIComponent(_admLogsState.q || '');
             _csvDownload('/api/admin/logs.csv?q=' + q, 'pearnly_logs.csv');
         });
+    }
+
+    // ============ 全局设置(钥匙闸)· WP2 ============
+    function _settingsRolloutWrapSync() {
+        const enabled = !!document.getElementById('adm-set-agent-enabled')?.checked;
+        const wrap = document.getElementById('adm-set-rollout-wrap');
+        if (wrap) wrap.classList.toggle('is-off', !enabled);
+    }
+
+    function _renderAllowlist(rows) {
+        const host = document.getElementById('adm-set-allowlist-list');
+        if (!host) return;
+        if (!rows || !rows.length) {
+            host.innerHTML =
+                '<div class="adm-empty">' + _esc(_t('adm-set-allowlist-empty')) + '</div>';
+            return;
+        }
+        host.innerHTML = rows
+            .map(function (u) {
+                const who = _esc(u.username || u.email || _t('adm-set-allowlist-unknown'));
+                return (
+                    '<div class="adm-set-allow-row">' +
+                    '<span><span class="adm-set-allow-who">' +
+                    who +
+                    '</span> <span class="adm-set-allow-id">' +
+                    _esc(u.user_id) +
+                    '</span></span>' +
+                    '<button class="btn btn-ghost btn-sm" data-adm-allow-remove="' +
+                    _esc(u.user_id) +
+                    '">' +
+                    _esc(_t('adm-set-allowlist-remove')) +
+                    '</button>' +
+                    '</div>'
+                );
+            })
+            .join('');
+        host.querySelectorAll('[data-adm-allow-remove]').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                try {
+                    const d = await _adminFetch('/api/admin/platform-settings/allowlist/remove', {
+                        method: 'POST',
+                        body: { user_id: btn.dataset.admAllowRemove },
+                    });
+                    _renderAllowlist(d.allowlist);
+                } catch (e) {
+                    _toast(_t('adm-load-fail'), 'error');
+                }
+            });
+        });
+    }
+
+    async function _renderSettingsPage() {
+        const toggle = document.getElementById('adm-set-agent-enabled');
+        if (!toggle) return;
+        if (!toggle.__bound) {
+            toggle.__bound = true;
+            toggle.addEventListener('change', _settingsRolloutWrapSync);
+            document.getElementById('adm-set-save')?.addEventListener('click', async function () {
+                const rollout =
+                    document.querySelector('input[name="adm-set-rollout"]:checked')?.value ||
+                    'allowlist';
+                try {
+                    await _adminFetch('/api/admin/platform-settings', {
+                        method: 'POST',
+                        body: { enabled: !!toggle.checked, rollout: rollout },
+                    });
+                    _toast(_t('adm-set-saved-toast'), 'success');
+                    _renderSettingsPage();
+                } catch (e) {
+                    _toast(_t('adm-load-fail'), 'error');
+                }
+            });
+            const addBtn = document.getElementById('adm-set-allowlist-add');
+            const input = document.getElementById('adm-set-allowlist-input');
+            addBtn?.addEventListener('click', async function () {
+                const uid = (input?.value || '').trim();
+                if (!uid) return;
+                try {
+                    const d = await _adminFetch('/api/admin/platform-settings/allowlist/add', {
+                        method: 'POST',
+                        body: { user_id: uid },
+                    });
+                    if (input) input.value = '';
+                    _renderAllowlist(d.allowlist);
+                } catch (e) {
+                    _toast(_t('adm-load-fail'), 'error');
+                }
+            });
+        }
+        let d;
+        try {
+            d = await _adminFetch('/api/admin/platform-settings');
+        } catch (e) {
+            _toast(_t('adm-load-fail'), 'error');
+            return;
+        }
+        const ag = d.agent_enabled || {};
+        toggle.checked = !!ag.enabled;
+        const rollout = ag.rollout || 'allowlist';
+        document.querySelectorAll('input[name="adm-set-rollout"]').forEach(function (r) {
+            r.checked = r.value === rollout;
+        });
+        _settingsRolloutWrapSync();
+        const savedEl = document.getElementById('adm-set-saved');
+        if (savedEl)
+            savedEl.textContent = ag.updated_at
+                ? _t('adm-set-saved-at') + ' ' + new Date(ag.updated_at).toLocaleString()
+                : '';
+        _renderAllowlist(d.allowlist);
     }
 
     // ============ 主启动流程 ============

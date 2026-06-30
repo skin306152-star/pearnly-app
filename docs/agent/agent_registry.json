@@ -9,6 +9,7 @@
   "admin_users_query_routes": "D",
   "admin_users_mutation_routes": "D",
   "admin_migration_routes": "D",
+  "admin_settings_routes": "D",
   "auth_admin_routes": "D",
   "auth_admin_risk_routes": "D",
   "auth_email_code_routes": "D",

@@ -864,3 +864,95 @@ body.admin-layout-body .lang-switching-overlay {
   color: #6b7280;
   font-variant-numeric: tabular-nums;
 }
+
+/* WP2 · 全局设置(钥匙闸)页 · 对话 Agent 总闸 + 灰度名单 */
+.adm-set-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+  cursor: pointer;
+}
+.adm-set-row input[type='checkbox'] {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--btn-blue);
+}
+.adm-set-row-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+.adm-set-row-desc {
+  display: block;
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+.adm-set-rollout {
+  margin-top: 16px;
+  padding-left: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.adm-set-rollout.is-off {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.adm-set-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+}
+.adm-set-radio input {
+  accent-color: var(--btn-blue);
+}
+.adm-set-actions {
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.adm-set-saved {
+  font-size: 12px;
+  color: #6b7280;
+}
+.adm-set-add {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.adm-set-add input {
+  flex: 1;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+}
+.adm-set-allow-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.adm-set-allow-who {
+  font-size: 13px;
+  color: #111827;
+}
+.adm-set-allow-id {
+  font-size: 11px;
+  color: #9ca3af;
+  font-variant-numeric: tabular-nums;
+}

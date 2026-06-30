@@ -208,6 +208,7 @@ def _boot_schema_ddl() -> None:
         (db.ensure_vat_recon_tables, "vat_recon 建表"),
         (db.ensure_vat_recon_tasks_table, "vat_recon_tasks 建表"),
         (db.ensure_bank_recon_v2_table, "bank_recon_v2 建表"),
+        (db.ensure_platform_settings, "platform_settings 钥匙闸建表"),
     ]
     for ensure_fn, label in boot_ensures:
         try:
@@ -243,9 +244,7 @@ def _boot_schema_ddl() -> None:
     # 套账隔离 PO-7b · 连号计数器按主体(建 uq_dns_ws + 回填 + 守门式 drop 旧 PK)
     # 铁律 #21:新 schema 独立 services/db_migrations/ · 见 06-po7b-numbering-proposal
     try:
-        from services.db_migrations.numbering_workspace_key import (
-            ensure_numbering_workspace_key,
-        )
+        from services.db_migrations.numbering_workspace_key import ensure_numbering_workspace_key
 
         ensure_numbering_workspace_key()
     except Exception as e:

@@ -9,7 +9,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png?v=1" />
     <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon-180.png?v=1" />
 
-    <link rel="stylesheet" href="/static/dist/admin.css?v=11851000" />
+    <link rel="stylesheet" href="/static/dist/admin.css?v=11851002" />
 
     <script>
       // admin layout 标志 · home.js loadAll() 检测此 flag 走精简路径(不跑 home 渲染)
@@ -192,6 +192,25 @@
             <path d="M2 11h3l2 5 3-10 2 7 2-3h4" />
           </svg>
           <span data-i18n="adm-sidebar-monitor">系统监控</span>
+        </a>
+        <a class="admin-layout-nav-item" data-admin-route="settings" href="/admin/settings">
+          <svg
+            viewBox="0 0 20 20"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="10" cy="10" r="2.5" />
+            <path
+              d="M10 1.5v2M10 16.5v2M3 10H1.5M18.5 10H17M4.9 4.9L3.8 3.8M16.2 16.2l-1.1-1.1M15.1 4.9l1.1-1.1M3.8 16.2l1.1-1.1"
+            />
+          </svg>
+          <span data-i18n="adm-sidebar-settings">全局设置</span>
         </a>
       </aside>
 
@@ -777,13 +796,104 @@
             <div id="adm-risk-content"></div>
           </div>
         </section>
+
+        <section class="page" id="page-admin-settings">
+          <div class="page-head">
+            <div class="page-head-icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="3" />
+                <path
+                  d="M12 2v3M12 19v3M2 12h3M19 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"
+                />
+              </svg>
+            </div>
+            <div class="page-head-text">
+              <h1 class="page-title" data-i18n="adm-set-title">全局设置</h1>
+              <div class="page-subtitle" data-i18n="adm-set-sub">
+                平台级开关 · 一键关掉对话 Agent 回退现状 · 支持只对指定用户灰度
+              </div>
+            </div>
+          </div>
+
+          <div class="cost-section" style="margin-top: 24px">
+            <div class="cost-section-head">
+              <h3 data-i18n="adm-set-agent-title">对话 Agent</h3>
+              <span class="cost-section-hint" data-i18n="adm-set-agent-hint"
+                >关 = 整层 Agent 被绕过 · 用户无感回到现状</span
+              >
+            </div>
+
+            <label class="adm-set-row">
+              <input type="checkbox" id="adm-set-agent-enabled" />
+              <span>
+                <span class="adm-set-row-label" data-i18n="adm-set-agent-enabled-label"
+                  >启用对话 Agent</span
+                >
+                <span class="adm-set-row-desc" data-i18n="adm-set-agent-enabled-desc"
+                  >总闸 · 关闭后下面的灰度策略一律无效</span
+                >
+              </span>
+            </label>
+
+            <div class="adm-set-rollout" id="adm-set-rollout-wrap">
+              <div class="adm-set-row-label" data-i18n="adm-set-rollout-label">灰度策略</div>
+              <label class="adm-set-radio">
+                <input type="radio" name="adm-set-rollout" value="allowlist" />
+                <span data-i18n="adm-set-rollout-allowlist">仅名单内用户(灰度)</span>
+              </label>
+              <label class="adm-set-radio">
+                <input type="radio" name="adm-set-rollout" value="all" />
+                <span data-i18n="adm-set-rollout-all">全部用户</span>
+              </label>
+            </div>
+
+            <div class="adm-set-actions">
+              <button class="btn btn-primary btn-sm" id="adm-set-save" data-i18n="adm-set-save">
+                保存
+              </button>
+              <span class="adm-set-saved" id="adm-set-saved" data-i18n="adm-set-saved-at"></span>
+            </div>
+          </div>
+
+          <div class="cost-section" id="adm-set-allowlist-section">
+            <div class="cost-section-head">
+              <h3 data-i18n="adm-set-allowlist-title">灰度名单</h3>
+              <span class="cost-section-hint" data-i18n="adm-set-allowlist-hint"
+                >按用户 ID 加入 · 仅在「仅名单内用户」策略下生效</span
+              >
+            </div>
+            <div class="adm-set-add">
+              <input
+                type="text"
+                id="adm-set-allowlist-input"
+                data-i18n-placeholder="adm-set-allowlist-ph"
+                placeholder="粘贴用户 ID(UUID)"
+              />
+              <button
+                class="btn btn-sm"
+                id="adm-set-allowlist-add"
+                data-i18n="adm-set-allowlist-add"
+              >
+                加入
+              </button>
+            </div>
+            <div id="adm-set-allowlist-list"></div>
+          </div>
+        </section>
       </main>
     </div>
 
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="/static/admin/admin-i18n.js?v=11841102"></script>
+    <script src="/static/admin/admin-i18n.js?v=11851002"></script>
 
-    <script src="/static/admin/admin.js?v=11841102" defer></script>
+    <script src="/static/admin/admin.js?v=11851002" defer></script>
   </body>
 </html>

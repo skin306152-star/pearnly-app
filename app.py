@@ -198,6 +198,9 @@ from routes.tenant_routes import (
 from routes.admin_logs_routes import (
     router as admin_logs_router,
 )  # REFACTOR-B1 · 操作/审计日志 4 路由 · 2026-05-25
+from routes.admin_settings_routes import (
+    router as admin_settings_router,
+)  # WP2 · 平台钥匙闸(对话 Agent 总闸 + 灰度)4 路由 · 2026-06-30
 from routes.exceptions_routes import (
     router as exceptions_router,
 )  # REFACTOR-B1 · 异常处理 8 路由 · 2026-05-24
@@ -311,6 +314,7 @@ app.include_router(admin_migration_router)  # REFACTOR-B1 · 超管迁移/RLS 7 
 app.include_router(admin_cost_router)  # REFACTOR-B1 · 超管成本/收入/监控 10 路由(2026-05-25)
 app.include_router(tenant_router)  # REFACTOR-B1 · 租户管理 6 路由(2026-05-25)
 app.include_router(admin_logs_router)  # REFACTOR-B1 · 操作/审计日志 4 路由(2026-05-25)
+app.include_router(admin_settings_router)  # WP2 · 平台钥匙闸 4 路由(对话 Agent 总闸 + 灰度)
 app.include_router(exceptions_router)  # REFACTOR-B1 · 异常处理 8 路由(2026-05-24)
 app.include_router(billing_router)  # 阶段 5 Task 5.1 · billing 11 路由(2026-05-22)
 app.include_router(

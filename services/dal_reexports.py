@@ -39,6 +39,9 @@ _REEXPORTS = {
     "services.settings_misc.schema": [
         "ensure_settings_misc_rls",
     ],
+    "services.platform_settings.schema": [
+        "ensure_platform_settings",
+    ],
     "services.email_ingest.store": [
         "get_email_account",
         "get_email_account_safe",

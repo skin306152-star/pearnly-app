@@ -2,7 +2,7 @@
 """一次性上线 LINE Rich Menu(prod channel token)。
 
 跑法(prod venv):  cd /opt/mrpilot && set -a && . ./.env && set +a && ./venv/bin/python scripts/setup_rich_menu.py
-幂等:重复跑会先删旧同名菜单再重建,不堆叠。需 LINE_CHANNEL_TOKEN 在环境里。
+幂等:重复跑会先删旧同名菜单再重建,不堆叠。需 LINE_CHANNEL_ACCESS_TOKEN 在环境里。
 """
 
 import os

@@ -283,33 +283,45 @@ def parse_with_gemini(
         return {"ok": False, "error": "Gemini API key 未配置", "rows": []}
 
     from services.ai_gateway import transport
+    from services.ocr.gemini_models import flash, tier_for_model, try_with_fallback
 
-    def _call():
-        return transport.multimodal_to_json(
-            _GEMINI_PROMPT,
-            [(file_bytes, mime_type)],
-            tier="flash",
-            api_key=key,
-            temperature=0.1,
-            response_mime=True,
-            max_tokens=16384,
-            timeout_s=60,
-            max_retries=0,
-            task="vat.report_parse",
-        )
+    def _call(model_name: str):
+        tier = tier_for_model(model_name)
 
-    # v118.32.4.9.6 · 仅超时单次重试(真实国税局 PDF 504 修)· 经网关切后端
-    out = _call()
-    if not out.ok and out.error_kind == "timeout":
-        import time
+        def _once():
+            return transport.multimodal_to_json(
+                _GEMINI_PROMPT,
+                [(file_bytes, mime_type)],
+                tier=tier,
+                api_key=key,
+                temperature=0.1,
+                response_mime=True,
+                max_tokens=16384,
+                timeout_s=60,
+                max_retries=0,
+                task="vat.report_parse",
+            )
 
-        logger.warning("[vat_gemini] 首次超时 · 2 秒后重试")
-        time.sleep(2)
-        out = _call()
+        # v118.32.4.9.6 · 仅超时单次重试(真实国税局 PDF 504 修)· 经网关切后端
+        out = _once()
+        if not out.ok and out.error_kind == "timeout":
+            import time
 
-    if not out.ok:
+            logger.warning("[vat_gemini] %s 首次超时 · 2 秒后重试", model_name)
+            time.sleep(2)
+            out = _once()
+        return out
+
+    # 便宜首读(flash)解析失败/非 JSON → 升级 OCR_FALLBACK_MODEL(=3.5-flash·糊扫描件救场)再读一次。
+    out = try_with_fallback(
+        _call, primary=flash(), ok=lambda o: bool(o) and o.ok, label="vat_gemini"
+    )
+
+    if out is None or not out.ok:
         err = (
-            "Gemini 返回非 JSON" if out.error_kind == "parse" else f"Gemini 失败: {out.error_kind}"
+            "Gemini 返回非 JSON"
+            if out is not None and out.error_kind == "parse"
+            else f"Gemini 失败: {out.error_kind if out is not None else 'all_models'}"
         )
         logger.error(f"[vat_gemini] {err}")
         return {"ok": False, "error": err, "rows": []}

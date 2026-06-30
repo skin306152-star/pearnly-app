@@ -106,23 +106,32 @@ def extract_invoice_fields_batch(
         ]
 
     from services.ai_gateway import transport
+    from services.ocr.gemini_models import flash, tier_for_model, try_with_fallback
 
-    res = transport.multimodal_to_json(
-        _INVOICE_BATCH_PROMPT.format(n=n),
-        images,
-        tier="flash",
-        api_key=key,
-        temperature=0.0,
-        response_mime=True,
-        max_tokens=16384,
-        timeout_s=timeout,
-        max_retries=0,
-        task="vat.invoice_batch",
-    )
-    if not res.ok:
-        logger.warning(f"[vex.batch] n={n} 失败: {res.error_kind}")
+    def _call(model_name: str):
+        return transport.multimodal_to_json(
+            _INVOICE_BATCH_PROMPT.format(n=n),
+            images,
+            tier=tier_for_model(model_name),
+            api_key=key,
+            temperature=0.0,
+            response_mime=True,
+            max_tokens=16384,
+            timeout_s=timeout,
+            max_retries=0,
+            task="vat.invoice_batch",
+        )
+
+    # 便宜首读(flash)失败/没解析出任何发票 → 升级 OCR_FALLBACK_MODEL(=3.5-flash)再读一批。
+    def _ok(r) -> bool:
+        return bool(r) and r.ok and bool((r.data or {}).get("invoices"))
+
+    res = try_with_fallback(_call, primary=flash(), ok=_ok, label="vex.batch")
+    if res is None or not res.ok:
+        kind = res.error_kind if res is not None else "all_models"
+        logger.warning(f"[vex.batch] n={n} 失败: {kind}")
         return [
-            {"ok": False, "filename": f.get("filename"), "error": f"AI 批量失败: {res.error_kind}"}
+            {"ok": False, "filename": f.get("filename"), "error": f"AI 批量失败: {kind}"}
             for f in invoice_files
         ]
     items = (res.data or {}).get("invoices") or []

@@ -86,33 +86,43 @@ def _detect_image_mime(b: bytes) -> str:
 
 
 def _gemini_vision_extract(image_bytes: bytes, api_key: Optional[str]) -> Dict[str, Any]:
-    """单次多模态调用:身份证图 + 专用 prompt → JSON dict。经 ai_gateway 网关
-    (默认 aistudio·随 OCR_LLM_BACKEND 整体切 vertex/selfhost),tier=flash_lite
-    复刻原 DEFAULT_MODEL。失败抛 IdCardExtractError(路由据此回 422 needs_review / 500)。"""
+    """多模态调用:身份证图 + 专用 prompt → JSON dict。便宜首读(flash_lite)读不出合规
+    13 位身份证号时升级到 OCR_FALLBACK_MODEL(=3.5-flash·糊图/缺一位救场)再读一次。
+    经 ai_gateway 网关(随 OCR_LLM_BACKEND 切 vertex/selfhost)。两档都不出号 → 抛
+    IdCardExtractError(路由据此回 422 needs_review / 500)。"""
     import os
 
     key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
     if not key:
         raise IdCardExtractError("no Gemini api key (GOOGLE_API_KEY / GEMINI_API_KEY)")
     from services.ai_gateway import transport
+    from services.ocr.gemini_models import flash_lite, tier_for_model, try_with_fallback
 
-    out = transport.multimodal_to_json(
-        _ID_CARD_PROMPT,
-        [(bytes(image_bytes), _detect_image_mime(bytes(image_bytes)))],
-        tier="flash_lite",
-        api_key=key.strip(),
-        temperature=0.0,
-        response_mime=True,
-        max_tokens=16384,
-        timeout_s=DEFAULT_TIMEOUT_SECONDS,
-        max_retries=0,
-        task="ocr.id_card",
-    )
-    if not out.ok:
-        raise IdCardExtractError(f"gemini vision call failed: {out.error_kind}")
-    if not isinstance(out.data, dict):
-        raise IdCardExtractError("gemini returned non-dict id card data")
-    return out.data
+    img = bytes(image_bytes)
+
+    def _call(model_name: str):
+        out = transport.multimodal_to_json(
+            _ID_CARD_PROMPT,
+            [(img, _detect_image_mime(img))],
+            tier=tier_for_model(model_name),
+            api_key=key.strip(),
+            temperature=0.0,
+            response_mime=True,
+            max_tokens=16384,
+            timeout_s=DEFAULT_TIMEOUT_SECONDS,
+            max_retries=0,
+            task="ocr.id_card",
+        )
+        return out.data if out.ok and isinstance(out.data, dict) else None
+
+    # 身份证唯一刚需字段=13 位号;首读没读出合规号即升级(_normalize 也以 len==13 为采信门槛)。
+    def _has_id(d) -> bool:
+        return isinstance(d, dict) and len(re.sub(r"\D", "", str(d.get("people_id") or ""))) == 13
+
+    data = try_with_fallback(_call, primary=flash_lite(), ok=_has_id, label="ocr.id_card")
+    if data is None:
+        raise IdCardExtractError("gemini vision call failed (no valid id, all models)")
+    return data
 
 
 def _normalize(data: Dict[str, Any]) -> Dict[str, Any]:

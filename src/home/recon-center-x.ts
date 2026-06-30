@@ -49,13 +49,15 @@ import { saveStep, readStep } from './step-resume.js';
 
 const $ = (id: string) => document.getElementById(id);
 const MAX_BYTES = 25 * 1024 * 1024; // 25MB 单文件上限
+// 对账只有「工作区 / 结果」两态,借续步助手的 step 字段记结果态(>1 才会被持久化)。
+const RESULTS_STEP = 4;
 let bannerHidden = false;
 let bound = false;
 
 function view(v: RxView) {
     showView(v, bannerHidden);
     // 续步:只记「结果(处理差异)」态;其余态记 1 即清记忆。ctx=tab 区分三类对账。
-    saveStep('recon-center', v === 'results' ? 4 : 1, RX.tab);
+    saveStep('recon-center', v === 'results' ? RESULTS_STEP : 1, RX.tab);
 }
 
 // 清本次对账的临时数据(切换类型/清空/返回共用)
@@ -462,8 +464,8 @@ function init() {
     updateReady();
     // 续步:软导航回来时,内存里若还留着上次的结果且同一对账类型 → 复原到结果态;否则工作区。
     // 硬刷新后 RX.result 已空 → 守门不过 → 干净回工作区。
-    const memo = readStep('recon-center');
-    if (memo && memo.step === 4 && RX.result && (!memo.ctx || memo.ctx === RX.tab)) {
+    const memo = readStep('recon-center', RX.tab);
+    if (memo && memo.step === RESULTS_STEP && RX.result) {
         view('results');
         renderResult();
     } else {

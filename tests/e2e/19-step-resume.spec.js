@@ -12,8 +12,7 @@ const { test, expect } = require('@playwright/test');
 const { hasCreds, ensureStorageState, STORAGE_STATE } = require('./_helpers/auth');
 const { enterApp, openRoute } = require('./_helpers/app');
 const { attachConsoleGuard, assertNoConsoleErrors } = require('./_helpers/console-guard');
-
-const MEMO_KEY = 'pearnly_step_dms-intake';
+const { seedStepMemo, readStepMemo } = require('./_helpers/step-resume');
 
 test.describe('录入工作台 · 续步记忆守门', () => {
     test.skip(!hasCreds(), '需测试账号·CI 无凭据时跳过');
@@ -28,10 +27,7 @@ test.describe('录入工作台 · 续步记忆守门', () => {
         await openRoute(page, 'dms-intake');
 
         // 模拟「上一次停在第 3 步」的残留记忆(内存态此刻是空上传态 → 不该复原到第 3 步)
-        await page.evaluate(
-            ([k]) => localStorage.setItem(k, JSON.stringify({ step: 3, ctx: 'invoice' })),
-            [MEMO_KEY]
-        );
+        await seedStepMemo(page, 'dms-intake', { step: 3, ctx: 'invoice' });
 
         // 离开再回来 → loadDmsIntake 走 resumeFlow:内存态不够 → resetFlow 回第 1 步
         await openRoute(page, 'history');
@@ -43,7 +39,7 @@ test.describe('录入工作台 · 续步记忆守门', () => {
         ).toHaveClass(/active/);
         await expect(page.locator('#dx-s-upload'), '第 1 步上传态可见').toBeVisible();
 
-        const memo = await page.evaluate(([k]) => localStorage.getItem(k), [MEMO_KEY]);
+        const memo = await readStepMemo(page, 'dms-intake');
         expect(memo, '降级后记忆已清掉(下次不再误复原)').toBeNull();
 
         assertNoConsoleErrors(expect, guard);

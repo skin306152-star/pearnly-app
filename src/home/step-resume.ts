@@ -19,12 +19,16 @@ export function saveStep(flow: string, step: number, ctx?: string): void {
     }
 }
 
-export function readStep(flow: string): StepMemo | null {
+// ctx 传入时:记忆属于别的子流程(录入的另一任务 / 对账的另一 tab)→ 返回 null 不复原。
+// 各调用方不再自己拼 ctx 比较,语义单一来源。
+export function readStep(flow: string, ctx?: string): StepMemo | null {
     try {
         const raw = localStorage.getItem(PREFIX + flow);
         if (!raw) return null;
         const m = JSON.parse(raw) as StepMemo;
-        return typeof m?.step === 'number' && m.step > 1 ? m : null;
+        if (typeof m?.step !== 'number' || m.step <= 1) return null;
+        if (m.ctx && m.ctx !== ctx) return null;
+        return m;
     } catch {
         return null;
     }

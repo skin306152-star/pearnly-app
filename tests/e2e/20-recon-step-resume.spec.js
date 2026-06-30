@@ -12,8 +12,7 @@ const { test, expect } = require('@playwright/test');
 const { hasCreds, ensureStorageState, STORAGE_STATE } = require('./_helpers/auth');
 const { enterApp, openRoute } = require('./_helpers/app');
 const { attachConsoleGuard, assertNoConsoleErrors } = require('./_helpers/console-guard');
-
-const MEMO_KEY = 'pearnly_step_recon-center';
+const { seedStepMemo, readStepMemo } = require('./_helpers/step-resume');
 
 test.describe('对账中心 · 续步记忆守门', () => {
     test.skip(!hasCreds(), '需测试账号·CI 无凭据时跳过');
@@ -29,10 +28,7 @@ test.describe('对账中心 · 续步记忆守门', () => {
         await expect(page.locator('#rcx-workspace'), '工作区可见').not.toHaveClass(/rcx-hidden/);
 
         // 模拟「上次停在结果态」的残留记忆(本次内存无 RX.result → 不该复原到结果页)
-        await page.evaluate(
-            ([k]) => localStorage.setItem(k, JSON.stringify({ step: 4, ctx: 'bank' })),
-            [MEMO_KEY]
-        );
+        await seedStepMemo(page, 'recon-center', { step: 4, ctx: 'bank' });
 
         await openRoute(page, 'history');
         await openRoute(page, 'reconcile');
@@ -40,7 +36,7 @@ test.describe('对账中心 · 续步记忆守门', () => {
         await expect(page.locator('#rcx-results'), '结果页未误显').not.toHaveClass(/rcx-show/);
         await expect(page.locator('#rcx-workspace'), '回落到工作区').not.toHaveClass(/rcx-hidden/);
 
-        const memo = await page.evaluate(([k]) => localStorage.getItem(k), [MEMO_KEY]);
+        const memo = await readStepMemo(page, 'recon-center');
         expect(memo, '降级后记忆已清掉').toBeNull();
 
         assertNoConsoleErrors(expect, guard);

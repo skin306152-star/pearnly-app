@@ -12,8 +12,7 @@ const { test, expect } = require('@playwright/test');
 const { hasCreds, ensureStorageState, STORAGE_STATE } = require('./_helpers/auth');
 const { enterApp } = require('./_helpers/app');
 const { attachConsoleGuard, assertNoConsoleErrors } = require('./_helpers/console-guard');
-
-const MEMO_KEY = 'pearnly_step_sales-wizard';
+const { seedStepMemo, readStepMemo } = require('./_helpers/step-resume');
 
 test.describe('销项开票向导 · 续步记忆守门', () => {
     test.skip(!hasCreds(), '需测试账号·CI 无凭据时跳过');
@@ -27,10 +26,7 @@ test.describe('销项开票向导 · 续步记忆守门', () => {
         await enterApp(page);
 
         // 模拟「上次停在第 3 步」的残留记忆(本次是新页面,内存无 st → 不该复原到第 3 步)
-        await page.evaluate(
-            ([k]) => localStorage.setItem(k, JSON.stringify({ step: 3 })),
-            [MEMO_KEY]
-        );
+        await seedStepMemo(page, 'sales-wizard', { step: 3 });
 
         await page.evaluate(() => window.openSalesWizard && window.openSalesWizard());
         await expect(page.locator('.sw-stepper'), '向导步骤条渲染').toBeVisible({
@@ -41,7 +37,7 @@ test.describe('销项开票向导 · 续步记忆守门', () => {
         await expect(steps.nth(0), '第 1 步高亮(全新开始)').toHaveClass(/active/);
         await expect(page.locator('.sw-step.active'), '当前激活步唯一').toHaveCount(1);
 
-        const memo = await page.evaluate(([k]) => localStorage.getItem(k), [MEMO_KEY]);
+        const memo = await readStepMemo(page, 'sales-wizard');
         expect(memo, '降级后记忆已清掉').toBeNull();
 
         assertNoConsoleErrors(expect, guard);

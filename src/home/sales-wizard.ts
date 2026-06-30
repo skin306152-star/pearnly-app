@@ -453,8 +453,7 @@ function resumeWizard(): boolean {
 }
 
 window.openSalesWizard = async function () {
-    const resumed = resumeWizard();
-    if (!resumed) {
+    if (!resumeWizard()) {
         st = freshState();
         cur = 0;
     }

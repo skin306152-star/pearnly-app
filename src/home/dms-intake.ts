@@ -380,8 +380,8 @@ function bind() {
 // 续步:软导航回来时复原到离开的那一步。只在内存态够复原该步时才复原,否则回落第 1 步
 // (硬刷新后内存态已空 → 守门不通过 → 干净从头)。成功页不复原。
 function resumeFlow(): boolean {
-    const memo = readStep('dms-intake');
-    if (!memo || (memo.ctx && memo.ctx !== S.task)) return false;
+    const memo = readStep('dms-intake', S.task);
+    if (!memo) return false;
     if (S.task === 'invoice') {
         if (IV.view !== 'review' && IV.view !== 'submit') return false;
         rerenderInvoice();

@@ -19,7 +19,7 @@
 
 ## 1. 六类文案模板(每类给 key + 泰/中/英 + 槽位)
 
-i18n key 前缀统一 `agent.`。`{xxx}` 是运行时填的槽位。
+i18n key 前缀统一 `agent.`。`{xxx}` 是运行时填的槽位。本文 TH/ZH/EN 是文案源;**ja 按 4 语铁律由 i18n 补全**(`check_i18n --strict` 守门,与现有 `line_correct_i18n.py` 一致)——WP3 已落 4 语,源表不再逐列列 ja。
 
 ### 1.1 反问(ask)—— 缺参数,卡住时
 触发:`slots` 闸判某必填参数没接地。
@@ -47,13 +47,18 @@ i18n key 前缀统一 `agent.`。`{xxx}` 是运行时填的槽位。
 ### 1.3 成功回执(success receipt)—— 工具干完
 结构:✅ 一句结论 + 关键数 + 可选下一步。各工具一个 key。
 
-| key | TH 模板 |
-|---|---|
-| `agent.ok.history` | เดือนนี้สแกนไป {count} ใบ · ยอดรวม {total} บาท{top_list} |
-| `agent.ok.balance` | เครดิตคงเหลือ {balance} บาท · ใช้ไปเดือนนี้ {pages} หน้า |
-| `agent.ok.push` | ✅ ส่งเข้า {endpoint} แล้ว · เลขเอกสาร {bill_no} |
-| `agent.ok.push_dup` | ใบนี้ส่งเข้า {endpoint} ไปแล้ว (เลข {bill_no}) ไม่ส่งซ้ำ | 
-| `agent.ok.recon` | กระทบยอดเสร็จ · ตรงกัน {matched} รายการ ไม่ตรง {unmatched} |
+M1 上线的 5 个 A 档只读工具,每个一个 `agent.ok.*`(前 5 行);push/recon 等 B 档留 M3。
+
+| key | 对应工具(M1) | TH 模板 |
+|---|---|---|
+| `agent.ok.history` | list_history | เดือนนี้สแกนไป {count} ใบ · ยอดรวม {total} บาท{top_list} |
+| `agent.ok.history_summary` | history_summary | สรุปเดือนนี้: {count} ใบ · ยอดรวม {total} บาท{by_category} |
+| `agent.ok.balance` | balance | เครดิตคงเหลือ {balance} บาท · ใช้ไปเดือนนี้ {pages} หน้า |
+| `agent.ok.usage_this_month` | usage_this_month | เดือนนี้ใช้ไป {pages} หน้า · {docs} เอกสาร |
+| `agent.ok.notifications` | list_notifications | มีแจ้งเตือน {count} รายการ{top_list} |
+| `agent.ok.push` | (M3) | ✅ ส่งเข้า {endpoint} แล้ว · เลขเอกสาร {bill_no} |
+| `agent.ok.push_dup` | (M3) | ใบนี้ส่งเข้า {endpoint} ไปแล้ว (เลข {bill_no}) ไม่ส่งซ้ำ |
+| `agent.ok.recon` | (M3) | กระทบยอดเสร็จ · ตรงกัน {matched} รายการ ไม่ตรง {unmatched} |
 
 ### 1.4 超范围引导(out_of_scope)—— C/D 档或非业务
 触发:`kind=out_of_scope`。**不只是拒绝,要指路。**
@@ -62,7 +67,7 @@ i18n key 前缀统一 `agent.`。`{xxx}` 是运行时填的槽位。
 |---|---|---|
 | `agent.oos.app_only` | เรื่องนี้ทำในแอปจะสะดวกกว่า เปิดที่ {app_link} ได้เลย | 这个在 App 里做更方便:{app_link} |
 | `agent.oos.security` | เรื่องบัญชี/รหัสผ่าน ต้องทำในแอปเพื่อความปลอดภัย | 账号/密码相关请到 App,保安全 |
-| `agent.oos.capability` | ผมช่วยได้เรื่อง: ดูประวัติสแกน, เช็คยอดเครดิต, ส่งเข้า ERP, กระทบยอด · ลองพิมพ์มาได้เลย | 我能帮:查识别历史、查余额、推 ERP、对账·说一句试试 |
+| `agent.oos.capability` | ช่วยได้เรื่อง: ดูประวัติสแกน, เช็คยอดเครดิต, ส่งเข้า ERP, กระทบยอด · ลองพิมพ์มาได้เลยค่ะ | 我能帮:查识别历史、查余额、推 ERP、对账·说一句试试 |
 
 > 超范围必带"我能做什么"的出口,别让用户撞墙。
 
@@ -75,7 +80,15 @@ i18n key 前缀统一 `agent.`。`{xxx}` 是运行时填的槽位。
 | `no_endpoint` | ยังไม่ได้ตั้งค่าปลายทาง ERP · ตั้งในแอปก่อนนะ | 还没配 ERP 端点·先去 App 配 |
 | `forbidden` | สิทธิ์ของคุณยังเข้าถึงเมนูนี้ไม่ได้ · ติดต่อแอดมินของบริษัท | 你暂无此权限·找公司管理员 |
 | `history_not_found` | หาเอกสารใบนั้นไม่เจอ · ลองส่งเลขใบเสร็จอีกครั้ง | 找不到那张·重发单号 |
+| `no_tenant` | ยังไม่ได้ผูกบัญชีบริษัท · เปิดในแอปก่อนนะ | 还没绑定公司账套·先到 App 开 |
+| `query_failed` | ดึงข้อมูลไม่สำเร็จ ลองใหม่อีกครั้งนะคะ | 查询失败,稍后再试 |
+| `not_available_yet` | ฟังก์ชันนี้ยังทำผ่านแชทไม่ได้ ทำในแอปได้เลย {app_link} | 这个还不能在对话里做·到 App 操作:{app_link} |
+| `unknown` | ระบบมีปัญหาชั่วคราว ลองใหม่อีกครั้งนะคะ | 系统临时问题,稍后再试 |
 | `_default` | ระบบมีปัญหาชั่วคราว ลองใหม่อีกครั้งนะคะ | 系统临时问题,稍后再试 |
+
+> **★ key 命名锁定(裁判定论 · 两窗口对齐唯一源)**:失败类前缀一律 `agent.failure.*`(**不是 `agent.err.*`**)。
+> `copy_map.py`(WP1 持有)的 `error_code → i18n key` 必须用上表的 `agent.failure.<code>`;`i18n-data.js`(WP3 持有)按上表登记。两边都抄本表,不互改对方文件。
+> **人设锁定**:全站语气一律女性 `ค่ะ/คะ`,§1.4 `agent.oos.capability` 原 "ผม" 已废,改 `ดิฉัน`/省略主语,与全站及 ask 模板一致。
 
 ### 1.6 闲聊/问候(chat)
 复用现成 `services/line_binding/line_voice.py` + `line_expense_qa.reply_pool()` 的自然语气层,不新造。新增仅 `agent.chat.greeting` 等少量,沿用现有池。

@@ -47,7 +47,9 @@ def build_payload() -> dict:
     """6 区 Rich Menu 配置(纯·喂 createRichMenu)。postback displayText 让点按回显友好文字。"""
     return {
         "size": {"width": _W, "height": _H},
-        "selected": True,
+        # 默认折叠:打开对话不强制展开盖住聊天,用户点 chatBarText 才展开。
+        # LINE 不发折叠/展开 webhook,无法逐用户记忆状态,只能定这个默认值。
+        "selected": False,
         "name": MENU_NAME,
         "chatBarText": "เมนู Pearnly",
         "areas": [

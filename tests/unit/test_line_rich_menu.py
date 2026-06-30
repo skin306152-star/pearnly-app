@@ -35,6 +35,11 @@ class PayloadTests(unittest.TestCase):
         self.assertEqual(self.p["size"], {"width": 2500, "height": 1686})
         self.assertEqual(len(self.areas), 6)
 
+    def test_default_collapsed(self):
+        # 默认折叠:不每次强制展开盖聊天。LINE 无折叠 webhook → 无法逐用户记忆,
+        # 只能定默认。改回 True 前先确认产品确实要每次弹开。
+        self.assertFalse(self.p["selected"])
+
     def test_within_bounds(self):
         for a in self.areas:
             b = a["bounds"]

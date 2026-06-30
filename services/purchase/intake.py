@@ -334,7 +334,7 @@ def resolve_image_intake(
 
         cats = _cat_svc.get_tree(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
     except Exception:
-        cats = []
+        pass
     draft = build_draft_from_invoice(fields, kind=kind, categories=cats)
     # 来源透传到单据(line/photo),否则 create_doc 默认 manual 显「手录」
     draft["source"] = source

@@ -42,6 +42,16 @@ LINE webhook   ──►   model via ai_gateway   ──►   services/agent/exe
 - LINE 大脑 `services/expense/line_agent.py:understand()` 已是"一次调用吐 JSON"的范式 + `may_write()` 写闸 + `amount_grounded()` 参数接地 + `line_chat_memory` 多轮记忆 → **新大脑顺着这个骨架长,不另起炉灶**。
 - 路由是薄壳,业务在 service 层 → **Agent 工具挂 service 层**(`services/agent/executor.py`),以用户身份调,复用 `get_cursor_rls` / `require_perm` / `charge_ocr` / `has_recent_successful_push`,**不绕任何安全闸**。
 
+### ★ 两条不可破的能力铁律(Zihao 拍板 2026-07-01 · 每个窗口都守)
+
+1. **能力只增不减(additive-only · 绝不因接 Agent 让用户失去任何已有功能)。**
+   现有 LINE 能力(记账 / 撤销 / 改错 / 查汇总 / 查明细 / 闲聊)一律保留。新大脑**只处理它当前有工具的意图**(M1 = 5 个只读),**凡是它还没有工具的意图,必须自动落回现有可用旧路径**(`understand()`+`_dispatch_agent()`),由旧逻辑照常完成 —— **不许回"去 App 做"把已有能力降级**。只有**新旧 LINE 都不做的事**(改密码 / POS 等 C/D 档)才引导去 App。
+   - 落地:新 loop 对"非自己工具集"的意图 **返回 defer(`None`)→ 跌落旧路**,而不是 `not_available_yet`。
+   - 终态:M3+ 把撤销/改错/记账也做成工具后,Agent 成为旧能力的**超集**;**任何一个里程碑,能力都只多不少**。
+
+2. **前后端同源 · 显示与实际不许矛盾(single-source · honest surface)。**
+   对话(LINE)和按钮(App / 网页)是**同一套后端 service 的两扇门**,调的是同一批函数 → 能力天然一致,不存在"两套各说各话"。文案/状态用 **contract 测试**(前端 `i18n-data.js` 的 `agent.*` key 必须 ⊆ Python 端 `agent_i18n`,对不上=CI 红)+ **状态诚实闸**(失败显失败,绝不把没成功渲染成成功,绝不吐裸 key)双重盯死。
+
 ---
 
 ## 2. 四个安全档(决定一个功能进不进 Agent、怎么进)

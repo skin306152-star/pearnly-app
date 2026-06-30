@@ -13,6 +13,8 @@ from pathlib import Path
 _SRC = Path(__file__).resolve().parents[2] / "src" / "home"
 _REVIEW = _SRC / "dms-intake-review.ts"
 _INVOICE = _SRC / "dms-intake-invoice.ts"
+# 缺口④ 接线后识别机制(含响应→IvResult 映射 ingestResult)抽到此模块
+_RECOGNIZE = _SRC / "dms-intake-invoice-recognize.ts"
 
 
 class ImagePagingRegressionTests(unittest.TestCase):
@@ -35,9 +37,13 @@ class ImagePagingRegressionTests(unittest.TestCase):
         self.assertIn("focusin", src, "应监听 focusin 实现聚焦自动跟随")
 
     def test_page_indices_surfaced(self):
-        src = _INVOICE.read_text(encoding="utf-8")
-        self.assertIn("pageIndices", src, "IvInvoice 应带 pageIndices")
-        self.assertIn("page_indices", src, "应从识别响应 page_indices 透出")
+        # IvInvoice 接口字段仍在主模块;响应 page_indices 透出随 ingestResult 抽到 recognize 模块
+        self.assertIn(
+            "pageIndices", _INVOICE.read_text(encoding="utf-8"), "IvInvoice 应带 pageIndices"
+        )
+        self.assertIn(
+            "page_indices", _RECOGNIZE.read_text(encoding="utf-8"), "应从识别响应 page_indices 透出"
+        )
 
 
 if __name__ == "__main__":

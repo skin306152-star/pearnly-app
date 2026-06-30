@@ -41,11 +41,11 @@ class TestAgentLoop(unittest.TestCase):
         out = loop.handle_turn(
             "อากาศวันนี้", _CTX, decide=_decide(AgentAction(kind="out_of_scope")), history=[]
         )
-        self.assertTrue(out.startswith("[out_of_scope"))
+        self.assertTrue(out.startswith("agent.oos."))
 
     def test_chat(self):
         out = loop.handle_turn("สวัสดี", _CTX, decide=_decide(AgentAction(kind="chat")), history=[])
-        self.assertTrue(out.startswith("[chat"))
+        self.assertTrue(out.startswith("agent.chat."))
 
     def test_ask(self):
         out = loop.handle_turn(
@@ -54,7 +54,7 @@ class TestAgentLoop(unittest.TestCase):
             decide=_decide(AgentAction(kind="ask", ask_field="keyword")),
             history=[],
         )
-        self.assertIn("keyword", out)
+        self.assertTrue(out.startswith("agent.ask."))
 
     def test_tool_happy_path_runs_handler(self):
         ts = _FakeToolset(ToolResult(ok=True, receipt="RECEIPT_OK"))
@@ -75,7 +75,7 @@ class TestAgentLoop(unittest.TestCase):
             decide=_decide(AgentAction(kind="tool", tool="ghost", args={})),
             history=[],
         )
-        self.assertTrue(out.startswith("[out_of_scope"))
+        self.assertTrue(out.startswith("agent.oos."))
 
     def test_fabricated_required_slot_triggers_ask(self):
         spec = ToolSpec(
@@ -96,7 +96,7 @@ class TestAgentLoop(unittest.TestCase):
                 toolset=ts,
                 history=[],
             )
-        self.assertIn("status", out)
+        self.assertTrue(out.startswith("agent.ask."))
         self.assertEqual(ts.calls, [])  # 绝不带编造值执行
 
     def test_b_bucket_requires_confirmation(self):
@@ -119,7 +119,7 @@ class TestAgentLoop(unittest.TestCase):
             confirmed = loop.handle_turn(
                 "ยืนยัน", _CTX, decide=_decide(action), toolset=ts_confirmed, history=[]
             )
-        self.assertTrue(unconfirmed.startswith("[confirm"))
+        self.assertTrue(unconfirmed.startswith("agent.confirm."))
         self.assertEqual(ts_unconfirmed.calls, [])  # 未确认不执行
         self.assertEqual(confirmed, "EXECUTED")  # 确认词后执行
 
@@ -132,7 +132,7 @@ class TestAgentLoop(unittest.TestCase):
             toolset=ts,
             history=[],
         )
-        self.assertTrue(out.startswith("[failure"))
+        self.assertTrue(out.startswith("agent.failure."))
 
 
 if __name__ == "__main__":

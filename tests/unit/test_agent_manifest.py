@@ -6,8 +6,20 @@
 
 import unittest
 
-from services.agent import manifest
+from services.agent import copy_map, manifest
 from services.agent.contracts import ToolSpec
+
+# CONVERSATION-SPEC §1.5 失败码表(键名锁定 · 两窗口对齐唯一源)。
+_SPEC_FAILURE_CODES = {
+    "insufficient_balance",
+    "no_endpoint",
+    "forbidden",
+    "history_not_found",
+    "no_tenant",
+    "query_failed",
+    "not_available_yet",
+    "unknown",
+}
 
 
 class TestAgentManifest(unittest.TestCase):
@@ -50,6 +62,28 @@ class TestAgentManifest(unittest.TestCase):
         with self.assertRaises(Exception):
             manifest.TOOLS[0].name = "x"  # frozen dataclass 不可改
         self.assertIsInstance(manifest.TOOLS[0], ToolSpec)
+
+
+class TestCopyMapKeyAlignment(unittest.TestCase):
+    """键名锁定:失败 agent.failure.* / 成功回执 agent.ok.*(CONVERSATION-SPEC §1.3/§1.5)。"""
+
+    def test_failure_keys_prefixed(self):
+        for code, key in copy_map.ERROR_COPY.items():
+            self.assertTrue(key.startswith("agent.failure."), f"{code}→{key} 应 agent.failure.*")
+
+    def test_spec_failure_codes_covered(self):
+        missing = _SPEC_FAILURE_CODES - set(copy_map.ERROR_COPY)
+        self.assertFalse(missing, f"spec §1.5 失败码未映射:{missing}")
+
+    def test_ok_keys_cover_every_m1_tool(self):
+        self.assertEqual(
+            set(copy_map.OK_COPY), {t.name for t in manifest.TOOLS}, "成功回执 key 应每个工具一个"
+        )
+        for key in copy_map.OK_COPY.values():
+            self.assertTrue(key.startswith("agent.ok."), f"{key} 应 agent.ok.*")
+
+    def test_failure_default_is_spec_default(self):
+        self.assertEqual(copy_map.failure("never_seen_code"), "agent.failure._default")
 
 
 if __name__ == "__main__":

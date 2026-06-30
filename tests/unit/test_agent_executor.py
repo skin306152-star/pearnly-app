@@ -26,7 +26,7 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertEqual(kwargs["status_filter"], "failed")
         self.assertEqual(kwargs["restrict_client_ids"], [5])
         self.assertEqual(kwargs["retention_days"], 90)
-        self.assertIn("receipt.history", res.receipt)
+        self.assertTrue(res.receipt.startswith("agent.ok.history"))
 
     @patch("services.agent.executor.db")
     def test_history_summary_reads_status_counts(self, db):

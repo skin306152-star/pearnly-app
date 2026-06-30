@@ -173,10 +173,23 @@ def _ocr_payment_method(fields: dict) -> Optional[str]:
     return payment_from_ocr(fields.get("payment_method")) or None
 
 
-def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
+def _apply_categories(lines: list, *, vendor: str, categories: list) -> None:
+    """图片票明细就地补科目(确定性规则·复用 LINE 路同款 category_ai.rule_category):商户+品名
+    命中即填本套账真叶子 (category_id, subcategory_id),命中不了留 None(用户在复核屏选)。
+    只在传了科目树时调;纯规则、零 LLM、零网络 → 不拖慢录入热路径。"""
+    from services.expense import category_ai
+
+    for ln in lines:
+        cid, sid = category_ai.rule_category(vendor, ln.get("description", ""), categories)
+        ln["category_id"] = cid
+        ln["subcategory_id"] = sid
+
+
+def build_draft_from_invoice(fields: dict, *, kind: str, categories: list | None = None) -> dict:
     """OCR 抽取 → 进项录入草稿(屏10 预填)。行取自 items,无 items 则按总额单行兜底。
 
     费用类(kind=expense·含截图证据)不带可抵进项 VAT,即便 OCR 读到 vat 也归 0(进项票才抵)。
+    传 categories(本套账科目树)时按确定性规则给每行补 category_id/subcategory_id;不传维持原样。
     """
     fields = normalize_ocr_fields(fields)
     has_vat = kind != "expense" and _to_decimal(fields.get("vat")) > 0
@@ -209,6 +222,10 @@ def build_draft_from_invoice(fields: dict, *, kind: str) -> dict:
         # 行明细之和既不合票面税前小计、也不合票面总额 → OCR 明细乱读(多品项串行/qty 误读·如 7-11
         # 读成 845 ≠ 票面 110)→ 收敛成单行兜底(=票面值),别让错明细之和冒充总额。
         lines = [_single_line(fields, base, vat_rate)]
+    if categories:
+        _apply_categories(
+            lines, vendor=(fields.get("seller_name") or "").strip(), categories=categories
+        )
     draft = {
         "doc_kind": kind,
         "supplier": {
@@ -310,7 +327,15 @@ def resolve_image_intake(
     low_conf = str(confidence or "").lower() in ("needs_review", "low", "")
     fc = dict(field_confidence or {})
 
-    draft = build_draft_from_invoice(fields, kind=kind)
+    # 图片采购票自动归类(确定性规则 → 本套账真实科目树)。加载失败 → 不解析(行留空·维持现状)。
+    cats: list = []
+    try:
+        from services.purchase import categories as _cat_svc
+
+        cats = _cat_svc.get_tree(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
+    except Exception:
+        cats = []
+    draft = build_draft_from_invoice(fields, kind=kind, categories=cats)
     # 来源透传到单据(line/photo),否则 create_doc 默认 manual 显「手录」
     draft["source"] = source
     calc = totals_svc.compute_purchase_totals(

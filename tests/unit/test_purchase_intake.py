@@ -378,5 +378,48 @@ class PaymentDefaultTests(unittest.TestCase):
         self.assertEqual(d["payment_status"], "paid")
 
 
+class ApplyCategoriesTests(unittest.TestCase):
+    # 最小科目树(名与 category_ai._TARGETS 别名对齐 → 规则可解析到真叶子)。
+    TREE = [
+        {
+            "id": "p_food",
+            "name": "ค่าอาหารและรับรอง",
+            "children": [{"id": "c_food", "name": "ค่าอาหาร/เครื่องดื่ม"}],
+        },
+        {
+            "id": "p_fuel",
+            "name": "ค่าเดินทางและขนส่ง",
+            "children": [{"id": "c_fuel", "name": "ค่าน้ำมันเชื้อเพลิง"}],
+        },
+    ]
+
+    def test_no_categories_keeps_lines_uncategorized(self):
+        # 不传科目树(向后兼容):行不带 category_id 键,与历史行为一致。
+        f = {"seller_name": "Bangchak", "items": [{"name": "ดีเซล", "qty": "1", "price": "1780"}]}
+        d = ik.build_draft_from_invoice(f, kind="expense")
+        self.assertNotIn("category_id", d["lines"][0])
+
+    def test_fuel_vendor_item_resolves(self):
+        # 加油票:品名「ดีเซล」→ 油费子科目(确定性规则)。
+        f = {"seller_name": "Bangchak", "items": [{"name": "ดีเซล", "qty": "1", "price": "1780"}]}
+        ln = ik.build_draft_from_invoice(f, kind="expense", categories=self.TREE)["lines"][0]
+        self.assertEqual((ln["category_id"], ln["subcategory_id"]), ("p_fuel", "c_fuel"))
+
+    def test_convenience_food_item_resolves(self):
+        # 7-11 咖啡:品名「อเมริกาโน่」→ 餐饮子科目。
+        f = {
+            "seller_name": "7-Eleven",
+            "items": [{"name": "อเมริกาโน่เย็น", "qty": "1", "price": "45"}],
+        }
+        ln = ik.build_draft_from_invoice(f, kind="expense", categories=self.TREE)["lines"][0]
+        self.assertEqual((ln["category_id"], ln["subcategory_id"]), ("p_food", "c_food"))
+
+    def test_unmatched_stays_none(self):
+        # 商户/品名都对不上 → 留 None(用户在复核屏选),不乱填。
+        f = {"seller_name": "Unknown XYZ", "items": [{"name": "zzz", "qty": "1", "price": "10"}]}
+        ln = ik.build_draft_from_invoice(f, kind="expense", categories=self.TREE)["lines"][0]
+        self.assertIsNone(ln["category_id"])
+
+
 if __name__ == "__main__":
     unittest.main()

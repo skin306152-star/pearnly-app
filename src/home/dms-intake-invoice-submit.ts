@@ -150,7 +150,9 @@ export async function doFinish() {
     if (IV.output.erp && !enabled.length) return showToast(t('dxi-need-erp'), 'warn');
     IV.busy = true;
     renderSubmit();
-    // 终态:无论仅完成 / 导出 / 推送,都先把草稿落进识别记录(staged→正式)。
+    // 终态:① 先把复核面改过的字段(已实时写入 IV.results)全部写进各自记录 →
+    // ② 再 commit 草稿→正式落识别记录。顺序不能反,否则落库的是识别时原值(治"改了不同步")。
+    await persistAllEdits();
     await commitStaged();
     let excelOk = false;
     let erpOk = 0;
@@ -164,6 +166,25 @@ export async function doFinish() {
     IV.busy = false;
     renderResult(excelOk, erpOk, erpFail);
 }
+// 第4步落库前:把所有发票当前字段(复核面改后·已实时写入 IV.results)写进各自记录。
+// 不依赖用户是否点过「保存修改」→ 用户看到什么改值,就一定落进识别记录(治"改了不同步")。
+async function persistAllEdits(): Promise<void> {
+    const puts: Promise<unknown>[] = [];
+    IV.results.forEach((r) => {
+        r.invoices.forEach((inv) => {
+            if (!inv.history_id) return;
+            puts.push(
+                fetch(`/api/history/${encodeURIComponent(inv.history_id)}`, {
+                    method: 'PUT',
+                    headers: authHeaders(true),
+                    body: JSON.stringify({ pages: [{ fields: inv.fields }] }),
+                }).catch(() => {})
+            );
+        });
+    });
+    await Promise.all(puts);
+}
+
 // 把本次草稿记录落进识别记录(staged→正式)。失败不阻断导出/推送(记录仍可经 id 引用)。
 async function commitStaged(): Promise<void> {
     const ids = allHistoryIds();

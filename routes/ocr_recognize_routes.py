@@ -37,8 +37,10 @@ async def ocr_recognize(
 
     content = await file.read()
 
+    # staged=True:网页交互式录入 → 识别先以草稿落库(不进识别记录),待录入第4步
+    # 完成/导出/推送调 /api/ocr/commit 才翻正式。后台 worker / 文件夹自动入口不走本路由(即时可见)。
     outcome = run_recognition_core(
-        user, content, file, client_id=client_id, ws_client_id=_ws_client_id
+        user, content, file, client_id=client_id, ws_client_id=_ws_client_id, staged=True
     )
 
     # PDF 留底后台化:响应返回后才生成 searchable PDF + 回填 pdf_storage_path(前端 has_pdf 届时显示)。

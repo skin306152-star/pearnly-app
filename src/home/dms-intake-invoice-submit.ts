@@ -120,26 +120,38 @@ function summaryHtml() {
         item('dxi-sum-files', String(IV.results.length)) +
         item('dxi-sum-rows', String(totalInvoices())) +
         item('dxi-sum-confirm', '0') +
-        item('dxi-sum-target', IV.output.erp ? targetName() : t('dxi-target-export-only')) +
+        item('dxi-sum-target', targetSummary()) +
         '</div></div>'
     );
 }
+// 目标系统四态:空选=仅入库(只落识别记录)/ 仅导出 / 推送目标 / 导出+推送。
+function targetSummary(): string {
+    const { excel, erp } = IV.output;
+    if (excel && erp) return t('dxi-target-export-push');
+    if (erp) return targetName();
+    if (excel) return t('dxi-target-export-only');
+    return t('dxi-target-staged-only');
+}
 function submitFootHtml() {
+    // 空选 → 按钮=「完成」(仅落识别记录);选了导出/推送 → 「执行导出 / 推送」。两者都先落识别记录。
+    const goKey = IV.output.excel || IV.output.erp ? 'dxi-submit-go' : 'dxi-submit-finish-only';
     return (
         `<div class="dx-foot"><div class="dx-note">${esc(t('dxi-submit-hint'))}</div>` +
         '<div style="display:flex;gap:8px">' +
         `<button class="btn" id="dx-inv-sub-back">${esc(t('dxi-submit-back'))}</button>` +
-        `<button class="btn primary" id="dx-inv-finish"${IV.busy ? ' disabled' : ''}>${esc(t('dxi-submit-go'))}</button></div></div>`
+        `<button class="btn primary" id="dx-inv-finish"${IV.busy ? ' disabled' : ''}>${esc(t(goKey))}</button></div></div>`
     );
 }
 
 export async function doFinish() {
     if (IV.busy) return;
-    if (!IV.output.excel && !IV.output.erp) return showToast(t('dxi-need-output'), 'warn');
+    // 空选合法(= 仅完成入库);只在选了推送但无可用端点时拦。
     const enabled = IV.endpoints.filter((e) => e.enabled !== false);
     if (IV.output.erp && !enabled.length) return showToast(t('dxi-need-erp'), 'warn');
     IV.busy = true;
     renderSubmit();
+    // 终态:无论仅完成 / 导出 / 推送,都先把草稿落进识别记录(staged→正式)。
+    await commitStaged();
     let excelOk = false;
     let erpOk = 0;
     let erpFail = 0;
@@ -151,6 +163,20 @@ export async function doFinish() {
     }
     IV.busy = false;
     renderResult(excelOk, erpOk, erpFail);
+}
+// 把本次草稿记录落进识别记录(staged→正式)。失败不阻断导出/推送(记录仍可经 id 引用)。
+async function commitStaged(): Promise<void> {
+    const ids = allHistoryIds();
+    if (!ids.length) return;
+    try {
+        await fetch('/api/ocr/commit', {
+            method: 'POST',
+            headers: authHeaders(true),
+            body: JSON.stringify({ ids }),
+        });
+    } catch {
+        /* 落库失败:容后(列表可能暂不显示)· 不阻断本次导出/推送 */
+    }
 }
 function allHistoryIds(): string[] {
     const ids: string[] = [];

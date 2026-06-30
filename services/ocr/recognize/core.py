@@ -64,8 +64,13 @@ def run_recognition_core(
     *,
     client_id: Optional[str] = None,
     ws_client_id: Optional[int] = None,
+    staged: bool = False,
 ) -> Dict[str, Any]:
-    """识别核心 · 同步(pipeline/persist/push 全同步)· 调用方负责读 content + 留底调度。"""
+    """识别核心 · 同步(pipeline/persist/push 全同步)· 调用方负责读 content + 留底调度。
+
+    staged=True(仅网页交互式上传):识别记录先以草稿落库,不进识别记录列表,
+    待第4步完成/导出/推送调 /api/ocr/commit 才翻正式。后台/文件夹自动入口不传(即时可见)。
+    """
     plan = user.get("plan", "free")
 
     # PO-4 · 缺套账时回落本租户默认套账(上传记录绝不漏归属写 NULL)。
@@ -300,6 +305,7 @@ def run_recognition_core(
         file_hash=file_hash,
         client_id=client_id,
         _ws_client_id=ws_client_id,
+        staged=staged,
     )
     invoice_groups = _persist["invoice_groups"]
     invoice_count = _persist["invoice_count"]

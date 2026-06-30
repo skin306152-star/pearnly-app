@@ -131,6 +131,16 @@ class TaxIdChecksumTests(unittest.TestCase):
         inv = _inv(seller_tax="0105535134278", buyer_tax="0107538000633")
         self.assertTrue(any("校验位不符" in r for r in evaluate_sanity(inv)))
 
+    def test_dashed_bad_checksum_flagged(self):
+        # 票面带连字符的误读税号:归一去分隔后 13 位但校验不过 → 仍抓。
+        inv = _inv(seller_tax="0-1075-38000-63-3", subtotal="84", total_amount="84")
+        self.assertTrue(any("校验位不符" in r for r in evaluate_sanity(inv)))
+
+    def test_dashed_good_checksum_not_flagged(self):
+        # 同款连字符格式但真值:校验过 → 不误杀。
+        inv = _inv(seller_tax="0-1075-36000-63-3", subtotal="84", total_amount="84")
+        self.assertFalse(any("校验位不符" in r for r in evaluate_sanity(inv)))
+
 
 if __name__ == "__main__":
     unittest.main()

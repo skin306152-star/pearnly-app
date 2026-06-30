@@ -46,6 +46,7 @@ EXPECTED_USERINFO_FIELDS = {
     "can_use_email_ingest",
     "can_use_folder_watch",
     "can_use_smart_alert",
+    "ocr_async_web",
     "can_use_automation",
     "typhoon_quota_monthly",
     "typhoon_used_this_month",

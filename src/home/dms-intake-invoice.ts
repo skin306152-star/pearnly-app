@@ -5,11 +5,12 @@
 //   去重(name+size)/6 路并发/client_id 归属/needs_review·重复·自动推送 透出。
 //   复核/导出/结果在 dms-intake-invoice-submit.ts(控行数)。
 // ============================================================
-/* global t, token, showToast */
-import { S, esc, $, authHeaders } from './dms-intake-core.js';
+/* global t, showToast */
+import { S, esc, $ } from './dms-intake-core.js';
 import { enterSubmit, renderSubmit, doFinish } from './dms-intake-invoice-submit.js';
 import { renderReview, onReviewClick } from './dms-intake-review.js';
 import { imagesToPdf, analyzeImageQuality } from './camera-image-utils.js';
+import { recognizeOne, ctrls, recState } from './dms-intake-invoice-recognize.js';
 
 export type Dict = Record<string, unknown>;
 export interface IvFile {
@@ -61,8 +62,6 @@ export const IV = {
     aborted: false, // 用户点「停止」· worker 据此停拉队列
     view: 'upload' as 'upload' | 'review' | 'submit' | 'success',
 };
-// 在飞请求控制器集合(停止时一次性 abort)
-const ctrls = new Set<AbortController>();
 const IMG = /\.(png|jpe?g|webp|tiff?|bmp|gif)$/i;
 
 export const w = window as unknown as {
@@ -227,75 +226,16 @@ async function addFiles(list: FileList | null | undefined) {
     renderInvoiceUpload();
 }
 
-// ── 步骤 2:识别(6 路并发 · 90s超时/中止 · 网络失败自动重试一次 · 可停止 · 多发票/警告透出)──
-const dupWarn: unknown[] = [];
-let autoPushed = 0;
-let cidCache: unknown = null;
-
-// 单张识别:AbortController + 90s 超时;网络/超时失败自动重试一次;用户停止则取消
-async function recognizeOne(f: IvFile, isRetry: boolean) {
-    f.status = isRetry ? 'retrying' : 'processing';
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 90000);
-    ctrls.add(ctrl);
-    let netErr = false;
-    try {
-        const form = new FormData();
-        form.append('file', f.file, f.name);
-        if (cidCache != null) form.append('client_id', String(cidCache));
-        const r = await fetch('/api/ocr/recognize', {
-            method: 'POST',
-            headers: authHeaders(),
-            body: form,
-            signal: ctrl.signal,
-        });
-        const d = (await r.json().catch(() => ({}))) as Dict;
-        if (!r.ok) {
-            const detail = (d.detail as { code?: string } | string) || 'unknown';
-            const code = typeof detail === 'string' ? detail : detail.code || 'unknown';
-            f.status = 'error';
-            f.errorKey = 'err.' + code;
-            f.canRetry =
-                !/file_too_large|too_many_pages|not_invoice|monthly_limit|need_api_key|not_pdf/.test(
-                    code
-                );
-            return;
-        }
-        f.status = 'success';
-        f.canRetry = false;
-        IV.results.push(ingestResult(d));
-        if (((d.duplicate_warnings as unknown[]) || []).length)
-            dupWarn.push(...(d.duplicate_warnings as unknown[]));
-        if (d.auto_pushed) autoPushed++;
-    } catch {
-        netErr = true;
-    } finally {
-        clearTimeout(timer);
-        ctrls.delete(ctrl);
-    }
-    if (netErr) {
-        if (IV.aborted) {
-            f.status = 'error';
-            f.errorKey = 'status-cancelled';
-            f.canRetry = false;
-            return;
-        }
-        if (!isRetry) return recognizeOne(f, true); // 网络/超时 → 静默重试一次
-        f.status = 'error';
-        f.errorKey = 'dxi-recognize-fail';
-        f.canRetry = true;
-    }
-}
-
+// ── 步骤 2:识别(机制在 dms-intake-invoice-recognize.ts · recognizeOne / ctrls / recState)──
 async function startRecognize() {
     const waiting = IV.files.filter((f) => f.status === 'waiting');
     if (!waiting.length || IV.busy) return;
     IV.busy = true;
     IV.aborted = false;
     ctrls.clear();
-    dupWarn.length = 0;
-    autoPushed = 0;
-    cidCache = typeof w.getCurrentClientId === 'function' ? w.getCurrentClientId() : null;
+    recState.dupWarn.length = 0;
+    recState.autoPushed = 0;
+    recState.cidCache = typeof w.getCurrentClientId === 'function' ? w.getCurrentClientId() : null;
     const total = waiting.length;
     let done = 0;
     renderProcessing(0, total);
@@ -317,8 +257,10 @@ async function startRecognize() {
     await Promise.all(Array.from({ length: Math.min(6, total) }, () => worker()));
     IV.busy = false;
     const failN = waiting.filter((f) => f.status === 'error').length;
-    if (dupWarn.length) showToast(t('dxi-dup-warn').replace('{n}', String(dupWarn.length)), 'warn');
-    if (autoPushed) showToast(t('dxi-auto-pushed').replace('{n}', String(autoPushed)), 'success');
+    if (recState.dupWarn.length)
+        showToast(t('dxi-dup-warn').replace('{n}', String(recState.dupWarn.length)), 'warn');
+    if (recState.autoPushed)
+        showToast(t('dxi-auto-pushed').replace('{n}', String(recState.autoPushed)), 'success');
     if (!IV.results.length) {
         showToast(t('dxi-rev-empty'), 'error');
         renderInvoiceUpload();
@@ -352,42 +294,6 @@ function retryFile(idx: number) {
     f.status = 'waiting';
     f.errorKey = undefined;
     void startRecognize();
-}
-function ingestResult(d: Dict): IvResult {
-    const pages = (d.pages as unknown[]) || [];
-    const raw = (d.invoices as Array<Record<string, unknown>>) || [];
-    // 后端揪出的"发票号格式偏离多数派"张(1-based index)→ 标到对应票
-    const fmtWarnIdx = new Set(
-        ((d.invoice_format_warnings as Array<{ invoice_index?: number }>) || []).map(
-            (w0) => w0.invoice_index
-        )
-    );
-    const invoices: IvInvoice[] = raw.length
-        ? raw.map((x, i) => ({
-              fields: (x.fields as Dict) || {},
-              history_id: (x.history_id as string) || null,
-              idx: (x.source_index as number) || i + 1,
-              total: (x.source_total as number) || raw.length,
-              fmtWarn: fmtWarnIdx.has((x.source_index as number) || i + 1),
-              pageIndices: (x.page_indices as number[]) || [],
-          }))
-        : [
-              {
-                  fields: w.mergeFields ? w.mergeFields(pages) : (pages[0] as Dict) || {},
-                  history_id: (d.history_id as string) || null,
-                  idx: 1,
-                  total: 1,
-              },
-          ];
-    return {
-        filename: (d.filename as string) || '',
-        invoices,
-        history_ids: (d.history_ids as string[]) || (d.history_id ? [d.history_id as string] : []),
-        invoice_count: (d.invoice_count as number) || invoices.length,
-        needs_review:
-            !!d.needs_review || ((d.missed_invoice_warnings as unknown[]) || []).length > 0,
-        from_cache: !!d.from_cache,
-    };
 }
 function renderProcessing(done: number, total: number) {
     const el = $('dx-s-searching');

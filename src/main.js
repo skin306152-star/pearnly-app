@@ -139,6 +139,7 @@ import './home/topbar-avatar.js'; // REFACTOR-C1 · 顶栏三件套/头像菜单
 import './home/recon-subtab-settings.js'; // REFACTOR-C1 · 对账子tab+设置弹窗
 import './home/erp-onboard.js'; // REFACTOR-C1 · ERP 对接新用户引导 modal
 import './home/recon-job-poll.js'; // REFACTOR-C1 · 对账异步任务前端轮询(window._reconPollJob)· 须在 bank-recon-v2 前
+import './home/ocr-job-poll.js'; // 缺口④ · 网页 OCR 异步任务轮询(window._ocrPollJob)· flag OCR_ASYNC_WEB 开时 dms/folder 入口调用
 import './home/recon-center-x.js'; // 2026-06-14 · 对账中心重设计(统一三类型 · 覆盖旧 loadReconcilePage · 须在 recon-center/recon-job-poll/bank-recon-v2 之后)
 import './home/settings-general.js'; // REFACTOR-C1 · 设置→通用面板(语言 select + tz/date/number)
 import './home/sidebar-nav-group.js'; // REFACTOR-C1 · 侧栏可折叠业务流分组(window.expandNavGroupForRoute)

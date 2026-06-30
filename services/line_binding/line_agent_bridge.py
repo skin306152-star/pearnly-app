@@ -30,10 +30,10 @@ def try_agent_turn(bound_user, text, lang, tid, ws, line_user_id, history) -> Op
             tenant_id=tid,
             workspace_client_id=ws,
             line_user_id=line_user_id,
-            lang=lang,
         )
         key = loop.handle_turn(text, ctx, history=history)
         return agent_i18n.render(key, lang) if key is not None else None
     except Exception:
-        logger.warning("[line agent] turn failed; defer to legacy path")
+        # 任何异常一律 defer(铁律:Agent 不许把错误抛给用户);带 uid + 栈便于排障。
+        logger.warning("[line agent] turn failed; defer to legacy (uid=%s)", uid, exc_info=True)
         return None

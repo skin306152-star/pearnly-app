@@ -71,7 +71,6 @@ class AgentContext:
     tenant_id: Optional[str] = None
     workspace_client_id: Optional[Any] = None
     line_user_id: Optional[str] = None
-    lang: str = "th"  # 本轮用户语言(渲染在表现层用 · agent 核心保持文案无关)
     anchors: dict[str, Any] = field(default_factory=dict)
     endpoint_config: dict[str, Any] = field(default_factory=dict)
     prior_results: dict[str, Any] = field(default_factory=dict)

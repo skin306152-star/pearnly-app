@@ -93,6 +93,7 @@ def history_receipt(items: list, total: int) -> str:
 
 
 def history_summary_receipt(counts: dict) -> str:
+    # 槽位 count/by_status 必须与 agent_i18n 的 agent.ok.history_summary 模板对齐(改模板需同步)。
     counts = counts or {}
     total = sum(int(v or 0) for v in counts.values())
     by_status = ", ".join(f"{k} {counts[k]}" for k in sorted(counts) if counts[k]) or "-"

@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import logging
 
+from core import db
+
 logger = logging.getLogger(__name__)
 
 _SQLS = [
@@ -40,8 +42,6 @@ _SQLS = [
 
 def ensure_platform_settings() -> None:
     """建钥匙闸两表(幂等 · 每条独立事务)。挂在 services/startup.py 的 boot_ensures。"""
-    from core import db
-
     for sql in _SQLS:
         try:
             with db.get_cursor(commit=True) as cur:

@@ -16,13 +16,13 @@ import json
 import logging
 from typing import Any, Optional
 
+from core import db
+
 logger = logging.getLogger(__name__)
 
 
 def get_setting(key: str) -> Optional[dict]:
     """读一条设置;不存在返 None。value 为 psycopg2 已解析的 dict(jsonb)。"""
-    from core import db
-
     with db.get_cursor() as cur:
         cur.execute(
             "SELECT key, value, enabled, updated_at, updated_by "
@@ -35,8 +35,6 @@ def get_setting(key: str) -> Optional[dict]:
 
 def set_setting(key: str, value: Any, enabled: bool, by: Optional[str] = None) -> None:
     """upsert 一条设置(总闸 + 灰度策略)。by = 操作超管 user_id(审计)。"""
-    from core import db
-
     with db.get_cursor(commit=True) as cur:
         cur.execute(
             """INSERT INTO platform_settings (key, value, enabled, updated_at, updated_by)
@@ -52,8 +50,6 @@ def set_setting(key: str, value: Any, enabled: bool, by: Optional[str] = None) -
 
 def list_allowlist(key: str) -> list[str]:
     """返回某设置 allowlist 内的 user_id(str)列表。"""
-    from core import db
-
     with db.get_cursor() as cur:
         cur.execute(
             "SELECT user_id::text AS user_id FROM platform_setting_allowlist "
@@ -64,8 +60,6 @@ def list_allowlist(key: str) -> list[str]:
 
 
 def add_to_allowlist(key: str, user_id: str) -> None:
-    from core import db
-
     with db.get_cursor(commit=True) as cur:
         cur.execute(
             "INSERT INTO platform_setting_allowlist (setting_key, user_id) "
@@ -75,8 +69,6 @@ def add_to_allowlist(key: str, user_id: str) -> None:
 
 
 def remove_from_allowlist(key: str, user_id: str) -> None:
-    from core import db
-
     with db.get_cursor(commit=True) as cur:
         cur.execute(
             "DELETE FROM platform_setting_allowlist WHERE setting_key = %s AND user_id = %s",
@@ -106,8 +98,6 @@ def is_enabled_for_user(key: str, user_id: Optional[str]) -> bool:
             return True
         if not user_id:
             return False
-        from core import db
-
         with db.get_cursor() as cur:
             cur.execute(
                 "SELECT 1 FROM platform_setting_allowlist "

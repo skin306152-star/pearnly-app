@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import logging
+import uuid as _uuid
 
 from fastapi import APIRouter, HTTPException, Request
 
@@ -27,6 +28,28 @@ logger = logging.getLogger("mr-pilot")
 router = APIRouter()
 
 _ROLLOUTS = ("allowlist", "all")
+
+
+def _resolve_user_id(raw: str) -> str:
+    """把超管输入解析成真实 user_id:支持填邮箱(没人记 UUID)→ 查 users 表换 id。
+    空 / 查不到 / 非法 UUID → 400/404 友好报错,绝不让坏值插进 UUID 列触发 500。"""
+    raw = (raw or "").strip()
+    if not raw:
+        raise HTTPException(400, detail="platform_settings.missing_user_id")
+    if "@" in raw:
+        with db.get_cursor() as cur:
+            cur.execute(
+                "SELECT id::text AS id FROM users WHERE lower(email) = lower(%s) LIMIT 1",
+                (raw,),
+            )
+            row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, detail="platform_settings.user_email_not_found")
+        return row["id"]
+    try:
+        return str(_uuid.UUID(raw))
+    except (ValueError, AttributeError, TypeError):
+        raise HTTPException(400, detail="platform_settings.bad_user_id")
 
 
 def _enrich_users(user_ids: list[str]) -> list[dict]:
@@ -84,23 +107,19 @@ async def set_platform_settings(request: Request):
 
 @router.post("/api/admin/platform-settings/allowlist/add")
 async def add_allowlist_user(request: Request):
-    """加灰度用户。body: {user_id}。"""
+    """加灰度用户。body: {user_id}(可填邮箱或 UUID)。"""
     _require_super_admin(request)
     body = await request.json()
-    user_id = (body.get("user_id") or "").strip()
-    if not user_id:
-        raise HTTPException(400, detail="platform_settings.missing_user_id")
+    user_id = _resolve_user_id(body.get("user_id") or "")
     store.add_to_allowlist(AGENT_ENABLED_KEY, user_id)
     return {"ok": True, "allowlist": _enrich_users(store.list_allowlist(AGENT_ENABLED_KEY))}
 
 
 @router.post("/api/admin/platform-settings/allowlist/remove")
 async def remove_allowlist_user(request: Request):
-    """移除灰度用户。body: {user_id}。"""
+    """移除灰度用户。body: {user_id}(可填邮箱或 UUID)。"""
     _require_super_admin(request)
     body = await request.json()
-    user_id = (body.get("user_id") or "").strip()
-    if not user_id:
-        raise HTTPException(400, detail="platform_settings.missing_user_id")
+    user_id = _resolve_user_id(body.get("user_id") or "")
     store.remove_from_allowlist(AGENT_ENABLED_KEY, user_id)
     return {"ok": True, "allowlist": _enrich_users(store.list_allowlist(AGENT_ENABLED_KEY))}

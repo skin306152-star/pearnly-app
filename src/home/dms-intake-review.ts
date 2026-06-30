@@ -3,8 +3,8 @@
 //   点文件行「查看结果」→ 识别结果就地展开在该行下方(只开一行);
 //   左字段卡可直接编辑(核心6 + 展开全部字段含明细行表) · 右原图卡边看边改
 //   (拖拽 / 滚轮缩放 / 放大缩小 / 旋转 / 重置 / 双击)。
-//   多发票 PDF → 同面板堆叠 N 组字段 + 右侧查看器「按发票翻」(发票 i/N):翻到 / 聚焦
-//   哪张发票,查看器据其 page_indices 自动渲染该张所在物理页,不再写死第 1 页漏看后面的票。
+//   多发票 PDF → 同面板堆叠 N 组字段 + 右侧复用共享 image-viewer.ts(识别记录/异常同款):
+//   按物理页翻(‹ 1/N ›)看到每一页,治「一份多页 PDF 只渲第一页」。不再各写一套查看器。
 //   字段编辑经「保存修改」真持久化到各张 ocr_history;确认态(IV.confirmed)仍纯前端视觉。
 //   从 invoice-submit.ts 拆出以控行数。
 // ============================================================
@@ -12,6 +12,7 @@
 import { esc, $, authHeaders } from './dms-intake-core.js';
 import { IV, ext, showStepInv } from './dms-intake-invoice.js';
 import type { Dict, IvInvoice, IvResult } from './dms-intake-invoice.js';
+import { imageViewerHtml, mountImageViewer } from './image-viewer.js';
 
 // 复核预览字段(复用 OCR 抽屉字段标签键)
 const REV_CORE: Array<[string, string]> = [
@@ -43,12 +44,9 @@ function passable(r: IvResult): boolean {
     return !r.needs_review && fileWarns(r) === 0;
 }
 
-// 原图缓存(history_id → objectURL) + 查看器变换态(同一刻只一个面板展开)
-const imgCache = new Map<string, string>(); // key: `${hid}:${page}` → objectURL
-let vstate = { x: 0, y: 0, scale: 1, rot: 0 };
-let vInv = 0; // 查看器当前显示第几张发票(0-based)· 翻页单位 = 发票而非物理页
+// 原图查看器复用识别记录/异常同款共享件(image-viewer.ts · 按物理页翻 + 缩放/旋转/全屏)·
+// 同一刻只一个面板挂载,重渲先清旧实例。
 let viewerCleanup: (() => void) | null = null;
-const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 export function renderReview() {
     IV.view = 'review';
@@ -145,13 +143,10 @@ function invoiceGroupHtml(fi: number, ii: number, inv: IvInvoice): string {
     };
     const core = REV_CORE.map(cell).join('');
     const more = REV_MORE.map(cell).join('');
-    // data-iv-show:聚焦 / 点这组任意处 → 右侧查看器自动切到该张发票(自动跟随,无需按钮)
     return (
-        `<div class="dx-inv-grp" data-iv-show="${ii}">` +
         head +
         `<div class="dx-review-grid">${core}</div>` +
-        `<div class="dx-extra"><div class="dx-review-grid">${more}</div>${itemsTableHtml(inv)}</div>` +
-        '</div>'
+        `<div class="dx-extra"><div class="dx-review-grid">${more}</div>${itemsTableHtml(inv)}</div>`
     );
 }
 
@@ -185,23 +180,13 @@ function fieldsFootHtml(): string {
 function imageCardHtml(r: IvResult): string {
     const noimg = !r.history_ids.length;
     return (
-        `<div class="dx-imgcard${noimg ? ' noimg' : ''}"><div class="dx-vtoolbar">` +
-        `<div class="dx-vtitle">${esc(t('dxi-rev-viewer-title'))}</div><div class="dx-vctrls">` +
-        '<span class="dx-vpage" style="display:none">' +
-        '<button class="dx-icon-btn dx-page-prev" title="‹">‹</button>' +
-        '<span class="dx-vpageno">1/1</span>' +
-        '<button class="dx-icon-btn dx-page-next" title="›">›</button></span>' +
-        '<button class="dx-icon-btn dx-zoom-out" title="−">−</button>' +
-        '<span class="dx-zoom">100%</span>' +
-        '<button class="dx-icon-btn dx-zoom-in" title="+">＋</button>' +
-        '<button class="dx-icon-btn dx-rotate" title="↻">↻</button>' +
-        '<button class="dx-icon-btn dx-reset" title="⟲">⟲</button></div></div>' +
-        '<div class="dx-viewport"><div class="dx-canvas">' +
-        '<img class="dx-rimg" draggable="false" alt="">' +
-        '</div>' +
-        `<div class="dx-vempty">${esc(t('dxi-rev-noimg'))}</div>` +
-        `<div class="dx-vloading"><span class="dx-vspin"></span>${esc(t('dxi-rev-loading'))}</div>` +
-        `<div class="dx-vhelp">${esc(t('dxi-rev-viewer-help'))}</div></div></div>`
+        `<div class="dx-imgcard${noimg ? ' noimg' : ''}">` +
+        imageViewerHtml({
+            hint: t('imgv-hint'),
+            noimg: t('imgv-noimg'),
+            loading: t('imgv-loading'),
+        }) +
+        '</div>'
     );
 }
 
@@ -278,20 +263,6 @@ export function onReviewClick(tg: HTMLElement): boolean {
         btn.textContent = t(on ? 'dxi-rev-toggle-less' : 'dxi-rev-toggle-all');
         return true;
     }
-    if (tg.closest('.dx-page-prev')) return (gotoInvoice(vInv - 1), true);
-    if (tg.closest('.dx-page-next')) return (gotoInvoice(vInv + 1), true);
-    if (tg.closest('.dx-zoom-in')) return (zoomBy(0.15), true);
-    if (tg.closest('.dx-zoom-out')) return (zoomBy(-0.15), true);
-    if (tg.closest('.dx-rotate')) {
-        vstate.rot = (vstate.rot + 90) % 360;
-        applyViewer();
-        return true;
-    }
-    if (tg.closest('.dx-reset')) {
-        vstate = { x: 0, y: 0, scale: 1, rot: 0 };
-        applyViewer();
-        return true;
-    }
     if (tg.closest('.dx-save-one')) {
         void saveOpenFileEdits(tg.closest('.dx-save-one'));
         return true;
@@ -324,21 +295,8 @@ function nextUnconfirmed(from: number): number {
 function openPanel(): HTMLElement | null {
     return document.querySelector('.dx-acc-item.open .dx-acc-panel');
 }
-function zoomBy(d: number) {
-    vstate.scale = clamp(vstate.scale + d, 0.4, 3.4);
-    applyViewer();
-}
-function applyViewer() {
-    const panel = openPanel();
-    if (!panel) return;
-    const canvas = panel.querySelector('.dx-canvas') as HTMLElement | null;
-    const label = panel.querySelector('.dx-zoom');
-    if (canvas)
-        canvas.style.transform = `translate(calc(-50% + ${vstate.x}px), calc(-50% + ${vstate.y}px)) scale(${vstate.scale}) rotate(${vstate.rot}deg)`;
-    if (label) label.textContent = Math.round(vstate.scale * 100) + '%';
-}
-
-// 展开后:加载原图 + 接拖拽/滚轮(只对当前展开面板 · 重渲先清旧 window 监听)
+// 展开后:把共享查看器挂到 .dx-imgcard(内含 .pv-viewer)· 各张发票共用整份留底 PDF,
+// 用首张记录 + 物理页翻页(‹ 1/N ›)即可翻到每张票所在页。重渲先清旧实例。
 function bindOpenViewer() {
     if (viewerCleanup) {
         viewerCleanup();
@@ -348,139 +306,8 @@ function bindOpenViewer() {
     const panel = openPanel();
     const r = IV.results[IV.openIdx];
     if (!panel || !r) return;
-    vstate = { x: 0, y: 0, scale: 1, rot: 0 };
-    vInv = 0;
-    applyViewer();
-    updatePageIndicator(panel);
-    void loadImage(panel, r, vInv);
-
-    const viewport = panel.querySelector('.dx-viewport') as HTMLElement | null;
-    if (!viewport) return;
-
-    // 自动跟随:聚焦 / 点哪张发票的字段组 → 查看器切到那张(无需任何按钮)。
-    // focusin 接住键盘/鼠标聚焦输入框;click 兜住点击组内非可聚焦处(标题等)·重复触发被
-    // gotoInvoice 的 next===vInv 早返吸收。
-    const fields = panel.querySelector('.dx-fields') as HTMLElement | null;
-    const follow = (e: Event) => {
-        const grp = (e.target as HTMLElement).closest('[data-iv-show]') as HTMLElement | null;
-        if (grp) gotoInvoice(+(grp.dataset.ivShow || '0'));
-    };
-    fields?.addEventListener('focusin', follow);
-    fields?.addEventListener('click', follow);
-
-    let drag = false;
-    let sx = 0;
-    let sy = 0;
-    let ox = 0;
-    let oy = 0;
-    viewport.addEventListener('mousedown', (e) => {
-        drag = true;
-        sx = e.clientX;
-        sy = e.clientY;
-        ox = vstate.x;
-        oy = vstate.y;
-        viewport.classList.add('dragging');
-    });
-    const move = (e: MouseEvent) => {
-        if (!drag) return;
-        vstate.x = ox + (e.clientX - sx);
-        vstate.y = oy + (e.clientY - sy);
-        applyViewer();
-    };
-    const up = () => {
-        drag = false;
-        viewport.classList.remove('dragging');
-    };
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', up);
-    viewport.addEventListener(
-        'wheel',
-        (e) => {
-            e.preventDefault();
-            zoomBy(e.deltaY < 0 ? 0.1 : -0.1);
-        },
-        { passive: false }
-    );
-    viewport.addEventListener('dblclick', () => {
-        vstate = { x: 0, y: 0, scale: 1.6, rot: 0 };
-        applyViewer();
-    });
-    viewerCleanup = () => {
-        window.removeEventListener('mousemove', move);
-        window.removeEventListener('mouseup', up);
-        fields?.removeEventListener('focusin', follow);
-        fields?.removeEventListener('click', follow);
-    };
-}
-
-// 该张发票占的物理页(1-based,后端 page_indices 给,可信)· 缺则回落第 1 页。
-function pageOfInvoice(r: IvResult, invIdx: number): number {
-    const pi = r.invoices[invIdx]?.pageIndices;
-    return pi && pi.length ? pi[0] : 1;
-}
-
-function updatePageIndicator(panel: HTMLElement) {
-    const r = IV.results[IV.openIdx];
-    const n = r ? r.invoices.length : 1;
-    const wrap = panel.querySelector('.dx-vpage') as HTMLElement | null;
-    const no = panel.querySelector('.dx-vpageno');
-    if (no) no.textContent = `${vInv + 1}/${n}`;
-    if (wrap) wrap.style.display = n > 1 ? '' : 'none';
-}
-
-// 切到第 invIdx 张发票(翻页箭头 / 自动跟随聚焦)· 已是当前张则不重载(避免聚焦每个字段都闪)。
-function gotoInvoice(invIdx: number) {
-    const panel = openPanel();
-    const r = IV.results[IV.openIdx];
-    if (!panel || !r) return;
-    const next = clamp(invIdx, 0, r.invoices.length - 1);
-    if (next === vInv) return;
-    vInv = next;
-    vstate = { x: 0, y: 0, scale: 1, rot: 0 };
-    applyViewer();
-    updatePageIndicator(panel);
-    void loadImage(panel, r, vInv);
-}
-
-async function loadImage(panel: HTMLElement, r: IvResult, invIdx: number) {
-    const img = panel.querySelector('.dx-rimg') as HTMLImageElement | null;
-    const card = panel.querySelector('.dx-imgcard');
-    // 各张发票共用整份留底 PDF → 用该张自己的记录 + 它的物理页,缺则回落首张记录。
-    const hid = r.history_ids[invIdx] || r.history_ids[0];
-    const page = pageOfInvoice(r, invIdx);
-    if (!img || !card) return;
-    if (!hid) {
-        card.classList.add('noimg');
-        return;
+    const pane = panel.querySelector('.dx-imgcard') as HTMLElement | null;
+    if (pane?.querySelector('.pv-viewer')) {
+        viewerCleanup = mountImageViewer(pane, r.history_ids[0] || null);
     }
-    const key = `${hid}:${page}`;
-    const cached = imgCache.get(key);
-    if (cached) {
-        img.src = cached;
-        return;
-    }
-    // 留底 PDF 是识别返回后【异步后台】回填(几秒后才落盘)· 首次 404 = 还没就绪 →
-    // 轮询重试等它,别一次 404 就永久判「原图不可用」。面板被收起/重渲(isConnected=false)即放弃。
-    card.classList.add('loading');
-    for (let attempt = 0; attempt < 8; attempt++) {
-        if (!panel.isConnected || vInv !== invIdx) return; // 已翻走 → 放弃这张的在途请求
-        try {
-            const resp = await fetch(`/api/history/${encodeURIComponent(hid)}/page/${page}.png`, {
-                headers: authHeaders(),
-            });
-            if (resp.ok) {
-                const url = URL.createObjectURL(await resp.blob());
-                imgCache.set(key, url);
-                card.classList.remove('loading');
-                if (vInv === invIdx) img.src = url; // 仍停在这张才贴图
-                return;
-            }
-            if (resp.status !== 404) break; // 渲染失败等硬错 → 不再等
-        } catch {
-            break; // 网络错 → 停
-        }
-        await new Promise((res) => setTimeout(res, 1200));
-    }
-    card.classList.remove('loading');
-    card.classList.add('noimg');
 }

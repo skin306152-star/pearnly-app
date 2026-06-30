@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-"""回归守门:多票复核原图必须能看到每张票所在物理页,不能写死只取 page/1.png。
+"""回归守门:录入工作台复核原图必须能看到每一页,且复用共享查看器(不再各写一套)。
 
-血泪:一份 3 票 PDF 跨 2 物理页,原图却恒取 page/1.png → 第三张(第 2 页)的图永远
-看不到("三票只显示两图")。修法 = 查看器「按发票翻」+ 聚焦自动跟随:翻 / 聚焦哪张票,
-据其 page_indices 渲染该张所在物理页。此测试钉住该机制(不写死页码、无人工按钮)。
+血泪:一份 3 票 PDF 跨 2 物理页,录入工作台曾自写一套 .dx- 查看器、写死 page/1.png →
+第 3 张(第 2 页)永远看不到("三票两图")。而识别记录/异常用的是共享 image-viewer.ts,
+多页翻页修复只打在共享件上,自写那套一次次掉队("修过又出现")。修法 = 录入工作台改复用
+共享 image-viewer.ts(按物理页翻 ‹1/N›),一处修复三处生效。此测试钉死复用,防再各写一套。
 """
 
-import re
 import unittest
 from pathlib import Path
 
@@ -15,26 +15,26 @@ _REVIEW = _SRC / "dms-intake-review.ts"
 _INVOICE = _SRC / "dms-intake-invoice.ts"
 # 缺口④ 接线后识别机制(含响应→IvResult 映射 ingestResult)抽到此模块
 _RECOGNIZE = _SRC / "dms-intake-invoice-recognize.ts"
+_VIEWER = _SRC / "image-viewer.ts"
 
 
 class ImagePagingRegressionTests(unittest.TestCase):
-    def test_loadimage_is_page_parameterized(self):
+    def test_review_reuses_shared_viewer(self):
+        # 录入工作台复用共享查看器,不再自写 → 多页翻页一处修复三处生效。
         src = _REVIEW.read_text(encoding="utf-8")
-        self.assertNotIn("/page/1.png", src, "原图不应写死 page/1.png(治三票两图)")
-        self.assertRegex(src, r"/page/\$\{page\}\.png", "原图 fetch 应按 page 参数化")
-        # 页码必须来自该张发票的 page_indices,不能写死
-        self.assertIn("pageOfInvoice", src, "物理页应据发票 page_indices 推导")
-        self.assertIn("pageIndices", src, "应读发票 page_indices")
-        self.assertIn("pi[0]", src, "取该票首个物理页")
+        self.assertIn("image-viewer", src, "应 import 共享查看器 image-viewer.ts")
+        self.assertIn("mountImageViewer", src, "应挂载共享查看器")
+        self.assertIn("imageViewerHtml", src, "应用共享查看器 HTML")
+        # 不应再有自写查看器残留(各写一套正是反复回归的根因)
+        for dead in ("dx-rimg", "dx-viewport", "loadImage", "gotoInvoice"):
+            self.assertNotIn(dead, src, f"自写查看器残留:{dead}")
 
-    def test_per_invoice_nav_and_autofollow(self):
-        src = _REVIEW.read_text(encoding="utf-8")
-        self.assertNotIn("dx-inv-viewpage", src, "不应有人工「看此张原图」按钮(改自动跟随)")
-        self.assertIn("dx-page-next", src, "应有按发票翻页控件")
-        self.assertIn("gotoInvoice", src, "翻页单位应为发票(gotoInvoice)")
-        # 自动跟随:聚焦发票字段组 → 查看器切到该张
-        self.assertIn("data-iv-show", src, "发票组应带 data-iv-show 供自动跟随定位")
-        self.assertIn("focusin", src, "应监听 focusin 实现聚焦自动跟随")
+    def test_shared_viewer_is_page_parameterized(self):
+        # 多页翻页引擎在共享件:按 page 取图 + X-Page-Count 决定翻页,绝不写死第 1 页。
+        src = _VIEWER.read_text(encoding="utf-8")
+        self.assertNotIn("/page/1.png", src, "不应写死 page/1.png")
+        self.assertRegex(src, r"/page/\$\{[^}]+\}\.png", "原图 fetch 应按 page 参数化")
+        self.assertIn("X-Page-Count", src, "应读 X-Page-Count 决定能否翻页")
 
     def test_page_indices_surfaced(self):
         # IvInvoice 接口字段仍在主模块;响应 page_indices 透出随 ingestResult 抽到 recognize 模块

@@ -262,22 +262,8 @@
 .dmsx .dx-fields-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;border-top:1px dashed var(--dx-line);padding-top:11px;flex-wrap:wrap}
 .dmsx .dx-fields-foot-a{display:flex;gap:8px}
 .dmsx .dx-imgcard{border:1px solid var(--dx-line);border-radius:12px;background:var(--card);overflow:hidden}
-.dmsx .dx-vtoolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 11px;border-bottom:1px solid var(--dx-line)}
-.dmsx .dx-vtitle{font-size:10px;font-weight:800;color:var(--ink2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dmsx .dx-vctrls{display:flex;align-items:center;gap:5px}
-.dmsx .dx-icon-btn{width:28px;height:28px;border:1px solid var(--dx-line);border-radius:8px;background:var(--card);color:var(--ink);font-size:13px;font-weight:800;display:grid;place-items:center;cursor:pointer}
-.dmsx .dx-icon-btn:hover{border-color:var(--dx-brand);color:var(--dx-brand)}
-.dmsx .dx-zoom{min-width:42px;text-align:center;font-size:10px;color:var(--ink2);font-weight:800}
-.dmsx .dx-viewport{height:460px;position:relative;overflow:hidden;background:var(--bg);cursor:grab;touch-action:none}
-.dmsx .dx-viewport.dragging{cursor:grabbing}
-.dmsx .dx-canvas{position:absolute;left:50%;top:50%;transform-origin:center center;will-change:transform}
-.dmsx .dx-rimg{display:block;max-width:none;width:380px;border-radius:5px;box-shadow:var(--dx-shadow);user-select:none;pointer-events:none;background:var(--card)}
-.dmsx .dx-vempty,.dmsx .dx-vloading{display:none;position:absolute;inset:0;place-items:center;gap:9px;color:var(--ink2);font-size:11px;text-align:center;padding:20px}
-.dmsx .dx-imgcard.noimg .dx-canvas{display:none}
-.dmsx .dx-imgcard.noimg .dx-vempty{display:grid}
-.dmsx .dx-imgcard.loading .dx-vloading{display:grid;grid-auto-flow:row}
-.dmsx .dx-vspin{width:26px;height:26px;border-radius:50%;border:3px solid var(--dx-line);border-top-color:var(--dx-brand);animation:dxspin .8s linear infinite}
-.dmsx .dx-vhelp{position:absolute;left:11px;bottom:11px;background:var(--card);border:1px solid var(--dx-line);border-radius:9px;padding:6px 9px;font-size:9px;color:var(--ink2);max-width:78%}
+/* 复用共享查看器 image-viewer.ts(.pv-*)· 在录入工作台里给固定高度、去内层重复边框 */
+.dmsx .dx-imgcard .pv-viewer{height:460px;border:0;border-radius:0}
 /* 上传队列:紧凑可滚动 + × 内联(防几十/上百文件硬堆、按钮被挤到底) */
 .dmsx .dx-two{align-items:start}
 .dmsx .dx-qlist{display:grid;gap:7px;max-height:340px;overflow:auto;padding-right:2px;margin-top:4px}
@@ -292,8 +278,6 @@
 .dmsx .dx-inv-head{font-size:10px;font-weight:800;color:var(--dx-brand);margin:12px 2px 6px;padding-top:9px;border-top:1px dashed var(--dx-line)}
 .dmsx .dx-fields .dx-inv-head:first-of-type{border-top:0;padding-top:0;margin-top:2px}
 .dmsx .dx-inv-fmtwarn{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:8px;font-size:9px;font-weight:700;color:#92400e;background:var(--amber-weak);border:1px solid var(--amber-line)}
-.dmsx .dx-vpage{display:inline-flex;align-items:center;gap:2px;margin-right:6px}
-.dmsx .dx-vpageno{font-size:11px;font-weight:700;color:var(--dx-ink,#334155);min-width:30px;text-align:center}
 .dmsx .dx-recheck-banner{border:1px solid var(--dx-amber-line);background:var(--dx-amber-soft);color:var(--dx-amber);border-radius:11px;padding:10px 12px;font-size:11px;font-weight:700;margin-bottom:11px}
 .dmsx .dx-rv{background:var(--bg);border-radius:10px;padding:9px}
 .dmsx .dx-rv.warn{background:var(--dx-amber-soft);border:1px solid var(--dx-amber-line)}
@@ -331,7 +315,7 @@
   .dmsx .dx-scan,.dmsx .dx-review-grid{grid-template-columns:1fr 1fr}
   .dmsx .dx-rgrid,.dmsx .dx-rgrid.image-left{grid-template-columns:1fr}
   .dmsx .dx-rgrid.image-left .dx-fields,.dmsx .dx-rgrid.image-left .dx-imgcard{order:0}
-  .dmsx .dx-viewport{height:380px}
+  .dmsx .dx-imgcard .pv-viewer{height:380px}
   .dmsx .dx-stepper{grid-template-columns:repeat(2,1fr)}
   .dmsx .dx-step:not(:last-child):after{display:none}
   .dmsx .dx-cmp{overflow:auto}

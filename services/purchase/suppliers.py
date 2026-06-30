@@ -94,14 +94,46 @@ def get_supplier(
     return cur.fetchone()
 
 
+def _find_by_canonical_brand(cur, *, tenant_id, workspace_client_id, brand) -> Optional[dict]:
+    """已知大连锁:在本套账按归一品牌键找既有供应商。
+
+    税号缺失时(便利店随手记账常无税号)也能并 7-Eleven/711 这类同一连锁的不同写法,
+    避免各建一个供应商。仅 create_supplier 在 is_known_brand 命中时调用。
+    """
+    from services.expense import merchant
+
+    cur.execute(
+        f"SELECT {_SELECT} FROM suppliers " "WHERE tenant_id = %s AND workspace_client_id = %s",
+        (tenant_id, workspace_client_id),
+    )
+    for row in cur.fetchall():
+        if merchant.canonical_merchant(row["name"], row.get("tax_id") or "") == brand:
+            return row
+    return None
+
+
 def create_supplier(cur, *, tenant_id: str, workspace_client_id: int, **fields) -> dict:
-    """建供应商。给了税号且本套账已存在 → 返回既有(AI 匹配语义,不重复建)。"""
+    """建供应商。给了税号且本套账已存在 → 返回既有(AI 匹配语义,不重复建)。
+
+    无税号但属已知大连锁 → 按归一品牌键复用既有(治 7-Eleven/711 各建一个供应商);
+    通用小店名不并(防误并两个不同的同名小店)。
+    """
+    from services.expense import merchant
+
     data = _clean(fields)
     existing = find_by_tax_id(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, tax_id=data["tax_id"]
     )
     if existing is not None:
         return existing
+    if data["name"] and merchant.is_known_brand(data["name"]):
+        brand = merchant.canonical_merchant(data["name"], data["tax_id"] or "")
+        if brand:
+            hit = _find_by_canonical_brand(
+                cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, brand=brand
+            )
+            if hit is not None:
+                return hit
     cur.execute(
         f"INSERT INTO suppliers (tenant_id, workspace_client_id, {', '.join(_COLS)}) "
         "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) "

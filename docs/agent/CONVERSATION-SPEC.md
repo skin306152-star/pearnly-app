@@ -30,6 +30,11 @@ i18n key 前缀统一 `agent.`。`{xxx}` 是运行时填的槽位。本文 TH/ZH
 | `agent.ask.amount` | จำนวนเงินเท่าไหร่คะ | 金额多少? | What's the amount? |
 | `agent.ask.endpoint` | จะส่งเข้าระบบไหนคะ (มี {endpoints}) | 推到哪个端点?(有 {endpoints}) | Which ERP endpoint? ({endpoints}) |
 | `agent.ask.period` | ช่วงไหนคะ เช่น เดือนนี้ หรือ มิถุนายน | 哪个区间?如本月/六月 | Which period? e.g. this month |
+| `agent.ask.keyword` | หาคำว่าอะไรคะ เช่น ชื่อร้านหรือเลขใบเสร็จ | 找什么关键词?如店名/单号 | Search for what? e.g. shop name or invoice no. |
+| `agent.ask.status` | ดูสถานะไหนคะ: ยืนยันแล้ว / รอดำเนินการ / ล้มเหลว | 看哪个状态?已确认/待处理/失败 | Which status? confirmed / pending / failed |
+
+> 注:`keyword`/`status` 是只读工具的**可选** slot,M1 正常不触发反问(loop 只问必填缺口);
+> 补这两 key 是给"结果太多让用户缩小范围"等未来场景兜底,也消除 copy_map 已引用却无 i18n 的 latent 缺口。
 
 > 规则:反问只问**当前缺的那一个**(`chk.missing[0]`),不一次抛一堆。问完记 pending,等用户补。
 

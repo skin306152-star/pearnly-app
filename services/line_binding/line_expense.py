@@ -121,6 +121,19 @@ def handle_expense_text(
             _pool("amount_missing")
             return True
 
+        # 2a. 对话 Agent 插座(WP5 钥匙闸):灰度命中 + 余额够先试新 Agent;只接管有工具的意图,
+        #     返 None(defer)则一行不改地落回下方旧 understand()+_dispatch_agent()(能力只增不减)。
+        if _ocr_balance_ok(bound_user):
+            from services.line_binding import line_agent_bridge
+
+            agent_reply = line_agent_bridge.try_agent_turn(
+                bound_user, text, lang, stid, ws, line_user_id, history
+            )
+            if agent_reply is not None:
+                _charge_line_l2(bound_user, stid)
+                _say(agent_reply)
+                return True
+
         # 2. 大脑(一次 LLM):听意图 + 抽槽 + 自然回复 → 工具分发。
         from services.expense import line_agent, line_l2
 
@@ -310,7 +323,7 @@ def _do_record(
             cur,
             tenant_id=tid,
             workspace_client_id=ws,
-            data=_to_purchase_data(draft.model_dump()),
+            data=line_booker.draft_to_purchase_data(draft.model_dump()),
             settings=cfg,
             verdict=verdict,
             created_by=created_by,
@@ -383,42 +396,6 @@ def _reply_card(
         workspace_client_id=ws,
         tenant_id=tenant_id,
         line_user_id=line_user_id,
-    )
-
-
-def _to_purchase_data(d: dict) -> dict:
-    """expense_draft → 采购进项建单 data(单笔路 · 单行)。
-
-    数量(#8):「买2杯咖啡共120」→ 行 qty=2、单价=60(split_qty_price·总额不漂);无数量 → qty=1。
-    doc-level 组装走共享 line_booker.to_purchase_data(与多项路同口径)。
-    """
-    from services.expense.line_quick_entry import split_qty_price
-    from services.line_binding import line_booker
-
-    _qty, _unit_price = split_qty_price(d.get("amount"), d.get("qty"), d.get("unit_price"))
-    line = {
-        "item_type": "service" if (d.get("expense_type") == "service") else "goods",
-        "description": (
-            d.get("note") or d.get("subcategory") or d.get("category") or "LINE บันทึก"
-        ).strip(),
-        "qty": _qty,
-        "unit_price": _unit_price,
-        "vat_rate": 0,
-        "wht_rate": 0,
-        "category_id": d.get("category_id"),
-        "subcategory_id": d.get("subcategory_id"),
-    }
-    return line_booker.to_purchase_data(
-        lines=[line],
-        doc_date=d.get("doc_date"),
-        category_id=d.get("category_id"),
-        supplier={
-            "name": (d.get("vendor_name") or "").strip(),
-            "tax_id": (d.get("vendor_tax_id") or "").strip() or None,
-        },
-        document_type=d.get("document_type"),
-        doc_no=(d.get("invoice_number") or "").strip() or None,
-        currency=d.get("currency") or "THB",
     )
 
 

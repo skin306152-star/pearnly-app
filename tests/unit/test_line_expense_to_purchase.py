@@ -4,7 +4,7 @@
 import unittest
 from decimal import Decimal
 
-from services.line_binding.line_expense import _to_purchase_data
+from services.line_binding.line_booker import draft_to_purchase_data as _to_purchase_data
 
 
 class ToPurchaseDataTests(unittest.TestCase):

@@ -48,11 +48,16 @@ _OOS_DEFAULT = "agent.oos.capability"  # §1.4 超范围必带「我能做什么
 _CHAT_DEFAULT = "agent.chat.greeting"  # §1.6 沿用现有语气池
 
 
+def _clean(v) -> str:
+    """槽位值消毒:去掉占位串分隔符,保证 agent_i18n._parse 不被值里的 ;| 破坏。"""
+    return str(v).replace(";", ",").replace("|", "/")
+
+
 def _render(key: str, **slots) -> str:
-    """key(+slots)占位串。WP5 接 i18n 时换成真渲染,调用点不变。"""
+    """key(+slots)占位串。LINE 侧由 services.agent.agent_i18n.render 翻成 4 语真文案。"""
     if not slots:
         return key
-    payload = ";".join(f"{k}={v}" for k, v in slots.items())
+    payload = ";".join(f"{k}={_clean(v)}" for k, v in slots.items())
     return f"{key}|{payload}"
 
 
@@ -84,12 +89,14 @@ def failure(error_code: str | None) -> str:
 
 
 def history_receipt(items: list, total: int) -> str:
-    return _render(OK_COPY["list_history"], count=total, shown=len(items))
+    return _render(OK_COPY["list_history"], count=total)
 
 
 def history_summary_receipt(counts: dict) -> str:
-    slots = {k: counts[k] for k in sorted(counts or {})}
-    return _render(OK_COPY["history_summary"], **slots)
+    counts = counts or {}
+    total = sum(int(v or 0) for v in counts.values())
+    by_status = ", ".join(f"{k} {counts[k]}" for k in sorted(counts) if counts[k]) or "-"
+    return _render(OK_COPY["history_summary"], count=total, by_status=by_status)
 
 
 def balance_receipt(billing: dict) -> str:

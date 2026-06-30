@@ -46,7 +46,13 @@ def handle_turn(
     toolset: Optional[executor.AgentToolset] = None,
     history: Optional[list] = None,
     today: Optional[str] = None,
-) -> str:
+) -> Optional[str]:
+    """一轮对话。返回 copy_map 占位串 = Agent 接管本轮;返回 None = defer。
+
+    ★ 能力只增不减(MASTER-PLAN 铁律):Agent 只接管**有工具且能完成**的意图,其余一律 defer
+    (None)→ 调用方落回旧 understand()+_dispatch_agent() 照常完成(撤销/改错/记账都在旧路)。
+    只有新旧 LINE 都不做的(改密码/POS),才由旧路引导去 App。
+    """
     decide = decide or brain.decide
     toolset = toolset or executor.AgentToolset()
     history = history if history is not None else _recent(ctx)
@@ -54,28 +60,28 @@ def handle_turn(
 
     action = decide(user_text, history, today=today)
 
-    if action.kind == "out_of_scope":
-        return copy_map.out_of_scope(action.message)
-    if action.kind == "chat":
-        return copy_map.chat(action.message)
-    if action.kind == "ask":
+    # 无工具的意图(超范围/闲聊)→ 让旧路处理,不降级。
+    if action.kind in ("out_of_scope", "chat"):
+        return None
+    if action.kind == "ask":  # 大脑主动反问 → Agent 接管(守槽纪律)
         return copy_map.ask(action.ask_field or "")
 
     spec = manifest.TOOLS_BY_NAME.get(action.tool)
-    if not spec:  # 大脑选了不存在的工具 → 当超范围
-        return copy_map.out_of_scope()
+    if not spec:  # 大脑选了不存在的工具 → defer 给旧路
+        return None
 
     chk = slots.check_slots(action, user_text=user_text, history=history, ctx=ctx)
     if not chk.ok:
         if chk.rejected:  # 审计:模型试图编值
             logger.warning("slot_fabricated tool=%s rejected=%s", action.tool, chk.rejected)
-        return copy_map.ask(chk.missing[0])
+        return copy_map.ask(chk.missing[0])  # 必填槽没接地 → 反问(绝不带编造值执行)
 
     if spec.confirm and not _user_confirmed(user_text):  # B 档:先复述确认
         return copy_map.confirm(spec, chk.grounded)
 
     handler = getattr(toolset, spec.handler, None)
-    if handler is None:  # manifest 登记了但 executor 没实现
-        return copy_map.failure("unknown")
+    if handler is None:  # manifest 登记了但 executor 没实现 → defer
+        return None
     result = handler(ctx, **chk.grounded)
-    return result.receipt if result.ok else copy_map.failure(result.error_code)
+    # 工具失败也 defer:旧路可能仍能完成,绝不因新路出错降级用户已有能力。
+    return result.receipt if result.ok else None

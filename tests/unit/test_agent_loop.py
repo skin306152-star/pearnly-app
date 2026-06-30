@@ -37,15 +37,16 @@ def _temp_tool(spec):
 
 
 class TestAgentLoop(unittest.TestCase):
-    def test_out_of_scope(self):
+    def test_out_of_scope_defers(self):
+        # 无工具的超范围 → defer(None),交旧路引导(能力只增不减)。
         out = loop.handle_turn(
             "อากาศวันนี้", _CTX, decide=_decide(AgentAction(kind="out_of_scope")), history=[]
         )
-        self.assertTrue(out.startswith("agent.oos."))
+        self.assertIsNone(out)
 
-    def test_chat(self):
+    def test_chat_defers(self):
         out = loop.handle_turn("สวัสดี", _CTX, decide=_decide(AgentAction(kind="chat")), history=[])
-        self.assertTrue(out.startswith("agent.chat."))
+        self.assertIsNone(out)
 
     def test_ask(self):
         out = loop.handle_turn(
@@ -68,14 +69,14 @@ class TestAgentLoop(unittest.TestCase):
         self.assertEqual(out, "RECEIPT_OK")
         self.assertEqual(ts.calls[0][0], "get_balance")
 
-    def test_unknown_tool_is_out_of_scope(self):
+    def test_unknown_tool_defers(self):
         out = loop.handle_turn(
             "x",
             _CTX,
             decide=_decide(AgentAction(kind="tool", tool="ghost", args={})),
             history=[],
         )
-        self.assertTrue(out.startswith("agent.oos."))
+        self.assertIsNone(out)
 
     def test_fabricated_required_slot_triggers_ask(self):
         spec = ToolSpec(
@@ -123,7 +124,8 @@ class TestAgentLoop(unittest.TestCase):
         self.assertEqual(ts_unconfirmed.calls, [])  # 未确认不执行
         self.assertEqual(confirmed, "EXECUTED")  # 确认词后执行
 
-    def test_failed_result_renders_failure(self):
+    def test_failed_result_defers(self):
+        # 工具失败 → defer(None):旧路可能仍能完成,不因新路出错降级。
         ts = _FakeToolset(ToolResult(ok=False, error_code="query_failed"))
         out = loop.handle_turn(
             "ยอดเงิน",
@@ -132,7 +134,7 @@ class TestAgentLoop(unittest.TestCase):
             toolset=ts,
             history=[],
         )
-        self.assertTrue(out.startswith("agent.failure."))
+        self.assertIsNone(out)
 
 
 if __name__ == "__main__":

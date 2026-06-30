@@ -128,6 +128,40 @@ def to_purchase_data(
     }
 
 
+def draft_to_purchase_data(d: dict) -> dict:
+    """expense_draft(dict)→ 采购进项建单 data(单笔路 · 单行),组装走上面 to_purchase_data。
+
+    数量(#8):「买2杯咖啡共120」→ 行 qty=2、单价=60(split_qty_price·总额不漂);无数量 → qty=1。
+    """
+    from services.expense.line_quick_entry import split_qty_price
+
+    _qty, _unit_price = split_qty_price(d.get("amount"), d.get("qty"), d.get("unit_price"))
+    line = {
+        "item_type": "service" if (d.get("expense_type") == "service") else "goods",
+        "description": (
+            d.get("note") or d.get("subcategory") or d.get("category") or "LINE บันทึก"
+        ).strip(),
+        "qty": _qty,
+        "unit_price": _unit_price,
+        "vat_rate": 0,
+        "wht_rate": 0,
+        "category_id": d.get("category_id"),
+        "subcategory_id": d.get("subcategory_id"),
+    }
+    return to_purchase_data(
+        lines=[line],
+        doc_date=d.get("doc_date"),
+        category_id=d.get("category_id"),
+        supplier={
+            "name": (d.get("vendor_name") or "").strip(),
+            "tax_id": (d.get("vendor_tax_id") or "").strip() or None,
+        },
+        document_type=d.get("document_type"),
+        doc_no=(d.get("invoice_number") or "").strip() or None,
+        currency=d.get("currency") or "THB",
+    )
+
+
 def emit_result_card(
     reply_token,
     *,

@@ -40,6 +40,19 @@ function ingestOcrSuccess(f: IvFile, d: Dict) {
         recState.dupWarn.push(...(d.duplicate_warnings as unknown[]));
     if (d.auto_pushed) recState.autoPushed++;
 }
+// 上传表单(文件 + 当前 client_id 归属)· 同步/异步两路共用
+function buildOcrForm(f: IvFile): FormData {
+    const form = new FormData();
+    form.append('file', f.file, f.name);
+    if (recState.cidCache != null) form.append('client_id', String(recState.cidCache));
+    return form;
+}
+// 用户中途停止 → 取消态(两路共用)
+function setAbortedError(f: IvFile) {
+    f.status = 'error';
+    f.errorKey = 'status-cancelled';
+    f.canRetry = false;
+}
 
 // 单张识别:AbortController + 90s 超时;网络/超时失败自动重试一次;用户停止则取消。
 // flag OCR_ASYNC_WEB 开 → 走 submit + 轮询(无 90s 上限 · 后台 worker 跑 · 见 recognizeAsync)。
@@ -51,9 +64,7 @@ export async function recognizeOne(f: IvFile, isRetry: boolean) {
     ctrls.add(ctrl);
     let netErr = false;
     try {
-        const form = new FormData();
-        form.append('file', f.file, f.name);
-        if (recState.cidCache != null) form.append('client_id', String(recState.cidCache));
+        const form = buildOcrForm(f);
         const r = await fetch('/api/ocr/recognize', {
             method: 'POST',
             headers: authHeaders(),
@@ -74,9 +85,7 @@ export async function recognizeOne(f: IvFile, isRetry: boolean) {
     }
     if (netErr) {
         if (IV.aborted) {
-            f.status = 'error';
-            f.errorKey = 'status-cancelled';
-            f.canRetry = false;
+            setAbortedError(f);
             return;
         }
         if (!isRetry) return recognizeOne(f, true); // 网络/超时 → 静默重试一次
@@ -90,9 +99,7 @@ export async function recognizeOne(f: IvFile, isRetry: boolean) {
 // 域失败(error_code 与同步 HTTP detail 同词表)走 setOcrError;传输失败(timeout/poll_unreachable)兜底可重试。
 async function recognizeAsync(f: IvFile) {
     try {
-        const form = new FormData();
-        form.append('file', f.file, f.name);
-        if (recState.cidCache != null) form.append('client_id', String(recState.cidCache));
+        const form = buildOcrForm(f);
         const sr = await fetch('/api/ocr/submit', {
             method: 'POST',
             headers: authHeaders(),
@@ -109,9 +116,7 @@ async function recognizeAsync(f: IvFile) {
             return;
         }
         if (IV.aborted) {
-            f.status = 'error';
-            f.errorKey = 'status-cancelled';
-            f.canRetry = false;
+            setAbortedError(f);
             return;
         }
         if (job.error_code && !/poll_unreachable|timeout/.test(job.error_code)) {

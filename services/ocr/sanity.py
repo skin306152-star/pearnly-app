@@ -21,7 +21,11 @@ from __future__ import annotations
 
 from typing import List
 
-from services.ocr.money import normalize_id as _digits, normalize_money as _money
+from services.ocr.money import (
+    normalize_id as _digits,
+    normalize_money as _money,
+    valid_thai_tax_id as _valid_tax_id,
+)
 
 # 钱字段比对容差(泰铢):吸收四舍五入,又抓得住真错。
 _TOL = 0.5
@@ -92,5 +96,11 @@ def evaluate_sanity(invoice) -> List[str]:
                 f"缺 VAT 且总额 {total} != 净额 {net:.2f}(小计 {sub} − 折扣 {discount or 0}),"
                 f"差 {diff:.2f} 既非 0 也非 7%({expected_vat:.2f}) — 勾稽不平"
             )
+
+    # 规则 5:税号位数对(13)但 MOD-11 校验位不过 → 八成 OCR 读错一位(Big C 538↔536:
+    # 合法税号恒过校验,失败几乎只来自误读)。仅判已是 13 位者,不碰空/残缺(那是别的事)。
+    for name, raw in (("seller_tax", st), ("buyer_tax", bt)):
+        if len(raw) == 13 and not _valid_tax_id(raw):
+            reasons.append(f"{name} {raw} 校验位不符 — 13 位但 MOD-11 不过(疑读错一位)")
 
     return reasons

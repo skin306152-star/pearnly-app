@@ -32,3 +32,14 @@ def normalize_money(v: Any) -> Optional[float]:
 def normalize_id(v: Any) -> str:
     """税号/单号只留数字(票面常带空格/连字符:0-7355-27000-28-9)。"""
     return _RE_NON_DIGIT.sub("", str(v or ""))
+
+
+def valid_thai_tax_id(v: Any) -> bool:
+    """泰国 13 位税号 MOD-11 校验位:末位 = 前 12 位加权和的校验码。先归一去分隔符;
+    非 13 位纯数字一律 False。算法同 services/knowledge/rules/validity(各域独立·不跨域耦合)。"""
+    s = normalize_id(v)
+    if len(s) != 13:
+        return False
+    digits = [int(c) for c in s]
+    weighted = sum(digits[i] * (13 - i) for i in range(12))
+    return digits[12] == (11 - (weighted % 11)) % 10

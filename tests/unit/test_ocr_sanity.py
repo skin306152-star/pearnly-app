@@ -38,7 +38,7 @@ class CleanInvoiceTests(unittest.TestCase):
             vat="4.58",
             total_amount="70.00",
             seller_tax="0107561000013",
-            buyer_tax="0105556700123",
+            buyer_tax="0105535134278",
         )
         self.assertEqual(evaluate_sanity(inv), [])
 
@@ -68,11 +68,11 @@ class NegativeTests(unittest.TestCase):
 
 class SellerBuyerTests(unittest.TestCase):
     def test_seller_equals_buyer_flagged(self):
-        inv = _inv(seller_tax="0-1055-56700-12-3", buyer_tax="0105556700123")
+        inv = _inv(seller_tax="0-1055-35134-27-8", buyer_tax="0105535134278")
         self.assertTrue(any("串了表头税号" in r for r in evaluate_sanity(inv)))
 
     def test_distinct_tax_ids_pass(self):
-        inv = _inv(seller_tax="0107561000013", buyer_tax="0105556700123")
+        inv = _inv(seller_tax="0107561000013", buyer_tax="0105535134278")
         self.assertEqual(evaluate_sanity(inv), [])
 
 
@@ -109,6 +109,27 @@ class VatMissingReconcileTests(unittest.TestCase):
         # 7-11 折扣票陷阱:小计115 − 折扣5 = 总额110,vat 空 → 合法,不误杀。
         inv = _inv(subtotal="115.00", discount="5.00", total_amount="110.00")
         self.assertEqual(evaluate_sanity(inv), [])
+
+
+class TaxIdChecksumTests(unittest.TestCase):
+    def test_bad_checksum_seller_flagged(self):
+        # Big C 实测误读 0107538000633(真值 …536…):13 位但 MOD-11 不过 → 转人工。
+        inv = _inv(seller_tax="0107538000633", subtotal="84", total_amount="84")
+        self.assertTrue(any("校验位不符" in r for r in evaluate_sanity(inv)))
+
+    def test_good_checksum_not_flagged(self):
+        # Big C 真值 0107536000633:校验位过 → 不误杀。
+        inv = _inv(seller_tax="0107536000633", subtotal="84", total_amount="84")
+        self.assertFalse(any("校验位不符" in r for r in evaluate_sanity(inv)))
+
+    def test_non_13_digit_not_flagged(self):
+        # 残缺/空税号不归此规则(交别的处理) → 不误杀。
+        self.assertFalse(any("校验位不符" in r for r in evaluate_sanity(_inv(seller_tax="010753"))))
+        self.assertFalse(any("校验位不符" in r for r in evaluate_sanity(_inv(seller_tax=""))))
+
+    def test_bad_checksum_buyer_flagged(self):
+        inv = _inv(seller_tax="0105535134278", buyer_tax="0107538000633")
+        self.assertTrue(any("校验位不符" in r for r in evaluate_sanity(inv)))
 
 
 if __name__ == "__main__":

@@ -221,6 +221,31 @@ jobs:
             python scripts/check_new_routes_contract.py
           fi
 
+  # Pearnly Agent · 能力防漏闸(2026-06-30)· 软闸(warning · 先不挡 · Agent 上线时切 FAIL)
+  #   从 routes/*.py 机械扒全部 API 入口 · 对照 docs/agent/agent_registry.json 的 A/B/C/D 分类。
+  #   新增路由文件未登记(=忘了决定进不进 Agent)→ 脚本非零 → 这里红提醒,杜绝"漏接最后才发现"。
+  #   现 Agent 功能未落地 · 软闸只提示不挡;真 wiring 工具时把 continue-on-error 改 false(硬门)。
+  lint-agent:
+    name: lint-agent (Agent 能力登记完整性 · WARNING mode)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # ⚠️ 软闸 · 红但不挡 push · Agent 正式落地时改 false(fail 模式 · 同 lint-routes 演进)
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 零依赖(只用标准库)· 任何环境跑得动
+
+      - name: Agent 能力防漏闸 · 每个 routes/*.py 必在 agent_registry.json 分类
+        run: python scripts/agent_capability_audit.py
+
   test:
     name: import + i18n + unit + vite-build + e2e
     runs-on: ubuntu-latest

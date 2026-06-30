@@ -8,7 +8,7 @@
 //   字段编辑经「保存修改」真持久化到各张 ocr_history;确认态(IV.confirmed)仍纯前端视觉。
 //   从 invoice-submit.ts 拆出以控行数。
 // ============================================================
-/* global t, showToast */
+/* global t, showToast, withLoading */
 import { esc, $, authHeaders } from './dms-intake-core.js';
 import { IV, ext, showStepInv } from './dms-intake-invoice.js';
 import type { Dict, IvInvoice, IvResult } from './dms-intake-invoice.js';
@@ -136,12 +136,12 @@ function invoiceGroupHtml(fi: number, ii: number, inv: IvInvoice): string {
         inv.total > 1 && pg
             ? `<button class="dx-inv-viewpage" data-page="${pg}">${esc(t('dxi-rev-viewpage'))}</button>`
             : '';
-    const head =
+    const label =
         inv.total > 1
-            ? `<div class="dx-inv-head">${esc(t('dxi-inv-no').replace('{i}', String(inv.idx)).replace('{n}', String(inv.total)))}${fmtChip}${viewBtn}</div>`
-            : fmtChip
-              ? `<div class="dx-inv-head">${fmtChip}</div>`
-              : '';
+            ? esc(t('dxi-inv-no').replace('{i}', String(inv.idx)).replace('{n}', String(inv.total)))
+            : '';
+    const headInner = label + fmtChip + viewBtn;
+    const head = headInner ? `<div class="dx-inv-head">${headInner}</div>` : '';
     const cell = ([k, lk]: [string, string]) => {
         const warn = warns.has(k) ? ' warn' : '';
         const v = String(inv.fields[k] ?? '');
@@ -229,24 +229,23 @@ async function saveOpenFileEdits(btn: HTMLElement | null): Promise<void> {
         showToast(t('dxi-rev-save-fail'), 'error');
         return;
     }
-    btn?.setAttribute('disabled', '1');
     try {
-        await Promise.all(
-            targets.map((iv) =>
-                fetch(`/api/history/${encodeURIComponent(iv.history_id as string)}`, {
-                    method: 'PUT',
-                    headers: authHeaders(true),
-                    body: JSON.stringify({ pages: [{ fields: iv.fields }] }),
-                }).then((resp) => {
-                    if (!resp.ok) throw new Error(String(resp.status));
-                })
+        await withLoading(btn, () =>
+            Promise.all(
+                targets.map((iv) =>
+                    fetch(`/api/history/${encodeURIComponent(iv.history_id as string)}`, {
+                        method: 'PUT',
+                        headers: authHeaders(true),
+                        body: JSON.stringify({ pages: [{ fields: iv.fields }] }),
+                    }).then((resp) => {
+                        if (!resp.ok) throw new Error(String(resp.status));
+                    })
+                )
             )
         );
         showToast(t('dxi-rev-saved'), 'success');
     } catch {
         showToast(t('dxi-rev-save-fail'), 'error');
-    } finally {
-        btn?.removeAttribute('disabled');
     }
 }
 

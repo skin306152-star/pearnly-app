@@ -48,7 +48,7 @@ def inconsistent_indices(numbers: List[str]) -> List[int]:
 
     counts = Counter(sigs.values())
     top_sig, top_n = counts.most_common(1)[0]
-    if list(counts.values()).count(top_n) > 1:
+    if sum(1 for v in counts.values() if v == top_n) > 1:
         return []  # 多个签名并列最多 → 无明确多数派,不裁
     if top_n * 2 <= len(sigs):
         return []  # 多数派没过半 → 不裁
@@ -84,9 +84,11 @@ def format_warnings_for_groups(invoice_groups) -> List[dict]:
     返回 [{invoice_index(1基), invoice_number, reason}],供识别路由置 needs_review +
     回前端提示人工核对。空 = 无异常。
     """
-    fields = [(g or {}).get("invoice_fields") or {} for g in (invoice_groups or [])]
-    numbers = [f.get("invoice_number") for f in fields]
-    sellers = [f.get("seller_tax") for f in fields]
+    numbers, sellers = [], []
+    for g in invoice_groups or []:
+        f = (g or {}).get("invoice_fields") or {}
+        numbers.append(f.get("invoice_number"))
+        sellers.append(f.get("seller_tax"))
     return [
         {
             "invoice_index": idx + 1,

@@ -22,6 +22,11 @@ from services.erp import mrerp_xlsx_generator as _gen
 from services.erp.exceptions import MRERPBusinessError
 from services.erp.mrerp_adapter_models import FailedRow, ImportResult, SuccessRow
 from services.erp.mrerp_business_friendly import translate_reasons
+from services.erp.mrerp_http.account_valve import (
+    ACCOUNT_REVIEW_CODE,
+    account_gate,
+    tag_account_review,
+)
 from services.erp.mrerp_http.modules import MrErpModule, get_module
 from services.erp.mrerp_http.report_parse import parse_master_report
 from services.erp.mrerp_http.session import MrErpSession
@@ -141,6 +146,13 @@ class MrErpHttpAdapter:
         if not histories:
             return self._result(original, [], mismatch_failed, t0, 0)
 
+        # 科目安全阀(主动层):提供了该套账科目表且配置科目码不在表内 → 全挡下退回用户配置(不硬建)。
+        review = account_gate(mappings)
+        if review:
+            reasons = [ACCOUNT_REVIEW_CODE, "科目码不在该套账科目表: " + ", ".join(review)]
+            fr = [self._fail_row(h, reasons) for h in histories]
+            return self._result(original, [], mismatch_failed + fr, t0, 0)
+
         # 缺对手方主数据则自建并注入码(须在 preflight 前)· 销项建买方客户 / 采购建卖方供应商。
         # 除套账主体外一切可自建 · 见 autocreate。
         if m.doc_type.startswith("sales"):
@@ -191,6 +203,14 @@ class MrErpHttpAdapter:
             len(xlsx_bytes),
         )
 
+    def _fail_row(self, h: Dict[str, Any], reasons: List[str]) -> FailedRow:
+        return FailedRow(
+            invoice_no=_gen.derive_mrerp_invoice_no(h),
+            reasons=reasons,
+            reasons_friendly=translate_reasons(reasons),
+            original=h,
+        )
+
     def _filter_by_account_set(
         self, histories: List[Dict[str, Any]], mappings: Dict[str, Any]
     ) -> Tuple[List[Dict[str, Any]], List[FailedRow]]:
@@ -206,14 +226,7 @@ class MrErpHttpAdapter:
         for h in histories:
             if confirmed_account_set_mismatch(h, h, own_tax_id=own, expected_direction=expected):
                 reasons = ["票面买卖方与套账主体不符 · 未推送(防推错套账)"]
-                failed.append(
-                    FailedRow(
-                        invoice_no=_gen.derive_mrerp_invoice_no(h),
-                        reasons=reasons,
-                        reasons_friendly=translate_reasons(reasons),
-                        original=h,
-                    )
-                )
+                failed.append(self._fail_row(h, reasons))
             else:
                 kept.append(h)
         return kept, failed
@@ -366,15 +379,18 @@ class MrErpHttpAdapter:
             SuccessRow(invoice_no=i, mrerp_bill_no=f"SI{i}", original=by_inv.get(i, {}))
             for i in report.success
         ]
-        failed = [
-            FailedRow(
-                invoice_no=row.invoice_no,
-                reasons=list(row.reasons),
-                reasons_friendly=translate_reasons(list(row.reasons)),
-                original=by_inv.get(row.invoice_no, {}),
+        # 科目安全阀:report 报科目未匹配 → 归为 ERR_ACCOUNT_NEEDS_REVIEW(退回用户配置,不硬建)
+        failed = []
+        for row in report.failed:
+            reasons = tag_account_review(list(row.reasons))
+            failed.append(
+                FailedRow(
+                    invoice_no=row.invoice_no,
+                    reasons=reasons,
+                    reasons_friendly=translate_reasons(reasons),
+                    original=by_inv.get(row.invoice_no, {}),
+                )
             )
-            for row in report.failed
-        ]
         seen = {s.invoice_no for s in success} | {f.invoice_no for f in failed}
         for inv in expected:
             if inv not in seen:
@@ -407,21 +423,8 @@ class MrErpHttpAdapter:
             ok, err_code, warnings = _validate(h, mappings)
             if ok:
                 valid.append(h)
-                continue
-            inv = (
-                _gen.derive_mrerp_invoice_no(h)
-                if h.get("invoice_date")
-                else (h.get("invoice_number") or h.get("invoice_no") or "?")
-            )
-            reasons = [err_code or "ERR_UNKNOWN_PREFLIGHT"]
-            failed.append(
-                FailedRow(
-                    invoice_no=inv,
-                    reasons=reasons,
-                    reasons_friendly=translate_reasons(reasons),
-                    original=h,
-                )
-            )
+            else:
+                failed.append(self._fail_row(h, [err_code or "ERR_UNKNOWN_PREFLIGHT"]))
         return valid, failed
 
     def _result(

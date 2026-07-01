@@ -68,6 +68,13 @@ _ERR_CATALOG: Dict[str, Dict[str, str]] = {
         "zh": "这个 ERP 连接还没绑任何 Pearnly 客户 · 请在向导第 1 步至少选 1 个客户",
         "zh_TW": "這個 ERP 連線還沒綁任何 Pearnly 客戶 · 請在精靈第 1 步至少選 1 個客戶",
     },
+    "ERR_ACCOUNT_NEEDS_REVIEW": {
+        # 科目安全阀(Zihao 定 · 匹配不上退回用户不硬建):科目码不在该套账科目表 → 让用户配置正确科目码。
+        "th": "รหัสบัญชีไม่ตรงกับผังบัญชีของชุดบัญชีนี้ · กรุณาตั้งค่ารหัสบัญชีที่ถูกต้องสำหรับชุดบัญชีนี้ (ระบบไม่สร้างบัญชีให้อัตโนมัติ)",
+        "en": "Account code not found in this account-set's chart · please configure the correct account codes for this account-set (accounts are not auto-created)",
+        "zh": "科目码不在该套账的科目表里 · 请为该套账配置正确的科目码(系统不会自动新建科目)",
+        "zh_TW": "科目碼不在該套帳的科目表裡 · 請為該套帳配置正確的科目碼(系統不會自動新建科目)",
+    },
     "ERR_NO_CUSTOMER_MAPPING": {
         # 问题 b (Zihao 2026-05-19 拍板 · v118.34.26) · action-oriented:
         # 告诉用户去哪里配 mapping · 或者开 wizard 种子客户开自动建.

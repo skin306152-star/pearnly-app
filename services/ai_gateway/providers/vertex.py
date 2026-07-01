@@ -119,6 +119,7 @@ def _gen_json(contents, *, model_name, config, max_retries):
     from services.ocr.layer2_gemini import _parse_json
 
     client = _client()
+    last_raw = ""
     for attempt in range(max_retries + 1):
         try:
             resp = client.models.generate_content(
@@ -129,6 +130,7 @@ def _gen_json(contents, *, model_name, config, max_retries):
         raw = (getattr(resp, "text", "") or "").strip()
         it, ot = _usage(resp)
         if raw:
+            last_raw = raw
             try:
                 return ProviderOutcome(
                     ok=True,
@@ -141,7 +143,8 @@ def _gen_json(contents, *, model_name, config, max_retries):
                 pass
         if attempt < max_retries:
             continue
-    return ProviderOutcome(ok=False, error_kind="parse", model=model_name)
+    # 解析失败带回原文(Agent 可把散文当回复救援)· raw 绝不进日志(_observe 只记 error_kind/token)
+    return ProviderOutcome(ok=False, error_kind="parse", model=model_name, raw=last_raw)
 
 
 def text_to_json(

@@ -66,6 +66,18 @@ class Layer2GeminiContractTest(unittest.TestCase):
         self.assertIs(g._USER_PROMPT_PREFIX, p._USER_PROMPT_PREFIX)
         self.assertIs(g._RETRY_TRIM_HINT, p._RETRY_TRIM_HINT)
 
+    def test_parse_json_extracts_object_from_surrounding_prose(self) -> None:
+        # 批二·容错:模型偶尔在 JSON 前后夹散文 → 抠出首个完整 {...}(严格路先行·干净 JSON 零影响)。
+        self.assertEqual(g._parse_json('Here is the result: {"a": 1} thanks'), {"a": 1})
+        self.assertEqual(g._parse_json('x {"a": {"b": 2}} y'), {"a": {"b": 2}})
+        self.assertEqual(g._parse_json('p {"a": "has } brace"} q'), {"a": "has } brace"})
+
+    def test_parse_json_no_object_still_raises(self) -> None:
+        import json
+
+        with self.assertRaises(json.JSONDecodeError):
+            g._parse_json("not json at all")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -57,6 +57,7 @@ class ProviderOutcome:
     model: str = ""
     input_tokens: int = 0
     output_tokens: int = 0
+    raw: str = ""  # 解析失败时携带模型原文,供上层救援(如 Agent 把散文当回复);★绝不进日志/计费
 
 
 @dataclass

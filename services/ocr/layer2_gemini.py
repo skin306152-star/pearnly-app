@@ -46,6 +46,32 @@ class Layer2TransientError(Layer2Error):
     """Network / timeout / 5xx. Potentially retryable."""
 
 
+def _first_json_object(s: str) -> str:
+    """抠出首个括号平衡的 {...} 子串(字符串内的括号/转义不计);找不到抛 JSONDecodeError。"""
+    start = s.find("{")
+    if start < 0:
+        raise json.JSONDecodeError("no JSON object found", s, 0)
+    depth, in_str, esc = 0, False, False
+    for i in range(start, len(s)):
+        c = s[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+        elif c == '"':
+            in_str = True
+        elif c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                return s[start : i + 1]
+    raise json.JSONDecodeError("unbalanced JSON object", s, start)
+
+
 def _parse_json(text: str) -> dict:
     """Parse Gemini's response as JSON, stripping markdown fences if present.
 
@@ -63,7 +89,12 @@ def _parse_json(text: str) -> dict:
             s = s[3:]
         if s.rstrip().endswith("```"):
             s = s.rstrip()[:-3].rstrip()
-    obj = json.loads(s)
+    try:
+        obj = json.loads(s)
+    except json.JSONDecodeError:
+        # 兜底:模型偶尔在 JSON 前后夹散文("Here's the result: {...}")→ 抠出首个完整 {...} 再解析。
+        # 严格路先行,仅失败时才走(OCR 干净 JSON 零影响)。抠不出仍抛,交上层救援。
+        obj = json.loads(_first_json_object(s))
     if not isinstance(obj, dict):
         # Gemini returned a list / scalar / etc. — treat as parse failure
         raise json.JSONDecodeError(

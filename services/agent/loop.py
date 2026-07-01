@@ -196,10 +196,23 @@ def _prompt(
     )
 
 
+def _salvage_prose(outcome) -> Optional["LoopStep"]:
+    """parse 失败但模型吐了干净散文(常是陪伴/查询的人话·忘了包 JSON)→ 当回复救回,别浪费成 crash。
+    含 { 的多半是坏/截断 JSON 残片(不给用户看)→ 不救,交 crash 走安全兜底。"""
+    raw = (getattr(outcome, "raw", "") or "").strip()
+    if not raw or len(raw) > 800 or "{" in raw or '"kind"' in raw:
+        return None
+    return LoopStep(kind="reply", message=raw)
+
+
 def _parse_step(outcome) -> LoopStep:
     """ProviderOutcome → LoopStep。区分「模型主动 defer(record/edit)」与「故障(crash)」——
-    传输/解析失败、畸形输出都标 reason=crash,让上层走安全兜底而非当记账 defer 掉旧路。"""
+    传输/解析失败、畸形输出都标 reason=crash,让上层走安全兜底而非当记账 defer 掉旧路。
+    解析失败时先试把模型原文当回复救回(_salvage_prose),救不了才 crash。"""
     if not getattr(outcome, "ok", False) or not isinstance(getattr(outcome, "data", None), dict):
+        salvaged = _salvage_prose(outcome)
+        if salvaged is not None:
+            return salvaged  # 模型写了人话没包 JSON → 直接当回复(治陪伴句被吞成故障)
         return LoopStep(kind="defer", reason="crash")  # parse 失败/传输错 = 大脑故障,非决策
     d = outcome.data
     kind = d.get("kind")

@@ -158,6 +158,45 @@ class TestAgentLoop(unittest.TestCase):
         self.assertEqual(out.kind, "crash")
 
 
+class _Outcome:
+    def __init__(self, ok=False, data=None, raw="", error_kind="parse"):
+        self.ok = ok
+        self.data = data
+        self.raw = raw
+        self.error_kind = error_kind
+
+
+class TestBrainSalvage(unittest.TestCase):
+    """批二·大脑救援:parse 失败但模型吐了干净人话 → 当回复救回(治陪伴句被吞成故障)。"""
+
+    def test_clean_prose_salvaged_as_reply(self):
+        step = loop._parse_step(_Outcome(raw="อยู่ตรงนี้นะคะ เสียใจด้วยนะ 🫂"))
+        self.assertEqual(step.kind, "reply")
+        self.assertEqual(step.message, "อยู่ตรงนี้นะคะ เสียใจด้วยนะ 🫂")
+
+    def test_broken_json_fragment_not_salvaged_is_crash(self):
+        # 含 { 的截断/坏 JSON → 不给用户看残片 → crash 走安全兜底。
+        step = loop._parse_step(_Outcome(raw='{"kind":"reply","message":"อยู่'))
+        self.assertEqual((step.kind, step.reason), ("defer", "crash"))
+
+    def test_empty_raw_is_crash(self):
+        step = loop._parse_step(_Outcome(raw=""))
+        self.assertEqual(step.reason, "crash")
+
+    def test_overlong_raw_not_salvaged(self):
+        step = loop._parse_step(_Outcome(raw="ก" * 801))
+        self.assertEqual(step.reason, "crash")
+
+    def test_salvaged_prose_flows_as_reply_through_turn(self):
+        out = loop.handle_turn(
+            "ภรรยาไม่รักฉัน",
+            _CTX,
+            decide=_script(loop._parse_step(_Outcome(raw="อยู่ตรงนี้นะคะ"))),
+            history=[],
+        )
+        self.assertEqual((out.kind, out.text), ("reply", "อยู่ตรงนี้นะคะ"))
+
+
 class _RecToolset:
     def __init__(self, result):
         self._result = result

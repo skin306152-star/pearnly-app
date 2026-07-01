@@ -109,11 +109,13 @@ def _chat_json(prompt, images, *, temperature, response_mime, max_tokens, timeou
     }
     if response_mime:
         payload["response_format"] = {"type": "json_object"}
+    last_raw = ""
     for attempt in range(max_retries + 1):
         text, kind, toks = _chat_text(payload, timeout_s)
         if kind:
             return ProviderOutcome(ok=False, error_kind=kind, model=model_name)
         if text:
+            last_raw = text
             try:
                 return ProviderOutcome(
                     ok=True,
@@ -126,7 +128,8 @@ def _chat_json(prompt, images, *, temperature, response_mime, max_tokens, timeou
                 pass
         if attempt < max_retries:
             continue
-    return ProviderOutcome(ok=False, error_kind="parse", model=model_name)
+    # 解析失败带回原文(Agent 可把散文当回复救援)· raw 绝不进日志(_observe 只记 error_kind/token)
+    return ProviderOutcome(ok=False, error_kind="parse", model=model_name, raw=last_raw)
 
 
 def text_to_json(

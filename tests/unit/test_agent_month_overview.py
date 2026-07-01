@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
-"""本月聚合数据层(agent_overview.month_overview)+ 共用可见性谓词(owner_visibility_where)。"""
+"""本月聚合数据层(_ov)+ 共用可见性谓词(owner_visibility_where)。"""
 
 import unittest
 from unittest.mock import MagicMock, patch
 
 from services.ocr_history import agent_overview
 from services.ocr_history import list_status as ls
+
+_ov = agent_overview.docs_overview
 
 
 class TestOwnerVisibilityWhere(unittest.TestCase):
@@ -47,7 +49,7 @@ class TestMonthOverview(unittest.TestCase):
             [{"category_tag": "fuel", "c": 3}, {"category_tag": "food", "c": 2}],
         )
         db.get_cursor_rls.return_value.__enter__.return_value = cur
-        out = agent_overview.month_overview("u1", "t1")
+        out = _ov("u1", "t1")
         self.assertEqual(out["doc_count"], 5)
         self.assertEqual(out["amount_total"], 1500.5)
         self.assertEqual(out["by_category"], [("fuel", 3), ("food", 2)])
@@ -56,7 +58,7 @@ class TestMonthOverview(unittest.TestCase):
     def test_include_categories_false_skips_group_query(self, db):
         cur = self._cursor({"doc_count": 2, "amount_total": 0})
         db.get_cursor_rls.return_value.__enter__.return_value = cur
-        out = agent_overview.month_overview("u1", "t1", include_categories=False)
+        out = _ov("u1", "t1", include_categories=False)
         self.assertEqual(out["by_category"], [])
         cur.fetchall.assert_not_called()
 
@@ -64,19 +66,19 @@ class TestMonthOverview(unittest.TestCase):
     def test_zero_docs_skips_group_query(self, db):
         cur = self._cursor({"doc_count": 0, "amount_total": 0})
         db.get_cursor_rls.return_value.__enter__.return_value = cur
-        out = agent_overview.month_overview("u1", "t1")
+        out = _ov("u1", "t1")
         self.assertEqual(out["by_category"], [])
         cur.fetchall.assert_not_called()
 
     def test_retention_zero_returns_empty_without_db(self):
         # 不可查历史(retention==0)→ 不碰 DB,返空。
-        out = agent_overview.month_overview("u1", "t1", retention_days=0)
+        out = _ov("u1", "t1", retention_days=0)
         self.assertEqual(out, {"doc_count": 0, "amount_total": 0.0, "by_category": []})
 
     @patch("services.ocr_history.agent_overview.db")
     def test_db_error_degrades_to_empty(self, db):
         db.get_cursor_rls.side_effect = RuntimeError("boom")
-        out = agent_overview.month_overview("u1", "t1")
+        out = _ov("u1", "t1")
         self.assertEqual(out["doc_count"], 0)
         self.assertEqual(out["by_category"], [])
 

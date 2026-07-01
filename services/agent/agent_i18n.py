@@ -92,10 +92,10 @@ _T: dict[str, dict[str, str]] = {
         "ja": "{count} 件の記録があります{top_list}",
     },
     "agent.ok.history_summary": {
-        "zh": "本月汇总:{count} 张·合计 {total}฿{by_category}",
-        "en": "This month: {count} documents · total {total} THB{by_category}",
-        "th": "สรุปเดือนนี้: {count} ใบ · ยอดรวม {total} บาท{by_category}",
-        "ja": "今月のまとめ:{count} 件 · 合計 {total} バーツ{by_category}",
+        "zh": "识别记录共 {count} 张·合计 {total}฿{by_category}",
+        "en": "{count} documents · total {total} THB{by_category}",
+        "th": "มีเอกสารทั้งหมด {count} รายการ · รวม {total} บาท{by_category}",
+        "ja": "記録は合計 {count} 件 · 合計 {total} バーツ{by_category}",
     },
     "agent.ok.balance": {
         "zh": "余额 {balance}฿·本月已用 {pages} 页",

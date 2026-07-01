@@ -301,7 +301,7 @@ _REEXPORTS = {
     ],
     "services.ocr_history.store": [
         "list_ocr_history",
-        "month_overview",
+        "docs_overview",
         "get_ocr_history_detail",
         "update_ocr_history_pages",
         "commit_staged_ocr_history",

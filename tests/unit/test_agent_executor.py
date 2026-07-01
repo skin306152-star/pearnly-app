@@ -25,13 +25,14 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertEqual(kwargs["keyword"], "7-11")
         self.assertEqual(kwargs["status_filter"], "failed")
         self.assertEqual(kwargs["restrict_client_ids"], [5])
-        self.assertEqual(kwargs["retention_days"], 90)
+        self.assertEqual(kwargs["retention_days"], 365)  # 套餐口径(非原始字段),与网页一致
+        self.assertIsNone(kwargs["workspace_client_id"])  # 跨套账聚合
         self.assertTrue(res.receipt.startswith("agent.ok.history"))
 
     @patch("services.agent.executor.db")
-    def test_history_summary_uses_month_overview(self, db):
+    def test_history_summary_uses_overview(self, db):
         db.get_visible_client_ids_for_user.return_value = None
-        db.month_overview.return_value = {
+        db.docs_overview.return_value = {
             "doc_count": 4,
             "amount_total": 1234.0,
             "by_category": [("fuel", 3), ("food", 1)],
@@ -39,12 +40,13 @@ class TestAgentExecutor(unittest.TestCase):
         res = self.ts.summarize_ocr_history(_CTX)
         self.assertTrue(res.ok)
         self.assertEqual(res.data["doc_count"], 4)
-        # 本月量透传给渲染:合计฿(千分位)+ 分类。
         self.assertIn("count=4", res.receipt)
         self.assertIn("1,234", res.receipt)
         self.assertIn("fuel 3", res.receipt)
-        kwargs = db.month_overview.call_args.kwargs
-        self.assertEqual(kwargs["retention_days"], 90)
+        kwargs = db.docs_overview.call_args.kwargs
+        self.assertEqual(kwargs["retention_days"], 365)
+        self.assertFalse(kwargs["this_month"])  # 汇总走保留期窗口,非本月
+        self.assertIsNone(kwargs["workspace_client_id"])  # 跨套账聚合
 
     @patch("services.agent.executor.db")
     def test_balance(self, db):
@@ -61,13 +63,14 @@ class TestAgentExecutor(unittest.TestCase):
     def test_usage_this_month(self, db):
         db.get_billing_status_combined.return_value = {"balance_thb": 0, "pages_used_this_month": 7}
         db.get_visible_client_ids_for_user.return_value = None
-        db.month_overview.return_value = {"doc_count": 5, "amount_total": 0.0, "by_category": []}
+        db.docs_overview.return_value = {"doc_count": 5, "amount_total": 0.0, "by_category": []}
         res = self.ts.get_usage_this_month(_CTX)
         self.assertTrue(res.ok)
         self.assertIn("pages=7", res.receipt)
         self.assertIn("docs=5", res.receipt)
-        # 用量只要张数,不查分类分布(省一次分组查询)。
-        self.assertFalse(db.month_overview.call_args.kwargs["include_categories"])
+        kwargs = db.docs_overview.call_args.kwargs
+        self.assertFalse(kwargs["include_categories"])  # 用量只要张数
+        self.assertTrue(kwargs["this_month"])  # 用量是计费口径 → 本月
 
     @patch("services.agent.executor.db")
     def test_list_notifications(self, db):

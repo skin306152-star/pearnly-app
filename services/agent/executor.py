@@ -13,29 +13,35 @@ from __future__ import annotations
 from typing import Optional
 
 from core import db
+from core.route_helpers import _plan_permissions
 from services.agent import copy_map
 from services.agent.contracts import AgentContext, ToolResult
 
 
 def _retention(user: dict) -> Optional[int]:
-    """用户的历史保留天数(None → list_ocr_history 自动按 user 表兜底)。"""
-    v = (user or {}).get("history_retention_days")
-    try:
-        return int(v) if v is not None else None
-    except (TypeError, ValueError):
-        return None
+    """历史保留天数 —— 与网页 history_routes._check_history_access 同口径(按套餐,非原始字段)。
+
+    此前误读 user["history_retention_days"](对多数号=0=不可查)→ Agent 一律返 0,与网页
+    (按套餐给 7/90/365)矛盾。改走套餐权限:不给看历史返 0,否则返套餐保留天数。
+    """
+    p = _plan_permissions((user or {}).get("plan"))
+    if not p.get("can_view_history"):
+        return 0
+    return int(p.get("history_retention_days", 7))
 
 
 class AgentToolset:
     # ── A 档:只读(无需确认) ──────────────────────────────────────────
 
     def list_ocr_history(self, ctx: AgentContext, *, keyword=None, status=None) -> ToolResult:
+        # workspace_client_id=None:跨该租户可见的全部套账聚合(LINE 无顶栏切换器,查询默认聚合;
+        # 否则只看默认套账,数据在别的套账就查不到)。RLS + restrict_client_ids 仍锁租户/可见客户。
         res = db.list_ocr_history(
             user_id=str(ctx.user["id"]),
             tenant_id=ctx.tenant_id,
             keyword=keyword,
             status_filter=status,
-            workspace_client_id=ctx.workspace_client_id,
+            workspace_client_id=None,
             limit=20,
             offset=0,
             retention_days=_retention(ctx.user),
@@ -46,7 +52,8 @@ class AgentToolset:
         return ToolResult(ok=True, data=res, receipt=copy_map.history_receipt(items, total))
 
     def summarize_ocr_history(self, ctx: AgentContext) -> ToolResult:
-        ov = self._month_overview(ctx)
+        # 汇总走保留期窗口(与 list 同口径,数字对得上),非严格本月。
+        ov = self._overview(ctx, this_month=False)
         return ToolResult(ok=True, data=ov, receipt=copy_map.history_summary_receipt(ov))
 
     def get_balance(self, ctx: AgentContext) -> ToolResult:
@@ -55,19 +62,23 @@ class AgentToolset:
 
     def get_usage_this_month(self, ctx: AgentContext) -> ToolResult:
         b = db.get_billing_status_combined(str(ctx.user["id"]), ctx.tenant_id)
-        ov = self._month_overview(ctx, include_categories=False)
+        # 用量是计费口径 → 本月;张数陪着页数一起本月。
+        ov = self._overview(ctx, this_month=True, include_categories=False)
         docs = int(ov.get("doc_count") or 0)
         return ToolResult(
             ok=True, data={"billing": b, "docs": docs}, receipt=copy_map.usage_receipt(b, docs)
         )
 
-    def _month_overview(self, ctx: AgentContext, *, include_categories: bool = True) -> dict:
-        return db.month_overview(
+    def _overview(
+        self, ctx: AgentContext, *, this_month: bool, include_categories: bool = True
+    ) -> dict:
+        return db.docs_overview(
             str(ctx.user["id"]),
             ctx.tenant_id,
-            workspace_client_id=ctx.workspace_client_id,
+            workspace_client_id=None,
             restrict_client_ids=db.get_visible_client_ids_for_user(ctx.user),
             retention_days=_retention(ctx.user),
+            this_month=this_month,
             include_categories=include_categories,
         )
 

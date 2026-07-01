@@ -4950,7 +4950,7 @@ window.I18N = {
         'agent.failure._default': '系统临时问题,稍后再试',
         'agent.chat.greeting': '你好,有什么记账的事我能帮忙?',
         // M1 工具回执 + 失败码补全(spec 1d188f15)
-        'agent.ok.history_summary': '本月汇总:{count} 张·合计 {total}฿{by_category}',
+        'agent.ok.history_summary': '识别记录共 {count} 张·合计 {total}฿{by_category}',
         'agent.ok.usage_this_month': '本月已用 {pages} 页·{docs} 张单据',
         'agent.ok.notifications': '有 {count} 条通知{top_list}',
         'agent.failure.no_tenant': '还没绑定公司账套·先到 App 开',
@@ -9886,7 +9886,7 @@ window.I18N = {
         'agent.failure._default': 'Temporary system issue · please try again shortly',
         'agent.chat.greeting': 'Hi! How can I help with your accounting today?',
         // M1 tool receipts + failure codes (spec 1d188f15)
-        'agent.ok.history_summary': 'This month: {count} documents · total {total} THB{by_category}',
+        'agent.ok.history_summary': '{count} documents · total {total} THB{by_category}',
         'agent.ok.usage_this_month': '{pages} pages used this month · {docs} documents',
         'agent.ok.notifications': '{count} notifications{top_list}',
         'agent.failure.no_tenant': 'No company account linked yet · please open the app first',
@@ -14815,7 +14815,7 @@ window.I18N = {
         'agent.failure._default': 'ระบบมีปัญหาชั่วคราว ลองใหม่อีกครั้งนะคะ',
         'agent.chat.greeting': 'สวัสดีค่ะ มีอะไรให้ช่วยเรื่องบัญชีไหมคะ',
         // ข้อความตอบกลับเครื่องมือ M1 + รหัสข้อผิดพลาด (spec 1d188f15)
-        'agent.ok.history_summary': 'สรุปเดือนนี้: {count} ใบ · ยอดรวม {total} บาท{by_category}',
+        'agent.ok.history_summary': 'มีเอกสารทั้งหมด {count} รายการ · รวม {total} บาท{by_category}',
         'agent.ok.usage_this_month': 'เดือนนี้ใช้ไป {pages} หน้า · {docs} เอกสาร',
         'agent.ok.notifications': 'มีแจ้งเตือน {count} รายการ{top_list}',
         'agent.failure.no_tenant': 'ยังไม่ได้ผูกบัญชีบริษัท · เปิดในแอปก่อนนะ',
@@ -19740,7 +19740,7 @@ window.I18N = {
         'agent.failure._default': 'システムに一時的な問題が発生しました · 後ほどもう一度お試しください',
         'agent.chat.greeting': 'こんにちは!会計のことで何かお手伝いできますか?',
         // M1 ツール応答 + 失敗コード (spec 1d188f15)
-        'agent.ok.history_summary': '今月のまとめ:{count} 件 · 合計 {total} バーツ{by_category}',
+        'agent.ok.history_summary': '記録は合計 {count} 件 · 合計 {total} バーツ{by_category}',
         'agent.ok.usage_this_month': '今月の利用 {pages} ページ · {docs} 件',
         'agent.ok.notifications': '通知が {count} 件{top_list}',
         'agent.failure.no_tenant': '会社の帳簿がまだ紐付けられていません · 先にアプリで開いてください',

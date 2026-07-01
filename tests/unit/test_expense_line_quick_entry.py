@@ -95,6 +95,15 @@ class IntentGuardTests(unittest.TestCase):
         self.assertFalse(lqe.is_question("ค่าน้ำ 50"))
         self.assertFalse(lqe.is_question("打车 120"))
 
+    def test_how_many_is_question(self):
+        # 回归:数量问句必须判为问句,才不被 L1「报了商品缺金额」拦下 → 交 Agent 查(M2)。
+        self.assertTrue(lqe.is_question("เดือนนี้สแกนกี่ใบ"))  # 这个月扫了几张
+        self.assertTrue(lqe.is_question("เดือนนี้ใช้ไปกี่หน้า"))  # 用了几页
+        self.assertTrue(lqe.is_question("这个月扫了几张"))
+        # 真记账不受影响(数量词不出现在正常一句话记账里)。
+        self.assertFalse(lqe.is_question("ค่าน้ำมัน 500"))
+        self.assertFalse(lqe.is_question("ซื้อของ 3 ชิ้น 200"))
+
     def test_l1_intent_support(self):
         self.assertEqual(lqe.l1_intent("人工客服"), "support")
         self.assertEqual(lqe.l1_intent("转人工"), "support")

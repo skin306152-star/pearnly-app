@@ -109,15 +109,20 @@ def handle_expense_text(
                 line_user_id,
             )
         if not isq and si is None and not is_edit and lqe.has_item_context(text):
-            with db.get_cursor_rls(stid, commit=True) as cur:
-                conversation.save_pending(
-                    cur,
-                    line_user_id=line_user_id,
-                    tenant_id=stid,
-                    workspace_client_id=ws,
-                    draft=parsed,
-                    missing="amount",
-                )
+            # pending 是多轮补金额的便利态(best-effort):存不下(如跨租户旧行撞 upsert)也照常
+            # 追问金额,绝不让它把这轮拖崩回落到兜底文案。
+            try:
+                with db.get_cursor_rls(stid, commit=True) as cur:
+                    conversation.save_pending(
+                        cur,
+                        line_user_id=line_user_id,
+                        tenant_id=stid,
+                        workspace_client_id=ws,
+                        draft=parsed,
+                        missing="amount",
+                    )
+            except Exception:
+                logger.warning("[line] save_pending failed; still prompt for amount")
             _pool("amount_missing")
             return True
 

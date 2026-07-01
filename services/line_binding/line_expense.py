@@ -39,7 +39,7 @@ def handle_expense_text(
         line_chat_memory.note(line_user_id=line_user_id, tenant_id=stid, role="user", content=text)
 
         # 灰度用户走「前门倒置」:模型站前门先判意图(闲聊也交它自然回复)。非灰度 → 老路一行不变。
-        from services.line_binding import line_agent_bridge, line_agent_confirm
+        from services.line_binding import line_agent_bridge
 
         gated = line_agent_bridge.frontdoor_enabled(bound_user)
 
@@ -62,12 +62,6 @@ def handle_expense_text(
         if ws is None:
             return False
 
-        # 记账确认续接(写档):有 agentrec 待办且答"是/否" → 落库/取消(先于改错,免被截走)。
-        if gated and line_agent_confirm.resolve_record(
-            bound_user, reply_token, text, stid, ws, lang, ctx, book=_do_record
-        ):
-            return True
-
         # 0. 改错路由(最高优先·#6):会话态续接 > 引用澄清/直接改 > 引用取消/删除(先于记账/大脑)。
         from services.expense import line_correct_flow
 
@@ -76,15 +70,25 @@ def handle_expense_text(
         ):
             return True
 
-        # 对话 Agent 前门(灰度·前门倒置):模型先判意图——查询/闲聊/产品问题自己组织人话回复;
-        # 记账/改错/超范围 → defer(None)落回下方旧确定性路(记账在旧路,能力只增不减)。
+        # 对话 Agent 前门(灰度·前门倒置):模型判意图——查询/闲聊自己组织人话回复;记账走现有
+        # _do_record 出富卡 + 确认按钮(能力只增不减);改错/超范围 → defer 落回下方旧确定性路。
         if gated and _ocr_balance_ok(bound_user):
             agent_reply = line_agent_bridge.try_agent_turn(
-                bound_user, text, lang, stid, ws, line_user_id, history
+                bound_user,
+                text,
+                lang,
+                stid,
+                ws,
+                line_user_id,
+                history,
+                reply_token=reply_token,
+                quote_token=quote_token,
+                book=_do_record,
             )
             if agent_reply is not None:
                 _charge_line_l2(bound_user, stid)
-                _say(agent_reply)
+                if agent_reply != line_agent_bridge.RECORD_CARD_SENT:
+                    _say(agent_reply)  # 记账已出卡则不再发文字(reply_token 已用)
                 return True
 
         si = lqe.l1_intent(text)

@@ -149,13 +149,14 @@ class _RecToolset:
 
 
 class TestConfirmFlow(unittest.TestCase):
-    """M3 记账确认握手:接地→落待办→大脑自撰复述(文案不写死);写关则 defer;金额没接地则追问。"""
+    """M3 记账:模型提议→接地建草稿→record_sink 出富卡(确认走现成卡按钮+postback);
+    写关/无出卡器则 defer;金额没接地则大脑文字追问(不出卡)。"""
 
     def _draft(self):
         return ExpenseDraft(amount=Decimal("50"), vendor_name="cafe", note="coffee")
 
-    def test_confirm_persists_and_lets_model_compose(self):
-        persisted = []
+    def test_record_sink_emits_card_and_consumes_turn(self):
+        sunk = []
         ts = _RecToolset(ToolResult(ok=True, data={"draft": self._draft()}))
         out = loop.handle_turn(
             "咖啡 50",
@@ -164,16 +165,15 @@ class TestConfirmFlow(unittest.TestCase):
                 loop.LoopStep(
                     "tool", tool="record_expense", args={"amount": "50", "note": "coffee"}
                 ),
-                loop.LoopStep("reply", message="记一笔咖啡 50 泰铢,确认吗?"),
             ),
             toolset=ts,
             history=[],
             allow_write=True,
-            confirm_persist=lambda ctx, data: persisted.append(data),
+            record_sink=lambda ctx, draft: sunk.append(draft),
         )
-        self.assertEqual(out, "记一笔咖啡 50 泰铢,确认吗?")  # 复述由模型写,非模板
-        self.assertEqual(len(persisted), 1)  # 待办已落
-        self.assertEqual(persisted[0]["draft"].amount, Decimal("50"))
+        self.assertEqual(out, loop.RECORD_CARD_SENT)  # 卡即回复:消费本轮,别再发文字
+        self.assertEqual(len(sunk), 1)  # 走出卡回调
+        self.assertEqual(sunk[0].amount, Decimal("50"))  # 接地好的真实草稿
 
     def test_confirm_tool_deferred_when_write_off(self):
         # 写关:record_expense 一律 defer 回旧路(记账走旧乐观路,现状不变)。
@@ -187,7 +187,7 @@ class TestConfirmFlow(unittest.TestCase):
         )
         self.assertIsNone(out)
 
-    def test_confirm_no_persist_sink_defers(self):
+    def test_no_record_sink_defers(self):
         out = loop.handle_turn(
             "咖啡 50",
             _CTX,
@@ -195,12 +195,12 @@ class TestConfirmFlow(unittest.TestCase):
             toolset=_RecToolset(ToolResult(ok=True, data={"draft": self._draft()})),
             history=[],
             allow_write=True,
-            confirm_persist=None,
+            record_sink=None,
         )
         self.assertIsNone(out)
 
-    def test_amount_ungrounded_asks_not_persists(self):
-        persisted = []
+    def test_amount_ungrounded_asks_not_sinks(self):
+        sunk = []
         ts = _RecToolset(ToolResult(ok=False, error_code="amount_ungrounded"))
         out = loop.handle_turn(
             "咖啡",
@@ -212,37 +212,16 @@ class TestConfirmFlow(unittest.TestCase):
             toolset=ts,
             history=[],
             allow_write=True,
-            confirm_persist=lambda ctx, data: persisted.append(data),
+            record_sink=lambda ctx, draft: sunk.append(draft),
         )
         self.assertEqual(out, "金额多少?")
-        self.assertEqual(persisted, [])  # 没接地绝不落待办
+        self.assertEqual(sunk, [])  # 没接地绝不出卡
 
     def test_visible_tools_hides_confirm_when_write_off(self):
         off = {t.name for t in loop._visible_tools(False)}
         on = {t.name for t in loop._visible_tools(True)}
         self.assertNotIn("record_expense", off)
         self.assertIn("record_expense", on)
-
-    def test_confirm_observation_shape(self):
-        obs = loop._confirm_observation({"draft": self._draft()})
-        self.assertEqual(
-            obs,
-            {
-                "ok": True,
-                "pending_confirm": True,
-                "amount": 50.0,
-                "vendor": "cafe",
-                "note": "coffee",
-            },
-        )
-
-    def test_grounded_fallback_record_confirm(self):
-        msg = loop._grounded_fallback(
-            [{"tool": "record_expense", "pending_confirm": True, "amount": 50.0, "vendor": "cafe"}],
-            "zh",
-        )
-        self.assertIn("50", msg)
-        self.assertIn("cafe", msg)
 
 
 class TestObservePayload(unittest.TestCase):

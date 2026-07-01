@@ -1316,6 +1316,10 @@ class _FakeMRERPAdapterForPushTests:
     def __exit__(self, *a):
         return False
 
+    def upload_routed_batch(self, histories, mappings):
+        # 方向路由入口(真 adapter 同名):测试单据无税号锚点 → 默认单次 upload_invoice_batch。
+        return self.upload_invoice_batch(histories, mappings)
+
     def upload_invoice_batch(self, histories, mappings):
         """Return a happy-path ImportResult with one SuccessRow per
         history. Records args so assertions can check the shape."""
@@ -1575,6 +1579,10 @@ class _AsyncTripwireAdapter:
 
     def __exit__(self, *a):
         return False
+
+    def upload_routed_batch(self, histories, mappings):
+        # 方向路由入口(真 adapter 同名):测试单据无税号锚点 → 默认单次 upload_invoice_batch。
+        return self.upload_invoice_batch(histories, mappings)
 
     def upload_invoice_batch(self, histories, mappings):
         from services.erp.mrerp_adapter import ImportResult, SuccessRow

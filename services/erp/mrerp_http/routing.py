@@ -12,10 +12,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from services.erp.express_push.common import payment_is_paid
 from services.erp.express_push.direction import resolve_direction
+from services.erp.mrerp_adapter_models import ImportResult
+from services.erp.mrerp_http.modules import get_module
 from services.purchase.field_clean import clean_tax_id
 
 
@@ -34,6 +36,45 @@ def choose_doc_type(
     if direction == "purchase":
         return "purchase"
     return None
+
+
+def route_and_upload(adapter, histories: List[Dict[str, Any]], mappings: Dict[str, Any]):
+    """按每张单据的方向路由 doc_type 再推送 · 合并为一个 ImportResult(同一会话内复用登录)。
+
+    **只把【确认为采购】的票切到采购模块**——销项 / 判不出方向(ambiguous / 无 own_tax_id)
+    一律保持 adapter 构造时的默认 doc_type(sales_credit),零倒退于今天正常的销项路;别家的
+    票由匹配闸(_filter_by_account_set)另挡。sales_cash 路由需收款科目槽配置,属独立增强,不碰。
+    """
+    if not histories:
+        return ImportResult(total=0)
+    own = mappings.get("_own_tax_id") if isinstance(mappings, dict) else None
+    default_doc = adapter.module.doc_type
+    groups: Dict[str, List[Dict[str, Any]]] = {}
+    order: List[str] = []
+    for h in histories:
+        chosen = choose_doc_type(h, h, own_tax_id=own)
+        dt = "purchase" if chosen == "purchase" else default_doc
+        groups.setdefault(dt, []).append(h)
+        if dt not in order:
+            order.append(dt)
+
+    # 全部同向且=默认 → 直接走原路(零行为变化 · 不切模块)。
+    if order == [default_doc]:
+        return adapter.upload_invoice_batch(histories, mappings)
+
+    merged = ImportResult(total=len(histories))
+    saved = adapter.module
+    try:
+        for dt in order:
+            adapter.module = get_module(dt)
+            r = adapter.upload_invoice_batch(groups[dt], mappings)
+            merged.success.extend(r.success)
+            merged.failed.extend(r.failed)
+            merged.elapsed_ms += r.elapsed_ms or 0
+            merged.xlsx_size_bytes += r.xlsx_size_bytes or 0
+    finally:
+        adapter.module = saved
+    return merged
 
 
 def confirmed_account_set_mismatch(

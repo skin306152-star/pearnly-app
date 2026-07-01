@@ -85,6 +85,21 @@ def _dispatch_mrerp_batch(
         flats.append(hf)
         inv_nos.append(_mrerp_history_invoice_no(hf))
 
+    # ★套账主体税号锚点(方向路由 + 匹配闸都要):单张路本就注入,批量路此前漏了 → 方向恒
+    #   判不出全落销项、匹配闸也全放行。一端点通常绑一个账套 → 取首张能解析到的税号即代表本批。
+    try:
+        from services.erp.express_push.preflight import _own_tax_id
+
+        for hf in flats:
+            own_tax = _own_tax_id(endpoint, hf, tenant_id)
+            if own_tax:
+                mappings = {**mappings, "_own_tax_id": own_tax}
+                break
+    except Exception:
+        logger.exception(
+            "dispatch_mrerp_batch: own_tax_id resolve failed; 方向路由/匹配闸本批不启用"
+        )
+
     # build adapter 一次。失败 → 全批同一个 err 结果。
     adapter, build_err = erp_push.build_mrerp_adapter(config)
     if build_err:
@@ -111,7 +126,7 @@ def _dispatch_mrerp_batch(
     # 一次性推全批(sync · 必须在事件循环外 · caller 用 to_thread 包)。
     try:
         with adapter:
-            result = adapter.upload_invoice_batch(flats, mappings)
+            result = adapter.upload_routed_batch(flats, mappings)
     except MRERPAuthError as e:
         return _all_same(
             histories, inv_nos, endpoint_id, tenant_id, 401, f"auth: {e}", f"ERR_AUTH: {e}", t0

@@ -219,7 +219,7 @@ def push_mrerp_history(
     #    in app.py wraps push_to_endpoint with asyncio.to_thread).
     try:
         with adapter:
-            result = adapter.upload_invoice_batch([history_flat], mappings)
+            result = adapter.upload_routed_batch([history_flat], mappings)
     except MRERPAuthError as e:
         return _resp(False, 401, f"auth: {e}", error_msg=f"ERR_AUTH: {e}")
     except MRERPTechnicalError as e:

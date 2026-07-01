@@ -126,6 +126,16 @@ class MrErpHttpAdapter:
 
     # ---- 主入口 -------------------------------------------------------
 
+    def upload_routed_batch(
+        self, histories: List[Dict[str, Any]], mappings: Dict[str, Any]
+    ) -> ImportResult:
+        """方向自动路由后推送(采购→采购模块 · 销项/ambiguous 保持默认)· 见 routing.route_and_upload。"""
+        if self._sess is None:
+            raise RuntimeError("MrErpHttpAdapter used outside `with` block")
+        from services.erp.mrerp_http.routing import route_and_upload
+
+        return route_and_upload(self, histories, mappings)
+
     def upload_invoice_batch(
         self, histories: List[Dict[str, Any]], mappings: Dict[str, Any]
     ) -> ImportResult:

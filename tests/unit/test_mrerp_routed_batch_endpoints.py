@@ -1,0 +1,128 @@
+# -*- coding: utf-8 -*-
+"""Bug#1 回归闸 · 方向路由真的把请求打到对的 MR.ERP 导入模块。
+
+驱动**真实** MrErpHttpAdapter.upload_routed_batch(不打桩 upload_invoice_batch),
+只把网络会话层 MrErpSession 换成记录每个端点 URL 的假会话 → 断言:
+  - 采购票(买方=套账主体)的交易导入落在 impaptran(采购模块),不落 impartran(销项)。
+  - 销项票(卖方=套账主体)落 impartran。
+  - 混批:两个模块各打各的,采购绝不串进销项。
+
+修复前:两条真实推送流恒用默认 sales_credit → 采购票全打 impartran(记成销项)。
+本闸锁死"方向 → doc_type → 模块端点"整条接线,防回退。
+"""
+
+from __future__ import annotations
+
+import unittest
+from types import SimpleNamespace
+from unittest import mock
+
+from services.erp.mrerp_http.adapter import MrErpHttpAdapter
+
+OWN = "0105562046201"  # 套账主体税号(=买方 → 采购;=卖方 → 销项)
+OTHER = "0999999999999"
+
+# 预览页:form#frmimport1 里一行已勾选的 cbimport + idus(供 _parse_preview_form 抽出可提交行)。
+_PREVIEW = (
+    '<form id="frmimport1">'
+    '<input type="hidden" name="idus" value="15">'
+    '<input type="hidden" name="selmenu" value="118">'
+    '<input type="checkbox" name="cbimport[2]" value="2" checked>'
+    "</form>"
+)
+
+
+class _FakeResp(SimpleNamespace):
+    pass
+
+
+class _FakeSession:
+    """记录所有 prepare/post 的目标路径 · 按 URL 返回让 5 步流程走通的假响应。"""
+
+    def __init__(self, **_kw):
+        self.idus = "15"
+        self.session = SimpleNamespace(close=lambda: None)
+        self.paths: list[str] = []
+
+    def prepare(self, probe_path="impartran/formupload.php?idmenu=370"):
+        self.paths.append(probe_path)
+
+    def post(self, path, **_kw):
+        self.paths.append(path)
+        if "uploadexcel" in path:
+            return _FakeResp(status_code=200, text="", content=b"")
+        if "formrdpc" in path:
+            return _FakeResp(status_code=200, text=_PREVIEW, content=_PREVIEW.encode())
+        if "importpc" in path:
+            return _FakeResp(status_code=200, text="1", content=b"1")
+        # report.php 等:importpc 返 "1" 时用不到,给个空成功兜底。
+        return _FakeResp(status_code=200, text="", content=b"")
+
+
+def _sales(inv):
+    return {
+        "client_id": 1,  # → 客户码 0006(见 mappings)
+        "invoice_number": inv,
+        "invoice_date": "2026-07-01",
+        "total_amount": "107.00",
+        "fields": {"seller_tax": OWN, "buyer_tax": OTHER},
+    }
+
+
+def _purchase(inv):
+    return {
+        "client_id": 2,
+        "invoice_number": inv,
+        "invoice_date": "2026-07-01",
+        "total_amount": "107.00",
+        # 卖方=供应商(非套账) · 买方=套账主体 → 采购。供应商码回退卖方税号,preflight 过。
+        "fields": {"seller_tax": OTHER, "buyer_tax": OWN},
+    }
+
+
+_MAPPINGS = {
+    "clients": [{"erp_type": "mrerp", "client_id": 1, "erp_code": "0006"}],
+    "suppliers": [{"erp_type": "mrerp", "client_id": 2, "seller_tax": OTHER, "erp_code": "V001"}],
+    "products": [],
+    "accounts": [],
+    "taxes": [],
+    "_own_tax_id": OWN,
+}
+
+
+class RoutedBatchEndpointTests(unittest.TestCase):
+    def _run(self, histories):
+        adapter = MrErpHttpAdapter(
+            login_url="https://x", username="u", password="p", serialize_sessions=False
+        )
+        with mock.patch("services.erp.mrerp_http.adapter.MrErpSession", _FakeSession):
+            with adapter:
+                sess = adapter._sess
+                res = adapter.upload_routed_batch(histories, dict(_MAPPINGS))
+        return res, sess.paths
+
+    @staticmethod
+    def _txn(paths, module):
+        """该模块下真正的交易提交(importpc)端点。"""
+        return [p for p in paths if p.startswith(f"{module}/") and "importpc" in p]
+
+    def test_purchase_hits_purchase_module_not_sales(self):
+        res, paths = self._run([_purchase("IVPUR01")])
+        self.assertTrue(self._txn(paths, "impaptran"), f"采购未打到 impaptran: {paths}")
+        self.assertFalse(self._txn(paths, "impartran"), f"采购误串进销项 impartran: {paths}")
+        self.assertEqual(len(res.success), 1)
+
+    def test_sales_hits_sales_module(self):
+        _, paths = self._run([_sales("IVSAL01")])
+        self.assertTrue(self._txn(paths, "impartran"), f"销项未打到 impartran: {paths}")
+        self.assertFalse(self._txn(paths, "impaptran"), f"销项误串进采购 impaptran: {paths}")
+
+    def test_mixed_batch_splits_correctly(self):
+        res, paths = self._run([_sales("IVSAL02"), _purchase("IVPUR02")])
+        self.assertTrue(self._txn(paths, "impartran"), f"混批销项段缺失: {paths}")
+        self.assertTrue(self._txn(paths, "impaptran"), f"混批采购段缺失: {paths}")
+        self.assertEqual(len(res.success), 2)
+
+
+if __name__ == "__main__":
+    unittest.main()

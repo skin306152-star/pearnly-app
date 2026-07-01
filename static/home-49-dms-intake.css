@@ -374,8 +374,7 @@
   .dmsx .dx-bar .btn{flex:1}
 }
 
-/* Ueå\ð · 
-‡ ERP Þ¥a(	û¡:Ñh’MR.ERP+Express·«ýÁ’DMS)· hover >' */
+/* context ERP connect cards on dms-intake (hover-zoom entry cards) */
 .dmsx .dx-erp-cards-zone{margin-top:16px}
 .dmsx .dx-erp-cards-zone:empty{display:none}
 .dmsx .dx-erp-h{font-size:12px;color:var(--ink2);font-weight:600;margin:0 2px 10px}

@@ -64,6 +64,57 @@ def provision_customers(adapter, valid: List[Dict[str, Any]], mappings: Dict[str
             clients.append({"erp_type": "mrerp", "client_id": cid, "erp_code": code})
 
 
+def _seller_from_history(h: Dict[str, Any]) -> Dict[str, str]:
+    """从 OCR history 抽卖方(供应商)· 码优先用卖方税号(确定性幂等),无税号回退 client_id。"""
+    fields = h.get("fields") if isinstance(h.get("fields"), dict) else {}
+
+    def pick(*keys: str) -> str:
+        for k in keys:
+            v = h.get(k) or (fields.get(k) if isinstance(fields, dict) else None)
+            if v:
+                return str(v).strip()
+        return ""
+
+    tax = re.sub(r"\D", "", pick("seller_tax", "seller_tax_id", "supplier_tax_id"))[:20]
+    code = tax or ("V" + str(h.get("client_id") or "0"))
+    return {
+        "code": code[:20],
+        "name": pick("seller_name", "supplier_name", "seller") or "-",
+        "tax_id": tax,
+        "address": pick("seller_address", "supplier_address"),
+        "phone": pick("seller_phone", "phone"),
+        "email": pick("seller_email", "email"),
+    }
+
+
+def provision_suppliers(adapter, valid: List[Dict[str, Any]], mappings: Dict[str, Any]) -> None:
+    """采购缺供应商则自建 · 建成功把码注入 mappings['suppliers'](原地 · 供 purchase 生成器解析)。"""
+    if not isinstance(mappings, dict) or not mappings.get("_mrerp_auto_create_supplier", True):
+        return
+    have = {
+        str(r.get("erp_code") or "").strip()
+        for r in mappings.get("suppliers") or []
+        if isinstance(r, dict)
+    }
+    pending: Dict[str, Dict[str, str]] = {}
+    inject: List[tuple] = []
+    for h in valid:
+        seller = _seller_from_history(h)
+        if not seller["code"] or seller["code"] in have:
+            continue
+        pending.setdefault(seller["code"], seller)
+        inject.append((int(h.get("client_id") or 0), seller["code"], seller["tax_id"]))
+    if not pending:
+        return
+    results = adapter.create_suppliers(list(pending.values()), mappings)
+    suppliers = mappings.setdefault("suppliers", [])
+    for cid, code, tax in inject:
+        if results.get(code):
+            suppliers.append(
+                {"erp_type": "mrerp", "client_id": cid, "seller_tax": tax, "erp_code": code}
+            )
+
+
 def _iter_items(h: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
     """从 history 抽商品行(items / fields.items / pages[].fields.items · 同明细装配口径)。"""
     fields = h.get("fields") if isinstance(h.get("fields"), dict) else {}

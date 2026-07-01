@@ -141,19 +141,23 @@ class MrErpHttpAdapter:
         if not histories:
             return self._result(original, [], mismatch_failed, t0, 0)
 
-        # 销项:缺买方客户则自建并注入码(须在 preflight 前 · 否则"客户未映射"会先把票拒掉)。
+        # 缺对手方主数据则自建并注入码(须在 preflight 前)· 销项建买方客户 / 采购建卖方供应商。
         # 除套账主体外一切可自建 · 见 autocreate。
         if m.doc_type.startswith("sales"):
             from services.erp.mrerp_http.autocreate import provision_customers
 
             provision_customers(self, histories, mappings)
+        elif m.doc_type == "purchase":
+            from services.erp.mrerp_http.autocreate import provision_suppliers
+
+            provision_suppliers(self, histories, mappings)
 
         valid, preflight_failed = self._preflight(histories, mappings)
         if not valid:
             return self._result(original, [], mismatch_failed + preflight_failed, t0, 0)
 
-        # 销项:明细行对不上已有商品则自建并注入码(在生成 xlsx 前)· 见 autocreate
-        if m.doc_type.startswith("sales"):
+        # 销/采:明细行对不上已有商品则自建并注入码(在生成 xlsx 前)· 见 autocreate
+        if m.doc_type.startswith("sales") or m.doc_type == "purchase":
             from services.erp.mrerp_http.autocreate import provision_products
 
             provision_products(self, valid, mappings)
@@ -223,6 +227,12 @@ class MrErpHttpAdapter:
     ) -> Dict[str, bool]:
         """自建商品(idempotent)· 导入 impstkmas · 返回 {商品码: 成功}。已存在视为成功。"""
         return self._import_masters(get_module("master_product"), products, mappings, "C")
+
+    def create_suppliers(
+        self, suppliers: List[Dict[str, Any]], mappings: Dict[str, Any]
+    ) -> Dict[str, bool]:
+        """自建供应商(idempotent)· 导入 impapmas · 返回 {供应商码: 成功}。已存在视为成功。"""
+        return self._import_masters(get_module("master_supplier"), suppliers, mappings, "A")
 
     def _import_masters(
         self, module, records: List[Dict[str, Any]], mappings: Dict[str, Any], code_col: str
@@ -382,8 +392,14 @@ class MrErpHttpAdapter:
     ) -> Tuple[List[Dict[str, Any]], List[FailedRow]]:
         valid: List[Dict[str, Any]] = []
         failed: List[FailedRow] = []
+        is_purchase = self.module.doc_type == "purchase"
+        if is_purchase:
+            from services.erp.mrerp_xlsx_purchase import validate_purchase_history
         for h in histories:
-            ok, err_code, warnings = _gen.validate_history_for_sales_credit(h, mappings)
+            if is_purchase:
+                ok, err_code, warnings = validate_purchase_history(h, mappings)
+            else:
+                ok, err_code, warnings = _gen.validate_history_for_sales_credit(h, mappings)
             if ok:
                 valid.append(h)
                 continue

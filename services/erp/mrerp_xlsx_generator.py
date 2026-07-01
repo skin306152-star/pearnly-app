@@ -284,6 +284,18 @@ def generate_xlsx(
 
         return generate_xlsx_product(histories, mappings)
 
+    # purchase 采购(impaptran)· 3-sheet 官方模板克隆 · 见 mrerp_xlsx_purchase
+    if sheet_kind == "purchase":
+        from services.erp.mrerp_xlsx_purchase import generate_xlsx_purchase
+
+        return generate_xlsx_purchase(histories, mappings)
+
+    # master_supplier 自建供应商(impapmas)· 官方模板克隆 · 见 mrerp_xlsx_supplier
+    if sheet_kind == "supplier_master":
+        from services.erp.mrerp_xlsx_supplier import generate_xlsx_supplier
+
+        return generate_xlsx_supplier(histories, mappings)
+
     schema = MRERP_SHEET_SCHEMAS.get(sheet_kind)
     if not schema:
         raise ValueError(f"unknown sheet_kind: {sheet_kind}")

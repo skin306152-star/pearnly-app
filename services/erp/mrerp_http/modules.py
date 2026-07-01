@@ -39,9 +39,9 @@ MODULES: Dict[str, MrErpModule] = {
     "sales_cash": MrErpModule(
         "sales_cash", "imparse", 371, 125, "sales_cash", "arse", 125, verified=True
     ),
-    # 采购(AP tran)· 2026-07-01 实测 selmenu=67(ซื้อ)/453(ซื้อ-ค่าใช้จ่าย)· 模板/生成器待补 S3
+    # 采购(AP tran)· selmenu 67(ซื้อ)/453(费用)· 3-sheet 模板克隆见 mrerp_xlsx_purchase(账套=买方)
     "purchase": MrErpModule(
-        "purchase", "impaptran", 363, 67, "purchase_credit", "aptran", 67, verified=False
+        "purchase", "impaptran", 363, 67, "purchase", "aptran", 67, verified=True
     ),
     # 库存进出(仅数量)· S4
     "stock_receive": MrErpModule(

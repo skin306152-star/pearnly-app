@@ -258,21 +258,52 @@ def handle_turn(
 
 
 def _grounded_fallback(observations: list, lang: str) -> Optional[str]:
-    """模型两次不肯成文时,按已取到的工具结果给一句诚实兜底(避免查询回落旧路误路)。"""
+    """模型两次不肯成文时,按已取到的工具结果给一句诚实兜底(避免查询回落旧路念"这笔多少钱")。
+
+    尤其覆盖搜索/通知的 0 结果(旧路 has_item_context 会误路那种),别把已查到的查询 defer。
+    """
+
+    def pick(d):
+        return d.get(lang, d["en"])
+
     last = observations[-1] if observations else {}
-    if last.get("tool") == "list_history":
-        total = int(last.get("total") or 0)
-        if not total:
-            return {
-                "th": "ไม่พบเอกสารที่ตรงกับคำค้นครับ",
-                "zh": "没有找到相关单据。",
-                "en": "No matching receipts found.",
-                "ja": "該当する書類は見つかりませんでした。",
-            }.get(lang, "No matching receipts found.")
-        return {
-            "th": f"พบเอกสารที่ตรงกับคำค้น {total} รายการ",
-            "zh": f"找到 {total} 条相关单据。",
-            "en": f"Found {total} matching receipts.",
-            "ja": f"{total}件見つかりました。",
-        }.get(lang, f"Found {total} matching receipts.")
-    return None  # 其它工具的罕见成文失败 → 交旧路
+    tool = last.get("tool")
+    if tool == "list_history":
+        n = int(last.get("total") or 0)
+        if not n:
+            return pick(
+                {
+                    "th": "ไม่พบเอกสารที่ตรงกับคำค้นครับ",
+                    "zh": "没有找到相关单据。",
+                    "en": "No matching receipts found.",
+                    "ja": "該当する書類は見つかりませんでした。",
+                }
+            )
+        return pick(
+            {
+                "th": f"พบเอกสารที่ตรงกับคำค้น {n} รายการ",
+                "zh": f"找到 {n} 条相关单据。",
+                "en": f"Found {n} matching receipts.",
+                "ja": f"{n}件見つかりました。",
+            }
+        )
+    if tool == "list_notifications":
+        n = int(last.get("count") or 0)
+        if not n:
+            return pick(
+                {
+                    "th": "ไม่มีแจ้งเตือนใหม่ครับ",
+                    "zh": "目前没有新通知。",
+                    "en": "No new notifications.",
+                    "ja": "新しい通知はありません。",
+                }
+            )
+        return pick(
+            {
+                "th": f"มีแจ้งเตือน {n} รายการ",
+                "zh": f"有 {n} 条通知。",
+                "en": f"{n} notifications.",
+                "ja": f"通知が{n}件あります。",
+            }
+        )
+    return None  # 其它工具罕见成文失败 → 交旧路(其查询兜底非"问价格"误路)

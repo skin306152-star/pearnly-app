@@ -111,3 +111,25 @@ def resolve_reply_lang(text, preferred_lang, ev_lang) -> str:
     if detected in _STRONG:
         return detected
     return preferred_lang or ev_lang or "th"
+
+
+def card_lang(line_user_id, tenant_id, ev_lang) -> str:
+    """无文本触发的卡片(按钮 postback / 图片OCR结果卡)的回复语言。
+
+    这类触发没有当轮文本可判脚本,过去回落账号偏好 preferred_lang → 中文账号的用户在泰语对话里
+    收到中文卡(设计语言不一致)。改为跟随【最近对话实际语言】:取 24h 内最近一条用户消息的脚本
+    (显式「说中文」切换也会体现在后续消息里,自然被跟上)→ LINE 事件语言 → 泰语(主市场兜底)。
+    刻意不读 preferred_lang —— 卡片跟对话走,不跟账号系统语言。
+    """
+    try:
+        from services.line_binding import line_chat_memory
+
+        recent = line_chat_memory.recent(line_user_id=line_user_id, tenant_id=tenant_id)
+        for turn in reversed(recent or []):
+            if turn.get("role") == "user":
+                detected = line_classify.detect_text_lang(turn.get("content") or "")
+                if detected in _STRONG:
+                    return detected
+    except Exception:
+        pass
+    return ev_lang or "th"

@@ -144,7 +144,10 @@ async def _handle_line_event(ev: dict):
         if not bound:
             return
         line_reply.begin_loading(line_user_id)
-        lang = bound.get("preferred_lang") or _ev_lang(ev)
+        from services.expense import line_lang
+
+        # 卡片(按钮 postback)跟随最近对话语言,不跟账号偏好(治泰语对话点取消却回中文卡)。
+        lang = line_lang.card_lang(line_user_id, bound.get("tenant_id"), _ev_lang(ev))
         data = (ev.get("postback") or {}).get("data", "")
         # Rich Menu 区(rm_*)→ 路由到现有汇总/明细/PDF/能力说明;非菜单 postback 交卡片动作分发。
         if line_rich_menu.handle_postback(bound, reply_token, data, lang, line_user_id):
@@ -193,8 +196,10 @@ async def _handle_line_event(ev: dict):
                     )
                 return
 
-            # v118.25.4 · 已绑定用户 · 优先用 Pearnly 网站偏好语言 · 兜底用 LINE 语言(不再写死 zh)
-            lang = bound_user.get("preferred_lang") or _ev_lang(ev)
+            # 图片OCR结果卡跟随最近对话语言,不跟账号偏好(治泰语对话收到中文结果卡)。
+            from services.expense import line_lang
+
+            lang = line_lang.card_lang(line_user_id, bound_user.get("tenant_id"), _ev_lang(ev))
 
             # 收到票据即用 replyToken 回处理中 ack(P1E-1·有上下文):说明正在读取金额/日期/卖家/VAT/明细。
             # 结果卡稍后异步 push;此处 replyToken 仅这一次用,不影响后续。

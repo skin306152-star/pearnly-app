@@ -2,6 +2,7 @@
 """LINE 语言中枢:明说切换 / 按消息文本自动跟随 / 回落链(line-language-follow-p0)。"""
 
 import unittest
+from unittest import mock
 
 from services.expense import line_lang
 
@@ -64,6 +65,48 @@ class ResolveReplyLangTests(unittest.TestCase):
     def test_fallback_chain_to_ev_then_thai(self):
         self.assertEqual(line_lang.resolve_reply_lang("190", None, "en"), "en")
         self.assertEqual(line_lang.resolve_reply_lang("", None, None), "th")
+
+
+class CardLangTests(unittest.TestCase):
+    """无文本触发的卡片(按钮 postback / 图片结果卡)跟随最近对话语言,不读账号偏好。"""
+
+    @staticmethod
+    def _recent(turns):
+        return mock.patch("services.line_binding.line_chat_memory.recent", return_value=turns)
+
+    def test_follows_recent_user_message_language(self):
+        # 最近对话是泰语 → 卡片泰语(哪怕 ev_lang=中文·本函数刻意不看账号偏好)。
+        with self._recent(
+            [{"role": "user", "content": "ค่ากาแฟ 50"}, {"role": "bot", "content": "โอเค"}]
+        ):
+            self.assertEqual(line_lang.card_lang("U1", "t1", "zh"), "th")
+
+    def test_uses_latest_user_turn(self):
+        # 取最近一条用户消息:泰→中切换后收到中文卡(显式换语言自然被跟上)。
+        with self._recent(
+            [{"role": "user", "content": "สวัสดี"}, {"role": "user", "content": "你好"}]
+        ):
+            self.assertEqual(line_lang.card_lang("U1", "t1", "th"), "zh")
+
+    def test_skips_weak_and_bot_turns(self):
+        # 纯数字/机器人消息无强脚本 → 跳过,继续找更早的强信号用户消息。
+        with self._recent(
+            [
+                {"role": "user", "content": "สวัสดีค่ะ"},
+                {"role": "bot", "content": "hi"},
+                {"role": "user", "content": "500"},
+            ]
+        ):
+            self.assertEqual(line_lang.card_lang("U1", "t1", "en"), "th")
+
+    def test_no_history_falls_to_ev_then_thai(self):
+        with self._recent([]):
+            self.assertEqual(line_lang.card_lang("U1", "t1", "ja"), "ja")
+            self.assertEqual(line_lang.card_lang("U1", "t1", None), "th")
+
+    def test_memory_failure_falls_to_ev(self):
+        with mock.patch("services.line_binding.line_chat_memory.recent", side_effect=RuntimeError):
+            self.assertEqual(line_lang.card_lang("U1", "t1", "th"), "th")
 
 
 if __name__ == "__main__":

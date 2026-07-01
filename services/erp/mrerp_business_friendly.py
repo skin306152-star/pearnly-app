@@ -152,6 +152,12 @@ _ERR_CATALOG: Dict[str, Dict[str, str]] = {
         "zh": "税率不在允许枚举内(vat_7 / vat_0 / vat_exempt / non_vat)",
         "zh_TW": "稅率不在允許列舉內(vat_7 / vat_0 / vat_exempt / non_vat)",
     },
+    "ERR_VAT_RATE_ANOMALY": {
+        "th": "VAT ที่อ่านได้ไม่เท่ากับ 7% ตามมาตรฐาน — โปรดตรวจสอบ (ไม่ส่งอัตโนมัติ)",
+        "en": "Read VAT rate is not ~7% (Thai standard) — please review; not auto-pushed",
+        "zh": "票面 VAT 隐含税率非约 7%(泰国标准)· 转人工复核 · 不自动推送",
+        "zh_TW": "票面 VAT 隱含稅率非約 7%(泰國標準)· 轉人工複核 · 不自動推送",
+    },
     "ERR_DATE_FUTURE": {
         "th": "วันที่ใบกำกับเลย 30 วันในอนาคต ห้ามอัปโหลด",
         "en": "Invoice date is more than 30 days in the future — upload blocked",

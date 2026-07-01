@@ -24,7 +24,10 @@
 
 ---
 
-## 1. 当前在干啥(整顿期 · 2026-05 起)
+## 1. 当前在干啥(2026-07 · 整顿核心已收官 → 正常产品开发)
+
+- **▶ 当前主线(2026-07-01)**:**对话 Agent M1(WP1~WP5)全线收官**,灰度上线 skin canary(enabled=True·rollout=allowlist=[skin]·真机验收通过),**待 Zihao 拍板放量**。近期已上线:OCR 兜底 gemini-3.5-flash、网页 OCR 上传异步(flag `OCR_ASYNC_WEB` 默认关)、录入续步记忆 + 发票/身份证两入口布局统一。**唯一活地图 = `CLAUDE.md/STATE_PEARNLY.md` 顶部状态卡**;Agent 线全景见 `docs/agent/MASTER-PLAN.md`。下面 2026-06-03 一段是整顿收官时的历史快照,已不代表当前主线。
+
 
 - **⏳ 当前实况(2026-06-03)**:✅ 后端 .py 全 ≤500 · ✅ **前端 `src/home/*.js` 全部 ≤500 收官**(本窗口收最后 11 个 · 11→0 FAIL · 全 push 上线 + prod 真浏览器实测 · 零 console error)。**check_file_size FAIL 0 · 所有源文件 ≤500 达成**(login.html 分层着陆页换新已上线·巨石退场·5000 豁免已删)。法律页 `/terms` `/privacy` 孤儿捞回 git + 重做标准界面(prod 验绿)。范式 [[c9-store-centralization-bankrecon]]。**✅ 代码目录重组收官上线**(铁律#30·整顿最后一步·`d05cf6d`·122 root .py→顶层 routes/core/+复用 services/<域>/·方案B·prod 零 500)。整顿核心全收官。**下一步:staging(Wave3)或品牌资产接线**。
 - **模式**:整顿封锁期(铁律 #18)· **0 新功能** · 只做 `REFACTOR_MASTER_PLAN.md` 的 9 阶段 task。**判文件先分类**:一堆独立函数→facade 切(re-export);单个巨类→mixin 真重构。**下个 task 顺序**:✅`bank_recon_v2`6745→422 + ✅`gl_vat_reconciler`1423→72 + ✅`recon_routes`2000→460 + ✅`vat_excel_export`1960→55 收官 / 🔄`bank_recon_excel`1397→841(剩 export_bank_recon_excel 816 闭包函数)/ `mrerp_xlsx_generator`1336 → ERP 周边 `customer_sync`/`product_sync` → 报表 → 前端 `src/home/*`(~14 个 >500)。**巨函数分解范式(build_excel 已实证)**:样式无运行时依赖→提模块级·sheet body 保缩进搬进 `_build_sheetN`(字节级 verbatim)·只产出数据的 sheet 加 return·**旧 vs 新逐 cell 等价验证**;⚠️若函数内多嵌套闭包(export_bank_recon_excel 18 个)先规划「闭包→参数」映射再动。**路由组拆范式**:子模块各 `APIRouter()` 无 prefix→主 include_router→路由表 sorted diff 逐字一致;⚠️AST lineno 不含装饰器(块首 handler 的 `@router` 会丢·起点取 min decorator lineno);handlers.py 运行时 import 的函数全 re-export。**facade 切范式**:AST 取节点(lineno,end_lineno)·gap 注释归属后随→AST dump 比对证 0 逻辑改→ruff F401--fix + **F821 兜底抓漏 import**→**新建模块前必验路径空闲(裸 open('w') 会静默覆盖已存在文件)**→noqa 放 `from(` 开括号行→black 保 CRLF→全量 unittest + 契约 assertIs。**机械闸盲区**:根目录非 *_routes.py 的业务 .py(bank_recon_v2 等)当前 check_file_size 没监控·开 fail 模式前需先扩 glob。
@@ -96,7 +99,8 @@ npm run build                                     # 改前端才需(Vite)
 | 拆巨石作战手册 | `docs/refactor/BATCH_STRATEGY.md` |
 | 业务概念 / 状态机 / 验收剧本 | `docs/agent/BUSINESS_GLOSSARY · ERROR_CODES_AND_STATES · ACCEPTANCE_PLAYBOOKS` |
 | 销项发票 · 开票模块规格 | `docs/sales-module/docs/15`(买方动态表单)· `16`(后端合规/折扣/纸张/留底/审批/日期/模板)· `13`(逐 PO 计划) |
-| **LINE 进票据(做后端前必读)** | `docs/smart-intake/09`(图片识别核心 · prod 实测 L3 过度触发致 9–61s · 改哪里+泰国税票分类)+ `docs/smart-intake/10`(文本路:回复护栏/意图路由/模糊字段映射 · 泰语优先 · 模型只听懂不开口)· 两条腿共用字段 schema/确认卡/下游 · 配 `14`(流程外壳) |
+| **LINE 进票据(做后端前必读)** | `docs/line-platform/02-procurement-canon.md`(采购进项产品正本·旧讨论冲突裁决·P1E口径)+ `docs/smart-intake/09`(图片识别核心)+ `docs/smart-intake/10`(文本路:回复护栏/意图路由/模糊字段映射)· 两条腿共用字段 schema/确认卡/下游 |
+| **对话 Agent(当前主线 · M1 WP1~5 已上线)** | `docs/agent/MASTER-PLAN.md`(全景 + 为啥"插座插头" + 里程碑 + 工作包)· `docs/agent/M1-SOCKET-DESIGN.md`(技术总纲)· `docs/agent/CONVERSATION-SPEC.md`(对话文案规范)· `services/agent/README.md`(每文件职责) |
 | **产品北极星 · 模块化平台(防跑偏)** | `docs/PRODUCT_VISION_MODULAR.md`(身份一句话 + 底座/模块/出口三层 + 模块化六原则 + 业态套餐)· 加功能前先对一遍 |
 | 为啥这么决策 | `docs/refactor/adr-*.md`(ADR-001~011) |
 | 铁律全文细节 | `CLAUDE.md/CLAUDE.md`(30 铁律) |

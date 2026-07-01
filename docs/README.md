@@ -1,12 +1,13 @@
 # Pearnly · `docs/` 索引
 
-> **更新**:2026-06-02 · 文档整理(删 .bak / 标记陈旧交接 / 入口 AGENTS 刷新)
+> **更新**:2026-07-01 · 文档对齐真实源码 + 理顺(重写 STATE 状态卡 → 对话 Agent M1 主线 / 过期一次性 HANDOFF 归档到 `docs/archive/` / 入口 AGENTS 刷新)。上一次 2026-06-02。
 >
 > 这是 `docs/` 下所有 markdown 的导航 · 给新接力 agent 和 Zihao 用。
 > 每条 1-2 句说明 + 创建/更新日期 + 现在还能不能信(✅ 当前 / 📚 历史 / ⚠️ 已过时但保留)。
 >
 > **⚠️ 单一权威源(活文档·只信这些)**:`AGENTS.md`(唯一入口)· `CLAUDE.md/STATE_PEARNLY.md`(状态卡)· `CLAUDE.md/REFACTOR_MASTER_PLAN.md`(进度看板)· `CLAUDE.md/CLAUDE.md`(铁律)· `OUTCOMES.md`(Zihao 结果跟踪)。
-> **已标记陈旧(勿当现状)**:`HANDOVER_TO_NEXT_WINDOW.md` · `CLAUDE.md/HANDOFF_REFACTOR_BC.md` · `docs/STATE_2026_05_19.md`(均一次性交接·已被 STATE 取代)。`docs/ONBOARDING.md` 与根 `ONBOARDING.md` 重复(待合并)。
+> **当前主线活文档**:`docs/agent/MASTER-PLAN.md`(对话 Agent M1 · WP1~5)+ `docs/agent/M1-SOCKET-DESIGN.md` + `docs/agent/CONVERSATION-SPEC.md`。
+> **已归档到 `docs/archive/`(历史快照·勿当现状)**:2026-06 的一次性 HANDOFF(绑主体面板/体积闸/全检收口/整顿恢复/全局诊断/erp-recon/express-v1/B8-RLS-wave2 等)· `Pearnly_按优先级可执行任务清单_2026-05-21.md` · `STATE_2026_05_19.md`。均已被 STATE 状态卡取代。`docs/ONBOARDING.md` 与根 `ONBOARDING.md` 重复(待合并)。
 >
 > **项目级文档不在这里** · 见项目根:
 > - `CLAUDE.md/CLAUDE.md`(项目宪法 · 28 条铁律)

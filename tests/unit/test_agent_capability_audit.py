@@ -3,6 +3,7 @@
 新增路由文件忘了登记 → 闸脚本非零 → 本测试红,提醒"这条还没决定进不进 Agent"。
 与 CI 的 lint-agent job 同闸,单测层再兜一道。
 """
+
 import json
 import subprocess
 import sys
@@ -18,7 +19,9 @@ class TestAgentCapabilityAudit(unittest.TestCase):
     def test_audit_script_passes(self):
         result = subprocess.run(
             [sys.executable, str(SCRIPT)],
-            capture_output=True, text=True, cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            cwd=str(ROOT),
         )
         self.assertEqual(result.returncode, 0, f"防漏闸非零退出:\n{result.stdout}\n{result.stderr}")
 

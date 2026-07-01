@@ -55,9 +55,7 @@ def main() -> None:
         )
         row = cur.fetchone()
     line_uid = (row and row.get("line_user_id")) or f"sim:{args.user}"
-    ctx = AgentContext(
-        user=user, tenant_id=tid, workspace_client_id=args.ws, line_user_id=line_uid
-    )
+    ctx = AgentContext(user=user, tenant_id=tid, workspace_client_id=args.ws, line_user_id=line_uid)
     print(f"=== agent_sim · user={args.user} · tenant={ctx.tenant_id} ===\n")
     for label, msg in BATTERY:
         try:

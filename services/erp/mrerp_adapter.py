@@ -34,10 +34,8 @@ Public surface:
         # business
         login() -> None                         # idempotent
         select_company() -> None                # idempotent; auto-logs in
-        upload_invoice_batch(histories,
-                             mappings) -> ImportResult
-        search_invoice(invoice_no) -> Optional[InvoiceRecord]
-        delete_invoice(db_row_id) -> bool
+
+    发票推送已迁 HTTP 直写(mrerp_http/)· 本类只保留登录 + 主数据(测试连接 / 列客户商品)。
 
 Exception taxonomy (see services.erp.exceptions):
     MRERPAuthError       — credentials bounced; do NOT retry
@@ -83,10 +81,8 @@ from services.erp.mrerp_adapter_models import (  # noqa: E402,F401
     SuccessRow,
 )
 
-# M1/M2/M3/M4 verbatim 搬家:登录/上传/取报告/主数据方法组拆成 mixin(MRO 组合 · 0 逻辑改)
+# 登录 + 主数据 mixin(发票推送 upload/report mixin 已随 S5 删旧 Playwright 发票路移除)
 from services.erp.mrerp_adapter_login import MRERPLoginMixin  # noqa: E402
-from services.erp.mrerp_adapter_upload import MRERPUploadMixin  # noqa: E402
-from services.erp.mrerp_adapter_report import MRERPReportMixin  # noqa: E402
 from services.erp.mrerp_adapter_masterdata import MRERPMasterDataMixin  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -99,7 +95,7 @@ T = TypeVar("T")
 # ============================================================
 
 
-class MRERPAdapter(MRERPLoginMixin, MRERPUploadMixin, MRERPReportMixin, MRERPMasterDataMixin):
+class MRERPAdapter(MRERPLoginMixin, MRERPMasterDataMixin):
 
     SC_PATH_FORMUPLOAD = "/impartran/formupload.php"
     SC_PATH_FORMRDPC = "/impartran/formrdpc.php"

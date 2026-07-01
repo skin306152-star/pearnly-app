@@ -33,26 +33,20 @@ class TestModules(unittest.TestCase):
             get_module("nope")
 
 
-class TestTransportSwitch(unittest.TestCase):
-    def test_pick(self):
-        from services.erp.erp_push_adapters import _mrerp_transport
+class TestBuildAdapter(unittest.TestCase):
+    """S5 删旧 Playwright 发票路后:build_mrerp_adapter 恒返 HTTP 直写(无传输开关)。"""
 
-        self.assertEqual(_mrerp_transport({"transport": "HTTP"}), "http")
-        self.assertEqual(_mrerp_transport({}), "playwright")
-
-    def test_build_http_branch_returns_http_adapter(self):
+    def test_build_always_returns_http_adapter(self):
         from services.erp.erp_push_adapters import build_mrerp_adapter
 
-        adapter, err = build_mrerp_adapter(
-            {
-                "system_url": "https://www.mrerp4sme.com",
-                "username": "u",
-                "password": "p",
-                "transport": "http",
-            }
-        )
+        base = {"system_url": "https://www.mrerp4sme.com", "username": "u", "password": "p"}
+        adapter, err = build_mrerp_adapter(base)
         self.assertIsNone(err)
         self.assertEqual(type(adapter).__name__, "MrErpHttpAdapter")
+        # 即便旧配置残留 transport=playwright 也走 HTTP(开关已删)
+        adapter2, err2 = build_mrerp_adapter({**base, "transport": "playwright"})
+        self.assertIsNone(err2)
+        self.assertEqual(type(adapter2).__name__, "MrErpHttpAdapter")
 
 
 class TestSession(unittest.TestCase):

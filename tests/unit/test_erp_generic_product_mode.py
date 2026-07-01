@@ -101,35 +101,43 @@ class GeneratorGenericFallbackTests(unittest.TestCase):
 
 
 # ============================================================
-# 契约 2 · adapter 模式开关(经 build_mrerp_adapter)
+# 契约 2 · 通用商品模式(S5 后走 HTTP:mappings['_mrerp_generic_product'] → provision_products)
 # ============================================================
-class AdapterGenericModeWiringTests(unittest.TestCase):
-    def _base_cfg(self, **extra):
-        cfg = {
-            "system_url": "https://www.mrerp4sme.com",
-            "username": "u",
-            "password": "p",
-            "comidyear": "6",
-            "seldb": "1",
-        }
-        cfg.update(extra)
-        return cfg
+class GenericProductModeHttpTests(unittest.TestCase):
+    """删旧 Playwright 发票路后,通用商品码由推送流注入 mappings,provision_products 映射不新建。"""
 
-    def test_generic_code_set_enters_generic_mode(self):
-        from services.erp import erp_push
+    def _valid(self):
+        return [{"id": "x", "items": [{"name": "Unmatched Item", "qty": 1, "unit_price": 10}]}]
 
-        adapter, err = erp_push.build_mrerp_adapter(
-            self._base_cfg(generic_product_code="GEN-INCOME")
-        )
-        self.assertIsNone(err, f"构建失败:{err!r}")
-        self.assertEqual(adapter.generic_product_code, "GEN-INCOME")
+    def test_generic_maps_unmatched_without_create(self):
+        from services.erp.mrerp_http.autocreate import provision_products
 
-    def test_no_generic_code_is_precise_mode(self):
-        from services.erp import erp_push
+        calls = {"n": 0}
 
-        adapter, err = erp_push.build_mrerp_adapter(self._base_cfg())
-        self.assertIsNone(err, f"构建失败:{err!r}")
-        self.assertIsNone(adapter.generic_product_code, "未配通用码应为精确模式(None)")
+        class _A:
+            def create_products(self, *a, **k):
+                calls["n"] += 1
+                return {}
+
+        m = {"products": [], "_mrerp_generic_product": "GEN-INCOME"}
+        provision_products(_A(), self._valid(), m)
+        self.assertEqual(calls["n"], 0, "配了通用码不应逐行新建商品")
+        self.assertEqual(m["products"][0]["erp_code"], "GEN-INCOME")
+
+    def test_no_generic_creates_per_line(self):
+        from services.erp.mrerp_http.autocreate import provision_products
+
+        created = []
+
+        class _A:
+            def create_products(self, prods, mappings):
+                created.extend(prods)
+                return {p["code"]: True for p in prods}
+
+        m = {"products": []}
+        provision_products(_A(), self._valid(), m)
+        self.assertEqual(len(created), 1, "未配通用码应逐行新建")
+        self.assertTrue(m["products"][0]["erp_code"].startswith("P"))
 
 
 # ============================================================

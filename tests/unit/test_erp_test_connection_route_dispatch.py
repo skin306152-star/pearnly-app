@@ -1109,7 +1109,6 @@ class PushMRERPRouteContractTests(unittest.TestCase):
            once with the single-history list shape.
         """
         from services.erp import erp_push as _erp_mod
-        from services.erp import mrerp_adapter as _mrerp_mod
 
         endpoint = {
             "id": "ep-test-1",
@@ -1167,7 +1166,8 @@ class PushMRERPRouteContractTests(unittest.TestCase):
         sys.modules["core.db"] = fake_db
         try:
             with (
-                patch.object(_mrerp_mod, "MRERPAdapter", _FakeMRERPAdapterForPushTests),
+                # S5 后发票推送走 HTTP 直写 → patch build_mrerp_adapter 导入的 HTTP adapter 符号
+                patch("services.erp.mrerp_http.MrErpHttpAdapter", _FakeMRERPAdapterForPushTests),
                 patch.object(_erp_mod, "logger", MagicMock()),
             ):
                 result = _erp_mod.push_to_endpoint(endpoint, history)
@@ -1425,7 +1425,6 @@ class PushMRERPAsyncContextTests(unittest.TestCase):
         and the route returns 500 with that text. We assert no such
         text appears."""
         app = self.app_module
-        from services.erp import mrerp_adapter as _mrerp_mod
 
         fake_ep = {
             "id": "ep-mrerp-1",
@@ -1483,7 +1482,7 @@ class PushMRERPAsyncContextTests(unittest.TestCase):
             patch.object(app.db, "update_endpoint_stats", return_value=None),
             patch.object(app.db, "update_history_push_status", return_value=None),
             patch.object(app.db, "get_erp_retry_delay_sec", return_value=None),
-            patch.object(_mrerp_mod, "MRERPAdapter", _AsyncTripwireAdapter),
+            patch("services.erp.mrerp_http.MrErpHttpAdapter", _AsyncTripwireAdapter),
         ):
             client = await self._make_async_client()
             async with client:

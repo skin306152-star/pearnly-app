@@ -156,6 +156,11 @@ def push_mrerp_history(
 
     mappings = load_mrerp_mappings(tenant_id)
 
+    # 通用销售商品码(向导「通用商品」)· 配了 → 对不上的明细行映射到它,不逐行新建(见 provision_products)。
+    _gp = str(config.get("generic_product_code") or "").strip()
+    if _gp:
+        mappings = {**mappings, "_mrerp_generic_product": _gp}
+
     # ★套账匹配闸锚点:把套账主体(workspace_client)税号喂进 mappings → adapter 核票面
     # 买卖方符不符套账,确认别家的票则挡下不推(防推错套账)。复用 Express 侧同源解析(方向锚点单一事实源)。
     try:
@@ -204,7 +209,7 @@ def push_mrerp_history(
         )
 
     # adapter 已构造成功 → playwright 必可 import · 取异常类用于下方分类。
-    from services.erp.mrerp_adapter import (
+    from services.erp.exceptions import (
         MRERPAuthError,
         MRERPTechnicalError,
         MRERPBusinessError,

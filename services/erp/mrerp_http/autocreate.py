@@ -137,9 +137,14 @@ def _product_code_from_name(name: str) -> str:
 
 
 def provision_products(adapter, valid: List[Dict[str, Any]], mappings: Dict[str, Any]) -> None:
-    """明细行对不上已有商品则自建 · 建成功把码注入 mappings['products'](原地)。"""
+    """明细行对不上已有商品 → 建并注入码;配了通用商品码则映射到它(不逐行新建)。
+
+    `mappings['_mrerp_generic_product']`(向导「通用销售商品码」)= 对不上的行统一映射到该商品,
+    推送更快 · 不产生重复商品(不自建)· 见 build_mrerp_adapter。未配 → 逐行 md5 自建(老行为)。
+    """
     if not isinstance(mappings, dict) or not mappings.get("_mrerp_auto_create_product", True):
         return
+    generic = str(mappings.get("_mrerp_generic_product") or "").strip()
     lookup = _build_product_lookup(mappings)
     pending: Dict[str, Dict[str, Any]] = {}
     inject: List[tuple] = []
@@ -147,6 +152,9 @@ def provision_products(adapter, valid: List[Dict[str, Any]], mappings: Dict[str,
         for item in _iter_items(h):
             name = str(item.get("name") or item.get("description") or "").strip()
             if not name or _resolve_product_code(name, lookup):
+                continue
+            if generic:
+                inject.append((name, generic))  # 映射到通用商品,不新建
                 continue
             code = _product_code_from_name(name)
             pending.setdefault(
@@ -158,10 +166,14 @@ def provision_products(adapter, valid: List[Dict[str, Any]], mappings: Dict[str,
                 },
             )
             inject.append((name, code))
+    products = mappings.setdefault("products", [])
+    if generic:
+        for name, code in inject:
+            products.append({"item_name": name, "erp_code": code})
+        return
     if not pending:
         return
     results = adapter.create_products(list(pending.values()), mappings)
-    products = mappings.setdefault("products", [])
     for name, code in inject:
         if results.get(code):
             products.append({"item_name": name, "erp_code": code})

@@ -33,23 +33,15 @@ if str(PROJECT_ROOT) not in sys.path:
 from services.erp.mrerp_adapter import MRERPAdapter  # noqa: E402
 from services.erp import mrerp_adapter_models as _models  # noqa: E402
 from services.erp import mrerp_adapter_login as _login  # noqa: E402
-from services.erp import mrerp_adapter_upload as _upload  # noqa: E402
-from services.erp import mrerp_adapter_report as _report  # noqa: E402
 from services.erp import mrerp_adapter_masterdata as _master  # noqa: E402
 
 
 class MrerpAdapterMixinContractTest(unittest.TestCase):
+    # S5 删旧 Playwright 发票路后:发票推送(upload/report mixin)已移除,本类只剩登录 + 主数据。
     def test_mro_order_fixed(self) -> None:
         self.assertEqual(
             [c.__name__ for c in MRERPAdapter.__mro__],
-            [
-                "MRERPAdapter",
-                "MRERPLoginMixin",
-                "MRERPUploadMixin",
-                "MRERPReportMixin",
-                "MRERPMasterDataMixin",
-                "object",
-            ],
+            ["MRERPAdapter", "MRERPLoginMixin", "MRERPMasterDataMixin", "object"],
         )
 
     def test_methods_resolve_to_expected_mixin(self) -> None:
@@ -57,20 +49,10 @@ class MrerpAdapterMixinContractTest(unittest.TestCase):
             # main class body (核心 lifecycle + staticmethod helpers)
             "__init__": MRERPAdapter,
             "from_encrypted": MRERPAdapter,
-            "_retry_technical": MRERPAdapter,
-            "_extract_items": MRERPAdapter,
-            "_extract_buyer": MRERPAdapter,
-            "dialog_log": MRERPAdapter,
             # login mixin
             "login": _login.MRERPLoginMixin,
             "select_company": _login.MRERPLoginMixin,
             "_is_login_bounced": _login.MRERPLoginMixin,
-            # upload mixin
-            "upload_invoice_batch": _upload.MRERPUploadMixin,
-            "search_invoice": _upload.MRERPUploadMixin,
-            "delete_invoice": _upload.MRERPUploadMixin,
-            # report mixin
-            "_upload_and_fetch_report": _report.MRERPReportMixin,
             # masterdata mixin
             "_sync_master_data": _master.MRERPMasterDataMixin,
             "_verify_resolved_master_data": _master.MRERPMasterDataMixin,
@@ -79,12 +61,15 @@ class MrerpAdapterMixinContractTest(unittest.TestCase):
             self.assertIn(name, vars(cls), f"{name} 不在 {cls.__name__} 本体")
             self.assertTrue(callable(getattr(MRERPAdapter, name, None)), f"{name} MRO 不可达")
 
+    def test_upload_report_removed(self) -> None:
+        # 发票推送已迁 HTTP 直写(mrerp_http/)· 旧 Playwright 上传/取报告方法不得残留
+        for gone in ("upload_invoice_batch", "search_invoice", "_upload_and_fetch_report"):
+            self.assertFalse(hasattr(MRERPAdapter, gone), f"{gone} 应随 S5 删除")
+
     def test_no_method_name_collision_across_mixins(self) -> None:
         # mixin 之间方法名不得重叠(否则 MRO 静默覆盖)
         groups = [
             _login.MRERPLoginMixin,
-            _upload.MRERPUploadMixin,
-            _report.MRERPReportMixin,
             _master.MRERPMasterDataMixin,
         ]
         seen: dict = {}
@@ -99,7 +84,7 @@ class MrerpAdapterMixinContractTest(unittest.TestCase):
                     seen[name] = g.__name__
 
     def test_submodules_are_leaf(self) -> None:
-        for m in (_models, _login, _upload, _report, _master):
+        for m in (_models, _login, _master):
             self.assertIsNone(
                 getattr(m, "mrerp_adapter", None), f"{m.__name__} 不应 back-import 主类"
             )

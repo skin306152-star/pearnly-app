@@ -71,6 +71,9 @@ def _dispatch_mrerp_batch(
         ]
 
     mappings = erp_push.load_mrerp_mappings(tenant_id)
+    _gp = str(config.get("generic_product_code") or "").strip()  # 通用商品码 → provision_products
+    if _gp:
+        mappings = {**mappings, "_mrerp_generic_product": _gp}
 
     # flatten 全部 + 记每张的 invoice_no(回映射键)。
     flats: List[Dict[str, Any]] = []
@@ -99,7 +102,7 @@ def _dispatch_mrerp_batch(
             for h in histories
         ]
 
-    from services.erp.mrerp_adapter import (
+    from services.erp.exceptions import (
         MRERPAuthError,
         MRERPTechnicalError,
         MRERPBusinessError,

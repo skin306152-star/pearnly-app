@@ -44,10 +44,13 @@ async def _auto_push_history(
         try:
             # 批 2 改动 2 (v118.34.34) · 推送去重 · 同 history × endpoint
             # 已 success 过 → 静默跳过 + 写 skipped_dup log.
+            # + 跨记录:同票重新上传(新 history_id)按票号+卖方判重,防 auto 双推。
             existing = db.has_recent_successful_push(
                 history_id,
                 ep["id"],
                 user_id,
+                invoice_no=history.get("invoice_no"),
+                seller_name=history.get("seller_name"),
             )
             if existing:
                 db.insert_push_log(
@@ -260,7 +263,13 @@ async def _auto_push_batch_for_endpoint(user_id, endpoint, histories, tenant_id=
     to_push = []
     for h in histories:
         try:
-            existing = db.has_recent_successful_push(str(h["id"]), endpoint["id"], user_id)
+            existing = db.has_recent_successful_push(
+                str(h["id"]),
+                endpoint["id"],
+                user_id,
+                invoice_no=h.get("invoice_no"),
+                seller_name=h.get("seller_name"),
+            )
         except Exception:
             existing = None
         if existing:

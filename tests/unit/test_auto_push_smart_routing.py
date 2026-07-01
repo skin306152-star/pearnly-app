@@ -152,8 +152,10 @@ class BatchForEndpointTests(unittest.IsolatedAsyncioTestCase):
                 {"log_id": log_id, "success": success}
             ),
         ).start()
-        mock.patch.object(db, "update_endpoint_stats", side_effect=lambda *a: None).start()
-        mock.patch.object(db, "update_history_push_status", side_effect=lambda *a: None).start()
+        mock.patch.object(db, "update_endpoint_stats", side_effect=lambda *a, **kw: None).start()
+        mock.patch.object(
+            db, "update_history_push_status", side_effect=lambda *a, **kw: None
+        ).start()
         mock.patch.object(
             db, "is_user_data_error", side_effect=lambda m: bool(m and "NAME_MISMATCH" in m)
         ).start()
@@ -170,7 +172,7 @@ class BatchForEndpointTests(unittest.IsolatedAsyncioTestCase):
         mock.patch.object(
             db,
             "has_recent_successful_push",
-            side_effect=lambda hid, eid, u: {"id": "prior", "response_body": "{}"},
+            side_effect=lambda hid, eid, u, **kw: {"id": "prior", "response_body": "{}"},
         ).start()
         from services.erp import push_dispatch
 
@@ -184,7 +186,9 @@ class BatchForEndpointTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.logs[0]["status"], "skipped_dup")
 
     async def test_results_persisted_and_failure_schedules_retry(self):
-        mock.patch.object(db, "has_recent_successful_push", side_effect=lambda *a: None).start()
+        mock.patch.object(
+            db, "has_recent_successful_push", side_effect=lambda *a, **kw: None
+        ).start()
         from services.erp import push_dispatch
 
         results = [
@@ -233,7 +237,9 @@ class BatchForEndpointTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.retries), 1)
 
     async def test_per_invoice_isolation_on_persist_error(self):
-        mock.patch.object(db, "has_recent_successful_push", side_effect=lambda *a: None).start()
+        mock.patch.object(
+            db, "has_recent_successful_push", side_effect=lambda *a, **kw: None
+        ).start()
         from services.erp import push_dispatch
 
         results = [

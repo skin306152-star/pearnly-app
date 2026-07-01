@@ -43,19 +43,12 @@ MODULES: Dict[str, MrErpModule] = {
     "purchase": MrErpModule(
         "purchase", "impaptran", 363, 67, "purchase", "aptran", 67, verified=True
     ),
-    # 库存进出(仅数量)· S4
+    # 库存进出(仅数量 · Zihao 定不算成本)· selmenu 入库 28/出库 32(2026-07-01 实测)· 模板见 mrerp_xlsx_stock
     "stock_receive": MrErpModule(
-        "stock_receive",
-        "impstktranrec",
-        355,
-        None,
-        "stock_receive",
-        "stktranrec",
-        28,
-        verified=False,
+        "stock_receive", "impstktranrec", 355, 28, "stock_receive", "stktranrec", 28, verified=True
     ),
     "stock_issue": MrErpModule(
-        "stock_issue", "impstktraniss", 356, None, "stock_issue", "stktraniss", 32, verified=False
+        "stock_issue", "impstktraniss", 356, 32, "stock_issue", "stktraniss", 32, verified=True
     ),
     # 主数据自建(走导入,非 Playwright 表单)· S2
     "master_customer": MrErpModule(

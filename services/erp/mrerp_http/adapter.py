@@ -156,8 +156,12 @@ class MrErpHttpAdapter:
         if not valid:
             return self._result(original, [], mismatch_failed + preflight_failed, t0, 0)
 
-        # 销/采:明细行对不上已有商品则自建并注入码(在生成 xlsx 前)· 见 autocreate
-        if m.doc_type.startswith("sales") or m.doc_type == "purchase":
+        # 销/采/库存:明细行对不上已有商品则自建并注入码(在生成 xlsx 前)· 见 autocreate
+        if m.doc_type.startswith("sales") or m.doc_type in (
+            "purchase",
+            "stock_receive",
+            "stock_issue",
+        ):
             from services.erp.mrerp_http.autocreate import provision_products
 
             provision_products(self, valid, mappings)
@@ -392,14 +396,15 @@ class MrErpHttpAdapter:
     ) -> Tuple[List[Dict[str, Any]], List[FailedRow]]:
         valid: List[Dict[str, Any]] = []
         failed: List[FailedRow] = []
-        is_purchase = self.module.doc_type == "purchase"
-        if is_purchase:
-            from services.erp.mrerp_xlsx_purchase import validate_purchase_history
+        doc = self.module.doc_type
+        if doc == "purchase":
+            from services.erp.mrerp_xlsx_purchase import validate_purchase_history as _validate
+        elif doc in ("stock_receive", "stock_issue"):
+            from services.erp.mrerp_xlsx_stock import validate_stock_history as _validate
+        else:
+            _validate = _gen.validate_history_for_sales_credit
         for h in histories:
-            if is_purchase:
-                ok, err_code, warnings = validate_purchase_history(h, mappings)
-            else:
-                ok, err_code, warnings = _gen.validate_history_for_sales_credit(h, mappings)
+            ok, err_code, warnings = _validate(h, mappings)
             if ok:
                 valid.append(h)
                 continue

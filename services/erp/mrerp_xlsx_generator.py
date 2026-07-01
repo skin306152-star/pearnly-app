@@ -296,6 +296,14 @@ def generate_xlsx(
 
         return generate_xlsx_supplier(histories, mappings)
 
+    # 库存进出(impstktranrec/impstktraniss · 仅数量)· 官方模板克隆 · 见 mrerp_xlsx_stock
+    if sheet_kind in ("stock_receive", "stock_issue"):
+        from services.erp.mrerp_xlsx_stock import generate_xlsx_stock
+
+        return generate_xlsx_stock(
+            histories, mappings, kind="receive" if sheet_kind == "stock_receive" else "issue"
+        )
+
     schema = MRERP_SHEET_SCHEMAS.get(sheet_kind)
     if not schema:
         raise ValueError(f"unknown sheet_kind: {sheet_kind}")

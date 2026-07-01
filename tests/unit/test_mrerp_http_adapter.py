@@ -115,7 +115,7 @@ class TestClassifyAndGuards(unittest.TestCase):
         self.assertEqual(failed, [])
 
     def test_unverified_doc_type_refuses_before_network(self):
-        a = self._adapter(doc_type="stock_receive")  # 端点已知但未就绪(selmenu 待补 · S4 库存)
+        a = self._adapter(doc_type="master_supplier")  # 主数据 doc_type 不走 batch(verified=False)
         with a:  # __enter__ 只建 session 对象 · 不登录 · 无网络
             with self.assertRaises(MRERPBusinessError):
                 a.upload_invoice_batch([{"id": "x", "invoice_date": "2026-07-01"}], {})

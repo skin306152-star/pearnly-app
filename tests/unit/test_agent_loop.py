@@ -138,5 +138,26 @@ class TestAgentLoop(unittest.TestCase):
         self.assertIsNone(out)
 
 
+class TestObservePayload(unittest.TestCase):
+    def test_notifications_count_from_list(self):
+        # list_notification_logs 返回的 result.data 是 list;count 必须按真实条数,不能恒 0。
+        obs = loop._observe_payload(
+            "list_notifications", ToolResult(ok=True, data=[{"id": 1}, {"id": 2}, {"id": 3}])
+        )
+        self.assertEqual(obs, {"ok": True, "count": 3})
+
+    def test_notifications_empty_list(self):
+        obs = loop._observe_payload("list_notifications", ToolResult(ok=True, data=[]))
+        self.assertEqual(obs, {"ok": True, "count": 0})
+
+    def test_grounded_fallback_notifications_some(self):
+        msg = loop._grounded_fallback([{"tool": "list_notifications", "count": 2}], "zh")
+        self.assertEqual(msg, "有 2 条通知。")
+
+    def test_grounded_fallback_notifications_zero(self):
+        msg = loop._grounded_fallback([{"tool": "list_notifications", "count": 0}], "en")
+        self.assertEqual(msg, "No new notifications.")
+
+
 if __name__ == "__main__":
     unittest.main()

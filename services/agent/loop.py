@@ -119,7 +119,9 @@ def _observe_payload(tool: str, result) -> dict:
             "pages_used_this_month": data.get("pages_used_this_month"),
         }
     if tool == "list_notifications":
-        return {"ok": True, "count": len(data) if isinstance(data, list) else 0}
+        # data 在上面被强转成 dict(取代码统一路径);通知工具的 result.data 是 list,读原始值。
+        logs = result.data if isinstance(result.data, list) else []
+        return {"ok": True, "count": len(logs)}
     if tool == "list_workspaces":
         return {
             "ok": True,

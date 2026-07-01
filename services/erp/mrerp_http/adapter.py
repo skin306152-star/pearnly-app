@@ -186,8 +186,7 @@ class MrErpHttpAdapter:
     def _filter_by_account_set(
         self, histories: List[Dict[str, Any]], mappings: Dict[str, Any]
     ) -> Tuple[List[Dict[str, Any]], List[FailedRow]]:
-        """匹配闸:能确认是别家的票才挡下。mappings['_own_tax_id'] 提供才启用(否则全放行=旧行为)。
-        读不到票面税号=无法确认→放行(交上游已判方向),只挡确认不符的(防推错套账不误挡)。"""
+        """匹配闸:只挡能确认是别家的票(读不到税号→放行不误挡)· _own_tax_id 提供才启用(否则全放行)。"""
         own = mappings.get("_own_tax_id") if isinstance(mappings, dict) else None
         if not own:
             return histories, []

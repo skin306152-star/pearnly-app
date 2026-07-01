@@ -266,6 +266,12 @@ def generate_xlsx(
     if Workbook is None:
         raise RuntimeError("openpyxl not installed · pip install openpyxl")
 
+    # sales_cash 走官方模板克隆(同 sales_credit 思路 · 绕过 stub schema)· 见 mrerp_xlsx_sales_cash
+    if sheet_kind == "sales_cash":
+        from services.erp.mrerp_xlsx_sales_cash import generate_xlsx_sales_cash
+
+        return generate_xlsx_sales_cash(histories, mappings)
+
     schema = MRERP_SHEET_SCHEMAS.get(sheet_kind)
     if not schema:
         raise ValueError(f"unknown sheet_kind: {sheet_kind}")

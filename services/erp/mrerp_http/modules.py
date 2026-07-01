@@ -33,9 +33,11 @@ MODULES: Dict[str, MrErpModule] = {
     "sales_credit": MrErpModule(
         "sales_credit", "impartran", 370, 118, "sales_credit", "artran", 118, verified=True
     ),
-    # 2026-07-01 实测捕获 selmenu=125(ใบขายเงินสด)· sheet_kind 模板待补(S3)
+    # 现金销售(ใบขายเงินสด)· selmenu 125 · 列表 arse/125 · 模板克隆见 mrerp_xlsx_sales_cash。
+    # 2026-07-01 真站点端到端跑通(HTTP 直写→report 回读→arse 列表 UI 命中 107.00→删)。
+    # 收款槽(รับอื่นๆ)填 GL 科目码 · 3 槽必填 · 详见生成器与 known-facts §6.4。
     "sales_cash": MrErpModule(
-        "sales_cash", "imparse", 371, 125, "sales_cash", "artran", 118, verified=False
+        "sales_cash", "imparse", 371, 125, "sales_cash", "arse", 125, verified=True
     ),
     # 采购(AP tran)· 2026-07-01 实测 selmenu=67(ซื้อ)/453(ซื้อ-ค่าใช้จ่าย)· 模板/生成器待补 S3
     "purchase": MrErpModule(

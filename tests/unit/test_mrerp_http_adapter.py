@@ -23,10 +23,10 @@ class TestModules(unittest.TestCase):
         self.assertEqual((m.path, m.idmenu, m.selmenu), ("impartran", 370, 118))
         self.assertTrue(m.verified)
 
-    def test_sales_cash_endpoint_captured_but_unverified(self):
+    def test_sales_cash_endpoint_verified(self):
         m = get_module("sales_cash")
         self.assertEqual((m.path, m.idmenu, m.selmenu), ("imparse", 371, 125))
-        self.assertFalse(m.verified)
+        self.assertTrue(m.verified)  # 2026-07-01 真站点端到端跑通
 
     def test_unknown_doc_type_raises(self):
         with self.assertRaises(ValueError):
@@ -115,7 +115,7 @@ class TestClassifyAndGuards(unittest.TestCase):
         self.assertEqual(failed, [])
 
     def test_unverified_doc_type_refuses_before_network(self):
-        a = self._adapter(doc_type="sales_cash")  # 端点已知但未就绪
+        a = self._adapter(doc_type="purchase")  # 端点已知但未就绪(S3 采购待补)
         with a:  # __enter__ 只建 session 对象 · 不登录 · 无网络
             with self.assertRaises(MRERPBusinessError):
                 a.upload_invoice_batch([{"id": "x", "invoice_date": "2026-07-01"}], {})

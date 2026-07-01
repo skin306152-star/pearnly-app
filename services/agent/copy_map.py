@@ -81,6 +81,20 @@ def confirm(spec: ToolSpec, grounded: dict) -> str:
     return f"agent.confirm.{spec.name}"
 
 
+def record_confirm(amount, vendor) -> str:
+    """记账复述兜底(§1.2)· 仅当大脑不肯自撰时用 · 填 amount/vendor → 键 agent.confirm.record(四语)。
+
+    主路是大脑用真实数字自撰复述(不写死);本模板只作模型两次不成文时的诚实兜底。
+    """
+    amt = f"{float(amount):,.2f}" if amount is not None else ""
+    return _render("agent.confirm.record", amount=amt, vendor=vendor or "-")
+
+
+def cancelled() -> str:
+    """确认被取消(§1.2)· 现成键 agent.confirm.cancelled(四语)。"""
+    return "agent.confirm.cancelled"
+
+
 def failure(error_code: str | None) -> str:
     return ERROR_COPY.get(error_code or "unknown", _FAILURE_DEFAULT)
 

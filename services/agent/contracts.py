@@ -71,6 +71,7 @@ class AgentContext:
     tenant_id: Optional[str] = None
     workspace_client_id: Optional[Any] = None
     line_user_id: Optional[str] = None
+    user_text: str = ""  # 本轮用户原文(写工具建草稿做金额接地用·loop 每轮注入)
     anchors: dict[str, Any] = field(default_factory=dict)
     endpoint_config: dict[str, Any] = field(default_factory=dict)
     prior_results: dict[str, Any] = field(default_factory=dict)

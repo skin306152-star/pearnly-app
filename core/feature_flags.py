@@ -14,6 +14,9 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 AGENT_ENABLED_KEY = "agent_enabled"
+# M3 写工具(记账/推 ERP…)子闸:与总闸分开,默认关。开总闸只放只读+确认查询,
+# 写能力要单独开(灰度先行·真机验稳才放量)。复用同一套 platform_settings 灰度机制。
+AGENT_WRITE_KEY = "agent_write_tools"
 
 
 def agent_enabled_for(user_id: Optional[str]) -> bool:
@@ -24,4 +27,18 @@ def agent_enabled_for(user_id: Optional[str]) -> bool:
         return store.is_enabled_for_user(AGENT_ENABLED_KEY, user_id)
     except Exception as e:
         logger.warning(f"agent_enabled_for fail-closed: {e}")
+        return False
+
+
+def agent_write_enabled_for(user_id: Optional[str]) -> bool:
+    """写工具(B 档)是否对该用户开启。默认关(无记录→False);任何异常 fail-closed。
+
+    关时 record_expense 等写工具对模型不可见,记账逐字节走旧乐观路(能力只增不减)。
+    """
+    try:
+        from services.platform_settings import store
+
+        return store.is_enabled_for_user(AGENT_WRITE_KEY, user_id)
+    except Exception as e:
+        logger.warning(f"agent_write_enabled_for fail-closed: {e}")
         return False

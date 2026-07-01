@@ -116,7 +116,29 @@ class AgentToolset:
             return ToolResult(ok=False, error_code="not_bound")
         return ToolResult(ok=True, data={"switched_to": match})
 
-    # ── B 档:写操作(M3 才开)· 样板留桩,展示确认前置 + 幂等 + 权限的形状 ──
+    # ── B 档:写操作(M3 · confirm=True 先复述后执行) ──
+
+    def record_expense(
+        self, ctx: AgentContext, *, amount=None, vendor_name="", note="", date="", expense_type=""
+    ) -> ToolResult:
+        """记账工具:把模型抽取的字段建成草稿(纯构建,不落库)。
+
+        金额走 to_draft 的 amount_grounded 唯一钱闸——编造的金额被置空 → ok=False(缺金额,
+        调用方追问),绝不凭空入账。落库在用户确认后由 LINE 入口 pop 待办 → _do_record 完成。
+        """
+        from services.expense.line_l2 import to_draft
+
+        data = {
+            "amount": amount,
+            "vendor_name": vendor_name,
+            "note": note,
+            "date": date,
+            "expense_type": expense_type,
+        }
+        draft = to_draft(data, ctx.user_text or "")
+        if not draft.has_amount():
+            return ToolResult(ok=False, error_code="amount_ungrounded")
+        return ToolResult(ok=True, data={"draft": draft})
 
     def push_to_erp(self, ctx: AgentContext, *, history_id=None, endpoint_id=None) -> ToolResult:
         return ToolResult(ok=False, error_code="not_implemented_m1")

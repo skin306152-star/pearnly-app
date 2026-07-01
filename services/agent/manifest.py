@@ -77,6 +77,49 @@ TOOLS: tuple[ToolSpec, ...] = (
         confirm=False,
     ),
     ToolSpec(
+        name="record_expense",
+        bucket="B",
+        title_th="บันทึกค่าใช้จ่าย",
+        desc_th=(
+            "บันทึกค่าใช้จ่ายใหม่เมื่อผู้ใช้บอกจำนวนเงิน + ชื่อของ/ร้าน "
+            "(เช่น 'กาแฟ 50', 'จ่ายค่าน้ำ 300') — ระบบจะให้ผู้ใช้ยืนยันก่อนบันทึกจริง"
+        ),
+        slots=(
+            # amount 走 to_draft 的 amount_grounded 做钱路唯一闸(model_freeform 只放行到执行器再验,
+            # 编造的钱在 to_draft 被置空 → 落缺金额追问,绝不凭空入账)。
+            SlotSpec(
+                "amount",
+                required=False,
+                source="model_freeform",
+                desc_th="จำนวนเงินรวม (ตัวเลข)",
+                desc_zh="总额(数字·执行器再过金额接地)",
+            ),
+            SlotSpec(
+                "vendor_name",
+                required=False,
+                source="user_text",
+                desc_th="ชื่อร้าน/ผู้ขาย ถ้ามี",
+                desc_zh="卖家/店名(用户原话提到才采纳)",
+            ),
+            SlotSpec(
+                "note",
+                required=False,
+                source="model_freeform",
+                desc_th="ชื่อสินค้า/รายการที่ซื้อ",
+                desc_zh="物品名(不含金额/店名)",
+            ),
+            SlotSpec(
+                "date",
+                required=False,
+                source="user_text",
+                desc_th="วันที่ YYYY-MM-DD ถ้าระบุ",
+                desc_zh="日期(用户提到才采纳)",
+            ),
+        ),
+        handler="record_expense",
+        confirm=True,
+    ),
+    ToolSpec(
         name="list_workspaces",
         bucket="B",
         title_th="ดูรายชื่อชุดบัญชี/บริษัท",
@@ -114,6 +157,7 @@ REGISTRY_AREA: dict[str, str] = {
     "balance": "billing_credits_routes",
     "usage_this_month": "billing_records_routes",
     "list_notifications": "notification_routes",
+    "record_expense": "purchase_intake_routes",
     "list_workspaces": "workspace_routes",
     "switch_workspace": "workspace_routes",
 }

@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Callable, Optional
 
-from services.agent import brain, executor, manifest, slots
+from services.agent import brain, copy_map, executor, manifest, slots
 from services.agent.contracts import AgentAction, AgentContext
 
 logger = logging.getLogger(__name__)
@@ -58,6 +58,16 @@ _SYSTEM = """คุณคือผู้ช่วยของ Pearnly ระบ�
 {{"kind":"defer","reason":"record|edit"}}"""
 
 _FORCE_REPLY = '\n\nคุณมีข้อมูลจากเครื่องมือครบแล้ว ต้องตอบผู้ใช้เดี๋ยวนี้ด้วย kind="reply" เท่านั้น ห้ามเรียกเครื่องมืออีก'
+
+# 写工具开启时追加(关时不加 → 提示词逐字节现状)。放最后 + ★★ 强调 → 覆盖上方"记账 defer"规则。
+# 复述由大脑自己写(数字来自工具结果·不念模板);未确认前不算已记。
+_WRITE_HINT = (
+    "\n\n★★ โหมดบันทึกเปิดแล้ว: ถ้าผู้ใช้จะบันทึกค่าใช้จ่ายใหม่ "
+    "(มีจำนวนเงิน + ชื่อของ/ร้าน เช่น 'กาแฟ 50', 'จ่ายค่าน้ำ 300') "
+    "ให้เรียกเครื่องมือ record_expense แทนการ defer (การแก้ไข/ลบยังคง defer). "
+    "เมื่อผลลัพธ์มี pending_confirm=true ให้ทวนรายการ (จำนวนเงิน+ของ ตามตัวเลขจากเครื่องมือ) "
+    'แล้วถามผู้ใช้ให้ยืนยัน เช่น "บันทึก … ใช่ไหมคะ" — ยังไม่บันทึกจริงจนกว่าผู้ใช้จะยืนยัน'
+)
 
 
 def _today() -> str:
@@ -131,10 +141,21 @@ def _observe_payload(tool: str, result) -> dict:
     return {"ok": True}
 
 
-def _prompt(user_text, history, today, observations, *, lang: str, force_reply: bool) -> str:
+def _visible_tools(allow_write: bool) -> tuple:
+    """模型看得到的工具表:写关时隐藏 confirm 工具(记账等)→ 记账走旧路,现状不变。"""
+    return tuple(t for t in manifest.TOOLS if allow_write or not t.confirm)
+
+
+def _prompt(
+    user_text, history, today, observations, *, lang: str, force_reply: bool, allow_write=False
+) -> str:
     head = _SYSTEM.format(
-        today=today, tools=brain._tool_table(manifest.TOOLS), lang_name=_LANGS.get(lang, "English")
+        today=today,
+        tools=brain._tool_table(_visible_tools(allow_write)),
+        lang_name=_LANGS.get(lang, "English"),
     )
+    if allow_write:
+        head += _WRITE_HINT
     obs = ""
     if observations:
         obs = "\n\nผลลัพธ์จากเครื่องมือที่เรียกไปแล้ว:\n" + json.dumps(
@@ -163,12 +184,20 @@ def _parse_step(outcome) -> LoopStep:
 
 
 def _decide_step(
-    user_text, history, *, today, observations, lang="en", force_reply=False
+    user_text, history, *, today, observations, lang="en", force_reply=False, allow_write=False
 ) -> LoopStep:
     from services.ai_gateway import transport
 
     outcome = transport.text_to_json(
-        _prompt(user_text, history, today, observations, lang=lang, force_reply=force_reply),
+        _prompt(
+            user_text,
+            history,
+            today,
+            observations,
+            lang=lang,
+            force_reply=force_reply,
+            allow_write=allow_write,
+        ),
         tier="flash",
         response_mime=True,
         max_tokens=768,
@@ -188,13 +217,21 @@ def handle_turn(
     toolset: Optional[executor.AgentToolset] = None,
     history: Optional[list] = None,
     today: Optional[str] = None,
+    allow_write: bool = False,
+    confirm_persist: Optional[Callable] = None,
 ) -> Optional[str]:
-    """一轮对话。返回模型撰写的自然语言回复(Agent 接管)= str;返回 None = defer 给旧路。"""
+    """一轮对话。返回模型撰写的自然语言回复(Agent 接管)= str;返回 None = defer 给旧路。
+
+    allow_write=True 且带 confirm_persist(落待办的回调)时,B 档 confirm 工具(记账)启用:
+    模型提议 → 接地建草稿 → 落待办 → 把真实字段喂回,由模型自撰复述+问确认(下轮"是"由入口落库)。
+    写关或没落地器 → confirm 工具一律 defer(记账走旧乐观路,现状不变)。
+    """
     decide = decide or _decide_step
     toolset = toolset or executor.AgentToolset()
     history = history if history is not None else _recent(ctx)
     today = today or _today()
     lang = _reply_lang(user_text)
+    ctx.user_text = user_text  # 写工具建草稿做金额接地要原文
 
     observations: list = []
     called: set = set()
@@ -206,6 +243,7 @@ def handle_turn(
             observations=observations,
             lang=lang,
             force_reply=bool(observations),
+            allow_write=allow_write,
         )
         if step.kind == "reply":
             return step.message or None
@@ -220,6 +258,8 @@ def handle_turn(
         spec = manifest.TOOLS_BY_NAME.get(step.tool)
         if not spec:
             return None
+        if spec.confirm and (not allow_write or confirm_persist is None):
+            return None  # 写工具没开/无落地器 → defer 回旧路(记账走旧乐观路)
         chk = slots.check_slots(
             AgentAction(kind="tool", tool=step.tool, args=step.args),
             user_text=user_text,
@@ -238,18 +278,47 @@ def handle_turn(
             return None
         result = handler(ctx, **chk.grounded)
         called.add(step.tool)
+        if spec.confirm:
+            # 写档:不立即执行。金额没接地 → 喂回缺口让模型追问;接地成功 → 落待办 + 把真实字段
+            # 喂回,由模型自撰复述+问确认(文案不写死·数字来自工具·下轮"是"由入口落库)。
+            if not result.ok:
+                observations.append(
+                    {"tool": step.tool, "ok": False, "error": result.error_code or "need_more"}
+                )
+                continue
+            confirm_persist(ctx, result.data)
+            observations.append({"tool": step.tool, **_confirm_observation(result.data)})
+            continue
         observations.append({"tool": step.tool, **_observe_payload(step.tool, result)})
 
     # 循环里没成文(重复调/步数用尽)→ 拿着已取到的真实数据,最后强逼一次成文;
     # 仍不成文 → 用工具结果兜底一句(绝不把已查到的查询 defer 回旧路念"这笔多少钱")。
     if observations:
         final = decide(
-            user_text, history, today=today, observations=observations, lang=lang, force_reply=True
+            user_text,
+            history,
+            today=today,
+            observations=observations,
+            lang=lang,
+            force_reply=True,
+            allow_write=allow_write,
         )
         if final.kind == "reply" and final.message:
             return final.message
         return _grounded_fallback(observations, lang)
     return None
+
+
+def _confirm_observation(data: dict) -> dict:
+    """记账待确认 → 喂回模型的真实字段(供大脑自撰复述;数字来自 draft,非模型编造)。"""
+    draft = data["draft"]
+    return {
+        "ok": True,
+        "pending_confirm": True,
+        "amount": float(draft.amount) if draft.amount is not None else None,
+        "vendor": draft.vendor_name or "",
+        "note": draft.note or "",
+    }
 
 
 # 模型两次不肯成文时,按已取到的工具结果给的诚实兜底句(四语 · {n} 为数量)。
@@ -290,6 +359,13 @@ _FALLBACK_COUNT_KEY = {"list_history": "total", "list_notifications": "count"}
 
 def _grounded_fallback(observations: list, lang: str) -> Optional[str]:
     last = observations[-1] if observations else {}
+    if last.get("tool") == "record_expense" and last.get("pending_confirm"):
+        # 大脑没把复述写出来 → 用接地好的真实数字兜一句确认(仅兜底·主路是大脑自撰)。
+        from services.agent import agent_i18n
+
+        return agent_i18n.render(
+            copy_map.record_confirm(last.get("amount"), last.get("vendor")), lang
+        )
     table = _FALLBACK.get(last.get("tool"))
     if not table:
         return None

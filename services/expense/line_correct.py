@@ -45,7 +45,7 @@ _PREFIX = "correct:"  # 待 是/否 确认(最终)
 _CLAR_PREFIX = "correctclar:"  # 待用户选「改哪个字段」(多轮·correctclar:<ws>:<doc>)
 _VAL_PREFIX = "correctval:"  # 待用户给「新值」(多轮·correctval:<ws>:<doc>:<field>)
 _ACTIVE_PREFIX = "correctactive:"  # 改完续接态(active_doc_id·后续字段编辑继续命中同一张·验收 #2)
-_YES = ("是", "对", "好", "确认", "ok", "yes", "ใช่", "ตกลง", "ถูก", "確認", "はい")
+_YES = ("是", "对", "好", "确认", "ok", "yes", "ใช่", "ยืนยัน", "ตกลง", "ถูก", "確認", "はい")
 # 否定词优先于肯定:治子串塌缩(「ไม่ใช่」含「ใช่」、「不对」含「对」)→ 否则把「不」当「是」照改账。
 _NO = (
     "不",

@@ -31,7 +31,8 @@ class ToolSpec:
     desc_th: str  # 这个工具干嘛(泰文,进提示词)
     slots: tuple[SlotSpec, ...]
     handler: str  # AgentToolset 上的方法名,如 "list_ocr_history"
-    confirm: bool  # B 档=True,执行前必复述确认
+    confirm: bool  # True=执行前先复述+确认(不可逆动作如推 ERP);记账=False 高置信直录
+    writes: bool = False  # True=写工具(写子闸关时对大脑隐藏 + 经 record_sink 出卡·记账/推 ERP)
 
 
 @dataclass

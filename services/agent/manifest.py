@@ -82,7 +82,7 @@ TOOLS: tuple[ToolSpec, ...] = (
         title_th="บันทึกค่าใช้จ่าย",
         desc_th=(
             "บันทึกค่าใช้จ่ายใหม่เมื่อผู้ใช้บอกจำนวนเงิน + ชื่อของ/ร้าน "
-            "(เช่น 'กาแฟ 50', 'จ่ายค่าน้ำ 300') — ระบบจะให้ผู้ใช้ยืนยันก่อนบันทึกจริง"
+            "(เช่น 'กาแฟ 50', 'จ่ายค่าน้ำ 300') — มั่นใจก็บันทึกเลย ระบบออกการ์ดให้ (แก้/ยกเลิกได้ภายหลัง)"
         ),
         slots=(
             # amount 走 to_draft 的 amount_grounded 做钱路唯一闸(model_freeform 只放行到执行器再验,
@@ -117,7 +117,8 @@ TOOLS: tuple[ToolSpec, ...] = (
             ),
         ),
         handler="record_expense",
-        confirm=True,
+        confirm=False,  # 高置信直录(可撤销·非不可逆)→ 不先确认;缺金额由大脑文字追问
+        writes=True,
     ),
     ToolSpec(
         name="list_workspaces",

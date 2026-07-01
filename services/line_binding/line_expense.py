@@ -305,9 +305,20 @@ def _dispatch_agent(
 
 
 def _do_record(
-    bound_user, reply_token, text, tid, ws, draft, used_l2, quote_token, lang, line_user_id=""
+    bound_user,
+    reply_token,
+    text,
+    tid,
+    ws,
+    draft,
+    used_l2,
+    quote_token,
+    lang,
+    line_user_id="",
+    ack_text="",
 ) -> bool:
-    """置信驱动入账(图/文同口径):建草稿 → 高置信 post_doc;回数据卡。计费由调用方管。"""
+    """置信驱动入账(图/文同口径):建草稿 → 高置信 post_doc;回数据卡。计费由调用方管。
+    ack_text 传入(Agent 路的大脑暖话)→ 显示在卡上方替代模板句;空 → 回落 ack_message 模板。"""
     from services.expense import confidence
     from services.line_binding import line_booker
     from services.purchase import categories as cat_svc
@@ -348,7 +359,9 @@ def _do_record(
             verdict=verdict,
             created_by=created_by,
         )
-    _reply_card(
+    from services.line_binding import line_record_card
+
+    line_record_card.reply_card(
         reply_token,
         state,
         draft,
@@ -360,63 +373,9 @@ def _do_record(
         str(ws or ""),
         tenant_id=tid,
         line_user_id=line_user_id,
+        ack_text=ack_text,
     )
     return True
-
-
-def _card_fields_from_draft(draft) -> dict:
-    """ExpenseDraft → 数据卡归一字段(#10b 详情结构化:逐条 `物品 ×数量 ฿金额`·物品名=draft.note 清出名)。"""
-    from services.expense.line_quick_entry import qty_label
-
-    item = (draft.note or "").strip()
-    items = []
-    if item and draft.amount is not None:
-        items = [{"name": qty_label(item, draft.qty), "amount": f"{draft.amount:,.2f}"}]
-    return {
-        "document_type": draft.document_type or "",
-        "expense_type": draft.expense_type or "",
-        "date": draft.doc_date or "",
-        "category": draft.category or "",
-        "subcategory": draft.subcategory or "",
-        "vendor": draft.vendor_name or "",
-        "seller_tax": getattr(draft, "vendor_tax_id", "") or "",
-        "invoice_number": draft.invoice_number or "",
-        "payment_method": getattr(draft, "payment_method", "") or "",
-        "items": items,
-        "detail": item,
-    }
-
-
-def _reply_card(
-    reply_token,
-    state,
-    draft,
-    doc_id,
-    lang,
-    quote_token,
-    workspace_name="",
-    token="",
-    ws="",
-    tenant_id=None,
-    line_user_id="",
-) -> None:
-    """回执 = 引用原句一行 + Flex 数据卡(三路共用 line_booker.emit_result_card)。"""
-    from services.line_binding import line_booker
-
-    line_booker.emit_result_card(
-        reply_token,
-        state=state,
-        amount=draft.amount,
-        fields=_card_fields_from_draft(draft),
-        doc_id=doc_id,
-        lang=lang,
-        quote_token=quote_token,
-        workspace_name=workspace_name,
-        token=token,
-        workspace_client_id=ws,
-        tenant_id=tenant_id,
-        line_user_id=line_user_id,
-    )
 
 
 def _dup_warn(bound_user, draft, ws) -> bool:

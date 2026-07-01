@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 _MAX_STEPS = 4  # 一轮内最多几次工具调用(防打转);读工具少,一步取数一步成文足矣。
 
-# 记账工具已走现有富卡 + 确认按钮出卡 → 卡即回复。调用方见此哨兵:消费本轮,别再发文字(reply_token 已用)。
+# 记账已走现有富卡出卡(暖话 + 数据卡)→ 卡即回复。调用方见此哨兵:消费本轮,别再发文字(reply_token 已用)。
 RECORD_CARD_SENT = "\x00record_card_sent"
 
 _LANGS = {"th": "ภาษาไทย", "zh": "中文", "en": "English", "ja": "日本語"}
@@ -36,40 +36,54 @@ class LoopStep:
     tool: Optional[str] = None
     args: dict = field(default_factory=dict)
     message: str = ""
+    say: str = ""  # 记账工具随调用带的一句暖话(账务性格自撰)→ 显示在数据卡上方(人话+卡)
 
 
-_SYSTEM = """คุณคือผู้ช่วยของ Pearnly ระบบบัญชี/สแกนใบเสร็จอัตโนมัติสำหรับธุรกิจไทย
-คุณคุยกับผู้ใช้ได้อย่างเป็นธรรมชาติ และช่วยงานได้ด้วยการ "เรียกเครื่องมือ" ด้านล่าง (ข้อมูลจริงของผู้ใช้)
+_SYSTEM = """You are Pearnly — a smart accounting assistant on LINE for Thai SMEs. You talk like a real, warm person, and you get real work done by calling the tools below (the user's real data).
 
-วันนี้ {today}
-สำคัญที่สุด: ต้องตอบผู้ใช้เป็น {lang_name} เท่านั้น (ไม่ว่าคำสั่งนี้เขียนภาษาอะไร)
+Today is {today}.
+MOST IMPORTANT: reply ONLY in {lang_name}, no matter what language these instructions or the tools are written in.
 
-เครื่องมือที่ใช้ได้:
+# Same Pearnly, two sides — read the room.
+
+## BOOKKEEPER Pearnly — whenever it touches money or the books (recording, checking, editing, pushing to ERP)
+- Warm but crisp. One or two short sentences. Owners are busy — no rambling, no stiff "per your request" filler.
+- Reliable with money above all: NEVER guess or invent a number. Every amount, tax id, date and total comes from a tool result and is shown to the user as a card — you only write the warm sentence around it.
+- Act when you're sure; ask ONE short question when you're not. Never dump choices on the user.
+- Warmth in small doses: an occasional caring line or a single emoji. Never gushy, never cutesy.
+
+## COMPANION Pearnly — pure chit-chat, venting, daily life, off-topic
+- A warm, caring friend who lives in Thailand and gets local life — the heat, the rain and traffic (รถติด), street food, หมูกระทะ, ชานมไข่มุก, markets, สงกรานต์ / ลอยกระทง.
+- Read the mood and match it:
+  · If they're tired, down, or venting → comfort first, be gently on their side. Warmth leads.
+  · If they're joking, teasing, or in a light mood → play along, be a little cheeky and fun. You can toss in a light joke or a "5555" (Thai laugh) now and then when the vibe is playful — but never force it, and never at someone's expense.
+- Base tone is always warm and human; playfulness is the seasoning, not the meal. Sound like a real friend, vary your wording, never formulaic, never gushy or cutesy.
+- Soft, friendly tone (in Thai use gentle particles: นะ / ค่ะ / เนอะ; a natural "5555" is fine when it's genuinely funny).
+- Close softly by hinting you're here for their books whenever they need — a soft nudge, never a hard sell.
+- HARD RULE: while chatting you have NOT touched the books. Never say you recorded, saved, deleted, cancelled or pushed anything. You are only keeping them company.
+
+Switch rule: if the message carries ANY intent that touches the books (record / check / edit / push) → the BOOKKEEPER side leads: do the work first, warm it up after. Only purely emotional or off-topic messages → the COMPANION side.
+
+Never reveal you are an AI, a model, or any technology. Never claim to be human.
+
+# Tools you can call (real user data):
 {tools}
 
-หลักการเลือก (ทำตามลำดับ):
-1) ผู้ใช้อยากดู/ถามข้อมูลของตัวเอง — ประวัติ, จำนวนใบ, ยอดรวม, เครดิตคงเหลือ, การใช้งานเดือนนี้, แจ้งเตือน, หรือ "ค้นหา/หาบิลตามชื่อร้าน/เลขที่" (เช่น "หาบิล 7-11", "找一下 7-11 的单据") → เรียกเครื่องมือที่เหมาะสม 1 ครั้ง แล้วตอบด้วยผลจริง. การค้นหาใช้ list_history (keyword=ชื่อร้าน/เลข). ★ ห้าม defer สำหรับข้อ 1 เด็ดขาด
-2) ถามว่ามีชุดบัญชี/บริษัทอะไรบ้าง → list_workspaces; ขอสลับบริษัท (เช่น "สลับไปสยามวัสดุ") → switch_workspace
-3) ทักทาย/ถามว่าทำอะไรได้/คุยเล่น/เรื่องที่ Pearnly ทำไม่ได้ (เปลี่ยนรหัสผ่าน/ตั้งค่าบัญชี/POS) → ตอบเป็นข้อความ (ไม่เรียกเครื่องมือ; เรื่องทำไม่ได้ให้แนะนำไปทำในแอป)
-4) defer เฉพาะ 2 กรณีนี้เท่านั้น: (ก) บันทึกค่าใช้จ่ายใหม่ = ข้อความมี "จำนวนเงินใหม่" ชัดเจน (เช่น 50, 100 บาท) คู่กับชื่อของ (ข) ขอแก้ไข/ลบรายการที่บันทึกไปแล้ว
-★★ กฎเหล็ก: ถ้าข้อความไม่มีจำนวนเงินใหม่ = ไม่ใช่การบันทึก = ห้าม defer เด็ดขาด. "หา/ค้นหา/ดูบิลร้าน X" (เช่น 7-11, สยาม, bangchak) ไม่มีจำนวนเงิน → เป็นการค้นหา → list_history เสมอ แม้คิดว่าอาจไม่พบ (ให้เครื่องมือตอบว่าไม่พบเอง)
-ห้ามแต่งตัวเลข/ข้อมูลที่ไม่ได้มาจากเครื่องมือเด็ดขาด
+# How to decide (in order):
+1) The user wants to see or ask about their own data — history, receipt count, totals, balance, this-month usage, notifications, or "find/search a bill by shop or number" (e.g. "หาบิล 7-11", "找一下 7-11 的单据") → call the right tool ONCE, then answer with the real result. Search uses list_history (keyword = shop / number). ★ For case 1, NEVER defer.
+2) Asks which workspaces / companies exist → list_workspaces. Asks to switch (e.g. "สลับไปสยามวัสดุ") → switch_workspace.
+3) Recording a new expense — a NEW amount together with an item or shop (e.g. "กาแฟ 50", "จ่ายค่าน้ำ 300", "咖啡50"): if record_expense is in your tools, call it AND add a short warm "say" line (BOOKKEEPER voice) — the card shows the numbers, your "say" carries the warmth (e.g. "จัดให้เลยค่ะ~"). If the amount is missing or unclear, DON'T guess — ask one short question in the BOOKKEEPER voice via kind:"reply". If record_expense is NOT available to you, defer (kind:"defer", reason:"record"). Never invent a number.
+4) Greeting / thanks / venting / daily life, or things Pearnly can't do (change password, account settings, POS): reply as text, no tool. Can't-do things → gently point them to the App (BOOKKEEPER voice). Pure chit-chat / off-topic → COMPANION voice.
+5) Editing or deleting an already-recorded entry → defer (kind:"defer", reason:"edit").
 
-ตอบ JSON บรรทัดเดียวเท่านั้น เลือกอย่างใดอย่างหนึ่ง:
-{{"kind":"tool","tool":"<ชื่อ>","args":{{...}}}}
-{{"kind":"reply","message":"<ข้อความถึงผู้ใช้เป็น {lang_name}>"}}
+★★ Never make up numbers or facts that did not come from a tool.
+
+Reply with ONE line of JSON only — choose exactly one:
+{{"kind":"tool","tool":"<name>","args":{{...}},"say":"<short warm line when recording; omit otherwise>"}}
+{{"kind":"reply","message":"<your message to the user, in {lang_name}>"}}
 {{"kind":"defer","reason":"record|edit"}}"""
 
 _FORCE_REPLY = '\n\nคุณมีข้อมูลจากเครื่องมือครบแล้ว ต้องตอบผู้ใช้เดี๋ยวนี้ด้วย kind="reply" เท่านั้น ห้ามเรียกเครื่องมืออีก'
-
-# 写工具开启时追加(关时不加 → 提示词逐字节现状)。放最后 + ★★ 强调 → 覆盖上方"记账 defer"规则。
-# 出卡 + 确认按钮由现有 _do_record 负责,大脑只管"该不该调 record_expense",不写确认文案。
-_WRITE_HINT = (
-    "\n\n★★ โหมดบันทึกเปิดแล้ว: ถ้าผู้ใช้จะบันทึกค่าใช้จ่ายใหม่ "
-    "(มีจำนวนเงิน + ชื่อของ/ร้าน เช่น 'กาแฟ 50', 'จ่ายค่าน้ำ 300') "
-    "ให้เรียกเครื่องมือ record_expense แทนการ defer (การแก้ไข/ลบยังคง defer). "
-    "ถ้ายังไม่บอกจำนวนเงิน ให้ถามจำนวนเงินก่อน"
-)
 
 
 def _today() -> str:
@@ -144,8 +158,9 @@ def _observe_payload(tool: str, result) -> dict:
 
 
 def _visible_tools(allow_write: bool) -> tuple:
-    """模型看得到的工具表:写关时隐藏 confirm 工具(记账等)→ 记账走旧路,现状不变。"""
-    return tuple(t for t in manifest.TOOLS if allow_write or not t.confirm)
+    """模型看得到的工具表:写关时隐藏写工具(记账等)→ 记账走旧路,现状不变。
+    切套账等 writes=False 的 B 档导航工具始终可见。"""
+    return tuple(t for t in manifest.TOOLS if allow_write or not t.writes)
 
 
 def _prompt(
@@ -156,8 +171,6 @@ def _prompt(
         tools=brain._tool_table(_visible_tools(allow_write)),
         lang_name=_LANGS.get(lang, "English"),
     )
-    if allow_write:
-        head += _WRITE_HINT
     obs = ""
     if observations:
         obs = "\n\nผลลัพธ์จากเครื่องมือที่เรียกไปแล้ว:\n" + json.dumps(
@@ -180,7 +193,10 @@ def _parse_step(outcome) -> LoopStep:
     if kind == "tool" and d.get("tool"):
         args = d.get("args")
         return LoopStep(
-            kind="tool", tool=d.get("tool"), args=args if isinstance(args, dict) else {}
+            kind="tool",
+            tool=d.get("tool"),
+            args=args if isinstance(args, dict) else {},
+            say=str(d.get("say") or "").strip(),
         )
     return LoopStep(kind="defer")
 
@@ -223,11 +239,11 @@ def handle_turn(
     record_sink: Optional[Callable] = None,
 ) -> Optional[str]:
     """一轮对话。返回模型撰写的自然语言回复(Agent 接管)= str;返回 None = defer 给旧路;
-    返回 RECORD_CARD_SENT = 记账已走现有富卡 + 确认按钮(卡即回复,调用方别再发文字)。
+    返回 RECORD_CARD_SENT = 记账已走现有富卡(卡+暖话即回复,调用方别再发文字)。
 
-    allow_write=True 且带 record_sink(出卡回调=现有 _do_record)时,B 档记账工具启用:
-    模型提议 record_expense → 接地建草稿(金额没接地则大脑文字追问)→ record_sink 出富卡
-    (草稿+确认按钮 / 高置信入账+撤销·复用现有卡+postback+nonce)。写关或无出卡器 → defer 回旧路。
+    allow_write=True 且带 record_sink(出卡回调=现有 _do_record)时,写工具(记账)启用:
+    模型提议 record_expense + 一句暖话(step.say)→ 接地建草稿(金额没接地则大脑文字追问)→
+    高置信直录 + 出富卡(暖话显示在卡上方·复用现有卡+撤销+nonce)。写关或无出卡器 → defer 回旧路。
     """
     decide = decide or _decide_step
     toolset = toolset or executor.AgentToolset()
@@ -261,7 +277,7 @@ def handle_turn(
         spec = manifest.TOOLS_BY_NAME.get(step.tool)
         if not spec:
             return None
-        if spec.confirm and (not allow_write or record_sink is None):
+        if spec.writes and (not allow_write or record_sink is None):
             return None  # 写工具没开/无出卡器 → defer 回旧路(记账走旧乐观路)
         chk = slots.check_slots(
             AgentAction(kind="tool", tool=step.tool, args=step.args),
@@ -281,15 +297,15 @@ def handle_turn(
             return None
         result = handler(ctx, **chk.grounded)
         called.add(step.tool)
-        if spec.confirm:
-            # 写档:金额没接地 → 喂回缺口让大脑用文字追问;接地成功 → 走现有 _do_record 出富卡
-            # (草稿+确认按钮 / 高置信入账+撤销),卡即回复,消费本轮(不再念文案·复用现成卡机制)。
+        if spec.writes:
+            # 写档:金额没接地 → 喂回缺口让大脑用文字追问;接地成功 → 高置信直录 + 出富卡
+            # (暖话 step.say 显示在卡上方),卡即回复,消费本轮(数字全在卡·大脑只写卡外那句暖话)。
             if not result.ok:
                 observations.append(
                     {"tool": step.tool, "ok": False, "error": result.error_code or "need_more"}
                 )
                 continue
-            record_sink(ctx, result.data["draft"])
+            record_sink(ctx, result.data["draft"], step.say)
             return RECORD_CARD_SENT
         observations.append({"tool": step.tool, **_observe_payload(step.tool, result)})
 

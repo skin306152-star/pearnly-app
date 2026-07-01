@@ -149,13 +149,13 @@ class _RecToolset:
 
 
 class TestConfirmFlow(unittest.TestCase):
-    """M3 记账:模型提议→接地建草稿→record_sink 出富卡(确认走现成卡按钮+postback);
+    """M3 记账:模型提议 + 暖话 say → 接地建草稿 → record_sink 高置信直录出富卡(暖话在卡上方);
     写关/无出卡器则 defer;金额没接地则大脑文字追问(不出卡)。"""
 
     def _draft(self):
         return ExpenseDraft(amount=Decimal("50"), vendor_name="cafe", note="coffee")
 
-    def test_record_sink_emits_card_and_consumes_turn(self):
+    def test_record_sink_emits_card_with_say_and_consumes_turn(self):
         sunk = []
         ts = _RecToolset(ToolResult(ok=True, data={"draft": self._draft()}))
         out = loop.handle_turn(
@@ -163,19 +163,23 @@ class TestConfirmFlow(unittest.TestCase):
             _CTX,
             decide=_script(
                 loop.LoopStep(
-                    "tool", tool="record_expense", args={"amount": "50", "note": "coffee"}
+                    "tool",
+                    tool="record_expense",
+                    args={"amount": "50", "note": "coffee"},
+                    say="好,帮你记上咖啡~",
                 ),
             ),
             toolset=ts,
             history=[],
             allow_write=True,
-            record_sink=lambda ctx, draft: sunk.append(draft),
+            record_sink=lambda ctx, draft, say="": sunk.append((draft, say)),
         )
         self.assertEqual(out, loop.RECORD_CARD_SENT)  # 卡即回复:消费本轮,别再发文字
-        self.assertEqual(len(sunk), 1)  # 走出卡回调
-        self.assertEqual(sunk[0].amount, Decimal("50"))  # 接地好的真实草稿
+        self.assertEqual(len(sunk), 1)  # 走出卡回调(直录·非按钮)
+        self.assertEqual(sunk[0][0].amount, Decimal("50"))  # 接地好的真实草稿
+        self.assertEqual(sunk[0][1], "好,帮你记上咖啡~")  # 暖话由大脑写,传到卡上方
 
-    def test_confirm_tool_deferred_when_write_off(self):
+    def test_record_deferred_when_write_off(self):
         # 写关:record_expense 一律 defer 回旧路(记账走旧乐观路,现状不变)。
         out = loop.handle_turn(
             "咖啡 50",
@@ -212,16 +216,17 @@ class TestConfirmFlow(unittest.TestCase):
             toolset=ts,
             history=[],
             allow_write=True,
-            record_sink=lambda ctx, draft: sunk.append(draft),
+            record_sink=lambda ctx, draft, say="": sunk.append(draft),
         )
         self.assertEqual(out, "金额多少?")
         self.assertEqual(sunk, [])  # 没接地绝不出卡
 
-    def test_visible_tools_hides_confirm_when_write_off(self):
+    def test_visible_tools_hides_write_tool_when_write_off(self):
         off = {t.name for t in loop._visible_tools(False)}
         on = {t.name for t in loop._visible_tools(True)}
-        self.assertNotIn("record_expense", off)
+        self.assertNotIn("record_expense", off)  # 写工具写关时对大脑隐藏
         self.assertIn("record_expense", on)
+        self.assertIn("switch_workspace", off)  # 导航工具(writes=False)始终可见
 
 
 class TestObservePayload(unittest.TestCase):

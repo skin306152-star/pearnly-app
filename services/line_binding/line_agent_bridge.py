@@ -35,21 +35,22 @@ def write_enabled(bound_user) -> bool:
 
 
 def _record_sink(bound_user, text, lang, tid, ws, line_user_id, reply_token, quote_token, book):
-    """记账出卡回调:模型抽的草稿 → 现有 book(=line_expense._do_record·used_l2=True → needs_review
-    → 草稿卡 + 确认按钮),确认走现成 postback + nonce。写关/缺件 → None(记账 defer 回旧乐观路)。"""
+    """记账出卡回调:模型抽的草稿 + 暖话 say → 现有 book(=line_expense._do_record·used_l2=False
+    高置信直录·ack_text=say 让暖话显示在数据卡上方)。写关/缺件 → None(记账 defer 回旧乐观路)。"""
     if not (book and reply_token and write_enabled(bound_user)):
         return None
-    return lambda _ctx, draft: book(
+    return lambda _ctx, draft, say="": book(
         bound_user,
         reply_token,
         draft.raw_text or text,
         tid,
         ws,
         draft,
-        True,
+        False,
         quote_token,
         lang,
         line_user_id,
+        ack_text=say,
     )
 
 

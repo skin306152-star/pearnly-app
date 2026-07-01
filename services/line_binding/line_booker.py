@@ -178,8 +178,11 @@ def emit_result_card(
     source="text",
     tenant_id=None,
     line_user_id="",
+    ack_text="",
 ) -> None:
     """三路共用发卡口:引用回执(text·可被引用)+ Flex 数据卡(不可引用 → 拆两条发)。
+
+    ack_text 传入(Agent 路大脑暖话)→ 用它当卡上方那句;空 → 回落 ack_message 模板(图/文旧路不变)。
 
     发完把两条消息 id 绑到该 doc(line_message_refs)→ 用户长按任一条 reply「删除/改成X」可
     精确定位这张单(引用底座 P1A)。记映射 best-effort,失败不阻塞回执。
@@ -193,7 +196,7 @@ def emit_result_card(
         # line_card import 放 try 内:模块未部署/渲染失败都在此兜底,不冒泡成上层兜底误判。
         from services.line_binding import line_card
 
-        ack = {"type": "text", "text": ack_message(lang, state, amount, fields)}
+        ack = {"type": "text", "text": ack_text or ack_message(lang, state, amount, fields)}
         if quote_token:
             ack["quoteToken"] = quote_token
         card = line_card.result_card(

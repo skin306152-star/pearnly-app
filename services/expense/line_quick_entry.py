@@ -482,10 +482,10 @@ def parse_multi(text: str) -> Optional[list]:
     """Parse one sentence into multiple deterministic expense items."""
     from services.expense import amount_extract
 
-    # 与单笔路共用金钱语境清洗:量级归一 + 剥非金额数 + 日期 + 长编号/税号(共用编译)。
+    # 与单笔路共用金钱语境清洗:量级归一 + 剥非金额数 + 卖家店号(7-11/711 不当价·对齐单笔) + 日期 + 长编号/税号。
     clean = amount_extract.strip_nonmoney(amount_extract.normalize_words(text or ""))
     clean = amount_extract._RE_LONG_ID.sub(
-        " ", _MULTI_FIELD_DATE_RE.sub(" ", _MULTI_DATE_RE.sub(" ", clean))
+        " ", _MULTI_FIELD_DATE_RE.sub(" ", _MULTI_DATE_RE.sub(" ", _strip_vendor_brands(clean)))
     )
     items = []
     for m in _MULTI_RE.finditer(clean.strip()):

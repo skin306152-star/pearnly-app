@@ -50,6 +50,12 @@ class MultiSumNoiseTests(unittest.TestCase):
         self.assertEqual(_amt("ค่าต่อทะเบียน 1000"), Decimal("1000"))
         self.assertEqual(_amt("ค่าโทร 500 ค่าน้ำ 80"), Decimal("580"))
 
+    def test_vendor_shop_number_not_counted_as_amount(self):
+        # 卖家店号(7-11/711)紧挨金额:店号不当价。多笔 regex 路此前漏剥 → 记成 711;
+        # 已对齐单笔路(共用 _strip_vendor_brands)。真机原图那条:应记 30+200+100=330,非 1011。
+        self.assertEqual(_amt("ที่ 711 30บาท กล้วย 200 เนื้อหมู 100"), Decimal("330"))
+        self.assertEqual(_amt("7-11 ครีม 120 ยาสีฟัน 45"), Decimal("165"))
+
     def test_model_glued_number_fixed_by_dictionary(self):
         # 型号词典(amount_extract._PRODUCT_BRANDS)整剥 M150 → 记真价 20(原残留·Tier B 真大脑曾误记150)。
         self.assertEqual(_amt("M150 2 ขวด 20"), Decimal("20"))

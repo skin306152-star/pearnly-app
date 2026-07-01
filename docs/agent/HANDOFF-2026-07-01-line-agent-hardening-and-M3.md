@@ -13,6 +13,10 @@
 | `8801ecce` | **批三·时区+兜底**:`_today()` 走 `bangkok_now()`(治"几点"报 UTC);`_grounded_fallback` 覆盖到钱工具(balance/summary/usage)。 |
 | `af75d29c` | **缓存友好**:易变时间戳移出 persona 头 → ~1.5k token 静态前缀可被供应商前缀缓存命中(批三把分钟级时间戳塞头部会撞碎缓存,已修)。 |
 | `4ec117d7` | **/simplify 收口**:`_grounded_fallback` 收成表驱动(`_VALUE_FB`);两处热路懒加载提模块级。 |
+| `fb590fc0` | **_SYSTEM 换最终版**(Zihao 双人格暖+俏皮 + Honesty check 质检段):case3 记账直录(去 say 暖话行·JSON 去 say 字段)+ 加固「假设/问句/否定不记账」;Honesty check=结果呈现前回看用户原话,不符则诚实反问,★只提醒不改数字。保留时间戳不进缓存前缀 + 泰文原文。 |
+| `582f6971` | **卡片语言跟随对话**(不再跟账号偏好):无文本触发的卡(按钮 postback `:147` / 图片OCR结果卡 `:197`)过去回落 `preferred_lang`→中文账号用户在泰语对话收中文卡。新增 `line_lang.card_lang`(最近一条用户消息脚本 → ev_lang → th·刻意不读偏好);文本消息路本就对(泰语在 `_STRONG`)。泰国主市场→整段对话统一泰语。 |
+
+**大脑后端已从 qwen 换回 Vertex gemini-2.5-flash**(2026-07-01·见 §二 + [[ocr-llm-backend-gateway]])。
 
 **核心不变量**(改任何前门逻辑都别破):
 - crash(parse失败/空回复/工具名错/循环空转)→ 安全兜底一句,**不问价格/不静默错入账/不跑第二个大脑**。

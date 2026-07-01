@@ -14,10 +14,9 @@ S1 仅接 sales_credit(赊销)· 主数据自动建/方向识别在 S2 · 现金
 from __future__ import annotations
 
 import logging
+import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
-
-from bs4 import BeautifulSoup
 
 from services.erp import mrerp_xlsx_generator as _gen
 from services.erp.exceptions import MRERPBusinessError
@@ -29,6 +28,15 @@ from services.erp.mrerp_report_parser import parse_import_report
 from services.erp.session_lock import mrerp_session_lock
 
 logger = logging.getLogger(__name__)
+
+# 预览页解析(标准库正则 · 不引 bs4:bs4 非 prod 依赖,直写运行期不能靠它)。
+_FORM_RE = re.compile(
+    r'<form\b[^>]*\bid=["\'](frmimport\d+)["\'][^>]*>(.*?)</form>', re.IGNORECASE | re.DOTALL
+)
+_TAG_RE = re.compile(r"<(input|select|textarea)\b([^>]*?)/?>", re.IGNORECASE)
+_ATTR_RE = re.compile(r'([\w-]+)\s*=\s*"([^"]*)"')
+_TAGSTRIP_RE = re.compile(r"<[^>]+>")
+_HINT_KEYWORDS = ("ไม่พบ", "ผิดพลาด", "ไม่ถูกต้อง", "ซ้ำ", "ไม่ครบ")
 
 
 class MrErpHttpAdapter:
@@ -319,53 +327,42 @@ class MrErpHttpAdapter:
         if not html:
             return []
         hints: List[str] = []
-        try:
-            soup = BeautifulSoup(html, "html.parser")
-            text = soup.get_text("\n", strip=True)
-            for line in text.split("\n"):
-                line = line.strip()
-                if not line or len(line) > 200 or line in hints:
-                    continue
-                if any(k in line for k in ("ไม่พบ", "ผิดพลาด", "ไม่ถูกต้อง", "ซ้ำ", "ไม่ครบ")):
-                    hints.append(line)
-        except Exception:
-            pass
+        for line in _TAGSTRIP_RE.sub("\n", html).split("\n"):
+            line = line.strip()
+            if not line or len(line) > 200 or line in hints:
+                continue
+            if any(k in line for k in _HINT_KEYWORDS):
+                hints.append(line)
         return hints[:5]
 
     @staticmethod
     def _parse_preview_form(
         html: str,
     ) -> Tuple[List[Tuple[str, str]], List[str], Optional[str]]:
-        """从预览 HTML 抽 form#frmimport1 的全部字段 + cbimport row_ids + 该 form 的 idus。"""
-        soup = BeautifulSoup(html, "html.parser")
-        form = soup.find("form", id="frmimport1") or soup.find(
-            "form", id=lambda v: bool(v) and v.startswith("frmimport")
-        )
+        """从预览 HTML 抽 form#frmimport1 的全部字段 + cbimport row_ids + 该 form 的 idus。
+
+        标准库正则:确认表(sales_credit)只含 hidden input + cbimport 复选框,无 <select>。
+        """
+        mform = _FORM_RE.search(html)
+        scope = mform.group(2) if mform else html
         fields: List[Tuple[str, str]] = []
         row_ids: List[str] = []
         idus_form: Optional[str] = None
-        scope = form if form is not None else soup
-        for el in scope.find_all(["input", "select", "textarea"]):
-            name = el.get("name")
+        for _tag, attrs_str in _TAG_RE.findall(scope):
+            attrs = {k.lower(): v for k, v in _ATTR_RE.findall(attrs_str)}
+            name = attrs.get("name")
             if not name:
                 continue
-            etype = (el.get("type") or "").lower()
-            if etype == "checkbox":
+            if attrs.get("type", "").lower() == "checkbox":
                 # 预览默认勾选的行才提交(cbimport[N])
-                if el.has_attr("checked") or name.startswith("cbimport"):
-                    val = el.get("value") or "on"
-                    fields.append((name, val))
-                    m = name[len("cbimport") :].strip("[]")
-                    if name.startswith("cbimport") and m.isdigit():
-                        row_ids.append(m)
+                if "checked" in attrs_str.lower() or name.startswith("cbimport"):
+                    fields.append((name, attrs.get("value", "on")))
+                    key = name[len("cbimport") :].strip("[]")
+                    if name.startswith("cbimport") and key.isdigit():
+                        row_ids.append(key)
                 continue
-            val = el.get("value") if el.name != "select" else _selected_option(el)
-            fields.append((name, val if val is not None else ""))
-            if name in ("idus", "idus1") and (val or "").strip():
-                idus_form = str(val).strip()
+            val = attrs.get("value", "")
+            fields.append((name, val))
+            if name in ("idus", "idus1") and val.strip():
+                idus_form = val.strip()
         return fields, row_ids, idus_form
-
-
-def _selected_option(select_el) -> Optional[str]:
-    opt = select_el.find("option", selected=True) or select_el.find("option")
-    return opt.get("value") if opt else None

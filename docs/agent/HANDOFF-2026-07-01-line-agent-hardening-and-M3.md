@@ -22,8 +22,8 @@
 ## 二、现在的真实状态(接手必知)
 
 - **写子闸 `agent_write_tools` 已全开**(`rollout: all` · enabled · prod platform_settings)。**记账写工具 record_expense 现在对所有用户可见** → 记账消息由前门大脑直接出直录卡(复用现成精致卡 + 暖话 + 撤销),不再 defer 旧路。回退:`store.set_setting("agent_write_tools", {"rollout":"allowlist"}, True)` 或 enabled=False。
-- **大脑后端 = qwen-flash**,但**不是自托管**:`AGENT_BRAIN_BACKEND=selfhost` + `SELFHOST_OCR_URL=...aliyuncs.com`(阿里云百炼 MaaS 按量付费)。不是免费自建 GPU。
-- **成本**:今日 64 次对话调用,日志记 ฿1.23——但那是 `costing.py` **按 Gemini 单价估的假账**(不管真实模型),真实阿里云 qwen 花费更低。实测:输入 1508 tok/次 vs 输出 40 tok/次(37×),成本几乎全在"重发的静态大提示词"→ 已做缓存友好(前缀稳定,供应商自动前缀缓存能命中)。真实账单看阿里云百炼控制台。
+- **大脑后端 = Vertex gemini-2.5-flash**(2026-07-01 Zihao 拍板废除 qwen · 换回 OCR 同款)。prod `/opt/mrpilot/.env` 已注释掉 `AGENT_BRAIN_BACKEND=selfhost` + 3 行 `SELFHOST_OCR_*`(备份 `.env.pre-qwen-abolish-20260701`)→ Agent 跟随全局 `OCR_LLM_BACKEND=vertex`,与 OCR 同模型/同 A 账号/同项目,无冲突(各发无状态请求·只共享配额+账单)。金丝雀实证 `brain._brain_backend()=None → active_backend()=vertex → CALL ok=True model=gemini-2.5-flash`。回滚=取消注释那 4 行 + `systemctl restart mrpilot`。详见记忆 [[ocr-llm-backend-gateway]]。
+  - ⚠️ ~~曾短暂用阿里云百炼 qwen-flash 省钱~~——已废除;阿里云那把 key 现闲置,可去控制台停用。`costing.py` 仍按 Gemini 单价估(现在就是真实后端,估得准了)。
 - **验证工具**(scratchpad,可复跑):`line_sim.py`(读/闲聊/故障路 40 条压测·0 问价格 0 崩溃逃逸)、`line_sim_write.py`(写路径 30 条·0 编造入账 0 双记)。跑真实路由代码,只注入模型层(本地无 GCP/真模型跑不了真 Gemini)。
 
 ## 三、M3 还剩什么(用户问"只剩 ERP 推送了吗")

@@ -420,6 +420,11 @@
         }
     });
 
+    // 录入工作台上下文卡入口:先确保端点已载(拿到已存配置)再开向导。
+    (window as any)._mrerpDmsOpenWizard = function () {
+        _loadEndpoint(false).then(_openWizard);
+    };
+
     if (typeof window.subscribeI18n === 'function') {
         window.subscribeI18n('mrerp-dms-adapter', _renderCard);
     }

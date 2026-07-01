@@ -25,14 +25,7 @@
             </div>
         </div>
 
-        <!-- A4 · 顶部 tab 切换(推送异常已并入推送日志的失败卡 · 2026-06-26) -->
-        <div class="int-top-tabs" role="tablist">
-            <button class="int-top-tab active" type="button" data-int-top-tab="cards" data-i18n="int-tab-cards">集成卡片</button>
-            <button class="int-top-tab" type="button" data-int-top-tab="logs" data-i18n="int-tab-logs">推送日志</button>
-        </div>
-
-        <!-- Tab 1: integration-row 卡片(现有内容不变) -->
-        <div class="int-top-panel active" data-int-top-panel="cards">
+        <!-- 推送日志已抽为左侧栏独立页(page-push-logs · 2026-07-01)· 集成页只留集成卡片 -->
         <div class="card">
             <!-- 2026-06-10 五-bis · 卡片按归属重排 + 业态显隐:
                  firm 全显;商户业态(retail/restaurant/…)只显 LINE Bot + 智能提醒(data-firm-only 由 module-nav 控)。
@@ -120,27 +113,8 @@
             <!-- 旧的 Google Drive / Google Sheets 两条描述行已删:被上方 OAuth 连接卡取代
                  (一次授权覆盖 Drive + Sheets)· 对齐原型⑥单卡 · 去 3 条 Google 冗余。 -->
 
-            <div class="sec-divider" data-firm-only="1"></div>
-
-            <!-- 第 3 组 · ERP 系统 -->
-            <div class="integrations-section-title" data-firm-only="1" data-i18n="integrations-section-erp">ERP 系统</div>
-
-            <div class="integration-row" data-firm-only="1" data-int-target="automation" data-int-anchor="erp">
-                <div class="int-icon ic-erp">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                        <path d="M9 9h6v6H9z"/>
-                        <path d="M9 3v6M15 3v6M9 15v6M15 15v6M3 9h6M3 15h6M15 9h6M15 15h6"/>
-                    </svg>
-                </div>
-                <div class="int-info">
-                    <div class="int-name"><span data-i18n="int-name-erp">ERP 对接</span></div>
-                    <div class="int-desc" data-i18n="int-desc-erp">MR.ERP · Webhook 等 · 识别完自动推到 ERP</div>
-                </div>
-                <div class="int-actions">
-                    <button class="int-btn-configure" data-route="automation" data-i18n="btn-configure">配置</button>
-                </div>
-            </div>
+            <!-- 第 3 组「ERP 系统」已移除(2026-07-01)· ERP 连接/推送改由「录入工作台」上下文卡承接:
+                 发票任务→MR.ERP+Express·身份证任务→MR.ERP DMS(见 dms-intake-erp-cards)· 集成页只留采集/归档/通知。 -->
 
             <div class="sec-divider"></div>
 
@@ -163,77 +137,6 @@
                 </div>
             </div>
         </div>
-        </div>
-        <!-- /Tab 1 -->
-
-        <!-- Tab 2: 推送日志(从 auto-panel="erp" subpanel="logs" 搬过来 · A4 · v118.34.19) -->
-        <div class="int-top-panel" data-int-top-panel="logs">
-            <div class="card">
-                <section class="erp-logs-section" id="erp-logs-section">
-                    <!-- 今日推送统计并入标题行 · 空态不再单飘一条 banner(S7/S8) -->
-                    <div class="erp-logs-head">
-                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 1"/>
-                        </svg>
-                        <span data-i18n="erp-logs-title">推送日志</span>
-                        <div id="erp-today-stats" class="erp-today-stats"></div>
-                    </div>
-
-                    <div class="erp-logs-toolbar">
-                        <div class="erp-logs-filters" id="erp-logs-filters">
-                            <button class="chip-filter active" data-filter-key="all" data-filter-val=""><span data-i18n="erp-logs-filter-all">全部</span></button>
-                            <button class="chip-filter" data-filter-key="status" data-filter-val="success">✓ <span data-i18n="erp-logs-filter-ok">成功</span></button>
-                            <button class="chip-filter" data-filter-key="status" data-filter-val="retrying">↻ <span data-i18n="erp-logs-filter-retrying">重试中</span></button>
-                            <button class="chip-filter" data-filter-key="status" data-filter-val="failed">✗ <span data-i18n="erp-logs-filter-fail">失败</span></button>
-                            <button class="chip-filter" data-filter-key="trigger" data-filter-val="auto"><span data-i18n="erp-logs-filter-auto">自动</span></button>
-                            <button class="chip-filter" data-filter-key="trigger" data-filter-val="manual"><span data-i18n="erp-logs-filter-manual">手动</span></button>
-                            <!-- DMS 推送可视化闭环(Zihao 2026-06-01)· ERP 系统筛选改【下拉】·
-                                 只列真实配置的 ERP 端点(loadErpLogs 运行期填充)· 选一个看一个 · 不再硬编码三件套混在一起. -->
-                            <span class="erp-logs-filter-sep" aria-hidden="true">|</span>
-                            <!-- 业务类型下拉(草稿「全部业务」)· 发票单据 / 身份证订车 -->
-                            <select id="erp-logs-business-select" class="erp-logs-erp-select" aria-label="business">
-                                <option value="" data-i18n="erp-logs-biz-all">全部业务</option>
-                                <option value="invoice" data-i18n="erp-logs-biz-invoice">发票 / 单据</option>
-                                <option value="id_card" data-i18n="erp-logs-biz-idcard">身份证订车</option>
-                            </select>
-                            <select id="erp-logs-erp-select" class="erp-logs-erp-select" aria-label="ERP">
-                                <option value="" data-i18n="erp-logs-erp-all">全部 ERP</option>
-                            </select>
-                        </div>
-                        <div class="erp-logs-toolbar-right">
-                            <div class="erp-logs-search">
-                                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
-                                <input type="search" id="erp-logs-search" data-i18n-placeholder="erp-logs-search-ph" placeholder="搜索单据号 / 客户 / 任务">
-                            </div>
-                            <button class="btn btn-ghost btn-tiny" id="btn-refresh-logs" title="刷新">
-                                <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 7a4.5 4.5 0 11-1.3-3.2M12 2v3h-3"/></svg>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div id="erp-logs-batch-bar" class="erp-logs-batch-bar" style="display:none;">
-                        <span class="erp-logs-batch-count" id="erp-logs-batch-count" data-i18n="erp-batch-selected" data-i18n-vars='{"n":0}'>已选 0 条</span>
-                        <button class="btn btn-primary btn-tiny" id="btn-erp-batch-retry">
-                            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 7a4.5 4.5 0 11-1.3-3.2M12 2v3h-3"/></svg>
-                            <span data-i18n="erp-batch-retry-btn">批量重推</span>
-                        </button>
-                        <!-- Bug 6 (Zihao 2026-05-19 拍板 · v118.34.23) · 批量删除按钮 -->
-                        <button class="btn btn-ghost btn-tiny btn-danger-ghost" id="btn-erp-batch-delete">
-                            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h8M5 4V2.5h4V4M6 7v4M8 7v4M4 4l.5 8h5l.5-8"/></svg>
-                            <span data-i18n="erp-batch-delete-btn">批量删除</span>
-                        </button>
-                        <button class="btn btn-ghost btn-tiny" id="btn-erp-batch-clear">
-                            <span data-i18n="erp-batch-clear">取消选择</span>
-                        </button>
-                    </div>
-
-                    <div id="erp-logs-list" class="erp-logs-list">
-                        <div class="erp-logs-empty" data-i18n="erp-logs-loading">加载中…</div>
-                    </div>
-                </section>
-            </div>
-        </div>
-        <!-- /Tab 2 -->
 `;
     sec.dataset.wbInjected = '1';
     try {

@@ -181,7 +181,10 @@ export function dxShell(t: (k: string) => string, task = 'invoice'): string {
         '<div class="dx-state" id="dx-s-inv-review"></div>' +
         '<div class="dx-state" id="dx-s-inv-submit"></div>' +
         '<div class="dx-state" id="dx-s-success"></div>' +
-        '</div></div></div>' +
+        '</div>' + // close .dx-card(流程卡)
+        // 上下文 ERP 连接卡(控制器 renderDxErpCards 按任务填充:发票→MR.ERP+Express·身份证→DMS)
+        '<div id="dx-erp-cards" class="dx-erp-cards-zone"></div>' +
+        '</div></div>' + // close .dx-wrap / .dmsx
         // 确认弹窗(站内 .modal)
         '<div class="modal-overlay" id="dx-modal-mask" style="display:none;"></div>'
     );

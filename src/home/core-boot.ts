@@ -95,10 +95,10 @@ function applyLang(lang?: any) {
         }
     } catch (e) {}
     try {
-        // A4 (v118.34.19) · 集成主页面也展示推送日志 · 同样需要切语言刷新
+        // 推送日志独立页(2026-07-01 · 从集成页抽出)· 切语言刷新
         if (
             typeof loadErpLogs === 'function' &&
-            (currentRoute === 'automation' || currentRoute === 'integrations')
+            (currentRoute === 'automation' || currentRoute === 'push-logs')
         ) {
             loadErpLogs();
             if (typeof loadErpTodayStats === 'function') loadErpTodayStats();
@@ -229,19 +229,8 @@ function routeTo(route?: any) {
     const loader = ROUTE_LOADERS[route];
     const winFns = window as unknown as Record<string, () => void>;
     if (loader && typeof winFns[loader] === 'function') winFns[loader]();
-    // A4 (v118.34.19) · 进集成页 · 默认 cards tab · 同时刷新 erp logs
-    // (logs tab 切过去时会再调一次 · 这里是首屏 / 切回时数据保鲜)
+    // 进集成页 · 刷新 Google 授权卡(推送日志已抽为独立页 · 由 ROUTE_LOADERS.loadPushLogs 拉)
     if (route === 'integrations') {
-        if (typeof loadErpLogs === 'function') {
-            try {
-                loadErpLogs();
-            } catch (e) {}
-        }
-        if (typeof loadErpTodayStats === 'function') {
-            try {
-                loadErpTodayStats();
-            } catch (e) {}
-        }
         if (typeof window.loadIntegrationGoogle === 'function') {
             try {
                 window.loadIntegrationGoogle();

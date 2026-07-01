@@ -180,6 +180,13 @@ const SIDEBAR_HTML = `
                 </svg>
                 <span class="nav-label" data-i18n="nav-history">识别记录</span>
             </div>
+            <div class="nav-item nav-sub-item" data-route="push-logs" data-module="sales">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 5h12M4 10h12M4 15h8"/>
+                    <circle cx="16" cy="15" r="2.2"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-push-logs">推送日志</span>
+            </div>
             <div class="nav-item nav-sub-item" data-route="reconcile" data-module="recon">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="3" y1="17" x2="17" y2="17"/>

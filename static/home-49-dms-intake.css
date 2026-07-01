@@ -373,3 +373,21 @@
   .dmsx .dx-bar>div:last-child{display:flex;gap:8px}
   .dmsx .dx-bar .btn{flex:1}
 }
+
+/* Ueå\ð · 
+‡ ERP Þ¥a(	û¡:Ñh’MR.ERP+Express·«ýÁ’DMS)· hover >' */
+.dmsx .dx-erp-cards-zone{margin-top:16px}
+.dmsx .dx-erp-cards-zone:empty{display:none}
+.dmsx .dx-erp-h{font-size:12px;color:var(--ink2);font-weight:600;margin:0 2px 10px}
+.dmsx .dx-erp-row{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.dmsx .dx-erp-card{border:1px solid var(--dx-line);border-radius:16px;padding:16px 18px;display:grid;grid-template-columns:44px 1fr auto;gap:14px;align-items:center;background:var(--card);cursor:pointer;transition:transform .14s ease,box-shadow .14s ease,border-color .14s ease}
+.dmsx .dx-erp-card:hover{transform:scale(1.02);box-shadow:0 10px 26px rgba(0,0,0,.10);border-color:var(--dx-brand)}
+.dmsx .dx-erp-card:focus-visible{outline:2px solid var(--dx-brand);outline-offset:2px}
+.dmsx .dx-erp-ic{width:44px;height:44px;border-radius:13px;background:var(--dx-brand-soft);color:var(--dx-brand);display:grid;place-items:center}
+.dmsx .dx-erp-info{min-width:0}
+.dmsx .dx-erp-info b{display:block;font-size:14px}
+.dmsx .dx-erp-status{display:block;font-size:11px;color:var(--ink2);margin-top:4px}
+.dmsx .dx-erp-card.is-connected .dx-erp-status{color:var(--dx-green)}
+.dmsx .dx-erp-cta{font-size:12px;font-weight:600;color:var(--dx-brand);white-space:nowrap;padding:7px 14px;border:1px solid var(--dx-brand);border-radius:10px;background:var(--dx-brand-soft)}
+.dmsx .dx-erp-card.is-connected .dx-erp-cta{color:var(--ink2);border-color:var(--dx-line);background:var(--card)}
+@media (max-width:700px){.dmsx .dx-erp-row{grid-template-columns:1fr}}

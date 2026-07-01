@@ -39,6 +39,7 @@ import {
     onInvoiceDrop,
 } from './dms-intake-invoice.js';
 import { readStep } from './step-resume.js';
+import { renderDxErpCards } from './dms-intake-erp-cards.js';
 
 // ── 步骤 1:上传 ──────────────────────────────────────────────
 function renderUpload() {
@@ -236,6 +237,7 @@ function selectTask(task: 'invoice' | 'identity') {
     const el = sec();
     if (!el) return;
     el.innerHTML = dxShell(t, S.task);
+    renderDxErpCards(S.task);
     resetFlow();
 }
 
@@ -245,12 +247,10 @@ function openRecords() {
         if (typeof window.routeTo === 'function') window.routeTo('history');
         return;
     }
-    if (typeof window.activateIntegrationsLogsTab === 'function') {
-        window.activateIntegrationsLogsTab();
-        // 等 logs tab + 下拉渲染好再设筛选(activateIntegrationsLogsTab 内部 loadErpLogs 异步)
-        setTimeout(() => window.setErpLogAdapter?.('mrerp_dms'), 80);
-    } else if (typeof window.routeTo === 'function') {
-        window.routeTo('integrations');
+    // 推送日志已抽为独立页(push-logs)· 进页后按 DMS 适配器筛选(loadPushLogs 内部 loadErpLogs 异步)
+    if (typeof window.routeTo === 'function') {
+        window.routeTo('push-logs');
+        setTimeout(() => window.setErpLogAdapter?.('mrerp_dms'), 120);
     }
 }
 
@@ -405,6 +405,7 @@ window.loadDmsIntake = function () {
     const el = sec();
     if (!el) return;
     el.innerHTML = dxShell(t, S.task);
+    renderDxErpCards(S.task);
     bind();
     if (!resumeFlow()) resetFlow();
 };
@@ -413,6 +414,7 @@ if (typeof window.subscribeI18n === 'function') {
     window.subscribeI18n('dms-intake', () => {
         if (!sec()?.querySelector('.dmsx')) return;
         sec()!.innerHTML = dxShell(t, S.task);
+        renderDxErpCards(S.task);
         if (S.task === 'invoice') return rerenderInvoice();
         const map: Record<number, string> = {
             1: 'dx-s-upload',

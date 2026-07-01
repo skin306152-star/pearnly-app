@@ -174,9 +174,9 @@ class MrErpHttpAdapter:
         # 销项:缺买方客户则自建并注入码(须在 preflight 前 · 否则"客户未映射"会先把票拒掉)。
         # 除套账主体外一切可自建 · 见 autocreate。
         if m.doc_type.startswith("sales"):
-            from services.erp.mrerp_http.autocreate import ensure_customers
+            from services.erp.mrerp_http.autocreate import provision_customers
 
-            ensure_customers(self, histories, mappings)
+            provision_customers(self, histories, mappings)
 
         valid, preflight_failed = self._preflight(histories, mappings)
         if not valid:

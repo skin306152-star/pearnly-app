@@ -35,7 +35,7 @@ def _buyer_from_history(h: Dict[str, Any]) -> Dict[str, str]:
     }
 
 
-def ensure_customers(adapter, valid: List[Dict[str, Any]], mappings: Dict[str, Any]) -> None:
+def provision_customers(adapter, valid: List[Dict[str, Any]], mappings: Dict[str, Any]) -> None:
     """缺买方客户则自建 · 建成功把码注入 mappings['clients'](原地)。"""
     if not isinstance(mappings, dict) or not mappings.get("_mrerp_auto_create_customer", True):
         return

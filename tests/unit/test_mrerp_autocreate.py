@@ -6,7 +6,7 @@
 
 import unittest
 
-from services.erp.mrerp_http.autocreate import _buyer_from_history, ensure_customers
+from services.erp.mrerp_http.autocreate import _buyer_from_history, provision_customers
 
 
 class _StubAdapter:
@@ -42,7 +42,7 @@ class TestEnsureCustomers(unittest.TestCase):
     def test_creates_and_injects_when_missing(self):
         mappings = {"clients": []}
         stub = _StubAdapter({})
-        ensure_customers(stub, [_hist(777, tax="1111111111111")], mappings)
+        provision_customers(stub, [_hist(777, tax="1111111111111")], mappings)
         self.assertEqual(len(stub.called_with), 1)
         injected = [c["erp_code"] for c in mappings["clients"]]
         self.assertEqual(injected, ["1111111111111"])
@@ -50,19 +50,19 @@ class TestEnsureCustomers(unittest.TestCase):
     def test_skips_when_already_mapped(self):
         mappings = {"clients": [{"erp_type": "mrerp", "client_id": 777, "erp_code": "0006"}]}
         stub = _StubAdapter({})
-        ensure_customers(stub, [_hist(777)], mappings)
+        provision_customers(stub, [_hist(777)], mappings)
         self.assertIsNone(stub.called_with)  # 未触发建档
 
     def test_does_not_inject_on_create_failure(self):
         mappings = {"clients": []}
         stub = _StubAdapter({"2222222222222": False})  # 建档失败
-        ensure_customers(stub, [_hist(777, tax="2222222222222")], mappings)
+        provision_customers(stub, [_hist(777, tax="2222222222222")], mappings)
         self.assertEqual(mappings["clients"], [])  # 失败不注入(推票会干净失败,不写脏)
 
     def test_opt_out_flag(self):
         mappings = {"clients": [], "_mrerp_auto_create_customer": False}
         stub = _StubAdapter({})
-        ensure_customers(stub, [_hist(777)], mappings)
+        provision_customers(stub, [_hist(777)], mappings)
         self.assertIsNone(stub.called_with)
 
 

@@ -95,8 +95,10 @@ def parse_proof_command(text: str, today: date = None):
     low = (text or "").lower().strip()
     if not any(k in low for k in _TRIGGERS):
         return None
+    from services.sales.dates import bangkok_today
+
     f, t, label = _month_range(
-        today or date.today(), 1 if any(k in low for k in _LAST_MONTH) else 0
+        today or bangkok_today(), 1 if any(k in low for k in _LAST_MONTH) else 0
     )
     return {"date_from": f, "date_to": t, "period": label}
 

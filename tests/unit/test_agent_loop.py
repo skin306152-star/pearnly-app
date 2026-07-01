@@ -150,12 +150,13 @@ class TestAgentLoop(unittest.TestCase):
         self.assertEqual(out.text, "ขอสถานะหน่อยครับ")
         self.assertEqual(ts.calls, [])  # 必填缺失绝不执行
 
-    def test_steps_exhausted_crashes(self):
-        # 重复调同工具、步数用尽仍不成文 → crash(有兜底则成文;此处 balance 无兜底表 → crash)。
+    def test_steps_exhausted_uses_grounded_fallback(self):
+        # 重复调同工具、步数用尽仍不成文 → 拿已取到的真实数字兜底成文(balance 有兜底 → 诚实回余额)。
         ts = _FakeToolset(ToolResult(ok=True, data={"balance_thb": 1}))
         steps = [loop.LoopStep("tool", tool="balance", args={}) for _ in range(loop._MAX_STEPS)]
         out = loop.handle_turn("x", _CTX, decide=_script(*steps), toolset=ts, history=[])
-        self.assertEqual(out.kind, "crash")
+        self.assertEqual(out.kind, "reply")
+        self.assertIn("1", out.text)
 
 
 class _Outcome:
@@ -195,6 +196,36 @@ class TestBrainSalvage(unittest.TestCase):
             history=[],
         )
         self.assertEqual((out.kind, out.text), ("reply", "อยู่ตรงนี้นะคะ"))
+
+
+class TestTimezoneAndFallback(unittest.TestCase):
+    """批三·时区 + 兜底覆盖:大脑拿到曼谷本地时间(答几点);钱工具成文失败有真实数字兜底。"""
+
+    def test_today_is_bangkok_local_with_time(self):
+        s = loop._today()
+        self.assertIn("Asia/Bangkok", s)  # 曼谷本地(非 UTC)
+        self.assertRegex(s, r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}")  # 带时钟 → 能答「现在几点」
+
+    def test_fallback_balance_shows_number(self):
+        out = loop._grounded_fallback([{"tool": "balance", "balance_thb": 74375}], "zh")
+        self.assertIn("74,375", out)
+
+    def test_fallback_summary_shows_count_and_total(self):
+        out = loop._grounded_fallback(
+            [{"tool": "history_summary", "doc_count": 12, "amount_total": 8450}], "en"
+        )
+        self.assertIn("12", out)
+        self.assertIn("8,450", out)
+
+    def test_fallback_usage_shows_pages(self):
+        out = loop._grounded_fallback(
+            [{"tool": "usage_this_month", "pages_used_this_month": 30}], "en"
+        )
+        self.assertIn("30", out)
+
+    def test_fallback_uncovered_tool_returns_none(self):
+        # 套账导航低风险未覆盖 → None(交入口安全兜底,不编)。
+        self.assertIsNone(loop._grounded_fallback([{"tool": "list_workspaces"}], "en"))
 
 
 class _RecToolset:

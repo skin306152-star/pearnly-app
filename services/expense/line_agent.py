@@ -16,8 +16,9 @@
 from __future__ import annotations
 
 import logging
-from datetime import date
 from typing import Optional
+
+from services.sales.dates import bangkok_today
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +141,9 @@ def understand(
     try:
         from services.ai_gateway import router as ai_gateway
 
-        prompt = _PROMPT.format(today=today or date.today().isoformat()) + _history_block(history)
+        prompt = _PROMPT.format(today=today or bangkok_today().isoformat()) + _history_block(
+            history
+        )
         # 经 AI Gateway 跑 line_text_understand(P2E):模型档位/超时由 task 规格定(flash·18s·
         # 与现状一致),供应商解耦在 gateway。失败/超时/parse → ok=False → 回落确定性回复(不崩)。
         res = ai_gateway.run_task(

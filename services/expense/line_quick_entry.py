@@ -16,6 +16,7 @@ from typing import Optional
 
 from services.expense.expense_draft import ExpenseDraft
 from services.expense.line_classify import classify_expense_type
+from services.sales.dates import bangkok_today
 
 # 分类不在此硬编码 —— 改由 webhook 拿本套账真实科目树(expense_categories)+ intake._match_category
 # 匹配(图/文共用同一套树,不分叉)。本文件只做与树无关的确定性字段抽取。
@@ -74,7 +75,7 @@ def _to_decimal(s: str) -> Optional[Decimal]:
 
 
 def _today() -> date:
-    return date.today()
+    return bangkok_today()  # 票面/记账「今天」按曼谷本地(服务器 UTC·临近午夜 date.today 差一天)
 
 
 def _parse_date(text: str) -> Optional[str]:
@@ -87,10 +88,8 @@ def _parse_date(text: str) -> Optional[str]:
     if any(w in low for w in _YESTERDAY_WORDS):
         return (_today() - timedelta(days=1)).isoformat()
     mrel = re.search(r"(\d+)\s*(?:天前|วันก่อน|days?\s+ago)", low)  # N 天前
-    if mrel:
-        n = int(mrel.group(1))
-        if 0 < n <= 366:
-            return (_today() - timedelta(days=n)).isoformat()
+    if mrel and 0 < (n := int(mrel.group(1))) <= 366:
+        return (_today() - timedelta(days=n)).isoformat()
     # 年首/ISO(2026-06-18 · 2026/6/18 · 佛历 2569/6/18−543)先试,再回退 DD/MM/YY[YY]。
     my = re.search(r"(?<!\d)(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})(?!\d)", text)
     if my:

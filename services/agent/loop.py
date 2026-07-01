@@ -14,7 +14,6 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import date
 from typing import Callable, Optional
 
 from services.agent import brain, executor, manifest, slots
@@ -55,7 +54,7 @@ class TurnResult:
 
 _SYSTEM = """You are Pearnly — a smart accounting assistant on LINE for Thai SMEs. You talk like a real, warm person, and you get real work done by calling the tools below (the user's real data).
 
-Today is {today}.
+Right now it is {today}. Use this for any date / day-of-week / time question — never guess the time.
 MOST IMPORTANT: reply ONLY in {lang_name}, no matter what language these instructions or the tools are written in.
 
 # Same Pearnly, two sides — read the room.
@@ -101,7 +100,11 @@ _FORCE_REPLY = '\n\nคุณมีข้อมูลจากเครื่อ
 
 
 def _today() -> str:
-    return date.today().isoformat()
+    """现在的曼谷本地时间(星期+日期+时钟)——喂大脑答「今天/星期几/现在几点」,绝不让它编时间。
+    服务器跑 UTC,直接 date.today() 会差 7 小时(临近午夜连日期都错)→ 必走 bangkok_now。"""
+    from services.sales.dates import bangkok_now
+
+    return bangkok_now().strftime("%A %Y-%m-%d %H:%M") + " (Asia/Bangkok, UTC+7)"
 
 
 def _reply_lang(text: str) -> str:
@@ -406,12 +409,60 @@ _FALLBACK = {
 }
 _FALLBACK_COUNT_KEY = {"list_history": "total", "list_notifications": "count"}
 
+# 值型只读工具的兜底(展示真实数字·非计数)。套账导航(list/switch_workspace)低风险 → 不兜底,交安全兜底。
+_FB_BALANCE = {
+    "th": "ยอดเครดิตคงเหลือ ฿{v} ครับ",
+    "zh": "你的余额是 ฿{v}。",
+    "en": "Your balance is ฿{v}.",
+    "ja": "残高は฿{v}です。",
+}
+_FB_SUMMARY = {
+    "th": "เดือนนี้บันทึกไป {n} รายการ รวม ฿{v} ครับ",
+    "zh": "本月记录 {n} 单,合计 ฿{v}。",
+    "en": "This month: {n} documents, ฿{v} total.",
+    "ja": "今月は{n}件、合計฿{v}です。",
+}
+_FB_USAGE = {
+    "th": "เดือนนี้ใช้ไป {p} หน้าครับ",
+    "zh": "本月已用 {p} 页。",
+    "en": "You've used {p} pages this month.",
+    "ja": "今月は{p}ページ使いました。",
+}
+
+
+def _fb_money(v) -> str:
+    try:
+        return f"{float(v or 0):,.0f}"
+    except (TypeError, ValueError):
+        return "0"
+
+
+def _fb_int(v) -> int:
+    try:
+        return int(v or 0)
+    except (TypeError, ValueError):
+        return 0
+
 
 def _grounded_fallback(observations: list, lang: str) -> Optional[str]:
+    """成文失败的最后兜底:从最后一个工具观测取真实数字拼一句诚实话(绝不编)。
+    覆盖计数型(list_history/notifications)+ 值型钱工具(balance/summary/usage);
+    套账导航(list/switch_workspace)低风险未覆盖 → None → 交入口安全兜底。"""
     last = observations[-1] if observations else {}
-    table = _FALLBACK.get(last.get("tool"))
-    if not table:
-        return None
-    n = int(last.get(_FALLBACK_COUNT_KEY[last["tool"]]) or 0)
-    msgs = table["some" if n else "zero"]
-    return msgs.get(lang, msgs["en"]).format(n=n)
+    tool = last.get("tool")
+    table = _FALLBACK.get(tool)
+    if table:
+        n = _fb_int(last.get(_FALLBACK_COUNT_KEY[tool]))
+        msgs = table["some" if n else "zero"]
+        return msgs.get(lang, msgs["en"]).format(n=n)
+    if tool == "balance":
+        return _FB_BALANCE.get(lang, _FB_BALANCE["en"]).format(v=_fb_money(last.get("balance_thb")))
+    if tool == "history_summary":
+        return _FB_SUMMARY.get(lang, _FB_SUMMARY["en"]).format(
+            n=_fb_int(last.get("doc_count")), v=_fb_money(last.get("amount_total"))
+        )
+    if tool == "usage_this_month":
+        return _FB_USAGE.get(lang, _FB_USAGE["en"]).format(
+            p=_fb_int(last.get("pages_used_this_month"))
+        )
+    return None

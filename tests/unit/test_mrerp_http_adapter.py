@@ -131,5 +131,42 @@ class TestClassifyAndGuards(unittest.TestCase):
         self.assertEqual(res.total, 0)
 
 
+class TestRouting(unittest.TestCase):
+    """方向识别 → doc_type(复用 Express 税号锚点)。"""
+
+    OWN = "1234567890123"
+    OTHER = "9999999999999"
+
+    def _flat(self, seller, buyer, paid=False):
+        f = {"seller_tax": seller, "buyer_tax": buyer}
+        if paid:
+            f["payment_status"] = "paid"
+        return {"fields": f}
+
+    def test_sales_credit(self):
+        from services.erp.mrerp_http.routing import choose_doc_type
+
+        flat = self._flat(seller=self.OWN, buyer=self.OTHER)
+        self.assertEqual(choose_doc_type(flat, {}, own_tax_id=self.OWN), "sales_credit")
+
+    def test_sales_cash_when_paid(self):
+        from services.erp.mrerp_http.routing import choose_doc_type
+
+        flat = self._flat(seller=self.OWN, buyer=self.OTHER, paid=True)
+        self.assertEqual(choose_doc_type(flat, {}, own_tax_id=self.OWN), "sales_cash")
+
+    def test_purchase(self):
+        from services.erp.mrerp_http.routing import choose_doc_type
+
+        flat = self._flat(seller=self.OTHER, buyer=self.OWN)
+        self.assertEqual(choose_doc_type(flat, {}, own_tax_id=self.OWN), "purchase")
+
+    def test_ambiguous_returns_none(self):
+        from services.erp.mrerp_http.routing import choose_doc_type
+
+        flat = self._flat(seller=self.OTHER, buyer=self.OTHER)
+        self.assertIsNone(choose_doc_type(flat, {}, own_tax_id=self.OWN))
+
+
 if __name__ == "__main__":
     unittest.main()

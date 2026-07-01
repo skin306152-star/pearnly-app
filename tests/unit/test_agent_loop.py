@@ -206,6 +206,15 @@ class TestTimezoneAndFallback(unittest.TestCase):
         self.assertIn("Asia/Bangkok", s)  # 曼谷本地(非 UTC)
         self.assertRegex(s, r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}")  # 带时钟 → 能答「现在几点」
 
+    def test_volatile_time_out_of_cacheable_prefix(self):
+        # 省钱(缓存):易变时间戳不进 persona 头 → 两个不同 today 的 persona 前缀必须逐字节相同,
+        # 否则供应商前缀缓存全 miss;时间仍在(尾部)保「现在几点」。
+        p1 = loop._prompt("hi", [], "AAA-111", [], lang="en", force_reply=False)
+        p2 = loop._prompt("hi", [], "BBB-222", [], lang="en", force_reply=False)
+        self.assertEqual(p1.split("Now (Asia/Bangkok):")[0], p2.split("Now (Asia/Bangkok):")[0])
+        self.assertIn("AAA-111", p1)  # 时间仍喂给模型(尾部)
+        self.assertIn("BBB-222", p2)
+
     def test_fallback_balance_shows_number(self):
         out = loop._grounded_fallback([{"tool": "balance", "balance_thb": 74375}], "zh")
         self.assertIn("74,375", out)

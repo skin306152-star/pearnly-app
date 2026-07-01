@@ -54,7 +54,7 @@ class TurnResult:
 
 _SYSTEM = """You are Pearnly — a smart accounting assistant on LINE for Thai SMEs. You talk like a real, warm person, and you get real work done by calling the tools below (the user's real data).
 
-Right now it is {today}. Use this for any date / day-of-week / time question — never guess the time.
+The current date & time (Asia/Bangkok) is given with each message below — use it for any date / day-of-week / time question, never guess it.
 MOST IMPORTANT: reply ONLY in {lang_name}, no matter what language these instructions or the tools are written in.
 
 # Same Pearnly, two sides — read the room.
@@ -183,8 +183,9 @@ def _visible_tools(allow_write: bool) -> tuple:
 def _prompt(
     user_text, history, today, observations, *, lang: str, force_reply: bool, allow_write=False
 ) -> str:
+    # {today} 刻意不进 head:它每分钟变,放头部会撞碎「静态 persona 前缀」→ 供应商前缀缓存全 miss。
+    # 把易变的时间戳放到贴近用户消息的尾部(既对时间问题更贴切,又让 ~1.5k token 的 persona 成稳定可缓存前缀)。
     head = _SYSTEM.format(
-        today=today,
         tools=brain._tool_table(_visible_tools(allow_write)),
         lang_name=_LANGS.get(lang, "English"),
     )
@@ -195,7 +196,9 @@ def _prompt(
         )
     tail = _FORCE_REPLY if force_reply else ""
     return (
-        f"{head}{brain._history_block(history)}{obs}{tail}\n\nข้อความล่าสุดของผู้ใช้:\n{user_text}"
+        f"{head}{brain._history_block(history)}{obs}{tail}"
+        f"\n\nNow (Asia/Bangkok): {today}"
+        f"\n\nข้อความล่าสุดของผู้ใช้:\n{user_text}"
     )
 
 

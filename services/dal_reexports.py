@@ -324,6 +324,7 @@ _REEXPORTS = {
         "unbind_line_by_user",
         "unbind_line_by_line_user_id",
         "ensure_line_binding_rls",
+        "ensure_line_binding_columns",
     ],
     "services.credits.store": [
         "get_credits_revenue_overview",

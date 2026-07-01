@@ -31,7 +31,7 @@ _DETERMINISTIC = {
     "services.line_binding.line_chat_memory.note": lambda **k: None,
     "services.expense.replies.detect_smalltalk": lambda t: None,
     "services.purchase.intake.line_expense_gate_open": lambda cur, tenant_id: True,
-    "core.workspace_context.default_workspace_id": lambda cur, tid: 1,
+    "services.line_binding.line_workspace.resolve_write_workspace": lambda cur, **k: 1,
     "services.expense.line_correct_flow.route": lambda *a, **k: False,
     "services.expense.line_quick_entry.l1_intent": lambda t: None,
     "services.expense.line_quick_entry.is_question": lambda t: False,

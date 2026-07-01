@@ -76,6 +76,32 @@ TOOLS: tuple[ToolSpec, ...] = (
         handler="list_notification_logs",
         confirm=False,
     ),
+    ToolSpec(
+        name="list_workspaces",
+        bucket="B",
+        title_th="ดูรายชื่อชุดบัญชี/บริษัท",
+        desc_th="ดูว่ามีชุดบัญชี (บริษัท/ผู้ติดต่อ) อะไรบ้าง และตอนนี้กำลังใช้ชุดไหนอยู่",
+        slots=(),
+        handler="list_workspaces",
+        confirm=False,
+    ),
+    ToolSpec(
+        name="switch_workspace",
+        bucket="B",
+        title_th="สลับชุดบัญชี/บริษัท",
+        desc_th="สลับไปทำงานกับชุดบัญชี/บริษัทอื่นตามชื่อ (เช่น 'สลับไปสยามวัสดุ') รายการที่บันทึกหลังจากนั้นจะเข้าชุดนี้",
+        slots=(
+            SlotSpec(
+                "name",
+                required=True,
+                source="user_text",
+                desc_th="ชื่อชุดบัญชี/บริษัทที่จะสลับไป",
+                desc_zh="要切到的套账/公司名(取用户原话)",
+            ),
+        ),
+        handler="switch_workspace",
+        confirm=False,
+    ),
 )
 
 # 大脑只能从这里选(O(1) 查表)。
@@ -88,6 +114,8 @@ REGISTRY_AREA: dict[str, str] = {
     "balance": "billing_credits_routes",
     "usage_this_month": "billing_records_routes",
     "list_notifications": "notification_routes",
+    "list_workspaces": "workspace_routes",
+    "switch_workspace": "workspace_routes",
 }
 
 _REGISTRY_PATH = Path(__file__).resolve().parents[2] / "docs" / "agent" / "agent_registry.json"

@@ -190,6 +190,7 @@ def _boot_schema_ddl() -> None:
         (db.ensure_ocr_feedback_table, "ocr_correction_examples 建表+RLS"),
         (db.ensure_google_sub_column, "google_sub 列"),
         (db.ensure_line_uid_column, "line_uid 列"),
+        (db.ensure_line_binding_columns, "line_bindings.current_workspace_client_id 列"),
         (db.ensure_password_changed_at_column, "password_changed_at 列"),
         (db.ensure_email_codes_table, "email_codes 建表"),
         (db.ensure_gl_vat_task_table, "gl_vat_task 建表"),

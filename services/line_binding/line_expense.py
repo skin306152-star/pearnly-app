@@ -50,13 +50,16 @@ def handle_expense_text(
             _pool(small)
             return True
 
-        from core.workspace_context import default_workspace_id
+        from services.line_binding import line_workspace
         from services.purchase import intake as intake_svc
 
         with db.get_cursor_rls(stid) as cur:
             if not intake_svc.line_expense_gate_open(cur, tenant_id=stid):
                 return False
-            ws = default_workspace_id(cur, stid)
+            # 写入落「当前套账」(用户切过则用它,否则回落默认套账)。
+            ws = line_workspace.resolve_write_workspace(
+                cur, tenant_id=stid, line_user_id=line_user_id
+            )
         if ws is None:
             return False
 

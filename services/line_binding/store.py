@@ -254,3 +254,15 @@ def ensure_line_binding_rls() -> None:
             apply_user_rls(cur, *existing_tables(cur, ("line_bindings", "line_binding_codes")))
     except Exception as e:
         logger.warning(f"ensure_line_binding_rls skipped: {e}")
+
+
+def ensure_line_binding_columns() -> None:
+    """LINE 会话态「当前套账」列(幂等 · IF NOT EXISTS)。legacy 表无 CREATE 钩子,启动时补。"""
+    try:
+        with db.get_cursor(commit=True) as cur:
+            cur.execute(
+                "ALTER TABLE line_bindings "
+                "ADD COLUMN IF NOT EXISTS current_workspace_client_id BIGINT"
+            )
+    except Exception as e:
+        logger.warning(f"ensure_line_binding_columns skipped: {e}")

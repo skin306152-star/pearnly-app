@@ -86,6 +86,39 @@ class AgentToolset:
         logs = db.list_notification_logs(str(ctx.user["id"]), tenant_id=ctx.tenant_id, limit=20)
         return ToolResult(ok=True, data=logs, receipt=copy_map.notifications_receipt(logs))
 
+    # ── 套账(workspace):LINE 会话态「当前套账」列表/切换 ──
+    def list_workspaces(self, ctx: AgentContext) -> ToolResult:
+        from services.line_binding import line_workspace
+
+        with db.get_cursor_rls(tenant_id=ctx.tenant_id, user_id=str(ctx.user["id"])) as cur:
+            rows = line_workspace.list_active(cur, tenant_id=ctx.tenant_id)
+            cur_id = line_workspace.current_workspace_id(
+                cur, tenant_id=ctx.tenant_id, line_user_id=ctx.line_user_id
+            )
+        return ToolResult(ok=True, data={"workspaces": rows, "current_id": cur_id})
+
+    def switch_workspace(self, ctx: AgentContext, *, name=None) -> ToolResult:
+        from services.line_binding import line_workspace
+
+        if not name:
+            return ToolResult(ok=False, error_code="missing_name")
+        with db.get_cursor_rls(
+            tenant_id=ctx.tenant_id, user_id=str(ctx.user["id"]), commit=True
+        ) as cur:
+            match = line_workspace.match_by_name(cur, tenant_id=ctx.tenant_id, name=name)
+            if not match:
+                rows = line_workspace.list_active(cur, tenant_id=ctx.tenant_id)
+                return ToolResult(
+                    ok=False, error_code="workspace_not_found", data={"workspaces": rows}
+                )
+            line_workspace.set_current(
+                cur,
+                tenant_id=ctx.tenant_id,
+                line_user_id=ctx.line_user_id,
+                workspace_client_id=match["id"],
+            )
+        return ToolResult(ok=True, data={"switched_to": match})
+
     # ── B 档:写操作(M3 才开)· 样板留桩,展示确认前置 + 幂等 + 权限的形状 ──
 
     def push_to_erp(self, ctx: AgentContext, *, history_id=None, endpoint_id=None) -> ToolResult:

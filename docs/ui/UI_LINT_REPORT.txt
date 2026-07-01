@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 329 个源文件全扫
+# UI 设计合规扫描报告 · 330 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 8(8 文件)
@@ -11,7 +11,7 @@
      1  static\admin\admin.css
         └ 521: color: #2563eb;
      1  static\admin\admin.js
-        └ 285: google_vision: { label: 'Google Vision', color: '#2563EB' },
+        └ 291: google_vision: { label: 'Google Vision', color: '#2563EB' },
      1  static\pos\pos-cashier.js
         └ 25: $('main-avatar').style.background = c.color || '#2563EB';
      1  static\pos\pos-data.js
@@ -106,8 +106,8 @@
      1  static\home-31-navia-topbar.css
         └ 370: background: var(--blue-50);
 
-## emoji当图标(应换Lucide) — 命中 203(30 文件)
-    92  static\i18n-data.js
+## emoji当图标(应换Lucide) — 命中 207(30 文件)
+    96  static\i18n-data.js
         └ 1274: 'billing-accuracy-good': '✅ 准',
         └ 1275: 'billing-accuracy-fair': '⚠ 一般',
     35  static\erp-mrerp-connect.js
@@ -117,14 +117,14 @@
         └ 7: welcomeSub: '准备好一起把工作推进吧 💗',
         └ 8: bubble: '今天的工作<br />会很顺利 😊',
      8  static\admin\admin-i18n.js
-        └ 106: 'tn-status-overdraft': '⚠ 透支',
-        └ 148: 'adm-risk-title': '⚠ 风控 · 可疑活动',
+        └ 127: 'tn-status-overdraft': '⚠ 透支',
+        └ 169: 'adm-risk-title': '⚠ 风控 · 可疑活动',
      7  src\home\knowledge-fab.ts
         └ 119: burst(['💛', '✨', '💙', '🐾']);
         └ 171: const HELLO = [kbT('kb-fab-hi', '喵?'), kbT('kb-fab-ask', '问我呀!'), '🐾'];
      5  static\admin\admin.js
-        └ 1812: ? '<span class="adm-drawer-pill adm-pill-danger">⚠ ' +
-        └ 1879: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
+        └ 1818: ? '<span class="adm-drawer-pill adm-pill-danger">⚠ ' +
+        └ 1885: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
      4  static\pos\pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
         └ 258: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
@@ -151,7 +151,7 @@
      1  src\home\dms-intake-invoice-submit.ts
         └ 91: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
      1  src\home\dms-intake.ts
-        └ 66: '<div class="dx-file"><div class="dx-file-ic">📄</div>' +
+        └ 68: '<div class="dx-file"><div class="dx-file-ic">📄</div>' +
      1  src\home\erp-log-card.ts
         └ 80: statusIcon = '⏭';
      1  src\home\erp-log-detail.ts
@@ -171,7 +171,7 @@
      1  src\home\sales-wizard-io.ts
         └ 31: // 向导纸张选项 ↔ 后端 paper_size:pos = 80mm 热敏窄版。
      1  static\admin\admin.html
-        └ 775: <h3 data-i18n="adm-risk-title">⚠ 风控 · 可疑活动</h3>
+        └ 794: <h3 data-i18n="adm-risk-title">⚠ 风控 · 可疑活动</h3>
      1  static\home-09-badges-locks.css
         └ 147: content: "🔒";
      1  static\home-14-gemini-admin.css
@@ -187,8 +187,8 @@
         └ 168: max-width: 520px;
         └ 173: max-width: 420px;
      5  static\admin\admin.js
-        └ 1627: '<div class="cpw-forgot-modal" style="max-width:420px">' +
-        └ 1693: '<div class="cpw-forgot-modal" style="max-width:420px">' +
+        └ 1633: '<div class="cpw-forgot-modal" style="max-width:420px">' +
+        └ 1699: '<div class="cpw-forgot-modal" style="max-width:420px">' +
      5  static\home-02-switcher.css
         └ 17: max-width: 240px;
         └ 53: max-width: 420px;
@@ -296,7 +296,7 @@
      1  src\home\rules-settings.ts
         └ 222: `<div class="rs-pop" style="max-width:460px;">` +
      1  src\home\sales-wizard.ts
-        └ 312: m.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
+        └ 314: m.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
      1  static\erp-mrerp-connect.js
         └ 916: '<div class="mrerp-wizard" style="max-width:520px">' +
      1  static\home-06-responsive-rd.css
@@ -370,7 +370,7 @@
      1  src\home\modal-notif-new.ts
         └ 14: <div class="modal" style="max-width:520px;">
      1  src\home\sales-wizard.ts
-        └ 312: m.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
+        └ 314: m.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
      1  static\home-19-exceptions-alerts.css
         └ 377: width: 920px;  /* 默认宽度覆盖 .drawer 的 480 */
 
@@ -421,10 +421,10 @@
         └ 1084: 'time-min-ago-suffix': ' 分钟前',
         └ 1085: 'time-hour-ago-suffix': ' 小时前',
      4  static\admin\admin-i18n.js
-        └ 230: 'time-hours-ago': '{n} 小时前',
-        └ 231: 'time-days-ago': '{n} 天前',
+        └ 251: 'time-hours-ago': '{n} 小时前',
+        └ 252: 'time-days-ago': '{n} 天前',
 
-## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 956(64 文件)
+## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 963(64 文件)
    157  static\home-18-admin-users.css
     83  static\pos\pos.css
     83  static\pos\pos.css
@@ -432,8 +432,8 @@
     63  static\erp-mrerp-connect.css
     51  static\pos\pos-restaurant.css
     51  static\pos\pos-restaurant.css
+    39  static\admin\admin.css
     39  static\landing\landing-auth.css
-    31  static\admin\admin.css
     30  static\landing\landing.css
     21  static\recon-review.js
     20  static\home-30-settings-modal.css
@@ -443,7 +443,7 @@
     15  static\pos\pos.html
     15  static\pos\pos.html
     12  static\home-40-sales-wizard.css
-    12  static\home-49-dms-intake.css
+    11  static\home-49-dms-intake.css
     10  static\erp-mrerp-connect.js
      9  src\home\sales-account.ts
      9  src\home\sales-wizard-steps.ts

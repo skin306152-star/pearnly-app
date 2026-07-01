@@ -109,6 +109,15 @@ def _existing_express_id(cur, user_id: str) -> Optional[str]:
     return str(row["id"]) if row else None
 
 
+def _disable_other_auto_push(cur, user_id: str, keep_endpoint_id) -> None:
+    """自动推送单例(2026-07-01 · 防双推):关掉除 keep 外该用户所有端点的 auto_push。
+    与 is_default 单选同思路 · create/update 共用单一实现(单一事实源)。"""
+    cur.execute(
+        "UPDATE erp_endpoints SET auto_push = false WHERE user_id = %s AND id <> %s",
+        (user_id, str(keep_endpoint_id)),
+    )
+
+
 def create_erp_endpoint(
     user_id: str,
     name: str,
@@ -147,10 +156,7 @@ def create_erp_endpoint(
             # 自动推送单例(2026-07-01 Zihao 拍板 · 防双推):同一用户只能有一个端点开自动推
             # → 新端点设自动时,把其它端点的 auto_push 全关掉。手动/停用不受影响。
             if auto_push and row:
-                cur.execute(
-                    "UPDATE erp_endpoints SET auto_push = false " "WHERE user_id = %s AND id <> %s",
-                    (user_id, str(row["id"])),
-                )
+                _disable_other_auto_push(cur, user_id, row["id"])
             _last_create_endpoint_error = None
             return str(row["id"]) if row else None
     except Exception as e:
@@ -202,10 +208,7 @@ def update_erp_endpoint(user_id: str, endpoint_id: str, **fields) -> bool:
                 )
             # 自动推送单例(2026-07-01 · 防双推):设自动时先关掉其它端点的 auto_push。
             if fields.get("auto_push"):
-                cur.execute(
-                    "UPDATE erp_endpoints SET auto_push = false WHERE user_id = %s AND id <> %s",
-                    (user_id, endpoint_id),
-                )
+                _disable_other_auto_push(cur, user_id, endpoint_id)
             sql = f"UPDATE erp_endpoints SET {', '.join(sets)} WHERE user_id = %s AND id = %s"
             vals.extend([user_id, endpoint_id])
             cur.execute(sql, tuple(vals))

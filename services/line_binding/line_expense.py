@@ -39,9 +39,14 @@ def handle_expense_text(
         history = line_chat_memory.recent(line_user_id=line_user_id, tenant_id=stid)
         line_chat_memory.note(line_user_id=line_user_id, tenant_id=stid, role="user", content=text)
 
-        # 0. 闲聊/引导(零成本 L1)→ 问候/感谢/能力说明/开始/上传(治复读)。引用用户当前消息。
+        # 灰度用户走「前门倒置」:模型站前门先判意图(闲聊也交它自然回复)。非灰度 → 老路一行不变。
+        from services.line_binding import line_agent_bridge
+
+        gated = line_agent_bridge.frontdoor_enabled(bound_user)
+
+        # 0. 闲聊/引导(零成本 L1)→ 问候/感谢/能力说明/开始/上传(治复读)。灰度用户交 Agent 前门。
         small = replies.detect_smalltalk(text)
-        if small:
+        if small and not gated:
             _pool(small)
             return True
 
@@ -62,6 +67,17 @@ def handle_expense_text(
             bound_user, reply_token, line_user_id, text, lang, stid, ws, quoted_message_id, ctx
         ):
             return True
+
+        # 对话 Agent 前门(灰度·前门倒置):模型先判意图——查询/闲聊/产品问题自己组织人话回复;
+        # 记账/改错/超范围 → defer(None)落回下方旧确定性路(记账在旧路,能力只增不减)。
+        if gated and _ocr_balance_ok(bound_user):
+            agent_reply = line_agent_bridge.try_agent_turn(
+                bound_user, text, lang, stid, ws, line_user_id, history
+            )
+            if agent_reply is not None:
+                _charge_line_l2(bound_user, stid)
+                _say(agent_reply)
+                return True
 
         si = lqe.l1_intent(text)
         isq = lqe.is_question(text) or lqe.is_nonassertive(text)
@@ -125,19 +141,6 @@ def handle_expense_text(
                 logger.warning("[line] save_pending failed; still prompt for amount")
             _pool("amount_missing")
             return True
-
-        # 2a. 对话 Agent 插座(WP5 钥匙闸):灰度命中 + 余额够先试新 Agent;只接管有工具的意图,
-        #     返 None(defer)则一行不改地落回下方旧 understand()+_dispatch_agent()(能力只增不减)。
-        if _ocr_balance_ok(bound_user):
-            from services.line_binding import line_agent_bridge
-
-            agent_reply = line_agent_bridge.try_agent_turn(
-                bound_user, text, lang, stid, ws, line_user_id, history
-            )
-            if agent_reply is not None:
-                _charge_line_l2(bound_user, stid)
-                _say(agent_reply)
-                return True
 
         # 2. 大脑(一次 LLM):听意图 + 抽槽 + 自然回复 → 工具分发。
         from services.expense import line_agent, line_l2

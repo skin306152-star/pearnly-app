@@ -9,7 +9,6 @@ import unittest
 from contextlib import ExitStack, contextmanager
 from unittest.mock import MagicMock, patch
 
-from services.agent.contracts import AgentAction
 from services.line_binding import line_expense
 
 _BOUND = {"id": "u1", "tenant_id": "t1"}
@@ -83,18 +82,17 @@ class TestAgentGate(unittest.TestCase):
             self.understand.assert_called_once()
 
     def test_agent_owns_readonly_query(self):
-        # 闸开 + 新 loop 返回回执 → Agent 接管,渲染人话,旧 understand 不跑,计费扣 1。
+        # 前门:模型撰写人话回复 → Agent 接管,原文直出(不套模板),旧 understand 不跑,计费扣 1。
         with (
             patch("core.feature_flags.agent_enabled_for", return_value=True),
-            patch("services.agent.loop.handle_turn", return_value="agent.ok.history|count=3"),
+            patch("services.agent.loop.handle_turn", return_value="คุณมีเอกสาร 3 ใบ"),
         ):
             ok = self._call()
         self.assertTrue(ok)
         self.understand.assert_not_called()
         self.charge.assert_called_once()
         body = self.reply.call_args.args[1]
-        self.assertIn("3", body)
-        self.assertNotIn("{", body)  # 渲染成真文案,不漏 key/花括号
+        self.assertEqual(body, "คุณมีเอกสาร 3 ใบ")  # 模型原文,前门不再套模板/渲染 key
 
     def test_undo_defers_and_legacy_undo_runs(self):
         # ★ 灰度用户「撤销上一笔」:新 loop 无 undo 工具 → 真实 defer → 旧路成功撤销(能力不丢)。
@@ -104,10 +102,7 @@ class TestAgentGate(unittest.TestCase):
         self.understand.return_value = {"intent": "undo"}
         with (
             patch("core.feature_flags.agent_enabled_for", return_value=True),
-            patch(
-                "services.agent.brain.decide",
-                return_value=AgentAction(kind="out_of_scope"),
-            ),
+            patch("services.agent.loop.handle_turn", return_value=None),  # 模型 defer(无 undo 工具)
         ):
             ok = self._call("ยกเลิกรายการล่าสุด")
         self.assertTrue(ok)

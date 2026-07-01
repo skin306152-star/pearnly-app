@@ -6883,6 +6883,7 @@ RESPONSE
                         <input type="checkbox" id="ep-auto-push">
                         <span class="form-switch-label" data-i18n="ep-auto-push">识别成功后自动推送</span>
                     </label>
+                    <div class="form-hint" data-i18n="ep-auto-push-single-hint">只能有一个 ERP 开自动推送 · 开启会自动关闭其它端点的自动推送(防止一张票重复入账)</div>
                 </div>
 
                 <!-- 测试连接结果 -->

@@ -144,6 +144,13 @@ def create_erp_endpoint(
                 (user_id, name, adapter, _json.dumps(config), is_default, auto_push),
             )
             row = cur.fetchone()
+            # 自动推送单例(2026-07-01 Zihao 拍板 · 防双推):同一用户只能有一个端点开自动推
+            # → 新端点设自动时,把其它端点的 auto_push 全关掉。手动/停用不受影响。
+            if auto_push and row:
+                cur.execute(
+                    "UPDATE erp_endpoints SET auto_push = false " "WHERE user_id = %s AND id <> %s",
+                    (user_id, str(row["id"])),
+                )
             _last_create_endpoint_error = None
             return str(row["id"]) if row else None
     except Exception as e:
@@ -191,6 +198,12 @@ def update_erp_endpoint(user_id: str, endpoint_id: str, **fields) -> bool:
             if fields.get("is_default"):
                 cur.execute(
                     "UPDATE erp_endpoints SET is_default = false WHERE user_id = %s AND id <> %s",
+                    (user_id, endpoint_id),
+                )
+            # 自动推送单例(2026-07-01 · 防双推):设自动时先关掉其它端点的 auto_push。
+            if fields.get("auto_push"):
+                cur.execute(
+                    "UPDATE erp_endpoints SET auto_push = false WHERE user_id = %s AND id <> %s",
                     (user_id, endpoint_id),
                 )
             sql = f"UPDATE erp_endpoints SET {', '.join(sets)} WHERE user_id = %s AND id = %s"

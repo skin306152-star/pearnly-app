@@ -239,6 +239,22 @@ class CreateEndpointTests(unittest.TestCase):
             store.create_erp_endpoint("u1", "n", "webhook", {}, is_default=False)
         self.assertNotIn("SET is_default = false", cur.all_sql())
 
+    def test_auto_push_unsets_others_on_create(self):
+        # 自动推送单例:新端点设自动 → 关掉其它端点的 auto_push(带 id <> 排除自己)。
+        cur = FakeCursor(fetchone={"id": "new-1"})
+        with patch_cursor(cur):
+            store.create_erp_endpoint("u1", "n", "webhook", {}, auto_push=True)
+        self.assertIn("SET auto_push = false", cur.all_sql())
+        demote = [c for c in cur.calls if "SET auto_push = false" in c[0]][0]
+        self.assertIn("id <> %s", demote[0])
+        self.assertEqual(demote[1], ("u1", "new-1"))  # 排除新建的自己
+
+    def test_no_auto_push_unset_when_manual(self):
+        cur = FakeCursor(fetchone={"id": "new-1"})
+        with patch_cursor(cur):
+            store.create_erp_endpoint("u1", "n", "webhook", {}, auto_push=False)
+        self.assertNotIn("SET auto_push = false", cur.all_sql())
+
     def test_exception_records_global_error_and_returns_none(self):
         with patch_cursor_raises(ValueError("dberr")):
             out = store.create_erp_endpoint("u1", "n", "webhook", {})
@@ -273,6 +289,23 @@ class UpdateEndpointTests(unittest.TestCase):
         with patch_cursor(cur):
             store.update_erp_endpoint("u1", "e1", is_default=True)
         self.assertIn("id <> %s", cur.calls[0][0])
+
+    def test_auto_push_unsets_other_rows_on_update(self):
+        # 自动推送单例:改端点为自动 → 关掉其它端点的 auto_push。
+        cur = FakeCursor(rowcount=1)
+        with patch_cursor(cur):
+            store.update_erp_endpoint("u1", "e1", auto_push=True)
+        demote = [c for c in cur.calls if "SET auto_push = false" in c[0]]
+        self.assertTrue(demote, "应发出关闭其它 auto_push 的 UPDATE")
+        self.assertIn("id <> %s", demote[0][0])
+        self.assertEqual(demote[0][1], ("u1", "e1"))
+
+    def test_no_auto_push_unset_when_disabling(self):
+        # 关自动(auto_push=False)不触发单例关闭(只有开自动才互斥)。
+        cur = FakeCursor(rowcount=1)
+        with patch_cursor(cur):
+            store.update_erp_endpoint("u1", "e1", auto_push=False)
+        self.assertNotIn("SET auto_push = false WHERE user_id = %s AND id <> %s", cur.all_sql())
 
     def test_rowcount_zero_returns_false(self):
         cur = FakeCursor(rowcount=0)

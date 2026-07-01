@@ -117,6 +117,36 @@ class MrErpSession:
         if not self._company_selected:
             self.select_company(idus_probe_path)
 
+    def list_account_sets(self) -> list[dict]:
+        """登录后抓 /login/selectdb.php 的账套链接 → [{comidyear, seldb, name}]。
+
+        账套(年度账套)在选公司页以 `<a href="mainmenu.php?comidyear=N&seldb=M">名称</a>` 列出
+        (test01 实测:TEST2019=6/1 · TEST2020=15/1)。凭据错则被踢回登录页 → MRERPAuthError。
+        供连接向导「选套账」步用:账号密码 → 列账套让用户选。
+        """
+        if not self._logged_in:
+            self.login()
+        try:
+            r = self.session.get(f"{self.base}/login/selectdb.php", timeout=self.timeout)
+        except requests.RequestException as e:
+            raise MRERPTechnicalError(f"list_account_sets network error: {e}") from e
+        if self._is_login_bounced(r):
+            raise MRERPAuthError("credentials rejected (bounced to login on selectdb)")
+        return self._parse_account_sets(r.text)
+
+    @staticmethod
+    def _parse_account_sets(html: str) -> list[dict]:
+        out: list[dict] = []
+        seen = set()
+        pat = r'mainmenu\.php\?comidyear=(\d+)&(?:amp;)?seldb=(\d+)["\'][^>]*>([^<]+)</a>'
+        for m in re.finditer(pat, html or "", re.IGNORECASE):
+            key = (m.group(1), m.group(2))
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append({"comidyear": m.group(1), "seldb": m.group(2), "name": m.group(3).strip()})
+        return out
+
     # ---- request helpers --------------------------------------------
 
     def get(self, path: str, **kw) -> requests.Response:

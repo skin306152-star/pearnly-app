@@ -191,36 +191,52 @@ class HardeningContractTests(unittest.TestCase):
 
     def test_never_raises_on_garbage_input(self):
         """Hammer it with malformed input — None, weird types, mixed
-        shapes — and verify it always returns a dict, never throws."""
+        shapes — and verify it always returns a dict, never throws.
+
+        S5: test-connection 走 HTTP 会话 · mock 掉 MrErpSession 保证单测零网络
+        (有效形态凭据的用例会走到会话层 → 让它抛 Technical 模拟不可达)。"""
+        import types as _types
+
+        from services.erp.exceptions import MRERPTechnicalError
+
+        class _NoNetSession:
+            def __init__(self, **kw):
+                self.session = _types.SimpleNamespace(close=lambda: None)
+                self.comidyear, self.seldb = "6", "1"
+
+            def list_account_sets(self):
+                raise MRERPTechnicalError("no network in unit test")
+
+            def select_company(self, *a, **k):
+                raise MRERPTechnicalError("no network in unit test")
+
         cases = [
             None,
             {},
             {"username": "u"},  # missing password
             {"password": "p"},  # missing username
             {"username": "", "password": ""},  # both empty strings
-            {"username": "u", "password": "p", "system_url": ""},  # empty url
+            {"username": "u", "password": "p", "system_url": ""},  # empty url → 走会话层
             {"username_enc": "garbage", "password_enc": "more-garbage"},
             {"username_enc": "gAAAAA-but-truncated"},  # looks-fernet-but-broken
         ]
-        for cfg in cases:
-            try:
-                result = _erp.test_mrerp_endpoint(cfg)
-            except Exception as e:
-                self.fail(
-                    f"test_mrerp_endpoint raised {type(e).__name__} on " f"input {cfg!r}: {e!s}"
+        with patch("services.erp.mrerp_http.session.MrErpSession", _NoNetSession):
+            for cfg in cases:
+                try:
+                    result = _erp.test_mrerp_endpoint(cfg)
+                except Exception as e:
+                    self.fail(
+                        f"test_mrerp_endpoint raised {type(e).__name__} on input {cfg!r}: {e!s}"
+                    )
+                self.assertIsInstance(result, dict, f"non-dict for {cfg!r}")
+                self.assertIn("ok", result)
+                self.assertFalse(result["ok"], f"unexpected ok=True for malformed input {cfg!r}")
+                # Friendly error is always populated when ok=False.
+                self.assertIsInstance(
+                    result.get("error_friendly"),
+                    dict,
+                    f"missing error_friendly for {cfg!r}: {result!r}",
                 )
-            self.assertIsInstance(result, dict, f"non-dict for {cfg!r}")
-            self.assertIn("ok", result)
-            self.assertFalse(
-                result["ok"],
-                f"unexpected ok=True for malformed input {cfg!r}",
-            )
-            # Friendly error is always populated when ok=False.
-            self.assertIsInstance(
-                result.get("error_friendly"),
-                dict,
-                f"missing error_friendly for {cfg!r}: {result!r}",
-            )
 
     def test_accepts_plaintext_credentials_shape(self):
         """Wizard sends {username, password} (plain). Backend must not
@@ -261,39 +277,28 @@ class HardeningContractTests(unittest.TestCase):
         self.assertNotEqual(result["error_code"], "ERR_CRED_DECRYPT")
 
     def test_import_failure_returns_friendly_not_500(self):
-        """If the heavy MR.ERP/Playwright import fails (simulated by
-        patching the lazy import inside the function), we MUST surface
-        an ERR_PLAYWRIGHT_MISSING / ERR_UNEXPECTED with a friendly
-        catalogue — NOT raise (which becomes a 500 to the UI)."""
+        """If the HTTP session layer fails to import (simulated by patching
+        the lazy import inside the function), we MUST surface ERR_UNEXPECTED
+        with a friendly catalogue — NOT raise (which becomes a 500 to UI)."""
         import builtins
 
         real_import = builtins.__import__
 
         def boom(name, *a, **kw):
-            if "mrerp_adapter" in name:
-                raise ImportError("No module named 'playwright.sync_api'")
+            if "mrerp_http" in name:
+                raise ImportError("simulated session import failure")
             return real_import(name, *a, **kw)
 
         with patch.object(builtins, "__import__", side_effect=boom):
-            result = _erp.test_mrerp_endpoint(
-                {
-                    "username": "u",
-                    "password": "p",
-                }
-            )
+            result = _erp.test_mrerp_endpoint({"username": "u", "password": "p"})
         self.assertIsInstance(result, dict)
         self.assertFalse(result["ok"])
-        self.assertIn(result["error_code"], ("ERR_PLAYWRIGHT_MISSING", "ERR_UNEXPECTED"))
-        self.assertIsInstance(result["error_friendly"], dict)
-        # Friendly text must mention playwright OR mention server error.
-        any_lang_text = " ".join(result["error_friendly"].values()).lower()
-        self.assertTrue(
-            "playwright" in any_lang_text
-            or "server" in any_lang_text
-            or "服务器" in any_lang_text
-            or "伺服器" in any_lang_text,
-            f"friendly message uninformative: {result['error_friendly']!r}",
-        )
+        self.assertEqual(result["error_code"], "ERR_UNEXPECTED")
+        # Friendly catalogue always populated with all 4 langs (never a bare 500).
+        friendly = result["error_friendly"]
+        self.assertIsInstance(friendly, dict)
+        for lang in ("zh", "en", "th", "zh_TW"):
+            self.assertTrue(friendly.get(lang), f"friendly missing/empty for {lang}: {friendly!r}")
 
 
 @unittest.skipUnless(

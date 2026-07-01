@@ -65,6 +65,31 @@ class TestSession(unittest.TestCase):
         self.assertTrue(MrErpSession._is_login_bounced(form))
         self.assertFalse(MrErpSession._is_login_bounced(ok))
 
+    def test_parse_account_sets(self):
+        # selectdb.php 实测形态(test01):每账套一条 mainmenu 链接(raw &)
+        html = (
+            '<a href="mainmenu.php?comidyear=6&seldb=1">TEST2019</a>\r\n'
+            '<a href="mainmenu.php?comidyear=15&seldb=1">TEST2020</a>'
+        )
+        sets = MrErpSession._parse_account_sets(html)
+        self.assertEqual(
+            sets,
+            [
+                {"comidyear": "6", "seldb": "1", "name": "TEST2019"},
+                {"comidyear": "15", "seldb": "1", "name": "TEST2020"},
+            ],
+        )
+
+    def test_parse_account_sets_html_entity_and_dedup(self):
+        # &amp; 编码 + 重复链接去重
+        html = (
+            '<a href="mainmenu.php?comidyear=6&amp;seldb=1">TEST2019</a>'
+            '<a href="mainmenu.php?comidyear=6&amp;seldb=1">TEST2019</a>'
+        )
+        sets = MrErpSession._parse_account_sets(html)
+        self.assertEqual(sets, [{"comidyear": "6", "seldb": "1", "name": "TEST2019"}])
+        self.assertEqual(MrErpSession._parse_account_sets(""), [])
+
 
 class TestPreviewParse(unittest.TestCase):
     PREVIEW = """

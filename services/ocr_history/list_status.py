@@ -33,6 +33,38 @@ BUYER_NAME_SQL = _jsonb_first("buyer_name")
 VAT_AMOUNT_SQL = _jsonb_first("vat")
 
 
+def owner_visibility_where(
+    user_id: str,
+    tenant_id: Optional[str],
+    workspace_client_id: Optional[int],
+    restrict_client_ids: Optional[List[int]],
+) -> Tuple[List[str], list]:
+    """识别记录「谁能看到哪些行」的单一可见性事实源:所有权 + 套账 + 员工分配 + 排除草稿。
+
+    不含时间窗/关键词/状态/客户切换 —— 时间窗由调用方叠加(列表用保留期、月度聚合用本月),
+    故这里不含。谓词与 queries.list_ocr_history 内联版一致(月度聚合 agent_overview 复用它防漂)。
+    """
+    if tenant_id:
+        where = ["user_id IN (SELECT id FROM users WHERE tenant_id = %s)"]
+        params: list = [tenant_id]
+    else:
+        where = ["user_id = %s"]
+        params = [user_id]
+    if workspace_client_id is not None:
+        where.append("(workspace_client_id = %s OR workspace_client_id IS NULL)")
+        params.append(int(workspace_client_id))
+    if restrict_client_ids is not None:
+        if len(restrict_client_ids) == 0:
+            where.append("(user_id = %s AND client_id IS NULL)")
+            params.append(user_id)
+        else:
+            where.append("(client_id = ANY(%s::bigint[]) OR (user_id = %s AND client_id IS NULL))")
+            params.append([int(c) for c in restrict_client_ids])
+            params.append(user_id)
+    where.append("staged = FALSE")
+    return where, params
+
+
 def apply_list_filters(
     where: List[str],
     params: list,

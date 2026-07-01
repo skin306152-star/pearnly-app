@@ -29,16 +29,22 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertTrue(res.receipt.startswith("agent.ok.history"))
 
     @patch("services.agent.executor.db")
-    def test_history_summary_reads_status_counts(self, db):
+    def test_history_summary_uses_month_overview(self, db):
         db.get_visible_client_ids_for_user.return_value = None
-        db.list_ocr_history.return_value = {
-            "items": [],
-            "total": 0,
-            "status_counts": {"confirmed": 3, "failed": 1},
+        db.month_overview.return_value = {
+            "doc_count": 4,
+            "amount_total": 1234.0,
+            "by_category": [("fuel", 3), ("food", 1)],
         }
         res = self.ts.summarize_ocr_history(_CTX)
         self.assertTrue(res.ok)
-        self.assertEqual(res.data, {"confirmed": 3, "failed": 1})
+        self.assertEqual(res.data["doc_count"], 4)
+        # 本月量透传给渲染:合计฿(千分位)+ 分类。
+        self.assertIn("count=4", res.receipt)
+        self.assertIn("1,234", res.receipt)
+        self.assertIn("fuel 3", res.receipt)
+        kwargs = db.month_overview.call_args.kwargs
+        self.assertEqual(kwargs["retention_days"], 90)
 
     @patch("services.agent.executor.db")
     def test_balance(self, db):
@@ -54,9 +60,14 @@ class TestAgentExecutor(unittest.TestCase):
     @patch("services.agent.executor.db")
     def test_usage_this_month(self, db):
         db.get_billing_status_combined.return_value = {"balance_thb": 0, "pages_used_this_month": 7}
+        db.get_visible_client_ids_for_user.return_value = None
+        db.month_overview.return_value = {"doc_count": 5, "amount_total": 0.0, "by_category": []}
         res = self.ts.get_usage_this_month(_CTX)
         self.assertTrue(res.ok)
         self.assertIn("pages=7", res.receipt)
+        self.assertIn("docs=5", res.receipt)
+        # 用量只要张数,不查分类分布(省一次分组查询)。
+        self.assertFalse(db.month_overview.call_args.kwargs["include_categories"])
 
     @patch("services.agent.executor.db")
     def test_list_notifications(self, db):

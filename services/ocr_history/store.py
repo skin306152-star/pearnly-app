@@ -18,6 +18,7 @@ from services.ocr_history.queries import (  # noqa: F401
     find_ocr_by_hash,
     check_duplicate_invoice,
 )
+from services.ocr_history.agent_overview import month_overview  # noqa: F401
 from services.ocr_history.mutations import (  # noqa: F401
     _extract_summary_fields,
     update_ocr_history_pages,

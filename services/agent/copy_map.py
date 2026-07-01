@@ -88,16 +88,32 @@ def failure(error_code: str | None) -> str:
 # ── executor 回执(§1.3) ─────────────────────────────────────────────────
 
 
+def _doc_line(item: dict) -> str:
+    """一条单据的紧凑行:对手方/店名 + 金额(销项时买方名优先,采购时卖方名)。"""
+    name = item.get("buyer_name") or item.get("seller_name") or item.get("filename") or "-"
+    amount = item.get("total_amount")
+    amount_s = f" {float(amount):,.0f}฿" if amount is not None else ""
+    return f"· {name}{amount_s}"
+
+
 def history_receipt(items: list, total: int) -> str:
-    return _render(OK_COPY["list_history"], count=total)
+    # top_list 取真实前 3 条(count 是全量,top_list 只是预览);无条目留空。
+    lines = [_doc_line(it) for it in (items or [])[:3]]
+    top_list = ("\n" + "\n".join(lines)) if lines else ""
+    return _render(OK_COPY["list_history"], count=total, top_list=top_list)
 
 
-def history_summary_receipt(counts: dict) -> str:
-    # 槽位 count/by_status 必须与 agent_i18n 的 agent.ok.history_summary 模板对齐(改模板需同步)。
-    counts = counts or {}
-    total = sum(int(v or 0) for v in counts.values())
-    by_status = ", ".join(f"{k} {counts[k]}" for k in sorted(counts) if counts[k]) or "-"
-    return _render(OK_COPY["history_summary"], count=total, by_status=by_status)
+def history_summary_receipt(overview: dict) -> str:
+    # 槽位 count/total/by_category 对齐 agent_i18n 的 agent.ok.history_summary(改模板需同步)。
+    ov = overview or {}
+    cats = ov.get("by_category") or []
+    by_category = (" · " + ", ".join(f"{tag} {n}" for tag, n in cats)) if cats else ""
+    return _render(
+        OK_COPY["history_summary"],
+        count=int(ov.get("doc_count") or 0),
+        total=f"{float(ov.get('amount_total') or 0):,.0f}",
+        by_category=by_category,
+    )
 
 
 def balance_receipt(billing: dict) -> str:
@@ -109,9 +125,11 @@ def balance_receipt(billing: dict) -> str:
     )
 
 
-def usage_receipt(billing: dict) -> str:
+def usage_receipt(billing: dict, docs: int = 0) -> str:
     return _render(
-        OK_COPY["usage_this_month"], pages=int((billing or {}).get("pages_used_this_month") or 0)
+        OK_COPY["usage_this_month"],
+        pages=int((billing or {}).get("pages_used_this_month") or 0),
+        docs=int(docs or 0),
     )
 
 

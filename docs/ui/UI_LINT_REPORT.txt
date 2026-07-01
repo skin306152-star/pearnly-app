@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 321 个源文件全扫
+# UI 设计合规扫描报告 · 329 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 8(8 文件)
@@ -106,10 +106,10 @@
      1  static\home-31-navia-topbar.css
         └ 370: background: var(--blue-50);
 
-## emoji当图标(应换Lucide) — 命中 204(31 文件)
+## emoji当图标(应换Lucide) — 命中 203(30 文件)
     92  static\i18n-data.js
-        └ 1188: 'billing-accuracy-good': '✅ 准',
-        └ 1189: 'billing-accuracy-fair': '⚠ 一般',
+        └ 1274: 'billing-accuracy-good': '✅ 准',
+        └ 1275: 'billing-accuracy-fair': '⚠ 一般',
     35  static\erp-mrerp-connect.js
         └ 275: zh: '⚙ 高级设置(自动创建买方/商品的模板 · 可不填)',
         └ 276: en: '⚙ Advanced (templates for auto-creating buyers/products · optional)',
@@ -170,8 +170,6 @@
         └ 14: * ⚠️ 暂塞 home.js(全局 window 工具 · 三个 recon IIFE 共用)· 迁出 deadline = REFACTOR-C1
      1  src\home\sales-wizard-io.ts
         └ 31: // 向导纸张选项 ↔ 后端 paper_size:pos = 80mm 热敏窄版。
-     1  src\home\settings-core.ts
-        └ 207: <tr><td style="color:#a0aec0; padding:8px 0;">${t('settings-role')}</td><td style="padding
      1  static\admin\admin.html
         └ 775: <h3 data-i18n="adm-risk-title">⚠ 风控 · 可疑活动</h3>
      1  static\home-09-badges-locks.css
@@ -181,7 +179,7 @@
      1  static\home-37-html-inline.css
         └ 153: /* v102 · 统一「需复核」⚠ icon · 替代原「缺金额 → 补金额」黄按钮 */
 
-## 小固定max-width(查是否@media) — 命中 124(63 文件)
+## 小固定max-width(查是否@media) — 命中 125(64 文件)
      8  src\home\sales-detail.ts
         └ 115: detailMask().innerHTML = `<div class="modal" role="dialog" style="max-width:640px">
         └ 160: actionMask().innerHTML = `<div class="modal" role="dialog" style="max-width:380px">
@@ -292,9 +290,9 @@
      1  src\home\module-settings.ts
         └ 52: .modset{max-width:680px;}
      1  src\home\page-settings.ts
-        └ 419: <input type="text" class="form-input" id="access-log-search" data-i18n-placeholder="set-ac
+        └ 405: <input type="text" class="form-input" id="access-log-search" data-i18n-placeholder="set-ac
      1  src\home\purchase-capture.ts
-        └ 36: .pur.cap .rhint{font-size:12.5px;color:var(--ink2);max-width:320px;line-height:1.6;}
+        └ 35: .pur.cap .rhint{font-size:12.5px;color:var(--ink2);max-width:320px;line-height:1.6;}
      1  src\home\rules-settings.ts
         └ 222: `<div class="rs-pop" style="max-width:460px;">` +
      1  src\home\sales-wizard.ts
@@ -330,7 +328,9 @@
      1  static\home-39-sales.css
         └ 101: max-width: 300px;
      1  static\home-49-dms-intake.css
-        └ 204: .dmsx .dx-sgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;text-align:left;m
+        └ 203: .dmsx .dx-sgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;text-align:left;m
+     1  static\home-54-records.css
+        └ 295: max-width: 380px;
      1  static\landing\landing-static-bg.css
         └ 212: max-width: 250px;
      1  static\landing\mascot-scene.js
@@ -381,7 +381,7 @@
      1  src\home\confirm-modal.ts
         └ 12: // 自定义确认对话框 · v0.15.6 · 替换浏览器原生 confirm()
      1  src\home\purchase-settings.ts
-        └ 102: // F16 · 去原生 prompt():点「加科目」就地变行内输入框(Enter 存 / Esc 取消 / 失焦存)。
+        └ 170: // F16 · 去原生 prompt():点「加科目」就地变行内输入框(Enter 存 / Esc 取消 / 失焦存)。
      1  src\home\sales-detail.ts
         └ 436: : confirm(t('sx-del-draft-confirm'));
      1  src\home\sales-products.ts
@@ -416,18 +416,15 @@
      1  static\recon-mapping.js
         └ 126: '.rmap-ov{position:fixed;inset:0;background:rgba(17,17,17,.45);z-index:99999;display:flex;
 
-## i18n原始键残留 — 命中 29(3 文件)
+## i18n原始键残留 — 命中 24(2 文件)
     20  static\i18n-data.js
-        └ 998: 'time-min-ago-suffix': ' 分钟前',
-        └ 999: 'time-hour-ago-suffix': ' 小时前',
-     5  src\home\dashboard.ts
-        └ 39: if (s < 3600) return Math.floor(s / 60) + _t('time-min-ago-suffix', ' 分钟前')!;
-        └ 40: if (s < 86400) return Math.floor(s / 3600) + _t('time-hour-ago-suffix', ' 小时前')!;
+        └ 1084: 'time-min-ago-suffix': ' 分钟前',
+        └ 1085: 'time-hour-ago-suffix': ' 小时前',
      4  static\admin\admin-i18n.js
         └ 230: 'time-hours-ago': '{n} 小时前',
         └ 231: 'time-days-ago': '{n} 天前',
 
-## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 962(66 文件)
+## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 956(64 文件)
    157  static\home-18-admin-users.css
     83  static\pos\pos.css
     83  static\pos\pos.css
@@ -446,8 +443,8 @@
     15  static\pos\pos.html
     15  static\pos\pos.html
     12  static\home-40-sales-wizard.css
+    12  static\home-49-dms-intake.css
     10  static\erp-mrerp-connect.js
-    10  static\home-49-dms-intake.css
      9  src\home\sales-account.ts
      9  src\home\sales-wizard-steps.ts
      9  static\recon-mapping.js
@@ -458,7 +455,6 @@
      7  static\legal.css
      6  src\home\pos-cashiers.ts
      6  src\home\rules-settings-data.ts
-     6  src\home\settings-core.ts
      6  static\home-37-html-inline.css
      6  static\landing\auth-sso.css
      4  src\home\core.ts
@@ -471,7 +467,6 @@
      3  static\pos\pos-data.js
      2  src\home\bank-recon-drawer.ts
      2  src\home\bank-recon-picker.ts
-     2  src\home\dashboard.ts
      2  src\home\dms-intake-confirm.ts
      2  src\home\history-drawer.ts
      2  src\home\line-email-modal.ts

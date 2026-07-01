@@ -83,18 +83,19 @@ _T: dict[str, dict[str, str]] = {
         "ja": "キャンセルしました",
     },
     # ── 成功回执(ok) ──
-    # ★ M1 诚实改写:history/summary 计数是保留期窗口(非严格本月),去掉取不到的合计฿/分类。
+    # M2 回填富版:history=列表预览(count+真实前几条),summary/usage=本月聚合(合计฿/分类/单据数)。
+    # 键值与 i18n-data.js 逐字一致(test_key_parity + 数据层 agent_overview 供本月量)。
     "agent.ok.history": {
-        "zh": "识别记录 {count} 张",
-        "en": "Found {count} documents",
-        "th": "พบเอกสาร {count} รายการ",
-        "ja": "{count} 件の記録があります",
+        "zh": "识别记录 {count} 张{top_list}",
+        "en": "Found {count} documents{top_list}",
+        "th": "พบเอกสาร {count} รายการ{top_list}",
+        "ja": "{count} 件の記録があります{top_list}",
     },
     "agent.ok.history_summary": {
-        "zh": "汇总:共 {count} 张 · {by_status}",
-        "en": "Summary: {count} total · {by_status}",
-        "th": "สรุป: ทั้งหมด {count} รายการ · {by_status}",
-        "ja": "まとめ:合計 {count} 件 · {by_status}",
+        "zh": "本月汇总:{count} 张·合计 {total}฿{by_category}",
+        "en": "This month: {count} documents · total {total} THB{by_category}",
+        "th": "สรุปเดือนนี้: {count} ใบ · ยอดรวม {total} บาท{by_category}",
+        "ja": "今月のまとめ:{count} 件 · 合計 {total} バーツ{by_category}",
     },
     "agent.ok.balance": {
         "zh": "余额 {balance}฿·本月已用 {pages} 页",
@@ -103,10 +104,10 @@ _T: dict[str, dict[str, str]] = {
         "ja": "クレジット残高 {balance} バーツ · 今月の利用 {pages} ページ",
     },
     "agent.ok.usage_this_month": {
-        "zh": "本月已用 {pages} 页",
-        "en": "{pages} pages used this month",
-        "th": "เดือนนี้ใช้ไป {pages} หน้า",
-        "ja": "今月の利用 {pages} ページ",
+        "zh": "本月已用 {pages} 页·{docs} 张单据",
+        "en": "{pages} pages used this month · {docs} documents",
+        "th": "เดือนนี้ใช้ไป {pages} หน้า · {docs} เอกสาร",
+        "ja": "今月の利用 {pages} ページ · {docs} 件",
     },
     "agent.ok.notifications": {
         "zh": "有 {count} 条通知{top_list}",

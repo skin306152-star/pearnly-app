@@ -46,18 +46,8 @@ class AgentToolset:
         return ToolResult(ok=True, data=res, receipt=copy_map.history_receipt(items, total))
 
     def summarize_ocr_history(self, ctx: AgentContext) -> ToolResult:
-        # status_counts 是全量分布(不受 limit 影响),只取它做汇总。
-        res = db.list_ocr_history(
-            user_id=str(ctx.user["id"]),
-            tenant_id=ctx.tenant_id,
-            workspace_client_id=ctx.workspace_client_id,
-            limit=1,
-            offset=0,
-            retention_days=_retention(ctx.user),
-            restrict_client_ids=db.get_visible_client_ids_for_user(ctx.user),
-        )
-        counts = res.get("status_counts", {}) if isinstance(res, dict) else {}
-        return ToolResult(ok=True, data=counts, receipt=copy_map.history_summary_receipt(counts))
+        ov = self._month_overview(ctx)
+        return ToolResult(ok=True, data=ov, receipt=copy_map.history_summary_receipt(ov))
 
     def get_balance(self, ctx: AgentContext) -> ToolResult:
         b = db.get_billing_status_combined(str(ctx.user["id"]), ctx.tenant_id)
@@ -65,7 +55,21 @@ class AgentToolset:
 
     def get_usage_this_month(self, ctx: AgentContext) -> ToolResult:
         b = db.get_billing_status_combined(str(ctx.user["id"]), ctx.tenant_id)
-        return ToolResult(ok=True, data=b, receipt=copy_map.usage_receipt(b))
+        ov = self._month_overview(ctx, include_categories=False)
+        docs = int(ov.get("doc_count") or 0)
+        return ToolResult(
+            ok=True, data={"billing": b, "docs": docs}, receipt=copy_map.usage_receipt(b, docs)
+        )
+
+    def _month_overview(self, ctx: AgentContext, *, include_categories: bool = True) -> dict:
+        return db.month_overview(
+            str(ctx.user["id"]),
+            ctx.tenant_id,
+            workspace_client_id=ctx.workspace_client_id,
+            restrict_client_ids=db.get_visible_client_ids_for_user(ctx.user),
+            retention_days=_retention(ctx.user),
+            include_categories=include_categories,
+        )
 
     def list_notification_logs(self, ctx: AgentContext) -> ToolResult:
         logs = db.list_notification_logs(str(ctx.user["id"]), tenant_id=ctx.tenant_id, limit=20)

@@ -51,10 +51,11 @@ class TestAgentI18n(unittest.TestCase):
     def test_value_separators_do_not_break_parse(self):
         # copy_map 已消毒 ; |;此处确认值含逗号/空格仍正确落位。
         out = agent_i18n.render(
-            "agent.ok.history_summary|count=4;by_status=confirmed 3, failed 1", "zh"
+            "agent.ok.history_summary|count=4;total=1,234;by_category= · fuel 3, food 1", "zh"
         )
         self.assertIn("4", out)
-        self.assertIn("confirmed 3, failed 1", out)
+        self.assertIn("1,234", out)
+        self.assertIn("fuel 3, food 1", out)
 
     def test_all_four_langs_present(self):
         for key in agent_i18n.keys():

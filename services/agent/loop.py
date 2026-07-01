@@ -65,15 +65,10 @@ def _today() -> str:
 
 
 def _reply_lang(text: str) -> str:
-    """回复语言 = 用户最新消息的文字系统(治"中文提问泰文作答")。"""
-    t = text or ""
-    if any("฀" <= c <= "๿" for c in t):
-        return "th"
-    if any("぀" <= c <= "ヿ" for c in t):
-        return "ja"
-    if any("一" <= c <= "鿿" for c in t):
-        return "zh"
-    return "en"
+    """回复语言 = 用户最新消息的文字系统(治"中文提问泰文作答")。无字母 → 英文。"""
+    from services.expense.line_classify import detect_text_lang
+
+    return detect_text_lang(text) or "en"
 
 
 def _recent(ctx: AgentContext) -> list:
@@ -257,53 +252,47 @@ def handle_turn(
     return None
 
 
+# 模型两次不肯成文时,按已取到的工具结果给的诚实兜底句(四语 · {n} 为数量)。
+# 只覆盖搜索/通知的 0 结果(旧路 has_item_context 会把这类误路成"问价格");其它工具罕见
+# 成文失败交旧路(其查询兜底非误路)。计数字段名见 _FALLBACK_COUNT_KEY。
+_FALLBACK = {
+    "list_history": {
+        "zero": {
+            "th": "ไม่พบเอกสารที่ตรงกับคำค้นครับ",
+            "zh": "没有找到相关单据。",
+            "en": "No matching receipts found.",
+            "ja": "該当する書類は見つかりませんでした。",
+        },
+        "some": {
+            "th": "พบเอกสารที่ตรงกับคำค้น {n} รายการ",
+            "zh": "找到 {n} 条相关单据。",
+            "en": "Found {n} matching receipts.",
+            "ja": "{n}件見つかりました。",
+        },
+    },
+    "list_notifications": {
+        "zero": {
+            "th": "ไม่มีแจ้งเตือนใหม่ครับ",
+            "zh": "目前没有新通知。",
+            "en": "No new notifications.",
+            "ja": "新しい通知はありません。",
+        },
+        "some": {
+            "th": "มีแจ้งเตือน {n} รายการ",
+            "zh": "有 {n} 条通知。",
+            "en": "{n} notifications.",
+            "ja": "通知が{n}件あります。",
+        },
+    },
+}
+_FALLBACK_COUNT_KEY = {"list_history": "total", "list_notifications": "count"}
+
+
 def _grounded_fallback(observations: list, lang: str) -> Optional[str]:
-    """模型两次不肯成文时,按已取到的工具结果给一句诚实兜底(避免查询回落旧路念"这笔多少钱")。
-
-    尤其覆盖搜索/通知的 0 结果(旧路 has_item_context 会误路那种),别把已查到的查询 defer。
-    """
-
-    def pick(d):
-        return d.get(lang, d["en"])
-
     last = observations[-1] if observations else {}
-    tool = last.get("tool")
-    if tool == "list_history":
-        n = int(last.get("total") or 0)
-        if not n:
-            return pick(
-                {
-                    "th": "ไม่พบเอกสารที่ตรงกับคำค้นครับ",
-                    "zh": "没有找到相关单据。",
-                    "en": "No matching receipts found.",
-                    "ja": "該当する書類は見つかりませんでした。",
-                }
-            )
-        return pick(
-            {
-                "th": f"พบเอกสารที่ตรงกับคำค้น {n} รายการ",
-                "zh": f"找到 {n} 条相关单据。",
-                "en": f"Found {n} matching receipts.",
-                "ja": f"{n}件見つかりました。",
-            }
-        )
-    if tool == "list_notifications":
-        n = int(last.get("count") or 0)
-        if not n:
-            return pick(
-                {
-                    "th": "ไม่มีแจ้งเตือนใหม่ครับ",
-                    "zh": "目前没有新通知。",
-                    "en": "No new notifications.",
-                    "ja": "新しい通知はありません。",
-                }
-            )
-        return pick(
-            {
-                "th": f"มีแจ้งเตือน {n} รายการ",
-                "zh": f"有 {n} 条通知。",
-                "en": f"{n} notifications.",
-                "ja": f"通知が{n}件あります。",
-            }
-        )
-    return None  # 其它工具罕见成文失败 → 交旧路(其查询兜底非"问价格"误路)
+    table = _FALLBACK.get(last.get("tool"))
+    if not table:
+        return None
+    n = int(last.get(_FALLBACK_COUNT_KEY[last["tool"]]) or 0)
+    msgs = table["some" if n else "zero"]
+    return msgs.get(lang, msgs["en"]).format(n=n)

@@ -27,12 +27,17 @@ def classify_reply(text: str) -> str:
     return "other"
 
 
-def resolve_record(
-    bound_user, reply_token, line_user_id, text, tid, ws, quote_token, lang, *, book
-) -> bool:
-    """有 agentrec 待办 → 按回复落库/取消/放行;无待办 → False(交后续路由)。"""
+def resolve_record(bound_user, reply_token, text, tid, ws, lang, ctx, *, book) -> bool:
+    """有 agentrec 待办 → 按回复落库/取消/放行;写关或无待办 → False(交后续路由)。
+
+    ctx = handle_expense_text 的回复上下文 dict(quote_token / line_user_id / tenant_id)。
+    """
     from services.expense import conversation, line_classify
 
+    if not line_agent_bridge.write_enabled(bound_user):
+        return False
+    line_user_id = ctx["line_user_id"]
+    quote_token = ctx.get("quote_token")
     with db.get_cursor_rls(tid) as cur:
         pend = conversation.peek_pending(cur, line_user_id=line_user_id)
     if not pend or not str(pend.get("missing") or "").startswith(line_agent_bridge.AGENTREC):

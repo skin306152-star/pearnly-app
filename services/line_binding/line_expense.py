@@ -29,9 +29,8 @@ def handle_expense_text(
         def _pool(kind):
             line_expense_qa.reply_pool(reply_token, kind, text, lang, **ctx)
 
-        from services.expense import line_classify
+        from services.expense import line_classify, replies
         from services.expense import line_quick_entry as lqe
-        from services.expense import replies
         from services.line_binding import line_chat_memory
 
         text = line_classify.normalize_user_text(text)  # 全角标点归一(治全角冒号解析失败·#8)
@@ -40,7 +39,7 @@ def handle_expense_text(
         line_chat_memory.note(line_user_id=line_user_id, tenant_id=stid, role="user", content=text)
 
         # 灰度用户走「前门倒置」:模型站前门先判意图(闲聊也交它自然回复)。非灰度 → 老路一行不变。
-        from services.line_binding import line_agent_bridge
+        from services.line_binding import line_agent_bridge, line_agent_confirm
 
         gated = line_agent_bridge.frontdoor_enabled(bound_user)
 
@@ -63,23 +62,11 @@ def handle_expense_text(
         if ws is None:
             return False
 
-        # 记账确认续接(前门倒置·写档):有 agentrec 待办且用户答"是/否" → 落库/取消
-        # (先于改错/记账,免得"取消"被改错流截走)。写关时无此类待办,不触发。落库回调注入 _do_record。
-        if gated and line_agent_bridge.write_enabled(bound_user):
-            from services.line_binding import line_agent_confirm
-
-            if line_agent_confirm.resolve_record(
-                bound_user,
-                reply_token,
-                line_user_id,
-                text,
-                stid,
-                ws,
-                quote_token,
-                lang,
-                book=_do_record,
-            ):
-                return True
+        # 记账确认续接(写档):有 agentrec 待办且答"是/否" → 落库/取消(先于改错,免被截走)。
+        if gated and line_agent_confirm.resolve_record(
+            bound_user, reply_token, text, stid, ws, lang, ctx, book=_do_record
+        ):
+            return True
 
         # 0. 改错路由(最高优先·#6):会话态续接 > 引用澄清/直接改 > 引用取消/删除(先于记账/大脑)。
         from services.expense import line_correct_flow

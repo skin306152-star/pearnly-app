@@ -1,7 +1,23 @@
 # M3 · 写工具确认握手 · 实现规格(复用现有零件 · 不发明)
 
 > 原则(Zihao 2026-07-01):**按 code 背后逻辑做,不自创,拿市场成熟方案迭代适配**。
-> 本规格把 M3 的"先确认再执行"握手,映射成**镜像现有 `line_correct` 确认流 + 复用 `line_pending_entry` 存储**,只在 loop 加一档,别的全是拼装。
+
+> ## ⚠️ 修订(2026-07-01·commit `500ada57`):确认改走「现有富卡 + 确认按钮」,弃文字握手
+>
+> Zihao 指出确认应复用那张精致数据卡,不是纯文字。复查代码证实:现有 `line_card_actions`
+> 的「草稿卡 + [ยืนยัน]/[ยกเลิก] 按钮 + postback(`ACTION_CONFIRM`)+ nonce 令牌」**本就是**
+> "确认-再-落库 + 幂等"的成熟机制(即下表 Stripe/乐观-Undo 那两行的真等价物)。下文 §2.1~§2.3 的
+> 「文字复述 + 文字是/否 + `line_pending_entry` 待办」是**重复造轮子,已废弃删除**。
+>
+> **现行设计**:Agent 提议 `record_expense` → 接地建草稿 → `record_sink` 走现有
+> `line_expense._do_record`(`used_l2=True` → 置信判 `needs_review` → 出草稿卡 + 确认按钮);
+> 确认由**卡片按钮 + 现成 postback + nonce** 完成(非文字)。金额没接地 → 大脑用文字追问。
+> 卡即回复,`loop` 返 `RECORD_CARD_SENT` 哨兵让入口消费本轮不再发文字。写子闸
+> `AGENT_WRITE_TOOLS` 仍默认关(关=记账 defer 回旧乐观路,旧路 `_do_record` 一样出这张卡)。
+> 已删:`line_agent_confirm` 模块+测试、`loop._confirm_observation`、`copy_map.record_confirm/
+> cancelled`、`bridge._persist_record_pending/AGENTREC`。§2.4 安全约束仍全部成立。
+>
+> 下面 §0 的成熟方案对照仍有效(只是我们选了"卡+按钮 postback"这条,而非"文字确认"那条)。
 
 ## 0. 市场成熟形状 ↔ 我们已有的等价物
 

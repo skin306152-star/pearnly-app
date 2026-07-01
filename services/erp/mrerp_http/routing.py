@@ -33,3 +33,15 @@ def choose_doc_type(
     if direction == "purchase":
         return "purchase"
     return None
+
+
+def belongs_to_account_set(
+    flat: Dict[str, Any], history: Dict[str, Any], *, own_tax_id: Any, expected_direction: str
+) -> bool:
+    """票面买卖方是否符合套账主体 + 期望方向(销/采)。防"把别家的票推错套账"的安全闸。
+
+    own_tax_id 空(套账税号未解析)或票面买卖方都对不上套账主体 → 方向≠expected → False(不放行)。
+    """
+    if not own_tax_id:
+        return False
+    return resolve_direction(flat, history, own_tax_id=own_tax_id) == expected_direction

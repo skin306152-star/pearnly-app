@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+from services.line_binding import line_agent_bridge
+
 # 大脑故障时的安全兜底(四语·温和中性·不追问价格·不逼记账)。
 _SAFE_FALLBACK = {
     "th": "อยู่ตรงนี้นะคะ 😊 มีอะไรให้เพิร์นลี่ช่วยไหมคะ",
@@ -47,8 +49,6 @@ def route_gated(
     defer_record/defer_edit/无余额 → 返回 False(交调用方旧路,保留全部旧能力)。"""
     if not balance_ok:
         return False  # 无余额不跑大脑 → 旧路(与旧 L2 同口径)
-
-    from services.line_binding import line_agent_bridge
 
     res = line_agent_bridge.try_agent_turn(
         bound_user,

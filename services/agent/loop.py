@@ -18,6 +18,7 @@ from typing import Callable, Optional
 
 from services.agent import brain, executor, manifest, slots
 from services.agent.contracts import AgentAction, AgentContext
+from services.sales.dates import bangkok_now
 
 logger = logging.getLogger(__name__)
 
@@ -102,8 +103,6 @@ _FORCE_REPLY = '\n\nคุณมีข้อมูลจากเครื่อ
 def _today() -> str:
     """现在的曼谷本地时间(星期+日期+时钟)——喂大脑答「今天/星期几/现在几点」,绝不让它编时间。
     服务器跑 UTC,直接 date.today() 会差 7 小时(临近午夜连日期都错)→ 必走 bangkok_now。"""
-    from services.sales.dates import bangkok_now
-
     return bangkok_now().strftime("%A %Y-%m-%d %H:%M") + " (Asia/Bangkok, UTC+7)"
 
 
@@ -447,25 +446,29 @@ def _fb_int(v) -> int:
         return 0
 
 
+# 值型只读工具:tool → (四语模板, 从观测取模板槽位的函数)。加一个值型工具 = 加一行,不再加 if 分支。
+_VALUE_FB = {
+    "balance": (_FB_BALANCE, lambda o: {"v": _fb_money(o.get("balance_thb"))}),
+    "history_summary": (
+        _FB_SUMMARY,
+        lambda o: {"n": _fb_int(o.get("doc_count")), "v": _fb_money(o.get("amount_total"))},
+    ),
+    "usage_this_month": (_FB_USAGE, lambda o: {"p": _fb_int(o.get("pages_used_this_month"))}),
+}
+
+
 def _grounded_fallback(observations: list, lang: str) -> Optional[str]:
     """成文失败的最后兜底:从最后一个工具观测取真实数字拼一句诚实话(绝不编)。
-    覆盖计数型(list_history/notifications)+ 值型钱工具(balance/summary/usage);
-    套账导航(list/switch_workspace)低风险未覆盖 → None → 交入口安全兜底。"""
+    计数型走 _FALLBACK(zero/some),值型走 _VALUE_FB;套账导航未覆盖 → None → 交入口安全兜底。"""
     last = observations[-1] if observations else {}
     tool = last.get("tool")
     table = _FALLBACK.get(tool)
-    if table:
+    if table:  # 计数型(list_history / list_notifications)
         n = _fb_int(last.get(_FALLBACK_COUNT_KEY[tool]))
         msgs = table["some" if n else "zero"]
         return msgs.get(lang, msgs["en"]).format(n=n)
-    if tool == "balance":
-        return _FB_BALANCE.get(lang, _FB_BALANCE["en"]).format(v=_fb_money(last.get("balance_thb")))
-    if tool == "history_summary":
-        return _FB_SUMMARY.get(lang, _FB_SUMMARY["en"]).format(
-            n=_fb_int(last.get("doc_count")), v=_fb_money(last.get("amount_total"))
-        )
-    if tool == "usage_this_month":
-        return _FB_USAGE.get(lang, _FB_USAGE["en"]).format(
-            p=_fb_int(last.get("pages_used_this_month"))
-        )
+    spec = _VALUE_FB.get(tool)  # 值型(balance / history_summary / usage_this_month)
+    if spec:
+        msgs, extract = spec
+        return msgs.get(lang, msgs["en"]).format(**extract(last))
     return None

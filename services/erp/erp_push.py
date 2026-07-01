@@ -156,6 +156,17 @@ def push_mrerp_history(
 
     mappings = load_mrerp_mappings(tenant_id)
 
+    # ★套账匹配闸锚点:把套账主体(workspace_client)税号喂进 mappings → adapter 核票面
+    # 买卖方符不符套账,确认别家的票则挡下不推(防推错套账)。复用 Express 侧同源解析(方向锚点单一事实源)。
+    try:
+        from services.erp.express_push.preflight import _own_tax_id
+
+        own_tax = _own_tax_id(endpoint, history_flat, tenant_id)
+        if own_tax:
+            mappings = {**mappings, "_own_tax_id": own_tax}
+    except Exception:
+        logger.exception("push_mrerp_history: own_tax_id resolve failed; 匹配闸本次不启用")
+
     request_body = {
         "history_id": str(history_record.get("id") or ""),
         "invoice_no": history_record.get("invoice_no"),

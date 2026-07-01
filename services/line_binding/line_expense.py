@@ -70,25 +70,26 @@ def handle_expense_text(
         ):
             return True
 
-        # 对话 Agent 前门(灰度·前门倒置):模型判意图——查询/闲聊自己组织人话回复;记账走现有
-        # _do_record 出富卡 + 确认按钮(能力只增不减);改错/超范围 → defer 落回下方旧确定性路。
-        if gated and _ocr_balance_ok(bound_user):
-            agent_reply = line_agent_bridge.try_agent_turn(
+        # 对话 Agent 前门(灰度·前门倒置·收口):reply/直录卡/大脑故障 → 前门消费(故障走安全兜底,
+        # 绝不掉旧路地雷);模型主动 defer 记账/改错 或 无余额 → 返 False 落回下方旧确定性路(能力不丢)。
+        if gated:
+            from services.line_binding import line_agent_route
+
+            if line_agent_route.route_gated(
                 bound_user,
+                reply_token,
+                line_user_id,
                 text,
                 lang,
                 stid,
                 ws,
-                line_user_id,
+                quote_token,
                 history,
-                reply_token=reply_token,
-                quote_token=quote_token,
+                balance_ok=_ocr_balance_ok(bound_user),
+                say=_say,
+                charge=lambda: _charge_line_l2(bound_user, stid),
                 book=_do_record,
-            )
-            if agent_reply is not None:
-                _charge_line_l2(bound_user, stid)
-                if agent_reply != line_agent_bridge.RECORD_CARD_SENT:
-                    _say(agent_reply)  # 记账已出卡则不再发文字(reply_token 已用)
+            ):
                 return True
 
         si = lqe.l1_intent(text)

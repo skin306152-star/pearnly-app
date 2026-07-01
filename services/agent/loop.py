@@ -24,9 +24,6 @@ logger = logging.getLogger(__name__)
 
 _MAX_STEPS = 4  # 一轮内最多几次工具调用(防打转);读工具少,一步取数一步成文足矣。
 
-# 记账已走现有富卡出卡(暖话 + 数据卡)→ 卡即回复。调用方见此哨兵:消费本轮,别再发文字(reply_token 已用)。
-RECORD_CARD_SENT = "\x00record_card_sent"
-
 _LANGS = {"th": "ภาษาไทย", "zh": "中文", "en": "English", "ja": "日本語"}
 
 
@@ -37,6 +34,23 @@ class LoopStep:
     args: dict = field(default_factory=dict)
     message: str = ""
     say: str = ""  # 记账工具随调用带的一句暖话(账务性格自撰)→ 显示在数据卡上方(人话+卡)
+    reason: str = ""  # defer 时的原因:record/edit=模型主动裁决;crash=解析/传输故障(非决策)
+
+
+@dataclass
+class TurnResult:
+    """前门一轮的结论(区分「模型主动裁决」与「大脑故障」,让入口别把故障当记账 defer 掉旧路地雷)。
+
+    kind:
+      reply        模型自撰的人话回复(text=正文)
+      card_sent    记账已直录 + 富卡已发(入口别再发文字)
+      defer_record 模型判定=记账,写子闸关 → 交确定性直录(旧路救命索)
+      defer_edit   模型判定=改错 → 交改错流
+      crash        大脑故障(parse 失败/空回复/工具名错/循环空转)→ 入口走安全兜底,绝不掉旧路地雷
+    """
+
+    kind: str
+    text: str = ""
 
 
 _SYSTEM = """You are Pearnly — a smart accounting assistant on LINE for Thai SMEs. You talk like a real, warm person, and you get real work done by calling the tools below (the user's real data).
@@ -183,9 +197,10 @@ def _prompt(
 
 
 def _parse_step(outcome) -> LoopStep:
-    """ProviderOutcome → LoopStep。失败/非法 → defer(fail-safe:交回旧路,不炸不编)。"""
+    """ProviderOutcome → LoopStep。区分「模型主动 defer(record/edit)」与「故障(crash)」——
+    传输/解析失败、畸形输出都标 reason=crash,让上层走安全兜底而非当记账 defer 掉旧路。"""
     if not getattr(outcome, "ok", False) or not isinstance(getattr(outcome, "data", None), dict):
-        return LoopStep(kind="defer")
+        return LoopStep(kind="defer", reason="crash")  # parse 失败/传输错 = 大脑故障,非决策
     d = outcome.data
     kind = d.get("kind")
     if kind == "reply":
@@ -198,7 +213,9 @@ def _parse_step(outcome) -> LoopStep:
             args=args if isinstance(args, dict) else {},
             say=str(d.get("say") or "").strip(),
         )
-    return LoopStep(kind="defer")
+    if kind == "defer":
+        return LoopStep(kind="defer", reason=str(d.get("reason") or "record").strip())
+    return LoopStep(kind="defer", reason="crash")  # 缺 kind / 非法结构 = 故障
 
 
 def _decide_step(
@@ -237,13 +254,13 @@ def handle_turn(
     today: Optional[str] = None,
     allow_write: bool = False,
     record_sink: Optional[Callable] = None,
-) -> Optional[str]:
-    """一轮对话。返回模型撰写的自然语言回复(Agent 接管)= str;返回 None = defer 给旧路;
-    返回 RECORD_CARD_SENT = 记账已走现有富卡(卡+暖话即回复,调用方别再发文字)。
+) -> TurnResult:
+    """一轮对话 → TurnResult(见其 docstring:reply/card_sent/defer_record/defer_edit/crash)。
+    关键:大脑故障(parse 失败/空回复/工具错)归 crash(入口走安全兜底),绝不混成记账 defer 掉旧路地雷。
 
     allow_write=True 且带 record_sink(出卡回调=现有 _do_record)时,写工具(记账)启用:
     模型提议 record_expense + 一句暖话(step.say)→ 接地建草稿(金额没接地则大脑文字追问)→
-    高置信直录 + 出富卡(暖话显示在卡上方·复用现有卡+撤销+nonce)。写关或无出卡器 → defer 回旧路。
+    高置信直录 + 出富卡(暖话显示在卡上方·复用现有卡+撤销+nonce)。写关 → defer_record 交旧路直录。
     """
     decide = decide or _decide_step
     toolset = toolset or executor.AgentToolset()
@@ -265,20 +282,24 @@ def handle_turn(
             allow_write=allow_write,
         )
         if step.kind == "reply":
-            return step.message or None
-        if step.kind != "tool":
-            # 已取到数据却不肯成文 → 去强制成文(绝不把已查到的查询 defer 回旧路误路);
-            # 一次工具都没调的 defer 才是真「记账/改错」→ 交旧路。
+            if step.message:
+                return TurnResult("reply", step.message)
+            if observations:
+                break  # 空回复但已取到数据 → 强制成文
+            return TurnResult("crash")  # 空回复且无数据 = 大脑故障,不当 defer
+        if step.kind != "tool":  # defer
+            # 已取到数据却不肯成文 → 强制成文(绝不把已查到的查询 defer 掉旧路误路);
+            # 一步都没调的 defer 才是真裁决 → 按 reason 分流(record/edit=交旧路,crash=安全兜底)。
             if observations:
                 break
-            return None
+            return _defer_result(step.reason)
         if step.tool in called:  # 重复调同一工具 → 收敛去最终成文
             break
         spec = manifest.TOOLS_BY_NAME.get(step.tool)
         if not spec:
-            return None
+            return TurnResult("crash")  # 模型调不存在的工具 = 故障(非记账 defer)
         if spec.writes and (not allow_write or record_sink is None):
-            return None  # 写工具没开/无出卡器 → defer 回旧路(记账走旧乐观路)
+            return TurnResult("defer_record")  # 记账写关 → 交确定性直录(救命索)
         chk = slots.check_slots(
             AgentAction(kind="tool", tool=step.tool, args=step.args),
             user_text=user_text,
@@ -294,7 +315,7 @@ def handle_turn(
             continue
         handler = getattr(toolset, spec.handler, None)
         if handler is None:
-            return None
+            return TurnResult("crash")  # manifest/executor 不同步 = 部署故障(非 defer)
         result = handler(ctx, **chk.grounded)
         called.add(step.tool)
         if spec.writes:
@@ -306,11 +327,11 @@ def handle_turn(
                 )
                 continue
             record_sink(ctx, result.data["draft"], step.say)
-            return RECORD_CARD_SENT
+            return TurnResult("card_sent")
         observations.append({"tool": step.tool, **_observe_payload(step.tool, result)})
 
     # 循环里没成文(重复调/步数用尽)→ 拿着已取到的真实数据,最后强逼一次成文;
-    # 仍不成文 → 用工具结果兜底一句(绝不把已查到的查询 defer 回旧路念"这笔多少钱")。
+    # 仍不成文 → 用工具结果兜底一句(绝不把已查到的查询 defer 掉旧路念"这笔多少钱")。
     if observations:
         final = decide(
             user_text,
@@ -322,9 +343,19 @@ def handle_turn(
             allow_write=allow_write,
         )
         if final.kind == "reply" and final.message:
-            return final.message
-        return _grounded_fallback(observations, lang)
-    return None
+            return TurnResult("reply", final.message)
+        fb = _grounded_fallback(observations, lang)
+        return TurnResult("reply", fb) if fb else TurnResult("crash")
+    return TurnResult("crash")  # 循环空转无产出 = 故障(不静默掉旧路)
+
+
+def _defer_result(reason: str) -> TurnResult:
+    """模型主动 defer 的 reason → TurnResult。record/edit 交旧路对应确定性路;其余(crash 等)走安全兜底。"""
+    if reason == "record":
+        return TurnResult("defer_record")
+    if reason == "edit":
+        return TurnResult("defer_edit")
+    return TurnResult("crash")
 
 
 # 模型两次不肯成文时,按已取到的工具结果给的诚实兜底句(四语 · {n} 为数量)。

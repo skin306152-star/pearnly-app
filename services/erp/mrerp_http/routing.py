@@ -16,6 +16,7 @@ from typing import Any, Dict, Optional
 
 from services.erp.express_push.common import payment_is_paid
 from services.erp.express_push.direction import resolve_direction
+from services.purchase.field_clean import clean_tax_id
 
 
 def _fields(flat: Dict[str, Any]) -> Dict[str, Any]:
@@ -35,13 +36,31 @@ def choose_doc_type(
     return None
 
 
-def belongs_to_account_set(
+def confirmed_account_set_mismatch(
     flat: Dict[str, Any], history: Dict[str, Any], *, own_tax_id: Any, expected_direction: str
 ) -> bool:
-    """票面买卖方是否符合套账主体 + 期望方向(销/采)。防"把别家的票推错套账"的安全闸。
+    """能【确认】这张票不属于本套账吗?防"把别家的票推错套账"的安全闸。
 
-    own_tax_id 空(套账税号未解析)或票面买卖方都对不上套账主体 → 方向≠expected → False(不放行)。
+    只在【确认不符】时返 True(挡下),读不到税号=无法确认→False(不挡·交上游已判的方向)。
+    确认不符 = ① 方向刚好相反(如采购票走销项)· 或 ② 票面读到了买卖方税号但都不是套账主体。
+    own_tax_id 空(套账税号未解析)→ 无锚点无法判 → False(不挡)。
     """
     if not own_tax_id:
         return False
-    return resolve_direction(flat, history, own_tax_id=own_tax_id) == expected_direction
+    direction = resolve_direction(flat, history, own_tax_id=own_tax_id)
+    if direction == expected_direction:
+        return False  # 确认属于本套账
+    if direction:
+        return True  # 方向相反(采购票走销项等)→ 确认不符
+    # direction=None(ambiguous):仅当票面确实读到买卖方税号、却都不是套账主体,才算确认别家的票
+    own = clean_tax_id(own_tax_id)
+    fields = _fields(flat)
+    read = [
+        t
+        for t in (
+            clean_tax_id(fields.get("seller_tax") or fields.get("seller_tax_id")),
+            clean_tax_id(fields.get("buyer_tax") or fields.get("buyer_tax_id")),
+        )
+        if t
+    ]
+    return bool(read) and own not in read

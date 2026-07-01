@@ -186,19 +186,18 @@ class MrErpHttpAdapter:
     def _filter_by_account_set(
         self, histories: List[Dict[str, Any]], mappings: Dict[str, Any]
     ) -> Tuple[List[Dict[str, Any]], List[FailedRow]]:
-        """匹配闸:票面买卖方须符合套账主体。mappings['_own_tax_id'] 提供才启用(否则全放行=旧行为)。"""
+        """匹配闸:能确认是别家的票才挡下。mappings['_own_tax_id'] 提供才启用(否则全放行=旧行为)。
+        读不到票面税号=无法确认→放行(交上游已判方向),只挡确认不符的(防推错套账不误挡)。"""
         own = mappings.get("_own_tax_id") if isinstance(mappings, dict) else None
         if not own:
             return histories, []
-        from services.erp.mrerp_http.routing import belongs_to_account_set
+        from services.erp.mrerp_http.routing import confirmed_account_set_mismatch
 
         expected = "sales" if self.module.doc_type.startswith("sales") else "purchase"
         kept: List[Dict[str, Any]] = []
         failed: List[FailedRow] = []
         for h in histories:
-            if belongs_to_account_set(h, h, own_tax_id=own, expected_direction=expected):
-                kept.append(h)
-            else:
+            if confirmed_account_set_mismatch(h, h, own_tax_id=own, expected_direction=expected):
                 reasons = ["票面买卖方与套账主体不符 · 未推送(防推错套账)"]
                 failed.append(
                     FailedRow(
@@ -208,6 +207,8 @@ class MrErpHttpAdapter:
                         original=h,
                     )
                 )
+            else:
+                kept.append(h)
         return kept, failed
 
     # ---- 自建主数据 --------------------------------------------------

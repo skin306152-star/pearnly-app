@@ -9,6 +9,7 @@ import unittest
 from contextlib import ExitStack, contextmanager
 from unittest.mock import MagicMock, patch
 
+from services.agent.loop import TurnResult
 from services.line_binding import line_expense
 
 _BOUND = {"id": "u1", "tenant_id": "t1"}
@@ -85,7 +86,10 @@ class TestAgentGate(unittest.TestCase):
         # 前门:模型撰写人话回复 → Agent 接管,原文直出(不套模板),旧 understand 不跑,计费扣 1。
         with (
             patch("core.feature_flags.agent_enabled_for", return_value=True),
-            patch("services.agent.loop.handle_turn", return_value="คุณมีเอกสาร 3 ใบ"),
+            patch(
+                "services.agent.loop.handle_turn",
+                return_value=TurnResult("reply", "คุณมีเอกสาร 3 ใบ"),
+            ),
         ):
             ok = self._call()
         self.assertTrue(ok)
@@ -94,20 +98,31 @@ class TestAgentGate(unittest.TestCase):
         body = self.reply.call_args.args[1]
         self.assertEqual(body, "คุณมีเอกสาร 3 ใบ")  # 模型原文,前门不再套模板/渲染 key
 
-    def test_undo_defers_and_legacy_undo_runs(self):
-        # ★ 灰度用户「撤销上一笔」:新 loop 无 undo 工具 → 真实 defer → 旧路成功撤销(能力不丢)。
+    def test_edit_defer_falls_to_legacy_undo(self):
+        # ★ 灰度用户「撤销上一笔」:新 loop 无 undo 工具 → 模型主动 defer_edit → 旧路成功撤销(能力不丢)。
         undo = self.stack.enter_context(
             patch("services.line_binding.line_expense_qa.reply_undo", return_value=True)
         )
         self.understand.return_value = {"intent": "undo"}
         with (
             patch("core.feature_flags.agent_enabled_for", return_value=True),
-            patch("services.agent.loop.handle_turn", return_value=None),  # 模型 defer(无 undo 工具)
+            patch("services.agent.loop.handle_turn", return_value=TurnResult("defer_edit")),
         ):
             ok = self._call("ยกเลิกรายการล่าสุด")
         self.assertTrue(ok)
-        self.understand.assert_called_once()  # 落回旧大脑
+        self.understand.assert_called_once()  # 主动 defer → 落回旧大脑(保留撤销能力)
         undo.assert_called_once()  # 旧撤销真的执行了
+
+    def test_crash_uses_safe_fallback_not_legacy(self):
+        # ★ 止血核心:大脑故障(crash)→ 安全兜底,绝不掉旧路(旧 understand 不跑,不问价格/不误入账)。
+        with (
+            patch("core.feature_flags.agent_enabled_for", return_value=True),
+            patch("services.agent.loop.handle_turn", return_value=TurnResult("crash")),
+        ):
+            ok = self._call("ภรรยาไม่รักฉันแล้ว")
+        self.assertTrue(ok)
+        self.understand.assert_not_called()  # 故障不落旧路第二个大脑
+        self.reply.assert_called_once()  # 只发了一句安全兜底
 
     def test_insufficient_balance_skips_agent(self):
         # 余额不够:Agent 不进(与旧 L2 同口径),不调新 loop。

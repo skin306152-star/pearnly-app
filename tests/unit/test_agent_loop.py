@@ -53,12 +53,25 @@ class TestAgentLoop(unittest.TestCase):
             decide=_script(loop.LoopStep("reply", message="ยินดีช่วยครับ")),
             history=[],
         )
-        self.assertEqual(out, "ยินดีช่วยครับ")
+        self.assertEqual(out.kind, "reply")
+        self.assertEqual(out.text, "ยินดีช่วยครับ")
 
-    def test_defer_returns_none(self):
-        # 记账/改错/超范围 → defer(None),交旧确定性路。
-        out = loop.handle_turn("กาแฟ 50", _CTX, decide=_script(loop.LoopStep("defer")), history=[])
-        self.assertIsNone(out)
+    def test_record_defer_routes_to_deterministic(self):
+        # 模型主动判定=记账(reason=record)→ defer_record,交确定性直录(非 crash)。
+        out = loop.handle_turn(
+            "กาแฟ 50",
+            _CTX,
+            decide=_script(loop.LoopStep("defer", reason="record")),
+            history=[],
+        )
+        self.assertEqual(out.kind, "defer_record")
+
+    def test_crash_defer_when_no_reason(self):
+        # 无 reason 的 defer(畸形/故障)→ crash,入口走安全兜底,不当记账。
+        out = loop.handle_turn(
+            "x", _CTX, decide=_script(loop.LoopStep("defer", reason="crash")), history=[]
+        )
+        self.assertEqual(out.kind, "crash")
 
     def test_tool_then_reply_uses_observation(self):
         ts = _FakeToolset(ToolResult(ok=True, data={"balance_thb": 58.02}))
@@ -72,14 +85,16 @@ class TestAgentLoop(unittest.TestCase):
             toolset=ts,
             history=[],
         )
-        self.assertEqual(out, "เครดิตคงเหลือ 58.02 บาท")
+        self.assertEqual(out.kind, "reply")
+        self.assertEqual(out.text, "เครดิตคงเหลือ 58.02 บาท")
         self.assertEqual(ts.calls[0][0], "get_balance")
 
-    def test_unknown_tool_defers(self):
+    def test_unknown_tool_crashes(self):
+        # 模型调不存在的工具 = 故障 → crash(不静默当记账 defer)。
         out = loop.handle_turn(
             "x", _CTX, decide=_script(loop.LoopStep("tool", tool="ghost", args={})), history=[]
         )
-        self.assertIsNone(out)
+        self.assertEqual(out.kind, "crash")
 
     def test_fabricated_optional_slot_dropped_not_executed_with_it(self):
         # status 源=user_text;文本没提 → 编造被丢弃,工具仍以可信参数(无 status)执行。
@@ -104,7 +119,8 @@ class TestAgentLoop(unittest.TestCase):
                 toolset=ts,
                 history=[],
             )
-        self.assertEqual(out, "ok")
+        self.assertEqual(out.kind, "reply")
+        self.assertEqual(out.text, "ok")
         self.assertEqual(ts.calls, [("probe_handler", {})])  # 不带编造 status
 
     def test_missing_required_slot_not_executed(self):
@@ -130,14 +146,16 @@ class TestAgentLoop(unittest.TestCase):
                 toolset=ts,
                 history=[],
             )
-        self.assertEqual(out, "ขอสถานะหน่อยครับ")
+        self.assertEqual(out.kind, "reply")
+        self.assertEqual(out.text, "ขอสถานะหน่อยครับ")
         self.assertEqual(ts.calls, [])  # 必填缺失绝不执行
 
-    def test_steps_exhausted_defers(self):
+    def test_steps_exhausted_crashes(self):
+        # 重复调同工具、步数用尽仍不成文 → crash(有兜底则成文;此处 balance 无兜底表 → crash)。
         ts = _FakeToolset(ToolResult(ok=True, data={"balance_thb": 1}))
         steps = [loop.LoopStep("tool", tool="balance", args={}) for _ in range(loop._MAX_STEPS)]
         out = loop.handle_turn("x", _CTX, decide=_script(*steps), toolset=ts, history=[])
-        self.assertIsNone(out)
+        self.assertEqual(out.kind, "crash")
 
 
 class _RecToolset:
@@ -174,7 +192,7 @@ class TestConfirmFlow(unittest.TestCase):
             allow_write=True,
             record_sink=lambda ctx, draft, say="": sunk.append((draft, say)),
         )
-        self.assertEqual(out, loop.RECORD_CARD_SENT)  # 卡即回复:消费本轮,别再发文字
+        self.assertEqual(out.kind, "card_sent")  # 卡即回复:消费本轮,别再发文字
         self.assertEqual(len(sunk), 1)  # 走出卡回调(直录·非按钮)
         self.assertEqual(sunk[0][0].amount, Decimal("50"))  # 接地好的真实草稿
         self.assertEqual(sunk[0][1], "好,帮你记上咖啡~")  # 暖话由大脑写,传到卡上方
@@ -189,7 +207,7 @@ class TestConfirmFlow(unittest.TestCase):
             history=[],
             allow_write=False,
         )
-        self.assertIsNone(out)
+        self.assertEqual(out.kind, "defer_record")  # 写关 → 交确定性直录
 
     def test_no_record_sink_defers(self):
         out = loop.handle_turn(
@@ -201,7 +219,7 @@ class TestConfirmFlow(unittest.TestCase):
             allow_write=True,
             record_sink=None,
         )
-        self.assertIsNone(out)
+        self.assertEqual(out.kind, "defer_record")
 
     def test_amount_ungrounded_asks_not_sinks(self):
         sunk = []
@@ -218,7 +236,8 @@ class TestConfirmFlow(unittest.TestCase):
             allow_write=True,
             record_sink=lambda ctx, draft, say="": sunk.append(draft),
         )
-        self.assertEqual(out, "金额多少?")
+        self.assertEqual(out.kind, "reply")
+        self.assertEqual(out.text, "金额多少?")
         self.assertEqual(sunk, [])  # 没接地绝不出卡
 
     def test_visible_tools_hides_write_tool_when_write_off(self):

@@ -25,6 +25,19 @@ from services.recon.bank_recon_utils import (
 logger = logging.getLogger(__name__)
 
 
+def _stmt_has_content(data: Any) -> bool:
+    """Gemini 是否真抽到东西:有交易行,或(零交易单)至少抽到期初/期末余额。
+
+    两者皆空 = 整张读空(扫描件 OCR 失败等)。不加此判据时 try_with_fallback 会把
+    {"rows": []} 当成功放行 → 对账里出现假的 0.00 期末。返 False 触发升级重试,再空则失败。
+    """
+    if not isinstance(data, dict):
+        return False
+    if data.get("rows"):
+        return True
+    return bool(data.get("opening_balance") or data.get("closing_balance"))
+
+
 def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> Dict[str, Any]:
     """
     Gemini fallback: extract bank statement data from scanned PDF.
@@ -147,8 +160,10 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
                 text = re.sub(r"^```[a-z]*\n?", "", text).rstrip("`").strip()
             return json.loads(text)
 
-        # 主模型(flash-lite)解析失败/截断/空 → 升级到更强兜底模型重试一次(糊图扫描件救场)。
-        data = try_with_fallback(_call, primary=flash_lite(), label=f"gemini_stmt[{filename}]")
+        # 主模型(flash-lite)解析失败/截断/整张读空 → 升级到更强兜底模型重试一次(糊图扫描件救场)。
+        data = try_with_fallback(
+            _call, primary=flash_lite(), ok=_stmt_has_content, label=f"gemini_stmt[{filename}]"
+        )
         if data is None:
             return {"ok": False, "rows": [], "error": "gemini statement parse failed (all models)"}
 

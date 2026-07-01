@@ -6,17 +6,27 @@
 
 import unittest
 
-from services.erp.mrerp_http.autocreate import _buyer_from_history, provision_customers
+from services.erp.mrerp_http.autocreate import (
+    _buyer_from_history,
+    _product_code_from_name,
+    provision_customers,
+    provision_products,
+)
 
 
 class _StubAdapter:
     def __init__(self, results):
         self._results = results
         self.called_with = None
+        self.products_called = None
 
     def create_customers(self, customers, mappings):
         self.called_with = customers
         return {c["code"]: self._results.get(c["code"], True) for c in customers}
+
+    def create_products(self, products, mappings):
+        self.products_called = products
+        return {p["code"]: self._results.get(p["code"], True) for p in products}
 
 
 def _hist(cid, tax="0105561000000", name="Buyer"):
@@ -64,6 +74,35 @@ class TestEnsureCustomers(unittest.TestCase):
         stub = _StubAdapter({})
         provision_customers(stub, [_hist(777)], mappings)
         self.assertIsNone(stub.called_with)
+
+
+class TestProvisionProducts(unittest.TestCase):
+    def _hist_items(self, *names):
+        return {"client_id": 1, "items": [{"name": n, "unit_price": 10} for n in names]}
+
+    def test_code_is_deterministic(self):
+        self.assertEqual(_product_code_from_name("Lipstick"), _product_code_from_name("lipstick "))
+
+    def test_creates_and_injects_unmapped_items(self):
+        mappings = {"products": []}
+        stub = _StubAdapter({})
+        provision_products(stub, [self._hist_items("Lipstick", "Mascara")], mappings)
+        self.assertEqual(len(stub.products_called), 2)
+        self.assertEqual(len(mappings["products"]), 2)
+        self.assertIn("Lipstick", [p["item_name"] for p in mappings["products"]])
+
+    def test_skips_already_mapped_item(self):
+        code = _product_code_from_name("Lipstick")
+        mappings = {"products": [{"item_name": "Lipstick", "erp_code": code}]}
+        stub = _StubAdapter({})
+        provision_products(stub, [self._hist_items("Lipstick")], mappings)
+        self.assertIsNone(stub.products_called)  # 已有,不建
+
+    def test_opt_out(self):
+        mappings = {"products": [], "_mrerp_auto_create_product": False}
+        stub = _StubAdapter({})
+        provision_products(stub, [self._hist_items("Lipstick")], mappings)
+        self.assertIsNone(stub.products_called)
 
 
 if __name__ == "__main__":

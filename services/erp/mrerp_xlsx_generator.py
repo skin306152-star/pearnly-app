@@ -278,6 +278,12 @@ def generate_xlsx(
 
         return generate_xlsx_customer(histories, mappings)
 
+    # master_product 自建商品(impstkmas)· 官方模板克隆 · 见 mrerp_xlsx_product
+    if sheet_kind == "product_master":
+        from services.erp.mrerp_xlsx_product import generate_xlsx_product
+
+        return generate_xlsx_product(histories, mappings)
+
     schema = MRERP_SHEET_SCHEMAS.get(sheet_kind)
     if not schema:
         raise ValueError(f"unknown sheet_kind: {sheet_kind}")

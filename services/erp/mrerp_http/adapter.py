@@ -7,8 +7,8 @@
 导入 5 步(known-facts §5)全走 requests,importpc 后**强制拉 report.php 逐行判成败**
 (不信 "2"),这是"像 Express 一样稳"的回读闸。老 PHP 单账号单会话 → 复用 session_lock 串行。
 
-已接:赊销/现金销售(S1/S3)· 方向识别(S2a·routing)· 销项缺买方客户自动建(S2b·autocreate)。
-采购/库存/自建商品/科目在 S3/S4。构造签名兼容 build_mrerp_adapter 传入的全部 kwargs(未用者吞下)。
+已接:赊销/现金销售(S1/S3)· 方向识别(S2a)· 销项缺买方客户+商品自动建(S2b·autocreate)。
+采购/库存/科目在 S3/S4。构造签名兼容 build_mrerp_adapter 传入的全部 kwargs(未用者吞下)。
 """
 
 from __future__ import annotations
@@ -44,10 +44,13 @@ def _selmenu_param(m) -> str:
     return "" if m.selmenu is None else str(m.selmenu)
 
 
-def _parse_master_report(report_bytes: bytes) -> Dict[str, str]:
-    """主数据导入 report(A=码 · Z=หมายเหตุ 备注)→ {码: 备注}(空备注=成功)。
+def _parse_master_report(
+    report_bytes: bytes, code_col: str = "A", note_col: Optional[str] = None
+) -> Dict[str, str]:
+    """主数据导入 report → {码: 备注}(空备注=成功)。code_col=码所在列(客户 A / 商品 C),
+    note_col=备注列(None=取该行最右单元格 · 客户 Z / 商品末列)。
 
-    主数据 report 是「码+备注」格式,mrerp_report_parser 是发票口径不通用,故本地小解析。"""
+    mrerp_report_parser 是发票口径不通用,故本地小解析。"""
     import io
     import zipfile
 
@@ -70,6 +73,12 @@ def _parse_master_report(report_bytes: bytes) -> Dict[str, str]:
             return ""
         return strings[int(v)] if 't="s"' in attrs else v
 
+    def _col_idx(letter: str) -> int:
+        n = 0
+        for ch in letter:
+            n = n * 26 + (ord(ch) - 64)
+        return n
+
     for rm in re.finditer(r'<row r="(\d+)"[^>]*>(.*?)</row>', xml, re.DOTALL):
         if rm.group(1) == "1":  # 表头
             continue
@@ -77,9 +86,11 @@ def _parse_master_report(report_bytes: bytes) -> Dict[str, str]:
             c.group(1): _val(c.group(2), c.group(3))
             for c in re.finditer(r'<c r="([A-Z]+)\d+"([^>]*)>(?:<v>(.*?)</v>)?</c>', rm.group(2))
         }
-        code = cells.get("A", "")
-        if code:
-            out[code] = cells.get("Z", "")
+        code = cells.get(code_col, "")
+        if not code:
+            continue
+        col = note_col or (max(cells, key=_col_idx) if cells else None)
+        out[code] = cells.get(col, "") if col else ""
     return out
 
 
@@ -182,6 +193,12 @@ class MrErpHttpAdapter:
         if not valid:
             return self._result(histories, [], preflight_failed, t0, 0)
 
+        # 销项:明细行对不上已有商品则自建并注入码(在生成 xlsx 前)· 见 autocreate
+        if m.doc_type.startswith("sales"):
+            from services.erp.mrerp_http.autocreate import provision_products
+
+            provision_products(self, valid, mappings)
+
         xlsx_bytes = _gen.generate_xlsx(valid, mappings, sheet_kind=m.sheet_kind)
         expected = [_gen.derive_mrerp_invoice_no(h) for h in valid]
 
@@ -208,24 +225,37 @@ class MrErpHttpAdapter:
     def create_customers(
         self, customers: List[Dict[str, Any]], mappings: Dict[str, Any]
     ) -> Dict[str, bool]:
-        """自建客户(idempotent)· 导入 imparmas · 返回 {客户码: 成功}。已存在(ซ้ำ)视为成功。"""
-        codes = [str(c.get("code") or "") for c in customers if c.get("code")]
+        """自建客户(idempotent)· 导入 imparmas · 返回 {客户码: 成功}。已存在视为成功。"""
+        return self._import_masters(get_module("master_customer"), customers, mappings, "A")
+
+    def create_products(
+        self, products: List[Dict[str, Any]], mappings: Dict[str, Any]
+    ) -> Dict[str, bool]:
+        """自建商品(idempotent)· 导入 impstkmas · 返回 {商品码: 成功}。已存在视为成功。"""
+        return self._import_masters(get_module("master_product"), products, mappings, "C")
+
+    def _import_masters(
+        self, module, records: List[Dict[str, Any]], mappings: Dict[str, Any], code_col: str
+    ) -> Dict[str, bool]:
+        """自建主数据通用流:导入 → raw=1 全成功;否则读 report 判逐行(空备注/已存在=成功)。"""
+        codes = [str(r.get("code") or "") for r in records if r.get("code")]
         if not codes:
             return {}
         if self._sess is None:
             raise RuntimeError("MrErpHttpAdapter used outside `with` block")
-        cm = get_module("master_customer")
-        xlsx = _gen.generate_xlsx(customers, mappings, sheet_kind=cm.sheet_kind)
-        self._sess.prepare(f"{cm.path}/formupload.php?idmenu={cm.idmenu}")
-        self._upload_xlsx(xlsx, module=cm)
-        form_fields, row_ids, idus_form = self._fetch_preview(module=cm)
+        xlsx = _gen.generate_xlsx(records, mappings, sheet_kind=module.sheet_kind)
+        self._sess.prepare(f"{module.path}/formupload.php?idmenu={module.idmenu}")
+        self._upload_xlsx(xlsx, module=module)
+        form_fields, row_ids, idus_form = self._fetch_preview(module=module)
         if not row_ids:
             return {c: False for c in codes}
-        raw = self._confirm_import(form_fields, row_ids, module=cm)
+        raw = self._confirm_import(form_fields, row_ids, module=module)
         if raw == "1":
             return {c: True for c in codes}
-        notes = _parse_master_report(self._fetch_report(idus_form, module=cm))
-        # 空备注=新建成功;"มีอยู่ในระบบแล้ว"(该码已存在)=幂等重复,视为成功(客户可用)
+        notes = _parse_master_report(
+            self._fetch_report(idus_form, module=module), code_col=code_col
+        )
+        # 空备注=新建成功;"มีอยู่ในระบบแล้ว"(该码已存在)=幂等重复,视为成功
         return {c: (not notes.get(c) or "มีอยู่ในระบบแล้ว" in notes.get(c, "")) for c in codes}
 
     # ---- 5 步 --------------------------------------------------------

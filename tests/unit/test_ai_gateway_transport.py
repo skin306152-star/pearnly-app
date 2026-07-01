@@ -91,6 +91,23 @@ class TestTransportRouting(unittest.TestCase):
         self.assertEqual(transport.text_to_text("p").data, "hello")
         self.assertEqual(transport.embed(["a"]).data, [[0.1, 0.2]])
 
+    def test_backend_override_selects_provider(self):
+        # 传 backend= 覆盖全局:get_provider 收到覆盖名(Agent 大脑走便宜后端,OCR 不受影响)。
+        with (
+            mock.patch.object(backends, "get_provider", return_value=_FakeProvider) as gp,
+            mock.patch.object(backends, "active_backend", return_value="vertex"),
+        ):
+            transport.text_to_json("hi", backend="selfhost")
+            gp.assert_called_once_with("selfhost")
+
+    def test_no_backend_follows_global(self):
+        with (
+            mock.patch.object(backends, "get_provider", return_value=_FakeProvider) as gp,
+            mock.patch.object(backends, "active_backend", return_value="vertex"),
+        ):
+            transport.text_to_json("hi")
+            gp.assert_called_once_with("vertex")
+
     def test_non_outcome_return_is_defended(self):
         class Bad:
             NAME = "bad"

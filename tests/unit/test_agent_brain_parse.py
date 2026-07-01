@@ -65,6 +65,31 @@ class TestAgentBrainParse(unittest.TestCase):
             transport.text_to_json = original
         self.assertEqual(a.tool, "balance")
 
+    def test_decide_passes_brain_backend(self):
+        # AGENT_BRAIN_BACKEND 未设 → backend=None(跟随全局);设 selfhost → 透传给网关。
+        import os
+
+        import services.ai_gateway.transport as transport
+
+        seen = {}
+        original = transport.text_to_json
+
+        def _stub(*a, **k):
+            seen["backend"] = k.get("backend")
+            return _out({"kind": "tool", "tool": "balance", "args": {}})
+
+        transport.text_to_json = _stub
+        try:
+            os.environ.pop("AGENT_BRAIN_BACKEND", None)
+            brain.decide("hi", [], today="2026-06-30")
+            self.assertIsNone(seen["backend"])
+            os.environ["AGENT_BRAIN_BACKEND"] = "selfhost"
+            brain.decide("hi", [], today="2026-06-30")
+            self.assertEqual(seen["backend"], "selfhost")
+        finally:
+            transport.text_to_json = original
+            os.environ.pop("AGENT_BRAIN_BACKEND", None)
+
 
 if __name__ == "__main__":
     unittest.main()

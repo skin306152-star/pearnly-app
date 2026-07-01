@@ -16,14 +16,16 @@ from services.ai_gateway import logging as ai_log
 from services.ai_gateway.tasks import AiResult, ProviderOutcome
 
 
-def _observe(task: str, outcome: ProviderOutcome, latency_ms: int, *, tenant_id, user_id, trace_id):
+def _observe(
+    task: str, outcome: ProviderOutcome, latency_ms: int, *, provider, tenant_id, user_id, trace_id
+):
     """复用 gateway 日志/计费口径(无原文/key/raw response)。"""
     result = AiResult(
         ok=bool(outcome.ok),
         task=task,
         schema_version="t1",
         data=None,  # 日志不带 data
-        provider=backends.active_backend(),
+        provider=provider,
         model=outcome.model,
         error_kind=outcome.error_kind,
         latency_ms=latency_ms,
@@ -35,16 +37,27 @@ def _observe(task: str, outcome: ProviderOutcome, latency_ms: int, *, tenant_id,
 
 
 def _run(
-    method: str, args: tuple, kwargs: dict, *, task, tenant_id, user_id, trace_id
+    method: str, args: tuple, kwargs: dict, *, task, backend=None, tenant_id, user_id, trace_id
 ) -> ProviderOutcome:
-    prov = backends.get_provider()
+    # backend=None → 全局 OCR_LLM_BACKEND;传值 → 本次调用覆盖(如 Agent 大脑走便宜 selfhost,
+    # OCR 仍走全局 Gemini)。provider 名按生效后端记日志。
+    effective = (backend or backends.active_backend()).strip().lower()
+    prov = backends.get_provider(effective)
     fn = getattr(prov, method)
     start = time.time()
     outcome = fn(*args, **kwargs)
     latency_ms = int((time.time() - start) * 1000)
     if not isinstance(outcome, ProviderOutcome):  # 防御:provider 契约错
         outcome = ProviderOutcome(ok=False, error_kind="provider")
-    _observe(task, outcome, latency_ms, tenant_id=tenant_id, user_id=user_id, trace_id=trace_id)
+    _observe(
+        task,
+        outcome,
+        latency_ms,
+        provider=effective,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        trace_id=trace_id,
+    )
     return outcome
 
 
@@ -59,6 +72,7 @@ def text_to_json(
     timeout_s: int = 30,
     max_retries: int = 1,
     task: str = "ocr.text_json",
+    backend: Optional[str] = None,
     tenant_id=None,
     user_id=None,
     trace_id=None,
@@ -76,6 +90,7 @@ def text_to_json(
             max_retries=max_retries,
         ),
         task=task,
+        backend=backend,
         tenant_id=tenant_id,
         user_id=user_id,
         trace_id=trace_id,

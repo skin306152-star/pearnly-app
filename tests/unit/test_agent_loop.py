@@ -389,6 +389,25 @@ class TestReplySanityGate(unittest.TestCase):
         self.assertIn("5", out.text)  # 诚实兜底真实数字,不发那坨零
 
 
+class TestSystemPromptContract(unittest.TestCase):
+    """_SYSTEM 收口:质检准则在、记账 say 暖话字段已去、假设/否定不记账加固在、时间戳不进缓存前缀。"""
+
+    def _p(self):
+        return loop._prompt("x", [], "TS-1", [], lang="th", force_reply=False, allow_write=True)
+
+    def test_has_honesty_check_and_hypothetical_guard(self):
+        p = self._p()
+        self.assertIn("Honesty check", p)  # 结果呈现前的质检段
+        self.assertIn("hypothetical", p.lower())  # 假设/否定不当真记账
+        self.assertIn("negation", p.lower())
+
+    def test_say_field_removed(self):
+        self.assertNotIn('"say"', self._p())  # 记账直录·不再要暖话行字段
+
+    def test_time_not_in_cacheable_header(self):
+        self.assertNotIn("TS-1", self._p().split("Now (Asia/Bangkok):")[0])  # 缓存前缀不含易变时间
+
+
 class TestMultiItemDefersToPreciseCard(unittest.TestCase):
     """一句话多笔支出:写开时确定性判定为多笔 → defer_record 交精准多笔卡路,不被单笔工具吞成一笔。"""
 

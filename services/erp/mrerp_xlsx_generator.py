@@ -272,6 +272,12 @@ def generate_xlsx(
 
         return generate_xlsx_sales_cash(histories, mappings)
 
+    # master_customer 自建客户(imparmas)· 官方模板克隆 · 见 mrerp_xlsx_customer
+    if sheet_kind == "customer_master":
+        from services.erp.mrerp_xlsx_customer import generate_xlsx_customer
+
+        return generate_xlsx_customer(histories, mappings)
+
     schema = MRERP_SHEET_SCHEMAS.get(sheet_kind)
     if not schema:
         raise ValueError(f"unknown sheet_kind: {sheet_kind}")

@@ -39,6 +39,11 @@ _TAGSTRIP_RE = re.compile(r"<[^>]+>")
 _HINT_KEYWORDS = ("ไม่พบ", "ผิดพลาด", "ไม่ถูกต้อง", "ซ้ำ", "ไม่ครบ")
 
 
+def _selmenu_param(m) -> str:
+    """selmenu 表单参数 · 主数据导入(imparmas/impstkmas…)无 selmenu → 发空串,别发 'None'。"""
+    return "" if m.selmenu is None else str(m.selmenu)
+
+
 class MrErpHttpAdapter:
     def __init__(
         self,
@@ -165,7 +170,7 @@ class MrErpHttpAdapter:
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
             },
-            data={"idus": str(self._sess.idus), "selmenu": str(m.selmenu)},
+            data={"idus": str(self._sess.idus), "selmenu": _selmenu_param(m)},
             headers={
                 "Referer": f"{self.login_url}/{m.path}/formupload.php?idmenu={m.idmenu}",
                 "X-Requested-With": "XMLHttpRequest",
@@ -183,7 +188,7 @@ class MrErpHttpAdapter:
         m = self.module
         r = self._sess.post(
             f"{m.path}/formrdpc.php",
-            data={"idus": str(self._sess.idus), "selmenu": str(m.selmenu)},
+            data={"idus": str(self._sess.idus), "selmenu": _selmenu_param(m)},
             headers={
                 "Referer": f"{self.login_url}/{m.path}/formupload.php?idmenu={m.idmenu}",
                 "Content-Type": "application/x-www-form-urlencoded",

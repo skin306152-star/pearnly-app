@@ -81,7 +81,8 @@ def _iter_items(h: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
 
 def _product_code_from_name(name: str) -> str:
     """商品名 → 确定性商品码(≤15 · 幂等:同名同码 → create_products 重复视为成功)。"""
-    digest = hashlib.md5(name.strip().lower().encode("utf-8")).hexdigest()
+    # md5 仅作确定性短码派生,非安全用途 → usedforsecurity=False(过 bandit)
+    digest = hashlib.md5(name.strip().lower().encode("utf-8"), usedforsecurity=False).hexdigest()
     return ("P" + digest)[:12].upper()
 
 

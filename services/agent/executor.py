@@ -92,9 +92,7 @@ class AgentToolset:
 
         with db.get_cursor_rls(tenant_id=ctx.tenant_id, user_id=str(ctx.user["id"])) as cur:
             rows = line_workspace.list_active(cur, tenant_id=ctx.tenant_id)
-            cur_id = line_workspace.current_workspace_id(
-                cur, tenant_id=ctx.tenant_id, line_user_id=ctx.line_user_id
-            )
+            cur_id = line_workspace.current_workspace_id(cur, line_user_id=ctx.line_user_id)
         return ToolResult(ok=True, data={"workspaces": rows, "current_id": cur_id})
 
     def switch_workspace(self, ctx: AgentContext, *, name=None) -> ToolResult:
@@ -111,12 +109,11 @@ class AgentToolset:
                 return ToolResult(
                     ok=False, error_code="workspace_not_found", data={"workspaces": rows}
                 )
-            line_workspace.set_current(
-                cur,
-                tenant_id=ctx.tenant_id,
-                line_user_id=ctx.line_user_id,
-                workspace_client_id=match["id"],
+            hit = line_workspace.set_current(
+                cur, line_user_id=ctx.line_user_id, workspace_client_id=match["id"]
             )
+        if not hit:  # 没命中绑定行 → 别谎报成功
+            return ToolResult(ok=False, error_code="not_bound")
         return ToolResult(ok=True, data={"switched_to": match})
 
     # ── B 档:写操作(M3 才开)· 样板留桩,展示确认前置 + 幂等 + 权限的形状 ──

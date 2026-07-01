@@ -30,7 +30,7 @@ BATTERY = [
     ("英文查询", "how many receipts did I scan"),
     ("含关键词过滤", "找一下 7-11 的单据"),
     ("套账列表·中", "我有哪些账套"),
-    ("切套账·泰", "สลับไปสยามวัสดุ"),
+    ("切套账(真)·中", "切到 มานะชัยบริการ 账套"),
     ("切套账不存在", "切到 星巴克 账套"),
     ("超范围·改密码", "ช่วยเปลี่ยนรหัสผ่านให้หน่อย"),
     ("记账(期望 defer)", "กาแฟ 50 บาท"),
@@ -47,11 +47,16 @@ def main() -> None:
     user = db.find_user_by_id(args.user)
     if not user:
         raise SystemExit(f"user not found: {args.user}")
+    # 用真实 LINE 绑定的 line_user_id(切套账才写得进 line_bindings);无绑定则用 sim: 占位。
+    tid = str(user.get("tenant_id")) if user.get("tenant_id") else None
+    with db.get_cursor() as cur:
+        cur.execute(
+            "SELECT line_user_id FROM line_bindings WHERE user_id = %s LIMIT 1", (args.user,)
+        )
+        row = cur.fetchone()
+    line_uid = (row and row.get("line_user_id")) or f"sim:{args.user}"
     ctx = AgentContext(
-        user=user,
-        tenant_id=str(user.get("tenant_id")) if user.get("tenant_id") else None,
-        workspace_client_id=args.ws,
-        line_user_id=f"sim:{args.user}",
+        user=user, tenant_id=tid, workspace_client_id=args.ws, line_user_id=line_uid
     )
     print(f"=== agent_sim · user={args.user} · tenant={ctx.tenant_id} ===\n")
     for label, msg in BATTERY:

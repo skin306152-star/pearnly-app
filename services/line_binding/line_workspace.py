@@ -15,12 +15,14 @@ def _norm(s: str) -> str:
     return "".join((s or "").lower().split())
 
 
-def current_workspace_id(cur, *, tenant_id, line_user_id) -> Optional[int]:
-    """该 LINE 用户选定的当前套账 id;未选 → None。"""
+def current_workspace_id(cur, *, line_user_id) -> Optional[int]:
+    """该 LINE 用户选定的当前套账 id;未选 → None。
+
+    按 line_user_id 单键(全局唯一;line_bindings.tenant_id 历史行普遍为 NULL,不能进 WHERE)。
+    """
     cur.execute(
-        "SELECT current_workspace_client_id FROM line_bindings "
-        "WHERE line_user_id = %s AND tenant_id = %s",
-        (line_user_id, tenant_id),
+        "SELECT current_workspace_client_id FROM line_bindings WHERE line_user_id = %s",
+        (line_user_id,),
     )
     row = cur.fetchone()
     val = row.get("current_workspace_client_id") if row else None
@@ -38,7 +40,7 @@ def resolve_write_workspace(cur, *, tenant_id, line_user_id) -> Optional[int]:
     from core.workspace_context import default_workspace_id
 
     try:
-        chosen = current_workspace_id(cur, tenant_id=tenant_id, line_user_id=line_user_id)
+        chosen = current_workspace_id(cur, line_user_id=line_user_id)
     except Exception:
         chosen = None
     return chosen or default_workspace_id(cur, tenant_id)
@@ -54,12 +56,14 @@ def list_active(cur, *, tenant_id) -> list:
     return [{"id": int(r["id"]), "name": r["name"]} for r in cur.fetchall()]
 
 
-def set_current(cur, *, tenant_id, line_user_id, workspace_client_id) -> bool:
-    """把该 LINE 用户的当前套账钉到 workspace_client_id。返回是否命中绑定行。"""
+def set_current(cur, *, line_user_id, workspace_client_id) -> bool:
+    """把该 LINE 用户的当前套账钉到 workspace_client_id。返回是否命中绑定行。
+
+    按 line_user_id 单键(全局唯一;tenant_id 历史行为 NULL,进 WHERE 会写不中)。
+    """
     cur.execute(
-        "UPDATE line_bindings SET current_workspace_client_id = %s "
-        "WHERE line_user_id = %s AND tenant_id = %s",
-        (workspace_client_id, line_user_id, tenant_id),
+        "UPDATE line_bindings SET current_workspace_client_id = %s WHERE line_user_id = %s",
+        (workspace_client_id, line_user_id),
     )
     return cur.rowcount > 0
 

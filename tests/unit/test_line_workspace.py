@@ -18,11 +18,11 @@ def _cur(fetchone=None, fetchall=None, rowcount=1):
 class TestLineWorkspace(unittest.TestCase):
     def test_current_none_when_unset(self):
         cur = _cur(fetchone={"current_workspace_client_id": None})
-        self.assertIsNone(lw.current_workspace_id(cur, tenant_id="t", line_user_id="U"))
+        self.assertIsNone(lw.current_workspace_id(cur, line_user_id="U"))
 
     def test_current_returns_int(self):
         cur = _cur(fetchone={"current_workspace_client_id": 84})
-        self.assertEqual(lw.current_workspace_id(cur, tenant_id="t", line_user_id="U"), 84)
+        self.assertEqual(lw.current_workspace_id(cur, line_user_id="U"), 84)
 
     def test_resolve_falls_back_to_default(self):
         # 未选当前套账 → 回落 default_workspace_id。
@@ -46,9 +46,11 @@ class TestLineWorkspace(unittest.TestCase):
 
     def test_set_current_reports_hit(self):
         cur = _cur(rowcount=1)
-        self.assertTrue(
-            lw.set_current(cur, tenant_id="t", line_user_id="U", workspace_client_id=84)
-        )
+        self.assertTrue(lw.set_current(cur, line_user_id="U", workspace_client_id=84))
+
+    def test_set_current_miss_when_no_binding(self):
+        cur = _cur(rowcount=0)
+        self.assertFalse(lw.set_current(cur, line_user_id="U", workspace_client_id=84))
 
 
 if __name__ == "__main__":

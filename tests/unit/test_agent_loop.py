@@ -13,7 +13,7 @@ def _script(*steps):
     """按顺序吐 LoopStep,模拟模型多步决策(tool→...→reply)。"""
     it = iter(steps)
 
-    def decide(user_text, history, *, today, observations):
+    def decide(user_text, history, *, today, observations, **kw):
         return next(it)
 
     return decide

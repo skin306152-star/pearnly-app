@@ -118,10 +118,8 @@ def _observe_payload(tool: str, result) -> dict:
             "balance_thb": data.get("balance_thb"),
             "pages_used_this_month": data.get("pages_used_this_month"),
         }
-    if tool == "list_notifications":
-        # data 在上面被强转成 dict(取代码统一路径);通知工具的 result.data 是 list,读原始值。
-        logs = result.data if isinstance(result.data, list) else []
-        return {"ok": True, "count": len(logs)}
+    if tool == "list_notifications":  # result.data 是 list(非上面 dict 化的 data)→ 直接数长度
+        return {"ok": True, "count": len(result.data) if isinstance(result.data, list) else 0}
     if tool == "list_workspaces":
         return {
             "ok": True,

@@ -4,7 +4,7 @@ import unittest
 from contextlib import contextmanager
 from decimal import Decimal
 
-from services.agent import loop, manifest
+from services.agent import fallbacks, loop, manifest
 from services.agent.contracts import AgentContext, SlotSpec, ToolResult, ToolSpec
 from services.expense.expense_draft import ExpenseDraft
 
@@ -216,25 +216,25 @@ class TestTimezoneAndFallback(unittest.TestCase):
         self.assertIn("BBB-222", p2)
 
     def test_fallback_balance_shows_number(self):
-        out = loop._grounded_fallback([{"tool": "balance", "balance_thb": 74375}], "zh")
+        out = fallbacks.grounded_fallback([{"tool": "balance", "balance_thb": 74375}], "zh")
         self.assertIn("74,375", out)
 
     def test_fallback_summary_shows_count_and_total(self):
-        out = loop._grounded_fallback(
+        out = fallbacks.grounded_fallback(
             [{"tool": "history_summary", "doc_count": 12, "amount_total": 8450}], "en"
         )
         self.assertIn("12", out)
         self.assertIn("8,450", out)
 
     def test_fallback_usage_shows_pages(self):
-        out = loop._grounded_fallback(
+        out = fallbacks.grounded_fallback(
             [{"tool": "usage_this_month", "pages_used_this_month": 30}], "en"
         )
         self.assertIn("30", out)
 
     def test_fallback_uncovered_tool_returns_none(self):
         # 套账导航低风险未覆盖 → None(交入口安全兜底,不编)。
-        self.assertIsNone(loop._grounded_fallback([{"tool": "list_workspaces"}], "en"))
+        self.assertIsNone(fallbacks.grounded_fallback([{"tool": "list_workspaces"}], "en"))
 
 
 class _RecToolset:
@@ -340,12 +340,109 @@ class TestObservePayload(unittest.TestCase):
         self.assertEqual(obs, {"ok": True, "count": 0})
 
     def test_grounded_fallback_notifications_some(self):
-        msg = loop._grounded_fallback([{"tool": "list_notifications", "count": 2}], "zh")
+        msg = fallbacks.grounded_fallback([{"tool": "list_notifications", "count": 2}], "zh")
         self.assertEqual(msg, "有 2 条通知。")
 
     def test_grounded_fallback_notifications_zero(self):
-        msg = loop._grounded_fallback([{"tool": "list_notifications", "count": 0}], "en")
+        msg = fallbacks.grounded_fallback([{"tool": "list_notifications", "count": 0}], "en")
         self.assertEqual(msg, "No new notifications.")
+
+
+class TestReplySanityGate(unittest.TestCase):
+    """出口护栏:失控生成(复读循环/超长/退化)绝不原样发,换 crash → 入口安全兜底(model-agnostic)。"""
+
+    def test_sane_reply_accepts_normal(self):
+        self.assertTrue(loop._sane_reply("ยินดีช่วยครับ 1+1 เท่ากับ 2 ค่ะ"))
+        self.assertTrue(loop._sane_reply("2"))
+        self.assertTrue(loop._sane_reply("5555 ตลกมากเลยค่ะ"))  # 泰语笑声不误杀
+
+    def test_sane_reply_rejects_runaway(self):
+        self.assertFalse(loop._sane_reply("1" + "0" * 400))  # 一屏零(复读循环)
+        self.assertFalse(loop._sane_reply("ก" * 1600))  # 超长
+        self.assertFalse(loop._sane_reply("   "))  # 空
+
+    def test_insane_reply_becomes_crash(self):
+        # 模型回一屏零 → 出口护栏拦下 → crash(入口出安全兜底,绝不原样怼给用户)。
+        out = loop.handle_turn(
+            "1+1 เท่ากับอะไร",
+            _CTX,
+            decide=_script(loop.LoopStep("reply", message="1" + "0" * 400)),
+            history=[],
+        )
+        self.assertEqual(out.kind, "crash")
+
+    def test_insane_final_reply_falls_to_grounded_fallback(self):
+        # 强制成文那步也吐失控输出 → 不发,改用工具真实数字兜底(此处 balance=5)。
+        ts = _FakeToolset(ToolResult(ok=True, data={"balance_thb": 5}))
+        out = loop.handle_turn(
+            "ยอดเงิน",
+            _CTX,
+            decide=_script(
+                loop.LoopStep("tool", tool="balance", args={}),
+                loop.LoopStep("tool", tool="balance", args={}),  # 重复 → 收敛去成文
+                loop.LoopStep("reply", message="0" * 200),  # 强制成文吐失控输出
+            ),
+            toolset=ts,
+            history=[],
+        )
+        self.assertEqual(out.kind, "reply")
+        self.assertIn("5", out.text)  # 诚实兜底真实数字,不发那坨零
+
+
+class TestMultiItemDefersToPreciseCard(unittest.TestCase):
+    """一句话多笔支出:写开时确定性判定为多笔 → defer_record 交精准多笔卡路,不被单笔工具吞成一笔。"""
+
+    def _draft(self):
+        return ExpenseDraft(amount=Decimal("50"))
+
+    def test_is_multi_record_detection(self):
+        self.assertTrue(loop._is_multi_record("咖啡50 米40"))
+        self.assertTrue(loop._is_multi_record("กาแฟ 50 ข้าว 40"))
+        self.assertFalse(loop._is_multi_record("กาแฟ 50"))  # 单笔不命中
+        self.assertFalse(loop._is_multi_record("สวัสดี"))
+
+    def test_multi_defers_before_brain_when_write_on(self):
+        sunk = []
+        out = loop.handle_turn(
+            "咖啡50 米40",
+            _CTX,
+            decide=_script(loop.LoopStep("tool", tool="record_expense", args={"amount": "50"})),
+            toolset=_RecToolset(ToolResult(ok=True, data={"draft": self._draft()})),
+            history=[],
+            allow_write=True,
+            record_sink=lambda ctx, draft, say="": sunk.append(draft),
+        )
+        self.assertEqual(out.kind, "defer_record")  # 交精准多笔卡路(旧路 do_record_multi)
+        self.assertEqual(sunk, [])  # 单笔工具没执行 → 没吞成一笔
+
+    def test_single_still_records_via_brain_when_write_on(self):
+        # 对照:单笔照走大脑直录出卡(多笔守门不误伤单笔)。
+        sunk = []
+        out = loop.handle_turn(
+            "咖啡 50",
+            _CTX,
+            decide=_script(
+                loop.LoopStep("tool", tool="record_expense", args={"amount": "50"}, say="hi")
+            ),
+            toolset=_RecToolset(ToolResult(ok=True, data={"draft": self._draft()})),
+            history=[],
+            allow_write=True,
+            record_sink=lambda ctx, draft, say="": sunk.append(draft),
+        )
+        self.assertEqual(out.kind, "card_sent")
+        self.assertEqual(len(sunk), 1)
+
+    def test_multi_not_intercepted_when_write_off(self):
+        # 写关:记账本就 defer 回旧路(旧路自走多笔),前置拦不介入 → 走正常 defer_record。
+        out = loop.handle_turn(
+            "咖啡50 米40",
+            _CTX,
+            decide=_script(loop.LoopStep("tool", tool="record_expense", args={"amount": "50"})),
+            toolset=_RecToolset(ToolResult(ok=True, data={"draft": self._draft()})),
+            history=[],
+            allow_write=False,
+        )
+        self.assertEqual(out.kind, "defer_record")
 
 
 if __name__ == "__main__":

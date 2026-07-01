@@ -16,7 +16,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
-from services.agent import brain, executor, manifest, slots
+from services.agent import brain, executor, fallbacks, manifest, slots
 from services.agent.contracts import AgentAction, AgentContext
 from services.sales.dates import bangkok_now
 
@@ -113,6 +113,17 @@ def _reply_lang(text: str) -> str:
     return detect_text_lang(text) or "en"
 
 
+def _is_multi_record(text: str) -> bool:
+    """确定性判定:一句话多笔支出(≥2 个「名+额」)。与旧路同一个 parse_multi,口径一致——
+    命中即交现成精准多笔卡路(do_record_multi),别让只建单笔的记账写工具吞成一笔(能力只增不减)。"""
+    from services.expense.line_quick_entry import parse_multi
+
+    try:
+        return bool(parse_multi(text or ""))
+    except Exception:
+        return False
+
+
 def _recent(ctx: AgentContext) -> list:
     if not ctx.line_user_id or not ctx.tenant_id:
         return []
@@ -201,6 +212,38 @@ def _prompt(
     )
 
 
+# 回复出口护栏:闲聊/查询回复本就一两句,失控生成(复读循环/退化输出)绝不原样发给用户。
+# 与后端无关(model-agnostic)——换任何大脑都可能偶发抽风,这是最后一道兜底。
+_REPLY_MAX_LEN = 1500  # 超长 = 大概率失控(正常回复远短于此)
+_REPLY_MAX_RUN = 30  # 同一字符连续 30+ = 复读循环(如「1000…000」一屏零)
+_REPLY_MIN_VARIETY_LEN = 60  # 达到此长度却只有极少种字符 = 退化输出
+
+
+def _sane_reply(message: str) -> bool:
+    """模型自撰回复是否合理(非失控生成)。空/超长/字符复读/极低多样性 → 不合理。"""
+    t = (message or "").strip()
+    if not t or len(t) > _REPLY_MAX_LEN:
+        return False
+    longest = run = 1
+    for prev, cur in zip(t, t[1:]):
+        run = run + 1 if cur == prev else 1
+        if run > longest:
+            longest = run
+    if longest >= _REPLY_MAX_RUN:
+        return False
+    if len(t) >= _REPLY_MIN_VARIETY_LEN and len(set(t)) <= 4:
+        return False
+    return True
+
+
+def _reply_result(message: str) -> TurnResult:
+    """模型回复 → TurnResult,过出口护栏:失控输出换 crash(入口出安全兜底,绝不原样怼给用户)。"""
+    if _sane_reply(message):
+        return TurnResult("reply", message)
+    logger.warning("[agent] insane reply suppressed len=%d", len(message or ""))
+    return TurnResult("crash")
+
+
 def _salvage_prose(outcome) -> Optional["LoopStep"]:
     """parse 失败但模型吐了干净散文(常是陪伴/查询的人话·忘了包 JSON)→ 当回复救回,别浪费成 crash。
     含 { 的多半是坏/截断 JSON 残片(不给用户看)→ 不救,交 crash 走安全兜底。"""
@@ -287,6 +330,12 @@ def handle_turn(
     lang = _reply_lang(user_text)
     ctx.user_text = user_text  # 写工具建草稿做金额接地要原文
 
+    # 多笔记账守门:记账写工具只建单笔,遇确定性判定为多笔的消息会把它吞成一笔(丢账)。
+    # → defer 回旧确定性路,由现成精准多笔卡(do_record_multi)逐条入账。写关时记账本就 defer,
+    # 旧路自会走多笔,故只在写开时前置拦(旧路 :107 会用同一 parse_multi 复核后出多笔卡)。
+    if allow_write and record_sink is not None and _is_multi_record(user_text):
+        return TurnResult("defer_record")
+
     observations: list = []
     called: set = set()
     for _ in range(_MAX_STEPS):
@@ -301,7 +350,7 @@ def handle_turn(
         )
         if step.kind == "reply":
             if step.message:
-                return TurnResult("reply", step.message)
+                return _reply_result(step.message)  # 过出口护栏:失控输出 → 安全兜底
             if observations:
                 break  # 空回复但已取到数据 → 强制成文
             return TurnResult("crash")  # 空回复且无数据 = 大脑故障,不当 defer
@@ -360,9 +409,9 @@ def handle_turn(
             force_reply=True,
             allow_write=allow_write,
         )
-        if final.kind == "reply" and final.message:
+        if final.kind == "reply" and _sane_reply(final.message):
             return TurnResult("reply", final.message)
-        fb = _grounded_fallback(observations, lang)
+        fb = fallbacks.grounded_fallback(observations, lang)
         return TurnResult("reply", fb) if fb else TurnResult("crash")
     return TurnResult("crash")  # 循环空转无产出 = 故障(不静默掉旧路)
 
@@ -374,101 +423,3 @@ def _defer_result(reason: str) -> TurnResult:
     if reason == "edit":
         return TurnResult("defer_edit")
     return TurnResult("crash")
-
-
-# 模型两次不肯成文时,按已取到的工具结果给的诚实兜底句(四语 · {n} 为数量)。
-# 只覆盖搜索/通知的 0 结果(旧路 has_item_context 会把这类误路成"问价格");其它工具罕见
-# 成文失败交旧路(其查询兜底非误路)。计数字段名见 _FALLBACK_COUNT_KEY。
-_FALLBACK = {
-    "list_history": {
-        "zero": {
-            "th": "ไม่พบเอกสารที่ตรงกับคำค้นครับ",
-            "zh": "没有找到相关单据。",
-            "en": "No matching receipts found.",
-            "ja": "該当する書類は見つかりませんでした。",
-        },
-        "some": {
-            "th": "พบเอกสารที่ตรงกับคำค้น {n} รายการ",
-            "zh": "找到 {n} 条相关单据。",
-            "en": "Found {n} matching receipts.",
-            "ja": "{n}件見つかりました。",
-        },
-    },
-    "list_notifications": {
-        "zero": {
-            "th": "ไม่มีแจ้งเตือนใหม่ครับ",
-            "zh": "目前没有新通知。",
-            "en": "No new notifications.",
-            "ja": "新しい通知はありません。",
-        },
-        "some": {
-            "th": "มีแจ้งเตือน {n} รายการ",
-            "zh": "有 {n} 条通知。",
-            "en": "{n} notifications.",
-            "ja": "通知が{n}件あります。",
-        },
-    },
-}
-_FALLBACK_COUNT_KEY = {"list_history": "total", "list_notifications": "count"}
-
-# 值型只读工具的兜底(展示真实数字·非计数)。套账导航(list/switch_workspace)低风险 → 不兜底,交安全兜底。
-_FB_BALANCE = {
-    "th": "ยอดเครดิตคงเหลือ ฿{v} ครับ",
-    "zh": "你的余额是 ฿{v}。",
-    "en": "Your balance is ฿{v}.",
-    "ja": "残高は฿{v}です。",
-}
-_FB_SUMMARY = {
-    "th": "เดือนนี้บันทึกไป {n} รายการ รวม ฿{v} ครับ",
-    "zh": "本月记录 {n} 单,合计 ฿{v}。",
-    "en": "This month: {n} documents, ฿{v} total.",
-    "ja": "今月は{n}件、合計฿{v}です。",
-}
-_FB_USAGE = {
-    "th": "เดือนนี้ใช้ไป {p} หน้าครับ",
-    "zh": "本月已用 {p} 页。",
-    "en": "You've used {p} pages this month.",
-    "ja": "今月は{p}ページ使いました。",
-}
-
-
-def _fb_money(v) -> str:
-    try:
-        return f"{float(v or 0):,.0f}"
-    except (TypeError, ValueError):
-        return "0"
-
-
-def _fb_int(v) -> int:
-    try:
-        return int(v or 0)
-    except (TypeError, ValueError):
-        return 0
-
-
-# 值型只读工具:tool → (四语模板, 从观测取模板槽位的函数)。加一个值型工具 = 加一行,不再加 if 分支。
-_VALUE_FB = {
-    "balance": (_FB_BALANCE, lambda o: {"v": _fb_money(o.get("balance_thb"))}),
-    "history_summary": (
-        _FB_SUMMARY,
-        lambda o: {"n": _fb_int(o.get("doc_count")), "v": _fb_money(o.get("amount_total"))},
-    ),
-    "usage_this_month": (_FB_USAGE, lambda o: {"p": _fb_int(o.get("pages_used_this_month"))}),
-}
-
-
-def _grounded_fallback(observations: list, lang: str) -> Optional[str]:
-    """成文失败的最后兜底:从最后一个工具观测取真实数字拼一句诚实话(绝不编)。
-    计数型走 _FALLBACK(zero/some),值型走 _VALUE_FB;套账导航未覆盖 → None → 交入口安全兜底。"""
-    last = observations[-1] if observations else {}
-    tool = last.get("tool")
-    table = _FALLBACK.get(tool)
-    if table:  # 计数型(list_history / list_notifications)
-        n = _fb_int(last.get(_FALLBACK_COUNT_KEY[tool]))
-        msgs = table["some" if n else "zero"]
-        return msgs.get(lang, msgs["en"]).format(n=n)
-    spec = _VALUE_FB.get(tool)  # 值型(balance / history_summary / usage_this_month)
-    if spec:
-        msgs, extract = spec
-        return msgs.get(lang, msgs["en"]).format(**extract(last))
-    return None

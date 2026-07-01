@@ -6,9 +6,20 @@ erp_push.py re-export 二者,调用方与测试经 erp_push.<name> 访问的契�
 """
 
 import logging
+import os
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+
+def _mrerp_transport(config: Dict[str, Any]) -> str:
+    """直写(http)还是 Playwright · endpoint.config.transport 优先,其次 env,默认 playwright(安全)。
+    S1 灰度用:MRERP_TRANSPORT=http 或单 endpoint 配 transport=http 切直写,一秒回退。"""
+    return (
+        str(config.get("transport") or "").strip().lower()
+        or os.getenv("MRERP_TRANSPORT", "").strip().lower()
+        or "playwright"
+    )
 
 
 def load_mrerp_mappings(tenant_id: Optional[str]) -> Dict[str, Any]:
@@ -33,15 +44,20 @@ def build_mrerp_adapter(config: Dict[str, Any]):
       - 失败 → (None, {"http_status", "body", "error_msg"}) · caller 直接拼成 push 结果 dict
     单张(push_mrerp_history)和批量(push_dispatch.dispatch_endpoint_batch)共用此构造逻辑。
     """
-    # lazy adapter import (Playwright may be missing on dev boxes).
-    try:
-        from services.erp.mrerp_adapter import MRERPAdapter
-    except ImportError as e:
-        return None, {
-            "http_status": 0,
-            "body": f"playwright_missing: {e}",
-            "error_msg": f"ERR_PLAYWRIGHT_MISSING: {e}",
-        }
+    # 选传输 → 定 adapter 类。http 直写不碰 Playwright(为将来删 Playwright 铺路)。
+    transport = _mrerp_transport(config)
+    if transport == "http":
+        from services.erp.mrerp_http import MrErpHttpAdapter as AdapterCls
+    else:
+        # lazy adapter import (Playwright may be missing on dev boxes).
+        try:
+            from services.erp.mrerp_adapter import MRERPAdapter as AdapterCls
+        except ImportError as e:
+            return None, {
+                "http_status": 0,
+                "body": f"playwright_missing: {e}",
+                "error_msg": f"ERR_PLAYWRIGHT_MISSING: {e}",
+            }
 
     # credentials. Accept both shapes:
     #   enc_user/enc_pass (Fernet ciphertext via wizard POST encryption)
@@ -82,13 +98,13 @@ def build_mrerp_adapter(config: Dict[str, Any]):
 
     try:
         if enc_user and enc_pass:
-            adapter = MRERPAdapter.from_encrypted(
+            adapter = AdapterCls.from_encrypted(
                 encrypted_username=enc_user,
                 encrypted_password=enc_pass,
                 **common_kwargs,
             )
         elif plain_user and plain_pass:
-            adapter = MRERPAdapter(
+            adapter = AdapterCls(
                 username=plain_user,
                 password=plain_pass,
                 **common_kwargs,

@@ -144,6 +144,34 @@ class RoutedBatchEndpointTests(unittest.TestCase):
             [p for p in paths if "importpc" in p], f"别家的票不该打任何导入端点: {paths}"
         )
 
+    def test_foreign_currency_blocked_by_doc_sanity(self):
+        """外币票(fields.currency=USD)→ 单据防呆挡下·不推(对抗票 15 的防线;OCR 读到币种时生效)。"""
+        h = {
+            "client_id": 1,
+            "invoice_number": "IVUSD",
+            "invoice_date": "2026-07-01",
+            "total_amount": "428.00",
+            "fields": {"seller_tax": OWN, "buyer_tax": OTHER, "currency": "USD"},
+        }
+        res, paths = self._run([h])
+        self.assertEqual(len(res.success), 0)
+        self.assertEqual(len(res.failed), 1)
+        self.assertIn("currency_not_thb", res.failed[0].reasons[0])
+        self.assertFalse([p for p in paths if "importpc" in p], f"外币票不该推: {paths}")
+
+    def test_credit_note_blocked_by_doc_sanity(self):
+        h = {
+            "client_id": 1,
+            "invoice_number": "IVCN",
+            "invoice_date": "2026-07-01",
+            "total_amount": "107.00",
+            "fields": {"seller_tax": OWN, "buyer_tax": OTHER, "notes": "ใบลดหนี้ credit note"},
+        }
+        res, paths = self._run([h])
+        self.assertEqual(len(res.failed), 1)
+        self.assertEqual(res.failed[0].reasons[0], "credit_note")
+        self.assertFalse([p for p in paths if "importpc" in p])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -123,6 +123,27 @@ class RoutedBatchEndpointTests(unittest.TestCase):
         self.assertTrue(self._txn(paths, "impaptran"), f"混批采购段缺失: {paths}")
         self.assertEqual(len(res.success), 2)
 
+    def test_foreign_invoice_blocked_by_account_set_gate(self):
+        """别家的票(买卖方都读到税号·都不是套账主体)→ 匹配闸挡下·不推不打任何导入端点。
+
+        对抗票 07/13 场景:此前批量路没注入 _own_tax_id → 闸失效 → 别家票记成我方销项。
+        Bug#1 注入 own_tax 后闸生效,本闸锁死"能确认不符即挡"。
+        """
+        foreign = {
+            "client_id": 3,
+            "invoice_number": "IVFOREIGN",
+            "invoice_date": "2026-07-01",
+            "total_amount": "107.00",
+            # 卖 0999.. 买 0107.. · 都非套账主体 OWN(0105562046201)→ 确认别家的票
+            "fields": {"seller_tax": OTHER, "buyer_tax": "0107777666555"},
+        }
+        res, paths = self._run([foreign])
+        self.assertEqual(len(res.success), 0, "别家的票不该落库")
+        self.assertEqual(len(res.failed), 1)
+        self.assertFalse(
+            [p for p in paths if "importpc" in p], f"别家的票不该打任何导入端点: {paths}"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

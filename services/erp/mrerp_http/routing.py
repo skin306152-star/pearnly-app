@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 
 from services.erp.express_push.common import payment_is_paid
 from services.erp.express_push.direction import resolve_direction
+from services.erp.express_push.doc_sanity import check_document
 from services.erp.mrerp_adapter_models import FailedRow, ImportResult
 from services.erp.mrerp_http.modules import get_module
 from services.purchase.field_clean import clean_tax_id
@@ -82,8 +83,6 @@ _DOC_SANITY_FRIENDLY: Dict[str, Dict[str, str]] = {
 
 def _doc_sanity_reason(history: Dict[str, Any], doc_type: str) -> Optional[str]:
     """单据防呆(外币/贷项/押金/未来日期/坏税号)· 复用 Express doc_sanity · 命中返 reason。"""
-    from services.erp.express_push.doc_sanity import check_document
-
     fields = history.get("fields") if isinstance(history.get("fields"), dict) else {}
     direction = "purchase" if doc_type == "purchase" else "sales"
     return check_document(fields, history, direction)
@@ -116,8 +115,7 @@ def route_and_upload(adapter, histories: List[Dict[str, Any]], mappings: Dict[st
     own = mappings.get("_own_tax_id") if isinstance(mappings, dict) else None
     default_doc = adapter.module.doc_type
     sanity_failed: List[FailedRow] = []
-    groups: Dict[str, List[Dict[str, Any]]] = {}
-    order: List[str] = []
+    groups: Dict[str, List[Dict[str, Any]]] = {}  # dict 保序 → 无需单独 order 列表
     for h in histories:
         chosen = choose_doc_type(h, h, own_tax_id=own)
         dt = "purchase" if chosen == "purchase" else default_doc
@@ -126,22 +124,20 @@ def route_and_upload(adapter, histories: List[Dict[str, Any]], mappings: Dict[st
             sanity_failed.append(_sanity_fail_row(h, reason))
             continue
         groups.setdefault(dt, []).append(h)
-        if dt not in order:
-            order.append(dt)
 
-    if not order:  # 全被防呆挡下
+    if not groups:  # 全被防呆挡下
         res = ImportResult(total=total)
         res.failed = sanity_failed
         return res
 
     # 无防呆命中 且 全部同向=默认 → 走原路(零行为变化 · 单次 upload)。
-    if not sanity_failed and order == [default_doc]:
+    if not sanity_failed and list(groups) == [default_doc]:
         return adapter.upload_invoice_batch(histories, mappings)
 
     merged = ImportResult(total=total)
     saved = adapter.module
     try:
-        for dt in order:
+        for dt in groups:
             adapter.module = get_module(dt)
             r = adapter.upload_invoice_batch(groups[dt], mappings)
             merged.success.extend(r.success)

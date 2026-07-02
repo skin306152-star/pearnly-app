@@ -155,14 +155,14 @@ def vat_rate_anomaly(history: Dict[str, Any]) -> bool:
     仅在能算(total>0 且 vat>0)时判;vat≈0(免税/零税率)不判。税基=total−vat
     → 折扣已含在 total,不误杀折扣票;偏离 7% 太多(默认 [5%,9%] 外)→ True(异常)。
     """
-    total = fmt_number(history.get("total_amount"))
+    total = fmt_number(history.get("total_amount"))  # -> Optional[float]
     vat = fmt_number(history.get("vat"))
-    if not total or float(total) <= 0 or not vat or float(vat) <= 0:
+    if not total or total <= 0 or not vat or vat <= 0:
         return False
-    base = float(total) - float(vat)
+    base = total - vat
     if base <= 0:
         return False
-    rate = float(vat) / base
+    rate = vat / base
     return rate < MRERP_VAT_RATE_MIN or rate > MRERP_VAT_RATE_MAX
 
 

@@ -39,6 +39,10 @@ class _FakeAdapter:
             raise self._raises
         return self._result
 
+    def upload_routed_batch(self, flats, mappings):
+        # 真 adapter 的方向路由入口:无方向锚点 → 走默认 → 单次 upload_invoice_batch(契约不变)。
+        return self.upload_invoice_batch(flats, mappings)
+
 
 def _result(success_rows, failed_rows):
     return SimpleNamespace(

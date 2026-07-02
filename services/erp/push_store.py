@@ -296,32 +296,56 @@ def has_recent_successful_push(
     history_id: str,
     endpoint_id: str,
     user_id: str,
+    invoice_no: Optional[str] = None,
+    seller_name: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """批 2 改动 2 (Zihao 2026-05-19 拍板 · v118.34.34) · 推送去重 check.
     返回最近一次 success log (含 mrerp_bill_no 等)· 没有返 None.
 
-    用于 push_to_endpoint 之前 check:同 history × endpoint 之前已经
-    success 过 · 别再推一次 · 写一条 skipped_dup log 静默跳过.
+    ① 同 history × endpoint 已 success 过 → 命中(原逻辑)。
+    ② 跨记录:同一张票**重新上传**=新 history_id,原①判不出 → 按自然键
+       (票号 + 卖方名)× endpoint 再判一次,防同票 auto 双推双记账(对抗票 16)。
+       仅在 invoice_no 提供时启用(auto-push 传入);manual/旧 3 参调用行为不变。
+       要求票号**与**卖方名都相等才算撞(err 向"放行"·不误挡不同卖方复用同号/OCR 变体)。
 
     严格 user_id scope · 防跨账号 false positive.
     """
-    if not history_id or not endpoint_id:
+    if not endpoint_id:
         return None
     try:
         with db.get_cursor_rls(user_id=str(user_id)) as cur:
-            cur.execute(
-                """
-                SELECT id, response_body, created_at, invoice_no
-                FROM erp_push_logs
-                WHERE history_id = %s AND endpoint_id = %s
-                  AND user_id = %s AND status = 'success'
-                ORDER BY created_at DESC
-                LIMIT 1
-            """,
-                (history_id, endpoint_id, str(user_id)),
-            )
-            r = cur.fetchone()
-            return dict(r) if r else None
+            if history_id:
+                cur.execute(
+                    """
+                    SELECT id, response_body, created_at, invoice_no
+                    FROM erp_push_logs
+                    WHERE history_id = %s AND endpoint_id = %s
+                      AND user_id = %s AND status = 'success'
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """,
+                    (history_id, endpoint_id, str(user_id)),
+                )
+                r = cur.fetchone()
+                if r:
+                    return dict(r)
+            if invoice_no:
+                cur.execute(
+                    """
+                    SELECT id, response_body, created_at, invoice_no
+                    FROM erp_push_logs
+                    WHERE endpoint_id = %s AND user_id = %s AND status = 'success'
+                      AND invoice_no = %s
+                      AND COALESCE(seller_name, '') = COALESCE(%s, '')
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """,
+                    (endpoint_id, str(user_id), invoice_no, seller_name),
+                )
+                r = cur.fetchone()
+                if r:
+                    return dict(r)
+            return None
     except Exception as e:
         logger.error(f"has_recent_successful_push failed: {e}")
         return None

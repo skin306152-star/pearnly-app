@@ -143,6 +143,29 @@ def derive_mrerp_invoice_no(history: Dict[str, Any]) -> str:
     return f"{date_part}-{seq}"
 
 
+# 泰国标准 VAT=7%。税基取 total−vat(对折扣稳健:折扣已含在 total,不误杀 7-11 折扣票)。
+# 票面 VAT 隐含税率落在 [MIN, MAX] 外(如 10%)= 异常 → 转人工,不自动过账错税。
+MRERP_VAT_RATE_MIN = 0.05
+MRERP_VAT_RATE_MAX = 0.09
+
+
+def vat_rate_anomaly(history: Dict[str, Any]) -> bool:
+    """票面 VAT 与应税基的隐含税率是否异常(非 ≈7%)· 对抗票 06(10% 内部自洽仍应转人工)。
+
+    仅在能算(total>0 且 vat>0)时判;vat≈0(免税/零税率)不判。税基=total−vat
+    → 折扣已含在 total,不误杀折扣票;偏离 7% 太多(默认 [5%,9%] 外)→ True(异常)。
+    """
+    total = fmt_number(history.get("total_amount"))  # -> Optional[float]
+    vat = fmt_number(history.get("vat"))
+    if not total or total <= 0 or not vat or vat <= 0:
+        return False
+    base = total - vat
+    if base <= 0:
+        return False
+    rate = vat / base
+    return rate < MRERP_VAT_RATE_MIN or rate > MRERP_VAT_RATE_MAX
+
+
 # ============================================================
 # 验证:发票装得出有效 sales_credit 行吗?
 # 留 facade(读 facade 级 derive_mrerp_invoice_no + MRERP_*_MAX · 二者皆 monkeypatch 目标)
@@ -221,6 +244,10 @@ def validate_history_for_sales_credit(
     tax_kind = derive_tax_kind(history)
     if tax_kind not in MRERP_VALID_TAX_KINDS_SC:
         return False, "ERR_TAX_RATE_INVALID", []
+
+    # VAT 税率合理性(对抗票 06):票面 VAT 隐含税率非 ≈7% → 转人工,不自动过账错税。
+    if vat_rate_anomaly(history):
+        return False, "ERR_VAT_RATE_ANOMALY", []
 
     # Date sanity (P1-A §3.5).
     warnings: List[str] = []

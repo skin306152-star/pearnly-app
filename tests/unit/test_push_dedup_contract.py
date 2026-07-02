@@ -229,5 +229,71 @@ class HasRecentSuccessfulPushNegativeTests(unittest.TestCase):
         self.assertIsNone(r)
 
 
+class _SeqCursor(_MockCursor):
+    """按 execute 顺序返不同 fetchone(测两段查询:先 history 后 票号+卖方)。"""
+
+    def __init__(self, results):
+        super().__init__()
+        self._results = list(results)
+
+    def fetchone(self):
+        return self._results.pop(0) if self._results else None
+
+
+class HasRecentSuccessfulPushCrossRecordTests(unittest.TestCase):
+    """Bug#3 · 同票重新上传(新 history_id)按 (票号+卖方) 跨记录去重,防 auto 双推。"""
+
+    def test_cross_record_hit_by_invoice_and_seller(self):
+        # query1(history)未命中 → query2(票号+卖方)命中
+        cur = _SeqCursor([None, {"id": "log-dup", "invoice_no": "IV6900179"}])
+        with (
+            patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cur)),
+            patch.object(db, "get_cursor_rls", lambda *a, **k: _MockCursorCM(cur)),
+        ):
+            r = db.has_recent_successful_push(
+                "new-hist", "ep-1", "u1", invoice_no="IV6900179", seller_name="เบคแลบ"
+            )
+        self.assertIsNotNone(r)
+        self.assertEqual(r["id"], "log-dup")
+        self.assertEqual(len(cur.executed), 2)  # 两段都跑(history 未中才查票号)
+        sql2, params2 = cur.executed[1]
+        self.assertIn("invoice_no = %s", sql2)
+        self.assertIn("seller_name", sql2)
+        self.assertNotIn("history_id", sql2)  # 跨记录段不锁 history
+        self.assertIn("IV6900179", [str(p) for p in params2])
+        self.assertIn("เบคแลบ", [str(p) for p in params2])
+
+    def test_history_hit_short_circuits_no_invoice_query(self):
+        # query1 命中 → 直接返回 · 不跑票号段(即便给了 invoice_no)
+        cur = _SeqCursor([{"id": "log-hist", "invoice_no": "IV1"}])
+        with (
+            patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cur)),
+            patch.object(db, "get_cursor_rls", lambda *a, **k: _MockCursorCM(cur)),
+        ):
+            r = db.has_recent_successful_push("h1", "ep-1", "u1", invoice_no="IV1", seller_name="s")
+        self.assertEqual(r["id"], "log-hist")
+        self.assertEqual(len(cur.executed), 1)
+
+    def test_cross_record_miss_returns_none(self):
+        cur = _SeqCursor([None, None])
+        with (
+            patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cur)),
+            patch.object(db, "get_cursor_rls", lambda *a, **k: _MockCursorCM(cur)),
+        ):
+            r = db.has_recent_successful_push("h1", "ep-1", "u1", invoice_no="IVX", seller_name="s")
+        self.assertIsNone(r)
+        self.assertEqual(len(cur.executed), 2)
+
+    def test_no_invoice_no_keeps_single_query(self):
+        # 不传 invoice_no(manual / 旧 3 参)→ 只跑 history 段 · 行为不变
+        cur = _SeqCursor([None])
+        with (
+            patch.object(db, "get_cursor", lambda *a, **k: _MockCursorCM(cur)),
+            patch.object(db, "get_cursor_rls", lambda *a, **k: _MockCursorCM(cur)),
+        ):
+            db.has_recent_successful_push("h1", "ep-1", "u1")
+        self.assertEqual(len(cur.executed), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

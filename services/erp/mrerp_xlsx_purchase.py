@@ -139,6 +139,9 @@ def validate_purchase_history(history: Dict[str, Any], mappings: Dict[str, Any])
         return False, "ERR_NO_TOTAL_AMOUNT", []
     if not _supplier_code(history, mappings):
         return False, "ERR_NO_SUPPLIER", []
+    # VAT 税率合理性(对抗票 06 · 与销项同口径):进项票隐含税率非 ≈7% → 转人工。
+    if _gen.vat_rate_anomaly(history):
+        return False, "ERR_VAT_RATE_ANOMALY", []
     return True, None, []
 
 

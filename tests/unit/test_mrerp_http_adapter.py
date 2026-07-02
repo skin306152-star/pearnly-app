@@ -187,5 +187,78 @@ class TestRouting(unittest.TestCase):
         self.assertIsNone(choose_doc_type(flat, {}, own_tax_id=self.OWN))
 
 
+class TestRoutedBatch(unittest.TestCase):
+    """upload_routed_batch:按方向把采购票切到采购模块,销项/ambiguous 保持默认(Bug#1 接线)。"""
+
+    OWN = "1234567890123"
+    OTHER = "9999999999999"
+
+    def _adapter(self):
+        a = MrErpHttpAdapter(
+            login_url="https://x", username="u", password="p", serialize_sessions=False
+        )
+        a._sess = object()  # 绕过 `with` 检查 · upload 被打桩不联网
+        return a
+
+    def _flat(self, seller, buyer, inv):
+        return {
+            "id": inv,
+            "invoice_number": inv,
+            "fields": {"seller_tax": seller, "buyer_tax": buyer},
+        }
+
+    def _stub_upload(self, adapter):
+        """把 upload_invoice_batch 换成记录『当时 module.doc_type + 收到哪些票』的桩。"""
+        from services.erp.mrerp_adapter_models import ImportResult, SuccessRow
+
+        calls = []
+
+        def fake(histories, mappings):
+            dt = adapter.module.doc_type
+            ids = [h["id"] for h in histories]
+            calls.append((dt, ids))
+            res = ImportResult(total=len(histories))
+            res.success = [
+                SuccessRow(invoice_no=i, mrerp_bill_no=f"X{i}", original={}) for i in ids
+            ]
+            return res
+
+        adapter.upload_invoice_batch = fake  # type: ignore[assignment]
+        return calls
+
+    def test_purchase_routed_to_purchase_module(self):
+        a = self._adapter()
+        calls = self._stub_upload(a)
+        histories = [
+            self._flat(seller=self.OWN, buyer=self.OTHER, inv="S1"),  # 销项
+            self._flat(seller=self.OTHER, buyer=self.OWN, inv="P1"),  # 采购
+            self._flat(seller=self.OTHER, buyer=self.OTHER, inv="A1"),  # ambiguous
+        ]
+        res = a.upload_routed_batch(histories, {"_own_tax_id": self.OWN})
+        by = {dt: ids for dt, ids in calls}
+        self.assertEqual(by["purchase"], ["P1"])  # 采购切到采购模块
+        self.assertEqual(sorted(by["sales_credit"]), ["A1", "S1"])  # 销项+ambiguous 留默认
+        self.assertEqual(len(res.success), 3)
+        self.assertEqual(a.module.doc_type, "sales_credit")  # 结束后 module 复位
+
+    def test_all_sales_uses_fast_path_single_call(self):
+        a = self._adapter()
+        calls = self._stub_upload(a)
+        histories = [
+            self._flat(seller=self.OWN, buyer=self.OTHER, inv="S1"),
+            self._flat(seller=self.OWN, buyer=self.OTHER, inv="S2"),
+        ]
+        a.upload_routed_batch(histories, {"_own_tax_id": self.OWN})
+        self.assertEqual(len(calls), 1)  # 全销项 → 不切模块 · 一次调用整批
+        self.assertEqual(calls[0], ("sales_credit", ["S1", "S2"]))
+
+    def test_no_own_tax_all_default(self):
+        a = self._adapter()
+        calls = self._stub_upload(a)
+        histories = [self._flat(seller=self.OTHER, buyer=self.OWN, inv="P1")]
+        a.upload_routed_batch(histories, {})  # 无 own_tax → 判不出 → 落默认(不倒退)
+        self.assertEqual(calls, [("sales_credit", ["P1"])])
+
+
 if __name__ == "__main__":
     unittest.main()

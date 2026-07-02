@@ -12,10 +12,13 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from services.erp.express_push.common import payment_is_paid
 from services.erp.express_push.direction import resolve_direction
+from services.erp.express_push.doc_sanity import check_document
+from services.erp.mrerp_adapter_models import FailedRow, ImportResult
+from services.erp.mrerp_http.modules import get_module
 from services.purchase.field_clean import clean_tax_id
 
 
@@ -34,6 +37,117 @@ def choose_doc_type(
     if direction == "purchase":
         return "purchase"
     return None
+
+
+# 单据防呆码 → 四语友好文案(前缀匹配 · currency_not_thb:usd 带后缀也命中)· 全转人工。
+# MR.ERP 本地(mrerp_business_friendly 已近 500 行 · 不塞该大目录)· 与 Express 类别渲染并存。
+_DOC_SANITY_FRIENDLY: Dict[str, Dict[str, str]] = {
+    "currency_not_thb": {
+        "th": "เอกสารเป็นสกุลเงินต่างประเทศ (ไม่ใช่บาท) — ตรวจสอบด้วยตนเอง ไม่บันทึกอัตโนมัติ",
+        "en": "Foreign-currency document (not THB) — manual review; not auto-posted",
+        "zh": "外币单据(非泰铢)· 转人工复核 · 不自动过账",
+        "ja": "外貨建て伝票(タイバーツ以外)· 手動確認 · 自動計上しない",
+    },
+    "credit_note": {
+        "th": "ใบลดหนี้/คืนสินค้า — ต้องกลับรายการ ไม่บันทึกเป็นบิลปกติ",
+        "en": "Credit note / return — must be a reversal, not a normal invoice",
+        "zh": "贷项/退货单 · 应走负向冲销 · 转人工",
+        "ja": "クレジットノート/返品 · 逆仕訳が必要 · 手動確認",
+    },
+    "deposit_receipt": {
+        "th": "ใบรับเงินมัดจำ/ประกัน — ค่าใช้จ่ายยังไม่เกิด ตรวจสอบด้วยตนเอง",
+        "en": "Deposit/guarantee receipt — expense not yet incurred; manual review",
+        "zh": "押金/定金收据 · 费用尚未发生 · 转人工",
+        "ja": "手付金/保証金の受領書 · 費用未発生 · 手動確認",
+    },
+    "date_future": {
+        "th": "วันที่เอกสารเป็นอนาคต — ตรวจสอบด้วยตนเอง",
+        "en": "Document date is in the future — please review",
+        "zh": "单据日期为未来 · 可疑复核 · 转人工",
+        "ja": "伝票日付が未来 · 要確認 · 手動確認",
+    },
+    "date_reissued": {
+        "th": "เอกสารออกใบแทน/ย้อนหลัง — ตรวจสอบด้วยตนเอง",
+        "en": "Re-issued/back-dated document — please review",
+        "zh": "补开/倒签单据 · 可疑复核 · 转人工",
+        "ja": "再発行/遡及日付の伝票 · 要確認 · 手動確認",
+    },
+    "tax_id_invalid": {
+        "th": "เลขประจำตัวผู้เสียภาษีของคู่ค้าไม่ครบ 13 หลัก — ตรวจสอบ",
+        "en": "Counterparty tax ID is not 13 digits — please check",
+        "zh": "对手方税号非 13 位 · 转人工核对",
+        "ja": "取引先の納税者番号が13桁でない · 要確認",
+    },
+}
+
+
+def _doc_sanity_reason(history: Dict[str, Any], doc_type: str) -> Optional[str]:
+    """单据防呆(外币/贷项/押金/未来日期/坏税号)· 复用 Express doc_sanity · 命中返 reason。"""
+    fields = history.get("fields") if isinstance(history.get("fields"), dict) else {}
+    direction = "purchase" if doc_type == "purchase" else "sales"
+    return check_document(fields, history, direction)
+
+
+def _sanity_fail_row(history: Dict[str, Any], reason: str) -> FailedRow:
+    from services.erp import mrerp_xlsx_generator as _gen
+
+    friendly = next(
+        (tr for pfx, tr in _DOC_SANITY_FRIENDLY.items() if reason.startswith(pfx)), None
+    )
+    return FailedRow(
+        invoice_no=_gen.derive_mrerp_invoice_no(history),
+        reasons=[reason],
+        reasons_friendly=[friendly] if friendly else [],
+        original=history,
+    )
+
+
+def route_and_upload(adapter, histories: List[Dict[str, Any]], mappings: Dict[str, Any]):
+    """按每张单据的方向路由 doc_type 再推送 · 合并为一个 ImportResult(同一会话内复用登录)。
+
+    推送前先跑**单据防呆**(外币/贷项/押金/未来日期/坏税号 → 转人工·复用 Express doc_sanity),
+    命中即落 failed 不推不建。其余**只把【确认为采购】的票切到采购模块**——销项 / 判不出方向
+    一律保持默认 doc_type(sales_credit),零倒退;别家的票由匹配闸(_filter_by_account_set)另挡。
+    """
+    if not histories:
+        return ImportResult(total=0)
+    total = len(histories)
+    own = mappings.get("_own_tax_id") if isinstance(mappings, dict) else None
+    default_doc = adapter.module.doc_type
+    sanity_failed: List[FailedRow] = []
+    groups: Dict[str, List[Dict[str, Any]]] = {}  # dict 保序 → 无需单独 order 列表
+    for h in histories:
+        chosen = choose_doc_type(h, h, own_tax_id=own)
+        dt = "purchase" if chosen == "purchase" else default_doc
+        reason = _doc_sanity_reason(h, dt)
+        if reason:
+            sanity_failed.append(_sanity_fail_row(h, reason))
+            continue
+        groups.setdefault(dt, []).append(h)
+
+    if not groups:  # 全被防呆挡下
+        res = ImportResult(total=total)
+        res.failed = sanity_failed
+        return res
+
+    # 无防呆命中 且 全部同向=默认 → 走原路(零行为变化 · 单次 upload)。
+    if not sanity_failed and list(groups) == [default_doc]:
+        return adapter.upload_invoice_batch(histories, mappings)
+
+    merged = ImportResult(total=total)
+    saved = adapter.module
+    try:
+        for dt in groups:
+            adapter.module = get_module(dt)
+            r = adapter.upload_invoice_batch(groups[dt], mappings)
+            merged.success.extend(r.success)
+            merged.failed.extend(r.failed)
+            merged.elapsed_ms += r.elapsed_ms or 0
+            merged.xlsx_size_bytes += r.xlsx_size_bytes or 0
+    finally:
+        adapter.module = saved
+    merged.failed.extend(sanity_failed)
+    return merged
 
 
 def confirmed_account_set_mismatch(

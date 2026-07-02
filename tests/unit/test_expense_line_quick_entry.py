@@ -6,12 +6,12 @@
 """
 
 import unittest
-from datetime import date
 from decimal import Decimal
 
 from services.expense import amount_extract as ae
 from services.expense import line_quick_entry as lqe
 from services.expense.expense_draft import ExpenseDraft
+from services.sales.dates import bangkok_today  # 与 parser 的 _today() 同源 · 防 UTC 午夜差一天
 
 
 class ParseExpenseTests(unittest.TestCase):
@@ -63,7 +63,7 @@ class ParseExpenseTests(unittest.TestCase):
 
     def test_date_today_word(self):
         d = lqe.parse_expense("ค่าน้ำ 50 วันนี้")
-        self.assertEqual(d.doc_date, date.today().isoformat())
+        self.assertEqual(d.doc_date, bangkok_today().isoformat())
 
     def test_date_buddhist_two_digit(self):
         # 13/06/69 → 佛历 2569-543 = 2026
@@ -80,7 +80,7 @@ class ParseExpenseTests(unittest.TestCase):
         self.assertEqual(d.amount, Decimal("50"))
 
     def test_default_date_today(self):
-        self.assertEqual(lqe.parse_expense("ค่าน้ำ 50").doc_date, date.today().isoformat())
+        self.assertEqual(lqe.parse_expense("ค่าน้ำ 50").doc_date, bangkok_today().isoformat())
 
 
 class IntentGuardTests(unittest.TestCase):

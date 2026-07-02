@@ -5,17 +5,18 @@
 与多笔 LLM 路对齐;无线索时卖家为空(不乱填)。"""
 
 import unittest
-from datetime import date, timedelta
+from datetime import timedelta
 
 from services.expense.line_quick_entry import (
     _extract_item_name,
     _extract_vendor,
     parse_expense,
 )
+from services.sales.dates import bangkok_today  # 与 parser 的 _today() 同源 · 防 UTC 午夜差一天
 
 
 def _d(n):
-    return (date.today() - timedelta(days=n)).isoformat()
+    return (bangkok_today() - timedelta(days=n)).isoformat()
 
 
 class VendorTests(unittest.TestCase):

@@ -160,12 +160,24 @@ def handle_expense_text(
             _pool("amount_missing")
             return True
 
-        # 2. 大脑(一次 LLM):听意图 + 抽槽 + 自然回复 → 工具分发。
+        # T5 单一决策者(设计 §3.2):M3 全家桶开 → 前门大脑是唯一 LLM 决策者,旧 LLM
+        # understand() 物理退出灰度路。模型仍 defer_edit(理应用 edit 工具却没用)→ 确定性
+        # 列可改字段引导重说,绝不再开第二个大脑二次解读(行为不一致/双倍成本的根)。
+        from services.line_binding import line_agent_bridge as _bridge
+
+        m3_on = gated and _bridge.m3_enabled(bound_user)
+        if m3_on and agent_verdict == "defer_edit":
+            from services.expense import line_correct_i18n as ci
+
+            _say(ci.t(ci.EDIT_EXAMPLES, line_classify.detect_text_lang(text) or lang))
+            return True
+
+        # 2. 大脑(一次 LLM):听意图 + 抽槽 + 自然回复 → 工具分发。M3 开则跳过(单一决策者)。
         from services.expense import line_agent, line_l2
 
         api_key = line_l2.resolve_api_key(bound_user)
         u = None
-        if api_key and _ocr_balance_ok(bound_user):
+        if api_key and not m3_on and _ocr_balance_ok(bound_user):
             u = line_agent.understand(text, api_key=api_key, history=history)
         if u:
             _charge_line_l2(bound_user, stid)

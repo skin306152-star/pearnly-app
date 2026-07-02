@@ -12,6 +12,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from typing import Any, Dict, List, Optional
 
 from services.erp.express_push.common import payment_is_paid
@@ -20,6 +22,8 @@ from services.erp.express_push.doc_sanity import check_document
 from services.erp.mrerp_adapter_models import FailedRow, ImportResult
 from services.erp.mrerp_http.modules import get_module
 from services.purchase.field_clean import clean_tax_id
+
+logger = logging.getLogger("mr-pilot")
 
 
 def _fields(flat: Dict[str, Any]) -> Dict[str, Any]:
@@ -149,6 +153,15 @@ def route_and_upload(adapter, histories: List[Dict[str, Any]], mappings: Dict[st
             continue
         groups.setdefault(dt, []).append(h)
 
+    # 方向可排查:push 日志 request_body 不记 doc_type,出问题只能反证(真机排查踩过)。
+    logger.info(
+        "[mrerp-route] groups=%s sanity_failed=%d",
+        {
+            k: [str(h.get("invoice_number") or h.get("id") or "?")[:24] for h in v]
+            for k, v in groups.items()
+        },
+        len(sanity_failed),
+    )
     if not groups:  # 全被防呆挡下
         res = ImportResult(total=total)
         res.failed = sanity_failed

@@ -144,10 +144,12 @@ class AgentToolset:
 
     # ── A 档:M4 扩充(推送状态 / 税号核验 / 我的套餐) ──
 
-    def _locate_doc(self, ctx: AgentContext, keyword):
+    def _locate_doc(self, ctx: AgentContext, keyword, *, allow_doc_fallback=False):
         """按关键词定位一张单据(推送状态/推 ERP 共用锚点步)。
         返回 (hist, None) 或 (None, 失败 ToolResult):零命中→not_found;
-        带词多命中→候选喂回让用户挑(绝不猜);无词→最近一张。"""
+        带词多命中→候选喂回让用户挑(绝不猜);无词→最近一张。
+        allow_doc_fallback 只有 push_to_erp 开:兜底会插载体行(写副作用),
+        查状态这类纯读不许有。"""
         res = db.list_ocr_history(
             user_id=str(ctx.user["id"]),
             tenant_id=ctx.tenant_id,
@@ -160,6 +162,14 @@ class AgentToolset:
         )
         items = res.get("items", []) if isinstance(res, dict) else []
         if not items:
+            # 图先话后盲区根治:记账租户图片单不写识别记录 → 查近期图片来源单据反拼载体行
+            # (doc_fallback·记账主路零改动)。兜底也无 → 原 not_found 口径。
+            if allow_doc_fallback:
+                from services.agent import doc_fallback
+
+                doc_hist = doc_fallback.locate_pushable_doc(ctx, keyword)
+                if doc_hist:
+                    return doc_hist, None
             return None, ToolResult(ok=False, error_code="history_not_found")
         if keyword and len(items) > 1:
             cands = [
@@ -295,7 +305,7 @@ class AgentToolset:
         p = _plan_permissions((ctx.user or {}).get("plan"))
         if not p.get("can_push_erp"):
             return ToolResult(ok=False, error_code="forbidden")
-        hist, fail = self._locate_doc(ctx, doc_keyword)
+        hist, fail = self._locate_doc(ctx, doc_keyword, allow_doc_fallback=True)
         if fail is not None:
             return fail
 

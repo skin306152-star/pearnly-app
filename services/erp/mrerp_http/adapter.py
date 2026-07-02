@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from services.erp import mrerp_xlsx_generator as _gen
 from services.erp.exceptions import MRERPBusinessError
-from services.erp.mrerp_adapter_models import FailedRow, ImportResult, SuccessRow
+from services.erp.mrerp_adapter_models import FailedRow, ImportResult, SuccessRow, bill_no_for
 from services.erp.mrerp_business_friendly import translate_reasons
 from services.erp.mrerp_http.account_valve import (
     ACCOUNT_REVIEW_CODE,
@@ -376,21 +376,17 @@ class MrErpHttpAdapter:
         self, valid: List[Dict[str, Any]], expected: List[str], raw: str, idus_form: Optional[str]
     ) -> Tuple[List[SuccessRow], List[FailedRow]]:
         by_inv = {inv: h for inv, h in zip(expected, valid)}
+
+        def _ok_row(i: str) -> SuccessRow:
+            bill = bill_no_for(self.module.doc_type, i)
+            return SuccessRow(invoice_no=i, mrerp_bill_no=bill, original=by_inv.get(i, {}))
+
         if raw == "1":
             # importpc "1" = 全部提交 · 不出报告
-            return (
-                [
-                    SuccessRow(invoice_no=i, mrerp_bill_no=f"SI{i}", original=by_inv.get(i, {}))
-                    for i in expected
-                ],
-                [],
-            )
+            return [_ok_row(i) for i in expected], []
         # 任何其他情况(含 "2")→ 必拉 report 逐行判定,不臆断
         report = parse_import_report(self._fetch_report(idus_form))
-        success = [
-            SuccessRow(invoice_no=i, mrerp_bill_no=f"SI{i}", original=by_inv.get(i, {}))
-            for i in report.success
-        ]
+        success = [_ok_row(i) for i in report.success]
         # 科目安全阀:report 报科目未匹配 → 归为 ERR_ACCOUNT_NEEDS_REVIEW(退回用户配置,不硬建)
         failed = []
         for row in report.failed:

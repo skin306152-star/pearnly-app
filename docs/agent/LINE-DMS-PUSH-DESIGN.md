@@ -1,6 +1,7 @@
 # LINE-DMS:拍身份证 → 建 DMS 客户 · 设计(施工前方案)
 
 > 2026-07-02 · loop 能力块。推送主路径,按铁律先报方案。
+> ✅ 已按本方案落地(PR#41 · merge 2fd19015):检查点表=line_pending_actions·共用识别层=services/erp/dms_id_ocr·闸 agent_dms_push。
 > 依赖已就绪:LI 意图框架(话先图后)+ M3 确认握手状态机(本块=泛用检查点表首个消费者)。
 
 ## 0 · 现状

@@ -220,8 +220,7 @@ async def _handle_line_image_ocr(
             return True
 
         tid_str = str(user_fresh["tenant_id"]) if user_fresh.get("tenant_id") else None
-        # LI-2 意图分流(闸 agent_image_intent 默认关):决策/落地/故障兜底全在 route 层,
-        # 指令默认值 = 现状代码逐字节不变(handled=None · ws=None · skip_ingest=False)。
+        # LI-2 意图分流(闸默认关):决策/落地/兜底全在 route 层,指令默认值=现状代码逐字节不变。
         from services.ocr import line_image_route
 
         _idir = await line_image_route.intercept(
@@ -241,8 +240,7 @@ async def _handle_line_image_ocr(
         )
         if _idir.handled is not None:
             return _idir.handled
-        if _idir.ws is not None:
-            _ws_client_id = _idir.ws
+        _ws_client_id = _idir.ws if _idir.ws is not None else _ws_client_id
 
         # 统一智能通道(docs/smart-intake/15):图片 → 置信驱动入账(建草稿/高置信直接入账)+ 数据卡。
         #   expense 开 → ingest_line_image(高置信直接入正式账,其余草稿/待归类);回执发数据卡。

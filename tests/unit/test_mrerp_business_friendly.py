@@ -54,6 +54,15 @@ class ErrCodeLookupTests(unittest.TestCase):
         self.assertIn("18", out["zh_TW"])
         self.assertIn("18", out["th"])
 
+    def test_err_account_set_mismatch(self):
+        # 匹配闸失败码 · 曾是裸中文 reason(任何 ui_lang 都显示中文)→ 必须走 catalog 四语。
+        out = get_friendly("ERR_ACCOUNT_SET_MISMATCH")
+        for lang in SUPPORTED_LANGS:
+            self.assertTrue(out[lang], f"missing {lang}")
+            self.assertNotEqual(out[lang], "ERR_ACCOUNT_SET_MISMATCH", f"{lang} 是 raw 回显")
+        self.assertIn("account set", out["en"])
+        self.assertIn("未推送", out["zh"])
+
     def test_err_customer_code_too_long(self):
         out = get_friendly("ERR_CUSTOMER_CODE_TOO_LONG")
         self.assertIn("20", out["en"])

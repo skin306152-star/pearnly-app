@@ -75,6 +75,13 @@ _ERR_CATALOG: Dict[str, Dict[str, str]] = {
         "zh": "科目码不在该套账的科目表里 · 请为该套账配置正确的科目码(系统不会自动新建科目)",
         "zh_TW": "科目碼不在該套帳的科目表裡 · 請為該套帳配置正確的科目碼(系統不會自動新建科目)",
     },
+    "ERR_ACCOUNT_SET_MISMATCH": {
+        # 匹配闸(防推错套账):票面买卖方与套账主体税号确认不符 → 挡下不推。
+        "th": "ผู้ขาย/ผู้ซื้อบนเอกสารไม่ตรงกับนิติบุคคลของชุดบัญชีนี้ · ไม่ได้ส่ง (กันบันทึกผิดชุดบัญชี) · กรุณาตรวจสอบว่าเลือกกิจการถูกต้อง",
+        "en": "The document's seller/buyer does not match this account-set's entity · not pushed (protects against posting into the wrong account set) · check that the right business is selected",
+        "zh": "票面买卖方与该套账主体不符 · 未推送(防止记进错误套账)· 请确认是否选对了企业主体",
+        "zh_TW": "票面買賣方與該套帳主體不符 · 未推送(防止記進錯誤套帳)· 請確認是否選對了企業主體",
+    },
     "ERR_NO_CUSTOMER_MAPPING": {
         # 问题 b (Zihao 2026-05-19 拍板 · v118.34.26) · action-oriented:
         # 告诉用户去哪里配 mapping · 或者开 wizard 种子客户开自动建.

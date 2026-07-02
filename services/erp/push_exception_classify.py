@@ -37,10 +37,11 @@ def classify_push_exception(error_msg: Optional[str]) -> str:
         return "direction_unknown"
     if "low_confidence" in msg:
         return "low_confidence"
-    # 单据防呆(preflight doc_sanity):外币/贷项/押金/未来日期/坏税号 → 须人工判断,无自助修。
+    # 单据防呆(preflight doc_sanity)+ 套账匹配闸:须人工判断,无自助修。
     if any(
         k in msg
         for k in (
+            "ERR_ACCOUNT_SET_MISMATCH",
             "currency_not_thb",
             "seller_buyer_same_tax",
             "credit_note",

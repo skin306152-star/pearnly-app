@@ -143,6 +143,15 @@ class RoutedBatchEndpointTests(unittest.TestCase):
         self.assertFalse(
             [p for p in paths if "importpc" in p], f"别家的票不该打任何导入端点: {paths}"
         )
+        # reason 必须是错误码(经 friendly catalog 按 ui_lang 本地化)· 不许裸中文散文
+        row = res.failed[0]
+        self.assertEqual(row.reasons, ["ERR_ACCOUNT_SET_MISMATCH"])
+        friendly = row.reasons_friendly[0]
+        for lang in ("th", "en", "zh", "zh_TW"):
+            self.assertTrue(friendly.get(lang), f"missing friendly {lang}")
+            self.assertNotEqual(
+                friendly[lang], "ERR_ACCOUNT_SET_MISMATCH", f"{lang} 未命中 catalog(raw 回显)"
+            )
 
     def test_foreign_currency_blocked_by_doc_sanity(self):
         """外币票(fields.currency=USD)→ 单据防呆挡下·不推(对抗票 15 的防线;OCR 读到币种时生效)。"""

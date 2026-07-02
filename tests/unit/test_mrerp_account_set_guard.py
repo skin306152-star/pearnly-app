@@ -71,7 +71,8 @@ class TestFilterByAccountSet(unittest.TestCase):
             [match, ambiguous, mism], {"_own_tax_id": _OWN}
         )
         self.assertEqual([len(kept), len(failed)], [2, 1])
-        self.assertIn("套账主体不符", failed[0].reasons[0])
+        # reason=错误码 · 四语文案由 mrerp_business_friendly 出(不再裸中文散文)
+        self.assertEqual(failed[0].reasons, ["ERR_ACCOUNT_SET_MISMATCH"])
 
 
 if __name__ == "__main__":

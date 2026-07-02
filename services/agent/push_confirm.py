@@ -53,7 +53,8 @@ def send_confirm_card(
     bound_user, reply_token, push: dict, lang, tid, ws, line_user_id, quote_token=""
 ) -> bool:
     """接地通过的推送提案 → 铸一次性 nonce + 出确认卡。【不执行任何推送】。
-    出不了卡(nonce 铸造失败等)返回 False → loop 归 crash 安全兜底。"""
+    出不了卡(nonce 铸造失败等)返回 False → loop 归 crash 安全兜底。
+    reply_token 为空 = 异步语境(图片意图路 LI-2)→ 改走 push 消息发同一张卡。"""
     from services.line_binding import line_action_nonce, line_postback, line_reply
 
     try:
@@ -104,9 +105,18 @@ def send_confirm_card(
                 ],
             },
         }
-        line_reply.reply_messages_context(
-            reply_token, [msg], line_user_id=line_user_id, tenant_id=tid, quote_token=quote_token
-        )
+        if reply_token:
+            line_reply.reply_messages_context(
+                reply_token,
+                [msg],
+                line_user_id=line_user_id,
+                tenant_id=tid,
+                quote_token=quote_token,
+            )
+        else:
+            line_reply.push_messages_context(
+                line_user_id, [msg], tenant_id=tid, quote_token=quote_token
+            )
         return True
     except Exception:
         logger.warning("[agent push] confirm card failed", exc_info=True)

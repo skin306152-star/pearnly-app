@@ -219,11 +219,35 @@ async def _handle_line_image_ocr(
             _notify(line_client.t_line(lang, "line_not_receipt_recovery"))
             return True
 
+        tid_str = str(user_fresh["tenant_id"]) if user_fresh.get("tenant_id") else None
+        # LI-2 意图分流(闸 agent_image_intent 默认关):决策/落地/故障兜底全在 route 层,
+        # 指令默认值 = 现状代码逐字节不变(handled=None · ws=None · skip_ingest=False)。
+        from services.ocr import line_image_route
+
+        _idir = await line_image_route.intercept(
+            user_fresh,
+            _ws_client_id,
+            tid_str,
+            line_user_id,
+            lang,
+            quote,
+            result,
+            pages,
+            _pipeline_cost_thb,
+            filename,
+            file_bytes,
+            file_hash,
+            quote_token,
+        )
+        if _idir.handled is not None:
+            return _idir.handled
+        if _idir.ws is not None:
+            _ws_client_id = _idir.ws
+
         # 统一智能通道(docs/smart-intake/15):图片 → 置信驱动入账(建草稿/高置信直接入账)+ 数据卡。
         #   expense 开 → ingest_line_image(高置信直接入正式账,其余草稿/待归类);回执发数据卡。
         #   expense 关 → 不入账,走下方识别记录原路(事务所等),一字不动。异常 → 同样回落识别记录。
         ingests = []
-        tid_str = str(user_fresh["tenant_id"]) if user_fresh.get("tenant_id") else None
         try:
             from services.purchase.intake import (
                 fields_from_invoice,
@@ -232,7 +256,7 @@ async def _handle_line_image_ocr(
             from services.purchase.line_ingest import ingest_line_image
 
             _pages_struct = getattr(_pipe_res, "pages", None) or []
-            if _pages_struct and _ws_client_id and tid_str:
+            if _pages_struct and _ws_client_id and tid_str and not _idir.skip_ingest:
                 with db.get_cursor_rls(tid_str, commit=True) as cur:
                     if line_expense_gate_open(cur, tenant_id=tid_str):
                         # 票图闭环:LINE 图持久化到 pdf_storage → image_ref 挂进单据。

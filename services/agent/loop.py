@@ -143,9 +143,18 @@ def _recent(ctx: AgentContext) -> list:
 # 注:record_multi 是 sink 专用伪工具名(多笔确定性直分发·不在 manifest·模型永远看不见)。
 
 
-def _gates(allow_write: bool, allow_m3: bool, allow_push: bool) -> frozenset:
+def _gates(
+    allow_write: bool, allow_m3: bool, allow_push: bool, allow_image: bool = False
+) -> frozenset:
     return frozenset(
-        name for name, on in (("write", allow_write), ("m3", allow_m3), ("push", allow_push)) if on
+        name
+        for name, on in (
+            ("write", allow_write),
+            ("m3", allow_m3),
+            ("push", allow_push),
+            ("image", allow_image),
+        )
+        if on
     )
 
 
@@ -308,6 +317,7 @@ def handle_turn(
     allow_write: bool = False,
     allow_m3: bool = False,
     allow_push: bool = False,
+    allow_image: bool = False,
     write_sink: Optional[Callable] = None,
 ) -> TurnResult:
     """一轮对话 → TurnResult(见其 docstring:reply/card_sent/defer_record/defer_edit/crash)。
@@ -323,7 +333,7 @@ def handle_turn(
     history = history if history is not None else _recent(ctx)
     today = today or _today()
     lang = _reply_lang(user_text)
-    gates = _gates(allow_write, allow_m3, allow_push)
+    gates = _gates(allow_write, allow_m3, allow_push, allow_image)
     ctx.user_text = user_text  # 写工具建草稿做金额接地要原文
 
     # 多笔记账守门:记账写工具只建单笔,遇确定性判定为多笔的消息会把它吞成一笔(丢账)。

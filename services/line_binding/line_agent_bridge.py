@@ -60,6 +60,22 @@ def push_enabled(bound_user) -> bool:
     return feature_flags.agent_push_enabled_for(_uid(bound_user))
 
 
+def image_enabled(bound_user) -> bool:
+    """图片意图子闸(LI)。关 → 发图走现状管线逐字节不变。"""
+    from core import feature_flags
+
+    return feature_flags.agent_image_enabled_for(_uid(bound_user))
+
+
+# 计划已存的回执(LINE 专用过程文案 · 与 push_confirm._ACK 同先例留 inline)。
+_PLAN_ACK = {
+    "th": "รับทราบค่ะ ส่งรูป/ไฟล์มาได้เลย เดี๋ยวจัดการตามนั้นให้",
+    "zh": "记下了,把图发来我就照这个办。",
+    "en": "Got it — send the photo/file and I'll handle it that way.",
+    "ja": "承知しました。写真を送っていただければ、その通りに処理します。",
+}
+
+
 def _make_write_sink(
     bound_user, text, lang, tid, ws, line_user_id, reply_token, quote_token, quoted_message_id, book
 ):
@@ -128,6 +144,23 @@ def _make_write_sink(
                 quote_token=quote_token,
             )
             return "card_sent" if sent else None
+        if tool == "plan_incoming_doc":
+            from services.line_binding import line_intent_store, line_reply
+
+            plan = data.get("plan")
+            if plan is None or not tid:
+                return None
+            line_intent_store.set_intent(
+                tid, line_user_id, plan, workspace_client_id=plan.get("book_to_id") or ws
+            )
+            line_reply.reply_text_context(
+                reply_token,
+                say or _PLAN_ACK.get(lang, _PLAN_ACK["en"]),
+                line_user_id=line_user_id,
+                tenant_id=tid,
+                quote_token=quote_token,
+            )
+            return "card_sent"
         if tool == "edit_entry":
             from services.expense import line_correct
 
@@ -205,6 +238,7 @@ def try_agent_turn(
             allow_write=sink is not None,
             allow_m3=sink is not None and m3_enabled(bound_user),
             allow_push=sink is not None and push_enabled(bound_user),
+            allow_image=sink is not None and image_enabled(bound_user),
             write_sink=sink,
         )
     except Exception:

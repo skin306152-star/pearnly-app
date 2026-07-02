@@ -92,7 +92,13 @@ class _ScriptedToolset:
             self.calls.append((name, kwargs))
             if name in self._canned:
                 return self._canned[name]
-            if name in ("record_expense", "push_to_erp", "undo_entry", "edit_entry"):
+            if name in (
+                "record_expense",
+                "push_to_erp",
+                "undo_entry",
+                "edit_entry",
+                "plan_incoming_doc",
+            ):
                 return getattr(self._real, name)(ctx, **kwargs)
             raise AssertionError(f"corpus 缺 canned 工具结果: {name}")
 
@@ -124,6 +130,7 @@ class TestCorpusLoop(unittest.TestCase):
             allow_write=write,
             allow_m3=case.get("m3", False),
             allow_push=case.get("push", False),
+            allow_image=case.get("image", False),
             write_sink=sink if write else None,
         )
         return res, records, decide_calls, toolset, sunk_tools
@@ -156,6 +163,8 @@ class TestCorpusLoop(unittest.TestCase):
                     self.assertNotIn(h, called, case["id"])
                 for t in exp.get("sunk", []):
                     self.assertIn(t, sunk_tools, case["id"])
+                for t in exp.get("sunk_not", []):
+                    self.assertNotIn(t, sunk_tools, case["id"])
                 for h, absent in exp.get("kwargs_absent", {}).items():
                     kw = next(k for n, k in toolset.calls if n == h)
                     for a in absent:
@@ -207,6 +216,11 @@ class TestCorpusEntry(unittest.TestCase):
                     self.assertEqual(len(r.undos), 1, case["id"])
                 elif outcome in ("edit", "edit_legacy"):
                     self.assertEqual(len(r.edits), 1, case["id"])
+                elif outcome == "plan_saved":
+                    # 话先图后:计划已存(待图执行)+ 一句 ack;绝不当场记账/推送。
+                    self.assertEqual(len(r.plans), 1, case["id"])
+                    self.assertEqual(len(r.says), 1, case["id"])
+                    self.assertEqual(len(r.do_records), 0, case["id"])
                 elif outcome == "pool":
                     self.assertEqual(len(r.pools), 1, case["id"])
                 else:

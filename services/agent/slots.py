@@ -35,6 +35,10 @@ def _ground(
 ) -> tuple[bool, object, Optional[str]]:
     """单 slot 接地。返回 (ok, 可信值, 失败原因)。"""
     if slot.source == "model_freeform":
+        if isinstance(value, (list, tuple)):
+            # 列表槽(如 plan 的 goals 枚举)保形状逐元清洗;str() 压平会把枚举毁成 "['x']"。
+            vals = [str(v).strip()[:_MAX_FREEFORM] for v in value if str(v).strip()]
+            return True, vals[:10], None
         return True, str(value).strip()[:_MAX_FREEFORM], None
     if slot.source == "user_text":
         if _appears_in_text(str(value), blob):

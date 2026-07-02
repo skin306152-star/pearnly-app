@@ -72,5 +72,16 @@ class TestPlanIncomingDoc(unittest.TestCase):
         self.assertEqual(hit.data["plan"]["book_to_id"], 84)
 
 
+class TestPlanToolVisibility(unittest.TestCase):
+    def test_gate_controls_visibility(self):
+        # image 闸开(且写开)才对模型可见;闸关 = 提示词里没有这个工具 = 现状。
+        from services.agent.loop import _visible_tools
+
+        on = {t.name for t in _visible_tools(frozenset({"write", "image"}))}
+        off = {t.name for t in _visible_tools(frozenset({"write"}))}
+        self.assertIn("plan_incoming_doc", on)
+        self.assertNotIn("plan_incoming_doc", off)
+
+
 if __name__ == "__main__":
     unittest.main()

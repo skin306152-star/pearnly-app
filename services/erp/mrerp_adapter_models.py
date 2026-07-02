@@ -83,3 +83,10 @@ class ImportResult:
             "report_xlsx_path": self.report_xlsx_path,
             "all_success": self.all_success,
         }
+
+
+def bill_no_for(doc_type: str, invoice_no: str) -> str:
+    """回执单号:销项类 MR.ERP 列表实测显示 SI+票号;采购/库存前缀未实测过,
+    不臆造(曾把采购也标 SI·纯显示化妆债)→ 非销项原样返票号(REFNUM 可查)。"""
+    prefix = "SI" if str(doc_type or "").startswith("sales") else ""
+    return f"{prefix}{invoice_no}"

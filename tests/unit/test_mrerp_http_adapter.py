@@ -13,6 +13,7 @@ import unittest
 
 from services.erp.exceptions import MRERPBusinessError
 from services.erp.mrerp_http.adapter import MrErpHttpAdapter
+from services.erp.mrerp_adapter_models import bill_no_for
 from services.erp.mrerp_http.modules import get_module
 from services.erp.mrerp_http.session import MrErpSession
 
@@ -200,6 +201,23 @@ class TestRouting(unittest.TestCase):
 
         flat = {"fields": {"document_type": "receipt", "buyer_tax": self.OTHER}}
         self.assertIsNone(choose_doc_type(flat, {}, own_tax_id=self.OWN))
+
+
+class TestBillNoPrefix(unittest.TestCase):
+    """回执单号前缀跟方向走:销项=SI+票号(列表实测);采购/库存不臆造前缀(化妆债修正)。"""
+
+    def test_prefix_by_direction(self):
+        from services.erp.mrerp_http.modules import get_module
+
+        a = MrErpHttpAdapter(
+            login_url="https://x", username="u", password="p", serialize_sessions=False
+        )
+        a.module = get_module("sales_credit")
+        self.assertEqual(bill_no_for(a.module.doc_type, "690701-1"), "SI690701-1")
+        a.module = get_module("sales_cash")
+        self.assertEqual(bill_no_for(a.module.doc_type, "690701-1"), "SI690701-1")
+        a.module = get_module("purchase")
+        self.assertEqual(bill_no_for(a.module.doc_type, "690701-1"), "690701-1")
 
 
 class TestRoutedBatch(unittest.TestCase):

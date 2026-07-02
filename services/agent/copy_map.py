@@ -160,14 +160,15 @@ def recon_detail_receipt(task: dict, rows: list) -> str:
     # 槽位 unmatched/top_list 对齐 agent.ok.recon_detail;side 用 GL/BANK/NO-GL/DIFF 通语记号免翻译。
     t = task or {}
     unmatched = _recon_unmatched(t)
+    # 行形状统一由 recon_tools 三档构造器保证(date/side/amount/desc·tax 用 doc_no 顶 date 槽)
     lines = [
         "· "
         + " ".join(
             str(x)
             for x in (
                 r.get("date") or r.get("doc_no") or "",
-                r.get("side") or r.get("issue") or "",
-                r.get("amount") or r.get("invoice_amount") or "",
+                r.get("side") or "",
+                r.get("amount") or "",
                 r.get("desc") or "",
             )
             if x

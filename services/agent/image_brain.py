@@ -12,9 +12,9 @@ from __future__ import annotations
 import json
 import logging
 
-logger = logging.getLogger(__name__)
+from services.agent.loop import _LANGS as _LANG_NAMES  # 与 loop 同一语言名表,免两处漂移
 
-_LANG_NAMES = {"th": "ไทย", "zh": "中文", "en": "English", "ja": "日本語"}
+logger = logging.getLogger(__name__)
 
 _PROMPT = """คุณคือผู้ช่วยบัญชี Pearnly ผู้ใช้เพิ่งส่งรูปเอกสารมา แต่ระบบอ่านได้ไม่มั่นใจ
 สรุปที่อ่านได้: {summary}

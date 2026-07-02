@@ -39,10 +39,15 @@ def normalize_kind(kind) -> str:
 
 def overview(ctx: AgentContext) -> ToolResult:
     """对账只读概览:bank+income+tax 三档一次给齐(问法含糊时模型逐档讲一句)。
-    每档最近 3 条,条目带归一 matched/unmatched;store 层故障返空表不抛 → 诚实空口径。"""
-    bank = _bank_recent(ctx, limit=3)
-    income = _income_recent(ctx, limit=3)
-    tax = _tax_recent(ctx, limit=3)
+    每档最近 3 条,条目带归一 matched/unmatched;store 层故障返空表不抛 → 诚实空口径。
+    三档查询相互独立 → 并行(总延迟=最慢一档而非三档之和;本函数已在 to_thread 线程)。"""
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        f_bank = pool.submit(_bank_recent, ctx, limit=3)
+        f_income = pool.submit(_income_recent, ctx, limit=3)
+        f_tax = pool.submit(_tax_recent, ctx, limit=3)
+        bank, income, tax = f_bank.result(), f_income.result(), f_tax.result()
     latest = next((k[0] for k in (bank, income, tax) if k), None)
     receipt = copy_map.recon_receipt(latest) if latest else ""
     data: dict = {"bank": {"recent": bank}, "income": {"recent": income}, "tax": {"recent": tax}}
@@ -171,15 +176,7 @@ def _tax_detail(ctx: AgentContext, keyword) -> ToolResult:
 
     out = list_vat_recon_tasks(ctx.tenant_id, str(ctx.user["id"]), page=1, page_size=10) or {}
     tasks = out.get("rows") or []
-    head = None
-    q = "".join(str(keyword or "").lower().split())
-    if q:
-        for t in tasks:
-            hay = "".join(f"{t.get('client_name') or ''}{t.get('period') or ''}".lower().split())
-            if q in hay:
-                head = t
-                break
-    head = head or (tasks[0] if tasks else None)
+    head = _pick_task(tasks, keyword, hay_keys=("client_name", "period"))
     if not head:
         return ToolResult(
             ok=True,
@@ -201,8 +198,11 @@ def _tax_detail(ctx: AgentContext, keyword) -> ToolResult:
     bad = [
         {
             "issue": str(r.get("status_key") or ""),
+            # side/amount=三档统一的回执展示键(copy_map 只认一种行形,不再猜键名)
+            "side": str(r.get("status_key") or "").removeprefix("st_").upper(),
             "doc_no": str(r.get("invoice_no") or ""),
             "desc": str(r.get("customer") or "")[:40],
+            "amount": _s(r.get("amount_inv")),
             "invoice_amount": _s(r.get("amount_inv")),
             "report_amount": _s(r.get("amount_rep")),
         }
@@ -232,17 +232,7 @@ def _income_detail(ctx: AgentContext, keyword) -> ToolResult:
     from services.recon.gl_vat_store import get_gl_vat_task, list_gl_vat_tasks
 
     tasks = list_gl_vat_tasks(str(ctx.user["id"]), ctx.tenant_id, limit=10)
-    head = None
-    q = "".join(str(keyword or "").lower().split())
-    if q:
-        for t in tasks:
-            hay = "".join(
-                f"{t.get('gl_filename') or ''}{t.get('vat_filename') or ''}".lower().split()
-            )
-            if q in hay:
-                head = t
-                break
-    head = head or (tasks[0] if tasks else None)
+    head = _pick_task(tasks, keyword, hay_keys=("gl_filename", "vat_filename"))
     if not head:
         return ToolResult(
             ok=True,
@@ -299,18 +289,16 @@ def _i(v):
         return 0
 
 
-def _pick_task(tasks, keyword):
-    """keyword 对银行码/文件名松匹配(归一小写去空格);没给/没中 → 最新一条。
-    刻意不做"多命中反问":任务按时间倒序,最新即用户语境里的"这次"。"""
+def _pick_task(tasks, keyword, hay_keys=("bank_code", "stmt_files", "gl_files")):
+    """keyword 对 hay_keys 拼串松匹配(归一小写去空格);没给/没中 → 最新一条。
+    三档共用;刻意不做"多命中反问":任务按时间倒序,最新即用户语境里的"这次"。"""
     if not tasks:
         return None
     q = "".join(str(keyword or "").lower().split())
     if q:
         for t in tasks:
-            hay = "".join(
-                str(x or "") for x in (t.get("bank_code"), t.get("stmt_files"), t.get("gl_files"))
-            ).lower()
-            if q in "".join(hay.split()):
+            hay = "".join("".join(str(t.get(k) or "").split()) for k in hay_keys).lower()
+            if q in hay:
                 return t
     return tasks[0]
 

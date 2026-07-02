@@ -34,6 +34,7 @@ class _Base(unittest.TestCase):
 
         patches = [
             patch("services.recon_jobs.worker.STAGE_DIR", self.tmp),
+            patch("core.feature_flags.agent_recon_intake_enabled_for", return_value=True),
             patch("services.line_binding.line_pending_actions.set_action", set_action),
             patch("services.line_binding.line_pending_actions.read_action", read_action),
             patch("services.line_binding.line_pending_actions.take_action", take_action),

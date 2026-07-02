@@ -7,6 +7,10 @@
 
 from __future__ import annotations
 
+import logging
+
+logger = logging.getLogger("mr-pilot")
+
 _ERR_MAX = 160  # 推送错误原文喂模型的截断长度(人话化由模型做,原文防灌上下文)
 
 
@@ -75,4 +79,7 @@ def payload(tool: str, result) -> dict:
     if tool in ("recon_overview", "recon_detail"):
         # 执行器产出已是最小观测(recent≤5 / unmatched≤8);漏这支=模型拿不到数字只能空话。
         return {"ok": True, **data}
+    if data:
+        # 止血告警:新只读工具漏登观测分支=数据被静默吞、模型只能空话(真机雷 2026-07-03)。
+        logger.warning("observe: tool %s has unprojected data (keys=%s)", tool, sorted(data))
     return {"ok": True}

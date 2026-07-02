@@ -208,15 +208,13 @@ def execute_confirmed(user, tid, line_user_id, lang, action) -> None:
 def _friendly_reason(result, lang) -> str:
     """错误人话:ERR_DMS_* 目录(push_log_friendly)优先,兜底 error_friendly/裸码。"""
     code = str(result.get("error_code") or "")
+    fallback = str(result.get("error_friendly") or code or "unknown")
     try:
-        from services.erp import push_log_friendly
+        from services.erp.push_log_friendly import friendly_text
 
-        hit = push_log_friendly.friendly_any(code) or {}
-        if hit.get(lang) or hit.get("en"):
-            return hit.get(lang) or hit["en"]
+        return friendly_text(code, lang, fallback)
     except Exception:
-        pass
-    return str(result.get("error_friendly") or code or "unknown")
+        return fallback
 
 
 def cancel(user, tid, line_user_id, lang) -> None:

@@ -141,12 +141,10 @@ def _recon_fb(tool: str, o: dict, lang: str) -> str:
     if not t:
         msgs = _FB_RECON["zero"]
         return msgs.get(lang, msgs["en"])
-    m = _fb_int(t.get("matched"))
-    u = _fb_int(t.get("unmatched"))
-    if not u:
-        u = _fb_int(t.get("unmatched_gl")) + _fb_int(t.get("unmatched_stmt"))
+    from services.agent.copy_map import _recon_unmatched  # 归一口径单一定义点
+
     msgs = _FB_RECON["some"]
-    return msgs.get(lang, msgs["en"]).format(m=m, u=u)
+    return msgs.get(lang, msgs["en"]).format(m=_fb_int(t.get("matched")), u=_recon_unmatched(t))
 
 
 # 值型只读工具:tool → (四语模板, 从观测取模板槽位的函数)。加一个值型工具 = 加一行,不再加 if 分支。

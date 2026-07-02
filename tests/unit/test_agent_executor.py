@@ -13,6 +13,34 @@ class TestAgentExecutor(unittest.TestCase):
     def setUp(self):
         self.ts = AgentToolset()
 
+    def test_recon_overview(self):
+        tasks = [
+            {
+                "bank_code": "KBANK",
+                "matched_count": 42,
+                "unmatched_gl": 2,
+                "unmatched_stmt": 1,
+                "status": "done",
+                "created_at": "2026-07-01 09:00",
+            },
+        ]
+        with patch(
+            "services.recon.bank_recon_v2_store.list_bank_recon_v2_tasks", return_value=tasks
+        ):
+            res = self.ts.get_recon_overview(_CTX)
+        self.assertTrue(res.ok)
+        self.assertEqual(res.data["count"], 1)
+        self.assertEqual(res.data["recent"][0]["matched"], 42)
+        self.assertIn("42", res.receipt)
+        self.assertIn("3", res.receipt)  # 不一致 = unmatched_gl+unmatched_stmt
+
+    def test_recon_overview_empty(self):
+        with patch("services.recon.bank_recon_v2_store.list_bank_recon_v2_tasks", return_value=[]):
+            res = self.ts.get_recon_overview(_CTX)
+        self.assertTrue(res.ok)
+        self.assertEqual(res.data["count"], 0)
+        self.assertEqual(res.receipt, "")  # 无任务:数据诚实,成文交模型
+
     @patch("services.agent.executor.db")
     def test_list_history_passes_identity(self, db):
         db.get_visible_client_ids_for_user.return_value = [5]

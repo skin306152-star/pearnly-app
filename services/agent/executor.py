@@ -69,6 +69,25 @@ class AgentToolset:
             ok=True, data={"billing": b, "docs": docs}, receipt=copy_map.usage_receipt(b, docs)
         )
 
+    def get_recon_overview(self, ctx: AgentContext) -> ToolResult:
+        """银行对账结果只读概览(店 list_bank_recon_v2_tasks · RLS 内 · 店层故障返空表不抛)。"""
+        from services.recon.bank_recon_v2_store import list_bank_recon_v2_tasks
+
+        tasks = list_bank_recon_v2_tasks(str(ctx.user["id"]), ctx.tenant_id, limit=5)
+        recent = [
+            {
+                "bank": t.get("bank_code"),
+                "matched": t.get("matched_count"),
+                "unmatched_gl": t.get("unmatched_gl"),
+                "unmatched_stmt": t.get("unmatched_stmt"),
+                "status": t.get("status"),
+                "created_at": str(t.get("created_at") or "")[:16],
+            }
+            for t in tasks
+        ]
+        receipt = copy_map.recon_receipt(recent[0]) if recent else ""
+        return ToolResult(ok=True, data={"count": len(recent), "recent": recent}, receipt=receipt)
+
     def _overview(
         self, ctx: AgentContext, *, this_month: bool, include_categories: bool = True
     ) -> dict:

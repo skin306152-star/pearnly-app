@@ -182,6 +182,22 @@ class TestExecuteTerminals(unittest.TestCase):
         charge.assert_called_once()
 
 
+class TestNotInvoiceGuidance(unittest.TestCase):
+    """非票据靶向引导:银行对账单认出来指去对账,别再"不像票据"死胡同(真机探针)。"""
+
+    def test_bank_statement_gets_targeted_guidance(self):
+        pages = [{"fields": {"document_type": "bank_statement", "is_not_invoice": "true"}}]
+        out = r.not_invoice_guidance(pages, "zh")
+        self.assertIn("银行对账", out)
+        self.assertIn("กระทบยอด", r.not_invoice_guidance(pages, "th"))
+
+    def test_other_non_invoice_falls_back(self):
+        self.assertIsNone(r.not_invoice_guidance([{"fields": {"document_type": "photo"}}], "zh"))
+        self.assertIsNone(r.not_invoice_guidance([], "zh"))
+        self.assertIsNone(r.not_invoice_guidance(None, "zh"))
+        self.assertIsNone(r.not_invoice_guidance([{"fields": None}, None], "zh"))
+
+
 class TestPreCardSanity(unittest.TestCase):
     """出卡前防呆预检:注定推不过的票不给确认按钮,直接四语人话+留存指引。"""
 

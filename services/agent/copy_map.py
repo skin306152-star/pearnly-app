@@ -32,6 +32,7 @@ OK_COPY: dict[str, str] = {
     "balance": "agent.ok.balance",
     "usage_this_month": "agent.ok.usage_this_month",
     "list_notifications": "agent.ok.notifications",
+    "recon_overview": "agent.ok.recon",  # 复用预登记键(两侧 parity 已守)
 }
 
 # 反问 slot → i18n key(§1.1)。未登记的 slot → 通用「哪一张」。
@@ -137,6 +138,15 @@ def notifications_receipt(logs: list) -> str:
     return _render(OK_COPY["list_notifications"], count=len(logs or []))
 
 
+def recon_receipt(latest: dict) -> str:
+    # 槽位 matched/unmatched 对齐 agent_i18n 的 agent.ok.recon(不一致 = GL+对账单两侧之和)。
+    t = latest or {}
+    unmatched = int(t.get("unmatched_gl") or 0) + int(t.get("unmatched_stmt") or 0)
+    return _render(
+        OK_COPY["recon_overview"], matched=int(t.get("matched") or 0), unmatched=unmatched
+    )
+
+
 __all__ = [
     "ERROR_COPY",
     "OK_COPY",
@@ -151,4 +161,5 @@ __all__ = [
     "balance_receipt",
     "usage_receipt",
     "notifications_receipt",
+    "recon_receipt",
 ]

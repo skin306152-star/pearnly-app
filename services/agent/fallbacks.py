@@ -127,10 +127,15 @@ _FB_RECON = {
 
 def _recon_fb(tool: str, o: dict, lang: str) -> str:
     if tool == "recon_overview":
-        # 双档形状:bank 优先取最新,没有再看 income(条目已带归一 matched/unmatched)。
-        t = ((o.get("bank") or {}).get("recent") or [None])[0] or (
-            (o.get("income") or {}).get("recent") or [None]
-        )[0]
+        # 三档形状:bank→income→tax 取第一个有任务的档(条目已带归一 matched/unmatched)。
+        t = next(
+            (
+                ((o.get(k) or {}).get("recent") or [None])[0]
+                for k in ("bank", "income", "tax")
+                if ((o.get(k) or {}).get("recent") or [None])[0]
+            ),
+            None,
+        )
     else:
         t = o.get("task")
     if not t:

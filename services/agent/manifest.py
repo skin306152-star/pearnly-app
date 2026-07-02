@@ -81,10 +81,11 @@ TOOLS: tuple[ToolSpec, ...] = (
         # 只读查询;bucket=B 因功能区 recon_routes_bankv2 整档登记 B(区含 run/delete 写动作,
         # 档随区走),writes=False + gate=None → 始终可见,与 A 档只读工具同一可见性。
         bucket="B",
-        title_th="ดูผลกระทบยอด (ธนาคาร/รายได้)",
+        title_th="ดูผลกระทบยอด (ธนาคาร/รายได้/ภาษีขาย)",
         desc_th=(
-            "ดูผลกระทบยอดล่าสุดทั้งสองแบบ: ธนาคาร (bank statement↔GL) และรายได้ "
-            "(GL↔รายงานภาษีขาย) ตรงกันกี่รายการ ไม่ตรงกี่รายการ (ใช้เมื่อถามเรื่องกระทบยอด/对账/reconcile)"
+            "ดูผลกระทบยอดล่าสุดครบสามแบบ: ธนาคาร (bank statement↔GL) · รายได้ (GL↔รายงานภาษีขาย) · "
+            "ตรวจรายงานภาษีขาย (ใบกำกับ↔รายงาน) ตรงกันกี่รายการ ไม่ตรงกี่รายการ "
+            "(ใช้เมื่อถามเรื่องกระทบยอด/对账/reconcile)"
         ),
         slots=(),
         handler="get_recon_overview",
@@ -98,14 +99,14 @@ TOOLS: tuple[ToolSpec, ...] = (
         title_th="ดูรายการกระทบยอดที่ไม่ตรงกัน",
         desc_th=(
             "ดูรายละเอียดรายการที่กระทบยอดไม่ตรง ใช้เมื่อถาม 'รายการไหนไม่ตรง/ต่างตรงไหน' · "
-            "kind=bank (ธนาคาร↔GL) หรือ income (รายได้ GL↔รายงานภาษีขาย เช่นถามเรื่องกระทบยอดรายได้)"
+            "kind=bank (ธนาคาร↔GL) / income (รายได้ GL↔รายงานภาษีขาย) / tax (ตรวจรายงานภาษีขาย ใบกำกับ↔รายงาน)"
         ),
         slots=(
             SlotSpec(
                 "kind",
                 required=False,
                 source="model_freeform",
-                desc_th="ประเภท: bank (ค่าเริ่มต้น) / income / tax(tax ยังไม่เปิด)",
+                desc_th="ประเภท: bank (ค่าเริ่มต้น) / income / tax",
                 desc_zh="档位枚举 bank/income/tax(缺省 bank·执行器再验)",
             ),
             SlotSpec(

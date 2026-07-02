@@ -38,13 +38,14 @@ def normalize_kind(kind) -> str:
 
 
 def overview(ctx: AgentContext) -> ToolResult:
-    """对账只读概览:bank+income 双档一次给齐(问法含糊时模型两档都讲一句)。
+    """对账只读概览:bank+income+tax 三档一次给齐(问法含糊时模型逐档讲一句)。
     每档最近 3 条,条目带归一 matched/unmatched;store 层故障返空表不抛 → 诚实空口径。"""
     bank = _bank_recent(ctx, limit=3)
     income = _income_recent(ctx, limit=3)
-    latest = bank[0] if bank else (income[0] if income else None)
+    tax = _tax_recent(ctx, limit=3)
+    latest = next((k[0] for k in (bank, income, tax) if k), None)
     receipt = copy_map.recon_receipt(latest) if latest else ""
-    data: dict = {"bank": {"recent": bank}, "income": {"recent": income}}
+    data: dict = {"bank": {"recent": bank}, "income": {"recent": income}, "tax": {"recent": tax}}
     if not latest:
         # 在线验证抓到:空数据时模型爱说"结果已准备好请查看"(虚)。给显式提示钉住口径。
         data["hint"] = (
@@ -92,14 +93,31 @@ def _income_recent(ctx, *, limit) -> list:
     ]
 
 
+def _tax_recent(ctx, *, limit) -> list:
+    from services.recon.vat_recon_tasks_store import list_vat_recon_tasks
+
+    out = list_vat_recon_tasks(ctx.tenant_id, str(ctx.user["id"]), page=1, page_size=limit) or {}
+    return [
+        {
+            "client": t.get("client_name"),
+            "period": t.get("period"),
+            "matched": _i(t.get("matched")),
+            "unmatched": _i(t.get("mismatched")),
+            "mismatch_amount": _s(t.get("mismatch_amount")),
+            "status": t.get("status"),
+            "created_at": str(t.get("created_at") or "")[:16],
+        }
+        for t in out.get("rows") or []
+    ]
+
+
 def detail(ctx: AgentContext, *, kind=None, keyword=None) -> ToolResult:
-    """对不上的明细钻取(默认最新一次任务;keyword=银行名/文件名定位)。
-    bank/income 已通;tax 如实答 not_available_yet(方案三开)。"""
+    """对不上的明细钻取(默认最新一次任务;keyword=银行名/客户名/期间定位)。三档全通。"""
     k = normalize_kind(kind)
     if k == "income":
         return _income_detail(ctx, keyword)
-    if k != "bank":
-        return ToolResult(ok=False, error_code="not_available_yet")
+    if k == "tax":
+        return _tax_detail(ctx, keyword)
     from services.recon.bank_recon_v2_store import (
         get_bank_recon_v2_task,
         list_bank_recon_v2_tasks,
@@ -139,6 +157,69 @@ def detail(ctx: AgentContext, *, kind=None, keyword=None) -> ToolResult:
         },
         "unmatched": unmatched[:_DETAIL_CAP],
         "omitted": max(0, len(unmatched) - _DETAIL_CAP),
+    }
+    return ToolResult(
+        ok=True, data=data, receipt=copy_map.recon_detail_receipt(data["task"], data["unmatched"])
+    )
+
+
+def _tax_detail(ctx: AgentContext, keyword) -> ToolResult:
+    """销项税报告核查(销项发票 ↔ 销项税报告 · A 路径 vat_recon_tasks)不一致明细:
+    raw_data_json.rows 里 status_key≠st_ok(st_diff=金额不一致 / st_no_rep=报告缺 /
+    st_no_inv=发票缺)。"""
+    from services.recon.vat_recon_tasks_store import get_vat_recon_task, list_vat_recon_tasks
+
+    out = list_vat_recon_tasks(ctx.tenant_id, str(ctx.user["id"]), page=1, page_size=10) or {}
+    tasks = out.get("rows") or []
+    head = None
+    q = "".join(str(keyword or "").lower().split())
+    if q:
+        for t in tasks:
+            hay = "".join(f"{t.get('client_name') or ''}{t.get('period') or ''}".lower().split())
+            if q in hay:
+                head = t
+                break
+    head = head or (tasks[0] if tasks else None)
+    if not head:
+        return ToolResult(
+            ok=True,
+            data={
+                "count": 0,
+                "hint": (
+                    "no sales-VAT check runs yet — say so honestly and suggest running one "
+                    "under Reconciliation Center (tax tab) on the web"
+                ),
+            },
+        )
+    full = get_vat_recon_task(str(head["id"]), ctx.tenant_id, str(ctx.user["id"])) or {}
+    raw = full.get("raw_data_json") or {}
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except Exception:
+            raw = {}
+    bad = [
+        {
+            "issue": str(r.get("status_key") or ""),
+            "doc_no": str(r.get("invoice_no") or ""),
+            "desc": str(r.get("customer") or "")[:40],
+            "invoice_amount": _s(r.get("amount_inv")),
+            "report_amount": _s(r.get("amount_rep")),
+        }
+        for r in (raw.get("rows") or [])
+        if str(r.get("status_key") or "") not in ("", "st_ok")
+    ]
+    data = {
+        "task": {
+            "client": head.get("client_name"),
+            "period": head.get("period"),
+            "created_at": str(head.get("created_at") or "")[:16],
+            "matched": _i(head.get("matched")),
+            "unmatched": _i(head.get("mismatched")),
+            "mismatch_amount": _s(head.get("mismatch_amount")),
+        },
+        "unmatched": bad[:_DETAIL_CAP],
+        "omitted": max(0, len(bad) - _DETAIL_CAP),
     }
     return ToolResult(
         ok=True, data=data, receipt=copy_map.recon_detail_receipt(data["task"], data["unmatched"])

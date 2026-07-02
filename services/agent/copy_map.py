@@ -161,7 +161,17 @@ def recon_detail_receipt(task: dict, rows: list) -> str:
     t = task or {}
     unmatched = _recon_unmatched(t)
     lines = [
-        f"· {r.get('date', '')} {r.get('side', '')} {r.get('amount', '')} {r.get('desc', '')}".rstrip()
+        "· "
+        + " ".join(
+            str(x)
+            for x in (
+                r.get("date") or r.get("doc_no") or "",
+                r.get("side") or r.get("issue") or "",
+                r.get("amount") or r.get("invoice_amount") or "",
+                r.get("desc") or "",
+            )
+            if x
+        )
         for r in (rows or [])[:3]
     ]
     top_list = ("\n" + "\n".join(lines)) if lines else ""

@@ -14,6 +14,7 @@ class TestAgentExecutor(unittest.TestCase):
         self.ts = AgentToolset()
 
     def test_recon_overview(self):
+        # 2026-07-03 起双档形状({bank:{recent},income:{recent}})· 细契约在 test_agent_recon_tools。
         tasks = [
             {
                 "bank_code": "KBANK",
@@ -24,21 +25,26 @@ class TestAgentExecutor(unittest.TestCase):
                 "created_at": "2026-07-01 09:00",
             },
         ]
-        with patch(
-            "services.recon.bank_recon_v2_store.list_bank_recon_v2_tasks", return_value=tasks
+        with (
+            patch(
+                "services.recon.bank_recon_v2_store.list_bank_recon_v2_tasks", return_value=tasks
+            ),
+            patch("services.recon.gl_vat_store.list_gl_vat_tasks", return_value=[]),
         ):
             res = self.ts.get_recon_overview(_CTX)
         self.assertTrue(res.ok)
-        self.assertEqual(res.data["count"], 1)
-        self.assertEqual(res.data["recent"][0]["matched"], 42)
+        self.assertEqual(res.data["bank"]["recent"][0]["matched"], 42)
         self.assertIn("42", res.receipt)
         self.assertIn("3", res.receipt)  # 不一致 = unmatched_gl+unmatched_stmt
 
     def test_recon_overview_empty(self):
-        with patch("services.recon.bank_recon_v2_store.list_bank_recon_v2_tasks", return_value=[]):
+        with (
+            patch("services.recon.bank_recon_v2_store.list_bank_recon_v2_tasks", return_value=[]),
+            patch("services.recon.gl_vat_store.list_gl_vat_tasks", return_value=[]),
+        ):
             res = self.ts.get_recon_overview(_CTX)
         self.assertTrue(res.ok)
-        self.assertEqual(res.data["count"], 0)
+        self.assertIn("hint", res.data)
         self.assertEqual(res.receipt, "")  # 无任务:数据诚实,成文交模型
 
     @patch("services.agent.executor.db")

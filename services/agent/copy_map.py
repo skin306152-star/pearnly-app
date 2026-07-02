@@ -139,19 +139,27 @@ def notifications_receipt(logs: list) -> str:
     return _render(OK_COPY["list_notifications"], count=len(logs or []))
 
 
+def _recon_unmatched(t: dict) -> int:
+    """归一不一致计数:income 直给 unmatched;bank 老形状回落 GL+对账单两侧之和。"""
+    if t.get("unmatched") is not None:
+        return int(t.get("unmatched") or 0)
+    return int(t.get("unmatched_gl") or 0) + int(t.get("unmatched_stmt") or 0)
+
+
 def recon_receipt(latest: dict) -> str:
-    # 槽位 matched/unmatched 对齐 agent_i18n 的 agent.ok.recon(不一致 = GL+对账单两侧之和)。
+    # 槽位 matched/unmatched 对齐 agent_i18n 的 agent.ok.recon。
     t = latest or {}
-    unmatched = int(t.get("unmatched_gl") or 0) + int(t.get("unmatched_stmt") or 0)
     return _render(
-        OK_COPY["recon_overview"], matched=int(t.get("matched") or 0), unmatched=unmatched
+        OK_COPY["recon_overview"],
+        matched=int(t.get("matched") or 0),
+        unmatched=_recon_unmatched(t),
     )
 
 
 def recon_detail_receipt(task: dict, rows: list) -> str:
-    # 槽位 unmatched/top_list 对齐 agent.ok.recon_detail;side 用 GL/BANK 通语记号免翻译。
+    # 槽位 unmatched/top_list 对齐 agent.ok.recon_detail;side 用 GL/BANK/NO-GL/DIFF 通语记号免翻译。
     t = task or {}
-    unmatched = int(t.get("unmatched_gl") or 0) + int(t.get("unmatched_stmt") or 0)
+    unmatched = _recon_unmatched(t)
     lines = [
         f"· {r.get('date', '')} {r.get('side', '')} {r.get('amount', '')} {r.get('desc', '')}".rstrip()
         for r in (rows or [])[:3]

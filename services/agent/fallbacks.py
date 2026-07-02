@@ -126,12 +126,20 @@ _FB_RECON = {
 
 
 def _recon_fb(tool: str, o: dict, lang: str) -> str:
-    t = (o.get("recent") or [None])[0] if tool == "recon_overview" else o.get("task")
+    if tool == "recon_overview":
+        # 双档形状:bank 优先取最新,没有再看 income(条目已带归一 matched/unmatched)。
+        t = ((o.get("bank") or {}).get("recent") or [None])[0] or (
+            (o.get("income") or {}).get("recent") or [None]
+        )[0]
+    else:
+        t = o.get("task")
     if not t:
         msgs = _FB_RECON["zero"]
         return msgs.get(lang, msgs["en"])
     m = _fb_int(t.get("matched"))
-    u = _fb_int(t.get("unmatched_gl")) + _fb_int(t.get("unmatched_stmt"))
+    u = _fb_int(t.get("unmatched"))
+    if not u:
+        u = _fb_int(t.get("unmatched_gl")) + _fb_int(t.get("unmatched_stmt"))
     msgs = _FB_RECON["some"]
     return msgs.get(lang, msgs["en"]).format(m=m, u=u)
 

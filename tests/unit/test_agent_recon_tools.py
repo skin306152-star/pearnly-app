@@ -113,6 +113,26 @@ class TestDetail(unittest.TestCase):
         r = self._run(json.dumps([_row("gl_debit_only")]))
         self.assertEqual(len(r.data["unmatched"]), 1)
 
+    def test_data_is_json_safe_with_decimals(self):
+        # 真机雷:锚点余额列是 DB Decimal → prompt json.dumps 炸 → 整轮 crash。
+        import json
+        from decimal import Decimal
+
+        dec_task = {**_TASK, "stmt_opening": Decimal("1000.00"), "formula_diff": Decimal("-20")}
+        with (
+            patch(
+                "services.recon.bank_recon_v2_store.list_bank_recon_v2_tasks",
+                return_value=[dec_task],
+            ),
+            patch(
+                "services.recon.bank_recon_v2_store.get_bank_recon_v2_task",
+                return_value={**dec_task, "detail_json": [_row("gl_debit_only")]},
+            ),
+        ):
+            r = rt.detail(_CTX)
+        json.dumps(r.data)  # 必须可序列化
+        self.assertEqual(r.data["task"]["stmt_opening"], "1000.00")
+
 
 class TestOverviewDelegation(unittest.TestCase):
     def test_executor_delegates(self):

@@ -143,6 +143,24 @@ class TestTextAndLaunch(_Base):
         self.assertNotIn(("t-1", "Uabc"), self.actions)  # 检查点已消费
         self.assertTrue(any("⏳" in m for m in self.sent))
 
+    def test_files_ready_prompts_code_or_go(self):
+        # 科目号可选(产品口径空=全量):文件齐→提示"回编码或回开始";回"开始"即空科目起跑。
+        with (
+            patch.object(
+                ri.db,
+                "get_billing_status_combined",
+                return_value={"allowed": True, "is_exempt": False},
+            ),
+            patch("core.workspace_context.default_workspace_for_write", return_value=84),
+            patch("services.recon_jobs.store.enqueue", return_value="job-2") as enq,
+        ):
+            self._start()
+            self._fill_files()
+            self.assertTrue(any("开始" in m for m in self.sent))  # 出口提示
+            self.assertTrue(ri.try_text(_USER, "开始", "zh", "t-1", "Uabc"))
+        enq.assert_called_once()
+        self.assertEqual(enq.call_args.args[3]["gl_account"], "")
+
     def test_insufficient_balance_blocks_and_cleans(self):
         with (
             patch.object(

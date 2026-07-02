@@ -111,15 +111,54 @@ def cache_shortcut(user, line_user_id, file_hash, ws, lang, quote_token) -> bool
 async def pre_ocr_shortcut(
     user, line_user_id, file_hash, ws, lang, quote_token, *, file_bytes, filename
 ) -> Optional[bool]:
-    """费用 OCR 前的两条快路:① 意图=dms → 专用身份证路接管(绕过费用管线,
-    LINE-DMS-PUSH-DESIGN §2);② 缓存快路(dup 状态卡/指纹缓存)。
+    """费用 OCR 前的三条快路:① 对账收件模式 → 文件归档进 job 暂存(零识别扣费);
+    ② 意图=dms → 专用身份证路接管;③ 缓存快路(dup 状态卡/指纹缓存)。
     返回 True/False=已完全处理;None=继续现状管线。"""
+    intake = await _recon_intake_shortcut(
+        user, line_user_id, lang, file_bytes, filename, quote_token
+    )
+    if intake is not None:
+        return intake
     dms = await _dms_shortcut(user, line_user_id, lang, file_bytes, filename, quote_token)
     if dms is not None:
         return dms
     if cache_shortcut(user, line_user_id, file_hash, ws, lang, quote_token):
         return True
     return None
+
+
+async def _recon_intake_shortcut(user, line_user_id, lang, file_bytes, filename, quote_token):
+    """对账收件缝:双闸开 + 有活跃收件检查点才接管;其余 None=现状。
+    故障 → None(文件走现状 OCR,绝不静默蒸发)。"""
+    try:
+        import asyncio as _aio
+
+        from core import feature_flags
+
+        uid = str(user.get("id") or "")
+        tid = str(user.get("tenant_id") or "")
+        if not (uid and tid and line_user_id):
+            return None
+        if not (
+            feature_flags.agent_image_enabled_for(uid)
+            and feature_flags.agent_recon_intake_enabled_for(uid)
+        ):
+            return None
+        from services.agent import recon_intake
+
+        return await _aio.to_thread(
+            recon_intake.handle_file,
+            user,
+            tid,
+            line_user_id,
+            lang,
+            file_bytes,
+            filename,
+            quote_token,
+        )
+    except Exception:
+        logger.warning("[recon_intake] shortcut failed; default pipeline", exc_info=True)
+        return None
 
 
 async def _dms_shortcut(user, line_user_id, lang, file_bytes, filename, quote_token):

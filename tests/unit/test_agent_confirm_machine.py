@@ -122,6 +122,7 @@ class TestCheckpointPriority(unittest.TestCase):
         with (
             patch("core.feature_flags.agent_confirm_enabled_for", return_value=True),
             patch("core.feature_flags.agent_dms_enabled_for", return_value=dms_flag),
+            patch("services.line_binding.line_pending_actions.read_action", return_value=action),
             patch("services.line_binding.line_pending_actions.take_action", return_value=action),
             patch("services.line_binding.line_action_nonce.latest_pending") as lp,
             patch("services.agent.dms_push.execute_confirmed") as ex,

@@ -347,6 +347,29 @@ TOOLS: tuple[ToolSpec, ...] = (
         gate="image",
     ),
     ToolSpec(
+        name="recon_intake_start",
+        bucket="B",
+        title_th="เริ่มกระทบยอดธนาคารผ่าน LINE",
+        desc_th=(
+            "ผู้ใช้อยากทำกระทบยอดธนาคารตรงนี้เลย (เช่น 'ทำกระทบยอดให้หน่อย', '帮我做银行对账') — "
+            "เปิดรับไฟล์: ผู้ใช้ส่งสเตทเมนต์+ไฟล์ GL แล้วบอกเลขบัญชี ระบบจะกระทบให้และแจ้งผล "
+            "(ถ้าแค่ถามผลเดิม ใช้ recon_overview/recon_detail)"
+        ),
+        slots=(
+            SlotSpec(
+                "gl_account",
+                required=False,
+                source="user_text",
+                desc_th="เลขบัญชี GL ถ้าผู้ใช้บอกมาแล้ว (เช่น 1010)",
+                desc_zh="GL 科目号(用户原话给了才带)",
+            ),
+        ),
+        handler="recon_intake_start",
+        confirm=False,  # 开收件只是等文件(可随时取消);真扣费在对账 worker 与网页同口径
+        writes=True,
+        gate="image",  # 可见性随 LI 大闸;细闸 agent_recon_intake 在执行器 fail-closed(同 dms 先例)
+    ),
+    ToolSpec(
         name="list_workspaces",
         bucket="B",
         title_th="ดูรายชื่อชุดบัญชี/บริษัท",
@@ -394,6 +417,7 @@ REGISTRY_AREA: dict[str, str] = {
     "edit_entry": "purchase_routes",
     "push_to_erp": "erp_push_log_routes",
     "plan_incoming_doc": "purchase_intake_routes",
+    "recon_intake_start": "recon_routes_bankv2",
     "list_workspaces": "workspace_routes",
     "switch_workspace": "workspace_routes",
 }

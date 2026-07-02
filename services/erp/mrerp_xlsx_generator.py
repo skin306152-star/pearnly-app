@@ -339,7 +339,7 @@ def generate_xlsx(
     if not schema:
         raise ValueError(f"unknown sheet_kind: {sheet_kind}")
     if schema.get("stub") and not schema.get("header_columns"):
-        raise RuntimeError(f"sheet_kind={sheet_kind} 物料未到 · 字段未填")
+        raise RuntimeError(f"sheet_kind={sheet_kind} stub schema has no header_columns yet")
 
     # sales_credit 走 Korn 真样本克隆路径(100% PhpSpreadsheet 兼容)
     # 详见 docs/integrations/mrerp-known-facts.md §6 xlsx 字节级冷知识
@@ -353,7 +353,7 @@ def generate_xlsx(
 
     groups = _collect_sheet_groups(schema)
     if not groups:
-        raise RuntimeError(f"sheet_kind={sheet_kind} 无任何 columns 配置")
+        raise RuntimeError(f"sheet_kind={sheet_kind} has no sheet groups configured")
 
     wb = Workbook()
     bold = Font(bold=True)

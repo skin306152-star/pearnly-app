@@ -15,6 +15,7 @@ import unittest
 
 from services.erp import mrerp_xlsx_generator as gen
 from services.erp.erp_payload import flatten_history_for_mrerp
+from services.erp.mrerp_xlsx_fmt import history_number
 from services.erp.mrerp_xlsx_purchase import validate_purchase_history
 
 _CLIENTS = {"clients": [{"erp_type": "mrerp", "client_id": 1, "erp_code": "0006"}]}
@@ -67,19 +68,13 @@ class HistoryNumberTests(unittest.TestCase):
     """history_number:顶层优先 · fields 兜底 · 键序生效。"""
 
     def test_top_level_wins(self):
-        from services.erp.mrerp_xlsx_fmt import history_number
-
         h = {"vat": "7.00", "fields": {"vat": "999"}}
         self.assertEqual(history_number(h, "vat"), 7.0)
 
     def test_fields_fallback(self):
-        from services.erp.mrerp_xlsx_fmt import history_number
-
         self.assertEqual(history_number({"fields": {"vat": "7.00"}}, "vat"), 7.0)
 
     def test_key_order_and_missing(self):
-        from services.erp.mrerp_xlsx_fmt import history_number
-
         h = {"fields": {"amount_before_tax": "100"}}
         self.assertEqual(history_number(h, "subtotal", "amount_before_tax"), 100.0)
         self.assertIsNone(history_number(h, "nope"))

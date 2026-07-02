@@ -104,5 +104,50 @@ class TestImageIntentRedlines(unittest.TestCase):
         self.assertEqual(route.terminal, "default")
 
 
+class TestImageIntentFuzz(unittest.TestCase):
+    """确定性混沌(种子固定·进 CI):随机意图/摘要/闸/大脑行为轰决策核,三不变量恒真。"""
+
+    def test_invariants_hold_under_chaos(self):
+        import random
+
+        rng = random.Random(42)
+        goals_pool = ["record", "push", "archive_only", "nothing", "fly", ""]
+        kinds = ["invoice", "id_card", "unknown", "", None]
+        brains = [
+            None,
+            lambda s, lang="th": {
+                "terminal": rng.choice(["push", "both", "ask", "record", "junk"])
+            },
+            lambda s, lang="th": (_ for _ in ()).throw(RuntimeError("boom")),
+            lambda s, lang="th": rng.choice([None, "prose", 42, [], {}]),
+        ]
+        for i in range(500):
+            pending = (
+                None
+                if rng.random() < 0.4
+                else {
+                    "goals": rng.sample(goals_pool, rng.randint(0, 3)),
+                    "push_to": rng.choice([None, "MR.ERP", ""]),
+                    "book_to_id": rng.choice([None, 84]),
+                }
+            )
+            gates = frozenset(
+                g for g in ("image", "push") if rng.random() < (0.7 if g == "image" else 0.5)
+            )
+            summary = {"doc_kind": rng.choice(kinds), "confidence": rng.choice(["high", "low", ""])}
+            route = route_image(
+                summary, pending=pending, gates=gates, decide=rng.choice(brains), lang="th"
+            )
+            # 不变量一:永不炸、必有合法终端。
+            self.assertIsInstance(route, ImageRoute, i)
+            # 不变量二:image 闸关 = 恒 default(现状契约)。
+            if "image" not in gates:
+                self.assertEqual(route.terminal, "default", i)
+            # 不变量三:push/both 只可能来自用户明说(pending 含 push)且 push 闸开。
+            if route.terminal in ("push", "both"):
+                self.assertIn("push", gates, i)
+                self.assertIn("push", (pending or {}).get("goals") or [], i)
+
+
 if __name__ == "__main__":
     unittest.main()

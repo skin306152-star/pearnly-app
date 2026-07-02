@@ -262,9 +262,9 @@ def start(user, tid, line_user_id, lang, *, kind="bank", gl_account=None) -> Non
     m = _ACCOUNT_RE.search(str(gl_account or ""))
     if m:
         account = m.group(1)
-    kind = str(kind or "bank").strip().lower()
-    if kind not in _KIND_CFG:
-        kind = "bank"
+    from services.agent import recon_tools
+
+    kind = recon_tools.normalize_kind(kind)  # 复用 recon_tools 归一(认更多别名,单一定义点)
     r1, r2 = _KIND_CFG[kind]["roles"]
     action = {
         "tool": TOOL,
@@ -395,10 +395,9 @@ def _launch(user, tid, line_user_id, lang, action) -> bool:
         "lang": lang,
         "notify": {"line_user_id": line_user_id, "lang": lang},
     }
-    if cfg["job_type"] == "bank":
+    if cfg["asks_account"]:
         params["gl_account"] = action.get("gl_account") or ""
-    elif cfg["job_type"] == "glvat":
-        params["revenue_prefix"] = "4"  # 收入科目前缀,与网页 submit 默认一致
+    # revenue_prefix 交 glvat handler 自己兜底("4"),此处不重复默认值
     input_ref = [
         {"path": f["path"], "filename": f["filename"], "role": f["role"]}
         for f in action.get("files") or []

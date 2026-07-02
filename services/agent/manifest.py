@@ -91,6 +91,35 @@ TOOLS: tuple[ToolSpec, ...] = (
         confirm=False,
     ),
     ToolSpec(
+        name="recon_detail",
+        # 只读钻取;bucket=B 同 recon_overview(功能区 recon_routes_bankv2 整档 B,档随区走),
+        # writes=False + gate=None → 始终可见。
+        bucket="B",
+        title_th="ดูรายการกระทบยอดที่ไม่ตรงกัน",
+        desc_th=(
+            "ดูรายละเอียดรายการที่กระทบยอดไม่ตรง (อันไหนมีแค่ในธนาคาร/แค่ใน GL, ยอดยกมา-ยกไป) "
+            "ใช้เมื่อถาม 'รายการไหนไม่ตรง/ต่างตรงไหน' · ตอนนี้มีเฉพาะกระทบยอดธนาคาร (kind=bank)"
+        ),
+        slots=(
+            SlotSpec(
+                "kind",
+                required=False,
+                source="model_freeform",
+                desc_th="ประเภท: bank (ค่าเริ่มต้น) / income / tax",
+                desc_zh="档位枚举 bank/income/tax(缺省 bank·执行器再验)",
+            ),
+            SlotSpec(
+                "keyword",
+                required=False,
+                source="model_freeform",
+                desc_th="ชื่อธนาคาร/ไฟล์ ระบุงานไหน (ไม่ระบุ = ครั้งล่าสุด)",
+                desc_zh="定位任务的银行名/文件名(缺省=最新一次)",
+            ),
+        ),
+        handler="get_recon_detail",
+        confirm=False,
+    ),
+    ToolSpec(
         name="push_status",
         bucket="A",
         title_th="เช็คสถานะการส่งเข้า ERP",
@@ -353,6 +382,7 @@ REGISTRY_AREA: dict[str, str] = {
     "list_notifications": "notification_routes",
     "push_status": "erp_listing_routes",
     "recon_overview": "recon_routes_bankv2",
+    "recon_detail": "recon_routes_bankv2",
     "rd_lookup": "rd_routes",
     "my_plan": "me_routes",
     "record_expense": "purchase_intake_routes",

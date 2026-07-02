@@ -33,6 +33,7 @@ OK_COPY: dict[str, str] = {
     "usage_this_month": "agent.ok.usage_this_month",
     "list_notifications": "agent.ok.notifications",
     "recon_overview": "agent.ok.recon",  # 复用预登记键(两侧 parity 已守)
+    "recon_detail": "agent.ok.recon_detail",
 }
 
 # 反问 slot → i18n key(§1.1)。未登记的 slot → 通用「哪一张」。
@@ -147,6 +148,18 @@ def recon_receipt(latest: dict) -> str:
     )
 
 
+def recon_detail_receipt(task: dict, rows: list) -> str:
+    # 槽位 unmatched/top_list 对齐 agent.ok.recon_detail;side 用 GL/BANK 通语记号免翻译。
+    t = task or {}
+    unmatched = int(t.get("unmatched_gl") or 0) + int(t.get("unmatched_stmt") or 0)
+    lines = [
+        f"· {r.get('date', '')} {r.get('side', '')} {r.get('amount', '')} {r.get('desc', '')}".rstrip()
+        for r in (rows or [])[:3]
+    ]
+    top_list = ("\n" + "\n".join(lines)) if lines else ""
+    return _render(OK_COPY["recon_detail"], unmatched=unmatched, top_list=top_list)
+
+
 __all__ = [
     "ERROR_COPY",
     "OK_COPY",
@@ -162,4 +175,5 @@ __all__ = [
     "usage_receipt",
     "notifications_receipt",
     "recon_receipt",
+    "recon_detail_receipt",
 ]

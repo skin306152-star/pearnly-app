@@ -180,6 +180,62 @@ class TestTextAndLaunch(_Base):
         self.assertFalse(os.path.exists(ri._stage_dir(a)))  # 目录已清
 
 
+class TestIncomeAndTaxKinds(_Base):
+    """二期:income(GL+销项税报告·齐即自动跑)/ tax(发票批+报告·数量开放等"开始")。"""
+
+    def _launch_env(self):
+        return (
+            patch.object(
+                ri.db,
+                "get_billing_status_combined",
+                return_value={"allowed": True, "is_exempt": False},
+            ),
+            patch("core.workspace_context.default_workspace_for_write", return_value=84),
+            patch("services.recon_jobs.store.enqueue", return_value="job-9"),
+        )
+
+    def test_income_roles_and_autolaunch(self):
+        p1, p2, p3 = self._launch_env()
+        with p1, p2, p3 as enq:
+            ri.start(_USER, "t-1", "Uabc", "zh", kind="income")
+            self.assertIn("GL 总账", self.sent[0])
+            ri.handle_file(_USER, "t-1", "Uabc", "zh", b"g", "gl_jun.pdf", None)  # 顺序:第一件=GL
+            out = ri.handle_file(_USER, "t-1", "Uabc", "zh", b"v", "ภ.พ.30-มิ.ย.pdf", None)
+        self.assertTrue(out)
+        enq.assert_called_once()
+        args, kwargs = enq.call_args
+        self.assertEqual(args[0], "glvat")
+        self.assertEqual(args[3]["revenue_prefix"], "4")
+        self.assertNotIn("gl_account", args[3])
+        self.assertEqual(sorted(f["role"] for f in args[4]), ["gl", "vat"])
+
+    def test_tax_open_count_waits_for_go(self):
+        p1, p2, p3 = self._launch_env()
+        with p1, p2, p3 as enq:
+            ri.start(_USER, "t-1", "Uabc", "zh", kind="tax")
+            ri.handle_file(_USER, "t-1", "Uabc", "zh", b"i1", "inv1.jpg", None)  # 顺序:发票先
+            ri.handle_file(_USER, "t-1", "Uabc", "zh", b"r", "รายงานภาษีขาย.pdf", None)
+            self.assertTrue(any("开始" in m for m in self.sent))  # 齐了不自动跑,提示继续发或开始
+            enq.assert_not_called()
+            ri.handle_file(_USER, "t-1", "Uabc", "zh", b"i2", "inv2.jpg", None)  # 补第二张发票
+            a = self.actions[("t-1", "Uabc")]
+            self.assertEqual((a["invoice"], a["report"]), (2, 1))
+            self.assertTrue(ri.try_text(_USER, "开始", "zh", "t-1", "Uabc"))
+        enq.assert_called_once()
+        self.assertEqual(enq.call_args.args[0], "salesvat")
+        roles = [f["role"] for f in enq.call_args.args[4]]
+        self.assertEqual(sorted(roles), ["invoice", "invoice", "report"])
+
+    def test_income_ignores_account_codes(self):
+        # income 无科目号概念:数字消息交正常轮,绝不被收件流吞。
+        ri.start(_USER, "t-1", "Uabc", "zh", kind="income")
+        self.assertFalse(ri.try_text(_USER, "1010", "zh", "t-1", "Uabc"))
+
+    def test_unknown_kind_falls_to_bank(self):
+        ri.start(_USER, "t-1", "Uabc", "zh", kind="อะไรนะ")
+        self.assertEqual(self.actions[("t-1", "Uabc")]["kind"], "bank")
+
+
 class TestConfirmMachineDispatch(unittest.TestCase):
     def _resume(self, word, tool, take_result="TAKEN"):
         from services.agent import confirm_machine as m

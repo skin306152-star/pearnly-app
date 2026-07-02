@@ -81,15 +81,24 @@ class AgentToolset:
 
         return recon_tools.detail(ctx, kind=kind, keyword=keyword)
 
-    def recon_intake_start(self, ctx: AgentContext, *, gl_account=None) -> ToolResult:
-        """LINE 对账收件:执行器只核验细闸(fail-closed,同 dms 先例),
+    def recon_intake_start(self, ctx: AgentContext, *, kind=None, gl_account=None) -> ToolResult:
+        """LINE 对账收件:执行器只核验细闸(fail-closed,同 dms 先例)+ 档位归一,
         真正开收件(检查点+暂存目录)在 write_sink 落地。"""
         from core import feature_flags
+        from services.agent import recon_tools
 
         if not feature_flags.agent_recon_intake_enabled_for(str(ctx.user["id"])):
             return ToolResult(ok=False, error_code="not_available_yet")
         # 权限不再另设代理闸:细闸 fail-closed + 起跑前余额预检即真门(对账扣费在 worker 同网页口径)
-        return ToolResult(ok=True, data={"intake": {"gl_account": gl_account or None}})
+        return ToolResult(
+            ok=True,
+            data={
+                "intake": {
+                    "kind": recon_tools.normalize_kind(kind),
+                    "gl_account": gl_account or None,
+                }
+            },
+        )
 
     def _overview(
         self, ctx: AgentContext, *, this_month: bool, include_categories: bool = True

@@ -60,3 +60,10 @@
 - slots `model_freeform` 原本 str() 压平列表槽(已修·测试锁)。
 - 语料 JSONL 尾行换行风格要跟文件一致;PYTHONUTF8=1 常备。
 - RATCHET-EXEMPT 逐文件写进 commit message,新文件也算净增。
+
+## 新债豁免声明(2026-07-02 · master 向前盖)
+
+`line_intent_store.ensure_table` 命中 lint-debt 反模式 #5(运行期建表)。豁免理由:本仓 LINE 侧
+新表的既定 dual-run 惯例(prod 无 alembic 钩子 → 首用 ensure 自愈;`line_action_nonces`/
+`line_voice_quota` 同款先例),alembic `0045_line_pending_intents` 已留档。分支逐 commit 闸
+因 LI-2 run 被后续 push 取消而漏扫,merge 全量 diff 在 master 炸出 → 本 commit 补声明转绿。

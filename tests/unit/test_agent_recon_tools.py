@@ -127,5 +127,35 @@ class TestOverviewDelegation(unittest.TestCase):
         self.assertIn("agent.ok.recon", r.receipt)
 
 
+class TestObservationAndFallback(unittest.TestCase):
+    """真机雷(2026-07-02):observe 漏 recon 分支 → 模型观测只剩 {"ok":True} 零数字
+    只能空话/crash。锁:观测直通执行器产出;成文兜底给诚实计数。"""
+
+    def test_observe_passes_recon_data_through(self):
+        from services.agent import observe
+        from services.agent.contracts import ToolResult
+
+        detail = ToolResult(ok=True, data={"task": {"matched": 9}, "unmatched": [{"side": "GL"}]})
+        out = observe.payload("recon_detail", detail)
+        self.assertEqual(out["task"]["matched"], 9)
+        self.assertEqual(len(out["unmatched"]), 1)
+        ov = ToolResult(ok=True, data={"count": 1, "recent": [{"matched": 5}]})
+        self.assertEqual(observe.payload("recon_overview", ov)["recent"][0]["matched"], 5)
+
+    def test_grounded_fallback_covers_recon(self):
+        from services.agent import fallbacks
+
+        obs = [
+            {
+                "tool": "recon_detail",
+                "ok": True,
+                "task": {"matched": 9, "unmatched_gl": 5, "unmatched_stmt": 2},
+            }
+        ]
+        self.assertIn("7", fallbacks.grounded_fallback(obs, "zh"))
+        obs2 = [{"tool": "recon_overview", "ok": True, "recent": []}]
+        self.assertIn("银行对账", fallbacks.grounded_fallback(obs2, "zh"))  # 空数据诚实指路
+
+
 if __name__ == "__main__":
     unittest.main()

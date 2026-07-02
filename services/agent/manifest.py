@@ -112,8 +112,11 @@ TOOLS: tuple[ToolSpec, ...] = (
                 "keyword",
                 required=False,
                 source="model_freeform",
-                desc_th="ชื่อธนาคาร/ไฟล์ ระบุงานไหน (ไม่ระบุ = ครั้งล่าสุด)",
-                desc_zh="定位任务的银行名/文件名(缺省=最新一次)",
+                desc_th=(
+                    "ชื่อธนาคาร/ไฟล์ ระบุงานไหน เช่นถาม 'kbank อันไหนไม่ตรง' → keyword:\"kbank\" "
+                    "(ไม่ระบุ = ครั้งล่าสุด)"
+                ),
+                desc_zh="定位任务的银行名/文件名(用户点名了就带上·缺省=最新一次)",
             ),
         ),
         handler="get_recon_detail",

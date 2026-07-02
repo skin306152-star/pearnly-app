@@ -297,7 +297,9 @@ def _decide_step(
         ),
         tier="flash",
         response_mime=True,
-        max_tokens=768,
+        # 1200:泰文 token 密度低,768 会把"对账明细"这类多行回复截断成坏 JSON
+        # (真机雷 2026-07-03:泰语问明细恒落兜底)。失控输出仍有 _sane_reply 出口护栏。
+        max_tokens=1200,
         timeout_s=18,
         max_retries=1,
         task="agent_loop",

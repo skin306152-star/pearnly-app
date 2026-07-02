@@ -23,6 +23,19 @@ class TestPlanIncomingDoc(unittest.TestCase):
             r = self.ts.plan_incoming_doc(_CTX, goals=bad)
             self.assertFalse(r.ok, bad)
             self.assertEqual(r.error_code, "invalid_goals")
+        # 拒绝时喂回合法枚举 → 模型环内自愈,不逼用户重说。
+        r = self.ts.plan_incoming_doc(_CTX, goals=["fly"])
+        self.assertIn("push", r.data["allowed_goals"])
+
+    def test_goal_aliases_from_real_model(self):
+        # prod 真机抓到 gemini 意译枚举(send_to_erp/do_not_record)→ 确定性归一救回。
+        r = self.ts.plan_incoming_doc(_CTX, goals=["send_to_erp", "do_not_record"])
+        self.assertTrue(r.ok)
+        self.assertEqual(r.data["plan"]["goals"], ["push"])
+        # 只剩否定记号 = 什么都不做
+        r2 = self.ts.plan_incoming_doc(_CTX, goals=["do_not_record"])
+        self.assertTrue(r2.ok)
+        self.assertEqual(r2.data["plan"]["goals"], [])
 
     def test_nothing_maps_to_empty_goals(self):
         r = self.ts.plan_incoming_doc(_CTX, goals=["nothing"])

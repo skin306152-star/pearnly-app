@@ -312,6 +312,36 @@ class AgentToolset:
         )
 
     _PLAN_GOALS = frozenset({"record", "push", "archive_only", "nothing"})
+    # 模型高频意译的确定性归一(prod 真机抓到 gemini 吐 send_to_erp/do_not_record):
+    # 别名→正名;否定前缀(do_not_/no_/skip_…)对已知目标 = "不做它" → 丢记号(空串)。
+    _GOAL_ALIASES = {
+        "push": "push",
+        "send_to_erp": "push",
+        "push_erp": "push",
+        "send_erp": "push",
+        "push_to_erp": "push",
+        "erp": "push",
+        "record": "record",
+        "book": "record",
+        "archive": "archive_only",
+        "archive_only": "archive_only",
+        "save_only": "archive_only",
+        "nothing": "nothing",
+        "none": "nothing",
+        "no_action": "nothing",
+    }
+    _NEG_PREFIXES = ("do_not_", "dont_", "not_", "no_", "skip_")
+
+    @classmethod
+    def _norm_goal(cls, g) -> Optional[str]:
+        """别名归一。返回正名 / ""(否定记号·忽略)/ None(真不认识)。"""
+        g = str(g).strip().lower()
+        if g in cls._GOAL_ALIASES:
+            return cls._GOAL_ALIASES[g]
+        for pre in cls._NEG_PREFIXES:
+            if g.startswith(pre) and cls._GOAL_ALIASES.get(g[len(pre) :]):
+                return ""
+        return None
 
     def plan_incoming_doc(
         self, ctx: AgentContext, *, goals=None, endpoint_name=None, workspace_name=None
@@ -322,11 +352,24 @@ class AgentToolset:
         列表喂观测,模型引导用户挑),绝不模糊猜。nothing 与其它目标互斥(都不要=只有它)。
         """
         raw = goals if isinstance(goals, (list, tuple)) else [goals] if goals else []
-        parsed = {str(g).strip().lower() for g in raw if str(g).strip()}
-        if not parsed or not parsed <= self._PLAN_GOALS:
-            return ToolResult(ok=False, error_code="invalid_goals")
+        tokens = [str(g).strip() for g in raw if str(g).strip()]
+        normed = [self._norm_goal(g) for g in tokens]
+        # 真不认识的记号 → 拒绝,但把合法枚举喂回观测让模型环内自愈(不逼用户重说)。
+        if not tokens or None in normed:
+            return ToolResult(
+                ok=False,
+                error_code="invalid_goals",
+                data={"allowed_goals": sorted(self._PLAN_GOALS)},
+            )
+        parsed = {g for g in normed if g}
+        if not parsed:
+            parsed = {"nothing"}  # 只剩否定记号("别记")= 什么都不做
         if "nothing" in parsed and len(parsed) > 1:
-            return ToolResult(ok=False, error_code="invalid_goals")
+            return ToolResult(
+                ok=False,
+                error_code="invalid_goals",
+                data={"allowed_goals": sorted(self._PLAN_GOALS)},
+            )
         if "push" in parsed:
             if not _plan_permissions((ctx.user or {}).get("plan")).get("can_push_erp"):
                 return ToolResult(ok=False, error_code="forbidden")

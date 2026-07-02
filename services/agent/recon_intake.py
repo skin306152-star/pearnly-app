@@ -22,8 +22,25 @@ logger = logging.getLogger("mr-pilot")
 
 TOOL = "recon_intake"
 _TTL_MINUTES = 15
-# GL 侧=表格类扩展名(与 OCR table path 同清单);其余(pdf/图)按对账单收。
-_GL_EXTS = {".xlsx", ".xls", ".xlsm", ".csv", ".tsv"}
+# role 归属:扩展名两边都不可靠(GL 常是 PDF,对账单也有 Excel·真件夹实证)——
+# 文件名记号优先纠偏,其余按顺序收(开场文案定死:先对账单后 GL)。
+_GL_NAME_RE = re.compile(r"gl|ledger|总账|總帳|แยกประเภท", re.IGNORECASE)
+_STMT_NAME_RE = re.compile(r"statement|stmt|สเตทเมนต์|เดินบัญชี|对账单", re.IGNORECASE)
+
+
+def _role_for(action, filename) -> str:
+    name = str(filename or "")
+    if _GL_NAME_RE.search(name):
+        return "gl"
+    if _STMT_NAME_RE.search(name):
+        return "stmt"
+    if not action.get("stmt"):
+        return "stmt"
+    if not action.get("gl"):
+        return "gl"
+    return "stmt"  # 都齐还发 → 当补充对账单页(多页流水最常见)
+
+
 # 科目号:整句就是编码(可带"科目/บัญชี/GL"前缀)才收——含编码的普通聊天
 # (如"看看那张 7-11 的单据")绝不许被吞(对抗用例抓过)。
 _ACCOUNT_RE = re.compile(
@@ -34,15 +51,15 @@ _MAX_ACCOUNT_TEXT_LEN = 30
 
 _OPEN = {
     "th": (
-        "ได้เลยค่ะ ส่งมา 2 อย่างนะคะ: ① สเตทเมนต์ธนาคาร (PDF/รูป) ② ไฟล์ GL (Excel/CSV) · "
-        "แล้วพิมพ์เลขบัญชี GL ที่จะกระทบ (เช่น 1010) · พิมพ์ 'ยกเลิก' เพื่อยกเลิกได้ (ภายใน 15 นาที)"
+        "ได้เลยค่ะ ส่งมาตามลำดับนะคะ: ① สเตทเมนต์ธนาคารก่อน ② แล้วค่อยไฟล์ GL · "
+        "จากนั้นพิมพ์เลขบัญชี GL (เช่น 1010) · พิมพ์ 'ยกเลิก' เพื่อยกเลิกได้ (ภายใน 15 นาที)"
     ),
-    "zh": "好,发我两样:①银行对账单(PDF/图片)②GL 总账文件(Excel/CSV)·再告诉我 GL 科目号(比如 1010)。回「取消」可放弃(15 分钟内有效)。",
+    "zh": "好,按顺序发我两样:①先发银行对账单 ②再发 GL 总账文件·然后告诉我 GL 科目号(比如 1010)。回「取消」可放弃(15 分钟内有效)。",
     "en": (
-        "Sure — send me two things: ① the bank statement (PDF/photo) ② the GL file (Excel/CSV), "
+        "Sure — send them in order: ① the bank statement first ② then the GL file, "
         "then type the GL account code (e.g. 1010). Type 'cancel' to abort (valid 15 min)."
     ),
-    "ja": "了解です。①銀行明細(PDF/画像)②GL ファイル(Excel/CSV)を送り、GL 科目コード(例 1010)を入力してください。「キャンセル」で中止できます(15分以内)。",
+    "ja": "了解です。順番に:①先に銀行明細 ②次に GL ファイルを送り、GL 科目コード(例 1010)を入力してください。「キャンセル」で中止できます(15分以内)。",
 }
 _ROLE_NAME = {
     "stmt": {"th": "สเตทเมนต์ธนาคาร", "zh": "银行对账单", "en": "bank statement", "ja": "銀行明細"},
@@ -158,15 +175,14 @@ def start(user, tid, line_user_id, lang, *, gl_account=None) -> None:
 
 
 def handle_file(user, tid, line_user_id, lang, file_bytes, filename, quote_token):
-    """收件模式下的文件:按扩展名归 role 落进 job 暂存目录(不进费用 OCR,零识别扣费)。
+    """收件模式下的文件:归 role 落进 job 暂存目录(不进费用 OCR,零识别扣费)。
     返回 True=已收;None=无活跃收件(走正常图片管线)。同步重活——调用方 to_thread。"""
     from services.line_binding import line_pending_actions
 
     action = line_pending_actions.read_action(tid, line_user_id)
     if not action or action.get("tool") != TOOL:
         return None
-    ext = os.path.splitext(filename or "")[1].lower()
-    role = "gl" if ext in _GL_EXTS else "stmt"
+    role = _role_for(action, filename)
     stage = _stage_dir(action)
     os.makedirs(stage, exist_ok=True)
     base = os.path.basename(filename or f"{role}.bin")

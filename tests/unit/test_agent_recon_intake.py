@@ -78,6 +78,24 @@ class TestStartAndCollect(_Base):
     def test_no_checkpoint_returns_none(self):
         self.assertIsNone(ri.handle_file(_USER, "t-1", "Uabc", "zh", b"x", "a.pdf", None))
 
+    def test_gl_as_pdf_ordered_flow(self):
+        # 真件夹实证:GL 常是 PDF——扩展名不可靠,顺序收:第一件=对账单,第二件=GL。
+        self._start()
+        ri.handle_file(_USER, "t-1", "Uabc", "zh", b"p1", "BAY 9789.pdf", None)
+        ri.handle_file(_USER, "t-1", "Uabc", "zh", b"p2", "กระทบยอด.pdf", None)
+        a = self.actions[("t-1", "Uabc")]
+        self.assertEqual((a["stmt"], a["gl"]), (1, 1))
+
+    def test_filename_token_overrides_order(self):
+        # 文件名带 GL/ledger 记号 → 即便先发也归 GL(纠偏);statement 记号同理。
+        self._start()
+        ri.handle_file(_USER, "t-1", "Uabc", "zh", b"g", "general ledger BANK.pdf", None)
+        a = self.actions[("t-1", "Uabc")]
+        self.assertEqual((a["stmt"], a["gl"]), (0, 1))
+        ri.handle_file(_USER, "t-1", "Uabc", "zh", b"s", "statement_jun.xlsx", None)
+        a = self.actions[("t-1", "Uabc")]
+        self.assertEqual((a["stmt"], a["gl"]), (1, 1))
+
 
 class TestTextAndLaunch(_Base):
     def _fill_files(self):

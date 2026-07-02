@@ -186,6 +186,21 @@ class TestRouting(unittest.TestCase):
         flat = self._flat(seller=self.OTHER, buyer=self.OTHER)
         self.assertIsNone(choose_doc_type(flat, {}, own_tax_id=self.OWN))
 
+    def test_retail_receipt_without_buyer_falls_to_purchase(self):
+        # 真机语料(SISTER MAKEUP 2026-07-02):零售小票无任何税号锚点,Pearnly 记成费用,
+        # 推 ERP 却掉端点默认销项 → ERR_NO_CLIENT。expense + 无买方身份 → 采购。
+        from services.erp.mrerp_http.routing import choose_doc_type
+
+        flat = {"fields": {"document_type": "receipt", "seller_name": "SISTER MAKEUP"}}
+        self.assertEqual(choose_doc_type(flat, {}, own_tax_id=self.OWN), "purchase")
+
+    def test_expense_with_foreign_buyer_stays_none(self):
+        # 读到了买方税号(即便别家)→ 不赌方向,留给匹配闸。
+        from services.erp.mrerp_http.routing import choose_doc_type
+
+        flat = {"fields": {"document_type": "receipt", "buyer_tax": self.OTHER}}
+        self.assertIsNone(choose_doc_type(flat, {}, own_tax_id=self.OWN))
+
 
 class TestRoutedBatch(unittest.TestCase):
     """upload_routed_batch:按方向把采购票切到采购模块,销项/ambiguous 保持默认(Bug#1 接线)。"""

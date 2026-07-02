@@ -36,6 +36,18 @@ def choose_doc_type(
         return "sales_cash" if payment_is_paid(_fields(flat)) else "sales_credit"
     if direction == "purchase":
         return "purchase"
+    # 税号锚点判不出(零售小票常态:票面无买方身份)→ 跟 Pearnly 自身单据判定走:
+    # judge_direction=expense 且买方身份完全缺失 = 本子里记的是费用支出 → ERP 同向
+    # 落采购。此前掉端点默认销项 → 销项闸要求挂客户 → 恒 ERR_NO_CLIENT(真机语料
+    # SISTER MAKEUP 2026-07-02)。票面读到了买方税号(即便是别家的)不走此兜底,
+    # 仍留 None ——那是匹配闸(confirmed_account_set_mismatch)的辖区,不赌方向。
+    from services.purchase.intake import judge_direction
+
+    fields = _fields(flat)
+    kind, _ = judge_direction(fields)
+    buyer = clean_tax_id(fields.get("buyer_tax") or fields.get("buyer_tax_id"))
+    if kind == "expense" and not buyer:
+        return "purchase"
     return None
 
 

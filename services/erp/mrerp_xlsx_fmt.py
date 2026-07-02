@@ -80,6 +80,24 @@ def fmt_number(value: Any) -> Optional[float]:
     return float(n)
 
 
+def history_number(history: Any, *keys: str) -> Optional[float]:
+    """按键序取金额:顶层优先,history['fields'] 兜底。
+
+    真实推送流的 history 经 flatten_history_for_mrerp 产出:顶层只有 total_amount 等
+    SELECT 列,OCR 的 vat/subtotal 只在 fields 嵌套里。闸/生成器读金额必须两层都看,
+    只读顶层会对真实单据静默空转(2026-07-02 复测 BUG4 根因)。"""
+    if not isinstance(history, dict):
+        return None
+    fields = history.get("fields")
+    fields = fields if isinstance(fields, dict) else {}
+    for key in keys:
+        for src in (history, fields):
+            n = fmt_number(src.get(key))
+            if n is not None:
+                return n
+    return None
+
+
 def fmt_number_strict(value: Any) -> float:
     """金额严格模式 → float · 负数 / 超 MAX_AMOUNT / 非法都 raise ValueError
     用于 sales_credit 上传前 preflight · 销项发票净额必须 > 0

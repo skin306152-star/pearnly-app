@@ -15,7 +15,7 @@ from collections import OrderedDict
 from typing import Any, Dict, List
 
 from services.erp import mrerp_xlsx_generator as _gen
-from services.erp.mrerp_xlsx_fmt import fmt_date, fmt_number
+from services.erp.mrerp_xlsx_fmt import fmt_date, fmt_number, history_number
 from services.erp.mrerp_xlsx_lookups import _build_product_lookup, _resolve_product_code
 from services.erp.mrerp_xlsx_sales_credit import _format_num
 from services.purchase.field_clean import clean_tax_id
@@ -118,8 +118,12 @@ def _detail_rows(history: Dict[str, Any], mappings: Dict[str, Any]) -> List[Dict
             }
         )
     if not rows:
-        sub = fmt_number(history.get("subtotal") or history.get("amount_before_tax"))
-        sub = sub if sub is not None else (fmt_number(history.get("total_amount")) or 0)
+        # 无明细行兜底:金额须是税基(表头税率 7 แยก=价外)。subtotal 缺(真实流只在
+        # fields)→ 从含税总额剥 7% 反推,与 sales_credit 兜底同口径,不把含税额当税基。
+        sub = history_number(history, "subtotal", "amount_before_tax")
+        if sub is None:
+            tot = history_number(history, "total_amount")
+            sub = round(tot / 1.07, 2) if tot else 0
         rows.append({"code": "", "qty": 1, "price": sub, "amount": sub})
     return rows
 
@@ -131,10 +135,10 @@ def validate_purchase_history(history: Dict[str, Any], mappings: Dict[str, Any])
         return False, "ERR_NO_HISTORY", []
     if not history.get("invoice_date"):
         return False, "ERR_NO_INVOICE_DATE", []
-    total = fmt_number(history.get("total_amount"))
+    total = history_number(history, "total_amount")
     if total is None:
-        sub = fmt_number(history.get("subtotal")) or 0
-        total = sub + (fmt_number(history.get("vat")) or 0)
+        sub = history_number(history, "subtotal") or 0
+        total = sub + (history_number(history, "vat") or 0)
     if not total or total <= 0:
         return False, "ERR_NO_TOTAL_AMOUNT", []
     if not _supplier_code(history, mappings):

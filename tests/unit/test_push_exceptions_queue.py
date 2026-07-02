@@ -44,6 +44,8 @@ class ClassifyPushExceptionTests(unittest.TestCase):
         self.assertEqual(c("EXPRESS_MANUAL: date_future"), "document_review")
         self.assertEqual(c("EXPRESS_MANUAL: date_reissued"), "document_review")
         self.assertEqual(c("EXPRESS_MANUAL: tax_id_invalid"), "document_review")
+        # MR.ERP 匹配闸(防推错套账)· 人工判断 · 不落 Express 账套配错桶
+        self.assertEqual(c("ERR_ACCOUNT_SET_MISMATCH"), "document_review")
 
 
 class _Cur:

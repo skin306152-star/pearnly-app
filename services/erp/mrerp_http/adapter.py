@@ -145,7 +145,7 @@ class MrErpHttpAdapter:
             raise RuntimeError("MrErpHttpAdapter used outside `with` block")
         m = self.module
         if not m.verified or m.selmenu is None:
-            raise MRERPBusinessError(f"doc_type={m.doc_type} 直写未就绪(selmenu/模板待补 · S3/S4)")
+            raise MRERPBusinessError(f"doc_type={m.doc_type} direct-write not ready")
         t0 = time.time()
         original = histories
 
@@ -159,7 +159,8 @@ class MrErpHttpAdapter:
         # 科目安全阀(主动层):提供了该套账科目表且配置科目码不在表内 → 全挡下退回用户配置(不硬建)。
         review = account_gate(mappings)
         if review:
-            reasons = [ACCOUNT_REVIEW_CODE, "科目码不在该套账科目表: " + ", ".join(review)]
+            # 第二项只放科目码本身(语言中立数据)· 解释文案由 ACCOUNT_REVIEW_CODE 四语出。
+            reasons = [ACCOUNT_REVIEW_CODE, ", ".join(review)]
             fr = [self._fail_row(h, reasons) for h in histories]
             return self._result(original, [], mismatch_failed + fr, t0, 0)
 
@@ -228,15 +229,16 @@ class MrErpHttpAdapter:
         own = mappings.get("_own_tax_id") if isinstance(mappings, dict) else None
         if not own:
             return histories, []
-        from services.erp.mrerp_http.routing import confirmed_account_set_mismatch
+        from services.erp.mrerp_http import routing as _routing
 
         expected = "sales" if self.module.doc_type.startswith("sales") else "purchase"
         kept: List[Dict[str, Any]] = []
         failed: List[FailedRow] = []
         for h in histories:
-            if confirmed_account_set_mismatch(h, h, own_tax_id=own, expected_direction=expected):
-                reasons = ["票面买卖方与套账主体不符 · 未推送(防推错套账)"]
-                failed.append(self._fail_row(h, reasons))
+            if _routing.confirmed_account_set_mismatch(
+                h, h, own_tax_id=own, expected_direction=expected
+            ):
+                failed.append(self._fail_row(h, [_routing.ACCOUNT_SET_MISMATCH_CODE]))
             else:
                 kept.append(h)
         return kept, failed

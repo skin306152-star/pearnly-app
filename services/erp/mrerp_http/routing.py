@@ -156,6 +156,10 @@ def route_and_upload(adapter, histories: List[Dict[str, Any]], mappings: Dict[st
     return merged
 
 
+# 匹配闸失败码 · 四语文案在 mrerp_business_friendly(_fail_row 经 translate_reasons 取)。
+ACCOUNT_SET_MISMATCH_CODE = "ERR_ACCOUNT_SET_MISMATCH"
+
+
 def confirmed_account_set_mismatch(
     flat: Dict[str, Any], history: Dict[str, Any], *, own_tax_id: Any, expected_direction: str
 ) -> bool:

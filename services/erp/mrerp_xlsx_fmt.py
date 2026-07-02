@@ -4,6 +4,7 @@
 铁律 29 字段格式(日期/字符串/金额)+ MR.ERP 服务端长度/日期/税种上限。纯函数,0 逻辑改。
 """
 
+import hashlib
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Optional
@@ -50,6 +51,16 @@ def fmt_date(value: Any) -> str:
     if isinstance(value, datetime):
         return value.strftime("%Y-%m-%d")
     return str(value)[:10]
+
+
+def supplier_code_from_name(name: Any) -> str:
+    """卖方名 → 确定性供应商码(无税号零售卖家 · 幂等)。autocreate 与 purchase 生成器
+    共用,两侧推导必须同源否则建了对不上。md5 仅派生短码非安全用途。"""
+    s = str(name or "").strip().lower()
+    if not s or s == "-":
+        return ""
+    digest = hashlib.md5(s.encode("utf-8"), usedforsecurity=False).hexdigest()
+    return ("V" + digest)[:12].upper()
 
 
 def fmt_str(value: Any, max_len: int = 50) -> str:

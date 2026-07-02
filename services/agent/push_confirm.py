@@ -25,18 +25,20 @@ NONCE_TTL_HOURS = 1  # 推送确认卡不该隔夜有效(默认 72h 是记账卡
 _BTN_OK = {"th": "ยืนยันส่ง", "zh": "确认推送", "en": "Confirm", "ja": "送信する"}
 _BTN_NO = {"th": "ยกเลิก", "zh": "取消", "en": "Cancel", "ja": "キャンセル"}
 _ACK = {
-    "th": "กำลังส่งเข้า ERP ให้อยู่ค่ะ เดี๋ยวแจ้งผลนะคะ",
-    "zh": "正在推送到 ERP,稍后告诉你结果。",
-    "en": "Pushing to ERP now — I'll let you know the result.",
-    "ja": "ERP へ送信しています。結果をお知らせしますね。",
+    "th": "⏳ รับคำยืนยันแล้วค่ะ กำลังส่งเข้า ERP อยู่ เดี๋ยวแจ้งผลนะคะ",
+    "zh": "⏳ 已收到确认,正在推送到 ERP…结果马上回报。",
+    "en": "⏳ Confirmed — pushing to ERP now, result coming shortly.",
+    "ja": "⏳ 確認を受け付けました。ERP へ送信中です。結果をお知らせします。",
 }
 # 成功/重复走现成 agent.ok.push / agent.ok.push_dup 四语键(为 M3 预登记·两侧 parity 已守);
 # ACK/FAIL 是 LINE 专用过程文案(M5 网页 Agent 不复用确认卡流程)→ 留 inline,与安全兜底同先例。
+# ⏳/❌ 状态记号与 line_i18n exp_ack_* 的 ✅ 同一套视觉语言(Zihao 2026-07-02:任务要有
+# 等待/执行/成功/失败可见状态)。
 _FAIL = {
-    "th": "ส่งเข้า ERP ไม่สำเร็จค่ะ: {reason} · ดูรายละเอียดที่หน้าประวัติการส่งได้เลย",
-    "zh": "推送失败:{reason}·可到推送日志页看详情。",
-    "en": "Push failed: {reason} · see the push log page for details.",
-    "ja": "送信に失敗しました:{reason} · 送信ログページをご確認ください。",
+    "th": "❌ ส่งเข้า ERP ไม่สำเร็จค่ะ: {reason} · ดูรายละเอียดที่หน้าประวัติการส่งได้เลย",
+    "zh": "❌ 推送失败:{reason}·可到推送日志页看详情。",
+    "en": "❌ Push failed: {reason} · see the push log page for details.",
+    "ja": "❌ 送信に失敗しました:{reason} · 送信ログページをご確認ください。",
 }
 
 

@@ -48,6 +48,41 @@ class TestBuyerFromHistory(unittest.TestCase):
         self.assertEqual(b["code"], "0999999999999")
 
 
+class TestSellerNameCode(unittest.TestCase):
+    """真机语料(SISTER MAKEUP 2026-07-02):零售卖家无税号 → 码按名字确定性派生,
+    autocreate 与 purchase 生成器两侧同源;旧 V0 共享垃圾码兜底已删。"""
+
+    def test_no_tax_derives_from_name(self):
+        from services.erp.mrerp_http.autocreate import _seller_from_history
+        from services.erp.mrerp_xlsx_fmt import supplier_code_from_name
+
+        h = {"fields": {"seller_name": "SISTER MAKEUP"}}
+        seller = _seller_from_history(h)
+        self.assertEqual(seller["code"], supplier_code_from_name("SISTER MAKEUP"))
+        self.assertTrue(seller["code"].startswith("V"))
+
+    def test_validation_side_resolves_same_code(self):
+        from services.erp.mrerp_http.autocreate import _seller_from_history
+        from services.erp.mrerp_xlsx_purchase import _supplier_code
+
+        h = {"fields": {"seller_name": "SISTER MAKEUP"}}
+        created = _seller_from_history(h)["code"]
+        resolved = _supplier_code(h, {"suppliers": []})
+        self.assertEqual(created, resolved)
+
+    def test_tax_still_wins(self):
+        from services.erp.mrerp_http.autocreate import _seller_from_history
+
+        h = {"fields": {"seller_name": "ACME", "seller_tax": "0107561000013"}}
+        self.assertEqual(_seller_from_history(h)["code"], "0107561000013")
+
+    def test_no_tax_no_name_no_cid_yields_empty(self):
+        # 旧行为建 "V0" 共享垃圾码且 preflight 解析不到 → 改为空码(provision 跳过)。
+        from services.erp.mrerp_http.autocreate import _seller_from_history
+
+        self.assertEqual(_seller_from_history({"fields": {}})["code"], "")
+
+
 class TestEnsureCustomers(unittest.TestCase):
     def test_creates_and_injects_when_missing(self):
         mappings = {"clients": []}

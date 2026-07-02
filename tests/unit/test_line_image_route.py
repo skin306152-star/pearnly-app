@@ -182,6 +182,51 @@ class TestExecuteTerminals(unittest.TestCase):
         charge.assert_called_once()
 
 
+class TestPreCardSanity(unittest.TestCase):
+    """出卡前防呆预检:注定推不过的票不给确认按钮,直接四语人话+留存指引。"""
+
+    def test_implausible_date_blocks_card_with_honest_text(self):
+        sent = {}
+        with (
+            patch.object(r, "_notify", side_effect=lambda *a: sent.setdefault("text", a[2])),
+            patch.object(r.db, "list_erp_endpoints") as eps,
+        ):
+            ok = r._send_push_card(
+                _USER,
+                84,
+                "t-1",
+                "Uabc",
+                "zh",
+                "hid-9",
+                ImageRoute("push"),
+                [{"fields": {"date": "1970-01-01", "seller_name": "SISTER MAKEUP"}}],
+                "q",
+            )
+        self.assertFalse(ok)
+        eps.assert_not_called()  # 预检命中 → 连端点都不该去解析
+        self.assertIn("2000", sent["text"])  # 人话文案而非裸码
+        self.assertNotIn("date_implausible", sent["text"])
+
+    def test_clean_fields_pass_preflight(self):
+        with (
+            patch.object(r.db, "list_erp_endpoints", return_value=[]),
+            patch.object(r, "_notify") as notify,
+        ):
+            ok = r._send_push_card(
+                _USER,
+                84,
+                "t-1",
+                "Uabc",
+                "zh",
+                "hid-9",
+                ImageRoute("push"),
+                [{"fields": {"date": "2026-01-17", "seller_name": "SISTER MAKEUP"}}],
+                "q",
+            )
+        self.assertFalse(ok)  # 无端点 → 走 _NO_ENDPOINT 老路(预检不拦干净票)
+        notify.assert_called_once()
+
+
 class TestCacheShortcut(unittest.TestCase):
     """缓存快路让位契约(真机第一轮踩到:先说目的再重发同图,被 dup 短路吞掉意图)。"""
 

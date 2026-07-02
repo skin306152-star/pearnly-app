@@ -55,6 +55,13 @@ class TestDmsPushFriendly(unittest.TestCase):
         self.assertIn("ja", d)
         self.assertTrue(d["ja"].strip())
 
+    def test_friendly_any_covers_doc_sanity_codes(self):
+        # 真机截图(2026-07-02):date_implausible 在 LINE 失败消息裸奔 → 纳入统一目录。
+        for code in ("date_implausible", "date_future", "currency_not_thb:usd"):
+            hit = plq.friendly_any(code)
+            self.assertIsNotNone(hit, code)
+            self.assertTrue(hit.get("zh"), code)
+
     def test_friendly_any_none_on_gibberish(self):
         self.assertIsNone(plq.friendly_any("ERR_TOTALLY_UNRELATED_XYZ"))
         self.assertIsNone(plq.friendly_any(None))

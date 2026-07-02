@@ -88,7 +88,25 @@ def dms_push_friendly(error_msg: Optional[str]) -> Optional[Dict[str, str]]:
     return None
 
 
+def _doc_sanity_friendly(error_msg: Optional[str]) -> Optional[Dict[str, str]]:
+    """单据防呆码(date_implausible/currency_not_thb 等)四语化 · 复用 routing 唯一目录。
+    此前只翻 ERR_*,doc_sanity 码在 LINE 失败消息里裸奔(真机 2026-07-02 截图抓到)。"""
+    msg = str(error_msg or "")
+    if not msg:
+        return None
+    try:
+        from services.erp.mrerp_http.routing import _DOC_SANITY_FRIENDLY
+
+        return next((tr for pfx, tr in _DOC_SANITY_FRIENDLY.items() if pfx in msg), None)
+    except Exception:
+        return None
+
+
 def friendly_any(error_msg: Optional[str]) -> Optional[Dict[str, str]]:
-    """发票推送 catalog 优先(friendly_for_ui)· 未命中再退身份证订车映射。
-    给 push 日志/详情/异常统一用 · 任一命中即不裸露 ERR_*。"""
-    return friendly_for_ui(error_msg) or dms_push_friendly(error_msg)
+    """发票推送 catalog 优先(friendly_for_ui)→ 单据防呆码 → 身份证订车映射。
+    给 push 日志/详情/异常/LINE 失败消息统一用 · 任一命中即不裸露内部码。"""
+    return (
+        friendly_for_ui(error_msg)
+        or _doc_sanity_friendly(error_msg)
+        or dms_push_friendly(error_msg)
+    )

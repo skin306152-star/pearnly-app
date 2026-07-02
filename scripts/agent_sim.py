@@ -84,12 +84,16 @@ def main() -> None:
     battery = _corpus_battery(args.corpus, args.only) if args.corpus else BATTERY
     drafts: list = []
 
-    def dry_sink(_ctx, draft, say=""):
-        drafts.append(draft)
-        print(
-            f"  SINK: [DRY·不入账] amount={draft.amount} vendor={draft.vendor_name!r} "
-            f"note={draft.note!r} say={say!r}"
+    def dry_sink(_ctx, tool, data, say=""):
+        drafts.append((tool, data))
+        draft = (data or {}).get("draft")
+        detail = (
+            f"amount={draft.amount} vendor={draft.vendor_name!r} note={draft.note!r}"
+            if draft is not None
+            else repr(data)
         )
+        print(f"  SINK: [DRY·不落地] tool={tool} {detail} say={say!r}")
+        return "card_sent"
 
     print(f"=== agent_sim · user={args.user} · tenant={ctx.tenant_id} · write={args.write} ===\n")
     for label, msg in battery:
@@ -99,14 +103,14 @@ def main() -> None:
                 ctx,
                 history=[],
                 allow_write=args.write,
-                record_sink=dry_sink if args.write else None,
+                write_sink=dry_sink if args.write else None,
             )
             shown = f"<{res.kind}> {res.text}"
         except Exception as e:  # 模拟器要看到崩没崩,不吞
             shown = f"[EXCEPTION] {type(e).__name__}: {e}"
         print(f"[{label}]\n  USER: {msg}\n  BOT : {shown}\n")
     if args.write:
-        print(f"--- 干跑草稿共 {len(drafts)} 笔(零入账) ---")
+        print(f"--- 干跑写动作共 {len(drafts)} 笔(零落地) ---")
 
 
 if __name__ == "__main__":

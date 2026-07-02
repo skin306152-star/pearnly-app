@@ -170,6 +170,62 @@ TOOLS: tuple[ToolSpec, ...] = (
         writes=True,
     ),
     ToolSpec(
+        name="undo_entry",
+        bucket="B",
+        title_th="ยกเลิก/ลบรายการที่บันทึกแล้ว",
+        desc_th=(
+            "ยกเลิกหรือลบรายการที่บันทึกไปแล้ว (เช่น 'ยกเลิกรายการล่าสุด' หรือ reply การ์ดแล้วบอกยกเลิก) "
+            "ระบบหาเป้าหมายเองจากข้อความ/การ์ดที่อ้างถึง"
+        ),
+        slots=(),
+        handler="undo_entry",
+        confirm=False,  # 冲销可经「恢复」找回,非不可逆;定位不明由确定性执行侧反问
+        writes=True,
+    ),
+    ToolSpec(
+        name="edit_entry",
+        bucket="B",
+        title_th="แก้ไขรายการที่บันทึกแล้ว",
+        desc_th=(
+            "แก้ไขรายการที่บันทึกไปแล้ว เช่น 'แก้รายการล่าสุดเป็น 80' 'เปลี่ยนร้านเป็น Tops' "
+            "ใส่เฉพาะช่องที่ผู้ใช้ต้องการแก้"
+        ),
+        slots=(
+            # 新金额必须在用户原话(钱路接地);改错的确认/风险三档由 line_correct 确定性执行。
+            SlotSpec(
+                "amount",
+                required=False,
+                source="user_text",
+                desc_th="ยอดใหม่ (ต้องอยู่ในข้อความผู้ใช้)",
+                desc_zh="新金额(必须出现在原话·防编造)",
+            ),
+            SlotSpec(
+                "vendor_name",
+                required=False,
+                source="user_text",
+                desc_th="ชื่อร้านใหม่ ถ้าจะแก้ร้าน",
+                desc_zh="新卖家名(用户原话提到才采纳)",
+            ),
+            SlotSpec(
+                "date",
+                required=False,
+                source="model_freeform",
+                desc_th="วันที่ใหม่ YYYY-MM-DD (แปลงจากคำพูดเช่น เมื่อวาน ได้)",
+                desc_zh="新日期(允许相对词换算·与旧路同口径·格式闸在 line_correct)",
+            ),
+            SlotSpec(
+                "note",
+                required=False,
+                source="model_freeform",
+                desc_th="หมวดหมู่/รายละเอียดใหม่ ถ้าจะแก้หมวด",
+                desc_zh="新科目线索(仅当只改科目时)",
+            ),
+        ),
+        handler="edit_entry",
+        confirm=False,  # 风险确认(是/否)由 line_correct 的确定性三档自行把关
+        writes=True,
+    ),
+    ToolSpec(
         name="list_workspaces",
         bucket="B",
         title_th="ดูรายชื่อชุดบัญชี/บริษัท",
@@ -211,6 +267,8 @@ REGISTRY_AREA: dict[str, str] = {
     "rd_lookup": "rd_routes",
     "my_plan": "me_routes",
     "record_expense": "purchase_intake_routes",
+    "undo_entry": "purchase_routes",
+    "edit_entry": "purchase_routes",
     "list_workspaces": "workspace_routes",
     "switch_workspace": "workspace_routes",
 }

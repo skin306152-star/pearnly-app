@@ -246,13 +246,13 @@ class _RecToolset:
 
 
 class TestConfirmFlow(unittest.TestCase):
-    """M3 记账:模型提议 + 暖话 say → 接地建草稿 → record_sink 高置信直录出富卡(暖话在卡上方);
+    """M3 记账:模型提议 + 暖话 say → 接地建草稿 → write_sink 高置信直录出富卡(暖话在卡上方);
     写关/无出卡器则 defer;金额没接地则大脑文字追问(不出卡)。"""
 
     def _draft(self):
         return ExpenseDraft(amount=Decimal("50"), vendor_name="cafe", note="coffee")
 
-    def test_record_sink_emits_card_with_say_and_consumes_turn(self):
+    def test_write_sink_emits_card_with_say_and_consumes_turn(self):
         sunk = []
         ts = _RecToolset(ToolResult(ok=True, data={"draft": self._draft()}))
         out = loop.handle_turn(
@@ -269,7 +269,10 @@ class TestConfirmFlow(unittest.TestCase):
             toolset=ts,
             history=[],
             allow_write=True,
-            record_sink=lambda ctx, draft, say="": sunk.append((draft, say)),
+            write_sink=lambda ctx, tool, data, say="": (
+                sunk.append((data["draft"], say)),
+                "card_sent",
+            )[1],
         )
         self.assertEqual(out.kind, "card_sent")  # 卡即回复:消费本轮,别再发文字
         self.assertEqual(len(sunk), 1)  # 走出卡回调(直录·非按钮)
@@ -288,7 +291,7 @@ class TestConfirmFlow(unittest.TestCase):
         )
         self.assertEqual(out.kind, "defer_record")  # 写关 → 交确定性直录
 
-    def test_no_record_sink_defers(self):
+    def test_no_write_sink_defers(self):
         out = loop.handle_turn(
             "咖啡 50",
             _CTX,
@@ -296,7 +299,7 @@ class TestConfirmFlow(unittest.TestCase):
             toolset=_RecToolset(ToolResult(ok=True, data={"draft": self._draft()})),
             history=[],
             allow_write=True,
-            record_sink=None,
+            write_sink=None,
         )
         self.assertEqual(out.kind, "defer_record")
 
@@ -313,7 +316,7 @@ class TestConfirmFlow(unittest.TestCase):
             toolset=ts,
             history=[],
             allow_write=True,
-            record_sink=lambda ctx, draft, say="": sunk.append(draft),
+            write_sink=lambda ctx, tool, data, say="": (sunk.append(data["draft"]), "card_sent")[1],
         )
         self.assertEqual(out.kind, "reply")
         self.assertEqual(out.text, "金额多少?")
@@ -429,7 +432,7 @@ class TestMultiItemDefersToPreciseCard(unittest.TestCase):
             toolset=_RecToolset(ToolResult(ok=True, data={"draft": self._draft()})),
             history=[],
             allow_write=True,
-            record_sink=lambda ctx, draft, say="": sunk.append(draft),
+            write_sink=lambda ctx, tool, data, say="": (sunk.append(data["draft"]), "card_sent")[1],
         )
         self.assertEqual(out.kind, "defer_record")  # 交精准多笔卡路(旧路 do_record_multi)
         self.assertEqual(sunk, [])  # 单笔工具没执行 → 没吞成一笔
@@ -446,7 +449,7 @@ class TestMultiItemDefersToPreciseCard(unittest.TestCase):
             toolset=_RecToolset(ToolResult(ok=True, data={"draft": self._draft()})),
             history=[],
             allow_write=True,
-            record_sink=lambda ctx, draft, say="": sunk.append(draft),
+            write_sink=lambda ctx, tool, data, say="": (sunk.append(data["draft"]), "card_sent")[1],
         )
         self.assertEqual(out.kind, "card_sent")
         self.assertEqual(len(sunk), 1)

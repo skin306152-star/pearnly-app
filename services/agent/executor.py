@@ -230,5 +230,24 @@ class AgentToolset:
             return ToolResult(ok=False, error_code="amount_ungrounded")
         return ToolResult(ok=True, data={"draft": draft})
 
+    def undo_entry(self, ctx: AgentContext) -> ToolResult:
+        """撤销:目标定位(引用卡/「上一笔」)与不明确时的反问全在 reply_undo 确定性侧,
+        这里只把决策权交出去——模型没有任何目标猜测权。"""
+        return ToolResult(ok=True, data={})
+
+    def edit_entry(
+        self, ctx: AgentContext, *, amount=None, vendor_name="", date="", note=""
+    ) -> ToolResult:
+        """改错:槽位已过接地闸(新金额必在原话),拼成旧大脑同构的字段包交
+        line_correct.request_correct(定位/风险三档/是/否确认全复用,一行不改)。"""
+        u = {
+            "intent": "edit",
+            "amount": amount,
+            "vendor_name": vendor_name,
+            "date": date,
+            "note": note,
+        }
+        return ToolResult(ok=True, data={"u": u})
+
     def push_to_erp(self, ctx: AgentContext, *, history_id=None, endpoint_id=None) -> ToolResult:
         return ToolResult(ok=False, error_code="not_implemented_m1")

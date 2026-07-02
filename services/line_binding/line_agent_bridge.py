@@ -2,8 +2,12 @@
 """对话 Agent 插座 ↔ LINE 入口的桥(WP5)。
 
 line_expense.handle_expense_text 为灰度用户在关键词分支「之前」调 try_agent_turn(前门倒置):
-模型自己判意图——查询/闲聊自己组织人话回复(接管本轮),记账/改错/超范围 → 返 None(defer),
+模型自己判意图——查询/闲聊自己组织人话回复(接管本轮),超范围/闸关的写意图 → defer,
 调用方逐字节落回旧 understand()+_dispatch_agent()。能力只增不减,旧路一行不改。
+
+write_sink 是写工具的唯一落地口:loop 提议 + 接地通过后,这里分发到现有确定性执行
+(记账 _do_record / 多笔 do_record_multi / 撤销 reply_undo / 改错 request_correct),
+定位、风险确认、幂等全在那些既有流程里,大脑没有任何直接写库的手。
 """
 
 from __future__ import annotations
@@ -14,7 +18,7 @@ from services.agent.loop import TurnResult  # 前门结论类型(reply/card_sent
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["TurnResult", "frontdoor_enabled", "write_enabled", "try_agent_turn"]
+__all__ = ["TurnResult", "frontdoor_enabled", "write_enabled", "m3_enabled", "try_agent_turn"]
 
 
 def frontdoor_enabled(bound_user) -> bool:
@@ -33,24 +37,88 @@ def write_enabled(bound_user) -> bool:
     return feature_flags.agent_write_enabled_for(uid)
 
 
-def _record_sink(bound_user, text, lang, tid, ws, line_user_id, reply_token, quote_token, book):
-    """记账出卡回调:模型抽的草稿 + 暖话 say → 现有 book(=line_expense._do_record·used_l2=False
-    高置信直录·ack_text=say 让暖话显示在数据卡上方)。写关/缺件 → None(记账 defer 回旧乐观路)。"""
-    if not (book and reply_token and write_enabled(bound_user)):
+def m3_enabled(bound_user) -> bool:
+    """M3 全家桶子闸(撤销/改错工具 + 多笔直分发)· 默认关 → defer 交旧路,现状不变。"""
+    from core import feature_flags
+
+    uid = str(bound_user["id"]) if bound_user.get("id") else None
+    return feature_flags.agent_m3_enabled_for(uid)
+
+
+def _make_write_sink(
+    bound_user, text, lang, tid, ws, line_user_id, reply_token, quote_token, quoted_message_id, book
+):
+    """写工具落地分发。返回 sink(ctx, tool, data, say) -> TurnResult kind | None。
+    book=line_expense._do_record(入口注入·避免循环 import);其余执行流按需惰性 import。
+    """
+    if not (book and reply_token):
         return None
-    return lambda _ctx, draft, say="": book(
-        bound_user,
-        reply_token,
-        draft.raw_text or text,
-        tid,
-        ws,
-        draft,
-        False,
-        quote_token,
-        lang,
-        line_user_id,
-        ack_text=say,
-    )
+
+    def sink(_ctx, tool, data, say=""):
+        data = data or {}
+        if tool == "record_expense":
+            draft = data.get("draft")
+            if draft is None:
+                return None
+            book(
+                bound_user,
+                reply_token,
+                draft.raw_text or text,
+                tid,
+                ws,
+                draft,
+                False,
+                quote_token,
+                lang,
+                line_user_id,
+                ack_text=say,
+            )
+            return "card_sent"
+        if tool == "record_multi":
+            from services.expense.line_quick_entry import parse_multi
+            from services.line_binding import line_expense_multi
+
+            items = parse_multi(text)
+            if not items:  # loop 预判与复核不一致 → 不硬拆,交 crash 安全兜底
+                return None
+            line_expense_multi.do_record_multi(
+                bound_user, reply_token, text, tid, ws, items, quote_token, lang, line_user_id
+            )
+            return "card_sent"
+        if tool == "undo_entry":
+            from services.line_binding import line_expense_qa
+
+            line_expense_qa.reply_undo(
+                bound_user,
+                reply_token,
+                lang,
+                tid,
+                ws,
+                line_user_id,
+                quoted_message_id,
+                text,
+                quote_token=quote_token,
+            )
+            return "card_sent"
+        if tool == "edit_entry":
+            from services.expense import line_correct
+
+            line_correct.request_correct(
+                bound_user,
+                reply_token,
+                line_user_id,
+                text,
+                data.get("u") or {},
+                quoted_message_id,
+                lang,
+                tid,
+                ws,
+                quote_token=quote_token,
+            )
+            return "card_sent"
+        return None  # 未知写工具 = manifest/sink 不同步 → loop 归 crash
+
+    return sink
 
 
 def try_agent_turn(
@@ -64,11 +132,12 @@ def try_agent_turn(
     *,
     reply_token=None,
     quote_token=None,
+    quoted_message_id=None,
     book=None,
 ) -> TurnResult:
     """钥匙闸 + agent 循环 → TurnResult。故障/未启用一律归 crash(入口走安全兜底,绝不掉旧路地雷)。
 
-    reply_token/quote_token/book=入口的出卡料;写开启时记账走 book 高置信直录出富卡。
+    reply_token/quote_token/book=入口的出卡料;写开启时写工具经 write_sink 落现有确定性执行。
     lang 保留兼容:回复语言由模型按用户最新消息自适应,不再套模板。
     """
     from core import feature_flags
@@ -85,14 +154,29 @@ def try_agent_turn(
             tenant_id=tid,
             workspace_client_id=ws,
             line_user_id=line_user_id,
+            quoted_message_id=quoted_message_id,
         )
         sink = None
         if feature_flags.agent_write_enabled_for(uid):
-            sink = _record_sink(
-                bound_user, text, lang, tid, ws, line_user_id, reply_token, quote_token, book
+            sink = _make_write_sink(
+                bound_user,
+                text,
+                lang,
+                tid,
+                ws,
+                line_user_id,
+                reply_token,
+                quote_token,
+                quoted_message_id,
+                book,
             )
         return loop.handle_turn(
-            text, ctx, history=history, allow_write=sink is not None, record_sink=sink
+            text,
+            ctx,
+            history=history,
+            allow_write=sink is not None,
+            allow_m3=sink is not None and m3_enabled(bound_user),
+            write_sink=sink,
         )
     except Exception:
         # 任何异常 → crash(铁律:Agent 不许把错误抛给用户);入口安全兜底,带 uid + 栈便于排障。

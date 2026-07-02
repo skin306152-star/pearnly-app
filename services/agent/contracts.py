@@ -72,6 +72,7 @@ class AgentContext:
     tenant_id: Optional[str] = None
     workspace_client_id: Optional[Any] = None
     line_user_id: Optional[str] = None
+    quoted_message_id: Optional[str] = None  # 用户长按引用的消息 id(撤销/改错锚定目标)
     user_text: str = ""  # 本轮用户原文(写工具建草稿做金额接地用·loop 每轮注入)
     anchors: dict[str, Any] = field(default_factory=dict)
     endpoint_config: dict[str, Any] = field(default_factory=dict)

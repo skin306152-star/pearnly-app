@@ -60,7 +60,15 @@ def _make_decide(case: dict):
     calls: list = []
 
     def decide(
-        user_text, history, *, today, observations, lang, force_reply=False, allow_write=False
+        user_text,
+        history,
+        *,
+        today,
+        observations,
+        lang,
+        force_reply=False,
+        allow_write=False,
+        allow_m3=False,
     ):
         calls.append(lang)
         if not items:
@@ -93,7 +101,7 @@ class _ScriptedToolset:
             self.calls.append((name, kwargs))
             if name in self._canned:
                 return self._canned[name]
-            if name in ("record_expense", "push_to_erp"):
+            if name in ("record_expense", "push_to_erp", "undo_entry", "edit_entry"):
                 return getattr(self._real, name)(ctx, **kwargs)
             raise AssertionError(f"corpus 缺 canned 工具结果: {name}")
 
@@ -105,8 +113,15 @@ class TestCorpusLoop(unittest.TestCase):
         decide, decide_calls = _make_decide(case)
         toolset = _ScriptedToolset(case.get("tools"))
         records: list = []
+        sunk_tools: list = []
         write = case.get("write", True)
-        sink = (lambda ctx, draft, say="": records.append((draft, say))) if write else None
+
+        def sink(ctx, tool, data, say=""):
+            sunk_tools.append(tool)
+            if tool == "record_expense":
+                records.append(((data or {}).get("draft"), say))
+            return "card_sent"
+
         ctx = AgentContext(user={"id": "u1", "tenant_id": "t1"}, tenant_id="t1", line_user_id="U1")
         res = loop.handle_turn(
             case["text"],
@@ -116,16 +131,17 @@ class TestCorpusLoop(unittest.TestCase):
             history=case.get("history") or [],
             today=_TODAY,
             allow_write=write,
-            record_sink=sink,
+            allow_m3=case.get("m3", False),
+            write_sink=sink if write else None,
         )
-        return res, records, decide_calls, toolset
+        return res, records, decide_calls, toolset, sunk_tools
 
     def test_corpus(self):
         cases = _load("loop")
         self.assertGreaterEqual(len(cases), 60)
         for case in cases:
             with self.subTest(case["id"]):
-                res, records, decide_calls, toolset = self._run(case)
+                res, records, decide_calls, toolset, sunk_tools = self._run(case)
                 exp = case["expect"]
                 self.assertEqual(res.kind, exp["terminal"], f"{case['id']}: text={res.text!r}")
                 for frag in exp.get("must", []):
@@ -146,6 +162,8 @@ class TestCorpusLoop(unittest.TestCase):
                     self.assertIn(h, called, case["id"])
                 for h in exp.get("called_not", []):
                     self.assertNotIn(h, called, case["id"])
+                for t in exp.get("sunk", []):
+                    self.assertIn(t, sunk_tools, case["id"])
                 for h, absent in exp.get("kwargs_absent", {}).items():
                     kw = next(k for n, k in toolset.calls if n == h)
                     for a in absent:
@@ -166,7 +184,7 @@ class TestCorpusEntry(unittest.TestCase):
 
         flags = case.get("flags") or {}
         decide, decide_calls = _make_decide(case)
-        says, pools, do_records, multis = [], [], [], []
+        says, pools, do_records, multis, undos, edits = [], [], [], [], [], []
         understand_calls = []
 
         def _understand(text, **kw):
@@ -198,7 +216,10 @@ class TestCorpusEntry(unittest.TestCase):
             "services.expense.line_l2.resolve_api_key": lambda u: "k",
             "core.feature_flags.agent_enabled_for": lambda uid: bool(flags.get("enabled")),
             "core.feature_flags.agent_write_enabled_for": lambda uid: bool(flags.get("write")),
+            "core.feature_flags.agent_m3_enabled_for": lambda uid: bool(flags.get("m3")),
         }
+        if case.get("skip_correct_flow"):
+            fakes["services.expense.line_correct_flow.route"] = lambda *a, **k: False
         with ExitStack() as stack:
             for target, fn in fakes.items():
                 stack.enter_context(patch(target, fn))
@@ -225,6 +246,18 @@ class TestCorpusEntry(unittest.TestCase):
                 )
             )
             stack.enter_context(
+                patch(
+                    "services.line_binding.line_expense_qa.reply_undo",
+                    lambda *a, **k: undos.append(a),
+                )
+            )
+            stack.enter_context(
+                patch(
+                    "services.expense.line_correct.request_correct",
+                    lambda *a, **k: (edits.append(a), True)[1],
+                )
+            )
+            stack.enter_context(
                 patch.object(
                     line_expense,
                     "_do_record",
@@ -244,6 +277,8 @@ class TestCorpusEntry(unittest.TestCase):
             pools=pools,
             do_records=do_records,
             multis=multis,
+            undos=undos,
+            edits=edits,
             understand_calls=understand_calls,
             decide_calls=decide_calls,
         )
@@ -257,7 +292,14 @@ class TestCorpusEntry(unittest.TestCase):
                 exp = case["expect"]
                 self.assertTrue(r.consumed, case["id"])
                 # 单一出口不变量:一轮恰好一个用户可见出口。
-                outs = len(r.says) + len(r.pools) + len(r.do_records) + len(r.multis)
+                outs = (
+                    len(r.says)
+                    + len(r.pools)
+                    + len(r.do_records)
+                    + len(r.multis)
+                    + len(r.undos)
+                    + len(r.edits)
+                )
                 self.assertEqual(outs, 1, f"{case['id']}: 出口数 {outs}")
                 if "understand_calls" in exp:
                     self.assertEqual(len(r.understand_calls), exp["understand_calls"], case["id"])
@@ -281,6 +323,10 @@ class TestCorpusEntry(unittest.TestCase):
                 elif outcome == "income_guide":
                     self.assertEqual(len(r.says), 1, case["id"])
                     self.assertEqual(len(r.do_records), 0, case["id"])
+                elif outcome == "undo":
+                    self.assertEqual(len(r.undos), 1, case["id"])
+                elif outcome in ("edit", "edit_legacy"):
+                    self.assertEqual(len(r.edits), 1, case["id"])
                 elif outcome == "pool":
                     self.assertEqual(len(r.pools), 1, case["id"])
                 else:

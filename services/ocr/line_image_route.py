@@ -38,6 +38,12 @@ _NO_ENDPOINT = {
     "en": "No ERP endpoint connected yet — add one under Integrations on the web first.",
     "ja": "ERP がまだ接続されていません。ウェブの「連携」から先に追加してください。",
 }
+_CANT_PUSH = {
+    "th": "⚠️ ใบนี้ยังส่งเข้า ERP ไม่ได้ค่ะ: {reason} · เก็บเอกสารไว้ให้แล้ว แก้บนเว็บแล้วส่งได้เลย",
+    "zh": "⚠️ 这张票暂不能推送:{reason}·单据已留存,到网页修正后可再推。",
+    "en": "⚠️ This document can't be pushed yet: {reason} · it's saved — fix it on the web, then push.",
+    "ja": "⚠️ この伝票はまだ送信できません:{reason} · 保存済みです。ウェブで修正後に送信できます。",
+}
 _PUSH_DROPPED = {
     "th": "ส่วนการส่งเข้า ERP ยังไม่เปิดใช้งานค่ะ เก็บใบไว้ให้แล้ว เปิดใช้เมื่อไหร่ส่งได้เลย",
     "zh": "推送功能暂未开通,单据已留存,开通后可直接推。",
@@ -228,9 +234,31 @@ def _charge_async(user, quote, hid, filename, tid, *, pages, result, cost_thb) -
         logger.warning(f"[line_intent] cost log failed (non-blocking): {e}")
 
 
+def _push_blocked_reason(fields) -> Optional[str]:
+    """出卡前防呆预检:注定推不过的票别给确认按钮(点了才失败=坏体验·Zihao 2026-07-02)。
+    推送时的权威闸仍在 route_and_upload,这里只是同源判定前移;预检崩了不挡卡。"""
+    try:
+        from services.erp.express_push.doc_sanity import check_document
+
+        return check_document(fields or {}, {"fields": fields or {}}, "purchase")
+    except Exception:
+        logger.warning("[line_intent] pre-card sanity failed; card proceeds", exc_info=True)
+        return None
+
+
 def _send_push_card(user, ws, tid, line_user_id, lang, hid, route, pages, quote_token) -> bool:
-    """载体行 → 端点解析 → 确认卡(push 消息)。不执行任何推送。"""
+    """载体行 → 防呆预检 → 端点解析 → 确认卡(push 消息)。不执行任何推送。"""
     from services.agent import push_confirm
+
+    _f = (pages[0] or {}).get("fields") or {} if pages else {}
+    blocked = _push_blocked_reason(_f)
+    if blocked:
+        from services.erp import push_log_friendly
+
+        hit = push_log_friendly.friendly_any(blocked) or {}
+        reason = hit.get(lang) or hit.get("en") or blocked
+        _notify(line_user_id, tid, _t(_CANT_PUSH, lang).format(reason=reason), quote_token)
+        return False
 
     eps = [e for e in (db.list_erp_endpoints(str(user["id"])) or []) if e.get("enabled", True)]
     endpoint = None
@@ -243,14 +271,13 @@ def _send_push_card(user, ws, tid, line_user_id, lang, hid, route, pages, quote_
     if not endpoint:
         _notify(line_user_id, tid, _t(_NO_ENDPOINT, lang), quote_token)
         return False
-    fields = (pages[0] or {}).get("fields") or {} if pages else {}
     push = {
         "history_id": str(hid),
         "endpoint_id": str(endpoint["id"]),
         "endpoint_name": endpoint.get("name") or "ERP",
-        "invoice_no": fields.get("invoice_number") or "",
-        "vendor": fields.get("seller_name") or "",
-        "amount": fields.get("total_amount"),
+        "invoice_no": _f.get("invoice_number") or "",
+        "vendor": _f.get("seller_name") or "",
+        "amount": _f.get("total_amount"),
     }
     return push_confirm.send_confirm_card(
         user, "", push, lang, tid, ws, line_user_id, quote_token=quote_token or ""

@@ -10,6 +10,7 @@ import hashlib
 import re
 from typing import Any, Dict, Iterable, List
 
+from services.erp import mrerp_xlsx_fmt as fmt
 from services.erp.mrerp_xlsx_lookups import (
     _build_product_lookup,
     _resolve_product_code,
@@ -76,10 +77,15 @@ def _seller_from_history(h: Dict[str, Any]) -> Dict[str, str]:
         return ""
 
     tax = re.sub(r"\D", "", pick("seller_tax", "seller_tax_id", "supplier_tax_id"))[:20]
-    code = tax or ("V" + str(h.get("client_id") or "0"))
+    name = pick("seller_name", "supplier_name", "seller")
+    # 码推导链与 mrerp_xlsx_purchase._supplier_code 严格同源:税号 → 名字派生(零售
+    # 小票常态卖方无税号 · 真机语料 SISTER MAKEUP)→ V+client_id。旧 "V0" 兜底删除:
+    # 无税号无名无 client 建出共享垃圾码,preflight 又解析不到,建了白建。
+    cid = h.get("client_id")
+    code = tax or fmt.supplier_code_from_name(name) or (("V" + str(cid)) if cid else "")
     return {
         "code": code[:20],
-        "name": pick("seller_name", "supplier_name", "seller") or "-",
+        "name": name or "-",
         "tax_id": tax,
         "address": pick("seller_address", "supplier_address"),
         "phone": pick("seller_phone", "phone"),

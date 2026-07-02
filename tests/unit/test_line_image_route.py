@@ -191,6 +191,21 @@ class TestNotInvoiceGuidance(unittest.TestCase):
         self.assertIn("银行对账", out)
         self.assertIn("กระทบยอด", r.not_invoice_guidance(pages, "th"))
 
+    def test_statement_keyword_in_notes_detected(self):
+        # 真机探针:费用 OCR 路对流水页只给 document_type=other,真信号在 notes/页原文。
+        pages = [
+            {
+                "fields": {
+                    "document_type": "other",
+                    "is_not_invoice": "true",
+                    "notes": "รายการเดินบัญชีเงินฝากออมทรัพย์ 01/01/2026",
+                }
+            }
+        ]
+        self.assertIn("银行对账", r.not_invoice_guidance(pages, "zh"))
+        pages2 = [{"fields": {"document_type": "other"}, "text": "STATEMENT OF ACCOUNT ..."}]
+        self.assertIn("Bank Reconciliation", r.not_invoice_guidance(pages2, "en"))
+
     def test_other_non_invoice_falls_back(self):
         self.assertIsNone(r.not_invoice_guidance([{"fields": {"document_type": "photo"}}], "zh"))
         self.assertIsNone(r.not_invoice_guidance([], "zh"))

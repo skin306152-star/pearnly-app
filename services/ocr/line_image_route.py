@@ -83,13 +83,28 @@ class Directive:
         self.skip_ingest = skip_ingest
 
 
+# 对账单确定性记号(泰/英)。费用 OCR 路的 L2 对流水页只给 document_type=other,
+# 真信号在 notes/页原文(真机探针:BAY 流水 notes="รายการเดินบัญชีเงินฝาก...")。
+_STMT_KW = (
+    "รายการเดินบัญชี",
+    "เดินบัญชี",
+    "statement of account",
+    "bank statement",
+    "ยอดยกมา",
+)
+
+
 def not_invoice_guidance(pages, lang) -> Optional[str]:
     """非票据页的靶向引导:认出银行对账单 → 指去网页对账 + 可问对账结果(替掉
-    "不像票据请发费用文件"的死胡同 · 真机探针 2026-07-02)。认不出/故障 → None(回落通用文案)。"""
+    "不像票据请发费用文件"的死胡同 · 真机探针 2026-07-02)。认不出/故障 → None(回落通用文案)。
+    只在 all_pages_not_invoice 分支被调,不碰票据热路。"""
     try:
         for p in pages or []:
-            doc_type = str(((p or {}).get("fields") or {}).get("document_type") or "")
-            if doc_type == "bank_statement":
+            f = (p or {}).get("fields") or {}
+            if str(f.get("document_type") or "") == "bank_statement":
+                return _t(_BANK_STMT_GUIDE, lang)
+            blob = f"{f.get('notes') or ''} {str((p or {}).get('text') or '')[:2000]}".lower()
+            if any(k in blob for k in _STMT_KW):
                 return _t(_BANK_STMT_GUIDE, lang)
     except Exception:
         return None

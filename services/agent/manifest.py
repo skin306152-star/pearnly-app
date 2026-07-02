@@ -77,6 +77,55 @@ TOOLS: tuple[ToolSpec, ...] = (
         confirm=False,
     ),
     ToolSpec(
+        name="push_status",
+        bucket="A",
+        title_th="เช็คสถานะการส่งเข้า ERP",
+        desc_th=(
+            "เช็คว่าเอกสาร/บิลถูกส่งเข้า ERP แล้วหรือยัง และผลการส่งล่าสุด "
+            "(เช่น 'บิล 7-11 ส่งเข้า ERP หรือยัง') ไม่ระบุใบไหน = ใบล่าสุด"
+        ),
+        slots=(
+            SlotSpec(
+                "keyword",
+                required=False,
+                source="model_freeform",
+                desc_th="คำค้นระบุใบ เช่น ชื่อร้านหรือเลขใบเสร็จ",
+                desc_zh="定位单据的关键词(店名/单号)",
+            ),
+        ),
+        handler="get_push_status",
+        confirm=False,
+    ),
+    ToolSpec(
+        name="rd_lookup",
+        bucket="A",
+        title_th="ตรวจเลขผู้เสียภาษีกับกรมสรรพากร",
+        desc_th=(
+            "ตรวจสอบเลขประจำตัวผู้เสียภาษี 13 หลักกับกรมสรรพากร "
+            "ได้ชื่อบริษัท สาขา ที่อยู่ (เลขต้องอยู่ในข้อความของผู้ใช้)"
+        ),
+        slots=(
+            SlotSpec(
+                "tax_id",
+                required=True,
+                source="user_text",
+                desc_th="เลขผู้เสียภาษี 13 หลัก (คัดจากข้อความผู้ใช้เท่านั้น)",
+                desc_zh="13 位税号(必须出现在用户原话·防编造)",
+            ),
+        ),
+        handler="rd_lookup",
+        confirm=False,
+    ),
+    ToolSpec(
+        name="my_plan",
+        bucket="A",
+        title_th="ดูแพ็กเกจ/สิทธิ์การใช้งานของฉัน",
+        desc_th="ดูว่าตอนนี้ใช้แพ็กเกจอะไร เครดิตคงเหลือ เก็บประวัติได้กี่วัน และวันหมดอายุแพ็กเกจ",
+        slots=(),
+        handler="get_my_plan",
+        confirm=False,
+    ),
+    ToolSpec(
         name="record_expense",
         bucket="B",
         title_th="บันทึกค่าใช้จ่าย",
@@ -158,6 +207,9 @@ REGISTRY_AREA: dict[str, str] = {
     "balance": "billing_credits_routes",
     "usage_this_month": "billing_records_routes",
     "list_notifications": "notification_routes",
+    "push_status": "erp_listing_routes",
+    "rd_lookup": "rd_routes",
+    "my_plan": "me_routes",
     "record_expense": "purchase_intake_routes",
     "list_workspaces": "workspace_routes",
     "switch_workspace": "workspace_routes",
@@ -167,6 +219,10 @@ _REGISTRY_PATH = Path(__file__).resolve().parents[2] / "docs" / "agent" / "agent
 
 
 def load_registry() -> dict[str, str]:
-    """读 agent_registry.json(功能区 → 档)。供交叉核对测试与防漏闸用。"""
+    """读 agent_registry.json(功能区 → 档)。A 档登记值为 {bucket, agent} 结构 → 归一成桶。"""
     data = json.loads(_REGISTRY_PATH.read_text(encoding="utf-8"))
-    return {k: v for k, v in data.items() if not k.startswith("_")}
+    return {
+        k: (v.get("bucket") if isinstance(v, dict) else v)
+        for k, v in data.items()
+        if not k.startswith("_")
+    }

@@ -79,6 +79,35 @@ def _fb_int(v) -> int:
         return 0
 
 
+_FB_PLAN = {
+    "th": "ตอนนี้ใช้แพ็กเกจ {plan} ค่ะ",
+    "zh": "你当前的套餐是 {plan}。",
+    "en": "Your current plan is {plan}.",
+    "ja": "現在のプランは {plan} です。",
+}
+_FB_RD = {
+    "th": "เลข {tax_id}: {name}",
+    "zh": "税号 {tax_id}:{name}",
+    "en": "Tax ID {tax_id}: {name}",
+    "ja": "納税者番号 {tax_id}:{name}",
+}
+
+# 推送状态是布尔分叉(推了/没推),单模板装不下 → 独立两态表。状态诚实:failed 走 no。
+_FB_PUSH = {
+    "yes": {
+        "th": "ใบนี้ส่งเข้า {e} แล้วค่ะ",
+        "zh": "这张已推进 {e}。",
+        "en": "This document was pushed to {e}.",
+        "ja": "この伝票は {e} へ送信済みです。",
+    },
+    "no": {
+        "th": "ใบนี้ยังไม่ได้ส่งเข้า ERP ค่ะ",
+        "zh": "这张还没推进 ERP。",
+        "en": "This document has not been pushed to ERP yet.",
+        "ja": "この伝票はまだ ERP へ送信されていません。",
+    },
+}
+
 # 值型只读工具:tool → (四语模板, 从观测取模板槽位的函数)。加一个值型工具 = 加一行,不再加 if 分支。
 _VALUE_FB = {
     "balance": (_FB_BALANCE, lambda o: {"v": _fb_money(o.get("balance_thb"))}),
@@ -87,6 +116,11 @@ _VALUE_FB = {
         lambda o: {"n": _fb_int(o.get("doc_count")), "v": _fb_money(o.get("amount_total"))},
     ),
     "usage_this_month": (_FB_USAGE, lambda o: {"p": _fb_int(o.get("pages_used_this_month"))}),
+    "my_plan": (_FB_PLAN, lambda o: {"plan": str(o.get("plan") or "")}),
+    "rd_lookup": (
+        _FB_RD,
+        lambda o: {"tax_id": str(o.get("tax_id") or ""), "name": str(o.get("name") or "")},
+    ),
 }
 
 
@@ -100,8 +134,15 @@ def grounded_fallback(observations: list, lang: str) -> Optional[str]:
         n = _fb_int(last.get(_FALLBACK_COUNT_KEY[tool]))
         msgs = table["some" if n else "zero"]
         return msgs.get(lang, msgs["en"]).format(n=n)
-    spec = _VALUE_FB.get(tool)  # 值型(balance / history_summary / usage_this_month)
+    if tool == "push_status":
+        if not last.get("ok"):
+            return None  # 定位失败/多候选交安全兜底,不硬编状态
+        msgs = _FB_PUSH["yes" if last.get("pushed") else "no"]
+        return msgs.get(lang, msgs["en"]).format(e=str(last.get("endpoint") or "ERP"))
+    spec = _VALUE_FB.get(tool)  # 值型(balance / history_summary / usage / my_plan / rd)
     if spec:
+        if tool in ("my_plan", "rd_lookup") and not last.get("ok"):
+            return None
         msgs, extract = spec
         return msgs.get(lang, msgs["en"]).format(**extract(last))
     return None

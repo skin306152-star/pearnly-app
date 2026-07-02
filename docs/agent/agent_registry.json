@@ -1,8 +1,12 @@
 {
-  "_doc": "Pearnly Agent 能力登记表 · 每个 routes/*.py 一个桶。A=进只读 B=进要确认 C=不进App专属 D=不进系统安全。新增路由文件未登记 → 审计闸红。详见 AGENT-CAPABILITY-INVENTORY.md。",
+  "_doc": "Pearnly Agent 能力登记表 · 每个 routes/*.py 一个桶。A=进只读 B=进要确认 C=不进App专属 D=不进系统安全。A 档必须带 agent 字段:tool:<manifest工具名,逗号分隔> 或 exempt:<原因slug>(exempt 建议配 why)。新增路由未登记或 A 档缺 agent → 审计闸红。详见 AGENT-CAPABILITY-INVENTORY.md 与 M3-M4-CLOSED-LOOP-DESIGN.md §2。",
   "accounting_routes": "B",
   "accounting_bank_routes": "B",
-  "accounting_books_routes": "A",
+  "accounting_books_routes": {
+    "bucket": "A",
+    "agent": "exempt:app-report",
+    "why": "账本报表界面·对话给不了表格体验·留 App"
+  },
   "admin_logs_routes": "D",
   "admin_cost_routes": "D",
   "admin_diagnostics_routes": "D",
@@ -13,11 +17,20 @@
   "auth_admin_routes": "D",
   "auth_admin_risk_routes": "D",
   "auth_email_code_routes": "D",
-  "auth_me_routes": "A",
+  "auth_me_routes": {
+    "bucket": "A",
+    "agent": "tool:my_plan"
+  },
   "auth_password_routes": "D",
   "bank_recon_routes": "B",
-  "billing_credits_routes": "A",
-  "billing_records_routes": "A",
+  "billing_credits_routes": {
+    "bucket": "A",
+    "agent": "tool:balance"
+  },
+  "billing_records_routes": {
+    "bucket": "A",
+    "agent": "tool:usage_this_month"
+  },
   "billing_subscription_routes": "B",
   "billing_topup_routes": "B",
   "categories_routes": "B",
@@ -30,20 +43,47 @@
   "email_ingest_routes": "B",
   "erp_agent": "D",
   "erp_endpoints_routes": "C",
-  "erp_export_routes": "A",
-  "erp_express_account_routes": "A",
-  "erp_listing_routes": "A",
+  "erp_export_routes": {
+    "bucket": "A",
+    "agent": "exempt:file-export",
+    "why": "文件导出下载走网页·对话给不了附件"
+  },
+  "erp_express_account_routes": {
+    "bucket": "A",
+    "agent": "exempt:erp-config-read",
+    "why": "Express 账套配置读·配置类留 App"
+  },
+  "erp_listing_routes": {
+    "bucket": "A",
+    "agent": "tool:push_status"
+  },
   "erp_mappings_routes": "C",
   "erp_push_log_routes": "B",
   "exceptions_routes": "B",
-  "export_routes": "A",
+  "export_routes": {
+    "bucket": "A",
+    "agent": "exempt:file-export",
+    "why": "文件导出下载走网页"
+  },
   "google_oauth_routes": "D",
   "history_routes": "B",
   "import_routes": "B",
-  "inventory_report_routes": "A",
+  "inventory_report_routes": {
+    "bucket": "A",
+    "agent": "exempt:app-report",
+    "why": "库存报表·留 App"
+  },
   "inventory_routes": "B",
-  "knowledge_ask_routes": "A",
-  "knowledge_risk_routes": "A",
+  "knowledge_ask_routes": {
+    "bucket": "A",
+    "agent": "exempt:billed-answer",
+    "why": "计费型问答(0.50฿/答)·不适合大脑自动触发·接入需单独报方案"
+  },
+  "knowledge_risk_routes": {
+    "bucket": "A",
+    "agent": "exempt:app-report",
+    "why": "风险检查报告界面·留 App"
+  },
   "knowledge_routes": "B",
   "knowledge_rules_routes": "B",
   "line_account_merge_routes": "D",
@@ -52,13 +92,27 @@
   "line_liff_routes": "D",
   "line_webhook_routes": "D",
   "login_routes": "D",
-  "me_routes": "A",
-  "meta_aliases_routes": "A",
+  "me_routes": {
+    "bucket": "A",
+    "agent": "tool:my_plan"
+  },
+  "meta_aliases_routes": {
+    "bucket": "A",
+    "agent": "exempt:not-user-capability",
+    "why": "元数据别名·非用户能力"
+  },
   "modules_routes": "C",
-  "notification_routes": "A",
+  "notification_routes": {
+    "bucket": "A",
+    "agent": "tool:list_notifications"
+  },
   "oauth_line_routes": "D",
   "oauth_routes": "D",
-  "ocr_export_routes": "A",
+  "ocr_export_routes": {
+    "bucket": "A",
+    "agent": "exempt:file-export",
+    "why": "OCR 导出下载走网页"
+  },
   "ocr_jobs_routes": "B",
   "ocr_recognize_routes": "B",
   "pages_routes": "D",
@@ -73,14 +127,20 @@
   "purchase_config_routes": "C",
   "purchase_intake_routes": "B",
   "purchase_routes": "B",
-  "rd_routes": "A",
+  "rd_routes": {
+    "bucket": "A",
+    "agent": "tool:rd_lookup"
+  },
   "recon_jobs_routes": "B",
   "recon_routes": "B",
   "recon_routes_bankv2": "B",
   "recon_routes_bankv2_run": "B",
   "recon_routes_glvat": "B",
   "recon_routes_v1_batch": "B",
-  "report_routes": "A",
+  "report_routes": {
+    "bucket": "A",
+    "agent": "tool:list_history,history_summary"
+  },
   "sales_routes": "B",
   "sales_send_routes": "B",
   "sales_seller_routes": "B",

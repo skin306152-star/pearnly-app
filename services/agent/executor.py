@@ -116,6 +116,96 @@ class AgentToolset:
             return ToolResult(ok=False, error_code="not_bound")
         return ToolResult(ok=True, data={"switched_to": match})
 
+    # ── A 档:M4 扩充(推送状态 / 税号核验 / 我的套餐) ──
+
+    def get_push_status(self, ctx: AgentContext, *, keyword=None) -> ToolResult:
+        """某张单据推没推 ERP(镜像 erp_push_log_routes 的查询口径·erp_push_logs 唯一状态源)。
+
+        keyword 定位单据:唯一命中查最新推送日志;多命中回候选让模型请用户挑(不猜);
+        无 keyword 取最近一张。failed/未推绝不说成推送成功(状态诚实红线)。
+        """
+        p = _plan_permissions((ctx.user or {}).get("plan"))
+        if not p.get("can_push_erp"):
+            return ToolResult(ok=False, error_code="forbidden")
+        res = db.list_ocr_history(
+            user_id=str(ctx.user["id"]),
+            tenant_id=ctx.tenant_id,
+            keyword=keyword,
+            workspace_client_id=None,
+            limit=5,
+            offset=0,
+            retention_days=_retention(ctx.user),
+            restrict_client_ids=db.get_visible_client_ids_for_user(ctx.user),
+        )
+        items = res.get("items", []) if isinstance(res, dict) else []
+        if not items:
+            return ToolResult(ok=False, error_code="history_not_found")
+        if keyword and len(items) > 1:
+            cands = [
+                {"vendor": i.get("seller_name") or "", "amount": i.get("total_amount")}
+                for i in items
+            ]
+            return ToolResult(ok=False, error_code="ambiguous_doc", data={"candidates": cands})
+        hist = items[0]
+        logs = db.list_push_logs(
+            str(ctx.user["id"]), history_id=str(hist.get("id")), limit=1, tenant_id=ctx.tenant_id
+        )
+        log = ((logs or {}).get("items") or [None])[0]
+        status = (log or {}).get("status") or ""
+        return ToolResult(
+            ok=True,
+            data={
+                "doc": {
+                    "vendor": hist.get("seller_name") or "",
+                    "amount": hist.get("total_amount"),
+                    "invoice_no": hist.get("invoice_no") or "",
+                },
+                "pushed": bool(log) and db.counts_as_endpoint_success(status),
+                "status": status or "never_pushed",
+                "endpoint": (log or {}).get("endpoint_name") or "",
+                "when": str((log or {}).get("created_at") or ""),
+                "error": (log or {}).get("error_msg") or "",
+            },
+        )
+
+    def rd_lookup(self, ctx: AgentContext, *, tax_id=None) -> ToolResult:
+        """税号 → 税局(RD)注册信息。tax_id 槽 user_text 接地:13 位必须出现在用户原话里。"""
+        from services.rd import rd_api
+
+        res = rd_api.lookup_vat(str(tax_id or ""))
+        if not res.get("ok"):
+            code = res.get("error") or "query_failed"
+            mapped = {"invalid_format": "rd_invalid_tax_id", "not_found": "rd_not_found"}
+            return ToolResult(ok=False, error_code=mapped.get(code, "query_failed"))
+        return ToolResult(ok=True, data=res.get("data") or {})
+
+    def get_my_plan(self, ctx: AgentContext) -> ToolResult:
+        """当前套餐/权限/订阅一览(只读聚合,shape 变动用 .get 容忍)。"""
+        from services.billing import subscription as sub_svc
+
+        plan = (ctx.user or {}).get("plan") or "free"
+        perms = _plan_permissions(plan)
+        b = db.get_billing_status_combined(str(ctx.user["id"]), ctx.tenant_id)
+        sub = None
+        try:
+            row = sub_svc.get_active_subscription(ctx.tenant_id)
+            if row:
+                sub = {
+                    "plan": row.get("plan_key") or row.get("plan") or "",
+                    "period_end": str(row.get("current_period_end") or ""),
+                }
+        except Exception:  # 订阅读不到不挡套餐信息(只读聚合,残缺好过报错)
+            sub = None
+        return ToolResult(
+            ok=True,
+            data={
+                "plan": plan,
+                "balance_thb": (b or {}).get("balance_thb"),
+                "retention_days": _retention(ctx.user),
+                "subscription": sub,
+            },
+        )
+
     # ── B 档:写操作(M3 · confirm=True 先复述后执行) ──
 
     def record_expense(

@@ -16,7 +16,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
-from services.agent import brain, executor, fallbacks, manifest, slots
+from services.agent import brain, executor, fallbacks, manifest, observe, slots
 from services.agent.contracts import AgentAction, AgentContext
 from services.sales.dates import bangkok_now
 
@@ -133,58 +133,6 @@ def _recent(ctx: AgentContext) -> list:
     from services.line_binding import line_chat_memory
 
     return line_chat_memory.recent(line_user_id=ctx.line_user_id, tenant_id=ctx.tenant_id)
-
-
-def _observe_payload(tool: str, result) -> dict:
-    """把工具结果压成喂回模型的最小事实(只保留组织回复必需的字段,别灌满上下文)。"""
-    data = result.data if isinstance(result.data, dict) else {}
-    if not result.ok:
-        # 切套账没匹配到 → 把可选套账喂回,让模型请用户挑一个(非报错回退)。
-        out = {"ok": False, "error": result.error_code or "failed"}
-        if data.get("workspaces"):
-            out["workspaces"] = data["workspaces"]
-        return out
-    if tool == "list_history":
-        items = data.get("items") or []
-        top = [
-            {
-                "vendor": (i.get("seller_name") or i.get("vendor_name") or ""),
-                "amount": i.get("total_amount"),
-            }
-            for i in items[:5]
-        ]
-        return {"ok": True, "total": data.get("total", len(items)), "top": top}
-    if tool == "history_summary":
-        return {
-            "ok": True,
-            "doc_count": data.get("doc_count", 0),
-            "amount_total": data.get("amount_total", 0),
-            "by_category": data.get("by_category", []),
-        }
-    if tool == "usage_this_month":
-        b = data.get("billing") or {}
-        return {
-            "ok": True,
-            "pages_used_this_month": b.get("pages_used_this_month"),
-            "docs": data.get("docs"),
-        }
-    if tool == "balance":
-        return {
-            "ok": True,
-            "balance_thb": data.get("balance_thb"),
-            "pages_used_this_month": data.get("pages_used_this_month"),
-        }
-    if tool == "list_notifications":  # result.data 是 list(非上面 dict 化的 data)→ 直接数长度
-        return {"ok": True, "count": len(result.data) if isinstance(result.data, list) else 0}
-    if tool == "list_workspaces":
-        return {
-            "ok": True,
-            "workspaces": data.get("workspaces", []),
-            "current_id": data.get("current_id"),
-        }
-    if tool == "switch_workspace":
-        return {"ok": True, "switched_to": data.get("switched_to")}
-    return {"ok": True}
 
 
 def _visible_tools(allow_write: bool) -> tuple:
@@ -398,7 +346,7 @@ def handle_turn(
                 continue
             record_sink(ctx, result.data["draft"], step.say)
             return TurnResult("card_sent")
-        observations.append({"tool": step.tool, **_observe_payload(step.tool, result)})
+        observations.append({"tool": step.tool, **observe.payload(step.tool, result)})
 
     # 循环里没成文(重复调/步数用尽)→ 拿着已取到的真实数据,最后强逼一次成文;
     # 仍不成文 → 用工具结果兜底一句(绝不把已查到的查询 defer 掉旧路念"这笔多少钱")。

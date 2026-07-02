@@ -4,7 +4,7 @@ import unittest
 from contextlib import contextmanager
 from decimal import Decimal
 
-from services.agent import fallbacks, loop, manifest
+from services.agent import fallbacks, loop, manifest, observe
 from services.agent.contracts import AgentContext, SlotSpec, ToolResult, ToolSpec
 from services.expense.expense_draft import ExpenseDraft
 
@@ -330,13 +330,13 @@ class TestConfirmFlow(unittest.TestCase):
 class TestObservePayload(unittest.TestCase):
     def test_notifications_count_from_list(self):
         # list_notification_logs 返回的 result.data 是 list;count 必须按真实条数,不能恒 0。
-        obs = loop._observe_payload(
+        obs = observe.payload(
             "list_notifications", ToolResult(ok=True, data=[{"id": 1}, {"id": 2}, {"id": 3}])
         )
         self.assertEqual(obs, {"ok": True, "count": 3})
 
     def test_notifications_empty_list(self):
-        obs = loop._observe_payload("list_notifications", ToolResult(ok=True, data=[]))
+        obs = observe.payload("list_notifications", ToolResult(ok=True, data=[]))
         self.assertEqual(obs, {"ok": True, "count": 0})
 
     def test_grounded_fallback_notifications_some(self):

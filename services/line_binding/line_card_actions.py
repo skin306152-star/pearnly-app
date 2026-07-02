@@ -174,6 +174,16 @@ def handle_postback(bound_user, reply_token, data: str, lang: str) -> None:
         line_bulk_undo.handle_postback(bound_user, reply_token, action, token, lang)
         return
 
+    # Agent 推 ERP 确认卡(确认/取消):nonce 消费 + 后台执行在独立模块(services/agent)。
+    if action in (
+        line_postback.ACTION_AGENT_PUSH_CONFIRM,
+        line_postback.ACTION_AGENT_PUSH_CANCEL,
+    ):
+        from services.agent import push_confirm
+
+        push_confirm.handle_postback(bound_user, reply_token, action, token, lang)
+        return
+
     # 主动解绑(确认/取消):令牌目标=用户,确认即解绑,走独立模块。
     if action in (line_postback.ACTION_UNBIND_CONFIRM, line_postback.ACTION_UNBIND_CANCEL):
         from services.line_binding import line_unbind

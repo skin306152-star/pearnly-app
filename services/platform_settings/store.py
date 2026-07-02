@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any, Optional
 
 from core import db
@@ -21,8 +22,17 @@ from core import db
 logger = logging.getLogger(__name__)
 
 
+# 闸设置在 LINE webhook 热路径上每消息读 2-4 次;闸只由超管手动翻,秒级陈旧无害 →
+# 进程内 30s TTL 缓存把每消息 SELECT 清零。set_setting 失效本进程;多 worker 最迟 30s 收敛。
+_CACHE_TTL_S = 30
+_cache: dict[str, tuple[float, Optional[dict]]] = {}
+
+
 def get_setting(key: str) -> Optional[dict]:
-    """读一条设置;不存在返 None。value 为 psycopg2 已解析的 dict(jsonb)。"""
+    """读一条设置;不存在返 None(30s 进程缓存)。value 为 psycopg2 已解析的 dict(jsonb)。"""
+    hit = _cache.get(key)
+    if hit and time.monotonic() - hit[0] < _CACHE_TTL_S:
+        return hit[1]
     with db.get_cursor() as cur:
         cur.execute(
             "SELECT key, value, enabled, updated_at, updated_by "
@@ -30,7 +40,9 @@ def get_setting(key: str) -> Optional[dict]:
             (key,),
         )
         row = cur.fetchone()
-    return dict(row) if row else None
+    out = dict(row) if row else None
+    _cache[key] = (time.monotonic(), out)
+    return out
 
 
 def set_setting(key: str, value: Any, enabled: bool, by: Optional[str] = None) -> None:
@@ -46,6 +58,7 @@ def set_setting(key: str, value: Any, enabled: bool, by: Optional[str] = None) -
                      updated_by = EXCLUDED.updated_by""",
             (key, json.dumps(value or {}), bool(enabled), str(by) if by else None),
         )
+    _cache.pop(key, None)
 
 
 def list_allowlist(key: str) -> list[str]:

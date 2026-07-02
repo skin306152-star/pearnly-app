@@ -116,6 +116,106 @@ class AgentToolset:
             return ToolResult(ok=False, error_code="not_bound")
         return ToolResult(ok=True, data={"switched_to": match})
 
+    # ── A 档:M4 扩充(推送状态 / 税号核验 / 我的套餐) ──
+
+    def _locate_doc(self, ctx: AgentContext, keyword):
+        """按关键词定位一张单据(推送状态/推 ERP 共用锚点步)。
+        返回 (hist, None) 或 (None, 失败 ToolResult):零命中→not_found;
+        带词多命中→候选喂回让用户挑(绝不猜);无词→最近一张。"""
+        res = db.list_ocr_history(
+            user_id=str(ctx.user["id"]),
+            tenant_id=ctx.tenant_id,
+            keyword=keyword,
+            workspace_client_id=None,
+            limit=5,
+            offset=0,
+            retention_days=_retention(ctx.user),
+            restrict_client_ids=db.get_visible_client_ids_for_user(ctx.user),
+        )
+        items = res.get("items", []) if isinstance(res, dict) else []
+        if not items:
+            return None, ToolResult(ok=False, error_code="history_not_found")
+        if keyword and len(items) > 1:
+            cands = [
+                {"vendor": i.get("seller_name") or "", "amount": i.get("total_amount")}
+                for i in items
+            ]
+            return None, ToolResult(
+                ok=False, error_code="ambiguous_doc", data={"candidates": cands}
+            )
+        return items[0], None
+
+    def get_push_status(self, ctx: AgentContext, *, keyword=None) -> ToolResult:
+        """某张单据推没推 ERP(镜像 erp_push_log_routes 的查询口径·erp_push_logs 唯一状态源)。
+
+        keyword 定位单据:唯一命中查最新推送日志;多命中回候选让模型请用户挑(不猜);
+        无 keyword 取最近一张。failed/未推绝不说成推送成功(状态诚实红线)。
+        """
+        p = _plan_permissions((ctx.user or {}).get("plan"))
+        if not p.get("can_push_erp"):
+            return ToolResult(ok=False, error_code="forbidden")
+        hist, fail = self._locate_doc(ctx, keyword)
+        if fail is not None:
+            return fail
+        logs = db.list_push_logs(
+            str(ctx.user["id"]), history_id=str(hist.get("id")), limit=1, tenant_id=ctx.tenant_id
+        )
+        log = ((logs or {}).get("items") or [None])[0]
+        status = (log or {}).get("status") or ""
+        return ToolResult(
+            ok=True,
+            data={
+                "doc": {
+                    "vendor": hist.get("seller_name") or "",
+                    "amount": hist.get("total_amount"),
+                    "invoice_no": hist.get("invoice_no") or "",
+                },
+                "pushed": bool(log) and db.counts_as_endpoint_success(status),
+                "status": status or "never_pushed",
+                "endpoint": (log or {}).get("endpoint_name") or "",
+                "when": str((log or {}).get("created_at") or ""),
+                "error": (log or {}).get("error_msg") or "",
+            },
+        )
+
+    def rd_lookup(self, ctx: AgentContext, *, tax_id=None) -> ToolResult:
+        """税号 → 税局(RD)注册信息。tax_id 槽 user_text 接地:13 位必须出现在用户原话里。"""
+        from services.rd import rd_api
+
+        res = rd_api.lookup_vat(str(tax_id or ""))
+        if not res.get("ok"):
+            code = res.get("error") or "query_failed"
+            mapped = {"invalid_format": "rd_invalid_tax_id", "not_found": "rd_not_found"}
+            return ToolResult(ok=False, error_code=mapped.get(code, "query_failed"))
+        return ToolResult(ok=True, data=res.get("data") or {})
+
+    def get_my_plan(self, ctx: AgentContext) -> ToolResult:
+        """当前套餐/权限/订阅一览(只读聚合,shape 变动用 .get 容忍)。"""
+        from services.billing import subscription as sub_svc
+
+        plan = (ctx.user or {}).get("plan") or "free"
+        perms = _plan_permissions(plan)
+        b = db.get_billing_status_combined(str(ctx.user["id"]), ctx.tenant_id)
+        sub = None
+        try:
+            row = sub_svc.get_active_subscription(ctx.tenant_id)
+            if row:
+                sub = {
+                    "plan": row.get("plan_key") or row.get("plan") or "",
+                    "period_end": str(row.get("current_period_end") or ""),
+                }
+        except Exception:  # 订阅读不到不挡套餐信息(只读聚合,残缺好过报错)
+            sub = None
+        return ToolResult(
+            ok=True,
+            data={
+                "plan": plan,
+                "balance_thb": (b or {}).get("balance_thb"),
+                "retention_days": _retention(ctx.user),
+                "subscription": sub,
+            },
+        )
+
     # ── B 档:写操作(M3 · confirm=True 先复述后执行) ──
 
     def record_expense(
@@ -140,5 +240,73 @@ class AgentToolset:
             return ToolResult(ok=False, error_code="amount_ungrounded")
         return ToolResult(ok=True, data={"draft": draft})
 
-    def push_to_erp(self, ctx: AgentContext, *, history_id=None, endpoint_id=None) -> ToolResult:
-        return ToolResult(ok=False, error_code="not_implemented_m1")
+    def undo_entry(self, ctx: AgentContext) -> ToolResult:
+        """撤销:目标定位(引用卡/「上一笔」)与不明确时的反问全在 reply_undo 确定性侧,
+        这里只把决策权交出去——模型没有任何目标猜测权。"""
+        return ToolResult(ok=True, data={})
+
+    def edit_entry(
+        self, ctx: AgentContext, *, amount=None, vendor_name="", date="", note=""
+    ) -> ToolResult:
+        """改错:槽位已过接地闸(新金额必在原话),拼成旧大脑同构的字段包交
+        line_correct.request_correct(定位/风险三档/是/否确认全复用,一行不改)。"""
+        u = {
+            "intent": "edit",
+            "amount": amount,
+            "vendor_name": vendor_name,
+            "date": date,
+            "note": note,
+        }
+        return ToolResult(ok=True, data={"u": u})
+
+    def push_to_erp(self, ctx: AgentContext, *, doc_keyword=None, endpoint_name=None) -> ToolResult:
+        """推 ERP 备料(confirm=True:这里只定位+选端点+预检,【绝不执行推送】)。
+
+        ok=True 的 data["push"] 交 write_sink 出确认卡;真推送要等用户点卡上的确认按钮
+        (services/agent/push_confirm)。定位模糊/无端点/已推过 → ok=False 喂回观测,
+        由模型追问或诚实告知,绝不猜目标、绝不重复推。
+        """
+        p = _plan_permissions((ctx.user or {}).get("plan"))
+        if not p.get("can_push_erp"):
+            return ToolResult(ok=False, error_code="forbidden")
+        hist, fail = self._locate_doc(ctx, doc_keyword)
+        if fail is not None:
+            return fail
+
+        endpoints = [
+            e for e in (db.list_erp_endpoints(str(ctx.user["id"])) or []) if e.get("enabled", True)
+        ]
+        endpoint = None
+        if endpoint_name:
+            q = "".join(str(endpoint_name).lower().split())
+            hits = [e for e in endpoints if q in "".join(str(e.get("name") or "").lower().split())]
+            endpoint = hits[0] if len(hits) == 1 else None
+        else:
+            # 列表已按 is_default DESC, created ASC 排序且滤过 enabled → 首行即默认端点
+            endpoint = endpoints[0] if endpoints else None
+        if not endpoint:
+            names = [e.get("name") or "" for e in endpoints]
+            return ToolResult(ok=False, error_code="no_endpoint", data={"endpoints": names})
+
+        prior = db.has_recent_successful_push(
+            str(hist.get("id")), endpoint["id"], str(ctx.user["id"])
+        )
+        if prior:
+            return ToolResult(
+                ok=False,
+                error_code="already_pushed",
+                data={"pushed_endpoint": endpoint.get("name") or "ERP"},
+            )
+        return ToolResult(
+            ok=True,
+            data={
+                "push": {
+                    "history_id": str(hist.get("id")),
+                    "endpoint_id": str(endpoint["id"]),
+                    "endpoint_name": endpoint.get("name") or "ERP",
+                    "invoice_no": hist.get("invoice_no") or "",
+                    "vendor": hist.get("seller_name") or "",
+                    "amount": hist.get("total_amount"),
+                }
+            },
+        )

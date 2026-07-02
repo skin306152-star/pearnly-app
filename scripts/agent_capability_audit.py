@@ -51,6 +51,30 @@ def extract_endpoints() -> dict[str, list[tuple[str, str]]]:
     return found
 
 
+def bucket_of(value) -> str:
+    """登记值 → 桶。A 档为 {bucket, agent[, why]} 结构,B/C/D 仍为裸字符串。"""
+    if isinstance(value, dict):
+        return str(value.get("bucket") or "?")
+    return str(value)
+
+
+def agent_annotation_errors(registry: dict) -> list[str]:
+    """A 档第二道核对:每个 A 功能区必须显式声明接法(tool:xxx)或豁免(exempt:原因)。
+    没这道,'已分 A 但没人接'会静默漂成假覆盖。"""
+    errs = []
+    for area, value in registry.items():
+        if bucket_of(value) != "A":
+            continue
+        agent = value.get("agent") if isinstance(value, dict) else None
+        if not isinstance(agent, str) or not (
+            agent.startswith("tool:") or agent.startswith("exempt:")
+        ):
+            errs.append(area)
+        elif len(agent.split(":", 1)[1].strip()) == 0:
+            errs.append(area)
+    return sorted(errs)
+
+
 def main() -> int:
     show_list = "--list" in sys.argv
     registry = {
@@ -67,7 +91,7 @@ def main() -> int:
     per_bucket_files: Counter[str] = Counter()
     per_bucket_eps: Counter[str] = Counter()
     for f, eps in code.items():
-        b = registry.get(f, "?")
+        b = bucket_of(registry.get(f, "?"))
         per_bucket_files[b] += 1
         per_bucket_eps[b] += len(eps)
 
@@ -81,7 +105,7 @@ def main() -> int:
     if show_list:
         print("\n-- 全部入口 --")
         for f in sorted(code):
-            b = registry.get(f, "?")
+            b = bucket_of(registry.get(f, "?"))
             print(f"\n[{b}] {f}")
             for method, path in code[f]:
                 print(f"    {method:<6} {path}")
@@ -89,16 +113,29 @@ def main() -> int:
     if stale:
         print(f"\n[warn] 登记表有、代码已无(可清理): {', '.join(stale)}")
 
+    failed = False
     if unclassified:
+        failed = True
         print(
             f"\n[FAIL] 代码里有、登记表未分类的功能区 {len(unclassified)} 个 → 请在 "
             f"agent_registry.json 标 A/B/C/D:"
         )
         for f in unclassified:
             print(f"    - {f}  ({len(code[f])} 入口)")
-        return 1
 
-    print("\n[OK] 全部功能区已分类 · 无遗漏")
+    bad_agents = agent_annotation_errors(registry)
+    if bad_agents:
+        failed = True
+        print(
+            f"\n[FAIL] A 档功能区缺 agent 声明 {len(bad_agents)} 个 → "
+            f'标 {{"bucket":"A","agent":"tool:<名>|exempt:<原因>"}}:'
+        )
+        for f in bad_agents:
+            print(f"    - {f}")
+
+    if failed:
+        return 1
+    print("\n[OK] 全部功能区已分类 · A 档全声明接法 · 无遗漏")
     return 0
 
 

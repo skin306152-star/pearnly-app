@@ -77,6 +77,55 @@ TOOLS: tuple[ToolSpec, ...] = (
         confirm=False,
     ),
     ToolSpec(
+        name="push_status",
+        bucket="A",
+        title_th="เช็คสถานะการส่งเข้า ERP",
+        desc_th=(
+            "เช็คว่าเอกสาร/บิลถูกส่งเข้า ERP แล้วหรือยัง และผลการส่งล่าสุด "
+            "(เช่น 'บิล 7-11 ส่งเข้า ERP หรือยัง') ไม่ระบุใบไหน = ใบล่าสุด"
+        ),
+        slots=(
+            SlotSpec(
+                "keyword",
+                required=False,
+                source="model_freeform",
+                desc_th="คำค้นระบุใบ เช่น ชื่อร้านหรือเลขใบเสร็จ",
+                desc_zh="定位单据的关键词(店名/单号)",
+            ),
+        ),
+        handler="get_push_status",
+        confirm=False,
+    ),
+    ToolSpec(
+        name="rd_lookup",
+        bucket="A",
+        title_th="ตรวจเลขผู้เสียภาษีกับกรมสรรพากร",
+        desc_th=(
+            "ตรวจสอบเลขประจำตัวผู้เสียภาษี 13 หลักกับกรมสรรพากร "
+            "ได้ชื่อบริษัท สาขา ที่อยู่ (เลขต้องอยู่ในข้อความของผู้ใช้)"
+        ),
+        slots=(
+            SlotSpec(
+                "tax_id",
+                required=True,
+                source="user_text",
+                desc_th="เลขผู้เสียภาษี 13 หลัก (คัดจากข้อความผู้ใช้เท่านั้น)",
+                desc_zh="13 位税号(必须出现在用户原话·防编造)",
+            ),
+        ),
+        handler="rd_lookup",
+        confirm=False,
+    ),
+    ToolSpec(
+        name="my_plan",
+        bucket="A",
+        title_th="ดูแพ็กเกจ/สิทธิ์การใช้งานของฉัน",
+        desc_th="ดูว่าตอนนี้ใช้แพ็กเกจอะไร เครดิตคงเหลือ เก็บประวัติได้กี่วัน และวันหมดอายุแพ็กเกจ",
+        slots=(),
+        handler="get_my_plan",
+        confirm=False,
+    ),
+    ToolSpec(
         name="record_expense",
         bucket="B",
         title_th="บันทึกค่าใช้จ่าย",
@@ -119,6 +168,94 @@ TOOLS: tuple[ToolSpec, ...] = (
         handler="record_expense",
         confirm=False,  # 高置信直录(可撤销·非不可逆)→ 不先确认;缺金额由大脑文字追问
         writes=True,
+        gate="write",
+    ),
+    ToolSpec(
+        name="undo_entry",
+        bucket="B",
+        title_th="ยกเลิก/ลบรายการที่บันทึกแล้ว",
+        desc_th=(
+            "ยกเลิกหรือลบรายการที่บันทึกไปแล้ว (เช่น 'ยกเลิกรายการล่าสุด' หรือ reply การ์ดแล้วบอกยกเลิก) "
+            "ระบบหาเป้าหมายเองจากข้อความ/การ์ดที่อ้างถึง"
+        ),
+        slots=(),
+        handler="undo_entry",
+        confirm=False,  # 冲销可经「恢复」找回,非不可逆;定位不明由确定性执行侧反问
+        writes=True,
+        gate="m3",
+    ),
+    ToolSpec(
+        name="edit_entry",
+        bucket="B",
+        title_th="แก้ไขรายการที่บันทึกแล้ว",
+        desc_th=(
+            "แก้ไขรายการที่บันทึกไปแล้ว เช่น 'แก้รายการล่าสุดเป็น 80' 'เปลี่ยนร้านเป็น Tops' "
+            "ใส่เฉพาะช่องที่ผู้ใช้ต้องการแก้"
+        ),
+        slots=(
+            # 新金额必须在用户原话(钱路接地);改错的确认/风险三档由 line_correct 确定性执行。
+            SlotSpec(
+                "amount",
+                required=False,
+                source="user_text",
+                desc_th="ยอดใหม่ (ต้องอยู่ในข้อความผู้ใช้)",
+                desc_zh="新金额(必须出现在原话·防编造)",
+            ),
+            SlotSpec(
+                "vendor_name",
+                required=False,
+                source="user_text",
+                desc_th="ชื่อร้านใหม่ ถ้าจะแก้ร้าน",
+                desc_zh="新卖家名(用户原话提到才采纳)",
+            ),
+            SlotSpec(
+                "date",
+                required=False,
+                source="model_freeform",
+                desc_th="วันที่ใหม่ YYYY-MM-DD (แปลงจากคำพูดเช่น เมื่อวาน ได้)",
+                desc_zh="新日期(允许相对词换算·与旧路同口径·格式闸在 line_correct)",
+            ),
+            SlotSpec(
+                "note",
+                required=False,
+                source="model_freeform",
+                desc_th="หมวดหมู่/รายละเอียดใหม่ ถ้าจะแก้หมวด",
+                desc_zh="新科目线索(仅当只改科目时)",
+            ),
+        ),
+        handler="edit_entry",
+        confirm=False,  # 风险确认(是/否)由 line_correct 的确定性三档自行把关
+        writes=True,
+        gate="m3",
+    ),
+    ToolSpec(
+        name="push_to_erp",
+        bucket="B",
+        title_th="ส่งเอกสารเข้า ERP",
+        desc_th=(
+            "ส่งเอกสาร/บิลที่สแกนแล้วเข้า ERP (เช่น 'ส่งใบ 7-11 เข้า ERP') — เครื่องมือนี้แค่เตรียม"
+            "การ์ดยืนยัน ระบบจะส่งจริงก็ต่อเมื่อผู้ใช้กดยืนยันบนการ์ดเท่านั้น"
+        ),
+        slots=(
+            SlotSpec(
+                "doc_keyword",
+                required=False,
+                source="model_freeform",
+                desc_th="คำค้นระบุใบ เช่น ชื่อร้านหรือเลขใบเสร็จ (ไม่ระบุ = ใบล่าสุด)",
+                desc_zh="定位单据的关键词(店名/单号·缺省=最近一张)",
+            ),
+            SlotSpec(
+                "endpoint_name",
+                required=False,
+                source="user_text",
+                desc_th="ชื่อปลายทาง ERP ถ้าผู้ใช้ระบุ",
+                desc_zh="端点名(用户原话点名才采纳·缺省=默认端点)",
+            ),
+        ),
+        handler="push_to_erp",
+        confirm=True,  # 不可逆:工具只备料,真推送在用户点确认按钮之后(push_confirm)
+        writes=True,
+        gate="push",
     ),
     ToolSpec(
         name="list_workspaces",
@@ -158,7 +295,13 @@ REGISTRY_AREA: dict[str, str] = {
     "balance": "billing_credits_routes",
     "usage_this_month": "billing_records_routes",
     "list_notifications": "notification_routes",
+    "push_status": "erp_listing_routes",
+    "rd_lookup": "rd_routes",
+    "my_plan": "me_routes",
     "record_expense": "purchase_intake_routes",
+    "undo_entry": "purchase_routes",
+    "edit_entry": "purchase_routes",
+    "push_to_erp": "erp_push_log_routes",
     "list_workspaces": "workspace_routes",
     "switch_workspace": "workspace_routes",
 }
@@ -167,6 +310,10 @@ _REGISTRY_PATH = Path(__file__).resolve().parents[2] / "docs" / "agent" / "agent
 
 
 def load_registry() -> dict[str, str]:
-    """读 agent_registry.json(功能区 → 档)。供交叉核对测试与防漏闸用。"""
+    """读 agent_registry.json(功能区 → 档)。A 档登记值为 {bucket, agent} 结构 → 归一成桶。"""
     data = json.loads(_REGISTRY_PATH.read_text(encoding="utf-8"))
-    return {k: v for k, v in data.items() if not k.startswith("_")}
+    return {
+        k: (v.get("bucket") if isinstance(v, dict) else v)
+        for k, v in data.items()
+        if not k.startswith("_")
+    }

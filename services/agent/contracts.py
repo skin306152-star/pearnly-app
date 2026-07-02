@@ -32,7 +32,8 @@ class ToolSpec:
     slots: tuple[SlotSpec, ...]
     handler: str  # AgentToolset 上的方法名,如 "list_ocr_history"
     confirm: bool  # True=执行前先复述+确认(不可逆动作如推 ERP);记账=False 高置信直录
-    writes: bool = False  # True=写工具(写子闸关时对大脑隐藏 + 经 record_sink 出卡·记账/推 ERP)
+    writes: bool = False  # True=写工具(经 write_sink 落确定性执行·大脑无直接写库的手)
+    gate: Optional[str] = None  # 子闸名(write/m3/push)· None=恒可见;加新闸=加一个值,不加参数
 
 
 @dataclass
@@ -72,6 +73,7 @@ class AgentContext:
     tenant_id: Optional[str] = None
     workspace_client_id: Optional[Any] = None
     line_user_id: Optional[str] = None
+    quoted_message_id: Optional[str] = None  # 用户长按引用的消息 id(撤销/改错锚定目标)
     user_text: str = ""  # 本轮用户原文(写工具建草稿做金额接地用·loop 每轮注入)
     anchors: dict[str, Any] = field(default_factory=dict)
     endpoint_config: dict[str, Any] = field(default_factory=dict)

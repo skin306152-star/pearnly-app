@@ -80,10 +80,14 @@ class TestAgentExecutor(unittest.TestCase):
         db.list_notification_logs.assert_called_once_with("u1", tenant_id="t1", limit=20)
         self.assertIn("count=2", res.receipt)
 
-    def test_b_bucket_stub_not_implemented(self):
-        res = self.ts.push_to_erp(_CTX, history_id="h1")
+    def test_push_prepare_requires_permission(self):
+        # push_to_erp 已从 M1 桩变备料实现(全链在 test_agent_push_confirm):无权限先拦。
+        with patch(
+            "services.agent.executor._plan_permissions", return_value={"can_push_erp": False}
+        ):
+            res = self.ts.push_to_erp(_CTX, doc_keyword="7-11")
         self.assertFalse(res.ok)
-        self.assertEqual(res.error_code, "not_implemented_m1")
+        self.assertEqual(res.error_code, "forbidden")
 
 
 if __name__ == "__main__":

@@ -45,6 +45,9 @@ def _patch_cursor(setting_row, in_allowlist=False, raise_on_open=False):
 
 
 class IsEnabledForUserTests(unittest.TestCase):
+    def setUp(self):
+        store._cache.clear()  # get_setting 有 30s 进程缓存,测试间必须隔离
+
     def test_no_record_defaults_closed(self):
         with _patch_cursor(None):
             self.assertFalse(store.is_enabled_for_user("agent_enabled", "u1"))

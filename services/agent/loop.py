@@ -14,9 +14,10 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Callable, Optional
 
-from services.agent import brain, executor, fallbacks, manifest, slots
+from services.agent import brain, executor, fallbacks, manifest, observe, slots
 from services.agent.contracts import AgentAction, AgentContext
 from services.sales.dates import bangkok_now
 
@@ -88,7 +89,8 @@ Never reveal you are an AI, a model, or any technology. Never claim to be human.
 2) Asks which workspaces / companies exist → list_workspaces. Asks to switch (e.g. "สลับไปสยามวัสดุ") → switch_workspace.
 3) Recording a new expense — a NEW amount together with an item or shop (e.g. "กาแฟ 50", "จ่ายค่าน้ำ 300", "咖啡50"): if record_expense is in your tools, call it. If the amount is missing or unclear, DON'T guess — ask one short question in the BOOKKEEPER voice. A hypothetical ("if I spent 100"), a question, or a negation ("don't record this") is NOT a real record — never call record_expense for those. If record_expense is NOT available to you, defer (kind:"defer", reason:"record"). Never invent a number.
 4) Greeting / thanks / venting / daily life, or things Pearnly can't do (change password, account settings, POS): reply as text, no tool. Can't-do things → gently point them to the App (BOOKKEEPER voice). Pure chit-chat / off-topic → COMPANION voice.
-5) Editing or deleting an already-recorded entry → defer (kind:"defer", reason:"edit").
+5) Editing or deleting an already-recorded entry (e.g. "แก้รายการล่าสุดเป็น 80", "ยกเลิกรายการล่าสุด"): if undo_entry / edit_entry are in your tools → call undo_entry to cancel/delete, or edit_entry with ONLY the fields the user wants changed (a new amount must appear in their message — never invent one). If they are NOT in your tools → defer (kind:"defer", reason:"edit").
+6) Pushing a document into ERP (e.g. "ส่งใบ 7-11 เข้า ERP", "推到ERP"): if push_to_erp is in your tools, call it — it only PREPARES a confirmation card; NOTHING is sent until the user taps confirm on the card. If it is NOT in your tools, gently point them to the App (BOOKKEEPER voice).
 
 # Honesty check — before you reply with a tool result:
 Glance back at what the user actually asked. If the result doesn't match — wrong target, what got recorded differs from what they said, it failed, or it's empty — say so honestly and gently and let the user decide (e.g. "ดูเหมือนจะบันทึกเป็น 500 แต่คุณบอก 50 ใช่ไหมคะ อยากให้แก้ไหม"). NEVER silently alter any number or content in the result — you flag, you never fix. If it matches, reply warmly as normal.
@@ -116,15 +118,16 @@ def _reply_lang(text: str) -> str:
     return detect_text_lang(text) or "en"
 
 
-def _is_multi_record(text: str) -> bool:
-    """确定性判定:一句话多笔支出(≥2 个「名+额」)。与旧路同一个 parse_multi,口径一致——
-    命中即交现成精准多笔卡路(do_record_multi),别让只建单笔的记账写工具吞成一笔(能力只增不减)。"""
+def _multi_items(text: str):
+    """确定性判定:一句话多笔支出(≥2 个「名+额」)→ 返回解析项(透传 sink 免二次解析)。
+    与旧路同一个 parse_multi,口径一致——命中即交现成精准多笔卡路(do_record_multi),
+    别让只建单笔的记账写工具吞成一笔(能力只增不减)。非多笔/解析异常 → None。"""
     from services.expense.line_quick_entry import parse_multi
 
     try:
-        return bool(parse_multi(text or ""))
+        return parse_multi(text or "") or None
     except Exception:
-        return False
+        return None
 
 
 def _recent(ctx: AgentContext) -> list:
@@ -135,71 +138,50 @@ def _recent(ctx: AgentContext) -> list:
     return line_chat_memory.recent(line_user_id=ctx.line_user_id, tenant_id=ctx.tenant_id)
 
 
-def _observe_payload(tool: str, result) -> dict:
-    """把工具结果压成喂回模型的最小事实(只保留组织回复必需的字段,别灌满上下文)。"""
-    data = result.data if isinstance(result.data, dict) else {}
-    if not result.ok:
-        # 切套账没匹配到 → 把可选套账喂回,让模型请用户挑一个(非报错回退)。
-        out = {"ok": False, "error": result.error_code or "failed"}
-        if data.get("workspaces"):
-            out["workspaces"] = data["workspaces"]
-        return out
-    if tool == "list_history":
-        items = data.get("items") or []
-        top = [
-            {
-                "vendor": (i.get("seller_name") or i.get("vendor_name") or ""),
-                "amount": i.get("total_amount"),
-            }
-            for i in items[:5]
-        ]
-        return {"ok": True, "total": data.get("total", len(items)), "top": top}
-    if tool == "history_summary":
-        return {
-            "ok": True,
-            "doc_count": data.get("doc_count", 0),
-            "amount_total": data.get("amount_total", 0),
-            "by_category": data.get("by_category", []),
-        }
-    if tool == "usage_this_month":
-        b = data.get("billing") or {}
-        return {
-            "ok": True,
-            "pages_used_this_month": b.get("pages_used_this_month"),
-            "docs": data.get("docs"),
-        }
-    if tool == "balance":
-        return {
-            "ok": True,
-            "balance_thb": data.get("balance_thb"),
-            "pages_used_this_month": data.get("pages_used_this_month"),
-        }
-    if tool == "list_notifications":  # result.data 是 list(非上面 dict 化的 data)→ 直接数长度
-        return {"ok": True, "count": len(result.data) if isinstance(result.data, list) else 0}
-    if tool == "list_workspaces":
-        return {
-            "ok": True,
-            "workspaces": data.get("workspaces", []),
-            "current_id": data.get("current_id"),
-        }
-    if tool == "switch_workspace":
-        return {"ok": True, "switched_to": data.get("switched_to")}
-    return {"ok": True}
+# 子闸关时模型硬调工具的落点:m3(改错/撤销)交旧路;push 喂观测让模型引导去 App;
+# write(记账)由 writes+sink 守卫先一步 defer。加新闸 = ToolSpec 标 gate + 这里加一行。
+# 注:record_multi 是 sink 专用伪工具名(多笔确定性直分发·不在 manifest·模型永远看不见)。
 
 
-def _visible_tools(allow_write: bool) -> tuple:
-    """模型看得到的工具表:写关时隐藏写工具(记账等)→ 记账走旧路,现状不变。
-    切套账等 writes=False 的 B 档导航工具始终可见。"""
-    return tuple(t for t in manifest.TOOLS if allow_write or not t.writes)
+def _gates(allow_write: bool, allow_m3: bool, allow_push: bool) -> frozenset:
+    return frozenset(
+        name for name, on in (("write", allow_write), ("m3", allow_m3), ("push", allow_push)) if on
+    )
+
+
+def _visible_tools(gates: frozenset) -> tuple:
+    """模型看得到的工具表:写工具先看 write 闸(写关=全部写能力隐藏,m3/push 也不例外),
+    再看各自子闸;gate=None 的导航/只读工具始终可见。闸关=旧路现状不变。"""
+    out = []
+    for t in manifest.TOOLS:
+        if t.writes and "write" not in gates:
+            continue
+        if t.gate is not None and t.gate not in gates:
+            continue
+        out.append(t)
+    return tuple(out)
+
+
+@lru_cache(maxsize=8)
+def _tools_prompt(gates: frozenset) -> str:
+    """gates 组合 → 提示词工具表(确定性,按闸组合缓存,免每步重建)。"""
+    return brain._tool_table(_visible_tools(gates))
 
 
 def _prompt(
-    user_text, history, today, observations, *, lang: str, force_reply: bool, allow_write=False
+    user_text,
+    history,
+    today,
+    observations,
+    *,
+    lang: str,
+    force_reply: bool,
+    gates: frozenset = frozenset(),
 ) -> str:
     # {today} 刻意不进 head:它每分钟变,放头部会撞碎「静态 persona 前缀」→ 供应商前缀缓存全 miss。
     # 把易变的时间戳放到贴近用户消息的尾部(既对时间问题更贴切,又让 ~1.5k token 的 persona 成稳定可缓存前缀)。
     head = _SYSTEM.format(
-        tools=brain._tool_table(_visible_tools(allow_write)),
+        tools=_tools_prompt(gates),
         lang_name=_LANGS.get(lang, "English"),
     )
     obs = ""
@@ -283,7 +265,14 @@ def _parse_step(outcome) -> LoopStep:
 
 
 def _decide_step(
-    user_text, history, *, today, observations, lang="en", force_reply=False, allow_write=False
+    user_text,
+    history,
+    *,
+    today,
+    observations,
+    lang="en",
+    force_reply=False,
+    gates: frozenset = frozenset(),
 ) -> LoopStep:
     from services.ai_gateway import transport
 
@@ -295,7 +284,7 @@ def _decide_step(
             observations,
             lang=lang,
             force_reply=force_reply,
-            allow_write=allow_write,
+            gates=gates,
         ),
         tier="flash",
         response_mime=True,
@@ -317,27 +306,36 @@ def handle_turn(
     history: Optional[list] = None,
     today: Optional[str] = None,
     allow_write: bool = False,
-    record_sink: Optional[Callable] = None,
+    allow_m3: bool = False,
+    allow_push: bool = False,
+    write_sink: Optional[Callable] = None,
 ) -> TurnResult:
     """一轮对话 → TurnResult(见其 docstring:reply/card_sent/defer_record/defer_edit/crash)。
     关键:大脑故障(parse 失败/空回复/工具错)归 crash(入口走安全兜底),绝不混成记账 defer 掉旧路地雷。
 
-    allow_write=True 且带 record_sink(出卡回调=现有 _do_record)时,写工具(记账)启用:
-    模型提议 record_expense + 一句暖话(step.say)→ 接地建草稿(金额没接地则大脑文字追问)→
-    高置信直录 + 出富卡(暖话显示在卡上方·复用现有卡+撤销+nonce)。写关 → defer_record 交旧路直录。
+    write_sink(ctx, tool, data, say) 是写工具的唯一落地口(bridge 装配·分发到现有确定性执行:
+    记账 _do_record / 多笔 do_record_multi / 撤销 reply_undo / 改错 request_correct),返回
+    TurnResult kind 或 None(=没落地,归 crash)。allow_m3 开 → 撤销/改错工具对模型可见 +
+    多笔由确定性预判直接分发(模型全程无拆分权);关 → 逐字节现状(defer 交旧路)。
     """
     decide = decide or _decide_step
     toolset = toolset or executor.AgentToolset()
     history = history if history is not None else _recent(ctx)
     today = today or _today()
     lang = _reply_lang(user_text)
+    gates = _gates(allow_write, allow_m3, allow_push)
     ctx.user_text = user_text  # 写工具建草稿做金额接地要原文
 
     # 多笔记账守门:记账写工具只建单笔,遇确定性判定为多笔的消息会把它吞成一笔(丢账)。
     # → defer 回旧确定性路,由现成精准多笔卡(do_record_multi)逐条入账。写关时记账本就 defer,
     # 旧路自会走多笔,故只在写开时前置拦(旧路 :107 会用同一 parse_multi 复核后出多笔卡)。
-    if allow_write and record_sink is not None and _is_multi_record(user_text):
-        return TurnResult("defer_record")
+    if allow_write and write_sink is not None:
+        multi_items = _multi_items(user_text)
+        if multi_items:
+            if "m3" in gates:  # 多笔绕开模型直接分发现成精准多笔卡(拆分权永远在确定性代码)
+                kind = write_sink(ctx, "record_multi", {"items": multi_items}, "")
+                return TurnResult(kind) if kind else TurnResult("crash")
+            return TurnResult("defer_record")
 
     observations: list = []
     called: set = set()
@@ -349,7 +347,7 @@ def handle_turn(
             observations=observations,
             lang=lang,
             force_reply=bool(observations),
-            allow_write=allow_write,
+            gates=gates,
         )
         if step.kind == "reply":
             if step.message:
@@ -368,8 +366,13 @@ def handle_turn(
         spec = manifest.TOOLS_BY_NAME.get(step.tool)
         if not spec:
             return TurnResult("crash")  # 模型调不存在的工具 = 故障(非记账 defer)
-        if spec.writes and (not allow_write or record_sink is None):
+        if spec.writes and (not allow_write or write_sink is None):
             return TurnResult("defer_record")  # 记账写关 → 交确定性直录(救命索)
+        if spec.gate and spec.gate not in gates:  # 子闸关但模型硬调(闸关时本就不可见)
+            if spec.gate == "m3":
+                return TurnResult("defer_edit")  # 改错/撤销交旧路(能力不丢)
+            observations.append({"tool": step.tool, "ok": False, "error": "not_available_yet"})
+            continue  # 推送等:引导去 App(旧路本就没有该能力)
         chk = slots.check_slots(
             AgentAction(kind="tool", tool=step.tool, args=step.args),
             user_text=user_text,
@@ -396,9 +399,9 @@ def handle_turn(
                     {"tool": step.tool, "ok": False, "error": result.error_code or "need_more"}
                 )
                 continue
-            record_sink(ctx, result.data["draft"], step.say)
-            return TurnResult("card_sent")
-        observations.append({"tool": step.tool, **_observe_payload(step.tool, result)})
+            kind = write_sink(ctx, step.tool, result.data, step.say)
+            return TurnResult(kind) if kind else TurnResult("crash")
+        observations.append({"tool": step.tool, **observe.payload(step.tool, result)})
 
     # 循环里没成文(重复调/步数用尽)→ 拿着已取到的真实数据,最后强逼一次成文;
     # 仍不成文 → 用工具结果兜底一句(绝不把已查到的查询 defer 掉旧路念"这笔多少钱")。
@@ -410,7 +413,7 @@ def handle_turn(
             observations=observations,
             lang=lang,
             force_reply=True,
-            allow_write=allow_write,
+            gates=gates,
         )
         if final.kind == "reply" and _sane_reply(final.message):
             return TurnResult("reply", final.message)

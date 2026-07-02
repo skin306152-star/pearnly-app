@@ -72,10 +72,11 @@ def handle_expense_text(
 
         # 对话 Agent 前门(灰度·前门倒置·收口):reply/直录卡/大脑故障 → 前门消费(故障走安全兜底,
         # 绝不掉旧路地雷);模型主动 defer 记账/改错 或 无余额 → 返 False 落回下方旧确定性路(能力不丢)。
+        agent_verdict = "skip"
         if gated:
             from services.line_binding import line_agent_route
 
-            if line_agent_route.route_gated(
+            agent_verdict = line_agent_route.route_gated(
                 bound_user,
                 reply_token,
                 line_user_id,
@@ -86,16 +87,20 @@ def handle_expense_text(
                 quote_token,
                 history,
                 balance_ok=_ocr_balance_ok(bound_user),
+                quoted_message_id=quoted_message_id,
                 say=_say,
                 charge=lambda: _charge_line_l2(bound_user, stid),
                 book=_do_record,
-            ):
+            )
+            if agent_verdict == "consumed":
                 return True
 
         si = lqe.l1_intent(text)
         isq = lqe.is_question(text) or lqe.is_nonassertive(text)
         # 改错分流(P2):「上一笔改成X / 第1张改成Y」是改错 → 跳过 L1 记账,交大脑判 edit 抽字段。
-        is_edit = lqe.is_edit_request(text)
+        # ★前门模型已裁决=改错(defer_edit)也算:关键词检测器认不出的改错句
+        # (如「แก้รายการล่าสุดเป็น 80」)绝不许掉进下面 L1 分支被误记成新支出。
+        is_edit = lqe.is_edit_request(text) or agent_verdict == "defer_edit"
 
         # #7 收入识别:明确「收款/卖出」且无购买动词 → 不误记支出(保守·问句/已有 L1 意图不拦)。
         if lqe.detect_income(text) and not isq and si is None:
@@ -155,12 +160,24 @@ def handle_expense_text(
             _pool("amount_missing")
             return True
 
-        # 2. 大脑(一次 LLM):听意图 + 抽槽 + 自然回复 → 工具分发。
+        # T5 单一决策者(设计 §3.2):M3 全家桶开 → 前门大脑是唯一 LLM 决策者,旧 LLM
+        # understand() 物理退出灰度路。模型仍 defer_edit(理应用 edit 工具却没用)→ 确定性
+        # 列可改字段引导重说,绝不再开第二个大脑二次解读(行为不一致/双倍成本的根)。
+        from services.line_binding import line_agent_bridge as _bridge
+
+        m3_on = gated and _bridge.m3_enabled(bound_user)
+        if m3_on and agent_verdict == "defer_edit":
+            from services.expense import line_correct_i18n as ci
+
+            _say(ci.t(ci.EDIT_EXAMPLES, line_classify.detect_text_lang(text) or lang))
+            return True
+
+        # 2. 大脑(一次 LLM):听意图 + 抽槽 + 自然回复 → 工具分发。M3 开则跳过(单一决策者)。
         from services.expense import line_agent, line_l2
 
         api_key = line_l2.resolve_api_key(bound_user)
         u = None
-        if api_key and _ocr_balance_ok(bound_user):
+        if api_key and not m3_on and _ocr_balance_ok(bound_user):
             u = line_agent.understand(text, api_key=api_key, history=history)
         if u:
             _charge_line_l2(bound_user, stid)

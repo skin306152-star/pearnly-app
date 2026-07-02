@@ -192,6 +192,7 @@ class TestRoutedBatch(unittest.TestCase):
 
     OWN = "1234567890123"
     OTHER = "9999999999999"
+    OTHER2 = "8888888888888"  # ambiguous 造数买卖方须不同(同号会撞 seller_buyer_same_tax 闸)
 
     def _adapter(self):
         a = MrErpHttpAdapter(
@@ -232,7 +233,7 @@ class TestRoutedBatch(unittest.TestCase):
         histories = [
             self._flat(seller=self.OWN, buyer=self.OTHER, inv="S1"),  # 销项
             self._flat(seller=self.OTHER, buyer=self.OWN, inv="P1"),  # 采购
-            self._flat(seller=self.OTHER, buyer=self.OTHER, inv="A1"),  # ambiguous
+            self._flat(seller=self.OTHER, buyer=self.OTHER2, inv="A1"),  # ambiguous
         ]
         res = a.upload_routed_batch(histories, {"_own_tax_id": self.OWN})
         by = {dt: ids for dt, ids in calls}

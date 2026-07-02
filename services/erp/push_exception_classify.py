@@ -42,6 +42,7 @@ def classify_push_exception(error_msg: Optional[str]) -> str:
         k in msg
         for k in (
             "currency_not_thb",
+            "seller_buyer_same_tax",
             "credit_note",
             "deposit_receipt",
             "date_future",

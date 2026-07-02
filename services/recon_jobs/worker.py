@@ -90,6 +90,8 @@ def _run_one(job: Dict) -> None:
         store.update_progress(job_id, p, worker_id=WORKER_ID, lease_seconds=LEASE_SEC)
 
     keep_stage = False  # S8 · needs_review 时留暂存(confirm 重对账复用 gl 文件)
+    # 终态回推(LINE 收件流带 params.notify 时):在 finally 统一发,绝不影响 job 本体。
+    outcome = {"status": None, "result_table": None, "result_id": None, "error_code": None}
     try:
         params = dict(job.get("params") or {})
         for key in ("job_id", "user_id", "tenant_id", "workspace_client_id"):
@@ -103,11 +105,13 @@ def _run_one(job: Dict) -> None:
         if _sentinel == "__needs_review__":
             store.set_needs_review(job_id, result[1])
             keep_stage = True
+            outcome["status"] = "needs_review"
             logger.info(f"[recon-worker] job {job_id} ({jtype}) -> needs_review(待用户核对)")
             return
         # BUG-FIX-RECON-GLCSV · 整侧解析失败不再静默 done:能弹列映射 → needs_mapping;否则 failed。
         if _sentinel == "__needs_mapping__":
             store.set_needs_mapping(job_id, result[1] or {})
+            outcome["status"] = "needs_mapping"
             logger.info(f"[recon-worker] job {job_id} ({jtype}) -> needs_mapping(待用户确认列对应)")
             return
         if _sentinel == "__failed__":
@@ -118,6 +122,7 @@ def _run_one(job: Dict) -> None:
                 result_table=p.get("result_table"),
                 result_id=p.get("result_id"),
             )
+            outcome.update(status="failed", error_code=p.get("error_code") or "parse_failed")
             logger.info(f"[recon-worker] job {job_id} ({jtype}) -> failed({p.get('error_code')})")
             return
         result_table: Optional[str] = None
@@ -125,14 +130,23 @@ def _run_one(job: Dict) -> None:
         if isinstance(result, (tuple, list)) and len(result) == 2:
             result_table, result_id = result
         store.finish(job_id, result_table or jtype, result_id)
+        outcome.update(status="done", result_table=result_table, result_id=result_id)
         logger.info(f"[recon-worker] job {job_id} ({jtype}) done -> {result_table}:{result_id}")
     except Exception as e:  # noqa: BLE001
         logger.error(f"[recon-worker] job {job_id} ({jtype}) FAILED: {e}\n{traceback.format_exc()}")
         # 真错存进 error_code(前端/库可见)· 别再吞成通用 processing_error 让人无从诊断。
         store.fail(job_id, (str(e).strip()[:200] or "processing_error"))
+        outcome.update(status="failed", error_code=(str(e).strip()[:80] or "processing_error"))
     finally:
         if not keep_stage:
             _cleanup_stage(job_id)
+        if outcome["status"]:
+            try:
+                from services.recon_jobs import line_notify
+
+                line_notify.notify_terminal(job, **outcome)
+            except Exception:
+                logger.warning(f"[recon-worker] notify failed (job {job_id}); ignored")
 
 
 async def run_worker(stop_event: Optional[asyncio.Event] = None) -> None:

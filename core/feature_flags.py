@@ -32,6 +32,9 @@ AGENT_CONFIRM_KEY = "agent_confirm_machine"
 # LINE DMS 身份证推送子闸(LINE-DMS-PUSH-DESIGN):默认关。关 → 身份证图走现状
 # (not_invoice 靶向引导仍在,无副作用);开 → 说过"进 DMS"再发身份证 = 复述+确认后建客户。
 AGENT_DMS_KEY = "agent_dms_push"
+# LINE 对账收件子闸(RECON-3-LINE-PLAN 方案一触发底座):默认关。关 → 说"做银行对账"
+# 得 not_available_yet 诚实拒、文件走现状 OCR;开 → 收件配对→异步对账→完成回推。
+AGENT_RECON_INTAKE_KEY = "agent_recon_intake"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -78,3 +81,8 @@ def agent_confirm_enabled_for(user_id: Optional[str]) -> bool:
 def agent_dms_enabled_for(user_id: Optional[str]) -> bool:
     """LINE DMS 身份证推送子闸。关 = 身份证图走现状,plan 的 dms 目标如实拒。"""
     return _enabled(AGENT_DMS_KEY, user_id, "agent_dms_enabled_for")
+
+
+def agent_recon_intake_enabled_for(user_id: Optional[str]) -> bool:
+    """LINE 对账收件子闸。关 = 工具如实拒、文件走现状 OCR。"""
+    return _enabled(AGENT_RECON_INTAKE_KEY, user_id, "agent_recon_intake_enabled_for")

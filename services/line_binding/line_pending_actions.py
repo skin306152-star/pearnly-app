@@ -76,6 +76,31 @@ def set_action(tenant_id, line_user_id, action: dict, *, ttl_minutes=None) -> No
     _with_heal(_run)
 
 
+def read_action(tenant_id, line_user_id) -> Optional[dict]:
+    """读而不取:消费方先看 tool 决定要不要吃(乱 take 会把别的流程的检查点吞掉,
+    比如收件检查点被"确认"两字误消费)。故障 → None。"""
+    from core import db
+
+    def _run():
+        with db.get_cursor_rls(str(tenant_id)) as cur:
+            cur.execute(
+                "SELECT action FROM line_pending_actions "
+                "WHERE tenant_id = %s AND line_user_id = %s AND expires_at > now()",
+                (str(tenant_id), str(line_user_id)),
+            )
+            row = cur.fetchone()
+        if not row:
+            return None
+        action = row.get("action")
+        return action if isinstance(action, dict) else json.loads(action or "{}")
+
+    try:
+        return _with_heal(_run)
+    except Exception:
+        logger.warning("[line_actions] read failed; treat as none", exc_info=True)
+        return None
+
+
 def take_action(tenant_id, line_user_id) -> Optional[dict]:
     """原子取走并删除(单发单用):过期行同删不返。无 → None(交下一级 resume 通道)。"""
     from core import db

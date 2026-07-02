@@ -144,6 +144,17 @@ def _make_write_sink(
                 quote_token=quote_token,
             )
             return "card_sent" if sent else None
+        if tool == "recon_intake_start":
+            from services.agent import recon_intake
+
+            recon_intake.start(
+                bound_user,
+                tid,
+                line_user_id,
+                lang,
+                gl_account=(data.get("intake") or {}).get("gl_account"),
+            )
+            return "card_sent"
         if tool == "plan_incoming_doc":
             from services.line_binding import line_intent_store, line_reply
 
@@ -214,6 +225,11 @@ def try_agent_turn(
         bound_user, reply_token, text, lang, tenant_id=tid, line_user_id=line_user_id
     ):
         return TurnResult("card_sent")  # handle_postback 已回话,入口别再出声
+    # 对账收件:活跃收件缺科目号且这句像编码 → 收下(别的话不吃,收件不打断正常对话)。
+    from services.agent import recon_intake
+
+    if recon_intake.try_text(bound_user, text, lang, tid, line_user_id):
+        return TurnResult("card_sent")
     try:
         from services.agent import loop
         from services.agent.contracts import AgentContext

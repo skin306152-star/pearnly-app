@@ -226,6 +226,34 @@ TOOLS: tuple[ToolSpec, ...] = (
         writes=True,
     ),
     ToolSpec(
+        name="push_to_erp",
+        bucket="B",
+        title_th="ส่งเอกสารเข้า ERP",
+        desc_th=(
+            "ส่งเอกสาร/บิลที่สแกนแล้วเข้า ERP (เช่น 'ส่งใบ 7-11 เข้า ERP') — เครื่องมือนี้แค่เตรียม"
+            "การ์ดยืนยัน ระบบจะส่งจริงก็ต่อเมื่อผู้ใช้กดยืนยันบนการ์ดเท่านั้น"
+        ),
+        slots=(
+            SlotSpec(
+                "doc_keyword",
+                required=False,
+                source="model_freeform",
+                desc_th="คำค้นระบุใบ เช่น ชื่อร้านหรือเลขใบเสร็จ (ไม่ระบุ = ใบล่าสุด)",
+                desc_zh="定位单据的关键词(店名/单号·缺省=最近一张)",
+            ),
+            SlotSpec(
+                "endpoint_name",
+                required=False,
+                source="user_text",
+                desc_th="ชื่อปลายทาง ERP ถ้าผู้ใช้ระบุ",
+                desc_zh="端点名(用户原话点名才采纳·缺省=默认端点)",
+            ),
+        ),
+        handler="push_to_erp",
+        confirm=True,  # 不可逆:工具只备料,真推送在用户点确认按钮之后(push_confirm)
+        writes=True,
+    ),
+    ToolSpec(
         name="list_workspaces",
         bucket="B",
         title_th="ดูรายชื่อชุดบัญชี/บริษัท",
@@ -269,6 +297,7 @@ REGISTRY_AREA: dict[str, str] = {
     "record_expense": "purchase_intake_routes",
     "undo_entry": "purchase_routes",
     "edit_entry": "purchase_routes",
+    "push_to_erp": "erp_push_log_routes",
     "list_workspaces": "workspace_routes",
     "switch_workspace": "workspace_routes",
 }

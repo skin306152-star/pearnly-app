@@ -18,7 +18,14 @@ from services.agent.loop import TurnResult  # 前门结论类型(reply/card_sent
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["TurnResult", "frontdoor_enabled", "write_enabled", "m3_enabled", "try_agent_turn"]
+__all__ = [
+    "TurnResult",
+    "frontdoor_enabled",
+    "write_enabled",
+    "m3_enabled",
+    "push_enabled",
+    "try_agent_turn",
+]
 
 
 def frontdoor_enabled(bound_user) -> bool:
@@ -43,6 +50,14 @@ def m3_enabled(bound_user) -> bool:
 
     uid = str(bound_user["id"]) if bound_user.get("id") else None
     return feature_flags.agent_m3_enabled_for(uid)
+
+
+def push_enabled(bound_user) -> bool:
+    """推 ERP 子闸(confirm-first 不可逆写)· 默认关。"""
+    from core import feature_flags
+
+    uid = str(bound_user["id"]) if bound_user.get("id") else None
+    return feature_flags.agent_push_enabled_for(uid)
 
 
 def _make_write_sink(
@@ -100,6 +115,20 @@ def _make_write_sink(
                 quote_token=quote_token,
             )
             return "card_sent"
+        if tool == "push_to_erp":
+            from services.agent import push_confirm
+
+            sent = push_confirm.send_confirm_card(
+                bound_user,
+                reply_token,
+                data.get("push") or {},
+                lang,
+                tid,
+                ws,
+                line_user_id,
+                quote_token=quote_token,
+            )
+            return "card_sent" if sent else None
         if tool == "edit_entry":
             from services.expense import line_correct
 
@@ -176,6 +205,7 @@ def try_agent_turn(
             history=history,
             allow_write=sink is not None,
             allow_m3=sink is not None and m3_enabled(bound_user),
+            allow_push=sink is not None and push_enabled(bound_user),
             write_sink=sink,
         )
     except Exception:

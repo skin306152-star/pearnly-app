@@ -59,17 +59,7 @@ def _make_decide(case: dict):
     items = list(case.get("script") or [])
     calls: list = []
 
-    def decide(
-        user_text,
-        history,
-        *,
-        today,
-        observations,
-        lang,
-        force_reply=False,
-        allow_write=False,
-        allow_m3=False,
-    ):
+    def decide(user_text, history, *, observations, lang, **kw):
         calls.append(lang)
         if not items:
             raise AssertionError(f"{case['id']}: script 用尽(decide 第 {len(calls)} 次)")
@@ -132,6 +122,7 @@ class TestCorpusLoop(unittest.TestCase):
             today=_TODAY,
             allow_write=write,
             allow_m3=case.get("m3", False),
+            allow_push=case.get("push", False),
             write_sink=sink if write else None,
         )
         return res, records, decide_calls, toolset, sunk_tools

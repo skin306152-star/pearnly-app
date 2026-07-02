@@ -249,5 +249,72 @@ class AgentToolset:
         }
         return ToolResult(ok=True, data={"u": u})
 
-    def push_to_erp(self, ctx: AgentContext, *, history_id=None, endpoint_id=None) -> ToolResult:
-        return ToolResult(ok=False, error_code="not_implemented_m1")
+    def push_to_erp(self, ctx: AgentContext, *, doc_keyword=None, endpoint_name=None) -> ToolResult:
+        """推 ERP 备料(confirm=True:这里只定位+选端点+预检,【绝不执行推送】)。
+
+        ok=True 的 data["push"] 交 write_sink 出确认卡;真推送要等用户点卡上的确认按钮
+        (services/agent/push_confirm)。定位模糊/无端点/已推过 → ok=False 喂回观测,
+        由模型追问或诚实告知,绝不猜目标、绝不重复推。
+        """
+        p = _plan_permissions((ctx.user or {}).get("plan"))
+        if not p.get("can_push_erp"):
+            return ToolResult(ok=False, error_code="forbidden")
+        res = db.list_ocr_history(
+            user_id=str(ctx.user["id"]),
+            tenant_id=ctx.tenant_id,
+            keyword=doc_keyword,
+            workspace_client_id=None,
+            limit=5,
+            offset=0,
+            retention_days=_retention(ctx.user),
+            restrict_client_ids=db.get_visible_client_ids_for_user(ctx.user),
+        )
+        items = res.get("items", []) if isinstance(res, dict) else []
+        if not items:
+            return ToolResult(ok=False, error_code="history_not_found")
+        if doc_keyword and len(items) > 1:
+            cands = [
+                {"vendor": i.get("seller_name") or "", "amount": i.get("total_amount")}
+                for i in items
+            ]
+            return ToolResult(ok=False, error_code="ambiguous_doc", data={"candidates": cands})
+        hist = items[0]
+
+        endpoints = [
+            e for e in (db.list_erp_endpoints(str(ctx.user["id"])) or []) if e.get("enabled", True)
+        ]
+        endpoint = None
+        if endpoint_name:
+            q = "".join(str(endpoint_name).lower().split())
+            hits = [e for e in endpoints if q in "".join(str(e.get("name") or "").lower().split())]
+            endpoint = hits[0] if len(hits) == 1 else None
+        else:
+            endpoint = db.get_default_erp_endpoint(str(ctx.user["id"]))
+            if endpoint and not endpoint.get("enabled", True):
+                endpoint = None
+        if not endpoint:
+            names = [e.get("name") or "" for e in endpoints]
+            return ToolResult(ok=False, error_code="no_endpoint", data={"endpoints": names})
+
+        prior = db.has_recent_successful_push(
+            str(hist.get("id")), endpoint["id"], str(ctx.user["id"])
+        )
+        if prior:
+            return ToolResult(
+                ok=False,
+                error_code="already_pushed",
+                data={"pushed_endpoint": endpoint.get("name") or "ERP"},
+            )
+        return ToolResult(
+            ok=True,
+            data={
+                "push": {
+                    "history_id": str(hist.get("id")),
+                    "endpoint_id": str(endpoint["id"]),
+                    "endpoint_name": endpoint.get("name") or "ERP",
+                    "invoice_no": hist.get("invoice_no") or "",
+                    "vendor": hist.get("seller_name") or "",
+                    "amount": hist.get("total_amount"),
+                }
+            },
+        )

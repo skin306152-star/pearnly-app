@@ -20,6 +20,9 @@ AGENT_WRITE_KEY = "agent_write_tools"
 # M3 全家桶子闸(撤销/改错工具 + 多笔直分发):与写子闸分开,默认关。
 # 开 → 大脑成为记账域唯一决策者(旧 LLM understand 退出灰度路);关 → defer 交旧路,现状不变。
 AGENT_M3_KEY = "agent_m3_tools"
+# 推 ERP 子闸(唯一 confirm-first 的不可逆写):默认关。关 → 工具对模型不可见,
+# 模型硬调只得到 not_available_yet 观测(引导去 App),线上行为零变化。
+AGENT_PUSH_KEY = "agent_push_erp"
 
 
 def agent_enabled_for(user_id: Optional[str]) -> bool:
@@ -41,6 +44,17 @@ def agent_m3_enabled_for(user_id: Optional[str]) -> bool:
         return store.is_enabled_for_user(AGENT_M3_KEY, user_id)
     except Exception as e:
         logger.warning(f"agent_m3_enabled_for fail-closed: {e}")
+        return False
+
+
+def agent_push_enabled_for(user_id: Optional[str]) -> bool:
+    """推 ERP confirm-first 是否对该用户开启。默认关;异常 fail-closed。"""
+    try:
+        from services.platform_settings import store
+
+        return store.is_enabled_for_user(AGENT_PUSH_KEY, user_id)
+    except Exception as e:
+        logger.warning(f"agent_push_enabled_for fail-closed: {e}")
         return False
 
 

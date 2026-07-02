@@ -89,6 +89,7 @@ Never reveal you are an AI, a model, or any technology. Never claim to be human.
 3) Recording a new expense — a NEW amount together with an item or shop (e.g. "กาแฟ 50", "จ่ายค่าน้ำ 300", "咖啡50"): if record_expense is in your tools, call it. If the amount is missing or unclear, DON'T guess — ask one short question in the BOOKKEEPER voice. A hypothetical ("if I spent 100"), a question, or a negation ("don't record this") is NOT a real record — never call record_expense for those. If record_expense is NOT available to you, defer (kind:"defer", reason:"record"). Never invent a number.
 4) Greeting / thanks / venting / daily life, or things Pearnly can't do (change password, account settings, POS): reply as text, no tool. Can't-do things → gently point them to the App (BOOKKEEPER voice). Pure chit-chat / off-topic → COMPANION voice.
 5) Editing or deleting an already-recorded entry (e.g. "แก้รายการล่าสุดเป็น 80", "ยกเลิกรายการล่าสุด"): if undo_entry / edit_entry are in your tools → call undo_entry to cancel/delete, or edit_entry with ONLY the fields the user wants changed (a new amount must appear in their message — never invent one). If they are NOT in your tools → defer (kind:"defer", reason:"edit").
+6) Pushing a document into ERP (e.g. "ส่งใบ 7-11 เข้า ERP", "推到ERP"): if push_to_erp is in your tools, call it — it only PREPARES a confirmation card; NOTHING is sent until the user taps confirm on the card. If it is NOT in your tools, gently point them to the App (BOOKKEEPER voice).
 
 # Honesty check — before you reply with a tool result:
 Glance back at what the user actually asked. If the result doesn't match — wrong target, what got recorded differs from what they said, it failed, or it's empty — say so honestly and gently and let the user decide (e.g. "ดูเหมือนจะบันทึกเป็น 500 แต่คุณบอก 50 ใช่ไหมคะ อยากให้แก้ไหม"). NEVER silently alter any number or content in the result — you flag, you never fix. If it matches, reply warmly as normal.
@@ -137,9 +138,11 @@ def _recent(ctx: AgentContext) -> list:
 
 # 只在 M3 子闸(agent_m3_tools)开时对模型可见的写工具:改错/撤销收进大脑,旧 LLM 退场。
 _M3_ONLY = ("undo_entry", "edit_entry")
+# 只在推送子闸(agent_push_erp)开时可见:唯一 confirm-first 的不可逆写。
+_PUSH_ONLY = ("push_to_erp",)
 
 
-def _visible_tools(allow_write: bool, allow_m3: bool = False) -> tuple:
+def _visible_tools(allow_write: bool, allow_m3: bool = False, allow_push: bool = False) -> tuple:
     """模型看得到的工具表:写关时隐藏写工具(记账等)→ 记账走旧路,现状不变。
     改错/撤销工具另受 M3 子闸;切套账等 writes=False 的 B 档导航工具始终可见。"""
     out = []
@@ -147,6 +150,8 @@ def _visible_tools(allow_write: bool, allow_m3: bool = False) -> tuple:
         if t.writes and not allow_write:
             continue
         if t.name in _M3_ONLY and not allow_m3:
+            continue
+        if t.name in _PUSH_ONLY and not allow_push:
             continue
         out.append(t)
     return tuple(out)
@@ -162,11 +167,12 @@ def _prompt(
     force_reply: bool,
     allow_write=False,
     allow_m3=False,
+    allow_push=False,
 ) -> str:
     # {today} 刻意不进 head:它每分钟变,放头部会撞碎「静态 persona 前缀」→ 供应商前缀缓存全 miss。
     # 把易变的时间戳放到贴近用户消息的尾部(既对时间问题更贴切,又让 ~1.5k token 的 persona 成稳定可缓存前缀)。
     head = _SYSTEM.format(
-        tools=brain._tool_table(_visible_tools(allow_write, allow_m3)),
+        tools=brain._tool_table(_visible_tools(allow_write, allow_m3, allow_push)),
         lang_name=_LANGS.get(lang, "English"),
     )
     obs = ""
@@ -259,6 +265,7 @@ def _decide_step(
     force_reply=False,
     allow_write=False,
     allow_m3=False,
+    allow_push=False,
 ) -> LoopStep:
     from services.ai_gateway import transport
 
@@ -272,6 +279,7 @@ def _decide_step(
             force_reply=force_reply,
             allow_write=allow_write,
             allow_m3=allow_m3,
+            allow_push=allow_push,
         ),
         tier="flash",
         response_mime=True,
@@ -294,6 +302,7 @@ def handle_turn(
     today: Optional[str] = None,
     allow_write: bool = False,
     allow_m3: bool = False,
+    allow_push: bool = False,
     write_sink: Optional[Callable] = None,
 ) -> TurnResult:
     """一轮对话 → TurnResult(见其 docstring:reply/card_sent/defer_record/defer_edit/crash)。
@@ -332,6 +341,7 @@ def handle_turn(
             force_reply=bool(observations),
             allow_write=allow_write,
             allow_m3=allow_m3,
+            allow_push=allow_push,
         )
         if step.kind == "reply":
             if step.message:
@@ -354,6 +364,10 @@ def handle_turn(
             return TurnResult("defer_record")  # 记账写关 → 交确定性直录(救命索)
         if step.tool in _M3_ONLY and not allow_m3:
             return TurnResult("defer_edit")  # M3 子闸关:改错/撤销交旧路(能力不丢·模型硬调也拦)
+        if step.tool in _PUSH_ONLY and not allow_push:
+            # 推送闸关:喂回 not_available_yet,模型自然引导去 App(旧路本就没有推送能力)。
+            observations.append({"tool": step.tool, "ok": False, "error": "not_available_yet"})
+            continue
         chk = slots.check_slots(
             AgentAction(kind="tool", tool=step.tool, args=step.args),
             user_text=user_text,
@@ -396,6 +410,7 @@ def handle_turn(
             force_reply=True,
             allow_write=allow_write,
             allow_m3=allow_m3,
+            allow_push=allow_push,
         )
         if final.kind == "reply" and _sane_reply(final.message):
             return TurnResult("reply", final.message)

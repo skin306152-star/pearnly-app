@@ -362,6 +362,12 @@ class AgentToolset:
                 data={"allowed_goals": sorted(self._PLAN_GOALS)},
             )
         parsed = {g for g in normed if g}
+        # 确定性意图推断:点名端点=要推、点名套账=要记(prod 真机抓到模型只报否定记号
+        # +端点名 → 归一成空目标,用户"只推别记"被存成"什么都不做")。
+        if endpoint_name and "push" not in parsed and "nothing" not in parsed:
+            parsed.add("push")
+        if workspace_name and "record" not in parsed and "nothing" not in parsed:
+            parsed.add("record")
         if not parsed:
             parsed = {"nothing"}  # 只剩否定记号("别记")= 什么都不做
         if "nothing" in parsed and len(parsed) > 1:

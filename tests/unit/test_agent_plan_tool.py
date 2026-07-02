@@ -37,6 +37,17 @@ class TestPlanIncomingDoc(unittest.TestCase):
         self.assertTrue(r2.ok)
         self.assertEqual(r2.data["plan"]["goals"], [])
 
+    def test_named_endpoint_implies_push(self):
+        # prod 真机第二雷:模型只报否定记号+端点名 → 空目标带端点="只推别记"被存成"都不做"。
+        # 确定性推断:点名端点=要推;点名套账=要记。
+        with patch(
+            "services.agent.executor.db.list_erp_endpoints",
+            return_value=[{"id": "e1", "name": "MR.ERP TEST2019", "enabled": True}],
+        ):
+            r = self.ts.plan_incoming_doc(_CTX, goals=["do_not_record"], endpoint_name="MR.ERP")
+        self.assertTrue(r.ok)
+        self.assertEqual(r.data["plan"]["goals"], ["push"])
+
     def test_nothing_maps_to_empty_goals(self):
         r = self.ts.plan_incoming_doc(_CTX, goals=["nothing"])
         self.assertTrue(r.ok)

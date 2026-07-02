@@ -41,6 +41,7 @@ class ClassifyPushExceptionTests(unittest.TestCase):
         self.assertEqual(c("EXPRESS_MANUAL: currency_not_thb:usd"), "document_review")
         self.assertEqual(c("EXPRESS_MANUAL: credit_note"), "document_review")
         self.assertEqual(c("EXPRESS_MANUAL: deposit_receipt"), "document_review")
+        self.assertEqual(c("EXPRESS_MANUAL: date_implausible"), "document_review")
         self.assertEqual(c("EXPRESS_MANUAL: date_future"), "document_review")
         self.assertEqual(c("EXPRESS_MANUAL: date_reissued"), "document_review")
         self.assertEqual(c("EXPRESS_MANUAL: tax_id_invalid"), "document_review")

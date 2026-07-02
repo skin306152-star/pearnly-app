@@ -46,6 +46,7 @@ def classify_push_exception(error_msg: Optional[str]) -> str:
             "seller_buyer_same_tax",
             "credit_note",
             "deposit_receipt",
+            "date_implausible",
             "date_future",
             "date_reissued",
             "tax_id_invalid",

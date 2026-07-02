@@ -34,6 +34,7 @@ const _EXPRESS_REASON_I18N: Record<string, string> = {
     seller_buyer_same_tax: 'erp-reason-same-tax',
     credit_note: 'erp-reason-credit-note',
     deposit_receipt: 'erp-reason-deposit',
+    date_implausible: 'erp-reason-date-implausible',
     date_future: 'erp-reason-date-future',
     date_reissued: 'erp-reason-date-reissued',
     tax_id_invalid: 'erp-reason-tax-invalid',

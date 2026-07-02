@@ -92,18 +92,19 @@ def detail(ctx: AgentContext, *, kind=None, keyword=None) -> ToolResult:
     rows = _detail_rows(full)
     unmatched = [_compact_row(r) for r in rows if str(r.get("match_status") or "") != "matched"]
     data = {
+        # 锚点余额列是 DB Decimal,不转 str 会炸 prompt 的 json.dumps(真机雷 2026-07-03)。
         "task": {
             "bank": task_head.get("bank_code"),
             "gl_account": task_head.get("gl_account"),
             "created_at": str(task_head.get("created_at") or "")[:16],
-            "matched": task_head.get("matched_count"),
-            "unmatched_gl": task_head.get("unmatched_gl"),
-            "unmatched_stmt": task_head.get("unmatched_stmt"),
-            "stmt_opening": task_head.get("stmt_opening"),
-            "stmt_closing": task_head.get("stmt_closing"),
-            "gl_opening": task_head.get("gl_opening"),
-            "gl_closing": task_head.get("gl_closing"),
-            "formula_diff": task_head.get("formula_diff"),
+            "matched": _i(task_head.get("matched_count")),
+            "unmatched_gl": _i(task_head.get("unmatched_gl")),
+            "unmatched_stmt": _i(task_head.get("unmatched_stmt")),
+            "stmt_opening": _s(task_head.get("stmt_opening")),
+            "stmt_closing": _s(task_head.get("stmt_closing")),
+            "gl_opening": _s(task_head.get("gl_opening")),
+            "gl_closing": _s(task_head.get("gl_closing")),
+            "formula_diff": _s(task_head.get("formula_diff")),
         },
         "unmatched": unmatched[:_DETAIL_CAP],
         "omitted": max(0, len(unmatched) - _DETAIL_CAP),
@@ -111,6 +112,17 @@ def detail(ctx: AgentContext, *, kind=None, keyword=None) -> ToolResult:
     return ToolResult(
         ok=True, data=data, receipt=copy_map.recon_detail_receipt(data["task"], data["unmatched"])
     )
+
+
+def _s(v):
+    return None if v is None else str(v)
+
+
+def _i(v):
+    try:
+        return int(v or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _pick_task(tasks, keyword):

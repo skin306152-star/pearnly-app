@@ -26,6 +26,7 @@ def run_entry(case: dict, make_decide):
     flags = case.get("flags") or {}
     decide, decide_calls = make_decide(case)
     says, pools, do_records, multis, undos, edits = [], [], [], [], [], []
+    plans: list = []
     understand_calls = []
 
     def _understand(text, **kw):
@@ -59,6 +60,7 @@ def run_entry(case: dict, make_decide):
         "core.feature_flags.agent_write_enabled_for": lambda uid: bool(flags.get("write")),
         "core.feature_flags.agent_m3_enabled_for": lambda uid: bool(flags.get("m3")),
         "core.feature_flags.agent_push_enabled_for": lambda uid: bool(flags.get("push")),
+        "core.feature_flags.agent_image_enabled_for": lambda uid: bool(flags.get("image")),
     }
     if case.get("skip_correct_flow"):
         fakes["services.expense.line_correct_flow.route"] = lambda *a, **k: False
@@ -108,6 +110,12 @@ def run_entry(case: dict, make_decide):
         )
         stack.enter_context(patch.object(line_expense, "_ocr_balance_ok", lambda u: True))
         stack.enter_context(patch.object(line_expense, "_charge_line_l2", lambda u, t: None))
+        stack.enter_context(
+            patch(
+                "services.line_binding.line_intent_store.set_intent",
+                lambda *a, **k: plans.append((a, k)),
+            )
+        )
         stack.enter_context(patch("services.expense.line_agent.understand", _understand))
         stack.enter_context(patch.object(loop, "_decide_step", decide))
         consumed = line_expense.handle_expense_text(
@@ -121,6 +129,7 @@ def run_entry(case: dict, make_decide):
         multis=multis,
         undos=undos,
         edits=edits,
+        plans=plans,
         understand_calls=understand_calls,
         decide_calls=decide_calls,
     )

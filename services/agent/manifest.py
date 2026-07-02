@@ -258,6 +258,44 @@ TOOLS: tuple[ToolSpec, ...] = (
         gate="push",
     ),
     ToolSpec(
+        name="plan_incoming_doc",
+        bucket="B",
+        title_th="กำหนดว่าจะทำอะไรกับเอกสารที่กำลังจะส่งมา",
+        desc_th=(
+            "ผู้ใช้บอกล่วงหน้าว่าเอกสาร/รูปใบต่อไปจะให้ทำอะไร เช่น 'ใบต่อไปส่งเข้า ERP เลย "
+            "ไม่ต้องบันทึก' หรือ 'รูปหน้าจะบันทึกเข้าชุด X' — เก็บเป็นแผนไว้ พอรูปมาถึงระบบทำตามทันที"
+        ),
+        slots=(
+            # goals 是封闭枚举(record/push/archive_only/nothing 组合),端点/套账名必须
+            # 出自用户原话并在执行器对真实资产核验——查无此名如实退回,绝不猜目标。
+            SlotSpec(
+                "goals",
+                required=True,
+                source="model_freeform",
+                desc_th="สิ่งที่จะทำ (เลือกจาก: record / push / archive_only / nothing · เลือกได้หลายอัน)",
+                desc_zh="目的组合(枚举 record/push/archive_only/nothing·执行器再验)",
+            ),
+            SlotSpec(
+                "endpoint_name",
+                required=False,
+                source="user_text",
+                desc_th="ชื่อปลายทาง ERP ถ้าผู้ใช้ระบุ",
+                desc_zh="端点名(用户原话点名才采纳)",
+            ),
+            SlotSpec(
+                "workspace_name",
+                required=False,
+                source="user_text",
+                desc_th="ชื่อชุดบัญชีที่จะบันทึกเข้า ถ้าผู้ใช้ระบุ",
+                desc_zh="套账名(用户原话点名才采纳)",
+            ),
+        ),
+        handler="plan_incoming_doc",
+        confirm=False,  # 存的是"下一张图怎么处理"的计划,不可逆动作(推送)届时仍走确认卡
+        writes=True,
+        gate="image",
+    ),
+    ToolSpec(
         name="list_workspaces",
         bucket="B",
         title_th="ดูรายชื่อชุดบัญชี/บริษัท",
@@ -302,6 +340,7 @@ REGISTRY_AREA: dict[str, str] = {
     "undo_entry": "purchase_routes",
     "edit_entry": "purchase_routes",
     "push_to_erp": "erp_push_log_routes",
+    "plan_incoming_doc": "purchase_intake_routes",
     "list_workspaces": "workspace_routes",
     "switch_workspace": "workspace_routes",
 }

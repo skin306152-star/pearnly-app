@@ -310,3 +310,53 @@ class AgentToolset:
                 }
             },
         )
+
+    _PLAN_GOALS = frozenset({"record", "push", "archive_only", "nothing"})
+
+    def plan_incoming_doc(
+        self, ctx: AgentContext, *, goals=None, endpoint_name=None, workspace_name=None
+    ) -> ToolResult:
+        """ "下一张图怎么处理"的计划(LI-2)。只核验+成形,存表在 write_sink(bridge)。
+
+        goals 闭集核验;端点/套账名必须对上用户真实资产——查无此名如实退回(带真实
+        列表喂观测,模型引导用户挑),绝不模糊猜。nothing 与其它目标互斥(都不要=只有它)。
+        """
+        raw = goals if isinstance(goals, (list, tuple)) else [goals] if goals else []
+        parsed = {str(g).strip().lower() for g in raw if str(g).strip()}
+        if not parsed or not parsed <= self._PLAN_GOALS:
+            return ToolResult(ok=False, error_code="invalid_goals")
+        if "nothing" in parsed and len(parsed) > 1:
+            return ToolResult(ok=False, error_code="invalid_goals")
+        if "push" in parsed:
+            if not _plan_permissions((ctx.user or {}).get("plan")).get("can_push_erp"):
+                return ToolResult(ok=False, error_code="forbidden")
+        plan = {"goals": sorted(parsed - {"nothing"})}
+
+        if endpoint_name:
+            eps = [
+                e
+                for e in (db.list_erp_endpoints(str(ctx.user["id"])) or [])
+                if e.get("enabled", True)
+            ]
+            q = "".join(str(endpoint_name).lower().split())
+            hits = [e for e in eps if q in "".join(str(e.get("name") or "").lower().split())]
+            if len(hits) != 1:
+                names = [e.get("name") or "" for e in eps]
+                return ToolResult(ok=False, error_code="no_endpoint", data={"endpoints": names})
+            plan["push_to"] = hits[0].get("name") or ""
+
+        if workspace_name:
+            from services.line_binding import line_workspace
+
+            with db.get_cursor_rls(tenant_id=ctx.tenant_id, user_id=str(ctx.user["id"])) as cur:
+                match = line_workspace.match_by_name(
+                    cur, tenant_id=ctx.tenant_id, name=workspace_name
+                )
+                if not match:
+                    rows = line_workspace.list_active(cur, tenant_id=ctx.tenant_id)
+                    return ToolResult(
+                        ok=False, error_code="workspace_not_found", data={"workspaces": rows}
+                    )
+            plan["book_to_id"] = match["id"]
+            plan["book_to"] = match.get("name") or ""
+        return ToolResult(ok=True, data={"plan": plan})

@@ -23,6 +23,9 @@ AGENT_M3_KEY = "agent_m3_tools"
 # 推 ERP 子闸(唯一 confirm-first 的不可逆写):默认关。关 → 工具对模型不可见,
 # 模型硬调只得到 not_available_yet 观测(引导去 App),线上行为零变化。
 AGENT_PUSH_KEY = "agent_push_erp"
+# LINE 图片意图子闸(LI 框架):默认关。关 → 发图走现状管线逐字节不变;
+# 开 → 图片 OCR 后先过意图分流(services/agent/image_intent),用户明说的目的优先。
+AGENT_IMAGE_KEY = "agent_image_intent"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -54,3 +57,8 @@ def agent_m3_enabled_for(user_id: Optional[str]) -> bool:
 def agent_push_enabled_for(user_id: Optional[str]) -> bool:
     """推 ERP confirm-first 子闸。关 = 工具不可见,硬调得 not_available_yet。"""
     return _enabled(AGENT_PUSH_KEY, user_id, "agent_push_enabled_for")
+
+
+def agent_image_enabled_for(user_id: Optional[str]) -> bool:
+    """LINE 图片意图子闸(LI)。关 = 发图走现状管线逐字节不变。"""
+    return _enabled(AGENT_IMAGE_KEY, user_id, "agent_image_enabled_for")

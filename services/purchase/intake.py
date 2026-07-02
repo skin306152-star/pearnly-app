@@ -377,6 +377,8 @@ def resolve_image_intake(
         and (draft["supplier"]["name"] or "").strip()
         and calc["grand_total"] > 0
         and created_by
+        # 日期读成 1970/未来年被清空 = 模型幻觉过 → 不自动过账,留草稿等人核日期。
+        and "date_implausible_cleared" not in (fields.get("_corrections") or [])
     ):
         from services.purchase import docs as _docs, posting as _posting
 

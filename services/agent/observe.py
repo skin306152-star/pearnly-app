@@ -72,4 +72,7 @@ def payload(tool: str, result) -> dict:
         }
     if tool == "my_plan":  # 执行器产出即最小观测
         return {"ok": True, **data}
+    if tool in ("recon_overview", "recon_detail"):
+        # 执行器产出已是最小观测(recent≤5 / unmatched≤8);漏这支=模型拿不到数字只能空话。
+        return {"ok": True, **data}
     return {"ok": True}

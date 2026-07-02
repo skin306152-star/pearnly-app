@@ -108,6 +108,34 @@ _FB_PUSH = {
     },
 }
 
+# 对账两态(有结果/还没跑过)。detail 的"哪些对不上"细行交模型;兜底只给诚实计数。
+_FB_RECON = {
+    "some": {
+        "th": "กระทบยอดล่าสุด: ตรงกัน {m} รายการ ไม่ตรง {u} รายการค่ะ",
+        "zh": "最近一次对账:一致 {m} 笔,不一致 {u} 笔。",
+        "en": "Latest reconciliation: {m} matched, {u} unmatched.",
+        "ja": "最新の照合:一致 {m} 件、不一致 {u} 件です。",
+    },
+    "zero": {
+        "th": "ยังไม่มีผลกระทบยอดค่ะ ลองอัปโหลดที่เมนูกระทบยอดธนาคารบนเว็บก่อนนะคะ",
+        "zh": "还没有对账记录,先到网页「银行对账」上传跑一次。",
+        "en": "No reconciliation runs yet — upload files under Bank Reconciliation on the web first.",
+        "ja": "まだ照合結果がありません。ウェブの「銀行照合」で先に実行してください。",
+    },
+}
+
+
+def _recon_fb(tool: str, o: dict, lang: str) -> str:
+    t = (o.get("recent") or [None])[0] if tool == "recon_overview" else o.get("task")
+    if not t:
+        msgs = _FB_RECON["zero"]
+        return msgs.get(lang, msgs["en"])
+    m = _fb_int(t.get("matched"))
+    u = _fb_int(t.get("unmatched_gl")) + _fb_int(t.get("unmatched_stmt"))
+    msgs = _FB_RECON["some"]
+    return msgs.get(lang, msgs["en"]).format(m=m, u=u)
+
+
 # 值型只读工具:tool → (四语模板, 从观测取模板槽位的函数)。加一个值型工具 = 加一行,不再加 if 分支。
 _VALUE_FB = {
     "balance": (_FB_BALANCE, lambda o: {"v": _fb_money(o.get("balance_thb"))}),
@@ -139,6 +167,8 @@ def grounded_fallback(observations: list, lang: str) -> Optional[str]:
     if tool == "push_status":
         msgs = _FB_PUSH["yes" if last.get("pushed") else "no"]
         return msgs.get(lang, msgs["en"]).format(e=str(last.get("endpoint") or "ERP"))
+    if tool in ("recon_overview", "recon_detail"):
+        return _recon_fb(tool, last, lang)
     spec = _VALUE_FB.get(tool)  # 值型(balance / history_summary / usage / my_plan / rd)
     if spec:
         msgs, extract = spec

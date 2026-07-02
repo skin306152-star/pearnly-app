@@ -129,20 +129,18 @@ def grounded_fallback(observations: list, lang: str) -> Optional[str]:
     计数型走 _FALLBACK(zero/some),值型走 _VALUE_FB;套账导航未覆盖 → None → 交入口安全兜底。"""
     last = observations[-1] if observations else {}
     tool = last.get("tool")
+    if not last.get("ok"):
+        return None  # 失败观测绝不格式化成自信数字(零命中≠查询失败)→ 交安全兜底
     table = _FALLBACK.get(tool)
     if table:  # 计数型(list_history / list_notifications)
         n = _fb_int(last.get(_FALLBACK_COUNT_KEY[tool]))
         msgs = table["some" if n else "zero"]
         return msgs.get(lang, msgs["en"]).format(n=n)
     if tool == "push_status":
-        if not last.get("ok"):
-            return None  # 定位失败/多候选交安全兜底,不硬编状态
         msgs = _FB_PUSH["yes" if last.get("pushed") else "no"]
         return msgs.get(lang, msgs["en"]).format(e=str(last.get("endpoint") or "ERP"))
     spec = _VALUE_FB.get(tool)  # 值型(balance / history_summary / usage / my_plan / rd)
     if spec:
-        if tool in ("my_plan", "rd_lookup") and not last.get("ok"):
-            return None
         msgs, extract = spec
         return msgs.get(lang, msgs["en"]).format(**extract(last))
     return None

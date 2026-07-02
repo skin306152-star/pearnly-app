@@ -59,16 +59,8 @@ def payload(tool: str, result) -> dict:
         }
     if tool == "switch_workspace":
         return {"ok": True, "switched_to": data.get("switched_to")}
-    if tool == "push_status":
-        return {
-            "ok": True,
-            "doc": data.get("doc"),
-            "pushed": data.get("pushed"),
-            "status": data.get("status"),
-            "endpoint": data.get("endpoint"),
-            "when": data.get("when"),
-            "error": (data.get("error") or "")[:_ERR_MAX],
-        }
+    if tool == "push_status":  # 执行器产出即最小观测,只补错误截断
+        return {"ok": True, **data, "error": (data.get("error") or "")[:_ERR_MAX]}
     if tool == "rd_lookup":
         return {
             "ok": True,
@@ -78,12 +70,6 @@ def payload(tool: str, result) -> dict:
             "address": data.get("address"),
             "province": data.get("province"),
         }
-    if tool == "my_plan":
-        return {
-            "ok": True,
-            "plan": data.get("plan"),
-            "balance_thb": data.get("balance_thb"),
-            "retention_days": data.get("retention_days"),
-            "subscription": data.get("subscription"),
-        }
+    if tool == "my_plan":  # 执行器产出即最小观测
+        return {"ok": True, **data}
     return {"ok": True}

@@ -43,16 +43,16 @@ class TestRouteGated(unittest.TestCase):
 
     def test_defer_record_falls_to_legacy(self):
         handled, said, _ = _call(TurnResult("defer_record"))
-        self.assertIn(handled, ("defer_record", "defer_edit", "skip"))  # 交旧路确定性直录
+        self.assertEqual(handled, "defer_record")  # 交旧路确定性直录
         self.assertEqual(said, [])
 
     def test_defer_edit_falls_to_legacy(self):
         handled, _, _ = _call(TurnResult("defer_edit"))
-        self.assertIn(handled, ("defer_record", "defer_edit", "skip"))  # 交旧路(改错/撤销·能力不丢)
+        self.assertEqual(handled, "defer_edit")  # 交旧路(改错/撤销·能力不丢)
 
     def test_no_balance_skips_agent_to_legacy(self):
         handled, said, charged = _call(balance_ok=False)
-        self.assertIn(handled, ("defer_record", "defer_edit", "skip"))  # 无余额不跑大脑 → 旧路
+        self.assertEqual(handled, "skip")  # 无余额不跑大脑 → 旧路
         self.assertEqual((said, charged), ([], []))
 
 

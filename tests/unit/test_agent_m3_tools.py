@@ -33,18 +33,18 @@ def _sink_recorder(sunk):
 
 class TestM3Visibility(unittest.TestCase):
     def test_m3_tools_hidden_without_flag(self):
-        names = {t.name for t in loop._visible_tools(True, False)}
+        names = {t.name for t in loop._visible_tools(frozenset({"write"}))}
         self.assertNotIn("undo_entry", names)
         self.assertNotIn("edit_entry", names)
         self.assertIn("record_expense", names)
 
     def test_m3_tools_visible_with_flag(self):
-        names = {t.name for t in loop._visible_tools(True, True)}
+        names = {t.name for t in loop._visible_tools(frozenset({"write", "m3"}))}
         self.assertIn("undo_entry", names)
         self.assertIn("edit_entry", names)
 
     def test_write_off_hides_all_write_tools_regardless_of_m3(self):
-        names = {t.name for t in loop._visible_tools(False, True)}
+        names = {t.name for t in loop._visible_tools(frozenset({"m3"}))}
         self.assertNotIn("record_expense", names)
         self.assertNotIn("undo_entry", names)
 

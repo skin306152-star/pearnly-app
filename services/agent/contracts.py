@@ -32,7 +32,8 @@ class ToolSpec:
     slots: tuple[SlotSpec, ...]
     handler: str  # AgentToolset 上的方法名,如 "list_ocr_history"
     confirm: bool  # True=执行前先复述+确认(不可逆动作如推 ERP);记账=False 高置信直录
-    writes: bool = False  # True=写工具(写子闸关时对大脑隐藏 + 经 record_sink 出卡·记账/推 ERP)
+    writes: bool = False  # True=写工具(经 write_sink 落确定性执行·大脑无直接写库的手)
+    gate: Optional[str] = None  # 子闸名(write/m3/push)· None=恒可见;加新闸=加一个值,不加参数
 
 
 @dataclass

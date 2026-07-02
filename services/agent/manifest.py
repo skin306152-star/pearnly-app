@@ -168,6 +168,7 @@ TOOLS: tuple[ToolSpec, ...] = (
         handler="record_expense",
         confirm=False,  # 高置信直录(可撤销·非不可逆)→ 不先确认;缺金额由大脑文字追问
         writes=True,
+        gate="write",
     ),
     ToolSpec(
         name="undo_entry",
@@ -181,6 +182,7 @@ TOOLS: tuple[ToolSpec, ...] = (
         handler="undo_entry",
         confirm=False,  # 冲销可经「恢复」找回,非不可逆;定位不明由确定性执行侧反问
         writes=True,
+        gate="m3",
     ),
     ToolSpec(
         name="edit_entry",
@@ -224,6 +226,7 @@ TOOLS: tuple[ToolSpec, ...] = (
         handler="edit_entry",
         confirm=False,  # 风险确认(是/否)由 line_correct 的确定性三档自行把关
         writes=True,
+        gate="m3",
     ),
     ToolSpec(
         name="push_to_erp",
@@ -252,6 +255,7 @@ TOOLS: tuple[ToolSpec, ...] = (
         handler="push_to_erp",
         confirm=True,  # 不可逆:工具只备料,真推送在用户点确认按钮之后(push_confirm)
         writes=True,
+        gate="push",
     ),
     ToolSpec(
         name="list_workspaces",

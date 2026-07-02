@@ -28,36 +28,36 @@ __all__ = [
 ]
 
 
+def _uid(bound_user):
+    return str(bound_user["id"]) if bound_user.get("id") else None
+
+
 def frontdoor_enabled(bound_user) -> bool:
-    """本用户是否走「前门倒置」(灰度钥匙闸)。关 → 老确定性路一行不变。"""
+    """前门倒置总闸。关 → 老确定性路一行不变。"""
     from core import feature_flags
 
-    uid = str(bound_user["id"]) if bound_user.get("id") else None
-    return feature_flags.agent_enabled_for(uid)
+    return feature_flags.agent_enabled_for(_uid(bound_user))
 
 
 def write_enabled(bound_user) -> bool:
-    """本用户是否启用写工具(记账等 B 档)· 默认关 → 记账走旧乐观路,现状不变。"""
+    """写工具子闸。关 → 记账走旧乐观路,现状不变。"""
     from core import feature_flags
 
-    uid = str(bound_user["id"]) if bound_user.get("id") else None
-    return feature_flags.agent_write_enabled_for(uid)
+    return feature_flags.agent_write_enabled_for(_uid(bound_user))
 
 
 def m3_enabled(bound_user) -> bool:
-    """M3 全家桶子闸(撤销/改错工具 + 多笔直分发)· 默认关 → defer 交旧路,现状不变。"""
+    """M3 全家桶子闸(撤销/改错 + 多笔直分发)。关 → defer 交旧路,现状不变。"""
     from core import feature_flags
 
-    uid = str(bound_user["id"]) if bound_user.get("id") else None
-    return feature_flags.agent_m3_enabled_for(uid)
+    return feature_flags.agent_m3_enabled_for(_uid(bound_user))
 
 
 def push_enabled(bound_user) -> bool:
-    """推 ERP 子闸(confirm-first 不可逆写)· 默认关。"""
+    """推 ERP 子闸(confirm-first 不可逆写)。默认关。"""
     from core import feature_flags
 
-    uid = str(bound_user["id"]) if bound_user.get("id") else None
-    return feature_flags.agent_push_enabled_for(uid)
+    return feature_flags.agent_push_enabled_for(_uid(bound_user))
 
 
 def _make_write_sink(
@@ -90,11 +90,10 @@ def _make_write_sink(
             )
             return "card_sent"
         if tool == "record_multi":
-            from services.expense.line_quick_entry import parse_multi
             from services.line_binding import line_expense_multi
 
-            items = parse_multi(text)
-            if not items:  # loop 预判与复核不一致 → 不硬拆,交 crash 安全兜底
+            items = data.get("items")  # loop 预判解析结果透传,免二次解析
+            if not items:  # 透传缺失 → 不硬拆,交 crash 安全兜底
                 return None
             line_expense_multi.do_record_multi(
                 bound_user, reply_token, text, tid, ws, items, quote_token, lang, line_user_id

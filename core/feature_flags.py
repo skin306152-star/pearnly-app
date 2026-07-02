@@ -25,48 +25,32 @@ AGENT_M3_KEY = "agent_m3_tools"
 AGENT_PUSH_KEY = "agent_push_erp"
 
 
+def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
+    """钥匙闸统一读法:任何异常一律 fail-closed 回 False(安全阀,绝不因基建抖动误放)。"""
+    try:
+        from services.platform_settings import store
+
+        return store.is_enabled_for_user(key, user_id)
+    except Exception as e:
+        logger.warning(f"{label} fail-closed: {e}")
+        return False
+
+
 def agent_enabled_for(user_id: Optional[str]) -> bool:
-    """对话 Agent 是否对该用户开启。任何异常一律 fail-closed 回 False。"""
-    try:
-        from services.platform_settings import store
-
-        return store.is_enabled_for_user(AGENT_ENABLED_KEY, user_id)
-    except Exception as e:
-        logger.warning(f"agent_enabled_for fail-closed: {e}")
-        return False
-
-
-def agent_m3_enabled_for(user_id: Optional[str]) -> bool:
-    """M3 全家桶(撤销/改错/多笔直分发)是否对该用户开启。默认关;异常 fail-closed。"""
-    try:
-        from services.platform_settings import store
-
-        return store.is_enabled_for_user(AGENT_M3_KEY, user_id)
-    except Exception as e:
-        logger.warning(f"agent_m3_enabled_for fail-closed: {e}")
-        return False
-
-
-def agent_push_enabled_for(user_id: Optional[str]) -> bool:
-    """推 ERP confirm-first 是否对该用户开启。默认关;异常 fail-closed。"""
-    try:
-        from services.platform_settings import store
-
-        return store.is_enabled_for_user(AGENT_PUSH_KEY, user_id)
-    except Exception as e:
-        logger.warning(f"agent_push_enabled_for fail-closed: {e}")
-        return False
+    """对话 Agent 总闸。"""
+    return _enabled(AGENT_ENABLED_KEY, user_id, "agent_enabled_for")
 
 
 def agent_write_enabled_for(user_id: Optional[str]) -> bool:
-    """写工具(B 档)是否对该用户开启。默认关(无记录→False);任何异常 fail-closed。
+    """写工具(记账等 B 档)子闸。关 = 记账逐字节走旧乐观路。"""
+    return _enabled(AGENT_WRITE_KEY, user_id, "agent_write_enabled_for")
 
-    关时 record_expense 等写工具对模型不可见,记账逐字节走旧乐观路(能力只增不减)。
-    """
-    try:
-        from services.platform_settings import store
 
-        return store.is_enabled_for_user(AGENT_WRITE_KEY, user_id)
-    except Exception as e:
-        logger.warning(f"agent_write_enabled_for fail-closed: {e}")
-        return False
+def agent_m3_enabled_for(user_id: Optional[str]) -> bool:
+    """M3 全家桶(撤销/改错/多笔直分发)子闸。关 = defer 交旧路,现状不变。"""
+    return _enabled(AGENT_M3_KEY, user_id, "agent_m3_enabled_for")
+
+
+def agent_push_enabled_for(user_id: Optional[str]) -> bool:
+    """推 ERP confirm-first 子闸。关 = 工具不可见,硬调得 not_available_yet。"""
+    return _enabled(AGENT_PUSH_KEY, user_id, "agent_push_enabled_for")

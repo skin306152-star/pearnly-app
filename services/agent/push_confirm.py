@@ -15,7 +15,7 @@ import logging
 import threading
 
 from core import db
-from services.agent import agent_i18n
+from services.agent import agent_i18n, copy_map
 
 logger = logging.getLogger(__name__)
 
@@ -30,18 +30,8 @@ _ACK = {
     "en": "Pushing to ERP now — I'll let you know the result.",
     "ja": "ERP へ送信しています。結果をお知らせしますね。",
 }
-_OK = {
-    "th": "ส่งเข้า {endpoint} เรียบร้อยแล้วค่ะ ✅",
-    "zh": "已成功推进 {endpoint} ✅",
-    "en": "Pushed to {endpoint} successfully ✅",
-    "ja": "{endpoint} へ送信しました ✅",
-}
-_DUP = {
-    "th": "ใบนี้เคยส่งเข้า {endpoint} แล้วค่ะ ไม่ส่งซ้ำนะคะ",
-    "zh": "这张之前已推过 {endpoint},不重复推送。",
-    "en": "This document was already pushed to {endpoint} — not pushing again.",
-    "ja": "この伝票は {endpoint} へ送信済みのため、再送しません。",
-}
+# 成功/重复走现成 agent.ok.push / agent.ok.push_dup 四语键(为 M3 预登记·两侧 parity 已守);
+# ACK/FAIL 是 LINE 专用过程文案(M5 网页 Agent 不复用确认卡流程)→ 留 inline,与安全兜底同先例。
 _FAIL = {
     "th": "ส่งเข้า ERP ไม่สำเร็จค่ะ: {reason} · ดูรายละเอียดที่หน้าประวัติการส่งได้เลย",
     "zh": "推送失败:{reason}·可到推送日志页看详情。",
@@ -54,9 +44,9 @@ def _t(table: dict, lang: str) -> str:
     return table.get(lang, table["en"])
 
 
-def _clean(v) -> str:
-    """槽位值消毒(与 copy_map 同款):单号里混入 ;| 不许破坏 agent_i18n 占位串解析。"""
-    return str(v if v not in (None, "") else "-").replace(";", ",").replace("|", "/")
+def _slot(v) -> str:
+    """空值展示成 -(占位串编码/消毒交 copy_map._render,单一实现)。"""
+    return "-" if v in (None, "") else str(v)
 
 
 def send_confirm_card(
@@ -86,10 +76,11 @@ def send_confirm_card(
         if not token:
             return False
         body = agent_i18n.render(
-            "agent.confirm.push|invoice_no={i};amount={a};endpoint={e}".format(
-                i=_clean(push.get("invoice_no")),
-                a=_clean(push.get("amount")),
-                e=_clean(push.get("endpoint_name")),
+            copy_map._render(
+                "agent.confirm.push",
+                invoice_no=_slot(push.get("invoice_no")),
+                amount=_slot(push.get("amount")),
+                endpoint=_slot(push.get("endpoint_name")),
             ),
             lang,
         )
@@ -160,15 +151,11 @@ def handle_postback(bound_user, reply_token, action, token, lang, *, runner=None
             ref["history_id"], ref["endpoint_id"], str(bound_user.get("id") or "")
         ):
             ep = db.get_erp_endpoint(str(bound_user.get("id") or ""), ref["endpoint_id"]) or {}
-            _say(_t(_DUP, lang).format(endpoint=ep.get("name") or "ERP"))
-        else:
-            _say(line_client.t_line(lang, "card_action_stale"))
-        return
-    if res["status"] != "ok":
-        _say(line_client.t_line(lang, "card_action_stale"))
-        return
-    ref = _parse_ref(res.get("action_ref"))
-    if ref is None:
+            _say(_dup_text(ep.get("name"), None, lang))
+            return
+        res = {"status": "stale"}
+    ref = _parse_ref(res.get("action_ref")) if res["status"] == "ok" else None
+    if ref is None:  # missing/伪造/坏 ref 统一失效口径
         _say(line_client.t_line(lang, "card_action_stale"))
         return
     if action == line_postback.ACTION_AGENT_PUSH_CANCEL:
@@ -239,7 +226,11 @@ def _execute_push(user, tid, history_id, endpoint_id) -> dict:
             elapsed_ms=0,
             trigger="line_agent",
         )
-        return {"kind": "dup", "endpoint": endpoint.get("name") or "ERP"}
+        return {
+            "kind": "dup",
+            "endpoint": endpoint.get("name") or "ERP",
+            "invoice_no": history.get("invoice_no"),
+        }
 
     result = _erp.push_to_endpoint(endpoint, history)
     final_status = db.classify_push_status(result["success"], result.get("error_msg"))
@@ -267,18 +258,33 @@ def _execute_push(user, tid, history_id, endpoint_id) -> dict:
             db.schedule_log_retry(str(log_id), first_delay)
 
     ep_name = endpoint.get("name") or "ERP"
+    inv = history.get("invoice_no")
     if final_status == "skipped_dup":
-        return {"kind": "dup", "endpoint": ep_name}
+        return {"kind": "dup", "endpoint": ep_name, "invoice_no": inv}
     if db.counts_as_endpoint_success(final_status):
-        return {"kind": "ok", "endpoint": ep_name}
+        return {"kind": "ok", "endpoint": ep_name, "invoice_no": inv}
     return {"kind": "failure", "code": "push_failed", "error": result.get("error_msg") or ""}
+
+
+def _ok_text(endpoint, invoice_no, lang) -> str:
+    line = copy_map._render(
+        "agent.ok.push", endpoint=_slot(endpoint or "ERP"), bill_no=_slot(invoice_no)
+    )
+    return agent_i18n.render(line, lang)
+
+
+def _dup_text(endpoint, invoice_no, lang) -> str:
+    line = copy_map._render(
+        "agent.ok.push_dup", endpoint=_slot(endpoint or "ERP"), bill_no=_slot(invoice_no)
+    )
+    return agent_i18n.render(line, lang)
 
 
 def _result_text(out: dict, lang: str) -> str:
     if out["kind"] == "ok":
-        return _t(_OK, lang).format(endpoint=out.get("endpoint") or "ERP")
+        return _ok_text(out.get("endpoint"), out.get("invoice_no"), lang)
     if out["kind"] == "dup":
-        return _t(_DUP, lang).format(endpoint=out.get("endpoint") or "ERP")
+        return _dup_text(out.get("endpoint"), out.get("invoice_no"), lang)
     code = out.get("code")
     if code == "history_not_found":
         return agent_i18n.render("agent.failure.history_not_found", lang)

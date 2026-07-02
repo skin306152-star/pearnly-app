@@ -216,19 +216,21 @@ class TestTimezoneAndFallback(unittest.TestCase):
         self.assertIn("BBB-222", p2)
 
     def test_fallback_balance_shows_number(self):
-        out = fallbacks.grounded_fallback([{"tool": "balance", "balance_thb": 74375}], "zh")
+        out = fallbacks.grounded_fallback(
+            [{"tool": "balance", "ok": True, "balance_thb": 74375}], "zh"
+        )
         self.assertIn("74,375", out)
 
     def test_fallback_summary_shows_count_and_total(self):
         out = fallbacks.grounded_fallback(
-            [{"tool": "history_summary", "doc_count": 12, "amount_total": 8450}], "en"
+            [{"tool": "history_summary", "ok": True, "doc_count": 12, "amount_total": 8450}], "en"
         )
         self.assertIn("12", out)
         self.assertIn("8,450", out)
 
     def test_fallback_usage_shows_pages(self):
         out = fallbacks.grounded_fallback(
-            [{"tool": "usage_this_month", "pages_used_this_month": 30}], "en"
+            [{"tool": "usage_this_month", "ok": True, "pages_used_this_month": 30}], "en"
         )
         self.assertIn("30", out)
 
@@ -323,8 +325,8 @@ class TestConfirmFlow(unittest.TestCase):
         self.assertEqual(sunk, [])  # 没接地绝不出卡
 
     def test_visible_tools_hides_write_tool_when_write_off(self):
-        off = {t.name for t in loop._visible_tools(False)}
-        on = {t.name for t in loop._visible_tools(True)}
+        off = {t.name for t in loop._visible_tools(frozenset())}
+        on = {t.name for t in loop._visible_tools(frozenset({"write"}))}
         self.assertNotIn("record_expense", off)  # 写工具写关时对大脑隐藏
         self.assertIn("record_expense", on)
         self.assertIn("switch_workspace", off)  # 导航工具(writes=False)始终可见
@@ -343,11 +345,15 @@ class TestObservePayload(unittest.TestCase):
         self.assertEqual(obs, {"ok": True, "count": 0})
 
     def test_grounded_fallback_notifications_some(self):
-        msg = fallbacks.grounded_fallback([{"tool": "list_notifications", "count": 2}], "zh")
+        msg = fallbacks.grounded_fallback(
+            [{"tool": "list_notifications", "ok": True, "count": 2}], "zh"
+        )
         self.assertEqual(msg, "有 2 条通知。")
 
     def test_grounded_fallback_notifications_zero(self):
-        msg = fallbacks.grounded_fallback([{"tool": "list_notifications", "count": 0}], "en")
+        msg = fallbacks.grounded_fallback(
+            [{"tool": "list_notifications", "ok": True, "count": 0}], "en"
+        )
         self.assertEqual(msg, "No new notifications.")
 
 
@@ -396,7 +402,9 @@ class TestSystemPromptContract(unittest.TestCase):
     """_SYSTEM 收口:质检准则在、记账 say 暖话字段已去、假设/否定不记账加固在、时间戳不进缓存前缀。"""
 
     def _p(self):
-        return loop._prompt("x", [], "TS-1", [], lang="th", force_reply=False, allow_write=True)
+        return loop._prompt(
+            "x", [], "TS-1", [], lang="th", force_reply=False, gates=frozenset({"write"})
+        )
 
     def test_has_honesty_check_and_hypothetical_guard(self):
         p = self._p()
@@ -417,11 +425,11 @@ class TestMultiItemDefersToPreciseCard(unittest.TestCase):
     def _draft(self):
         return ExpenseDraft(amount=Decimal("50"))
 
-    def test_is_multi_record_detection(self):
-        self.assertTrue(loop._is_multi_record("咖啡50 米40"))
-        self.assertTrue(loop._is_multi_record("กาแฟ 50 ข้าว 40"))
-        self.assertFalse(loop._is_multi_record("กาแฟ 50"))  # 单笔不命中
-        self.assertFalse(loop._is_multi_record("สวัสดี"))
+    def test_multi_items_detection(self):
+        self.assertTrue(bool(loop._multi_items("咖啡50 米40")))
+        self.assertTrue(bool(loop._multi_items("กาแฟ 50 ข้าว 40")))
+        self.assertFalse(bool(loop._multi_items("กาแฟ 50")))  # 单笔不命中
+        self.assertFalse(bool(loop._multi_items("สวัสดี")))
 
     def test_multi_defers_before_brain_when_write_on(self):
         sunk = []

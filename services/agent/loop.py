@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Callable, Optional
 
 from services.agent import brain, executor, fallbacks, manifest, observe, slots
@@ -117,15 +118,16 @@ def _reply_lang(text: str) -> str:
     return detect_text_lang(text) or "en"
 
 
-def _is_multi_record(text: str) -> bool:
-    """确定性判定:一句话多笔支出(≥2 个「名+额」)。与旧路同一个 parse_multi,口径一致——
-    命中即交现成精准多笔卡路(do_record_multi),别让只建单笔的记账写工具吞成一笔(能力只增不减)。"""
+def _multi_items(text: str):
+    """确定性判定:一句话多笔支出(≥2 个「名+额」)→ 返回解析项(透传 sink 免二次解析)。
+    与旧路同一个 parse_multi,口径一致——命中即交现成精准多笔卡路(do_record_multi),
+    别让只建单笔的记账写工具吞成一笔(能力只增不减)。非多笔/解析异常 → None。"""
     from services.expense.line_quick_entry import parse_multi
 
     try:
-        return bool(parse_multi(text or ""))
+        return parse_multi(text or "") or None
     except Exception:
-        return False
+        return None
 
 
 def _recent(ctx: AgentContext) -> list:
@@ -136,25 +138,34 @@ def _recent(ctx: AgentContext) -> list:
     return line_chat_memory.recent(line_user_id=ctx.line_user_id, tenant_id=ctx.tenant_id)
 
 
-# 只在 M3 子闸(agent_m3_tools)开时对模型可见的写工具:改错/撤销收进大脑,旧 LLM 退场。
-_M3_ONLY = ("undo_entry", "edit_entry")
-# 只在推送子闸(agent_push_erp)开时可见:唯一 confirm-first 的不可逆写。
-_PUSH_ONLY = ("push_to_erp",)
+# 子闸关时模型硬调工具的落点:m3(改错/撤销)交旧路;push 喂观测让模型引导去 App;
+# write(记账)由 writes+sink 守卫先一步 defer。加新闸 = ToolSpec 标 gate + 这里加一行。
+# 注:record_multi 是 sink 专用伪工具名(多笔确定性直分发·不在 manifest·模型永远看不见)。
 
 
-def _visible_tools(allow_write: bool, allow_m3: bool = False, allow_push: bool = False) -> tuple:
-    """模型看得到的工具表:写关时隐藏写工具(记账等)→ 记账走旧路,现状不变。
-    改错/撤销工具另受 M3 子闸;切套账等 writes=False 的 B 档导航工具始终可见。"""
+def _gates(allow_write: bool, allow_m3: bool, allow_push: bool) -> frozenset:
+    return frozenset(
+        name for name, on in (("write", allow_write), ("m3", allow_m3), ("push", allow_push)) if on
+    )
+
+
+def _visible_tools(gates: frozenset) -> tuple:
+    """模型看得到的工具表:写工具先看 write 闸(写关=全部写能力隐藏,m3/push 也不例外),
+    再看各自子闸;gate=None 的导航/只读工具始终可见。闸关=旧路现状不变。"""
     out = []
     for t in manifest.TOOLS:
-        if t.writes and not allow_write:
+        if t.writes and "write" not in gates:
             continue
-        if t.name in _M3_ONLY and not allow_m3:
-            continue
-        if t.name in _PUSH_ONLY and not allow_push:
+        if t.gate is not None and t.gate not in gates:
             continue
         out.append(t)
     return tuple(out)
+
+
+@lru_cache(maxsize=8)
+def _tools_prompt(gates: frozenset) -> str:
+    """gates 组合 → 提示词工具表(确定性,按闸组合缓存,免每步重建)。"""
+    return brain._tool_table(_visible_tools(gates))
 
 
 def _prompt(
@@ -165,14 +176,12 @@ def _prompt(
     *,
     lang: str,
     force_reply: bool,
-    allow_write=False,
-    allow_m3=False,
-    allow_push=False,
+    gates: frozenset = frozenset(),
 ) -> str:
     # {today} 刻意不进 head:它每分钟变,放头部会撞碎「静态 persona 前缀」→ 供应商前缀缓存全 miss。
     # 把易变的时间戳放到贴近用户消息的尾部(既对时间问题更贴切,又让 ~1.5k token 的 persona 成稳定可缓存前缀)。
     head = _SYSTEM.format(
-        tools=brain._tool_table(_visible_tools(allow_write, allow_m3, allow_push)),
+        tools=_tools_prompt(gates),
         lang_name=_LANGS.get(lang, "English"),
     )
     obs = ""
@@ -263,9 +272,7 @@ def _decide_step(
     observations,
     lang="en",
     force_reply=False,
-    allow_write=False,
-    allow_m3=False,
-    allow_push=False,
+    gates: frozenset = frozenset(),
 ) -> LoopStep:
     from services.ai_gateway import transport
 
@@ -277,9 +284,7 @@ def _decide_step(
             observations,
             lang=lang,
             force_reply=force_reply,
-            allow_write=allow_write,
-            allow_m3=allow_m3,
-            allow_push=allow_push,
+            gates=gates,
         ),
         tier="flash",
         response_mime=True,
@@ -318,16 +323,19 @@ def handle_turn(
     history = history if history is not None else _recent(ctx)
     today = today or _today()
     lang = _reply_lang(user_text)
+    gates = _gates(allow_write, allow_m3, allow_push)
     ctx.user_text = user_text  # 写工具建草稿做金额接地要原文
 
     # 多笔记账守门:记账写工具只建单笔,遇确定性判定为多笔的消息会把它吞成一笔(丢账)。
     # → defer 回旧确定性路,由现成精准多笔卡(do_record_multi)逐条入账。写关时记账本就 defer,
     # 旧路自会走多笔,故只在写开时前置拦(旧路 :107 会用同一 parse_multi 复核后出多笔卡)。
-    if allow_write and write_sink is not None and _is_multi_record(user_text):
-        if allow_m3:  # 多笔绕开模型直接分发现成精准多笔卡(拆分权永远在确定性代码)
-            kind = write_sink(ctx, "record_multi", {}, "")
-            return TurnResult(kind) if kind else TurnResult("crash")
-        return TurnResult("defer_record")
+    if allow_write and write_sink is not None:
+        multi_items = _multi_items(user_text)
+        if multi_items:
+            if "m3" in gates:  # 多笔绕开模型直接分发现成精准多笔卡(拆分权永远在确定性代码)
+                kind = write_sink(ctx, "record_multi", {"items": multi_items}, "")
+                return TurnResult(kind) if kind else TurnResult("crash")
+            return TurnResult("defer_record")
 
     observations: list = []
     called: set = set()
@@ -339,9 +347,7 @@ def handle_turn(
             observations=observations,
             lang=lang,
             force_reply=bool(observations),
-            allow_write=allow_write,
-            allow_m3=allow_m3,
-            allow_push=allow_push,
+            gates=gates,
         )
         if step.kind == "reply":
             if step.message:
@@ -362,12 +368,11 @@ def handle_turn(
             return TurnResult("crash")  # 模型调不存在的工具 = 故障(非记账 defer)
         if spec.writes and (not allow_write or write_sink is None):
             return TurnResult("defer_record")  # 记账写关 → 交确定性直录(救命索)
-        if step.tool in _M3_ONLY and not allow_m3:
-            return TurnResult("defer_edit")  # M3 子闸关:改错/撤销交旧路(能力不丢·模型硬调也拦)
-        if step.tool in _PUSH_ONLY and not allow_push:
-            # 推送闸关:喂回 not_available_yet,模型自然引导去 App(旧路本就没有推送能力)。
+        if spec.gate and spec.gate not in gates:  # 子闸关但模型硬调(闸关时本就不可见)
+            if spec.gate == "m3":
+                return TurnResult("defer_edit")  # 改错/撤销交旧路(能力不丢)
             observations.append({"tool": step.tool, "ok": False, "error": "not_available_yet"})
-            continue
+            continue  # 推送等:引导去 App(旧路本就没有该能力)
         chk = slots.check_slots(
             AgentAction(kind="tool", tool=step.tool, args=step.args),
             user_text=user_text,
@@ -408,9 +413,7 @@ def handle_turn(
             observations=observations,
             lang=lang,
             force_reply=True,
-            allow_write=allow_write,
-            allow_m3=allow_m3,
-            allow_push=allow_push,
+            gates=gates,
         )
         if final.kind == "reply" and _sane_reply(final.message):
             return TurnResult("reply", final.message)

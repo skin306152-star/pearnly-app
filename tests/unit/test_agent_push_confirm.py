@@ -55,10 +55,6 @@ class TestPrepare(unittest.TestCase):
                 "core.db.list_erp_endpoints",
                 return_value=[{"id": "e1", "name": "MR.ERP", "enabled": True}],
             ),
-            patch(
-                "core.db.get_default_erp_endpoint",
-                return_value={"id": "e1", "name": "MR.ERP", "enabled": True},
-            ),
             patch("core.db.has_recent_successful_push", return_value=None),
         ):
             res = AgentToolset().push_to_erp(_CTX, doc_keyword="7-11")
@@ -72,10 +68,9 @@ class TestPrepare(unittest.TestCase):
             _perms(),
             patch("core.db.list_ocr_history", return_value=self._hist()),
             patch(
-                "core.db.get_default_erp_endpoint",
-                return_value={"id": "e1", "name": "MR.ERP", "enabled": True},
+                "core.db.list_erp_endpoints",
+                return_value=[{"id": "e1", "name": "MR.ERP", "enabled": True}],
             ),
-            patch("core.db.list_erp_endpoints", return_value=[]),
             patch("core.db.has_recent_successful_push", return_value={"id": "log1"}),
         ):
             res = AgentToolset().push_to_erp(_CTX)
@@ -86,15 +81,11 @@ class TestPrepare(unittest.TestCase):
         with (
             _perms(),
             patch("core.db.list_ocr_history", return_value=self._hist()),
-            patch("core.db.get_default_erp_endpoint", return_value=None),
-            patch(
-                "core.db.list_erp_endpoints",
-                return_value=[{"id": "e2", "name": "Express", "enabled": True}],
-            ),
+            patch("core.db.list_erp_endpoints", return_value=[]),
         ):
             res = AgentToolset().push_to_erp(_CTX)
         self.assertEqual(res.error_code, "no_endpoint")
-        self.assertEqual(res.data["endpoints"], ["Express"])
+        self.assertEqual(res.data["endpoints"], [])
 
     def test_prepare_endpoint_by_name(self):
         with (
@@ -358,7 +349,7 @@ class TestLoopPushGate(unittest.TestCase):
         names = {
             t.name
             for t in __import__("services.agent.loop", fromlist=["x"])._visible_tools(
-                True, True, False
+                frozenset({"write", "m3"})
             )
         }
         self.assertNotIn("push_to_erp", names)
@@ -366,7 +357,7 @@ class TestLoopPushGate(unittest.TestCase):
     def test_push_visible_with_flag(self):
         from services.agent import loop
 
-        names = {t.name for t in loop._visible_tools(True, True, True)}
+        names = {t.name for t in loop._visible_tools(frozenset({"write", "m3", "push"}))}
         self.assertIn("push_to_erp", names)
 
     def test_hard_call_without_flag_gets_not_available(self):

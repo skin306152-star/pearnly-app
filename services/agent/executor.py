@@ -118,15 +118,10 @@ class AgentToolset:
 
     # ── A 档:M4 扩充(推送状态 / 税号核验 / 我的套餐) ──
 
-    def get_push_status(self, ctx: AgentContext, *, keyword=None) -> ToolResult:
-        """某张单据推没推 ERP(镜像 erp_push_log_routes 的查询口径·erp_push_logs 唯一状态源)。
-
-        keyword 定位单据:唯一命中查最新推送日志;多命中回候选让模型请用户挑(不猜);
-        无 keyword 取最近一张。failed/未推绝不说成推送成功(状态诚实红线)。
-        """
-        p = _plan_permissions((ctx.user or {}).get("plan"))
-        if not p.get("can_push_erp"):
-            return ToolResult(ok=False, error_code="forbidden")
+    def _locate_doc(self, ctx: AgentContext, keyword):
+        """按关键词定位一张单据(推送状态/推 ERP 共用锚点步)。
+        返回 (hist, None) 或 (None, 失败 ToolResult):零命中→not_found;
+        带词多命中→候选喂回让用户挑(绝不猜);无词→最近一张。"""
         res = db.list_ocr_history(
             user_id=str(ctx.user["id"]),
             tenant_id=ctx.tenant_id,
@@ -139,14 +134,29 @@ class AgentToolset:
         )
         items = res.get("items", []) if isinstance(res, dict) else []
         if not items:
-            return ToolResult(ok=False, error_code="history_not_found")
+            return None, ToolResult(ok=False, error_code="history_not_found")
         if keyword and len(items) > 1:
             cands = [
                 {"vendor": i.get("seller_name") or "", "amount": i.get("total_amount")}
                 for i in items
             ]
-            return ToolResult(ok=False, error_code="ambiguous_doc", data={"candidates": cands})
-        hist = items[0]
+            return None, ToolResult(
+                ok=False, error_code="ambiguous_doc", data={"candidates": cands}
+            )
+        return items[0], None
+
+    def get_push_status(self, ctx: AgentContext, *, keyword=None) -> ToolResult:
+        """某张单据推没推 ERP(镜像 erp_push_log_routes 的查询口径·erp_push_logs 唯一状态源)。
+
+        keyword 定位单据:唯一命中查最新推送日志;多命中回候选让模型请用户挑(不猜);
+        无 keyword 取最近一张。failed/未推绝不说成推送成功(状态诚实红线)。
+        """
+        p = _plan_permissions((ctx.user or {}).get("plan"))
+        if not p.get("can_push_erp"):
+            return ToolResult(ok=False, error_code="forbidden")
+        hist, fail = self._locate_doc(ctx, keyword)
+        if fail is not None:
+            return fail
         logs = db.list_push_logs(
             str(ctx.user["id"]), history_id=str(hist.get("id")), limit=1, tenant_id=ctx.tenant_id
         )
@@ -259,26 +269,9 @@ class AgentToolset:
         p = _plan_permissions((ctx.user or {}).get("plan"))
         if not p.get("can_push_erp"):
             return ToolResult(ok=False, error_code="forbidden")
-        res = db.list_ocr_history(
-            user_id=str(ctx.user["id"]),
-            tenant_id=ctx.tenant_id,
-            keyword=doc_keyword,
-            workspace_client_id=None,
-            limit=5,
-            offset=0,
-            retention_days=_retention(ctx.user),
-            restrict_client_ids=db.get_visible_client_ids_for_user(ctx.user),
-        )
-        items = res.get("items", []) if isinstance(res, dict) else []
-        if not items:
-            return ToolResult(ok=False, error_code="history_not_found")
-        if doc_keyword and len(items) > 1:
-            cands = [
-                {"vendor": i.get("seller_name") or "", "amount": i.get("total_amount")}
-                for i in items
-            ]
-            return ToolResult(ok=False, error_code="ambiguous_doc", data={"candidates": cands})
-        hist = items[0]
+        hist, fail = self._locate_doc(ctx, doc_keyword)
+        if fail is not None:
+            return fail
 
         endpoints = [
             e for e in (db.list_erp_endpoints(str(ctx.user["id"])) or []) if e.get("enabled", True)
@@ -289,9 +282,8 @@ class AgentToolset:
             hits = [e for e in endpoints if q in "".join(str(e.get("name") or "").lower().split())]
             endpoint = hits[0] if len(hits) == 1 else None
         else:
-            endpoint = db.get_default_erp_endpoint(str(ctx.user["id"]))
-            if endpoint and not endpoint.get("enabled", True):
-                endpoint = None
+            # 列表已按 is_default DESC, created ASC 排序且滤过 enabled → 首行即默认端点
+            endpoint = endpoints[0] if endpoints else None
         if not endpoint:
             names = [e.get("name") or "" for e in endpoints]
             return ToolResult(ok=False, error_code="no_endpoint", data={"endpoints": names})

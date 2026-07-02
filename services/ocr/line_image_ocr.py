@@ -15,14 +15,13 @@ from core import db
 from core import workspace_context as wc
 from core.db import insert_ocr_history
 from services.exceptions.exception_checks import _async_run_exception_checks
-from services.ocr import line_image_fastpath as fastpath
+from services.ocr import line_image_route
 from services.ocr.line_multi_page import select_bookable_pages
 from services.ocr.entrypoints import (
     all_pages_not_invoice as _ocr_all_pages_not_invoice,
     billing_quote as _ocr_billing_quote,
     charge_successful_ocr as _ocr_charge_success,
     content_hash as _ocr_content_hash,
-    get_cached_history as _ocr_get_cached,
     is_supported_ocr_file as _ocr_is_supported_file,
     run_pipeline_for_file as _ocr_run_pipeline_file,
 )
@@ -154,18 +153,12 @@ async def _handle_line_image_ocr(
         # 归 LINE 用户租户的默认套账(绑定店)。缺则 None(insert 内 NULL · 不拦上传)。
         _ws_client_id = wc.default_workspace_for_write(user_fresh.get("tenant_id"))
 
-        # 3. OCR 前快速路径(P1G-Perf):同张图已建过单据 → 重发当前状态卡,跳过 Vision/Gemini/分类。
+        # 3+3.5 OCR 前缓存快路(dup 状态卡/指纹缓存)已搬 line_image_route.cache_shortcut:
+        # 有待决意图时让位(重发同图+新意图不被短路吞),无意图/闸关时逐字节同现状。
         file_hash = _ocr_content_hash(file_bytes)
-        if fastpath.early_dup_short_circuit(
+        if line_image_route.cache_shortcut(
             user_fresh, line_user_id, file_hash, _ws_client_id, lang, quote_token
         ):
-            return True
-        # 3.5 文件指纹缓存(firm/未开记账路写过 ocr_history)→ 缓存字段重建卡(不重 OCR/扣费)。
-        cached = _ocr_get_cached(user_fresh, file_hash, workspace_client_id=_ws_client_id)
-        if cached:
-            fastpath.handle_ocr_cache_hit(
-                user_fresh, file_hash, cached, line_user_id, lang, quote_token, _ws_client_id
-            )
             return True
 
         quote = _ocr_billing_quote(user_fresh, file_bytes, filename, max_pages=50)
@@ -221,8 +214,6 @@ async def _handle_line_image_ocr(
 
         tid_str = str(user_fresh["tenant_id"]) if user_fresh.get("tenant_id") else None
         # LI-2 意图分流(闸默认关):决策/落地/兜底全在 route 层,指令默认值=现状代码逐字节不变。
-        from services.ocr import line_image_route
-
         _idir = await line_image_route.intercept(
             user_fresh,
             _ws_client_id,

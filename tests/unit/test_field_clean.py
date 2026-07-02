@@ -13,6 +13,32 @@ from services.purchase import field_clean as fc
 from services.purchase import ocr_corrections
 
 
+class DatePlausibilityTests(unittest.TestCase):
+    """票面日期合理窗(真机语料:SISTER MAKEUP 的 POS 没设时钟,票面印 01-01-2513 佛历
+    = 公历 1970-01-01,曾以此日期自动入正式账亮给用户)。窗外 → 清空 + 标记。"""
+
+    def test_buddhist_epoch_cleared(self):
+        out = ocr_corrections.normalize_fields({"date": "01-01-2513"})
+        self.assertEqual(out["date"], "")
+        self.assertIn("date_implausible_cleared", out["_corrections"])
+
+    def test_model_epoch_iso_cleared(self):
+        out = ocr_corrections.normalize_fields({"date": "1970-01-01"})
+        self.assertEqual(out["date"], "")
+
+    def test_far_future_cleared(self):
+        out = ocr_corrections.normalize_fields({"date": "2031-01-01"})
+        self.assertEqual(out["date"], "")
+
+    def test_normal_dates_kept(self):
+        # 同一票钉着的 K+ 刷卡小票真日期(17/01/26 → 2026-01-17)必须照常归一保留。
+        out = ocr_corrections.normalize_fields({"date": "17/01/26"})
+        self.assertEqual(out["date"], "2026-01-17")
+        out2 = ocr_corrections.normalize_fields({"date": "2026-07-02"})
+        self.assertEqual(out2["date"], "2026-07-02")
+        self.assertNotIn("_corrections", out2)
+
+
 class CleanTaxIdTests(unittest.TestCase):
     def test_short_number_rejected(self):  # 样例 1:tax_id=13/15/2026/06 → 空
         for bad in ("13", "15", "2026", "06", "736"):

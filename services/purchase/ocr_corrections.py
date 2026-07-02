@@ -57,6 +57,18 @@ def _normalize_date(value: Any) -> str:
         return raw
 
 
+def _implausible_doc_date(iso: str) -> bool:
+    """单据日期出活票合理窗之外(读不出日期时模型会吐 1970-01-01 这类占位)。
+    窗:2000-01-01 ≤ d ≤ 明年末——佛历 2543+ 折算后都 ≥2000,超窗必是幻觉/误读。"""
+    if not _ISO_RE.match(iso or ""):
+        return False
+    try:
+        d = date.fromisoformat(iso)
+    except ValueError:
+        return True
+    return d.year < 2000 or d.year > date.today().year + 1
+
+
 def _is_branch_number_as_invoice(fields: dict, invoice_no: str) -> bool:
     digits = re.sub(r"\D", "", invoice_no or "")
     if not digits or digits != str(invoice_no or "").strip() or len(digits) > 5:
@@ -149,7 +161,10 @@ def normalize_fields(fields: dict | None) -> dict:
         out["invoice_number"] = inv_no
 
     norm_date = _normalize_date(src.get("date"))
-    if norm_date != (src.get("date") or ""):
+    if _implausible_doc_date(norm_date):
+        out["date"] = ""
+        corrections.append("date_implausible_cleared")
+    elif norm_date != (src.get("date") or ""):
         out["date"] = norm_date
         corrections.append("date_normalized")
 

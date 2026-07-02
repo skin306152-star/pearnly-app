@@ -64,6 +64,25 @@ class TestIntentStore(unittest.TestCase):
         with patch("core.db.get_cursor_rls", side_effect=RuntimeError("db down")):
             self.assertIsNone(s.take_intent("t-1", "Uabc"))
 
+    def test_peek_reads_without_delete(self):
+        # peek 只看不取:缓存快路让位判断用,绝不消费意图(take 仍是唯一消费点)。
+        cur = MagicMock()
+        cur.fetchone.return_value = {"?column?": 1}
+        with patch("core.db.get_cursor_rls", return_value=_cm(cur)):
+            self.assertTrue(s.peek_intent("t-1", "Uabc"))
+        sql = cur.execute.call_args.args[0]
+        self.assertIn("SELECT 1 FROM line_pending_intents", sql)
+        self.assertNotIn("DELETE", sql)
+        self.assertIn("expires_at > now()", sql)
+
+    def test_peek_none_and_failure_return_false(self):
+        cur = MagicMock()
+        cur.fetchone.return_value = None
+        with patch("core.db.get_cursor_rls", return_value=_cm(cur)):
+            self.assertFalse(s.peek_intent("t-1", "Uabc"))
+        with patch("core.db.get_cursor_rls", side_effect=RuntimeError("db down")):
+            self.assertFalse(s.peek_intent("t-1", "Uabc"))
+
 
 if __name__ == "__main__":
     unittest.main()

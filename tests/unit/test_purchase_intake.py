@@ -7,6 +7,7 @@
 
 import unittest
 from decimal import Decimal
+from unittest import mock
 
 from services.purchase import intake as ik
 from services.purchase import totals as totals_svc
@@ -296,14 +297,14 @@ class LineGateTests(unittest.TestCase):
 class ResolveImageIntakeTests(unittest.TestCase):
     """待归类下线:识别完一律建草稿(糊图/฿0/低置信也建),不再落 inbox。"""
 
-    def _resolve(self, fields, confidence, **kw):
+    def _resolve(self, fields, confidence, settings_override=None, **kw):
         return ik.resolve_image_intake(
             _FakeCur(),
             tenant_id="t",
             workspace_client_id=1,
             fields=fields,
             confidence=confidence,
-            settings={},
+            settings=settings_override or {},
             **kw,
         )
 
@@ -332,6 +333,39 @@ class ResolveImageIntakeTests(unittest.TestCase):
         data = self._resolve(f, "needs_review")
         self.assertEqual(data["route"], "purchase")
         self.assertIsNotNone(data["draft"])
+
+    def test_implausible_date_blocks_autobook(self):
+        # 真机语料(SISTER MAKEUP·2026-07-02):POS 时钟没设,票面印 01-01-2513(佛历)=
+        # 公历 1970-01-01,曾直接自动过账亮给用户。窗外日期 → 清空 + 只建草稿等人核。
+        f = {
+            "document_type": "receipt",
+            "seller_name": "SISTER MAKEUP",
+            "date": "01-01-2513",
+            "total_amount": "4918.00",
+            "items": [{"name": "Cushion 01", "qty": "1", "subtotal": "590.00"}],
+        }
+        data = self._resolve(f, "high", settings_override={"auto_book": True}, created_by="u")
+        self.assertNotEqual(data["route"], "booked")
+        self.assertIsNotNone(data["draft"])
+        self.assertEqual(data["draft"]["doc_date"], None)
+
+    def test_valid_date_still_autobooks(self):
+        # 正常日期不受新闸影响:同样字段换真日期 → 照旧走自动过账分支。
+        f = {
+            "document_type": "receipt",
+            "seller_name": "SISTER MAKEUP",
+            "date": "2026-01-17",
+            "total_amount": "4918.00",
+            "items": [{"name": "Cushion 01", "qty": "1", "subtotal": "590.00"}],
+        }
+        created = {"doc": {"id": "D9"}}
+        with (
+            mock.patch("services.purchase.docs.create_doc", return_value=created),
+            mock.patch("services.purchase.posting.post_doc"),
+            mock.patch("services.purchase.docs.find_by_dedupe", return_value=None),
+        ):
+            data = self._resolve(f, "high", settings_override={"auto_book": True}, created_by="u")
+        self.assertEqual(data["route"], "booked")
 
     def test_source_propagates_to_draft(self):
         # 来源(line/photo)必须落到草稿,否则 create_doc 默认 manual → 列表显「手录」(PO-6)。

@@ -182,5 +182,63 @@ class TestExecuteTerminals(unittest.TestCase):
         charge.assert_called_once()
 
 
+class TestCacheShortcut(unittest.TestCase):
+    """缓存快路让位契约(真机第一轮踩到:先说目的再重发同图,被 dup 短路吞掉意图)。"""
+
+    _ARGS = (_USER, "Uabc", "h1", 84, "th", "q")
+
+    def test_pending_intent_yields_to_full_pipeline(self):
+        # 有活意图 → 整段快路让位(不查 dup 不读缓存),让意图分流吃到这张图。
+        with (
+            patch.object(r, "_intent_pending", return_value=True),
+            patch("services.ocr.line_image_fastpath.early_dup_short_circuit") as dup,
+            patch("services.ocr.entrypoints.get_cached_history") as cached,
+        ):
+            self.assertFalse(r.cache_shortcut(*self._ARGS))
+        dup.assert_not_called()
+        cached.assert_not_called()
+
+    def test_no_intent_keeps_legacy_shortcuts(self):
+        # 无意图 = 搬家前行为:dup 命中 → True;仅缓存命中 → 重建卡 + True;都没有 → False。
+        with patch.object(r, "_intent_pending", return_value=False):
+            with patch(
+                "services.ocr.line_image_fastpath.early_dup_short_circuit", return_value=True
+            ):
+                self.assertTrue(r.cache_shortcut(*self._ARGS))
+            with (
+                patch(
+                    "services.ocr.line_image_fastpath.early_dup_short_circuit",
+                    return_value=False,
+                ),
+                patch("services.ocr.entrypoints.get_cached_history", return_value={"id": "c1"}),
+                patch("services.ocr.line_image_fastpath.handle_ocr_cache_hit") as hit,
+            ):
+                self.assertTrue(r.cache_shortcut(*self._ARGS))
+                hit.assert_called_once()
+            with (
+                patch(
+                    "services.ocr.line_image_fastpath.early_dup_short_circuit",
+                    return_value=False,
+                ),
+                patch("services.ocr.entrypoints.get_cached_history", return_value=None),
+            ):
+                self.assertFalse(r.cache_shortcut(*self._ARGS))
+
+    def test_intent_pending_is_fail_safe_and_gated(self):
+        # 闸关 → 不碰 store;peek 崩 → False(快路照旧),意图层故障不许改主路行为。
+        with patch("core.feature_flags.agent_image_enabled_for", return_value=False):
+            with patch("services.line_binding.line_intent_store.peek_intent") as peek:
+                self.assertFalse(r._intent_pending(_USER, "Uabc"))
+            peek.assert_not_called()
+        with (
+            patch("core.feature_flags.agent_image_enabled_for", return_value=True),
+            patch(
+                "services.line_binding.line_intent_store.peek_intent",
+                side_effect=RuntimeError("db down"),
+            ),
+        ):
+            self.assertFalse(r._intent_pending(_USER, "Uabc"))
+
+
 if __name__ == "__main__":
     unittest.main()

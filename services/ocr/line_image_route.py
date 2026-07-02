@@ -62,6 +62,46 @@ class Directive:
         self.skip_ingest = skip_ingest
 
 
+def cache_shortcut(user, line_user_id, file_hash, ws, lang, quote_token) -> bool:
+    """OCR 前缓存快路(dup 状态卡 / 指纹缓存重建卡),搬自 line_image_ocr(等价零改动)。
+
+    有活的待决意图时整段让位返回 False——"先说目的、再重发同一张图"是用户最自然的动作
+    (真机第一轮就踩到:说了"只推"再发图,被 dup 短路吞成"已入账"状态卡)。无意图/闸关
+    时行为与搬家前逐字节一致。
+    """
+    if _intent_pending(user, line_user_id):
+        logger.info("[line_intent] pending intent; cache shortcut yields to full pipeline")
+        return False
+    from services.ocr import line_image_fastpath as fastpath
+    from services.ocr.entrypoints import get_cached_history
+
+    if fastpath.early_dup_short_circuit(user, line_user_id, file_hash, ws, lang, quote_token):
+        return True
+    cached = get_cached_history(user, file_hash, workspace_client_id=ws)
+    if cached:
+        fastpath.handle_ocr_cache_hit(user, file_hash, cached, line_user_id, lang, quote_token, ws)
+        return True
+    return False
+
+
+def _intent_pending(user, line_user_id) -> bool:
+    """闸开且该用户有未过期意图(只看不取,take 仍只在 decide)。故障 → False = 快路照旧。"""
+    try:
+        from core import feature_flags
+        from services.line_binding import line_intent_store
+
+        uid = str(user.get("id") or "")
+        tid = str(user.get("tenant_id") or "")
+        if not (uid and tid and line_user_id):
+            return False
+        if not feature_flags.agent_image_enabled_for(uid):
+            return False
+        return line_intent_store.peek_intent(tid, line_user_id)
+    except Exception:
+        logger.warning("[line_intent] peek failed; cache shortcut stays", exc_info=True)
+        return False
+
+
 async def intercept(
     user,
     ws,

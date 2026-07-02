@@ -2,12 +2,13 @@
 """对账只读工具层(services/agent/recon_tools)· 方案一(bank 明细钻取)契约。
 
 铁三条:① 数字全来自 store 结果,明细截 _DETAIL_CAP 并如实报 omitted;
-② keyword 没中/没给 → 最新一条,零任务诚实 hint;③ income/tax 未通电 → not_available_yet。
+② keyword 没中/没给 → 最新一条,零任务诚实 hint;③ 三档(bank/income/tax)口径各自对齐 store 真形状。
 """
 
 import unittest
 from unittest.mock import patch
 
+from core import db  # noqa: F401  # 先热 DAL 门面:直 import recon store 会撞循环 import
 from services.agent import recon_tools as rt
 from services.agent.contracts import AgentContext
 
@@ -95,12 +96,11 @@ class TestDetail(unittest.TestCase):
         self.assertTrue(r.ok)
         self.assertIn("hint", r.data)
 
-    def test_tax_not_available_yet(self):
-        # income 已通电(TestIncomeDetail);tax 留方案三,继续如实拒。
-        for k in ("tax", "vat", "sales_vat"):
-            r = rt.detail(_CTX, kind=k)
-            self.assertFalse(r.ok, k)
-            self.assertEqual(r.error_code, "not_available_yet")
+    def test_unknown_kind_defaults_to_bank(self):
+        # 三档全通电;不认识的档位归一成 bank(最常问),绝不报错挡路。
+        r = self._run([_row("gl_debit_only")], kind="อะไรก็ไม่รู้")
+        self.assertTrue(r.ok)
+        self.assertEqual(r.data["task"]["bank"], "BAY")
 
     def test_kind_default_and_aliases(self):
         self.assertEqual(rt.normalize_kind(None), "bank")
@@ -146,14 +146,29 @@ _GLVAT_TASK = {
     "created_at": "2026-07-02 09:00:00",
 }
 
+_VATREC_TASK = {
+    "id": "6a0d1c22-0000-0000-0000-000000000001",
+    "client_name": "บริษัท เอ จำกัด",
+    "period": "2026-06",
+    "matched": 30,
+    "mismatched": 4,
+    "mismatch_amount": "512.50",
+    "status": "done",
+    "created_at": "2026-07-01 08:00:00",
+}
+
 
 class TestOverviewTwoKinds(unittest.TestCase):
-    def _run(self, bank, income):
+    def _run(self, bank, income, tax=None):
         from services.agent.executor import AgentToolset
 
         with (
             patch("services.recon.bank_recon_v2_store.list_bank_recon_v2_tasks", return_value=bank),
             patch("services.recon.gl_vat_store.list_gl_vat_tasks", return_value=income),
+            patch(
+                "services.recon.vat_recon_tasks_store.list_vat_recon_tasks",
+                return_value={"rows": tax or []},
+            ),
         ):
             return AgentToolset().get_recon_overview(_CTX)
 
@@ -171,9 +186,16 @@ class TestOverviewTwoKinds(unittest.TestCase):
         self.assertIn("matched=20", r.receipt)
         self.assertNotIn("hint", r.data)
 
-    def test_both_empty_is_honest(self):
+    def test_all_empty_is_honest(self):
         r = self._run([], [])
         self.assertIn("hint", r.data)
+
+    def test_tax_kind_in_overview(self):
+        r = self._run([], [], tax=[_VATREC_TASK])
+        t = r.data["tax"]["recent"][0]
+        self.assertEqual(t["unmatched"], 4)
+        self.assertEqual(t["mismatch_amount"], "512.50")
+        self.assertIn("matched=30", r.receipt)  # 三档兜底链:bank/income 空 → tax 顶上
 
 
 class TestIncomeDetail(unittest.TestCase):
@@ -233,12 +255,78 @@ class TestIncomeDetail(unittest.TestCase):
         r = self._run(tasks=[])
         self.assertIn("hint", r.data)
 
-    def test_tax_still_not_available(self):
-        self.assertEqual(rt.detail(_CTX, kind="tax").error_code, "not_available_yet")
-
     def test_income_data_json_safe(self):
         import json
 
+        json.dumps(self._run().data)
+
+
+class TestTaxDetail(unittest.TestCase):
+    _RAW = {
+        "rows": [
+            {
+                "status_key": "st_ok",
+                "customer": "A",
+                "invoice_no": "V-1",
+                "amount_inv": 100.0,
+                "amount_rep": 100.0,
+                "kind": "matched",
+            },
+            {
+                "status_key": "st_diff",
+                "customer": "B",
+                "invoice_no": "V-2",
+                "amount_inv": 300.0,
+                "amount_rep": 290.0,
+                "kind": "matched",
+            },
+            {
+                "status_key": "st_no_rep",
+                "customer": "C",
+                "invoice_no": "V-3",
+                "amount_inv": 500.0,
+                "amount_rep": 0,
+                "kind": "invoice_orphan",
+            },
+        ]
+    }
+
+    def _run(self, *, tasks=None, keyword=None):
+        with (
+            patch(
+                "services.recon.vat_recon_tasks_store.list_vat_recon_tasks",
+                return_value={"rows": [_VATREC_TASK] if tasks is None else tasks},
+            ),
+            patch(
+                "services.recon.vat_recon_tasks_store.get_vat_recon_task",
+                return_value={**_VATREC_TASK, "raw_data_json": self._RAW},
+            ),
+        ):
+            return rt.detail(_CTX, kind="tax", keyword=keyword)
+
+    def test_only_problem_rows_survive(self):
+        r = self._run()
+        self.assertTrue(r.ok)
+        issues = {u["doc_no"]: u["issue"] for u in r.data["unmatched"]}
+        self.assertEqual(issues, {"V-2": "st_diff", "V-3": "st_no_rep"})
+        self.assertEqual(r.data["task"]["mismatch_amount"], "512.50")
+        self.assertIn("agent.ok.recon_detail", r.receipt)
+
+    def test_keyword_matches_client_or_period(self):
+        other = {
+            **_VATREC_TASK,
+            "id": "6a0d1c22-0000-0000-0000-000000000002",
+            "client_name": "ร้านบี",
+            "period": "2026-05",
+        }
+        r = self._run(tasks=[other, _VATREC_TASK], keyword="2026-06")
+        self.assertEqual(r.data["task"]["period"], "2026-06")
+
+    def test_empty_is_honest_and_json_safe(self):
+        import json
+
+        r = self._run(tasks=[])
+        self.assertIn("hint", r.data)
         json.dumps(self._run().data)
 
 

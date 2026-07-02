@@ -48,6 +48,8 @@ _ACCOUNT_RE = re.compile(
     re.IGNORECASE,
 )
 _MAX_ACCOUNT_TEXT_LEN = 30
+# 文件齐后不想指定科目号 → 回"开始"直接跑(产品口径:parse_gl 的 account_code 允许空=全量)。
+_GO_WORDS = frozenset({"开始", "開始", "跑吧", "เริ่ม", "เริ่มเลย", "start", "go", "run"})
 
 _OPEN = {
     "th": (
@@ -76,6 +78,12 @@ _GOT = {
     "zh": "收到{role},还差:{missing}",
     "en": "Got the {role}. Still missing: {missing}",
     "ja": "{role}を受け取りました。残り:{missing}",
+}
+_FILES_READY = {
+    "th": "ไฟล์ครบแล้วค่ะ พิมพ์เลขบัญชี GL (เช่น 1010) หรือพิมพ์ 'เริ่ม' เพื่อกระทบทั้งหมดเลย",
+    "zh": "文件齐了——回 GL 科目号(如 1010),或回「开始」不指定直接跑。",
+    "en": "Files complete — type the GL account code (e.g. 1010), or type 'start' to run without one.",
+    "ja": "ファイルが揃いました。GL 科目コード(例 1010)を入力するか、「開始」で指定なしで実行します。",
 }
 _GOT_ACCOUNT = {
     "th": "รับเลขบัญชี {account} แล้วค่ะ ยังขาด: {missing}",
@@ -130,8 +138,12 @@ def _missing_names(action, lang) -> str:
     return " + ".join(miss)
 
 
+def _files_ready(action) -> bool:
+    return bool(action.get("stmt") and action.get("gl"))
+
+
 def _ready(action) -> bool:
-    return bool(action.get("stmt") and action.get("gl") and action.get("gl_account"))
+    return _files_ready(action) and bool(action.get("gl_account"))
 
 
 def _stage_dir(action) -> str:
@@ -196,14 +208,18 @@ def handle_file(user, tid, line_user_id, lang, file_bytes, filename, quote_token
     if _ready(action):
         return _launch(user, tid, line_user_id, lang, action)
     line_pending_actions.set_action(tid, line_user_id, action, ttl_minutes=_TTL_MINUTES)
-    _notify(
-        line_user_id,
-        tid,
-        _t(_GOT, lang).format(
-            role=_t(_ROLE_NAME[role], lang), missing=_missing_names(action, lang)
-        ),
-        quote_token,
-    )
+    if _files_ready(action):
+        # 只差科目号:科目号可选(产品口径空=全量)→ 给"回编码或回开始"的出口
+        _notify(line_user_id, tid, _t(_FILES_READY, lang), quote_token)
+    else:
+        _notify(
+            line_user_id,
+            tid,
+            _t(_GOT, lang).format(
+                role=_t(_ROLE_NAME[role], lang), missing=_missing_names(action, lang)
+            ),
+            quote_token,
+        )
     return True
 
 
@@ -219,6 +235,9 @@ def try_text(user, text, lang, tid, line_user_id) -> bool:
         t = str(text or "").strip()
         if len(t) > _MAX_ACCOUNT_TEXT_LEN:
             return False
+        if t.lower() in _GO_WORDS and _files_ready(action):
+            action["gl_account"] = ""  # 明确不指定 → 全量口径(与网页空科目一致)
+            return bool(_launch(user, tid, line_user_id, lang, action))
         m = _ACCOUNT_RE.fullmatch(t)
         if not m:
             return False

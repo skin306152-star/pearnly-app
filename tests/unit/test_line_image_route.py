@@ -328,13 +328,30 @@ class TestCacheShortcut(unittest.TestCase):
 
 
 class TestDmsShortcut(unittest.TestCase):
-    """DMS 绕过点(费用 OCR 之前):双闸都开 + 意图=dms 才接管;其余一律 None=现状。"""
+    """DMS 绕过点(费用 OCR 之前):细闸开 + 意图=dms 才接管(大闸在 pre_ocr_shortcut
+    读一次传下来);其余一律 None=现状。"""
 
-    _ARGS = (_USER, "Uabc", "zh", b"img", "id.jpg", "q")
+    _ARGS = (_USER, "t-1", "Uabc", "zh", b"img", "id.jpg", "q")
 
-    def test_gates_off_returns_none_without_reading_intent(self):
+    def test_image_gate_off_skips_all_shortcuts(self):
+        # 大闸关:pre_ocr_shortcut 不进任何接管快路,只剩缓存段(一次 flag 读省三处查询)。
         with (
-            patch("core.feature_flags.agent_image_enabled_for", return_value=True),
+            patch.object(r, "_image_flag_on", return_value=False),
+            patch.object(r, "_dms_shortcut") as dms,
+            patch.object(r, "_recon_intake_shortcut") as intake,
+            patch.object(r, "cache_shortcut", return_value=False),
+        ):
+            out = _run(
+                r.pre_ocr_shortcut(
+                    _USER, "Uabc", "h1", 84, "zh", "q", file_bytes=b"x", filename="a.jpg"
+                )
+            )
+        self.assertIsNone(out)
+        dms.assert_not_called()
+        intake.assert_not_called()
+
+    def test_dms_gate_off_returns_none_without_reading_intent(self):
+        with (
             patch("core.feature_flags.agent_dms_enabled_for", return_value=False),
             patch("services.line_binding.line_intent_store.read_intent") as rd,
         ):
@@ -343,7 +360,6 @@ class TestDmsShortcut(unittest.TestCase):
 
     def test_non_dms_intent_returns_none_without_consuming(self):
         with (
-            patch("core.feature_flags.agent_image_enabled_for", return_value=True),
             patch("core.feature_flags.agent_dms_enabled_for", return_value=True),
             patch(
                 "services.line_binding.line_intent_store.read_intent",
@@ -356,7 +372,6 @@ class TestDmsShortcut(unittest.TestCase):
 
     def test_dms_intent_takes_and_hands_off(self):
         with (
-            patch("core.feature_flags.agent_image_enabled_for", return_value=True),
             patch("core.feature_flags.agent_dms_enabled_for", return_value=True),
             patch(
                 "services.line_binding.line_intent_store.read_intent",
@@ -371,7 +386,6 @@ class TestDmsShortcut(unittest.TestCase):
 
     def test_crash_falls_back_to_default_pipeline(self):
         with (
-            patch("core.feature_flags.agent_image_enabled_for", return_value=True),
             patch("core.feature_flags.agent_dms_enabled_for", return_value=True),
             patch(
                 "services.line_binding.line_intent_store.read_intent",

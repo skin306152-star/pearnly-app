@@ -110,3 +110,10 @@ def friendly_any(error_msg: Optional[str]) -> Optional[Dict[str, str]]:
         or _doc_sanity_friendly(error_msg)
         or dms_push_friendly(error_msg)
     )
+
+
+def friendly_text(error_msg: Optional[str], lang: str, fallback: str = "") -> str:
+    """friendly_any 的取词版:命中给 lang(回落 en),未命中给 fallback。
+    LINE 侧三处各写一遍"hit.get(lang) or hit['en']"收敛到这(/simplify 2026-07-03)。"""
+    hit = friendly_any(error_msg) or {}
+    return hit.get(lang) or hit.get("en") or fallback

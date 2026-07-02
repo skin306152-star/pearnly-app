@@ -104,6 +104,17 @@ class CardLangTests(unittest.TestCase):
             self.assertEqual(line_lang.card_lang("U1", "t1", "ja"), "ja")
             self.assertEqual(line_lang.card_lang("U1", "t1", None), "th")
 
+    def test_image_placeholder_turn_is_skipped(self):
+        # 发图轮的系统占位("[ส่งรูปใบเสร็จ]"·写死泰文)不是用户的话——中文对话发图后
+        # 点按钮,回执曾被它带偏成泰语(真机 2026-07-02)。占位轮必须跳过,继续找真话。
+        with self._recent(
+            [
+                {"role": "user", "content": "帮我推这张"},
+                {"role": "user", "content": "[ส่งรูปใบเสร็จ]"},
+            ]
+        ):
+            self.assertEqual(line_lang.card_lang("U1", "t1", "th"), "zh")
+
     def test_memory_failure_falls_to_ev(self):
         with mock.patch("services.line_binding.line_chat_memory.recent", side_effect=RuntimeError):
             self.assertEqual(line_lang.card_lang("U1", "t1", "th"), "th")

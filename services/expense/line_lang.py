@@ -126,10 +126,16 @@ def card_lang(line_user_id, tenant_id, ev_lang) -> str:
 
         recent = line_chat_memory.recent(line_user_id=line_user_id, tenant_id=tenant_id)
         for turn in reversed(recent or []):
-            if turn.get("role") == "user":
-                detected = line_classify.detect_text_lang(turn.get("content") or "")
-                if detected in _STRONG:
-                    return detected
+            if turn.get("role") != "user":
+                continue
+            content = str(turn.get("content") or "").strip()
+            # 发图等无文本轮记成系统占位(如 "[ส่งรูปใบเสร็จ]"·写死泰文)——不是用户说的话,
+            # 拿它判语言会把中文对话的按钮回执带偏成泰语(真机 2026-07-02 手机复验抓到)。
+            if content.startswith("[") and content.endswith("]"):
+                continue
+            detected = line_classify.detect_text_lang(content)
+            if detected in _STRONG:
+                return detected
     except Exception:
         pass
     return ev_lang or "th"

@@ -83,22 +83,7 @@ def set_intent(
 
 def peek_intent(tenant_id, line_user_id) -> bool:
     """有未过期意图?只看不取(缓存快路让位判断用)。任何故障 → False = 快路照旧。"""
-    from core import db
-
-    def _run():
-        with db.get_cursor_rls(str(tenant_id)) as cur:
-            cur.execute(
-                "SELECT 1 FROM line_pending_intents "
-                "WHERE tenant_id = %s AND line_user_id = %s AND expires_at > now()",
-                (str(tenant_id), str(line_user_id)),
-            )
-            return cur.fetchone() is not None
-
-    try:
-        return bool(_with_heal(_run))
-    except Exception:
-        logger.warning("[line_intent] peek failed; treat as none", exc_info=True)
-        return False
+    return read_intent(tenant_id, line_user_id) is not None
 
 
 def read_intent(tenant_id, line_user_id) -> Optional[dict]:

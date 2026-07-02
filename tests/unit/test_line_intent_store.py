@@ -67,11 +67,11 @@ class TestIntentStore(unittest.TestCase):
     def test_peek_reads_without_delete(self):
         # peek 只看不取:缓存快路让位判断用,绝不消费意图(take 仍是唯一消费点)。
         cur = MagicMock()
-        cur.fetchone.return_value = {"?column?": 1}
+        cur.fetchone.return_value = {"intent": {"goals": ["push"]}}
         with patch("core.db.get_cursor_rls", return_value=_cm(cur)):
             self.assertTrue(s.peek_intent("t-1", "Uabc"))
         sql = cur.execute.call_args.args[0]
-        self.assertIn("SELECT 1 FROM line_pending_intents", sql)
+        self.assertIn("SELECT intent FROM line_pending_intents", sql)  # peek=read_intent 推导
         self.assertNotIn("DELETE", sql)
         self.assertIn("expires_at > now()", sql)
 

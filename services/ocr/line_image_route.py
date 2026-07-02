@@ -113,36 +113,46 @@ async def pre_ocr_shortcut(
 ) -> Optional[bool]:
     """费用 OCR 前的三条快路:① 对账收件模式 → 文件归档进 job 暂存(零识别扣费);
     ② 意图=dms → 专用身份证路接管;③ 缓存快路(dup 状态卡/指纹缓存)。
-    返回 True/False=已完全处理;None=继续现状管线。"""
-    intake = await _recon_intake_shortcut(
-        user, line_user_id, lang, file_bytes, filename, quote_token
-    )
-    if intake is not None:
-        return intake
-    dms = await _dms_shortcut(user, line_user_id, lang, file_bytes, filename, quote_token)
-    if dms is not None:
-        return dms
+    返回 True/False=已完全处理;None=继续现状管线。
+
+    顺序即语义,别乱调:收件模式必须压过一切(收件时重发同图若先撞缓存=文件被吞);
+    dms 意图必须压过缓存(说了目的再重发同图不许被 dup 短路);缓存永远最后。
+    LI 大闸(agent_image)在此读一次传下去,免得每条快路各查一遍 allowlist。"""
+    uid = str(user.get("id") or "")
+    tid = str(user.get("tenant_id") or "")
+    image_on = bool(uid and tid and line_user_id) and _image_flag_on(uid)
+    if image_on:
+        intake = await _recon_intake_shortcut(
+            user, tid, line_user_id, lang, file_bytes, filename, quote_token
+        )
+        if intake is not None:
+            return intake
+        dms = await _dms_shortcut(user, tid, line_user_id, lang, file_bytes, filename, quote_token)
+        if dms is not None:
+            return dms
     if cache_shortcut(user, line_user_id, file_hash, ws, lang, quote_token):
         return True
     return None
 
 
-async def _recon_intake_shortcut(user, line_user_id, lang, file_bytes, filename, quote_token):
-    """对账收件缝:双闸开 + 有活跃收件检查点才接管;其余 None=现状。
+def _image_flag_on(uid) -> bool:
+    try:
+        from core import feature_flags
+
+        return feature_flags.agent_image_enabled_for(uid)
+    except Exception:
+        return False
+
+
+async def _recon_intake_shortcut(user, tid, line_user_id, lang, file_bytes, filename, quote_token):
+    """对账收件缝:细闸开 + 有活跃收件检查点才接管(大闸由调用方判过);其余 None=现状。
     故障 → None(文件走现状 OCR,绝不静默蒸发)。"""
     try:
         import asyncio as _aio
 
         from core import feature_flags
 
-        uid = str(user.get("id") or "")
-        tid = str(user.get("tenant_id") or "")
-        if not (uid and tid and line_user_id):
-            return None
-        if not (
-            feature_flags.agent_image_enabled_for(uid)
-            and feature_flags.agent_recon_intake_enabled_for(uid)
-        ):
+        if not feature_flags.agent_recon_intake_enabled_for(str(user.get("id") or "")):
             return None
         from services.agent import recon_intake
 
@@ -161,23 +171,17 @@ async def _recon_intake_shortcut(user, line_user_id, lang, file_bytes, filename,
         return None
 
 
-async def _dms_shortcut(user, line_user_id, lang, file_bytes, filename, quote_token):
+async def _dms_shortcut(user, tid, line_user_id, lang, file_bytes, filename, quote_token):
     """意图=dms 的图 → 身份证识别+复述检查点(services/agent/dms_push)。
-    闸关/无意图/非 dms → None;接管路自身任何故障 → 人话已发 or 回 None 走现状
-    (身份证会被 not_invoice 引导,图绝不静默蒸发)。take 只在确认接管后发生。"""
+    细闸关/无意图/非 dms → None(大闸由调用方判过);接管路自身任何故障 → 人话已发
+    or 回 None 走现状(身份证会被 not_invoice 引导,图绝不静默蒸发)。take 只在确认接管后。"""
     try:
         import asyncio as _aio
 
         from core import feature_flags
         from services.line_binding import line_intent_store
 
-        uid = str(user.get("id") or "")
-        tid = str(user.get("tenant_id") or "")
-        if not (uid and tid and line_user_id):
-            return None
-        if not (
-            feature_flags.agent_image_enabled_for(uid) and feature_flags.agent_dms_enabled_for(uid)
-        ):
+        if not feature_flags.agent_dms_enabled_for(str(user.get("id") or "")):
             return None
         intent = line_intent_store.read_intent(tid, line_user_id)
         from services.agent import dms_push
@@ -375,10 +379,9 @@ def _send_push_card(user, ws, tid, line_user_id, lang, hid, route, pages, quote_
     _f = (pages[0] or {}).get("fields") or {} if pages else {}
     blocked = _push_blocked_reason(_f)
     if blocked:
-        from services.erp import push_log_friendly
+        from services.erp.push_log_friendly import friendly_text
 
-        hit = push_log_friendly.friendly_any(blocked) or {}
-        reason = hit.get(lang) or hit.get("en") or blocked
+        reason = friendly_text(blocked, lang, blocked)
         _notify(line_user_id, tid, _t(_CANT_PUSH, lang).format(reason=reason), quote_token)
         return False
 

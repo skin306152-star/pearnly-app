@@ -225,17 +225,27 @@ def handle_file(user, tid, line_user_id, lang, file_bytes, filename, quote_token
 
 def try_text(user, text, lang, tid, line_user_id) -> bool:
     """收件模式下的文本:短消息里的编码记号 → 科目号。别的话一律不吃(交正常轮,
-    检查点保留——用户中途问别的不打断收件)。"""
+    检查点保留——用户中途问别的不打断收件)。
+
+    挂在每条文本必经处 → 零成本预过滤(长度/词形)和闸检查都排在 DB 读之前:
+    普通聊天、闸关时零查询(/simplify 效率雷 2026-07-03)。"""
     try:
+        t = str(text or "").strip()
+        if len(t) > _MAX_ACCOUNT_TEXT_LEN:
+            return False
+        is_go = t.lower() in _GO_WORDS
+        if not is_go and not _ACCOUNT_RE.fullmatch(t):
+            return False
+        from core import feature_flags
+
+        if not feature_flags.agent_recon_intake_enabled_for(str((user or {}).get("id") or "")):
+            return False
         from services.line_binding import line_pending_actions
 
         action = line_pending_actions.read_action(tid, line_user_id)
         if not action or action.get("tool") != TOOL or action.get("gl_account"):
             return False
-        t = str(text or "").strip()
-        if len(t) > _MAX_ACCOUNT_TEXT_LEN:
-            return False
-        if t.lower() in _GO_WORDS and _files_ready(action):
+        if is_go and _files_ready(action):
             action["gl_account"] = ""  # 明确不指定 → 全量口径(与网页空科目一致)
             return bool(_launch(user, tid, line_user_id, lang, action))
         m = _ACCOUNT_RE.fullmatch(t)

@@ -23,52 +23,19 @@ from core.db import insert_ocr_history
 from services.agent.image_intent import ImageRoute, route_image
 from services.ocr.entrypoints import charge_successful_ocr as _charge
 
+# 四语过程文案(零逻辑)拆在 line_route_copy;import-through 保住既有引用名。
+from services.ocr.line_route_copy import (
+    _ASK_GOAL,
+    _BANK_STMT_GUIDE,
+    _CANT_PUSH,
+    _ID_CARD_GUIDE,
+    _NO_ENDPOINT,
+    _PUSH_DROPPED,
+    _SKIP_ACK,
+    _t,
+)
+
 logger = logging.getLogger("mr-pilot")
-
-# LINE 专用过程文案(与 push_confirm._ACK 同先例留 inline)。
-_SKIP_ACK = {
-    "th": "รับทราบค่ะ ใบนี้ไม่บันทึกและไม่ส่งเข้า ERP ให้นะคะ",
-    "zh": "好的,这张不记账、也不推送。",
-    "en": "Okay — this one won't be recorded or pushed to ERP.",
-    "ja": "了解です。この伝票は記帳も ERP 送信もしません。",
-}
-_NO_ENDPOINT = {
-    "th": "ยังไม่ได้เชื่อมต่อ ERP ค่ะ ไปที่เว็บ Pearnly > การเชื่อมต่อ เพื่อเพิ่มปลายทางก่อนนะคะ",
-    "zh": "还没有可用的 ERP 端点,请先到网页「集成」里连接一个。",
-    "en": "No ERP endpoint connected yet — add one under Integrations on the web first.",
-    "ja": "ERP がまだ接続されていません。ウェブの「連携」から先に追加してください。",
-}
-_CANT_PUSH = {
-    "th": "⚠️ ใบนี้ยังส่งเข้า ERP ไม่ได้ค่ะ: {reason} · เก็บเอกสารไว้ให้แล้ว แก้บนเว็บแล้วส่งได้เลย",
-    "zh": "⚠️ 这张票暂不能推送:{reason}·单据已留存,到网页修正后可再推。",
-    "en": "⚠️ This document can't be pushed yet: {reason} · it's saved — fix it on the web, then push.",
-    "ja": "⚠️ この伝票はまだ送信できません:{reason} · 保存済みです。ウェブで修正後に送信できます。",
-}
-_BANK_STMT_GUIDE = {
-    "th": (
-        "ใบนี้เป็นรายการเดินบัญชีธนาคารค่ะ ไม่ใช่ใบเสร็จค่าใช้จ่าย · ไปที่เว็บ Pearnly > "
-        "กระทบยอดธนาคาร เพื่ออัปโหลดทำกระทบยอดได้เลย หรือถามผลกระทบยอดล่าสุดกับฉันก็ได้ค่ะ"
-    ),
-    "zh": "这是银行对账单,不是费用票据·请到网页「银行对账」上传做对账;也可以直接问我最近的对账结果。",
-    "en": (
-        "This is a bank statement, not an expense receipt. Upload it under Bank Reconciliation "
-        "on the web — or just ask me for the latest reconciliation results."
-    ),
-    "ja": (
-        "これは銀行取引明細で、経費の伝票ではありません。ウェブの「銀行照合」から"
-        "アップロードしてください。最新の照合結果は私に聞いても大丈夫です。"
-    ),
-}
-_PUSH_DROPPED = {
-    "th": "ส่วนการส่งเข้า ERP ยังไม่เปิดใช้งานค่ะ เก็บใบไว้ให้แล้ว เปิดใช้เมื่อไหร่ส่งได้เลย",
-    "zh": "推送功能暂未开通,单据已留存,开通后可直接推。",
-    "en": "ERP push isn't enabled yet — the document is saved and can be pushed once enabled.",
-    "ja": "ERP 送信はまだ有効化されていません。伝票は保存済みで、有効化後に送信できます。",
-}
-
-
-def _t(table: dict, lang: str) -> str:
-    return table.get(lang, table["en"])
 
 
 class Directive:
@@ -92,20 +59,28 @@ _STMT_KW = (
     "bank statement",
     "ยอดยกมา",
 )
+# 身份证确定性记号(泰/英)· 与对账单同模式同挂点(LINE-DMS-PUSH-DESIGN §2)。
+_ID_KW = (
+    "บัตรประจำตัวประชาชน",
+    "เลขประจำตัวประชาชน",
+    "thai national id",
+    "identification card",
+)
 
 
 def not_invoice_guidance(pages, lang) -> Optional[str]:
-    """非票据页的靶向引导:认出银行对账单 → 指去网页对账 + 可问对账结果(替掉
-    "不像票据请发费用文件"的死胡同 · 真机探针 2026-07-02)。认不出/故障 → None(回落通用文案)。
-    只在 all_pages_not_invoice 分支被调,不碰票据热路。"""
+    """非票据页的靶向引导:认出银行对账单 → 指去网页对账 + 可问对账结果;认出身份证 →
+    指路"先说建 DMS 客户再发"(替掉"不像票据请发费用文件"的死胡同 · 真机探针 2026-07-02)。
+    认不出/故障 → None(回落通用文案)。只在 all_pages_not_invoice 分支被调,不碰票据热路。"""
     try:
         for p in pages or []:
             f = (p or {}).get("fields") or {}
-            if str(f.get("document_type") or "") == "bank_statement":
-                return _t(_BANK_STMT_GUIDE, lang)
+            doc_type = str(f.get("document_type") or "")
             blob = f"{f.get('notes') or ''} {str((p or {}).get('text') or '')[:2000]}".lower()
-            if any(k in blob for k in _STMT_KW):
+            if doc_type == "bank_statement" or any(k in blob for k in _STMT_KW):
                 return _t(_BANK_STMT_GUIDE, lang)
+            if doc_type == "id_card" or any(k in blob for k in _ID_KW):
+                return _t(_ID_CARD_GUIDE, lang)
     except Exception:
         return None
     return None
@@ -131,6 +106,59 @@ def cache_shortcut(user, line_user_id, file_hash, ws, lang, quote_token) -> bool
         fastpath.handle_ocr_cache_hit(user, file_hash, cached, line_user_id, lang, quote_token, ws)
         return True
     return False
+
+
+async def pre_ocr_shortcut(
+    user, line_user_id, file_hash, ws, lang, quote_token, *, file_bytes, filename
+) -> Optional[bool]:
+    """费用 OCR 前的两条快路:① 意图=dms → 专用身份证路接管(绕过费用管线,
+    LINE-DMS-PUSH-DESIGN §2);② 缓存快路(dup 状态卡/指纹缓存)。
+    返回 True/False=已完全处理;None=继续现状管线。"""
+    dms = await _dms_shortcut(user, line_user_id, lang, file_bytes, filename, quote_token)
+    if dms is not None:
+        return dms
+    if cache_shortcut(user, line_user_id, file_hash, ws, lang, quote_token):
+        return True
+    return None
+
+
+async def _dms_shortcut(user, line_user_id, lang, file_bytes, filename, quote_token):
+    """意图=dms 的图 → 身份证识别+复述检查点(services/agent/dms_push)。
+    闸关/无意图/非 dms → None;接管路自身任何故障 → 人话已发 or 回 None 走现状
+    (身份证会被 not_invoice 引导,图绝不静默蒸发)。take 只在确认接管后发生。"""
+    try:
+        import asyncio as _aio
+
+        from core import feature_flags
+        from services.line_binding import line_intent_store
+
+        uid = str(user.get("id") or "")
+        tid = str(user.get("tenant_id") or "")
+        if not (uid and tid and line_user_id):
+            return None
+        if not (
+            feature_flags.agent_image_enabled_for(uid) and feature_flags.agent_dms_enabled_for(uid)
+        ):
+            return None
+        intent = line_intent_store.read_intent(tid, line_user_id)
+        from services.agent import dms_push
+
+        if not dms_push.wants_dms(intent):
+            return None
+        line_intent_store.take_intent(tid, line_user_id)  # 单发单用,与其它意图同语义
+        return await _aio.to_thread(
+            dms_push.handle_id_card,
+            user,
+            tid,
+            line_user_id,
+            lang,
+            file_bytes,
+            filename,
+            quote_token,
+        )
+    except Exception:
+        logger.warning("[line_dms] shortcut failed; default pipeline", exc_info=True)
+        return None
 
 
 def _intent_pending(user, line_user_id) -> bool:
@@ -168,7 +196,7 @@ async def intercept(
 ) -> Directive:
     """line_image_ocr 的唯一挂点:决策+落地+全故障兜底收在这层,调用方只应用指令。"""
     try:
-        route = decide(user, ws, tid, line_user_id, result)
+        route = decide(user, ws, tid, line_user_id, result, lang=lang)
         if route is None:
             return Directive()
         if route.workspace is not None:
@@ -192,17 +220,20 @@ async def intercept(
         return Directive(
             handled=handled,
             ws=route.workspace,
-            skip_ingest=route.terminal == "archive_only",
+            skip_ingest=route.terminal in ("archive_only", "ask"),
         )
     except Exception:
         logger.warning("[line_intent] intercept failed; default route", exc_info=True)
         return Directive()
 
 
-def decide(user, ws_client_id, tenant_id, line_user_id, result) -> Optional[ImageRoute]:
-    """闸 + 意图 → 分流。None = 现状管线(闸关/无意图普通票/任何故障)。"""
+def decide(user, ws_client_id, tenant_id, line_user_id, result, lang="th") -> Optional[ImageRoute]:
+    """闸 + 意图 → 分流。None = 现状管线(闸关/无意图普通票/任何故障)。
+    没意图 + 读不清 → 问一次大脑(LI §3 第三层 · 2026-07-02 通电);大脑答不上
+    route_image 自兜回 default,绝不因大脑抖动丢图。"""
     try:
         from core import feature_flags
+        from services.agent import image_brain
         from services.line_binding import line_intent_store
 
         uid = str(user.get("id") or "")
@@ -214,11 +245,20 @@ def decide(user, ws_client_id, tenant_id, line_user_id, result) -> Optional[Imag
         gates = {"image"}
         if feature_flags.agent_push_enabled_for(uid):
             gates.add("push")
+        _f = ((result.get("pages") or [{}])[0] or {}).get("fields") or {}
         summary = {
-            "doc_kind": "invoice",  # not_invoice 已在上游拦掉;歧义档(身份证等)LI-3 接大脑
+            "doc_kind": "invoice",  # not_invoice 已在上游拦掉,歧义信号只剩置信度
             "confidence": "low" if str(result.get("confidence") or "") == "low" else "high",
+            "seller": str(_f.get("seller_name") or ""),
+            "total": str(_f.get("total_amount") or ""),
         }
-        route = route_image(summary, pending=pending, gates=frozenset(gates))
+        route = route_image(
+            summary,
+            pending=pending,
+            gates=frozenset(gates),
+            decide=image_brain.decide_image,
+            lang=lang,
+        )
         return None if route.terminal == "default" else route
     except Exception:
         logger.warning("[line_intent] decide failed; default route", exc_info=True)
@@ -353,6 +393,27 @@ async def execute(
         )
         _notify(line_user_id, tid, _t(_SKIP_ACK, lang), quote_token)
         _note(line_user_id, tid, "意图:这张不记不推(已识别未落账)")
+        return True
+
+    if route.terminal == "ask":
+        # 歧义问询落地:单据存识别记录(不丢、网页可查),用确定性文案反问该怎么办
+        # (含"回一句+重发"闭环指引——缓存快路会给新意图让位,重发即按答复执行)。
+        # 大脑只选终端,问句不用它的(资金面文案必须确定性)。
+        hid = _insert_carrier(
+            user, ws, tid, line_user_id, pages=pages, result=result, quote=quote, misc=misc
+        )
+        _charge_async(
+            user,
+            quote,
+            str(hid) if hid else None,
+            filename,
+            tid,
+            pages=pages,
+            result=result,
+            cost_thb=cost_thb,
+        )
+        _notify(line_user_id, tid, _t(_ASK_GOAL, lang), quote_token)
+        _note(line_user_id, tid, "意图:读不清已反问(存识别记录未入账)")
         return True
 
     if route.terminal not in ("push", "both"):

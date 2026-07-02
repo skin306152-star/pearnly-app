@@ -40,6 +40,10 @@ class ImageRoute:
 def _from_pending(pending: dict, gates: frozenset) -> ImageRoute:
     """用户明说过的意图 → 确定性映射(唯一可信源,不再问大脑)。"""
     goals = set(pending.get("goals") or [])
+    if "dms" in goals:
+        # DMS 意图在费用 OCR 之前就被 dms 绕过点接管;走到这=闸中途关/接管失败,
+        # 按 default 走现状管线(身份证会被 not_invoice 引导),绝不映成 nothing 吞图。
+        return ImageRoute("default")
     endpoint = pending.get("push_to") or None
     # 计划步已解析过套账 → 优先用 id(执行层直接覆盖);裸名只在未解析的老意图里出现。
     workspace = pending.get("book_to_id") or pending.get("book_to") or None

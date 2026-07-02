@@ -347,7 +347,7 @@ class AgentToolset:
             },
         )
 
-    _PLAN_GOALS = frozenset({"record", "push", "archive_only", "nothing"})
+    _PLAN_GOALS = frozenset({"record", "push", "archive_only", "nothing", "dms"})
     # 模型高频意译的确定性归一(prod 真机抓到 gemini 吐 send_to_erp/do_not_record):
     # 别名→正名;否定前缀(do_not_/no_/skip_…)对已知目标 = "不做它" → 丢记号(空串)。
     _GOAL_ALIASES = {
@@ -365,6 +365,12 @@ class AgentToolset:
         "nothing": "nothing",
         "none": "nothing",
         "no_action": "nothing",
+        "dms": "dms",
+        "dms_customer": "dms",
+        "dms_push": "dms",
+        "id_card_to_dms": "dms",
+        "idcard_dms": "dms",
+        "create_dms_customer": "dms",
     }
     _NEG_PREFIXES = ("do_not_", "dont_", "not_", "no_", "skip_")
 
@@ -398,6 +404,29 @@ class AgentToolset:
                 data={"allowed_goals": sorted(self._PLAN_GOALS)},
             )
         parsed = {g for g in normed if g}
+        if "dms" in parsed:
+            # dms 独占目标(下一张=身份证建 DMS 客户,与记账/推送语义互斥);
+            # 闸关/无 DMS 端点如实拒——绝不存一个到时执行不了的计划。
+            if len(parsed) > 1:
+                return ToolResult(
+                    ok=False,
+                    error_code="invalid_goals",
+                    data={"allowed_goals": sorted(self._PLAN_GOALS)},
+                )
+            from core import feature_flags
+            from services.erp import dms_id_ocr
+
+            if not feature_flags.agent_dms_enabled_for(str(ctx.user["id"])):
+                return ToolResult(ok=False, error_code="not_available_yet")
+            if not _plan_permissions((ctx.user or {}).get("plan")).get("can_push_erp"):
+                return ToolResult(ok=False, error_code="forbidden")
+            if not dms_id_ocr.resolve_dms_endpoint(str(ctx.user["id"]), None):
+                return ToolResult(
+                    ok=False,
+                    error_code="no_dms_endpoint",
+                    data={"hint": "connect MR.ERP DMS under Pearnly web > Integrations"},
+                )
+            return ToolResult(ok=True, data={"plan": {"goals": ["dms"]}})
         # 确定性意图推断:点名端点=要推、点名套账=要记(prod 真机抓到模型只报否定记号
         # +端点名 → 归一成空目标,用户"只推别记"被存成"什么都不做")。
         if endpoint_name and "push" not in parsed and "nothing" not in parsed:

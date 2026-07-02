@@ -212,6 +212,17 @@ class TestNotInvoiceGuidance(unittest.TestCase):
         self.assertIsNone(r.not_invoice_guidance(None, "zh"))
         self.assertIsNone(r.not_invoice_guidance([{"fields": None}, None], "zh"))
 
+    def test_id_card_gets_dms_guidance(self):
+        # 无意图发身份证:靶向指路"先说建 DMS 客户再发"(与对账单同模式同挂点)。
+        pages = [{"fields": {"document_type": "id_card", "is_not_invoice": "true"}}]
+        self.assertIn("DMS", r.not_invoice_guidance(pages, "zh"))
+        pages2 = [
+            {
+                "fields": {"document_type": "other", "notes": "บัตรประจำตัวประชาชน Thai ID"},
+            }
+        ]
+        self.assertIn("DMS", r.not_invoice_guidance(pages2, "th"))
+
 
 class TestPreCardSanity(unittest.TestCase):
     """出卡前防呆预检:注定推不过的票不给确认按钮,直接四语人话+留存指引。"""
@@ -314,6 +325,119 @@ class TestCacheShortcut(unittest.TestCase):
             ),
         ):
             self.assertFalse(r._intent_pending(_USER, "Uabc"))
+
+
+class TestDmsShortcut(unittest.TestCase):
+    """DMS 绕过点(费用 OCR 之前):双闸都开 + 意图=dms 才接管;其余一律 None=现状。"""
+
+    _ARGS = (_USER, "Uabc", "zh", b"img", "id.jpg", "q")
+
+    def test_gates_off_returns_none_without_reading_intent(self):
+        with (
+            patch("core.feature_flags.agent_image_enabled_for", return_value=True),
+            patch("core.feature_flags.agent_dms_enabled_for", return_value=False),
+            patch("services.line_binding.line_intent_store.read_intent") as rd,
+        ):
+            self.assertIsNone(_run(r._dms_shortcut(*self._ARGS)))
+        rd.assert_not_called()
+
+    def test_non_dms_intent_returns_none_without_consuming(self):
+        with (
+            patch("core.feature_flags.agent_image_enabled_for", return_value=True),
+            patch("core.feature_flags.agent_dms_enabled_for", return_value=True),
+            patch(
+                "services.line_binding.line_intent_store.read_intent",
+                return_value={"goals": ["push"]},
+            ),
+            patch("services.line_binding.line_intent_store.take_intent") as take,
+        ):
+            self.assertIsNone(_run(r._dms_shortcut(*self._ARGS)))
+        take.assert_not_called()  # 非 dms 意图留给 OCR 后的 decide 消费
+
+    def test_dms_intent_takes_and_hands_off(self):
+        with (
+            patch("core.feature_flags.agent_image_enabled_for", return_value=True),
+            patch("core.feature_flags.agent_dms_enabled_for", return_value=True),
+            patch(
+                "services.line_binding.line_intent_store.read_intent",
+                return_value={"goals": ["dms"]},
+            ),
+            patch("services.line_binding.line_intent_store.take_intent") as take,
+            patch("services.agent.dms_push.handle_id_card", return_value=True) as h,
+        ):
+            self.assertIs(_run(r._dms_shortcut(*self._ARGS)), True)
+        take.assert_called_once()
+        h.assert_called_once()
+
+    def test_crash_falls_back_to_default_pipeline(self):
+        with (
+            patch("core.feature_flags.agent_image_enabled_for", return_value=True),
+            patch("core.feature_flags.agent_dms_enabled_for", return_value=True),
+            patch(
+                "services.line_binding.line_intent_store.read_intent",
+                side_effect=RuntimeError("db down"),
+            ),
+        ):
+            self.assertIsNone(_run(r._dms_shortcut(*self._ARGS)))
+
+
+class TestAskTerminal(unittest.TestCase):
+    """歧义问询落地:存识别记录(不丢)+ 扣费 + 确定性反问(含重发闭环指引)。"""
+
+    def test_ask_saves_carrier_charges_and_asks(self):
+        sent = {}
+        with (
+            patch.object(r, "_insert_carrier", return_value="hid-a") as ins,
+            patch.object(r, "_charge_async") as charge,
+            patch.object(r, "_notify", side_effect=lambda *a: sent.setdefault("text", a[2])),
+            patch.object(r, "_note"),
+        ):
+            out = _run(r.execute(ImageRoute("ask", say="大脑的问句"), **_EXEC_KW))
+        self.assertIs(out, True)
+        ins.assert_called_once()
+        self.assertEqual(charge.call_args.args[2], "hid-a")
+        # 问句必须是确定性文案(资金面不许用大脑生成文案),且带"回一句+重发"指引。
+        self.assertNotIn("大脑的问句", sent["text"])
+        self.assertIn("ส่งรูปนี้อีกครั้ง", sent["text"])  # _EXEC_KW lang=th
+
+
+class TestBrainConsultWiring(unittest.TestCase):
+    """歧义问大脑通电:没意图+低置信才问;大脑答只读终端生效,胡答/故障回 default。"""
+
+    def _decide(self, brain_out, confidence="low"):
+        with (
+            patch("core.feature_flags.agent_image_enabled_for", return_value=True),
+            patch("core.feature_flags.agent_push_enabled_for", return_value=False),
+            patch("services.line_binding.line_intent_store.take_intent", return_value=None),
+            patch("services.agent.image_brain.decide_image", return_value=brain_out) as brain,
+        ):
+            route = r.decide(
+                _USER, 84, "t-1", "Uabc", {"confidence": confidence, "pages": []}, lang="zh"
+            )
+        return route, brain
+
+    def test_low_confidence_consults_brain(self):
+        route, brain = self._decide({"terminal": "nothing", "say": "x"})
+        brain.assert_called_once()
+        self.assertEqual(route.terminal, "nothing")
+
+    def test_brain_ask_becomes_ask_route(self):
+        route, _ = self._decide({"terminal": "ask", "say": "จะให้ทำอะไรคะ"})
+        self.assertEqual(route.terminal, "ask")
+
+    def test_brain_push_is_corrected_to_ask(self):
+        # 钱路红线:大脑硬答 push 一律矫成 ask(不可逆动作必须来自用户原话)。
+        route, _ = self._decide({"terminal": "push"})
+        self.assertEqual(route.terminal, "ask")
+
+    def test_high_confidence_never_consults(self):
+        route, brain = self._decide({"terminal": "nothing"}, confidence="high")
+        brain.assert_not_called()
+        self.assertIsNone(route)  # default → None = 现状管线
+
+    def test_brain_junk_falls_back_to_default(self):
+        route, _ = self._decide(None)
+        self.assertIsNone(route)
 
 
 if __name__ == "__main__":

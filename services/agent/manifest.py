@@ -349,19 +349,26 @@ TOOLS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="recon_intake_start",
         bucket="B",
-        title_th="เริ่มกระทบยอดธนาคารผ่าน LINE",
+        title_th="เริ่มกระทบยอดผ่าน LINE (ธนาคาร/รายได้/ภาษีขาย)",
         desc_th=(
-            "ผู้ใช้อยากทำกระทบยอดธนาคารตรงนี้เลย (เช่น 'ทำกระทบยอดให้หน่อย', '帮我做银行对账') — "
-            "เปิดรับไฟล์: ผู้ใช้ส่งสเตทเมนต์+ไฟล์ GL แล้วบอกเลขบัญชี ระบบจะกระทบให้และแจ้งผล "
+            "ผู้ใช้อยากทำกระทบยอดตรงนี้เลย (เช่น 'ทำกระทบยอดให้หน่อย', '帮我做银行对账', "
+            "'กระทบยอดรายได้ให้หน่อย', '核查销项税报告') — เปิดรับไฟล์ตามประเภทแล้วระบบกระทบให้และแจ้งผล "
             "(ถ้าแค่ถามผลเดิม ใช้ recon_overview/recon_detail)"
         ),
         slots=(
             SlotSpec(
+                "kind",
+                required=False,
+                source="model_freeform",
+                desc_th="ประเภท: bank (ธนาคาร·ค่าเริ่มต้น) / income (รายได้ GL↔ภาษีขาย) / tax (ตรวจรายงานภาษีขาย)",
+                desc_zh="档位枚举 bank/income/tax(缺省 bank·执行器再验)",
+            ),
+            SlotSpec(
                 "gl_account",
                 required=False,
                 source="user_text",
-                desc_th="เลขบัญชี GL ถ้าผู้ใช้บอกมาแล้ว (เช่น 1010)",
-                desc_zh="GL 科目号(用户原话给了才带)",
+                desc_th="เลขบัญชี GL ถ้าผู้ใช้บอกมาแล้ว (เช่น 1010 · เฉพาะ bank)",
+                desc_zh="GL 科目号(仅 bank·用户原话给了才带)",
             ),
         ),
         handler="recon_intake_start",

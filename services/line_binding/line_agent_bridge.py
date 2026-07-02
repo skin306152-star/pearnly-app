@@ -147,12 +147,14 @@ def _make_write_sink(
         if tool == "recon_intake_start":
             from services.agent import recon_intake
 
+            intake = data.get("intake") or {}
             recon_intake.start(
                 bound_user,
                 tid,
                 line_user_id,
                 lang,
-                gl_account=(data.get("intake") or {}).get("gl_account"),
+                kind=intake.get("kind") or "bank",
+                gl_account=intake.get("gl_account"),
             )
             return "card_sent"
         if tool == "plan_incoming_doc":

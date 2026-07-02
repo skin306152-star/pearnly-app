@@ -86,7 +86,14 @@ class AgentToolset:
             for t in tasks
         ]
         receipt = copy_map.recon_receipt(recent[0]) if recent else ""
-        return ToolResult(ok=True, data={"count": len(recent), "recent": recent}, receipt=receipt)
+        data: dict = {"count": len(recent), "recent": recent}
+        if not recent:
+            # 在线验证抓到:空数据时模型爱说"结果已准备好请查看"(虚)。给显式提示钉住口径。
+            data["hint"] = (
+                "no reconciliation runs yet — say so honestly and suggest uploading "
+                "a bank statement under Bank Reconciliation on the web"
+            )
+        return ToolResult(ok=True, data=data, receipt=receipt)
 
     def _overview(
         self, ctx: AgentContext, *, this_month: bool, include_categories: bool = True

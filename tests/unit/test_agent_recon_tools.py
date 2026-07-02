@@ -95,8 +95,9 @@ class TestDetail(unittest.TestCase):
         self.assertTrue(r.ok)
         self.assertIn("hint", r.data)
 
-    def test_income_tax_not_available_yet(self):
-        for k in ("income", "tax", "vat", "gl_vat"):
+    def test_tax_not_available_yet(self):
+        # income 已通电(TestIncomeDetail);tax 留方案三,继续如实拒。
+        for k in ("tax", "vat", "sales_vat"):
             r = rt.detail(_CTX, kind=k)
             self.assertFalse(r.ok, k)
             self.assertEqual(r.error_code, "not_available_yet")
@@ -134,17 +135,111 @@ class TestDetail(unittest.TestCase):
         self.assertEqual(r.data["task"]["stmt_opening"], "1000.00")
 
 
-class TestOverviewDelegation(unittest.TestCase):
-    def test_executor_delegates(self):
+_GLVAT_TASK = {
+    "id": 3,
+    "gl_filename": "gl_jun.xlsx",
+    "vat_filename": "vat_jun.xlsx",
+    "matched_count": 20,
+    "unmatched_count": 2,
+    "diff_count": 1,
+    "status": "done",
+    "created_at": "2026-07-02 09:00:00",
+}
+
+
+class TestOverviewTwoKinds(unittest.TestCase):
+    def _run(self, bank, income):
         from services.agent.executor import AgentToolset
 
-        with patch(
-            "services.recon.bank_recon_v2_store.list_bank_recon_v2_tasks", return_value=[_TASK]
+        with (
+            patch("services.recon.bank_recon_v2_store.list_bank_recon_v2_tasks", return_value=bank),
+            patch("services.recon.gl_vat_store.list_gl_vat_tasks", return_value=income),
         ):
-            r = AgentToolset().get_recon_overview(_CTX)
-        self.assertTrue(r.ok)
-        self.assertEqual(r.data["recent"][0]["bank"], "BAY")
+            return AgentToolset().get_recon_overview(_CTX)
+
+    def test_two_kind_shape_with_normalized_counts(self):
+        r = self._run([_TASK], [_GLVAT_TASK])
+        self.assertEqual(r.data["bank"]["recent"][0]["bank"], "BAY")
+        self.assertEqual(r.data["bank"]["recent"][0]["unmatched"], 3)  # gl1+stmt2 归一
+        inc = r.data["income"]["recent"][0]
+        self.assertEqual(inc["unmatched"], 3)  # 缺GL 2 + 金额不一致 1
+        self.assertEqual(inc["missing_in_gl"], 2)
         self.assertIn("agent.ok.recon", r.receipt)
+
+    def test_income_only_still_receipts(self):
+        r = self._run([], [_GLVAT_TASK])
+        self.assertIn("matched=20", r.receipt)
+        self.assertNotIn("hint", r.data)
+
+    def test_both_empty_is_honest(self):
+        r = self._run([], [])
+        self.assertIn("hint", r.data)
+
+
+class TestIncomeDetail(unittest.TestCase):
+    _ROWS = [
+        {
+            "doc_no": "INV-1",
+            "date": "2026-06-01",
+            "customer_name": "A",
+            "vat_amount": 100.0,
+            "gl_amount": 100.0,
+            "diff": 0.0,
+            "account_codes": "4001",
+        },
+        {
+            "doc_no": "INV-2",
+            "date": "2026-06-02",
+            "customer_name": "B",
+            "vat_amount": 200.0,
+            "gl_amount": None,
+            "diff": None,
+            "account_codes": "",
+        },
+        {
+            "doc_no": "INV-3",
+            "date": "2026-06-03",
+            "customer_name": "C",
+            "vat_amount": 300.0,
+            "gl_amount": 290.0,
+            "diff": 10.0,
+            "account_codes": "4001",
+        },
+    ]
+
+    def _run(self, *, keyword=None, tasks=None):
+        with (
+            patch(
+                "services.recon.gl_vat_store.list_gl_vat_tasks",
+                return_value=[_GLVAT_TASK] if tasks is None else tasks,
+            ),
+            patch(
+                "services.recon.gl_vat_store.get_gl_vat_task",
+                return_value={**_GLVAT_TASK, "detail_json": self._ROWS},
+            ),
+        ):
+            return rt.detail(_CTX, kind="income", keyword=keyword)
+
+    def test_only_problem_rows_survive(self):
+        # diff=0 的匹配行必须滤掉;缺 GL 与金额不一致分别打 issue 记号。
+        r = self._run()
+        self.assertTrue(r.ok)
+        issues = {u["doc_no"]: u["issue"] for u in r.data["unmatched"]}
+        self.assertEqual(issues, {"INV-2": "missing_in_gl", "INV-3": "amount_diff"})
+        self.assertEqual(r.data["task"]["unmatched"], 3)
+        self.assertIn("agent.ok.recon_detail", r.receipt)
+
+    def test_income_empty_is_honest(self):
+        r = self._run(tasks=[])
+        self.assertIn("hint", r.data)
+
+    def test_tax_still_not_available(self):
+        self.assertEqual(rt.detail(_CTX, kind="tax").error_code, "not_available_yet")
+
+    def test_income_data_json_safe(self):
+        import json
+
+        json.dumps(self._run().data)
 
 
 class TestObservationAndFallback(unittest.TestCase):
@@ -173,8 +268,24 @@ class TestObservationAndFallback(unittest.TestCase):
             }
         ]
         self.assertIn("7", fallbacks.grounded_fallback(obs, "zh"))
-        obs2 = [{"tool": "recon_overview", "ok": True, "recent": []}]
+        obs2 = [
+            {
+                "tool": "recon_overview",
+                "ok": True,
+                "bank": {"recent": []},
+                "income": {"recent": []},
+            }
+        ]
         self.assertIn("银行对账", fallbacks.grounded_fallback(obs2, "zh"))  # 空数据诚实指路
+        obs3 = [
+            {
+                "tool": "recon_overview",
+                "ok": True,
+                "bank": {"recent": []},
+                "income": {"recent": [{"matched": 20, "unmatched": 3}]},
+            }
+        ]
+        self.assertIn("3", fallbacks.grounded_fallback(obs3, "zh"))  # income 也有兜底数字
 
 
 if __name__ == "__main__":

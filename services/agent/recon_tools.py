@@ -38,36 +38,66 @@ def normalize_kind(kind) -> str:
 
 
 def overview(ctx: AgentContext) -> ToolResult:
-    """银行对账只读概览(方案二起扩三档)。store 层故障返空表不抛 → 诚实空口径。"""
+    """对账只读概览:bank+income 双档一次给齐(问法含糊时模型两档都讲一句)。
+    每档最近 3 条,条目带归一 matched/unmatched;store 层故障返空表不抛 → 诚实空口径。"""
+    bank = _bank_recent(ctx, limit=3)
+    income = _income_recent(ctx, limit=3)
+    latest = bank[0] if bank else (income[0] if income else None)
+    receipt = copy_map.recon_receipt(latest) if latest else ""
+    data: dict = {"bank": {"recent": bank}, "income": {"recent": income}}
+    if not latest:
+        # 在线验证抓到:空数据时模型爱说"结果已准备好请查看"(虚)。给显式提示钉住口径。
+        data["hint"] = (
+            "no reconciliation runs yet — say so honestly and suggest uploading "
+            "files under Reconciliation Center on the web"
+        )
+    return ToolResult(ok=True, data=data, receipt=receipt)
+
+
+def _bank_recent(ctx, *, limit) -> list:
     from services.recon.bank_recon_v2_store import list_bank_recon_v2_tasks
 
-    tasks = list_bank_recon_v2_tasks(str(ctx.user["id"]), ctx.tenant_id, limit=5)
-    recent = [
+    tasks = list_bank_recon_v2_tasks(str(ctx.user["id"]), ctx.tenant_id, limit=limit)
+    return [
         {
             "bank": t.get("bank_code"),
-            "matched": t.get("matched_count"),
-            "unmatched_gl": t.get("unmatched_gl"),
-            "unmatched_stmt": t.get("unmatched_stmt"),
+            "matched": _i(t.get("matched_count")),
+            "unmatched": _i(t.get("unmatched_gl")) + _i(t.get("unmatched_stmt")),
+            "unmatched_gl": _i(t.get("unmatched_gl")),
+            "unmatched_stmt": _i(t.get("unmatched_stmt")),
             "status": t.get("status"),
             "created_at": str(t.get("created_at") or "")[:16],
         }
         for t in tasks
     ]
-    receipt = copy_map.recon_receipt(recent[0]) if recent else ""
-    data: dict = {"count": len(recent), "recent": recent}
-    if not recent:
-        # 在线验证抓到:空数据时模型爱说"结果已准备好请查看"(虚)。给显式提示钉住口径。
-        data["hint"] = (
-            "no reconciliation runs yet — say so honestly and suggest uploading "
-            "a bank statement under Bank Reconciliation on the web"
-        )
-    return ToolResult(ok=True, data=data, receipt=receipt)
+
+
+def _income_recent(ctx, *, limit) -> list:
+    from services.recon.gl_vat_store import list_gl_vat_tasks
+
+    tasks = list_gl_vat_tasks(str(ctx.user["id"]), ctx.tenant_id, limit=limit)
+    return [
+        {
+            "gl_file": t.get("gl_filename"),
+            "vat_file": t.get("vat_filename"),
+            "matched": _i(t.get("matched_count")),
+            # unmatched 归一口径 = 缺 GL(unmatched_count)+ 金额不一致(diff_count)
+            "unmatched": _i(t.get("unmatched_count")) + _i(t.get("diff_count")),
+            "missing_in_gl": _i(t.get("unmatched_count")),
+            "amount_diff": _i(t.get("diff_count")),
+            "status": t.get("status"),
+            "created_at": str(t.get("created_at") or "")[:16],
+        }
+        for t in tasks
+    ]
 
 
 def detail(ctx: AgentContext, *, kind=None, keyword=None) -> ToolResult:
     """对不上的明细钻取(默认最新一次任务;keyword=银行名/文件名定位)。
-    v1 只通 bank 档;income/tax 如实答 not_available_yet(方案二/三依次开)。"""
+    bank/income 已通;tax 如实答 not_available_yet(方案三开)。"""
     k = normalize_kind(kind)
+    if k == "income":
+        return _income_detail(ctx, keyword)
     if k != "bank":
         return ToolResult(ok=False, error_code="not_available_yet")
     from services.recon.bank_recon_v2_store import (
@@ -98,6 +128,7 @@ def detail(ctx: AgentContext, *, kind=None, keyword=None) -> ToolResult:
             "gl_account": task_head.get("gl_account"),
             "created_at": str(task_head.get("created_at") or "")[:16],
             "matched": _i(task_head.get("matched_count")),
+            "unmatched": _i(task_head.get("unmatched_gl")) + _i(task_head.get("unmatched_stmt")),
             "unmatched_gl": _i(task_head.get("unmatched_gl")),
             "unmatched_stmt": _i(task_head.get("unmatched_stmt")),
             "stmt_opening": _s(task_head.get("stmt_opening")),
@@ -108,6 +139,68 @@ def detail(ctx: AgentContext, *, kind=None, keyword=None) -> ToolResult:
         },
         "unmatched": unmatched[:_DETAIL_CAP],
         "omitted": max(0, len(unmatched) - _DETAIL_CAP),
+    }
+    return ToolResult(
+        ok=True, data=data, receipt=copy_map.recon_detail_receipt(data["task"], data["unmatched"])
+    )
+
+
+def _income_detail(ctx: AgentContext, keyword) -> ToolResult:
+    """收入对账(GL 收入科目 ↔ 销项税报告)不一致明细:缺 GL(gl_amount=None)+
+    金额不一致(diff≠0)。行形状来自 gl_vat_task.detail_json(以 VAT 报表为主表)。"""
+    from services.recon.gl_vat_store import get_gl_vat_task, list_gl_vat_tasks
+
+    tasks = list_gl_vat_tasks(str(ctx.user["id"]), ctx.tenant_id, limit=10)
+    head = None
+    q = "".join(str(keyword or "").lower().split())
+    if q:
+        for t in tasks:
+            hay = "".join(
+                f"{t.get('gl_filename') or ''}{t.get('vat_filename') or ''}".lower().split()
+            )
+            if q in hay:
+                head = t
+                break
+    head = head or (tasks[0] if tasks else None)
+    if not head:
+        return ToolResult(
+            ok=True,
+            data={
+                "count": 0,
+                "hint": (
+                    "no income reconciliation runs yet — say so honestly and suggest "
+                    "running one under Reconciliation Center (income tab) on the web"
+                ),
+            },
+        )
+    full = get_gl_vat_task(int(head["id"]), str(ctx.user["id"]), ctx.tenant_id) or {}
+    rows = _detail_rows(full)
+    bad = [
+        {
+            "issue": "missing_in_gl" if r.get("gl_amount") is None else "amount_diff",
+            "side": "NO-GL" if r.get("gl_amount") is None else "DIFF",
+            "doc_no": str(r.get("doc_no") or ""),
+            "date": str(r.get("date") or ""),
+            "desc": str(r.get("customer_name") or "")[:40],
+            "amount": _s(r.get("vat_amount")),
+            "gl_amount": _s(r.get("gl_amount")),
+            "diff": _s(r.get("diff")),
+        }
+        for r in rows
+        if r.get("gl_amount") is None or (r.get("diff") not in (None, 0, 0.0))
+    ]
+    data = {
+        "task": {
+            "gl_file": head.get("gl_filename"),
+            "vat_file": head.get("vat_filename"),
+            "created_at": str(head.get("created_at") or "")[:16],
+            "matched": _i(head.get("matched_count")),
+            "unmatched": _i(head.get("unmatched_count")) + _i(head.get("diff_count")),
+            "missing_in_gl": _i(head.get("unmatched_count")),
+            "amount_diff": _i(head.get("diff_count")),
+        },
+        "unmatched": bad[:_DETAIL_CAP],
+        "omitted": max(0, len(bad) - _DETAIL_CAP),
     }
     return ToolResult(
         ok=True, data=data, receipt=copy_map.recon_detail_receipt(data["task"], data["unmatched"])

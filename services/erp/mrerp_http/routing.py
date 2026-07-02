@@ -66,6 +66,12 @@ _DOC_SANITY_FRIENDLY: Dict[str, Dict[str, str]] = {
         "zh": "押金/定金收据 · 费用尚未发生 · 转人工",
         "ja": "手付金/保証金の受領書 · 費用未発生 · 手動確認",
     },
+    "date_implausible": {
+        "th": "วันที่เอกสารผิดปกติ (เก่ากว่าปี 2000) — เครื่อง POS อาจไม่ได้ตั้งเวลา ตรวจสอบด้วยตนเอง",
+        "en": "Implausible document date (before 2000) — POS clock likely unset; manual review",
+        "zh": "单据日期异常(早于 2000 年)· POS 时钟疑未设置 · 转人工复核",
+        "ja": "伝票日付が異常(2000年以前)· POS 時計未設定の可能性 · 手動確認",
+    },
     "date_future": {
         "th": "วันที่เอกสารเป็นอนาคต — ตรวจสอบด้วยตนเอง",
         "en": "Document date is in the future — please review",

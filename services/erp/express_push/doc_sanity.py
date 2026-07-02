@@ -9,6 +9,7 @@ preflight 在方向判定后、映射前调用。挡掉"不该当普通票直接
   seller_buyer_same_tax   买卖方同税号(自己卖给自己 · 必有一方写错 · 方向判不出)
   credit_note             贷项/退货单(应走负向冲销,不当正向采购/销项)
   deposit_receipt         押金/定金收据(尚未发生费用 · 转人工)
+  date_implausible        古董日期(y<2000 · POS 时钟没设的票 · 必假)
   date_future             未来日期(反造假 · 标可疑复核)
   date_reissued           补开/倒签(ออกใบแทน 等 · 标可疑复核)
   tax_id_invalid          对手方税号位数非法(非 13 位)
@@ -124,8 +125,11 @@ def check_document(
     if any(k in blob for k in _DEPOSIT_KW):
         return "deposit_receipt"
 
-    # 5 · 日期合理性:未来日期 / 补开倒签 → 标可疑复核。
+    # 5 · 日期合理性:古董日期(POS 时钟没设印佛历 2513=1970 · 真机语料)/ 未来日期 /
+    # 补开倒签 → 标可疑复核。与录入侧 ocr_corrections 日期合理窗同口径(y<2000 必假)。
     invoice_date = _parse_iso_date(history.get("invoice_date") or fields.get("date"))
+    if invoice_date is not None and invoice_date.year < 2000:
+        return "date_implausible"
     if invoice_date is not None and invoice_date > (today or date.today()):
         return "date_future"
     if any(k in blob for k in _REISSUE_KW):

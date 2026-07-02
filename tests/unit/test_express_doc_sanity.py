@@ -170,6 +170,17 @@ class DepositTests(unittest.TestCase):
 
 
 class DateTests(unittest.TestCase):
+    def test_ancient_date_blocked(self):
+        # 真机语料(SISTER MAKEUP 2026-07-02):POS 时钟没设,票面印佛历 2513=1970-01-01,
+        # 曾带着 1970 日期通过防呆(只有 future 闸)。y<2000 必假 → 转人工。
+        r = check_document(_fields(), _hist("1970-01-01"), "purchase", today=TODAY)
+        self.assertEqual(r, "date_implausible")
+        r2 = check_document(_fields(), _hist("1999-12-31"), "sales", today=TODAY)
+        self.assertEqual(r2, "date_implausible")
+
+    def test_year_2000_boundary_passes(self):
+        self.assertIsNone(check_document(_fields(), _hist("2000-01-01"), "purchase", today=TODAY))
+
     def test_future_date_blocked(self):
         r = check_document(_fields(), _hist("2026-12-31"), "purchase", today=TODAY)
         self.assertEqual(r, "date_future")

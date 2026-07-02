@@ -134,6 +134,12 @@ _T: dict[str, dict[str, str]] = {
         "th": "กระทบยอดเสร็จ · ตรงกัน {matched} รายการ ไม่ตรง {unmatched}",
         "ja": "照合完了 · 一致 {matched} 件、不一致 {unmatched} 件",
     },
+    "agent.ok.recon_detail": {
+        "zh": "对不上的有 {unmatched} 笔{top_list}",
+        "en": "{unmatched} unmatched items{top_list}",
+        "th": "รายการที่ไม่ตรงกันมี {unmatched} รายการ{top_list}",
+        "ja": "不一致は {unmatched} 件です{top_list}",
+    },
     # ── 超范围引导(oos) ──
     "agent.oos.app_only": {
         "zh": "这个在 App 里做更方便:{app_link}",

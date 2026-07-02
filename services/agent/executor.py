@@ -70,30 +70,16 @@ class AgentToolset:
         )
 
     def get_recon_overview(self, ctx: AgentContext) -> ToolResult:
-        """银行对账结果只读概览(店 list_bank_recon_v2_tasks · RLS 内 · 店层故障返空表不抛)。"""
-        from services.recon.bank_recon_v2_store import list_bank_recon_v2_tasks
+        """对账概览(数据装配在 services/agent/recon_tools · 三档依次通电)。"""
+        from services.agent import recon_tools
 
-        tasks = list_bank_recon_v2_tasks(str(ctx.user["id"]), ctx.tenant_id, limit=5)
-        recent = [
-            {
-                "bank": t.get("bank_code"),
-                "matched": t.get("matched_count"),
-                "unmatched_gl": t.get("unmatched_gl"),
-                "unmatched_stmt": t.get("unmatched_stmt"),
-                "status": t.get("status"),
-                "created_at": str(t.get("created_at") or "")[:16],
-            }
-            for t in tasks
-        ]
-        receipt = copy_map.recon_receipt(recent[0]) if recent else ""
-        data: dict = {"count": len(recent), "recent": recent}
-        if not recent:
-            # 在线验证抓到:空数据时模型爱说"结果已准备好请查看"(虚)。给显式提示钉住口径。
-            data["hint"] = (
-                "no reconciliation runs yet — say so honestly and suggest uploading "
-                "a bank statement under Bank Reconciliation on the web"
-            )
-        return ToolResult(ok=True, data=data, receipt=receipt)
+        return recon_tools.overview(ctx)
+
+    def get_recon_detail(self, ctx: AgentContext, *, kind=None, keyword=None) -> ToolResult:
+        """对账不一致明细钻取(同上,薄委托)。"""
+        from services.agent import recon_tools
+
+        return recon_tools.detail(ctx, kind=kind, keyword=keyword)
 
     def _overview(
         self, ctx: AgentContext, *, this_month: bool, include_categories: bool = True

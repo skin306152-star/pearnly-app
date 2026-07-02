@@ -26,6 +26,9 @@ AGENT_PUSH_KEY = "agent_push_erp"
 # LINE 图片意图子闸(LI 框架):默认关。关 → 发图走现状管线逐字节不变;
 # 开 → 图片 OCR 后先过意图分流(services/agent/image_intent),用户明说的目的优先。
 AGENT_IMAGE_KEY = "agent_image_intent"
+# M3 确认握手状态机(LangGraph HITL 范式 · docs/agent/M3-CONFIRM-HANDSHAKE-DESIGN.md):
+# 默认关。开 → 确认卡 15 分钟内打"确认/取消"字样与点按钮同效(resume 闸消费同一 nonce)。
+AGENT_CONFIRM_KEY = "agent_confirm_machine"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -62,3 +65,8 @@ def agent_push_enabled_for(user_id: Optional[str]) -> bool:
 def agent_image_enabled_for(user_id: Optional[str]) -> bool:
     """LINE 图片意图子闸(LI)。关 = 发图走现状管线逐字节不变。"""
     return _enabled(AGENT_IMAGE_KEY, user_id, "agent_image_enabled_for")
+
+
+def agent_confirm_enabled_for(user_id: Optional[str]) -> bool:
+    """确认握手状态机子闸。关 = 文本"确认"走正常对话轮,按钮卡现状不变。"""
+    return _enabled(AGENT_CONFIRM_KEY, user_id, "agent_confirm_enabled_for")

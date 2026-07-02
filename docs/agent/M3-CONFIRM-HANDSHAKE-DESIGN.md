@@ -77,6 +77,14 @@ CONFIRMED   CANCELLED     SUPERSEDED            EXPIRED
 - 模拟对话舱:多轮剧本(复述→隔一条闲聊→再确认=EXPIRED/SUPERSEDED 语义核对)。
 - 500 轮混沌:随机消息序列,不变量=无检查点绝不执行、执行次数 ≤ 确认次数。
 
+## 5b · v1 落地范围(2026-07-02 Zihao 批"按方案做"后收敛)
+
+推送确认卡本身就是持久化检查点(line_action_nonces·kind=agent_push)→ **v1 不建新表**,
+只落 resume 闸(`services/agent/confirm_machine.py`):15 分钟内最近一张待确认卡 ×
+文本确认/取消词(窄词表·全等匹配)→ 与点按钮同效(消费同一 nonce)。
+`line_pending_actions` 泛用检查点表留给第一个无卡片消费者(DMS)落地时再建——
+不造没有生产者的库表(加新必想删旧)。flag=`agent_confirm_machine`,默认关。
+
 ## 6 · 风险与回滚
 
 - 风险:resume 闸挡在所有 LINE 文本最前——任何崩溃必须 fail-open 到现状路

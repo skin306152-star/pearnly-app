@@ -206,6 +206,14 @@ def try_agent_turn(
     uid = str(bound_user["id"]) if bound_user.get("id") else None
     if not feature_flags.agent_enabled_for(uid):
         return TurnResult("crash")
+    # M3 确认握手 · resume 闸:15 分钟内有待确认推送卡 + 文本是确认/取消词 → 与点按钮
+    # 同效(消费同一 nonce,后到的撞 used 幂等)。闸关/无卡/非确认词/故障 → 正常对话轮。
+    from services.agent import confirm_machine
+
+    if confirm_machine.try_resume(
+        bound_user, reply_token, text, lang, tenant_id=tid, line_user_id=line_user_id
+    ):
+        return TurnResult("card_sent")  # handle_postback 已回话,入口别再出声
     try:
         from services.agent import loop
         from services.agent.contracts import AgentContext

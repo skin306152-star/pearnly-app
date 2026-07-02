@@ -114,3 +114,21 @@ def consume(cur, *, tenant_id, token) -> dict:
             "workspace_client_id": info["workspace_client_id"],
         }
     return {"status": "expired"}
+
+
+def latest_pending(cur, *, tenant_id, user_id, kind, within_minutes=15):
+    """最近铸造、未消费、未过期的指定类动作 token(M3 文本确认通道定位用)。
+
+    只认 within_minutes 内铸的卡:nonce TTL 72h 是防重放口径,文本"确认"是会话语境口径,
+    旧卡不该被一句确认字样隔空引爆。无 → None。
+    """
+    cur.execute(
+        "SELECT token FROM line_action_nonces "
+        "WHERE tenant_id = %s AND user_id = %s AND consumed_at IS NULL "
+        "  AND expires_at > now() AND created_at > now() - make_interval(mins => %s) "
+        "  AND action_ref LIKE %s "
+        "ORDER BY created_at DESC LIMIT 1",
+        (tenant_id, str(user_id or ""), int(within_minutes), f'%"kind": "{kind}"%'),
+    )
+    row = cur.fetchone()
+    return row["token"] if row else None

@@ -209,7 +209,9 @@ async def _handle_line_image_ocr(
             _notify_card("ocr_failed", line_client.t_line(lang, "line_ocr_failed_recovery"))
             return False
         if _ocr_all_pages_not_invoice(pages):
-            _notify(line_client.t_line(lang, "line_not_receipt_recovery"))
+            # 非票据靶向引导(银行对账单→指去对账·认不出回落通用文案)
+            _guide = line_image_route.not_invoice_guidance(pages, lang)
+            _notify(_guide or line_client.t_line(lang, "line_not_receipt_recovery"))
             return True
 
         tid_str = str(user_fresh["tenant_id"]) if user_fresh.get("tenant_id") else None

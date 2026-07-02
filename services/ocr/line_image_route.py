@@ -44,6 +44,21 @@ _CANT_PUSH = {
     "en": "⚠️ This document can't be pushed yet: {reason} · it's saved — fix it on the web, then push.",
     "ja": "⚠️ この伝票はまだ送信できません:{reason} · 保存済みです。ウェブで修正後に送信できます。",
 }
+_BANK_STMT_GUIDE = {
+    "th": (
+        "ใบนี้เป็นรายการเดินบัญชีธนาคารค่ะ ไม่ใช่ใบเสร็จค่าใช้จ่าย · ไปที่เว็บ Pearnly > "
+        "กระทบยอดธนาคาร เพื่ออัปโหลดทำกระทบยอดได้เลย หรือถามผลกระทบยอดล่าสุดกับฉันก็ได้ค่ะ"
+    ),
+    "zh": "这是银行对账单,不是费用票据·请到网页「银行对账」上传做对账;也可以直接问我最近的对账结果。",
+    "en": (
+        "This is a bank statement, not an expense receipt. Upload it under Bank Reconciliation "
+        "on the web — or just ask me for the latest reconciliation results."
+    ),
+    "ja": (
+        "これは銀行取引明細で、経費の伝票ではありません。ウェブの「銀行照合」から"
+        "アップロードしてください。最新の照合結果は私に聞いても大丈夫です。"
+    ),
+}
 _PUSH_DROPPED = {
     "th": "ส่วนการส่งเข้า ERP ยังไม่เปิดใช้งานค่ะ เก็บใบไว้ให้แล้ว เปิดใช้เมื่อไหร่ส่งได้เลย",
     "zh": "推送功能暂未开通,单据已留存,开通后可直接推。",
@@ -66,6 +81,19 @@ class Directive:
         self.handled = handled
         self.ws = ws
         self.skip_ingest = skip_ingest
+
+
+def not_invoice_guidance(pages, lang) -> Optional[str]:
+    """非票据页的靶向引导:认出银行对账单 → 指去网页对账 + 可问对账结果(替掉
+    "不像票据请发费用文件"的死胡同 · 真机探针 2026-07-02)。认不出/故障 → None(回落通用文案)。"""
+    try:
+        for p in pages or []:
+            doc_type = str(((p or {}).get("fields") or {}).get("document_type") or "")
+            if doc_type == "bank_statement":
+                return _t(_BANK_STMT_GUIDE, lang)
+    except Exception:
+        return None
+    return None
 
 
 def cache_shortcut(user, line_user_id, file_hash, ws, lang, quote_token) -> bool:

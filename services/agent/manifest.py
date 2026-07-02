@@ -77,6 +77,20 @@ TOOLS: tuple[ToolSpec, ...] = (
         confirm=False,
     ),
     ToolSpec(
+        name="recon_overview",
+        # 只读查询;bucket=B 因功能区 recon_routes_bankv2 整档登记 B(区含 run/delete 写动作,
+        # 档随区走),writes=False + gate=None → 始终可见,与 A 档只读工具同一可见性。
+        bucket="B",
+        title_th="ดูผลกระทบยอดธนาคาร",
+        desc_th=(
+            "ดูผลการกระทบยอดธนาคาร (bank reconciliation) ล่าสุด: ตรงกันกี่รายการ "
+            "ไม่ตรงกี่รายการ ธนาคารไหน (ใช้เมื่อถามเรื่องกระทบยอด/对账/reconcile)"
+        ),
+        slots=(),
+        handler="get_recon_overview",
+        confirm=False,
+    ),
+    ToolSpec(
         name="push_status",
         bucket="A",
         title_th="เช็คสถานะการส่งเข้า ERP",
@@ -337,6 +351,7 @@ REGISTRY_AREA: dict[str, str] = {
     "usage_this_month": "billing_records_routes",
     "list_notifications": "notification_routes",
     "push_status": "erp_listing_routes",
+    "recon_overview": "recon_routes_bankv2",
     "rd_lookup": "rd_routes",
     "my_plan": "me_routes",
     "record_expense": "purchase_intake_routes",

@@ -78,6 +78,14 @@ def try_resume(bound_user, reply_token, text, lang, *, tenant_id, line_user_id) 
         word = classify(text)
         if word is None:
             return False
+        # 泛用检查点(刚复述完等答复,语境最强)优先于推送卡 nonce(设计 §3 消费顺序)。
+        from services.line_binding import line_pending_actions
+
+        action = line_pending_actions.take_action(str(tenant_id), line_user_id)
+        if action:
+            return _resume_action(
+                bound_user, word, lang, action, tenant_id=tenant_id, line_user_id=line_user_id
+            )
         from services.line_binding import line_action_nonce as nonce
 
         with db.get_cursor_rls(str(tenant_id)) as cur:
@@ -106,3 +114,23 @@ def try_resume(bound_user, reply_token, text, lang, *, tenant_id, line_user_id) 
     except Exception:
         logger.warning("[confirm_machine] resume failed; normal turn", exc_info=True)
         return False
+
+
+def _resume_action(bound_user, word, lang, action, *, tenant_id, line_user_id) -> bool:
+    """泛用检查点分发(take 已消费 · 单发单用)。目前唯一工具=dms_push;
+    未知工具=生产者/消费者不同步 → 记日志走正常轮(检查点作废,宁可让用户重来)。"""
+    from core import feature_flags
+    from services.agent import dms_push
+
+    tool = str((action or {}).get("tool") or "")
+    if tool != dms_push.TOOL:
+        logger.warning("[confirm_machine] unknown pending action tool=%s; dropped", tool)
+        return False
+    uid = str((bound_user or {}).get("id") or "")
+    if word == "no" or not feature_flags.agent_dms_enabled_for(uid):
+        # 闸中途被关:检查点已取走,按取消处理(诚实,不静默吞)。
+        dms_push.cancel(bound_user, str(tenant_id), line_user_id, lang)
+        return True
+    dms_push.execute_confirmed(bound_user, str(tenant_id), line_user_id, lang, action)
+    logger.info("[confirm_machine] checkpoint-%s consumed tool=%s", word, tool)
+    return True

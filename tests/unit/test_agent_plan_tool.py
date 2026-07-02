@@ -96,6 +96,52 @@ class TestPlanIncomingDoc(unittest.TestCase):
         self.assertEqual(hit.data["plan"]["book_to_id"], 84)
 
 
+class TestPlanDmsGoal(unittest.TestCase):
+    """dms 目标(身份证建 DMS 客户 · LINE-DMS-PUSH-DESIGN):独占、闸 fail-closed、
+    端点必须真实存在——绝不存一个到时执行不了的计划。"""
+
+    def setUp(self):
+        self.ts = AgentToolset()
+
+    _EP = {"id": "e1", "adapter": "mrerp_dms"}
+
+    def _run(self, goals, *, flag=True, ep=_EP):
+        with (
+            patch("core.feature_flags.agent_dms_enabled_for", return_value=flag),
+            patch("services.erp.dms_id_ocr.resolve_dms_endpoint", return_value=ep),
+        ):
+            return self.ts.plan_incoming_doc(_CTX, goals=goals)
+
+    def test_dms_goal_and_aliases(self):
+        for g in ("dms", "dms_customer", "id_card_to_dms", "create_dms_customer"):
+            r = self._run([g])
+            self.assertTrue(r.ok, g)
+            self.assertEqual(r.data["plan"]["goals"], ["dms"])
+
+    def test_dms_is_exclusive(self):
+        r = self._run(["dms", "record"])
+        self.assertEqual(r.error_code, "invalid_goals")
+
+    def test_gate_off_fails_closed(self):
+        r = self._run(["dms"], flag=False)
+        self.assertEqual(r.error_code, "not_available_yet")
+
+    def test_no_dms_endpoint_is_honest(self):
+        r = self._run(["dms"], ep=None)
+        self.assertEqual(r.error_code, "no_dms_endpoint")
+
+    def test_dms_requires_push_permission(self):
+        with (
+            patch("core.feature_flags.agent_dms_enabled_for", return_value=True),
+            patch(
+                "services.agent.executor._plan_permissions",
+                return_value={"can_push_erp": False},
+            ),
+        ):
+            r = self.ts.plan_incoming_doc(_CTX, goals=["dms"])
+        self.assertEqual(r.error_code, "forbidden")
+
+
 class TestPlanToolVisibility(unittest.TestCase):
     def test_gate_controls_visibility(self):
         # image 闸开(且写开)才对模型可见;闸关 = 提示词里没有这个工具 = 现状。

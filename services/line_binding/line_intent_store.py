@@ -101,6 +101,31 @@ def peek_intent(tenant_id, line_user_id) -> bool:
         return False
 
 
+def read_intent(tenant_id, line_user_id) -> Optional[dict]:
+    """读而不取(DMS 绕过点看意图内容判断是否接管;take 仍只在真正消费方)。
+    故障 → None = 当没有意图,绝不挡图片主路。"""
+    from core import db
+
+    def _run():
+        with db.get_cursor_rls(str(tenant_id)) as cur:
+            cur.execute(
+                "SELECT intent FROM line_pending_intents "
+                "WHERE tenant_id = %s AND line_user_id = %s AND expires_at > now()",
+                (str(tenant_id), str(line_user_id)),
+            )
+            row = cur.fetchone()
+        if not row:
+            return None
+        intent = row.get("intent")
+        return intent if isinstance(intent, dict) else json.loads(intent or "{}")
+
+    try:
+        return _with_heal(_run)
+    except Exception:
+        logger.warning("[line_intent] read failed; treat as none", exc_info=True)
+        return None
+
+
 def take_intent(tenant_id, line_user_id) -> Optional[dict]:
     """原子取走并删除(单发单用):过期行同删不返。无 → None(走默认路)。"""
     from core import db

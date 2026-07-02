@@ -153,13 +153,21 @@ async def _handle_line_image_ocr(
         # 归 LINE 用户租户的默认套账(绑定店)。缺则 None(insert 内 NULL · 不拦上传)。
         _ws_client_id = wc.default_workspace_for_write(user_fresh.get("tenant_id"))
 
-        # 3+3.5 OCR 前缓存快路(dup 状态卡/指纹缓存)已搬 line_image_route.cache_shortcut:
-        # 有待决意图时让位(重发同图+新意图不被短路吞),无意图/闸关时逐字节同现状。
+        # 3+3.5 费用 OCR 前快路(line_image_route.pre_ocr_shortcut):①意图=dms →
+        # 专用身份证路接管;②缓存快路(dup/指纹·有待决意图时让位)。None=继续现状。
         file_hash = _ocr_content_hash(file_bytes)
-        if line_image_route.cache_shortcut(
-            user_fresh, line_user_id, file_hash, _ws_client_id, lang, quote_token
-        ):
-            return True
+        _pre = await line_image_route.pre_ocr_shortcut(
+            user_fresh,
+            line_user_id,
+            file_hash,
+            _ws_client_id,
+            lang,
+            quote_token,
+            file_bytes=file_bytes,
+            filename=filename,
+        )
+        if _pre is not None:
+            return _pre
 
         quote = _ocr_billing_quote(user_fresh, file_bytes, filename, max_pages=50)
         if not quote.get("allowed"):
@@ -287,10 +295,8 @@ async def _handle_line_image_ocr(
                 _one["source"] = "image" if _is_img else "file"  # 来自图片 / 来自文件
             # 已入账/草稿/待归类 → 不写识别记录;计费与历史脱钩(history_id=None);回执发数据卡。
             try:
-                import asyncio as _acharge
-
-                _acharge.create_task(
-                    _acharge.to_thread(
+                asyncio.create_task(
+                    asyncio.to_thread(
                         _ocr_charge_success, user_fresh, quote, None, f"LINE OCR · {filename}"
                     )
                 )
@@ -362,10 +368,8 @@ async def _handle_line_image_ocr(
             hid = None
         if hid:
             try:
-                import asyncio as _asyncio_charge_l
-
-                _asyncio_charge_l.create_task(
-                    _asyncio_charge_l.to_thread(
+                asyncio.create_task(
+                    asyncio.to_thread(
                         _ocr_charge_success,
                         user_fresh,
                         quote,
@@ -399,8 +403,6 @@ async def _handle_line_image_ocr(
         # v118.22.0.3 · 增加 duplicate 预检 · 让 LINE 票据也享有「重复发票拦截」防护
         if hid:
             try:
-                import asyncio as _asyncio_exc_l
-
                 _primary = pages[0] if pages else {}
                 _f = _primary.get("fields") or {}
                 _exc_total = None
@@ -431,7 +433,7 @@ async def _handle_line_image_ocr(
                         }
                 except Exception as _e_dup:
                     logger.warning(f"[line_ocr] duplicate 检测失败(不影响 hook): {_e_dup}")
-                _asyncio_exc_l.create_task(
+                asyncio.create_task(
                     _async_run_exception_checks(
                         history_id=str(hid),
                         user_id=str(user_fresh["id"]),

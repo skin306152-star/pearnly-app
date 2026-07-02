@@ -113,6 +113,60 @@ class TestResume(unittest.TestCase):
             )
 
 
+class TestCheckpointPriority(unittest.TestCase):
+    """泛用检查点(line_pending_actions)优先于推送卡 nonce(设计 §3 消费顺序)。"""
+
+    _ACTION = {"tool": "dms_push", "endpoint_id": "e1", "fields": {"name": "A"}}
+
+    def _run(self, text, *, action, dms_flag=True):
+        with (
+            patch("core.feature_flags.agent_confirm_enabled_for", return_value=True),
+            patch("core.feature_flags.agent_dms_enabled_for", return_value=dms_flag),
+            patch("services.line_binding.line_pending_actions.take_action", return_value=action),
+            patch("services.line_binding.line_action_nonce.latest_pending") as lp,
+            patch("services.agent.dms_push.execute_confirmed") as ex,
+            patch("services.agent.dms_push.cancel") as ca,
+        ):
+            out = m.try_resume(_USER, "rtok", text, "zh", tenant_id="t-1", line_user_id="Uabc")
+        return out, lp, ex, ca
+
+    def test_yes_executes_checkpoint_before_nonce(self):
+        out, lp, ex, ca = self._run("确认", action=self._ACTION)
+        self.assertTrue(out)
+        ex.assert_called_once()
+        self.assertEqual(ex.call_args.args[-1], self._ACTION)
+        lp.assert_not_called()  # 检查点命中 → 不再摸推送卡
+        ca.assert_not_called()
+
+    def test_no_cancels_checkpoint(self):
+        out, _lp, ex, ca = self._run("取消", action=self._ACTION)
+        self.assertTrue(out)
+        ca.assert_called_once()
+        ex.assert_not_called()
+
+    def test_dms_gate_off_midflight_cancels_honestly(self):
+        out, _lp, ex, ca = self._run("确认", action=self._ACTION, dms_flag=False)
+        self.assertTrue(out)
+        ca.assert_called_once()
+        ex.assert_not_called()
+
+    def test_no_checkpoint_falls_to_nonce_path(self):
+        # 只验消费顺序:无检查点 → 继续查推送卡 nonce(无卡 → 正常轮)。
+        with (
+            patch("core.feature_flags.agent_confirm_enabled_for", return_value=True),
+            patch("services.line_binding.line_pending_actions.take_action", return_value=None),
+            patch("core.db.get_cursor_rls", return_value=_cm(MagicMock())),
+            patch(
+                "services.line_binding.line_action_nonce.latest_pending", return_value=None
+            ) as lp,
+            patch("services.agent.dms_push.execute_confirmed") as ex,
+        ):
+            out = m.try_resume(_USER, "rtok", "确认", "zh", tenant_id="t-1", line_user_id="U")
+        self.assertFalse(out)
+        lp.assert_called_once()
+        ex.assert_not_called()
+
+
 class TestNonceQueryContract(unittest.TestCase):
     def test_latest_pending_sql_shape(self):
         from services.line_binding import line_action_nonce as nonce

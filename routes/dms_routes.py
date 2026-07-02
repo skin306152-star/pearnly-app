@@ -22,66 +22,23 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import time
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from core import db
+from services.erp import dms_id_ocr as _id_ocr
 from services.erp import erp_dms_intake as _dms_intake
 from core.auth import get_current_user_from_request
 from routes.erp_routes_access import _check_push_access
-from core.route_helpers import _tid
 
 logger = logging.getLogger("mr-pilot")
 
 router = APIRouter()
 
-# 身份证图片大小上限(MB)· 与发票 OCR 同量级 · 防超大文件拖垮 Vision。
-_MAX_ID_CARD_MB = 15
-
-
-def _resolve_dms_endpoint(user_id: str, endpoint_id: Optional[str]) -> Optional[Dict[str, Any]]:
-    """选 mrerp_dms endpoint。带 id 时校验它确实是 mrerp_dms(绝不用非 DMS 端点);
-    不带时取第一个 enabled 的 mrerp_dms。"""
-    if endpoint_id:
-        ep = db.get_erp_endpoint(user_id, endpoint_id)
-        if ep and (ep.get("adapter") or "").strip().lower() == "mrerp_dms":
-            return ep
-        return None
-    eps = db.list_erp_endpoints(user_id) or []
-    for ep in eps:
-        if (ep.get("adapter") or "").strip().lower() == "mrerp_dms" and ep.get(
-            "enabled"
-        ) is not False:
-            return ep
-    return None
-
-
-def _ensure_image_bytes(content: bytes, content_type: str = "") -> bytes:
-    """身份证 OCR(extract_thai_id_card)只吃图片。共享上传流水线会把图片
-    包成单页 PDF(相机/相册图片在到达本接口前经 imagesToPdf 转 photo_*.pdf),
-    后端按图读 PDF → Layer1Error。这里把 PDF 首页栅格化成 PNG 兜底
-    (DMS-UI-003 · 2026-06-01)· 非 PDF 字节原样返回。"""
-    is_pdf = content[:5] == b"%PDF-" or (content_type or "").strip().lower() == "application/pdf"
-    if not is_pdf:
-        return content
-    try:
-        import fitz  # PyMuPDF · OCR 流水线已在用(layer1_vision/pipeline)
-
-        doc = fitz.open(stream=content, filetype="pdf")
-        if doc.page_count < 1:
-            doc.close()
-            return content
-        page = doc.load_page(0)
-        # 300 DPI · 与发票 OCR 渲染同量级 · 身份证小字够清晰
-        pix = page.get_pixmap(matrix=fitz.Matrix(300 / 72.0, 300 / 72.0), alpha=False)
-        png = pix.tobytes("png")
-        doc.close()
-        return png or content
-    except Exception as e:
-        logger.warning(f"[dms] PDF→图栅格化失败 · 退回原字节: {e}")
-        return content
+# 端点解析/字段整形与 LINE 侧共用(services/erp/dms_id_ocr · 2026-07-02 抽出)。
+_resolve_dms_endpoint = _id_ocr.resolve_dms_endpoint
+_editable_id_card = _id_ocr.editable_id_card
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -94,99 +51,20 @@ async def _ocr_id_card(
     request: Request, file: UploadFile, endpoint_id: Optional[str], user: Dict[str, Any]
 ):
     """读图 + 选 DMS 端点 + 身份证 OCR + 计费(鉴权由调用方先做)。
-    返回 (ep, ocr, elapsed_ms)。出错抛 HTTPException(空文件/超大/无端点/识别失败)。"""
+    返回 (ep, ocr, elapsed_ms)。出错抛 HTTPException(空文件/超大/无端点/识别失败),
+    响应体与抽出前逐字节一致(DmsOcrError.detail 原样转)。"""
     content = await file.read()
-    if not content:
-        raise HTTPException(400, detail="ocr.empty_file")
-    if len(content) > _MAX_ID_CARD_MB * 1024 * 1024:
-        raise HTTPException(400, detail={"code": "ocr.file_too_large", "mb": _MAX_ID_CARD_MB})
-    ep = _resolve_dms_endpoint(user["id"], endpoint_id)
-    if not ep:
-        raise HTTPException(400, detail="dms.no_endpoint")
-
-    # 余额闸 · 与其它 OCR 入口对齐(铁律 #26):余额不足且非豁免 → 402 拦下,绝不先识别再扣成负。
-    # 身份证 OCR 按 1 页计(charge kind='pdf' units=1)· 异常容错降级(不阻塞,与热路径一致)。
     try:
-        _bill = db.get_billing_status_combined(str(user["id"]), _tid(user))
-        if not _bill.get("allowed") and not _bill.get("is_exempt"):
-            raise HTTPException(
-                402,
-                detail={
-                    "code": "insufficient_balance",
-                    "balance": _bill.get("balance_thb", 0.0),
-                    "estimated_cost": float(
-                        db.estimate_pdf_cost_thb(_bill.get("pages_used_this_month", 0), 1)
-                    ),
-                    "pages_used_this_month": _bill.get("pages_used_this_month", 0),
-                },
-            )
-    except HTTPException:
-        raise
-    except Exception as _be:
-        logger.warning(f"[dms] billing pre-check skip(error tolerated): {_be}")
-
-    own_key = (
-        user.get("gemini_api_key") or user.get("custom_gemini_api_key") or ""
-    ).strip() or None
-    image_bytes = await asyncio.to_thread(_ensure_image_bytes, content, file.content_type or "")
-    t0 = time.time()
-    try:
-        from services.ocr.id_card_extract import extract_thai_id_card
-
-        ocr = await asyncio.to_thread(extract_thai_id_card, image_bytes, own_key)
-    except Exception as e:
-        is_unreadable = type(e).__name__ == "IdCardExtractError"
-        if not is_unreadable:
-            logger.exception("dms id-card OCR failed")
-        raise HTTPException(
-            422 if is_unreadable else 500,
-            detail={
-                "code": "ocr.id_card_unreadable" if is_unreadable else "ocr.failed",
-                "msg": str(e)[:200] if is_unreadable else type(e).__name__,
-            },
+        return await asyncio.to_thread(
+            _id_ocr.recognize_id_card,
+            user,
+            content,
+            file.filename,
+            file.content_type or "",
+            endpoint_id,
         )
-    elapsed = int((time.time() - t0) * 1000)
-    try:
-        asyncio.create_task(
-            asyncio.to_thread(
-                db.charge_ocr_async,
-                str(user.get("id")),
-                _tid(user),
-                "pdf",
-                1,
-                None,
-                f"DMS id-card OCR · {file.filename}",
-            )
-        )
-    except Exception as _be:
-        logger.warning(f"[dms] id-card billing fire failed (tolerated): {_be}")
-    return ep, ocr, elapsed
-
-
-def _editable_id_card(id_card: Dict[str, Any]) -> Dict[str, Any]:
-    """面板可编辑用的识别字段(完整 · 非遮蔽 · 用户自己的扫描件)。"""
-    addr = id_card.get("address") or {}
-    first = id_card.get("first_name", "")
-    last = id_card.get("last_name", "")
-    return {
-        "prefix_name": id_card.get("prefix_name", ""),
-        "first_name": first,
-        "last_name": last,
-        "name": f"{first} {last}".strip(),
-        "people_id": id_card.get("people_id", ""),
-        "birthday_be": id_card.get("birthday_be", ""),
-        "phone": "",
-        "address": {
-            "house_no": addr.get("house_no", ""),
-            "moo": addr.get("moo", ""),
-            "soi": addr.get("soi", ""),
-            "road": addr.get("road", ""),
-            "province": addr.get("province", ""),
-            "district": addr.get("district", ""),
-            "subdistrict": addr.get("subdistrict", ""),
-            "zipcode": addr.get("zipcode", ""),
-        },
-    }
+    except _id_ocr.DmsOcrError as e:
+        raise HTTPException(e.http_status, detail=e.detail)
 
 
 @router.post("/api/dms/id-card/recognize")

@@ -29,6 +29,9 @@ AGENT_IMAGE_KEY = "agent_image_intent"
 # M3 确认握手状态机(LangGraph HITL 范式 · docs/agent/M3-CONFIRM-HANDSHAKE-DESIGN.md):
 # 默认关。开 → 确认卡 15 分钟内打"确认/取消"字样与点按钮同效(resume 闸消费同一 nonce)。
 AGENT_CONFIRM_KEY = "agent_confirm_machine"
+# LINE DMS 身份证推送子闸(LINE-DMS-PUSH-DESIGN):默认关。关 → 身份证图走现状
+# (not_invoice 靶向引导仍在,无副作用);开 → 说过"进 DMS"再发身份证 = 复述+确认后建客户。
+AGENT_DMS_KEY = "agent_dms_push"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -70,3 +73,8 @@ def agent_image_enabled_for(user_id: Optional[str]) -> bool:
 def agent_confirm_enabled_for(user_id: Optional[str]) -> bool:
     """确认握手状态机子闸。关 = 文本"确认"走正常对话轮,按钮卡现状不变。"""
     return _enabled(AGENT_CONFIRM_KEY, user_id, "agent_confirm_enabled_for")
+
+
+def agent_dms_enabled_for(user_id: Optional[str]) -> bool:
+    """LINE DMS 身份证推送子闸。关 = 身份证图走现状,plan 的 dms 目标如实拒。"""
+    return _enabled(AGENT_DMS_KEY, user_id, "agent_dms_enabled_for")

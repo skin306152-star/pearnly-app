@@ -3,6 +3,8 @@
 
 锁:_ocr_id_card 在做 OCR/扣费之前必须过 get_billing_status_combined —— 余额不足且
 非豁免 → 402 拦下,绝不先识别再扣成负;放行/豁免才继续。回归防护此前缺闸的洞。
+2026-07-02 起闸体在 services/erp/dms_id_ocr(网页/LINE 共用),路由是薄转换层——
+本测仍打路由入口,patch 落服务模块(验到 HTTPException 转换一整条)。
 """
 
 import asyncio
@@ -10,6 +12,7 @@ import unittest
 from unittest import mock
 
 import routes.dms_routes as dms
+from services.erp import dms_id_ocr as svc
 
 
 class _FakeUpload:
@@ -37,7 +40,7 @@ def _run(coro):
 
 class DmsBillingGateTest(unittest.TestCase):
     def setUp(self):
-        self._ep_patch = mock.patch.object(dms, "_resolve_dms_endpoint", return_value=_EP)
+        self._ep_patch = mock.patch.object(svc, "resolve_dms_endpoint", return_value=_EP)
         self._ep_patch.start()
         self.addCleanup(self._ep_patch.stop)
 
@@ -50,9 +53,9 @@ class DmsBillingGateTest(unittest.TestCase):
             "pages_used_this_month": 5,
         }
         with (
-            mock.patch.object(dms.db, "get_billing_status_combined", return_value=bill),
-            mock.patch.object(dms.db, "estimate_pdf_cost_thb", return_value=1.5),
-            mock.patch.object(dms.db, "charge_ocr_async") as charge,
+            mock.patch.object(svc.db, "get_billing_status_combined", return_value=bill),
+            mock.patch.object(svc.db, "estimate_pdf_cost_thb", return_value=1.5),
+            mock.patch.object(svc.db, "charge_ocr_async") as charge,
             mock.patch("services.ocr.id_card_extract.extract_thai_id_card") as extract,
         ):
             with self.assertRaises(dms.HTTPException) as ctx:
@@ -67,8 +70,8 @@ class DmsBillingGateTest(unittest.TestCase):
         bill = {"allowed": False, "is_exempt": True, "balance_thb": 0.0, "pages_used_this_month": 0}
         ocr_out = {"needs_review": False, "missing_fields": [], "id_card": {"first_name": "a"}}
         with (
-            mock.patch.object(dms.db, "get_billing_status_combined", return_value=bill),
-            mock.patch.object(dms.db, "charge_ocr_async"),
+            mock.patch.object(svc.db, "get_billing_status_combined", return_value=bill),
+            mock.patch.object(svc.db, "charge_ocr_async"),
             mock.patch("services.ocr.id_card_extract.extract_thai_id_card", return_value=ocr_out),
         ):
             ep, ocr, _ms = _run(dms._ocr_id_card(object(), _FakeUpload(), None, _USER))
@@ -85,8 +88,8 @@ class DmsBillingGateTest(unittest.TestCase):
         }
         ocr_out = {"needs_review": False, "missing_fields": [], "id_card": {"first_name": "b"}}
         with (
-            mock.patch.object(dms.db, "get_billing_status_combined", return_value=bill),
-            mock.patch.object(dms.db, "charge_ocr_async"),
+            mock.patch.object(svc.db, "get_billing_status_combined", return_value=bill),
+            mock.patch.object(svc.db, "charge_ocr_async"),
             mock.patch("services.ocr.id_card_extract.extract_thai_id_card", return_value=ocr_out),
         ):
             ep, ocr, _ms = _run(dms._ocr_id_card(object(), _FakeUpload(), None, _USER))

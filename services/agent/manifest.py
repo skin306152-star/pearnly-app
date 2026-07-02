@@ -280,7 +280,8 @@ TOOLS: tuple[ToolSpec, ...] = (
             "ตัวอย่าง: 'ใบต่อไปส่งเข้า ERP ไม่ต้องบันทึก' → goals:[\"push\"] · "
             "'รูปหน้าบันทึกเข้าชุด X' → goals:[\"record\"] · "
             "'รูปหน้าไม่ต้องทำอะไร/แค่ดูให้' → goals:[\"nothing\"] · "
-            '\'บันทึกด้วยส่ง ERP ด้วย\' → goals:["record","push"]'
+            '\'บันทึกด้วยส่ง ERP ด้วย\' → goals:["record","push"] · '
+            "'บัตรประชาชนใบต่อไปสร้างลูกค้า DMS' → goals:[\"dms\"]"
         ),
         slots=(
             # goals 是封闭枚举(record/push/archive_only/nothing 组合),端点/套账名必须
@@ -289,8 +290,8 @@ TOOLS: tuple[ToolSpec, ...] = (
                 "goals",
                 required=True,
                 source="model_freeform",
-                desc_th="สิ่งที่จะทำ (เลือกจาก: record / push / archive_only / nothing · เลือกได้หลายอัน)",
-                desc_zh="目的组合(枚举 record/push/archive_only/nothing·执行器再验)",
+                desc_th="สิ่งที่จะทำ (เลือกจาก: record / push / archive_only / nothing / dms · dms=บัตรประชาชนสร้างลูกค้า DMS ใช้เดี่ยว)",
+                desc_zh="目的组合(枚举 record/push/archive_only/nothing/dms·dms=身份证建DMS客户须独占·执行器再验)",
             ),
             SlotSpec(
                 "endpoint_name",

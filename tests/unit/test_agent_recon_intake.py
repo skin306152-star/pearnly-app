@@ -205,7 +205,8 @@ class TestIncomeAndTaxKinds(_Base):
         enq.assert_called_once()
         args, kwargs = enq.call_args
         self.assertEqual(args[0], "glvat")
-        self.assertEqual(args[3]["revenue_prefix"], "4")
+        # revenue_prefix 不在 params 里(交 glvat handler 自己兜底"4",不重复默认值)
+        self.assertNotIn("revenue_prefix", args[3])
         self.assertNotIn("gl_account", args[3])
         self.assertEqual(sorted(f["role"] for f in args[4]), ["gl", "vat"])
 

@@ -31,6 +31,7 @@ const _EXPRESS_REASON_I18N: Record<string, string> = {
     account_not_in_chart: 'erp-reason-not-in-chart',
     // 单据防呆(doc_sanity · 须人工判断):外币/贷项/押金/未来日期/补开倒签/坏税号。
     currency_not_thb: 'erp-reason-currency',
+    seller_buyer_same_tax: 'erp-reason-same-tax',
     credit_note: 'erp-reason-credit-note',
     deposit_receipt: 'erp-reason-deposit',
     date_future: 'erp-reason-date-future',

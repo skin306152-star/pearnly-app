@@ -48,6 +48,12 @@ _DOC_SANITY_FRIENDLY: Dict[str, Dict[str, str]] = {
         "zh": "外币单据(非泰铢)· 转人工复核 · 不自动过账",
         "ja": "外貨建て伝票(タイバーツ以外)· 手動確認 · 自動計上しない",
     },
+    "seller_buyer_same_tax": {
+        "th": "เลขผู้เสียภาษีผู้ขายกับผู้ซื้อเป็นเลขเดียวกัน — เอกสารผิดปกติ ตรวจสอบด้วยตนเอง",
+        "en": "Seller and buyer share the same tax ID — abnormal document; manual review",
+        "zh": "买卖方税号相同 · 票面异常(自己卖给自己)· 转人工复核",
+        "ja": "売り手と買い手の納税者番号が同一 · 伝票異常 · 手動確認",
+    },
     "credit_note": {
         "th": "ใบลดหนี้/คืนสินค้า — ต้องกลับรายการ ไม่บันทึกเป็นบิลปกติ",
         "en": "Credit note / return — must be a reversal, not a normal invoice",

@@ -13,7 +13,7 @@ import io
 from typing import Any, Dict, List
 
 from services.erp import mrerp_xlsx_generator as _gen
-from services.erp.mrerp_xlsx_fmt import fmt_date, fmt_number
+from services.erp.mrerp_xlsx_fmt import fmt_date, fmt_number, history_number
 from services.erp.mrerp_xlsx_lookups import (
     lookup_customer_code,
     _build_product_lookup,
@@ -125,8 +125,8 @@ def build_sales_credit_detail_rows(
                 }
             )
     if not rows:
-        sub = fmt_number(history.get("subtotal") or history.get("amount_before_tax"))
-        tot = fmt_number(history.get("total_amount"))
+        sub = history_number(history, "subtotal", "amount_before_tax")
+        tot = history_number(history, "total_amount")
         if sub is None and tot is not None:
             sub = round(tot / 1.07, 2)
         unit = sub or tot or 0

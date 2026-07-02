@@ -10,6 +10,7 @@ import zipfile
 
 from services.erp.mrerp_http.autocreate import _seller_from_history, provision_suppliers
 from services.erp.mrerp_xlsx_purchase import (
+    _detail_rows,
     _supplier_code,
     generate_xlsx_purchase,
     validate_purchase_history,
@@ -76,6 +77,25 @@ class TestPurchaseValidate(unittest.TestCase):
         h3["fields"] = {}
         h3["seller_tax_id"] = ""
         self.assertEqual(validate_purchase_history(h3, {"suppliers": []})[1], "ERR_NO_SUPPLIER")
+
+
+class TestPurchaseDetailFallback(unittest.TestCase):
+    """无明细行兜底:金额=税基(表头税率 7 แยก 价外)。真实流 subtotal 只在 fields,
+    只有含税总额时剥 7% 反推,不把含税额当税基多记 7%。"""
+
+    def _no_items(self, **top):
+        h = {"id": "abc124", "invoice_date": "2026-07-01", "fields": {}}
+        h.update(top)
+        return h
+
+    def test_fields_subtotal_used_as_base(self):
+        h = self._no_items(total_amount="107.00")
+        h["fields"]["subtotal"] = "100.00"
+        self.assertEqual(_detail_rows(h, {})[0]["amount"], 100.0)
+
+    def test_total_only_strips_vat(self):
+        rows = _detail_rows(self._no_items(total_amount="107.00"), {})
+        self.assertEqual(rows[0]["amount"], 100.0)
 
 
 class TestSupplierMaster(unittest.TestCase):

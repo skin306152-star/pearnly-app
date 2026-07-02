@@ -64,6 +64,7 @@ from services.erp.mrerp_xlsx_fmt import (  # noqa: F401  facade public re-export
     fmt_str,
     fmt_number,
     fmt_number_strict,
+    history_number,
 )
 
 # 商品/客户/科目/税种查表 + tax_kind 推断 · masterdata adapter 经 _gen.X 调 · re-export 契约
@@ -154,9 +155,12 @@ def vat_rate_anomaly(history: Dict[str, Any]) -> bool:
 
     仅在能算(total>0 且 vat>0)时判;vat≈0(免税/零税率)不判。税基=total−vat
     → 折扣已含在 total,不误杀折扣票;偏离 7% 太多(默认 [5%,9%] 外)→ True(异常)。
+
+    金额走 history_number(顶层→fields 兜底):真实推送流 history 经 flatten,
+    vat 只在 fields 里——只读顶层曾让本闸对所有真实单据空转(2026-07-02 复测)。
     """
-    total = fmt_number(history.get("total_amount"))  # -> Optional[float]
-    vat = fmt_number(history.get("vat"))
+    total = history_number(history, "total_amount")
+    vat = history_number(history, "vat")
     if not total or total <= 0 or not vat or vat <= 0:
         return False
     base = total - vat

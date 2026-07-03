@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Callable, Optional
 
-from services.agent import brain, executor, fallbacks, manifest, observe, slots
+from services.agent import brain, executor, fallbacks, manifest, native_fc, observe, slots
 from services.agent.contracts import AgentAction, AgentContext
 from services.sales.dates import bangkok_now
 
@@ -96,9 +96,9 @@ Never reveal you are an AI, a model, or any technology. Never claim to be human.
 # How to decide (in order):
 1) The user wants to see or ask about their own data — history, receipt count, totals, balance, this-month usage, notifications, or "find/search a bill by shop or number" (e.g. "หาบิล 7-11", "找一下 7-11 的单据") → call the right tool ONCE, then answer with the real result. Search uses list_history (keyword = shop / number). ★ For case 1, NEVER defer.
 2) Asks which workspaces / companies exist → list_workspaces. Asks to switch (e.g. "สลับไปสยามวัสดุ") → switch_workspace.
-3) Recording a new expense — a NEW amount together with an item or shop (e.g. "กาแฟ 50", "จ่ายค่าน้ำ 300", "咖啡50"): if record_expense is in your tools, call it. If the amount is missing or unclear, DON'T guess — ask one short question in the BOOKKEEPER voice. A hypothetical ("if I spent 100"), a question, or a negation ("don't record this") is NOT a real record — never call record_expense for those. If record_expense is NOT available to you, defer (kind:"defer", reason:"record"). Never invent a number.
+3) Recording a new expense — a NEW amount together with an item or shop (e.g. "กาแฟ 50", "จ่ายค่าน้ำ 300", "咖啡50"): if record_expense is in your tools, call it. If the amount is missing or unclear, DON'T guess — ask one short question in the BOOKKEEPER voice. A hypothetical ("if I spent 100"), a question, or a negation ("don't record this") is NOT a real record — never call record_expense for those. If record_expense is NOT available to you, defer with reason "record". Never invent a number.
 4) Greeting / thanks / venting / daily life, or things Pearnly can't do (change password, account settings, POS): reply as text, no tool. Can't-do things → gently point them to the App (BOOKKEEPER voice). Pure chit-chat / off-topic → COMPANION voice.
-5) Editing or deleting an already-recorded entry (e.g. "แก้รายการล่าสุดเป็น 80", "ยกเลิกรายการล่าสุด"): if undo_entry / edit_entry are in your tools → call undo_entry to cancel/delete, or edit_entry with ONLY the fields the user wants changed (a new amount must appear in their message — never invent one). If they are NOT in your tools → defer (kind:"defer", reason:"edit").
+5) Editing or deleting an already-recorded entry (e.g. "แก้รายการล่าสุดเป็น 80", "ยกเลิกรายการล่าสุด"): if undo_entry / edit_entry are in your tools → call undo_entry to cancel/delete, or edit_entry with ONLY the fields the user wants changed (a new amount must appear in their message — never invent one). If they are NOT in your tools → defer with reason "edit".
 6) Pushing a document into ERP (e.g. "ส่งใบ 7-11 เข้า ERP", "推到ERP"): if push_to_erp is in your tools, call it — it only PREPARES a confirmation card; NOTHING is sent until the user taps confirm on the card. If it is NOT in your tools, gently point them to the App (BOOKKEEPER voice).
 7) Wants to RUN a reconciliation right here in chat — bank ("帮我做银行对账", "ทำกระทบยอดให้หน่อย"), income ("กระทบยอดรายได้", "做收入对账") or sales-VAT check ("ตรวจรายงานภาษีขาย", "核查销项税报告"): if recon_intake_start is in your tools, call it immediately with the matching kind (bank / income / tax) — the flow itself collects the files step by step, so do NOT ask for files/accounts first. If it is NOT in your tools, point them to Reconciliation Center on the web. (Just asking for existing results → recon_overview / recon_detail.)
 
@@ -107,7 +107,10 @@ Glance back at what the user actually asked. If the result doesn't match — wro
 
 ★★ Never make up numbers or facts that did not come from a tool.
 
-Reply with ONE line of JSON only — choose exactly one:
+{protocol}"""
+
+# JSON 协议尾(现状);原生 FC 模式的协议尾/催成文在 native_fc(决策输出通道二选一)。
+_PROTO_JSON = """Reply with ONE line of JSON only — choose exactly one:
 {{"kind":"tool","tool":"<name>","args":{{...}}}}
 {{"kind":"reply","message":"<your message to the user, in {lang_name}>"}}
 {{"kind":"defer","reason":"record|edit"}}"""
@@ -196,19 +199,23 @@ def _prompt(
     lang: str,
     force_reply: bool,
     gates: frozenset = frozenset(),
+    native: bool = False,
 ) -> str:
     # {today} 刻意不进 head:它每分钟变,放头部会撞碎「静态 persona 前缀」→ 供应商前缀缓存全 miss。
     # 把易变的时间戳放到贴近用户消息的尾部(既对时间问题更贴切,又让 ~1.5k token 的 persona 成稳定可缓存前缀)。
+    lang_name = _LANGS.get(lang, "English")
+    proto = (native_fc.PROTOCOL if native else _PROTO_JSON).format(lang_name=lang_name)
     head = _SYSTEM.format(
         tools=_tools_prompt(gates),
-        lang_name=_LANGS.get(lang, "English"),
+        lang_name=lang_name,
+        protocol=proto,
     )
     obs = ""
     if observations:
         obs = "\n\nผลลัพธ์จากเครื่องมือที่เรียกไปแล้ว:\n" + json.dumps(
             observations, ensure_ascii=False
         )
-    tail = _FORCE_REPLY if force_reply else ""
+    tail = (native_fc.FORCE_REPLY if native else _FORCE_REPLY) if force_reply else ""
     return (
         f"{head}{brain._history_block(history)}{obs}{tail}"
         f"\n\nNow (Asia/Bangkok): {today}"
@@ -272,10 +279,13 @@ def _parse_step(outcome) -> LoopStep:
         return LoopStep(kind="reply", message=str(d.get("message") or "").strip())
     if kind == "tool" and d.get("tool"):
         args = d.get("args")
+        args = args if isinstance(args, dict) else {}
+        if d["tool"] == "defer":  # FC 模式的 defer 是声明的工具 → 映射回同一条 defer 出路
+            return LoopStep(kind="defer", reason=str(args.get("reason") or "record").strip())
         return LoopStep(
             kind="tool",
             tool=d.get("tool"),
-            args=args if isinstance(args, dict) else {},
+            args=args,
             say=str(d.get("say") or "").strip(),
         )
     if kind == "defer":
@@ -298,8 +308,9 @@ def _decide_step(
     from services.ai_gateway import transport
 
     user = (ctx.user if ctx else None) or {}
-    outcome = transport.text_to_json(
-        _prompt(
+
+    def _p(native):
+        return _prompt(
             user_text,
             history,
             today,
@@ -307,9 +318,11 @@ def _decide_step(
             lang=lang,
             force_reply=force_reply,
             gates=gates,
-        ),
+            native=native,
+        )
+
+    common = dict(
         tier="flash",
-        response_mime=True,
         # 1200:泰文 token 密度低,768 会把"对账明细"这类多行回复截断成坏 JSON
         # (真机雷 2026-07-03:泰语问明细恒落兜底)。失控输出仍有 _sane_reply 出口护栏。
         max_tokens=1200,
@@ -318,13 +331,23 @@ def _decide_step(
             _STEP_MIN_S, min(_STEP_MAX_S, int(_STEP_MAX_S if budget_s is None else budget_s))
         ),
         max_retries=1,
-        task="agent_loop",
         backend=brain._brain_backend(),
         # 成本归属 + 同轮串联:没有这三样,agent 烧的钱记不到租户、多次调用对不上号
         tenant_id=ctx.tenant_id if ctx else None,
         user_id=str(user.get("id")) if user.get("id") else None,
         trace_id=(ctx.trace_id or None) if ctx else None,
     )
+    if ctx is not None and native_fc.enabled_for(user.get("id")):
+        # 原生 FC(P2):决策结构化返回,消 JSON 截断/parse 类 crash;后端未实现回落下方 JSON 路
+        outcome = transport.text_to_action(
+            _p(True),
+            tools=list(native_fc.declarations(_visible_tools(gates))),
+            task="agent_loop_fc",
+            **common,
+        )
+        if getattr(outcome, "error_kind", None) != "unsupported":
+            return _parse_step(outcome)
+    outcome = transport.text_to_json(_p(False), response_mime=True, task="agent_loop", **common)
     return _parse_step(outcome)
 
 

@@ -122,6 +122,11 @@ def _json_or_outcome(model_name, contents, *, timeout_s, max_retries, model):
     return ProviderOutcome(ok=False, error_kind="parse", model=model_name)
 
 
+def text_to_action(prompt: str, *, tools, **kw) -> ProviderOutcome:
+    """原生 function-calling 暂未实现(旧 SDK·非 prod agent 后端)→ 调用方回落 JSON 协议。"""
+    return ProviderOutcome(ok=False, error_kind="unsupported", model=NAME)
+
+
 def text_to_json(
     prompt: str,
     *,

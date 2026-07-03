@@ -97,6 +97,45 @@ def text_to_json(
     )
 
 
+def text_to_action(
+    prompt: str,
+    *,
+    tools: List[dict],
+    tier: str = "flash",
+    api_key: Optional[str] = None,
+    temperature: float = 0.0,
+    max_tokens: int = 1200,
+    timeout_s: int = 18,
+    max_retries: int = 1,
+    task: str = "agent_loop_fc",
+    backend: Optional[str] = None,
+    tenant_id=None,
+    user_id=None,
+    trace_id=None,
+) -> ProviderOutcome:
+    """原生 function-calling 决策:声明 tools,provider 结构化返回动作
+    data={"kind":"tool","tool","args"} 或 {"kind":"reply","message"}。
+    后端未实现 → error_kind="unsupported"(调用方回落 text_to_json 协议)。"""
+    return _run(
+        "text_to_action",
+        (prompt,),
+        dict(
+            tools=tools,
+            tier=tier,
+            api_key=api_key,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout_s=timeout_s,
+            max_retries=max_retries,
+        ),
+        task=task,
+        backend=backend,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        trace_id=trace_id,
+    )
+
+
 def multimodal_to_json(
     prompt: str,
     images: List[Tuple[bytes, str]],

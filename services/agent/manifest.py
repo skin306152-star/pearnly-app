@@ -325,6 +325,7 @@ TOOLS: tuple[ToolSpec, ...] = (
                 source="model_freeform",
                 desc_th="สิ่งที่จะทำ (เลือกจาก: record / push / archive_only / nothing / dms · dms=บัตรประชาชนสร้างลูกค้า DMS ใช้เดี่ยว)",
                 desc_zh="目的组合(枚举 record/push/archive_only/nothing/dms·dms=身份证建DMS客户须独占·执行器再验)",
+                kind="array",
             ),
             SlotSpec(
                 "endpoint_name",

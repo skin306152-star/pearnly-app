@@ -21,6 +21,7 @@ class SlotSpec:
     source: SlotSource
     desc_th: str  # 给大脑看的泰文说明(进提示词)
     desc_zh: str  # 团队看的中文说明
+    kind: str = "string"  # 参数形状(string|array)——原生 function-calling 的 schema 用
 
 
 @dataclass(frozen=True)

@@ -242,6 +242,15 @@ async def _handle_line_event(ev: dict):
                 )
             return
 
+        # 语音消息:闸开走转写→同文本路;闸关/未绑定返回 False 落下方 unsupported 现状。
+        if msg_type == "audio":
+            from services.expense import line_stt
+
+            if await line_stt.try_handle_audio(
+                msg, line_user_id, reply_token, ev, _ev_lang(ev), text_handler=_handle_line_text
+            ):
+                return
+
         # 其他类型消息
         if reply_token:
             # v118.25.4 · 已绑定取用户偏好 · 未绑定用规范化 LINE 语言(不再 zh fallback)

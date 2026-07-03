@@ -44,6 +44,9 @@ AGENT_QUICK_CHIPS_KEY = "agent_quick_chips"
 # 跨轮锚点记忆子闸(P2):默认关。关 → 锚点不加载/不采集/不落库,行为逐字节不变;
 # 开 → 「把刚才那张推进 ERP」这类不带票号的口头指代能定位上一轮碰过的单据。
 AGENT_ANCHOR_KEY = "agent_anchor_memory"
+# LINE 语音转写子闸(P2):默认关。关 → 语音消息回 unsupported 现状逐字节不变;
+# 开 → 语音经网关 Gemini 逐字转写(回显原文)后走与打字完全相同的文本路。
+AGENT_VOICE_KEY = "agent_voice_stt"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -110,3 +113,8 @@ def agent_quick_chips_enabled_for(user_id: Optional[str]) -> bool:
 def agent_anchor_enabled_for(user_id: Optional[str]) -> bool:
     """跨轮锚点记忆子闸。关 = 锚点全程不流动,现状不变。"""
     return _enabled(AGENT_ANCHOR_KEY, user_id, "agent_anchor_enabled_for")
+
+
+def agent_voice_enabled_for(user_id: Optional[str]) -> bool:
+    """LINE 语音转写子闸。关 = 语音回 unsupported,现状不变。"""
+    return _enabled(AGENT_VOICE_KEY, user_id, "agent_voice_enabled_for")

@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 from typing import Optional
 
-MODEL = "gemini-2.5-flash"  # 参考默认;实际模型由网关 tier=flash 解析(可随后端切换)
+MODEL = "gemini-2.5-flash"  # 参考默认;实际模型由网关 tier=brain 解析(对话档·随 AGENT_BRAIN_MODEL)
 
 
 class GenerationError(RuntimeError):
@@ -38,7 +38,7 @@ def generate(prompt: str, *, system: Optional[str] = None, temperature: float = 
     out = transport.text_to_text(
         prompt,
         system=system,
-        tier="flash",
+        tier="brain",
         api_key=key,
         temperature=temperature,
         timeout_s=120,

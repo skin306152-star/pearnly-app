@@ -7,9 +7,13 @@
      (默认 gemini-3.5-flash)· 把"换模型救不了的结构问题"和"换模型能救的图质问题"分开处理。
 
 env 开关(都给了默认值,不配也能跑):
-  OCR_FLASH_MODEL       默认 gemini-2.5-flash       (视觉/解析主力)
-  OCR_FLASHLITE_MODEL   默认 gemini-2.5-flash-lite  (轻量文字)
-  OCR_FALLBACK_MODEL    默认 gemini-3.5-flash       (兜底升级;设为空串关闭兜底)
+  OCR_FLASH_MODEL       默认 gemini-3.5-flash  (视觉/解析主力)
+  OCR_FLASHLITE_MODEL   默认 gemini-3.5-flash  (轻量档;lite 在 vertex 不可用,与主力同模型)
+  OCR_FALLBACK_MODEL    默认 gemini-3.5-flash  (兜底升级;设为空串关闭兜底)
+  AGENT_BRAIN_MODEL     默认 gemini-2.5-flash  (对话大脑,与 OCR 档独立)
+
+2026-07-03 Zihao 拍板:OCR 主力升 3.5-flash(57 张真件实测:速度 ~5x、总额 29/29 持平、
+VAT 更全、单号更干净、token 省 ~23%、零回归);大脑不动,单独档钉 2.5(brain())。
 """
 
 import logging
@@ -22,14 +26,16 @@ T = TypeVar("T")
 
 
 def flash() -> str:
-    return os.environ.get("OCR_FLASH_MODEL", "gemini-2.5-flash").strip() or "gemini-2.5-flash"
+    return os.environ.get("OCR_FLASH_MODEL", "gemini-3.5-flash").strip() or "gemini-3.5-flash"
 
 
 def flash_lite() -> str:
-    return (
-        os.environ.get("OCR_FLASHLITE_MODEL", "gemini-2.5-flash-lite").strip()
-        or "gemini-2.5-flash-lite"
-    )
+    return os.environ.get("OCR_FLASHLITE_MODEL", "gemini-3.5-flash").strip() or "gemini-3.5-flash"
+
+
+def brain() -> str:
+    """LINE/网页对话 Agent 大脑模型——与 OCR 档独立配置,OCR 换模型不牵连大脑。"""
+    return os.environ.get("AGENT_BRAIN_MODEL", "gemini-2.5-flash").strip() or "gemini-2.5-flash"
 
 
 def fallback() -> str:
@@ -58,14 +64,17 @@ def tier_for_model(model_name: str) -> str:
     """Reverse of the tier→model resolution: classify a concrete model name back
     into a tier bucket. Guard sites that already hold a model name (bank GL/stmt,
     L2/L3 try_with_fallback) use this to route through the gateway transport,
-    which speaks tiers. Unknown names fall back to "flash"."""
+    which speaks tiers. Unknown names fall back to "flash".
+
+    多档共用同一模型名时(2026-07-03 起默认全 3.5)映到最中性的 "flash"——
+    provider 解析回同一模型,行为无差,只影响档位标签。"""
     name = (model_name or "").strip()
-    if name and name == fallback():
-        return "fallback"
-    if name == flash_lite():
-        return "flash_lite"
     if name == flash():
         return "flash"
+    if name == flash_lite():
+        return "flash_lite"
+    if name and name == fallback():
+        return "fallback"
     if name and name == escalate():
         return "escalate"
     return "flash"

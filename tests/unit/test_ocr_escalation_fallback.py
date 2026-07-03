@@ -14,9 +14,14 @@ from unittest import mock
 from services.ocr import id_card_extract
 from services.vat import vat_parser_gemini, vat_ocr_batch
 
-# 清掉 env 覆盖 → 默认档(flash_lite=2.5-flash-lite / flash=2.5-flash / fallback=3.5-flash),
+# 显式造三档互异的梯子(默认档 2026-07-03 起全 3.5·同名时 tier_for_model 塌缩),
 # 使 tier_for_model 映射稳定:首读档→flash/flash_lite,升级档→fallback。
 _MODEL_ENV = ("OCR_FLASH_MODEL", "OCR_FLASHLITE_MODEL", "OCR_FALLBACK_MODEL", "OCR_ESCALATE_MODEL")
+_LADDER = {
+    "OCR_FLASH_MODEL": "gemini-2.5-flash",
+    "OCR_FLASHLITE_MODEL": "gemini-2.5-flash-lite",
+    "OCR_FALLBACK_MODEL": "gemini-3.5-flash",
+}
 
 
 def _res(ok=True, data=None, error_kind=None):
@@ -30,6 +35,7 @@ class _BaseEscalationTest(unittest.TestCase):
         self._saved = {k: os.environ.get(k) for k in _MODEL_ENV}
         for k in _MODEL_ENV:
             os.environ.pop(k, None)
+        os.environ.update(_LADDER)
         self.tiers = []  # 按调用顺序记录每次 multimodal 的 tier
 
     def tearDown(self):

@@ -20,7 +20,11 @@ class ModelClientTest(unittest.TestCase):
             captured.update(kw, prompt=prompt)
             return ProviderOutcome(ok=True, data={"a": 1})
 
-        with mock.patch("services.ai_gateway.transport.text_to_json", fake):
+        ladder = {"OCR_FLASHLITE_MODEL": "gemini-2.5-flash-lite"}  # 与主力档区分开才能验反解
+        with (
+            mock.patch.dict("os.environ", ladder),
+            mock.patch("services.ai_gateway.transport.text_to_json", fake),
+        ):
             out = model_client.json_from_text(
                 "p", model_name=gemini_models.flash_lite(), task="t.x", api_key="k"
             )

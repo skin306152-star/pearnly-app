@@ -291,7 +291,7 @@ def _decide_step(
         )
 
     common = dict(
-        tier="flash",
+        tier="brain",  # 大脑独立档(AGENT_BRAIN_MODEL·2.5)· OCR 升 3.5 不牵连
         # 1200:泰文 token 密度低,768 会把"对账明细"这类多行回复截断成坏 JSON
         # (真机雷 2026-07-03:泰语问明细恒落兜底)。失控输出仍有 _sane_reply 出口护栏。
         max_tokens=1200,

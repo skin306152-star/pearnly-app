@@ -19,11 +19,19 @@ def _outcome(**kw):
 
 class TierForModelTests(unittest.TestCase):
     def test_reverse_mapping(self):
-        self.assertEqual(gemini_models.tier_for_model(gemini_models.flash()), "flash")
-        self.assertEqual(gemini_models.tier_for_model(gemini_models.flash_lite()), "flash_lite")
-        self.assertEqual(gemini_models.tier_for_model(gemini_models.fallback()), "fallback")
+        # 三档互异时逐档反解;默认(全 3.5 同名)塌缩映到中性 "flash"。
+        ladder = {
+            "OCR_FLASH_MODEL": "gemini-2.5-flash",
+            "OCR_FLASHLITE_MODEL": "gemini-2.5-flash-lite",
+            "OCR_FALLBACK_MODEL": "gemini-3.5-flash",
+        }
+        with mock.patch.dict("os.environ", ladder):
+            self.assertEqual(gemini_models.tier_for_model(gemini_models.flash()), "flash")
+            self.assertEqual(gemini_models.tier_for_model(gemini_models.flash_lite()), "flash_lite")
+            self.assertEqual(gemini_models.tier_for_model(gemini_models.fallback()), "fallback")
         self.assertEqual(gemini_models.tier_for_model("totally-unknown-model"), "flash")
         self.assertEqual(gemini_models.tier_for_model(""), "flash")
+        self.assertEqual(gemini_models.tier_for_model(gemini_models.flash()), "flash")
 
 
 class GuardRoutingTests(unittest.TestCase):
@@ -44,7 +52,11 @@ class GuardRoutingTests(unittest.TestCase):
             captured["mime"] = images[0][1]
             return ProviderOutcome(ok=True, data={"people_id": "1234567890123"})
 
-        with mock.patch("services.ai_gateway.transport.multimodal_to_json", fake_mm):
+        ladder = {"OCR_FLASHLITE_MODEL": "gemini-2.5-flash-lite"}  # 与主力档区分开才能验首读档
+        with (
+            mock.patch.dict("os.environ", ladder),
+            mock.patch("services.ai_gateway.transport.multimodal_to_json", fake_mm),
+        ):
             out = id_card_extract.extract_thai_id_card(b"\xff\xd8\xff\x00fake-jpeg", api_key="k")
         self.assertEqual(out["id_card"]["people_id"], "1234567890123")
         self.assertEqual(captured["tier"], "flash_lite")  # 复刻原 DEFAULT_MODEL=flash-lite

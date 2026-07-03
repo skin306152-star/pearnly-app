@@ -54,6 +54,7 @@ from typing import List, Optional, Tuple
 from pydantic import ValidationError
 
 from .gemini_models import fallback as _ocr_fallback
+from .gemini_models import flash as _ocr_flash
 from .schemas import (
     BusinessDocumentType,
     Layer3PageResult,
@@ -69,7 +70,7 @@ logger = logging.getLogger(__name__)
 # ============================================================
 # Layer3 是 OCR pipeline 的升级兜底档(layer1+2 低置信才到此)· 用更强模型兜底
 # (默认 gemini-3.5-flash)· OCR_FALLBACK_MODEL="" 时退回 OCR_FLASH_MODEL。
-DEFAULT_MODEL = _ocr_fallback() or os.environ.get("OCR_FLASH_MODEL", "gemini-2.5-flash")
+DEFAULT_MODEL = _ocr_fallback() or _ocr_flash()
 DEFAULT_MAX_RETRIES = 1
 # L3 timeout (P1G-Perf · Zihao 2026-06-18). Prod escalates to gemini-2.5-pro,
 # which kept hitting the old 45s ceiling then 504 — the user waits the full 45s

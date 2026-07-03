@@ -74,6 +74,14 @@ _PLAN_ACK = {
     "en": "Got it — send the photo/file and I'll handle it that way.",
     "ja": "承知しました。写真を送っていただければ、その通りに処理します。",
 }
+# 计划回执的回溯提示:刚处理过一张图时,明说计划只管「下一张」并给回溯说法,
+# 治图文同发 race 输掉后意图错配到之后那张图(用户以为说的是刚才那张)。
+_PLAN_RETRO_HINT = {
+    "th": " (ใช้กับรูปใบถัดไปนะคะ ถ้าหมายถึงใบเมื่อกี้ พิมพ์ว่า「ส่งใบเมื่อกี้เข้า ERP」ได้เลย)",
+    "zh": "(这只管下一张图;如果你说的是刚才那张,直接说「把刚才那张推进ERP」就行。)",
+    "en": ' (This applies to the NEXT photo — if you meant the one just now, say "push the last one to ERP".)',
+    "ja": "(これは次の写真に適用されます。先ほどの伝票のことでしたら「さっきの伝票をERPへ」とお送りください。)",
+}
 
 
 def _make_write_sink(
@@ -166,9 +174,12 @@ def _make_write_sink(
             line_intent_store.set_intent(
                 tid, line_user_id, plan, workspace_client_id=plan.get("book_to_id") or ws
             )
+            ack = say or _PLAN_ACK.get(lang, _PLAN_ACK["en"])
+            if (_ctx.anchors or {}).get("last_image_doc_id"):
+                ack += _PLAN_RETRO_HINT.get(lang, _PLAN_RETRO_HINT["en"])
             line_reply.reply_text_context(
                 reply_token,
-                say or _PLAN_ACK.get(lang, _PLAN_ACK["en"]),
+                ack,
                 line_user_id=line_user_id,
                 tenant_id=tid,
                 quote_token=quote_token,

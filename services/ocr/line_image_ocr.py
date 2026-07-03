@@ -326,6 +326,12 @@ async def _handle_line_image_ocr(
                     _ws_client_id,
                     tenant_id=tid_str,
                 )
+            # 跨轮锚点:锚定这张单,让下一句「把刚才那张推进ERP」命中它(闸关 no-op)。
+            from services.agent import anchors as agent_anchors
+
+            agent_anchors.record_image_docs(
+                user_fresh, tid_str, line_user_id, ingests, _ws_client_id
+            )
             # 对话记忆(PO-15):记图片轮的结果,让下一句文本问「为什么/需补啥」时大脑接得住。
             from services.line_binding import line_chat_memory
 

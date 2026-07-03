@@ -76,23 +76,33 @@ def locate_pushable_doc(ctx, keyword) -> Optional[Dict[str, Any]]:
             )
         if not detail:
             return None
-        hid = _ensure_carrier(ctx, ws, detail)
-        if not hid:
-            return None
-        fields = carrier_fields_from_doc(detail)
-        logger.info("[doc_fallback] doc=%s -> carrier=%s", str(doc["id"])[:8], str(hid)[:8])
-        return {
-            "id": str(hid),
-            "invoice_no": fields["invoice_number"],
-            "seller_name": fields["seller_name"],
-            "total_amount": fields["total_amount"],
-        }
+        return carrier_hist_for_detail(ctx, ws, detail)
     except Exception:
         logger.warning("[doc_fallback] locate failed; keep not_found", exc_info=True)
         return None
 
 
-def _ensure_carrier(ctx, ws, detail) -> Optional[str]:
+def carrier_hist_for_detail(ctx, ws, detail, *, insert: bool = True) -> Optional[Dict[str, Any]]:
+    """单据详情 → 载体 hist 形 dict(推送定位/锚点定位共用)。
+
+    insert=False 给纯读场景(查推送状态):只认已存在的载体,绝不插行;
+    没有载体 = 没推过,返回 id 为空的 hist(单据信息照给,推送日志自然查空)。"""
+    hid = _ensure_carrier(ctx, ws, detail, insert=insert)
+    fields = carrier_fields_from_doc(detail)
+    if hid:
+        doc_id = str((detail.get("doc") or {}).get("id"))
+        logger.info("[doc_fallback] doc=%s -> carrier=%s", doc_id[:8], str(hid)[:8])
+    elif insert:
+        return None
+    return {
+        "id": str(hid) if hid else "",
+        "invoice_no": fields["invoice_number"],
+        "seller_name": fields["seller_name"],
+        "total_amount": fields["total_amount"],
+    }
+
+
+def _ensure_carrier(ctx, ws, detail, *, insert: bool = True) -> Optional[str]:
     """按 source_ref=purchase_doc:<id> 幂等取/建载体行(重复"推刚才那张"不重插)。"""
     doc_id = str((detail.get("doc") or {}).get("id"))
     ref = f"purchase_doc:{doc_id}"
@@ -104,6 +114,8 @@ def _ensure_carrier(ctx, ws, detail) -> Optional[str]:
         row = cur.fetchone()
     if row:
         return str(row["id"])
+    if not insert:
+        return None
     fields = carrier_fields_from_doc(detail)
     return db.insert_ocr_history(
         user_id=str(ctx.user["id"]),

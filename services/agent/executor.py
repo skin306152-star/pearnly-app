@@ -159,8 +159,8 @@ class AgentToolset:
         allow_doc_fallback 只有 push_to_erp 开:兜底会插载体行(写副作用),
         查状态这类纯读不许有。"""
         if not keyword:
-            # 「刚才那张」优先认跨轮锚点(读时已复核可见性);锚空/失效回落最近一张。
-            hit = anchors.resolve_history(ctx)
+            # 「刚才那张」优先认跨轮锚点(读时已复核可见性/单据状态);锚空/失效回落最近一张。
+            hit = anchors.resolve_history(ctx, allow_carrier_insert=allow_doc_fallback)
             if hit:
                 return hit, None
         res = db.list_ocr_history(

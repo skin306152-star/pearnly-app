@@ -59,7 +59,7 @@ class PayloadTests(unittest.TestCase):
         self.assertEqual(total, 2500 * 1686)  # 无重叠 + 满面积 = 恰好铺满
 
     def test_per_row_splits_match_illustration(self):
-        # 点击区列边界贴 v8 插画按钮位置(非均分):左/中缝上排(915)略右于下排(865)。
+        # 点击区列边界贴 v9 插画按钮位置(非均分):左/中缝上排(915)略右于下排(865)。
         # 换背景图若按钮位置变了,这里会挂 → 提醒同步复核 _ROW_X。
         by = {}
         for a in self.areas:

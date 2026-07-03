@@ -188,10 +188,9 @@ def _is_noop(detail: dict, key: str, new) -> bool:
     """目标值已等于当前值?(验收 #3:no-op 不 void/不重建/不写审计)。category 名↔id 不比,放行。"""
     cur = _current(detail, key)
     if key == "amount":
-        try:
-            return Decimal(str(new)) == Decimal(str(cur or 0))
-        except (InvalidOperation, ValueError):
-            return False
+        from core.money import amounts_equal
+
+        return amounts_equal(new, cur or 0)  # 当前值空 → 0(改错 no-op 口径)
     if key in ("doc_date", "vendor_name", "payment_method"):
         return str(new or "") == str(cur or "")
     return False

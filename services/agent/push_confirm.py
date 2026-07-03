@@ -212,16 +212,13 @@ def _execute_and_notify(
 
 
 def _amount_matches(snapshot, current) -> bool:
-    """确认卡快照金额 vs 执行时单据金额。卡上没展示过金额(空)→ 不比;可比则必须相等——
+    """确认卡快照金额 vs 执行时单据金额。卡上没展示过金额(空/占位)→ 不比;可比则必须相等——
     用户确认的是卡上那个数,推出去的必须还是它(确认与执行之间单据可能被网页端改过)。"""
     if snapshot in (None, "", "-"):
         return True
-    from decimal import Decimal, InvalidOperation
+    from core.money import amounts_equal
 
-    try:
-        return Decimal(str(snapshot)) == Decimal(str(current))
-    except (InvalidOperation, TypeError, ValueError):
-        return str(snapshot) == str(current)
+    return amounts_equal(snapshot, current)
 
 
 def _execute_push(user, tid, history_id, endpoint_id, confirmed_amount=None) -> dict:

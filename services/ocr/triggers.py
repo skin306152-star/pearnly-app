@@ -72,24 +72,27 @@ def _bucket_confidence(conf: float, needs_review: bool) -> str:
 
 
 def _check_amount_math(invoice: ThaiInvoice) -> Optional[str]:
-    """Returns a trigger reason string if subtotal + vat != total within
-    AMOUNT_TOLERANCE_THB, else None. If any of the 3 fields can't be parsed
-    as a number, returns None (don't fire false trigger on a missing field —
-    missing fields are caught by the dedicated checks)."""
+    """Returns a trigger reason string if the amounts don't reconcile within
+    AMOUNT_TOLERANCE_THB, else None. If any of the 3 core fields can't be
+    parsed as a number, returns None (don't fire false trigger on a missing
+    field — missing fields are caught by the dedicated checks).
+
+    泰国票折扣在小计后、VAT 前:总额 = 小计 − 折扣 + VAT。小计有「折前」「折后」两种
+    印法,两种口径任一平即放行,别把 7-11 类折扣票误送 L3(f003 实案 2026-07-03)。"""
     try:
         sub = float(invoice.subtotal) if invoice.subtotal else None
         vat = float(invoice.vat) if invoice.vat else None
         total = float(invoice.total_amount) if invoice.total_amount else None
+        disc = float(invoice.discount) if getattr(invoice, "discount", None) else 0.0
     except (ValueError, TypeError):
         return "amount field not numeric (parse failed)"
     if sub is None or vat is None or total is None:
         return None  # can't check; another rule may fire
-    expected = sub + vat
-    diff = abs(expected - total)
+    diff = min(abs(sub + vat - total), abs(sub - disc + vat - total))
     if diff > AMOUNT_TOLERANCE_THB:
         return (
-            f"amount math fail: subtotal {sub:.2f} + vat {vat:.2f} "
-            f"= {expected:.2f} != total {total:.2f} "
+            f"amount math fail: subtotal {sub:.2f} - discount {disc:.2f} "
+            f"+ vat {vat:.2f} != total {total:.2f} "
             f"(diff {diff:.2f} > {AMOUNT_TOLERANCE_THB})"
         )
     return None

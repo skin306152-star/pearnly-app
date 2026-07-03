@@ -97,6 +97,18 @@ def evaluate_sanity(invoice) -> List[str]:
                 f"差 {diff:.2f} 既非 0 也非 7%({expected_vat:.2f}) — 勾稽不平"
             )
 
+    # 规则 4b(f003 实案 2026-07-03):VAT 在场但小计−折扣+VAT 对不上总额。泰国票折扣在
+    # 小计后、VAT 前(净额 = 小计 − 折扣,总额 = 净额 + VAT);漏抓折扣行 → 存下的税基虚高、
+    # 自己勾稽都不平却仍 auto。小计有「折前」「折后」两种印法,两种口径任一平即放行。
+    if vat is not None and sub is not None and total is not None and sub > 0:
+        gross_diff = abs(sub + vat - total)
+        net_diff = abs(sub - (discount or 0.0) + vat - total)
+        if min(gross_diff, net_diff) > _TOL:
+            reasons.append(
+                f"总额 {total} != 小计 {sub} − 折扣 {discount or 0} + VAT {vat}"
+                f"(差 {min(gross_diff, net_diff):.2f}) — 勾稽不平(疑漏折扣行/选错列)"
+            )
+
     # 规则 5:税号位数对(13)但 MOD-11 校验位不过 → 八成 OCR 读错一位(Big C 538↔536:
     # 合法税号恒过校验,失败几乎只来自误读)。仅判已是 13 位者,不碰空/残缺(那是别的事)。
     for name, raw in (("seller_tax", st), ("buyer_tax", bt)):
@@ -104,3 +116,29 @@ def evaluate_sanity(invoice) -> List[str]:
             reasons.append(f"{name} {raw} 校验位不符 — 13 位但 MOD-11 不过(疑读错一位)")
 
     return reasons
+
+
+def infer_missing_discount(invoice) -> str | None:
+    """折扣确定性反推:折扣缺失但「小计 + VAT − 总额」的差额 D 恰好使
+    (小计 − D) × 7% ≈ VAT 时,票面几乎必然印了一行 ส่วนลด 被漏抓 → 回填 D。
+
+    双重勾稽(差额 + VAT 税基)同时成立才回填,单一差额不动手 —— 那可能是选错列,
+    交给规则 4b 转人工。回填成功返回说明文字(进 validation_warnings 留痕),否则 None。
+    """
+    if getattr(invoice, "is_not_invoice", False):
+        return None
+    if _money(getattr(invoice, "discount", None)) is not None:
+        return None
+    sub = _money(getattr(invoice, "subtotal", None))
+    vat = _money(getattr(invoice, "vat", None))
+    total = _money(getattr(invoice, "total_amount", None))
+    if sub is None or vat is None or total is None or sub <= 0 or vat <= 0:
+        return None
+    d = sub + vat - total
+    if d <= _TOL:
+        return None
+    expected_vat = (sub - d) * _VAT_RATE
+    if abs(expected_vat - vat) > max(_TOL, vat * _RECON_REL):
+        return None
+    invoice.discount = f"{d:.2f}"
+    return f"discount_inferred: 票面折扣 {d:.2f} 未被提取,由勾稽差额+7%税基双重校验反推回填"

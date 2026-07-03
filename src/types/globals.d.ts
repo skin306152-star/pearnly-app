@@ -267,6 +267,7 @@ interface Window {
     ReconMapping?: { show: (...args: any[]) => void; [key: string]: unknown };
     ReconReview?: { show: (...args: any[]) => void; [key: string]: unknown };
     bindDrawerClient?: LegacyBridge;
+    bindDrawerWorkspace?: LegacyBridge;
     _planState?: Record<string, unknown> | null;
     _erpExcOpenEdit?: LegacyBridge;
     setActiveWorkspaceClientId?: LegacyBridge;

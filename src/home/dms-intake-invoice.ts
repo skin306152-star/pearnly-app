@@ -69,6 +69,8 @@ export const w = window as unknown as {
     getMaxFiles?: () => number;
     getMaxMbPerFile?: () => number;
     getCurrentClientId?: () => unknown;
+    getActiveWorkspaceClientId?: () => number | null;
+    _workspaceClientsCache?: { id: number; name?: string }[];
     mergeFields?: (pages: unknown) => Dict;
     routeTo?: (r: string) => void;
 };
@@ -237,6 +239,8 @@ async function startRecognize() {
     ctrls.clear();
     recState.dupWarn.length = 0;
     recState.autoPushed = 0;
+    recState.wsRouted = 0;
+    recState.wsRoutedIds.clear();
     recState.cidCache = typeof w.getCurrentClientId === 'function' ? w.getCurrentClientId() : null;
     const total = waiting.length;
     let done = 0;
@@ -263,6 +267,16 @@ async function startRecognize() {
         showToast(t('dxi-dup-warn').replace('{n}', String(recState.dupWarn.length)), 'warn');
     if (recState.autoPushed)
         showToast(t('dxi-auto-pushed').replace('{n}', String(recState.autoPushed)), 'success');
+    if (recState.wsRouted) {
+        const cache = w._workspaceClientsCache || [];
+        const names = Array.from(recState.wsRoutedIds)
+            .map((id) => (cache.find((c) => c.id === id) || {}).name || '#' + id)
+            .join(' / ');
+        showToast(
+            t('dxi-ws-routed').replace('{n}', String(recState.wsRouted)).replace('{names}', names),
+            'warn'
+        );
+    }
     if (!IV.results.length) {
         showToast(t('dxi-rev-empty'), 'error');
         renderInvoiceUpload();

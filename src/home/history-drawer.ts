@@ -69,6 +69,10 @@ async function openHistoryDrawer(historyId: string) {
         if (typeof window.bindDrawerClient === 'function') {
             window.bindDrawerClient(detail.id, detail.client_id || null);
         }
+        // 归属套账下拉(多套账才注入 · 手动改归属的口子)
+        if (typeof window.bindDrawerWorkspace === 'function') {
+            window.bindDrawerWorkspace(detail.id, detail.workspace_client_id || null);
+        }
 
         // P0-2: 异步检查是否已推送过(不阻塞抽屉渲染)
         _checkDrawerPushStatus(detail.id);

@@ -348,6 +348,35 @@ class AssignClientRequest(BaseModel):
     client_id: Optional[int] = None  # None 表示移除归属
 
 
+class AssignWorkspaceRequest(BaseModel):
+    workspace_client_id: int = Field(..., description="目标套账 id(必须指定,不许清空归属)")
+
+
+@router.post("/api/history/{history_id}/assign_workspace")
+async def api_assign_workspace(history_id: str, req: AssignWorkspaceRequest, request: Request):
+    """把识别记录改归属到另一个套账(税号路由再准也有例外:代付/税号印错的票)。
+
+    只许挪到本租户的套账;不提供清空(NULL 会让 Express 方向判定失锚,见 persist 注释)。
+    """
+    user = get_current_user_from_request(request)
+    _check_history_access(user)
+    _tenant = _tid(user)
+    if not _tenant:
+        raise HTTPException(400, detail="workspace.required")
+    from core.workspace_context import assert_workspace_in_tenant
+
+    with db.get_cursor() as cur:
+        assert_workspace_in_tenant(
+            cur, tenant_id=_tenant, workspace_client_id=int(req.workspace_client_id)
+        )
+    ok = db.update_history_workspace_client_id(
+        history_id, int(req.workspace_client_id), str(user["id"]), tenant_id=_tenant
+    )
+    if not ok:
+        raise HTTPException(400, detail="history.assign_workspace_failed")
+    return {"ok": True, "workspace_client_id": int(req.workspace_client_id)}
+
+
 @router.post("/api/history/{history_id}/assign_client")
 async def api_assign_client(history_id: str, req: AssignClientRequest, request: Request):
     """把发票归属到客户 · client_id=null 表示取消归属"""

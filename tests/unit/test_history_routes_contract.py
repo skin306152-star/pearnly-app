@@ -44,9 +44,10 @@ class HistoryRoutesContractTests(unittest.TestCase):
             ("PUT", "/api/v1/history/{record_id}"),
             ("DELETE", "/api/v1/history/{record_id}"),
             ("POST", "/api/history/{history_id}/assign_client"),
+            ("POST", "/api/history/{history_id}/assign_workspace"),
         }
         self.assertEqual(got, expected)
-        self.assertEqual(len(router.routes), 13)
+        self.assertEqual(len(router.routes), 14)
 
     def test_app_includes_history_router(self):
         """防 include_router 漏挂 · app 必须能路由到 history"""

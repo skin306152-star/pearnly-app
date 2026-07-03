@@ -63,6 +63,7 @@ def persist_invoices(
 
     history_ids = []
     duplicate_warnings = []  # v0.13 · 收集所有发票的重复警告
+    workspace_assignments = []  # 每张票的最终套账归属(路由结果透明给前端,治"扫完找不到")
     primary_history_id = None  # 第一张发票的 history_id · 兼容老前端字段
     primary_archive_name = None
     primary_category_tag = None
@@ -346,6 +347,7 @@ def persist_invoices(
             #     消费 → none/multi 时清 NULL 会让采购票(卖方=供应商≠自家)失去自家锚点 →
             #     direction_unknown。故仅命中具体主体才覆盖,否则保留 insert 归属。
             _ws_assigned = None
+            _ws_final = _ws_client_id
             try:
                 _seller_match = db.match_workspace_for_seller(
                     seller_tax=(g_fields or {}).get("seller_tax"),
@@ -358,6 +360,7 @@ def persist_invoices(
                     db.update_history_workspace_client_id(
                         hid, _ws_assigned, str(user["id"]), tenant_id=_tid(user)
                     )
+                    _ws_final = _ws_assigned
                 logger.info(
                     "[seller-route] %s history=%s seller=%r workspace_client_id=%s",
                     _seller_match.get("action"),
@@ -384,6 +387,7 @@ def persist_invoices(
                         db.update_history_workspace_client_id(
                             hid, _ws_buyer, str(user["id"]), tenant_id=_tid(user)
                         )
+                        _ws_final = _ws_buyer
                         logger.info(
                             "[buyer-route] %s history=%s buyer=%r workspace_client_id=%s",
                             _buyer_match.get("action"),
@@ -393,6 +397,13 @@ def persist_invoices(
                         )
                 except Exception as _bre:
                     logger.warning(f"buyer-route failed (history={hid[:8]}): {_bre}")
+
+            workspace_assignments.append(
+                {
+                    "history_id": str(hid),
+                    "workspace_id": int(_ws_final) if _ws_final is not None else None,
+                }
+            )
 
             # v118.20.1 · 异常栏 · 异步跑零成本规则(不阻塞 OCR 主流程)
             try:
@@ -427,6 +438,7 @@ def persist_invoices(
         "invoice_count": invoice_count,
         "history_ids": history_ids,
         "duplicate_warnings": duplicate_warnings,
+        "workspace_assignments": workspace_assignments,
         "primary_history_id": primary_history_id,
         "primary_archive_name": primary_archive_name,
         "primary_category_tag": primary_category_tag,

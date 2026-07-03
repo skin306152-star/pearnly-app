@@ -18,6 +18,9 @@ export const recState = {
     dupWarn: [] as unknown[],
     autoPushed: 0,
     cidCache: null as unknown,
+    // 归属透明:本批被税号路由归到「非当前所选套账」的票数 + 目标套账 id 集合
+    wsRouted: 0,
+    wsRoutedIds: new Set<number>(),
 };
 
 // 失败码 → 文件状态(同步/异步两路共用 · 同一 err.<code> i18n 词表 + 同 canRetry 判定)
@@ -39,12 +42,27 @@ function ingestOcrSuccess(f: IvFile, d: Dict) {
     if (((d.duplicate_warnings as unknown[]) || []).length)
         recState.dupWarn.push(...(d.duplicate_warnings as unknown[]));
     if (d.auto_pushed) recState.autoPushed++;
+    // 归属透明:税号路由把票归到别的套账时计数,批次结束一次性明示(治"扫完找不到")
+    const attr = d.workspace_attribution as
+        | { assignments?: { workspace_id?: number | null }[] }
+        | undefined;
+    const activeWs = w.getActiveWorkspaceClientId ? w.getActiveWorkspaceClientId() : null;
+    if (attr && activeWs != null) {
+        for (const a of attr.assignments || []) {
+            if (a && a.workspace_id != null && a.workspace_id !== activeWs) {
+                recState.wsRouted++;
+                recState.wsRoutedIds.add(a.workspace_id);
+            }
+        }
+    }
 }
-// 上传表单(文件 + 当前 client_id 归属)· 同步/异步两路共用
+// 上传表单(文件 + 当前 client_id 归属 + 当前套账)· 同步/异步两路共用
 function buildOcrForm(f: IvFile): FormData {
     const form = new FormData();
     form.append('file', f.file, f.name);
     if (recState.cidCache != null) form.append('client_id', String(recState.cidCache));
+    const wsId = w.getActiveWorkspaceClientId ? w.getActiveWorkspaceClientId() : null;
+    if (wsId != null) form.append('workspace_client_id', String(wsId));
     return form;
 }
 // 用户中途停止 → 取消态(两路共用)

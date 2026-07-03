@@ -412,6 +412,11 @@ def run_recognition_core(
             "category_tag": primary_category_tag,
             "auto_pushed": auto_pushed,
             "duplicate_warnings": duplicate_warnings,
+            # 归属透明:每张票按税号路由后的最终套账(前端对照当前所选套账,不一致就明示)
+            "workspace_attribution": {
+                "requested_workspace_id": int(ws_client_id) if ws_client_id is not None else None,
+                "assignments": _persist.get("workspace_assignments") or [],
+            },
             "quota": {
                 "ip_used_today": None,
                 "ip_daily_limit": None,

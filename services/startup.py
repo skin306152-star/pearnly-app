@@ -268,8 +268,7 @@ def _boot_schema_ddl() -> None:
     except Exception as e:
         logger.warning(f"启动 authz schema 失败: {e}")
 
-    # 自动做账/报税/一句话记账 schema 双跑(accounting 6 表 / tax 3 表 / expense_draft ·
-    # docs accounting·tax-filing·smart-intake)。NEW-DEBT-EXEMPT: prod 无 alembic 钩子 → 启动自愈式迁移。
+    # 自动做账/报税/一句话记账 schema 双跑(docs accounting·tax-filing·smart-intake)。NEW-DEBT-EXEMPT。
     for _path, _fn, _label in (
         ("services.accounting.schema", "ensure_accounting_schema", "accounting"),
         ("services.tax.schema", "ensure_tax_schema", "tax"),
@@ -280,10 +279,7 @@ def _boot_schema_ddl() -> None:
         except Exception as e:
             logger.warning(f"启动 {_label} schema 失败: {e}")
 
-    # LINE 各表幂等建(prod 无 alembic 钩子 → 启动自愈式迁移,口径同 expense schema)。
-    # NEW-DEBT-EXEMPT: nonce 0037(防重放) / chat 0038(对话记忆) / msg_refs 0041(引用底座) /
-    # voice_quota 0044(闲聊每日上限) / webhook_dedup 0046(redelivery 幂等) /
-    # agent turn_log 0047(轮级审计)。
+    # LINE 各表幂等建(启动自愈式迁移)。NEW-DEBT-EXEMPT: alembic 留档 0037-0047 同号。
     for _mod, _label in (
         ("services.line_binding.line_action_nonce", "动作令牌"),
         ("services.line_binding.line_chat_memory", "对话记忆"),

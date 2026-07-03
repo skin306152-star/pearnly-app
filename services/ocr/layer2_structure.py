@@ -69,7 +69,6 @@ from .layer2_gemini import (  # noqa: F401 · L2-A/L2-B 纯搬家 re-export(调�
     Layer2TransientError,
     _call_gemini_with_retry,
     _classify_gemini_exception,
-    _get_model,
     _parse_json,
 )
 

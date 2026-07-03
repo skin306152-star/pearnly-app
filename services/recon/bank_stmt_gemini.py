@@ -6,9 +6,7 @@ extractors fail; results cached (in-memory LRU + disk) by file-bytes hash.
 """
 
 import hashlib
-import json
 import logging
-import re
 from typing import Any, Dict
 
 from services.ocr.gemini_models import flash_lite, try_with_fallback
@@ -82,12 +80,6 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
             "printed_totals": cached.get("printed_totals"),  # v118.35.0.63
         }
     try:
-        import google.generativeai as genai
-        import base64
-
-        genai.configure(api_key=api_key)
-
-        b64 = base64.b64encode(file_bytes).decode()
         # v118.33.13.0 · strict accounting-grade prompt — no guessing, no hallucination
         prompt = (
             "You are extracting EVERY transaction row from a bank statement (scanned PDF) for "
@@ -139,26 +131,9 @@ def _gemini_parse_statement(file_bytes: bytes, filename: str, api_key: str) -> D
         # 默认温度~1.0 导致同一扫描件每次识别结果不同(实测 BAY 行数 212↔274 飘)·
         # 设 0 后大幅稳定且通常更准 · top_p=1 candidate_count=1。
         def _call(model_name):
-            from services.ai_gateway import backends
+            from services.ocr.model_client import json_from_pdf
 
-            if not backends.is_aistudio():  # vertex / selfhost 经网关;默认 aistudio 走原 base64 路
-                from services.recon.bank_recon_utils import gateway_pdf_to_json
-
-                return gateway_pdf_to_json(model_name, file_bytes, prompt, "bank.stmt")
-
-            resp = genai.GenerativeModel(model_name).generate_content(
-                [{"mime_type": "application/pdf", "data": b64}, prompt],
-                generation_config={
-                    "temperature": 0.0,
-                    "top_p": 1.0,
-                    "candidate_count": 1,
-                    "max_output_tokens": 32768,
-                },
-            )
-            text = (resp.text or "").strip()
-            if text.startswith("```"):
-                text = re.sub(r"^```[a-z]*\n?", "", text).rstrip("`").strip()
-            return json.loads(text)
+            return json_from_pdf(model_name, file_bytes, prompt, "bank.stmt")
 
         # 主模型(flash-lite)解析失败/截断/整张读空 → 升级到更强兜底模型重试一次(糊图扫描件救场)。
         data = try_with_fallback(

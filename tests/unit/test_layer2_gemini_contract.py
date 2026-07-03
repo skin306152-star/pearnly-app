@@ -32,7 +32,6 @@ _REEXPORTED = (
     "Layer2TransientError",
     "_parse_json",
     "_classify_gemini_exception",
-    "_get_model",
     "_call_gemini_with_retry",
     "DEFAULT_TEMPERATURE",
     "DEFAULT_MAX_OUTPUT_TOKENS",

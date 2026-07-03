@@ -13,9 +13,6 @@ small page chunks and merge the per-chunk rows, so no single reply approaches
 the limit and one bad chunk can't sink the rest.
 """
 
-import re
-import json
-import base64
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -59,31 +56,10 @@ def _page_chunks(file_bytes: bytes, pages_per_chunk: int) -> List[bytes]:
 
 
 def _call_json(model_name: str, pdf_bytes: bytes, prompt: str) -> dict:
-    """One Gemini call returning parsed JSON (temperature 0 for determinism)."""
-    from services.ai_gateway import backends
+    """One model call returning parsed JSON (temperature 0 for determinism)."""
+    from services.ocr.model_client import json_from_pdf
 
-    if not backends.is_aistudio():  # vertex / selfhost 经网关;默认 aistudio 走下方原 base64 路
-        from services.recon.bank_recon_utils import gateway_pdf_to_json
-
-        return gateway_pdf_to_json(model_name, pdf_bytes, prompt, "bank.gl")
-
-    import google.generativeai as genai
-
-    model = genai.GenerativeModel(model_name)
-    b64 = base64.b64encode(pdf_bytes).decode()
-    resp = model.generate_content(
-        [{"mime_type": "application/pdf", "data": b64}, prompt],
-        generation_config={
-            "temperature": 0.0,
-            "top_p": 1.0,
-            "candidate_count": 1,
-            "max_output_tokens": 32768,
-        },
-    )
-    text = (resp.text or "").strip()
-    if text.startswith("```"):
-        text = re.sub(r"^```[a-z]*\n?", "", text).rstrip("`").strip()
-    return json.loads(text)
+    return json_from_pdf(model_name, pdf_bytes, prompt, "bank.gl")
 
 
 def _row_from_dict(r: dict, account_code: str) -> Optional[GlRow]:
@@ -108,9 +84,6 @@ def gemini_parse_gl(
 ) -> Dict[str, Any]:
     """Gemini fallback for GL PDFs. Chunked by page to survive long ledgers."""
     try:
-        import google.generativeai as genai
-
-        genai.configure(api_key=api_key)
         hint = f" Filter to account code starting with '{account_code}'." if account_code else ""
         prompt = _PROMPT.format(hint=hint)
 

@@ -105,23 +105,20 @@ def _gemini_vision_extract(image_bytes: bytes, api_key: Optional[str]) -> Dict[s
     key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
     if not key:
         raise IdCardExtractError("no Gemini api key (GOOGLE_API_KEY / GEMINI_API_KEY)")
-    from services.ai_gateway import transport
-    from services.ocr.gemini_models import flash_lite, tier_for_model, try_with_fallback
+    from services.ocr import model_client
+    from services.ocr.gemini_models import flash_lite, try_with_fallback
 
     img = bytes(image_bytes)
 
     def _call(model_name: str):
-        out = transport.multimodal_to_json(
+        out = model_client.json_from_images(
             _ID_CARD_PROMPT,
             [(img, _detect_image_mime(img))],
-            tier=tier_for_model(model_name),
-            api_key=key.strip(),
-            temperature=0.0,
-            response_mime=True,
-            max_tokens=16384,
-            timeout_s=DEFAULT_TIMEOUT_SECONDS,
-            max_retries=0,
+            model_name=model_name,
             task="ocr.id_card",
+            api_key=key.strip(),
+            timeout_s=DEFAULT_TIMEOUT_SECONDS,
+            max_tokens=16384,
         )
         return out.data if out.ok and isinstance(out.data, dict) else None
 

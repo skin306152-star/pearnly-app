@@ -94,7 +94,6 @@ from services.ocr.layer3_gemini import (  # noqa: F401 · re-export + refine 用
     _parse_json,
     _classify_gemini_exception,
     _call_l3_via_gateway,
-    _get_model,
 )
 
 # Layer3 异常类 → services/ocr/layer3_gemini.py(模块化深化)· 下方 re-import 回。
@@ -400,99 +399,17 @@ def _call_gemini_with_retry(
         raise TypeError(f"layer3: image_bytes not a valid image: {type(e).__name__}: {e}") from e
 
     base_user_prompt = _build_user_prompt(layer1_text, layer2_invoice, trigger_reasons)
-
-    from services.ai_gateway import backends
-
-    if not backends.is_aistudio():  # vertex / selfhost 经网关;默认 aistudio 走下方原路
-        mime = f"image/{(pil_image.format or 'png').lower()}"
-        return _call_l3_via_gateway(
-            image_bytes,
-            mime,
-            _SYSTEM_PROMPT,
-            base_user_prompt,
-            api_key,
-            model_name,
-            max_retries,
-            timeout,
-        )
-
-    model = _get_model(api_key=api_key, model_name=model_name)
-
-    last_parse_error: Optional[str] = None
-    last_raw_preview: str = ""
-
-    for attempt in range(max_retries + 1):
-        # B2 fix: on retry, augment the user prompt with JSON hygiene rules
-        if attempt == 0:
-            current_user_prompt = base_user_prompt
-        else:
-            current_user_prompt = (
-                base_user_prompt
-                + _RETRY_HINT_BASE
-                + f"\n\nPrevious parse error: {last_parse_error}"
-            )
-        try:
-            response = model.generate_content(
-                [_SYSTEM_PROMPT, pil_image, current_user_prompt],
-                request_options={"timeout": timeout},
-            )
-        except Exception as e:
-            raise _classify_gemini_exception(e) from e
-
-        raw = (response.text or "").strip() if hasattr(response, "text") else ""
-
-        # Capture token usage (best effort)
-        input_tokens = 0
-        output_tokens = 0
-        try:
-            usage = getattr(response, "usage_metadata", None)
-            if usage is not None:
-                input_tokens = int(getattr(usage, "prompt_token_count", 0) or 0)
-                output_tokens = int(getattr(usage, "candidates_token_count", 0) or 0)
-        except Exception:  # pragma: no cover (defensive)
-            pass
-
-        if not raw:
-            last_parse_error = "empty response"
-            last_raw_preview = ""
-            logger.warning(
-                "layer3: empty response (attempt %d/%d)",
-                attempt + 1,
-                max_retries + 1,
-            )
-            if attempt < max_retries:
-                continue
-            raise Layer3FallbackError(
-                f"layer3: Gemini returned empty response after " f"{max_retries + 1} attempts"
-            )
-
-        try:
-            data = _parse_json(raw)
-        except json.JSONDecodeError as e:
-            last_parse_error = str(e)
-            last_raw_preview = raw[:300]
-            logger.warning(
-                "layer3: JSON parse failed (attempt %d/%d): %s; raw[:200]=%r",
-                attempt + 1,
-                max_retries + 1,
-                e,
-                raw[:200],
-            )
-            if attempt < max_retries:
-                continue
-            raise Layer3FallbackError(
-                f"layer3: Gemini returned invalid JSON after "
-                f"{max_retries + 1} attempts: {last_parse_error}; "
-                f"raw[:300]={last_raw_preview!r}"
-            ) from e
-
-        return data, {
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "retries": attempt,
-        }
-
-    raise Layer3FallbackError(f"layer3: unreachable; last parse error: {last_parse_error}")
+    mime = f"image/{(pil_image.format or 'png').lower()}"
+    return _call_l3_via_gateway(
+        image_bytes,
+        mime,
+        _SYSTEM_PROMPT,
+        base_user_prompt,
+        api_key,
+        model_name,
+        max_retries,
+        timeout,
+    )
 
 
-# Gemini 传输层(_parse_json/_classify_gemini_exception/_get_model)→ services/ocr/layer3_gemini.py(模块化深化)。
+# Gemini 传输层(_parse_json/_classify_gemini_exception)→ services/ocr/layer3_gemini.py(模块化深化)。

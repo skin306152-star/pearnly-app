@@ -154,6 +154,12 @@ async def run_recovery_tick():
         await run_line_ocr_job_tick()
     except Exception as e:
         logger.warning(f"[line_ocr_jobs] tick failed: {e}")
+    try:
+        from services.notification import proactive
+
+        await proactive.run_tick()
+    except Exception as e:
+        logger.warning(f"[proactive_nudge] tick failed: {e}")
 
 
 async def run_accounting_posting_failure_tick():

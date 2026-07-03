@@ -57,6 +57,8 @@ class SlotCheck:
 @dataclass
 class ToolResult:
     ok: bool
+    # 恒为 dict(契约):list 类结果由 handler 包成 {"items":[...]} → observe/write_sink/fallbacks
+    # 一律按 dict 消费,不再逐处 isinstance(历史雷:通知 count 恒 0 = list 被强转空 dict)。
     data: Any = None
     error_code: Optional[str] = None  # 机器码,翻人话由 copy_map(WP3)
     receipt: str = ""  # 给用户的人话回执

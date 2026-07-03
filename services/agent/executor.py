@@ -115,7 +115,10 @@ class AgentToolset:
 
     def list_notification_logs(self, ctx: AgentContext) -> ToolResult:
         logs = db.list_notification_logs(str(ctx.user["id"]), tenant_id=ctx.tenant_id, limit=20)
-        return ToolResult(ok=True, data=logs, receipt=copy_map.notifications_receipt(logs))
+        # data 恒为 dict(契约·见 ToolResult.data):list 结果包成 {"items"},消费侧不再 isinstance
+        return ToolResult(
+            ok=True, data={"items": logs}, receipt=copy_map.notifications_receipt(logs)
+        )
 
     # ── 套账(workspace):LINE 会话态「当前套账」列表/切换 ──
     def list_workspaces(self, ctx: AgentContext) -> ToolResult:

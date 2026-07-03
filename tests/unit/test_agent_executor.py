@@ -113,6 +113,8 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertTrue(res.ok)
         db.list_notification_logs.assert_called_once_with("u1", tenant_id="t1", limit=20)
         self.assertIn("count=2", res.receipt)
+        # 契约:data 恒 dict(list 结果包成 {"items"}),消费侧不再 isinstance
+        self.assertEqual(res.data, {"items": [{"id": 1}, {"id": 2}]})
 
     def test_push_prepare_requires_permission(self):
         # push_to_erp 已从 M1 桩变备料实现(全链在 test_agent_push_confirm):无权限先拦。

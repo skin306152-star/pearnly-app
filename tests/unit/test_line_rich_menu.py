@@ -59,7 +59,7 @@ class PayloadTests(unittest.TestCase):
         self.assertEqual(total, 2500 * 1686)  # 无重叠 + 满面积 = 恰好铺满
 
     def test_per_row_splits_match_illustration(self):
-        # 点击区列边界贴 v7 插画按钮位置(非均分):底排比上排更靠左(中间被猫+咖啡占位)。
+        # 点击区列边界贴 v8 插画按钮位置(非均分):左/中缝上排(915)略右于下排(865)。
         # 换背景图若按钮位置变了,这里会挂 → 提醒同步复核 _ROW_X。
         by = {}
         for a in self.areas:
@@ -68,9 +68,9 @@ class PayloadTests(unittest.TestCase):
             by[key] = a["bounds"]
         top_mid_x = by["a=rm_summary"]["x"]  # 上排中格左边界
         bot_mid_x = by["a=rm_help"]["x"]  # 下排中格左边界
-        self.assertEqual(top_mid_x, 720)
-        self.assertEqual(bot_mid_x, 670)
-        self.assertLess(bot_mid_x, top_mid_x)  # 底排整体左移
+        self.assertEqual(top_mid_x, 915)
+        self.assertEqual(bot_mid_x, 865)
+        self.assertLess(bot_mid_x, top_mid_x)  # 下排左/中缝略靠左
         # 角上两格贴齐画布边(相机顶左、官网底右)
         self.assertEqual(by["camera"]["x"], 0)
         self.assertEqual(by["a=rm_detail"]["x"], 0)

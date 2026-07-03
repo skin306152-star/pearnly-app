@@ -25,14 +25,14 @@ _IMAGE_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     "static",
     "brand",
-    "line-richmenu-v7-2500x1686.jpg",
+    "line-richmenu-v8-2500x1686.jpg",
 )
 _W, _H = 2500, 1686
 _ROW_H = 843  # 两行各 843 覆盖 1686
-# 点击区不均分三列:v7 插画按钮非等距(底排偏左·中间被猫+咖啡占位),列边界贴按钮间隙,
-# 使每个按钮的图标+文字都落在自己格内(叠网格验过:上排 720/1610·下排 670/1380)。
+# 点击区列边界贴 v8 插画按钮间隙(非均分):上下两排列基本对齐,仅左/中缝差一点。
+# 叠网格逐个验过图标+文字都落对格:上排 915/1670·下排 865/1670。
 # 每排仍三段无缝铺满 0..2500,满覆盖不重叠不变量不变。换背景图必须同步复核这两组边界。
-_ROW_X = ((0, 720, 1610, 2500), (0, 670, 1380, 2500))  # 行 0 上排、行 1 下排各自的列边界
+_ROW_X = ((0, 915, 1670, 2500), (0, 865, 1670, 2500))  # 行 0 上排、行 1 下排各自的列边界
 _RM_ACTIONS = {"rm_summary", "rm_proof", "rm_detail", "rm_help"}
 # 官网入口:在 LINE 内置浏览器打开会让随后的 Google 登录被 disallowed_useragent 拦死。
 # openExternalBrowser=1 让 LINE 直接用系统浏览器(Safari/Chrome)打开 → Google 登录才合规、会话也持久。

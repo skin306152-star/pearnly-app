@@ -67,8 +67,18 @@ _ID_CARD_PROMPT = (
 
 
 def extract_thai_id_card(image_bytes: bytes, api_key: Optional[str] = None) -> Dict[str, Any]:
-    """身份证图 → 结构化字段。直接走 Gemini 多模态视觉(图→JSON),与发票 OCR
-    同一条 prod 可用路;不依赖 Google Vision(prod 未配 GOOGLE_APPLICATION_CREDENTIALS)。"""
+    """身份证图 → 结构化字段。Facade → controller(task=id_card)。"""
+    from services.ocr import controller
+    from services.ocr.contracts import OcrRequest
+
+    return controller.run(
+        OcrRequest(task="id_card", file_bytes=image_bytes, filename="", api_key=api_key)
+    ).data
+
+
+def _extract_id_card_impl(image_bytes: bytes, api_key: Optional[str] = None) -> Dict[str, Any]:
+    """直接走 Gemini 多模态视觉(图→JSON),与发票 OCR 同一条 prod 可用路;
+    不依赖 Google Vision(prod 未配 GOOGLE_APPLICATION_CREDENTIALS)。"""
     if not image_bytes:
         raise IdCardExtractError("empty image bytes")
     data = _gemini_vision_extract(image_bytes, (api_key or "").strip() or None)

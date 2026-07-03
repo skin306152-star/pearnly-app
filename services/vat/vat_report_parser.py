@@ -116,6 +116,18 @@ def _parse_vat_via_pipeline(
 def parse_vat_report(
     file_bytes: bytes, filename: str, api_key: Optional[str] = None
 ) -> Dict[str, Any]:
+    """销项 VAT 报表解析(任意格式)。Facade → controller(task=vat_report)。"""
+    from services.ocr import controller
+    from services.ocr.contracts import OcrRequest
+
+    return controller.run(
+        OcrRequest(task="vat_report", file_bytes=file_bytes, filename=filename, api_key=api_key)
+    ).data
+
+
+def _parse_vat_report_impl(
+    file_bytes: bytes, filename: str, api_key: Optional[str] = None
+) -> Dict[str, Any]:
     ext = (filename or "").lower().rsplit(".", 1)[-1]
 
     if ext in ("xlsx", "xls"):
@@ -203,7 +215,7 @@ def parse_structured_invoices(files, api_key: Optional[str] = None) -> List[Dict
     """xlsx/csv 发票文件列表 [(bytes, filename)] → 发票记录列表(行项直读)。"""
     out: List[Dict[str, Any]] = []
     for b, fn in files:
-        rep = parse_vat_report(b, fn, api_key=api_key)
+        rep = _parse_vat_report_impl(b, fn, api_key=api_key)
         for row in rep.get("rows") or []:
             out.append(report_row_to_invoice(row, fn))
     return out

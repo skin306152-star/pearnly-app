@@ -140,6 +140,24 @@ from services.recon.bank_recon_scoring import (  # noqa: F401  re-export (bank_r
 def parse_bank_statement_pdf(
     file_bytes: bytes, filename: str, api_key: str = "", tenant_id: Optional[str] = None
 ) -> Dict[str, Any]:
+    """Parse a bank statement (any format). Facade → controller(task=bank_statement)。"""
+    from services.ocr import controller
+    from services.ocr.contracts import OcrRequest
+
+    return controller.run(
+        OcrRequest(
+            task="bank_statement",
+            file_bytes=file_bytes,
+            filename=filename,
+            api_key=api_key,
+            tenant_id=tenant_id,
+        )
+    ).data
+
+
+def _parse_bank_statement_impl(
+    file_bytes: bytes, filename: str, api_key: str = "", tenant_id: Optional[str] = None
+) -> Dict[str, Any]:
     """
     Parse a bank statement.
 
@@ -403,6 +421,29 @@ def parse_bank_statement_pdf(
 
 
 def parse_gl(
+    file_bytes: bytes,
+    filename: str,
+    account_code: str = "",
+    api_key: str = "",
+    tenant_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Parse a general ledger (any format). Facade → controller(task=gl_ledger)。"""
+    from services.ocr import controller
+    from services.ocr.contracts import OcrRequest
+
+    return controller.run(
+        OcrRequest(
+            task="gl_ledger",
+            file_bytes=file_bytes,
+            filename=filename,
+            api_key=api_key,
+            tenant_id=tenant_id,
+            options={"account_code": account_code},
+        )
+    ).data
+
+
+def _parse_gl_impl(
     file_bytes: bytes,
     filename: str,
     account_code: str = "",

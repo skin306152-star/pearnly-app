@@ -52,23 +52,28 @@ def _compute_total_cost(page_results: List[PipelinePageResult]) -> float:
           ran (layer_chain starts with "L1"). When text_path (Layer 0)
           hit and Vision was skipped, layer_chain starts with "text" and
           no Vision cost is added.
-        - L2 tokens 按当前 flash_lite 档模型计价、L3 按升级档(escalate)模型计价,
-          档位换模型后账本自动跟价(2026-07-03 起两档默认都是 3.5-flash)。
+        - 逐页按【实际用过的模型】计价(PageResult.layer2_model/layer3_model,
+          page_runner 调用时记录);页上没记(旧结果/直调层函数)才回落当前档位。
+          OCR_MODE 混跑 2.5/3.5 时账本仍然对得上真账单。
         - Then * THB_PER_USD (default 35)
     """
     from services.ocr import gemini_models
 
-    l2_in, l2_out = price_per_m_usd(gemini_models.flash_lite())
-    l3_in, l3_out = price_per_m_usd(gemini_models.escalate() or gemini_models.flash())
     total_usd = 0.0
     for pr in page_results:
         # Vision per-page — only when L1 actually ran (skipped for text_path)
         if "L1" in pr.layer_chain:
             total_usd += COST_VISION_PER_PAGE_USD
+        l2_model = getattr(pr, "layer2_model", "") or gemini_models.flash_lite()
+        l2_in, l2_out = price_per_m_usd(l2_model)
         total_usd += (pr.layer2_input_tokens / 1_000_000.0) * l2_in
         total_usd += (pr.layer2_output_tokens / 1_000_000.0) * l2_out
         # L3 tokens > 0 means the escalation arm ran
         if pr.layer3_input_tokens or pr.layer3_output_tokens:
+            l3_model = (
+                getattr(pr, "layer3_model", "") or gemini_models.escalate() or gemini_models.flash()
+            )
+            l3_in, l3_out = price_per_m_usd(l3_model)
             total_usd += (pr.layer3_input_tokens / 1_000_000.0) * l3_in
             total_usd += (pr.layer3_output_tokens / 1_000_000.0) * l3_out
     return total_usd * THB_PER_USD

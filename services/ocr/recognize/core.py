@@ -187,7 +187,7 @@ def run_recognition_core(
             ocr_request_context(str(user["id"]), _tid(user)),
             engine_context(
                 "invoice", plan_code=_plan_code, is_exempt=bool(_billing.get("is_exempt"))
-            ),
+            ) as _engine_mode,
         ):
             if _ext in PDF_EXTENSIONS:
                 _pipe_res = _pipeline_run_pdf(content, max_pages=max_pages, api_key=api_key)
@@ -197,6 +197,11 @@ def run_recognition_core(
                 _pipe_res = _pipeline_run_table(
                     content, filename=file.filename or "upload", api_key=api_key
                 )
+        # 台账观测参数:实际用的模型(混模型时逗号并列)/是否触发升级臂
+        _ocr_models = sorted(
+            {m for p in _pipe_res.pages for m in (p.layer2_model, p.layer3_model) if m}
+        )
+        _l3_fired = any(p.layer3_input_tokens or p.layer3_output_tokens for p in _pipe_res.pages)
         result = pipeline_result_to_legacy_dict(_pipe_res)
         _pipeline_cost_thb = float(_pipe_res.estimated_cost_thb)
         logger.info(
@@ -228,6 +233,22 @@ def run_recognition_core(
         if err_name == "Layer1PDFError" or isinstance(_pipe_err, ValueError):
             raise HTTPException(400, detail=f"ocr.invalid_file: {_pipe_err}")
         logger.exception(f"❌ pipeline_v1 失败: {err_name}: {_pipe_err}")
+        # 引擎失败也记台账(status=failed,零成本行)——失败率才算得出。文件不合法(400)不算。
+        try:
+            db.log_ocr_cost(
+                user_id=str(user["id"]),
+                tenant_id=str(user.get("tenant_id")) if user.get("tenant_id") else None,
+                history_id=None,
+                engine="pipeline_v1",
+                pages=page_count,
+                input_tokens=0,
+                output_tokens=0,
+                cost_thb=0.0,
+                elapsed_ms=0,
+                status="failed",
+            )
+        except Exception:
+            pass
         raise HTTPException(500, detail="ocr.engine_error")
 
     # 非发票检测:全部页都非发票 → 不入库不扣费。
@@ -340,6 +361,9 @@ def run_recognition_core(
             output_tokens=total_output_tokens,
             cost_thb=_pipeline_cost_thb,
             elapsed_ms=int(result.get("elapsed_ms") or 0),
+            model=",".join(_ocr_models),
+            mode=_engine_mode,
+            l3_fired=_l3_fired,
         )
         logger.info(
             f"💰 成本记录 · {total_pages} 页 · in={total_input_tokens} out={total_output_tokens} "

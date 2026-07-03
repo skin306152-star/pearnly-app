@@ -70,37 +70,34 @@ def _messages(
     if not key:
         return None, {}, "auth"
     headers = {"x-api-key": key, "anthropic-version": _VERSION, "content-type": "application/json"}
+    payload: dict = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "messages": [{"role": "user", "content": user}],
+    }
+    if model not in _NO_TEMP:  # 已知拒 temperature 的代际直接不带,省一次试错
+        payload["temperature"] = temperature
+    if system:
+        block = {"type": "text", "text": system}
+        if cache_system:
+            block["cache_control"] = {"type": "ephemeral"}
+        payload["system"] = [block]
 
-    def _payload(with_temp: bool) -> dict:
-        p: dict = {
-            "model": model,
-            "max_tokens": max_tokens,
-            "messages": [{"role": "user", "content": user}],
-        }
-        if with_temp:
-            p["temperature"] = temperature
-        if system:
-            block = {"type": "text", "text": system}
-            if cache_system:
-                block["cache_control"] = {"type": "ephemeral"}
-            p["system"] = [block]
-        return p
-
-    # 已知拒 temperature 的模型直接不带;否则带,被拒则记忆+去掉重发一次。
-    for with_temp in ((False,) if model in _NO_TEMP else (True, False)):
+    for _ in range(2):  # 首发若因 temperature 被拒 → 记忆该模型 + 去掉重发一次
+        url = f"{_base()}/v1/messages"
         try:
-            resp = httpx.post(
-                f"{_base()}/v1/messages",
-                headers=headers,
-                json=_payload(with_temp),
-                timeout=timeout_s,
-            )
+            resp = httpx.post(url, headers=headers, json=payload, timeout=timeout_s)
         except httpx.TimeoutException:
             return None, {}, "timeout"
         except httpx.HTTPError:
             return None, {}, "provider"
-        if resp.status_code == 400 and with_temp and "temperature" in resp.text.lower():
-            _NO_TEMP.add(model)  # 该模型代际已弃 temperature → 记住,下方 with_temp=False 重发
+        if (
+            resp.status_code == 400
+            and "temperature" in payload
+            and "temperature" in resp.text.lower()
+        ):
+            _NO_TEMP.add(model)
+            payload.pop("temperature")
             continue
         if resp.status_code >= 400:
             return None, {}, _error_kind_status(resp.status_code)
@@ -112,7 +109,7 @@ def _messages(
             return text.strip(), (body.get("usage") or {}), None
         except Exception:  # noqa: BLE001
             return None, {}, "parse"
-    return None, {}, "provider"  # 理论不可达(with_temp=False 分支必返回)
+    return None, {}, "provider"  # 理论不可达(第二次已不带 temperature,必走到返回)
 
 
 def _billed_input(usage: dict) -> int:

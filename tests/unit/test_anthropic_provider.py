@@ -108,7 +108,7 @@ class TestAnthropicProvider(unittest.TestCase):
         seen = []
 
         def _cap(url, headers=None, json=None, timeout=None):
-            seen.append(json)
+            seen.append(dict(json))  # 快照:provider 会原地 pop temperature 重发,存引用会被改
             if "temperature" in json:
                 return _Resp(400, {}, text="`temperature` is deprecated for this model")
             return _Resp(200, _ok_body('{"kind":"reply"}', {"input_tokens": 1, "output_tokens": 1}))

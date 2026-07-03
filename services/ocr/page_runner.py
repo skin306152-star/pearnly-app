@@ -166,8 +166,13 @@ def _process_one_page(
         l1_layer_name = "text"
 
     # --- Layer 2 ---
+    # 模型名调用时取(engine_policy 的请求级覆写才生效;模块级 DEFAULT_MODEL 是
+    # import 期冻结的 env 值)。实际用了哪个模型记进 PageResult,成本按它计价。
     t_l2 = time.time()
-    l2_result = _l2_extract_page(l1_page, api_key=api_key, document_type=document_type)
+    l2_model = gemini_models.flash_lite()
+    l2_result = _l2_extract_page(
+        l1_page, api_key=api_key, model_name=l2_model, document_type=document_type
+    )
     l2_ms = int((time.time() - t_l2) * 1000)
     l2_invoice = l2_result.invoice
     l2_document = l2_result.document
@@ -209,6 +214,7 @@ def _process_one_page(
     l3_in_tokens = 0
     l3_out_tokens = 0
     l3_ms = 0
+    l3_model = ""
     needs_manual_review = False
     error_msg: Optional[str] = None
 
@@ -252,6 +258,7 @@ def _process_one_page(
             l3_in_tokens = res["in_tokens"]
             l3_out_tokens = res["out_tokens"]
             l3_ms = res["ms"]
+            l3_model = (res.get("models") or [""])[-1]
         except Layer3AuthError:
             raise
         except (
@@ -269,12 +276,14 @@ def _process_one_page(
                 raise
     elif l3_eligible:
         try:
+            l3_model = gemini_models.fallback() or gemini_models.flash()
             l3_result = _l3_refine_page(
                 image_bytes=image_bytes,
                 layer1_page=l1_page,
                 layer2_invoice=l2_invoice,
                 trigger_reasons=triggers,
                 api_key=api_key,
+                model_name=l3_model,
                 document_type=document_type,
             )
             invoice = l3_result.invoice
@@ -427,6 +436,8 @@ def _process_one_page(
         layer2_output_tokens=l2_result.output_tokens,
         layer3_input_tokens=l3_in_tokens,
         layer3_output_tokens=l3_out_tokens,
+        layer2_model=l2_model,
+        layer3_model=l3_model if (l3_in_tokens or l3_out_tokens) else "",
         layer1_ms=l1_ms,
         layer2_ms=l2_ms,
         layer3_ms=l3_ms,

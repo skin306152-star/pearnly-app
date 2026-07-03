@@ -178,9 +178,17 @@ def run_recognition_core(
         )
         from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
         from services.ocr.feedback.context import ocr_request_context
+        from services.ocr.engine_policy import engine_context
 
         # 反馈闭环 ② · 设请求级上下文(L2 few-shot 按租户取例;flag 关时无副作用)
-        with ocr_request_context(str(user["id"]), _tid(user)):
+        # 引擎策略:按 OCR_MODE + 租户套餐决定本次请求的模型档位(fail-safe direct35)
+        _plan_code = (_billing.get("subscription") or {}).get("plan_code")
+        with (
+            ocr_request_context(str(user["id"]), _tid(user)),
+            engine_context(
+                "invoice", plan_code=_plan_code, is_exempt=bool(_billing.get("is_exempt"))
+            ),
+        ):
             if _ext in PDF_EXTENSIONS:
                 _pipe_res = _pipeline_run_pdf(content, max_pages=max_pages, api_key=api_key)
             elif _ext in IMAGE_EXTENSIONS:

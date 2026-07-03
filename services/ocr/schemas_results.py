@@ -132,6 +132,8 @@ class PipelinePageResult(BaseModel):
     layer2_output_tokens: int = Field(default=0, ge=0)
     layer3_input_tokens: int = Field(default=0, ge=0)
     layer3_output_tokens: int = Field(default=0, ge=0)
+    layer2_model: str = Field(default="", description="L2 实际用的模型名(成本按它计价)")
+    layer3_model: str = Field(default="", description="L3/升级臂实际用的模型名;没跑 = 空")
     layer1_ms: int = Field(default=0, ge=0)
     layer2_ms: int = Field(default=0, ge=0)
     layer3_ms: int = Field(default=0, ge=0, description="0 if L3 didn't run")

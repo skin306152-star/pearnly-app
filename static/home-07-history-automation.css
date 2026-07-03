@@ -477,7 +477,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 10000;
+    z-index: 13500; /* showConfirm 用此壳·必须盖过所有向导弹窗(exp-wiz-overlay 13000/mrerp-wizard-overlay 11000),
+                       否则从向导里点危险操作(如重置密钥)确认框被挡在后面点不到 */
     padding: 20px;
 }
 .modal {

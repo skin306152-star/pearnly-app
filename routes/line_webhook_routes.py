@@ -419,7 +419,10 @@ async def _handle_line_text(
             return
         # 文本路 · 置信驱动入账(docs/smart-intake/15):记账意图→解析→高置信直接入账+数据卡,
         # 其余草稿请确认;闲聊/查账/问答→智能回复。回执引用原句(quoteToken)。
-        if line_expense.handle_expense_text(
+        # to_thread:里面有大脑(最长 ~20s 预算)+ 同步 DB,直接调会把整个事件循环
+        # 卡住 → 全站 webhook(别的用户)一起等。挪到线程池,事件循环只管收发。
+        if await asyncio.to_thread(
+            line_expense.handle_expense_text,
             bound_user,
             reply_token,
             line_user_id,

@@ -78,3 +78,5 @@ class AgentContext:
     anchors: dict[str, Any] = field(default_factory=dict)
     endpoint_config: dict[str, Any] = field(default_factory=dict)
     prior_results: dict[str, Any] = field(default_factory=dict)
+    trace_id: str = ""  # 本轮追踪号(loop 生成)——串起同轮多次网关调用 + 审计行
+    tool_trace: list = field(default_factory=list)  # 本轮工具轨迹 [{tool,ok,error}](审计留痕)

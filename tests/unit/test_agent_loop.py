@@ -3,6 +3,7 @@
 import unittest
 from contextlib import contextmanager
 from decimal import Decimal
+from unittest.mock import MagicMock, patch
 
 from services.agent import fallbacks, loop, manifest, observe
 from services.agent.contracts import AgentContext, SlotSpec, ToolResult, ToolSpec
@@ -480,6 +481,88 @@ class TestMultiItemDefersToPreciseCard(unittest.TestCase):
             allow_write=False,
         )
         self.assertEqual(out.kind, "defer_record")
+
+
+class TestBudgetAndAttribution(unittest.TestCase):
+    """一轮总预算(LINE reply_token 30s 时效内必出回复)+ 网关成本归属。"""
+
+    def test_decide_receives_ctx_and_budget(self):
+        seen = {}
+
+        def decide(user_text, history, *, today, observations, **kw):
+            seen.update(kw)
+            return loop.LoopStep("reply", message="ok")
+
+        ctx = AgentContext(user={"id": "u1"}, tenant_id="t1")
+        loop.handle_turn("hi", ctx, decide=decide, history=[])
+        self.assertIs(seen.get("ctx"), ctx)
+        self.assertTrue(ctx.trace_id)  # 每轮有 trace_id(串网关日志 + 审计行)
+        self.assertGreater(seen.get("budget_s"), 0)
+
+    def test_budget_exhausted_before_first_step_is_crash(self):
+        # 预算见底且一无所获 → crash(入口安全兜底),绝不顶着 reply_token 失效继续跑。
+        calls = []
+
+        def decide(*a, **kw):
+            calls.append(1)
+            return loop.LoopStep("reply", message="late")
+
+        with patch.object(loop, "_TURN_BUDGET_S", 0):
+            out = loop.handle_turn("hi", AgentContext(user={}), decide=decide, history=[])
+        self.assertEqual(out.kind, "crash")
+        self.assertEqual(calls, [])  # 一步都没开
+
+    def test_budget_exhausted_with_data_falls_back_grounded(self):
+        # 取到数据后预算烧穿 → 跳过尾部成文,直接用工具结果兜底一句(诚实,不空手)。
+        ticks = iter([0.0, 5.0, 5.0, 99.0, 99.0, 99.0, 99.0])
+        decide = _script(
+            loop.LoopStep("tool", tool="list_notifications", args={}),
+            loop.LoopStep("reply", message="never-reached"),
+        )
+
+        class _NotifToolset:
+            def list_notification_logs(self, ctx, **kw):
+                return ToolResult(ok=True, data=[{"id": 1}, {"id": 2}])
+
+        with patch("services.agent.loop.time.monotonic", lambda: next(ticks)):
+            out = loop.handle_turn(
+                "มีแจ้งเตือนไหม",
+                AgentContext(user={"id": "u1"}, tenant_id="t1"),
+                decide=decide,
+                toolset=_NotifToolset(),
+                history=[],
+            )
+        self.assertEqual(out.kind, "reply")
+        self.assertIn("2", out.text)  # grounded fallback 用真实条数,不是空话
+
+    def test_decide_step_passes_attribution_to_gateway(self):
+        seen = {}
+
+        def fake_text_to_json(prompt, **kw):
+            seen.update(kw)
+            return MagicMock(ok=False, data=None, raw="")
+
+        ctx = AgentContext(user={"id": "u9"}, tenant_id="t9", trace_id="tr-1")
+        with unittest.mock.patch("services.ai_gateway.transport.text_to_json", fake_text_to_json):
+            loop._decide_step("hi", [], today="t", observations=[], ctx=ctx, budget_s=7.5)
+        self.assertEqual(seen["tenant_id"], "t9")
+        self.assertEqual(seen["user_id"], "u9")
+        self.assertEqual(seen["trace_id"], "tr-1")
+        self.assertEqual(seen["timeout_s"], 7)  # 单步超时被剩余预算压缩
+
+    def test_tool_trace_collected_on_ctx(self):
+        ctx = AgentContext(user={"id": "u1"}, tenant_id="t1")
+        loop.handle_turn(
+            "ยอดเงิน",
+            ctx,
+            decide=_script(
+                loop.LoopStep("tool", tool="balance", args={}),
+                loop.LoopStep("reply", message="58"),
+            ),
+            toolset=_FakeToolset(ToolResult(ok=True, data={"balance_thb": 58})),
+            history=[],
+        )
+        self.assertEqual(ctx.tool_trace, [{"tool": "balance", "ok": True, "error": None}])
 
 
 if __name__ == "__main__":

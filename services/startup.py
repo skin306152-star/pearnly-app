@@ -282,13 +282,15 @@ def _boot_schema_ddl() -> None:
 
     # LINE 各表幂等建(prod 无 alembic 钩子 → 启动自愈式迁移,口径同 expense schema)。
     # NEW-DEBT-EXEMPT: nonce 0037(防重放) / chat 0038(对话记忆) / msg_refs 0041(引用底座) /
-    # voice_quota 0044(闲聊每日上限) / webhook_dedup 0046(redelivery 幂等)。
+    # voice_quota 0044(闲聊每日上限) / webhook_dedup 0046(redelivery 幂等) /
+    # agent turn_log 0047(轮级审计)。
     for _mod, _label in (
         ("services.line_binding.line_action_nonce", "动作令牌"),
         ("services.line_binding.line_chat_memory", "对话记忆"),
         ("services.line_binding.line_message_refs", "消息映射"),
         ("services.expense.line_voice_quota", "闲聊配额"),
         ("services.line_binding.line_webhook_dedup", "webhook去重"),
+        ("services.agent.turn_log", "Agent审计"),
     ):
         try:
             __import__(_mod, fromlist=["ensure_table"]).ensure_table()

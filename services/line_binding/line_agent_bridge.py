@@ -214,11 +214,34 @@ def try_agent_turn(
     reply_token/quote_token/book=入口的出卡料;写开启时写工具经 write_sink 落现有确定性执行。
     lang 保留兼容:回复语言由模型按用户最新消息自适应,不再套模板。
     """
+    import time
+
     from core import feature_flags
 
     uid = str(bound_user["id"]) if bound_user.get("id") else None
     if not feature_flags.agent_enabled_for(uid):
         return TurnResult("crash")
+    started = time.monotonic()
+
+    def _audit(kind, *, trace_id=None, tool_trace=None):
+        """轮级审计留痕(best-effort 双保险:审计绝不挡对话)。"""
+        try:
+            from services.agent import turn_log
+
+            turn_log.record(
+                tenant_id=tid,
+                user_id=uid,
+                line_user_id=line_user_id,
+                trace_id=trace_id,
+                lang=lang,
+                user_text=text,
+                result_kind=kind,
+                tool_trace=tool_trace,
+                elapsed_ms=int((time.monotonic() - started) * 1000),
+            )
+        except Exception:
+            logger.warning("[line agent] audit failed", exc_info=True)
+
     # M3 确认握手 · resume 闸:15 分钟内有待确认推送卡 + 文本是确认/取消词 → 与点按钮
     # 同效(消费同一 nonce,后到的撞 used 幂等)。闸关/无卡/非确认词/故障 → 正常对话轮。
     from services.agent import confirm_machine
@@ -226,11 +249,13 @@ def try_agent_turn(
     if confirm_machine.try_resume(
         bound_user, reply_token, text, lang, tenant_id=tid, line_user_id=line_user_id
     ):
+        _audit("card_sent", tool_trace=[{"tool": "confirm_resume", "ok": True}])
         return TurnResult("card_sent")  # handle_postback 已回话,入口别再出声
     # 对账收件:活跃收件缺科目号且这句像编码 → 收下(别的话不吃,收件不打断正常对话)。
     from services.agent import recon_intake
 
     if recon_intake.try_text(bound_user, text, lang, tid, line_user_id):
+        _audit("card_sent", tool_trace=[{"tool": "recon_intake_text", "ok": True}])
         return TurnResult("card_sent")
     try:
         from services.agent import loop
@@ -257,7 +282,7 @@ def try_agent_turn(
                 quoted_message_id,
                 book,
             )
-        return loop.handle_turn(
+        res = loop.handle_turn(
             text,
             ctx,
             history=history,
@@ -267,7 +292,10 @@ def try_agent_turn(
             allow_image=sink is not None and image_enabled(bound_user),
             write_sink=sink,
         )
+        _audit(res.kind, trace_id=ctx.trace_id, tool_trace=ctx.tool_trace)
+        return res
     except Exception:
         # 任何异常 → crash(铁律:Agent 不许把错误抛给用户);入口安全兜底,带 uid + 栈便于排障。
         logger.warning("[line agent] turn failed; safe fallback (uid=%s)", uid, exc_info=True)
+        _audit("crash")
         return TurnResult("crash")

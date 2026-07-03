@@ -26,11 +26,25 @@ def _cm(cur):
 class TestSeenBefore(unittest.TestCase):
     def test_fresh_event_processes_and_cleans(self):
         cur = _cursor(rowcount=1)
-        with patch("core.db.get_cursor", lambda **k: _cm(cur)):
+        with (
+            patch("core.db.get_cursor", lambda **k: _cm(cur)),
+            patch.object(dd.random, "random", return_value=0.0),  # 命中采样 → 必跑清理
+        ):
             self.assertFalse(dd.seen_before("evt-1"))
         sqls = [c.args[0] for c in cur.execute.call_args_list]
         self.assertTrue(any("ON CONFLICT (event_id) DO NOTHING" in s for s in sqls))
-        self.assertTrue(any("DELETE FROM line_webhook_events" in s for s in sqls))  # 顺手清老行
+        self.assertTrue(any("DELETE FROM line_webhook_events" in s for s in sqls))  # 采样清老行
+
+    def test_cleanup_is_sampled_not_every_event(self):
+        # 热路径:未命中采样时只 INSERT,不为"几乎总删空"的 DELETE 买单。
+        cur = _cursor(rowcount=1)
+        with (
+            patch("core.db.get_cursor", lambda **k: _cm(cur)),
+            patch.object(dd.random, "random", return_value=0.99),
+        ):
+            self.assertFalse(dd.seen_before("evt-2"))
+        sqls = [c.args[0] for c in cur.execute.call_args_list]
+        self.assertFalse(any("DELETE" in s for s in sqls))
 
     def test_redelivery_is_skipped(self):
         cur = _cursor(rowcount=0)  # 冲突插不进 = 处理过

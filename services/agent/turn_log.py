@@ -13,10 +13,12 @@ from __future__ import annotations
 
 import json
 import logging
+import random
 
 logger = logging.getLogger(__name__)
 
-RETENTION_DAYS = 90  # 审计回放窗口;写时顺手清,表不长毛
+RETENTION_DAYS = 90  # 审计回放窗口;采样清老行,表不长毛
+_CLEAN_PROB = 0.02  # 清理采样率:90d 保留意味着绝大多数轮删 0 行,别每轮都跑
 _TEXT_MAX = 300
 
 _TABLE = """
@@ -98,11 +100,12 @@ def record(
                     elapsed_ms,
                 ),
             )
-            cur.execute(
-                "DELETE FROM agent_turn_logs "
-                "WHERE created_at < now() - make_interval(days => %s)",
-                (RETENTION_DAYS,),
-            )
+            if random.random() < _CLEAN_PROB:
+                cur.execute(
+                    "DELETE FROM agent_turn_logs "
+                    "WHERE created_at < now() - make_interval(days => %s)",
+                    (RETENTION_DAYS,),
+                )
     except Exception:
         logger.warning("[agent turn_log] record failed", exc_info=True)
 

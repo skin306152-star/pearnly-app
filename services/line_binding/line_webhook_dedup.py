@@ -13,10 +13,12 @@ INSERT ON CONFLICT DO NOTHING 原子抢占:插不进 = 处理过,整个事件跳
 from __future__ import annotations
 
 import logging
+import random
 
 logger = logging.getLogger(__name__)
 
-TTL_HOURS = 48  # LINE redelivery 窗口远短于此;写时顺手清老行,表恒小
+TTL_HOURS = 48  # LINE redelivery 窗口远短于此;采样清老行,表恒小
+_CLEAN_PROB = 0.02  # 清理采样率:webhook 最热路径,别每个事件都为"几乎总删空"的 DELETE 买单
 
 _TABLE = """
 CREATE TABLE IF NOT EXISTS line_webhook_events (
@@ -51,7 +53,7 @@ def seen_before(event_id) -> bool:
                 (eid,),
             )
             fresh = cur.rowcount > 0
-            if fresh:
+            if fresh and random.random() < _CLEAN_PROB:
                 cur.execute(
                     "DELETE FROM line_webhook_events "
                     "WHERE received_at < now() - make_interval(hours => %s)",

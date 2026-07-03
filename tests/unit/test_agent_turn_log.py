@@ -35,10 +35,11 @@ class TestRecord(unittest.TestCase):
 
     def test_inserts_row_and_cleans_retention(self):
         cur = MagicMock()
-        self._record(cur)
+        with patch.object(turn_log.random, "random", return_value=0.0):  # 命中采样 → 必跑清理
+            self._record(cur)
         sqls = [c.args[0] for c in cur.execute.call_args_list]
         self.assertTrue(any("INSERT INTO agent_turn_logs" in s for s in sqls))
-        self.assertTrue(any("DELETE FROM agent_turn_logs" in s for s in sqls))  # 90d 写时顺清
+        self.assertTrue(any("DELETE FROM agent_turn_logs" in s for s in sqls))  # 90d 采样清
         ins = next(c for c in cur.execute.call_args_list if "INSERT" in c.args[0])
         self.assertLessEqual(len(ins.args[1][5]), turn_log._TEXT_MAX)  # user_text 截断
 

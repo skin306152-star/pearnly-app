@@ -79,6 +79,7 @@ class AgentContext:
     quoted_message_id: Optional[str] = None  # 用户长按引用的消息 id(撤销/改错锚定目标)
     user_text: str = ""  # 本轮用户原文(写工具建草稿做金额接地用·loop 每轮注入)
     anchors: dict[str, Any] = field(default_factory=dict)
+    anchors_enabled: bool = False  # 锚点闸(agent_anchor_memory)开才采集/消费,关=逐字节现状
     endpoint_config: dict[str, Any] = field(default_factory=dict)
     prior_results: dict[str, Any] = field(default_factory=dict)
     trace_id: str = ""  # 本轮追踪号(loop 生成)——串起同轮多次网关调用 + 审计行

@@ -88,6 +88,31 @@ class TestAnthropicProvider(unittest.TestCase):
             anthropic.text_to_json("body", system="prefix", cache_system=False)
         self.assertNotIn("cache_control", seen["payload"]["system"][0])
 
+    def test_temperature_omitted_for_new_model_alias(self):
+        # claude-sonnet-5(无日期后缀)已废弃 temperature,传了报 400 → 必须不发。
+        seen = {}
+
+        def _cap(url, headers=None, json=None, timeout=None):
+            seen["payload"] = json
+            return _Resp(200, _ok_body('{"kind":"reply"}', {"input_tokens": 1, "output_tokens": 1}))
+
+        with patch.dict("os.environ", {"ANTHROPIC_BEST_MODEL": "claude-sonnet-5"}):
+            with patch("httpx.post", _cap):
+                anthropic.text_to_json("p", tier="best")
+        self.assertNotIn("temperature", seen["payload"])
+
+    def test_temperature_sent_for_dated_model(self):
+        seen = {}
+
+        def _cap(url, headers=None, json=None, timeout=None):
+            seen["payload"] = json
+            return _Resp(200, _ok_body('{"kind":"reply"}', {"input_tokens": 1, "output_tokens": 1}))
+
+        with patch.dict("os.environ", {"ANTHROPIC_FLASH_MODEL": "claude-haiku-4-5-20251001"}):
+            with patch("httpx.post", _cap):
+                anthropic.text_to_json("p", tier="flash", temperature=0.0)
+        self.assertEqual(seen["payload"]["temperature"], 0.0)
+
     def test_action_unsupported_falls_back(self):
         oc = anthropic.text_to_action("p", tools=[])
         self.assertIsInstance(oc, ProviderOutcome)

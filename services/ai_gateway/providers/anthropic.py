@@ -15,12 +15,20 @@ cache_control)→ Anthropic 缓存该前缀,命中读价降到 10%,是这类 wor
 from __future__ import annotations
 
 import os
+import re
 from typing import Optional, Tuple
 
 from services.ai_gateway.tasks import ProviderOutcome
 
 NAME = "anthropic"
 _VERSION = "2023-06-01"
+# 带 8 位日期后缀的模型(如 ...-20251001)仍收 temperature;新别名(claude-sonnet-5 等)已废弃该参数,
+# 传了报 400。用日期后缀区分,避免硬编码型号清单(自维护)。
+_DATED = re.compile(r"-\d{8}$")
+
+
+def _accepts_temperature(model: str) -> bool:
+    return bool(_DATED.search(model or ""))
 
 
 def _base() -> str:
@@ -66,9 +74,10 @@ def _messages(
     payload: dict = {
         "model": model,
         "max_tokens": max_tokens,
-        "temperature": temperature,
         "messages": [{"role": "user", "content": user}],
     }
+    if _accepts_temperature(model):
+        payload["temperature"] = temperature
     if system:
         block = {"type": "text", "text": system}
         if cache_system:

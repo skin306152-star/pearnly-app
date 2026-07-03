@@ -41,6 +41,9 @@ AGENT_NATIVE_FC_KEY = "agent_native_fc"
 # 回复底部 quick-reply chips 子闸(P2):默认关。关 → 纯文本回复现状不变;
 # 开 → agent 回复/安全兜底带 2-3 个可点建议(教育用户能问什么)。
 AGENT_QUICK_CHIPS_KEY = "agent_quick_chips"
+# 跨轮锚点记忆子闸(P2):默认关。关 → 锚点不加载/不采集/不落库,行为逐字节不变;
+# 开 → 「把刚才那张推进 ERP」这类不带票号的口头指代能定位上一轮碰过的单据。
+AGENT_ANCHOR_KEY = "agent_anchor_memory"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -102,3 +105,8 @@ def agent_native_fc_enabled_for(user_id: Optional[str]) -> bool:
 def agent_quick_chips_enabled_for(user_id: Optional[str]) -> bool:
     """quick-reply chips 子闸。关 = 纯文本回复现状不变。"""
     return _enabled(AGENT_QUICK_CHIPS_KEY, user_id, "agent_quick_chips_enabled_for")
+
+
+def agent_anchor_enabled_for(user_id: Optional[str]) -> bool:
+    """跨轮锚点记忆子闸。关 = 锚点全程不流动,现状不变。"""
+    return _enabled(AGENT_ANCHOR_KEY, user_id, "agent_anchor_enabled_for")

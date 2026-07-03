@@ -14,7 +14,7 @@ from typing import Optional
 
 from core import db
 from core.route_helpers import _plan_permissions
-from services.agent import copy_map
+from services.agent import anchors, copy_map
 from services.agent.contracts import AgentContext, ToolResult
 
 
@@ -158,6 +158,11 @@ class AgentToolset:
         带词多命中→候选喂回让用户挑(绝不猜);无词→最近一张。
         allow_doc_fallback 只有 push_to_erp 开:兜底会插载体行(写副作用),
         查状态这类纯读不许有。"""
+        if not keyword:
+            # 「刚才那张」优先认跨轮锚点(读时已复核可见性);锚空/失效回落最近一张。
+            hit = anchors.resolve_history(ctx)
+            if hit:
+                return hit, None
         res = db.list_ocr_history(
             user_id=str(ctx.user["id"]),
             tenant_id=ctx.tenant_id,

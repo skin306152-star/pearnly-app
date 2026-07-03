@@ -261,12 +261,21 @@ def try_agent_turn(
         from services.agent import loop
         from services.agent.contracts import AgentContext
 
+        # 跨轮锚点(agent_anchor_memory):闸开才 load/采集/落库,关 = 锚点全程不流动。
+        anchors_on = feature_flags.agent_anchor_enabled_for(uid) and bool(tid and line_user_id)
+        loaded_anchors = {}
+        if anchors_on:
+            from services.line_binding import line_anchor_store
+
+            loaded_anchors = line_anchor_store.get_anchors(tid, line_user_id)
         ctx = AgentContext(
             user=bound_user,
             tenant_id=tid,
             workspace_client_id=ws,
             line_user_id=line_user_id,
             quoted_message_id=quoted_message_id,
+            anchors=dict(loaded_anchors),
+            anchors_enabled=anchors_on,
         )
         sink = None
         if feature_flags.agent_write_enabled_for(uid):
@@ -292,6 +301,8 @@ def try_agent_turn(
             allow_image=sink is not None and image_enabled(bound_user),
             write_sink=sink,
         )
+        if anchors_on and ctx.anchors != loaded_anchors:
+            line_anchor_store.set_anchors(tid, line_user_id, ctx.anchors)
         _audit(res.kind, trace_id=ctx.trace_id, tool_trace=ctx.tool_trace)
         return res
     except Exception:

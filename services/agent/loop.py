@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Callable, Optional
 
-from services.agent import brain, executor, fallbacks, manifest, native_fc, observe, slots
+from services.agent import anchors, brain, executor, fallbacks, manifest, native_fc, observe, slots
 from services.agent.contracts import AgentAction, AgentContext
 from services.sales.dates import bangkok_now
 
@@ -462,6 +462,7 @@ def handle_turn(
         ctx.tool_trace.append(
             {"tool": step.tool, "ok": bool(result.ok), "error": result.error_code or None}
         )
+        anchors.collect(ctx, step.tool, result)  # 闸关 no-op;记"刚才碰过的对象"供下轮指代
         if spec.writes:
             # 写档:金额没接地 → 喂回缺口让大脑用文字追问;接地成功 → 高置信直录 + 出富卡
             # (暖话 step.say 显示在卡上方),卡即回复,消费本轮(数字全在卡·大脑只写卡外那句暖话)。

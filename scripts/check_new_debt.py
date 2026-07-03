@@ -103,7 +103,12 @@ def main() -> int:
 
     base = args.base or f"{args.head}~1"
     diff_text = _git(["diff", "--unified=0", f"{base}..{args.head}"])
-    msg = _git(["log", "-1", "--format=%B", args.head])
+    # 豁免收集范围 = base..head 全部 commit message(与 check_line_ratchet 同口径)。
+    # 只读 HEAD 在 PR 跑会读到 GitHub 合成 merge commit("Merge <sha> into ...")——
+    # 分支里写好的豁免永远读不到,带 ensure_ 的 PR 必红且无法从分支侧修。
+    msg = _git(["log", "--format=%B", f"{base}..{args.head}"]) or _git(
+        ["log", "-1", "--format=%B", args.head]
+    )
     exempt = EXEMPT_MARKER in msg
 
     violations = scan_diff(diff_text)

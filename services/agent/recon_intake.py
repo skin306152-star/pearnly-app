@@ -383,10 +383,8 @@ def _launch(user, tid, line_user_id, lang, action) -> bool:
         _cleanup(action)
         _notify(line_user_id, tid, _t(_NO_BALANCE, lang))
         return True
-    from core import workspace_context as wc
-
     cfg = _cfg(action)
-    ws = wc.default_workspace_for_write(tid)
+    ws = _write_workspace(tid, line_user_id)
     params = {
         "user_id": uid,
         "tenant_id": tid,
@@ -423,6 +421,22 @@ def _launch(user, tid, line_user_id, lang, action) -> bool:
         _notify(line_user_id, tid, _t(_STARTED_PLAIN, lang))
     _note(line_user_id, tid, f"对账收件齐({action.get('kind')}),job={str(rid)[:8]} 已入队")
     return True
+
+
+def _write_workspace(tid, line_user_id):
+    """对账归属套账 = 用户当前套账(与记账写路 line_expense:59 同口径,尊重 switch_workspace);
+    读取异常回落租户默认套账,绝不因套账解析挡对账。"""
+    from services.line_binding import line_workspace
+
+    try:
+        with db.get_cursor_rls(tid) as cur:
+            return line_workspace.resolve_write_workspace(
+                cur, tenant_id=tid, line_user_id=line_user_id
+            )
+    except Exception:
+        from core import workspace_context as wc
+
+        return wc.default_workspace_for_write(tid)
 
 
 def cancel(user, tid, line_user_id, lang, action) -> None:

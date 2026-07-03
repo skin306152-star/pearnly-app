@@ -419,7 +419,10 @@ async def _handle_line_text(
             return
         # 文本路 · 置信驱动入账(docs/smart-intake/15):记账意图→解析→高置信直接入账+数据卡,
         # 其余草稿请确认;闲聊/查账/问答→智能回复。回执引用原句(quoteToken)。
-        if line_expense.handle_expense_text(
+        # to_thread:里面有大脑(最长 ~20s 预算)+ 同步 DB,直接调会把整个事件循环
+        # 卡住 → 全站 webhook(别的用户)一起等。挪到线程池,事件循环只管收发。
+        if await asyncio.to_thread(
+            line_expense.handle_expense_text,
             bound_user,
             reply_token,
             line_user_id,
@@ -465,9 +468,19 @@ async def line_webhook(request: Request):
         logger.error(f"[line_webhook] JSON 解析失败: {e}")
         return {"status": "bad_json"}
 
+    from services.line_binding import line_webhook_dedup
+
     events = payload.get("events") or []
     for ev in events:
         try:
+            # LINE redelivery 会原样重投:按 webhookEventId 原子判重,重投整个跳过
+            # (at-most-once:文本直录无消息级幂等,双记账比丢一条伤害大)。
+            if line_webhook_dedup.seen_before(ev.get("webhookEventId")):
+                logger.info(
+                    "[line_webhook] duplicate event skipped id=%s",
+                    str(ev.get("webhookEventId"))[:24],
+                )
+                continue
             await _handle_line_event(ev)
         except Exception as e:
             logger.error(f"[line_webhook] 事件处理异常: {e}")

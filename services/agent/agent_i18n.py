@@ -184,6 +184,12 @@ _T: dict[str, dict[str, str]] = {
         "th": "หาเอกสารใบนั้นไม่เจอ · ลองส่งเลขใบเสร็จอีกครั้ง",
         "ja": "その伝票が見つかりません · 領収書番号をもう一度送ってください",
     },
+    "agent.failure.changed_since_confirm": {
+        "zh": "这张单在确认后被改过(金额对不上)·已暂停推送,请重新发起",
+        "en": "This document changed after you confirmed (amount no longer matches) · push paused, please start again",
+        "th": "เอกสารใบนี้ถูกแก้ไขหลังยืนยัน (ยอดเงินไม่ตรงกัน) · หยุดส่งไว้ก่อน รบกวนเริ่มใหม่อีกครั้งนะคะ",
+        "ja": "確認後にこの伝票が変更されました(金額が一致しません)· 送信を保留しました。もう一度やり直してください",
+    },
     "agent.failure.no_tenant": {
         "zh": "还没绑定公司账套·先到 App 开",
         "en": "No company account linked yet · please open the app first",

@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import json
 import logging
+import time
+import uuid
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Callable, Optional
@@ -24,6 +26,13 @@ from services.sales.dates import bangkok_now
 logger = logging.getLogger(__name__)
 
 _MAX_STEPS = 4  # 一轮内最多几次工具调用(防打转);读工具少,一步取数一步成文足矣。
+
+# 一轮总时长预算(秒)。LINE reply_token ~30s 一次性:最坏 5 次网关调用 × 18s 远超时效,
+# 用户什么都收不到。预算内必出回复(见底=拿已取到的数据成文/兜底),余量留给出卡与网络。
+_TURN_BUDGET_S = 20
+_STEP_MAX_S = 18  # 单次网关调用超时上限(受剩余预算压缩)
+_STEP_MIN_S = 3  # 单次网关调用的最小超时(再短必空手而归,不如直接收敛)
+_TAIL_RESERVE_S = 3  # 开新步前给尾部成文留的余量(循环头阈值 = _STEP_MIN_S + 这个)
 
 _LANGS = {"th": "ภาษาไทย", "zh": "中文", "en": "English", "ja": "日本語"}
 
@@ -283,9 +292,12 @@ def _decide_step(
     lang="en",
     force_reply=False,
     gates: frozenset = frozenset(),
+    ctx: Optional[AgentContext] = None,
+    budget_s: Optional[float] = None,
 ) -> LoopStep:
     from services.ai_gateway import transport
 
+    user = (ctx.user if ctx else None) or {}
     outcome = transport.text_to_json(
         _prompt(
             user_text,
@@ -301,10 +313,17 @@ def _decide_step(
         # 1200:泰文 token 密度低,768 会把"对账明细"这类多行回复截断成坏 JSON
         # (真机雷 2026-07-03:泰语问明细恒落兜底)。失控输出仍有 _sane_reply 出口护栏。
         max_tokens=1200,
-        timeout_s=18,
+        # 单次超时受本轮剩余预算压缩(_TURN_BUDGET_S):预算内必出回复
+        timeout_s=max(
+            _STEP_MIN_S, min(_STEP_MAX_S, int(_STEP_MAX_S if budget_s is None else budget_s))
+        ),
         max_retries=1,
         task="agent_loop",
         backend=brain._brain_backend(),
+        # 成本归属 + 同轮串联:没有这三样,agent 烧的钱记不到租户、多次调用对不上号
+        tenant_id=ctx.tenant_id if ctx else None,
+        user_id=str(user.get("id")) if user.get("id") else None,
+        trace_id=(ctx.trace_id or None) if ctx else None,
     )
     return _parse_step(outcome)
 
@@ -338,6 +357,11 @@ def handle_turn(
     lang = _reply_lang(user_text)
     gates = _gates(allow_write, allow_m3, allow_push, allow_image)
     ctx.user_text = user_text  # 写工具建草稿做金额接地要原文
+    ctx.trace_id = ctx.trace_id or uuid.uuid4().hex[:16]  # 串起同轮网关调用 + 审计行
+    started = time.monotonic()
+
+    def _remaining() -> float:
+        return _TURN_BUDGET_S - (time.monotonic() - started)
 
     # 多笔记账守门:记账写工具只建单笔,遇确定性判定为多笔的消息会把它吞成一笔(丢账)。
     # → defer 回旧确定性路,由现成精准多笔卡(do_record_multi)逐条入账。写关时记账本就 defer,
@@ -352,16 +376,24 @@ def handle_turn(
 
     observations: list = []
     called: set = set()
-    for _ in range(_MAX_STEPS):
-        step = decide(
+
+    def _decide(force_reply: bool) -> LoopStep:
+        return decide(
             user_text,
             history,
             today=today,
             observations=observations,
             lang=lang,
-            force_reply=bool(observations),
+            force_reply=force_reply,
             gates=gates,
+            ctx=ctx,
+            budget_s=_remaining(),
         )
+
+    for _ in range(_MAX_STEPS):
+        if _remaining() < _STEP_MIN_S + _TAIL_RESERVE_S:  # 预算见底:留口气给尾部成文
+            break
+        step = _decide(bool(observations))
         if step.kind == "reply":
             if step.message:
                 return _reply_result(step.message)  # 过出口护栏:失控输出 → 安全兜底
@@ -404,6 +436,9 @@ def handle_turn(
             return TurnResult("crash")  # manifest/executor 不同步 = 部署故障(非 defer)
         result = handler(ctx, **chk.grounded)
         called.add(step.tool)
+        ctx.tool_trace.append(
+            {"tool": step.tool, "ok": bool(result.ok), "error": result.error_code or None}
+        )
         if spec.writes:
             # 写档:金额没接地 → 喂回缺口让大脑用文字追问;接地成功 → 高置信直录 + 出富卡
             # (暖话 step.say 显示在卡上方),卡即回复,消费本轮(数字全在卡·大脑只写卡外那句暖话)。
@@ -416,20 +451,13 @@ def handle_turn(
             return TurnResult(kind) if kind else TurnResult("crash")
         observations.append({"tool": step.tool, **observe.payload(step.tool, result)})
 
-    # 循环里没成文(重复调/步数用尽)→ 拿着已取到的真实数据,最后强逼一次成文;
-    # 仍不成文 → 用工具结果兜底一句(绝不把已查到的查询 defer 掉旧路念"这笔多少钱")。
+    # 循环里没成文(重复调/步数用尽/预算见底)→ 拿着已取到的真实数据,最后强逼一次成文;
+    # 仍不成文/预算耗尽 → 用工具结果兜底一句(绝不把已查到的查询 defer 掉旧路念"这笔多少钱")。
     if observations:
-        final = decide(
-            user_text,
-            history,
-            today=today,
-            observations=observations,
-            lang=lang,
-            force_reply=True,
-            gates=gates,
-        )
-        if final.kind == "reply" and _sane_reply(final.message):
-            return TurnResult("reply", final.message)
+        if _remaining() >= _STEP_MIN_S:
+            final = _decide(True)
+            if final.kind == "reply" and _sane_reply(final.message):
+                return TurnResult("reply", final.message)
         fb = fallbacks.grounded_fallback(observations, lang)
         return TurnResult("reply", fb) if fb else TurnResult("crash")
     return TurnResult("crash")  # 循环空转无产出 = 故障(不静默掉旧路)

@@ -22,7 +22,7 @@ def _cm(cur):
 
 class TestClassify(unittest.TestCase):
     def test_yes_words(self):
-        for w in ("确认", "ยืนยัน", "confirm", "確認", "ยืนยันเลย", "确认推送"):
+        for w in ("确认", "ยืนยัน", "confirm", "確認", "ยืนยันเลย", "确认推送", "送信", "送信する"):
             self.assertEqual(m.classify(w), "yes", w)
 
     def test_no_words(self):

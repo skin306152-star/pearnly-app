@@ -50,6 +50,9 @@ AGENT_VOICE_KEY = "agent_voice_stt"
 # 主动触达子闸(P2):默认关。关 → 一条不发现状不变;开 → 每月 10–15 日窗口
 # 给绑定 LINE 用户发一条 VAT 申报截止提醒(每用户每期恰一条·台账去重)。
 AGENT_PROACTIVE_KEY = "agent_proactive_nudge"
+# 复合续步子闸(P2):默认关。关 → 记账卡出即终轮现状不变;开 → 一句话「记账+提问」
+# 出卡后继续答剩余问题(跟进文字入口 push·推 ERP/撤销/改错仍即卡即终)。
+AGENT_COMPOUND_KEY = "agent_compound_turn"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -126,3 +129,8 @@ def agent_voice_enabled_for(user_id: Optional[str]) -> bool:
 def agent_proactive_enabled_for(user_id: Optional[str]) -> bool:
     """主动触达子闸。关 = 一条不发,现状不变。"""
     return _enabled(AGENT_PROACTIVE_KEY, user_id, "agent_proactive_enabled_for")
+
+
+def agent_compound_enabled_for(user_id: Optional[str]) -> bool:
+    """复合续步子闸。关 = 记账卡出即终轮,现状不变。"""
+    return _enabled(AGENT_COMPOUND_KEY, user_id, "agent_compound_enabled_for")

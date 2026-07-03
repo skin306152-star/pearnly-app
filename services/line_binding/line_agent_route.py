@@ -133,6 +133,10 @@ def route_gated(
         return "consumed"
     if res.kind == "card_sent":
         charge()
+        if res.text:  # 复合续步:同句剩余问题的答案(reply_token 已被卡消费 → push 跟进)
+            from services.line_binding import line_reply
+
+            line_reply.push_text_context(line_user_id, res.text, tenant_id=tid)
         return "consumed"
     if res.kind == "crash":
         # ★大脑故障 → 分级兜底:清晰单笔记账句走 L1 确定性直录(零 LLM·不丢账·不计费),

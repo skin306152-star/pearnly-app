@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import random
 import sys
 from collections import Counter
@@ -25,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tests.unit import _agent_entry_harness as harness  # noqa: E402
 from services.agent import loop, manifest  # noqa: E402
 
-_CORPUS = Path(__file__).resolve().parents[1] / "tests" / "agent_corpus" / "corpus.jsonl"
+_CORPUS_DIR = Path(__file__).resolve().parents[1] / "tests" / "agent_corpus"
 
 _FLAG_COMBOS = [
     {"enabled": False, "write": False},
@@ -38,10 +39,13 @@ _FLAG_COMBOS = [
 
 def _texts() -> list:
     pool = []
-    for ln in _CORPUS.read_text(encoding="utf-8").splitlines():
-        ln = ln.strip()
-        if ln:
-            pool.append(json.loads(ln)["text"])
+    for path in sorted(_CORPUS_DIR.glob("*.jsonl")):
+        for ln in path.read_text(encoding="utf-8").splitlines():
+            ln = ln.strip()
+            if ln:
+                text = json.loads(ln).get("text")
+                if text:
+                    pool.append(str(text))
     return pool
 
 
@@ -190,6 +194,7 @@ def _db_patches(cards):
 
 
 def main() -> int:
+    logging.disable(logging.CRITICAL)
     ap = argparse.ArgumentParser()
     ap.add_argument("--rounds", type=int, default=500)
     ap.add_argument("--seed", type=int, default=42)

@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 from typing import Optional
 
-_VALID = ("aistudio", "vertex", "selfhost")
+_VALID = ("aistudio", "vertex", "selfhost", "anthropic")
 
 
 def active_backend() -> str:
@@ -40,6 +40,10 @@ def get_provider(name: Optional[str] = None):
         from services.ai_gateway.providers import selfhost
 
         return selfhost
+    if backend == "anthropic":
+        from services.ai_gateway.providers import anthropic
+
+        return anthropic
     from services.ai_gateway.providers import aistudio
 
     return aistudio

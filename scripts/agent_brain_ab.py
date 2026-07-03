@@ -89,7 +89,7 @@ def _prompt_parts(text: str, lang: str):
     full = loop._prompt(
         text, [], TODAY, [], lang=lang, force_reply=False, gates=ALL_GATES, native=False
     )
-    body = full[len(head):] if full.startswith(head) else full
+    body = full[len(head) :] if full.startswith(head) else full
     return head, body, full
 
 
@@ -195,21 +195,23 @@ def _run_arm(arm: str, cases: list[dict]) -> dict:
         "avg_out": round(out_tok / calls) if calls else 0,
         "avg_ms": round(ms_tot / calls) if calls else 0,
         # 每千轮 = 每样本成本 × 4.4 大脑调用/轮(prod 实测 70 calls / 16 traces)
-        "usd_per_1k_turns": round(
-            _cost_usd(
-                model,
-                {
-                    "input_tokens": in_tok / calls if calls else 0,
-                    "cache_read_input_tokens": cr_tok / calls if calls else 0,
-                    "output_tokens": out_tok / calls if calls else 0,
-                },
+        "usd_per_1k_turns": (
+            round(
+                _cost_usd(
+                    model,
+                    {
+                        "input_tokens": in_tok / calls if calls else 0,
+                        "cache_read_input_tokens": cr_tok / calls if calls else 0,
+                        "output_tokens": out_tok / calls if calls else 0,
+                    },
+                )
+                * 4.4
+                * 1000,
+                2,
             )
-            * 4.4
-            * 1000,
-            2,
-        )
-        if calls
-        else 0.0,
+            if calls
+            else 0.0
+        ),
     }
 
 
@@ -235,7 +237,17 @@ def main() -> int:
     arms = [a.strip() for a in args.arms.split(",") if a.strip() in ARMS]
     results = [_run_arm(a, cases) for a in arms]
     print("\n== results ==")
-    hdr = ["arm", "model", "accuracy", "avg_in", "avg_cache_read", "avg_out", "avg_ms", "usd_per_1k_turns", "errors"]
+    hdr = [
+        "arm",
+        "model",
+        "accuracy",
+        "avg_in",
+        "avg_cache_read",
+        "avg_out",
+        "avg_ms",
+        "usd_per_1k_turns",
+        "errors",
+    ]
     print(" | ".join(hdr))
     for r in results:
         print(" | ".join(str(r[h]) for h in hdr))

@@ -100,7 +100,9 @@ def _messages(
         return None, {}, _error_kind_status(resp.status_code)
     try:
         body = resp.json()
-        text = "".join(b.get("text", "") for b in body.get("content", []) if b.get("type") == "text")
+        text = "".join(
+            b.get("text", "") for b in body.get("content", []) if b.get("type") == "text"
+        )
         return text.strip(), (body.get("usage") or {}), None
     except Exception:  # noqa: BLE001
         return None, {}, "parse"

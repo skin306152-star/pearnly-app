@@ -77,7 +77,7 @@ def _predict(step) -> str:
 
 def _prompt_parts(text: str, lang: str):
     """复用 loop 真实提示词;拆成(稳定前缀 head, 变动尾 body)供缓存档分离。"""
-    from services.agent import brain, loop
+    from services.agent import loop
     from services.agent import native_fc  # noqa: F401 — 确保 _PROTO 常量已就绪
 
     lang_name = loop._LANGS.get(lang, "English")

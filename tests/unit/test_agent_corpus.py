@@ -22,17 +22,21 @@ from services.agent import executor, loop
 from tests.unit._agent_entry_harness import run_entry
 from services.agent.contracts import AgentContext, ToolResult
 
-_CORPUS = Path(__file__).resolve().parents[1] / "agent_corpus" / "corpus.jsonl"
+_CORPUS_DIR = Path(__file__).resolve().parents[1] / "agent_corpus"
 _TODAY = "Wednesday 2026-07-01 10:00 (Asia/Bangkok, UTC+7)"
+
+
+def _iter_cases():
+    for path in sorted(_CORPUS_DIR.glob("*.jsonl")):
+        for ln in path.read_text(encoding="utf-8").splitlines():
+            ln = ln.strip()
+            if ln:
+                yield json.loads(ln)
 
 
 def _load(suite: str) -> list:
     cases = []
-    for ln in _CORPUS.read_text(encoding="utf-8").splitlines():
-        ln = ln.strip()
-        if not ln:
-            continue
-        c = json.loads(ln)
+    for c in _iter_cases():
         if c.get("online_only"):
             continue
         if c.get("suite") == suite:

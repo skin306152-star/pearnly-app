@@ -1,8 +1,9 @@
 # Agent 对抗语料库(永久回归资产)
 
-一份语料,两个跑法(设计:`docs/agent/M3-M4-CLOSED-LOOP-DESIGN.md` §4):
+一组语料(JSONL),两个跑法(设计:`docs/agent/M3-M4-CLOSED-LOOP-DESIGN.md` §4):
 
-- **离线(CI 闸)**:`tests/unit/test_agent_corpus.py` 把 `script` 注入模型决策层,跑**真实
+- **离线(CI 闸)**:`tests/unit/test_agent_corpus.py` 读取本目录所有 `*.jsonl`,
+  把 `script` 注入模型决策层,跑**真实
   路由代码**(loop 循环 / slots 接地 / 多笔守门 / 出口护栏 / 兜底 / LINE 入口分流),断言终态。
   测的是管道:模型给出任何输出(含故障输出),路由与护栏行为全对。
 - **在线(prod 验收台)**:`scripts/agent_sim.py --corpus tests/agent_corpus/corpus.jsonl`
@@ -36,4 +37,5 @@ probe     一句话:这条在防什么
 ## 铁律
 
 - 语料只加不删。线上每翻一次车,先加一条复现语料(红),再修(绿)。
+- `corpus.jsonl` 放手写/事故复现语料;`generated_matrix.jsonl` 放多语言矩阵扩面语料。
 - `expect.records` 与金额断言是钱路红线:否定/假设/情绪/缺金额/编造金额 一律 0。

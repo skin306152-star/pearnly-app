@@ -61,6 +61,15 @@ def run_entry(case: dict, make_decide):
         "core.feature_flags.agent_m3_enabled_for": lambda uid: bool(flags.get("m3")),
         "core.feature_flags.agent_push_enabled_for": lambda uid: bool(flags.get("push")),
         "core.feature_flags.agent_image_enabled_for": lambda uid: bool(flags.get("image")),
+        "core.feature_flags.agent_confirm_enabled_for": lambda uid: bool(flags.get("confirm")),
+        "core.feature_flags.agent_dms_enabled_for": lambda uid: bool(flags.get("dms")),
+        "core.feature_flags.agent_recon_intake_enabled_for": lambda uid: bool(
+            flags.get("recon_intake")
+        ),
+        "core.feature_flags.agent_native_fc_enabled_for": lambda uid: bool(flags.get("native_fc")),
+        "core.feature_flags.agent_quick_chips_enabled_for": lambda uid: bool(
+            flags.get("quick_chips")
+        ),
     }
     if case.get("skip_correct_flow"):
         fakes["services.expense.line_correct_flow.route"] = lambda *a, **k: False

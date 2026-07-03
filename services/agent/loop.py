@@ -19,7 +19,8 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Callable, Optional
 
-from services.agent import anchors, brain, executor, fallbacks, manifest, native_fc, observe, slots
+from services.agent import anchors, brain, executor, fallbacks, manifest, native_fc, observe
+from services.agent import reply_guard, slots
 from services.agent.contracts import AgentAction, AgentContext
 from services.sales.dates import bangkok_now
 
@@ -101,6 +102,7 @@ Never reveal you are an AI, a model, or any technology. Never claim to be human.
 5) Editing or deleting an already-recorded entry (e.g. "แก้รายการล่าสุดเป็น 80", "ยกเลิกรายการล่าสุด"): if undo_entry / edit_entry are in your tools → call undo_entry to cancel/delete, or edit_entry with ONLY the fields the user wants changed (a new amount must appear in their message — never invent one). If they are NOT in your tools → defer with reason "edit".
 6) Pushing a document into ERP (e.g. "ส่งใบ 7-11 เข้า ERP", "推到ERP"): if push_to_erp is in your tools, call it — it only PREPARES a confirmation card; NOTHING is sent until the user taps confirm on the card. If it is NOT in your tools, gently point them to the App (BOOKKEEPER voice).
 7) Wants to RUN a reconciliation right here in chat — bank ("帮我做银行对账", "ทำกระทบยอดให้หน่อย"), income ("กระทบยอดรายได้", "做收入对账") or sales-VAT check ("ตรวจรายงานภาษีขาย", "核查销项税报告"): if recon_intake_start is in your tools, call it immediately with the matching kind (bank / income / tax) — the flow itself collects the files step by step, so do NOT ask for files/accounts first. If it is NOT in your tools, point them to Reconciliation Center on the web. (Just asking for existing results → recon_overview / recon_detail.)
+8) If ONE message BOTH records an expense AND asks something else (e.g. "กาแฟ 50 บาท เดือนนี้กี่ใบ"): call record_expense FIRST; once it succeeds, answer the remaining question with the right read tool. NEVER answer a compound message with prose alone — do the work.
 
 # Honesty check — before you reply with a tool result:
 Glance back at what the user actually asked. If the result doesn't match — wrong target, what got recorded differs from what they said, it failed, or it's empty — say so honestly and gently and let the user decide (e.g. "ดูเหมือนจะบันทึกเป็น 500 แต่คุณบอก 50 ใช่ไหมคะ อยากให้แก้ไหม"). NEVER silently alter any number or content in the result — you flag, you never fix. If it matches, reply warmly as normal.
@@ -223,55 +225,22 @@ def _prompt(
     )
 
 
-# 回复出口护栏:闲聊/查询回复本就一两句,失控生成(复读循环/退化输出)绝不原样发给用户。
-# 与后端无关(model-agnostic)——换任何大脑都可能偶发抽风,这是最后一道兜底。
-_REPLY_MAX_LEN = 1500  # 超长 = 大概率失控(正常回复远短于此)
-_REPLY_MAX_RUN = 30  # 同一字符连续 30+ = 复读循环(如「1000…000」一屏零)
-_REPLY_MIN_VARIETY_LEN = 60  # 达到此长度却只有极少种字符 = 退化输出
-
-
-def _sane_reply(message: str) -> bool:
-    """模型自撰回复是否合理(非失控生成)。空/超长/字符复读/极低多样性 → 不合理。"""
-    t = (message or "").strip()
-    if not t or len(t) > _REPLY_MAX_LEN:
-        return False
-    longest = run = 1
-    for prev, cur in zip(t, t[1:]):
-        run = run + 1 if cur == prev else 1
-        if run > longest:
-            longest = run
-    if longest >= _REPLY_MAX_RUN:
-        return False
-    if len(t) >= _REPLY_MIN_VARIETY_LEN and len(set(t)) <= 4:
-        return False
-    return True
-
-
 def _reply_result(message: str) -> TurnResult:
     """模型回复 → TurnResult,过出口护栏:失控输出换 crash(入口出安全兜底,绝不原样怼给用户)。"""
-    if _sane_reply(message):
+    if reply_guard.sane(message):
         return TurnResult("reply", message)
     logger.warning("[agent] insane reply suppressed len=%d", len(message or ""))
     return TurnResult("crash")
 
 
-def _salvage_prose(outcome) -> Optional["LoopStep"]:
-    """parse 失败但模型吐了干净散文(常是陪伴/查询的人话·忘了包 JSON)→ 当回复救回,别浪费成 crash。
-    含 { 的多半是坏/截断 JSON 残片(不给用户看)→ 不救,交 crash 走安全兜底。"""
-    raw = (getattr(outcome, "raw", "") or "").strip()
-    if not raw or len(raw) > 800 or "{" in raw or '"kind"' in raw:
-        return None
-    return LoopStep(kind="reply", message=raw)
-
-
 def _parse_step(outcome) -> LoopStep:
     """ProviderOutcome → LoopStep。区分「模型主动 defer(record/edit)」与「故障(crash)」——
     传输/解析失败、畸形输出都标 reason=crash,让上层走安全兜底而非当记账 defer 掉旧路。
-    解析失败时先试把模型原文当回复救回(_salvage_prose),救不了才 crash。"""
+    解析失败时先试把模型原文当回复救回(reply_guard.salvage_prose),救不了才 crash。"""
     if not getattr(outcome, "ok", False) or not isinstance(getattr(outcome, "data", None), dict):
-        salvaged = _salvage_prose(outcome)
+        salvaged = reply_guard.salvage_prose(outcome)
         if salvaged is not None:
-            return salvaged  # 模型写了人话没包 JSON → 直接当回复(治陪伴句被吞成故障)
+            return LoopStep(kind="reply", message=salvaged)  # 人话没包 JSON → 当回复救回
         return LoopStep(kind="defer", reason="crash")  # parse 失败/传输错 = 大脑故障,非决策
     d = outcome.data
     kind = d.get("kind")
@@ -363,6 +332,7 @@ def handle_turn(
     allow_m3: bool = False,
     allow_push: bool = False,
     allow_image: bool = False,
+    allow_compound: bool = False,
     write_sink: Optional[Callable] = None,
 ) -> TurnResult:
     """一轮对话 → TurnResult(见其 docstring:reply/card_sent/defer_record/defer_edit/crash)。
@@ -399,6 +369,17 @@ def handle_turn(
 
     observations: list = []
     called: set = set()
+    sent_card = False  # 复合续步:记账卡已出,后续文字降级为卡后跟进(入口 push)
+
+    def _out(message: str) -> TurnResult:
+        if not sent_card:
+            return _reply_result(message)
+        ok = bool(message) and reply_guard.sane(message)
+        return TurnResult("card_sent", message if ok else "")
+
+    def _fail() -> TurnResult:
+        # 卡已出后绝不归 crash:入口的 L1 救援会把同句再直录一笔(双记账),卡本身已是有效回复。
+        return TurnResult("card_sent") if sent_card else TurnResult("crash")
 
     def _decide(force_reply: bool) -> LoopStep:
         return decide(
@@ -419,10 +400,12 @@ def handle_turn(
         step = _decide(bool(observations))
         if step.kind == "reply":
             if step.message:
-                return _reply_result(step.message)  # 过出口护栏:失控输出 → 安全兜底
+                return _out(step.message)  # 过出口护栏:失控输出 → 安全兜底/丢跟进
+            if sent_card:
+                return TurnResult("card_sent")  # 卡后无话可说 = 卡即全部,不再强逼成文
             if observations:
                 break  # 空回复但已取到数据 → 强制成文
-            return TurnResult("crash")  # 空回复且无数据 = 大脑故障,不当 defer
+            return _fail()  # 空回复且无数据 = 大脑故障,不当 defer
         if step.kind != "tool":  # defer
             # 已取到数据却不肯成文 → 强制成文(绝不把已查到的查询 defer 掉旧路误路);
             # 一步都没调的 defer 才是真裁决 → 按 reason 分流(record/edit=交旧路,crash=安全兜底)。
@@ -433,7 +416,7 @@ def handle_turn(
             break
         spec = manifest.TOOLS_BY_NAME.get(step.tool)
         if not spec:
-            return TurnResult("crash")  # 模型调不存在的工具 = 故障(非记账 defer)
+            return _fail()  # 模型调不存在的工具 = 故障(非记账 defer)
         if spec.writes and (not allow_write or write_sink is None):
             return TurnResult("defer_record")  # 记账写关 → 交确定性直录(救命索)
         if spec.gate and spec.gate not in gates:  # 子闸关但模型硬调(闸关时本就不可见)
@@ -456,7 +439,7 @@ def handle_turn(
             continue
         handler = getattr(toolset, spec.handler, None)
         if handler is None:
-            return TurnResult("crash")  # manifest/executor 不同步 = 部署故障(非 defer)
+            return _fail()  # manifest/executor 不同步 = 部署故障(非 defer)
         result = handler(ctx, **chk.grounded)
         called.add(step.tool)
         ctx.tool_trace.append(
@@ -472,7 +455,15 @@ def handle_turn(
                 )
                 continue
             kind = write_sink(ctx, step.tool, result.data, step.say)
-            return TurnResult(kind) if kind else TurnResult("crash")
+            if not kind:
+                return _fail()
+            if kind != "card_sent" or not allow_compound or step.tool != "record_expense":
+                return TurnResult(kind)
+            # 复合续步(闸 agent_compound_turn):记账卡已出不终轮,把落账事实喂回,
+            # 让模型继续答同句里的剩余问题(跟进文字由入口 push;推 ERP/撤销/改错仍即卡即终)。
+            sent_card = True
+            observations.append({"tool": step.tool, "ok": True, "recorded": True})
+            continue
         observations.append({"tool": step.tool, **observe.payload(step.tool, result)})
 
     # 循环里没成文(重复调/步数用尽/预算见底)→ 拿着已取到的真实数据,最后强逼一次成文;
@@ -480,11 +471,11 @@ def handle_turn(
     if observations:
         if _remaining() >= _STEP_MIN_S:
             final = _decide(True)
-            if final.kind == "reply" and _sane_reply(final.message):
-                return TurnResult("reply", final.message)
+            if final.kind == "reply" and reply_guard.sane(final.message):
+                return _out(final.message)
         fb = fallbacks.grounded_fallback(observations, lang)
-        return TurnResult("reply", fb) if fb else TurnResult("crash")
-    return TurnResult("crash")  # 循环空转无产出 = 故障(不静默掉旧路)
+        return _out(fb) if fb else _fail()
+    return _fail()  # 循环空转无产出 = 故障(不静默掉旧路)
 
 
 def _defer_result(reason: str) -> TurnResult:

@@ -310,6 +310,7 @@ def try_agent_turn(
             allow_m3=sink is not None and m3_enabled(bound_user),
             allow_push=sink is not None and push_enabled(bound_user),
             allow_image=sink is not None and image_enabled(bound_user),
+            allow_compound=sink is not None and feature_flags.agent_compound_enabled_for(uid),
             write_sink=sink,
         )
         if anchors_on and ctx.anchors != loaded_anchors:

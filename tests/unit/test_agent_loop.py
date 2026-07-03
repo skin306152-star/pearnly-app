@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
-from services.agent import fallbacks, loop, manifest, observe
+from services.agent import fallbacks, loop, manifest, observe, reply_guard
 from services.agent.contracts import AgentContext, SlotSpec, ToolResult, ToolSpec
 from services.expense.expense_draft import ExpenseDraft
 
@@ -363,14 +363,14 @@ class TestReplySanityGate(unittest.TestCase):
     """出口护栏:失控生成(复读循环/超长/退化)绝不原样发,换 crash → 入口安全兜底(model-agnostic)。"""
 
     def test_sane_reply_accepts_normal(self):
-        self.assertTrue(loop._sane_reply("ยินดีช่วยครับ 1+1 เท่ากับ 2 ค่ะ"))
-        self.assertTrue(loop._sane_reply("2"))
-        self.assertTrue(loop._sane_reply("5555 ตลกมากเลยค่ะ"))  # 泰语笑声不误杀
+        self.assertTrue(reply_guard.sane("ยินดีช่วยครับ 1+1 เท่ากับ 2 ค่ะ"))
+        self.assertTrue(reply_guard.sane("2"))
+        self.assertTrue(reply_guard.sane("5555 ตลกมากเลยค่ะ"))  # 泰语笑声不误杀
 
     def test_sane_reply_rejects_runaway(self):
-        self.assertFalse(loop._sane_reply("1" + "0" * 400))  # 一屏零(复读循环)
-        self.assertFalse(loop._sane_reply("ก" * 1600))  # 超长
-        self.assertFalse(loop._sane_reply("   "))  # 空
+        self.assertFalse(reply_guard.sane("1" + "0" * 400))  # 一屏零(复读循环)
+        self.assertFalse(reply_guard.sane("ก" * 1600))  # 超长
+        self.assertFalse(reply_guard.sane("   "))  # 空
 
     def test_insane_reply_becomes_crash(self):
         # 模型回一屏零 → 出口护栏拦下 → crash(入口出安全兜底,绝不原样怼给用户)。

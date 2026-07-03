@@ -234,21 +234,19 @@ def run_recognition_core(
             raise HTTPException(400, detail=f"ocr.invalid_file: {_pipe_err}")
         logger.exception(f"❌ pipeline_v1 失败: {err_name}: {_pipe_err}")
         # 引擎失败也记台账(status=failed,零成本行)——失败率才算得出。文件不合法(400)不算。
-        try:
-            db.log_ocr_cost(
-                user_id=str(user["id"]),
-                tenant_id=str(user.get("tenant_id")) if user.get("tenant_id") else None,
-                history_id=None,
-                engine="pipeline_v1",
-                pages=page_count,
-                input_tokens=0,
-                output_tokens=0,
-                cost_thb=0.0,
-                elapsed_ms=0,
-                status="failed",
-            )
-        except Exception:
-            pass
+        # log_ocr_cost 内部全量捕获返回 bool,不会拖垮错误响应。
+        db.log_ocr_cost(
+            user_id=str(user["id"]),
+            tenant_id=_tid(user),
+            history_id=None,
+            engine="pipeline_v1",
+            pages=page_count,
+            input_tokens=0,
+            output_tokens=0,
+            cost_thb=0.0,
+            elapsed_ms=0,
+            status="failed",
+        )
         raise HTTPException(500, detail="ocr.engine_error")
 
     # 非发票检测:全部页都非发票 → 不入库不扣费。

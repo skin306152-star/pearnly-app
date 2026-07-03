@@ -20,7 +20,13 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from core.route_helpers import _log_op, _require_super_admin
 from services.cost.store import get_ocr_engine_metrics
 from services.ocr.contracts import OCR_TASKS
-from services.ocr.engine_policy import DEFAULT_CONFIG, MODES, SETTING_KEY, load_config
+from services.ocr.engine_policy import (
+    CONCRETE_MODES,
+    DEFAULT_CONFIG,
+    MODES,
+    SETTING_KEY,
+    load_config,
+)
 from services.platform_settings import store
 
 logger = logging.getLogger("mr-pilot")
@@ -28,7 +34,6 @@ logger = logging.getLogger("mr-pilot")
 router = APIRouter()
 
 # defaults_by_plan 只许落到具体档(auto 进套餐表会循环,resolve 侧也会兜回 direct35)
-_CONCRETE_MODES = ("direct35", "economy")
 
 
 @router.get("/api/admin/ocr-engine")
@@ -40,7 +45,7 @@ async def get_ocr_engine_policy(request: Request):
         "updated_at": (row["updated_at"].isoformat() if row and row.get("updated_at") else None),
         "options": {
             "modes": list(MODES),
-            "plan_modes": list(_CONCRETE_MODES),
+            "plan_modes": list(CONCRETE_MODES),
             "tasks": list(OCR_TASKS),
         },
     }
@@ -62,7 +67,7 @@ async def set_ocr_engine_policy(request: Request):
     defaults_by_plan = dict(DEFAULT_CONFIG["defaults_by_plan"])
     for k in defaults_by_plan:
         v = (plans.get(k) or defaults_by_plan[k]).strip()
-        if v not in _CONCRETE_MODES:
+        if v not in CONCRETE_MODES:
             raise HTTPException(400, detail=f"ocr_engine.bad_plan_mode:{k}")
         defaults_by_plan[k] = v
 

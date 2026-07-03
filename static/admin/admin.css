@@ -961,10 +961,11 @@ body.admin-layout-body .lang-switching-overlay {
 .adm-eng-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   margin-top: 10px;
-  max-width: 420px;
+}
+.adm-eng-row .adm-set-row-label {
+  min-width: 160px;
 }
 .adm-eng-select {
   min-width: 180px;

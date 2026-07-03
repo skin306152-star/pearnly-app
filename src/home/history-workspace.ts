@@ -3,7 +3,7 @@
 // 税号路由再准也有例外(代付/票面税号印错)→ 给手动改归属的口子。
 // 单套账租户不注入(没得挪 · 不加噪音);改归属打 POST /api/history/{id}/assign_workspace。
 // ============================================================
-/* global token, t, showToast, escapeHtml */
+/* global token, t, showToast */
 
 type WsClient = { id: number; name?: string };
 
@@ -34,23 +34,22 @@ window.bindDrawerWorkspace = async function (historyId: unknown, currentWs: unkn
     const wrap = document.createElement('div');
     wrap.id = 'drawer-workspace-wrap';
     wrap.className = 'drawer-client-body';
-    wrap.innerHTML =
-        '<select class="drawer-client-select" id="drawer-workspace-select" title="' +
-        escapeHtml(t('drawer-workspace-label')) +
-        '"><option value="">' +
-        escapeHtml(t('drawer-workspace-label')) +
-        '</option>' +
-        cache
-            .map(
-                (c) =>
-                    '<option value="' + c.id + '">' + escapeHtml(c.name || '#' + c.id) + '</option>'
-            )
-            .join('') +
-        '</select>';
+    const sel = document.createElement('select');
+    sel.className = 'drawer-client-select';
+    sel.id = 'drawer-workspace-select';
+    sel.title = t('drawer-workspace-label');
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = t('drawer-workspace-label');
+    sel.appendChild(placeholder);
+    for (const c of cache) {
+        const opt = document.createElement('option');
+        opt.value = String(c.id);
+        opt.textContent = c.name || '#' + c.id;
+        sel.appendChild(opt);
+    }
+    wrap.appendChild(sel);
     card.appendChild(wrap);
-
-    const sel = document.getElementById('drawer-workspace-select') as HTMLSelectElement | null;
-    if (!sel) return;
     const cur = currentWs ? String(currentWs) : '';
     sel.value = cur;
     sel.onchange = async () => {

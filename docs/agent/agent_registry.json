@@ -10,6 +10,7 @@
   "admin_logs_routes": "D",
   "admin_cost_routes": "D",
   "admin_diagnostics_routes": "D",
+  "admin_ocr_engine_routes": "D",
   "admin_users_query_routes": "D",
   "admin_users_mutation_routes": "D",
   "admin_migration_routes": "D",

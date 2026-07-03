@@ -1,49 +1,30 @@
 # -*- coding: utf-8 -*-
-"""大脑(M1-SOCKET-DESIGN §4)—— JSON 动作模式。
+"""大脑决策的共享 helper —— 后端选择 + 提示词工具表/历史块。
 
-把人话翻译成「调哪个工具、带什么参数」,真干活的是 executor。大脑只选,不执行、不编业务。
-后端按 OCR_LLM_BACKEND 自动切(qwen↔gemini),网关一行不改。
+真正的决策循环在 loop.py(它拼提示词、调网关、解析动作)。这里只留三个被复用的纯函数:
+后端覆盖(_brain_backend)、工具表渲染(_tool_table)、历史块渲染(_history_block)。
+后端按 OCR_LLM_BACKEND 自动切(vertex/gemini),网关一行不改。
 
-注:现成 transport.text_to_json(prompt, *, tier, response_mime: bool, ...) 没有独立的 text 形参
-(M1-SOCKET-DESIGN §4.2 的伪码把 user_text 当独立参数是示意)—— 这里把用户最新消息折进 prompt,
-response_mime=True 走 JSON 模式。工具表从 manifest.TOOLS 自动生成,加工具=改 manifest。
+注:旧的一击式 decide()/build_prompt()/_parse_action()(kind=tool/ask/out_of_scope/chat)
+是 M1 骨架,已被 loop.py 的真 agent 循环(kind=tool/reply/defer)取代并删除。
 """
 
 from __future__ import annotations
 
-import logging
 import os
 from typing import Optional
 
-from services.agent import contracts, manifest
-
-logger = logging.getLogger(__name__)
+from services.agent import contracts
 
 
 def _brain_backend() -> Optional[str]:
     """Agent 大脑的后端覆盖(env AGENT_BRAIN_BACKEND)。
 
-    未设 → None → 跟随全局 OCR_LLM_BACKEND(现状 = Gemini,零变化)。设 selfhost + SELFHOST_*
-    端点就绪 → 只有 Agent 路由走便宜 qwen,OCR 不受影响。端点不可用时 provider 收敛为错误 →
-    _parse_action 兜底 chat → loop defer 回旧路,不炸用户(fail-safe)。
+    未设 → None → 跟随全局 OCR_LLM_BACKEND(现状 = Vertex Gemini,零变化)。设 selfhost +
+    SELFHOST_* 端点就绪 → 只有 Agent 路由走便宜 qwen,OCR 不受影响。端点不可用时 provider
+    收敛为错误 → loop 归 crash → defer 回旧路,不炸用户(fail-safe)。
     """
     return (os.environ.get("AGENT_BRAIN_BACKEND") or "").strip().lower() or None
-
-
-_VALID_KINDS = ("tool", "ask", "out_of_scope", "chat")
-
-_SYSTEM_TH = """คุณคือผู้ช่วยของ Pearnly (ระบบบัญชี/สแกนเอกสาร) ทำได้เฉพาะงานในรายการเครื่องมือด้านล่างเท่านั้น
-ถ้าผู้ใช้ขอสิ่งที่อยู่นอกรายการ ให้ตอบ kind="out_of_scope" พร้อมแนะนำสิ่งที่ทำได้
-ห้ามเดา/แต่งค่าพารามิเตอร์เด็ดขาด ถ้าข้อมูลไม่พอ ให้ตอบ kind="ask" เพื่อถามกลับ
-วันนี้คือ {today}
-
-เครื่องมือที่ใช้ได้:
-{tools}
-
-ถาม "สแกนกี่ใบ/กี่รายการ/เดือนนี้กี่ใบ" ให้ใช้ history_summary; ถามเรื่องหน้า/โควตา/ค่าบริการที่ใช้ไป ให้ใช้ usage_this_month
-
-ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น:
-{{"kind":"tool|ask|out_of_scope|chat","tool":"<ชื่อเครื่องมือ>","args":{{...}},"ask_field":"<slot>","message":"<ข้อความถึงผู้ใช้>"}}"""
 
 
 def _tool_table(tools: tuple[contracts.ToolSpec, ...]) -> str:
@@ -66,49 +47,3 @@ def _history_block(history: Optional[list]) -> str:
     return "\n\nบทสนทนาล่าสุด (บริบทเท่านั้น จัดประเภทเฉพาะข้อความล่าสุดด้านล่าง):\n" + "\n".join(
         turns
     )
-
-
-def build_prompt(
-    tools: tuple[contracts.ToolSpec, ...], user_text: str, history: Optional[list], today: str
-) -> str:
-    head = _SYSTEM_TH.format(today=today, tools=_tool_table(tools))
-    return f"{head}{_history_block(history)}\n\nข้อความล่าสุดของผู้ใช้:\n{user_text}"
-
-
-def _parse_action(outcome) -> contracts.AgentAction:
-    """ProviderOutcome → AgentAction。失败/非法/解析不出 → kind=chat 兜底(永不抛、永不执行)。"""
-    if not getattr(outcome, "ok", False) or not isinstance(getattr(outcome, "data", None), dict):
-        return contracts.AgentAction(kind="chat")
-    data = outcome.data
-    kind = data.get("kind")
-    if kind not in _VALID_KINDS:
-        return contracts.AgentAction(kind="chat", message=str(data.get("message") or ""))
-    args = data.get("args")
-    action = contracts.AgentAction(
-        kind=kind,
-        tool=(data.get("tool") or None),
-        args=args if isinstance(args, dict) else {},
-        ask_field=(data.get("ask_field") or None),
-        message=str(data.get("message") or ""),
-    )
-    if action.kind == "tool" and not action.tool:
-        return contracts.AgentAction(kind="out_of_scope")
-    return action
-
-
-def decide(user_text: str, history: Optional[list], *, today: str) -> contracts.AgentAction:
-    """一次网关调用,把人话翻成动作。后端按 OCR_LLM_BACKEND 自动切(qwen/gemini)。"""
-    from services.ai_gateway import transport
-
-    prompt = build_prompt(manifest.TOOLS, user_text, history, today)
-    outcome = transport.text_to_json(
-        prompt,
-        tier="flash",
-        response_mime=True,
-        max_tokens=512,
-        timeout_s=18,
-        max_retries=1,
-        task="agent_decide",
-        backend=_brain_backend(),
-    )
-    return _parse_action(outcome)

@@ -334,23 +334,17 @@ class TestConfirmFlow(unittest.TestCase):
 
 
 class TestObservePayload(unittest.TestCase):
-    def test_notifications_count_from_list(self):
-        # list_notification_logs 返回的 result.data 是 list;count 必须按真实条数,不能恒 0。
+    def test_notifications_count_from_items(self):
+        # 契约:data 恒 dict,list 结果包成 {"items"};count 按真实条数,不能恒 0。
         obs = observe.payload(
-            "list_notifications", ToolResult(ok=True, data=[{"id": 1}, {"id": 2}, {"id": 3}])
+            "list_notifications",
+            ToolResult(ok=True, data={"items": [{"id": 1}, {"id": 2}, {"id": 3}]}),
         )
         self.assertEqual(obs, {"ok": True, "count": 3})
 
-    def test_notifications_empty_list(self):
-        obs = observe.payload("list_notifications", ToolResult(ok=True, data=[]))
+    def test_notifications_empty_items(self):
+        obs = observe.payload("list_notifications", ToolResult(ok=True, data={"items": []}))
         self.assertEqual(obs, {"ok": True, "count": 0})
-
-    def test_failure_with_list_data_keeps_count(self):
-        # 失败结果带 list(候选/命中列表)不许被强转空 dict 静默吞(通知 count 恒 0 同类雷)。
-        obs = observe.payload(
-            "list_notifications", ToolResult(ok=False, error_code="boom", data=[{"id": 1}])
-        )
-        self.assertEqual(obs, {"ok": False, "error": "boom", "count": 1})
 
     def test_grounded_fallback_notifications_some(self):
         msg = fallbacks.grounded_fallback(
@@ -522,7 +516,7 @@ class TestBudgetAndAttribution(unittest.TestCase):
 
         class _NotifToolset:
             def list_notification_logs(self, ctx, **kw):
-                return ToolResult(ok=True, data=[{"id": 1}, {"id": 2}])
+                return ToolResult(ok=True, data={"items": [{"id": 1}, {"id": 2}]})
 
         with patch("services.agent.loop.time.monotonic", lambda: next(ticks)):
             out = loop.handle_turn(

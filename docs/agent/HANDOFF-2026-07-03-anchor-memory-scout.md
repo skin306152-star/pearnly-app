@@ -1,4 +1,12 @@
-# 接力 · 结构化跨轮记忆(anchors 接线)· 侦察已完成待实现
+# 接力 · 结构化跨轮记忆(anchors 接线)· ✅ 已实现上线(2026-07-03 · PR#58)
+
+> ✅ **2026-07-03 实现收官**:PR#58 merge `507fb771`,按下方方案 B 原样落地(唯一偏差:
+> ensure 走首用自愈照 line_pending_intents 先例、不进满线的 startup.py;alembic 0048 留档)。
+> CI 七闸全绿 · 全量 5734 单测绿 · prod 冒烟过(自愈建表/跨租户隔离/RLS on+1 policy)。
+> 闸 `agent_anchor_memory` 已开 **allowlist 金丝雀(skin+163)**,其余用户 fail-closed 关。
+> **剩人类门**:163 号真机——发图识别一张 →「把刚才那张推进ERP」(不带票号)→ 确认卡应是
+> 同一张;验过 `store.set_setting("agent_anchor_memory",{"rollout":"all"},True)` 放量。
+> 以下为当时的侦察原文(留档)。
 
 > 2026-07-03 · /loop 任务① 起步即被 Zihao 暂停 · **只做了只读侦察,零代码改动**
 > 下次续做:直接从「设计/实现」开工,不必重跑侦察。闸默认关,走 PR→CI→合并→prod 验证流程。

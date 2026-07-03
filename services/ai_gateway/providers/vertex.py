@@ -167,6 +167,86 @@ def text_to_json(
     )
 
 
+def _fc_schema(d: Optional[dict]):
+    """通用 JSON-schema dict → SDK Schema(无参工具不带 parameters → None)。"""
+    from google.genai import types
+
+    if not d:
+        return None
+    t = str(d.get("type", "string")).upper()
+    kw = {"type": getattr(types.Type, t, types.Type.STRING)}
+    if d.get("description"):
+        kw["description"] = d["description"]
+    if d.get("enum"):
+        kw["enum"] = [str(v) for v in d["enum"]]
+    if t == "OBJECT":
+        kw["properties"] = {k: _fc_schema(v) for k, v in (d.get("properties") or {}).items()}
+        if d.get("required"):
+            kw["required"] = list(d["required"])
+    if t == "ARRAY" and d.get("items"):
+        kw["items"] = _fc_schema(d["items"])
+    return types.Schema(**kw)
+
+
+def text_to_action(
+    prompt: str,
+    *,
+    tools: List[dict],
+    tier: str = "flash",
+    api_key: Optional[str] = None,
+    temperature: float = 0.0,
+    max_tokens: int = 1200,
+    timeout_s: int = 18,
+    max_retries: int = 1,
+) -> ProviderOutcome:
+    """原生 function-calling 决策。返回归一动作 dict(与 agent JSON 协议同形):
+    functionCall → {"kind":"tool","tool","args"} · 纯文本 → {"kind":"reply","message"}。"""
+    from google.genai import types
+
+    model_name = _resolve_model(tier)
+    decls = [
+        types.FunctionDeclaration(
+            name=d["name"],
+            description=d.get("description") or "",
+            parameters=_fc_schema(d.get("parameters")),
+        )
+        for d in tools
+    ]
+    config = types.GenerateContentConfig(
+        temperature=temperature,
+        max_output_tokens=max_tokens,
+        tools=[types.Tool(function_declarations=decls)],
+    )
+    try:
+        resp = _client().models.generate_content(model=model_name, contents=prompt, config=config)
+    except Exception as e:  # noqa: BLE001
+        return ProviderOutcome(ok=False, error_kind=_error_kind(e), model=model_name)
+    it, ot = _usage(resp)
+    fcs = getattr(resp, "function_calls", None) or []
+    if fcs:
+        fc = fcs[0]
+        return ProviderOutcome(
+            ok=True,
+            data={"kind": "tool", "tool": fc.name, "args": dict(fc.args or {})},
+            model=model_name,
+            input_tokens=it,
+            output_tokens=ot,
+        )
+    try:
+        text = (getattr(resp, "text", "") or "").strip()
+    except Exception:  # noqa: BLE001 — 混合 parts 时 .text 可能抛
+        text = ""
+    if text:
+        return ProviderOutcome(
+            ok=True,
+            data={"kind": "reply", "message": text},
+            model=model_name,
+            input_tokens=it,
+            output_tokens=ot,
+        )
+    return ProviderOutcome(ok=False, error_kind="parse", model=model_name)
+
+
 def multimodal_to_json(
     prompt: str,
     images: List[Tuple[bytes, str]],

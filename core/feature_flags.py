@@ -35,6 +35,12 @@ AGENT_DMS_KEY = "agent_dms_push"
 # LINE 对账收件子闸(RECON-3-LINE-PLAN 方案一触发底座):默认关。关 → 说"做银行对账"
 # 得 not_available_yet 诚实拒、文件走现状 OCR;开 → 收件配对→异步对账→完成回推。
 AGENT_RECON_INTAKE_KEY = "agent_recon_intake"
+# 大脑原生 function-calling 子闸(P2):默认关。关 → 手写单行 JSON 协议现状不变;
+# 开 → 决策经 provider 原生工具调用(消 JSON 截断/parse 类 crash),后端不支持自动回落 JSON 路。
+AGENT_NATIVE_FC_KEY = "agent_native_fc"
+# 回复底部 quick-reply chips 子闸(P2):默认关。关 → 纯文本回复现状不变;
+# 开 → agent 回复/安全兜底带 2-3 个可点建议(教育用户能问什么)。
+AGENT_QUICK_CHIPS_KEY = "agent_quick_chips"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -86,3 +92,13 @@ def agent_dms_enabled_for(user_id: Optional[str]) -> bool:
 def agent_recon_intake_enabled_for(user_id: Optional[str]) -> bool:
     """LINE 对账收件子闸。关 = 工具如实拒、文件走现状 OCR。"""
     return _enabled(AGENT_RECON_INTAKE_KEY, user_id, "agent_recon_intake_enabled_for")
+
+
+def agent_native_fc_enabled_for(user_id: Optional[str]) -> bool:
+    """大脑原生 function-calling 子闸。关 = 手写 JSON 协议现状不变。"""
+    return _enabled(AGENT_NATIVE_FC_KEY, user_id, "agent_native_fc_enabled_for")
+
+
+def agent_quick_chips_enabled_for(user_id: Optional[str]) -> bool:
+    """quick-reply chips 子闸。关 = 纯文本回复现状不变。"""
+    return _enabled(AGENT_QUICK_CHIPS_KEY, user_id, "agent_quick_chips_enabled_for")

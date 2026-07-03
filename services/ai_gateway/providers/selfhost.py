@@ -132,6 +132,11 @@ def _chat_json(prompt, images, *, temperature, response_mime, max_tokens, timeou
     return ProviderOutcome(ok=False, error_kind="parse", model=model_name, raw=last_raw)
 
 
+def text_to_action(prompt, *, tools, **kw) -> ProviderOutcome:
+    """原生 function-calling 暂未实现(OpenAI 兼容端点·非 prod agent 后端)→ 调用方回落 JSON 协议。"""
+    return ProviderOutcome(ok=False, error_kind="unsupported", model=NAME)
+
+
 def text_to_json(
     prompt: str,
     *,

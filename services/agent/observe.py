@@ -19,6 +19,9 @@ def payload(tool: str, result) -> dict:
     if not result.ok:
         # 失败也带上可选项(套账候选/单据候选),让模型请用户挑一个(非报错回退)。
         out = {"ok": False, "error": result.error_code or "failed"}
+        if isinstance(result.data, list):
+            # 失败也可能带 list(候选/命中列表)——别静默强转空 dict(通知 count 恒 0 同类雷)
+            out["count"] = len(result.data)
         for key in ("workspaces", "candidates", "endpoints", "pushed_endpoint"):
             if data.get(key):
                 out[key] = data[key]

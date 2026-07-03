@@ -27,6 +27,8 @@ _YES = frozenset(
         "确认",
         "确认推送",
         "確認",
+        "送信",
+        "送信する",  # ja 按钮 label(push_confirm._BTN_OK)——用户照按钮字打字必须命中
         "confirm",
         "ยืนยัน",
         "ยืนยันเลย",

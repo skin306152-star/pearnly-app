@@ -155,6 +155,25 @@ class TestConfirmCard(unittest.TestCase):
             line_postback.ACTION_AGENT_PUSH_CANCEL,
         )
 
+    def test_card_ref_snapshots_amount(self):
+        # 卡上给用户看的金额进 nonce ref 快照,执行时校验单据没被改过(TOCTOU 防线)。
+        with (
+            patch("core.db.get_cursor_rls", _fake_cursor),
+            patch("services.line_binding.line_action_nonce.mint", return_value="TOK1") as mint,
+            patch("services.line_binding.line_reply.reply_messages_context", lambda *a, **k: None),
+        ):
+            push_confirm.send_confirm_card(
+                _BOUND,
+                "rt",
+                {"history_id": "h1", "endpoint_id": "e1", "amount": 120},
+                "th",
+                "t1",
+                1,
+                "U1",
+            )
+        ref = json.loads(mint.call_args.kwargs["action_ref"])
+        self.assertEqual(ref["amount"], "120")
+
     def test_mint_failure_returns_false(self):
         with (
             patch("core.db.get_cursor_rls", _fake_cursor),
@@ -234,6 +253,57 @@ class TestPostback(unittest.TestCase):
             plan_ok=False,
         )
         self.assertEqual(ran, [])
+
+    def test_no_permission_does_not_burn_nonce(self):
+        # 权限先于 nonce 消费:无权点确认不烧卡,升级套餐后 TTL 内同一张卡仍可确认。
+        says = []
+        with (
+            patch("core.db.get_cursor_rls", _fake_cursor),
+            patch("services.line_binding.line_action_nonce.consume") as consume,
+            patch(
+                "services.line_binding.line_reply.reply_text_context",
+                lambda rt, body, **k: says.append(body),
+            ),
+            patch("core.route_helpers._plan_permissions", return_value={"can_push_erp": False}),
+        ):
+            push_confirm.handle_postback(
+                _BOUND,
+                "rt",
+                line_postback.ACTION_AGENT_PUSH_CONFIRM,
+                "TOK1",
+                "th",
+                runner=lambda fn: None,
+            )
+        consume.assert_not_called()
+        self.assertTrue(says)  # 诚实回"无权限",而不是静默
+
+    def test_cancel_works_without_push_permission(self):
+        # 取消不需要推送权限(权限闸只拦确认),nonce 照常消费。
+        says, ran = self._run(
+            line_postback.ACTION_AGENT_PUSH_CANCEL,
+            {"status": "ok", "action_ref": self._ref()},
+            plan_ok=False,
+        )
+        self.assertEqual(ran, [])
+        self.assertTrue(says)
+
+    def test_confirm_passes_amount_snapshot_to_execution(self):
+        ref = json.dumps(
+            {"kind": "agent_push", "history_id": "h1", "endpoint_id": "e1", "amount": "120"}
+        )
+        says, ran = self._run(
+            line_postback.ACTION_AGENT_PUSH_CONFIRM, {"status": "ok", "action_ref": ref}
+        )
+        with (
+            patch.object(
+                push_confirm,
+                "_execute_push",
+                return_value={"kind": "ok", "endpoint": "E", "invoice_no": "IV"},
+            ) as ex,
+            patch("services.line_binding.line_reply.push_text_context"),
+        ):
+            ran[0]()
+        self.assertEqual(ex.call_args.args[4], "120")
 
     def test_bad_ref_stale(self):
         says, ran = self._run(
@@ -330,6 +400,34 @@ class TestExecute(unittest.TestCase):
             out = push_confirm._execute_push(_BOUND, "t1", "h1", "e1")
         self.assertEqual(out["kind"], "failure")
         retry.assert_called_once()
+
+    def test_amount_changed_since_confirm_blocks_push(self):
+        # 用户确认的是卡上那个数;执行时单据被改过(网页端编辑)→ 拦下,绝不推新值。
+        with (
+            patch(
+                "core.db.get_ocr_history_detail",
+                return_value={"invoice_no": "IV1", "seller_name": "7-11", "total_amount": 250},
+            ),
+            patch(
+                "core.db.get_erp_endpoint",
+                return_value={"id": "e1", "name": "MR.ERP", "enabled": True, "adapter": "mrerp"},
+            ),
+            patch("core.db.has_recent_successful_push", return_value=None),
+            patch("services.erp.erp_push.push_to_endpoint") as pusher,
+        ):
+            out = push_confirm._execute_push(_BOUND, "t1", "h1", "e1", confirmed_amount="120")
+        self.assertEqual(out, {"kind": "failure", "code": "changed_since_confirm"})
+        pusher.assert_not_called()
+        text = push_confirm._result_text(out, "zh")
+        self.assertIn("改过", text)
+
+    def test_amount_snapshot_format_tolerant_and_no_snapshot_skips(self):
+        # "120" vs 120.00 数值相等不误拦;老卡无快照(None)不比对照常推。
+        self.assertTrue(push_confirm._amount_matches("120", 120.00))
+        self.assertTrue(push_confirm._amount_matches(None, 999))
+        self.assertTrue(push_confirm._amount_matches("-", 999))
+        self.assertFalse(push_confirm._amount_matches("120", 250))
+        self.assertFalse(push_confirm._amount_matches("120", None))
 
     def test_result_text_failure_never_says_success(self):
         text = push_confirm._result_text(

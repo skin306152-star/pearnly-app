@@ -60,11 +60,14 @@ def send_confirm_card(
     from services.line_binding import line_action_nonce, line_postback, line_reply
 
     try:
+        amount = push.get("amount")
         ref = json.dumps(
             {
                 "kind": REF_KIND,
                 "history_id": str(push["history_id"]),
                 "endpoint_id": str(push["endpoint_id"]),
+                # 卡上给用户看的金额快照:执行时校验单据没被改过(防确认与推送间的窗口)
+                "amount": None if amount in (None, "") else str(amount),
             }
         )
         with db.get_cursor_rls(tid, commit=True) as cur:
@@ -149,6 +152,14 @@ def handle_postback(bound_user, reply_token, action, token, lang, *, runner=None
     if not (tid and token):
         _say(line_client.t_line(lang, "card_action_stale"))
         return
+    from core.route_helpers import _plan_permissions
+
+    if action != line_postback.ACTION_AGENT_PUSH_CANCEL and not _plan_permissions(
+        (bound_user or {}).get("plan")
+    ).get("can_push_erp"):
+        # 权限先于 nonce 消费:无权点确认不烧卡,升级套餐后 TTL 内同一张卡仍可确认
+        _say(agent_i18n.render("agent.failure.forbidden", lang))
+        return
     from services.line_binding import line_action_nonce as nonce
 
     with db.get_cursor_rls(tid, commit=True) as cur:
@@ -173,26 +184,23 @@ def handle_postback(bound_user, reply_token, action, token, lang, *, runner=None
     if action == line_postback.ACTION_AGENT_PUSH_CANCEL:
         _say(agent_i18n.render("agent.confirm.cancelled", lang))
         return
-    from core.route_helpers import _plan_permissions
-
-    if not _plan_permissions((bound_user or {}).get("plan")).get("can_push_erp"):
-        _say(agent_i18n.render("agent.failure.forbidden", lang))
-        return
     _say(_t(_ACK, lang))
     run = runner or (lambda fn: threading.Thread(target=fn, daemon=True).start())
     run(
         lambda: _execute_and_notify(
-            bound_user, tid, ref["history_id"], ref["endpoint_id"], lang, luid
+            bound_user, tid, ref["history_id"], ref["endpoint_id"], lang, luid, ref.get("amount")
         )
     )
 
 
-def _execute_and_notify(user, tid, history_id, endpoint_id, lang, line_user_id) -> None:
+def _execute_and_notify(
+    user, tid, history_id, endpoint_id, lang, line_user_id, confirmed_amount=None
+) -> None:
     """后台执行 + 结果 push 消息。任何异常都给用户一句诚实失败,绝不静默。"""
     from services.line_binding import line_reply
 
     try:
-        out = _execute_push(user, tid, history_id, endpoint_id)
+        out = _execute_push(user, tid, history_id, endpoint_id, confirmed_amount)
         text = _result_text(out, lang)
     except Exception:
         logger.exception("[agent push] execute failed history=%s", str(history_id)[:8])
@@ -203,7 +211,20 @@ def _execute_and_notify(user, tid, history_id, endpoint_id, lang, line_user_id) 
         logger.warning("[agent push] result notify failed", exc_info=True)
 
 
-def _execute_push(user, tid, history_id, endpoint_id) -> dict:
+def _amount_matches(snapshot, current) -> bool:
+    """确认卡快照金额 vs 执行时单据金额。卡上没展示过金额(空)→ 不比;可比则必须相等——
+    用户确认的是卡上那个数,推出去的必须还是它(确认与执行之间单据可能被网页端改过)。"""
+    if snapshot in (None, "", "-"):
+        return True
+    from decimal import Decimal, InvalidOperation
+
+    try:
+        return Decimal(str(snapshot)) == Decimal(str(current))
+    except (InvalidOperation, TypeError, ValueError):
+        return str(snapshot) == str(current)
+
+
+def _execute_push(user, tid, history_id, endpoint_id, confirmed_amount=None) -> dict:
     """真实推送编排 —— 镜像 routes/erp_push_log_routes.py:34-162(唯一权威范式)。
     层 2 幂等:已成功推过 → skipped_dup 日志 + 不重推;层 3:erp_push_logs 唯一状态源。"""
     from services.erp import erp_push as _erp
@@ -243,6 +264,15 @@ def _execute_push(user, tid, history_id, endpoint_id) -> dict:
             "endpoint": endpoint.get("name") or "ERP",
             "invoice_no": history.get("invoice_no"),
         }
+
+    if not _amount_matches(confirmed_amount, history.get("total_amount")):
+        logger.warning(
+            "[agent push] amount changed since confirm history=%s confirmed=%s now=%s",
+            str(history_id)[:8],
+            confirmed_amount,
+            history.get("total_amount"),
+        )
+        return {"kind": "failure", "code": "changed_since_confirm"}
 
     result = _erp.push_to_endpoint(endpoint, history)
     final_status = db.classify_push_status(result["success"], result.get("error_msg"))
@@ -302,6 +332,8 @@ def _result_text(out: dict, lang: str) -> str:
         return agent_i18n.render("agent.failure.history_not_found", lang)
     if code == "no_endpoint":
         return agent_i18n.render("agent.failure.no_endpoint", lang)
+    if code == "changed_since_confirm":
+        return agent_i18n.render("agent.failure.changed_since_confirm", lang)
     reason = _friendly_reason(out.get("error") or "", lang)
     return _t(_FAIL, lang).format(reason=reason)
 

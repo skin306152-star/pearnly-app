@@ -344,6 +344,13 @@ class TestObservePayload(unittest.TestCase):
         obs = observe.payload("list_notifications", ToolResult(ok=True, data=[]))
         self.assertEqual(obs, {"ok": True, "count": 0})
 
+    def test_failure_with_list_data_keeps_count(self):
+        # 失败结果带 list(候选/命中列表)不许被强转空 dict 静默吞(通知 count 恒 0 同类雷)。
+        obs = observe.payload(
+            "list_notifications", ToolResult(ok=False, error_code="boom", data=[{"id": 1}])
+        )
+        self.assertEqual(obs, {"ok": False, "error": "boom", "count": 1})
+
     def test_grounded_fallback_notifications_some(self):
         msg = fallbacks.grounded_fallback(
             [{"tool": "list_notifications", "ok": True, "count": 2}], "zh"

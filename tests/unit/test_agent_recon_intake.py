@@ -162,6 +162,39 @@ class TestTextAndLaunch(_Base):
         enq.assert_called_once()
         self.assertEqual(enq.call_args.args[3]["gl_account"], "")
 
+    def test_launch_uses_current_workspace(self):
+        # 归属套账 = 用户「当前套账」(与记账写路同口径,尊重 switch_workspace),不是租户默认套账。
+        with (
+            patch.object(
+                ri.db,
+                "get_billing_status_combined",
+                return_value={"allowed": True, "is_exempt": False},
+            ),
+            patch.object(ri.db, "get_cursor_rls", return_value=MagicMock()),
+            patch("services.line_binding.line_workspace.resolve_write_workspace", return_value=72),
+            patch("services.recon_jobs.store.enqueue", return_value="job-3") as enq,
+        ):
+            self._start(gl_account="1010")
+            self._fill_files()
+        self.assertEqual(enq.call_args.args[3]["workspace_client_id"], 72)
+        self.assertEqual(enq.call_args.kwargs["workspace_client_id"], 72)
+
+    def test_launch_workspace_read_failure_falls_back_to_default(self):
+        # 套账解析基建炸 → 回落默认套账,绝不挡对账。
+        with (
+            patch.object(
+                ri.db,
+                "get_billing_status_combined",
+                return_value={"allowed": True, "is_exempt": False},
+            ),
+            patch.object(ri.db, "get_cursor_rls", side_effect=RuntimeError("db down")),
+            patch("core.workspace_context.default_workspace_for_write", return_value=84),
+            patch("services.recon_jobs.store.enqueue", return_value="job-4") as enq,
+        ):
+            self._start(gl_account="1010")
+            self._fill_files()
+        self.assertEqual(enq.call_args.args[3]["workspace_client_id"], 84)
+
     def test_insufficient_balance_blocks_and_cleans(self):
         with (
             patch.object(

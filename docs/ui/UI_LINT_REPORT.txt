@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 330 个源文件全扫
+# UI 设计合规扫描报告 · 332 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 8(8 文件)
@@ -108,8 +108,8 @@
 
 ## emoji当图标(应换Lucide) — 命中 207(30 文件)
     96  static\i18n-data.js
-        └ 1274: 'billing-accuracy-good': '✅ 准',
-        └ 1275: 'billing-accuracy-fair': '⚠ 一般',
+        └ 1276: 'billing-accuracy-good': '✅ 准',
+        └ 1277: 'billing-accuracy-fair': '⚠ 一般',
     35  static\erp-mrerp-connect.js
         └ 275: zh: '⚙ 高级设置(自动创建买方/商品的模板 · 可不填)',
         └ 276: en: '⚙ Advanced (templates for auto-creating buyers/products · optional)',
@@ -147,13 +147,13 @@
      2  static\pos\pos-restaurant-ops.js
         └ 83: const tm = (t.late ? '⚠ ' : '⏱ ') + (t.minutes || 0) + ' ' + POS.t('posui.rest.min');
      1  src\home\app-shell-html.ts
-        └ 410: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
+        └ 417: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
      1  src\home\dms-intake-invoice-submit.ts
         └ 91: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
      1  src\home\dms-intake.ts
-        └ 68: '<div class="dx-file"><div class="dx-file-ic">📄</div>' +
+        └ 69: '<div class="dx-file"><div class="dx-file-ic">📄</div>' +
      1  src\home\erp-log-card.ts
-        └ 80: statusIcon = '⏭';
+        └ 82: statusIcon = '⏭';
      1  src\home\erp-log-detail.ts
         └ 277: tlItem(isOk ? 'ok' : 'mid', '↗', t('erp-tl-pushed'), epName + ' · ' + triggerText)
      1  src\home\history-drawer.ts
@@ -302,7 +302,7 @@
      1  static\home-06-responsive-rd.css
         └ 144: max-width: 600px;
      1  static\home-07-history-automation.css
-        └ 487: max-width: 600px;
+        └ 490: max-width: 600px;
      1  static\home-08-pagehead-toast.css
         └ 157: max-width: 320px;
      1  static\home-10-push-logs.css
@@ -424,7 +424,7 @@
         └ 251: 'time-hours-ago': '{n} 小时前',
         └ 252: 'time-days-ago': '{n} 天前',
 
-## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 963(64 文件)
+## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 957(64 文件)
    157  static\home-18-admin-users.css
     83  static\pos\pos.css
     83  static\pos\pos.css
@@ -444,7 +444,6 @@
     15  static\pos\pos.html
     12  static\home-40-sales-wizard.css
     11  static\home-49-dms-intake.css
-    10  static\erp-mrerp-connect.js
      9  src\home\sales-account.ts
      9  src\home\sales-wizard-steps.ts
      9  static\recon-mapping.js
@@ -461,6 +460,7 @@
      4  src\home\erp-mrerp-dms-connect.ts
      4  src\home\line-panel.ts
      4  src\home\module-settings.ts
+     4  static\erp-mrerp-connect.js
      3  static\pos\pos-data.js
      3  static\landing\auth-modal.css
      3  static\landing\responsive.css

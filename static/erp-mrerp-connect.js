@@ -118,27 +118,6 @@
             zh_TW: '失敗',
             ja: '失敗',
         },
-        'card-stat-mode-auto': {
-            zh: '自动推送',
-            en: 'Auto push',
-            th: 'ส่งอัตโนมัติ',
-            zh_TW: '自動推送',
-            ja: '自動送信',
-        },
-        'card-stat-mode-manual': {
-            zh: '手动推送',
-            en: 'Manual push',
-            th: 'ส่งด้วยตนเอง',
-            zh_TW: '手動推送',
-            ja: '手動送信',
-        },
-        'card-stat-mode-none': {
-            zh: '未配置',
-            en: 'Not set',
-            th: 'ยังไม่ตั้งค่า',
-            zh_TW: '未設定',
-            ja: '未設定',
-        },
         // Empty state
         'empty-banner-title': {
             zh: '还没有连接任何 ERP · 点上面的卡片开始连接',

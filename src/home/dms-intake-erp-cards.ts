@@ -42,10 +42,25 @@ function T(k: string): string {
     return typeof w.t === 'function' ? w.t(k) : k;
 }
 
-type EpRec = Record<string, unknown> & { id?: string; enabled?: boolean };
+type EpRec = Record<string, unknown> & {
+    id?: string;
+    enabled?: boolean;
+    adapter?: string;
+    auto_push?: boolean;
+    config?: Record<string, unknown>;
+};
 
 function isEnabled(ep: EpRec | null): boolean {
     return !!ep && ep.enabled !== false;
+}
+
+// 推送方式:发票 ERP 看 auto_push;DMS 的自动标志在 config.id_card_auto_push
+// (adapter=mrerp_dms 的 auto_push 后端强制 false·防误投,见 erp_endpoints_routes)。
+function isAutoPush(ep: EpRec): boolean {
+    if (String(ep.adapter || '').toLowerCase() === 'mrerp_dms') {
+        return (ep.config || {}).id_card_auto_push === true;
+    }
+    return ep.auto_push === true;
 }
 
 function cardHtml(def: ErpCardDef): string {
@@ -72,11 +87,14 @@ function fillCard(card: HTMLElement, ep: EpRec | null): void {
     card.classList.toggle('is-disabled', !!ep && !enabled);
 
     if (st) {
-        st.textContent = !ep
-            ? T('dx-erp-not-connected')
-            : enabled
-              ? T('dx-erp-connected')
-              : T('dx-erp-disabled');
+        // 已连接时接上推送方式(自动/手动)· 停用/未连接不显示(此时方式无意义)。
+        if (!ep) st.textContent = T('dx-erp-not-connected');
+        else if (!enabled) st.textContent = T('dx-erp-disabled');
+        else
+            st.textContent =
+                T('dx-erp-connected') +
+                ' · ' +
+                T(isAutoPush(ep) ? 'dx-erp-mode-auto' : 'dx-erp-mode-manual');
     }
     if (!acts) return;
     if (!ep) {

@@ -956,3 +956,21 @@ body.admin-layout-body .lang-switching-overlay {
   color: #9ca3af;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---- OCR 引擎策略页(adm-eng-*) ---- */
+.adm-eng-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  max-width: 420px;
+}
+.adm-eng-select {
+  min-width: 180px;
+  padding: 6px 10px;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 8px;
+  background: var(--card-bg, #fff);
+  font-size: 13px;
+}

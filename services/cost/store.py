@@ -54,6 +54,13 @@ def ensure_ocr_cost_log_table():
                 """)
             except Exception as _me:
                 logger.warning(f"ocr_cost_log.history_id 类型迁移失败(不致命): {_me}")
+            # 2026-07-04 引擎策略观测列:实际模型/模式/升级臂/状态(失败也记账,失败率才算得出)。
+            cur.execute("""
+                ALTER TABLE ocr_cost_log ADD COLUMN IF NOT EXISTS model TEXT NOT NULL DEFAULT '';
+                ALTER TABLE ocr_cost_log ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT '';
+                ALTER TABLE ocr_cost_log ADD COLUMN IF NOT EXISTS l3_fired BOOLEAN NOT NULL DEFAULT FALSE;
+                ALTER TABLE ocr_cost_log ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ok';
+            """)
             # enroll:tenant_id 可空 + user_id NOT NULL → tenant_or_user(孤立行回退 user 隔离)。
             from core.rls import apply_tenant_or_user_rls
 
@@ -73,8 +80,12 @@ def log_ocr_cost(
     output_tokens: int,
     cost_thb: float,
     elapsed_ms: int,
+    model: str = "",
+    mode: str = "",
+    l3_fired: bool = False,
+    status: str = "ok",
 ) -> bool:
-    """每次识别完写一条成本记录"""
+    """每次识别完写一条成本记录(失败也写 status='failed',失败率才算得出)"""
     try:
         with db.get_cursor_rls(
             tenant_id=str(tenant_id) if tenant_id else None,
@@ -85,8 +96,9 @@ def log_ocr_cost(
                 """
                 INSERT INTO ocr_cost_log
                 (user_id, tenant_id, history_id, engine, pages,
-                 input_tokens, output_tokens, cost_thb, elapsed_ms)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 input_tokens, output_tokens, cost_thb, elapsed_ms,
+                 model, mode, l3_fired, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """,
                 (
@@ -99,6 +111,10 @@ def log_ocr_cost(
                     output_tokens,
                     round(float(cost_thb), 4),
                     elapsed_ms,
+                    model or "",
+                    mode or "",
+                    bool(l3_fired),
+                    status or "ok",
                 ),
             )
             new_id = cur.fetchone()["id"]
@@ -254,3 +270,80 @@ def get_cost_daily_by_engine(days: int = 30) -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"get_cost_daily_by_engine failed: {e}")
         return []
+
+
+def get_ocr_engine_metrics(days: int = 7) -> Dict[str, Any]:
+    """引擎策略面板聚合:今日 + 近 N 天的成本/每张成本/延迟/模型占比/L3 触发率/失败率。
+
+    成本口径 = ocr_cost_log.cost_thb(逐请求按实际模型单价算好落库,见 services/ocr/cost.py);
+    这里只做 SUM/AVG,不再按档位反推——混跑 2.5/3.5 也不会算串。
+    """
+    empty = {"cost_thb": 0.0, "pages": 0, "requests": 0}
+    out: Dict[str, Any] = {
+        "days": int(days),
+        "today": dict(empty),
+        "window": {**empty, "avg_ms": 0, "l3_rate": 0.0, "fail_rate": 0.0},
+        "by_model": [],
+        "by_mode": [],
+    }
+    try:
+        with db.get_cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    COALESCE(SUM(CASE WHEN created_at::date = CURRENT_DATE THEN cost_thb END), 0) AS today_cost,
+                    COALESCE(SUM(CASE WHEN created_at::date = CURRENT_DATE THEN pages END), 0) AS today_pages,
+                    COUNT(CASE WHEN created_at::date = CURRENT_DATE THEN 1 END) AS today_reqs,
+                    COALESCE(SUM(cost_thb), 0) AS w_cost,
+                    COALESCE(SUM(pages), 0) AS w_pages,
+                    COUNT(*) AS w_reqs,
+                    COALESCE(AVG(CASE WHEN status = 'ok' THEN elapsed_ms END), 0) AS w_avg_ms,
+                    COUNT(CASE WHEN l3_fired THEN 1 END) AS w_l3,
+                    COUNT(CASE WHEN status <> 'ok' THEN 1 END) AS w_failed
+                FROM ocr_cost_log
+                WHERE created_at >= NOW() - make_interval(days => %s)
+            """,
+                (int(days),),
+            )
+            r = cur.fetchone() or {}
+            w_reqs = int(r.get("w_reqs") or 0)
+            out["today"] = {
+                "cost_thb": float(r.get("today_cost") or 0),
+                "pages": int(r.get("today_pages") or 0),
+                "requests": int(r.get("today_reqs") or 0),
+            }
+            out["window"] = {
+                "cost_thb": float(r.get("w_cost") or 0),
+                "pages": int(r.get("w_pages") or 0),
+                "requests": w_reqs,
+                "avg_ms": int(r.get("w_avg_ms") or 0),
+                "l3_rate": (int(r.get("w_l3") or 0) / w_reqs) if w_reqs else 0.0,
+                "fail_rate": (int(r.get("w_failed") or 0) / w_reqs) if w_reqs else 0.0,
+            }
+            for col, key in (("model", "by_model"), ("mode", "by_mode")):
+                cur.execute(
+                    f"""
+                    SELECT COALESCE(NULLIF({col}, ''), '(unrecorded)') AS name,
+                           COUNT(*) AS cnt,
+                           COALESCE(SUM(cost_thb), 0) AS cost,
+                           COALESCE(SUM(pages), 0) AS pages,
+                           COALESCE(AVG(CASE WHEN status = 'ok' THEN elapsed_ms END), 0) AS avg_ms
+                    FROM ocr_cost_log
+                    WHERE created_at >= NOW() - make_interval(days => %s)
+                    GROUP BY 1 ORDER BY cost DESC
+                """,
+                    (int(days),),
+                )
+                out[key] = [
+                    {
+                        "name": row["name"],
+                        "requests": int(row["cnt"]),
+                        "cost_thb": float(row["cost"]),
+                        "pages": int(row["pages"]),
+                        "avg_ms": int(row["avg_ms"] or 0),
+                    }
+                    for row in cur.fetchall()
+                ]
+    except Exception as e:
+        logger.error(f"get_ocr_engine_metrics failed: {e}")
+    return out

@@ -143,6 +143,7 @@
         if (p === '/admin/topup' || p === '/admin/topup/') return 'topup';
         if (p === '/admin/monitor' || p === '/admin/monitor/') return 'monitor';
         if (p === '/admin/settings' || p === '/admin/settings/') return 'settings';
+        if (p === '/admin/engine' || p === '/admin/engine/') return 'engine';
         return 'cost';
     }
 
@@ -153,6 +154,7 @@
             topup: 'page-admin-topup',
             monitor: 'page-admin-monitor',
             settings: 'page-admin-settings',
+            engine: 'page-admin-engine',
         };
         Object.keys(pages).forEach(function (r) {
             const el = document.getElementById(pages[r]);
@@ -168,6 +170,7 @@
         if (route === 'topup') _renderTopupPage();
         if (route === 'monitor') _renderMonitorPage();
         if (route === 'settings') _renderSettingsPage();
+        if (route === 'engine') _renderEnginePage();
     }
 
     function _bindSidebar() {
@@ -258,6 +261,7 @@
                 else if (_r === 'topup') _renderTopupPage();
                 else if (_r === 'monitor') _renderMonitorPage();
                 else if (_r === 'settings') _renderSettingsPage();
+                else if (_r === 'engine') _renderEnginePage();
                 else _renderCostPage();
             });
         });
@@ -2984,6 +2988,182 @@
                 ? _t('adm-set-saved-at') + ' ' + new Date(ag.updated_at).toLocaleString()
                 : '';
         _renderAllowlist(d.allowlist);
+    }
+
+    // ============ OCR 引擎策略页 ============
+    const _ENG_PLANS = ['none', 'S', 'M', 'L', 'exempt'];
+    const _ENG_TASKS = ['invoice', 'id_card', 'bank_statement', 'gl_ledger', 'vat_report'];
+
+    function _engSelect(id, options, withEmpty) {
+        let html = '<select class="adm-eng-select" id="' + id + '">';
+        if (withEmpty)
+            html += '<option value="">' + _esc(_t('adm-eng-follow-global')) + '</option>';
+        options.forEach(function (o) {
+            html += '<option value="' + o + '">' + o + '</option>';
+        });
+        return html + '</select>';
+    }
+
+    function _engKpi(label, value, sub) {
+        return (
+            '<div class="cost-kpi-card"><div class="cost-kpi-label">' +
+            _esc(label) +
+            '</div><div class="cost-kpi-value">' +
+            _esc(value) +
+            '</div><div class="cost-kpi-sub">' +
+            _esc(sub || '') +
+            '</div></div>'
+        );
+    }
+
+    function _renderEngineMetrics(m) {
+        const kpis = document.getElementById('adm-eng-kpis');
+        if (!kpis) return;
+        const w = m.window || {};
+        const today = m.today || {};
+        const perPage = w.pages ? w.cost_thb / w.pages : 0;
+        kpis.innerHTML =
+            _engKpi(
+                _t('adm-eng-kpi-today'),
+                '฿ ' + _fmt(today.cost_thb || 0, 2),
+                (today.requests || 0) + ' req · ' + (today.pages || 0) + ' p'
+            ) +
+            _engKpi(
+                _t('adm-eng-kpi-perpage'),
+                '฿ ' + _fmt(perPage, 3),
+                _t('adm-eng-kpi-window') + ' ฿ ' + _fmt(w.cost_thb || 0, 2)
+            ) +
+            _engKpi(_t('adm-eng-kpi-latency'), _fmt((w.avg_ms || 0) / 1000, 1) + 's', '') +
+            _engKpi(
+                _t('adm-eng-kpi-l3'),
+                _fmt((w.l3_rate || 0) * 100, 1) + '%',
+                _t('adm-eng-kpi-fail') + ' ' + _fmt((w.fail_rate || 0) * 100, 1) + '%'
+            );
+        const box = document.getElementById('adm-eng-by-model');
+        if (!box) return;
+        const rows = (m.by_model || [])
+            .map(function (r) {
+                return (
+                    '<tr><td>' +
+                    _esc(r.name) +
+                    '</td><td>' +
+                    r.requests +
+                    '</td><td>' +
+                    r.pages +
+                    '</td><td>฿ ' +
+                    _fmt(r.cost_thb, 2) +
+                    '</td><td>' +
+                    _fmt((r.avg_ms || 0) / 1000, 1) +
+                    's</td></tr>'
+                );
+            })
+            .join('');
+        box.innerHTML = rows
+            ? '<div class="cost-table-wrap"><table class="cost-table"><thead><tr><th>' +
+              [
+                  _t('adm-eng-col-model'),
+                  _t('adm-eng-col-reqs'),
+                  _t('adm-eng-col-pages'),
+                  _t('adm-eng-col-cost'),
+                  _t('adm-eng-col-latency'),
+              ].join('</th><th>') +
+              '</th></tr></thead><tbody>' +
+              rows +
+              '</tbody></table></div>'
+            : '<div class="cost-section-hint">' + _esc(_t('adm-eng-no-data')) + '</div>';
+    }
+
+    function _renderEngineForm(policy) {
+        const mode = policy.mode || 'direct35';
+        document.querySelectorAll('input[name="adm-eng-mode"]').forEach(function (r) {
+            r.checked = r.value === mode;
+        });
+        const plans = document.getElementById('adm-eng-plans');
+        if (plans) {
+            plans.innerHTML = _ENG_PLANS
+                .map(function (p) {
+                    return (
+                        '<label class="adm-eng-row"><span class="adm-set-row-label">' +
+                        _esc(_t('adm-eng-plan-' + p)) +
+                        '</span>' +
+                        _engSelect('adm-eng-plan-' + p, ['direct35', 'economy'], false) +
+                        '</label>'
+                    );
+                })
+                .join('');
+            _ENG_PLANS.forEach(function (p) {
+                const sel = document.getElementById('adm-eng-plan-' + p);
+                if (sel) sel.value = (policy.defaults_by_plan || {})[p] || 'direct35';
+            });
+        }
+        const tasks = document.getElementById('adm-eng-tasks');
+        if (tasks) {
+            tasks.innerHTML = _ENG_TASKS
+                .map(function (tk) {
+                    return (
+                        '<label class="adm-eng-row"><span class="adm-set-row-label">' +
+                        _esc(_t('adm-eng-task-' + tk)) +
+                        '</span>' +
+                        _engSelect('adm-eng-task-' + tk, ['direct35', 'economy', 'auto'], true) +
+                        '</label>'
+                    );
+                })
+                .join('');
+            _ENG_TASKS.forEach(function (tk) {
+                const sel = document.getElementById('adm-eng-task-' + tk);
+                if (sel) sel.value = (policy.overrides_by_task || {})[tk] || '';
+            });
+        }
+    }
+
+    async function _renderEnginePage() {
+        const saveBtn = document.getElementById('adm-eng-save');
+        if (!saveBtn) return;
+        if (!saveBtn.__bound) {
+            saveBtn.__bound = true;
+            saveBtn.addEventListener('click', async function () {
+                const mode =
+                    document.querySelector('input[name="adm-eng-mode"]:checked')?.value ||
+                    'direct35';
+                const defaults_by_plan = {};
+                _ENG_PLANS.forEach(function (p) {
+                    defaults_by_plan[p] =
+                        document.getElementById('adm-eng-plan-' + p)?.value || 'direct35';
+                });
+                const overrides_by_task = {};
+                _ENG_TASKS.forEach(function (tk) {
+                    const v = document.getElementById('adm-eng-task-' + tk)?.value || '';
+                    if (v) overrides_by_task[tk] = v;
+                });
+                try {
+                    await _adminFetch('/api/admin/ocr-engine', {
+                        method: 'POST',
+                        body: {
+                            mode: mode,
+                            defaults_by_plan: defaults_by_plan,
+                            overrides_by_task: overrides_by_task,
+                        },
+                    });
+                    _toast(_t('adm-eng-saved-toast'), 'success');
+                    _renderEnginePage();
+                } catch (e) {
+                    _toast(_t('adm-load-fail'), 'error');
+                }
+            });
+        }
+        try {
+            const d = await _adminFetch('/api/admin/ocr-engine');
+            _renderEngineForm(d.policy || {});
+            const savedEl = document.getElementById('adm-eng-saved');
+            if (savedEl)
+                savedEl.textContent = d.updated_at
+                    ? _t('adm-set-saved-at') + ' ' + new Date(d.updated_at).toLocaleString()
+                    : '';
+            const m = await _adminFetch('/api/admin/ocr-engine/metrics?days=7');
+            _renderEngineMetrics(m || {});
+        } catch (e) {
+            _toast(_t('adm-load-fail'), 'error');
+        }
     }
 
     // ============ 主启动流程 ============

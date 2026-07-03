@@ -25,22 +25,27 @@ _IMAGE_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     "static",
     "brand",
-    "line-richmenu-pearnly-illustrated-bg-v6-2500x1686.jpg",
+    "line-richmenu-v7-2500x1686.jpg",
 )
 _W, _H = 2500, 1686
-# 三列精确覆盖 2500(中列 +1 补齐·无缝无重叠),两行各 843 覆盖 1686。
-_COLS = ((0, 833), (833, 834), (1667, 833))
-_ROWS = ((0, 843), (843, 843))
+_ROW_H = 843  # 两行各 843 覆盖 1686
+# 点击区不均分三列:v7 插画按钮非等距(底排偏左·中间被猫+咖啡占位),列边界贴按钮间隙,
+# 使每个按钮的图标+文字都落在自己格内(叠网格验过:上排 720/1610·下排 670/1380)。
+# 每排仍三段无缝铺满 0..2500,满覆盖不重叠不变量不变。换背景图必须同步复核这两组边界。
+_TOP_X = (0, 720, 1610, 2500)
+_BOT_X = (0, 670, 1380, 2500)
 _RM_ACTIONS = {"rm_summary", "rm_proof", "rm_detail", "rm_help"}
 # 官网入口:在 LINE 内置浏览器打开会让随后的 Google 登录被 disallowed_useragent 拦死。
 # openExternalBrowser=1 让 LINE 直接用系统浏览器(Safari/Chrome)打开 → Google 登录才合规、会话也持久。
 _WEB_URL = "https://pearnly.com?openExternalBrowser=1"
 
 
-def _area(col: int, row: int, action: dict) -> dict:
-    x, w = _COLS[col]
-    y, h = _ROWS[row]
-    return {"bounds": {"x": x, "y": y, "width": w, "height": h}, "action": action}
+def _area(xedges: tuple, col: int, row: int, action: dict) -> dict:
+    x0, x1 = xedges[col], xedges[col + 1]
+    return {
+        "bounds": {"x": x0, "y": row * _ROW_H, "width": x1 - x0, "height": _ROW_H},
+        "action": action,
+    }
 
 
 def build_payload() -> dict:
@@ -53,16 +58,29 @@ def build_payload() -> dict:
         "name": MENU_NAME,
         "chatBarText": "เมนู Pearnly",
         "areas": [
-            _area(0, 0, {"type": "camera", "label": "ถ่ายบิล"}),
+            _area(_TOP_X, 0, 0, {"type": "camera", "label": "ถ่ายบิล"}),
             _area(
-                1, 0, {"type": "postback", "data": "a=rm_summary", "displayText": "สรุปเดือนนี้"}
+                _TOP_X,
+                1,
+                0,
+                {"type": "postback", "data": "a=rm_summary", "displayText": "สรุปเดือนนี้"},
             ),
             _area(
-                2, 0, {"type": "postback", "data": "a=rm_proof", "displayText": "รวมหลักฐาน PDF"}
+                _TOP_X,
+                2,
+                0,
+                {"type": "postback", "data": "a=rm_proof", "displayText": "รวมหลักฐาน PDF"},
             ),
-            _area(0, 1, {"type": "postback", "data": "a=rm_detail", "displayText": "รายการล่าสุด"}),
-            _area(1, 1, {"type": "postback", "data": "a=rm_help", "displayText": "วิธีใช้"}),
-            _area(2, 1, {"type": "uri", "label": "เว็บไซต์", "uri": _WEB_URL}),
+            _area(
+                _BOT_X,
+                0,
+                1,
+                {"type": "postback", "data": "a=rm_detail", "displayText": "รายการล่าสุด"},
+            ),
+            _area(
+                _BOT_X, 1, 1, {"type": "postback", "data": "a=rm_help", "displayText": "วิธีใช้"}
+            ),
+            _area(_BOT_X, 2, 1, {"type": "uri", "label": "เว็บไซต์", "uri": _WEB_URL}),
         ],
     }
 

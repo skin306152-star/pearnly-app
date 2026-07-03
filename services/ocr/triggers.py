@@ -16,6 +16,7 @@ import re
 from typing import List, Optional
 
 from .confidence import check_field_in_l1_text, find_field_min_word_conf
+from .money import normalize_money
 from .pattern_memory import InvoicePatternMemory
 from .schemas import BusinessDocumentType, Page, ThaiInvoice
 
@@ -83,7 +84,8 @@ def _check_amount_math(invoice: ThaiInvoice) -> Optional[str]:
         sub = float(invoice.subtotal) if invoice.subtotal else None
         vat = float(invoice.vat) if invoice.vat else None
         total = float(invoice.total_amount) if invoice.total_amount else None
-        disc = float(invoice.discount) if getattr(invoice, "discount", None) else 0.0
+        # 折扣走 normalize_money(千分位/货币符号容忍),别让 "1,780.00" 误报 parse failed
+        disc = normalize_money(getattr(invoice, "discount", None)) or 0.0
     except (ValueError, TypeError):
         return "amount field not numeric (parse failed)"
     if sub is None or vat is None or total is None:

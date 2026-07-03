@@ -3152,14 +3152,16 @@
             });
         }
         try {
-            const d = await _adminFetch('/api/admin/ocr-engine');
+            const [d, m] = await Promise.all([
+                _adminFetch('/api/admin/ocr-engine'),
+                _adminFetch('/api/admin/ocr-engine/metrics?days=7'),
+            ]);
             _renderEngineForm(d.policy || {});
             const savedEl = document.getElementById('adm-eng-saved');
             if (savedEl)
                 savedEl.textContent = d.updated_at
                     ? _t('adm-set-saved-at') + ' ' + new Date(d.updated_at).toLocaleString()
                     : '';
-            const m = await _adminFetch('/api/admin/ocr-engine/metrics?days=7');
             _renderEngineMetrics(m || {});
         } catch (e) {
             _toast(_t('adm-load-fail'), 'error');

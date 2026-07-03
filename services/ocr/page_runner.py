@@ -189,11 +189,14 @@ def _process_one_page(
     elif document_type in ("auto", "invoice"):
         validation_warnings.extend(validate_invoice(l2_invoice, l1_page))
 
-    # 折扣确定性反推(f003 实案):漏抓折扣的票先把数据修平再评触发,免白跑一趟 L3。
-    if document_type in ("auto", "invoice") and not l2_invoice.is_not_invoice:
-        _disc_note = infer_missing_discount(l2_invoice)
-        if _disc_note:
-            validation_warnings.append(_disc_note)
+    def _repair_discount(inv) -> None:
+        """折扣确定性反推(f003 实案):L2 后修平免白跑 L3,L3 换了新 invoice 再兜一次。"""
+        if document_type in ("auto", "invoice") and not inv.is_not_invoice:
+            note = infer_missing_discount(inv)
+            if note:
+                validation_warnings.append(note)
+
+    _repair_discount(l2_invoice)
 
     # --- Trigger evaluation (invoice path only — non-invoice docs use validators) ---
     # triggers gate the slow L3 visual re-read; soft_flags only lower confidence
@@ -378,14 +381,8 @@ def _process_one_page(
             needs_manual_review = True
 
     # L3/image-first 换了新 invoice 的话,对最终结果再反推一次折扣(视觉复读同样可能漏抓)。
-    if (
-        document_type in ("auto", "invoice")
-        and invoice is not l2_invoice
-        and not invoice.is_not_invoice
-    ):
-        _disc_note = infer_missing_discount(invoice)
-        if _disc_note:
-            validation_warnings.append(_disc_note)
+    if invoice is not l2_invoice:
+        _repair_discount(invoice)
 
     # 合理性硬闸(2026-06-29 · sanity.evaluate_sanity):对【最终】invoice 查结构上不可能的错
     # (负数/卖买税号相同/总额<单行/缺VAT勾稽不平)。命中 → 强制转人工,绝不静默 auto。

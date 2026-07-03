@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-"""task → 免费优先路径 / 模型档位 的单一事实源。
+"""task → 免费优先路径 / 首读档 tier 名 的静态声明(单一事实源)。
 
-档位只声明 tier 名,具体模型名统一经 gemini_models 由 env 解析
-(OCR_FLASH_MODEL / OCR_FLASHLITE_MODEL)——换模型改 env 或 gemini_models
-默认值即可,业务代码零改动。free_first 描述该 task 的零成本确定性路径
-(有文字层的 PDF / Excel / regex),命中即不叫模型。
+本模块只管「这个 task 用哪一档」;「这一档此刻映射到哪个具体模型」由
+gemini_models 解析(env 默认 + engine_policy 按 OCR_MODE 的请求级覆写)——
+换模型改 env/后台策略即可,业务代码零改动。free_first 描述该 task 的
+零成本确定性路径(有文字层的 PDF / Excel / regex),命中即不叫模型。
 """
 
 from __future__ import annotations

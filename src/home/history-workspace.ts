@@ -3,7 +3,8 @@
 // 税号路由再准也有例外(代付/票面税号印错)→ 给手动改归属的口子。
 // 单套账租户不注入(没得挪 · 不加噪音);改归属打 POST /api/history/{id}/assign_workspace。
 // ============================================================
-/* global token, t, showToast */
+/* global t, showToast */
+import { apiClient } from './clients-helpers.js';
 
 type WsClient = { id: number; name?: string };
 
@@ -58,15 +59,10 @@ window.bindDrawerWorkspace = async function (historyId: unknown, currentWs: unkn
             return;
         }
         try {
-            const r = await fetch(`/api/history/${historyId}/assign_workspace`, {
+            await apiClient(`/api/history/${historyId}/assign_workspace`, {
                 method: 'POST',
-                headers: {
-                    Authorization: 'Bearer ' + token,
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify({ workspace_client_id: parseInt(sel.value, 10) }),
             });
-            if (!r.ok) throw new Error('assign_workspace ' + r.status);
             showToast(t('ws-msg-updated'), 'success');
         } catch (e) {
             console.error(e);

@@ -19,6 +19,8 @@ import re
 from difflib import SequenceMatcher
 from typing import List, Dict, Any
 
+from services.ocr.money import normalize_money
+
 
 def _is_empty(v: Any) -> bool:
     if v is None:
@@ -51,11 +53,8 @@ def _norm_qty(v: Any) -> str:
 
 
 def _norm_price(v: Any) -> str:
-    s = str(v or "").strip().replace(",", "")
-    try:
-        return f"{float(s):.2f}"
-    except ValueError:
-        return s
+    f = normalize_money(v)
+    return f"{f:.2f}" if f is not None else str(v or "").strip()
 
 
 def _keep_longer_name(entry: Dict, raw_name: str, norm_name: str) -> None:
@@ -76,27 +75,26 @@ def _merge_items(pages: List[Dict]) -> List[Dict]:
        读出错字的行(นครสวรรค์ vs นครสวรรศ์ · INV2026030002 实案 5 行存成 10 行)。
        正常多页发票各页行互不重复,永远到不了这一步,不会误合口味变体。
     """
-    entries: List[Dict] = []  # {"item","name","qty","price","page_pos"}
+    entries: List[Dict] = []  # {"item","name","qty","price"} · 按页序追加
     seen_strict = set()
-    for page_pos, p in enumerate(pages):
+    for p in pages:
         f = p.get("fields") or {}
         items = f.get("items") or []
         if not isinstance(items, list):
             continue
-        page_new: List[Dict] = []
+        prev_end = len(entries)  # 本页开始前的存量 = 前页行(模糊并入只对它们扫)
         n_items = 0
-        n_dup = 0
         for it in items:
             if not isinstance(it, dict):
                 continue
             n_items += 1
-            name = _norm_name(it.get("name"))
+            raw_name = str(it.get("name", "") or "").strip()
+            name = _norm_name(raw_name)
             qty = _norm_qty(it.get("qty"))
             price = _norm_price(it.get("price"))
 
             # 严格去重
             if (name, qty, price) in seen_strict:
-                n_dup += 1
                 continue
 
             # 松散去重:qty+price 相同 · name 子串关系
@@ -112,26 +110,26 @@ def _merge_items(pages: List[Dict]) -> List[Dict]:
                         dup_of = prev
                         break
             if dup_of is not None:
-                n_dup += 1
-                _keep_longer_name(dup_of, str(it.get("name", "") or "").strip(), name)
+                _keep_longer_name(dup_of, raw_name, name)
                 continue
 
-            entry = {"item": it, "name": name, "qty": qty, "price": price, "page_pos": page_pos}
             seen_strict.add((name, qty, price))
-            entries.append(entry)
-            page_new.append(entry)
+            entries.append({"item": it, "name": name, "qty": qty, "price": price})
 
-        # 复写联判定:本页 ≥2 行且过半已判重 → 剩余行大概率是同一联被 OCR 读出错字,
-        # 对每行找前页 qty+price 相同的最相近行,相似度 ≥0.9 才并入(取最优,不取先到)。
+        # 复写联判定:本页 ≥2 行且过半已判重(判重数 = n_items − 本页新增)→ 剩余行
+        # 大概率是同一联被 OCR 读出错字,对每行找前页 qty+price 相同的最相近行,
+        # 相似度 ≥0.9 才并入(取最优,不取先到)。被并入行的严格键留在 seen_strict:
+        # 后页同键行仍该判重(它是已并入行的复本),语义正确。
+        page_new = entries[prev_end:]
+        n_dup = n_items - len(page_new)
         if n_items >= 2 and n_dup * 2 >= n_items and page_new:
             for entry in page_new:
                 if not entry["name"]:
                     continue
                 best, best_ratio = None, 0.0
-                for prev in entries:
+                for prev in entries[:prev_end]:
                     if (
-                        prev["page_pos"] == page_pos
-                        or prev["qty"] != entry["qty"]
+                        prev["qty"] != entry["qty"]
                         or prev["price"] != entry["price"]
                         or not prev["name"]
                     ):

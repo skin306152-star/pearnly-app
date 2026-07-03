@@ -23,11 +23,11 @@ from services.ocr import gemini_models
 logger = logging.getLogger(__name__)
 
 SETTING_KEY = "ocr_engine_policy"
-MODES = ("direct35", "economy", "auto")
 _FAILSAFE_MODE = "direct35"
 
 # mode → tier 覆写表。direct35 不覆写(吃 env 默认全 3.5);economy 走 2.5 阶梯、
-# 兜底/升级臂仍 3.5(勾稽不平/低置信才花大钱)。加新模式先补这里再补 cost 价表。
+# 兜底/升级臂仍 3.5(勾稽不平/低置信才花大钱)。加新模式只补这里 + cost 价表,
+# CONCRETE_MODES/MODES 由本表派生(admin 路由校验同源,别再手抄档位清单)。
 MODE_MODEL_MAPS: Dict[str, Dict[str, str]] = {
     "direct35": {},
     "economy": {
@@ -37,6 +37,8 @@ MODE_MODEL_MAPS: Dict[str, Dict[str, str]] = {
         "escalate": "gemini-3.5-flash",
     },
 }
+CONCRETE_MODES = tuple(MODE_MODEL_MAPS)
+MODES = (*CONCRETE_MODES, "auto")
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "mode": "direct35",
@@ -48,7 +50,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "L": "direct35",
         "exempt": "direct35",
     },
-    # task → mode 覆写(空 = 跟全局)。task 名与 services/ocr/policy.OCR_TASKS 一致。
+    # task → mode 覆写(空 = 跟全局)。task 名与 services/ocr/contracts.OCR_TASKS 一致。
     "overrides_by_task": {},
 }
 
@@ -58,7 +60,7 @@ _ACTIVE_MODE: ContextVar[str] = ContextVar("ocr_engine_mode", default="")
 
 def load_config() -> Dict[str, Any]:
     """后台配置(缺省/故障回落 DEFAULT_CONFIG)。浅合并顶层键,别信部分写入的形状。"""
-    cfg = {k: v for k, v in DEFAULT_CONFIG.items()}
+    cfg = dict(DEFAULT_CONFIG)
     try:
         from services.platform_settings import store
 
@@ -99,9 +101,16 @@ def active_mode() -> str:
 
 @contextmanager
 def engine_context(task: str, plan_code: Optional[str] = None, is_exempt: bool = False):
-    """请求级策略生效域:进入时按 mode 下发模型覆写,退出时还原。yield 生效 mode。"""
+    """请求级策略生效域:进入时按 mode 下发模型覆写,退出时还原。yield 生效 mode。
+
+    已在生效域内(如 recognize/core 带套餐包过、日后又迁进 controller)则原样透传,
+    不许内层无套餐的 resolve 覆盖外层带套餐的结果。"""
+    active = _ACTIVE_MODE.get()
+    if active:
+        yield active
+        return
     mode = resolve_mode(task, plan_code=plan_code, is_exempt=is_exempt)
-    token = gemini_models.set_model_override(MODE_MODEL_MAPS.get(mode) or None)
+    token = gemini_models.set_model_override(MODE_MODEL_MAPS.get(mode))
     mode_token = _ACTIVE_MODE.set(mode)
     try:
         yield mode

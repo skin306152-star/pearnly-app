@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-services/ocr/cost.py · REFACTOR-WA-OCRSPLIT P-A(纯搬家 · 0 逻辑改)
+services/ocr/cost.py
 
-从 pipeline.py 抽出成本核算:Gemini 定价常量 + _compute_total_cost(汇总每页估算成本 → THB)。
-pipeline 文件头 re-export 回原命名空间 → 调用方 0 改动 · 对象身份不变。
+成本核算(内部观测账本,非用户计费——用户按页/字符扣积分,见 core.db 计费口径):
+按模型分价的 Google 官方单价表 + _compute_total_cost(按当前 env 档位模型计价)。
+pipeline 文件头 re-export 回原命名空间 → 调用方 0 改动。
 """
 
 from __future__ import annotations
 
 import os
-from typing import List
+from typing import List, Tuple
 
 from .schemas import PipelinePageResult
 
@@ -18,17 +19,29 @@ THB_PER_USD = float(os.environ.get("OCR_PIPELINE_THB_PER_USD", "35"))
 
 COST_VISION_PER_PAGE_USD = 0.00150
 
+# Google 官方单价(USD / 百万 token · 2026-05 价表)。前缀匹配,lite 排在 2.5-flash 前防误吞;
+# 换/加模型先补这行,内部账本才对得上真账单。3.5-flash 单价 ≈ 2.5 的 5x/3.6x——
+# 换模型省不省钱要按这里重算,别拿 token 数当钱数(2026-07-03 血泪)。
+MODEL_PRICES_PER_M_USD = {
+    "gemini-3.5-flash": (1.50, 9.00),
+    "gemini-2.5-flash-lite": (0.10, 0.40),
+    "gemini-2.5-flash": (0.30, 2.50),
+}
 
-COST_FLASHLITE_INPUT_PER_M_USD = 0.10
+# 旧常量名保留(pipeline re-export 契约):按历史档位口径取值的别名。
+COST_FLASHLITE_INPUT_PER_M_USD, COST_FLASHLITE_OUTPUT_PER_M_USD = MODEL_PRICES_PER_M_USD[
+    "gemini-2.5-flash-lite"
+]
+COST_FLASH_INPUT_PER_M_USD, COST_FLASH_OUTPUT_PER_M_USD = MODEL_PRICES_PER_M_USD["gemini-2.5-flash"]
 
 
-COST_FLASHLITE_OUTPUT_PER_M_USD = 0.40
-
-
-COST_FLASH_INPUT_PER_M_USD = 0.30
-
-
-COST_FLASH_OUTPUT_PER_M_USD = 2.50
+def price_per_m_usd(model: str) -> Tuple[float, float]:
+    """模型名 → (输入, 输出) USD/百万token。未知模型按 3.5-flash 计(观测宁高勿低)。"""
+    name = (model or "").strip()
+    for prefix, price in MODEL_PRICES_PER_M_USD.items():
+        if name.startswith(prefix):
+            return price
+    return MODEL_PRICES_PER_M_USD["gemini-3.5-flash"]
 
 
 def _compute_total_cost(page_results: List[PipelinePageResult]) -> float:
@@ -39,20 +52,23 @@ def _compute_total_cost(page_results: List[PipelinePageResult]) -> float:
           ran (layer_chain starts with "L1"). When text_path (Layer 0)
           hit and Vision was skipped, layer_chain starts with "text" and
           no Vision cost is added.
-        - Flash-Lite cost = (input * 0.10 + output * 0.40) / 1M tokens, USD
-        - Flash cost = (input * 0.30 + output * 2.50) / 1M tokens, USD
+        - L2 tokens 按当前 flash_lite 档模型计价、L3 按升级档(escalate)模型计价,
+          档位换模型后账本自动跟价(2026-07-03 起两档默认都是 3.5-flash)。
         - Then * THB_PER_USD (default 35)
     """
+    from services.ocr import gemini_models
+
+    l2_in, l2_out = price_per_m_usd(gemini_models.flash_lite())
+    l3_in, l3_out = price_per_m_usd(gemini_models.escalate() or gemini_models.flash())
     total_usd = 0.0
     for pr in page_results:
         # Vision per-page — only when L1 actually ran (skipped for text_path)
         if "L1" in pr.layer_chain:
             total_usd += COST_VISION_PER_PAGE_USD
-        # Flash-Lite (always runs)
-        total_usd += (pr.layer2_input_tokens / 1_000_000.0) * COST_FLASHLITE_INPUT_PER_M_USD
-        total_usd += (pr.layer2_output_tokens / 1_000_000.0) * COST_FLASHLITE_OUTPUT_PER_M_USD
-        # Flash (only if L3 ran successfully — tokens > 0 means it ran)
+        total_usd += (pr.layer2_input_tokens / 1_000_000.0) * l2_in
+        total_usd += (pr.layer2_output_tokens / 1_000_000.0) * l2_out
+        # L3 tokens > 0 means the escalation arm ran
         if pr.layer3_input_tokens or pr.layer3_output_tokens:
-            total_usd += (pr.layer3_input_tokens / 1_000_000.0) * COST_FLASH_INPUT_PER_M_USD
-            total_usd += (pr.layer3_output_tokens / 1_000_000.0) * COST_FLASH_OUTPUT_PER_M_USD
+            total_usd += (pr.layer3_input_tokens / 1_000_000.0) * l3_in
+            total_usd += (pr.layer3_output_tokens / 1_000_000.0) * l3_out
     return total_usd * THB_PER_USD

@@ -97,5 +97,36 @@ class SourceRefsNullToleranceTests(unittest.TestCase):
         self.assertIn("vat", inv.source_refs)
 
 
+class DocumentTypeEvidenceTests(unittest.TestCase):
+    """守门:银行/电商截图证据类型须直通,不被吞成 other(2026-07-03 契约裂缝根因)。
+
+    真因:layer2_prompts 教 Gemini 输出 payment_evidence/order_evidence,但 ThaiInvoice
+    的 Literal + _coerce allowed 集漏了这两值 → 强转成 "other",judge_direction 的证据分支
+    在真实管线变死分支,卡片只显「其他」。补进枚举后两值直通、下游按证据分流。
+    """
+
+    def test_payment_evidence_survives(self):
+        self.assertEqual(
+            ThaiInvoice(seller_name="x", document_type="payment_evidence").document_type,
+            "payment_evidence",
+        )
+
+    def test_order_evidence_survives(self):
+        self.assertEqual(
+            ThaiInvoice(seller_name="x", document_type="order_evidence").document_type,
+            "order_evidence",
+        )
+
+    def test_unknown_still_coerced_to_other(self):
+        self.assertEqual(
+            ThaiInvoice(seller_name="x", document_type="ใบอะไรก็ไม่รู้").document_type, "other"
+        )
+
+    def test_null_defaults_tax_invoice(self):
+        self.assertEqual(
+            ThaiInvoice(seller_name="x", document_type=None).document_type, "tax_invoice"
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

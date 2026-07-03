@@ -129,13 +129,21 @@ class ThaiInvoice(BaseModel):
     """
 
     document_type: Literal[
-        "tax_invoice", "simplified_tax_invoice", "receipt", "credit_note", "other"
+        "tax_invoice",
+        "simplified_tax_invoice",
+        "receipt",
+        "credit_note",
+        "payment_evidence",
+        "order_evidence",
+        "other",
     ] = Field(
         default="tax_invoice",
         description="document type. tax_invoice = full Thai tax invoice "
         "(ใบกำกับภาษีเต็มรูป, can claim input VAT, legal invoice no required); "
         "simplified_tax_invoice = ใบกำกับภาษีอย่างย่อ/ABB (POS slip, no legal "
-        "invoice no, cannot claim VAT); receipt/credit_note/other otherwise",
+        "invoice no, cannot claim VAT); payment_evidence = bank/PromptPay transfer "
+        "slip (proves payment, not a tax doc); order_evidence = e-commerce order "
+        "screenshot; receipt/credit_note/other otherwise",
     )
     is_not_invoice: bool = Field(
         default=False,
@@ -272,7 +280,15 @@ class ThaiInvoice(BaseModel):
         """Gemini may return null or an unexpected value; fall back to tax_invoice."""
         if v is None:
             return "tax_invoice"
-        allowed = {"tax_invoice", "simplified_tax_invoice", "receipt", "credit_note", "other"}
+        allowed = {
+            "tax_invoice",
+            "simplified_tax_invoice",
+            "receipt",
+            "credit_note",
+            "payment_evidence",
+            "order_evidence",
+            "other",
+        }
         return v if v in allowed else "other"
 
     @field_validator("source_refs", mode="before")

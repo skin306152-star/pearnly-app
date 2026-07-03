@@ -34,6 +34,35 @@ def _safe_line(lang: str) -> str:
     return _SAFE_FALLBACK.get(lang, _SAFE_FALLBACK["en"])
 
 
+def _say_with_chips(bound_user, reply_token, body, user_text, lang, tid, line_user_id, quote_token):
+    """带 quick-reply chips 的文本回复(P2·教用户能问什么)。
+    闸关/发送失败/任何异常 → False,调用方走纯文本 say——chips 是锦上添花,绝不许丢回复。"""
+    try:
+        from services.agent import quick_chips
+
+        if not quick_chips.enabled_for(str((bound_user or {}).get("id") or "")):
+            return False
+        from services.line_binding import line_reply
+
+        msg = {
+            "type": "text",
+            "text": str(body),
+            "quickReply": quick_chips.quick_reply(user_text, lang),
+        }
+        return bool(
+            line_reply.reply_messages_context(
+                reply_token,
+                [msg],
+                line_user_id=line_user_id,
+                tenant_id=tid,
+                quote_token=quote_token or "",
+            )
+        )
+    except Exception:
+        logger.warning("[line agent] chips reply failed; plain text", exc_info=True)
+        return False
+
+
 def _l1_rescue_draft(text: str):
     """大脑故障时的分级兜底判定:只对「无 LLM 也能确定性解析」的清晰单笔记账句放行 L1 直录。
 
@@ -97,7 +126,10 @@ def route_gated(
     )
     if res.kind == "reply":
         charge()
-        say(res.text)
+        if not _say_with_chips(
+            bound_user, reply_token, res.text, text, lang, tid, line_user_id, quote_token
+        ):
+            say(res.text)
         return "consumed"
     if res.kind == "card_sent":
         charge()
@@ -124,7 +156,11 @@ def route_gated(
                 return "consumed"
             except Exception:
                 logger.warning("[line agent] L1 rescue failed; safe fallback", exc_info=True)
-        say(_safe_line(lang))
+        # 安全兜底带 chips 最有用:用户正不知道能干嘛,给 2-3 个可点的下一步
+        if not _say_with_chips(
+            bound_user, reply_token, _safe_line(lang), text, lang, tid, line_user_id, quote_token
+        ):
+            say(_safe_line(lang))
         return "consumed"
     # defer_record / defer_edit → 交旧路对应确定性能力,并把裁决一起交回(防二次误判)。
     return res.kind

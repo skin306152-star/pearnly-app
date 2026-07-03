@@ -389,4 +389,11 @@
 .dmsx .dx-erp-card.is-connected .dx-erp-status{color:var(--dx-green)}
 .dmsx .dx-erp-cta{font-size:12px;font-weight:600;color:var(--dx-brand);white-space:nowrap;padding:7px 14px;border:1px solid var(--dx-brand);border-radius:10px;background:var(--dx-brand-soft)}
 .dmsx .dx-erp-card.is-connected .dx-erp-cta{color:var(--ink2);border-color:var(--dx-line);background:var(--card)}
+.dmsx .dx-erp-card{cursor:default}
+.dmsx .dx-erp-card.is-disabled{opacity:.72}
+.dmsx .dx-erp-card.is-disabled .dx-erp-status{color:var(--ink2)}
+.dmsx .dx-erp-acts{display:flex;gap:8px;align-items:center}
+.dmsx .dx-erp-cta{cursor:pointer}
+.dmsx .dx-erp-toggle{font-size:12px;font-weight:600;color:var(--ink2);white-space:nowrap;padding:7px 12px;border:1px solid var(--dx-line);border-radius:10px;background:var(--card);cursor:pointer}
+.dmsx .dx-erp-toggle:hover{border-color:var(--dx-brand);color:var(--dx-brand)}
 @media (max-width:700px){.dmsx .dx-erp-row{grid-template-columns:1fr}}

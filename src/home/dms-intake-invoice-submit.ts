@@ -93,16 +93,14 @@ function erpTargetsHtml() {
             `<button class="btn" id="dx-inv-go-int">${esc(t('dxi-erp-empty-btn'))}</button></div>`
         );
     }
-    const cards = IV.endpoints
+    // 停用端点不显示(启用/停用是「同批不误投多个 ERP」的闸)· 只在已启用里选一个手动推送目标。
+    const cards = enabled
         .map((e) => {
-            const dis = e.enabled === false;
-            const on = !dis && String(e.id) === IV.target ? ' active' : '';
+            const on = String(e.id) === IV.target ? ' active' : '';
             const lg = (e.adapter || '').slice(0, 2).toUpperCase();
-            const meta = dis
-                ? t('dxi-erp-disabled')
-                : (e.is_default ? t('dxi-erp-default') + ' · ' : '') + t('dxi-erp-enabled');
+            const meta = (e.is_default ? t('dxi-erp-default') + ' · ' : '') + t('dxi-erp-enabled');
             return (
-                `<div class="dx-erp${on}${dis ? ' dis' : ''}"${dis ? '' : ` data-iv-erp="${esc(e.id)}"`}>` +
+                `<div class="dx-erp${on}" data-iv-erp="${esc(e.id)}">` +
                 `<div class="dx-erp-lg">${esc(lg)}</div>` +
                 `<div class="dx-erp-c"><b>${esc(e.name || e.adapter)}</b><span>${esc(meta)}</span></div>` +
                 '<div class="dx-erp-chk">✓</div></div>'

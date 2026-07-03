@@ -1,8 +1,10 @@
 // ============================================================
 // 录入工作台 · 上下文 ERP 连接卡(按任务)
 // 发票/收据录入 → MR.ERP(财务)+ Express;身份证→DMS 客户 → MR.ERP DMS。
-// 卡片显示连接状态 · 点击开对应连接向导(全局入口,不与重卡片模块耦合)。
-// 状态来自 /api/erp/endpoints(data.items) · 卡片交互 hover 放大见 home-49-dms-intake.css。
+// 卡片显示连接状态 + 启用/停用开关 · 点「配置」开对应连接向导。
+// 启用/停用是「同批票据不误投多个 ERP」的闸:停用 → 第四步推送面板不显示该端点、
+//   自动推送后端也按 enabled=TRUE 过滤(services/erp/push_store.list_erp_endpoints)。
+// 状态来自 /api/erp/endpoints(data.items) · toggle 走 PATCH {enabled} 并刷新全局端点缓存。
 // ============================================================
 import { esc, authHeaders } from './dms-intake-core.js';
 
@@ -29,22 +31,66 @@ const ICONS: Record<string, string> = {
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="22" height="22"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.1"/><path d="M6 16c.7-1.4 1.9-2.1 3-2.1s2.3.7 3 2.1M14 10h4M14 14h4"/></svg>',
 };
 
+type WinBridge = {
+    t?: (k: string) => string;
+    pearnlyConfirm?: (msg: string, title?: string) => Promise<boolean>;
+    _refreshErpEndpointsCache?: () => void;
+};
+
 function T(k: string): string {
-    const w = window as unknown as { t?: (k: string) => string };
+    const w = window as unknown as WinBridge;
     return typeof w.t === 'function' ? w.t(k) : k;
 }
 
+type EpRec = Record<string, unknown> & { id?: string; enabled?: boolean };
+
+function isEnabled(ep: EpRec | null): boolean {
+    return !!ep && ep.enabled !== false;
+}
+
 function cardHtml(def: ErpCardDef): string {
+    // 骨架:图标 + 名称 + 状态占位 + 动作区(状态拉回后由 fillCard 填按钮)。
     return (
-        `<div class="dx-erp-card" data-erp="${esc(def.adapter)}" role="button" tabindex="0">` +
+        `<div class="dx-erp-card" data-erp="${esc(def.adapter)}">` +
         `<div class="dx-erp-ic">${ICONS[def.key] || ''}</div>` +
         '<div class="dx-erp-info">' +
         `<b>${esc(def.name)}</b>` +
         `<span class="dx-erp-status" data-erp-status>${esc(T('dx-erp-checking'))}</span>` +
         '</div>' +
-        `<span class="dx-erp-cta" data-erp-cta>${esc(T('dx-erp-connect'))}</span>` +
+        '<div class="dx-erp-acts" data-erp-acts></div>' +
         '</div>'
     );
+}
+
+// 依端点状态填充单张卡的状态徽章 + 动作按钮。
+function fillCard(card: HTMLElement, ep: EpRec | null): void {
+    (card as unknown as { _ep: EpRec | null })._ep = ep;
+    const st = card.querySelector<HTMLElement>('[data-erp-status]');
+    const acts = card.querySelector<HTMLElement>('[data-erp-acts]');
+    const enabled = isEnabled(ep);
+    card.classList.toggle('is-connected', !!ep && enabled);
+    card.classList.toggle('is-disabled', !!ep && !enabled);
+
+    if (st) {
+        st.textContent = !ep
+            ? T('dx-erp-not-connected')
+            : enabled
+              ? T('dx-erp-connected')
+              : T('dx-erp-disabled');
+    }
+    if (!acts) return;
+    if (!ep) {
+        acts.innerHTML = `<button type="button" class="dx-erp-cta" data-erp-config>${esc(
+            T('dx-erp-connect')
+        )}</button>`;
+        return;
+    }
+    // 已配置:启用/停用 + 配置。toggle 在前、配置在后(对齐老连接卡按钮顺序)。
+    acts.innerHTML =
+        `<button type="button" class="dx-erp-toggle" data-erp-toggle>${esc(
+            T(enabled ? 'dx-erp-disable' : 'dx-erp-enable')
+        )}</button>` +
+        `<button type="button" class="dx-erp-cta" data-erp-config>${esc(T('dx-erp-config'))}</button>`;
 }
 
 function openWizardFor(adapter: string, ep: unknown): void {
@@ -56,22 +102,49 @@ function openWizardFor(adapter: string, ep: unknown): void {
     else if (adapter === 'mrerp_dms') w._mrerpDmsOpenWizard?.(ep || null);
 }
 
-function bindClicks(zone: HTMLElement): void {
-    zone.querySelectorAll<HTMLElement>('.dx-erp-card').forEach((card) => {
-        const fire = () =>
-            openWizardFor(card.dataset.erp || '', (card as unknown as { _ep?: unknown })._ep);
-        card.addEventListener('click', fire);
-        card.addEventListener('keydown', (e) => {
-            if ((e as KeyboardEvent).key === 'Enter' || (e as KeyboardEvent).key === ' ') {
-                e.preventDefault();
-                fire();
-            }
+async function toggleEndpoint(card: HTMLElement): Promise<void> {
+    const ep = (card as unknown as { _ep?: EpRec | null })._ep || null;
+    if (!ep || !ep.id) return;
+    const enabling = !isEnabled(ep);
+    const w = window as unknown as WinBridge;
+    if (!enabling && typeof w.pearnlyConfirm === 'function') {
+        const ok = await w.pearnlyConfirm(T('dx-erp-confirm-disable'));
+        if (!ok) return;
+    }
+    try {
+        const r = await fetch(`/api/erp/endpoints/${encodeURIComponent(ep.id)}`, {
+            method: 'PATCH',
+            headers: authHeaders(true),
+            body: JSON.stringify({ enabled: enabling }),
         });
+        if (!r.ok) throw new Error('http_' + r.status);
+        // 单一状态源:刷新全局端点缓存 → 第四步推送面板/自动推送 picker 立刻反映启停(铁律 #12)。
+        if (typeof w._refreshErpEndpointsCache === 'function') w._refreshErpEndpointsCache();
+        fillCard(card, { ...ep, enabled: enabling });
+    } catch {
+        /* 网络/权限失败:保持原状,不误显启停成功 */
+    }
+}
+
+function bindClicks(zone: HTMLElement): void {
+    zone.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        const card = target.closest<HTMLElement>('.dx-erp-card');
+        if (!card) return;
+        if (target.closest('[data-erp-toggle]')) {
+            e.preventDefault();
+            void toggleEndpoint(card);
+            return;
+        }
+        if (target.closest('[data-erp-config]')) {
+            e.preventDefault();
+            openWizardFor(card.dataset.erp || '', (card as unknown as { _ep?: unknown })._ep);
+        }
     });
 }
 
 async function loadStatus(zone: HTMLElement, defs: ErpCardDef[]): Promise<void> {
-    let items: Array<Record<string, unknown>> = [];
+    let items: EpRec[] = [];
     try {
         const r = await fetch('/api/erp/endpoints', { headers: authHeaders() });
         if (r.ok) {
@@ -85,18 +158,7 @@ async function loadStatus(zone: HTMLElement, defs: ErpCardDef[]): Promise<void> 
         const card = zone.querySelector<HTMLElement>(`[data-erp="${def.adapter}"]`);
         if (!card) return;
         const ep = items.find((e) => String(e.adapter || '').toLowerCase() === def.adapter) || null;
-        (card as unknown as { _ep: unknown })._ep = ep;
-        const st = card.querySelector('[data-erp-status]');
-        const cta = card.querySelector('[data-erp-cta]');
-        if (ep) {
-            card.classList.add('is-connected');
-            if (st) st.textContent = T('dx-erp-connected');
-            if (cta) cta.textContent = T('dx-erp-config');
-        } else {
-            card.classList.remove('is-connected');
-            if (st) st.textContent = T('dx-erp-not-connected');
-            if (cta) cta.textContent = T('dx-erp-connect');
-        }
+        fillCard(card, ep);
     });
 }
 

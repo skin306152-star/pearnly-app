@@ -33,6 +33,17 @@ test.describe('录入工作台 · 上下文 ERP 连接卡', () => {
         ).toBeVisible();
         await expect(zone.locator('.dx-erp-card'), '发票任务两卡').toHaveCount(2);
 
+        // 每张卡都有动作按钮(未连接=「连接」· 已连接=「配置」· 均带 data-erp-config)。
+        // 「启用/停用」toggle 仅在已配置端点时出现 → 走人工 live 验(依赖真端点),不进 CI 断言。
+        await expect(
+            zone.locator('.dx-erp-card[data-erp="mrerp"] [data-erp-config]'),
+            'MR.ERP 卡有动作按钮'
+        ).toBeVisible();
+        await expect(
+            zone.locator('.dx-erp-card[data-erp="express"] [data-erp-config]'),
+            'Express 卡有动作按钮'
+        ).toBeVisible();
+
         // 切「身份证→DMS 客户」任务 → 只剩 MR.ERP DMS 一卡
         await page.locator('.dx-opt[data-task="identity"]').click();
         await expect(

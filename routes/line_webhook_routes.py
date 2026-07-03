@@ -465,9 +465,19 @@ async def line_webhook(request: Request):
         logger.error(f"[line_webhook] JSON 解析失败: {e}")
         return {"status": "bad_json"}
 
+    from services.line_binding import line_webhook_dedup
+
     events = payload.get("events") or []
     for ev in events:
         try:
+            # LINE redelivery 会原样重投:按 webhookEventId 原子判重,重投整个跳过
+            # (at-most-once:文本直录无消息级幂等,双记账比丢一条伤害大)。
+            if line_webhook_dedup.seen_before(ev.get("webhookEventId")):
+                logger.info(
+                    "[line_webhook] duplicate event skipped id=%s",
+                    str(ev.get("webhookEventId"))[:24],
+                )
+                continue
             await _handle_line_event(ev)
         except Exception as e:
             logger.error(f"[line_webhook] 事件处理异常: {e}")

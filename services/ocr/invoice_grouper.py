@@ -15,6 +15,8 @@ Pearnly · v0.11 发票智能分组模块
 - notes:拼接(换行分隔)
 """
 
+import re
+from difflib import SequenceMatcher
 from typing import List, Dict, Any
 
 
@@ -36,56 +38,114 @@ def _first_non_empty(pages: List[Dict], field: str):
     return None
 
 
+def _norm_name(v: Any) -> str:
+    """去掉全部空白再比对:同一联的泰文行被 OCR 读出碎空格(ราคา ส่ง vs ราคาส่ง)
+    是双联去重失手的头号原因(INV2026030002 实案 2026-07-03)。"""
+    return "".join(str(v or "").split())
+
+
+def _norm_qty(v: Any) -> str:
+    """取数量的数字部分:两联的同一行常被读成 "1" 与 "1 ก้อน"(单位词时有时无)。"""
+    m = re.match(r"\s*([\d.,]*\d)", str(v or ""))
+    return m.group(1).replace(",", "") if m else str(v or "").strip()
+
+
+def _norm_price(v: Any) -> str:
+    s = str(v or "").strip().replace(",", "")
+    try:
+        return f"{float(s):.2f}"
+    except ValueError:
+        return s
+
+
+def _keep_longer_name(entry: Dict, raw_name: str, norm_name: str) -> None:
+    """判重命中时保留更长的 name(通常更详细)。"""
+    if len(raw_name) > len(str(entry["item"].get("name", "") or "").strip()):
+        entry["item"]["name"] = raw_name
+        entry["name"] = norm_name
+
+
 def _merge_items(pages: List[Dict]) -> List[Dict]:
-    """把多页的 items 拼接 · v88 · 跨页去重
-    规则:
-    1) 严格:(name, qty, price) 完全相同 → 重复
+    """把多页的 items 拼接 · v88 · 跨页去重(2026-07-03 归一化+复写联加强)
+    规则(比对全部先归一化:name 去空白 · qty 取数字 · price 数值化 —— 双联的同一行
+    常被 OCR 读成「ราคา ส่ง / 1」与「ราคาส่ง / 1 ก้อน」,原样比对必失手):
+    1) 严格:(name, qty, price) 归一化后相同 → 重复
     2) 松散:qty+price 相同 · 且一方 name 是另一方子串 → 重复(保留更长 name)
-    这对多页发票(ใบส่งสินค้า + ใบเสร็จรับเงิน)常见的「第 2 页商品重复印一次」场景有效
+    3) 复写联模糊:本页过半行已被 1/2 判重(证明这页是同票复写联)时,剩余行按
+       qty+price 相同 + name 相似度 ≥0.9 并入前页最相近行 —— 兜住复写联上被 OCR
+       读出错字的行(นครสวรรค์ vs นครสวรรศ์ · INV2026030002 实案 5 行存成 10 行)。
+       正常多页发票各页行互不重复,永远到不了这一步,不会误合口味变体。
     """
-    merged: List[Dict] = []
+    entries: List[Dict] = []  # {"item","name","qty","price","page_pos"}
     seen_strict = set()
-    for p in pages:
+    for page_pos, p in enumerate(pages):
         f = p.get("fields") or {}
         items = f.get("items") or []
         if not isinstance(items, list):
             continue
+        page_new: List[Dict] = []
+        n_items = 0
+        n_dup = 0
         for it in items:
             if not isinstance(it, dict):
                 continue
-            name = str(it.get("name", "") or "").strip()
-            qty = str(it.get("qty", "") or "").strip()
-            price = str(it.get("price", "") or "").strip()
+            n_items += 1
+            name = _norm_name(it.get("name"))
+            qty = _norm_qty(it.get("qty"))
+            price = _norm_price(it.get("price"))
 
             # 严格去重
-            key = (name, qty, price)
-            if key in seen_strict:
+            if (name, qty, price) in seen_strict:
+                n_dup += 1
                 continue
 
             # 松散去重:qty+price 相同 · name 子串关系
+            dup_of = None
             if name and (qty or price):
-                is_dup = False
-                for prev in merged:
-                    pname = str(prev.get("name", "") or "").strip()
-                    pqty = str(prev.get("qty", "") or "").strip()
-                    pprice = str(prev.get("price", "") or "").strip()
+                for prev in entries:
                     if (
-                        pqty == qty
-                        and pprice == price
-                        and pname
-                        and (name in pname or pname in name)
+                        prev["qty"] == qty
+                        and prev["price"] == price
+                        and prev["name"]
+                        and (name in prev["name"] or prev["name"] in name)
                     ):
-                        is_dup = True
-                        # 保留更长的 name(通常更详细)
-                        if len(name) > len(pname):
-                            prev["name"] = name
+                        dup_of = prev
                         break
-                if is_dup:
-                    continue
+            if dup_of is not None:
+                n_dup += 1
+                _keep_longer_name(dup_of, str(it.get("name", "") or "").strip(), name)
+                continue
 
-            seen_strict.add(key)
-            merged.append(it)
-    return merged
+            entry = {"item": it, "name": name, "qty": qty, "price": price, "page_pos": page_pos}
+            seen_strict.add((name, qty, price))
+            entries.append(entry)
+            page_new.append(entry)
+
+        # 复写联判定:本页 ≥2 行且过半已判重 → 剩余行大概率是同一联被 OCR 读出错字,
+        # 对每行找前页 qty+price 相同的最相近行,相似度 ≥0.9 才并入(取最优,不取先到)。
+        if n_items >= 2 and n_dup * 2 >= n_items and page_new:
+            for entry in page_new:
+                if not entry["name"]:
+                    continue
+                best, best_ratio = None, 0.0
+                for prev in entries:
+                    if (
+                        prev["page_pos"] == page_pos
+                        or prev["qty"] != entry["qty"]
+                        or prev["price"] != entry["price"]
+                        or not prev["name"]
+                    ):
+                        continue
+                    ratio = SequenceMatcher(None, entry["name"], prev["name"]).ratio()
+                    if ratio > best_ratio:
+                        best, best_ratio = prev, ratio
+                if best is not None and best_ratio >= 0.9:
+                    _keep_longer_name(
+                        best, str(entry["item"].get("name", "") or "").strip(), entry["name"]
+                    )
+                    entries.remove(entry)
+
+    return [e["item"] for e in entries]
 
 
 def _build_invoice_from_pages(pages_group: List[Dict]) -> Dict[str, Any]:
@@ -103,6 +163,8 @@ def _build_invoice_from_pages(pages_group: List[Dict]) -> Dict[str, Any]:
         "buyer_tax": _first_non_empty(pages_group, "buyer_tax"),
         "buyer_addr": _first_non_empty(pages_group, "buyer_addr"),
         "subtotal": _first_non_empty(pages_group, "subtotal"),
+        # 折扣必须随行:漏了它下游税基虚高、勾稽不平(f003 实案 2026-07-03)
+        "discount": _first_non_empty(pages_group, "discount"),
         "vat": _first_non_empty(pages_group, "vat"),
         "total_amount": _first_non_empty(pages_group, "total_amount"),
         "category": _first_non_empty(pages_group, "category"),

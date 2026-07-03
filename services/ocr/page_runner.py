@@ -29,7 +29,7 @@ from .layer3_fallback import (
     refine_page as _l3_refine_page,
 )
 from .pattern_memory import InvoicePatternMemory
-from .sanity import evaluate_sanity
+from .sanity import evaluate_sanity, infer_missing_discount
 from .schemas import BusinessDocumentType, Page, PipelinePageResult
 from .triggers import (
     _aggregate_page_confidence,
@@ -183,6 +183,12 @@ def _process_one_page(
         validation_warnings.extend(validate_bank_document(l2_document, l1_page))
     elif document_type in ("auto", "invoice"):
         validation_warnings.extend(validate_invoice(l2_invoice, l1_page))
+
+    # 折扣确定性反推(f003 实案):漏抓折扣的票先把数据修平再评触发,免白跑一趟 L3。
+    if document_type in ("auto", "invoice") and not l2_invoice.is_not_invoice:
+        _disc_note = infer_missing_discount(l2_invoice)
+        if _disc_note:
+            validation_warnings.append(_disc_note)
 
     # --- Trigger evaluation (invoice path only — non-invoice docs use validators) ---
     # triggers gate the slow L3 visual re-read; soft_flags only lower confidence
@@ -361,6 +367,16 @@ def _process_one_page(
             )
             validation_warnings.append(reason)
             needs_manual_review = True
+
+    # L3/image-first 换了新 invoice 的话,对最终结果再反推一次折扣(视觉复读同样可能漏抓)。
+    if (
+        document_type in ("auto", "invoice")
+        and invoice is not l2_invoice
+        and not invoice.is_not_invoice
+    ):
+        _disc_note = infer_missing_discount(invoice)
+        if _disc_note:
+            validation_warnings.append(_disc_note)
 
     # 合理性硬闸(2026-06-29 · sanity.evaluate_sanity):对【最终】invoice 查结构上不可能的错
     # (负数/卖买税号相同/总额<单行/缺VAT勾稽不平)。命中 → 强制转人工,绝不静默 auto。

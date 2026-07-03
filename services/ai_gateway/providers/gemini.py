@@ -22,6 +22,7 @@ def _resolve_model(model_tier: str) -> str:
         "flash_lite": gemini_models.flash_lite,
         "best": gemini_models.best,
         "fallback": gemini_models.fallback,
+        "brain": gemini_models.brain,
     }.get(model_tier, gemini_models.flash)()
 
 

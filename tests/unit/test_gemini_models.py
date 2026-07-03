@@ -33,9 +33,18 @@ class GeminiModelsTests(unittest.TestCase):
                 os.environ[k] = v
 
     def test_defaults(self):
-        self.assertEqual(gm.flash(), "gemini-2.5-flash")
-        self.assertEqual(gm.flash_lite(), "gemini-2.5-flash-lite")
+        # 2026-07-03 拍板:OCR 主力 3.5-flash(57 真件实测);大脑独立档钉 2.5。
+        self.assertEqual(gm.flash(), "gemini-3.5-flash")
+        self.assertEqual(gm.flash_lite(), "gemini-3.5-flash")
         self.assertEqual(gm.fallback(), "gemini-3.5-flash")
+        self.assertEqual(gm.brain(), "gemini-2.5-flash")
+
+    def test_brain_env_override(self):
+        os.environ["AGENT_BRAIN_MODEL"] = "gemini-z"
+        try:
+            self.assertEqual(gm.brain(), "gemini-z")
+        finally:
+            os.environ.pop("AGENT_BRAIN_MODEL", None)
 
     def test_env_override(self):
         os.environ["OCR_FLASH_MODEL"] = "gemini-x"
@@ -44,15 +53,16 @@ class GeminiModelsTests(unittest.TestCase):
         self.assertEqual(gm.fallback(), "gemini-y")
 
     def test_models_with_fallback_order_and_dedup(self):
+        # 默认 primary == fallback(都 3.5)→ 去重成单模型
+        self.assertEqual(gm.models_with_fallback(), ["gemini-3.5-flash"])
+        # primary != fallback → 按 [主, 兜底] 顺序
+        os.environ["OCR_FLASH_MODEL"] = "gemini-2.5-flash"
         self.assertEqual(gm.models_with_fallback(), ["gemini-2.5-flash", "gemini-3.5-flash"])
-        # primary == fallback → 不重复
-        os.environ["OCR_FALLBACK_MODEL"] = "gemini-2.5-flash"
-        self.assertEqual(gm.models_with_fallback(), ["gemini-2.5-flash"])
 
     def test_fallback_disabled(self):
         os.environ["OCR_FALLBACK_MODEL"] = ""
         self.assertEqual(gm.fallback(), "")
-        self.assertEqual(gm.models_with_fallback(), ["gemini-2.5-flash"])
+        self.assertEqual(gm.models_with_fallback(), ["gemini-3.5-flash"])
 
     def test_escalate_defaults_to_fallback(self):
         # image-first 升级臂默认 = fallback(3.5-flash),不另起档位。
@@ -67,6 +77,7 @@ class GeminiModelsTests(unittest.TestCase):
         self.assertEqual(gm.escalate(), "gemini-fb")
 
     def test_try_escalates_on_primary_failure(self):
+        os.environ["OCR_FLASH_MODEL"] = "gemini-2.5-flash"  # 造出 [主, 兜底] 两档梯子
         tried = []
 
         def call(m):
@@ -80,6 +91,8 @@ class GeminiModelsTests(unittest.TestCase):
         self.assertEqual(tried, ["gemini-2.5-flash", "gemini-3.5-flash"])
 
     def test_try_escalates_on_unacceptable_result(self):
+        os.environ["OCR_FLASH_MODEL"] = "gemini-2.5-flash"
+
         # 主模型返回空 → 视为不可接受 → 升级
         def call(m):
             return [] if m == "gemini-2.5-flash" else [1, 2, 3]
@@ -101,7 +114,7 @@ class GeminiModelsTests(unittest.TestCase):
             return {"ok": True}
 
         gm.try_with_fallback(call, label="t")
-        self.assertEqual(tried, ["gemini-2.5-flash"])  # 兜底未被调用
+        self.assertEqual(tried, ["gemini-3.5-flash"])  # 兜底未被调用(默认主=兜底·单档)
 
 
 if __name__ == "__main__":

@@ -3,16 +3,16 @@
 services/ocr/layer2_gemini.py · REFACTOR-WA-OCRSPLIT L2-A(纯搬家·0 逻辑改)
 
 从 layer2_structure.py 抽出的 Gemini 传输/解析纯 helper(无 prompt/抽取算法耦合):
-  Layer2Error 及 3 子类 · _parse_json · _classify_gemini_exception ·
-  model 懒加载单例(_model_cache/_model_lock/_get_model)+ 2 个模型配置常量。
+  Layer2Error 及 3 子类 · _parse_json · _classify_gemini_exception + 2 个模型配置常量。
 layer2_structure 文件头 re-export 回原命名空间 → 调用方 / COV4 单测 0 改动 · 对象身份不变。
+模型调用一律经 model_client→ai_gateway(2026-07-03 收口,aistudio 直连 SDK 老路删除,
+aistudio 后端由 providers/aistudio.py 承接,埋点/解析/重试口径一致)。
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import threading
 from typing import Optional, Tuple
 
 from .layer2_prompts import (
@@ -155,58 +155,6 @@ def _classify_gemini_exception(e: Exception) -> Exception:
     return Layer2Error(f"layer2: {name}: {msg}")
 
 
-_model_cache: dict = {}
-
-
-_model_lock = threading.Lock()
-
-
-def _get_model(api_key: str, model_name: str):
-    """Return a GenerativeModel for the given (api_key, model_name).
-
-    Cached up to 10 distinct combinations to bound memory. Each cache entry
-    is a fully-configured GenerativeModel (handles its own connection pool
-    internally so we don't need a separate lock for usage, only for init).
-    """
-    cache_key = (api_key, model_name)
-
-    if cache_key in _model_cache:
-        return _model_cache[cache_key]
-
-    with _model_lock:
-        if cache_key in _model_cache:
-            return _model_cache[cache_key]
-
-        try:
-            import google.generativeai as genai
-        except ImportError as e:
-            raise ImportError(
-                "layer2: google-generativeai required. " "Install: pip install google-generativeai"
-            ) from e
-
-        # Note: direct endpoint (no Cloudflare proxy). If/when dev machine
-        # cannot reach generativelanguage.googleapis.com, plumb a proxy via
-        # env var rather than hardcoding here.
-        genai.configure(api_key=api_key)
-
-        model = genai.GenerativeModel(
-            model_name=model_name,
-            generation_config={
-                "temperature": DEFAULT_TEMPERATURE,
-                "max_output_tokens": DEFAULT_MAX_OUTPUT_TOKENS,
-                "response_mime_type": "application/json",
-            },
-        )
-
-        # Bound cache size — pop oldest if at limit
-        if len(_model_cache) >= 10:
-            _model_cache.pop(next(iter(_model_cache)))
-        _model_cache[cache_key] = model
-
-        logger.info("layer2: GenerativeModel initialized: %s", model_name)
-        return model
-
-
 def _record_gemini_call(success: bool, kind: Optional[str], ms: int) -> None:
     """监控埋点:保留 record_gemini_call 口径(网关后端 provider 不自带此埋点)。"""
     try:
@@ -230,29 +178,24 @@ def _l2_error_for_kind(kind: str, model_name: str) -> Exception:
 def _call_l2_via_gateway(
     base_prompt: str, api_key: str, model_name: str, max_retries: int, timeout: int
 ) -> Tuple[dict, dict]:
-    """非 aistudio 后端(vertex/selfhost):L2 文本→JSON 经网关 transport。保留
-    record_gemini_call 埋点 + (data, meta) 元组契约;auth/quota/transient 映射回
-    Layer2 异常,parse/empty 在重试预算内追加 _RETRY_TRIM_HINT 再试(同原逻辑)。"""
+    """L2 文本→JSON 经 model_client(全后端统一)。保留 record_gemini_call 埋点
+    + (data, meta) 元组契约;auth/quota/transient 映射回 Layer2 异常,
+    parse/empty 在重试预算内追加 _RETRY_TRIM_HINT 再试(同原逻辑)。"""
     import time as _t
 
-    from services.ai_gateway import transport
-    from services.ocr.gemini_models import tier_for_model
+    from services.ocr import model_client
 
-    tier = tier_for_model(model_name)
     last_kind = "parse"
     for attempt in range(max_retries + 1):
         prompt = base_prompt + (_RETRY_TRIM_HINT if attempt > 0 else "")
         t0 = _t.time()
-        out = transport.text_to_json(
+        out = model_client.json_from_text(
             prompt,
-            tier=tier,
-            api_key=api_key,
-            temperature=DEFAULT_TEMPERATURE,
-            response_mime=True,
-            max_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
-            timeout_s=timeout,
-            max_retries=0,
+            model_name=model_name,
             task="ocr.layer2",
+            api_key=api_key,
+            timeout_s=timeout,
+            max_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
         )
         _record_gemini_call(out.ok, out.error_kind, int((_t.time() - t0) * 1000))
         if out.ok:
@@ -299,104 +242,4 @@ def _call_gemini_with_retry(
 
         fewshot_hint = fewshot.maybe_block_for_text(text)
     base_prompt = sys_prompt + "\n\n" + fewshot_hint + _USER_PROMPT_PREFIX + text
-
-    from services.ai_gateway import backends
-
-    if not backends.is_aistudio():  # vertex / selfhost 经网关;默认 aistudio 走下方原路
-        return _call_l2_via_gateway(base_prompt, api_key, model_name, max_retries, timeout)
-
-    model = _get_model(api_key=api_key, model_name=model_name)
-
-    last_parse_error: Optional[str] = None
-    last_raw_preview: str = ""
-
-    for attempt in range(max_retries + 1):
-        # v118.35.0.5 · 重试时追加"精简输出"指令 · 救 token 上限截断场景
-        prompt = base_prompt + (_RETRY_TRIM_HINT if attempt > 0 else "")
-        # v118.35.0.25 · 埋点 · 记 Gemini 调用统计(给 Earn 监控面板 + LINE 告警用)
-        import time as _t_v25
-
-        _t_start = _t_v25.time()
-        try:
-            response = model.generate_content(
-                prompt,
-                request_options={"timeout": timeout},
-            )
-            try:
-                from services.monitoring import record_gemini_call as _rec
-
-                _rec(
-                    success=True, http_status=200, latency_ms=int((_t_v25.time() - _t_start) * 1000)
-                )
-            except Exception:
-                pass
-        except Exception as e:
-            try:
-                from services.monitoring import record_gemini_call as _rec
-
-                _http = 429 if ("ResourceExhausted" in type(e).__name__ or "429" in str(e)) else 500
-                _rec(
-                    success=False,
-                    http_status=_http,
-                    latency_ms=int((_t_v25.time() - _t_start) * 1000),
-                )
-            except Exception:
-                pass
-            # Network / auth / quota / unknown — classify and propagate
-            raise _classify_gemini_exception(e) from e
-
-        raw = (response.text or "").strip() if hasattr(response, "text") else ""
-
-        # Capture token usage (best effort)
-        input_tokens = 0
-        output_tokens = 0
-        try:
-            usage = getattr(response, "usage_metadata", None)
-            if usage is not None:
-                input_tokens = int(getattr(usage, "prompt_token_count", 0) or 0)
-                output_tokens = int(getattr(usage, "candidates_token_count", 0) or 0)
-        except Exception:  # pragma: no cover  (defensive only)
-            pass
-
-        if not raw:
-            last_parse_error = "empty response"
-            last_raw_preview = ""
-            logger.warning(
-                "layer2: empty response (attempt %d/%d)",
-                attempt + 1,
-                max_retries + 1,
-            )
-            if attempt < max_retries:
-                continue
-            raise ValueError(
-                f"layer2: Gemini returned empty response after " f"{max_retries + 1} attempts"
-            )
-
-        try:
-            data = _parse_json(raw)
-        except json.JSONDecodeError as e:
-            last_parse_error = str(e)
-            last_raw_preview = raw[:300]
-            logger.warning(
-                "layer2: JSON parse failed (attempt %d/%d): %s; raw[:200]=%r",
-                attempt + 1,
-                max_retries + 1,
-                e,
-                raw[:200],
-            )
-            if attempt < max_retries:
-                continue
-            raise ValueError(
-                f"layer2: Gemini returned invalid JSON after "
-                f"{max_retries + 1} attempts: {last_parse_error}; "
-                f"raw[:300]={last_raw_preview!r}"
-            ) from e
-
-        return data, {
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "retries": attempt,
-        }
-
-    # Defensive fallback (loop should always either return or raise above)
-    raise ValueError(f"layer2: unreachable; last parse error: {last_parse_error}")
+    return _call_l2_via_gateway(base_prompt, api_key, model_name, max_retries, timeout)

@@ -43,7 +43,7 @@ class RunTaskTests(unittest.TestCase):
         fp = FakeProvider(T.ProviderOutcome(ok=True, data={}))
         router.run_task("expense_category_choose", prompt="p", text="t", api_key="k", provider=fp)
         self.assertEqual(fp.calls[0]["timeout_s"], 12)  # task 默认
-        self.assertEqual(fp.calls[0]["model_tier"], "flash")
+        self.assertEqual(fp.calls[0]["model_tier"], "brain")  # LINE 通道挂大脑档(与 OCR 档独立)
         self.assertEqual(fp.calls[0]["max_retries"], 1)
 
     def test_timeout_override(self):

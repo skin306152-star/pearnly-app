@@ -69,7 +69,6 @@ from .layer2_gemini import (  # noqa: F401 · L2-A/L2-B 纯搬家 re-export(调�
     Layer2TransientError,
     _call_gemini_with_retry,
     _classify_gemini_exception,
-    _get_model,
     _parse_json,
 )
 
@@ -89,7 +88,9 @@ logger = logging.getLogger(__name__)
 # ============================================================
 # Constants
 # ============================================================
-DEFAULT_MODEL = os.environ.get("OCR_FLASHLITE_MODEL", "gemini-2.5-flash-lite")
+from .gemini_models import flash_lite as _flashlite_model
+
+DEFAULT_MODEL = _flashlite_model()
 DEFAULT_MAX_RETRIES = 1
 DEFAULT_TIMEOUT_SECONDS = 60
 # v118.35.0.11 · 8192 → 16384 · raw_row_data 字段从 BankStatementEntry schema
@@ -138,8 +139,8 @@ def extract_from_text(
     Args:
         text: OCR text (typically a Page.full_text from layer 1)
         api_key: API key override; defaults to env GOOGLE_API_KEY then GEMINI_API_KEY
-        model_name: Gemini model id; defaults to env OCR_FLASHLITE_MODEL or
-            "gemini-2.5-flash-lite"
+        model_name: Gemini model id; defaults to gemini_models.flash_lite()
+            (env OCR_FLASHLITE_MODEL)
         max_retries: JSON-parse retries before ValueError (default 1 per spec)
         timeout: per-API-call timeout in seconds (default 60)
 

@@ -40,7 +40,7 @@ def decide_image(summary: dict, lang: str = "th") -> dict:
     )
     outcome = transport.text_to_json(
         prompt,
-        tier="flash",
+        tier="brain",
         response_mime=True,
         max_tokens=256,
         timeout_s=12,

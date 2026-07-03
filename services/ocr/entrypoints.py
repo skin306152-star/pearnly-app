@@ -15,14 +15,7 @@ import hashlib
 from typing import Any, Dict, Optional
 
 from core import db
-from services.ocr.pipeline import (
-    IMAGE_EXTENSIONS,
-    PDF_EXTENSIONS,
-    TABLE_EXTENSIONS,
-    run_on_image_bytes,
-    run_on_pdf_bytes,
-    run_on_table_bytes,
-)
+from services.ocr.pipeline import IMAGE_EXTENSIONS, PDF_EXTENSIONS, TABLE_EXTENSIONS
 
 SUPPORTED_OCR_EXTENSIONS = PDF_EXTENSIONS | IMAGE_EXTENSIONS | TABLE_EXTENSIONS
 
@@ -131,14 +124,19 @@ def run_pipeline_for_file(
     api_key: Optional[str],
     max_pages: int = 50,
 ):
-    ext = file_ext(filename)
-    if ext in PDF_EXTENSIONS:
-        return run_on_pdf_bytes(file_bytes, max_pages=max_pages, api_key=api_key)
-    if ext in IMAGE_EXTENSIONS:
-        return run_on_image_bytes(file_bytes, api_key=api_key)
-    if ext in TABLE_EXTENSIONS:
-        return run_on_table_bytes(file_bytes, filename=filename, api_key=api_key)
-    raise ValueError(f"unsupported OCR file extension: {ext}")
+    """Facade → controller(task=invoice)· 派发逻辑在 handlers/invoice.py。"""
+    from services.ocr import controller
+    from services.ocr.contracts import OcrRequest
+
+    return controller.run(
+        OcrRequest(
+            task="invoice",
+            file_bytes=file_bytes,
+            filename=filename,
+            api_key=api_key,
+            options={"max_pages": max_pages},
+        )
+    ).data
 
 
 def all_pages_not_invoice(pages: list) -> bool:

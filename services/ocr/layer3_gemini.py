@@ -7,7 +7,6 @@ layer3_fallback re-import 全部名字回去(refine_page/refine_with_image 用 +
 
 import json
 import logging
-import threading
 
 logger = logging.getLogger(__name__)
 
@@ -119,56 +118,7 @@ def _classify_gemini_exception(e: Exception) -> Exception:
 
 
 # ============================================================
-# Model lazy singleton (keyed by api_key + model_name)
-# ============================================================
-_model_cache: dict = {}
-_model_lock = threading.Lock()
-
-
-def _get_model(api_key: str, model_name: str):
-    """Return a GenerativeModel for the given (api_key, model_name).
-
-    Cached up to 10 distinct combinations. Same pattern as layer 2.
-    """
-    cache_key = (api_key, model_name)
-
-    if cache_key in _model_cache:
-        return _model_cache[cache_key]
-
-    with _model_lock:
-        if cache_key in _model_cache:
-            return _model_cache[cache_key]
-
-        try:
-            import google.generativeai as genai
-        except ImportError as e:
-            raise ImportError(
-                "layer3: google-generativeai required. " "Install: pip install google-generativeai"
-            ) from e
-
-        # Direct endpoint (no Cloudflare proxy). If/when dev machine cannot
-        # reach generativelanguage.googleapis.com, plumb a proxy via env var.
-        genai.configure(api_key=api_key)
-
-        model = genai.GenerativeModel(
-            model_name=model_name,
-            generation_config={
-                "temperature": DEFAULT_TEMPERATURE,
-                "max_output_tokens": DEFAULT_MAX_OUTPUT_TOKENS,
-                "response_mime_type": "application/json",
-            },
-        )
-
-        if len(_model_cache) >= 10:
-            _model_cache.pop(next(iter(_model_cache)))
-        _model_cache[cache_key] = model
-
-        logger.info("layer3: GenerativeModel initialized: %s", model_name)
-        return model
-
-
-# ============================================================
-# ai_gateway 后端路由(vertex/selfhost · 默认 aistudio 不经此)
+# ai_gateway 路由(全后端统一经 model_client · 2026-07-03 收口)
 # ============================================================
 # B2 fix: 重试时追加 JSON 卫生提示,降低长泰文序列化时的截断/坏 JSON 概率。
 _RETRY_HINT_BASE = (
@@ -204,13 +154,11 @@ def _call_l3_via_gateway(
     max_retries: int,
     timeout: int,
 ):
-    """非 aistudio 后端(vertex/selfhost):L3 多模态→JSON 经网关 transport。保留
-    (data, meta) 元组契约 + 重试追加 JSON 卫生提示;auth/quota/transient 映射回
-    Layer3 异常,parse/empty 在重试预算内重试。默认 aistudio 不走此函数。"""
-    from services.ai_gateway import transport
-    from services.ocr.gemini_models import tier_for_model
+    """L3 多模态→JSON 经 model_client(全后端统一)。保留 (data, meta) 元组契约
+    + 重试追加 JSON 卫生提示;auth/quota/transient 映射回 Layer3 异常,
+    parse/empty 在重试预算内重试。"""
+    from services.ocr import model_client
 
-    tier = tier_for_model(model_name)
     last_kind = "parse"
     for attempt in range(max_retries + 1):
         user_prompt = (
@@ -218,17 +166,14 @@ def _call_l3_via_gateway(
             if attempt == 0
             else base_user_prompt + _RETRY_HINT_BASE + f"\n\nPrevious parse error: {last_kind}"
         )
-        out = transport.multimodal_to_json(
+        out = model_client.json_from_images(
             system_prompt + "\n\n" + user_prompt,
             [(image_bytes, mime)],
-            tier=tier,
-            api_key=api_key,
-            temperature=DEFAULT_TEMPERATURE,
-            response_mime=True,
-            max_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
-            timeout_s=timeout,
-            max_retries=0,
+            model_name=model_name,
             task="ocr.layer3",
+            api_key=api_key,
+            timeout_s=timeout,
+            max_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
         )
         if out.ok:
             return out.data, {

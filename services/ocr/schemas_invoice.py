@@ -3,7 +3,7 @@
 
 import re
 from datetime import date
-from typing import Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional, get_args
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from services.ocr.schemas_layer1 import FieldRef
@@ -280,15 +280,8 @@ class ThaiInvoice(BaseModel):
         """Gemini may return null or an unexpected value; fall back to tax_invoice."""
         if v is None:
             return "tax_invoice"
-        allowed = {
-            "tax_invoice",
-            "simplified_tax_invoice",
-            "receipt",
-            "credit_note",
-            "payment_evidence",
-            "order_evidence",
-            "other",
-        }
+        # 允许集直接取自字段 Literal → 单一事实源,加枚举值只改上面一处。
+        allowed = set(get_args(cls.model_fields["document_type"].annotation))
         return v if v in allowed else "other"
 
     @field_validator("source_refs", mode="before")

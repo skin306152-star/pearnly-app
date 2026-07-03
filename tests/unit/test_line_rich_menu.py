@@ -60,7 +60,7 @@ class PayloadTests(unittest.TestCase):
 
     def test_per_row_splits_match_illustration(self):
         # 点击区列边界贴 v7 插画按钮位置(非均分):底排比上排更靠左(中间被猫+咖啡占位)。
-        # 换背景图若按钮位置变了,这里会挂 → 提醒同步复核 _TOP_X/_BOT_X。
+        # 换背景图若按钮位置变了,这里会挂 → 提醒同步复核 _ROW_X。
         by = {}
         for a in self.areas:
             act = a["action"]

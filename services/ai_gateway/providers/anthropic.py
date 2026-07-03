@@ -15,20 +15,16 @@ cache_control)→ Anthropic 缓存该前缀,命中读价降到 10%,是这类 wor
 from __future__ import annotations
 
 import os
-import re
 from typing import Optional, Tuple
 
 from services.ai_gateway.tasks import ProviderOutcome
 
 NAME = "anthropic"
 _VERSION = "2023-06-01"
-# 带 8 位日期后缀的模型(如 ...-20251001)仍收 temperature;新别名(claude-sonnet-5 等)已废弃该参数,
-# 传了报 400。用日期后缀区分,避免硬编码型号清单(自维护)。
-_DATED = re.compile(r"-\d{8}$")
-
-
-def _accepts_temperature(model: str) -> bool:
-    return bool(_DATED.search(model or ""))
+# temperature 在较新代际(Sonnet 5 / Opus 4.7+ / Fable 5 …)已废弃,传了报 400;老代际(Haiku 4.5 等)
+# 仍收。规则按模型代际走,与命名形状无关 → 不猜:发一次,若因 temperature 被拒就记下该模型、去掉重发。
+# 运行时自适配,零型号清单维护;命中后进程内记忆,不重复试错。
+_NO_TEMP: set[str] = set()
 
 
 def _base() -> str:
@@ -66,46 +62,57 @@ def _messages(
     timeout_s: int,
     cache_system: bool,
 ) -> Tuple[Optional[str], dict, Optional[str]]:
-    """低层 Claude 调用 → (text, usage, error_kind)。usage 含缓存 token 明细(计费/AB 用)。"""
+    """低层 Claude 调用 → (text, usage, error_kind)。usage 含缓存 token 明细(计费/AB 用)。
+    temperature 被某代际拒(400)时:记下该模型、去掉 temperature 重发一次(见 _NO_TEMP)。"""
     import httpx
 
-    if not _key():
+    key = _key()
+    if not key:
         return None, {}, "auth"
-    payload: dict = {
-        "model": model,
-        "max_tokens": max_tokens,
-        "messages": [{"role": "user", "content": user}],
-    }
-    if _accepts_temperature(model):
-        payload["temperature"] = temperature
-    if system:
-        block = {"type": "text", "text": system}
-        if cache_system:
-            block["cache_control"] = {"type": "ephemeral"}
-        payload["system"] = [block]
-    headers = {
-        "x-api-key": _key(),
-        "anthropic-version": _VERSION,
-        "content-type": "application/json",
-    }
-    try:
-        resp = httpx.post(
-            f"{_base()}/v1/messages", headers=headers, json=payload, timeout=timeout_s
-        )
-    except httpx.TimeoutException:
-        return None, {}, "timeout"
-    except httpx.HTTPError:
-        return None, {}, "provider"
-    if resp.status_code >= 400:
-        return None, {}, _error_kind_status(resp.status_code)
-    try:
-        body = resp.json()
-        text = "".join(
-            b.get("text", "") for b in body.get("content", []) if b.get("type") == "text"
-        )
-        return text.strip(), (body.get("usage") or {}), None
-    except Exception:  # noqa: BLE001
-        return None, {}, "parse"
+    headers = {"x-api-key": key, "anthropic-version": _VERSION, "content-type": "application/json"}
+
+    def _payload(with_temp: bool) -> dict:
+        p: dict = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "messages": [{"role": "user", "content": user}],
+        }
+        if with_temp:
+            p["temperature"] = temperature
+        if system:
+            block = {"type": "text", "text": system}
+            if cache_system:
+                block["cache_control"] = {"type": "ephemeral"}
+            p["system"] = [block]
+        return p
+
+    # 已知拒 temperature 的模型直接不带;否则带,被拒则记忆+去掉重发一次。
+    for with_temp in ((False,) if model in _NO_TEMP else (True, False)):
+        try:
+            resp = httpx.post(
+                f"{_base()}/v1/messages",
+                headers=headers,
+                json=_payload(with_temp),
+                timeout=timeout_s,
+            )
+        except httpx.TimeoutException:
+            return None, {}, "timeout"
+        except httpx.HTTPError:
+            return None, {}, "provider"
+        if resp.status_code == 400 and with_temp and "temperature" in resp.text.lower():
+            _NO_TEMP.add(model)  # 该模型代际已弃 temperature → 记住,下方 with_temp=False 重发
+            continue
+        if resp.status_code >= 400:
+            return None, {}, _error_kind_status(resp.status_code)
+        try:
+            body = resp.json()
+            text = "".join(
+                b.get("text", "") for b in body.get("content", []) if b.get("type") == "text"
+            )
+            return text.strip(), (body.get("usage") or {}), None
+        except Exception:  # noqa: BLE001
+            return None, {}, "parse"
+    return None, {}, "provider"  # 理论不可达(with_temp=False 分支必返回)
 
 
 def _billed_input(usage: dict) -> int:
@@ -142,7 +149,7 @@ def text_to_json(
 
     model = _model(tier)
     last_raw = ""
-    for attempt in range(max_retries + 1):
+    for _ in range(max_retries + 1):
         text, usage, kind = _messages(
             system=system,
             user=prompt,
@@ -165,9 +172,7 @@ def text_to_json(
                     output_tokens=int(usage.get("output_tokens", 0) or 0),
                 )
             except Exception:  # noqa: BLE001
-                pass
-        if attempt < max_retries:
-            continue
+                pass  # 坏 JSON → 继续下一次重试(循环自然推进),重试用尽后落 parse
     return ProviderOutcome(ok=False, error_kind="parse", model=model, raw=last_raw)
 
 

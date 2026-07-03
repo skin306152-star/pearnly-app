@@ -12,9 +12,10 @@ from services.ai_gateway.tasks import ProviderOutcome
 
 
 class _Resp:
-    def __init__(self, status, body):
+    def __init__(self, status, body, text=""):
         self.status_code = status
         self._body = body
+        self.text = text
 
     def json(self):
         return self._body
@@ -88,30 +89,55 @@ class TestAnthropicProvider(unittest.TestCase):
             anthropic.text_to_json("body", system="prefix", cache_system=False)
         self.assertNotIn("cache_control", seen["payload"]["system"][0])
 
-    def test_temperature_omitted_for_new_model_alias(self):
-        # claude-sonnet-5(无日期后缀)已废弃 temperature,传了报 400 → 必须不发。
+    def test_temperature_sent_when_model_accepts(self):
+        # 模型收 temperature → 一次成功,payload 带 temperature(决策任务要 temp=0 确定性)。
         seen = {}
 
         def _cap(url, headers=None, json=None, timeout=None):
             seen["payload"] = json
+            return _Resp(200, _ok_body('{"kind":"reply"}', {"input_tokens": 1, "output_tokens": 1}))
+
+        with patch.dict("os.environ", {"ANTHROPIC_FLASH_MODEL": "claude-haiku-4-5"}):
+            with patch("httpx.post", _cap):
+                anthropic.text_to_json("p", tier="flash", temperature=0.0)
+        self.assertEqual(seen["payload"]["temperature"], 0.0)
+
+    def test_temperature_stripped_and_retried_on_400(self):
+        # 模型拒 temperature(400)→ 记住该模型 + 去掉重发一次 → 最终成功 payload 不带 temperature。
+        anthropic._NO_TEMP.discard("claude-sonnet-5")
+        seen = []
+
+        def _cap(url, headers=None, json=None, timeout=None):
+            seen.append(json)
+            if "temperature" in json:
+                return _Resp(400, {}, text="`temperature` is deprecated for this model")
             return _Resp(200, _ok_body('{"kind":"reply"}', {"input_tokens": 1, "output_tokens": 1}))
 
         with patch.dict("os.environ", {"ANTHROPIC_BEST_MODEL": "claude-sonnet-5"}):
             with patch("httpx.post", _cap):
-                anthropic.text_to_json("p", tier="best")
-        self.assertNotIn("temperature", seen["payload"])
+                oc = anthropic.text_to_json("p", tier="best", temperature=0.0)
+        self.assertTrue(oc.ok)
+        self.assertEqual(len(seen), 2)  # 带 temp 被拒 → 去掉重发
+        self.assertIn("temperature", seen[0])
+        self.assertNotIn("temperature", seen[1])
+        self.assertIn("claude-sonnet-5", anthropic._NO_TEMP)  # 已记忆,下次直接不带
+        anthropic._NO_TEMP.discard("claude-sonnet-5")
 
-    def test_temperature_sent_for_dated_model(self):
-        seen = {}
+    def test_no_temp_memo_skips_temperature_next_call(self):
+        # 已记忆拒 temp 的模型 → 后续调用一次成功、直接不带 temperature(不再试错)。
+        anthropic._NO_TEMP.add("claude-sonnet-5")
+        seen = []
 
         def _cap(url, headers=None, json=None, timeout=None):
-            seen["payload"] = json
+            seen.append(json)
             return _Resp(200, _ok_body('{"kind":"reply"}', {"input_tokens": 1, "output_tokens": 1}))
 
-        with patch.dict("os.environ", {"ANTHROPIC_FLASH_MODEL": "claude-haiku-4-5-20251001"}):
+        with patch.dict("os.environ", {"ANTHROPIC_BEST_MODEL": "claude-sonnet-5"}):
             with patch("httpx.post", _cap):
-                anthropic.text_to_json("p", tier="flash", temperature=0.0)
-        self.assertEqual(seen["payload"]["temperature"], 0.0)
+                anthropic.text_to_json("p", tier="best", temperature=0.0)
+        self.assertEqual(len(seen), 1)  # 无试错
+        self.assertNotIn("temperature", seen[0])
+        anthropic._NO_TEMP.discard("claude-sonnet-5")
 
     def test_action_unsupported_falls_back(self):
         oc = anthropic.text_to_action("p", tools=[])

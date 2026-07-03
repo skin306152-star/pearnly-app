@@ -194,17 +194,19 @@ def _run_arm(arm: str, cases: list[dict]) -> dict:
         "avg_cache_read": round(cr_tok / calls) if calls else 0,
         "avg_out": round(out_tok / calls) if calls else 0,
         "avg_ms": round(ms_tot / calls) if calls else 0,
-        # 每千轮 = 每样本成本 × 4.4 大脑调用/轮(prod 实测 70 calls / 16 traces)
+        # 每千轮 = 总成本/样本数 × 4.4 大脑调用/轮(prod 实测 70 calls / 16 traces)。
+        # 成本对 token 线性 → 直接用累计量算再除,不必先拼每样本均值 dict。
         "usd_per_1k_turns": (
             round(
                 _cost_usd(
                     model,
                     {
-                        "input_tokens": in_tok / calls if calls else 0,
-                        "cache_read_input_tokens": cr_tok / calls if calls else 0,
-                        "output_tokens": out_tok / calls if calls else 0,
+                        "input_tokens": in_tok,
+                        "cache_read_input_tokens": cr_tok,
+                        "output_tokens": out_tok,
                     },
                 )
+                / calls
                 * 4.4
                 * 1000,
                 2,

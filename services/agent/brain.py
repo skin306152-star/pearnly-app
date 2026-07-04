@@ -20,11 +20,7 @@ _VALID_BACKENDS = {"aistudio", "vertex", "selfhost", "anthropic"}
 
 
 def _brain_backend() -> Optional[str]:
-    """Agent 大脑的后端覆盖(env AGENT_BRAIN_BACKEND)。
-
-    不设置时返回 None,让 transport 跟随全局 OCR_LLM_BACKEND。这样大脑与 OCR 共用同一
-    网关后端,但仍保留 AGENT_BRAIN_MODEL 独立模型档。需要临时切 qwen/Claude/AI Studio 时
-    才显式设置 AGENT_BRAIN_BACKEND;坏值忽略,避免误落到 aistudio。"""
+    """Agent 大脑后端覆盖;未设置/坏值则跟随 OCR_LLM_BACKEND。"""
     raw = (os.environ.get("AGENT_BRAIN_BACKEND") or "").strip().lower()
     return raw if raw in _VALID_BACKENDS else None
 

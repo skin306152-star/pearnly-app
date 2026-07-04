@@ -41,6 +41,22 @@ class TestBackendSwitch(unittest.TestCase):
         self._set("VERTEX")  # 大小写不敏感
         self.assertEqual(backends.active_backend(), "vertex")
 
+    def test_backend_override_set_reset(self):
+        self.assertIsNone(backends.override_backend())
+        tok = backends.set_backend_override("aistudio")
+        try:
+            self.assertEqual(backends.override_backend(), "aistudio")
+        finally:
+            backends.reset_backend_override(tok)
+        self.assertIsNone(backends.override_backend())
+
+    def test_backend_override_rejects_invalid(self):
+        tok = backends.set_backend_override("nonsense")
+        try:
+            self.assertIsNone(backends.override_backend())
+        finally:
+            backends.reset_backend_override(tok)
+
 
 class _FakeProvider:
     NAME = "fake"
@@ -107,6 +123,32 @@ class TestTransportRouting(unittest.TestCase):
         ):
             transport.text_to_json("hi")
             gp.assert_called_once_with("vertex")
+
+    def test_request_override_beats_global(self):
+        # engine_policy 钉的请求级覆盖被 transport 消费(即使全局是 vertex)。含 multimodal。
+        with (
+            mock.patch.object(backends, "get_provider", return_value=_FakeProvider) as gp,
+            mock.patch.object(backends, "active_backend", return_value="vertex"),
+        ):
+            tok = backends.set_backend_override("aistudio")
+            try:
+                transport.multimodal_to_json("p", [(b"i", "image/png")], tier="flash")
+            finally:
+                backends.reset_backend_override(tok)
+            gp.assert_called_once_with("aistudio")
+
+    def test_explicit_backend_beats_request_override(self):
+        # 显式传入(大脑)优先于请求级覆盖。
+        with (
+            mock.patch.object(backends, "get_provider", return_value=_FakeProvider) as gp,
+            mock.patch.object(backends, "active_backend", return_value="vertex"),
+        ):
+            tok = backends.set_backend_override("aistudio")
+            try:
+                transport.text_to_json("hi", backend="selfhost")
+            finally:
+                backends.reset_backend_override(tok)
+            gp.assert_called_once_with("selfhost")
 
     def test_non_outcome_return_is_defended(self):
         class Bad:

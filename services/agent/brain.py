@@ -18,13 +18,13 @@ from services.agent import contracts
 
 
 def _brain_backend() -> Optional[str]:
-    """Agent 大脑的后端覆盖(env AGENT_BRAIN_BACKEND)。
+    """Agent 大脑的后端(env AGENT_BRAIN_BACKEND · 默认 aistudio)。
 
-    未设 → None → 跟随全局 OCR_LLM_BACKEND(现状 = Vertex Gemini,零变化)。设 selfhost +
-    SELFHOST_* 端点就绪 → 只有 Agent 路由走便宜 qwen,OCR 不受影响。端点不可用时 provider
-    收敛为错误 → loop 归 crash → defer 回旧路,不炸用户(fail-safe)。
-    """
-    return (os.environ.get("AGENT_BRAIN_BACKEND") or "").strip().lower() or None
+    大脑档钉 gemini-2.5-flash(AGENT_BRAIN_MODEL),而 2.5 仅 AI Studio 有、Vertex 会 404
+    (2026-06-29 Vertex 迁移后只装了 3.5)。故默认 aistudio,与 OCR 后端解耦——OCR 走 Vertex
+    也不牵连大脑。显式设 selfhost/vertex 可覆盖(端点不可用时 provider 收敛为错 → loop 归
+    crash → defer 回旧路,fail-safe)。"""
+    return (os.environ.get("AGENT_BRAIN_BACKEND") or "aistudio").strip().lower() or "aistudio"
 
 
 def _tool_table(tools: tuple[contracts.ToolSpec, ...]) -> str:

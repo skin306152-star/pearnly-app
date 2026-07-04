@@ -39,9 +39,12 @@ def _observe(
 def _run(
     method: str, args: tuple, kwargs: dict, *, task, backend=None, tenant_id, user_id, trace_id
 ) -> ProviderOutcome:
-    # backend=None → 全局 OCR_LLM_BACKEND;传值 → 本次调用覆盖(如 Agent 大脑走便宜 selfhost,
-    # OCR 仍走全局 Gemini)。provider 名按生效后端记日志。
-    effective = (backend or backends.active_backend()).strip().lower()
+    # backend 优先级:显式传入(如 Agent 大脑) > 请求级覆盖(engine_policy 按档钉,如 economy→
+    # aistudio) > 全局 OCR_LLM_BACKEND。所有形态(含 OCR multimodal)都经此,故三条选档路
+    # (全局/套餐 auto/任务覆写)只要解析出同一档,后端就一致,不会上下游脱节。
+    effective = (
+        (backend or backends.override_backend() or backends.active_backend()).strip().lower()
+    )
     prov = backends.get_provider(effective)
     fn = getattr(prov, method)
     start = time.time()

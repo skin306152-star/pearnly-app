@@ -176,8 +176,6 @@ def run_recognition_core(
         from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
         from services.ocr.feedback.context import ocr_request_context
 
-        # 反馈闭环 ② · 设请求级上下文(L2 few-shot 按租户取例;flag 关时无副作用)
-        # 引擎策略由 OCR controller 统一套入:按 OCR_MODE + 租户套餐决定本次请求的模型档位。
         _plan_code = (_billing.get("subscription") or {}).get("plan_code")
         _engine_mode = resolve_mode(
             "invoice", plan_code=_plan_code, is_exempt=bool(_billing.get("is_exempt"))

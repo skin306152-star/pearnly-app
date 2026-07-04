@@ -74,6 +74,34 @@ CASES = [
         },
     ),
     (
+        "两行不同预扣率(服务 3% + 运输 1%·逐行汇总非全局单一率)",
+        [
+            {"qty": 1, "unit_price": 10000, "discount": 0, "vat_rate": 7, "wht_rate": 3},
+            {"qty": 1, "unit_price": 5000, "discount": 0, "vat_rate": 0, "wht_rate": 1},
+        ],
+        {},
+        {
+            # 净 15000 · VAT 700 · 含税 15700 · WHT 300+50=350 · 实付 15350
+            "subtotal": "15000.00",
+            "vat_amount": "700.00",
+            "grand_total": "15700.00",
+            "wht_amount": "350.00",
+            "net_payable": "15350.00",
+        },
+    ),
+    (
+        "商品行也可带预扣(税务上存在·140 净额 × 1% = 1.40)",
+        [{"qty": 1, "unit_price": 140, "discount": 0, "vat_rate": 7, "wht_rate": 1}],
+        {},
+        {
+            "subtotal": "140.00",
+            "vat_amount": "9.80",
+            "grand_total": "149.80",
+            "wht_amount": "1.40",
+            "net_payable": "148.40",
+        },
+    ),
+    (
         "逐行取整(两行各 0.5 分·分别取整非汇总取整)",
         [
             {"qty": 1, "unit_price": 1.07, "discount": 0, "vat_rate": 7, "wht_rate": 0},

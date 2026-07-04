@@ -43,8 +43,8 @@ def _run(
     # aistudio) > 全局 OCR_LLM_BACKEND。所有形态(含 OCR multimodal)都经此,故三条选档路
     # (全局/套餐 auto/任务覆写)只要解析出同一档,后端就一致,不会上下游脱节。
     effective = (
-        backend or backends.override_backend() or backends.active_backend()
-    ).strip().lower()
+        (backend or backends.override_backend() or backends.active_backend()).strip().lower()
+    )
     prov = backends.get_provider(effective)
     fn = getattr(prov, method)
     start = time.time()

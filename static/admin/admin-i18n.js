@@ -51,7 +51,8 @@
             'adm-eng-mode-hint':
                 'A · 高精度 = 全程 gemini-3.5-flash · 走 Vertex · 最准,单价最高 ‖ B · 经济 = L2 常规识别用 gemini-2.5-flash-lite / gemini-2.5-flash,难票 L3 自动升 gemini-3.5-flash · 整条走 AI Studio · 省钱 ‖ 自动 = 按下方套餐表给每个用户选 A 或 B(L1 取文字层不计模型费,两档相同)',
             'adm-eng-mode-direct35': 'A · 高精度(全程 gemini-3.5-flash)',
-            'adm-eng-mode-economy': 'B · 经济(L2 用 gemini-2.5-flash(-lite) · 难票 L3 升 gemini-3.5-flash)',
+            'adm-eng-mode-economy':
+                'B · 经济(L2 用 gemini-2.5-flash(-lite) · 难票 L3 升 gemini-3.5-flash)',
             'adm-eng-mode-auto': '自动(按下方套餐表)',
             'adm-eng-opt-direct35': 'A · 高精度',
             'adm-eng-opt-economy': 'B · 经济',
@@ -407,7 +408,8 @@
             'adm-eng-mode-hint':
                 'A · แม่นยำสูง = gemini-3.5-flash ทั้งหมด · ผ่าน Vertex · แม่นสุด ราคาสูงสุด ‖ B · ประหยัด = L2 อ่านปกติใช้ gemini-2.5-flash-lite / gemini-2.5-flash, งานยาก L3 ขึ้น gemini-3.5-flash อัตโนมัติ · ทั้งเส้นผ่าน AI Studio · ประหยัด ‖ อัตโนมัติ = เลือก A หรือ B ตามแพ็กเกจผู้ใช้ (L1 ดึงชั้นข้อความ ไม่คิดค่าโมเดล เท่ากันทั้งสอง)',
             'adm-eng-mode-direct35': 'A · แม่นยำสูง (gemini-3.5-flash ทั้งหมด)',
-            'adm-eng-mode-economy': 'B · ประหยัด (L2 ใช้ gemini-2.5-flash(-lite) · งานยาก L3 ขึ้น gemini-3.5-flash)',
+            'adm-eng-mode-economy':
+                'B · ประหยัด (L2 ใช้ gemini-2.5-flash(-lite) · งานยาก L3 ขึ้น gemini-3.5-flash)',
             'adm-eng-mode-auto': 'อัตโนมัติ (ตามตารางแพ็กเกจ)',
             'adm-eng-opt-direct35': 'A · แม่นยำสูง',
             'adm-eng-opt-economy': 'B · ประหยัด',

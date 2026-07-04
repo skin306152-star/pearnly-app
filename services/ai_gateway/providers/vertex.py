@@ -24,6 +24,14 @@ def _location() -> str:
     return os.environ.get("VERTEX_LOCATION", "asia-southeast1").strip() or "asia-southeast1"
 
 
+def _location_for_model(model: str) -> str:
+    """按模型选区域:gemini-2.5-* 仅 Vertex global 端点提供(asia-se1 返 404,实测),
+    走 global(真图 OCR 3.6s / 30 连打零错);3.5 与 embedding 留就近区域(默认 asia-se1)。"""
+    if (model or "").lower().startswith("gemini-2.5"):
+        return os.environ.get("VERTEX_LOCATION_25", "global").strip() or "global"
+    return _location()
+
+
 def _project() -> Optional[str]:
     return (
         os.environ.get("GCP_PROJECT")
@@ -54,8 +62,8 @@ def _embed_model() -> str:
     )
 
 
-def _client():
-    loc = _location()
+def _client(loc: Optional[str] = None):
+    loc = loc or _location()
     proj = _project()
     key = (proj, loc)
     if key in _client_cache:
@@ -119,7 +127,7 @@ def _usage(resp) -> Tuple[int, int]:
 def _gen_json(contents, *, model_name, config, max_retries):
     from services.ocr.layer2_gemini import _parse_json
 
-    client = _client()
+    client = _client(_location_for_model(model_name))
     last_raw = ""
     for attempt in range(max_retries + 1):
         try:
@@ -219,7 +227,9 @@ def text_to_action(
         tools=[types.Tool(function_declarations=decls)],
     )
     try:
-        resp = _client().models.generate_content(model=model_name, contents=prompt, config=config)
+        resp = _client(_location_for_model(model_name)).models.generate_content(
+            model=model_name, contents=prompt, config=config
+        )
     except Exception as e:  # noqa: BLE001
         return ProviderOutcome(ok=False, error_kind=_error_kind(e), model=model_name)
     it, ot = _usage(resp)
@@ -291,7 +301,7 @@ def text_to_text(
     if system:
         kw["system_instruction"] = system
     try:
-        resp = _client().models.generate_content(
+        resp = _client(_location_for_model(model_name)).models.generate_content(
             model=model_name, contents=prompt, config=types.GenerateContentConfig(**kw)
         )
     except Exception as e:  # noqa: BLE001

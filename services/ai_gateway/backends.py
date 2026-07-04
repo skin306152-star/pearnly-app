@@ -18,9 +18,9 @@ from typing import Optional
 
 _VALID = ("aistudio", "vertex", "selfhost", "anthropic")
 
-# 请求级后端覆盖(engine_policy 按 OCR_MODE 设置):某档需固定某家 provider 时用。
-# 例:economy 档钉 aistudio(Vertex 无 2.5 模型),direct35 档留 None 跟随全局。
-# 显式传入 transport 的 backend 参数 > 本覆盖 > 全局 env(见 transport._run)。
+# 请求级后端覆盖:某处需为本请求固定某家 provider 时用(通用能力)。
+# 现无生产调用方——economy 曾用它钉 aistudio(Vertex 无 2.5),已改由 vertex provider
+# 按模型路由到 global 替代。显式传入 transport 的 backend 参数 > 本覆盖 > 全局 env。
 _OVERRIDE: ContextVar[Optional[str]] = ContextVar("llm_backend_override", default=None)
 
 

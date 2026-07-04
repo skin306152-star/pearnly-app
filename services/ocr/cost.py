@@ -24,6 +24,7 @@ COST_VISION_PER_PAGE_USD = 0.00150
 # 换模型省不省钱要按这里重算,别拿 token 数当钱数(2026-07-03 血泪)。
 MODEL_PRICES_PER_M_USD = {
     "gemini-3.5-flash": (1.50, 9.00),
+    "gemini-3.1-flash-lite": (0.25, 1.50),
     "gemini-2.5-flash-lite": (0.10, 0.40),
     "gemini-2.5-flash": (0.30, 2.50),
 }

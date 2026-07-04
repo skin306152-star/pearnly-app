@@ -26,13 +26,15 @@ SETTING_KEY = "ocr_engine_policy"
 _FAILSAFE_MODE = "direct35"
 
 # mode → tier 覆写表。direct35 不覆写(吃 env 默认全 3.5);economy 只在 L2 读取臂用
-# 2.5-lite(实测最快最省),兜底/L3 升级臂维持 3.5(勾稽不平/低置信才花大钱救那 6% 抽错)。
+# 3.1-flash-lite(36 张实测:钱字段 100% 追平 3.5、修对 2.5-lite 抽错那张、3.5s 最快),
+# 兜底/L3 升级臂维持 3.5(勾稽不平/低置信才花大钱救难票)。
 # 加新模式只补这里 + cost 价表,CONCRETE_MODES/MODES 由本表派生(admin 路由校验同源)。
-# 32 张实测:2.5-flash 三轴全输(22s 哪都救不了 + 单号乱加前缀),已弃,不入档。
+# 前身 2.5-flash-lite(97% 总额、฿0.028/张)已换 3.1-flash-lite(~฿0.08/张,仍是 3.5 的 1/6);
+# 2.5-flash 三轴全输(22s + 单号乱加前缀),已弃,不入档。3.1/2.5 同走 Vertex global。
 MODE_MODEL_MAPS: Dict[str, Dict[str, str]] = {
     "direct35": {},
     "economy": {
-        "flash_lite": "gemini-2.5-flash-lite",
+        "flash_lite": "gemini-3.1-flash-lite",
         "fallback": "gemini-3.5-flash",
         "escalate": "gemini-3.5-flash",
     },

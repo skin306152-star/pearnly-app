@@ -25,9 +25,11 @@ def _location() -> str:
 
 
 def _location_for_model(model: str) -> str:
-    """按模型选区域:gemini-2.5-* 仅 Vertex global 端点提供(asia-se1 返 404,实测),
-    走 global(真图 OCR 3.6s / 30 连打零错);3.5 与 embedding 留就近区域(默认 asia-se1)。"""
-    if (model or "").lower().startswith("gemini-2.5"):
+    """按模型选区域:gemini-2.5-* 与 gemini-3.1-* 仅 Vertex global 端点提供(asia-se1 实测,
+    2.5 返 404、3.1-lite 返空 JSON 均跑不通),走 global(真图 OCR 3.5~3.6s / 连打零错);
+    3.5 与 embedding 留就近区域(默认 asia-se1)。VERTEX_LOCATION_25 覆写这批 global-only 档的区域。"""
+    m = (model or "").lower()
+    if m.startswith("gemini-2.5") or m.startswith("gemini-3.1"):
         return os.environ.get("VERTEX_LOCATION_25", "global").strip() or "global"
     return _location()
 

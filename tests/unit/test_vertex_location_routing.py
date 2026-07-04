@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Vertex per-model 区域路由:gemini-2.5-* 只在 global 端点存在(asia-se1 返 404,实测),
-必须自动落 global;3.5 与 embedding 留就近区域,不被 2.5 的路由牵连(否则知识库换区/延迟劣化)。"""
+"""Vertex per-model 区域路由:gemini-2.5-* 与 gemini-3.1-* 只在 global 端点跑得通
+(asia-se1 实测 2.5 返 404、3.1-lite 返空 JSON),必须自动落 global;3.5 与 embedding 留就近区域,
+不被 global-only 档的路由牵连(否则知识库换区/延迟劣化)。"""
 
 from __future__ import annotations
 
@@ -17,6 +18,11 @@ class LocationForModelTests(unittest.TestCase):
         with mock.patch.dict("os.environ", _CLEAR):
             self.assertEqual(vertex._location_for_model("gemini-2.5-flash-lite"), "global")
             self.assertEqual(vertex._location_for_model("gemini-2.5-flash"), "global")
+
+    def test_31_models_route_to_global(self):
+        with mock.patch.dict("os.environ", _CLEAR):
+            self.assertEqual(vertex._location_for_model("gemini-3.1-flash-lite"), "global")
+            self.assertEqual(vertex._location_for_model("gemini-3.1-pro-preview"), "global")
 
     def test_35_and_embedding_stay_default_region(self):
         with mock.patch.dict("os.environ", _CLEAR):

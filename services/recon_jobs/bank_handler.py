@@ -49,6 +49,12 @@ def run_bank_recon(
     tenant_id = params.get("tenant_id")
     workspace_client_id = params.get("workspace_client_id")  # PO-6d · 套账随 job 行存
     is_exempt = bool(params.get("is_exempt", True))
+    plan_code = params.get("plan_code")
+    ocr_policy_ctx = {}
+    if plan_code:
+        ocr_policy_ctx["plan_code"] = plan_code
+    if params.get("is_exempt") is True:
+        ocr_policy_ctx["is_exempt"] = True
 
     # ADR-006 S8 · 用户核对纠错后的重对账:注入修正行 → 跳过 stmt OCR(不重读、不重扣费)
     confirmed_rows = params.get("confirmed_stmt_rows")
@@ -78,11 +84,26 @@ def run_bank_recon(
         ]
     else:
         stmt_results = _parallel(
-            lambda bf: parse_bank_statement_pdf(bf[0], bf[1], api_key, tenant_id=_scope), stmt_data
+            lambda bf: parse_bank_statement_pdf(
+                bf[0],
+                bf[1],
+                api_key,
+                tenant_id=_scope,
+                **ocr_policy_ctx,
+            ),
+            stmt_data,
         )
     progress_cb({"stage": "parse", "stage_done": len(stmt_data), "stage_total": total})
     gl_results = _parallel(
-        lambda bf: parse_gl_v2(bf[0], bf[1], gl_account, api_key, tenant_id=_scope), gl_data
+        lambda bf: parse_gl_v2(
+            bf[0],
+            bf[1],
+            gl_account,
+            api_key,
+            tenant_id=_scope,
+            **ocr_policy_ctx,
+        ),
+        gl_data,
     )
     progress_cb({"stage": "parse", "stage_done": total, "stage_total": total})
 

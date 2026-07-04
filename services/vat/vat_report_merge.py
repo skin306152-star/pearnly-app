@@ -16,7 +16,12 @@ logger = logging.getLogger(__name__)
 # VAT 报告多份拼接 · 校验同卖方同期间
 # ════════════════════════════════════════════════════════════════════════
 def merge_vat_reports(
-    report_files: List[Dict[str, Any]], api_key: Optional[str] = None
+    report_files: List[Dict[str, Any]],
+    api_key: Optional[str] = None,
+    *,
+    plan_code: Optional[str] = None,
+    is_exempt: bool = False,
+    user_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     """多份 VAT 报告 PDF 串行解析 · 拼接 rows · 校验同卖方同期间
     report_files: [{filename, bytes}]
@@ -30,11 +35,23 @@ def merge_vat_reports(
     sources: List[Dict] = []
     _rep_in_tok = 0
     _rep_out_tok = 0
+    policy_kwargs: Dict[str, Any] = {}
+    if plan_code:
+        policy_kwargs["plan_code"] = plan_code
+    if is_exempt:
+        policy_kwargs["is_exempt"] = True
+    if user_type:
+        policy_kwargs["user_type"] = user_type
     for f in report_files:
         # P0-2:报告 OCR 加线程层硬超时 · 偶发挂起的 Gemini 调用不再让 job 无限 running
         _fb, _fn = f["bytes"], f["filename"]
         r = _ocr_with_hard_timeout(
-            lambda fb=_fb, fn=_fn: parse_vat_report(fb, fn, api_key=api_key),
+            lambda fb=_fb, fn=_fn: parse_vat_report(
+                fb,
+                fn,
+                api_key=api_key,
+                **policy_kwargs,
+            ),
             timeout_sec=int(os.environ.get("VEX_REPORT_OCR_TIMEOUT_SEC", "120")),
             on_timeout=lambda: {
                 "ok": False,

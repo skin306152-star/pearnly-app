@@ -19,10 +19,15 @@ def handle(req: OcrRequest):
     name = (req.filename or "").lower()
     ext = "." + name.rsplit(".", 1)[-1] if "." in name else ""
     max_pages = int(req.options.get("max_pages", 50))
+    document_type = req.options.get("document_type", "auto")
     if ext in PDF_EXTENSIONS:
-        return run_on_pdf_bytes(req.file_bytes, max_pages=max_pages, api_key=req.api_key)
+        return run_on_pdf_bytes(
+            req.file_bytes, max_pages=max_pages, api_key=req.api_key, document_type=document_type
+        )
     if ext in IMAGE_EXTENSIONS:
-        return run_on_image_bytes(req.file_bytes, api_key=req.api_key)
+        return run_on_image_bytes(req.file_bytes, api_key=req.api_key, document_type=document_type)
     if ext in TABLE_EXTENSIONS:
-        return run_on_table_bytes(req.file_bytes, filename=req.filename, api_key=req.api_key)
+        return run_on_table_bytes(
+            req.file_bytes, filename=req.filename, api_key=req.api_key, document_type=document_type
+        )
     raise ValueError(f"unsupported OCR file extension: {ext}")

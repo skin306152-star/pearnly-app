@@ -105,6 +105,9 @@ async def bank_v2_run(
     _lg.getLogger("recon").info(
         f"[bank_v2_run] api_key_present={bool(api_key)} user_id={user.get('id')}"
     )
+    from services.ocr.entrypoints import policy_context_from_billing
+
+    _ocr_policy_ctx = policy_context_from_billing(_billing_bv2)
     loop = asyncio.get_event_loop()
 
     # 1. Read all uploaded files
@@ -123,12 +126,18 @@ async def bank_v2_run(
 
     async def _parse_stmt(b, fname):
         return await loop.run_in_executor(
-            None, lambda: parse_bank_statement_pdf(b, fname, api_key, tenant_id=_tid_stmt)
+            None,
+            lambda: parse_bank_statement_pdf(
+                b, fname, api_key, tenant_id=_tid_stmt, **_ocr_policy_ctx
+            ),
         )
 
     async def _parse_gl(b, fname):
         return await loop.run_in_executor(
-            None, lambda: parse_gl_v2(b, fname, gl_account, api_key, tenant_id=_tid_stmt)
+            None,
+            lambda: parse_gl_v2(
+                b, fname, gl_account, api_key, tenant_id=_tid_stmt, **_ocr_policy_ctx
+            ),
         )
 
     stmt_results = await asyncio.gather(*[_parse_stmt(b, fn) for b, fn in stmt_data])

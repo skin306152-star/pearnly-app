@@ -69,33 +69,33 @@ async def bank_recon_upload(request: Request, file: UploadFile = File(...)):
     if len(pdf_bytes) > 20 * 1024 * 1024:
         raise HTTPException(413, detail="bank_recon.file_too_large")
 
-    from services.recon import bank_recon_v2 as br
     import asyncio
 
     try:
-        if _bank_ext in PDF_EXTENSIONS:
-            # Existing flow: pdfplumber → Gemini fallback (handles scan + text PDFs)
-            parsed = await asyncio.to_thread(br.parse_statement_pdf, pdf_bytes, filename)
-        else:
-            # New flow: route through unified pipeline with explicit document_type
-            # so Excel/CSV/Word bank statements bypass OCR and the GL/Bank
-            # validators reject mis-sourced amounts (e.g. 6091).
-            from services.ocr.pipeline import (
-                run_on_image_bytes as _bank_run_image,
-                run_on_table_bytes as _bank_run_table,
-            )
-            from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
+        from services.ocr import controller
+        from services.ocr.contracts import OcrRequest
+        from services.ocr.entrypoints import policy_context_from_billing
 
-            if _bank_ext in IMAGE_EXTENSIONS:
-                _pipe_res = await asyncio.to_thread(
-                    _bank_run_image, pdf_bytes, document_type="bank_statement"
+        _ocr_policy_ctx = {}
+        try:
+            _ocr_policy_ctx = policy_context_from_billing(
+                db.get_billing_status_combined(str(user["id"]), _tid(user))
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[bank_recon.ocr_policy] billing lookup skipped: {e}")
+
+        parsed = await asyncio.to_thread(
+            lambda: controller.run(
+                OcrRequest(
+                    task="bank_statement",
+                    file_bytes=pdf_bytes,
+                    filename=filename,
+                    tenant_id=_tid(user),
+                    **_ocr_policy_ctx,
+                    options={"shape": "legacy_parsed_statement"},
                 )
-            else:  # TABLE_EXTENSIONS
-                _pipe_res = await asyncio.to_thread(
-                    _bank_run_table, pdf_bytes, filename, None, None, "bank_statement"
-                )
-            _legacy = pipeline_result_to_legacy_dict(_pipe_res)
-            parsed = br.parsed_from_pipeline_legacy(_legacy, filename)
+            ).data
+        )
     except Exception as e:
         logger.exception("[bank_recon] 解析异常")
         raise HTTPException(500, detail=f"bank_recon.parse_exception:{str(e)[:100]}")

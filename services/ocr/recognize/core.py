@@ -171,32 +171,22 @@ def run_recognition_core(
     _chg_kind = None  # 扣费参数 · 实际扣费在 history 落库后
     _chg_units = 0
     try:
-        from services.ocr.pipeline import (
-            run_on_pdf_bytes as _pipeline_run_pdf,
-            run_on_image_bytes as _pipeline_run_image,
-            run_on_table_bytes as _pipeline_run_table,
-        )
+        from services.ocr.entrypoints import run_pipeline_for_file as _run_ocr_controller
         from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
         from services.ocr.feedback.context import ocr_request_context
-        from services.ocr.engine_policy import engine_context
 
         # 反馈闭环 ② · 设请求级上下文(L2 few-shot 按租户取例;flag 关时无副作用)
-        # 引擎策略:按 OCR_MODE + 租户套餐决定本次请求的模型档位(fail-safe direct35)
+        # 引擎策略由 OCR controller 统一套入:按 OCR_MODE + 租户套餐决定本次请求的模型档位。
         _plan_code = (_billing.get("subscription") or {}).get("plan_code")
-        with (
-            ocr_request_context(str(user["id"]), _tid(user)),
-            engine_context(
-                "invoice", plan_code=_plan_code, is_exempt=bool(_billing.get("is_exempt"))
-            ) as _engine_mode,
-        ):
-            if _ext in PDF_EXTENSIONS:
-                _pipe_res = _pipeline_run_pdf(content, max_pages=max_pages, api_key=api_key)
-            elif _ext in IMAGE_EXTENSIONS:
-                _pipe_res = _pipeline_run_image(content, api_key=api_key)
-            else:  # TABLE_EXTENSIONS — Excel / CSV / Word / TXT
-                _pipe_res = _pipeline_run_table(
-                    content, filename=file.filename or "upload", api_key=api_key
-                )
+        with ocr_request_context(str(user["id"]), _tid(user)):
+            _pipe_res = _run_ocr_controller(
+                content,
+                file.filename or "upload",
+                api_key=api_key,
+                max_pages=max_pages,
+                plan_code=_plan_code,
+                is_exempt=bool(_billing.get("is_exempt")),
+            )
         # 台账观测参数:实际用的模型(混模型时逗号并列)/是否触发升级臂
         _ocr_models = sorted(
             {m for p in _pipe_res.pages for m in (p.layer2_model, p.layer3_model) if m}

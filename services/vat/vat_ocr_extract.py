@@ -51,9 +51,8 @@ def _extract_invoice_via_pipeline(
         from services.ocr.pipeline import (
             IMAGE_EXTENSIONS,
             TABLE_EXTENSIONS,
-            run_on_image_bytes as _run_image,
-            run_on_table_bytes as _run_table,
         )
+        from services.ocr.entrypoints import run_pipeline_for_file
         from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "filename": filename, "error": f"pipeline 不可用: {e}"}
@@ -61,10 +60,12 @@ def _extract_invoice_via_pipeline(
     ext_dot = "." + (filename or "").lower().rsplit(".", 1)[-1]
     try:
         if ext_dot in IMAGE_EXTENSIONS:
-            pr = _run_image(file_bytes, api_key=api_key, document_type="invoice")
+            pr = run_pipeline_for_file(
+                file_bytes, filename or "invoice", api_key=api_key, document_type="invoice"
+            )
         elif ext_dot in TABLE_EXTENSIONS:
-            pr = _run_table(
-                file_bytes, filename=filename or "invoice", api_key=api_key, document_type="invoice"
+            pr = run_pipeline_for_file(
+                file_bytes, filename or "invoice", api_key=api_key, document_type="invoice"
             )
         else:
             return {"ok": False, "filename": filename, "error": f"不支持的格式 {ext_dot}"}

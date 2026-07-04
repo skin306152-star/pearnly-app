@@ -47,19 +47,34 @@ class ControllerTest(unittest.TestCase):
         self.assertIs(res.data, sentinel)
         self.assertEqual(res.task, "invoice")
         self.assertGreaterEqual(res.elapsed_ms, 0)
-        m.assert_called_once_with(b"x", max_pages=7, api_key=None)
+        m.assert_called_once_with(b"x", max_pages=7, api_key=None, document_type="auto")
 
     def test_invoice_dispatch_image_and_table(self):
         with mock.patch(
             "services.ocr.handlers.invoice.run_on_image_bytes", return_value="img"
         ) as mi:
             self.assertEqual(controller.run(_req("invoice", "r.jpg")).data, "img")
-        mi.assert_called_once_with(b"x", api_key=None)
+        mi.assert_called_once_with(b"x", api_key=None, document_type="auto")
         with mock.patch(
             "services.ocr.handlers.invoice.run_on_table_bytes", return_value="tbl"
         ) as mt:
             self.assertEqual(controller.run(_req("invoice", "r.xlsx")).data, "tbl")
-        mt.assert_called_once_with(b"x", filename="r.xlsx", api_key=None)
+        mt.assert_called_once_with(b"x", filename="r.xlsx", api_key=None, document_type="auto")
+
+    def test_controller_passes_plan_context_to_engine_policy(self):
+        with (
+            mock.patch("services.ocr.controller.policy_for", return_value=None),
+            mock.patch("services.ocr.controller.import_module") as imp,
+            mock.patch("services.ocr.controller.engine_context") as ctx,
+        ):
+            ctx.return_value.__enter__.return_value = "economy"
+            ctx.return_value.__exit__.return_value = False
+            imp.return_value.handle.return_value = "ok"
+            res = controller.run(
+                _req("invoice", plan_code="L", is_exempt=True, user_type="enterprise")
+            )
+        self.assertEqual(res.data, "ok")
+        ctx.assert_called_once_with("invoice", plan_code="L", is_exempt=True)
 
     def test_invoice_unsupported_ext_raises_valueerror(self):
         with self.assertRaises(ValueError):
@@ -74,7 +89,17 @@ class FacadeTest(unittest.TestCase):
 
         with mock.patch("services.ocr.handlers.invoice.run_on_image_bytes", return_value="ok") as m:
             self.assertEqual(run_pipeline_for_file(b"i", "a.png", api_key="k"), "ok")
-        m.assert_called_once_with(b"i", api_key="k")
+        m.assert_called_once_with(b"i", api_key="k", document_type="auto")
+
+    def test_run_pipeline_for_file_can_force_document_type(self):
+        from services.ocr.entrypoints import run_pipeline_for_file
+
+        with mock.patch("services.ocr.handlers.invoice.run_on_image_bytes", return_value="ok") as m:
+            self.assertEqual(
+                run_pipeline_for_file(b"i", "a.png", api_key="k", document_type="invoice"),
+                "ok",
+            )
+        m.assert_called_once_with(b"i", api_key="k", document_type="invoice")
 
     def test_extract_thai_id_card(self):
         from services.ocr import id_card_extract
@@ -104,6 +129,16 @@ class FacadeTest(unittest.TestCase):
         m.assert_called_once_with(
             b"g", "gl.pdf", account_code="1010", api_key="key", tenant_id="t2"
         )
+
+    def test_parse_gl_vat_facade(self):
+        from services.recon import gl_vat_parse_excel
+
+        with mock.patch.object(
+            gl_vat_parse_excel, "_parse_gl_impl", return_value={"ok": True, "rows": []}
+        ) as m:
+            out = gl_vat_parse_excel.parse_gl(b"g", "gl.pdf", revenue_prefix="7")
+        self.assertEqual(out, {"ok": True, "rows": []})
+        m.assert_called_once_with(b"g", "gl.pdf", revenue_prefix="7")
 
     def test_parse_vat_report(self):
         from services.vat import vat_report_parser

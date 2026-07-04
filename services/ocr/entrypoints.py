@@ -118,11 +118,27 @@ def billing_quote(
     }
 
 
+def policy_context_from_billing(billing_or_quote: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Extract OCR engine policy inputs from an existing billing lookup."""
+    source = billing_or_quote or {}
+    billing = source.get("billing") if isinstance(source.get("billing"), dict) else source
+    subscription = (billing or {}).get("subscription") or {}
+    return {
+        "plan_code": subscription.get("plan_code"),
+        "is_exempt": bool(source.get("is_exempt") or (billing or {}).get("is_exempt")),
+    }
+
+
 def run_pipeline_for_file(
     file_bytes: bytes,
     filename: str,
     api_key: Optional[str],
     max_pages: int = 50,
+    *,
+    document_type: str = "auto",
+    plan_code: Optional[str] = None,
+    is_exempt: bool = False,
+    user_type: Optional[str] = None,
 ):
     """Facade → controller(task=invoice)· 派发逻辑在 handlers/invoice.py。"""
     from services.ocr import controller
@@ -134,7 +150,10 @@ def run_pipeline_for_file(
             file_bytes=file_bytes,
             filename=filename,
             api_key=api_key,
-            options={"max_pages": max_pages},
+            plan_code=plan_code,
+            is_exempt=is_exempt,
+            user_type=user_type,
+            options={"max_pages": max_pages, "document_type": document_type},
         )
     ).data
 

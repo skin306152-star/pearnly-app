@@ -101,7 +101,7 @@ def editable_id_card(id_card: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _billing_gate(user: Dict[str, Any]) -> None:
+def _billing_gate(user: Dict[str, Any]) -> Dict[str, Any]:
     """余额闸 · 与其它 OCR 入口对齐(铁律 #26):不足且非豁免 → 402 拦下,绝不先识别
     再扣成负。异常容错降级(不阻塞,与热路径一致)。"""
     try:
@@ -119,10 +119,12 @@ def _billing_gate(user: Dict[str, Any]) -> None:
                     "pages_used_this_month": _bill.get("pages_used_this_month", 0),
                 },
             )
+        return _bill
     except DmsOcrError:
         raise
     except Exception as _be:
         logger.warning(f"[dms] billing pre-check skip(error tolerated): {_be}")
+        return {"is_exempt": False, "subscription": None}
 
 
 def recognize_id_card(
@@ -143,7 +145,7 @@ def recognize_id_card(
     ep = resolve_dms_endpoint(str(user["id"]), endpoint_id)
     if not ep:
         raise DmsOcrError("dms.no_endpoint", 400, "dms.no_endpoint")
-    _billing_gate(user)
+    _billing = _billing_gate(user)
 
     own_key = (
         user.get("gemini_api_key") or user.get("custom_gemini_api_key") or ""
@@ -152,8 +154,13 @@ def recognize_id_card(
     t0 = time.time()
     try:
         from services.ocr.id_card_extract import extract_thai_id_card
+        from services.ocr.entrypoints import policy_context_from_billing
 
-        ocr = extract_thai_id_card(image_bytes, own_key)
+        ocr = extract_thai_id_card(
+            image_bytes,
+            own_key,
+            **policy_context_from_billing(_billing),
+        )
     except Exception as e:
         is_unreadable = type(e).__name__ == "IdCardExtractError"
         if not is_unreadable:

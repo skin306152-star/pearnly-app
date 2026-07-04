@@ -28,6 +28,7 @@ from core import db
 from core import workspace_context as wc
 from core.route_helpers import _tid
 from services.authz.deps import require_perm
+from services.ocr.entrypoints import policy_context_from_billing
 from services.recon_jobs import store, worker
 
 logger = logging.getLogger("recon_jobs.routes")
@@ -190,6 +191,7 @@ async def bank_v2_submit(
 
     tenant_id = user.get("tenant_id")
     billing = _credits_precheck(user["id"], tenant_id, len(stmt_files) + len(gl_files))
+    _ocr_policy_ctx = policy_context_from_billing(billing)
 
     job_id = str(uuid.uuid4())
     try:
@@ -209,6 +211,7 @@ async def bank_v2_submit(
             "workspace_client_id": _ws,  # PO-6d · 套账随 job 行/params 存
             "api_key": _user_key(user),
             "is_exempt": bool(billing.get("is_exempt", True)),
+            "plan_code": _ocr_policy_ctx.get("plan_code"),
             "lang": lang,
             "gl_account": gl_account,
             "stmt_opening_override": stmt_opening_override,
@@ -263,6 +266,7 @@ async def gl_vat_submit(
     # M3-3 修(2026-05-25):收入对账与银行对账一致 · submit 前置 credits 检查(余额不足直接 402 ·
     #   不让付费 OCR/Gemini 先跑再失败)· is_exempt 透传给 worker 决定是否扣费。
     billing = _credits_precheck(user["id"], tenant_id, len(gl_list) + len(vat_list))
+    _ocr_policy_ctx = policy_context_from_billing(billing)
     job_id = str(uuid.uuid4())
     try:
         input_ref = await _stage_uploads(job_id, gl_list, "gl", "gl.pdf")
@@ -274,6 +278,7 @@ async def gl_vat_submit(
             "workspace_client_id": _ws,  # PO-6d
             "api_key": _user_key(user),
             "is_exempt": bool(billing.get("is_exempt", True)),
+            "plan_code": _ocr_policy_ctx.get("plan_code"),
             "revenue_prefix": revenue_prefix or "4",
             "lang": lang,
         }
@@ -312,6 +317,7 @@ async def vat_excel_submit(
 
     tenant_id = user.get("tenant_id")
     billing = _credits_precheck(user["id"], tenant_id, len(invoices) + len(reports))
+    _ocr_policy_ctx = policy_context_from_billing(billing)
 
     job_id = str(uuid.uuid4())
     try:
@@ -324,6 +330,7 @@ async def vat_excel_submit(
             "workspace_client_id": _ws,  # PO-6d
             "api_key": _user_key(user),
             "is_exempt": bool(billing.get("is_exempt", True)),
+            "plan_code": _ocr_policy_ctx.get("plan_code"),
             "lang": lang,
         }
         rid = store.enqueue(

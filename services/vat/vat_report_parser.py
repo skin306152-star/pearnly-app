@@ -114,14 +114,28 @@ def _parse_vat_via_pipeline(
 
 
 def parse_vat_report(
-    file_bytes: bytes, filename: str, api_key: Optional[str] = None
+    file_bytes: bytes,
+    filename: str,
+    api_key: Optional[str] = None,
+    *,
+    plan_code: Optional[str] = None,
+    is_exempt: bool = False,
+    user_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     """销项 VAT 报表解析(任意格式)。Facade → controller(task=vat_report)。"""
     from services.ocr import controller
     from services.ocr.contracts import OcrRequest
 
     return controller.run(
-        OcrRequest(task="vat_report", file_bytes=file_bytes, filename=filename, api_key=api_key)
+        OcrRequest(
+            task="vat_report",
+            file_bytes=file_bytes,
+            filename=filename,
+            api_key=api_key,
+            plan_code=plan_code,
+            is_exempt=is_exempt,
+            user_type=user_type,
+        )
     ).data
 
 

@@ -38,6 +38,15 @@ async def batch_process(
     if not user:
         raise HTTPException(401, "未登录")
     api_key = _user_key(user)
+    _ocr_policy_ctx = {}
+    try:
+        from services.ocr.entrypoints import policy_context_from_billing
+
+        _ocr_policy_ctx = policy_context_from_billing(
+            db.get_billing_status_combined(str(user["id"]), user.get("tenant_id"))
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[batch_process.ocr_policy] billing lookup skipped: {e}")
     import asyncio
 
     loop = asyncio.get_event_loop()
@@ -173,7 +182,7 @@ async def batch_process(
 
         # 新 pipeline 唯一路径(text_path layer 0 + Vision + Flash-Lite + Flash · 100% 埋点)
         try:
-            from services.ocr.pipeline import run_on_pdf_bytes as _pipeline_run
+            from services.ocr.entrypoints import run_pipeline_for_file as _run_ocr_controller
             from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
             from services.ocr.feedback.context import ocr_request_context
 
@@ -182,7 +191,14 @@ async def batch_process(
             def _run_with_ctx():
                 # 反馈闭环 ② · 上下文须在 executor 线程内设(contextvar 不跨线程传)
                 with ocr_request_context(str(user["id"]), _ctx_tid):
-                    return _pipeline_run(content_b, max_pages=10, api_key=api_key)
+                    return _run_ocr_controller(
+                        content_b,
+                        fname,
+                        api_key=api_key,
+                        max_pages=10,
+                        document_type="invoice",
+                        **_ocr_policy_ctx,
+                    )
 
             _pipe_res = await asyncio.wait_for(
                 loop.run_in_executor(None, _run_with_ctx),

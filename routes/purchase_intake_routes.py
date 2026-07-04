@@ -42,7 +42,13 @@ def _run_ocr(user_fresh: dict, file_bytes: bytes, filename: str) -> tuple[dict, 
     if not quote.get("allowed"):
         raise PosError("purchase.unexpected", 402, detail=quote.get("error_code") or "ocr_blocked")
     try:
-        pipe_res = ocr.run_pipeline_for_file(file_bytes, filename, api_key=api_key, max_pages=50)
+        pipe_res = ocr.run_pipeline_for_file(
+            file_bytes,
+            filename,
+            api_key=api_key,
+            max_pages=50,
+            **ocr.policy_context_from_billing(quote),
+        )
     except Exception as e:
         raise PosError("purchase.unexpected", 422, detail="ocr_failed") from e
     pages = getattr(pipe_res, "pages", None) or []

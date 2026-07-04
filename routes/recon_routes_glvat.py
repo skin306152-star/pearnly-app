@@ -154,10 +154,16 @@ async def gl_vat_run(
     # 1. 并行解析所有 GL 文件 + 合并 rows
     import asyncio
 
+    from services.ocr.entrypoints import policy_context_from_billing
+
+    _ocr_policy_ctx = policy_context_from_billing(_billing_glv)
     loop = asyncio.get_event_loop()
     gl_results = await asyncio.gather(
         *[
-            loop.run_in_executor(None, lambda b=b, n=n: parse_gl(b, n, revenue_prefix or "4"))
+            loop.run_in_executor(
+                None,
+                lambda b=b, n=n: parse_gl(b, n, revenue_prefix or "4", **_ocr_policy_ctx),
+            )
             for b, n in gl_data
         ]
     )
@@ -184,7 +190,10 @@ async def gl_vat_run(
     # 2. 并行解析所有 VAT 报表 + 合并 rows
     vat_results = await asyncio.gather(
         *[
-            loop.run_in_executor(None, lambda b=b, n=n: parse_vat_report(b, n, api_key=api_key))
+            loop.run_in_executor(
+                None,
+                lambda b=b, n=n: parse_vat_report(b, n, api_key=api_key, **_ocr_policy_ctx),
+            )
             for b, n in vat_data
         ]
     )

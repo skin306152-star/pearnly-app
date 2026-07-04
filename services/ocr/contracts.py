@@ -25,6 +25,9 @@ class OcrRequest:
     filename: str
     api_key: Optional[str] = None
     tenant_id: Optional[str] = None
+    plan_code: Optional[str] = None
+    is_exempt: bool = False
+    user_type: Optional[str] = None
     options: Dict[str, Any] = field(default_factory=dict)
 
 

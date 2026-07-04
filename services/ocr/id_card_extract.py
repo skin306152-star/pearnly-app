@@ -66,13 +66,28 @@ _ID_CARD_PROMPT = (
 )
 
 
-def extract_thai_id_card(image_bytes: bytes, api_key: Optional[str] = None) -> Dict[str, Any]:
+def extract_thai_id_card(
+    image_bytes: bytes,
+    api_key: Optional[str] = None,
+    *,
+    plan_code: Optional[str] = None,
+    is_exempt: bool = False,
+    user_type: Optional[str] = None,
+) -> Dict[str, Any]:
     """身份证图 → 结构化字段。Facade → controller(task=id_card)。"""
     from services.ocr import controller
     from services.ocr.contracts import OcrRequest
 
     return controller.run(
-        OcrRequest(task="id_card", file_bytes=image_bytes, filename="", api_key=api_key)
+        OcrRequest(
+            task="id_card",
+            file_bytes=image_bytes,
+            filename="",
+            api_key=api_key,
+            plan_code=plan_code,
+            is_exempt=is_exempt,
+            user_type=user_type,
+        )
     ).data
 
 

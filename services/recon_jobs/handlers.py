@@ -40,6 +40,12 @@ def run_glvat(
     user_id = str(params.get("user_id"))
     tenant_id = params.get("tenant_id")
     is_exempt = bool(params.get("is_exempt", True))
+    plan_code = params.get("plan_code")
+    ocr_policy_ctx = {}
+    if plan_code:
+        ocr_policy_ctx["plan_code"] = plan_code
+    if params.get("is_exempt") is True:
+        ocr_policy_ctx["is_exempt"] = True
 
     gl_data = _read_inputs(input_ref, "gl")
     vat_data = _read_inputs(input_ref, "vat")
@@ -47,7 +53,15 @@ def run_glvat(
     progress_cb({"stage": "parse", "stage_done": 0, "stage_total": total})
 
     # 1. 并行解析 GL + 合并 rows
-    gl_results = _parallel(lambda bf: parse_gl(bf[0], bf[1], revenue_prefix), gl_data)
+    gl_results = _parallel(
+        lambda bf: parse_gl(
+            bf[0],
+            bf[1],
+            revenue_prefix,
+            **ocr_policy_ctx,
+        ),
+        gl_data,
+    )
     progress_cb({"stage": "parse", "stage_done": len(gl_data), "stage_total": total})
     # M3-2 修(2026-05-25 收入对账回归):已知业务失败返回 __failed__ sentinel 带明确 error_code ·
     #   worker 据此置 job failed + error_code(不再被统一吞成 processing_error)· 前端映射成 4 语文案。
@@ -62,7 +76,15 @@ def run_glvat(
     gl_row_count = sum(r.get("row_count") or 0 for r in gl_results)
 
     # 2. 并行解析 VAT + 合并 rows
-    vat_results = _parallel(lambda bf: parse_vat_report(bf[0], bf[1], api_key=api_key), vat_data)
+    vat_results = _parallel(
+        lambda bf: parse_vat_report(
+            bf[0],
+            bf[1],
+            api_key=api_key,
+            **ocr_policy_ctx,
+        ),
+        vat_data,
+    )
     progress_cb({"stage": "parse", "stage_done": total, "stage_total": total})
     vat_errors = [r.get("error") for r in vat_results if not r.get("ok") and r.get("error")]
     if vat_errors and not any(r.get("rows") for r in vat_results):
@@ -163,6 +185,13 @@ def run_salesvat(
     workspace_client_id = params.get("workspace_client_id")  # PO-6d · 套账随 job 行存
     is_exempt = bool(params.get("is_exempt", True))
 
+    plan_code = params.get("plan_code")
+    ocr_policy_ctx = {}
+    if plan_code:
+        ocr_policy_ctx["plan_code"] = plan_code
+    if params.get("is_exempt") is True:
+        ocr_policy_ctx["is_exempt"] = True
+
     invoices = _read_inputs(input_ref, "invoice")
     reports = _read_inputs(input_ref, "report")
     t0 = time.time()
@@ -170,7 +199,11 @@ def run_salesvat(
     # 报告先合并
     progress_cb({"stage": "report", "stage_done": 0, "stage_total": 1})
     report_files = [{"filename": fn, "bytes": b} for b, fn in reports]
-    rep_result = merge_vat_reports(report_files, api_key)
+    rep_result = merge_vat_reports(
+        report_files,
+        api_key,
+        **ocr_policy_ctx,
+    )
     if not rep_result.get("ok"):
         raise ValueError(rep_result.get("error", "报告解析失败"))
 

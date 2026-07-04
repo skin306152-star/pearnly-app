@@ -4,7 +4,7 @@
 import io
 import logging
 from datetime import date, datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from services.recon.field_comparator import normalize_invoice_no
 from services.ocr.error_format import short_error as _short_err
@@ -144,7 +144,33 @@ def parse_gl_excel(file_bytes: bytes, revenue_prefix: str = "4") -> Dict[str, An
 # ─────────────────────────────────────────────────────────────────────
 # 统一入口
 # ─────────────────────────────────────────────────────────────────────
-def parse_gl(file_bytes: bytes, filename: str, revenue_prefix: str = "4") -> Dict[str, Any]:
+def parse_gl(
+    file_bytes: bytes,
+    filename: str,
+    revenue_prefix: str = "4",
+    *,
+    plan_code: Optional[str] = None,
+    is_exempt: bool = False,
+    user_type: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Facade → controller(task=gl_ledger, flavor=gl_vat)."""
+    from services.ocr import controller
+    from services.ocr.contracts import OcrRequest
+
+    return controller.run(
+        OcrRequest(
+            task="gl_ledger",
+            file_bytes=file_bytes,
+            filename=filename,
+            plan_code=plan_code,
+            is_exempt=is_exempt,
+            user_type=user_type,
+            options={"flavor": "gl_vat", "revenue_prefix": revenue_prefix},
+        )
+    ).data
+
+
+def _parse_gl_impl(file_bytes: bytes, filename: str, revenue_prefix: str = "4") -> Dict[str, Any]:
     """按后缀分发解析 GL 文件。
 
     2026-05-21 multi-format refactor:

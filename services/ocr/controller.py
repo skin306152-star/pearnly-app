@@ -22,8 +22,7 @@ def run(req: OcrRequest) -> OcrResult:
     policy_for(req.task)
     handler = import_module(f"{_HANDLER_PKG}.{req.task}")
     t0 = time.monotonic()
-    # 套餐档位在这层拿不到(不为它加 DB 查询);task 覆写 + 全局 mode 已够,
-    # 走网页主路的 recognize/core 自带套餐上下文。
-    with engine_context(req.task):
+    # Controller 只消费调用方传入的套餐上下文,不在这里查 DB;没有上下文时按 none 档回落。
+    with engine_context(req.task, plan_code=req.plan_code, is_exempt=req.is_exempt):
         data = handler.handle(req)
     return OcrResult(task=req.task, data=data, elapsed_ms=int((time.monotonic() - t0) * 1000))

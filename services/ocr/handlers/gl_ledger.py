@@ -8,6 +8,15 @@ from services.ocr.contracts import OcrRequest
 
 
 def handle(req: OcrRequest):
+    if req.options.get("flavor") == "gl_vat":
+        from services.recon import gl_vat_parse_excel
+
+        return gl_vat_parse_excel._parse_gl_impl(
+            req.file_bytes,
+            req.filename,
+            revenue_prefix=str(req.options.get("revenue_prefix") or "4"),
+        )
+
     from services.recon import bank_recon_v2
 
     return bank_recon_v2._parse_gl_impl(

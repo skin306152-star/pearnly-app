@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 import uuid
 from typing import Optional
 
@@ -22,6 +23,7 @@ from routes.accounting_common import auth_member, gate, resolve_ws, uid
 from services.accounting import bank_candidates, bank_match, bank_recon
 
 router = APIRouter(prefix="/api/accounting/bank", tags=["accounting-bank"])
+logger = logging.getLogger(__name__)
 
 _MAX_BYTES = 20 * 1024 * 1024
 
@@ -74,27 +76,34 @@ async def api_create_bank_account(
 # --------------------------------------------------------------------------- #
 # 导入(multipart;sha256 查重 → 409;解析复用 recon)
 # --------------------------------------------------------------------------- #
-async def _parse_statement(raw: bytes, filename: str):
+async def _parse_statement(
+    raw: bytes,
+    filename: str,
+    tenant_id: Optional[str] = None,
+    ocr_policy_ctx: Optional[dict] = None,
+):
     """复用 services/recon 解析栈(PDF→pdfplumber/Gemini;表格/图片→统一管道)· 重 CPU 进线程。"""
     from services.ocr.pipeline import IMAGE_EXTENSIONS, PDF_EXTENSIONS, TABLE_EXTENSIONS
-    from services.recon import bank_recon_v2 as br
 
     name_l = filename.lower()
     ext = "." + name_l.rsplit(".", 1)[-1] if "." in name_l else ""
     if ext not in (PDF_EXTENSIONS | IMAGE_EXTENSIONS | TABLE_EXTENSIONS):
         raise PosError("acct.unexpected", 422, detail="unsupported_format")
-    if ext in PDF_EXTENSIONS:
-        return await asyncio.to_thread(br.parse_statement_pdf, raw, filename)
-    from services.ocr.legacy_adapter import pipeline_result_to_legacy_dict
-    from services.ocr.pipeline import run_on_image_bytes, run_on_table_bytes
+    from services.ocr import controller
+    from services.ocr.contracts import OcrRequest
 
-    if ext in IMAGE_EXTENSIONS:
-        res = await asyncio.to_thread(run_on_image_bytes, raw, document_type="bank_statement")
-    else:
-        res = await asyncio.to_thread(
-            run_on_table_bytes, raw, filename, None, None, "bank_statement"
-        )
-    return br.parsed_from_pipeline_legacy(pipeline_result_to_legacy_dict(res), filename)
+    return await asyncio.to_thread(
+        lambda: controller.run(
+            OcrRequest(
+                task="bank_statement",
+                file_bytes=raw,
+                filename=filename,
+                tenant_id=tenant_id,
+                **(ocr_policy_ctx or {}),
+                options={"shape": "legacy_parsed_statement"},
+            )
+        ).data
+    )
 
 
 @router.post("/import")
@@ -118,9 +127,23 @@ async def api_bank_import(
             cur, tenant_id=tid, workspace_client_id=ws, sha256=sha256
         ):
             raise PosError("acct.bank.duplicate_file", 409)
+    _ocr_policy_ctx = {}
+    try:
+        from services.ocr.entrypoints import policy_context_from_billing
+
+        _ocr_policy_ctx = policy_context_from_billing(
+            db.get_billing_status_combined(str(user["id"]), tid)
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[acct.bank.ocr_policy] billing lookup skipped: {e}")
 
     try:
-        parsed = await _parse_statement(raw, file.filename or "statement")
+        parsed = await _parse_statement(
+            raw,
+            file.filename or "statement",
+            tenant_id=tid,
+            ocr_policy_ctx=_ocr_policy_ctx,
+        )
     except PosError:
         raise
     except Exception:

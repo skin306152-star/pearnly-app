@@ -2999,7 +2999,7 @@
         if (withEmpty)
             html += '<option value="">' + _esc(_t('adm-eng-follow-global')) + '</option>';
         options.forEach(function (o) {
-            html += '<option value="' + o + '">' + o + '</option>';
+            html += '<option value="' + o + '">' + _esc(_t('adm-eng-opt-' + o)) + '</option>';
         });
         return html + '</select>';
     }

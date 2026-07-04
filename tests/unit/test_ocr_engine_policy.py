@@ -99,6 +99,42 @@ class EngineContextTests(unittest.TestCase):
                     self.assertEqual(gemini_models.brain(), "gemini-2.5-flash")
 
 
+class BackendByModeTests(unittest.TestCase):
+    """economy 钉 aistudio(Vertex 无 2.5),direct35 跟随全局。三条选档路都得一致,
+    否则改了后端而上下游没跟上 → 该档静默失效。"""
+
+    def _backend_in_ctx(self, cfg, task="invoice", **kw):
+        from services.ai_gateway import backends
+
+        with mock.patch.dict("os.environ", _ENV_CLEAR):
+            with mock.patch.object(ep, "load_config", return_value=cfg):
+                self.assertIsNone(backends.override_backend())  # 进入前无覆盖
+                with ep.engine_context(task, **kw):
+                    got = backends.override_backend()
+                self.assertIsNone(backends.override_backend())  # 退出后已还原
+        return got
+
+    def test_economy_pins_aistudio_via_global(self):
+        cfg = {**ep.DEFAULT_CONFIG, "mode": "economy"}
+        self.assertEqual(self._backend_in_ctx(cfg), "aistudio")
+
+    def test_economy_pins_aistudio_via_task_override(self):
+        cfg = {**ep.DEFAULT_CONFIG, "mode": "direct35", "overrides_by_task": {"invoice": "economy"}}
+        self.assertEqual(self._backend_in_ctx(cfg), "aistudio")
+
+    def test_economy_pins_aistudio_via_auto_plan(self):
+        cfg = {
+            **ep.DEFAULT_CONFIG,
+            "mode": "auto",
+            "defaults_by_plan": {"none": "economy", "L": "direct35", "exempt": "direct35"},
+        }
+        self.assertEqual(self._backend_in_ctx(cfg), "aistudio")
+
+    def test_direct35_follows_global_backend(self):
+        cfg = {**ep.DEFAULT_CONFIG, "mode": "direct35"}
+        self.assertIsNone(self._backend_in_ctx(cfg))
+
+
 def _page(chain, l2i=0, l2o=0, l3i=0, l3o=0, l2_model="", l3_model=""):
     return SimpleNamespace(
         layer_chain=chain,

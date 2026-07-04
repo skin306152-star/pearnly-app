@@ -943,21 +943,23 @@
             <div class="cost-section-head">
               <h3 data-i18n="adm-eng-mode-title">全局模式</h3>
               <span class="cost-section-hint" data-i18n="adm-eng-mode-hint"
-                >direct35 = 全 3.5 快准贵 · economy = 2.5 阶梯省钱兜底升 3.5 · auto = 按套餐表</span
+                >A · 高精度 = 全程 gemini-3.5-flash · 走 Vertex · 最准,单价最高 ‖ B · 经济 = L2 常规识别用 gemini-2.5-flash-lite / gemini-2.5-flash,难票 L3 自动升 gemini-3.5-flash · 整条走 AI Studio · 省钱 ‖ 自动 = 按下方套餐表给每个用户选 A 或 B(L1 取文字层不计模型费,两档相同)</span
               >
             </div>
             <div class="adm-set-rollout">
               <label class="adm-set-radio">
                 <input type="radio" name="adm-eng-mode" value="direct35" />
-                <span data-i18n="adm-eng-mode-direct35">高质量 direct35(全 3.5)</span>
+                <span data-i18n="adm-eng-mode-direct35">A · 高精度(全程 gemini-3.5-flash)</span>
               </label>
               <label class="adm-set-radio">
                 <input type="radio" name="adm-eng-mode" value="economy" />
-                <span data-i18n="adm-eng-mode-economy">低成本 economy(2.5 阶梯)</span>
+                <span data-i18n="adm-eng-mode-economy"
+                  >B · 经济(L2 用 gemini-2.5-flash(-lite) · 难票 L3 升 gemini-3.5-flash)</span
+                >
               </label>
               <label class="adm-set-radio">
                 <input type="radio" name="adm-eng-mode" value="auto" />
-                <span data-i18n="adm-eng-mode-auto">自动 auto(按下方套餐表)</span>
+                <span data-i18n="adm-eng-mode-auto">自动(按下方套餐表)</span>
               </label>
             </div>
 
@@ -984,8 +986,8 @@
 
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="/static/admin/admin-i18n.js?v=11852600"></script>
+    <script src="/static/admin/admin-i18n.js?v=11852700"></script>
 
-    <script src="/static/admin/admin.js?v=11852600" defer></script>
+    <script src="/static/admin/admin.js?v=11852700" defer></script>
   </body>
 </html>

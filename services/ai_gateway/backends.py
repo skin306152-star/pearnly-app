@@ -13,9 +13,30 @@ OCR_LLM_BACKEND = aistudio(默认) | vertex | selfhost
 from __future__ import annotations
 
 import os
+from contextvars import ContextVar, Token
 from typing import Optional
 
 _VALID = ("aistudio", "vertex", "selfhost", "anthropic")
+
+# 请求级后端覆盖(engine_policy 按 OCR_MODE 设置):某档需固定某家 provider 时用。
+# 例:economy 档钉 aistudio(Vertex 无 2.5 模型),direct35 档留 None 跟随全局。
+# 显式传入 transport 的 backend 参数 > 本覆盖 > 全局 env(见 transport._run)。
+_OVERRIDE: ContextVar[Optional[str]] = ContextVar("llm_backend_override", default=None)
+
+
+def set_backend_override(backend: Optional[str]) -> Token:
+    """设本请求上下文的后端覆盖;调用方负责用返回 token reset。非法值当无覆盖。"""
+    b = (backend or "").strip().lower()
+    return _OVERRIDE.set(b if b in _VALID else None)
+
+
+def reset_backend_override(token: Token) -> None:
+    _OVERRIDE.reset(token)
+
+
+def override_backend() -> Optional[str]:
+    """当前请求的后端覆盖(无 = None)。transport 在调用方未显式指定 backend 时消费。"""
+    return _OVERRIDE.get()
 
 
 def active_backend() -> str:

@@ -3038,6 +3038,17 @@
                 _t('adm-eng-kpi-l3'),
                 _fmt((w.l3_rate || 0) * 100, 1) + '%',
                 _t('adm-eng-kpi-fail') + ' ' + _fmt((w.fail_rate || 0) * 100, 1) + '%'
+            ) +
+            _engKpi(
+                _t('adm-eng-kpi-shadow'),
+                _fmt(((m.shadow || {}).rate || 0) * 100, 1) + '%',
+                _t('adm-eng-shadow-ran') +
+                    ' ' +
+                    ((m.shadow || {}).total || 0) +
+                    ' · ' +
+                    _t('adm-eng-shadow-mism') +
+                    ' ' +
+                    ((m.shadow || {}).mismatches || 0)
             );
         const box = document.getElementById('adm-eng-by-model');
         if (!box) return;

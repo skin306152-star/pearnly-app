@@ -346,4 +346,11 @@ def get_ocr_engine_metrics(days: int = 7) -> Dict[str, Any]:
                 ]
     except Exception as e:
         logger.error(f"get_ocr_engine_metrics failed: {e}")
+    # 影子双跑读数(近 30 天固定窗口·独立于上面的 days):跑 N 张 · 不一致 M 张 · 不一致率。
+    try:
+        from services.ocr import shadow_money_store
+
+        out["shadow"] = shadow_money_store.aggregate(days=30)
+    except Exception as e:
+        logger.warning(f"shadow metrics skip: {e}")
     return out

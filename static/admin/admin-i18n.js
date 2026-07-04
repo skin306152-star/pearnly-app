@@ -52,10 +52,10 @@
             'adm-eng-no-data': '暂无数据',
             'adm-eng-mode-title': '全局模式',
             'adm-eng-mode-hint':
-                'A · 高精度 = 全程 gemini-3.5-flash · 走 Vertex · 最准,单价最高 ‖ B · 经济 = L2 读取用 gemini-2.5-flash-lite(走 Vertex global · 实测最快最省 ~฿0.08/张)· 难票 L3 自动升 gemini-3.5-flash · 省钱 ‖ 自动 = 按下方套餐表给每个用户选 A 或 B(L1 取文字层不计模型费,两档相同)',
+                'A · 高精度 = 全程 gemini-3.5-flash · 走 Vertex · 最准,单价最高 ‖ B · 经济 = L2 读取用 gemini-3.1-flash-lite(走 Vertex global · 实测最快 · 钱字段追平 3.5 · ~฿0.08/张)· 难票 L3 自动升 gemini-3.5-flash · 省钱 ‖ 自动 = 按下方套餐表给每个用户选 A 或 B(L1 取文字层不计模型费,两档相同)',
             'adm-eng-mode-direct35': 'A · 高精度(全程 gemini-3.5-flash)',
             'adm-eng-mode-economy':
-                'B · 经济(L2 用 gemini-2.5-flash-lite · 难票 L3 升 gemini-3.5-flash)',
+                'B · 经济(L2 用 gemini-3.1-flash-lite · 难票 L3 升 gemini-3.5-flash)',
             'adm-eng-mode-auto': '自动(按下方套餐表)',
             'adm-eng-opt-direct35': 'A · 高精度',
             'adm-eng-opt-economy': 'B · 经济',
@@ -412,10 +412,10 @@
             'adm-eng-no-data': 'ยังไม่มีข้อมูล',
             'adm-eng-mode-title': 'โหมดหลัก',
             'adm-eng-mode-hint':
-                'A · แม่นยำสูง = gemini-3.5-flash ทั้งหมด · ผ่าน Vertex · แม่นสุด ราคาสูงสุด ‖ B · ประหยัด = L2 อ่านใช้ gemini-2.5-flash-lite (ผ่าน Vertex global · เร็วสุด/ถูกสุดจากผลทดสอบ ~฿0.08/ใบ) · งานยาก L3 ขึ้น gemini-3.5-flash อัตโนมัติ · ประหยัด ‖ อัตโนมัติ = เลือก A หรือ B ตามแพ็กเกจผู้ใช้ (L1 ดึงชั้นข้อความ ไม่คิดค่าโมเดล เท่ากันทั้งสอง)',
+                'A · แม่นยำสูง = gemini-3.5-flash ทั้งหมด · ผ่าน Vertex · แม่นสุด ราคาสูงสุด ‖ B · ประหยัด = L2 อ่านใช้ gemini-3.1-flash-lite (ผ่าน Vertex global · เร็วสุด · ช่องเงินเสมอ 3.5 จากผลทดสอบ ~฿0.08/ใบ) · งานยาก L3 ขึ้น gemini-3.5-flash อัตโนมัติ · ประหยัด ‖ อัตโนมัติ = เลือก A หรือ B ตามแพ็กเกจผู้ใช้ (L1 ดึงชั้นข้อความ ไม่คิดค่าโมเดล เท่ากันทั้งสอง)',
             'adm-eng-mode-direct35': 'A · แม่นยำสูง (gemini-3.5-flash ทั้งหมด)',
             'adm-eng-mode-economy':
-                'B · ประหยัด (L2 ใช้ gemini-2.5-flash-lite · งานยาก L3 ขึ้น gemini-3.5-flash)',
+                'B · ประหยัด (L2 ใช้ gemini-3.1-flash-lite · งานยาก L3 ขึ้น gemini-3.5-flash)',
             'adm-eng-mode-auto': 'อัตโนมัติ (ตามตารางแพ็กเกจ)',
             'adm-eng-opt-direct35': 'A · แม่นยำสูง',
             'adm-eng-opt-economy': 'B · ประหยัด',

@@ -77,8 +77,8 @@ class EngineContextTests(unittest.TestCase):
                 with ep.engine_context("invoice") as mode:
                     self.assertEqual(mode, "economy")
                     self.assertEqual(ep.active_mode(), "economy")
-                    # L2 读取臂 = 2.5-lite;兜底/升级臂 = 3.5;flash 档已弃,留 env 默认不覆写
-                    self.assertEqual(gemini_models.flash_lite(), "gemini-2.5-flash-lite")
+                    # L2 读取臂 = 3.1-lite;兜底/升级臂 = 3.5;flash 档已弃,留 env 默认不覆写
+                    self.assertEqual(gemini_models.flash_lite(), "gemini-3.1-flash-lite")
                     self.assertEqual(gemini_models.fallback(), "gemini-3.5-flash")
                     self.assertEqual(gemini_models.escalate(), "gemini-3.5-flash")
                     self.assertEqual(gemini_models.flash(), "gemini-3.5-flash")
@@ -127,6 +127,21 @@ class CostByRecordedModelTests(unittest.TestCase):
                 ]
             )
         self.assertAlmostEqual(thb, (0.10 + 0.40) * 35.0, places=4)
+
+    def test_l2_economy_model_31_lite_priced(self):
+        # economy 现役 L2 = 3.1-flash-lite,按其单价计($0.25/$1.50)不套 3.5
+        with mock.patch.dict("os.environ", _ENV_CLEAR):
+            thb = c._compute_total_cost(
+                [
+                    _page(
+                        ["text", "L2"],
+                        l2i=1_000_000,
+                        l2o=1_000_000,
+                        l2_model="gemini-3.1-flash-lite",
+                    )
+                ]
+            )
+        self.assertAlmostEqual(thb, (0.25 + 1.50) * 35.0, places=4)
 
     def test_l3_priced_by_recorded_model(self):
         with mock.patch.dict("os.environ", _ENV_CLEAR):

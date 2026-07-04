@@ -8,7 +8,7 @@
 
 env 开关(都给了默认值,不配也能跑):
   OCR_FLASH_MODEL       默认 gemini-3.5-flash  (视觉/解析主力)
-  OCR_FLASHLITE_MODEL   默认 gemini-3.5-flash  (轻量档;economy 档覆写为 2.5-lite,走 Vertex global)
+  OCR_FLASHLITE_MODEL   默认 gemini-3.5-flash  (轻量档;economy 档覆写为 3.1-flash-lite,走 Vertex global)
   OCR_FALLBACK_MODEL    默认 gemini-3.5-flash  (兜底升级;设为空串关闭兜底)
   AGENT_BRAIN_MODEL     默认 gemini-2.5-flash  (对话大脑,与 OCR 档独立)
 

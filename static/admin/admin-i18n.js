@@ -32,7 +32,7 @@
             'adm-set-saved-toast': '已保存',
             'adm-sidebar-engine': 'OCR 引擎',
             'adm-eng-title': 'OCR 引擎策略',
-            'adm-eng-sub': '模式/套餐/任务级档位 · 配置故障自动回落 direct35 · 改动留审计',
+            'adm-eng-sub': '模式/套餐/任务级档位 · 配置故障自动回落 A · 高精度(全 3.5)· 改动留审计',
             'adm-eng-metrics-title': '运行指标(近 7 天)',
             'adm-eng-metrics-hint': '成本按每次识别实际用的模型单价落账 · 混跑 2.5/3.5 不算串',
             'adm-eng-kpi-today': '今日 OCR 成本',
@@ -388,7 +388,7 @@
             'adm-sidebar-engine': 'เครื่องยนต์ OCR',
             'adm-eng-title': 'นโยบายเครื่องยนต์ OCR',
             'adm-eng-sub':
-                'โหมด/แพ็กเกจ/ระดับงาน · ขัดข้องจะกลับ direct35 อัตโนมัติ · บันทึก audit',
+                'โหมด/แพ็กเกจ/ระดับงาน · ขัดข้องจะกลับ A · แม่นยำสูง (3.5 ทั้งหมด) อัตโนมัติ · บันทึก audit',
             'adm-eng-metrics-title': 'ตัวชี้วัด (7 วันล่าสุด)',
             'adm-eng-metrics-hint':
                 'ต้นทุนคิดตามราคาโมเดลที่ใช้จริงต่อครั้ง · ผสม 2.5/3.5 ไม่ปนกัน',

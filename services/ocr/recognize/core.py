@@ -362,6 +362,23 @@ def run_recognition_core(
     except Exception as _cost_err:
         logger.warning(f"成本记录写入失败(不影响识别): {_cost_err}")
 
+    # 影子双跑:B 档发票钱字段后台用 3.5 悄悄复核,量真错率(不改结果/不计费/异常吞掉)。
+    if _engine_mode == "economy" and history_ids:
+        try:
+            from services.ocr import shadow_money
+
+            shadow_money.schedule(
+                content=content,
+                filename=file.filename,
+                invoice_groups=invoice_groups[:invoice_count],
+                confidence=confidence,
+                history_id=primary_history_id,
+                tenant_id=str(user.get("tenant_id")) if user.get("tenant_id") else None,
+                user_id=str(user["id"]),
+            )
+        except Exception as _sh_err:
+            logger.warning(f"影子双跑调度跳过(不影响识别): {_sh_err}")
+
     # 同页多票防静默漏:收集 pipeline 标出的"可能漏识别发票"页。
     missed_invoice_warnings: List[dict] = []
     for _pg in result.get("pages") or []:

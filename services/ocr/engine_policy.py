@@ -25,13 +25,13 @@ logger = logging.getLogger(__name__)
 SETTING_KEY = "ocr_engine_policy"
 _FAILSAFE_MODE = "direct35"
 
-# mode → tier 覆写表。direct35 不覆写(吃 env 默认全 3.5);economy 走 2.5 阶梯、
-# 兜底/升级臂仍 3.5(勾稽不平/低置信才花大钱)。加新模式只补这里 + cost 价表,
-# CONCRETE_MODES/MODES 由本表派生(admin 路由校验同源,别再手抄档位清单)。
+# mode → tier 覆写表。direct35 不覆写(吃 env 默认全 3.5);economy 只在 L2 读取臂用
+# 2.5-lite(实测最快最省),兜底/L3 升级臂维持 3.5(勾稽不平/低置信才花大钱救那 6% 抽错)。
+# 加新模式只补这里 + cost 价表,CONCRETE_MODES/MODES 由本表派生(admin 路由校验同源)。
+# 32 张实测:2.5-flash 三轴全输(22s 哪都救不了 + 单号乱加前缀),已弃,不入档。
 MODE_MODEL_MAPS: Dict[str, Dict[str, str]] = {
     "direct35": {},
     "economy": {
-        "flash": "gemini-2.5-flash",
         "flash_lite": "gemini-2.5-flash-lite",
         "fallback": "gemini-3.5-flash",
         "escalate": "gemini-3.5-flash",
@@ -39,14 +39,6 @@ MODE_MODEL_MAPS: Dict[str, Dict[str, str]] = {
 }
 CONCRETE_MODES = tuple(MODE_MODEL_MAPS)
 MODES = (*CONCRETE_MODES, "auto")
-
-# mode → LLM 后端。economy 的 2.5 档在 Vertex 上不存在(404),而 AI Studio 三档全有,
-# 故 economy 整条(含难票升 3.5 的兜底臂)钉 aistudio,零 404;direct35 留 None 跟随全局
-# (现状 vertex 全 3.5)。设在 engine_context 这一唯一收口 → 三条选档路自动一致。
-MODE_BACKEND: Dict[str, Optional[str]] = {
-    "direct35": None,
-    "economy": "aistudio",
-}
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "mode": "direct35",
@@ -118,14 +110,10 @@ def engine_context(task: str, plan_code: Optional[str] = None, is_exempt: bool =
         yield active
         return
     mode = resolve_mode(task, plan_code=plan_code, is_exempt=is_exempt)
-    from services.ai_gateway import backends
-
     token = gemini_models.set_model_override(MODE_MODEL_MAPS.get(mode))
-    backend_token = backends.set_backend_override(MODE_BACKEND.get(mode))
     mode_token = _ACTIVE_MODE.set(mode)
     try:
         yield mode
     finally:
         _ACTIVE_MODE.reset(mode_token)
-        backends.reset_backend_override(backend_token)
         gemini_models.reset_model_override(token)

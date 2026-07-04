@@ -124,10 +124,28 @@ function subCatOptions(
     );
 }
 
+// 预扣税率(หัก ณ ที่จ่าย):逐行可编辑 · 单一事实源 = 行上 wht_rate。快捷档 = 泰国常用法定档
+// (运输 1% / 广告 2% / 服务 3% / 租金 5%);框内仍可手输其他值。商品行同样显示(默认 0)。
+const WHT_PRESETS = [0, 1, 2, 3, 5];
+function whtRow(l: DocLine, i: number): string {
+    const chips = WHT_PRESETS.map(
+        (r) =>
+            `<span class="whtchip ${Number(l.wht_rate) === r ? 'on' : ''}" data-wht="${i}:${r}">${r}%</span>`
+    ).join('');
+    return `<div class="whtrow">
+        <label>${escapeHtml(t('pur-wht-label'))}</label>
+        <div class="whtctl">
+            <div class="whtin"><input class="fin tnum" type="number" min="0" max="100" step="0.5" data-fld="${i}:wht_rate" value="${l.wht_rate}"><span class="pct">%</span></div>
+            <div class="whtchips">${chips}</div>
+        </div>
+    </div>`;
+}
+
 function lineHtml(l: DocLine, i: number, cats: Category[]): string {
     const isSvc = l.item_type === 'service';
+    // 商品行显示配 SKU 状态;服务行的 WHT 已移入下方 whtRow(此处不再重复标识)。
     const extra = isSvc
-        ? `<span class="pill warn">${escapeHtml(t('pur-svc-wht'))} ${l.wht_rate}%</span>`
+        ? ''
         : l.product_matched
           ? `<span class="pill ok">${escapeHtml(t('pur-matched'))}</span> · <span class="link" data-stock="${i}">${escapeHtml(t('pur-stock-in'))} ✓</span>`
           : `<span class="pill warn">${escapeHtml(t('pur-unmatched'))}</span> · <span class="link" data-match="${i}">${escapeHtml(t('pur-match'))}</span>`;
@@ -150,7 +168,8 @@ function lineHtml(l: DocLine, i: number, cats: Category[]): string {
             <div class="f"><label>${escapeHtml(t('pur-cat-sub'))}</label><div class="inp sm"><select class="fsel" data-fld="${i}:subcategory_id">${subCatOptions(cats, l.category_id, l.subcategory_id)}</select></div></div>
             <div class="f"><label>VAT</label><div class="inp sm"><select class="fsel" data-fld="${i}:vat_rate"><option value="0" ${l.vat_rate == 0 ? 'selected' : ''}>0%</option><option value="7" ${l.vat_rate == 7 ? 'selected' : ''}>7%</option></select></div></div>
         </div>
-        <div class="iextra"><span data-lt="${i}">${escapeHtml(t('pur-line-total'))} ฿${fmtMoney(lineTotal(l))}</span> · ${extra}</div>
+        <div class="iextra"><span data-lt="${i}">${escapeHtml(t('pur-line-total'))} ฿${fmtMoney(lineTotal(l))}</span>${extra ? ' · ' + extra : ''}</div>
+        ${whtRow(l, i)}
         ${discRow}
     </div>`;
 }
@@ -194,9 +213,24 @@ function reLines(): void {
 
 function setLineField(i: number, key: string, val: string): void {
     const l = LST!.lines[i] as unknown as Record<string, unknown>;
-    if (key === 'qty' || key === 'unit_price' || key === 'discount' || key === 'vat_rate')
+    if (
+        key === 'qty' ||
+        key === 'unit_price' ||
+        key === 'discount' ||
+        key === 'vat_rate' ||
+        key === 'wht_rate'
+    )
         l[key] = num(val);
     else l[key] = val;
+}
+
+// 手输税率时只刷 chips 高亮 · 不重设 input.value(否则打「0.5」在「0.」处被抹回「0」)。
+function markWhtChips(i: number): void {
+    const l = LST!.lines[i];
+    document.querySelectorAll<HTMLElement>(`#pur-lines [data-wht^="${i}:"]`).forEach((c) => {
+        const r = Number(c.dataset.wht!.split(':')[1]);
+        c.classList.toggle('on', Number(l.wht_rate) === r);
+    });
 }
 
 function bindLines(): void {
@@ -210,6 +244,7 @@ function bindLines(): void {
                 reLines();
                 return;
             }
+            if (key === 'wht_rate') markWhtChips(Number(iS));
             const lt = document.querySelector<HTMLElement>(`[data-lt="${iS}"]`);
             if (lt)
                 lt.textContent =
@@ -226,6 +261,20 @@ function bindLines(): void {
             l.item_type = it as 'goods' | 'service';
             l.wht_rate = it === 'service' ? LWHT : 0;
             reLines();
+        };
+    });
+    // 快捷档:点即填框 + 刷高亮 + 重算(不整屏重渲 · 保住手输焦点体验一致)。
+    document.querySelectorAll<HTMLElement>('#pur-lines [data-wht]').forEach((el) => {
+        el.onclick = () => {
+            const [iS, rS] = el.dataset.wht!.split(':');
+            const i = Number(iS);
+            setLineField(i, 'wht_rate', rS); // 单一字段写入口 · 与手输走同一路
+            const inp = document.querySelector<HTMLInputElement>(
+                `#pur-lines [data-fld="${i}:wht_rate"]`
+            );
+            if (inp) inp.value = rS;
+            markWhtChips(i);
+            LREFRESH();
         };
     });
     document.querySelectorAll<HTMLElement>('#pur-lines [data-del]').forEach((el) => {

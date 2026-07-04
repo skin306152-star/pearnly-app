@@ -92,6 +92,17 @@ export const PURCHASE_FORM_CSS = `
 .pur .iextra{margin-top:9px;font-size:11.5px;color:var(--ink2);} .pur .iextra .link{color:var(--accent);cursor:pointer;}
 .pur .pill{font-size:10.5px;padding:1px 7px;border-radius:5px;}
 .pur .pill.ok{background:var(--green-weak);color:var(--green);} .pur .pill.warn{background:var(--amber-weak);color:var(--amber);}
+/* 逐行预扣税率(หัก ณ ที่จ่าย):输入框 + 常用档 chips · 移动端换行 */
+.pur .whtrow{margin-top:9px;display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;}
+.pur .whtrow>label{font-size:11.5px;color:var(--ink2);font-weight:600;flex:none;}
+.pur .whtctl{display:flex;align-items:center;flex-wrap:wrap;gap:8px;}
+.pur .whtin{display:flex;align-items:center;width:84px;border:1px solid var(--line);border-radius:8px;padding:3px 9px;background:var(--card);}
+.pur .whtin input{width:100%;border:0;outline:0;background:transparent;font:inherit;color:var(--ink);text-align:right;}
+.pur .whtin input::-webkit-outer-spin-button,.pur .whtin input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.pur .whtin .pct{color:var(--ink2);font-size:12.5px;margin-left:3px;}
+.pur .whtchips{display:flex;gap:6px;flex-wrap:wrap;}
+.pur .whtchip{font-size:11.5px;padding:4px 9px;border-radius:8px;border:1px solid var(--line);color:var(--ink2);background:var(--card);cursor:pointer;}
+.pur .whtchip.on{border-color:var(--accent);background:var(--accent-weak);color:var(--accent-deep);font-weight:700;}
 .pur .addline{width:100%;border:1px dashed var(--accent);color:var(--accent-deep);background:var(--accent-weak);border-radius:11px;padding:11px;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;}
 /* 汇总卡(手动改额) */
 .pur .sum{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;}

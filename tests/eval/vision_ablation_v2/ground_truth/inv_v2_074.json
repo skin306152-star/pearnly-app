@@ -1,0 +1,47 @@
+{
+  "document_type": "simplified_tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00074",
+  "date": "2026-06-19",
+  "date_raw": "19/06/2026",
+  "seller_name": "Siam Service Point Co., Ltd.",
+  "seller_tax": "0105500000074",
+  "seller_addr": "88 Rama IX Road, Huai Khwang, Bangkok",
+  "buyer_name": "",
+  "buyer_tax": "",
+  "buyer_addr": "",
+  "subtotal": "2838.00",
+  "vat": "198.66",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "3036.66",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "กาแฟคั่วกลาง 250g (bag)",
+      "qty": "3",
+      "price": "333.00",
+      "subtotal": "999.00"
+    },
+    {
+      "name": "ค่าบริการจัดส่ง (job)",
+      "qty": "4",
+      "price": "362.00",
+      "subtotal": "1448.00"
+    },
+    {
+      "name": "ข้าวกล่องพนักงาน (box)",
+      "qty": "1",
+      "price": "391.00",
+      "subtotal": "391.00"
+    }
+  ],
+  "notes": "",
+  "category": "food",
+  "additional_invoices": []
+}

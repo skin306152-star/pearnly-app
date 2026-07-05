@@ -1,0 +1,61 @@
+{
+  "id": "trap12_non_invoice_decoy_003",
+  "name": "trap12_non_invoice_decoy_003",
+  "file": "trap12_non_invoice_decoy_003.jpg",
+  "document_type": "other",
+  "is_not_invoice": true,
+  "is_copy_or_duplicate": false,
+  "seller_name": "Lotus's สาขาพระราม 4",
+  "seller_tax": "0107543000121",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "หจก. สกิน แอนด์ โค",
+  "buyer_tax": "0903563007788",
+  "buyer_addr": "",
+  "invoice_number": "IV70/10058",
+  "date": "2026-07-05",
+  "date_raw": "05/07/2569",
+  "subtotal": "582.00",
+  "vat": "40.74",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "622.74",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "สายชาร์จ USB-C",
+      "qty": "2",
+      "price": "199.00",
+      "subtotal": "398.00"
+    },
+    {
+      "name": "นมสด",
+      "qty": "3",
+      "price": "28.00",
+      "subtotal": "84.00"
+    },
+    {
+      "name": "น้ำดื่ม 600ml",
+      "qty": "1",
+      "price": "10.00",
+      "subtotal": "10.00"
+    },
+    {
+      "name": "กาแฟเย็น",
+      "qty": "2",
+      "price": "45.00",
+      "subtotal": "90.00"
+    }
+  ],
+  "items_count": 4,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "non_invoice_decoy",
+  "traps": ["po_quote_delivery_copy"],
+  "degradation": ["glare"],
+  "_note": "po_quote_delivery_copy; glare"
+}

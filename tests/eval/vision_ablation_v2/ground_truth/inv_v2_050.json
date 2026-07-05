@@ -1,0 +1,47 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00050",
+  "date": "2026-06-23",
+  "date_raw": "23/06/2026",
+  "seller_name": "Siam Service Point Co., Ltd.",
+  "seller_tax": "0105500000050",
+  "seller_addr": "88 Rama IX Road, Huai Khwang, Bangkok",
+  "buyer_name": "Mango Cloud Accounting Ltd.",
+  "buyer_tax": "0105500009050",
+  "buyer_addr": "12 Wireless Road, Bangkok",
+  "subtotal": "3414.00",
+  "vat": "238.98",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "3652.98",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "กาแฟคั่วกลาง 250g (bag)",
+      "qty": "3",
+      "price": "405.00",
+      "subtotal": "1215.00"
+    },
+    {
+      "name": "ค่าบริการจัดส่ง (job)",
+      "qty": "4",
+      "price": "434.00",
+      "subtotal": "1736.00"
+    },
+    {
+      "name": "ข้าวกล่องพนักงาน (box)",
+      "qty": "1",
+      "price": "463.00",
+      "subtotal": "463.00"
+    }
+  ],
+  "notes": "Handwritten approval note appears near the total.",
+  "category": "food",
+  "additional_invoices": []
+}

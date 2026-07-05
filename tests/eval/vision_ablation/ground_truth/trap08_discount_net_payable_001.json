@@ -1,0 +1,49 @@
+{
+  "id": "trap08_discount_net_payable_001",
+  "name": "trap08_discount_net_payable_001",
+  "file": "trap08_discount_net_payable_001.jpg",
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "seller_name": "ร้านอาหารบ้านสวนป้าลี",
+  "seller_tax": "0735559001248",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "บริษัท ดาต้าทูลส์ จำกัด",
+  "buyer_tax": "0735527000289",
+  "buyer_addr": "",
+  "invoice_number": "IV69/10036",
+  "date": "2026-07-05",
+  "date_raw": "05/07/2569",
+  "subtotal": "1896.68",
+  "vat": "0.00",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "50.00",
+  "total_amount": "1846.68",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "น้ำมันดีเซล ลิตร",
+      "qty": "12.35",
+      "price": "32.12",
+      "subtotal": "396.68"
+    },
+    {
+      "name": "บริการซ่อมแซม",
+      "qty": "1",
+      "price": "1500.00",
+      "subtotal": "1500.00"
+    }
+  ],
+  "items_count": 2,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "discount_net_payable",
+  "traps": ["discount_line"],
+  "degradation": ["motion_blur_mid"],
+  "_note": "discount_line; motion_blur_mid"
+}

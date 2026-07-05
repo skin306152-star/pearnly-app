@@ -1,0 +1,145 @@
+{
+  "id": "trap13_dense_micro_rows_002",
+  "name": "trap13_dense_micro_rows_002",
+  "file": "trap13_dense_micro_rows_002.jpg",
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "seller_name": "บริษัท เซ็นทรัล ฟู้ด รีเทล จำกัด",
+  "seller_tax": "0105544060428",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "",
+  "buyer_tax": "",
+  "buyer_addr": "",
+  "invoice_number": "IV69/10063",
+  "date": "2026-07-05",
+  "date_raw": "05/07/2569",
+  "subtotal": "1433.25",
+  "vat": "100.33",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "1533.58",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "น้ำดื่ม 600ml",
+      "qty": "1",
+      "price": "18.00",
+      "subtotal": "18.00"
+    },
+    {
+      "name": "กาแฟเย็น",
+      "qty": "1",
+      "price": "25.25",
+      "subtotal": "25.25"
+    },
+    {
+      "name": "สปาเก็ตตี้",
+      "qty": "1",
+      "price": "32.50",
+      "subtotal": "32.50"
+    },
+    {
+      "name": "กระดาษ A4",
+      "qty": "1",
+      "price": "39.75",
+      "subtotal": "39.75"
+    },
+    {
+      "name": "ค่าขนส่ง",
+      "qty": "1",
+      "price": "47.00",
+      "subtotal": "47.00"
+    },
+    {
+      "name": "ข้าวกล่อง",
+      "qty": "1",
+      "price": "54.25",
+      "subtotal": "54.25"
+    },
+    {
+      "name": "น้ำมันดีเซล ลิตร",
+      "qty": "1",
+      "price": "61.50",
+      "subtotal": "61.50"
+    },
+    {
+      "name": "บริการซ่อมแซม",
+      "qty": "1",
+      "price": "68.75",
+      "subtotal": "68.75"
+    },
+    {
+      "name": "สายชาร์จ USB-C",
+      "qty": "1",
+      "price": "76.00",
+      "subtotal": "76.00"
+    },
+    {
+      "name": "นมสด",
+      "qty": "1",
+      "price": "83.25",
+      "subtotal": "83.25"
+    },
+    {
+      "name": "น้ำดื่ม 600ml",
+      "qty": "1",
+      "price": "90.50",
+      "subtotal": "90.50"
+    },
+    {
+      "name": "กาแฟเย็น",
+      "qty": "1",
+      "price": "97.75",
+      "subtotal": "97.75"
+    },
+    {
+      "name": "สปาเก็ตตี้",
+      "qty": "1",
+      "price": "105.00",
+      "subtotal": "105.00"
+    },
+    {
+      "name": "กระดาษ A4",
+      "qty": "1",
+      "price": "112.25",
+      "subtotal": "112.25"
+    },
+    {
+      "name": "ค่าขนส่ง",
+      "qty": "1",
+      "price": "119.50",
+      "subtotal": "119.50"
+    },
+    {
+      "name": "ข้าวกล่อง",
+      "qty": "1",
+      "price": "126.75",
+      "subtotal": "126.75"
+    },
+    {
+      "name": "น้ำมันดีเซล ลิตร",
+      "qty": "1",
+      "price": "134.00",
+      "subtotal": "134.00"
+    },
+    {
+      "name": "บริการซ่อมแซม",
+      "qty": "1",
+      "price": "141.25",
+      "subtotal": "141.25"
+    }
+  ],
+  "items_count": 18,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "dense_micro_rows",
+  "traps": ["micro_text", "many_line_items"],
+  "degradation": ["thermal_fade"],
+  "_note": "micro_text; many_line_items; thermal_fade"
+}

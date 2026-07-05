@@ -1,0 +1,135 @@
+{
+  "document_type": "bank_statement",
+  "bank_name": "KASIKORNBANK",
+  "bank_code": "kbank",
+  "account_name": "Pearnly Retail Co., Ltd.",
+  "account_number": "108-007-00008-9",
+  "account_last4": "0008",
+  "period_start": "2026-06-01",
+  "period_end": "2026-06-30",
+  "opening_balance": "27536.00",
+  "closing_balance": "24225.00",
+  "entries": [
+    {
+      "transaction_date": "2026-06-08",
+      "transaction_date_raw": "08/06/26",
+      "description": "Monthly bank fee 008",
+      "reference": "KBANK-008-0000",
+      "deposit": "",
+      "withdrawal": "748.00",
+      "amount": "748.00",
+      "direction": "withdrawal",
+      "balance": "26788.00"
+    },
+    {
+      "transaction_date": "2026-06-10",
+      "transaction_date_raw": "10/06/26",
+      "description": "Supplier INV-26-008",
+      "reference": "KBANK-008-0001",
+      "deposit": "845.00",
+      "withdrawal": "",
+      "amount": "845.00",
+      "direction": "deposit",
+      "balance": "27633.00"
+    },
+    {
+      "transaction_date": "2026-06-12",
+      "transaction_date_raw": "12/06/26",
+      "description": "Interest credit008",
+      "reference": "KBANK-008-0002",
+      "deposit": "",
+      "withdrawal": "942.00",
+      "amount": "942.00",
+      "direction": "withdrawal",
+      "balance": "26691.00"
+    },
+    {
+      "transaction_date": "2026-06-14",
+      "transaction_date_raw": "14/06/26",
+      "description": "PromptPay REF 6091 008",
+      "reference": "KBANK-008-0003",
+      "deposit": "",
+      "withdrawal": "1039.00",
+      "amount": "1039.00",
+      "direction": "withdrawal",
+      "balance": "25652.00"
+    },
+    {
+      "transaction_date": "2026-06-16",
+      "transaction_date_raw": "16/06/26",
+      "description": "POS batch 10280137 008",
+      "reference": "KBANK-008-0004",
+      "deposit": "1136.00",
+      "withdrawal": "",
+      "amount": "1136.00",
+      "direction": "deposit",
+      "balance": "26788.00"
+    },
+    {
+      "transaction_date": "2026-06-18",
+      "transaction_date_raw": "18/06/26",
+      "description": "Monthly bank fee 008",
+      "reference": "KBANK-008-0005",
+      "deposit": "",
+      "withdrawal": "1233.00",
+      "amount": "1233.00",
+      "direction": "withdrawal",
+      "balance": "25555.00"
+    },
+    {
+      "transaction_date": "2026-06-20",
+      "transaction_date_raw": "20/06/26",
+      "description": "Supplier INV-26-008",
+      "reference": "KBANK-008-0006",
+      "deposit": "",
+      "withdrawal": "1330.00",
+      "amount": "1330.00",
+      "direction": "withdrawal",
+      "balance": "24225.00"
+    },
+    {
+      "transaction_date": "2026-06-22",
+      "transaction_date_raw": "22/06/26",
+      "description": "Interest credit008",
+      "reference": "KBANK-008-0007",
+      "deposit": "1427.00",
+      "withdrawal": "",
+      "amount": "1427.00",
+      "direction": "deposit",
+      "balance": "25652.00"
+    },
+    {
+      "transaction_date": "2026-06-24",
+      "transaction_date_raw": "24/06/26",
+      "description": "PromptPay REF 6091 008",
+      "reference": "KBANK-008-0008",
+      "deposit": "",
+      "withdrawal": "1524.00",
+      "amount": "1524.00",
+      "direction": "withdrawal",
+      "balance": "24128.00"
+    },
+    {
+      "transaction_date": "2026-06-26",
+      "transaction_date_raw": "26/06/26",
+      "description": "POS batch 10280137 008",
+      "reference": "KBANK-008-0009",
+      "deposit": "",
+      "withdrawal": "1621.00",
+      "amount": "1621.00",
+      "direction": "withdrawal",
+      "balance": "22507.00"
+    },
+    {
+      "transaction_date": "2026-06-28",
+      "transaction_date_raw": "28/06/26",
+      "description": "Monthly bank fee 008",
+      "reference": "KBANK-008-0010",
+      "deposit": "1718.00",
+      "withdrawal": "",
+      "amount": "1718.00",
+      "direction": "deposit",
+      "balance": "24225.00"
+    }
+  ]
+}

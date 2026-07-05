@@ -1,0 +1,35 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00048",
+  "date": "2026-06-21",
+  "date_raw": "21/06/2026",
+  "seller_name": "Bangkok Office Supply Co., Ltd.",
+  "seller_tax": "0105500000048",
+  "seller_addr": "123 Silom Road, Bang Rak, Bangkok",
+  "buyer_name": "Pearnly Retail Co., Ltd.",
+  "buyer_tax": "0105500009048",
+  "buyer_addr": "99/18 Sathorn Road, Bangkok",
+  "subtotal": "12.50",
+  "vat": "0.00",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "12.50",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "USD",
+  "items": [
+    {
+      "name": "กระดาษ A4 80 แกรม (ream)",
+      "qty": "1",
+      "price": "12.50",
+      "subtotal": "12.50"
+    }
+  ],
+  "notes": "",
+  "category": "food",
+  "additional_invoices": []
+}

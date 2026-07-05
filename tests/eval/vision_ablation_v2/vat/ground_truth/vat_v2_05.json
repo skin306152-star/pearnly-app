@@ -1,0 +1,132 @@
+{
+  "document_type": "vat_report",
+  "seller_name": "Aroi Dee Restaurant Ltd.",
+  "seller_tax": "0105500006005",
+  "period_year": "2026",
+  "period_month": "06",
+  "total_subtotal": "15215.00",
+  "total_vat": "1065.05",
+  "total_total": "16280.05",
+  "entries": [
+    {
+      "seq_no": "1",
+      "transaction_date": "2026-06-06",
+      "transaction_date_raw": "06/06/26",
+      "invoice_no": "IV26-VAT-05-001",
+      "customer_name": "Mango Cloud Accounting Ltd.",
+      "customer_tax": "0105500000500",
+      "customer_branch": "00000",
+      "subtotal": "815.00",
+      "vat": "57.05",
+      "total": "872.05"
+    },
+    {
+      "seq_no": "2",
+      "transaction_date": "2026-06-07",
+      "transaction_date_raw": "07/06/26",
+      "invoice_no": "IV26-VAT-05-002",
+      "customer_name": "Lotus Field Trading Co., Ltd.",
+      "customer_tax": "0105500000501",
+      "customer_branch": "สำนักงานใหญ่",
+      "subtotal": "972.00",
+      "vat": "68.04",
+      "total": "1040.04"
+    },
+    {
+      "seq_no": "3",
+      "transaction_date": "2026-06-08",
+      "transaction_date_raw": "08/06/26",
+      "invoice_no": "IV26-VAT-05-003",
+      "customer_name": "North Star Clinic Co., Ltd.",
+      "customer_tax": "0105500000502",
+      "customer_branch": "00000",
+      "subtotal": "1129.00",
+      "vat": "79.03",
+      "total": "1208.03"
+    },
+    {
+      "seq_no": "4",
+      "transaction_date": "2026-06-09",
+      "transaction_date_raw": "09/06/26",
+      "invoice_no": "IV26-VAT-05-004",
+      "customer_name": "Pearnly Retail Co., Ltd.",
+      "customer_tax": "0105500000503",
+      "customer_branch": "สำนักงานใหญ่",
+      "subtotal": "1286.00",
+      "vat": "90.02",
+      "total": "1376.02"
+    },
+    {
+      "seq_no": "5",
+      "transaction_date": "2026-06-10",
+      "transaction_date_raw": "10/06/26",
+      "invoice_no": "IV26-VAT-05-005",
+      "customer_name": "Mango Cloud Accounting Ltd.",
+      "customer_tax": "0105500000504",
+      "customer_branch": "00000",
+      "subtotal": "1443.00",
+      "vat": "101.01",
+      "total": "1544.01"
+    },
+    {
+      "seq_no": "6",
+      "transaction_date": "2026-06-11",
+      "transaction_date_raw": "11/06/26",
+      "invoice_no": "IV26-VAT-05-006",
+      "customer_name": "Lotus Field Trading Co., Ltd.",
+      "customer_tax": "0105500000505",
+      "customer_branch": "สำนักงานใหญ่",
+      "subtotal": "1600.00",
+      "vat": "112.00",
+      "total": "1712.00"
+    },
+    {
+      "seq_no": "7",
+      "transaction_date": "2026-06-12",
+      "transaction_date_raw": "12/06/26",
+      "invoice_no": "IV26-VAT-05-007",
+      "customer_name": "North Star Clinic Co., Ltd.",
+      "customer_tax": "0105500000506",
+      "customer_branch": "00000",
+      "subtotal": "1757.00",
+      "vat": "122.99",
+      "total": "1879.99"
+    },
+    {
+      "seq_no": "8",
+      "transaction_date": "2026-06-13",
+      "transaction_date_raw": "13/06/26",
+      "invoice_no": "IV26-VAT-05-008",
+      "customer_name": "Pearnly Retail Co., Ltd.",
+      "customer_tax": "0105500000507",
+      "customer_branch": "สำนักงานใหญ่",
+      "subtotal": "1914.00",
+      "vat": "133.98",
+      "total": "2047.98"
+    },
+    {
+      "seq_no": "9",
+      "transaction_date": "2026-06-14",
+      "transaction_date_raw": "14/06/26",
+      "invoice_no": "IV26-VAT-05-009",
+      "customer_name": "Mango Cloud Accounting Ltd.",
+      "customer_tax": "0105500000508",
+      "customer_branch": "00000",
+      "subtotal": "2071.00",
+      "vat": "144.97",
+      "total": "2215.97"
+    },
+    {
+      "seq_no": "10",
+      "transaction_date": "2026-06-15",
+      "transaction_date_raw": "15/06/26",
+      "invoice_no": "IV26-VAT-05-010",
+      "customer_name": "Lotus Field Trading Co., Ltd.",
+      "customer_tax": "0105500000509",
+      "customer_branch": "สำนักงานใหญ่",
+      "subtotal": "2228.00",
+      "vat": "155.96",
+      "total": "2383.96"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": true,
+  "invoice_number": "IV26-00046",
+  "date": "2026-06-19",
+  "date_raw": "19/06/2026",
+  "seller_name": "Thai Packaging Hub Co., Ltd.",
+  "seller_tax": "0105500000046",
+  "seller_addr": "29 Theparak Road, Samut Prakan",
+  "buyer_name": "North Star Clinic Co., Ltd.",
+  "buyer_tax": "0105500009046",
+  "buyer_addr": "21 Phahonyothin Road, Bangkok",
+  "subtotal": "2870.00",
+  "vat": "200.90",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "3070.90",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "อุปกรณ์ทำความสะอาด (set)",
+      "qty": "3",
+      "price": "337.00",
+      "subtotal": "1011.00"
+    },
+    {
+      "name": "ค่าซ่อมเครื่องพิมพ์ (job)",
+      "qty": "4",
+      "price": "366.00",
+      "subtotal": "1464.00"
+    },
+    {
+      "name": "กระดาษ A4 80 แกรม (ream)",
+      "qty": "1",
+      "price": "395.00",
+      "subtotal": "395.00"
+    }
+  ],
+  "notes": "",
+  "category": "food",
+  "additional_invoices": []
+}

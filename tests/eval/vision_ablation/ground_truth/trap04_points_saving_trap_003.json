@@ -1,0 +1,61 @@
+{
+  "id": "trap04_points_saving_trap_003",
+  "name": "trap04_points_saving_trap_003",
+  "file": "trap04_points_saving_trap_003.jpg",
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "seller_name": "PTT Station Cafe Amazon",
+  "seller_tax": "0107561000013",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "หจก. สกิน แอนด์ โค",
+  "buyer_tax": "0903563007788",
+  "buyer_addr": "",
+  "invoice_number": "IV69/10018",
+  "date": "2026-07-05",
+  "date_raw": "05/07/2569",
+  "subtotal": "582.00",
+  "vat": "0.00",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "582.00",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "สายชาร์จ USB-C",
+      "qty": "2",
+      "price": "199.00",
+      "subtotal": "398.00"
+    },
+    {
+      "name": "นมสด",
+      "qty": "3",
+      "price": "28.00",
+      "subtotal": "84.00"
+    },
+    {
+      "name": "น้ำดื่ม 600ml",
+      "qty": "1",
+      "price": "10.00",
+      "subtotal": "10.00"
+    },
+    {
+      "name": "กาแฟเย็น",
+      "qty": "2",
+      "price": "45.00",
+      "subtotal": "90.00"
+    }
+  ],
+  "items_count": 4,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "points_saving_trap",
+  "traps": ["loyalty_points", "saving_not_discount"],
+  "degradation": ["glare"],
+  "_note": "loyalty_points; saving_not_discount; glare"
+}

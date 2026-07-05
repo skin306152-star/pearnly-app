@@ -1,0 +1,53 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00027",
+  "date": "2026-06-28",
+  "date_raw": "28/06/2569",
+  "seller_name": "Plern Coffee Roasters Ltd.",
+  "seller_tax": "0105500000027",
+  "seller_addr": "14 Nimman Road, Muang, Chiang Mai",
+  "buyer_name": "Mango Cloud Accounting Ltd.",
+  "buyer_tax": "0105500009027",
+  "buyer_addr": "12 Wireless Road, Bangkok",
+  "subtotal": "2466.00",
+  "vat": "172.62",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "2638.62",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "ค่าบริการจัดส่ง (job)",
+      "qty": "4",
+      "price": "494.00",
+      "subtotal": "1976.00"
+    },
+    {
+      "name": "ข้าวกล่องพนักงาน (box)",
+      "qty": "1",
+      "price": "43.00",
+      "subtotal": "43.00"
+    },
+    {
+      "name": "น้ำดื่ม 600ml (pack)",
+      "qty": "2",
+      "price": "72.00",
+      "subtotal": "144.00"
+    },
+    {
+      "name": "อุปกรณ์ทำความสะอาด (set)",
+      "qty": "3",
+      "price": "101.00",
+      "subtotal": "303.00"
+    }
+  ],
+  "notes": "",
+  "category": "office",
+  "additional_invoices": []
+}

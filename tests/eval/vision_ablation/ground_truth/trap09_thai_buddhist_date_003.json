@@ -1,0 +1,67 @@
+{
+  "id": "trap09_thai_buddhist_date_003",
+  "name": "trap09_thai_buddhist_date_003",
+  "file": "trap09_thai_buddhist_date_003.jpg",
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "seller_name": "ร้านอาหารบ้านสวนป้าลี",
+  "seller_tax": "0735559001248",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "",
+  "buyer_tax": "",
+  "buyer_addr": "",
+  "invoice_number": "IV70/10043",
+  "date": "2026-07-05",
+  "date_raw": "2026/07/05",
+  "subtotal": "2596.68",
+  "vat": "181.77",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "2778.45",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "กระดาษ A4",
+      "qty": "3",
+      "price": "120.00",
+      "subtotal": "360.00"
+    },
+    {
+      "name": "ค่าขนส่ง",
+      "qty": "1",
+      "price": "80.00",
+      "subtotal": "80.00"
+    },
+    {
+      "name": "ข้าวกล่อง",
+      "qty": "4",
+      "price": "65.00",
+      "subtotal": "260.00"
+    },
+    {
+      "name": "น้ำมันดีเซล ลิตร",
+      "qty": "12.35",
+      "price": "32.12",
+      "subtotal": "396.68"
+    },
+    {
+      "name": "บริการซ่อมแซม",
+      "qty": "1",
+      "price": "1500.00",
+      "subtotal": "1500.00"
+    }
+  ],
+  "items_count": 5,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "thai_buddhist_date",
+  "traps": ["be_year", "two_digit_year"],
+  "degradation": ["glare"],
+  "_note": "be_year; two_digit_year; glare"
+}

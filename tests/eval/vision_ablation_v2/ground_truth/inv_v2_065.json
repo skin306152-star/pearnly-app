@@ -1,0 +1,41 @@
+{
+  "document_type": "credit_note",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00065",
+  "date": "2026-06-10",
+  "date_raw": "10/06/2026",
+  "seller_name": "Aroi Dee Restaurant Ltd.",
+  "seller_tax": "0105500000065",
+  "seller_addr": "77 Sukhumvit 31, Bangkok",
+  "buyer_name": "",
+  "buyer_tax": "",
+  "buyer_addr": "",
+  "subtotal": "-987.00",
+  "vat": "-69.09",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "-1056.09",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "หมึกพิมพ์ HP 680 (pc)",
+      "qty": "2",
+      "price": "-180.00",
+      "subtotal": "-360.00"
+    },
+    {
+      "name": "กาแฟคั่วกลาง 250g (bag)",
+      "qty": "3",
+      "price": "-209.00",
+      "subtotal": "-627.00"
+    }
+  ],
+  "notes": "",
+  "category": "office",
+  "additional_invoices": []
+}

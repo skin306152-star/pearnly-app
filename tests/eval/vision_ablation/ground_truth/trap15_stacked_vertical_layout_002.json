@@ -1,0 +1,55 @@
+{
+  "id": "trap15_stacked_vertical_layout_002",
+  "name": "trap15_stacked_vertical_layout_002",
+  "file": "trap15_stacked_vertical_layout_002.jpg",
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "seller_name": "บริษัท สยามแม็คโคร จำกัด (มหาชน)",
+  "seller_tax": "0107537000521",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "บริษัท เพิร์นลี่ เทค จำกัด",
+  "buyer_tax": "0105564061523",
+  "buyer_addr": "",
+  "invoice_number": "IV70/10073",
+  "date": "2026-07-05",
+  "date_raw": "05/07/2569",
+  "subtotal": "700.00",
+  "vat": "49.00",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "749.00",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "กระดาษ A4",
+      "qty": "3",
+      "price": "120.00",
+      "subtotal": "360.00"
+    },
+    {
+      "name": "ค่าขนส่ง",
+      "qty": "1",
+      "price": "80.00",
+      "subtotal": "80.00"
+    },
+    {
+      "name": "ข้าวกล่อง",
+      "qty": "4",
+      "price": "65.00",
+      "subtotal": "260.00"
+    }
+  ],
+  "items_count": 3,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "stacked_vertical_layout",
+  "traps": ["stacked_columns"],
+  "degradation": ["thermal_fade"],
+  "_note": "stacked_columns; thermal_fade"
+}

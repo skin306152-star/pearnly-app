@@ -1,0 +1,17 @@
+{
+  "invoice_count": 90,
+  "bank_count": 56,
+  "gl_count": 12,
+  "vat_count": 12,
+  "bank_distribution": {
+    "bay": 8,
+    "bbl": 8,
+    "gsb": 8,
+    "kbank": 8,
+    "ktb": 8,
+    "scb": 8,
+    "ttb": 8
+  },
+  "augraphy_required": true,
+  "photo_composite_required": true
+}

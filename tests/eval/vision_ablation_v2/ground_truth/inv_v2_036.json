@@ -1,0 +1,35 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00036",
+  "date": "2026-06-09",
+  "date_raw": "09/06/2026",
+  "seller_name": "Bangkok Office Supply Co., Ltd.",
+  "seller_tax": "0105500000036",
+  "seller_addr": "123 Silom Road, Bang Rak, Bangkok",
+  "buyer_name": "Lotus Field Trading Co., Ltd.",
+  "buyer_tax": "0105500009036",
+  "buyer_addr": "66 Chan Road, Bangkok",
+  "subtotal": "167.00",
+  "vat": "0.00",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "167.00",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "ข้าวกล่องพนักงาน (box)",
+      "qty": "1",
+      "price": "167.00",
+      "subtotal": "167.00"
+    }
+  ],
+  "notes": "VAT exempt line, total equals subtotal.",
+  "category": "food",
+  "additional_invoices": []
+}

@@ -1,0 +1,55 @@
+{
+  "id": "trap09_thai_buddhist_date_001",
+  "name": "trap09_thai_buddhist_date_001",
+  "file": "trap09_thai_buddhist_date_001.jpg",
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "seller_name": "Lotus's สาขาพระราม 4",
+  "seller_tax": "0107543000121",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "บริษัท เพิร์นลี่ เทค จำกัด",
+  "buyer_tax": "0105564061523",
+  "buyer_addr": "",
+  "invoice_number": "IV71/10041",
+  "date": "2026-07-05",
+  "date_raw": "05/07/69",
+  "subtotal": "509.00",
+  "vat": "35.63",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "544.63",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "กาแฟเย็น",
+      "qty": "2",
+      "price": "45.00",
+      "subtotal": "90.00"
+    },
+    {
+      "name": "สปาเก็ตตี้",
+      "qty": "1",
+      "price": "59.00",
+      "subtotal": "59.00"
+    },
+    {
+      "name": "กระดาษ A4",
+      "qty": "3",
+      "price": "120.00",
+      "subtotal": "360.00"
+    }
+  ],
+  "items_count": 3,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "thai_buddhist_date",
+  "traps": ["be_year", "two_digit_year"],
+  "degradation": ["motion_blur_mid"],
+  "_note": "be_year; two_digit_year; motion_blur_mid"
+}

@@ -1,0 +1,47 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00078",
+  "date": "2026-06-23",
+  "date_raw": "23/06/2026",
+  "seller_name": "Bangkok Office Supply Co., Ltd.",
+  "seller_tax": "0105500000078",
+  "seller_addr": "123 Silom Road, Bang Rak, Bangkok",
+  "buyer_name": "North Star Clinic Co., Ltd.",
+  "buyer_tax": "0105500009078",
+  "buyer_addr": "21 Phahonyothin Road, Bangkok",
+  "subtotal": "3382.00",
+  "vat": "224.90",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "169.10",
+  "total_amount": "3437.80",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "อุปกรณ์ทำความสะอาด (set)",
+      "qty": "3",
+      "price": "401.00",
+      "subtotal": "1203.00"
+    },
+    {
+      "name": "ค่าซ่อมเครื่องพิมพ์ (job)",
+      "qty": "4",
+      "price": "430.00",
+      "subtotal": "1720.00"
+    },
+    {
+      "name": "กระดาษ A4 80 แกรม (ream)",
+      "qty": "1",
+      "price": "459.00",
+      "subtotal": "459.00"
+    }
+  ],
+  "notes": "",
+  "category": "food",
+  "additional_invoices": []
+}

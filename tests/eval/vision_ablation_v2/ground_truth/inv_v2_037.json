@@ -1,0 +1,41 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00037",
+  "date": "2026-06-10",
+  "date_raw": "10/06/2026",
+  "seller_name": "Nakhon Fresh Mart Ltd.",
+  "seller_tax": "0105500000037",
+  "seller_addr": "45 Mittraphap Road, Muang, Khon Kaen",
+  "buyer_name": "Lotus Field Trading Co., Ltd.",
+  "buyer_tax": "0105500009037",
+  "buyer_addr": "66 Chan Road, Bangkok",
+  "subtotal": "1007.00",
+  "vat": "70.49",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "1077.49",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "น้ำดื่ม 600ml (pack)",
+      "qty": "2",
+      "price": "184.00",
+      "subtotal": "368.00"
+    },
+    {
+      "name": "อุปกรณ์ทำความสะอาด (set)",
+      "qty": "3",
+      "price": "213.00",
+      "subtotal": "639.00"
+    }
+  ],
+  "notes": "",
+  "category": "office",
+  "additional_invoices": []
+}

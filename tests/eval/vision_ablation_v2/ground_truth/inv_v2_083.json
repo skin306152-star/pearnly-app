@@ -1,0 +1,53 @@
+{
+  "document_type": "credit_note",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00083",
+  "date": "2026-06-28",
+  "date_raw": "28/06/2026",
+  "seller_name": "Aroi Dee Restaurant Ltd.",
+  "seller_tax": "0105500000083",
+  "seller_addr": "77 Sukhumvit 31, Bangkok",
+  "buyer_name": "",
+  "buyer_tax": "",
+  "buyer_addr": "",
+  "subtotal": "-2386.00",
+  "vat": "-167.02",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "-2553.02",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "ค่าบริการจัดส่ง (job)",
+      "qty": "4",
+      "price": "-486.00",
+      "subtotal": "-1944.00"
+    },
+    {
+      "name": "ข้าวกล่องพนักงาน (box)",
+      "qty": "1",
+      "price": "-35.00",
+      "subtotal": "-35.00"
+    },
+    {
+      "name": "น้ำดื่ม 600ml (pack)",
+      "qty": "2",
+      "price": "-64.00",
+      "subtotal": "-128.00"
+    },
+    {
+      "name": "อุปกรณ์ทำความสะอาด (set)",
+      "qty": "3",
+      "price": "-93.00",
+      "subtotal": "-279.00"
+    }
+  ],
+  "notes": "",
+  "category": "office",
+  "additional_invoices": []
+}

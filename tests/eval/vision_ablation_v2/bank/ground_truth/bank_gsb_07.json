@@ -1,0 +1,124 @@
+{
+  "document_type": "bank_statement",
+  "bank_name": "Government Savings Bank",
+  "bank_code": "gsb",
+  "account_name": "Pearnly Retail Co., Ltd.",
+  "account_number": "147-006-00047-9",
+  "account_last4": "0047",
+  "period_start": "2026-06-01",
+  "period_end": "2026-06-30",
+  "opening_balance": "39899.00",
+  "closing_balance": "28474.00",
+  "entries": [
+    {
+      "transaction_date": "2026-06-07",
+      "transaction_date_raw": "07/06/26",
+      "description": "POS batch 10280137 047",
+      "reference": "GSB-047-0000",
+      "deposit": "",
+      "withdrawal": "2347.00",
+      "amount": "2347.00",
+      "direction": "withdrawal",
+      "balance": "37552.00"
+    },
+    {
+      "transaction_date": "2026-06-09",
+      "transaction_date_raw": "09/06/26",
+      "description": "Monthly bank fee 047",
+      "reference": "GSB-047-0001",
+      "deposit": "2444.00",
+      "withdrawal": "",
+      "amount": "2444.00",
+      "direction": "deposit",
+      "balance": "39996.00"
+    },
+    {
+      "transaction_date": "2026-06-11",
+      "transaction_date_raw": "11/06/26",
+      "description": "Supplier INV-26-047",
+      "reference": "GSB-047-0002",
+      "deposit": "",
+      "withdrawal": "2541.00",
+      "amount": "2541.00",
+      "direction": "withdrawal",
+      "balance": "37455.00"
+    },
+    {
+      "transaction_date": "2026-06-13",
+      "transaction_date_raw": "13/06/26",
+      "description": "Interest credit047",
+      "reference": "GSB-047-0003",
+      "deposit": "",
+      "withdrawal": "2638.00",
+      "amount": "2638.00",
+      "direction": "withdrawal",
+      "balance": "34817.00"
+    },
+    {
+      "transaction_date": "2026-06-15",
+      "transaction_date_raw": "15/06/26",
+      "description": "PromptPay REF 6091 047",
+      "reference": "GSB-047-0004",
+      "deposit": "2735.00",
+      "withdrawal": "",
+      "amount": "2735.00",
+      "direction": "deposit",
+      "balance": "37552.00"
+    },
+    {
+      "transaction_date": "2026-06-17",
+      "transaction_date_raw": "17/06/26",
+      "description": "POS batch 10280137 047",
+      "reference": "GSB-047-0005",
+      "deposit": "",
+      "withdrawal": "2832.00",
+      "amount": "2832.00",
+      "direction": "withdrawal",
+      "balance": "34720.00"
+    },
+    {
+      "transaction_date": "2026-06-19",
+      "transaction_date_raw": "19/06/26",
+      "description": "Monthly bank fee 047",
+      "reference": "GSB-047-0006",
+      "deposit": "",
+      "withdrawal": "2929.00",
+      "amount": "2929.00",
+      "direction": "withdrawal",
+      "balance": "31791.00"
+    },
+    {
+      "transaction_date": "2026-06-21",
+      "transaction_date_raw": "21/06/26",
+      "description": "Supplier INV-26-047",
+      "reference": "GSB-047-0007",
+      "deposit": "3026.00",
+      "withdrawal": "",
+      "amount": "3026.00",
+      "direction": "deposit",
+      "balance": "34817.00"
+    },
+    {
+      "transaction_date": "2026-06-23",
+      "transaction_date_raw": "23/06/26",
+      "description": "Interest credit047",
+      "reference": "GSB-047-0008",
+      "deposit": "",
+      "withdrawal": "3123.00",
+      "amount": "3123.00",
+      "direction": "withdrawal",
+      "balance": "31694.00"
+    },
+    {
+      "transaction_date": "2026-06-25",
+      "transaction_date_raw": "25/06/26",
+      "description": "PromptPay REF 6091 047",
+      "reference": "GSB-047-0009",
+      "deposit": "",
+      "withdrawal": "3220.00",
+      "amount": "3220.00",
+      "direction": "withdrawal",
+      "balance": "28474.00"
+    }
+  ]
+}

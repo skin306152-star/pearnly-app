@@ -1,0 +1,55 @@
+{
+  "id": "trap16_zero_baht_promo_005",
+  "name": "trap16_zero_baht_promo_005",
+  "file": "trap16_zero_baht_promo_005.jpg",
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "seller_name": "บริษัท สยามแม็คโคร จำกัด (มหาชน)",
+  "seller_tax": "0107537000521",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "บริษัท เพิร์นลี่ เทค จำกัด",
+  "buyer_tax": "0105564061523",
+  "buyer_addr": "",
+  "invoice_number": "IV69/10081",
+  "date": "2026-07-05",
+  "date_raw": "05/07/2569",
+  "subtotal": "509.00",
+  "vat": "0.00",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "509.00",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "กาแฟเย็น",
+      "qty": "2",
+      "price": "45.00",
+      "subtotal": "90.00"
+    },
+    {
+      "name": "สปาเก็ตตี้",
+      "qty": "1",
+      "price": "59.00",
+      "subtotal": "59.00"
+    },
+    {
+      "name": "กระดาษ A4",
+      "qty": "3",
+      "price": "120.00",
+      "subtotal": "360.00"
+    }
+  ],
+  "items_count": 3,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "zero_baht_promo",
+  "traps": ["zero_baht_promo_line"],
+  "degradation": ["low_res", "jpeg_artifact"],
+  "_note": "zero_baht_promo_line; low_res; jpeg_artifact"
+}

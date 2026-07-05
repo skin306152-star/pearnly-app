@@ -1,0 +1,124 @@
+{
+  "document_type": "bank_statement",
+  "bank_name": "Siam Commercial Bank",
+  "bank_code": "scb",
+  "account_name": "Pearnly Retail Co., Ltd.",
+  "account_number": "115-006-00015-9",
+  "account_last4": "0015",
+  "period_start": "2026-06-01",
+  "period_end": "2026-06-30",
+  "opening_balance": "29755.00",
+  "closing_balance": "26812.00",
+  "entries": [
+    {
+      "transaction_date": "2026-06-07",
+      "transaction_date_raw": "07/06/26",
+      "description": "POS batch 10280137 015",
+      "reference": "SCB-015-0000",
+      "deposit": "1035.00",
+      "withdrawal": "",
+      "amount": "1035.00",
+      "direction": "deposit",
+      "balance": "30790.00"
+    },
+    {
+      "transaction_date": "2026-06-09",
+      "transaction_date_raw": "09/06/26",
+      "description": "Monthly bank fee 015",
+      "reference": "SCB-015-0001",
+      "deposit": "",
+      "withdrawal": "1132.00",
+      "amount": "1132.00",
+      "direction": "withdrawal",
+      "balance": "29658.00"
+    },
+    {
+      "transaction_date": "2026-06-11",
+      "transaction_date_raw": "11/06/26",
+      "description": "Supplier INV-26-015",
+      "reference": "SCB-015-0002",
+      "deposit": "",
+      "withdrawal": "1229.00",
+      "amount": "1229.00",
+      "direction": "withdrawal",
+      "balance": "28429.00"
+    },
+    {
+      "transaction_date": "2026-06-13",
+      "transaction_date_raw": "13/06/26",
+      "description": "Interest credit015",
+      "reference": "SCB-015-0003",
+      "deposit": "1326.00",
+      "withdrawal": "",
+      "amount": "1326.00",
+      "direction": "deposit",
+      "balance": "29755.00"
+    },
+    {
+      "transaction_date": "2026-06-15",
+      "transaction_date_raw": "15/06/26",
+      "description": "PromptPay REF 6091 015",
+      "reference": "SCB-015-0004",
+      "deposit": "",
+      "withdrawal": "1423.00",
+      "amount": "1423.00",
+      "direction": "withdrawal",
+      "balance": "28332.00"
+    },
+    {
+      "transaction_date": "2026-06-17",
+      "transaction_date_raw": "17/06/26",
+      "description": "POS batch 10280137 015",
+      "reference": "SCB-015-0005",
+      "deposit": "",
+      "withdrawal": "1520.00",
+      "amount": "1520.00",
+      "direction": "withdrawal",
+      "balance": "26812.00"
+    },
+    {
+      "transaction_date": "2026-06-19",
+      "transaction_date_raw": "19/06/26",
+      "description": "Monthly bank fee 015",
+      "reference": "SCB-015-0006",
+      "deposit": "1617.00",
+      "withdrawal": "",
+      "amount": "1617.00",
+      "direction": "deposit",
+      "balance": "28429.00"
+    },
+    {
+      "transaction_date": "2026-06-21",
+      "transaction_date_raw": "21/06/26",
+      "description": "Supplier INV-26-015",
+      "reference": "SCB-015-0007",
+      "deposit": "",
+      "withdrawal": "1714.00",
+      "amount": "1714.00",
+      "direction": "withdrawal",
+      "balance": "26715.00"
+    },
+    {
+      "transaction_date": "2026-06-23",
+      "transaction_date_raw": "23/06/26",
+      "description": "Interest credit015",
+      "reference": "SCB-015-0008",
+      "deposit": "",
+      "withdrawal": "1811.00",
+      "amount": "1811.00",
+      "direction": "withdrawal",
+      "balance": "24904.00"
+    },
+    {
+      "transaction_date": "2026-06-25",
+      "transaction_date_raw": "25/06/26",
+      "description": "PromptPay REF 6091 015",
+      "reference": "SCB-015-0009",
+      "deposit": "1908.00",
+      "withdrawal": "",
+      "amount": "1908.00",
+      "direction": "deposit",
+      "balance": "26812.00"
+    }
+  ]
+}

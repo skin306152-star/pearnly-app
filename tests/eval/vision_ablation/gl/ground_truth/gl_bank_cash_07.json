@@ -1,0 +1,153 @@
+{
+  "id": "gl_bank_cash_07",
+  "file": "gl/images/gl_bank_cash_07.jpg",
+  "doc_type": "general_ledger",
+  "document_type": "general_ledger",
+  "period_start": "2026-01-01",
+  "period_end": "2026-01-31",
+  "account_name": "เงินฝากธนาคาร",
+  "account_number": "1112-07",
+  "opening_balance": "51998.00",
+  "closing_balance": "53498.00",
+  "entry_count": 12,
+  "total_debit": "9900.00",
+  "total_credit": "8400.00",
+  "entries": [
+    {
+      "transaction_date": "2026-01-01",
+      "voucher_no": "JV681000.6",
+      "account_code": "1112-07",
+      "description": "รับ/จ่าย เลขงาน 6091-0",
+      "debit": "1200.00",
+      "credit": "",
+      "amount": "1200.00",
+      "direction": "deposit",
+      "balance": "53198.00"
+    },
+    {
+      "transaction_date": "2026-01-02",
+      "voucher_no": "JV681001.6",
+      "account_code": "1112-07",
+      "description": "รับ/จ่าย เลขงาน 6091-1",
+      "debit": "",
+      "credit": "1025.00",
+      "amount": "1025.00",
+      "direction": "withdrawal",
+      "balance": "52173.00"
+    },
+    {
+      "transaction_date": "2026-01-03",
+      "voucher_no": "JV681002.6",
+      "account_code": "1112-07",
+      "description": "รับ/จ่าย เลขงาน 6091-2",
+      "debit": "1380.00",
+      "credit": "",
+      "amount": "1380.00",
+      "direction": "deposit",
+      "balance": "53553.00"
+    },
+    {
+      "transaction_date": "2026-01-04",
+      "voucher_no": "JV681003.6",
+      "account_code": "1112-07",
+      "description": "รับ/จ่าย เลขงาน 6091-3",
+      "debit": "",
+      "credit": "1175.00",
+      "amount": "1175.00",
+      "direction": "withdrawal",
+      "balance": "52378.00"
+    },
+    {
+      "transaction_date": "2026-01-05",
+      "voucher_no": "JV681004.6",
+      "account_code": "1112-07",
+      "description": "รับ/จ่าย เลขงาน 6091-4",
+      "debit": "1560.00",
+      "credit": "",
+      "amount": "1560.00",
+      "direction": "deposit",
+      "balance": "53938.00"
+    },
+    {
+      "transaction_date": "2026-01-06",
+      "voucher_no": "JV681005.6",
+      "account_code": "1112-07",
+      "description": "รับ/จ่าย เลขงาน 6091-5",
+      "debit": "",
+      "credit": "1325.00",
+      "amount": "1325.00",
+      "direction": "withdrawal",
+      "balance": "52613.00"
+    },
+    {
+      "transaction_date": "2026-01-07",
+      "voucher_no": "JV681006.6",
+      "account_code": "1112-07",
+      "description": "รับ/จ่าย เลขงาน 6091-6",
+      "debit": "1740.00",
+      "credit": "",
+      "amount": "1740.00",
+      "direction": "deposit",
+      "balance": "54353.00"
+    },
+    {
+      "transaction_date": "2026-01-08",
+      "voucher_no": "JV681007.6",
+      "account_code": "1112-07",
+      "description": "รับ/จ่าย เลขงาน 6091-7",
+      "debit": "",
+      "credit": "1475.00",
+      "amount": "1475.00",
+      "direction": "withdrawal",
+      "balance": "52878.00"
+    },
+    {
+      "transaction_date": "2026-01-09",
+      "voucher_no": "JV681008.6",
+      "account_code": "1112-07",
+      "description": "รับ/จ่าย เลขงาน 6091-8",
+      "debit": "1920.00",
+      "credit": "",
+      "amount": "1920.00",
+      "direction": "deposit",
+      "balance": "54798.00"
+    },
+    {
+      "transaction_date": "2026-01-10",
+      "voucher_no": "JV681009.6",
+      "account_code": "1112-07",
+      "description": "รับ/จ่าย เลขงาน 6091-9",
+      "debit": "",
+      "credit": "1625.00",
+      "amount": "1625.00",
+      "direction": "withdrawal",
+      "balance": "53173.00"
+    },
+    {
+      "transaction_date": "2026-01-11",
+      "voucher_no": "JV681010.6",
+      "account_code": "1112-07",
+      "description": "รับ/จ่าย เลขงาน 6091-10",
+      "debit": "2100.00",
+      "credit": "",
+      "amount": "2100.00",
+      "direction": "deposit",
+      "balance": "55273.00"
+    },
+    {
+      "transaction_date": "2026-01-12",
+      "voucher_no": "JV681011.6",
+      "account_code": "1112-07",
+      "description": "รับ/จ่าย เลขงาน 6091-11",
+      "debit": "",
+      "credit": "1775.00",
+      "amount": "1775.00",
+      "direction": "withdrawal",
+      "balance": "53498.00"
+    }
+  ],
+  "scenario": "gl_photo",
+  "traps": ["rounding_tail_difference"],
+  "degradation": ["phone_photo_skew"],
+  "_note": "GL balance chain is continuous"
+}

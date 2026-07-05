@@ -1,0 +1,53 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00015",
+  "date": "2026-06-16",
+  "date_raw": "16/06/2026",
+  "seller_name": "Plern Coffee Roasters Ltd.",
+  "seller_tax": "0105500000015",
+  "seller_addr": "14 Nimman Road, Muang, Chiang Mai",
+  "buyer_name": "North Star Clinic Co., Ltd.",
+  "buyer_tax": "0105500009015",
+  "buyer_addr": "21 Phahonyothin Road, Bangkok",
+  "subtotal": "3306.00",
+  "vat": "219.85",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "165.30",
+  "total_amount": "3360.55",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "ค่าซ่อมเครื่องพิมพ์ (job)",
+      "qty": "4",
+      "price": "290.00",
+      "subtotal": "1160.00"
+    },
+    {
+      "name": "กระดาษ A4 80 แกรม (ream)",
+      "qty": "1",
+      "price": "319.00",
+      "subtotal": "319.00"
+    },
+    {
+      "name": "หมึกพิมพ์ HP 680 (pc)",
+      "qty": "2",
+      "price": "348.00",
+      "subtotal": "696.00"
+    },
+    {
+      "name": "กาแฟคั่วกลาง 250g (bag)",
+      "qty": "3",
+      "price": "377.00",
+      "subtotal": "1131.00"
+    }
+  ],
+  "notes": "",
+  "category": "office",
+  "additional_invoices": []
+}

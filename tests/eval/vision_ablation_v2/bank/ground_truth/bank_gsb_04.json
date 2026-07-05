@@ -1,0 +1,146 @@
+{
+  "document_type": "bank_statement",
+  "bank_name": "Government Savings Bank",
+  "bank_code": "gsb",
+  "account_name": "Pearnly Retail Co., Ltd.",
+  "account_number": "144-003-00044-9",
+  "account_last4": "0044",
+  "period_start": "2026-06-01",
+  "period_end": "2026-06-30",
+  "opening_balance": "38948.00",
+  "closing_balance": "27918.00",
+  "entries": [
+    {
+      "transaction_date": "2026-06-04",
+      "transaction_date_raw": "04/06/26",
+      "description": "Supplier INV-26-044",
+      "reference": "GSB-044-0000",
+      "deposit": "",
+      "withdrawal": "2224.00",
+      "amount": "2224.00",
+      "direction": "withdrawal",
+      "balance": "36724.00"
+    },
+    {
+      "transaction_date": "2026-06-06",
+      "transaction_date_raw": "06/06/26",
+      "description": "Interest credit044",
+      "reference": "GSB-044-0001",
+      "deposit": "2321.00",
+      "withdrawal": "",
+      "amount": "2321.00",
+      "direction": "deposit",
+      "balance": "39045.00"
+    },
+    {
+      "transaction_date": "2026-06-08",
+      "transaction_date_raw": "08/06/26",
+      "description": "PromptPay REF 6091 044",
+      "reference": "GSB-044-0002",
+      "deposit": "",
+      "withdrawal": "2418.00",
+      "amount": "2418.00",
+      "direction": "withdrawal",
+      "balance": "36627.00"
+    },
+    {
+      "transaction_date": "2026-06-10",
+      "transaction_date_raw": "10/06/26",
+      "description": "POS batch 10280137 044",
+      "reference": "GSB-044-0003",
+      "deposit": "",
+      "withdrawal": "2515.00",
+      "amount": "2515.00",
+      "direction": "withdrawal",
+      "balance": "34112.00"
+    },
+    {
+      "transaction_date": "2026-06-12",
+      "transaction_date_raw": "12/06/26",
+      "description": "Monthly bank fee 044",
+      "reference": "GSB-044-0004",
+      "deposit": "2612.00",
+      "withdrawal": "",
+      "amount": "2612.00",
+      "direction": "deposit",
+      "balance": "36724.00"
+    },
+    {
+      "transaction_date": "2026-06-14",
+      "transaction_date_raw": "14/06/26",
+      "description": "Supplier INV-26-044",
+      "reference": "GSB-044-0005",
+      "deposit": "",
+      "withdrawal": "2709.00",
+      "amount": "2709.00",
+      "direction": "withdrawal",
+      "balance": "34015.00"
+    },
+    {
+      "transaction_date": "2026-06-16",
+      "transaction_date_raw": "16/06/26",
+      "description": "Interest credit044",
+      "reference": "GSB-044-0006",
+      "deposit": "",
+      "withdrawal": "2806.00",
+      "amount": "2806.00",
+      "direction": "withdrawal",
+      "balance": "31209.00"
+    },
+    {
+      "transaction_date": "2026-06-18",
+      "transaction_date_raw": "18/06/26",
+      "description": "PromptPay REF 6091 044",
+      "reference": "GSB-044-0007",
+      "deposit": "2903.00",
+      "withdrawal": "",
+      "amount": "2903.00",
+      "direction": "deposit",
+      "balance": "34112.00"
+    },
+    {
+      "transaction_date": "2026-06-20",
+      "transaction_date_raw": "20/06/26",
+      "description": "POS batch 10280137 044",
+      "reference": "GSB-044-0008",
+      "deposit": "",
+      "withdrawal": "3000.00",
+      "amount": "3000.00",
+      "direction": "withdrawal",
+      "balance": "31112.00"
+    },
+    {
+      "transaction_date": "2026-06-22",
+      "transaction_date_raw": "22/06/26",
+      "description": "Monthly bank fee 044",
+      "reference": "GSB-044-0009",
+      "deposit": "",
+      "withdrawal": "3097.00",
+      "amount": "3097.00",
+      "direction": "withdrawal",
+      "balance": "28015.00"
+    },
+    {
+      "transaction_date": "2026-06-24",
+      "transaction_date_raw": "24/06/26",
+      "description": "Supplier INV-26-044",
+      "reference": "GSB-044-0010",
+      "deposit": "3194.00",
+      "withdrawal": "",
+      "amount": "3194.00",
+      "direction": "deposit",
+      "balance": "31209.00"
+    },
+    {
+      "transaction_date": "2026-06-26",
+      "transaction_date_raw": "26/06/26",
+      "description": "Interest credit044",
+      "reference": "GSB-044-0011",
+      "deposit": "",
+      "withdrawal": "3291.00",
+      "amount": "3291.00",
+      "direction": "withdrawal",
+      "balance": "27918.00"
+    }
+  ]
+}

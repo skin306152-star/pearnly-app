@@ -1,0 +1,47 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": true,
+  "invoice_number": "IV26-00082",
+  "date": "2026-06-27",
+  "date_raw": "27/06/2026",
+  "seller_name": "Thai Packaging Hub Co., Ltd.",
+  "seller_tax": "0105500000082",
+  "seller_addr": "29 Theparak Road, Samut Prakan",
+  "buyer_name": "Mango Cloud Accounting Ltd.",
+  "buyer_tax": "0105500009082",
+  "buyer_addr": "12 Wireless Road, Bangkok",
+  "subtotal": "3446.00",
+  "vat": "241.22",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "3687.22",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "กาแฟคั่วกลาง 250g (bag)",
+      "qty": "3",
+      "price": "469.00",
+      "subtotal": "1407.00"
+    },
+    {
+      "name": "ค่าบริการจัดส่ง (job)",
+      "qty": "4",
+      "price": "498.00",
+      "subtotal": "1992.00"
+    },
+    {
+      "name": "ข้าวกล่องพนักงาน (box)",
+      "qty": "1",
+      "price": "47.00",
+      "subtotal": "47.00"
+    }
+  ],
+  "notes": "",
+  "category": "food",
+  "additional_invoices": []
+}

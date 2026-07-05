@@ -1,0 +1,53 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00019",
+  "date": "2026-06-20",
+  "date_raw": "20/06/2026",
+  "seller_name": "Nakhon Fresh Mart Ltd.",
+  "seller_tax": "0105500000019",
+  "seller_addr": "45 Mittraphap Road, Muang, Khon Kaen",
+  "buyer_name": "Mango Cloud Accounting Ltd.",
+  "buyer_tax": "0105500009019",
+  "buyer_addr": "12 Wireless Road, Bangkok",
+  "subtotal": "3986.00",
+  "vat": "279.02",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "4265.02",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "ค่าบริการจัดส่ง (job)",
+      "qty": "4",
+      "price": "358.00",
+      "subtotal": "1432.00"
+    },
+    {
+      "name": "ข้าวกล่องพนักงาน (box)",
+      "qty": "1",
+      "price": "387.00",
+      "subtotal": "387.00"
+    },
+    {
+      "name": "น้ำดื่ม 600ml (pack)",
+      "qty": "2",
+      "price": "416.00",
+      "subtotal": "832.00"
+    },
+    {
+      "name": "อุปกรณ์ทำความสะอาด (set)",
+      "qty": "3",
+      "price": "445.00",
+      "subtotal": "1335.00"
+    }
+  ],
+  "notes": "",
+  "category": "office",
+  "additional_invoices": []
+}

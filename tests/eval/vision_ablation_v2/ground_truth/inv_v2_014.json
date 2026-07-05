@@ -1,0 +1,47 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00014",
+  "date": "2026-06-15",
+  "date_raw": "15/06/26",
+  "seller_name": "Siam Service Point Co., Ltd.",
+  "seller_tax": "0105500000014",
+  "seller_addr": "88 Rama IX Road, Huai Khwang, Bangkok",
+  "buyer_name": "North Star Clinic Co., Ltd.",
+  "buyer_tax": "0105500009014",
+  "buyer_addr": "21 Phahonyothin Road, Bangkok",
+  "subtotal": "2358.00",
+  "vat": "165.06",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "2523.06",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "อุปกรณ์ทำความสะอาด (set)",
+      "qty": "3",
+      "price": "273.00",
+      "subtotal": "819.00"
+    },
+    {
+      "name": "ค่าซ่อมเครื่องพิมพ์ (job)",
+      "qty": "4",
+      "price": "302.00",
+      "subtotal": "1208.00"
+    },
+    {
+      "name": "กระดาษ A4 80 แกรม (ream)",
+      "qty": "1",
+      "price": "331.00",
+      "subtotal": "331.00"
+    }
+  ],
+  "notes": "Handwritten approval note appears near the total.",
+  "category": "food",
+  "additional_invoices": []
+}

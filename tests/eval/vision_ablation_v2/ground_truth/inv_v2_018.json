@@ -1,0 +1,47 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00018",
+  "date": "2026-06-19",
+  "date_raw": "19/06/2026",
+  "seller_name": "Bangkok Office Supply Co., Ltd.",
+  "seller_tax": "0105500000018",
+  "seller_addr": "123 Silom Road, Bang Rak, Bangkok",
+  "buyer_name": "Mango Cloud Accounting Ltd.",
+  "buyer_tax": "0105500009018",
+  "buyer_addr": "12 Wireless Road, Bangkok",
+  "subtotal": "2902.00",
+  "vat": "0.00",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "2902.00",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "กาแฟคั่วกลาง 250g (bag)",
+      "qty": "3",
+      "price": "341.00",
+      "subtotal": "1023.00"
+    },
+    {
+      "name": "ค่าบริการจัดส่ง (job)",
+      "qty": "4",
+      "price": "370.00",
+      "subtotal": "1480.00"
+    },
+    {
+      "name": "ข้าวกล่องพนักงาน (box)",
+      "qty": "1",
+      "price": "399.00",
+      "subtotal": "399.00"
+    }
+  ],
+  "notes": "VAT exempt line, total equals subtotal.",
+  "category": "food",
+  "additional_invoices": []
+}

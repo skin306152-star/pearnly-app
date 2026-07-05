@@ -1,0 +1,35 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "INV-2026-0000-000044-BKK-WH-09",
+  "date": "2026-06-17",
+  "date_raw": "17/06/2569",
+  "seller_name": "Siam Service Point Co., Ltd.",
+  "seller_tax": "0105500000044",
+  "seller_addr": "88 Rama IX Road, Huai Khwang, Bangkok",
+  "buyer_name": "Lotus Field Trading Co., Ltd.",
+  "buyer_tax": "0105500009044",
+  "buyer_addr": "66 Chan Road, Bangkok",
+  "subtotal": "303.00",
+  "vat": "21.21",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "324.21",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "ข้าวกล่องพนักงาน (box)",
+      "qty": "1",
+      "price": "303.00",
+      "subtotal": "303.00"
+    }
+  ],
+  "notes": "",
+  "category": "food",
+  "additional_invoices": []
+}

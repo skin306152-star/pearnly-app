@@ -1,0 +1,53 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00055",
+  "date": "2026-06-28",
+  "date_raw": "28/06/2569",
+  "seller_name": "Nakhon Fresh Mart Ltd.",
+  "seller_tax": "0105500000055",
+  "seller_addr": "45 Mittraphap Road, Muang, Khon Kaen",
+  "buyer_name": "North Star Clinic Co., Ltd.",
+  "buyer_tax": "0105500009055",
+  "buyer_addr": "21 Phahonyothin Road, Bangkok",
+  "subtotal": "2426.00",
+  "vat": "169.82",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "2595.82",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "ค่าซ่อมเครื่องพิมพ์ (job)",
+      "qty": "4",
+      "price": "490.00",
+      "subtotal": "1960.00"
+    },
+    {
+      "name": "กระดาษ A4 80 แกรม (ream)",
+      "qty": "1",
+      "price": "39.00",
+      "subtotal": "39.00"
+    },
+    {
+      "name": "หมึกพิมพ์ HP 680 (pc)",
+      "qty": "2",
+      "price": "68.00",
+      "subtotal": "136.00"
+    },
+    {
+      "name": "กาแฟคั่วกลาง 250g (bag)",
+      "qty": "3",
+      "price": "97.00",
+      "subtotal": "291.00"
+    }
+  ],
+  "notes": "",
+  "category": "office",
+  "additional_invoices": []
+}

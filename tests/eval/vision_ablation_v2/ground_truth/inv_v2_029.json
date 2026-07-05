@@ -1,0 +1,41 @@
+{
+  "document_type": "credit_note",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00029",
+  "date": "2026-06-02",
+  "date_raw": "02/06/2026",
+  "seller_name": "Aroi Dee Restaurant Ltd.",
+  "seller_tax": "0105500000029",
+  "seller_addr": "77 Sukhumvit 31, Bangkok",
+  "buyer_name": "",
+  "buyer_tax": "",
+  "buyer_addr": "",
+  "subtotal": "-327.00",
+  "vat": "-22.89",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "-349.89",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "น้ำดื่ม 600ml (pack)",
+      "qty": "2",
+      "price": "-48.00",
+      "subtotal": "-96.00"
+    },
+    {
+      "name": "อุปกรณ์ทำความสะอาด (set)",
+      "qty": "3",
+      "price": "-77.00",
+      "subtotal": "-231.00"
+    }
+  ],
+  "notes": "",
+  "category": "office",
+  "additional_invoices": []
+}

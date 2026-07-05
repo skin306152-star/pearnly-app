@@ -1,0 +1,77 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00089",
+  "date": "2026-06-06",
+  "date_raw": "06/06/2026",
+  "seller_name": "Aroi Dee Restaurant Ltd.",
+  "seller_tax": "0105500000089",
+  "seller_addr": "77 Sukhumvit 31, Bangkok",
+  "buyer_name": "Pearnly Retail Co., Ltd.",
+  "buyer_tax": "0105500009089",
+  "buyer_addr": "99/18 Sathorn Road, Bangkok",
+  "subtotal": "627.00",
+  "vat": "43.89",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "670.89",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "หมึกพิมพ์ HP 680 (pc)",
+      "qty": "2",
+      "price": "108.00",
+      "subtotal": "216.00"
+    },
+    {
+      "name": "กาแฟคั่วกลาง 250g (bag)",
+      "qty": "3",
+      "price": "137.00",
+      "subtotal": "411.00"
+    }
+  ],
+  "notes": "",
+  "category": "office",
+  "additional_invoices": [
+    {
+      "document_type": "tax_invoice",
+      "is_not_invoice": false,
+      "is_copy_or_duplicate": false,
+      "invoice_number": "IV26-X0089",
+      "date": "2026-06-21",
+      "date_raw": "21/06/2026",
+      "seller_name": "Second Page Vendor Co., Ltd.",
+      "seller_tax": "0105500003089",
+      "seller_addr": "8 Ratchada Road, Bangkok",
+      "buyer_name": "Pearnly Retail Co., Ltd.",
+      "buyer_tax": "0105500009089",
+      "buyer_addr": "99/18 Sathorn Road, Bangkok",
+      "subtotal": "949.00",
+      "vat": "66.43",
+      "wht_rate": "",
+      "wht_amount": "",
+      "discount": "",
+      "total_amount": "1015.43",
+      "cash_amount": "",
+      "change_amount": "",
+      "payment_method": "transfer",
+      "currency": "",
+      "items": [
+        {
+          "name": "ค่าบริการเพิ่มเติม",
+          "qty": "1",
+          "price": "949.00",
+          "subtotal": "949.00"
+        }
+      ],
+      "notes": "",
+      "category": "service",
+      "additional_invoices": []
+    }
+  ]
+}

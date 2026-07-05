@@ -1,0 +1,35 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": true,
+  "invoice_number": "IV26-00028",
+  "date": "2026-06-01",
+  "date_raw": "01/06/26",
+  "seller_name": "Thai Packaging Hub Co., Ltd.",
+  "seller_tax": "0105500000028",
+  "seller_addr": "29 Theparak Road, Samut Prakan",
+  "buyer_name": "Lotus Field Trading Co., Ltd.",
+  "buyer_tax": "0105500009028",
+  "buyer_addr": "66 Chan Road, Bangkok",
+  "subtotal": "511.00",
+  "vat": "35.77",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "546.77",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "ข้าวกล่องพนักงาน (box)",
+      "qty": "1",
+      "price": "511.00",
+      "subtotal": "511.00"
+    }
+  ],
+  "notes": "",
+  "category": "food",
+  "additional_invoices": []
+}

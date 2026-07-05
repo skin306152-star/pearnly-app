@@ -1,0 +1,41 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00057",
+  "date": "2026-06-02",
+  "date_raw": "02/06/2026",
+  "seller_name": "Plern Coffee Roasters Ltd.",
+  "seller_tax": "0105500000057",
+  "seller_addr": "14 Nimman Road, Muang, Chiang Mai",
+  "buyer_name": "Pearnly Retail Co., Ltd.",
+  "buyer_tax": "0105500009057",
+  "buyer_addr": "99/18 Sathorn Road, Bangkok",
+  "subtotal": "307.00",
+  "vat": "21.49",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "328.49",
+  "cash_amount": "400.00",
+  "change_amount": "71.51",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "หมึกพิมพ์ HP 680 (pc)",
+      "qty": "2",
+      "price": "44.00",
+      "subtotal": "88.00"
+    },
+    {
+      "name": "กาแฟคั่วกลาง 250g (bag)",
+      "qty": "3",
+      "price": "73.00",
+      "subtotal": "219.00"
+    }
+  ],
+  "notes": "",
+  "category": "office",
+  "additional_invoices": []
+}

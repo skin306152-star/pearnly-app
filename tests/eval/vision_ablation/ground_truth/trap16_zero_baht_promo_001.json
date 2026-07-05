@@ -1,0 +1,55 @@
+{
+  "id": "trap16_zero_baht_promo_001",
+  "name": "trap16_zero_baht_promo_001",
+  "file": "trap16_zero_baht_promo_001.jpg",
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "seller_name": "บริษัท เอเชีย ออฟฟิศ ซัพพลาย จำกัด",
+  "seller_tax": "0105562033104",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "บริษัท เพิร์นลี่ เทค จำกัด",
+  "buyer_tax": "0105564061523",
+  "buyer_addr": "",
+  "invoice_number": "IV71/10077",
+  "date": "2026-07-05",
+  "date_raw": "05/07/2569",
+  "subtotal": "1982.00",
+  "vat": "138.74",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "2120.74",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "บริการซ่อมแซม",
+      "qty": "1",
+      "price": "1500.00",
+      "subtotal": "1500.00"
+    },
+    {
+      "name": "สายชาร์จ USB-C",
+      "qty": "2",
+      "price": "199.00",
+      "subtotal": "398.00"
+    },
+    {
+      "name": "นมสด",
+      "qty": "3",
+      "price": "28.00",
+      "subtotal": "84.00"
+    }
+  ],
+  "items_count": 3,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "zero_baht_promo",
+  "traps": ["zero_baht_promo_line"],
+  "degradation": ["motion_blur_mid"],
+  "_note": "zero_baht_promo_line; motion_blur_mid"
+}

@@ -1,0 +1,67 @@
+{
+  "id": "trap12_non_invoice_decoy_004",
+  "name": "trap12_non_invoice_decoy_004",
+  "file": "trap12_non_invoice_decoy_004.jpg",
+  "document_type": "other",
+  "is_not_invoice": true,
+  "is_copy_or_duplicate": true,
+  "seller_name": "PTT Station Cafe Amazon",
+  "seller_tax": "0107561000013",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "",
+  "buyer_tax": "",
+  "buyer_addr": "",
+  "invoice_number": "IV71/10059",
+  "date": "2026-07-05",
+  "date_raw": "05/07/2569",
+  "subtotal": "603.00",
+  "vat": "42.21",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "645.21",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "นมสด",
+      "qty": "3",
+      "price": "28.00",
+      "subtotal": "84.00"
+    },
+    {
+      "name": "น้ำดื่ม 600ml",
+      "qty": "1",
+      "price": "10.00",
+      "subtotal": "10.00"
+    },
+    {
+      "name": "กาแฟเย็น",
+      "qty": "2",
+      "price": "45.00",
+      "subtotal": "90.00"
+    },
+    {
+      "name": "สปาเก็ตตี้",
+      "qty": "1",
+      "price": "59.00",
+      "subtotal": "59.00"
+    },
+    {
+      "name": "กระดาษ A4",
+      "qty": "3",
+      "price": "120.00",
+      "subtotal": "360.00"
+    }
+  ],
+  "items_count": 5,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "non_invoice_decoy",
+  "traps": ["po_quote_delivery_copy"],
+  "degradation": ["crease"],
+  "_note": "po_quote_delivery_copy; crease"
+}

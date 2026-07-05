@@ -1,0 +1,124 @@
+{
+  "document_type": "bank_statement",
+  "bank_name": "Bangkok Bank",
+  "bank_code": "bbl",
+  "account_name": "Pearnly Retail Co., Ltd.",
+  "account_number": "123-006-00023-9",
+  "account_last4": "0023",
+  "period_start": "2026-06-01",
+  "period_end": "2026-06-30",
+  "opening_balance": "32291.00",
+  "closing_balance": "24802.00",
+  "entries": [
+    {
+      "transaction_date": "2026-06-07",
+      "transaction_date_raw": "07/06/26",
+      "description": "POS batch 10280137 023",
+      "reference": "BBL-023-0000",
+      "deposit": "",
+      "withdrawal": "1363.00",
+      "amount": "1363.00",
+      "direction": "withdrawal",
+      "balance": "30928.00"
+    },
+    {
+      "transaction_date": "2026-06-09",
+      "transaction_date_raw": "09/06/26",
+      "description": "Monthly bank fee 023",
+      "reference": "BBL-023-0001",
+      "deposit": "1460.00",
+      "withdrawal": "",
+      "amount": "1460.00",
+      "direction": "deposit",
+      "balance": "32388.00"
+    },
+    {
+      "transaction_date": "2026-06-11",
+      "transaction_date_raw": "11/06/26",
+      "description": "Supplier INV-26-023",
+      "reference": "BBL-023-0002",
+      "deposit": "",
+      "withdrawal": "1557.00",
+      "amount": "1557.00",
+      "direction": "withdrawal",
+      "balance": "30831.00"
+    },
+    {
+      "transaction_date": "2026-06-13",
+      "transaction_date_raw": "13/06/26",
+      "description": "Interest credit023",
+      "reference": "BBL-023-0003",
+      "deposit": "",
+      "withdrawal": "1654.00",
+      "amount": "1654.00",
+      "direction": "withdrawal",
+      "balance": "29177.00"
+    },
+    {
+      "transaction_date": "2026-06-15",
+      "transaction_date_raw": "15/06/26",
+      "description": "PromptPay REF 6091 023",
+      "reference": "BBL-023-0004",
+      "deposit": "1751.00",
+      "withdrawal": "",
+      "amount": "1751.00",
+      "direction": "deposit",
+      "balance": "30928.00"
+    },
+    {
+      "transaction_date": "2026-06-17",
+      "transaction_date_raw": "17/06/26",
+      "description": "POS batch 10280137 023",
+      "reference": "BBL-023-0005",
+      "deposit": "",
+      "withdrawal": "1848.00",
+      "amount": "1848.00",
+      "direction": "withdrawal",
+      "balance": "29080.00"
+    },
+    {
+      "transaction_date": "2026-06-19",
+      "transaction_date_raw": "19/06/26",
+      "description": "Monthly bank fee 023",
+      "reference": "BBL-023-0006",
+      "deposit": "",
+      "withdrawal": "1945.00",
+      "amount": "1945.00",
+      "direction": "withdrawal",
+      "balance": "27135.00"
+    },
+    {
+      "transaction_date": "2026-06-21",
+      "transaction_date_raw": "21/06/26",
+      "description": "Supplier INV-26-023",
+      "reference": "BBL-023-0007",
+      "deposit": "2042.00",
+      "withdrawal": "",
+      "amount": "2042.00",
+      "direction": "deposit",
+      "balance": "29177.00"
+    },
+    {
+      "transaction_date": "2026-06-23",
+      "transaction_date_raw": "23/06/26",
+      "description": "Interest credit023",
+      "reference": "BBL-023-0008",
+      "deposit": "",
+      "withdrawal": "2139.00",
+      "amount": "2139.00",
+      "direction": "withdrawal",
+      "balance": "27038.00"
+    },
+    {
+      "transaction_date": "2026-06-25",
+      "transaction_date_raw": "25/06/26",
+      "description": "PromptPay REF 6091 023",
+      "reference": "BBL-023-0009",
+      "deposit": "",
+      "withdrawal": "2236.00",
+      "amount": "2236.00",
+      "direction": "withdrawal",
+      "balance": "24802.00"
+    }
+  ]
+}

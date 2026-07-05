@@ -1,0 +1,49 @@
+{
+  "id": "trap04_points_saving_trap_001",
+  "name": "trap04_points_saving_trap_001",
+  "file": "trap04_points_saving_trap_001.jpg",
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "seller_name": "บริษัท สยามแม็คโคร จำกัด (มหาชน)",
+  "seller_tax": "0107537000521",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "บริษัท ดาต้าทูลส์ จำกัด",
+  "buyer_tax": "0735527000289",
+  "buyer_addr": "",
+  "invoice_number": "IV70/10016",
+  "date": "2026-07-05",
+  "date_raw": "05/07/2569",
+  "subtotal": "1896.68",
+  "vat": "132.77",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "2029.45",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "น้ำมันดีเซล ลิตร",
+      "qty": "12.35",
+      "price": "32.12",
+      "subtotal": "396.68"
+    },
+    {
+      "name": "บริการซ่อมแซม",
+      "qty": "1",
+      "price": "1500.00",
+      "subtotal": "1500.00"
+    }
+  ],
+  "items_count": 2,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "points_saving_trap",
+  "traps": ["loyalty_points", "saving_not_discount"],
+  "degradation": ["motion_blur_mid"],
+  "_note": "loyalty_points; saving_not_discount; motion_blur_mid"
+}

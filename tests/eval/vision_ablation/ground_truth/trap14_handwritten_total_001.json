@@ -1,0 +1,67 @@
+{
+  "id": "trap14_handwritten_total_001",
+  "name": "trap14_handwritten_total_001",
+  "file": "trap14_handwritten_total_001.jpg",
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "seller_name": "PTT Station Cafe Amazon",
+  "seller_tax": "0107561000013",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "",
+  "buyer_tax": "",
+  "buyer_addr": "",
+  "invoice_number": "IV70/10067",
+  "date": "2026-07-05",
+  "date_raw": "05/07/2569",
+  "subtotal": "2082.00",
+  "vat": "145.74",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "2227.74",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "บริการซ่อมแซม",
+      "qty": "1",
+      "price": "1500.00",
+      "subtotal": "1500.00"
+    },
+    {
+      "name": "สายชาร์จ USB-C",
+      "qty": "2",
+      "price": "199.00",
+      "subtotal": "398.00"
+    },
+    {
+      "name": "นมสด",
+      "qty": "3",
+      "price": "28.00",
+      "subtotal": "84.00"
+    },
+    {
+      "name": "น้ำดื่ม 600ml",
+      "qty": "1",
+      "price": "10.00",
+      "subtotal": "10.00"
+    },
+    {
+      "name": "กาแฟเย็น",
+      "qty": "2",
+      "price": "45.00",
+      "subtotal": "90.00"
+    }
+  ],
+  "items_count": 5,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "handwritten_total",
+  "traps": ["handwritten_amount"],
+  "degradation": ["motion_blur_mid"],
+  "_note": "handwritten_amount; motion_blur_mid"
+}

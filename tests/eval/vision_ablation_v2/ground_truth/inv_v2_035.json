@@ -1,0 +1,89 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00035",
+  "date": "2026-06-08",
+  "date_raw": "08/06/26",
+  "seller_name": "Aroi Dee Restaurant Ltd.",
+  "seller_tax": "0105500000035",
+  "seller_addr": "77 Sukhumvit 31, Bangkok",
+  "buyer_name": "Mango Cloud Accounting Ltd.",
+  "buyer_tax": "0105500009035",
+  "buyer_addr": "12 Wireless Road, Bangkok",
+  "subtotal": "1906.00",
+  "vat": "133.42",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "2039.42",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "ค่าบริการจัดส่ง (job)",
+      "qty": "4",
+      "price": "150.00",
+      "subtotal": "600.00"
+    },
+    {
+      "name": "ข้าวกล่องพนักงาน (box)",
+      "qty": "1",
+      "price": "179.00",
+      "subtotal": "179.00"
+    },
+    {
+      "name": "น้ำดื่ม 600ml (pack)",
+      "qty": "2",
+      "price": "208.00",
+      "subtotal": "416.00"
+    },
+    {
+      "name": "อุปกรณ์ทำความสะอาด (set)",
+      "qty": "3",
+      "price": "237.00",
+      "subtotal": "711.00"
+    }
+  ],
+  "notes": "",
+  "category": "office",
+  "additional_invoices": [
+    {
+      "document_type": "tax_invoice",
+      "is_not_invoice": false,
+      "is_copy_or_duplicate": false,
+      "invoice_number": "IV26-X0035",
+      "date": "2026-06-21",
+      "date_raw": "21/06/2026",
+      "seller_name": "Second Page Vendor Co., Ltd.",
+      "seller_tax": "0105500003035",
+      "seller_addr": "8 Ratchada Road, Bangkok",
+      "buyer_name": "Pearnly Retail Co., Ltd.",
+      "buyer_tax": "0105500009035",
+      "buyer_addr": "99/18 Sathorn Road, Bangkok",
+      "subtotal": "895.00",
+      "vat": "62.65",
+      "wht_rate": "",
+      "wht_amount": "",
+      "discount": "",
+      "total_amount": "957.65",
+      "cash_amount": "",
+      "change_amount": "",
+      "payment_method": "transfer",
+      "currency": "",
+      "items": [
+        {
+          "name": "ค่าบริการเพิ่มเติม",
+          "qty": "1",
+          "price": "895.00",
+          "subtotal": "895.00"
+        }
+      ],
+      "notes": "",
+      "category": "service",
+      "additional_invoices": []
+    }
+  ]
+}

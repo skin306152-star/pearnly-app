@@ -1,0 +1,41 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00045",
+  "date": "2026-06-18",
+  "date_raw": "18/06/2569",
+  "seller_name": "Plern Coffee Roasters Ltd.",
+  "seller_tax": "0105500000045",
+  "seller_addr": "14 Nimman Road, Muang, Chiang Mai",
+  "buyer_name": "Lotus Field Trading Co., Ltd.",
+  "buyer_tax": "0105500009045",
+  "buyer_addr": "66 Chan Road, Bangkok",
+  "subtotal": "1687.00",
+  "vat": "118.09",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "1805.09",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "น้ำดื่ม 600ml (pack)",
+      "qty": "2",
+      "price": "320.00",
+      "subtotal": "640.00"
+    },
+    {
+      "name": "อุปกรณ์ทำความสะอาด (set)",
+      "qty": "3",
+      "price": "349.00",
+      "subtotal": "1047.00"
+    }
+  ],
+  "notes": "",
+  "category": "office",
+  "additional_invoices": []
+}

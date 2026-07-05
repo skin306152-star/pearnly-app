@@ -1,0 +1,55 @@
+{
+  "id": "trap01_cash_change_trap_003",
+  "name": "trap01_cash_change_trap_003",
+  "file": "trap01_cash_change_trap_003.jpg",
+  "document_type": "simplified_tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "seller_name": "ร้านอาหารบ้านสวนป้าลี",
+  "seller_tax": "0735559001248",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "",
+  "buyer_tax": "",
+  "buyer_addr": "",
+  "invoice_number": "IV69/10003",
+  "date": "2026-07-05",
+  "date_raw": "05/07/2569",
+  "subtotal": "167.00",
+  "vat": "0.00",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "167.00",
+  "cash_amount": "200.00",
+  "change_amount": "33.00",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "ข้าวกล่อง",
+      "qty": "1",
+      "price": "109.00",
+      "subtotal": "109.00"
+    },
+    {
+      "name": "น้ำดื่ม",
+      "qty": "1",
+      "price": "10.00",
+      "subtotal": "10.00"
+    },
+    {
+      "name": "กาแฟเย็น",
+      "qty": "1",
+      "price": "48.00",
+      "subtotal": "48.00"
+    }
+  ],
+  "items_count": 3,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "cash_change_trap",
+  "traps": ["cash_gt_total", "change_line"],
+  "degradation": ["glare"],
+  "_note": "cash_gt_total; change_line; glare"
+}

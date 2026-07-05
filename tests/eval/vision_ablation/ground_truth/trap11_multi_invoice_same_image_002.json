@@ -1,0 +1,172 @@
+{
+  "id": "trap11_multi_invoice_same_image_002",
+  "name": "trap11_multi_invoice_same_image_002",
+  "file": "trap11_multi_invoice_same_image_002.jpg",
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "seller_name": "ร้านอาหารบ้านสวนป้าลี",
+  "seller_tax": "0735559001248",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "บริษัท ดาต้าทูลส์ จำกัด",
+  "buyer_tax": "0735527000289",
+  "buyer_addr": "",
+  "invoice_number": "IV70/10052",
+  "date": "2026-07-05",
+  "date_raw": "05/07/2569",
+  "subtotal": "419.00",
+  "vat": "29.33",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "448.33",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "สปาเก็ตตี้",
+      "qty": "1",
+      "price": "59.00",
+      "subtotal": "59.00"
+    },
+    {
+      "name": "กระดาษ A4",
+      "qty": "3",
+      "price": "120.00",
+      "subtotal": "360.00"
+    }
+  ],
+  "items_count": 2,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [
+    {
+      "id": "trap11_multi_invoice_same_image_002_B",
+      "name": "trap11_multi_invoice_same_image_002_B",
+      "file": "trap11_multi_invoice_same_image_002_B.jpg",
+      "document_type": "tax_invoice",
+      "is_not_invoice": false,
+      "is_copy_or_duplicate": false,
+      "seller_name": "บริษัท สยามแม็คโคร จำกัด (มหาชน)",
+      "seller_tax": "0107537000521",
+      "seller_addr": "กรุงเทพมหานคร",
+      "buyer_name": "บริษัท เพิร์นลี่ เทค จำกัด",
+      "buyer_tax": "0105564061523",
+      "buyer_addr": "",
+      "invoice_number": "IV71/10041",
+      "date": "2026-07-05",
+      "date_raw": "05/07/2569",
+      "subtotal": "509.00",
+      "vat": "35.63",
+      "wht_rate": "",
+      "wht_amount": "",
+      "discount": "0.00",
+      "total_amount": "544.63",
+      "cash_amount": "",
+      "change_amount": "",
+      "payment_method": "transfer",
+      "currency": "",
+      "items": [
+        {
+          "name": "กาแฟเย็น",
+          "qty": "2",
+          "price": "45.00",
+          "subtotal": "90.00"
+        },
+        {
+          "name": "สปาเก็ตตี้",
+          "qty": "1",
+          "price": "59.00",
+          "subtotal": "59.00"
+        },
+        {
+          "name": "กระดาษ A4",
+          "qty": "3",
+          "price": "120.00",
+          "subtotal": "360.00"
+        }
+      ],
+      "items_count": 3,
+      "notes": "",
+      "category": "ค่าใช้จ่าย",
+      "additional_invoices": [],
+      "scenario": "multi_invoice_same_image",
+      "traps": ["same_image_extra_invoice"],
+      "degradation": [],
+      "_note": ""
+    },
+    {
+      "id": "trap11_multi_invoice_same_image_002_C",
+      "name": "trap11_multi_invoice_same_image_002_C",
+      "file": "trap11_multi_invoice_same_image_002_C.jpg",
+      "document_type": "tax_invoice",
+      "is_not_invoice": false,
+      "is_copy_or_duplicate": false,
+      "seller_name": "PTT Station Cafe Amazon",
+      "seller_tax": "0107561000013",
+      "seller_addr": "กรุงเทพมหานคร",
+      "buyer_name": "",
+      "buyer_tax": "",
+      "buyer_addr": "",
+      "invoice_number": "IV69/10051",
+      "date": "2026-07-05",
+      "date_raw": "05/07/2569",
+      "subtotal": "849.00",
+      "vat": "0.00",
+      "wht_rate": "",
+      "wht_amount": "",
+      "discount": "0.00",
+      "total_amount": "849.00",
+      "cash_amount": "",
+      "change_amount": "",
+      "payment_method": "transfer",
+      "currency": "",
+      "items": [
+        {
+          "name": "กาแฟเย็น",
+          "qty": "2",
+          "price": "45.00",
+          "subtotal": "90.00"
+        },
+        {
+          "name": "สปาเก็ตตี้",
+          "qty": "1",
+          "price": "59.00",
+          "subtotal": "59.00"
+        },
+        {
+          "name": "กระดาษ A4",
+          "qty": "3",
+          "price": "120.00",
+          "subtotal": "360.00"
+        },
+        {
+          "name": "ค่าขนส่ง",
+          "qty": "1",
+          "price": "80.00",
+          "subtotal": "80.00"
+        },
+        {
+          "name": "ข้าวกล่อง",
+          "qty": "4",
+          "price": "65.00",
+          "subtotal": "260.00"
+        }
+      ],
+      "items_count": 5,
+      "notes": "",
+      "category": "ค่าใช้จ่าย",
+      "additional_invoices": [],
+      "scenario": "multi_invoice_same_image",
+      "traps": ["same_image_extra_invoice"],
+      "degradation": [],
+      "_note": ""
+    }
+  ],
+  "scenario": "multi_invoice_same_image",
+  "traps": ["same_image_multi_invoice"],
+  "degradation": ["thermal_fade"],
+  "_note": "same_image_multi_invoice; thermal_fade"
+}

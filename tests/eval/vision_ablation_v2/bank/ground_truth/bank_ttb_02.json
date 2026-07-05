@@ -1,0 +1,124 @@
+{
+  "document_type": "bank_statement",
+  "bank_name": "TMBThanachart Bank",
+  "bank_code": "ttb",
+  "account_name": "Pearnly Retail Co., Ltd.",
+  "account_number": "134-001-00034-9",
+  "account_last4": "0034",
+  "period_start": "2026-06-01",
+  "period_end": "2026-06-30",
+  "opening_balance": "35778.00",
+  "closing_balance": "27067.00",
+  "entries": [
+    {
+      "transaction_date": "2026-06-02",
+      "transaction_date_raw": "02/06/26",
+      "description": "POS batch 10280137 034",
+      "reference": "TTB-034-0000",
+      "deposit": "",
+      "withdrawal": "1814.00",
+      "amount": "1814.00",
+      "direction": "withdrawal",
+      "balance": "33964.00"
+    },
+    {
+      "transaction_date": "2026-06-04",
+      "transaction_date_raw": "04/06/26",
+      "description": "Monthly bank fee 034",
+      "reference": "TTB-034-0001",
+      "deposit": "",
+      "withdrawal": "1911.00",
+      "amount": "1911.00",
+      "direction": "withdrawal",
+      "balance": "32053.00"
+    },
+    {
+      "transaction_date": "2026-06-06",
+      "transaction_date_raw": "06/06/26",
+      "description": "Supplier INV-26-034",
+      "reference": "TTB-034-0002",
+      "deposit": "2008.00",
+      "withdrawal": "",
+      "amount": "2008.00",
+      "direction": "deposit",
+      "balance": "34061.00"
+    },
+    {
+      "transaction_date": "2026-06-08",
+      "transaction_date_raw": "08/06/26",
+      "description": "Interest credit034",
+      "reference": "TTB-034-0003",
+      "deposit": "",
+      "withdrawal": "2105.00",
+      "amount": "2105.00",
+      "direction": "withdrawal",
+      "balance": "31956.00"
+    },
+    {
+      "transaction_date": "2026-06-10",
+      "transaction_date_raw": "10/06/26",
+      "description": "PromptPay REF 6091 034",
+      "reference": "TTB-034-0004",
+      "deposit": "",
+      "withdrawal": "2202.00",
+      "amount": "2202.00",
+      "direction": "withdrawal",
+      "balance": "29754.00"
+    },
+    {
+      "transaction_date": "2026-06-12",
+      "transaction_date_raw": "12/06/26",
+      "description": "POS batch 10280137 034",
+      "reference": "TTB-034-0005",
+      "deposit": "2299.00",
+      "withdrawal": "",
+      "amount": "2299.00",
+      "direction": "deposit",
+      "balance": "32053.00"
+    },
+    {
+      "transaction_date": "2026-06-14",
+      "transaction_date_raw": "14/06/26",
+      "description": "Monthly bank fee 034",
+      "reference": "TTB-034-0006",
+      "deposit": "",
+      "withdrawal": "2396.00",
+      "amount": "2396.00",
+      "direction": "withdrawal",
+      "balance": "29657.00"
+    },
+    {
+      "transaction_date": "2026-06-16",
+      "transaction_date_raw": "16/06/26",
+      "description": "Supplier INV-26-034",
+      "reference": "TTB-034-0007",
+      "deposit": "",
+      "withdrawal": "2493.00",
+      "amount": "2493.00",
+      "direction": "withdrawal",
+      "balance": "27164.00"
+    },
+    {
+      "transaction_date": "2026-06-18",
+      "transaction_date_raw": "18/06/26",
+      "description": "Interest credit034",
+      "reference": "TTB-034-0008",
+      "deposit": "2590.00",
+      "withdrawal": "",
+      "amount": "2590.00",
+      "direction": "deposit",
+      "balance": "29754.00"
+    },
+    {
+      "transaction_date": "2026-06-20",
+      "transaction_date_raw": "20/06/26",
+      "description": "PromptPay REF 6091 034",
+      "reference": "TTB-034-0009",
+      "deposit": "",
+      "withdrawal": "2687.00",
+      "amount": "2687.00",
+      "direction": "withdrawal",
+      "balance": "27067.00"
+    }
+  ]
+}

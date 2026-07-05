@@ -1,0 +1,61 @@
+{
+  "id": "trap09_thai_buddhist_date_002",
+  "name": "trap09_thai_buddhist_date_002",
+  "file": "trap09_thai_buddhist_date_002.jpg",
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "seller_name": "PTT Station Cafe Amazon",
+  "seller_tax": "0107561000013",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "หจก. สกิน แอนด์ โค",
+  "buyer_tax": "0903563007788",
+  "buyer_addr": "",
+  "invoice_number": "IV69/10042",
+  "date": "2026-07-05",
+  "date_raw": "5 ก.ค. 2569",
+  "subtotal": "759.00",
+  "vat": "0.00",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "759.00",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "สปาเก็ตตี้",
+      "qty": "1",
+      "price": "59.00",
+      "subtotal": "59.00"
+    },
+    {
+      "name": "กระดาษ A4",
+      "qty": "3",
+      "price": "120.00",
+      "subtotal": "360.00"
+    },
+    {
+      "name": "ค่าขนส่ง",
+      "qty": "1",
+      "price": "80.00",
+      "subtotal": "80.00"
+    },
+    {
+      "name": "ข้าวกล่อง",
+      "qty": "4",
+      "price": "65.00",
+      "subtotal": "260.00"
+    }
+  ],
+  "items_count": 4,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "thai_buddhist_date",
+  "traps": ["be_year", "two_digit_year"],
+  "degradation": ["thermal_fade"],
+  "_note": "be_year; two_digit_year; thermal_fade"
+}

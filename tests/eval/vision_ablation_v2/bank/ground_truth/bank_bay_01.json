@@ -1,0 +1,113 @@
+{
+  "document_type": "bank_statement",
+  "bank_name": "Krungsri Bank",
+  "bank_code": "bay",
+  "account_name": "Pearnly Retail Co., Ltd.",
+  "account_number": "125-000-00025-9",
+  "account_last4": "0025",
+  "period_start": "2026-06-01",
+  "period_end": "2026-06-30",
+  "opening_balance": "32925.00",
+  "closing_balance": "28008.00",
+  "entries": [
+    {
+      "transaction_date": "2026-06-01",
+      "transaction_date_raw": "01/06/26",
+      "description": "PromptPay REF 6091 025",
+      "reference": "BAY-025-0000",
+      "deposit": "",
+      "withdrawal": "1445.00",
+      "amount": "1445.00",
+      "direction": "withdrawal",
+      "balance": "31480.00"
+    },
+    {
+      "transaction_date": "2026-06-03",
+      "transaction_date_raw": "03/06/26",
+      "description": "POS batch 10280137 025",
+      "reference": "BAY-025-0001",
+      "deposit": "",
+      "withdrawal": "1542.00",
+      "amount": "1542.00",
+      "direction": "withdrawal",
+      "balance": "29938.00"
+    },
+    {
+      "transaction_date": "2026-06-05",
+      "transaction_date_raw": "05/06/26",
+      "description": "Monthly bank fee 025",
+      "reference": "BAY-025-0002",
+      "deposit": "1639.00",
+      "withdrawal": "",
+      "amount": "1639.00",
+      "direction": "deposit",
+      "balance": "31577.00"
+    },
+    {
+      "transaction_date": "2026-06-07",
+      "transaction_date_raw": "07/06/26",
+      "description": "Supplier INV-26-025",
+      "reference": "BAY-025-0003",
+      "deposit": "",
+      "withdrawal": "1736.00",
+      "amount": "1736.00",
+      "direction": "withdrawal",
+      "balance": "29841.00"
+    },
+    {
+      "transaction_date": "2026-06-09",
+      "transaction_date_raw": "09/06/26",
+      "description": "Interest credit025",
+      "reference": "BAY-025-0004",
+      "deposit": "",
+      "withdrawal": "1833.00",
+      "amount": "1833.00",
+      "direction": "withdrawal",
+      "balance": "28008.00"
+    },
+    {
+      "transaction_date": "2026-06-11",
+      "transaction_date_raw": "11/06/26",
+      "description": "PromptPay REF 6091 025",
+      "reference": "BAY-025-0005",
+      "deposit": "1930.00",
+      "withdrawal": "",
+      "amount": "1930.00",
+      "direction": "deposit",
+      "balance": "29938.00"
+    },
+    {
+      "transaction_date": "2026-06-13",
+      "transaction_date_raw": "13/06/26",
+      "description": "POS batch 10280137 025",
+      "reference": "BAY-025-0006",
+      "deposit": "",
+      "withdrawal": "2027.00",
+      "amount": "2027.00",
+      "direction": "withdrawal",
+      "balance": "27911.00"
+    },
+    {
+      "transaction_date": "2026-06-15",
+      "transaction_date_raw": "15/06/26",
+      "description": "Monthly bank fee 025",
+      "reference": "BAY-025-0007",
+      "deposit": "",
+      "withdrawal": "2124.00",
+      "amount": "2124.00",
+      "direction": "withdrawal",
+      "balance": "25787.00"
+    },
+    {
+      "transaction_date": "2026-06-17",
+      "transaction_date_raw": "17/06/26",
+      "description": "Supplier INV-26-025",
+      "reference": "BAY-025-0008",
+      "deposit": "2221.00",
+      "withdrawal": "",
+      "amount": "2221.00",
+      "direction": "deposit",
+      "balance": "28008.00"
+    }
+  ]
+}

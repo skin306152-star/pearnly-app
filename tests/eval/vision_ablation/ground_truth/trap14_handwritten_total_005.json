@@ -1,0 +1,67 @@
+{
+  "id": "trap14_handwritten_total_005",
+  "name": "trap14_handwritten_total_005",
+  "file": "trap14_handwritten_total_005.jpg",
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "seller_name": "CP ALL, 7-Eleven สาขาสีลม",
+  "seller_tax": "0107542000011",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "",
+  "buyer_tax": "",
+  "buyer_addr": "",
+  "invoice_number": "IV71/10071",
+  "date": "2026-07-05",
+  "date_raw": "05/07/2569",
+  "subtotal": "849.00",
+  "vat": "59.43",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "908.43",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "กาแฟเย็น",
+      "qty": "2",
+      "price": "45.00",
+      "subtotal": "90.00"
+    },
+    {
+      "name": "สปาเก็ตตี้",
+      "qty": "1",
+      "price": "59.00",
+      "subtotal": "59.00"
+    },
+    {
+      "name": "กระดาษ A4",
+      "qty": "3",
+      "price": "120.00",
+      "subtotal": "360.00"
+    },
+    {
+      "name": "ค่าขนส่ง",
+      "qty": "1",
+      "price": "80.00",
+      "subtotal": "80.00"
+    },
+    {
+      "name": "ข้าวกล่อง",
+      "qty": "4",
+      "price": "65.00",
+      "subtotal": "260.00"
+    }
+  ],
+  "items_count": 5,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "handwritten_total",
+  "traps": ["handwritten_amount"],
+  "degradation": ["low_res", "jpeg_artifact"],
+  "_note": "handwritten_amount; low_res; jpeg_artifact"
+}

@@ -1,0 +1,135 @@
+{
+  "document_type": "bank_statement",
+  "bank_name": "Krungthai Bank",
+  "bank_code": "ktb",
+  "account_name": "Pearnly Retail Co., Ltd.",
+  "account_number": "156-007-00056-9",
+  "account_last4": "0056",
+  "period_start": "2026-06-01",
+  "period_end": "2026-06-30",
+  "opening_balance": "42752.00",
+  "closing_balance": "33537.00",
+  "entries": [
+    {
+      "transaction_date": "2026-06-08",
+      "transaction_date_raw": "08/06/26",
+      "description": "Monthly bank fee 056",
+      "reference": "KTB-056-0000",
+      "deposit": "",
+      "withdrawal": "2716.00",
+      "amount": "2716.00",
+      "direction": "withdrawal",
+      "balance": "40036.00"
+    },
+    {
+      "transaction_date": "2026-06-10",
+      "transaction_date_raw": "10/06/26",
+      "description": "Supplier INV-26-056",
+      "reference": "KTB-056-0001",
+      "deposit": "2813.00",
+      "withdrawal": "",
+      "amount": "2813.00",
+      "direction": "deposit",
+      "balance": "42849.00"
+    },
+    {
+      "transaction_date": "2026-06-12",
+      "transaction_date_raw": "12/06/26",
+      "description": "Interest credit056",
+      "reference": "KTB-056-0002",
+      "deposit": "",
+      "withdrawal": "2910.00",
+      "amount": "2910.00",
+      "direction": "withdrawal",
+      "balance": "39939.00"
+    },
+    {
+      "transaction_date": "2026-06-14",
+      "transaction_date_raw": "14/06/26",
+      "description": "PromptPay REF 6091 056",
+      "reference": "KTB-056-0003",
+      "deposit": "",
+      "withdrawal": "3007.00",
+      "amount": "3007.00",
+      "direction": "withdrawal",
+      "balance": "36932.00"
+    },
+    {
+      "transaction_date": "2026-06-16",
+      "transaction_date_raw": "16/06/26",
+      "description": "POS batch 10280137 056",
+      "reference": "KTB-056-0004",
+      "deposit": "3104.00",
+      "withdrawal": "",
+      "amount": "3104.00",
+      "direction": "deposit",
+      "balance": "40036.00"
+    },
+    {
+      "transaction_date": "2026-06-18",
+      "transaction_date_raw": "18/06/26",
+      "description": "Monthly bank fee 056",
+      "reference": "KTB-056-0005",
+      "deposit": "",
+      "withdrawal": "3201.00",
+      "amount": "3201.00",
+      "direction": "withdrawal",
+      "balance": "36835.00"
+    },
+    {
+      "transaction_date": "2026-06-20",
+      "transaction_date_raw": "20/06/26",
+      "description": "Supplier INV-26-056",
+      "reference": "KTB-056-0006",
+      "deposit": "",
+      "withdrawal": "3298.00",
+      "amount": "3298.00",
+      "direction": "withdrawal",
+      "balance": "33537.00"
+    },
+    {
+      "transaction_date": "2026-06-22",
+      "transaction_date_raw": "22/06/26",
+      "description": "Interest credit056",
+      "reference": "KTB-056-0007",
+      "deposit": "3395.00",
+      "withdrawal": "",
+      "amount": "3395.00",
+      "direction": "deposit",
+      "balance": "36932.00"
+    },
+    {
+      "transaction_date": "2026-06-24",
+      "transaction_date_raw": "24/06/26",
+      "description": "PromptPay REF 6091 056",
+      "reference": "KTB-056-0008",
+      "deposit": "",
+      "withdrawal": "3492.00",
+      "amount": "3492.00",
+      "direction": "withdrawal",
+      "balance": "33440.00"
+    },
+    {
+      "transaction_date": "2026-06-26",
+      "transaction_date_raw": "26/06/26",
+      "description": "POS batch 10280137 056",
+      "reference": "KTB-056-0009",
+      "deposit": "",
+      "withdrawal": "3589.00",
+      "amount": "3589.00",
+      "direction": "withdrawal",
+      "balance": "29851.00"
+    },
+    {
+      "transaction_date": "2026-06-28",
+      "transaction_date_raw": "28/06/26",
+      "description": "Monthly bank fee 056",
+      "reference": "KTB-056-0010",
+      "deposit": "3686.00",
+      "withdrawal": "",
+      "amount": "3686.00",
+      "direction": "deposit",
+      "balance": "33537.00"
+    }
+  ]
+}

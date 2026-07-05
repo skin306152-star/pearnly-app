@@ -1,0 +1,89 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00071",
+  "date": "2026-06-16",
+  "date_raw": "16/06/2026",
+  "seller_name": "Aroi Dee Restaurant Ltd.",
+  "seller_tax": "0105500000071",
+  "seller_addr": "77 Sukhumvit 31, Bangkok",
+  "buyer_name": "North Star Clinic Co., Ltd.",
+  "buyer_tax": "0105500009071",
+  "buyer_addr": "21 Phahonyothin Road, Bangkok",
+  "subtotal": "3226.00",
+  "vat": "225.82",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "3451.82",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "ค่าซ่อมเครื่องพิมพ์ (job)",
+      "qty": "4",
+      "price": "282.00",
+      "subtotal": "1128.00"
+    },
+    {
+      "name": "กระดาษ A4 80 แกรม (ream)",
+      "qty": "1",
+      "price": "311.00",
+      "subtotal": "311.00"
+    },
+    {
+      "name": "หมึกพิมพ์ HP 680 (pc)",
+      "qty": "2",
+      "price": "340.00",
+      "subtotal": "680.00"
+    },
+    {
+      "name": "กาแฟคั่วกลาง 250g (bag)",
+      "qty": "3",
+      "price": "369.00",
+      "subtotal": "1107.00"
+    }
+  ],
+  "notes": "",
+  "category": "office",
+  "additional_invoices": [
+    {
+      "document_type": "tax_invoice",
+      "is_not_invoice": false,
+      "is_copy_or_duplicate": false,
+      "invoice_number": "IV26-X0071",
+      "date": "2026-06-21",
+      "date_raw": "21/06/2026",
+      "seller_name": "Second Page Vendor Co., Ltd.",
+      "seller_tax": "0105500003071",
+      "seller_addr": "8 Ratchada Road, Bangkok",
+      "buyer_name": "Pearnly Retail Co., Ltd.",
+      "buyer_tax": "0105500009071",
+      "buyer_addr": "99/18 Sathorn Road, Bangkok",
+      "subtotal": "931.00",
+      "vat": "65.17",
+      "wht_rate": "",
+      "wht_amount": "",
+      "discount": "",
+      "total_amount": "996.17",
+      "cash_amount": "",
+      "change_amount": "",
+      "payment_method": "transfer",
+      "currency": "",
+      "items": [
+        {
+          "name": "ค่าบริการเพิ่มเติม",
+          "qty": "1",
+          "price": "931.00",
+          "subtotal": "931.00"
+        }
+      ],
+      "notes": "",
+      "category": "service",
+      "additional_invoices": []
+    }
+  ]
+}

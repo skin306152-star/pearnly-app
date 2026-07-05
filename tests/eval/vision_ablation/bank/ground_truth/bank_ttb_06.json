@@ -1,0 +1,174 @@
+{
+  "id": "bank_ttb_06",
+  "file": "bank/images/bank_ttb_06.jpg",
+  "doc_type": "bank_statement",
+  "document_type": "bank_statement",
+  "bank_name": "ธนาคารทหารไทยธนชาต",
+  "bank_code": "ttb",
+  "account_name": "บริษัท ดาต้าทูลส์ จำกัด",
+  "account_number": "102-3-82645-5",
+  "account_last4": "2645",
+  "period_start": "2025-12-01",
+  "period_end": "2025-12-31",
+  "opening_balance": "-35000.00",
+  "closing_balance": "-39530.00",
+  "entry_count": 15,
+  "total_deposit": "20310.00",
+  "total_withdrawal": "24840.00",
+  "entries": [
+    {
+      "transaction_date": "2025-12-01",
+      "description": "โอนเงิน REF050000",
+      "reference": "KPLUS",
+      "deposit": "",
+      "withdrawal": "1525.00",
+      "amount": "1525.00",
+      "balance": "-36525.00",
+      "direction": "withdrawal"
+    },
+    {
+      "transaction_date": "2025-12-02",
+      "description": "โอนเงิน REF050001",
+      "reference": "KPLUS",
+      "deposit": "2796.00",
+      "withdrawal": "",
+      "amount": "2796.00",
+      "balance": "-33729.00",
+      "direction": "deposit"
+    },
+    {
+      "transaction_date": "2025-12-03",
+      "description": "โอนเงิน REF050002",
+      "reference": "KPLUS",
+      "deposit": "",
+      "withdrawal": "1799.00",
+      "amount": "1799.00",
+      "balance": "-35528.00",
+      "direction": "withdrawal"
+    },
+    {
+      "transaction_date": "2025-12-04",
+      "description": "โอนเงิน REF050003",
+      "reference": "KPLUS",
+      "deposit": "",
+      "withdrawal": "1936.00",
+      "amount": "1936.00",
+      "balance": "-37464.00",
+      "direction": "withdrawal"
+    },
+    {
+      "transaction_date": "2025-12-05",
+      "description": "โอนเงิน REF050004",
+      "reference": "KPLUS",
+      "deposit": "3429.00",
+      "withdrawal": "",
+      "amount": "3429.00",
+      "balance": "-34035.00",
+      "direction": "deposit"
+    },
+    {
+      "transaction_date": "2025-12-06",
+      "description": "โอนเงิน REF050005",
+      "reference": "KPLUS",
+      "deposit": "",
+      "withdrawal": "2210.00",
+      "amount": "2210.00",
+      "balance": "-36245.00",
+      "direction": "withdrawal"
+    },
+    {
+      "transaction_date": "2025-12-07",
+      "description": "โอนเงิน REF050006",
+      "reference": "KPLUS",
+      "deposit": "",
+      "withdrawal": "2347.00",
+      "amount": "2347.00",
+      "balance": "-38592.00",
+      "direction": "withdrawal"
+    },
+    {
+      "transaction_date": "2025-12-08",
+      "description": "โอนเงิน REF050007",
+      "reference": "KPLUS",
+      "deposit": "4062.00",
+      "withdrawal": "",
+      "amount": "4062.00",
+      "balance": "-34530.00",
+      "direction": "deposit"
+    },
+    {
+      "transaction_date": "2025-12-09",
+      "description": "โอนเงิน REF050008",
+      "reference": "KPLUS",
+      "deposit": "",
+      "withdrawal": "2621.00",
+      "amount": "2621.00",
+      "balance": "-37151.00",
+      "direction": "withdrawal"
+    },
+    {
+      "transaction_date": "2025-12-10",
+      "description": "โอนเงิน REF050009",
+      "reference": "KPLUS",
+      "deposit": "",
+      "withdrawal": "2758.00",
+      "amount": "2758.00",
+      "balance": "-39909.00",
+      "direction": "withdrawal"
+    },
+    {
+      "transaction_date": "2025-12-11",
+      "description": "โอนเงิน REF050010",
+      "reference": "KPLUS",
+      "deposit": "4695.00",
+      "withdrawal": "",
+      "amount": "4695.00",
+      "balance": "-35214.00",
+      "direction": "deposit"
+    },
+    {
+      "transaction_date": "2025-12-12",
+      "description": "โอนเงิน REF050011",
+      "reference": "KPLUS",
+      "deposit": "",
+      "withdrawal": "3032.00",
+      "amount": "3032.00",
+      "balance": "-38246.00",
+      "direction": "withdrawal"
+    },
+    {
+      "transaction_date": "2025-12-13",
+      "description": "โอนเงิน REF050012",
+      "reference": "KPLUS",
+      "deposit": "",
+      "withdrawal": "3169.00",
+      "amount": "3169.00",
+      "balance": "-41415.00",
+      "direction": "withdrawal"
+    },
+    {
+      "transaction_date": "2025-12-14",
+      "description": "โอนเงิน REF050013",
+      "reference": "KPLUS",
+      "deposit": "5328.00",
+      "withdrawal": "",
+      "amount": "5328.00",
+      "balance": "-36087.00",
+      "direction": "deposit"
+    },
+    {
+      "transaction_date": "2025-12-15",
+      "description": "โอนเงิน REF050014",
+      "reference": "KPLUS",
+      "deposit": "",
+      "withdrawal": "3443.00",
+      "amount": "3443.00",
+      "balance": "-39530.00",
+      "direction": "withdrawal"
+    }
+  ],
+  "scenario": "bank_statement_photo",
+  "traps": ["overdraft_negative"],
+  "degradation": ["moire"],
+  "_note": "synthetic bank statement with reconciled running balance"
+}

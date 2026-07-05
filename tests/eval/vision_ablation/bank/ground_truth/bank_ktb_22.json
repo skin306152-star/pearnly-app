@@ -1,0 +1,154 @@
+{
+  "id": "bank_ktb_22",
+  "file": "bank/images/bank_ktb_22.jpg",
+  "doc_type": "bank_statement",
+  "document_type": "bank_statement",
+  "bank_name": "ธนาคารกรุงไทย",
+  "bank_code": "ktb",
+  "account_name": "บริษัท ดาต้าทูลส์ จำกัด",
+  "account_number": "102-3-82661-1",
+  "account_last4": "2661",
+  "period_start": "2025-12-01",
+  "period_end": "2025-12-31",
+  "opening_balance": "26191.00",
+  "closing_balance": "25598.00",
+  "entry_count": 13,
+  "total_deposit": "20615.00",
+  "total_withdrawal": "21208.00",
+  "entries": [
+    {
+      "transaction_date": "2025-12-01",
+      "description": "โอนเงิน REF210000",
+      "reference": "KPLUS",
+      "deposit": "2857.00",
+      "withdrawal": "",
+      "amount": "2857.00",
+      "balance": "29048.00",
+      "direction": "deposit"
+    },
+    {
+      "transaction_date": "2025-12-02",
+      "description": "โอนเงิน REF210001",
+      "reference": "KPLUS",
+      "deposit": "",
+      "withdrawal": "1966.00",
+      "amount": "1966.00",
+      "balance": "27082.00",
+      "direction": "withdrawal"
+    },
+    {
+      "transaction_date": "2025-12-03",
+      "description": "โอนเงิน REF210002",
+      "reference": "KPLUS",
+      "deposit": "",
+      "withdrawal": "2103.00",
+      "amount": "2103.00",
+      "balance": "24979.00",
+      "direction": "withdrawal"
+    },
+    {
+      "transaction_date": "2025-12-04",
+      "description": "โอนเงิน REF210003",
+      "reference": "KPLUS",
+      "deposit": "3490.00",
+      "withdrawal": "",
+      "amount": "3490.00",
+      "balance": "28469.00",
+      "direction": "deposit"
+    },
+    {
+      "transaction_date": "2025-12-05",
+      "description": "โอนเงิน REF210004",
+      "reference": "KPLUS",
+      "deposit": "",
+      "withdrawal": "2377.00",
+      "amount": "2377.00",
+      "balance": "26092.00",
+      "direction": "withdrawal"
+    },
+    {
+      "transaction_date": "2025-12-06",
+      "description": "โอนเงิน REF210005",
+      "reference": "KPLUS",
+      "deposit": "",
+      "withdrawal": "2514.00",
+      "amount": "2514.00",
+      "balance": "23578.00",
+      "direction": "withdrawal"
+    },
+    {
+      "transaction_date": "2025-12-07",
+      "description": "โอนเงิน REF210006",
+      "reference": "KPLUS",
+      "deposit": "4123.00",
+      "withdrawal": "",
+      "amount": "4123.00",
+      "balance": "27701.00",
+      "direction": "deposit"
+    },
+    {
+      "transaction_date": "2025-12-08",
+      "description": "โอนเงิน REF210007",
+      "reference": "KPLUS",
+      "deposit": "",
+      "withdrawal": "2788.00",
+      "amount": "2788.00",
+      "balance": "24913.00",
+      "direction": "withdrawal"
+    },
+    {
+      "transaction_date": "2025-12-09",
+      "description": "โอนเงิน REF210008",
+      "reference": "KPLUS",
+      "deposit": "",
+      "withdrawal": "2925.00",
+      "amount": "2925.00",
+      "balance": "21988.00",
+      "direction": "withdrawal"
+    },
+    {
+      "transaction_date": "2025-12-10",
+      "description": "โอนเงิน REF210009",
+      "reference": "KPLUS",
+      "deposit": "4756.00",
+      "withdrawal": "",
+      "amount": "4756.00",
+      "balance": "26744.00",
+      "direction": "deposit"
+    },
+    {
+      "transaction_date": "2025-12-11",
+      "description": "โอนเงิน REF210010",
+      "reference": "KPLUS",
+      "deposit": "",
+      "withdrawal": "3199.00",
+      "amount": "3199.00",
+      "balance": "23545.00",
+      "direction": "withdrawal"
+    },
+    {
+      "transaction_date": "2025-12-12",
+      "description": "โอนเงิน REF210011",
+      "reference": "KPLUS",
+      "deposit": "",
+      "withdrawal": "3336.00",
+      "amount": "3336.00",
+      "balance": "20209.00",
+      "direction": "withdrawal"
+    },
+    {
+      "transaction_date": "2025-12-13",
+      "description": "โอนเงิน REF210012",
+      "reference": "KPLUS",
+      "deposit": "5389.00",
+      "withdrawal": "",
+      "amount": "5389.00",
+      "balance": "25598.00",
+      "direction": "deposit"
+    }
+  ],
+  "scenario": "bank_statement_photo",
+  "traps": [],
+  "degradation": ["moire"],
+  "_note": "synthetic bank statement with reconciled running balance"
+}

@@ -1,0 +1,53 @@
+{
+  "document_type": "credit_note",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "IV26-00047",
+  "date": "2026-06-20",
+  "date_raw": "20/06/2026",
+  "seller_name": "Aroi Dee Restaurant Ltd.",
+  "seller_tax": "0105500000047",
+  "seller_addr": "77 Sukhumvit 31, Bangkok",
+  "buyer_name": "",
+  "buyer_tax": "",
+  "buyer_addr": "",
+  "subtotal": "-3946.00",
+  "vat": "-276.22",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "-4222.22",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "ค่าซ่อมเครื่องพิมพ์ (job)",
+      "qty": "4",
+      "price": "-354.00",
+      "subtotal": "-1416.00"
+    },
+    {
+      "name": "กระดาษ A4 80 แกรม (ream)",
+      "qty": "1",
+      "price": "-383.00",
+      "subtotal": "-383.00"
+    },
+    {
+      "name": "หมึกพิมพ์ HP 680 (pc)",
+      "qty": "2",
+      "price": "-412.00",
+      "subtotal": "-824.00"
+    },
+    {
+      "name": "กาแฟคั่วกลาง 250g (bag)",
+      "qty": "3",
+      "price": "-441.00",
+      "subtotal": "-1323.00"
+    }
+  ],
+  "notes": "",
+  "category": "office",
+  "additional_invoices": []
+}

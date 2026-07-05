@@ -1,0 +1,35 @@
+{
+  "document_type": "tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": true,
+  "invoice_number": "IV26-00064",
+  "date": "2026-06-09",
+  "date_raw": "09/06/2026",
+  "seller_name": "Thai Packaging Hub Co., Ltd.",
+  "seller_tax": "0105500000064",
+  "seller_addr": "29 Theparak Road, Samut Prakan",
+  "buyer_name": "Pearnly Retail Co., Ltd.",
+  "buyer_tax": "0105500009064",
+  "buyer_addr": "99/18 Sathorn Road, Bangkok",
+  "subtotal": "163.00",
+  "vat": "11.41",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "",
+  "total_amount": "174.41",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "กระดาษ A4 80 แกรม (ream)",
+      "qty": "1",
+      "price": "163.00",
+      "subtotal": "163.00"
+    }
+  ],
+  "notes": "",
+  "category": "food",
+  "additional_invoices": []
+}

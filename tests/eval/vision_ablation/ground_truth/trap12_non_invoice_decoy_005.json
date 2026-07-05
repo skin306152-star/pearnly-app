@@ -1,0 +1,49 @@
+{
+  "id": "trap12_non_invoice_decoy_005",
+  "name": "trap12_non_invoice_decoy_005",
+  "file": "trap12_non_invoice_decoy_005.jpg",
+  "document_type": "order_evidence",
+  "is_not_invoice": true,
+  "is_copy_or_duplicate": false,
+  "seller_name": "ร้านอาหารบ้านสวนป้าลี",
+  "seller_tax": "0735559001248",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "บริษัท ดาต้าทูลส์ จำกัด",
+  "buyer_tax": "0735527000289",
+  "buyer_addr": "",
+  "invoice_number": "IV69/10060",
+  "date": "2026-07-05",
+  "date_raw": "05/07/2569",
+  "subtotal": "100.00",
+  "vat": "0.00",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "100.00",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "transfer",
+  "currency": "",
+  "items": [
+    {
+      "name": "น้ำดื่ม 600ml",
+      "qty": "1",
+      "price": "10.00",
+      "subtotal": "10.00"
+    },
+    {
+      "name": "กาแฟเย็น",
+      "qty": "2",
+      "price": "45.00",
+      "subtotal": "90.00"
+    }
+  ],
+  "items_count": 2,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "non_invoice_decoy",
+  "traps": ["po_quote_delivery_copy"],
+  "degradation": ["low_res", "jpeg_artifact"],
+  "_note": "po_quote_delivery_copy; low_res; jpeg_artifact"
+}

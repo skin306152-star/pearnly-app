@@ -115,6 +115,17 @@ def evaluate_sanity(invoice) -> List[str]:
         if len(raw) == 13 and not _valid_tax_id(raw):
             reasons.append(f"{name} {raw} 校验位不符 — 13 位但 MOD-11 不过(疑读错一位)")
 
+    # 规则 6(trap08 实案 2026-07-05):明细行和 > 小计 → 结构不可能(小计=折扣前行和,
+    # 行只会漏读不会多出钱)。抓「重影把 8 糊成 3」这类同一位错同时进小计与总额的自洽性
+    # 误读——双读/勾稽全绿,但票面明细行和把真数供出来了。只单向判(行和小于小计=漏行,
+    # 合法,不误杀);相对 2% + 绝对 0.5 双容差吸掉四舍五入。
+    if sub is not None and sub > 0 and lines and len(lines) >= 2:
+        line_sum = sum(lines)
+        if line_sum > sub + max(_TOL, sub * _RECON_REL):
+            reasons.append(
+                f"明细行和 {line_sum:.2f} > 小计 {sub} — 结构不可能(疑小计/总额读错一位)"
+            )
+
     return reasons
 
 

@@ -142,6 +142,37 @@ class TaxIdChecksumTests(unittest.TestCase):
         self.assertFalse(any("校验位不符" in r for r in evaluate_sanity(inv)))
 
 
+class LineSumExceedsSubtotalTests(unittest.TestCase):
+    # 规则 6(trap08 实案):重影把小计/总额同一位数字糊错(1896→1396·1846→1346),
+    # 勾稽自平+双读一致全绿,但明细行和(396.68+1500=1896.68)供出真数。
+
+    def _items(self, *subs):
+        from services.ocr.schemas import LineItem
+
+        return [LineItem(name=f"i{i}", subtotal=s) for i, s in enumerate(subs)]
+
+    def test_trap08_shape_flagged(self):
+        inv = _inv(subtotal="1396.68", vat="0.00", total_amount="1346.68", discount="50.00",
+                   items=self._items("396.68", "1500.00"))
+        self.assertTrue(any("明细行和" in r for r in evaluate_sanity(inv)))
+
+    def test_partial_items_not_flagged(self):
+        # 只读到部分明细(行和 < 小计)= 合法漏行,不误杀
+        inv = _inv(subtotal="1896.68", total_amount="1896.68",
+                   items=self._items("396.68"))
+        self.assertFalse(any("明细行和" in r for r in evaluate_sanity(inv)))
+
+    def test_rounding_within_tolerance_not_flagged(self):
+        inv = _inv(subtotal="100.00", total_amount="107.00", vat="7.00",
+                   items=self._items("60.00", "40.30"))  # 0.30 < max(0.5, 2%)
+        self.assertFalse(any("明细行和" in r for r in evaluate_sanity(inv)))
+
+    def test_single_item_not_judged(self):
+        # 单行明细信息量不足(行本身可能读错),≥2 行才判
+        inv = _inv(subtotal="100.00", total_amount="100.00", items=self._items("999.00"))
+        self.assertFalse(any("明细行和" in r for r in evaluate_sanity(inv)))
+
+
 class CreditNoteReviewTests(unittest.TestCase):
     # P1 台账 #8:贷记单=方向性单据,两链共用本判定强制人工,不许当普通发票静默过账。
 

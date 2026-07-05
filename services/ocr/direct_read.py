@@ -84,7 +84,12 @@ def _sniff_mime(image_bytes: bytes) -> str:
     return "image/png"  # PDF 渲染页就是 PNG;未知类型按 PNG 送,模型端自会报错
 
 
-def _call_model(image_bytes: bytes, document_type: BusinessDocumentType, api_key: Optional[str]):
+def _call_model(
+    image_bytes: bytes,
+    document_type: BusinessDocumentType,
+    api_key: Optional[str],
+    tier: str = "flash_lite",
+):
     from services.ai_gateway import backends
 
     sys_prompt = (
@@ -95,11 +100,83 @@ def _call_model(image_bytes: bytes, document_type: BusinessDocumentType, api_key
     return backends.get_provider().multimodal_to_json(
         sys_prompt + _IMAGE_INPUT_NOTE,
         [(image_bytes, _sniff_mime(image_bytes))],
-        tier="flash_lite",
+        tier=tier,
         api_key=key,
         timeout_s=_TIMEOUT_S,
         max_retries=_MAX_RETRIES,
     )
+
+
+# ── 双读一致性(台账 #3 · 04 号方案 B 档:金额分级)────────────────────
+# 治自洽性幻觉:整套数字编错但勾稽自平,确定性闸全绿(实证 trap05 508.97→5518897)。
+# 两次独立读撞出同一套错数字概率极低;不一致 → 人工,不机器仲裁谁对。
+# 只覆盖"直读一次过闸"的票——回落票走 Vision 链整套重跑,天然已是双读。
+BIG_TICKET_THB = float(os.environ.get("OCR_DOUBLE_READ_BIG_THB", "2000"))
+_VERIFY_FIELDS = ("total_amount", "vat", "subtotal", "seller_tax")
+_VERIFY_TOL_THB = 0.5  # 与勾稽闸同容差
+
+
+def double_read_enabled() -> bool:
+    return os.environ.get("OCR_DOUBLE_READ", "1").strip().lower() not in ("0", "false", "no", "off")
+
+
+def _perturb_jpeg(image_bytes: bytes) -> bytes:
+    """小票二读用同档模型 → 图像轻微重压缩打破确定性重复错(同族共病对策)。失败原图。"""
+    try:
+        import io as _io
+
+        from PIL import Image
+
+        buf = _io.BytesIO()
+        Image.open(_io.BytesIO(image_bytes)).convert("RGB").save(buf, format="JPEG", quality=85)
+        out = buf.getvalue()
+        return out or image_bytes
+    except Exception:  # noqa: BLE001 — 扰动只是加强项,绝不因它断链
+        return image_bytes
+
+
+def _verify_mismatches(first: ThaiInvoice, second: ThaiInvoice) -> List[str]:
+    from .money import normalize_id, normalize_money
+
+    out: List[str] = []
+    for f in _VERIFY_FIELDS:
+        va = str(getattr(first, f, "") or "").strip()
+        vb = str(getattr(second, f, "") or "").strip()
+        if f == "seller_tax":
+            ok = normalize_id(va) == normalize_id(vb)
+        else:
+            na, nb = normalize_money(va), normalize_money(vb)
+            if na is None and nb is None:
+                ok = True
+            elif na is None or nb is None:
+                ok = False
+            else:
+                ok = abs(na - nb) <= _VERIFY_TOL_THB
+        if not ok:
+            out.append(f"double_read: {f} 两读不一致({va or '空'} vs {vb or '空'})")
+    return out
+
+
+def _second_read(image_bytes: bytes, first: ThaiInvoice, api_key: Optional[str], page_number: int):
+    """二读:大票(≥阈值)升 3.5 跨模型防共病;小票同档 + 图像扰动。崩了 → 回落 Vision 路
+    (它整链重跑,本身就是双读)。返回 (outcome, invoice)。"""
+    from .money import normalize_money
+
+    total = normalize_money(first.total_amount)
+    big = total is not None and abs(total) >= BIG_TICKET_THB
+    tier = "fallback" if big else "flash_lite"
+    img = image_bytes if big else _perturb_jpeg(image_bytes)
+    try:
+        o2 = _call_model(img, "invoice", api_key, tier=tier)
+    except Exception as e:  # noqa: BLE001
+        raise DirectReadFallback(f"page {page_number}: second read raise: {e}") from e
+    if not o2.ok or not isinstance(o2.data, dict):
+        raise DirectReadFallback(f"page {page_number}: second read {o2.error_kind or 'empty'}")
+    try:
+        inv2 = ThaiInvoice(**o2.data)
+    except ValidationError as e:
+        raise DirectReadFallback(f"page {page_number}: second read schema: {e}") from e
+    return o2, inv2
 
 
 def read_page(
@@ -140,6 +217,26 @@ def read_page(
         warnings.append(cn_reason)
         force_review = True
 
+    # 双读一致性:过闸的发票再独立读一遍,钱面四件不一致 → 人工(差异原样进警告)。
+    chain = ["ID"]
+    l3_in = l3_out = 0
+    l3_model = ""
+    if (
+        document_type in ("auto", "invoice")
+        and not invoice.is_not_invoice
+        and double_read_enabled()
+    ):
+        o2, inv2 = _second_read(image_bytes, invoice, api_key, page_number)
+        chain = ["ID", "ID2"]
+        l3_in, l3_out, l3_model = o2.input_tokens, o2.output_tokens, o2.model
+        mismatches = _verify_mismatches(invoice, inv2)
+        if mismatches:
+            warnings.extend(mismatches)
+            force_review = True
+            logger.warning(
+                "direct-read double-read mismatch page %d: %s", page_number, "; ".join(mismatches)
+            )
+
     # 与 triggers 同口径:0.95 起步、每条软标注 -0.05;≥0.98 才 auto(直读永达不到,
     # 维持发票 confirm-first 现状),0.90-0.98 = yellow_confirm,再低转人工。
     final_confidence = round(max(0.0, 0.95 - 0.05 * len(warnings)), 4)
@@ -149,12 +246,15 @@ def read_page(
         invoice=invoice,
         document_type=document_type,
         document=document,
-        layer_chain=["ID"],
+        layer_chain=chain,
         trigger_reasons=[],
         layer1_avg_confidence=0.0,
         layer2_input_tokens=outcome.input_tokens,
         layer2_output_tokens=outcome.output_tokens,
         layer2_model=outcome.model,
+        layer3_input_tokens=l3_in,
+        layer3_output_tokens=l3_out,
+        layer3_model=l3_model if (l3_in or l3_out) else "",
         layer2_ms=int((time.time() - t0) * 1000),
         total_ms=int((time.time() - t0) * 1000),
         needs_manual_review=band == "needs_review",

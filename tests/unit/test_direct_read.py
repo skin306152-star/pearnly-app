@@ -31,13 +31,16 @@ _GOOD_INVOICE = {
 
 
 class _FakeProvider:
+    """单 outcome = 每次调用同稿(双读读到一致);列表 = 按序出稿(造两读分歧)。"""
+
     def __init__(self, outcome):
-        self._o = outcome
+        self._seq = list(outcome) if isinstance(outcome, list) else [outcome]
         self.calls = []
 
     def multimodal_to_json(self, prompt, images, **kw):
         self.calls.append({"prompt": prompt, "images": images, **kw})
-        return self._o
+        i = min(len(self.calls) - 1, len(self._seq) - 1)
+        return self._seq[i]
 
 
 def _patch_provider(outcome):
@@ -77,9 +80,10 @@ class ReadPageTests(unittest.TestCase):
         )
         with _patch_provider(outcome):
             pr = dr.read_page(b"\xff\xd8fakejpeg", page_number=1)
-        self.assertEqual(pr.layer_chain, ["ID"])
+        self.assertEqual(pr.layer_chain, ["ID", "ID2"])  # 双读默认开·两读一致放行
         self.assertEqual(pr.invoice.total_amount, "70.00")
         self.assertEqual(pr.layer2_model, "gemini-3.1-flash-lite")
+        self.assertGreater(pr.layer3_input_tokens, 0)  # 二读 token 记 layer3(成本按它计)
         self.assertEqual(pr.confidence_band, "yellow_confirm")  # 永不 auto·confirm-first 不变
         self.assertFalse(pr.needs_manual_review)
         self.assertEqual(pr.validation_warnings, [])
@@ -146,7 +150,58 @@ class ReadPageTests(unittest.TestCase):
         with _patch_provider(ProviderOutcome(ok=True, data=doc, model="m")):
             pr = dr.read_page(b"\xff\xd8x", page_number=1, document_type="bank_statement")
         self.assertIsNotNone(pr.document)
+        self.assertEqual(pr.layer_chain, ["ID"])  # 非发票不双读(下游对账有自己的勾稽)
+
+
+class DoubleReadTests(unittest.TestCase):
+    # 04 号方案 B 档:自洽性幻觉(trap05 5518897)唯一机器解=两次独立读比对钱面四件
+
+    def _outcomes(self, second_data):
+        first = ProviderOutcome(ok=True, data=dict(_GOOD_INVOICE), model="lite", input_tokens=9)
+        return [first, ProviderOutcome(ok=True, data=second_data, model="m2", input_tokens=9)]
+
+    def test_mismatch_forces_review_with_both_readings(self):
+        # 二读总额不同(自洽性幻觉的样子)→ 人工 + 差异原样进警告,不机器仲裁谁对
+        second = {**_GOOD_INVOICE, "total_amount": "5518897", "subtotal": "5518890",
+                  "vat": "7.00"}
+        with _patch_provider(self._outcomes(second)):
+            pr = dr.read_page(b"\xff\xd8x", page_number=1)
+        self.assertTrue(pr.needs_manual_review)
+        self.assertEqual(pr.confidence_band, "needs_review")
+        self.assertTrue(any("total_amount" in w and "5518897" in w
+                            for w in pr.validation_warnings))
+
+    def test_small_ticket_uses_lite_with_perturbed_image(self):
+        fp = _FakeProvider(self._outcomes(dict(_GOOD_INVOICE)))  # total 70 < 2000
+        with mock.patch("services.ai_gateway.backends.get_provider", return_value=fp):
+            dr.read_page(b"\xff\xd8x", page_number=1)
+        self.assertEqual(len(fp.calls), 2)
+        self.assertEqual(fp.calls[1]["tier"], "flash_lite")
+
+    def test_big_ticket_escalates_to_fallback_tier(self):
+        big = {**_GOOD_INVOICE, "subtotal": "4672.90", "vat": "327.10",
+               "total_amount": "5000.00"}
+        fp = _FakeProvider([ProviderOutcome(ok=True, data=big, model="lite"),
+                            ProviderOutcome(ok=True, data=dict(big), model="m35")])
+        with mock.patch("services.ai_gateway.backends.get_provider", return_value=fp):
+            pr = dr.read_page(b"\xff\xd8x", page_number=1)
+        self.assertEqual(fp.calls[1]["tier"], "fallback")  # ≥฿2000 跨模型二读防共病
+        self.assertFalse(pr.needs_manual_review)
+
+    def test_kill_switch_single_read(self):
+        fp = _FakeProvider(ProviderOutcome(ok=True, data=dict(_GOOD_INVOICE), model="m"))
+        with mock.patch.dict("os.environ", {"OCR_DOUBLE_READ": "0"}):
+            with mock.patch("services.ai_gateway.backends.get_provider", return_value=fp):
+                pr = dr.read_page(b"\xff\xd8x", page_number=1)
+        self.assertEqual(len(fp.calls), 1)
         self.assertEqual(pr.layer_chain, ["ID"])
+
+    def test_second_read_failure_falls_back(self):
+        seq = [ProviderOutcome(ok=True, data=dict(_GOOD_INVOICE), model="m"),
+               ProviderOutcome(ok=False, error_kind="parse")]
+        with _patch_provider(seq):
+            with self.assertRaises(dr.DirectReadFallback):
+                dr.read_page(b"\xff\xd8x", page_number=1)
 
 
 class PipelineWiringTests(unittest.TestCase):

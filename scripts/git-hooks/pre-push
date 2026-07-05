@@ -72,9 +72,17 @@ if [ -n "$PY_CHANGED" ]; then
     # shellcheck disable=SC2086
     ruff check $PY_EXIST || fail "ruff(本次改动的 .py 有 lint 错)"
 
-    echo "  · black --check(格式)"
-    # shellcheck disable=SC2086
-    black --check $PY_EXIST || fail "black 格式(本次改动的 .py)"
+    # black 按【将要推送的提交内容】校验(git show HEAD:file),不查工作区文件。
+    # 血泪(2026-07-05 三连红):并行窗口边推边改——推送的 commit 里是未格式化旧内容,
+    # 工作区当时已 black 干净 → 钩子放行、CI 红。前端 prettier 早为同坑改成提交内容校验,同款。
+    echo "  · black --check(格式 · 按待推送提交内容)"
+    BLK_FAIL=0
+    for f in $PY_EXIST; do
+      git cat-file -e "HEAD:$f" 2>/dev/null || continue
+      git show "HEAD:$f" | black --check --quiet --stdin-filename "$f" - >/dev/null 2>&1 \
+        || { echo "    ✗ $f"; BLK_FAIL=1; }
+    done
+    [ "$BLK_FAIL" = "1" ] && fail "black 格式(待推送提交里的 .py 未格式化 · black 该文件后重新 commit 再推)"
   fi
 
   echo "  · import app 冒烟(catch SyntaxError / 漏 import → boot 崩 → 502)"

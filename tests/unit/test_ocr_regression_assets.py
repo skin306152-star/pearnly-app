@@ -80,14 +80,14 @@ class GateLogicTests(unittest.TestCase):
         )
 
     def _good_inv(self):
-        # 2026-07-05 验收轮实测值 —— 基线必须放行自己的出生数据
+        # 2026-07-05 第4轮 + 2026-07-06 台账#6/#10 修后复验 —— 基线必须放行自己的出生数据
         return {
             "n": 181,
-            "avg_score": 0.851,
-            "total_amount_miss": 11,
-            "silent_pass": 1,
-            "silent_files": ["trap11"],
-            "fallback_share": 0.188,
+            "avg_score": 0.8532,
+            "total_amount_miss": 10,
+            "silent_pass": 0,
+            "silent_files": [],
+            "fallback_share": 0.193,
         }
 
     def test_baseline_passes_its_own_birth_data(self):
@@ -95,7 +95,7 @@ class GateLogicTests(unittest.TestCase):
 
         good_rec = {
             "bank_v1": 0.992,
-            "gl_v1": 0.4,
+            "gl_v1": 0.55,
             "vat_v1": 0.979,
             "bank_v2": 0.968,
             "gl_v2": 1.0,
@@ -109,16 +109,16 @@ class GateLogicTests(unittest.TestCase):
         base = self._base()
         for field, bad_val in (
             ("avg_score", 0.70),
-            ("silent_pass", 3),
+            ("silent_pass", 1),
             ("fallback_share", 0.40),
             ("total_amount_miss", 30),
         ):
             inv = {**self._good_inv(), field: bad_val}
             self.assertTrue(check(inv, {}, base), f"{field}={bad_val} 应触红")
         self.assertTrue(check(self._good_inv(), {"bank_v2": 0.80}, base))
-        self.assertTrue(check(self._good_inv(), {"gl_v1": 0.20}, base))
-        # gl_v1 已知弱版式有独立地板 0.35,不吃 v2 的 0.95 门槛
-        self.assertEqual(check(self._good_inv(), {"gl_v1": 0.40}, base), [])
+        self.assertTrue(check(self._good_inv(), {"gl_v1": 0.45}, base))
+        # gl_v1 已知弱版式有独立地板 0.5(2026-07-06 棘轮),不吃 v2 的 0.95 门槛
+        self.assertEqual(check(self._good_inv(), {"gl_v1": 0.55}, base), [])
 
 
 if __name__ == "__main__":

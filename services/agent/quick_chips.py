@@ -41,17 +41,33 @@ def enabled_for(user_id) -> bool:
     return feature_flags.agent_quick_chips_enabled_for(str(user_id) if user_id else None)
 
 
-def quick_reply(user_text: str, lang: str) -> dict:
-    """LINE quickReply payload。语言=用户本条消息文字系统(与回复正文同源),回落入口 lang。"""
+# 大脑故障兜底的「再问一次」chip:一点即把原话重发(用户不用重打)。
+_RETRY_LABEL = {"th": "ถามอีกครั้ง", "zh": "再问一次", "en": "Ask again", "ja": "もう一度きく"}
+
+
+def quick_reply(user_text: str, lang: str, retry_text: str | None = None) -> dict:
+    """LINE quickReply payload。语言=用户本条消息文字系统(与回复正文同源),回落入口 lang。
+    retry_text 给了 → 首位插「再问一次」chip 重发原话(crash 兜底专用)。"""
     from services.expense.line_classify import detect_text_lang
 
     lg = detect_text_lang(user_text or "") or (lang if lang in _CHIPS else "en")
-    return {
-        "items": [
+    items = [
+        {
+            "type": "action",
+            "action": {"type": "message", "label": label[:20], "text": text},
+        }
+        for label, text in _CHIPS.get(lg, _CHIPS["en"])
+    ]
+    if retry_text:
+        items.insert(
+            0,
             {
                 "type": "action",
-                "action": {"type": "message", "label": label[:20], "text": text},
-            }
-            for label, text in _CHIPS.get(lg, _CHIPS["en"])
-        ]
-    }
+                "action": {
+                    "type": "message",
+                    "label": _RETRY_LABEL.get(lg, _RETRY_LABEL["en"]),
+                    "text": retry_text[:300],
+                },
+            },
+        )
+    return {"items": items}

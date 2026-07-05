@@ -41,6 +41,18 @@ class TestChipsPayload(unittest.TestCase):
         self.assertEqual(item["type"], "action")
         self.assertEqual(item["action"]["type"], "message")
 
+    def test_retry_chip_prepended_with_original_text(self):
+        # crash 兜底:首位=「再问一次」重发原话;不传 retry_text 时形状不变。
+        qr = quick_chips.quick_reply("这个月花了多少", "zh", retry_text="这个月花了多少")
+        first = qr["items"][0]["action"]
+        self.assertEqual(first["label"], "再问一次")
+        self.assertEqual(first["text"], "这个月花了多少")
+        self.assertEqual(len(qr["items"]), 4)
+        long = "ก" * 400
+        qr = quick_chips.quick_reply(long, "th", retry_text=long)
+        self.assertLessEqual(len(qr["items"][0]["action"]["text"]), 300)  # LINE text 上限
+        self.assertEqual(len(quick_chips.quick_reply("hi", "en")["items"]), 3)
+
 
 class TestRouteChips(unittest.TestCase):
     def _call(self, res, *, chips_on):

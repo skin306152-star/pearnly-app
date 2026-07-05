@@ -84,6 +84,23 @@ _PLAN_RETRO_HINT = {
 }
 
 
+def _progress_cb(lang, tid, line_user_id):
+    """慢轮「正在查…」推送回调(loop 超阈值一次性调·用 push 不动 reply_token)。
+    record=False:进度提示不进对话记忆,别让大脑下轮把它当自己说过的话。"""
+    if not line_user_id:
+        return None
+
+    def ping():
+        from services.agent import fallbacks
+        from services.line_binding import line_reply
+
+        line_reply.push_text_context(
+            line_user_id, fallbacks.progress_text(lang), tenant_id=tid, record=False
+        )
+
+    return ping
+
+
 def _make_write_sink(
     bound_user, text, lang, tid, ws, line_user_id, reply_token, quote_token, quoted_message_id, book
 ):
@@ -289,6 +306,7 @@ def try_agent_turn(
             anchors=dict(loaded_anchors),
             anchors_enabled=anchors_on,
         )
+        ctx.progress = _progress_cb(lang, tid, line_user_id)
         sink = None
         if feature_flags.agent_write_enabled_for(uid):
             sink = _make_write_sink(

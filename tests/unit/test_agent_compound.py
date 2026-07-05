@@ -101,6 +101,13 @@ class TestCompoundTurn(unittest.TestCase):
         self.assertEqual(out.text, "")
         self.assertEqual(self.ctx.degraded, "card_text_dropped")  # 观测:第二问丢失可量化
 
+    def test_insane_followup_rescued_by_grounded_fallback(self):
+        # 查询观测在手时跟进被吞 → 用观测拼答案救回(第二问不再无声消失)。
+        out, _, _ = self._run(_REC, _QRY, loop.LoopStep("reply", message="1" + "0" * 400))
+        self.assertEqual(out.kind, "card_sent")
+        self.assertIn("17", out.text)  # list_history total=17 的兜底句
+        self.assertEqual(self.ctx.degraded, "card_text_fb")
+
     def test_failure_after_card_never_crashes(self):
         # 卡后模型抽风调不存在的工具:归 crash 会触发入口 L1 救援把同句再直录(双记账)→ 必须 card_sent。
         out, _, _ = self._run(_REC, loop.LoopStep("tool", tool="no_such_tool", args={}))

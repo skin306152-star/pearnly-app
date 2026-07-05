@@ -375,18 +375,22 @@ def handle_turn(
         if not sent_card:
             return _reply_result(message)
         ok = bool(message) and reply_guard.sane(message)
-        if message and not ok:
-            ctx.degraded = "card_text_dropped"  # 复合跟进被护栏吞(观测:量"第二问丢失率")
+        if message and not ok:  # 复合跟进被护栏吞 → 先用观测拼答案抢救,救不回才真丢
+            fb = fallbacks.grounded_fallback(observations, lang)
+            ctx.degraded = "card_text_fb" if fb else "card_text_dropped"
+            return TurnResult("card_sent", fb or "")
         return TurnResult("card_sent", message if ok else "")
 
     def _fail() -> TurnResult:
         # 卡已出后绝不归 crash:入口的 L1 救援会把同句再直录一笔(双记账),卡本身已是有效回复。
         if sent_card:
-            ctx.degraded = ctx.degraded or "card_fail"
-            return TurnResult("card_sent")
+            fb = fallbacks.grounded_fallback(observations, lang)
+            ctx.degraded = ctx.degraded or ("card_text_fb" if fb else "card_fail")
+            return TurnResult("card_sent", fb or "")
         return TurnResult("crash")
 
     def _decide(force_reply: bool) -> LoopStep:
+        fallbacks.progress_ping(ctx, time.monotonic() - started)  # 慢轮中间反馈(阈值+一次性在内)
         return decide(
             user_text,
             history,
@@ -416,7 +420,10 @@ def handle_turn(
             # 一步都没调的 defer 才是真裁决 → 按 reason 分流(record/edit=交旧路,crash=安全兜底)。
             if observations:
                 break
-            return _defer_result(step.reason)
+            # record/edit=模型主动裁决交旧路;其余(crash 等)走安全兜底。
+            return TurnResult(
+                {"record": "defer_record", "edit": "defer_edit"}.get(step.reason, "crash")
+            )
         if step.tool in called:  # 重复调同一工具 → 收敛去最终成文
             break
         spec = manifest.TOOLS_BY_NAME.get(step.tool)
@@ -484,12 +491,3 @@ def handle_turn(
             return _out(fb)
         return _fail()
     return _fail()  # 循环空转无产出 = 故障(不静默掉旧路)
-
-
-def _defer_result(reason: str) -> TurnResult:
-    """模型主动 defer 的 reason → TurnResult。record/edit 交旧路对应确定性路;其余(crash 等)走安全兜底。"""
-    if reason == "record":
-        return TurnResult("defer_record")
-    if reason == "edit":
-        return TurnResult("defer_edit")
-    return TurnResult("crash")

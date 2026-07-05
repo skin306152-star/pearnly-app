@@ -41,6 +41,14 @@ class TestRouteGated(unittest.TestCase):
         self.assertEqual(said, [route._SAFE_FALLBACK["th"]])
         self.assertEqual(charged, [])  # 故障不计费
 
+    def test_crash_questionish_gets_honest_retry_line(self):
+        # 问句碰上大脑故障 → 诚实认卡顿(不拿"我在呢"装没事);非问句仍走中性兜底(上一测)。
+        with patch("services.expense.line_quick_entry.is_question", return_value=True):
+            handled, said, charged = _call(TurnResult("crash"))
+        self.assertEqual(handled, "consumed")
+        self.assertEqual(said, [route._RETRY_FALLBACK["th"]])
+        self.assertEqual(charged, [])
+
     def test_defer_record_falls_to_legacy(self):
         handled, said, _ = _call(TurnResult("defer_record"))
         self.assertEqual(handled, "defer_record")  # 交旧路确定性直录

@@ -209,6 +209,57 @@ class TestBrainSalvage(unittest.TestCase):
         self.assertEqual((out.kind, out.text), ("reply", "อยู่ตรงนี้นะคะ"))
 
 
+class TestProgressPing(unittest.TestCase):
+    """慢轮中间反馈:阈值内不响、超阈值恰响一次、回调炸了不挡对话。"""
+
+    def _ctx(self, cb):
+        c = AgentContext(user={"id": "u1"}, tenant_id="t1")
+        c.progress = cb
+        return c
+
+    def test_under_threshold_silent(self):
+        fired = []
+        fallbacks.progress_ping(self._ctx(lambda: fired.append(1)), 2.0)
+        self.assertEqual(fired, [])
+
+    def test_over_threshold_fires_exactly_once(self):
+        fired = []
+        ctx = self._ctx(lambda: fired.append(1))
+        fallbacks.progress_ping(ctx, 6.0)
+        fallbacks.progress_ping(ctx, 9.0)  # 同轮第二次 → 不重发(宁缺勿刷屏)
+        self.assertEqual(fired, [1])
+
+    def test_no_callback_noop(self):
+        fallbacks.progress_ping(AgentContext(user={}, tenant_id="t1"), 9.0)  # 不抛 = 通过
+
+    def test_callback_failure_never_raises(self):
+        def boom():
+            raise RuntimeError("push down")
+
+        fallbacks.progress_ping(self._ctx(boom), 7.0)  # 不抛 = 通过
+
+    def test_slow_turn_pings_via_decide(self):
+        # 端到端:decide 慢(模拟耗时) → 第二步前 ping 已发。用假时钟免真睡。
+        ctx = AgentContext(user={"id": "u1"}, tenant_id="t1")
+        fired = []
+        ctx.progress = lambda: fired.append(1)
+        ts = _FakeToolset(ToolResult(ok=True, data={"balance_thb": 9}))
+        clock = iter([0.0, 0.0, 6.0, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8])
+        with patch.object(loop.time, "monotonic", lambda: next(clock, 7.0)):
+            out = loop.handle_turn(
+                "ยอดเงิน",
+                ctx,
+                decide=_script(
+                    loop.LoopStep("tool", tool="balance", args={}),
+                    loop.LoopStep("reply", message="฿9"),
+                ),
+                toolset=ts,
+                history=[],
+            )
+        self.assertEqual(out.kind, "reply")
+        self.assertEqual(fired, [1])
+
+
 class TestTimezoneAndFallback(unittest.TestCase):
     """批三·时区 + 兜底覆盖:大脑拿到曼谷本地时间(答几点);钱工具成文失败有真实数字兜底。"""
 

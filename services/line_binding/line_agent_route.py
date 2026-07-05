@@ -28,14 +28,27 @@ _SAFE_FALLBACK = {
     "en": "I'm here 😊 Is there anything I can help you with?",
     "ja": "ここにいますよ😊 何かお手伝いできることはありますか?",
 }
+# 明显在问事却碰上大脑故障 → 诚实认卡顿(别用"我在呢"装没事),配「再问一次」chip 重发原话。
+_RETRY_FALLBACK = {
+    "th": "ขอโทษค่ะ เมื่อกี้สะดุดนิดหน่อย กดปุ่มด้านล่างถามอีกครั้งได้เลยนะคะ",
+    "zh": "抱歉刚才卡了一下,点下面的按钮再问一次就好。",
+    "en": "Sorry, I stumbled just now — tap below to ask again.",
+    "ja": "すみません、少しつまずきました。下のボタンでもう一度どうぞ。",
+}
 
 
 def _safe_line(lang: str) -> str:
     return _SAFE_FALLBACK.get(lang, _SAFE_FALLBACK["en"])
 
 
-def _say_with_chips(bound_user, reply_token, body, user_text, lang, tid, line_user_id, quote_token):
-    """带 quick-reply chips 的文本回复(P2·教用户能问什么)。
+def _retry_line(lang: str) -> str:
+    return _RETRY_FALLBACK.get(lang, _RETRY_FALLBACK["en"])
+
+
+def _say_with_chips(
+    bound_user, reply_token, body, user_text, lang, tid, line_user_id, quote_token, retry_text=None
+):
+    """带 quick-reply chips 的文本回复(P2·教用户能问什么;retry_text=crash 兜底的重发原话 chip)。
     闸关/发送失败/任何异常 → False,调用方走纯文本 say——chips 是锦上添花,绝不许丢回复。"""
     try:
         from services.agent import quick_chips
@@ -47,7 +60,7 @@ def _say_with_chips(bound_user, reply_token, body, user_text, lang, tid, line_us
         msg = {
             "type": "text",
             "text": str(body),
-            "quickReply": quick_chips.quick_reply(user_text, lang),
+            "quickReply": quick_chips.quick_reply(user_text, lang, retry_text=retry_text),
         }
         return bool(
             line_reply.reply_messages_context(
@@ -160,11 +173,28 @@ def route_gated(
                 return "consumed"
             except Exception:
                 logger.warning("[line agent] L1 rescue failed; safe fallback", exc_info=True)
-        # 安全兜底带 chips 最有用:用户正不知道能干嘛,给 2-3 个可点的下一步
+        # 安全兜底带 chips 最有用:用户正不知道能干嘛,给 2-3 个可点的下一步;
+        # 明显是问句 → 诚实认卡顿 + 「再问一次」chip 重发原话(答案丢了别拿"我在呢"装没事)。
+        questionish = False
+        try:
+            from services.expense import line_quick_entry as lqe
+
+            questionish = bool(lqe.is_question(text))
+        except Exception:
+            pass
+        body = _retry_line(lang) if questionish else _safe_line(lang)
         if not _say_with_chips(
-            bound_user, reply_token, _safe_line(lang), text, lang, tid, line_user_id, quote_token
+            bound_user,
+            reply_token,
+            body,
+            text,
+            lang,
+            tid,
+            line_user_id,
+            quote_token,
+            retry_text=text if questionish else None,
         ):
-            say(_safe_line(lang))
+            say(body)
         return "consumed"
     # defer_record / defer_edit → 交旧路对应确定性能力,并把裁决一起交回(防二次误判)。
     return res.kind

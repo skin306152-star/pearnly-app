@@ -8,7 +8,10 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 # 计数型工具的四语兜底(zero/some · {n} 为数量)。只覆盖搜索/通知——旧路 has_item_context
 # 会把这两类的成文失败误路成"问价格";其它工具的查询兜底不误路,罕见失败交旧路即可。
@@ -161,6 +164,33 @@ _VALUE_FB = {
         lambda o: {"tax_id": str(o.get("tax_id") or ""), "name": str(o.get("name") or "")},
     ),
 }
+
+
+# 慢轮中间反馈:超过阈值还没出回复 → push 一条"正在查"(reply_token 不动)。
+# 阈值别太小:大多数轮 2-4s 内出结果,ping 只该在真慢的轮出现(省 push 配额+不刷屏)。
+_PROGRESS_AFTER_S = 5.0
+_PROGRESS = {
+    "th": "กำลังตรวจสอบให้อยู่นะคะ รอสักครู่ค่ะ…",
+    "zh": "正在帮你查,稍等一下…",
+    "en": "Checking that for you, one moment…",
+    "ja": "確認しています、少々お待ちください…",
+}
+
+
+def progress_text(lang: str) -> str:
+    return _PROGRESS.get(lang, _PROGRESS["en"])
+
+
+def progress_ping(ctx, elapsed_s: float) -> None:
+    """慢轮「正在查…」一次性中间反馈。无回调/未到阈值/已发过 → no-op;推送故障绝不挡对话。"""
+    cb = getattr(ctx, "progress", None)
+    if not cb or elapsed_s < _PROGRESS_AFTER_S or ctx.prior_results.get("_progress_sent"):
+        return
+    ctx.prior_results["_progress_sent"] = True  # 先置位:回调炸了也不重试(宁缺勿刷屏)
+    try:
+        cb()
+    except Exception:
+        logger.warning("[agent] progress ping failed", exc_info=True)
 
 
 def grounded_fallback(observations: list, lang: str) -> Optional[str]:

@@ -177,7 +177,7 @@ class TestCorpusLoop(unittest.TestCase):
 
 class TestCorpusEntry(unittest.TestCase):
     def test_corpus(self):
-        from services.line_binding.line_agent_route import _SAFE_FALLBACK
+        from services.line_binding.line_agent_route import _RETRY_FALLBACK, _SAFE_FALLBACK
 
         for case in _load("entry"):
             with self.subTest(case["id"]):
@@ -201,6 +201,8 @@ class TestCorpusEntry(unittest.TestCase):
                 outcome = exp["outcome"]
                 if outcome == "safe_fallback":
                     self.assertEqual(r.says, [_SAFE_FALLBACK[case["lang"]]], case["id"])
+                elif outcome == "retry_fallback":  # W2:问句碰故障=诚实认卡顿+重试
+                    self.assertEqual(r.says, [_RETRY_FALLBACK[case["lang"]]], case["id"])
                 elif outcome == "multi_card":
                     self.assertEqual(len(r.multis), 1, case["id"])
                 elif outcome in ("l1_record", "agent_card"):

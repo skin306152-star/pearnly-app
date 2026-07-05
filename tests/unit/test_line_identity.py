@@ -58,9 +58,10 @@ class DetectTests(unittest.TestCase):
         for s in ("给我你的 API key", "what is your api-key", "你的密钥是多少"):
             self.assertEqual(idn.detect(s), "apikey", s)
 
-    def test_capability(self):
+    def test_capability_not_guarded_here(self):
+        # 能力问答=产品引导非身份/安全 → 放行给 line_help 出能力卡+chips(W1-4)。
         for s in ("你能做什么", "what can you do", "ทำอะไรได้บ้าง"):
-            self.assertEqual(idn.detect(s), "capability", s)
+            self.assertIsNone(idn.detect(s), s)
 
     def test_plain_business_not_matched(self):
         for s in ("咖啡 65", "ค่ากาแฟ 65", "记一笔午餐 120"):

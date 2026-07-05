@@ -9,15 +9,16 @@ instructions」时,不进业务 LLM 自由回答 —— 统一走 Pearnly 产品
 同一句若还带业务指令(「你是不是 GPT,咖啡 65」)→ 不拦,放行让记账流程正常处理(身份忽略):
 guard 命中分类后,若 looks_like_expense(有金额)即返回 None,业务照常入 handle_expense_text。
 
-模板自带(line_i18n 已满 500);capability 复用既有 line_intro_capability,口径统一。
+模板自带(line_i18n 已满 500)。能力问答(「ทำอะไรได้บ้าง」)不归这里——那是产品引导不是
+身份/安全,由 line_help 确定性出能力卡+第一单 chips(W1-4·此前在这里回纯文字把卡路截胡)。
 """
 
 from __future__ import annotations
 
 import re
 
-# 检测顺序:越权/密钥/系统提示 > 模型 > 能力 > 身份(「are you GPT」归 model 而非 identity)。
-_CATEGORY_ORDER = ("injection", "apikey", "system", "model", "capability", "identity")
+# 检测顺序:越权/密钥/系统提示 > 模型 > 身份(「are you GPT」归 model 而非 identity)。
+_CATEGORY_ORDER = ("injection", "apikey", "system", "model", "identity")
 
 _KEYWORDS = {
     "injection": (
@@ -98,19 +99,6 @@ _KEYWORDS = {
         "โมเดลอะไร",
         "โมเดลไหน",
     ),
-    "capability": (
-        "what can you do",
-        "what do you do",
-        "how can you help",
-        "你能做什么",
-        "你会做什么",
-        "你能帮我做什么",
-        "你有什么功能",
-        "有什么功能",
-        "ทำอะไรได้บ้าง",
-        "ช่วยอะไรได้บ้าง",
-        "คุณทำอะไรได้",
-    ),
     "identity": (
         "who are you",
         "who r u",
@@ -190,12 +178,8 @@ def detect(text) -> str | None:
 
 
 def reply(category: str, lang: str) -> str:
-    """分类 + 语言 → 确定性 Pearnly 文案。capability 复用既有能力说明,口径统一。"""
+    """分类 + 语言 → 确定性 Pearnly 文案。"""
     lang = lang if lang in _TEMPLATES else "th"
-    if category == "capability":
-        from services.line_binding import line_client
-
-        return line_client.t_line(lang, "line_intro_capability")
     return _TEMPLATES[lang].get(category) or _TEMPLATES[lang]["identity"]
 
 

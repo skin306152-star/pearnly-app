@@ -8,6 +8,7 @@
     "why": "账本报表界面·对话给不了表格体验·留 App"
   },
   "admin_logs_routes": "D",
+  "admin_agent_routes": "D",
   "admin_cost_routes": "D",
   "admin_diagnostics_routes": "D",
   "admin_ocr_engine_routes": "D",

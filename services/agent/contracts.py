@@ -84,3 +84,6 @@ class AgentContext:
     prior_results: dict[str, Any] = field(default_factory=dict)
     trace_id: str = ""  # 本轮追踪号(loop 生成)——串起同轮多次网关调用 + 审计行
     tool_trace: list = field(default_factory=list)  # 本轮工具轨迹 [{tool,ok,error}](审计留痕)
+    degraded: str = (
+        ""  # 本轮降级标记(loop 标·turn_log 落库):grounded_fb/card_text_dropped/card_fail
+    )

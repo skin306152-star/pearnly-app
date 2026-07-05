@@ -155,9 +155,19 @@ class TestAgentLoop(unittest.TestCase):
         # 重复调同工具、步数用尽仍不成文 → 拿已取到的真实数字兜底成文(balance 有兜底 → 诚实回余额)。
         ts = _FakeToolset(ToolResult(ok=True, data={"balance_thb": 1}))
         steps = [loop.LoopStep("tool", tool="balance", args={}) for _ in range(loop._MAX_STEPS)]
-        out = loop.handle_turn("x", _CTX, decide=_script(*steps), toolset=ts, history=[])
+        ctx = AgentContext(user={"id": "u1"}, tenant_id="t1")
+        out = loop.handle_turn("x", ctx, decide=_script(*steps), toolset=ts, history=[])
         self.assertEqual(out.kind, "reply")
         self.assertIn("1", out.text)
+        self.assertEqual(ctx.degraded, "grounded_fb")  # 观测:兜底成文与模型成文可区分
+
+    def test_normal_reply_not_marked_degraded(self):
+        ctx = AgentContext(user={"id": "u1"}, tenant_id="t1")
+        out = loop.handle_turn(
+            "สวัสดี", ctx, decide=_script(loop.LoopStep("reply", message="ยินดีค่ะ")), history=[]
+        )
+        self.assertEqual(out.kind, "reply")
+        self.assertEqual(ctx.degraded, "")
 
 
 class _Outcome:

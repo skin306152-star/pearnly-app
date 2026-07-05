@@ -32,6 +32,7 @@ from services.line_binding import (
     line_card_actions,
     line_client,
     line_expense,
+    line_funnel,
     line_imagemap,
     line_intake,
     line_proof,
@@ -119,6 +120,7 @@ async def _handle_line_event(ev: dict):
     # follow:用户加 Bot 好友 → 发欢迎卡(泰语图卡 A1 / 其他语言文字版)。
     # ⚠️ 若 LINE 后台仍开着「加好友自动问候 Greeting」会双发,需在后台关掉(见交接说明)。
     if ev_type == "follow":
+        line_funnel.mark("follow", line_user_id)  # 漏斗一级(内部 best-effort,不挡欢迎)
         if reply_token:
             lang = _ev_lang(ev)
             _reply_card_or_text(

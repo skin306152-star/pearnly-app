@@ -144,6 +144,7 @@
         if (p === '/admin/monitor' || p === '/admin/monitor/') return 'monitor';
         if (p === '/admin/settings' || p === '/admin/settings/') return 'settings';
         if (p === '/admin/engine' || p === '/admin/engine/') return 'engine';
+        if (p === '/admin/agent' || p === '/admin/agent/') return 'agent';
         return 'cost';
     }
 
@@ -155,6 +156,7 @@
             monitor: 'page-admin-monitor',
             settings: 'page-admin-settings',
             engine: 'page-admin-engine',
+            agent: 'page-admin-agent',
         };
         Object.keys(pages).forEach(function (r) {
             const el = document.getElementById(pages[r]);
@@ -171,6 +173,7 @@
         if (route === 'monitor') _renderMonitorPage();
         if (route === 'settings') _renderSettingsPage();
         if (route === 'engine') _renderEnginePage();
+        if (route === 'agent') _renderAgentPage();
     }
 
     function _bindSidebar() {
@@ -262,6 +265,7 @@
                 else if (_r === 'monitor') _renderMonitorPage();
                 else if (_r === 'settings') _renderSettingsPage();
                 else if (_r === 'engine') _renderEnginePage();
+                else if (_r === 'agent') _renderAgentPage();
                 else _renderCostPage();
             });
         });
@@ -3174,6 +3178,102 @@
                     ? _t('adm-set-saved-at') + ' ' + new Date(d.updated_at).toLocaleString()
                     : '';
             _renderEngineMetrics(m || {});
+        } catch (e) {
+            _toast(_t('adm-load-fail'), 'error');
+        }
+    }
+
+    // ============ Agent 助手观测页 ============
+    function _agentBreakTable(titleKey, obj, total) {
+        const keys = Object.keys(obj || {});
+        if (!keys.length) return '';
+        keys.sort(function (a, b) {
+            return (obj[b] || 0) - (obj[a] || 0);
+        });
+        const rows = keys
+            .map(function (k) {
+                const n = obj[k] || 0;
+                const pct = total ? ((n / total) * 100).toFixed(1) : '0.0';
+                return (
+                    '<tr><td>' +
+                    _esc(
+                        _t('adm-agent-dim-' + k) === 'adm-agent-dim-' + k
+                            ? k
+                            : _t('adm-agent-dim-' + k)
+                    ) +
+                    '</td><td>' +
+                    n +
+                    '</td><td>' +
+                    pct +
+                    '%</td></tr>'
+                );
+            })
+            .join('');
+        return (
+            '<div class="cost-section-head" style="margin-top: 16px"><h3>' +
+            _esc(_t(titleKey)) +
+            '</h3></div>' +
+            '<div class="cost-table-wrap"><table class="cost-table"><thead><tr><th>' +
+            [_t('adm-agent-col-dim'), _t('adm-agent-col-count'), '%'].join('</th><th>') +
+            '</th></tr></thead><tbody>' +
+            rows +
+            '</tbody></table></div>'
+        );
+    }
+
+    async function _renderAgentPage() {
+        const kpis = document.getElementById('adm-agent-kpis');
+        if (!kpis) return;
+        try {
+            const d = await _adminFetch('/api/admin/agent/overview?hours=24&days=7');
+            const h = d.health || {};
+            const byKind = h.by_kind || {};
+            let msSum = 0;
+            Object.keys(byKind).forEach(function (k) {
+                msSum += (byKind[k].count || 0) * (byKind[k].avg_ms || 0);
+            });
+            const avgS = h.total ? msSum / h.total / 1000 : 0;
+            kpis.innerHTML =
+                _engKpi(_t('adm-agent-kpi-turns'), String(h.total || 0), '24h') +
+                _engKpi(
+                    _t('adm-agent-kpi-crash'),
+                    ((h.crash_rate || 0) * 100).toFixed(1) + '%',
+                    ((byKind.crash || {}).count || 0) + ' ' + _t('adm-agent-kpi-turns-unit')
+                ) +
+                _engKpi(
+                    _t('adm-agent-kpi-degraded'),
+                    ((h.degraded_rate || 0) * 100).toFixed(1) + '%',
+                    _t('adm-agent-kpi-degraded-sub')
+                ) +
+                _engKpi(_t('adm-agent-kpi-latency'), avgS.toFixed(1) + 's', '');
+            const box = document.getElementById('adm-agent-breakdown');
+            if (box)
+                box.innerHTML =
+                    _agentBreakTable('adm-agent-by-intent', h.by_intent, h.total) +
+                    _agentBreakTable('adm-agent-by-degraded', h.by_degraded, h.total);
+            const f = d.funnel || {};
+            const funnelBox = document.getElementById('adm-agent-funnel');
+            const cv = function (a, b) {
+                return b ? ((a / b) * 100).toFixed(0) + '%' : '–';
+            };
+            if (funnelBox)
+                funnelBox.innerHTML =
+                    _engKpi(_t('adm-agent-funnel-follow'), String(f.follows || 0), '') +
+                    _engKpi(
+                        _t('adm-agent-funnel-bind'),
+                        String(f.binds || 0),
+                        cv(f.binds || 0, f.follows || 0)
+                    ) +
+                    _engKpi(
+                        _t('adm-agent-funnel-used'),
+                        String(f.agent_used || 0),
+                        cv(f.agent_used || 0, f.binds || 0)
+                    ) +
+                    _engKpi(
+                        _t('adm-agent-funnel-recorded'),
+                        String(f.recorded || 0),
+                        cv(f.recorded || 0, f.agent_used || 0)
+                    );
         } catch (e) {
             _toast(_t('adm-load-fail'), 'error');
         }

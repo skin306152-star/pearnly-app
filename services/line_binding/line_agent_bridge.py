@@ -234,7 +234,7 @@ def try_agent_turn(
         return TurnResult("crash")
     started = time.monotonic()
 
-    def _audit(kind, *, trace_id=None, tool_trace=None):
+    def _audit(kind, *, trace_id=None, tool_trace=None, degraded=""):
         """轮级审计留痕(best-effort 双保险:审计绝不挡对话)。"""
         try:
             from services.agent import turn_log
@@ -249,6 +249,7 @@ def try_agent_turn(
                 result_kind=kind,
                 tool_trace=tool_trace,
                 elapsed_ms=int((time.monotonic() - started) * 1000),
+                degraded=degraded,
             )
         except Exception:
             logger.warning("[line agent] audit failed", exc_info=True)
@@ -315,7 +316,7 @@ def try_agent_turn(
         )
         if anchors_on and ctx.anchors != loaded_anchors:
             line_anchor_store.set_anchors(tid, line_user_id, ctx.anchors)
-        _audit(res.kind, trace_id=ctx.trace_id, tool_trace=ctx.tool_trace)
+        _audit(res.kind, trace_id=ctx.trace_id, tool_trace=ctx.tool_trace, degraded=ctx.degraded)
         return res
     except Exception:
         # 任何异常 → crash(铁律:Agent 不许把错误抛给用户);入口安全兜底,带 uid + 栈便于排障。

@@ -60,9 +60,10 @@ class TestCompoundTurn(unittest.TestCase):
     def _run(self, *steps, compound=True, ts=None, allow_push=False):
         sunk = []
         ts = ts or _Toolset()
+        self.ctx = _ctx()
         out = loop.handle_turn(
             "กาแฟ 50 เดือนนี้กี่ใบ",
-            _ctx(),
+            self.ctx,
             decide=_script(*steps),
             toolset=ts,
             history=[],
@@ -98,11 +99,18 @@ class TestCompoundTurn(unittest.TestCase):
         out, _, _ = self._run(_REC, loop.LoopStep("reply", message="1" + "0" * 400))
         self.assertEqual(out.kind, "card_sent")  # 失控跟进丢弃,卡本身已是有效回复
         self.assertEqual(out.text, "")
+        self.assertEqual(self.ctx.degraded, "card_text_dropped")  # 观测:第二问丢失可量化
 
     def test_failure_after_card_never_crashes(self):
         # 卡后模型抽风调不存在的工具:归 crash 会触发入口 L1 救援把同句再直录(双记账)→ 必须 card_sent。
         out, _, _ = self._run(_REC, loop.LoopStep("tool", tool="no_such_tool", args={}))
         self.assertEqual(out.kind, "card_sent")
+        self.assertEqual(self.ctx.degraded, "card_fail")
+
+    def test_clean_turn_not_marked_degraded(self):
+        out, _, _ = self._run(_REC, _QRY, _ANS)
+        self.assertEqual(out.text, "เดือนนี้ 17 ใบค่ะ")
+        self.assertEqual(self.ctx.degraded, "")  # 正常轮不许误标(degraded 率的分母诚实)
 
     def test_push_card_still_ends_turn(self):
         # 推 ERP 是 confirm-first:出确认卡=终态,复合续步不适用。

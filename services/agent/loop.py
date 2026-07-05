@@ -375,11 +375,16 @@ def handle_turn(
         if not sent_card:
             return _reply_result(message)
         ok = bool(message) and reply_guard.sane(message)
+        if message and not ok:
+            ctx.degraded = "card_text_dropped"  # 复合跟进被护栏吞(观测:量"第二问丢失率")
         return TurnResult("card_sent", message if ok else "")
 
     def _fail() -> TurnResult:
         # 卡已出后绝不归 crash:入口的 L1 救援会把同句再直录一笔(双记账),卡本身已是有效回复。
-        return TurnResult("card_sent") if sent_card else TurnResult("crash")
+        if sent_card:
+            ctx.degraded = ctx.degraded or "card_fail"
+            return TurnResult("card_sent")
+        return TurnResult("crash")
 
     def _decide(force_reply: bool) -> LoopStep:
         return decide(
@@ -474,7 +479,10 @@ def handle_turn(
             if final.kind == "reply" and reply_guard.sane(final.message):
                 return _out(final.message)
         fb = fallbacks.grounded_fallback(observations, lang)
-        return _out(fb) if fb else _fail()
+        if fb:
+            ctx.degraded = "grounded_fb"  # 观测:非模型成文,拿工具结果拼的兜底句
+            return _out(fb)
+        return _fail()
     return _fail()  # 循环空转无产出 = 故障(不静默掉旧路)
 
 

@@ -19,7 +19,7 @@ def _cm(cur):
 
 
 class TestRecord(unittest.TestCase):
-    def _record(self, cur, kind="reply"):
+    def _record(self, cur, kind="reply", degraded=""):
         with patch("core.db.get_cursor_rls", lambda tid, **k: _cm(cur)):
             turn_log.record(
                 tenant_id="t1",
@@ -31,6 +31,7 @@ class TestRecord(unittest.TestCase):
                 result_kind=kind,
                 tool_trace=[{"tool": "balance", "ok": True, "error": None}],
                 elapsed_ms=1234,
+                degraded=degraded,
             )
 
     def test_inserts_row_and_cleans_retention(self):
@@ -42,6 +43,15 @@ class TestRecord(unittest.TestCase):
         self.assertTrue(any("DELETE FROM agent_turn_logs" in s for s in sqls))  # 90d 采样清
         ins = next(c for c in cur.execute.call_args_list if "INSERT" in c.args[0])
         self.assertLessEqual(len(ins.args[1][5]), turn_log._TEXT_MAX)  # user_text 截断
+        self.assertIsNone(ins.args[1][9])  # 未降级 → degraded 落 NULL(率的分母诚实)
+        self.assertEqual(ins.args[1][10], "query")  # balance 轨迹 → intent=query
+
+    def test_degraded_marker_persisted(self):
+        cur = MagicMock()
+        with patch.object(turn_log.random, "random", return_value=1.0):
+            self._record(cur, degraded="grounded_fb")
+        ins = next(c for c in cur.execute.call_args_list if "INSERT" in c.args[0])
+        self.assertEqual(ins.args[1][9], "grounded_fb")
 
     def test_crash_logs_alarm_marker(self):
         cur = MagicMock()
@@ -81,14 +91,32 @@ class TestRecord(unittest.TestCase):
     def test_stats_shape(self):
         cur = MagicMock()
         cur.fetchall.return_value = [
-            {"result_kind": "reply", "n": 8, "avg_ms": 900},
-            {"result_kind": "crash", "n": 2, "avg_ms": 1500},
+            {"result_kind": "reply", "intent": "query", "degraded": None, "n": 6, "avg_ms": 900},
+            {
+                "result_kind": "reply",
+                "intent": "chat",
+                "degraded": "grounded_fb",
+                "n": 2,
+                "avg_ms": 700,
+            },
+            {"result_kind": "crash", "intent": "crash", "degraded": None, "n": 2, "avg_ms": 1500},
         ]
         with patch("core.db.get_cursor", lambda **k: _cm(cur)):
             out = turn_log.stats(hours=24)
         self.assertEqual(out["total"], 10)
         self.assertEqual(out["crash_rate"], 0.2)
+        self.assertEqual(out["degraded_rate"], 0.2)
         self.assertEqual(out["by_kind"]["reply"]["count"], 8)
+        self.assertEqual(out["by_kind"]["reply"]["avg_ms"], 850)  # 加权均值(6*900+2*700)/8
+        self.assertEqual(out["by_intent"], {"query": 6, "chat": 2, "crash": 2})
+        self.assertEqual(out["by_degraded"], {"grounded_fb": 2})
+
+    def test_derive_intent(self):
+        trace = [{"tool": "record_expense", "ok": True}]
+        self.assertEqual(turn_log.derive_intent("card_sent", trace), "record")
+        self.assertEqual(turn_log.derive_intent("reply", []), "chat")  # 纯文本轮
+        self.assertEqual(turn_log.derive_intent("defer_record", None), "record")
+        self.assertEqual(turn_log.derive_intent("crash", [{"tool": "no_such"}]), "crash")
 
     def test_ensure_table_applies_rls(self):
         cur = MagicMock()
@@ -113,6 +141,7 @@ class TestBridgeAudit(unittest.TestCase):
         def fake_handle_turn(text, ctx, **kw):
             ctx.trace_id = "tr-9"
             ctx.tool_trace.append({"tool": "balance", "ok": True, "error": None})
+            ctx.degraded = "grounded_fb"
             return TurnResult("reply", "58")
 
         with (
@@ -131,6 +160,7 @@ class TestBridgeAudit(unittest.TestCase):
         self.assertEqual(rec["trace_id"], "tr-9")
         self.assertEqual(rec["tool_trace"], [{"tool": "balance", "ok": True, "error": None}])
         self.assertGreaterEqual(rec["elapsed_ms"], 0)
+        self.assertEqual(rec["degraded"], "grounded_fb")  # loop 标的降级随审计落库
 
     def test_exception_path_records_crash(self):
         from services.line_binding import line_agent_bridge as bridge

@@ -43,8 +43,15 @@ def handle_expense_text(
 
         gated = line_agent_bridge.frontdoor_enabled(bound_user)
 
-        # 0. 闲聊/引导(零成本 L1)→ 问候/感谢/能力说明/开始/上传(治复读)。灰度用户交 Agent 前门。
+        # 0. 闲聊/引导(零成本 L1)→ 问候/感谢/能力说明/开始/上传(治复读)。灰度用户交 Agent 前门;
+        # 唯能力/上传类纯问法(无数字短句)全员确定性接住(W1-4:新用户第一问不赌大脑)。
         small = replies.detect_smalltalk(text)
+        from services.line_binding import line_help
+
+        if line_help.maybe_reply(
+            bound_user, reply_token, line_user_id, text, lang, small, quote_token
+        ):
+            return True
         if small and not gated:
             _pool(small)
             return True

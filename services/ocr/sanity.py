@@ -50,36 +50,15 @@ def evaluate_sanity(invoice) -> List[str]:
     每条规则都保守:只在「结构上不可能对」时触发,宁可漏抓(交给软闸/人工)也不误杀
     正常票(误杀 = 凭空增加人工量 + 失去信任)。
 
-    同页多票(additional_invoices):每张附加票各自过一遍核心规则(它们会拆成独立
-    入库条目,漏闸=静默入账),再加规则 7 跨票错配核对。
+    同页多票(additional_invoices):附加票逐张过核心规则 + 规则 7 跨票错配核对,
+    见 sanity_multi(延迟导入防环:它顶层回导本模块共享件)。
     """
     if getattr(invoice, "is_not_invoice", False):
         return []
 
-    reasons = _core_reasons(invoice)
-    extras = [
-        x
-        for x in (getattr(invoice, "additional_invoices", None) or [])
-        if not getattr(x, "is_not_invoice", False)
-    ]
-    if extras:
-        for i, extra in enumerate(extras, start=2):
-            reasons.extend(f"同页第{i}张: {r}" for r in _core_reasons(extra))
-        # 规则 7(trap11 实案 2026-07-05):同页多票 = 金额跨票错配高危。整片三元组
-        # (小计/VAT/总额)被偷给另一张票时自身勾稽全平——唯一供出真数的是本票明细
-        # 行和。多票页把规则 6 的单边收紧为双边:行和 ≠ 小计即转人工。单票页不收紧
-        # (服务费/未列项让行和 < 小计,合法)。
-        for i, inv in enumerate([invoice] + extras, start=1):
-            sub_i = _money(getattr(inv, "subtotal", None))
-            lines_i = _line_subtotals(inv)
-            if sub_i is not None and sub_i > 0 and len(lines_i) >= 2:
-                line_sum = sum(lines_i)
-                if abs(line_sum - sub_i) > max(_TOL, sub_i * _RECON_REL):
-                    reasons.append(
-                        f"同页第{i}张: 明细行和 {line_sum:.2f} ≠ 小计 {sub_i}"
-                        " — 多票页疑金额跨票错配"
-                    )
-    return reasons
+    from services.ocr.sanity_multi import multi_invoice_reasons
+
+    return _core_reasons(invoice) + multi_invoice_reasons(invoice)
 
 
 def _core_reasons(invoice) -> List[str]:

@@ -125,6 +125,22 @@ class ReadPageTests(unittest.TestCase):
             pr = dr.read_page(b"\x89PNG\r\n\x1a\nx", page_number=1)
         self.assertTrue(pr.invoice.is_not_invoice)
 
+    def test_credit_note_negative_kept_and_forced_review(self):
+        # P1 台账 #8:贷记单负数不回落(数学对负数成立·sanity 豁免),但强制人工确认方向
+        cn = {
+            **_GOOD_INVOICE,
+            "document_type": "credit_note",
+            "subtotal": "-65.42",
+            "vat": "-4.58",
+            "total_amount": "-70.00",
+        }
+        with _patch_provider(ProviderOutcome(ok=True, data=cn, model="m")):
+            pr = dr.read_page(b"\xff\xd8x", page_number=1)
+        self.assertEqual(pr.invoice.total_amount, "-70.00")  # 负号保留
+        self.assertTrue(pr.needs_manual_review)
+        self.assertEqual(pr.confidence_band, "needs_review")
+        self.assertTrue(any("credit_note" in w for w in pr.validation_warnings))
+
     def test_bank_document_parsed(self):
         doc = {"document_type": "bank_statement", "entries": []}
         with _patch_provider(ProviderOutcome(ok=True, data=doc, model="m")):

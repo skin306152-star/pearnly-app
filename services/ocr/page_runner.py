@@ -29,7 +29,7 @@ from .layer3_fallback import (
     refine_page as _l3_refine_page,
 )
 from .pattern_memory import InvoicePatternMemory
-from .sanity import evaluate_sanity, infer_missing_discount
+from .sanity import credit_note_review_reason, evaluate_sanity, infer_missing_discount
 from .schemas import BusinessDocumentType, Page, PipelinePageResult
 from .triggers import (
     _aggregate_page_confidence,
@@ -391,6 +391,10 @@ def _process_one_page(
         sanity_reasons = evaluate_sanity(invoice)
         if sanity_reasons:
             validation_warnings.extend(sanity_reasons)
+            needs_manual_review = True
+        cn_reason = credit_note_review_reason(invoice)
+        if cn_reason:
+            validation_warnings.append(cn_reason)
             needs_manual_review = True
 
     # Record final invoice pattern in pattern memory (after possible L3

@@ -118,6 +118,20 @@ def evaluate_sanity(invoice) -> List[str]:
     return reasons
 
 
+def credit_note_review_reason(invoice) -> str | None:
+    """贷记单(ใบลดหนี้)= 方向性单据,一律转人工确认,不许当普通发票静默过账。
+
+    P1 台账 #8(2026-07-05 实弹):票面负数被读成正数 → 退货冲销当正常进账,方向反。
+    金额符号真伪机器无法自证(真实贷记单正负印法都有),方向只能人工把关。
+    两条链(直读/Vision 路)共用本判定。
+    """
+    if getattr(invoice, "is_not_invoice", False):
+        return None
+    if getattr(invoice, "document_type", "") != "credit_note":
+        return None
+    return "credit_note — 冲销方向需人工确认(金额符号以票面为准)"
+
+
 def infer_missing_discount(invoice) -> str | None:
     """折扣确定性反推:折扣缺失但「小计 + VAT − 总额」的差额 D 恰好使
     (小计 − D) × 7% ≈ VAT 时,票面几乎必然印了一行 ส่วนลด 被漏抓 → 回填 D。

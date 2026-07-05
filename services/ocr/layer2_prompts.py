@@ -300,6 +300,11 @@ CRITICAL RULES:
    than inventing a rounded figure — NEVER output a made-up total. LOYALTY POINTS (คะแนน / แต้ม /
    EARN, or a "22/785"-style points pair) are NOT money and NOT a quantity — never put them in
    qty / price / subtotal / total_amount.
+4d. CREDIT NOTES (ใบลดหนี้ — money DIRECTION, critical): if the document is a credit
+   note, set document_type = "credit_note" and copy amount SIGNS exactly as printed:
+   a printed "-2,809.82" (or "(2,809.82)") MUST become "-2809.82" in subtotal / vat /
+   total_amount and line items. NEVER flip a printed negative to positive — a credit
+   note recorded as a positive invoice reverses the money direction.
 5. TAX IDs: Exactly 13 digits, no dashes/spaces. Empty string if not found.
 6. WHT (หัก ณ ที่จ่าย / ภ.ง.ด.3 / ภ.ง.ด.53): Common rates 1/2/3/5%. wht_rate is the number ONLY ("3" not "3%"). Only extract if printed; do NOT guess.
 6b. PAYMENT_METHOD: only if the bill prints how it was paid. "cash" (เงินสด/CASH), "transfer" (โอน/

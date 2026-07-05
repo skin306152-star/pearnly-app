@@ -142,5 +142,24 @@ class TaxIdChecksumTests(unittest.TestCase):
         self.assertFalse(any("校验位不符" in r for r in evaluate_sanity(inv)))
 
 
+class CreditNoteReviewTests(unittest.TestCase):
+    # P1 台账 #8:贷记单=方向性单据,两链共用本判定强制人工,不许当普通发票静默过账。
+
+    def test_credit_note_flagged_for_review(self):
+        from services.ocr.sanity import credit_note_review_reason
+
+        inv = _inv(document_type="credit_note", subtotal="-65.42", vat="-4.58",
+                   total_amount="-70.00")
+        self.assertIsNotNone(credit_note_review_reason(inv))
+        # 负数金额在 credit_note 上不该被 sanity 规则 1 硬毙(既有豁免的守门)
+        self.assertFalse(any("不可能为负" in r for r in evaluate_sanity(inv)))
+
+    def test_normal_invoice_not_flagged(self):
+        from services.ocr.sanity import credit_note_review_reason
+
+        self.assertIsNone(credit_note_review_reason(_inv(total_amount="70.00")))
+        self.assertIsNone(credit_note_review_reason(_inv(is_not_invoice=True)))
+
+
 if __name__ == "__main__":
     unittest.main()

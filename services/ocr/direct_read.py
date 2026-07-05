@@ -30,7 +30,7 @@ from pydantic import ValidationError
 from .cost import _compute_total_cost
 from .layer2_prompts import _SYSTEM_PROMPT
 from .layer2_structure import _DOC_PROMPTS, _DOC_SCHEMAS
-from .sanity import evaluate_sanity, infer_missing_discount
+from .sanity import credit_note_review_reason, evaluate_sanity, infer_missing_discount
 from .schemas import BusinessDocumentType, PipelinePageResult, PipelineResult, ThaiInvoice
 from .triggers import _bucket_confidence, _check_amount_math
 
@@ -133,10 +133,17 @@ def read_page(
         except ValidationError as e:
             raise DirectReadFallback(f"page {page_number}: {document_type} schema: {e}") from e
 
+    # 贷记单方向性单据强制人工(两链共判 · sanity.credit_note_review_reason)
+    force_review = False
+    cn_reason = credit_note_review_reason(invoice)
+    if cn_reason:
+        warnings.append(cn_reason)
+        force_review = True
+
     # 与 triggers 同口径:0.95 起步、每条软标注 -0.05;≥0.98 才 auto(直读永达不到,
     # 维持发票 confirm-first 现状),0.90-0.98 = yellow_confirm,再低转人工。
     final_confidence = round(max(0.0, 0.95 - 0.05 * len(warnings)), 4)
-    band = _bucket_confidence(final_confidence, False)
+    band = _bucket_confidence(final_confidence, force_review)
     return PipelinePageResult(
         page_number=page_number,
         invoice=invoice,

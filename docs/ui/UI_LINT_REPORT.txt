@@ -106,7 +106,7 @@
      1  static\home-31-navia-topbar.css
         └ 370: background: var(--blue-50);
 
-## emoji当图标(应换Lucide) — 命中 218(31 文件)
+## emoji当图标(应换Lucide) — 命中 207(30 文件)
     96  static\i18n-data.js
         └ 1276: 'billing-accuracy-good': '✅ 准',
         └ 1277: 'billing-accuracy-fair': '⚠ 一般',
@@ -116,9 +116,6 @@
     20  static\landing\landing-i18n.js
         └ 7: welcomeSub: '准备好一起把工作推进吧 💗',
         └ 8: bubble: '今天的工作<br />会很顺利 😊',
-    11  static\landing\landing-tour-i18n.js
-        └ 53: sumBub: 'เดือนนี้บันทึกไป 42 ใบ รวม ฿58,240 ครับ 📊',
-        └ 63: mismatch: '⚠ ยอดไม่ตรงกับ statement (ต่าง ฿120)',
      8  static\admin\admin-i18n.js
         └ 210: 'tn-status-overdraft': '⚠ 透支',
         └ 252: 'adm-risk-title': '⚠ 风控 · 可疑活动',

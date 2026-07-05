@@ -20,6 +20,22 @@ from difflib import SequenceMatcher
 from typing import List, Dict, Any
 
 from services.ocr.money import normalize_money
+from services.ocr.schemas_invoice import ThaiInvoice
+
+# 合并时标量字段全量随行,不再手工白名单——白名单漏字段会静默蒸发
+# (f003 折扣漏合并、台账#5 currency/document_type 不透出,同一类病)。
+# items/notes 有专用合并逻辑;嵌套结构与页级判定标志不属于发票字段。
+_NON_SCALAR_FIELDS = frozenset(
+    {
+        "items",
+        "notes",
+        "additional_invoices",
+        "source_refs",
+        "is_not_invoice",
+        "is_copy_or_duplicate",
+    }
+)
+_SCALAR_FIELDS = tuple(k for k in ThaiInvoice.model_fields if k not in _NON_SCALAR_FIELDS)
 
 
 def _is_empty(v: Any) -> bool:
@@ -150,24 +166,9 @@ def _build_invoice_from_pages(pages_group: List[Dict]) -> Dict[str, Any]:
     """把同一张发票的 N 页合并成一个 fields 字典"""
     if not pages_group:
         return {}
-    # 基础字段取第一个非空
-    merged_fields = {
-        "invoice_number": _first_non_empty(pages_group, "invoice_number"),
-        "date": _first_non_empty(pages_group, "date"),
-        "seller_name": _first_non_empty(pages_group, "seller_name"),
-        "seller_tax": _first_non_empty(pages_group, "seller_tax"),
-        "seller_addr": _first_non_empty(pages_group, "seller_addr"),
-        "buyer_name": _first_non_empty(pages_group, "buyer_name"),
-        "buyer_tax": _first_non_empty(pages_group, "buyer_tax"),
-        "buyer_addr": _first_non_empty(pages_group, "buyer_addr"),
-        "subtotal": _first_non_empty(pages_group, "subtotal"),
-        # 折扣必须随行:漏了它下游税基虚高、勾稽不平(f003 实案 2026-07-03)
-        "discount": _first_non_empty(pages_group, "discount"),
-        "vat": _first_non_empty(pages_group, "vat"),
-        "total_amount": _first_non_empty(pages_group, "total_amount"),
-        "category": _first_non_empty(pages_group, "category"),
-        "items": _merge_items(pages_group),
-    }
+    # 标量字段一律取第一个非空(跨页发票各字段可能散在不同页)
+    merged_fields: Dict[str, Any] = {k: _first_non_empty(pages_group, k) for k in _SCALAR_FIELDS}
+    merged_fields["items"] = _merge_items(pages_group)
     # notes 拼接
     notes = []
     for p in pages_group:

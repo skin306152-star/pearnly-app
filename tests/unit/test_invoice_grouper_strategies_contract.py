@@ -71,5 +71,42 @@ class Strategy3FallbackTests(unittest.TestCase):
         self.assertEqual(sorted(groups[0]["page_indices"]), [1, 2])
 
 
+class FieldCarryContractTests(unittest.TestCase):
+    """台账#5:合并白名单丢字段 → currency/document_type/WHT 在前门响应恒空。
+    契约 = ThaiInvoice 全部标量字段必须随行,schema 加新字段不许再静默蒸发。"""
+
+    def test_all_scalar_schema_fields_carried(self):
+        from services.ocr.schemas_invoice import ThaiInvoice
+
+        pages = [_p(invoice_number="A", total_amount="100")]
+        merged = ig.group_pages_to_invoices(pages)[0]["invoice_fields"]
+        expected = set(ThaiInvoice.model_fields) - ig._NON_SCALAR_FIELDS | {"items"}
+        self.assertEqual(set(merged) - {"notes"}, expected)
+
+    def test_currency_and_doc_type_survive_merge(self):
+        pages = [
+            _p(
+                invoice_number="A",
+                currency="USD",
+                document_type="credit_note",
+                wht_rate="3",
+                payment_method="card",
+                total_amount="100",
+            ),
+            _p(invoice_number="A"),
+        ]
+        merged = ig.group_pages_to_invoices(pages)[0]["invoice_fields"]
+        self.assertEqual(merged["currency"], "USD")
+        self.assertEqual(merged["document_type"], "credit_note")
+        self.assertEqual(merged["wht_rate"], "3")
+        self.assertEqual(merged["payment_method"], "card")
+
+    def test_first_non_empty_across_pages(self):
+        # 跨页发票:currency 只印在第 2 页也要拿到
+        pages = [_p(invoice_number="A"), _p(invoice_number="A", currency="EUR")]
+        merged = ig.group_pages_to_invoices(pages)[0]["invoice_fields"]
+        self.assertEqual(merged["currency"], "EUR")
+
+
 if __name__ == "__main__":
     unittest.main()

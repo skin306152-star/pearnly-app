@@ -37,9 +37,7 @@ class CorpusGroundTruthTests(unittest.TestCase):
                 m = json.loads(line)
                 gt_rel = m.get("gt") or m.get("ground_truth")
                 if gt_rel:
-                    self.assertTrue(
-                        (mf.parent / gt_rel).exists(), f"{mf.name} → {gt_rel} 缺失"
-                    )
+                    self.assertTrue((mf.parent / gt_rel).exists(), f"{mf.name} → {gt_rel} 缺失")
 
     def test_baseline_shape(self):
         base = json.loads(
@@ -66,9 +64,7 @@ class PromptContractTests(unittest.TestCase):
             self.assertIn(anchor, lp._SYSTEM_PROMPT, f"发票提示词锚点丢失: {anchor}")
 
     def test_recon_prompt_anchors(self):
-        self.assertIn(
-            "PROVENANCE", lp._GL_SYSTEM_PROMPT
-        )  # GL 金额溯源(描述列数字不当金额)
+        self.assertIn("PROVENANCE", lp._GL_SYSTEM_PROMPT)  # GL 金额溯源(描述列数字不当金额)
         self.assertIn(
             "Negative numbers stay negative", lp._BANK_STATEMENT_SYSTEM_PROMPT
         )  # 透支负号

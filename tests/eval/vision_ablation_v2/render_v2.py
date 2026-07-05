@@ -6,7 +6,6 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-
 FONT_REGULAR = [
     "C:/Windows/Fonts/NotoSansThai-Regular.ttf",
     "C:/Windows/Fonts/Sarabun-Regular.ttf",
@@ -35,15 +34,21 @@ def text_size(draw: ImageDraw.ImageDraw, text: str, face: ImageFont.ImageFont) -
     return right - left, bottom - top
 
 
-def right_text(draw: ImageDraw.ImageDraw, x: int, y: int, text: str, face, fill=(30, 30, 30)) -> None:
+def right_text(
+    draw: ImageDraw.ImageDraw, x: int, y: int, text: str, face, fill=(30, 30, 30)
+) -> None:
     width, _ = text_size(draw, str(text), face)
     draw.text((x - width, y), str(text), font=face, fill=fill)
 
 
-def center_text(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int], text: str, face, fill=(30, 30, 30)) -> None:
+def center_text(
+    draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int], text: str, face, fill=(30, 30, 30)
+) -> None:
     width, height = text_size(draw, str(text), face)
     x0, y0, x1, y1 = box
-    draw.text((x0 + (x1 - x0 - width) / 2, y0 + (y1 - y0 - height) / 2), str(text), font=face, fill=fill)
+    draw.text(
+        (x0 + (x1 - x0 - width) / 2, y0 + (y1 - y0 - height) / 2), str(text), font=face, fill=fill
+    )
 
 
 def paper(width: int, height: int, color=(250, 248, 238)) -> Image.Image:
@@ -117,7 +122,12 @@ def _render_receipt(case: dict) -> Image.Image:
         draw.text((44, y), "Second invoice on same page:", font=small, fill=(60, 60, 60))
         y += 36
         extra = gt["additional_invoices"][0]
-        draw.text((44, y), f"{extra['invoice_number']} total {extra['total_amount']}", font=small, fill=(40, 40, 40))
+        draw.text(
+            (44, y),
+            f"{extra['invoice_number']} total {extra['total_amount']}",
+            font=small,
+            fill=(40, 40, 40),
+        )
     if "handwritten" in case["trap"]:
         _handwrite(draw, 66, height - 135, "approved / paid", seed=13)
     return img
@@ -154,7 +164,9 @@ def _render_invoice_a4(case: dict) -> Image.Image:
     if gt["wht_amount"]:
         y = _total_line(draw, y, "WHT", gt["wht_amount"], normal, 1135, gt["currency"], 780)
     y += 14
-    y = _total_line(draw, y, "Grand Total", gt["total_amount"], font(38, True), 1135, gt["currency"], 780)
+    y = _total_line(
+        draw, y, "Grand Total", gt["total_amount"], font(38, True), 1135, gt["currency"], 780
+    )
     if gt["notes"]:
         draw.text((64, 1540), gt["notes"][:80], font=small, fill=(70, 70, 70))
     if "handwritten" in case["trap"]:
@@ -167,12 +179,22 @@ def _render_non_invoice(case: dict) -> Image.Image:
     draw = ImageDraw.Draw(img)
     draw.rectangle((0, 0, 1040, 110), fill=(62, 72, 84))
     draw.text((70, 36), "Purchase Memo", font=font(42, True), fill=(255, 255, 255))
-    draw.text((70, 170), "This is a synthetic internal memo, not a tax invoice.", font=font(32), fill=(35, 35, 35))
+    draw.text(
+        (70, 170),
+        "This is a synthetic internal memo, not a tax invoice.",
+        font=font(32),
+        fill=(35, 35, 35),
+    )
     draw.text((70, 230), "Topic: supplier quotation review", font=font(31), fill=(35, 35, 35))
     for index in range(12):
         y = 330 + index * 62
         draw.line((70, y, 970, y), fill=(190, 190, 185), width=2)
-        draw.text((82, y + 12), f"{index + 1}. review item {6091 + index} / not an amount", font=font(25), fill=(65, 65, 65))
+        draw.text(
+            (82, y + 12),
+            f"{index + 1}. review item {6091 + index} / not an amount",
+            font=font(25),
+            fill=(65, 65, 65),
+        )
     _handwrite(draw, 90, 1160, "please compare vendors", seed=9)
     return img
 
@@ -186,10 +208,22 @@ def render_bank_paper(case: dict) -> Image.Image:
     draw.rectangle((0, 0, 1700, 118), fill=theme)
     draw.text((70, 32), gt["bank_name"], font=font(42, True), fill=dark)
     draw.text((1160, 38), "Synthetic Account Statement", font=font(31, True), fill=dark)
-    draw.text((70, 154), f"Account: {gt['account_name']}  {gt['account_number']}", font=font(29), fill=(30, 30, 30))
-    draw.text((70, 197), f"Period: {gt['period_start']} to {gt['period_end']}", font=font(27), fill=(55, 55, 55))
+    draw.text(
+        (70, 154),
+        f"Account: {gt['account_name']}  {gt['account_number']}",
+        font=font(29),
+        fill=(30, 30, 30),
+    )
+    draw.text(
+        (70, 197),
+        f"Period: {gt['period_start']} to {gt['period_end']}",
+        font=font(27),
+        fill=(55, 55, 55),
+    )
     draw.text((1180, 154), f"Opening {gt['opening_balance']}", font=font(28), fill=(30, 30, 30))
-    draw.text((1180, 197), f"Closing {gt['closing_balance']}", font=font(28, True), fill=(30, 30, 30))
+    draw.text(
+        (1180, 197), f"Closing {gt['closing_balance']}", font=font(28, True), fill=(30, 30, 30)
+    )
     headers = ["Date", "Description", "Reference", "Withdrawal", "Deposit", "Balance"]
     rows = [
         [
@@ -207,7 +241,12 @@ def render_bank_paper(case: dict) -> Image.Image:
     if case["render"]["variant"] % 3 == 1:
         widths = [165, 470, 290, 210, 220, 235]
     _grid(draw, 55, y, widths, 50, headers, rows, 43, header_fill=_soft_color(theme))
-    draw.text((70, 1118), "Layout skeleton only. All account data is synthetic.", font=font(23), fill=(80, 80, 80))
+    draw.text(
+        (70, 1118),
+        "Layout skeleton only. All account data is synthetic.",
+        font=font(23),
+        fill=(80, 80, 80),
+    )
     return img
 
 
@@ -217,15 +256,38 @@ def render_gl_paper(case: dict) -> Image.Image:
     draw = ImageDraw.Draw(img)
     draw.rectangle((0, 0, 1650, 105), fill=(52, 65, 75))
     draw.text((62, 30), "General Ledger - Bank Account", font=font(39, True), fill=(255, 255, 255))
-    draw.text((62, 142), f"Account {gt['account_number']} / {gt['account_name']}", font=font(29), fill=(35, 35, 35))
-    draw.text((62, 184), f"Period {gt['period_start']} to {gt['period_end']}", font=font(27), fill=(60, 60, 60))
+    draw.text(
+        (62, 142),
+        f"Account {gt['account_number']} / {gt['account_name']}",
+        font=font(29),
+        fill=(35, 35, 35),
+    )
+    draw.text(
+        (62, 184),
+        f"Period {gt['period_start']} to {gt['period_end']}",
+        font=font(27),
+        fill=(60, 60, 60),
+    )
     headers = ["Date", "Voucher", "Account", "Description", "Debit", "Credit", "Balance"]
     rows = [
-        [e["transaction_date_raw"], e["voucher_no"], e["account_code"], e["description"][:32], e["debit"], e["credit"], e["balance"]]
+        [
+            e["transaction_date_raw"],
+            e["voucher_no"],
+            e["account_code"],
+            e["description"][:32],
+            e["debit"],
+            e["credit"],
+            e["balance"],
+        ]
         for e in gt["entries"]
     ]
     _grid(draw, 45, 260, [145, 185, 140, 430, 200, 200, 220], 48, headers, rows, 41)
-    draw.text((62, 1084), f"Opening {gt['opening_balance']}   Closing {gt['closing_balance']}", font=font(27, True), fill=(30, 30, 30))
+    draw.text(
+        (62, 1084),
+        f"Opening {gt['opening_balance']}   Closing {gt['closing_balance']}",
+        font=font(27, True),
+        fill=(30, 30, 30),
+    )
     return img
 
 
@@ -235,8 +297,18 @@ def render_vat_paper(case: dict) -> Image.Image:
     draw = ImageDraw.Draw(img)
     draw.rectangle((0, 0, 1650, 105), fill=(86, 55, 96))
     draw.text((62, 30), "VAT Report", font=font(40, True), fill=(255, 255, 255))
-    draw.text((62, 142), f"{gt['seller_name']}  Tax ID {gt['seller_tax']}", font=font(28), fill=(35, 35, 35))
-    draw.text((62, 184), f"Period {gt['period_month']}/{gt['period_year']}", font=font(27), fill=(60, 60, 60))
+    draw.text(
+        (62, 142),
+        f"{gt['seller_name']}  Tax ID {gt['seller_tax']}",
+        font=font(28),
+        fill=(35, 35, 35),
+    )
+    draw.text(
+        (62, 184),
+        f"Period {gt['period_month']}/{gt['period_year']}",
+        font=font(27),
+        fill=(60, 60, 60),
+    )
     headers = ["No", "Date", "Invoice", "Customer", "Tax ID", "Subtotal", "VAT", "Total"]
     rows = [
         [
@@ -261,7 +333,17 @@ def render_vat_paper(case: dict) -> Image.Image:
     return img
 
 
-def _grid(draw, x: int, y: int, widths: list[int], row_h: int, headers: list[str], rows: list[list[str]], font_size: int, header_fill=None) -> None:
+def _grid(
+    draw,
+    x: int,
+    y: int,
+    widths: list[int],
+    row_h: int,
+    headers: list[str],
+    rows: list[list[str]],
+    font_size: int,
+    header_fill=None,
+) -> None:
     header_fill = header_fill or (224, 228, 232)
     face = font(font_size - 12)
     head_face = font(font_size - 10, True)
@@ -269,7 +351,9 @@ def _grid(draw, x: int, y: int, widths: list[int], row_h: int, headers: list[str
     draw.rectangle((x, y, x + total_w, y + row_h), fill=header_fill, outline=(120, 120, 120))
     cursor = x
     for idx, header in enumerate(headers):
-        draw.rectangle((cursor, y, cursor + widths[idx], y + row_h), outline=(130, 130, 130), width=2)
+        draw.rectangle(
+            (cursor, y, cursor + widths[idx], y + row_h), outline=(130, 130, 130), width=2
+        )
         draw.text((cursor + 10, y + 13), header, font=head_face, fill=(30, 30, 30))
         cursor += widths[idx]
     for row_index, row in enumerate(rows):
@@ -292,7 +376,16 @@ def _dash(draw: ImageDraw.ImageDraw, y: int, width: int) -> None:
         draw.line((x, y, x + 12, y), fill=(35, 35, 35), width=2)
 
 
-def _total_line(draw, y: int, label: str, value: str | None, face, right: int, currency: str = "", left: int = 44) -> int:
+def _total_line(
+    draw,
+    y: int,
+    label: str,
+    value: str | None,
+    face,
+    right: int,
+    currency: str = "",
+    left: int = 44,
+) -> int:
     draw.text((left, y), label, font=face, fill=(25, 25, 25))
     right_text(draw, right, y, _print_money(value or "", currency), face, fill=(25, 25, 25))
     return y + int(face.size * 1.25)
@@ -317,7 +410,12 @@ def _handwrite(draw: ImageDraw.ImageDraw, x: int, y: int, text: str, seed: int) 
     rng = random.Random(seed)
     face = font(36)
     for idx, char in enumerate(text):
-        draw.text((x + idx * 17 + rng.randint(-1, 2), y + rng.randint(-2, 2)), char, font=face, fill=(28, 55, 142))
+        draw.text(
+            (x + idx * 17 + rng.randint(-1, 2), y + rng.randint(-2, 2)),
+            char,
+            font=face,
+            fill=(28, 55, 142),
+        )
     draw.line((x - 6, y + 48, x + len(text) * 18, y + 55), fill=(28, 55, 142), width=3)
 
 

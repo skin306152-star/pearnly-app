@@ -19,7 +19,9 @@ from augraphy import (
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 
 
-def save_photo(paper_image: Image.Image, out_path: Path, seed: int, profile: str, kind: str) -> dict:
+def save_photo(
+    paper_image: Image.Image, out_path: Path, seed: int, profile: str, kind: str
+) -> dict:
     degraded = _apply_augraphy(paper_image, seed, kind)
     marked = _surface_marks(degraded, seed, profile)
     photo = _compose_on_background(marked, seed, profile, kind)
@@ -61,7 +63,9 @@ def _apply_augraphy(image: Image.Image, seed: int, kind: str) -> Image.Image:
             ),
         ],
         post_phase=[
-            DirtyDrum(line_width_range=(1, 2), line_concentration=0.06, noise_intensity=0.18, p=0.65),
+            DirtyDrum(
+                line_width_range=(1, 2), line_concentration=0.06, noise_intensity=0.18, p=0.65
+            ),
             Stains(stains_blend_alpha=0.22, p=0.38),
             ShadowCast(
                 shadow_vertices_range=(3, 9),
@@ -89,7 +93,11 @@ def _surface_marks(image: Image.Image, seed: int, profile: str) -> Image.Image:
     w, h = img.size
     for _ in range(2 + seed % 3):
         x0 = rng.randint(40, max(45, w - 60))
-        draw.line((x0, 10, x0 + rng.randint(-35, 35), h - 20), fill=(0, 0, 0, rng.randint(18, 36)), width=rng.randint(2, 4))
+        draw.line(
+            (x0, 10, x0 + rng.randint(-35, 35), h - 20),
+            fill=(0, 0, 0, rng.randint(18, 36)),
+            width=rng.randint(2, 4),
+        )
     if "coffee" in profile:
         for _ in range(3):
             x = rng.randint(w // 6, w - w // 6)
@@ -112,7 +120,12 @@ def _compose_on_background(image: Image.Image, seed: int, profile: str, kind: st
     scale = min(max_w / image.width, max_h / image.height)
     size = (max(1, int(image.width * scale)), max(1, int(image.height * scale)))
     work = image.resize(size, Image.Resampling.BICUBIC).convert("RGBA")
-    rgba = work.rotate(rng.uniform(-4.8, 5.2), resample=Image.Resampling.BICUBIC, expand=True, fillcolor=(0, 0, 0, 0))
+    rgba = work.rotate(
+        rng.uniform(-4.8, 5.2),
+        resample=Image.Resampling.BICUBIC,
+        expand=True,
+        fillcolor=(0, 0, 0, 0),
+    )
     alpha = np.minimum(np.array(rgba.getchannel("A")), np.array(_ragged_mask(rgba.size, seed)))
     rgba.putalpha(Image.fromarray(alpha.astype(np.uint8), "L"))
     src = np.array(rgba)
@@ -132,24 +145,32 @@ def _compose_on_background(image: Image.Image, seed: int, profile: str, kind: st
         ]
     )
     matrix = cv2.getPerspectiveTransform(np.float32([[0, 0], [w, 0], [w, h], [0, h]]), dst)
-    warped = cv2.warpPerspective(src, matrix, frame, flags=cv2.INTER_CUBIC, borderValue=(0, 0, 0, 0))
+    warped = cv2.warpPerspective(
+        src, matrix, frame, flags=cv2.INTER_CUBIC, borderValue=(0, 0, 0, 0)
+    )
     composed = _drop_shadow(bg, warped, seed)
     alpha = warped[:, :, 3:4].astype(np.float32) / 255.0
     comp = composed.astype(np.float32) * (1 - alpha) + warped[:, :, :3].astype(np.float32) * alpha
-    return Image.fromarray(_camera_finish(np.clip(comp, 0, 255).astype(np.uint8), seed, profile), "RGB")
+    return Image.fromarray(
+        _camera_finish(np.clip(comp, 0, 255).astype(np.uint8), seed, profile), "RGB"
+    )
 
 
 def _desk_background(width: int, height: int, seed: int, profile: str) -> np.ndarray:
     rng = np.random.default_rng(seed)
     if "wood" in profile or "receipt" in profile or seed % 2:
         base = np.array([118, 82, 48], dtype=np.float32)
-        grain = 18 * np.sin(np.linspace(0, 1, width) * 48 + seed) + 8 * np.sin(np.linspace(0, 1, width) * 127)
+        grain = 18 * np.sin(np.linspace(0, 1, width) * 48 + seed) + 8 * np.sin(
+            np.linspace(0, 1, width) * 127
+        )
         bg = np.zeros((height, width, 3), dtype=np.float32) + base + grain[None, :, None]
         bg += rng.normal(0, 7, (height, width, 1))
         for plank in range(180, width, 280):
             bg[:, plank : plank + 3, :] *= 0.58
     else:
-        bg = np.zeros((height, width, 3), dtype=np.float32) + np.array([98, 104, 108], dtype=np.float32)
+        bg = np.zeros((height, width, 3), dtype=np.float32) + np.array(
+            [98, 104, 108], dtype=np.float32
+        )
         bg += rng.normal(0, 9, (height, width, 1))
     cv2.rectangle(bg, (width - 360, 70), (width - 40, 310), (42, 47, 54), -1)
     cv2.rectangle(bg, (40, height - 260), (430, height - 50), (160, 148, 127), -1)
@@ -176,7 +197,12 @@ def _ragged_mask(size: tuple[int, int], seed: int) -> Image.Image:
 def _drop_shadow(background: np.ndarray, warped: np.ndarray, seed: int) -> np.ndarray:
     rng = random.Random(seed)
     blur = cv2.GaussianBlur(warped[:, :, 3], (0, 0), sigmaX=18 + seed % 10)
-    shifted = np.roll(np.roll(blur, rng.randint(26, 58), axis=0), rng.randint(18, 42), axis=1).astype(np.float32) / 255.0
+    shifted = (
+        np.roll(np.roll(blur, rng.randint(26, 58), axis=0), rng.randint(18, 42), axis=1).astype(
+            np.float32
+        )
+        / 255.0
+    )
     out = background.astype(np.float32)
     out *= 1 - shifted[:, :, None] * 0.42
     return np.clip(out, 0, 255).astype(np.uint8)

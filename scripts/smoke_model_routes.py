@@ -34,8 +34,10 @@ def print_route_table() -> None:
     diff = rm.diff_from_defaults(routes)
     set_knobs = [v for v in rm.ROUTE_ENV_VARS if (os.environ.get(v) or "").strip()]
 
-    print(f"后端: {backends.active_backend()}"
-          f"{'' if backends.active_backend() == rm.DEFAULT_BACKEND else '(env 覆写,默认 ' + rm.DEFAULT_BACKEND + ')'}")
+    print(
+        f"后端: {backends.active_backend()}"
+        f"{'' if backends.active_backend() == rm.DEFAULT_BACKEND else '(env 覆写,默认 ' + rm.DEFAULT_BACKEND + ')'}"
+    )
     print(f"生效的路由 env: {', '.join(set_knobs) or '(无,全默认)'}")
     print()
     print(f"{'车道':<26} {'模型':<26} {'Vertex区域':<16} 状态")
@@ -43,7 +45,11 @@ def print_route_table() -> None:
     for lane, route in routes.items():
         if lane in diff:
             exp = diff[lane][0]
-            note = f"≠默认(默认 {exp.model} @ {exp.vertex_location})" if exp else "≠默认(新车道,默认表没有)"
+            note = (
+                f"≠默认(默认 {exp.model} @ {exp.vertex_location})"
+                if exp
+                else "≠默认(新车道,默认表没有)"
+            )
         else:
             note = "=默认"
         print(f"{lane:<26} {route.model:<26} {route.vertex_location:<16} {note}")

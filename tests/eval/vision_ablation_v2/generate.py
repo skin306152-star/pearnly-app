@@ -11,7 +11,6 @@ from cases_v2 import BANK_SOURCES, bank_cases, gl_cases, invoice_cases, vat_case
 from photo_v2 import save_photo
 from render_v2 import render_bank_paper, render_gl_paper, render_invoice_paper, render_vat_paper
 
-
 ROOT = Path(__file__).resolve().parent
 
 
@@ -56,7 +55,13 @@ def generate_invoices() -> list[dict]:
     manifest = []
     for index, case in enumerate(invoice_cases(), start=1):
         image_path = ROOT / case["image"]
-        quality = save_photo(render_invoice_paper(case), image_path, 1000 + index, case["photo_profile"], case["render"]["kind"])
+        quality = save_photo(
+            render_invoice_paper(case),
+            image_path,
+            1000 + index,
+            case["photo_profile"],
+            case["render"]["kind"],
+        )
         write_json(ROOT / case["ground_truth"], case["gt"])
         manifest.append(
             {
@@ -77,7 +82,9 @@ def generate_bank() -> list[dict]:
     manifest = []
     for index, case in enumerate(bank_cases(), start=1):
         image_path = ROOT / case["image"]
-        quality = save_photo(render_bank_paper(case), image_path, 2000 + index, case["photo_profile"], "statement")
+        quality = save_photo(
+            render_bank_paper(case), image_path, 2000 + index, case["photo_profile"], "statement"
+        )
         write_json(ROOT / case["ground_truth"], case["gt"])
         manifest.append(
             {
@@ -102,7 +109,9 @@ def generate_gl() -> list[dict]:
     manifest = []
     for index, case in enumerate(gl_cases(), start=1):
         image_path = ROOT / case["image"]
-        quality = save_photo(render_gl_paper(case), image_path, 3000 + index, case["photo_profile"], "ledger")
+        quality = save_photo(
+            render_gl_paper(case), image_path, 3000 + index, case["photo_profile"], "ledger"
+        )
         write_json(ROOT / case["ground_truth"], case["gt"])
         manifest.append(
             {
@@ -121,7 +130,9 @@ def generate_vat() -> list[dict]:
     manifest = []
     for index, case in enumerate(vat_cases(), start=1):
         image_path = ROOT / case["image"]
-        quality = save_photo(render_vat_paper(case), image_path, 4000 + index, case["photo_profile"], "vat")
+        quality = save_photo(
+            render_vat_paper(case), image_path, 4000 + index, case["photo_profile"], "vat"
+        )
         write_json(ROOT / case["ground_truth"], case["gt"])
         manifest.append(
             {
@@ -136,7 +147,9 @@ def generate_vat() -> list[dict]:
     return manifest
 
 
-def validate_corpus(invoices: list[dict], bank: list[dict], gl: list[dict], vat: list[dict]) -> None:
+def validate_corpus(
+    invoices: list[dict], bank: list[dict], gl: list[dict], vat: list[dict]
+) -> None:
     assert len(invoices) >= 80
     bank_counts = Counter(item["bank_code"] for item in bank)
     assert len(bank_counts) >= 6 and min(bank_counts.values()) >= 8
@@ -192,7 +205,9 @@ def validate_vat(gt: dict) -> None:
     assert dec(gt["total_total"]) == total
 
 
-def write_samples(invoices: list[dict], bank: list[dict], gl: list[dict], vat: list[dict]) -> list[dict]:
+def write_samples(
+    invoices: list[dict], bank: list[dict], gl: list[dict], vat: list[dict]
+) -> list[dict]:
     selected = [
         invoices[0],
         invoices[2],
@@ -212,14 +227,17 @@ def write_samples(invoices: list[dict], bank: list[dict], gl: list[dict], vat: l
         src = ROOT / item["image"]
         dst = sample_dir / f"sample_{index:02d}_{Path(item['image']).name}"
         shutil.copy2(src, dst)
-        samples.append({"label": item["id"], "path": dst.relative_to(ROOT).as_posix(), "type": item["type"]})
+        samples.append(
+            {"label": item["id"], "path": dst.relative_to(ROOT).as_posix(), "type": item["type"]}
+        )
     return samples
 
 
 def write_readme(summary: dict, samples: list[dict]) -> None:
     sample_lines = "\n".join(f"![{item['label']}]({item['path']})" for item in samples)
     source_lines = "\n".join(
-        f"- `{code}` {source['name']}: {source['url']} ({source['note']})" for code, source in BANK_SOURCES.items()
+        f"- `{code}` {source['name']}: {source['url']} ({source['note']})"
+        for code, source in BANK_SOURCES.items()
     )
     bank_distribution = json.dumps(summary["bank_distribution"], ensure_ascii=False, sort_keys=True)
     checklist = "\n".join(
@@ -276,7 +294,9 @@ def run_prettier() -> None:
         return
     json_files = [str(path) for path in ROOT.rglob("*.json")]
     for start in range(0, len(json_files), 40):
-        subprocess.run([npx, "prettier", "--write", *json_files[start : start + 40]], check=False, cwd=ROOT)
+        subprocess.run(
+            [npx, "prettier", "--write", *json_files[start : start + 40]], check=False, cwd=ROOT
+        )
 
 
 def write_json(path: Path, value: dict) -> None:
@@ -289,7 +309,9 @@ def read_json(path: Path) -> dict:
 
 
 def write_jsonl(path: Path, rows: list[dict]) -> None:
-    path.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows), encoding="utf-8")
+    path.write_text(
+        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows), encoding="utf-8"
+    )
 
 
 def dec(value: str | None) -> Decimal:

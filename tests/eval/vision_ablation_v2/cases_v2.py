@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
-
 CENT = Decimal("0.01")
 
 
@@ -156,7 +155,11 @@ def _invoice_case(seq: int, trap: str) -> dict:
     if trap in {"discount_before_vat", "overlapping_columns"}:
         discount = (subtotal * Decimal("0.05")).quantize(CENT)
     taxable = subtotal - discount
-    vat = Decimal("0.00") if trap in {"foreign_currency", "tax_exempt", "zero_total"} else taxable * Decimal("0.07")
+    vat = (
+        Decimal("0.00")
+        if trap in {"foreign_currency", "tax_exempt", "zero_total"}
+        else taxable * Decimal("0.07")
+    )
     wht_rate = "3.00" if trap == "wht" else ""
     wht_amount = taxable * Decimal("0.03") if trap == "wht" else Decimal("0.00")
     total = taxable + vat - wht_amount
@@ -213,7 +216,11 @@ def _invoice_case(seq: int, trap: str) -> dict:
         "category": "office" if seq % 2 else "food",
         "additional_invoices": [_extra_invoice(seq)] if trap == "multi_invoice" else [],
     }
-    kind = "receipt" if trap in {"thermal_receipt", "cash_change", "folded_receipt"} or seq % 3 else "a4"
+    kind = (
+        "receipt"
+        if trap in {"thermal_receipt", "cash_change", "folded_receipt"} or seq % 3
+        else "a4"
+    )
     return {
         "id": f"inv_v2_{seq:03d}",
         "image": f"images/inv_v2_{seq:03d}.jpg",
@@ -292,7 +299,14 @@ def _extra_invoice(seed: int) -> dict:
         "change_amount": "",
         "payment_method": "transfer",
         "currency": "",
-        "items": [{"name": "ค่าบริการเพิ่มเติม", "qty": "1", "price": money(subtotal), "subtotal": money(subtotal)}],
+        "items": [
+            {
+                "name": "ค่าบริการเพิ่มเติม",
+                "qty": "1",
+                "price": money(subtotal),
+                "subtotal": money(subtotal),
+            }
+        ],
         "notes": "",
         "category": "service",
         "additional_invoices": [],

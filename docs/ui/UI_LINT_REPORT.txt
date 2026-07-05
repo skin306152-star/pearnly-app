@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 333 个源文件全扫
+# UI 设计合规扫描报告 · 339 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 8(8 文件)
@@ -11,7 +11,7 @@
      1  static\admin\admin.css
         └ 521: color: #2563eb;
      1  static\admin\admin.js
-        └ 295: google_vision: { label: 'Google Vision', color: '#2563EB' },
+        └ 299: google_vision: { label: 'Google Vision', color: '#2563EB' },
      1  static\pos\pos-cashier.js
         └ 25: $('main-avatar').style.background = c.color || '#2563EB';
      1  static\pos\pos-data.js
@@ -106,7 +106,7 @@
      1  static\home-31-navia-topbar.css
         └ 370: background: var(--blue-50);
 
-## emoji当图标(应换Lucide) — 命中 207(30 文件)
+## emoji当图标(应换Lucide) — 命中 218(31 文件)
     96  static\i18n-data.js
         └ 1276: 'billing-accuracy-good': '✅ 准',
         └ 1277: 'billing-accuracy-fair': '⚠ 一般',
@@ -116,15 +116,18 @@
     20  static\landing\landing-i18n.js
         └ 7: welcomeSub: '准备好一起把工作推进吧 💗',
         └ 8: bubble: '今天的工作<br />会很顺利 😊',
+    11  static\landing\landing-tour-i18n.js
+        └ 53: sumBub: 'เดือนนี้บันทึกไป 42 ใบ รวม ฿58,240 ครับ 📊',
+        └ 63: mismatch: '⚠ ยอดไม่ตรงกับ statement (ต่าง ฿120)',
      8  static\admin\admin-i18n.js
-        └ 165: 'tn-status-overdraft': '⚠ 透支',
-        └ 207: 'adm-risk-title': '⚠ 风控 · 可疑活动',
+        └ 210: 'tn-status-overdraft': '⚠ 透支',
+        └ 252: 'adm-risk-title': '⚠ 风控 · 可疑活动',
      7  src\home\knowledge-fab.ts
         └ 119: burst(['💛', '✨', '💙', '🐾']);
         └ 171: const HELLO = [kbT('kb-fab-hi', '喵?'), kbT('kb-fab-ask', '问我呀!'), '🐾'];
      5  static\admin\admin.js
-        └ 1822: ? '<span class="adm-drawer-pill adm-pill-danger">⚠ ' +
-        └ 1889: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
+        └ 1826: ? '<span class="adm-drawer-pill adm-pill-danger">⚠ ' +
+        └ 1893: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
      4  static\pos\pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
         └ 258: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
@@ -171,7 +174,7 @@
      1  src\home\sales-wizard-io.ts
         └ 31: // 向导纸张选项 ↔ 后端 paper_size:pos = 80mm 热敏窄版。
      1  static\admin\admin.html
-        └ 811: <h3 data-i18n="adm-risk-title">⚠ 风控 · 可疑活动</h3>
+        └ 830: <h3 data-i18n="adm-risk-title">⚠ 风控 · 可疑活动</h3>
      1  static\home-09-badges-locks.css
         └ 147: content: "🔒";
      1  static\home-14-gemini-admin.css
@@ -187,8 +190,8 @@
         └ 168: max-width: 520px;
         └ 173: max-width: 420px;
      5  static\admin\admin.js
-        └ 1637: '<div class="cpw-forgot-modal" style="max-width:420px">' +
-        └ 1703: '<div class="cpw-forgot-modal" style="max-width:420px">' +
+        └ 1641: '<div class="cpw-forgot-modal" style="max-width:420px">' +
+        └ 1707: '<div class="cpw-forgot-modal" style="max-width:420px">' +
      5  static\home-02-switcher.css
         └ 17: max-width: 240px;
         └ 53: max-width: 420px;
@@ -421,10 +424,10 @@
         └ 1084: 'time-min-ago-suffix': ' 分钟前',
         └ 1085: 'time-hour-ago-suffix': ' 小时前',
      4  static\admin\admin-i18n.js
-        └ 289: 'time-hours-ago': '{n} 小时前',
-        └ 290: 'time-days-ago': '{n} 天前',
+        └ 334: 'time-hours-ago': '{n} 小时前',
+        └ 335: 'time-days-ago': '{n} 天前',
 
-## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 958(64 文件)
+## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 1044(69 文件)
    157  static\home-18-admin-users.css
     83  static\pos\pos.css
     83  static\pos\pos.css
@@ -434,7 +437,9 @@
     51  static\pos\pos-restaurant.css
     40  static\admin\admin.css
     39  static\landing\landing-auth.css
+    34  static\landing\landing-tour-cards.css
     30  static\landing\landing.css
+    27  static\landing\landing-tour-phone.css
     21  static\recon-review.js
     20  static\home-30-settings-modal.css
     17  static\home-38-buttons.css
@@ -443,7 +448,9 @@
     15  static\pos\pos.html
     15  static\pos\pos.html
     12  static\home-40-sales-wizard.css
+    12  static\landing\landing-tour.js
     11  static\home-49-dms-intake.css
+    10  static\landing\landing-tour.css
      9  src\home\sales-account.ts
      9  src\home\sales-wizard-steps.ts
      9  static\recon-mapping.js
@@ -463,6 +470,7 @@
      4  static\erp-mrerp-connect.js
      3  static\pos\pos-data.js
      3  static\landing\auth-modal.css
+     3  static\landing\landing-tour-scenes.js
      3  static\landing\responsive.css
      3  static\pos\pos-data.js
      2  src\home\bank-recon-drawer.ts

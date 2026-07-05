@@ -1,0 +1,384 @@
+/* 着陆页产品导览 · 拟真手机壳 + LINE 聊天皮肤(landing-tour.css 的续篇 · 打包顺序紧随其后) */
+/* 拟真手机壳 + 状态栏 */
+.ptour .phone {
+  width: min(330px, 26vw);
+  aspect-ratio: 330/676;
+  border-radius: 56px;
+  padding: 11px;
+  position: relative;
+  background: linear-gradient(160deg, #1b1725, #0e0b18 60%, #241f31);
+  box-shadow:
+    0 0 0 2.5px #cdc9d9,
+    0 0 0 4.5px #8f8aa0,
+    inset 0 0 6px rgba(255, 255, 255, 0.12),
+    var(--card-shadow);
+}
+.ptour .phone .sidebtn {
+  position: absolute;
+  background: linear-gradient(90deg, #a29dbb, #d9d6e4, #8d879f);
+  border-radius: 3px;
+  z-index: 0;
+}
+.ptour .phone .sb-l1 {
+  left: -6px;
+  top: 17%;
+  width: 3px;
+  height: 26px;
+}
+.ptour .phone .sb-l2 {
+  left: -6px;
+  top: 24%;
+  width: 3px;
+  height: 44px;
+}
+.ptour .phone .sb-l3 {
+  left: -6px;
+  top: 32%;
+  width: 3px;
+  height: 44px;
+}
+.ptour .phone .sb-r1 {
+  right: -6px;
+  top: 26%;
+  width: 3px;
+  height: 68px;
+}
+.ptour .scr {
+  width: 100%;
+  height: 100%;
+  border-radius: 46px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+.ptour .sbar {
+  flex: none;
+  height: 46px;
+  background: #fff;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 24px 5px;
+  color: #0c0a18;
+}
+.ptour .sbar .tm {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.ptour .sbar .isl {
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 96px;
+  height: 27px;
+  border-radius: 99px;
+  background: #000;
+}
+.ptour .sbar .isl::after {
+  content: '';
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #131a2b;
+  box-shadow: inset 0 0 2px 1px #2a3a5e;
+}
+.ptour .sbar .sic {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.ptour .sbar .sig {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  height: 11px;
+}
+.ptour .sbar .sig i {
+  width: 2.5px;
+  border-radius: 1px;
+  background: #0c0a18;
+  display: block;
+}
+.ptour .sbar .sig i:nth-child(1) {
+  height: 4px;
+}
+.ptour .sbar .sig i:nth-child(2) {
+  height: 6px;
+}
+.ptour .sbar .sig i:nth-child(3) {
+  height: 8.5px;
+}
+.ptour .sbar .sig i:nth-child(4) {
+  height: 11px;
+}
+.ptour .sbar .wifi {
+  width: 15px;
+  height: 11px;
+  position: relative;
+  overflow: hidden;
+}
+.ptour .sbar .wifi::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 120%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #0c0a18 0 18%,
+    transparent 19% 38%,
+    #0c0a18 39% 52%,
+    transparent 53% 70%,
+    #0c0a18 71% 84%,
+    transparent 85%
+  );
+}
+.ptour .sbar .bat {
+  width: 23px;
+  height: 11.5px;
+  border: 1.5px solid rgba(12, 10, 24, 0.4);
+  border-radius: 3.5px;
+  position: relative;
+}
+.ptour .sbar .bat::before {
+  content: '';
+  position: absolute;
+  inset: 1.5px;
+  right: 5px;
+  background: #0c0a18;
+  border-radius: 1.5px;
+}
+.ptour .sbar .bat::after {
+  content: '';
+  position: absolute;
+  right: -4px;
+  top: 3px;
+  width: 2px;
+  height: 4px;
+  background: rgba(12, 10, 24, 0.4);
+  border-radius: 0 2px 2px 0;
+}
+
+/* LINE 聊天头/底/气泡 */
+.ptour .chat-head {
+  flex: none;
+  background: #fff;
+  color: #111;
+  padding: 6px 14px 10px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border-bottom: 1px solid #ececf2;
+}
+.ptour .chat-head .back {
+  font-size: 19px;
+  color: #333;
+  font-weight: 400;
+  margin-right: 1px;
+}
+.ptour .chat-head .av {
+  width: 31px;
+  height: 31px;
+  border-radius: 50%;
+  flex: none;
+  background: linear-gradient(135deg, var(--purple), var(--pink));
+  color: #fff;
+  font-weight: 900;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ptour .chat-head .nm {
+  font-weight: 800;
+  font-size: 15.5px;
+  color: #111;
+  letter-spacing: -0.01em;
+}
+.ptour .chat-head .ai {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  background: var(--line-g);
+  color: #fff;
+  border-radius: 5px;
+  padding: 2px 6px;
+  margin-left: 1px;
+}
+.ptour .chat-head .hic {
+  margin-left: auto;
+  display: flex;
+  gap: 13px;
+  color: #333;
+}
+.ptour .chat-head .hic svg {
+  display: block;
+}
+.ptour .chat-body {
+  flex: 1;
+  overflow: hidden;
+  padding: 12px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  background: linear-gradient(180deg, #bcc6ea, #b4c3e9);
+}
+.ptour .datechip {
+  align-self: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(90, 105, 150, 0.55);
+  border-radius: 99px;
+  padding: 3px 11px;
+  animation: ptpop 0.38s cubic-bezier(0.34, 1.4, 0.5, 1) both;
+}
+.ptour .chat-foot {
+  flex: none;
+  background: #fff;
+  padding: 8px 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: #3c3c46;
+}
+.ptour .chat-foot .aa {
+  flex: 1;
+  height: 31px;
+  border-radius: 999px;
+  background: #f1f1f5;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 12.5px;
+  color: #9a9aa6;
+}
+.ptour .chat-foot svg {
+  display: block;
+}
+.ptour .homebar {
+  position: absolute;
+  bottom: 7px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 110px;
+  height: 4px;
+  border-radius: 99px;
+  background: #111;
+  opacity: 0.85;
+  z-index: 6;
+}
+
+.ptour .msg {
+  display: flex;
+  gap: 6px;
+  max-width: 88%;
+  align-items: flex-end;
+  animation: ptpop 0.38s cubic-bezier(0.34, 1.4, 0.5, 1) both;
+}
+@keyframes ptpop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.ptour .msg.user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+.ptour .msg.bot {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+.ptour .msg .meta {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 8.5px;
+  line-height: 1.5;
+  color: #5f6c93;
+  font-weight: 600;
+  padding-bottom: 2px;
+}
+.ptour .msg.bot .meta {
+  align-items: flex-start;
+  align-self: flex-end;
+}
+.ptour .msg .bav {
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  flex: none;
+  margin-top: 1px;
+  background: linear-gradient(135deg, var(--purple), var(--pink));
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ptour .bub {
+  border-radius: 15px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #1e2333;
+}
+.ptour .msg.user .bub {
+  background: linear-gradient(180deg, #8bef7c, #6fe360);
+  border-bottom-right-radius: 4px;
+}
+.ptour .msg.bot .bub {
+  background: #fff;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 3px rgba(50, 60, 110, 0.14);
+}
+.ptour .typing .bub {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 11px 13px;
+}
+.ptour .typing .d {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #b3aad4;
+  animation: pttb 1.1s infinite;
+}
+.ptour .typing .d:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.ptour .typing .d:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes pttb {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-5px);
+    opacity: 1;
+  }
+}

@@ -1,0 +1,290 @@
+/* 着陆页产品导览(登录页=第1页 + 5 屏卖点横向滑动 · 循环) · 全部选择器锁 .ptour* 前缀防泄漏 */
+.ptour,
+.ptour-arrow,
+.ptour-dots {
+  --purple: #7655f6;
+  --pink: #f04fbd;
+  --ink: #33249c;
+  --body-c: #52496f;
+  --line-g: #06c755;
+  --card-shadow:
+    0 24px 60px -18px rgba(118, 85, 246, 0.28), 0 6px 18px -8px rgba(118, 85, 246, 0.18);
+}
+
+/* landing-auth.css 有全局 svg{width:100%} — 导览内恢复按 width/height 属性定尺寸 */
+.ptour svg,
+.ptour-arrow svg {
+  width: auto;
+  height: auto;
+}
+
+#pearnly-auth-root {
+  transition: transform 0.72s cubic-bezier(0.7, 0, 0.22, 1);
+}
+html.ptour-on #pearnly-auth-root {
+  transform: translateX(-100vw);
+}
+
+.ptour {
+  position: fixed;
+  inset: 0;
+  z-index: 700;
+  pointer-events: none;
+  overflow: hidden;
+  font-family: 'Noto Sans Thai', 'Noto Sans SC', 'Noto Sans JP', Helvetica, Arial, sans-serif;
+  color: var(--body-c);
+}
+.ptour-bg {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  background: linear-gradient(135deg, #aca4ff 0%, #dcc8ff 34%, #ffd9ec 66%, #ffeccb 100%);
+}
+html.ptour-on .ptour-bg {
+  opacity: 1;
+}
+.ptour-bg .pglow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.65;
+}
+.ptour-bg .pg1 {
+  width: 640px;
+  height: 640px;
+  left: -180px;
+  top: -160px;
+  background: radial-gradient(circle, rgba(118, 85, 246, 0.5) 0%, transparent 70%);
+  animation: ptdrift1 26s ease-in-out infinite alternate;
+}
+.ptour-bg .pg2 {
+  width: 560px;
+  height: 560px;
+  right: -160px;
+  bottom: -140px;
+  background: radial-gradient(circle, rgba(240, 79, 189, 0.4) 0%, transparent 70%);
+  animation: ptdrift2 32s ease-in-out infinite alternate;
+}
+.ptour-bg .pg3 {
+  width: 520px;
+  height: 520px;
+  left: 52%;
+  bottom: -200px;
+  background: radial-gradient(circle, rgba(88, 214, 235, 0.4) 0%, transparent 70%);
+  animation: ptdrift1 34s ease-in-out infinite alternate-reverse;
+}
+@keyframes ptdrift1 {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(110px, 70px);
+  }
+}
+@keyframes ptdrift2 {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(-90px, -80px);
+  }
+}
+
+.ptour-track {
+  position: relative;
+  display: flex;
+  height: 100%;
+  width: 500%;
+  transform: translateX(20%);
+  transition: transform 0.72s cubic-bezier(0.7, 0, 0.22, 1);
+}
+.ptour-screen {
+  width: 20%;
+  height: 100%;
+  flex: none;
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  padding: 72px 7vw 70px;
+  gap: 3vw;
+}
+.ptour-screen.flip .copy {
+  order: 2;
+}
+.ptour-screen.flip .demo {
+  order: 1;
+  justify-self: start;
+}
+.ptour-screen .demo {
+  justify-self: end;
+}
+.ptour-screen.solo {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  text-align: center;
+}
+.ptour-screen.solo .copy {
+  display: grid;
+  justify-items: center;
+}
+.ptour-screen.solo .sub {
+  margin-left: auto;
+  margin-right: auto;
+}
+.ptour-screen.solo .ctarow {
+  justify-content: center;
+  align-items: center;
+  gap: 26px;
+}
+
+.ptour .copy .fx {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s ease;
+}
+.ptour-screen.active .copy .fx {
+  opacity: 1;
+  transform: none;
+}
+.ptour-screen.active .copy .fx:nth-child(1) {
+  transition-delay: 0.15s;
+}
+.ptour-screen.active .copy .fx:nth-child(2) {
+  transition-delay: 0.28s;
+}
+.ptour-screen.active .copy .fx:nth-child(3) {
+  transition-delay: 0.41s;
+}
+.ptour-screen.active .copy .fx:nth-child(4) {
+  transition-delay: 0.54s;
+}
+.ptour-screen.active .copy .fx:nth-child(5) {
+  transition-delay: 0.67s;
+}
+
+.ptour .kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--purple);
+  background: rgba(118, 85, 246, 0.1);
+  border-radius: 999px;
+  padding: 7px 15px;
+  margin-bottom: 22px;
+}
+.ptour .kicker svg {
+  flex: none;
+}
+.ptour h1 {
+  font-size: clamp(34px, 3.6vw, 54px);
+  line-height: 1.14;
+  font-weight: 900;
+  color: var(--ink);
+  letter-spacing: -0.025em;
+  margin-bottom: 20px;
+  text-wrap: pretty;
+}
+.ptour .grad {
+  background: linear-gradient(100deg, var(--purple), var(--pink));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.ptour .sub {
+  font-size: clamp(16px, 1.25vw, 19px);
+  line-height: 1.65;
+  max-width: 34em;
+  margin-bottom: 26px;
+  text-wrap: pretty;
+}
+.ptour .points {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 30px;
+}
+.ptour .pt {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #3a3360;
+}
+.ptour .pt svg {
+  flex: none;
+}
+.ptour .ctarow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.ptour .ctacol {
+  display: grid;
+  gap: 12px;
+}
+.ptour .cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: none;
+  font-size: 16.5px;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 15px 28px;
+  transition: transform 0.2s;
+}
+.ptour .cta:hover {
+  transform: translateY(-2px);
+}
+.ptour .cta.line {
+  background: var(--line-g);
+  color: #fff;
+  animation: ptbreathe 2.8s ease-in-out infinite;
+}
+@keyframes ptbreathe {
+  0%,
+  100% {
+    box-shadow:
+      0 10px 26px -8px rgba(6, 199, 85, 0.55),
+      0 0 0 0 rgba(6, 199, 85, 0.25);
+  }
+  50% {
+    box-shadow:
+      0 10px 30px -6px rgba(6, 199, 85, 0.7),
+      0 0 0 9px rgba(6, 199, 85, 0);
+  }
+}
+.ptour .cta.ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 2px solid rgba(51, 36, 156, 0.35);
+  justify-content: center;
+}
+.ptour .cta.ghost:hover {
+  border-color: var(--purple);
+  color: var(--purple);
+}
+.ptour .cta .lineic {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--line-g);
+  font-size: 10px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

@@ -25,6 +25,9 @@ const BUNDLES = [
             'landing/landing-scale.js',
             'landing/landing-i18n.js',
             'landing/mascot-scene.js',
+            'landing/landing-tour-i18n.js',
+            'landing/landing-tour-scenes.js',
+            'landing/landing-tour.js',
         ],
     },
     // 管理控制台 SPA · 邀请接受公开页:plain-script 逻辑 minify 进 dist(view-source 只见外壳)。

@@ -123,6 +123,9 @@ const LANDING_CSS = [
     'landing/landing-static-bg.css',
     'landing/landing-static-bg-mobile.css',
     'landing/landing-interactions.css',
+    'landing/landing-tour.css',
+    'landing/landing-tour-phone.css',
+    'landing/landing-tour-cards.css',
 ];
 
 // 管理控制台 SPA + 邀请页:主题令牌在前,组件样式在后(固化原 DOM 顺序)。

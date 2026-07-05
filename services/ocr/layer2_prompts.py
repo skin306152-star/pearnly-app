@@ -312,7 +312,16 @@ CRITICAL RULES:
 6c. CURRENCY: fill ONLY when the amounts are clearly in a NON-Thai currency (USD / US$ / $ /
    ดอลลาร์ / EUR / € / etc.) — put the printed code or symbol. Leave EMPTY for Thai baht (บาท / THB /
    ฿) or when no currency is shown. Do NOT guess; most Thai invoices are baht and stay empty.
-7. is_not_invoice: true ONLY if the text is clearly not an invoice (letter, contract, blank page, signature page).
+7. is_not_invoice: true ONLY if the document is clearly not purchase/payment evidence
+   (letter, contract, blank page, signature page, or a pre-transaction document per 7c).
+   A page showing a seller, line items/amounts and a total IS an invoice/receipt —
+   dense digits (phone numbers, member ids, long reference codes) or several competing
+   amount lines NEVER make a real invoice a non-invoice.
+7c. PRE-TRANSACTION DOCUMENTS (no money has moved — must NOT be recorded as an expense):
+   a PURCHASE ORDER (ใบสั่งซื้อ / PO), a QUOTATION (ใบเสนอราคา / QUOTATION), or a BARE
+   delivery note (ใบส่งของ / ใบส่งสินค้า with NO ใบกำกับภาษี in the title) → set
+   is_not_invoice = true. CAREFUL: the combined title "ใบส่งของ/ใบกำกับภาษี" (delivery
+   note + tax invoice) IS a real tax invoice — never reject those.
 7b. DOCUMENT TYPE (decides whether a legal invoice number is required downstream):
    - "tax_invoice": a FULL Thai tax invoice (ใบกำกับภาษีเต็มรูป) — has a legal
      invoice number (เลขที่) AND the seller's 13-digit tax ID. Only this type can

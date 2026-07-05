@@ -18,6 +18,8 @@ OUT = Path(__file__).resolve().parent
 FONT_DIR = ROOT / "services" / "export" / "fonts"
 FONT = str(FONT_DIR / "Sarabun-Regular.ttf")
 FONT_B = str(FONT_DIR / "Sarabun-Bold.ttf")
+
+
 def fix_tax_check_digit(tax_id: str) -> str:
     """给 13 位税号重算 mod-11 校验位(对合法真税号幂等;非 13 位数字原样返回)。
 

@@ -77,8 +77,7 @@ def modeA(raw, fn, pdt, cat):
         actual = _recon_agg(cat, _merge_docs(leg.get("pages") or []))
     # 静默放行审计:钱字段错 + band 非 needs_review = 溜过闸(双读验收的归零指标)
     review = any(getattr(p, "needs_manual_review", False) for p in pages)
-    return {"actual": actual, "cost": cost, "ms": ms, "l3": l3,
-            "chain": chain, "review": review}
+    return {"actual": actual, "cost": cost, "ms": ms, "l3": l3, "chain": chain, "review": review}
 
 
 def modeB(raw, fn, prompt, cat):

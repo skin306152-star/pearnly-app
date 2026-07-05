@@ -123,9 +123,7 @@ class ReadPageTests(unittest.TestCase):
 
     def test_not_invoice_passes_through(self):
         # 猫的照片:直读判非票直接返回,不回落(Vision 路也救不出发票)
-        with _patch_provider(
-            ProviderOutcome(ok=True, data={"is_not_invoice": True}, model="m")
-        ):
+        with _patch_provider(ProviderOutcome(ok=True, data={"is_not_invoice": True}, model="m")):
             pr = dr.read_page(b"\x89PNG\r\n\x1a\nx", page_number=1)
         self.assertTrue(pr.invoice.is_not_invoice)
 
@@ -162,14 +160,12 @@ class DoubleReadTests(unittest.TestCase):
 
     def test_mismatch_forces_review_with_both_readings(self):
         # 二读总额不同(自洽性幻觉的样子)→ 人工 + 差异原样进警告,不机器仲裁谁对
-        second = {**_GOOD_INVOICE, "total_amount": "5518897", "subtotal": "5518890",
-                  "vat": "7.00"}
+        second = {**_GOOD_INVOICE, "total_amount": "5518897", "subtotal": "5518890", "vat": "7.00"}
         with _patch_provider(self._outcomes(second)):
             pr = dr.read_page(b"\xff\xd8x", page_number=1)
         self.assertTrue(pr.needs_manual_review)
         self.assertEqual(pr.confidence_band, "needs_review")
-        self.assertTrue(any("total_amount" in w and "5518897" in w
-                            for w in pr.validation_warnings))
+        self.assertTrue(any("total_amount" in w and "5518897" in w for w in pr.validation_warnings))
 
     def test_small_ticket_uses_lite_with_perturbed_image(self):
         fp = _FakeProvider(self._outcomes(dict(_GOOD_INVOICE)))  # total 70 < 2000
@@ -179,10 +175,13 @@ class DoubleReadTests(unittest.TestCase):
         self.assertEqual(fp.calls[1]["tier"], "flash_lite")
 
     def test_big_ticket_escalates_to_fallback_tier(self):
-        big = {**_GOOD_INVOICE, "subtotal": "4672.90", "vat": "327.10",
-               "total_amount": "5000.00"}
-        fp = _FakeProvider([ProviderOutcome(ok=True, data=big, model="lite"),
-                            ProviderOutcome(ok=True, data=dict(big), model="m35")])
+        big = {**_GOOD_INVOICE, "subtotal": "4672.90", "vat": "327.10", "total_amount": "5000.00"}
+        fp = _FakeProvider(
+            [
+                ProviderOutcome(ok=True, data=big, model="lite"),
+                ProviderOutcome(ok=True, data=dict(big), model="m35"),
+            ]
+        )
         with mock.patch("services.ai_gateway.backends.get_provider", return_value=fp):
             pr = dr.read_page(b"\xff\xd8x", page_number=1)
         self.assertEqual(fp.calls[1]["tier"], "fallback")  # ≥฿2000 跨模型二读防共病
@@ -197,8 +196,10 @@ class DoubleReadTests(unittest.TestCase):
         self.assertEqual(pr.layer_chain, ["ID"])
 
     def test_second_read_failure_falls_back(self):
-        seq = [ProviderOutcome(ok=True, data=dict(_GOOD_INVOICE), model="m"),
-               ProviderOutcome(ok=False, error_kind="parse")]
+        seq = [
+            ProviderOutcome(ok=True, data=dict(_GOOD_INVOICE), model="m"),
+            ProviderOutcome(ok=False, error_kind="parse"),
+        ]
         with _patch_provider(seq):
             with self.assertRaises(dr.DirectReadFallback):
                 dr.read_page(b"\xff\xd8x", page_number=1)

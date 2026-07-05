@@ -165,6 +165,7 @@ PDF_EXTENSIONS = {".pdf"}
 # (table_path direct read). Final set comes from table_path.SUPPORTED_TABLE_EXTENSIONS.
 TABLE_EXTENSIONS = SUPPORTED_TABLE_EXTENSIONS
 
+
 # ============================================================
 # Public API
 # ============================================================
@@ -417,9 +418,7 @@ def run_on_image_bytes(
     engine = "pipeline_v1"
     if direct_read.enabled() and direct_read.route_direct(1, document_type):
         try:
-            return direct_read.run_file(
-                [image_bytes], document_type=document_type, api_key=api_key
-            )
+            return direct_read.run_file([image_bytes], document_type=document_type, api_key=api_key)
         except direct_read.DirectReadFallback as e:
             logger.warning("pipeline: image direct-read fell back to Vision path: %s", e)
             engine = direct_read.ENGINE_FALLBACK

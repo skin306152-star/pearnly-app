@@ -60,7 +60,12 @@ class DirectReadFallback(Exception):
 
 
 def enabled() -> bool:
-    return os.environ.get("OCR_IMAGE_DIRECT", "1").strip().lower() not in ("0", "false", "no", "off")
+    return os.environ.get("OCR_IMAGE_DIRECT", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
 
 
 def route_direct(page_count: int, document_type: BusinessDocumentType) -> bool:

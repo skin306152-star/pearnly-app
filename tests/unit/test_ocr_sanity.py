@@ -148,8 +148,9 @@ class CreditNoteReviewTests(unittest.TestCase):
     def test_credit_note_flagged_for_review(self):
         from services.ocr.sanity import credit_note_review_reason
 
-        inv = _inv(document_type="credit_note", subtotal="-65.42", vat="-4.58",
-                   total_amount="-70.00")
+        inv = _inv(
+            document_type="credit_note", subtotal="-65.42", vat="-4.58", total_amount="-70.00"
+        )
         self.assertIsNotNone(credit_note_review_reason(inv))
         # 负数金额在 credit_note 上不该被 sanity 规则 1 硬毙(既有豁免的守门)
         self.assertFalse(any("不可能为负" in r for r in evaluate_sanity(inv)))

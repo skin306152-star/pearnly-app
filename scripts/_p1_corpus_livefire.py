@@ -115,8 +115,13 @@ def _fire_one(sess, item):
     t0 = time.time()
     r = _recognize(sess, item["img"].name, data)
     ms = int((time.time() - t0) * 1000)
-    row = {"id": item["id"], "corpus": item["corpus"], "scenario": item["scenario"],
-           "status": r.status_code, "ms": ms}
+    row = {
+        "id": item["id"],
+        "corpus": item["corpus"],
+        "scenario": item["scenario"],
+        "status": r.status_code,
+        "ms": ms,
+    }
     if r.status_code == 400 and "not_invoice" in r.text:
         row["outcome"] = "pass_decoy" if _expect_decoy(item) else "fail_false_reject"
         return row
@@ -167,9 +172,12 @@ def _fire_probes(sess, out):
         try:
             r = _recognize(sess, name, payload)
             graceful = r.status_code < 500
-            row = {"id": f"probe:{name}", "status": r.status_code,
-                   "outcome": "pass_graceful" if graceful else "fail_500",
-                   "body": r.text[:200]}
+            row = {
+                "id": f"probe:{name}",
+                "status": r.status_code,
+                "outcome": "pass_graceful" if graceful else "fail_500",
+                "body": r.text[:200],
+            }
         except Exception as e:  # noqa: BLE001
             row = {"id": f"probe:{name}", "outcome": "fail_raise", "body": str(e)[:200]}
         out.write(json.dumps(row, ensure_ascii=False) + "\n")

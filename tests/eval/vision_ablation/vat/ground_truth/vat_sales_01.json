@@ -22,13 +22,13 @@
       "transaction_date_raw": "01/02/2569",
       "invoice_no": "IV69/00000",
       "customer_name": "บริษัท ลูกค้า 1",
-      "customer_tax": "0105500000000",
+      "customer_tax": "0105500000003",
       "customer_branch": "สำนักงานใหญ่",
       "subtotal": "500.00",
       "vat": "0.00",
       "total": "500.00",
       "pre_vat_amount": "500.00",
-      "buyer_tax": "0105500000000"
+      "buyer_tax": "0105500000003"
     },
     {
       "seq_no": "2",
@@ -36,13 +36,13 @@
       "transaction_date_raw": "02/02/2569",
       "invoice_no": "IV69/00001",
       "customer_name": "บริษัท ลูกค้า 2",
-      "customer_tax": "0105500000001",
+      "customer_tax": "0105500000003",
       "customer_branch": "สำนักงานใหญ่",
       "subtotal": "637.00",
       "vat": "44.59",
       "total": "681.59",
       "pre_vat_amount": "637.00",
-      "buyer_tax": "0105500000001"
+      "buyer_tax": "0105500000003"
     },
     {
       "seq_no": "3",
@@ -50,13 +50,13 @@
       "transaction_date_raw": "03/02/2569",
       "invoice_no": "IV69/00002",
       "customer_name": "บริษัท ลูกค้า 3",
-      "customer_tax": "0105500000002",
+      "customer_tax": "0105500000003",
       "customer_branch": "สำนักงานใหญ่",
       "subtotal": "774.00",
       "vat": "54.18",
       "total": "828.18",
       "pre_vat_amount": "774.00",
-      "buyer_tax": "0105500000002"
+      "buyer_tax": "0105500000003"
     },
     {
       "seq_no": "4",
@@ -78,13 +78,13 @@
       "transaction_date_raw": "05/02/2569",
       "invoice_no": "IV69/00004",
       "customer_name": "บริษัท ลูกค้า 5",
-      "customer_tax": "0105500000004",
+      "customer_tax": "0105500000003",
       "customer_branch": "สำนักงานใหญ่",
       "subtotal": "1048.00",
       "vat": "0.00",
       "total": "1048.00",
       "pre_vat_amount": "1048.00",
-      "buyer_tax": "0105500000004"
+      "buyer_tax": "0105500000003"
     },
     {
       "seq_no": "6",
@@ -92,13 +92,13 @@
       "transaction_date_raw": "06/02/2569",
       "invoice_no": "IV69/00005",
       "customer_name": "บริษัท ลูกค้า 6",
-      "customer_tax": "0105500000005",
+      "customer_tax": "0105500000003",
       "customer_branch": "สำนักงานใหญ่",
       "subtotal": "1185.00",
       "vat": "82.95",
       "total": "1267.95",
       "pre_vat_amount": "1185.00",
-      "buyer_tax": "0105500000005"
+      "buyer_tax": "0105500000003"
     },
     {
       "seq_no": "7",
@@ -106,13 +106,13 @@
       "transaction_date_raw": "07/02/2569",
       "invoice_no": "IV69/00006",
       "customer_name": "บริษัท ลูกค้า 7",
-      "customer_tax": "0105500000006",
+      "customer_tax": "0105500000003",
       "customer_branch": "สำนักงานใหญ่",
       "subtotal": "1322.00",
       "vat": "92.54",
       "total": "1414.54",
       "pre_vat_amount": "1322.00",
-      "buyer_tax": "0105500000006"
+      "buyer_tax": "0105500000003"
     },
     {
       "seq_no": "8",
@@ -120,13 +120,13 @@
       "transaction_date_raw": "08/02/2569",
       "invoice_no": "IV69/00007",
       "customer_name": "บริษัท ลูกค้า 8",
-      "customer_tax": "0105500000007",
+      "customer_tax": "0105500000003",
       "customer_branch": "สำนักงานใหญ่",
       "subtotal": "1459.00",
       "vat": "102.13",
       "total": "1561.13",
       "pre_vat_amount": "1459.00",
-      "buyer_tax": "0105500000007"
+      "buyer_tax": "0105500000003"
     },
     {
       "seq_no": "9",
@@ -134,13 +134,13 @@
       "transaction_date_raw": "09/02/2569",
       "invoice_no": "IV69/00008",
       "customer_name": "บริษัท ลูกค้า 9",
-      "customer_tax": "0105500000008",
+      "customer_tax": "0105500000003",
       "customer_branch": "สำนักงานใหญ่",
       "subtotal": "1596.00",
       "vat": "0.00",
       "total": "1596.00",
       "pre_vat_amount": "1596.00",
-      "buyer_tax": "0105500000008"
+      "buyer_tax": "0105500000003"
     }
   ],
   "entries": [
@@ -150,13 +150,13 @@
       "transaction_date_raw": "01/02/2569",
       "invoice_no": "IV69/00000",
       "customer_name": "บริษัท ลูกค้า 1",
-      "customer_tax": "0105500000000",
+      "customer_tax": "0105500000003",
       "customer_branch": "สำนักงานใหญ่",
       "subtotal": "500.00",
       "vat": "0.00",
       "total": "500.00",
       "pre_vat_amount": "500.00",
-      "buyer_tax": "0105500000000"
+      "buyer_tax": "0105500000003"
     },
     {
       "seq_no": "2",
@@ -164,13 +164,13 @@
       "transaction_date_raw": "02/02/2569",
       "invoice_no": "IV69/00001",
       "customer_name": "บริษัท ลูกค้า 2",
-      "customer_tax": "0105500000001",
+      "customer_tax": "0105500000003",
       "customer_branch": "สำนักงานใหญ่",
       "subtotal": "637.00",
       "vat": "44.59",
       "total": "681.59",
       "pre_vat_amount": "637.00",
-      "buyer_tax": "0105500000001"
+      "buyer_tax": "0105500000003"
     },
     {
       "seq_no": "3",
@@ -178,13 +178,13 @@
       "transaction_date_raw": "03/02/2569",
       "invoice_no": "IV69/00002",
       "customer_name": "บริษัท ลูกค้า 3",
-      "customer_tax": "0105500000002",
+      "customer_tax": "0105500000003",
       "customer_branch": "สำนักงานใหญ่",
       "subtotal": "774.00",
       "vat": "54.18",
       "total": "828.18",
       "pre_vat_amount": "774.00",
-      "buyer_tax": "0105500000002"
+      "buyer_tax": "0105500000003"
     },
     {
       "seq_no": "4",
@@ -206,13 +206,13 @@
       "transaction_date_raw": "05/02/2569",
       "invoice_no": "IV69/00004",
       "customer_name": "บริษัท ลูกค้า 5",
-      "customer_tax": "0105500000004",
+      "customer_tax": "0105500000003",
       "customer_branch": "สำนักงานใหญ่",
       "subtotal": "1048.00",
       "vat": "0.00",
       "total": "1048.00",
       "pre_vat_amount": "1048.00",
-      "buyer_tax": "0105500000004"
+      "buyer_tax": "0105500000003"
     },
     {
       "seq_no": "6",
@@ -220,13 +220,13 @@
       "transaction_date_raw": "06/02/2569",
       "invoice_no": "IV69/00005",
       "customer_name": "บริษัท ลูกค้า 6",
-      "customer_tax": "0105500000005",
+      "customer_tax": "0105500000003",
       "customer_branch": "สำนักงานใหญ่",
       "subtotal": "1185.00",
       "vat": "82.95",
       "total": "1267.95",
       "pre_vat_amount": "1185.00",
-      "buyer_tax": "0105500000005"
+      "buyer_tax": "0105500000003"
     },
     {
       "seq_no": "7",
@@ -234,13 +234,13 @@
       "transaction_date_raw": "07/02/2569",
       "invoice_no": "IV69/00006",
       "customer_name": "บริษัท ลูกค้า 7",
-      "customer_tax": "0105500000006",
+      "customer_tax": "0105500000003",
       "customer_branch": "สำนักงานใหญ่",
       "subtotal": "1322.00",
       "vat": "92.54",
       "total": "1414.54",
       "pre_vat_amount": "1322.00",
-      "buyer_tax": "0105500000006"
+      "buyer_tax": "0105500000003"
     },
     {
       "seq_no": "8",
@@ -248,13 +248,13 @@
       "transaction_date_raw": "08/02/2569",
       "invoice_no": "IV69/00007",
       "customer_name": "บริษัท ลูกค้า 8",
-      "customer_tax": "0105500000007",
+      "customer_tax": "0105500000003",
       "customer_branch": "สำนักงานใหญ่",
       "subtotal": "1459.00",
       "vat": "102.13",
       "total": "1561.13",
       "pre_vat_amount": "1459.00",
-      "buyer_tax": "0105500000007"
+      "buyer_tax": "0105500000003"
     },
     {
       "seq_no": "9",
@@ -262,13 +262,13 @@
       "transaction_date_raw": "09/02/2569",
       "invoice_no": "IV69/00008",
       "customer_name": "บริษัท ลูกค้า 9",
-      "customer_tax": "0105500000008",
+      "customer_tax": "0105500000003",
       "customer_branch": "สำนักงานใหญ่",
       "subtotal": "1596.00",
       "vat": "0.00",
       "total": "1596.00",
       "pre_vat_amount": "1596.00",
-      "buyer_tax": "0105500000008"
+      "buyer_tax": "0105500000003"
     }
   ],
   "scenario": "vat_report_photo",

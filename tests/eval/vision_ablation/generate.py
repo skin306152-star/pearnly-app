@@ -18,21 +18,40 @@ OUT = Path(__file__).resolve().parent
 FONT_DIR = ROOT / "services" / "export" / "fonts"
 FONT = str(FONT_DIR / "Sarabun-Regular.ttf")
 FONT_B = str(FONT_DIR / "Sarabun-Bold.ttf")
+def fix_tax_check_digit(tax_id: str) -> str:
+    """给 13 位税号重算 mod-11 校验位(对合法真税号幂等;非 13 位数字原样返回)。
+
+    P1 台账 #4:早期语料税号没算校验位 → 生产 sanity mod-11 闸对着假税号狂响,
+    把直读回落率人为放大到 69%。语料税号必须过真实校验,否则每轮实测都被污染。
+    """
+    t = (tax_id or "").strip()
+    if len(t) != 13 or not t.isdigit():
+        return t
+    s = sum(int(t[i]) * (13 - i) for i in range(12))
+    return t[:12] + str((11 - s % 11) % 10)
+
+
 SELLERS = [
-    ("CP ALL, 7-Eleven สาขาสีลม", "0107542000011"),
-    ("บริษัท เซ็นทรัล ฟู้ด รีเทล จำกัด", "0105544060428"),
-    ("บริษัท สยามแม็คโคร จำกัด (มหาชน)", "0107537000521"),
-    ("Lotus's สาขาพระราม 4", "0107543000121"),
-    ("PTT Station Cafe Amazon", "0107561000013"),
-    ("ร้านอาหารบ้านสวนป้าลี", "0735559001248"),
-    ("บริษัท เอเชีย ออฟฟิศ ซัพพลาย จำกัด", "0105562033104"),
-    ("บริษัท เมืองไทยโลจิสติกส์ จำกัด", "0105558123456"),
+    (name, fix_tax_check_digit(tax))
+    for name, tax in [
+        ("CP ALL, 7-Eleven สาขาสีลม", "0107542000011"),
+        ("บริษัท เซ็นทรัล ฟู้ด รีเทล จำกัด", "0105544060428"),
+        ("บริษัท สยามแม็คโคร จำกัด (มหาชน)", "0107537000521"),
+        ("Lotus's สาขาพระราม 4", "0107543000121"),
+        ("PTT Station Cafe Amazon", "0107561000013"),
+        ("ร้านอาหารบ้านสวนป้าลี", "0735559001248"),
+        ("บริษัท เอเชีย ออฟฟิศ ซัพพลาย จำกัด", "0105562033104"),
+        ("บริษัท เมืองไทยโลจิสติกส์ จำกัด", "0105558123456"),
+    ]
 ]
 BUYERS = [
-    ("บริษัท ดาต้าทูลส์ จำกัด", "0735527000289"),
-    ("บริษัท เพิร์นลี่ เทค จำกัด", "0105564061523"),
-    ("หจก. สกิน แอนด์ โค", "0903563007788"),
-    ("", ""),
+    (name, fix_tax_check_digit(tax))
+    for name, tax in [
+        ("บริษัท ดาต้าทูลส์ จำกัด", "0735527000289"),
+        ("บริษัท เพิร์นลี่ เทค จำกัด", "0105564061523"),
+        ("หจก. สกิน แอนด์ โค", "0903563007788"),
+        ("", ""),
+    ]
 ]
 ITEMS = [
     ("น้ำดื่ม 600ml", "1", "10.00"),
@@ -855,13 +874,13 @@ def vat_case(i):
                 "transaction_date_raw": f"{r + 1:02d}/02/2569",
                 "invoice_no": f"IV69/{i:02d}{r:03d}",
                 "customer_name": f"บริษัท ลูกค้า {r + 1}",
-                "customer_tax": f"01055{i%10}{r:07d}"[:13],
+                "customer_tax": fix_tax_check_digit(f"01055{i%10}{r:07d}"[:13]),
                 "customer_branch": "สำนักงานใหญ่",
                 "subtotal": m(sub),
                 "vat": m(vat),
                 "total": m(total),
                 "pre_vat_amount": m(sub),
-                "buyer_tax": f"01055{i%10}{r:07d}"[:13],
+                "buyer_tax": fix_tax_check_digit(f"01055{i%10}{r:07d}"[:13]),
             }
         )
     deg = [
@@ -888,7 +907,7 @@ def vat_case(i):
         "period_year": "2026",
         "period_month": "02",
         "seller_name": "บริษัท ดาต้าทูลส์ จำกัด",
-        "seller_tax": "0735527000289",
+        "seller_tax": fix_tax_check_digit("0735527000289"),
         "row_count": len(rows),
         "total_pre_vat": m(total_sub),
         "total_subtotal": m(total_sub),

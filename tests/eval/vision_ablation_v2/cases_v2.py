@@ -11,7 +11,11 @@ def money(value: Decimal | int | str) -> str:
 
 
 def tax_id(seed: int) -> str:
-    return f"01055{seed % 100000000:08d}"
+    # 前 12 位定型后补 mod-11 校验位:生产 sanity 有真校验闸,假校验位的语料税号
+    # 会把回落率打爆(P1 台账 #4·2026-07-05 实弹坐实),语料必须发合法税号。
+    base = f"01055{seed % 10000000:07d}"
+    s = sum(int(base[i]) * (13 - i) for i in range(12))
+    return base + str((11 - s % 11) % 10)
 
 
 def iso_date(index: int) -> tuple[str, str]:

@@ -15,8 +15,14 @@ from typing import List, Dict, Any, Optional
 from services.ocr.error_format import short_error as _short_err
 from services.recon.bank_recon_types import StatementRow
 from services.recon.bank_recon_utils import _to_float, _parse_date, _BANK_SIGNATURES
+from services.recon.bank_stmt_balance import (
+    _correct_direction_from_balance,
+    _repair_amount_from_balance,
+    _verify_row_balances,
+)
 from services.recon.bank_stmt_xlsx import parse_bank_stmt_xlsx_direct
 from services.recon.bank_stmt_legacy import gl_rows_from_pipeline_legacy
+from services.recon.bank_table_io import _is_summary_row
 
 logger = logging.getLogger(__name__)
 
@@ -135,13 +141,30 @@ def _parse_bank_stmt_via_pipeline(
                 source_file=filename,
             )
         )
+
+    # 台账#11 · 图片/扫描件路此前拿到行就直接返回,余额链三件套(方向纠正/逐行核对/
+    # 金额反推修复)只跑 PDF 与 xlsx 路 → 实弹 5/56 行方向翻转静默放行。与其余两路
+    # 同序接线;期初取文档级字段(无动行已被上面过滤,行内无从兜底)。
+    rows = [r for r in rows if not _is_summary_row(r.description)]
+    opening = _to_float(doc.get("opening_balance"))
+    closing = _to_float(doc.get("closing_balance"))
+    _correct_direction_from_balance(rows, opening)
+    _verify_row_balances(rows, opening)
+    _repair_amount_from_balance(rows, opening)
+    balance_warn_count = sum(1 for r in rows if r.balance_ok is False)
+    if not closing:
+        closing = next((r.balance for r in reversed(rows) if r.balance), 0.0)
+
     return {
         "ok": True,
         "rows": rows,
         "row_count": len(rows),
+        "opening": opening,
+        "closing": closing,
         "bank_code": bank_code,
+        "balance_warn_count": balance_warn_count,
         "parser_version": "bank_recon_v2+pipeline_v1",
-        "needs_review": legacy.get("_needs_review", False),
+        "needs_review": bool(legacy.get("_needs_review", False) or balance_warn_count),
     }
 
 

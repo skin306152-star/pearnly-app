@@ -27,8 +27,15 @@ from services.ocr.layer2_prompts import (
 
 sys.path.insert(0, "/opt/mrpilot/tests/eval")
 from invoice_scorer import score_invoice  # 复用项目发票打分器
+from recon_scorer import (  # 对账裁判已扶正为一等公民(P2)· 本 harness 不再自带打分
+    aggregate_doc as _recon_agg,
+    merge_pages as _merge_docs,
+    score_recon,
+)
 
 CORPUS = os.environ.get("CORPUS", "/tmp/vision_ablation")
+# SKIP_B=1 → 只跑 A 臂(现役生产链)。消融已定案,回归/实弹模式不再烧 B 臂双倍成本。
+SKIP_B = os.environ.get("SKIP_B", "") == "1"
 _POOL = ThreadPoolExecutor(max_workers=3)
 
 
@@ -53,52 +60,6 @@ DOC_MAP = {
     "vat_report": ("vat_report", _VAT_REPORT_SYSTEM_PROMPT, "vat"),
 }
 IMG_PROMPT_HINT = "\n\n(This is a scanned/photographed document image — read it directly.)\n"
-
-
-def _num(x):
-    try:
-        return float(str(x).replace(",", "").replace("−", "-"))
-    except Exception:
-        return None
-
-
-def _money_close(a, b, tol=0.01):
-    na, nb = _num(a), _num(b)
-    if na is None or nb is None:
-        return a in (None, "") and b in (None, "")
-    return abs(na - nb) <= max(tol, abs(nb) * 0.001)
-
-
-RECON_KEYS = {
-    "bank": [
-        "opening_balance",
-        "closing_balance",
-        "entry_count",
-        "total_deposit",
-        "total_withdrawal",
-    ],
-    "gl": ["opening_balance", "closing_balance", "entry_count", "total_debit", "total_credit"],
-    "vat": ["row_count", "total_pre_vat", "total_vat", "total_amount"],
-}
-
-
-def score_recon(cat, gt, actual):
-    """对账勾稽汇总打分:逐字段 close 命中率 + 明细行数比。"""
-    keys = RECON_KEYS[cat]
-    hits, n, miss = 0, 0, []
-    for k in keys:
-        if k not in gt or gt.get(k) in (None, ""):
-            continue
-        n += 1
-        av = actual.get(k)
-        if k.endswith("count"):
-            ok = str(gt[k]) == str(av)
-        else:
-            ok = _money_close(gt[k], av)
-        hits += int(ok)
-        if not ok:
-            miss.append("%s(gt=%s/got=%s)" % (k, gt[k], av))
-    return {"score": round(hits / n, 3) if n else None, "n": n, "miss": miss}
 
 
 def modeA(raw, fn, pdt, cat):
@@ -154,64 +115,6 @@ def _flatten_inv(d):
     return inv if isinstance(inv, dict) else {}
 
 
-def _sum(entries, key):
-    tot, seen = Decimal(0), False
-    for e in entries or []:
-        v = (e or {}).get(key)
-        if v in (None, ""):
-            continue
-        try:
-            tot += Decimal(str(v).replace(",", "").replace("−", "-"))
-            seen = True
-        except Exception:
-            pass
-    return format(tot, "f") if seen else None
-
-
-def _merge_docs(pages):
-    """多页 → 单 recon doc(entries 拼接·opening 取首页·closing 取末个非空)。"""
-    docs = [
-        (p or {}).get("document")
-        for p in pages
-        if isinstance(p, dict) and isinstance(p.get("document"), dict)
-    ]
-    if not docs:
-        return {}
-    base = dict(docs[0])
-    ents = []
-    for d in docs:
-        ents += d.get("entries") or d.get("rows") or []
-    base["entries"] = ents
-    for d in docs:
-        if d.get("closing_balance") not in (None, ""):
-            base["closing_balance"] = d["closing_balance"]
-    return base
-
-
-def _recon_agg(cat, doc):
-    """结构化 doc(A组 page['document'] / B组 多模态 JSON)→ 勾稽汇总字段(GT 键名对齐)。"""
-    if not isinstance(doc, dict):
-        return {}
-    ents = doc.get("entries") or doc.get("rows") or []
-    out = {
-        "entry_count": len(ents),
-        "row_count": len(ents),
-        "opening_balance": doc.get("opening_balance"),
-        "closing_balance": doc.get("closing_balance"),
-    }
-    if cat == "bank":
-        out["total_deposit"] = _sum(ents, "deposit")
-        out["total_withdrawal"] = _sum(ents, "withdrawal")
-    elif cat == "gl":
-        out["total_debit"] = _sum(ents, "debit")
-        out["total_credit"] = _sum(ents, "credit")
-    elif cat == "vat":
-        out["total_pre_vat"] = doc.get("total_subtotal") or _sum(ents, "subtotal")
-        out["total_vat"] = doc.get("total_vat") or _sum(ents, "vat")
-        out["total_amount"] = doc.get("total_total") or _sum(ents, "total")
-    return out
-
-
 def load(cat, imgdir, gtdir):
     rows = []
     for gp in sorted(glob.glob(gtdir + "/*.json")):
@@ -244,10 +147,13 @@ def main():
             A = modeA(raw, fn, pdt, cat)
         except Exception as e:
             A = {"actual": {}, "cost": 0, "ms": 0, "l3": False, "err": str(e)[:40]}
-        try:
-            B = modeB(raw, fn, bprompt, cat)
-        except Exception as e:
-            B = {"actual": {}, "cost": 0, "ms": 0, "err": str(e)[:40]}
+        if SKIP_B:
+            B = {"actual": {}, "cost": 0, "ms": 0, "err": "skipped"}
+        else:
+            try:
+                B = modeB(raw, fn, bprompt, cat)
+            except Exception as e:
+                B = {"actual": {}, "cost": 0, "ms": 0, "err": str(e)[:40]}
         if cat == "invoice":
             sA = score_invoice(gt, A["actual"])
             sB = score_invoice(gt, B["actual"])

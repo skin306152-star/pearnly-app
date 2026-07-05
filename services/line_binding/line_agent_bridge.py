@@ -155,6 +155,13 @@ def _make_write_sink(
                 quote_token=quote_token,
             )
             return "card_sent"
+        if tool == "ask_knowledge":
+            from services.agent import knowledge_confirm
+
+            sent = knowledge_confirm.send_confirm_card(
+                bound_user, reply_token, data.get("question"), lang, tid, line_user_id, quote_token
+            )
+            return "card_sent" if sent else None
         if tool == "push_to_erp":
             from services.agent import push_confirm
 
@@ -307,6 +314,11 @@ def try_agent_turn(
             anchors_enabled=anchors_on,
         )
         ctx.progress = _progress_cb(lang, tid, line_user_id)
+        # 用户画像(agent_user_profile):闸开才算/拼,关或故障 = 提示词逐字节不变。
+        if feature_flags.agent_profile_enabled_for(uid):
+            from services.agent import user_profile
+
+            ctx.profile_note = user_profile.context_note(uid, tid, line_user_id)
         sink = None
         if feature_flags.agent_write_enabled_for(uid):
             sink = _make_write_sink(

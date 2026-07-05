@@ -120,6 +120,14 @@ class AgentToolset:
             ok=True, data={"items": logs}, receipt=copy_map.notifications_receipt(logs)
         )
 
+    def ask_knowledge(self, ctx: AgentContext, *, question=None) -> ToolResult:
+        from core import feature_flags  # 备料而已:真检索/扣费在确认卡之后(knowledge_confirm)
+
+        q = str(question or "").strip()
+        if not q or not feature_flags.agent_knowledge_enabled_for(str(ctx.user.get("id") or "")):
+            return ToolResult(ok=False, error_code="not_available_yet")
+        return ToolResult(ok=True, data={"question": q})
+
     # ── 套账(workspace):LINE 会话态「当前套账」列表/切换 ──
     def list_workspaces(self, ctx: AgentContext) -> ToolResult:
         from services.line_binding import line_workspace
@@ -143,12 +151,15 @@ class AgentToolset:
                 return ToolResult(
                     ok=False, error_code="workspace_not_found", data={"workspaces": rows}
                 )
+            note = line_workspace.switch_note(
+                cur, tenant_id=ctx.tenant_id, line_user_id=ctx.line_user_id, new_id=match["id"]
+            )
             hit = line_workspace.set_current(
                 cur, line_user_id=ctx.line_user_id, workspace_client_id=match["id"]
             )
         if not hit:  # 没命中绑定行 → 别谎报成功
             return ToolResult(ok=False, error_code="not_bound")
-        return ToolResult(ok=True, data={"switched_to": match})
+        return ToolResult(ok=True, data={"switched_to": match, **note})
 
     # ── A 档:M4 扩充(推送状态 / 税号核验 / 我的套餐) ──
 

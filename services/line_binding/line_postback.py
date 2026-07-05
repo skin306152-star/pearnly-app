@@ -26,6 +26,11 @@ ACTION_LEARN = "exp_learn"
 # data 只带 token(不信客户端目标·纵深防御与其余动作同款)。
 ACTION_AGENT_PUSH_CONFIRM = "agent_push_ok"
 ACTION_AGENT_PUSH_CANCEL = "agent_push_no"
+# Agent 知识库问答确认卡(确认/取消):问题原文存于令牌 action_ref(JSON),data 只带 token。
+ACTION_AGENT_KB_CONFIRM = "agent_kb_ok"
+ACTION_AGENT_KB_CANCEL = "agent_kb_no"
+# 月报卡一键退订:幂等无令牌(重复点同一回执·只写本人 line_bindings 标记,无越权面)。
+ACTION_MONTHLY_UNSUB = "mrep_unsub"
 # LINE 端主动解绑(确认/取消):目标用户存于一次性令牌 action_ref,data 只带 token。
 ACTION_UNBIND_CONFIRM = "line_unbind_confirm"
 ACTION_UNBIND_CANCEL = "line_unbind_cancel"
@@ -40,6 +45,9 @@ _ACTIONS = (
     ACTION_UNBIND_CANCEL,
     ACTION_AGENT_PUSH_CONFIRM,
     ACTION_AGENT_PUSH_CANCEL,
+    ACTION_AGENT_KB_CONFIRM,
+    ACTION_AGENT_KB_CANCEL,
+    ACTION_MONTHLY_UNSUB,
 )
 
 
@@ -83,6 +91,21 @@ def agent_push_confirm_data(token: str) -> str:
 def agent_push_cancel_data(token: str) -> str:
     """Agent 推送取消(作废令牌·绝不推送)。"""
     return urlencode({"a": ACTION_AGENT_PUSH_CANCEL, "n": token})
+
+
+def agent_kb_confirm_data(token: str) -> str:
+    """Agent 知识库问答确认(问题在令牌 action_ref·确认才检索+扣费)。"""
+    return urlencode({"a": ACTION_AGENT_KB_CONFIRM, "n": token})
+
+
+def agent_kb_cancel_data(token: str) -> str:
+    """Agent 知识库问答取消(作废令牌·不检索不扣费)。"""
+    return urlencode({"a": ACTION_AGENT_KB_CANCEL, "n": token})
+
+
+def monthly_report_unsub_data() -> str:
+    """月报一键退订(幂等·无令牌)。"""
+    return urlencode({"a": ACTION_MONTHLY_UNSUB})
 
 
 def unbind_confirm_data(token: str) -> str:

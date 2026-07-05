@@ -77,9 +77,9 @@
   },
   "inventory_routes": "B",
   "knowledge_ask_routes": {
-    "bucket": "A",
-    "agent": "exempt:billed-answer",
-    "why": "计费型问答(0.50฿/答)·不适合大脑自动触发·接入需单独报方案"
+    "bucket": "B",
+    "agent": "tool:ask_knowledge",
+    "why": "计费型问答(0.50฿/答)·confirm-first 接入(W3-4):确认卡点确认才检索+扣费·no_answer 不扣·档由 A 改 B=烧钱动作按写档管"
   },
   "knowledge_risk_routes": {
     "bucket": "A",

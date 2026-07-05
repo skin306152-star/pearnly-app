@@ -88,3 +88,4 @@ class AgentContext:
         ""  # 本轮降级标记(loop 标·turn_log 落库):grounded_fb/card_text_fb/card_text_dropped/card_fail
     )
     progress: Any = None  # 慢轮中间反馈回调(bridge 装配·loop 经 fallbacks.progress_ping 一次性调)
+    profile_note: str = ""  # 用户画像+昨日摘要提示词块(bridge 闸开才装·空串=提示词现状不变)

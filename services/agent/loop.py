@@ -202,6 +202,7 @@ def _prompt(
     force_reply: bool,
     gates: frozenset = frozenset(),
     native: bool = False,
+    note: str = "",
 ) -> str:
     # {today} 刻意不进 head:它每分钟变,放头部会撞碎「静态 persona 前缀」→ 供应商前缀缓存全 miss。
     # 把易变的时间戳放到贴近用户消息的尾部(既对时间问题更贴切,又让 ~1.5k token 的 persona 成稳定可缓存前缀)。
@@ -219,7 +220,7 @@ def _prompt(
         )
     tail = (native_fc.FORCE_REPLY if native else _FORCE_REPLY) if force_reply else ""
     return (
-        f"{head}{brain._history_block(history)}{obs}{tail}"
+        f"{head}{note}{brain._history_block(history)}{obs}{tail}"
         f"\n\nNow (Asia/Bangkok): {today}"
         f"\n\nข้อความล่าสุดของผู้ใช้:\n{user_text}"
     )
@@ -288,6 +289,7 @@ def _decide_step(
             force_reply=force_reply,
             gates=gates,
             native=native,
+            note=ctx.profile_note if ctx else "",
         )
 
     common = dict(

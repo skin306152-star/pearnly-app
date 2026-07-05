@@ -53,6 +53,18 @@ AGENT_PROACTIVE_KEY = "agent_proactive_nudge"
 # 复合续步子闸(P2):默认关。关 → 记账卡出即终轮现状不变;开 → 一句话「记账+提问」
 # 出卡后继续答剩余问题(跟进文字入口 push·推 ERP/撤销/改错仍即卡即终)。
 AGENT_COMPOUND_KEY = "agent_compound_turn"
+# 用户画像子闸(W3):默认关。关 → 提示词逐字节不变;开 → 高频商家/类目/昨日摘要
+# 拼进上下文(services/agent/user_profile·fail-open),常客不再被反复问类目。
+AGENT_PROFILE_KEY = "agent_user_profile"
+# 知识库问答子闸(W3):默认关。关 → 工具硬调得 not_available_yet 诚实拒;
+# 开 → confirm-first 确认卡,用户点确认才检索+扣 ฿0.50(no_answer 不扣)。
+AGENT_KNOWLEDGE_KEY = "agent_ask_knowledge"
+# 月报卡子闸(W4·拍板默认开+可退订):关 → 一条不发;开 → 每月 1–3 日推上月
+# 数字月报(带看明细/退订按钮·上月零单不发·台账去重每用户每期恰一条)。
+AGENT_MONTHLY_REPORT_KEY = "agent_monthly_report"
+# 掉线召回子闸(W4·拍板月最多一条·文案 Zihao 过目后才放):默认关。
+# 开 → 有过单据但连续 14 天零单的用户,每自然月最多收一条温和召回。
+AGENT_RECALL_KEY = "agent_recall_nudge"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -134,3 +146,23 @@ def agent_proactive_enabled_for(user_id: Optional[str]) -> bool:
 def agent_compound_enabled_for(user_id: Optional[str]) -> bool:
     """复合续步子闸。关 = 记账卡出即终轮,现状不变。"""
     return _enabled(AGENT_COMPOUND_KEY, user_id, "agent_compound_enabled_for")
+
+
+def agent_profile_enabled_for(user_id: Optional[str]) -> bool:
+    """用户画像子闸。关 = 画像不算不拼,提示词现状不变。"""
+    return _enabled(AGENT_PROFILE_KEY, user_id, "agent_profile_enabled_for")
+
+
+def agent_knowledge_enabled_for(user_id: Optional[str]) -> bool:
+    """知识库问答子闸。关 = 工具诚实拒,不出确认卡不扣费。"""
+    return _enabled(AGENT_KNOWLEDGE_KEY, user_id, "agent_knowledge_enabled_for")
+
+
+def agent_monthly_report_enabled_for(user_id: Optional[str]) -> bool:
+    """月报卡子闸。关 = 一条不发,现状不变。"""
+    return _enabled(AGENT_MONTHLY_REPORT_KEY, user_id, "agent_monthly_report_enabled_for")
+
+
+def agent_recall_enabled_for(user_id: Optional[str]) -> bool:
+    """掉线召回子闸。关 = 一条不发,现状不变。"""
+    return _enabled(AGENT_RECALL_KEY, user_id, "agent_recall_enabled_for")

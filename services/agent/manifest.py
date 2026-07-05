@@ -378,6 +378,24 @@ TOOLS: tuple[ToolSpec, ...] = (
         gate="image",  # 可见性随 LI 大闸;细闸 agent_recon_intake 在执行器 fail-closed(同 dms 先例)
     ),
     ToolSpec(
+        name="ask_knowledge",
+        bucket="B",
+        title_th="ถามฐานความรู้ (คิด ฿0.50 เมื่อตอบสำเร็จ)",
+        desc_th="ถามความรู้บัญชี/ภาษีจากเอกสารในฐานความรู้ของกิจการ ระบบส่งการ์ดยืนยันก่อน ผู้ใช้กดยืนยันจึงค้นและคิดค่าใช้จ่าย ใช้เมื่อถามกฎเกณฑ์/ความรู้ ไม่ใช่ถามยอดของตัวเอง",
+        slots=(
+            SlotSpec(
+                "question",
+                required=True,
+                source="user_text",
+                desc_th="คำถามที่จะถามฐานความรู้ (ตามคำพูดผู้ใช้)",
+                desc_zh="要问知识库的问题(取用户原话)",
+            ),
+        ),
+        handler="ask_knowledge",
+        confirm=True,  # 计费动作:先确认卡,点确认才检索+扣费(no_answer 不扣)
+        writes=True,  # 经 write_sink 出确认卡终轮(与推 ERP 同款 confirm-first 出口)
+    ),
+    ToolSpec(
         name="list_workspaces",
         bucket="B",
         title_th="ดูรายชื่อชุดบัญชี/บริษัท",
@@ -428,6 +446,7 @@ REGISTRY_AREA: dict[str, str] = {
     "recon_intake_start": "recon_routes_bankv2",
     "list_workspaces": "workspace_routes",
     "switch_workspace": "workspace_routes",
+    "ask_knowledge": "knowledge_ask_routes",
 }
 
 _REGISTRY_PATH = Path(__file__).resolve().parents[2] / "docs" / "agent" / "agent_registry.json"

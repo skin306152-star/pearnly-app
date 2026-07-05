@@ -35,6 +35,20 @@ _COPY = {
     ),
     "ja": "📅 {p}分の付加価値税(PP30)の申告をお忘れなく。紙申告は今月15日締切です。先月の書類サマリーはいつでもお尋ねください。",
 }
+# W4-2 数字版:该用户上月有单据时改发带自己数字的提醒(更有用);查不到/零单回落无数字版。
+# 措辞用「เอกสาร N ใบ รวม ฿X」不说"销项"——ocr_history 合计是扫描单据口径,不冒充申报数。
+_COPY_NUM = {
+    "th": (
+        "📅 เดือน {p} คุณมีเอกสาร {n} ใบ รวม ฿{total:,.0f} — อย่าลืมยื่น ภ.พ.30 นะคะ "
+        "แบบกระดาษครบกำหนดวันที่ 15 เดือนนี้ค่ะ"
+    ),
+    "zh": "📅 你 {p} 有 {n} 张单据,合计 ฿{total:,.0f}——别忘了申报 ภ.พ.30,纸质本月 15 号截止。",
+    "en": (
+        "📅 You booked {n} docs totaling ฿{total:,.0f} in {p} — PP30 paper filing is due "
+        "on the 15th this month."
+    ),
+    "ja": "📅 {p}は書類{n}件・合計฿{total:,.0f}でした。PP30の紙申告は今月15日締切です。お忘れなく。",
+}
 
 
 def _period(today: date) -> str:
@@ -95,7 +109,7 @@ def send_due_nudges(today: Optional[date] = None) -> int:
             if _already_sent(uid, tid, period):
                 continue
             lang = line_lang.card_lang(row["line_user_id"], tid, row.get("preferred_lang") or "th")
-            text = _COPY.get(lang, _COPY["en"]).format(p=period)
+            text = _copy_for(uid, tid, period, lang)
             ok = line_reply.push_text_context(row["line_user_id"], text, tenant_id=tid)
             log_notification(
                 uid,
@@ -114,6 +128,31 @@ def send_due_nudges(today: Optional[date] = None) -> int:
     if sent:
         logger.info("[proactive] tax_due_nudge sent=%d period=%s", sent, period)
     return sent
+
+
+def _copy_for(user_id, tenant_id, period, lang) -> str:
+    """有上月数字发数字版,查不到/零单回落无数字版(文案层故障不许挡提醒)。"""
+    from core import db
+    from services.ocr_history import list_status as ls
+
+    try:
+        where, params = ls.owner_visibility_where(user_id, tenant_id, None, None)
+        with db.get_cursor_rls(tenant_id=tenant_id, user_id=str(user_id)) as cur:
+            cur.execute(
+                f"SELECT COUNT(*) AS n, COALESCE(SUM(total_amount), 0) AS total "
+                f"FROM ocr_history WHERE {' AND '.join(where)} "
+                f"AND to_char(created_at AT TIME ZONE 'Asia/Bangkok', 'YYYY-MM') = %s "
+                f"AND created_at >= now() - make_interval(days => 40)",
+                params + [period],
+            )
+            row = cur.fetchone()
+        if row and int(row["n"]):
+            return _COPY_NUM.get(lang, _COPY_NUM["en"]).format(
+                p=period, n=int(row["n"]), total=float(row["total"])
+            )
+    except Exception:
+        logger.warning("[proactive] numbered copy failed; fallback plain", exc_info=True)
+    return _COPY.get(lang, _COPY["en"]).format(p=period)
 
 
 def _bangkok_today() -> date:

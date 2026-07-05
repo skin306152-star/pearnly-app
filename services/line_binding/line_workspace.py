@@ -75,3 +75,38 @@ def match_by_name(cur, *, tenant_id, name) -> Optional[dict]:
         return None
     hits = [w for w in list_active(cur, tenant_id=tenant_id) if q in _norm(w["name"])]
     return hits[0] if len(hits) == 1 else None
+
+
+def switch_note(cur, *, tenant_id, line_user_id, new_id) -> dict:
+    """切换前的防错上下文(W3-3 事务所多账套):之前在哪个套账 + 刚才是否有单落在那边。
+
+    观测带 previous_workspace / recent_doc_in_previous,大脑照实告知「刚才那张
+    还在旧套账」,治切错账套后单据"消失"的困惑。取不出任何一项都静默省略——
+    防错提示不许挡切换主路。须在 set_current 之前调(读的是切换前的当前套账)。
+    """
+    out: dict = {}
+    try:
+        prev_id = current_workspace_id(cur, line_user_id=line_user_id)
+        if prev_id is None or prev_id == int(new_id):
+            return out
+        cur.execute(
+            "SELECT name FROM workspace_clients WHERE id = %s AND tenant_id = %s",
+            (prev_id, tenant_id),
+        )
+        row = cur.fetchone()
+        if row:
+            out["previous_workspace"] = {"id": prev_id, "name": row["name"]}
+        cur.execute(
+            "SELECT invoice_no, seller_name, total_amount FROM ocr_history "
+            "WHERE tenant_id = %s AND workspace_client_id = %s "
+            "AND created_at >= now() - make_interval(mins => 30) "
+            "ORDER BY created_at DESC LIMIT 1",
+            (tenant_id, prev_id),
+        )
+        doc = cur.fetchone()
+        if doc:
+            out["recent_doc_in_previous"] = dict(doc)
+            out["note"] = "Docs recorded before switching stay in the previous workspace."
+    except Exception:
+        return out
+    return out

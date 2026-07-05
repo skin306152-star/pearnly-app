@@ -160,6 +160,18 @@ async def run_recovery_tick():
         await proactive.run_tick()
     except Exception as e:
         logger.warning(f"[proactive_nudge] tick failed: {e}")
+    try:
+        from services.notification import monthly_report
+
+        await monthly_report.run_tick()
+    except Exception as e:
+        logger.warning(f"[monthly_report] tick failed: {e}")
+    try:
+        from services.notification import recall
+
+        await recall.run_tick()
+    except Exception as e:
+        logger.warning(f"[recall_nudge] tick failed: {e}")
 
 
 async def run_accounting_posting_failure_tick():

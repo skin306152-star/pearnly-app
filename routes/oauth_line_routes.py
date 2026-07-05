@@ -165,7 +165,7 @@ async def _handle_connect_line(user_id: str, code: str):
 
         line_reply.push_messages_context(
             sub,
-            line_imagemap.welcome_messages(),
+            line_imagemap.welcome_messages(user.get("preferred_lang")),
             tenant_id=str(user["tenant_id"]) if user.get("tenant_id") else None,
         )
     except Exception as e:
@@ -284,7 +284,7 @@ async def line_oauth_callback(code: str = "", state: str = "", error: str = ""):
 
         line_reply.push_messages_context(
             line_uid,
-            line_imagemap.welcome_messages(),
+            line_imagemap.welcome_messages(user.get("preferred_lang")),
             tenant_id=str(user["tenant_id"]) if user.get("tenant_id") else None,
         )
     except Exception as e:

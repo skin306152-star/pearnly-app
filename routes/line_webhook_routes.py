@@ -332,10 +332,10 @@ async def _handle_line_text(
             )
             return
 
-        # 绑定成功 → A5 成功卡 + A12 新手轮播(一次发)。
+        # 绑定成功 → A5 成功卡 + A12 新手轮播 + 第一单引导(一次发)。
         line_reply.reply_messages_context(
             reply_token,
-            line_imagemap.welcome_messages(),
+            line_imagemap.welcome_messages(lang),
             line_user_id=line_user_id,
             tenant_id=(user.get("tenant_id") if user else None),
         )

@@ -165,9 +165,16 @@ def onboarding_carousel() -> dict:
     }
 
 
-def welcome_messages() -> list:
-    """绑定成功欢迎:A5 成功卡 + A12 新手轮播。扫码绑/登录自动绑/用 LINE 连接 三处共用。"""
-    return [card_message("bind_success"), onboarding_carousel()]
+def welcome_messages(lang: str | None = None) -> list:
+    """绑定成功欢迎:A5 成功卡 + A12 新手轮播 + 第一单引导(文字跟用户语言·卡恒泰语)。
+    扫码绑/登录自动绑/用 LINE 连接 三处共用。引导带 quickReply,须是最后一条(LINE 只显示末条的)。"""
+    from services.line_binding import line_bind_i18n
+
+    return [
+        card_message("bind_success"),
+        onboarding_carousel(),
+        line_bind_i18n.first_doc_nudge_msg(lang),
+    ]
 
 
 def has_card(card_key: str) -> bool:

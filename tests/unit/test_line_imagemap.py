@@ -61,6 +61,25 @@ class CardMessageTests(unittest.TestCase):
             self.assertIn(f"A12-onboard-{i}", hero["url"])
             self.assertEqual(hero["action"]["type"], "uri")
 
+    def test_welcome_messages_end_with_first_doc_nudge(self):
+        # 引导必须是末条:LINE 只显示最后一条消息的 quickReply(chips 挂错位置=白做)。
+        msgs = im.welcome_messages("zh")
+        self.assertEqual(len(msgs), 3)
+        nudge = msgs[-1]
+        self.assertEqual(nudge["type"], "text")
+        actions = [it["action"] for it in nudge["quickReply"]["items"]]
+        self.assertEqual(actions[0]["type"], "camera")  # 一键开相机=第一单最短路径
+        self.assertEqual(actions[1]["type"], "message")
+        self.assertIn("拍", nudge["text"] + actions[0]["label"])
+
+    def test_welcome_messages_nudge_follows_lang_cards_stay_thai(self):
+        for lang in ("th", "zh", "en", "ja"):
+            msgs = im.welcome_messages(lang)
+            self.assertTrue(msgs[-1]["text"])  # 四语文案齐
+        self.assertEqual(
+            im.welcome_messages(None)[-1]["text"], im.welcome_messages("th")[-1]["text"]
+        )
+
     def test_onboard_stems_in_route_whitelist(self):
         for i in range(1, 7):
             self.assertIn(f"A12-onboard-{i}", im.CARD_STEMS)

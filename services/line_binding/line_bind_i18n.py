@@ -114,6 +114,25 @@ _COPY: Dict[str, Dict[str, str]] = {
             "アカウントを切り替える場合は、現在のアカウントで連携を解除してから、再度連携してください。"
         ),
     },
+    "first_doc_nudge": {
+        "th": (
+            "พร้อมใช้งานแล้ว 🎉 ลองเลยตอนนี้:\n"
+            "ถ่ายรูปบิลหรือใบเสร็จส่งมา เดี๋ยวบันทึกบัญชีให้ภายในไม่กี่วินาที "
+            "หรือกดปุ่มด้านล่างได้เลยค่ะ"
+        ),
+        "en": (
+            "You're all set 🎉 Try it now:\n"
+            "Snap a photo of any receipt and send it — I'll record it in seconds. "
+            "Or tap a button below."
+        ),
+        "zh": (
+            "都连好了 🎉 现在就试试:\n拍一张收据发给我,几秒钟帮你记好账。也可以直接点下面的按钮。"
+        ),
+        "ja": (
+            "設定完了です🎉 さっそく試してみましょう:\n"
+            "レシートを撮って送ってください。数秒で記帳します。下のボタンからもどうぞ。"
+        ),
+    },
     "follow_welcome": {
         "th": (
             "สวัสดีค่ะ ฉันคือผู้ช่วยบัญชีจาก Pearnly\n"
@@ -171,6 +190,24 @@ _BTN: Dict[str, Dict[str, str]] = {
         "zh": "联系客服",
         "ja": "サポートに連絡",
     },
+    "camera": {
+        "th": "ถ่ายบิลเลย",
+        "en": "Snap a receipt",
+        "zh": "拍一张票",
+        "ja": "レシート撮影",
+    },
+    "example": {
+        "th": "ค่ากาแฟ 65",
+        "en": "Coffee 65",
+        "zh": "咖啡 65",
+        "ja": "コーヒー 65",
+    },
+    "capability": {
+        "th": "ทำอะไรได้บ้าง",
+        "en": "What can you do?",
+        "zh": "你能做什么",
+        "ja": "何ができる?",
+    },
 }
 
 
@@ -218,3 +255,29 @@ def bind_success_msg(lang: Optional[str]) -> dict:
 def follow_welcome_msg(lang: Optional[str]) -> dict:
     """加好友欢迎(非泰语文字回落版;泰语走 line_imagemap 的 A1 图卡)。"""
     return _msg(t_bind(lang, "follow_welcome"), [_qr_uri(lang, "connect")])
+
+
+def first_doc_nudge_msg(lang: Optional[str]) -> dict:
+    """绑定成功后的「第一单引导」:行动指令 + 一键开相机/示例记账/问能力三个 chips。
+    aha 时刻(第一张票几秒入账)从用户自己悟变被领着走;camera action 仅手机 LINE 生效,
+    桌面端 LINE 不显示该 chip 由 LINE 客户端自行处理。"""
+    chips = [
+        {"type": "action", "action": {"type": "camera", "label": _label(lang, "camera")}},
+        {
+            "type": "action",
+            "action": {
+                "type": "message",
+                "label": _label(lang, "example"),
+                "text": _label(lang, "example"),
+            },
+        },
+        {
+            "type": "action",
+            "action": {
+                "type": "message",
+                "label": _label(lang, "capability"),
+                "text": _label(lang, "capability"),
+            },
+        },
+    ]
+    return _msg(t_bind(lang, "first_doc_nudge"), chips)

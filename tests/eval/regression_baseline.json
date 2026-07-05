@@ -1,0 +1,20 @@
+{
+  "_doc": "OCR 行为回归闸基线(P6)。换模型/改提示词/动管线的 PR 必须在 prod 跑一轮语料并过 scripts/ocr_regression_gate.py。阈值=硬门槛(min=不得低于/max=不得超过),放宽任何一项必须走 PR 由 Zihao 可审。数字来源=2026-07-05 验收轮(commit c6666ef3·181 发票+128 对账·prod S2 链)。",
+  "created": "2026-07-05",
+  "baseline_commit": "c6666ef3",
+  "invoice": {
+    "n_min": 150,
+    "avg_score_min": 0.83,
+    "total_amount_miss_max": 12,
+    "silent_pass_max": 1,
+    "_silent_pass_note": "实测 2(trap08 已被 sanity 规则6 拦→归 0;trap11=回落链多票配对错·台账#6)。#6 修掉后此项棘轮到 0。",
+    "fallback_share_max": 0.25
+  },
+  "recon": {
+    "bank_avg_min": 0.95,
+    "vat_avg_min": 0.95,
+    "gl_v2_avg_min": 0.95,
+    "gl_v1_avg_min": 0.35,
+    "_gl_v1_note": "v1 GL 竖排堆叠版式=已知最弱(台账#10 实测 0.40)。修掉后棘轮上调。"
+  }
+}

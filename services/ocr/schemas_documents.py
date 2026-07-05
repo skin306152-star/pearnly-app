@@ -111,6 +111,10 @@ class GeneralLedgerDocument(BaseModel):
     account_number: str = Field(default="", description="account number if printed")
     opening_balance: str = Field(default="")
     closing_balance: str = Field(default="")
+    # 台账#10 · 页脚印刷合计(Total Debit/Credit)。堆叠版式借贷合并一列时,
+    # 这是消歧首行借贷方向的唯一确定性信息源(gl_balance_chain 用)。
+    total_debit: str = Field(default="", description="printed footer Total Debit or empty")
+    total_credit: str = Field(default="", description="printed footer Total Credit or empty")
     entries: List[GLEntry] = Field(default_factory=list)
 
     # v118.35.0.51 · 顶层 str 字段 None→"" 兜底(同 BankStatementDocument)
@@ -121,6 +125,8 @@ class GeneralLedgerDocument(BaseModel):
         "account_number",
         "opening_balance",
         "closing_balance",
+        "total_debit",
+        "total_credit",
         mode="before",
     )
     @classmethod

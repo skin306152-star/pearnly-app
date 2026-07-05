@@ -18,6 +18,7 @@ from typing import Dict, List, Optional
 
 from . import gemini_models, image_first
 from .confidence import check_field_in_l1_text, find_field_min_word_conf
+from .gl_balance_chain import repair_gl_document
 from .layer1_vision import extract_from_image_bytes as _l1_extract_image
 from .layer2_structure import extract_from_page as _l2_extract_page
 from .layer3_fallback import (
@@ -184,6 +185,8 @@ def _process_one_page(
     validation_warnings: List[str] = list(l2_result.validation_warnings)
     if document_type == "general_ledger" and l2_document is not None:
         validation_warnings.extend(validate_gl_document(l2_document, l1_page))
+        # 台账#10 · 堆叠版式借贷一列/期初不印 → 余额链确定性修复(方向纠正+期初反推)
+        validation_warnings.extend(repair_gl_document(l2_document))
     elif document_type == "bank_statement" and l2_document is not None:
         validation_warnings.extend(validate_bank_document(l2_document, l1_page))
     elif document_type in ("auto", "invoice"):

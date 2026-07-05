@@ -32,6 +32,8 @@ Output ONE JSON object (no markdown fences, no prose, just JSON):
   "account_number": "account number or empty",
   "opening_balance": "number-as-string, no commas, or empty",
   "closing_balance": "number-as-string, no commas, or empty",
+  "total_debit": "printed footer Total Debit / รวมเดบิต, number-as-string, or empty",
+  "total_credit": "printed footer Total Credit / รวมเครดิต, number-as-string, or empty",
   "entries": [
     {
       "transaction_date": "YYYY-MM-DD or empty",
@@ -77,6 +79,9 @@ CRITICAL RULES — VIOLATIONS ARE BUGS:
    - debit > 0  →  direction = "deposit"     (bank account goes UP / เงินฝาก)
    - credit > 0 →  direction = "withdrawal"  (bank account goes DOWN / ถอนเงิน)
    - both 0 / both blank → direction = "" (skip — likely a header or summary row)
+   - MERGED "Debit/Credit" column (one column, direction not printed): put the
+     value in `debit` — do NOT guess direction from the description wording.
+     Downstream recomputes direction deterministically from the balance chain.
 
 3. AMOUNT DERIVATION:
    - amount = debit if debit > 0 else credit
@@ -90,7 +95,9 @@ CRITICAL RULES — VIOLATIONS ARE BUGS:
 
 6. SKIP rows that are pure subtotals / openings / closings / page headers
    (e.g. "ยอดยกมา", "ยอดยกไป", "Balance forward", "Subtotal"). They go into
-   opening_balance / closing_balance, NOT entries.
+   opening_balance / closing_balance, NOT entries. Footer "Total Debit" /
+   "Total Credit" (รวมเดบิต / รวมเครดิต) amounts go into the document-level
+   total_debit / total_credit fields, NOT entries.
 
 7. raw_row_data is for audit: dump the original column→cell mapping as you
    read it. If you cannot identify columns, leave it as an empty object {}.

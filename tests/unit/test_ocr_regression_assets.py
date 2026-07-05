@@ -65,6 +65,9 @@ class PromptContractTests(unittest.TestCase):
 
     def test_recon_prompt_anchors(self):
         self.assertIn("PROVENANCE", lp._GL_SYSTEM_PROMPT)  # GL 金额溯源(描述列数字不当金额)
+        # 台账#10 堆叠版式:页脚合计入 doc 级字段(首行方向唯一消歧源)+ 合并列不猜方向
+        self.assertIn("total_debit", lp._GL_SYSTEM_PROMPT)
+        self.assertIn('MERGED "Debit/Credit" column', lp._GL_SYSTEM_PROMPT)
         self.assertIn(
             "Negative numbers stay negative", lp._BANK_STATEMENT_SYSTEM_PROMPT
         )  # 透支负号

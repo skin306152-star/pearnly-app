@@ -28,6 +28,7 @@ from typing import List, Optional
 from pydantic import ValidationError
 
 from .cost import _compute_total_cost
+from .gl_balance_chain import repair_gl_document
 from .layer2_prompts import _SYSTEM_PROMPT
 from .layer2_structure import _DOC_PROMPTS, _DOC_SCHEMAS
 from .sanity import credit_note_review_reason, evaluate_sanity, infer_missing_discount
@@ -214,6 +215,9 @@ def read_page(
             document = _DOC_SCHEMAS[document_type](**outcome.data)
         except ValidationError as e:
             raise DirectReadFallback(f"page {page_number}: {document_type} schema: {e}") from e
+        if document_type == "general_ledger":
+            # 台账#10 · 与 Vision 路(page_runner)同一套余额链修复,两链不劈叉
+            warnings.extend(repair_gl_document(document))
 
     # 贷记单方向性单据强制人工(两链共判 · sanity.credit_note_review_reason)
     force_review = False

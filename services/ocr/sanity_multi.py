@@ -6,8 +6,9 @@
 真数的是本票明细行和。多票页把 sanity 规则 6 的单边收紧为双边(规则 7);
 单票页不收紧,不误伤服务费/未列项票(行和 < 小计合法)。
 
-evaluate_sanity 是唯一调用方(两条链共用单一挂点);从 sanity 延迟导入本模块,
-本模块顶层回导 sanity 的共享件 —— 单向延迟即无环。
+evaluate_sanity 是唯一调用方(两条链共用单一挂点)。sanity.py 顶层导入本模块;
+本模块反向导入 sanity 的共享件必须延迟到函数体内 —— sanity.py 顶层导入本模块时
+本模块还在加载中,若本模块顶层回导 sanity 会在其未定义完时取值,故延迟到调用时。
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from typing import List
 
 
 def multi_invoice_reasons(invoice) -> List[str]:
-    from services.ocr.sanity import _RECON_REL, _TOL, _core_reasons, _line_subtotals, _money
+    from services.ocr.sanity import _core_reasons, _line_subtotals, _money, line_sum_mismatch
 
     extras = [
         x
@@ -29,14 +30,12 @@ def multi_invoice_reasons(invoice) -> List[str]:
     reasons: List[str] = []
     for i, extra in enumerate(extras, start=2):
         reasons.extend(f"同页第{i}张: {r}" for r in _core_reasons(extra))
-    # 规则 7:行和 ≠ 小计即转人工(明细 ≥2 行才有判断力,单行自身可能读错)。
+    # 规则 7:行和 ≠ 小计即转人工(单边规则 6 在多票页收紧为双边,见 line_sum_mismatch)。
     for i, inv in enumerate([invoice] + extras, start=1):
         sub = _money(getattr(inv, "subtotal", None))
-        lines = _line_subtotals(inv)
-        if sub is not None and sub > 0 and len(lines) >= 2:
-            line_sum = sum(lines)
-            if abs(line_sum - sub) > max(_TOL, sub * _RECON_REL):
-                reasons.append(
-                    f"同页第{i}张: 明细行和 {line_sum:.2f} ≠ 小计 {sub} — 多票页疑金额跨票错配"
-                )
+        line_sum = line_sum_mismatch(sub, _line_subtotals(inv), symmetric=True)
+        if line_sum is not None:
+            reasons.append(
+                f"同页第{i}张: 明细行和 {line_sum:.2f} ≠ 小计 {sub} — 多票页疑金额跨票错配"
+            )
     return reasons

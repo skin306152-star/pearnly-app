@@ -26,6 +26,7 @@ from services.ocr.money import (
     normalize_money as _money,
     valid_thai_tax_id as _valid_tax_id,
 )
+from services.ocr.sanity_multi import multi_invoice_reasons
 
 # 钱字段比对容差(泰铢):吸收四舍五入,又抓得住真错。
 _TOL = 0.5
@@ -44,6 +45,24 @@ def _line_subtotals(invoice) -> List[float]:
     return out
 
 
+def line_sum_mismatch(sub, lines: List[float], symmetric: bool = False) -> float | None:
+    """明细行和是否与小计不平,不平则返回行和(供调用方拼消息),平则 None。
+
+    单侧(规则 6·默认)只判「行和 > 小计」——行只会漏读不会多出钱,合法漏行
+    (行和 < 小计)不误杀。双侧(规则 7·多票页收紧,见 sanity_multi)连「行和 <
+    小计」也判,因为跨票错配会把行和往两边带偏,不能再放过偏低的一侧。
+    两侧共用同一容差,消息措辞由调用方按各自语境拼(单票"结构不可能" vs
+    多票页"跨票错配"),不在此耦合。
+    """
+    if sub is None or sub <= 0 or not lines or len(lines) < 2:
+        return None
+    line_sum = sum(lines)
+    tol = max(_TOL, sub * _RECON_REL)
+    if line_sum > sub + tol or (symmetric and line_sum < sub - tol):
+        return line_sum
+    return None
+
+
 def evaluate_sanity(invoice) -> List[str]:
     """返回硬否决原因列表(空=通过)。命中任一 → 调用方强制转人工,绝不 auto。
 
@@ -51,12 +70,10 @@ def evaluate_sanity(invoice) -> List[str]:
     正常票(误杀 = 凭空增加人工量 + 失去信任)。
 
     同页多票(additional_invoices):附加票逐张过核心规则 + 规则 7 跨票错配核对,
-    见 sanity_multi(延迟导入防环:它顶层回导本模块共享件)。
+    见 sanity_multi(该模块延迟导入本模块的共享件;本模块可放心顶层导它,无环)。
     """
     if getattr(invoice, "is_not_invoice", False):
         return []
-
-    from services.ocr.sanity_multi import multi_invoice_reasons
 
     return _core_reasons(invoice) + multi_invoice_reasons(invoice)
 
@@ -128,12 +145,9 @@ def _core_reasons(invoice) -> List[str]:
     # 行只会漏读不会多出钱)。抓「重影把 8 糊成 3」这类同一位错同时进小计与总额的自洽性
     # 误读——双读/勾稽全绿,但票面明细行和把真数供出来了。只单向判(行和小于小计=漏行,
     # 合法,不误杀);相对 2% + 绝对 0.5 双容差吸掉四舍五入。
-    if sub is not None and sub > 0 and lines and len(lines) >= 2:
-        line_sum = sum(lines)
-        if line_sum > sub + max(_TOL, sub * _RECON_REL):
-            reasons.append(
-                f"明细行和 {line_sum:.2f} > 小计 {sub} — 结构不可能(疑小计/总额读错一位)"
-            )
+    line_sum = line_sum_mismatch(sub, lines)
+    if line_sum is not None:
+        reasons.append(f"明细行和 {line_sum:.2f} > 小计 {sub} — 结构不可能(疑小计/总额读错一位)")
 
     return reasons
 

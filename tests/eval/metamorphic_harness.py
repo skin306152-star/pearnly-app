@@ -20,8 +20,11 @@ import os
 import sys
 
 sys.path.insert(0, "/opt/mrpilot")
+sys.path.insert(0, os.path.dirname(__file__))
 
 from PIL import Image, ImageEnhance, ImageFilter
+
+from recon_scorer import money_close
 
 BLUR_LADDER = (0.8, 1.4, 2.0, 2.8)
 
@@ -48,18 +51,10 @@ def perturbations(raw: bytes) -> dict:
     return out
 
 
-def money_eq(a, b, tol: float = 0.01) -> bool:
-    """两读数视为同一金额;都空也算一致(读不出是种稳定状态)。"""
-    try:
-        return abs(float(str(a).replace(",", "")) - float(str(b).replace(",", ""))) <= tol
-    except (TypeError, ValueError):
-        return (a in (None, "")) == (b in (None, ""))
-
-
 def verdict(base: dict, got: dict, review: bool) -> str:
     """不变量:total_amount + invoice_number 相对基线读数不变。
     变了且 review=False → SILENT(真 bug);变了但转人工 → review(诚实)。"""
-    same_total = money_eq(base.get("total_amount"), got.get("total_amount"))
+    same_total = money_close(base.get("total_amount"), got.get("total_amount"))
     same_no = str(base.get("invoice_number") or "") == str(got.get("invoice_number") or "")
     if same_total and same_no:
         return "ok"

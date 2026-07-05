@@ -31,6 +31,7 @@ Custom exceptions (all subclass Layer1Error):
     Layer1QuotaError      (quota / rate-limit exceeded, retry after backoff)
     Layer1TransientError  (timeout / 5xx / network, potentially retryable)
     Layer1PDFError        (PDF cannot be parsed or rendered)
+    Layer1InvalidImageError (bytes not a decodable image · user's file, not the engine)
     Layer1Error           (everything else / unknown)
 
 Environment:
@@ -70,6 +71,7 @@ from .layer1_base import (  # noqa: F401 · re-export(外部 import + 内部自�
     Layer1QuotaError,
     Layer1TransientError,
     Layer1PDFError,
+    Layer1InvalidImageError,
 )
 
 
@@ -347,6 +349,10 @@ def _call_vision_for_image(
             raise Layer1QuotaError(f"layer1: page {page_number}: API error code {code}: {msg}")
         if code in (4, 13, 14):
             raise Layer1TransientError(f"layer1: page {page_number}: API error code {code}: {msg}")
+        if code == 3:
+            raise Layer1InvalidImageError(
+                f"layer1: page {page_number}: API error code {code}: {msg}"
+            )
         raise Layer1Error(f"layer1: page {page_number}: API error code {code}: {msg}")
 
     return _response_to_page(response, page_number=page_number)

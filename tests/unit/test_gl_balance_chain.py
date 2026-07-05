@@ -116,31 +116,23 @@ class OpeningDerivationTests(unittest.TestCase):
 class StackedLayoutEndToEndTests(unittest.TestCase):
     def test_gl_bank_cash_signature(self):
         # 语料 gl_bank_cash_01 的数字骨架:交替借贷 12 行 · 期初不印 · 借贷一列
-        # 模拟模型把全部金额读进借方(方向信息在版式上不存在)
+        # 模拟模型把全部金额读进借方(方向信息在版式上不存在)。余额由金额+期初
+        # 交替加减推导(不手抄第二份数组)· 真实票面期初 50000。
+        opening_ref = 50000
         amounts = [1200, 1025, 1380, 1175, 1560, 1325, 1740, 1475, 1920, 1625, 2100, 1775]
-        balances = [
-            51200,
-            50175,
-            51555,
-            50380,
-            51940,
-            50615,
-            52355,
-            50880,
-            52800,
-            51175,
-            53275,
-            51500,
-        ]
+        balances, running = [], opening_ref
+        for i, amt in enumerate(amounts):
+            running += amt if i % 2 == 0 else -amt
+            balances.append(running)
         doc = _doc(
             [_e(debit=str(a), balance=str(b)) for a, b in zip(amounts, balances)],
-            closing="51500",
+            closing=str(balances[-1]),
             total_debit="9900",
             total_credit="8400",
         )
         warnings = repair_gl_document(doc)
         self.assertEqual(warnings, [])
-        self.assertEqual(doc.opening_balance, "50000.00")
+        self.assertEqual(doc.opening_balance, f"{opening_ref}.00")
         total_debit = sum(float(e.debit) for e in doc.entries if e.debit)
         total_credit = sum(float(e.credit) for e in doc.entries if e.credit)
         self.assertEqual(total_debit, 9900.0)  # GT total_debit

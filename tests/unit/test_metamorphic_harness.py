@@ -10,7 +10,7 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "eval"))
 
-from metamorphic_harness import BLUR_LADDER, money_eq, perturbations, verdict  # noqa: E402
+from metamorphic_harness import BLUR_LADDER, perturbations, verdict  # noqa: E402
 
 
 def _seed_jpeg() -> bytes:
@@ -46,10 +46,11 @@ class VerdictTests(unittest.TestCase):
         got = {"total_amount": "", "invoice_number": "A"}
         self.assertEqual(verdict(base, got, review=True), "review")
 
-    def test_money_eq_handles_commas_and_empty(self):
-        self.assertTrue(money_eq("1,200.00", "1200.00"))
-        self.assertTrue(money_eq("", None))
-        self.assertFalse(money_eq("", "5.00"))
+    def test_total_amount_comparison_reuses_recon_scorer_money_close(self):
+        # verdict 的钱字段比对复用 recon_scorer.money_close(不再自造 float 解析)
+        base = {"total_amount": "1,200.00", "invoice_number": "A"}
+        got = {"total_amount": "1200.00", "invoice_number": "A"}
+        self.assertEqual(verdict(base, got, review=False), "ok")
 
 
 if __name__ == "__main__":

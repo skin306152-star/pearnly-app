@@ -58,6 +58,8 @@ def repair_gl_document(doc) -> List[str]:
     warnings: List[str] = []
     prev = _dec(doc.opening_balance)
     gap = False  # prev 与本行之间隔了缺余额的行 → 涨跌不再对应单笔金额
+    sd = sc = Decimal(0)  # 明细借贷行和,随主循环单趟累计(供页脚合计对账用,免二次扫描)
+    last_bal_raw = ""  # 期末回填要用原始印刷字符串(不重新格式化),故与 bal 分开存
     for i, e in enumerate(entries, start=1):
         bal = _dec(e.balance)
         if bal is None:
@@ -71,36 +73,31 @@ def repair_gl_document(doc) -> List[str]:
                 if (delta > 0 and cred > 0) or (delta < 0 and deb > 0):
                     _set_side(e, amt, is_debit=delta > 0)
                     e.raw_row_data["direction_autocorrected"] = True
+                    deb, cred = (amt, Decimal(0)) if delta > 0 else (Decimal(0), amt)
                     logger.info("GL 行%d 借贷方向与余额涨跌矛盾 · 已按余额链摆正", i)
             elif not gap:
                 warnings.append(
                     f"GL 余额链断裂 行{i}: 上行余额 {_fmt(prev)} ± 金额 {_fmt(amt)} ≠ 余额 {_fmt(bal)}"
                 )
+        sd, sc, last_bal_raw = sd + deb, sc + cred, e.balance
         prev, gap = bal, False
 
-    warnings.extend(_reconcile_printed_totals(doc, entries))
+    warnings.extend(_reconcile_printed_totals(doc, entries, sd, sc))
     _derive_opening(doc, entries)
     if not (doc.closing_balance or "").strip():
-        last_bal = next((e.balance for e in reversed(entries) if _dec(e.balance) is not None), "")
-        doc.closing_balance = last_bal
+        doc.closing_balance = last_bal_raw
     return warnings
 
 
-def _sums(entries) -> tuple:
-    sd = sum((_dec(e.debit) or Decimal(0) for e in entries), Decimal(0))
-    sc = sum((_dec(e.credit) or Decimal(0) for e in entries), Decimal(0))
-    return sd, sc
-
-
-def _reconcile_printed_totals(doc, entries) -> List[str]:
-    """页脚印刷合计 vs 明细行和。首行方向没有上行余额可验(期初不印时),
-    印刷合计是唯一确定性信息源:行和对不上、且恰好翻转首行就两项全平 → 翻首行;
-    翻了也平不了 = 可能漏行/读错合计 → 只标警告(同 bank _audit_completeness 精神)。
+def _reconcile_printed_totals(doc, entries, sd: Decimal, sc: Decimal) -> List[str]:
+    """页脚印刷合计 vs 明细行和(行和由调用方在主循环单趟累计好,不重扫)。
+    首行方向没有上行余额可验(期初不印时),印刷合计是唯一确定性信息源:
+    行和对不上、且恰好翻转首行就两项全平 → 翻首行;翻了也平不了 = 可能漏行/
+    读错合计 → 只标警告(同 bank _audit_completeness 精神)。
     """
     p_deb, p_cred = _dec(doc.total_debit), _dec(doc.total_credit)
     if p_deb is None or p_cred is None or not entries:
         return []
-    sd, sc = _sums(entries)
     if abs(sd - p_deb) <= _TOL and abs(sc - p_cred) <= _TOL:
         return []
     first = entries[0]

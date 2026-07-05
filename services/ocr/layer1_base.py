@@ -41,3 +41,9 @@ class Layer1TransientError(Layer1Error):
 
 class Layer1PDFError(Layer1Error):
     """PDF cannot be opened or rendered (corrupted, password-protected, etc.)."""
+
+
+class Layer1InvalidImageError(Layer1Error):
+    """Image bytes are not a decodable image (Vision API code 3 / INVALID_ARGUMENT):
+    truncated upload, wrong-extension payload (e.g. PDF bytes named .jpg), 0-byte body.
+    User's file problem, not an engine fault — callers map this to a 4xx."""

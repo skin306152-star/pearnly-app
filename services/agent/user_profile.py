@@ -171,17 +171,35 @@ def render(profile: dict) -> str:
     return "\n".join(lines)
 
 
+def _refresh_async(user_id, tenant_id, line_user_id) -> None:
+    """后台算画像(5 次 DB 往返)并写缓存。异常只 warning —— 画像算不出只是下轮少块料。"""
+    import threading
+
+    def _run():
+        try:
+            profile = _compute(user_id, tenant_id)
+            profile["y_queries"] = _yesterday_queries(tenant_id, line_user_id)
+            _store(tenant_id, line_user_id, profile)
+        except Exception:
+            logger.warning("[user_profile] async refresh failed", exc_info=True)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 def context_note(user_id, tenant_id, line_user_id) -> str:
-    """对话轮入口:取(缓存或现算)画像 → 渲染提示词块。任何故障回空串。"""
+    """对话轮入口:命中缓存 → 渲染提示词块;未命中 → 后台刷新、本轮先回空串。
+
+    画像是纯加料(fail-open),绝不该让用户等它:热路径只留 1 次轻缓存查询,未命中时把
+    重活(_compute+_store 5 次往返)甩后台线程,下一轮生效。任何故障回空串。
+    """
     if not (user_id and tenant_id and line_user_id):
         return ""
     try:
         profile = _load_cached(tenant_id, line_user_id)
-        if profile is None:
-            profile = _compute(user_id, tenant_id)
-            profile["y_queries"] = _yesterday_queries(tenant_id, line_user_id)
-            _store(tenant_id, line_user_id, profile)
-        return render(profile)
     except Exception:
-        logger.warning("[user_profile] note failed; empty", exc_info=True)
+        logger.warning("[user_profile] cache read failed; empty", exc_info=True)
         return ""
+    if profile is not None:
+        return render(profile)
+    _refresh_async(user_id, tenant_id, line_user_id)
+    return ""

@@ -169,6 +169,8 @@ def handle_postback(bound_user, reply_token, action, token, lang, *, runner=None
         return
     if res["status"] == "used":
         # 双击/重放:已推成功就诚实说推过了,否则按失效卡处理(不二次推送)。
+        # 注:knowledge_confirm 的 used 分支是「一律按失效卡」——问答无"已答过可复述"语义,
+        # 那是有意分叉(推 ERP 可查是否推成功来复述,检索答案不可回放)。两者别当成能合并的同一逻辑。
         ref = _parse_ref(res.get("action_ref"))
         if ref and db.has_recent_successful_push(
             ref["history_id"], ref["endpoint_id"], str(bound_user.get("id") or "")

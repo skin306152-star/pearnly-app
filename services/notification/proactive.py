@@ -57,24 +57,6 @@ def _period(today: date) -> str:
     return f"{y:04d}-{m:02d}"
 
 
-def _already_sent(user_id, tenant_id, period) -> bool:
-    """去重台账:该用户该期发过(sent)即跳。查询失败按已发处理 —— 花钱面宁少勿重。"""
-    from core import db
-
-    try:
-        with db.get_cursor_rls(tenant_id=tenant_id, user_id=str(user_id)) as cur:
-            cur.execute(
-                "SELECT 1 FROM notification_logs "
-                "WHERE user_id = %s AND template_code = %s AND event_ref = %s AND status = 'sent' "
-                "LIMIT 1",
-                (str(user_id), TEMPLATE_CODE, period),
-            )
-            return cur.fetchone() is not None
-    except Exception:
-        logger.warning("[proactive] dedup check failed; skip to be safe", exc_info=True)
-        return True
-
-
 def _bound_users() -> list:
     """全部 LINE 绑定用户(跨租户扫描 · 与 list_active_notification_rules_by_template
     同理由的显式 bypass:后台任务无单租户上下文,行级过滤在逐用户闸与去重)。"""
@@ -93,9 +75,9 @@ def send_due_nudges(today: Optional[date] = None) -> int:
     from core import feature_flags
     from services.expense import line_lang
     from services.line_binding import line_reply
-    from services.notification.store import log_notification
+    from services.notification import store
 
-    today = today or _bangkok_today()
+    today = today or store.bangkok_today()
     if today.day not in WINDOW_DAYS:
         return 0
     period = _period(today)
@@ -106,12 +88,12 @@ def send_due_nudges(today: Optional[date] = None) -> int:
             if not feature_flags.agent_proactive_enabled_for(uid):
                 continue
             tid = row.get("tenant_id")
-            if _already_sent(uid, tid, period):
+            if store.already_sent(uid, tid, TEMPLATE_CODE, period):
                 continue
             lang = line_lang.card_lang(row["line_user_id"], tid, row.get("preferred_lang") or "th")
             text = _copy_for(uid, tid, period, lang)
             ok = line_reply.push_text_context(row["line_user_id"], text, tenant_id=tid)
-            log_notification(
+            store.log_notification(
                 uid,
                 tid,
                 None,
@@ -155,19 +137,15 @@ def _copy_for(user_id, tenant_id, period, lang) -> str:
     return _COPY.get(lang, _COPY["en"]).format(p=period)
 
 
-def _bangkok_today() -> date:
-    from services.sales.dates import bangkok_now
-
-    return bangkok_now().date()
-
-
 async def run_tick() -> int:
     """recovery tick 挂点:节流 + 窗口先判(无 DB 免费退出),核心跑 to_thread。"""
+    from services.notification import store
+
     global _last_run
     now = time.monotonic()
     if now - _last_run < _TICK_MIN_INTERVAL_S:
         return 0
-    if _bangkok_today().day not in WINDOW_DAYS:
+    if store.bangkok_today().day not in WINDOW_DAYS:
         _last_run = now
         return 0
     _last_run = now

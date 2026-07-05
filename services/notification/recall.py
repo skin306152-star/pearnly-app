@@ -35,24 +35,6 @@ def _period(today: date) -> str:
     return f"{today.year:04d}-{today.month:02d}"
 
 
-def _already_sent(user_id, tenant_id, period) -> bool:
-    """月度去重(与 proactive 同口径):查询失败按已发处理,花钱面宁少勿重。"""
-    from core import db
-
-    try:
-        with db.get_cursor_rls(tenant_id=tenant_id, user_id=str(user_id)) as cur:
-            cur.execute(
-                "SELECT 1 FROM notification_logs "
-                "WHERE user_id = %s AND template_code = %s AND event_ref = %s AND status = 'sent' "
-                "LIMIT 1",
-                (str(user_id), TEMPLATE_CODE, period),
-            )
-            return cur.fetchone() is not None
-    except Exception:
-        logger.warning("[recall] dedup check failed; skip to be safe", exc_info=True)
-        return True
-
-
 def _idle(user_id, tenant_id) -> bool:
     """有过单据 && 最近 14 天零单 = 掉线。查不出按不掉线(宁少勿扰)。"""
     from core import db
@@ -80,10 +62,10 @@ def send_recall_nudges(today: Optional[date] = None) -> int:
     from core import feature_flags
     from services.expense import line_lang
     from services.line_binding import line_reply
+    from services.notification import store
     from services.notification.proactive import _bound_users
-    from services.notification.store import log_notification
 
-    today = today or _bangkok_today()
+    today = today or store.bangkok_today()
     period = _period(today)
     sent = 0
     for row in _bound_users():
@@ -92,7 +74,7 @@ def send_recall_nudges(today: Optional[date] = None) -> int:
             if not feature_flags.agent_recall_enabled_for(uid):
                 continue
             tid = row.get("tenant_id")
-            if _already_sent(uid, tid, period):
+            if store.already_sent(uid, tid, TEMPLATE_CODE, period):
                 continue
             if not _idle(uid, tid):
                 continue
@@ -100,7 +82,7 @@ def send_recall_nudges(today: Optional[date] = None) -> int:
             ok = line_reply.push_text_context(
                 row["line_user_id"], _COPY.get(lang, _COPY["en"]), tenant_id=tid
             )
-            log_notification(
+            store.log_notification(
                 uid,
                 tid,
                 None,
@@ -117,12 +99,6 @@ def send_recall_nudges(today: Optional[date] = None) -> int:
     if sent:
         logger.info("[recall] sent=%d period=%s", sent, period)
     return sent
-
-
-def _bangkok_today() -> date:
-    from services.sales.dates import bangkok_now
-
-    return bangkok_now().date()
 
 
 async def run_tick() -> int:

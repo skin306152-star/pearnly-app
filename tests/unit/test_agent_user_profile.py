@@ -6,7 +6,7 @@
 """
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from services.agent import user_profile
 
@@ -51,17 +51,37 @@ class TestContextNote(unittest.TestCase):
         compute.assert_not_called()
         self.assertIn("Frequent merchants: A", note)
 
-    def test_cache_miss_computes_and_stores(self):
-        fresh = {"merchants": [], "categories": [], "docs_30d": 7, "y_docs": 0, "y_total": 0.0}
+    def test_cache_miss_returns_empty_and_refreshes_async(self):
+        # 热路径不阻塞:未命中当轮回空串,把重活甩后台,不同步 _compute。
         with (
             patch.object(user_profile, "_load_cached", return_value=None),
+            patch.object(user_profile, "_refresh_async") as refresh,
+            patch.object(user_profile, "_compute") as compute,
+        ):
+            note = user_profile.context_note("u1", "t1", "U_line")
+        self.assertEqual(note, "")
+        refresh.assert_called_once_with("u1", "t1", "U_line")
+        compute.assert_not_called()  # 当轮绝不同步算
+
+    def test_refresh_async_computes_and_stores(self):
+        # 后台刷新真算+写(线程内跑,patch Thread 成同步执行以断言)。
+        fresh = {"merchants": [], "categories": [], "docs_30d": 7, "y_docs": 0, "y_total": 0.0}
+
+        def _sync_thread(target, daemon=None):
+            t = MagicMock()
+            t.start = target
+            return t
+
+        with (
             patch.object(user_profile, "_compute", return_value=dict(fresh)),
             patch.object(user_profile, "_yesterday_queries", return_value=1),
             patch.object(user_profile, "_store") as store,
+            patch("threading.Thread", _sync_thread),
         ):
-            note = user_profile.context_note("u1", "t1", "U_line")
+            user_profile._refresh_async("u1", "t1", "U_line")
         store.assert_called_once()
-        self.assertIn("7", note)
+        stored = store.call_args.args[2]
+        self.assertEqual(stored["y_queries"], 1)
 
     def test_any_failure_returns_empty(self):
         with patch.object(user_profile, "_load_cached", side_effect=RuntimeError("db down")):

@@ -150,7 +150,9 @@ def handle_postback(bound_user, reply_token, action, token, lang, *, runner=None
     if res["status"] == "expired":
         _say(line_client.t_line(lang, "card_action_expired"))
         return
-    if res["status"] != "ok":  # used/stale:问答无"已答过可复述"语义,双击一律按失效卡
+    # used/stale:问答无"已答过可复述"语义,双击一律按失效卡(与 push_confirm 的 used 分支
+    # 有意分叉:推 ERP 能查是否推成功来复述,检索答案不可回放 → 两处骨架像但此处不可合并)。
+    if res["status"] != "ok":
         _say(line_client.t_line(lang, "card_action_stale"))
         return
     ref = _parse_ref(res.get("action_ref"))

@@ -52,14 +52,10 @@ def _t(table: dict, lang: str) -> str:
     return table.get(lang, table["en"])
 
 
-def _prev_period(today: date) -> str:
-    y, m = (today.year, today.month - 1) if today.month > 1 else (today.year - 1, 12)
-    return f"{y:04d}-{m:02d}"
-
-
-def _prev_prev_period(today: date) -> str:
-    y, m = (today.year, today.month - 2) if today.month > 2 else (today.year - 1, today.month + 10)
-    return f"{y:04d}-{m:02d}"
+def _period_back(today: date, n: int) -> str:
+    """今天(曼谷)往回数 n 个自然月的 'YYYY-MM'。月序号直接减,免跨年分支/魔法数。"""
+    idx = today.year * 12 + (today.month - 1) - n
+    return f"{idx // 12:04d}-{idx % 12 + 1:02d}"
 
 
 def _month_stats(user_id, tenant_id, period, prior_period) -> Optional[dict]:
@@ -106,6 +102,17 @@ def _ensure_opt_out_column() -> None:
         )
 
 
+def _with_heal(fn):
+    """退订列缺失(prod 无 alembic 钩子)→ 首用 ALTER 自愈重试一次;其余异常上抛。"""
+    try:
+        return fn()
+    except Exception as e:
+        if "monthly_report_opt_out" not in str(e):
+            raise
+        _ensure_opt_out_column()
+        return fn()
+
+
 def _recipients() -> list:
     """绑定用户 + 退订标记(跨租户扫描·同 proactive._bound_users 的显式 bypass 理由)。"""
     from core import db
@@ -119,13 +126,7 @@ def _recipients() -> list:
             )
             return list(cur.fetchall())
 
-    try:
-        return _run()
-    except Exception as e:
-        if "monthly_report_opt_out" not in str(e):
-            raise
-        _ensure_opt_out_column()
-        return _run()
+    return _with_heal(_run)
 
 
 def set_opt_out(line_user_id, value: bool) -> bool:
@@ -140,31 +141,7 @@ def set_opt_out(line_user_id, value: bool) -> bool:
             )
             return cur.rowcount > 0
 
-    try:
-        return _run()
-    except Exception as e:
-        if "monthly_report_opt_out" not in str(e):
-            raise
-        _ensure_opt_out_column()
-        return _run()
-
-
-def _already_sent(user_id, tenant_id, period) -> bool:
-    """去重台账(与 proactive 同口径):查询失败按已发处理,花钱面宁少勿重。"""
-    from core import db
-
-    try:
-        with db.get_cursor_rls(tenant_id=tenant_id, user_id=str(user_id)) as cur:
-            cur.execute(
-                "SELECT 1 FROM notification_logs "
-                "WHERE user_id = %s AND template_code = %s AND event_ref = %s AND status = 'sent' "
-                "LIMIT 1",
-                (str(user_id), TEMPLATE_CODE, period),
-            )
-            return cur.fetchone() is not None
-    except Exception:
-        logger.warning("[monthly_report] dedup check failed; skip to be safe", exc_info=True)
-        return True
+    return _with_heal(_run)
 
 
 def _message(stats: dict, period: str, lang: str) -> dict:
@@ -204,13 +181,13 @@ def send_monthly_reports(today: Optional[date] = None) -> int:
     from core import feature_flags
     from services.expense import line_lang
     from services.line_binding import line_reply
-    from services.notification.store import log_notification
+    from services.notification import store
 
-    today = today or _bangkok_today()
+    today = today or store.bangkok_today()
     if today.day not in WINDOW_DAYS:
         return 0
-    period = _prev_period(today)
-    prior = _prev_prev_period(today)
+    period = _period_back(today, 1)
+    prior = _period_back(today, 2)
     sent = 0
     for row in _recipients():
         try:
@@ -220,7 +197,7 @@ def send_monthly_reports(today: Optional[date] = None) -> int:
             if not feature_flags.agent_monthly_report_enabled_for(uid):
                 continue
             tid = row.get("tenant_id")
-            if _already_sent(uid, tid, period):
+            if store.already_sent(uid, tid, TEMPLATE_CODE, period):
                 continue
             stats = _month_stats(uid, tid, period, prior)
             if not stats or not stats["n"]:  # 上月零单:没数字的月报是噪音,不发
@@ -229,7 +206,7 @@ def send_monthly_reports(today: Optional[date] = None) -> int:
             ok = line_reply.push_messages_context(
                 row["line_user_id"], [_message(stats, period, lang)], tenant_id=tid
             )
-            log_notification(
+            store.log_notification(
                 uid,
                 tid,
                 None,
@@ -263,19 +240,15 @@ def handle_unsub(bound_user, reply_token, lang) -> None:
     )
 
 
-def _bangkok_today() -> date:
-    from services.sales.dates import bangkok_now
-
-    return bangkok_now().date()
-
-
 async def run_tick() -> int:
     """recovery tick 挂点:节流 + 窗口先判(无 DB 免费退出),核心跑 to_thread。"""
+    from services.notification import store
+
     global _last_run
     now = time.monotonic()
     if now - _last_run < _TICK_MIN_INTERVAL_S:
         return 0
-    if _bangkok_today().day not in WINDOW_DAYS:
+    if store.bangkok_today().day not in WINDOW_DAYS:
         _last_run = now
         return 0
     _last_run = now

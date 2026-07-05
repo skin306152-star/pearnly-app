@@ -21,7 +21,7 @@ def _send(*, flag=True, dup=False, idle=True):
     with (
         patch("services.notification.proactive._bound_users", return_value=list(_ROWS)),
         patch("core.feature_flags.agent_recall_enabled_for", return_value=flag),
-        patch.object(recall, "_already_sent", return_value=dup),
+        patch("services.notification.store.already_sent", return_value=dup),
         patch.object(recall, "_idle", return_value=idle),
         patch("services.expense.line_lang.card_lang", return_value="th"),
         patch(

@@ -38,7 +38,7 @@ def _patched(rows, *, flag=True, dup=False, stats=None, pushed=None, logged=None
     return (
         patch.object(monthly_report, "_recipients", return_value=rows),
         patch("core.feature_flags.agent_monthly_report_enabled_for", return_value=flag),
-        patch.object(monthly_report, "_already_sent", return_value=dup),
+        patch("services.notification.store.already_sent", return_value=dup),
         patch.object(monthly_report, "_month_stats", return_value=stats),
         patch("services.expense.line_lang.card_lang", return_value="th"),
         patch(
@@ -146,12 +146,13 @@ class TestUnsub(unittest.TestCase):
 
 
 class TestPeriods(unittest.TestCase):
-    def test_prev_periods_cross_year(self):
-        self.assertEqual(monthly_report._prev_period(date(2026, 1, 2)), "2025-12")
-        self.assertEqual(monthly_report._prev_prev_period(date(2026, 1, 2)), "2025-11")
-        self.assertEqual(monthly_report._prev_prev_period(date(2026, 2, 2)), "2025-12")
-        self.assertEqual(monthly_report._prev_period(date(2026, 7, 1)), "2026-06")
-        self.assertEqual(monthly_report._prev_prev_period(date(2026, 7, 1)), "2026-05")
+    def test_period_back_cross_year(self):
+        self.assertEqual(monthly_report._period_back(date(2026, 1, 2), 1), "2025-12")
+        self.assertEqual(monthly_report._period_back(date(2026, 1, 2), 2), "2025-11")
+        self.assertEqual(monthly_report._period_back(date(2026, 2, 2), 2), "2025-12")
+        self.assertEqual(monthly_report._period_back(date(2026, 7, 1), 1), "2026-06")
+        self.assertEqual(monthly_report._period_back(date(2026, 7, 1), 2), "2026-05")
+        self.assertEqual(monthly_report._period_back(date(2026, 7, 1), 0), "2026-07")
 
 
 if __name__ == "__main__":

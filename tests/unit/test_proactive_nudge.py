@@ -22,7 +22,7 @@ class TestSendDueNudges(unittest.TestCase):
     def setUp(self):
         patch.object(proactive, "_bound_users", return_value=_users()).start()
         patch("core.feature_flags.agent_proactive_enabled_for", return_value=True).start()
-        patch.object(proactive, "_already_sent", return_value=False).start()
+        patch("services.notification.store.already_sent", return_value=False).start()
         patch("services.expense.line_lang.card_lang", return_value="th").start()
         self.push = patch(
             "services.line_binding.line_reply.push_text_context", return_value=True
@@ -51,7 +51,7 @@ class TestSendDueNudges(unittest.TestCase):
         self.push.assert_not_called()
 
     def test_dedup_skips_already_sent(self):
-        with patch.object(proactive, "_already_sent", return_value=True):
+        with patch("services.notification.store.already_sent", return_value=True):
             self.assertEqual(proactive.send_due_nudges(date(2026, 7, 12)), 0)
         self.push.assert_not_called()
 
@@ -68,9 +68,11 @@ class TestSendDueNudges(unittest.TestCase):
 
 class TestAlreadySent(unittest.TestCase):
     def test_query_failure_returns_true(self):
-        # 花钱面宁少勿重:台账查询失败按已发处理。
+        # 花钱面宁少勿重:台账查询失败按已发处理(去重 helper 已上收 store)。
+        from services.notification import store
+
         with patch("core.db.get_cursor_rls", side_effect=RuntimeError("db down")):
-            self.assertTrue(proactive._already_sent("u1", "t1", "2026-06"))
+            self.assertTrue(store.already_sent("u1", "t1", "tax_due_nudge", "2026-06"))
 
 
 if __name__ == "__main__":

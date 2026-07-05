@@ -181,6 +181,62 @@ class LineSumExceedsSubtotalTests(unittest.TestCase):
         self.assertFalse(any("明细行和" in r for r in evaluate_sanity(inv)))
 
 
+class MultiInvoicePageTests(unittest.TestCase):
+    # 规则 7 + 附加票过闸(trap11 实案 2026-07-05):同页三张小票,主票被整片偷走
+    # 另一张的自洽三元组(759/0/759)→ 单票勾稽全平静默放行;行和 700 供出真数。
+
+    def _items(self, *subs):
+        from services.ocr.schemas import LineItem
+
+        return [LineItem(name=f"i{i}", subtotal=s) for i, s in enumerate(subs)]
+
+    def test_trap11_stolen_triple_flagged(self):
+        extra = _inv(
+            subtotal="419.00",
+            vat="29.33",
+            total_amount="448.33",
+            items=self._items("59.00", "360.00"),
+        )
+        inv = _inv(
+            subtotal="759.00",
+            vat="0.00",
+            total_amount="759.00",  # 偷来的自洽三元组
+            items=self._items("360.00", "80.00", "260.00"),  # 本票行和 700
+            additional_invoices=[extra],
+        )
+        self.assertTrue(any("跨票错配" in r for r in evaluate_sanity(inv)))
+
+    def test_consistent_multi_page_passes(self):
+        extra = _inv(
+            subtotal="419.00",
+            vat="29.33",
+            total_amount="448.33",
+            items=self._items("59.00", "360.00"),
+        )
+        inv = _inv(
+            subtotal="700.00",
+            vat="49.00",
+            total_amount="749.00",
+            items=self._items("360.00", "80.00", "260.00"),
+            additional_invoices=[extra],
+        )
+        self.assertEqual(evaluate_sanity(inv), [])
+
+    def test_extra_invoice_core_rules_gated(self):
+        # 附加票拆成独立入库条目 · 它自己的结构硬伤(负总额)必须被闸住
+        extra = _inv(total_amount="-500")
+        inv = _inv(subtotal="100", total_amount="107", additional_invoices=[extra])
+        reasons = evaluate_sanity(inv)
+        self.assertTrue(any(r.startswith("同页第2张") and "为负" in r for r in reasons))
+
+    def test_single_ticket_underread_lines_still_legal(self):
+        # 单票页行和 < 小计(服务费/未列项)不收紧 —— 规则 7 只管多票页
+        inv = _inv(
+            subtotal="759.00", total_amount="759.00", items=self._items("360.00", "80.00", "260.00")
+        )
+        self.assertEqual(evaluate_sanity(inv), [])
+
+
 class CreditNoteReviewTests(unittest.TestCase):
     # P1 台账 #8:贷记单=方向性单据,两链共用本判定强制人工,不许当普通发票静默过账。
 

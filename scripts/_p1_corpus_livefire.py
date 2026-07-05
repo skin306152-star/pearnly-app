@@ -151,27 +151,67 @@ def _fire_one(sess, item):
     return row
 
 
-_PROBES = [
-    ("empty.jpg", b""),
-    ("fake_ext.pdf", b"\xff\xd8\xff\xe0" + b"\x00" * 400),  # jpg 头字节但扩展名 .pdf
-    ("blank.png", None),  # 运行时生成纯白图
-]
-
-
-def _blank_png() -> bytes:
+def _img(color="white", size=(800, 1000), fmt="PNG") -> bytes:
     from PIL import Image
 
     buf = io.BytesIO()
-    Image.new("RGB", (800, 1000), "white").save(buf, format="PNG")
+    Image.new("RGB", size, color).save(buf, format=fmt)
     return buf.getvalue()
 
 
+def _noise_jpg(size=(900, 1200)) -> bytes:
+    import random
+
+    from PIL import Image
+
+    rnd = random.Random(20260706)
+    img = Image.new("RGB", size)
+    img.putdata([(rnd.randrange(256),) * 3 for _ in range(size[0] * size[1])])
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=80)
+    return buf.getvalue()
+
+
+def _probes() -> list:
+    """入口怪文件层(P3):每个真实用户可能真传的怪东西。考「死得体面」=
+    非 500 + 结构化人话码 + 零扣费,不考读得准。全部运行时生成,零外部依赖。"""
+    jpg = _img(fmt="JPEG")
+    return [
+        ("empty.jpg", b""),
+        ("fake_ext.pdf", b"\xff\xd8\xff\xe0" + b"\x00" * 400),  # jpg 头字节但扩展名 .pdf
+        ("fake_ext2.jpg", b"%PDF-1.4\n" + b"0" * 400),  # pdf 头字节但扩展名 .jpg
+        ("blank.png", _img()),
+        ("black.jpg", _img("black", fmt="JPEG")),
+        ("tiny.jpg", _img(size=(8, 8), fmt="JPEG")),
+        ("panorama.jpg", _img(size=(400, 8000), fmt="JPEG")),  # 竖幅全景长图
+        ("noise_photo.jpg", _noise_jpg()),  # 口袋里误拍的噪点图
+        ("corrupt.pdf", b"%PDF-1.4\n1 0 obj\n<<garbage" + os.urandom(600)),
+        ("truncated.jpg", jpg[: len(jpg) // 3]),  # 上传断流截半
+        ("no_ext", jpg),  # 无扩展名
+        ("weird_name_ใบเสร็จ #1 (copy).jpg", jpg),
+        ("script.exe.jpg", jpg),  # 双扩展名
+        ("garbage.csv", "\x00\x01\x02,,,\nnot,a,table".encode()),  # 表格直读门
+        ("bom_utf16.csv", "﻿a,b,c\n1,2,3".encode("utf-16")),
+    ]
+
+
+def _credits(sess) -> float:
+    try:
+        r = sess.get(f"{BASE}/api/me/credits", timeout=15)
+        d = r.json()
+        return float(d.get("balance_thb") or d.get("balance") or 0)
+    except Exception:  # noqa: BLE001
+        return -1.0
+
+
 def _fire_probes(sess, out):
-    for name, data in _PROBES:
-        payload = _blank_png() if data is None else data
+    bal0 = _credits(sess)
+    n_fail = n_accepted = 0
+    for name, payload in _probes():
         try:
             r = _recognize(sess, name, payload)
             graceful = r.status_code < 500
+            n_accepted += r.status_code == 200
             row = {
                 "id": f"probe:{name}",
                 "status": r.status_code,
@@ -180,19 +220,28 @@ def _fire_probes(sess, out):
             }
         except Exception as e:  # noqa: BLE001
             row = {"id": f"probe:{name}", "outcome": "fail_raise", "body": str(e)[:200]}
+        n_fail += row["outcome"] != "pass_graceful"
         out.write(json.dumps(row, ensure_ascii=False) + "\n")
         print(row["id"], row["outcome"], row.get("status"))
+    bal1 = _credits(sess)
+    # 成功处理(200)扣费合法;全被拒收却掉余额 = 拒收还扣费,违规
+    charged_on_reject = bal0 >= 0 and bal1 < bal0 and n_accepted == 0
+    print(
+        f"probes: {n_fail} 不体面 · {n_accepted} 张被正常收案 · 余额 {bal0} → {bal1} · "
+        + ("❌ 拒收还扣费" if charged_on_reject else "扣费面 ✓")
+    )
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--probes-only", action="store_true", help="只打入口怪文件层,不跑语料")
     ap.add_argument("--out", default=os.environ.get("P1_OUT", "p1_results.jsonl"))
     args = ap.parse_args()
 
     sess = requests.Session()
     _login(sess)
-    items = _load_items()
+    items = [] if args.probes_only else _load_items()
     if args.limit:
         items = items[: args.limit]
     print(f"corpus items: {len(items)} → {BASE}")

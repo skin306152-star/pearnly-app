@@ -35,6 +35,19 @@ from services.ocr.invoice_no import format_warnings_for_groups
 logger = logging.getLogger("mr-pilot")
 
 
+def classify_pipeline_error(exc: Exception) -> Optional[str]:
+    """管线异常分诊:用户文件问题 → 400 detail 码;引擎故障 → None(调用方 500)。
+
+    坏字节配图片扩展名(伪装扩展名/截断/非图内容)Vision 报 Bad image data,
+    此前直通 500 吓用户(入口怪文件实弹 2026-07-06);损坏 PDF 走 Layer1PDFError。
+    """
+    if type(exc).__name__ == "Layer1PDFError" or isinstance(exc, ValueError):
+        return f"ocr.invalid_file: {exc}"
+    if "Bad image data" in str(exc):
+        return "ocr.unreadable_file"
+    return None
+
+
 def _page_confidence(p: dict) -> int:
     f = p.get("fields", {}) or {}
     s = 0
@@ -221,9 +234,10 @@ def run_recognition_core(
     except HTTPException:
         raise
     except Exception as _pipe_err:
+        _user_fault = classify_pipeline_error(_pipe_err)
+        if _user_fault:
+            raise HTTPException(400, detail=_user_fault)
         err_name = type(_pipe_err).__name__
-        if err_name == "Layer1PDFError" or isinstance(_pipe_err, ValueError):
-            raise HTTPException(400, detail=f"ocr.invalid_file: {_pipe_err}")
         logger.exception(f"❌ pipeline_v1 失败: {err_name}: {_pipe_err}")
         # 引擎失败也记台账(status=failed,零成本行)——失败率才算得出。文件不合法(400)不算。
         # log_ocr_cost 内部全量捕获返回 bool,不会拖垮错误响应。

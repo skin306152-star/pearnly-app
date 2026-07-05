@@ -37,7 +37,9 @@ class CorpusGroundTruthTests(unittest.TestCase):
                 m = json.loads(line)
                 gt_rel = m.get("gt") or m.get("ground_truth")
                 if gt_rel:
-                    self.assertTrue((mf.parent / gt_rel).exists(), f"{mf.name} → {gt_rel} 缺失")
+                    self.assertTrue(
+                        (mf.parent / gt_rel).exists(), f"{mf.name} → {gt_rel} 缺失"
+                    )
 
     def test_baseline_shape(self):
         base = json.loads(
@@ -51,11 +53,11 @@ class CorpusGroundTruthTests(unittest.TestCase):
 class PromptContractTests(unittest.TestCase):
     # 每个锚点背后是一条实测换来的钱面规则;删掉/改名必须让这里红,逼出显式决策。
     _INVOICE_ANCHORS = (
-        "4b. TOTAL vs PAYMENT",          # 找零陷阱(总额≠现金≠找零)
-        "4d. CREDIT NOTES",              # 贷记单负号保真(台账#8)
-        "4e. SUBTOTAL SEMANTICS",        # VAT 内含填法(台账#7·回落率 26%→19%)
-        "7c. PRE-TRANSACTION DOCUMENTS", # PO/报价单诱饵拒收(台账#1)
-        "ใบส่งของ/ใบกำกับภาษี",            # 二合一真票防误杀例外
+        "4b. TOTAL vs PAYMENT",  # 找零陷阱(总额≠现金≠找零)
+        "4d. CREDIT NOTES",  # 贷记单负号保真(台账#8)
+        "4e. SUBTOTAL SEMANTICS",  # VAT 内含填法(台账#7·回落率 26%→19%)
+        "7c. PRE-TRANSACTION DOCUMENTS",  # PO/报价单诱饵拒收(台账#1)
+        "ใบส่งของ/ใบกำกับภาษี",  # 二合一真票防误杀例外
         "NEVER flip a printed negative",
     )
 
@@ -64,8 +66,12 @@ class PromptContractTests(unittest.TestCase):
             self.assertIn(anchor, lp._SYSTEM_PROMPT, f"发票提示词锚点丢失: {anchor}")
 
     def test_recon_prompt_anchors(self):
-        self.assertIn("PROVENANCE", lp._GL_SYSTEM_PROMPT)  # GL 金额溯源(描述列数字不当金额)
-        self.assertIn("Negative numbers stay negative", lp._BANK_STATEMENT_SYSTEM_PROMPT)  # 透支负号
+        self.assertIn(
+            "PROVENANCE", lp._GL_SYSTEM_PROMPT
+        )  # GL 金额溯源(描述列数字不当金额)
+        self.assertIn(
+            "Negative numbers stay negative", lp._BANK_STATEMENT_SYSTEM_PROMPT
+        )  # 透支负号
 
 
 class GateLogicTests(unittest.TestCase):
@@ -76,22 +82,38 @@ class GateLogicTests(unittest.TestCase):
 
     def _good_inv(self):
         # 2026-07-05 验收轮实测值 —— 基线必须放行自己的出生数据
-        return {"n": 181, "avg_score": 0.851, "total_amount_miss": 11, "silent_pass": 1,
-                "silent_files": ["trap11"], "fallback_share": 0.188}
+        return {
+            "n": 181,
+            "avg_score": 0.851,
+            "total_amount_miss": 11,
+            "silent_pass": 1,
+            "silent_files": ["trap11"],
+            "fallback_share": 0.188,
+        }
 
     def test_baseline_passes_its_own_birth_data(self):
         from ocr_regression_gate import check
 
-        good_rec = {"bank_v1": 0.992, "gl_v1": 0.4, "vat_v1": 0.979,
-                    "bank_v2": 0.968, "gl_v2": 1.0, "vat_v2": 1.0}
+        good_rec = {
+            "bank_v1": 0.992,
+            "gl_v1": 0.4,
+            "vat_v1": 0.979,
+            "bank_v2": 0.968,
+            "gl_v2": 1.0,
+            "vat_v2": 1.0,
+        }
         self.assertEqual(check(self._good_inv(), good_rec, self._base()), [])
 
     def test_regressions_go_red(self):
         from ocr_regression_gate import check
 
         base = self._base()
-        for field, bad_val in (("avg_score", 0.70), ("silent_pass", 3),
-                               ("fallback_share", 0.40), ("total_amount_miss", 30)):
+        for field, bad_val in (
+            ("avg_score", 0.70),
+            ("silent_pass", 3),
+            ("fallback_share", 0.40),
+            ("total_amount_miss", 30),
+        ):
             inv = {**self._good_inv(), field: bad_val}
             self.assertTrue(check(inv, {}, base), f"{field}={bad_val} 应触红")
         self.assertTrue(check(self._good_inv(), {"bank_v2": 0.80}, base))

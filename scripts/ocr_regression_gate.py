@@ -51,7 +51,9 @@ def recon_metrics(rows_by_tag: dict) -> dict:
     out = {}
     for tag, rows in rows_by_tag.items():
         for cat in ("bank", "gl", "vat"):
-            rs = [r["A_score"] for r in rows if r.get("cat") == cat and r.get("A_score") is not None]
+            rs = [
+                r["A_score"] for r in rows if r.get("cat") == cat and r.get("A_score") is not None
+            ]
             if rs:
                 out[f"{cat}_{tag}"] = round(sum(rs) / len(rs), 3)
     return out
@@ -68,7 +70,9 @@ def check(inv: dict, rec: dict, base: dict) -> list:
     if inv["total_amount_miss"] > b["total_amount_miss_max"]:
         bad.append(f"总额错票 {inv['total_amount_miss']} > {b['total_amount_miss_max']}")
     if inv["silent_pass"] > b["silent_pass_max"]:
-        bad.append(f"钱错静默放行 {inv['silent_pass']} > {b['silent_pass_max']}: {inv['silent_files']}")
+        bad.append(
+            f"钱错静默放行 {inv['silent_pass']} > {b['silent_pass_max']}: {inv['silent_files']}"
+        )
     if inv["fallback_share"] > b["fallback_share_max"]:
         bad.append(f"直读回落率 {inv['fallback_share']} > {b['fallback_share_max']}")
     r = base["recon"]
@@ -85,7 +89,9 @@ def check(inv: dict, rec: dict, base: dict) -> list:
 def main() -> int:
     ap = argparse.ArgumentParser(description="OCR 行为回归闸:跑批结果 vs 基线")
     ap.add_argument("--invoice", nargs="*", default=[], help="发票轮结果 json(可多份合并)")
-    ap.add_argument("--recon", nargs="*", default=[], help="对账轮结果 json(文件名含 v1/v2 用于 gl 分列)")
+    ap.add_argument(
+        "--recon", nargs="*", default=[], help="对账轮结果 json(文件名含 v1/v2 用于 gl 分列)"
+    )
     ap.add_argument("--baseline", default=str(BASELINE_PATH))
     args = ap.parse_args()
 
@@ -105,9 +111,7 @@ def main() -> int:
     if rec:
         print("对账:", rec)
 
-    bad = check(inv, rec, base) if inv else (
-        ["未提供发票结果(--invoice 必填,发票是流量大头)"]
-    )
+    bad = check(inv, rec, base) if inv else (["未提供发票结果(--invoice 必填,发票是流量大头)"])
     if bad:
         print("\n❌ 回归闸红:")
         for x in bad:

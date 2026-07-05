@@ -152,19 +152,27 @@ class LineSumExceedsSubtotalTests(unittest.TestCase):
         return [LineItem(name=f"i{i}", subtotal=s) for i, s in enumerate(subs)]
 
     def test_trap08_shape_flagged(self):
-        inv = _inv(subtotal="1396.68", vat="0.00", total_amount="1346.68", discount="50.00",
-                   items=self._items("396.68", "1500.00"))
+        inv = _inv(
+            subtotal="1396.68",
+            vat="0.00",
+            total_amount="1346.68",
+            discount="50.00",
+            items=self._items("396.68", "1500.00"),
+        )
         self.assertTrue(any("明细行和" in r for r in evaluate_sanity(inv)))
 
     def test_partial_items_not_flagged(self):
         # 只读到部分明细(行和 < 小计)= 合法漏行,不误杀
-        inv = _inv(subtotal="1896.68", total_amount="1896.68",
-                   items=self._items("396.68"))
+        inv = _inv(subtotal="1896.68", total_amount="1896.68", items=self._items("396.68"))
         self.assertFalse(any("明细行和" in r for r in evaluate_sanity(inv)))
 
     def test_rounding_within_tolerance_not_flagged(self):
-        inv = _inv(subtotal="100.00", total_amount="107.00", vat="7.00",
-                   items=self._items("60.00", "40.30"))  # 0.30 < max(0.5, 2%)
+        inv = _inv(
+            subtotal="100.00",
+            total_amount="107.00",
+            vat="7.00",
+            items=self._items("60.00", "40.30"),
+        )  # 0.30 < max(0.5, 2%)
         self.assertFalse(any("明细行和" in r for r in evaluate_sanity(inv)))
 
     def test_single_item_not_judged(self):

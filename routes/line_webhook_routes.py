@@ -287,8 +287,9 @@ async def _handle_line_text(
     # v118.25.4 · 在最开头算出 ev_lang 备用 · 所有未确定身份的 fallback 都用它
     ev_lang = _ev_lang(ev)
 
-    # 6 位数字 → 尝试当作绑定码
-    if len(text) == 6 and text.isdigit():
+    # 6 位数字 → 尝试当作绑定码(仅未绑定用户;已绑用户的 6 位数字=普通消息,放行给大脑,
+    # 免笑声「555555」/随口报数撞 6 位码格式被核销弹「链接失效」卡)。
+    if len(text) == 6 and text.isdigit() and not db.get_user_by_line_user_id(line_user_id):
         user_id = db.consume_line_binding_code(text)
         if not user_id:
             # v118.25.4 · 绑定码无效 · 还不知道是哪个 Pearnly 用户 · 用 LINE 语言

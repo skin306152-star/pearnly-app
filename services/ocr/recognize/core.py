@@ -345,7 +345,7 @@ def run_recognition_core(
             user_id=str(user["id"]),
             tenant_id=str(user.get("tenant_id")) if user.get("tenant_id") else None,
             history_id=primary_history_id,
-            engine="pipeline_v1",
+            engine=str(getattr(_pipe_res, "engine", "") or "pipeline_v1"),
             pages=total_pages,
             input_tokens=total_input_tokens,
             output_tokens=total_output_tokens,

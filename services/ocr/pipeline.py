@@ -48,6 +48,7 @@ import time
 from pathlib import Path
 from typing import List, Optional, Union
 
+from . import direct_read
 from .layer1_base import Layer1TransientError
 from .layer1_vision import (
     Layer1PDFError,
@@ -147,17 +148,6 @@ def downscale_image_bytes(image_bytes: bytes, max_long_edge: int) -> bytes:
         return image_bytes
 
 
-# Template (invoice_number prefix) familiarity check — minimum seen instances
-# before flagging a new pattern as anomalous, to avoid flagging the first
-# invoice ever for a given seller.
-
-# Critical fields whose word-level confidence we check (B1 fix: replaces the
-# page-avg confidence trigger which was too coarse).
-# date is checked separately because date_raw / date might both be present
-
-# Gemini pricing (USD per 1M tokens unless noted). Update if Google changes pricing.
-# Source: architecture.md §三 cost table back-calculated to per-token rates.
-
 DEFAULT_DPI = 200
 DEFAULT_MAX_PAGES = 50
 
@@ -174,15 +164,6 @@ PDF_EXTENSIONS = {".pdf"}
 # 2026-05-21 multi-format refactor: Excel/CSV/Word bypass OCR entirely
 # (table_path direct read). Final set comes from table_path.SUPPORTED_TABLE_EXTENSIONS.
 TABLE_EXTENSIONS = SUPPORTED_TABLE_EXTENSIONS
-
-# 2026-05-21 confidence routing buckets (per request "confidence routing /
-# review queue"). Auto-flow threshold matches financial-grade SaaS norms.
-
-
-# ============================================================
-# Invoice number pattern memory (B1 fix part: template familiarity)
-# ============================================================
-
 
 # ============================================================
 # Public API
@@ -359,6 +340,22 @@ def run_on_pdf_bytes(
         )
         layer1_pages_override = None
 
+    # image-direct 直读(2026-07-05 S2 分流):扫描件短文档跳过 Vision。
+    # 电子 PDF(text_path 命中)不经此;长表/多页对账件路由器直接放行到 Vision 路。
+    engine = "pipeline_v1"
+    if (
+        layer1_pages_override is None
+        and direct_read.enabled()
+        and direct_read.route_direct(len(page_image_bytes_list), document_type)
+    ):
+        try:
+            return direct_read.run_file(
+                page_image_bytes_list, document_type=document_type, api_key=api_key
+            )
+        except direct_read.DirectReadFallback as e:
+            logger.warning("pipeline: pdf direct-read fell back to Vision path: %s", e)
+            engine = direct_read.ENGINE_FALLBACK
+
     page_results: List[PipelinePageResult] = _process_pages(
         page_image_bytes_list,
         layer1_pages_override,
@@ -375,6 +372,7 @@ def run_on_pdf_bytes(
         pages=page_results,
         page_count=len(page_results),
         elapsed_ms=elapsed_ms,
+        engine=engine,
         estimated_cost_thb=cost_thb,
     )
 
@@ -415,6 +413,17 @@ def run_on_image_bytes(
         raise ValueError("pipeline: empty image bytes")
 
     t0 = time.time()
+    # image-direct 直读(2026-07-05 S2 分流):单图默认跳过 Vision,原图直喂多模态。
+    engine = "pipeline_v1"
+    if direct_read.enabled() and direct_read.route_direct(1, document_type):
+        try:
+            return direct_read.run_file(
+                [image_bytes], document_type=document_type, api_key=api_key
+            )
+        except direct_read.DirectReadFallback as e:
+            logger.warning("pipeline: image direct-read fell back to Vision path: %s", e)
+            engine = direct_read.ENGINE_FALLBACK
+
     # Step3(REFACTOR-WA-OCRPERF)· 仅图片上传:Layer1 Vision 用压缩版(最长边 cap)·
     # image_bytes 传原图全分辨率 → L3 兜底用原图。PDF 路径(run_on_pdf_bytes)不经此。
     _l1_img = downscale_image_bytes(image_bytes, OCR_IMG_MAX_LONG_EDGE)
@@ -434,6 +443,7 @@ def run_on_image_bytes(
         pages=[pr],
         page_count=1,
         elapsed_ms=elapsed_ms,
+        engine=engine,
         estimated_cost_thb=cost_thb,
     )
 

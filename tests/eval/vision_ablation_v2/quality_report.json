@@ -1,0 +1,122 @@
+{
+  "total_images": 170,
+  "sample_count": 10,
+  "checks": {
+    "all_samples_nonblank": true,
+    "all_samples_non_white_background": true,
+    "all_manifest_items_have_augraphy_flag": true,
+    "all_manifest_items_have_photo_composite_flag": true
+  },
+  "samples": [
+    {
+      "label": "inv_v2_001",
+      "type": "invoice",
+      "path": "samples/sample_01_inv_v2_001.jpg",
+      "width": 1500,
+      "height": 1700,
+      "rgb_mean": 114.93,
+      "rgb_stddev": 63.66,
+      "white_ratio": 0.0002,
+      "file_kb": 388.4
+    },
+    {
+      "label": "inv_v2_003",
+      "type": "invoice",
+      "path": "samples/sample_02_inv_v2_003.jpg",
+      "width": 1500,
+      "height": 1700,
+      "rgb_mean": 115.82,
+      "rgb_stddev": 62.65,
+      "white_ratio": 0.0001,
+      "file_kb": 439.7
+    },
+    {
+      "label": "inv_v2_009",
+      "type": "invoice",
+      "path": "samples/sample_03_inv_v2_009.jpg",
+      "width": 1900,
+      "height": 1400,
+      "rgb_mean": 118.39,
+      "rgb_stddev": 64.66,
+      "white_ratio": 0.0008,
+      "file_kb": 461.5
+    },
+    {
+      "label": "inv_v2_016",
+      "type": "invoice",
+      "path": "samples/sample_04_inv_v2_016.jpg",
+      "width": 1500,
+      "height": 1700,
+      "rgb_mean": 108.11,
+      "rgb_stddev": 57.95,
+      "white_ratio": 0.0004,
+      "file_kb": 459.6
+    },
+    {
+      "label": "bank_kbank_01",
+      "type": "bank_statement",
+      "path": "samples/sample_05_bank_kbank_01.jpg",
+      "width": 1900,
+      "height": 1400,
+      "rgb_mean": 151.89,
+      "rgb_stddev": 80.4,
+      "white_ratio": 0.0526,
+      "file_kb": 595.1
+    },
+    {
+      "label": "bank_scb_02",
+      "type": "bank_statement",
+      "path": "samples/sample_06_bank_scb_02.jpg",
+      "width": 1900,
+      "height": 1400,
+      "rgb_mean": 152.52,
+      "rgb_stddev": 72.16,
+      "white_ratio": 0.0122,
+      "file_kb": 453.3
+    },
+    {
+      "label": "bank_ttb_01",
+      "type": "bank_statement",
+      "path": "samples/sample_07_bank_ttb_01.jpg",
+      "width": 1900,
+      "height": 1400,
+      "rgb_mean": 153.62,
+      "rgb_stddev": 77.58,
+      "white_ratio": 0.0151,
+      "file_kb": 545.6
+    },
+    {
+      "label": "bank_ktb_01",
+      "type": "bank_statement",
+      "path": "samples/sample_08_bank_ktb_01.jpg",
+      "width": 1900,
+      "height": 1400,
+      "rgb_mean": 150.35,
+      "rgb_stddev": 71.99,
+      "white_ratio": 0.0007,
+      "file_kb": 455.1
+    },
+    {
+      "label": "gl_v2_04",
+      "type": "general_ledger",
+      "path": "samples/sample_09_gl_v2_04.jpg",
+      "width": 1900,
+      "height": 1400,
+      "rgb_mean": 146.79,
+      "rgb_stddev": 57.69,
+      "white_ratio": 0.0003,
+      "file_kb": 476.7
+    },
+    {
+      "label": "vat_v2_06",
+      "type": "vat_report",
+      "path": "samples/sample_10_vat_v2_06.jpg",
+      "width": 1900,
+      "height": 1400,
+      "rgb_mean": 152.74,
+      "rgb_stddev": 60.81,
+      "white_ratio": 0.0007,
+      "file_kb": 496.0
+    }
+  ]
+}

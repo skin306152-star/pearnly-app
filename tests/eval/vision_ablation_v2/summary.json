@@ -12,6 +12,43 @@
     "scb": 8,
     "ttb": 8
   },
+  "invoice_trap_distribution": {
+    "baseline": 5,
+    "cash_change": 5,
+    "copy_duplicate": 5,
+    "credit_note": 5,
+    "discount_before_vat": 5,
+    "foreign_currency": 5,
+    "handwritten_note": 5,
+    "long_numbers": 5,
+    "multi_invoice": 5,
+    "non_invoice": 5,
+    "overlapping_columns": 5,
+    "quantity_as_amount": 5,
+    "tax_exempt": 5,
+    "thai_date": 5,
+    "thermal_receipt": 5,
+    "thousands_sticky": 5,
+    "wht": 5,
+    "zero_total": 5
+  },
+  "photo_profile_distribution": {
+    "coffee_stain": 28,
+    "curled_a4": 15,
+    "folded_receipt": 28,
+    "handheld_low_light": 15,
+    "laminated_counter_shadow": 29,
+    "motion_blur": 14,
+    "phone_flash": 28,
+    "wood_table_angle": 13
+  },
+  "render_kind_distribution": {
+    "a4": 25,
+    "bank_statement": 56,
+    "general_ledger": 12,
+    "receipt": 65,
+    "vat_report": 12
+  },
   "augraphy_required": true,
   "photo_composite_required": true
 }

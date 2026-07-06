@@ -9,35 +9,33 @@ from pathlib import Path
 
 from cases_v2 import BANK_SOURCES, bank_cases, gl_cases, invoice_cases, vat_cases
 from photo_v2 import save_photo
+from PIL import Image, ImageStat
 from render_v2 import render_bank_paper, render_gl_paper, render_invoice_paper, render_vat_paper
 
 ROOT = Path(__file__).resolve().parent
 
 
 def main() -> None:
-    reset_generated_files()
-    invoices = generate_invoices()
-    bank = generate_bank()
-    gl = generate_gl()
-    vat = generate_vat()
-    validate_corpus(invoices, bank, gl, vat)
-    recon = bank + gl + vat
-    write_jsonl(ROOT / "manifest.jsonl", invoices)
-    write_jsonl(ROOT / "manifest_recon.jsonl", recon)
-    samples = write_samples(invoices, bank, gl, vat)
-    summary = {
-        "invoice_count": len(invoices),
-        "bank_count": len(bank),
-        "gl_count": len(gl),
-        "vat_count": len(vat),
-        "bank_distribution": dict(sorted(Counter(item["bank_code"] for item in bank).items())),
-        "augraphy_required": True,
-        "photo_composite_required": True,
-    }
-    write_json(ROOT / "summary.json", summary)
-    write_readme(summary, samples)
-    run_prettier()
-    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    cleanup_augraphy_cache()
+    try:
+        reset_generated_files()
+        invoices = generate_invoices()
+        bank = generate_bank()
+        gl = generate_gl()
+        vat = generate_vat()
+        validate_corpus(invoices, bank, gl, vat)
+        recon = bank + gl + vat
+        write_jsonl(ROOT / "manifest.jsonl", invoices)
+        write_jsonl(ROOT / "manifest_recon.jsonl", recon)
+        samples = write_samples(invoices, bank, gl, vat)
+        summary = build_summary(invoices, bank, gl, vat)
+        report = write_quality_report(invoices + recon, samples)
+        write_json(ROOT / "summary.json", summary)
+        write_readme(summary, samples, report)
+        run_prettier()
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+    finally:
+        cleanup_augraphy_cache()
 
 
 def reset_generated_files() -> None:
@@ -45,10 +43,19 @@ def reset_generated_files() -> None:
         raise RuntimeError(f"refusing to clean unexpected path: {ROOT}")
     for name in ["images", "ground_truth", "bank", "gl", "vat", "samples"]:
         shutil.rmtree(ROOT / name, ignore_errors=True)
-    for name in ["manifest.jsonl", "manifest_recon.jsonl", "summary.json"]:
+    for name in ["manifest.jsonl", "manifest_recon.jsonl", "summary.json", "quality_report.json"]:
         path = ROOT / name
         if path.exists():
             path.unlink()
+
+
+def cleanup_augraphy_cache() -> None:
+    cache = ROOT.parents[2] / "augraphy_cache"
+    if not cache.exists():
+        return
+    if cache.name != "augraphy_cache" or not cache.is_dir():
+        raise RuntimeError(f"refusing to clean unexpected cache path: {cache}")
+    shutil.rmtree(cache)
 
 
 def generate_invoices() -> list[dict]:
@@ -205,6 +212,29 @@ def validate_vat(gt: dict) -> None:
     assert dec(gt["total_total"]) == total
 
 
+def build_summary(invoices: list[dict], bank: list[dict], gl: list[dict], vat: list[dict]) -> dict:
+    recon = bank + gl + vat
+    all_items = invoices + recon
+    return {
+        "invoice_count": len(invoices),
+        "bank_count": len(bank),
+        "gl_count": len(gl),
+        "vat_count": len(vat),
+        "bank_distribution": dict(sorted(Counter(item["bank_code"] for item in bank).items())),
+        "invoice_trap_distribution": dict(
+            sorted(Counter(item["trap"] for item in invoices).items())
+        ),
+        "photo_profile_distribution": dict(
+            sorted(Counter(item["photo_profile"] for item in all_items).items())
+        ),
+        "render_kind_distribution": dict(
+            sorted(Counter(item.get("render_kind", item["type"]) for item in all_items).items())
+        ),
+        "augraphy_required": True,
+        "photo_composite_required": True,
+    }
+
+
 def write_samples(
     invoices: list[dict], bank: list[dict], gl: list[dict], vat: list[dict]
 ) -> list[dict]:
@@ -233,13 +263,68 @@ def write_samples(
     return samples
 
 
-def write_readme(summary: dict, samples: list[dict]) -> None:
+def write_quality_report(manifest: list[dict], samples: list[dict]) -> dict:
+    metrics = [image_metrics(item) for item in samples]
+    report = {
+        "total_images": len(manifest),
+        "sample_count": len(samples),
+        "checks": {
+            "all_samples_nonblank": all(item["rgb_stddev"] > 25 for item in metrics),
+            "all_samples_non_white_background": all(item["white_ratio"] < 0.55 for item in metrics),
+            "all_manifest_items_have_augraphy_flag": all(
+                item.get("quality", {}).get("augraphy") is True for item in manifest
+            ),
+            "all_manifest_items_have_photo_composite_flag": all(
+                item.get("quality", {}).get("photo_composite") is True for item in manifest
+            ),
+        },
+        "samples": metrics,
+    }
+    write_json(ROOT / "quality_report.json", report)
+    return report
+
+
+def image_metrics(sample: dict) -> dict:
+    path = ROOT / sample["path"]
+    with Image.open(path) as image:
+        rgb = image.convert("RGB")
+        stat = ImageStat.Stat(rgb)
+        pixels = list(rgb.getdata())
+    white = sum(1 for red, green, blue in pixels if (red + green + blue) / 3 > 245)
+    total = len(pixels)
+    return {
+        "label": sample["label"],
+        "type": sample["type"],
+        "path": sample["path"],
+        "width": rgb.width,
+        "height": rgb.height,
+        "rgb_mean": round(sum(stat.mean) / 3, 2),
+        "rgb_stddev": round(sum(stat.stddev) / 3, 2),
+        "white_ratio": round(white / total, 4),
+        "file_kb": round(path.stat().st_size / 1024, 1),
+    }
+
+
+def write_readme(summary: dict, samples: list[dict], report: dict) -> None:
     sample_lines = "\n".join(f"![{item['label']}]({item['path']})" for item in samples)
+    sample_table = "\n".join(
+        f"| `{item['label']}` | {item['type']} | {item['rgb_stddev']} | {item['white_ratio']} |"
+        for item in report["samples"]
+    )
     source_lines = "\n".join(
         f"- `{code}` {source['name']}: {source['url']} ({source['note']})"
         for code, source in BANK_SOURCES.items()
     )
     bank_distribution = json.dumps(summary["bank_distribution"], ensure_ascii=False, sort_keys=True)
+    trap_distribution = json.dumps(
+        summary["invoice_trap_distribution"], ensure_ascii=False, sort_keys=True
+    )
+    profile_distribution = json.dumps(
+        summary["photo_profile_distribution"], ensure_ascii=False, sort_keys=True
+    )
+    render_distribution = json.dumps(
+        summary["render_kind_distribution"], ensure_ascii=False, sort_keys=True
+    )
     checklist = "\n".join(
         [
             "- [x] Background is not pure white.",
@@ -263,6 +348,12 @@ This corpus is the realism upgrade of V1. It keeps the V1 GT schema, field align
 - General ledger reports: {summary["gl_count"]}
 - VAT reports: {summary["vat_count"]}
 
+## Scenario Distribution
+
+- Invoice traps: `{trap_distribution}`
+- Photo profiles: `{profile_distribution}`
+- Render kinds: `{render_distribution}`
+
 ## Realism Contract
 
 - Every image is first rendered as a synthetic document, then passed through Augraphy (`InkBleed`, `Folding`, `BrightnessTexturize`, `DirtyDrum`, `Stains`, optional `ShadowCast`).
@@ -280,6 +371,12 @@ Bank layouts are skeleton recreations only. All names, account numbers, referenc
 ## Self-check
 
 {checklist}
+
+Machine-readable QA is in `quality_report.json`.
+
+| Sample | Type | RGB stddev | White ratio |
+|---|---:|---:|---:|
+{sample_table}
 
 ## Sample Inspection Set
 

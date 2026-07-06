@@ -11,6 +11,12 @@ This corpus is the realism upgrade of V1. It keeps the V1 GT schema, field align
 - General ledger reports: 12
 - VAT reports: 12
 
+## Scenario Distribution
+
+- Invoice traps: `{"baseline": 5, "cash_change": 5, "copy_duplicate": 5, "credit_note": 5, "discount_before_vat": 5, "foreign_currency": 5, "handwritten_note": 5, "long_numbers": 5, "multi_invoice": 5, "non_invoice": 5, "overlapping_columns": 5, "quantity_as_amount": 5, "tax_exempt": 5, "thai_date": 5, "thermal_receipt": 5, "thousands_sticky": 5, "wht": 5, "zero_total": 5}`
+- Photo profiles: `{"coffee_stain": 28, "curled_a4": 15, "folded_receipt": 28, "handheld_low_light": 15, "laminated_counter_shadow": 29, "motion_blur": 14, "phone_flash": 28, "wood_table_angle": 13}`
+- Render kinds: `{"a4": 25, "bank_statement": 56, "general_ledger": 12, "receipt": 65, "vat_report": 12}`
+
 ## Realism Contract
 
 - Every image is first rendered as a synthetic document, then passed through Augraphy (`InkBleed`, `Folding`, `BrightnessTexturize`, `DirtyDrum`, `Stains`, optional `ShadowCast`).
@@ -39,6 +45,21 @@ Bank layouts are skeleton recreations only. All names, account numbers, referenc
 - [x] Paper deformation, folds, curled edges, or ragged edges are visible.
 - [x] Augraphy degradation is applied to every rendered page.
 - [x] Thai text uses installed Thai-capable fonts and renders without square boxes in samples.
+
+Machine-readable QA is in `quality_report.json`.
+
+| Sample | Type | RGB stddev | White ratio |
+|---|---:|---:|---:|
+| `inv_v2_001` | invoice | 63.66 | 0.0002 |
+| `inv_v2_003` | invoice | 62.65 | 0.0001 |
+| `inv_v2_009` | invoice | 64.66 | 0.0008 |
+| `inv_v2_016` | invoice | 57.95 | 0.0004 |
+| `bank_kbank_01` | bank_statement | 80.4 | 0.0526 |
+| `bank_scb_02` | bank_statement | 72.16 | 0.0122 |
+| `bank_ttb_01` | bank_statement | 77.58 | 0.0151 |
+| `bank_ktb_01` | bank_statement | 71.99 | 0.0007 |
+| `gl_v2_04` | general_ledger | 57.69 | 0.0003 |
+| `vat_v2_06` | vat_report | 60.81 | 0.0007 |
 
 ## Sample Inspection Set
 

@@ -1,0 +1,50 @@
+{
+  "id": "cash_change_p3_029_blur08",
+  "file": "cash_change_p3_029_blur08.jpg",
+  "document_type": "simplified_tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "RCP69-8028",
+  "date": "2026-07-06",
+  "date_raw": "06/07/69 13:27",
+  "seller_name": "บริษัท เมืองไทยโลจิสติกส์ จำกัด",
+  "seller_tax": "0105558123451",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "",
+  "buyer_tax": "",
+  "buyer_addr": "",
+  "subtotal": "219.00",
+  "vat": "0.00",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "219.00",
+  "cash_amount": "332.00",
+  "change_amount": "113.00",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "กระดาษ A4",
+      "qty": "1",
+      "price": "135.78",
+      "subtotal": "135.78"
+    },
+    {
+      "name": "หมึกพิมพ์",
+      "qty": "1",
+      "price": "83.22",
+      "subtotal": "83.22"
+    }
+  ],
+  "items_count": 2,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "cash_change_trap",
+  "traps": ["cash_gt_total", "change_line"],
+  "degradation": ["blur0.8"],
+  "corpus": "p3",
+  "base_id": "cash_change_p3_029",
+  "_note": "cash tendered minus true total equals change"
+}

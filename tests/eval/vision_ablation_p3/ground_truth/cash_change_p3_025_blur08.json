@@ -1,0 +1,50 @@
+{
+  "id": "cash_change_p3_025_blur08",
+  "file": "cash_change_p3_025_blur08.jpg",
+  "document_type": "simplified_tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "RCP69-8024",
+  "date": "2026-07-06",
+  "date_raw": "06/07/69 13:27",
+  "seller_name": "CP ALL, 7-Eleven สาขาสีลม",
+  "seller_tax": "0107542000011",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "",
+  "buyer_tax": "",
+  "buyer_addr": "",
+  "subtotal": "207.00",
+  "vat": "0.00",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "207.00",
+  "cash_amount": "386.00",
+  "change_amount": "179.00",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "กาแฟเย็น",
+      "qty": "1",
+      "price": "128.34",
+      "subtotal": "128.34"
+    },
+    {
+      "name": "ข้าวกล่อง",
+      "qty": "1",
+      "price": "78.66",
+      "subtotal": "78.66"
+    }
+  ],
+  "items_count": 2,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "cash_change_trap",
+  "traps": ["cash_gt_total", "change_line"],
+  "degradation": ["blur0.8"],
+  "corpus": "p3",
+  "base_id": "cash_change_p3_025",
+  "_note": "cash tendered minus true total equals change"
+}

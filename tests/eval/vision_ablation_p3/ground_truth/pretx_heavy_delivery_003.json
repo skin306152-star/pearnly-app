@@ -1,0 +1,55 @@
+{
+  "id": "pretx_heavy_delivery_003",
+  "file": "pretx_heavy_delivery_003.jpg",
+  "document_type": "other",
+  "is_not_invoice": true,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "DELIVERY-69-3102",
+  "date": "2026-07-06",
+  "date_raw": "06/07/2569",
+  "seller_name": "บริษัท เมืองไทยโลจิสติกส์ จำกัด",
+  "seller_tax": "0105558123451",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "หจก. สกิน แอนด์ โค",
+  "buyer_tax": "0903563007782",
+  "buyer_addr": "กรุงเทพมหานคร",
+  "subtotal": "305.00",
+  "vat": "0.00",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "305.00",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "",
+  "currency": "",
+  "items": [
+    {
+      "name": "ค่าขนส่ง",
+      "qty": "1",
+      "price": "85.00",
+      "subtotal": "85.00"
+    },
+    {
+      "name": "แฟ้มเอกสาร",
+      "qty": "6",
+      "price": "35.00",
+      "subtotal": "210.00"
+    },
+    {
+      "name": "น้ำดื่ม",
+      "qty": "1",
+      "price": "10.00",
+      "subtotal": "10.00"
+    }
+  ],
+  "items_count": 3,
+  "notes": "",
+  "category": "เอกสาร",
+  "additional_invoices": [],
+  "scenario": "pretransaction_decoy_heavy_degrade",
+  "traps": ["po_quote_delivery_copy"],
+  "degradation": ["fold_crease", "low_res", "jpeg_artifact", "crumple", "title_line_creased"],
+  "corpus": "p3",
+  "_note": "not an invoice; heavy folds obscure document title"
+}

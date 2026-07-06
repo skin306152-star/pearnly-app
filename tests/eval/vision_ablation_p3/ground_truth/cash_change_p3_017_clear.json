@@ -1,0 +1,50 @@
+{
+  "id": "cash_change_p3_017_clear",
+  "file": "cash_change_p3_017_clear.jpg",
+  "document_type": "simplified_tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "RCP69-8016",
+  "date": "2026-07-06",
+  "date_raw": "06/07/69 13:27",
+  "seller_name": "บริษัท เมืองไทยโลจิสติกส์ จำกัด",
+  "seller_tax": "0105558123451",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "",
+  "buyer_tax": "",
+  "buyer_addr": "",
+  "subtotal": "209.00",
+  "vat": "0.00",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "209.00",
+  "cash_amount": "316.00",
+  "change_amount": "107.00",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "กาแฟเย็น",
+      "qty": "1",
+      "price": "129.58",
+      "subtotal": "129.58"
+    },
+    {
+      "name": "ข้าวกล่อง",
+      "qty": "1",
+      "price": "79.42",
+      "subtotal": "79.42"
+    }
+  ],
+  "items_count": 2,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "cash_change_trap",
+  "traps": ["cash_gt_total", "change_line"],
+  "degradation": [],
+  "corpus": "p3",
+  "base_id": "cash_change_p3_017",
+  "_note": "cash tendered minus true total equals change"
+}

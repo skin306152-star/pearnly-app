@@ -1,0 +1,28 @@
+{
+  "id": "id_card_photocopy_007",
+  "file": "id_card/images/id_card_photocopy_007.jpg",
+  "people_id": "1000003581151",
+  "prefix_name": "นาย",
+  "first_name": "สมชาย",
+  "last_name": "ใจดี",
+  "first_name_en": "Somchai",
+  "last_name_en": "Jaidee",
+  "birthday_be": "2546-01-10",
+  "issue_date_be": "2563-01-15",
+  "expiry_date_be": "2573-05-11",
+  "address": {
+    "house_no": "12/7",
+    "moo": "5",
+    "soi": "ลาดพร้าว 71",
+    "road": "",
+    "subdistrict": "ลาดพร้าว",
+    "district": "ลาดพร้าว",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": "10230",
+    "address_raw": "12/7 หมู่ 5 ซ.ลาดพร้าว 71 ต.ลาดพร้าว อ.ลาดพร้าว จ.กรุงเทพมหานคร 10230"
+  },
+  "scenario": "id_card_photocopy",
+  "traps": ["copy_watermark"],
+  "degradation": ["grayscale_copy"],
+  "_note": "synthetic Thai ID card, no real person data"
+}

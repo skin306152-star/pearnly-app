@@ -1,0 +1,50 @@
+{
+  "id": "cash_change_p3_010_clear",
+  "file": "cash_change_p3_010_clear.jpg",
+  "document_type": "simplified_tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "RCP69-8009",
+  "date": "2026-07-06",
+  "date_raw": "06/07/69 13:27",
+  "seller_name": "ร้านวัสดุก่อสร้าง เจริญทรัพย์",
+  "seller_tax": "0735559001248",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "",
+  "buyer_tax": "",
+  "buyer_addr": "",
+  "subtotal": "1662.00",
+  "vat": "0.00",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "1662.00",
+  "cash_amount": "1832.00",
+  "change_amount": "170.00",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "ข้าวกล่อง",
+      "qty": "1",
+      "price": "1030.44",
+      "subtotal": "1030.44"
+    },
+    {
+      "name": "น้ำดื่ม",
+      "qty": "1",
+      "price": "631.56",
+      "subtotal": "631.56"
+    }
+  ],
+  "items_count": 2,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "cash_change_trap",
+  "traps": ["cash_gt_total", "change_line", "similar_leading_digits", "row_order_shuffled"],
+  "degradation": [],
+  "corpus": "p3",
+  "base_id": "cash_change_p3_010",
+  "_note": "cash tendered minus true total equals change"
+}

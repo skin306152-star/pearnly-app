@@ -1,0 +1,50 @@
+{
+  "id": "cash_change_p3_023_clear",
+  "file": "cash_change_p3_023_clear.jpg",
+  "document_type": "simplified_tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "RCP69-8022",
+  "date": "2026-07-06",
+  "date_raw": "06/07/69 13:27",
+  "seller_name": "บริษัท เมืองไทยโลจิสติกส์ จำกัด",
+  "seller_tax": "0105558123451",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "",
+  "buyer_tax": "",
+  "buyer_addr": "",
+  "subtotal": "214.00",
+  "vat": "0.00",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "214.00",
+  "cash_amount": "324.00",
+  "change_amount": "110.00",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "ค่าขนส่ง",
+      "qty": "1",
+      "price": "132.68",
+      "subtotal": "132.68"
+    },
+    {
+      "name": "แฟ้มเอกสาร",
+      "qty": "1",
+      "price": "81.32",
+      "subtotal": "81.32"
+    }
+  ],
+  "items_count": 2,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "cash_change_trap",
+  "traps": ["cash_gt_total", "change_line"],
+  "degradation": [],
+  "corpus": "p3",
+  "base_id": "cash_change_p3_023",
+  "_note": "cash tendered minus true total equals change"
+}

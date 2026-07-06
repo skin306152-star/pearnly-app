@@ -1,0 +1,28 @@
+{
+  "id": "id_card_photocopy_010",
+  "file": "id_card/images/id_card_photocopy_010.jpg",
+  "people_id": "1000003818720",
+  "prefix_name": "นาง",
+  "first_name": "อรทัย",
+  "last_name": "แสงทอง",
+  "first_name_en": "Orathai",
+  "last_name_en": "Saengthong",
+  "birthday_be": "2549-04-13",
+  "issue_date_be": "2563-04-15",
+  "expiry_date_be": "2573-05-11",
+  "address": {
+    "house_no": "301",
+    "moo": "1",
+    "soi": "",
+    "road": "มิตรภาพ",
+    "subdistrict": "ในเมือง",
+    "district": "เมืองขอนแก่น",
+    "province": "ขอนแก่น",
+    "zipcode": "40000",
+    "address_raw": "301 หมู่ 1 ถ.มิตรภาพ ต.ในเมือง อ.เมืองขอนแก่น จ.ขอนแก่น 40000"
+  },
+  "scenario": "id_card_photocopy",
+  "traps": ["copy_watermark"],
+  "degradation": ["grayscale_copy"],
+  "_note": "synthetic Thai ID card, no real person data"
+}

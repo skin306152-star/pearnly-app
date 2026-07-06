@@ -1,0 +1,55 @@
+{
+  "id": "pretx_heavy_quote_002",
+  "file": "pretx_heavy_quote_002.jpg",
+  "document_type": "other",
+  "is_not_invoice": true,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "QUOTE-69-3101",
+  "date": "2026-07-06",
+  "date_raw": "06/07/2569",
+  "seller_name": "ร้านวัสดุก่อสร้าง เจริญทรัพย์",
+  "seller_tax": "0735559001248",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "บริษัท เพิร์นลี่ เทค จำกัด",
+  "buyer_tax": "0105564061526",
+  "buyer_addr": "กรุงเทพมหานคร",
+  "subtotal": "1755.00",
+  "vat": "122.85",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "1877.85",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "",
+  "currency": "",
+  "items": [
+    {
+      "name": "หมึกพิมพ์",
+      "qty": "2",
+      "price": "790.00",
+      "subtotal": "1580.00"
+    },
+    {
+      "name": "ค่าขนส่ง",
+      "qty": "1",
+      "price": "85.00",
+      "subtotal": "85.00"
+    },
+    {
+      "name": "กาแฟเย็น",
+      "qty": "2",
+      "price": "45.00",
+      "subtotal": "90.00"
+    }
+  ],
+  "items_count": 3,
+  "notes": "",
+  "category": "เอกสาร",
+  "additional_invoices": [],
+  "scenario": "pretransaction_decoy_heavy_degrade",
+  "traps": ["po_quote_delivery_copy"],
+  "degradation": ["fold_crease", "low_res", "jpeg_artifact", "crumple", "title_line_creased"],
+  "corpus": "p3",
+  "_note": "not an invoice; heavy folds obscure document title"
+}

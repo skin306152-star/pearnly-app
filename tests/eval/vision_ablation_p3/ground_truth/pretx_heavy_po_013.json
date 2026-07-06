@@ -1,0 +1,55 @@
+{
+  "id": "pretx_heavy_po_013",
+  "file": "pretx_heavy_po_013.jpg",
+  "document_type": "order_evidence",
+  "is_not_invoice": true,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "PO-69-3112",
+  "date": "2026-07-06",
+  "date_raw": "06/07/2569",
+  "seller_name": "บริษัท เอเชีย ออฟฟิศ ซัพพลาย จำกัด",
+  "seller_tax": "0105562033100",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "บริษัท ดาต้าทูลส์ จำกัด",
+  "buyer_tax": "0735527000289",
+  "buyer_addr": "กรุงเทพมหานคร",
+  "subtotal": "209.00",
+  "vat": "0.00",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "209.00",
+  "cash_amount": "",
+  "change_amount": "",
+  "payment_method": "",
+  "currency": "",
+  "items": [
+    {
+      "name": "กาแฟเย็น",
+      "qty": "2",
+      "price": "45.00",
+      "subtotal": "90.00"
+    },
+    {
+      "name": "ข้าวกล่อง",
+      "qty": "1",
+      "price": "109.00",
+      "subtotal": "109.00"
+    },
+    {
+      "name": "น้ำดื่ม",
+      "qty": "1",
+      "price": "10.00",
+      "subtotal": "10.00"
+    }
+  ],
+  "items_count": 3,
+  "notes": "",
+  "category": "เอกสาร",
+  "additional_invoices": [],
+  "scenario": "pretransaction_decoy_heavy_degrade",
+  "traps": ["po_quote_delivery_copy"],
+  "degradation": ["fold_crease", "low_res", "jpeg_artifact"],
+  "corpus": "p3",
+  "_note": "not an invoice; heavy folds obscure document title"
+}

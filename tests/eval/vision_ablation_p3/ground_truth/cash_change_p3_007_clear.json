@@ -1,0 +1,50 @@
+{
+  "id": "cash_change_p3_007_clear",
+  "file": "cash_change_p3_007_clear.jpg",
+  "document_type": "simplified_tax_invoice",
+  "is_not_invoice": false,
+  "is_copy_or_duplicate": false,
+  "invoice_number": "RCP69-8006",
+  "date": "2026-07-06",
+  "date_raw": "06/07/69 13:27",
+  "seller_name": "CP ALL, 7-Eleven สาขาสีลม",
+  "seller_tax": "0107542000011",
+  "seller_addr": "กรุงเทพมหานคร",
+  "buyer_name": "",
+  "buyer_tax": "",
+  "buyer_addr": "",
+  "subtotal": "192.00",
+  "vat": "0.00",
+  "wht_rate": "",
+  "wht_amount": "",
+  "discount": "0.00",
+  "total_amount": "192.00",
+  "cash_amount": "362.00",
+  "change_amount": "170.00",
+  "payment_method": "cash",
+  "currency": "",
+  "items": [
+    {
+      "name": "ค่าขนส่ง",
+      "qty": "1",
+      "price": "119.04",
+      "subtotal": "119.04"
+    },
+    {
+      "name": "แฟ้มเอกสาร",
+      "qty": "1",
+      "price": "72.96",
+      "subtotal": "72.96"
+    }
+  ],
+  "items_count": 2,
+  "notes": "",
+  "category": "ค่าใช้จ่าย",
+  "additional_invoices": [],
+  "scenario": "cash_change_trap",
+  "traps": ["cash_gt_total", "change_line", "similar_leading_digits"],
+  "degradation": [],
+  "corpus": "p3",
+  "base_id": "cash_change_p3_007",
+  "_note": "cash tendered minus true total equals change"
+}

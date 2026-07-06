@@ -1,0 +1,28 @@
+{
+  "id": "id_card_skewed_008",
+  "file": "id_card/images/id_card_skewed_008.jpg",
+  "people_id": "1000002076541",
+  "prefix_name": "นางสาว",
+  "first_name": "ณัฐธิดา",
+  "last_name": "จันทร์เพ็ญ",
+  "first_name_en": "Nattida",
+  "last_name_en": "Chanpen",
+  "birthday_be": "2547-06-18",
+  "issue_date_be": "2563-06-15",
+  "expiry_date_be": "2573-05-11",
+  "address": {
+    "house_no": "45",
+    "moo": "2",
+    "soi": "",
+    "road": "สุขุมวิท",
+    "subdistrict": "ปากน้ำ",
+    "district": "เมืองสมุทรปราการ",
+    "province": "สมุทรปราการ",
+    "zipcode": "10270",
+    "address_raw": "45 หมู่ 2 ถ.สุขุมวิท ต.ปากน้ำ อ.เมืองสมุทรปราการ จ.สมุทรปราการ 10270"
+  },
+  "scenario": "id_card_skewed",
+  "traps": [],
+  "degradation": ["skew_8_20"],
+  "_note": "synthetic Thai ID card, no real person data"
+}

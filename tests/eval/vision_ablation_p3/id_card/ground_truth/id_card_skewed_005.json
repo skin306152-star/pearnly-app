@@ -1,0 +1,28 @@
+{
+  "id": "id_card_skewed_005",
+  "file": "id_card/images/id_card_skewed_005.jpg",
+  "people_id": "1000001838979",
+  "prefix_name": "นาย",
+  "first_name": "ธีรภัทร",
+  "last_name": "บุญมี",
+  "first_name_en": "Teerapat",
+  "last_name_en": "Boonmee",
+  "birthday_be": "2544-03-15",
+  "issue_date_be": "2563-03-15",
+  "expiry_date_be": "2573-05-11",
+  "address": {
+    "house_no": "301",
+    "moo": "1",
+    "soi": "",
+    "road": "มิตรภาพ",
+    "subdistrict": "ในเมือง",
+    "district": "เมืองขอนแก่น",
+    "province": "ขอนแก่น",
+    "zipcode": "40000",
+    "address_raw": "301 หมู่ 1 ถ.มิตรภาพ ต.ในเมือง อ.เมืองขอนแก่น จ.ขอนแก่น 40000"
+  },
+  "scenario": "id_card_skewed",
+  "traps": [],
+  "degradation": ["skew_8_20"],
+  "_note": "synthetic Thai ID card, no real person data"
+}

@@ -1,0 +1,28 @@
+{
+  "id": "id_card_glare_003",
+  "file": "id_card/images/id_card_glare_003.jpg",
+  "people_id": "1000002472498",
+  "prefix_name": "นาย",
+  "first_name": "ปกรณ์",
+  "last_name": "วงศ์ชัย",
+  "first_name_en": "Pakorn",
+  "last_name_en": "Wongchai",
+  "birthday_be": "2532-11-23",
+  "issue_date_be": "2563-11-15",
+  "expiry_date_be": "2573-05-11",
+  "address": {
+    "house_no": "45",
+    "moo": "2",
+    "soi": "",
+    "road": "สุขุมวิท",
+    "subdistrict": "ปากน้ำ",
+    "district": "เมืองสมุทรปราการ",
+    "province": "สมุทรปราการ",
+    "zipcode": "10270",
+    "address_raw": "45 หมู่ 2 ถ.สุขุมวิท ต.ปากน้ำ อ.เมืองสมุทรปราการ จ.สมุทรปราการ 10270"
+  },
+  "scenario": "id_card_glare",
+  "traps": [],
+  "degradation": ["glare"],
+  "_note": "synthetic Thai ID card, no real person data"
+}

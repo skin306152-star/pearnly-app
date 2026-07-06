@@ -1,0 +1,28 @@
+{
+  "id": "id_card_glare_006",
+  "file": "id_card/images/id_card_glare_006.jpg",
+  "people_id": "1000002710062",
+  "prefix_name": "นางสาว",
+  "first_name": "กมลวรรณ",
+  "last_name": "ศรีสุข",
+  "first_name_en": "Kamonwan",
+  "last_name_en": "Srisuk",
+  "birthday_be": "2535-02-26",
+  "issue_date_be": "2563-02-15",
+  "expiry_date_be": "2573-05-11",
+  "address": {
+    "house_no": "99/1",
+    "moo": "3",
+    "soi": "",
+    "road": "",
+    "subdistrict": "บางรัก",
+    "district": "บางรัก",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": "10500",
+    "address_raw": "99/1 หมู่ 3 ต.บางรัก อ.บางรัก จ.กรุงเทพมหานคร 10500"
+  },
+  "scenario": "id_card_glare",
+  "traps": [],
+  "degradation": ["glare"],
+  "_note": "synthetic Thai ID card, no real person data"
+}

@@ -1,0 +1,17 @@
+{
+  "seed": 73031,
+  "pretransaction_count": 20,
+  "cash_change_variants": 30,
+  "cash_change_images": 60,
+  "id_card_count": 40,
+  "image_count": 120,
+  "scenarios": {
+    "pretransaction_decoy_heavy_degrade": 20,
+    "cash_change_trap": 60,
+    "id_card_clean": 10,
+    "id_card_skewed": 10,
+    "id_card_glare": 10,
+    "id_card_expired": 5,
+    "id_card_photocopy": 5
+  }
+}

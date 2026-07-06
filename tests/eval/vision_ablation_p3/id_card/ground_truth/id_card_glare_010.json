@@ -1,0 +1,28 @@
+{
+  "id": "id_card_glare_010",
+  "file": "id_card/images/id_card_glare_010.jpg",
+  "people_id": "1000003026823",
+  "prefix_name": "นางสาว",
+  "first_name": "ณัฐธิดา",
+  "last_name": "จันทร์เพ็ญ",
+  "first_name_en": "Nattida",
+  "last_name_en": "Chanpen",
+  "birthday_be": "2539-06-03",
+  "issue_date_be": "2563-06-15",
+  "expiry_date_be": "2573-05-11",
+  "address": {
+    "house_no": "301",
+    "moo": "1",
+    "soi": "",
+    "road": "มิตรภาพ",
+    "subdistrict": "ในเมือง",
+    "district": "เมืองขอนแก่น",
+    "province": "ขอนแก่น",
+    "zipcode": "40000",
+    "address_raw": "301 หมู่ 1 ถ.มิตรภาพ ต.ในเมือง อ.เมืองขอนแก่น จ.ขอนแก่น 40000"
+  },
+  "scenario": "id_card_glare",
+  "traps": [],
+  "degradation": ["glare"],
+  "_note": "synthetic Thai ID card, no real person data"
+}

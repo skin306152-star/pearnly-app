@@ -1,0 +1,28 @@
+{
+  "id": "id_card_skewed_010",
+  "file": "id_card/images/id_card_skewed_010.jpg",
+  "people_id": "1000002234929",
+  "prefix_name": "นางสาว",
+  "first_name": "กมลวรรณ",
+  "last_name": "ศรีสุข",
+  "first_name_en": "Kamonwan",
+  "last_name_en": "Srisuk",
+  "birthday_be": "2549-08-20",
+  "issue_date_be": "2563-08-15",
+  "expiry_date_be": "2573-05-11",
+  "address": {
+    "house_no": "301",
+    "moo": "1",
+    "soi": "",
+    "road": "มิตรภาพ",
+    "subdistrict": "ในเมือง",
+    "district": "เมืองขอนแก่น",
+    "province": "ขอนแก่น",
+    "zipcode": "40000",
+    "address_raw": "301 หมู่ 1 ถ.มิตรภาพ ต.ในเมือง อ.เมืองขอนแก่น จ.ขอนแก่น 40000"
+  },
+  "scenario": "id_card_skewed",
+  "traps": [],
+  "degradation": ["skew_8_20"],
+  "_note": "synthetic Thai ID card, no real person data"
+}

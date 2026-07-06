@@ -1,0 +1,28 @@
+{
+  "id": "id_card_glare_009",
+  "file": "id_card/images/id_card_glare_009.jpg",
+  "people_id": "1000002947631",
+  "prefix_name": "นาย",
+  "first_name": "ปกรณ์",
+  "last_name": "วงศ์ชัย",
+  "first_name_en": "Pakorn",
+  "last_name_en": "Wongchai",
+  "birthday_be": "2538-05-02",
+  "issue_date_be": "2563-05-15",
+  "expiry_date_be": "2573-05-11",
+  "address": {
+    "house_no": "8/88",
+    "moo": "9",
+    "soi": "",
+    "road": "",
+    "subdistrict": "ช้างเผือก",
+    "district": "เมืองเชียงใหม่",
+    "province": "เชียงใหม่",
+    "zipcode": "50300",
+    "address_raw": "8/88 หมู่ 9 ต.ช้างเผือก อ.เมืองเชียงใหม่ จ.เชียงใหม่ 50300"
+  },
+  "scenario": "id_card_glare",
+  "traps": [],
+  "degradation": ["glare"],
+  "_note": "synthetic Thai ID card, no real person data"
+}

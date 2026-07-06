@@ -1,0 +1,3 @@
+# Generated JPGs are local, reproducible via generate.cjs (seed in summary.json), not versioned.
+images/
+id_card/images/

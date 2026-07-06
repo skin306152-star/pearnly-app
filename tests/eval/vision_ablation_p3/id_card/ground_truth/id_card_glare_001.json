@@ -1,0 +1,28 @@
+{
+  "id": "id_card_glare_001",
+  "file": "id_card/images/id_card_glare_001.jpg",
+  "people_id": "1000002314116",
+  "prefix_name": "นาย",
+  "first_name": "ธีรภัทร",
+  "last_name": "บุญมี",
+  "first_name_en": "Teerapat",
+  "last_name_en": "Boonmee",
+  "birthday_be": "2530-09-21",
+  "issue_date_be": "2563-09-15",
+  "expiry_date_be": "2573-05-11",
+  "address": {
+    "house_no": "99/1",
+    "moo": "3",
+    "soi": "",
+    "road": "",
+    "subdistrict": "บางรัก",
+    "district": "บางรัก",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": "10500",
+    "address_raw": "99/1 หมู่ 3 ต.บางรัก อ.บางรัก จ.กรุงเทพมหานคร 10500"
+  },
+  "scenario": "id_card_glare",
+  "traps": [],
+  "degradation": ["glare"],
+  "_note": "synthetic Thai ID card, no real person data"
+}

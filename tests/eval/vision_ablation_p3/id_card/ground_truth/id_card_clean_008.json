@@ -1,0 +1,28 @@
+{
+  "id": "id_card_clean_008",
+  "file": "id_card/images/id_card_clean_008.jpg",
+  "people_id": "1000001284647",
+  "prefix_name": "นางสาว",
+  "first_name": "กมลวรรณ",
+  "last_name": "ศรีสุข",
+  "first_name_en": "Kamonwan",
+  "last_name_en": "Srisuk",
+  "birthday_be": "2537-08-08",
+  "issue_date_be": "2563-08-15",
+  "expiry_date_be": "2573-05-11",
+  "address": {
+    "house_no": "45",
+    "moo": "2",
+    "soi": "",
+    "road": "สุขุมวิท",
+    "subdistrict": "ปากน้ำ",
+    "district": "เมืองสมุทรปราการ",
+    "province": "สมุทรปราการ",
+    "zipcode": "10270",
+    "address_raw": "45 หมู่ 2 ถ.สุขุมวิท ต.ปากน้ำ อ.เมืองสมุทรปราการ จ.สมุทรปราการ 10270"
+  },
+  "scenario": "id_card_clean",
+  "traps": [],
+  "degradation": [],
+  "_note": "synthetic Thai ID card, no real person data"
+}

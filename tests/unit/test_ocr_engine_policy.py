@@ -92,6 +92,23 @@ class EngineContextTests(unittest.TestCase):
                     self.assertEqual(mode, "direct35")
                     self.assertEqual(gemini_models.flash(), "gemini-3.5-flash")
 
+    def test_selfhost_pins_backend_and_restores(self):
+        from services.ai_gateway import backends
+
+        with mock.patch.dict("os.environ", _ENV_CLEAR):
+            self.assertIsNone(backends.override_backend())
+            cfg = {**ep.DEFAULT_CONFIG, "mode": "selfhost"}
+            with mock.patch.object(ep, "load_config", return_value=cfg):
+                with ep.engine_context("invoice") as mode:
+                    self.assertEqual(mode, "selfhost")
+                    self.assertEqual(ep.active_mode(), "selfhost")
+                    # 档钉后端 selfhost(直读/Vision shim 调 get_provider 才吃得到)
+                    self.assertEqual(backends.override_backend(), "selfhost")
+                    # 不动 Gemini 档位(空覆写)
+                    self.assertEqual(gemini_models.flash(), "gemini-3.5-flash")
+            self.assertIsNone(backends.override_backend())
+            self.assertEqual(ep.active_mode(), "")
+
     def test_brain_not_affected_by_override(self):
         cfg = {**ep.DEFAULT_CONFIG, "mode": "economy"}
         with mock.patch.dict("os.environ", {**_ENV_CLEAR, "AGENT_BRAIN_MODEL": ""}):
@@ -157,6 +174,16 @@ class CostByRecordedModelTests(unittest.TestCase):
                 ]
             )
         self.assertAlmostEqual(thb, (1.50 + 9.00) * 35.0, places=4)
+
+    def test_selfhost_model_zero_cost(self):
+        # 自托管模型无 per-token 云成本 → 记 0(只付电费,不进此观测账本)
+        with mock.patch.dict(
+            "os.environ", {**_ENV_CLEAR, "SELFHOST_OCR_MODEL": "google/gemma-4-27b"}
+        ):
+            thb = c._compute_total_cost(
+                [_page(["ID"], l2i=1_000_000, l2o=1_000_000, l2_model="google/gemma-4-27b")]
+            )
+        self.assertEqual(thb, 0.0)
 
     def test_missing_recorded_model_falls_back_to_env_tier(self):
         # 旧结果/直调层函数没记模型 → 按当前档位计(默认 3.5)

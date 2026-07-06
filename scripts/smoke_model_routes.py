@@ -40,19 +40,22 @@ def print_route_table() -> None:
     )
     print(f"生效的路由 env: {', '.join(set_knobs) or '(无,全默认)'}")
     print()
-    print(f"{'车道':<26} {'模型':<26} {'Vertex区域':<16} 状态")
-    print("-" * 84)
+    print(f"{'车道':<24} {'模型':<28} {'区域':<14} {'后端':<10} 状态")
+    print("-" * 92)
     for lane, route in routes.items():
         if lane in diff:
             exp = diff[lane][0]
             note = (
-                f"≠默认(默认 {exp.model} @ {exp.vertex_location})"
+                f"≠默认(默认 {exp.model} @ {exp.vertex_location or exp.backend})"
                 if exp
                 else "≠默认(新车道,默认表没有)"
             )
         else:
             note = "=默认"
-        print(f"{lane:<26} {route.model:<26} {route.vertex_location:<16} {note}")
+        print(
+            f"{lane:<24} {route.model:<28} {route.vertex_location or '—':<14} "
+            f"{route.backend:<10} {note}"
+        )
     gone = [lane for lane, (exp, act) in diff.items() if act is None]
     for lane in gone:
         print(f"{lane:<26} {'(消失)':<26} {'':<16} ≠默认(默认表有、实际解析没有)")
@@ -95,6 +98,22 @@ def _fire_embedding() -> None:
         print(f"{'knowledge.embedding':<26} FAIL(raise)  {type(e).__name__}: {str(e)[:100]}")
 
 
+def _fire_selfhost() -> None:
+    """自部署档一发:走 selfhost provider(SELFHOST_OCR_* 未配 → FAIL(auth),即"端点没接上"信号)。"""
+    from services.ai_gateway import backends
+
+    t0 = time.time()
+    try:
+        out = backends.get_provider("selfhost").text_to_json(
+            'ตอบ JSON เท่านั้น: {"pong": true}', tier="flash", timeout_s=25, max_retries=0
+        )
+        ms = int((time.time() - t0) * 1000)
+        status = "OK" if out.ok else f"FAIL({out.error_kind})"
+        print(f"{'ocr.selfhost.flash':<26} {status:<12} model={out.model or '?':<26} {ms}ms")
+    except Exception as e:  # noqa: BLE001 — 冒烟工具:任何炸法都落成一行可读结果
+        print(f"{'ocr.selfhost.flash':<26} FAIL(raise)  {type(e).__name__}: {str(e)[:100]}")
+
+
 def fire_all() -> None:
     print()
     print("真打冒烟(每车道一发,走业务同源水管):")
@@ -102,6 +121,7 @@ def fire_all() -> None:
     _fire_one("agent.brain", "brain", None)
     _fire_one("ocr.direct35.flash", "flash", None)
     _fire_one("ocr.economy.flash_lite", "flash_lite", "economy")
+    _fire_selfhost()
     _fire_embedding()
 
 

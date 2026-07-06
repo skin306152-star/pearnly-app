@@ -76,6 +76,24 @@ class RoutingMatrixContractTests(unittest.TestCase):
                 f"mode {mode!r} 覆写了非 OCR 档位: {sorted(mapping)}",
             )
 
+    def test_selfhost_lanes_use_selfhost_backend(self):
+        # 自部署档:四档统一走 selfhost 后端、无 Vertex 区域;env 未配 → 占位名(不虚记 Gemini 名)
+        with scrubbed_env():
+            routes = rm.resolve_routes()
+        for tier in ("flash", "flash_lite", "fallback", "escalate"):
+            r = routes[f"ocr.selfhost.{tier}"]
+            self.assertEqual(r.backend, "selfhost")
+            self.assertEqual(r.vertex_location, "")
+            self.assertEqual(r.model, "(unset)")
+
+    def test_selfhost_model_env_reflected(self):
+        # 运维填 SELFHOST_OCR_MODEL(Gemma4 等)→ 总表如实显真名,与默认(unset)偏离(冒烟可见)
+        with scrubbed_env(SELFHOST_OCR_MODEL="google/gemma-4-27b"):
+            routes = rm.resolve_routes()
+            diff = rm.diff_from_defaults(routes)
+        self.assertEqual(routes["ocr.selfhost.flash"].model, "google/gemma-4-27b")
+        self.assertIn("ocr.selfhost.flash", diff)
+
     def test_resolve_does_not_leak_override_context(self):
         from services.ocr import gemini_models
 

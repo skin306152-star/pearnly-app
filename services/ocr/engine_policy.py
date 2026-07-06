@@ -18,6 +18,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any, Dict, Optional
 
+from services.ai_gateway import backends
 from services.ocr import gemini_models
 
 logger = logging.getLogger(__name__)
@@ -38,9 +39,16 @@ MODE_MODEL_MAPS: Dict[str, Dict[str, str]] = {
         "fallback": "gemini-3.5-flash",
         "escalate": "gemini-3.5-flash",
     },
+    # 自部署档:不动 Gemini 档位(空覆写),改把整条 LLM 后端切到 selfhost provider
+    # (OpenAI 兼容端点·env SELFHOST_OCR_*)。选中即全管线(直读/Vision 回落)打自托管机。
+    "selfhost": {},
 }
 CONCRETE_MODES = tuple(MODE_MODEL_MAPS)
 MODES = (*CONCRETE_MODES, "auto")
+
+# mode → LLM 后端覆盖(未列 = 跟全局 OCR_LLM_BACKEND)。engine_context 进入时按档钉后端,
+# 经 backends.override_backend 下发,get_provider/transport 消费——档位与后端单点同源。
+MODE_BACKENDS: Dict[str, str] = {"selfhost": "selfhost"}
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "mode": "direct35",
@@ -113,9 +121,13 @@ def engine_context(task: str, plan_code: Optional[str] = None, is_exempt: bool =
         return
     mode = resolve_mode(task, plan_code=plan_code, is_exempt=is_exempt)
     token = gemini_models.set_model_override(MODE_MODEL_MAPS.get(mode))
+    backend = MODE_BACKENDS.get(mode)
+    backend_token = backends.set_backend_override(backend) if backend else None
     mode_token = _ACTIVE_MODE.set(mode)
     try:
         yield mode
     finally:
         _ACTIVE_MODE.reset(mode_token)
+        if backend_token is not None:
+            backends.reset_backend_override(backend_token)
         gemini_models.reset_model_override(token)

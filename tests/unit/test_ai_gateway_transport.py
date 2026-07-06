@@ -41,6 +41,29 @@ class TestBackendSwitch(unittest.TestCase):
         self._set("VERTEX")  # 大小写不敏感
         self.assertEqual(backends.active_backend(), "vertex")
 
+    def test_is_aistudio_honors_override(self):
+        # Vision 回落 shim(gemini.py)据 is_aistudio 决策 → 必须认 override,否则直读切了
+        # 自托管、回落却打回 aistudio,两路劈叉
+        self._set(None)  # 全局 aistudio
+        self.assertTrue(backends.is_aistudio())
+        tok = backends.set_backend_override("selfhost")
+        try:
+            self.assertFalse(backends.is_aistudio())
+            self.assertEqual(backends.effective_backend(), "selfhost")
+        finally:
+            backends.reset_backend_override(tok)
+        self.assertTrue(backends.is_aistudio())
+
+    def test_get_provider_consumes_override(self):
+        # 无显式名时 get_provider 消费请求级 override(直读/gemini shim 热路才吃得到 selfhost 档)
+        self._set(None)  # 全局 aistudio
+        tok = backends.set_backend_override("selfhost")
+        try:
+            self.assertEqual(backends.get_provider().NAME, "selfhost")
+        finally:
+            backends.reset_backend_override(tok)
+        self.assertEqual(backends.get_provider().NAME, "aistudio")
+
     def test_backend_override_set_reset(self):
         self.assertIsNone(backends.override_backend())
         tok = backends.set_backend_override("aistudio")

@@ -94,9 +94,11 @@
             'adm-eng-mode-direct35': 'A · 高精度(全程 gemini-3.5-flash)',
             'adm-eng-mode-economy':
                 'B · 经济(L2 用 gemini-3.1-flash-lite · 难票 L3 升 gemini-3.5-flash)',
+            'adm-eng-mode-selfhost': '自部署(自托管模型 · 走 SELFHOST 端点 · 数据不出门)',
             'adm-eng-mode-auto': '自动(按下方套餐表)',
             'adm-eng-opt-direct35': 'A · 高精度',
             'adm-eng-opt-economy': 'B · 经济',
+            'adm-eng-opt-selfhost': '自部署',
             'adm-eng-opt-auto': '自动',
             'adm-eng-plan-title': '套餐默认档(auto 模式生效)',
             'adm-eng-plan-none': '无订阅(按量)',
@@ -493,9 +495,11 @@
             'adm-eng-mode-direct35': 'A · แม่นยำสูง (gemini-3.5-flash ทั้งหมด)',
             'adm-eng-mode-economy':
                 'B · ประหยัด (L2 ใช้ gemini-3.1-flash-lite · งานยาก L3 ขึ้น gemini-3.5-flash)',
+            'adm-eng-mode-selfhost': 'เซิร์ฟเวอร์ตนเอง (โมเดลโฮสต์เอง · ผ่าน SELFHOST · ข้อมูลไม่ออกนอก)',
             'adm-eng-mode-auto': 'อัตโนมัติ (ตามตารางแพ็กเกจ)',
             'adm-eng-opt-direct35': 'A · แม่นยำสูง',
             'adm-eng-opt-economy': 'B · ประหยัด',
+            'adm-eng-opt-selfhost': 'เซิร์ฟเวอร์ตนเอง',
             'adm-eng-opt-auto': 'อัตโนมัติ',
             'adm-eng-plan-title': 'ค่าเริ่มต้นตามแพ็กเกจ (มีผลในโหมด auto)',
             'adm-eng-plan-none': 'ไม่มีแพ็กเกจ (จ่ายตามใช้)',

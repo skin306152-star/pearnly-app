@@ -40,19 +40,30 @@ def override_backend() -> Optional[str]:
 
 
 def active_backend() -> str:
-    """当前后端(env OCR_LLM_BACKEND·小写·未知值回落 aistudio 不抛)。"""
+    """全局后端(env OCR_LLM_BACKEND·小写·未知值回落 aistudio 不抛)。"""
     raw = (os.environ.get("OCR_LLM_BACKEND") or "aistudio").strip().lower()
     return raw if raw in _VALID else "aistudio"
 
 
+def effective_backend() -> str:
+    """本请求实际后端:请求级覆盖(engine_policy 按档钉)> 全局 env。
+    所有"走哪家 provider"的决策单点同源(is_aistudio / get_provider),不劈叉。"""
+    return override_backend() or active_backend()
+
+
 def is_aistudio() -> bool:
-    """是否默认后端(老路径)。OCR 核心据此走"原样旧代码"分支。"""
-    return active_backend() == "aistudio"
+    """是否默认后端(老路径)。OCR 核心据此走"原样旧代码"分支——认请求级覆盖:
+    selfhost 档钉了 override 时即便全局 env=aistudio 也返回 False,回落 Vision 路一并切自托管。"""
+    return effective_backend() == "aistudio"
 
 
 def get_provider(name: Optional[str] = None):
-    """取 provider 模块(懒加载·避免顶层 import 重链路 / 可选依赖)。"""
-    backend = (name or active_backend()).strip().lower()
+    """取 provider 模块(懒加载·避免顶层 import 重链路 / 可选依赖)。
+
+    未显式指定后端时消费请求级覆盖(override_backend),再回落全局 env——这样
+    engine_policy 按档钉的后端(如 selfhost 档)对直调 get_provider() 的热路(直读/
+    gemini shim)也生效,不止 transport。transport 已自算 effective 后显式传入,不双取。"""
+    backend = (name or effective_backend()).strip().lower()
     if backend == "vertex":
         from services.ai_gateway.providers import vertex
 

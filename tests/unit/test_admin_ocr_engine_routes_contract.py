@@ -70,7 +70,18 @@ class PolicyRouteTests(unittest.TestCase):
         body = r.json()
         self.assertEqual(body["policy"]["mode"], "direct35")
         self.assertIn("invoice", body["options"]["tasks"])
-        self.assertEqual(body["options"]["plan_modes"], ["direct35", "economy"])
+        self.assertEqual(body["options"]["plan_modes"], ["direct35", "economy", "selfhost"])
+
+    def test_selfhost_mode_accepted(self):
+        # 自部署档可作全局模式落库(校验走 MODES 派生,后端无需特判)
+        with (
+            mock.patch.object(mod.store, "set_setting") as m_set,
+            mock.patch.object(mod, "_log_op"),
+            mock.patch.object(mod.store, "get_setting", return_value=None),
+        ):
+            r = self.client.post("/api/admin/ocr-engine", json={"mode": "selfhost"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(m_set.call_args[0][1]["mode"], "selfhost")
 
     def test_bad_mode_400(self):
         r = self.client.post("/api/admin/ocr-engine", json={"mode": "gpt99"})

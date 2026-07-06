@@ -21,6 +21,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Dict, NamedTuple, Tuple
 
+from services.ai_gateway.providers.selfhost import _model as _selfhost_model
 from services.ai_gateway.providers.vertex import _embed_model, _location, _location_for_model
 from services.ocr import engine_policy, gemini_models
 
@@ -28,6 +29,7 @@ from services.ocr import engine_policy, gemini_models
 class Route(NamedTuple):
     model: str
     vertex_location: str
+    backend: str = "aistudio"  # 云档默认 aistudio;selfhost 档打自托管端点(区域概念不适用)
 
 
 # 会拧动路由的全部 env 旋钮(契约测试逐一清空;冒烟脚本据此标注覆写来源)。
@@ -39,10 +41,15 @@ ROUTE_ENV_VARS: Tuple[str, ...] = (
     "OCR_ESCALATE_MODEL",
     "OCR_ENGINE_MODE",
     "OCR_LLM_BACKEND",
+    "SELFHOST_OCR_MODEL",
     "VERTEX_LOCATION",
     "VERTEX_LOCATION_25",
     "VERTEX_EMBED_MODEL",
 )
+
+# 自部署档在总表里的占位:具体 VLM 由运维 env SELFHOST_OCR_MODEL 定(Gemma4/Qwen 随切),
+# env 全空时显式记作未配置,不是 Gemini 名——冒烟脚本在 prod 会显真名并标"≠默认"。
+_SELFHOST_UNSET = "(unset)"
 
 _OCR_TIERS: Tuple[str, ...] = ("flash", "flash_lite", "fallback", "escalate")
 
@@ -61,6 +68,11 @@ EXPECTED_DEFAULT_ROUTES: Dict[str, Route] = {
     "ocr.economy.flash_lite": Route("gemini-3.1-flash-lite", "global"),
     "ocr.economy.fallback": Route("gemini-3.5-flash", "asia-southeast1"),
     "ocr.economy.escalate": Route("gemini-3.5-flash", "asia-southeast1"),
+    # 自部署档:后端整体切 selfhost,四档统一映射到同一 VLM(SELFHOST_OCR_MODEL),无 Vertex 区域。
+    "ocr.selfhost.flash": Route(_SELFHOST_UNSET, "", "selfhost"),
+    "ocr.selfhost.flash_lite": Route(_SELFHOST_UNSET, "", "selfhost"),
+    "ocr.selfhost.fallback": Route(_SELFHOST_UNSET, "", "selfhost"),
+    "ocr.selfhost.escalate": Route(_SELFHOST_UNSET, "", "selfhost"),
 }
 
 DEFAULT_BACKEND = "aistudio"
@@ -78,6 +90,12 @@ def resolve_routes() -> "OrderedDict[str, Route]":
     routes["agent.best"] = _route(gemini_models.best())
     routes["knowledge.embedding"] = Route(_embed_model(), _location())
     for mode in engine_policy.CONCRETE_MODES:
+        # 后端覆盖档(selfhost):不走 Gemini 档位解析,四档同映射到自托管 VLM,无区域。
+        if engine_policy.MODE_BACKENDS.get(mode) == "selfhost":
+            model = _selfhost_model() or _SELFHOST_UNSET
+            for tier in _OCR_TIERS:
+                routes[f"ocr.{mode}.{tier}"] = Route(model, "", "selfhost")
+            continue
         token = gemini_models.set_model_override(engine_policy.MODE_MODEL_MAPS[mode])
         try:
             for tier in _OCR_TIERS:

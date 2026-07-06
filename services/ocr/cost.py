@@ -37,8 +37,12 @@ COST_FLASH_INPUT_PER_M_USD, COST_FLASH_OUTPUT_PER_M_USD = MODEL_PRICES_PER_M_USD
 
 
 def price_per_m_usd(model: str) -> Tuple[float, float]:
-    """模型名 → (输入, 输出) USD/百万token。未知模型按 3.5-flash 计(观测宁高勿低)。"""
+    """模型名 → (输入, 输出) USD/百万token。未知模型按 3.5-flash 计(观测宁高勿低)。
+    自托管模型(== SELFHOST_OCR_MODEL)无 per-token 云成本 → 0,只付电费(不进此账本)。"""
     name = (model or "").strip()
+    selfhost = os.environ.get("SELFHOST_OCR_MODEL", "").strip()
+    if name and selfhost and name == selfhost:
+        return (0.0, 0.0)
     for prefix, price in MODEL_PRICES_PER_M_USD.items():
         if name.startswith(prefix):
             return price

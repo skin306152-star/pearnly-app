@@ -3101,7 +3101,7 @@
                         '<label class="adm-eng-row"><span class="adm-set-row-label">' +
                         _esc(_t('adm-eng-plan-' + p)) +
                         '</span>' +
-                        _engSelect('adm-eng-plan-' + p, ['direct35', 'economy'], false) +
+                        _engSelect('adm-eng-plan-' + p, ['direct35', 'economy', 'selfhost'], false) +
                         '</label>'
                     );
                 })
@@ -3119,7 +3119,11 @@
                         '<label class="adm-eng-row"><span class="adm-set-row-label">' +
                         _esc(_t('adm-eng-task-' + tk)) +
                         '</span>' +
-                        _engSelect('adm-eng-task-' + tk, ['direct35', 'economy', 'auto'], true) +
+                        _engSelect(
+                            'adm-eng-task-' + tk,
+                            ['direct35', 'economy', 'selfhost', 'auto'],
+                            true
+                        ) +
                         '</label>'
                     );
                 })

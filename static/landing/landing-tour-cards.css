@@ -445,9 +445,6 @@
     grid-template-columns: 1fr;
     gap: 16px;
     padding: 58px 7vw 72px;
-    overflow-x: hidden;
-    overflow-y: auto; /* 内容超一屏时该屏内竖向滚动,不裁切 */
-    align-content: safe center;
   }
   .ptour-screen .demo,
   .ptour-screen.flip .demo {

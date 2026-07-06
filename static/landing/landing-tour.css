@@ -107,6 +107,9 @@ html.ptour-on .ptour-bg {
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: center;
+  align-content: safe center; /* 放得下居中,放不下(浏览器放大/窄高窗)从顶部起,配 overflow 可滚不裁切 */
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 72px 7vw 70px;
   gap: 3vw;
 }

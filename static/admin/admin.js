@@ -3101,7 +3101,11 @@
                         '<label class="adm-eng-row"><span class="adm-set-row-label">' +
                         _esc(_t('adm-eng-plan-' + p)) +
                         '</span>' +
-                        _engSelect('adm-eng-plan-' + p, ['direct35', 'economy', 'selfhost'], false) +
+                        _engSelect(
+                            'adm-eng-plan-' + p,
+                            ['direct35', 'economy', 'selfhost'],
+                            false
+                        ) +
                         '</label>'
                     );
                 })

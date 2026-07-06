@@ -495,7 +495,8 @@
             'adm-eng-mode-direct35': 'A · แม่นยำสูง (gemini-3.5-flash ทั้งหมด)',
             'adm-eng-mode-economy':
                 'B · ประหยัด (L2 ใช้ gemini-3.1-flash-lite · งานยาก L3 ขึ้น gemini-3.5-flash)',
-            'adm-eng-mode-selfhost': 'เซิร์ฟเวอร์ตนเอง (โมเดลโฮสต์เอง · ผ่าน SELFHOST · ข้อมูลไม่ออกนอก)',
+            'adm-eng-mode-selfhost':
+                'เซิร์ฟเวอร์ตนเอง (โมเดลโฮสต์เอง · ผ่าน SELFHOST · ข้อมูลไม่ออกนอก)',
             'adm-eng-mode-auto': 'อัตโนมัติ (ตามตารางแพ็กเกจ)',
             'adm-eng-opt-direct35': 'A · แม่นยำสูง',
             'adm-eng-opt-economy': 'B · ประหยัด',

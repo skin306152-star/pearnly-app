@@ -109,6 +109,8 @@
 
     const railX = (i) => (1 - i) * 20;
     const authRoot = () => document.getElementById('pearnly-auth-root');
+    // 对齐 landing-tour.css 的 .ptour-track / #pearnly-auth-root 过渡(0.72s),收尾留 40ms 余量
+    const SLIDE_MS = 720;
     function move(el, transform, instant) {
         if (!el) return;
         if (instant) el.style.transition = 'none';
@@ -117,6 +119,11 @@
             void el.offsetWidth;
             el.style.transition = '';
         }
+    }
+    // 页 i 的规范停靠位(轨道 + 登录页);相邻切换/圆点跳转/环绕收尾/初始化共用
+    function settle(i, instant) {
+        move(track, `translateX(${railX(i)}%)`, instant);
+        move(authRoot(), i === 0 ? 'translateX(0)' : 'translateX(-100vw)', instant);
     }
     function paint(i) {
         document.documentElement.classList.toggle('ptour-on', i > 0);
@@ -147,10 +154,9 @@
         cur = target;
         paint(target);
         setTimeout(() => {
-            move(track, `translateX(${railX(target)}%)`, true);
-            move(authRoot(), target === 0 ? 'translateX(0)' : 'translateX(-100vw)', true);
+            settle(target, true);
             busy = false;
-        }, 760);
+        }, SLIDE_MS + 40);
     }
     function go(i) {
         if (busy) return;
@@ -159,8 +165,7 @@
         if (cur === PAGES - 1 && target === 0) return wrap(true);
         if (cur === 0 && target === PAGES - 1) return wrap(false);
         cur = target;
-        move(track, `translateX(${railX(target)}%)`);
-        move(authRoot(), target === 0 ? 'translateX(0)' : 'translateX(-100vw)');
+        settle(target);
         paint(target);
     }
 
@@ -201,7 +206,6 @@
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
 
     applyTexts();
-    move(track, `translateX(${railX(0)}%)`, true);
-    move(authRoot(), 'translateX(0)', true);
+    settle(0, true);
     paint(0);
 })();

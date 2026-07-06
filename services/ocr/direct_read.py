@@ -123,7 +123,9 @@ _VERIFY_TOL_THB = 0.5  # 与勾稽闸同容差
 
 
 def double_read_enabled() -> bool:
-    return os.environ.get("OCR_DOUBLE_READ", "1").strip().lower() not in ("0", "false", "no", "off")
+    # 默认关(2026-07-06 ROI 实验:双读对钱字段独家保护=0·与确定性闸完全冗余·且是成本贵尾巴,
+    # 见记忆 double-read-roi-experiment)。需要时 env OCR_DOUBLE_READ=1 一键恢复。
+    return os.environ.get("OCR_DOUBLE_READ", "0").strip().lower() not in ("0", "false", "no", "off")
 
 
 def _perturb_jpeg(image_bytes: bytes) -> bytes:

@@ -80,10 +80,10 @@ class ReadPageTests(unittest.TestCase):
         )
         with _patch_provider(outcome):
             pr = dr.read_page(b"\xff\xd8fakejpeg", page_number=1)
-        self.assertEqual(pr.layer_chain, ["ID", "ID2"])  # 双读默认开·两读一致放行
+        self.assertEqual(pr.layer_chain, ["ID"])  # 双读默认关(ROI 实验=0 独家保护)·单读
         self.assertEqual(pr.invoice.total_amount, "70.00")
         self.assertEqual(pr.layer2_model, "gemini-3.1-flash-lite")
-        self.assertGreater(pr.layer3_input_tokens, 0)  # 二读 token 记 layer3(成本按它计)
+        self.assertEqual(pr.layer3_input_tokens, 0)  # 单读·无二读 token
         self.assertEqual(pr.confidence_band, "yellow_confirm")  # 永不 auto·confirm-first 不变
         self.assertFalse(pr.needs_manual_review)
         self.assertEqual(pr.validation_warnings, [])
@@ -151,6 +151,7 @@ class ReadPageTests(unittest.TestCase):
         self.assertEqual(pr.layer_chain, ["ID"])  # 非发票不双读(下游对账有自己的勾稽)
 
 
+@mock.patch.dict("os.environ", {"OCR_DOUBLE_READ": "1"})  # 双读默认关·本类显式启用测机制本身
 class DoubleReadTests(unittest.TestCase):
     # 04 号方案 B 档:自洽性幻觉(trap05 5518897)唯一机器解=两次独立读比对钱面四件
 

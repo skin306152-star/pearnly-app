@@ -72,38 +72,19 @@ def _post(sess, url, filename, data, timeout=180):
             time.sleep(3)
 
 
-def _load_invoices():
-    items = []
+def _load():
+    """读一次 manifest,按 scenario 前缀分成(发票类, 身份证类)。"""
+    invoices, id_cards = [], []
     for line in (P3 / "manifest.jsonl").read_text(encoding="utf-8").splitlines():
         m = json.loads(line)
-        if m.get("scenario", "").startswith("id_card"):
-            continue
-        items.append(
-            {
-                "id": m["id"],
-                "scenario": m["scenario"],
-                "img": P3 / m["file"],
-                "gt": json.loads((P3 / m["gt"]).read_text(encoding="utf-8")),
-            }
-        )
-    return items
-
-
-def _load_id_cards():
-    items = []
-    for line in (P3 / "manifest.jsonl").read_text(encoding="utf-8").splitlines():
-        m = json.loads(line)
-        if not m.get("scenario", "").startswith("id_card"):
-            continue
-        items.append(
-            {
-                "id": m["id"],
-                "scenario": m["scenario"],
-                "img": P3 / m["file"],
-                "gt": json.loads((P3 / m["gt"]).read_text(encoding="utf-8")),
-            }
-        )
-    return items
+        item = {
+            "id": m["id"],
+            "scenario": m["scenario"],
+            "img": P3 / m["file"],
+            "gt": json.loads((P3 / m["gt"]).read_text(encoding="utf-8")),
+        }
+        (id_cards if m["scenario"].startswith("id_card") else invoices).append(item)
+    return invoices, id_cards
 
 
 def _expect_decoy(gt) -> bool:
@@ -185,8 +166,9 @@ def main():
     sess = requests.Session()
     _login(sess)
 
-    invoices = [] if args.only == "id_card" else _load_invoices()
-    id_cards = [] if args.only == "invoice" else _load_id_cards()
+    all_invoices, all_id_cards = _load()
+    invoices = [] if args.only == "id_card" else all_invoices
+    id_cards = [] if args.only == "invoice" else all_id_cards
     if args.limit:
         invoices, id_cards = invoices[: args.limit], id_cards[: args.limit]
     print(f"invoices={len(invoices)} id_cards={len(id_cards)} → {BASE}")

@@ -13,6 +13,7 @@ import unittest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "eval")))
 
 import id_card_scorer as sc  # noqa: E402
+from services.ocr.money import valid_thai_tax_id  # noqa: E402
 
 # 合法号(前12位加权 mod-11 → 校验位 6)。
 _VALID_ID = "1101700123456"
@@ -38,17 +39,19 @@ class NormalizeTests(unittest.TestCase):
 
 
 class ChecksumTests(unittest.TestCase):
+    # 身份证号 = 个人税号,scorer 的 id_valid 复用 money.valid_thai_tax_id;
+    # 这里锁住 scorer 依赖的边界行为(去噪/错校验位/非13位)。
     def test_valid_id_passes(self):
-        self.assertTrue(sc.thai_citizen_id_checkdigit_ok(_VALID_ID))
+        self.assertTrue(valid_thai_tax_id(_VALID_ID))
         # 带空格/破折号照样过(先去噪)。
-        self.assertTrue(sc.thai_citizen_id_checkdigit_ok("1-1017-00123-45-6"))
+        self.assertTrue(valid_thai_tax_id("1-1017-00123-45-6"))
 
     def test_wrong_checkdigit_fails(self):
-        self.assertFalse(sc.thai_citizen_id_checkdigit_ok("1101700123457"))
+        self.assertFalse(valid_thai_tax_id("1101700123457"))
 
     def test_wrong_length_fails(self):
         for v in ("", "123", "11017001234567", None):
-            self.assertFalse(sc.thai_citizen_id_checkdigit_ok(v))
+            self.assertFalse(valid_thai_tax_id(v))
 
 
 class ScoreTests(unittest.TestCase):

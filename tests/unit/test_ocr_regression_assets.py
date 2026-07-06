@@ -14,9 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
-sys.path.insert(0, str(ROOT / "tests" / "eval"))
 
-from id_card_scorer import thai_citizen_id_checkdigit_ok  # noqa: E402
 from services.ocr import layer2_prompts as lp  # noqa: E402
 from services.ocr.id_card_extract import _ID_CARD_PROMPT  # noqa: E402
 from services.ocr.money import valid_thai_tax_id  # noqa: E402
@@ -58,7 +56,7 @@ class CorpusGroundTruthTests(unittest.TestCase):
         idc = ROOT / "tests/eval/vision_ablation_p3/id_card/ground_truth"
         for gt in idc.glob("*.json"):
             pid = json.loads(gt.read_text(encoding="utf-8")).get("people_id")
-            if not thai_citizen_id_checkdigit_ok(pid):
+            if not valid_thai_tax_id(pid):
                 bad.append(f"{gt.name}:{pid}")
         self.assertEqual(bad, [])
 

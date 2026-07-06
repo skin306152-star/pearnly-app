@@ -15,7 +15,7 @@ Public:
     extract_thai_id_card(image_bytes, api_key=None) -> dict
         {
           "id_card": { people_id, first_name, last_name, birthday_be,
-                       prefix_name, address: {...} },
+                       issue_date_be, expiry_date_be, prefix_name, address: {...} },
           "confidence": "high|medium|low",
           "needs_review": bool,
           "missing_fields": [str, ...],
@@ -51,6 +51,11 @@ _ID_CARD_PROMPT = (
     '  "date_of_birth_be": "date of birth as dd/mm/yyyy in BUDDHIST ERA (พ.ศ.). '
     "If the card shows a Thai month name, convert to numeric month. If the year is "
     'Gregorian (ค.ศ.), add 543 to make it Buddhist era.",\n'
+    '  "issue_date_be": "date of issue (วันออกบัตร / Date of Issue) as dd/mm/yyyy in '
+    'Buddhist era, same era/format rules as date_of_birth_be. Empty if not printed.",\n'
+    '  "expiry_date_be": "expiry date (วันบัตรหมดอายุ / Date of Expiry) as dd/mm/yyyy in '
+    "Buddhist era, same era/format rules as date_of_birth_be. If the card says ตลอดชีพ "
+    '(lifetime), return the literal string LIFETIME. Empty if not printed.",\n'
     '  "address_raw": "the full registered address line as printed",\n'
     '  "house_no": "house number (บ้านเลขที่)",\n'
     '  "moo": "village no (หมู่ที่) digits only, else empty",\n'
@@ -154,6 +159,12 @@ def _normalize(data: Dict[str, Any]) -> Dict[str, Any]:
     first_name = str(data.get("first_name_th") or data.get("first_name") or "").strip()
     last_name = str(data.get("last_name_th") or data.get("last_name") or "").strip()
     birthday_be = _normalize_be_date(str(data.get("date_of_birth_be") or "").strip())
+    issue_date_be = _normalize_be_date(str(data.get("issue_date_be") or "").strip())
+    # 终身证印 ตลอดชีพ(无到期日)· 原样透出 LIFETIME · 其余走日期归一。
+    raw_expiry = str(data.get("expiry_date_be") or "").strip()
+    expiry_date_be = (
+        "LIFETIME" if raw_expiry.upper() == "LIFETIME" else _normalize_be_date(raw_expiry)
+    )
     prefix_name = _normalize_thai_prefix(str(data.get("prefix") or "").strip())
 
     address = {
@@ -201,6 +212,8 @@ def _normalize(data: Dict[str, Any]) -> Dict[str, Any]:
             "first_name": first_name,
             "last_name": last_name,
             "birthday_be": birthday_be,
+            "issue_date_be": issue_date_be,
+            "expiry_date_be": expiry_date_be,
             "prefix_name": prefix_name,
             "address": address,
         },

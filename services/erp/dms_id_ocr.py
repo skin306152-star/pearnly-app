@@ -87,6 +87,8 @@ def editable_id_card(id_card: Dict[str, Any]) -> Dict[str, Any]:
         "name": f"{first} {last}".strip(),
         "people_id": id_card.get("people_id", ""),
         "birthday_be": id_card.get("birthday_be", ""),
+        "issue_date_be": id_card.get("issue_date_be", ""),
+        "expiry_date_be": id_card.get("expiry_date_be", ""),
         "phone": "",
         "address": {
             "house_no": addr.get("house_no", ""),

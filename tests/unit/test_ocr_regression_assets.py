@@ -14,8 +14,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "tests" / "eval"))
 
+from id_card_scorer import thai_citizen_id_checkdigit_ok  # noqa: E402
 from services.ocr import layer2_prompts as lp  # noqa: E402
+from services.ocr.id_card_extract import _ID_CARD_PROMPT  # noqa: E402
 from services.ocr.money import valid_thai_tax_id  # noqa: E402
 
 
@@ -38,6 +41,26 @@ class CorpusGroundTruthTests(unittest.TestCase):
                 gt_rel = m.get("gt") or m.get("ground_truth")
                 if gt_rel:
                     self.assertTrue((mf.parent / gt_rel).exists(), f"{mf.name} → {gt_rel} 缺失")
+
+    def test_p3_decoy_corpus_locked(self):
+        # 台账#1 收官(P3 实弹 20/20 全拒):重折痕预交易单据拒收集不许被掏空/翻标
+        decoys = list(
+            (ROOT / "tests/eval/vision_ablation_p3/ground_truth").glob("pretx_heavy_*.json")
+        )
+        self.assertEqual(len(decoys), 20, "重折痕 decoy 语料数被改")
+        for f in decoys:
+            gt = json.loads(f.read_text(encoding="utf-8"))
+            self.assertTrue(gt.get("is_not_invoice"), f"{f.name} 丢了 is_not_invoice")
+
+    def test_p3_id_card_people_ids_pass_checksum(self):
+        # 身份证号走泰国校验位(≠税号 mod-11)——语料自身不许有非法号(#4 的镜像)
+        bad = []
+        idc = ROOT / "tests/eval/vision_ablation_p3/id_card/ground_truth"
+        for gt in idc.glob("*.json"):
+            pid = json.loads(gt.read_text(encoding="utf-8")).get("people_id")
+            if not thai_citizen_id_checkdigit_ok(pid):
+                bad.append(f"{gt.name}:{pid}")
+        self.assertEqual(bad, [])
 
     def test_baseline_shape(self):
         base = json.loads(
@@ -62,6 +85,11 @@ class PromptContractTests(unittest.TestCase):
     def test_invoice_prompt_anchors(self):
         for anchor in self._INVOICE_ANCHORS:
             self.assertIn(anchor, lp._SYSTEM_PROMPT, f"发票提示词锚点丢失: {anchor}")
+
+    def test_id_card_prompt_anchors(self):
+        # #14(P3):身份证发证/到期日抽取 + 终身证 LIFETIME —— 过期语义不许被悄悄撤回
+        for anchor in ("issue_date_be", "expiry_date_be", "LIFETIME"):
+            self.assertIn(anchor, _ID_CARD_PROMPT, f"身份证提示词锚点丢失: {anchor}")
 
     def test_recon_prompt_anchors(self):
         self.assertIn("PROVENANCE", lp._GL_SYSTEM_PROMPT)  # GL 金额溯源(描述列数字不当金额)

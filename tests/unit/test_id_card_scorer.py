@@ -59,6 +59,8 @@ class ScoreTests(unittest.TestCase):
             "first_name": "สมชาย",
             "last_name": "ใจดี",
             "birthday_be": "2530-05-12",
+            "issue_date_be": "2563-01-15",
+            "expiry_date_be": "2573-05-11",
             "address": {"subdistrict": "บางรัก", "district": "บางรัก", "zipcode": "10500"},
         }
         gt.update(over)
@@ -72,6 +74,8 @@ class ScoreTests(unittest.TestCase):
             "first_name": "สมชาย",
             "last_name": "ใจดี",
             "birthday_be": "12/05/2530",
+            "issue_date_be": "15/01/2563",
+            "expiry_date_be": "11/05/2573",
             "address": {"subdistrict": "บางรัก", "district": "บางรัก", "zipcode": "10500"},
         }
         a.update(over)
@@ -86,6 +90,17 @@ class ScoreTests(unittest.TestCase):
     def test_wrong_people_id_is_critical(self):
         r = sc.score_id_card(self._gt(), self._actual(people_id="1101700123457"))
         self.assertIn("people_id", r["critical_misses"])
+        self.assertLess(r["weighted_score"], 1.0)
+
+    def test_expiry_cross_format_matches(self):
+        # #14:GT YYYY-MM-DD 到期日 与 prod dd/mm/yyyy 归一后相等。
+        r = sc.score_id_card(self._gt(), self._actual())
+        self.assertTrue(r["fields"]["expiry_date_be"]["match"])
+        self.assertTrue(r["fields"]["issue_date_be"]["match"])
+
+    def test_wrong_expiry_is_scored_miss(self):
+        r = sc.score_id_card(self._gt(), self._actual(expiry_date_be="11/05/2571"))
+        self.assertFalse(r["fields"]["expiry_date_be"]["match"])
         self.assertLess(r["weighted_score"], 1.0)
 
     def test_nested_address_scored(self):

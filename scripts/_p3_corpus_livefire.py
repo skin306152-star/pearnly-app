@@ -159,6 +159,8 @@ def _fire_id_card(sess, item):
     row["pid_read"] = ic.get("people_id")
     row["name_gt"] = f"{item['gt'].get('first_name', '')} {item['gt'].get('last_name', '')}".strip()
     row["name_read"] = f"{ic.get('first_name', '')} {ic.get('last_name', '')}".strip()
+    row["expiry_gt"] = item["gt"].get("expiry_date_be")
+    row["expiry_read"] = ic.get("expiry_date_be")
     row["needs_review"] = body.get("needs_review")
     return row
 

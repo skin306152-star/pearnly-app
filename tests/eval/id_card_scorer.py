@@ -8,10 +8,8 @@
 为什么按权重而非平均:公民号(people_id)读错 = 建到别人名下,和 soi 少一个字的
 代价天差地别。身份证建客户的三根命门 people_id/first_name/last_name 权重最高。
 
-两处刻意不打分(prod 侧无输出可比,别当漏判):
-- issue_date / expiry_date:_ID_CARD_PROMPT 不抽发证/到期日,「过期证」语义现在读不出
-  来 —— 是产品缺口,归台账,不进本 scorer 的 _FIELD_SPEC。
-- phone:面板恒空占位,非 OCR 字段。
+刻意不打分(prod 侧无输出可比):phone 面板恒空占位,非 OCR 字段。
+issue_date/expiry_date 自 2026-07-06 起 prod 已抽取(_ID_CARD_PROMPT 补·治 #14),纳入打分。
 
 两处格式必须归一(否则真值/抽取全判 miss):
 - 生日:真值 YYYY-MM-DD(BE),prod _normalize_be_date 出 dd/mm/yyyy(BE)→ canonical。
@@ -35,6 +33,8 @@ _FIELD_SPEC: Dict[str, tuple] = {
     "first_name": ("text", 3),
     "last_name": ("text", 3),
     "birthday_be": ("date", 2),
+    "issue_date_be": ("date", 1),
+    "expiry_date_be": ("date", 2),
     "prefix_name": ("text", 1),
     "address.house_no": ("text", 1),
     "address.subdistrict": ("text", 1),

@@ -438,11 +438,16 @@
 }
 
 @media (max-width: 980px) {
+  .ptour-arrow {
+    display: none; /* 手机端改横滑翻页,不显示左右按钮 */
+  }
   .ptour-screen {
     grid-template-columns: 1fr;
-    gap: 20px;
-    padding: 70px 6vw 80px;
-    overflow: hidden;
+    gap: 16px;
+    padding: 58px 7vw 72px;
+    overflow-x: hidden;
+    overflow-y: auto; /* 内容超一屏时该屏内竖向滚动,不裁切 */
+    align-content: safe center;
   }
   .ptour-screen .demo,
   .ptour-screen.flip .demo {
@@ -458,15 +463,15 @@
     justify-content: center;
   }
   .ptour .phone {
-    width: min(280px, 72vw);
+    width: min(232px, 62vw);
   }
   .ptour h1 {
     font-size: clamp(26px, 7vw, 38px);
   }
-  .ptour-arrow.l {
-    left: 8px;
+  .ptour .sub {
+    margin-bottom: 18px;
   }
-  .ptour-arrow.r {
-    right: 8px;
+  .ptour .points {
+    margin-bottom: 20px;
   }
 }

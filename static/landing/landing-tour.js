@@ -99,20 +99,69 @@
     }
 
     let cur = 0;
+    let busy = false;
     for (let i = 0; i < PAGES; i += 1) {
         const b = document.createElement('button');
         b.setAttribute('aria-label', `page ${i + 1}`);
         b.onclick = () => go(i);
         dots.appendChild(b);
     }
-    function go(i) {
-        cur = ((i % PAGES) + PAGES) % PAGES;
-        track.style.transform = `translateX(${(1 - cur) * 20}%)`;
-        document.documentElement.classList.toggle('ptour-on', cur > 0);
-        dots.querySelectorAll('button').forEach((b, j) => b.classList.toggle('on', j === cur));
-        screens.forEach((s, j) => s.classList.toggle('active', j === cur - 1));
-        if (cur > 0) scenes.play(cur - 1, dict());
+
+    const railX = (i) => (1 - i) * 20;
+    const authRoot = () => document.getElementById('pearnly-auth-root');
+    function move(el, transform, instant) {
+        if (!el) return;
+        if (instant) el.style.transition = 'none';
+        el.style.transform = transform;
+        if (instant) {
+            void el.offsetWidth;
+            el.style.transition = '';
+        }
+    }
+    function paint(i) {
+        document.documentElement.classList.toggle('ptour-on', i > 0);
+        dots.querySelectorAll('button').forEach((b, j) => b.classList.toggle('on', j === i));
+        screens.forEach((s, j) => s.classList.toggle('active', j === i - 1));
+        if (i > 0) scenes.play(i - 1, dict());
         else scenes.stop();
+    }
+
+    // 相邻切换与圆点跳转走绝对定位。仅首尾环绕(末屏→登录页 / 登录页→末屏)需先把登录页与
+    // 卖点轨道预置到屏外再同向滑入 —— 否则 translateX 从 -80% 直接跳回 +20% 会反向甩一整屏。
+    function wrap(forward) {
+        busy = true;
+        const target = forward ? 0 : PAGES - 1;
+        if (forward) {
+            move(authRoot(), 'translateX(100vw)', true);
+            requestAnimationFrame(() => {
+                move(track, 'translateX(-100%)');
+                move(authRoot(), 'translateX(0)');
+            });
+        } else {
+            move(track, 'translateX(-100%)', true);
+            requestAnimationFrame(() => {
+                move(track, `translateX(${railX(target)}%)`);
+                move(authRoot(), 'translateX(100vw)');
+            });
+        }
+        cur = target;
+        paint(target);
+        setTimeout(() => {
+            move(track, `translateX(${railX(target)}%)`, true);
+            move(authRoot(), target === 0 ? 'translateX(0)' : 'translateX(-100vw)', true);
+            busy = false;
+        }, 760);
+    }
+    function go(i) {
+        if (busy) return;
+        const target = ((i % PAGES) + PAGES) % PAGES;
+        if (target === cur) return;
+        if (cur === PAGES - 1 && target === 0) return wrap(true);
+        if (cur === 0 && target === PAGES - 1) return wrap(false);
+        cur = target;
+        move(track, `translateX(${railX(target)}%)`);
+        move(authRoot(), target === 0 ? 'translateX(0)' : 'translateX(-100vw)');
+        paint(target);
     }
 
     document.getElementById('ptour-prev').onclick = () => go(cur - 1);
@@ -152,5 +201,7 @@
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
 
     applyTexts();
-    go(0);
+    move(track, `translateX(${railX(0)}%)`, true);
+    move(authRoot(), 'translateX(0)', true);
+    paint(0);
 })();

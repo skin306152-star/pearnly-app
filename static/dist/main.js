@@ -19,121 +19,6 @@ This device has been logged out automatically.`,th:`บัญชีของค�
         <div class="panel">${e.sections||""}${a}</div></div></div>`}function hh(e){let a="";for(let s=1;s<=e.total;s++)a+=`<span class="dot${s<=e.step?" on":""}">${s}</span>`,s<e.total&&(a+=`<span class="seg${s<e.step?" on":""}"></span>`);const n=e.prev||e.next?`<div class="foot" style="justify-content:space-between">${e.prev||"<span></span>"}${e.next||""}</div>`:"";return`<div class="ui"><div class="wrap">${ss({title:e.title})}
         <div class="panel"><div class="steps">${a}</div>
             <div class="box" style="border:none">${e.body||""}</div>${n}</div></div></div>`}const gh={overview:uh,list:mh,detail:vh,entry:fh,settings:bh,wizard:hh};window.uiTpl=gh;function Wt(e,a){const n=document.getElementById(e);if(!(!n||n.dataset.wbInjected==="1")){n.innerHTML=a,n.dataset.wbInjected="1";try{const s=window._currentLang||localStorage.getItem("mrpilot_lang")||"th",i=window.I18N;if(!i||!i[s])return;n.querySelectorAll("[data-i18n]").forEach(o=>{const r=o.getAttribute("data-i18n");r&&i[s][r]&&(o.textContent=i[s][r])}),n.querySelectorAll("[data-i18n-placeholder]").forEach(o=>{const r=o.getAttribute("data-i18n-placeholder");r&&i[s][r]&&(o.placeholder=i[s][r])})}catch{}}}const xh=`
-    <div class="topbar-left">
-        <!-- v86 · 手机端汉堡按钮(桌面端隐藏) -->
-        <button class="topbar-hamburger" id="topbar-hamburger" aria-label="Menu">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="3" y1="6" x2="17" y2="6"/>
-                <line x1="3" y1="10" x2="17" y2="10"/>
-                <line x1="3" y1="14" x2="17" y2="14"/>
-            </svg>
-        </button>
-        <!-- 2026-06-10 Claude 式导航:品牌区迁入侧栏顶部(.sb-brand)· 顶栏左侧只留手机端汉堡 -->
-    </div>
-
-    <div class="topbar-right">
-        <!-- v117 · 删除原右上角"管理"下拉 · 用户管理已在左下角导航 · 入口唯一化 -->
-        <!-- v118.28.5 · 语言切换器从这里移到「设置 → 个人资料」内 · 顶栏右侧腾给客户切换器 -->
-
-        <!-- v118.28.5 · 客户切换器(从 brand 旁迁移到顶栏右侧 · 跟 Linear / Notion workspace switcher 同位置) -->
-        <!-- B4 (2026-05-26) · workspace 工作模式切换器(账套主体=在为哪家公司做账)·
-             取代旧 ClientSwitcher(买方过滤)。控件由 src/home/workspace-switcher.js 渲染进
-             #workspace-switcher-root。外层保留 id=client-switcher 供 admin-mode 隐藏 + 既有定位 CSS。 -->
-        <div class="client-switcher cs-right" id="client-switcher">
-            <div id="workspace-switcher-root"></div>
-        </div>
-
-        <!-- NAV-IA Phase 1 · 顶栏搜索框(2026-05-15 拍板 · 点击/⌘K 弹命令面板) -->
-        <div class="topbar-search" id="topbar-search" role="button" tabindex="0"
-             aria-label="Open command palette"
-             title="搜索 · 快速跳转 (Cmd+K / Ctrl+K)">
-            <svg class="topbar-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor"
-                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="9" cy="9" r="6"/>
-                <line x1="14" y1="14" x2="17" y2="17"/>
-            </svg>
-            <span class="topbar-search-text" data-i18n="topbar-search-ph">搜索发票 · 客户 · 跳转...</span>
-            <span class="topbar-search-kbd"><span class="topbar-search-kbd-mac">⌘K</span><span class="topbar-search-kbd-win">Ctrl K</span></span>
-        </div>
-
-        <!-- NAV-IA Phase 1 · 头像下拉菜单(2026-05-15 拍板 · 收纳账户/设置/管理员入口) -->
-        <div class="avatar-wrap" id="avatar-wrap">
-            <button type="button" class="avatar" id="avatar-btn" aria-haspopup="menu" aria-expanded="false" title="账户菜单">·</button>
-            <div class="avatar-popup" id="avatar-popup" role="menu">
-                <div class="avatar-popup-head">
-                    <div class="avatar-popup-name" id="avatar-popup-name">—</div>
-                    <div class="avatar-popup-email" id="avatar-popup-email">—</div>
-                </div>
-                <button type="button" class="avatar-popup-item" data-action="settings" id="avatar-menu-settings" role="menuitem">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <circle cx="10" cy="10" r="2.5"/>
-                        <path d="M15.3 12a1 1 0 00.2 1.1l.1.1a1.5 1.5 0 11-2.1 2.1l-.1-.1a1 1 0 00-1.1-.2 1 1 0 00-.6.9v.1a1.5 1.5 0 11-3 0v-.1a1 1 0 00-.6-.9 1 1 0 00-1.1.2l-.1.1A1.5 1.5 0 114.8 13.3l.1-.1a1 1 0 00.2-1.1 1 1 0 00-.9-.6h-.1a1.5 1.5 0 110-3h.1a1 1 0 00.9-.6 1 1 0 00-.2-1.1l-.1-.1A1.5 1.5 0 116.9 4.7l.1.1a1 1 0 001.1.2h.1a1 1 0 00.6-.9v-.1a1.5 1.5 0 113 0v.1a1 1 0 00.6.9 1 1 0 001.1-.2l.1-.1a1.5 1.5 0 112.1 2.1l-.1.1a1 1 0 00-.2 1.1 1 1 0 00.9.6h.1a1.5 1.5 0 110 3h-.1a1 1 0 00-.9.6z"/>
-                    </svg>
-                    <span data-i18n="avatar-menu-settings">设置</span>
-                </button>
-                <a class="avatar-popup-item" href="/console" data-show-if-team="1" id="avatar-menu-console" role="menuitem" style="text-decoration:none;color:inherit;">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M10 2.5l6.5 3.75v7.5L10 17.5l-6.5-3.75v-7.5L10 2.5z"/>
-                        <circle cx="10" cy="10" r="2.5"/>
-                    </svg>
-                    <span data-i18n="avatar-menu-console">团队与权限</span>
-                </a>
-                <button type="button" class="avatar-popup-item" data-action="billing" data-show-if-money="1" id="avatar-menu-billing" role="menuitem">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <rect x="2.5" y="5" width="15" height="11" rx="1.5"/>
-                        <line x1="2.5" y1="9" x2="17.5" y2="9"/>
-                        <line x1="5.5" y1="13" x2="8" y2="13"/>
-                    </svg>
-                    <span data-i18n="avatar-menu-billing">账户 &amp; 余额</span>
-                </button>
-                <button type="button" class="avatar-popup-item" data-action="shortcuts" id="avatar-menu-shortcuts" role="menuitem">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <rect x="2" y="5.5" width="16" height="10" rx="1.5"/>
-                        <line x1="5" y1="9" x2="5" y2="9.01"/>
-                        <line x1="8" y1="9" x2="8" y2="9.01"/>
-                        <line x1="11" y1="9" x2="11" y2="9.01"/>
-                        <line x1="14" y1="9" x2="14" y2="9.01"/>
-                        <line x1="5.5" y1="12.5" x2="14.5" y2="12.5"/>
-                    </svg>
-                    <span data-i18n="avatar-menu-shortcuts">键盘快捷键</span>
-                </button>
-                <div class="avatar-popup-sep" data-show-if-special="1"></div>
-                <button type="button" class="avatar-popup-item" data-action="admin" data-show-if-admin="1" id="avatar-menu-admin" role="menuitem" style="display:none">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M10 2.5l6 2v5c0 4-2.8 6.8-6 8-3.2-1.2-6-4-6-8v-5l6-2z"/>
-                        <path d="M7.5 10l2 2 3.5-3.5"/>
-                    </svg>
-                    <span data-i18n="avatar-menu-admin">管理员后台</span>
-                    <span class="avatar-pill avatar-pill-admin" data-i18n="avatar-menu-badge-admin">超管</span>
-                </button>
-                <div class="avatar-popup-sep"></div>
-                <button type="button" class="avatar-popup-item" data-action="theme" id="avatar-menu-theme" role="menuitem">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M16 11.2A6 6 0 1 1 8.8 4 4.7 4.7 0 0 0 16 11.2z"/>
-                    </svg>
-                    <span data-i18n="avatar-menu-theme">暗夜模式</span>
-                    <span class="theme-sw" id="avatar-theme-sw" aria-hidden="true"></span>
-                </button>
-                <button type="button" class="avatar-popup-item" data-action="help" id="avatar-menu-help" role="menuitem">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <circle cx="10" cy="10" r="8"/>
-                        <path d="M7.5 7.5a2.5 2.5 0 015 0c0 1.25-1 1.875-1.875 2.5-.5.36-.625.625-.625 1.25"/>
-                        <circle cx="10" cy="14.5" r="0.5" fill="currentColor"/>
-                    </svg>
-                    <span data-i18n="avatar-menu-help">帮助 &amp; 反馈</span>
-                </button>
-                <button type="button" class="avatar-popup-item avatar-popup-item-danger" data-action="logout" id="avatar-menu-logout" role="menuitem">
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M13 4v2H5v8h8v2a2 2 0 01-2 2H5a2 2 0 01-2-2V4a2 2 0 012-2h6a2 2 0 012 2z"/>
-                        <path d="M15 7l3 3-3 3M9 10h9"/>
-                    </svg>
-                    <span data-i18n="avatar-menu-logout">退出登录</span>
-                </button>
-            </div>
-        </div>
-
-    </div>
-`,yh=`
     <!-- 2026-06-10 Claude 式导航拍板:侧栏顶区 = logo + 品牌名 + 折叠键(logo 自顶栏迁入) -->
     <div class="sb-brand">
         <img class="brand-icon" src="/static/brand/pwa-icon-192.png?v=1" alt="Pearnly" />
@@ -512,7 +397,122 @@ This device has been logged out automatically.`,th:`บัญชีของค�
             </span>
         </button>
     </div>
-`;Wt("topbar",xh);Wt("sidebar",yh);const wh={check:'<path d="M20 6 9 17l-5-5"/>',chev:'<path d="m9 18 6-6-6-6"/>',info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',edit:'<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/>',user:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'};function Ht(e,a=""){return`<svg class="onb-i ${a}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">`+(wh[e]||"")+"</svg>"}function kh(e){return'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+e+'"/></svg>'}const Qc=`
+`,yh=`
+    <div class="topbar-left">
+        <!-- v86 · 手机端汉堡按钮(桌面端隐藏) -->
+        <button class="topbar-hamburger" id="topbar-hamburger" aria-label="Menu">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="3" y1="6" x2="17" y2="6"/>
+                <line x1="3" y1="10" x2="17" y2="10"/>
+                <line x1="3" y1="14" x2="17" y2="14"/>
+            </svg>
+        </button>
+        <!-- 2026-06-10 Claude 式导航:品牌区迁入侧栏顶部(.sb-brand)· 顶栏左侧只留手机端汉堡 -->
+    </div>
+
+    <div class="topbar-right">
+        <!-- v117 · 删除原右上角"管理"下拉 · 用户管理已在左下角导航 · 入口唯一化 -->
+        <!-- v118.28.5 · 语言切换器从这里移到「设置 → 个人资料」内 · 顶栏右侧腾给客户切换器 -->
+
+        <!-- v118.28.5 · 客户切换器(从 brand 旁迁移到顶栏右侧 · 跟 Linear / Notion workspace switcher 同位置) -->
+        <!-- B4 (2026-05-26) · workspace 工作模式切换器(账套主体=在为哪家公司做账)·
+             取代旧 ClientSwitcher(买方过滤)。控件由 src/home/workspace-switcher.js 渲染进
+             #workspace-switcher-root。外层保留 id=client-switcher 供 admin-mode 隐藏 + 既有定位 CSS。 -->
+        <div class="client-switcher cs-right" id="client-switcher">
+            <div id="workspace-switcher-root"></div>
+        </div>
+
+        <!-- NAV-IA Phase 1 · 顶栏搜索框(2026-05-15 拍板 · 点击/⌘K 弹命令面板) -->
+        <div class="topbar-search" id="topbar-search" role="button" tabindex="0"
+             aria-label="Open command palette"
+             title="搜索 · 快速跳转 (Cmd+K / Ctrl+K)">
+            <svg class="topbar-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="9" cy="9" r="6"/>
+                <line x1="14" y1="14" x2="17" y2="17"/>
+            </svg>
+            <span class="topbar-search-text" data-i18n="topbar-search-ph">搜索发票 · 客户 · 跳转...</span>
+            <span class="topbar-search-kbd"><span class="topbar-search-kbd-mac">⌘K</span><span class="topbar-search-kbd-win">Ctrl K</span></span>
+        </div>
+
+        <!-- NAV-IA Phase 1 · 头像下拉菜单(2026-05-15 拍板 · 收纳账户/设置/管理员入口) -->
+        <div class="avatar-wrap" id="avatar-wrap">
+            <button type="button" class="avatar" id="avatar-btn" aria-haspopup="menu" aria-expanded="false" title="账户菜单">·</button>
+            <div class="avatar-popup" id="avatar-popup" role="menu">
+                <div class="avatar-popup-head">
+                    <div class="avatar-popup-name" id="avatar-popup-name">—</div>
+                    <div class="avatar-popup-email" id="avatar-popup-email">—</div>
+                </div>
+                <button type="button" class="avatar-popup-item" data-action="settings" id="avatar-menu-settings" role="menuitem">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="10" cy="10" r="2.5"/>
+                        <path d="M15.3 12a1 1 0 00.2 1.1l.1.1a1.5 1.5 0 11-2.1 2.1l-.1-.1a1 1 0 00-1.1-.2 1 1 0 00-.6.9v.1a1.5 1.5 0 11-3 0v-.1a1 1 0 00-.6-.9 1 1 0 00-1.1.2l-.1.1A1.5 1.5 0 114.8 13.3l.1-.1a1 1 0 00.2-1.1 1 1 0 00-.9-.6h-.1a1.5 1.5 0 110-3h.1a1 1 0 00.9-.6 1 1 0 00-.2-1.1l-.1-.1A1.5 1.5 0 116.9 4.7l.1.1a1 1 0 001.1.2h.1a1 1 0 00.6-.9v-.1a1.5 1.5 0 113 0v.1a1 1 0 00.6.9 1 1 0 001.1-.2l.1-.1a1.5 1.5 0 112.1 2.1l-.1.1a1 1 0 00-.2 1.1 1 1 0 00.9.6h.1a1.5 1.5 0 110 3h-.1a1 1 0 00-.9.6z"/>
+                    </svg>
+                    <span data-i18n="avatar-menu-settings">设置</span>
+                </button>
+                <a class="avatar-popup-item" href="/console" data-show-if-team="1" id="avatar-menu-console" role="menuitem" style="text-decoration:none;color:inherit;">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M10 2.5l6.5 3.75v7.5L10 17.5l-6.5-3.75v-7.5L10 2.5z"/>
+                        <circle cx="10" cy="10" r="2.5"/>
+                    </svg>
+                    <span data-i18n="avatar-menu-console">团队与权限</span>
+                </a>
+                <button type="button" class="avatar-popup-item" data-action="billing" data-show-if-money="1" id="avatar-menu-billing" role="menuitem">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="2.5" y="5" width="15" height="11" rx="1.5"/>
+                        <line x1="2.5" y1="9" x2="17.5" y2="9"/>
+                        <line x1="5.5" y1="13" x2="8" y2="13"/>
+                    </svg>
+                    <span data-i18n="avatar-menu-billing">账户 &amp; 余额</span>
+                </button>
+                <button type="button" class="avatar-popup-item" data-action="shortcuts" id="avatar-menu-shortcuts" role="menuitem">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="2" y="5.5" width="16" height="10" rx="1.5"/>
+                        <line x1="5" y1="9" x2="5" y2="9.01"/>
+                        <line x1="8" y1="9" x2="8" y2="9.01"/>
+                        <line x1="11" y1="9" x2="11" y2="9.01"/>
+                        <line x1="14" y1="9" x2="14" y2="9.01"/>
+                        <line x1="5.5" y1="12.5" x2="14.5" y2="12.5"/>
+                    </svg>
+                    <span data-i18n="avatar-menu-shortcuts">键盘快捷键</span>
+                </button>
+                <div class="avatar-popup-sep" data-show-if-special="1"></div>
+                <button type="button" class="avatar-popup-item" data-action="admin" data-show-if-admin="1" id="avatar-menu-admin" role="menuitem" style="display:none">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M10 2.5l6 2v5c0 4-2.8 6.8-6 8-3.2-1.2-6-4-6-8v-5l6-2z"/>
+                        <path d="M7.5 10l2 2 3.5-3.5"/>
+                    </svg>
+                    <span data-i18n="avatar-menu-admin">管理员后台</span>
+                    <span class="avatar-pill avatar-pill-admin" data-i18n="avatar-menu-badge-admin">超管</span>
+                </button>
+                <div class="avatar-popup-sep"></div>
+                <button type="button" class="avatar-popup-item" data-action="theme" id="avatar-menu-theme" role="menuitem">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M16 11.2A6 6 0 1 1 8.8 4 4.7 4.7 0 0 0 16 11.2z"/>
+                    </svg>
+                    <span data-i18n="avatar-menu-theme">暗夜模式</span>
+                    <span class="theme-sw" id="avatar-theme-sw" aria-hidden="true"></span>
+                </button>
+                <button type="button" class="avatar-popup-item" data-action="help" id="avatar-menu-help" role="menuitem">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="10" cy="10" r="8"/>
+                        <path d="M7.5 7.5a2.5 2.5 0 015 0c0 1.25-1 1.875-1.875 2.5-.5.36-.625.625-.625 1.25"/>
+                        <circle cx="10" cy="14.5" r="0.5" fill="currentColor"/>
+                    </svg>
+                    <span data-i18n="avatar-menu-help">帮助 &amp; 反馈</span>
+                </button>
+                <button type="button" class="avatar-popup-item avatar-popup-item-danger" data-action="logout" id="avatar-menu-logout" role="menuitem">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M13 4v2H5v8h8v2a2 2 0 01-2 2H5a2 2 0 01-2-2V4a2 2 0 012-2h6a2 2 0 012 2z"/>
+                        <path d="M15 7l3 3-3 3M9 10h9"/>
+                    </svg>
+                    <span data-i18n="avatar-menu-logout">退出登录</span>
+                </button>
+            </div>
+        </div>
+
+    </div>
+`;Wt("topbar",yh);Wt("sidebar",xh);const wh={check:'<path d="M20 6 9 17l-5-5"/>',chev:'<path d="m9 18 6-6-6-6"/>',info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',edit:'<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/>',user:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'};function Ht(e,a=""){return`<svg class="onb-i ${a}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">`+(wh[e]||"")+"</svg>"}function kh(e){return'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+e+'"/></svg>'}const Qc=`
 .onb-root{position:fixed;inset:0;z-index:1300;background:var(--bg);overflow:auto;color:var(--ink);
   font-size:13.5px;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;}
 .onb-root *{box-sizing:border-box;}
@@ -4598,18 +4598,18 @@ ${p.raw_text||p.text||""}`).join(`
 .expd .rhd .rsub{font-size:12.5px;color:var(--ink2);margin-left:auto;}
 .expd .ico{width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:9px;color:var(--ink2);cursor:pointer;background:var(--card);}
 .expd .ico:hover{background:var(--line2);color:var(--ink);}
-.expd .ico.danger:hover{color:var(--danger,#e5484d);border-color:#f3c9cb;}
+.expd .ico.danger:hover{color:var(--danger);border-color:var(--danger);}
 .expd .slist{flex:1;overflow-y:auto;padding:8px 14px;}
 .expd .srow{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:10px;border:1px solid transparent;}
 .expd .srow:hover{background:var(--line2);border-color:var(--line);}
-.expd .srow .dot{width:6px;height:6px;border-radius:50%;background:#d6cffb;flex:0 0 6px;}
+.expd .srow .dot{width:6px;height:6px;border-radius:50%;background:var(--accent-soft);flex:0 0 6px;}
 .expd .srow .snm{font-size:14px;flex:1;cursor:text;border-radius:6px;padding:1px 5px;margin:-1px -5px;}
 .expd .srow .snm:hover{background:var(--card);}
 .expd .srow .sacts{display:flex;gap:3px;opacity:0;transition:.12s;}
 .expd .srow:hover .sacts{opacity:1;}
 .expd .mini{width:29px;height:29px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;color:var(--ink3);cursor:pointer;}
 .expd .mini:hover{background:var(--line);color:var(--ink);}
-.expd .mini.danger:hover{color:var(--danger,#e5484d);background:#fff0f0;}
+.expd .mini.danger:hover{color:var(--danger);background:var(--line2);}
 .expd .addsub{margin:6px 12px 14px;height:42px;}
 .expd .empty{padding:60px 20px;text-align:center;color:var(--ink3);font-size:13.5px;}
 .expd .cin{height:34px;padding:0 11px;border:1px solid var(--accent);border-radius:9px;font-size:13px;outline:0;min-width:150px;}

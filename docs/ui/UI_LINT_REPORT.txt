@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 339 个源文件全扫
+# UI 设计合规扫描报告 · 341 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 8(8 文件)
@@ -117,8 +117,8 @@
         └ 7: welcomeSub: '准备好一起把工作推进吧 💗',
         └ 8: bubble: '今天的工作<br />会很顺利 😊',
      8  static\admin\admin-i18n.js
-        └ 210: 'tn-status-overdraft': '⚠ 透支',
-        └ 252: 'adm-risk-title': '⚠ 风控 · 可疑活动',
+        └ 212: 'tn-status-overdraft': '⚠ 透支',
+        └ 254: 'adm-risk-title': '⚠ 风控 · 可疑活动',
      7  src\home\knowledge-fab.ts
         └ 119: burst(['💛', '✨', '💙', '🐾']);
         └ 171: const HELLO = [kbT('kb-fab-hi', '喵?'), kbT('kb-fab-ask', '问我呀!'), '🐾'];
@@ -146,8 +146,8 @@
         └ 176: <div class="copyright">© 2026 PEARNLY Co., Ltd. All rights reserved.</div>
      2  static\pos\pos-restaurant-ops.js
         └ 83: const tm = (t.late ? '⚠ ' : '⏱ ') + (t.minutes || 0) + ' ' + POS.t('posui.rest.min');
-     1  src\home\app-shell-html.ts
-        └ 417: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
+     1  src\home\app-shell-sidebar-html.ts
+        └ 324: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
      1  src\home\dms-intake-invoice-submit.ts
         └ 91: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
      1  src\home\dms-intake.ts
@@ -377,11 +377,9 @@
 ## 自曝/AI文案 — 命中 0(0 文件)
   ✅ 无
 
-## 原生弹窗(禁) — 命中 5(5 文件)
+## 原生弹窗(禁) — 命中 4(4 文件)
      1  src\home\confirm-modal.ts
         └ 12: // 自定义确认对话框 · v0.15.6 · 替换浏览器原生 confirm()
-     1  src\home\purchase-settings.ts
-        └ 170: // F16 · 去原生 prompt():点「加科目」就地变行内输入框(Enter 存 / Esc 取消 / 失焦存)。
      1  src\home\sales-detail.ts
         └ 436: : confirm(t('sx-del-draft-confirm'));
      1  src\home\sales-products.ts
@@ -421,8 +419,8 @@
         └ 1084: 'time-min-ago-suffix': ' 分钟前',
         └ 1085: 'time-hour-ago-suffix': ' 小时前',
      4  static\admin\admin-i18n.js
-        └ 334: 'time-hours-ago': '{n} 小时前',
-        └ 335: 'time-days-ago': '{n} 天前',
+        └ 336: 'time-hours-ago': '{n} 小时前',
+        └ 337: 'time-days-ago': '{n} 天前',
 
 ## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 1044(69 文件)
    157  static\home-18-admin-users.css
@@ -477,7 +475,7 @@
      2  src\home\line-email-modal.ts
      2  static\home-10-push-logs.css
      2  static\landing\mascot-effects.css
-     1  src\home\app-shell-html.ts
+     1  src\home\app-shell-sidebar-html.ts
      1  src\home\clients-buyer.ts
      1  src\home\clients-helpers.ts
      1  src\home\confirm-modal.ts

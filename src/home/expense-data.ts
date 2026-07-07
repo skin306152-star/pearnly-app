@@ -36,18 +36,18 @@ const PAGE_CSS = `
 .expd .rhd .rsub{font-size:12.5px;color:var(--ink2);margin-left:auto;}
 .expd .ico{width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:9px;color:var(--ink2);cursor:pointer;background:var(--card);}
 .expd .ico:hover{background:var(--line2);color:var(--ink);}
-.expd .ico.danger:hover{color:var(--danger,#e5484d);border-color:#f3c9cb;}
+.expd .ico.danger:hover{color:var(--danger);border-color:var(--danger);}
 .expd .slist{flex:1;overflow-y:auto;padding:8px 14px;}
 .expd .srow{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:10px;border:1px solid transparent;}
 .expd .srow:hover{background:var(--line2);border-color:var(--line);}
-.expd .srow .dot{width:6px;height:6px;border-radius:50%;background:#d6cffb;flex:0 0 6px;}
+.expd .srow .dot{width:6px;height:6px;border-radius:50%;background:var(--accent-soft);flex:0 0 6px;}
 .expd .srow .snm{font-size:14px;flex:1;cursor:text;border-radius:6px;padding:1px 5px;margin:-1px -5px;}
 .expd .srow .snm:hover{background:var(--card);}
 .expd .srow .sacts{display:flex;gap:3px;opacity:0;transition:.12s;}
 .expd .srow:hover .sacts{opacity:1;}
 .expd .mini{width:29px;height:29px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;color:var(--ink3);cursor:pointer;}
 .expd .mini:hover{background:var(--line);color:var(--ink);}
-.expd .mini.danger:hover{color:var(--danger,#e5484d);background:#fff0f0;}
+.expd .mini.danger:hover{color:var(--danger);background:var(--line2);}
 .expd .addsub{margin:6px 12px 14px;height:42px;}
 .expd .empty{padding:60px 20px;text-align:center;color:var(--ink3);font-size:13.5px;}
 .expd .cin{height:34px;padding:0 11px;border:1px solid var(--accent);border-radius:9px;font-size:13px;outline:0;min-width:150px;}

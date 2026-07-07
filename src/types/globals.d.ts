@@ -279,6 +279,7 @@ interface Window {
     loadKnowledgePage?: () => void;
     loadSalesWorkbench?: () => void;
     loadSalesProducts?: () => void;
+    loadExpenseData?: () => void;
     loadSalesAccount?: () => void;
     // core-boot 路由跳转(module-nav 据业态把识别记录隐藏后回落首页用)
     routeTo?: (route: string) => void;

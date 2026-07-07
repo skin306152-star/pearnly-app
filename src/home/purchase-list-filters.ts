@@ -186,7 +186,11 @@ export function bindFilterChips(onChange: () => void): void {
     window.addEventListener('scroll', closeAllChips, true);
 }
 
-function closeAllChips(): void {
+// 关掉所有筛选下拉。但事件源自筛选 chip 内部(点下拉空白/滚动条、或滚动下拉自身)时不关 ——
+// 否则 window scroll(capture)会在滚动下拉内容那一刻就把它关掉(= 用户报的"滚不动")。
+function closeAllChips(e?: Event): void {
+    const tgt = e && (e.target as HTMLElement | null);
+    if (tgt && typeof tgt.closest === 'function' && tgt.closest('.fchip')) return;
     document.querySelectorAll('.pur.pl .fchip').forEach((x) => x.classList.remove('open'));
 }
 

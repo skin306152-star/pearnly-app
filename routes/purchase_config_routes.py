@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from core import db
 from core.pos_api import PosError, ok
 from routes.purchase_common import auth_member, gate, resolve_ws
+from services.erp import mappings_store as erp_mappings
 from services.purchase import categories as cat_svc
 from services.purchase import settings as settings_svc
 from services.purchase import suppliers as sup_svc
@@ -171,6 +172,12 @@ async def api_update_category(category_id: str, req: CategoryIn, request: Reques
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, req.workspace_client_id)
+        new_name = (req.name or "").strip()
+        old_name = (
+            cat_svc.name_of(cur, tenant_id=tid, workspace_client_id=ws, category_id=category_id)
+            if new_name
+            else None
+        )
         row = cat_svc.update_category(
             cur,
             tenant_id=tid,
@@ -182,6 +189,9 @@ async def api_update_category(category_id: str, req: CategoryIn, request: Reques
         )
         if row is None:
             raise PosError("purchase.unexpected", 404)
+        # 改名连带改 GL 科目映射(name-keyed·不改就断推送科目)· 同事务
+        if old_name and new_name and old_name != new_name:
+            erp_mappings.rename_category_mapping(cur, tid, old_name, new_name)
         return ok({"category": row})
 
 
@@ -193,8 +203,10 @@ async def api_delete_category(
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
-        cat_svc.delete_category(cur, tenant_id=tid, workspace_client_id=ws, category_id=category_id)
-        return ok({"deleted": True})
+        res = cat_svc.delete_category(
+            cur, tenant_id=tid, workspace_client_id=ws, category_id=category_id
+        )
+        return ok(res)
 
 
 # ---- 采购设置 ----------------------------------------------------------------

@@ -199,6 +199,36 @@ const SIDEBAR_HTML = `
         </div>
     </div>
 
+    <!-- 商品 ▼ 可折叠组(主数据枢纽:商品数据 + 费用数据 · 对齐 MR.ERP m3 ระบบสินค้า · 置于采购之上)·
+         对所有业态可见(费用数据人人要 · 商品数据卖货商户用)· 不加 data-module 门控 -->
+    <div class="nav-group nav-collapsible" data-collapsible="products">
+        <div class="nav-group-toggle" data-toggle-group="products">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 7l7-4 7 4v6l-7 4-7-4V7z"/>
+                <path d="M3 7l7 4 7-4M10 11v6"/>
+            </svg>
+            <span class="nav-label" data-i18n="nav-group-products">商品</span>
+            <svg class="nav-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 8l4 4 4-4"/>
+            </svg>
+        </div>
+        <div class="nav-sub">
+            <div class="nav-item nav-sub-item" data-route="sales-products">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 7l1-4h12l1 4M4 7v9h12V7M8 16v-4h4v4"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-sales-products">商品数据</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="expense-data">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 3.5h9a2 2 0 012 2V17l-3-2-3 2-3-2-2 2V3.5z"/>
+                    <path d="M7 7h5M7 10h4"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-expense-data">费用数据</span>
+            </div>
+        </div>
+    </div>
+
     <!-- 进项管理 ▼ 可折叠组(采购 Phase 1 · 3 子项:采购/进项 · 供应商 · 采购设置)· 门控 expense -->
     <div class="nav-group nav-collapsible" data-collapsible="expense">
         <div class="nav-group-toggle" data-toggle-group="expense">
@@ -420,14 +450,7 @@ const SIDEBAR_HTML = `
     <!-- 主数据 · 商品/客户共享(以后 POS/库存复用同一份商品库)-->
     <div class="nav-section-label" data-i18n="nav-group-master">主数据</div>
 
-    <!-- 商品管理 = 共享主数据(销项 PO-10 · 不归销售发票子菜单) -->
-    <div class="nav-item" data-route="sales-products">
-        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 7l1-4h12l1 4M4 7v9h12V7M8 16v-4h4v4"/>
-        </svg>
-        <span class="nav-label" data-i18n="nav-sales-products">商品管理</span>
-    </div>
-
+    <!-- 商品管理已升级为顶级「商品」组(商品数据 + 费用数据 · 见上方 data-collapsible=products)· 此处不再散落 -->
     <!-- 客户 / 异常栏 / 自动化 独立项(自动化 Phase 7 才合并进集成页) -->
     <div class="nav-item" data-route="clients"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 17v-1.5a3 3 0 00-3-3H5a3 3 0 00-3 3V17"/><circle cx="8" cy="6.5" r="3"/><path d="M18 17v-1.5a3 3 0 00-2.3-2.9"/><path d="M13 3.6a3 3 0 010 5.8"/></svg><span class="nav-label" data-i18n="nav-clients">客户管理</span></div>
     <!-- 公司资料 · 当前账套主体开票/申报信息(行内编辑 · company-profile.ts) -->

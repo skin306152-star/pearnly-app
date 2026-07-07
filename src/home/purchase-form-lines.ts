@@ -99,18 +99,23 @@ function lineTotal(l: DocLine): number {
 function topCats(cats: Category[]): Category[] {
     return cats.filter((c) => !c.parent_id);
 }
+// 停用(is_active=false)的科目不再可选,但当前行已选的那条永远保留 —— 否则打开老单据时
+// 它的已停用分类在下拉里找不到,保存会被清空(见费用数据软删设计)。
+function pickable(list: Category[], sel: string | null | undefined): Category[] {
+    return list.filter((c) => c.is_active !== false || c.id === sel);
+}
 function opt(v: string, label: string, sel: string | null | undefined): string {
     return `<option value="${escapeHtml(v)}" ${v === sel ? 'selected' : ''}>${escapeHtml(label)}</option>`;
 }
 function bigCatOptions(cats: Category[], sel: string | null | undefined): string {
     return (
         `<option value="">${escapeHtml(t('pur-cat-none'))}</option>` +
-        topCats(cats)
+        pickable(topCats(cats), sel)
             .map((c) => opt(c.id, c.name, sel))
             .join('')
     );
 }
-// 小类随大类联动:无大类 → 仅「未分类」;有大类 → 该大类 children。
+// 小类随大类联动:无大类 → 仅「未分类」;有大类 → 该大类 children(停用的滤掉·已选保留)。
 function subCatOptions(
     cats: Category[],
     topId: string | null | undefined,
@@ -120,7 +125,9 @@ function subCatOptions(
     const kids = (top && top.children) || [];
     return (
         `<option value="">${escapeHtml(t('pur-cat-none'))}</option>` +
-        kids.map((k) => opt(k.id, k.name, sel)).join('')
+        pickable(kids, sel)
+            .map((k) => opt(k.id, k.name, sel))
+            .join('')
     );
 }
 

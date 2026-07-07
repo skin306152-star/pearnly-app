@@ -16,6 +16,8 @@
         'sales-invoices': 'sales',
         'sales-account': 'sales',
         receivables: 'sales',
+        'sales-products': 'products',
+        'expense-data': 'products',
         purchase: 'expense',
         'purchase-suppliers': 'expense',
         'purchase-settings': 'expense',
@@ -57,6 +59,10 @@
         let changed = false;
         if (state.sales === undefined) {
             state.sales = false;
+            changed = true;
+        }
+        if (state.products === undefined) {
+            state.products = false;
             changed = true;
         }
         if (state.expense === undefined) {

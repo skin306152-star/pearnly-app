@@ -253,6 +253,23 @@ def list_erp_account_mappings(tenant_id):
         return []
 
 
+def rename_category_mapping(cur, tenant_id, old_name, new_name) -> None:
+    """费用分类改名时同步 GL 科目映射(本表 pearnly_category 按名字 key,不改名映射会断)。
+    用调用方 cursor·与分类改名同事务原子。跳过目标名在同 erp_type 已存在的行,避开
+    UNIQUE(tenant_id, erp_type, pearnly_category)。"""
+    old = (old_name or "").strip()[:64]
+    new = (new_name or "").strip()[:64]
+    if not old or not new or old == new:
+        return
+    cur.execute(
+        "UPDATE erp_account_mappings m SET pearnly_category = %s, updated_at = NOW() "
+        "WHERE m.tenant_id = %s AND m.pearnly_category = %s "
+        "AND NOT EXISTS (SELECT 1 FROM erp_account_mappings x "
+        "WHERE x.tenant_id = m.tenant_id AND x.erp_type = m.erp_type AND x.pearnly_category = %s)",
+        (new, str(tenant_id), old, new),
+    )
+
+
 def upsert_erp_account_mapping(
     tenant_id, erp_type, pearnly_category, erp_code, erp_name, notes, user_id
 ):

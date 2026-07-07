@@ -298,10 +298,60 @@ def update_category(
     return cur.fetchone()
 
 
-def delete_category(cur, *, tenant_id: str, workspace_client_id: int, category_id: str) -> None:
-    """删科目(子类随 FK ON DELETE CASCADE 一并删)。"""
+def name_of(cur, *, tenant_id: str, workspace_client_id: int, category_id: str) -> Optional[str]:
+    cur.execute(
+        "SELECT name FROM expense_categories "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s",
+        (tenant_id, workspace_client_id, category_id),
+    )
+    row = cur.fetchone()
+    return row["name"] if row else None
+
+
+def _child_ids(cur, *, tenant_id: str, workspace_client_id: int, parent_id: str) -> list:
+    cur.execute(
+        "SELECT id FROM expense_categories "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND parent_id = %s",
+        (tenant_id, workspace_client_id, parent_id),
+    )
+    return [str(r["id"]) for r in cur.fetchall()]
+
+
+def _usage_count(cur, *, tenant_id: str, ids: list) -> int:
+    """这些科目 id 是否被历史单据 / 学习记忆引用(明细行大小类 + 单据头大类 + 归类记忆)。
+    这三张表的 category 列是裸 id 无外键,删前必须自查,否则删了 = 历史悬空。"""
+    if not ids:
+        return 0
+    cur.execute(
+        "SELECT ("
+        "(SELECT count(*) FROM purchase_lines WHERE tenant_id = %s"
+        " AND (category_id = ANY(%s::uuid[]) OR subcategory_id = ANY(%s::uuid[])))"
+        " + (SELECT count(*) FROM purchase_docs WHERE tenant_id = %s AND category_id = ANY(%s::uuid[]))"
+        " + (SELECT count(*) FROM expense_learned WHERE tenant_id = %s"
+        " AND (category_id = ANY(%s::uuid[]) OR subcategory_id = ANY(%s::uuid[])))"
+        ") AS n",
+        (tenant_id, ids, ids, tenant_id, ids, tenant_id, ids, ids),
+    )
+    row = cur.fetchone()
+    return int(row["n"]) if row else 0
+
+
+def delete_category(cur, *, tenant_id: str, workspace_client_id: int, category_id: str) -> dict:
+    """删科目:被历史单据/归类记忆用过 → 转停用(is_active=false·含子类),历史仍按 id 解析出名字、
+    不悬空;从未用过 → 真删(子类随 FK CASCADE)。返回实际动作 {disabled|deleted}。"""
+    ids = [str(category_id)] + _child_ids(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, parent_id=category_id
+    )
+    if _usage_count(cur, tenant_id=tenant_id, ids=ids) > 0:
+        cur.execute(
+            "UPDATE expense_categories SET is_active = FALSE "
+            "WHERE tenant_id = %s AND workspace_client_id = %s AND (id = %s OR parent_id = %s)",
+            (tenant_id, workspace_client_id, category_id, category_id),
+        )
+        return {"disabled": True, "deleted": False}
     cur.execute(
         "DELETE FROM expense_categories "
         "WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s",
         (tenant_id, workspace_client_id, category_id),
     )
+    return {"disabled": False, "deleted": True}

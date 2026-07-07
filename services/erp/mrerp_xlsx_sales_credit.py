@@ -15,7 +15,7 @@ from typing import Any, Dict, List
 from services.erp import mrerp_xlsx_generator as _gen
 from services.erp.mrerp_xlsx_fmt import fmt_date, fmt_number, history_number
 from services.erp.mrerp_xlsx_lookups import (
-    lookup_customer_code,
+    resolve_customer_code,
     _build_product_lookup,
     _resolve_product_code,
 )
@@ -27,8 +27,8 @@ from services.erp.mrerp_xlsx_lookups import (
 def build_sales_credit_row(history: Dict[str, Any], mappings: Dict[str, Any]) -> Dict[str, Any]:
     """v27.8.1.4 · 严格对齐 Korn 真实样本 18 列 header
     v27.8.1.5 · invoice_no 转 MR.ERP YYMMDD-NNN 标准格式"""
-    cid = history.get("client_id") or 0
-    customer_code = lookup_customer_code(cid, mappings)
+    # 客户码:真实客户优先,散客(无 client_id)→ 现金客户 เงินสด(与 preflight 同源解析)
+    customer_code = resolve_customer_code(history, mappings)
 
     # v27.8.1.5 · invoice_no 转 MR.ERP 标准格式(原 OCR 号 'INV-...' 不被认)
     mrerp_invoice_no = _gen.derive_mrerp_invoice_no(history)

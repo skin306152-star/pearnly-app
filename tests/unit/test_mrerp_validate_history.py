@@ -116,9 +116,12 @@ class LegacyErrorCoverageTests(unittest.TestCase):
         self.assertEqual(err, "ERR_NO_HISTORY")
 
     def test_no_client(self):
+        # 现金客户兜底关掉时,无 client_id 仍报 ERR_NO_CLIENT(旧行为)。
+        m = _good_mappings()
+        m["_mrerp_cash_customer_fallback"] = False
         ok, err, _ = gen.validate_history_for_sales_credit(
             _good_history(client_id=0),
-            _good_mappings(),
+            m,
         )
         self.assertFalse(ok)
         self.assertEqual(err, "ERR_NO_CLIENT")
@@ -160,6 +163,50 @@ class LegacyErrorCoverageTests(unittest.TestCase):
         )
         self.assertFalse(ok)
         self.assertEqual(err, "ERR_NO_TOTAL_AMOUNT")
+
+
+class CashCustomerFallbackTests(unittest.TestCase):
+    """散客销项(套账主体自己是卖家、买方无具名)→ 客户归一到现金客户 เงินสด,
+    不再被 ERR_NO_CLIENT 硬拦。对齐 Express 侧 CASH_CUSTOMER_NAME 约定。"""
+
+    def test_no_client_defaults_to_cash_customer(self):
+        # 无 client_id + 默认兜底开 → 过 preflight(客户 = เงินสด)
+        ok, err, _ = gen.validate_history_for_sales_credit(
+            _good_history(client_id=0),
+            _good_mappings(),
+        )
+        self.assertTrue(ok)
+        self.assertIsNone(err)
+
+    def test_cash_fallback_off_restores_err_no_client(self):
+        m = _good_mappings()
+        m["_mrerp_cash_customer_fallback"] = False
+        ok, err, _ = gen.validate_history_for_sales_credit(
+            _good_history(client_id=0),
+            m,
+        )
+        self.assertFalse(ok)
+        self.assertEqual(err, "ERR_NO_CLIENT")
+
+    def test_resolver_real_client_wins_over_cash(self):
+        from services.erp.mrerp_xlsx_lookups import resolve_customer_code
+
+        self.assertEqual(resolve_customer_code(_good_history(), _good_mappings("0006")), "0006")
+
+    def test_resolver_walkin_returns_cash_customer(self):
+        from services.erp.mrerp_xlsx_lookups import MRERP_CASH_CUSTOMER, resolve_customer_code
+
+        self.assertEqual(
+            resolve_customer_code(_good_history(client_id=0), _good_mappings()),
+            MRERP_CASH_CUSTOMER,
+        )
+
+    def test_client_without_mapping_still_err_customer_mapping(self):
+        # 有 client_id 但缺 mrerp 映射 → 仍 ERR_NO_CUSTOMER_MAPPING(不误吞进现金客户)
+        empty = {"clients": [], "accounts": [], "taxes": [], "products": []}
+        ok, err, _ = gen.validate_history_for_sales_credit(_good_history(), empty)
+        self.assertFalse(ok)
+        self.assertEqual(err, "ERR_NO_CUSTOMER_MAPPING")
 
 
 class FieldLengthTests(unittest.TestCase):

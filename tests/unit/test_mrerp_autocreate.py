@@ -110,6 +110,30 @@ class TestEnsureCustomers(unittest.TestCase):
         provision_customers(stub, [_hist(777)], mappings)
         self.assertIsNone(stub.called_with)
 
+    def test_walkin_ensures_cash_customer(self):
+        # 散客销项(无 client_id)→ 幂等自建通用现金客户 เงินสด(不按空买方建垃圾码 C0),
+        # 且不注入 clients 映射(resolve_customer_code 对 cid=0 直接返 เงินสด)。
+        from services.erp.mrerp_xlsx_lookups import MRERP_CASH_CUSTOMER
+
+        mappings = {"clients": []}
+        stub = _StubAdapter({})
+        provision_customers(stub, [{"client_id": 0}], mappings)
+        self.assertEqual([c["code"] for c in stub.called_with], [MRERP_CASH_CUSTOMER])
+        self.assertEqual(mappings["clients"], [])  # 现金客户不进 client 映射
+
+    def test_walkin_deduped_across_histories(self):
+        from services.erp.mrerp_xlsx_lookups import MRERP_CASH_CUSTOMER
+
+        stub = _StubAdapter({})
+        provision_customers(stub, [{"client_id": 0}, {"client_id": 0}], {"clients": []})
+        self.assertEqual([c["code"] for c in stub.called_with], [MRERP_CASH_CUSTOMER])  # 只建一次
+
+    def test_walkin_skipped_when_cash_fallback_off(self):
+        mappings = {"clients": [], "_mrerp_cash_customer_fallback": False}
+        stub = _StubAdapter({})
+        provision_customers(stub, [{"client_id": 0}], mappings)
+        self.assertIsNone(stub.called_with)  # 兜底关 → 不建现金客户
+
 
 class TestProvisionProducts(unittest.TestCase):
     def _hist_items(self, *names):

@@ -77,6 +77,26 @@ def lookup_customer_code(client_id: int, mappings: Dict[str, Any]) -> str:
     return ""
 
 
+# 散客销项:套账主体自己是卖家、买方无具名(零售现金票常态)→ 客户归一到通用现金客户。
+# 与 Express 侧约定一致(express_push.sales_mapper.CASH_CUSTOMER_NAME)· MR.ERP 侧该客户档由
+# provision_customers 幂等自建。CUSCOD=CUSNAM="เงินสด"。
+MRERP_CASH_CUSTOMER = "เงินสด"
+
+
+def resolve_customer_code(history: Dict[str, Any], mappings: Dict[str, Any]) -> str:
+    """销项客户码:真实客户映射优先;完全无客户(散客)→ 现金客户兜底 เงินสด。
+
+    有 client_id 但缺 mrerp 映射 → 返回空(交给 provision 自建 / preflight 报 ERR_NO_CUSTOMER_MAPPING),
+    不误吞进现金客户。现金兜底可经 mappings['_mrerp_cash_customer_fallback']=False 关闭(回旧行为)。
+    """
+    cid = history.get("client_id") or 0
+    if cid:
+        return lookup_customer_code(cid, mappings)
+    if isinstance(mappings, dict) and mappings.get("_mrerp_cash_customer_fallback", True):
+        return MRERP_CASH_CUSTOMER
+    return ""
+
+
 def lookup_account_code(category: str, mappings: Dict[str, Any]) -> str:
     acc = (mappings or {}).get("accounts") or []
     for m in acc:

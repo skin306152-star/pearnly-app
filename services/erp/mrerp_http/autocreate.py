@@ -12,6 +12,7 @@ from typing import Any, Dict, Iterable, List
 
 from services.erp import mrerp_xlsx_fmt as fmt
 from services.erp.mrerp_xlsx_lookups import (
+    MRERP_CASH_CUSTOMER,
     _build_product_lookup,
     _resolve_product_code,
     lookup_customer_code,
@@ -45,10 +46,20 @@ def provision_customers(adapter, valid: List[Dict[str, Any]], mappings: Dict[str
     """缺买方客户则自建 · 建成功把码注入 mappings['clients'](原地)。"""
     if not isinstance(mappings, dict) or not mappings.get("_mrerp_auto_create_customer", True):
         return
+    cash_fallback = mappings.get("_mrerp_cash_customer_fallback", True)
     pending: Dict[str, Dict[str, str]] = {}
     inject: List[tuple] = []
     for h in valid:
         cid = int(h.get("client_id") or 0)
+        if not cid:
+            # 散客销项(无 client_id)→ 幂等确保通用现金客户存在,不按空买方建垃圾码。
+            # 无需注入 clients 映射:resolve_customer_code 对 cid=0 直接返 เงินสด。
+            if cash_fallback:
+                pending.setdefault(
+                    MRERP_CASH_CUSTOMER,
+                    {"code": MRERP_CASH_CUSTOMER, "name": MRERP_CASH_CUSTOMER, "tax_id": ""},
+                )
+            continue
         if lookup_customer_code(cid, mappings):
             continue  # 已映射,跳过
         buyer = _buyer_from_history(h)

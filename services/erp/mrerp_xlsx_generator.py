@@ -74,6 +74,7 @@ from services.erp.mrerp_xlsx_lookups import (  # noqa: F401  facade public re-ex
     _build_product_lookup,
     _resolve_product_code,
     lookup_customer_code,
+    resolve_customer_code,
     lookup_account_code,
     lookup_tax_code,
     derive_tax_kind,
@@ -206,11 +207,10 @@ def validate_history_for_sales_credit(
     if not history:
         return False, "ERR_NO_HISTORY", []
     cid = history.get("client_id") or 0
-    if not cid:
-        return False, "ERR_NO_CLIENT", []
-    customer_code = lookup_customer_code(cid, mappings)
+    customer_code = resolve_customer_code(history, mappings)
     if not customer_code:
-        return False, "ERR_NO_CUSTOMER_MAPPING", []
+        # 无客户且现金兜底关 → ERR_NO_CLIENT;有客户但缺 mrerp 映射 → ERR_NO_CUSTOMER_MAPPING
+        return False, ("ERR_NO_CUSTOMER_MAPPING" if cid else "ERR_NO_CLIENT"), []
     if not (history.get("invoice_no") or history.get("invoice_number")):
         return False, "ERR_NO_INVOICE_NO", []
     if not history.get("invoice_date"):

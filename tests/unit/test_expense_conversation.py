@@ -18,7 +18,7 @@ class _LearnStore:
 
     def execute(self, sql, params=None):
         if "INSERT INTO expense_learned" in sql:
-            _tid, _ws, kw, cid, sid, cn, sn = params
+            _tid, _ws, kw, cid, sid, cn, sn, _src = params
             self.rows[kw] = {
                 "category_id": cid,
                 "subcategory_id": sid,
@@ -239,7 +239,7 @@ class _Store:
 
     def execute(self, sql, params=None):
         if "INSERT INTO expense_learned" in sql:
-            _t, _w, kw, cid, sid, cn, sn = params
+            _t, _w, kw, cid, sid, cn, sn, _src = params
             self.rows[kw] = {
                 "keyword": kw,
                 "category_id": cid,

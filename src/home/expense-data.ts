@@ -52,6 +52,23 @@ const PAGE_CSS = `
 .expd .empty{padding:60px 20px;text-align:center;color:var(--ink3);font-size:13.5px;}
 .expd .cin{height:34px;padding:0 11px;border:1px solid var(--accent);border-radius:9px;font-size:13px;outline:0;min-width:150px;}
 .expd .state{padding:52px 16px;text-align:center;color:var(--ink2);font-size:14px;}
+.expd .subcard{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--card);}
+.expd .subcard:hover{border-color:var(--accent-soft);}
+.expd .sc-top{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+.expd .sc-top .snm{font-size:14px;font-weight:600;cursor:text;border-radius:6px;padding:1px 5px;margin:-1px -5px;}
+.expd .sc-top .snm:hover{background:var(--line2);}
+.expd .sc-top .sp{flex:1;}
+.expd .sc-top .hits{font-size:11.5px;color:var(--ink2);background:var(--line2);border-radius:999px;padding:2px 9px;}
+.expd .sc-top .sacts{display:flex;opacity:0;transition:.12s;}
+.expd .subcard:hover .sc-top .sacts{opacity:1;}
+.expd .kwrow{display:flex;flex-wrap:wrap;gap:7px;align-items:center;}
+.expd .kwlbl{font-size:11.5px;color:var(--ink3);margin-right:2px;}
+.expd .kw{display:inline-flex;align-items:center;gap:5px;height:27px;padding:0 10px;font-size:12px;background:var(--accent-soft);color:var(--accent);border-radius:7px;}
+.expd .kw .x{cursor:pointer;font-size:13px;opacity:.6;}
+.expd .kw .x:hover{opacity:1;}
+.expd .addkw{display:inline-flex;align-items:center;gap:4px;height:27px;padding:0 10px;font-size:12px;border:1px dashed var(--accent);border-radius:7px;color:var(--accent);cursor:pointer;background:var(--card);}
+.expd .addkw:hover{background:var(--accent-soft);}
+.expd .nokw{font-size:12px;color:var(--ink3);font-style:italic;}
 `;
 
 const IC_PLUS =
@@ -61,14 +78,21 @@ const IC_TRASH =
 const IC_SEARCH =
     '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="9" cy="9" r="6"/><path d="M14 14l3 3"/></svg>';
 
+type Rule = { keyword: string; category_id: string | null; subcategory_id: string | null };
+
 let tree: Category[] = [];
 let selBig: string | null = null;
 let kw = '';
+let rules: Rule[] = []; // 用户识别关键词(source=user_rule)· 灰度闸开才有
+let hits: Record<string, number> = {}; // subcategory_id → 本月归类单据数
+let kwEnabled = false; // 关键词规则灰度闸;关 = 回落 Phase 1 纯小类清单
 
 const bigs = (): Category[] => tree.filter((c) => c.is_active !== false);
 const shown = (): Category[] => bigs().filter((c) => !kw || c.name.includes(kw));
 const cur = (): Category | null => tree.find((c) => c.id === selBig) || null;
 const subs = (c: Category): Category[] => (c.children || []).filter((k) => k.is_active !== false);
+const kwsOf = (id: string): string[] =>
+    rules.filter((r) => r.subcategory_id === id).map((r) => r.keyword);
 
 function bigListHtml(): string {
     const list = shown();
@@ -82,15 +106,38 @@ function bigListHtml(): string {
         .join('');
 }
 
+// 小类行:灰度闸关 → 纯行(Phase 1);闸开 → 卡片带识别关键词 + 本月命中数。
+function subRowHtml(k: Category): string {
+    const del = `<span class="mini danger" data-del="${escapeHtml(k.id)}" data-kind="sub" title="${escapeHtml(t('expd-del'))}">${IC_TRASH}</span>`;
+    const snm = `<span class="snm" data-edit-sub="${escapeHtml(k.id)}">${escapeHtml(k.name)}</span>`;
+    if (!kwEnabled) {
+        return `<div class="srow"><span class="dot"></span>${snm}<span class="sacts">${del}</span></div>`;
+    }
+    const n = hits[k.id] || 0;
+    const hitBadge =
+        n > 0
+            ? `<span class="hits">${escapeHtml(t('expd-hits').replace('{n}', String(n)))}</span>`
+            : '';
+    const words = kwsOf(k.id);
+    const chips = words
+        .map(
+            (w) =>
+                `<span class="kw">${escapeHtml(w)}<span class="x" data-delkw="${escapeHtml(w)}" title="${escapeHtml(t('expd-del'))}">×</span></span>`
+        )
+        .join('');
+    const body = words.length
+        ? chips
+        : `<span class="nokw">${escapeHtml(t('expd-kw-none'))}</span>`;
+    return `<div class="subcard">
+        <div class="sc-top">${snm}${hitBadge}<span class="sp"></span><span class="sacts">${del}</span></div>
+        <div class="kwrow"><span class="kwlbl">${escapeHtml(t('expd-kw-label'))}</span>${body}<span class="addkw" data-addkw="${escapeHtml(k.id)}">${IC_PLUS}${escapeHtml(t('expd-kw-add'))}</span></div>
+    </div>`;
+}
+
 function rightHtml(): string {
     const c = cur();
     if (!c) return `<div class="empty">${escapeHtml(t('expd-pick-big'))}</div>`;
-    const rows = subs(c)
-        .map(
-            (k) =>
-                `<div class="srow"><span class="dot"></span><span class="snm" data-edit-sub="${escapeHtml(k.id)}">${escapeHtml(k.name)}</span><span class="sacts"><span class="mini danger" data-del="${escapeHtml(k.id)}" data-kind="sub" title="${escapeHtml(t('expd-del'))}">${IC_TRASH}</span></span></div>`
-        )
-        .join('');
+    const rows = subs(c).map(subRowHtml).join('');
     return `<div class="rhd">
             <span class="rnm" data-edit-cat="${escapeHtml(c.id)}">${escapeHtml(c.name)}</span>
             <span class="ico danger" data-del="${escapeHtml(c.id)}" data-kind="cat" title="${escapeHtml(t('expd-del'))}">${IC_TRASH}</span>
@@ -232,6 +279,31 @@ async function del(id: string, kind: string): Promise<void> {
     rerender();
 }
 
+async function addKw(targetId: string, keyword: string): Promise<void> {
+    const w = keyword.trim().toLowerCase();
+    if (!w) return rerender();
+    try {
+        const res = (await papi('POST', '/api/purchase/expense-rules', {
+            target_id: targetId,
+            keyword: w,
+        })) as { rule?: Rule };
+        if (res.rule && !rules.some((r) => r.keyword === res.rule!.keyword)) rules.push(res.rule);
+    } catch (e) {
+        showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
+    }
+    rerender();
+}
+
+async function delKw(keyword: string): Promise<void> {
+    try {
+        await papi('DELETE', '/api/purchase/expense-rules', { keyword });
+        rules = rules.filter((r) => r.keyword !== keyword);
+    } catch (e) {
+        showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
+    }
+    rerender();
+}
+
 function bindLeft(): void {
     document.querySelectorAll<HTMLElement>('#expd-blist .brow').forEach((el) => {
         el.onclick = () => {
@@ -264,6 +336,19 @@ function bindRight(): void {
                 placeholder: t('expd-add-sub'),
                 commit: (v) => add(v, addSub.dataset.addSub || null),
             });
+    document.querySelectorAll<HTMLElement>('#expd-rgt [data-addkw]').forEach((el) => {
+        el.onclick = () =>
+            inlineInput(el, {
+                placeholder: t('expd-kw-add'),
+                commit: (v) => addKw(el.dataset.addkw || '', v),
+            });
+    });
+    document.querySelectorAll<HTMLElement>('#expd-rgt [data-delkw]').forEach((el) => {
+        el.onclick = (e) => {
+            e.stopPropagation();
+            delKw(el.dataset.delkw || '');
+        };
+    });
 }
 function bind(): void {
     const srch = document.getElementById('expd-srch') as HTMLInputElement | null;
@@ -301,6 +386,21 @@ async function load(): Promise<void> {
         return;
     }
     tree = res?.categories || [];
+    // 识别关键词规则(灰度闸)· 拉不到 / 闸关 → 回落纯小类清单,不阻塞主页面。
+    try {
+        const rr = (await papi('GET', '/api/purchase/expense-rules')) as {
+            enabled?: boolean;
+            rules?: Rule[];
+            hits?: Record<string, number>;
+        };
+        kwEnabled = !!rr.enabled;
+        rules = rr.rules || [];
+        hits = rr.hits || {};
+    } catch (_) {
+        kwEnabled = false;
+        rules = [];
+        hits = {};
+    }
     if (!selBig || !tree.some((c) => c.id === selBig)) selBig = bigs()[0]?.id || null;
     sec.innerHTML = shell();
     bind();

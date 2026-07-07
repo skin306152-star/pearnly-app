@@ -17,6 +17,7 @@ from core import db
 from core.pos_api import PosError, ok
 from routes.purchase_common import auth_member, gate, resolve_ws
 from services.erp import mappings_store as erp_mappings
+from services.expense import keyword_rules
 from services.purchase import categories as cat_svc
 from services.purchase import settings as settings_svc
 from services.purchase import suppliers as sup_svc
@@ -207,6 +208,62 @@ async def api_delete_category(
             cur, tenant_id=tid, workspace_client_id=ws, category_id=category_id
         )
         return ok(res)
+
+
+# ---- 费用识别关键词规则(Phase 2 · 灰度)-------------------------------------
+
+
+class ExpenseRuleIn(BaseModel):
+    workspace_client_id: Optional[int] = None
+    target_id: str = ""  # 挂词的科目 id(通常小类)
+    keyword: str = ""
+
+
+@router.get("/expense-rules")
+async def api_get_expense_rules(request: Request, workspace_client_id: Optional[int] = Query(None)):
+    _, tid = auth_member(request, "purchase.doc.view")
+    if not keyword_rules.rules_enabled(tid):
+        return ok({"enabled": False, "rules": [], "hits": {}})
+    with db.get_cursor_rls(tid, commit=False) as cur:
+        gate(cur, tid)
+        ws = resolve_ws(cur, request, tid, workspace_client_id)
+        return ok(
+            {
+                "enabled": True,
+                "rules": keyword_rules.list_rules(cur, tenant_id=tid, workspace_client_id=ws),
+                "hits": keyword_rules.hit_counts(cur, tenant_id=tid, workspace_client_id=ws),
+            }
+        )
+
+
+@router.post("/expense-rules")
+async def api_add_expense_rule(req: ExpenseRuleIn, request: Request):
+    _, tid = auth_member(request, "purchase.supplier.manage")
+    if not keyword_rules.rules_enabled(tid):
+        raise PosError("purchase.unexpected", 403, detail="feature_disabled")
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        gate(cur, tid)
+        ws = resolve_ws(cur, request, tid, req.workspace_client_id)
+        row = keyword_rules.add_rule(
+            cur, tenant_id=tid, workspace_client_id=ws, target_id=req.target_id, keyword=req.keyword
+        )
+        if row is None:
+            raise PosError("purchase.line_invalid", 422, detail="invalid_rule")
+        return ok({"rule": row})
+
+
+@router.delete("/expense-rules")
+async def api_delete_expense_rule(req: ExpenseRuleIn, request: Request):
+    _, tid = auth_member(request, "purchase.supplier.manage")
+    if not keyword_rules.rules_enabled(tid):
+        raise PosError("purchase.unexpected", 403, detail="feature_disabled")
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        gate(cur, tid)
+        ws = resolve_ws(cur, request, tid, req.workspace_client_id)
+        deleted = keyword_rules.delete_rule(
+            cur, tenant_id=tid, workspace_client_id=ws, keyword=req.keyword
+        )
+        return ok({"deleted": deleted})
 
 
 # ---- 采购设置 ----------------------------------------------------------------

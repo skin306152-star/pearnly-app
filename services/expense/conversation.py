@@ -149,7 +149,7 @@ def lookup_learned_for_text(
     """文字路归类的学习命中(用户学习恒高于品名/商户默认规则)。无命中 → None。
 
     ① 商户身份键:从卖家名/文本归一出商户(merchant.canonical_merchant)→ 精确查 seller:<归一名>,
-       与图片路 line_ingest._learned_category、与学习按钮存键同一把。治「711 水」漏掉「以后711都记X」
+       与图片路 image_category._learned_category、与学习按钮存键同一把。治「711 水」漏掉「以后711都记X」
        —— 子串匹配桥不了 711→7-eleven,品牌归一才能。
     ② 关键词子串:品名/卖家裸词(lookup_learned)。"""
     from services.expense import merchant
@@ -184,20 +184,26 @@ def learn(
     subcategory_id: Optional[str],
     category_name: str = "",
     subcategory_name: str = "",
+    source: str = "correction",
 ) -> None:
-    """记住 关键词→科目(用户改过一次 · 网页复核屏纠正时调)。空关键词忽略。"""
+    """记住 关键词→科目(用户改过一次 · 网页复核屏纠正时调)。空关键词忽略。
+
+    source='user_rule' = 用户在费用数据页显式挂的规则(免疫纠错覆盖);'correction' = 纠错自学。
+    冲突时:纠错(correction)不许覆盖已有 user_rule 行(用户明确设过的优先),user_rule 可覆盖任意。
+    """
     kw = (keyword or "").strip().lower()
     if not kw:
         return
     cur.execute(
         "INSERT INTO expense_learned "
         "(tenant_id, workspace_client_id, keyword, category_id, subcategory_id, "
-        "category_name, subcategory_name, updated_at) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s, now()) "
+        "category_name, subcategory_name, source, updated_at) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, now()) "
         "ON CONFLICT (tenant_id, workspace_client_id, keyword) DO UPDATE SET "
         "category_id = EXCLUDED.category_id, subcategory_id = EXCLUDED.subcategory_id, "
         "category_name = EXCLUDED.category_name, subcategory_name = EXCLUDED.subcategory_name, "
-        "updated_at = now()",
+        "source = EXCLUDED.source, updated_at = now() "
+        "WHERE expense_learned.source <> 'user_rule' OR EXCLUDED.source = 'user_rule'",
         (
             tenant_id,
             workspace_client_id,
@@ -206,5 +212,6 @@ def learn(
             subcategory_id,
             category_name,
             subcategory_name,
+            source,
         ),
     )

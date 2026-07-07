@@ -194,12 +194,12 @@ class CategoryTimeoutTests(unittest.TestCase):
     """分类 LLM 走 3s 硬上限 + source 归因(P1G-Perf · 不阻塞入账卡)。"""
 
     def test_timeout_is_short(self):
-        from services.purchase.line_ingest import _CAT_LLM_TIMEOUT
+        from services.purchase.image_category import _CAT_LLM_TIMEOUT
 
         self.assertLessEqual(_CAT_LLM_TIMEOUT, 3)
 
     def _call(self, **over):
-        from services.purchase import line_ingest as li
+        from services.purchase import image_category as li
 
         kw = dict(
             tenant_id="T1",
@@ -211,11 +211,11 @@ class CategoryTimeoutTests(unittest.TestCase):
             api_key="k",
         )
         kw.update(over)
-        return li._smart_category(object(), **kw)
+        return li.smart_category(object(), **kw)
 
     def test_learned_overrides_rules_and_llm(self):
         from services.expense import category_ai
-        from services.purchase import line_ingest as li
+        from services.purchase import image_category as li
 
         learned = {
             "category_id": "L1",
@@ -236,7 +236,7 @@ class CategoryTimeoutTests(unittest.TestCase):
 
     def test_rule_item_layer_source_and_no_llm(self):
         from services.expense import category_ai
-        from services.purchase import line_ingest as li
+        from services.purchase import image_category as li
 
         with (
             mock.patch("services.purchase.categories.get_tree", return_value=[]),
@@ -251,7 +251,7 @@ class CategoryTimeoutTests(unittest.TestCase):
 
     def test_vendor_layer_marks_vendor_default(self):
         from services.expense import category_ai
-        from services.purchase import line_ingest as li
+        from services.purchase import image_category as li
 
         with (
             mock.patch("services.purchase.categories.get_tree", return_value=[]),
@@ -266,7 +266,7 @@ class CategoryTimeoutTests(unittest.TestCase):
 
     def test_llm_fallback_uses_short_timeout(self):
         from services.expense import category_ai
-        from services.purchase import line_ingest as li
+        from services.purchase import image_category as li
 
         with (
             mock.patch("services.purchase.categories.get_tree", return_value=[]),

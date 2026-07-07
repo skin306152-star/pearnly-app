@@ -49,4 +49,8 @@ def ensure_expense_schema() -> None:
     with db.get_cursor(commit=True) as cur:
         cur.execute(_PENDING_TABLE)
         cur.execute(_LEARNED_TABLE)
+        # source:'user_rule'=用户在费用数据页可编辑的关键词规则,''/'correction'=纠错自学(见 0055)。
+        cur.execute(
+            "ALTER TABLE expense_learned ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT ''"
+        )
         apply_tenant_rls(cur, "line_pending_entry", "expense_learned")

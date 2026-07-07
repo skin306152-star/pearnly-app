@@ -44,11 +44,7 @@ def assert_public_url(url: str) -> None:
 
 
 async def assert_public_config_url(cfg: dict) -> None:
-    """从 endpoint config 取 system_url,非空则校验只指公网。
-
-    异步入口 · 供 async 路由复用:getaddrinfo 阻塞 → to_thread 离事件循环(铁律#10)。
-    非公网抛 ValueError,交由调用方翻成 HTTPException。
-    """
+    """取 config.system_url 非空则校验只指公网 · async 路由复用 · getaddrinfo→to_thread(铁律#10)·非公网抛 ValueError。"""
     url = str((cfg or {}).get("system_url") or "").strip()
     if url:
         await asyncio.to_thread(assert_public_url, url)

@@ -28,6 +28,6 @@
                 window.openIntegrationDrawer(_anchorMap[anchor], title);
             }
         }
-        // map 外的 anchor(如 Google 连接卡 · 自带按钮在 purchase-google.ts 处理)不拦截
+        // map 外的 anchor(自带独立按钮/卡片的)不拦截
     });
 })();

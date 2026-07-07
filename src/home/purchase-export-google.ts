@@ -1,6 +1,6 @@
 // 采购导出页 · Google 连接卡组件(状态查询 / 渲染 / 连接 / 断开)。
 // 从 purchase-export.ts 抽出以守单一职责。卡片骨架(#pex-gcard 等)与样式由该页 shell()/PAGE_CSS 注入。
-// 逻辑与集成中心 purchase-google.ts 同源(端点一致),后续可合并为共用卡组件去重。
+// 原集成中心 Google 卡迁来并收敛为唯一实现(元素 id 用 pex-g 前缀)· 端点 /api/integrations/google/*。
 /* global t, escapeHtml, showToast */
 import { papi, activeWsId, purchaseErrMsg } from './purchase-common.js';
 

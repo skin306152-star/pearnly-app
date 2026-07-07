@@ -30,7 +30,6 @@ const PAGE_CSS = `
 .pur.pex .acts{display:flex;gap:9px;flex-wrap:wrap;}
 .pur.pex .acts .ic{width:16px;height:16px;flex:none;}
 .pur.pex .infonote{background:var(--bg);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--ink2);margin-top:12px;display:flex;gap:7px;align-items:flex-start;}
-.pur.pex .infonote.ok{background:var(--green-weak);color:var(--green);}
 .pur.pex .infonote .ic{width:16px;height:16px;flex:none;margin-top:1px;}
 .pur.pex .tree{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink2);white-space:pre;line-height:1.8;overflow:auto;}
 .pur.pex .cols{display:flex;flex-wrap:wrap;gap:6px;}

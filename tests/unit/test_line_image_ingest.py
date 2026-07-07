@@ -35,6 +35,8 @@ def _run(resolve_ret, *, band="high", auto_book=True, fields=None, tree=None):
         mock.patch("services.purchase.docs.create_doc", return_value=created) as cdoc,
         mock.patch("services.purchase.posting.post_doc", return_value=created) as pdoc,
         mock.patch("services.line_binding.line_action_nonce.mint", return_value="TOK"),
+        # 关键词步默认全量开;这些用例验入账/分类主流程,桩掉用户关键词匹配(单测另覆盖)。
+        mock.patch("services.expense.keyword_rules.match_category", return_value=None),
     ):
         out = li.ingest_line_image(
             object(),
@@ -48,6 +50,12 @@ def _run(resolve_ret, *, band="high", auto_book=True, fields=None, tree=None):
 
 
 class IngestTests(unittest.TestCase):
+    def setUp(self):
+        # 关键词步默认全量开;本类用例(含自建 mock 块的)验入账/分类主流程,统一桩掉用户关键词匹配。
+        p = mock.patch("services.expense.keyword_rules.match_category", return_value=None)
+        p.start()
+        self.addCleanup(p.stop)
+
     def test_high_complete_posts(self):
         # 自动入账开 + 高置信齐全 → 直接过账(posted)。卡片明细取自 OCR items(加总≤总额)。
         res = {"route": "purchase", "draft": _draft(), "dedupe_hit": False, "field_confidence": {}}

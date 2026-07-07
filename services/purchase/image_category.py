@@ -91,7 +91,7 @@ def smart_category(cur, *, tenant_id, workspace_client_id, vendor, tax_id, descs
     (cat_id, sub_id, cat_name, sub_name, conf, source);source 喂日志 category_source ∈
     learned|rule|vendor_default|item|ai|fallback|none。LLM 步骤 3s 硬上限,超时回落规则/中性。
     """
-    from services.expense import category_ai, conversation, keyword_rules, merchant
+    from services.expense import category_ai, keyword_rules, merchant
     from services.purchase import categories as cat_svc
     from services.purchase import intake as ik
 
@@ -110,23 +110,22 @@ def smart_category(cur, *, tenant_id, workspace_client_id, vendor, tax_id, descs
         )
 
     # 用户识别关键词(费用数据页可编辑 · Phase 2):税号/卖家身份没命中 → 按票面文字子串匹配用户
-    # 挂的词。灰度闸控;闸关 = 走原有规则,零行为变化。学习优先仍在写死规则之前。
-    if keyword_rules.rules_enabled(tenant_id):
-        kwhit = conversation.lookup_learned(
-            cur,
-            tenant_id=tenant_id,
-            workspace_client_id=workspace_client_id,
-            text=f"{vendor or ''} {joined}",
+    # 挂的词(只认 user_rule)。总闸控;学习优先仍在写死规则之前。存量表空 → 零行为变化。
+    kwhit = keyword_rules.match_category(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        text=f"{vendor or ''} {joined}",
+    )
+    if kwhit and kwhit.get("category_id"):
+        return (
+            kwhit["category_id"],
+            kwhit.get("subcategory_id"),
+            kwhit.get("category_name") or "",
+            kwhit.get("subcategory_name") or "",
+            Decimal("0.95"),
+            "learned",
         )
-        if kwhit and kwhit.get("category_id"):
-            return (
-                kwhit["category_id"],
-                kwhit.get("subcategory_id"),
-                kwhit.get("category_name") or "",
-                kwhit.get("subcategory_name") or "",
-                Decimal("0.95"),
-                "learned",
-            )
 
     # 糊名清税号 → curated 别名喂规则(仅身份解析,分类仍走品名优先)。
     rule_vendor = vendor or merchant.merchant_alias_by_tax(tax_id)

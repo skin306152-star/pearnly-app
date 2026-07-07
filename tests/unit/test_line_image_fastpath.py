@@ -211,7 +211,9 @@ class CategoryTimeoutTests(unittest.TestCase):
             api_key="k",
         )
         kw.update(over)
-        return li.smart_category(object(), **kw)
+        # 关键词步默认全量开;这些用例验规则/LLM 路,桩掉用户关键词匹配(单测另覆盖)。
+        with mock.patch("services.expense.keyword_rules.match_category", return_value=None):
+            return li.smart_category(object(), **kw)
 
     def test_learned_overrides_rules_and_llm(self):
         from services.expense import category_ai

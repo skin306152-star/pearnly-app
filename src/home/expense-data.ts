@@ -14,7 +14,10 @@ const PAGE_CSS = `
 .expd .ph{margin-bottom:14px;}
 .expd .ph .t{font-size:21px;font-weight:680;letter-spacing:-.2px;}
 .expd .ph .sub{color:var(--ink2);font-size:13px;margin-top:5px;}
-.expd .split{display:grid;grid-template-columns:300px 1fr;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-height:520px;}
+.expd .split{display:grid;grid-template-columns:300px 6px 1fr;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-height:520px;}
+.expd .gutter{cursor:col-resize;position:relative;background:transparent;}
+.expd .gutter::before{content:"";position:absolute;left:2px;top:0;bottom:0;width:1px;background:var(--line);transition:background .12s,width .12s;}
+.expd .gutter:hover::before,.expd .gutter.drag::before{background:var(--accent);width:2px;left:2px;}
 .expd .lft{border-right:1px solid var(--line);display:flex;flex-direction:column;background:var(--line2);}
 .expd .lhd{padding:13px 15px 7px;font-size:11.5px;font-weight:700;color:var(--ink3);letter-spacing:.3px;}
 .expd .srch{margin:0 11px 7px;display:flex;align-items:center;gap:8px;height:35px;padding:0 11px;background:var(--card);border:1px solid var(--line);border-radius:10px;color:var(--ink3);}
@@ -83,6 +86,7 @@ type Rule = { keyword: string; category_id: string | null; subcategory_id: strin
 let tree: Category[] = [];
 let selBig: string | null = null;
 let kw = '';
+let leftW = Math.max(220, Math.min(560, Number(localStorage.getItem('mrpilot_expd_lw')) || 300)); // 大类栏宽·可拖·记住
 let rules: Rule[] = []; // 用户识别关键词(source=user_rule)· 灰度闸开才有
 let hits: Record<string, number> = {}; // subcategory_id → 本月归类单据数
 let kwEnabled = false; // 关键词规则灰度闸;关 = 回落 Phase 1 纯小类清单
@@ -150,13 +154,14 @@ function rightHtml(): string {
 function shell(): string {
     return `<div class="expd">
         <div class="ph"><div class="t">${escapeHtml(t('nav-expense-data'))}</div><div class="sub">${escapeHtml(t('expd-sub'))}</div></div>
-        <div class="split">
+        <div class="split" id="expd-split" style="grid-template-columns:${leftW}px 6px 1fr">
             <div class="lft">
                 <div class="lhd">${escapeHtml(t('expd-big-label'))}</div>
                 <div class="srch">${IC_SEARCH}<input id="expd-srch" placeholder="${escapeHtml(t('expd-search'))}" value="${escapeHtml(kw)}"></div>
                 <div class="blist" id="expd-blist">${bigListHtml()}</div>
                 <div class="addbig" id="expd-add-big">${IC_PLUS}${escapeHtml(t('expd-add-big'))}</div>
             </div>
+            <div class="gutter" id="expd-gutter" title="${escapeHtml(t('expd-drag'))}"></div>
             <div class="rgt" id="expd-rgt">${rightHtml()}</div>
         </div>
     </div>`;
@@ -361,8 +366,36 @@ function bind(): void {
     if (addBig)
         addBig.onclick = () =>
             inlineInput(addBig, { placeholder: t('expd-add-big'), commit: (v) => add(v, null) });
+    bindGutter();
     bindLeft();
     bindRight();
+}
+
+// 大类/小类栏分割线可拖拽调宽(220–560px)· 松手记进 localStorage · 下次进页沿用。
+function bindGutter(): void {
+    const gutter = document.getElementById('expd-gutter');
+    const split = document.getElementById('expd-split');
+    if (!gutter || !split) return;
+    gutter.onmousedown = (e) => {
+        e.preventDefault();
+        const startX = e.clientX;
+        const startW = leftW;
+        gutter.classList.add('drag');
+        document.body.style.userSelect = 'none';
+        const move = (ev: MouseEvent) => {
+            leftW = Math.max(220, Math.min(560, startW + ev.clientX - startX));
+            split.style.gridTemplateColumns = `${leftW}px 6px 1fr`;
+        };
+        const up = () => {
+            document.removeEventListener('mousemove', move);
+            document.removeEventListener('mouseup', up);
+            gutter.classList.remove('drag');
+            document.body.style.userSelect = '';
+            localStorage.setItem('mrpilot_expd_lw', String(leftW));
+        };
+        document.addEventListener('mousemove', move);
+        document.addEventListener('mouseup', up);
+    };
 }
 
 function stateHtml(msg: string, retry: boolean): string {

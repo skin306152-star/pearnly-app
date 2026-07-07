@@ -22,17 +22,42 @@ FLAG_KEY = "expense_keyword_rules"
 
 
 def rules_enabled(tenant_id: str) -> bool:
-    """灰度闸(fail-closed):按 tenant_id 查 platform_settings 名单/rollout。异常一律关。
-
-    allowlist 存 tenant_id(把「用户键」当租户键用,统一路由与归类路都持 tid)。
-    """
+    """全量开(Zihao 2026-07-07 拍板放量)· 保留紧急总闸:平台设置 expense_keyword_rules 被超管
+    显式 enabled=false 时才关。无记录 / 读失败 → 开(不因设置读抖动关掉已放量功能)。tenant_id
+    保留以便日后按租户回收(现全量忽略)。图片路只匹配 user_rule(见 match_category)→ 全量开
+    对存量数据零归类变化(user_rule 表为空,要用户自己加词才生效)。"""
     try:
         from services.platform_settings import store as ps
 
-        return ps.is_enabled_for_user(FLAG_KEY, str(tenant_id))
-    except Exception as e:  # noqa: BLE001 — 闸查不到只当关,绝不误开钱路
-        logger.warning("[keyword_rules] flag check fail-closed: %s", str(e)[:160])
-        return False
+        row = ps.get_setting(FLAG_KEY)
+        return row is None or bool(row.get("enabled"))
+    except Exception as e:  # noqa: BLE001 — 设置读失败不该关掉已放量功能
+        logger.warning("[keyword_rules] flag read defaulted-on: %s", str(e)[:160])
+        return True
+
+
+def match_category(cur, *, tenant_id: str, workspace_client_id: int, text: str):
+    """图片路用户关键词步:闸开 + 只匹配用户显式规则(source='user_rule',不含隐式纠错)。票面
+    文字子串命中 → 返回该科目 dict;否则 None。只认 user_rule 是有意的:全量开时对存量数据零
+    归类变化(表空),要用户在费用数据页明确挂词才影响归类。"""
+    if not rules_enabled(tenant_id):
+        return None
+    low = (text or "").lower()
+    cur.execute(
+        "SELECT keyword, category_id, subcategory_id, category_name, subcategory_name "
+        "FROM expense_learned "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND source = 'user_rule'",
+        (tenant_id, workspace_client_id),
+    )
+    for r in cur.fetchall():
+        if r["keyword"] and r["keyword"].lower() in low:
+            return {
+                "category_id": str(r["category_id"]) if r["category_id"] else None,
+                "subcategory_id": str(r["subcategory_id"]) if r["subcategory_id"] else None,
+                "category_name": r["category_name"],
+                "subcategory_name": r["subcategory_name"],
+            }
+    return None
 
 
 def _resolve_target(cur, *, tenant_id: str, workspace_client_id: int, target_id: str):

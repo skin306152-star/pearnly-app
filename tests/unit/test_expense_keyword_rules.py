@@ -9,6 +9,7 @@
 """
 
 import unittest
+from unittest import mock
 
 import core.db  # noqa: F401  单脚本起头须先 import core.db(dal_reexports 循环·app 运行时无此问题)
 from services.expense import conversation, keyword_rules
@@ -154,6 +155,68 @@ class LearnSourceGuardTests(unittest.TestCase):
         # 纠错不许覆盖 user_rule 行的 ON CONFLICT 守卫
         self.assertIn("expense_learned.source <> 'user_rule'", sql)
         self.assertIn("user_rule", cur.insert_params())
+
+
+class MatchCategoryTests(unittest.TestCase):
+    def test_hits_user_rule_substring(self):
+        cur = FakeCursor()
+        cur.select_rows = [
+            {
+                "keyword": "grab",
+                "category_id": "P",
+                "subcategory_id": "S",
+                "category_name": "交通",
+                "subcategory_name": "打车",
+            }
+        ]
+        with mock.patch("services.platform_settings.store.get_setting", return_value=None):
+            hit = keyword_rules.match_category(
+                cur, tenant_id="t", workspace_client_id=6, text="ค่า grab 128 บาท"
+            )
+        self.assertEqual((hit["category_id"], hit["subcategory_id"]), ("P", "S"))
+        self.assertTrue(cur.has("source = 'user_rule'"))  # 只认用户显式规则
+
+    def test_no_substring_hit_returns_none(self):
+        cur = FakeCursor()
+        cur.select_rows = [
+            {
+                "keyword": "ptt",
+                "category_id": "P",
+                "subcategory_id": "S",
+                "category_name": "",
+                "subcategory_name": "",
+            }
+        ]
+        with mock.patch("services.platform_settings.store.get_setting", return_value=None):
+            self.assertIsNone(
+                keyword_rules.match_category(cur, tenant_id="t", workspace_client_id=6, text="grab")
+            )
+
+    def test_kill_switch_skips_query(self):
+        cur = FakeCursor()
+        with mock.patch.object(keyword_rules, "rules_enabled", return_value=False):
+            self.assertIsNone(
+                keyword_rules.match_category(cur, tenant_id="t", workspace_client_id=6, text="grab")
+            )
+        self.assertEqual(cur.calls, [])  # 关掉 → 不查库
+
+
+class FlagDefaultTests(unittest.TestCase):
+    def test_default_on_when_no_setting(self):
+        with mock.patch("services.platform_settings.store.get_setting", return_value=None):
+            self.assertTrue(keyword_rules.rules_enabled("t"))
+
+    def test_off_when_explicitly_disabled(self):
+        with mock.patch(
+            "services.platform_settings.store.get_setting", return_value={"enabled": False}
+        ):
+            self.assertFalse(keyword_rules.rules_enabled("t"))
+
+    def test_on_when_enabled(self):
+        with mock.patch(
+            "services.platform_settings.store.get_setting", return_value={"enabled": True}
+        ):
+            self.assertTrue(keyword_rules.rules_enabled("t"))
 
 
 if __name__ == "__main__":

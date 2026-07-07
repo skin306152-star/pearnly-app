@@ -53,11 +53,10 @@ class LoginResponse(BaseModel):
 
 
 def _record_login_failure(username: str, request: Request):
-    """记录登录失败 · 用于锁定逻辑"""
+    """记录登录失败 · 用于锁定逻辑(commit=True 必需:不落库则 30min 计数恒 0 · 账号锁失效)"""
     try:
         ip = request.client.host if request.client else None
         ua = request.headers.get("user-agent", "")[:200]
-        # commit=True 必需:失败记录要落库才能被 30min 窗口计数(缺它则失败永不持久 · 账号锁形同虚设)
         with db.get_cursor(commit=True) as cur:
             cur.execute(
                 """

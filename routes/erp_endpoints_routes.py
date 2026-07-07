@@ -107,18 +107,13 @@ async def erp_endpoints_create(req: ErpEndpointCreate, request: Request):
         # 客户列表为空的新用户(连接向导第 1 步永远过不去)。字段保留兼容
         # 老数据,新建默认 [] 保持 shape 一致。
         config = dict(req.config or {})
-        # SSRF 防护:存端点前校验 system_url 只指公网,挡内网/元数据(安全评估 2026-07-07)。
-        # getaddrinfo 阻塞 → to_thread 离开事件循环(铁律 #10)。
-        _su = str(config.get("system_url") or "").strip()
-        if _su:
-            import asyncio as _aio
+        # SSRF 防护:存端点前校验 system_url 只指公网,挡内网/元数据(安全评估 2026-07-07)
+        from services.erp.ssrf_guard import assert_public_config_url
 
-            from services.erp.ssrf_guard import assert_public_url
-
-            try:
-                await _aio.to_thread(assert_public_url, _su)
-            except ValueError as _sse:
-                raise HTTPException(400, detail=f"erp.blocked_url:{_sse}")
+        try:
+            await assert_public_config_url(config)
+        except ValueError as _sse:
+            raise HTTPException(400, detail=f"erp.blocked_url:{_sse}")
         if req.adapter == "mrerp" and not isinstance(config.get("client_ids"), list):
             config["client_ids"] = []
 
@@ -223,6 +218,13 @@ async def erp_endpoints_update(endpoint_id: str, req: ErpEndpointUpdate, request
 
     if "config" in fields:
         new_cfg = dict(fields["config"] or {})
+        # SSRF 防护:PATCH 也是 system_url 写入边界,同样挡内网/元数据(安全评估 2026-07-07)
+        from services.erp.ssrf_guard import assert_public_config_url
+
+        try:
+            await assert_public_config_url(new_cfg)
+        except ValueError as _sse:
+            raise HTTPException(400, detail=f"erp.blocked_url:{_sse}")
         token = str(new_cfg.get("token", ""))
         if token and ("***" in token or token == ""):
             if existing_ep:

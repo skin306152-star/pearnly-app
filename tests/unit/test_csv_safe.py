@@ -6,9 +6,11 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import unittest
 
-from services.export.csv_safe import safe_row
+from services.export.csv_safe import SafeCsvWriter, safe_row
 
 
 class CsvSafeTest(unittest.TestCase):
@@ -24,6 +26,17 @@ class CsvSafeTest(unittest.TestCase):
         # 普通文本 / 纯数字(含负金额)/ 非字符串 一律原样
         row = ["Acme Co", "-100.50", "+42", "1,250.00", 5, None, "user@x.com"]
         self.assertEqual(safe_row(row), row)
+
+    def test_safe_writer_neutralizes_real_csv_output(self) -> None:
+        # 端到端:经真 csv.writer 落盘的输出必已中和公式、且不误伤负数金额
+        buf = io.StringIO()
+        w = SafeCsvWriter(csv.writer(buf))
+        w.writerow(['=HYPERLINK("http://evil","x")', "-1+9*cmd", "-100.50"])
+        out = buf.getvalue()
+        self.assertIn("'=HYPERLINK", out)
+        self.assertIn("'-1+9*cmd", out)
+        self.assertIn("-100.50", out)
+        self.assertNotIn("'-100.50", out)
 
 
 if __name__ == "__main__":

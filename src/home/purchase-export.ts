@@ -3,7 +3,14 @@
 // excel → xlsx blob 直下;drive/sheet 未连 Google(412 google_not_connected)→ 跳集成中心高亮卡;
 // 已连 → {job_id} 轮询进度(queued/running/done/failed)· 完成给 Sheet 直达链接 / 归档条数。
 /* global t, escapeHtml, showToast */
-import { authHeaders, activeWsId, injectPurBase, injectStyle, papi } from './purchase-common.js';
+import {
+    authHeaders,
+    activeWsId,
+    injectPurBase,
+    injectStyle,
+    papi,
+    purchaseErrMsg,
+} from './purchase-common.js';
 import { dateRangeParams } from './purchase-list-filters.js';
 
 type Fmt = 'excel' | 'drive' | 'sheet';
@@ -44,6 +51,17 @@ const PAGE_CSS = `
 .pur.pex .res{margin-top:12px;font-size:13px;color:var(--ink2);display:none;}
 .pur.pex .res.on{display:block;}
 .pur.pex .res a{color:var(--accent);font-weight:700;text-decoration:none;}
+.pur.pex .gcard .gname{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:700;color:var(--ink);}
+.pur.pex .int-gst{font-size:11px;font-weight:700;border-radius:6px;padding:2px 8px;}
+.pur.pex .int-gst.on{background:var(--green-weak);color:var(--green);}
+.pur.pex .int-gst.off,.pur.pex .int-gst.na{background:var(--line2);color:var(--ink3);}
+.pur.pex .gdesc{font-size:12px;color:var(--ink2);margin-top:8px;line-height:1.6;}
+.pur.pex .gact{margin-top:13px;}
+.pur.pex .gact .ig-btn{padding:7px 14px;border:1px solid var(--line);background:var(--card);color:var(--ink2);border-radius:8px;font-family:inherit;font-size:12.5px;font-weight:500;cursor:pointer;}
+.pur.pex .gact .ig-btn:hover{background:var(--bg);border-color:var(--ink-4);color:var(--ink);}
+.pur.pex .gact .ig-btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700;}
+.pur.pex .gact .ig-btn.pri:hover{background:var(--accent-deep);}
+.pur.pex .gcard.hl{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak);}
 `;
 
 const IC_DOWNLOAD =
@@ -52,8 +70,6 @@ const IC_CLOUD =
     '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4 4 0 01-.5-7.97 5 5 0 019.6-1.5A4 4 0 0117 18z"/></svg>';
 const IC_GRID =
     '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16M15 4v16"/></svg>';
-const IC_LINK =
-    '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6"/><path d="M8.5 12.5l-2 2a3 3 0 004.2 4.2l2-2M15.5 11.5l2-2a3 3 0 00-4.2-4.2l-2 2"/></svg>';
 const IC_BOOK =
     '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a2 2 0 012 2v14H7a2 2 0 01-2-2z"/><path d="M5 18a2 2 0 012-2h11"/></svg>';
 
@@ -118,30 +134,85 @@ async function doExcel(): Promise<void> {
     }
 }
 
-// 未连 Drive/Sheet → 跳集成中心高亮 Google 卡引导授权。
+// 未连 Drive/Sheet → 高亮本页顶部 Google 连接卡引导授权(连接就在这页,不再跳集成中心)。
 function jumpToConnect(): void {
-    window.routeTo?.('integrations');
-    setTimeout(() => window.highlightGoogleCard?.(), 120);
+    const card = document.getElementById('pex-gcard');
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('hl');
+    setTimeout(() => card.classList.remove('hl'), 1600);
 }
 
-function renderGoogleNote(st: GoogleStatus): void {
-    const box = document.getElementById('pex-google-notebox');
-    const note = document.getElementById('pex-google-note');
-    if (!box || !note) return;
-    box.classList.toggle('ok', !!st.connected);
+function renderGoogleCard(st: GoogleStatus): void {
+    const badge = document.getElementById('pex-gbadge');
+    const desc = document.getElementById('pex-gdesc');
+    const act = document.getElementById('pex-gact');
+    if (!badge || !desc || !act) return;
     if (!st.configured) {
-        note.textContent = t('int-google-na-desc');
+        badge.className = 'int-gst na';
+        badge.textContent = t('int-google-st-na');
+        desc.textContent = t('int-google-na-desc');
+        act.innerHTML = '';
         return;
     }
-    note.textContent = st.connected
-        ? t('pur-export-note-connected', { email: st.email || 'Google' })
-        : t('pur-export-note-disconnected');
+    if (st.connected) {
+        badge.className = 'int-gst on';
+        badge.textContent = t('int-google-st-on');
+        desc.textContent = st.email
+            ? t('int-google-connected-as', { email: st.email })
+            : t('int-google-desc');
+        act.innerHTML = `<button class="ig-btn" id="pex-gdisconnect">${escapeHtml(t('int-google-disconnect'))}</button>`;
+        const b = document.getElementById('pex-gdisconnect');
+        if (b) b.onclick = gDisconnect;
+        return;
+    }
+    badge.className = 'int-gst off';
+    badge.textContent = t('int-google-st-off');
+    desc.textContent = t('int-google-desc');
+    act.innerHTML = `<button class="ig-btn pri" id="pex-gconnect">${escapeHtml(t('int-google-connect'))}</button>`;
+    const b = document.getElementById('pex-gconnect');
+    if (b) b.onclick = gConnect;
 }
 
-async function loadGoogleNote(): Promise<void> {
+// 连接走整页导航换一次性票据(与集成中心同一后端端点)· 按当前套账隔离。
+async function gConnect(): Promise<void> {
     const ws = activeWsId();
     if (ws == null) {
-        renderGoogleNote({ configured: true, connected: false, email: '' });
+        showToast(t('workspace.required'), 'error');
+        return;
+    }
+    try {
+        const res = (await papi(
+            'POST',
+            `/api/integrations/google/connect/start?workspace_client_id=${ws}`
+        )) as { url?: string };
+        if (!res.url) throw new Error('missing_google_connect_url');
+        window.location.href = res.url;
+    } catch (e) {
+        showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
+    }
+}
+
+async function gDisconnect(): Promise<void> {
+    if (typeof window.showConfirm === 'function') {
+        const ok = await window.showConfirm(t('int-google-disconnect-confirm'));
+        if (!ok) return;
+    }
+    const ws = activeWsId();
+    const q = ws != null ? `?workspace_client_id=${ws}` : '';
+    try {
+        await papi('POST', `/api/integrations/google/disconnect${q}`);
+        showToast(t('int-google-disconnected'), 'success');
+        loadGoogleCard();
+    } catch (e) {
+        showToast(purchaseErrMsg(e, 'purchase.unexpected'), 'error');
+    }
+}
+
+async function loadGoogleCard(): Promise<void> {
+    const ws = activeWsId();
+    if (ws == null) {
+        renderGoogleCard({ configured: true, connected: false, email: '' });
         return;
     }
     try {
@@ -149,9 +220,9 @@ async function loadGoogleNote(): Promise<void> {
             'GET',
             `/api/integrations/google/status?workspace_client_id=${ws}`
         )) as GoogleStatus;
-        renderGoogleNote(st);
+        renderGoogleCard(st);
     } catch (_) {
-        renderGoogleNote({ configured: true, connected: false, email: '' });
+        renderGoogleCard({ configured: true, connected: false, email: '' });
     }
 }
 
@@ -260,6 +331,11 @@ function colsHtml(): string {
 function shell(): string {
     return `<div class="pur pex"><div class="wrap">
         <div class="ph"><span class="back" id="pex-back">‹</span><div class="t">${escapeHtml(t('pur-export-title'))}</div></div>
+        <div class="panel gcard" id="pex-gcard">
+            <div class="gname">${escapeHtml(t('int-google-name'))}<span class="int-gst off" id="pex-gbadge">${escapeHtml(t('int-google-st-off'))}</span></div>
+            <div class="gdesc" id="pex-gdesc">${escapeHtml(t('int-google-desc'))}</div>
+            <div class="gact" id="pex-gact"></div>
+        </div>
         <div class="panel">
             <h4>${escapeHtml(t('pur-export-p1'))}</h4>
             <div class="acts">
@@ -267,7 +343,6 @@ function shell(): string {
                 <button class="btn" data-fmt="drive">${IC_CLOUD}${escapeHtml(t('pur-export-drive'))}</button>
                 <button class="btn" data-fmt="sheet">${IC_GRID}${escapeHtml(t('pur-export-sheet'))}</button>
             </div>
-            <div class="infonote" id="pex-google-notebox">${IC_LINK}<span id="pex-google-note">${escapeHtml(t('pur-export-note'))}</span></div>
             <div class="res"></div>
         </div>
         <div class="panel">
@@ -306,5 +381,5 @@ window.loadPurchaseExport = function () {
     const s = sec();
     if (s) s.innerHTML = shell();
     bind();
-    loadGoogleNote();
+    loadGoogleCard();
 };

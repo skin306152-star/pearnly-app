@@ -30,6 +30,24 @@ _DEFAULT_EXEMPT_PREFIXES = (
     "/assets",
 )
 
+# 认证敏感路径:按客户端 IP 强限流(远低于全局阈值)· 防密码爆破/撞库(安全评估 2026-07-07 H2)
+_AUTH_PATHS = ("/api/login", "/api/v1/login")
+
+
+def _client_ip(headers: dict, scope: Scope) -> str:
+    """真实客户端 IP:CF 回源时取 CF-Connecting-IP(CF 覆写 · 客户端伪造不了)· 回退 XFF / 直连。
+
+    登录限流必须按不可伪造的来源分桶:若取 token 指纹或可伪造的 XFF 首段,攻击者塞个假头就换桶绕过。
+    """
+    cf = headers.get(b"cf-connecting-ip", b"").decode("latin-1").strip()
+    if cf:
+        return cf
+    xff = headers.get(b"x-forwarded-for", b"").decode("latin-1").strip()
+    if xff:
+        return xff.split(",")[0].strip()
+    client = scope.get("client")
+    return client[0] if client else "unknown"
+
 
 def _subject_key(headers: dict, scope: Scope) -> str:
     """限流分桶 key:已登录按 token 指纹 · 否则按客户端 IP(headers 已物化 · 不重复解析)。"""
@@ -68,6 +86,12 @@ class RateLimitMiddleware:
             self.limit = int(os.environ.get("RATE_LIMIT_PER_MIN", "600"))
         except ValueError:
             self.limit = 600
+        # 登录强限流阈值(每 IP 每分钟)· 远低于全局 · 防爆破 · 设 0 关闭
+        try:
+            self.login_limit = int(os.environ.get("LOGIN_RATE_LIMIT_PER_MIN", "10"))
+        except ValueError:
+            self.login_limit = 10
+        self.auth_paths = _AUTH_PATHS
         override = (os.environ.get("RATE_LIMIT_EXEMPT_PREFIXES") or "").strip()
         self.exempt = (
             tuple(p.strip() for p in override.split(",") if p.strip()) or _DEFAULT_EXEMPT_PREFIXES
@@ -82,12 +106,26 @@ class RateLimitMiddleware:
             await self.app(scope, receive, send)
             return
 
+        path = scope.get("path", "")
         # str.startswith 接受前缀元组 · 一次判断所有豁免前缀
-        if scope.get("path", "").startswith(self.exempt):
+        if path.startswith(self.exempt):
             await self.app(scope, receive, send)
             return
 
         headers = dict(scope.get("headers") or [])  # 物化一次 · 供分桶 key 复用
+
+        # 登录路径先过一道按 IP 的强限流(独立分桶)· 防密码爆破 · fail-open
+        if path in self.auth_paths and self.login_limit > 0:
+            try:
+                ok, retry_after = self.limiter.check(
+                    "login:" + _client_ip(headers, scope), self.login_limit, window=60
+                )
+            except Exception:
+                ok, retry_after = True, 0
+            if not ok:
+                await _reject(send, retry_after)
+                return
+
         try:
             allowed, retry_after = self.limiter.check(
                 _subject_key(headers, scope), self.limit, window=60

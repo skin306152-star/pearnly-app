@@ -45,17 +45,10 @@ _NO_CACHE = {
 # ============================================================
 @router.get("/api/health")
 async def health():
-    # 新架构 · pipeline_v1 唯一路径 · 健康检查改为校验 GCP Service Account 就绪
+    # 新架构 · pipeline_v1 唯一路径 · 健康检查改为校验 GCP Service Account 就绪。
+    # 只对外暴露就绪布尔:凭证文件路径属敏感信息,免鉴权端点不得回显(安全评估 2026-07-07 M1)。
     _creds = (os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") or "").strip()
-    if _creds and os.path.isfile(_creds):
-        credentials_status = {"available": True, "path": _creds}
-    elif _creds:
-        credentials_status = {"available": False, "error": f"file not found: {_creds}"}
-    else:
-        credentials_status = {
-            "available": False,
-            "error": "GOOGLE_APPLICATION_CREDENTIALS env not set",
-        }
+    credentials_status = {"available": bool(_creds and os.path.isfile(_creds))}
     return {
         "status": "ok",
         "version": "0.18.5-v105",

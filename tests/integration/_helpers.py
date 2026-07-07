@@ -53,6 +53,12 @@ try:
 except ImportError:
     pass
 
+# 集成测试共享单个 app 实例 · 反复登录会撞进程内限流桶(尤其 /api/login 强限流)。
+# 统一在测试上下文默认关限流(setdefault · 显式 env 仍可覆盖);限流本身由
+# tests/integration/test_ratelimit_middleware.py 用独立 app + 显式 env 覆盖验证。
+# 必须在 import app(get_test_client 内)之前设 · 中间件启动时读一次 env。
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
+
 
 # ──────────────────────────────────────────────────────────────
 # Env-gated skip helpers · 集成测试要么真跑要么干净 skip

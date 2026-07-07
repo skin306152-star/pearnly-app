@@ -81,40 +81,9 @@
                 </div>
             </div>
 
-            <div class="sec-divider" data-firm-only="1"></div>
-
-            <!-- 第 2 组 · 归档交付(Google · 事务所把结果交付客户/会计) -->
-            <div class="integrations-info-bar" data-firm-only="1">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="10" cy="10" r="8"/>
-                    <line x1="10" y1="6" x2="10" y2="10"/>
-                    <circle cx="10" cy="14" r="0.6" fill="currentColor"/>
-                </svg>
-                <span data-i18n="integrations-google-info">授权一次 Google 账号 · Drive 和 Sheets 均可使用 · 无需重复授权</span>
-            </div>
-
-            <div class="integrations-section-title" data-firm-only="1" data-i18n="integrations-section-archive">归档交付</div>
-
-            <!-- Google 授权连接卡(外流归档 OAuth · purchase-google.ts 填状态/连接/断开)·
-                 一次授权覆盖 Drive + Sheets · 凭据按套账隔离 · 未连点「连接 Google」走整页导航。 -->
-            <div class="integration-row" id="int-google-card" data-firm-only="1">
-                <div class="int-icon ic-g">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M7 18a4 4 0 01-.5-7.97 5 5 0 019.6-1.5A4 4 0 0117 18z"/>
-                    </svg>
-                </div>
-                <div class="int-info">
-                    <div class="int-name"><span data-i18n="int-google-name">Google Drive / Sheets</span><span class="int-gst off" id="int-google-st" data-i18n="int-google-st-off">未连接</span></div>
-                    <div class="int-desc" id="int-google-desc" data-i18n="int-google-desc">把进项原图归档进 Drive(证据 + 交会计 PDF)· 并同步成可追溯的 Sheet 报表</div>
-                </div>
-                <div class="int-actions" id="int-google-act"></div>
-            </div>
-
-            <!-- 旧的 Google Drive / Google Sheets 两条描述行已删:被上方 OAuth 连接卡取代
-                 (一次授权覆盖 Drive + Sheets)· 对齐原型⑥单卡 · 去 3 条 Google 冗余。 -->
-
-            <!-- 第 3 组「ERP 系统」已移除(2026-07-01)· ERP 连接/推送改由「录入工作台」上下文卡承接:
-                 发票任务→MR.ERP+Express·身份证任务→MR.ERP DMS(见 dms-intake-erp-cards)· 集成页只留采集/归档/通知。 -->
+            <!-- 归档交付(Google Drive/Sheets)连接卡已迁至采购导出页(purchase-export · purchase-export-google.ts):
+                 连接就在用到它的地方 · 避免 per-套账 连接态在两处不一致。集成页只留采集/通知。
+                 第 3 组「ERP 系统」亦已移除(2026-07-01)· ERP 连接/推送由「录入工作台」上下文卡承接。 -->
 
             <div class="sec-divider"></div>
 

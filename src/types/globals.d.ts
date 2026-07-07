@@ -341,8 +341,6 @@ interface Window {
     openPurchaseExport?: () => void;
     loadPurchaseExport?: () => void;
     loadPurchaseCapture?: () => void;
-    loadIntegrationGoogle?: () => void;
-    highlightGoogleCard?: () => void;
     __LIFF_BOOTSTRAP__?: number;
     isOwner?: (u?: AppUser | null) => boolean;
     reloadInventory?: () => void;

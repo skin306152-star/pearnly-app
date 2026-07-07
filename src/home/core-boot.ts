@@ -229,14 +229,6 @@ function routeTo(route?: any) {
     const loader = ROUTE_LOADERS[route];
     const winFns = window as unknown as Record<string, () => void>;
     if (loader && typeof winFns[loader] === 'function') winFns[loader]();
-    // 进集成页 · 刷新 Google 授权卡(推送日志已抽为独立页 · 由 ROUTE_LOADERS.loadPushLogs 拉)
-    if (route === 'integrations') {
-        if (typeof window.loadIntegrationGoogle === 'function') {
-            try {
-                window.loadIntegrationGoogle();
-            } catch (e) {}
-        }
-    }
 }
 
 // 重载当前路由(不切页/不改 hash)· 复用:① 初始 hash 兜底 ② 切账套后拉对应套账数据。

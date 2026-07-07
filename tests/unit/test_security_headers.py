@@ -30,21 +30,32 @@ class SecurityHeadersMiddlewareTests(unittest.TestCase):
         self.assertIn("max-age=31536000", resp.headers["strict-transport-security"])
         self.assertIn("geolocation=()", resp.headers["permissions-policy"])
 
-    def test_csp_defaults_to_report_only(self):
-        # 首发 report-only:上报违规不拦截 · 强制头不应出现
+    def test_csp_emits_both_enforce_and_report(self):
+        # 强制档 + 观察档同时下发:强制档 = 已复验子集,观察档 = 完整策略
         resp = _client().get("/ping")
-        self.assertIn("content-security-policy-report-only", resp.headers)
-        self.assertIn("default-src 'self'", resp.headers["content-security-policy-report-only"])
-        self.assertNotIn("content-security-policy", resp.headers)
+        enforce = resp.headers["content-security-policy"]
+        report = resp.headers["content-security-policy-report-only"]
+        self.assertIn("script-src 'self'", enforce)
+        self.assertIn("object-src 'none'", enforce)
+        self.assertIn("default-src 'self'", report)  # 完整策略才有 default-src
 
-    def test_csp_enforcing_when_env_false(self):
-        with patch.dict(os.environ, {"CSP_REPORT_ONLY": "false"}):
-            resp = _client().get("/ping")
-        self.assertIn("content-security-policy", resp.headers)
-        self.assertNotIn("content-security-policy-report-only", resp.headers)
+    def test_enforce_omits_unverified_directives(self):
+        # 不变量:强制档只含真机复验过的指令,决不含 img/connect/frame/form(防误伤)
+        enforce = _client().get("/ping").headers["content-security-policy"]
+        for unverified in ("img-src", "connect-src", "frame-ancestors", "form-action"):
+            self.assertNotIn(unverified, enforce)
 
-    def test_csp_disabled_when_empty(self):
-        with patch.dict(os.environ, {"CONTENT_SECURITY_POLICY": ""}):
+    def test_cloudflareinsights_whitelisted(self):
+        # 回归守门:CF 边缘注入的 beacon 必须在两档白名单内(prod 真机抓到过该违规)
+        resp = _client().get("/ping")
+        self.assertIn("static.cloudflareinsights.com", resp.headers["content-security-policy"])
+        self.assertIn(
+            "static.cloudflareinsights.com",
+            resp.headers["content-security-policy-report-only"],
+        )
+
+    def test_both_csp_disabled_when_env_empty(self):
+        with patch.dict(os.environ, {"CSP_ENFORCE": "", "CONTENT_SECURITY_POLICY": ""}):
             resp = _client().get("/ping")
         self.assertNotIn("content-security-policy", resp.headers)
         self.assertNotIn("content-security-policy-report-only", resp.headers)

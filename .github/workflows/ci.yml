@@ -244,6 +244,30 @@ jobs:
       - name: Agent 能力防漏闸 · 每个 routes/*.py 必在 agent_registry.json 分类
         run: python scripts/agent_capability_audit.py
 
+  # 代码质量 Canon · 闸-Q4 · 换大脑不写死(依赖倒置 CQ-1 · 2026-07-08)
+  #   业务逻辑(services/routes/core)禁硬编码模型名(claude-*/gemini-N/gpt-N)· 模型名只许在
+  #   ai_gateway / gemini_models / cost / engine_policy(合法归属地)· 换大脑=改一处不改一堆。
+  #   WARN 模式(continue-on-error · 存量 4 处待清)· 清完后脚本挂 --fail 切硬门。见 docs/CODE_QUALITY_CANON.md。
+  lint-model:
+    name: lint-model (换大脑不写死 · WARN mode)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 零依赖(只用标准库)
+
+      - name: 闸-Q4 · 业务逻辑禁硬编码模型名(依赖倒置 · 见 CODE_QUALITY_CANON.md)
+        run: python scripts/check_no_hardcoded_model.py
+
   test:
     name: import + i18n + unit + vite-build + e2e
     runs-on: ubuntu-latest

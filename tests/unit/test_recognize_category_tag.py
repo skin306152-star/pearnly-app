@@ -8,7 +8,6 @@ import unittest
 
 from services.ocr.recognize import category_tag
 
-
 # 预设风格的两级科目树(泰语名·同生产 seed_presets 口径)
 TREE = [
     {
@@ -31,9 +30,7 @@ class ResolveTagTests(unittest.TestCase):
         self.assertEqual(tag, "ค่าอาหาร/เครื่องดื่ม")
 
     def test_item_keyword_hits(self):
-        tag = category_tag.resolve_tag(
-            {"seller_name": "", "items": [{"name": "กาแฟลาเต้"}]}, TREE
-        )
+        tag = category_tag.resolve_tag({"seller_name": "", "items": [{"name": "กาแฟลาเต้"}]}, TREE)
         self.assertEqual(tag, "ค่าอาหาร/เครื่องดื่ม")
 
     def test_model_chinese_word_maps_to_tenant_thai(self):

@@ -20,9 +20,7 @@ def item_descriptions(fields: Dict[str, Any]) -> str:
     if not isinstance(items, list):
         return ""
     return " ".join(
-        str(it.get("name") or it.get("description") or "")
-        for it in items
-        if isinstance(it, dict)
+        str(it.get("name") or it.get("description") or "") for it in items if isinstance(it, dict)
     )
 
 

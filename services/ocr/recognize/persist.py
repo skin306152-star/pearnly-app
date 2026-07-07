@@ -79,20 +79,16 @@ def persist_invoices(
     # 关键词规则匹配·无 LLM·一次性载树(多张共用);无套账/载树失败 → 树 None,回落旧行为。
     from services.ocr.recognize import category_tag as _cat_tag
 
+    # _ws_client_id 已由 core.py 统一回落(缺套账 → default_workspace_for_write),这里直接用。
+    # 为空只可能是租户零套账 → 无树 → 回落模型分类。不再二次解析(避免非 RLS 游标重复那一步)。
     _cat_tree = None
     try:
-        from core.workspace_context import default_workspace_id
-        from services.purchase import categories as _cat_svc
+        if _ws_client_id:
+            from services.purchase import categories as _cat_svc
 
-        with db.get_cursor() as _cur:
-            # 无活跃套账(自助/未选)→ 回落租户默认套账,与 resolve_ws/费用数据页同口径。
-            # 否则这批上传载不到树 → 又落回模型中文(正是抽屉里看到中文的根因)。
-            _ws_for_cat = (
-                int(_ws_client_id) if _ws_client_id else default_workspace_id(_cur, _tid(user))
-            )
-            if _ws_for_cat:
+            with db.get_cursor() as _cur:
                 _cat_tree = _cat_svc.get_tree(
-                    _cur, tenant_id=_tid(user), workspace_client_id=_ws_for_cat
+                    _cur, tenant_id=_tid(user), workspace_client_id=int(_ws_client_id)
                 )
     except Exception as _te:
         logger.warning(f"[category] 载套账分类树失败(回落模型分类): {_te}")

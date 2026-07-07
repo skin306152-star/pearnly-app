@@ -18,6 +18,7 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from core import db
+from services.export.csv_safe import SafeCsvWriter
 
 logger = logging.getLogger("mr-pilot")
 
@@ -159,7 +160,7 @@ def build_csv(rows: List[Dict[str, Any]]) -> str:
     """operation_logs 原始行 → CSV(BOM + 表头)。纯函数(无 DB · 便于单测)。"""
     buf = io.StringIO()
     buf.write("﻿")  # BOM · Excel 中/泰文不乱码
-    writer = csv.writer(buf)
+    writer = SafeCsvWriter(csv.writer(buf))
     writer.writerow(list(CSV_COLUMNS))
     for r in rows:
         created = r.get("created_at")

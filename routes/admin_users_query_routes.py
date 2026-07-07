@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from core import db
 from core.route_helpers import _require_super_admin
+from services.export.csv_safe import SafeCsvWriter
 from services.team import console_store
 
 logger = logging.getLogger("mr-pilot")
@@ -353,7 +354,7 @@ async def admin_users_csv(request: Request):
 
     buf = _StringIO()
     buf.write("\ufeff")
-    w = _csv.writer(buf)
+    w = SafeCsvWriter(_csv.writer(buf))
     w.writerow(
         [
             "created_at",

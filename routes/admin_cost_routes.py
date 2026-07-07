@@ -31,6 +31,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from core import db
 from core.route_helpers import _require_super_admin
+from services.export.csv_safe import SafeCsvWriter
 
 logger = logging.getLogger("mr-pilot")
 
@@ -205,7 +206,7 @@ async def admin_credits_export(request: Request, days: int = 30):
     import csv
 
     buf = io.StringIO()
-    w = csv.writer(buf)
+    w = SafeCsvWriter(csv.writer(buf))
     w.writerow(
         [
             "id",
@@ -267,7 +268,7 @@ async def admin_cost_export(request: Request, days: int = 30):
         import csv
 
         buf = io.StringIO()
-        w = csv.writer(buf)
+        w = SafeCsvWriter(csv.writer(buf))
         w.writerow(["时间", "用户", "引擎", "页数", "输入Token", "输出Token", "成本THB", "耗时ms"])
         for r in rows:
             w.writerow(

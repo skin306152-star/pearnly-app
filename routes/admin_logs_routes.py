@@ -26,6 +26,7 @@ from fastapi import APIRouter, HTTPException, Request
 from core import db
 from core.auth import get_current_user_from_request
 from core.route_helpers import _require_super_admin
+from services.export.csv_safe import SafeCsvWriter
 
 router = APIRouter()
 
@@ -97,7 +98,7 @@ async def admin_logs_csv(
 
     buf = _StringIO()
     buf.write("﻿")  # BOM · Excel 中文不乱码
-    w = _csv.writer(buf)
+    w = SafeCsvWriter(_csv.writer(buf))
     w.writerow(
         [
             "created_at",
@@ -204,7 +205,7 @@ async def me_access_log_csv(request: Request, q: str = ""):
 
     buf = _StringIO()
     buf.write("﻿")
-    w = _csv.writer(buf)
+    w = SafeCsvWriter(_csv.writer(buf))
     w.writerow(
         ["created_at", "actor_username", "action", "target_type", "target_name", "ip", "details"]
     )

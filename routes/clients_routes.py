@@ -36,6 +36,7 @@ from pydantic import BaseModel, Field
 
 from core import db
 from core.auth import get_current_user_from_request
+from services.export.csv_safe import SafeCsvWriter
 
 logger = logging.getLogger("mr-pilot")
 router = APIRouter()
@@ -259,7 +260,7 @@ async def api_export_client_invoices(client_id: int, request: Request, month: Op
 
         # 拼 CSV(Excel 兼容)
         buf = io.StringIO()
-        w = csv.writer(buf)
+        w = SafeCsvWriter(csv.writer(buf))
         title_month = month or "All"
         w.writerow([f"客户:{client.get('name', '')} · 月份:{title_month}"])
         w.writerow([f"税号:{client.get('tax_id') or '—'} · 共 {len(rows)} 张"])

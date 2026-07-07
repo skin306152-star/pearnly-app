@@ -11,18 +11,25 @@ from services.erp.mrerp_http.autocreate import (
     _product_code_from_name,
     provision_customers,
     provision_products,
+    provision_suppliers,
 )
+from services.erp.mrerp_xlsx_lookups import MRERP_CASH_CUSTOMER
 
 
 class _StubAdapter:
     def __init__(self, results):
         self._results = results
         self.called_with = None
+        self.suppliers_called = None
         self.products_called = None
 
     def create_customers(self, customers, mappings):
         self.called_with = customers
         return {c["code"]: self._results.get(c["code"], True) for c in customers}
+
+    def create_suppliers(self, suppliers, mappings):
+        self.suppliers_called = suppliers
+        return {s["code"]: self._results.get(s["code"], True) for s in suppliers}
 
     def create_products(self, products, mappings):
         self.products_called = products
@@ -133,6 +140,41 @@ class TestEnsureCustomers(unittest.TestCase):
         stub = _StubAdapter({})
         provision_customers(stub, [{"client_id": 0}], mappings)
         self.assertIsNone(stub.called_with)  # 兜底关 → 不建现金客户
+
+
+class TestCashSupplier(unittest.TestCase):
+    """现金采购(卖方完全无身份)→ 现金供应商 เงินสด 兜底 + 幂等自建(与销项现金客户对称)。"""
+
+    def test_supplier_code_falls_back_to_cash(self):
+        from services.erp.mrerp_xlsx_purchase import _supplier_code
+
+        self.assertEqual(_supplier_code({"fields": {}}, {"suppliers": []}), MRERP_CASH_CUSTOMER)
+
+    def test_supplier_code_fallback_off_yields_empty(self):
+        from services.erp.mrerp_xlsx_purchase import _supplier_code
+
+        m = {"suppliers": [], "_mrerp_cash_supplier_fallback": False}
+        self.assertEqual(_supplier_code({"fields": {}}, m), "")
+
+    def test_named_seller_still_wins(self):
+        from services.erp.mrerp_xlsx_purchase import _supplier_code
+
+        code = _supplier_code({"fields": {"seller_name": "ACME"}}, {"suppliers": []})
+        self.assertNotEqual(code, MRERP_CASH_CUSTOMER)
+        self.assertTrue(code)
+
+    def test_provision_ensures_cash_supplier(self):
+        mappings = {"suppliers": []}
+        stub = _StubAdapter({})
+        provision_suppliers(stub, [{"fields": {}}], mappings)
+        self.assertEqual([s["code"] for s in stub.suppliers_called], [MRERP_CASH_CUSTOMER])
+        self.assertEqual(mappings["suppliers"], [])  # 现金供应商不进 suppliers 映射
+
+    def test_provision_skips_when_cash_fallback_off(self):
+        mappings = {"suppliers": [], "_mrerp_cash_supplier_fallback": False}
+        stub = _StubAdapter({})
+        provision_suppliers(stub, [{"fields": {}}], mappings)
+        self.assertIsNone(stub.suppliers_called)
 
 
 class TestProvisionProducts(unittest.TestCase):

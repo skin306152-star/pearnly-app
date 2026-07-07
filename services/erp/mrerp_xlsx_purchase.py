@@ -21,7 +21,11 @@ from services.erp.mrerp_xlsx_fmt import (
     history_number,
     supplier_code_from_name,
 )
-from services.erp.mrerp_xlsx_lookups import _build_product_lookup, _resolve_product_code
+from services.erp.mrerp_xlsx_lookups import (
+    MRERP_CASH_CUSTOMER,
+    _build_product_lookup,
+    _resolve_product_code,
+)
 from services.erp.mrerp_xlsx_sales_credit import _format_num
 from services.purchase.field_clean import clean_tax_id
 
@@ -96,7 +100,12 @@ def _supplier_code(history: Dict[str, Any], mappings: Dict[str, Any]) -> str:
     # 回退链与 autocreate._seller_from_history 严格同源(税号 → 名字派生 → V+cid),
     # 否则自建供应商的码在这儿解析不到 → ERR_NO_SUPPLIER(真机语料 SISTER MAKEUP)。
     name_code = supplier_code_from_name(fields.get("seller_name") or fields.get("supplier_name"))
-    return seller_tax or name_code or (("V" + cid) if cid else "")
+    code = seller_tax or name_code or (("V" + cid) if cid else "")
+    # 卖方完全无身份(现金采购小票常态)→ 现金供应商兜底(与销项现金客户对称 · เงินสด),
+    # 由 provision_suppliers 幂等自建。可经 mappings['_mrerp_cash_supplier_fallback']=False 关闭。
+    if not code and isinstance(mappings, dict) and mappings.get("_mrerp_cash_supplier_fallback", True):
+        return MRERP_CASH_CUSTOMER
+    return code
 
 
 def _detail_rows(history: Dict[str, Any], mappings: Dict[str, Any]) -> List[Dict[str, Any]]:

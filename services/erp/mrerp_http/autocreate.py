@@ -108,6 +108,7 @@ def provision_suppliers(adapter, valid: List[Dict[str, Any]], mappings: Dict[str
     """采购缺供应商则自建 · 建成功把码注入 mappings['suppliers'](原地 · 供 purchase 生成器解析)。"""
     if not isinstance(mappings, dict) or not mappings.get("_mrerp_auto_create_supplier", True):
         return
+    cash_fallback = mappings.get("_mrerp_cash_supplier_fallback", True)
     have = {
         str(r.get("erp_code") or "").strip()
         for r in mappings.get("suppliers") or []
@@ -117,7 +118,16 @@ def provision_suppliers(adapter, valid: List[Dict[str, Any]], mappings: Dict[str
     inject: List[tuple] = []
     for h in valid:
         seller = _seller_from_history(h)
-        if not seller["code"] or seller["code"] in have:
+        if not seller["code"]:
+            # 无卖方身份(现金采购小票)→ 幂等确保现金供应商 เงินสด,不建垃圾码。
+            # 无需注入 suppliers 映射:_supplier_code 对空码直接返 เงินสด。
+            if cash_fallback and MRERP_CASH_CUSTOMER not in have:
+                pending.setdefault(
+                    MRERP_CASH_CUSTOMER,
+                    {"code": MRERP_CASH_CUSTOMER, "name": MRERP_CASH_CUSTOMER, "tax_id": ""},
+                )
+            continue
+        if seller["code"] in have:
             continue
         pending.setdefault(seller["code"], seller)
         inject.append((int(h.get("client_id") or 0), seller["code"], seller["tax_id"]))

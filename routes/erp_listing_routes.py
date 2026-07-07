@@ -50,6 +50,19 @@ async def erp_test_connection(req: ErpTestConnectionRequest, request: Request):
     cfg = dict(req.config or {})
     cfg.pop("_token_set", None)
 
+    # SSRF 防护:用户可控的 system_url 只许公网目标,挡内网/元数据探测(安全评估 2026-07-07)。
+    # getaddrinfo 会阻塞 → to_thread 离开事件循环(铁律 #10)。
+    _su = str(cfg.get("system_url") or "").strip()
+    if _su:
+        import asyncio as _aio
+
+        from services.erp.ssrf_guard import assert_public_url
+
+        try:
+            await _aio.to_thread(assert_public_url, _su)
+        except ValueError as _sse:
+            raise HTTPException(400, detail=f"erp.blocked_url:{_sse}")
+
     # mrerp: real login + company-picker scrape (rich shape with
     # ok / companies / error_friendly). Wizard JS already understands
     # this shape. test_mrerp_endpoint is contracted to NEVER raise but

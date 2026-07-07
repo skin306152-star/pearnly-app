@@ -75,6 +75,23 @@ def persist_invoices(
     except Exception as e:
         logger.warning(f"[dup_check] 读取用户设置失败 · 用默认值: {e}")
 
+    # 识别科目归到【本套账费用分类树】(泰语),不再存模型自由文本(可能中文)。
+    # 关键词规则匹配·无 LLM·一次性载树(多张共用);无套账/载树失败 → 树 None,回落旧行为。
+    from services.ocr.recognize import category_tag as _cat_tag
+
+    _cat_tree = None
+    try:
+        if _ws_client_id:
+            from services.purchase import categories as _cat_svc
+
+            with db.get_cursor() as _cur:
+                _cat_tree = _cat_svc.get_tree(
+                    _cur, tenant_id=_tid(user), workspace_client_id=int(_ws_client_id)
+                )
+    except Exception as _te:
+        logger.warning(f"[category] 载套账分类树失败(回落模型分类): {_te}")
+        _cat_tree = None
+
     # v114/v115 · PDF 留底(searchable PDF 生成 + save_pdf)·
     # REFACTOR-WA-OCRPERF Step1:挪出响应主路径 → 响应返回后后台生成 + 回填 pdf_storage_path
     #   (字段/响应不变 · 砍墙钟开销大头)。下方 insert 先存 None · 见函数尾部后台任务。
@@ -86,11 +103,19 @@ def persist_invoices(
         # 给每张发票生成归档名(基于该张的合并字段)
         try:
             g_archive_name = _archive.preview_name(g_fields or {}, template)
-            g_category_tag = (g_fields.get("category") or "").strip() or None if g_fields else None
         except Exception as e:
             logger.warning(f"归档名生成失败(发票 #{idx}): {e}")
             g_archive_name = None
-            g_category_tag = None
+
+        # 科目标签:归本套账分类(泰语)→ 命中用你的科目名并同步进 g_fields["category"]
+        # (抽屉显示 f.category||category_tag,须一致);不中留空,不落模型自由文本/中文。
+        # 载树失败/无套账(_cat_tree=None)→ 回落模型分类(不因基础设施问题全空)。
+        if _cat_tree:
+            g_category_tag = _cat_tag.resolve_tag(g_fields or {}, _cat_tree)
+            if g_fields is not None:
+                g_fields["category"] = g_category_tag or ""
+        else:
+            g_category_tag = (g_fields.get("category") or "").strip() or None if g_fields else None
 
         # v118.18 · 推荐分类「学习」· 同 seller 历史用过的 category 优先于 Gemini 的猜测
         try:

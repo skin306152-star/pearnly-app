@@ -16,7 +16,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional
 
-from . import gemini_models, image_first
+from . import gemini_models, image_first, totals_rescue
 from .confidence import check_field_in_l1_text, find_field_min_word_conf
 from .gl_balance_chain import repair_gl_document
 from .layer1_vision import extract_from_image_bytes as _l1_extract_image
@@ -304,8 +304,16 @@ def _process_one_page(
             error_msg = f"L3 fallback error: {e}"
             logger.warning("pipeline: L3 fallback error on page %d: %s", page_number, e)
             if fallback_to_layer2_on_layer3_error:
-                layer_chain = [l1_layer_name, "L2", "L3_failed"]
-                needs_manual_review = True
+                # 全量 JSON 复读失败(长 schema 易截断)→ 窄口径重抽四个金额字段
+                # 最后抢救一次;救不回来才举手(NBC 折扣票实案 2026-07-08)。
+                rescued = totals_rescue.rescue_totals(image_bytes, api_key, l3_model)
+                patched = totals_rescue.apply_rescue(l2_invoice, rescued) if rescued else None
+                if patched is not None:
+                    invoice = patched
+                    layer_chain = [l1_layer_name, "L2", "L3_totals_rescue"]
+                else:
+                    layer_chain = [l1_layer_name, "L2", "L3_failed"]
+                    needs_manual_review = True
             else:
                 raise
         except Layer3QuotaError as e:

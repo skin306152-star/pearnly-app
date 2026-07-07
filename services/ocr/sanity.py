@@ -63,6 +63,29 @@ def line_sum_mismatch(sub, lines: List[float], symmetric: bool = False) -> float
     return None
 
 
+def vat_ratio_mismatch(sub: float | None, vat: float | None, discount: float | None) -> str | None:
+    """VAT 是否为净额的法定 7% — 与规则 4b(总额勾稽)独立的第二道校验。
+
+    抓「小计/VAT/总额三者被同时误读却仍恰好互相自洽」这类规则 4b 抓不住的自洽性
+    幻觉(sanity.py 顶部诚实边界写的缺口之一;NBC 折扣票实案 2026-07-08:69→60/
+    8→3 两位误读,sub+vat=total 仍平,但 VAT 不再是净额的 7%)。折扣两种印法
+    (折前/折后)任一口径对上即放行,不误杀折扣票(同规则 4b/f003)。
+    """
+    if vat is None or vat <= 0 or sub is None or sub <= 0:
+        return None
+    gross_expected = sub * _VAT_RATE
+    net_sub = sub - (discount or 0.0)
+    net_expected = net_sub * _VAT_RATE if net_sub > 0 else gross_expected
+    diff = min(abs(vat - gross_expected), abs(vat - net_expected))
+    tol = max(_TOL, min(gross_expected, net_expected) * _RECON_REL)
+    if diff <= tol:
+        return None
+    return (
+        f"VAT {vat} 既非小计 {sub} × 7%({gross_expected:.2f})也非净额(折后){net_sub:.2f} × 7%"
+        f"({net_expected:.2f})(差 {diff:.2f}) — 疑小计/VAT 单数位误读(自洽性幻觉)"
+    )
+
+
 def evaluate_sanity(invoice) -> List[str]:
     """返回硬否决原因列表(空=通过)。命中任一 → 调用方强制转人工,绝不 auto。
 
@@ -134,6 +157,11 @@ def _core_reasons(invoice) -> List[str]:
                 f"总额 {total} != 小计 {sub} − 折扣 {discount or 0} + VAT {vat}"
                 f"(差 {min(gross_diff, net_diff):.2f}) — 勾稽不平(疑漏折扣行/选错列)"
             )
+
+    # 规则 4c:VAT 与小计的 7% 关系独立复核(见 vat_ratio_mismatch 文档字符串)。
+    ratio_reason = vat_ratio_mismatch(sub, vat, discount)
+    if ratio_reason:
+        reasons.append(ratio_reason)
 
     # 规则 5:税号位数对(13)但 MOD-11 校验位不过 → 八成 OCR 读错一位(Big C 538↔536:
     # 合法税号恒过校验,失败几乎只来自误读)。仅判已是 13 位者,不碰空/残缺(那是别的事)。

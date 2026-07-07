@@ -237,6 +237,41 @@ class MultiInvoicePageTests(unittest.TestCase):
         self.assertEqual(evaluate_sanity(inv), [])
 
 
+class VatRatioMismatchTests(unittest.TestCase):
+    # 规则 4c(NBC 折扣票实案 2026-07-08):sub+vat=total 仍自洽(规则 4b 放行)但
+    # VAT 不再是净额的法定 7% —— 抓「小计/VAT/总额被同时误读却互相凑巧对平」这类
+    # 自洽性幻觉。
+
+    def test_self_consistent_but_wrong_ratio_flagged(self):
+        inv = _inv(subtotal="53129.00", vat="4060.05", total_amount="57189.05")
+        reasons = evaluate_sanity(inv)
+        self.assertTrue(any("单数位误读" in r for r in reasons))
+        # 规则 4b 本身不该重复报警(三者本就互相对平)
+        self.assertFalse(any("勾稽不平" in r for r in reasons))
+
+    def test_true_seven_percent_passes(self):
+        inv = _inv(subtotal="58129.35", vat="4069.05", total_amount="62198.40")
+        self.assertEqual(evaluate_sanity(inv), [])
+
+    def test_discount_pre_discount_base_passes(self):
+        # VAT 算在折前小计上,折扣只减 payable(trap08_discount_net_payable 语义)。
+        inv = _inv(subtotal="100.00", vat="7.00", discount="50.00", total_amount="57.00")
+        self.assertEqual(evaluate_sanity(inv), [])
+
+    def test_discount_post_discount_base_passes(self):
+        # VAT 算在折后净额上,小计印的是折前数(f003 语义)。
+        inv = _inv(subtotal="5210.00", vat="354.90", discount="140.00", total_amount="5424.90")
+        self.assertEqual(evaluate_sanity(inv), [])
+
+    def test_zero_vat_not_flagged(self):
+        # VAT=0(免税/未列示销项)是合法形态,不该被 7% 关系误杀。
+        inv = _inv(subtotal="1396.68", vat="0.00", total_amount="1346.68", discount="50.00")
+        self.assertFalse(any("单数位误读" in r for r in evaluate_sanity(inv)))
+
+    def test_vat_missing_not_flagged(self):
+        self.assertFalse(any("单数位误读" in r for r in evaluate_sanity(_inv(subtotal="100"))))
+
+
 class CreditNoteReviewTests(unittest.TestCase):
     # P1 台账 #8:贷记单=方向性单据,两链共用本判定强制人工,不许当普通发票静默过账。
 

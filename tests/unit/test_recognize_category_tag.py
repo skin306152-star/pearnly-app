@@ -57,5 +57,33 @@ class ResolveTagTests(unittest.TestCase):
         self.assertEqual(category_tag.item_descriptions({}), "")
 
 
+class SanitizeLearnedTests(unittest.TestCase):
+    """学习值净化:真分类名(预置/自定义)留、旧模型中文映射不上→None(不回灌)、无树→原样。"""
+
+    def test_real_tenant_name_kept(self):
+        self.assertEqual(
+            category_tag.sanitize_learned("ค่าอาหาร/เครื่องดื่ม", TREE), "ค่าอาหาร/เครื่องดื่ม"
+        )
+
+    def test_custom_tenant_name_kept(self):
+        # 自定义(不在 _TARGETS 别名里)的真分类名也不能误伤
+        tree = [{"id": "p", "name": "หมวดพิเศษ", "children": [{"id": "c", "name": "ของเฉพาะร้าน"}]}]
+        self.assertEqual(category_tag.sanitize_learned("ของเฉพาะร้าน", tree), "ของเฉพาะร้าน")
+
+    def test_stale_chinese_maps_to_thai(self):
+        self.assertEqual(category_tag.sanitize_learned("餐饮", TREE), "ค่าอาหาร/เครื่องดื่ม")
+
+    def test_stale_chinese_unmappable_returns_none(self):
+        # 旧的"化妆品"非本套账分类、也映射不上 → None(调用方据此不覆盖,不回灌中文)
+        self.assertIsNone(category_tag.sanitize_learned("化妆品", TREE))
+
+    def test_no_tree_keeps_word(self):
+        self.assertEqual(category_tag.sanitize_learned("化妆品", None), "化妆品")
+
+    def test_empty_returns_none(self):
+        self.assertIsNone(category_tag.sanitize_learned("", TREE))
+        self.assertIsNone(category_tag.sanitize_learned(None, TREE))
+
+
 if __name__ == "__main__":
     unittest.main()

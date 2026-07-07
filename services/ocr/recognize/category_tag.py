@@ -47,3 +47,23 @@ def resolve_tag(fields: Dict[str, Any], tree: List[Dict[str, Any]]) -> Optional[
     if not cid:
         return None
     return _name_in_tree(tree, cid, sid)
+
+
+def sanitize_learned(word: Optional[str], tree: List[Dict[str, Any]]) -> Optional[str]:
+    """净化"同卖方学习"到的旧科目值:是本套账真实分类名(预置/自定义)→ 原样保留;否则(旧
+    模型自由文本,如中文'化妆品')→ 跨语言映射到本套账分类,映射不上 → None(不回灌非本套账中文)。
+    无树(无套账/载树失败)→ 原样保留(回落·不误伤)。调用方仅在返回真值时才覆盖,None 不清空。
+    """
+    if not word:
+        return None
+    if not tree:
+        return word
+    w = str(word).strip()
+    for parent in tree:
+        if parent.get("name") == w:
+            return w
+        for child in parent.get("children") or []:
+            if child.get("name") == w:
+                return w
+    cid, sid = category_ai.match_user_category(w, tree)
+    return _name_in_tree(tree, cid, sid) if cid else None

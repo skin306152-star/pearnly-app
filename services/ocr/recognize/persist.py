@@ -115,7 +115,7 @@ def persist_invoices(
             if g_fields is not None:
                 g_fields["category"] = g_category_tag or ""
         else:
-            g_category_tag = (g_fields.get("category") or "").strip() or None if g_fields else None
+            g_category_tag = ((g_fields or {}).get("category") or "").strip() or None
 
         # v118.18 · 推荐分类「学习」· 同 seller 历史用过的 category 优先于 Gemini 的猜测
         try:
@@ -126,6 +126,9 @@ def persist_invoices(
                     user_id=str(user["id"]),
                     tenant_id=_tid(user),
                 )
+                # 学到的值也过树净化:旧的模型中文(非本套账分类)映射不上 → None → 不覆盖
+                # (保留上面的树映射结果,既不回灌中文也不清空)。见 category_tag.sanitize_learned。
+                _learned = _cat_tag.sanitize_learned(_learned, _cat_tree)
                 if _learned:
                     g_category_tag = _learned
                     # 同步覆盖 g_fields["category"] · 让 pages 写入也带这个 · 抽屉打开就显示学到的科目

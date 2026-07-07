@@ -80,9 +80,11 @@ def rescue_totals(
     return data or None
 
 
-def apply_rescue(invoice: ThaiInvoice, rescued: dict) -> Optional[ThaiInvoice]:
+def apply_rescue(invoice: ThaiInvoice, rescued: Optional[dict]) -> Optional[ThaiInvoice]:
     """把重抽的金额字段贴回 invoice 副本,只在贴回后勾稽 + VAT-7% 都能自洽时才
-    返回新对象;仍不平 = 救援没成功,别硬用,返回 None 让调用方走原有兜底。"""
+    返回新对象;没抽到字段 / 仍不平 = 救援没成功,别硬用,返回 None 让调用方走原有兜底。"""
+    if not rescued:
+        return None
     patched = invoice.model_copy(update=rescued)
     if _check_amount_math(patched):
         return None

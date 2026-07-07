@@ -63,6 +63,11 @@ class RescueTotalsTests(unittest.TestCase):
 
 
 class ApplyRescueTests(unittest.TestCase):
+    def test_no_rescue_data_rejected(self):
+        # rescue_totals 拿不到任何字段(None / 空字典)→ 直接判救援失败,不碰 invoice。
+        self.assertIsNone(totals_rescue.apply_rescue(_MISREAD_INVOICE, None))
+        self.assertIsNone(totals_rescue.apply_rescue(_MISREAD_INVOICE, {}))
+
     def test_fixed_totals_accepted(self):
         rescued = {"subtotal": "58129.35", "vat": "4069.05", "total_amount": "62198.40"}
         patched = totals_rescue.apply_rescue(_MISREAD_INVOICE, rescued)

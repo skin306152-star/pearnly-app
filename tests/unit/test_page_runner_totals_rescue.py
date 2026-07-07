@@ -75,7 +75,7 @@ class TotalsRescueWiringTests(unittest.TestCase):
     def test_failed_rescue_still_raises_hand_with_original_numbers(self):
         with (
             mock.patch.object(page_runner.totals_rescue, "rescue_totals", return_value=None),
-            mock.patch.object(page_runner.totals_rescue, "apply_rescue"),
+            mock.patch.object(page_runner.totals_rescue, "apply_rescue", return_value=None),
         ):
             pr = self._run()
         # 数字不比修前更差:救不回来就原样带 L2 的读数举手,绝不硬套一个还不平的数。

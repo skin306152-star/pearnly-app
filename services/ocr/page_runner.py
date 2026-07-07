@@ -307,7 +307,7 @@ def _process_one_page(
                 # 全量 JSON 复读失败(长 schema 易截断)→ 窄口径重抽四个金额字段
                 # 最后抢救一次;救不回来才举手(NBC 折扣票实案 2026-07-08)。
                 rescued = totals_rescue.rescue_totals(image_bytes, api_key, l3_model)
-                patched = totals_rescue.apply_rescue(l2_invoice, rescued) if rescued else None
+                patched = totals_rescue.apply_rescue(l2_invoice, rescued)
                 if patched is not None:
                     invoice = patched
                     layer_chain = [l1_layer_name, "L2", "L3_totals_rescue"]

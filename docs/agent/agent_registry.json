@@ -147,6 +147,7 @@
   "sales_send_routes": "B",
   "sales_seller_routes": "B",
   "sales_settings_routes": "C",
+  "security_routes": "D",
   "settings_routes": "C",
   "tax_routes": "B",
   "tenant_routes": "B",

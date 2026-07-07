@@ -12,6 +12,7 @@
 from typing import Any, Dict, List, Optional
 
 from services.expense import category_ai
+from services.purchase.image_category import _category_names
 
 
 def item_descriptions(fields: Dict[str, Any]) -> str:
@@ -24,15 +25,10 @@ def item_descriptions(fields: Dict[str, Any]) -> str:
     )
 
 
-def _name_in_tree(tree: List[Dict[str, Any]], cid: Any, sid: Any) -> Optional[str]:
-    """(大类id, 子类id) → 树里的名字(子类优先,无子则大类名)。"""
-    for parent in tree or []:
-        if parent.get("id") == cid:
-            for child in parent.get("children") or []:
-                if child.get("id") == sid:
-                    return child.get("name")
-            return parent.get("name")
-    return None
+def _name(tree: List[Dict[str, Any]], cid: Any, sid: Any) -> Optional[str]:
+    """(大类id, 子类id) → 树里的名字(子类优先,无子则大类名);复用 image_category._category_names。"""
+    cat_name, sub_name = _category_names(tree, cid, sid)
+    return sub_name or cat_name or None
 
 
 def resolve_tag(fields: Dict[str, Any], tree: List[Dict[str, Any]]) -> Optional[str]:
@@ -46,7 +42,7 @@ def resolve_tag(fields: Dict[str, Any], tree: List[Dict[str, Any]]) -> Optional[
         cid, sid = category_ai.match_user_category(str(fields.get("category") or ""), tree)
     if not cid:
         return None
-    return _name_in_tree(tree, cid, sid)
+    return _name(tree, cid, sid)
 
 
 def sanitize_learned(word: Optional[str], tree: List[Dict[str, Any]]) -> Optional[str]:
@@ -66,4 +62,4 @@ def sanitize_learned(word: Optional[str], tree: List[Dict[str, Any]]) -> Optiona
             if child.get("name") == w:
                 return w
     cid, sid = category_ai.match_user_category(w, tree)
-    return _name_in_tree(tree, cid, sid) if cid else None
+    return _name(tree, cid, sid) if cid else None

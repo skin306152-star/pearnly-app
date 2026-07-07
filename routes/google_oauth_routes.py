@@ -111,7 +111,7 @@ async def api_connect(
 async def api_callback(
     request: Request, code: Optional[str] = Query(None), state: Optional[str] = Query(None)
 ):
-    """Google 重定向回调(公开·state 即凭证)。换码存凭据 → 回集成中心。"""
+    """Google 重定向回调(公开·state 即凭证)。换码存凭据 → 回采购导出页(连接入口所在)。"""
     if not code or not state:
         return HTMLResponse("<p>授权失败:缺少参数,请重试。</p>", status_code=400)
     with db.get_cursor(commit=True) as cur:
@@ -134,7 +134,7 @@ async def api_callback(
             scope=tok["scope"],
             created_by=owner["user_id"],
         )
-    return RedirectResponse("/home#integrations", status_code=302)
+    return RedirectResponse("/home#/purchase-export", status_code=302)
 
 
 @router.post("/disconnect")

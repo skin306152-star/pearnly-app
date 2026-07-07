@@ -76,7 +76,10 @@ class TestPurchaseValidate(unittest.TestCase):
         h3["client_id"] = 0
         h3["fields"] = {}
         h3["seller_tax_id"] = ""
-        self.assertEqual(validate_purchase_history(h3, {"suppliers": []})[1], "ERR_NO_SUPPLIER")
+        # 现金供应商兜底关掉时,无卖方身份仍报 ERR_NO_SUPPLIER(旧行为);
+        # 兜底开(默认)则归 เงินสด 现金供应商,见 test_mrerp_autocreate.TestCashSupplier。
+        m = {"suppliers": [], "_mrerp_cash_supplier_fallback": False}
+        self.assertEqual(validate_purchase_history(h3, m)[1], "ERR_NO_SUPPLIER")
 
 
 class TestPurchaseDetailFallback(unittest.TestCase):

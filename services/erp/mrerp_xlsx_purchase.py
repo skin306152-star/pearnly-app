@@ -103,7 +103,11 @@ def _supplier_code(history: Dict[str, Any], mappings: Dict[str, Any]) -> str:
     code = seller_tax or name_code or (("V" + cid) if cid else "")
     # 卖方完全无身份(现金采购小票常态)→ 现金供应商兜底(与销项现金客户对称 · เงินสด),
     # 由 provision_suppliers 幂等自建。可经 mappings['_mrerp_cash_supplier_fallback']=False 关闭。
-    if not code and isinstance(mappings, dict) and mappings.get("_mrerp_cash_supplier_fallback", True):
+    if (
+        not code
+        and isinstance(mappings, dict)
+        and mappings.get("_mrerp_cash_supplier_fallback", True)
+    ):
         return MRERP_CASH_CUSTOMER
     return code
 

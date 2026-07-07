@@ -130,6 +130,23 @@ def _sanity_fail_row(history: Dict[str, Any], reason: str) -> FailedRow:
     )
 
 
+def _walkin_to_cash(history: Dict[str, Any], default_doc: str, mappings: Dict[str, Any]) -> bool:
+    """无买方散客销售 → 现金销售单(ขายเงินสด · 账正:钱入现金,不在 เงินสด 客户下虚挂应收)。
+
+    仅当 ① 默认端点是销项 ② 开关开(默认 · mappings['_mrerp_walkin_sales_cash']=False 可关)
+    ③ 无买方身份(无 client_id 且票面无买方税号)。现金收款科目由 sales_cash 生成器解析(默认
+    1111-01,可经 _mrerp_receipt_account_cash 覆盖);套账无该科目时 account_gate 会干净挡下,不乱推。
+    """
+    if not default_doc.startswith("sales"):
+        return False
+    if not (isinstance(mappings, dict) and mappings.get("_mrerp_walkin_sales_cash", True)):
+        return False
+    if history.get("client_id"):
+        return False
+    fields = _fields(history)
+    return not clean_tax_id(fields.get("buyer_tax") or fields.get("buyer_tax_id"))
+
+
 def route_and_upload(adapter, histories: List[Dict[str, Any]], mappings: Dict[str, Any]):
     """按每张单据的方向路由 doc_type 再推送 · 合并为一个 ImportResult(同一会话内复用登录)。
 
@@ -146,7 +163,12 @@ def route_and_upload(adapter, histories: List[Dict[str, Any]], mappings: Dict[st
     groups: Dict[str, List[Dict[str, Any]]] = {}  # dict 保序 → 无需单独 order 列表
     for h in histories:
         chosen = choose_doc_type(h, h, own_tax_id=own)
-        dt = "purchase" if chosen == "purchase" else default_doc
+        if chosen == "purchase":
+            dt = "purchase"
+        elif _walkin_to_cash(h, default_doc, mappings):
+            dt = "sales_cash"  # 散客现金销售 → ขายเงินสด(账正)
+        else:
+            dt = default_doc  # 销项/判不出 → 默认(sales_credit)· 零倒退
         reason = _doc_sanity_reason(h, dt)
         if reason:
             sanity_failed.append(_sanity_fail_row(h, reason))

@@ -293,6 +293,37 @@ class TestRoutedBatch(unittest.TestCase):
         a.upload_routed_batch(histories, {})  # 无 own_tax → 判不出 → 落默认(不倒退)
         self.assertEqual(calls, [("sales_credit", ["P1"])])
 
+    def test_walkin_no_buyer_routed_to_sales_cash(self):
+        # 己方卖、无买方(散客现金票)→ 现金销售单 ขายเงินสด(账正,不虚挂应收)
+        a = self._adapter()
+        calls = self._stub_upload(a)
+        histories = [self._flat(seller=self.OWN, buyer="", inv="W1")]
+        a.upload_routed_batch(histories, {"_own_tax_id": self.OWN})
+        by = {dt: ids for dt, ids in calls}
+        self.assertEqual(by.get("sales_cash"), ["W1"])
+        self.assertNotIn("sales_credit", by)
+
+    def test_walkin_stays_credit_when_flag_off(self):
+        a = self._adapter()
+        calls = self._stub_upload(a)
+        histories = [self._flat(seller=self.OWN, buyer="", inv="W1")]
+        a.upload_routed_batch(
+            histories, {"_own_tax_id": self.OWN, "_mrerp_walkin_sales_cash": False}
+        )
+        by = {dt: ids for dt, ids in calls}
+        self.assertEqual(by.get("sales_credit"), ["W1"])
+        self.assertNotIn("sales_cash", by)
+
+    def test_sale_with_buyer_stays_credit(self):
+        # 有买方身份的销售 → 仍走赊销(不当散客现金处理)
+        a = self._adapter()
+        calls = self._stub_upload(a)
+        histories = [self._flat(seller=self.OWN, buyer=self.OTHER, inv="S1")]
+        a.upload_routed_batch(histories, {"_own_tax_id": self.OWN})
+        by = {dt: ids for dt, ids in calls}
+        self.assertEqual(by.get("sales_credit"), ["S1"])
+        self.assertNotIn("sales_cash", by)
+
 
 if __name__ == "__main__":
     unittest.main()

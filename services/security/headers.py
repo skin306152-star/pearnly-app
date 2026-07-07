@@ -18,7 +18,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 _ENFORCE_CSP = (
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' "
     "https://cdnjs.cloudflare.com https://static.cloudflareinsights.com; "
-    "object-src 'none'; base-uri 'self'"
+    "object-src 'none'; base-uri 'self'; report-uri /api/csp-report"
 )
 _REPORT_CSP = (
     "default-src 'self'; "
@@ -30,7 +30,8 @@ _REPORT_CSP = (
     "https://*.googleusercontent.com https://storage.googleapis.com https://www.mrerp4sme.com; "
     "connect-src 'self' https://api.line.me https://access.line.me https://static.cloudflareinsights.com; "
     "frame-src 'self' https://liff.line.me https://access.line.me; "
-    "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+    "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; "
+    "report-uri /api/csp-report"
 )
 
 

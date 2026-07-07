@@ -23,6 +23,7 @@ try:
 except ImportError:
     line_client = None  # line_client.py 不在 pearnly 仓库 · 文件需单独部署到服务器
 from routes.report_routes import router as reports_router  # v109.0
+from routes.security_routes import router as security_router  # CSP 违规上报(安全评估 2026-07-07)
 from routes.ocr_recognize_routes import (
     router as ocr_recognize_router,
 )  # REFACTOR-WB-app · 2026-06-01
@@ -265,6 +266,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Pearnly API", version="0.3.5-mvp", lifespan=lifespan)
 app.include_router(reports_router)  # v109.0
+app.include_router(security_router)  # CSP 违规上报 /api/csp-report(安全评估 2026-07-07)
 app.include_router(ocr_recognize_router)  # REFACTOR-WB-app · OCR 识别主路由(2026-06-01)
 app.include_router(signup_router)  # v109.3
 app.include_router(recon_router)  # v118.32.0 · 销项税对账

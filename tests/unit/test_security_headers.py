@@ -54,6 +54,15 @@ class SecurityHeadersMiddlewareTests(unittest.TestCase):
             resp.headers["content-security-policy-report-only"],
         )
 
+    def test_report_uri_present_in_both(self):
+        # 违规上报目标:两档都要带 report-uri,否则违规收不到、无法数据驱动升格
+        resp = _client().get("/ping")
+        self.assertIn("report-uri /api/csp-report", resp.headers["content-security-policy"])
+        self.assertIn(
+            "report-uri /api/csp-report",
+            resp.headers["content-security-policy-report-only"],
+        )
+
     def test_both_csp_disabled_when_env_empty(self):
         with patch.dict(os.environ, {"CSP_ENFORCE": "", "CONTENT_SECURITY_POLICY": ""}):
             resp = _client().get("/ping")

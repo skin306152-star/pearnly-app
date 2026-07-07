@@ -57,7 +57,8 @@ def _record_login_failure(username: str, request: Request):
     try:
         ip = request.client.host if request.client else None
         ua = request.headers.get("user-agent", "")[:200]
-        with db.get_cursor() as cur:
+        # commit=True 必需:失败记录要落库才能被 30min 窗口计数(缺它则失败永不持久 · 账号锁形同虚设)
+        with db.get_cursor(commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO login_failure_log(email_or_username, ip, user_agent)
@@ -133,9 +134,9 @@ async def login(req: LoginRequest, request: Request):
         is_super_admin=bool(user.get("is_super_admin")),
         remember_me=req.is_remember(),
     )
-    # 登录成功 · 清空失败记录
+    # 登录成功 · 清空失败记录(commit=True:清除也要落库,否则下次仍按旧失败数误锁)
     try:
-        with db.get_cursor() as cur:
+        with db.get_cursor(commit=True) as cur:
             cur.execute(
                 "DELETE FROM login_failure_log WHERE email_or_username = %s",
                 (req.username.lower().strip(),),

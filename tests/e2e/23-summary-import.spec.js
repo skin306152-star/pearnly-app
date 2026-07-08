@@ -96,4 +96,60 @@ test.describe('录入工作台 · 汇总表批量建单', () => {
 
         assertNoConsoleErrors(expect, guard);
     });
+
+    // 模式 2「没有表,直接填」:跳过上传 → 逐日 日期+数量 网格(单价固定自动算金额)→ 建单。
+    // 专测「按年月生成整月」+ 佛历日号拼日期 + qty×单价推算金额自洽,不重复模式 1 的散客断言。
+    test('直接填模式 → 逐日数量批量建单', async ({ page }) => {
+        const guard = attachConsoleGuard(page);
+        const shot = (name) =>
+            page.screenshot({ path: path.join(OUT, name + '.png'), fullPage: true });
+
+        await enterApp(page);
+        await page.evaluate(() => {
+            const g = globalThis;
+            if (typeof g.routeTo === 'function') g.routeTo('dms-intake');
+            else g.location.hash = '#/dms-intake';
+        });
+        await page.locator('.dx-opt[data-task="summary_batch"]').click();
+
+        // 切「没有表,直接填」→ 开始填写 → 逐日网格在场(不经上传/解析)。
+        await page.locator('[data-mode="manual"]').click();
+        await page.locator('#dxb-manual-start').click();
+        await expect(page.locator('.dxb-grid'), '逐日网格在场').toBeVisible();
+
+        // 批次常量:佛历年月 + 固定单价(只填数量靠它算金额)。
+        await page.locator('[data-bk="period_year"]').fill('2569'); // 佛历 → 后端转 2026
+        await page.locator('[data-bk="period_month"]').fill('6');
+        await page.locator('[data-bk="unit_price"]').fill('6.07');
+        await page.locator('[data-bk="counterparty_name"]').fill('7-11');
+        await page.locator('[data-bk="cash_walkin"]').check();
+        await page.locator('[data-bk="product_name"]').fill('น้ำแข็ง');
+        await page.locator('[data-bk="doc_no_pattern"]').fill('MAN-' + Date.now() + '-{seq}');
+
+        // 「按年月生成整月」→ 6 月应生成 30 行,填前两行数量。
+        await page.locator('#dxb-grid-genmonth').click();
+        await expect(page.locator('.dxb-gridrow:not(.dxb-gridhead)'), '生成整月 30 行').toHaveCount(
+            30
+        );
+        await page.locator('[data-grid-row="0"][data-grid-field="qty"]').fill('180');
+        await page.locator('[data-grid-row="1"][data-grid-field="qty"]').fill('210');
+        await shot('06-manual-grid');
+
+        // 预览:日号 1 + 佛历年月 → 公历 2026-06-01;180×6.07 含税 = 1169.08(金额自洽)。
+        await page.locator('#dxb-to-review').click();
+        await expect(page.locator('#dx-s-batch-review .dxb-tbl'), '预览表在场').toBeVisible();
+        const firstRow = page.locator('#dx-s-batch-review .dxb-tbl tbody tr').first();
+        await expect(firstRow, '日号+佛历年月拼成公历日期').toContainText('2026-06-01');
+        await expect(firstRow, '数量×单价含税自动算').toContainText('1169.08');
+        await shot('07-manual-preview');
+
+        // 建单:未填数量的空行不阻断整批,已填行照建。
+        await page.locator('#dxb-commit').click();
+        await expect(page.locator('#dx-s-batch-submit .dxb-stats'), '结果统计在场').toBeVisible();
+        const createdTxt = await page.locator('.dxb-stat.green b').first().innerText();
+        expect(parseInt(createdTxt, 10), '至少建成一单').toBeGreaterThan(0);
+        await shot('08-manual-result');
+
+        assertNoConsoleErrors(expect, guard);
+    });
 });

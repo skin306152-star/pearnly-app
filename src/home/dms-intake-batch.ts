@@ -180,7 +180,8 @@ export function renderBatchUpload() {
         '<div class="dx-side"><div class="dx-side-box">' +
         `<b>${esc(t('dx-side-cur'))}</b><ul>` +
         `<li>${esc(t('dxb-flow1'))}</li><li>${esc(t('dxb-flow2'))}</li><li>${esc(t('dxb-flow3'))}</li></ul></div>` +
-        `<div class="dx-side-box"><b>${esc(t('dx-side-rule'))}</b><p>${esc(t('dxb-side-tip'))}</p></div></div>` +
+        `<div class="dx-side-box"><b>${esc(t('dxb-fit-h'))}</b><p>${esc(t('dxb-side-tip'))}</p>` +
+        `<p class="dx-hint" style="margin-top:8px">${esc(t('dxb-fit-no'))}</p></div></div>` +
         '</div>' +
         '<input type="file" id="dxb-file" accept=".xlsx,.xls,.csv,.tsv" style="display:none">';
 }

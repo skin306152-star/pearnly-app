@@ -5,7 +5,7 @@
      1  static\pos\pos-cashier.js
         └ 25: $('main-avatar').style.background = c.color || '#2563EB';
      1  static\pos\pos-data.js
-        └ 338: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
+        └ 344: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
      1  static\pos\pos.js
         └ 126: const color = c.color || '#2563EB';
      1  static\admin\admin.css
@@ -15,7 +15,7 @@
      1  static\pos\pos-cashier.js
         └ 25: $('main-avatar').style.background = c.color || '#2563EB';
      1  static\pos\pos-data.js
-        └ 338: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
+        └ 344: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
      1  static\pos\pos.js
         └ 126: const color = c.color || '#2563EB';
 
@@ -108,8 +108,8 @@
 
 ## emoji当图标(应换Lucide) — 命中 207(30 文件)
     96  static\i18n-data.js
-        └ 1388: 'billing-accuracy-good': '✅ 准',
-        └ 1389: 'billing-accuracy-fair': '⚠ 一般',
+        └ 1390: 'billing-accuracy-good': '✅ 准',
+        └ 1391: 'billing-accuracy-fair': '⚠ 一般',
     35  static\erp-mrerp-connect.js
         └ 254: zh: '⚙ 高级设置(自动创建买方/商品的模板 · 可不填)',
         └ 255: en: '⚙ Advanced (templates for auto-creating buyers/products · optional)',
@@ -127,10 +127,10 @@
         └ 1893: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
      4  static\pos\pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
-        └ 269: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
+        └ 270: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
      4  static\pos\pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
-        └ 269: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
+        └ 270: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
      2  src\home\core.ts
         └ 2: // 工具(t/escapeHtml/svgIcon)+ Session 被踢弹窗(🔴)+ 鉴权 API(🔴铁律#26)+ plan 上限 helper。
      2  static\pos\pos-restaurant-ops.js
@@ -416,8 +416,8 @@
 
 ## i18n原始键残留 — 命中 24(2 文件)
     20  static\i18n-data.js
-        └ 1196: 'time-min-ago-suffix': ' 分钟前',
-        └ 1197: 'time-hour-ago-suffix': ' 小时前',
+        └ 1198: 'time-min-ago-suffix': ' 分钟前',
+        └ 1199: 'time-hour-ago-suffix': ' 小时前',
      4  static\admin\admin-i18n.js
         └ 336: 'time-hours-ago': '{n} 小时前',
         └ 337: 'time-days-ago': '{n} 天前',

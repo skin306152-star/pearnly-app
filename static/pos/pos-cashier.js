@@ -372,6 +372,12 @@
                 })
         );
     }
+    // 绑定 3×4 数字键盘(收款/数量共用):点键 → fn(data-key)。两处键盘同一 data-key 约定,免属性名分叉。
+    function bindKeypad(id, fn) {
+        $(id)
+            .querySelectorAll('.key')
+            .forEach((b) => b.addEventListener('click', () => fn(b.dataset.key)));
+    }
     function keyPress(k) {
         let s = String(tendered);
         if (k === 'back') s = s.slice(0, -1) || '0';
@@ -780,13 +786,9 @@
         document
             .querySelectorAll('#pay-mask .pm')
             .forEach((el) => el.addEventListener('click', () => setPm(el.dataset.pm)));
-        $('pay-keypad')
-            .querySelectorAll('.key')
-            .forEach((b) => b.addEventListener('click', () => keyPress(b.dataset.key)));
+        bindKeypad('pay-keypad', keyPress);
         // 数量键盘弹窗:点键累加(主路径·不靠物理键盘)+ 关闭/确定 + 背景点击关。
-        $('qty-keypad')
-            .querySelectorAll('.key')
-            .forEach((b) => b.addEventListener('click', () => qtyKey(b.dataset.qk)));
+        bindKeypad('qty-keypad', qtyKey);
         $('qty-close-btn').addEventListener('click', closeQtyPad);
         $('qty-confirm').addEventListener('click', confirmQtyPad);
         $('qty-mask').addEventListener('click', (e) => {

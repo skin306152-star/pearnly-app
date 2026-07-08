@@ -104,10 +104,10 @@ async def api_bootstrap(request: Request, workspace_client_id: Optional[int] = Q
 
 @router.get("/payment-methods")
 async def api_payment_methods(request: Request, workspace_client_id: Optional[int] = Query(None)):
-    """收银台轻量拉收款设置(显隐开关 + 银行/PromptPay 信息)。
+    """收银台轻量拉收款设置(与 bootstrap.payment 同一份 get_settings · 不投影)。
 
-    老板在别处改了收款方式后,已开着的收银台回到前台时用它同步 —— 不重拉整包 bootstrap
-    (那含全量商品)。收银员 token 可读(与 bootstrap 同鉴权),不是老板专属的 admin 配置口。
+    老板在别处改收款方式后,已开着的收银台回前台用它同步(走轻量口而非重拉整包 bootstrap)。
+    收银员 token 可读(同 bootstrap 鉴权),非 admin 口;返回的银行/PromptPay 是结账给顾客核对的。
     """
     from services.pos import payment_settings as pay_settings
 

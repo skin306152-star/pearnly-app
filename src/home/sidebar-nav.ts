@@ -43,7 +43,18 @@ document.querySelectorAll<HTMLElement>('.nav-item').forEach((item) => {
             return;
         }
         // POS · 跨 SPA 入口(切到收银台 → 独立 /pos · 整页跳转,非 hash 路由)
+        // 先清设备绑定(pos_store_*),否则 /pos 优先认旧设备绑定,盖过老板当前选的套账。
         if (item.dataset.href) {
+            if (item.id === 'nav-pos-switch') {
+                try {
+                    localStorage.removeItem('pos_store_token');
+                    localStorage.removeItem('pos_store_ws');
+                    localStorage.removeItem('pos_store_name');
+                    localStorage.removeItem('pos_store_addr');
+                } catch (_) {
+                    /* no-op */
+                }
+            }
             window.location.href = item.dataset.href;
             return;
         }

@@ -35,8 +35,8 @@ def _owner_ctx(request: Request, ws_override: Optional[int]) -> tuple[str, int]:
 
 class SheetsSettings(BaseModel):
     workspace_client_id: Optional[int] = None
-    spreadsheet_id: str = ""
     enabled: bool = False
+    lang: str = "th"
 
 
 @router.get("/sheets-settings")
@@ -54,6 +54,7 @@ async def api_get_sheets_settings(
             **settings,
             "connected": bool(cred),
             "email": (cred or {}).get("google_email") or "",
+            "sheet_url": svc.sheet_url(settings["spreadsheet_id"]),
         }
     )
 
@@ -64,12 +65,9 @@ async def api_save_sheets_settings(req: SheetsSettings, request: Request):
     with db.get_cursor_rls(tid, commit=True) as cur:
         assert_module_enabled(cur, tid, "pos")
         require_workspace(cur, tid, ws)
-        return ok(
-            svc.save_settings(
-                cur,
-                tenant_id=tid,
-                workspace_client_id=ws,
-                spreadsheet_id=req.spreadsheet_id,
-                enabled=req.enabled,
-            )
+        settings = (
+            svc.ensure_target_sheet(cur, tenant_id=tid, workspace_client_id=ws, lang=req.lang)
+            if req.enabled
+            else svc.set_enabled(cur, tenant_id=tid, workspace_client_id=ws, enabled=False)
         )
+        return ok({**settings, "sheet_url": svc.sheet_url(settings["spreadsheet_id"])})

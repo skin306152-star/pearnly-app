@@ -108,6 +108,7 @@ class GetRouteTests(unittest.IsolatedAsyncioTestCase):
                 "enabled": True,
                 "connected": True,
                 "email": "a@b.com",
+                "sheet_url": "https://docs.google.com/spreadsheets/d/SS1/edit",
             },
         )
 
@@ -134,6 +135,96 @@ class GetRouteTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(body["data"]["connected"])
         self.assertEqual(body["data"]["email"], "")
+
+
+class PutRouteTests(unittest.IsolatedAsyncioTestCase):
+    async def test_enable_calls_ensure_target_sheet_with_lang(self):
+        from routes import pos_sheets_routes as psr
+
+        with (
+            patch.object(
+                psr,
+                "require_perm_pos",
+                return_value={"tenant_id": "t-1", "workspace_client_id": 7},
+            ),
+            patch.object(psr.db, "get_cursor_rls", return_value=_CursorCtx()),
+            patch.object(psr, "assert_module_enabled"),
+            patch.object(psr, "require_workspace"),
+            patch.object(
+                psr.svc,
+                "ensure_target_sheet",
+                return_value={
+                    "spreadsheet_id": "SS2",
+                    "tab_name": "POS",
+                    "enabled": True,
+                    "header_lang": "zh",
+                },
+            ) as ensure_mock,
+        ):
+            body = await psr.api_save_sheets_settings(
+                psr.SheetsSettings(workspace_client_id=7, enabled=True, lang="zh"), _request()
+            )
+
+        ensure_mock.assert_called_once_with(
+            unittest.mock.ANY, tenant_id="t-1", workspace_client_id=7, lang="zh"
+        )
+        self.assertEqual(
+            body["data"]["sheet_url"], "https://docs.google.com/spreadsheets/d/SS2/edit"
+        )
+
+    async def test_disable_calls_set_enabled_not_ensure(self):
+        from routes import pos_sheets_routes as psr
+
+        with (
+            patch.object(
+                psr,
+                "require_perm_pos",
+                return_value={"tenant_id": "t-1", "workspace_client_id": 7},
+            ),
+            patch.object(psr.db, "get_cursor_rls", return_value=_CursorCtx()),
+            patch.object(psr, "assert_module_enabled"),
+            patch.object(psr, "require_workspace"),
+            patch.object(psr, "svc") as svc_mock,
+        ):
+            svc_mock.set_enabled.return_value = {
+                "spreadsheet_id": "SS1",
+                "tab_name": "POS",
+                "enabled": False,
+                "header_lang": "th",
+            }
+            svc_mock.sheet_url.return_value = "https://docs.google.com/spreadsheets/d/SS1/edit"
+            await psr.api_save_sheets_settings(
+                psr.SheetsSettings(workspace_client_id=7, enabled=False), _request()
+            )
+
+        svc_mock.set_enabled.assert_called_once_with(
+            unittest.mock.ANY, tenant_id="t-1", workspace_client_id=7, enabled=False
+        )
+        svc_mock.ensure_target_sheet.assert_not_called()
+
+    async def test_not_connected_surfaces_pos_error(self):
+        from core.pos_api import PosError
+        from routes import pos_sheets_routes as psr
+
+        with (
+            patch.object(
+                psr,
+                "require_perm_pos",
+                return_value={"tenant_id": "t-1", "workspace_client_id": 7},
+            ),
+            patch.object(psr.db, "get_cursor_rls", return_value=_CursorCtx()),
+            patch.object(psr, "assert_module_enabled"),
+            patch.object(psr, "require_workspace"),
+            patch.object(
+                psr.svc,
+                "ensure_target_sheet",
+                side_effect=PosError("pos.google_not_connected", 400),
+            ),
+        ):
+            with self.assertRaises(PosError):
+                await psr.api_save_sheets_settings(
+                    psr.SheetsSettings(workspace_client_id=7, enabled=True), _request()
+                )
 
 
 if __name__ == "__main__":

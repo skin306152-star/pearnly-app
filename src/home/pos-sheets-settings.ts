@@ -12,6 +12,7 @@ interface SheetsSettings {
     enabled: boolean;
     connected: boolean;
     email: string;
+    sheet_url: string;
 }
 
 const URL = '/api/pos/admin/sheets-settings';
@@ -55,10 +56,8 @@ const STYLE = `
 .rsheet .gst .em{color:var(--ink2);font-size:12.5px;}
 .rsheet .ig-btn{height:36px;padding:0 16px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:13px;font-weight:600;cursor:pointer;}
 .rsheet .ig-btn.pri{background:var(--btn-blue,var(--accent));color:var(--accent-ink);border:0;}
-.rsheet label{display:block;font-size:12px;color:var(--ink2);margin:14px 0 6px;}
-.rsheet .fld{height:44px;border:1px solid var(--line);border-radius:10px;padding:0 13px;display:flex;align-items:center;background:var(--line2);}
-.rsheet .fld input{border:0;outline:0;background:transparent;flex:1;font-size:14.5px;color:var(--ink);}
 .rsheet .hint{font-size:11.5px;color:var(--ink3);margin-top:6px;line-height:1.5;}
+.rsheet .hint a{color:var(--btn-blue,var(--accent));font-weight:600;text-decoration:none;}
 .rsheet .row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;}
 .rsheet .row .n{font-size:14px;font-weight:600;color:var(--ink);}
 .rsheet .sw{width:44px;height:25px;border-radius:999px;flex:0 0 44px;position:relative;cursor:pointer;transition:.15s;background:var(--line);}
@@ -97,13 +96,14 @@ function render(s: SheetsSettings): void {
     const actBtn = s.connected
         ? `<button class="ig-btn" id="rsheet-disconnect">${escapeHtml(t('int-google-disconnect'))}</button>`
         : `<button class="ig-btn pri" id="rsheet-connect">${escapeHtml(t('int-google-connect'))}</button>`;
+    const sheetLink = s.spreadsheet_id
+        ? `<div class="hint">${escapeHtml(t('psheet.sheet_ready'))} <a href="${escapeHtml(s.sheet_url)}" target="_blank" rel="noopener">${escapeHtml(t('psheet.open_sheet'))}</a></div>`
+        : `<div class="hint">${escapeHtml(t('psheet.auto_create_hint'))}</div>`;
     body.innerHTML = `<div class="card">
         <div class="gst">${gst}</div>
         <div class="hint">${escapeHtml(t('psheet.connect_hint'))}</div>
         ${actBtn}
-        <label>${escapeHtml(t('psheet.sheet_id'))}</label>
-        <div class="fld"><input id="rsheet-id" value="${escapeHtml(s.spreadsheet_id)}" placeholder="${escapeHtml(t('psheet.sheet_id_ph'))}"></div>
-        <div class="hint">${escapeHtml(t('psheet.sheet_id_hint'))}</div>
+        ${sheetLink}
         <div class="row"><div class="n">${escapeHtml(t('psheet.enabled'))}</div><div class="sw${s.enabled ? ' on' : ''}" id="rsheet-toggle"></div></div>
         </div>
         <button class="save" id="rsheet-save">${escapeHtml(t('rpay.save'))}</button>`;
@@ -154,10 +154,10 @@ async function save(): Promise<void> {
     const btn = document.getElementById('rsheet-save') as HTMLButtonElement;
     btn.disabled = true;
     const enabled = !!document.getElementById('rsheet-toggle')?.classList.contains('on');
-    const spreadsheet_id =
-        (document.getElementById('rsheet-id') as HTMLInputElement | null)?.value || '';
+    // 表头语言 = 当下老板后台界面语言(建表那一刻定死,后续追加沿用,不随收银员当下语言漂移)。
+    const lang = window._currentLang || 'th';
     try {
-        await call('PUT', { workspace_client_id: ws, spreadsheet_id, enabled });
+        await call('PUT', { workspace_client_id: ws, enabled, lang });
         // PUT 只回业务字段(spreadsheet_id/tab_name/enabled)不带 connected/email → 重新拉一次取真连接态。
         await load();
         showToast(t('rpay.saved'), 'success');

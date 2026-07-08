@@ -48,26 +48,36 @@ class GetSaveSettingsTests(unittest.TestCase):
     def test_defaults_when_no_row(self):
         cur = FakeCursor([None])
         out = svc.get_settings(cur, tenant_id="t-1", workspace_client_id=7)
-        self.assertEqual(out, {"spreadsheet_id": "", "tab_name": "POS", "enabled": False})
+        self.assertEqual(
+            out, {"spreadsheet_id": "", "tab_name": "POS", "enabled": False, "header_lang": "th"}
+        )
 
     def test_reads_explicit_row(self):
-        cur = FakeCursor([{"spreadsheet_id": "SS1", "tab_name": "Sales", "enabled": True}])
+        cur = FakeCursor(
+            [{"spreadsheet_id": "SS1", "tab_name": "Sales", "enabled": True, "header_lang": "en"}]
+        )
         out = svc.get_settings(cur, tenant_id="t-1", workspace_client_id=7)
-        self.assertEqual(out, {"spreadsheet_id": "SS1", "tab_name": "Sales", "enabled": True})
+        self.assertEqual(
+            out,
+            {"spreadsheet_id": "SS1", "tab_name": "Sales", "enabled": True, "header_lang": "en"},
+        )
 
     def test_save_extracts_id_and_upserts(self):
         # save_settings 末尾调 get_settings 回读 → 备第二次 fetchone
-        cur = FakeCursor([{"spreadsheet_id": "SS1", "tab_name": "POS", "enabled": True}])
+        cur = FakeCursor(
+            [{"spreadsheet_id": "SS1", "tab_name": "POS", "enabled": True, "header_lang": "zh"}]
+        )
         svc.save_settings(
             cur,
             tenant_id="t-1",
             workspace_client_id=7,
             spreadsheet_id="https://docs.google.com/spreadsheets/d/SS1/edit",
             enabled=True,
+            header_lang="zh",
         )
         upsert = cur.calls[0]
         self.assertIn("INSERT INTO pos_sheets_settings", upsert[0])
-        self.assertEqual(upsert[1], ("t-1", 7, "SS1", True))
+        self.assertEqual(upsert[1], ("t-1", 7, "SS1", True, "zh"))
 
     def test_save_blank_id_stores_null(self):
         cur = FakeCursor([None])
@@ -75,40 +85,47 @@ class GetSaveSettingsTests(unittest.TestCase):
             cur, tenant_id="t-1", workspace_client_id=7, spreadsheet_id="", enabled=False
         )
         upsert = cur.calls[0]
-        self.assertEqual(upsert[1], ("t-1", 7, None, False))
+        self.assertEqual(upsert[1], ("t-1", 7, None, False, "th"))
 
 
 class SyncSaleTests(unittest.TestCase):
     def _cur(self, settings_row):
         return FakeCursor([settings_row])
 
+    _SETTINGS_OFF = {
+        "spreadsheet_id": "SS1",
+        "tab_name": "POS",
+        "enabled": False,
+        "header_lang": "th",
+    }
+    _SETTINGS_NO_SHEET = {
+        "spreadsheet_id": "",
+        "tab_name": "POS",
+        "enabled": True,
+        "header_lang": "th",
+    }
+    _SETTINGS_ON = {
+        "spreadsheet_id": "SS1",
+        "tab_name": "POS",
+        "enabled": True,
+        "header_lang": "zh",
+    }
+
     def test_disabled_is_noop(self):
-        cur = self._cur({"spreadsheet_id": "SS1", "tab_name": "POS", "enabled": False})
-        with patch.object(
-            svc,
-            "get_settings",
-            return_value={"spreadsheet_id": "SS1", "tab_name": "POS", "enabled": False},
-        ):
+        cur = self._cur(self._SETTINGS_OFF)
+        with patch.object(svc, "get_settings", return_value=self._SETTINGS_OFF):
             with patch("services.export.google_oauth.valid_access_token") as tok:
                 svc.sync_sale(cur, tenant_id="t-1", workspace_client_id=7, sale_id="s1")
                 tok.assert_not_called()
 
     def test_no_spreadsheet_configured_is_noop(self):
-        with patch.object(
-            svc,
-            "get_settings",
-            return_value={"spreadsheet_id": "", "tab_name": "POS", "enabled": True},
-        ):
+        with patch.object(svc, "get_settings", return_value=self._SETTINGS_NO_SHEET):
             with patch("services.export.google_oauth.valid_access_token") as tok:
                 svc.sync_sale(FakeCursor(), tenant_id="t-1", workspace_client_id=7, sale_id="s1")
                 tok.assert_not_called()
 
     def test_no_google_token_is_noop_not_error(self):
-        with patch.object(
-            svc,
-            "get_settings",
-            return_value={"spreadsheet_id": "SS1", "tab_name": "POS", "enabled": True},
-        ):
+        with patch.object(svc, "get_settings", return_value=self._SETTINGS_ON):
             with patch("services.export.google_oauth.valid_access_token", return_value=None):
                 with patch("services.export.sheets.SheetsClient") as client_cls:
                     svc.sync_sale(
@@ -117,23 +134,27 @@ class SyncSaleTests(unittest.TestCase):
                     client_cls.assert_not_called()
 
     def test_configured_and_connected_appends_row(self):
-        # sync_sale 直查行项(cur.execute+fetchall);sale 头/payments 走 sales_store(下方 mock)。
+        # sync_sale 直查行项(cur.execute+fetchall) + 收银员姓名(cur.execute+fetchone);
+        # sale 头/payments 走 sales_store(下方 mock)。
         sale_cur = FakeCursor(
+            fetch_queue=[{"display_name": "Earn"}],
             fetchall_queue=[[{"qty": Decimal("1"), "name_th": "บลัชออน", "name_en": "Blush"}]],
         )
         with (
-            patch.object(
-                svc,
-                "get_settings",
-                return_value={"spreadsheet_id": "SS1", "tab_name": "POS", "enabled": True},
-            ),
+            patch.object(svc, "get_settings", return_value=self._SETTINGS_ON),
             patch("services.export.google_oauth.valid_access_token", return_value="TOKEN"),
             patch(
                 "services.pos.sales_store.get_sale",
                 return_value={
                     "id": "s1",
                     "receipt_no": "R001",
+                    "cashier_id": "c1",
+                    "subtotal": Decimal("271.03"),
+                    "discount_total": Decimal("0"),
+                    "vat_amount": Decimal("18.97"),
                     "grand_total": Decimal("290.00"),
+                    "paid_total": Decimal("300.00"),
+                    "change_amount": Decimal("10.00"),
                     "sold_at": None,
                 },
             ),
@@ -153,8 +174,9 @@ class SyncSaleTests(unittest.TestCase):
         self.assertEqual(args[1], "POS")
         row = args[2]
         self.assertEqual(row[0], "R001")
-        self.assertIn("บลัชออน x1", row[2])
-        self.assertEqual(row[4], "transfer")
+        self.assertEqual(row[3], "Earn")
+        self.assertIn("บลัชออน x1", row[4])
+        self.assertEqual(row[10], "银行转账")  # header_lang=zh → 中文付款方式标签
 
     def test_exception_anywhere_is_swallowed(self):
         with patch.object(svc, "get_settings", side_effect=RuntimeError("boom")):

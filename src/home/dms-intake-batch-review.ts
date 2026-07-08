@@ -104,12 +104,17 @@ function render() {
     const head =
         '<tr>' +
         `<th>${esc(t('dxb-th-docno'))}</th><th>${esc(t('dxb-th-date'))}</th>` +
-        `<th>${esc(t('dxb-th-party'))}</th><th>${esc(t('dxb-th-total'))}</th>` +
+        `<th>${esc(t('dxb-th-party'))}</th><th class="dxb-num">${esc(t('dxb-th-total'))}</th>` +
         `<th>${esc(t('dxb-th-route'))}</th><th>${esc(t('dxb-th-check'))}</th></tr>`;
+    // 固定列宽:短列收窄,徽章列(方向/落点、检查)多分位置,消掉右侧空白。
+    const cols =
+        '<colgroup>' +
+        '<col style="width:15%"><col style="width:11%"><col style="width:15%">' +
+        '<col style="width:13%"><col style="width:27%"><col style="width:19%"></colgroup>';
     const canCommit = d.total - d.blocked_count > 0;
     el.innerHTML =
         summaryHtml(d) +
-        `<div class="dxb-tblwrap"><table class="dxb-tbl"><thead>${head}</thead><tbody>` +
+        `<div class="dxb-tblwrap"><table class="dxb-tbl">${cols}<thead>${head}</thead><tbody>` +
         d.preview.map(rowHtml).join('') +
         '</tbody></table></div>' +
         '<div class="dx-actions" style="margin-top:14px">' +

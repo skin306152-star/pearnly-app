@@ -434,11 +434,13 @@
 .dmsx .dx-banner.amber{background:var(--dx-amber-soft);color:var(--dx-amber);border:1px solid var(--dx-amber-line)}
 .dmsx .dx-badge.red{background:var(--dx-red-soft);color:var(--dx-red)}
 .dmsx .dxb-tblwrap{overflow-x:auto;border:1px solid var(--dx-line);border-radius:12px}
-.dmsx .dxb-tbl{width:100%;border-collapse:collapse;font-size:11px;min-width:560px}
+.dmsx .dxb-tbl{width:100%;border-collapse:collapse;font-size:11px;min-width:620px;table-layout:fixed}
 .dmsx .dxb-tbl th{text-align:left;padding:9px 10px;background:var(--bg);color:var(--dx-muted);font-weight:800;white-space:nowrap;border-bottom:1px solid var(--dx-line)}
-.dmsx .dxb-tbl td{padding:9px 10px;border-bottom:1px solid var(--dx-line);vertical-align:middle}
+.dmsx .dxb-tbl td{padding:9px 10px;border-bottom:1px solid var(--dx-line);vertical-align:middle;overflow:hidden;text-overflow:ellipsis}
 .dmsx .dxb-tbl tr:last-child td{border-bottom:none}
+.dmsx .dxb-tbl th.dxb-num{text-align:right}
 .dmsx .dxb-tbl .dxb-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dmsx .dxb-tbl td .dx-badge{white-space:nowrap}
 .dmsx .dxb-tbl tr.dxb-blocked{background:var(--dx-red-soft)}
 .dmsx .dxb-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
 .dmsx .dxb-stat{border:1px solid var(--dx-line);border-radius:12px;padding:12px;text-align:center}

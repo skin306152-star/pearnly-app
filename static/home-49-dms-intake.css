@@ -401,8 +401,27 @@
 /* 汇总表批量建单(第三任务)· 列映射 / 批次常量表单 / 预览表 / 结果 */
 .dmsx .dx-inp{width:100%;border:1px solid var(--dx-line);border-radius:9px;background:var(--card);color:var(--dx-text);font-size:12px;padding:8px 10px}
 .dmsx .dx-inp:focus{outline:none;border-color:var(--dx-brand)}
-.dmsx .dx-map-row{display:grid;grid-template-columns:110px 1fr;gap:10px;align-items:center;margin-bottom:9px}
+.dmsx .dx-map-row{display:grid;grid-template-columns:1fr auto minmax(0,1.3fr);gap:9px;align-items:center;margin-bottom:0}
 .dmsx .dx-map-k{font-size:11px;color:var(--dx-muted)}
+.dmsx .dx-map-arrow{color:var(--ink2);font-size:12px}
+.dmsx .dxb-step2{display:flex;flex-direction:column;gap:14px}
+.dmsx .dx-mapgrid{display:grid;grid-template-columns:1fr 1fr;gap:11px 22px}
+.dmsx .dx-fillgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px 20px}
+.dmsx .dx-chk-row{grid-column:1/-1;padding:2px 0}
+.dmsx .dx-chk-row .dx-hint{margin-top:3px;margin-left:23px}
+@media(max-width:760px){.dmsx .dx-mapgrid,.dmsx .dx-fillgrid{grid-template-columns:1fr}}
+.dmsx .dxb-modes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.dmsx .dxb-mode{text-align:left;border:1px solid var(--dx-line);border-radius:12px;background:var(--card);padding:11px 13px;cursor:pointer;display:flex;flex-direction:column;gap:3px}
+.dmsx .dxb-mode b{font-size:12px;color:var(--dx-text)}
+.dmsx .dxb-mode span{font-size:10px;color:var(--ink2);line-height:1.4}
+.dmsx .dxb-mode.active{border-color:var(--dx-brand);box-shadow:0 0 0 2px color-mix(in srgb,var(--dx-brand) 22%,transparent)}
+.dmsx .dxb-gridhead{color:var(--dx-muted);font-size:10px;font-weight:700}
+.dmsx .dxb-gridrow{display:grid;grid-template-columns:26px 1fr 1fr 30px;gap:8px;align-items:center;margin-bottom:7px}
+.dmsx .dxb-gno{font-size:11px;color:var(--ink2);text-align:center}
+.dmsx .dxb-gdel{border:none;background:transparent;color:var(--ink2);font-size:17px;line-height:1;cursor:pointer;border-radius:6px}
+.dmsx .dxb-gdel:hover{color:var(--dx-red);background:color-mix(in srgb,var(--dx-red) 12%,transparent)}
+.dmsx .dxb-grid{max-height:340px;overflow-y:auto}
+@media(max-width:760px){.dmsx .dxb-modes{grid-template-columns:1fr}}
 .dmsx .dx-fld{margin-bottom:11px}
 .dmsx .dx-fld label{display:block;font-size:11px;color:var(--dx-muted);margin-bottom:5px}
 .dmsx .dx-req{color:var(--dx-red);font-weight:900}

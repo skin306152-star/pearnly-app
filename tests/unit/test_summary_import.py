@@ -170,6 +170,33 @@ class CommitHelperTests(unittest.TestCase):
         self.assertNotIn("_direction", cleaned)
 
 
+class AmountDerivationTests(unittest.TestCase):
+    """只填数量 + 固定单价 → 金额自动算(直接填模式 / 汇总表只有数量列)。"""
+
+    def test_qty_times_fixed_price(self):
+        parsed = {"rows": [{"index": 0, "cells": ["2026-06-01", "100"], "is_summary": False}]}
+        consts = _sales_constants(cash_walkin=True, unit_price="6.50")
+        mapped = mapping_svc.map_rows(
+            parsed, column_map={"date": 0, "qty": 1}, constants=consts, workspace=_WORKSPACE
+        )
+        f = mapped[0]["fields"]
+        self.assertEqual(f["subtotal"], "650.00")  # 100 × 6.50
+        self.assertEqual(f["vat"], "45.50")  # 650 × 7%
+        self.assertEqual(f["total_amount"], "695.50")
+        judged = judge_svc.judge_rows(mapped, own_tax_id=_OWN_TAX, dup_doc_nos=[])
+        self.assertFalse(judged[0]["blocked"])  # 金额自洽 → 不阻断
+
+    def test_sheet_amounts_win_over_derivation(self):
+        # 表里已给金额 → 用表里的,不重算。
+        mapped = mapping_svc.map_rows(
+            parse_svc.parse_table(_CSV, "s.csv"),
+            column_map=_COLMAP,
+            constants=_sales_constants(unit_price="999"),
+            workspace=_WORKSPACE,
+        )
+        self.assertEqual(mapped[0]["fields"]["total_amount"], "649.49")  # 取表内,非 100×999
+
+
 class DateResolutionTests(unittest.TestCase):
     """真实泰国汇总表日期:佛历年 / 只有日号 / DD/MM/YYYY。"""
 

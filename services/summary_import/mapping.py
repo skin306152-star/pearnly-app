@@ -89,19 +89,65 @@ def _assign_parties(
     fields["customer_tax"] = buyer["tax"]
 
 
-def _line_item(
-    constants: Dict[str, Any], cells: List[str], column_map: Dict[str, Any]
+def _num(v: Any):
+    from decimal import Decimal, InvalidOperation
+
+    try:
+        s = str(v).replace(",", "").strip()
+        return Decimal(s) if s else None
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _unit_price(constants: Dict[str, Any], cells: List[str], column_map: Dict[str, Any]):
+    """单价:批次常量优先(单一单价场景),否则取映射列。"""
+    return _num(constants.get("unit_price")) or _num(_col_value(cells, column_map, "unit_price"))
+
+
+def _derive_amounts(
+    cells: List[str], column_map: Dict[str, Any], constants: Dict[str, Any], has_vat: Any
 ) -> Dict[str, str]:
-    """单行商品明细。商品名整批常量优先,否则取映射列;编码整批常量(空→ERP 自建)。"""
+    """金额三态:表里有就用;只给数量+固定单价则自动算(税前=量×价,税=税前×7%,总额=税前+税)。
+
+    「不手打、只填数量」的核心:汇总表/直接填模式都可能只有数量,金额由此推出,保证自洽过 amounts() 闸。
+    """
+    from decimal import Decimal
+
+    def q2(x):
+        return x.quantize(Decimal("0.01")) if x is not None else None
+
+    def s(x):
+        return format(q2(x), "f") if x is not None else ""
+
+    sub = _num(_col_value(cells, column_map, "subtotal"))
+    vat = _num(_col_value(cells, column_map, "vat"))
+    tot = _num(_col_value(cells, column_map, "total_amount"))
+    qty = _num(_col_value(cells, column_map, "qty"))
+    price = _unit_price(constants, cells, column_map)
+
+    if sub is None and qty is not None and price is not None:
+        sub = q2(qty * price)
+    if vat is None and sub is not None:
+        vat = q2(sub * Decimal("0.07")) if has_vat is not False else Decimal("0")
+    if tot is None and sub is not None:
+        tot = q2(sub + (vat or Decimal("0")))
+    return {"subtotal": s(sub), "vat": s(vat), "total_amount": s(tot)}
+
+
+def _line_item(
+    constants: Dict[str, Any], cells: List[str], column_map: Dict[str, Any], subtotal: str
+) -> Dict[str, str]:
+    """单行商品明细。商品名整批常量优先,否则取映射列;编码整批常量(空→ERP 自建);金额取推算后税前。"""
     name = str(constants.get("product_name") or "").strip() or _col_value(
         cells, column_map, "item_name"
     )
+    price = _unit_price(constants, cells, column_map)
     return {
         "name": name,
         "code": str(constants.get("product_code") or "").strip(),
         "qty": _col_value(cells, column_map, "qty"),
-        "price": _col_value(cells, column_map, "unit_price"),
-        "subtotal": _col_value(cells, column_map, "subtotal"),
+        "price": format(price, "f") if price is not None else "",
+        "subtotal": subtotal,
     }
 
 
@@ -122,7 +168,8 @@ def build_row_fields(
     has_vat = constants.get("has_vat")
     payment_method = str(constants.get("payment_method") or "").strip()
 
-    item = _line_item(constants, cells, column_map)
+    amounts = _derive_amounts(cells, column_map, constants, has_vat)
+    item = _line_item(constants, cells, column_map, amounts["subtotal"])
     # 日期归一:完整日期直接用(佛历转公历);只有日号→配批次年月拼完整日期;认不出留原值(判定层报 bad_date)。
     raw_date = _col_value(cells, column_map, "date")
     date = resolve_date(raw_date, _period(constants)) or raw_date
@@ -132,9 +179,9 @@ def build_row_fields(
             str(constants.get("doc_no_pattern") or ""), index, len(str(row_count))
         ),
         "date": date,
-        "subtotal": _col_value(cells, column_map, "subtotal"),
-        "vat": _col_value(cells, column_map, "vat"),
-        "total_amount": _col_value(cells, column_map, "total_amount"),
+        "subtotal": amounts["subtotal"],
+        "vat": amounts["vat"],
+        "total_amount": amounts["total_amount"],
         "payment_method": payment_method,
         "items": (
             [{k: item[k] for k in ("name", "qty", "price", "subtotal")}] if item["name"] else []

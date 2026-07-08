@@ -110,14 +110,20 @@ def _deduct_non_batch(
         batch_id=None,
     )
     loose_qty = Decimal(str(loose["qty_on_hand"])) if loose else Decimal("0")
-    take_loose = need if need < loose_qty else loose_qty
-    alloc = fefo.select_batches_for_outflow(
-        cur,
-        tenant_id=tenant_id,
-        workspace_client_id=workspace_client_id,
-        product_id=product_id,
-        warehouse_id=warehouse_id,
-        qty_needed=need - take_loose,
+    take_loose = min(need, loose_qty)
+    remainder = need - take_loose
+    # 散装已够整行时不必再查批次(省热路径一次 DB 往返 · 非批次品的常态)。
+    alloc = (
+        fefo.select_batches_for_outflow(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            product_id=product_id,
+            warehouse_id=warehouse_id,
+            qty_needed=remainder,
+        )
+        if remainder > 0
+        else {"allocations": [], "shortfall": Decimal("0")}
     )
     if alloc["shortfall"] > 0:
         raise PosError("pos.out_of_stock", 409, detail=str(product_id))

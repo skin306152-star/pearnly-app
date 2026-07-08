@@ -15,20 +15,21 @@ from services.pos import stock
 
 
 def _sell(qty, *, loose, alloc, shortfall=Decimal("0")):
-    """跑一次非批次卖出,返回记录到的 apply_movement 调用列表 [(batch_id, qty_delta)]。"""
+    """跑一次非批次卖出,返回 (apply_movement 调用列表 [(batch_id, qty_delta)], fefo 查询次数)。"""
     loose_row = {"qty_on_hand": Decimal(str(loose))} if loose is not None else None
     moves = []
+    fefo_calls = []
 
     def _rec(cur, **kw):
         moves.append((kw["batch_id"], kw["qty_delta"]))
 
+    def _fefo(cur, **kw):
+        fefo_calls.append(kw)
+        return {"allocations": list(alloc), "shortfall": Decimal(str(shortfall))}
+
     with (
         mock.patch.object(stock.inv_store, "get_stock_for_update", return_value=loose_row),
-        mock.patch.object(
-            stock.fefo,
-            "select_batches_for_outflow",
-            return_value={"allocations": list(alloc), "shortfall": Decimal(str(shortfall))},
-        ),
+        mock.patch.object(stock.fefo, "select_batches_for_outflow", side_effect=_fefo),
         mock.patch.object(stock.ledger, "apply_movement", side_effect=_rec),
     ):
         stock.deduct_for_sale(
@@ -42,22 +43,24 @@ def _sell(qty, *, loose, alloc, shortfall=Decimal("0")):
             explicit_batch_id=None,
             sale_id="s1",
         )
-    return moves
+    return moves, len(fefo_calls)
 
 
 class NonBatchPoolTests(unittest.TestCase):
     def test_stranded_batch_stock_sells_via_fefo(self):
         # metta 复现:散装 0,货全在批次行 → 卖 3 全从批次扣,不报库存不足
-        moves = _sell(3, loose=0, alloc=[{"batch_id": "b1", "qty": Decimal("3")}])
+        moves, _ = _sell(3, loose=0, alloc=[{"batch_id": "b1", "qty": Decimal("3")}])
         self.assertEqual(moves, [("b1", Decimal("-3"))])
 
-    def test_loose_covers_no_batch_touch(self):
-        moves = _sell(3, loose=10, alloc=[])
+    def test_loose_covers_skips_batch_query(self):
+        # 散装够整行 → 不再查批次(短路省一次 DB 往返)
+        moves, fefo_n = _sell(3, loose=10, alloc=[])
         self.assertEqual(moves, [(None, Decimal("-3"))])
+        self.assertEqual(fefo_n, 0)
 
     def test_mixed_loose_first_then_fefo(self):
         # 散装 2 + 批次补 3 = 5
-        moves = _sell(5, loose=2, alloc=[{"batch_id": "b1", "qty": Decimal("3")}])
+        moves, _ = _sell(5, loose=2, alloc=[{"batch_id": "b1", "qty": Decimal("3")}])
         self.assertEqual(moves, [(None, Decimal("-2")), ("b1", Decimal("-3"))])
 
     def test_total_short_raises_before_any_move(self):

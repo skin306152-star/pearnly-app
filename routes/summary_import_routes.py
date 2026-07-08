@@ -3,9 +3,9 @@
 
 parse    上传 xlsx/csv → 表头 + 行(供列映射)
 validate 列映射 + 批次常量 → 逐行方向/落点判定 + 缺字段警告(前端预览据此,不前端假装判定)
-commit   同一入参 + 已确认 → 逐行建账本草稿 + 写 ocr_history(可推 ERP)
+commit   同一入参 + 已确认 → 逐行写 ocr_history(推 ERP 记账料;不建账本/发票草稿)
 
-薄层:auth → 套账解析(purchase_common 同款)→ 调 services/summary_import。判定/建单逻辑全在服务层。
+薄层:auth → 套账解析(purchase_common 同款)→ 调 services/summary_import。判定/写库逻辑全在服务层。
 统一 POS 信封(前缀已入 core.pos_api._POS_PREFIXES)。模块门控走 expense(与采购同域)。
 """
 
@@ -110,7 +110,7 @@ async def api_validate(cfg: MapConfig, request: Request):
 
 @router.post("/commit")
 async def api_commit(cfg: MapConfig, request: Request):
-    """确认后建单。硬阻断行(缺单号/日期/金额)自动跳过,其余逐行建账本草稿 + 写 ocr_history。"""
+    """确认后落库。硬阻断行(缺单号/日期/金额)自动跳过,其余逐行写 ocr_history(推 ERP 记账料)。"""
     user, tid = auth_member(request, "purchase.doc.create")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
@@ -140,7 +140,6 @@ async def api_commit(cfg: MapConfig, request: Request):
         {
             "results": all_rows,
             "created": sum(1 for r in results if r["status"] == "created"),
-            "booked_no_push": sum(1 for r in results if r["status"] == "booked_no_push"),
             "failed": sum(1 for r in results if r["status"] == "failed"),
             "skipped": len(skipped),
             "total": len(all_rows),

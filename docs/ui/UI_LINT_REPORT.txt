@@ -5,7 +5,7 @@
      1  static\pos\pos-cashier.js
         └ 25: $('main-avatar').style.background = c.color || '#2563EB';
      1  static\pos\pos-data.js
-        └ 344: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
+        └ 345: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
      1  static\pos\pos.js
         └ 126: const color = c.color || '#2563EB';
      1  static\admin\admin.css
@@ -15,7 +15,7 @@
      1  static\pos\pos-cashier.js
         └ 25: $('main-avatar').style.background = c.color || '#2563EB';
      1  static\pos\pos-data.js
-        └ 344: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
+        └ 345: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
      1  static\pos\pos.js
         └ 126: const color = c.color || '#2563EB';
 
@@ -238,8 +238,8 @@
         └ 13: <div class="modal" style="max-width:420px;">
         └ 30: <div class="modal" style="max-width:420px;">
      2  src\home\sales-products.ts
-        └ 129: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:560px">
-        └ 239: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
+        └ 130: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:560px">
+        └ 242: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
      2  src\home\sales-wizard-steps.ts
         └ 239: <div class="sw-row" style="max-width:580px">
         └ 242: ${st.paper !== 'pos' ? `<div class="sw-field" style="max-width:580px;margin-top:4px"><labe
@@ -352,8 +352,8 @@
         └ 13: <div class="modal" style="max-width:420px;">
         └ 30: <div class="modal" style="max-width:420px;">
      2  src\home\sales-products.ts
-        └ 129: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:560px">
-        └ 239: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
+        └ 130: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:560px">
+        └ 242: mask.innerHTML = `<div class="modal" role="dialog" style="max-width:480px">
      2  static\home-05-overlays.css
         └ 9: .drawer {
         └ 17: .drawer.show { transform: translateX(0); }
@@ -383,7 +383,7 @@
      1  src\home\sales-detail.ts
         └ 436: : confirm(t('sx-del-draft-confirm'));
      1  src\home\sales-products.ts
-        └ 223: } else if (!confirm(t('sx-p-del-confirm'))) return;
+        └ 226: } else if (!confirm(t('sx-p-del-confirm'))) return;
      1  src\home\session-heartbeat.ts
         └ 52: alert('Session expired');
 

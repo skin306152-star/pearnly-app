@@ -2,10 +2,11 @@
 """汇总表 → 批量建单 单测(纯函数 · 不连库)。
 
 覆盖:解析(CSV·合计行标注)/ 映射(甲乙方落位·散客归一·单号生成·重号)/ 判定(税号复核方向·
-现金赊账·缺字段警告三态)/ commit 纯组装(买方块·销项行)。真 DB 建单由真账号 E2E 守。
+现金赊账·缺字段警告三态)/ commit(只写 ocr_history 记账料·不建账本单据)。真 DB 写入由真账号 E2E 守。
 """
 
 import unittest
+from unittest import mock
 
 from services.summary_import import commit as commit_svc
 from services.summary_import import dates as dates_svc
@@ -149,25 +150,32 @@ class JudgeTests(unittest.TestCase):
 
 
 class CommitHelperTests(unittest.TestCase):
-    def test_buyer_block_company_vs_anonymous(self):
-        company = commit_svc._buyer_block({"buyer_name": "7-11", "buyer_tax": _CP_TAX})
-        self.assertEqual(company["type"], "company")
-        self.assertEqual(company["tax_id"], _CP_TAX)
-        walkin = commit_svc._buyer_block({"buyer_name": "เงินสด", "buyer_tax": ""})
-        self.assertEqual(walkin["type"], "anonymous")
-
-    def test_sales_lines_from_items(self):
-        lines = commit_svc._sales_lines({"items": [{"name": "Ice", "qty": "100", "price": "6.07"}]})
-        self.assertEqual(lines[0]["description"], "Ice")
-        self.assertEqual(lines[0]["qty"], "100")
-        self.assertTrue(lines[0]["vat_applicable"])
-
     def test_clean_fields_strips_internal(self):
         cleaned = commit_svc._clean_fields(
             {"buyer_tax": _CP_TAX, "_direction": "sales", "_walkin": False}
         )
         self.assertIn("buyer_tax", cleaned)
         self.assertNotIn("_direction", cleaned)
+
+    def test_commit_writes_ocr_history_only_no_ledger_draft(self):
+        # 记账推 ERP,不开票:commit 只写 ocr_history(source_ref 留空·剥内部字段),绝不建账本单据。
+        calls = []
+
+        def _fake_insert(**kw):
+            calls.append(kw)
+            return "ocr-1"
+
+        with mock.patch.object(commit_svc.db, "insert_ocr_history", _fake_insert):
+            rows = [{"row_index": 0, "fields": {"buyer_tax": _CP_TAX, "_direction": "sales"}}]
+            res = commit_svc.commit_rows(
+                tenant_id="t", workspace_client_id=9, created_by="u", rows=rows, batch_ref="b"
+            )
+        self.assertEqual(res[0]["status"], "created")
+        self.assertEqual(res[0]["ocr_history_id"], "ocr-1")
+        self.assertEqual(len(calls), 1)
+        self.assertIsNone(calls[0]["source_ref"])  # 无账本单据可反指
+        self.assertEqual(calls[0]["source"], commit_svc._SUMMARY_SOURCE)
+        self.assertNotIn("_direction", calls[0]["pages"][0]["fields"])  # 内部字段已剥
 
 
 class AmountDerivationTests(unittest.TestCase):

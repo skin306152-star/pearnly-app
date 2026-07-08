@@ -1,6 +1,7 @@
 // ============================================================
 // 录入工作台 · 汇总表批量建单 · 步骤4 提交(调 /commit · 逐行结果如实展示)
-// 硬阻断行后端已跳过(skipped);建成的既落账本草稿又写 ocr_history(可推 ERP)。失败行显错误码。
+// 硬阻断行后端已跳过(skipped);建成的写入 ocr_history(识别记录·可推 ERP),不建账本/发票草稿。
+// 失败行显错误码。
 // ============================================================
 import { esc, $, showStep } from './dms-intake-core.js';
 import { B, wsHeaders } from './dms-intake-batch.js';
@@ -12,16 +13,13 @@ function t(k: string): string {
 
 interface RowResult {
     row_index: number;
-    status: 'created' | 'booked_no_push' | 'failed' | 'skipped';
-    doc_id?: string;
-    direction?: string;
+    status: 'created' | 'failed' | 'skipped';
     error?: string;
     warnings?: string[];
 }
 interface CommitData {
     results: RowResult[];
     created: number;
-    booked_no_push: number;
     failed: number;
     skipped: number;
     total: number;
@@ -31,7 +29,6 @@ let _data: CommitData | null = null;
 
 const STATUS_BADGE: Record<string, string> = {
     created: 'green',
-    booked_no_push: 'amber',
     failed: 'red',
     skipped: 'blue',
 };
@@ -42,7 +39,6 @@ function statHtml(d: CommitData): string {
     return (
         '<div class="dxb-stats">' +
         chip(d.created, 'dxb-st-created', 'green') +
-        chip(d.booked_no_push, 'dxb-st-nopush', 'amber') +
         chip(d.failed, 'dxb-st-failed', 'red') +
         chip(d.skipped, 'dxb-st-skipped', 'blue') +
         '</div>'
@@ -51,12 +47,8 @@ function statHtml(d: CommitData): string {
 
 function rowLine(r: RowResult): string {
     const cls = STATUS_BADGE[r.status] || 'blue';
-    const label = t('dxb-st-' + r.status.replace('booked_no_push', 'nopush'));
-    const detail = r.error
-        ? ` · ${esc(r.error)}`
-        : r.doc_id
-          ? ` · ${esc(r.doc_id.slice(0, 8))}`
-          : '';
+    const label = t('dxb-st-' + r.status);
+    const detail = r.error ? ` · ${esc(r.error)}` : '';
     return (
         '<div class="dxb-rline">' +
         `<span class="dxb-rno">#${esc(String((r.row_index ?? 0) + 1))}</span>` +
@@ -110,9 +102,8 @@ export async function enterBatchSubmit() {
 
 export function onBatchSubmitClick(tg: HTMLElement): boolean {
     if (tg.closest('#dxb-view-list')) {
-        // 销项批 → 销项列表;采购批 → 采购列表(与建单方向一致)。
-        const route = B.constants.direction === 'sales' ? 'sales' : 'purchase';
-        if (typeof window.routeTo === 'function') window.routeTo(route);
+        // 记账料落「识别记录」,从那里推 ERP(不建账本/发票单,故不去销项/采购列表)。
+        if (typeof window.routeTo === 'function') window.routeTo('history');
         return true;
     }
     if (tg.closest('#dxb-restart')) {

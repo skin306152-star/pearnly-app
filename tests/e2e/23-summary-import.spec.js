@@ -1,7 +1,7 @@
 // Pearnly E2E · 23 汇总表 → 批量建单(录入工作台第三任务卡)真机全链
 // ============================================================
 // 覆盖 4 步闭环:选卡 → 上传汇总表(7-11 冰厂 xlsx)→ 列映射+批次常量(刻意留空客户税号+勾散客)
-//   → 逐行预览(方向/落点徽章为后端真判 · 散客买方归一 เงินสด)→ 提交建单(账本草稿 + ocr_history)。
+//   → 逐行预览(方向/落点徽章为后端真判 · 散客买方归一 เงินสด)→ 提交(写 ocr_history 记账料·不建账本单据)。
 // 专测散客/现金票路径(不是只测有税号的顺风场景)。每步截图存档供视觉验收;全程 console guard。
 // doc_no 带本次运行时间戳前缀 → 跨次运行不撞号(测试账号可反复跑)。
 // ============================================================
@@ -89,9 +89,9 @@ test.describe('录入工作台 · 汇总表批量建单', () => {
         // ── 提交建单 → 结果统计 ──
         await page.locator('#dxb-commit').click();
         await expect(page.locator('#dx-s-batch-submit .dxb-stats'), '结果统计在场').toBeVisible();
-        // 建成数(第一格=已建单)应 > 0。
+        // 建成数(第一格=已记录·可推 ERP)应 > 0。
         const createdTxt = await page.locator('.dxb-stat.green b').first().innerText();
-        expect(parseInt(createdTxt, 10), '至少建成一单').toBeGreaterThan(0);
+        expect(parseInt(createdTxt, 10), '至少记成一条').toBeGreaterThan(0);
         await shot('05-result');
 
         assertNoConsoleErrors(expect, guard);

@@ -14,8 +14,8 @@ from core.pos_api import PosError
 from services.pos import stock
 
 
-def _sell(qty, *, loose, alloc, shortfall=Decimal("0")):
-    """跑一次非批次卖出,返回 (apply_movement 调用列表 [(batch_id, qty_delta)], fefo 查询次数)。"""
+def _sell(qty, *, loose, alloc, shortfall=Decimal("0"), track_batch=False):
+    """跑一次卖出,返回 (apply_movement 调用列表 [(batch_id, qty_delta)], fefo 查询次数)。"""
     loose_row = {"qty_on_hand": Decimal(str(loose))} if loose is not None else None
     moves = []
     fefo_calls = []
@@ -39,7 +39,7 @@ def _sell(qty, *, loose, alloc, shortfall=Decimal("0")):
             warehouse_id=1,
             product_id="p",
             qty_base=qty,
-            track_batch=False,
+            track_batch=track_batch,
             explicit_batch_id=None,
             sale_id="s1",
         )
@@ -93,6 +93,62 @@ class NonBatchPoolTests(unittest.TestCase):
                     product_id="p",
                     qty_base=5,
                     track_batch=False,
+                    explicit_batch_id=None,
+                    sale_id="s1",
+                )
+        self.assertEqual(ctx.exception.code, "pos.out_of_stock")
+        self.assertEqual(recorded, [])
+
+
+class BatchWithLooseTests(unittest.TestCase):
+    """批次品(track_batch)反向"看得见卖不出":进货没填批号 → 货进散装桶,FEFO 要能兜底扣。"""
+
+    def test_batch_covers_leaves_loose_untouched(self):
+        moves, fefo_n = _sell(
+            3, loose=99, alloc=[{"batch_id": "b1", "qty": Decimal("3")}], track_batch=True
+        )
+        self.assertEqual(moves, [("b1", Decimal("-3"))])  # 批次够 → 不碰散装
+        self.assertEqual(fefo_n, 1)
+
+    def test_batch_short_falls_back_to_loose(self):
+        # 批次给 2、缺 1 → 从散装补 1(混有散装货的批次品也能卖)
+        moves, _ = _sell(
+            3,
+            loose=5,
+            alloc=[{"batch_id": "b1", "qty": Decimal("2")}],
+            shortfall=Decimal("1"),
+            track_batch=True,
+        )
+        self.assertEqual(moves, [("b1", Decimal("-2")), (None, Decimal("-1"))])
+
+    def test_batch_and_loose_short_raises(self):
+        # 批次 1 + 散装 0,想卖 3 → out_of_stock,不留半扣
+        recorded = []
+        with (
+            mock.patch.object(
+                stock.inv_store, "get_stock_for_update", return_value={"qty_on_hand": Decimal("0")}
+            ),
+            mock.patch.object(
+                stock.fefo,
+                "select_batches_for_outflow",
+                return_value={
+                    "allocations": [{"batch_id": "b1", "qty": Decimal("1")}],
+                    "shortfall": Decimal("2"),
+                },
+            ),
+            mock.patch.object(
+                stock.ledger, "apply_movement", side_effect=lambda *a, **k: recorded.append(k)
+            ),
+        ):
+            with self.assertRaises(PosError) as ctx:
+                stock.deduct_for_sale(
+                    object(),
+                    tenant_id="t",
+                    workspace_client_id=12,
+                    warehouse_id=1,
+                    product_id="p",
+                    qty_base=3,
+                    track_batch=True,
                     explicit_batch_id=None,
                     sale_id="s1",
                 )

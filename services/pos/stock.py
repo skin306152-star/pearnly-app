@@ -56,6 +56,8 @@ def deduct_for_sale(
             sale_id=sale_id,
             created_by=created_by,
         )
+    # 批次品:FEFO 先效先出选批;批次不足则从散装(无批次)行兜底——批次品若混有散装货
+    # (进货没填批号 → 货进散装桶),否则同样"看得见卖不出"。总量不足才 out_of_stock。
     alloc = fefo.select_batches_for_outflow(
         cur,
         tenant_id=tenant_id,
@@ -64,24 +66,67 @@ def deduct_for_sale(
         warehouse_id=warehouse_id,
         qty_needed=need,
     )
-    if alloc["shortfall"] > 0:
-        raise PosError("pos.out_of_stock", 409, detail=str(product_id))
+    moves = [(a["batch_id"], Decimal(str(a["qty"]))) for a in alloc["allocations"]]
+    shortfall = alloc["shortfall"]
+    if shortfall > 0:
+        take_loose = min(
+            shortfall,
+            _loose_on_hand(
+                cur, tenant_id=tenant_id, product_id=product_id, warehouse_id=warehouse_id
+            ),
+        )
+        if shortfall - take_loose > 0:
+            raise PosError("pos.out_of_stock", 409, detail=str(product_id))
+        if take_loose > 0:
+            moves.append((None, take_loose))
+    return _apply_sale_moves(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        warehouse_id=warehouse_id,
+        product_id=product_id,
+        moves=moves,
+        sale_id=sale_id,
+        created_by=created_by,
+    )
+
+
+def _loose_on_hand(cur, *, tenant_id: str, product_id: str, warehouse_id: int) -> Decimal:
+    """散装行(batch NULL)当前库存;无行=0。已 FOR UPDATE 锁行(get_stock_for_update)。"""
+    row = inv_store.get_stock_for_update(
+        cur, tenant_id=tenant_id, product_id=product_id, warehouse_id=warehouse_id, batch_id=None
+    )
+    return Decimal(str(row["qty_on_hand"])) if row else Decimal("0")
+
+
+def _apply_sale_moves(
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    warehouse_id: int,
+    product_id: str,
+    moves: list,
+    sale_id: str,
+    created_by=None,
+) -> Optional[str]:
+    """按 moves [(batch_id, qty>0)] 逐笔扣库存(sale_out),返回记到销售行的首个批次 id(全散装=None)。"""
     first = None
-    for a in alloc["allocations"]:
+    for batch_id, qty in moves:
         ledger.apply_movement(
             cur,
             tenant_id=tenant_id,
             workspace_client_id=workspace_client_id,
             warehouse_id=warehouse_id,
             product_id=product_id,
-            batch_id=a["batch_id"],
+            batch_id=batch_id,
             txn_type="sale_out",
-            qty_delta=-Decimal(str(a["qty"])),
+            qty_delta=-qty,
             ref_type="pos_sale",
             ref_id=sale_id,
             created_by=created_by,
         )
-        first = first or a["batch_id"]
+        first = first or batch_id
     return first
 
 
@@ -98,19 +143,13 @@ def _deduct_non_batch(
 ) -> None:
     """非批次品出库:散装行(batch NULL)+ 批次行合成一个库存池,散装优先、再 FEFO 补。
 
-    历史上非批次品被「带批号进货」时,货会落进批次行、散装行留 0——此时只查散装行会误判
-    out_of_stock,而库存页按所有行加总却显示有货("看得见卖不出")。这里把两处当同一池扣,
-    先耗散装再按先效先出扣批次,消除口径分裂。总量不足才 out_of_stock。
+    非批次品被「带批号进货」时货会落进批次行、散装行留 0——只查散装行会误判 out_of_stock,
+    而库存页按所有行加总却显示有货("看得见卖不出")。两处当同一池扣,消除口径分裂;总量不足才拒。
     """
-    loose = inv_store.get_stock_for_update(
-        cur,
-        tenant_id=tenant_id,
-        product_id=product_id,
-        warehouse_id=warehouse_id,
-        batch_id=None,
+    take_loose = min(
+        need,
+        _loose_on_hand(cur, tenant_id=tenant_id, product_id=product_id, warehouse_id=warehouse_id),
     )
-    loose_qty = Decimal(str(loose["qty_on_hand"])) if loose else Decimal("0")
-    take_loose = min(need, loose_qty)
     remainder = need - take_loose
     # 散装已够整行时不必再查批次(省热路径一次 DB 往返 · 非批次品的常态)。
     alloc = (
@@ -129,20 +168,16 @@ def _deduct_non_batch(
         raise PosError("pos.out_of_stock", 409, detail=str(product_id))
     moves = [(None, take_loose)] if take_loose > 0 else []
     moves.extend((a["batch_id"], Decimal(str(a["qty"]))) for a in alloc["allocations"])
-    for batch_id, qty in moves:
-        ledger.apply_movement(
-            cur,
-            tenant_id=tenant_id,
-            workspace_client_id=workspace_client_id,
-            warehouse_id=warehouse_id,
-            product_id=product_id,
-            batch_id=batch_id,
-            txn_type="sale_out",
-            qty_delta=-qty,
-            ref_type="pos_sale",
-            ref_id=sale_id,
-            created_by=created_by,
-        )
+    _apply_sale_moves(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        warehouse_id=warehouse_id,
+        product_id=product_id,
+        moves=moves,
+        sale_id=sale_id,
+        created_by=created_by,
+    )
     return None
 
 

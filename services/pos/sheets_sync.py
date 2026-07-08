@@ -89,9 +89,7 @@ def _sale_row(cur, *, tenant_id: str, sale: dict) -> list:
         "WHERE l.tenant_id = %s AND l.sale_id = %s ORDER BY l.id",
         (tenant_id, sale["id"]),
     )
-    items = ", ".join(
-        f"{r['name_th'] or r['name_en']} x{r['qty']}" for r in cur.fetchall()
-    )
+    items = ", ".join(f"{r['name_th'] or r['name_en']} x{r['qty']}" for r in cur.fetchall())
     payments = sales_store.list_payments(cur, tenant_id=tenant_id, sale_id=sale["id"])
     method = payments[0]["method"] if payments else ""
     sold_at = sale["sold_at"].isoformat() if sale.get("sold_at") else ""

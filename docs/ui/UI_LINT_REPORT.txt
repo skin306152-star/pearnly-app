@@ -1,11 +1,11 @@
-# UI 设计合规扫描报告 · 341 个源文件全扫
+# UI 设计合规扫描报告 · 342 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 8(8 文件)
      1  static\pos\pos-cashier.js
         └ 25: $('main-avatar').style.background = c.color || '#2563EB';
      1  static\pos\pos-data.js
-        └ 312: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
+        └ 327: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
      1  static\pos\pos.js
         └ 126: const color = c.color || '#2563EB';
      1  static\admin\admin.css
@@ -15,7 +15,7 @@
      1  static\pos\pos-cashier.js
         └ 25: $('main-avatar').style.background = c.color || '#2563EB';
      1  static\pos\pos-data.js
-        └ 312: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
+        └ 327: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
      1  static\pos\pos.js
         └ 126: const color = c.color || '#2563EB';
 
@@ -127,10 +127,10 @@
         └ 1893: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
      4  static\pos\pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
-        └ 258: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
+        └ 268: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
      4  static\pos\pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
-        └ 258: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
+        └ 268: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
      2  src\home\core.ts
         └ 2: // 工具(t/escapeHtml/svgIcon)+ Session 被踢弹窗(🔴)+ 鉴权 API(🔴铁律#26)+ plan 上限 helper。
      2  static\pos\pos-restaurant-ops.js
@@ -147,7 +147,7 @@
      2  static\pos\pos-restaurant-ops.js
         └ 83: const tm = (t.late ? '⚠ ' : '⏱ ') + (t.minutes || 0) + ' ' + POS.t('posui.rest.min');
      1  src\home\app-shell-sidebar-html.ts
-        └ 324: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
+        └ 330: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
      1  src\home\dms-intake-invoice-submit.ts
         └ 91: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
      1  src\home\dms-intake.ts
@@ -193,14 +193,14 @@
         └ 17: max-width: 240px;
         └ 53: max-width: 420px;
      4  static\pos\pos.css
-        └ 193: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
-        └ 213: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
+        └ 196: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
+        └ 216: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
      4  static\home-37-html-inline.css
         └ 660: max-width: 420px;
         └ 1201: max-width: 420px;
      4  static\pos\pos.css
-        └ 193: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
-        └ 213: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
+        └ 196: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
+        └ 216: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
      3  src\home\knowledge-ask.ts
         └ 116: .kb-qa{background:var(--card,var(--card));border:1px solid var(--line,var(--line));border-
         └ 142: .kb-qa-hint{font-size:12px;color:var(--ink-3,#999);margin-top:12px;max-width:760px;line-he

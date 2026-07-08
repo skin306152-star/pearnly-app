@@ -110,13 +110,17 @@ class GoogleConnectLaunchTicketTests(unittest.IsolatedAsyncioTestCase):
         with (
             patch.object(gor.db, "get_cursor", return_value=_CursorCtx()),
             patch.object(gor.google_store, "consume_state", side_effect=consume_state),
-            patch.object(gor.google_oauth, "exchange_code", return_value={
-                "email": "a@b.com",
-                "access_token": "AT",
-                "refresh_token": "RT",
-                "expires_at": None,
-                "scope": "drive",
-            }),
+            patch.object(
+                gor.google_oauth,
+                "exchange_code",
+                return_value={
+                    "email": "a@b.com",
+                    "access_token": "AT",
+                    "refresh_token": "RT",
+                    "expires_at": None,
+                    "scope": "drive",
+                },
+            ),
             patch.object(gor.google_store, "upsert_credential"),
         ):
             resp = await gor.api_callback(_request(), code="CODE", state="OAUTHSTATE")

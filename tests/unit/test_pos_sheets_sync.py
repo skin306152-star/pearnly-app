@@ -84,30 +84,36 @@ class SyncSaleTests(unittest.TestCase):
 
     def test_disabled_is_noop(self):
         cur = self._cur({"spreadsheet_id": "SS1", "tab_name": "POS", "enabled": False})
-        with patch.object(svc, "get_settings", return_value={
-            "spreadsheet_id": "SS1", "tab_name": "POS", "enabled": False
-        }):
+        with patch.object(
+            svc,
+            "get_settings",
+            return_value={"spreadsheet_id": "SS1", "tab_name": "POS", "enabled": False},
+        ):
             with patch("services.export.google_oauth.valid_access_token") as tok:
                 svc.sync_sale(cur, tenant_id="t-1", workspace_client_id=7, sale_id="s1")
                 tok.assert_not_called()
 
     def test_no_spreadsheet_configured_is_noop(self):
-        with patch.object(svc, "get_settings", return_value={
-            "spreadsheet_id": "", "tab_name": "POS", "enabled": True
-        }):
+        with patch.object(
+            svc,
+            "get_settings",
+            return_value={"spreadsheet_id": "", "tab_name": "POS", "enabled": True},
+        ):
             with patch("services.export.google_oauth.valid_access_token") as tok:
                 svc.sync_sale(FakeCursor(), tenant_id="t-1", workspace_client_id=7, sale_id="s1")
                 tok.assert_not_called()
 
     def test_no_google_token_is_noop_not_error(self):
-        with patch.object(svc, "get_settings", return_value={
-            "spreadsheet_id": "SS1", "tab_name": "POS", "enabled": True
-        }):
-            with patch(
-                "services.export.google_oauth.valid_access_token", return_value=None
-            ):
+        with patch.object(
+            svc,
+            "get_settings",
+            return_value={"spreadsheet_id": "SS1", "tab_name": "POS", "enabled": True},
+        ):
+            with patch("services.export.google_oauth.valid_access_token", return_value=None):
                 with patch("services.export.sheets.SheetsClient") as client_cls:
-                    svc.sync_sale(FakeCursor(), tenant_id="t-1", workspace_client_id=7, sale_id="s1")
+                    svc.sync_sale(
+                        FakeCursor(), tenant_id="t-1", workspace_client_id=7, sale_id="s1"
+                    )
                     client_cls.assert_not_called()
 
     def test_configured_and_connected_appends_row(self):
@@ -116,13 +122,21 @@ class SyncSaleTests(unittest.TestCase):
             fetchall_queue=[[{"qty": Decimal("1"), "name_th": "บลัชออน", "name_en": "Blush"}]],
         )
         with (
-            patch.object(svc, "get_settings", return_value={
-                "spreadsheet_id": "SS1", "tab_name": "POS", "enabled": True
-            }),
+            patch.object(
+                svc,
+                "get_settings",
+                return_value={"spreadsheet_id": "SS1", "tab_name": "POS", "enabled": True},
+            ),
             patch("services.export.google_oauth.valid_access_token", return_value="TOKEN"),
-            patch("services.pos.sales_store.get_sale", return_value={
-                "id": "s1", "receipt_no": "R001", "grand_total": Decimal("290.00"), "sold_at": None
-            }),
+            patch(
+                "services.pos.sales_store.get_sale",
+                return_value={
+                    "id": "s1",
+                    "receipt_no": "R001",
+                    "grand_total": Decimal("290.00"),
+                    "sold_at": None,
+                },
+            ),
             patch(
                 "services.pos.sales_store.list_payments",
                 return_value=[{"method": "transfer"}],

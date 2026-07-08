@@ -101,7 +101,9 @@ def delete_credential(cur, *, tenant_id, workspace_client_id) -> bool:
 
 
 # ── OAuth state(防 CSRF · 单次消费 · 5 分钟过期)─────────────────────────────
-def save_state(cur, *, state, tenant_id, workspace_client_id, user_id, return_to="purchase-export") -> None:
+def save_state(
+    cur, *, state, tenant_id, workspace_client_id, user_id, return_to="purchase-export"
+) -> None:
     cur.execute("DELETE FROM export_oauth_states WHERE created_at < now() - interval '5 minutes'")
     cur.execute(
         "INSERT INTO export_oauth_states "

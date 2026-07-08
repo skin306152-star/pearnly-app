@@ -33,9 +33,9 @@ test.describe('录入工作台 · 汇总表批量建单', () => {
         // 录入工作台入口在可折叠导航组内(默认收起 · 侧栏点击非本功能验收点),
         // 直接走 hash 路由进目标页,再对真实渲染的功能 UI 断言。
         await page.evaluate(() => {
-            const w = window;
-            if (typeof w.routeTo === 'function') w.routeTo('dms-intake');
-            else location.hash = '#/dms-intake';
+            const g = globalThis;
+            if (typeof g.routeTo === 'function') g.routeTo('dms-intake');
+            else g.location.hash = '#/dms-intake';
         });
         await expect(page.locator('#page-dms-intake'), '录入工作台页激活').toHaveClass(/active/);
 

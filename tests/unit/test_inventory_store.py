@@ -12,15 +12,19 @@ from services.inventory import store
 
 
 class FakeCursor:
-    def __init__(self, ones=None):
+    def __init__(self, ones=None, manys=None):
         self.calls = []
         self._ones = list(ones or [])
+        self._manys = list(manys or [])
 
     def execute(self, sql, params=None):
         self.calls.append((sql, params))
 
     def fetchone(self):
         return self._ones.pop(0) if self._ones else None
+
+    def fetchall(self):
+        return self._manys.pop(0) if self._manys else []
 
     @property
     def last_sql(self):
@@ -29,6 +33,22 @@ class FakeCursor:
     @property
     def last_params(self):
         return self.calls[-1][1]
+
+
+class SumOnHandForUpdateTests(unittest.TestCase):
+    def test_sums_all_batches_and_locks(self):
+        cur = FakeCursor(
+            manys=[[{"q": Decimal("100")}, {"q": Decimal("100")}, {"q": Decimal("50")}]]
+        )
+        total = store.sum_on_hand_for_update(cur, tenant_id="t-1", product_id="p", warehouse_id=1)
+        self.assertEqual(total, Decimal("250"))  # Python 求和(聚合不能 FOR UPDATE)
+        self.assertIn("FOR UPDATE", cur.calls[0][0])  # 锁全部批次行防并发
+        self.assertNotIn("batch_id", cur.calls[0][0])  # 跨所有批次 · 不按 batch 过滤
+
+    def test_no_rows_is_zero(self):
+        cur = FakeCursor(manys=[[]])
+        total = store.sum_on_hand_for_update(cur, tenant_id="t-1", product_id="p", warehouse_id=1)
+        self.assertEqual(total, Decimal("0"))
 
 
 class ApplyStockDeltaTests(unittest.TestCase):

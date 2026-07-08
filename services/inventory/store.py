@@ -248,6 +248,21 @@ def get_stock_for_update(
     return cur.fetchone()
 
 
+def sum_on_hand_for_update(cur, *, tenant_id: str, product_id: str, warehouse_id: int) -> Decimal:
+    """锁定并汇总某 (product,warehouse) 跨所有批次的在库总量。
+
+    盘点按总数对账用:显示端 stock_overview 是 SUM(所有批次),盘点也须拿同口径总数算差异,
+    否则只对 batch=None 单行 → 差异全错(见 ledger.count)。先 FOR UPDATE 锁全部批次行防并发,
+    再 Python 求和(聚合本身不能 FOR UPDATE)。
+    """
+    cur.execute(
+        "SELECT COALESCE(qty_on_hand, 0) AS q FROM inventory_stock "
+        "WHERE tenant_id = %s AND product_id = %s AND warehouse_id = %s FOR UPDATE",
+        (tenant_id, product_id, warehouse_id),
+    )
+    return sum((Decimal(str(r["q"])) for r in cur.fetchall()), Decimal("0"))
+
+
 def apply_stock_delta(
     cur,
     *,

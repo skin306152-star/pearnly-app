@@ -12,15 +12,19 @@ from services.inventory import ledger
 
 
 class FakeCursor:
-    def __init__(self, ones=None):
+    def __init__(self, ones=None, manys=None):
         self.calls = []
         self._ones = list(ones or [])
+        self._manys = list(manys or [])
 
     def execute(self, sql, params=None):
         self.calls.append((sql, params))
 
     def fetchone(self):
         return self._ones.pop(0) if self._ones else None
+
+    def fetchall(self):
+        return self._manys.pop(0) if self._manys else []
 
 
 class ResolveFactorTests(unittest.TestCase):
@@ -126,16 +130,16 @@ class ReceiveConversionTests(unittest.TestCase):
 
 
 class CountTests(unittest.TestCase):
-    def test_delta_generated_from_system_vs_counted(self):
-        # 系统 7,实盘 5 → delta -2 生成 count 流水
+    def test_delta_from_total_across_batches_not_single_row(self):
+        # 无批次盘点:system_qty 取全批次总和(4+3=7),实盘 5 → delta -2。
         cur = FakeCursor(
             ones=[
-                {"base_unit": "ชิ้น"},  # resolve_factor (validate)
-                {"id": "s1", "qty_on_hand": Decimal("7")},  # count 读系统数
+                {"base_unit": "ชิ้น"},  # assert_product_owned
                 {"id": "txc"},  # insert_txn (count)
-                {"id": "s1", "qty_on_hand": Decimal("7")},  # apply_stock_delta 锁行
-                {"qty_on_hand": Decimal("5")},  # apply_stock_delta UPDATE RETURNING
-            ]
+                {"id": "sN", "qty_on_hand": Decimal("3")},  # apply_stock_delta 锁 None 行
+                {"qty_on_hand": Decimal("1")},  # apply_stock_delta UPDATE RETURNING
+            ],
+            manys=[[{"q": Decimal("4")}, {"q": Decimal("3")}]],  # sum_on_hand_for_update
         )
         out = ledger.count(
             cur,
@@ -151,6 +155,47 @@ class CountTests(unittest.TestCase):
         txn_call = next(c for c in cur.calls if "INSERT INTO inventory_transactions" in c[0])
         self.assertIn("count", txn_call[1])
         self.assertIn(Decimal("-2"), txn_call[1])
+
+    def test_multibatch_count_converges_to_counted_not_double_adds(self):
+        # 真机 bug 回归:库存分散 3 批(100+100+100=300 总),用户按总数盘 100。
+        # 修前只读 batch=None 单行 → delta 全错;修后 system_qty=300 → delta=-200,总数收敛到 100。
+        cur = FakeCursor(
+            ones=[
+                {"base_unit": "ชิ้น"},  # assert_product_owned
+                {"id": "txc"},  # insert_txn
+                {"id": "sN", "qty_on_hand": Decimal("100")},  # 锁 None 行
+                {"qty_on_hand": Decimal("-100")},  # None 行落差异后(总仍收敛=100)
+            ],
+            manys=[[{"q": Decimal("100")}, {"q": Decimal("100")}, {"q": Decimal("100")}]],
+        )
+        out = ledger.count(
+            cur,
+            tenant_id="t",
+            workspace_client_id=9,
+            warehouse_id=1,
+            lines=[{"product_id": "p", "batch_id": None, "counted_qty": 100}],
+        )
+        adj = out["adjustments"][0]
+        self.assertEqual(adj["system_qty"], 300.0)  # 总和,非单行
+        self.assertEqual(adj["delta"], -200.0)
+        txn_call = next(c for c in cur.calls if "INSERT INTO inventory_transactions" in c[0])
+        self.assertIn(Decimal("-200"), txn_call[1])
+
+    def test_matched_count_no_movement(self):
+        # 实盘=系统总数 → delta 0 → 不写流水(治"数 600 却 +200")。
+        cur = FakeCursor(
+            ones=[{"base_unit": "ชิ้น"}],
+            manys=[[{"q": Decimal("300")}, {"q": Decimal("300")}]],  # 总 600
+        )
+        out = ledger.count(
+            cur,
+            tenant_id="t",
+            workspace_client_id=9,
+            warehouse_id=1,
+            lines=[{"product_id": "p", "batch_id": None, "counted_qty": 600}],
+        )
+        self.assertEqual(out["adjustments"][0]["delta"], 0.0)
+        self.assertFalse(any("INSERT INTO inventory_transactions" in c[0] for c in cur.calls))
 
 
 if __name__ == "__main__":

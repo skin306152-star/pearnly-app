@@ -212,20 +212,30 @@ def count(
     lines: list,
     created_by=None,
 ) -> dict:
-    """盘点:实际数对系统数,差异生成 count 调整流水。返回 {adjustments}。"""
+    """盘点:实际数对系统数,差异生成 count 调整流水。返回 {adjustments}。
+
+    对账口径必须与显示端一致:stock_overview 显示的是 SUM(所有批次)。前端盘点无批次字段
+    (用户按货架总数盘),故 batch 缺省时 system_qty 取全批次总和、差异落到 batch=None 聚合行,
+    令总数收敛到盘点值。若显式指定 batch,才对单批次行对账(API 完整性,前端暂不走)。
+    """
     adjustments = []
     for line in lines:
         product_id = line["product_id"]
         batch_id = line.get("batch_id")
         assert_product_owned(cur, tenant_id=tenant_id, product_id=product_id)
-        row = store.get_stock_for_update(
-            cur,
-            tenant_id=tenant_id,
-            product_id=product_id,
-            warehouse_id=warehouse_id,
-            batch_id=batch_id,
-        )
-        system_qty = Decimal(str(row["qty_on_hand"])) if row else Decimal("0")
+        if batch_id is None:
+            system_qty = store.sum_on_hand_for_update(
+                cur, tenant_id=tenant_id, product_id=product_id, warehouse_id=warehouse_id
+            )
+        else:
+            row = store.get_stock_for_update(
+                cur,
+                tenant_id=tenant_id,
+                product_id=product_id,
+                warehouse_id=warehouse_id,
+                batch_id=batch_id,
+            )
+            system_qty = Decimal(str(row["qty_on_hand"])) if row else Decimal("0")
         counted = Decimal(str(line["counted_qty"]))
         delta = counted - system_qty
         if delta != 0:

@@ -185,17 +185,6 @@ def get_or_create_default_warehouse(
 
 
 # ── batches ───────────────────────────────────────────────────────────
-def product_tracks_batch(cur, *, tenant_id: str, product_id: str) -> bool:
-    """商品是否勾了「批次管理」(products.track_batch)。非批次品收货时忽略批号 → 货入散装行,
-    避免货被锁进批次行、而非批次卖出查散装行够不着(= 库存看得见卖不出)。"""
-    cur.execute(
-        "SELECT track_batch FROM products WHERE tenant_id = %s AND id = %s",
-        (tenant_id, product_id),
-    )
-    row = cur.fetchone()
-    return bool(row and row["track_batch"])
-
-
 def get_or_create_batch(
     cur,
     *,

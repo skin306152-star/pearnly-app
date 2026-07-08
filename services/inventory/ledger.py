@@ -136,10 +136,7 @@ def receive(
         if qty_base <= 0:
             raise InventoryError("pos.line_invalid")
         batch_id = None
-        # 只有批次品才落批次行;非批次品即便传了批号也忽略(货入散装桶 → 收银台卖得出)。
-        if line.get("batch_no") and store.product_tracks_batch(
-            cur, tenant_id=tenant_id, product_id=product_id
-        ):
+        if line.get("batch_no"):
             batch = store.get_or_create_batch(
                 cur,
                 tenant_id=tenant_id,

@@ -122,11 +122,12 @@ def stock_overview(
 
 def _batches_by_product(cur, *, tenant_id: str, workspace_client_id: int) -> dict:
     cur.execute(
-        "SELECT s.product_id, b.batch_no, b.expiry_date, SUM(s.qty_on_hand) AS qty "
+        "SELECT s.product_id, b.id AS batch_id, b.batch_no, b.expiry_date, "
+        "SUM(s.qty_on_hand) AS qty "
         "FROM inventory_stock s JOIN inventory_batches b ON b.id = s.batch_id "
         "WHERE s.tenant_id = %s AND s.workspace_client_id = %s AND s.batch_id IS NOT NULL "
         "AND s.qty_on_hand <> 0 "
-        "GROUP BY s.product_id, b.batch_no, b.expiry_date "
+        "GROUP BY s.product_id, b.id, b.batch_no, b.expiry_date "
         "ORDER BY b.expiry_date ASC NULLS LAST",
         (tenant_id, workspace_client_id),
     )
@@ -134,6 +135,7 @@ def _batches_by_product(cur, *, tenant_id: str, workspace_client_id: int) -> dic
     for r in cur.fetchall():
         out.setdefault(str(r["product_id"]), []).append(
             {
+                "batch_id": str(r["batch_id"]),
                 "batch_no": r["batch_no"],
                 "expiry_date": r["expiry_date"].isoformat() if r["expiry_date"] else None,
                 "qty": _f(r["qty"]),

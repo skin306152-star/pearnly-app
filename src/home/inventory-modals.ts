@@ -2,7 +2,14 @@
 // 概念稿屏7 只画了列表;入库/盘点为「补交互」,用 .modal(D1 闸禁新增 .drawer),沿用 home-41 同套令牌。
 // 接 04 §4:POST /api/inventory/in、POST /api/inventory/count(带 workspace_client_id)。表单四态:提交转圈 + inline 错误码本地化。
 /* global t, escapeHtml, showToast */
-import { invApi, activeWsId, invErrMsg, type InLine, type CountLine } from './inventory-common.js';
+import {
+    invApi,
+    activeWsId,
+    invErrMsg,
+    fmtQty,
+    type InLine,
+    type CountLine,
+} from './inventory-common.js';
 
 const IC_X =
     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M18 6 6 18M6 6l12 12"/></svg>';
@@ -38,15 +45,36 @@ function productById(id: string) {
     return invApi.products().find((p) => p.product_id === id) || null;
 }
 
-// 收货行:按选中商品是否批次品显隐批号/效期;非批次品同时清空,确保不发批号(不落批次桶)。
-function applyBatchVisibility(row: HTMLElement) {
-    const cell = row.querySelector<HTMLElement>('[data-batchcell]');
-    if (!cell) return;
+// 选中商品后按是否批次品调整行:收货行显隐批号/效期(非批次品清空不发批号);
+// 盘点行显隐并填充批次下拉(逐批盘:选具体批次单独对账,或「合计」走整品聚合)。
+function onProductChange(row: HTMLElement) {
     const sel = row.querySelector<HTMLSelectElement>('[data-k="product_id"]');
     const prod = sel ? productById(sel.value) : null;
-    const show = !!(prod && prod.track_batch);
-    cell.style.display = show ? 'flex' : 'none';
-    if (!show) cell.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.value = ''));
+    const isBatch = !!(prod && prod.track_batch);
+
+    const cell = row.querySelector<HTMLElement>('[data-batchcell]');
+    if (cell) {
+        cell.style.display = isBatch ? 'flex' : 'none';
+        if (!isBatch)
+            cell.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.value = ''));
+    }
+
+    const bsel = row.querySelector<HTMLSelectElement>('[data-batchsel]');
+    if (bsel) {
+        const batches = (isBatch && prod ? prod.batches : []).filter((b) => b.batch_id);
+        bsel.innerHTML = batches.length
+            ? `<option value="">${escapeHtml(t('inv-count-all-batches'))}</option>` +
+              batches
+                  .map(
+                      (b) =>
+                          `<option value="${escapeHtml(b.batch_id!)}">${escapeHtml(
+                              (b.batch_no || '—') + ' · ' + t('inv-count-onhand') + fmtQty(b.qty)
+                          )}</option>`
+                  )
+                  .join('')
+            : '';
+        bsel.style.display = batches.length ? '' : 'none';
+    }
 }
 
 function bindProductChange(maskId: string) {
@@ -54,7 +82,7 @@ function bindProductChange(maskId: string) {
     if (!mask) return;
     mask.querySelectorAll<HTMLElement>('[data-row]').forEach((row) => {
         const sel = row.querySelector<HTMLSelectElement>('[data-k="product_id"]');
-        if (sel) sel.onchange = () => applyBatchVisibility(row);
+        if (sel) sel.onchange = () => onProductChange(row);
     });
 }
 
@@ -63,7 +91,8 @@ function countRowHtml(): string {
     return `<div class="inv-frow count" data-row="${id}">
         <select class="inv-field" data-k="product_id"><option value="">—</option>${productOptions()}</select>
         <span style="display:flex;gap:6px;align-items:center">
-            <input class="inv-field" data-k="counted_qty" type="number" min="0" step="0.001" placeholder="0">
+            <select class="inv-field" data-k="batch_id" data-batchsel style="display:none;flex:1"></select>
+            <input class="inv-field" data-k="counted_qty" type="number" min="0" step="0.001" placeholder="0" style="width:82px">
             <button type="button" class="inv-rowx" data-rowx="${id}" aria-label="${escapeHtml(t('inv-row-remove'))}">×</button>
         </span>
     </div>`;
@@ -178,7 +207,11 @@ async function doSubmit(cfg: ModalCfg, submit: HTMLButtonElement) {
     if (cfg.isCount) {
         const lines: CountLine[] = raw
             .filter((r) => r.product_id && r.counted_qty !== '')
-            .map((r) => ({ product_id: r.product_id, counted_qty: r.counted_qty }));
+            .map((r) => {
+                const ln: CountLine = { product_id: r.product_id, counted_qty: r.counted_qty };
+                if (r.batch_id) ln.batch_id = r.batch_id; // 选了具体批次 → 逐批对账;空=合计
+                return ln;
+            });
         if (!lines.length) {
             showErr(cfg.maskId, t('inv-err-no-lines'));
             return;

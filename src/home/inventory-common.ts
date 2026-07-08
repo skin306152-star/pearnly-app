@@ -9,6 +9,7 @@ export interface InvName {
     zh: string | null;
 }
 export interface InvBatch {
+    batch_id?: string;
     batch_no: string | null;
     expiry_date: string | null;
     qty: number | null;
@@ -55,6 +56,7 @@ export interface InLine {
 }
 export interface CountLine {
     product_id: string;
+    batch_id?: string;
     counted_qty: string;
 }
 

@@ -4,9 +4,36 @@
 锁定:路由 path+method 契约 · app.py include · 路由用 POS 信封 + 模块守门。"""
 
 import unittest
+from unittest.mock import patch
+
+from starlette.requests import Request
 
 import routes.pos_sales_routes as mod
+import services.pos.payment_settings as pay_settings
 from routes.pos_sales_routes import router
+
+
+def _request():
+    return Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/pos/payment-methods",
+            "query_string": b"",
+            "headers": [],
+            "server": ("testserver", 80),
+            "scheme": "http",
+        }
+    )
+
+
+class _CursorCtx:
+    def __enter__(self):
+        return object()
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
 
 EXPECTED = {
     ("GET", "/api/pos/bootstrap"),
@@ -26,6 +53,7 @@ EXPECTED = {
     ("GET", "/api/pos/sales/{sale_id}/promptpay-qr"),
     ("GET", "/api/pos/sales/{sale_id}/receipt-pdf"),
     ("GET", "/api/pos/promptpay-qr"),
+    ("GET", "/api/pos/payment-methods"),
 }
 
 
@@ -50,6 +78,39 @@ class PosSalesRoutesContractTests(unittest.TestCase):
         self.assertTrue(hasattr(mod, "assert_module_enabled"))
         self.assertTrue(hasattr(mod, "PosError"))
         self.assertTrue(hasattr(mod, "pos_auth"))
+
+
+class PaymentMethodsRouteTests(unittest.IsolatedAsyncioTestCase):
+    async def test_cashier_readable_returns_settings(self):
+        # 收银员 token(带 workspace_client_id · 无 admin 权限)即可读 → 走 _read 不是 owner admin 口。
+        with (
+            patch.object(
+                mod, "pos_auth", return_value={"tenant_id": "t-1", "workspace_client_id": 7}
+            ),
+            patch.object(mod.db, "get_cursor_rls", return_value=_CursorCtx()),
+            patch.object(mod, "assert_module_enabled"),
+            patch.object(mod, "require_workspace"),
+            patch.object(
+                pay_settings,
+                "get_settings",
+                return_value={
+                    "promptpay_enabled": True,
+                    "card_enabled": True,
+                    "bank_transfer_enabled": True,
+                    "bank_name": "开泰银行",
+                    "bank_account_no": "1234567890",
+                    "bank_account_name": "Pearnly",
+                    "promptpay_id": "0812345678",
+                },
+            ) as gs,
+        ):
+            body = await mod.api_payment_methods(_request(), workspace_client_id=7)
+
+        self.assertTrue(body["ok"])
+        self.assertTrue(body["data"]["bank_transfer_enabled"])
+        self.assertEqual(body["data"]["bank_name"], "开泰银行")
+        _, kwargs = gs.call_args
+        self.assertEqual(kwargs["workspace_client_id"], 7)
 
 
 if __name__ == "__main__":

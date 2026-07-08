@@ -496,6 +496,10 @@
             POS.setNet(false);
             POS.toast(POS.t('posui.net.toast.offline'));
         });
+        // 收银台回到前台 → 同步收款设置(老板可能在另一设备/标签页改了收款方式;不刷新看不到)。
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && POS.pay) POS.pay.refresh();
+        });
         // PWA 外壳 SW(08 ADR-1)· 失败不影响在线使用。从根路径 /pos-sw.js 注册 + scope:/pos
         // → SW 能控 /pos 导航(断网重开外壳)。旧 /static/pos/pos-sw.js(scope 卡 /static/pos/
         // 控不了 /pos)顺手注销,免双注册残留。

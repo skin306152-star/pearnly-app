@@ -164,6 +164,33 @@
         if (cart[i].qty <= 0) cart.splice(i, 1);
         renderCart();
     }
+    // 点数量就地输入(便利店大批量免狂点 +)。回车/失焦落值:>0 覆盖 · =0 删行 · 空/非法回退原值。
+    function editQty(i, el) {
+        if (el.querySelector('input')) return;
+        const prev = cart[i].qty;
+        el.innerHTML =
+            '<input class="q-edit" type="number" inputmode="numeric" min="0" value="' + prev + '">';
+        const inp = el.querySelector('input');
+        inp.focus();
+        inp.select();
+        let done = false;
+        const commit = () => {
+            if (done) return;
+            done = true;
+            const v = Math.floor(Number(inp.value));
+            if (Number.isFinite(v) && v > 0) cart[i].qty = v;
+            else if (inp.value.trim() === '0') cart.splice(i, 1);
+            renderCart();
+        };
+        inp.addEventListener('blur', commit);
+        inp.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') inp.blur();
+            else if (e.key === 'Escape') {
+                done = true;
+                renderCart();
+            }
+        });
+    }
     function clearCart() {
         cart = [];
         discount = 0;
@@ -210,7 +237,9 @@
                         POS.t('posui.cart.unit') +
                         '</div></div><div class="stepper"><button data-dec="' +
                         i +
-                        '">−</button><span class="q tnum">' +
+                        '">−</button><span class="q tnum" data-qi="' +
+                        i +
+                        '" role="button" tabindex="0">' +
                         c.qty +
                         '</span><button data-inc="' +
                         i +
@@ -225,6 +254,9 @@
             lines
                 .querySelectorAll('[data-inc]')
                 .forEach((b) => (b.onclick = () => changeQty(Number(b.dataset.inc), 1)));
+            lines
+                .querySelectorAll('.q[data-qi]')
+                .forEach((el) => (el.onclick = () => editQty(Number(el.dataset.qi), el)));
             $('cart-sub').textContent = POS.tf('posui.cart.items', {
                 n: itemCount,
                 k: cart.length,

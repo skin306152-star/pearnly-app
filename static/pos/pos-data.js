@@ -142,6 +142,17 @@
             if (b && b.store && POS.cacheStoreInfo) POS.cacheStoreInfo(b.store);
         } catch (_) {}
     };
+    // 强制重拉收款设置(老板在别处改了开关 → 收银台回前台时同步 · 走轻量口不重拉整包 bootstrap)。
+    // 与 ensure 区别:无视已缓存必拉;失败静默保留旧值(离线/路由缺失不误清已配的方式)。
+    pay.refresh = async function () {
+        try {
+            const p = await POS.data.paymentMethods();
+            if (!p) return;
+            state.payment = p;
+            const mask = document.getElementById('pay-mask');
+            if (mask && mask.classList.contains('show')) pay.applyMethods('#pay-mask .pm');
+        } catch (_) {}
+    };
     // 按收款设置显隐支付方式元素(现金恒显;关掉的方式不显)。sel 命中容器内带 data-pm 的元素。
     pay.applyMethods = function (sel) {
         const s = pay.settings();
@@ -446,6 +457,14 @@
                 return { modules: { pos: { config: { business_type: 'retail' } } } };
             throw e;
         }
+    };
+
+    // 轻量拉收款设置(pay.refresh 用 · 只回显隐开关+银行/PromptPay 信息,不含商品)。
+    data.paymentMethods = async function () {
+        return await apiFetch(
+            'GET',
+            '/api/pos/payment-methods?workspace_client_id=' + (state.workspaceClientId || '')
+        );
     };
 
     // 收款前出码:按账套配的 PromptPay ID + 待收金额生成二维码(无需先建单)。

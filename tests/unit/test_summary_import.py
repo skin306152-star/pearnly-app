@@ -8,6 +8,7 @@
 import unittest
 
 from services.summary_import import commit as commit_svc
+from services.summary_import import dates as dates_svc
 from services.summary_import import judge as judge_svc
 from services.summary_import import mapping as mapping_svc
 from services.summary_import import parse as parse_svc
@@ -167,6 +168,56 @@ class CommitHelperTests(unittest.TestCase):
         )
         self.assertIn("buyer_tax", cleaned)
         self.assertNotIn("_direction", cleaned)
+
+
+class DateResolutionTests(unittest.TestCase):
+    """真实泰国汇总表日期:佛历年 / 只有日号 / DD/MM/YYYY。"""
+
+    def test_be_year_to_ad(self):
+        self.assertEqual(dates_svc.to_ad_year(2569), 2026)
+        self.assertEqual(dates_svc.to_ad_year(2026), 2026)  # 已是公历不动
+
+    def test_parse_full_date_be_and_dmy(self):
+        self.assertEqual(dates_svc.parse_full_date("2569-06-01"), "2026-06-01")  # 佛历转公历
+        self.assertEqual(dates_svc.parse_full_date("01/06/2569"), "2026-06-01")  # DD/MM/YYYY
+        self.assertIsNone(dates_svc.parse_full_date("1"))  # 光日号非完整日期
+
+    def test_resolve_day_number_with_period(self):
+        self.assertEqual(dates_svc.resolve_date("3", (2026, 6)), "2026-06-03")
+        self.assertIsNone(dates_svc.resolve_date("3", None))  # 无年月无法拼
+        self.assertIsNone(dates_svc.resolve_date("", (2026, 6)))
+
+    def test_detect_period_from_thai_title(self):
+        self.assertEqual(dates_svc.detect_period("สรุปยอดขาย 7-11 เดือน มิถุนายน 2569"), (2026, 6))
+        self.assertIsNone(dates_svc.detect_period("no month here"))
+
+
+class RealSheetShapeTests(unittest.TestCase):
+    """真表结构:标题行在前 + 光日号日期 + 佛历。跳过前言认表头 + 拼日期。"""
+
+    _REAL = (
+        "สรุปยอดขาย 7-11 เดือน มิถุนายน 2569,,,,,\n"
+        "วันที่,ยอด,ราคา,ก่อน vat,vat,รวมเงิน\n"
+        "1,19220,6.07,116665.40,8166.58,124831.98\n"
+        "2,20200,6.07,122614.00,8582.98,131196.98\n"
+    ).encode("utf-8")
+
+    def test_skips_title_locates_header_and_period(self):
+        parsed = parse_svc.parse_table(self._REAL, "real.csv")
+        self.assertEqual(parsed["headers"][0], "วันที่")  # 跳过标题行
+        self.assertEqual(parsed["row_count"], 2)
+        self.assertEqual(parsed["suggested_period"], [2026, 6])  # 自动认年月
+
+    def test_day_number_dates_composed_via_period(self):
+        parsed = parse_svc.parse_table(self._REAL, "real.csv")
+        yr, mo = parsed["suggested_period"]
+        consts = _sales_constants(cash_walkin=True, period_year=yr, period_month=mo)
+        mapped = mapping_svc.map_rows(
+            parsed, column_map=_COLMAP, constants=consts, workspace=_WORKSPACE
+        )
+        self.assertEqual(mapped[0]["fields"]["date"], "2026-06-01")  # 日号1 → 完整公历日期
+        judged = judge_svc.judge_rows(mapped, own_tax_id=_OWN_TAX, dup_doc_nos=[])
+        self.assertFalse(judged[0]["blocked"])  # 日期拼成 → 不再 bad_date 阻断
 
 
 if __name__ == "__main__":

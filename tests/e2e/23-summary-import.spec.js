@@ -54,6 +54,9 @@ test.describe('录入工作台 · 汇总表批量建单', () => {
         await page.locator('#dxb-parse').click();
         await expect(page.locator('#dx-s-batch-map'), '映射步在场').toBeVisible();
 
+        // ── 真实格式:标题行「เดือน มิถุนายน 2569」→ 批次年月应自动预填(佛历日号靠它拼完整日期)──
+        await expect(page.locator('[data-bk="period_year"]'), '年月自动预填').not.toHaveValue('');
+
         // ── 列映射:显式指定金额列(模拟真实用户复核自动猜列 · 不盲信启发式)──
         // 泰文表头 "ยอดเงินก่อน vat"(税前)/"ยอดเงิน vat"(税额)/"ยอดเงินรวม"(总额)。
         await page.locator('[data-col="date"]').selectOption({ label: 'วันที่' });

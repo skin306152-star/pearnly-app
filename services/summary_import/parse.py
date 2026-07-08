@@ -15,8 +15,10 @@ from services.recon.bank_table_io import (
     _load_csv_sheets,
     _load_excel_all_sheets,
 )
+from services.summary_import.dates import detect_period
 
 _MAX_ROWS = 2000  # 单批上限:再多是异常输入(月度汇总远小于此),防前端/内存被撑爆
+_HEADER_SCAN = 15  # 表头最多藏在前 N 行之下(标题/公司抬头/说明等前言行)
 
 # 汇总表底部合计行:除 recon 关键词外,补「整格恰为总计词」的常见短写(recon 列表按子串匹配,
 # 漏了裸「รวม」「合计」这类单格总计行)。不改 recon 共享列表(它服务银行对账,语义不同)。
@@ -29,6 +31,23 @@ def _looks_summary(cells: List[str]) -> bool:
         if _is_summary_row(c) or c.strip().lower() in _TOTAL_CELL:
             return True
     return False
+
+
+def _is_num(s: str) -> bool:
+    try:
+        float(s.replace(",", "").strip())
+        return True
+    except (ValueError, AttributeError):
+        return False
+
+
+def _looks_header(cells: List[str]) -> bool:
+    """像表头行:≥3 个非空格、且多数为文字(非数字)。用于跳过标题/前言行,定位真表头。"""
+    nonempty = [c for c in cells if c.strip()]
+    if len(nonempty) < 3:
+        return False
+    numeric = sum(1 for c in nonempty if _is_num(c))
+    return numeric * 2 <= len(nonempty)  # 多数非数字 → 表头;多数数字 → 数据行
 
 
 def _cell(v: Any) -> str:
@@ -58,36 +77,58 @@ def _pick_sheet(sheets: List[tuple]) -> tuple:
     return sheets[0]
 
 
-def parse_table(file_bytes: bytes, filename: str = "") -> Dict[str, Any]:
-    """解析汇总表。返回 {sheet_name, headers, rows, row_count, truncated}。
+def _locate_header(nonempty: List[List[str]]) -> int:
+    """真表头行下标(在前 _HEADER_SCAN 行里找"像表头"的);找不到 → 0(退回第一行,兼容干净表)。"""
+    for i, cells in enumerate(nonempty[:_HEADER_SCAN]):
+        if _looks_header(cells):
+            return i
+    return 0
 
-    headers = 第一条非空行(表头);rows = 其后每条数据行的 {index, cells, is_summary}。
-    is_summary 标注底部合计行(不是丢弃,交前端/用户决定是否建单)。解析不出 → headers/rows 空。
+
+def parse_table(file_bytes: bytes, filename: str = "") -> Dict[str, Any]:
+    """解析汇总表。返回 {sheet_name, headers, rows, row_count, truncated, preamble, suggested_period}。
+
+    先跳过标题/前言行定位真表头(真实泰国汇总表常有「สรุปยอดขาย...เดือน...」标题行),表头之上
+    的前言文字用于自动认年月(日期列只写日号时按此拼完整日期)。rows = 表头之后每条数据行的
+    {index, cells, is_summary};is_summary 标注底部合计行。解析不出 → headers/rows 空。
     """
+    empty = {
+        "sheet_name": "",
+        "headers": [],
+        "rows": [],
+        "row_count": 0,
+        "truncated": False,
+        "preamble": "",
+        "suggested_period": None,
+    }
     sheets = _sheets(file_bytes or b"", filename)
     if not sheets:
-        return {"sheet_name": "", "headers": [], "rows": [], "row_count": 0, "truncated": False}
+        return empty
 
     sheet_name, raw_rows = _pick_sheet(sheets)
-    header: List[str] = []
+    nonempty = [[_cell(c) for c in r] for r in raw_rows if not _row_is_empty(r)]
+    if not nonempty:
+        return {**empty, "sheet_name": sheet_name}
+
+    hidx = _locate_header(nonempty)
+    preamble = " ".join(c for row in nonempty[:hidx] for c in row if c.strip())
+    header = nonempty[hidx]
+
     data: List[Dict[str, Any]] = []
     truncated = False
-    for r in raw_rows:
-        if _row_is_empty(r):
-            continue
-        cells = [_cell(c) for c in r]
-        if not header:
-            header = cells
-            continue
+    for cells in nonempty[hidx + 1 :]:
         if len(data) >= _MAX_ROWS:
             truncated = True
             break
         data.append({"index": len(data), "cells": cells, "is_summary": _looks_summary(cells)})
 
+    period = detect_period(preamble)
     return {
         "sheet_name": sheet_name,
         "headers": header,
         "rows": data,
         "row_count": len(data),
         "truncated": truncated,
+        "preamble": preamble,
+        "suggested_period": list(period) if period else None,
     }

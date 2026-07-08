@@ -13,6 +13,7 @@ import re
 from typing import Any, Dict, List
 
 from services.purchase.field_clean import clean_tax_id
+from services.summary_import.dates import resolve_date, to_ad_year
 
 CASH_COUNTERPARTY = "เงินสด"  # 与 MRERP_CASH_CUSTOMER / Express CASH_CUSTOMER_NAME 同串
 _SEQ_RE = re.compile(r"\{(?:seq|n|序号|日期序号)\}")
@@ -27,6 +28,18 @@ def _col_value(row_cells: List[str], column_map: Dict[str, Any], key: str) -> st
         return str(row_cells[int(idx)]).strip()
     except (IndexError, ValueError, TypeError):
         return ""
+
+
+def _period(constants: Dict[str, Any]) -> Any:
+    """批次年月 →(公历 year, month)或 None。年份填佛历自动转公历。日期列只有日号时按此拼完整日期。"""
+    y = str(constants.get("period_year") or "").strip()
+    m = str(constants.get("period_month") or "").strip()
+    if not (y.isdigit() and m.isdigit()):
+        return None
+    mm = int(m)
+    if not (1 <= mm <= 12):
+        return None
+    return to_ad_year(int(y)), mm
 
 
 def _gen_doc_no(pattern: str, index: int, width: int) -> str:
@@ -110,12 +123,15 @@ def build_row_fields(
     payment_method = str(constants.get("payment_method") or "").strip()
 
     item = _line_item(constants, cells, column_map)
+    # 日期归一:完整日期直接用(佛历转公历);只有日号→配批次年月拼完整日期;认不出留原值(判定层报 bad_date)。
+    raw_date = _col_value(cells, column_map, "date")
+    date = resolve_date(raw_date, _period(constants)) or raw_date
     fields: Dict[str, Any] = {
         "document_type": "tax_invoice" if has_vat is not False else "receipt",
         "invoice_number": _gen_doc_no(
             str(constants.get("doc_no_pattern") or ""), index, len(str(row_count))
         ),
-        "date": _col_value(cells, column_map, "date"),
+        "date": date,
         "subtotal": _col_value(cells, column_map, "subtotal"),
         "vat": _col_value(cells, column_map, "vat"),
         "total_amount": _col_value(cells, column_map, "total_amount"),

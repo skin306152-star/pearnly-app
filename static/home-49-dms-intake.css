@@ -406,6 +406,9 @@
 .dmsx .dx-fld{margin-bottom:11px}
 .dmsx .dx-fld label{display:block;font-size:11px;color:var(--dx-muted);margin-bottom:5px}
 .dmsx .dx-req{color:var(--dx-red);font-weight:900}
+.dmsx .dx-period{display:flex;gap:8px}
+.dmsx .dx-period input:first-child{flex:2}
+.dmsx .dx-period input:last-child{flex:1}
 .dmsx .dx-chk{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dx-text);margin:2px 0 11px;cursor:pointer}
 .dmsx .dx-chk input{width:15px;height:15px;accent-color:var(--dx-brand)}
 .dmsx .dx-banner{border-radius:11px;padding:10px 12px;font-size:11px;line-height:1.55}

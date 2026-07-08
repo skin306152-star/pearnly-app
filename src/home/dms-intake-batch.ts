@@ -32,6 +32,8 @@ export interface ParsedTable {
     rows: Array<{ index: number; cells: string[]; is_summary: boolean }>;
     row_count: number;
     truncated: boolean;
+    preamble?: string;
+    suggested_period?: number[] | null; // [公历 year, month] · 从标题自动认出
 }
 
 export interface BatchConstants {
@@ -44,6 +46,8 @@ export interface BatchConstants {
     doc_no_pattern: string;
     cash_walkin: boolean;
     has_vat: boolean;
+    period_year: string; // 批次年月:日期列只有日号时按此拼完整日期(佛历自动转公历)
+    period_month: string;
 }
 
 // 可映射的目标字段(表里有的按列取)· label 走 i18n。
@@ -81,6 +85,8 @@ export const B = {
         doc_no_pattern: '',
         cash_walkin: false,
         has_vat: true,
+        period_year: '',
+        period_month: '',
     } as BatchConstants,
     busy: false,
 };
@@ -175,6 +181,12 @@ async function doParse() {
         }
         B.parsed = d.data as ParsedTable;
         B.columnMap = guessColumns(B.parsed.headers);
+        // 标题里认出年月 → 预填(显示佛历,与表一致;后端 _period 会转公历)。日期是完整日期时此项忽略。
+        const sp = B.parsed.suggested_period;
+        if (sp && sp.length === 2) {
+            B.constants.period_year = String(sp[0] + 543);
+            B.constants.period_month = String(sp[1]);
+        }
         B.view = 'map';
         renderBatchMap();
         showStep(2, 'dx-s-batch-map');
@@ -233,6 +245,10 @@ function constHtml(): string {
         '<div class="dx-fld">' +
         `<label>${esc(t('dxb-f-direction'))}</label>` +
         `<select class="dx-inp" data-bk="direction">${dirSel('sales', 'dxb-dir-sales')}${dirSel('purchase', 'dxb-dir-purchase')}</select></div>` +
+        '<div class="dx-fld"><label>' +
+        esc(t('dxb-f-period')) +
+        `</label><div class="dx-period"><input class="dx-inp" data-bk="period_year" value="${esc(String(c.period_year ?? ''))}" placeholder="${esc(t('dxb-f-period-year-ph'))}" inputmode="numeric"><input class="dx-inp" data-bk="period_month" value="${esc(String(c.period_month ?? ''))}" placeholder="${esc(t('dxb-f-period-month-ph'))}" inputmode="numeric"></div>` +
+        `<div class="dx-hint">${esc(t('dxb-f-period-hint'))}</div></div>` +
         field('counterparty_name', 'dxb-f-counterparty', '', true) +
         field('counterparty_tax', 'dxb-f-tax', t('dxb-f-tax-ph')) +
         chk('cash_walkin', 'dxb-f-walkin') +

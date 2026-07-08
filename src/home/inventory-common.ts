@@ -23,6 +23,7 @@ export interface InvItem {
     min_stock: number | null;
     avg_cost: number | null;
     status: 'ok' | 'low' | 'out';
+    track_batch: boolean;
     batches: InvBatch[];
 }
 export interface InvSummary {
@@ -170,10 +171,13 @@ export const invApi = {
     },
 
     // 入库/盘点弹窗商品下拉:用最近加载的本账套在售商品(无需另请求)。
-    products(): { product_id: string; name: string }[] {
+    // track_batch/batches 一并带出:入库按它显隐批号/效期、盘点按它决定是否逐批。
+    products(): { product_id: string; name: string; track_batch: boolean; batches: InvBatch[] }[] {
         return lastItems.map((it) => ({
             product_id: it.product_id,
             name: localizedName(it.name),
+            track_batch: !!it.track_batch,
+            batches: it.batches || [],
         }));
     },
 };

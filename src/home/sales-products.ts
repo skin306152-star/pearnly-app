@@ -22,6 +22,7 @@ interface Product {
     unit?: string;
     unit_price: number;
     vat_applicable: boolean;
+    track_batch?: boolean;
     image_url?: string;
 }
 
@@ -144,6 +145,7 @@ function openEdit(p: Product | null) {
                 <div><label>${escapeHtml(t('sx-p-f-price'))}</label><input type="number" id="sx-pf-price" value="${p ? p.unit_price : ''}" min="0" step="0.01"></div>
             </div>
             <div class="form-row"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="sx-pf-vat" ${!p || p.vat_applicable ? 'checked' : ''} style="width:auto"> ${escapeHtml(t('sx-p-f-vat'))}</label></div>
+            <div class="form-row"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="sx-pf-batch" ${p && p.track_batch ? 'checked' : ''} style="width:auto"> ${escapeHtml(t('sx-p-f-batch'))}</label><div class="sx-field-hint">${escapeHtml(t('sx-p-f-batch-hint'))}</div></div>
             <div class="form-row">${imageFieldHtml('sx-pf-image', t('sx-p-f-image'), p?.image_url)}</div>
         </div>
         <div class="modal-footer" style="justify-content:space-between;gap:8px">
@@ -171,6 +173,7 @@ function readForm() {
         unit: val('sx-pf-unit') || null,
         unit_price: Number(val('sx-pf-price')) || 0,
         vat_applicable: (document.getElementById('sx-pf-vat') as HTMLInputElement).checked,
+        track_batch: (document.getElementById('sx-pf-batch') as HTMLInputElement).checked,
         image_url: val('sx-pf-image') || null,
     };
 }

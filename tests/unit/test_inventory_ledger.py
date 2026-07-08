@@ -7,6 +7,7 @@
 
 import unittest
 from decimal import Decimal
+from unittest import mock
 
 from services.inventory import ledger
 
@@ -127,6 +128,48 @@ class ReceiveConversionTests(unittest.TestCase):
         )
         self.assertTrue(out["deduped"])
         self.assertEqual(out["txn_ids"], [])
+
+
+class ReceiveBatchGuardTests(unittest.TestCase):
+    """非批次品即便传批号也不落批次行(货入散装桶)——防"库存看得见卖不出"从源头。"""
+
+    def _run(self, tracks):
+        created, moved = [], []
+
+        def _batch(cur, **kw):
+            created.append(kw)
+            return {"id": "b1"}
+
+        def _move(cur, **kw):
+            moved.append(kw.get("batch_id"))
+            return {"txn": {"id": "tx1"}, "qty_on_hand": Decimal("5")}
+
+        with (
+            mock.patch.object(ledger, "resolve_factor", return_value=Decimal("1")),
+            mock.patch.object(ledger.store, "product_tracks_batch", return_value=tracks),
+            mock.patch.object(ledger.store, "get_or_create_batch", side_effect=_batch),
+            mock.patch.object(ledger, "apply_movement", side_effect=_move),
+        ):
+            ledger.receive(
+                object(),
+                tenant_id="t",
+                workspace_client_id=9,
+                warehouse_id=1,
+                lines=[
+                    {"product_id": "p", "qty": 3, "batch_no": "L1", "expiry_date": "2027-01-01"}
+                ],
+            )
+        return created, moved
+
+    def test_nonbatch_product_ignores_batch_no(self):
+        created, moved = self._run(tracks=False)
+        self.assertEqual(created, [])  # 未建批次
+        self.assertEqual(moved, [None])  # 货入散装行
+
+    def test_batch_product_creates_batch(self):
+        created, moved = self._run(tracks=True)
+        self.assertEqual(len(created), 1)  # 建了批次
+        self.assertEqual(moved, ["b1"])  # 货入批次行
 
 
 class CountTests(unittest.TestCase):

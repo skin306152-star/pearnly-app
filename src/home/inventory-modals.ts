@@ -18,16 +18,44 @@ function productOptions(): string {
 
 function inRowHtml(): string {
     const id = 'invr-' + rowSeq++;
+    // 批号/效期默认藏起来:只有选中的商品在商品资料里勾了「批次管理」才显(applyBatchVisibility)。
+    // 普通百货不碰批次 → 货进散装桶、收银台直接可卖(否则批次桶货够不着 = 看得见卖不出)。
     return `<div class="inv-frow" data-row="${id}">
         <select class="inv-field" data-k="product_id"><option value="">—</option>${productOptions()}</select>
         <input class="inv-field" data-k="qty" type="number" min="0" step="0.001" placeholder="0">
         <input class="inv-field" data-k="unit_cost" type="number" min="0" step="0.01" placeholder="0.00">
         <span style="display:flex;gap:6px;align-items:center">
-            <input class="inv-field" data-k="batch_no" placeholder="${escapeHtml(t('inv-f-batch'))}">
-            <input class="inv-field" data-k="expiry_date" type="date">
+            <span class="inv-batchcell" data-batchcell style="display:none;gap:6px;align-items:center;flex:1">
+                <input class="inv-field" data-k="batch_no" placeholder="${escapeHtml(t('inv-f-batch'))}">
+                <input class="inv-field" data-k="expiry_date" type="date">
+            </span>
             <button type="button" class="inv-rowx" data-rowx="${id}" aria-label="${escapeHtml(t('inv-row-remove'))}">×</button>
         </span>
     </div>`;
+}
+
+function productById(id: string) {
+    return invApi.products().find((p) => p.product_id === id) || null;
+}
+
+// 收货行:按选中商品是否批次品显隐批号/效期;非批次品同时清空,确保不发批号(不落批次桶)。
+function applyBatchVisibility(row: HTMLElement) {
+    const cell = row.querySelector<HTMLElement>('[data-batchcell]');
+    if (!cell) return;
+    const sel = row.querySelector<HTMLSelectElement>('[data-k="product_id"]');
+    const prod = sel ? productById(sel.value) : null;
+    const show = !!(prod && prod.track_batch);
+    cell.style.display = show ? 'flex' : 'none';
+    if (!show) cell.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.value = ''));
+}
+
+function bindProductChange(maskId: string) {
+    const mask = document.getElementById(maskId);
+    if (!mask) return;
+    mask.querySelectorAll<HTMLElement>('[data-row]').forEach((row) => {
+        const sel = row.querySelector<HTMLSelectElement>('[data-k="product_id"]');
+        if (sel) sel.onchange = () => applyBatchVisibility(row);
+    });
 }
 
 function countRowHtml(): string {
@@ -109,8 +137,10 @@ function openModal(cfg: ModalCfg) {
             const rows = document.getElementById(cfg.maskId + '-rows');
             if (rows) rows.insertAdjacentHTML('beforeend', cfg.rowFactory());
             bindRowX(cfg.maskId);
+            bindProductChange(cfg.maskId);
         };
     bindRowX(cfg.maskId);
+    bindProductChange(cfg.maskId);
     const submit = document.getElementById(cfg.maskId + '-submit') as HTMLButtonElement | null;
     if (submit) submit.onclick = () => doSubmit(cfg, submit);
     mask.onclick = (e) => {

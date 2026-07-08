@@ -69,6 +69,7 @@ def _prow(qty, avg_cost):
         "base_unit": "เม็ด",
         "min_stock": None,
         "default_cost": None,
+        "track_batch": False,
         "qty_on_hand": Decimal(str(qty)),
         "avg_cost": Decimal(str(avg_cost)),
     }

@@ -34,6 +34,7 @@ def _prow(qty, min_stock=None, avg_cost=None, image_url=None):
         "base_unit": "เม็ด",
         "min_stock": Decimal(str(min_stock)) if min_stock is not None else None,
         "default_cost": None,
+        "track_batch": False,
         "qty_on_hand": Decimal(str(qty)),
         "avg_cost": Decimal(str(avg_cost)) if avg_cost is not None else None,
     }

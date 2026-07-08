@@ -44,7 +44,7 @@ def stock_overview(
     # 也列出来(零库存)。批次均价子查询同步按套账,避免跨套账批次拉低/抬高本套账均价。
     sql = (
         "SELECT p.id AS product_id, p.name_th, p.name_en, p.name_zh, p.barcode, "
-        "p.image_url, p.base_unit, p.min_stock, p.default_cost, "
+        "p.image_url, p.base_unit, p.min_stock, p.default_cost, p.track_batch, "
         "COALESCE(SUM(s.qty_on_hand), 0) AS qty_on_hand, "
         "COALESCE(MAX(b.avg_cost), p.default_cost) AS avg_cost "
         "FROM products p "
@@ -69,7 +69,7 @@ def stock_overview(
         params += [like, like, like]
     sql += (
         " GROUP BY p.id, p.name_th, p.name_en, p.name_zh, p.barcode, p.image_url, "
-        "p.base_unit, p.min_stock, p.default_cost ORDER BY p.name_th"
+        "p.base_unit, p.min_stock, p.default_cost, p.track_batch ORDER BY p.name_th"
     )
     cur.execute(sql, params)
     rows = cur.fetchall()
@@ -107,6 +107,7 @@ def stock_overview(
                 "min_stock": _f(r["min_stock"]),
                 "avg_cost": None if mask_cost else _f(r["avg_cost"]),
                 "status": status,
+                "track_batch": bool(r["track_batch"]),
                 "batches": batches_by_product.get(str(r["product_id"]), []),
             }
         )

@@ -73,3 +73,20 @@ def method_label(method: str, lang: str) -> str:
     lg = norm_lang(lang)
     entry = _PAYMENT_METHOD_LABEL.get(method or "")
     return entry[lg] if entry else (method or "")
+
+
+_SHIFT_LABEL = {"th": "กะ", "en": "Shift", "zh": "班次", "ja": "シフト"}
+_SHIFT_OPEN_LABEL = {
+    "th": "ยังไม่ปิดกะ",
+    "en": "still open",
+    "zh": "进行中",
+    "ja": "進行中",
+}
+
+
+def shift_label(lang: str) -> str:
+    return _SHIFT_LABEL[norm_lang(lang)]
+
+
+def shift_open_label(lang: str) -> str:
+    return _SHIFT_OPEN_LABEL[norm_lang(lang)]

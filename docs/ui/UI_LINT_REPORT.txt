@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 342 个源文件全扫
+# UI 设计合规扫描报告 · 343 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 8(8 文件)
@@ -147,7 +147,7 @@
      2  static\pos\pos-restaurant-ops.js
         └ 83: const tm = (t.late ? '⚠ ' : '⏱ ') + (t.minutes || 0) + ' ' + POS.t('posui.rest.min');
      1  src\home\app-shell-sidebar-html.ts
-        └ 330: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
+        └ 336: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
      1  src\home\dms-intake-invoice-submit.ts
         └ 91: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
      1  src\home\dms-intake.ts

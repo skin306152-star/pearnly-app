@@ -306,6 +306,8 @@ interface Window {
     loadPosPayment?: () => void;
     // POS · Google Sheet 留档设置页(owner · 路由 pos-sheets · 平铺 section)
     loadPosSheets?: () => void;
+    // POS · 交易明细日志页(view 级 · 路由 pos-sales-log · 平铺 section)
+    loadPosSalesLog?: () => void;
     loadInventoryPage?: () => void;
     loadPosOnboardingPage?: () => void;
     loadSalesReport?: () => void;

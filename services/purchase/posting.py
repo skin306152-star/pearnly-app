@@ -65,12 +65,10 @@ def post_doc(cur, *, tenant_id, workspace_client_id, doc_id, auto_stock_in, crea
         source_id=doc_id,
         created_by=created_by,
     )
-    # 建单即付(智能默认收据/用户手动设已付):购票过账后补记全额付款,
-    # 账本应付↔现金对平(pay_doc 同步记付款分录·做账关则 no-op)。
-    # get_doc 返回 {"doc": {...}, "lines": [...]} 嵌套结构,取字段须走 doc["doc"]。
-    head = doc["doc"]
-    payable = Decimal(str(head.get("net_payable") or 0))
-    if head.get("payment_status") == "paid" and payable > 0:
+    # 建单即付(智能默认收据/用户手动设已付):购票过账后补记全额付款,账本应付↔现金对平
+    # (pay_doc 同步记付款分录·做账关则 no-op)。get_doc 是嵌套结构,取字段走 doc["doc"]。
+    payable = Decimal(str(doc["doc"].get("net_payable") or 0))
+    if doc["doc"].get("payment_status") == "paid" and payable > 0:
         doc = pay_doc(
             cur,
             tenant_id=tenant_id,

@@ -197,7 +197,7 @@ class LineValidationTests(unittest.TestCase):
 class PostAutoPayTests(unittest.TestCase):
     """PO-5 建单即付:post 时 payment_status='paid' → 自动补付款(复用 pay_doc)。"""
 
-    def _post(self, doc):
+    def _post(self, payment_status):
         from unittest import mock
 
         captured = {}
@@ -214,12 +214,26 @@ class PostAutoPayTests(unittest.TestCase):
                     "paid_amount": 0,
                 }
 
+        # get_doc 真实契约是嵌套 {"doc": {...}, "lines": [...]}(services/purchase/docs.py:284),
+        # mock 必须还原这层嵌套,否则测不出 post_doc 误把它当扁平字典取值的回归(生产真踩过)。
+        nested_doc = {
+            "doc": {
+                "id": "D1",
+                "payment_status": payment_status,
+                "net_payable": 100,
+                "paid_amount": 0,
+            },
+            "lines": [],
+            "attachments": [],
+            "supplier": None,
+        }
+
         def fake_pay(cur, **k):
             captured.update(k)
-            return {**doc, "paid_amount": 100}
+            return nested_doc
 
         with (
-            mock.patch.object(posting_svc.docs_svc, "get_doc", return_value=doc),
+            mock.patch.object(posting_svc.docs_svc, "get_doc", return_value=nested_doc),
             mock.patch.object(posting_svc.acct_hooks, "enqueue_posting", return_value=None),
             mock.patch.object(posting_svc, "pay_doc", side_effect=fake_pay),
         ):
@@ -236,16 +250,12 @@ class PostAutoPayTests(unittest.TestCase):
     def test_paid_doc_auto_pays(self):
         from decimal import Decimal
 
-        res, captured = self._post(
-            {"id": "D1", "payment_status": "paid", "net_payable": 100, "paid_amount": 0}
-        )
+        res, captured = self._post("paid")
         self.assertEqual(captured.get("amount"), Decimal("100"))
-        self.assertEqual(res["paid_amount"], 100)
+        self.assertEqual(res["doc"]["paid_amount"], 0)  # fake_pay 桩不重算,只验调用发生
 
     def test_unpaid_doc_no_auto_pay(self):
-        res, captured = self._post(
-            {"id": "D1", "payment_status": "unpaid", "net_payable": 100, "paid_amount": 0}
-        )
+        res, captured = self._post("unpaid")
         self.assertEqual(captured, {})
 
 

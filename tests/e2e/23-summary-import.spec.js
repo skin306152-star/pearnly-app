@@ -9,7 +9,7 @@
 const path = require('path');
 const { test, expect } = require('@playwright/test');
 const { hasCreds, ensureStorageState, STORAGE_STATE } = require('./_helpers/auth');
-const { enterApp, openRoute } = require('./_helpers/app');
+const { enterApp } = require('./_helpers/app');
 const { attachConsoleGuard, assertNoConsoleErrors } = require('./_helpers/console-guard');
 
 const FIXTURE = path.join(__dirname, '_fixtures', 'summary-7-11-ice.xlsx');
@@ -30,7 +30,14 @@ test.describe('录入工作台 · 汇总表批量建单', () => {
             page.screenshot({ path: path.join(OUT, name + '.png'), fullPage: true });
 
         await enterApp(page);
-        await openRoute(page, 'dms-intake');
+        // 录入工作台入口在可折叠导航组内(默认收起 · 侧栏点击非本功能验收点),
+        // 直接走 hash 路由进目标页,再对真实渲染的功能 UI 断言。
+        await page.evaluate(() => {
+            const w = window;
+            if (typeof w.routeTo === 'function') w.routeTo('dms-intake');
+            else location.hash = '#/dms-intake';
+        });
+        await expect(page.locator('#page-dms-intake'), '录入工作台页激活').toHaveClass(/active/);
 
         // ── 选第三张卡(中间位)· 上传步露出 ──
         await page.locator('.dx-opt[data-task="summary_batch"]').click();
@@ -46,6 +53,13 @@ test.describe('录入工作台 · 汇总表批量建单', () => {
         await shot('02-upload');
         await page.locator('#dxb-parse').click();
         await expect(page.locator('#dx-s-batch-map'), '映射步在场').toBeVisible();
+
+        // ── 列映射:显式指定金额列(模拟真实用户复核自动猜列 · 不盲信启发式)──
+        // 泰文表头 "ยอดเงินก่อน vat"(税前)/"ยอดเงิน vat"(税额)/"ยอดเงินรวม"(总额)。
+        await page.locator('[data-col="date"]').selectOption({ label: 'วันที่' });
+        await page.locator('[data-col="subtotal"]').selectOption({ label: 'ยอดเงินก่อน vat' });
+        await page.locator('[data-col="vat"]').selectOption({ label: 'ยอดเงิน vat' });
+        await page.locator('[data-col="total_amount"]').selectOption({ label: 'ยอดเงินรวม' });
 
         // ── 批次常量:刻意留空客户税号 + 勾选散客(专测现金兜底路径)──
         await page.locator('[data-bk="counterparty_name"]').fill('7-11');

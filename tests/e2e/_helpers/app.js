@@ -19,9 +19,28 @@ async function dismissWorkspaceModal(page) {
     await modal.waitFor({ state: 'detached', timeout: 5_000 }).catch(() => {});
 }
 
+// 多账套用户登录后有一道硬启动闸 workspace-gate-root(#workspace-gate-root · onboarding 选公司),
+// 在 sidebar 之前 preboot 且把 sidebar 置 visibility:hidden——必须先选一个账套才能进主应用。
+// 单账套用户此闸自动跳过。E2E 里选第一个账套进场(不新建 · 只做启动必需的选择)。
+async function dismissWorkspaceGate(page) {
+    const pick = page.locator('#workspace-gate-root [data-wsg-pick]').first();
+    const appeared = await pick
+        .waitFor({ state: 'visible', timeout: 6_000 })
+        .then(() => true)
+        .catch(() => false);
+    if (!appeared) return;
+    await pick.click();
+    await page
+        .locator('#workspace-gate-root')
+        .waitFor({ state: 'detached', timeout: 8_000 })
+        .catch(() => {});
+}
+
 // 进主应用 · storageState 已注入 mrpilot_token → home.js 不该把我们踢回着陆页
 async function enterApp(page) {
     await page.goto('/home');
+    // 多账套启动闸先过(否则 sidebar 一直 visibility:hidden)
+    await dismissWorkspaceGate(page);
     // 侧栏在 = token 有效、进了主应用(无 token 时 home.js 会 window.location.href='/')
     await expect(page.locator('#sidebar'), '进主应用(token 有效)').toBeVisible({
         timeout: 15_000,

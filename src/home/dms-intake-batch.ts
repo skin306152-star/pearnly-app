@@ -93,15 +93,26 @@ export function resetBatch() {
     B.busy = false;
 }
 
+// 表头猜列:按「最长命中关键词」贪心配对,每个表头只归一个字段。
+// (泰文表头 "ยอดเงินก่อน vat" 既含 subtotal 的 "ยอดเงินก่อน" 又含 vat 的裸 "vat" →
+//  最长命中胜出,避免 subtotal/vat 撞同一列造成"金额不符"假阳。)
 function guessColumns(headers: string[]): Record<string, number> {
-    const map: Record<string, number> = {};
+    const cands: Array<{ key: string; idx: number; score: number }> = [];
     COLS.forEach(([key]) => {
         const kws = GUESS[key] || [];
-        const idx = headers.findIndex((h) => {
+        headers.forEach((h, idx) => {
             const low = (h || '').toLowerCase();
-            return kws.some((kw) => low.includes(kw));
+            const score = kws.reduce((m, kw) => (low.includes(kw) ? Math.max(m, kw.length) : m), 0);
+            if (score > 0) cands.push({ key, idx, score });
         });
-        if (idx >= 0) map[key] = idx;
+    });
+    cands.sort((a, b) => b.score - a.score);
+    const map: Record<string, number> = {};
+    const usedIdx = new Set<number>();
+    cands.forEach((c) => {
+        if (c.key in map || usedIdx.has(c.idx)) return;
+        map[c.key] = c.idx;
+        usedIdx.add(c.idx);
     });
     return map;
 }

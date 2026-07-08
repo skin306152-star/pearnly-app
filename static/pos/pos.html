@@ -411,6 +411,24 @@
               </svg>
               <span data-i18n="posui.pay.card">刷卡</span>
             </div>
+            <div class="pm" data-pm="transfer">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <line x1="3" y1="21" x2="21" y2="21" />
+                <line x1="5" y1="21" x2="5" y2="10" />
+                <line x1="10" y1="21" x2="10" y2="10" />
+                <line x1="14" y1="21" x2="14" y2="10" />
+                <line x1="19" y1="21" x2="19" y2="10" />
+                <polygon points="12 3 21 8 3 8" />
+              </svg>
+              <span data-i18n="posui.pay.transfer">转账</span>
+            </div>
           </div>
 
           <div class="pm-body" id="pm-cash">
@@ -473,6 +491,32 @@
             <div class="pm-err" id="pay-card-err"></div>
             <button class="confirm" id="pay-card-confirm" data-i18n="posui.pay.confirm.card">
               已完成 · 出小票
+            </button>
+          </div>
+
+          <div class="pm-body" id="pm-transfer" style="display: none">
+            <div class="bank-card" id="pay-bank-card">
+              <div class="bank-row">
+                <span data-i18n="posui.pay.bank_name">银行名称</span><b id="pay-bank-name"></b>
+              </div>
+              <div class="bank-row">
+                <span data-i18n="posui.pay.bank_no">银行账号</span
+                ><b id="pay-bank-no" class="tnum"></b>
+              </div>
+              <div class="bank-row">
+                <span data-i18n="posui.pay.bank_acc_name">户名</span><b id="pay-bank-acc-name"></b>
+              </div>
+            </div>
+            <div class="qr-note" data-i18n="posui.pay.transfer.hint">
+              让顾客转账到下方账户,核对金额后再确认
+            </div>
+            <div class="pm-err" id="pay-transfer-err"></div>
+            <button
+              class="confirm"
+              id="pay-transfer-confirm"
+              data-i18n="posui.pay.confirm.transfer"
+            >
+              已收到转账 · 出小票
             </button>
           </div>
         </div>

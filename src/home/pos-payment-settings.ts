@@ -12,6 +12,10 @@ interface PaySettings {
     service_charge_rate: string;
     price_includes_vat: boolean;
     promptpay_id: string;
+    bank_transfer_enabled: boolean;
+    bank_name: string;
+    bank_account_no: string;
+    bank_account_name: string;
 }
 
 const URL = '/api/pos/admin/payment-settings';
@@ -122,11 +126,21 @@ function render(s: PaySettings): void {
         '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="14" y1="14" x2="21" y2="21"/></svg>';
     const icCard =
         '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>';
+    const icBank =
+        '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="21" x2="21" y2="21"/><line x1="5" y1="21" x2="5" y2="10"/><line x1="10" y1="21" x2="10" y2="10"/><line x1="14" y1="21" x2="14" y2="10"/><line x1="19" y1="21" x2="19" y2="10"/><polygon points="12 3 21 8 3 8"/></svg>';
     const ppSub = `<div class="sub-cfg" id="rpay-pp-cfg"${s.promptpay_enabled ? '' : ' style="display:none;"'}>
         <label>${escapeHtml(t('rpay.pp_id'))}</label>
         <div class="fld"><span class="pre">฿</span><input id="rpay-ppid" maxlength="40" value="${escapeHtml(s.promptpay_id)}" placeholder="${escapeHtml(t('rpay.pp_ph'))}"></div>
         <div class="hint">${escapeHtml(t('rpay.pp_hint'))}</div></div>`;
     const cardSub = `<div class="sub-cfg"><div class="hint">${escapeHtml(t('rpay.card_hint'))}</div></div>`;
+    const bankSub = `<div class="sub-cfg" id="rpay-bank-cfg"${s.bank_transfer_enabled ? '' : ' style="display:none;"'}>
+        <label>${escapeHtml(t('rpay.bank_name'))}</label>
+        <div class="fld"><input id="rpay-bank-name" maxlength="120" value="${escapeHtml(s.bank_name)}" placeholder="${escapeHtml(t('rpay.bank_name_ph'))}"></div>
+        <label style="margin-top:10px;">${escapeHtml(t('rpay.bank_no'))}</label>
+        <div class="fld"><input id="rpay-bank-no" maxlength="40" value="${escapeHtml(s.bank_account_no)}" placeholder="${escapeHtml(t('rpay.bank_no_ph'))}"></div>
+        <label style="margin-top:10px;">${escapeHtml(t('rpay.bank_acc_name'))}</label>
+        <div class="fld"><input id="rpay-bank-acc-name" maxlength="120" value="${escapeHtml(s.bank_account_name)}" placeholder="${escapeHtml(t('rpay.bank_acc_name_ph'))}"></div>
+        <div class="hint">${escapeHtml(t('rpay.bank_hint'))}</div></div>`;
     const cash = `<div class="pm on lock"><div class="pmtop"><div class="ic">${icCash}</div><div class="tx"><div class="n">${escapeHtml(t('rpay.cash'))}</div><div class="d">${escapeHtml(t('rpay.cash_d'))}</div></div><div class="sw"></div></div></div>`;
     const methods =
         cash +
@@ -144,7 +158,14 @@ function render(s: PaySettings): void {
             t('rpay.card_d'),
             s.card_enabled,
             t('rpay.card_tag')
-        ).replace('__SUB_card__', cardSub);
+        ).replace('__SUB_card__', cardSub) +
+        pmRow(
+            'banktransfer',
+            icBank,
+            t('rpay.bank'),
+            t('rpay.bank_d'),
+            s.bank_transfer_enabled
+        ).replace('__SUB_banktransfer__', bankSub);
     body.innerHTML = `<div class="card"><div class="ch">${escapeHtml(t('rpay.methods'))}</div>${methods}</div>
         <div class="card"><div class="ch">${escapeHtml(t('rpay.other'))}</div>
             <div class="row"><div class="tx"><div class="n">${escapeHtml(t('rpay.service'))}</div><div class="d">${escapeHtml(t('rpay.service_d'))}</div></div>
@@ -163,6 +184,10 @@ function render(s: PaySettings): void {
                 const cfg = document.getElementById('rpay-pp-cfg');
                 if (cfg) cfg.style.display = onNow ? '' : 'none';
             }
+            if (which === 'banktransfer') {
+                const cfg = document.getElementById('rpay-bank-cfg');
+                if (cfg) cfg.style.display = onNow ? '' : 'none';
+            }
         })
     );
     (body.querySelector('#rpay-save') as HTMLElement).addEventListener('click', save);
@@ -173,6 +198,9 @@ async function save(): Promise<void> {
     btn.disabled = true;
     const ppOn = !!document.querySelector('.pm[data-pm="promptpay"]')?.classList.contains('on');
     const cardOn = !!document.querySelector('.pm[data-pm="card"]')?.classList.contains('on');
+    const bankOn = !!document
+        .querySelector('.pm[data-pm="banktransfer"]')
+        ?.classList.contains('on');
     const vatOn = !!document.querySelector('.row[data-pm="vat"] .pm')?.classList.contains('on');
     const payload = {
         workspace_client_id: ws,
@@ -183,6 +211,13 @@ async function save(): Promise<void> {
             Number((document.getElementById('rpay-svc') as HTMLInputElement).value) || 0,
         promptpay_id:
             (document.getElementById('rpay-ppid') as HTMLInputElement | null)?.value || '',
+        bank_transfer_enabled: bankOn,
+        bank_name:
+            (document.getElementById('rpay-bank-name') as HTMLInputElement | null)?.value || '',
+        bank_account_no:
+            (document.getElementById('rpay-bank-no') as HTMLInputElement | null)?.value || '',
+        bank_account_name:
+            (document.getElementById('rpay-bank-acc-name') as HTMLInputElement | null)?.value || '',
     };
     try {
         const s = await call('PUT', payload);

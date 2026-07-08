@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, Query, Request
@@ -26,6 +28,30 @@ from services.pos import (
 )
 
 router = APIRouter(prefix="/api/pos", tags=["pos-sales"])
+logger = logging.getLogger("mr-pilot")
+
+# 售出后台留档到 Google Sheet(fire-and-forget)· 持强引用防任务被 GC(asyncio 已知坑)。
+_sheets_sync_tasks: set = set()
+
+
+def _schedule_sheets_sync(tenant_id: str, workspace_client_id: int, sale_id: str) -> None:
+    async def _run():
+        try:
+            from services.pos import sheets_sync
+
+            with db.get_cursor_rls(tenant_id, commit=True) as cur:
+                sheets_sync.sync_sale(
+                    cur,
+                    tenant_id=tenant_id,
+                    workspace_client_id=workspace_client_id,
+                    sale_id=sale_id,
+                )
+        except Exception as e:  # noqa: BLE001 — 留档失败绝不影响已完成的收银
+            logger.warning("pos sheets sync task failed (sale_id=%s): %s", sale_id, e)
+
+    task = asyncio.create_task(_run())
+    _sheets_sync_tasks.add(task)
+    task.add_done_callback(_sheets_sync_tasks.discard)
 
 
 def _subject(request: Request) -> tuple[dict, str]:
@@ -223,17 +249,22 @@ def _dump(m) -> dict:
 @router.post("/sales")
 async def api_create_sale(req: CreateSaleRequest, request: Request):
     payload = _dump(req)
-    return _write(
-        request,
-        req.workspace_client_id,
-        lambda cur, tid, ws, user: sale_svc.create_sale(
+    user, tid = _subject(request)
+    ws = _resolve_ws(user, req.workspace_client_id)
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        assert_module_enabled(cur, tid, "pos")
+        require_workspace(cur, tid, ws)
+        result = sale_svc.create_sale(
             cur,
             tenant_id=tid,
             workspace_client_id=ws,
             payload={**payload, "cashier_id": user.get("cashier_id")},
             created_by=_created_by(user),
-        ),
-    )
+        )
+    # 只对本次真新建的单留档(client_uuid 命中去重的重放不重复追加,天然幂等)。
+    if not result.get("deduped"):
+        _schedule_sheets_sync(tid, ws, result["sale"]["id"])
+    return ok(result)
 
 
 class SyncRequest(BaseModel):

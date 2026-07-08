@@ -310,6 +310,12 @@ export const SIDEBAR_HTML = `
                 </svg>
                 <span class="nav-label" data-i18n="nav-pos-payment">收款设置</span>
             </div>
+            <div class="nav-item nav-sub-item" id="nav-pos-sheets" data-route="pos-sheets" data-module="pos" style="display:none;">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="3" width="16" height="14" rx="1.5"/><line x1="2" y1="7" x2="18" y2="7"/><line x1="7" y1="7" x2="7" y2="17"/><line x1="12" y1="7" x2="12" y2="17"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-pos-sheets">Google Sheet 留档</span>
+            </div>
             <div class="nav-item nav-sub-item" id="nav-pos-switch" data-href="/pos" data-module="pos">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="2" y="4" width="16" height="11" rx="1.5"/>

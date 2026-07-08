@@ -79,12 +79,52 @@ class CredentialTests(unittest.TestCase):
 
 class StateTests(unittest.TestCase):
     def test_consume_returns_owner(self):
-        cur = FakeCursor(one=[{"tenant_id": "t1", "workspace_client_id": 11, "user_id": "u1"}])
+        cur = FakeCursor(
+            one=[
+                {
+                    "tenant_id": "t1",
+                    "workspace_client_id": 11,
+                    "user_id": "u1",
+                    "return_to": "pos",
+                }
+            ]
+        )
         out = gs.consume_state(cur, state="xyz")
-        self.assertEqual(out, {"tenant_id": "t1", "workspace_client_id": 11, "user_id": "u1"})
+        self.assertEqual(
+            out,
+            {"tenant_id": "t1", "workspace_client_id": 11, "user_id": "u1", "return_to": "pos"},
+        )
+
+    def test_consume_missing_return_to_falls_back_to_purchase_export(self):
+        # 旧 state 行(升级前建的)没有 return_to 值时列默认已保底,这里只测 None 兜底分支。
+        cur = FakeCursor(
+            one=[{"tenant_id": "t1", "workspace_client_id": 11, "user_id": "u1", "return_to": None}]
+        )
+        out = gs.consume_state(cur, state="xyz")
+        self.assertEqual(out["return_to"], "purchase-export")
 
     def test_consume_missing_returns_none(self):
         self.assertIsNone(gs.consume_state(FakeCursor(), state="xyz"))
+
+    def test_save_state_defaults_return_to_purchase_export(self):
+        cur = FakeCursor()
+        gs.save_state(cur, state="xyz", tenant_id="t1", workspace_client_id=11, user_id="u1")
+        insert = cur.calls[-1]
+        self.assertIn("return_to", insert[0])
+        self.assertEqual(insert[1], ("xyz", "t1", 11, "u1", "purchase-export"))
+
+    def test_save_state_custom_return_to(self):
+        cur = FakeCursor()
+        gs.save_state(
+            cur,
+            state="xyz",
+            tenant_id="t1",
+            workspace_client_id=11,
+            user_id="u1",
+            return_to="pos",
+        )
+        insert = cur.calls[-1]
+        self.assertEqual(insert[1], ("xyz", "t1", 11, "u1", "pos"))
 
 
 class ArchivedTests(unittest.TestCase):

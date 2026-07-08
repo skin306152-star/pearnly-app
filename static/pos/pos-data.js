@@ -46,6 +46,13 @@
         if (typeof obj === 'string') return obj;
         return obj[state.lang] || obj.en || obj.th || obj.zh || Object.values(obj)[0] || '';
     };
+    // HTML 转义(本地小票拼字符串塞进 document.write 前用 · 防店铺资料含尖括号破版式)
+    POS.esc = function (s) {
+        return String(s == null ? '' : s).replace(
+            /[&<>"']/g,
+            (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+        );
+    };
     // 商品名缓存(product_id → name 对象)· 选品时填充 · 历史小票退货(详情行不带 name)按 id 回查
     POS.nameCache = {};
     POS.productName = function (productId) {
@@ -101,11 +108,17 @@
     // ── 收款设置访问器(老板配 · bootstrap 拉到 state.payment;未拉到用默认全开)──
     // 收银台与餐厅埋单共用。支付方式显隐数据驱动:data-pm 值同时是发后端的 method 字符串
     // (收银台 qr / 餐厅 promptpay 指同一 PromptPay),不归一以免改动报表分组,经 PM_FLAG 映射到开关。
-    const PAY_DEFAULTS = { promptpay_enabled: true, card_enabled: true, price_includes_vat: true };
+    const PAY_DEFAULTS = {
+        promptpay_enabled: true,
+        card_enabled: true,
+        bank_transfer_enabled: false,
+        price_includes_vat: true,
+    };
     const PM_FLAG = {
         qr: 'promptpay_enabled',
         promptpay: 'promptpay_enabled',
         card: 'card_enabled',
+        transfer: 'bank_transfer_enabled',
         // cash 无开关 → 恒显
     };
     const pay = (POS.pay = {});
@@ -120,11 +133,13 @@
         return r != null ? String(r) : '10';
     };
     // bootstrap 拉收款设置到 state.payment(已拉过则跳过;失败静默用默认,不阻塞卖货)。
+    // 顺带回写店铺名/地址缓存(小票抬头用,见 pos.js POS.cacheStoreInfo)。
     pay.ensure = async function () {
         if (state.payment) return;
         try {
             const b = await POS.data.bootstrap();
             if (b && b.payment) state.payment = b.payment;
+            if (b && b.store && POS.cacheStoreInfo) POS.cacheStoreInfo(b.store);
         } catch (_) {}
     };
     // 按收款设置显隐支付方式元素(现金恒显;关掉的方式不显)。sel 命中容器内带 data-pm 的元素。

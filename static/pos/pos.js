@@ -297,6 +297,7 @@
     const STORE_TOKEN_KEY = 'pos_store_token';
     const STORE_WS_KEY = 'pos_store_ws';
     const STORE_NAME_KEY = 'pos_store_name';
+    const STORE_ADDR_KEY = 'pos_store_addr';
 
     function readEnv() {
         try {
@@ -314,6 +315,8 @@
                 state.workspaceClientId = wc ? Number(wc) : null;
                 state.store = localStorage.getItem('pearnly_active_workspace_name') || '';
             }
+            // 小票抬头地址:离线打印用,来源见 pos-data.js pay.ensure() 拉到 bootstrap.store 后回写缓存。
+            state.storeAddress = localStorage.getItem(STORE_ADDR_KEY) || '';
         } catch (_) {}
     }
 
@@ -327,6 +330,17 @@
             localStorage.setItem(STORE_NAME_KEY, state.store);
         } catch (_) {}
     }
+
+    // bootstrap 拉到账套主体资料后回写店名/地址缓存(供离线打印小票用)· pos-data.js pay.ensure() 调。
+    POS.cacheStoreInfo = function (store) {
+        if (!store) return;
+        state.store = store.name || state.store;
+        state.storeAddress = store.address || '';
+        try {
+            if (store.name) localStorage.setItem(STORE_NAME_KEY, store.name);
+            localStorage.setItem(STORE_ADDR_KEY, state.storeAddress);
+        } catch (_) {}
+    };
 
     // 已绑定(店铺令牌)或老板旧路径(选了账套)→ 进登录;否则进设备绑定屏。
     function isProvisioned() {

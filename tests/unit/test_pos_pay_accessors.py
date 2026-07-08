@@ -94,6 +94,18 @@ const apply = {
     ),
     // 全开(state.payment=null 用默认)→ 全部显(现金'',其余'')
     cashier_default: applyCase(null, '#pay-mask .pm', ['cash', 'qr', 'card']),
+    // 银行转账关(默认)→ 收银台 transfer tab 隐
+    cashier_transfer_off: applyCase(
+        { promptpay_enabled: true, card_enabled: true, bank_transfer_enabled: false },
+        '#pay-mask .pm',
+        ['cash', 'transfer']
+    ),
+    // 银行转账开 → 收银台 transfer tab 显
+    cashier_transfer_on: applyCase(
+        { promptpay_enabled: true, card_enabled: true, bank_transfer_enabled: true },
+        '#pay-mask .pm',
+        ['cash', 'transfer']
+    ),
 };
 
 process.stdout.write(JSON.stringify({ defaults, accessor, apply }));
@@ -101,7 +113,12 @@ process.stdout.write(JSON.stringify({ defaults, accessor, apply }));
 
 # display 期望:'' = 显示(不改),'none' = 隐藏。现金永远 ''(无开关)。
 EXPECTED = {
-    "defaults": {"promptpay_enabled": True, "card_enabled": True, "price_includes_vat": True},
+    "defaults": {
+        "promptpay_enabled": True,
+        "card_enabled": True,
+        "bank_transfer_enabled": False,
+        "price_includes_vat": True,
+    },
     "accessor": [
         {"inclVat": True, "svcRate": "10"},  # null → 价内VAT + 服务费回落 10
         {"inclVat": False, "svcRate": "10"},
@@ -115,6 +132,8 @@ EXPECTED = {
         "restaurant_pp_off": [None, "none", ""],
         "restaurant_card_off": [None, "", "none"],
         "cashier_default": [None, "", ""],
+        "cashier_transfer_off": [None, "none"],
+        "cashier_transfer_on": [None, ""],
     },
 }
 

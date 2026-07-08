@@ -67,6 +67,10 @@ class GetSettingsTests(unittest.TestCase):
                     "card_enabled": True,
                     "service_charge_rate": Decimal("10.00"),
                     "price_includes_vat": False,
+                    "bank_transfer_enabled": True,
+                    "bank_name": "SCB",
+                    "bank_account_no": "123-456-789",
+                    "bank_account_name": "Sister Makeup",
                 },
                 {"promptpay_id": "0812345678"},
                 {"config": {"value": "restaurant"}},  # 业态查询(显式行会覆盖费率,不受默认影响)
@@ -77,6 +81,18 @@ class GetSettingsTests(unittest.TestCase):
         self.assertEqual(out["service_charge_rate"], "10")
         self.assertFalse(out["price_includes_vat"])
         self.assertEqual(out["promptpay_id"], "0812345678")
+        self.assertTrue(out["bank_transfer_enabled"])
+        self.assertEqual(out["bank_name"], "SCB")
+        self.assertEqual(out["bank_account_no"], "123-456-789")
+        self.assertEqual(out["bank_account_name"], "Sister Makeup")
+
+    def test_defaults_include_bank_transfer_off(self):
+        cur = FakeCursor([None, {"promptpay_id": None}, None])
+        out = svc.get_settings(cur, tenant_id="t-1", workspace_client_id=7)
+        self.assertFalse(out["bank_transfer_enabled"])
+        self.assertEqual(out["bank_name"], "")
+        self.assertEqual(out["bank_account_no"], "")
+        self.assertEqual(out["bank_account_name"], "")
 
 
 class SaveSettingsTests(unittest.TestCase):
@@ -102,6 +118,41 @@ class SaveSettingsTests(unittest.TestCase):
         writeback = cur.calls[1]
         self.assertIn("UPDATE workspace_clients SET promptpay_id", writeback[0])
         self.assertEqual(writeback[1], ("088", 7, "t-1"))  # trim + 账套 + 租户
+
+    def test_upsert_writes_bank_transfer_fields(self):
+        cur = FakeCursor([None, {"promptpay_id": None}, None])
+        svc.save_settings(
+            cur,
+            tenant_id="t-1",
+            workspace_client_id=7,
+            promptpay_enabled=True,
+            card_enabled=True,
+            service_charge_rate=0,
+            price_includes_vat=True,
+            promptpay_id="",
+            bank_transfer_enabled=True,
+            bank_name="  SCB  ",
+            bank_account_no="  123-456  ",
+            bank_account_name="  Sister Makeup  ",
+        )
+        upsert = cur.calls[0]
+        self.assertIn("bank_transfer_enabled", upsert[0])
+        self.assertEqual(upsert[1][6:], (True, "SCB", "123-456", "Sister Makeup"))  # trimmed
+
+    def test_upsert_blank_bank_fields_store_null(self):
+        cur = FakeCursor([None, {"promptpay_id": None}, None])
+        svc.save_settings(
+            cur,
+            tenant_id="t-1",
+            workspace_client_id=7,
+            promptpay_enabled=True,
+            card_enabled=True,
+            service_charge_rate=0,
+            price_includes_vat=True,
+            promptpay_id="",
+        )
+        upsert = cur.calls[0]
+        self.assertEqual(upsert[1][6:], (False, None, None, None))
 
 
 class RoutesContractTests(unittest.TestCase):

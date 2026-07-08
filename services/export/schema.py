@@ -61,6 +61,13 @@ _TABLES = (
     """,
 )
 
+_ALTERS = (
+    # return_to:回调最终跳转目标(哪个页面发起的连接 → 授权完回哪),复用同一份凭据服务多个
+    # 集成入口(采购导出/POS)。默认值保原有行为(旧 state 行/没传参数一律回采购导出页)。
+    "ALTER TABLE export_oauth_states "
+    "ADD COLUMN IF NOT EXISTS return_to text NOT NULL DEFAULT 'purchase-export'",
+)
+
 _INDEXES = (
     "CREATE INDEX IF NOT EXISTS ix_export_creds_ws "
     "ON export_google_credentials (tenant_id, workspace_client_id)",
@@ -80,6 +87,8 @@ def ensure_export_schema() -> None:  # NEW-DEBT-EXEMPT
         with db.get_cursor(commit=True) as cur:
             for ddl in _TABLES:
                 cur.execute(ddl)
+            for alter in _ALTERS:
+                cur.execute(alter)
             for idx in _INDEXES:
                 cur.execute(idx)
             apply_tenant_rls(cur, *_RLS_TABLES)

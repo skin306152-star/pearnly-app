@@ -268,7 +268,9 @@
         updateCash();
         POS.pay.applyMethods('#pay-mask .pm'); // 按收款设置显隐 PromptPay/刷卡
         setPm('cash');
-        ['pay-cash-err', 'pay-qr-err', 'pay-card-err'].forEach((id) => ($(id).textContent = ''));
+        ['pay-cash-err', 'pay-qr-err', 'pay-card-err', 'pay-transfer-err'].forEach(
+            (id) => ($(id).textContent = '')
+        );
         $('pay-mask').classList.add('show');
     }
     function closePay() {
@@ -281,7 +283,19 @@
         $('pm-cash').style.display = m === 'cash' ? 'block' : 'none';
         $('pm-qr').style.display = m === 'qr' ? 'block' : 'none';
         $('pm-card').style.display = m === 'card' ? 'block' : 'none';
+        $('pm-transfer').style.display = m === 'transfer' ? 'block' : 'none';
         if (m === 'qr') loadQr();
+        if (m === 'transfer') loadBankInfo();
+    }
+    // 切到银行转账 → 显示老板配的银行名/账号/户名;没配就提示去收款设置填(参照 loadQr 的 no_id 提示)。
+    function loadBankInfo() {
+        const s = POS.pay.settings();
+        const has = !!(s.bank_name || s.bank_account_no);
+        $('pay-bank-card').style.display = has ? 'block' : 'none';
+        $('pay-bank-name').textContent = s.bank_name || '';
+        $('pay-bank-no').textContent = s.bank_account_no || '';
+        $('pay-bank-acc-name').textContent = s.bank_account_name || '';
+        $('pay-transfer-err').textContent = has ? '' : POS.t('posui.pay.transfer.no_bank');
     }
     // 切到 PromptPay → 用账套配的 ID + 待收金额出码;未配 ID 提示去收款设置填。
     async function loadQr() {
@@ -461,6 +475,16 @@
                     '</td></tr>'
             )
             .join('');
+        const addrLine = state.storeAddress
+            ? '<div class="meta">' + POS.esc(state.storeAddress) + '</div>'
+            : '';
+        const methodLine = sale.method
+            ? '<tr class="tot"><td>' +
+              POS.t('posui.pay.method') +
+              '</td><td class="r">' +
+              POS.t('posui.pay.' + sale.method) +
+              '</td></tr>'
+            : '';
         const html =
             '<!doctype html><html><head><meta charset="utf-8"><title>' +
             (sale.receipt_no || '') +
@@ -469,7 +493,9 @@
             'td{padding:2px 0}.r{text-align:right}.tot td{border-top:1px dashed #000;padding-top:6px;font-weight:700}' +
             '.meta{color:#555;margin-bottom:8px}</style></head><body><h3>' +
             (state.store || 'Pearnly POS') +
-            '</h3><div class="meta">' +
+            '</h3>' +
+            addrLine +
+            '<div class="meta">' +
             (sale.receipt_no || '') +
             ' · ' +
             POS.hm(sale.sold_at || new Date()) +
@@ -479,7 +505,9 @@
             POS.t('posui.done.total') +
             '</td><td class="r">฿' +
             fmt(sale.grand_total) +
-            '</td></tr></table>' +
+            '</td></tr>' +
+            methodLine +
+            '</table>' +
             '<scr' +
             'ipt>window.onload=function(){window.print()}</scr' +
             'ipt></body></html>';
@@ -722,6 +750,9 @@
         );
         $('pay-card-confirm').addEventListener('click', (e) =>
             confirmPay('card', 'pay-card-err', e.currentTarget)
+        );
+        $('pay-transfer-confirm').addEventListener('click', (e) =>
+            confirmPay('transfer', 'pay-transfer-err', e.currentTarget)
         );
         // 成交成功面板
         $('done-print').addEventListener('click', openReceipt);

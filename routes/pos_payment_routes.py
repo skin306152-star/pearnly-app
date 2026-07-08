@@ -38,6 +38,10 @@ class PaymentSettings(BaseModel):
     service_charge_rate: float = Field(0, ge=0, le=100)
     price_includes_vat: bool = True
     promptpay_id: str = ""
+    bank_transfer_enabled: bool = False
+    bank_name: str = ""
+    bank_account_no: str = ""
+    bank_account_name: str = ""
 
 
 @router.get("/payment-settings")
@@ -67,5 +71,9 @@ async def api_save_payment_settings(req: PaymentSettings, request: Request):
                 service_charge_rate=req.service_charge_rate,
                 price_includes_vat=req.price_includes_vat,
                 promptpay_id=req.promptpay_id,
+                bank_transfer_enabled=req.bank_transfer_enabled,
+                bank_name=req.bank_name,
+                bank_account_no=req.bank_account_no,
+                bank_account_name=req.bank_account_name,
             )
         )

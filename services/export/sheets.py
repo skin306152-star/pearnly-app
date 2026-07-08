@@ -97,6 +97,16 @@ class SheetsClient:
             body={"values": matrix},
         ).execute()
 
+    def append_row(self, spreadsheet_id: str, tab: str, row: list) -> None:
+        """表尾追加一行(POS 每笔销售留档用 · 不覆盖既有内容,跟 overwrite_tab 语义不同)。"""
+        self._sheets.spreadsheets().values().append(
+            spreadsheetId=spreadsheet_id,
+            range=tab,
+            valueInputOption="USER_ENTERED",
+            insertDataOption="INSERT_ROWS",
+            body={"values": [row]},
+        ).execute()
+
 
 def sync(
     client, *, folder_id: str, subject: str, year: int, month: int, rows: list, lang: str = "th"

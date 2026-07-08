@@ -69,4 +69,5 @@
 | 09-build-spec | ★施工规约(销项血泪→规约) |
 | 10-acceptance | ★验收剧本 |
 | 11-build-plan-po | 逐 PO 施工顺序 |
+| 13-retail-sop-th | 零售/便利店使用手册(SOP/WI · 泰语 · 面向店员+老板) |
 | UI 预览 | 桌面 `Pearnly_POS_UI预览/`(浏览器实时预览 · 拍板用) |

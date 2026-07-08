@@ -91,6 +91,9 @@ from routes.pos_restaurant_admin_routes import (
 from routes.pos_payment_routes import (
     router as pos_payment_router,
 )  # POS 收款设置(老板后台)· 2026-06-08
+from routes.pos_sheets_routes import (
+    router as pos_sheets_router,
+)  # POS Google Sheet 留档设置(老板后台)· 2026-07-08
 from routes.purchase_routes import (
     router as purchase_router,
 )  # 商户采购 单据/入账/付款/作废 · 2026-06-08
@@ -284,6 +287,7 @@ app.include_router(pos_modules_router)  # POS 设置页模块管理 4 路由(C3 
 app.include_router(pos_restaurant_router)  # 餐厅 POS 前台/后厨/埋单 14 路由(PO-R · 2026-06-07)
 app.include_router(pos_restaurant_admin_router)  # 餐厅 POS 桌台/区域管理 6 路由(PO-R · 2026-06-07)
 app.include_router(pos_payment_router)  # POS 收款设置 GET/PUT(老板后台 · 2026-06-08)
+app.include_router(pos_sheets_router)  # POS Google Sheet 留档设置 GET/PUT(老板后台 · 2026-07-08)
 app.include_router(purchase_router)  # 商户采购 单据/入账/付款/作废 + 行匹配(2026-06-08)
 app.include_router(purchase_intake_router)  # 商户采购 智能入口 intake/expense(2026-06-08)
 app.include_router(purchase_export_router)  # 进项外流 Excel/Drive/Sheet 导出(2026-06-14)

@@ -17,10 +17,12 @@ from core.rls import apply_tenant_rls
 logger = logging.getLogger("mr-pilot")
 
 # 默认值:现金恒开;PromptPay/刷卡默认开(老板可关);价格含 VAT(泰国零售惯例)。
+# 银行转账默认关——填了银行信息才有意义开,不像 PromptPay/刷卡开着也能用。
 # 服务费默认按业态智能给:餐厅 10%(泰国餐厅惯例·老板可改),其余 0。见 _default_service_rate。
 _DEFAULTS = {
     "promptpay_enabled": True,
     "card_enabled": True,
+    "bank_transfer_enabled": False,
     "price_includes_vat": True,
 }
 _RESTAURANT_DEFAULT_SERVICE_RATE = "10"
@@ -51,6 +53,13 @@ def ensure_payment_schema() -> None:
                 PRIMARY KEY (tenant_id, workspace_client_id)
             )
             """)
+        cur.execute(
+            "ALTER TABLE pos_payment_settings "
+            "ADD COLUMN IF NOT EXISTS bank_transfer_enabled boolean NOT NULL DEFAULT FALSE, "
+            "ADD COLUMN IF NOT EXISTS bank_name text, "
+            "ADD COLUMN IF NOT EXISTS bank_account_no text, "
+            "ADD COLUMN IF NOT EXISTS bank_account_name text"
+        )
         apply_tenant_rls(cur, "pos_payment_settings")
 
 
@@ -81,7 +90,8 @@ def get_settings(cur, *, tenant_id: str, workspace_client_id: int, promptpay_id=
     promptpay_id 传入(非 None)则跳过 workspace_clients 查询——bootstrap 已握有该值,免重复 I/O。
     """
     cur.execute(
-        "SELECT promptpay_enabled, card_enabled, service_charge_rate, price_includes_vat "
+        "SELECT promptpay_enabled, card_enabled, service_charge_rate, price_includes_vat, "
+        "bank_transfer_enabled, bank_name, bank_account_no, bank_account_name "
         "FROM pos_payment_settings WHERE tenant_id = %s AND workspace_client_id = %s",
         (tenant_id, workspace_client_id),
     )
@@ -100,6 +110,10 @@ def get_settings(cur, *, tenant_id: str, workspace_client_id: int, promptpay_id=
             "service_charge_rate": _rate_str(row["service_charge_rate"]),
             "price_includes_vat": bool(row["price_includes_vat"]),
             "promptpay_id": promptpay_id or "",
+            "bank_transfer_enabled": bool(row["bank_transfer_enabled"]),
+            "bank_name": row["bank_name"] or "",
+            "bank_account_no": row["bank_account_no"] or "",
+            "bank_account_name": row["bank_account_name"] or "",
         }
     # 无显式行:才按业态算服务费智能默认(避免给已配账套白跑一次业态查询)。
     return {
@@ -108,6 +122,10 @@ def get_settings(cur, *, tenant_id: str, workspace_client_id: int, promptpay_id=
         "service_charge_rate": _default_service_rate(cur, tenant_id),
         "price_includes_vat": _DEFAULTS["price_includes_vat"],
         "promptpay_id": promptpay_id or "",
+        "bank_transfer_enabled": _DEFAULTS["bank_transfer_enabled"],
+        "bank_name": "",
+        "bank_account_no": "",
+        "bank_account_name": "",
     }
 
 
@@ -121,6 +139,10 @@ def save_settings(
     service_charge_rate,
     price_includes_vat: bool,
     promptpay_id: str,
+    bank_transfer_enabled: bool = False,
+    bank_name: str = "",
+    bank_account_no: str = "",
+    bank_account_name: str = "",
 ) -> dict:
     """upsert 收款设置 + 回写账套 promptpay_id(现金恒开不存)。返回回读视图。"""
     rate = _clean_rate(service_charge_rate)
@@ -128,13 +150,18 @@ def save_settings(
         """
         INSERT INTO pos_payment_settings
             (tenant_id, workspace_client_id, promptpay_enabled, card_enabled,
-             service_charge_rate, price_includes_vat)
-        VALUES (%s, %s, %s, %s, %s, %s)
+             service_charge_rate, price_includes_vat,
+             bank_transfer_enabled, bank_name, bank_account_no, bank_account_name)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (tenant_id, workspace_client_id)
         DO UPDATE SET promptpay_enabled = EXCLUDED.promptpay_enabled,
                       card_enabled = EXCLUDED.card_enabled,
                       service_charge_rate = EXCLUDED.service_charge_rate,
                       price_includes_vat = EXCLUDED.price_includes_vat,
+                      bank_transfer_enabled = EXCLUDED.bank_transfer_enabled,
+                      bank_name = EXCLUDED.bank_name,
+                      bank_account_no = EXCLUDED.bank_account_no,
+                      bank_account_name = EXCLUDED.bank_account_name,
                       updated_at = now()
         """,
         (
@@ -144,6 +171,10 @@ def save_settings(
             bool(card_enabled),
             rate,
             bool(price_includes_vat),
+            bool(bank_transfer_enabled),
+            (bank_name or "").strip()[:120] or None,
+            (bank_account_no or "").strip()[:40] or None,
+            (bank_account_name or "").strip()[:120] or None,
         ),
     )
     cur.execute(

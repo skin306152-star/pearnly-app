@@ -76,8 +76,9 @@ function apply(modules: Record<string, ModuleFlag>, businessType?: string | null
     show(document.getElementById('nav-group-pos'), inv || pos || showOnboard);
     show(document.getElementById('nav-pos-onboard'), showOnboard);
     show(document.getElementById('nav-pos-cashiers'), pos && owner); // 收银员管理 = owner · pos 开通后
-    // 收款设置 = owner · pos 开通后(全 POS 业态);桌台管理 = 仅餐厅业态(owner · pos)。
+    // 收款设置 / Google Sheet 留档 = owner · pos 开通后(全 POS 业态);桌台管理 = 仅餐厅业态(owner · pos)。
     show(document.getElementById('nav-pos-payment'), pos && owner);
+    show(document.getElementById('nav-pos-sheets'), pos && owner);
     show(document.getElementById('nav-pos-tables'), pos && owner && businessType === 'restaurant');
 
     // 「可开启功能 →」引导(owner + 有未开模块)→ 进设置 · 业务/模块 自助开通。

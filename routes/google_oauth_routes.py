@@ -21,6 +21,15 @@ from services.export import google_oauth, google_store
 
 router = APIRouter(prefix="/api/integrations/google", tags=["integrations-google"])
 _LAUNCH_PREFIX = "launch:"
+# 回调最终落地页:哪个功能发起连接,授权完就回哪(同一份 OAuth 凭据服务多个集成入口)。
+_RETURN_TARGETS = {
+    "purchase-export": "/home#/purchase-export",
+    "pos": "/home#/pos-sheets",
+}
+
+
+def _norm_return_to(value: Optional[str]) -> str:
+    return value if value in _RETURN_TARGETS else "purchase-export"
 
 
 def _redirect_uri(request: Request) -> str:
@@ -55,7 +64,11 @@ async def api_status(request: Request, workspace_client_id: Optional[int] = Quer
 
 
 @router.post("/connect/start")
-async def api_connect_start(request: Request, workspace_client_id: Optional[int] = Query(None)):
+async def api_connect_start(
+    request: Request,
+    workspace_client_id: Optional[int] = Query(None),
+    return_to: Optional[str] = Query(None),
+):
     user, tid = auth_member(request, "purchase.doc.approve")
     if not google_oauth.is_configured():
         raise PosError("purchase.unexpected", 503, detail="google_oauth_not_configured")
@@ -68,6 +81,7 @@ async def api_connect_start(request: Request, workspace_client_id: Optional[int]
             tenant_id=tid,
             workspace_client_id=ws,
             user_id=_uid(user),
+            return_to=_norm_return_to(return_to),
         )
     return ok({"url": _connect_launch_url(ticket)})
 
@@ -77,6 +91,7 @@ async def api_connect(
     request: Request,
     workspace_client_id: Optional[int] = Query(None),
     launch: Optional[str] = Query(None),
+    return_to: Optional[str] = Query(None),
 ):
     state = secrets.token_urlsafe(24)
 
@@ -88,6 +103,7 @@ async def api_connect(
         tid = owner["tenant_id"]
         ws = owner["workspace_client_id"]
         user_id = owner["user_id"]
+        return_to = owner["return_to"]
     else:
         user, tid = auth_member(request, "purchase.doc.approve")
         with db.get_cursor_rls(tid, commit=False) as cur:
@@ -98,7 +114,12 @@ async def api_connect(
         raise PosError("purchase.unexpected", 503, detail="google_oauth_not_configured")
     with db.get_cursor(commit=True) as cur:
         google_store.save_state(
-            cur, state=state, tenant_id=tid, workspace_client_id=ws, user_id=user_id
+            cur,
+            state=state,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            user_id=user_id,
+            return_to=_norm_return_to(return_to),
         )
     url = google_oauth.build_authorize_url(state=state, redirect=_redirect_uri(request))
     resp = RedirectResponse(url, status_code=302)
@@ -111,7 +132,7 @@ async def api_connect(
 async def api_callback(
     request: Request, code: Optional[str] = Query(None), state: Optional[str] = Query(None)
 ):
-    """Google 重定向回调(公开·state 即凭证)。换码存凭据 → 回采购导出页(连接入口所在)。"""
+    """Google 重定向回调(公开·state 即凭证)。换码存凭据 → 回发起连接的页面(见 _RETURN_TARGETS)。"""
     if not code or not state:
         return HTMLResponse("<p>授权失败:缺少参数,请重试。</p>", status_code=400)
     with db.get_cursor(commit=True) as cur:
@@ -134,7 +155,7 @@ async def api_callback(
             scope=tok["scope"],
             created_by=owner["user_id"],
         )
-    return RedirectResponse("/home#/purchase-export", status_code=302)
+    return RedirectResponse(_RETURN_TARGETS[_norm_return_to(owner["return_to"])], status_code=302)
 
 
 @router.post("/disconnect")

@@ -101,23 +101,24 @@ def delete_credential(cur, *, tenant_id, workspace_client_id) -> bool:
 
 
 # ── OAuth state(防 CSRF · 单次消费 · 5 分钟过期)─────────────────────────────
-def save_state(cur, *, state, tenant_id, workspace_client_id, user_id) -> None:
+def save_state(cur, *, state, tenant_id, workspace_client_id, user_id, return_to="purchase-export") -> None:
     cur.execute("DELETE FROM export_oauth_states WHERE created_at < now() - interval '5 minutes'")
     cur.execute(
-        "INSERT INTO export_oauth_states (state, tenant_id, workspace_client_id, user_id) "
-        "VALUES (%s, %s, %s, %s) ON CONFLICT (state) DO UPDATE SET "
+        "INSERT INTO export_oauth_states "
+        "(state, tenant_id, workspace_client_id, user_id, return_to) "
+        "VALUES (%s, %s, %s, %s, %s) ON CONFLICT (state) DO UPDATE SET "
         "tenant_id = EXCLUDED.tenant_id, workspace_client_id = EXCLUDED.workspace_client_id, "
-        "user_id = EXCLUDED.user_id, created_at = now()",
-        (state, tenant_id, workspace_client_id, user_id),
+        "user_id = EXCLUDED.user_id, return_to = EXCLUDED.return_to, created_at = now()",
+        (state, tenant_id, workspace_client_id, user_id, return_to),
     )
 
 
 def consume_state(cur, *, state):
-    """验证 + 单次消费(callback 用)。返回 {tenant_id,workspace_client_id,user_id} 或 None。"""
+    """验证 + 单次消费(callback 用)。返回 {tenant_id,workspace_client_id,user_id,return_to} 或 None。"""
     cur.execute(
         "DELETE FROM export_oauth_states "
         "WHERE state = %s AND created_at >= now() - interval '5 minutes' "
-        "RETURNING tenant_id, workspace_client_id, user_id",
+        "RETURNING tenant_id, workspace_client_id, user_id, return_to",
         (state,),
     )
     row = cur.fetchone()
@@ -127,6 +128,7 @@ def consume_state(cur, *, state):
         "tenant_id": str(row["tenant_id"]),
         "workspace_client_id": row["workspace_client_id"],
         "user_id": str(row["user_id"]),
+        "return_to": row["return_to"] or "purchase-export",
     }
 
 

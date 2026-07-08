@@ -123,7 +123,9 @@ def _write_ocr_history(
         filename=f"summary-{batch_ref}-{index + 1}",
         page_count=1,
         pages=[{"fields": fields, "is_copy": False, "is_duplicate": False}],
-        confidence="manual",
+        # 汇总批量=确定性精确数据(表里金额或量×固定单价算出,无 OCR 不确定性)→ 高置信,
+        # 让它过 Express/MR.ERP 推送的 low_confidence_band 闸(闸只认 high/auto·"manual" 会被当低置信拦)。
+        confidence="high",
         elapsed_ms=0,
         source=_SUMMARY_SOURCE,
         source_ref=str(doc_id),

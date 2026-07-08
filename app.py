@@ -103,6 +103,9 @@ from routes.purchase_routes import (
 from routes.purchase_intake_routes import (
     router as purchase_intake_router,
 )  # 商户采购 智能入口 intake/expense · 2026-06-08
+from routes.summary_import_routes import (
+    router as summary_import_router,
+)  # 汇总表 → 批量建单(录入工作台第三卡)· 2026-07-08
 from routes.export_routes import (
     router as purchase_export_router,
 )  # 进项外流 Excel/Drive/Sheet 导出 · 2026-06-14
@@ -296,6 +299,7 @@ app.include_router(pos_payment_router)  # POS 收款设置 GET/PUT(老板后台 
 app.include_router(pos_sheets_router)  # POS Google Sheet 留档设置 GET/PUT(老板后台 · 2026-07-08)
 app.include_router(purchase_router)  # 商户采购 单据/入账/付款/作废 + 行匹配(2026-06-08)
 app.include_router(purchase_intake_router)  # 商户采购 智能入口 intake/expense(2026-06-08)
+app.include_router(summary_import_router)  # 汇总表 → 批量建单 3 路由(录入工作台第三卡 · 2026-07-08)
 app.include_router(purchase_export_router)  # 进项外流 Excel/Drive/Sheet 导出(2026-06-14)
 app.include_router(google_oauth_router)  # 集成中心 Google Drive/Sheets 授权(2026-06-14)
 app.include_router(line_liff_router)  # LINE LIFF 鉴权 + 复核屏入口(2026-06-14)

@@ -16,7 +16,7 @@ export interface Cand {
 }
 
 export const S = {
-    task: 'invoice' as 'invoice' | 'identity',
+    task: 'invoice' as 'invoice' | 'identity' | 'summary_batch',
     step: 1,
     file: null as File | null,
     ocr: null as Dict | null,

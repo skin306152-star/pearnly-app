@@ -23,7 +23,7 @@
 .dmsx .dx-task-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
 .dmsx .dx-task-h b{font-size:13px}
 .dmsx .dx-task-h span{font-size:10px;color:var(--ink2)}
-.dmsx .dx-task-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dmsx .dx-task-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .dmsx .dx-opt{min-height:70px;border:1px solid var(--dx-line);border-radius:16px;padding:14px 16px;display:grid;grid-template-columns:40px 1fr auto;gap:12px;align-items:center;background:var(--card);cursor:pointer}
 .dmsx .dx-opt.active{border-color:var(--dx-brand);background:var(--bg)}
 .dmsx .dx-opt-ic{width:40px;height:40px;border-radius:13px;background:var(--dx-brand-soft);color:var(--dx-brand);display:grid;place-items:center}
@@ -397,3 +397,37 @@
 .dmsx .dx-erp-toggle{font-size:12px;font-weight:600;color:var(--ink2);white-space:nowrap;padding:7px 12px;border:1px solid var(--dx-line);border-radius:10px;background:var(--card);cursor:pointer}
 .dmsx .dx-erp-toggle:hover{border-color:var(--dx-brand);color:var(--dx-brand)}
 @media (max-width:700px){.dmsx .dx-erp-row{grid-template-columns:1fr}}
+
+/* 汇总表批量建单(第三任务)· 列映射 / 批次常量表单 / 预览表 / 结果 */
+.dmsx .dx-inp{width:100%;border:1px solid var(--dx-line);border-radius:9px;background:var(--card);color:var(--dx-text);font-size:12px;padding:8px 10px}
+.dmsx .dx-inp:focus{outline:none;border-color:var(--dx-brand)}
+.dmsx .dx-map-row{display:grid;grid-template-columns:110px 1fr;gap:10px;align-items:center;margin-bottom:9px}
+.dmsx .dx-map-k{font-size:11px;color:var(--dx-muted)}
+.dmsx .dx-fld{margin-bottom:11px}
+.dmsx .dx-fld label{display:block;font-size:11px;color:var(--dx-muted);margin-bottom:5px}
+.dmsx .dx-req{color:var(--dx-red);font-weight:900}
+.dmsx .dx-chk{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dx-text);margin:2px 0 11px;cursor:pointer}
+.dmsx .dx-chk input{width:15px;height:15px;accent-color:var(--dx-brand)}
+.dmsx .dx-banner{border-radius:11px;padding:10px 12px;font-size:11px;line-height:1.55}
+.dmsx .dx-banner.amber{background:var(--dx-amber-soft);color:var(--dx-amber);border:1px solid var(--dx-amber-line)}
+.dmsx .dx-badge.red{background:var(--dx-red-soft);color:var(--dx-red)}
+.dmsx .dxb-tblwrap{overflow-x:auto;border:1px solid var(--dx-line);border-radius:12px}
+.dmsx .dxb-tbl{width:100%;border-collapse:collapse;font-size:11px;min-width:560px}
+.dmsx .dxb-tbl th{text-align:left;padding:9px 10px;background:var(--bg);color:var(--dx-muted);font-weight:800;white-space:nowrap;border-bottom:1px solid var(--dx-line)}
+.dmsx .dxb-tbl td{padding:9px 10px;border-bottom:1px solid var(--dx-line);vertical-align:middle}
+.dmsx .dxb-tbl tr:last-child td{border-bottom:none}
+.dmsx .dxb-tbl .dxb-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dmsx .dxb-tbl tr.dxb-blocked{background:var(--dx-red-soft)}
+.dmsx .dxb-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
+.dmsx .dxb-stat{border:1px solid var(--dx-line);border-radius:12px;padding:12px;text-align:center}
+.dmsx .dxb-stat b{display:block;font-size:22px;font-weight:900}
+.dmsx .dxb-stat span{display:block;font-size:10px;color:var(--dx-muted);margin-top:3px}
+.dmsx .dxb-stat.green b{color:var(--dx-green)}
+.dmsx .dxb-stat.amber b{color:var(--dx-amber)}
+.dmsx .dxb-stat.red b{color:var(--dx-red)}
+.dmsx .dxb-stat.blue b{color:var(--dx-blue)}
+.dmsx .dxb-rlist{display:grid;gap:7px;margin-top:12px;max-height:280px;overflow-y:auto}
+.dmsx .dxb-rline{display:flex;align-items:center;gap:10px;font-size:11px}
+.dmsx .dxb-rno{color:var(--dx-muted);min-width:34px}
+.dmsx .dxb-rdet{color:var(--dx-muted);font-variant-numeric:tabular-nums}
+@media(max-width:700px){.dmsx .dxb-stats{grid-template-columns:repeat(2,1fr)}}

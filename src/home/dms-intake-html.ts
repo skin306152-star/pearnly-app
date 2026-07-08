@@ -130,6 +130,12 @@ export const STEP_KEYS: Record<string, Array<[string, string]>> = {
         ['dxi-st3', 'dxi-st3s'],
         ['dxi-st4', 'dxi-st4s'],
     ],
+    summary_batch: [
+        ['dxb-st1', 'dxb-st1s'],
+        ['dxb-st2', 'dxb-st2s'],
+        ['dxb-st3', 'dxb-st3s'],
+        ['dxb-st4', 'dxb-st4s'],
+    ],
 };
 
 // 任务选择器卡(发票 / 身份证)· data-task 切换由控制器接管
@@ -143,20 +149,28 @@ function taskPickerHtml(t: (k: string) => string, task: string): string {
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="22" height="22"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v4h4"/><path d="M9 11h6M9 15h6"/></svg>';
     const icId =
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="22" height="22"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.2"/><path d="M6 16c.8-1.6 2-2.4 3-2.4s2.2.8 3 2.4M14 10h4M14 14h4"/></svg>';
+    const icSum =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="22" height="22"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 4v16M3 14h18"/></svg>';
     return (
         '<div class="dx-card dx-task">' +
         '<div class="dx-task-h">' +
         `<b>${dxEsc(t('dxk-pick-h'))}</b><span>${dxEsc(t('dxk-pick-s'))}</span></div>` +
         '<div class="dx-task-grid">' +
         opt('invoice', 'dxk-inv-t', 'dxk-inv-d', icInv) +
+        opt('summary_batch', 'dxk-sum-t', 'dxk-sum-d', icSum) +
         opt('identity', 'dxk-id-t', 'dxk-id-d', icId) +
         '</div></div>'
     );
 }
 
+const TITLE_KEYS: Record<string, [string, string]> = {
+    invoice: ['dxi-title', 'dxi-sub'],
+    summary_batch: ['dxb-title', 'dxb-sub'],
+    identity: ['dx-title', 'dx-sub'],
+};
+
 export function dxShell(t: (k: string) => string, task = 'invoice'): string {
-    const titleKey = task === 'invoice' ? 'dxi-title' : 'dx-title';
-    const subKey = task === 'invoice' ? 'dxi-sub' : 'dx-sub';
+    const [titleKey, subKey] = TITLE_KEYS[task] || TITLE_KEYS.identity;
     const steps = STEP_KEYS[task] || STEP_KEYS.identity;
     const step = (n: number, b: string, s: string) =>
         `<div class="dx-step" data-step="${n}"><div class="dx-step-no">${n}</div>` +
@@ -180,6 +194,11 @@ export function dxShell(t: (k: string) => string, task = 'invoice'): string {
         '<div class="dx-state" id="dx-s-confirm"></div>' +
         '<div class="dx-state" id="dx-s-inv-review"></div>' +
         '<div class="dx-state" id="dx-s-inv-submit"></div>' +
+        // 汇总表批量建单:上传汇总表 / 列映射+常量 / 逐行预览 / 提交结果
+        '<div class="dx-state" id="dx-s-batch-up"></div>' +
+        '<div class="dx-state" id="dx-s-batch-map"></div>' +
+        '<div class="dx-state" id="dx-s-batch-review"></div>' +
+        '<div class="dx-state" id="dx-s-batch-submit"></div>' +
         '<div class="dx-state" id="dx-s-success"></div>' +
         '</div>' + // close .dx-card(流程卡)
         // 上下文 ERP 连接卡(控制器 renderDxErpCards 按任务填充:发票→MR.ERP+Express·身份证→DMS)

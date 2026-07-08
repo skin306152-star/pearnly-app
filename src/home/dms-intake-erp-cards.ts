@@ -20,6 +20,11 @@ const TASK_CARDS: Record<string, ErpCardDef[]> = {
         { key: 'mrerp', name: 'MR.ERP', adapter: 'mrerp' },
         { key: 'express', name: 'Express', adapter: 'express' },
     ],
+    // 汇总表批量建单落点与发票同(两家财务 ERP)· 建成的 ocr_history 走同一推送链路。
+    summary_batch: [
+        { key: 'mrerp', name: 'MR.ERP', adapter: 'mrerp' },
+        { key: 'express', name: 'Express', adapter: 'express' },
+    ],
     identity: [{ key: 'mrerp_dms', name: 'MR.ERP DMS', adapter: 'mrerp_dms' }],
 };
 

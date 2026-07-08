@@ -40,6 +40,17 @@ import {
 } from './dms-intake-invoice.js';
 import { readStep } from './step-resume.js';
 import { renderDxErpCards } from './dms-intake-erp-cards.js';
+import {
+    B,
+    resetBatch,
+    renderBatchUpload,
+    rerenderBatch,
+    onBatchClick,
+    onBatchChange,
+    onBatchDrop,
+} from './dms-intake-batch.js';
+import { onBatchReviewClick, rerenderBatchReview } from './dms-intake-batch-review.js';
+import { onBatchSubmitClick } from './dms-intake-batch-submit.js';
 
 // ── 步骤 1:上传 ──────────────────────────────────────────────
 function renderUpload() {
@@ -224,14 +235,19 @@ function resetFlow() {
     if (S.task === 'invoice') {
         resetInvoice();
         renderInvoiceUpload();
+        showStep(1, 'dx-s-upload');
+    } else if (S.task === 'summary_batch') {
+        resetBatch();
+        renderBatchUpload();
+        showStep(1, 'dx-s-batch-up');
     } else {
         renderUpload();
+        showStep(1, 'dx-s-upload');
     }
-    showStep(1, 'dx-s-upload');
 }
 
 // 任务切换:重渲整壳(任务选择器高亮 + 标题/步骤条按任务)· 委托监听挂在 section 上,innerHTML 重写不丢
-function selectTask(task: 'invoice' | 'identity') {
+function selectTask(task: 'invoice' | 'identity' | 'summary_batch') {
     if (S.task === task) return;
     S.task = task;
     const el = sec();
@@ -243,7 +259,7 @@ function selectTask(task: 'invoice' | 'identity') {
 
 // 查看记录:发票任务→识别记录;身份证任务→集成中心「推送日志」并按 DMS 适配器(mrerp_dms)筛选
 function openRecords() {
-    if (S.task === 'invoice') {
+    if (S.task === 'invoice' || S.task === 'summary_batch') {
         if (typeof window.routeTo === 'function') window.routeTo('history');
         return;
     }
@@ -265,8 +281,16 @@ function bind() {
         const hit = (id: string) => tg.closest('#' + id);
         // 任务选择器 + 查看记录(两任务共用)
         const taskCard = tg.closest('[data-task]') as HTMLElement | null;
-        if (taskCard) return selectTask(taskCard.dataset.task as 'invoice' | 'identity');
+        if (taskCard)
+            return selectTask(taskCard.dataset.task as 'invoice' | 'identity' | 'summary_batch');
         if (hit('dx-records')) return openRecords();
+        // 汇总表任务:重来键回落 resetFlow,其余交给批量模块三步各自处理器
+        if (S.task === 'summary_batch') {
+            if (hit('dxb-restart')) return resetFlow();
+            if (onBatchReviewClick(tg)) return;
+            if (onBatchSubmitClick(tg)) return;
+            return onBatchClick(tg);
+        }
         // 发票任务:全部交给发票模块,不落入身份证处理器
         if (S.task === 'invoice') {
             onInvoiceClick(tg);
@@ -349,6 +373,7 @@ function bind() {
 
     el.addEventListener('change', (ev) => {
         const tg = ev.target as HTMLElement;
+        if (S.task === 'summary_batch') return onBatchChange(tg);
         if (S.task === 'invoice') {
             onInvoiceChange(tg);
             return;
@@ -372,6 +397,7 @@ function bind() {
         ev.preventDefault();
         el.querySelector('.dx-drop')?.classList.remove('drag-over');
         const files = (ev as DragEvent).dataTransfer?.files;
+        if (S.task === 'summary_batch') return onBatchDrop(files);
         if (S.task === 'invoice') return void onInvoiceDrop(files);
         onFile(files?.[0] || null);
     });
@@ -382,6 +408,9 @@ function bind() {
 function resumeFlow(): boolean {
     const memo = readStep('dms-intake', S.task);
     if (!memo) return false;
+    if (S.task === 'summary_batch') {
+        return rerenderBatch() || rerenderBatchReview();
+    }
     if (S.task === 'invoice') {
         if (IV.view !== 'review' && IV.view !== 'submit') return false;
         rerenderInvoice();
@@ -415,6 +444,12 @@ if (typeof window.subscribeI18n === 'function') {
         if (!sec()?.querySelector('.dmsx')) return;
         sec()!.innerHTML = dxShell(t, S.task);
         renderDxErpCards(S.task);
+        if (S.task === 'summary_batch') {
+            if (B.view === 'map') return void rerenderBatch();
+            if (B.view === 'review') return void rerenderBatchReview();
+            renderBatchUpload();
+            return showStep(1, 'dx-s-batch-up');
+        }
         if (S.task === 'invoice') return rerenderInvoice();
         const map: Record<number, string> = {
             1: 'dx-s-upload',

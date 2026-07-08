@@ -33,6 +33,7 @@ _POS_PREFIXES = (
     "/api/me/modules",
     "/api/purchase",
     "/api/accounting",
+    "/api/summary-import",
 )
 _POS_EXACT = ("/api/me/onboarding",)
 
@@ -40,6 +41,7 @@ _POS_EXACT = ("/api/me/onboarding",)
 _VALIDATION_CODES = {
     "/api/purchase": "purchase.line_invalid",
     "/api/accounting": "acct.unexpected",
+    "/api/summary-import": "purchase.line_invalid",
 }
 
 

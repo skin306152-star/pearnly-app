@@ -151,6 +151,7 @@
   "sales_settings_routes": "C",
   "security_routes": "D",
   "settings_routes": "C",
+  "summary_import_routes": "C",
   "tax_routes": "B",
   "tenant_routes": "B",
   "uploads_routes": "B",

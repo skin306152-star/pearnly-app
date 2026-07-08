@@ -112,7 +112,8 @@ export function renderBatchUpload() {
     if (!el) return;
     const f = B.file;
     const body = f
-        ? '<div class="dx-file"><div class="dx-file-ic">📊</div>' +
+        ? '<div class="dx-file"><div class="dx-file-ic">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="18" height="18"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 4v16"/></svg></div>' +
           `<div class="dx-file-c"><b>${esc(f.name)}</b><span>${(f.size / 1048576).toFixed(2)} MB</span></div>` +
           `<span class="dx-badge green">${esc(t('dx-up-ready'))}</span></div>` +
           '<div class="dx-bar"><div class="dx-note"></div><div style="display:flex;gap:8px">' +

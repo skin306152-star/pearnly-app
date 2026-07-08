@@ -205,7 +205,7 @@ def _sale_row(cur, *, tenant_id: str, sale: dict, lang: str) -> list:
         time_s,
         cashier_name,
         items,
-        qty_total,
+        str(qty_total),
         str(sale.get("subtotal", 0)),
         str(sale.get("discount_total", 0)),
         str(sale.get("vat_amount", 0)),

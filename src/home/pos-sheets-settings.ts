@@ -63,7 +63,7 @@ const STYLE = `
 .rsheet .sw{width:44px;height:25px;border-radius:999px;flex:0 0 44px;position:relative;cursor:pointer;transition:.15s;background:var(--line);}
 .rsheet .sw::after{content:"";position:absolute;top:2px;left:2px;width:21px;height:21px;border-radius:50%;background:var(--card);transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.25);}
 .rsheet .sw.on{background:var(--btn-blue,var(--accent));}.rsheet .sw.on::after{left:21px;}
-.rsheet .save{width:100%;height:50px;border:0;border-radius:11px;background:var(--btn-blue,var(--accent));color:var(--accent-ink);font-weight:700;font-size:16px;cursor:pointer;margin-top:18px;}
+.rsheet .save{position:sticky;bottom:16px;width:100%;height:50px;border:0;border-radius:11px;background:var(--btn-blue,var(--accent));color:var(--accent-ink);font-weight:700;font-size:16px;cursor:pointer;margin-top:18px;box-shadow:0 4px 16px rgba(0,0,0,.18);}
 .rsheet .save:disabled{background:var(--line);cursor:not-allowed;}
 .rsheet .state{padding:44px 0;text-align:center;color:var(--ink3);font-size:13.5px;}
 `;

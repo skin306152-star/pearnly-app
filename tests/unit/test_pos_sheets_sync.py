@@ -8,6 +8,7 @@
      SheetsClient.append_row · 任何环节抛异常都被吞掉(后台留档失败绝不影响收银)
 """
 
+import json
 import unittest
 from decimal import Decimal
 from unittest.mock import patch
@@ -177,6 +178,10 @@ class SyncSaleTests(unittest.TestCase):
         self.assertEqual(row[3], "Earn")
         self.assertIn("บลัชออน x1", row[4])
         self.assertEqual(row[10], "银行转账")  # header_lang=zh → 中文付款方式标签
+        # qty_total(sum of Decimal qty)必须转成 JSON 能序列化的类型,否则 append_row 真调 Google
+        # API 时 googleapiclient 序列化请求体会炸 Decimal(生产真实踩过·pos_sheets sync_sale
+        # failed: Object of type Decimal is not JSON serializable)。
+        json.dumps(row)
 
     def test_exception_anywhere_is_swallowed(self):
         with patch.object(svc, "get_settings", side_effect=RuntimeError("boom")):

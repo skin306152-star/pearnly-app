@@ -76,7 +76,7 @@ const STYLE = `
 .rpay .pctfld{width:90px;height:38px;border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;padding:0 10px;background:var(--line2);}
 .rpay .pctfld input{border:0;outline:0;background:transparent;width:100%;text-align:right;font-size:14px;font-weight:600;color:var(--ink);}
 .rpay .pctfld span{color:var(--ink3);font-size:13px;}
-.rpay .save{width:100%;height:50px;border:0;border-radius:11px;background:var(--btn-blue,var(--accent));color:var(--accent-ink);font-weight:700;font-size:16px;cursor:pointer;}
+.rpay .save{position:sticky;bottom:16px;width:100%;height:50px;border:0;border-radius:11px;background:var(--btn-blue,var(--accent));color:var(--accent-ink);font-weight:700;font-size:16px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.18);}
 .rpay .save:disabled{background:var(--line);cursor:not-allowed;}
 .rpay .state{padding:44px 0;text-align:center;color:var(--ink3);font-size:13.5px;}
 `;

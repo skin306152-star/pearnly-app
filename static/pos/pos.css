@@ -138,9 +138,11 @@ body { background: var(--bg); color: var(--ink); font-size: 14px; }
 .pos-view--main .stepper button { width: 30px; height: 30px; border: 0; background: #fff; color: var(--ink); font-size: 17px; cursor: pointer; }
 .pos-view--main .stepper button:active { background: var(--blue-l); }
 .pos-view--main .stepper .q { width: 34px; text-align: center; font-size: 14px; cursor: pointer; }
-.pos-view--main .stepper .q-edit { width: 34px; height: 30px; border: 0; padding: 0; text-align: center; font-size: 14px; font-weight: 700; font-family: inherit; background: var(--line); color: var(--ink); -moz-appearance: textfield; appearance: textfield; }
-.pos-view--main .stepper .q-edit::-webkit-inner-spin-button, .pos-view--main .stepper .q-edit::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-.pos-view--main .stepper .q-edit:focus { outline: none; }
+.pos-view--main .qty-modal { width: 340px; }
+.pos-view--main .qty-modal .icbtn { background: var(--line); color: var(--ink-2); }
+.pos-view--main .qty-body { padding: 10px 22px 22px; }
+.pos-view--main .qty-item { text-align: center; color: var(--ink-2); font-size: 14px; min-height: 20px; margin-bottom: 4px; }
+.pos-view--main .qty-disp { text-align: center; font-size: 42px; font-weight: 800; color: var(--ink); margin: 6px 0 18px; }
 .pos-view--main .line .li-amt { width: 64px; text-align: right; font-weight: 600; }
 .pos-view--main .cart-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--ink-3); gap: 12px; }
 .pos-view--main .cart-empty svg { opacity: .5; }

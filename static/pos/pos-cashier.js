@@ -164,32 +164,41 @@
         if (cart[i].qty <= 0) cart.splice(i, 1);
         renderCart();
     }
-    // 点数量就地输入(便利店大批量免狂点 +)。回车/失焦落值:>0 覆盖 · =0 删行 · 空/非法回退原值。
-    function editQty(i, el) {
-        if (el.querySelector('input')) return;
-        const prev = cart[i].qty;
-        el.innerHTML =
-            '<input class="q-edit" type="number" inputmode="numeric" min="0" value="' + prev + '">';
-        const inp = el.querySelector('input');
-        inp.focus();
-        inp.select();
-        let done = false;
-        const commit = () => {
-            if (done) return;
-            done = true;
-            const v = Math.floor(Number(inp.value));
-            if (Number.isFinite(v) && v > 0) cart[i].qty = v;
-            else if (inp.value.trim() === '0') cart.splice(i, 1);
-            renderCart();
-        };
-        inp.addEventListener('blur', commit);
-        inp.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') inp.blur();
-            else if (e.key === 'Escape') {
-                done = true;
-                renderCart();
-            }
-        });
+    // 点数量 → 键盘弹窗输入(便利店大批量免狂点 +)。用点击而非原生 input 焦点:触屏友好,
+    // 且不受浏览器扩展/焦点抢占干扰(实测 inline input 在真机被环境吞键)。qtyBuf='' = 未输入
+    // (显示原数量);首键从头输;确定时 >0 覆盖 · =0/清空则删行。物理键盘作桌面加成(见 init)。
+    let qtyIdx = -1;
+    let qtyBuf = '';
+    function openQtyPad(i) {
+        qtyIdx = i;
+        qtyBuf = '';
+        $('qty-item-name').textContent = POS.nm(cart[i].name);
+        updateQtyDisp();
+        $('qty-mask').classList.add('show');
+    }
+    function closeQtyPad() {
+        $('qty-mask').classList.remove('show');
+        qtyIdx = -1;
+    }
+    function updateQtyDisp() {
+        if (qtyIdx < 0) return;
+        $('qty-disp').textContent = qtyBuf === '' ? String(cart[qtyIdx].qty) : qtyBuf;
+    }
+    function qtyKey(k) {
+        if (qtyIdx < 0) return;
+        if (k === 'clear') qtyBuf = '0';
+        else if (k === 'back') qtyBuf = (qtyBuf || String(cart[qtyIdx].qty)).slice(0, -1);
+        else qtyBuf = (qtyBuf === '0' ? '' : qtyBuf) + k;
+        if (qtyBuf.length > 4) qtyBuf = qtyBuf.slice(0, 4); // 防离谱数量撑破布局
+        updateQtyDisp();
+    }
+    function confirmQtyPad() {
+        if (qtyIdx < 0) return;
+        const v = qtyBuf === '' ? cart[qtyIdx].qty : parseInt(qtyBuf, 10);
+        if (!Number.isFinite(v) || v <= 0) cart.splice(qtyIdx, 1);
+        else cart[qtyIdx].qty = v;
+        closeQtyPad();
+        renderCart();
     }
     function clearCart() {
         cart = [];
@@ -256,7 +265,7 @@
                 .forEach((b) => (b.onclick = () => changeQty(Number(b.dataset.inc), 1)));
             lines
                 .querySelectorAll('.q[data-qi]')
-                .forEach((el) => (el.onclick = () => editQty(Number(el.dataset.qi), el)));
+                .forEach((el) => (el.onclick = () => openQtyPad(Number(el.dataset.qi))));
             $('cart-sub').textContent = POS.tf('posui.cart.items', {
                 n: itemCount,
                 k: cart.length,
@@ -774,6 +783,25 @@
         $('pay-keypad')
             .querySelectorAll('.key')
             .forEach((b) => b.addEventListener('click', () => keyPress(b.dataset.key)));
+        // 数量键盘弹窗:点键累加(主路径·不靠物理键盘)+ 关闭/确定 + 背景点击关。
+        $('qty-keypad')
+            .querySelectorAll('.key')
+            .forEach((b) => b.addEventListener('click', () => qtyKey(b.dataset.qk)));
+        $('qty-close-btn').addEventListener('click', closeQtyPad);
+        $('qty-confirm').addEventListener('click', confirmQtyPad);
+        $('qty-mask').addEventListener('click', (e) => {
+            if (e.target === $('qty-mask')) closeQtyPad();
+        });
+        // 桌面加成:弹窗开着时物理键盘也能输(数字/退格/回车/Esc);靠上面的点击兜底,吞键也不影响。
+        document.addEventListener('keydown', (e) => {
+            if (qtyIdx < 0) return;
+            if (e.key >= '0' && e.key <= '9') qtyKey(e.key);
+            else if (e.key === 'Backspace') qtyKey('back');
+            else if (e.key === 'Enter') confirmQtyPad();
+            else if (e.key === 'Escape') closeQtyPad();
+            else return;
+            e.preventDefault();
+        });
         $('pay-cash-confirm').addEventListener('click', (e) =>
             confirmPay('cash', 'pay-cash-err', e.currentTarget)
         );

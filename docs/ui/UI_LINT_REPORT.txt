@@ -108,8 +108,8 @@
 
 ## emoji当图标(应换Lucide) — 命中 207(30 文件)
     96  static\i18n-data.js
-        └ 1354: 'billing-accuracy-good': '✅ 准',
-        └ 1355: 'billing-accuracy-fair': '⚠ 一般',
+        └ 1388: 'billing-accuracy-good': '✅ 准',
+        └ 1389: 'billing-accuracy-fair': '⚠ 一般',
     35  static\erp-mrerp-connect.js
         └ 254: zh: '⚙ 高级设置(自动创建买方/商品的模板 · 可不填)',
         └ 255: en: '⚙ Advanced (templates for auto-creating buyers/products · optional)',
@@ -127,10 +127,10 @@
         └ 1893: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
      4  static\pos\pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
-        └ 268: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
+        └ 269: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
      4  static\pos\pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
-        └ 268: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
+        └ 269: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
      2  src\home\core.ts
         └ 2: // 工具(t/escapeHtml/svgIcon)+ Session 被踢弹窗(🔴)+ 鉴权 API(🔴铁律#26)+ plan 上限 helper。
      2  static\pos\pos-restaurant-ops.js
@@ -193,14 +193,14 @@
         └ 17: max-width: 240px;
         └ 53: max-width: 420px;
      4  static\pos\pos.css
-        └ 199: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
-        └ 219: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
+        └ 201: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
+        └ 221: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
      4  static\home-37-html-inline.css
         └ 660: max-width: 420px;
         └ 1201: max-width: 420px;
      4  static\pos\pos.css
-        └ 199: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
-        └ 219: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
+        └ 201: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
+        └ 221: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
      3  src\home\knowledge-ask.ts
         └ 116: .kb-qa{background:var(--card,var(--card));border:1px solid var(--line,var(--line));border-
         └ 142: .kb-qa-hint{font-size:12px;color:var(--ink-3,#999);margin-top:12px;max-width:760px;line-he
@@ -416,8 +416,8 @@
 
 ## i18n原始键残留 — 命中 24(2 文件)
     20  static\i18n-data.js
-        └ 1162: 'time-min-ago-suffix': ' 分钟前',
-        └ 1163: 'time-hour-ago-suffix': ' 小时前',
+        └ 1196: 'time-min-ago-suffix': ' 分钟前',
+        └ 1197: 'time-hour-ago-suffix': ' 小时前',
      4  static\admin\admin-i18n.js
         └ 336: 'time-hours-ago': '{n} 小时前',
         └ 337: 'time-days-ago': '{n} 天前',

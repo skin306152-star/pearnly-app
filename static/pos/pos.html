@@ -344,6 +344,47 @@
       <div class="cart-scrim" id="cart-scrim"></div>
 
       <!-- 收款弹窗 -->
+      <div class="mask" id="qty-mask">
+        <div class="modal qty-modal">
+          <div class="modal-head">
+            <div class="t" data-i18n="posui.qty.title">数量</div>
+            <button class="icbtn" id="qty-close-btn">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <div class="qty-body">
+            <div class="qty-item" id="qty-item-name"></div>
+            <div class="qty-disp tnum" id="qty-disp">0</div>
+            <div class="keypad" id="qty-keypad">
+              <button class="key" data-qk="7">7</button>
+              <button class="key" data-qk="8">8</button>
+              <button class="key" data-qk="9">9</button>
+              <button class="key" data-qk="4">4</button>
+              <button class="key" data-qk="5">5</button>
+              <button class="key" data-qk="6">6</button>
+              <button class="key" data-qk="1">1</button>
+              <button class="key" data-qk="2">2</button>
+              <button class="key" data-qk="3">3</button>
+              <button class="key" data-qk="clear">C</button>
+              <button class="key" data-qk="0">0</button>
+              <button class="key" data-qk="back">←</button>
+            </div>
+            <div style="height: 12px"></div>
+            <button class="confirm" id="qty-confirm" data-i18n="posui.qty.confirm">确定</button>
+          </div>
+        </div>
+      </div>
+
       <div class="mask" id="pay-mask">
         <div class="modal">
           <div class="modal-head">
@@ -1238,7 +1279,7 @@
       <div id="pos-toast-txt"></div>
     </div>
 
-    <script src="/static/pos/pos-i18n.js?v=11853000"></script>
+    <script src="/static/pos/pos-i18n.js?v=11854300"></script>
     <script src="/static/dist/pos.js?v=11854300" defer></script>
   </body>
 </html>

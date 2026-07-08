@@ -145,11 +145,12 @@
     // 强制重拉收款设置(老板在别处改了开关 → 收银台回前台时同步 · 走轻量口不重拉整包 bootstrap)。
     // 与 ensure 区别:无视已缓存必拉;失败静默保留旧值(离线/路由缺失不误清已配的方式)。
     // 节流 60s:回前台事件在手机上很频繁(切去银行 App 核对转账/锁屏/切窗都触发),而收款设置
-    // 极少变,不必每次切窗都打网络(retail flaky wifi)。
+    // 极少变,不必每次切窗都打网络(retail flaky wifi)。force=true 时无视节流——开收款弹窗那刻
+    // 收银员正要选方式,必须拿到最新开关(否则老板刚开的转账在 60s 节流窗内看不到,正是此前的坑)。
     let lastPayRefresh = 0;
-    pay.refresh = async function () {
+    pay.refresh = async function (force) {
         const now = Date.now();
-        if (now - lastPayRefresh < 60000) return;
+        if (!force && now - lastPayRefresh < 60000) return;
         lastPayRefresh = now;
         try {
             const p = await POS.data.paymentMethods();

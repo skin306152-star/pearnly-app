@@ -307,12 +307,15 @@
         tendered = 0;
         renderQuickCash();
         updateCash();
-        POS.pay.applyMethods('#pay-mask .pm'); // 按收款设置显隐 PromptPay/刷卡
+        POS.pay.applyMethods('#pay-mask .pm'); // 先按已缓存的设置显隐(瞬时,不阻塞开窗)
         setPm('cash');
         ['pay-cash-err', 'pay-qr-err', 'pay-card-err', 'pay-transfer-err'].forEach(
             (id) => ($(id).textContent = '')
         );
         $('pay-mask').classList.add('show');
+        // 开窗即强制重拉最新收款设置:老板刚在后台开的方式(如转账)靠这步立刻显出,
+        // 不再依赖切标签的 visibilitychange(真机操作流里常不触发 → 此前"开了不显")。
+        POS.pay.refresh(true);
     }
     function closePay() {
         $('pay-mask').classList.remove('show');

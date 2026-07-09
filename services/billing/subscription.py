@@ -56,6 +56,24 @@ _SUB_COLS = (
 )
 
 
+def active_sub_usage_join_sql(alias: str, tenant_ref: str) -> str:
+    """本月用量读侧 join 片段:显示用量 = monthly_page_usage.pages_used +
+    活跃订阅(status='active' AND cycle_end>NOW())的 pages_used_this_cycle。
+
+    两计数器写侧互斥(充值/按量走 monthly_page_usage · 订阅走本表 · 见
+    credits_schema.py 建表注释 4c),读侧相加不会重复计。tenant_subscriptions
+    PRIMARY KEY(tenant_id) 一对一,join 不放大行数,无需 LATERAL/子查询。
+
+    四个读点共用本片段(billing_credits_routes / credits.store / tenant_core /
+    account_status),避免各自手写漂移。tenant_ref 是调用方 SQL 里代表租户的
+    列引用或参数占位符(如 "t.id" / "%s::uuid")。
+    """
+    return (
+        f"LEFT JOIN tenant_subscriptions {alias} ON {alias}.tenant_id = {tenant_ref} "
+        f"AND {alias}.status = 'active' AND {alias}.cycle_end > NOW()"
+    )
+
+
 def get_active_subscription(tenant_id) -> dict | None:
     """当前有效订阅(无则 None)· 惰性续订/失效。
 

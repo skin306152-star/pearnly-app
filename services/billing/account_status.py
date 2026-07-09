@@ -91,23 +91,29 @@ def get_billing_status_combined(user_id, tenant_id) -> dict:
     try:
         ym = _bkk_year_month()
         with db.get_cursor_rls(tenant_id=str(tenant_id)) as cur:
-            # 一次 SELECT 合并两个 LEFT JOIN · 一次 DB roundtrip
+            # 一次 SELECT 合并三个 LEFT JOIN · 一次 DB roundtrip
+            # 用量 = 按量表 + 活跃订阅本周期用量(两计数器互斥不重复计 · 见
+            # services/billing/subscription.py active_sub_usage_join_sql)
             cur.execute(
-                """
+                f"""
                 SELECT
                     COALESCE(tc.balance_thb, 0) AS balance_thb,
-                    COALESCE(mpu.pages_used, 0) AS pages_used
+                    COALESCE(mpu.pages_used, 0) AS pages_used,
+                    COALESCE(ts.pages_used_this_cycle, 0) AS sub_pages_used
                 FROM (SELECT 1) AS dummy
                 LEFT JOIN tenant_credits tc ON tc.tenant_id = %s::uuid
                 LEFT JOIN monthly_page_usage mpu
                        ON mpu.tenant_id = %s::uuid AND mpu.year_month = %s
+                {db.active_sub_usage_join_sql("ts", "%s::uuid")}
                 LIMIT 1
             """,
-                (str(tenant_id), str(tenant_id), ym),
+                (str(tenant_id), str(tenant_id), ym, str(tenant_id)),
             )
             row = cur.fetchone()
             bal = float(row["balance_thb"] if row else 0)
-            used = int(row["pages_used"] if row else 0)
+            used = int(row["pages_used"] if row else 0) + int(
+                (row.get("sub_pages_used") if row else 0) or 0
+            )
 
         # 有有效订阅:套餐内有剩余额度即放行(额度免费 · 不看余额);额度耗尽才要余额>0 扣超额。
         # 单独 try:订阅查询失败按"无套餐"处理(走下方余额闸),不让它扩大外层异常→fail-open 放行的面。

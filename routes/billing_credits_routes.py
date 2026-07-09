@@ -59,13 +59,23 @@ async def get_my_credits(request: Request, response: Response):
                     # → 被下方 except 吞掉 → 余额永远停在默认 0 → 所有老板读自己余额都是 0
                     # (后台/my-companies 用 row["..."] 故正确显示 · 唯独这里读错)
                     balance_thb = float(row["balance_thb"])
+                # 本月用量 = 按量表 + 活跃订阅本周期用量(两计数器互斥不重复计 · 见
+                # services/billing/subscription.py active_sub_usage_join_sql)
                 cur.execute(
-                    "SELECT pages_used FROM monthly_page_usage WHERE tenant_id = %s AND year_month = %s",
-                    (tid, year_month),
+                    f"""
+                    SELECT
+                        COALESCE(mpu.pages_used, 0) AS pages_used,
+                        COALESCE(ts.pages_used_this_cycle, 0) AS sub_pages_used
+                    FROM (SELECT 1) AS dummy
+                    LEFT JOIN monthly_page_usage mpu
+                           ON mpu.tenant_id = %s AND mpu.year_month = %s
+                    {db.active_sub_usage_join_sql("ts", "%s")}
+                    """,
+                    (tid, year_month, tid),
                 )
                 row = cur.fetchone()
                 if row:
-                    pages_this_month = int(row["pages_used"])
+                    pages_this_month = int(row["pages_used"]) + int(row.get("sub_pages_used") or 0)
         except Exception as e:
             logger.warning(f"get_my_credits owner DB: {e}")
 

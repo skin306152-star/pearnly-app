@@ -88,12 +88,13 @@ def get_tenants_credits_summary(limit: int = 100) -> list:
         ym = db._bkk_year_month()
         with db.get_cursor() as cur:
             cur.execute(
-                """
+                f"""
                 SELECT
                     t.id::text AS tenant_id,
                     t.name AS tenant_name,
                     COALESCE(tc.balance_thb, 0) AS balance_thb,
                     COALESCE(mpu.pages_used, 0) AS pages_this_month,
+                    COALESCE(ts.pages_used_this_cycle, 0) AS sub_pages_used,
                     COALESCE(
                         (SELECT SUM(-ct.amount_thb) FROM credit_transactions ct
                          WHERE ct.tenant_id = t.id AND ct.type='usage'
@@ -112,6 +113,7 @@ def get_tenants_credits_summary(limit: int = 100) -> list:
                 LEFT JOIN tenant_credits tc ON tc.tenant_id = t.id
                 LEFT JOIN monthly_page_usage mpu
                        ON mpu.tenant_id = t.id AND mpu.year_month = %s
+                {db.active_sub_usage_join_sql("ts", "t.id")}
                 ORDER BY balance_thb DESC NULLS LAST
                 LIMIT %s
             """,
@@ -122,12 +124,15 @@ def get_tenants_credits_summary(limit: int = 100) -> list:
         out = []
         for r in rows:
             bal = float(r["balance_thb"] or 0)
+            # 本月用量 = 按量表 + 活跃订阅本周期用量(两计数器互斥不重复计 · 见
+            # services/billing/subscription.py active_sub_usage_join_sql)
+            pages_this_month = int(r["pages_this_month"] or 0) + int(r.get("sub_pages_used") or 0)
             out.append(
                 {
                     "tenant_id": r["tenant_id"],
                     "tenant_name": r["tenant_name"] or "(无名)",
                     "balance_thb": bal,
-                    "pages_this_month": int(r["pages_this_month"] or 0),
+                    "pages_this_month": pages_this_month,
                     "month_usage_thb": float(r["month_usage_thb"] or 0),
                     "lifetime_topup_thb": float(r["lifetime_topup_thb"] or 0),
                     "last_usage_at": r["last_usage_at"].isoformat() if r["last_usage_at"] else None,
@@ -153,10 +158,11 @@ def get_tenant_credit_summary(tenant_id: str) -> Dict[str, Any]:
         ym = db._bkk_year_month()
         with db.get_cursor() as cur:
             cur.execute(
-                """
+                f"""
                 SELECT
                     COALESCE(tc.balance_thb, 0) AS balance_thb,
                     COALESCE(mpu.pages_used, 0) AS pages_this_month,
+                    COALESCE(ts.pages_used_this_cycle, 0) AS sub_pages_used,
                     COALESCE(
                         (SELECT SUM(-ct.amount_thb) FROM credit_transactions ct
                          WHERE ct.tenant_id = t.id AND ct.type='usage'
@@ -173,6 +179,7 @@ def get_tenant_credit_summary(tenant_id: str) -> Dict[str, Any]:
                 LEFT JOIN tenant_credits tc ON tc.tenant_id = t.id
                 LEFT JOIN monthly_page_usage mpu
                        ON mpu.tenant_id = t.id AND mpu.year_month = %s
+                {db.active_sub_usage_join_sql("ts", "t.id")}
                 WHERE t.id = %s
                 """,
                 (ym, tenant_id),
@@ -181,9 +188,12 @@ def get_tenant_credit_summary(tenant_id: str) -> Dict[str, Any]:
         if not r:
             return {}
         bal = float(r["balance_thb"] or 0)
+        # 本月用量 = 按量表 + 活跃订阅本周期用量(两计数器互斥不重复计 · 见
+        # services/billing/subscription.py active_sub_usage_join_sql)
+        pages_this_month = int(r["pages_this_month"] or 0) + int(r.get("sub_pages_used") or 0)
         return {
             "balance_thb": bal,
-            "pages_this_month": int(r["pages_this_month"] or 0),
+            "pages_this_month": pages_this_month,
             "month_usage_thb": float(r["month_usage_thb"] or 0),
             "lifetime_topup_thb": float(r["lifetime_topup_thb"] or 0),
             "topup_count": int(r["topup_count"] or 0),

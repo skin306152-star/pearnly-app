@@ -325,19 +325,21 @@ def list_user_companies(user_id: str) -> list:
         year_month = db._bkk_year_month()
         with db.get_cursor() as cur:
             cur.execute(
-                """
+                f"""
                 SELECT
                     ucr.tenant_id::text AS tenant_id,
                     t.name AS name,
                     ucr.role AS role,
                     ucr.is_active AS is_active,
                     COALESCE(tc.balance_thb, 0) AS balance_thb,
-                    COALESCE(mpu.pages_used, 0) AS pages_this_month
+                    COALESCE(mpu.pages_used, 0) AS pages_this_month,
+                    COALESCE(ts.pages_used_this_cycle, 0) AS sub_pages_used
                 FROM user_company_roles ucr
                 JOIN tenants t ON t.id = ucr.tenant_id
                 LEFT JOIN tenant_credits tc ON tc.tenant_id = ucr.tenant_id
                 LEFT JOIN monthly_page_usage mpu
                        ON mpu.tenant_id = ucr.tenant_id AND mpu.year_month = %s
+                {db.active_sub_usage_join_sql("ts", "ucr.tenant_id")}
                 WHERE ucr.user_id = %s::uuid AND ucr.is_active = TRUE
                 ORDER BY t.name
             """,
@@ -346,13 +348,16 @@ def list_user_companies(user_id: str) -> list:
             rows = cur.fetchall() or []
         out = []
         for r in rows:
+            # 本月用量 = 按量表 + 活跃订阅本周期用量(两计数器互斥不重复计 · 见
+            # services/billing/subscription.py active_sub_usage_join_sql)
+            pages_this_month = int(r["pages_this_month"] or 0) + int(r.get("sub_pages_used") or 0)
             out.append(
                 {
                     "tenant_id": r["tenant_id"],
                     "name": r["name"] or "",
                     "role": r["role"] or "member",
                     "balance_thb": float(r["balance_thb"] or 0),
-                    "pages_this_month": int(r["pages_this_month"] or 0),
+                    "pages_this_month": pages_this_month,
                     "is_active": bool(r["is_active"]),
                 }
             )

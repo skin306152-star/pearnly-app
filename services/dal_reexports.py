@@ -352,6 +352,7 @@ _REEXPORTS = {
         "subscription_subscribe",
         "subscription_cancel",
         "subscription_catalog",
+        "active_sub_usage_join_sql",
     ],
     "services.auth.user_lookup": [
         "find_user_by_username",

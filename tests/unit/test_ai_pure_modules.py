@@ -297,6 +297,56 @@ class AiIntakeRenderPureTests(unittest.TestCase):
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class AiPkgRenderPureTests(unittest.TestCase):
+    """交付包视图(W5)的纯函数守门:证据文件名是否可当图片打开(状态诚实,xlsx/pdf 等
+    非图片文件不硬塞进查看器碎图)、应缴/留抵展示口径(负数=留抵,取绝对值,不 clamp)。
+    HTML 拼装依赖 at()/DOM 不在此测(交 W5 E2E)。"""
+
+    def test_is_image_file_name_recognizes_common_photo_extensions_only(self):
+        out = _run_node(f"""
+            const r = require({json.dumps(str(AI_DIR / "ai-pkg-render.js"))});
+            process.stdout.write(JSON.stringify([
+                r.isImageFileName('IMG_2647.jpg'), r.isImageFileName('receipt.PNG'),
+                r.isImageFileName('pos_may.xlsx'), r.isImageFileName('note.pdf'),
+                r.isImageFileName(null), r.isImageFileName(''),
+            ]));
+            """)
+        self.assertEqual(out, [True, True, False, False, False, False])
+
+    def test_due_display_reports_refund_for_negative_tax_due(self):
+        out = _run_node(f"""
+            const r = require({json.dumps(str(AI_DIR / "ai-pkg-render.js"))});
+            process.stdout.write(JSON.stringify([
+                r.dueDisplay('30851.33'), r.dueDisplay('-120.50'), r.dueDisplay('0'),
+            ]));
+            """)
+        self.assertEqual(
+            out,
+            [
+                {"labelKey": "pkg_line_due", "amount": 30851.33},
+                {"labelKey": "pkg_line_refund", "amount": 120.5},
+                {"labelKey": "pkg_line_due", "amount": 0},
+            ],
+        )
+
+    def test_kind_order_matches_five_deliverable_kinds(self):
+        out = _run_node(f"""
+            const r = require({json.dumps(str(AI_DIR / "ai-pkg-render.js"))});
+            process.stdout.write(JSON.stringify(r.KIND_ORDER));
+            """)
+        self.assertEqual(
+            out,
+            [
+                "pp30_draft",
+                "ledger_workpaper",
+                "bank_workpaper",
+                "missing_doc_memo",
+                "evidence_index",
+            ],
+        )
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class AiI18nStructureTests(unittest.TestCase):
     """i18n 词典是数据文件(同 console-i18n.js 先例,无 module.exports)——
     直接 eval 后校验四语 key 集合一致,防漏翻(某语言缺 key 会静默回落 zh,不易发现)。

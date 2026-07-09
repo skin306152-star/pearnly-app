@@ -23,6 +23,13 @@
                 return root.localStorage.getItem('mrpilot_token');
             };
 
+        // Bearer 头:有 token 才带,没有就是空头(fail-closed 交给后端 401)——
+        // call()/getItemImageBlob/downloadDeliverable 共用同一份,不各拼一套。
+        function authHeaders() {
+            var token = getToken();
+            return token ? { Authorization: 'Bearer ' + token } : {};
+        }
+
         // 响应外壳统一处理:非 2xx → 抛带 code/status 的 Error(调用方 mapApiErrorKey 取文案),
         // 2xx → 解出 JSON。JSON/multipart 请求共用同一份,不各拼一套错误契约。
         function handleResponse(r) {
@@ -44,9 +51,7 @@
         }
 
         function call(method, path, body) {
-            var token = getToken();
-            var headers = {};
-            if (token) headers.Authorization = 'Bearer ' + token;
+            var headers = authHeaders();
             if (body) headers['Content-Type'] = 'application/json';
             return root
                 .fetch(path, {
@@ -125,12 +130,36 @@
                     })
                     .then(handleResponse);
             },
-            // 原图直出(W3 审核队列):鉴权头是 Bearer,<img src> 发不了自定义头,调用方
-            // 拿 blob 自建 object URL 挂 <img>(同 console.js 导出下载的 fetch+blob 先例)。
+            // 交付物下载(W5 交付包页):鉴权头是 Bearer,<a href> 发不了自定义头,调用方拿
+            // blob 自建 object URL 触发下载(同 console.js exportLog 的 fetch+blob 先例)。
+            // 文件名从服务端 Content-Disposition 读(FileResponse 已带 filename=真实文件名),
+            // 读不到时退化用 kind 本身,不编一个假名字。
+            downloadDeliverable: function (orderId, kind) {
+                return root
+                    .fetch(
+                        '/api/workorder/orders/' +
+                            encodeURIComponent(orderId) +
+                            '/deliverables/' +
+                            encodeURIComponent(kind),
+                        { headers: authHeaders() }
+                    )
+                    .then(function (r) {
+                        if (!r.ok) {
+                            var err = new Error('workorder.deliverable_not_found');
+                            err.status = r.status;
+                            throw err;
+                        }
+                        var disp = r.headers.get('Content-Disposition') || '';
+                        var m = /filename="?([^";]+)"?/.exec(disp);
+                        var filename = m ? m[1] : kind;
+                        return r.blob().then(function (blob) {
+                            return { blob: blob, filename: filename };
+                        });
+                    });
+            },
+            // 原图直出(W3 审核队列 / W5 证据回链):鉴权头是 Bearer,<img src> 发不了自定义头,
+            // 调用方拿 blob 自建 object URL 挂 <img>(同 console.js 导出下载的 fetch+blob 先例)。
             getItemImageBlob: function (orderId, itemId) {
-                var token = getToken();
-                var headers = {};
-                if (token) headers.Authorization = 'Bearer ' + token;
                 return root
                     .fetch(
                         '/api/workorder/orders/' +
@@ -138,7 +167,7 @@
                             '/items/' +
                             encodeURIComponent(itemId) +
                             '/image',
-                        { headers: headers }
+                        { headers: authHeaders() }
                     )
                     .then(function (r) {
                         if (!r.ok) {

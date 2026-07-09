@@ -1,0 +1,250 @@
+/* Pearnly AI · 交付包视图(W5)样式——v4 §v-pkg 移植(pkg-line/pkg-total/evid/pfile/mask/
+ * modal/ev-row 1:1 抄自 Pearnly-AI-高保真原型-v4.html)。拆自 ai-client.css(单文件<500 行铁律)，
+ * 在 build-home-css.mjs 的 AI_CSS 里排 ai-client.css 之后、ai-viewer.css 之前——证据模态框内的
+ * .pv-viewer 挂载点在本文件定义(.pkg-evid-view),需要先有容器样式,查看器细节才生效。
+ *
+ * v4 的 .rail 助手侧栏本视图不接(M1 §5 降级表:AI 问答侧栏未接,藏 flag),故无对应样式。
+ */
+.pkg-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 14px 4px;
+  border-bottom: 1px solid var(--hair3);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pkg-line .d {
+  font-size: 12.5px;
+  color: var(--ink2);
+}
+.pkg-line .d small {
+  display: block;
+  color: var(--mut);
+  font-size: 11px;
+  margin-top: 2px;
+}
+.pkg-line .v {
+  display: flex;
+  align-items: baseline;
+  gap: 11px;
+}
+.pkg-line .n {
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.pkg-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 20px 4px 8px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.pkg-total .d {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mut);
+}
+.pkg-total .n {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 34px;
+  letter-spacing: -0.01em;
+  color: var(--gold);
+}
+.pkg-calc-note {
+  font-size: 12px;
+  color: var(--mut);
+  border-top: 1px solid var(--hair3);
+  padding-top: 11px;
+  margin-top: 4px;
+}
+.evid {
+  color: var(--gold);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  text-decoration: none;
+  border-bottom: 1px dotted var(--gold);
+}
+.evid:hover {
+  border-bottom-style: solid;
+}
+.pkg-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+.pfile {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  padding: 8px 13px;
+  font-size: 12px;
+  color: var(--ink2);
+  background: var(--surface2);
+}
+.pfile svg {
+  width: 13px;
+  height: 13px;
+  stroke: var(--mut);
+  flex-shrink: 0;
+}
+.pfile.muted {
+  color: var(--mut);
+}
+.pfile small {
+  color: var(--mut);
+  font-size: 10.5px;
+}
+.pfile button {
+  margin-left: 4px;
+  background: none;
+  border: none;
+  color: var(--gold);
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* 状态诚实:草稿被卡(未清完人审 / 缺料)时的说明块——不假装已生成。 */
+.pkg-blocked {
+  padding: 20px 4px;
+}
+.pkg-blocked .t {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.pkg-blocked .s,
+.pkg-blocked .reasons {
+  font-size: 12.5px;
+  color: var(--mut);
+  line-height: 1.7;
+}
+
+/* M1 降级区(电子签/推送 Express/退回工单未接——状态诚实,按钮禁用 + 提示条)。 */
+.pkg-downgrade {
+  margin-top: 17px;
+}
+.pkg-downgrade-note {
+  font-size: 11.5px;
+  color: var(--mut);
+  margin-top: 9px;
+}
+
+/* ---- 证据模态框(v4 .mask/.modal/.ev-row 1:1)---- */
+.pkg-mask {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(51, 47, 39, 0.4);
+  z-index: 100;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 8vh 20px 20px;
+  backdrop-filter: blur(2px);
+  overflow-y: auto;
+}
+.pkg-mask.on {
+  display: flex;
+}
+.pkg-modal {
+  background: var(--surface);
+  border-radius: 14px;
+  max-width: min(760px, 100%);
+  width: 100%;
+  max-height: 84vh;
+  overflow-y: auto;
+  box-shadow: var(--sh-pop);
+}
+.pkg-modal .mh {
+  padding: 20px 24px 13px;
+  border-bottom: 1px solid var(--hair);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pkg-modal .mh h3 {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.pkg-modal .mh p {
+  color: var(--mut);
+  font-size: 12px;
+  margin-top: 3px;
+}
+.pkg-modal .mclose {
+  background: none;
+  border: 1px solid var(--hair2);
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  cursor: pointer;
+  color: var(--ink2);
+}
+.pkg-modal .mb {
+  padding: 14px 24px 22px;
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: 16px;
+  align-items: start;
+}
+.pkg-evid-list {
+  min-width: 0;
+}
+.ev-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 9px;
+  font-size: 12.5px;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--hair3);
+  align-items: center;
+  border-radius: 8px;
+}
+.ev-row.sel {
+  background: var(--gold-soft);
+}
+.ev-row.novisual .evid {
+  color: var(--mut);
+  cursor: default;
+  border-bottom: none;
+}
+.pkg-evid-view {
+  background: var(--surface2);
+  border: 1px solid var(--hair2);
+  border-radius: 8px;
+  min-height: 300px;
+  position: relative;
+  overflow: hidden;
+}
+.pkg-evid-view.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--mut);
+  font-size: 12px;
+  padding: 20px;
+}
+
+@media (max-width: 720px) {
+  .pkg-modal .mb {
+    grid-template-columns: 1fr;
+  }
+}

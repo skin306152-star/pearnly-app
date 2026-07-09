@@ -299,6 +299,103 @@ class EvidenceIndexTests(PackageFixture):
         self.assertNotIn(2, index["numbers"]["input_vat"]["event_ids"])
 
 
+class SalesSourceAnnotationTests(PackageFixture):
+    """销项来源标注(状态诚实条款):人工申报的销项数字必须与 POS 直读区分呈现。"""
+
+    def test_direct_read_sales_defaults_to_direct_read_no_note(self):
+        store = self._sister_makeup_store()  # 既有夹具的 sales_read 无 source 字段
+        package.run(self._ctx(store))
+
+        pp30 = store.deliverables["pp30_draft"]["numbers"]
+        self.assertEqual(pp30["sales_source"], "direct_read")
+        self.assertIsNone(pp30["sales_source_note"])
+
+        pp30_md = Path(store.deliverables["pp30_draft"]["artifact_path"]).read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("แหล่งที่มา", pp30_md)  # direct_read 不额外提示,默认可信路径
+
+        ledger_md = Path(store.deliverables["ledger_workpaper"]["artifact_path"]).read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("แหล่งที่มา", ledger_md)  # ledger 与 pp30 同一份判定,不各拼一套
+
+        index = json.loads(
+            Path(store.deliverables["evidence_index"]["artifact_path"]).read_text(encoding="utf-8")
+        )
+        self.assertEqual(index["numbers"]["sales_amount"]["source"], "direct_read")
+        self.assertNotIn("note", index["numbers"]["sales_amount"])
+
+    def test_manual_entry_sales_labeled_and_not_confused_with_direct_read(self):
+        items = [
+            _purchase_item("u", "/in/undisputed.jpg"),
+            {
+                "id": "s1",
+                "kind": "sales_summary",
+                "status": "ok",
+                "flag_reason": None,
+                "file_ref": None,  # 人工填销项没有票据文件(api.record_sales_summary 同口径)
+            },
+        ]
+        events = [
+            _classified_evt(
+                1,
+                "u",
+                kind="purchase_invoice",
+                money={
+                    "subtotal": "354923.86",
+                    "vat": "25194.28",
+                    "total_amount": "380118.14",
+                },
+            ),
+            _classified_evt(
+                2,
+                "s1",
+                kind="sales_summary",
+                sales_read={
+                    "headers": ["ยอดขาย", "ภาษีขาย"],
+                    "rows": [{"cells": ["858780.16", "60114.61"], "is_summary": False}],
+                    "source": "manual_entry",
+                    "note": "no POS export, client reported by LINE",
+                },
+            ),
+            _reconcile_done_evt(),
+            _compute_done_evt(),
+        ]
+        store = FakeStore(items, events)
+        package.run(self._ctx(store))
+
+        pp30 = store.deliverables["pp30_draft"]["numbers"]
+        self.assertEqual(pp30["sales_source"], "manual_entry")
+        self.assertEqual(pp30["sales_source_note"], "no POS export, client reported by LINE")
+
+        pp30_md = Path(store.deliverables["pp30_draft"]["artifact_path"]).read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("กรอกเอง", pp30_md)
+        self.assertIn("no POS export, client reported by LINE", pp30_md)
+
+        ledger_md = Path(store.deliverables["ledger_workpaper"]["artifact_path"]).read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("แหล่งที่มา", ledger_md)
+        self.assertIn("กรอกเอง", ledger_md)
+
+        index = json.loads(
+            Path(store.deliverables["evidence_index"]["artifact_path"]).read_text(encoding="utf-8")
+        )
+        sales_numbers = index["numbers"]["sales_amount"]
+        self.assertEqual(sales_numbers["source"], "manual_entry")
+        self.assertEqual(sales_numbers["note"], "no POS export, client reported by LINE")
+        # 人工填的件没有票据文件——items 里该条 file_name 诚实给 None,不是编一个假文件名。
+        self.assertEqual(sales_numbers["items"], [{"item_id": "s1", "file_name": None}])
+        self.assertEqual(sales_numbers["source_files"], [])
+
+        # 进项证据不受影响(items 逐条含 file_name)。
+        purchase_items = index["numbers"]["input_vat"]["items"]
+        self.assertEqual(purchase_items, [{"item_id": "u", "file_name": "undisputed.jpg"}])
+
+
 class IdempotencyTests(PackageFixture):
     def test_rerun_overwrites_not_duplicates(self):
         store = self._sister_makeup_store()

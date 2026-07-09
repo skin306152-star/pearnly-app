@@ -152,51 +152,15 @@
     }
 
     function renderPkg() {
-        var body = $('cv-pkg');
         var order = currentOrder();
         if (!order) {
-            body.innerHTML = AI.state.emptyHtml({ title: at('wo_empty_t'), sub: at('wo_empty_s') });
+            $('cv-pkg').innerHTML = AI.state.emptyHtml({
+                title: at('wo_empty_t'),
+                sub: at('wo_empty_s'),
+            });
             return;
         }
-        body.innerHTML = AI.state.loadingHtml();
-        S.api
-            .listDeliverables(order.id)
-            .then(function (r) {
-                var rows = r.deliverables || [];
-                if (!rows.length) {
-                    body.innerHTML = AI.state.emptyHtml({
-                        title: at('pkg_empty_t'),
-                        sub: at('pkg_empty_s'),
-                    });
-                    return;
-                }
-                body.innerHTML =
-                    '<div class="panel"><div class="bd">' +
-                    rows
-                        .map(function (d) {
-                            var n = d.numbers || {};
-                            var firstKey = Object.keys(n)[0];
-                            var v = firstKey ? AI.format.money(n[firstKey]) : '';
-                            return (
-                                '<div class="dlv-line"><div class="d">' +
-                                esc(AI.format.fieldLabel(d.kind)) +
-                                '</div><div class="n">' +
-                                v +
-                                '</div></div>'
-                            );
-                        })
-                        .join('') +
-                    '</div></div>';
-            })
-            .catch(function () {
-                body.innerHTML = AI.state.errorHtml({
-                    title: at('error_t'),
-                    sub: at('error_s'),
-                    retryLabel: at('retry'),
-                });
-                var btn = body.querySelector('[data-action="retry"]');
-                if (btn) btn.onclick = renderPkg;
-            });
+        AI.pkg.mount(S.api, order, S.clientId);
     }
 
     function renderActiveView() {
@@ -227,8 +191,14 @@
 
     // route(clientId, view) 由 ai.js 的路由订阅调用;同一客户内切 tab/切期不重新拉客户身份。
     function mount(api, clientId, view) {
+        var prevView = S.view;
         S.api = api;
         S.view = view;
+        // 离开交付包 tab 收掉它挂在 document.body 的证据模态框(不在 cv-pkg 的 innerHTML
+        // 里,tab 切走不会自动隐藏——见 ai-pkg.js onLeave 注释)。
+        if (prevView === 'pkg' && view !== 'pkg' && window.AI.pkg) {
+            AI.pkg.onLeave();
+        }
         if (!chromeWired) {
             wireChrome();
             chromeWired = true;

@@ -73,6 +73,13 @@ def _resolve_numbers(ctx: StepContext, events: list[dict]) -> dict:
     if gates is None:
         gates = (evidence.replay_step_done(events, "reconcile") or {}).get("gates")
     base["gates"] = gates or {}
+
+    # 销项来源标注(状态诚实条款):人工申报的销项数字必须与 POS 直读区分,不混同呈现——
+    # 永远从事件流回放算(不吃 ctx.data 的同进程捷径),同一份判定给 pp30/ledger 底稿与
+    # evidence_index 共用,不各拼一套。
+    sales_source = evidence.sales_source_info_from_events(events)
+    base["sales_source"] = sales_source.get("source")
+    base["sales_source_note"] = sales_source.get("note")
     return base
 
 
@@ -96,10 +103,38 @@ def _bullets(title: str, rows: list[str]) -> list[str]:
     return [f"## {title}", "", *(rows or ["- (无)"]), ""]
 
 
+_SOURCE_LABEL_TH = {
+    "manual_entry": "กรอกเอง (人工申报)",
+    "direct_read": "อ่านตรงจากไฟล์ POS (POS 导出直读)",
+    "mixed": "กรอกเอง + อ่านตรง (人工申报 + 直读混合)",
+}
+
+
+def _sales_source_visible(source: str | None) -> bool:
+    """销项来源是否需要显著提示(状态诚实):direct_read 不提示(默认可信路径);
+    manual_entry/mixed 才提示——pp30 脚注与 ledger 底稿共用同一份判定,不各拼一套。"""
+    return bool(source) and source != "direct_read"
+
+
+def _sales_source_note_lines(numbers: dict) -> list[str]:
+    """销项来源脚注:与 evidence_index 的 sales_source_info 同一份判定,不重算。"""
+    source = numbers.get("sales_source")
+    if not _sales_source_visible(source):
+        return []
+    label = _SOURCE_LABEL_TH.get(source, source)
+    line = f"หมายเหตุแหล่งที่มายอดขาย (销项来源标注): {label}"
+    note = numbers.get("sales_source_note")
+    if note:
+        line += f" — {note}"
+    return ["", line]
+
+
 def _write_pp30(out_dir: Path, numbers: dict) -> tuple[str, dict]:
     """ภ.พ.30 关键行草稿:结构化 JSON(供程序/证据索引引用)+ markdown 底稿(供人读)。"""
     snapshot = {k: numbers.get(k) for k in _COMPUTE_KEYS}
     snapshot["prior_period_check"] = numbers.get("prior_period_check")
+    snapshot["sales_source"] = numbers.get("sales_source")
+    snapshot["sales_source_note"] = numbers.get("sales_source_note")
     json_path = _write_md(
         out_dir, "pp30_draft.json", [json.dumps(snapshot, ensure_ascii=False, indent=2)]
     )
@@ -122,6 +157,7 @@ def _write_pp30(out_dir: Path, numbers: dict) -> tuple[str, dict]:
             f"| มูลค่าซื้อที่นำมาหักได้ (可抵扣采购额) | {_dec_str(numbers.get('purchase_amount'))} |",
             f"| ภาษีซื้อ (进项税) | {_dec_str(numbers.get('input_vat'))} |",
             f"| {due_label} | {_dec_str(numbers.get('tax_due'))} |",
+            *_sales_source_note_lines(numbers),
             "",
             "หมายเหตุ: ฉบับทางการ (PDF) จัดทำใน M1 (官式 PDF 版式为 M1,本页仅内部核对底稿)",
         ],
@@ -155,6 +191,12 @@ def _write_ledger(
         "|---|---|---|---|---|---|---|",
     ]
     sales_count = sum(1 for it in items if it["kind"] == "sales_summary" and it["status"] == "ok")
+    source = numbers.get("sales_source")
+    source_line = (
+        f"แหล่งที่มา (来源): {_SOURCE_LABEL_TH.get(source, source)}"
+        if _sales_source_visible(source)
+        else None
+    )
     path = _write_md(
         out_dir,
         "ledger_workpaper.md",
@@ -167,7 +209,8 @@ def _write_ledger(
                 [
                     f"จากไฟล์สรุปยอดขาย {sales_count} รายการ (来自 {sales_count} 份销项汇总表): "
                     f"ยอดขาย {_dec_str(numbers.get('sales_amount'))} บาท / "
-                    f"ภาษีขาย {_dec_str(numbers.get('output_vat'))} บาท"
+                    f"ภาษีขาย {_dec_str(numbers.get('output_vat'))} บาท",
+                    *([source_line] if source_line else []),
                 ],
             ),
         ],
@@ -179,6 +222,8 @@ def _write_ledger(
         "sales_amount_total": numbers.get("sales_amount"),
         "output_vat_total": numbers.get("output_vat"),
         "sales_item_count": sales_count,
+        "sales_source": source,
+        "sales_source_note": numbers.get("sales_source_note"),
     }
     return str(path), snapshot
 

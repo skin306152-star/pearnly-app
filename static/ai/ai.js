@@ -79,6 +79,9 @@
         $('v-client').classList.toggle('on', route.name === 'client');
         $('navDash').classList.toggle('on', route.name === 'dashboard');
         if (route.name === 'dashboard') {
+            // 回工作台离开了客户独立页——交付包的证据模态框挂在 document.body(不在
+            // v-client 子树里),不主动收会悬在工作台上方(ai-pkg.js onLeave 同款注释)。
+            if (window.AI.pkg) AI.pkg.onLeave();
             AI.dashboard.load(api).then(function () {
                 window.scrollTo(0, dashScrollY);
             });

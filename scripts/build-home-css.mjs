@@ -143,6 +143,7 @@ const AI_CSS = [
     'ai/ai-dashboard.css',
     'ai/ai-client.css',
     'ai/ai-intake.css',
+    'ai/ai-pkg.css',
     'ai/ai-viewer.css',
 ];
 

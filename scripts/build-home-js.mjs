@@ -62,6 +62,9 @@ const BUNDLES = [
     // 排在 ai-review.js(编排)之前;ai-client.js 挂 renderReview 时才用到 AI.review,
     // 故 ai-review.js 仍需排在 ai-client.js 之前。ai-intake-render.js(纯校验+HTML)排在
     // ai-intake.js(上传/填数/续跑编排)之前,两者都在 ai-client.js(renderIntake 用 AI.intake)之前。
+    // ai-pkg-render.js(交付包纯函数+HTML,依赖 AI.format/AI.state/AI.viewer)排在
+    // ai-pkg.js(挂载/下载/证据模态框编排)之前,两者都在 ai-client.js(renderPkg 用
+    // AI.pkg)和 ai.js(离开客户页时调 AI.pkg.onLeave)之前。
     {
         out: 'static/dist/ai.js',
         files: [
@@ -78,6 +81,8 @@ const BUNDLES = [
             'ai/ai-review.js',
             'ai/ai-intake-render.js',
             'ai/ai-intake.js',
+            'ai/ai-pkg-render.js',
+            'ai/ai-pkg.js',
             'ai/ai-client.js',
             'ai/ai.js',
         ],

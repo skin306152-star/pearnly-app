@@ -336,8 +336,11 @@
 .btn:active {
   transform: translateY(1px);
 }
-.btn:focus-visible {
-  outline: 2px solid var(--sage);
+/* 聚焦金环(Canon §7:不用默认蓝)——按钮/侧栏项/自定义可点元素统一。 */
+.btn:focus-visible,
+.snav a:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
 .btn.pri {
@@ -445,10 +448,34 @@
   }
 }
 
-@media (max-width: 960px) {
+/* 侧栏自适应(Canon §6.4 · v4 未画,按该条延展):<1100px 折叠成图标栏——
+ * 保导航可用不整栏消失(v4 原 960px 直接 display:none 已被该新增铁律取代)。 */
+@media (max-width: 1100px) {
   .side {
+    width: 58px;
+  }
+  .brand {
+    justify-content: center;
+    padding: 22px 0 18px;
+  }
+  .brand .word,
+  .snav .lbl,
+  .snav a span,
+  .snav a .n,
+  .side .foot small {
     display: none;
   }
+  .snav a {
+    justify-content: center;
+    padding: 11px 0;
+  }
+  .side .foot {
+    justify-content: center;
+    padding: 16px 0;
+  }
+}
+
+@media (max-width: 960px) {
   .content {
     padding: 18px 15px 80px;
   }

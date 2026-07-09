@@ -65,15 +65,25 @@
         }
     }
 
+    // 离开工作台时记滚动位,回来时恢复(Canon §7:视图切换回来滚动位置不丢)。
+    var dashScrollY = 0;
+    var prevRouteName = null;
+
     function onRoute(api, route) {
+        if (prevRouteName === 'dashboard' && route.name !== 'dashboard') {
+            dashScrollY = window.scrollY;
+        }
+        prevRouteName = route.name;
         setCrumb(route);
         $('v-dashboard').classList.toggle('on', route.name === 'dashboard');
         $('v-client').classList.toggle('on', route.name === 'client');
         $('navDash').classList.toggle('on', route.name === 'dashboard');
-        window.scrollTo(0, 0);
         if (route.name === 'dashboard') {
-            AI.dashboard.load(api);
+            AI.dashboard.load(api).then(function () {
+                window.scrollTo(0, dashScrollY);
+            });
         } else {
+            window.scrollTo(0, 0);
             AI.client.mount(api, route.clientId, route.view);
         }
     }

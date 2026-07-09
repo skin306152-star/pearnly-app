@@ -90,14 +90,13 @@
                         var display = /vat|amount|due/.test(k) ? AI.format.money(v) : esc(v);
                         return (
                             '<div class="cell"><div class="lb">' +
-                            esc(k) +
+                            esc(AI.format.fieldLabel(k)) +
                             '</div><div class="v num">' +
                             display +
                             '</div></div>'
                         );
                     })
                     .join('');
-                var sc = AI.format.statusChip(d.status);
                 var needs = (d.needs || [])
                     .map(function (n) {
                         return '<div class="ni">' + esc(n) + '</div>';
@@ -106,11 +105,9 @@
                 body.innerHTML =
                     '<div class="panel"><div class="hd"><h3>' +
                     esc(at('tab_wo')) +
-                    ' <span class="chip ' +
-                    sc.cls +
-                    '">' +
-                    esc(at(sc.key)) +
-                    '</span><span class="note">' +
+                    ' ' +
+                    AI.format.chipHtml(d.status, d) +
+                    '<span class="note">' +
                     esc(at('wo_step')) +
                     ': ' +
                     esc(d.current_step) +
@@ -172,7 +169,7 @@
                             var v = firstKey ? AI.format.money(n[firstKey]) : '';
                             return (
                                 '<div class="dlv-line"><div class="d">' +
-                                esc(d.kind) +
+                                esc(AI.format.fieldLabel(d.kind)) +
                                 '</div><div class="n">' +
                                 v +
                                 '</div></div>'

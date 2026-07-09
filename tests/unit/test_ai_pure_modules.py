@@ -3,7 +3,7 @@
 """
 tests/unit/test_ai_pure_modules.py
 
-Pearnly AI(M1-W1)前端纯函数模块的等价/边界守门:ai-format.js / ai-router.js /
+Pearnly AI(M1-W1/W2)前端纯函数模块的等价/边界守门:ai-format.js / ai-router.js /
 ai-state.js / ai-api.js 都走 pos-totals.js 先例的 UMD 双导出,这里用真 node 直接
 require 源文件断言输出——不进浏览器,只测无 DOM 依赖的那一半逻辑。node 缺失时跳过
 (本地/CI 均装了 node)。
@@ -13,24 +13,9 @@ from __future__ import annotations
 
 import json
 import shutil
-import subprocess
 import unittest
-from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-AI_DIR = PROJECT_ROOT / "static" / "ai"
-
-
-def _run_node(js_source: str) -> dict:
-    proc = subprocess.run(
-        ["node", "-e", js_source],
-        cwd=str(PROJECT_ROOT),
-        capture_output=True,
-        timeout=15,
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(f"node failed: {proc.stderr.decode('utf-8', 'replace')}")
-    return json.loads(proc.stdout.decode("utf-8"))
+from tests.unit._node_harness import AI_DIR, _run_node
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
@@ -85,6 +70,43 @@ class AiFormatTests(unittest.TestCase):
                 {"cls": "b", "key": "status_stuck"},
                 {"cls": "a", "key": "status_running"},
                 {"cls": "n", "key": "status_unknown"},
+            ],
+        )
+
+    def test_status_chip_stuck_with_needs_overrides_generic_stuck(self):
+        # 看板卡片、客户详情页此前各自判"是不是缺料",同一张工单能对不上文案——
+        # 统一收进 statusChip(status, detail):谁传了非空 needs 谁就拿到缺料子态。
+        out = _run_node(f"""
+            const f = require({json.dumps(str(AI_DIR / "ai-format.js"))});
+            process.stdout.write(JSON.stringify([
+                f.statusChip('stuck'),
+                f.statusChip('stuck', {{needs: []}}),
+                f.statusChip('stuck', {{needs: ['bank_statement']}}),
+            ]));
+            """)
+        self.assertEqual(
+            out,
+            [
+                {"cls": "b", "key": "status_stuck"},
+                {"cls": "b", "key": "status_stuck"},
+                {"cls": "w", "key": "chip_needs_materials"},
+            ],
+        )
+
+    def test_chip_html_renders_span_and_shares_stuck_override(self):
+        out = _run_node(f"""
+            global.at = (k) => ({{status_running: 'AI 在做', chip_needs_materials: '缺料'}})[k] || k;
+            const f = require({json.dumps(str(AI_DIR / "ai-format.js"))});
+            process.stdout.write(JSON.stringify([
+                f.chipHtml('running'),
+                f.chipHtml('stuck', {{needs: ['bank_statement']}}),
+            ]));
+            """)
+        self.assertEqual(
+            out,
+            [
+                '<span class="chip a">AI 在做</span>',
+                '<span class="chip w">缺料</span>',
             ],
         )
 
@@ -164,6 +186,35 @@ class AiApiPureTests(unittest.TestCase):
             ]));
             """)
         self.assertEqual(out, ["err_workorder_not_found", "err_generic", "err_generic"])
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class FieldLabelTests(unittest.TestCase):
+    """fieldLabel 是查表 + 回落型格式化函数,随 W2 简化收口从 ai-board.js 搬来同类
+    的 statusChip/money 身边——同一份测试跟着函数搬,断言不变。"""
+
+    def test_known_field_uses_injected_lookup(self):
+        out = _run_node(f"""
+            global.at = (k) => (k === 'field_tax_due' ? '应缴税额' : k);
+            const f = require({json.dumps(str(AI_DIR / "ai-format.js"))});
+            process.stdout.write(JSON.stringify(f.fieldLabel('tax_due')));
+            """)
+        self.assertEqual(out, "应缴税额")
+
+    def test_unknown_field_falls_back_to_raw_key(self):
+        out = _run_node(f"""
+            global.at = (k) => k;
+            const f = require({json.dumps(str(AI_DIR / "ai-format.js"))});
+            process.stdout.write(JSON.stringify(f.fieldLabel('some_future_field')));
+            """)
+        self.assertEqual(out, "some_future_field")
+
+    def test_no_at_function_falls_back_to_raw_key(self):
+        out = _run_node(f"""
+            const f = require({json.dumps(str(AI_DIR / "ai-format.js"))});
+            process.stdout.write(JSON.stringify(f.fieldLabel('sales_amount')));
+            """)
+        self.assertEqual(out, "sales_amount")
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")

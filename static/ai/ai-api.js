@@ -71,6 +71,9 @@
             getOrder: function (id) {
                 return call('GET', '/api/workorder/orders/' + encodeURIComponent(id));
             },
+            createOrder: function (body) {
+                return call('POST', '/api/workorder/orders', body);
+            },
             listDeliverables: function (id) {
                 return call(
                     'GET',

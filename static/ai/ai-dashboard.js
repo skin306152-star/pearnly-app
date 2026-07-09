@@ -1,9 +1,11 @@
 /*
  * Pearnly AI · ai-dashboard.js · 选客户层(工作台首屏)渲染 + 数据编排
  *
- * 三张统计卡从两个真实只读端点现算(客户总数 / 待你处理单数 / AI 处理中单数)——
- * 不假装有 v4 演示的「异常项/缺票家数」,那需要 items 级数据(W2 才有)。
- * 简单卡片列表是 W1 占位(五列看板留给 W2 换皮,DOM 容器 #dashBody 不变)。
+ * 三张统计卡从两个真实只读端点现算(客户总数 / 待你处理单数 / AI 处理中单数)。
+ * 五列看板(M1-W2):list 端点只给 status,没有逐条 needs/blocked_reasons/numbers——
+ * 只对「每客户最新一期」里 status=stuck(缺料/挂起判定)或 review(读 tax_due)的订单
+ * 额外拉 detail,不对全量历史订单做 N+1;数量上界 = 看板会显示的卡片数。
+ * HTML 拼装/事件委托在 ai-kanban-render.js,分列/摘要纯函数在 ai-board.js。
  */
 (function () {
     'use strict';
@@ -12,9 +14,8 @@
         return document.getElementById(id);
     };
 
-    function esc(s) {
-        return AI.state.esc(s);
-    }
+    var lastApi = null;
+    var boardWired = false;
 
     function latestOrderByClient(orders) {
         var byClient = {};
@@ -23,28 +24,6 @@
             if (!cur || String(o.period) > String(cur.period)) byClient[o.workspace_client_id] = o;
         });
         return byClient;
-    }
-
-    function cardHtml(client, order) {
-        var meta = order ? at('card_period', { p: esc(order.period) }) : at('card_no_order');
-        var chip = '';
-        if (order) {
-            var sc = AI.format.statusChip(order.status);
-            chip = '<span class="chip ' + sc.cls + '">' + esc(at(sc.key)) + '</span>';
-        }
-        return (
-            '<div class="ccard" data-client-id="' +
-            esc(client.id) +
-            '" data-name="' +
-            esc((client.name || '').toLowerCase()) +
-            '"><div><div class="cname">' +
-            esc(client.name) +
-            '</div><div class="cmeta">' +
-            esc(meta) +
-            '</div></div><div class="cstat">' +
-            chip +
-            '<span class="cgo">›</span></div></div>'
-        );
     }
 
     function renderStats(clients, orders) {
@@ -59,7 +38,66 @@
         $('statRunningV').textContent = String(running);
     }
 
-    function renderList(clients, orders) {
+    // 只对「每客户最新一期」里 status=stuck(区分缺料/挂起)或 review(读 tax_due)的那些
+    // 订单批量拉 detail——数量上界 = 看板会显示的卡片数,不对全量历史订单做 N+1。单条失败
+    // (权限/网络)不拖垮全表:该条退化为"没有 detail"走 mapOrderToColumn/summarizeCard
+    // 的保守降级分支,不中断其它卡片渲染。
+    function loadDetailsForCards(api, latestOrders) {
+        var needDetail = latestOrders.filter(function (o) {
+            return o.status === 'stuck' || o.status === 'review';
+        });
+        if (!needDetail.length) return Promise.resolve({});
+        return Promise.all(
+            needDetail.map(function (o) {
+                return api
+                    .getOrder(o.id)
+                    .then(function (d) {
+                        return [o.id, d];
+                    })
+                    .catch(function () {
+                        return [o.id, null];
+                    });
+            })
+        ).then(function (pairs) {
+            var byOrderId = {};
+            pairs.forEach(function (p) {
+                if (p[1]) byOrderId[p[0]] = p[1];
+            });
+            return byOrderId;
+        });
+    }
+
+    function buildGroups(clients, latest, detailsByOrderId) {
+        var groups = {};
+        AI.board.COLUMNS.forEach(function (col) {
+            groups[col.key] = [];
+        });
+        clients.forEach(function (c) {
+            var order = latest[c.id] || null;
+            var detail = order ? detailsByOrderId[order.id] : null;
+            var mapped = AI.board.mapOrderToColumn(order, detail);
+            var entry = {
+                client: c,
+                order: order,
+                detail: detail,
+                column: mapped.column,
+                unknownStatus: !!mapped.unknown,
+                summary: AI.board.summarizeCard(order, detail),
+            };
+            (groups[mapped.column] || groups.materials).push(entry);
+        });
+        return groups;
+    }
+
+    function createOrderForClient(api, clientId) {
+        return api.createOrder({
+            workspace_client_id: clientId,
+            period: AI.board.currentPeriodBE(),
+            intent: 'monthly_vat',
+        });
+    }
+
+    function renderBoard(clients, latest, detailsByOrderId) {
         var body = $('dashBody');
         if (!clients.length) {
             body.innerHTML = AI.state.emptyHtml({
@@ -68,22 +106,22 @@
             });
             return;
         }
-        var latest = latestOrderByClient(orders);
-        var html =
-            '<div class="clist">' +
-            clients
-                .map(function (c) {
-                    return cardHtml(c, latest[c.id]);
-                })
-                .join('') +
-            '</div>';
-        body.innerHTML = html;
-        body.querySelectorAll('.ccard').forEach(function (el) {
-            el.addEventListener('click', function () {
-                var id = el.getAttribute('data-client-id');
-                window.location.hash = AI.router.buildClientHash(id, AI.router.DEFAULT_VIEW);
-            });
-        });
+        var groups = buildGroups(clients, latest, detailsByOrderId);
+        AI.kanban.renderBoard(body, groups);
+        // #dashBody 的节点本身不随重渲染换掉(只换 innerHTML)——事件委托只挂一次,
+        // 避免每次 load() 都在同一节点上叠加监听器(否则「开单」会被重复触发)。
+        if (!boardWired) {
+            AI.kanban.wireBoard(
+                body,
+                function (clientId) {
+                    return createOrderForClient(lastApi, clientId);
+                },
+                function () {
+                    load(lastApi);
+                }
+            );
+            boardWired = true;
+        }
     }
 
     function wireSearch() {
@@ -91,7 +129,7 @@
         input.value = '';
         input.oninput = function () {
             var q = input.value.trim().toLowerCase();
-            document.querySelectorAll('#dashBody .ccard').forEach(function (el) {
+            document.querySelectorAll('#dashBody .kcard').forEach(function (el) {
                 var name = el.getAttribute('data-name') || '';
                 el.style.display = !q || name.indexOf(q) >= 0 ? '' : 'none';
             });
@@ -99,17 +137,26 @@
     }
 
     function load(api) {
+        lastApi = api;
         var body = $('dashBody');
-        body.innerHTML = AI.state.loadingHtml();
+        // 防闪烁(Canon §7):重载(开单后刷新/回到本视图)保留旧看板直到新数据到,
+        // 骨架屏只在还没有任何看板时出——不给用户看「内容→骨架→内容」的跳变。
+        if (!body.querySelector('.kanban')) body.innerHTML = AI.state.loadingHtml();
         return Promise.all([api.listClients(), api.listOrders({})])
             .then(function (r) {
                 var clients = r[0].clients || [];
                 var orders = r[1].orders || [];
                 renderStats(clients, orders);
-                renderList(clients, orders);
-                wireSearch();
+                var latest = latestOrderByClient(orders);
+                var latestOrders = Object.keys(latest).map(function (k) {
+                    return latest[k];
+                });
+                return loadDetailsForCards(api, latestOrders).then(function (detailsByOrderId) {
+                    renderBoard(clients, latest, detailsByOrderId);
+                    wireSearch();
+                });
             })
-            .catch(function (e) {
+            .catch(function () {
                 body.innerHTML = AI.state.errorHtml({
                     title: at('error_t'),
                     sub: at('error_s'),
@@ -124,5 +171,5 @@
     }
 
     window.AI = window.AI || {};
-    window.AI.dashboard = { load: load, cardHtml: cardHtml };
+    window.AI.dashboard = { load: load };
 })();

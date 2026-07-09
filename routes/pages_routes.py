@@ -178,6 +178,18 @@ async def invite_page(token: str):
     return FileResponse("static/dist/invite.html", headers=_NO_CACHE)
 
 
+# Pearnly AI SPA(M1-W2)· 照 /console 先例:友好路由指向打包壳,鉴权/闸判定在前端
+# ai.js 里跑(闸关/未登录 → 整页跳 /home,见 ai.js boot() 注释)。
+@router.get("/ai", response_class=HTMLResponse)
+async def ai_page():
+    return FileResponse("static/dist/ai.html", headers=_NO_CACHE)
+
+
+@router.get("/ai/{rest:path}", response_class=HTMLResponse)
+async def ai_layout_page(rest: str):
+    return FileResponse("static/dist/ai.html", headers=_NO_CACHE)
+
+
 @router.get("/reset", response_class=HTMLResponse)
 async def reset_page():
     # 内联 HTML(非 static 文件)· 见 routes/reset_page.py 头注:webhook 不拾取新增 static 根文件

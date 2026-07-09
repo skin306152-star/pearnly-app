@@ -52,8 +52,10 @@ const BUNDLES = [
             'pos/pos.js',
         ],
     },
-    // Pearnly AI SPA(M1-W1)· 纯函数模块在前,DOM 编排模块在后,boot(ai.js)收尾。
+    // Pearnly AI SPA(M1-W2)· 纯函数模块在前,DOM 编排模块在后,boot(ai.js)收尾。
     // ai-i18n.js 是纯翻译数据(window.AII18N · 同 console-i18n/pos-i18n),独立 <script> 先加载。
+    // ai-board.js(分列/摘要纯函数)必须排在 ai-kanban-render.js(用它渲染)之前;
+    // ai-kanban-render.js 必须排在 ai-dashboard.js(用它渲染看板)之前。
     {
         out: 'static/dist/ai.js',
         files: [
@@ -61,6 +63,8 @@ const BUNDLES = [
             'ai/ai-router.js',
             'ai/ai-state.js',
             'ai/ai-api.js',
+            'ai/ai-board.js',
+            'ai/ai-kanban-render.js',
             'ai/ai-dashboard.js',
             'ai/ai-client.js',
             'ai/ai.js',

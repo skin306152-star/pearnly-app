@@ -1,5 +1,5 @@
-/* Pearnly AI · 选客户层(工作台首屏)— v4 §2 toolrow/search 1:1,
- * 五列看板降级为简单卡片列表(Zihao 拍板 W1 范围 · 容器结构给 W2 换皮留好)。
+/* Pearnly AI · 选客户层(工作台首屏)— v4 §2 toolrow/search + §2 kanban 1:1 移植
+ * (M1-W2 · UI-Canon-v4 修正#1:只做看板,不做列表/看板切换)。
  */
 
 .toolrow {
@@ -102,20 +102,59 @@
   color: var(--mut);
 }
 
-/* 简单卡片列表(W1 占位·W2 换五列看板复用 .ccard) */
-.clist {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+/* 五列看板(v4 §2 .kanban/.kcol/.kcard · 1:1 抄,颜色一律走 --token 变量)。
+ * 响应式按 Canon §6.2(窄屏列不换行挤压,容器内横滑)——v4 的 960px 两列换行
+ * 已被该新增铁律取代;每列最小 180px(1280 宽整板五列刚好放满,不出横滚),
+ * 更窄时 .kanban 自己横滚,页面不出横向滚动条。 */
+.kanban {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(180px, 1fr));
+  gap: 14px;
+  align-items: start;
+  overflow-x: auto;
+  padding-bottom: 6px;
 }
-.ccard {
+/* 窄高窗铁律(Canon §6.3):列体自身可竖滚不裁切;列头 sticky(§7)靠 kcol 滚动容器生效。 */
+.kcol {
+  background: var(--tabs-bg);
+  border-radius: 14px;
+  padding: 0 11px 8px;
+  max-height: calc(100vh - 230px);
+  min-height: 96px;
+  overflow-y: auto;
+}
+.kcol h4 {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--tabs-bg);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink2);
+  padding: 16px 5px 11px;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 8px;
+}
+.kcol h4 .n {
+  margin-left: auto;
+  background: var(--surface);
+  color: var(--mut);
+  border-radius: 99px;
+  padding: 1px 8px;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--hair);
+}
+.kcard {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--hair);
-  border-radius: 12px;
-  padding: 14px 18px;
+  border-radius: 11px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
   box-shadow: var(--sh-card);
   cursor: pointer;
   transition:
@@ -123,32 +162,69 @@
     box-shadow 0.12s,
     transform 0.08s;
 }
-.ccard:hover {
+.kcard:hover {
   border-color: var(--hair2);
   box-shadow: var(--sh-pop);
   transform: translateY(-1px);
 }
-.ccard .cname {
+.kcard.hot {
+  border-color: var(--crit-line);
+}
+.kcard.hot::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--crit);
+}
+/* Tab 可达的卡片(tabindex=0)聚焦金环——Canon §7,不用浏览器默认蓝。 */
+.kcard:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+/* 文字溢出省略号(Canon §6.2),完整内容在 title 提示里。 */
+.kcard b {
+  display: block;
   font-size: 13.5px;
   font-weight: 650;
   letter-spacing: -0.01em;
+  margin-bottom: 2px;
   font-family: var(--thai);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.ccard .cmeta {
+.kcard small {
   color: var(--mut);
   font-size: 11.5px;
+  display: block;
+  margin-bottom: 9px;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+.kcard .btn.sm {
   margin-top: 2px;
 }
-.ccard .cstat {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.ccard .cgo {
+/* 空列引导(Canon §7:空态给一句话说明,不是干巴巴一片空白)。 */
+.kempty {
   color: var(--faint);
-  font-size: 17px;
+  font-size: 11.5px;
+  text-align: center;
+  padding: 18px 6px 14px;
+  line-height: 1.6;
 }
-.ccard:hover .cgo {
-  color: var(--sage);
+/* 触屏目标 ≥40px(Canon §7)——只在粗指针设备放大,不破坏桌面 v4 视觉。 */
+@media (pointer: coarse) {
+  .kcard .btn.sm {
+    min-height: 40px;
+  }
 }
+/* v4 的 .kadd(列尾「+ 收料/补料」入口)在本次没有落地——收料视图挂在客户独立页内
+ * (Canon 修正#2),看板首屏没有脱离客户上下文的通用收料入口;缺工单的客户改用
+ * 卡片内「开单」按钮(.btn.sm,v4 未画过此场景,按 Canon tokens 延展)。 */

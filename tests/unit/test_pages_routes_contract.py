@@ -8,6 +8,7 @@ REFACTOR-B1 守门测试 · 静态页面 + 公开 meta 路由从 app.py 抽到 p
      · PO-B3 新增 /pos · /pos/{rest:path} 收银前台 SPA 页面路由
      · 权限批3 新增 /console · /console/{rest:path}(管理控制台 SPA)+
        /invite/{token}(邀请接受公开页)· 都从 static/console 出
+     · M1-W2 新增 /ai · /ai/{rest:path}(Pearnly AI SPA · 出 static/dist/ai.html)
   2. app.py 通过 include_router 真挂上了全部 18 条(防漏挂)
   3. /api/version **不在** pages_routes(在 meta_aliases · 读 PEARNLY_FRONTEND_VERSION
      模块全局 · 部署金丝雀)· 但仍挂在 app 上
@@ -35,6 +36,9 @@ EXPECTED = {
     ("GET", "/console"),
     ("GET", "/console/{rest:path}"),
     ("GET", "/invite/{token}"),
+    # M1-W2 新增:Pearnly AI SPA 友好路由(照 /console 先例 · 出 static/dist/ai.html)
+    ("GET", "/ai"),
+    ("GET", "/ai/{rest:path}"),
     ("GET", "/reset"),
     ("GET", "/terms"),
     ("GET", "/privacy"),
@@ -43,7 +47,7 @@ EXPECTED = {
 
 class PagesRoutesContractTests(unittest.TestCase):
     def test_router_registers_expected_routes(self):
-        """19 条路由 path+method 契约 · 防搬迁丢路由 / 改 URL"""
+        """21 条路由 path+method 契约 · 防搬迁丢路由 / 改 URL"""
         got = set()
         for r in router.routes:
             for m in getattr(r, "methods", set()) or set():
@@ -81,6 +85,9 @@ class PagesRoutesContractTests(unittest.TestCase):
         self.assertEqual(
             asyncio.run(pages_routes.invite_page("tok")).path, "static/dist/invite.html"
         )
+        ai = "static/dist/ai.html"
+        self.assertEqual(asyncio.run(pages_routes.ai_page()).path, ai)
+        self.assertEqual(asyncio.run(pages_routes.ai_layout_page("client/1/wo")).path, ai)
 
     def test_v1_aliases_delegate_to_base(self):
         """v1_health / v1_contact 委托给本模块 health / contact · 单一来源"""

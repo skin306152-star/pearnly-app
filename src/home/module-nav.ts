@@ -28,6 +28,18 @@ function apply(modules: Record<string, ModuleFlag>, businessType?: string | null
     const owner = typeof window.isOwner === 'function' ? window.isOwner() : false;
     const on = (k: string) => !!(modules[k] && modules[k].enabled);
 
+    // 首页(仪表盘=计费/订阅/余额面板)员工不给:导航项隐藏 + 若已落在首页则改落业务首页。
+    // 路由守卫在 core-boot.routeTo(dashboard+员工→_employeeHomeRoute)· 此处补引导期落地兜底。
+    const emp = typeof window.isEmployee === 'function' ? window.isEmployee() : false;
+    show(document.querySelector<HTMLElement>('.nav-item[data-route="dashboard"]'), !emp);
+    if (
+        emp &&
+        (location.hash || '').replace(/^#\//, '') === 'dashboard' &&
+        typeof window.routeTo === 'function'
+    ) {
+        window.routeTo('dashboard');
+    }
+
     // 逐项:每个标了 data-module 的 nav 元素按其模块开关显隐。
     GATEABLE.forEach((k) => {
         document

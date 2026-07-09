@@ -200,9 +200,24 @@ setupDropdown('lang-dropdown', (item: any) => applyLang(item.dataset.lang));
 // 路由表抽 route-table.ts(纯数据 · 控本文件行数):加新页改那边,这里只消费。
 import { VALID_ROUTES, ROUTE_LOADERS } from './route-table.js';
 
+// 员工(member)第一个可见的业务路由 · 首页(计费面板)对员工隐藏后落脚用:
+// firm 员工→录入工作台;商户员工→其首个可见业务页;都不可见时兜底 dms-intake。
+function _employeeHomeRoute(): string {
+    const items = document.querySelectorAll<HTMLElement>('.nav-item[data-route]');
+    for (let i = 0; i < items.length; i++) {
+        const r = items[i].dataset.route;
+        if (r && r !== 'dashboard' && items[i].offsetParent !== null) return r;
+    }
+    return 'dms-intake';
+}
+
 function routeTo(route?: any) {
     // REFACTOR-C1 · 老 admin/admin-users/admin-cost 路由已下线(超管走独立 /admin SPA)· 落到 ocr
     if (!VALID_ROUTES.includes(route)) route = 'dms-intake';
+    // 首页=计费/订阅/余额面板,员工看不到钱(permissions.shouldHideMoney)→ 改落其业务首页。
+    if (route === 'dashboard' && typeof window.isEmployee === 'function' && window.isEmployee()) {
+        route = _employeeHomeRoute();
+    }
     currentRoute = route;
     // v118.33.5 NAV-IA Phase 5 · 进子项路由 · 自动展开所在折叠组(销项/进项)
     if (typeof window.expandNavGroupForRoute === 'function') {

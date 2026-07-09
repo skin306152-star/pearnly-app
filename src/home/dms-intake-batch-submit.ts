@@ -76,7 +76,7 @@ function pushPanelHtml(): string {
         body = pushResultHtml(_pushed);
     } else if (!_endpoints.filter((e) => e.enabled !== false).length) {
         body =
-            '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
+            '<div class="dx-erp-empty">' +
             `<h4>${esc(t('dxi-erp-empty-t'))}</h4><p>${esc(t('dxi-erp-empty-d'))}</p>` +
             `<button class="btn" id="dxb-go-int">${esc(t('dxi-erp-empty-btn'))}</button></div>`;
     } else {

@@ -50,7 +50,7 @@ export function erpTargetCardsHtml(endpoints: ErpEndpoint[], target: string): st
                 `<div class="dx-erp${on}" data-erp-target="${esc(String(e.id))}">` +
                 `<div class="dx-erp-lg">${esc(lg)}</div>` +
                 `<div class="dx-erp-c"><b>${esc(e.name || e.adapter || 'ERP')}</b>` +
-                `<span>${esc(meta)}</span></div><div class="dx-erp-chk">✓</div></div>`
+                `<span>${esc(meta)}</span></div><div class="dx-erp-chk" aria-hidden="true"></div></div>`
             );
         })
         .join('');

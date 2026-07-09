@@ -282,6 +282,7 @@ def generate_xlsx(
     histories: List[Dict[str, Any]],
     mappings: Dict[str, Any],
     sheet_kind: str = "sales_credit",
+    expense: bool = False,
 ) -> bytes:
     """
     返回 .xlsx 二进制字节 · 调用方负责发给前端
@@ -289,6 +290,7 @@ def generate_xlsx(
     histories: List of OCR history dicts(1 个文件可多行 · 同 sheet 类型)
     mappings:  {'clients': [...], 'accounts': [...], 'taxes': [...]}(从 db 拿)
     sheet_kind: 9 选 1 · 默认销售-赊销
+    expense: 仅 purchase 生效 · 费用档(453)单据形态(นอกระบบ 单行含税全额)· 见 mrerp_xlsx_purchase
 
     🔴 铁律 28 修订(v118.27.4.2):
       根据 schema 实际有的 columns 段动态创建 1-4 sheet · 不再硬编码 3 sheet
@@ -319,7 +321,7 @@ def generate_xlsx(
     if sheet_kind == "purchase":
         from services.erp.mrerp_xlsx_purchase import generate_xlsx_purchase
 
-        return generate_xlsx_purchase(histories, mappings)
+        return generate_xlsx_purchase(histories, mappings, expense=expense)
 
     # master_supplier 自建供应商(impapmas)· 官方模板克隆 · 见 mrerp_xlsx_supplier
     if sheet_kind == "supplier_master":

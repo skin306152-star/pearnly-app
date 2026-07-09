@@ -75,6 +75,21 @@ _ERR_CATALOG: Dict[str, Dict[str, str]] = {
         "zh": "科目码不在该套账的科目表里 · 请为该套账配置正确的科目码(系统不会自动新建科目)",
         "zh_TW": "科目碼不在該套帳的科目表裡 · 請為該套帳配置正確的科目碼(系統不會自動新建科目)",
     },
+    "ERR_MRERP_IMPORT_ERROR": {
+        # _classify 诚实化(2026-07-09):importpc 返非数字体(alert/Error)= 服务器导入异常,
+        # 此时 report 备注列全空,逐行判会假绿 → 整批置失败转人工。
+        "th": "เซิร์ฟเวอร์ ERP เกิดข้อผิดพลาดระหว่างนำเข้า · ชุดนี้ยังไม่ถูกบันทึก · กรุณาตรวจสอบด้วยตนเอง",
+        "en": "ERP server returned an import error · this batch was not posted · manual review required",
+        "zh": "ERP 服务器导入异常 · 该批未入账 · 转人工处理",
+        "zh_TW": "ERP 伺服器匯入異常 · 該批未入帳 · 轉人工處理",
+    },
+    "ERR_MRERP_MODULE_UNAVAILABLE": {
+        # route_and_upload 静态隔离:该组端点未真机验证(verified=False)→ 整组转人工不推。
+        "th": "ประเภทเอกสารนี้ยังไม่เปิดใช้งานปลายทาง ERP · ยังไม่ได้ส่ง · กรุณาบันทึกด้วยตนเอง",
+        "en": "This document type's ERP endpoint is not enabled yet · not pushed · manual entry required",
+        "zh": "该单据类型的 ERP 端点尚未开通 · 未推送 · 转人工处理",
+        "zh_TW": "該單據類型的 ERP 端點尚未開通 · 未推送 · 轉人工處理",
+    },
     "ERR_ACCOUNT_SET_MISMATCH": {
         # 匹配闸(防推错套账):票面买卖方与套账主体税号确认不符 → 挡下不推。
         "th": "ผู้ขาย/ผู้ซื้อบนเอกสารไม่ตรงกับนิติบุคคลของชุดบัญชีนี้ · ไม่ได้ส่ง (กันบันทึกผิดชุดบัญชี) · กรุณาตรวจสอบว่าเลือกกิจการถูกต้อง",

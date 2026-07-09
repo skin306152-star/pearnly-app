@@ -13,6 +13,7 @@ from services.erp.mrerp_xlsx_purchase import (
     _detail_rows,
     _supplier_code,
     generate_xlsx_purchase,
+    validate_expense_history,
     validate_purchase_history,
 )
 from services.erp.mrerp_xlsx_supplier import build_supplier_row, generate_xlsx_supplier
@@ -101,6 +102,97 @@ class TestPurchaseDetailFallback(unittest.TestCase):
         self.assertEqual(rows[0]["amount"], 100.0)
 
 
+class TestExpenseGenerator(unittest.TestCase):
+    """费用采购(453)单据形态(2026-07-09 真机口径):税率 นอกระบบ · 单行 · 金额=含税总额。
+
+    费用票无完整税票,进项 VAT 不可抵扣计入成本 → 不逐行展开 items(行基额与含税总额
+    对不上,费用 GL 粒度来自物料科目);表头备注 1 留 items 名 join(人读线索)。
+    """
+
+    def _sheet2_rows(self, xlsx: bytes) -> int:
+        with zipfile.ZipFile(io.BytesIO(xlsx)) as z:
+            xml = z.read("xl/worksheets/sheet2.xml").decode("utf-8")
+        return len(re.findall(r"<row ", xml)) - 1  # 减表头
+
+    def _sst(self, xlsx: bytes) -> str:
+        with zipfile.ZipFile(io.BytesIO(xlsx)) as z:
+            return z.read("xl/sharedStrings.xml").decode("utf-8")
+
+    def test_single_row_gross_amount_and_off_system_vat(self):
+        xlsx = generate_xlsx_purchase([_hist()], {"suppliers": [], "products": []}, expense=True)
+        self.assertEqual(self._sheet2_rows(xlsx), 1)  # 单行(不逐行展开 items)
+        sst = self._sst(xlsx)
+        self.assertIn("นอกระบบ", sst)  # 体系外税率(0%·不进 VAT 报表)
+        self.assertNotIn("7 (แยก)", sst)  # 不再是货品档税率
+        self.assertIn("EXPENSE", sst)  # 通用费用物料码
+        self.assertIn("Widget", sst)  # 备注 1 = items 名(人读线索)
+        with zipfile.ZipFile(io.BytesIO(xlsx)) as z:
+            sheet2 = z.read("xl/worksheets/sheet2.xml").decode("utf-8")
+        self.assertIn(">214<", sheet2)  # 金额 = 含税总额(不剥 VAT)
+
+    def test_no_items_note_falls_back_to_seller_name(self):
+        h = _hist()
+        h.pop("items")
+        xlsx = generate_xlsx_purchase([h], {"suppliers": []}, expense=True)
+        sst = self._sst(xlsx)
+        self.assertIn("Acme Co", sst)
+
+    def test_overrides_via_mappings(self):
+        m = {
+            "suppliers": [],
+            "_mrerp_expense_vat_label": "7 (รวม)",
+            "_mrerp_expense_item_code": "SVC-EXP",
+        }
+        xlsx = generate_xlsx_purchase([_hist()], m, expense=True)
+        sst = self._sst(xlsx)
+        self.assertIn("7 (รวม)", sst)
+        self.assertNotIn("นอกระบบ", sst)
+        self.assertIn("SVC-EXP", sst)
+
+    def test_default_generation_unchanged(self):
+        # expense 缺省 False = 货品档字节不受影响(税率 7 แยก · 逐行明细)
+        xlsx = generate_xlsx_purchase([_hist()], {"suppliers": [], "products": []})
+        sst = self._sst(xlsx)
+        self.assertIn("7 (แยก)", sst)
+        self.assertNotIn("นอกระบบ", sst)
+        self.assertNotIn("EXPENSE", sst)
+
+
+class TestExpenseValidate(unittest.TestCase):
+    """费用 preflight:日期 + 含税总额>0 + 供应商码可解析 · 不跑 vat_rate_anomaly。"""
+
+    def test_ok(self):
+        ok, err, _ = validate_expense_history(_hist(), {"suppliers": []})
+        self.assertTrue(ok)
+        self.assertIsNone(err)
+
+    def test_missing_date_total_supplier(self):
+        h = _hist()
+        h["invoice_date"] = ""
+        self.assertEqual(validate_expense_history(h, {})[1], "ERR_NO_INVOICE_DATE")
+        h2 = _hist()
+        h2["total_amount"] = "0"
+        h2["subtotal"] = "0"
+        h2["vat"] = "0"
+        self.assertEqual(validate_expense_history(h2, {})[1], "ERR_NO_TOTAL_AMOUNT")
+        h3 = _hist()
+        h3["client_id"] = 0
+        h3["fields"] = {}
+        h3["seller_tax_id"] = ""
+        h3["seller_name"] = ""
+        m = {"suppliers": [], "_mrerp_cash_supplier_fallback": False}
+        self.assertEqual(validate_expense_history(h3, m)[1], "ERR_NO_SUPPLIER")
+
+    def test_vat_anomaly_passes(self):
+        # 隐含税率 30%(purchase 口径必挡)· 费用档 นอกระบบ 不抵扣无会计后果 → 放行
+        h = _hist()
+        h["vat"] = "50"
+        self.assertEqual(validate_purchase_history(h, {})[1], "ERR_VAT_RATE_ANOMALY")
+        ok, err, _ = validate_expense_history(h, {})
+        self.assertTrue(ok)
+        self.assertIsNone(err)
+
+
 class TestSupplierMaster(unittest.TestCase):
     def test_build_row_defaults_and_tax(self):
         row = build_supplier_row(
@@ -133,21 +225,46 @@ class _FakeAdapter:
 
 
 class TestProvisionSuppliers(unittest.TestCase):
+    """自建供应商:幂等建档 · **不注入 mappings['suppliers']**。
+
+    不注入的 why(2026-07-09 真机实锤):_supplier_code 兜底链与 _seller_from_history 同源,
+    码从票面重导出即可;旧注入行按 client_id 匹配,同 client_id 多个无税号卖家会全解析到
+    第一行的码(三张不同卖家的票落库后供应商全成同一家)。
+    """
+
     def test_seller_from_history_code_is_tax(self):
         s = _seller_from_history(_hist())
         self.assertEqual(s["code"], "0105512345678")
         self.assertEqual(s["name"], "Acme Co")
 
-    def test_creates_and_injects_on_success(self):
+    def test_creates_without_injecting(self):
+        fake = _FakeAdapter(ok=True)
         m = {"suppliers": []}
-        provision_suppliers(_FakeAdapter(ok=True), [_hist()], m)
-        self.assertEqual(len(m["suppliers"]), 1)
-        self.assertEqual(m["suppliers"][0]["erp_code"], "0105512345678")
+        provision_suppliers(fake, [_hist()], m)
+        self.assertEqual([s["code"] for s in fake.created], ["0105512345678"])
+        self.assertEqual(m["suppliers"], [])  # 不注入 · 生成器从票面重导出同码
 
-    def test_no_inject_on_failure(self):
+    def test_notax_sellers_each_resolve_own_code(self):
+        # 同 client_id 两个无税号卖家:各自名字派生码各归各,mappings 不被动。
+        h1 = {
+            "client_id": 3,
+            "invoice_date": "2026-07-01",
+            "fields": {"seller_name": "ร้านกาแฟทดสอบ"},
+        }
+        h2 = {
+            "client_id": 3,
+            "invoice_date": "2026-07-01",
+            "fields": {"seller_name": "ร้านขนมทดสอบ"},
+        }
+        fake = _FakeAdapter(ok=True)
         m = {"suppliers": []}
-        provision_suppliers(_FakeAdapter(ok=False), [_hist()], m)
+        provision_suppliers(fake, [h1, h2], m)
         self.assertEqual(m["suppliers"], [])
+        created = {s["code"] for s in fake.created}
+        self.assertEqual(len(created), 2)  # 两个卖家各建各的码
+        c1, c2 = _supplier_code(h1, m), _supplier_code(h2, m)
+        self.assertNotEqual(c1, c2)  # 旧注入按 client_id 匹配会把两票都解析到第一家
+        self.assertEqual({c1, c2}, created)  # 建档码与生成器解析码同源
 
     def test_skips_already_mapped(self):
         fake = _FakeAdapter()

@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
-"""MR.ERP xlsx · purchase(ซื้อสินค้า · impaptran/selmenu=67)· 克隆官方 example.xlsx 生成。
+"""MR.ERP xlsx · purchase(impaptran · selmenu 67 货品 / 453 费用)· 克隆官方 example.xlsx 生成。
 
 采购 = 3-sheet:表头(供应商/供应商票号/税率)+ 明细(商品/量/单价/金额)+ 尾(押金/收货 · 留空)。
 账套主体=买方;供应商(ผู้จำหน่าย)=采购票卖方 → 码经 mappings['suppliers'] 解析,无则回退卖方税号
 (与自建供应商码同口径 · 幂等)。克隆策略同 sales_cash(known-facts §6.3):字节模板只重写
 <sheetData>+sharedStrings,保留 styles。该模板 cellXfs:表头 s13/文本 s7/日期 s14/数值 s9。
+
+expense=True(453 · 2026-07-09 真机口径):费用票无完整税票,进项 VAT 不可抵扣计入成本 →
+税率 นอกระบบ(体系外 0% 不进 VAT 报表)· 明细固定单行(通用费用物料 · 金额=含税总额)·
+表头备注 1 留 items 名(人读线索)。不逐行展开 items:费用 GL 粒度来自物料科目,逐行无
+会计价值,且行基额与含税总额对不上。
 """
 
 import io
@@ -149,29 +154,86 @@ def _detail_rows(history: Dict[str, Any], mappings: Dict[str, Any]) -> List[Dict
     return rows
 
 
-def validate_purchase_history(history: Dict[str, Any], mappings: Dict[str, Any]):
-    """采购 preflight(最小 · 非 sales_credit 口径):日期 + 正金额 + 供应商码可解析。
-    返回 (ok, err_code, warnings)。供应商缺失由 provision_suppliers 前置补,故这里只兜底。"""
-    if not history:
-        return False, "ERR_NO_HISTORY", []
-    if not history.get("invoice_date"):
-        return False, "ERR_NO_INVOICE_DATE", []
+def _gross_total(history: Dict[str, Any]) -> float:
+    """含税总额:票面 total_amount 优先,缺则 subtotal+vat(费用档单行金额口径)。"""
     total = history_number(history, "total_amount")
     if total is None:
         sub = history_number(history, "subtotal") or 0
-        total = sub + (history_number(history, "vat") or 0)
-    if not total or total <= 0:
-        return False, "ERR_NO_TOTAL_AMOUNT", []
-    if not _supplier_code(history, mappings):
-        return False, "ERR_NO_SUPPLIER", []
+        total = round(sub + (history_number(history, "vat") or 0), 2)
+    return total or 0
+
+
+# 费用档(453)税率标签 · aptran bshlistboxdata 合法值:0 / 7 (แยก) / 7 (รวม) / นอกระบบ
+# นอกระบบ = 体系外(0% · 不进 VAT 报表)· 实测 นอกระบบ+单行含税总额落库成功(PNPXN-11B2)
+_EXPENSE_VAT_LABEL = "นอกระบบ"
+# 通用费用物料码 · 单一事实源:autocreate 建档端 import 同一常量/读取器,
+# 两端必须字节级一致,否则「建了码 X、明细写码 Y」→ ERP 因物料不存在拒收。
+EXPENSE_ITEM_CODE_DEFAULT = "EXPENSE"
+
+
+def expense_cfg(mappings: Dict[str, Any], key: str, default: str) -> str:
+    """费用档覆盖键读取(key 传全名,如 _mrerp_expense_item_code)· 空/缺回默认。"""
+    if isinstance(mappings, dict):
+        v = str(mappings.get(key) or "").strip()
+        if v:
+            return v
+    return default
+
+
+def _expense_item_code(mappings: Dict[str, Any]) -> str:
+    return expense_cfg(mappings, "_mrerp_expense_item_code", EXPENSE_ITEM_CODE_DEFAULT)
+
+
+def _expense_note(history: Dict[str, Any]) -> str:
+    """表头备注 1(人读线索):items 名 join,无 items 回退卖方名 · ≤60 字符。"""
+    fields = history.get("fields") if isinstance(history.get("fields"), dict) else {}
+    items = history.get("items")
+    if not isinstance(items, list):
+        items = fields.get("items") if isinstance(fields, dict) else None
+    names = [
+        str(it.get("name") or it.get("description") or "").strip()
+        for it in items or []
+        if isinstance(it, dict)
+    ]
+    note = " / ".join(n for n in names if n)
+    if not note:
+        note = str(history.get("seller_name") or fields.get("seller_name") or "").strip()
+    return note[:60]
+
+
+def validate_purchase_history(history: Dict[str, Any], mappings: Dict[str, Any]):
+    """采购 preflight(最小 · 非 sales_credit 口径):日期 + 正金额 + 供应商码可解析。
+    返回 (ok, err_code, warnings)。供应商缺失由 provision_suppliers 前置补,故这里只兜底。"""
+    ok, err, warnings = validate_expense_history(history, mappings)
+    if not ok:
+        return ok, err, warnings
     # VAT 税率合理性(对抗票 06 · 与销项同口径):进项票隐含税率非 ≈7% → 转人工。
     if _gen.vat_rate_anomaly(history):
         return False, "ERR_VAT_RATE_ANOMALY", []
     return True, None, []
 
 
-def generate_xlsx_purchase(histories: List[Dict[str, Any]], mappings: Dict[str, Any]) -> bytes:
-    """克隆官方模板生成 purchase xlsx(AP + 采购明细 · 押金/收货页留空)。"""
+def validate_expense_history(history: Dict[str, Any], mappings: Dict[str, Any]):
+    """费用采购(453)preflight:日期 + 含税总额>0 + 供应商码可解析。
+
+    不跑 vat_rate_anomaly——นอกระบบ 不抵扣,票面税率异常无会计后果(2026-07-09 拍板)。"""
+    if not history:
+        return False, "ERR_NO_HISTORY", []
+    if not history.get("invoice_date"):
+        return False, "ERR_NO_INVOICE_DATE", []
+    if _gross_total(history) <= 0:
+        return False, "ERR_NO_TOTAL_AMOUNT", []
+    if not _supplier_code(history, mappings):
+        return False, "ERR_NO_SUPPLIER", []
+    return True, None, []
+
+
+def generate_xlsx_purchase(
+    histories: List[Dict[str, Any]], mappings: Dict[str, Any], *, expense: bool = False
+) -> bytes:
+    """克隆官方模板生成 purchase xlsx(AP + 采购明细 · 押金/收货页留空)。
+
+    expense=True = 费用档(453)形态:税率 นอกระบบ · 单行(通用费用物料 · 含税总额)· 备注 1。"""
     with open(_template_path(), "rb") as f:
         template_bytes = f.read()
     files: Dict[str, bytes] = {}
@@ -207,7 +269,11 @@ def generate_xlsx_purchase(histories: List[Dict[str, Any]], mappings: Dict[str, 
         col_vals = {
             1: inv,
             2: date,
-            3: "7 (แยก)",
+            3: (
+                expense_cfg(mappings, "_mrerp_expense_vat_label", _EXPENSE_VAT_LABEL)
+                if expense
+                else "7 (แยก)"
+            ),
             4: "00000",
             5: "BOI1",
             6: "00002",
@@ -219,8 +285,10 @@ def generate_xlsx_purchase(histories: List[Dict[str, Any]], mappings: Dict[str, 
             12: date,
             13: 0,
         }
+        if expense:
+            col_vals[14] = _expense_note(history)  # หมายเหตุ 1 · 人读线索
         cells = []
-        for col in range(1, 14):
+        for col in range(1, max(col_vals) + 1):
             if col in _NUM_COLS_1:
                 cells.append(_num_cell(col, ridx, col_vals[col]))
             else:
@@ -234,7 +302,15 @@ def generate_xlsx_purchase(histories: List[Dict[str, Any]], mappings: Dict[str, 
     cur = 2
     for history in histories:
         inv = _gen.derive_mrerp_invoice_no(history)
-        for d in _detail_rows(history, mappings):
+        if expense:
+            # 费用档单行:通用费用物料 × 含税总额(นอกระบบ 税率下服务器不再拆税)
+            gross = _gross_total(history)
+            details = [
+                {"code": _expense_item_code(mappings), "qty": 1, "price": gross, "amount": gross}
+            ]
+        else:
+            details = _detail_rows(history, mappings)
+        for d in details:
             cells = [
                 _str_cell(1, cur, inv, _S_TEXT),
                 _str_cell(2, cur, d["code"], _S_TEXT),

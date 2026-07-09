@@ -37,15 +37,24 @@ class _FakeResp(SimpleNamespace):
 
 
 class _FakeSession:
-    """记录所有 prepare/post 的目标路径 · 按 URL 返回让 5 步流程走通的假响应。"""
+    """记录所有 prepare/get/post 的目标路径 · 按 URL 返回让 5 步流程走通的假响应。"""
 
     def __init__(self, **_kw):
         self.idus = "15"
         self.session = SimpleNamespace(close=lambda: None)
         self.paths: list[str] = []
+        self._prepared = False
 
     def prepare(self, probe_path="impartran/formupload.php?idmenu=370"):
-        self.paths.append(probe_path)
+        # 真 session 幂等(登录+选公司只发一次)· 照实模拟,否则每次 prepare 都记 probe
+        # 会假装"导航过了",盖掉缺 formupload GET 的回归(2026-07-09 真机根因)。
+        if not self._prepared:
+            self._prepared = True
+            self.paths.append(probe_path)
+
+    def get(self, path, **_kw):
+        self.paths.append(path)
+        return _FakeResp(status_code=200, text="", content=b"")
 
     def post(self, path, **_kw):
         self.paths.append(path)
@@ -76,6 +85,24 @@ def _purchase(inv):
         "invoice_date": "2026-07-01",
         "total_amount": "107.00",
         # 卖方=供应商(非套账) · 买方=套账主体 → 采购。供应商码回退卖方税号,preflight 过。
+        # 完整税票(tax_invoice+VAT+买方)→ judge_direction=purchase_invoice → purchase(67 货品),
+        # 非 purchase_expense(453 费用档)。
+        "fields": {
+            "seller_tax": OTHER,
+            "buyer_tax": OWN,
+            "document_type": "tax_invoice",
+            "vat": "7",
+        },
+    }
+
+
+def _purchase_expense(inv):
+    # 无完整税票信息(简式税票/收据常态)→ judge_direction=expense → purchase_expense(453)。
+    return {
+        "client_id": 2,
+        "invoice_number": inv,
+        "invoice_date": "2026-07-01",
+        "total_amount": "107.00",
         "fields": {"seller_tax": OTHER, "buyer_tax": OWN},
     }
 
@@ -122,6 +149,61 @@ class RoutedBatchEndpointTests(unittest.TestCase):
         self.assertTrue(self._txn(paths, "impartran"), f"混批销项段缺失: {paths}")
         self.assertTrue(self._txn(paths, "impaptran"), f"混批采购段缺失: {paths}")
         self.assertEqual(len(res.success), 2)
+
+    def test_expense_ticket_pushes_453(self):
+        """费用票(judge_direction=expense)→ purchase_expense(453·2026-07-09 真机已验)真打 impaptran。
+
+        推前 provision_products 走费用分支:经 impstkmas 幂等确保通用费用物料(会计口径:
+        费用过账走物料 GL 科目 · 非服务器强制)。
+        """
+        res, paths = self._run([_sales("IVSAL03"), _purchase_expense("IVEXP01")])
+        self.assertTrue(self._txn(paths, "impartran"), f"混批销项段缺失: {paths}")
+        self.assertTrue(self._txn(paths, "impaptran"), f"费用段未打到 impaptran: {paths}")
+        self.assertTrue(
+            [p for p in paths if p.startswith("impstkmas/")],
+            f"未经 impstkmas 确保费用物料: {paths}",
+        )
+        self.assertEqual(len(res.success), 2)
+        self.assertEqual(res.failed, [])
+
+    def test_formupload_get_immediately_before_each_upload(self):
+        """每次 uploadexcel 前必须显式 GET 本模块 formupload(2026-07-09 真机根因锁)。
+
+        老 PHP 按「最后打开的 form」在服务器 session 存导入上下文;prepare 幂等,
+        provisioning(impapmas/impstkmas)先跑会吃掉首次导航 → 后续导入带错上下文炸
+        alert("Error : ") 空消息假成功。GET 在 _upload_xlsx 内与 POST 相邻,逐模块断言。
+        """
+        _, paths = self._run([_sales("IVSAL05"), _purchase_expense("IVEXP03")])
+        for module, idmenu in (("impartran", 370), ("impstkmas", 353), ("impaptran", 363)):
+            idx = paths.index(f"{module}/component/uploadexcel.php")
+            self.assertEqual(
+                paths[idx - 1],
+                f"{module}/formupload.php?idmenu={idmenu}",
+                f"{module} 上传前缺 formupload GET: {paths}",
+            )
+
+    def test_unverified_module_held_without_sinking_other_groups(self):
+        """静态组间隔离(unverified 组前置转人工·不调 upload·不拖累兄弟组)行为锁。
+
+        purchase_expense 已 verified → 用合成 unverified 变体触发;MRERPBusinessError
+        保持向上抛——它也是已验证组真服务器拒收的载体,不许被吞成 MODULE_UNAVAILABLE。
+        """
+        import dataclasses
+
+        from services.erp.mrerp_http import modules as modules_mod
+
+        entry = modules_mod.MODULES["purchase_expense"]
+        modules_mod.MODULES["purchase_expense"] = dataclasses.replace(entry, verified=False)
+        try:
+            res, paths = self._run([_sales("IVSAL03"), _purchase_expense("IVEXP01")])
+        finally:
+            modules_mod.MODULES["purchase_expense"] = entry
+        self.assertTrue(self._txn(paths, "impartran"), f"销项组不该被拖累: {paths}")
+        aptran_paths = [p for p in paths if p.startswith("impaptran/")]
+        self.assertFalse(aptran_paths, f"费用组未验证不该发起任何请求: {aptran_paths}")
+        self.assertEqual(len(res.success), 1)
+        self.assertEqual(len(res.failed), 1)
+        self.assertEqual(res.failed[0].reasons, ["ERR_MRERP_MODULE_UNAVAILABLE"])
 
     def test_foreign_invoice_blocked_by_account_set_gate(self):
         """别家的票(买卖方都读到税号·都不是套账主体)→ 匹配闸挡下·不推不打任何导入端点。

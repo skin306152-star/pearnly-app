@@ -7,14 +7,13 @@
 导入 5 步(known-facts §5)全走 requests,importpc 后**强制拉 report.php 逐行判成败**
 (不信 "2"),这是"像 Express 一样稳"的回读闸。老 PHP 单账号单会话 → 复用 session_lock 串行。
 
-已接:赊销/现金销售(S1/S3)· 方向识别(S2a)· 销项缺买方客户+商品自动建(S2b·autocreate)。
-采购/库存/科目在 S3/S4。构造签名兼容 build_mrerp_adapter 传入的全部 kwargs(未用者吞下)。
+已接:销/采(67 货品+453 费用)/库存 · 方向识别 · 缺客户/供应商/商品自动建(autocreate)·
+构造签名兼容 build_mrerp_adapter 传入的全部 kwargs(未用者吞下)。
 """
 
 from __future__ import annotations
 
 import logging
-import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -28,21 +27,13 @@ from services.erp.mrerp_http.account_valve import (
     tag_account_review,
 )
 from services.erp.mrerp_http.modules import MrErpModule, get_module
+from services.erp.mrerp_http.preview_parse import TAGSTRIP_RE, parse_preview_form, preview_hints
 from services.erp.mrerp_http.report_parse import parse_master_report
 from services.erp.mrerp_http.session import MrErpSession
 from services.erp.mrerp_report_parser import parse_import_report
 from services.erp.session_lock import mrerp_session_lock
 
 logger = logging.getLogger(__name__)
-
-# 预览页解析(标准库正则 · 不引 bs4:bs4 非 prod 依赖,直写运行期不能靠它)。
-_FORM_RE = re.compile(
-    r'<form\b[^>]*\bid=["\'](frmimport\d+)["\'][^>]*>(.*?)</form>', re.IGNORECASE | re.DOTALL
-)
-_TAG_RE = re.compile(r"<(input|select|textarea)\b([^>]*?)/?>", re.IGNORECASE)
-_ATTR_RE = re.compile(r'([\w-]+)\s*=\s*"([^"]*)"')
-_TAGSTRIP_RE = re.compile(r"<[^>]+>")
-_HINT_KEYWORDS = ("ไม่พบ", "ผิดพลาด", "ไม่ถูกต้อง", "ซ้ำ", "ไม่ครบ")
 
 
 def _selmenu_param(m) -> str:
@@ -170,7 +161,7 @@ class MrErpHttpAdapter:
             from services.erp.mrerp_http.autocreate import provision_customers
 
             provision_customers(self, histories, mappings)
-        elif m.doc_type == "purchase":
+        elif m.sheet_kind == "purchase":  # purchase + purchase_expense 共用 impaptran 供应商自建
             from services.erp.mrerp_http.autocreate import provision_suppliers
 
             provision_suppliers(self, histories, mappings)
@@ -180,7 +171,7 @@ class MrErpHttpAdapter:
             return self._result(original, [], mismatch_failed + preflight_failed, t0, 0)
 
         # 销/采/库存:明细行对不上已有商品则自建并注入码(在生成 xlsx 前)· 见 autocreate
-        if m.doc_type.startswith("sales") or m.doc_type in (
+        if m.doc_type.startswith("sales") or m.sheet_kind in (
             "purchase",
             "stock_receive",
             "stock_issue",
@@ -189,16 +180,15 @@ class MrErpHttpAdapter:
 
             provision_products(self, valid, mappings)
 
-        xlsx_bytes = _gen.generate_xlsx(valid, mappings, sheet_kind=m.sheet_kind)
+        xlsx_bytes = _gen.generate_xlsx(valid, mappings, sheet_kind=m.sheet_kind, expense=m.expense)
         expected = [_gen.derive_mrerp_invoice_no(h) for h in valid]
 
-        probe = f"{m.path}/formupload.php?idmenu={m.idmenu}"
-        self._sess.prepare(probe)
+        self._sess.prepare(f"{m.path}/formupload.php?idmenu={m.idmenu}")
 
         self._upload_xlsx(xlsx_bytes)
         form_fields, row_ids, idus_form = self._fetch_preview()
         if not row_ids:
-            hints = self._preview_hints()
+            hints = preview_hints(getattr(self, "_last_preview_html", "") or "")
             msg = "preview has no importable rows (xlsx rejected server-side)"
             if hints:
                 msg += ": " + " / ".join(hints[:3])
@@ -289,6 +279,14 @@ class MrErpHttpAdapter:
 
     def _upload_xlsx(self, xlsx_bytes: bytes, module=None) -> None:
         m = module or self.module
+        # ★必须先显式 GET 目标模块的 formupload:老 PHP 按「最后打开的 form」在服务器
+        # session 存导入上下文;prepare() 幂等,provisioning(impapmas/impstkmas)先跑会
+        # 吃掉首次导航 → 后续 impaptran 导入带错上下文 → importpc 炸 alert("Error : ")
+        # 空消息假成功(2026-07-09 真机根因 · 补 GET 后三票混批 3/3 真落库 PNPGCC5F-1/2/3)。
+        self._sess.get(
+            f"{m.path}/formupload.php?idmenu={m.idmenu}",
+            headers={"Referer": f"{self.login_url}/login/mainmenu.php"},
+        )
         r = self._sess.post(
             f"{m.path}/component/uploadexcel.php",
             files={
@@ -381,36 +379,36 @@ class MrErpHttpAdapter:
             bill = bill_no_for(self.module.doc_type, i)
             return SuccessRow(invoice_no=i, mrerp_bill_no=bill, original=by_inv.get(i, {}))
 
+        def _fail(inv: str, reasons: List[str]) -> FailedRow:
+            return FailedRow(
+                invoice_no=inv,
+                reasons=reasons,
+                reasons_friendly=translate_reasons(reasons),
+                original=by_inv.get(inv, {}),
+            )
+
         if raw == "1":
             # importpc "1" = 全部提交 · 不出报告
             return [_ok_row(i) for i in expected], []
-        # 任何其他情况(含 "2")→ 必拉 report 逐行判定,不臆断
+        if not raw.strip().isdigit():
+            # 非数字体(alert/script/Error…)= 服务器异常:此时 report 备注列全空,逐行判
+            # 会把整批误判成功且实际不落库(2026-07-09 真机 453 假绿三连)→ 全部诚实置失败。
+            summary = TAGSTRIP_RE.sub("", raw).strip()[:120]
+            reasons = ["ERR_MRERP_IMPORT_ERROR"] + ([summary] if summary else [])
+            return [], [_fail(inv, reasons) for inv in expected]
+        # 纯数字(如 "2")= 正常受理但有逐行结果 → 必拉 report 逐行判定,不臆断
         report = parse_import_report(self._fetch_report(idus_form))
         success = [_ok_row(i) for i in report.success]
         # 科目安全阀:report 报科目未匹配 → 归为 ERR_ACCOUNT_NEEDS_REVIEW(退回用户配置,不硬建)
-        failed = []
-        for row in report.failed:
-            reasons = tag_account_review(list(row.reasons))
-            failed.append(
-                FailedRow(
-                    invoice_no=row.invoice_no,
-                    reasons=reasons,
-                    reasons_friendly=translate_reasons(reasons),
-                    original=by_inv.get(row.invoice_no, {}),
-                )
-            )
+        failed = [
+            _fail(row.invoice_no, tag_account_review(list(row.reasons))) for row in report.failed
+        ]
         seen = {s.invoice_no for s in success} | {f.invoice_no for f in failed}
-        for inv in expected:
-            if inv not in seen:
-                reasons = ["report did not mention this invoice"]
-                failed.append(
-                    FailedRow(
-                        invoice_no=inv,
-                        reasons=reasons,
-                        reasons_friendly=translate_reasons(reasons),
-                        original=by_inv.get(inv, {}),
-                    )
-                )
+        failed.extend(
+            _fail(inv, ["report did not mention this invoice"])
+            for inv in expected
+            if inv not in seen
+        )
         return success, failed
 
     # ---- helpers -----------------------------------------------------
@@ -420,10 +418,13 @@ class MrErpHttpAdapter:
     ) -> Tuple[List[Dict[str, Any]], List[FailedRow]]:
         valid: List[Dict[str, Any]] = []
         failed: List[FailedRow] = []
-        doc = self.module.doc_type
-        if doc == "purchase":
+        # 校验器按模块细分(sheet_kind 只管模板族):费用档(453)不跑 vat_rate_anomaly
+        # ——นอกระบบ 不抵扣,票面税率异常无会计后果(2026-07-09 拍板)。
+        if self.module.expense:
+            from services.erp.mrerp_xlsx_purchase import validate_expense_history as _validate
+        elif self.module.sheet_kind == "purchase":
             from services.erp.mrerp_xlsx_purchase import validate_purchase_history as _validate
-        elif doc in ("stock_receive", "stock_issue"):
+        elif self.module.sheet_kind in ("stock_receive", "stock_issue"):
             from services.erp.mrerp_xlsx_stock import validate_stock_history as _validate
         else:
             _validate = _gen.validate_history_for_sales_credit
@@ -450,47 +451,5 @@ class MrErpHttpAdapter:
         res.xlsx_size_bytes = xlsx_size
         return res
 
-    def _preview_hints(self) -> List[str]:
-        html = getattr(self, "_last_preview_html", "") or ""
-        if not html:
-            return []
-        hints: List[str] = []
-        for line in _TAGSTRIP_RE.sub("\n", html).split("\n"):
-            line = line.strip()
-            if not line or len(line) > 200 or line in hints:
-                continue
-            if any(k in line for k in _HINT_KEYWORDS):
-                hints.append(line)
-        return hints[:5]
-
-    @staticmethod
-    def _parse_preview_form(
-        html: str,
-    ) -> Tuple[List[Tuple[str, str]], List[str], Optional[str]]:
-        """从预览 HTML 抽 form#frmimport1 的全部字段 + cbimport row_ids + 该 form 的 idus。
-
-        标准库正则:确认表(sales_credit)只含 hidden input + cbimport 复选框,无 <select>。
-        """
-        mform = _FORM_RE.search(html)
-        scope = mform.group(2) if mform else html
-        fields: List[Tuple[str, str]] = []
-        row_ids: List[str] = []
-        idus_form: Optional[str] = None
-        for _tag, attrs_str in _TAG_RE.findall(scope):
-            attrs = {k.lower(): v for k, v in _ATTR_RE.findall(attrs_str)}
-            name = attrs.get("name")
-            if not name:
-                continue
-            if attrs.get("type", "").lower() == "checkbox":
-                # 预览默认勾选的行才提交(cbimport[N])
-                if "checked" in attrs_str.lower() or name.startswith("cbimport"):
-                    fields.append((name, attrs.get("value", "on")))
-                    key = name[len("cbimport") :].strip("[]")
-                    if name.startswith("cbimport") and key.isdigit():
-                        row_ids.append(key)
-                continue
-            val = attrs.get("value", "")
-            fields.append((name, val))
-            if name in ("idus", "idus1") and val.strip():
-                idus_form = val.strip()
-        return fields, row_ids, idus_form
+    # 预览解析纯函数外置(preview_parse)· 保留类名别名:既有测试/调用按此取
+    _parse_preview_form = staticmethod(parse_preview_form)

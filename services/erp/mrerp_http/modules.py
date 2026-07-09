@@ -26,6 +26,9 @@ class MrErpModule:
     listing_module: str  # 回读/查重用的 allview 模块
     listing_idmenu: int  # 回读列表 idmenu
     verified: bool = False
+    # 费用档单据形态(นอกระบบ 单行含税全额 · 生成器/校验器/自建按此分流)· 唯一定义点,
+    # 消费方读 m.expense,别再散写 doc_type == "purchase_expense" 比较。
+    expense: bool = False
 
 
 # 交易单据
@@ -42,6 +45,23 @@ MODULES: Dict[str, MrErpModule] = {
     # 采购(AP tran)· selmenu 67(ซื้อ)/453(费用)· 3-sheet 模板克隆见 mrerp_xlsx_purchase(账套=买方)
     "purchase": MrErpModule(
         "purchase", "impaptran", 363, 67, "purchase", "aptran", 67, verified=True
+    ),
+    # 费用档(ค่าใช้จ่าย)· selmenu 453 · 与 67 共用 impaptran 路径 + 3-sheet 模板(见上一条注释)。
+    # judge_direction=expense 的采购票由 routing.choose_doc_type 常开分流到此(F2)。
+    # 2026-07-09 真机端到端验(test01/TEST2019 · 完整路径混批 3/3 落库 PNPGCC5F-1/2/3)·
+    # 展示层单据号前缀 PN(67=PG)。453 不强制物料类型;费用/服务型物料是会计口径(费用
+    # 过账走物料科目)。历史 alert("Error : ") 假成功的根因=缺 formupload GET 会话上下文
+    # (adapter._upload_xlsx 已修)· 见 known-facts §15。
+    "purchase_expense": MrErpModule(
+        "purchase_expense",
+        "impaptran",
+        363,
+        453,
+        "purchase",
+        "aptran",
+        453,
+        verified=True,
+        expense=True,
     ),
     # 库存进出(仅数量 · Zihao 定不算成本)· selmenu 入库 28/出库 32(2026-07-01 实测)· 模板见 mrerp_xlsx_stock
     "stock_receive": MrErpModule(

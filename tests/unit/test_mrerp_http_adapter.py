@@ -33,6 +33,15 @@ class TestModules(unittest.TestCase):
         with self.assertRaises(ValueError):
             get_module("nope")
 
+    def test_purchase_expense_module_verified(self):
+        # selmenu 453(费用档)· 2026-07-09 真机端到端验(test01/TEST2019 · PNPXN-11B2)
+        m = get_module("purchase_expense")
+        self.assertEqual((m.path, m.idmenu, m.selmenu), ("impaptran", 363, 453))
+        self.assertEqual((m.listing_module, m.listing_idmenu), ("aptran", 453))
+        self.assertTrue(m.verified)
+        # sheet_kind 与 purchase(67)相同 · adapter 侧供应商/商品自建 + 模板族按此判 · 非按 doc_type
+        self.assertEqual(m.sheet_kind, get_module("purchase").sheet_kind)
+
 
 class TestBuildAdapter(unittest.TestCase):
     """S5 删旧 Playwright 发票路后:build_mrerp_adapter 恒返 HTTP 直写(无传输开关)。"""
@@ -116,6 +125,14 @@ class TestPreviewParse(unittest.TestCase):
         _, row_ids, _ = MrErpHttpAdapter._parse_preview_form("<form id='frmimport1'></form>")
         self.assertEqual(row_ids, [])
 
+    def test_preview_hints_extracts_thai_error_lines(self):
+        # 解析纯函数外置 preview_parse(adapter 只留 staticmethod 别名)
+        from services.erp.mrerp_http.preview_parse import preview_hints
+
+        html = "<div>ok line</div><div>ไม่พบข้อมูลสินค้า</div>"
+        self.assertEqual(preview_hints(html), ["ไม่พบข้อมูลสินค้า"])
+        self.assertEqual(preview_hints(""), [])
+
 
 class TestClassifyAndGuards(unittest.TestCase):
     def _adapter(self, doc_type="sales_credit"):
@@ -134,6 +151,41 @@ class TestClassifyAndGuards(unittest.TestCase):
         self.assertEqual(success[0].mrerp_bill_no, "SI690701-000001")
         self.assertEqual(failed, [])
 
+    def test_classify_alert_raw_all_failed_no_report(self):
+        # 真机 453 假绿三连(2026-07-09):importpc 返 alert("Error : ") 时 report 备注列全空,
+        # 逐行判会把整批误判成功且不落库。非数字体 raw = 服务器异常 → 全部诚实置失败,不碰 report。
+        a = self._adapter()
+
+        def no_report(_idus):
+            raise AssertionError("must not fetch report on server error raw")
+
+        a._fetch_report = no_report  # type: ignore[assignment]
+        raw = '<script>alert("Error : ");</script>'
+        success, failed = a._classify(
+            [{"id": "a"}, {"id": "b"}], ["INV1", "INV2"], raw=raw, idus_form="15"
+        )
+        self.assertEqual(success, [])
+        self.assertEqual(len(failed), 2)
+        for row in failed:
+            self.assertEqual(row.reasons[0], "ERR_MRERP_IMPORT_ERROR")
+            self.assertIn("alert", row.reasons[1])
+            self.assertNotIn("<script>", row.reasons[1])
+            self.assertLessEqual(len(row.reasons[1]), 120)
+
+    def test_classify_digit_raw_goes_to_report(self):
+        # raw 是纯数字(如 "2")= 服务器正常受理但有逐行结果 → 必拉 report 判定,不臆断。
+        a = self._adapter()
+        called = []
+
+        def fake_fetch(idus_form):
+            called.append(idus_form)
+            raise RuntimeError("report path taken")
+
+        a._fetch_report = fake_fetch  # type: ignore[assignment]
+        with self.assertRaises(RuntimeError):
+            a._classify([{"id": "a"}], ["INV1"], raw="2", idus_form="15")
+        self.assertEqual(called, ["15"])
+
     def test_unverified_doc_type_refuses_before_network(self):
         a = self._adapter(doc_type="master_supplier")  # 主数据 doc_type 不走 batch(verified=False)
         with a:  # __enter__ 只建 session 对象 · 不登录 · 无网络
@@ -151,16 +203,57 @@ class TestClassifyAndGuards(unittest.TestCase):
         self.assertEqual(res.total, 0)
 
 
+class TestPreflightDispatch(unittest.TestCase):
+    """_preflight 校验器按 doc_type 细分:purchase_expense 用费用校验(不跑 vat_rate_anomaly)。
+
+    费用票 นอกระบบ 不抵扣,票面税率异常无会计后果;同一张票在 purchase(67)口径下仍要挡。
+    """
+
+    def _adapter(self, doc_type):
+        return MrErpHttpAdapter(
+            login_url="https://x",
+            username="u",
+            password="p",
+            doc_type=doc_type,
+            serialize_sessions=False,
+        )
+
+    # 隐含税率 50/164≈30%(远超 [5%,9%])→ purchase 口径 ERR_VAT_RATE_ANOMALY
+    _ANOMALOUS = {
+        "id": "x1",
+        "invoice_date": "2026-07-01",
+        "total_amount": "214.00",
+        "vat": "50",
+        "fields": {"seller_tax": "0105512345678"},
+    }
+
+    def test_expense_preflight_skips_vat_anomaly(self):
+        a = self._adapter("purchase_expense")
+        valid, failed = a._preflight([dict(self._ANOMALOUS)], {"suppliers": []})
+        self.assertEqual(len(valid), 1)
+        self.assertEqual(failed, [])
+
+    def test_purchase_preflight_still_catches_vat_anomaly(self):
+        a = self._adapter("purchase")
+        valid, failed = a._preflight([dict(self._ANOMALOUS)], {"suppliers": []})
+        self.assertEqual(valid, [])
+        self.assertEqual(failed[0].reasons, ["ERR_VAT_RATE_ANOMALY"])
+
+
 class TestRouting(unittest.TestCase):
-    """方向识别 → doc_type(复用 Express 税号锚点)。"""
+    """方向识别 → doc_type(税号锚点 × judge_direction 费用/货品判据,常开无 flag)。"""
 
     OWN = "1234567890123"
     OTHER = "9999999999999"
 
-    def _flat(self, seller, buyer, paid=False):
+    def _flat(self, seller, buyer, paid=False, doc_type=None, vat=None):
         f = {"seller_tax": seller, "buyer_tax": buyer}
         if paid:
             f["payment_status"] = "paid"
+        if doc_type:
+            f["document_type"] = doc_type
+        if vat is not None:
+            f["vat"] = vat
         return {"fields": f}
 
     def test_sales_credit(self):
@@ -175,11 +268,28 @@ class TestRouting(unittest.TestCase):
         flat = self._flat(seller=self.OWN, buyer=self.OTHER, paid=True)
         self.assertEqual(choose_doc_type(flat, {}, own_tax_id=self.OWN), "sales_cash")
 
-    def test_purchase(self):
+    def test_sales_cash_from_receipt_doc_type_without_explicit_field(self):
+        # F3:无显式 payment_status,票种语义(receipt=已收)已足够判现销落 sales_cash。
+        from services.erp.mrerp_http.routing import choose_doc_type
+
+        flat = self._flat(seller=self.OWN, buyer=self.OTHER)
+        flat["fields"]["document_type"] = "receipt"
+        self.assertEqual(choose_doc_type(flat, {}, own_tax_id=self.OWN), "sales_cash")
+
+    def test_purchase_full_tax_invoice_stays_67(self):
+        # 完整税票(tax_invoice + VAT>0 + 买方身份)= 可抵进项 → judge_direction=purchase_invoice
+        # → purchase(selmenu 67 货品),不进费用档。
+        from services.erp.mrerp_http.routing import choose_doc_type
+
+        flat = self._flat(seller=self.OTHER, buyer=self.OWN, doc_type="tax_invoice", vat="7")
+        self.assertEqual(choose_doc_type(flat, {}, own_tax_id=self.OWN), "purchase")
+
+    def test_purchase_expense_ticket_routes_453(self):
+        # 非完整税票(简式税票/收据常态)→ judge_direction=expense → purchase_expense(453)。
         from services.erp.mrerp_http.routing import choose_doc_type
 
         flat = self._flat(seller=self.OTHER, buyer=self.OWN)
-        self.assertEqual(choose_doc_type(flat, {}, own_tax_id=self.OWN), "purchase")
+        self.assertEqual(choose_doc_type(flat, {}, own_tax_id=self.OWN), "purchase_expense")
 
     def test_ambiguous_returns_none(self):
         from services.erp.mrerp_http.routing import choose_doc_type
@@ -187,13 +297,13 @@ class TestRouting(unittest.TestCase):
         flat = self._flat(seller=self.OTHER, buyer=self.OTHER)
         self.assertIsNone(choose_doc_type(flat, {}, own_tax_id=self.OWN))
 
-    def test_retail_receipt_without_buyer_falls_to_purchase(self):
+    def test_retail_receipt_without_buyer_falls_to_purchase_expense(self):
         # 真机语料(SISTER MAKEUP 2026-07-02):零售小票无任何税号锚点,Pearnly 记成费用,
-        # 推 ERP 却掉端点默认销项 → ERR_NO_CLIENT。expense + 无买方身份 → 采购。
+        # 推 ERP 却掉端点默认销项 → ERR_NO_CLIENT。expense + 无买方身份 → 采购费用档(453)。
         from services.erp.mrerp_http.routing import choose_doc_type
 
         flat = {"fields": {"document_type": "receipt", "seller_name": "SISTER MAKEUP"}}
-        self.assertEqual(choose_doc_type(flat, {}, own_tax_id=self.OWN), "purchase")
+        self.assertEqual(choose_doc_type(flat, {}, own_tax_id=self.OWN), "purchase_expense")
 
     def test_expense_with_foreign_buyer_stays_none(self):
         # 读到了买方税号(即便别家)→ 不赌方向,留给匹配闸。
@@ -201,6 +311,21 @@ class TestRouting(unittest.TestCase):
 
         flat = {"fields": {"document_type": "receipt", "buyer_tax": self.OTHER}}
         self.assertIsNone(choose_doc_type(flat, {}, own_tax_id=self.OWN))
+
+
+class TestDocSanityDirectionForExpense(unittest.TestCase):
+    """_doc_sanity_reason 必须把 purchase_expense 当采购方向查(不是按 doc_type 精确等值)。
+
+    采购方向查【卖方】税号;销项方向查【买方】税号(doc_sanity.check_document L138-140)。
+    误判成销项会拿错税号去查,坏卖方税号的采购费用票会被漏放行(_PURCHASE_DOC_TYPES 修的洞)。
+    """
+
+    def test_bad_seller_tax_caught_not_misrouted_to_sales_check(self):
+        from services.erp.mrerp_http.routing import _doc_sanity_reason
+
+        history = {"fields": {"seller_tax": "123", "buyer_tax": "1234567890123"}}
+        self.assertEqual(_doc_sanity_reason(history, "purchase_expense"), "tax_id_invalid")
+        self.assertEqual(_doc_sanity_reason(history, "purchase"), "tax_id_invalid")
 
 
 class TestBillNoPrefix(unittest.TestCase):
@@ -221,7 +346,7 @@ class TestBillNoPrefix(unittest.TestCase):
 
 
 class TestRoutedBatch(unittest.TestCase):
-    """upload_routed_batch:按方向把采购票切到采购模块,销项/ambiguous 保持默认(Bug#1 接线)。"""
+    """upload_routed_batch:按方向把采购/费用票切到各自模块,销项/ambiguous 保持默认(Bug#1 接线)。"""
 
     OWN = "1234567890123"
     OTHER = "9999999999999"
@@ -234,12 +359,13 @@ class TestRoutedBatch(unittest.TestCase):
         a._sess = object()  # 绕过 `with` 检查 · upload 被打桩不联网
         return a
 
-    def _flat(self, seller, buyer, inv):
-        return {
-            "id": inv,
-            "invoice_number": inv,
-            "fields": {"seller_tax": seller, "buyer_tax": buyer},
-        }
+    def _flat(self, seller, buyer, inv, doc_type=None, vat=None):
+        fields = {"seller_tax": seller, "buyer_tax": buyer}
+        if doc_type:
+            fields["document_type"] = doc_type
+        if vat is not None:
+            fields["vat"] = vat
+        return {"id": inv, "invoice_number": inv, "fields": fields}
 
     def _stub_upload(self, adapter):
         """把 upload_invoice_batch 换成记录『当时 module.doc_type + 收到哪些票』的桩。"""
@@ -265,15 +391,81 @@ class TestRoutedBatch(unittest.TestCase):
         calls = self._stub_upload(a)
         histories = [
             self._flat(seller=self.OWN, buyer=self.OTHER, inv="S1"),  # 销项
-            self._flat(seller=self.OTHER, buyer=self.OWN, inv="P1"),  # 采购
+            self._flat(
+                seller=self.OTHER, buyer=self.OWN, inv="P1", doc_type="tax_invoice", vat="7"
+            ),
+            self._flat(seller=self.OTHER, buyer=self.OWN, inv="P2"),  # 采购费用(无完整税票信息)
             self._flat(seller=self.OTHER, buyer=self.OTHER2, inv="A1"),  # ambiguous
         ]
         res = a.upload_routed_batch(histories, {"_own_tax_id": self.OWN})
         by = {dt: ids for dt, ids in calls}
-        self.assertEqual(by["purchase"], ["P1"])  # 采购切到采购模块
+        self.assertEqual(by["purchase"], ["P1"])  # 完整税票切到采购模块(67)
+        self.assertEqual(by["purchase_expense"], ["P2"])  # 费用票切到费用模块(453·已真机验证)
         self.assertEqual(sorted(by["sales_credit"]), ["A1", "S1"])  # 销项+ambiguous 留默认
-        self.assertEqual(len(res.success), 3)
+        self.assertEqual(len(res.success), 4)
+        self.assertEqual(res.failed, [])
         self.assertEqual(a.module.doc_type, "sales_credit")  # 结束后 module 复位
+
+    def test_unverified_module_group_held_static(self):
+        # purchase_expense 已 verified → 静态隔离(unverified 组前置转人工·不调 upload)
+        # 用合成 unverified 变体锁行为,防未来加新端点时该防线退化。
+        import dataclasses
+
+        from services.erp.mrerp_http import modules as modules_mod
+
+        a = self._adapter()
+        calls = self._stub_upload(a)
+        entry = modules_mod.MODULES["purchase_expense"]
+        modules_mod.MODULES["purchase_expense"] = dataclasses.replace(entry, verified=False)
+        try:
+            histories = [
+                self._flat(seller=self.OWN, buyer=self.OTHER, inv="S1"),
+                self._flat(seller=self.OTHER, buyer=self.OWN, inv="E1"),  # → purchase_expense
+            ]
+            res = a.upload_routed_batch(histories, {"_own_tax_id": self.OWN})
+        finally:
+            modules_mod.MODULES["purchase_expense"] = entry
+        by = {dt: ids for dt, ids in calls}
+        self.assertEqual(by.get("sales_credit"), ["S1"])  # 兄弟组不被拖累
+        self.assertNotIn("purchase_expense", by)  # unverified 组不调 upload
+        self.assertEqual(len(res.success), 1)
+        self.assertEqual(res.failed[0].reasons, ["ERR_MRERP_MODULE_UNAVAILABLE"])
+        self.assertEqual(a.module.doc_type, "sales_credit")
+
+    def test_verified_group_business_error_propagates(self):
+        # 已验证组的真服务器拒收(MRERPBusinessError)必须向上抛(上游 push 流 catch),
+        # 不许被组循环吞成 ERR_MRERP_MODULE_UNAVAILABLE(那是 unverified 静态判的专用码)。
+        a = self._adapter()
+
+        def boom(histories, mappings):
+            raise MRERPBusinessError("server rejected upload")
+
+        a.upload_invoice_batch = boom  # type: ignore[assignment]
+        histories = [
+            self._flat(seller=self.OWN, buyer=self.OTHER, inv="S1"),
+            self._flat(
+                seller=self.OTHER, buyer=self.OWN, inv="P1", doc_type="tax_invoice", vat="7"
+            ),
+        ]
+        with self.assertRaises(MRERPBusinessError):
+            a.upload_routed_batch(histories, {"_own_tax_id": self.OWN})
+        self.assertEqual(a.module.doc_type, "sales_credit")  # finally 仍复位
+
+    def test_get_module_raise_restores_adapter_module(self):
+        # 反向守门:choose_doc_type 选中的 doc_type 若未注册,get_module 会 raise;
+        # try/finally 必须仍把 adapter.module 复位,不留半推状态。
+        from services.erp.mrerp_http import modules as modules_mod
+
+        a = self._adapter()
+        self._stub_upload(a)
+        histories = [self._flat(seller=self.OTHER, buyer=self.OWN, inv="P1")]  # → purchase_expense
+        saved_entry = modules_mod.MODULES.pop("purchase_expense")
+        try:
+            with self.assertRaises(ValueError):
+                a.upload_routed_batch(histories, {"_own_tax_id": self.OWN})
+        finally:
+            modules_mod.MODULES["purchase_expense"] = saved_entry
+        self.assertEqual(a.module.doc_type, "sales_credit")
 
     def test_all_sales_uses_fast_path_single_call(self):
         a = self._adapter()

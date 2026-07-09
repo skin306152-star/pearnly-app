@@ -5,7 +5,8 @@
 套账主体税号 == 卖方 → 销项;== 买方 → 采购;两边都对不上/都命中 → ambiguous(None,留人工)。
 方向再按付款状态细分成具体导入模块(见 modules.MODULES):
   销项:已付/现金 → sales_cash;否则 → sales_credit
-  采购:purchase(货品)
+  采购:judge_direction(services/purchase/intake · 与 Pearnly 自身单据同口径)判 expense →
+       purchase_expense(selmenu 453 · 费用档);判 purchase_invoice → purchase(selmenu 67 · 货品)
 
 只做纯映射;own_tax_id 由调用方从套账主体解析后传入。doc_type=None 时调用方不自动推(留人工)。
 """
@@ -34,24 +35,32 @@ def _fields(flat: Dict[str, Any]) -> Dict[str, Any]:
 def choose_doc_type(
     flat: Dict[str, Any], history: Dict[str, Any], *, own_tax_id: Any
 ) -> Optional[str]:
-    """套账主体税号 × 票面买卖方 → sales_credit / sales_cash / purchase / None(ambiguous)。"""
+    """套账主体税号 × 票面买卖方 → sales_credit / sales_cash / purchase(_expense) / None。"""
     direction = resolve_direction(flat, history, own_tax_id=own_tax_id)
     if direction == "sales":
         return "sales_cash" if payment_is_paid(_fields(flat)) else "sales_credit"
-    if direction == "purchase":
-        return "purchase"
-    # 税号锚点判不出(零售小票常态:票面无买方身份)→ 跟 Pearnly 自身单据判定走:
-    # judge_direction=expense 且买方身份完全缺失 = 本子里记的是费用支出 → ERP 同向
-    # 落采购。此前掉端点默认销项 → 销项闸要求挂客户 → 恒 ERR_NO_CLIENT(真机语料
-    # SISTER MAKEUP 2026-07-02)。票面读到了买方税号(即便是别家的)不走此兜底,
-    # 仍留 None ——那是匹配闸(confirmed_account_set_mismatch)的辖区,不赌方向。
+
+    # 采购锚点已定 或 判不出方向(下方兜底)都要用同一个 judge_direction 结果,算一次复用。
     from services.purchase.intake import judge_direction
 
     fields = _fields(flat)
     kind, _ = judge_direction(fields)
+    is_expense = kind == "expense"
+
+    if direction == "purchase":
+        doc = "purchase_expense" if is_expense else "purchase"
+        logger.info("[mrerp-route] doc=%s reason=anchor+judge_direction=%s", doc, kind)
+        return doc
+
+    # 税号锚点判不出(零售小票常态:票面无买方身份)→ 跟 Pearnly 自身单据判定走:
+    # judge_direction=expense 且买方身份完全缺失 = 本子里记的是费用支出 → ERP 同向
+    # 落采购费用档。此前掉端点默认销项 → 销项闸要求挂客户 → 恒 ERR_NO_CLIENT(真机语料
+    # SISTER MAKEUP 2026-07-02)。票面读到了买方税号(即便是别家的)不走此兜底,
+    # 仍留 None ——那是匹配闸(confirmed_account_set_mismatch)的辖区,不赌方向。
     buyer = clean_tax_id(fields.get("buyer_tax") or fields.get("buyer_tax_id"))
-    if kind == "expense" and not buyer:
-        return "purchase"
+    if is_expense and not buyer:
+        logger.info("[mrerp-route] doc=purchase_expense reason=fallback+judge_direction=expense")
+        return "purchase_expense"
     return None
 
 
@@ -109,10 +118,13 @@ _DOC_SANITY_FRIENDLY: Dict[str, Dict[str, str]] = {
 }
 
 
+_PURCHASE_DOC_TYPES = ("purchase", "purchase_expense")
+
+
 def _doc_sanity_reason(history: Dict[str, Any], doc_type: str) -> Optional[str]:
     """单据防呆(外币/贷项/押金/未来日期/坏税号)· 复用 Express doc_sanity · 命中返 reason。"""
     fields = history.get("fields") if isinstance(history.get("fields"), dict) else {}
-    direction = "purchase" if doc_type == "purchase" else "sales"
+    direction = "purchase" if doc_type in _PURCHASE_DOC_TYPES else "sales"
     return check_document(fields, history, direction)
 
 
@@ -126,6 +138,23 @@ def _sanity_fail_row(history: Dict[str, Any], reason: str) -> FailedRow:
         invoice_no=_gen.derive_mrerp_invoice_no(history),
         reasons=[reason],
         reasons_friendly=[friendly] if friendly else [],
+        original=history,
+    )
+
+
+MODULE_UNAVAILABLE_CODE = "ERR_MRERP_MODULE_UNAVAILABLE"
+
+
+def _module_unavailable_fail_row(history: Dict[str, Any]) -> FailedRow:
+    """端点未真机验证(verified=False)静态判掉的行 → 转人工 · 四语文案见 mrerp_business_friendly。"""
+    from services.erp import mrerp_xlsx_generator as _gen
+    from services.erp.mrerp_business_friendly import translate_reasons
+
+    reasons = [MODULE_UNAVAILABLE_CODE]
+    return FailedRow(
+        invoice_no=_gen.derive_mrerp_invoice_no(history),
+        reasons=reasons,
+        reasons_friendly=translate_reasons(reasons),
         original=history,
     )
 
@@ -151,7 +180,7 @@ def route_and_upload(adapter, histories: List[Dict[str, Any]], mappings: Dict[st
     """按每张单据的方向路由 doc_type 再推送 · 合并为一个 ImportResult(同一会话内复用登录)。
 
     推送前先跑**单据防呆**(外币/贷项/押金/未来日期/坏税号 → 转人工·复用 Express doc_sanity),
-    命中即落 failed 不推不建。其余**只把【确认为采购】的票切到采购模块**——销项 / 判不出方向
+    命中即落 failed 不推不建。其余**只把【确认为采购】的票切到采购/费用模块**——销项 / 判不出方向
     一律保持默认 doc_type(sales_credit),零倒退;别家的票由匹配闸(_filter_by_account_set)另挡。
     """
     if not histories:
@@ -163,8 +192,8 @@ def route_and_upload(adapter, histories: List[Dict[str, Any]], mappings: Dict[st
     groups: Dict[str, List[Dict[str, Any]]] = {}  # dict 保序 → 无需单独 order 列表
     for h in histories:
         chosen = choose_doc_type(h, h, own_tax_id=own)
-        if chosen == "purchase":
-            dt = "purchase"
+        if chosen in _PURCHASE_DOC_TYPES:
+            dt = chosen  # 采购(货品/67)或采购费用(453)分别切到各自模块
         elif _walkin_to_cash(h, default_doc, mappings):
             dt = "sales_cash"  # 散客现金销售 → ขายเงินสด(账正)
         else:
@@ -197,7 +226,19 @@ def route_and_upload(adapter, histories: List[Dict[str, Any]], mappings: Dict[st
     saved = adapter.module
     try:
         for dt in groups:
-            adapter.module = get_module(dt)
+            m = get_module(dt)
+            # 端点未真机验证(master_* 等 verified=False)→ 静态前置判掉,只转这一组人工,
+            # 别拖累混批里已打通的组。条件与 adapter 的 verified 闸(upload 前 raise)同源;
+            # 这里不 catch MRERPBusinessError——那也是已验证组真服务器拒收的载体,吞了会错标。
+            if not m.verified or m.selmenu is None:
+                logger.warning(
+                    "[mrerp-route] doc=%s module unavailable · %d row(s) held for manual review",
+                    dt,
+                    len(groups[dt]),
+                )
+                merged.failed.extend(_module_unavailable_fail_row(h) for h in groups[dt])
+                continue
+            adapter.module = m
             r = adapter.upload_invoice_batch(groups[dt], mappings)
             merged.success.extend(r.success)
             merged.failed.extend(r.failed)

@@ -5,6 +5,7 @@
 "缺则建/已映射跳过/建失败不注入/可关"契约。"""
 
 import unittest
+from types import SimpleNamespace
 
 from services.erp.mrerp_http.autocreate import (
     _buyer_from_history,
@@ -17,11 +18,13 @@ from services.erp.mrerp_xlsx_lookups import MRERP_CASH_CUSTOMER
 
 
 class _StubAdapter:
-    def __init__(self, results):
+    def __init__(self, results, doc_type="sales_credit"):
         self._results = results
         self.called_with = None
         self.suppliers_called = None
         self.products_called = None
+        self.products_mappings = None
+        self.module = SimpleNamespace(doc_type=doc_type, expense=doc_type == "purchase_expense")
 
     def create_customers(self, customers, mappings):
         self.called_with = customers
@@ -33,6 +36,7 @@ class _StubAdapter:
 
     def create_products(self, products, mappings):
         self.products_called = products
+        self.products_mappings = mappings
         return {p["code"]: self._results.get(p["code"], True) for p in products}
 
 
@@ -204,6 +208,83 @@ class TestProvisionProducts(unittest.TestCase):
         stub = _StubAdapter({})
         provision_products(stub, [self._hist_items("Lipstick")], mappings)
         self.assertIsNone(stub.products_called)
+
+
+class TestProvisionExpenseItem(unittest.TestCase):
+    """purchase_expense(453)分支:只幂等确保通用费用物料(บริการ, ค่าใช้จ่าย)· 不动 mappings。
+
+    费用/服务型(04-SER)+ 8 GL 科目全费用科目是**会计口径**(费用过账走物料科目,不挂
+    库存/销货成本),非服务器强制(453 也接受库存商品 · 2026-07-09 补测)。覆盖走 mappings
+    浅拷贝,不污染货品路径。不注入行名映射:expense 生成器直接用 _mrerp_expense_item_code
+    取码(注入无消费方),且注入会让同批货品单(67)的同名行错解析到费用物料(跨组污染)。
+    """
+
+    _ACC_KEYS = (
+        "acc_rev",
+        "acc_ret",
+        "acc_dis",
+        "acc_pur",
+        "acc_purret",
+        "acc_purdis",
+        "acc_inv",
+        "acc_cost",
+    )
+
+    def _hist_items(self, *names):
+        return {"client_id": 1, "items": [{"name": n, "unit_price": 10} for n in names]}
+
+    def test_creates_generic_expense_item_with_service_payload(self):
+        mappings = {"products": []}
+        stub = _StubAdapter({}, doc_type="purchase_expense")
+        provision_products(stub, [self._hist_items("ค่าน้ำ", "ค่าไฟ")], mappings)
+        self.assertEqual(len(stub.products_called), 1)  # 一个通用费用物料,不逐行建
+        self.assertEqual(stub.products_called[0]["code"], "EXPENSE")
+        self.assertEqual(stub.products_called[0]["name"], "ค่าใช้จ่าย")
+        m = stub.products_mappings
+        self.assertEqual(m["_mrerp_product_type"], "บริการ, ค่าใช้จ่าย")
+        self.assertEqual(m["_mrerp_product_category"], "04-SER")
+        for k in self._ACC_KEYS:
+            self.assertEqual(m[f"_mrerp_product_{k}"], "5230-01")
+        # 覆盖走浅拷贝 + 不注入行名映射:原 mappings 完全不被动(各组共享同一 dict)
+        self.assertNotIn("_mrerp_product_type", mappings)
+        self.assertEqual(mappings, {"products": []})
+
+    def test_generic_product_key_ignored_for_expense(self):
+        # _mrerp_generic_product 是销售概念,费用分支忽略之,仍建/用 EXPENSE
+        mappings = {"products": [], "_mrerp_generic_product": "SALESGEN"}
+        stub = _StubAdapter({}, doc_type="purchase_expense")
+        provision_products(stub, [self._hist_items("ค่าน้ำ")], mappings)
+        self.assertEqual(stub.products_called[0]["code"], "EXPENSE")
+        self.assertEqual(mappings["products"], [])
+
+    def test_overrides_via_expense_item_keys(self):
+        mappings = {
+            "products": [],
+            "_mrerp_expense_item_code": "SVC-EXP",
+            "_mrerp_expense_item_name": "บริการ",
+            "_mrerp_expense_item_acc": "5299-01",
+        }
+        stub = _StubAdapter({}, doc_type="purchase_expense")
+        provision_products(stub, [self._hist_items("ค่าน้ำ")], mappings)
+        self.assertEqual(stub.products_called[0]["code"], "SVC-EXP")
+        self.assertEqual(stub.products_called[0]["name"], "บริการ")
+        self.assertEqual(stub.products_mappings["_mrerp_product_acc_pur"], "5299-01")
+        self.assertEqual(mappings["products"], [])
+
+    def test_create_failure_silent_and_untouched(self):
+        mappings = {"products": []}
+        stub = _StubAdapter({"EXPENSE": False}, doc_type="purchase_expense")
+        provision_products(stub, [self._hist_items("ค่าน้ำ")], mappings)
+        self.assertEqual(mappings["products"], [])  # 建失败静默 · 推送侧干净失败
+
+    def test_goods_purchase_path_unchanged(self):
+        # 货品采购(purchase/67)不走费用分支:仍逐行 md5 自建,payload 无费用覆盖键
+        mappings = {"products": []}
+        stub = _StubAdapter({}, doc_type="purchase")
+        provision_products(stub, [self._hist_items("Widget")], mappings)
+        self.assertEqual(len(stub.products_called), 1)
+        self.assertNotEqual(stub.products_called[0]["code"], "EXPENSE")
+        self.assertNotIn("_mrerp_product_type", stub.products_mappings)
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ from typing import Optional
 from core.pos_api import PosError
 from services.purchase import docs as docs_svc
 from services.purchase import suppliers as sup_svc
+from services.purchase.attachment_files import resolve_upload_ref
 
 _GENERATED_KINDS = ("substitute_receipt", "wht_cert")
 _UPLOAD_KINDS = ("bill", "payment_proof")
@@ -179,17 +180,30 @@ def add_attachment(cur, *, tenant_id, workspace_client_id, doc_id, kind, url) ->
     return cur.fetchone()
 
 
-def delete_attachment(cur, *, tenant_id, workspace_client_id, attachment_id) -> None:
-    """删附件(限本套账内单据的附件)。"""
+def delete_attachment(
+    cur, *, tenant_id, workspace_client_id, attachment_id
+) -> Optional[tuple[str, str]]:
+    """删附件(限本套账内单据的附件)。返回该附件对应的落盘文件 ref(供路由层在事务提交后
+    物理删除);非本系统 uploads 文件(生成件虚 URL / bill 的 OCR 落盘 ref)→ None,见
+    services/purchase/attachment_files.resolve_upload_ref。"""
     cur.execute(
-        "DELETE FROM purchase_attachments "
+        "SELECT kind, url, generated FROM purchase_attachments "
         "WHERE tenant_id = %s AND id = %s AND purchase_doc_id IN ("
         "  SELECT id FROM purchase_docs "
         "  WHERE tenant_id = %s AND workspace_client_id = %s)",
         (tenant_id, attachment_id, tenant_id, workspace_client_id),
     )
-    if cur.rowcount == 0:
+    row = cur.fetchone()
+    if row is None:
         raise PosError("purchase.unexpected", 404)
+    ref = resolve_upload_ref(
+        tenant_id=tenant_id, kind=row["kind"], url=row["url"], generated=row["generated"]
+    )
+    cur.execute(
+        "DELETE FROM purchase_attachments WHERE tenant_id = %s AND id = %s",
+        (tenant_id, attachment_id),
+    )
+    return ref
 
 
 def _assert_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> None:

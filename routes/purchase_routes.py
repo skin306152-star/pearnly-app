@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from core import db
 from core.pos_api import PosError, ok
 from routes.purchase_common import auth_member, gate, resolve_ws, uid as _uid
+from services.purchase import attachment_files
 from services.purchase import correct as correct_svc
 from services.purchase import documents as documents_svc
 from services.purchase import docs as docs_svc
@@ -243,8 +244,14 @@ async def api_delete_doc(
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
+        # 级联删单前先查附件 ref(行被 FK CASCADE 删掉就查不到了);delete_doc 抛异常
+        # → with 块回滚 + 异常冒泡,下面 purge 永远不会跑到,不会出现「文件没了行还在」。
+        refs = attachment_files.collect_doc_refs(
+            cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id
+        )
         docs_svc.delete_doc(cur, tenant_id=tid, workspace_client_id=ws, doc_id=doc_id)
-        return ok({"deleted": True})
+    attachment_files.purge_files(refs)
+    return ok({"deleted": True})
 
 
 @router.post("/lines/{line_id}/match-product")
@@ -377,10 +384,12 @@ async def api_delete_attachment(
     with db.get_cursor_rls(tid, commit=True) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
-        documents_svc.delete_attachment(
+        ref = documents_svc.delete_attachment(
             cur, tenant_id=tid, workspace_client_id=ws, attachment_id=attachment_id
         )
-        return ok({"deleted": True})
+    # 事务已提交后才物理删文件,理由同上(api_delete_doc)。
+    attachment_files.purge_files([ref] if ref else [])
+    return ok({"deleted": True})
 
 
 @router.get("/proof-pdf/{token}")

@@ -111,3 +111,22 @@ def local_path_from_url(url: Optional[str]) -> Optional[Path]:
     if not url or not isinstance(url, str) or not url.startswith(URL_PREFIX):
         return None
     return _safe_under_root(media_root() / url[len(URL_PREFIX) :])
+
+
+def delete_image(tenant_id: str, name: str) -> bool:
+    """删一张已落盘图(路径沙盒同 local_path,name 只取 basename 防穿越)。
+
+    幂等:文件本就不存在算成功(调用方常在"删了行才删文件"之后重试/并发场景遇到)。
+    路径逃出 media_root 才是唯一真失败,返回 False 供调用方记日志。
+    """
+    root = media_root().resolve()
+    target = (root / str(tenant_id) / os.path.basename(name)).resolve()
+    try:
+        target.relative_to(root)
+    except ValueError:
+        return False
+    try:
+        target.unlink(missing_ok=True)
+    except OSError:
+        return False
+    return True

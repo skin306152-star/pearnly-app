@@ -490,7 +490,7 @@ def match_line_product(
 
 
 def delete_doc(cur, *, tenant_id, workspace_client_id, doc_id) -> None:
-    """删草稿(仅 draft · 级联删行/附件由 FK ON DELETE CASCADE)。"""
+    """删草稿(仅 draft · 级联删行/附件由 FK CASCADE);落盘文件由调用方查 attachment_files 先清。"""
     cur.execute(
         "DELETE FROM purchase_docs "
         "WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s AND status = 'draft'",

@@ -90,6 +90,28 @@ class ImageStoreTests(unittest.TestCase):
         self.assertEqual(st.media_type_for("png"), "image/png")
         self.assertEqual(st.media_type_for("jpg"), "image/jpeg")
 
+    def test_delete_image_removes_file(self):
+        res = st.save_image("t1", _png())
+        name = res["url"].rsplit("/", 1)[-1]
+        path = st.local_path("t1", name)
+        self.assertTrue(path.is_file())
+        self.assertTrue(st.delete_image("t1", name))
+        self.assertFalse(path.exists())
+
+    def test_delete_image_missing_file_is_idempotent(self):
+        self.assertTrue(st.delete_image("t1", "does-not-exist.png"))
+
+    def test_delete_image_traversal_blocked(self):
+        # 沙盒逃逸(basename 剥掉 ../ 后仍在 root 下就正常删;真逃逸场景是 tenant_id 本身
+        # 带 ../ —— basename 只清洗 name,tenant_id 段必须自己撑住)。
+        self.assertFalse(st.delete_image("../../etc", "passwd"))
+
+    def test_delete_image_does_not_touch_other_tenant(self):
+        res = st.save_image("t1", _png())
+        name = res["url"].rsplit("/", 1)[-1]
+        st.delete_image("t2", name)  # 别的租户同名文件不存在 → 幂等成功但不该删到 t1 的
+        self.assertTrue(st.local_path("t1", name).is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

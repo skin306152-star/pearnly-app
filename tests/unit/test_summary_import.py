@@ -226,6 +226,11 @@ class DateResolutionTests(unittest.TestCase):
         self.assertEqual(dates_svc.detect_period("สรุปยอดขาย 7-11 เดือน มิถุนายน 2569"), (2026, 6))
         self.assertIsNone(dates_svc.detect_period("no month here"))
 
+    def test_detect_period_ignores_tax_id_digits(self):
+        # 标题含税号 3101888669:年份必须认独立的 2569(=2026),不能被税号头部 "3101" 污染成 2558。
+        title = "สรุปยอดขาย บริษัท ทดสอบ จำกัด (เลขภาษี 3101888669) เดือน มิถุนายน 2569"
+        self.assertEqual(dates_svc.detect_period(title), (2026, 6))
+
 
 class RealSheetShapeTests(unittest.TestCase):
     """真表结构:标题行在前 + 光日号日期 + 佛历。跳过前言认表头 + 拼日期。"""

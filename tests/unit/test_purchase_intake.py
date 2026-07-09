@@ -386,6 +386,33 @@ class ResolveImageIntakeTests(unittest.TestCase):
 # 覆盖见 test_expense_line_quick_entry.py + test_line_expense_to_purchase.py。
 
 
+class DocTypePaymentHintTests(unittest.TestCase):
+    """票种→付款态会计判据(F3 单一事实源 · 也喂 ERP 推送 payment_verdict)全枚举。"""
+
+    def test_receipt_hints_paid(self):
+        self.assertTrue(ik.doc_type_payment_hint("receipt"))
+
+    def test_simplified_tax_invoice_hints_paid(self):
+        self.assertTrue(ik.doc_type_payment_hint("simplified_tax_invoice"))
+
+    def test_tax_invoice_hints_unpaid(self):
+        self.assertFalse(ik.doc_type_payment_hint("tax_invoice"))
+
+    def test_credit_note_hints_unpaid(self):
+        self.assertFalse(ik.doc_type_payment_hint("credit_note"))
+
+    def test_payment_evidence_no_hint(self):
+        # 转账截图非正规税票,方向证据不足,保守不赌。
+        self.assertIsNone(ik.doc_type_payment_hint("payment_evidence"))
+
+    def test_order_evidence_no_hint(self):
+        self.assertIsNone(ik.doc_type_payment_hint("order_evidence"))
+
+    def test_empty_no_hint(self):
+        self.assertIsNone(ik.doc_type_payment_hint(""))
+        self.assertIsNone(ik.doc_type_payment_hint(None))
+
+
 class PaymentDefaultTests(unittest.TestCase):
     """PO-5 智能默认付款态:现金收据 → 已付;税务发票/赊账 → 未付。"""
 

@@ -98,6 +98,20 @@ class ExpressMapperTests(unittest.TestCase):
         self.assertTrue(r.ok)
         self.assertEqual(r.payload["doctype"], "HP")
 
+    def test_receipt_doc_type_without_explicit_field_routes_to_hp(self):
+        # F3:receipt 在场即便无显式 payment_status/method,票种语义已足够判现购。
+        r = build_express_payload(_ptt_history(fields={"document_type": "receipt"}), config=_CONFIG)
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["doctype"], "HP")
+
+    def test_tax_invoice_doc_type_without_explicit_field_stays_rr(self):
+        # F3:完整税票无显式付款字段 → 明确赊(仍是 RR,只是语义从「默认」升级为「明确」)。
+        r = build_express_payload(
+            _ptt_history(fields={"document_type": "tax_invoice"}), config=_CONFIG
+        )
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["doctype"], "RR")
+
     def test_supplier_new_when_unmapped(self):
         r = build_express_payload(_ptt_history(), config=_CONFIG)
         self.assertTrue(r.payload["supplier"]["supplier_new"])

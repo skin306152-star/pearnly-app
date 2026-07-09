@@ -8,10 +8,13 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 _CENT = Decimal("0.01")
 _BALANCE_TOL = Decimal("0.02")  # 税前+税额 与 含税 容差
@@ -71,17 +74,37 @@ def detect_prename(name: str) -> str:
     return ""
 
 
-def payment_is_paid(fields: Dict[str, Any]) -> Optional[bool]:
-    """票面是否已付:True 已付 / False 未付 / None 无信号(由各 mapper 定默认)。"""
+SRC_EXPLICIT = "explicit"  # 票面付款字段(payment_status/method)直接给出
+SRC_DOC_TYPE = "doc_type"  # 无付款字段 · 靠票种会计判据(收据=已付/税票=赊)推
+SRC_NONE = ""  # 两者都无信号 · 留给各 mapper 的固定默认
+
+
+def payment_verdict(fields: Dict[str, Any]) -> tuple[Optional[bool], str]:
+    """票面是否已付 + 裁决来源(可查哪层定的·验收/排障用)。
+
+    优先级:票面显式付款字段(payment_status/method)> 票种语义(收据在场=已收/已付,
+    仅税票/贷项凭证=赊)> 无信号(交各 mapper 的固定默认,如 Express 进项 RR / 销项 IV)。
+    """
     status = str(fields.get("payment_status") or "").strip().lower()
     if status == "paid":
-        return True
+        return True, SRC_EXPLICIT
     if status in ("unpaid", "credit"):
-        return False
+        return False, SRC_EXPLICIT
     method = str(fields.get("payment_method") or "").strip().lower()
     if method and any(tok in method for tok in _PAID_TOKENS):
-        return True
-    return None
+        return True, SRC_EXPLICIT
+
+    from services.purchase.intake import doc_type_payment_hint
+
+    hint = doc_type_payment_hint(fields.get("document_type"))
+    if hint is not None:
+        return hint, SRC_DOC_TYPE
+    return None, SRC_NONE
+
+
+def payment_is_paid(fields: Dict[str, Any]) -> Optional[bool]:
+    """票面是否已付:True 已付 / False 未付 / None 无信号(由各 mapper 定默认)。"""
+    return payment_verdict(fields)[0]
 
 
 def be_dates(invoice_date: Any) -> Optional[tuple[str, str]]:

@@ -57,8 +57,14 @@ def judge_direction_row(fields: Dict[str, Any], own_tax_id: Any) -> Dict[str, An
 
 def judge_payment_row(fields: Dict[str, Any]) -> Dict[str, Any]:
     """现金/赊账落点。paid→现金票(MR.ERP sales_cash / Express HS);unpaid→赊账(sales_credit / IV);
-    无信号→按赊账默认(标 default,提示用户确认)。"""
-    paid = payment_is_paid(fields)
+    无信号→按赊账默认(标 default,提示用户确认)。
+
+    payment_is_paid(F3 起)也认票种语义,但这里的 document_type 是 mapping 层从批次「含 VAT」
+    复选框合成的代理值(非真实票面证据·见 mapping.py),不能当票种信号摊派现/赊,故判定时剔除,
+    只认真实 payment_method/status,无信号照旧兜底赊账待人确认。
+    """
+    signal_fields = {k: v for k, v in fields.items() if k != "document_type"}
+    paid = payment_is_paid(signal_fields)
     if paid is True:
         return {
             "paid": True,

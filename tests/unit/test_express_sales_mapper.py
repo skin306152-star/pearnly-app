@@ -125,6 +125,14 @@ class ExpressSalesMapperTests(unittest.TestCase):
         self.assertTrue(r.ok)
         self.assertEqual(r.payload["doctype"], "HS")
 
+    def test_receipt_doc_type_without_explicit_field_routes_to_hs(self):
+        # F3:receipt 在场即便无显式 payment_status/method,票种语义已足够判现销。
+        r = build_express_sales_payload(
+            _sales_history(fields={"document_type": "receipt"}), config=_CONFIG
+        )
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["doctype"], "HS")
+
     def test_missing_accounts_manual(self):
         r = build_express_sales_payload(_sales_history(), config={"account_set": "DATAT"})
         self.assertFalse(r.ok)

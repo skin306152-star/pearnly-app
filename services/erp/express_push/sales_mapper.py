@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -33,7 +34,7 @@ from services.erp.express_push.common import (
     detect_prename,
     extract_line_items,
     fail,
-    payment_is_paid,
+    payment_verdict,
     resolve_account,
     resolve_account_sourced,
     sanitize_payload_cp874,
@@ -45,6 +46,8 @@ from services.purchase.field_clean import (
     clean_seller,
     clean_tax_id,
 )
+
+logger = logging.getLogger(__name__)
 
 # 现金销售客户:ERP 真账套通行约定 —— CUSCOD=CUSNAM="เงินสด"(korn/test 套实测均已建档,
 # 应收走 ar_acc)。收现金零售单买方栏 OCR 即「เงินสด」,但被采购卖家清洗器(noise 黑名单含
@@ -170,10 +173,19 @@ def build_express_sales_payload(
     # 不碰库存/成本。status!=ok → companion 退回表头模式 + posted_partial(诚实)。
     detail = extract_line_items(fields, base, total=total)
 
-    paid = payment_is_paid(fields)
+    # 现销 HS / 赊销 IV:票面显式字段 > 票种语义(F3)> 无信号默认赊销。
+    # verdict_src 留痕排障用:现/赊哪层定的。
+    paid, verdict_src = payment_verdict(fields)
+    doctype = "HS" if paid else "IV"
+    logger.info(
+        "[express-sales] ref_no=%s doctype=%s payment_src=%s",
+        ref_no,
+        doctype,
+        verdict_src or "config_default",
+    )
     payload = {
         "direction": "sales",
-        "doctype": "HS" if paid else "IV",  # 默认 IV 赊销(无信号/未收)
+        "doctype": doctype,  # 默认 IV 赊销(无信号/未收)
         "account_set": account_set,
         "docdate_be": docdate_be,
         "vat_period_be": vat_period_be,

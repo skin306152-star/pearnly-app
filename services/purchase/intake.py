@@ -60,16 +60,28 @@ def judge_direction(fields: dict) -> tuple[str, str]:
     return "expense", "expense"
 
 
+def doc_type_payment_hint(doc_type: Optional[str]) -> Optional[bool]:
+    """票种→付款态的会计判据(单一事实源 · 采购工作台与 ERP 推送共用)。
+
+    收据/简式税票在场即已收/已付(True);仅完整税票/贷项凭证多为赊(False)。转账截图/
+    订单证据等非正规税票方向证据不足,保守留 None——不赌,由调用方决定兜底。
+    """
+    dt = (doc_type or "").strip().lower()
+    if dt in ("receipt", "simplified_tax_invoice"):
+        return True
+    if dt in ("tax_invoice", "credit_note"):
+        return False
+    return None
+
+
 def default_payment_status(doc_type: str, doc_kind: str) -> str:
     """智能默认付款态(PO-5):现金收据 → 已付;税务发票(多为赊账)→ 未付。用户可一键改。
 
     无明确单据类型:费用单(快记/无 VAT 多为现金小额)默认已付,其余(进货)未付。
     """
-    dt = (doc_type or "").strip().lower()
-    if dt in ("receipt", "simplified_tax_invoice"):
-        return "paid"
-    if dt in ("tax_invoice", "credit_note"):
-        return "unpaid"
+    hint = doc_type_payment_hint(doc_type)
+    if hint is not None:
+        return "paid" if hint else "unpaid"
     return "paid" if doc_kind == "expense" else "unpaid"
 
 

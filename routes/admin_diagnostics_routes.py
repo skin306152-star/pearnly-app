@@ -14,8 +14,9 @@ Pearnly · Admin Diagnostics / Internal Deploy 路由模块
   POST   /internal/install-playwright       · 同上 · POST 别名
 
 抽出 1 个 helper(EXECUTION_PLAN Task 5.2 "统一 secret 校验"):
-  _require_internal_token(token)  · 3 个 /internal/* 路由共用 · 比对 GITHUB_WEBHOOK_SECRET
+  _require_internal_token(request)  · 3 个 /internal/* 路由共用 · 比对 GITHUB_WEBHOOK_SECRET
   (POST /internal/deploy 用 HMAC 签名 · 不是 token · 不走这个 helper)
+  安全加固(2026-07-09):token 走 header X-Internal-Token(不落 query 日志)· compare_digest 恒定时间 · install-playwright 加 INTERNAL_OPS_ENABLED 开关(默认→404)· deploy/status 补鉴权。
 
 循环 import 解法:
   /api/admin/diagnostics/runtime 依赖 app.py 的全局 _last_500_event(mutable dict ·
@@ -25,6 +26,7 @@ Pearnly · Admin Diagnostics / Internal Deploy 路由模块
 
 from __future__ import annotations
 
+import hmac
 import logging
 import os
 
@@ -46,11 +48,13 @@ router = APIRouter()
 # 统一 internal/* token 校验(EXECUTION_PLAN Task 5.2 拍板)
 # 原来 3 个 /internal/* 路由都重复 4 行内联 check · 抽 1 个 helper
 # (POST /internal/deploy 用 HMAC 签名 · 不走这个)
+# 2026-07-09 安全加固:token 走 header(不落 query 日志)· compare_digest 恒定时间比对 · secret 未配置 fail-closed。
 # ============================================================
-def _require_internal_token(token: str) -> None:
-    """比对 token == GITHUB_WEBHOOK_SECRET env · 不等就 403"""
+def _require_internal_token(request: Request) -> None:
+    """比对 X-Internal-Token header == GITHUB_WEBHOOK_SECRET env · 不等就 403"""
     secret = os.environ.get("GITHUB_WEBHOOK_SECRET", "")
-    if not secret or token != secret:
+    token = request.headers.get("X-Internal-Token", "")
+    if not secret or not hmac.compare_digest(token, secret):
         raise HTTPException(status_code=403, detail="Invalid token")
 
 
@@ -142,13 +146,13 @@ async def github_deploy_webhook(request: Request):
 
 
 @router.get("/internal/deploy/manual")
-async def manual_deploy_trigger(token: str = ""):
+async def manual_deploy_trigger(request: Request):
     """
     备用手动部署触发器（webhook 失败时使用）。
-    访问：https://pearnly.com/internal/deploy/manual?token=<GITHUB_WEBHOOK_SECRET>
-    无需 SSH，浏览器直接触发。
+    调用：curl -H "X-Internal-Token: <GITHUB_WEBHOOK_SECRET>" https://pearnly.com/internal/deploy/manual
+    无需 SSH，header 带 token 触发（不走 URL query，避免落进访问日志）。
     """
-    _require_internal_token(token)
+    _require_internal_token(request)
     import subprocess as _subprocess
 
     logger.info("[git-deploy] manual trigger")
@@ -168,9 +172,9 @@ async def manual_deploy_trigger(token: str = ""):
 
 
 @router.get("/internal/deploy/log")
-async def deploy_log(token: str = "", lines: int = 50):
+async def deploy_log(request: Request, lines: int = 50):
     """查看最近部署日志。"""
-    _require_internal_token(token)
+    _require_internal_token(request)
     import subprocess as _subprocess
 
     try:
@@ -186,14 +190,17 @@ async def deploy_log(token: str = "", lines: int = 50):
 
 
 @router.get("/internal/deploy/status")
-async def deploy_status():
-    """上次部署是否被自动回滚(无鉴权 · 只读 marker · 信息极简非敏感:只含公开 commit SHA)。
+async def deploy_status(request: Request):
+    """上次部署是否被自动回滚(只读 marker · 信息极简非敏感:只含公开 commit SHA)。
 
     闭环'直到搞好'的钩子:无人值守 loop 每轮【先】查这个 —— 若 rolled_back=True,
     说明上次部署健康检查没过、已自动回滚到上个好版本(prod 仍活),detail 里的 bad=<sha>
     就是那个坏 commit。loop 应:git revert 该 bad commit + 把活重做对 + 重新 push,
     直到部署健康(git-deploy.sh 部署成功会自动删掉 marker → 这里恢复 rolled_back=False)。
+
+    2026-07-09 补鉴权:此前无校验,一条 GET 就能探知服务器是否刚回滚(暴露运维状态)。
     """
+    _require_internal_token(request)
     import os as _os
 
     marker = "/opt/mrpilot/.deploy_rollback"
@@ -220,13 +227,17 @@ async def deploy_status():
 #
 # Idempotent: pip skips already-installed packages, playwright skips
 # already-downloaded browsers. Safe to retry.
+# 2026-07-09 安全加固:最危险的 /internal/* 端点(pip install + 重启)· 除 token 外再加
+# INTERNAL_OPS_ENABLED 开关(默认关→404 · 不泄露存在),仅装 playwright 时临时开。
 @router.get("/internal/install-playwright")
 @router.post("/internal/install-playwright")
-async def install_playwright(token: str = "", with_deps: bool = False, restart: bool = True):
+async def install_playwright(request: Request, with_deps: bool = False, restart: bool = True):
     """One-shot installer for Playwright + chromium on the production host.
 
+    Auth: header X-Internal-Token, same value as GITHUB_WEBHOOK_SECRET env.
+    Also requires INTERNAL_OPS_ENABLED=1 env, otherwise 404 (route hidden).
+
     Query params:
-        token       Required. Same value as GITHUB_WEBHOOK_SECRET env.
         with_deps   If true, runs `playwright install chromium --with-deps`
                     (requires root + apt). Default false; usually not
                     needed if the host already has libgbm/libnss/etc.
@@ -239,7 +250,9 @@ async def install_playwright(token: str = "", with_deps: bool = False, restart: 
     can diff "what worked" vs "what failed" in the browser. NEVER raises
     — failure modes are part of the response, not the HTTP status.
     """
-    _require_internal_token(token)
+    if os.environ.get("INTERNAL_OPS_ENABLED", "") not in ("1", "true", "True"):
+        raise HTTPException(status_code=404)
+    _require_internal_token(request)
     import subprocess as _subprocess
     import shutil as _shutil
 
@@ -328,7 +341,10 @@ async def install_playwright(token: str = "", with_deps: bool = False, restart: 
                 start_new_session=True,
             )
         else:
-            next_step_url = "https://pearnly.com/internal/deploy/manual?token=<your-secret>"
+            next_step_url = (
+                'curl -H "X-Internal-Token: <your-secret>" '
+                "https://pearnly.com/internal/deploy/manual"
+            )
 
         return {
             "ok": True,

@@ -8,6 +8,7 @@
 import { esc, $, authHeaders } from './dms-intake-core.js';
 import { IV, showStepInv } from './dms-intake-invoice.js';
 import type { Dict, Endpoint } from './dms-intake-invoice.js';
+import { pushHistory } from './dms-intake-erp-push.js';
 
 // ── 步骤 4:导出 / 推送 ──────────────────────────────────────
 export async function enterSubmit() {
@@ -260,19 +261,7 @@ async function doExport(): Promise<boolean> {
     }
 }
 async function pushOne(historyId: string): Promise<boolean> {
-    try {
-        const body: Dict = { history_id: historyId };
-        if (IV.target) body.endpoint_id = IV.target;
-        const r = await fetch('/api/erp/push', {
-            method: 'POST',
-            headers: authHeaders(true),
-            body: JSON.stringify(body),
-        });
-        const d = (await r.json().catch(() => ({}))) as { ok?: boolean };
-        return r.ok && d.ok !== false;
-    } catch {
-        return false;
-    }
+    return pushHistory(historyId, IV.target);
 }
 function downloadBlob(blob: Blob, name: string) {
     const url = URL.createObjectURL(blob);

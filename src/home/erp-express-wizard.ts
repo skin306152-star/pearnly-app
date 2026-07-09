@@ -404,29 +404,27 @@
         }
     }
 
+    // 推送档位落库(auto_push + Express 自主档)。account_set/科目映射均由小助手心跳上报,此处不碰。
+    async function _persistMode(id: string) {
+        await fetch('/api/erp/endpoints/' + encodeURIComponent(id), {
+            method: 'PATCH',
+            headers: _auth(),
+            body: JSON.stringify({ auto_push: S.push }),
+        });
+        if (S.push) {
+            await fetch('/api/erp/endpoints/' + encodeURIComponent(id) + '/express-autonomy', {
+                method: 'PATCH',
+                headers: _auth(),
+                body: JSON.stringify({ autonomy: S.pushMode === 'full' ? 'auto' : 'standard' }),
+            });
+        }
+    }
+
     async function _finish() {
         var id = await _ensureEndpoint();
         if (id) {
             try {
-                // account_set 以小助手上报为准(heartbeat 已存),finish 只确认连接 + 自动推送开关。
-                await fetch('/api/erp/endpoints/' + encodeURIComponent(id), {
-                    method: 'PATCH',
-                    headers: _auth(),
-                    body: JSON.stringify({ auto_push: S.push }),
-                });
-                if (S.push) {
-                    await fetch(
-                        '/api/erp/endpoints/' + encodeURIComponent(id) + '/express-autonomy',
-                        {
-                            method: 'PATCH',
-                            headers: _auth(),
-                            body: JSON.stringify({
-                                autonomy: S.pushMode === 'full' ? 'auto' : 'standard',
-                            }),
-                        }
-                    );
-                }
-                // 科目映射现由小助手选定并随心跳上报(网页只读镜像),finish 不再写科目。
+                await _persistMode(id);
             } catch (e) {}
         }
         _close();
@@ -482,7 +480,19 @@
             S.pushMode = (tg as HTMLInputElement).value;
             S.push = S.pushMode !== 'manual';
             updateUI();
-            _toast(_t('exp-toast-mode-saved'));
+            // 端点已建 → 即时落库(toast 才诚实);未建 → 随「完成」一并存。
+            if (S.id) {
+                _persistMode(S.id).then(
+                    function () {
+                        _toast(_t('exp-toast-mode-saved'));
+                    },
+                    function () {
+                        _toast(_t('exp-toast-mode-save-failed'));
+                    }
+                );
+            } else {
+                _toast(_t('exp-toast-mode-saved'));
+            }
         }
     });
 

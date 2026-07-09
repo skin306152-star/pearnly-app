@@ -86,6 +86,40 @@
             getClient: function (id) {
                 return call('GET', '/api/workspace/clients/' + encodeURIComponent(id));
             },
+            runOrder: function (id) {
+                return call('POST', '/api/workorder/orders/' + encodeURIComponent(id) + '/run');
+            },
+            decide: function (orderId, body) {
+                return call(
+                    'POST',
+                    '/api/workorder/orders/' + encodeURIComponent(orderId) + '/decisions',
+                    body
+                );
+            },
+            // 原图直出(W3 审核队列):鉴权头是 Bearer,<img src> 发不了自定义头,调用方
+            // 拿 blob 自建 object URL 挂 <img>(同 console.js 导出下载的 fetch+blob 先例)。
+            getItemImageBlob: function (orderId, itemId) {
+                var token = getToken();
+                var headers = {};
+                if (token) headers.Authorization = 'Bearer ' + token;
+                return root
+                    .fetch(
+                        '/api/workorder/orders/' +
+                            encodeURIComponent(orderId) +
+                            '/items/' +
+                            encodeURIComponent(itemId) +
+                            '/image',
+                        { headers: headers }
+                    )
+                    .then(function (r) {
+                        if (!r.ok) {
+                            var err = new Error('workorder.item_image_not_found');
+                            err.status = r.status;
+                            throw err;
+                        }
+                        return r.blob();
+                    });
+            },
         };
     }
 

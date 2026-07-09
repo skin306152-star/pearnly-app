@@ -135,10 +135,15 @@
     }
 
     function renderReview() {
-        $('cv-review').innerHTML = AI.state.emptyHtml({
-            title: at('review_soon_t'),
-            sub: at('review_soon_s'),
-        });
+        var order = currentOrder();
+        if (!order) {
+            $('cv-review').innerHTML = AI.state.emptyHtml({
+                title: at('wo_empty_t'),
+                sub: at('wo_empty_s'),
+            });
+            return;
+        }
+        AI.review.mount(S.api, order, S.clientId);
     }
 
     function renderPkg() {

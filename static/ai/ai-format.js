@@ -72,22 +72,28 @@
         return '<span class="chip ' + sc.cls + '">' + escHtml(label) + '</span>';
     }
 
-    // JWT payload 解码(不验签,仅取展示用字段——token 本就是浏览器已信任的登录态)。
-    // 无角色/成员数据源(M1 降级表:多成员/角色 M3 才有)→ 只取邮箱本地部分做头像/姓名占位,
-    // 不伪造姓名或权限文案。
-    function jwtDisplayName(token) {
+    // JWT payload 解码(不验签,只取展示用字段——token 本就是浏览器已信任的登录态)。
+    // 解不出(格式不对/非法 base64/非 JSON)一律 null,调用方据此各自回落。
+    function jwtPayload(token) {
         try {
             var parts = String(token || '').split('.');
             if (parts.length < 2) return null;
-            var json = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-            var email = json.email || json.username || '';
-            // token payload 实测常只有 sub(不透明 UUID),没有邮箱/用户名就不展示——
-            // 露一串 UUID 比不展示更误导(状态诚实:没有数据不假装有意义)。
-            if (!email || email.indexOf('@') < 0) return null;
-            return String(email).split('@')[0];
+            return JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
         } catch (e) {
             return null;
         }
+    }
+
+    // 无角色/成员数据源(M1 降级表:多成员/角色 M3 才有)→ 只取邮箱本地部分做头像/姓名占位,
+    // 不伪造姓名或权限文案。
+    function jwtDisplayName(token) {
+        var json = jwtPayload(token);
+        if (!json) return null;
+        var email = json.email || json.username || '';
+        // token payload 实测常只有 sub(不透明 UUID),没有邮箱/用户名就不展示——
+        // 露一串 UUID 比不展示更误导(状态诚实:没有数据不假装有意义)。
+        if (!email || email.indexOf('@') < 0) return null;
+        return String(email).split('@')[0];
     }
 
     // 交付物/工单数字字段名 → 四语人话短标签(补 W1 降级点 7)。查表在 ai-i18n.js 的
@@ -106,6 +112,7 @@
         splitPeriod: splitPeriod,
         statusChip: statusChip,
         chipHtml: chipHtml,
+        jwtPayload: jwtPayload,
         jwtDisplayName: jwtDisplayName,
         fieldLabel: fieldLabel,
     };

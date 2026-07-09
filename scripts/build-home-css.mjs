@@ -135,8 +135,15 @@ const CONSOLE_CSS = ['console/console-theme.css', 'console/console.css'];
 const POS_CSS = ['pos/pos.css', 'pos/pos-restaurant.css'];
 
 // Pearnly AI SPA(M1-W1 · 独立工作台):令牌源在前,骨架/选客户层/客户页依次叠加
-// (固化原 ai.html 引用顺序)。
-const AI_CSS = ['ai/ai-theme.css', 'ai/ai-shell.css', 'ai/ai-dashboard.css', 'ai/ai-client.css'];
+// (固化原 ai.html 引用顺序)。ai-viewer.css(原件查看器 .pv-*)排最后——挂载点
+// .rv-imgwrap 在 ai-client.css 定义,查看器样式晚到不影响其令牌解析(CSS 变量按用时解析)。
+const AI_CSS = [
+    'ai/ai-theme.css',
+    'ai/ai-shell.css',
+    'ai/ai-dashboard.css',
+    'ai/ai-client.css',
+    'ai/ai-viewer.css',
+];
 
 const BUNDLES = [
     { list: HOME_CSS, out: 'static/dist/home.css' },

@@ -52,10 +52,15 @@ const BUNDLES = [
             'pos/pos.js',
         ],
     },
-    // Pearnly AI SPA(M1-W2)· 纯函数模块在前,DOM 编排模块在后,boot(ai.js)收尾。
+    // Pearnly AI SPA(M1-W3)· 纯函数模块在前,DOM 编排模块在后,boot(ai.js)收尾。
     // ai-i18n.js 是纯翻译数据(window.AII18N · 同 console-i18n/pos-i18n),独立 <script> 先加载。
     // ai-board.js(分列/摘要纯函数)必须排在 ai-kanban-render.js(用它渲染)之前;
     // ai-kanban-render.js 必须排在 ai-dashboard.js(用它渲染看板)之前。
+    // ai-viewer.js(原件查看器框架,零依赖)必须排在 ai-review-render.js(拼查看器骨架 HTML)
+    // 和 ai-review.js(mount/remount 交互 + 共享 LRU 缓存)之前。ai-review-queue.js(队列
+    // 过滤/分级/裁决 payload 纯函数)必须排在 ai-review-render.js(拼 HTML)之前,两者都要
+    // 排在 ai-review.js(编排)之前;ai-client.js 挂 renderReview 时才用到 AI.review,
+    // 故 ai-review.js 仍需排在 ai-client.js 之前。
     {
         out: 'static/dist/ai.js',
         files: [
@@ -63,9 +68,13 @@ const BUNDLES = [
             'ai/ai-router.js',
             'ai/ai-state.js',
             'ai/ai-api.js',
+            'ai/ai-viewer.js',
             'ai/ai-board.js',
             'ai/ai-kanban-render.js',
             'ai/ai-dashboard.js',
+            'ai/ai-review-queue.js',
+            'ai/ai-review-render.js',
+            'ai/ai-review.js',
             'ai/ai-client.js',
             'ai/ai.js',
         ],

@@ -36,6 +36,24 @@ class AiFormatTests(unittest.TestCase):
             """)
         self.assertEqual(out, [{"year": 2569, "month": 5}, None])
 
+    def test_jwt_payload_decodes_or_returns_null(self):
+        def _b64url(obj):
+            import base64
+
+            raw = json.dumps(obj).encode("utf-8")
+            return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+        tok = "h." + _b64url({"sub": "u1", "email": "zihao@example.com"}) + ".s"
+        out = _run_node(f"""
+            const f = require({json.dumps(str(AI_DIR / "ai-format.js"))});
+            process.stdout.write(JSON.stringify([
+                f.jwtPayload({json.dumps(tok)}),
+                f.jwtPayload('not-a-jwt'),
+                f.jwtPayload(null),
+            ]));
+            """)
+        self.assertEqual(out, [{"sub": "u1", "email": "zihao@example.com"}, None, None])
+
     def test_jwt_display_name_prefers_email_local_part_and_rejects_bare_sub(self):
         def _b64url(obj):
             import base64
@@ -220,12 +238,19 @@ class FieldLabelTests(unittest.TestCase):
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class AiI18nStructureTests(unittest.TestCase):
     """i18n 词典是数据文件(同 console-i18n.js 先例,无 module.exports)——
-    直接 eval 后校验四语 key 集合一致,防漏翻(某语言缺 key 会静默回落 zh,不易发现)。"""
+    直接 eval 后校验四语 key 集合一致,防漏翻(某语言缺 key 会静默回落 zh,不易发现)。
+    词典本体按语言拆成 4 个分片(单文件<500 行铁律),装配层 ai-i18n.js 依赖它们先
+    挂上 window.__AI_I18N_*__,同 ai.html 里 4 个 <script> 排 ai-i18n.js 之前的顺序。"""
 
     def test_four_languages_have_identical_key_sets(self):
+        shards = "".join(
+            f'require({json.dumps(str(AI_DIR / f"ai-i18n-{lang}.js"))});\n'
+            for lang in ("zh", "th", "en", "ja")
+        )
         out = _run_node(f"""
             global.window = global;
             global.localStorage = {{ getItem: () => null, setItem: () => {{}} }};
+            {shards}
             require({json.dumps(str(AI_DIR / "ai-i18n.js"))});
             const d = global.AII18N.dict;
             const keys = Object.fromEntries(

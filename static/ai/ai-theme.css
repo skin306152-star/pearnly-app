@@ -1,0 +1,71 @@
+/* Pearnly AI · design tokens — 1:1 移植自 设计稿/UI-Canon-v4.md §1(不得凭印象改配色/间距)。
+ * lint-ui 的裸 hex 检查把本文件当令牌来源放行(同 console-theme.css 先例)。
+ */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+:root {
+  --paper: #f4f1e8;
+  --surface: #fdfbf6;
+  --surface2: #f9f6ee;
+  --ink: #332f27;
+  --ink2: #57513f;
+  --mut: #8d8672;
+  --faint: #b7b09c;
+  --hair: #e8e2d3;
+  --hair2: #dcd4c1;
+  --gold: #a2823f;
+  --gold-soft: #f2ead6;
+  --sage: #6d7a4b;
+  --sage-deep: #5b673d;
+  --sage-soft: #e9ecd9;
+  --sage-line: #d3d9ba;
+  --good: #5c7040;
+  --good-soft: #e8eed9;
+  --good-line: #d1dcb7;
+  --warn: #96702a;
+  --warn-soft: #f4ebd4;
+  --warn-line: #e7d6a9;
+  --crit: #a5533a;
+  --crit-soft: #f4e3da;
+  --crit-line: #e8ccbd;
+  --sh-card: 0 1px 2px rgba(80, 66, 32, 0.05), 0 2px 8px rgba(80, 66, 32, 0.04);
+  --sh-pop: 0 2px 6px rgba(80, 66, 32, 0.09), 0 16px 40px rgba(80, 66, 32, 0.12);
+  --serif: Georgia, 'Times New Roman', serif;
+  --thai: 'Leelawadee UI', 'Sarabun', system-ui, sans-serif;
+
+  /* v4 组件层直接写死、未提到 :root 的固定色(值逐字节抄 v4,只是在本仓库补成令牌 ——
+     * lint-ui 禁裸 hex,v4 原型文件本身不受这条约束)。 */
+  --nav-hover: #f0ece0;
+  --nav-on-n: #e2e8cf;
+  --neutral-soft: #efece2;
+  --tabs-bg: #efeadd;
+  --hair3: #f1ede1;
+}
+body {
+  font-family: 'Inter', 'Segoe UI Variable', 'Segoe UI', var(--thai);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13.5px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+::selection {
+  background: #e6dcc0;
+}
+button {
+  font-family: inherit;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}

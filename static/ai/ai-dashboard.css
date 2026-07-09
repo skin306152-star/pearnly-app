@@ -1,0 +1,154 @@
+/* Pearnly AI · 选客户层(工作台首屏)— v4 §2 toolrow/search 1:1,
+ * 五列看板降级为简单卡片列表(Zihao 拍板 W1 范围 · 容器结构给 W2 换皮留好)。
+ */
+
+.toolrow {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+}
+.stat {
+  flex: 1;
+  min-width: 210px;
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  padding: 15px 18px;
+  box-shadow: var(--sh-card);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.stat .ic {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--sage-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.stat .ic svg {
+  width: 19px;
+  height: 19px;
+  stroke: var(--sage-deep);
+}
+.stat.warn .ic {
+  background: var(--crit-soft);
+}
+.stat.warn .ic svg {
+  stroke: var(--crit);
+}
+.stat .lb {
+  font-size: 11.5px;
+  color: var(--mut);
+  margin-bottom: 2px;
+}
+.stat .v {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.stat .v small {
+  font-size: 12px;
+  color: var(--mut);
+  font-weight: 500;
+}
+.search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--surface);
+  border: 1px solid var(--hair2);
+  border-radius: 11px;
+  padding: 0 14px;
+  min-width: 220px;
+}
+.search svg {
+  width: 15px;
+  height: 15px;
+  stroke: var(--mut);
+  flex-shrink: 0;
+}
+.search input {
+  border: none;
+  background: none;
+  padding: 12px 0;
+  font-size: 12.5px;
+  font-family: inherit;
+  color: var(--ink);
+  width: 100%;
+}
+.search input:focus {
+  outline: none;
+}
+
+.board-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.board-head h2 {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.board-head .note {
+  font-size: 11.5px;
+  color: var(--mut);
+}
+
+/* 简单卡片列表(W1 占位·W2 换五列看板复用 .ccard) */
+.clist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ccard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  padding: 14px 18px;
+  box-shadow: var(--sh-card);
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s,
+    transform 0.08s;
+}
+.ccard:hover {
+  border-color: var(--hair2);
+  box-shadow: var(--sh-pop);
+  transform: translateY(-1px);
+}
+.ccard .cname {
+  font-size: 13.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  font-family: var(--thai);
+}
+.ccard .cmeta {
+  color: var(--mut);
+  font-size: 11.5px;
+  margin-top: 2px;
+}
+.ccard .cstat {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ccard .cgo {
+  color: var(--faint);
+  font-size: 17px;
+}
+.ccard:hover .cgo {
+  color: var(--sage);
+}

@@ -134,12 +134,17 @@ const CONSOLE_CSS = ['console/console-theme.css', 'console/console.css'];
 // POS 收银 SPA:零售/药房基础样式在前,餐厅作用域样式在后(固化原 pos.html 顺序)。
 const POS_CSS = ['pos/pos.css', 'pos/pos-restaurant.css'];
 
+// Pearnly AI SPA(M1-W1 · 独立工作台):令牌源在前,骨架/选客户层/客户页依次叠加
+// (固化原 ai.html 引用顺序)。
+const AI_CSS = ['ai/ai-theme.css', 'ai/ai-shell.css', 'ai/ai-dashboard.css', 'ai/ai-client.css'];
+
 const BUNDLES = [
     { list: HOME_CSS, out: 'static/dist/home.css' },
     { list: ADMIN_CSS, out: 'static/dist/admin.css' },
     { list: LANDING_CSS, out: 'static/dist/landing.css' },
     { list: CONSOLE_CSS, out: 'static/dist/console.css' },
     { list: POS_CSS, out: 'static/dist/pos.css' },
+    { list: AI_CSS, out: 'static/dist/ai.css' },
 ];
 
 async function buildOne(list, out) {

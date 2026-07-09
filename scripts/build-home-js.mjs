@@ -52,6 +52,20 @@ const BUNDLES = [
             'pos/pos.js',
         ],
     },
+    // Pearnly AI SPA(M1-W1)· 纯函数模块在前,DOM 编排模块在后,boot(ai.js)收尾。
+    // ai-i18n.js 是纯翻译数据(window.AII18N · 同 console-i18n/pos-i18n),独立 <script> 先加载。
+    {
+        out: 'static/dist/ai.js',
+        files: [
+            'ai/ai-format.js',
+            'ai/ai-router.js',
+            'ai/ai-state.js',
+            'ai/ai-api.js',
+            'ai/ai-dashboard.js',
+            'ai/ai-client.js',
+            'ai/ai.js',
+        ],
+    },
 ];
 
 for (const b of BUNDLES) {

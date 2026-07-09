@@ -1,0 +1,202 @@
+/* Pearnly AI · 客户独立页(收料/工单/审核/交付包四视图壳)— v4 §2/§3 结构,
+ * 「客户 ∨」下拉降级为只读标识、「账期 ∨」保留可切(Canon 对 v4 的两条修正)。
+ */
+
+.chead {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.chead .who-ro {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.chead .cavatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--sage-soft);
+  color: var(--sage-deep);
+  font-family: var(--thai);
+  font-weight: 700;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chead .ctitle {
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  font-family: var(--thai);
+}
+.chead .csub {
+  color: var(--mut);
+  font-size: 12px;
+  margin-top: 2px;
+}
+.period-pick {
+  margin-left: auto;
+  position: relative;
+}
+.period-pick .pk {
+  background: var(--surface);
+  border: 1px solid var(--hair2);
+  border-radius: 10px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.period-pick .pk .pl {
+  color: var(--mut);
+}
+.period-pick .pk b {
+  font-weight: 650;
+}
+.period-menu {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 180px;
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 11px;
+  box-shadow: var(--sh-pop);
+  z-index: 30;
+  overflow: hidden;
+}
+.period-menu.on {
+  display: block;
+}
+.period-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 14px;
+  font-size: 12.5px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--ink2);
+  font-family: inherit;
+}
+.period-menu button:hover {
+  background: var(--sage-soft);
+}
+.period-menu button.on {
+  color: var(--sage-deep);
+  font-weight: 650;
+}
+
+.ctabs {
+  display: inline-flex;
+  background: var(--tabs-bg);
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 18px;
+}
+.ctabs button {
+  border: none;
+  background: none;
+  padding: 8px 18px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--mut);
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.ctabs button.on {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--sh-card);
+}
+
+.cview {
+  display: none;
+}
+.cview.on {
+  display: block;
+  animation: ai-fade 0.18s ease;
+}
+
+/* 工单视图:管线摘要 + 关键数字(真数据 · order_detail) */
+.wosum {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.wosum .cell {
+  background: var(--surface2);
+  border: 1px solid var(--hair);
+  border-radius: 11px;
+  padding: 12px 14px;
+}
+.wosum .cell .lb {
+  font-size: 10.5px;
+  color: var(--mut);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+.wosum .cell .v {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.needs-list {
+  margin-top: 14px;
+}
+.needs-list .ni {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 2px;
+  border-bottom: 1px solid var(--hair3);
+  font-size: 12.5px;
+  color: var(--ink2);
+}
+.needs-list .ni:last-child {
+  border-bottom: none;
+}
+
+/* 交付包视图:交付物清单(真数据 · deliverables) */
+.dlv-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--hair3);
+}
+.dlv-line:last-child {
+  border-bottom: none;
+}
+.dlv-line .d {
+  font-size: 12.5px;
+  color: var(--ink2);
+}
+.dlv-line .n {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 960px) {
+  .chead {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .period-pick {
+    margin-left: 0;
+  }
+}

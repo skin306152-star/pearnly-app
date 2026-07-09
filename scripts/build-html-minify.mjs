@@ -27,6 +27,8 @@ const TARGETS = [
     { src: 'static/console/invite.html', out: 'static/dist/invite.html' },
     // POS 收银 SPA:壳成品化(8 逻辑 JS 已合 dist/pos.js · 2 CSS 已合 dist/pos.css)。
     { src: 'static/pos/pos.html', out: 'static/dist/pos.html' },
+    // Pearnly AI SPA(M1-W1):壳成品化(7 逻辑 JS 已合 dist/ai.js · 4 CSS 已合 dist/ai.css)。
+    { src: 'static/ai/ai.html', out: 'static/dist/ai.html' },
 ];
 
 for (const t of TARGETS) {

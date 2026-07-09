@@ -1,0 +1,458 @@
+/* Pearnly AI · 应用骨架(侧栏/顶栏/内容区)+ 通用原子件 — 1:1 移植自 v4 §2。 */
+
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+.side {
+  width: 224px;
+  flex-shrink: 0;
+  background: var(--surface2);
+  border-right: 1px solid var(--hair);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+.brand {
+  padding: 22px 22px 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+.brand .mono {
+  width: 30px;
+  height: 30px;
+  border: 1.5px solid var(--gold);
+  border-radius: 8px;
+  color: var(--gold);
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding-bottom: 2px;
+}
+.brand .word {
+  font-family: var(--serif);
+  font-size: 18px;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+.brand .word b {
+  font-weight: 700;
+}
+.brand .word em {
+  font-style: italic;
+  color: var(--gold);
+  font-weight: 400;
+}
+.snav {
+  padding: 8px 12px;
+}
+.snav .lbl {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--faint);
+  text-transform: uppercase;
+  padding: 16px 10px 7px;
+}
+.snav a {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  color: var(--ink2);
+  font-weight: 550;
+  font-size: 13.5px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.12s;
+}
+.snav a svg {
+  width: 16px;
+  height: 16px;
+  stroke: var(--mut);
+  flex-shrink: 0;
+}
+.snav a:hover {
+  background: var(--nav-hover);
+}
+.snav a.on {
+  background: var(--sage);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(91, 103, 61, 0.3);
+}
+.snav a.on svg {
+  stroke: #fff;
+}
+.snav a[aria-disabled='true'] {
+  cursor: default;
+  color: var(--faint);
+}
+.snav a .n {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+.snav a.on .n {
+  color: var(--nav-on-n);
+}
+.side .foot {
+  margin-top: auto;
+  padding: 16px 20px;
+  border-top: 1px solid var(--hair);
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.fbadge {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--gold-soft);
+  border: 1px solid var(--hair2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fbadge svg {
+  width: 15px;
+  height: 15px;
+  stroke: var(--gold);
+}
+.side .foot small {
+  color: var(--mut);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+.side .foot small b {
+  color: var(--ink2);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+}
+.topbar {
+  padding: 0 34px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: rgba(244, 241, 232, 0.86);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--hair);
+}
+.topbar .crumb {
+  font-size: 13.5px;
+  color: var(--mut);
+  font-weight: 500;
+}
+.topbar .crumb a {
+  color: var(--sage);
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: 600;
+}
+.topbar h1 {
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.topbar .right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.bell {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--hair2);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+}
+.bell svg {
+  width: 16px;
+  height: 16px;
+  stroke: var(--ink2);
+}
+/* 铃铛无真数据(通知能力未接)→ 不假装有红点(M1 降级表:空态或藏)。 */
+.who {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.who .av {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--sage);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.who .wt {
+  line-height: 1.3;
+}
+.who .wt b {
+  font-size: 12.5px;
+}
+.who .wt small {
+  display: block;
+  color: var(--mut);
+  font-size: 10.5px;
+}
+
+.content {
+  padding: 26px 34px 96px;
+  max-width: 1200px;
+}
+.view {
+  display: none;
+}
+.view.on {
+  display: block;
+  animation: ai-fade 0.18s ease;
+}
+@keyframes ai-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ============ primitives(v4 §1 用法约定)============ */
+.dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot.g {
+  background: var(--good);
+}
+.dot.w {
+  background: var(--warn);
+}
+.dot.b {
+  background: var(--crit);
+}
+.dot.a {
+  background: var(--gold);
+}
+.dot.n {
+  background: var(--faint);
+}
+.dot.s {
+  background: var(--sage);
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2.5px 10px;
+  border-radius: 99px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.chip.g {
+  background: var(--good-soft);
+  color: var(--good);
+  border-color: var(--good-line);
+}
+.chip.s {
+  background: var(--sage-soft);
+  color: var(--sage-deep);
+  border-color: var(--sage-line);
+}
+.chip.w {
+  background: var(--warn-soft);
+  color: var(--warn);
+  border-color: var(--warn-line);
+}
+.chip.b {
+  background: var(--crit-soft);
+  color: var(--crit);
+  border-color: var(--crit-line);
+}
+.chip.a {
+  background: var(--gold-soft);
+  color: var(--gold);
+  border-color: var(--warn-line);
+}
+.chip.n {
+  background: var(--neutral-soft);
+  color: var(--mut);
+  border-color: var(--hair);
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 9px;
+  padding: 8px 16px;
+  border: 1px solid var(--hair2);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    transform 0.06s;
+}
+.btn:hover {
+  border-color: var(--mut);
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn:focus-visible {
+  outline: 2px solid var(--sage);
+  outline-offset: 2px;
+}
+.btn.pri {
+  background: var(--sage);
+  border-color: var(--sage);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(91, 103, 61, 0.28);
+}
+.btn.pri:hover {
+  background: var(--sage-deep);
+  border-color: var(--sage-deep);
+}
+.btn.sm {
+  font-size: 12px;
+  padding: 6px 13px;
+}
+.btn[disabled] {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  box-shadow: var(--sh-card);
+  margin-bottom: 16px;
+}
+.panel .hd {
+  padding: 15px 20px 0;
+}
+.panel .hd h3 {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.panel .hd .note {
+  font-size: 11.5px;
+  color: var(--mut);
+  font-weight: 400;
+}
+.panel .bd {
+  padding: 13px 20px 18px;
+}
+
+/* ============ 四态(v4 未画 error/空态细节 · 按 Canon tokens 延展)============ */
+.state-block {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--mut);
+}
+.state-block .ic {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--surface2);
+  border: 1px solid var(--hair2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 14px;
+}
+.state-block .ic svg {
+  width: 20px;
+  height: 20px;
+  stroke: var(--mut);
+}
+.state-block.err .ic {
+  background: var(--crit-soft);
+  border-color: var(--crit-line);
+}
+.state-block.err .ic svg {
+  stroke: var(--crit);
+}
+.state-block .t {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 5px;
+}
+.state-block .s {
+  font-size: 12px;
+  color: var(--mut);
+  max-width: min(380px, 100%);
+  margin: 0 auto;
+  line-height: 1.7;
+}
+.state-block .btn {
+  margin-top: 16px;
+}
+.skel {
+  background: linear-gradient(90deg, var(--surface2) 25%, var(--hair) 50%, var(--surface2) 75%);
+  background-size: 200% 100%;
+  animation: ai-skel 1.4s ease infinite;
+  border-radius: 8px;
+}
+@keyframes ai-skel {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (max-width: 960px) {
+  .side {
+    display: none;
+  }
+  .content {
+    padding: 18px 15px 80px;
+  }
+  .topbar {
+    padding: 0 15px;
+  }
+}

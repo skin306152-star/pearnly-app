@@ -302,7 +302,9 @@
                           '</button></div>'
                   )
                 : '';
-        return _fields(p, historyId) + _preflight(resp) + _entry(p) + docSec + _timeline(log, docnum);
+        return (
+            _fields(p, historyId) + _preflight(resp) + _entry(p) + docSec + _timeline(log, docnum)
+        );
     }
 
     // 保存单别裁决 → PATCH /api/history/{id}/posting({payment: cash|credit|null})。
@@ -310,7 +312,9 @@
     // 详情数据(log.request_body)留在闭包外,重渲要靠人手动重新打开详情,状态诚实不假装同步。
     async function _saveDoctype(btn: HTMLElement): Promise<void> {
         var cell = btn.closest('.exp-doctype-cell');
-        var sel = cell ? (cell.querySelector('.exp-doctype-select') as HTMLSelectElement | null) : null;
+        var sel = cell
+            ? (cell.querySelector('.exp-doctype-select') as HTMLSelectElement | null)
+            : null;
         var msg = cell ? (cell.querySelector('.exp-doctype-msg') as HTMLElement | null) : null;
         var historyId = btn.getAttribute('data-history-id');
         if (!sel || !historyId) return;

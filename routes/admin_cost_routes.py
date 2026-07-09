@@ -5,11 +5,12 @@ Pearnly · 超管成本/收入/监控面板路由模块(REFACTOR-B1 · 2026-05-2
 从 app.py 整片搬过来 · 纯搬家 · 不改业务逻辑 / URL / response shape / error code。
 全部路由仅超管可调(_require_super_admin)· 全是只读聚合 + CSV 导出 · 不涉扣费。
 
-覆盖 10 个 API:
+覆盖 11 个 API:
   GET /api/admin/cost/overview        · 成本面板 KPI
   GET /api/admin/cost/debug           · 成本追踪诊断(直查 ocr_cost_log)
   GET /api/admin/cost/by_user         · 按用户分组成本
   GET /api/admin/cost/daily_trend     · 成本每日趋势 + 引擎堆叠
+  GET /api/admin/cost/ai-usage        · AI 网关全量调用成本(ai_usage · 独立口径 2026-07-09)
   GET /api/admin/credits/overview     · 收入端 KPI
   GET /api/admin/credits/tenants      · 全公司余额清单
   GET /api/admin/credits/daily_trend  · 每日收支趋势
@@ -135,6 +136,25 @@ async def admin_cost_daily_trend(request: Request, days: int = 30):
     return {
         "days": db.get_cost_daily_trend(days=days),
         "by_engine": db.get_cost_daily_by_engine(days=days),
+    }
+
+
+@router.get("/api/admin/cost/ai-usage")
+async def admin_cost_ai_usage(request: Request):
+    """AI 网关全量调用成本(ai_usage · Agent 对话/LINE 语音/知识库问答 + OCR)· 近 30 天。
+
+    ⚠️ 独立口径,别跟上面 ocr_cost_log 系列数字相加:ai_usage 是网关唯一写点
+    (services/ai_gateway/logging.py::log_call)落的账,OCR 走 multimodal_to_json 也经
+    这里 —— 与 ocr_cost_log 的 OCR 记账有重叠但统计维度不同(无 engine/pages/history_id),
+    两表对不上是预期行为,不是 bug。
+    """
+    _require_super_admin(request)
+    from services.cost.ai_usage_store import get_usage_by_task, get_usage_daily_trend
+
+    return {
+        "note": "独立口径 · 与 ocr_cost_log 系列数字有重叠不可相加 · 见本端点注释",
+        "by_task": get_usage_by_task(days=30),
+        "daily_trend": get_usage_daily_trend(days=30),
     }
 
 

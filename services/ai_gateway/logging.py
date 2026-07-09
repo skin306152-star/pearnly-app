@@ -19,7 +19,7 @@ def payload_hash(text) -> str:
 
 
 def log_call(result, *, text=None, tenant_id=None, user_id=None, trace_id=None) -> None:
-    """记一次调用的工程元信息(无原文/prompt/key/raw response)。"""
+    """记一次调用的工程元信息(无原文/prompt/key/raw response)+ 落库 ai_usage。"""
     logger.info(
         "ai_call task=%s schema=%s provider=%s model=%s status=%s error_kind=%s latency_ms=%s "
         "in_tok=%s out_tok=%s cost_thb=%.6f payload_hash=%s tenant=%s user=%s trace=%s",
@@ -38,3 +38,28 @@ def log_call(result, *, text=None, tenant_id=None, user_id=None, trace_id=None) 
         user_id or "-",
         trace_id or "-",
     )
+    _record_usage(result, tenant_id=tenant_id, user_id=user_id, trace_id=trace_id)
+
+
+def _record_usage(result, *, tenant_id, user_id, trace_id) -> None:
+    """转发到 ai_usage 落库(懒 import 防循环)。store 层已全量吞异常,这里再兜一层——
+    成本记账绝不能是打断 AI 调用主路径的理由(如 ai_usage_store 导入失败)。"""
+    try:
+        from services.cost.ai_usage_store import log_ai_usage
+
+        log_ai_usage(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            task=result.task,
+            provider=result.provider,
+            model=result.model,
+            status="ok" if result.ok else "error",
+            error_kind=result.error_kind,
+            latency_ms=result.latency_ms,
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+            cost_thb=result.cost_thb,
+            trace_id=trace_id,
+        )
+    except Exception as e:
+        logger.warning("ai_usage record skipped: %s", e)

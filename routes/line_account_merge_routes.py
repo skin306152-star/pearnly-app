@@ -1,11 +1,11 @@
 """
-line_account_merge_routes.py · LINE 临时账号补邮箱 + 合并老账号(REFACTOR-B1)
+line_account_merge_routes.py · LINE 临时账号补邮箱(REFACTOR-B1 + P0 安全修复)
 
-从 app.py L3548-3620 抽出 · 0 业务逻辑改:
     GET  /api/me/needs_email           前端查是否是 line_xxx@line.local 临时占位
     POST /api/me/line_complete_email   补邮箱:
-        - 该 email 已绑老账号 → merge_line_account_into_existing + 颁老账号 token
-        - 不存在 → update_user_email_and_username + 重发 token(username 变)
+        - 该 email 已绑他人账号 → 409 拒绝,不合并、不发 token(邮箱从未验证归属,
+          曾经这里直接合并 + 颁发目标账号 token,是可被任何知情者利用的账户接管漏洞)
+        - 不存在(或就是本账号自己)→ update_user_email_and_username + 重发 token
 
 E2E 闸:spec 14(LINE binding)间接覆盖。
 """
@@ -49,32 +49,14 @@ async def me_line_complete_email(payload: _LinePostEmail, request: Request):
         raise HTTPException(status_code=400, detail="email_invalid")
 
     cur_user_id = str(user["id"])
-    line_uid = user.get("line_uid")
 
     # 检查该 email 是否已被其他账号占用
     existing = db.find_user_by_username(email_raw)
     if existing and str(existing["id"]) != cur_user_id:
-        # 合并到老账号
-        if not line_uid:
-            raise HTTPException(status_code=500, detail="missing_line_uid")
-        ok = db.merge_line_account_into_existing(cur_user_id, str(existing["id"]), line_uid)
-        if not ok:
-            raise HTTPException(status_code=500, detail="merge_failed")
-        # 颁老账号 token
-        merged_user = db.find_user_by_id(str(existing["id"]))
-        if not merged_user:
-            raise HTTPException(status_code=500, detail="target_user_lost")
-        db.update_last_login(str(merged_user["id"]))
-        new_token = create_access_token(
-            user_id=str(merged_user["id"]),
-            username=merged_user["username"],
-            plan=merged_user.get("plan") or "free",
-            tenant_id=str(merged_user["tenant_id"]) if merged_user.get("tenant_id") else None,
-            role=merged_user.get("role") or "owner",
-            is_super_admin=bool(merged_user.get("is_super_admin")),
-            remember_me=True,
-        )
-        return {"ok": True, "merged": True, "token": new_token}
+        # P0:此邮箱从未验证归属(只查了格式)。命中他人账号绝不可合并/发 token——
+        # 否则任何人报出受害者邮箱就能借自己的 LINE 占位账号顶替登录(账户接管)。
+        # 命中即拒,指引去走原账号登录后在设置里主动绑定。
+        raise HTTPException(status_code=409, detail="email_registered_use_login")
     else:
         # 直接更新临时账号
         ok = db.update_user_email_and_username(cur_user_id, email_raw)

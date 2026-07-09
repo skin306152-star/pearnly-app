@@ -1009,6 +1009,7 @@ window.I18N = {
         'line-email-submit': '保存并继续',
         'line-email-err-invalid': '邮箱格式不正确',
         'line-email-err-failed': '保存失败 · 请重试',
+        'line-email-err-registered': '该邮箱已有账号 · 请用原账号(密码或 Google)登录',
         'line-email-merged-toast': '已合并到您的现有账号',
         'line-email-saved-toast': '邮箱已保存',
         // v118.28.8 · Pearnly 访问日志(客户老板审计 Pearnly 内部员工)
@@ -6175,6 +6176,7 @@ window.I18N = {
         'line-email-submit': 'Save and continue',
         'line-email-err-invalid': 'Invalid email format',
         'line-email-err-failed': 'Save failed, please retry',
+        'line-email-err-registered': 'This email already has an account. Please log in with that account (password or Google).',
         'line-email-merged-toast': 'Merged into your existing account',
         'line-email-saved-toast': 'Email saved',
         // v118.28.8 · Pearnly access log
@@ -11316,6 +11318,7 @@ window.I18N = {
         'line-email-submit': 'บันทึกและดำเนินการต่อ',
         'line-email-err-invalid': 'รูปแบบอีเมลไม่ถูกต้อง',
         'line-email-err-failed': 'บันทึกไม่สำเร็จ · กรุณาลองอีกครั้ง',
+        'line-email-err-registered': 'อีเมลนี้มีบัญชีอยู่แล้ว · กรุณาเข้าสู่ระบบด้วยบัญชีเดิม (รหัสผ่านหรือ Google)',
         'line-email-merged-toast': 'รวมเข้ากับบัญชีเดิมของคุณแล้ว',
         'line-email-saved-toast': 'บันทึกอีเมลแล้ว',
         // v118.28.8 · Pearnly access log
@@ -16449,6 +16452,7 @@ window.I18N = {
         'line-email-submit': '保存して続行',
         'line-email-err-invalid': 'メール形式が正しくありません',
         'line-email-err-failed': '保存に失敗しました · もう一度お試しください',
+        'line-email-err-registered': 'このメールは既に登録されています · 元のアカウント(パスワードまたはGoogle)でログインしてください',
         'line-email-merged-toast': '既存のアカウントに統合されました',
         'line-email-saved-toast': 'メールを保存しました',
         // v118.28.8 · Pearnly access log

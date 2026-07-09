@@ -60,7 +60,16 @@
                     },
                     body: JSON.stringify({ email: v }),
                 });
-                if (!resp.ok) throw new Error('http_' + resp.status);
+                if (!resp.ok) {
+                    // 409 = 该邮箱已属他人账号(后端拒合并/拒发 token · 见 P0 修复)· 给出可操作提示
+                    if (resp.status === 409) {
+                        err!.textContent = t('line-email-err-registered');
+                        btn!.disabled = false;
+                        btn!.style.opacity = '1';
+                        return;
+                    }
+                    throw new Error('http_' + resp.status);
+                }
                 const data = await resp.json();
                 if (data.token) {
                     localStorage.setItem('mrpilot_token', data.token);

@@ -57,7 +57,7 @@ export function erpTargetCardsHtml(endpoints: ErpEndpoint[], target: string): st
     return `<div class="dx-erps">${cards}</div>`;
 }
 
-// 单条推送:每条 ocr_history 一次 POST /api/erp/push。true=成功。
+// 单条推送 POST /api/erp/push。已受理=true:ok=true(success/skipped_dup)或 status='pending'(Express 出站拉取异步入队·非失败);failed/manual=false。对齐后端 counts_as_endpoint_success。
 export async function pushHistory(historyId: string, target: string): Promise<boolean> {
     try {
         const body: Record<string, unknown> = { history_id: historyId };
@@ -67,8 +67,8 @@ export async function pushHistory(historyId: string, target: string): Promise<bo
             headers: authHeaders(true),
             body: JSON.stringify(body),
         });
-        const d = (await r.json().catch(() => ({}))) as { ok?: boolean };
-        return r.ok && d.ok !== false;
+        const d = (await r.json().catch(() => ({}))) as { ok?: boolean; status?: string };
+        return r.ok && (d.ok === true || d.status === 'pending');
     } catch {
         return false;
     }

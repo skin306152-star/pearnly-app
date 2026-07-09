@@ -7,6 +7,19 @@
 (function (root) {
     'use strict';
 
+    // 金额输入串 → 规范化十进制串(去千分位/空白,最多两位小数)或 null,解不出/超形一律 null。
+    // 真正的 Decimal 换算留给后端,前端只挡形。allowNegative 由调用方按字段语义定夺(销项
+    // 销售额/税额不认负号;人审 VAT 改数允许负号覆盖)——ai-intake-render.js 的 parseAmount
+    // 与 ai-review-queue.js 的 parseVat 曾各自定义同一条正则,收到这里共享一份。
+    function parseAmount(raw, allowNegative) {
+        var s = String(raw == null ? '' : raw)
+            .trim()
+            .replace(/,/g, '');
+        var re = allowNegative ? /^-?\d+(\.\d{1,2})?$/ : /^\d+(\.\d{1,2})?$/;
+        if (!s || !re.test(s)) return null;
+        return s;
+    }
+
     // 泰铢金额:两位小数 + 千分位,负数原样带负号(工单差额可能为负)。
     function money(v) {
         var n = Number(v);
@@ -108,6 +121,7 @@
     }
 
     var api = {
+        parseAmount: parseAmount,
         money: money,
         splitPeriod: splitPeriod,
         statusChip: statusChip,

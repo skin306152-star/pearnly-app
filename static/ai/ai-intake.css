@@ -1,0 +1,259 @@
+/* Pearnly AI · 收料视图(W4 补料流)样式——v4 §v-intake 移植。拆自 ai-client.css(双超 500 行铁律)，
+ * 拖拽上传 + 进料口(状态诚实) + 缺料补料卡(上传 POS 导出 / 人工填销项)。
+ * 配色/圆角/间距按 tokens，不凭印象。在 build-home-css.mjs 的 AI_CSS 里排 ai-client.css 之后。 */
+.intake-lead {
+  color: var(--mut);
+  font-size: 13px;
+  max-width: 560px;
+  margin-bottom: 16px;
+  line-height: 1.7;
+}
+.intake-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.dropzone {
+  background: var(--surface);
+  border: 2px dashed var(--hair2);
+  border-radius: 16px;
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+  padding: 24px;
+}
+.dropzone:hover,
+.dropzone.over {
+  border-color: var(--sage);
+  background: var(--sage-soft);
+}
+.dropzone:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+.dz-inner {
+  text-align: center;
+}
+.dz-ic {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--sage-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 14px;
+}
+.dz-ic svg {
+  width: 26px;
+  height: 26px;
+  stroke: var(--sage-deep);
+}
+.dz-t {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 6px;
+}
+.dz-s {
+  font-size: 12px;
+  color: var(--mut);
+  line-height: 1.7;
+  margin-bottom: 16px;
+  max-width: 360px;
+}
+.dz-filled {
+  text-align: center;
+  width: 100%;
+}
+.dz-count {
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+.dz-count b {
+  font-size: 22px;
+  color: var(--sage-deep);
+  font-variant-numeric: tabular-nums;
+}
+.dz-btns {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.file-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+  margin-bottom: 16px;
+  max-height: 120px;
+  overflow: hidden;
+}
+.fchip {
+  width: 26px;
+  height: 32px;
+  border-radius: 4px;
+  background: var(--surface2);
+  border: 1px solid var(--hair2);
+  position: relative;
+}
+.fchip::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  background: var(--faint);
+  box-shadow:
+    0 4px 0 var(--faint),
+    0 8px 0 var(--faint);
+}
+.chan-list {
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 16px;
+  box-shadow: var(--sh-card);
+  padding: 16px 18px;
+}
+.chan-h {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mut);
+  margin-bottom: 12px;
+}
+.chan {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--hair3);
+}
+.chan-ic {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--surface2);
+  border: 1px solid var(--hair2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-weight: 800;
+  color: var(--sage-deep);
+}
+.chan-ic svg {
+  width: 16px;
+  height: 16px;
+  stroke: var(--ink2);
+}
+.chan-ic.line {
+  background: var(--sage-soft);
+  color: var(--sage-deep);
+}
+.chan-tx {
+  flex: 1;
+  min-width: 0;
+}
+.chan-tx b {
+  font-size: 13px;
+  display: block;
+}
+.chan-tx small {
+  color: var(--mut);
+  font-size: 11px;
+}
+.chan-note {
+  font-size: 11.5px;
+  color: var(--mut);
+  line-height: 1.6;
+  padding-top: 12px;
+}
+.needs-card {
+  margin-bottom: 16px;
+  border-color: var(--warn-line);
+}
+.needs-sub {
+  font-size: 12.5px;
+  color: var(--ink2);
+  line-height: 1.7;
+  margin-bottom: 14px;
+}
+.needs-paths {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sales-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 420px;
+}
+.sf-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.sf-lb {
+  font-size: 11.5px;
+  color: var(--mut);
+  font-weight: 600;
+}
+.sf-in {
+  font-size: 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--hair2);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+}
+.sf-in:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.sf-hint {
+  font-size: 11px;
+  color: var(--mut);
+}
+.sf-btns,
+.rerun-body {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.intake-err {
+  font-size: 11.5px;
+  color: var(--crit);
+  font-weight: 600;
+  margin-top: 8px;
+}
+.rerun-card {
+  margin-top: 16px;
+}
+.rerun-body {
+  align-items: center;
+  padding: 6px 4px;
+}
+.rerun-body p {
+  font-size: 12.5px;
+  color: var(--ink2);
+  flex: 1;
+  min-width: 200px;
+}
+
+@media (max-width: 960px) {
+  .intake-grid {
+    grid-template-columns: 1fr;
+  }
+}

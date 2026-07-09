@@ -54,6 +54,12 @@ class DecisionIn(BaseModel):
     values: Optional[dict] = Field(None, description="recalc 时的人工补正数(如 {vat: '35.00'})")
 
 
+class SalesSummaryIn(BaseModel):
+    sales_amount: str = Field(..., max_length=40, description="销项销售额(十进制字符串)")
+    output_vat: str = Field(..., max_length=40, description="销项税额(十进制字符串)")
+    note: str = Field("", max_length=500, description="凭据备注(人工申报来源)")
+
+
 def _authorize(request: Request) -> tuple[dict, str]:
     """登录 + M1 闸(关→404 fail-closed)+ 动作权限。返回 (user, tenant_id)。"""
     user = get_current_user_from_request(request)
@@ -181,6 +187,29 @@ async def add_decision(work_order_id: str, req: DecisionIn, request: Request):
             )
         except api.WorkOrderApiError as e:
             code = 422 if e.code == "workorder.decision_invalid" else 404
+            raise HTTPException(code, detail=e.code) from e
+    return {"ok": True, "event_id": evt["id"]}
+
+
+@router.post("/api/workorder/orders/{work_order_id}/sales-summary")
+async def add_sales_summary(work_order_id: str, req: SalesSummaryIn, request: Request):
+    """人工填销项(销售额 + 销项税 + 凭据备注)。落 item_classified(sales_summary) 事件,
+    reconcile 的 R2 据此解锁(引擎/steps 不改)。金额十进制字符串进出、禁 float、非负。"""
+    user, tenant_id = _authorize(request)
+    with db.get_cursor(commit=True) as cur:
+        _load_order(cur, request, user, tenant_id, work_order_id)
+        try:
+            evt = api.record_sales_summary(
+                cur,
+                tenant_id=tenant_id,
+                work_order_id=work_order_id,
+                sales_amount=req.sales_amount,
+                output_vat=req.output_vat,
+                note=req.note,
+                actor=f"user:{user['id']}",
+            )
+        except api.WorkOrderApiError as e:
+            code = 422 if e.code.startswith("workorder.sales_summary") else 404
             raise HTTPException(code, detail=e.code) from e
     return {"ok": True, "event_id": evt["id"]}
 

@@ -142,6 +142,7 @@ const AI_CSS = [
     'ai/ai-shell.css',
     'ai/ai-dashboard.css',
     'ai/ai-client.css',
+    'ai/ai-intake.css',
     'ai/ai-viewer.css',
 ];
 

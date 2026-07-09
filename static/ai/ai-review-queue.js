@@ -43,14 +43,11 @@
     }
 
     // 人工 VAT 输入串 → 能否解成钱数的前置校验(真正的 Decimal 换算留给后端
-    // reconcile_gates,前端绝不重算钱)。去千分位空白,只认「整数.最多两位小数」。
-    // 解不出返回 null,调用方据此就地报错、不发请求。
+    // reconcile_gates,前端绝不重算钱)。去千分位空白,只认「整数.最多两位小数」,
+    // 认负号(recalc 改数可能是冲正)。共享解析在 ai-format.js(同 ai-intake-render.js
+    // 的 parseAmount 先例,两处曾各自写同一条正则)。
     function parseVat(raw) {
-        var s = String(raw == null ? '' : raw)
-            .trim()
-            .replace(/,/g, '');
-        if (!s || !/^-?\d+(\.\d{1,2})?$/.test(s)) return null;
-        return s;
+        return root.AI.format.parseAmount(raw, true);
     }
 
     // 一次按键(A 采纳 / E 改数 / X 剔除)→ POST /decisions 的 body(契约 §2)。

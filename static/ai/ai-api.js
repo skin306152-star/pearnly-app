@@ -23,6 +23,26 @@
                 return root.localStorage.getItem('mrpilot_token');
             };
 
+        // 响应外壳统一处理:非 2xx → 抛带 code/status 的 Error(调用方 mapApiErrorKey 取文案),
+        // 2xx → 解出 JSON。JSON/multipart 请求共用同一份,不各拼一套错误契约。
+        function handleResponse(r) {
+            return r
+                .json()
+                .catch(function () {
+                    return {};
+                })
+                .then(function (j) {
+                    if (!r.ok) {
+                        var code = j.detail || (j.error && j.error.code) || 'generic';
+                        var err = new Error(String(code));
+                        err.status = r.status;
+                        err.code = code;
+                        throw err;
+                    }
+                    return j;
+                });
+        }
+
         function call(method, path, body) {
             var token = getToken();
             var headers = {};
@@ -34,23 +54,7 @@
                     headers: headers,
                     body: body ? JSON.stringify(body) : undefined,
                 })
-                .then(function (r) {
-                    return r
-                        .json()
-                        .catch(function () {
-                            return {};
-                        })
-                        .then(function (j) {
-                            if (!r.ok) {
-                                var code = j.detail || (j.error && j.error.code) || 'generic';
-                                var err = new Error(String(code));
-                                err.status = r.status;
-                                err.code = code;
-                                throw err;
-                            }
-                            return j;
-                        });
-                });
+                .then(handleResponse);
         }
 
         return {
@@ -95,6 +99,31 @@
                     '/api/workorder/orders/' + encodeURIComponent(orderId) + '/decisions',
                     body
                 );
+            },
+            // 人工填销项(W4 补料流):销售额/销项税/凭据备注,后端落 sales_summary 事件解锁 R2。
+            submitSalesSummary: function (orderId, body) {
+                return call(
+                    'POST',
+                    '/api/workorder/orders/' + encodeURIComponent(orderId) + '/sales-summary',
+                    body
+                );
+            },
+            // 补料上传(W4):multipart。<fetch> 发 FormData 时不能手设 Content-Type
+            // (要让浏览器带 multipart boundary),故不走 call()。413 等结构化错误同源经
+            // handleResponse 抛出,调用方 mapApiErrorKey 取四语文案。
+            addMaterials: function (orderId, files) {
+                var token = getToken();
+                var headers = {};
+                if (token) headers.Authorization = 'Bearer ' + token;
+                var fd = new FormData();
+                for (var i = 0; i < files.length; i++) fd.append('files', files[i]);
+                return root
+                    .fetch('/api/workorder/orders/' + encodeURIComponent(orderId) + '/materials', {
+                        method: 'POST',
+                        headers: headers,
+                        body: fd,
+                    })
+                    .then(handleResponse);
             },
             // 原图直出(W3 审核队列):鉴权头是 Bearer,<img src> 发不了自定义头,调用方
             // 拿 blob 自建 object URL 挂 <img>(同 console.js 导出下载的 fetch+blob 先例)。

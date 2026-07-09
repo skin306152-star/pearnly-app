@@ -128,10 +128,15 @@
     }
 
     function renderIntake() {
-        $('cv-intake').innerHTML = AI.state.emptyHtml({
-            title: at('intake_soon_t'),
-            sub: at('intake_soon_s'),
-        });
+        var order = currentOrder();
+        if (!order) {
+            $('cv-intake').innerHTML = AI.state.emptyHtml({
+                title: at('intake_empty_t'),
+                sub: at('intake_empty_s'),
+            });
+            return;
+        }
+        AI.intake.mount(S.api, order, S.clientId);
     }
 
     function renderReview() {

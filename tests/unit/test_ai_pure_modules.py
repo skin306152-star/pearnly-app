@@ -17,6 +17,11 @@ import unittest
 
 from tests.unit._node_harness import AI_DIR, _run_node
 
+# ai-intake-render.js 的 parseAmount 转发给 AI.format.parseAmount(照 ai-viewer.js 的
+# esc()→AI.state.esc 先例)——node 单测独立进程里没人挂 AI.format,这里先 require
+# ai-format.js 把它挂上 globalThis,后续 require 的 ai-intake-render.js 才能真正解析。
+_REQUIRE_AI_FORMAT = f'require({json.dumps(str(AI_DIR / "ai-format.js"))});\n'
+
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class AiFormatTests(unittest.TestCase):
@@ -233,6 +238,62 @@ class FieldLabelTests(unittest.TestCase):
             process.stdout.write(JSON.stringify(f.fieldLabel('sales_amount')));
             """)
         self.assertEqual(out, "sales_amount")
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class AiIntakeRenderPureTests(unittest.TestCase):
+    """收料视图(W4)的纯校验守门:金额解析(非负、两位小数、去千分位)、销项 payload 构造、
+    上传前端预检(50 张 / 20MB)。HTML 拼装依赖 at()/DOM 不在此测(交 W4 E2E)。"""
+
+    def test_parse_amount_normalizes_and_rejects(self):
+        out = _run_node(f"""
+            {_REQUIRE_AI_FORMAT}
+            const r = require({json.dumps(str(AI_DIR / "ai-intake-render.js"))});
+            process.stdout.write(JSON.stringify([
+                r.parseAmount('858780.16'), r.parseAmount('1,234,567.50'),
+                r.parseAmount('  60114.61 '), r.parseAmount('-1'),
+                r.parseAmount('1.234'), r.parseAmount('abc'), r.parseAmount(''),
+            ]));
+            """)
+        self.assertEqual(out, ["858780.16", "1234567.50", "60114.61", None, None, None, None])
+
+    def test_build_sales_payload_requires_both_amounts(self):
+        out = _run_node(f"""
+            {_REQUIRE_AI_FORMAT}
+            const r = require({json.dumps(str(AI_DIR / "ai-intake-render.js"))});
+            process.stdout.write(JSON.stringify([
+                r.buildSalesPayload('858780.16', '60114.61', 'ยื่นเอง'),
+                r.buildSalesPayload('100', 'bad', 'n'),
+                r.buildSalesPayload('bad', '7', 'n'),
+            ]));
+            """)
+        self.assertEqual(
+            out,
+            [
+                {"sales_amount": "858780.16", "output_vat": "60114.61", "note": "ยื่นเอง"},
+                None,
+                None,
+            ],
+        )
+
+    def test_validate_files_caps_count_and_size(self):
+        out = _run_node(f"""
+            const r = require({json.dumps(str(AI_DIR / "ai-intake-render.js"))});
+            const ok = [{{size: 1000}}, {{size: 2000}}];
+            const tooMany = Array.from({{length: r.MAX_FILES + 1}}, () => ({{size: 1}}));
+            const tooBig = [{{size: r.MAX_BYTES + 1}}];
+            process.stdout.write(JSON.stringify([
+                r.validateFiles(ok), r.validateFiles(tooMany), r.validateFiles(tooBig),
+            ]));
+            """)
+        self.assertEqual(
+            out,
+            [
+                {"ok": True},
+                {"ok": False, "errKey": "err_workorder_too_many_files"},
+                {"ok": False, "errKey": "err_workorder_file_too_large"},
+            ],
+        )
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")

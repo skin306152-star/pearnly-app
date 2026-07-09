@@ -60,7 +60,8 @@ const BUNDLES = [
     // 和 ai-review.js(mount/remount 交互 + 共享 LRU 缓存)之前。ai-review-queue.js(队列
     // 过滤/分级/裁决 payload 纯函数)必须排在 ai-review-render.js(拼 HTML)之前,两者都要
     // 排在 ai-review.js(编排)之前;ai-client.js 挂 renderReview 时才用到 AI.review,
-    // 故 ai-review.js 仍需排在 ai-client.js 之前。
+    // 故 ai-review.js 仍需排在 ai-client.js 之前。ai-intake-render.js(纯校验+HTML)排在
+    // ai-intake.js(上传/填数/续跑编排)之前,两者都在 ai-client.js(renderIntake 用 AI.intake)之前。
     {
         out: 'static/dist/ai.js',
         files: [
@@ -75,6 +76,8 @@ const BUNDLES = [
             'ai/ai-review-queue.js',
             'ai/ai-review-render.js',
             'ai/ai-review.js',
+            'ai/ai-intake-render.js',
+            'ai/ai-intake.js',
             'ai/ai-client.js',
             'ai/ai.js',
         ],

@@ -16,6 +16,11 @@ import unittest
 
 from tests.unit._node_harness import AI_DIR, _run_node
 
+# ai-review-queue.js 的 parseVat 转发给 AI.format.parseAmount(照 ai-viewer.js 的
+# esc()→AI.state.esc 先例)——node 单测独立进程里没人挂 AI.format,这里先 require
+# ai-format.js 把它挂上 globalThis,后续 require 的 ai-review-queue.js 才能真正解析。
+_REQUIRE_AI_FORMAT = f'require({json.dumps(str(AI_DIR / "ai-format.js"))});\n'
+
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class FilterPurchaseQueueTests(unittest.TestCase):
@@ -98,6 +103,7 @@ class FlagReasonKeyTests(unittest.TestCase):
 class ParseVatTests(unittest.TestCase):
     def test_accepts_plain_and_thousands_separated_decimals(self):
         out = _run_node(f"""
+            {_REQUIRE_AI_FORMAT}
             const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
             process.stdout.write(JSON.stringify([
                 q.parseVat('4069.05'), q.parseVat('4,069.05'), q.parseVat('  4069  '), q.parseVat('0'),
@@ -107,6 +113,7 @@ class ParseVatTests(unittest.TestCase):
 
     def test_rejects_empty_non_numeric_and_too_many_decimals(self):
         out = _run_node(f"""
+            {_REQUIRE_AI_FORMAT}
             const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
             process.stdout.write(JSON.stringify([
                 q.parseVat(''), q.parseVat('   '), q.parseVat('abc'), q.parseVat('4069.055'), q.parseVat(null),
@@ -135,6 +142,7 @@ class BuildDecisionPayloadTests(unittest.TestCase):
 
     def test_recalc_carries_parsed_vat(self):
         out = _run_node(f"""
+            {_REQUIRE_AI_FORMAT}
             const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
             process.stdout.write(JSON.stringify(q.buildDecisionPayload('it1', 'recalc', '4,069.05')));
             """)
@@ -144,6 +152,7 @@ class BuildDecisionPayloadTests(unittest.TestCase):
 
     def test_recalc_without_valid_vat_returns_null_not_a_request(self):
         out = _run_node(f"""
+            {_REQUIRE_AI_FORMAT}
             const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
             process.stdout.write(JSON.stringify([
                 q.buildDecisionPayload('it1', 'recalc', ''),

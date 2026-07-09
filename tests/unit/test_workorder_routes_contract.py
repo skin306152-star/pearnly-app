@@ -34,6 +34,7 @@ class RouteContractTests(unittest.TestCase):
             ("GET", "/api/workorder/orders/{work_order_id}"),
             ("POST", "/api/workorder/orders/{work_order_id}/run"),
             ("POST", "/api/workorder/orders/{work_order_id}/decisions"),
+            ("POST", "/api/workorder/orders/{work_order_id}/sales-summary"),
             ("POST", "/api/workorder/orders/{work_order_id}/materials"),
             ("GET", "/api/workorder/orders/{work_order_id}/deliverables"),
             ("GET", "/api/workorder/orders/{work_order_id}/deliverables/{kind}"),
@@ -194,6 +195,50 @@ class DecisionMappingTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(HTTPException) as ctx:
             await self._call("face_value", item_ok=False)
         self.assertEqual(ctx.exception.status_code, 404)
+
+
+class SalesSummaryMappingTests(unittest.IsolatedAsyncioTestCase):
+    """人工填销项路由:合法落库返 ok;校验错(sales_summary_*)→ 422,其它业务错 → 404。"""
+
+    async def _call(self, err_code=None):
+        from routes import workorder_routes as wr
+
+        wo = {"workspace_client_id": 7}
+
+        def _rec(*a, **k):
+            if err_code:
+                raise wr.api.WorkOrderApiError(err_code)
+            return {"id": 5}
+
+        with (
+            mock.patch.object(wr, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(wr, "require_perm", return_value=_USER),
+            mock.patch.object(wr, "check_workspace_scope", return_value=None),
+            mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            mock.patch.object(wr.store, "get_work_order", return_value=wo),
+            mock.patch.object(wr.api, "record_sales_summary", side_effect=_rec),
+        ):
+            return await wr.add_sales_summary(
+                "wo-1",
+                wr.SalesSummaryIn(sales_amount="858780.16", output_vat="60114.61", note="ยื่นเอง"),
+                mock.Mock(),
+            )
+
+    async def test_valid_entry_ok(self):
+        out = await self._call()
+        self.assertTrue(out["ok"])
+        self.assertEqual(out["event_id"], 5)
+
+    async def test_invalid_amount_maps_422(self):
+        with self.assertRaises(HTTPException) as ctx:
+            await self._call(err_code="workorder.sales_summary_invalid")
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    async def test_overlong_note_maps_422(self):
+        with self.assertRaises(HTTPException) as ctx:
+            await self._call(err_code="workorder.sales_summary_note_too_long")
+        self.assertEqual(ctx.exception.status_code, 422)
 
 
 class DownloadGuardTests(unittest.IsolatedAsyncioTestCase):

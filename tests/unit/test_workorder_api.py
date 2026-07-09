@@ -11,10 +11,12 @@ from __future__ import annotations
 import unittest
 
 from services.workorder import api
+from tests.unit._workorder_fakes import WorkOrderFakeStoreBase
 
 
-class _FakeStore:
+class _FakeStore(WorkOrderFakeStoreBase):
     def __init__(self):
+        super().__init__()
         self.wo = {
             "id": "wo-1",
             "tenant_id": "t-1",
@@ -24,11 +26,12 @@ class _FakeStore:
             "status": "stuck",
             "current_step": "reconcile",
         }
-        self.items = []
-        self.events = []
+        self.events = []  # 详情测试预置的夹具事件流(与下面的 self.appended 分开)
         self.deliverables = []
-        self.appended = []
-        self._seq = 0
+        self.appended = []  # append_event 实际写入的新增事件,供断言
+
+    def _on_event_appended(self, row):
+        self.appended.append(row)
 
     def get_work_order(self, cur, *, tenant_id, work_order_id):
         return dict(self.wo) if self.wo and self.wo["id"] == work_order_id else None
@@ -47,20 +50,6 @@ class _FakeStore:
             if i["id"] == item_id and i["work_order_id"] == work_order_id:
                 return dict(i)
         return None
-
-    def append_event(
-        self, cur, *, tenant_id, work_order_id, step, event_type, payload=None, actor="system"
-    ):
-        self._seq += 1
-        row = {
-            "id": self._seq,
-            "step": step,
-            "event_type": event_type,
-            "payload": payload or {},
-            "actor": actor,
-        }
-        self.appended.append(row)
-        return dict(row)
 
     def list_work_orders(
         self,
@@ -301,6 +290,125 @@ class RecordDecisionTests(_ApiTestBase):
                 actor="u",
             )
         self.assertEqual(ctx.exception.code, "workorder.item_not_found")
+
+
+class RecordSalesSummaryTests(_ApiTestBase):
+    """人工填销项(W4):落与 classify 直读同构的 item_classified(sales_summary)事件,
+    reconcile 的 R2 回放据此解锁——形状契约(headers/rows/cells)与幂等/校验守门。"""
+
+    def test_valid_entry_appends_classified_sales_summary_event(self):
+        evt = api.record_sales_summary(
+            None,
+            tenant_id="t-1",
+            work_order_id="wo-1",
+            sales_amount="858780.16",
+            output_vat="60114.61",
+            note="ยื่นเอง · แนบสรุปยอดขายธนาคาร",
+            actor="user:9",
+        )
+        self.assertEqual(evt["event_type"], "item_classified")
+        payload = self.store.appended[-1]["payload"]
+        self.assertEqual(payload["kind"], "sales_summary")
+        self.assertEqual(payload["status"], "ok")
+        # sales_read 形状 = reconcile.aggregate_sales 消费的 {headers, rows:[{cells,is_summary}]}。
+        read = payload["sales_read"]
+        self.assertEqual(read["headers"], ["ยอดขาย", "ภาษีขาย"])
+        self.assertEqual(read["rows"], [{"cells": ["858780.16", "60114.61"], "is_summary": False}])
+        self.assertEqual(read["source"], "manual_entry")
+        self.assertEqual(read["note"], "ยื่นเอง · แนบสรุปยอดขายธนาคาร")
+        self.assertEqual(self.store.appended[-1]["step"], "classify")
+        self.assertEqual(self.store.appended[-1]["actor"], "user:9")
+
+    def test_refill_reuses_same_manual_item_idempotently(self):
+        api.record_sales_summary(
+            None,
+            tenant_id="t-1",
+            work_order_id="wo-1",
+            sales_amount="100.00",
+            output_vat="7.00",
+            note="",
+            actor="user:9",
+        )
+        first_item = self.store.appended[-1]["payload"]["item_id"]
+        api.record_sales_summary(
+            None,
+            tenant_id="t-1",
+            work_order_id="wo-1",
+            sales_amount="858780.16",
+            output_vat="60114.61",
+            note="",
+            actor="user:9",
+        )
+        second_item = self.store.appended[-1]["payload"]["item_id"]
+        # 同一人工销项件复用(固定 dedupe_key),reconcile latest-wins 覆盖旧值,不重复计入。
+        self.assertEqual(first_item, second_item)
+        manual_items = [i for i in self.store.items if i.get("kind") == "sales_summary"]
+        self.assertEqual(len(manual_items), 1)
+
+    def test_thousands_separator_and_padding_normalized(self):
+        api.record_sales_summary(
+            None,
+            tenant_id="t-1",
+            work_order_id="wo-1",
+            sales_amount="1,234,567.50",
+            output_vat="86,419.72",
+            note="",
+            actor="user:9",
+        )
+        read = self.store.appended[-1]["payload"]["sales_read"]
+        self.assertEqual(read["rows"][0]["cells"], ["1234567.50", "86419.72"])
+
+    def test_negative_amount_rejected(self):
+        with self.assertRaises(api.WorkOrderApiError) as ctx:
+            api.record_sales_summary(
+                None,
+                tenant_id="t-1",
+                work_order_id="wo-1",
+                sales_amount="-1.00",
+                output_vat="7.00",
+                note="",
+                actor="u",
+            )
+        self.assertEqual(ctx.exception.code, "workorder.sales_summary_invalid")
+
+    def test_non_numeric_amount_rejected(self):
+        with self.assertRaises(api.WorkOrderApiError) as ctx:
+            api.record_sales_summary(
+                None,
+                tenant_id="t-1",
+                work_order_id="wo-1",
+                sales_amount="lots",
+                output_vat="7.00",
+                note="",
+                actor="u",
+            )
+        self.assertEqual(ctx.exception.code, "workorder.sales_summary_invalid")
+
+    def test_empty_amount_rejected(self):
+        with self.assertRaises(api.WorkOrderApiError) as ctx:
+            api.record_sales_summary(
+                None,
+                tenant_id="t-1",
+                work_order_id="wo-1",
+                sales_amount="   ",
+                output_vat="7.00",
+                note="",
+                actor="u",
+            )
+        self.assertEqual(ctx.exception.code, "workorder.sales_summary_invalid")
+
+    def test_overlong_note_rejected(self):
+        with self.assertRaises(api.WorkOrderApiError) as ctx:
+            api.record_sales_summary(
+                None,
+                tenant_id="t-1",
+                work_order_id="wo-1",
+                sales_amount="100.00",
+                output_vat="7.00",
+                note="x" * 501,
+                actor="u",
+            )
+        self.assertEqual(ctx.exception.code, "workorder.sales_summary_note_too_long")
 
 
 class ListAndDeliverableTests(_ApiTestBase):

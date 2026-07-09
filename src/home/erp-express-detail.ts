@@ -7,9 +7,15 @@
 //   ③ 已推送显 Express 单号 + 诚实状态时间线(识别→已入队→待推送/已推送/失败,不伪造)
 // 数据全取 log.request_body(mapper 载荷)+ log.response_body(express_docnum)· 纯渲染无请求。
 // 复用抽屉的 .erp-detail-sec / .erp-tl-row 视觉系统 · 新增只 .exp-je* 分录卡(令牌)。
-// 暴露 (window).ExpressDetail.section(log) · 全局桥:t / escapeHtml。
+// 暴露 (window).ExpressDetail.section(log) · 全局桥:t / escapeHtml / token。
+//
+// F5 (2026-07-10) · 单别人工可选:doctype 单元格从只读改「自动/HP/RR」select + 保存,
+// 保存走 PATCH /api/history/{id}/posting(payment: cash|credit|null)。事件绑定不借宿主
+// erp-log-detail 的 [data-receipt-action] 委派(那条链路末尾无条件 closeAll,会把抽屉关掉)·
+// 改用模块自己的 document 级委派(drawer 每次重开都是新 DOM · 元素级绑定会失效)。
+// 来源徽标读 request_body.doctype_src,复用 .log-tag 既有视觉(manual/auto 两色)。
 // ============================================================
-/* global escapeHtml */
+/* global escapeHtml, token */
 (function () {
     'use strict';
 
@@ -81,16 +87,82 @@
         );
     }
 
-    function _fields(p: any): string {
+    // 来源徽标(doctype_src)· 复用 .log-tag 既有两色令牌:manual(人工)醒目 · 其余系统推定态柔和。
+    // 值域外(未识别的 src)不显示 —— 不伪造徽标。
+    var SRC_KEYS: Record<string, string> = {
+        manual: 'expd-src-manual',
+        explicit: 'expd-src-explicit',
+        doc_type: 'expd-src-doc_type',
+        profile: 'expd-src-profile',
+        bank: 'expd-src-bank',
+        config_default: 'expd-src-config_default',
+    };
+    function _srcBadge(src: any): string {
+        var key = SRC_KEYS[String(src || '')];
+        if (!key) return '';
+        var cls = src === 'manual' ? 'manual' : 'auto';
+        return '<span class="log-tag ' + cls + ' exp-doctype-src">' + _esc(_t(key)) + '</span>';
+    }
+
+    // 单别单元格:文案 + 三项 select(自动/HP/RR)+ 保存按钮。
+    // select 初值:仅当 doctype_src === 'manual' 才按 payload.doctype 选中对应项,否则「自动」——
+    // 系统推定态(explicit/doc_type/profile/bank/config_default)不当成人工选择回填,避免
+    // 误导「已经手动定过」。无 history_id 时(理论不该发生 · 兜底)退回纯只读文案,不渲染控件。
+    function _doctypeCell(p: any, historyId: any): string {
+        var doctype = p.doctype === 'HP' ? _t('expd-doctype-hp') : _t('expd-doctype-rr');
+        var isManual = p.doctype_src === 'manual' && (p.doctype === 'HP' || p.doctype === 'RR');
+        var selVal = isManual ? p.doctype : 'auto';
+        var opts = [
+            ['auto', _t('expd-doctype-auto')],
+            ['HP', _t('expd-doctype-hp')],
+            ['RR', _t('expd-doctype-rr')],
+        ]
+            .map(function (o) {
+                return (
+                    '<option value="' +
+                    o[0] +
+                    '"' +
+                    (o[0] === selVal ? ' selected' : '') +
+                    '>' +
+                    _esc(o[1]) +
+                    '</option>'
+                );
+            })
+            .join('');
+        var editor = historyId
+            ? '<div class="exp-doctype-edit">' +
+              '<select class="exp-doctype-select">' +
+              opts +
+              '</select>' +
+              '<button type="button" class="btn btn-ghost btn-tiny exp-doctype-save" data-history-id="' +
+              _esc(String(historyId)) +
+              '">' +
+              _esc(_t('expd-doctype-save')) +
+              '</button>' +
+              '<span class="exp-doctype-msg"></span>' +
+              '</div>'
+            : '';
+        return (
+            '<div class="erp-detail-cell exp-doctype-cell"><label>' +
+            _esc(_t('expd-f-doctype')) +
+            '</label><strong>' +
+            _esc(doctype) +
+            _srcBadge(p.doctype_src) +
+            '</strong>' +
+            editor +
+            '</div>'
+        );
+    }
+
+    function _fields(p: any, historyId: any): string {
         var sup = p.supplier || {};
         var code = sup.code || (sup.supplier_new ? _t('expd-supplier-new') : '-');
-        var doctype = p.doctype === 'HP' ? _t('expd-doctype-hp') : _t('expd-doctype-rr');
         var grid =
             _cell(_t('expd-f-supplier'), sup.name || '-') +
             _cell(_t('expd-f-taxid'), sup.tax_id || '-') +
             _cell(_t('expd-f-code'), code) +
             _cell(_t('expd-f-refno'), p.ref_no || '-') +
-            _cell(_t('expd-f-doctype'), doctype) +
+            _doctypeCell(p, historyId) +
             _cell(_t('expd-f-date'), _beDate(p.docdate_be)) +
             _cell(_t('expd-f-vatrate'), (p.vat_rate != null ? p.vat_rate : '-') + '%') +
             _cell(_t('expd-f-base'), _amt(p.base_amount)) +
@@ -203,6 +275,7 @@
         var p = _parseJson(log && log.request_body);
         var resp = _parseJson(log && log.response_body);
         var docnum = resp.express_docnum || '';
+        var historyId = log && log.history_id;
 
         // 空态:无分录载荷(待人工复核 / 未过闸门)。
         if (!p.lines || !p.lines.length) {
@@ -229,8 +302,71 @@
                           '</button></div>'
                   )
                 : '';
-        return _fields(p) + _preflight(resp) + _entry(p) + docSec + _timeline(log, docnum);
+        return _fields(p, historyId) + _preflight(resp) + _entry(p) + docSec + _timeline(log, docnum);
     }
+
+    // 保存单别裁决 → PATCH /api/history/{id}/posting({payment: cash|credit|null})。
+    // 三态文案(保存中/已保存/失败)就地更新触发按钮同格的 .exp-doctype-msg,不重渲整个抽屉——
+    // 详情数据(log.request_body)留在闭包外,重渲要靠人手动重新打开详情,状态诚实不假装同步。
+    async function _saveDoctype(btn: HTMLElement): Promise<void> {
+        var cell = btn.closest('.exp-doctype-cell');
+        var sel = cell ? (cell.querySelector('.exp-doctype-select') as HTMLSelectElement | null) : null;
+        var msg = cell ? (cell.querySelector('.exp-doctype-msg') as HTMLElement | null) : null;
+        var historyId = btn.getAttribute('data-history-id');
+        if (!sel || !historyId) return;
+        var val = sel.value;
+        var payment = val === 'HP' ? 'cash' : val === 'RR' ? 'credit' : null;
+        (btn as HTMLButtonElement).disabled = true;
+        sel.disabled = true;
+        if (msg) {
+            msg.textContent = _t('expd-doctype-saving');
+            msg.className = 'exp-doctype-msg mid';
+        }
+        try {
+            var resp = await fetch('/api/history/' + encodeURIComponent(historyId) + '/posting', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: 'Bearer ' + token,
+                },
+                body: JSON.stringify({ payment: payment }),
+            });
+            var j: any = {};
+            try {
+                j = await resp.json();
+            } catch (e) {
+                /* 空体也可能是成功(理论不会 · 兜底不炸) */
+            }
+            if (!resp.ok || !j.ok) throw new Error('save failed');
+            if (msg) {
+                msg.textContent = _t('expd-doctype-saved');
+                msg.className = 'exp-doctype-msg ok';
+            }
+        } catch (e) {
+            if (msg) {
+                msg.textContent = _t('expd-doctype-save-fail');
+                msg.className = 'exp-doctype-msg fail';
+            }
+        } finally {
+            (btn as HTMLButtonElement).disabled = false;
+            sel.disabled = false;
+        }
+    }
+
+    // document 级委派(一次性绑定)· 抽屉每次 showLogDetail() 都是新 DOM,元素级监听会失效;
+    // 不借宿主 erp-log-detail 的 [data-receipt-action] 链路——那条链路末尾无条件 closeAll()。
+    var _bound = false;
+    function _bindOnce(): void {
+        if (_bound) return;
+        _bound = true;
+        document.addEventListener('click', function (e: Event) {
+            var tgt = e.target as HTMLElement;
+            var btn = tgt.closest && (tgt.closest('.exp-doctype-save') as HTMLElement | null);
+            if (!btn) return;
+            _saveDoctype(btn);
+        });
+    }
+    _bindOnce();
 
     (window as any).ExpressDetail = { section: section };
 })();

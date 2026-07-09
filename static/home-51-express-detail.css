@@ -109,3 +109,41 @@
     text-align: center;
     line-height: 1.6;
 }
+
+/* 单别人工可选(F5 · 2026-07-10)· 来源徽标复用 .log-tag(定义在 home-10) · 编辑区只补
+   select + 保存按钮的排布,颜色/圆角全走既有 --line / --brand 令牌,不新造设计语言。 */
+.exp-doctype-cell strong {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.exp-doctype-src {
+    font-size: 9px;
+}
+.exp-doctype-edit {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 7px;
+    flex-wrap: wrap;
+}
+.exp-doctype-select {
+    height: 26px;
+    padding: 0 6px;
+    font-size: 11px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--card);
+    color: var(--ink);
+}
+.exp-doctype-msg {
+    font-size: 10px;
+    color: var(--ink-3);
+}
+.exp-doctype-msg.ok {
+    color: var(--success);
+}
+.exp-doctype-msg.fail {
+    color: var(--danger);
+}

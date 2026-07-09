@@ -162,5 +162,120 @@ class TaxIdDuplicateRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(out, {"ok": True, "id": 42})
 
 
+class M1ThaiNameGateRouteTests(unittest.IsolatedAsyncioTestCase):
+    """M1-B2:泰文注册名必填闸(pearnly_ai_m1)· 建档拒收 + 编辑不清空 + 存量不炸。"""
+
+    async def test_flag_off_create_without_thai_name_unaffected(self):
+        from routes import workspace_routes as wr
+
+        req = wr.WorkspaceClientCreate(name="Sister Makeup Co Ltd")
+        with (
+            mock.patch.object(wr, "require_perm", return_value={"id": "u1"}),
+            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=False),
+            mock.patch.object(wr.db, "tax_id_in_use", return_value=False),
+            mock.patch.object(wr.db, "create_workspace_client", return_value=42),
+            mock.patch.object(wr, "_log_op", return_value=None),
+        ):
+            out = await wr.create_workspace_client(req, mock.Mock())
+        self.assertEqual(out, {"ok": True, "id": 42})
+
+    async def test_flag_on_create_missing_thai_name_rejected(self):
+        from routes import workspace_routes as wr
+
+        req = wr.WorkspaceClientCreate(name="Sister Makeup Co Ltd")
+        with (
+            mock.patch.object(wr, "require_perm", return_value={"id": "u1"}),
+            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(wr.db, "create_workspace_client", side_effect=AssertionError),
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.create_workspace_client(req, mock.Mock())
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.detail["code"], "workspace.thai_name_required")
+        for lang in ("zh", "en", "th", "ja"):
+            self.assertTrue(ctx.exception.detail["message"][lang].strip())
+
+    async def test_flag_on_create_with_thai_name_passes(self):
+        from routes import workspace_routes as wr
+
+        req = wr.WorkspaceClientCreate(name="บริษัท ปิยะนุช จำกัด")
+        with (
+            mock.patch.object(wr, "require_perm", return_value={"id": "u1"}),
+            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(wr.db, "tax_id_in_use", return_value=False),
+            mock.patch.object(wr.db, "create_workspace_client", return_value=7),
+            mock.patch.object(wr, "_log_op", return_value=None),
+        ):
+            out = await wr.create_workspace_client(req, mock.Mock())
+        self.assertEqual(out, {"ok": True, "id": 7})
+
+    async def test_flag_on_edit_legacy_client_other_fields_succeeds(self):
+        # 存量客户 name 本就没有泰文(bootstrap 档案常见)——改地址等其它字段必须照常成功。
+        from routes import workspace_routes as wr
+
+        req = wr.WorkspaceClientUpdate(address="123 ถนนสุขุมวิท")
+        with (
+            mock.patch.object(wr, "require_perm", return_value={"id": "u1"}),
+            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(wr.db, "get_workspace_client", side_effect=AssertionError),
+            mock.patch.object(wr.db, "update_workspace_client", return_value=True),
+            mock.patch.object(wr, "_log_op", return_value=None),
+        ):
+            out = await wr.update_workspace_client_route(5, req, mock.Mock())
+        self.assertEqual(out, {"ok": True, "id": 5})
+
+    async def test_flag_on_edit_clearing_existing_thai_name_rejected(self):
+        from routes import workspace_routes as wr
+
+        req = wr.WorkspaceClientUpdate(name="Sister Makeup Co Ltd")
+        with (
+            mock.patch.object(wr, "require_perm", return_value={"id": "u1"}),
+            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(
+                wr.db,
+                "get_workspace_client",
+                return_value={"id": 5, "name": "บริษัท ปิยะนุช จำกัด"},
+            ),
+            mock.patch.object(wr.db, "update_workspace_client", side_effect=AssertionError),
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.update_workspace_client_route(5, req, mock.Mock())
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.detail["code"], "workspace.thai_name_locked")
+
+    async def test_flag_on_edit_swapping_thai_name_for_another_thai_name_passes(self):
+        from routes import workspace_routes as wr
+
+        req = wr.WorkspaceClientUpdate(name="บริษัท ใหม่ จำกัด")
+        with (
+            mock.patch.object(wr, "require_perm", return_value={"id": "u1"}),
+            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(
+                wr.db,
+                "get_workspace_client",
+                return_value={"id": 5, "name": "บริษัท ปิยะนุช จำกัด"},
+            ),
+            mock.patch.object(wr.db, "update_workspace_client", return_value=True),
+            mock.patch.object(wr, "_log_op", return_value=None),
+        ):
+            out = await wr.update_workspace_client_route(5, req, mock.Mock())
+        self.assertEqual(out, {"ok": True, "id": 5})
+
+    async def test_flag_off_edit_clearing_thai_name_unaffected(self):
+        # 闸关:即便是拆掉已有泰文名也不拦——行为与现状逐字节一致。
+        from routes import workspace_routes as wr
+
+        req = wr.WorkspaceClientUpdate(name="Sister Makeup Co Ltd")
+        with (
+            mock.patch.object(wr, "require_perm", return_value={"id": "u1"}),
+            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=False),
+            mock.patch.object(wr.db, "get_workspace_client", side_effect=AssertionError),
+            mock.patch.object(wr.db, "update_workspace_client", return_value=True),
+            mock.patch.object(wr, "_log_op", return_value=None),
+        ):
+            out = await wr.update_workspace_client_route(5, req, mock.Mock())
+        self.assertEqual(out, {"ok": True, "id": 5})
+
+
 if __name__ == "__main__":
     unittest.main()

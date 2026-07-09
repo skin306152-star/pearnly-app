@@ -65,6 +65,11 @@ AGENT_MONTHLY_REPORT_KEY = "agent_monthly_report"
 # 掉线召回子闸(W4·拍板月最多一条·文案 Zihao 过目后才放):默认关。
 # 开 → 有过单据但连续 14 天零单的用户,每自然月最多收一条温和召回。
 AGENT_RECALL_KEY = "agent_recall_nudge"
+# M1 客户建档收严子闸(B2 · 见 L2-验收.md 真语料坐实):默认关。关 → 建档/编辑校验
+# 现状逐字节不变;开 → 建档强收泰文注册名(OCR 方向判定的名称锚),编辑不许清空
+# 已登记的泰文名。判定域 = 账套主体归属(有 tenant_id 走 tenant 共享闸 · 个人套账退回
+# user_id · 与 workspace_clients 其余隔离口径一致),不是单个用户。
+PEARNLY_AI_M1_KEY = "pearnly_ai_m1"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -166,3 +171,12 @@ def agent_monthly_report_enabled_for(user_id: Optional[str]) -> bool:
 def agent_recall_enabled_for(user_id: Optional[str]) -> bool:
     """掉线召回子闸。关 = 一条不发,现状不变。"""
     return _enabled(AGENT_RECALL_KEY, user_id, "agent_recall_enabled_for")
+
+
+def pearnly_ai_m1_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) -> bool:
+    """M1 客户建档收严子闸。关 = 建档/编辑校验现状不变。
+
+    按账套主体归属判定,不按单个操作人:有 tenant_id 用 tenant(团队共享同一开关
+    状态,跟其余 workspace_clients 隔离口径一致);个人套账(无 tenant)退回 user_id。
+    """
+    return _enabled(PEARNLY_AI_M1_KEY, tenant_id or user_id, "pearnly_ai_m1_enabled_for")

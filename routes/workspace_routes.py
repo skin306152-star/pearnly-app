@@ -23,8 +23,10 @@ from pydantic import BaseModel, Field
 
 from core import db
 from core.auth import get_current_user_from_request
+from core.feature_flags import pearnly_ai_m1_enabled_for
 from core.route_helpers import _tid, _log_op
 from services.authz.deps import get_authz, require_perm
+from services.workspace import thai_name_gate
 
 router = APIRouter()
 
@@ -148,16 +150,25 @@ async def create_workspace_client(req: WorkspaceClientCreate, request: Request):
     主体,并可绑定到一个**已存在**的 ERP endpoint。
     """
     user = require_perm(request, "settings.workspace.manage")
+    tenant_id = _tid(user)
+    # M1-B2:泰文注册名必填(闸关 = 现状不变)——税号被 OCR 读花时,这是分拣方向
+    # 判定唯一的名称锚兜底(见 L2-验收.md 真语料坐实)。
+    if pearnly_ai_m1_enabled_for(
+        tenant_id, str(user["id"])
+    ) and not thai_name_gate.has_thai_registered_name(req.name):
+        raise HTTPException(
+            422, detail=thai_name_gate.error_payload(thai_name_gate.ERR_THAI_NAME_REQUIRED)
+        )
     # 企业主体税号在本租户内不得重复(向导步1 杀手锏的边界 · workspace-entry §五)。
     if (
         (req.subject_type or "company") != "personal"
         and (req.tax_id or "").strip()
-        and db.tax_id_in_use(str(user["id"]), _tid(user), req.tax_id)
+        and db.tax_id_in_use(str(user["id"]), tenant_id, req.tax_id)
     ):
         raise HTTPException(422, detail="workspace.tax_id_duplicate")
     wid = db.create_workspace_client(
         str(user["id"]),
-        _tid(user),
+        tenant_id,
         req.name,
         tax_id=req.tax_id,
         erp_endpoint_id=req.erp_endpoint_id,
@@ -206,19 +217,33 @@ async def update_workspace_client_route(
 ):
     """改账套主体名称/税号。仅老板/超管(账套主体是重大主体 · 与改买方不同)。"""
     user = require_perm(request, "settings.workspace.manage")
+    tenant_id = _tid(user)
     raw = req.model_dump() if hasattr(req, "model_dump") else req.dict()
     payload = {k: v for k, v in raw.items() if v is not None}
     if not payload:
         raise HTTPException(400, detail="workspace.no_changes")
+    # M1-B2:编辑不许清空已登记的泰文注册名(名称锚兜底不能被悄悄拆掉)。只在
+    # 请求真的想改 name 时查一次现状;缺泰文名的存量客户改其它字段不受影响
+    # (「存量不炸」——不强制回填,补填引导是 W1 前端另做)。
+    if (
+        (req.name or "").strip()
+        and pearnly_ai_m1_enabled_for(tenant_id, str(user["id"]))
+        and not thai_name_gate.has_thai_registered_name(req.name)
+    ):
+        current = db.get_workspace_client(workspace_client_id, str(user["id"]), tenant_id=tenant_id)
+        if current and thai_name_gate.has_thai_registered_name(current.get("name")):
+            raise HTTPException(
+                422, detail=thai_name_gate.error_payload(thai_name_gate.ERR_THAI_NAME_LOCKED)
+            )
     # 改税号时不得撞本租户其它主体(排除自身)。
     if (req.tax_id or "").strip() and db.tax_id_in_use(
-        str(user["id"]), _tid(user), req.tax_id, exclude_id=workspace_client_id
+        str(user["id"]), tenant_id, req.tax_id, exclude_id=workspace_client_id
     ):
         raise HTTPException(422, detail="workspace.tax_id_duplicate")
     ok = db.update_workspace_client(
         workspace_client_id,
         str(user["id"]),
-        tenant_id=_tid(user),
+        tenant_id=tenant_id,
         **payload,
     )
     if not ok:

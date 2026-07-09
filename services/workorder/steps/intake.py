@@ -31,6 +31,27 @@ def _normalize_specs(raw) -> list[tuple[Path, str]]:
     return specs
 
 
+def fingerprint(path: Path) -> str:
+    """文件级去重指纹:`file:` + 字节 sha256(与 classify 的票面级 `doc:` 指纹不同名字空间)。"""
+    return "file:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def register_file(ctx: StepContext, path: Path, source: str = _DEFAULT_SOURCE) -> dict:
+    """登记单份来料成 work_order_items(幂等:同字节重登收敛成一行)。
+
+    intake 步与 API 补料端点(routes/workorder_routes)共用这一条登记路径,保证「补料 =
+    走 intake 幂等指纹」不是两套写法,而是同一函数。
+    """
+    return ctx.store.add_item(
+        ctx.cur,
+        tenant_id=ctx.tenant_id,
+        work_order_id=ctx.work_order_id,
+        source=source,
+        file_ref=str(path),
+        dedupe_key=fingerprint(path),
+    )
+
+
 def run(ctx: StepContext) -> StepResult:
     """登记全部来料。幂等:同文件(同字节)重跑不重复登记。"""
     specs = _normalize_specs(ctx.data.get("intake_files"))
@@ -43,14 +64,6 @@ def run(ctx: StepContext) -> StepResult:
 
     fingerprints = set()
     for path, source in specs:
-        digest = "file:" + hashlib.sha256(path.read_bytes()).hexdigest()
-        ctx.store.add_item(
-            ctx.cur,
-            tenant_id=ctx.tenant_id,
-            work_order_id=ctx.work_order_id,
-            source=source,
-            file_ref=str(path),
-            dedupe_key=digest,
-        )
-        fingerprints.add(digest)
+        register_file(ctx, path, source)
+        fingerprints.add(fingerprint(path))
     return StepResult.ok(items_registered=len(fingerprints))

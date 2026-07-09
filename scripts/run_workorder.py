@@ -107,6 +107,8 @@ def _print_outcome(out: engine.RunOutcome, ctx: engine.StepContext) -> int:
 
 def main() -> int:
     args = _parse_args()
+    # 前置(解析客户 / 幂等开单 / 落人工裁决)走一个已提交事务,先于按步跑落库;
+    # 引擎再以 cursor_factory 每步各开独立事务(L2 教训:进程中途被杀不整跑回滚、不重烧 OCR)。
     with db.get_cursor(commit=True) as cur:
         client = _resolve_client(cur, client=args.client, tenant_id=args.tenant_id)
         tenant_id = args.tenant_id or client["tenant_id"]
@@ -120,12 +122,19 @@ def main() -> int:
         for raw in args.decide:
             d = _parse_decide(raw)
             store.append_event(cur, event_type="human_decision", payload=d, actor="user:cli", **ev)
-        data = {"deliverables_dir": args.out}
-        if args.intake_dir:
-            data["intake_files"] = _intake_files(args.intake_dir)
-        ctx = engine.StepContext(cur=cur, tenant_id=tenant_id, work_order_id=wo["id"], data=data)
-        out = engine.run_work_order(ctx, handlers=real_handlers())
-        return _print_outcome(out, ctx)
+
+    data = {"deliverables_dir": args.out}
+    if args.intake_dir:
+        data["intake_files"] = _intake_files(args.intake_dir)
+    ctx = engine.StepContext(
+        cur=None,
+        tenant_id=tenant_id,
+        work_order_id=wo["id"],
+        data=data,
+        cursor_factory=lambda: db.get_cursor(commit=True),
+    )
+    out = engine.run_work_order(ctx, handlers=real_handlers())
+    return _print_outcome(out, ctx)
 
 
 if __name__ == "__main__":

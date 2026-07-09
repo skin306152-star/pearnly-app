@@ -54,6 +54,66 @@ def open_work_order(
     return dict(cur.fetchone())
 
 
+_WO_COLUMNS = (
+    "id, tenant_id, workspace_client_id, period, intent, status, "
+    "current_step, created_at, updated_at"
+)
+
+
+def list_work_orders(
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: Optional[int] = None,
+    period: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[dict]:
+    """列该租户工单,可按账套/账期/状态筛,倒序分页。可选筛选走 `%s IS NULL OR col = %s`
+    的静态谓词(不动态拼 SQL 结构,值全参数化)——看板/列表读侧用。"""
+    cur.execute(
+        f"SELECT {_WO_COLUMNS} FROM work_orders "
+        "WHERE tenant_id = %s "
+        "AND (%s::bigint IS NULL OR workspace_client_id = %s::bigint) "
+        "AND (%s::text IS NULL OR period = %s::text) "
+        "AND (%s::text IS NULL OR status = %s::text) "
+        "ORDER BY created_at DESC, id DESC LIMIT %s OFFSET %s",
+        (
+            tenant_id,
+            workspace_client_id,
+            workspace_client_id,
+            period,
+            period,
+            status,
+            status,
+            limit,
+            offset,
+        ),
+    )
+    return [dict(r) for r in cur.fetchall()]
+
+
+def count_work_orders(
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: Optional[int] = None,
+    period: Optional[str] = None,
+    status: Optional[str] = None,
+) -> int:
+    """列表总数(分页 total)。同 list_work_orders 的筛选谓词。"""
+    cur.execute(
+        "SELECT count(*) AS n FROM work_orders "
+        "WHERE tenant_id = %s "
+        "AND (%s::bigint IS NULL OR workspace_client_id = %s::bigint) "
+        "AND (%s::text IS NULL OR period = %s::text) "
+        "AND (%s::text IS NULL OR status = %s::text)",
+        (tenant_id, workspace_client_id, workspace_client_id, period, period, status, status),
+    )
+    return int(cur.fetchone()["n"])
+
+
 def get_work_order(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
     cur.execute(
         "SELECT id, tenant_id, workspace_client_id, period, intent, status, "
@@ -182,6 +242,17 @@ def list_items(
             (tenant_id, work_order_id, status),
         )
     return [dict(r) for r in cur.fetchall()]
+
+
+def get_item(cur, *, tenant_id: str, work_order_id: str, item_id: str) -> Optional[dict]:
+    """取单件料,并同时校验它属于该工单(裁决接口验 item 归属用)。越界返 None。"""
+    cur.execute(
+        f"SELECT {_ITEM_COLUMNS} FROM work_order_items "
+        "WHERE tenant_id = %s AND work_order_id = %s AND id = %s",
+        (tenant_id, work_order_id, item_id),
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
 
 
 def update_item(

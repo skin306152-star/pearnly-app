@@ -1,0 +1,293 @@
+# -*- coding: utf-8 -*-
+"""工单制路由契约 + fail-closed 守门(routes/workorder_routes.py · M1-B1)。
+
+锁定:①八个端点按 path+method 注册且挂进 app;②M1 闸关时任一端点 404(对存量用户
+路由等于不存在);③闸开 + 鉴权后开单外形正确;④非法裁决 → 422、item 不属该单 → 404;
+⑤下载只放行库里登记过的交付物(未登记 → 404,不碰磁盘)。
+"""
+
+from __future__ import annotations
+
+import unittest
+from unittest import mock
+
+from fastapi import HTTPException
+
+from routes.workorder_routes import router as workorder_router
+
+
+def _route_set(router):
+    out = set()
+    for r in router.routes:
+        for m in getattr(r, "methods", set()) or set():
+            if m in ("GET", "POST", "PUT", "PATCH", "DELETE"):
+                out.add((m, r.path))
+    return out
+
+
+class RouteContractTests(unittest.TestCase):
+    def test_expected_routes_registered(self):
+        rs = _route_set(workorder_router)
+        expected = {
+            ("POST", "/api/workorder/orders"),
+            ("GET", "/api/workorder/orders"),
+            ("GET", "/api/workorder/orders/{work_order_id}"),
+            ("POST", "/api/workorder/orders/{work_order_id}/run"),
+            ("POST", "/api/workorder/orders/{work_order_id}/decisions"),
+            ("POST", "/api/workorder/orders/{work_order_id}/materials"),
+            ("GET", "/api/workorder/orders/{work_order_id}/deliverables"),
+            ("GET", "/api/workorder/orders/{work_order_id}/deliverables/{kind}"),
+        }
+        self.assertTrue(expected.issubset(rs), f"缺路由: {expected - rs}")
+
+
+class RouterMountedTests(unittest.TestCase):
+    def test_mounted_in_app(self):
+        import app  # noqa: F401
+
+        paths = {getattr(r, "path", None) for r in app.app.routes}
+        self.assertIn("/api/workorder/orders", paths)
+
+
+class _Cur:
+    def __init__(self, fetch=(1,)):
+        self._fetch = fetch
+
+    def execute(self, *a, **k):
+        pass
+
+    def fetchone(self):
+        return self._fetch
+
+
+class _CM:
+    def __init__(self, cur):
+        self.cur = cur
+
+    def __enter__(self):
+        return self.cur
+
+    def __exit__(self, *a):
+        return False
+
+
+class _FakeDB:
+    def __init__(self, cur):
+        self._cur = cur
+
+    def get_cursor(self, commit=False):
+        return _CM(self._cur)
+
+
+_USER = {"id": "u1", "tenant_id": "t-1"}
+
+
+class GateClosedTests(unittest.IsolatedAsyncioTestCase):
+    async def test_gate_closed_hides_route_as_404(self):
+        from routes import workorder_routes as wr
+
+        with (
+            mock.patch.object(wr, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=False),
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.list_orders(mock.Mock())
+        self.assertEqual(ctx.exception.status_code, 404)
+
+
+class CreateOrderTests(unittest.IsolatedAsyncioTestCase):
+    async def test_open_order_returns_shape(self):
+        from routes import workorder_routes as wr
+
+        wo = {
+            "id": "wo-1",
+            "workspace_client_id": 7,
+            "period": "2569-05",
+            "intent": "monthly_vat",
+            "status": "collecting",
+            "current_step": None,
+        }
+        with (
+            mock.patch.object(wr, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(wr, "require_perm", return_value=_USER),
+            mock.patch.object(wr, "check_workspace_scope", return_value=None),
+            mock.patch.object(wr, "db", _FakeDB(_Cur(fetch=(1,)))),
+            mock.patch.object(wr.api, "open_order", return_value=wo),
+        ):
+            out = await wr.create_order(
+                wr.OrderCreate(workspace_client_id=7, period="2569-05"), mock.Mock()
+            )
+        self.assertEqual(out["id"], "wo-1")
+        self.assertEqual(out["status"], "collecting")
+
+    async def test_unowned_workspace_is_404(self):
+        from routes import workorder_routes as wr
+
+        with (
+            mock.patch.object(wr, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(wr, "require_perm", return_value=_USER),
+            mock.patch.object(wr, "db", _FakeDB(_Cur(fetch=None))),  # 归属查询空 = 不属本租户
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.create_order(
+                    wr.OrderCreate(workspace_client_id=99, period="2569-05"), mock.Mock()
+                )
+        self.assertEqual(ctx.exception.status_code, 404)
+
+
+class DecisionMappingTests(unittest.IsolatedAsyncioTestCase):
+    async def _call(self, decision, item_ok):
+        from routes import workorder_routes as wr
+
+        wo = {"workspace_client_id": 7}
+        err = None if item_ok else wr.api.WorkOrderApiError("workorder.item_not_found")
+
+        def _rec(*a, **k):
+            if err:
+                raise err
+            return {"id": 5}
+
+        with (
+            mock.patch.object(wr, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(wr, "require_perm", return_value=_USER),
+            mock.patch.object(wr, "check_workspace_scope", return_value=None),
+            mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            mock.patch.object(wr.store, "get_work_order", return_value=wo),
+            mock.patch.object(wr.api, "record_decision", side_effect=_rec),
+        ):
+            return await wr.add_decision(
+                "wo-1", wr.DecisionIn(item_id="it-1", decision=decision), mock.Mock()
+            )
+
+    async def test_valid_decision_ok(self):
+        out = await self._call("face_value", item_ok=True)
+        self.assertTrue(out["ok"])
+
+    async def test_invalid_decision_maps_422(self):
+        from routes import workorder_routes as wr
+
+        wo = {"workspace_client_id": 7}
+        with (
+            mock.patch.object(wr, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(wr, "require_perm", return_value=_USER),
+            mock.patch.object(wr, "check_workspace_scope", return_value=None),
+            mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            mock.patch.object(wr.store, "get_work_order", return_value=wo),
+            mock.patch.object(
+                wr.api,
+                "record_decision",
+                side_effect=wr.api.WorkOrderApiError("workorder.decision_invalid"),
+            ),
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.add_decision(
+                    "wo-1", wr.DecisionIn(item_id="it-1", decision="bogus"), mock.Mock()
+                )
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    async def test_item_not_found_maps_404(self):
+        with self.assertRaises(HTTPException) as ctx:
+            await self._call("face_value", item_ok=False)
+        self.assertEqual(ctx.exception.status_code, 404)
+
+
+class DownloadGuardTests(unittest.IsolatedAsyncioTestCase):
+    async def test_unregistered_kind_is_404_without_touching_disk(self):
+        from routes import workorder_routes as wr
+
+        wo = {"workspace_client_id": 7}
+        with (
+            mock.patch.object(wr, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(wr, "require_perm", return_value=_USER),
+            mock.patch.object(wr, "check_workspace_scope", return_value=None),
+            mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            mock.patch.object(wr.store, "get_work_order", return_value=wo),
+            mock.patch.object(wr.api, "deliverable_artifact_path", return_value=None),
+            mock.patch.object(wr.storage, "resolve_within_order") as resolve,
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.download_deliverable("wo-1", "pp30_draft", mock.Mock())
+        self.assertEqual(ctx.exception.status_code, 404)
+        resolve.assert_not_called()  # 未登记就短路,不进磁盘解析
+
+
+class _FakeUpload:
+    """UploadFile 替身:read(n) 尊重封顶字节数(验证路由的封顶读法,不整读)。"""
+
+    def __init__(self, content: bytes, filename: str = "a.jpg"):
+        self._content = content
+        self.filename = filename
+        self.read_sizes: list = []
+
+    async def read(self, size: int = -1) -> bytes:
+        self.read_sizes.append(size)
+        return self._content if size < 0 else self._content[:size]
+
+
+class MaterialsUploadLimitTests(unittest.IsolatedAsyncioTestCase):
+    """补料上限防护:超文件数/超单文件字节 → 413 结构化码,且一字不落盘。"""
+
+    def _patches(self, wr):
+        return (
+            mock.patch.object(wr, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(wr, "require_perm", return_value=_USER),
+            mock.patch.object(wr, "check_workspace_scope", return_value=None),
+            mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            mock.patch.object(wr.store, "get_work_order", return_value={"workspace_client_id": 7}),
+        )
+
+    async def test_too_many_files_maps_413(self):
+        from routes import workorder_routes as wr
+
+        files = [_FakeUpload(b"x") for _ in range(wr._MAX_MATERIAL_FILES + 1)]
+        with mock.patch.object(wr.storage, "save_material") as save:
+            for p in self._patches(wr):
+                self.enterContext(p)
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.add_materials("wo-1", mock.Mock(), files=files)
+        self.assertEqual(ctx.exception.status_code, 413)
+        self.assertEqual(ctx.exception.detail, "workorder.too_many_files")
+        save.assert_not_called()
+
+    async def test_oversize_file_maps_413_with_capped_read(self):
+        from routes import workorder_routes as wr
+
+        big = _FakeUpload(b"z" * (wr._MAX_MATERIAL_BYTES + 1), filename="huge.pdf")
+        with mock.patch.object(wr.storage, "save_material") as save:
+            for p in self._patches(wr):
+                self.enterContext(p)
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.add_materials("wo-1", mock.Mock(), files=[big])
+        self.assertEqual(ctx.exception.status_code, 413)
+        self.assertEqual(ctx.exception.detail, "workorder.file_too_large")
+        # 封顶读法:只请求上限+1 字节,不整读超大文件。
+        self.assertEqual(big.read_sizes, [wr._MAX_MATERIAL_BYTES + 1])
+        save.assert_not_called()
+
+    async def test_within_limits_still_registers(self):
+        from routes import workorder_routes as wr
+
+        ok_file = _FakeUpload(b"bytes", filename="a.jpg")
+        with (
+            mock.patch.object(wr.storage, "save_material", return_value=mock.Mock()) as save,
+            mock.patch.object(
+                wr.intake,
+                "register_file",
+                return_value={"id": "it-1", "file_ref": "/m/a.jpg"},
+            ),
+        ):
+            for p in self._patches(wr):
+                self.enterContext(p)
+            out = await wr.add_materials("wo-1", mock.Mock(), files=[ok_file])
+        self.assertEqual(out["count"], 1)
+        save.assert_called_once()
+
+
+if __name__ == "__main__":
+    unittest.main()

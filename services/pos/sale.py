@@ -458,19 +458,22 @@ def void_sale(
     wh = inv_store.get_or_create_default_warehouse(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
     )
-    for ln in sales_store.list_lines(cur, tenant_id=tenant_id, sale_id=sale_id):
-        stock.restock(
-            cur,
-            tenant_id=tenant_id,
-            workspace_client_id=workspace_client_id,
-            warehouse_id=wh["id"],
-            product_id=str(ln["product_id"]),
-            batch_id=str(ln["batch_id"]) if ln["batch_id"] else None,
-            qty_base=ln["qty_base"],
-            ref_type="pos_void",
-            ref_id=sale_id,
-            txn_type="adjust",
-            created_by=created_by,
-        )
+    # 原单没扣过库存(餐饮成品单)就不回补——回补要照镜像扣减,不是照有单就补。
+    restore_stock = stock.sale_deducted_stock(cur, tenant_id=tenant_id, sale_id=sale_id)
+    if restore_stock:
+        for ln in sales_store.list_lines(cur, tenant_id=tenant_id, sale_id=sale_id):
+            stock.restock(
+                cur,
+                tenant_id=tenant_id,
+                workspace_client_id=workspace_client_id,
+                warehouse_id=wh["id"],
+                product_id=str(ln["product_id"]),
+                batch_id=str(ln["batch_id"]) if ln["batch_id"] else None,
+                qty_base=ln["qty_base"],
+                ref_type="pos_void",
+                ref_id=sale_id,
+                txn_type="adjust",
+                created_by=created_by,
+            )
     sales_store.set_status(cur, tenant_id=tenant_id, sale_id=sale_id, status="void")
-    return {"sale_id": sale_id, "status": "void", "stock_returned": True}
+    return {"sale_id": sale_id, "status": "void", "stock_returned": restore_stock}

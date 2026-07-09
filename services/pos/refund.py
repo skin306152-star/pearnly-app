@@ -39,7 +39,14 @@ def refund(
             client_uuid=client_uuid,
         )
         if existing:
-            return _refund_result(existing, deduped=True)
+            # 重放也如实报库存侧结果(餐饮单本就没回补过)。
+            return _refund_result(
+                existing,
+                deduped=True,
+                stock_returned=stock.sale_deducted_stock(
+                    cur, tenant_id=tenant_id, sale_id=original_sale_id
+                ),
+            )
 
     orig = sales_store.get_sale(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, sale_id=original_sale_id
@@ -134,6 +141,8 @@ def refund(
     wh = inv_store.get_or_create_default_warehouse(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
     )
+    # 原单没扣过库存(餐饮成品单)就不回补——回补要照镜像扣减,不是照有单就补。
+    restore_stock = stock.sale_deducted_stock(cur, tenant_id=tenant_id, sale_id=original_sale_id)
     for item, nl in zip(refund_items, totals["lines"]):
         oline = item["oline"]
         sales_store.insert_line(
@@ -154,19 +163,20 @@ def refund(
                 "line_total": -nl["line_total"],
             },
         )
-        stock.restock(
-            cur,
-            tenant_id=tenant_id,
-            workspace_client_id=workspace_client_id,
-            warehouse_id=wh["id"],
-            product_id=str(oline["product_id"]),
-            batch_id=str(oline["batch_id"]) if oline["batch_id"] else None,
-            qty_base=item["qty_base"],
-            ref_type="pos_refund",
-            ref_id=refund_sale_id,
-            txn_type="return_in",
-            created_by=created_by,
-        )
+        if restore_stock:
+            stock.restock(
+                cur,
+                tenant_id=tenant_id,
+                workspace_client_id=workspace_client_id,
+                warehouse_id=wh["id"],
+                product_id=str(oline["product_id"]),
+                batch_id=str(oline["batch_id"]) if oline["batch_id"] else None,
+                qty_base=item["qty_base"],
+                ref_type="pos_refund",
+                ref_id=refund_sale_id,
+                txn_type="return_in",
+                created_by=created_by,
+            )
 
     sales_store.insert_payment(
         cur,
@@ -175,16 +185,16 @@ def refund(
         method=refund_method,
         amount=grand,
     )
-    return _refund_result(refund_sale, deduped=False)
+    return _refund_result(refund_sale, deduped=False, stock_returned=restore_stock)
 
 
-def _refund_result(sale: dict, *, deduped: bool) -> dict:
+def _refund_result(sale: dict, *, deduped: bool, stock_returned: bool) -> dict:
     return {
         "refund_sale": {
             "id": str(sale["id"]),
             "receipt_no": sale["receipt_no"],
             "grand_total": sale_svc._money(sale["grand_total"]),
         },
-        "stock_returned": True,
+        "stock_returned": stock_returned,
         "deduped": deduped,
     }

@@ -218,6 +218,20 @@ def _check_and_move(
     )
 
 
+def sale_deducted_stock(cur, *, tenant_id: str, sale_id: str) -> bool:
+    """原单卖出时是否真扣过库存(retail 每行必扣 vs 餐饮成品单从不扣)。
+
+    退款/作废回补要以扣减为镜像:餐饮单在 pos_sale_lines 落行但从没写过
+    ref_type='pos_sale' 的库存流水,若无脑回补会把从没扣过的库存凭空加回去。
+    """
+    cur.execute(
+        "SELECT 1 FROM inventory_transactions "
+        "WHERE tenant_id = %s AND ref_type = 'pos_sale' AND ref_id = %s LIMIT 1",
+        (tenant_id, sale_id),
+    )
+    return cur.fetchone() is not None
+
+
 def restock(
     cur,
     *,

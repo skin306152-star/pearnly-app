@@ -804,3 +804,27 @@ button.btn-primary.btn-tiny:hover {
 }
 .erp-logs-erp-select:hover { border-color: var(--brand); }
 .erp-logs-erp-select:focus { outline: none; border-color: var(--brand); }
+
+/* 全选本页 + 分页(2026-07-09 · 与识别记录 .history-foot 同款) */
+.erp-logs-selrow { display: flex; align-items: center; padding: 4px 2px 10px; }
+.erp-logs-selall {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: var(--ink-3);
+    cursor: pointer;
+    user-select: none;
+}
+.erp-logs-selall input { cursor: pointer; }
+.erp-logs-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--ink-3);
+}
+.erp-logs-pager-info { font-variant-numeric: tabular-nums; }
+.erp-logs-pager-btns { display: flex; gap: 4px; }
+.erp-logs-pager-btns .btn { padding: 4px 12px; font-size: 12px; min-height: 0; }

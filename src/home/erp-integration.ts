@@ -28,6 +28,10 @@ let _logFilter = { key: 'all', val: '' };
 let _erpAdapter = '';
 let _erpLogBusiness = ''; // 业务类型下拉(全部业务 / id_card / invoice)
 let _erpLogKeyword = ''; // 日志搜索(单据号 / 卖方)
+// 分页(与识别记录/访问日志同款)· 换筛选/搜索回第一页,翻页/刷新保留当前页。
+let _logPage = 0;
+let _logTotal = 0;
+const _LOG_PAGE_SIZE = 30;
 let _erpSelectReady = false;
 // v118.25.1 · 推送日志多选状态(批量重推)
 let _erpSelected = new Set();
@@ -87,7 +91,10 @@ async function loadErpLogs(silent?: boolean) {
     _ensureErpSelectOptions();
 
     try {
-        const params = new URLSearchParams({ limit: '30' });
+        const params = new URLSearchParams({
+            limit: String(_LOG_PAGE_SIZE),
+            offset: String(_logPage * _LOG_PAGE_SIZE),
+        });
         if (_logFilter.key === 'status') params.set('status', _logFilter.val);
         if (_logFilter.key === 'trigger') params.set('trigger', _logFilter.val);
         // DMS 推送可视化闭环 · ERP 系统筛选改下拉(_erpAdapter)· 与 status/trigger chip 独立组合
@@ -103,6 +110,7 @@ async function loadErpLogs(silent?: boolean) {
         }
         const data = await resp.json();
         const items = data.items || [];
+        _logTotal = data.total || 0;
         // 有「推送中(pending)」行 → 4s 后静默再拉一次 · 让状态原地翻成 ✓/✗(2026-05-26)·
         // 无 pending 或离开页面(下次 listEl 不在直接 return)即自动停。
         if (window._erpLogPollTimer) {
@@ -119,7 +127,14 @@ async function loadErpLogs(silent?: boolean) {
             }, 4000);
         }
         if (items.length === 0) {
+            // 末页删空后 offset 越界 → 回退一页重拉(不留空页)。
+            if (_logTotal > 0 && _logPage > 0) {
+                _logPage--;
+                loadErpLogs(silent);
+                return;
+            }
             listEl.innerHTML = `<div class="erp-logs-empty">${escapeHtml(t('erp-logs-empty'))}</div>`;
+            _renderLogsPager(0);
             return;
         }
         // 失败卡「修复映射」picker 按 id 从当前列表取整条 · 绑主体面板同步渲染前需账套主体下拉数据
@@ -138,10 +153,36 @@ async function loadErpLogs(silent?: boolean) {
             if (!visibleIds.has(id)) _erpSelected.delete(id);
         }
         window._refreshErpBatchBar();
+        _renderLogsPager(items.length);
     } catch (e) {
         console.error('load erp logs failed', e);
         listEl.innerHTML = `<div class="erp-logs-empty">${escapeHtml(t('erp-logs-error'))}</div>`;
     }
+}
+
+// 分页页脚:显示「第 from-to / 共 total」+ 上/下页按钮(无数据或单页时隐藏)。
+function _renderLogsPager(shown: number) {
+    const foot = document.getElementById('erp-logs-foot');
+    const info = document.getElementById('erp-logs-pager-info');
+    const prev = document.getElementById('erp-logs-prev') as HTMLButtonElement | null;
+    const next = document.getElementById('erp-logs-next') as HTMLButtonElement | null;
+    if (!foot || !info || !prev || !next) return;
+    if (_logTotal <= _LOG_PAGE_SIZE) {
+        foot.style.display = 'none';
+        return;
+    }
+    foot.style.display = '';
+    const from = shown > 0 ? _logPage * _LOG_PAGE_SIZE + 1 : 0;
+    const to = _logPage * _LOG_PAGE_SIZE + shown;
+    info.textContent = t('erp-logs-pager', { from, to, total: _logTotal });
+    prev.disabled = _logPage === 0;
+    next.disabled = (_logPage + 1) * _LOG_PAGE_SIZE >= _logTotal;
+}
+
+// 换筛选/搜索 → 回第一页再拉(翻页/刷新不经此)。
+function _reloadLogsFirstPage() {
+    _logPage = 0;
+    loadErpLogs();
 }
 
 async function retryPushLog(logId: any) {
@@ -335,7 +376,21 @@ async function retryPushLog(logId: any) {
                 key: filterChip.dataset.filterKey as string,
                 val: filterChip.dataset.filterVal as string,
             };
-            loadErpLogs();
+            _reloadLogsFirstPage();
+            return;
+        }
+        if ((e.target as HTMLElement).closest('#erp-logs-prev')) {
+            if (_logPage > 0) {
+                _logPage--;
+                loadErpLogs();
+            }
+            return;
+        }
+        if ((e.target as HTMLElement).closest('#erp-logs-next')) {
+            if ((_logPage + 1) * _LOG_PAGE_SIZE < _logTotal) {
+                _logPage++;
+                loadErpLogs();
+            }
             return;
         }
         if ((e.target as HTMLElement).closest('#btn-refresh-logs')) {
@@ -359,10 +414,10 @@ async function retryPushLog(logId: any) {
         const el = e.target as HTMLElement;
         if (el && el.id === 'erp-logs-erp-select') {
             _erpAdapter = (el as HTMLInputElement).value || '';
-            loadErpLogs();
+            _reloadLogsFirstPage();
         } else if (el && el.id === 'erp-logs-business-select') {
             _erpLogBusiness = (el as HTMLInputElement).value || '';
-            loadErpLogs();
+            _reloadLogsFirstPage();
         }
     });
     // 日志搜索框(草稿「搜索单据号、客户或任务」)· debounce
@@ -372,7 +427,7 @@ async function retryPushLog(logId: any) {
         if (el && el.id === 'erp-logs-search') {
             _erpLogKeyword = (el as HTMLInputElement).value || '';
             if (_logSearchTimer) clearTimeout(_logSearchTimer);
-            _logSearchTimer = setTimeout(() => loadErpLogs(), 350);
+            _logSearchTimer = setTimeout(() => _reloadLogsFirstPage(), 350);
         }
     });
 })();
@@ -388,5 +443,6 @@ window.setErpLogAdapter = function (adapter: string) {
     _erpAdapter = adapter || '';
     const sel = document.getElementById('erp-logs-erp-select') as HTMLSelectElement | null;
     if (sel) sel.value = _erpAdapter;
+    _logPage = 0;
     loadErpLogs();
 };

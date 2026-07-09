@@ -76,8 +76,23 @@
                     </button>
                 </div>
 
+                <div class="erp-logs-selrow">
+                    <label class="erp-logs-selall">
+                        <input type="checkbox" data-log-select-all aria-label="select all">
+                        <span data-i18n="erp-logs-select-all">全选本页</span>
+                    </label>
+                </div>
+
                 <div id="erp-logs-list" class="erp-logs-list">
                     <div class="erp-logs-empty" data-i18n="erp-logs-loading">加载中…</div>
+                </div>
+
+                <div class="erp-logs-foot" id="erp-logs-foot" style="display:none;">
+                    <div id="erp-logs-pager-info" class="erp-logs-pager-info"></div>
+                    <div class="erp-logs-pager-btns">
+                        <button id="erp-logs-prev" class="btn btn-ghost">‹</button>
+                        <button id="erp-logs-next" class="btn btn-ghost">›</button>
+                    </div>
                 </div>
             </section>
         </div>

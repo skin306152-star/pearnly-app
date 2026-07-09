@@ -37,6 +37,7 @@ class RouteContractTests(unittest.TestCase):
             ("POST", "/api/workorder/orders/{work_order_id}/materials"),
             ("GET", "/api/workorder/orders/{work_order_id}/deliverables"),
             ("GET", "/api/workorder/orders/{work_order_id}/deliverables/{kind}"),
+            ("GET", "/api/workorder/orders/{work_order_id}/items/{item_id}/image"),
         }
         self.assertTrue(expected.issubset(rs), f"缺路由: {expected - rs}")
 
@@ -287,6 +288,73 @@ class MaterialsUploadLimitTests(unittest.IsolatedAsyncioTestCase):
             out = await wr.add_materials("wo-1", mock.Mock(), files=[ok_file])
         self.assertEqual(out["count"], 1)
         save.assert_called_once()
+
+
+class ItemImageTests(unittest.IsolatedAsyncioTestCase):
+    """item 原图端点(W3 契约 §1.2 缺口 A):只放行库里登记过且落在工单目录内的 file_ref。"""
+
+    def _patches(self, wr):
+        return (
+            mock.patch.object(wr, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(wr, "require_perm", return_value=_USER),
+            mock.patch.object(wr, "check_workspace_scope", return_value=None),
+            mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            mock.patch.object(wr.store, "get_work_order", return_value={"workspace_client_id": 7}),
+        )
+
+    async def test_item_without_file_ref_is_404_without_disk_touch(self):
+        from routes import workorder_routes as wr
+
+        with (
+            mock.patch.object(wr.store, "get_item", return_value={"id": "it-1", "file_ref": None}),
+            mock.patch.object(wr.storage, "resolve_within_order") as resolve,
+        ):
+            for p in self._patches(wr):
+                self.enterContext(p)
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.get_item_image("wo-1", "it-1", mock.Mock())
+        self.assertEqual(ctx.exception.status_code, 404)
+        self.assertEqual(ctx.exception.detail, "workorder.item_image_not_found")
+        resolve.assert_not_called()
+
+    async def test_file_outside_order_dir_is_404(self):
+        from routes import workorder_routes as wr
+
+        with (
+            mock.patch.object(
+                wr.store, "get_item", return_value={"id": "it-1", "file_ref": "/etc/passwd"}
+            ),
+            mock.patch.object(wr.storage, "resolve_within_order", return_value=None) as resolve,
+        ):
+            for p in self._patches(wr):
+                self.enterContext(p)
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.get_item_image("wo-1", "it-1", mock.Mock())
+        self.assertEqual(ctx.exception.status_code, 404)
+        self.assertEqual(ctx.exception.detail, "workorder.item_image_not_found")
+        resolve.assert_called_once_with("t-1", "wo-1", "/etc/passwd")
+
+    async def test_valid_image_served_with_extension_media_type(self):
+        import tempfile
+        from pathlib import Path
+
+        from routes import workorder_routes as wr
+
+        with tempfile.TemporaryDirectory() as td:
+            img = Path(td) / "IMG_2647.jpg"
+            img.write_bytes(b"jpeg-bytes")
+            with (
+                mock.patch.object(
+                    wr.store, "get_item", return_value={"id": "it-1", "file_ref": str(img)}
+                ),
+                mock.patch.object(wr.storage, "resolve_within_order", return_value=img),
+            ):
+                for p in self._patches(wr):
+                    self.enterContext(p)
+                resp = await wr.get_item_image("wo-1", "it-1", mock.Mock())
+        self.assertEqual(resp.media_type, "image/jpeg")
+        self.assertEqual(resp.path, str(img))
 
 
 if __name__ == "__main__":

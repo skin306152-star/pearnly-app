@@ -33,8 +33,9 @@ def replay_step_done(events: list[dict], step: str) -> Optional[dict]:
 
 
 def replay_items_by_type(events: list[dict], event_type: str) -> dict:
-    """按 item_id 回放某类事件为 {item_id: {"event_id":, "payload":}}(同 item 多条时
-    后者胜,反映最新裁决/识别——与 reconcile.py 回放同一份事件流的语义一致)。"""
+    """按 item_id 回放某类事件为 {item_id: {"event_id":, "payload":, "actor":, "at":}}
+    (同 item 多条时后者胜,反映最新裁决/识别——与 reconcile.py 回放同一份事件流的语义
+    一致)。actor/at 给「谁在何时判的」读侧(W3 审核队列);老消费者只取 payload 不受影响。"""
     out: dict = {}
     for e in events:
         if e["event_type"] != event_type:
@@ -42,7 +43,12 @@ def replay_items_by_type(events: list[dict], event_type: str) -> dict:
         payload = e.get("payload") or {}
         item_id = payload.get("item_id")
         if item_id:
-            out[item_id] = {"event_id": e["id"], "payload": payload}
+            out[item_id] = {
+                "event_id": e["id"],
+                "payload": payload,
+                "actor": e.get("actor"),
+                "at": e.get("created_at"),
+            }
     return out
 
 

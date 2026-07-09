@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import mimetypes
 import os
 from pathlib import Path
 from typing import Optional
@@ -241,3 +242,22 @@ async def download_deliverable(work_order_id: str, kind: str, request: Request):
     if not path:
         raise HTTPException(404, detail="workorder.deliverable_not_found")
     return FileResponse(str(path), filename=path.name)
+
+
+@router.get("/api/workorder/orders/{work_order_id}/items/{item_id}/image")
+async def get_item_image(work_order_id: str, item_id: str, request: Request):
+    """审核队列原图直出(W3 契约 §1.2 缺口 A)。与交付物下载同构:只放行该 item 库里
+    登记过的 file_ref,再断言落在工单目录内(防穿越);Content-Type 按扩展名给。"""
+    user, tenant_id = _authorize(request)
+    with db.get_cursor() as cur:
+        _load_order(cur, request, user, tenant_id, work_order_id)
+        item = store.get_item(
+            cur, tenant_id=tenant_id, work_order_id=work_order_id, item_id=item_id
+        )
+    if not item or not item.get("file_ref"):
+        raise HTTPException(404, detail="workorder.item_image_not_found")
+    path = storage.resolve_within_order(tenant_id, work_order_id, item["file_ref"])
+    if not path:
+        raise HTTPException(404, detail="workorder.item_image_not_found")
+    media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    return FileResponse(str(path), media_type=media_type, filename=path.name)

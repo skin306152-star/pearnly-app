@@ -165,6 +165,86 @@ class OrderDetailTests(_ApiTestBase):
         self.assertIsNone(api.order_detail(None, tenant_id="t-1", work_order_id="ghost"))
 
 
+class FlaggedEnrichmentTests(_ApiTestBase):
+    """W3 契约 §1.2/§5:flagged[] 每条带 ocr_read(票面钱字段)+ decision(最新裁决)。"""
+
+    def setUp(self):
+        super().setUp()
+        self.store.items = [
+            {
+                "id": "it-1",
+                "work_order_id": "wo-1",
+                "kind": "purchase_invoice",
+                "status": "flagged",
+                "flag_reason": "amount_math_fail",
+                "file_ref": "/x/a.jpg",
+            },
+        ]
+
+    def test_ocr_read_comes_from_item_classified_money(self):
+        money = {
+            "subtotal": "500.00",
+            "vat": "45.00",
+            "total_amount": "545.00",
+            "invoice_number": "IV999",
+            "seller_tax": "0735527000289",
+        }
+        self.store.events = [
+            {
+                "id": 1,
+                "step": "classify",
+                "event_type": "item_classified",
+                "payload": {"item_id": "it-1", "kind": "purchase_invoice", "money": money},
+            },
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertEqual(detail["flagged"][0]["ocr_read"], money)
+        self.assertIsNone(detail["flagged"][0]["decision"])  # 没判过就诚实给空
+
+    def test_decision_is_latest_human_decision_with_actor_and_at(self):
+        # 先 face_value 后 recalc:latest-wins,与 reconcile 回放同语义。
+        self.store.events = [
+            {
+                "id": 1,
+                "step": "reconcile",
+                "event_type": "human_decision",
+                "payload": {"item_id": "it-1", "decision": "face_value", "values": {}},
+                "actor": "user:9",
+                "created_at": "2026-07-09T10:00:00+00:00",
+            },
+            {
+                "id": 2,
+                "step": "reconcile",
+                "event_type": "human_decision",
+                "payload": {"item_id": "it-1", "decision": "recalc", "values": {"vat": "4069.05"}},
+                "actor": "user:9",
+                "created_at": "2026-07-09T10:05:00+00:00",
+            },
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        decision = detail["flagged"][0]["decision"]
+        self.assertEqual(decision["decision"], "recalc")
+        self.assertEqual(decision["values"], {"vat": "4069.05"})
+        self.assertEqual(decision["actor"], "user:9")
+        self.assertEqual(decision["at"], "2026-07-09T10:05:00+00:00")
+        self.assertIsNone(detail["flagged"][0]["ocr_read"])  # 无 item_classified 就空
+
+    def test_other_items_events_do_not_bleed_in(self):
+        self.store.events = [
+            {
+                "id": 1,
+                "step": "reconcile",
+                "event_type": "human_decision",
+                "payload": {"item_id": "it-999", "decision": "exclude", "values": {}},
+                "actor": "user:9",
+                "created_at": "2026-07-09T10:00:00+00:00",
+            },
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertIsNone(detail["flagged"][0]["decision"])
+        self.assertIsNone(detail["flagged"][0]["ocr_read"])
+
+
 class RecordDecisionTests(_ApiTestBase):
     def setUp(self):
         super().setUp()

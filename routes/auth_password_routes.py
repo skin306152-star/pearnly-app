@@ -85,8 +85,11 @@ def _send_password_reset_via_email(email: str, reset_url: str, user_name: str = 
         </div>
         """
     # 优先 · SMTP(系统主通道 · Gmail · 跟注册验证码一样)
+    # 注意:必须从定义处 routes.auth_email_code_routes 导入。app 只 include 了它的 router,
+    # 并未把 _smtp_send_email 提升到 app 命名空间——`from app import` 会 ImportError 被静默吞掉,
+    # SMTP 主通道形同虚设、全部退到未验证发件人的 Resend 而发不出(2026-07-09 找回密码 audit_only 根因)。
     try:
-        from app import _smtp_send_email
+        from routes.auth_email_code_routes import _smtp_send_email
 
         ok, err = _smtp_send_email(email, subject, html)
         if ok:

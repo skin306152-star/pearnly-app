@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """工单制 schema 双跑对齐闸(桌面 pearnly ai/M0-施工任务包-v1.md §3 · 铁律 #5)。
 
-prod 无自动迁移,services/workorder/schema.ensure_workorder_schema 与 alembic 0059 是
-同一份 DDL 的两处副本(启动 ensure / 正式迁移)。任一处漏建表/漏隔离 → 红。纯静态扫
-文本,不连库(照 tests/unit/test_purchase_schema.py 同款配方)。
+建表唯一走 alembic 0059(铁律 #5:无运行期 ensure 建表);services/workorder/schema.py
+只留与 0059 逐字对齐的 DDL 常量(集成测试助手从中建表)。这两份 DDL 任一处漏建表/漏
+隔离 → 红。纯静态扫文本,不连库(照 tests/unit/test_purchase_schema.py 同款配方)。
 """
 
 import pathlib

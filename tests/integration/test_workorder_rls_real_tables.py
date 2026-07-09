@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """工单制 4 表真表端到端隔离 + 幂等键验证(M0 T1 · 照 test_sales_rls_real_tables.py 配方)。
 
-真 ensure_workorder_schema()(建表 + apply_tenant_rls)在真 postgres 上验:租户 A 的工单/
+真 build_workorder_schema()(建表 + apply_tenant_rls)在真 postgres 上验:租户 A 的工单/
 事件/条目/交付物,租户 B 一概读不到、塞不进(WITH CHECK)。附带验证 store.py 三处幂等键
 真在数据库层面生效(唯一索引 + ON CONFLICT),不只是 SQL 文本看起来对。CI 默认 skip,本地跑:
 
@@ -30,7 +30,9 @@ class WorkOrderRlsTests(unittest.TestCase):
         os.environ["RLS_ROLE"] = "pearnly_app"
 
         from core import db, rls
-        from services.workorder import schema, store
+        from services.workorder import store
+
+        from tests.integration._workorder_schema import build_workorder_schema
 
         cls.db, cls.store = db, store
         with db.get_cursor_rls(bypass=True, commit=True) as cur:
@@ -39,7 +41,7 @@ class WorkOrderRlsTests(unittest.TestCase):
                 "DROP TABLE IF EXISTS work_order_deliverables, work_order_items, "
                 "work_order_events, work_orders CASCADE"
             )
-        schema.ensure_workorder_schema()  # 真建表 + apply_tenant_rls × 4
+        build_workorder_schema()  # 真建表 + apply_tenant_rls × 4
 
         with db.get_cursor_rls(bypass=True, commit=True) as cur:
             for table in _TABLES:

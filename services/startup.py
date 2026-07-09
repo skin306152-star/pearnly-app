@@ -273,7 +273,6 @@ def _boot_schema_ddl() -> None:
         ("services.accounting.schema", "ensure_accounting_schema", "accounting"),
         ("services.tax.schema", "ensure_tax_schema", "tax"),
         ("services.expense.schema", "ensure_expense_schema", "expense"),
-        ("services.workorder.schema", "ensure_workorder_schema", "workorder"),
     ):
         try:
             getattr(__import__(_path, fromlist=[_fn]), _fn)()

@@ -9,7 +9,7 @@ M0-施工任务包-v1.md §3)。work_orders 每客户每期一张(唯一约束 t
 意图,重复开单幂等返回既有单);其余三表挂在 work_order_id 下面。work_order_events
 只追加(证据链底座 + 断点续跑恢复源),DAL 层不给它 UPDATE/DELETE。四表统一纯 tenant
 RLS(仓库实证:apply_tenant_workspace_rls 虽存在但零表采用,见 b8-rls-HANDOFF §7.15.2)。
-Dual-run:services/workorder/schema.ensure_workorder_schema() 同源幂等 DDL。
+建表唯一走本迁移(铁律 #5);schema.py 只留逐字对齐 DDL 常量,test_workorder_schema.py 静态守。
 """
 
 from alembic import op

@@ -1,0 +1,22 @@
+# -*- coding: utf-8 -*-
+"""工单制真表隔离测试的建表助手(建表逻辑归测试自己 · 不进 services)。
+
+生产建表唯一走 alembic/versions/0059_workorder_core.py(铁律 #5)。真表 RLS 集成测试
+仍需在临时库里把 4 表拉起来,这里复用 services/workorder/schema.py 冻结的 DDL 常量
+(与 0059 的双跑对齐由 tests/unit/test_workorder_schema.py 静态守),把常量灌进游标 +
+挂纯 tenant RLS —— 等价于原 ensure_workorder_schema 的运行期行为,但只服务测试。
+"""
+
+from core import db
+from core.rls import apply_tenant_rls
+from services.workorder import schema
+
+
+def build_workorder_schema() -> None:
+    """在当前库建工单制 4 表 + 索引 + RLS(仅测试用 · 幂等)。"""
+    with db.get_cursor(commit=True) as cur:
+        for ddl in schema._TABLES:
+            cur.execute(ddl)
+        for idx in schema._INDEXES:
+            cur.execute(idx)
+        apply_tenant_rls(cur, *schema._RLS_TABLES)

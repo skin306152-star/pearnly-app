@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
-"""工单制 schema 双跑入口(启动调一次 · 与 alembic 0059 同源幂等 DDL · 铁律 #5)。
+"""工单制 4 表 DDL 常量(建表唯一事实源 = alembic 0059 · 铁律 #5:schema 只走迁移)。
 
-prod 无自动迁移钩子 → startup 经 ensure_workorder_schema() 幂等建 4 表 + RLS policy。
-DDL 与迁移逐字对齐(改一处必同改两处)。失败仅告警不 raise(不挡主服务)。
+这里不再有运行期 ensure 建表入口(反模式已删):真正的建表由 alembic/versions/
+0059_workorder_core.py 负责。本模块只冻结与 0059 逐字对齐的 DDL 常量,两处漂移由
+tests/unit/test_workorder_schema.py 静态守;真表隔离集成测试从这些常量建表(见
+tests/integration/_workorder_schema.py 的测试助手)。
 
 四表关系:work_orders 是每客户每期一张的顶层单据,workspace_client_id 恒非空(每单
 只属一个客户账套);其余三表以 work_order_id 挂在它下面,各自也带一份 tenant_id
-(同 purchase_lines/journal_lines 的子表惯例)。四表统一纯 tenant RLS(`apply_tenant_rls`)
+(同 purchase_lines/journal_lines 的子表惯例)。四表统一纯 tenant RLS
 ——docs/refactor/b8-rls-HANDOFF §7.15.2/7.20 反复验过:仓库里 `apply_tenant_workspace_rls`
 虽存在(core/rls.py)但实际零表采用,purchase_docs/journal_vouchers 等有 workspace_client_id
 的表照样只挂纯 tenant policy,应用层 WHERE tenant_id+workspace_client_id 才是真正的隔离主力、
@@ -15,14 +17,6 @@ RLS 是第二道防线,不重复造未经验证的模板。
 work_order_events 是唯一追加表:证据链底座 + 断点续跑的恢复源(重放到最后一条
 step_done = 当前进度)。DAL 层(store.py)故意不给它 UPDATE/DELETE 函数。
 """
-
-from __future__ import annotations
-
-import logging
-
-from core.rls import apply_tenant_rls
-
-logger = logging.getLogger("mr-pilot")
 
 _TABLES = (
     """
@@ -103,15 +97,3 @@ _RLS_TABLES = (
     "work_order_items",
     "work_order_deliverables",
 )
-
-
-def ensure_workorder_schema() -> None:
-    """幂等建工单制 4 表 + 索引 + RLS(startup 调 · 与 alembic 0059 同源)。"""
-    from core import db
-
-    with db.get_cursor(commit=True) as cur:
-        for ddl in _TABLES:
-            cur.execute(ddl)
-        for idx in _INDEXES:
-            cur.execute(idx)
-        apply_tenant_rls(cur, *_RLS_TABLES)

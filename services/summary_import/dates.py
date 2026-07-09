@@ -84,19 +84,12 @@ def resolve_date(cell: str, period: Optional[Tuple[int, int]]) -> Optional[str]:
 
 
 def detect_period(text: str) -> Optional[Tuple[int, int]]:
-    """从标题/前言文字自动认出(公历 year, month)。命中泰文月名 + 独立 4 位年份则返回,否则 None。
-
-    年份须是【独立】4 位数(前后非数字):否则标题里的税号/单号(如 เลขภาษี 3101888669 的
-    "3101")会先被抓成年份,污染成错误年份。并要求转公历后落在合理窗口,再排除误配。
-    """
-    if not text:
-        return None
-    low = text.lower()
+    """标题/前言 →(公历 year, month)。年份取独立 4 位(前后非数字,避开税号/单号数字被误当年份)+ 公历落 2000~2100。"""
+    low = (text or "").lower()
     month = next((m for name, m in _THAI_MONTHS.items() if name in low), None)
     if not month:
         return None
     for cand in re.findall(r"(?<!\d)\d{4}(?!\d)", text):
-        ad = to_ad_year(int(cand))
-        if 2000 <= ad <= 2100:
+        if 2000 <= (ad := to_ad_year(int(cand))) <= 2100:
             return ad, month
     return None

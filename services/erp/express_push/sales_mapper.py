@@ -34,7 +34,7 @@ from services.erp.express_push.common import (
     detect_prename,
     extract_line_items,
     fail,
-    payment_verdict,
+    payment_verdict_for,
     resolve_account,
     resolve_account_sourced,
     sanitize_payload_cp874,
@@ -173,9 +173,12 @@ def build_express_sales_payload(
     # 不碰库存/成本。status!=ok → companion 退回表头模式 + posted_partial(诚实)。
     detail = extract_line_items(fields, base, total=total)
 
-    # 现销 HS / 赊销 IV:票面显式字段 > 票种语义(F3)> 无信号默认赊销。
-    # verdict_src 留痕排障用:现/赊哪层定的。
-    paid, verdict_src = payment_verdict(fields)
+    # 现销 HS / 赊销 IV:六级漏斗(common.payment_verdict)—— 人工裁决 > 票面显式字段 >
+    # 票种语义(F3)> 银行佐证(F6)> 无信号默认赊销。销项 v1 不接供应商过账档案(档案锚是
+    # 卖方税号,销项无此维度)。verdict_src 留痕排障用:现/赊哪层定的。
+    paid, verdict_src = payment_verdict_for(
+        history, fields, mappings, direction="sales", total=total
+    )
     doctype = "HS" if paid else "IV"
     logger.info(
         "[express-sales] ref_no=%s doctype=%s payment_src=%s",
@@ -203,6 +206,7 @@ def build_express_sales_payload(
         # 变动科目(收入)的真实解析来源 · config_default=落账套默认→待核(诚实状态)。
         "account_source": acc_source,
         "account_review": acc_source == SRC_DEFAULT,
+        "doctype_src": verdict_src or "config_default",  # 现/赊哪层定的(F2-F6 六级漏斗留痕)
         "source": {
             "history_id": str(history.get("id") or ""),
             "filename": history.get("filename"),

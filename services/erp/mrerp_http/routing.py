@@ -17,7 +17,7 @@ import logging
 
 from typing import Any, Dict, List, Optional
 
-from services.erp.express_push.common import payment_is_paid
+from services.erp.express_push.common import payment_verdict_for
 from services.erp.express_push.direction import resolve_direction
 from services.erp.express_push.doc_sanity import check_document
 from services.erp.mrerp_adapter_models import FailedRow, ImportResult
@@ -33,23 +33,44 @@ def _fields(flat: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def choose_doc_type(
-    flat: Dict[str, Any], history: Dict[str, Any], *, own_tax_id: Any
+    flat: Dict[str, Any],
+    history: Dict[str, Any],
+    *,
+    own_tax_id: Any,
+    mappings: Optional[Dict[str, Any]] = None,
 ) -> Optional[str]:
-    """套账主体税号 × 票面买卖方 → sales_credit / sales_cash / purchase(_expense) / None。"""
+    """套账主体税号 × 票面买卖方 → sales_credit / sales_cash / purchase(_expense) / None。
+
+    mappings 可选(_bank_index · F6 银行佐证喂进销项 payment_verdict);未传 = 旧调用点零改动。
+    """
     direction = resolve_direction(flat, history, own_tax_id=own_tax_id)
-    if direction == "sales":
-        return "sales_cash" if payment_is_paid(_fields(flat)) else "sales_credit"
-
-    # 采购锚点已定 或 判不出方向(下方兜底)都要用同一个 judge_direction 结果,算一次复用。
-    from services.purchase.intake import judge_direction
-
     fields = _fields(flat)
-    kind, _ = judge_direction(fields)
-    is_expense = kind == "expense"
+
+    if direction == "sales":
+        paid, src = payment_verdict_for(flat, fields, mappings, direction="sales")
+        doc = "sales_cash" if paid else "sales_credit"
+        logger.info("[mrerp-route] doc=%s payment_src=%s", doc, src or "config_default")
+        return doc
+
+    # 采购方向货/费分流:人工裁决(posting_item_type_manual · F5 复核屏)优先于自动判据——
+    # 会计裁决,不是习惯裁决:有完整税票 = 可抵进项,票面法定证据不许被自动判据/档案习惯压过。
+    # 供应商过账档案(supplier_posting_profiles)的 default_item_type 同理在此不自动消费,
+    # 只留给工单线预填;唯用户在复核屏显式点过(manual)才算数,精度高于 judge_direction 猜测。
+    manual_item = str(fields.get("posting_item_type_manual") or "").strip().lower()
+    if manual_item in ("expense", "goods"):
+        is_expense = manual_item == "expense"
+        item_src = "manual"
+    else:
+        # 采购锚点已定 或 判不出方向(下方兜底)都要用同一个 judge_direction 结果,算一次复用。
+        from services.purchase.intake import judge_direction
+
+        kind, _ = judge_direction(fields)
+        is_expense = kind == "expense"
+        item_src = f"judge_direction={kind}"
 
     if direction == "purchase":
         doc = "purchase_expense" if is_expense else "purchase"
-        logger.info("[mrerp-route] doc=%s reason=anchor+judge_direction=%s", doc, kind)
+        logger.info("[mrerp-route] doc=%s reason=anchor+%s", doc, item_src)
         return doc
 
     # 税号锚点判不出(零售小票常态:票面无买方身份)→ 跟 Pearnly 自身单据判定走:
@@ -59,7 +80,7 @@ def choose_doc_type(
     # 仍留 None ——那是匹配闸(confirmed_account_set_mismatch)的辖区,不赌方向。
     buyer = clean_tax_id(fields.get("buyer_tax") or fields.get("buyer_tax_id"))
     if is_expense and not buyer:
-        logger.info("[mrerp-route] doc=purchase_expense reason=fallback+judge_direction=expense")
+        logger.info("[mrerp-route] doc=purchase_expense reason=fallback+%s", item_src)
         return "purchase_expense"
     return None
 
@@ -191,7 +212,7 @@ def route_and_upload(adapter, histories: List[Dict[str, Any]], mappings: Dict[st
     sanity_failed: List[FailedRow] = []
     groups: Dict[str, List[Dict[str, Any]]] = {}  # dict 保序 → 无需单独 order 列表
     for h in histories:
-        chosen = choose_doc_type(h, h, own_tax_id=own)
+        chosen = choose_doc_type(h, h, own_tax_id=own, mappings=mappings)
         if chosen in _PURCHASE_DOC_TYPES:
             dt = chosen  # 采购(货品/67)或采购费用(453)分别切到各自模块
         elif _walkin_to_cash(h, default_doc, mappings):

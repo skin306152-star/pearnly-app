@@ -17,6 +17,7 @@ from core import route_helpers
 from routes import history_routes
 from routes.history_routes import (
     HistoryBatchDeleteRequest,
+    HistoryPostingRequest,
     HistoryUpdateRequest,
     _check_history_access,
     router,
@@ -45,9 +46,10 @@ class HistoryRoutesContractTests(unittest.TestCase):
             ("DELETE", "/api/v1/history/{record_id}"),
             ("POST", "/api/history/{history_id}/assign_client"),
             ("POST", "/api/history/{history_id}/assign_workspace"),
+            ("PATCH", "/api/history/{record_id}/posting"),  # F5 · 人工裁决现/赊、货/费
         }
         self.assertEqual(got, expected)
-        self.assertEqual(len(router.routes), 14)
+        self.assertEqual(len(router.routes), 15)
 
     def test_app_includes_history_router(self):
         """防 include_router 漏挂 · app 必须能路由到 history"""
@@ -77,6 +79,7 @@ class HistoryRoutesContractTests(unittest.TestCase):
         """model 字段契约"""
         self.assertEqual(set(HistoryUpdateRequest.model_fields.keys()), {"pages"})
         self.assertEqual(set(HistoryBatchDeleteRequest.model_fields.keys()), {"ids"})
+        self.assertEqual(set(HistoryPostingRequest.model_fields.keys()), {"payment", "item_type"})
 
 
 if __name__ == "__main__":

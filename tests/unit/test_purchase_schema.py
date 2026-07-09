@@ -15,6 +15,7 @@ _MIGRATIONS = (
     "alembic/versions/0031_suppliers.py",
     "alembic/versions/0032_purchase_docs.py",
     "alembic/versions/0033_purchase_config.py",
+    "alembic/versions/0061_supplier_posting_profiles.py",
 )
 _ENSURE = "services/purchase/schema.py"
 
@@ -26,6 +27,7 @@ _EXPECTED_TABLES = {
     "expense_categories",
     "purchase_settings",
     "purchase_attachments",
+    "supplier_posting_profiles",  # F4(L2)· 0061
 }
 
 # 历史表:0033 建、0040 下线(待归类模块删)。迁移史里有,ensure 不再建。

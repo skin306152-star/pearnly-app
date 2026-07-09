@@ -250,6 +250,18 @@ class RoutedBatchEndpointTests(unittest.TestCase):
         self.assertIn("currency_not_thb", res.failed[0].reasons[0])
         self.assertFalse([p for p in paths if "importpc" in p], f"外币票不该推: {paths}")
 
+    def test_posting_item_type_manual_expense_routes_full_tax_invoice_to_453(self):
+        """F5:人工点了"记费用" → 即便票面是完整税票,也打 impaptran 的 453(费用档)而非 67。"""
+        h = _purchase("IVMANUAL01")  # 完整税票 → 自动判据本会走 purchase(67)
+        h["fields"]["posting_item_type_manual"] = "expense"
+        res, paths = self._run([h])
+        self.assertTrue(self._txn(paths, "impaptran"), f"未打到 impaptran: {paths}")
+        self.assertTrue(
+            [p for p in paths if p.startswith("impstkmas/")],
+            f"453 费用档未经 impstkmas 确保物料: {paths}",
+        )
+        self.assertEqual(len(res.success), 1)
+
     def test_credit_note_blocked_by_doc_sanity(self):
         h = {
             "client_id": 1,

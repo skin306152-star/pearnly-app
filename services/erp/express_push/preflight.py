@@ -21,6 +21,7 @@ from services.erp.express_push import direction as direction_mod
 from services.erp.express_push.doc_sanity import check_document
 from services.erp.express_push.mapper import build_express_payload
 from services.erp.express_push.sales_mapper import build_express_sales_payload
+from services.purchase.field_clean import clean_tax_id
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +143,43 @@ def _grade(history: Dict[str, Any], payload: Dict[str, Any], has_category: bool,
         return None
 
 
+def _attach_payment_evidence(
+    flat: Dict[str, Any], mappings: Dict[str, Any], tenant_id: Optional[str], user_id: Any
+) -> None:
+    """F4(L2)+F6(L3):供应商过账档案(仅进项 · 档案锚是卖方税号)+ 银行流水索引(两方向)·
+    就地写进 mappings 供 mapper/sales_mapper 的 payment_verdict 判据链读取。
+
+    查不到/表未建/无日期 → 对应键留空,绝不挡推送(与 F4/F6 本身"只加固不否决"的定位一致)。
+    """
+    if flat.get("direction") == "purchase" and tenant_id and flat.get("workspace_client_id"):
+        fields = flat.get("fields") if isinstance(flat.get("fields"), dict) else {}
+        seller_tax = clean_tax_id(
+            (fields or {}).get("seller_tax") or (fields or {}).get("seller_tax_id")
+        )
+        if seller_tax:
+            try:
+                from core import db
+                from services.purchase.supplier_posting import get_profiles
+
+                with db.get_cursor() as cur:
+                    profiles = get_profiles(
+                        cur,
+                        tenant_id=tenant_id,
+                        workspace_client_id=int(flat["workspace_client_id"]),
+                        tax_ids=[seller_tax],
+                    )
+                mappings["_supplier_profile"] = profiles.get(seller_tax)
+            except Exception:
+                logger.exception("preflight_express: supplier profile lookup failed")
+
+    try:
+        from services.erp.express_push.bank_evidence import load_bank_index_for_history
+
+        mappings["_bank_index"] = load_bank_index_for_history(flat, user_id)
+    except Exception:
+        logger.exception("preflight_express: bank index attach failed")
+
+
 def _fill_pending(checks: List[Check]) -> None:
     present = {c.key for c in checks}
     for k in CHECK_KEYS:
@@ -238,6 +276,8 @@ def preflight_express(endpoint: Dict[str, Any], history: Dict[str, Any]) -> Pref
                 request_body={"adapter": "express", "history_id": str(flat.get("id") or "")},
             )
         pf.checks.append(Check("document", OK))
+
+        _attach_payment_evidence(flat, mappings, tenant_id, user_id)
 
         if direction == "sales":
             mres = build_express_sales_payload(

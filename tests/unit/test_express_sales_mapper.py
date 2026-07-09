@@ -17,6 +17,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from services.erp.express_push.common import SRC_BANK, SRC_MANUAL  # noqa: E402
 from services.erp.express_push.sales_mapper import build_express_sales_payload  # noqa: E402
 
 _CONFIG = {
@@ -132,6 +133,32 @@ class ExpressSalesMapperTests(unittest.TestCase):
         )
         self.assertTrue(r.ok, r.reason)
         self.assertEqual(r.payload["doctype"], "HS")
+
+    def test_doctype_src_carried_config_default(self):
+        r = build_express_sales_payload(_sales_history(), config=_CONFIG)
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["doctype_src"], "config_default")
+
+    def test_posting_payment_manual_wins_over_doc_type(self):
+        # F5:人工裁决压过票种语义(receipt 本应判 HS)。
+        h = _sales_history(fields={"document_type": "receipt", "posting_payment_manual": "credit"})
+        r = build_express_sales_payload(h, config=_CONFIG)
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["doctype"], "IV")
+        self.assertEqual(r.payload["doctype_src"], SRC_MANUAL)
+
+    def test_bank_index_from_mappings_drives_doctype(self):
+        # F6:销项方向 = IN。fixture 的 fields 无 date/total_amount 两键(票面常态),
+        # 日期/金额取 history 顶层权威值(invoice_date/total_amount)也须命中。
+        mappings = {
+            "accounts": [],
+            "clients": [],
+            "_bank_index": [{"tx_date": "2015-12-15", "direction": "IN", "amount": "25097.92"}],
+        }
+        r = build_express_sales_payload(_sales_history(), config=_CONFIG, mappings=mappings)
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["doctype"], "HS")
+        self.assertEqual(r.payload["doctype_src"], SRC_BANK)
 
     def test_missing_accounts_manual(self):
         r = build_express_sales_payload(_sales_history(), config={"account_set": "DATAT"})

@@ -40,6 +40,12 @@ from core.db import (
 from core.auth import get_current_user_from_request
 from core.route_helpers import _plan_permissions, _tid
 from services.exceptions.exception_checks import _async_run_exception_checks, _parse_money
+from services.ocr_history.posting_manual import (
+    _ITEM_TYPE_VALUES,
+    _PAYMENT_VALUES,
+    backflow_supplier_profile,
+    update_history_posting_manual,
+)
 
 logger = logging.getLogger("mr-pilot")
 
@@ -192,6 +198,46 @@ async def history_update(record_id: str, req: HistoryUpdateRequest, request: Req
     except Exception as _re:
         logger.warning(f"history_update rechek hook failed (id={record_id}): {_re}")
     return {"ok": True, "rechecked": rechecked}
+
+
+class HistoryPostingRequest(BaseModel):
+    payment: Optional[str] = None  # "cash" | "credit" | null(缺省键=不动 · null=删键恢复自动)
+    item_type: Optional[str] = None  # "goods" | "expense" | null
+
+
+_POSTING_PAYMENT_VALUES = _PAYMENT_VALUES | {None}
+_POSTING_ITEM_TYPE_VALUES = _ITEM_TYPE_VALUES | {None}
+
+
+@router.patch("/api/history/{record_id}/posting")
+async def history_update_posting(record_id: str, req: HistoryPostingRequest, request: Request):
+    """F5 人工裁决:复核屏改现/赊、货/费(payment_verdict/choose_doc_type 最高优先级判据)。
+
+    回流(F4 · L2)在 posting_manual.backflow_supplier_profile:失败只 warning,不挡本次保存。
+    """
+    user = get_current_user_from_request(request)
+    _check_history_access(user)
+    tenant_id = _tid(user)
+    changed = req.model_dump(exclude_unset=True)
+    if not changed:
+        return {"ok": True}
+    # 值域闸在路由层:传错字 → 422,不许被 DAL 静默当"清除人工裁决"(DAL 的宽容 pop 语义=删键)。
+    if "payment" in changed and changed["payment"] not in _POSTING_PAYMENT_VALUES:
+        raise HTTPException(422, detail="history.posting_payment_invalid")
+    if "item_type" in changed and changed["item_type"] not in _POSTING_ITEM_TYPE_VALUES:
+        raise HTTPException(422, detail="history.posting_item_type_invalid")
+    result = update_history_posting_manual(str(user["id"]), record_id, tenant_id, **changed)
+    if not result.ok:
+        raise HTTPException(404, detail="history.not_found")
+    backflow_supplier_profile(
+        record_id=record_id,
+        tenant_id=tenant_id,
+        payment=changed.get("payment"),
+        item_type=changed.get("item_type"),
+        workspace_client_id=result.workspace_client_id,
+        seller_tax=result.seller_tax,
+    )
+    return {"ok": True}
 
 
 @router.delete("/api/history/{record_id}")

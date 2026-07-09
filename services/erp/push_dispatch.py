@@ -85,6 +85,12 @@ def _dispatch_mrerp_batch(
         flats.append(hf)
         inv_nos.append(_mrerp_history_invoice_no(hf))
 
+    # F6 银行佐证(L3)· 与单张路 push_mrerp_history 同源:批内取最早/最晚票面日期,一次性拉
+    # 覆盖全批的银行流水窗口(与 _own_tax_id 一样"一批共用一份"的取法)。
+    from services.erp.express_push.bank_evidence import attach_bank_index
+
+    mappings = attach_bank_index(mappings, flats, user_id, "dispatch_mrerp_batch")
+
     # ★套账主体税号锚点(方向路由 + 匹配闸都要):单张路本就注入,批量路此前漏了 → 方向恒
     #   判不出全落销项、匹配闸也全放行。一端点通常绑一个账套 → 取首张能解析到的税号即代表本批。
     try:

@@ -16,6 +16,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from services.erp.express_push.common import (  # noqa: E402
+    SRC_BANK,
+    SRC_MANUAL,
+    SRC_PROFILE,
+)
 from services.erp.express_push.mapper import build_express_payload  # noqa: E402
 
 _CONFIG = {
@@ -185,6 +190,47 @@ class ExpressMapperTests(unittest.TestCase):
         r = build_express_payload(h, config=_CONFIG)
         self.assertTrue(r.ok, r.reason)
         self.assertEqual(r.payload["vat_amount"], "26274.30")
+
+    def test_doctype_src_carried_config_default(self):
+        # 无信号 → config 默认(RR)· doctype_src 落 'config_default'(诚实待核标)。
+        r = build_express_payload(_ptt_history(), config=_CONFIG)
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["doctype_src"], "config_default")
+
+    def test_doctype_src_reflects_explicit_field(self):
+        r = build_express_payload(_ptt_history(fields={"payment_status": "paid"}), config=_CONFIG)
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["doctype_src"], "explicit")
+
+    def test_posting_payment_manual_wins_over_doc_type(self):
+        # F5:人工裁决(posting_payment_manual)压过票种语义(receipt 本应判 HP)。
+        h = _ptt_history(fields={"document_type": "receipt", "posting_payment_manual": "credit"})
+        r = build_express_payload(h, config=_CONFIG)
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["doctype"], "RR")
+        self.assertEqual(r.payload["doctype_src"], SRC_MANUAL)
+
+    def test_supplier_profile_from_mappings_drives_doctype(self):
+        # F4:mappings['_supplier_profile'] 的 default_payment=cash → HP · doctype_src='profile'。
+        mappings = {"accounts": [], "clients": [], "_supplier_profile": {"default_payment": "cash"}}
+        r = build_express_payload(_ptt_history(), config=_CONFIG, mappings=mappings)
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["doctype"], "HP")
+        self.assertEqual(r.payload["doctype_src"], SRC_PROFILE)
+
+    def test_bank_index_from_mappings_drives_doctype(self):
+        # F6:mappings['_bank_index'] 命中同金额/OUT/±7天 → HP · doctype_src='bank'。
+        # 关键:fixture 的 fields 无 date/total_amount 两键(票面常态),日期/金额取 history
+        # 顶层权威值(invoice_date/total_amount · mapper 传给 payment_verdict)也须命中。
+        mappings = {
+            "accounts": [],
+            "clients": [],
+            "_bank_index": [{"tx_date": "2015-12-31", "direction": "OUT", "amount": "401621.50"}],
+        }
+        r = build_express_payload(_ptt_history(), config=_CONFIG, mappings=mappings)
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["doctype"], "HP")
+        self.assertEqual(r.payload["doctype_src"], SRC_BANK)
 
     def test_vat_zero_two_line_entry(self):
         h = _ptt_history(fields={"subtotal": "100.00", "vat": "0"}, total_amount="100.00")

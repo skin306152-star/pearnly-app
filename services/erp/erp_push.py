@@ -161,6 +161,13 @@ def push_mrerp_history(
     if _gp:
         mappings = {**mappings, "_mrerp_generic_product": _gp}
 
+    # F6 银行佐证(L3)· 两方向 routing.choose_doc_type → payment_verdict 都读
+    # mappings['_bank_index'](与 Express preflight 同源 load_bank_index_for_history)。
+    # 查不到日期/表未建 → 静默空表,不挡推送。
+    from services.erp.express_push.bank_evidence import attach_bank_index
+
+    mappings = attach_bank_index(mappings, [history_flat], user_id, "push_mrerp_history")
+
     # ★套账匹配闸锚点:把套账主体(workspace_client)税号喂进 mappings → adapter 核票面
     # 买卖方符不符套账,确认别家的票则挡下不推(防推错套账)。复用 Express 侧同源解析(方向锚点单一事实源)。
     try:

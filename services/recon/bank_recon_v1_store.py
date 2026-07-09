@@ -444,6 +444,21 @@ def list_bank_recon_transactions(
         return []
 
 
+def list_transactions_window(user_id: Any, date_from: str, date_to: str) -> List[Dict[str, Any]]:
+    """F6 银行佐证(express_push.bank_evidence)按 user_id + 日期窗一次取流水
+    (tx_date/direction/amount)。不吞异常——调用方(bank_evidence.load_bank_index)自带
+    空表兜底外壳:这张表是用户手动建的对账草稿表(非迁移管理 · 测试库常缺),表所有权归一
+    到本 DAL,异常处理归一到调用方。
+    """
+    with db.get_cursor_rls(user_id=str(user_id)) as cur:
+        cur.execute(
+            "SELECT tx_date, direction, amount FROM bank_reconcile_transactions "
+            "WHERE user_id = %s AND tx_date BETWEEN %s AND %s",
+            (str(user_id), date_from, date_to),
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+
 def delete_bank_recon_session(
     user_id: str, session_id: str, workspace_client_id: Optional[int] = None, *, tenant_id=None
 ) -> bool:

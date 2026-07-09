@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """商户采购 schema 双跑入口(启动调一次 · 与 alembic 0031-0033 同源幂等 DDL)。
 
-prod 无自动迁移钩子 → startup 经 ensure_purchase_schema() 幂等建 6 表 + RLS policy。
+prod 无自动迁移钩子 → startup 经 ensure_purchase_schema() 幂等建 7 表 + RLS policy(F4 起
+含 supplier_posting_profiles · alembic/versions/0061_supplier_posting_profiles.py 留档)。
 DDL 与迁移逐字对齐(改一处必同改两处)。失败仅告警不 raise(不挡主服务)。隔离真正生效
 靠应用层 WHERE tenant_id;RLS policy 是最小权限角色的兜底(prod 现 BYPASSRLS)。
 """
@@ -134,6 +135,21 @@ _TABLES = (
         created_at timestamptz NOT NULL DEFAULT now()
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS supplier_posting_profiles (
+        tenant_id uuid NOT NULL,
+        workspace_client_id bigint NOT NULL,
+        seller_tax_id text NOT NULL,
+        default_payment text NOT NULL DEFAULT '',
+        default_item_type text NOT NULL DEFAULT '',
+        default_category_id uuid,
+        default_erp_account text,
+        source text NOT NULL DEFAULT '',
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        created_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY (tenant_id, workspace_client_id, seller_tax_id)
+    )
+    """,
 )
 
 _INDEXES = (
@@ -154,6 +170,8 @@ _INDEXES = (
     "ON expense_categories (tenant_id, workspace_client_id)",
     "CREATE INDEX IF NOT EXISTS ix_purchase_attachments_doc "
     "ON purchase_attachments (tenant_id, purchase_doc_id)",
+    "CREATE INDEX IF NOT EXISTS ix_supplier_posting_profiles_ws "
+    "ON supplier_posting_profiles (tenant_id, workspace_client_id)",
 )
 
 # 存量表补列(prod 已建表 → CREATE IF NOT EXISTS 不补列 · 须 ALTER 自愈幂等)。
@@ -173,11 +191,12 @@ _RLS_TABLES = (
     "expense_categories",
     "purchase_settings",
     "purchase_attachments",
+    "supplier_posting_profiles",
 )
 
 
 def ensure_purchase_schema() -> None:
-    """幂等建采购 6 表 + 索引 + RLS(startup 调 · 与 alembic 0031-0033 双跑)。"""
+    """幂等建采购 7 表 + 索引 + RLS(startup 调 · 与 alembic 0031-0033/0061 双跑)。"""
     from core import db
 
     with db.get_cursor(commit=True) as cur:

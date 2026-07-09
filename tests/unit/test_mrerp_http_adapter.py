@@ -312,6 +312,51 @@ class TestRouting(unittest.TestCase):
         flat = {"fields": {"document_type": "receipt", "buyer_tax": self.OTHER}}
         self.assertIsNone(choose_doc_type(flat, {}, own_tax_id=self.OWN))
 
+    def test_posting_item_type_manual_expense_overrides_full_tax_invoice(self):
+        # F5:人工点了"记费用",即便票面是完整税票(自动判据本会判 purchase/67 货品)。
+        from services.erp.mrerp_http.routing import choose_doc_type
+
+        flat = self._flat(seller=self.OTHER, buyer=self.OWN, doc_type="tax_invoice", vat="7")
+        flat["fields"]["posting_item_type_manual"] = "expense"
+        self.assertEqual(choose_doc_type(flat, {}, own_tax_id=self.OWN), "purchase_expense")
+
+    def test_posting_item_type_manual_goods_overrides_receipt_default(self):
+        # F5:人工点了"记货品",即便票面是简式收据(自动判据本会判 purchase_expense/453)。
+        from services.erp.mrerp_http.routing import choose_doc_type
+
+        flat = self._flat(seller=self.OTHER, buyer=self.OWN)
+        flat["fields"]["posting_item_type_manual"] = "goods"
+        self.assertEqual(choose_doc_type(flat, {}, own_tax_id=self.OWN), "purchase")
+
+    def test_posting_item_type_manual_garbage_value_ignored(self):
+        from services.erp.mrerp_http.routing import choose_doc_type
+
+        flat = self._flat(seller=self.OTHER, buyer=self.OWN)
+        flat["fields"]["posting_item_type_manual"] = "whatever"
+        self.assertEqual(choose_doc_type(flat, {}, own_tax_id=self.OWN), "purchase_expense")
+
+    def test_sales_bank_index_drives_cash(self):
+        # F6:mappings['_bank_index'] 命中 IN/同金额/±7天 → sales_cash(无 mappings 时零改动)。
+        from services.erp.mrerp_http.routing import choose_doc_type
+
+        flat = self._flat(seller=self.OWN, buyer=self.OTHER)
+        # 金额/日期在 flat 顶层(权威列 · fields 无 date/total_amount 两键的票面常态)也须命中。
+        flat["total_amount"] = "107.00"
+        flat["invoice_date"] = "2026-07-01"
+        mappings = {
+            "_bank_index": [{"tx_date": "2026-07-02", "direction": "IN", "amount": "107.00"}]
+        }
+        self.assertEqual(
+            choose_doc_type(flat, {}, own_tax_id=self.OWN, mappings=mappings), "sales_cash"
+        )
+
+    def test_sales_without_mappings_kwarg_unaffected(self):
+        # 旧调用点(不传 mappings)零回归:仍走票面显式/票种语义,无 bank_index 生效。
+        from services.erp.mrerp_http.routing import choose_doc_type
+
+        flat = self._flat(seller=self.OWN, buyer=self.OTHER)
+        self.assertEqual(choose_doc_type(flat, {}, own_tax_id=self.OWN), "sales_credit")
+
 
 class TestDocSanityDirectionForExpense(unittest.TestCase):
     """_doc_sanity_reason 必须把 purchase_expense 当采购方向查(不是按 doc_type 精确等值)。

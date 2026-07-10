@@ -17,9 +17,14 @@
 from __future__ import annotations
 
 import logging
-import secrets
 
-from services.auth.account_provision import create_owner_login_user, find_login_user
+from services.auth.account_provision import (
+    create_owner_login_user,
+    find_login_user,
+    generate_one_time_password as _gen_initial_password,  # noqa: F401 · 单测经本名引用
+    resolve_password,
+    write_login_password,
+)
 from services.auth.signup_core import (
     _ensure_tenant_for_new_user,
     _hash_password,
@@ -30,19 +35,6 @@ from services.pos import entitlements as ent
 logger = logging.getLogger("mr-pilot")
 
 _DEFAULT_AMOUNT_THB = 1000
-# 初始密码字母表:去掉易混字符(0/O/1/I/l),人念/手输/口头转交友好。
-_PW_LETTERS = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz"
-_PW_DIGITS = "23456789"
-_PW_LEN = 12
-
-
-def _gen_initial_password() -> str:
-    """生成一次性初始密码:满足 /reset 强度闸(≥8 · 至少一字母一数字),取 12 位。"""
-    pool = _PW_LETTERS + _PW_DIGITS
-    while True:
-        pw = "".join(secrets.choice(pool) for _ in range(_PW_LEN))
-        if any(c in _PW_LETTERS for c in pw) and any(c in _PW_DIGITS for c in pw):
-            return pw
 
 
 def provision_pos_account(
@@ -52,12 +44,15 @@ def provision_pos_account(
     tenant_name: str | None = None,
     granted_by: str | None = None,
     amount_paid_thb=None,
+    password: str | None = None,
 ) -> dict:
     """发放 POS 账号一条龙。调用方负责 commit(建号/建租户/grant 同一事务)。
 
-    返回 {existed, user_id, tenant_id, grant_code, initial_password}。
-    initial_password 仅在【新建账号】时非 None(一次性回显),已存在账号恒 None。
-    邮箱非法 → ValueError('email_invalid');重复开通/建租户失败 → ValueError(由路由翻错误码)。
+    password 可选:传了(过策略校验)就作初始密码,留空自动生成强随机;账号已存在时不改密
+    (existed 路不碰凭据,要改走重置密码流)。返回 {existed, user_id, tenant_id, grant_code,
+    initial_password};initial_password 仅【新建账号】非 None(一次性回显,自定义的也回显)。
+    邮箱非法 → ValueError('email_invalid');密码不合格 → ValueError('password_too_*');
+    建租户失败 → ValueError(由路由翻错误码)。
     """
     email_clean = (email or "").strip().lower()
     if not email_clean or "@" not in email_clean or "." not in email_clean.split("@", 1)[1]:
@@ -88,9 +83,12 @@ def provision_pos_account(
             "initial_password": None,
         }
 
-    password = _gen_initial_password()
+    initial_password = resolve_password(password)
     user_id = create_owner_login_user(
-        cur, email=email_clean, email_norm=email_norm, password_hash=_hash_password(password)
+        cur,
+        email=email_clean,
+        email_norm=email_norm,
+        password_hash=_hash_password(initial_password),
     )
     tid = _ensure_tenant_for_new_user(
         cur, user_id, "credits", company_name=tenant_name, username=email_clean
@@ -103,5 +101,31 @@ def provision_pos_account(
         "user_id": user_id,
         "tenant_id": str(tid),
         "grant_code": row["grant_code"],
-        "initial_password": password,
+        "initial_password": initial_password,
     }
+
+
+def reset_pos_account_password(cur, *, email: str, password: str | None = None) -> dict:
+    """发放制账号重置密码(超管 · Earn 后台)。调用方负责 commit。
+
+    范围严格限定(2026-07-10 安全纠正 · 照 TaxOps Z1-c 先例):账号所属租户必须持
+    pos_entitlement(任意 status)且账号是该租户成员(users.tenant_id 归属);超管账号、
+    无租户账号、租户无授权(=主站自由注册用户,有自助忘记密码通道)、邮箱不存在——一律
+    ValueError('not_in_scope'),路由统一翻 404 不区分缘由(防枚举)。历史上通用超管改密
+    端点因账户接管风险被砍 410(勘察修复台账 #1),此处绝不复活通用口。
+
+    password 可选:传了(过策略校验)就用它,留空自动生成强随机。返回
+    {user_id, email, new_password};明文只出现在返回值里,绝不写日志(调用方审计也不得带)。
+    """
+    email_clean = (email or "").strip().lower()
+    if not email_clean or "@" not in email_clean:
+        raise ValueError("not_in_scope")
+    user = find_login_user(cur, normalize_email(email_clean))
+    if not user or user.get("is_super_admin") or not user.get("tenant_id"):
+        raise ValueError("not_in_scope")
+    if not ent.get_for_tenant(cur, tenant_id=user["tenant_id"], active_only=False):
+        raise ValueError("not_in_scope")
+
+    new_password = resolve_password(password)
+    write_login_password(cur, user_id=user["id"], password_hash=_hash_password(new_password))
+    return {"user_id": user["id"], "email": email_clean, "new_password": new_password}

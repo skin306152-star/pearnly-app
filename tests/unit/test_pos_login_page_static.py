@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """POS 老板后台专属登录页(主域路径 /pos)入口收窄契约(PS-5)。
 
-验收断言 ①的静态部分:页面只有邮箱 + 密码 + 登录,断言【不存在】Google / LINE / 注册任何旁路;
-复用主站邮箱密码登录 API(零新鉴权),忘记密码走现有重置流,4 语齐全,有 viewport。
-(真浏览器渲染 + 截图为动态部分,见交付报告。)"""
+验收断言 ①的静态部分:页面只有邮箱 + 密码 + 登录,断言【不存在】Google / LINE / 注册 /
+忘记密码任何旁路(发放制账号密码问题找发号人);复用主站邮箱密码登录 API(零新鉴权),
+4 语齐全,有 viewport。(真浏览器渲染 + 截图为动态部分,见交付报告。)"""
 
 import unittest
 
@@ -37,9 +37,13 @@ class PosLoginPageContentTests(unittest.TestCase):
             self.assertNotIn(banned, low)
         self.assertNotIn("注册", POS_LOGIN_HTML)
 
-    def test_forgot_password_uses_existing_reset_flow(self):
-        # 忘记密码保留 · 走现有 /api/auth/forgot_password(不新造重置逻辑)
-        self.assertIn("/api/auth/forgot_password", POS_LOGIN_HTML)
+    def test_no_forgot_password_selfservice(self):
+        # 2026-07-10 Zihao 拍板:发放制账号不走自助找回(密码问题找发号人 → Earn 重置密码)。
+        # 接口引用 + 元素 id + 四语文案都不得出现。
+        self.assertNotIn("/api/auth/forgot_password", POS_LOGIN_HTML)
+        self.assertNotIn("p-forgot", POS_LOGIN_HTML)
+        for text in ("忘记密码", "ลืมรหัสผ่าน", "Forgot password", "パスワードをお忘れ"):
+            self.assertNotIn(text, POS_LOGIN_HTML)
 
     def test_four_languages_and_viewport(self):
         for lang in ("zh:", "th:", "en:", "ja:"):

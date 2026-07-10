@@ -109,6 +109,14 @@ class ProvisionBody(BaseModel):
     email: str = Field(..., min_length=3, max_length=200)
     tenant_name: Optional[str] = Field(None, max_length=100)
     amount_paid_thb: Optional[float] = Field(None, ge=0)
+    # 可选自定义初始密码(留空自动生成强随机)· 策略校验在服务层(与重置流同源)
+    password: Optional[str] = Field(None, max_length=128)
+
+
+class ResetPasswordBody(BaseModel):
+    email: str = Field(..., min_length=3, max_length=200)
+    # 可选自定义新密码(留空自动生成强随机)
+    password: Optional[str] = Field(None, max_length=128)
 
 
 @router.get("/api/admin/pos-entitlement")
@@ -166,15 +174,20 @@ async def provision_pos_account(request: Request, body: ProvisionBody):
                 tenant_name=(body.tenant_name or None),
                 granted_by=str(user["id"]),
                 amount_paid_thb=amount,
+                password=body.password,
             )
         except ValueError as e:
             code = str(e)
-            status_code = (
-                status.HTTP_400_BAD_REQUEST
-                if code in ("email_invalid", "tenant_provision_failed")
-                else status.HTTP_409_CONFLICT
-            )
-            raise HTTPException(status_code, detail=f"pos.provision_{code}") from e
+            if code in ("password_too_short", "password_too_weak"):
+                status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+                detail = f"account.{code}"
+            elif code in ("email_invalid", "tenant_provision_failed"):
+                status_code = status.HTTP_400_BAD_REQUEST
+                detail = f"pos.provision_{code}"
+            else:
+                status_code = status.HTTP_409_CONFLICT
+                detail = f"pos.provision_{code}"
+            raise HTTPException(status_code, detail=detail) from e
     # 审计:带 existed/邮箱/租户/授权码 —— 刻意不带 initial_password(不落日志)。
     _log_op(
         request,
@@ -193,6 +206,40 @@ async def provision_pos_account(request: Request, body: ProvisionBody):
         # 一次性回显:仅新建账号有值,超管当场转交客户后不再可得。
         "initial_password": res["initial_password"],
     }
+
+
+@router.post("/api/admin/pos-entitlement/reset-password")
+async def reset_pos_account_password(request: Request, body: ResetPasswordBody):
+    """发放制账号重置密码(严格限定域 · 不是通用改密)。
+
+    范围=账号所属租户持 pos_entitlement(任意 status)且账号是该租户成员;范围外(主站自由
+    注册用户/超管/不存在邮箱)一律 404 不区分缘由(防枚举)。通用超管改密端点历史上因账户
+    接管风险被砍 410(勘察修复台账 #1),不许复活——范围判定在 services/pos/provision。
+    密码可选自定义(策略不合格 422);回显一次,审计与日志绝不含密码本体。
+    """
+    user = _require_super_admin(request)
+    with db.get_cursor(commit=True) as cur:
+        try:
+            res = pos_provision.reset_pos_account_password(
+                cur, email=body.email, password=body.password
+            )
+        except ValueError as e:
+            code = str(e)
+            if code in ("password_too_short", "password_too_weak"):
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"account.{code}"
+                ) from e
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="pos.reset_not_available") from e
+    # 审计:谁给谁重置了密码(操作人 + 目标账号)—— 刻意不带密码本体。
+    _log_op(
+        request,
+        user,
+        action="pos_entitlement.reset_password",
+        target_type="user",
+        target_id=res["user_id"],
+        target_name=body.email,
+    )
+    return {"ok": True, "email": res["email"], "new_password": res["new_password"]}
 
 
 @router.post("/api/admin/pos-entitlement/revoke")

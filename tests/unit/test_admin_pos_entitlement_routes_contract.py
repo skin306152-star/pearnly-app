@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """admin_pos_entitlement_routes 契约(PS-3)。
 
-锁定:4 路由 path+method 契约;app include_router 挂上;全路由复用 route_helpers._require_super_admin
-单一来源;非超管一律 403(开通/吊销/转移是钱+授权敏感动作,守门丢不得)。"""
+锁定:6 路由 path+method 契约;app include_router 挂上;全路由复用 route_helpers._require_super_admin
+单一来源;非超管一律 403(开通/吊销/转移/发放/重置密码是钱+授权+凭据敏感动作,守门丢不得)。"""
 
 import unittest
 from unittest import mock
@@ -28,6 +28,7 @@ class RoutesContractTests(unittest.TestCase):
                 ("GET", "/api/admin/pos-entitlement"),
                 ("POST", "/api/admin/pos-entitlement/grant"),
                 ("POST", "/api/admin/pos-entitlement/provision"),
+                ("POST", "/api/admin/pos-entitlement/reset-password"),
                 ("POST", "/api/admin/pos-entitlement/revoke"),
                 ("POST", "/api/admin/pos-entitlement/transfer"),
             },
@@ -87,6 +88,14 @@ class GuardEnforcedTests(unittest.TestCase):
         with self._as_non_super():
             r = self.client.post(
                 "/api/admin/pos-entitlement/provision",
+                json={"email": "shop@example.com"},
+            )
+        self.assertEqual(r.status_code, 403)
+
+    def test_reset_password_non_super_403(self):
+        with self._as_non_super():
+            r = self.client.post(
+                "/api/admin/pos-entitlement/reset-password",
                 json={"email": "shop@example.com"},
             )
         self.assertEqual(r.status_code, 403)

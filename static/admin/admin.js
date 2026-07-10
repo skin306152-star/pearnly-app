@@ -3291,7 +3291,21 @@
                 '" style="min-width:220px" />' +
                 '<button class="btn btn-sm" id="adm-pos-xfer-btn">' +
                 _esc(_t('adm-pos-xfer-btn')) +
-                '</button></div>';
+                '</button></div>' +
+                // 重置密码(仅发放制账号 · 范围外后端一律 404):邮箱 + 可选自定义密码。
+                '<div class="adm-set-add" style="flex-wrap:wrap;gap:8px;margin-top:8px">' +
+                '<input type="email" id="adm-pos-reset-email" ' +
+                'data-i18n-placeholder="adm-pos-reset-ph" placeholder="' +
+                _esc(_t('adm-pos-reset-ph')) +
+                '" style="min-width:220px" />' +
+                '<input type="text" id="adm-pos-reset-pw" autocomplete="off" ' +
+                'data-i18n-placeholder="adm-pos-custom-pw-ph" placeholder="' +
+                _esc(_t('adm-pos-custom-pw-ph')) +
+                '" style="min-width:200px" />' +
+                '<button class="btn btn-sm" id="adm-pos-reset-btn">' +
+                _esc(_t('adm-pos-reset-btn')) +
+                '</button></div>' +
+                '<div id="adm-pos-reset-result" style="margin-top:12px"></div>';
         }
         return rows;
     }
@@ -3382,6 +3396,83 @@
                     _toast(_t('adm-pos-action-fail'), 'error');
                 }
             };
+        const reset = document.getElementById('adm-pos-reset-btn');
+        if (reset) {
+            // 查询若本身是邮箱,预填省一次输入(重置只按邮箱定位账号)。
+            const emailInput = document.getElementById('adm-pos-reset-email');
+            if (emailInput && !emailInput.value && _posLastQuery.indexOf('@') >= 0)
+                emailInput.value = _posLastQuery;
+            reset.onclick = _posResetPassword;
+        }
+    }
+
+    // 重置密码(仅发放制账号):可选自定义密码,回显一次;范围外后端一律 404。
+    async function _posResetPassword() {
+        const email = ((document.getElementById('adm-pos-reset-email') || {}).value || '')
+            .trim()
+            .toLowerCase();
+        const customPw = ((document.getElementById('adm-pos-reset-pw') || {}).value || '').trim();
+        const host = document.getElementById('adm-pos-reset-result');
+        if (!email || email.indexOf('@') < 0) {
+            _toast(_t('adm-pos-reset-need'), 'error');
+            return;
+        }
+        const ok = await _admConfirm(_t('adm-pos-reset-confirm').replace('{email}', email), {
+            title: _t('adm-pos-reset-btn'),
+            okText: _t('adm-pos-reset-btn'),
+            danger: true,
+        });
+        if (!ok) return;
+        try {
+            const r = await _adminFetch('/api/admin/pos-entitlement/reset-password', {
+                method: 'POST',
+                body: { email: email, password: customPw || null },
+            });
+            _toast(_t('adm-pos-reset-done'), 'success');
+            if (host) host.innerHTML = _posPwOnceHtml(email, r.new_password, 'adm-pos-reset-copy');
+        } catch (e) {
+            const msg =
+                String(e && e.message).indexOf('422') >= 0
+                    ? _t('adm-pos-pw-policy')
+                    : _t('adm-pos-reset-fail');
+            _toast(msg, 'error');
+        }
+    }
+
+    // 一次性密码回显块(发放/重置共用):明文 + 复制按钮,提示只显示这一次。
+    // headExtraHtml 可选:标题行邮箱后追加的已转义 HTML(发放流带授权码用)。
+    function _posPwOnceHtml(email, pw, copyBtnId, headExtraHtml) {
+        setTimeout(function () {
+            const cp = document.getElementById(copyBtnId);
+            if (cp && pw)
+                cp.onclick = function () {
+                    try {
+                        navigator.clipboard.writeText(pw);
+                        _toast(_t('adm-pos-prov-copied'), 'success');
+                    } catch (e) {
+                        /* 剪贴板不可用时无声降级:密码已明示在页面 */
+                    }
+                };
+        }, 0);
+        return (
+            '<div class="cost-section" style="border:1px solid var(--success);padding:14px 16px">' +
+            '<div style="font-weight:600;margin-bottom:8px">' +
+            _esc(email) +
+            (headExtraHtml || '') +
+            '</div>' +
+            '<div class="cost-section-hint" style="margin-bottom:6px">' +
+            _esc(_t('adm-pos-prov-pw-once')) +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+            '<code style="font-size:15px;padding:4px 10px;background:var(--panel-2,rgba(0,0,0,0.05));border-radius:6px">' +
+            _esc(pw) +
+            '</code>' +
+            '<button class="btn btn-sm" id="' +
+            copyBtnId +
+            '">' +
+            _esc(_t('adm-pos-prov-copy')) +
+            '</button></div></div>'
+        );
     }
 
     // 发放账号:输邮箱 → 建号+建租户+grant 一条龙(新账号一次性回显初始密码)。
@@ -3400,10 +3491,11 @@
             okText: _t('adm-pos-prov-go'),
         });
         if (!ok) return;
+        const customPw = ((document.getElementById('adm-pos-prov-pw') || {}).value || '').trim();
         try {
             const r = await _adminFetch('/api/admin/pos-entitlement/provision', {
                 method: 'POST',
-                body: { email: email, tenant_name: name || null },
+                body: { email: email, tenant_name: name || null, password: customPw || null },
             });
             _toast(_t('adm-pos-granted') + ' ' + (r.grant_code || ''), 'success');
             if (host) host.innerHTML = _posProvResultHtml(email, r);
@@ -3412,54 +3504,31 @@
             if (q) q.value = email;
             _posLoadStatus(email);
         } catch (e) {
-            _toast(_t('adm-pos-prov-fail'), 'error');
+            const msg =
+                String(e && e.message).indexOf('422') >= 0
+                    ? _t('adm-pos-pw-policy')
+                    : _t('adm-pos-prov-fail');
+            _toast(msg, 'error');
         }
     }
 
     function _posProvResultHtml(email, r) {
-        // 新账号:一次性显示初始密码(超管转交客户后即不可再得)+ 复制按钮。
-        let pwBlock = '';
-        if (r.existed) {
-            pwBlock =
-                '<div class="cost-section-hint">' + _esc(_t('adm-pos-prov-existed')) + '</div>';
-        } else if (r.initial_password) {
-            pwBlock =
-                '<div class="cost-section-hint" style="margin-bottom:6px">' +
-                _esc(_t('adm-pos-prov-pw-once')) +
-                '</div>' +
-                '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
-                '<code style="font-size:15px;padding:4px 10px;background:var(--panel-2,rgba(0,0,0,0.05));border-radius:6px">' +
-                _esc(r.initial_password) +
-                '</code>' +
-                '<button class="btn btn-sm" id="adm-pos-prov-copy">' +
-                _esc(_t('adm-pos-prov-copy')) +
-                '</button></div>';
+        // 新账号:一次性回显最终生效的初始密码(自定义的也回显 · 转交客户后不可再得)。
+        const codeHtml =
+            ' · ' + _esc(_t('adm-pos-code')) + ' <code>' + _esc(r.grant_code || '') + '</code>';
+        if (!r.existed && r.initial_password) {
+            return _posPwOnceHtml(email, r.initial_password, 'adm-pos-prov-copy', codeHtml);
         }
-        const box =
+        return (
             '<div class="cost-section" style="border:1px solid var(--success);padding:14px 16px">' +
             '<div style="font-weight:600;margin-bottom:8px">' +
             _esc(email) +
-            ' · ' +
-            _esc(_t('adm-pos-code')) +
-            ' <code>' +
-            _esc(r.grant_code || '') +
-            '</code></div>' +
-            pwBlock +
-            '</div>';
-        // 复制按钮延迟绑定(innerHTML 落地后)。
-        setTimeout(function () {
-            const cp = document.getElementById('adm-pos-prov-copy');
-            if (cp && r.initial_password)
-                cp.onclick = function () {
-                    try {
-                        navigator.clipboard.writeText(r.initial_password);
-                        _toast(_t('adm-pos-prov-copied'), 'success');
-                    } catch (e) {
-                        /* 剪贴板不可用时无声降级:密码已明示在页面 */
-                    }
-                };
-        }, 0);
-        return box;
+            codeHtml +
+            '</div>' +
+            '<div class="cost-section-hint">' +
+            _esc(_t('adm-pos-prov-existed')) +
+            '</div></div>'
+        );
     }
 
     function _renderPosPage() {

@@ -19,4 +19,5 @@ def build_workorder_schema() -> None:
             cur.execute(ddl)
         for idx in schema._INDEXES:
             cur.execute(idx)
+        schema.ensure_runtime_hardening(cur)  # C-1 租约/幂等键/原始文件名列
         apply_tenant_rls(cur, *schema._RLS_TABLES)

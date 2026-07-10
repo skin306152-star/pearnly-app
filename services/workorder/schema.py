@@ -97,3 +97,22 @@ _RLS_TABLES = (
     "work_order_items",
     "work_order_deliverables",
 )
+
+# 运行时加固 DDL(C-1)。与 alembic 0066_workorder_runtime_hardening 逐字对齐(dual-run):
+# prod alembic 指针停 0020,建列/建索引靠这里懒加载自愈,同 0060_ai_usage 范式。全部
+# 幂等(ADD COLUMN / CREATE INDEX 均 IF NOT EXISTS),已存在则空操作。基表 DDL(_TABLES)
+# 保持与 0059 逐字对齐不动,新增列走 ALTER 挂这里,不污染基表常量。
+RUNTIME_ALTERS = (
+    "ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS run_lease_owner text",
+    "ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS run_lease_expires_at timestamptz",
+    "ALTER TABLE work_order_events ADD COLUMN IF NOT EXISTS dedupe_key text",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_wo_events_dedupe "
+    "ON work_order_events (tenant_id, work_order_id, step, event_type, dedupe_key) "
+    "WHERE dedupe_key IS NOT NULL",
+)
+
+
+def ensure_runtime_hardening(cur) -> None:
+    """把 RUNTIME_ALTERS 灌进当前事务游标(幂等)。store.py 首次用到租约/幂等键列时懒调。"""
+    for ddl in RUNTIME_ALTERS:
+        cur.execute(ddl)

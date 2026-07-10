@@ -73,5 +73,41 @@ class WorkOrderSchemaParityTests(unittest.TestCase):
             self.assertNotIn("DELETE FROM work_order_events", text)
 
 
+_HARDEN_MIGRATION = "alembic/versions/0066_workorder_runtime_hardening.py"
+
+# 运行时加固(C-1)的 DDL 关键片段:ensure(schema.RUNTIME_ALTERS)与 0066 迁移必须同款。
+_HARDEN_NEEDLES = (
+    "ADD COLUMN IF NOT EXISTS run_lease_owner text",
+    "ADD COLUMN IF NOT EXISTS run_lease_expires_at timestamptz",
+    "ADD COLUMN IF NOT EXISTS dedupe_key text",
+    "uq_wo_events_dedupe",
+    "(tenant_id, work_order_id, step, event_type, dedupe_key)",
+    "WHERE dedupe_key IS NOT NULL",
+)
+
+
+class RuntimeHardeningParityTests(unittest.TestCase):
+    """C-1 §3/§4 dual-run 对齐:ensure 与 0066 迁移逐片段同款(prod alembic 停 0020,靠 ensure 自愈)。"""
+
+    def test_ensure_and_migration_carry_same_hardening_ddl(self):
+        ensure_text = _text(_ENSURE)
+        migration_text = _text(_HARDEN_MIGRATION)
+        for needle in _HARDEN_NEEDLES:
+            self.assertIn(needle, ensure_text, f"ensure 缺加固 DDL: {needle}")
+            self.assertIn(needle, migration_text, f"0066 迁移缺加固 DDL: {needle}")
+
+    def test_migration_merges_both_heads(self):
+        # 0066 收编 0058 之后分叉的两条链(0059 工单链 + 0065 主链)成单 head。
+        text = _text(_HARDEN_MIGRATION)
+        self.assertIn('"0065_users_username_lower_uniq"', text)
+        self.assertIn('"0059_workorder_core"', text)
+
+    def test_migration_downgrade_drops_everything(self):
+        text = _text(_HARDEN_MIGRATION)
+        self.assertIn("DROP INDEX IF EXISTS uq_wo_events_dedupe", text)
+        self.assertIn("DROP COLUMN IF EXISTS dedupe_key", text)
+        self.assertIn("DROP COLUMN IF EXISTS run_lease_owner", text)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -175,5 +175,82 @@ class DeliverablesTests(unittest.TestCase):
         self.assertIn("ORDER BY created_at", cur.calls[0][0])
 
 
+class RunLeaseTests(unittest.TestCase):
+    """C-1 §3 租约 SQL 形状:条件抢占(空/自持/过期)+ 参数化 + 释放只认自己。"""
+
+    def test_acquire_conditional_update_and_params(self):
+        cur = FakeCursor([{"id": "wo-1"}])  # RETURNING 到行 = 抢到
+        got = store.acquire_run_lease(
+            cur, tenant_id="t-1", work_order_id="wo-1", owner="run:abc", ttl_seconds=1800
+        )
+        self.assertTrue(got)
+        sql, params = cur.calls[0]
+        self.assertIn("UPDATE work_orders", sql)
+        self.assertIn("run_lease_owner IS NULL", sql)
+        self.assertIn("run_lease_expires_at < now()", sql)
+        self.assertIn("make_interval(secs => %s)", sql)
+        self.assertEqual(params, ("run:abc", 1800, "t-1", "wo-1", "run:abc"))
+
+    def test_acquire_returns_false_when_no_row(self):
+        cur = FakeCursor([None])  # 被他人未过期租约占着 → 0 行
+        self.assertFalse(
+            store.acquire_run_lease(
+                cur, tenant_id="t-1", work_order_id="wo-1", owner="run:x", ttl_seconds=60
+            )
+        )
+
+    def test_release_only_matches_owner(self):
+        cur = FakeCursor()
+        store.release_run_lease(cur, tenant_id="t-1", work_order_id="wo-1", owner="run:abc")
+        sql, params = cur.calls[0]
+        self.assertIn("SET run_lease_owner = NULL", sql)
+        self.assertIn("AND run_lease_owner = %s", sql)
+        self.assertEqual(params, ("t-1", "wo-1", "run:abc"))
+
+
+class AppendEventDedupeTests(unittest.TestCase):
+    """C-1 §4 事件幂等键:无 dedupe_key = 老路径逐字节;带 key = ON CONFLICT DO NOTHING。"""
+
+    def test_no_dedupe_key_keeps_legacy_insert(self):
+        cur = FakeCursor([{"id": 1}])
+        store.append_event(
+            cur, tenant_id="t-1", work_order_id="wo-1", step="classify", event_type="x"
+        )
+        sql, _ = cur.calls[0]
+        self.assertNotIn("ON CONFLICT", sql)
+        self.assertNotIn("dedupe_key", sql)
+
+    def test_dedupe_key_uses_on_conflict_do_nothing(self):
+        cur = FakeCursor([{"id": 2}])
+        store.append_event(
+            cur,
+            tenant_id="t-1",
+            work_order_id="wo-1",
+            step="classify",
+            event_type="item_classified",
+            payload={"item_id": "i1"},
+            dedupe_key="classify:i1",
+        )
+        sql, params = cur.calls[0]
+        self.assertIn("ON CONFLICT (tenant_id, work_order_id, step, event_type, dedupe_key)", sql)
+        self.assertIn("DO NOTHING", sql)
+        self.assertEqual(params[-1], "classify:i1")
+
+    def test_dedupe_conflict_returns_existing_row(self):
+        # INSERT ON CONFLICT DO NOTHING → 无 RETURNING 行(None);回读既有那条返回,不重记。
+        cur = FakeCursor([None, {"id": 7, "event_type": "item_classified"}])
+        out = store.append_event(
+            cur,
+            tenant_id="t-1",
+            work_order_id="wo-1",
+            step="classify",
+            event_type="item_classified",
+            dedupe_key="classify:i1",
+        )
+        self.assertEqual(out["id"], 7)
+        self.assertEqual(len(cur.calls), 2)  # INSERT + 回读 SELECT
+        self.assertIn("SELECT", cur.calls[1][0])
+
+
 if __name__ == "__main__":
     unittest.main()

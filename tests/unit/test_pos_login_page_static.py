@@ -3,12 +3,21 @@
 
 验收断言 ①的静态部分:页面只有账号(用户名或邮箱)+ 密码 + 登录,断言【不存在】Google /
 LINE / 注册 / 忘记密码任何旁路(发放制账号密码问题找发号人);复用主站账号密码登录 API
-(零新鉴权),4 语齐全,有 viewport。(真浏览器渲染 + 截图为动态部分,见交付报告。)"""
+(零新鉴权),4 语齐全,有 viewport。(真浏览器渲染 + 截图为动态部分,见交付报告。)
 
+演进(2026-07-10):页面从 routes/pos_login_page.py 内联常量挪成可读源 static/pos/pos-login.html
++ build 压成 dist/pos-login.html(view-source 只见外壳)· 本闸改对可读源断言。"""
+
+import re
 import unittest
+from pathlib import Path
 
 from routes.pages_routes import router as pages_router
-from routes.pos_login_page import POS_LOGIN_HTML
+
+# 断言对"实际服务出去的内容"生效:剥掉可读源里的开发注释(build minify 也会去掉),
+# 否则注释里解释入口收窄的"Google/LINE/注册"等字样会误伤 test_no_google_no_line_no_signup。
+_RAW = Path("static/pos/pos-login.html").read_text(encoding="utf-8")
+POS_LOGIN_HTML = re.sub(r"<!--.*?-->", "", _RAW, flags=re.S)
 
 
 class PosLoginPageContentTests(unittest.TestCase):

@@ -5,15 +5,16 @@ pages_routes.py · 静态页面服务 + 公开 meta 路由(health / contact)
 REFACTOR-B1 · 第二十会话从 app.py 抽出 · 0 业务逻辑改 · 纯后端搬家
 
 包含:
-  页面服务(HTMLResponse / FileResponse · 全公开 · 无鉴权):
-    /                   → static/landing/portal.dc.html(品牌门户 · no-cache · 脸0 2026-07-10)
-    /login              → static/dist/login.html(原登录页 · no-cache)
-    /home               → static/home.html(no-cache)
+  页面服务(FileResponse · 全公开 · 无鉴权 · 一律读 dist minified 外壳,源逐字可读):
+    /                   → static/dist/portal.html(品牌门户 · 源 static/landing/portal.dc.html)
+    /login              → static/dist/login.html(原登录页)
+    /home               → static/dist/home.html
     /admin              → 301 redirect → /admin/cost
-    /admin/{rest:path}  → static/admin/admin.html(SPA · no-cache)
-    /reset              → static/reset.html
-    /terms              → static/terms.html
-    /privacy            → static/privacy.html
+    /admin/{rest:path}  → static/dist/admin.html(SPA · 源 static/admin/admin.html)
+    /pos                → static/dist/pos-login.html(POS 老板登录 · 源 static/pos/pos-login.html)
+    /earn               → static/dist/earn-login.html(Earn 超管登录 · 源 static/earn/earn-login.html)
+    /reset              → static/dist/reset.html(源 reset.html)
+    /terms · /privacy   → static/dist/{terms,privacy}.html(源 static/{terms,privacy}.html)
   公开 meta:
     /api/health · /api/contact · /api/v1/health · /api/v1/contact
 
@@ -98,8 +99,9 @@ async def v1_contact():
 # ============================================================
 @router.get("/", response_class=HTMLResponse)
 async def root():
-    # 脸0(2026-07-10)· / = 品牌门户(4 产品分流)· 原登录页挪 /login · 门户自托管在 static/landing/ 直发不进 dist · no-cache。
-    return FileResponse("static/landing/portal.dc.html", headers=_NO_CACHE)
+    # 脸0(2026-07-10)· / = 品牌门户(4 产品分流)· 原登录页挪 /login · no-cache。
+    # 源逐字可读在 static/landing/portal.dc.html,build 压成 dist/portal.html(view-source 只见外壳)。
+    return FileResponse("static/dist/portal.html", headers=_NO_CACHE)
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -129,7 +131,8 @@ async def admin_page():
 # 老的 /admin URL(L4209)仍返回 home.html · 作 PEARNLY_ADMIN_MODE 老逻辑兜底
 @router.get("/admin/{rest:path}", response_class=HTMLResponse)
 async def admin_layout_page(rest: str):
-    return FileResponse("static/admin/admin.html", headers=_NO_CACHE)
+    # 源可读在 static/admin/admin.html,build 压成 dist/admin.html(外壳成品化 · admin JS/CSS 仍独立)。
+    return FileResponse("static/dist/admin.html", headers=_NO_CACHE)
 
 
 # POS 收银前台 SPA(PS-5 迁址 · 2026-07-10)· 收银台新家在 /cashier(与老板后台 /pos 分家,
@@ -200,12 +203,11 @@ async def ai_layout_page(rest: str):
 
 
 # POS 老板后台专属登录页(PS-5 · 主域路径 /pos · pos.pearnly.com 子域方案已废弃)。
-# 只有邮箱+密码,无 Google/LINE/注册。页头 guard:本机存过收银台绑定凭据(pos_store_token)→
+# 只有账号+密码(账号=用户名或邮箱),无 Google/LINE/注册。页头 guard:本机存过收银台绑定凭据(pos_store_token)→
 # 即跳 /cashier;否则渲染老板登录页。收银台 SPA 迁至 /cashier(见上)。不碰根路由 `/`(脸 0 门户在改)。
-def _pos_owner_login() -> HTMLResponse:
-    from routes.pos_login_page import POS_LOGIN_HTML
-
-    return HTMLResponse(POS_LOGIN_HTML, headers=_NO_CACHE)
+# 演进(2026-07-10):内联 .py 常量挪成可读源 static/pos/pos-login.html → build 压成 dist 产物。
+def _pos_owner_login() -> FileResponse:
+    return FileResponse("static/dist/pos-login.html", headers=_NO_CACHE)
 
 
 @router.get("/pos", response_class=HTMLResponse)
@@ -220,27 +222,25 @@ async def pos_owner_login_layout(rest: str):
 
 # Earn 超管后台专属登录页(主域路径 /earn · 2026-07-10 Zihao 拍板)。只有账号+密码,
 # 登录后前端打 /api/me 复核 is_super_admin(与 admin.js 鉴权同一事实源),非超管不落 token。
-# admin.js 无登录态/鉴权失败统一甩回本页。内联 HTML 原因同 reset_page。
+# admin.js 无登录态/鉴权失败统一甩回本页。
+# 演进(2026-07-10):内联 .py 常量挪成可读源 static/earn/earn-login.html → build 压成 dist 产物
+# (当年内联规避"webhook 不拾取新增 static 根文件";dist/ 子目录部署可靠,该约束不再适用)。
 @router.get("/earn", response_class=HTMLResponse)
 async def earn_login_page():
-    from routes.earn_login_page import EARN_LOGIN_HTML
-
-    return HTMLResponse(EARN_LOGIN_HTML, headers=_NO_CACHE)
+    return FileResponse("static/dist/earn-login.html", headers=_NO_CACHE)
 
 
 @router.get("/reset", response_class=HTMLResponse)
 async def reset_page():
-    # 内联 HTML(非 static 文件)· 见 routes/reset_page.py 头注:webhook 不拾取新增 static 根文件
-    from routes.reset_page import RESET_PAGE_HTML
-
-    return HTMLResponse(RESET_PAGE_HTML, headers=_NO_CACHE)
+    # 演进(2026-07-10):内联 .py 常量挪成可读源 reset.html → build 压成 dist 产物(同 /earn 注)。
+    return FileResponse("static/dist/reset.html", headers=_NO_CACHE)
 
 
 @router.get("/terms", response_class=HTMLResponse)
 async def terms_page():
-    return FileResponse("static/terms.html", headers=_NO_CACHE)
+    return FileResponse("static/dist/terms.html", headers=_NO_CACHE)
 
 
 @router.get("/privacy", response_class=HTMLResponse)
 async def privacy_page():
-    return FileResponse("static/privacy.html", headers=_NO_CACHE)
+    return FileResponse("static/dist/privacy.html", headers=_NO_CACHE)

@@ -4,16 +4,26 @@
 钉三条:① 页面只有账号 + 密码 + 登录,不存在 Google / LINE / 注册 / 忘记密码任何旁路,
 复用主站 /api/login(零新鉴权);② 放行判据 = /api/me 的 is_super_admin,通过才落 token
 进 /admin/cost,非超管有四语「无权限」文案;③ /earn 路由挂在 pages_routes 上、返回
-200 + HTML + no-cache(admin.js 甩回来的落点必须常在)。"""
+200 + HTML + no-cache(admin.js 甩回来的落点必须常在)。
+
+演进(2026-07-10):页面从 routes/earn_login_page.py 内联常量挪成可读源
+static/earn/earn-login.html + build 压成 dist/earn-login.html(view-source 只见外壳)·
+本闸改对可读源断言。"""
 
 import asyncio
+import re
 import unittest
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from routes import pages_routes
-from routes.earn_login_page import EARN_LOGIN_HTML
+
+# 断言对"实际服务出去的内容"生效:剥掉可读源里的开发注释(build minify 也会去掉),
+# 否则注释里解释入口收窄的"Google/LINE/注册"等字样会误伤 test_no_google_no_line_no_signup。
+_RAW = Path("static/earn/earn-login.html").read_text(encoding="utf-8")
+EARN_LOGIN_HTML = re.sub(r"<!--.*?-->", "", _RAW, flags=re.S)
 
 
 class EarnLoginPageContentTests(unittest.TestCase):
@@ -87,10 +97,10 @@ class EarnLoginRouteContractTests(unittest.TestCase):
         self.assertIn("no-store", cc)
         self.assertIn('id="e-form"', resp.text)
 
-    def test_route_handler_returns_inline_html(self):
-        # 内联 HTML(webhook 不拾取新增 static 根文件)· 直调 handler 钉住返回体就是本常量
+    def test_route_handler_serves_dist_product(self):
+        # /earn 出 dist minified 产物(dist/ 部署可靠 · 源可读在 static/earn/earn-login.html)
         resp = asyncio.run(pages_routes.earn_login_page())
-        self.assertEqual(resp.body.decode("utf-8"), EARN_LOGIN_HTML)
+        self.assertEqual(resp.path, "static/dist/earn-login.html")
 
 
 if __name__ == "__main__":

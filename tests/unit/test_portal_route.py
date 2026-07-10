@@ -33,7 +33,8 @@ class PortalRouteTest(unittest.TestCase):
         cls.html = PORTAL.read_text(encoding="utf-8")
 
     def test_root_serves_portal_login_serves_login(self):
-        self.assertEqual(asyncio.run(pages_routes.root()).path, "static/landing/portal.dc.html")
+        # / 出门户 minified 产物(源逐字可读在 static/landing/portal.dc.html · build 压成 dist/portal.html)
+        self.assertEqual(asyncio.run(pages_routes.root()).path, "static/dist/portal.html")
         self.assertEqual(asyncio.run(pages_routes.login_page()).path, "static/dist/login.html")
 
     def test_root_no_cache(self):
@@ -60,11 +61,10 @@ class PortalRouteTest(unittest.TestCase):
     def test_only_expected_external_strings(self):
         # 非本地资产的 http(s) 出现处只允许:__resources 的 unpkg 键 + 页脚 LINE OA 联系链接
         externals = set(re.findall(r"https?://[^\"'\s)]+", self.html))
-        # pos.pearnly.com = POS 老板后台独立域名(Zihao 2026-07-10 拍板 · PS-5 在建 · 门户四卡之一的跳转目标)
+        # 四卡终版全指站内路由(/ai · /login · /cashier · /pos)· pos.pearnly.com 死链已下线。
         allowed_prefixes = (
             "https://unpkg.com/react",
             "https://line.me/",
-            "https://pos.pearnly.com",
         )
         for u in externals:
             self.assertTrue(

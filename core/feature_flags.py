@@ -70,6 +70,11 @@ AGENT_RECALL_KEY = "agent_recall_nudge"
 # 已登记的泰文名。判定域 = 账套主体归属(有 tenant_id 走 tenant 共享闸 · 个人套账退回
 # user_id · 与 workspace_clients 其余隔离口径一致),不是单个用户。
 PEARNLY_AI_M1_KEY = "pearnly_ai_m1"
+# POS 退货/作废店长授权闸(PS-1 · 防内盗):默认关。关 → 退货/作废路由逐字节走历史
+# (任何持效 POS 令牌的收银员都能退,现网 metta 行为不变);开 → 操作者须持 pos.refund.approve,
+# 收银员无此码 → 必须店长 PIN 覆盖(校验店长确有该码)才放行,并把授权人写进审计。
+# 按账套主体(tenant)判定 —— 一家店整体开/关,与操作的收银员是谁无关。
+POS_REFUND_APPROVAL_KEY = "pos_refund_approval"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -180,3 +185,11 @@ def pearnly_ai_m1_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) 
     状态,跟其余 workspace_clients 隔离口径一致);个人套账(无 tenant)退回 user_id。
     """
     return _enabled(PEARNLY_AI_M1_KEY, tenant_id or user_id, "pearnly_ai_m1_enabled_for")
+
+
+def pos_refund_approval_enabled_for(tenant_id: Optional[str]) -> bool:
+    """POS 退货/作废店长授权闸。关 = 退货/作废权限校验现状不变(不校验、不弹授权)。
+
+    按 tenant 判定(单店整体开关);超管在平台后台把该店 tenant_id 加进 allowlist 即单店灰度。
+    """
+    return _enabled(POS_REFUND_APPROVAL_KEY, tenant_id, "pos_refund_approval_enabled_for")

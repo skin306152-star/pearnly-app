@@ -174,6 +174,11 @@
             ? POS.tf('posui.refund.confirm', { n: fmt(total) })
             : POS.t('posui.refund.title');
     }
+    function refundDone() {
+        POS.toast(POS.t('posui.refund.done'));
+        POS.showView('main');
+        resetRefund();
+    }
     async function doRefund() {
         const lines = Object.keys(refundSel).map((lid) => ({
             sale_line_id: lid,
@@ -183,13 +188,21 @@
         }));
         if (!lines.length) return;
         const btn = $('refund-do');
+        const saleId = refundSale.sale.id;
         btn.disabled = true;
         try {
-            await POS.data.refund(refundSale.sale.id, lines, refundWay);
-            POS.toast(POS.t('posui.refund.done'));
-            POS.showView('main');
-            resetRefund();
+            await POS.data.refund(saleId, lines, refundWay);
+            refundDone();
         } catch (e) {
+            // 授权闸开 + 收银员无权 → 弹店长授权窗,凭据带回重试;其余错误照常提示。
+            if (e.code === 'pos.approval_required' && POS.approve) {
+                POS.approve.open(
+                    (creds) => POS.data.refund(saleId, lines, refundWay, creds),
+                    refundDone
+                );
+                btn.disabled = false;
+                return;
+            }
             POS.toast(POS.posErrMsg(e.code, 'pos.unexpected'), 'error');
             btn.disabled = false;
         }

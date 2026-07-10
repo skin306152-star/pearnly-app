@@ -20,6 +20,7 @@ from core import db
 from core.pos_api import PosError, assert_module_enabled, ok, pos_auth, require_workspace
 from services.imaging import image_store
 from services.pos import (
+    approval as approval_svc,
     catalog,
     refund as refund_svc,
     sale as sale_svc,
@@ -343,14 +344,21 @@ class RefundRequest(BaseModel):
     client_uuid: Optional[str] = None
     lines: List[RefundLine] = Field(..., min_length=1)
     refund_method: str = "cash"
+    approval: Optional[approval_svc.ManagerApproval] = None
+
+
+class VoidRequest(BaseModel):
+    workspace_client_id: Optional[int] = None
+    approval: Optional[approval_svc.ManagerApproval] = None
 
 
 @router.post("/sales/{sale_id}/refund")
 async def api_refund(sale_id: str, req: RefundRequest, request: Request):
-    return _write(
+    return approval_svc.execute_gated_write(
         request,
-        req.workspace_client_id,
-        lambda cur, tid, ws, user: refund_svc.refund(
+        ws_override=req.workspace_client_id,
+        approval=_dump(req.approval) if req.approval else None,
+        write_fn=lambda cur, tid, ws, user: refund_svc.refund(
             cur,
             tenant_id=tid,
             workspace_client_id=ws,
@@ -361,23 +369,28 @@ async def api_refund(sale_id: str, req: RefundRequest, request: Request):
             cashier_id=user.get("cashier_id"),
             created_by=_created_by(user),
         ),
+        action="pos.refund.approved",
+        sale_id_of=lambda r: r["refund_sale"]["id"],
+        audit_details={"original_sale_id": sale_id, "method": req.refund_method},
     )
 
 
 @router.post("/sales/{sale_id}/void")
-async def api_void(
-    sale_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)
-):
-    return _write(
+async def api_void(sale_id: str, request: Request, req: Optional[VoidRequest] = None):
+    req = req or VoidRequest()
+    return approval_svc.execute_gated_write(
         request,
-        workspace_client_id,
-        lambda cur, tid, ws, user: sale_svc.void_sale(
+        ws_override=req.workspace_client_id,
+        approval=_dump(req.approval) if req.approval else None,
+        write_fn=lambda cur, tid, ws, user: sale_svc.void_sale(
             cur,
             tenant_id=tid,
             workspace_client_id=ws,
             sale_id=sale_id,
             created_by=_created_by(user),
         ),
+        action="pos.void.approved",
+        sale_id_of=lambda _r: sale_id,
     )
 
 

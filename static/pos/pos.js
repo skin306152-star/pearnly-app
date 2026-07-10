@@ -484,6 +484,7 @@
         updateLangButtons();
         if (POS.cashier) POS.cashier.init();
         if (POS.ops) POS.ops.init();
+        if (POS.approve) POS.approve.init();
         if (POS.restaurant) POS.restaurant.init();
         if (POS.offline) POS.offline.init();
         POS.setNet(navigator.onLine !== false);
@@ -513,7 +514,7 @@
                 })
                 .catch(() => {});
             navigator.serviceWorker
-                .register('/pos-sw.js?v=11850965', { scope: '/pos' })
+                .register('/pos-sw.js?v=11854600', { scope: '/pos' })
                 .catch(() => {});
         }
         tick();

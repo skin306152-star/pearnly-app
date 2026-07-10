@@ -574,13 +574,17 @@
         }
     };
 
-    data.refund = async function (saleId, lines, method) {
+    // approval(可选):店长授权覆盖凭据 { cashier_id, pin }。仅在授权闸开且收银员无权时,
+    // 前台弹窗收集后带上重试;闸关时永不出现(后端不返 pos.approval_required)。
+    data.refund = async function (saleId, lines, method, approval) {
+        const body = {
+            client_uuid: POS.uuid(),
+            lines,
+            refund_method: method,
+        };
+        if (approval) body.approval = approval;
         try {
-            return await apiFetch('POST', '/api/pos/sales/' + saleId + '/refund', {
-                client_uuid: POS.uuid(),
-                lines,
-                refund_method: method,
-            });
+            return await apiFetch('POST', '/api/pos/sales/' + saleId + '/refund', body);
         } catch (e) {
             if (POS.isRouteMissing(e) && POS.allowMock()) {
                 const total = lines.reduce((s, l) => s + Number(l._amt || 0), 0);

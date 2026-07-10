@@ -201,6 +201,8 @@ class CashierCreate(BaseModel):
     display_name: str = Field(..., min_length=1, max_length=80)
     pin: str = Field(..., min_length=4, max_length=32)
     color: Optional[str] = Field(None, max_length=20)
+    # 绑一个持 pos.refund.approve 的主账号 → 该收银员成为退货/作废授权人(PS-1)。
+    approver_user_id: Optional[str] = Field(None, max_length=64)
 
 
 class CashierUpdate(BaseModel):
@@ -209,6 +211,16 @@ class CashierUpdate(BaseModel):
     pin: Optional[str] = Field(None, min_length=4, max_length=32)
     color: Optional[str] = Field(None, max_length=20)
     is_active: Optional[bool] = None
+    # ""/null = 解绑授权人;省略 = 不动绑定。
+    approver_user_id: Optional[str] = Field(None, max_length=64)
+
+
+def _validate_approver(cur, tid: str, approver_user_id: Optional[str]) -> None:
+    """绑定授权人前置:必须是本租户在职成员(防绑跨租户/离职账号越权授权)。"""
+    if approver_user_id and not cashier_dal.is_active_member(
+        cur, tenant_id=tid, user_id=approver_user_id
+    ):
+        raise PosError("pos.forbidden", 403, detail="approver_not_member")
 
 
 def _cashier_out(row) -> dict:
@@ -245,6 +257,7 @@ async def api_admin_create_cashier(req: CashierCreate, request: Request):
     tid, _uid = require_perm_pos_tid(request, "pos.admin.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         require_workspace(cur, tid, req.workspace_client_id)
+        _validate_approver(cur, tid, req.approver_user_id)
         row = cashier_dal.create_cashier(
             cur,
             tenant_id=tid,
@@ -252,6 +265,7 @@ async def api_admin_create_cashier(req: CashierCreate, request: Request):
             display_name=req.display_name.strip(),
             pin_hash=pos_auth.hash_pin(req.pin),
             color=req.color,
+            user_id=req.approver_user_id or None,
         )
     return ok({"cashier": _cashier_out(row)})
 
@@ -260,8 +274,14 @@ async def api_admin_create_cashier(req: CashierCreate, request: Request):
 async def api_admin_update_cashier(cashier_id: str, req: CashierUpdate, request: Request):
     """改名/换色/启停/重设 PIN(只更传入字段)。"""
     tid, _uid = require_perm_pos_tid(request, "pos.admin.manage")
+    # 省略字段 = 不动绑定;传空串/null = 解绑;传 user_id = 绑定(校验在职成员)。
+    fields_set = req.model_dump(exclude_unset=True) if hasattr(req, "model_dump") else {}
+    user_id_arg = cashier_dal._UNSET
+    if "approver_user_id" in fields_set:
+        user_id_arg = req.approver_user_id or None
     with db.get_cursor_rls(tid, commit=True) as cur:
         require_workspace(cur, tid, req.workspace_client_id)
+        _validate_approver(cur, tid, req.approver_user_id)
         row = cashier_dal.update_cashier(
             cur,
             tenant_id=tid,
@@ -271,6 +291,7 @@ async def api_admin_update_cashier(cashier_id: str, req: CashierUpdate, request:
             color=req.color,
             is_active=req.is_active,
             pin_hash=pos_auth.hash_pin(req.pin) if req.pin else None,
+            user_id=user_id_arg,
         )
         if not row:
             raise PosError("pos.cashier_not_found", 404)

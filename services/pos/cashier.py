@@ -223,6 +223,20 @@ def delete_cashier_if_unused(cur, *, tenant_id: str, workspace_client_id: int, c
     return True
 
 
+def is_active_member(cur, *, tenant_id: str, user_id: str) -> bool:
+    """该 user 是否本租户的在职成员(店长授权人绑定前置校验 · 防绑跨租户/离职账号)。"""
+    cur.execute(
+        "SELECT 1 FROM memberships "
+        "WHERE tenant_id = %s AND user_id = %s AND status = 'active' LIMIT 1",
+        (str(tenant_id), str(user_id)),
+    )
+    return cur.fetchone() is not None
+
+
+# _UNSET 让 user_id 能被显式改成 None(解绑)而不与「本次不改」混淆(None 是有效目标值)。
+_UNSET = object()
+
+
 def update_cashier(
     cur,
     *,
@@ -233,8 +247,13 @@ def update_cashier(
     color: Optional[str] = None,
     is_active: Optional[bool] = None,
     pin_hash: Optional[str] = None,
+    user_id=_UNSET,
 ):
-    """改名/换色/启停/重设 PIN(只更非 None 字段)。找不到返 None。"""
+    """改名/换色/启停/重设 PIN/绑解主账号(只更传入字段)。找不到返 None。
+
+    user_id 绑定 = 把该收银员标为「店长授权人」的载体:绑到一个持 pos.refund.approve 的
+    主账号后,其 PIN 才能在退货授权窗覆盖放行(校验走关联主账号的 RBAC · services/pos/approval)。
+    """
     sets, vals = [], []
     if display_name is not None:
         sets.append("display_name = %s")
@@ -248,6 +267,9 @@ def update_cashier(
     if pin_hash is not None:
         sets.append("pin_hash = %s")
         vals.append(pin_hash)
+    if user_id is not _UNSET:
+        sets.append("user_id = %s")
+        vals.append(str(user_id) if user_id else None)
     if not sets:
         cur.execute(
             "SELECT id, display_name, color, is_active FROM pos_cashiers "

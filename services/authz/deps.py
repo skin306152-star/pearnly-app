@@ -148,6 +148,13 @@ def require_perm_pos_tid(request: Request, code: str, err: str = "pos.forbidden"
     return str(tid), uid
 
 
+def actor_has_perm(request: Optional[Request], user: dict, code: str) -> bool:
+    """给定主体 dict 是否持某码(不抛,返 bool)。共用 _check 判定核 —— 收银员令牌天然
+    只认 CASHIER_CODES(对 pos.refund.approve 恒 False),超管/成员按角色码集判。授权闸等
+    需要「先看操作者本人有没有权、没有再走覆盖流」的场景用它,不必 try/except require_perm。"""
+    return _check(request, user, code)[0]
+
+
 def get_authz(request: Optional[Request], user: dict) -> Authz:
     """取当前请求的权限快照(作用域过滤等下游用)。"""
     return _cached_authz(request, user)

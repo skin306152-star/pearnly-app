@@ -45,6 +45,7 @@ const BUNDLES = [
             'pos/pos-totals.js',
             'pos/pos-data.js',
             'pos/pos-offline.js',
+            'pos/pos-approve.js',
             'pos/pos-ops.js',
             'pos/pos-cashier.js',
             'pos/pos-restaurant.js',

@@ -268,15 +268,20 @@ function liffWsPending(): boolean {
     return !!(window as unknown as { __LIFF_WS__?: string }).__LIFF_WS__;
 }
 
-// LIFF 深链:该单已定套账 → 直接设为当前 + 满足门(不弹手选)。门壳若已起则摘掉。
-window.satisfyWorkspaceGate = function (id: number) {
-    if (!id) return;
+// 过门收尾公共段:标会话过门→设当前套账→关门壳→(reapplyNav 时)刷导航→刷顶栏套账控件。satisfy 传 true;auto 路(pos_only)传 false 把导航让给 module-nav 分支(避免重复/竞态)。
+function passGate(id: number, reapplyNav: boolean): void {
     _markGatePassed();
     if (typeof window.setActiveWorkspaceClientId === 'function')
         window.setActiveWorkspaceClientId(id);
     if (document.getElementById('workspace-gate-root')) close();
-    if (typeof window.applyModuleNav === 'function') window.applyModuleNav();
+    if (reapplyNav && typeof window.applyModuleNav === 'function') window.applyModuleNav();
     if (typeof window.renderWorkspaceControl === 'function') window.renderWorkspaceControl();
+}
+
+// LIFF 深链:该单已定套账 → 直接设为当前 + 满足门(不弹手选)。门壳若已起则摘掉。
+window.satisfyWorkspaceGate = function (id: number) {
+    if (!id) return;
+    passGate(id, true);
 };
 
 // core-boot/module-nav 在用户就绪后调:每次登录强制选套账(任何非超管账号),本会话选过才放行。
@@ -334,11 +339,7 @@ window.autoSatisfyWorkspaceGate = async function () {
         }
         id = list[0].id; // 静默取第一个(无 active 时的合理默认 · 不弹窗)
     }
-    _markGatePassed();
-    if (typeof window.setActiveWorkspaceClientId === 'function')
-        window.setActiveWorkspaceClientId(id);
-    if (document.getElementById('workspace-gate-root')) close();
-    if (typeof window.renderWorkspaceControl === 'function') window.renderWorkspaceControl();
+    passGate(id, false); // reapplyNav=false:见 passGate 头注(pos_only 导航让给 module-nav 分支)
 };
 
 // 关门(暴露给 module-nav:新注册向导接管时顶掉早起的门壳)。

@@ -71,21 +71,19 @@
         // settings/shortcuts 无其它门控 → 由本壳独家开关;billing/console 各有 money/team 门控(上方已算),
         // 壳只朝"隐"覆盖,不越权把它们显回来。
         var shellHide = window._avatarShellHide || [];
-        var settingsEl = document.getElementById('avatar-menu-settings');
-        if (settingsEl)
-            settingsEl.style.display = shellHide.indexOf('avatar-menu-settings') >= 0 ? 'none' : '';
-        var shortcutsEl = document.getElementById('avatar-menu-shortcuts');
-        if (shortcutsEl)
-            shortcutsEl.style.display =
-                shellHide.indexOf('avatar-menu-shortcuts') >= 0 ? 'none' : '';
-        if (shellHide.indexOf('avatar-menu-billing') >= 0) {
-            var billEl = document.getElementById('avatar-menu-billing');
-            if (billEl) billEl.style.display = 'none';
-        }
-        if (shellHide.indexOf('avatar-menu-console') >= 0) {
-            var consoleEl = document.getElementById('avatar-menu-console');
-            if (consoleEl) consoleEl.style.display = 'none';
-        }
+        // 壳独家双向开关:这两项无其它门控 → 命中则隐、未命中则显回,壳是唯一事实源。
+        var SHELL_TOGGLE = ['avatar-menu-settings', 'avatar-menu-shortcuts'];
+        SHELL_TOGGLE.forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.style.display = shellHide.indexOf(id) >= 0 ? 'none' : '';
+        });
+        // 只朝"隐"覆盖:这两项各有 money/team 门控(上方 role 逻辑已算),壳命中才压隐,绝不显回越权。
+        var SHELL_HIDE_ONLY = ['avatar-menu-billing', 'avatar-menu-console'];
+        SHELL_HIDE_ONLY.forEach(function (id) {
+            if (shellHide.indexOf(id) < 0) return;
+            var el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
     };
 
     // ---- 渲染头像 + 名字 + 邮箱(复用 renderSidebarUser 同款 letter/avatar_url 逻辑) ----

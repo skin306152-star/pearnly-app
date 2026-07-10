@@ -59,9 +59,9 @@ export const FIRM_PRESET: NavPreset = {
     avatarHide: FIRM_AVATAR_HIDE,
 };
 
-// POS 版(pos_only 拆卖收银壳):收银业务 + 公司资料 + 商品系统 + 采购系统 + 销售系统。
+// POS 版(pos_only 拆卖收银壳):收银 + 客户 + 公司 + 商品 + 采购 + 销售(clients 放 company 前,同会计版)。
 export const POS_PRESET: NavPreset = {
-    show: ['pos', 'company', 'products', 'purchases', 'sales'],
+    show: ['pos', 'clients', 'company', 'products', 'purchases', 'sales'],
     home: 'inventory',
     avatarHide: POS_AVATAR_HIDE,
 };

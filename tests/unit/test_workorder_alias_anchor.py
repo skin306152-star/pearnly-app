@@ -158,7 +158,16 @@ class _FakeItemStore:
         it["flag_reason"] = flag_reason
 
     def append_event(
-        self, cur, *, tenant_id, work_order_id, step, event_type, payload=None, actor="system"
+        self,
+        cur,
+        *,
+        tenant_id,
+        work_order_id,
+        step,
+        event_type,
+        payload=None,
+        actor="system",
+        dedupe_key=None,
     ):
         self.events.append({"event_type": event_type, "payload": payload or {}})
 

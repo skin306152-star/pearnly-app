@@ -63,7 +63,16 @@ class FakeStore:
             wo["current_step"] = current_step
 
     def append_event(
-        self, cur, *, tenant_id, work_order_id, step, event_type, payload=None, actor="system"
+        self,
+        cur,
+        *,
+        tenant_id,
+        work_order_id,
+        step,
+        event_type,
+        payload=None,
+        actor="system",
+        dedupe_key=None,
     ):
         self._evt_seq += 1
         row = {

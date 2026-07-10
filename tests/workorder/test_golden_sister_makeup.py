@@ -139,6 +139,10 @@ class GoldenSisterMakeupTests(unittest.TestCase):
         from services.workorder import engine, store
         from services.workorder.steps import real_handlers
 
+        # C-1:确保运行时加固列就位(租约 + 事件幂等键 dedupe_key)。真产品路径由 routes/run 或
+        # runner 在入口点建列;金标直调引擎,这里显式建一次(独立事务,幂等)才能跑 classify 的
+        # 带 dedupe_key 落事件,否则 append_event 撞「列不存在」。
+        store.ensure_runtime()
         cls.db, cls.store, cls.engine = db, store, engine
         # 函数直接存类属性会走描述符协议绑成方法(self 误作首参 TypeError),staticmethod
         # 保住「self.real_handlers() 取到的就是原函数」。

@@ -21,15 +21,35 @@ reconcile/人审,金标 IMG_2647 必须落在这条路径而非被吃掉)。
 
 from __future__ import annotations
 
+import os
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
 
 from core import feature_flags
+from services.ai_gateway import attribution
 from services.purchase.totals import dedupe_key
 from services.summary_import.parse import parse_table
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import sort as sort_step
 from services.workspace import client_alias_store
+
+# 工单 OCR 成本归因 task(落 ai_usage,与主站散单 OCR 台账分得开,见 C-1 §5)。
+_OCR_TASK = "workorder_classify"
+
+
+def _ocr_concurrency() -> int:
+    """classify 内并发喂 OCR 的上限(env PEARNLY_WORKORDER_OCR_CONCURRENCY,默认 5)。
+
+    OCR 是纯网络 I/O(vertex asia-se1 ~1.7s/张),并发把 104 张串行 22-26 分钟压到几分钟;
+    设 1 = 回退串行(feature flag 语义)。DB 写不并发——只并行取 OCR,结果按原序回主线程逐件
+    落库,守恒(Σ桶=N)与查重确定性都不受并发影响。"""
+    try:
+        return max(1, int(os.environ.get("PEARNLY_WORKORDER_OCR_CONCURRENCY", "5")))
+    except ValueError:
+        return 5
+
 
 # 校验警告文本命中这些关键词才归为「金额算不平」而非泛化的低置信——sanity.py 的
 # 硬闸消息(小计/VAT/行和/折扣勾稽)都落在这个词表里,命中即 amount_math_fail。
@@ -55,23 +75,28 @@ def run(ctx: StepContext) -> StepResult:
     flagged = 0
     seen_purchase_fp: dict[str, str] = {}
 
-    for item in pending:
-        if item["kind"] != "unknown":
-            continue
-        outcome = _classify_image(
+    # 并发取 OCR、按原序回主线程逐件裁堆+落库。原序消费(非完成序)保证查重「先到先占」
+    # 与串行逐字节一致;每件独立事务提交(有 cursor_factory 时),跑批中途被杀只丢在飞的
+    # 那几件,已落库件不重烧(断点续跑从未处理件继续)。
+    images = [it for it in pending if it["kind"] == "unknown"]
+    for item, ocr in _ocr_in_order(images, ctx.tenant_id):
+        outcome = _classify_from_ocr(
             item,
+            ocr,
             own_tax_id=own_tax_id,
             own_name=own_name,
             own_names=own_names,
             seen=seen_purchase_fp,
         )
         upd = outcome["update"]
-        ctx.store.update_item(ctx.cur, tenant_id=ctx.tenant_id, item_id=item["id"], **upd)
-        # 归堆即落 item_classified 事件:进项票带票面钱字段。这条事件是 reconcile 回放金额的
-        # 唯一持久源(证据链 + 断点续跑),classify 不算钱,只把票面原值落进证据流。
-        _emit_classified(
-            ctx, item, kind=upd["kind"], status=upd["status"], money=outcome.get("money")
-        )
+        with _item_scope(ctx):
+            ctx.store.update_item(ctx.cur, tenant_id=ctx.tenant_id, item_id=item["id"], **upd)
+            # 归堆即落 item_classified 事件:进项票带票面钱字段。这条事件是 reconcile 回放金额的
+            # 唯一持久源(证据链 + 断点续跑),classify 不算钱,只把票面原值落进证据流。dedupe_key
+            # 锚到 item:并发接管(过期租约被另一进程续跑)重放同件也只落一条,守恒不被撑破。
+            _emit_classified(
+                ctx, item, kind=upd["kind"], status=upd["status"], money=outcome.get("money")
+            )
         bins[outcome["kind"]] = bins.get(outcome["kind"], 0) + 1
         if outcome["flagged"]:
             flagged += 1
@@ -81,29 +106,81 @@ def run(ctx: StepContext) -> StepResult:
         if item["kind"] != "sales_summary":
             continue
         parsed, reason = _classify_summary(item)
+        with _item_scope(ctx):
+            if reason:
+                ctx.store.update_item(
+                    ctx.cur,
+                    tenant_id=ctx.tenant_id,
+                    item_id=item["id"],
+                    status="flagged",
+                    flag_reason=reason,
+                )
+                _emit_classified(ctx, item, kind="sales_summary", status="flagged", money=None)
+            else:
+                ctx.store.update_item(
+                    ctx.cur, tenant_id=ctx.tenant_id, item_id=item["id"], status="ok"
+                )
+                _emit_classified(
+                    ctx, item, kind="sales_summary", status="ok", money=None, sales_read=parsed
+                )
         if reason:
-            ctx.store.update_item(
-                ctx.cur,
-                tenant_id=ctx.tenant_id,
-                item_id=item["id"],
-                status="flagged",
-                flag_reason=reason,
-            )
-            _emit_classified(ctx, item, kind="sales_summary", status="flagged", money=None)
             flagged += 1
         else:
-            ctx.store.update_item(ctx.cur, tenant_id=ctx.tenant_id, item_id=item["id"], status="ok")
             reads[item["id"]] = parsed
-            _emit_classified(
-                ctx, item, kind="sales_summary", status="ok", money=None, sales_read=parsed
-            )
 
     return StepResult.ok(bins=bins, flagged=flagged, sales_summary_reads=reads)
 
 
+@contextmanager
+def _item_scope(ctx: StepContext):
+    """单件写作用域。有 cursor_factory:每件开一个独立事务(update_item + item_classified 原子
+    落库并提交),进程被杀只丢在飞件、已落件永久成立——逐件检查点。无 cursor_factory(内存
+    测试 / CLI 单事务):复用 ctx.cur,由上层统一提交,行为逐字节不变。"""
+    if ctx.cursor_factory is None:
+        yield
+        return
+    prev = ctx.cur
+    with ctx.cursor_factory() as cur:
+        ctx.cur = cur
+        try:
+            yield
+        finally:
+            ctx.cur = prev
+
+
+def _ocr_safe(item: dict, tenant_id: str):
+    """取一件 OCR,单件隔离:异常原样返回(不抛,不拖垮整批)。成本按 _OCR_TASK + 本租户归因
+    落 ai_usage(在本 worker 线程内设归因——ThreadPool 子线程起始上下文为空,主线程设了不算)。"""
+    token = attribution.set_attribution(
+        _OCR_TASK, tenant_id=str(tenant_id), trace_id=str(item.get("id") or "")
+    )
+    try:
+        return _ocr_image(item["file_ref"])
+    except Exception as exc:  # noqa: BLE001 - 单件隔离,绝不拖垮整步
+        return exc
+    finally:
+        attribution.reset_attribution(token)
+
+
+def _ocr_in_order(images: list[dict], tenant_id: str):
+    """并发取 OCR、按输入原序 yield (item, ocr_or_exc)。并发上限见 _ocr_concurrency;
+    ≤1 或单件走串行(免线程池开销,单测同步好断言)。原序消费保证下游查重/落库确定性。"""
+    n = _ocr_concurrency()
+    if n <= 1 or len(images) <= 1:
+        for it in images:
+            yield it, _ocr_safe(it, tenant_id)
+        return
+    with ThreadPoolExecutor(max_workers=n, thread_name_prefix="wo-classify-ocr") as pool:
+        futures = [pool.submit(_ocr_safe, it, tenant_id) for it in images]
+        for it, fut in zip(images, futures):
+            yield it, fut.result()
+
+
 def _emit_classified(ctx, item, *, kind, status, money, sales_read=None):
     """落一条 item_classified 证据事件。payload 带 item_id/kind/status,进项另带票面 money,
-    销项直读另带 sales_read——reconcile 据此回放,不依赖同进程 ctx.data(续跑不丢)。"""
+    销项直读另带 sales_read——reconcile 据此回放,不依赖同进程 ctx.data(续跑不丢)。
+
+    dedupe_key 锚到 item:同件重放(并发接管/异常续跑)命中事件唯一约束不重记,守恒不被撑破。"""
     payload = {"item_id": item["id"], "kind": kind, "status": status}
     if money:
         payload["money"] = money
@@ -116,23 +193,26 @@ def _emit_classified(ctx, item, *, kind, status, money, sales_read=None):
         step="classify",
         event_type="item_classified",
         payload=payload,
+        dedupe_key=f"classify:{item['id']}",
     )
 
 
-def _classify_image(
+def _classify_from_ocr(
     item: dict,
+    ocr,
     *,
     own_tax_id: Optional[str],
     own_name: Optional[str],
     own_names=None,
     seen: dict,
 ) -> dict:
-    """一张图/PDF:OCR → 归堆 → 购票查重 → 闸报警。异常只连坐这一件。"""
-    try:
-        fields = _ocr_image(item["file_ref"])
-    except Exception as exc:  # noqa: BLE001 - 单件隔离,绝不拖垮整步
-        upd = {"status": "flagged", "kind": None, "flag_reason": f"ocr_error:{type(exc).__name__}"}
+    """已取到 OCR(fields dict 或异常):归堆 → 购票查重 → 闸报警。异常只连坐这一件。
+
+    OCR 调用本身在 _ocr_safe(可并发)完成,这里是纯裁决(主线程逐件、原序执行 → 查重确定性)。"""
+    if isinstance(ocr, Exception):
+        upd = {"status": "flagged", "kind": None, "flag_reason": f"ocr_error:{type(ocr).__name__}"}
         return {"kind": "unknown", "flagged": True, "update": upd, "money": None}
+    fields = ocr
 
     kind, bin_reason = sort_step.bin_ocr_fields(
         fields, own_tax_id=own_tax_id, own_name=own_name, own_names=own_names

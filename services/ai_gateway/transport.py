@@ -11,7 +11,7 @@ from __future__ import annotations
 import time
 from typing import List, Optional, Tuple
 
-from services.ai_gateway import backends, costing
+from services.ai_gateway import attribution, backends, costing
 from services.ai_gateway import logging as ai_log
 from services.ai_gateway.tasks import AiResult, ProviderOutcome
 
@@ -19,21 +19,33 @@ from services.ai_gateway.tasks import AiResult, ProviderOutcome
 def _observe(
     task: str, outcome: ProviderOutcome, latency_ms: int, *, provider, tenant_id, user_id, trace_id
 ):
-    """复用 gateway 日志/计费口径(无原文/key/raw response)。"""
-    result = AiResult(
-        ok=bool(outcome.ok),
-        task=task,
-        schema_version="t1",
-        data=None,  # 日志不带 data
-        provider=provider,
-        model=outcome.model,
-        error_kind=outcome.error_kind,
-        latency_ms=latency_ms,
-        input_tokens=outcome.input_tokens,
-        output_tokens=outcome.output_tokens,
-        cost_thb=costing.estimate_thb(outcome.model, outcome.input_tokens, outcome.output_tokens),
+    """复用 gateway 日志/计费口径(无原文/key/raw response)。
+
+    归因上下文(attribution)覆盖内部 task 标签、补齐 tenant/user/trace:上层业务(如工单
+    classify)把成本记到自己名下,OCR 管线深处不必认识调用方。显式逐调用传入的 tenant/user/
+    trace 优先于归因(更精确)。"""
+    attr = attribution.current() or {}
+    ai_log.log_call(
+        AiResult(
+            ok=bool(outcome.ok),
+            task=attr.get("task") or task,
+            schema_version="t1",
+            data=None,  # 日志不带 data
+            provider=provider,
+            model=outcome.model,
+            error_kind=outcome.error_kind,
+            latency_ms=latency_ms,
+            input_tokens=outcome.input_tokens,
+            output_tokens=outcome.output_tokens,
+            cost_thb=costing.estimate_thb(
+                outcome.model, outcome.input_tokens, outcome.output_tokens
+            ),
+        ),
+        text=None,
+        tenant_id=tenant_id or attr.get("tenant_id"),
+        user_id=user_id or attr.get("user_id"),
+        trace_id=trace_id or attr.get("trace_id"),
     )
-    ai_log.log_call(result, text=None, tenant_id=tenant_id, user_id=user_id, trace_id=trace_id)
 
 
 def _run(

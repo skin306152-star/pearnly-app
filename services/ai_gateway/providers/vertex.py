@@ -89,10 +89,13 @@ def _error_kind(exc: Exception) -> str:
     name = type(exc).__name__
     msg = str(exc).lower()
     code = getattr(exc, "code", None)
-    if code in (401, 403) or "permission" in msg or "unauthenticated" in msg or "api key" in msg:
-        return "auth"
+    # 配额判定先于鉴权:配额耗尽偶尔以 403 + RESOURCE_EXHAUSTED 回(非 429),若先按 401/403
+    # 归 auth 会把可重试错误当成 fail-fast 不重试。真正的权限错(403 permission denied)不含
+    # quota 关键词,仍落到下面的 auth 分支,不受影响。
     if code == 429 or "quota" in msg or "resource_exhausted" in msg or "rate limit" in msg:
         return "quota"
+    if code in (401, 403) or "permission" in msg or "unauthenticated" in msg or "api key" in msg:
+        return "auth"
     if (
         code in (500, 502, 503, 504)
         or "timeout" in msg

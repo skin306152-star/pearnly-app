@@ -19,8 +19,9 @@ Key design choices:
 - No business logic, no fallback to other layers — those belong in pipeline.py
 
 Auth:
-- Reads env GOOGLE_API_KEY first, falls back to GEMINI_API_KEY for compat
-  with existing Pearnly .env
+- Key semantics unified with the main OCR path via services.ai_gateway.backends
+  (_resolve_gemini_key): aistudio backend needs GOOGLE_API_KEY / GEMINI_API_KEY;
+  vertex / selfhost authenticate by service account / endpoint and take no api_key.
 
 Public API:
     extract_from_text(text, ...)         -> ThaiInvoice
@@ -104,6 +105,21 @@ MIN_TEXT_LENGTH = 20
 # Truncate input text to bound token cost on accidentally-large pages.
 # Real Thai invoices fit comfortably in 5000-8000 chars; 30000 is a safety net.
 MAX_TEXT_LENGTH = 30000
+
+
+def _resolve_gemini_key(api_key: Optional[str]) -> Optional[str]:
+    """L2 文本抽取(含直读回落路)的密钥语义与主 OCR 路统一走 ai_gateway 后端。
+
+    aistudio 后端认 API key(GOOGLE_API_KEY / GEMINI_API_KEY),缺则 Layer2AuthError;vertex/
+    selfhost/anthropic 走服务账号 / ADC / 端点鉴权,api_key 无意义(provider 忽略),此时不
+    强求环境里第二把钥匙 —— 这正是「vertex SA 配置下回落票被误判 auth 全灭」的根因(见 C-1 §6)。
+    """
+    from services.ai_gateway import backends
+
+    key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+    if not key and backends.is_aistudio():
+        raise Layer2AuthError("layer2: GOOGLE_API_KEY (or GEMINI_API_KEY) env var not set")
+    return key.strip() if key else None
 
 
 # ============================================================
@@ -375,16 +391,14 @@ def _extract_doc_internal(
         )
         cleaned = cleaned[:MAX_TEXT_LENGTH]
 
-    key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
-    if not key:
-        raise Layer2AuthError("layer2: GOOGLE_API_KEY (or GEMINI_API_KEY) env var not set")
+    key = _resolve_gemini_key(api_key)
 
     prompt_prefix = _DOC_PROMPTS[document_type]
     schema_cls = _DOC_SCHEMAS[document_type]
 
     data, meta = _call_gemini_with_retry(
         cleaned,
-        api_key=key.strip(),
+        api_key=key,
         model_name=model_name,
         max_retries=max_retries,
         timeout=timeout,
@@ -436,13 +450,11 @@ def _extract_internal(
         )
         cleaned = cleaned[:MAX_TEXT_LENGTH]
 
-    key = api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
-    if not key:
-        raise Layer2AuthError("layer2: GOOGLE_API_KEY (or GEMINI_API_KEY) env var not set")
+    key = _resolve_gemini_key(api_key)
 
     data, meta = _call_gemini_with_retry(
         cleaned,
-        api_key=key.strip(),
+        api_key=key,
         model_name=model_name,
         max_retries=max_retries,
         timeout=timeout,

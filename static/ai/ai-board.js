@@ -1,10 +1,12 @@
 /*
  * Pearnly AI · ai-board.js · 五列看板的分列/摘要/账期纯函数(M1-W2)
  *
- * 三个纯函数,不碰 DOM、不查 window.at——调用方(ai-dashboard.js)负责渲染与 i18n:
+ * 四个纯函数,不碰 DOM、不查 window.at——调用方(ai-dashboard.js/ai-kanban-render.js)
+ * 负责渲染与 i18n:
  *   mapOrderToColumn(order, detail) → 五列之一(等资料/AI在做/等你审/待签字/已归档)
  *   summarizeCard(order, detail)    → 卡片摘要行的 i18n key + 变量
  *   currentPeriodBE(date)           → 公历日期换算佛历账期 "YYYY-MM"(开单默认账期)
+ *   periodOptions(count, date)      → 开单可选账期列表(当月在前,往前 count-1 个月)
  * COLUMNS 是五列的规范表(key + 顺序 + 列头圆点色),ai-kanban-render.js 渲染与
  * ai-dashboard.js 分组初始化都从这里派生,不各自维护第二份列清单。
  *
@@ -101,11 +103,25 @@
         return beYear + '-' + month;
     }
 
+    // 开单可选账期(影子月跑历史月份的前置刚需):当月在前,往前推 count-1 个月,共 count 个
+    // 选项。默认 count=14(当月 + 往前 13 个月)。Date 的月份运算原生处理跨年借位
+    // (new Date(y, -1, 1) 自动落到上一年 12 月),不用手写借位算术。
+    function periodOptions(count, date) {
+        var n = count > 0 ? count : 14;
+        var base = date instanceof Date && !isNaN(date.getTime()) ? date : new Date();
+        var out = [];
+        for (var i = 0; i < n; i++) {
+            out.push(currentPeriodBE(new Date(base.getFullYear(), base.getMonth() - i, 1)));
+        }
+        return out;
+    }
+
     var api = {
         COLUMNS: COLUMNS,
         mapOrderToColumn: mapOrderToColumn,
         summarizeCard: summarizeCard,
         currentPeriodBE: currentPeriodBE,
+        periodOptions: periodOptions,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) {

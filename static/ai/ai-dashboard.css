@@ -211,6 +211,30 @@
 .kcard .btn.sm {
   margin-top: 2px;
 }
+/* 开单账期选择器 + 按钮同行(min() 换算响应式列宽下的窄容器,禁裸 max-width)。 */
+.kopen {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+.kopen .period-sel {
+  flex: 1;
+  min-width: 0;
+  max-width: min(100%, 92px);
+  height: 30px;
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 11px;
+  padding: 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+.kopen .btn.sm {
+  margin-top: 0;
+  flex-shrink: 0;
+}
 /* 空列引导(Canon §7:空态给一句话说明,不是干巴巴一片空白)。 */
 .kempty {
   color: var(--faint);
@@ -222,6 +246,9 @@
 /* 触屏目标 ≥40px(Canon §7)——只在粗指针设备放大,不破坏桌面 v4 视觉。 */
 @media (pointer: coarse) {
   .kcard .btn.sm {
+    min-height: 40px;
+  }
+  .kopen .period-sel {
     min-height: 40px;
   }
 }

@@ -6,6 +6,13 @@
 function authH() {
     return { Authorization: 'Bearer ' + (localStorage.getItem('mrpilot_token') || '') };
 }
+// 结构化错误(422 detail={code,message:四语字典},见 thai_name_gate.error_payload)附到
+// 抛出的 Error 上,不再靠 String(detail) 把整个对象拍扁成 "[object Object]"——调用方
+// (如 subject-create.subjectErrorText)按需读 .i18nMessage 直出后端原文,读不到就退化用
+// .message(= 业务 code 或 "HTTP {status}")自行映射。detail 是纯字符串时行为不变。
+interface ApiError extends Error {
+    i18nMessage?: Record<string, string>;
+}
 async function apiClient(path: string, opts: RequestInit = {}) {
     const r = await fetch(path, {
         ...opts,
@@ -13,7 +20,14 @@ async function apiClient(path: string, opts: RequestInit = {}) {
     });
     if (!r.ok) {
         const err = await r.json().catch(() => ({}));
-        throw new Error(err.detail || 'HTTP ' + r.status);
+        const detail = err.detail;
+        const structured = detail && typeof detail === 'object' && typeof detail.code === 'string';
+        const code = structured ? detail.code : typeof detail === 'string' ? detail : 'HTTP ' + r.status;
+        const e = new Error(code) as ApiError;
+        if (structured && detail.message && typeof detail.message === 'object') {
+            e.i18nMessage = detail.message;
+        }
+        throw e;
     }
     return r.json();
 }

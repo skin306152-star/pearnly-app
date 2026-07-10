@@ -15,6 +15,7 @@ import {
     syncSubjectInputs,
     subjectLookup,
     createSubject,
+    subjectErrorText,
 } from './subject-create.js';
 
 type Subject = { id: number; name?: string; tax_id?: string; subject_type?: string };
@@ -214,11 +215,7 @@ async function doCreate(): Promise<void> {
         }
     } catch (err) {
         S.busy = false;
-        const code = err instanceof Error ? err.message : 'subj-create-fail';
-        showToast(
-            t(code === 'subj-name-required' ? 'subj-name-required' : 'subj-create-fail'),
-            'fail'
-        );
+        showToast(subjectErrorText(err), 'fail');
         render();
     }
 }

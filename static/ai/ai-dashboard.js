@@ -89,10 +89,12 @@
         return groups;
     }
 
-    function createOrderForClient(api, clientId) {
+    // period 由卡片上的账期选择器带来(见 ai-kanban-render.js);缺省(未渲染选择器的老
+    // 调用方/测试)时回落当月,不破坏既有行为。
+    function createOrderForClient(api, clientId, period) {
         return api.createOrder({
             workspace_client_id: clientId,
-            period: AI.board.currentPeriodBE(),
+            period: period || AI.board.currentPeriodBE(),
             intent: 'monthly_vat',
         });
     }
@@ -113,8 +115,8 @@
         if (!boardWired) {
             AI.kanban.wireBoard(
                 body,
-                function (clientId) {
-                    return createOrderForClient(lastApi, clientId);
+                function (clientId, period) {
+                    return createOrderForClient(lastApi, clientId, period);
                 },
                 function () {
                     load(lastApi);

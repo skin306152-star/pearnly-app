@@ -243,7 +243,8 @@ class FieldLabelTests(unittest.TestCase):
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class AiIntakeRenderPureTests(unittest.TestCase):
     """收料视图(W4)的纯校验守门:金额解析(非负、两位小数、去千分位)、销项 payload 构造、
-    上传前端预检(50 张 / 20MB)。HTML 拼装依赖 at()/DOM 不在此测(交 W4 E2E)。"""
+    上传前端预检(单文件 20MB;总张数不设上限,交给 splitBatches 分批)。HTML 拼装依赖
+    at()/DOM 不在此测(交 W4 E2E)。"""
 
     def test_parse_amount_normalizes_and_rejects(self):
         out = _run_node(f"""
@@ -276,21 +277,23 @@ class AiIntakeRenderPureTests(unittest.TestCase):
             ],
         )
 
-    def test_validate_files_caps_count_and_size(self):
+    def test_validate_files_allows_large_counts_caps_size(self):
+        # G1 遗留 P0-2:后端 splitBatches 已把任意张数切成安全批,前端不再挡总数——
+        # 104 张(超过旧 MAX_FILES=50 上限)必须放行;单文件超 20MB 仍被拦。
         out = _run_node(f"""
             const r = require({json.dumps(str(AI_DIR / "ai-intake-render.js"))});
             const ok = [{{size: 1000}}, {{size: 2000}}];
-            const tooMany = Array.from({{length: r.MAX_FILES + 1}}, () => ({{size: 1}}));
+            const manyFiles = Array.from({{length: 104}}, () => ({{size: 1}}));
             const tooBig = [{{size: r.MAX_BYTES + 1}}];
             process.stdout.write(JSON.stringify([
-                r.validateFiles(ok), r.validateFiles(tooMany), r.validateFiles(tooBig),
+                r.validateFiles(ok), r.validateFiles(manyFiles), r.validateFiles(tooBig),
             ]));
             """)
         self.assertEqual(
             out,
             [
                 {"ok": True},
-                {"ok": False, "errKey": "err_workorder_too_many_files"},
+                {"ok": True},
                 {"ok": False, "errKey": "err_workorder_file_too_large"},
             ],
         )

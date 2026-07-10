@@ -186,5 +186,40 @@ class CurrentPeriodBETests(unittest.TestCase):
         self.assertRegex(out, r"^\d{4}-\d{2}$")
 
 
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class PeriodOptionsTests(unittest.TestCase):
+    """开单账期可选(A3):当月在前 · 默认 14 个选项(当月 + 往前 13 个月) · 跨年借位正确。"""
+
+    def test_default_count_spans_current_plus_13_months_back(self):
+        out = _run_node(f"""
+            const b = require({json.dumps(str(AI_DIR / "ai-board.js"))});
+            process.stdout.write(JSON.stringify(b.periodOptions(undefined, new Date(2026, 6, 9))));
+            """)
+        self.assertEqual(len(out), 14)
+        self.assertEqual(out[0], "2569-07")  # 当月排第一(选择器默认选中项)
+        self.assertEqual(out[-1], "2568-06")  # 往前数到第 13 个月
+
+    def test_crosses_buddhist_year_boundary(self):
+        out = _run_node(f"""
+            const b = require({json.dumps(str(AI_DIR / "ai-board.js"))});
+            process.stdout.write(JSON.stringify(b.periodOptions(3, new Date(2026, 1, 15))));
+            """)
+        self.assertEqual(out, ["2569-02", "2569-01", "2568-12"])
+
+    def test_custom_count_honored(self):
+        out = _run_node(f"""
+            const b = require({json.dumps(str(AI_DIR / "ai-board.js"))});
+            process.stdout.write(JSON.stringify(b.periodOptions(3, new Date(2026, 6, 9)).length));
+            """)
+        self.assertEqual(out, 3)
+
+    def test_no_date_uses_now_and_returns_current_month_first(self):
+        out = _run_node(f"""
+            const b = require({json.dumps(str(AI_DIR / "ai-board.js"))});
+            process.stdout.write(JSON.stringify([b.periodOptions()[0], b.currentPeriodBE()]));
+            """)
+        self.assertEqual(out[0], out[1])
+
+
 if __name__ == "__main__":
     unittest.main()

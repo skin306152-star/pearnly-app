@@ -9,9 +9,10 @@
 (function (root) {
     'use strict';
 
-    // 补料上限,与后端 workorder_routes 的 _MAX_MATERIAL_FILES / _MAX_MATERIAL_BYTES 对齐——
-    // 前端先挡一道(省一次注定 413 的往返),后端仍是权威闸(错误码四语呈现同一份文案)。
-    var MAX_FILES = 50;
+    // 单文件字节上限,与后端 workorder_routes 的 _MAX_MATERIAL_BYTES 对齐——前端先挡一道
+    // (省一次注定 413 的往返),后端仍是权威闸(错误码四语呈现同一份文案)。总张数不在这里
+    // 挡:splitBatches 已把任意张数切成 ≤BATCH_MAX_FILES 的安全批,每批都远低于后端单请求
+    // 上限 _MAX_MATERIAL_FILES=50,故前端不再需要一道总数预检门槛。
     var MAX_BYTES = 20 * 1024 * 1024;
 
     // 单次请求分批上限(G1 真机:一次传 25 张 ~55MB 撞 prod nginx client_max_body_size 50M,
@@ -64,11 +65,10 @@
         return { sales_amount: sales, output_vat: vat, note: String(note == null ? '' : note) };
     }
 
-    // 上传前端预检:超文件数/超单文件字节 → 结构化错误 key(与后端 413 码映射同一份四语文案,
-    // 不各拼一套)。全通过返回 {ok:true}。
+    // 上传前端预检:超单文件字节 → 结构化错误 key(与后端 413 码映射同一份四语文案,不各拼
+    // 一套)。张数不设上限(见上 MAX_BYTES 注),全通过返回 {ok:true}。
     function validateFiles(files) {
         var list = files || [];
-        if (list.length > MAX_FILES) return { ok: false, errKey: 'err_workorder_too_many_files' };
         for (var i = 0; i < list.length; i++) {
             if (list[i] && list[i].size > MAX_BYTES) {
                 return { ok: false, errKey: 'err_workorder_file_too_large' };
@@ -78,7 +78,6 @@
     }
 
     var pure = {
-        MAX_FILES: MAX_FILES,
         MAX_BYTES: MAX_BYTES,
         BATCH_MAX_BYTES: BATCH_MAX_BYTES,
         BATCH_MAX_FILES: BATCH_MAX_FILES,
@@ -341,7 +340,6 @@
 
     root.AI = root.AI || {};
     root.AI.intakeRender = {
-        MAX_FILES: MAX_FILES,
         MAX_BYTES: MAX_BYTES,
         BATCH_MAX_BYTES: BATCH_MAX_BYTES,
         BATCH_MAX_FILES: BATCH_MAX_FILES,

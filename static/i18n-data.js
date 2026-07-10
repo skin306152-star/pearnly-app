@@ -622,6 +622,7 @@ window.I18N = {
         'acct.unexpected': '出了点问题,请重试',
         'acct.export_failed': '生成失败 · 请重试',
         'workspace.required': '请先选择公司(套账)',
+        'workspace.tax_id_duplicate': '该税号已在本账套下登记过,请检查或改用其他税号',
         // 商户采购(进项)Phase 1 · purchase-*.ts
         'nav-purchase': '采购 / 进项',
         'nav-purchase-suppliers': '供应商',
@@ -3536,6 +3537,7 @@ window.I18N = {
         'subj-optional': '选填',
         'subj-address-ph': '可暂不填写',
         'subj-store-note': '未完成企业登记或暂无税号亦可使用,仅开具收据。完成税务登记后,可在「公司资料」中补充税号并升级为企业主体,历史数据完整保留。',
+        'subj-no-tax-warn': '未填税号:后续票据的进/销方向判定将失去税号这个锚点,只能靠公司名称匹配,准确率会下降。建议尽快在「公司资料」中补充税号。',
         'subj-tax-label': '纳税人识别号(13 位)',
         'subj-tax-hint': '输入后自动获取企业名称与地址',
         'subj-to-manual': '未完成登记或暂无税号?手动填写主体名称',
@@ -5807,6 +5809,7 @@ window.I18N = {
         'acct.unexpected': 'Something went wrong — please retry',
         'acct.export_failed': 'Export failed — please retry',
         'workspace.required': 'Select a company (workspace) first',
+        'workspace.tax_id_duplicate': 'This tax ID is already registered under this workspace. Please check it or use a different tax ID.',
         // 商户采购(进项)Phase 1 · purchase-*.ts
         'nav-purchase': 'Purchases',
         'nav-purchase-suppliers': 'Suppliers',
@@ -8709,6 +8712,7 @@ window.I18N = {
         'subj-optional': 'optional',
         'subj-address-ph': 'You can fill this in later',
         'subj-store-note': 'You can use Pearnly without business registration or a tax ID; it issues receipts only. After registering for tax, add a tax ID in Company Profile to upgrade to a business entity. All history is kept.',
+        'subj-no-tax-warn': 'No tax ID: future invoice direction detection (purchase vs. sale) loses the tax-ID anchor and relies on company-name matching only, which is less accurate. Add a tax ID in Company Profile when you can.',
         'subj-tax-label': 'Tax ID (13 digits)',
         'subj-tax-hint': 'We will fetch the company name and address',
         'subj-to-manual': 'Not registered or no tax ID? Enter the name manually',
@@ -10967,6 +10971,7 @@ window.I18N = {
         'acct.unexpected': 'เกิดข้อผิดพลาด กรุณาลองใหม่',
         'acct.export_failed': 'สร้างไฟล์ไม่สำเร็จ กรุณาลองใหม่',
         'workspace.required': 'กรุณาเลือกบริษัท (ชุดบัญชี) ก่อน',
+        'workspace.tax_id_duplicate': 'เลขผู้เสียภาษีนี้มีการลงทะเบียนในชุดบัญชีนี้แล้ว กรุณาตรวจสอบหรือใช้เลขผู้เสียภาษีอื่น',
         // 商户采购(进项)Phase 1 · purchase-*.ts
         'nav-purchase': 'จัดซื้อ / ภาษีซื้อ',
         'nav-purchase-suppliers': 'ผู้ขาย',
@@ -13868,6 +13873,7 @@ window.I18N = {
         'subj-optional': 'ไม่บังคับ',
         'subj-address-ph': 'กรอกภายหลังได้',
         'subj-store-note': 'ใช้งานได้แม้ยังไม่จดทะเบียนหรือไม่มีเลขผู้เสียภาษี ออกได้เฉพาะใบเสร็จ เมื่อจดทะเบียนแล้วเพิ่มเลขผู้เสียภาษีใน "ข้อมูลบริษัท" เพื่ออัปเกรดเป็นนิติบุคคล ข้อมูลเดิมยังอยู่ครบ',
+        'subj-no-tax-warn': 'ไม่ได้กรอกเลขผู้เสียภาษี: การระบุทิศทางใบกำกับ (ซื้อ/ขาย) ในอนาคตจะไม่มีเลขภาษีเป็นหลักยึด ต้องอาศัยการจับคู่ชื่อบริษัทเพียงอย่างเดียว ความแม่นยำจะลดลง แนะนำให้เพิ่มเลขผู้เสียภาษีใน "ข้อมูลบริษัท" ภายหลัง',
         'subj-tax-label': 'เลขประจำตัวผู้เสียภาษี (13 หลัก)',
         'subj-tax-hint': 'กรอกแล้วระบบจะดึงชื่อและที่อยู่ให้',
         'subj-to-manual': 'ยังไม่จดทะเบียนหรือไม่มีเลขภาษี? กรอกชื่อเอง',
@@ -16119,6 +16125,7 @@ window.I18N = {
         'acct.unexpected': '問題が発生しました — 再試行してください',
         'acct.export_failed': '出力に失敗 — 再試行してください',
         'workspace.required': '先に会社(帳簿セット)を選択してください',
+        'workspace.tax_id_duplicate': 'この税番号はすでにこの帳簿セットに登録されています。確認するか、別の税番号を使用してください。',
         // 商户采购(进项)Phase 1 · purchase-*.ts
         'nav-purchase': '仕入 / 課税仕入',
         'nav-purchase-suppliers': '取引先',
@@ -19019,6 +19026,7 @@ window.I18N = {
         'subj-optional': '任意',
         'subj-address-ph': '後で入力できます',
         'subj-store-note': '登記や税番号がなくても利用でき、発行できるのは領収書のみです。税務登録後は「会社情報」で税番号を追加して法人へ昇格できます。履歴はすべて保持されます。',
+        'subj-no-tax-warn': '税番号未入力:今後の伝票の仕入/売上方向判定は税番号という手がかりを失い、会社名の照合のみに頼るため精度が下がります。後で「会社情報」に税番号を追加することをお勧めします。',
         'subj-tax-label': '納税者番号(13桁)',
         'subj-tax-hint': '入力すると会社名と住所を自動取得します',
         'subj-to-manual': '未登記・税番号なし?名称を手入力する',

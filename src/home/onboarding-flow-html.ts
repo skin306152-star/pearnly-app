@@ -7,6 +7,7 @@ const ICON: Record<string, string> = {
     check: '<path d="M20 6 9 17l-5-5"/>',
     chev: '<path d="m9 18 6-6-6-6"/>',
     info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+    warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
     edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/>',
     user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
 };
@@ -97,6 +98,9 @@ export const ONB_CSS = `
   padding:14px 16px;margin-top:22px;font-size:12.5px;line-height:1.7;color:var(--ink);}
 .onb-note .ic{color:var(--accent);flex:none;margin-top:1px;}
 .onb-note b{color:var(--accent);}
+.onb-note.warn{background:var(--warn-bg);}
+.onb-note.warn .ic{color:var(--warn);}
+.onb-note.warn b{color:var(--warn);}
 .onb-acts{display:flex;align-items:center;margin-top:30px;gap:10px;}
 .onb-acts .grp{display:flex;gap:10px;align-items:center;margin-left:auto;}
 .onb-lnk{background:none;border:0;color:var(--ink2);font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;}

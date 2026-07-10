@@ -125,6 +125,21 @@ export async function createSubject(s: SubjectState): Promise<{ id: number }> {
     return { id: r && r.id };
 }
 
+// 建主体失败 → 人话文案。422 结构化错误(apiClient 附的 i18nMessage,如泰文注册名必填/
+// 锁定)后端已给四语原文,直接挑当前语言渲染,不再吞成通用 toast;已知业务码(税号重复/
+// 名称必填)本地兜底;其余诚实退化成通用失败文案(不编造具体原因)。
+export function subjectErrorText(e: unknown): string {
+    const err = e as { message?: string; i18nMessage?: Record<string, string> } | null;
+    if (err && err.i18nMessage) {
+        const lang = window._currentLang || localStorage.getItem('mrpilot_lang') || 'th';
+        return err.i18nMessage[lang] || err.i18nMessage.en || err.i18nMessage.zh || '';
+    }
+    const code = err && err.message;
+    if (code === 'subj-name-required') return t('subj-name-required');
+    if (code === 'workspace.tax_id_duplicate') return t('workspace.tax_id_duplicate');
+    return t('subj-create-fail');
+}
+
 // 步②面板内层(seg + 当前分支字段 + note);动作行由 onboarding-flow 渲染。
 export function subjectPaneInner(s: SubjectState): string {
     const seg =
@@ -157,7 +172,10 @@ function manualBranch(s: SubjectState): string {
         `<div class="onb-fld"><label>${esc(t('subj-address'))}<span class="opt">· ${esc(t('subj-optional'))}</span></label>` +
         `<input class="onb-inp" id="onb-subj-addr" value="${esc(s.address)}" placeholder="${esc(t('subj-address-ph'))}"></div>` +
         '</div>' +
-        note(t('subj-store-note'))
+        note(t('subj-store-note')) +
+        // 不填税号的直接后果(G1 两轮实锤:税号是分拣方向判定的保命字段)——不阻断建档,
+        // 但必须把降级说清楚,别让用户在不知情的情况下选了一条更脆的路。
+        note(t('subj-no-tax-warn'), 'warn')
     );
 }
 
@@ -184,8 +202,10 @@ function taxBranch(s: SubjectState): string {
     );
 }
 
-function note(text: string): string {
-    return '<div class="onb-note">' + onbIcon('info', 'ic') + '<div>' + esc(text) + '</div></div>';
+function note(text: string, variant?: 'warn'): string {
+    const cls = variant ? ` ${variant}` : '';
+    const icon = variant === 'warn' ? 'warn' : 'info';
+    return `<div class="onb-note${cls}">` + onbIcon(icon, 'ic') + '<div>' + esc(text) + '</div></div>';
 }
 
 // 共享控制器(向导步② + 套账门新建专屏共用 · 防逻辑重复)。

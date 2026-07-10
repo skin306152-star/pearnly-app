@@ -13,6 +13,7 @@ import {
     subjectNextEnabled,
     syncSubjectInputs,
     createSubject,
+    subjectErrorText,
 } from './subject-create.js';
 import { injectStyle } from './acct-common.js';
 import { apiClient } from './clients-helpers.js';
@@ -377,11 +378,7 @@ async function doCreate(): Promise<void> {
         render();
     } catch (e) {
         S.busy = false;
-        const code = e instanceof Error ? e.message : 'subj-create-fail';
-        showToast(
-            t(code === 'subj-name-required' ? 'subj-name-required' : 'subj-create-fail'),
-            'fail'
-        );
+        showToast(subjectErrorText(e), 'fail');
         render();
     }
 }

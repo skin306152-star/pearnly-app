@@ -19,16 +19,34 @@
         return AI.format.chipHtml(entry.order.status, entry.detail);
     }
 
+    // 开单账期选择器 + 按钮(v4 未画过此场景,按 Canon tokens 延展)。当月排第一,原生
+    // <select> 不设 selected 属性即默认选中首项——无需另外读写状态。
+    function openOrderHtml(clientId) {
+        var opts = AI.board
+            .periodOptions()
+            .map(function (p) {
+                return '<option value="' + esc(p) + '">' + esc(p) + '</option>';
+            })
+            .join('');
+        return (
+            '<div class="kopen">' +
+            '<select class="period-sel" data-role="period-select" aria-label="' +
+            esc(at('card_period_select_label')) +
+            '">' +
+            opts +
+            '</select>' +
+            '<button class="btn sm" data-action="open-order" data-client-id="' +
+            esc(clientId) +
+            '">' +
+            esc(at('card_open_order')) +
+            '</button></div>'
+        );
+    }
+
     function cardHtml(entry) {
         var hotClass = entry.column === 'review' ? ' hot' : '';
         var summaryText = at(entry.summary.key, entry.summary.vars);
-        var openBtn = entry.order
-            ? ''
-            : '<button class="btn sm" data-action="open-order" data-client-id="' +
-              esc(entry.client.id) +
-              '">' +
-              esc(at('card_open_order')) +
-              '</button>';
+        var openBtn = entry.order ? '' : openOrderHtml(entry.client.id);
         // tabindex=0:卡片 Tab 可达(Enter/空格触发同点击,见 wireBoard);
         // title:名称/摘要窄卡被省略号截断时悬停可看全文(Canon §6.2)。
         return (
@@ -82,18 +100,26 @@
     }
 
     // 事件委托到看板容器,一次绑定覆盖全部卡片(重渲染后无需重新逐卡片绑定)。
-    // onOpenOrder(clientId) 返回 Promise;resolve 后调 onReloaded() 刷新整个看板。
+    // onOpenOrder(clientId, period) 返回 Promise;resolve 后调 onReloaded() 刷新整个看板。
     function activate(e, onOpenOrder, onReloaded) {
+        // 账期选择器点开/选值不算「点卡进客户页」——卡片整体可点导航,选择器是里面的
+        // 独立控件,不能被外层点击语义吞掉。
+        if (e.target.closest('[data-role="period-select"]')) {
+            e.stopPropagation();
+            return;
+        }
         var openBtn = e.target.closest('[data-action="open-order"]');
         if (openBtn) {
             e.stopPropagation();
             if (openBtn.disabled) return;
             var clientId = openBtn.getAttribute('data-client-id');
+            var periodSel = openBtn.closest('.kopen').querySelector('[data-role="period-select"]');
+            var period = periodSel ? periodSel.value : undefined;
             var idleLabel = openBtn.textContent;
             // loading 态 + 禁双击(Canon §7):失败恢复原文案可重试,成功由整板刷新收尾。
             openBtn.disabled = true;
             openBtn.textContent = at('card_open_order_busy');
-            onOpenOrder(clientId)
+            onOpenOrder(clientId, period)
                 .then(onReloaded)
                 .catch(function () {
                     openBtn.disabled = false;

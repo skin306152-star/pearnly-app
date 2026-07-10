@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 from core import db
 from core.route_helpers import assert_owns_workspace, authorize_pearnly_ai
 from services.authz.deps import check_workspace_scope
-from services.workorder import api, engine, runner, storage, store
+from services.workorder import api, archive, engine, runner, storage, store
 from services.workorder.steps import intake
 
 router = APIRouter()
@@ -81,6 +81,31 @@ def _load_order(cur, request: Request, user: dict, tenant_id: str, work_order_id
         raise HTTPException(404, detail="workorder.not_found")
     check_workspace_scope(request, user, wo["workspace_client_id"])
     return wo
+
+
+def _assert_mutable(wo: dict) -> None:
+    """冻结(archive)后工单只读:拒绝重跑/裁决/补料/填销项(唯回执可 append-only 补挂)。"""
+    if wo.get("status") == "archive":
+        raise HTTPException(409, detail="workorder.archived_readonly")
+
+
+# 冻结/归档相关业务错 → 409(状态冲突);归属类 → 404;其余校验错 → 422。
+_CONFLICT_CODES = {
+    "workorder.already_archived",
+    "workorder.not_reviewable",
+    "workorder.no_deliverables",
+    "workorder.freeze_source_missing",
+    "workorder.archived_readonly",
+    "workorder.not_archived",
+}
+
+
+def _raise_from_api_error(e: "api.WorkOrderApiError") -> None:
+    if e.code in ("workorder.not_found", "workorder.item_not_found"):
+        raise HTTPException(404, detail=e.code)
+    status = 409 if e.code in _CONFLICT_CODES else 422
+    detail = {"code": e.code, **e.context} if e.context else e.code
+    raise HTTPException(status, detail=detail)
 
 
 @router.post("/api/workorder/orders")
@@ -154,6 +179,7 @@ async def run_order(work_order_id: str, request: Request, background: Background
     store.ensure_runtime()  # 建租约列(独立事务)· 必须先于下面 SELECT/UPDATE 锁 work_orders
     with db.get_cursor(commit=True) as cur:
         wo = _load_order(cur, request, user, tenant_id, work_order_id)
+        _assert_mutable(wo)  # 冻结后只读:拒绝重跑
         if not store.acquire_run_lease(
             cur,
             tenant_id=tenant_id,
@@ -179,7 +205,7 @@ async def add_decision(work_order_id: str, req: DecisionIn, request: Request):
     """人工裁决(face_value/recalc/exclude),落 human_decision 事件(校验 item 属该单)。"""
     user, tenant_id = _authorize(request)
     with db.get_cursor(commit=True) as cur:
-        _load_order(cur, request, user, tenant_id, work_order_id)
+        _assert_mutable(_load_order(cur, request, user, tenant_id, work_order_id))
         try:
             evt = api.record_decision(
                 cur,
@@ -204,7 +230,7 @@ async def add_sales_summary(work_order_id: str, req: SalesSummaryIn, request: Re
     reconcile 的 R2 据此解锁(引擎/steps 不改)。金额十进制字符串进出、禁 float、非负。"""
     user, tenant_id = _authorize(request)
     with db.get_cursor(commit=True) as cur:
-        _load_order(cur, request, user, tenant_id, work_order_id)
+        _assert_mutable(_load_order(cur, request, user, tenant_id, work_order_id))
         try:
             evt = api.record_sales_summary(
                 cur,
@@ -228,7 +254,7 @@ async def add_materials(work_order_id: str, request: Request, files: list[Upload
     if len(files) > _MAX_MATERIAL_FILES:
         raise HTTPException(413, detail="workorder.too_many_files")
     with db.get_cursor() as cur:  # 先验归属,再落盘(不给未授权请求写磁盘的机会)
-        _load_order(cur, request, user, tenant_id, work_order_id)
+        _assert_mutable(_load_order(cur, request, user, tenant_id, work_order_id))
 
     saved: list[Path] = []
     for upload in files:
@@ -300,6 +326,65 @@ async def get_item_image(work_order_id: str, item_id: str, request: Request):
     if not path:
         raise HTTPException(404, detail="workorder.item_image_not_found")
     media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-    # 下载名还原用户原始文件名(落盘是 {uuid}__原名),审核看图不再是一串 uuid。
-    download_name = storage.original_name_of(item.get("file_ref")) or path.name
+    # 下载名还原用户原始文件名:优先无损列 original_name,空回落落盘名反解,审核看图不再是 uuid。
+    download_name = (
+        item.get("original_name") or storage.original_name_of(item.get("file_ref")) or path.name
+    )
     return FileResponse(str(path), media_type=media_type, filename=download_name)
+
+
+@router.post("/api/workorder/orders/{work_order_id}/archive")
+async def archive_order(work_order_id: str, request: Request):
+    """冻结:review→archive 原子出 freeze_manifest(六要素齐)。冻结后工单只读。
+
+    fail-closed:任一源文件已不在盘 → 409 workorder.freeze_source_missing 并点名(detail.missing);
+    非 review 态/已冻结 → 409。签批人=登录 actor(单一 actor,多角色审批属 C3)。"""
+    user, tenant_id = _authorize(request)
+    store.ensure_runtime()  # 建 version/original_name 列(独立事务·先于锁工单表的 txn)
+    with db.get_cursor(commit=True) as cur:
+        _load_order(cur, request, user, tenant_id, work_order_id)
+        try:
+            out = archive.archive_order(
+                cur, tenant_id=tenant_id, work_order_id=work_order_id, actor=f"user:{user['id']}"
+            )
+        except api.WorkOrderApiError as e:
+            _raise_from_api_error(e)
+    return {"ok": True, **out}
+
+
+@router.get("/api/workorder/orders/{work_order_id}/verify")
+async def verify_order(work_order_id: str, request: Request):
+    """篡改校验:逐 item 现算源文件 sha256 与冻结 manifest 比对(未冻结 → 409 not_archived)。"""
+    user, tenant_id = _authorize(request)
+    with db.get_cursor() as cur:
+        _load_order(cur, request, user, tenant_id, work_order_id)
+        try:
+            return archive.verify_manifest(cur, tenant_id=tenant_id, work_order_id=work_order_id)
+        except api.WorkOrderApiError as e:
+            _raise_from_api_error(e)
+
+
+@router.post("/api/workorder/orders/{work_order_id}/receipt")
+async def attach_receipt(work_order_id: str, request: Request, file: UploadFile = File(...)):
+    """申报回执补挂(append-only):冻结后唯一可写路径,落 receipt_attached 事件(带回执哈希),
+    不改已冻 manifest 本体。仅归档态可挂。"""
+    user, tenant_id = _authorize(request)
+    content = await file.read(_MAX_MATERIAL_BYTES + 1)
+    if len(content) > _MAX_MATERIAL_BYTES:
+        raise HTTPException(413, detail="workorder.file_too_large")
+    if not content:
+        raise HTTPException(422, detail="workorder.receipt_empty")
+    with db.get_cursor(commit=True) as cur:
+        _load_order(cur, request, user, tenant_id, work_order_id)
+        try:
+            out = archive.attach_receipt(
+                cur,
+                tenant_id=tenant_id,
+                work_order_id=work_order_id,
+                content=content,
+                original_name=file.filename,
+                actor=f"user:{user['id']}",
+            )
+        except api.WorkOrderApiError as e:
+            _raise_from_api_error(e)
+    return {"ok": True, **out}

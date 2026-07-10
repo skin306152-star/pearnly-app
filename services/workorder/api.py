@@ -51,11 +51,13 @@ _OUTPUT_VAT_HEADER = "ภาษีขาย"
 
 
 class WorkOrderApiError(ValueError):
-    """业务级校验错(路由映射成 4xx)。code 给前端错误契约。"""
+    """业务级校验错(路由映射成 4xx)。code 给前端错误契约;context 带结构化补充(如冻结闸
+    点名的缺失文件清单),路由原样透传给前端。"""
 
-    def __init__(self, code: str):
+    def __init__(self, code: str, *, context: Optional[dict] = None):
         super().__init__(code)
         self.code = code
+        self.context = context or {}
 
 
 def open_order(

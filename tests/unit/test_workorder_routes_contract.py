@@ -40,6 +40,9 @@ class RouteContractTests(unittest.TestCase):
             ("GET", "/api/workorder/orders/{work_order_id}/deliverables"),
             ("GET", "/api/workorder/orders/{work_order_id}/deliverables/{kind}"),
             ("GET", "/api/workorder/orders/{work_order_id}/items/{item_id}/image"),
+            ("POST", "/api/workorder/orders/{work_order_id}/archive"),
+            ("GET", "/api/workorder/orders/{work_order_id}/verify"),
+            ("POST", "/api/workorder/orders/{work_order_id}/receipt"),
         }
         self.assertTrue(expected.issubset(rs), f"缺路由: {expected - rs}")
 
@@ -393,6 +396,80 @@ class MaterialsUploadLimitTests(unittest.IsolatedAsyncioTestCase):
             out = await wr.add_materials("wo-1", mock.Mock(), files=[ok_file])
         self.assertEqual(out["count"], 1)
         save.assert_called_once()
+
+
+class ArchivedReadonlyGuardTests(unittest.IsolatedAsyncioTestCase):
+    """冻结(archive)后 mutating 端点结构化拒 409 archived_readonly。"""
+
+    def _patches(self, wr, wo_status):
+        return (
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
+            mock.patch.object(wr, "check_workspace_scope", return_value=None),
+            mock.patch.object(route_helpers, "check_workspace_scope", return_value=None),
+            mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            mock.patch.object(wr.store, "ensure_runtime", return_value=None),
+            mock.patch.object(
+                wr.store,
+                "get_work_order",
+                return_value={"workspace_client_id": 7, "status": wo_status},
+            ),
+        )
+
+    async def test_run_on_archived_is_409(self):
+        from routes import workorder_routes as wr
+
+        with mock.patch.object(wr.store, "acquire_run_lease") as acquire:
+            for p in self._patches(wr, "archive"):
+                self.enterContext(p)
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.run_order("wo-1", mock.Mock(), mock.Mock())
+        self.assertEqual(ctx.exception.status_code, 409)
+        self.assertEqual(ctx.exception.detail, "workorder.archived_readonly")
+        acquire.assert_not_called()  # 冻结后连租约都不抢
+
+
+class ArchiveEndpointTests(unittest.IsolatedAsyncioTestCase):
+    """冻结端点:成功透传状态;fail-closed 源缺失 → 409 且 detail 带 missing 点名。"""
+
+    def _patches(self, wr):
+        return (
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
+            mock.patch.object(wr, "check_workspace_scope", return_value=None),
+            mock.patch.object(route_helpers, "check_workspace_scope", return_value=None),
+            mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            mock.patch.object(wr.store, "ensure_runtime", return_value=None),
+            mock.patch.object(wr.store, "get_work_order", return_value={"workspace_client_id": 7}),
+        )
+
+    async def test_archive_success(self):
+        from routes import workorder_routes as wr
+
+        out_payload = {"status": "archive", "deliverable_version": 1, "manifest": {"item_count": 3}}
+        with mock.patch.object(wr.archive, "archive_order", return_value=out_payload):
+            for p in self._patches(wr):
+                self.enterContext(p)
+            out = await wr.archive_order("wo-1", mock.Mock())
+        self.assertTrue(out["ok"])
+        self.assertEqual(out["status"], "archive")
+
+    async def test_freeze_source_missing_maps_409_with_named_files(self):
+        from routes import workorder_routes as wr
+
+        err = wr.api.WorkOrderApiError(
+            "workorder.freeze_source_missing", context={"missing": ["gone.jpg"]}
+        )
+        with mock.patch.object(wr.archive, "archive_order", side_effect=err):
+            for p in self._patches(wr):
+                self.enterContext(p)
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.archive_order("wo-1", mock.Mock())
+        self.assertEqual(ctx.exception.status_code, 409)
+        self.assertEqual(ctx.exception.detail["code"], "workorder.freeze_source_missing")
+        self.assertEqual(ctx.exception.detail["missing"], ["gone.jpg"])
 
 
 class ItemImageTests(unittest.IsolatedAsyncioTestCase):

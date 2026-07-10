@@ -65,6 +65,24 @@
         ) {
             el.style.display = anySpecial ? '' : 'none';
         });
+
+        // 业态白名单收缩头像菜单(module-nav 据 business_type 写 _avatarShellHide · nav-presets 定名单)。
+        // 本函数在 i18n 切换 / cmdk 打开时重跑,故收缩要在这里(role 逻辑之后)兜底,免得被复位显回。
+        // settings/shortcuts 无其它门控 → 由本壳独家开关;billing/console 各有 money/team 门控(上方已算),
+        // 壳只朝"隐"覆盖,不越权把它们显回来。
+        var shellHide = window._avatarShellHide || [];
+        var settingsEl = document.getElementById('avatar-menu-settings');
+        if (settingsEl) settingsEl.style.display = shellHide.indexOf('avatar-menu-settings') >= 0 ? 'none' : '';
+        var shortcutsEl = document.getElementById('avatar-menu-shortcuts');
+        if (shortcutsEl) shortcutsEl.style.display = shellHide.indexOf('avatar-menu-shortcuts') >= 0 ? 'none' : '';
+        if (shellHide.indexOf('avatar-menu-billing') >= 0) {
+            var billEl = document.getElementById('avatar-menu-billing');
+            if (billEl) billEl.style.display = 'none';
+        }
+        if (shellHide.indexOf('avatar-menu-console') >= 0) {
+            var consoleEl = document.getElementById('avatar-menu-console');
+            if (consoleEl) consoleEl.style.display = 'none';
+        }
     };
 
     // ---- 渲染头像 + 名字 + 邮箱(复用 renderSidebarUser 同款 letter/avatar_url 逻辑) ----

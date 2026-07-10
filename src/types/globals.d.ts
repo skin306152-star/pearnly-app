@@ -285,6 +285,9 @@ interface Window {
     routeTo?: (route: string) => void;
     // POS PO-A1/A4/B1 · 模块导航显隐 + 库存后台(屏7)+ 开通收银(屏8)桥
     applyModuleNav?: () => void;
+    // 头像菜单业态白名单收缩:module-nav 据 business_type 写要隐的菜单项 id(nav-presets 定名单),
+    // applyRoleVisibility 消费(i18n/cmdk 重跑时保持锁死)。商户壳为空数组。
+    _avatarShellHide?: string[];
     // 丝滑专项 · 按钮即时反馈:点击→禁用+转圈→完成/失败必恢复
     withLoading?: <T>(btn: HTMLElement | null | undefined, fn: () => Promise<T>) => Promise<T>;
     // 平台业态套餐 PO-PP2 · 业态选择器弹窗(注册首次 / 设置切换业态 / 可开启功能)
@@ -295,6 +298,10 @@ interface Window {
     openClientAssign?: (client: { id: number; name: string }) => void;
     showWorkspaceGate?: () => void;
     enforceWorkspaceGate?: () => void;
+    // pos_only 收银壳:静默落套账放门(替代 enforceWorkspaceGate),不弹强制选套账弹窗。
+    autoSatisfyWorkspaceGate?: () => void;
+    // pos_only 收银壳把客户知识入口排除白名单外:置旗让 knowledge-center 的 kbProbe reveal 不显。
+    _navShellHidesKnowledge?: boolean;
     satisfyWorkspaceGate?: (id: number) => void;
     closeWorkspaceGate?: () => void;
     openSubjectCreate?: (opts?: { onCreated?: (id: number) => void }) => void;

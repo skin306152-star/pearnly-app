@@ -96,7 +96,7 @@ export const SIDEBAR_HTML = `
                 </svg>
                 <span class="nav-label" data-i18n="nav-sales-products">商品数据</span>
             </div>
-            <div class="nav-item nav-sub-item" data-route="expense-data" data-pos-only-hide>
+            <div class="nav-item nav-sub-item" data-route="expense-data">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 3.5h9a2 2 0 012 2V17l-3-2-3 2-3-2-2 2V3.5z"/>
                     <path d="M7 7h5M7 10h4"/>
@@ -291,7 +291,7 @@ export const SIDEBAR_HTML = `
                 </svg>
                 <span class="nav-label" data-i18n="nav-sales-report">销售报表</span>
             </div>
-            <div class="nav-item nav-sub-item" data-route="pos-sales-log" data-module="pos" data-pos-only-hide>
+            <div class="nav-item nav-sub-item" data-route="pos-sales-log" data-module="pos">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 4h12v12H4z"/><path d="M4 8h12M7 4v12"/>
                 </svg>
@@ -310,13 +310,13 @@ export const SIDEBAR_HTML = `
                 </svg>
                 <span class="nav-label" data-i18n="nav-pos-tables">桌台管理</span>
             </div>
-            <div class="nav-item nav-sub-item" id="nav-pos-payment" data-route="pos-payment" data-module="pos" data-pos-only-hide style="display:none;">
+            <div class="nav-item nav-sub-item" id="nav-pos-payment" data-route="pos-payment" data-module="pos" style="display:none;">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="2" y="5" width="16" height="11" rx="1.5"/><line x1="2" y1="9" x2="18" y2="9"/>
                 </svg>
                 <span class="nav-label" data-i18n="nav-pos-payment">收款设置</span>
             </div>
-            <div class="nav-item nav-sub-item" id="nav-pos-sheets" data-route="pos-sheets" data-module="pos" data-pos-only-hide style="display:none;">
+            <div class="nav-item nav-sub-item" id="nav-pos-sheets" data-route="pos-sheets" data-module="pos" style="display:none;">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="2" y="3" width="16" height="14" rx="1.5"/><line x1="2" y1="7" x2="18" y2="7"/><line x1="7" y1="7" x2="7" y2="17"/><line x1="12" y1="7" x2="12" y2="17"/>
                 </svg>
@@ -341,9 +341,9 @@ export const SIDEBAR_HTML = `
 
     <!-- 商品管理已升级为顶级「商品」组(商品数据 + 费用数据 · 见上方 data-collapsible=products)· 此处不再散落 -->
     <!-- 客户 / 异常栏 / 自动化 独立项(自动化 Phase 7 才合并进集成页) -->
-    <div class="nav-item" data-route="clients" data-pos-only-hide><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 17v-1.5a3 3 0 00-3-3H5a3 3 0 00-3 3V17"/><circle cx="8" cy="6.5" r="3"/><path d="M18 17v-1.5a3 3 0 00-2.3-2.9"/><path d="M13 3.6a3 3 0 010 5.8"/></svg><span class="nav-label" data-i18n="nav-clients">客户管理</span></div>
+    <div class="nav-item" data-route="clients"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 17v-1.5a3 3 0 00-3-3H5a3 3 0 00-3 3V17"/><circle cx="8" cy="6.5" r="3"/><path d="M18 17v-1.5a3 3 0 00-2.3-2.9"/><path d="M13 3.6a3 3 0 010 5.8"/></svg><span class="nav-label" data-i18n="nav-clients">客户管理</span></div>
     <!-- 公司资料 · 当前账套主体开票/申报信息(行内编辑 · company-profile.ts) -->
-    <div class="nav-item" data-route="company" data-pos-only-hide><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2.5" width="12" height="15" rx="1.5"/><path d="M8 17.5v-3h4v3M7 6h.01M13 6h.01M7 9h.01M13 9h.01M7 12h.01M13 12h.01"/></svg><span class="nav-label" data-i18n="nav-company">公司资料</span></div>
+    <div class="nav-item" data-route="company"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2.5" width="12" height="15" rx="1.5"/><path d="M8 17.5v-3h4v3M7 6h.01M13 6h.01M7 9h.01M13 9h.01M7 12h.01M13 12h.01"/></svg><span class="nav-label" data-i18n="nav-company">公司资料</span></div>
 
     <!-- KNOWLEDGE · 客户知识中心入口(放「客户管理」下方)· 探针门控(知识库 flag 开才显示 · knowledge-center.ts) -->
     <div class="nav-item" data-route="knowledge" id="nav-knowledge" style="display:none;">
@@ -355,7 +355,7 @@ export const SIDEBAR_HTML = `
         <span class="nav-label" data-i18n="nav-knowledge">客户知识</span>
     </div>
 
-    <div class="nav-item" data-route="exceptions" data-pos-only-hide>
+    <div class="nav-item" data-route="exceptions">
         <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9.1 3.4L2.3 15a1.5 1.5 0 001.3 2.3h12.8A1.5 1.5 0 0017.7 15L10.9 3.4a1.5 1.5 0 00-1.8 0z"/>
             <line x1="10" y1="8" x2="10" y2="12"/>
@@ -369,7 +369,7 @@ export const SIDEBAR_HTML = `
 
     <!-- 底部 pinned(Claude 式):可开启功能 / 集成 / 用户卡(点开 = 头像菜单) -->
     <div class="sidebar-bottom">
-        <div class="nav-item" id="nav-enroll" data-pos-only-hide style="display:none;">
+        <div class="nav-item" id="nav-enroll" style="display:none;">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="10" cy="10" r="7.5"/>
                 <path d="M10 6.5v7M6.5 10h7"/>
@@ -377,7 +377,7 @@ export const SIDEBAR_HTML = `
             <span class="nav-label" data-i18n="nav-enroll">可开启功能</span>
             <svg style="margin-left:auto;flex-shrink:0;color:var(--brand,#0E7C66);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
         </div>
-        <div class="nav-item" data-route="integrations" id="nav-integrations" data-pos-only-hide>
+        <div class="nav-item" data-route="integrations" id="nav-integrations">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M6 14L3 17M14 6l3-3"/>
                 <path d="M8 4L4 8a2.83 2.83 0 000 4l4 4a2.83 2.83 0 004 0l4-4a2.83 2.83 0 000-4l-4-4a2.83 2.83 0 00-4 0z"/>

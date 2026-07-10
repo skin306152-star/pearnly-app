@@ -75,4 +75,11 @@ async function visibleNavItems(page) {
     );
 }
 
-module.exports = { enterApp, openRoute, dismissWorkspaceGate, getModules, visibleNavItems };
+module.exports = {
+    enterApp,
+    openRoute,
+    dismissWorkspaceGate,
+    dismissWorkspaceModal,
+    getModules,
+    visibleNavItems,
+};

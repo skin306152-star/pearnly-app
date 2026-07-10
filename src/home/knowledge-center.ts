@@ -77,7 +77,9 @@ async function revealNavIfEnabled(): Promise<void> {
     if (window._knowledgeProbed) return;
     window._knowledgeProbed = true;
     try {
-        if (await kbProbe()) {
+        // pos_only 收银壳把客户知识排除在侧栏白名单外(module-nav 置 _navShellHidesKnowledge)→
+        // 即便有知识库也不显入口(与业态白名单一致 · 竞态双保险,module-nav 那边也会 hide 一次)。
+        if ((await kbProbe()) && !window._navShellHidesKnowledge) {
             const nav = document.getElementById('nav-knowledge');
             if (nav) nav.style.display = '';
         }

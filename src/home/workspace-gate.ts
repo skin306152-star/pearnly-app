@@ -306,6 +306,41 @@ window.enforceWorkspaceGate = function () {
     if (typeof window.showWorkspaceGate === 'function') window.showWorkspaceGate();
 };
 
+// pos_only 收银壳:单店卖货无多套账概念,不该被"强制选套账"门拦(Zihao 2026-07-10)。
+// 静默落 active/第一个套账放门,绝不弹选择列表拦收银开店;唯 0 套账(须先建)退回正常门。
+// 由 module-nav 在业态判定为 pos_only 时替代 enforceWorkspaceGate 调用。
+window.autoSatisfyWorkspaceGate = async function () {
+    if (window.PEARNLY_ADMIN_MODE) return;
+    if (_gateSatisfied || _gatePassedThisSession()) {
+        _gateSatisfied = true;
+        if (document.getElementById('workspace-gate-root')) close();
+        return;
+    }
+    // 已有持久 active 套账(= 上次用的)→ 直接过门,连 fetch 都省。
+    let id =
+        typeof window.getActiveWorkspaceClientId === 'function'
+            ? (window.getActiveWorkspaceClientId() as number | null)
+            : null;
+    if (!id) {
+        const list =
+            typeof window.fetchWorkspaceClients === 'function'
+                ? ((await window.fetchWorkspaceClients()) as Subject[])
+                : [];
+        window._workspaceClientsCache = list as [];
+        if (!list.length) {
+            // 0 套账:无主体无法经营 → 退回正常门(建套账流程),不静默。
+            if (typeof window.enforceWorkspaceGate === 'function') window.enforceWorkspaceGate();
+            return;
+        }
+        id = list[0].id; // 静默取第一个(无 active 时的合理默认 · 不弹窗)
+    }
+    _markGatePassed();
+    if (typeof window.setActiveWorkspaceClientId === 'function')
+        window.setActiveWorkspaceClientId(id);
+    if (document.getElementById('workspace-gate-root')) close();
+    if (typeof window.renderWorkspaceControl === 'function') window.renderWorkspaceControl();
+};
+
 // 关门(暴露给 module-nav:新注册向导接管时顶掉早起的门壳)。
 window.closeWorkspaceGate = close;
 

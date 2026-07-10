@@ -1,106 +1,139 @@
-// 平台业态套餐 · PO-PP1 · 主程序导航数据驱动(7 可开关模块按 GET /api/me/modules 显隐)
-// 接 GET /api/me/modules(信封 {ok,data:{modules,business_type,gateable}})· docs/platform-onboarding/03/04。
-// 每个 nav 项/折叠组标 data-module="<key>";本模块按租户开关逐项显隐:
-//   开 → 显;关 → 隐(关=隐藏不删数据 · D2)。混装组(销项=sales+recon+receivable)按 item 粒度显隐,
-//   整组仅当组内模块全关才隐。owner + 有未开模块 → 显「可开启功能 →」引导项(进设置 · 业务/模块)。
-// 老租户无显式行 → 后端回落 DEFAULT_ENABLED(sales/expense/recon/receivable/knowledge=on)→ 导航维持现状(D1)。
-// POS 引导项(开通收银台)沿用既有逻辑:pos 未开 + owner 显(provisioned≠enabled · 见 02 D3)。
-// PS-2 pos_only 精简外壳(POS 拆卖 · POS-体检报告 §5.3):运营侧显式打标的锁死收银店壳,
-// 不进自助业态选择器。apply() 末尾按 data-pos-only-hide 收一轮,菜单只留收银台入口+商品+
-// 库存+简单报表+收银员管理(客户/公司资料/异常栏/集成/费用数据/交易明细等一律隐)。
+// 侧栏 + 头像菜单显隐 · 业态驱动。两条路(唯一入口 · core-boot 用户就绪后调 applyModuleNav):
+//   ① firm / 未选业态(老事务所兜底)与 pos_only(拆卖收银壳)= Zihao 终版白名单写死(nav-presets.ts),
+//      清单内显、清单外隐,与后端模块开关解耦(pos_only 后端不开 sales/expense 也要出采购/销售菜单;
+//      firm 后端默认开 accounting 却要收起做账/商品)。以拍板清单为唯一事实源,不再逐 if 算。
+//   ② 其余商户业态(retail/pharmacy/restaurant/service/b2b)= 按 GET /api/me/modules 逐模块动态显隐。
+// 隐藏≠删:全程 display 控制,DOM 保留,切业态即复现(深链路由不封 · 菜单收缩是导航减负非权限)。
+// knowledge 例外:由 knowledge-center.ts kbProbe 独占门控,两路都不碰(抢同一元素会回归)。
 /* global apiGet */
+
+import { show, applyNavPreset, FIRM_PRESET, POS_PRESET } from './nav-presets.js';
 
 interface ModuleFlag {
     enabled?: boolean;
 }
 
-// knowledge 不在此列:它已有自己的门控(knowledge-center.ts 的 kbProbe 按后端可用性显隐 #nav-knowledge),
-// 此处接管会与 kbProbe 抢同一元素 → 留给它,避免回归。module-nav 只数据驱动后端模块门控的 6 项。
+// 商户业态动态门控的模块 key(knowledge 除外 · 见文件头)。
 const GATEABLE = ['sales', 'expense', 'recon', 'inventory', 'pos', 'receivable', 'accounting'];
 
-// 识别记录(上传识别 / 单据记录)= 事务所栈,仅事务所显示。显式商户业态 → 隐藏(F14·降级事务所专用)。
-// 关键:legacy 事务所从未 onboard → business_type=null,必须保留(与后端 route_line_image 的
-// `bt in (None,"firm")` 同源)。绝不"非 firm 就隐",会误杀老事务所主路径(铁律#26)。
-const MERCHANT_TYPES = ['retail', 'pharmacy', 'restaurant', 'service', 'b2b', 'pos_only'];
-
-function show(el: HTMLElement | null, on: boolean) {
-    if (el) el.style.display = on ? '' : 'none';
+function qs(sel: string): HTMLElement | null {
+    return document.querySelector<HTMLElement>(sel);
 }
 
-function apply(modules: Record<string, ModuleFlag>, businessType?: string | null) {
-    const owner = typeof window.isOwner === 'function' ? window.isOwner() : false;
-    const on = (k: string) => !!(modules[k] && modules[k].enabled);
-
-    // 首页(计费/订阅/余额面板)员工不给:隐藏导航 + 引导期落在首页则改落业务首页(守卫在 routeTo)。
-    const emp = typeof window.isEmployee === 'function' ? window.isEmployee() : false;
-    const onDash = (location.hash || '').replace(/^#\//, '') === 'dashboard';
-    show(document.querySelector<HTMLElement>('.nav-item[data-route="dashboard"]'), !emp);
-    if (emp && onDash && typeof window.routeTo === 'function') window.routeTo('dashboard');
-
-    // 逐项:每个标了 data-module 的 nav 元素按其模块开关显隐。
-    GATEABLE.forEach((k) => {
-        document
-            .querySelectorAll<HTMLElement>('[data-module="' + k + '"]')
-            .forEach((el) => show(el, on(k)));
-    });
-
-    // 五-bis(2026-06-10):识别中心/对账 = 事务所代账工具 → 收进「事务所工具」组(data-collapsible=firm),
-    // 仅事务所(firm)或未选业态(老租户兜底)显示,商户业态隐藏整组(隐藏≠删,切回 firm 即复现)。
-    // 关键:legacy 事务所从未 onboard → business_type=null,必须保留(与后端 route_line_image 的
-    // `bt in (None,"firm")` 同源)。绝不"非 firm 就隐",会误杀老事务所主路径(铁律#26)。
-    const isMerchant = !!businessType && MERCHANT_TYPES.indexOf(businessType) >= 0;
-    show(
-        document.querySelector<HTMLElement>('[data-collapsible="firm"]'),
-        !isMerchant && (on('sales') || on('recon'))
-    );
-    if (isMerchant) {
-        // 商户落在已隐藏的事务所工具路由(识别/记录/对账,含 routeTo 兜底回落 ocr)→ 改去首页。
-        const cur = (location.hash || '').replace(/^#\//, '');
-        if (
-            (!cur || cur === 'ocr' || cur === 'history' || cur === 'reconcile') &&
-            typeof window.routeTo === 'function'
-        ) {
-            window.routeTo('dashboard');
-        }
-    }
-
-    // 集成页卡片业态显隐(五-bis):firm 全显;商户只显 LINE Bot + 智能提醒。
-    // 标 data-firm-only 的卡/分组标题/分隔线在商户业态隐藏(隐藏≠删,切回 firm 复现)。
-    document
-        .querySelectorAll<HTMLElement>('#page-integrations [data-firm-only]')
-        .forEach((el) => show(el, !isMerchant));
-
-    // 折叠组级:销售开票组(发票工作台/账套/应收)按「sales 或 receivable 开」显隐。
-    show(
-        document.querySelector<HTMLElement>('[data-collapsible="sales"]'),
-        on('sales') || on('receivable')
-    );
-    show(document.querySelector<HTMLElement>('[data-collapsible="expense"]'), on('expense'));
-    show(document.querySelector<HTMLElement>('[data-collapsible="accounting"]'), on('accounting'));
-
-    // 收银业务组(inventory/pos)+ 开通引导:pos 未开通 + owner 仍显「开通收银台 →」(enabled≠provisioned)。
-    const pos = on('pos');
-    const inv = on('inventory');
+// 收银业务组内子项的角色/开通门控(与整组显隐分开)。gateGroup=true 时顺带按 inventory/pos/
+// 开通引导决定整组显隐(商户路径);清单路径已显式显组,gateGroup=false 只管组内子项。
+// 常显子项(库存/报表/交易明细/切收银台)一并复位,清切业态往返时的残留 display:none。
+function applyPosRoles(
+    owner: boolean,
+    pos: boolean,
+    inv: boolean,
+    businessType: string | null | undefined,
+    gateGroup: boolean
+): void {
     const showOnboard = !pos && owner;
-    show(document.getElementById('nav-group-pos'), inv || pos || showOnboard);
+    if (gateGroup) show(document.getElementById('nav-group-pos'), inv || pos || showOnboard);
     show(document.getElementById('nav-pos-onboard'), showOnboard);
-    show(document.getElementById('nav-pos-cashiers'), pos && owner); // 收银员管理 = owner · pos 开通后
-    // 收款设置 / Google Sheet 留档 = owner · pos 开通后(全 POS 业态);桌台管理 = 仅餐厅业态(owner · pos)。
+    show(document.getElementById('nav-pos-cashiers'), pos && owner);
     show(document.getElementById('nav-pos-payment'), pos && owner);
     show(document.getElementById('nav-pos-sheets'), pos && owner);
     show(document.getElementById('nav-pos-tables'), pos && owner && businessType === 'restaurant');
+    show(qs('.nav-item[data-route="inventory"]'), inv);
+    ['sales-report', 'pos-sales-log'].forEach((r) =>
+        show(qs('.nav-item[data-route="' + r + '"]'), pos)
+    );
+    show(document.getElementById('nav-pos-switch'), pos);
+}
+
+// 顶栏头像菜单按业态白名单收缩(清单路径设,商户路径清空)。落到全局供 applyRoleVisibility 复用:
+// 它在 i18n 切换 / cmdk 打开时会重跑,读同一份 _avatarShellHide 才不会把锁死项又显回来。
+function lockAvatarShell(hideIds: string[]): void {
+    window._avatarShellHide = hideIds;
+    if (typeof window.applyRoleVisibility === 'function') window.applyRoleVisibility();
+}
+
+// 商户业态(retail/pharmacy/restaurant/service/b2b)· 逐模块动态显隐(既有逻辑)。
+function applyMerchantNav(
+    businessType: string | null | undefined,
+    owner: boolean,
+    emp: boolean,
+    on: (k: string) => boolean
+): void {
+    // 首页=计费面板,员工看不到钱 → 隐藏 + 停在首页则回落业务首页。
+    show(qs('.nav-item[data-route="dashboard"]'), !emp);
+    const onDash = (location.hash || '').replace(/^#\//, '') === 'dashboard';
+    if (emp && onDash && typeof window.routeTo === 'function') window.routeTo('dashboard');
+
+    GATEABLE.forEach((k) =>
+        document
+            .querySelectorAll<HTMLElement>('[data-module="' + k + '"]')
+            .forEach((el) => show(el, on(k)))
+    );
+
+    // 事务所工具组 + 集成页 firm-only 卡:商户业态一律隐。
+    show(qs('[data-collapsible="firm"]'), false);
+    document
+        .querySelectorAll<HTMLElement>('#page-integrations [data-firm-only]')
+        .forEach((el) => show(el, false));
+    // 落在已隐藏的事务所工具路由(识别/记录/对账,含 routeTo 兜底回落 ocr)→ 回首页。
+    const cur = (location.hash || '').replace(/^#\//, '');
+    if (
+        (!cur || cur === 'ocr' || cur === 'history' || cur === 'reconcile') &&
+        typeof window.routeTo === 'function'
+    ) {
+        window.routeTo('dashboard');
+    }
+
+    show(qs('[data-collapsible="sales"]'), on('sales') || on('receivable'));
+    show(qs('[data-collapsible="expense"]'), on('expense'));
+    show(qs('[data-collapsible="accounting"]'), on('accounting'));
+
+    applyPosRoles(owner, on('pos'), on('inventory'), businessType, true);
 
     // 「可开启功能 →」引导(owner + 有未开模块)→ 进设置 · 业务/模块 自助开通。
-    const anyOff = owner && GATEABLE.some((k) => !on(k));
-    show(document.getElementById('nav-enroll'), anyOff);
+    show(document.getElementById('nav-enroll'), owner && GATEABLE.some((k) => !on(k)));
+}
 
-    // PS-2 · pos_only 收一轮(菜单清单见文件头):只隐不显——非 pos_only 账号不碰这批元素,
-    // 免得压掉 data-module/anyOff 已算出的显隐(部分元素两套门控叠加,只隐不显才不打架)。
-    if (businessType === 'pos_only') {
-        document
-            .querySelectorAll<HTMLElement>('[data-pos-only-hide]')
-            .forEach((el) => show(el, false));
+function apply(modules: Record<string, ModuleFlag>, businessType?: string | null): void {
+    const owner = typeof window.isOwner === 'function' ? window.isOwner() : false;
+    const emp = typeof window.isEmployee === 'function' ? window.isEmployee() : false;
+    const on = (k: string) => !!(modules[k] && modules[k].enabled);
+
+    const preset =
+        businessType === 'pos_only'
+            ? POS_PRESET
+            : !businessType || businessType === 'firm'
+              ? FIRM_PRESET
+              : null;
+
+    // 客户知识入口由 knowledge-center 的 kbProbe 按"有没有知识库"独立显隐(异步),module-nav 不抢。
+    // 唯 pos_only 收银壳要它彻底消失(不在白名单)→ 置旗让 kbProbe 的 reveal 不再显(竞态双保险)。
+    window._navShellHidesKnowledge = businessType === 'pos_only';
+
+    if (preset) {
+        applyNavPreset(preset);
+        if (businessType === 'pos_only') show(document.getElementById('nav-knowledge'), false);
+        // 首页=计费面板,员工不给(隐藏 + 若正停在首页则落业务首页;非员工由清单决定首页显隐)。
+        if (emp) {
+            show(qs('.nav-item[data-route="dashboard"]'), false);
+            const onDash = (location.hash || '').replace(/^#\//, '') === 'dashboard';
+            if (onDash && typeof window.routeTo === 'function') window.routeTo('dashboard');
+        }
+        // 集成页 firm-only 卡:会计版全显(商户路径会隐,切回来要复现)。
+        if (preset === FIRM_PRESET) {
+            document
+                .querySelectorAll<HTMLElement>('#page-integrations [data-firm-only]')
+                .forEach((el) => show(el, true));
+        }
+        // 收银业务组的角色/开通门控(组显隐已由清单处理,这里只管组内子项)。
+        if (businessType === 'pos_only') {
+            applyPosRoles(owner, on('pos'), on('inventory'), businessType, false);
+        }
+        lockAvatarShell(preset.avatarHide);
+        return;
     }
+
+    applyMerchantNav(businessType, owner, emp, on);
+    lockAvatarShell([]); // 商户壳:头像菜单不收缩,恢复常规角色门控。
 }
 
 // 新注册首进自动起引导向导(仅本次 page load 一次 · 老租户无 needs_onboarding 标记 → 永不起)。
@@ -129,6 +162,11 @@ async function applyModuleNav() {
         apply(data.modules || {}, data.business_type);
         if (data.needs_onboarding) {
             maybeAutoOnboard(data); // 新注册 → 引导向导(末步=选套账)
+        } else if (
+            data.business_type === 'pos_only' &&
+            typeof window.autoSatisfyWorkspaceGate === 'function'
+        ) {
+            window.autoSatisfyWorkspaceGate(); // pos_only 收银壳 → 静默落套账,不弹强制门
         } else if (typeof window.enforceWorkspaceGate === 'function') {
             window.enforceWorkspaceGate(); // 老用户每次登录 → 无 active 套账则起硬门
         }

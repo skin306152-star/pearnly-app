@@ -1,60 +1,158 @@
-// Pearnly E2E · 25 完整版账号侧栏零变化(PS-2 · pos_only 精简外壳的对照组)
+// Pearnly E2E · 25 会计版(firm / 未选业态兜底)· 侧栏 + 头像白名单 + 强制选套账门回归
 // ============================================================
-// 纯只读:不改任何账号状态,只验证非 pos_only 账号(现状 business_type≠pos_only)的侧栏
-// 行为与 pos_only 改动前完全一致——可见菜单项远超 7 个上限,且做账/报税等常规菜单正常
-// 显示。用来防「pos_only 门控代码不小心影响了正常账号」这一类回归。
+// pos_only(24 号)的对照组:验证会计版 firm 壳的终版白名单(Zihao 2026-07-10),并确保
+// pos_only 的"免门"改动没破坏会计版多套账用户的【强制选套账】现有行为。
+//   侧栏留:首页 / Pearnly Cowork / 采购系统 / 客户 / 公司 / 异常 / 销售系统 / 集成 + 账号块;
+//   收起:商品系统 / 做账 / 收银业务 / 可开启功能。
+//   头像留 4:团队与权限 / 暗夜模式 / 帮助 & 反馈 / 退出登录。
+//   关键解耦:firm 后端默认开 accounting,但「做账/商品」按白名单收起 —— 证明与模块开关脱钩。
 // ============================================================
+/* global document, window */
+
 const path = require('path');
 const { test, expect } = require('@playwright/test');
 const { hasCreds, ensureStorageState, STORAGE_STATE } = require('./_helpers/auth');
-const { enterApp, getModules, visibleNavItems } = require('./_helpers/app');
+const { enterApp, getModules, dismissWorkspaceModal } = require('./_helpers/app');
 const { attachConsoleGuard, assertNoConsoleErrors } = require('./_helpers/console-guard');
 
-const OUT = path.join(process.cwd(), 'tests', 'e2e', '_artifacts', 'ps2');
+const OUT = path.join(process.cwd(), 'tests', 'e2e', '_artifacts', 'nav-preset');
 
-test.describe('完整版账号 · pos_only 改动零回归', () => {
+const SIDEBAR = {
+    dashboard: '.nav-item[data-route="dashboard"]',
+    cowork: '[data-collapsible="firm"]',
+    products: '[data-collapsible="products"]',
+    purchases: '[data-collapsible="expense"]',
+    sales: '[data-collapsible="sales"]',
+    accounting: '[data-collapsible="accounting"]',
+    pos: '#nav-group-pos',
+    clients: '.nav-item[data-route="clients"]',
+    company: '.nav-item[data-route="company"]',
+    exceptions: '.nav-item[data-route="exceptions"]',
+    integrations: '#nav-integrations',
+    enroll: '#nav-enroll',
+};
+const AVATAR = {
+    settings: '#avatar-menu-settings',
+    console: '#avatar-menu-console',
+    billing: '#avatar-menu-billing',
+    shortcuts: '#avatar-menu-shortcuts',
+    theme: '#avatar-menu-theme',
+    help: '#avatar-menu-help',
+    logout: '#avatar-menu-logout',
+};
+
+async function setBusinessType(page, businessType) {
+    return page.evaluate(async (bt) => {
+        const tok = localStorage.getItem('mrpilot_token');
+        const r = await fetch('/api/me/onboarding', {
+            method: 'PUT',
+            headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ business_type: bt }),
+        });
+        return r.json();
+    }, businessType);
+}
+
+async function workspaceCount(page) {
+    return page.evaluate(async () => {
+        if (typeof window.fetchWorkspaceClients !== 'function') return 0;
+        const l = await window.fetchWorkspaceClients();
+        return Array.isArray(l) ? l.length : 0;
+    });
+}
+
+async function expandAllGroups(page) {
+    await page.evaluate(() =>
+        document
+            .querySelectorAll('.nav-collapsible.collapsed')
+            .forEach((g) => g.classList.remove('collapsed'))
+    );
+}
+
+test.describe('会计版 firm · 侧栏 + 头像 + 强制门回归', () => {
     test.skip(!hasCreds(), '需测试账号·CI 无凭据时跳过');
     test.use({ storageState: STORAGE_STATE });
+
+    let originalBusinessType = null;
+
     test.beforeAll(async ({ browser }) => {
         await ensureStorageState(browser);
     });
 
-    test('非 pos_only 账号 · 侧栏菜单项数 > 7 且做账/报税菜单可见', async ({ page }) => {
+    test.afterEach(async ({ page }) => {
+        if (originalBusinessType) await setBusinessType(page, originalBusinessType);
+    });
+
+    test('firm:侧栏 8 项白名单 + 头像留团队与权限 + 强制选套账门不破', async ({ page }) => {
         const guard = attachConsoleGuard(page);
         await enterApp(page);
 
-        const modules = await getModules(page);
-        expect(modules.ok).toBe(true);
-        expect(
-            modules.data.business_type,
-            '这条对照测试要求账号不是 pos_only(避免和 24 号 spec 的临时状态撞车)'
-        ).not.toBe('pos_only');
+        const before = await getModules(page);
+        expect(before.ok, 'GET /api/me/modules 成功').toBe(true);
+        originalBusinessType = before.data.business_type || 'firm';
 
-        // 数菜单前先等 module-nav apply 完(accounting 组默认 display:none,apply 才翻开;
-        // enterApp 只保证 sidebar 在,不保证模块显隐已生效——裸数是竞态)。
-        const acctOn = modules.data.modules.accounting && modules.data.modules.accounting.enabled;
-        if (acctOn) {
-            await expect(page.locator('.nav-item[data-route="acct-review"]')).toBeVisible({
-                timeout: 15000,
-            });
-        }
+        const wsN = await workspaceCount(page);
+        const flip = await setBusinessType(page, 'firm');
+        expect(flip.ok, 'PUT firm 成功(owner 权限)').toBe(true);
 
-        const visible = await visibleNavItems(page);
-
-        expect(visible.length, 'pos_only 闸不该收窄完整版菜单').toBeGreaterThan(7);
-
-        // accounting 开(该账号默认业态 firm 全开)时做账/报税菜单应正常显示——
-        // 证明 data-pos-only-hide 收口没有误伤非 pos_only 账号。
-        if (acctOn) {
-            expect(visible).toContain('acct-review');
-            expect(visible).toContain('tax-center');
-        }
-
-        await page.screenshot({
-            path: path.join(OUT, 'full_account_sidebar.png'),
-            fullPage: true,
+        // 回归:清 session 模拟新登录会话后全新进场,firm 多套账仍应【强制弹选套账门】。
+        await page.evaluate(() => {
+            try {
+                sessionStorage.clear();
+            } catch {
+                /* 私模 */
+            }
         });
+        await page.goto('/home');
 
-        assertNoConsoleErrors(expect, guard);
+        if (wsN >= 2) {
+            // firm 多套账:门必须弹(pos_only 免门改动不得波及此路径)· 选第一个进场。
+            const pick = page.locator('#workspace-gate-root [data-wsg-pick]').first();
+            await expect(pick, 'firm 多套账应强制弹选套账门').toBeVisible({ timeout: 20000 });
+            await pick.click();
+            await expect(page.locator('#workspace-gate-root')).toHaveCount(0, { timeout: 10000 });
+        } else {
+            // 单套账:本就自动跳门(与业态无关)· 只确保进了工作台。
+            await expect(page.locator('#sidebar')).toBeVisible({ timeout: 20000 });
+        }
+
+        await page.waitForFunction(
+            () => Array.isArray(window._avatarShellHide) && window._avatarShellHide.length === 3,
+            null,
+            { timeout: 20000 }
+        );
+        await dismissWorkspaceModal(page);
+        await expandAllGroups(page);
+
+        // 侧栏白名单内可见 / 外隐藏(做账 + 商品系统 收起 = 与模块开关解耦的铁证)。
+        for (const key of [
+            'dashboard',
+            'cowork',
+            'purchases',
+            'clients',
+            'company',
+            'exceptions',
+            'sales',
+            'integrations',
+        ]) {
+            await expect(page.locator(SIDEBAR[key]), `${key} 应可见`).toBeVisible();
+        }
+        for (const key of ['products', 'accounting', 'pos', 'enroll']) {
+            await expect(page.locator(SIDEBAR[key]), `${key} 应隐藏`).toBeHidden();
+        }
+
+        // 头像菜单:留 4(含团队与权限)· 砍 3(设置/账户余额/键盘快捷键)。
+        await page.locator('#avatar-btn').click();
+        await expect(page.locator('#avatar-popup')).toHaveClass(/show/);
+        for (const key of ['console', 'theme', 'help', 'logout']) {
+            await expect(page.locator(AVATAR[key]), `头像 ${key} 应可见`).toBeVisible();
+        }
+        for (const key of ['settings', 'billing', 'shortcuts']) {
+            await expect(page.locator(AVATAR[key]), `头像 ${key} 应隐藏`).toBeHidden();
+        }
+
+        await page.screenshot({ path: path.join(OUT, 'firm.png'), fullPage: true });
+
+        assertNoConsoleErrors(expect, guard, { allow: [/Failed to load resource.*403/] });
     });
 });

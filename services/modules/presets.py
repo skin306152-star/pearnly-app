@@ -18,6 +18,11 @@ from services.modules import store
 # business_type → 默认开的 module_key 列表(canonical 6 业态 · 02 表)。
 # sales 在所有业态都开(平台主线尖刀)。未列业态拒绝(onboarding 报 unknown_business_type)。
 # accounting(自动做账)全业态都开:经营动作即输入是平台主线(docs/product-vision/00)。
+#
+# pos_only 例外:POS 拆卖精简外壳(PS-2 · POS-体检报告 §5.3)。刻意不开 sales/accounting——
+# 这不是正常商户业态,是给拆卖租户锁死的收银小店壳(只留收银+库存),会计/报税/识别菜单
+# 对这类账号根本不该出现,不走平台主线尖刀那条默认开 sales 的惯例。不进自助业态选择器
+# TYPES 卡片列表(onboarding-business.ts)——只走运营侧显式打标,不给客户自选。
 BUSINESS_PRESETS: dict[str, list[str]] = {
     "firm": ["sales", "expense", "recon", "knowledge", "accounting"],
     "retail": ["sales", "inventory", "pos", "accounting"],
@@ -25,6 +30,7 @@ BUSINESS_PRESETS: dict[str, list[str]] = {
     "restaurant": ["sales", "inventory", "pos", "accounting"],
     "service": ["sales", "expense", "accounting"],
     "b2b": ["sales", "inventory", "receivable", "expense", "accounting"],
+    "pos_only": ["pos", "inventory"],
 }
 
 

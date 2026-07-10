@@ -1291,7 +1291,6 @@ class Component extends DCLogic {
     if (this._dmDocsCache && this._dmDocsN === n) return this._dmDocsCache;
     let s = 42 >>> 0;
     const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
-    const types = ['ก', 'ข', 'ค'];
     const colors = ['#4E7D25', '#B07A1E', '#3C7A6E'];
     const docs = [];
     for (let i = 0; i < n; i++) {
@@ -1480,7 +1479,7 @@ class Component extends DCLogic {
       },
     }));
     const rowDefs = [
-      { id: 'vat',   no: 'INV-2569/0614', vendor: L('บจก. สยามซัพพลาย', 'Siam Supply Co.'),   amt: '8,560.00',  pill: L('✗ VAT', '✗ VAT'),          err: 1 },
+      { id: 'vat',   no: 'INV-2569/0614', vendor: L('บจก. สยามซัพพลาย', 'Siam Supply Co.'),   amt: '8,560.00',  pill: '✗ VAT',                      err: 1 },
       { id: 'taxid', no: 'INV-2569/0631', vendor: L('บจก. เอ็นพี เทรดดิ้ง', 'NP Trading Co.'), amt: '12,412.00', pill: L('✗ เลขภาษี', '✗ Tax ID'),    err: 1 },
       { id: 'miss',  no: 'RCP-0847',      vendor: L('ร้านรุ่งเรืองการค้า', 'Rungruang Store'), amt: '1,177.00',  pill: L('⚠ ขาดใบกำกับ', '⚠ No invoice'), err: 0 },
       { id: 'dup',   no: 'INV-2569/0602', vendor: L('บจก. สยามซัพพลาย', 'Siam Supply Co.'),   amt: '8,560.00',  pill: L('⧉ ซ้ำ', '⧉ Dup'),          err: 0 },

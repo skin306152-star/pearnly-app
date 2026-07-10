@@ -103,6 +103,21 @@
             'adm-ai-reset-ok': '密码已重置 · 见下方',
             'adm-ai-reset-not-invited': '该账号不在邀请名单内,拒绝重置',
             'adm-ai-reset-subject-unknown': '找不到对应账号',
+            'adm-pos-prov-title': '发放账号',
+            'adm-pos-prov-hint':
+                '输客户邮箱 → 没账号就建号 + 建租户 + 开通一条龙 · 已有账号走既有租户开通',
+            'adm-pos-prov-email-ph': '客户邮箱',
+            'adm-pos-prov-name-ph': '店名(选填)',
+            'adm-pos-prov-go': '发放',
+            'adm-pos-prov-bad-email': '请输入有效邮箱',
+            'adm-pos-prov-confirm':
+                '确认给 {email} 发放 POS 账号并开通?没账号会新建并生成初始密码。',
+            'adm-pos-prov-existed':
+                '该邮箱已有账号 · 已在其现有租户上开通(未新建账号 · 无初始密码)。',
+            'adm-pos-prov-pw-once': '初始密码(只显示这一次 · 请立即复制转交客户,客户可自行改密):',
+            'adm-pos-prov-copy': '复制密码',
+            'adm-pos-prov-copied': '已复制',
+            'adm-pos-prov-fail': '发放失败(邮箱无效或该租户已开通)',
             'adm-agent-title': 'Agent 助手',
             'adm-agent-sub': 'LINE 对话助手健康与获客漏斗 · 只读观测 · 兜底率高=用户在拿废话',
             'adm-agent-health-title': '对话健康(近 24 小时)',
@@ -579,6 +594,22 @@
             'adm-ai-reset-ok': 'รีเซ็ตรหัสผ่านแล้ว · ดูด้านล่าง',
             'adm-ai-reset-not-invited': 'บัญชีนี้ไม่อยู่ในรายชื่อเชิญ · ปฏิเสธการรีเซ็ต',
             'adm-ai-reset-subject-unknown': 'ไม่พบบัญชีที่ตรงกัน',
+            'adm-pos-prov-title': 'ออกบัญชีให้ลูกค้า',
+            'adm-pos-prov-hint':
+                'ใส่อีเมลลูกค้า → ถ้ายังไม่มีบัญชี จะสร้างบัญชี + กิจการ + เปิดใช้งานให้ในขั้นตอนเดียว · ถ้ามีบัญชีแล้วจะเปิดใช้งานบนกิจการเดิม',
+            'adm-pos-prov-email-ph': 'อีเมลลูกค้า',
+            'adm-pos-prov-name-ph': 'ชื่อร้าน (ไม่บังคับ)',
+            'adm-pos-prov-go': 'ออกบัญชี',
+            'adm-pos-prov-bad-email': 'กรุณากรอกอีเมลที่ถูกต้อง',
+            'adm-pos-prov-confirm':
+                'ยืนยันออกบัญชี POS และเปิดใช้งานให้ {email}? ถ้ายังไม่มีบัญชีจะสร้างใหม่พร้อมรหัสผ่านเริ่มต้น',
+            'adm-pos-prov-existed':
+                'อีเมลนี้มีบัญชีอยู่แล้ว · เปิดใช้งานบนกิจการเดิมแล้ว (ไม่ได้สร้างบัญชีใหม่ · ไม่มีรหัสผ่านเริ่มต้น)',
+            'adm-pos-prov-pw-once':
+                'รหัสผ่านเริ่มต้น (แสดงครั้งเดียว · กรุณาคัดลอกส่งให้ลูกค้าทันที ลูกค้าเปลี่ยนเองได้):',
+            'adm-pos-prov-copy': 'คัดลอกรหัสผ่าน',
+            'adm-pos-prov-copied': 'คัดลอกแล้ว',
+            'adm-pos-prov-fail': 'ออกบัญชีไม่สำเร็จ (อีเมลไม่ถูกต้องหรือกิจการเปิดใช้งานอยู่แล้ว)',
             'adm-agent-title': 'ผู้ช่วย Agent',
             'adm-agent-sub':
                 'สุขภาพแชท LINE + ฟันเนลผู้ใช้ · อ่านอย่างเดียว · fallback สูง = ผู้ใช้ได้คำตอบเปล่า',

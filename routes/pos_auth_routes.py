@@ -171,7 +171,7 @@ async def api_pin_login(req: PinLoginRequest, request: Request):
 
 @router.get("/admin/store-code")
 async def api_get_store_code(request: Request, workspace_client_id: int = Query(...)):
-    """取该账套店铺码(无则建)· owner。前端拼二维码/链接 pearnly.com/pos?store=<code>。"""
+    """取该账套店铺码(无则建)· owner。前端拼二维码/链接 pearnly.com/cashier?store=<code>(PS-5 迁址)。"""
     tid, _uid = require_perm_pos_tid(request, "pos.admin.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         require_workspace(cur, tid, workspace_client_id)
@@ -184,7 +184,7 @@ async def api_get_store_code(request: Request, workspace_client_id: int = Query(
             workspace_client_id=workspace_client_id,
             store_name=store_name,
         )
-    link = _pos_base_url() + "/pos?store=" + info["code"]
+    link = _pos_base_url() + "/cashier?store=" + info["code"]
     return ok(
         {
             "code": info["code"],

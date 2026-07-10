@@ -501,9 +501,10 @@
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible' && POS.pay) POS.pay.refresh();
         });
-        // PWA 外壳 SW(08 ADR-1)· 失败不影响在线使用。从根路径 /pos-sw.js 注册 + scope:/pos
-        // → SW 能控 /pos 导航(断网重开外壳)。旧 /static/pos/pos-sw.js(scope 卡 /static/pos/
-        // 控不了 /pos)顺手注销,免双注册残留。
+        // PWA 外壳 SW(08 ADR-1 · PS-5 迁址)· 失败不影响在线使用。收银台新家在 /cashier,从根路径
+        // /cashier-sw.js 注册 + scope:/cashier → SW 能控 /cashier 导航(断网重开外壳)。只注销更旧的
+        // /static/pos/ 作用域残留;老 /pos 作用域 SW 故意保留 —— 迁移中的老设备靠它离线兜底老壳,
+        // 落到 /cashier 后各管各的作用域,互不抢导航。
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker
                 .getRegistrations()
@@ -514,7 +515,7 @@
                 })
                 .catch(() => {});
             navigator.serviceWorker
-                .register('/pos-sw.js?v=11854700', { scope: '/pos' })
+                .register('/cashier-sw.js?v=11871100', { scope: '/cashier' })
                 .catch(() => {});
         }
         tick();

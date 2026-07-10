@@ -19,6 +19,7 @@ from core import db
 from core.route_helpers import _log_op, _require_super_admin
 from services.modules import store as modules_store
 from services.pos import entitlements as ent
+from services.pos import provision as pos_provision
 
 router = APIRouter()
 
@@ -104,6 +105,12 @@ class TransferBody(BaseModel):
     to_tenant_id: str = Field(..., min_length=1, max_length=64)
 
 
+class ProvisionBody(BaseModel):
+    email: str = Field(..., min_length=3, max_length=200)
+    tenant_name: Optional[str] = Field(None, max_length=100)
+    amount_paid_thb: Optional[float] = Field(None, ge=0)
+
+
 @router.get("/api/admin/pos-entitlement")
 async def get_pos_entitlement(request: Request, q: str = Query(..., min_length=1)):
     """按标识查租户现状(授权 + 已用店/收银员 + 业态)。查不到 404。"""
@@ -140,6 +147,52 @@ async def grant_pos_entitlement(request: Request, body: GrantBody):
         details=f"amount={amount} code={row['grant_code']}",
     )
     return {"ok": True, "grant_code": row["grant_code"], "entitlement": _entitlement_out(row)}
+
+
+@router.post("/api/admin/pos-entitlement/provision")
+async def provision_pos_account(request: Request, body: ProvisionBody):
+    """发放账号一条龙:输客户邮箱 → 无账号则建号(回显一次性初始密码)+ 建租户 + grant。
+
+    邮箱已存在 → 走既有租户开通路(不建号、不回显密码)。审计只记邮箱/租户/授权码,
+    绝不落初始密码(铁律 #26:密码不进日志)。业务逻辑在 services/pos/provision。
+    """
+    user = _require_super_admin(request)
+    amount = _DEFAULT_AMOUNT_THB if body.amount_paid_thb is None else body.amount_paid_thb
+    with db.get_cursor(commit=True) as cur:
+        try:
+            res = pos_provision.provision_pos_account(
+                cur,
+                email=body.email,
+                tenant_name=(body.tenant_name or None),
+                granted_by=str(user["id"]),
+                amount_paid_thb=amount,
+            )
+        except ValueError as e:
+            code = str(e)
+            status_code = (
+                status.HTTP_400_BAD_REQUEST
+                if code in ("email_invalid", "tenant_provision_failed")
+                else status.HTTP_409_CONFLICT
+            )
+            raise HTTPException(status_code, detail=f"pos.provision_{code}") from e
+    # 审计:带 existed/邮箱/租户/授权码 —— 刻意不带 initial_password(不落日志)。
+    _log_op(
+        request,
+        user,
+        action="pos_entitlement.provision",
+        target_type="tenant",
+        target_id=res["tenant_id"],
+        target_name=body.email,
+        details=f"existed={res['existed']} code={res['grant_code']}",
+    )
+    return {
+        "ok": True,
+        "existed": res["existed"],
+        "tenant_id": res["tenant_id"],
+        "grant_code": res["grant_code"],
+        # 一次性回显:仅新建账号有值,超管当场转交客户后不再可得。
+        "initial_password": res["initial_password"],
+    }
 
 
 @router.post("/api/admin/pos-entitlement/revoke")

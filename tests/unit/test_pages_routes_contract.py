@@ -31,8 +31,12 @@ EXPECTED = {
     ("GET", "/admin"),
     ("GET", "/admin/{rest:path}"),
     ("GET", "/pos-sw.js"),
+    # PS-5:/pos 改作老板后台登录页(带老设备接回 /cashier 的 guard);收银台 SPA 迁至 /cashier
     ("GET", "/pos"),
     ("GET", "/pos/{rest:path}"),
+    ("GET", "/cashier-sw.js"),
+    ("GET", "/cashier"),
+    ("GET", "/cashier/{rest:path}"),
     ("GET", "/console"),
     ("GET", "/console/{rest:path}"),
     ("GET", "/invite/{token}"),

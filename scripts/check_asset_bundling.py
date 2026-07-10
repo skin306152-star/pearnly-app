@@ -113,7 +113,11 @@ def check_manifest_complete(fails):
 
     # SPA(console/pos):CSS 全进打包清单 + JS 逻辑全进 bundle;纯数据/SW 白名单跳过。
     _check_spa_bundled(fails, css_manifest, js_manifest, "console", {"console-i18n.js"})
-    _check_spa_bundled(fails, css_manifest, js_manifest, "pos", {"pos-i18n.js", "pos-sw.js"})
+    # pos-sw.js(老 /pos 作用域)+ cashier-sw.js(新 /cashier 作用域)都按 URL 注册的 Service
+    # Worker,不可打进 bundle;pos-i18n.js 纯翻译数据。三者白名单跳过。
+    _check_spa_bundled(
+        fails, css_manifest, js_manifest, "pos", {"pos-i18n.js", "pos-sw.js", "cashier-sw.js"}
+    )
 
 
 def main():

@@ -43,9 +43,9 @@ def verify_oauth_state(s: str) -> bool:
 
 
 def login_redirect_path(user: dict) -> str:
-    """登录落地分流:超管→/admin · 收银员→/pos · 其余→/home(POS PO-B1)。"""
+    """登录落地分流:超管→/admin · 收银员→/cashier(PS-5 迁址)· 其余→/home(POS PO-B1)。"""
     if bool(user.get("is_super_admin")):
         return "/admin"
     if (user.get("role") or "owner") == "cashier":
-        return "/pos"
+        return "/cashier"
     return "/home"

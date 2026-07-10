@@ -339,7 +339,7 @@ This device has been logged out automatically.`,th:`บัญชีของค�
                 </svg>
                 <span class="nav-label" data-i18n="nav-pos-sheets">Google Sheet 留档</span>
             </div>
-            <div class="nav-item nav-sub-item" id="nav-pos-switch" data-href="/pos" data-module="pos">
+            <div class="nav-item nav-sub-item" id="nav-pos-switch" data-href="/cashier" data-module="pos">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="2" y="4" width="16" height="11" rx="1.5"/>
                     <line x1="2" y1="9" x2="18" y2="9"/>
@@ -5413,7 +5413,7 @@ ${p.raw_text||p.text||""}`).join(`
         <div id="csh-access"></div>
         <div id="csh-list"></div>
         <div id="csh-modal-host"></div>
-    </div>`}function VH(e){const a=e.code||"",n=e.link||location.origin+"/pos?store="+encodeURIComponent(a),s=e.qr?`<img class="csh-ac-qr" alt="QR" src="data:image/png;base64,${e.qr}" />`:"";return`<div class="csh-access-card">
+    </div>`}function VH(e){const a=e.code||"",n=e.link||location.origin+"/cashier?store="+encodeURIComponent(a),s=e.qr?`<img class="csh-ac-qr" alt="QR" src="data:image/png;base64,${e.qr}" />`:"";return`<div class="csh-access-card">
         <div class="csh-ac-h">${escapeHtml(t("csh-access-title"))}</div>
         <div class="csh-ac-sub">${escapeHtml(t("csh-access-sub"))}</div>
         <div class="csh-ac-row">

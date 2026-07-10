@@ -132,35 +132,44 @@ async def admin_layout_page(rest: str):
     return FileResponse("static/admin/admin.html", headers=_NO_CACHE)
 
 
-# POS 收银前台 SPA(PO-B3 · 2026-06-07)· 独立 plain-script SPA(参考 admin layout)
-# /pos · /pos/{rest:path} 全返回 static/pos/pos.html;鉴权由前端 pos.js 落地
-# (PIN 登录 + 收银员 token),非收银员偷进由 SPA boot 弹回——复用 admin SPA 的前端鉴权模式。
-# 登录分流(role=cashier → /pos)见 routes/oauth_routes.py:_login_redirect_path。
-def _pos_page() -> FileResponse:
+# POS 收银前台 SPA(PS-5 迁址 · 2026-07-10)· 收银台新家在 /cashier(与老板后台 /pos 分家,
+# 消除混淆)· 独立 plain-script SPA(参考 admin layout)。/cashier · /cashier/{rest:path} 全返回
+# static/pos/pos.html;鉴权由前端 pos.js 落地(PIN 登录 + 收银员 token)。老径 /pos 改作老板后台
+# 登录页(见下,带老设备接回 /cashier 的 guard);老收银设备装的旧 PWA(scope /pos + cache-first
+# service worker)继续吐缓存老壳照常收银,零感知。
+def _cashier_page() -> FileResponse:
     return FileResponse("static/dist/pos.html", headers=_NO_CACHE)
 
 
 @router.get("/pos-sw.js")
 async def pos_service_worker():
-    # 从根路径出 Service Worker 脚本:脚本在 / → 最大 scope 可达整站,注册时 scope=/pos
-    # 即能控 /pos 导航(断网重开外壳)。挂在 /static/pos/ 下则 scope 卡 /static/pos/ 控不了 /pos。
-    # no-cache:SW 字节变更要即时被浏览器拾取触发更新。
+    # 老收银设备的 service worker(scope /pos)· 字节保持不动 → 旧 PWA 不触发更新、继续缓存老壳。
+    # no-cache:SW 字节若变更要即时被浏览器拾取。新收银台走 /cashier-sw.js(scope /cashier)。
     return FileResponse(
         "static/pos/pos-sw.js", media_type="application/javascript", headers=_NO_CACHE
     )
 
 
-@router.get("/pos", response_class=HTMLResponse)
-async def pos_page():
-    return _pos_page()
+@router.get("/cashier-sw.js")
+async def cashier_service_worker():
+    # 收银台新家的 Service Worker:从根路径出 → 可注册 scope=/cashier(控 /cashier 导航、离线重开壳)。
+    # 与 /pos-sw.js 各自独立作用域,互不影响(老设备的 /pos 旧 SW 原样保留)。
+    return FileResponse(
+        "static/pos/cashier-sw.js", media_type="application/javascript", headers=_NO_CACHE
+    )
 
 
-@router.get("/pos/{rest:path}", response_class=HTMLResponse)
-async def pos_layout_page(rest: str):
-    return _pos_page()
+@router.get("/cashier", response_class=HTMLResponse)
+async def cashier_page():
+    return _cashier_page()
 
 
-# 管理控制台 SPA(权限批3 · 2026-06-10)· 照 /pos 套路:独立 static/console 自含,
+@router.get("/cashier/{rest:path}", response_class=HTMLResponse)
+async def cashier_layout_page(rest: str):
+    return _cashier_page()
+
+
+# 管理控制台 SPA(权限批3 · 2026-06-10)· 照 /cashier 套路:独立 static/console 自含,
 # 登录态前端鉴权(can(team.member.view) 不过 → 403 人话页)。紫色主题只作用 /console。
 @router.get("/console", response_class=HTMLResponse)
 async def console_page():
@@ -188,6 +197,25 @@ async def ai_page():
 @router.get("/ai/{rest:path}", response_class=HTMLResponse)
 async def ai_layout_page(rest: str):
     return FileResponse("static/dist/ai.html", headers=_NO_CACHE)
+
+
+# POS 老板后台专属登录页(PS-5 · 主域路径 /pos · pos.pearnly.com 子域方案已废弃)。
+# 只有邮箱+密码,无 Google/LINE/注册。页头 guard:本机存过收银台绑定凭据(pos_store_token)→
+# 即跳 /cashier;否则渲染老板登录页。收银台 SPA 迁至 /cashier(见上)。不碰根路由 `/`(脸 0 门户在改)。
+def _pos_owner_login() -> HTMLResponse:
+    from routes.pos_login_page import POS_LOGIN_HTML
+
+    return HTMLResponse(POS_LOGIN_HTML, headers=_NO_CACHE)
+
+
+@router.get("/pos", response_class=HTMLResponse)
+async def pos_owner_login_page():
+    return _pos_owner_login()
+
+
+@router.get("/pos/{rest:path}", response_class=HTMLResponse)
+async def pos_owner_login_layout(rest: str):
+    return _pos_owner_login()
 
 
 @router.get("/reset", response_class=HTMLResponse)

@@ -144,7 +144,7 @@ interface StoreCode {
 }
 function accessHtml(d: StoreCode): string {
     const code = d.code || '';
-    const link = d.link || location.origin + '/pos?store=' + encodeURIComponent(code);
+    const link = d.link || location.origin + '/cashier?store=' + encodeURIComponent(code);
     const qr = d.qr ? `<img class="csh-ac-qr" alt="QR" src="data:image/png;base64,${d.qr}" />` : '';
     return `<div class="csh-access-card">
         <div class="csh-ac-h">${escapeHtml(t('csh-access-title'))}</div>

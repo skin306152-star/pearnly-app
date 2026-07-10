@@ -27,6 +27,7 @@ class RoutesContractTests(unittest.TestCase):
             {
                 ("GET", "/api/admin/pos-entitlement"),
                 ("POST", "/api/admin/pos-entitlement/grant"),
+                ("POST", "/api/admin/pos-entitlement/provision"),
                 ("POST", "/api/admin/pos-entitlement/revoke"),
                 ("POST", "/api/admin/pos-entitlement/transfer"),
             },
@@ -79,6 +80,14 @@ class GuardEnforcedTests(unittest.TestCase):
             r = self.client.post(
                 "/api/admin/pos-entitlement/transfer",
                 json={"from_tenant_id": "a", "to_tenant_id": "b"},
+            )
+        self.assertEqual(r.status_code, 403)
+
+    def test_provision_non_super_403(self):
+        with self._as_non_super():
+            r = self.client.post(
+                "/api/admin/pos-entitlement/provision",
+                json={"email": "shop@example.com"},
             )
         self.assertEqual(r.status_code, 403)
 

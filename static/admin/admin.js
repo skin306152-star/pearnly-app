@@ -3384,6 +3384,84 @@
             };
     }
 
+    // 发放账号:输邮箱 → 建号+建租户+grant 一条龙(新账号一次性回显初始密码)。
+    async function _posProvision() {
+        const email = ((document.getElementById('adm-pos-prov-email') || {}).value || '')
+            .trim()
+            .toLowerCase();
+        const name = ((document.getElementById('adm-pos-prov-name') || {}).value || '').trim();
+        const host = document.getElementById('adm-pos-prov-result');
+        if (!email || email.indexOf('@') < 0) {
+            _toast(_t('adm-pos-prov-bad-email'), 'error');
+            return;
+        }
+        const ok = await _admConfirm(_t('adm-pos-prov-confirm').replace('{email}', email), {
+            title: _t('adm-pos-prov-title'),
+            okText: _t('adm-pos-prov-go'),
+        });
+        if (!ok) return;
+        try {
+            const r = await _adminFetch('/api/admin/pos-entitlement/provision', {
+                method: 'POST',
+                body: { email: email, tenant_name: name || null },
+            });
+            _toast(_t('adm-pos-granted') + ' ' + (r.grant_code || ''), 'success');
+            if (host) host.innerHTML = _posProvResultHtml(email, r);
+            // 顺手把查租户输入填成该邮箱,方便复核开通结果。
+            const q = document.getElementById('adm-pos-q');
+            if (q) q.value = email;
+            _posLoadStatus(email);
+        } catch (e) {
+            _toast(_t('adm-pos-prov-fail'), 'error');
+        }
+    }
+
+    function _posProvResultHtml(email, r) {
+        // 新账号:一次性显示初始密码(超管转交客户后即不可再得)+ 复制按钮。
+        let pwBlock = '';
+        if (r.existed) {
+            pwBlock =
+                '<div class="cost-section-hint">' + _esc(_t('adm-pos-prov-existed')) + '</div>';
+        } else if (r.initial_password) {
+            pwBlock =
+                '<div class="cost-section-hint" style="margin-bottom:6px">' +
+                _esc(_t('adm-pos-prov-pw-once')) +
+                '</div>' +
+                '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+                '<code style="font-size:15px;padding:4px 10px;background:var(--panel-2,rgba(0,0,0,0.05));border-radius:6px">' +
+                _esc(r.initial_password) +
+                '</code>' +
+                '<button class="btn btn-sm" id="adm-pos-prov-copy">' +
+                _esc(_t('adm-pos-prov-copy')) +
+                '</button></div>';
+        }
+        const box =
+            '<div class="cost-section" style="border:1px solid var(--success);padding:14px 16px">' +
+            '<div style="font-weight:600;margin-bottom:8px">' +
+            _esc(email) +
+            ' · ' +
+            _esc(_t('adm-pos-code')) +
+            ' <code>' +
+            _esc(r.grant_code || '') +
+            '</code></div>' +
+            pwBlock +
+            '</div>';
+        // 复制按钮延迟绑定(innerHTML 落地后)。
+        setTimeout(function () {
+            const cp = document.getElementById('adm-pos-prov-copy');
+            if (cp && r.initial_password)
+                cp.onclick = function () {
+                    try {
+                        navigator.clipboard.writeText(r.initial_password);
+                        _toast(_t('adm-pos-prov-copied'), 'success');
+                    } catch (e) {
+                        /* 剪贴板不可用时无声降级:密码已明示在页面 */
+                    }
+                };
+        }, 0);
+        return box;
+    }
+
     function _renderPosPage() {
         const btn = document.getElementById('adm-pos-find');
         const input = document.getElementById('adm-pos-q');
@@ -3398,6 +3476,11 @@
             input.addEventListener('keydown', function (e) {
                 if (e.key === 'Enter') go();
             });
+        }
+        const prov = document.getElementById('adm-pos-prov-go');
+        if (prov && !prov.__bound) {
+            prov.__bound = true;
+            prov.addEventListener('click', _posProvision);
         }
         // 语言切换后重渲染:若已有查询结果,用当前语言重绘。
         if (_posLastQuery) _posLoadStatus(_posLastQuery);

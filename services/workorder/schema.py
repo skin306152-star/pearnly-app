@@ -98,17 +98,50 @@ _RLS_TABLES = (
     "work_order_deliverables",
 )
 
-# 运行时加固 DDL(C-1)。与 alembic 0066_workorder_runtime_hardening 逐字对齐(dual-run):
-# prod alembic 指针停 0020,建列/建索引靠这里懒加载自愈,同 0060_ai_usage 范式。全部
-# 幂等(ADD COLUMN / CREATE INDEX 均 IF NOT EXISTS),已存在则空操作。基表 DDL(_TABLES)
-# 保持与 0059 逐字对齐不动,新增列走 ALTER 挂这里,不污染基表常量。
+# 运行时加固 DDL(C-1 + C-2)。与 alembic 0066/0067 逐字对齐(dual-run):prod alembic 指针
+# 停 0020,建列/建索引/改外键靠这里懒加载自愈,同 0060_ai_usage 范式。全部幂等且对存量库
+# 可重入(ADD COLUMN / CREATE INDEX 均 IF NOT EXISTS;外键改造用 DO 块只挑当前 CASCADE 的改)。
+# 基表 DDL(_TABLES)保持与 0059 逐字对齐不动,增量走 ALTER 挂这里,不污染基表常量。
+_FK_RESTRICT_DO = """
+DO $$
+DECLARE r record;
+BEGIN
+    FOR r IN
+        SELECT conrelid::regclass AS tbl, conname
+        FROM pg_constraint
+        WHERE contype = 'f'
+          AND confrelid = 'work_orders'::regclass
+          AND conrelid IN (
+              'work_order_events'::regclass,
+              'work_order_items'::regclass,
+              'work_order_deliverables'::regclass
+          )
+          AND confdeltype = 'c'
+    LOOP
+        EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.tbl, r.conname);
+        EXECUTE format(
+            'ALTER TABLE %s ADD CONSTRAINT %I FOREIGN KEY (work_order_id) '
+            'REFERENCES work_orders (id) ON DELETE RESTRICT', r.tbl, r.conname);
+    END LOOP;
+END $$;
+"""
+
 RUNTIME_ALTERS = (
+    # C-1:租约 + 事件幂等键。
     "ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS run_lease_owner text",
     "ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS run_lease_expires_at timestamptz",
     "ALTER TABLE work_order_events ADD COLUMN IF NOT EXISTS dedupe_key text",
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_wo_events_dedupe "
     "ON work_order_events (tenant_id, work_order_id, step, event_type, dedupe_key) "
     "WHERE dedupe_key IS NOT NULL",
+    # C-2:堵级联删除蒸发口 + 交付物版本化 + 原始文件名列。
+    _FK_RESTRICT_DO,
+    "ALTER TABLE work_order_deliverables "
+    "ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1",
+    "DROP INDEX IF EXISTS uq_wo_deliverables_kind",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_wo_deliverables_kind_version "
+    "ON work_order_deliverables (tenant_id, work_order_id, kind, version)",
+    "ALTER TABLE work_order_items ADD COLUMN IF NOT EXISTS original_name text",
 )
 
 

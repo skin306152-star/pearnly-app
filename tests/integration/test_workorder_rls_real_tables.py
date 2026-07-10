@@ -172,13 +172,22 @@ class WorkOrderRlsTests(unittest.TestCase):
         kinds = [e["event_type"] for e in events]
         self.assertEqual(kinds, ["step_started", "step_done", "step_started"])  # 落库顺序
 
-    def test_work_order_cascade_deletes_children(self):
+    def test_delete_work_order_with_children_is_restricted(self):
+        # C-2:三子表外键 CASCADE→RESTRICT。有子行时删父单据被 DB 拒(证据不再一条 DELETE 蒸发,
+        # 磁盘原件不再成孤儿)。现状无删除代码路径,纯堵蒸发口。
+        import psycopg2
+
         wo_id = self._seed_tenant(TA)
         with self.db.get_cursor_rls(TA, commit=True) as cur:
-            cur.execute("DELETE FROM work_orders WHERE tenant_id = %s AND id = %s", (TA, wo_id))
+            with self.assertRaises(psycopg2.errors.Error):
+                cur.execute("DELETE FROM work_orders WHERE tenant_id = %s AND id = %s", (TA, wo_id))
+        # 父单据与子行都还在(删除被整体拒绝、回滚)。
+        with self.db.get_cursor_rls(TA) as cur:
+            cur.execute("SELECT count(*) n FROM work_orders WHERE id = %s", (wo_id,))
+            self.assertEqual(cur.fetchone()["n"], 1, "父单据应仍在(RESTRICT 拒删)")
             for table in _TABLES[1:]:
                 cur.execute(f"SELECT count(*) n FROM {table} WHERE work_order_id = %s", (wo_id,))
-                self.assertEqual(cur.fetchone()["n"], 0, f"{table} 应随父单据级联清空")
+                self.assertEqual(cur.fetchone()["n"], 1, f"{table} 子行应仍在")
 
 
 if __name__ == "__main__":

@@ -109,5 +109,41 @@ class RuntimeHardeningParityTests(unittest.TestCase):
         self.assertIn("DROP COLUMN IF EXISTS run_lease_owner", text)
 
 
+_FREEZE_MIGRATION = "alembic/versions/0067_workorder_freeze_evidence.py"
+
+# 冻结证据地基(C-2)DDL 关键片段:ensure(schema.RUNTIME_ALTERS)与 0067 迁移必须同款
+# (dual-run,prod alembic 停 0020 靠 ensure 自愈)。
+_FREEZE_NEEDLES = (
+    "ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1",
+    "uq_wo_deliverables_kind_version",
+    "(tenant_id, work_order_id, kind, version)",
+    "ADD COLUMN IF NOT EXISTS original_name text",
+    "confdeltype = 'c'",  # 外键 CASCADE→RESTRICT 的 DO 块:只挑当前 CASCADE 的改(重入安全)
+    "ON DELETE RESTRICT",
+)
+
+
+class FreezeEvidenceParityTests(unittest.TestCase):
+    """C-2 dual-run 对齐:级联删除改 RESTRICT + 交付物版本化 + 原始文件名列,ensure 与 0067 同款。"""
+
+    def test_ensure_and_migration_carry_same_freeze_ddl(self):
+        ensure_text = _text(_ENSURE)
+        migration_text = _text(_FREEZE_MIGRATION)
+        for needle in _FREEZE_NEEDLES:
+            self.assertIn(needle, ensure_text, f"ensure 缺 C-2 DDL: {needle}")
+            self.assertIn(needle, migration_text, f"0067 迁移缺 C-2 DDL: {needle}")
+
+    def test_migration_chains_to_hardening_head(self):
+        text = _text(_FREEZE_MIGRATION)
+        self.assertIn('down_revision = "0066_workorder_runtime_hardening"', text)
+
+    def test_migration_downgrade_reverts_all(self):
+        text = _text(_FREEZE_MIGRATION)
+        self.assertIn("DROP COLUMN IF EXISTS original_name", text)
+        self.assertIn("DROP INDEX IF EXISTS uq_wo_deliverables_kind_version", text)
+        self.assertIn("DROP COLUMN IF EXISTS version", text)
+        self.assertIn("ON DELETE CASCADE", text)  # 反向恢复
+
+
 if __name__ == "__main__":
     unittest.main()

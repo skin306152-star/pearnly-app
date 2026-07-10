@@ -22,11 +22,11 @@ from pathlib import Path
 from typing import Optional
 
 from core.feature_flags import pearnly_ai_sod_enabled_for
-from services.workorder import freeze, sod, storage, store
+from services.workorder import engine, freeze, sod, storage, store
 from services.workorder.api import WorkOrderApiError
 
-_STATUS_REVIEW = "review"  # engine.TERMINAL_STATUS:全 runnable 步绿停此,唯一可冻结起点
-_STATUS_ARCHIVE = "archive"
+_STATUS_REVIEW = engine.STATUS_REVIEW  # 词汇取 engine 单一事实源(C4-R1),唯一可冻结起点
+_STATUS_ARCHIVE = engine.STATUS_ARCHIVE
 _ARCHIVE_STEP = "archive"
 _EVT_ARCHIVED = "workorder_archived"
 _EVT_RECEIPT = "receipt_attached"

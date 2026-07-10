@@ -442,18 +442,38 @@ class MatrixTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(out["cells"][0]["badge"], "pending_order")
 
     async def test_badge_mapping_covers_all_engine_states(self):
+        """状态词汇全部取自 engine.STATUS_*(单一事实源)——C4-R1 教训:首版测试手打
+        "archived"/"signed" 臆造词与实现自证自洽,真冻结单(status=archive)错标未评估。"""
         from routes import tax_profile_routes as tr
+        from services.workorder import engine
+        from services.workorder.obligation_engine import STATUS_NIL
 
         self.assertEqual(tr._matrix_badge(None, None), "not_evaluated")
-        self.assertEqual(tr._matrix_badge("nil", "archived"), "no_need")
+        self.assertEqual(tr._matrix_badge(STATUS_NIL, engine.STATUS_ARCHIVE), "no_need")
         self.assertEqual(tr._matrix_badge("due", None), "pending_order")
-        self.assertEqual(tr._matrix_badge("due", "collecting"), "missing_materials")
-        self.assertEqual(tr._matrix_badge("due", "running"), "in_progress")
-        self.assertEqual(tr._matrix_badge("due", "stuck"), "pending_review")
-        self.assertEqual(tr._matrix_badge("tentative", "review"), "pending_review")
-        self.assertEqual(tr._matrix_badge("due", "archived"), "frozen")
-        self.assertEqual(tr._matrix_badge("due", "signed"), "frozen")
+        self.assertEqual(tr._matrix_badge("due", engine.STATUS_COLLECTING), "missing_materials")
+        self.assertEqual(tr._matrix_badge("due", engine.STATUS_RUNNING), "in_progress")
+        self.assertEqual(tr._matrix_badge("due", engine.STATUS_STUCK), "pending_review")
+        self.assertEqual(tr._matrix_badge("tentative", engine.STATUS_REVIEW), "pending_review")
+        self.assertEqual(tr._matrix_badge("due", engine.STATUS_ARCHIVE), "frozen")
         self.assertEqual(tr._matrix_badge("due", "some_future_status"), "not_evaluated")
+
+    async def test_badge_vocabulary_drift_guard(self):
+        """引擎词汇全集逐一喂给徽章映射,任何一个落 fallthrough(未评估)即红——
+        引擎未来新增/改名 status 时本测试先失败,矩阵必须同步认识新词才能过。"""
+        from routes import tax_profile_routes as tr
+        from services.workorder import engine
+        from services.workorder.archive import _STATUS_ARCHIVE
+
+        for status in engine.ALL_STATUSES:
+            badge = tr._matrix_badge("due", status)
+            self.assertNotEqual(
+                badge,
+                "not_evaluated",
+                f"引擎状态 {status!r} 未被矩阵徽章映射认识(词汇漂移)",
+            )
+        # 冻结徽章必须由归档模块真正写库的终态触发(主窗复验点:真冻结单 453b5a8c)。
+        self.assertEqual(tr._matrix_badge("due", _STATUS_ARCHIVE), "frozen")
 
     async def test_client_without_any_obligation_row_still_listed(self):
         """无物化记录的客户仍出现在矩阵里(LEFT JOIN 空行不吞客户),且不产生虚假列。"""

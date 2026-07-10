@@ -38,6 +38,18 @@ RUNNABLE_STEPS = STEPS[: STEPS.index(_LAST_RUNNABLE) + 1]
 # 全部 runnable 步绿后停在此状态(review→archive 的推进是 M1 人审的事)。
 TERMINAL_STATUS = "review"
 
+# 工单 status 词汇全集(单一事实源 · decisions.py 词汇表同款收敛 · C4-R1)。
+# collecting=开单默认(schema.py DDL DEFAULT 同词),running/stuck 由本引擎落,
+# review=TERMINAL_STATUS,archive 由 services/workorder/archive.py 归档落。
+# 任何消费方(矩阵徽章/看板/测试)一律 import 这里,不许手打字符串——
+# C4 首验曾臆造 "archived"/"signed" 两词,真冻结单错标「未评估」,此表即根治。
+STATUS_COLLECTING = "collecting"
+STATUS_RUNNING = "running"
+STATUS_STUCK = "stuck"
+STATUS_REVIEW = TERMINAL_STATUS
+STATUS_ARCHIVE = "archive"
+ALL_STATUSES = (STATUS_COLLECTING, STATUS_RUNNING, STATUS_STUCK, STATUS_REVIEW, STATUS_ARCHIVE)
+
 STEP_OK = "ok"
 STEP_STUCK = "stuck"
 STEP_NEEDS = "needs"
@@ -46,9 +58,6 @@ EVT_STARTED = "step_started"
 EVT_DONE = "step_done"
 EVT_STUCK = "step_stuck"
 EVT_NEEDS = "step_needs"
-
-_STATUS_RUNNING = "running"
-_STATUS_STUCK = "stuck"
 
 
 class WorkOrderEngineError(RuntimeError):
@@ -200,8 +209,8 @@ def _halt(ctx: StepContext, step: str, result: StepResult) -> RunOutcome:
         _emit(ctx, step, EVT_NEEDS, {"missing": list(result.missing)})
     else:
         _emit(ctx, step, EVT_STUCK, {"reasons": list(result.reasons)})
-    _set_status(ctx, _STATUS_STUCK, step)
-    return RunOutcome(status=_STATUS_STUCK, completed=False, stopped_at=step, result=result)
+    _set_status(ctx, STATUS_STUCK, step)
+    return RunOutcome(status=STATUS_STUCK, completed=False, stopped_at=step, result=result)
 
 
 def _run_step(
@@ -214,7 +223,7 @@ def _run_step(
     """
     with unit(ctx) as cur, _bound(ctx, cur):
         _emit(ctx, step, EVT_STARTED, {})
-        _set_status(ctx, _STATUS_RUNNING, step)
+        _set_status(ctx, STATUS_RUNNING, step)
         result = handler(ctx)
         if result.halted:
             return _halt(ctx, step, result)

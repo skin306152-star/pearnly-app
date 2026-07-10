@@ -26,6 +26,13 @@ from core import db
 from core.route_helpers import assert_owns_workspace, authorize_pearnly_ai
 from services.authz.deps import check_workspace_scope, get_authz
 from services.workorder import obligation_engine
+from services.workorder.engine import (
+    STATUS_ARCHIVE,
+    STATUS_COLLECTING,
+    STATUS_REVIEW,
+    STATUS_RUNNING,
+    STATUS_STUCK,
+)
 from services.workorder.obligation_engine import PERIOD_RE
 from services.workspace import client_alias_store, tax_profile_store
 from services.workspace.client_alias_store import AliasError
@@ -254,20 +261,25 @@ async def list_client_obligations(
 
 
 def _matrix_badge(obligation_status: Optional[str], order_status: Optional[str]) -> str:
-    """(obligation_status, order_status) → 矩阵格子徽章(纯函数,零 I/O,见常量顶注)。"""
+    """(obligation_status, order_status) → 矩阵格子徽章(纯函数,零 I/O,见常量顶注)。
+
+    order_status 词汇一律 import engine.STATUS_*(单一事实源,C4-R1:首版手打
+    "archived"/"signed" 两个臆造词,真冻结单 status=archive 落 fallthrough 错标
+    「未评估」——测试也用同一套错词自证自洽,教训=状态字符串必须来自权威常量)。
+    """
     if obligation_status is None:
         return _BADGE_NOT_EVALUATED  # 该期从未物化过义务(未存过画像/未开过单)
-    if obligation_status == "nil":
+    if obligation_status == obligation_engine.STATUS_NIL:
         return _BADGE_NO_NEED
     if order_status is None:
         return _BADGE_PENDING_ORDER
-    if order_status == "collecting":
+    if order_status == STATUS_COLLECTING:
         return _BADGE_MISSING_MATERIALS
-    if order_status == "running":
+    if order_status == STATUS_RUNNING:
         return _BADGE_IN_PROGRESS
-    if order_status in ("stuck", "review"):
+    if order_status in (STATUS_STUCK, STATUS_REVIEW):
         return _BADGE_PENDING_REVIEW
-    if order_status in ("archived", "signed"):
+    if order_status == STATUS_ARCHIVE:
         return _BADGE_FROZEN
     return _BADGE_NOT_EVALUATED  # 未知未来态:诚实降级,不冒充已知徽章
 

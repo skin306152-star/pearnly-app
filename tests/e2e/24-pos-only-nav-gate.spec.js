@@ -8,6 +8,7 @@
 // business_type 走已有 tenant_modules 哨兵行(services/modules/store.py),不新增表;
 // 切换用现成 PUT /api/me/onboarding(owner 专属)。
 // ============================================================
+/* global document, window, getComputedStyle */
 
 const path = require('path');
 const { test, expect } = require('@playwright/test');

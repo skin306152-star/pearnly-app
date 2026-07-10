@@ -4,6 +4,7 @@
 // 行为与 pos_only 改动前完全一致——可见菜单项远超 7 个上限,且做账/报税等常规菜单正常
 // 显示。用来防「pos_only 门控代码不小心影响了正常账号」这一类回归。
 // ============================================================
+/* global document, getComputedStyle */
 
 const path = require('path');
 const { test, expect } = require('@playwright/test');

@@ -13,22 +13,14 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Optional
 
+from services.workorder import decisions
+
 TOL = Decimal("0.01")
 ZERO = Decimal("0")
 CENT = Decimal("0.01")
 # 泰国标准 VAT 税率。ภ.พ.30 line6(可抵扣采购基)÷ line7(进项税)= 7% 是申报恒等式:人工修正
 # 某票税额后,该票的基必须按此率从修正后税额反推,才不破这条恒等式(见 _recalc)。
 STANDARD_VAT_RATE = Decimal("0.07")
-
-# 人工方向裁决(assign_kind)的取值:进项票 / 销项票 / 非税票。api.py 落库、routes 校验同表。
-_ASSIGN_KIND = "assign_kind"
-_KIND_PURCHASE = "purchase_invoice"
-_KIND_SALES = "sales_doc"
-_KIND_NON_TAX = "non_tax"
-# 人工豁免:显式放弃计入(不进 Σ、不进 unresolved),放行出包——留痕在 package 的备忘,
-# 归桶在 conservation 的 WAIVED 桶。R1 必须认它为已处置,否则豁免件卡死在 reconcile,
-# package 的豁免出包分支在产品全链上永远不可达。
-_WAIVE = "waive"
 
 # 汇总表列角色识别关键词(泰/英)。先认销项税列再认销售额列,避免销售额误命中税额列。
 _SALES_HINTS = ("ยอดขาย", "มูลค่า", "จำนวนเงิน", "รวมเงิน", "sales", "amount", "ยอด")
@@ -135,18 +127,18 @@ def _apply_direction(
     → 用其 OCR 钱字段进 R1;裁销项 → 票面不进 R1(销项合计走 R2 的 POS 直读/人工申报);裁非税
     → 排除;豁免(waive)→ 已处置不计入(放行出包,留痕在备忘)。裁进项但缺金额事件(续跑丢
     事件)→ 停机不静默少算。"""
-    if dec and dec.get("decision") == _WAIVE:
+    if dec and dec.get("decision") == decisions.WAIVE:
         return None
-    if not dec or dec.get("decision") != _ASSIGN_KIND:
-        reason = it.get("flag_reason") or "direction_ambiguous"
+    if not dec or dec.get("decision") != decisions.ASSIGN_KIND:
+        reason = it.get("flag_reason") or decisions.DIRECTION_AMBIGUOUS
         unresolved.append(f"{_label(it, money)}: 方向不明({reason})未人工裁定")
         return None
     kind = dec.get("kind")
-    if kind == _KIND_NON_TAX:
+    if kind == decisions.NON_TAX:
         return None
-    if kind == _KIND_SALES:
+    if kind == decisions.SALES_DOC:
         return None
-    if kind == _KIND_PURCHASE:
+    if kind == decisions.PURCHASE_INVOICE:
         if not money:
             unresolved.append(f"{_label(it, money)}: 方向裁定进项但缺 OCR 金额事件")
             return None
@@ -159,14 +151,14 @@ def _apply_decision(it: dict, money: dict, dec: dict, unresolved: list) -> Optio
     """一张 flagged 票的裁决取数。exclude/waive → 不计入(返回 None;waive 另在备忘留痕);
     未知裁决/缺料 → 计 unresolved。"""
     decision = dec.get("decision")
-    if decision in ("exclude", _WAIVE):
+    if decision in decisions.NON_COUNTING:
         return None
-    if decision == "face_value":
+    if decision == decisions.FACE_VALUE:
         if not money:
             unresolved.append(f"{_label(it, money)}: 按票面裁决但缺金额事件")
             return None
         return _effective(money)
-    if decision == "recalc":
+    if decision == decisions.RECALC:
         values = dec.get("values") or {}
         if not values.get("vat"):
             unresolved.append(f"{_label(it, money)}: 按重算裁决但未给 vat")

@@ -15,6 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from services.workorder import decisions
+
 # 终态桶键。BUCKET_ORDER 固定顺序,给确定性输出(利于快照/诊断复核)。
 INPUT_COUNTED = "input_counted"  # 已计入进项(purchase_invoice ok/裁决保留,或方向票裁进项)
 SALES_MATERIAL = "sales_material"  # 销项材料(sales_summary 直读/人工申报,已就绪)
@@ -34,12 +36,9 @@ BUCKET_ORDER = (
     PENDING,
 )
 
-# 裁决动词(与 api.py / reconcile_gates 同一张表,不另立一套)。
-_WAIVE = "waive"
-_ASSIGN_KIND = "assign_kind"
-_KEEP_DECISIONS = ("face_value", "recalc")  # 保留进合计的金额裁决
-_EXCLUDE = "exclude"
+_KEEP_DECISIONS = (decisions.FACE_VALUE, decisions.RECALC)  # 保留进合计的金额裁决
 
+# item.kind 取值(与裁决动词分属两套命名空间,故不进 decisions 词汇表)。
 _KIND_PURCHASE = "purchase_invoice"
 _KIND_SALES = "sales_summary"
 _KIND_BANK = "bank_statement"
@@ -47,14 +46,13 @@ _KIND_NON_TAX = "non_tax"
 _KIND_DUPLICATE = "duplicate"
 _KIND_UNKNOWN = "unknown"
 
-# 方向裁决(assign_kind)的裁定 kind。
-_ASSIGN_PURCHASE = "purchase_invoice"
-_ASSIGN_SALES = "sales_doc"
-_ASSIGN_NON_TAX = "non_tax"
-
-# 方向不明票的 flag_reason 前缀集:税号/名称锚点判不出进/销(direction_ambiguous),或自家
-# 命中卖方=疑似本方销项票(sales_direction_unhandled)。两者都 kind=unknown,都必须人工定向。
-_DIRECTION_PREFIXES = ("direction_ambiguous", "sales_direction_unhandled")
+# 方向票 assign_kind 裁定 kind → 终态桶。裁进项计入 R1、裁销项归销项侧、裁非税排除;
+# 裁定 kind 非法(不在表内)→ _bucket_of 兜底 PENDING。
+_ASSIGN_BUCKET = {
+    decisions.PURCHASE_INVOICE: INPUT_COUNTED,
+    decisions.SALES_DOC: SALES_REASSIGNED,
+    decisions.NON_TAX: EXCLUDED,
+}
 
 
 @dataclass(frozen=True)
@@ -77,28 +75,22 @@ class Conservation:
 
 
 def _is_direction(kind: str, flag_reason: str) -> bool:
-    return kind == _KIND_UNKNOWN and flag_reason.startswith(_DIRECTION_PREFIXES)
+    return kind == _KIND_UNKNOWN and flag_reason.startswith(decisions.DIRECTION_PREFIXES)
 
 
 def _bucket_of(item: dict, dec: dict | None) -> str:
     """单件终态归属。fail-closed:任何未落进明确终态的形态一律归 PENDING(待裁决)。"""
     decision = (dec or {}).get("decision")
-    if decision == _WAIVE:  # 豁免是显式人工放行,优先级高于其余判据
+    if decision == decisions.WAIVE:  # 豁免是显式人工放行,优先级高于其余判据
         return WAIVED
 
     kind = item.get("kind")
     flag_reason = str(item.get("flag_reason") or "")
 
     if _is_direction(kind, flag_reason):
-        if decision == _ASSIGN_KIND:
-            assigned = (dec or {}).get("kind")
-            if assigned == _ASSIGN_PURCHASE:
-                return INPUT_COUNTED
-            if assigned == _ASSIGN_SALES:
-                return SALES_REASSIGNED
-            if assigned == _ASSIGN_NON_TAX:
-                return EXCLUDED
-        return PENDING  # 方向票无 assign_kind 裁决(或裁定 kind 非法)→ 待裁决
+        if decision == decisions.ASSIGN_KIND:
+            return _ASSIGN_BUCKET.get((dec or {}).get("kind"), PENDING)
+        return PENDING  # 方向票无 assign_kind 裁决 → 待裁决
 
     if kind == _KIND_PURCHASE:
         status = item.get("status")
@@ -107,7 +99,7 @@ def _bucket_of(item: dict, dec: dict | None) -> str:
         if status == "flagged":
             if decision in _KEEP_DECISIONS:
                 return INPUT_COUNTED
-            if decision == _EXCLUDE:
+            if decision == decisions.EXCLUDE:
                 return EXCLUDED
             return PENDING  # flagged 进项无裁决 → 待裁决(与 reconcile R1 同口径)
         if status == "excluded":

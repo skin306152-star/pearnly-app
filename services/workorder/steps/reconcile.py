@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+from services.workorder import decisions
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import reconcile_gates as gates
 
@@ -24,11 +25,6 @@ _EVT_DECISION = "human_decision"
 _PURCHASE = "purchase_invoice"
 _SALES = "sales_summary"
 _BANK = "bank_statement"
-# classify 判不出进/销方向的票落 kind=unknown + flag_reason 以下列前缀起头(sort.bin_ocr_fields):
-#   direction_ambiguous       税号/名称锚点都对不上,进/销全然不明。
-#   sales_direction_unhandled 自家==卖方,疑似本方销项票(M0 不自动归堆单张销项)。
-# 两者都必须走人工方向裁决(assign_kind),不许被 R1 静默漏掉——G1/G1R2 黑洞的根因。
-_DIRECTION_PREFIXES = ("direction_ambiguous", "sales_direction_unhandled")
 
 
 def run(ctx: StepContext) -> StepResult:
@@ -37,7 +33,7 @@ def run(ctx: StepContext) -> StepResult:
         ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id
     )
     classified = _replay_money(events)
-    decisions = _replay(events, _EVT_DECISION)
+    decisions_by_item = _replay(events, _EVT_DECISION)
 
     # R1 进项税。除已归堆的进项票外,还收编「方向不明」票:它们钱已 OCR 出来,只是进/销没判准,
     # 必须靠人工 assign_kind 裁决归位(裁进项才入 Σ),无裁决 → 与「flagged 无裁决」同等停机点名。
@@ -48,9 +44,9 @@ def run(ctx: StepContext) -> StepResult:
         it
         for it in items
         if it["status"] == "flagged"
-        and str(it.get("flag_reason") or "").startswith(_DIRECTION_PREFIXES)
+        and str(it.get("flag_reason") or "").startswith(decisions.DIRECTION_PREFIXES)
     ]
-    r1 = gates.resolve_input_vat(purchases, classified, decisions, ambiguous=ambiguous)
+    r1 = gates.resolve_input_vat(purchases, classified, decisions_by_item, ambiguous=ambiguous)
     if r1["unresolved"]:
         return StepResult.stuck(r1["unresolved"])
 

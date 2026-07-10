@@ -11,6 +11,7 @@
     var PURCHASE_KIND = 'purchase_invoice';
     // 后端判不出进/销方向的两类票(sort.bin_ocr_fields · kind=unknown):锚点全然不明
     // (direction_ambiguous),或自家==卖方=疑似本方销项票(sales_direction_unhandled)。
+    // 随 services/workorder/decisions.py 的 DIRECTION_PREFIXES 同步(前端无法 import,手工对齐)。
     var DIRECTION_PREFIXES = ['direction_ambiguous', 'sales_direction_unhandled'];
 
     // 方向不明票必须人工定向,否则进项被静默漏掉(G1/G1R2 黑洞)。卡上切换成方向裁决三键,

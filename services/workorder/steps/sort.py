@@ -21,6 +21,7 @@ from typing import Optional
 
 from services.purchase.field_clean import clean_tax_id
 from services.recon.bank_recon_utils import _BANK_SIGNATURES, _bank_from_filename
+from services.workorder import decisions
 from services.workorder.engine import StepContext, StepResult
 
 _IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff", ".bmp"}
@@ -159,12 +160,12 @@ def bin_ocr_fields(fields: dict, *, own_tax_id, own_name=None) -> tuple[str, Opt
     if match_buyer and not match_seller:
         return ("purchase_invoice", None)
     if match_seller and not match_buyer:
-        return ("unknown", "sales_direction_unhandled")
+        return ("unknown", decisions.SALES_DIRECTION_UNHANDLED)
 
     by_name = _direction_by_name(f, own_name)
     if by_name:
         return by_name
-    return ("unknown", "direction_ambiguous")
+    return ("unknown", decisions.DIRECTION_AMBIGUOUS)
 
 
 def _mentions_bank(fields: dict) -> bool:
@@ -190,7 +191,7 @@ def _direction_by_name(fields: dict, own_name) -> Optional[tuple[str, Optional[s
     if _company_name_match(own_name, fields.get("buyer_name")):
         return ("purchase_invoice", None)
     if _company_name_match(own_name, fields.get("seller_name")):
-        return ("unknown", "sales_direction_unhandled")
+        return ("unknown", decisions.SALES_DIRECTION_UNHANDLED)
     return None
 
 

@@ -19,21 +19,25 @@
         return AI.format.chipHtml(entry.order.status, entry.detail);
     }
 
-    // 开单账期选择器 + 按钮(v4 未画过此场景,按 Canon tokens 延展)。当月排第一,原生
-    // <select> 不设 selected 属性即默认选中首项——无需另外读写状态。
-    function openOrderHtml(clientId) {
-        var opts = AI.board
+    // 账期 <option> 串:整块看板一次算好(periodOptions 不随卡片变),各开单卡复用同一串。
+    function periodOptionsHtml() {
+        return AI.board
             .periodOptions()
             .map(function (p) {
                 return '<option value="' + esc(p) + '">' + esc(p) + '</option>';
             })
             .join('');
+    }
+
+    // 开单账期选择器 + 按钮(v4 未画过此场景,按 Canon tokens 延展)。当月排第一,原生
+    // <select> 不设 selected 属性即默认选中首项——无需另外读写状态。
+    function openOrderHtml(clientId, optsHtml) {
         return (
             '<div class="kopen">' +
             '<select class="period-sel" data-role="period-select" aria-label="' +
             esc(at('card_period_select_label')) +
             '">' +
-            opts +
+            optsHtml +
             '</select>' +
             '<button class="btn sm" data-action="open-order" data-client-id="' +
             esc(clientId) +
@@ -43,10 +47,10 @@
         );
     }
 
-    function cardHtml(entry) {
+    function cardHtml(entry, optsHtml) {
         var hotClass = entry.column === 'review' ? ' hot' : '';
         var summaryText = at(entry.summary.key, entry.summary.vars);
-        var openBtn = entry.order ? '' : openOrderHtml(entry.client.id);
+        var openBtn = entry.order ? '' : openOrderHtml(entry.client.id, optsHtml);
         // tabindex=0:卡片 Tab 可达(Enter/空格触发同点击,见 wireBoard);
         // title:名称/摘要窄卡被省略号截断时悬停可看全文(Canon §6.2)。
         return (
@@ -71,9 +75,13 @@
         );
     }
 
-    function columnHtml(col, items) {
+    function columnHtml(col, items, optsHtml) {
         var body = items.length
-            ? items.map(cardHtml).join('')
+            ? items
+                  .map(function (entry) {
+                      return cardHtml(entry, optsHtml);
+                  })
+                  .join('')
             : '<div class="kempty">' + esc(at('col_empty')) + '</div>';
         return (
             '<div class="kcol"><h4><span class="dot ' +
@@ -91,10 +99,11 @@
     // groups: { materials: [entry...], working: [...], review: [...], sign: [...], archived: [...] }
     // entry: { client, order, detail, column, unknownStatus, summary }
     function renderBoard(container, groups) {
+        var optsHtml = periodOptionsHtml();
         container.innerHTML =
             '<div class="kanban">' +
             AI.board.COLUMNS.map(function (col) {
-                return columnHtml(col, groups[col.key] || []);
+                return columnHtml(col, groups[col.key] || [], optsHtml);
             }).join('') +
             '</div>';
     }

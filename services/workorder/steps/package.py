@@ -13,9 +13,9 @@ import json
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from services.workorder import evidence
+from services.workorder import decisions, evidence
 from services.workorder.engine import StepContext, StepResult
-from services.workorder.steps import conservation
+from services.workorder.steps import conservation, pp30_form
 
 _KIND_PP30 = "pp30_draft"
 _KIND_LEDGER = "ledger_workpaper"
@@ -38,10 +38,15 @@ def run(ctx: StepContext) -> StepResult:
     )
     items = ctx.store.list_items(ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id)
 
+    # human_decision 回放一次(带 actor/at 完整 rec):守恒归堆取 payload、备忘留痕取 actor,
+    # ledger 裁决列取 decision——三处共用同一份,不各 replay 一遍。
+    decision_recs = evidence.replay_items_by_type(events, "human_decision")
+
     # 守恒闸(出包前置):每件必须有明确终态。待裁决>0 或 Σ桶≠N → stuck 逐件点名,绝不
     # 让无裁决/无豁免的件溜进交付包(G1R2 sales_direction_unhandled 黑洞根治的最后一道门)。
-    decisions = _decision_payloads(events)
-    cons = conservation.bucket_items(items, decisions)
+    cons = conservation.bucket_items(
+        items, {iid: rec["payload"] for iid, rec in decision_recs.items()}
+    )
     blocked = conservation.stuck_reasons(cons, len(items))
     if blocked:
         return StepResult.stuck(blocked)
@@ -50,9 +55,9 @@ def run(ctx: StepContext) -> StepResult:
 
     kinds = {
         _KIND_PP30: _write_pp30(out_dir, numbers),
-        _KIND_LEDGER: _write_ledger(out_dir, items, events, numbers),
+        _KIND_LEDGER: _write_ledger(out_dir, items, events, decision_recs, numbers),
         _KIND_BANK: _write_bank(out_dir, items, numbers),
-        _KIND_MEMO: _write_memo(out_dir, items, events, numbers),
+        _KIND_MEMO: _write_memo(out_dir, items, cons, decision_recs, numbers),
         _KIND_EVIDENCE: _write_evidence_index(ctx, out_dir, items, events, numbers),
     }
     for kind, (artifact_path, snapshot) in kinds.items():
@@ -66,15 +71,6 @@ def run(ctx: StepContext) -> StepResult:
         )
 
     return StepResult.ok(deliverables={k: v[0] for k, v in kinds.items()})
-
-
-def _decision_payloads(events: list[dict]) -> dict:
-    """{item_id: 最新 human_decision payload}(latest-wins)——供守恒闸归堆用,与 reconcile
-    回放同源。只取 payload,不需 actor/at(那是备忘留痕的活,走 replay_items_by_type)。"""
-    return {
-        iid: rec["payload"]
-        for iid, rec in evidence.replay_items_by_type(events, "human_decision").items()
-    }
 
 
 def _resolve_numbers(ctx: StepContext, events: list[dict]) -> dict:
@@ -139,11 +135,6 @@ _ASSIGN_KIND_LABEL_TH = {
 }
 
 
-def _is_waived(replayed: dict | None) -> bool:
-    """该件最新裁决是否为人工豁免(latest-wins)。豁免件出包但必须在备忘留痕。"""
-    return bool(replayed) and (replayed.get("payload") or {}).get("decision") == "waive"
-
-
 def _sales_source_visible(source: str | None) -> bool:
     """销项来源是否需要显著提示(状态诚实):direct_read 不提示(默认可信路径);
     manual_entry/mixed 才提示——pp30 脚注与 ledger 底稿共用同一份判定,不各拼一套。"""
@@ -163,11 +154,9 @@ def _sales_source_note_lines(numbers: dict) -> list[str]:
     return ["", line]
 
 
-_SRC_NOTE_TH = {
-    "no_source_m1": "本期无独立数据源 · M1 诚实置 0",
-    "derived": "本表派生",
-    "reconcile": "对账定值",
-}
+# 只有「本期无独立数据源诚实置 0」的字段需要脚注;derived/reconcile 是真数字不加注
+# (map 命中即渲染,未命中的 source 自然无注)。
+_SRC_NOTE_TH = {pp30_form.SRC_NO_SOURCE_M1: "本期无独立数据源 · M1 诚实置 0"}
 
 
 def _pp30_form_rows(form: dict | None) -> list[str]:
@@ -177,10 +166,10 @@ def _pp30_form_rows(form: dict | None) -> list[str]:
         return ["| — | ยังไม่มีข้อมูลแบบเต็ม (无全字段数据) | — |"]
     rows = []
     for f in form["fields"]:
-        note = _SRC_NOTE_TH.get(f["source"], "") if f["source"] != "reconcile" else ""
+        note = _SRC_NOTE_TH.get(f["source"], "")
         rows.append(
             f"| {f['line']} | {f['label_th']} ({f['label_zh']}) | {_dec_str(f['amount'])}"
-            f"{' · ' + note if note and f['source'] == 'no_source_m1' else ''} |"
+            f"{' · ' + note if note else ''} |"
         )
     return rows
 
@@ -219,11 +208,10 @@ def _write_pp30(out_dir: Path, numbers: dict) -> tuple[str, dict]:
 
 
 def _write_ledger(
-    out_dir: Path, items: list[dict], events: list[dict], numbers: dict
+    out_dir: Path, items: list[dict], events: list[dict], decision_recs: dict, numbers: dict
 ) -> tuple[str, dict]:
     """进销明细底稿:每张进项票一行[文件名/票号/卖方税号/净额/税额/状态/裁决] + 销项汇总一段。"""
     classified = evidence.replay_items_by_type(events, "item_classified")
-    decisions = evidence.replay_items_by_type(events, "human_decision")
     purchases = sorted(
         (it for it in items if it["kind"] == "purchase_invoice"),
         key=lambda it: it.get("file_ref") or "",
@@ -231,7 +219,7 @@ def _write_ledger(
 
     def _row(it: dict) -> str:
         money = (classified.get(it["id"]) or {}).get("payload", {}).get("money") or {}
-        decision = (decisions.get(it["id"]) or {}).get("payload", {}).get("decision") or "-"
+        decision = (decision_recs.get(it["id"]) or {}).get("payload", {}).get("decision") or "-"
         return (
             f"| {Path(it.get('file_ref') or '').name} | {money.get('invoice_number') or '-'} "
             f"| {money.get('seller_tax') or '-'} | {_dec_str(money.get('subtotal'))} "
@@ -304,31 +292,35 @@ def _write_bank(out_dir: Path, items: list[dict], numbers: dict) -> tuple[str, d
 
 
 def _write_memo(
-    out_dir: Path, items: list[dict], events: list[dict], numbers: dict
+    out_dir: Path,
+    items: list[dict],
+    cons: conservation.Conservation,
+    decision_recs: dict,
+    numbers: dict,
 ) -> tuple[str, dict]:
     """缺料备忘:银行单缺失、曾被标记复核的票及其裁决、non_tax/duplicate 排除清单、人工豁免
-    留痕——如实枚举。豁免件虽出包,但谁豁免·为何·哪张必须显著在案(状态诚实,不悄悄放行)。"""
-    decisions = evidence.replay_items_by_type(events, "human_decision")
+    留痕——如实枚举。豁免件虽出包,但谁豁免·为何·哪张必须显著在案(状态诚实,不悄悄放行)。
+    豁免成员资格取自守恒桶(cons.buckets[WAIVED]),与出包闸同一事实源,不另判一套。"""
     gate = (numbers.get("gates") or {}).get("r3_bank") or {}
     bank_missing = gate.get("note") == "bank_statement_missing"
     flagged = [it for it in items if it.get("flag_reason") and it["status"] == "flagged"]
     non_tax = [it for it in items if it["kind"] == "non_tax" and it["status"] == "excluded"]
     duplicates = [it for it in items if it["kind"] == "duplicate" and it["status"] == "excluded"]
-    waived = [it for it in items if _is_waived(decisions.get(it["id"]))]
+    waived = cons.buckets[conservation.WAIVED]
 
     def _tag(it: dict, extra: str = "") -> str:
         return f"- {Path(it.get('file_ref') or '').name}: {it.get('flag_reason')}{extra}"
 
     def _flag_row(it: dict) -> str:
-        dec = (decisions.get(it["id"]) or {}).get("payload") or {}
+        dec = (decision_recs.get(it["id"]) or {}).get("payload") or {}
         decision = dec.get("decision")
-        if decision == "assign_kind":
+        if decision == decisions.ASSIGN_KIND:
             label = _ASSIGN_KIND_LABEL_TH.get(dec.get("kind"), dec.get("kind"))
             return _tag(it, f" → {label}")
         return _tag(it, f" → {decision or '无裁决'}")
 
     def _waive_row(it: dict) -> str:
-        rec = decisions.get(it["id"]) or {}
+        rec = decision_recs.get(it["id"]) or {}
         dec = rec.get("payload") or {}
         actor = rec.get("actor") or "?"
         reason = dec.get("reason") or "-"

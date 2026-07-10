@@ -11,18 +11,11 @@ from __future__ import annotations
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
-from services.workorder import evidence, store
+from services.workorder import decisions, evidence, store
 
 # 人工裁决三态,与 CLI --decide 同语义(见 L2-验收.md):
 #   face_value=确认票面 OCR 读数 · recalc=人工看原票补正 · exclude=剔除不计入
-_DECISIONS = ("face_value", "recalc", "exclude")
-# 方向裁决:方向不明票(kind=unknown/flag_reason=direction_ambiguous)由人定进/销/非税方向。
-# 语义在 reconcile_gates._apply_direction:进项入 R1 Σ、销项走 R2、非税排除。
-_ASSIGN_KIND = "assign_kind"
-_ASSIGN_KINDS = ("purchase_invoice", "sales_doc", "non_tax")
-# 豁免:人工显式放行一件既不裁决也无法归位的料,准其出包但备忘必留痕(谁豁免·为何·哪张)。
-# reason 必填——豁免是绕过守恒闸的唯一合法口子,不许无理由放行。语义在 conservation:WAIVED 桶。
-_WAIVE = "waive"
+_DECISIONS = (decisions.FACE_VALUE, decisions.RECALC, decisions.EXCLUDE)
 _DECISION_STEP = "reconcile"
 _EVT_DECISION = "human_decision"
 _EVT_CLASSIFIED = "item_classified"
@@ -224,11 +217,11 @@ def _decision_payload(
     item_id: str, decision: str, values: Optional[dict], kind: Optional[str], reason: Optional[str]
 ):
     """裁决事件 payload 构造 + 合法性校验。方向裁决的 kind 必须在允许集内;豁免的 reason 必填。"""
-    if decision == _ASSIGN_KIND:
-        if kind not in _ASSIGN_KINDS:
+    if decision == decisions.ASSIGN_KIND:
+        if kind not in decisions.ASSIGN_KINDS:
             raise WorkOrderApiError("workorder.decision_invalid")
         return {"item_id": item_id, "decision": decision, "kind": kind}
-    if decision == _WAIVE:
+    if decision == decisions.WAIVE:
         reason_s = (reason or "").strip()
         if not reason_s:
             raise WorkOrderApiError("workorder.waive_reason_required")

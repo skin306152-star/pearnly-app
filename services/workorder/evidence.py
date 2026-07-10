@@ -12,16 +12,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
+from services.workorder import decisions
+
 _EVT_DONE = "step_done"
 _EVT_CLASSIFIED = "item_classified"
 _EVT_DECISION = "human_decision"
 _KIND_PURCHASE = "purchase_invoice"
 _KIND_SALES = "sales_summary"
 _KIND_UNKNOWN = "unknown"
-
-# 方向不明票(item_classified.kind=unknown)经人工 assign_kind 裁定为进项后的裁决取值——
-# 与 reconcile_gates._apply_direction 同一张表,不重复定义两套 assign_kind 语义。
-_DECISION_ASSIGN_KIND = "assign_kind"
 
 # 应缴税额的证据只挂 compute 自己的 step_done——它是"销项-进项"这一步减法的落库点。
 _NUMBER_STEP = {"tax_due": "compute"}
@@ -85,13 +83,17 @@ def build_evidence_index(
     """
     files_by_item = {it["id"]: it.get("file_ref") for it in items}
     classified = replay_items_by_type(events, _EVT_CLASSIFIED)
-    decisions = replay_items_by_type(events, _EVT_DECISION)
+    decisions_by_item = replay_items_by_type(events, _EVT_DECISION)
 
     purchase_evidence = _collect_evidence(
-        classified, decisions, files_by_item, _KIND_PURCHASE, include_direction_assigned=True
+        classified,
+        decisions_by_item,
+        files_by_item,
+        _KIND_PURCHASE,
+        include_direction_assigned=True,
     )
-    sales_evidence = _collect_evidence(classified, decisions, files_by_item, _KIND_SALES)
-    sales_source = sales_source_info(classified, decisions)
+    sales_evidence = _collect_evidence(classified, decisions_by_item, files_by_item, _KIND_SALES)
+    sales_source = sales_source_info(classified, decisions_by_item)
     compute_done = _compute_done_event(events)
 
     number_evidence = {}
@@ -118,7 +120,7 @@ def build_evidence_index(
 
 def _collect_evidence(
     classified: dict,
-    decisions: dict,
+    decisions_by_item: dict,
     files_by_item: dict,
     kind: str,
     *,
@@ -139,19 +141,19 @@ def _collect_evidence(
     file_by_item_id: dict = {}
     for item_id, rec in classified.items():
         payload = rec["payload"]
-        dec = decisions.get(item_id)
+        dec = decisions_by_item.get(item_id)
         direction_assigned = (
             include_direction_assigned
             and payload.get("kind") == _KIND_UNKNOWN
             and dec is not None
-            and dec["payload"].get("decision") == _DECISION_ASSIGN_KIND
+            and dec["payload"].get("decision") == decisions.ASSIGN_KIND
             and dec["payload"].get("kind") == kind
         )
         if payload.get("kind") != kind and not direction_assigned:
             continue
         if not direction_assigned and kind == _KIND_SALES and payload.get("status") != "ok":
             continue
-        if dec and dec["payload"].get("decision") in ("exclude", "waive"):
+        if dec and dec["payload"].get("decision") in decisions.NON_COUNTING:
             continue  # 剔除/豁免的票没进合计,不算这个数字的支撑证据(豁免留痕在备忘)
         event_ids.add(rec["event_id"])
         file_ref = files_by_item.get(item_id)
@@ -171,7 +173,7 @@ def _collect_evidence(
     }
 
 
-def sales_source_info(classified: dict, decisions: dict) -> dict:
+def sales_source_info(classified: dict, decisions_by_item: dict) -> dict:
     """销项数字的来源标注:direct_read(POS 导出直读)/ manual_entry(人工填,附凭据备注)/
     mixed(同工单两种来源并存,如实标不各挑一个盖过另一个)。没有任何已生效的销项直读
     (全被剔除或本就没有)返回空字典——package.py/evidence 据此各自诚实降级,不假装有来源。
@@ -189,8 +191,8 @@ def sales_source_info(classified: dict, decisions: dict) -> dict:
         payload = rec["payload"]
         if payload.get("kind") != _KIND_SALES or payload.get("status") != "ok":
             continue
-        dec = decisions.get(item_id)
-        if dec and dec["payload"].get("decision") == "exclude":
+        dec = decisions_by_item.get(item_id)
+        if dec and dec["payload"].get("decision") == decisions.EXCLUDE:
             continue
         sales_read = payload.get("sales_read") or {}
         sources.add(sales_read.get("source") or _SOURCE_DIRECT)
@@ -210,8 +212,8 @@ def sales_source_info_from_events(events: list[dict]) -> dict:
     decisions 的调用方(package.py:_resolve_numbers,数字落定要早于证据索引汇编)用——
     每种事件类型只 replay 一次,不比 sales_source_info 本身多扫。"""
     classified = replay_items_by_type(events, _EVT_CLASSIFIED)
-    decisions = replay_items_by_type(events, _EVT_DECISION)
-    return sales_source_info(classified, decisions)
+    decisions_by_item = replay_items_by_type(events, _EVT_DECISION)
+    return sales_source_info(classified, decisions_by_item)
 
 
 def _compute_done_event(events: list[dict]) -> Optional[dict]:

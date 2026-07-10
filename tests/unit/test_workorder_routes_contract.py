@@ -13,6 +13,7 @@ from unittest import mock
 
 from fastapi import HTTPException
 
+from core import route_helpers
 from routes.workorder_routes import router as workorder_router
 
 
@@ -89,8 +90,8 @@ class GateClosedTests(unittest.IsolatedAsyncioTestCase):
         from routes import workorder_routes as wr
 
         with (
-            mock.patch.object(wr, "get_current_user_from_request", return_value=_USER),
-            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=False),
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=False),
         ):
             with self.assertRaises(HTTPException) as ctx:
                 await wr.list_orders(mock.Mock())
@@ -110,10 +111,11 @@ class CreateOrderTests(unittest.IsolatedAsyncioTestCase):
             "current_step": None,
         }
         with (
-            mock.patch.object(wr, "get_current_user_from_request", return_value=_USER),
-            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
-            mock.patch.object(wr, "require_perm", return_value=_USER),
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
             mock.patch.object(wr, "check_workspace_scope", return_value=None),
+            mock.patch.object(route_helpers, "check_workspace_scope", return_value=None),
             mock.patch.object(wr, "db", _FakeDB(_Cur(fetch=(1,)))),
             mock.patch.object(wr.api, "open_order", return_value=wo),
         ):
@@ -127,9 +129,9 @@ class CreateOrderTests(unittest.IsolatedAsyncioTestCase):
         from routes import workorder_routes as wr
 
         with (
-            mock.patch.object(wr, "get_current_user_from_request", return_value=_USER),
-            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
-            mock.patch.object(wr, "require_perm", return_value=_USER),
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
             mock.patch.object(wr, "db", _FakeDB(_Cur(fetch=None))),  # 归属查询空 = 不属本租户
         ):
             with self.assertRaises(HTTPException) as ctx:
@@ -152,10 +154,11 @@ class DecisionMappingTests(unittest.IsolatedAsyncioTestCase):
             return {"id": 5}
 
         with (
-            mock.patch.object(wr, "get_current_user_from_request", return_value=_USER),
-            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
-            mock.patch.object(wr, "require_perm", return_value=_USER),
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
             mock.patch.object(wr, "check_workspace_scope", return_value=None),
+            mock.patch.object(route_helpers, "check_workspace_scope", return_value=None),
             mock.patch.object(wr, "db", _FakeDB(_Cur())),
             mock.patch.object(wr.store, "get_work_order", return_value=wo),
             mock.patch.object(wr.api, "record_decision", side_effect=_rec),
@@ -173,10 +176,11 @@ class DecisionMappingTests(unittest.IsolatedAsyncioTestCase):
 
         wo = {"workspace_client_id": 7}
         with (
-            mock.patch.object(wr, "get_current_user_from_request", return_value=_USER),
-            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
-            mock.patch.object(wr, "require_perm", return_value=_USER),
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
             mock.patch.object(wr, "check_workspace_scope", return_value=None),
+            mock.patch.object(route_helpers, "check_workspace_scope", return_value=None),
             mock.patch.object(wr, "db", _FakeDB(_Cur())),
             mock.patch.object(wr.store, "get_work_order", return_value=wo),
             mock.patch.object(
@@ -211,10 +215,11 @@ class SalesSummaryMappingTests(unittest.IsolatedAsyncioTestCase):
             return {"id": 5}
 
         with (
-            mock.patch.object(wr, "get_current_user_from_request", return_value=_USER),
-            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
-            mock.patch.object(wr, "require_perm", return_value=_USER),
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
             mock.patch.object(wr, "check_workspace_scope", return_value=None),
+            mock.patch.object(route_helpers, "check_workspace_scope", return_value=None),
             mock.patch.object(wr, "db", _FakeDB(_Cur())),
             mock.patch.object(wr.store, "get_work_order", return_value=wo),
             mock.patch.object(wr.api, "record_sales_summary", side_effect=_rec),
@@ -247,10 +252,11 @@ class DownloadGuardTests(unittest.IsolatedAsyncioTestCase):
 
         wo = {"workspace_client_id": 7}
         with (
-            mock.patch.object(wr, "get_current_user_from_request", return_value=_USER),
-            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
-            mock.patch.object(wr, "require_perm", return_value=_USER),
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
             mock.patch.object(wr, "check_workspace_scope", return_value=None),
+            mock.patch.object(route_helpers, "check_workspace_scope", return_value=None),
             mock.patch.object(wr, "db", _FakeDB(_Cur())),
             mock.patch.object(wr.store, "get_work_order", return_value=wo),
             mock.patch.object(wr.api, "deliverable_artifact_path", return_value=None),
@@ -280,10 +286,11 @@ class MaterialsUploadLimitTests(unittest.IsolatedAsyncioTestCase):
 
     def _patches(self, wr):
         return (
-            mock.patch.object(wr, "get_current_user_from_request", return_value=_USER),
-            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
-            mock.patch.object(wr, "require_perm", return_value=_USER),
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
             mock.patch.object(wr, "check_workspace_scope", return_value=None),
+            mock.patch.object(route_helpers, "check_workspace_scope", return_value=None),
             mock.patch.object(wr, "db", _FakeDB(_Cur())),
             mock.patch.object(wr.store, "get_work_order", return_value={"workspace_client_id": 7}),
         )
@@ -340,10 +347,11 @@ class ItemImageTests(unittest.IsolatedAsyncioTestCase):
 
     def _patches(self, wr):
         return (
-            mock.patch.object(wr, "get_current_user_from_request", return_value=_USER),
-            mock.patch.object(wr, "pearnly_ai_m1_enabled_for", return_value=True),
-            mock.patch.object(wr, "require_perm", return_value=_USER),
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
             mock.patch.object(wr, "check_workspace_scope", return_value=None),
+            mock.patch.object(route_helpers, "check_workspace_scope", return_value=None),
             mock.patch.object(wr, "db", _FakeDB(_Cur())),
             mock.patch.object(wr.store, "get_work_order", return_value={"workspace_client_id": 7}),
         )

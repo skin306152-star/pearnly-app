@@ -358,6 +358,38 @@ class InviteCreateAccountTests(unittest.TestCase):
             )
         self.assertEqual(r.status_code, 409)
 
+    def test_invite_username_with_whitespace_422(self):
+        """非法用户名(含空白)在打 DB 之前就该被拒——校验复用 account_provision
+        单一事实源,与 /pos 开通同口径(2026-07-10 批次 B item 4)。"""
+        r = self.client.post(
+            "/api/admin/pearnly-ai/invite", json={"username_or_email": "has space"}
+        )
+        self.assertEqual(r.status_code, 422)
+        self.assertEqual(r.json()["detail"], "admin.pearnly_ai_username_invalid")
+
+    def test_invite_mixed_case_username_normalized_before_lookup(self):
+        """用户名统一 lower 归一后再查重(与 6ab310b8 大小写不敏感登录同口径)。"""
+        with mock.patch.object(
+            admin_pearnly_ai_routes.db, "find_user_by_username", return_value=None
+        ) as m_find:
+            with (
+                mock.patch.object(
+                    admin_pearnly_ai_routes,
+                    "create_owner_user",
+                    return_value={"ok": True, "user_id": "new-user", "tenant_id": "new-tenant"},
+                ),
+                mock.patch.object(admin_pearnly_ai_routes, "_log_op"),
+                mock.patch.object(
+                    admin_pearnly_ai_routes.platform_settings_store, "add_to_allowlist"
+                ),
+            ):
+                r = self.client.post(
+                    "/api/admin/pearnly-ai/invite", json={"username_or_email": "MemberOne"}
+                )
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["username"], "memberone")
+        m_find.assert_called_once_with("memberone")
+
 
 class RevokeTests(unittest.TestCase):
     def setUp(self):

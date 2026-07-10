@@ -6,7 +6,9 @@ generate_obligations 是纯函数核心:profile × period × data_signals × def
 (tax_obligation_defs 是全租户共享法定常量表,无 tenant_id 列——放画像域而非本模块,
 免了本包 test_workorder_sql_isolation 的"每句 DML 必带 tenant_id"机械闸误伤);
 materialize_obligations 是本模块唯一的写路径,写 client_period_obligations(该表按
-tenant_id 隔离,DML 带 tenant_id)。
+tenant_id 隔离,DML 带 tenant_id)。rematerialize_for_profile 是「取 defs → 现算 →
+落库」三步曲的唯一编排入口(开单接线、画像保存后重算两处调用方共用,失败不抛只记
+日志返 False——义务清单是供料层,不该挡住开单/画像保存主路径)。
 
 算法(§3.1 并集 + 数据覆盖,§3.2 九义务映射表):
   - obligations = profile_triggered ∪ data_triggered,每条带 status ∈
@@ -31,10 +33,21 @@ data_signals 本期最小实现(真实提取见 TODO(D1)):
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+import logging
+import re
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
 from services.summary_import.dates import to_ad_year
+from services.workspace import tax_profile_store
+
+logger = logging.getLogger(__name__)
+
+# 佛历「当期」判定(§3.3):佛历 = 公历 + 543(与 services/summary_import/dates.py 同口径),
+# period 格式恒为「YYYY-MM」——本模块是 period↔公历互译的唯一权威,画像路由等消费方
+# 一律 import 这两个常量,不许另起一份判据。
+_BE_YEAR_OFFSET = 543
+PERIOD_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
 # 义务状态(§3.1)。
 STATUS_DUE = "due"
@@ -80,6 +93,13 @@ def _empty_data_signals() -> dict:
     利息股息付款、是否有任何入库料件。本批(B2-d)按方案要求只接调用方传入的信号,
     工单开单接线处先传空信号字典(见 services/workorder/api.py::open_order)。"""
     return {k: False for k in _DATA_SIGNAL_KEYS}
+
+
+def current_be_period() -> str:
+    """当前公历月 → 佛历「YYYY-MM」,给「当期」判据的所有消费方(义务重物化、义务清单
+    GET 缺省 period)用同一权威,不许各自另算。"""
+    today = datetime.now(timezone.utc).date()
+    return f"{today.year + _BE_YEAR_OFFSET:04d}-{today.month:02d}"
 
 
 def _period_to_ad_month_start(period: str) -> date:
@@ -280,3 +300,39 @@ def materialize_obligations(
                 ob["due_efiling"],
             ),
         )
+
+
+def rematerialize_for_profile(
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    period: str,
+    profile: dict,
+    work_order_id: Optional[str] = None,
+) -> bool:
+    """「取 defs → 现算 → 落库」三步曲的唯一编排入口(开单接线、画像保存后重算两处
+    调用方共用)。义务清单是供料层,不该挡住调用方的主路径——任一环节出错都吞掉、
+    记日志、返 False,调用方按返回值决定是否再报,不需自己包 try/except。"""
+    try:
+        defs = tax_profile_store.load_active_defs(cur)
+        obligations = generate_obligations(
+            profile=profile, period=period, data_signals=None, defs=defs
+        )
+        materialize_obligations(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            work_order_id=work_order_id,
+            period=period,
+            obligations=obligations,
+        )
+        return True
+    except Exception:
+        logger.exception(
+            "obligation_engine rematerialize failed (tenant=%s, client=%s, period=%s)",
+            tenant_id,
+            workspace_client_id,
+            period,
+        )
+        return False

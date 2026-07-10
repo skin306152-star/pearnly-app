@@ -15,6 +15,7 @@ from unittest import mock
 
 from fastapi import HTTPException
 
+from core import route_helpers
 from routes.tax_profile_routes import router as tax_profile_router
 from services.workspace.client_alias_store import AliasError
 from services.workspace.tax_profile_store import TaxProfileError
@@ -95,13 +96,26 @@ class _FakeDB:
 _USER = {"id": "u1", "tenant_id": "t-1"}
 
 
+def _common_patches(tr, cur):
+    """闸开 + 鉴权通过 + 归属校验放行的标准四件套,四个「越权闸后走正常业务」测试类
+    (PutProfileTests/AliasCreateTests/AliasDeactivateTests/ObligationListTests)共用。"""
+    return (
+        mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+        mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+        mock.patch.object(route_helpers, "require_perm", return_value=_USER),
+        mock.patch.object(tr, "check_workspace_scope", return_value=None),
+        mock.patch.object(route_helpers, "check_workspace_scope", return_value=None),
+        mock.patch.object(tr, "db", _FakeDB(cur)),
+    )
+
+
 class GateClosedTests(unittest.IsolatedAsyncioTestCase):
     async def test_gate_closed_hides_tax_profile_as_404(self):
         from routes import tax_profile_routes as tr
 
         with (
-            mock.patch.object(tr, "get_current_user_from_request", return_value=_USER),
-            mock.patch.object(tr, "pearnly_ai_m1_enabled_for", return_value=False),
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=False),
         ):
             with self.assertRaises(HTTPException) as ctx:
                 await tr.get_tax_profile(7, mock.Mock())
@@ -111,8 +125,8 @@ class GateClosedTests(unittest.IsolatedAsyncioTestCase):
         from routes import tax_profile_routes as tr
 
         with (
-            mock.patch.object(tr, "get_current_user_from_request", return_value=_USER),
-            mock.patch.object(tr, "pearnly_ai_m1_enabled_for", return_value=False),
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=False),
         ):
             with self.assertRaises(HTTPException) as ctx:
                 await tr.list_client_obligations(7, mock.Mock())
@@ -126,9 +140,9 @@ class OwnershipIsolationTests(unittest.IsolatedAsyncioTestCase):
         from routes import tax_profile_routes as tr
 
         with (
-            mock.patch.object(tr, "get_current_user_from_request", return_value=_USER),
-            mock.patch.object(tr, "pearnly_ai_m1_enabled_for", return_value=True),
-            mock.patch.object(tr, "require_perm", return_value=_USER),
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
             mock.patch.object(tr, "db", _FakeDB(_Cur(fetchone_value=None))),
         ):
             with self.assertRaises(HTTPException) as ctx:
@@ -154,10 +168,11 @@ class GetProfileTests(unittest.IsolatedAsyncioTestCase):
             "created_at": None,
         }
         with (
-            mock.patch.object(tr, "get_current_user_from_request", return_value=_USER),
-            mock.patch.object(tr, "pearnly_ai_m1_enabled_for", return_value=True),
-            mock.patch.object(tr, "require_perm", return_value=_USER),
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
             mock.patch.object(tr, "check_workspace_scope", return_value=None),
+            mock.patch.object(route_helpers, "check_workspace_scope", return_value=None),
             mock.patch.object(tr, "db", _FakeDB(_Cur(fetchone_value=(1,)))),
             mock.patch.object(tr.tax_profile_store, "get_profile", return_value=profile),
         ):
@@ -171,10 +186,11 @@ class GetProfileTests(unittest.IsolatedAsyncioTestCase):
         from routes import tax_profile_routes as tr
 
         with (
-            mock.patch.object(tr, "get_current_user_from_request", return_value=_USER),
-            mock.patch.object(tr, "pearnly_ai_m1_enabled_for", return_value=True),
-            mock.patch.object(tr, "require_perm", return_value=_USER),
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
             mock.patch.object(tr, "check_workspace_scope", return_value=None),
+            mock.patch.object(route_helpers, "check_workspace_scope", return_value=None),
             mock.patch.object(tr, "db", _FakeDB(_Cur(fetchone_value=(1,)))),
             mock.patch.object(tr.tax_profile_store, "get_profile", return_value=None),
         ):
@@ -184,15 +200,6 @@ class GetProfileTests(unittest.IsolatedAsyncioTestCase):
 
 
 class PutProfileTests(unittest.IsolatedAsyncioTestCase):
-    def _patches(self, tr, cur):
-        return (
-            mock.patch.object(tr, "get_current_user_from_request", return_value=_USER),
-            mock.patch.object(tr, "pearnly_ai_m1_enabled_for", return_value=True),
-            mock.patch.object(tr, "require_perm", return_value=_USER),
-            mock.patch.object(tr, "check_workspace_scope", return_value=None),
-            mock.patch.object(tr, "db", _FakeDB(cur)),
-        )
-
     async def test_upsert_ok_triggers_obligation_regeneration(self):
         from routes import tax_profile_routes as tr
 
@@ -206,7 +213,7 @@ class PutProfileTests(unittest.IsolatedAsyncioTestCase):
             ) as m_gen,
             mock.patch.object(tr.obligation_engine, "materialize_obligations") as m_mat,
         ):
-            for p in self._patches(tr, _Cur(fetchone_value=(1,))):
+            for p in _common_patches(tr, _Cur(fetchone_value=(1,))):
                 self.enterContext(p)
             out = await tr.put_tax_profile(7, tr.TaxProfileUpdate(has_employees="yes"), mock.Mock())
         m_upsert.assert_called_once()
@@ -226,7 +233,7 @@ class PutProfileTests(unittest.IsolatedAsyncioTestCase):
                 side_effect=TaxProfileError("invalid_enum_value", field="has_employees"),
             ),
         ):
-            for p in self._patches(tr, _Cur(fetchone_value=(1,))):
+            for p in _common_patches(tr, _Cur(fetchone_value=(1,))):
                 self.enterContext(p)
             with self.assertRaises(HTTPException) as ctx:
                 await tr.put_tax_profile(7, tr.TaxProfileUpdate(has_employees="maybe"), mock.Mock())
@@ -245,27 +252,18 @@ class PutProfileTests(unittest.IsolatedAsyncioTestCase):
                 tr.tax_profile_store, "load_active_defs", side_effect=RuntimeError("db down")
             ),
         ):
-            for p in self._patches(tr, _Cur(fetchone_value=(1,))):
+            for p in _common_patches(tr, _Cur(fetchone_value=(1,))):
                 self.enterContext(p)
             out = await tr.put_tax_profile(7, tr.TaxProfileUpdate(has_employees="yes"), mock.Mock())
         self.assertEqual(out["profile"]["has_employees"], "yes")
 
 
 class AliasCreateTests(unittest.IsolatedAsyncioTestCase):
-    def _patches(self, tr, cur):
-        return (
-            mock.patch.object(tr, "get_current_user_from_request", return_value=_USER),
-            mock.patch.object(tr, "pearnly_ai_m1_enabled_for", return_value=True),
-            mock.patch.object(tr, "require_perm", return_value=_USER),
-            mock.patch.object(tr, "check_workspace_scope", return_value=None),
-            mock.patch.object(tr, "db", _FakeDB(cur)),
-        )
-
     async def test_add_alias_ok(self):
         from routes import tax_profile_routes as tr
 
         with mock.patch.object(tr.client_alias_store, "add_alias", return_value=42) as m_add:
-            for p in self._patches(tr, _Cur(fetchone_value=(1,))):
+            for p in _common_patches(tr, _Cur(fetchone_value=(1,))):
                 self.enterContext(p)
             out = await tr.create_client_alias(
                 7, tr.AliasCreate(alias_raw="Sister Makeup"), mock.Mock()
@@ -281,7 +279,7 @@ class AliasCreateTests(unittest.IsolatedAsyncioTestCase):
         with mock.patch.object(
             tr.client_alias_store, "add_alias", side_effect=AliasError("alias.norm_conflict")
         ):
-            for p in self._patches(tr, _Cur(fetchone_value=(1,))):
+            for p in _common_patches(tr, _Cur(fetchone_value=(1,))):
                 self.enterContext(p)
             with self.assertRaises(HTTPException) as ctx:
                 await tr.create_client_alias(7, tr.AliasCreate(alias_raw="shop"), mock.Mock())
@@ -292,7 +290,7 @@ class AliasCreateTests(unittest.IsolatedAsyncioTestCase):
         from routes import tax_profile_routes as tr
 
         with mock.patch.object(tr.client_alias_store, "add_alias", return_value=None):
-            for p in self._patches(tr, _Cur(fetchone_value=(1,))):
+            for p in _common_patches(tr, _Cur(fetchone_value=(1,))):
                 self.enterContext(p)
             with self.assertRaises(HTTPException) as ctx:
                 await tr.create_client_alias(7, tr.AliasCreate(alias_raw="***"), mock.Mock())
@@ -301,15 +299,6 @@ class AliasCreateTests(unittest.IsolatedAsyncioTestCase):
 
 
 class AliasDeactivateTests(unittest.IsolatedAsyncioTestCase):
-    def _patches(self, tr, cur):
-        return (
-            mock.patch.object(tr, "get_current_user_from_request", return_value=_USER),
-            mock.patch.object(tr, "pearnly_ai_m1_enabled_for", return_value=True),
-            mock.patch.object(tr, "require_perm", return_value=_USER),
-            mock.patch.object(tr, "check_workspace_scope", return_value=None),
-            mock.patch.object(tr, "db", _FakeDB(cur)),
-        )
-
     async def test_alias_not_belonging_to_client_is_404(self):
         """别名存在但归属另一客户(URL 路径与资源不一致)→ 404,不能跨客户误删。"""
         from routes import tax_profile_routes as tr
@@ -319,7 +308,7 @@ class AliasDeactivateTests(unittest.IsolatedAsyncioTestCase):
         calls = iter([(1,), None])
         cur.fetchone = lambda: next(calls)
         with mock.patch.object(tr.client_alias_store, "deactivate_alias") as m_deact:
-            for p in self._patches(tr, cur):
+            for p in _common_patches(tr, cur):
                 self.enterContext(p)
             with self.assertRaises(HTTPException) as ctx:
                 await tr.deactivate_client_alias(7, 55, mock.Mock())
@@ -333,22 +322,13 @@ class AliasDeactivateTests(unittest.IsolatedAsyncioTestCase):
         calls = iter([(1,), (1,)])
         cur.fetchone = lambda: next(calls)
         with mock.patch.object(tr.client_alias_store, "deactivate_alias", return_value=True):
-            for p in self._patches(tr, cur):
+            for p in _common_patches(tr, cur):
                 self.enterContext(p)
             out = await tr.deactivate_client_alias(7, 55, mock.Mock())
         self.assertEqual(out, {"ok": True})
 
 
 class ObligationListTests(unittest.IsolatedAsyncioTestCase):
-    def _patches(self, tr, cur):
-        return (
-            mock.patch.object(tr, "get_current_user_from_request", return_value=_USER),
-            mock.patch.object(tr, "pearnly_ai_m1_enabled_for", return_value=True),
-            mock.patch.object(tr, "require_perm", return_value=_USER),
-            mock.patch.object(tr, "check_workspace_scope", return_value=None),
-            mock.patch.object(tr, "db", _FakeDB(cur)),
-        )
-
     async def test_shape_serializes_dates_and_carries_display_names(self):
         from routes import tax_profile_routes as tr
 
@@ -364,7 +344,7 @@ class ObligationListTests(unittest.IsolatedAsyncioTestCase):
             }
         ]
         cur = _Cur(fetchone_value=(1,), fetchall_value=rows)
-        for p in self._patches(tr, cur):
+        for p in _common_patches(tr, cur):
             self.enterContext(p)
         out = await tr.list_client_obligations(7, mock.Mock(), period="2569-08")
         self.assertEqual(out["period"], "2569-08")
@@ -378,7 +358,7 @@ class ObligationListTests(unittest.IsolatedAsyncioTestCase):
         from routes import tax_profile_routes as tr
 
         cur = _Cur(fetchone_value=(1,), fetchall_value=[])
-        for p in self._patches(tr, cur):
+        for p in _common_patches(tr, cur):
             self.enterContext(p)
         out = await tr.list_client_obligations(7, mock.Mock(), period=None)
         self.assertRegex(out["period"], r"^\d{4}-\d{2}$")
@@ -388,9 +368,11 @@ class ObligationListTests(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(HTTPException) as ctx:
             with (
-                mock.patch.object(tr, "get_current_user_from_request", return_value=_USER),
-                mock.patch.object(tr, "pearnly_ai_m1_enabled_for", return_value=True),
-                mock.patch.object(tr, "require_perm", return_value=_USER),
+                mock.patch.object(
+                    route_helpers, "get_current_user_from_request", return_value=_USER
+                ),
+                mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+                mock.patch.object(route_helpers, "require_perm", return_value=_USER),
             ):
                 await tr.list_client_obligations(7, mock.Mock(), period="not-a-period")
         self.assertEqual(ctx.exception.status_code, 422)

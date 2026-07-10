@@ -89,29 +89,30 @@ def _generate_obligations_on_open(
     cur, *, tenant_id: str, workspace_client_id: int, work_order_id: str, period: str
 ) -> None:
     """开单即生成一次当期义务清单(税务画像-方案-B1.md §3 · B2-d)。数据信号本批传空
-    (TODO(D1):扫采购行 WHT/境外付款/利息股息付款出真实信号,现只吃画像判据),画像/
-    生成/物化任一环节出错都不应挡住开单本身(义务清单是供料层,不是开单主路径的一部分)。
+    (TODO(D1):扫采购行 WHT/境外付款/利息股息付款出真实信号,现只吃画像判据);画像读取/
+    生成/物化任一环节出错都不挡开单本身(义务清单是供料层,不是开单主路径的一部分)——
+    profile 读取本身也可能炸(DB 抖动),故这里单独兜底,不指望 rematerialize_for_profile
+    的内部 try/except(它只包 defs→生成→物化三步,profile 是调用方职责)。
     """
     try:
         profile = tax_profile_store.get_profile(
             cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
         )
-        if profile is None:
-            return
-        defs = tax_profile_store.load_active_defs(cur)
-        obligations = obligation_engine.generate_obligations(
-            profile=profile, period=period, data_signals=None, defs=defs
-        )
-        obligation_engine.materialize_obligations(
-            cur,
-            tenant_id=tenant_id,
-            workspace_client_id=workspace_client_id,
-            work_order_id=work_order_id,
-            period=period,
-            obligations=obligations,
-        )
     except Exception:
-        logger.exception("obligation_engine generation failed on open_order (tenant=%s)", tenant_id)
+        logger.exception(
+            "obligation_engine profile fetch failed on open_order (tenant=%s)", tenant_id
+        )
+        return
+    if profile is None:
+        return
+    obligation_engine.rematerialize_for_profile(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        period=period,
+        profile=profile,
+        work_order_id=work_order_id,
+    )
 
 
 def list_orders(

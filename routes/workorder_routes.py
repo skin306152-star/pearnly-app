@@ -22,10 +22,8 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from core import db
-from core.auth import get_current_user_from_request
-from core.feature_flags import pearnly_ai_m1_enabled_for
-from core.route_helpers import _tid
-from services.authz.deps import check_workspace_scope, require_perm
+from core.route_helpers import assert_owns_workspace, authorize_pearnly_ai
+from services.authz.deps import check_workspace_scope
 from services.workorder import api, engine, runner, storage, store
 from services.workorder.steps import intake
 
@@ -68,24 +66,11 @@ class SalesSummaryIn(BaseModel):
 
 def _authorize(request: Request) -> tuple[dict, str]:
     """登录 + M1 闸(关→404 fail-closed)+ 动作权限。返回 (user, tenant_id)。"""
-    user = get_current_user_from_request(request)
-    tenant_id = _tid(user)
-    if not pearnly_ai_m1_enabled_for(tenant_id, str(user["id"])):
-        raise HTTPException(404, detail="workorder.not_found")
-    require_perm(request, _PERM)
-    if not tenant_id:
-        raise HTTPException(403, detail="authz.forbidden")
-    return user, tenant_id
+    return authorize_pearnly_ai(request, _PERM, not_found="workorder.not_found")
 
 
 def _assert_owns_workspace(cur, request: Request, user: dict, tenant_id: str, ws_id: int) -> None:
-    cur.execute(
-        "SELECT 1 FROM workspace_clients WHERE id = %s AND tenant_id = %s",
-        (ws_id, tenant_id),
-    )
-    if not cur.fetchone():
-        raise HTTPException(404, detail="workorder.not_found")
-    check_workspace_scope(request, user, ws_id)
+    assert_owns_workspace(cur, request, user, tenant_id, ws_id, not_found="workorder.not_found")
 
 
 def _load_order(cur, request: Request, user: dict, tenant_id: str, work_order_id: str) -> dict:

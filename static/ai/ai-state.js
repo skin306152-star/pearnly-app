@@ -53,6 +53,25 @@
         );
     }
 
+    // <option> 列表拼装:values 按传入顺序渲染,selected 命中打 selected,文案由调用方的
+    // labelFn(v) 给(可读原始未转义文本,本函数负责 esc)。ai-profile-render.js(三态枚举
+    // 字段)/ai-profile-panels-render.js(别名种类/匹配模式下拉)共用同一段循环体。
+    function optionsHtml(values, selected, labelFn) {
+        return values
+            .map(function (v) {
+                return (
+                    '<option value="' +
+                    v +
+                    '"' +
+                    (v === selected ? ' selected' : '') +
+                    '>' +
+                    esc(labelFn(v)) +
+                    '</option>'
+                );
+            })
+            .join('');
+    }
+
     var api = {
         loadingHtml: loadingHtml,
         emptyHtml: function (opts) {
@@ -62,6 +81,7 @@
             return blockHtml('error', opts);
         },
         esc: esc,
+        optionsHtml: optionsHtml,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) {

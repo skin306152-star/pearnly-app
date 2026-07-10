@@ -32,6 +32,7 @@ from pydantic import BaseModel, Field
 from core import db
 from core.feature_flags import PEARNLY_AI_M1_KEY
 from core.route_helpers import _check_password_strength, _log_op, _require_super_admin
+from services.auth.account_provision import resolve_account_identifier
 from services.platform_settings import store as platform_settings_store
 from services.tenant.owner_users import create_owner_user
 
@@ -175,13 +176,21 @@ async def pearnly_ai_overview(request: Request):
 
 @router.post("/api/admin/pearnly-ai/invite")
 async def pearnly_ai_invite(request: Request, body: InviteBody):
-    """已有账号 → 按 tenant-first 判据直接加名单;不存在 → 任意用户名建号后加名单。"""
-    admin = _require_super_admin(request)
-    raw = body.username_or_email.strip()
-    if not raw:
-        raise HTTPException(400, detail="admin.pearnly_ai_missing_identity")
+    """已有账号 → 按 tenant-first 判据直接加名单;不存在 → 任意用户名建号后加名单。
 
-    existing = db.find_user_by_username(raw)
+    标识判定/归一复用 services.auth.account_provision.resolve_account_identifier(POS
+    发放账号 2026-07-10 同日建的权威模块,与 /pos 开通共口径,防两条建号路一硬一软)。
+    """
+    admin = _require_super_admin(request)
+    try:
+        identity = resolve_account_identifier(body.username_or_email)
+    except ValueError as e:
+        code = e.args[0] if e.args else "invalid"
+        if code == "account_missing":
+            raise HTTPException(400, detail="admin.pearnly_ai_missing_identity") from e
+        raise HTTPException(422, detail=f"admin.pearnly_ai_{code}") from e
+
+    existing = db.find_user_by_username(identity["lookup_key"])
     if existing:
         subject_id = _subject_id(existing)
         platform_settings_store.add_to_allowlist(PEARNLY_AI_M1_KEY, subject_id)
@@ -203,9 +212,10 @@ async def pearnly_ai_invite(request: Request, body: InviteBody):
     # 2026-07-10 Zihao 拍板:自由邀请制,用户名任意(不强制邮箱)。是邮箱就顺手落
     # users.email(supabase 侧可读),不是就只当登录名——/ai 账号无自助通道,邮箱非必需。
     temp_password = _resolve_password(body.password)
-    local_part = raw.split("@", 1)[0].strip() or "pearnly-ai"
+    username = identity["username"]
+    local_part = username.split("@", 1)[0].strip() or "pearnly-ai"
     result = create_owner_user(
-        username=raw,
+        username=username,
         password=temp_password,
         company_name=local_part,
         tenant_type="shared_api",
@@ -220,9 +230,9 @@ async def pearnly_ai_invite(request: Request, body: InviteBody):
 
     user_id = result["user_id"]
     tenant_id = result["tenant_id"]
-    if "@" in raw:
+    if identity["is_email"]:
         with db.get_cursor(commit=True) as cur:
-            cur.execute("UPDATE users SET email = %s WHERE id = %s", (raw, user_id))
+            cur.execute("UPDATE users SET email = %s WHERE id = %s", (identity["email"], user_id))
 
     platform_settings_store.add_to_allowlist(PEARNLY_AI_M1_KEY, tenant_id)
     _log_op(
@@ -231,13 +241,13 @@ async def pearnly_ai_invite(request: Request, body: InviteBody):
         action="pearnly_ai.create",
         target_type="tenant",
         target_id=tenant_id,
-        target_name=raw,
+        target_name=username,
     )
     return {
         "ok": True,
         "created_account": True,
         "subject_id": tenant_id,
-        "username": raw,
+        "username": username,
         "initial_password": temp_password,
     }
 

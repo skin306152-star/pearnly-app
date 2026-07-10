@@ -171,19 +171,9 @@
     function selectHtml(field, value) {
         var opts = GROUP_OPTIONS[field.group];
         var labelMap = GROUP_VALUE_LABEL_KEY[field.group];
-        var optHtml = opts
-            .map(function (v) {
-                return (
-                    '<option value="' +
-                    v +
-                    '"' +
-                    (v === value ? ' selected' : '') +
-                    '>' +
-                    esc(at(labelMap[v])) +
-                    '</option>'
-                );
-            })
-            .join('');
+        var optHtml = root.AI.state.optionsHtml(opts, value, function (v) {
+            return at(labelMap[v]);
+        });
         return (
             '<select class="sf-in" id="pf-' +
             field.key +

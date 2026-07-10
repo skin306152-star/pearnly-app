@@ -108,22 +108,6 @@
         );
     }
 
-    function optionsHtml(values, selected, labelFn) {
-        return values
-            .map(function (v) {
-                return (
-                    '<option value="' +
-                    v +
-                    '"' +
-                    (v === selected ? ' selected' : '') +
-                    '>' +
-                    esc(labelFn(v)) +
-                    '</option>'
-                );
-            })
-            .join('');
-    }
-
     function aliasFormHtml(ctx) {
         var err = ctx.aliasErrKey
             ? '<div class="intake-err">' + esc(at(ctx.aliasErrKey)) + '</div>'
@@ -137,10 +121,10 @@
             esc(ctx.aliasRawValue || '') +
             '">' +
             '<select class="sf-in" id="aliasKind" name="alias_kind">' +
-            optionsHtml(ALIAS_KINDS, ctx.aliasKindValue || 'misc', aliasKindLabel) +
+            root.AI.state.optionsHtml(ALIAS_KINDS, ctx.aliasKindValue || 'misc', aliasKindLabel) +
             '</select>' +
             '<select class="sf-in" id="aliasMode" name="match_mode">' +
-            optionsHtml(MATCH_MODES, ctx.aliasModeValue || 'exact', aliasModeLabel) +
+            root.AI.state.optionsHtml(MATCH_MODES, ctx.aliasModeValue || 'exact', aliasModeLabel) +
             '</select>' +
             '<button type="submit" class="btn pri" data-action="alias-add"' +
             (ctx.aliasSubmitting ? ' disabled' : '') +

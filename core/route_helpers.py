@@ -23,6 +23,8 @@ billing_routes / admin_diagnostics_routes 改成从这里 import(去掉各自的
   _tid                       · 取 user tenant_id(2026-05-25 第十七会话搬入)
   _plan_permissions          · plan 权限(扁平化全开 · 2026-05-25 搬入)
   _record_500 / _read_last_500 / _last_500_event · 最近 500 现场摘要(共享状态 · 2026-05-25 搬入)
+  authorize_pearnly_ai / assert_owns_workspace · pearnly_ai_m1 闸群共享鉴权(workorder_routes /
+  tax_profile_routes 曾字节级复制各一份 · 2026-07-10 批次 B simplify 收敛)
 """
 
 from __future__ import annotations
@@ -36,6 +38,8 @@ from fastapi import HTTPException, Request, status
 
 from core import db
 from core.auth import get_current_user_from_request
+from core.feature_flags import pearnly_ai_m1_enabled_for
+from services.authz.deps import check_workspace_scope, require_perm
 
 logger = logging.getLogger("mr-pilot")
 
@@ -253,3 +257,35 @@ def _read_last_500() -> Dict[str, Any]:
     if not _last_500_event:
         return {}
     return dict(_last_500_event)
+
+
+def authorize_pearnly_ai(request: Request, perm: str, *, not_found: str) -> tuple:
+    """pearnly_ai_m1 闸群共享鉴权:登录 + M1 闸(关→404 fail-closed)+ 动作权限。
+    返回 (user, tenant_id)。
+
+    workorder_routes 与 tax_profile_routes 曾各自维护一份字节级相同的 `_authorize`
+    (2026-07-10 批次 B simplify 收敛于此)。not_found 文案两路由组不同(workorder.
+    not_found / workspace.not_found),调用方各传各的,行为不变。
+    """
+    user = get_current_user_from_request(request)
+    tenant_id = _tid(user)
+    if not pearnly_ai_m1_enabled_for(tenant_id, str(user["id"])):
+        raise HTTPException(404, detail=not_found)
+    require_perm(request, perm)
+    if not tenant_id:
+        raise HTTPException(403, detail="authz.forbidden")
+    return user, tenant_id
+
+
+def assert_owns_workspace(
+    cur, request: Request, user: dict, tenant_id: str, ws_id: int, *, not_found: str
+) -> None:
+    """越权/不存在的账套主体一律 404(不泄漏存在性)。workorder_routes / tax_profile_routes
+    共用(2026-07-10 批次 B simplify 收敛),not_found 文案调用方各传各的。"""
+    cur.execute(
+        "SELECT 1 FROM workspace_clients WHERE id = %s AND tenant_id = %s",
+        (ws_id, tenant_id),
+    )
+    if not cur.fetchone():
+        raise HTTPException(404, detail=not_found)
+    check_workspace_scope(request, user, ws_id)

@@ -1139,16 +1139,13 @@ class Component extends DCLogic {
       setEn: () => this.setState({ lang: 'en' }),
       thBtnStyle: btn(lang === 'th'),
       enBtnStyle: btn(lang === 'en'),
-      // 接入落值(2026-07-10)· 事务所(AI)/会计登录走 /login(登录页自带注册流,门户零注册入口);
-      // POS 收银台开台走 /pos(收银 SPA · 见 routes/pages_routes.py:_pos_page);
-      // POS 老板后台走独立域名 pos.pearnly.com(Zihao 拍板 · PS-5 在建 · 上线前此链接为死链,
-      //   门户须与 PS-5 域名接入同批上线 · 时序由主窗把关);
-      // 预约演示/联系我们走产品现有 LINE OA(与 /api/contact 的 CONTACT_LINE_URL 同源);
-      // 隐私/条款指向已有 /privacy /terms 页(routes/pages_routes.py)。
-      loginAi: '/login',
+      // 四卡终版链接(2026-07-10 Zihao 拍板·子域名方案废弃):AI→/ai · 会计→/acc 未就绪前
+      // 临时 /login · 收银台→/cashier · POS 老板后台→/pos;演示/联系走 LINE OA(与
+      // /api/contact 的 CONTACT_LINE_URL 同源)。
+      loginAi: '/ai',
       loginAcc: '/login',
-      loginPosCashier: '/pos',
-      loginPosOwner: 'https://pos.pearnly.com',
+      loginPosCashier: '/cashier',
+      loginPosOwner: '/pos',
       bookDemo: 'https://line.me/R/ti/p/@pearnly',
       contactUs: 'https://line.me/R/ti/p/@pearnly',
       privacyUrl: '/privacy',

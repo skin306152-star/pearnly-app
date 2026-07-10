@@ -55,4 +55,4 @@ async function openRoute(page, route) {
     await expect(page.locator(`#page-${route}`), `路由 ${route} 页面激活`).toHaveClass(/active/);
 }
 
-module.exports = { enterApp, openRoute };
+module.exports = { enterApp, openRoute, dismissWorkspaceGate };

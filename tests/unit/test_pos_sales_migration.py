@@ -53,5 +53,31 @@ class PosSalesMigrationTests(unittest.TestCase):
             self.assertIn(f"DROP TABLE IF EXISTS {t}", m.group(1))
 
 
+class PosSaleLineCostMigrationTests(unittest.TestCase):
+    """0062_pos_sale_line_cost 守门测试:报表毛利的成本快照列(可空 · dual-run 同步)。"""
+
+    @classmethod
+    def setUpClass(cls):
+        with open(
+            os.path.join(ROOT, "alembic", "versions", "0062_pos_sale_line_cost.py"),
+            encoding="utf-8",
+        ) as f:
+            cls.mig = f.read()
+        with open(os.path.join(ROOT, "services", "pos", "sales_store.py"), encoding="utf-8") as f:
+            cls.ensure = f.read()
+
+    def test_revision_chain(self):
+        self.assertIn('revision = "0062_pos_sale_line_cost"', self.mig)
+        self.assertIn('down_revision = "0061_supplier_posting_profiles"', self.mig)
+
+    def test_adds_nullable_cost_column_idempotently_in_both(self):
+        ddl = "ALTER TABLE pos_sale_lines ADD COLUMN IF NOT EXISTS cost_total numeric(14,2)"
+        self.assertIn(ddl, self.mig)
+        self.assertIn(ddl, self.ensure)  # dual-run:services 层同一幂等 DDL
+
+    def test_downgrade_drops_column(self):
+        self.assertIn("ALTER TABLE pos_sale_lines DROP COLUMN IF EXISTS cost_total", self.mig)
+
+
 if __name__ == "__main__":
     unittest.main()

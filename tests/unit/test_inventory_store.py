@@ -132,6 +132,29 @@ class BatchWarehouseTests(unittest.TestCase):
         self.assertIn("INSERT INTO warehouses", cur.calls[1][0])
 
 
+class WeightedAvgCostLooseTests(unittest.TestCase):
+    """POS 报表 COGS 用:散装(无批次)成本 = 全部带成本进货流水按数量加权平均。"""
+
+    def test_weights_by_qty_across_multiple_purchases(self):
+        # 两笔进货:100 件@10、50 件@16 → 加权均价 = (1000+800)/150 = 12
+        cur = FakeCursor(ones=[{"cost_sum": Decimal("1800"), "qty_sum": Decimal("150")}])
+        avg = store.weighted_avg_purchase_cost_loose(
+            cur, tenant_id="t-1", workspace_client_id=9, product_id="p", warehouse_id=1
+        )
+        self.assertEqual(avg, Decimal("12"))
+        sql = cur.calls[0][0]
+        self.assertIn("batch_id IS NULL", sql)
+        self.assertIn("txn_type = 'purchase_in'", sql)
+        self.assertIn("unit_cost IS NOT NULL", sql)
+
+    def test_no_purchase_history_returns_none_not_zero(self):
+        cur = FakeCursor(ones=[{"cost_sum": None, "qty_sum": None}])
+        avg = store.weighted_avg_purchase_cost_loose(
+            cur, tenant_id="t-1", workspace_client_id=9, product_id="p", warehouse_id=1
+        )
+        self.assertIsNone(avg)  # 诚实未知,不当 0
+
+
 class TxnTests(unittest.TestCase):
     def test_insert_txn_parameterized_and_decimal(self):
         cur = FakeCursor(ones=[{"id": "tx1"}])

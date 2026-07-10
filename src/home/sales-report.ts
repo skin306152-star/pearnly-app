@@ -10,16 +10,25 @@ interface Kpi {
     sales_count: number;
     avg_ticket: string;
     refund: string;
+    cost: string;
+    gross_profit: string | null;
+    cost_complete: boolean;
 }
 interface DayRow {
     date: string;
     gross: string;
+    cost: string | null;
+    gross_profit: string | null;
+    cost_complete: boolean;
 }
 interface TopProduct {
     product_id: string;
     name: InvName;
     qty: string;
     gross: string;
+    cost: string;
+    gross_profit: string | null;
+    cost_complete: boolean;
 }
 interface CashierRow {
     cashier_id: string;
@@ -69,6 +78,11 @@ function bahtInt(v: string | number): string {
     return Math.round(Number(v) || 0).toLocaleString('en-US');
 }
 
+// 毛利/成本可能诚实置空(老单据无成本快照)——跟真 0 分开渲染,不拿 "—" 冒充 0,也不拿 0 冒充有数据。
+function moneyOrUnknown(v: string | null): string {
+    return v == null ? '—' : '฿' + bahtInt(v);
+}
+
 async function fetchReport(): Promise<Report> {
     const wsId = activeWsId();
     const { from, to } = resolveRange();
@@ -108,13 +122,22 @@ function rangeBar(): string {
 }
 
 function kpiCards(k: Kpi): string {
-    const card = (label: string, value: string) =>
-        `<div class="kpi"><div class="l">${escapeHtml(label)}</div><div class="v tnum">${value}</div></div>`;
+    const card = (label: string, value: string, unknown?: boolean, title?: string) =>
+        `<div class="kpi"><div class="l">${escapeHtml(label)}</div><div class="v tnum${unknown ? ' unknown' : ''}"${
+            title ? ` title="${escapeHtml(title)}"` : ''
+        }>${value}</div></div>`;
+    const profitUnknown = k.gross_profit == null;
     return `<div class="kpis">
         ${card(t('rep-kpi-gross'), '฿' + bahtInt(k.gross))}
         ${card(t('rep-kpi-count'), String(k.sales_count))}
         ${card(t('rep-kpi-avg'), '฿' + bahtInt(k.avg_ticket))}
         ${card(t('rep-kpi-refund'), '฿' + bahtInt(k.refund))}
+        ${card(
+            t('rep-kpi-profit'),
+            moneyOrUnknown(k.gross_profit),
+            profitUnknown,
+            profitUnknown ? t('rep-profit-unknown') : undefined
+        )}
     </div>`;
 }
 
@@ -125,7 +148,8 @@ function chartPanel(byDay: DayRow[], byMethod: Record<string, string>): string {
               .map((d) => {
                   const h = Math.max(3, Math.round(((Number(d.gross) || 0) / max) * 100));
                   const lbl = d.date.slice(5).replace('-', '/'); // MM/DD
-                  return `<div class="col" title="฿${bahtInt(d.gross)}"><div class="b" style="height:${h}%"></div><div class="x">${escapeHtml(lbl)}</div></div>`;
+                  const tip = `${t('rep-kpi-gross')} ฿${bahtInt(d.gross)} · ${t('rep-kpi-profit')} ${moneyOrUnknown(d.gross_profit)}`;
+                  return `<div class="col" title="${escapeHtml(tip)}"><div class="b" style="height:${h}%"></div><div class="x">${escapeHtml(lbl)}</div></div>`;
               })
               .join('')
         : `<div class="rep-state">${escapeHtml(t('rep-empty'))}</div>`;
@@ -145,12 +169,16 @@ function chartPanel(byDay: DayRow[], byMethod: Record<string, string>): string {
 function listsPanel(top: TopProduct[], cashiers: CashierRow[]): string {
     const topRows = top.length
         ? top
-              .map(
-                  (p, i) =>
-                      `<div class="row"><span class="rk">${i + 1}</span><span class="nm">${escapeHtml(
-                          localizedName(p.name)
-                      )} <span class="q">· ${escapeHtml(p.qty)} ${escapeHtml(t('rep-unit-items'))}</span></span><span class="v tnum">฿${bahtInt(p.gross)}</span></div>`
-              )
+              .map((p, i) => {
+                  const profitUnknown = p.gross_profit == null;
+                  return `<div class="row"><span class="rk">${i + 1}</span><span class="nm">${escapeHtml(
+                      localizedName(p.name)
+                  )} <span class="q">· ${escapeHtml(p.qty)} ${escapeHtml(t('rep-unit-items'))}</span></span><span class="v-col"><span class="v tnum">฿${bahtInt(
+                      p.gross
+                  )}</span><span class="pf tnum${profitUnknown ? ' unknown' : ''}">${escapeHtml(
+                      t('rep-kpi-profit')
+                  )} ${moneyOrUnknown(p.gross_profit)}</span></span></div>`;
+              })
               .join('')
         : `<div class="rep-state sm">${escapeHtml(t('rep-empty'))}</div>`;
     const cashierRows = cashiers.length
@@ -170,7 +198,7 @@ function listsPanel(top: TopProduct[], cashiers: CashierRow[]): string {
 }
 
 function skeleton(): string {
-    const kp = '<div class="kpi"><div class="rep-skel"></div></div>'.repeat(4);
+    const kp = '<div class="kpi"><div class="rep-skel"></div></div>'.repeat(5);
     return `<div class="kpis">${kp}</div>
         <div class="cards2">
             <div class="panel"><div class="chart">${'<div class="col"><div class="b skel" style="height:60%"></div></div>'.repeat(7)}</div></div>

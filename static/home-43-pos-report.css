@@ -70,7 +70,7 @@
 }
 .posrep .kpis {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
     gap: 12px;
     margin-bottom: 16px;
 }
@@ -89,6 +89,12 @@
     font-size: 24px;
     font-weight: 800;
     margin-top: 6px;
+}
+/* 毛利/成本无快照(老单据)诚实置空 —— 灰弱字重跟真实数字分开,不拿"—"冒充有数据的样子。 */
+.posrep .kpi .v.unknown {
+    color: var(--ink3);
+    font-weight: 600;
+    font-size: 20px;
 }
 .posrep .cards2 {
     display: grid;
@@ -200,6 +206,20 @@
 }
 .posrep .row .v {
     font-weight: 700;
+}
+.posrep .row .v-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+.posrep .row .pf {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink2);
+}
+.posrep .row .pf.unknown {
+    color: var(--ink3);
 }
 .posrep .rep-state {
     text-align: center;

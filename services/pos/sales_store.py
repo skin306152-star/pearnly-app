@@ -92,6 +92,10 @@ def ensure_sales_schema() -> None:
                     line_total numeric(14,2) NOT NULL
                 )
                 """)
+            # 0062:成本快照(卖出扣库存那一刻的 COGS · 报表毛利用);老行/无成本数据保持 NULL。
+            cur.execute(
+                "ALTER TABLE pos_sale_lines ADD COLUMN IF NOT EXISTS cost_total numeric(14,2)"
+            )
             cur.execute(
                 "CREATE INDEX IF NOT EXISTS ix_pos_sale_lines_sale ON pos_sale_lines (sale_id)"
             )
@@ -226,9 +230,10 @@ def insert_line(cur, *, tenant_id: str, sale_id: str, fields: dict) -> dict:
         "batch_id",
         "refund_of_line_id",
         "line_total",
+        "cost_total",
     ]
     qty = {"unit_factor", "qty", "qty_base"}
-    money = {"unit_price", "line_discount", "line_total"}
+    money = {"unit_price", "line_discount", "line_total", "cost_total"}
     vals = [tenant_id, sale_id]
     for c in cols:
         v = fields.get(c)
@@ -253,7 +258,7 @@ def insert_payment(cur, *, tenant_id: str, sale_id: str, method: str, amount, re
 def list_lines(cur, *, tenant_id: str, sale_id: str) -> list:
     cur.execute(
         "SELECT id, product_id, sell_unit, unit_factor, qty, qty_base, unit_price, "
-        "line_discount, vat_applicable, batch_id, refund_of_line_id, line_total "
+        "line_discount, vat_applicable, batch_id, refund_of_line_id, line_total, cost_total "
         "FROM pos_sale_lines WHERE tenant_id = %s AND sale_id = %s ORDER BY id",
         (tenant_id, sale_id),
     )

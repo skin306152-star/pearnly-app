@@ -198,7 +198,7 @@ def create_sale(
     sale_id = str(sale["id"])
 
     for item, nl in zip(resolved, totals["lines"]):
-        batch_used = stock.deduct_for_sale(
+        deducted = stock.deduct_for_sale(
             cur,
             tenant_id=tenant_id,
             workspace_client_id=workspace_client_id,
@@ -209,6 +209,16 @@ def create_sale(
             explicit_batch_id=item["explicit_batch_id"],
             sale_id=sale_id,
             created_by=created_by,
+        )
+        # 成本快照落在建单这一刻(不等报表期现算):按实际扣减的批次/散装段算 COGS,
+        # 事后批次成本被改也不影响历史单据的毛利(见 stock.cost_for_moves)。
+        cost_total = stock.cost_for_moves(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            warehouse_id=warehouse_id,
+            product_id=item["product_id"],
+            moves=deducted["moves"],
         )
         sales_store.insert_line(
             cur,
@@ -223,9 +233,10 @@ def create_sale(
                 "unit_price": item["unit_price"],
                 "line_discount": nl["discount"],
                 "vat_applicable": item["vat_applicable"],
-                "batch_id": batch_used,
+                "batch_id": deducted["batch_id"],
                 "refund_of_line_id": None,
                 "line_total": nl["line_total"],
+                "cost_total": cost_total,
             },
         )
     for p in payments:

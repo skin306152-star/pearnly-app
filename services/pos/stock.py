@@ -29,8 +29,13 @@ def deduct_for_sale(
     explicit_batch_id: Optional[str],
     sale_id: str,
     created_by=None,
-) -> Optional[str]:
-    """卖出扣库存,返回记到行上的 batch_id(非批次=None;多批 FEFO=首批)。不足 → out_of_stock。"""
+) -> dict:
+    """卖出扣库存,返回 {"batch_id", "moves"}。
+
+    batch_id 记到销售行上(非批次=None;多批 FEFO=首批,只作展示锚点);moves 是这笔卖出
+    实际扣减的全部 [(batch_id, qty>0)] 分段——多批次拆行时唯一能还原真实 COGS 的凭据(单
+    batch_id 字段丢失分段量),交给 cost_for_moves 按段算成本。不足 → out_of_stock。
+    """
     need = Decimal(str(qty_base))
     if explicit_batch_id:
         _check_and_move(
@@ -44,7 +49,7 @@ def deduct_for_sale(
             sale_id=sale_id,
             created_by=created_by,
         )
-        return explicit_batch_id
+        return {"batch_id": explicit_batch_id, "moves": [(explicit_batch_id, need)]}
     if not track_batch:
         return _deduct_non_batch(
             cur,
@@ -109,8 +114,9 @@ def _apply_sale_moves(
     moves: list,
     sale_id: str,
     created_by=None,
-) -> Optional[str]:
-    """按 moves [(batch_id, qty>0)] 逐笔扣库存(sale_out),返回记到销售行的首个批次 id(全散装=None)。"""
+) -> dict:
+    """按 moves [(batch_id, qty>0)] 逐笔扣库存(sale_out),返回 {"batch_id", "moves"}
+    (batch_id=记到销售行的首个批次,全散装=None;moves 原样回传供成本计算用)。"""
     first = None
     for batch_id, qty in moves:
         ledger.apply_movement(
@@ -127,7 +133,7 @@ def _apply_sale_moves(
             created_by=created_by,
         )
         first = first or batch_id
-    return first
+    return {"batch_id": first, "moves": moves}
 
 
 def _deduct_non_batch(
@@ -140,7 +146,7 @@ def _deduct_non_batch(
     need: Decimal,
     sale_id: str,
     created_by=None,
-) -> None:
+) -> dict:
     """非批次品出库:散装行(batch NULL)+ 批次行合成一个库存池,散装优先、再 FEFO 补。
 
     非批次品被「带批号进货」时货会落进批次行、散装行留 0——只查散装行会误判 out_of_stock,
@@ -168,7 +174,7 @@ def _deduct_non_batch(
         raise PosError("pos.out_of_stock", 409, detail=str(product_id))
     moves = [(None, take_loose)] if take_loose > 0 else []
     moves.extend((a["batch_id"], Decimal(str(a["qty"]))) for a in alloc["allocations"])
-    _apply_sale_moves(
+    return _apply_sale_moves(
         cur,
         tenant_id=tenant_id,
         workspace_client_id=workspace_client_id,
@@ -178,7 +184,6 @@ def _deduct_non_batch(
         sale_id=sale_id,
         created_by=created_by,
     )
-    return None
 
 
 def _check_and_move(
@@ -260,3 +265,47 @@ def restock(
         ref_id=ref_id,
         created_by=created_by,
     )
+
+
+def cost_for_moves(
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    warehouse_id: int,
+    product_id: str,
+    moves: list,
+) -> Optional[Decimal]:
+    """按卖出时实际扣减的批次/散装段算这笔销售行的 COGS(报表毛利 · 成本快照)。
+
+    批次段用该批次 inventory_batches.unit_cost(精确·批次自带进价);散装段没有批次可指,
+    退而求其次用该品散装进货的加权平均成本(store.weighted_avg_purchase_cost_loose · WAC)。
+    任一段成本未知(没记过进价)→ 整行 cost_total 为 None,报表按"无数据"诚实置空,绝不
+    拿已知段拼一个偏低的假成本出来。
+    """
+    total = Decimal("0")
+    for batch_id, qty in moves:
+        q = Decimal(str(qty))
+        if q <= 0:
+            continue
+        if batch_id:
+            batch = inv_store.get_batch(
+                cur,
+                tenant_id=tenant_id,
+                workspace_client_id=workspace_client_id,
+                product_id=product_id,
+                batch_id=batch_id,
+            )
+            unit_cost = batch.get("unit_cost") if batch else None
+        else:
+            unit_cost = inv_store.weighted_avg_purchase_cost_loose(
+                cur,
+                tenant_id=tenant_id,
+                workspace_client_id=workspace_client_id,
+                product_id=product_id,
+                warehouse_id=warehouse_id,
+            )
+        if unit_cost is None:
+            return None
+        total += q * Decimal(str(unit_cost))
+    return total.quantize(Decimal("0.01"))

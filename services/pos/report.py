@@ -68,12 +68,31 @@ def _kpi(cur, base, date_from, date_to) -> dict:
     gross = Decimal(str(row.get("gross") or 0))
     count = int(row.get("sales_count") or 0)
     avg = (gross / count) if count else Decimal("0")
+    cost, complete = _cost_agg(cur, base, date_from, date_to)
     return {
         "gross": _money(gross),
         "sales_count": count,
         "avg_ticket": _money(avg),
         "refund": _money(row.get("refund")),
+        "cost": _money(cost),
+        "gross_profit": _money(gross - cost) if complete else None,
+        "cost_complete": complete,
     }
+
+
+def _cost_agg(cur, base, date_from, date_to) -> tuple[Decimal, bool]:
+    """期内售出行的 COGS 合计 + 是否每行都有成本快照(有老单据/无成本记录 → False)。"""
+    rng, rp = _range("s.sold_at", date_from, date_to)
+    cur.execute(
+        "SELECT COALESCE(SUM(l.cost_total),0) AS cost, "
+        "COALESCE(BOOL_AND(l.cost_total IS NOT NULL), TRUE) AS complete "
+        "FROM pos_sale_lines l JOIN pos_sales s ON s.id = l.sale_id "
+        "WHERE l.tenant_id=%s AND s.workspace_client_id=%s "
+        "AND s.status='completed' AND s.sale_type='sale'" + rng,
+        list(base) + rp,
+    )
+    row = cur.fetchone() or {}
+    return Decimal(str(row.get("cost") or 0)), bool(row.get("complete", True))
 
 
 def _by_day(cur, base, date_from, date_to) -> list:
@@ -86,7 +105,45 @@ def _by_day(cur, base, date_from, date_to) -> list:
         + " GROUP BY 1 ORDER BY 1",
         list(base) + rp,
     )
-    return [{"date": r["d"].isoformat(), "gross": _money(r["gross"])} for r in cur.fetchall()]
+    rows = cur.fetchall()
+    cost_by_day = _cost_by_day(cur, base, date_from, date_to)
+    out = []
+    for r in rows:
+        d = r["d"].isoformat()
+        gross = Decimal(str(r["gross"]))
+        entry = {"date": d, "gross": _money(gross)}
+        entry.update(_profit_fields(gross, cost_by_day.get(d)))
+        out.append(entry)
+    return out
+
+
+def _cost_by_day(cur, base, date_from, date_to) -> dict:
+    """按天聚合的 COGS + 完整性(供 _by_day 拼装毛利)。"""
+    rng, rp = _range("s.sold_at", date_from, date_to)
+    cur.execute(
+        "SELECT (s.sold_at AT TIME ZONE 'UTC')::date AS d, "
+        "COALESCE(SUM(l.cost_total),0) AS cost, "
+        "COALESCE(BOOL_AND(l.cost_total IS NOT NULL), TRUE) AS complete "
+        "FROM pos_sale_lines l JOIN pos_sales s ON s.id = l.sale_id "
+        "WHERE l.tenant_id=%s AND s.workspace_client_id=%s "
+        "AND s.status='completed' AND s.sale_type='sale'" + rng + " GROUP BY 1",
+        list(base) + rp,
+    )
+    return {
+        r["d"].isoformat(): (Decimal(str(r["cost"])), bool(r["complete"])) for r in cur.fetchall()
+    }
+
+
+def _profit_fields(gross: Decimal, cost_entry) -> dict:
+    """毛利诚实置空:该桶(天/品)内任一行成本未知 → gross_profit=None,不拿部分数据瞎猜。"""
+    if not cost_entry:
+        return {"cost": None, "gross_profit": None, "cost_complete": False}
+    cost, complete = cost_entry
+    return {
+        "cost": _money(cost),
+        "gross_profit": _money(gross - cost) if complete else None,
+        "cost_complete": complete,
+    }
 
 
 def _by_method(cur, base, date_from, date_to) -> dict:
@@ -105,7 +162,9 @@ def _top_products(cur, base, date_from, date_to, top_n) -> list:
     rng, rp = _range("s.sold_at", date_from, date_to)
     cur.execute(
         "SELECT l.product_id, pr.name_th, pr.name_en, pr.name_zh, "
-        "COALESCE(SUM(l.qty),0) AS qty, COALESCE(SUM(l.line_total),0) AS gross "
+        "COALESCE(SUM(l.qty),0) AS qty, COALESCE(SUM(l.line_total),0) AS gross, "
+        "COALESCE(SUM(l.cost_total),0) AS cost, "
+        "COALESCE(BOOL_AND(l.cost_total IS NOT NULL), TRUE) AS complete "
         "FROM pos_sale_lines l JOIN pos_sales s ON s.id = l.sale_id "
         "JOIN products pr ON pr.id = l.product_id "
         "WHERE l.tenant_id=%s AND s.workspace_client_id=%s "
@@ -115,15 +174,18 @@ def _top_products(cur, base, date_from, date_to, top_n) -> list:
         "ORDER BY gross DESC LIMIT %s",
         list(base) + rp + [int(top_n)],
     )
-    return [
-        {
+    out = []
+    for r in cur.fetchall():
+        gross = Decimal(str(r["gross"]))
+        entry = {
             "product_id": str(r["product_id"]),
             "name": {"th": r["name_th"], "en": r["name_en"], "zh": r["name_zh"]},
             "qty": _qty(r["qty"]),
-            "gross": _money(r["gross"]),
+            "gross": _money(gross),
         }
-        for r in cur.fetchall()
-    ]
+        entry.update(_profit_fields(gross, (Decimal(str(r["cost"])), bool(r["complete"]))))
+        out.append(entry)
+    return out
 
 
 def _by_cashier(cur, base, date_from, date_to) -> list:

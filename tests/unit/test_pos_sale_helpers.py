@@ -7,6 +7,7 @@
 import unittest
 from datetime import datetime, timezone
 from decimal import Decimal
+from unittest import mock
 
 from services.pos import sale
 
@@ -74,6 +75,86 @@ class IdempotencyTests(unittest.TestCase):
         self.assertEqual(len(cur.calls), 1)
         joined = " ".join(c[0] for c in cur.calls)
         self.assertNotIn("INSERT", joined)
+
+
+class CreateSaleCostWiringTests(unittest.TestCase):
+    """create_sale 建单行时必须把 stock.cost_for_moves 算出的成本快照落进 cost_total,
+    且必须喂 deduct_for_sale 回传的完整 moves(不是只喂首批 batch_id)——报表毛利的地基。"""
+
+    def _run(self, *, cost_return):
+        cur = _Cur()
+        product = {
+            "id": "prod1",
+            "base_unit": "ea",
+            "track_batch": True,
+            "vat_applicable": True,
+            "name_th": "โค้ก",
+            "name_en": "Coke",
+            "name_zh": "可乐",
+        }
+        deducted = {"batch_id": "b1", "moves": [("b1", Decimal("1")), ("b2", Decimal("1"))]}
+        insert_line_calls = []
+        with (
+            mock.patch.object(sale, "_assert_shift_open"),
+            mock.patch.object(
+                sale.inv_store, "get_or_create_default_warehouse", return_value={"id": 1}
+            ),
+            mock.patch.object(sale.sales_store, "get_product_for_sale", return_value=product),
+            mock.patch.object(sale.numbering, "next_number", return_value=("RCP-T1-2026-00001", 1)),
+            mock.patch.object(sale.stock, "deduct_for_sale", return_value=deducted) as ded_mock,
+            mock.patch.object(sale.stock, "cost_for_moves", return_value=cost_return) as cost_mock,
+            mock.patch.object(
+                sale.sales_store,
+                "insert_sale",
+                return_value={
+                    "id": "sale1",
+                    "receipt_no": "RCP-T1-2026-00001",
+                    "grand_total": Decimal("20.00"),
+                    "vat_amount": Decimal("1.31"),
+                    "paid_total": Decimal("20.00"),
+                    "change_amount": Decimal("0.00"),
+                    "status": "completed",
+                },
+            ),
+            mock.patch.object(
+                sale.sales_store,
+                "insert_line",
+                side_effect=lambda *a, **kw: insert_line_calls.append(kw) or {"id": "line1"},
+            ),
+            mock.patch.object(sale.sales_store, "insert_payment"),
+            mock.patch.object(sale.acct_hooks, "enqueue_posting"),
+        ):
+            sale.create_sale(
+                cur,
+                tenant_id="t1",
+                workspace_client_id=9,
+                payload={
+                    "shift_id": "shift1",
+                    "lines": [{"product_id": "prod1", "qty": 2, "unit_price": 10}],
+                    "payments": [{"method": "cash", "amount": 20}],
+                },
+            )
+        return ded_mock, cost_mock, insert_line_calls
+
+    def test_cost_for_moves_fed_the_full_moves_from_deduct(self):
+        ded_mock, cost_mock, _calls = self._run(cost_return=Decimal("18.00"))
+        self.assertEqual(ded_mock.call_count, 1)
+        cost_kwargs = cost_mock.call_args.kwargs
+        self.assertEqual(cost_kwargs["moves"], [("b1", Decimal("1")), ("b2", Decimal("1"))])
+        self.assertEqual(cost_kwargs["product_id"], "prod1")
+
+    def test_line_persists_known_cost_snapshot(self):
+        _ded, _cost, calls = self._run(cost_return=Decimal("18.00"))
+        self.assertEqual(len(calls), 1)
+        fields = calls[0]["fields"]
+        self.assertEqual(fields["cost_total"], Decimal("18.00"))
+        self.assertEqual(fields["batch_id"], "b1")  # 展示锚点仍是首批
+
+    def test_line_persists_none_when_cost_unknown(self):
+        # 老批次没记进价 → cost_for_moves 诚实返 None,行上必须落 NULL,不许瞎猜 0
+        _ded, _cost, calls = self._run(cost_return=None)
+        fields = calls[0]["fields"]
+        self.assertIsNone(fields["cost_total"])
 
 
 if __name__ == "__main__":

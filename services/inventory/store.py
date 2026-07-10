@@ -363,3 +363,27 @@ def insert_txn(
         ),
     )
     return cur.fetchone()
+
+
+def weighted_avg_purchase_cost_loose(
+    cur, *, tenant_id: str, workspace_client_id: int, product_id: str, warehouse_id: int
+) -> Optional[Decimal]:
+    """散装(无批次)库存的加权平均进货成本(POS 报表 COGS · 非批次品成本口径)。
+
+    批次品有批次自带 unit_cost 可精确对账;散装货多次进价不同、无批次分摊,只能退而求其次用
+    加权平均成本(WAC,零售通行口径):对该 (product, warehouse) 全部 purchase_in 且 batch_id
+    IS NULL 的流水按数量加权。无任何带成本的进货记录 → None(诚实未知,不当 0)。
+    """
+    cur.execute(
+        "SELECT SUM(qty_delta * unit_cost) AS cost_sum, SUM(qty_delta) AS qty_sum "
+        "FROM inventory_transactions "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND product_id = %s "
+        "AND warehouse_id = %s AND batch_id IS NULL AND txn_type = 'purchase_in' "
+        "AND unit_cost IS NOT NULL AND qty_delta > 0",
+        (tenant_id, workspace_client_id, product_id, warehouse_id),
+    )
+    row = cur.fetchone() or {}
+    qty_sum = row.get("qty_sum")
+    if not qty_sum or Decimal(str(qty_sum)) == 0:
+        return None
+    return Decimal(str(row["cost_sum"])) / Decimal(str(qty_sum))

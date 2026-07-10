@@ -12,8 +12,8 @@ import logging
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
-from core.feature_flags import pearnly_ai_m1_enabled_for
-from services.workorder import decisions, evidence, obligation_engine, store
+from core.feature_flags import pearnly_ai_m1_enabled_for, pearnly_ai_sod_enabled_for
+from services.workorder import decisions, evidence, obligation_engine, sod, store
 from services.workspace import tax_profile_store
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,11 @@ _MAX_NOTE_LEN = 500
 # 列名 + 单数据行合成表落库,与真实 POS 汇总表直读产出的 sales_read 形状一致(不另造契约)。
 _SALES_HEADER = "ยอดขาย"
 _OUTPUT_VAT_HEADER = "ภาษีขาย"
+
+# 复核签批(C3 · 四权分立)。review 态内 append-only 事件,不新增状态位。
+_REVIEW_STEP = "review"
+_EVT_REVIEW_SIGNOFF = "review_signoff"
+_REVIEW_ROLE = "reviewer"
 
 
 class WorkOrderApiError(ValueError):
@@ -346,6 +351,33 @@ def record_sales_summary(
             "sales_read": sales_read,
         },
         actor=actor,
+    )
+
+
+def record_review_signoff(
+    cur, *, tenant_id: str, work_order_id: str, actor: str, note: Optional[str] = None
+) -> dict:
+    """复核签批(review 态内 append-only 事件,不新增状态)。SoD flag 开时复核人不得是
+    制单人(services.workorder.sod.reviewer_violation);同一复核人重签幂等覆盖(dedupe_key
+    含 actor,一人一条,latest-wins)。"""
+    events = store.list_events(cur, tenant_id=tenant_id, work_order_id=work_order_id)
+    violation = sod.reviewer_violation(
+        events, actor, enforced=pearnly_ai_sod_enabled_for(tenant_id)
+    )
+    if violation:
+        raise WorkOrderApiError(violation)
+    note_s = (note or "").strip()
+    if len(note_s) > _MAX_NOTE_LEN:
+        raise WorkOrderApiError("workorder.review_note_too_long")
+    return store.append_event(
+        cur,
+        tenant_id=tenant_id,
+        work_order_id=work_order_id,
+        step=_REVIEW_STEP,
+        event_type=_EVT_REVIEW_SIGNOFF,
+        payload={"role": _REVIEW_ROLE, "note": note_s},
+        actor=actor,
+        dedupe_key=f"review:{work_order_id}:{actor}",
     )
 
 

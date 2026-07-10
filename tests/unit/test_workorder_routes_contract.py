@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-"""工单制路由契约 + fail-closed 守门(routes/workorder_routes.py · M1-B1)。
+"""工单制路由契约 + fail-closed 守门(routes/workorder_routes.py · M1-B1 + C3 四权分立)。
 
-锁定:①八个端点按 path+method 注册且挂进 app;②M1 闸关时任一端点 404(对存量用户
-路由等于不存在);③闸开 + 鉴权后开单外形正确;④非法裁决 → 422、item 不属该单 → 404;
-⑤下载只放行库里登记过的交付物(未登记 → 404,不碰磁盘)。
+锁定:①端点按 path+method 注册且挂进 app;②M1 闸关时任一端点 404(对存量用户路由等于
+不存在);③闸开 + 鉴权后开单外形正确;④非法裁决 → 422、item 不属该单 → 404;⑤下载只
+放行库里登记过的交付物(未登记 → 404,不碰磁盘);⑥C3:每个端点传给 require_perm 的
+tax.filing.* 细码与方案闸点表逐一对齐(PermCodeWiringTests)。
 """
 
 from __future__ import annotations
@@ -40,6 +41,7 @@ class RouteContractTests(unittest.TestCase):
             ("GET", "/api/workorder/orders/{work_order_id}/deliverables"),
             ("GET", "/api/workorder/orders/{work_order_id}/deliverables/{kind}"),
             ("GET", "/api/workorder/orders/{work_order_id}/items/{item_id}/image"),
+            ("POST", "/api/workorder/orders/{work_order_id}/review"),
             ("POST", "/api/workorder/orders/{work_order_id}/archive"),
             ("GET", "/api/workorder/orders/{work_order_id}/verify"),
             ("POST", "/api/workorder/orders/{work_order_id}/receipt"),
@@ -335,6 +337,74 @@ class _FakeUpload:
     async def read(self, size: int = -1) -> bytes:
         self.read_sizes.append(size)
         return self._content if size < 0 else self._content[:size]
+
+
+class PermCodeWiringTests(unittest.IsolatedAsyncioTestCase):
+    """C3 拍板2 闸点表落地:每个端点传给 require_perm 的细码与方案表逐一对齐。_authorize
+    是每个端点的第一句,只需它成功即可捕获传入的码——之后无论下游怎么炸都不影响本测试
+    目的(db 一律 fake 短路,不碰真库,广播 except 吞掉必然发生的后续假数据错误)。"""
+
+    async def _perm_code_used(self, wr, coro):
+        with (
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(wr, "check_workspace_scope", return_value=None),
+            mock.patch.object(route_helpers, "check_workspace_scope", return_value=None),
+            mock.patch.object(wr, "db", _FakeDB(_Cur(fetch=(1,)))),
+            mock.patch.object(wr.store, "ensure_runtime", return_value=None),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER) as perm,
+            # 兜底:任何未拦到的 feature-flag 读侧(如 api.open_order 内的 pearnly_ai_m1_enabled_for)
+            # 一律短路,不许真碰 DB——本测试只关心 require_perm 传的码,不关心业务后续。
+            mock.patch("services.platform_settings.store.is_enabled_for_user", return_value=False),
+        ):
+            try:
+                await coro
+            except Exception:
+                pass
+        self.assertTrue(perm.called, "端点未走 require_perm")
+        return perm.call_args[0][1]
+
+    async def test_endpoint_perm_codes_match_gate_table(self):
+        from routes import workorder_routes as wr
+
+        cases = (
+            (wr.list_orders(mock.Mock()), wr._C_VIEW),
+            (wr.get_order("wo-1", mock.Mock()), wr._C_VIEW),
+            (wr.list_order_deliverables("wo-1", mock.Mock()), wr._C_VIEW),
+            (wr.download_deliverable("wo-1", "pp30_draft", mock.Mock()), wr._C_VIEW),
+            (wr.get_item_image("wo-1", "it-1", mock.Mock()), wr._C_VIEW),
+            (wr.verify_order("wo-1", mock.Mock()), wr._C_VIEW),
+            (
+                wr.create_order(
+                    wr.OrderCreate(workspace_client_id=7, period="2569-05"), mock.Mock()
+                ),
+                wr._C_PREPARE,
+            ),
+            (wr.run_order("wo-1", mock.Mock(), mock.Mock()), wr._C_PREPARE),
+            (
+                wr.add_decision(
+                    "wo-1", wr.DecisionIn(item_id="it-1", decision="face_value"), mock.Mock()
+                ),
+                wr._C_PREPARE,
+            ),
+            (
+                wr.add_sales_summary(
+                    "wo-1", wr.SalesSummaryIn(sales_amount="1", output_vat="1"), mock.Mock()
+                ),
+                wr._C_PREPARE,
+            ),
+            (wr.add_materials("wo-1", mock.Mock(), files=[]), wr._C_PREPARE),
+            (wr.review_signoff("wo-1", wr.ReviewSignoffIn(), mock.Mock()), wr._C_REVIEW),
+            (wr.archive_order("wo-1", mock.Mock()), wr._C_APPROVE),
+            (
+                wr.attach_receipt("wo-1", mock.Mock(), file=_FakeUpload(b"x")),
+                wr._C_FILE,
+            ),
+        )
+        for coro, expected in cases:
+            with self.subTest(expected=expected):
+                got = await self._perm_code_used(wr, coro)
+                self.assertEqual(got, expected)
 
 
 class MaterialsUploadLimitTests(unittest.IsolatedAsyncioTestCase):

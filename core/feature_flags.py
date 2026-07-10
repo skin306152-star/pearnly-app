@@ -81,6 +81,11 @@ POS_REFUND_APPROVAL_KEY = "pos_refund_approval"
 # 按 tenant 判定(与 pos_refund_approval 同款,tenant_id 当作灰度主体)· 消费在
 # services/pos/entitlements.pos_provision_allowed。
 POS_PROVISION_LOCK_KEY = "pos_provision_lock"
+# 工单四权分立 SoD 强制闸(C3 · 多角色审批):默认关。关 = 分权判定整体跳过,现状单人流
+# 不变(一人所全兼:开单/裁决/复核/冻结/回执全程无阻,与 pos_refund_approval 同款 fail-closed)。
+# 开(事务所)= 强制复核签批人∉制单集、冻结授权人∉制单集且须已有有效复核在场。按 tenant
+# 判定(单所整体开/关);消费在 services/workorder/sod.py。
+PEARNLY_AI_SOD_KEY = "pearnly_ai_sod"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -207,3 +212,12 @@ def pos_provision_lock_enabled_for(tenant_id: Optional[str]) -> bool:
     按 tenant 判定;放行判据(存量豁免 / 授权 / 订阅)在 entitlements.pos_provision_allowed。
     """
     return _enabled(POS_PROVISION_LOCK_KEY, tenant_id, "pos_provision_lock_enabled_for")
+
+
+def pearnly_ai_sod_enabled_for(tenant_id: Optional[str]) -> bool:
+    """工单 SoD 强制闸。关 = 分权判定整体跳过,单人所全兼现状不变。
+
+    按 tenant 判定(单所整体开/关,与 pos_refund_approval 同款);超管在平台后台把该
+    事务所 tenant_id 加进 allowlist 即单所灰度。
+    """
+    return _enabled(PEARNLY_AI_SOD_KEY, tenant_id, "pearnly_ai_sod_enabled_for")

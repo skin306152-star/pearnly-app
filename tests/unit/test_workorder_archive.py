@@ -3,7 +3,7 @@
 
 内存 FakeStore + 真临时盘(WORKORDER_STORAGE_DIR 指向 tmp),真算 sha256。覆盖:review→archive
 原子冻结、状态守卫(非 review/已冻结)、fail-closed 源文件缺失点名、篡改校验点名、回执 append-only
-补挂、冻结后只读守卫。
+补挂、冻结后只读守卫、C3 SoD 强制闸三拒场景(ArchiveSodTests)+ manifest.signatures 四字段回放。
 
 R1 回归纪律:FakeStore 事件行必须带 datetime 类型 created_at(对齐真 store 行——psycopg2 的
 timestamptz 是原生 datetime),且夹具默认含一条人工裁决;字符串时间戳替身曾让「带裁决的真单
@@ -153,11 +153,10 @@ class _ArchiveFixture(unittest.TestCase):
         ]
         return FakeStore(wo, items, events, version)
 
-    def _archive(self, store):
+    def _archive(self, store, *, enforced=False, actor="user:77"):
+        self._patch(archive, "pearnly_ai_sod_enabled_for", lambda tid: enforced)
         self._patch(archive, "store", store)
-        return archive.archive_order(
-            _Cur(), tenant_id=self.T, work_order_id=self.WO, actor="user:77"
-        )
+        return archive.archive_order(_Cur(), tenant_id=self.T, work_order_id=self.WO, actor=actor)
 
     def _patch(self, mod, name, val):
         orig = getattr(mod, name)
@@ -186,8 +185,16 @@ class ArchiveOrderTests(_ArchiveFixture):
         # 裁决段(R1 崩溃分支):datetime 行序列化成 ISO 字符串,裁决动作/actor 在案。
         self.assertEqual(manifest["decisions"]["a"]["decision"], "face_value")
         self.assertEqual(manifest["decisions"]["a"]["at"], _NOW.isoformat())
-        # 落 workorder_archived 事件。
-        self.assertTrue(any(e["event_type"] == "workorder_archived" for e in store.events))
+        # 落 workorder_archived 事件(补 role=approver)。
+        archived = [e for e in store.events if e["event_type"] == "workorder_archived"]
+        self.assertEqual(len(archived), 1)
+        self.assertEqual(archived[0]["payload"]["role"], "approver")
+        # C3 签名段(flag 关也如实回放:夹具裁决 actor=user:77 是唯一制单人,无复核签批,
+        # 授权人=user:77,回执未挂 filed_by 恒空)——schema 不因 flag 状态分叉。
+        self.assertEqual(manifest["signatures"]["prepared_by"], ["user:77"])
+        self.assertEqual(manifest["signatures"]["reviewed_by"], [])
+        self.assertEqual(manifest["signatures"]["approved_by"], "user:77")
+        self.assertIsNone(manifest["signatures"]["filed_by"])
 
     def test_not_review_state_rejected(self):
         store = self._store(status="stuck", version=1)
@@ -217,6 +224,64 @@ class ArchiveOrderTests(_ArchiveFixture):
         self.assertEqual(ctx.exception.code, "workorder.freeze_source_missing")
         self.assertEqual(ctx.exception.context["missing"], ["gone.jpg"])
         self.assertNotEqual(store.wo["status"], "archive")  # 未冻结
+
+
+class ArchiveSodTests(_ArchiveFixture):
+    """C3 拍板3 · SoD 强制闸(`pearnly_ai_sod` 开时叠加在冻结授权闸上)。夹具默认裁决
+    actor=user:77(唯一制单人)。三拒场景 + 合法链路 + manifest.signatures 四字段回放。"""
+
+    def test_flag_on_approver_is_preparer_rejected(self):
+        store = self._store(status="review", version=1)
+        with self.assertRaises(WorkOrderApiError) as ctx:
+            self._archive(store, enforced=True, actor="user:77")  # 授权人=制单人
+        self.assertEqual(ctx.exception.code, "workorder.sod.approver_is_preparer")
+        self.assertNotEqual(store.wo["status"], "archive")
+
+    def test_flag_on_no_review_signoff_rejected(self):
+        store = self._store(status="review", version=1)  # 无 review_signoff 事件
+        with self.assertRaises(WorkOrderApiError) as ctx:
+            self._archive(store, enforced=True, actor="user:99")
+        self.assertEqual(ctx.exception.code, "workorder.sod.review_required")
+        self.assertNotEqual(store.wo["status"], "archive")
+
+    def test_flag_on_signoff_by_preparer_still_requires_review(self):
+        store = self._store(status="review", version=1)
+        store.events.append(
+            {
+                "id": 3,
+                "step": "review",
+                "event_type": "review_signoff",
+                "payload": {"role": "reviewer", "note": ""},
+                "actor": "user:77",  # 复核人=制单人,不算有效签批
+                "created_at": _NOW,
+            }
+        )
+        with self.assertRaises(WorkOrderApiError) as ctx:
+            self._archive(store, enforced=True, actor="user:99")
+        self.assertEqual(ctx.exception.code, "workorder.sod.review_required")
+
+    def test_flag_on_valid_chain_archives_with_signatures(self):
+        store = self._store(status="review", version=1)
+        store.events.append(
+            {
+                "id": 3,
+                "step": "review",
+                "event_type": "review_signoff",
+                "payload": {"role": "reviewer", "note": "looks good"},
+                "actor": "user:88",
+                "created_at": _NOW,
+            }
+        )
+        out = self._archive(store, enforced=True, actor="user:99")
+        self.assertEqual(out["status"], "archive")
+        import json
+
+        path = Path(store.deliverables[freeze.MANIFEST_KIND]["artifact_path"])
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(manifest["signatures"]["prepared_by"], ["user:77"])
+        self.assertEqual(manifest["signatures"]["reviewed_by"], ["user:88"])
+        self.assertEqual(manifest["signatures"]["approved_by"], "user:99")
+        self.assertIsNone(manifest["signatures"]["filed_by"])
 
 
 class VerifyManifestTests(_ArchiveFixture):
@@ -277,7 +342,9 @@ class ReceiptTests(_ArchiveFixture):
             actor="user:9",
         )
         self.assertEqual(out["sha256"], hashlib.sha256(b"pdf-bytes").hexdigest())
-        self.assertTrue(any(e["event_type"] == "receipt_attached" for e in store.events))
+        receipts = [e for e in store.events if e["event_type"] == "receipt_attached"]
+        self.assertEqual(len(receipts), 1)
+        self.assertEqual(receipts[0]["payload"]["role"], "filer")
 
 
 class MutabilityGuardTests(unittest.TestCase):

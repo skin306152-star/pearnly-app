@@ -1,0 +1,132 @@
+# -*- coding: utf-8 -*-
+"""职责分离(SoD)判定守门(services/workorder/sod.py · C3 · 拍板3)。
+
+纯函数,零 DB/框架依赖:制单集回放(裁决 + 人工填销项,run_requested 机械触发不计入)、
+复核/授权闸判定(enforced=False 恒放行 = 一人所全兼零特判)。三拒场景(复核=制单人 /
+无签批冻结 / 授权=制单人)是 C3 验收硬项,逐条钉在这里。
+"""
+
+from __future__ import annotations
+
+import unittest
+
+from services.workorder import sod
+
+
+def _decision(actor):
+    return {"event_type": "human_decision", "actor": actor, "payload": {"item_id": "a"}}
+
+
+def _sales_summary(actor):
+    return {
+        "event_type": "item_classified",
+        "actor": actor,
+        "payload": {"kind": "sales_summary", "status": "ok"},
+    }
+
+
+def _classified_purchase(actor):
+    return {
+        "event_type": "item_classified",
+        "actor": actor,
+        "payload": {"kind": "purchase_invoice", "status": "ok"},
+    }
+
+
+def _run_requested(actor):
+    return {"event_type": "run_requested", "actor": actor, "payload": {}}
+
+
+def _review_signoff(actor):
+    return {"event_type": "review_signoff", "actor": actor, "payload": {"role": "reviewer"}}
+
+
+class PreparerActorsTests(unittest.TestCase):
+    def test_decision_actor_counts(self):
+        events = [_decision("user:1")]
+        self.assertEqual(sod.preparer_actors(events), {"user:1"})
+
+    def test_manual_sales_summary_counts(self):
+        events = [_sales_summary("user:2")]
+        self.assertEqual(sod.preparer_actors(events), {"user:2"})
+
+    def test_direct_read_classify_not_counted(self):
+        # 非人工填销项(无 kind=sales_summary 或 status 直读)不算制单判断。
+        events = [_classified_purchase("user:3")]
+        self.assertEqual(sod.preparer_actors(events), set())
+
+    def test_run_requested_mechanical_not_counted(self):
+        events = [_run_requested("user:4")]
+        self.assertEqual(sod.preparer_actors(events), set())
+
+    def test_dedup_across_multiple_events(self):
+        events = [_decision("user:1"), _decision("user:1"), _sales_summary("user:1")]
+        self.assertEqual(sod.preparer_actors(events), {"user:1"})
+
+    def test_multiple_preparers(self):
+        events = [_decision("user:1"), _sales_summary("user:2")]
+        self.assertEqual(sod.preparer_actors(events), {"user:1", "user:2"})
+
+
+class ReviewerActorsTests(unittest.TestCase):
+    def test_collects_signoff_actors(self):
+        events = [_review_signoff("user:9")]
+        self.assertEqual(sod.reviewer_actors(events), {"user:9"})
+
+    def test_non_signoff_events_ignored(self):
+        events = [_decision("user:1")]
+        self.assertEqual(sod.reviewer_actors(events), set())
+
+
+class ReviewerViolationTests(unittest.TestCase):
+    def test_flag_off_always_passes(self):
+        events = [_decision("user:1")]
+        self.assertIsNone(sod.reviewer_violation(events, "user:1", enforced=False))
+
+    def test_flag_on_reviewer_is_preparer_rejected(self):
+        events = [_decision("user:1")]
+        self.assertEqual(
+            sod.reviewer_violation(events, "user:1", enforced=True),
+            sod.REVIEWER_IS_PREPARER,
+        )
+
+    def test_flag_on_distinct_reviewer_passes(self):
+        events = [_decision("user:1")]
+        self.assertIsNone(sod.reviewer_violation(events, "user:2", enforced=True))
+
+
+class ApproverViolationTests(unittest.TestCase):
+    def test_flag_off_always_passes(self):
+        events = [_decision("user:1")]
+        self.assertIsNone(sod.approver_violation(events, "user:1", enforced=False))
+
+    def test_flag_on_approver_is_preparer_rejected(self):
+        events = [_decision("user:1"), _review_signoff("user:2")]
+        self.assertEqual(
+            sod.approver_violation(events, "user:1", enforced=True),
+            sod.APPROVER_IS_PREPARER,
+        )
+
+    def test_flag_on_no_signoff_rejected(self):
+        events = [_decision("user:1")]
+        self.assertEqual(
+            sod.approver_violation(events, "user:2", enforced=True),
+            sod.REVIEW_REQUIRED,
+        )
+
+    def test_flag_on_signoff_by_preparer_does_not_count(self):
+        # 复核人若同时也在制单集里,那条签批不算「有效」复核——不能自审自签绕过闸。
+        events = [_decision("user:1"), _review_signoff("user:1")]
+        self.assertEqual(
+            sod.approver_violation(events, "user:2", enforced=True),
+            sod.REVIEW_REQUIRED,
+        )
+
+    def test_flag_on_valid_three_actor_chain_passes(self):
+        # 制单人 user:1、复核人 user:2(≠制单人)、授权人 user:3(≠制单人)→ 放行。
+        events = [_decision("user:1"), _review_signoff("user:2")]
+        self.assertIsNone(sod.approver_violation(events, "user:3", enforced=True))
+
+
+if __name__ == "__main__":
+    unittest.main()

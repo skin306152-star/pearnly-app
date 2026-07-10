@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
-"""冻结/归档服务编排(C-2 · 任务包设计 3/6)。
+"""冻结/归档服务编排(C-2 · 任务包设计 3/6 · C3 叠加 SoD 授权闸)。
 
 freeze.py 是纯 manifest 汇编;本模块做「取库 → 现算哈希 → 写盘 → 落事件 → 钉状态」的编排,
 是 review→archive 这一步唯一入口。校验错抛 api.WorkOrderApiError(带 code/context),路由翻
 4xx/409。冻结后工单只读:mutating 端点先过 assert_mutable(archive → 结构化拒)。
 
-  - archive_order:原子冻结。六要素齐(逐 item sha256 现算 + 规则/模型版本 + 裁决回放 + 签批人
-    + 时间)合成 freeze_manifest.json 交付物 + workorder_archived 事件 + status=archive。
-    fail-closed:源文件缺失 → 拒绝并点名(freeze.FreezeError → 409)。幂等:已冻结 → 409。
+  - archive_order:原子冻结。SoD flag(`pearnly_ai_sod`)开时先过 sod.approver_violation
+    (授权人∉制单集 + 须有效复核在场);六要素齐(逐 item sha256 现算 + 规则/模型版本 +
+    裁决回放 + 签批人 + 时间)合成 freeze_manifest.json 交付物 + workorder_archived 事件
+    + status=archive。fail-closed:源文件缺失 → 拒绝并点名(freeze.FreezeError → 409)。
+    幂等:已冻结 → 409。
   - verify_manifest:篡改校验(读侧)。逐 item 现算 sha256 与冻结 manifest 比对,点名不符。
   - attach_receipt:申报回执 append-only 补挂(冻结后唯一可写路径,不改 manifest 本体)。
 """
@@ -19,7 +21,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from services.workorder import freeze, storage, store
+from core.feature_flags import pearnly_ai_sod_enabled_for
+from services.workorder import freeze, sod, storage, store
 from services.workorder.api import WorkOrderApiError
 
 _STATUS_REVIEW = "review"  # engine.TERMINAL_STATUS:全 runnable 步绿停此,唯一可冻结起点
@@ -57,7 +60,9 @@ def _manifest_summary(manifest: dict) -> dict:
 
 
 def archive_order(cur, *, tenant_id: str, work_order_id: str, actor: str) -> dict:
-    """review→archive 原子冻结。签批人=actor(触发归档的登录态),不做多角色审批(那是 C3)。"""
+    """review→archive 原子冻结。签批人=actor(触发归档的登录态)。SoD flag(`pearnly_ai_sod`)
+    开时:授权人不得是制单人,且须已有一条签批人∉制单集的有效复核签批(services.workorder.
+    sod);闸关时判定恒放行,单人所全兼现状不变。"""
     wo = store.get_work_order(cur, tenant_id=tenant_id, work_order_id=work_order_id)
     if not wo:
         raise WorkOrderApiError("workorder.not_found")
@@ -74,6 +79,11 @@ def archive_order(cur, *, tenant_id: str, work_order_id: str, actor: str) -> dic
 
     items = store.list_items(cur, tenant_id=tenant_id, work_order_id=work_order_id)
     events = store.list_events(cur, tenant_id=tenant_id, work_order_id=work_order_id)
+    violation = sod.approver_violation(
+        events, actor, enforced=pearnly_ai_sod_enabled_for(tenant_id)
+    )
+    if violation:
+        raise WorkOrderApiError(violation)
     ocr_models = freeze.ocr_models_from_ai_usage(
         cur, tenant_id=tenant_id, item_ids=[it["id"] for it in items]
     )
@@ -113,7 +123,7 @@ def archive_order(cur, *, tenant_id: str, work_order_id: str, actor: str) -> dic
         work_order_id=work_order_id,
         step=_ARCHIVE_STEP,
         event_type=_EVT_ARCHIVED,
-        payload=summary,
+        payload={**summary, "role": "approver"},
         actor=actor,
         dedupe_key=f"archive:{work_order_id}",
     )
@@ -185,7 +195,12 @@ def attach_receipt(
         work_order_id=work_order_id,
         step=_ARCHIVE_STEP,
         event_type=_EVT_RECEIPT,
-        payload={"file_ref": str(path), "original_name": original_name, "sha256": digest},
+        payload={
+            "file_ref": str(path),
+            "original_name": original_name,
+            "sha256": digest,
+            "role": "filer",
+        },
         actor=actor,
         dedupe_key=f"receipt:{digest}",
     )

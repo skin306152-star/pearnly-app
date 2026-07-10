@@ -46,7 +46,7 @@ def _expected(role, code):
     if role == "accountant":
         if _expected("clerk", code):
             return True
-        if code == "pos.report.view" or code == "acct.entry.review":
+        if code in {"pos.report.view", "acct.entry.review", "tax.filing.review", "tax.filing.file"}:
             return True
         if code in {"acct.coa.manage", "sales.product.manage", "purchase.supplier.manage"}:
             return True

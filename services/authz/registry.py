@@ -2,7 +2,8 @@
 """权限码 registry · 合法权限码与角色码集的单一来源(docs/permissions/02)。
 
 码形如 <模块>.<资源>.<动作>,动词收敛(view/create/edit/delete/approve/export/
-manage/operate;acct.entry.review 与 kb.ask 是图纸钦定的两个特例)。
+manage/operate;acct.entry.review/kb.ask/tax.filing.review/tax.filing.file 是图纸
+钦定的特例——四权分立命名贴 RD 实务动作,不硬凑收敛动词)。
 roles 表的 permissions JSONB 每次启动按本文件刷新;JSONB 出现 registry 没有的码
 = selfcheck() 报错(防漂移)。
 """
@@ -62,7 +63,9 @@ ACCT_CODES = (
 TAX_CODES = (
     "tax.filing.view",
     "tax.filing.create",
+    "tax.filing.review",  # 复核签批(C3 四权分立·工单 review 态内签批)
     "tax.filing.approve",
+    "tax.filing.file",  # 申报回执补挂(C3·冻结后唯一可写路径)
     "tax.settings.manage",
 )
 
@@ -219,7 +222,9 @@ _ACCOUNTANT = _CLERK + (
     "acct.entry.approve",
     "acct.coa.manage",
     "acct.ledger.export",
+    "tax.filing.review",  # 资深会计 = 复核+授权+申报全含(C3 一人所全兼零特判)
     "tax.filing.approve",
+    "tax.filing.file",
     "recon.approve",
     "recon.export",
     "inv.approve",

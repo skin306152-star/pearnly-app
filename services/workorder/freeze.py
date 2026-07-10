@@ -19,7 +19,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Callable, Optional
 
-from services.workorder import evidence, storage
+from services.workorder import evidence, sod, storage
 
 # 规则版本:裁决词汇(decisions.py)/守恒·勾稽闸逻辑变更时人工 bump,钉进每份冻结 manifest。
 # 常量落此处而非 decisions.py(那是零依赖词汇叶子,契约零改动)——冻结包是它的唯一消费者。
@@ -160,7 +160,22 @@ def build_manifest(
         "deliverable_version": int(deliverable_version),
         "items": item_records,
         "decisions": _replay_decisions(events),
+        "signatures": _signatures(events, approver),
         "receipt": None,  # 申报回执 append-only 补挂(不改已冻 manifest 本体)
+    }
+
+
+def _signatures(events: list[dict], approver: str) -> dict:
+    """签批四元组(additive · C3):制单集/复核签批人集合从事件流回放(与 sod.py 判定同一份
+    事件流,不重算)。flag 关/开都如实回放——本块不受 SoD 强制闸门控,只是照实记「谁真的
+    做了什么」,闸只管「允不允许」。approved_by 与顶层 approved_by 同值(冗余存一份供前端
+    直接读 signatures 块不必再拼)。filed_by 冻结时恒空:回执 append-only 补挂不改已冻
+    manifest 本体(与顶层 receipt 同语义),申报人查证走 receipt_attached 事件。"""
+    return {
+        "prepared_by": sorted(sod.preparer_actors(events)),
+        "reviewed_by": sorted(sod.reviewer_actors(events)),
+        "approved_by": approver,
+        "filed_by": None,
     }
 
 

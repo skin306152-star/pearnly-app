@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
-"""冻结 manifest 汇编守门(services/workorder/freeze.py · C-2 设计 3/5)。
+"""冻结 manifest 汇编守门(services/workorder/freeze.py · C-2 设计 3/5 + C3 signatures 段)。
 
 纯函数 build_manifest:六要素齐(逐 item sha256 + 规则版本 + 模型版本 + 裁决回放 + 签批人 +
-时间)。fail-closed:有 file_ref 却算不出哈希 → FreezeError 点名。sha256_of 注入,不碰真盘。
+时间)+ C3 additive 的 signatures{prepared_by/reviewed_by/approved_by/filed_by}(全部
+事件流回放,不受 SoD flag 门控——本块只如实记录,闸只管「允不允许」)。fail-closed:
+有 file_ref 却算不出哈希 → FreezeError 点名。sha256_of 注入,不碰真盘。
 
 R1 回归:事件行 created_at 用真 datetime 类型(对齐 psycopg2 真 store 行,不许字符串替身失真)
 ——带裁决的 manifest 必须 JSON 可序列化(datetime→ISO / Decimal→十进制串 / 未知类型 fail-loud)。
@@ -109,6 +111,37 @@ class BuildManifestTests(unittest.TestCase):
         # 回执留位 + 版本钉死
         self.assertIsNone(m["receipt"])
         self.assertEqual(m["deliverable_version"], 2)
+        # C3 签名段(additive):制单集自事件流回放(裁决 actor=user:77),无复核签批事件
+        # → reviewed_by 空,approved_by 与顶层同值,filed_by 冻结时恒空。
+        self.assertEqual(m["signatures"]["prepared_by"], ["user:77"])
+        self.assertEqual(m["signatures"]["reviewed_by"], [])
+        self.assertEqual(m["signatures"]["approved_by"], "user:77")
+        self.assertIsNone(m["signatures"]["filed_by"])
+
+    def test_signatures_collect_reviewer_distinct_from_preparer(self):
+        events = self._events() + [
+            {
+                "id": 6,
+                "step": "review",
+                "event_type": "review_signoff",
+                "payload": {"role": "reviewer", "note": ""},
+                "actor": "user:88",
+                "created_at": _DECIDED_AT,
+            }
+        ]
+        m = freeze.build_manifest(
+            work_order=_wo(),
+            items=self._items(),
+            events=events,
+            deliverable_version=1,
+            ocr_models=[],
+            approver="user:99",
+            frozen_at="2026-07-11T00:00:00+00:00",
+            sha256_of=_fake_hash,
+        )
+        self.assertEqual(m["signatures"]["prepared_by"], ["user:77"])
+        self.assertEqual(m["signatures"]["reviewed_by"], ["user:88"])
+        self.assertEqual(m["signatures"]["approved_by"], "user:99")
 
     def test_missing_source_file_fails_closed_and_names_it(self):
         items = [

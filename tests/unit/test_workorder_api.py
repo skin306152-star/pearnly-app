@@ -483,6 +483,61 @@ class RecordSalesSummaryTests(_ApiTestBase):
         self.assertEqual(ctx.exception.code, "workorder.sales_summary_note_too_long")
 
 
+class RecordReviewSignoffTests(_ApiTestBase):
+    """复核签批(C3 · api.record_review_signoff):flag 关人人可签(现状不变);flag 开
+    复核人不得是制单人(services.workorder.sod)。append-only 事件带 role=reviewer,
+    dedupe_key 含 actor(同人重签幂等覆盖,交给 store.append_event 的 ON CONFLICT 处理——
+    这里只断言调用点把 dedupe_key 传对)。"""
+
+    def test_flag_off_any_actor_signs(self):
+        self.store.events = [
+            {"event_type": "human_decision", "actor": "user:1", "payload": {"item_id": "a"}}
+        ]
+        with mock.patch.object(api, "pearnly_ai_sod_enabled_for", return_value=False):
+            evt = api.record_review_signoff(
+                None, tenant_id="t-1", work_order_id="wo-1", actor="user:1", note="ok"
+            )
+        self.assertEqual(evt["event_type"], "review_signoff")
+        appended = self.store.appended[-1]
+        self.assertEqual(appended["payload"], {"role": "reviewer", "note": "ok"})
+        self.assertEqual(appended["step"], "review")
+        self.assertEqual(appended["dedupe_key"], "review:wo-1:user:1")
+
+    def test_flag_on_reviewer_is_preparer_rejected(self):
+        self.store.events = [
+            {"event_type": "human_decision", "actor": "user:1", "payload": {"item_id": "a"}}
+        ]
+        with mock.patch.object(api, "pearnly_ai_sod_enabled_for", return_value=True):
+            with self.assertRaises(api.WorkOrderApiError) as ctx:
+                api.record_review_signoff(
+                    None, tenant_id="t-1", work_order_id="wo-1", actor="user:1"
+                )
+        self.assertEqual(ctx.exception.code, "workorder.sod.reviewer_is_preparer")
+        self.assertEqual(self.store.appended, [])  # 拒批不落事件
+
+    def test_flag_on_distinct_reviewer_signs(self):
+        self.store.events = [
+            {"event_type": "human_decision", "actor": "user:1", "payload": {"item_id": "a"}}
+        ]
+        with mock.patch.object(api, "pearnly_ai_sod_enabled_for", return_value=True):
+            evt = api.record_review_signoff(
+                None, tenant_id="t-1", work_order_id="wo-1", actor="user:2"
+            )
+        self.assertEqual(evt["event_type"], "review_signoff")
+
+    def test_overlong_note_rejected(self):
+        with mock.patch.object(api, "pearnly_ai_sod_enabled_for", return_value=False):
+            with self.assertRaises(api.WorkOrderApiError) as ctx:
+                api.record_review_signoff(
+                    None,
+                    tenant_id="t-1",
+                    work_order_id="wo-1",
+                    actor="user:1",
+                    note="x" * 501,
+                )
+        self.assertEqual(ctx.exception.code, "workorder.review_note_too_long")
+
+
 class ListAndDeliverableTests(_ApiTestBase):
     def test_list_orders_shape(self):
         out = api.list_orders(None, tenant_id="t-1", limit=25, offset=0)

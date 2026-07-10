@@ -7,9 +7,16 @@ import unittest
 from services.authz import registry
 from services.modules.store import KNOWN_MODULES
 
-# 8 个收敛动词 + 图纸钦定特例(acct.entry.review 逐笔审 · kb.ask 问答)
+# 8 个收敛动词 + 图纸钦定特例(acct.entry.review 逐笔审 · kb.ask 问答 ·
+# tax.filing.review/file C3 四权分立复核签批/申报回执)
 _VERBS = {"view", "create", "edit", "delete", "approve", "export", "manage", "operate"}
-_VERB_EXCEPTIONS = {"acct.entry.review", "kb.ask", "intake.upload"}
+_VERB_EXCEPTIONS = {
+    "acct.entry.review",
+    "kb.ask",
+    "intake.upload",
+    "tax.filing.review",
+    "tax.filing.file",
+}
 
 _CODE_RE = re.compile(r"^[a-z]+(\.[a-z_]+){1,2}$")
 

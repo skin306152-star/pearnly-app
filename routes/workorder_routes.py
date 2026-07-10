@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """Pearnly AI · 工单制 HTTP API(M1-B1 · 引擎后端化)。
 
-把 M0 的 CLI 发动机接上真后端:开单 / 列表看板 / 详情 / 触发推进 / 人工裁决 / 补料 / 交付包。
+把 M0 的 CLI 发动机接上真后端:开单 / 列表看板 / 详情 / 触发推进 / 人工裁决 / 补料 / 复核签批 /
+冻结 / 交付包(C3 · 四权分立细码见下方 _C_* 常量 + services/workorder/sod.py)。
 全组挂 feature flag `pearnly_ai_m1`(默认关):闸关时一律 404 —— 对存量 Pearnly 用户,这些
 路由等于不存在(fail-closed)。租户隔离全走 store.py 既有函数(tenant_id 取自登录态),
 每条 {id} 路由都校验工单归属本租户 + 账套作用域(check_workspace_scope,越权 404 防枚举)。
@@ -30,9 +31,15 @@ from services.workorder.steps import intake
 
 router = APIRouter()
 
-# 工单 = 在某账套主体上做月度申报工作 → 与「管理账套主体」同权(照 workspace_routes)。
-# M1 单用户,owner 短路即过;角色模型落地后(M3)可再拆 acct.entry.view/review。
-_PERM = "settings.workspace.manage"
+# 工单 = 月度申报工作,四权分立映射到 tax.filing.* 细码(C3):制单/复核/授权/申报/只读
+# 各自独立判定,owner/admin 走 all 短路、accountant 全含、clerk 仅制单+只读——一人所全兼
+# 零特判(codes 非互斥枚举)。SoD 强制(复核人≠制单人等)按 pearnly_ai_sod 闸叠加,见
+# services/workorder/sod.py。
+_C_VIEW = "tax.filing.view"
+_C_PREPARE = "tax.filing.create"
+_C_REVIEW = "tax.filing.review"
+_C_APPROVE = "tax.filing.approve"
+_C_FILE = "tax.filing.file"
 
 # 补料上限:单文件 20MB 照 bank_recon_routes 的单据上传上限(手机实拍/PDF 远小于此);
 # 单次 50 张系本域自定(仓库无多文件计数先例,vat_excel 的 30/1000 是业务条目数非上传数)
@@ -65,9 +72,13 @@ class SalesSummaryIn(BaseModel):
     note: str = Field("", max_length=500, description="凭据备注(人工申报来源)")
 
 
-def _authorize(request: Request) -> tuple[dict, str]:
-    """登录 + M1 闸(关→404 fail-closed)+ 动作权限。返回 (user, tenant_id)。"""
-    return authorize_pearnly_ai(request, _PERM, not_found="workorder.not_found")
+class ReviewSignoffIn(BaseModel):
+    note: str = Field("", max_length=500, description="复核备注(可选)")
+
+
+def _authorize(request: Request, perm: str) -> tuple[dict, str]:
+    """登录 + M1 闸(关→404 fail-closed)+ 动作细码权限。返回 (user, tenant_id)。"""
+    return authorize_pearnly_ai(request, perm, not_found="workorder.not_found")
 
 
 def _assert_owns_workspace(cur, request: Request, user: dict, tenant_id: str, ws_id: int) -> None:
@@ -90,6 +101,8 @@ def _assert_mutable(wo: dict) -> None:
 
 
 # 冻结/归档相关业务错 → 409(状态冲突);归属类 → 404;其余校验错 → 422。
+# SoD(C3):授权人自审/无有效复核在场 = 状态冲突(409);复核人自审(#11)不在此列 → 422
+# (它是「这次签批请求不合法」的校验错,不是工单状态冲突)。
 _CONFLICT_CODES = {
     "workorder.already_archived",
     "workorder.not_reviewable",
@@ -97,6 +110,8 @@ _CONFLICT_CODES = {
     "workorder.freeze_source_missing",
     "workorder.archived_readonly",
     "workorder.not_archived",
+    "workorder.sod.approver_is_preparer",
+    "workorder.sod.review_required",
 }
 
 
@@ -111,7 +126,7 @@ def _raise_from_api_error(e: "api.WorkOrderApiError") -> None:
 @router.post("/api/workorder/orders")
 async def create_order(req: OrderCreate, request: Request):
     """开单(幂等:同账套同期同意图返既有单)。"""
-    user, tenant_id = _authorize(request)
+    user, tenant_id = _authorize(request, _C_PREPARE)
     with db.get_cursor(commit=True) as cur:
         _assert_owns_workspace(cur, request, user, tenant_id, req.workspace_client_id)
         wo = api.open_order(
@@ -141,7 +156,7 @@ async def list_orders(
     offset: int = 0,
 ):
     """工单列表(按账套/账期/状态筛,倒序分页)。"""
-    _user, tenant_id = _authorize(request)
+    _user, tenant_id = _authorize(request, _C_VIEW)
     limit = max(1, min(int(limit), 200))
     offset = max(0, int(offset))
     with db.get_cursor() as cur:
@@ -159,7 +174,7 @@ async def list_orders(
 @router.get("/api/workorder/orders/{work_order_id}")
 async def get_order(work_order_id: str, request: Request):
     """工单详情:status/current_step + flagged 清单 + needs/停机原因 + 关键数字 + 交付物概览。"""
-    user, tenant_id = _authorize(request)
+    user, tenant_id = _authorize(request, _C_VIEW)
     with db.get_cursor() as cur:
         _load_order(cur, request, user, tenant_id, work_order_id)
         detail = api.order_detail(cur, tenant_id=tenant_id, work_order_id=work_order_id)
@@ -174,7 +189,7 @@ async def run_order(work_order_id: str, request: Request, background: Background
 
     双终端/双击同时 /run:先抢 DB 租约,抢不到(他人未过期租约占着)→ 409 run_in_progress;
     抢到者把 owner 交后台 advance,收尾释放。进程猝死则租约过期后另一终端可接管。"""
-    user, tenant_id = _authorize(request)
+    user, tenant_id = _authorize(request, _C_PREPARE)
     owner = f"run:{uuid.uuid4().hex}"
     store.ensure_runtime()  # 建租约列(独立事务)· 必须先于下面 SELECT/UPDATE 锁 work_orders
     with db.get_cursor(commit=True) as cur:
@@ -203,7 +218,7 @@ async def run_order(work_order_id: str, request: Request, background: Background
 @router.post("/api/workorder/orders/{work_order_id}/decisions")
 async def add_decision(work_order_id: str, req: DecisionIn, request: Request):
     """人工裁决(face_value/recalc/exclude),落 human_decision 事件(校验 item 属该单)。"""
-    user, tenant_id = _authorize(request)
+    user, tenant_id = _authorize(request, _C_PREPARE)
     with db.get_cursor(commit=True) as cur:
         _assert_mutable(_load_order(cur, request, user, tenant_id, work_order_id))
         try:
@@ -228,7 +243,7 @@ async def add_decision(work_order_id: str, req: DecisionIn, request: Request):
 async def add_sales_summary(work_order_id: str, req: SalesSummaryIn, request: Request):
     """人工填销项(销售额 + 销项税 + 凭据备注)。落 item_classified(sales_summary) 事件,
     reconcile 的 R2 据此解锁(引擎/steps 不改)。金额十进制字符串进出、禁 float、非负。"""
-    user, tenant_id = _authorize(request)
+    user, tenant_id = _authorize(request, _C_PREPARE)
     with db.get_cursor(commit=True) as cur:
         _assert_mutable(_load_order(cur, request, user, tenant_id, work_order_id))
         try:
@@ -250,7 +265,7 @@ async def add_sales_summary(work_order_id: str, req: SalesSummaryIn, request: Re
 @router.post("/api/workorder/orders/{work_order_id}/materials")
 async def add_materials(work_order_id: str, request: Request, files: list[UploadFile] = File(...)):
     """补料:multipart 上传,落盘到工单目录并登记成 work_order_items(走 intake 幂等指纹)。"""
-    user, tenant_id = _authorize(request)
+    user, tenant_id = _authorize(request, _C_PREPARE)
     if len(files) > _MAX_MATERIAL_FILES:
         raise HTTPException(413, detail="workorder.too_many_files")
     with db.get_cursor() as cur:  # 先验归属,再落盘(不给未授权请求写磁盘的机会)
@@ -283,7 +298,7 @@ async def add_materials(work_order_id: str, request: Request, files: list[Upload
 @router.get("/api/workorder/orders/{work_order_id}/deliverables")
 async def list_order_deliverables(work_order_id: str, request: Request):
     """交付物清单(kind + 关键数字 + 是否有可下载文件)。"""
-    user, tenant_id = _authorize(request)
+    user, tenant_id = _authorize(request, _C_VIEW)
     with db.get_cursor() as cur:
         _load_order(cur, request, user, tenant_id, work_order_id)
         return {
@@ -296,7 +311,7 @@ async def list_order_deliverables(work_order_id: str, request: Request):
 @router.get("/api/workorder/orders/{work_order_id}/deliverables/{kind}")
 async def download_deliverable(work_order_id: str, kind: str, request: Request):
     """下载单个交付物文件。只放行库里登记过的 artifact_path,再做工单目录内含校验(防穿越)。"""
-    user, tenant_id = _authorize(request)
+    user, tenant_id = _authorize(request, _C_VIEW)
     with db.get_cursor() as cur:
         _load_order(cur, request, user, tenant_id, work_order_id)
         artifact = api.deliverable_artifact_path(
@@ -314,7 +329,7 @@ async def download_deliverable(work_order_id: str, kind: str, request: Request):
 async def get_item_image(work_order_id: str, item_id: str, request: Request):
     """审核队列原图直出(W3 契约 §1.2 缺口 A)。与交付物下载同构:只放行该 item 库里
     登记过的 file_ref,再断言落在工单目录内(防穿越);Content-Type 按扩展名给。"""
-    user, tenant_id = _authorize(request)
+    user, tenant_id = _authorize(request, _C_VIEW)
     with db.get_cursor() as cur:
         _load_order(cur, request, user, tenant_id, work_order_id)
         item = store.get_item(
@@ -333,13 +348,35 @@ async def get_item_image(work_order_id: str, item_id: str, request: Request):
     return FileResponse(str(path), media_type=media_type, filename=download_name)
 
 
+@router.post("/api/workorder/orders/{work_order_id}/review")
+async def review_signoff(work_order_id: str, req: ReviewSignoffIn, request: Request):
+    """复核签批(C3 四权分立):review 态内落 append-only `review_signoff` 事件,不新增
+    状态位。SoD flag 关时人人可签(现状不变);开时复核人不得是制单人(→ 422
+    sod.reviewer_is_preparer)。同一复核人重签幂等覆盖(latest-wins)。"""
+    user, tenant_id = _authorize(request, _C_REVIEW)
+    with db.get_cursor(commit=True) as cur:
+        _assert_mutable(_load_order(cur, request, user, tenant_id, work_order_id))
+        try:
+            evt = api.record_review_signoff(
+                cur,
+                tenant_id=tenant_id,
+                work_order_id=work_order_id,
+                actor=f"user:{user['id']}",
+                note=req.note,
+            )
+        except api.WorkOrderApiError as e:
+            _raise_from_api_error(e)
+    return {"ok": True, "event_id": evt["id"]}
+
+
 @router.post("/api/workorder/orders/{work_order_id}/archive")
 async def archive_order(work_order_id: str, request: Request):
     """冻结:review→archive 原子出 freeze_manifest(六要素齐)。冻结后工单只读。
 
     fail-closed:任一源文件已不在盘 → 409 workorder.freeze_source_missing 并点名(detail.missing);
-    非 review 态/已冻结 → 409。签批人=登录 actor(单一 actor,多角色审批属 C3)。"""
-    user, tenant_id = _authorize(request)
+    非 review 态/已冻结 → 409。签批人=登录 actor;SoD flag 开时授权人不得是制单人且须有
+    有效复核在场(services/workorder/sod.py,→ 409 sod.approver_is_preparer/review_required)。"""
+    user, tenant_id = _authorize(request, _C_APPROVE)
     store.ensure_runtime()  # 建 version/original_name 列(独立事务·先于锁工单表的 txn)
     with db.get_cursor(commit=True) as cur:
         _load_order(cur, request, user, tenant_id, work_order_id)
@@ -355,7 +392,7 @@ async def archive_order(work_order_id: str, request: Request):
 @router.get("/api/workorder/orders/{work_order_id}/verify")
 async def verify_order(work_order_id: str, request: Request):
     """篡改校验:逐 item 现算源文件 sha256 与冻结 manifest 比对(未冻结 → 409 not_archived)。"""
-    user, tenant_id = _authorize(request)
+    user, tenant_id = _authorize(request, _C_VIEW)
     with db.get_cursor() as cur:
         _load_order(cur, request, user, tenant_id, work_order_id)
         try:
@@ -368,7 +405,7 @@ async def verify_order(work_order_id: str, request: Request):
 async def attach_receipt(work_order_id: str, request: Request, file: UploadFile = File(...)):
     """申报回执补挂(append-only):冻结后唯一可写路径,落 receipt_attached 事件(带回执哈希),
     不改已冻 manifest 本体。仅归档态可挂。"""
-    user, tenant_id = _authorize(request)
+    user, tenant_id = _authorize(request, _C_FILE)
     content = await file.read(_MAX_MATERIAL_BYTES + 1)
     if len(content) > _MAX_MATERIAL_BYTES:
         raise HTTPException(413, detail="workorder.file_too_large")

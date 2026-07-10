@@ -60,7 +60,16 @@ class WorkOrderFakeStoreBase:
         return dict(row)
 
     def append_event(
-        self, cur, *, tenant_id, work_order_id, step, event_type, payload=None, actor="system"
+        self,
+        cur,
+        *,
+        tenant_id,
+        work_order_id,
+        step,
+        event_type,
+        payload=None,
+        actor="system",
+        dedupe_key=None,
     ):
         self._seq += 1
         row = {
@@ -69,6 +78,7 @@ class WorkOrderFakeStoreBase:
             "event_type": event_type,
             "payload": payload or {},
             "actor": actor,
+            "dedupe_key": dedupe_key,
         }
         self._on_event_appended(row)
         return dict(row)

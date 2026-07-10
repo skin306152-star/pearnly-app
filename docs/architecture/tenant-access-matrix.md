@@ -31,7 +31,7 @@ Pearnly 的多租户由 4 类角色构成：
 ### 表 1 · `users`
 - **隔离字段**：`users.id` (主 key) · `users.tenant_id` (可 NULL = 孤立用户)
 - **查询函数**：
-  - `find_user_by_username(username)` `db.py:193` — `WHERE username = %s` — 无隔离（登录前必要 · JWT 签发后由 app 层限制）
+  - `find_user_by_username(username)` `services/auth/user_lookup.py` — `WHERE lower(username) = lower(%s)`（2026-07-10 起大小写不敏感）— 无隔离（登录前必要 · JWT 签发后由 app 层限制）
   - `find_user_by_id(user_id)` `db.py:206` — 主 key 查询
   - `find_user_by_google_sub(google_sub)` `db.py:222` — OAuth 用途
 - **修改函数**：`_ensure_one_account()` `db.py:115`（demo 初始化）

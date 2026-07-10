@@ -38,6 +38,17 @@ def is_known(business_type: str) -> bool:
     return business_type in BUSINESS_PRESETS
 
 
+def _pos_provision_allowed(cur, tenant_id: str) -> bool:
+    """PS-3 锁闸放行判据(懒导入避免 presets↔entitlements 循环)。任何异常一律放行:
+    锁闸是加限功能,基建抖动绝不该把 pos 从既有客户手里锁没(fail-open · 与钥匙闸相反的安全方向)。"""
+    try:
+        from services.pos.entitlements import pos_provision_allowed
+
+        return pos_provision_allowed(cur, tenant_id=str(tenant_id))
+    except Exception:
+        return True
+
+
 def apply_preset(cur, *, tenant_id: str, business_type: str) -> dict:
     """应用业态预设:7 模块按预设翻开关 + 记录 business_type。
 
@@ -49,12 +60,18 @@ def apply_preset(cur, *, tenant_id: str, business_type: str) -> dict:
         raise ValueError(f"unknown business_type: {business_type}")
 
     enabled_keys = set(BUSINESS_PRESETS[business_type])
+    # PS-3 新租户开通锁闸:闸开且未放行(非存量/无授权/无订阅)时,pos 即便在预设里也不真开
+    # (「预备但锁定」)。默认闸关 → pos_provision_allowed 恒 True → 与历史逐字节一致。
+    pos_locked = "pos" in enabled_keys and not _pos_provision_allowed(cur, tenant_id)
     for module_key in store.KNOWN_MODULES:
+        enabled = module_key in enabled_keys
+        if module_key == "pos" and pos_locked:
+            enabled = False
         store.set_module(
             cur,
             tenant_id=tenant_id,
             module_key=module_key,
-            enabled=module_key in enabled_keys,
+            enabled=enabled,
             config=None,
         )
     store.set_business_type(cur, tenant_id=tenant_id, business_type=business_type)

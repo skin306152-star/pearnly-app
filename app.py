@@ -220,6 +220,9 @@ from routes.admin_ocr_engine_routes import (
 from routes.admin_agent_routes import (
     router as admin_agent_router,
 )  # 对话 Agent 健康/漏斗观测 1 路由 · 2026-07-05
+from routes.admin_pos_entitlement_routes import (
+    router as admin_pos_entitlement_router,
+)  # PS-3 · POS 买断开通(开通/吊销/转移)4 路由 · 2026-07-10
 from routes.exceptions_routes import (
     router as exceptions_router,
 )  # REFACTOR-B1 · 异常处理 8 路由 · 2026-05-24
@@ -343,6 +346,7 @@ app.include_router(admin_logs_router)  # REFACTOR-B1 · 操作/审计日志 4 �
 app.include_router(admin_settings_router)  # WP2 · 平台钥匙闸 4 路由(对话 Agent 总闸 + 灰度)
 app.include_router(admin_ocr_engine_router)  # OCR 引擎策略 3 路由(模式/套餐/任务 + 指标)
 app.include_router(admin_agent_router)  # 对话 Agent 健康/漏斗观测 1 路由
+app.include_router(admin_pos_entitlement_router)  # PS-3 · POS 买断开通/吊销/转移 4 路由
 app.include_router(exceptions_router)  # REFACTOR-B1 · 异常处理 8 路由(2026-05-24)
 app.include_router(billing_router)  # 阶段 5 Task 5.1 · billing 11 路由(2026-05-22)
 app.include_router(

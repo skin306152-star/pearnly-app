@@ -89,15 +89,17 @@ def ensure_credits_tables():
                 )
             """)
 
-            # 4b. credit_transactions.type 增补 'subscription'(订阅月费扣账)。
-            #     表早以内联 CHECK 建 · 改约束须 drop+add(IF EXISTS 幂等 · 默认约束名)。
+            # 4b. credit_transactions.type 增补 'subscription'(订阅月费扣账)+ 'pos_buyout'
+            #     (POS 买断开通费审计行 · PS-3 · 不动余额,见 services/pos/entitlements)。
+            #     表早以内联 CHECK 建 · 改约束须 drop+add(IF EXISTS 幂等 · 默认约束名)。此处是该约束的
+            #     权威定义:与 alembic 0062 同源,新类型必两处同增(否则启动被本行 DROP+ADD 覆盖回退)。
             cur.execute(
                 "ALTER TABLE credit_transactions "
                 "DROP CONSTRAINT IF EXISTS credit_transactions_type_check"
             )
             cur.execute(
                 "ALTER TABLE credit_transactions ADD CONSTRAINT credit_transactions_type_check "
-                "CHECK (type IN ('topup','usage','adjustment','subscription'))"
+                "CHECK (type IN ('topup','usage','adjustment','subscription','pos_buyout'))"
             )
 
             # 4c. 订阅套餐:一公司一行当前订阅(周期=订阅日起30天 · 到期自动从余额续)。

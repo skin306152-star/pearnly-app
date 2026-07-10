@@ -23,6 +23,7 @@ from core.pos_api import PosError, ok, require_workspace
 from services.authz.deps import require_perm_pos_tid
 from services.pos import auth as pos_auth
 from services.pos import cashier as cashier_dal
+from services.pos import entitlements as entitlement_svc
 from services.pos import onboarding as onboarding_svc
 from services.pos import store_binding
 
@@ -108,6 +109,19 @@ def _resolve_tenant(cur, workspace_client_id: int) -> str:
     return tid
 
 
+def _enforce_entitlement_limit(cur, tid: str, workspace_client_id: int, kind: str) -> None:
+    """开通版上限执行:只对持有效 pos_entitlement 的租户卡上限(无授权=完整版/存量,零影响)。
+
+    超限 → PosError pos.entitlement_{store|cashier}_limit(前端映射四语「已达开通版上限·想开更多
+    联系我们再购一份」)。detail 带 used/limit 供前端可选拼数。
+    """
+    res = entitlement_svc.check_limit(
+        cur, tenant_id=tid, workspace_client_id=workspace_client_id, kind=kind
+    )
+    if res["entitled"] and not res["allowed"]:
+        raise PosError(f"pos.entitlement_{kind}_limit", 403, detail=f"{res['used']}/{res['limit']}")
+
+
 @router.post("/bind")
 async def api_bind_device(req: BindRequest, request: Request):
     """设备绑定:店铺码 → 解析 (tenant, workspace) → 签发长期店铺令牌(设备存 localStorage)。
@@ -161,6 +175,8 @@ async def api_get_store_code(request: Request, workspace_client_id: int = Query(
     tid, _uid = require_perm_pos_tid(request, "pos.admin.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         require_workspace(cur, tid, workspace_client_id)
+        # 开通版店铺上限:新账套要码时卡(本账套已有码=幂等放行,不算新开店)。
+        _enforce_entitlement_limit(cur, tid, workspace_client_id, "store")
         store_name = _store_name(cur, tid, workspace_client_id)
         info = store_binding.get_or_create_code(
             cur,
@@ -257,6 +273,8 @@ async def api_admin_create_cashier(req: CashierCreate, request: Request):
     tid, _uid = require_perm_pos_tid(request, "pos.admin.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
         require_workspace(cur, tid, req.workspace_client_id)
+        # 开通版收银员上限:达上限拦新增(启停/改名不受影响)。
+        _enforce_entitlement_limit(cur, tid, req.workspace_client_id, "cashier")
         _validate_approver(cur, tid, req.approver_user_id)
         row = cashier_dal.create_cashier(
             cur,

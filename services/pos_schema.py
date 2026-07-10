@@ -15,6 +15,7 @@ def bootstrap_pos_schema() -> None:
     from services.inventory import store as inventory_store
     from services.modules import store as modules_store
     from services.pos import cashier as pos_cashier
+    from services.pos import entitlements as pos_entitlements
     from services.pos import sales_store as pos_sales_store
     from services.pos import payment_settings as pos_payment
     from services.pos import sheets_sync as pos_sheets
@@ -32,6 +33,7 @@ def bootstrap_pos_schema() -> None:
         ("pos_store_codes", pos_store_binding.ensure_store_schema),
         ("pos_payment_settings", pos_payment.ensure_payment_schema),
         ("pos_sheets_settings", pos_sheets.ensure_schema),
+        ("pos_entitlements", pos_entitlements.ensure_pos_entitlement_schema),
     )
     for label, fn in steps:
         try:

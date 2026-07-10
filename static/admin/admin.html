@@ -248,6 +248,23 @@
           </svg>
           <span data-i18n="adm-sidebar-agent">Agent 助手</span>
         </a>
+        <a class="admin-layout-nav-item" data-admin-route="pos" href="/admin/pos">
+          <svg
+            viewBox="0 0 20 20"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 7l1-3h12l1 3M3 7h14v3a3 3 0 01-3 3H6a3 3 0 01-3-3V7z" />
+            <path d="M5 13v4h10v-4" />
+          </svg>
+          <span data-i18n="adm-sidebar-pos">POS 开通</span>
+        </a>
       </aside>
 
       <main class="admin-layout-main">
@@ -1055,13 +1072,61 @@
             <div class="cost-kpi-grid" id="adm-agent-funnel"></div>
           </div>
         </section>
+
+        <section class="page" id="page-admin-pos">
+          <div class="page-head">
+            <div class="page-head-icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M4 8l1.2-3.5h13.6L20 8M4 8h16v3.5a3.5 3.5 0 01-3.5 3.5h-9A3.5 3.5 0 014 11.5V8z"
+                />
+                <path d="M6 15v5h12v-5" />
+              </svg>
+            </div>
+            <div class="page-head-text">
+              <h1 class="page-title" data-i18n="adm-pos-title">POS 开通</h1>
+              <div class="page-subtitle" data-i18n="adm-pos-sub">
+                拆卖客户一次性开通费(ค่าติดตั้งและเปิดใช้งาน)· 手工授权 · 封顶 1 店 / 3 收银员 ·
+                不含人工支持
+              </div>
+            </div>
+          </div>
+
+          <div class="cost-section" style="margin-top: 24px">
+            <div class="cost-section-head">
+              <h3 data-i18n="adm-pos-lookup-title">查租户</h3>
+              <span class="cost-section-hint" data-i18n="adm-pos-lookup-hint"
+                >输 tenant_id / 成员邮箱 / 店名 → 看现状再开通</span
+              >
+            </div>
+            <div class="adm-set-add">
+              <input
+                type="text"
+                id="adm-pos-q"
+                data-i18n-placeholder="adm-pos-q-ph"
+                placeholder="tenant_id / 邮箱 / 店名"
+              />
+              <button class="btn btn-primary btn-sm" id="adm-pos-find" data-i18n="adm-pos-find">
+                查询
+              </button>
+            </div>
+            <div id="adm-pos-status" style="margin-top: 16px"></div>
+          </div>
+        </section>
       </main>
     </div>
 
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="/static/admin/admin-i18n.js?v=11856100"></script>
+    <script src="/static/admin/admin-i18n.js?v=11871000"></script>
 
-    <script src="/static/admin/admin.js?v=11856100" defer></script>
+    <script src="/static/admin/admin.js?v=11871000" defer></script>
   </body>
 </html>

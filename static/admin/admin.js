@@ -145,6 +145,7 @@
         if (p === '/admin/settings' || p === '/admin/settings/') return 'settings';
         if (p === '/admin/engine' || p === '/admin/engine/') return 'engine';
         if (p === '/admin/agent' || p === '/admin/agent/') return 'agent';
+        if (p === '/admin/pos' || p === '/admin/pos/') return 'pos';
         return 'cost';
     }
 
@@ -157,6 +158,7 @@
             settings: 'page-admin-settings',
             engine: 'page-admin-engine',
             agent: 'page-admin-agent',
+            pos: 'page-admin-pos',
         };
         Object.keys(pages).forEach(function (r) {
             const el = document.getElementById(pages[r]);
@@ -174,6 +176,7 @@
         if (route === 'settings') _renderSettingsPage();
         if (route === 'engine') _renderEnginePage();
         if (route === 'agent') _renderAgentPage();
+        if (route === 'pos') _renderPosPage();
     }
 
     function _bindSidebar() {
@@ -266,6 +269,7 @@
                 else if (_r === 'settings') _renderSettingsPage();
                 else if (_r === 'engine') _renderEnginePage();
                 else if (_r === 'agent') _renderAgentPage();
+                else if (_r === 'pos') _renderPosPage();
                 else _renderCostPage();
             });
         });
@@ -3189,6 +3193,199 @@
         } catch (e) {
             _toast(_t('adm-load-fail'), 'error');
         }
+    }
+
+    // ============ POS 开通页(PS-3 买断授权 · 开通/吊销/转移)============
+    let _posLastQuery = '';
+
+    function _posBadge(status) {
+        // 自带样式(不依赖 POS-home 的 .csh-st · admin 包未必含该切片):active=绿,其余=灰。
+        const color = status === 'active' ? 'var(--success)' : 'var(--ink-3)';
+        return (
+            '<span style="display:inline-block;padding:1px 8px;border-radius:999px;' +
+            'font-size:12px;color:#fff;background:' +
+            color +
+            '">' +
+            _esc(_t('adm-pos-st-' + status)) +
+            '</span>'
+        );
+    }
+
+    function _posStatusHtml(d) {
+        const t = d.tenant || {};
+        const ent = d.entitlement;
+        let rows =
+            '<div class="cost-kpi-grid" style="margin-bottom:16px">' +
+            _engKpi(_t('adm-pos-tenant'), _esc(t.name || '—'), _esc(t.id || '')) +
+            _engKpi(
+                _t('adm-pos-stores'),
+                (d.stores_used != null ? d.stores_used : '—') +
+                    (ent ? ' / ' + ent.store_limit : ''),
+                _t('adm-pos-cashiers') +
+                    ' ' +
+                    (d.cashiers_used != null ? d.cashiers_used : '—') +
+                    (ent ? ' / ' + ent.cashier_limit : '')
+            ) +
+            _engKpi(
+                _t('adm-pos-biztype'),
+                _esc(d.business_type || '—'),
+                d.has_subscription ? _t('adm-pos-has-sub') : ''
+            ) +
+            '</div>';
+
+        if (ent) {
+            rows +=
+                '<div class="cost-section-hint" style="margin-bottom:12px">' +
+                _t('adm-pos-status') +
+                ' ' +
+                _posBadge(ent.status) +
+                ' · ' +
+                _t('adm-pos-code') +
+                ' <code>' +
+                _esc(ent.grant_code) +
+                '</code> · ' +
+                _t('adm-pos-paid') +
+                ' ฿' +
+                _fmt(ent.amount_paid_thb || 0, 2) +
+                '</div>';
+        } else {
+            rows +=
+                '<div class="cost-section-hint" style="margin-bottom:12px">' +
+                _esc(_t('adm-pos-none')) +
+                '</div>';
+        }
+
+        // 动作区:未开通 → 开通(金额可改);已开通 → 吊销 + 转移(填目标标识)。
+        if (!ent) {
+            rows +=
+                '<div class="adm-set-add">' +
+                '<input type="number" id="adm-pos-amount" min="0" step="1" value="1000" ' +
+                'style="flex:0 0 140px" />' +
+                '<button class="btn btn-primary btn-sm" id="adm-pos-grant">' +
+                _esc(_t('adm-pos-grant-btn')) +
+                '</button></div>';
+        } else {
+            rows +=
+                '<div class="adm-set-add" style="flex-wrap:wrap;gap:8px">' +
+                '<button class="btn btn-danger btn-sm" id="adm-pos-revoke">' +
+                _esc(_t('adm-pos-revoke-btn')) +
+                '</button>' +
+                '<input type="text" id="adm-pos-xfer" ' +
+                'data-i18n-placeholder="adm-pos-xfer-ph" placeholder="' +
+                _esc(_t('adm-pos-xfer-ph')) +
+                '" style="min-width:220px" />' +
+                '<button class="btn btn-sm" id="adm-pos-xfer-btn">' +
+                _esc(_t('adm-pos-xfer-btn')) +
+                '</button></div>';
+        }
+        return rows;
+    }
+
+    async function _posLoadStatus(q) {
+        const host = document.getElementById('adm-pos-status');
+        if (!host) return;
+        _posLastQuery = q;
+        host.innerHTML = '<div class="cost-section-hint">···</div>';
+        let d;
+        try {
+            d = await _adminFetch('/api/admin/pos-entitlement?q=' + encodeURIComponent(q));
+        } catch (e) {
+            host.innerHTML =
+                '<div class="cost-section-hint">' + _esc(_t('adm-pos-not-found')) + '</div>';
+            return;
+        }
+        host.innerHTML = _posStatusHtml(d);
+        _posBindActions(d);
+    }
+
+    function _posBindActions(d) {
+        const tid = (d.tenant || {}).id;
+        const grant = document.getElementById('adm-pos-grant');
+        if (grant)
+            grant.onclick = async function () {
+                const amount = Number(
+                    (document.getElementById('adm-pos-amount') || {}).value || 1000
+                );
+                const ok = await _admConfirm(_t('adm-pos-grant-confirm'), {
+                    title: _t('adm-pos-grant-btn'),
+                    okText: _t('adm-pos-grant-btn'),
+                });
+                if (!ok) return;
+                try {
+                    const r = await _adminFetch('/api/admin/pos-entitlement/grant', {
+                        method: 'POST',
+                        body: { tenant_id: tid, amount_paid_thb: amount },
+                    });
+                    _toast(_t('adm-pos-granted') + ' ' + (r.grant_code || ''), 'success');
+                    _posLoadStatus(_posLastQuery);
+                } catch (e) {
+                    _toast(_t('adm-pos-action-fail'), 'error');
+                }
+            };
+        const revoke = document.getElementById('adm-pos-revoke');
+        if (revoke)
+            revoke.onclick = async function () {
+                const ok = await _admConfirm(_t('adm-pos-revoke-confirm'), {
+                    title: _t('adm-pos-revoke-btn'),
+                    okText: _t('adm-pos-revoke-btn'),
+                    danger: true,
+                });
+                if (!ok) return;
+                try {
+                    await _adminFetch('/api/admin/pos-entitlement/revoke', {
+                        method: 'POST',
+                        body: { tenant_id: tid },
+                    });
+                    _toast(_t('adm-pos-revoked'), 'success');
+                    _posLoadStatus(_posLastQuery);
+                } catch (e) {
+                    _toast(_t('adm-pos-action-fail'), 'error');
+                }
+            };
+        const xfer = document.getElementById('adm-pos-xfer-btn');
+        if (xfer)
+            xfer.onclick = async function () {
+                const to = ((document.getElementById('adm-pos-xfer') || {}).value || '').trim();
+                if (!to) {
+                    _toast(_t('adm-pos-xfer-need'), 'error');
+                    return;
+                }
+                const ok = await _admConfirm(_t('adm-pos-xfer-confirm'), {
+                    title: _t('adm-pos-xfer-btn'),
+                    okText: _t('adm-pos-xfer-btn'),
+                    danger: true,
+                });
+                if (!ok) return;
+                try {
+                    await _adminFetch('/api/admin/pos-entitlement/transfer', {
+                        method: 'POST',
+                        body: { from_tenant_id: tid, to_tenant_id: to },
+                    });
+                    _toast(_t('adm-pos-xferred'), 'success');
+                    _posLoadStatus(to); // 转移后跟随到目标租户看新状态
+                } catch (e) {
+                    _toast(_t('adm-pos-action-fail'), 'error');
+                }
+            };
+    }
+
+    function _renderPosPage() {
+        const btn = document.getElementById('adm-pos-find');
+        const input = document.getElementById('adm-pos-q');
+        if (!btn || !input) return;
+        if (!btn.__bound) {
+            btn.__bound = true;
+            const go = function () {
+                const q = (input.value || '').trim();
+                if (q) _posLoadStatus(q);
+            };
+            btn.addEventListener('click', go);
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') go();
+            });
+        }
+        // 语言切换后重渲染:若已有查询结果,用当前语言重绘。
+        if (_posLastQuery) _posLoadStatus(_posLastQuery);
     }
 
     // ============ Agent 助手观测页 ============

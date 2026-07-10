@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 346 个源文件全扫
+# UI 设计合规扫描报告 · 390 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 8(8 文件)
@@ -11,7 +11,7 @@
      1  static\admin\admin.css
         └ 521: color: #2563eb;
      1  static\admin\admin.js
-        └ 299: google_vision: { label: 'Google Vision', color: '#2563EB' },
+        └ 318: google_vision: { label: 'Google Vision', color: '#2563EB' },
      1  static\pos\pos-cashier.js
         └ 25: $('main-avatar').style.background = c.color || '#2563EB';
      1  static\pos\pos-data.js
@@ -21,11 +21,11 @@
 
 ## 旧token名(应用全局emerald) — 命中 286(32 文件)
     59  static\pos\pos.css
-        └ 12: --blue: #7C4DFF; --blue-d: #6B3FF2; --blue-l: #EEE5FF;
-        └ 39: .pos-view--login .brand .b .dot { width: 9px; height: 9px; border-radius: 50%; background:
+        └ 14: --blue: var(--accent); --blue-d: var(--accent-d); --blue-l: var(--accent-weak);
+        └ 41: .pos-view--login .brand .b .dot { width: 9px; height: 9px; border-radius: 50%; background:
     59  static\pos\pos.css
-        └ 12: --blue: #7C4DFF; --blue-d: #6B3FF2; --blue-l: #EEE5FF;
-        └ 39: .pos-view--login .brand .b .dot { width: 9px; height: 9px; border-radius: 50%; background:
+        └ 14: --blue: var(--accent); --blue-d: var(--accent-d); --blue-l: var(--accent-weak);
+        └ 41: .pos-view--login .brand .b .dot { width: 9px; height: 9px; border-radius: 50%; background:
     22  static\pos\pos-restaurant.css
         └ 5: * 复用 pos.css 顶层 --blue/--ink/--bg 等令牌;厨房屏自带深色令牌。.prettierignore 豁免(同 home-*.css)。
         └ 18: .pos-view--rtables .rtop .brand .dot { width: 9px; height: 9px; border-radius: 50%; backgr
@@ -108,8 +108,8 @@
 
 ## emoji当图标(应换Lucide) — 命中 207(30 文件)
     96  static\i18n-data.js
-        └ 1390: 'billing-accuracy-good': '✅ 准',
-        └ 1391: 'billing-accuracy-fair': '⚠ 一般',
+        └ 1399: 'billing-accuracy-good': '✅ 准',
+        └ 1400: 'billing-accuracy-fair': '⚠ 一般',
     35  static\erp-mrerp-connect.js
         └ 254: zh: '⚙ 高级设置(自动创建买方/商品的模板 · 可不填)',
         └ 255: en: '⚙ Advanced (templates for auto-creating buyers/products · optional)',
@@ -117,20 +117,20 @@
         └ 7: welcomeSub: '准备好一起把工作推进吧 💗',
         └ 8: bubble: '今天的工作<br />会很顺利 😊',
      8  static\admin\admin-i18n.js
-        └ 212: 'tn-status-overdraft': '⚠ 透支',
-        └ 254: 'adm-risk-title': '⚠ 风控 · 可疑活动',
+        └ 305: 'tn-status-overdraft': '⚠ 透支',
+        └ 347: 'adm-risk-title': '⚠ 风控 · 可疑活动',
      7  src\home\knowledge-fab.ts
         └ 119: burst(['💛', '✨', '💙', '🐾']);
         └ 171: const HELLO = [kbT('kb-fab-hi', '喵?'), kbT('kb-fab-ask', '问我呀!'), '🐾'];
      5  static\admin\admin.js
-        └ 1826: ? '<span class="adm-drawer-pill adm-pill-danger">⚠ ' +
-        └ 1893: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
+        └ 1845: ? '<span class="adm-drawer-pill adm-pill-danger">⚠ ' +
+        └ 1912: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
      4  static\pos\pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
-        └ 270: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
+        └ 275: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
      4  static\pos\pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
-        └ 270: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
+        └ 275: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
      2  src\home\core.ts
         └ 2: // 工具(t/escapeHtml/svgIcon)+ Session 被踢弹窗(🔴)+ 鉴权 API(🔴铁律#26)+ plan 上限 helper。
      2  static\pos\pos-restaurant-ops.js
@@ -149,13 +149,13 @@
      1  src\home\app-shell-sidebar-html.ts
         └ 336: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
      1  src\home\dms-intake-invoice-submit.ts
-        └ 91: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
+        └ 92: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
      1  src\home\dms-intake.ts
         └ 80: '<div class="dx-file"><div class="dx-file-ic">📄</div>' +
      1  src\home\erp-log-card.ts
         └ 82: statusIcon = '⏭';
      1  src\home\erp-log-detail.ts
-        └ 277: tlItem(isOk ? 'ok' : 'mid', '↗', t('erp-tl-pushed'), epName + ' · ' + triggerText)
+        └ 280: tlItem(isOk ? 'ok' : 'mid', '↗', t('erp-tl-pushed'), epName + ' · ' + triggerText)
      1  src\home\history-drawer.ts
         └ 342: // v102 · 点统一「需复核」⚠ 直接打开抽屉(原 fill-amount 改名为 review)
      1  src\home\line-panel.ts
@@ -171,7 +171,7 @@
      1  src\home\sales-wizard-io.ts
         └ 31: // 向导纸张选项 ↔ 后端 paper_size:pos = 80mm 热敏窄版。
      1  static\admin\admin.html
-        └ 830: <h3 data-i18n="adm-risk-title">⚠ 风控 · 可疑活动</h3>
+        └ 865: <h3 data-i18n="adm-risk-title">⚠ 风控 · 可疑活动</h3>
      1  static\home-09-badges-locks.css
         └ 147: content: "🔒";
      1  static\home-14-gemini-admin.css
@@ -187,20 +187,20 @@
         └ 168: max-width: 520px;
         └ 173: max-width: 420px;
      5  static\admin\admin.js
-        └ 1641: '<div class="cpw-forgot-modal" style="max-width:420px">' +
-        └ 1707: '<div class="cpw-forgot-modal" style="max-width:420px">' +
+        └ 1660: '<div class="cpw-forgot-modal" style="max-width:420px">' +
+        └ 1726: '<div class="cpw-forgot-modal" style="max-width:420px">' +
      5  static\home-02-switcher.css
         └ 17: max-width: 240px;
         └ 53: max-width: 420px;
      4  static\pos\pos.css
-        └ 201: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
-        └ 221: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
+        └ 227: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
+        └ 247: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
      4  static\home-37-html-inline.css
         └ 660: max-width: 420px;
         └ 1201: max-width: 420px;
      4  static\pos\pos.css
-        └ 201: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
-        └ 221: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
+        └ 227: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
+        └ 247: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
      3  src\home\knowledge-ask.ts
         └ 116: .kb-qa{background:var(--card,var(--card));border:1px solid var(--line,var(--line));border-
         └ 142: .kb-qa-hint{font-size:12px;color:var(--ink-3,#999);margin-top:12px;max-width:760px;line-he
@@ -398,7 +398,7 @@
      1  static\admin\admin.css
         └ 333: z-index: 9999;
      1  static\admin\admin.js
-        └ 62: 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;
+        └ 73: 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;
      1  static\home-05-overlays.css
         └ 13: z-index: 999; transform: translateX(100%);
      1  static\home-17-aibalance-reports-trial.css
@@ -416,11 +416,11 @@
 
 ## i18n原始键残留 — 命中 24(2 文件)
     20  static\i18n-data.js
-        └ 1198: 'time-min-ago-suffix': ' 分钟前',
-        └ 1199: 'time-hour-ago-suffix': ' 小时前',
+        └ 1207: 'time-min-ago-suffix': ' 分钟前',
+        └ 1208: 'time-hour-ago-suffix': ' 小时前',
      4  static\admin\admin-i18n.js
-        └ 336: 'time-hours-ago': '{n} 小时前',
-        └ 337: 'time-days-ago': '{n} 天前',
+        └ 429: 'time-hours-ago': '{n} 小时前',
+        └ 430: 'time-days-ago': '{n} 天前',
 
 ## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 1044(69 文件)
    157  static\home-18-admin-users.css

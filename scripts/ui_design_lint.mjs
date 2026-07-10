@@ -19,6 +19,10 @@ const SKIP_DIR = /node_modules|[\\/]dist[\\/]|_mock|\.map$/i;
 // vendor/ 是自托管的第三方运行时(React/THREE/GSAP/support.js/字体)——都不是 Pearnly
 // 应用设计系统的一部分。整块排除,免得营销配色/第三方源码污染裸hex/emoji 等棘轮基线。
 const MARKETING_EXCLUDE = /static[\\/]landing[\\/](portal\.dc\.html|vendor[\\/])/i;
+// 自包含独立登录页可读源(EN-6 view-source 压缩:原 routes/*.py 内联常量挪出,同字节
+// 此前本就不在扫描范围):页内自带局部 :root 令牌,不接应用设计系统的 CSS 变量基建,
+// 配色对齐义务在各文件头注(如 earn-login 对 admin.css 令牌)。served 产物在 dist 另有跳过。
+const STANDALONE_PAGE_EXCLUDE = /static[\\/](pos[\\/]pos-login|earn[\\/]earn-login)\.html/i;
 const EXT = /\.(ts|js|css|html)$/i;
 
 const CHECKS = [
@@ -58,7 +62,8 @@ function walk(dir, out) {
     }
     for (const e of ents) {
         const p = path.join(dir, e.name);
-        if (SKIP_DIR.test(p) || MARKETING_EXCLUDE.test(p)) continue;
+        if (SKIP_DIR.test(p) || MARKETING_EXCLUDE.test(p) || STANDALONE_PAGE_EXCLUDE.test(p))
+            continue;
         if (e.isDirectory()) walk(p, out);
         else if (EXT.test(e.name)) out.push(p);
     }

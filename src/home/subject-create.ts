@@ -205,7 +205,9 @@ function taxBranch(s: SubjectState): string {
 function note(text: string, variant?: 'warn'): string {
     const cls = variant ? ` ${variant}` : '';
     const icon = variant === 'warn' ? 'warn' : 'info';
-    return `<div class="onb-note${cls}">` + onbIcon(icon, 'ic') + '<div>' + esc(text) + '</div></div>';
+    return (
+        `<div class="onb-note${cls}">` + onbIcon(icon, 'ic') + '<div>' + esc(text) + '</div></div>'
+    );
 }
 
 // 共享控制器(向导步② + 套账门新建专屏共用 · 防逻辑重复)。

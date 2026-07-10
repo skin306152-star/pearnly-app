@@ -22,7 +22,11 @@ async function apiClient(path: string, opts: RequestInit = {}) {
         const err = await r.json().catch(() => ({}));
         const detail = err.detail;
         const structured = detail && typeof detail === 'object' && typeof detail.code === 'string';
-        const code = structured ? detail.code : typeof detail === 'string' ? detail : 'HTTP ' + r.status;
+        const code = structured
+            ? detail.code
+            : typeof detail === 'string'
+              ? detail
+              : 'HTTP ' + r.status;
         const e = new Error(code) as ApiError;
         if (structured && detail.message && typeof detail.message === 'object') {
             e.i18nMessage = detail.message;

@@ -177,17 +177,3 @@ def _signatures(events: list[dict], approver: str) -> dict:
         "approved_by": approver,
         "filed_by": None,
     }
-
-
-def ocr_models_from_ai_usage(cur, *, tenant_id: str, item_ids: list) -> list:
-    """从 ai_usage 取本工单 classify 用过的模型名(C-1 归因单一事实源,只读不双写)。
-    trace_id=item_id 由 classify._ocr_safe 打点;无行(无 OCR/被裁剪)返空。"""
-    if not item_ids:
-        return []
-    cur.execute(
-        "SELECT DISTINCT model FROM ai_usage "
-        "WHERE tenant_id = %s AND task = 'workorder_classify' "
-        "AND trace_id = ANY(%s) AND model IS NOT NULL",
-        (tenant_id, list(item_ids)),
-    )
-    return [r["model"] if isinstance(r, dict) else r[0] for r in cur.fetchall()]

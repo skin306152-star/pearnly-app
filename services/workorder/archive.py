@@ -84,7 +84,7 @@ def archive_order(cur, *, tenant_id: str, work_order_id: str, actor: str) -> dic
     )
     if violation:
         raise WorkOrderApiError(violation)
-    ocr_models = freeze.ocr_models_from_ai_usage(
+    ocr_models = store.ocr_models_for_items(
         cur, tenant_id=tenant_id, item_ids=[it["id"] for it in items]
     )
     try:

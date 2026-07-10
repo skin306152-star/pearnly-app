@@ -58,6 +58,9 @@ class FakeStore:
     def list_events(self, cur, *, tenant_id, work_order_id):
         return [dict(e) for e in self.events]
 
+    def ocr_models_for_items(self, cur, *, tenant_id, item_ids):
+        return []
+
     def upsert_deliverable(
         self, cur, *, tenant_id, work_order_id, kind, version=1, artifact_path=None, numbers=None
     ):

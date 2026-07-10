@@ -445,3 +445,18 @@ def list_deliverables(cur, *, tenant_id: str, work_order_id: str) -> list[dict]:
         (tenant_id, work_order_id),
     )
     return [dict(r) for r in cur.fetchall()]
+
+
+def ocr_models_for_items(cur, *, tenant_id: str, item_ids: list) -> list:
+    """本工单 classify 用过的模型名(C-1 ai_usage 归因单一事实源,只读不双写;trace_id=
+    item_id 由 classify._ocr_safe 打点)。冻结 manifest 模型版本轴的取数口——查询归 DAL,
+    freeze 保持纯汇编(其自述契约:不碰 DB)。无行(无 OCR/被裁剪)返空。"""
+    if not item_ids:
+        return []
+    cur.execute(
+        "SELECT DISTINCT model FROM ai_usage "
+        "WHERE tenant_id = %s AND task = 'workorder_classify' "
+        "AND trace_id = ANY(%s) AND model IS NOT NULL",
+        (tenant_id, list(item_ids)),
+    )
+    return [r["model"] if isinstance(r, dict) else r[0] for r in cur.fetchall()]

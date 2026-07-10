@@ -94,10 +94,16 @@ def _load_order(cur, request: Request, user: dict, tenant_id: str, work_order_id
     return wo
 
 
-def _assert_mutable(wo: dict) -> None:
-    """冻结(archive)后工单只读:拒绝重跑/裁决/补料/填销项(唯回执可 append-only 补挂)。"""
-    if wo.get("status") == "archive":
-        raise HTTPException(409, detail="workorder.archived_readonly")
+def _load_mutable_order(cur, request: Request, user: dict, tenant_id: str, work_order_id: str):
+    """取单 + 冻结只读闸。写端点(run/裁决/补料/填销项/签批)一律走这里,漏挂只读闸在结构上
+    不可能;verify/回执/下载/看图等冻结后仍要工作的端点走 _load_order。判定归
+    archive.assert_mutable 单一实现(词汇=engine.STATUS_ARCHIVE 权威常量,不手打字符串)。"""
+    wo = _load_order(cur, request, user, tenant_id, work_order_id)
+    try:
+        archive.assert_mutable(wo)
+    except api.WorkOrderApiError as e:
+        _raise_from_api_error(e)
+    return wo
 
 
 # 冻结/归档相关业务错 → 409(状态冲突);归属类 → 404;其余校验错 → 422。
@@ -193,8 +199,7 @@ async def run_order(work_order_id: str, request: Request, background: Background
     owner = f"run:{uuid.uuid4().hex}"
     store.ensure_runtime()  # 建租约列(独立事务)· 必须先于下面 SELECT/UPDATE 锁 work_orders
     with db.get_cursor(commit=True) as cur:
-        wo = _load_order(cur, request, user, tenant_id, work_order_id)
-        _assert_mutable(wo)  # 冻结后只读:拒绝重跑
+        wo = _load_mutable_order(cur, request, user, tenant_id, work_order_id)
         if not store.acquire_run_lease(
             cur,
             tenant_id=tenant_id,
@@ -220,7 +225,7 @@ async def add_decision(work_order_id: str, req: DecisionIn, request: Request):
     """人工裁决(face_value/recalc/exclude),落 human_decision 事件(校验 item 属该单)。"""
     user, tenant_id = _authorize(request, _C_PREPARE)
     with db.get_cursor(commit=True) as cur:
-        _assert_mutable(_load_order(cur, request, user, tenant_id, work_order_id))
+        _load_mutable_order(cur, request, user, tenant_id, work_order_id)
         try:
             evt = api.record_decision(
                 cur,
@@ -245,7 +250,7 @@ async def add_sales_summary(work_order_id: str, req: SalesSummaryIn, request: Re
     reconcile 的 R2 据此解锁(引擎/steps 不改)。金额十进制字符串进出、禁 float、非负。"""
     user, tenant_id = _authorize(request, _C_PREPARE)
     with db.get_cursor(commit=True) as cur:
-        _assert_mutable(_load_order(cur, request, user, tenant_id, work_order_id))
+        _load_mutable_order(cur, request, user, tenant_id, work_order_id)
         try:
             evt = api.record_sales_summary(
                 cur,
@@ -269,7 +274,7 @@ async def add_materials(work_order_id: str, request: Request, files: list[Upload
     if len(files) > _MAX_MATERIAL_FILES:
         raise HTTPException(413, detail="workorder.too_many_files")
     with db.get_cursor() as cur:  # 先验归属,再落盘(不给未授权请求写磁盘的机会)
-        _assert_mutable(_load_order(cur, request, user, tenant_id, work_order_id))
+        _load_mutable_order(cur, request, user, tenant_id, work_order_id)
 
     saved: list[Path] = []
     for upload in files:
@@ -355,7 +360,7 @@ async def review_signoff(work_order_id: str, req: ReviewSignoffIn, request: Requ
     sod.reviewer_is_preparer)。同一复核人重签幂等覆盖(latest-wins)。"""
     user, tenant_id = _authorize(request, _C_REVIEW)
     with db.get_cursor(commit=True) as cur:
-        _assert_mutable(_load_order(cur, request, user, tenant_id, work_order_id))
+        _load_mutable_order(cur, request, user, tenant_id, work_order_id)
         try:
             evt = api.record_review_signoff(
                 cur,

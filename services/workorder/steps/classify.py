@@ -122,6 +122,7 @@ def run(ctx: StepContext) -> StepResult:
                     flag_reason=reason,
                 )
                 _emit_classified(ctx, item, kind="sales_summary", status="flagged", money=None)
+                flagged += 1
             else:
                 ctx.store.update_item(
                     ctx.cur, tenant_id=ctx.tenant_id, item_id=item["id"], status="ok"
@@ -129,10 +130,7 @@ def run(ctx: StepContext) -> StepResult:
                 _emit_classified(
                     ctx, item, kind="sales_summary", status="ok", money=None, sales_read=parsed
                 )
-        if reason:
-            flagged += 1
-        else:
-            reads[item["id"]] = parsed
+                reads[item["id"]] = parsed
 
     return StepResult.ok(bins=bins, flagged=flagged, sales_summary_reads=reads)
 

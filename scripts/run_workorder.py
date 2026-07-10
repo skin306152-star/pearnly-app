@@ -107,6 +107,9 @@ def _print_outcome(out: engine.RunOutcome, ctx: engine.StepContext) -> int:
 
 def main() -> int:
     args = _parse_args()
+    # 运行时加固列自愈必须先于任何锁工单表的事务(routes/runner 各自前置调,CLI 是第三个
+    # 真实入口,漏调=缺列库上 dedupe_key 直接崩在金标路径)。
+    store.ensure_runtime()
     # 前置(解析客户 / 幂等开单 / 落人工裁决)走一个已提交事务,先于按步跑落库;
     # 引擎再以 cursor_factory 每步各开独立事务(L2 教训:进程中途被杀不整跑回滚、不重烧 OCR)。
     with db.get_cursor(commit=True) as cur:

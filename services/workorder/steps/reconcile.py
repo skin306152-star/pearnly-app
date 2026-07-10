@@ -24,9 +24,11 @@ _EVT_DECISION = "human_decision"
 _PURCHASE = "purchase_invoice"
 _SALES = "sales_summary"
 _BANK = "bank_statement"
-# classify 判不出进/销方向的票落 kind=unknown + flag_reason 以此起头(sort.bin_ocr_fields)。
-# 这类票必须走人工方向裁决(assign_kind),不许被 R1 静默漏掉——G1 定金冲抵票黑洞的根因。
-_DIRECTION_AMBIGUOUS = "direction_ambiguous"
+# classify 判不出进/销方向的票落 kind=unknown + flag_reason 以下列前缀起头(sort.bin_ocr_fields):
+#   direction_ambiguous       税号/名称锚点都对不上,进/销全然不明。
+#   sales_direction_unhandled 自家==卖方,疑似本方销项票(M0 不自动归堆单张销项)。
+# 两者都必须走人工方向裁决(assign_kind),不许被 R1 静默漏掉——G1/G1R2 黑洞的根因。
+_DIRECTION_PREFIXES = ("direction_ambiguous", "sales_direction_unhandled")
 
 
 def run(ctx: StepContext) -> StepResult:
@@ -46,7 +48,7 @@ def run(ctx: StepContext) -> StepResult:
         it
         for it in items
         if it["status"] == "flagged"
-        and str(it.get("flag_reason") or "").startswith(_DIRECTION_AMBIGUOUS)
+        and str(it.get("flag_reason") or "").startswith(_DIRECTION_PREFIXES)
     ]
     r1 = gates.resolve_input_vat(purchases, classified, decisions, ambiguous=ambiguous)
     if r1["unresolved"]:

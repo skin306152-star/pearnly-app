@@ -15,6 +15,7 @@ from typing import Optional
 
 from services.workorder import evidence
 from services.workorder.engine import StepContext, StepResult
+from services.workorder.steps import pp30_form
 
 _STEP_RECONCILE = "reconcile"
 _DELIVERABLE_PP30 = "pp30_draft"
@@ -44,6 +45,14 @@ def run(ctx: StepContext) -> StepResult:
     )
     period = (work_order or {}).get("period")
 
+    # 全字段 ภ.พ.30 契约在此(汇集层)派生一次,package 只渲染不重算。
+    form = pp30_form.build(
+        sales_amount=reconcile_numbers["sales_amount_total"],
+        output_vat=reconcile_numbers["output_vat_total"],
+        purchase_amount=reconcile_numbers["purchase_amount_total"],
+        input_vat=reconcile_numbers["input_vat_total"],
+    )
+
     return StepResult.ok(
         tax_due=str(tax_due),
         sales_amount=reconcile_numbers["sales_amount_total"],
@@ -51,6 +60,7 @@ def run(ctx: StepContext) -> StepResult:
         purchase_amount=reconcile_numbers["purchase_amount_total"],
         input_vat=reconcile_numbers["input_vat_total"],
         period=period,
+        pp30_form=form,
         prior_period_check=_prior_period_check(ctx, work_order, tax_due),
     )
 

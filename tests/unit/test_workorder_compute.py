@@ -88,6 +88,17 @@ class TaxDueTests(unittest.TestCase):
         self.assertEqual(out.payload["input_vat"], GOLDEN_INPUT_VAT)
         self.assertEqual(out.payload["period"], "2569-05")
 
+        # compute 汇集层产出全字段 ภ.พ.30 契约;逐字段 = 官方申报数。
+        from services.workorder.steps import pp30_form
+
+        amounts = pp30_form.amounts(out.payload["pp30_form"])
+        self.assertEqual(amounts["sales_total"], "858780.16")
+        self.assertEqual(amounts["output_vat"], GOLDEN_OUTPUT_VAT)
+        self.assertEqual(amounts["purchase_creditable"], "418046.86")
+        self.assertEqual(amounts["input_vat"], GOLDEN_INPUT_VAT)
+        self.assertEqual(Decimal(amounts["net_tax_due"]), GOLDEN_TAX_DUE)
+        self.assertEqual(Decimal(amounts["total_payable"]), GOLDEN_TAX_DUE)
+
     def test_input_vat_exceeds_output_vat_reports_negative_not_clamped(self):
         data = {
             "input_vat_total": "500.00",

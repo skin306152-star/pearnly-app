@@ -141,8 +141,11 @@ def _classify_image(
         status = "flagged" if reason else "ok"
     upd = {"status": status, "kind": kind, "flag_reason": reason}
     # 方向不明的票也快照票面钱字段:该票 OCR 已读过,钱在手上,只是进/销方向没判准。人工
-    # 裁定为进项后,reconcile 直接用这份读数进 R1,不必为定向重跑一遍付费 OCR。
-    capture_money = kind == "purchase_invoice" or (reason or "").startswith("direction_ambiguous")
+    # 裁定为进项后,reconcile 直接用这份读数进 R1,不必为定向重跑一遍付费 OCR。两类方向票
+    # (direction_ambiguous / sales_direction_unhandled)同口径,后者裁进项时也要有钱可用。
+    capture_money = kind == "purchase_invoice" or (reason or "").startswith(
+        ("direction_ambiguous", "sales_direction_unhandled")
+    )
     money = _money_fields(fields) if capture_money else None
     return {"kind": kind, "flagged": status == "flagged", "update": upd, "money": money}
 

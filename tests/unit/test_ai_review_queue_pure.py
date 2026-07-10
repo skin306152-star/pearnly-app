@@ -44,34 +44,37 @@ class FilterPurchaseQueueTests(unittest.TestCase):
             """)
         self.assertEqual(out, [[], []])
 
-    def test_direction_ambiguous_tickets_are_collected_into_queue(self):
-        # G1 黑洞根治:方向不明票(kind=unknown / flag_reason=direction_ambiguous)也进队列。
+    def test_direction_tickets_of_both_prefixes_are_collected_into_queue(self):
+        # G1/G1R2 黑洞根治:两类方向票(kind=unknown)都进队列——direction_ambiguous(锚点不明)
+        # 与 sales_direction_unhandled(疑似本方销项)。后者过去被漏收 → 无裁决照样出包。
         out = _run_node(f"""
             const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
             const flagged = [
                 {{item_id: 'a', kind: 'purchase_invoice', flag_reason: 'amount_math_fail'}},
                 {{item_id: 'd', kind: 'unknown', flag_reason: 'direction_ambiguous'}},
                 {{item_id: 'x', kind: 'unknown', flag_reason: 'sales_direction_unhandled'}},
+                {{item_id: 'b', kind: 'bank_statement'}},
             ];
             process.stdout.write(JSON.stringify(q.filterPurchaseQueue(flagged).map(x => x.item_id)));
             """)
-        self.assertEqual(out, ["a", "d"])
+        self.assertEqual(out, ["a", "d", "x"])
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class IsDirectionTicketTests(unittest.TestCase):
-    def test_only_direction_ambiguous_prefixed_reasons_are_direction(self):
+    def test_both_direction_prefixes_are_direction_others_are_not(self):
         out = _run_node(f"""
             const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
             process.stdout.write(JSON.stringify([
                 q.isDirectionTicket({{flag_reason: 'direction_ambiguous'}}),
                 q.isDirectionTicket({{flag_reason: 'direction_ambiguous:deposit'}}),
+                q.isDirectionTicket({{flag_reason: 'sales_direction_unhandled'}}),
                 q.isDirectionTicket({{flag_reason: 'amount_math_fail'}}),
                 q.isDirectionTicket({{flag_reason: ''}}),
                 q.isDirectionTicket(null),
             ]));
             """)
-        self.assertEqual(out, [True, True, False, False, False])
+        self.assertEqual(out, [True, True, True, False, False, False])
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
@@ -136,6 +139,14 @@ class FlagReasonKeyTests(unittest.TestCase):
             ]));
             """)
         self.assertEqual(out, ["rv_flag_direction", "rv_flag_direction"])
+
+    def test_sales_direction_unhandled_maps_to_own_key(self):
+        # 收编第二类方向票:自家==卖方=疑似本方销项,人话与 direction_ambiguous 区分呈现。
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            process.stdout.write(JSON.stringify(q.flagReasonKey('sales_direction_unhandled')));
+            """)
+        self.assertEqual(out, "rv_flag_sales_direction")
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")

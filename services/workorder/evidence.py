@@ -151,8 +151,8 @@ def _collect_evidence(
             continue
         if not direction_assigned and kind == _KIND_SALES and payload.get("status") != "ok":
             continue
-        if dec and dec["payload"].get("decision") == "exclude":
-            continue  # 人工裁决剔除的票没进合计,不算这个数字的支撑证据
+        if dec and dec["payload"].get("decision") in ("exclude", "waive"):
+            continue  # 剔除/豁免的票没进合计,不算这个数字的支撑证据(豁免留痕在备忘)
         event_ids.add(rec["event_id"])
         file_ref = files_by_item.get(item_id)
         file_by_item_id[item_id] = file_ref

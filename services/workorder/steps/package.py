@@ -15,6 +15,7 @@ from pathlib import Path
 
 from services.workorder import evidence
 from services.workorder.engine import StepContext, StepResult
+from services.workorder.steps import conservation
 
 _KIND_PP30 = "pp30_draft"
 _KIND_LEDGER = "ledger_workpaper"
@@ -36,6 +37,15 @@ def run(ctx: StepContext) -> StepResult:
         ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id
     )
     items = ctx.store.list_items(ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id)
+
+    # 守恒闸(出包前置):每件必须有明确终态。待裁决>0 或 Σ桶≠N → stuck 逐件点名,绝不
+    # 让无裁决/无豁免的件溜进交付包(G1R2 sales_direction_unhandled 黑洞根治的最后一道门)。
+    decisions = _decision_payloads(events)
+    cons = conservation.bucket_items(items, decisions)
+    blocked = conservation.stuck_reasons(cons, len(items))
+    if blocked:
+        return StepResult.stuck(blocked)
+
     numbers = _resolve_numbers(ctx, events)
 
     kinds = {
@@ -58,16 +68,27 @@ def run(ctx: StepContext) -> StepResult:
     return StepResult.ok(deliverables={k: v[0] for k, v in kinds.items()})
 
 
+def _decision_payloads(events: list[dict]) -> dict:
+    """{item_id: 最新 human_decision payload}(latest-wins)——供守恒闸归堆用,与 reconcile
+    回放同源。只取 payload,不需 actor/at(那是备忘留痕的活,走 replay_items_by_type)。"""
+    return {
+        iid: rec["payload"]
+        for iid, rec in evidence.replay_items_by_type(events, "human_decision").items()
+    }
+
+
 def _resolve_numbers(ctx: StepContext, events: list[dict]) -> dict:
     """取 compute 落下的六个数字 + reconcile 的 gates(供银行/进销底稿用)。同进程直接读
     ctx.data;续跑场景从事件流回放对应步的 step_done——与 compute.py 同一个范式。"""
     if all(ctx.data.get(k) for k in _COMPUTE_KEYS):
         base = {k: ctx.data[k] for k in _COMPUTE_KEYS}
         base["prior_period_check"] = ctx.data.get("prior_period_check")
+        base["pp30_form"] = ctx.data.get("pp30_form")
     else:
         payload = evidence.replay_step_done(events, "compute") or {}
         base = {k: payload.get(k) for k in _COMPUTE_KEYS}
         base["prior_period_check"] = payload.get("prior_period_check")
+        base["pp30_form"] = payload.get("pp30_form")
 
     gates = ctx.data.get("gates")
     if gates is None:
@@ -118,6 +139,11 @@ _ASSIGN_KIND_LABEL_TH = {
 }
 
 
+def _is_waived(replayed: dict | None) -> bool:
+    """该件最新裁决是否为人工豁免(latest-wins)。豁免件出包但必须在备忘留痕。"""
+    return bool(replayed) and (replayed.get("payload") or {}).get("decision") == "waive"
+
+
 def _sales_source_visible(source: str | None) -> bool:
     """销项来源是否需要显著提示(状态诚实):direct_read 不提示(默认可信路径);
     manual_entry/mixed 才提示——pp30 脚注与 ledger 底稿共用同一份判定,不各拼一套。"""
@@ -137,19 +163,42 @@ def _sales_source_note_lines(numbers: dict) -> list[str]:
     return ["", line]
 
 
+_SRC_NOTE_TH = {
+    "no_source_m1": "本期无独立数据源 · M1 诚实置 0",
+    "derived": "本表派生",
+    "reconcile": "对账定值",
+}
+
+
+def _pp30_form_rows(form: dict | None) -> list[str]:
+    """把 compute 派生的 ภ.พ.30 全字段行渲染成 markdown 表(package 只渲染,不重算)。
+    诚实置 0 的字段(0%/免税销售、上期留抵、加算金、罚金)带来源标注,不与真数字混同。"""
+    if not form or not form.get("fields"):
+        return ["| — | ยังไม่มีข้อมูลแบบเต็ม (无全字段数据) | — |"]
+    rows = []
+    for f in form["fields"]:
+        note = _SRC_NOTE_TH.get(f["source"], "") if f["source"] != "reconcile" else ""
+        rows.append(
+            f"| {f['line']} | {f['label_th']} ({f['label_zh']}) | {_dec_str(f['amount'])}"
+            f"{' · ' + note if note and f['source'] == 'no_source_m1' else ''} |"
+        )
+    return rows
+
+
 def _write_pp30(out_dir: Path, numbers: dict) -> tuple[str, dict]:
-    """ภ.พ.30 关键行草稿:结构化 JSON(供程序/证据索引引用)+ markdown 底稿(供人读)。"""
+    """ภ.พ.30 草稿:结构化 JSON(供程序/证据索引引用)+ markdown 底稿(供人读)。JSON 快照既留
+    5 个关键基数(向后兼容既有引用)又留全字段 pp30_form(官方逐行契约)。"""
+    form = numbers.get("pp30_form")
     snapshot = {k: numbers.get(k) for k in _COMPUTE_KEYS}
     snapshot["prior_period_check"] = numbers.get("prior_period_check")
     snapshot["sales_source"] = numbers.get("sales_source")
     snapshot["sales_source_note"] = numbers.get("sales_source_note")
+    snapshot["pp30_form"] = form
     json_path = _write_md(
         out_dir, "pp30_draft.json", [json.dumps(snapshot, ensure_ascii=False, indent=2)]
     )
     snapshot["json_path"] = str(json_path)
 
-    due = Decimal(numbers["tax_due"])
-    due_label = "ภาษีที่ต้องชำระ (应缴税额)" if due >= 0 else "ภาษีที่ขอคืน/ยกไป (留抵税额)"
     md_path = _write_md(
         out_dir,
         "pp30_draft.md",
@@ -158,13 +207,9 @@ def _write_pp30(out_dir: Path, numbers: dict) -> tuple[str, dict]:
             "",
             f"งวดที่ (期间): {numbers.get('period') or '-'}",
             "",
-            "| รายการ (项目) | จำนวนเงิน บาท (金额,THB) |",
-            "|---|---|",
-            f"| ยอดขาย (销售额) | {_dec_str(numbers.get('sales_amount'))} |",
-            f"| ภาษีขาย (销项税) | {_dec_str(numbers.get('output_vat'))} |",
-            f"| มูลค่าซื้อที่นำมาหักได้ (可抵扣采购额) | {_dec_str(numbers.get('purchase_amount'))} |",
-            f"| ภาษีซื้อ (进项税) | {_dec_str(numbers.get('input_vat'))} |",
-            f"| {due_label} | {_dec_str(numbers.get('tax_due'))} |",
+            "| ช่อง (行) | รายการ (项目) | จำนวนเงิน บาท (金额,THB) |",
+            "|---|---|---|",
+            *_pp30_form_rows(form),
             *_sales_source_note_lines(numbers),
             "",
             "หมายเหตุ: ฉบับทางการ (PDF) จัดทำใน M1 (官式 PDF 版式为 M1,本页仅内部核对底稿)",
@@ -261,13 +306,15 @@ def _write_bank(out_dir: Path, items: list[dict], numbers: dict) -> tuple[str, d
 def _write_memo(
     out_dir: Path, items: list[dict], events: list[dict], numbers: dict
 ) -> tuple[str, dict]:
-    """缺料备忘:银行单缺失、曾被标记复核的票及其裁决、non_tax/duplicate 排除清单——如实枚举。"""
+    """缺料备忘:银行单缺失、曾被标记复核的票及其裁决、non_tax/duplicate 排除清单、人工豁免
+    留痕——如实枚举。豁免件虽出包,但谁豁免·为何·哪张必须显著在案(状态诚实,不悄悄放行)。"""
     decisions = evidence.replay_items_by_type(events, "human_decision")
     gate = (numbers.get("gates") or {}).get("r3_bank") or {}
     bank_missing = gate.get("note") == "bank_statement_missing"
     flagged = [it for it in items if it.get("flag_reason") and it["status"] == "flagged"]
     non_tax = [it for it in items if it["kind"] == "non_tax" and it["status"] == "excluded"]
     duplicates = [it for it in items if it["kind"] == "duplicate" and it["status"] == "excluded"]
+    waived = [it for it in items if _is_waived(decisions.get(it["id"]))]
 
     def _tag(it: dict, extra: str = "") -> str:
         return f"- {Path(it.get('file_ref') or '').name}: {it.get('flag_reason')}{extra}"
@@ -279,6 +326,13 @@ def _write_memo(
             label = _ASSIGN_KIND_LABEL_TH.get(dec.get("kind"), dec.get("kind"))
             return _tag(it, f" → {label}")
         return _tag(it, f" → {decision or '无裁决'}")
+
+    def _waive_row(it: dict) -> str:
+        rec = decisions.get(it["id"]) or {}
+        dec = rec.get("payload") or {}
+        actor = rec.get("actor") or "?"
+        reason = dec.get("reason") or "-"
+        return f"- {Path(it.get('file_ref') or '').name}: ยกเว้นโดย (豁免人) {actor} · เหตุผล (理由) {reason}"
 
     lines = [
         "# บันทึกเอกสารที่ขาด/ต้องทบทวน (缺料与待复核备忘)",
@@ -292,6 +346,10 @@ def _write_memo(
         ),
         *_bullets("รายการที่ไม่ใช่เอกสารภาษี (non_tax 排除清单)", [_tag(it) for it in non_tax]),
         *_bullets("เอกสารซ้ำ (duplicate 排除清单)", [_tag(it) for it in duplicates]),
+        *_bullets(
+            "รายการที่ยกเว้นโดยมนุษย์ (人工豁免出包 · 谁豁免·为何·哪张)",
+            [_waive_row(it) for it in waived],
+        ),
     ]
     path = _write_md(out_dir, "missing_doc_memo.md", lines)
     snapshot = {
@@ -299,6 +357,7 @@ def _write_memo(
         "flagged_count": len(flagged),
         "non_tax_count": len(non_tax),
         "duplicate_count": len(duplicates),
+        "waived_count": len(waived),
     }
     return str(path), snapshot
 

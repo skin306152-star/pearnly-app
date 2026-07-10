@@ -15,13 +15,20 @@ from decimal import Decimal
 from pathlib import Path
 
 from services.workorder.engine import StepContext
-from services.workorder.steps import package
+from services.workorder.steps import package, pp30_form
 
 GOLDEN_SALES_AMOUNT = "858780.16"
 GOLDEN_OUTPUT_VAT = "60114.61"
 GOLDEN_PURCHASE_AMOUNT = "418046.86"
 GOLDEN_INPUT_VAT = "29263.28"
 GOLDEN_TAX_DUE = "30851.33"
+
+GOLDEN_PP30_FORM = pp30_form.build(
+    sales_amount=GOLDEN_SALES_AMOUNT,
+    output_vat=GOLDEN_OUTPUT_VAT,
+    purchase_amount=GOLDEN_PURCHASE_AMOUNT,
+    input_vat=GOLDEN_INPUT_VAT,
+)
 
 
 class FakeStore:
@@ -75,6 +82,30 @@ def _ambiguous_item(item_id, file_ref, *, status="flagged"):
     }
 
 
+def _sales_direction_item(item_id, file_ref, *, status="flagged"):
+    """自家==卖方的方向票(kind=unknown/flag_reason=sales_direction_unhandled)——G1R2 黑洞形态:
+    过去既不进 R1、又不被出包闸拦,无裁决照样出包。"""
+    return {
+        "id": item_id,
+        "kind": "unknown",
+        "status": status,
+        "flag_reason": "sales_direction_unhandled",
+        "file_ref": file_ref,
+    }
+
+
+def _waive_evt(event_id, item_id, reason, actor="user:audit"):
+    """人工豁免事件(带 reason + actor,供守恒闸放行 + 备忘留痕)。"""
+    payload = {"item_id": item_id, "decision": "waive", "reason": reason}
+    return {
+        "id": event_id,
+        "step": "reconcile",
+        "event_type": "human_decision",
+        "payload": payload,
+        "actor": actor,
+    }
+
+
 def _classified_evt(event_id, item_id, *, kind, money=None, sales_read=None, status="ok"):
     payload = {"item_id": item_id, "kind": kind, "status": status}
     if money:
@@ -120,6 +151,7 @@ def _compute_done_evt(event_id=21):
             "purchase_amount": GOLDEN_PURCHASE_AMOUNT,
             "input_vat": GOLDEN_INPUT_VAT,
             "period": "2569-05",
+            "pp30_form": GOLDEN_PP30_FORM,
             "prior_period_check": {"status": "no_prior_period"},
         },
     }
@@ -133,6 +165,7 @@ def _compute_ctx_data():
         "purchase_amount": GOLDEN_PURCHASE_AMOUNT,
         "input_vat": GOLDEN_INPUT_VAT,
         "period": "2569-05",
+        "pp30_form": GOLDEN_PP30_FORM,
         "prior_period_check": {"status": "no_prior_period"},
         "gates": {"r3_bank": {"bank_statement_present": False, "note": "bank_statement_missing"}},
     }
@@ -228,6 +261,15 @@ class FiveDeliverablesTests(PackageFixture):
         self.assertTrue(Path(pp30["json_path"]).is_file())
         pp30_json = json.loads(Path(pp30["json_path"]).read_text(encoding="utf-8"))
         self.assertEqual(pp30_json["tax_due"], GOLDEN_TAX_DUE)
+
+        # 快照带全字段 ภ.พ.30 契约,逐字段 = 官方申报数;markdown 底稿逐行渲染(含诚实置 0 行)。
+        form_amounts = pp30_form.amounts(pp30["pp30_form"])
+        self.assertEqual(form_amounts["purchase_creditable"], GOLDEN_PURCHASE_AMOUNT)
+        self.assertEqual(form_amounts["input_vat"], GOLDEN_INPUT_VAT)
+        self.assertEqual(form_amounts["total_payable"], GOLDEN_TAX_DUE)
+        pp30_md = Path(pp30["json_path"]).with_name("pp30_draft.md").read_text(encoding="utf-8")
+        self.assertIn("ยอดขายที่ต้องเสียภาษี", pp30_md)  # 应税销售额(派生行)
+        self.assertIn("เงินเพิ่ม", pp30_md)  # 加算金(本期无源诚实置 0 行)
 
         ledger_md = Path(store.deliverables["ledger_workpaper"]["artifact_path"]).read_text(
             encoding="utf-8"
@@ -530,6 +572,87 @@ class SalesSourceAnnotationTests(PackageFixture):
         # 进项证据不受影响(items 逐条含 file_name)。
         purchase_items = index["numbers"]["input_vat"]["items"]
         self.assertEqual(purchase_items, [{"item_id": "u", "file_name": "undisputed.jpg"}])
+
+
+class ConservationGateTests(PackageFixture):
+    """守恒硬闸:每件必须有明确终态,待裁决>0 → package stuck 逐件点名,绝不出包。
+    G1R2 根治:一张 sales_direction_unhandled 无裁决的票,修前照样出包(先红),现在必 stuck。"""
+
+    def _store_with_undecided_direction(self):
+        items = [
+            _purchase_item("u", "/in/undisputed.jpg"),
+            _sales_direction_item("x", "/in/6d001f06_sales.jpg"),
+            _sales_item(),
+        ]
+        events = [
+            _classified_evt(
+                1,
+                "u",
+                kind="purchase_invoice",
+                money={"subtotal": "354923.86", "vat": "25194.28", "total_amount": "380118.14"},
+            ),
+            _classified_evt(2, "x", kind="unknown", status="flagged", money=None),
+            _classified_evt(3, "s1", kind="sales_summary", sales_read={"headers": [], "rows": []}),
+            _reconcile_done_evt(),
+            _compute_done_evt(),
+        ]
+        return FakeStore(items, events)
+
+    def test_undecided_sales_direction_ticket_blocks_package_and_names_it(self):
+        store = self._store_with_undecided_direction()
+        out = package.run(self._ctx(store))
+        self.assertEqual(out.status, "stuck")
+        self.assertTrue(any("6d001f06_sales.jpg" in r for r in out.reasons))
+        self.assertTrue(any("sales_direction_unhandled" in r for r in out.reasons))
+        # stuck 即不出包:交付物一件未落。
+        self.assertEqual(store.deliverables, {})
+
+    def test_assigning_direction_unblocks_package(self):
+        # 同一张票裁 assign_sales(归销项材料)后守恒成立 → 正常出包。
+        store = self._store_with_undecided_direction()
+        store.events.insert(-2, _assign_kind_evt(9, "x", "sales_doc"))
+        out = package.run(self._ctx(store))
+        self.assertEqual(out.status, "ok")
+        self.assertEqual(len(store.deliverables), 5)
+
+
+class WaiveTests(PackageFixture):
+    """豁免通道:waive 后守恒放行可出包,但备忘必须留痕(谁豁免·为何·哪张文件)。"""
+
+    def _store_with_waived_direction(self):
+        items = [
+            _purchase_item("u", "/in/undisputed.jpg"),
+            _sales_direction_item("x", "/in/lost_original.jpg"),
+            _sales_item(),
+        ]
+        events = [
+            _classified_evt(
+                1,
+                "u",
+                kind="purchase_invoice",
+                money={"subtotal": "354923.86", "vat": "25194.28", "total_amount": "380118.14"},
+            ),
+            _classified_evt(2, "x", kind="unknown", status="flagged", money=None),
+            _classified_evt(3, "s1", kind="sales_summary", sales_read={"headers": [], "rows": []}),
+            _waive_evt(4, "x", "客户 LINE 确认为个人杂支·原件遗失", actor="user:77"),
+            _reconcile_done_evt(),
+            _compute_done_evt(),
+        ]
+        return FakeStore(items, events)
+
+    def test_waived_ticket_lets_package_ship_with_memo_trace(self):
+        store = self._store_with_waived_direction()
+        out = package.run(self._ctx(store))
+        self.assertEqual(out.status, "ok")
+        self.assertEqual(len(store.deliverables), 5)
+
+        memo = store.deliverables["missing_doc_memo"]
+        memo_md = Path(memo["artifact_path"]).read_text(encoding="utf-8")
+        # 谁豁免 + 为何 + 哪张文件,三者齐现。
+        self.assertIn("user:77", memo_md)
+        self.assertIn("客户 LINE 确认为个人杂支·原件遗失", memo_md)
+        self.assertIn("lost_original.jpg", memo_md)
+        self.assertEqual(memo["numbers"]["waived_count"], 1)
 
 
 class IdempotencyTests(PackageFixture):

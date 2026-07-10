@@ -9,18 +9,26 @@
 
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Optional
 
 TOL = Decimal("0.01")
 ZERO = Decimal("0")
+CENT = Decimal("0.01")
+# 泰国标准 VAT 税率。ภ.พ.30 line6(可抵扣采购基)÷ line7(进项税)= 7% 是申报恒等式:人工修正
+# 某票税额后,该票的基必须按此率从修正后税额反推,才不破这条恒等式(见 _recalc)。
+STANDARD_VAT_RATE = Decimal("0.07")
 
 # 人工方向裁决(assign_kind)的取值:进项票 / 销项票 / 非税票。api.py 落库、routes 校验同表。
 _ASSIGN_KIND = "assign_kind"
 _KIND_PURCHASE = "purchase_invoice"
 _KIND_SALES = "sales_doc"
 _KIND_NON_TAX = "non_tax"
+# 人工豁免:显式放弃计入(不进 Σ、不进 unresolved),放行出包——留痕在 package 的备忘,
+# 归桶在 conservation 的 WAIVED 桶。R1 必须认它为已处置,否则豁免件卡死在 reconcile,
+# package 的豁免出包分支在产品全链上永远不可达。
+_WAIVE = "waive"
 
 # 汇总表列角色识别关键词(泰/英)。先认销项税列再认销售额列,避免销售额误命中税额列。
 _SALES_HINTS = ("ยอดขาย", "มูลค่า", "จำนวนเงิน", "รวมเงิน", "sales", "amount", "ยอด")
@@ -48,10 +56,21 @@ def _effective(money: dict) -> dict:
     return {"net": net, "vat": vat, "grand": grand}
 
 
+def _base_from_vat(vat: Decimal) -> Decimal:
+    """标准税率下由税额反推可抵扣基:base = vat / 7%,量化到分。税额为 0 则基为 0。"""
+    if vat == ZERO:
+        return ZERO
+    return (vat / STANDARD_VAT_RATE).quantize(CENT, rounding=ROUND_HALF_UP)
+
+
 def _recalc(money: dict, values: dict) -> dict:
-    """人工「按重算」裁决:税额以裁决值为准,净额沿用票面,含税额派生成 净+税(恢复自洽)。"""
-    net = to_dec(values.get("net")) or to_dec(money.get("subtotal"))
+    """人工「按重算」裁决:税额以裁决值为准。净额——裁决显式给则用之;否则按标准税率从修正后
+    税额反推(base = vat / 7%),绝不沿用 OCR 旧净额。旧净额对应的是被修正掉的旧税额,留用会让
+    整单可抵扣采购基与进项税脱节(G1R2 工单 IMG_2647 折扣淡票:OCR 净 58048.40 对旧税 4060.05,
+    人工修正税 4069.05 后基应为 58129.29,沿用旧净 → 采购税基整单短 80.89)。含税额缺则派生成
+    净+税恢复借贷自洽。"""
     vat = to_dec(values.get("vat"))
+    net = to_dec(values.get("net")) or _base_from_vat(vat)
     grand = to_dec(values.get("grand_total")) or (net + vat)
     return {"net": net, "vat": vat, "grand": grand}
 
@@ -114,9 +133,13 @@ def _apply_direction(
 ) -> Optional[dict]:
     """方向不明票的人工方向裁决取数。无裁决/未定方向 → 计 unresolved(点名·绝不静默);裁进项
     → 用其 OCR 钱字段进 R1;裁销项 → 票面不进 R1(销项合计走 R2 的 POS 直读/人工申报);裁非税
-    → 排除。裁进项但缺金额事件(续跑丢事件)→ 停机不静默少算。"""
+    → 排除;豁免(waive)→ 已处置不计入(放行出包,留痕在备忘)。裁进项但缺金额事件(续跑丢
+    事件)→ 停机不静默少算。"""
+    if dec and dec.get("decision") == _WAIVE:
+        return None
     if not dec or dec.get("decision") != _ASSIGN_KIND:
-        unresolved.append(f"{_label(it, money)}: 方向不明(direction_ambiguous)未人工裁定")
+        reason = it.get("flag_reason") or "direction_ambiguous"
+        unresolved.append(f"{_label(it, money)}: 方向不明({reason})未人工裁定")
         return None
     kind = dec.get("kind")
     if kind == _KIND_NON_TAX:
@@ -133,9 +156,10 @@ def _apply_direction(
 
 
 def _apply_decision(it: dict, money: dict, dec: dict, unresolved: list) -> Optional[dict]:
-    """一张 flagged 票的裁决取数。exclude → 剔除(返回 None);未知裁决/缺料 → 计 unresolved。"""
+    """一张 flagged 票的裁决取数。exclude/waive → 不计入(返回 None;waive 另在备忘留痕);
+    未知裁决/缺料 → 计 unresolved。"""
     decision = dec.get("decision")
-    if decision == "exclude":
+    if decision in ("exclude", _WAIVE):
         return None
     if decision == "face_value":
         if not money:

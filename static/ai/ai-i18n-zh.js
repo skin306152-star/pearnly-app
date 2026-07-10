@@ -144,6 +144,7 @@ window.__AI_I18N_ZH__ = {
     rv_flag_low_conf: '置信度偏低',
     rv_flag_ocr_error: '识别失败',
     rv_flag_direction: '方向不明 · 进项还是销项?',
+    rv_flag_sales_direction: '疑似本方销项 · 请确认方向',
     rv_key_dir_purchase: '进项',
     rv_key_dir_sales: '销项',
     rv_key_dir_nontax: '非税票',

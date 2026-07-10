@@ -262,6 +262,58 @@ class R1DirectionAmbiguousTests(unittest.TestCase):
         self.assertEqual(Decimal(out.payload["input_vat_total"]), Decimal("100.00"))
 
 
+class R1RecalcBaseConsistencyTests(unittest.TestCase):
+    """G1R2 采购税基 −80.89 根因回归:人工「按重算」把税额修正后,可抵扣基必须与修正后税额
+    在标准税率下自洽(base = vat / 7%),绝不沿用 OCR 旧净额——旧净额对应的是被修正掉的旧
+    税额,留用会让 ภ.พ.30 line6(基)÷line7(税)=7% 的申报恒等式破裂。
+
+    形态取自真工单 6a4bfbdd(client 94)IMG_2647 折扣淡票:OCR 读 净=58048.40/税=4060.05,
+    人工修正税=4069.05。修正后正确基 = 4069.05/0.07 = 58129.29,与 OCR 旧净差 80.89——这正是
+    整单税基缺口的唯一来源。修前:purchase_amount_total=417965.97(用旧净);修后:418046.86。
+    """
+
+    # 无争议 10 张的真实聚合(净=税/7% 自洽):税 25194.23 → 净 359917.57(= 25194.23/0.07)。
+    CLEAN_NET = "359917.57"
+    CLEAN_VAT = "25194.23"
+    # IMG_2647 OCR 读值(折扣淡票·净与税互不自洽,票面 total 也对不上→amount_math_fail)。
+    OCR_NET, OCR_VAT, OCR_TOTAL = "58048.40", "4060.05", "62108.40"
+    CORRECTED_VAT = "4069.05"  # 人工按票面印刷值修正
+    OFFICIAL_PURCHASE = Decimal("418046.86")
+    OFFICIAL_INPUT_VAT = Decimal("29263.28")
+    GAP = Decimal("80.89")
+
+    def _store(self):
+        items = [
+            _pi("clean", file="clean10.jpg"),
+            _pi("x", status="flagged", flag_reason="amount_math_fail", file="IMG_2647.jpg"),
+        ]
+        events = [
+            _money_evt(
+                "clean",
+                net=self.CLEAN_NET,
+                vat=self.CLEAN_VAT,
+                grand=str(Decimal(self.CLEAN_NET) + Decimal(self.CLEAN_VAT)),
+            ),
+            _money_evt(
+                "x", net=self.OCR_NET, vat=self.OCR_VAT, grand=self.OCR_TOTAL, status="flagged"
+            ),
+            _decision_evt("x", "recalc", values={"vat": self.CORRECTED_VAT}),
+            _sales_evt(),
+        ]
+        return FakeStore(items, events)
+
+    def test_recalc_derives_base_from_corrected_vat_not_stale_ocr_net(self):
+        out = reconcile.run(_ctx(self._store()))
+        self.assertEqual(out.status, "ok")
+        self.assertEqual(Decimal(out.payload["input_vat_total"]), self.OFFICIAL_INPUT_VAT)
+        # 核心断言:税基取修正后税额反推的基,整单税基精确重现官方(修前会短 80.89)。
+        self.assertEqual(Decimal(out.payload["purchase_amount_total"]), self.OFFICIAL_PURCHASE)
+
+    def test_gap_is_exactly_the_disputed_ticket_base_correction(self):
+        stale = Decimal(self.CLEAN_NET) + Decimal(self.OCR_NET)  # 用旧净的历史错值
+        self.assertEqual(self.OFFICIAL_PURCHASE - stale, self.GAP)
+
+
 class R2SalesTests(unittest.TestCase):
     def test_aggregates_sales_and_skips_summary_row(self):
         items = [_pi("p1", file="a.jpg")]

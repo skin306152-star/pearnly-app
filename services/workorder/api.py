@@ -20,6 +20,9 @@ _DECISIONS = ("face_value", "recalc", "exclude")
 # 语义在 reconcile_gates._apply_direction:进项入 R1 Σ、销项走 R2、非税排除。
 _ASSIGN_KIND = "assign_kind"
 _ASSIGN_KINDS = ("purchase_invoice", "sales_doc", "non_tax")
+# 豁免:人工显式放行一件既不裁决也无法归位的料,准其出包但备忘必留痕(谁豁免·为何·哪张)。
+# reason 必填——豁免是绕过守恒闸的唯一合法口子,不许无理由放行。语义在 conservation:WAIVED 桶。
+_WAIVE = "waive"
 _DECISION_STEP = "reconcile"
 _EVT_DECISION = "human_decision"
 _EVT_CLASSIFIED = "item_classified"
@@ -197,10 +200,12 @@ def record_decision(
     values: Optional[dict],
     actor: str,
     kind: Optional[str] = None,
+    reason: Optional[str] = None,
 ) -> dict:
     """落人工裁决事件(CLI --decide 同语义)。金额裁决(face_value/recalc/exclude)带 values;
-    方向裁决(assign_kind)带 kind。校验裁决合法 + item 确属该单,否则拒。"""
-    payload = _decision_payload(item_id, decision, values, kind)
+    方向裁决(assign_kind)带 kind;豁免(waive)带 reason(必填)。校验裁决合法 + item 确属
+    该单,否则拒。"""
+    payload = _decision_payload(item_id, decision, values, kind, reason)
     item = store.get_item(cur, tenant_id=tenant_id, work_order_id=work_order_id, item_id=item_id)
     if not item:
         raise WorkOrderApiError("workorder.item_not_found")
@@ -215,12 +220,21 @@ def record_decision(
     )
 
 
-def _decision_payload(item_id: str, decision: str, values: Optional[dict], kind: Optional[str]):
-    """裁决事件 payload 构造 + 合法性校验。方向裁决的 kind 必须在允许集内。"""
+def _decision_payload(
+    item_id: str, decision: str, values: Optional[dict], kind: Optional[str], reason: Optional[str]
+):
+    """裁决事件 payload 构造 + 合法性校验。方向裁决的 kind 必须在允许集内;豁免的 reason 必填。"""
     if decision == _ASSIGN_KIND:
         if kind not in _ASSIGN_KINDS:
             raise WorkOrderApiError("workorder.decision_invalid")
         return {"item_id": item_id, "decision": decision, "kind": kind}
+    if decision == _WAIVE:
+        reason_s = (reason or "").strip()
+        if not reason_s:
+            raise WorkOrderApiError("workorder.waive_reason_required")
+        if len(reason_s) > _MAX_NOTE_LEN:
+            raise WorkOrderApiError("workorder.waive_reason_too_long")
+        return {"item_id": item_id, "decision": decision, "reason": reason_s}
     if decision in _DECISIONS:
         return {"item_id": item_id, "decision": decision, "values": values or {}}
     raise WorkOrderApiError("workorder.decision_invalid")

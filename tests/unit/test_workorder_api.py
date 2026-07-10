@@ -296,6 +296,43 @@ class RecordDecisionTests(_ApiTestBase):
             )
         self.assertEqual(ctx.exception.code, "workorder.decision_invalid")
 
+    def test_waive_decision_appends_event_with_reason(self):
+        evt = api.record_decision(
+            None,
+            tenant_id="t-1",
+            work_order_id="wo-1",
+            item_id="it-1",
+            decision="waive",
+            values=None,
+            actor="user:9",
+            reason="client confirmed by LINE, original lost",
+        )
+        self.assertEqual(evt["event_type"], "human_decision")
+        self.assertEqual(
+            self.store.appended[-1]["payload"],
+            {
+                "item_id": "it-1",
+                "decision": "waive",
+                "reason": "client confirmed by LINE, original lost",
+            },
+        )
+        self.assertEqual(self.store.appended[-1]["actor"], "user:9")
+
+    def test_waive_without_reason_rejected(self):
+        for bad in (None, "", "   "):
+            with self.assertRaises(api.WorkOrderApiError) as ctx:
+                api.record_decision(
+                    None,
+                    tenant_id="t-1",
+                    work_order_id="wo-1",
+                    item_id="it-1",
+                    decision="waive",
+                    values=None,
+                    actor="u",
+                    reason=bad,
+                )
+            self.assertEqual(ctx.exception.code, "workorder.waive_reason_required")
+
     def test_invalid_decision_rejected(self):
         with self.assertRaises(api.WorkOrderApiError) as ctx:
             api.record_decision(

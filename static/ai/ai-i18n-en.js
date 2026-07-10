@@ -147,6 +147,7 @@ window.__AI_I18N_EN__ = {
     rv_flag_low_conf: 'Low-confidence read',
     rv_flag_ocr_error: 'Could not read the document',
     rv_flag_direction: 'Direction unclear · purchase or sale?',
+    rv_flag_sales_direction: 'Looks like your own sales doc · confirm direction',
     rv_key_dir_purchase: 'Purchase',
     rv_key_dir_sales: 'Sale',
     rv_key_dir_nontax: 'Non-tax',

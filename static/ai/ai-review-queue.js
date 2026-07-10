@@ -9,12 +9,18 @@
     'use strict';
 
     var PURCHASE_KIND = 'purchase_invoice';
-    var DIRECTION_AMBIGUOUS = 'direction_ambiguous';
+    // 后端判不出进/销方向的两类票(sort.bin_ocr_fields · kind=unknown):锚点全然不明
+    // (direction_ambiguous),或自家==卖方=疑似本方销项票(sales_direction_unhandled)。
+    var DIRECTION_PREFIXES = ['direction_ambiguous', 'sales_direction_unhandled'];
 
-    // 方向不明票(kind=unknown / flag_reason=direction_ambiguous):后端判不出进/销方向,
-    // 必须人工定向,否则进项被静默漏掉(G1 黑洞)。卡上切换成方向裁决三键,不走 A/E/X。
+    // 方向不明票必须人工定向,否则进项被静默漏掉(G1/G1R2 黑洞)。卡上切换成方向裁决三键,
+    // 不走 A/E/X。按 flag_reason 前缀判(两类同一套 P/S/X 定向流程)。
     function isDirectionTicket(it) {
-        return !!it && String(it.flag_reason || '').indexOf(DIRECTION_AMBIGUOUS) === 0;
+        if (!it) return false;
+        var reason = String(it.flag_reason || '');
+        return DIRECTION_PREFIXES.some(function (p) {
+            return reason.indexOf(p) === 0;
+        });
     }
 
     // 契约 §1.1:队列 = flagged 里的进项票 + 方向不明票(后者收编进队列由人定向,
@@ -43,6 +49,7 @@
         ocr_low_confidence: 'rv_flag_low_conf',
         ocr_error: 'rv_flag_ocr_error',
         direction_ambiguous: 'rv_flag_direction',
+        sales_direction_unhandled: 'rv_flag_sales_direction',
     };
     function flagReasonKey(reason) {
         var r = String(reason || '');

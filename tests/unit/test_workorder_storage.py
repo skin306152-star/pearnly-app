@@ -58,6 +58,34 @@ class StorageLayoutTests(unittest.TestCase):
     def test_resolve_empty_returns_none(self):
         self.assertIsNone(storage.resolve_within_order(self.tenant, self.wo, ""))
 
+    def test_save_material_embeds_original_name_and_uuid(self):
+        path = storage.save_material(
+            self.tenant, self.wo, b"x", ".bin", original_name="IMG_2647.JPG"
+        )
+        self.assertTrue(path.is_file())
+        # 落盘名 = {uuid}__原名词干.ext;ext 优先取自原名(.jpg 而非 .bin)。
+        self.assertTrue(path.name.endswith("__IMG_2647.jpg"), path.name)
+        self.assertEqual(storage.original_name_of(str(path)), "IMG_2647.jpg")
+
+    def test_save_material_without_name_stays_pure_uuid(self):
+        path = storage.save_material(self.tenant, self.wo, b"x", ".pdf")
+        self.assertNotIn("__", path.name)
+        self.assertEqual(path.suffix, ".pdf")
+
+    def test_original_name_of_falls_back_to_basename_for_cli_paths(self):
+        # CLI 直喂真实路径(非内嵌格式)→ 返 basename;空 → None。
+        self.assertEqual(storage.original_name_of("/in/IMG_2650.JPG"), "IMG_2650.JPG")
+        self.assertIsNone(storage.original_name_of(None))
+
+    def test_save_material_sanitizes_hostile_name(self):
+        path = storage.save_material(
+            self.tenant, self.wo, b"x", ".bin", original_name="../../etc/pa ss;rm.jpg"
+        )
+        # 词干去路径分隔/危险字符后仍落在 materials 目录内。
+        self.assertIn("materials", path.parts)
+        self.assertNotIn("..", path.name)
+        self.assertNotIn("/", path.name)
+
 
 if __name__ == "__main__":
     unittest.main()

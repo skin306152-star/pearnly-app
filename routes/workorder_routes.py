@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import mimetypes
 import os
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -144,10 +145,23 @@ async def get_order(work_order_id: str, request: Request):
 
 @router.post("/api/workorder/orders/{work_order_id}/run")
 async def run_order(work_order_id: str, request: Request, background: BackgroundTasks):
-    """触发推进。HTTP 不阻塞:落 run_requested 事件即返回,真跑交后台(每步独立事务提交)。"""
+    """触发推进。HTTP 不阻塞:抢 running 租约防重入,落 run_requested 事件即返回,真跑交后台。
+
+    双终端/双击同时 /run:先抢 DB 租约,抢不到(他人未过期租约占着)→ 409 run_in_progress;
+    抢到者把 owner 交后台 advance,收尾释放。进程猝死则租约过期后另一终端可接管。"""
     user, tenant_id = _authorize(request)
+    owner = f"run:{uuid.uuid4().hex}"
+    store.ensure_runtime()  # 建租约列(独立事务)· 必须先于下面 SELECT/UPDATE 锁 work_orders
     with db.get_cursor(commit=True) as cur:
         wo = _load_order(cur, request, user, tenant_id, work_order_id)
+        if not store.acquire_run_lease(
+            cur,
+            tenant_id=tenant_id,
+            work_order_id=work_order_id,
+            owner=owner,
+            ttl_seconds=runner.run_lease_ttl_seconds(),
+        ):
+            raise HTTPException(409, detail="workorder.run_in_progress")
         store.append_event(
             cur,
             tenant_id=tenant_id,
@@ -156,7 +170,7 @@ async def run_order(work_order_id: str, request: Request, background: Background
             event_type="run_requested",
             actor=f"user:{user['id']}",
         )
-    background.add_task(runner.advance, tenant_id, work_order_id)
+    background.add_task(runner.advance, tenant_id, work_order_id, owner)
     return {"queued": True, "status": wo["status"]}
 
 
@@ -225,7 +239,11 @@ async def add_materials(work_order_id: str, request: Request, files: list[Upload
         if not content:
             continue
         suffix = os.path.splitext(upload.filename or "")[1].lower() or ".bin"
-        saved.append(storage.save_material(tenant_id, work_order_id, content, suffix))
+        saved.append(
+            storage.save_material(
+                tenant_id, work_order_id, content, suffix, original_name=upload.filename
+            )
+        )
 
     registered = []
     with db.get_cursor(commit=True) as cur:
@@ -282,4 +300,6 @@ async def get_item_image(work_order_id: str, item_id: str, request: Request):
     if not path:
         raise HTTPException(404, detail="workorder.item_image_not_found")
     media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-    return FileResponse(str(path), media_type=media_type, filename=path.name)
+    # 下载名还原用户原始文件名(落盘是 {uuid}__原名),审核看图不再是一串 uuid。
+    download_name = storage.original_name_of(item.get("file_ref")) or path.name
+    return FileResponse(str(path), media_type=media_type, filename=download_name)

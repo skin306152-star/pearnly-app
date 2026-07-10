@@ -35,6 +35,11 @@ class _FakeStore:
     def __init__(self, items):
         self._items = items
         self.events = []
+        self.released = []
+        self.ensured = 0
+
+    def ensure_runtime(self):
+        self.ensured += 1
 
     def list_items(self, cur, *, tenant_id, work_order_id):
         return list(self._items)
@@ -43,6 +48,9 @@ class _FakeStore:
         self, cur, *, tenant_id, work_order_id, step, event_type, payload=None, actor="system"
     ):
         self.events.append({"event_type": event_type, "payload": payload or {}})
+
+    def release_run_lease(self, cur, *, tenant_id, work_order_id, owner):
+        self.released.append(owner)
 
 
 class RunnerTestBase(unittest.TestCase):
@@ -102,6 +110,16 @@ class AdvanceTests(RunnerTestBase):
         self.assertIn("error", out)
         self.assertEqual(runner._inflight, set())  # 释放了 in-flight,不会卡死后续
         self.assertIn("run_finished", [e["event_type"] for e in self.store.events])
+
+    def test_lease_owner_released_on_finish(self):
+        # 路由抢到租约后把 owner 交 advance,收尾必须释放(供另一终端接管)。
+        runner.advance("t-1", "wo-1", "run:abc")
+        self.assertEqual(self.store.released, ["run:abc"])
+
+    def test_no_owner_means_no_lease_release(self):
+        # 直调(CLI/测试)不涉租约,不误调 release。
+        runner.advance("t-1", "wo-1")
+        self.assertEqual(self.store.released, [])
 
 
 if __name__ == "__main__":

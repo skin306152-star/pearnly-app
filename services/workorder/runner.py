@@ -14,6 +14,7 @@ HTTP 不许长阻塞(真跑 ~100 张 OCR 要几分钟):路由把 advance() 交 F
 from __future__ import annotations
 
 import logging
+import os
 import threading
 
 from core import db
@@ -28,6 +29,15 @@ EVT_RUN_FINISHED = "run_finished"
 
 _inflight_lock = threading.Lock()
 _inflight: set = set()
+
+
+def run_lease_ttl_seconds() -> int:
+    """/run 租约有效期(秒)。默认 1800:远大于一次全量跑批(并发化后目标 <6 分钟),又能在
+    进程猝死后自动过期让另一终端接管。env PEARNLY_WORKORDER_RUN_LEASE_TTL 覆写。"""
+    try:
+        return max(60, int(os.environ.get("PEARNLY_WORKORDER_RUN_LEASE_TTL", "1800")))
+    except ValueError:
+        return 1800
 
 
 def _intake_files(items: list[dict]) -> list[str]:
@@ -49,16 +59,18 @@ def _release(key: tuple) -> None:
         _inflight.discard(key)
 
 
-def advance(tenant_id: str, work_order_id: str) -> dict:
+def advance(tenant_id: str, work_order_id: str, lease_owner: str | None = None) -> dict:
     """把某工单推进到底或首个卡点(缺料 needs / 挂起票 stuck)。每步独立事务提交。
 
     背景任务里跑,吞异常只记日志(已完成步已提交,下次 /run 续跑)——绝不让后台线程崩掉。
-    返回结果字典仅供测试/日志断言。
+    返回结果字典仅供测试/日志断言。lease_owner:路由抢到的 DB 租约持有者,收尾释放(供另一
+    终端接管);None = 直调(CLI/测试)不涉租约。进程内 _inflight 是同进程快速去重的第二道闸。
     """
     key = (str(tenant_id), str(work_order_id))
     if not _try_claim(key):
         return {"skipped": "already_running"}
     try:
+        store.ensure_runtime()  # 建租约/幂等键列(独立事务·先于任何锁工单表的 txn)
         with db.get_cursor(commit=True) as cur:
             items = store.list_items(cur, tenant_id=tenant_id, work_order_id=work_order_id)
             store.append_event(
@@ -93,6 +105,20 @@ def advance(tenant_id: str, work_order_id: str) -> dict:
         return {"error": str(e)[:200]}
     finally:
         _release(key)
+        _release_lease(tenant_id, work_order_id, lease_owner)
+
+
+def _release_lease(tenant_id: str, work_order_id: str, lease_owner: str | None) -> None:
+    """收尾释放 DB 租约(仅路由抢租的调用有 owner)。best-effort:失败只记日志,租约会自然过期。"""
+    if not lease_owner:
+        return
+    try:
+        with db.get_cursor(commit=True) as cur:
+            store.release_run_lease(
+                cur, tenant_id=tenant_id, work_order_id=work_order_id, owner=lease_owner
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[workorder-runner] release-lease {work_order_id} failed: {e}")
 
 
 def _finish(tenant_id: str, work_order_id: str, result: dict) -> None:

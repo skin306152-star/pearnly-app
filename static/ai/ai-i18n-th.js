@@ -207,7 +207,6 @@ window.__AI_I18N_TH__ = {
     gate_password_label: 'รหัสผ่าน',
     gate_password_ph: 'กรอกรหัสผ่าน',
     gate_remember_label: 'จำการเข้าสู่ระบบ',
-    gate_forgot_link: 'ลืมรหัสผ่าน / ตั้งรหัสผ่าน?',
     gate_login_btn: 'เข้าสู่ระบบ',
     gate_login_btn_busy: 'กำลังเข้าสู่ระบบ…',
     gate_err_required: 'กรุณากรอกชื่อผู้ใช้งานและรหัสผ่าน',

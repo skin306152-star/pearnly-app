@@ -80,12 +80,15 @@
             'adm-ai-invite-hint':
                 '填已有用户的用户名/邮箱直接加名单;不存在的账号必须填邮箱,自动建号',
             'adm-ai-invite-ph': '用户名或邮箱(新客户请填邮箱)',
+            'adm-ai-invite-pwd-ph': '密码(留空自动生成)',
             'adm-ai-invite-btn': '邀请',
             'adm-ai-invite-existing-ok': '已加入名单',
             'adm-ai-invite-created-ok': '已建号并加入名单 · 初始密码见下方',
             'adm-ai-invite-needs-email': '账号不存在 · 请填邮箱以自动建号',
             'adm-ai-invite-username-exists': '该用户名/邮箱已被占用',
             'adm-ai-pwd-warn': '初始密码仅显示一次 · 请立即复制转告客户 · 关闭后无法再查看',
+            'adm-ai-pwd-for-label': '账号:{n}',
+            'adm-ai-pwd-too-weak': '密码强度不足(至少 8 位 · 需同时含字母和数字)',
             'adm-ai-pwd-copy': '复制',
             'adm-ai-pwd-copied': '已复制',
             'adm-ai-pwd-close': '我已保存,关闭',
@@ -95,6 +98,11 @@
             'adm-ai-list-unknown': '(已失联 · 账号或租户已删)',
             'adm-ai-revoke-btn': '收回',
             'adm-ai-revoke-confirm': '再点一次确认收回',
+            'adm-ai-reset-btn': '重置密码',
+            'adm-ai-reset-confirm': '重置 {n} 的密码?留空自动生成,或在此指定新密码',
+            'adm-ai-reset-ok': '密码已重置 · 见下方',
+            'adm-ai-reset-not-invited': '该账号不在邀请名单内,拒绝重置',
+            'adm-ai-reset-subject-unknown': '找不到对应账号',
             'adm-agent-title': 'Agent 助手',
             'adm-agent-sub': 'LINE 对话助手健康与获客漏斗 · 只读观测 · 兜底率高=用户在拿废话',
             'adm-agent-health-title': '对话健康(近 24 小时)',
@@ -544,6 +552,7 @@
             'adm-ai-invite-hint':
                 'กรอกชื่อผู้ใช้/อีเมลของบัญชีที่มีอยู่เพื่อเพิ่มเข้ารายชื่อ · บัญชีที่ยังไม่มีต้องกรอกอีเมลเพื่อสร้างอัตโนมัติ',
             'adm-ai-invite-ph': 'ชื่อผู้ใช้หรืออีเมล (ลูกค้าใหม่กรุณากรอกอีเมล)',
+            'adm-ai-invite-pwd-ph': 'รหัสผ่าน (เว้นว่างเพื่อสุ่มอัตโนมัติ)',
             'adm-ai-invite-btn': 'เชิญ',
             'adm-ai-invite-existing-ok': 'เพิ่มเข้ารายชื่อแล้ว',
             'adm-ai-invite-created-ok':
@@ -552,6 +561,9 @@
             'adm-ai-invite-username-exists': 'ชื่อผู้ใช้/อีเมลนี้ถูกใช้แล้ว',
             'adm-ai-pwd-warn':
                 'รหัสผ่านเริ่มต้นแสดงเพียงครั้งเดียว · กรุณาคัดลอกแจ้งลูกค้าทันที · ปิดแล้วดูซ้ำไม่ได้',
+            'adm-ai-pwd-for-label': 'บัญชี: {n}',
+            'adm-ai-pwd-too-weak':
+                'รหัสผ่านไม่รัดกุมพอ (อย่างน้อย 8 ตัว · ต้องมีทั้งตัวอักษรและตัวเลข)',
             'adm-ai-pwd-copy': 'คัดลอก',
             'adm-ai-pwd-copied': 'คัดลอกแล้ว',
             'adm-ai-pwd-close': 'บันทึกแล้ว ปิดหน้าต่าง',
@@ -561,6 +573,12 @@
             'adm-ai-list-unknown': '(ขาดการเชื่อมโยง · บัญชีหรือกิจการถูกลบแล้ว)',
             'adm-ai-revoke-btn': 'นำออก',
             'adm-ai-revoke-confirm': 'กดอีกครั้งเพื่อยืนยันการนำออก',
+            'adm-ai-reset-btn': 'รีเซ็ตรหัสผ่าน',
+            'adm-ai-reset-confirm':
+                'รีเซ็ตรหัสผ่านของ {n}? เว้นว่างเพื่อสุ่มอัตโนมัติ หรือกำหนดรหัสผ่านใหม่ที่นี่',
+            'adm-ai-reset-ok': 'รีเซ็ตรหัสผ่านแล้ว · ดูด้านล่าง',
+            'adm-ai-reset-not-invited': 'บัญชีนี้ไม่อยู่ในรายชื่อเชิญ · ปฏิเสธการรีเซ็ต',
+            'adm-ai-reset-subject-unknown': 'ไม่พบบัญชีที่ตรงกัน',
             'adm-agent-title': 'ผู้ช่วย Agent',
             'adm-agent-sub':
                 'สุขภาพแชท LINE + ฟันเนลผู้ใช้ · อ่านอย่างเดียว · fallback สูง = ผู้ใช้ได้คำตอบเปล่า',

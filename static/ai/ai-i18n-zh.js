@@ -205,7 +205,6 @@ window.__AI_I18N_ZH__ = {
     gate_password_label: '密码',
     gate_password_ph: '请输入密码',
     gate_remember_label: '记住登录',
-    gate_forgot_link: '忘记密码 / 设置密码？',
     gate_login_btn: '登录',
     gate_login_btn_busy: '登录中…',
     gate_err_required: '请输入用户名和密码',

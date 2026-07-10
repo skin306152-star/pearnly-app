@@ -50,7 +50,18 @@
             opts.body = JSON.stringify(opts.body);
         }
         const r = await fetch(path, Object.assign({}, opts, { headers: headers }));
-        if (!r.ok) throw new Error('HTTP ' + r.status);
+        if (!r.ok) {
+            // detail 挂在 Error 对象上(不改 .message 格式)· 调用方按 detail 精确分流
+            // 错误文案,而不是只能靠 HTTP status 猜(一个 422 可能对应好几种业务原因)。
+            let detail = '';
+            try {
+                detail = (await r.json()).detail || '';
+            } catch (_) {}
+            const err = new Error('HTTP ' + r.status);
+            err.status = r.status;
+            err.detail = detail;
+            throw err;
+        }
         return r.json();
     }
     function _toast(msg, kind) {
@@ -3430,11 +3441,20 @@
                     '</span><span class="adm-ai-list-meta">' +
                     meta +
                     '</span></span>' +
+                    '<span class="adm-ai-list-actions">' +
+                    '<button class="btn btn-ghost btn-sm" data-adm-ai-reset="' +
+                    _esc(r.subject_id) +
+                    '" data-adm-ai-reset-who="' +
+                    _esc(r.username || r.email || r.subject_id) +
+                    '">' +
+                    _esc(_t('adm-ai-reset-btn')) +
+                    '</button>' +
                     '<button class="btn btn-ghost btn-sm" data-adm-ai-revoke="' +
                     _esc(r.subject_id) +
                     '">' +
                     _esc(_t('adm-ai-revoke-btn')) +
                     '</button>' +
+                    '</span>' +
                     '</div>'
                 );
             })
@@ -3458,17 +3478,62 @@
                 }
             });
         });
+        host.querySelectorAll('[data-adm-ai-reset]').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                const who = btn.dataset.admAiResetWho || btn.dataset.admAiReset;
+                // _admPrompt = 站内 window.prompt 替代品(确认问句当 title + 可选密码输入框
+                // 当 body)· null = 取消,'' = 确认但留空(后端落回随机密码)。
+                const pwd = await _admPrompt(_t('adm-ai-reset-confirm').replace('{n}', who), {
+                    placeholder: _t('adm-ai-invite-pwd-ph'),
+                    okText: _t('adm-ai-reset-btn'),
+                });
+                if (pwd === null) return;
+                const trimmed = pwd.trim();
+                try {
+                    const r = await _adminFetch('/api/admin/pearnly-ai/reset-password', {
+                        method: 'POST',
+                        body: trimmed
+                            ? { subject_id: btn.dataset.admAiReset, password: trimmed }
+                            : { subject_id: btn.dataset.admAiReset },
+                    });
+                    _toast(_t('adm-ai-reset-ok'), 'success');
+                    _showAiPassword(r.initial_password, r.username);
+                } catch (e) {
+                    _toast(_t(_aiPasswordErrorKey(e)), 'error');
+                }
+            });
+        });
     }
 
-    function _showAiPassword(pwd) {
+    function _showAiPassword(pwd, username) {
         const box = document.getElementById('adm-ai-pwd-box');
         const input = document.getElementById('adm-ai-pwd-value');
         if (!box || !input) return;
         input.value = pwd;
+        const forLine = document.getElementById('adm-ai-pwd-for');
+        if (forLine)
+            forLine.textContent = username
+                ? _t('adm-ai-pwd-for-label').replace('{n}', username)
+                : '';
         box.hidden = false;
     }
 
+    // 密码相关错误统一按 err.detail(后端 HTTPException detail)精确分流,而不是猜 HTTP
+    // status——同一个 422 在 invite 上可能是「建号必须给邮箱」也可能是「自定义密码太弱」,
+    // 状态码分不清,必须落到 detail 上一一对应。
+    function _aiPasswordErrorKey(err) {
+        const detail = (err && err.detail) || '';
+        if (detail.indexOf('pwd.') === 0) return 'adm-ai-pwd-too-weak';
+        if (detail === 'admin.pearnly_ai_not_invited') return 'adm-ai-reset-not-invited';
+        if (detail === 'admin.pearnly_ai_subject_unknown') return 'adm-ai-reset-subject-unknown';
+        return 'adm-load-fail';
+    }
+
     function _aiInviteErrorKey(err) {
+        const detail = (err && err.detail) || '';
+        if (detail.indexOf('pwd.') === 0) return 'adm-ai-pwd-too-weak';
+        if (detail === 'admin.pearnly_ai_needs_email_to_create') return 'adm-ai-invite-needs-email';
+        if (detail === 'admin.username_exists') return 'adm-ai-invite-username-exists';
         const msg = (err && err.message) || '';
         if (msg.indexOf('422') !== -1) return 'adm-ai-invite-needs-email';
         if (msg.indexOf('409') !== -1) return 'adm-ai-invite-username-exists';
@@ -3478,21 +3543,26 @@
     async function _renderPearlyAiPage() {
         const btn = document.getElementById('adm-ai-invite-btn');
         const input = document.getElementById('adm-ai-invite-input');
+        const pwInput = document.getElementById('adm-ai-invite-password');
         if (!btn || !input) return;
         if (!btn.__bound) {
             btn.__bound = true;
             const go = async function () {
                 const raw = (input.value || '').trim();
                 if (!raw) return;
+                const pwd = (pwInput && pwInput.value.trim()) || '';
                 try {
                     const r = await _adminFetch('/api/admin/pearnly-ai/invite', {
                         method: 'POST',
-                        body: { username_or_email: raw },
+                        body: pwd
+                            ? { username_or_email: raw, password: pwd }
+                            : { username_or_email: raw },
                     });
                     input.value = '';
+                    if (pwInput) pwInput.value = '';
                     if (r.created_account) {
                         _toast(_t('adm-ai-invite-created-ok'), 'success');
-                        _showAiPassword(r.initial_password);
+                        _showAiPassword(r.initial_password, r.username);
                     } else {
                         _toast(_t('adm-ai-invite-existing-ok'), 'success');
                     }
@@ -3519,8 +3589,10 @@
             document.getElementById('adm-ai-pwd-close')?.addEventListener('click', function () {
                 const box = document.getElementById('adm-ai-pwd-box');
                 const val = document.getElementById('adm-ai-pwd-value');
+                const forLine = document.getElementById('adm-ai-pwd-for');
                 if (box) box.hidden = true;
                 if (val) val.value = '';
+                if (forLine) forLine.textContent = '';
             });
         }
         let d;

@@ -208,7 +208,6 @@ window.__AI_I18N_JA__ = {
     gate_password_label: 'パスワード',
     gate_password_ph: 'パスワードを入力',
     gate_remember_label: 'ログイン情報を記憶する',
-    gate_forgot_link: 'パスワードをお忘れですか？/ パスワード設定',
     gate_login_btn: 'ログイン',
     gate_login_btn_busy: 'ログイン中…',
     gate_err_required: 'ユーザー名とパスワードを入力してください',

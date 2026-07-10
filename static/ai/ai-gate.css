@@ -149,18 +149,6 @@
   color: var(--ink2);
   cursor: pointer;
 }
-.gf-link {
-  color: var(--sage-deep);
-  font-weight: 600;
-  text-decoration: none;
-}
-.gf-link:hover {
-  text-decoration: underline;
-}
-.gf-link:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 2px;
-}
 .gf-submit {
   width: 100%;
   justify-content: center;

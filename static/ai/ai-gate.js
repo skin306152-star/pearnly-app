@@ -142,9 +142,6 @@
             '<label class="gf-check"><input id="gateRemember" type="checkbox" checked /> <span>' +
             esc(t('gate_remember_label')) +
             '</span></label>' +
-            '<a class="gf-link" id="gateForgotLink" href="/login" target="_blank" rel="noopener">' +
-            esc(t('gate_forgot_link')) +
-            '</a>' +
             '</div>' +
             '<button class="btn pri gf-submit" id="gateSubmitBtn" type="submit">' +
             esc(t('gate_login_btn')) +

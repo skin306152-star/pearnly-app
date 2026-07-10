@@ -13,6 +13,9 @@ user_id 当 tenant_id 写进名单,或反过来)闸对该用户永远判不中,�
     生成一次性初始密码只在本次响应回显(库里只存 bcrypt,不落日志/审计 details),
     建完自动进名单。
 
+建号(invite)和重置(reset-password)都可选传 password:超管指定就用(仍过
+_check_password_strength 同一把尺子),留空落回随机一次性密码 —— 见 _resolve_password。
+
 名单存取全部经 services/platform_settings/store 现有 API;platform_setting_allowlist
 表的 created_at(store 不暴露)直接只读查一次,不碰 store.py 内部实现。
 """
@@ -23,6 +26,7 @@ import logging
 import secrets
 import string
 
+import bcrypt as _bcrypt
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
@@ -43,10 +47,17 @@ _PASSWORD_GEN_ATTEMPTS = 50
 
 class InviteBody(BaseModel):
     username_or_email: str = Field(..., min_length=1, max_length=200)
+    # 留空 = 系统随机生成(现行为);传了走 _check_password_strength 同一把尺子。
+    password: str | None = Field(None, min_length=8, max_length=200)
 
 
 class RevokeBody(BaseModel):
     subject_id: str = Field(..., min_length=1, max_length=64)
+
+
+class ResetPasswordBody(BaseModel):
+    subject_id: str = Field(..., min_length=1, max_length=64)
+    password: str | None = Field(None, min_length=8, max_length=200)
 
 
 def _subject_id(user: dict) -> str:
@@ -64,6 +75,16 @@ def _generate_temp_password() -> str:
         if _check_password_strength(pwd) is None:
             return pwd
     raise HTTPException(500, detail="admin.pearnly_ai_password_gen_failed")
+
+
+def _resolve_password(custom: str | None) -> str:
+    """建号/重置的密码来源:超管给了就用(仍过强度尺子),没给才落回随机一次性密码。"""
+    if not custom:
+        return _generate_temp_password()
+    err = _check_password_strength(custom)
+    if err:
+        raise HTTPException(422, detail=err)
+    return custom
 
 
 def _enrich_subjects(subject_ids: list[str]) -> dict[str, dict]:
@@ -183,7 +204,7 @@ async def pearnly_ai_invite(request: Request, body: InviteBody):
     if "@" not in raw:
         raise HTTPException(422, detail="admin.pearnly_ai_needs_email_to_create")
 
-    temp_password = _generate_temp_password()
+    temp_password = _resolve_password(body.password)
     local_part = raw.split("@", 1)[0].strip() or "pearnly-ai"
     result = create_owner_user(
         username=raw,
@@ -241,3 +262,61 @@ async def pearnly_ai_revoke(request: Request, body: RevokeBody):
         target_name=info.get("username") or info.get("company_name"),
     )
     return {"ok": True}
+
+
+def _resolve_target_user(subject_id: str) -> dict | None:
+    """反解 subject_id(tenant-first 判据的产物)回目标 user 行。
+
+    subject_id 先当 tenant_id 查 tenants.owner_user_id(团队账套口径);查不到
+    落空,再当 user_id 直接查(个人套账口径)。跟 _subject_id() 是同一条判据的
+    正反两个方向,任何一边改了口径都要同步改这里,否则重置会打到错的账号。
+    """
+    with db.get_cursor() as cur:
+        cur.execute(
+            "SELECT owner_user_id::text AS owner_user_id FROM tenants WHERE id::text = %s",
+            (subject_id,),
+        )
+        row = cur.fetchone()
+    owner_user_id = row.get("owner_user_id") if row else None
+    if owner_user_id:
+        return db.find_user_by_id(owner_user_id)
+    return db.find_user_by_id(subject_id)
+
+
+@router.post("/api/admin/pearnly-ai/reset-password")
+async def pearnly_ai_reset_password(request: Request, body: ResetPasswordBody):
+    """重置 /ai 邀请账号密码 —— 仅限邀请名单内主体,不复活通用超管改密能力。
+
+    routes/admin_users_mutation_routes.py 的通用 /api/admin/users/{id}/reset-password
+    早被故意砍成 410("超管不碰客户密码":主站账号忘密走登录页自助流程)。/ai 是
+    邀请制账号,登录卡不放"忘记密码"(Z1-c 拍板:密码全由 Earn 后台管理),没有
+    自助通道可走,所以单独开这个重置口子——但严格闸在 allowlist 名单内,一旦
+    subject 不在名单直接 404,不是把砍掉的通用能力开回来。
+    """
+    admin = _require_super_admin(request)
+    subject_id = body.subject_id.strip()
+    if not subject_id:
+        raise HTTPException(400, detail="admin.pearnly_ai_missing_subject")
+    if subject_id not in platform_settings_store.list_allowlist(PEARNLY_AI_M1_KEY):
+        raise HTTPException(404, detail="admin.pearnly_ai_not_invited")
+
+    # 密码校验(cheap · 无 DB 依赖)先于目标反解,弱密码直接 422 不用多打一趟 DB。
+    new_password = _resolve_password(body.password)
+
+    target = _resolve_target_user(subject_id)
+    if not target:
+        raise HTTPException(404, detail="admin.pearnly_ai_subject_unknown")
+
+    pw_hash = _bcrypt.hashpw(new_password.encode("utf-8"), _bcrypt.gensalt()).decode("utf-8")
+    with db.get_cursor(commit=True) as cur:
+        cur.execute("UPDATE users SET password_hash = %s WHERE id = %s", (pw_hash, target["id"]))
+
+    _log_op(
+        request,
+        admin,
+        action="pearnly_ai.reset_password",
+        target_type="tenant" if target.get("tenant_id") else "user",
+        target_id=subject_id,
+        target_name=target.get("username"),
+    )
+    return {"ok": True, "username": target.get("username"), "initial_password": new_password}

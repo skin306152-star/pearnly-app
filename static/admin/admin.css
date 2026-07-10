@@ -925,6 +925,7 @@ body.admin-layout-body .lang-switching-overlay {
 }
 .adm-set-add {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -993,6 +994,11 @@ body.admin-layout-body .lang-switching-overlay {
   margin-bottom: 8px;
   flex-wrap: wrap;
 }
+.adm-ai-list-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
 .adm-ai-list-who {
   display: flex;
   flex-direction: column;
@@ -1020,6 +1026,14 @@ body.admin-layout-body .lang-switching-overlay {
   font-weight: 600;
   color: var(--amber-800);
   margin-bottom: 8px;
+}
+.adm-ai-pwd-for {
+  font-size: 12px;
+  color: var(--amber-800);
+  margin-bottom: 8px;
+}
+.adm-ai-pwd-for:empty {
+  display: none;
 }
 .adm-ai-pwd-row {
   display: flex;

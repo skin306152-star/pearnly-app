@@ -208,7 +208,6 @@ window.__AI_I18N_EN__ = {
     gate_password_label: 'Password',
     gate_password_ph: 'Enter your password',
     gate_remember_label: 'Remember me',
-    gate_forgot_link: 'Forgot password / Set password?',
     gate_login_btn: 'Sign in',
     gate_login_btn_busy: 'Signing in…',
     gate_err_required: 'Please enter username and password',

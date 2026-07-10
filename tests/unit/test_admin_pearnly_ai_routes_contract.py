@@ -1,16 +1,22 @@
 # -*- coding: utf-8 -*-
-"""admin_pearnly_ai_routes 契约(Z1-b · pearnly_ai_m1 闸发放侧)。
+"""admin_pearnly_ai_routes 契约(Z1-b/Z1-c · pearnly_ai_m1 闸发放侧)。
 
-锁定:3 路由 path+method 契约;app include_router 挂上;全路由复用
+锁定:4 路由 path+method 契约;app include_router 挂上;全路由复用
 route_helpers._require_super_admin 单一来源(非超管一律 403)。业务层重点钉死
 tenant-first 判据(core/feature_flags.pearnly_ai_m1_enabled_for 同一口径:有
 tenant_id 写 tenant_id,没有才退回 user_id——写反了闸永远判不中且查不出根因)、
 一次性密码只在响应回显一次(不进 _log_op details)。
+
+reset-password(Z1-c)额外钉死:仅限 allowlist 名单内 subject(不复活已被砍掉的
+通用超管改密 /api/admin/users/{id}/reset-password);自定义密码走
+_check_password_strength 同一把尺子,弱密码 422、留空落回随机一次性密码。
 """
 
 import contextlib
 import unittest
 from unittest import mock
+
+import bcrypt
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -34,6 +40,25 @@ class _SeqCursor:
         return self._fetchall.pop(0) if self._fetchall else []
 
 
+class _OneRowCursor:
+    """支持 fetchone 的游标 · 用于 _resolve_target_user 的 tenant 反查 + 密码 UPDATE。
+
+    reset-password 一次请求里 db.get_cursor() 被调用两次(反查 owner_user_id、
+    写 password_hash),两次都拿同一个游标实例——fetchone 只有第一次查询用得上,
+    UPDATE 那次只调 execute,互不干扰。
+    """
+
+    def __init__(self, row=None):
+        self._row = row
+        self.queries = []
+
+    def execute(self, sql, params=None):
+        self.queries.append((sql, params))
+
+    def fetchone(self):
+        return self._row
+
+
 @contextlib.contextmanager
 def _cursor_cm(cur):
     yield cur
@@ -52,6 +77,7 @@ class RoutesContractTests(unittest.TestCase):
                 ("GET", "/api/admin/pearnly-ai/overview"),
                 ("POST", "/api/admin/pearnly-ai/invite"),
                 ("POST", "/api/admin/pearnly-ai/revoke"),
+                ("POST", "/api/admin/pearnly-ai/reset-password"),
             },
         )
 
@@ -62,6 +88,7 @@ class RoutesContractTests(unittest.TestCase):
         self.assertIn("/api/admin/pearnly-ai/overview", paths)
         self.assertIn("/api/admin/pearnly-ai/invite", paths)
         self.assertIn("/api/admin/pearnly-ai/revoke", paths)
+        self.assertIn("/api/admin/pearnly-ai/reset-password", paths)
 
     def test_super_admin_guard_single_source(self):
         self.assertIs(
@@ -98,6 +125,11 @@ class GuardEnforcedTests(unittest.TestCase):
     def test_revoke_non_super_403(self):
         with self._as_non_super():
             r = self.client.post("/api/admin/pearnly-ai/revoke", json={"subject_id": "t1"})
+        self.assertEqual(r.status_code, 403)
+
+    def test_reset_password_non_super_403(self):
+        with self._as_non_super():
+            r = self.client.post("/api/admin/pearnly-ai/reset-password", json={"subject_id": "t1"})
         self.assertEqual(r.status_code, 403)
 
 
@@ -347,6 +379,174 @@ class RevokeTests(unittest.TestCase):
     def test_revoke_missing_subject_400(self):
         r = self.client.post("/api/admin/pearnly-ai/revoke", json={"subject_id": "  "})
         self.assertEqual(r.status_code, 400)
+
+
+class ResetPasswordTests(unittest.TestCase):
+    """/ai 邀请账号密码重置 —— 严格闸在 allowlist 名单内,不是通用改密能力复活。"""
+
+    def setUp(self):
+        self.app = FastAPI()
+        self.app.include_router(router)
+        self.client = TestClient(self.app)
+        self._su = mock.patch.object(
+            route_helpers,
+            "get_current_user_from_request",
+            return_value={"id": "earn", "is_super_admin": True},
+        )
+        self._su.start()
+        self.addCleanup(self._su.stop)
+
+    def test_reset_password_subject_not_in_allowlist_404(self):
+        with mock.patch.object(
+            admin_pearnly_ai_routes.platform_settings_store, "list_allowlist", return_value=[]
+        ):
+            r = self.client.post(
+                "/api/admin/pearnly-ai/reset-password", json={"subject_id": "tenant-9"}
+            )
+        self.assertEqual(r.status_code, 404)
+        self.assertEqual(r.json()["detail"], "admin.pearnly_ai_not_invited")
+
+    def test_reset_password_tenant_subject_returns_password_not_logged(self):
+        # allowlist 存的是 tenant_id · _resolve_target_user 先查 tenants.owner_user_id
+        # 再反查 user 行 —— 同一个游标先答 owner_user_id 后吃 UPDATE。
+        cur = _OneRowCursor({"owner_user_id": "user-9"})
+        with (
+            mock.patch.object(
+                admin_pearnly_ai_routes.platform_settings_store,
+                "list_allowlist",
+                return_value=["tenant-9"],
+            ),
+            mock.patch.object(
+                admin_pearnly_ai_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(cur)
+            ),
+            mock.patch.object(
+                admin_pearnly_ai_routes.db,
+                "find_user_by_id",
+                return_value={"id": "user-9", "username": "boss", "tenant_id": "tenant-9"},
+            ),
+            mock.patch.object(admin_pearnly_ai_routes, "_log_op") as m_log,
+        ):
+            r = self.client.post(
+                "/api/admin/pearnly-ai/reset-password", json={"subject_id": "tenant-9"}
+            )
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body["username"], "boss")
+        pwd = body["initial_password"]
+        self.assertGreaterEqual(len(pwd), 8)
+        # 密码绝不进审计 details/日志(硬禁区,跟 invite 建号一样)
+        self.assertNotIn(pwd, str(m_log.call_args))
+
+    def test_reset_password_user_subject_without_tenant_200(self):
+        cur = _OneRowCursor(None)  # tenant 反查落空 → 落回当 user_id 直查
+        with (
+            mock.patch.object(
+                admin_pearnly_ai_routes.platform_settings_store,
+                "list_allowlist",
+                return_value=["user-orphan"],
+            ),
+            mock.patch.object(
+                admin_pearnly_ai_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(cur)
+            ),
+            mock.patch.object(
+                admin_pearnly_ai_routes.db,
+                "find_user_by_id",
+                return_value={"id": "user-orphan", "username": "solo", "tenant_id": None},
+            ),
+            mock.patch.object(admin_pearnly_ai_routes, "_log_op"),
+        ):
+            r = self.client.post(
+                "/api/admin/pearnly-ai/reset-password", json={"subject_id": "user-orphan"}
+            )
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["username"], "solo")
+
+    def test_reset_password_subject_unknown_404(self):
+        cur = _OneRowCursor(None)
+        with (
+            mock.patch.object(
+                admin_pearnly_ai_routes.platform_settings_store,
+                "list_allowlist",
+                return_value=["ghost-id"],
+            ),
+            mock.patch.object(
+                admin_pearnly_ai_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(cur)
+            ),
+            mock.patch.object(admin_pearnly_ai_routes.db, "find_user_by_id", return_value=None),
+        ):
+            r = self.client.post(
+                "/api/admin/pearnly-ai/reset-password", json={"subject_id": "ghost-id"}
+            )
+        self.assertEqual(r.status_code, 404)
+        self.assertEqual(r.json()["detail"], "admin.pearnly_ai_subject_unknown")
+
+    def test_reset_password_custom_strong_password_hashes_and_verifies(self):
+        """Zihao 追加拍板:超管自定义密码 → bcrypt 存的哈希能验回原始明文。"""
+        cur = _OneRowCursor(None)
+        with (
+            mock.patch.object(
+                admin_pearnly_ai_routes.platform_settings_store,
+                "list_allowlist",
+                return_value=["user-orphan"],
+            ),
+            mock.patch.object(
+                admin_pearnly_ai_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(cur)
+            ),
+            mock.patch.object(
+                admin_pearnly_ai_routes.db,
+                "find_user_by_id",
+                return_value={"id": "user-orphan", "username": "solo", "tenant_id": None},
+            ),
+            mock.patch.object(admin_pearnly_ai_routes, "_log_op"),
+        ):
+            r = self.client.post(
+                "/api/admin/pearnly-ai/reset-password",
+                json={"subject_id": "user-orphan", "password": "Zihao2026x"},
+            )
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["initial_password"], "Zihao2026x")
+        update_sql, update_params = cur.queries[-1]
+        self.assertIn("UPDATE users SET password_hash", update_sql)
+        stored_hash = update_params[0]
+        self.assertTrue(bcrypt.checkpw(b"Zihao2026x", stored_hash.encode("utf-8")))
+
+    def test_reset_password_weak_custom_password_422(self):
+        """弱密码在反解目标用户之前就该被拒 —— 不合格直接 422,不用打 DB。"""
+        with mock.patch.object(
+            admin_pearnly_ai_routes.platform_settings_store,
+            "list_allowlist",
+            return_value=["user-orphan"],
+        ):
+            r = self.client.post(
+                "/api/admin/pearnly-ai/reset-password",
+                json={"subject_id": "user-orphan", "password": "12345678"},
+            )
+        self.assertEqual(r.status_code, 422)
+
+    def test_reset_password_blank_falls_back_to_random_strong_password(self):
+        cur = _OneRowCursor(None)
+        with (
+            mock.patch.object(
+                admin_pearnly_ai_routes.platform_settings_store,
+                "list_allowlist",
+                return_value=["user-orphan"],
+            ),
+            mock.patch.object(
+                admin_pearnly_ai_routes.db, "get_cursor", lambda *a, **k: _cursor_cm(cur)
+            ),
+            mock.patch.object(
+                admin_pearnly_ai_routes.db,
+                "find_user_by_id",
+                return_value={"id": "user-orphan", "username": "solo", "tenant_id": None},
+            ),
+            mock.patch.object(admin_pearnly_ai_routes, "_log_op"),
+        ):
+            r = self.client.post(
+                "/api/admin/pearnly-ai/reset-password", json={"subject_id": "user-orphan"}
+            )
+        self.assertEqual(r.status_code, 200)
+        pwd = r.json()["initial_password"]
+        self.assertIsNone(route_helpers._check_password_strength(pwd))
 
 
 if __name__ == "__main__":

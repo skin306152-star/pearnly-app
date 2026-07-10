@@ -9,62 +9,23 @@
 // 解耦要点:pos_only 后端只开 pos+inventory,却要出「采购/销售」菜单 —— 证明菜单可见性由
 // 白名单写死、与模块开关脱钩。切业态用现成 owner 专属 PUT /api/me/onboarding。
 // ============================================================
-/* global document, window */
+/* global window */
 
 const path = require('path');
 const { test, expect } = require('@playwright/test');
 const { hasCreds, ensureStorageState, STORAGE_STATE } = require('./_helpers/auth');
-const { enterApp, getModules, dismissWorkspaceModal } = require('./_helpers/app');
+const {
+    enterApp,
+    getModules,
+    dismissWorkspaceModal,
+    SIDEBAR,
+    AVATAR,
+    setBusinessType,
+    expandAllGroups,
+} = require('./_helpers/app');
 const { attachConsoleGuard, assertNoConsoleErrors } = require('./_helpers/console-guard');
 
 const OUT = path.join(process.cwd(), 'tests', 'e2e', '_artifacts', 'nav-preset');
-
-const SIDEBAR = {
-    dashboard: '.nav-item[data-route="dashboard"]',
-    cowork: '[data-collapsible="firm"]',
-    products: '[data-collapsible="products"]',
-    purchases: '[data-collapsible="expense"]',
-    sales: '[data-collapsible="sales"]',
-    accounting: '[data-collapsible="accounting"]',
-    pos: '#nav-group-pos',
-    clients: '.nav-item[data-route="clients"]',
-    company: '.nav-item[data-route="company"]',
-    exceptions: '.nav-item[data-route="exceptions"]',
-    integrations: '#nav-integrations',
-    enroll: '#nav-enroll',
-    knowledge: '#nav-knowledge',
-};
-const AVATAR = {
-    settings: '#avatar-menu-settings',
-    console: '#avatar-menu-console',
-    billing: '#avatar-menu-billing',
-    shortcuts: '#avatar-menu-shortcuts',
-    theme: '#avatar-menu-theme',
-    help: '#avatar-menu-help',
-    logout: '#avatar-menu-logout',
-};
-
-async function setBusinessType(page, businessType) {
-    return page.evaluate(async (bt) => {
-        const tok = localStorage.getItem('mrpilot_token');
-        const r = await fetch('/api/me/onboarding', {
-            method: 'PUT',
-            headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ business_type: bt }),
-        });
-        return r.json();
-    }, businessType);
-}
-
-// 折叠组默认展开(max-height),但持久化可能收起 → 收起态子项高度 0、Playwright 判不可见。
-// 本测试只断言"组是否属于白名单",与折叠无关,故先全部展开,断言才稳。
-async function expandAllGroups(page) {
-    await page.evaluate(() =>
-        document
-            .querySelectorAll('.nav-collapsible.collapsed')
-            .forEach((g) => g.classList.remove('collapsed'))
-    );
-}
 
 test.describe('pos_only 收银壳 · 侧栏 + 头像 + 免门', () => {
     test.skip(!hasCreds(), '需测试账号·CI 无凭据时跳过');
@@ -123,14 +84,13 @@ test.describe('pos_only 收银壳 · 侧栏 + 头像 + 免门', () => {
         await expandAllGroups(page);
 
         // ② 侧栏白名单内可见 / 外隐藏。
-        for (const key of ['pos', 'company', 'products', 'purchases', 'sales']) {
+        for (const key of ['pos', 'clients', 'company', 'products', 'purchases', 'sales']) {
             await expect(page.locator(SIDEBAR[key]), `${key} 应可见`).toBeVisible();
         }
         for (const key of [
             'dashboard',
             'cowork',
             'accounting',
-            'clients',
             'exceptions',
             'integrations',
             'enroll',

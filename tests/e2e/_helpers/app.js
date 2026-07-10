@@ -65,6 +65,57 @@ async function getModules(page) {
     });
 }
 
+// 业态导航门控 spec(24 pos_only / 25 firm)共用的选择器表 + 切业态 + 展开折叠组。
+// SIDEBAR 取两 spec 超集(含 24 独有的 knowledge 键 · 25 不引用无害);各 spec 的白名单
+// 期望列表各自留在 spec 里(两业态本就不同)。
+const SIDEBAR = {
+    dashboard: '.nav-item[data-route="dashboard"]',
+    cowork: '[data-collapsible="firm"]',
+    products: '[data-collapsible="products"]',
+    purchases: '[data-collapsible="expense"]',
+    sales: '[data-collapsible="sales"]',
+    accounting: '[data-collapsible="accounting"]',
+    pos: '#nav-group-pos',
+    clients: '.nav-item[data-route="clients"]',
+    company: '.nav-item[data-route="company"]',
+    exceptions: '.nav-item[data-route="exceptions"]',
+    integrations: '#nav-integrations',
+    enroll: '#nav-enroll',
+    knowledge: '#nav-knowledge',
+};
+const AVATAR = {
+    settings: '#avatar-menu-settings',
+    console: '#avatar-menu-console',
+    billing: '#avatar-menu-billing',
+    shortcuts: '#avatar-menu-shortcuts',
+    theme: '#avatar-menu-theme',
+    help: '#avatar-menu-help',
+    logout: '#avatar-menu-logout',
+};
+
+// owner 专属 PUT /api/me/onboarding 切业态(pos_only / firm)· afterEach 幂等复原用
+async function setBusinessType(page, businessType) {
+    return page.evaluate(async (bt) => {
+        const tok = localStorage.getItem('mrpilot_token');
+        const r = await fetch('/api/me/onboarding', {
+            method: 'PUT',
+            headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ business_type: bt }),
+        });
+        return r.json();
+    }, businessType);
+}
+
+// 折叠组默认展开(max-height),但持久化可能收起 → 收起态子项高度 0、Playwright 判不可见。
+// 门控 spec 只断言"组是否属于白名单",与折叠无关,故先全部展开,断言才稳。
+async function expandAllGroups(page) {
+    await page.evaluate(() =>
+        document
+            .querySelectorAll('.nav-collapsible.collapsed')
+            .forEach((g) => g.classList.remove('collapsed'))
+    );
+}
+
 // 当前侧栏「真正可见」的 .nav-item 的 data-route 列表(display≠none 且有布局盒)·
 // 数菜单靠它,不靠 class 自欺。返回 route(无则回落 id / 占位)。
 async function visibleNavItems(page) {
@@ -82,4 +133,8 @@ module.exports = {
     dismissWorkspaceModal,
     getModules,
     visibleNavItems,
+    SIDEBAR,
+    AVATAR,
+    setBusinessType,
+    expandAllGroups,
 };

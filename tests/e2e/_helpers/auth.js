@@ -83,22 +83,15 @@ async function ensureStorageState(browser) {
     }
 
     fs.mkdirSync(AUTH_DIR, { recursive: true });
-    // 自举鸡生蛋:调用方 spec 通常 test.use({ storageState: STORAGE_STATE }),Playwright 会把该
-    // 选项继承给 browser.newContext()——文件还没生成时直接 ENOENT。先落一个空 state 占位,
-    // 登录失败再删掉(空文件是"新鲜"的,不删会让下一轮 TTL 误判已登录)。
-    fs.writeFileSync(STORAGE_STATE, JSON.stringify({ cookies: [], origins: [] }));
-    const ctx = await browser.newContext();
+    // 自举鸡生蛋:调用方 spec 的 test.use({ storageState: STORAGE_STATE }) 会把文件路径继承给
+    // browser.newContext(),文件还没生成时直接 ENOENT。显式传空 storageState 内存对象覆盖掉继承的
+    // 路径(Playwright 原生收 {cookies,origins} 对象),不落占位文件——既免了占位期间同账号并行进程
+    // TTL 误判已登录,也免了登录失败时 unlink 掉盘上仍有效的旧 token(仅登录成功才写盘)。
+    const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const page = await ctx.newPage();
     try {
         await doUiLogin(page);
         await ctx.storageState({ path: STORAGE_STATE });
-    } catch (e) {
-        try {
-            fs.unlinkSync(STORAGE_STATE);
-        } catch {
-            /* 占位已被别处清 · 忽略 */
-        }
-        throw e;
     } finally {
         await ctx.close();
     }

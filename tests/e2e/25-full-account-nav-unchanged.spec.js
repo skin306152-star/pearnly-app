@@ -7,59 +7,23 @@
 //   头像留 4:团队与权限 / 暗夜模式 / 帮助 & 反馈 / 退出登录。
 //   关键解耦:firm 后端默认开 accounting,但「做账/商品」按白名单收起 —— 证明与模块开关脱钩。
 // ============================================================
-/* global document, window */
+/* global window */
 
 const path = require('path');
 const { test, expect } = require('@playwright/test');
 const { hasCreds, ensureStorageState, STORAGE_STATE } = require('./_helpers/auth');
-const { enterApp, getModules, dismissWorkspaceModal } = require('./_helpers/app');
+const {
+    enterApp,
+    getModules,
+    dismissWorkspaceModal,
+    SIDEBAR,
+    AVATAR,
+    setBusinessType,
+    expandAllGroups,
+} = require('./_helpers/app');
 const { attachConsoleGuard, assertNoConsoleErrors } = require('./_helpers/console-guard');
 
 const OUT = path.join(process.cwd(), 'tests', 'e2e', '_artifacts', 'nav-preset');
-
-const SIDEBAR = {
-    dashboard: '.nav-item[data-route="dashboard"]',
-    cowork: '[data-collapsible="firm"]',
-    products: '[data-collapsible="products"]',
-    purchases: '[data-collapsible="expense"]',
-    sales: '[data-collapsible="sales"]',
-    accounting: '[data-collapsible="accounting"]',
-    pos: '#nav-group-pos',
-    clients: '.nav-item[data-route="clients"]',
-    company: '.nav-item[data-route="company"]',
-    exceptions: '.nav-item[data-route="exceptions"]',
-    integrations: '#nav-integrations',
-    enroll: '#nav-enroll',
-};
-const AVATAR = {
-    settings: '#avatar-menu-settings',
-    console: '#avatar-menu-console',
-    billing: '#avatar-menu-billing',
-    shortcuts: '#avatar-menu-shortcuts',
-    theme: '#avatar-menu-theme',
-    help: '#avatar-menu-help',
-    logout: '#avatar-menu-logout',
-};
-
-async function setBusinessType(page, businessType) {
-    return page.evaluate(async (bt) => {
-        const tok = localStorage.getItem('mrpilot_token');
-        const r = await fetch('/api/me/onboarding', {
-            method: 'PUT',
-            headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ business_type: bt }),
-        });
-        return r.json();
-    }, businessType);
-}
-
-async function expandAllGroups(page) {
-    await page.evaluate(() =>
-        document
-            .querySelectorAll('.nav-collapsible.collapsed')
-            .forEach((g) => g.classList.remove('collapsed'))
-    );
-}
 
 test.describe('会计版 firm · 侧栏 + 头像 + 强制门回归', () => {
     test.skip(!hasCreds(), '需测试账号·CI 无凭据时跳过');

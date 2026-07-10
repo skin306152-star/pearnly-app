@@ -1,0 +1,304 @@
+/* Pearnly AI · ai-gate.css · 未登录登录卡 + 邀请制提示两种门面样式(Z1-a)
+ * 复用 ai-theme.css 令牌 + ai-shell.css 的 .btn 系统(登录/退出按钮直接吃 .btn/.btn.pri),
+ * 不新造一套配色。全视口居中卡片,响应式按 UI-Canon-v4 §6 硬验收——宽度用 rem 相对单位,
+ * 不写裸 max-width:NNNpx(lint-ui 闸);窄高窗用 safe center 防止内容被居中裁切滚不动。
+ */
+.gate-root {
+  display: none;
+  min-height: 100vh;
+  min-height: 100dvh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;
+  overflow-y: auto;
+  background: var(--paper);
+  padding: 32px 16px;
+}
+.gate-root.on {
+  display: flex;
+}
+.gate-wrap {
+  width: 100%;
+  max-width: 30rem;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.gate-langbar {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.gate-lang-btn {
+  background: var(--surface);
+  border: 1px solid var(--hair2);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 12px;
+  color: var(--ink2);
+  cursor: pointer;
+}
+.gate-lang-btn.on {
+  border-color: var(--gold);
+  color: var(--gold);
+  font-weight: 700;
+}
+.gate-lang-btn:hover {
+  border-color: var(--mut);
+}
+.gate-lang-btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.gate-card {
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 18px;
+  box-shadow: var(--sh-pop);
+  padding: 32px 28px 26px;
+}
+.gate-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+.gate-brand .mono {
+  width: 34px;
+  height: 34px;
+  border: 1.5px solid var(--gold);
+  border-radius: 9px;
+  color: var(--gold);
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 2px;
+  flex-shrink: 0;
+}
+.gate-brand .word {
+  font-family: var(--serif);
+  font-size: 19px;
+  color: var(--ink);
+}
+.gate-brand .word b {
+  font-weight: 700;
+}
+.gate-brand .word em {
+  font-style: italic;
+  color: var(--gold);
+  font-weight: 400;
+}
+.gate-h1 {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 6px;
+}
+.gate-sub {
+  font-size: 12.5px;
+  color: var(--mut);
+  line-height: 1.6;
+  margin-bottom: 22px;
+}
+.gate-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.gf-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.gf-row label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.gf-row input {
+  font-size: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--hair2);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  width: 100%;
+}
+.gf-row input:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-color: var(--gold);
+}
+.gf-split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+}
+.gf-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink2);
+  cursor: pointer;
+}
+.gf-link {
+  color: var(--sage-deep);
+  font-weight: 600;
+  text-decoration: none;
+}
+.gf-link:hover {
+  text-decoration: underline;
+}
+.gf-link:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.gf-submit {
+  width: 100%;
+  justify-content: center;
+  padding: 11px 16px;
+  font-size: 13.5px;
+}
+.gf-msg {
+  font-size: 12px;
+  min-height: 16px;
+  line-height: 1.5;
+}
+.gf-msg.error {
+  color: var(--crit);
+  font-weight: 600;
+}
+.gate-card-invite {
+  text-align: center;
+}
+.gate-card-invite .gate-brand {
+  justify-content: center;
+}
+.gate-invite-ic {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--gold-soft);
+  border: 1px solid var(--hair2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+.gate-invite-ic svg {
+  width: 22px;
+  height: 22px;
+  stroke: var(--gold);
+}
+.gate-card-invite .gate-sub {
+  margin-bottom: 20px;
+}
+.gate-help {
+  background: var(--surface2);
+  border: 1px solid var(--hair);
+  border-radius: 16px;
+  padding: 16px 18px;
+}
+.gh-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ink2);
+  margin-bottom: 12px;
+}
+.gh-ic {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--hair2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.gh-ic svg {
+  width: 13px;
+  height: 13px;
+  stroke: var(--sage-deep);
+}
+.gh-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.gh-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--hair2);
+  text-decoration: none;
+  color: var(--ink2);
+  font-size: 11px;
+  min-height: 40px;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+.gh-item:hover {
+  border-color: var(--sage);
+  background: var(--sage-soft);
+}
+.gh-item:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.gh-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface2);
+}
+.gh-dot svg {
+  width: 14px;
+  height: 14px;
+  stroke: var(--ink2);
+}
+.gh-dot.email {
+  background: var(--gold-soft);
+}
+.gh-dot.email svg {
+  stroke: var(--gold);
+}
+.gh-dot.line {
+  background: var(--sage-soft);
+}
+.gh-dot.line svg {
+  stroke: var(--sage-deep);
+}
+.gh-dot.phone {
+  background: var(--good-soft);
+}
+.gh-dot.phone svg {
+  stroke: var(--good);
+}
+
+@media (max-width: 480px) {
+  .gate-card {
+    padding: 26px 20px 20px;
+  }
+  .gh-grid {
+    gap: 6px;
+  }
+}

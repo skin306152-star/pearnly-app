@@ -105,8 +105,8 @@ def resolve_account_identifier(raw: str) -> dict:
     }
 
 
-def find_login_user(cur, email_norm: str):
-    """按归一化邮箱找已存在账号(邮箱 / 归一化邮箱 / 用户名三路,与注册防薅同口径)。
+def find_login_user(cur, lookup_key: str):
+    """按 lookup_key 找账号(邮箱形态喂归一化邮箱、用户名形态喂小写;邮箱/归一化邮箱/用户名三路 lower() 命中,与注册防薅同口径)。
 
     返回 dict(id / tenant_id / username / is_super_admin)或 None。用调用方事务游标。
     """
@@ -115,7 +115,7 @@ def find_login_user(cur, email_norm: str):
         "COALESCE(is_super_admin, FALSE) AS is_super_admin "
         "FROM users WHERE lower(COALESCE(email,'')) = %s "
         "OR lower(COALESCE(email_normalized,'')) = %s OR lower(username) = %s LIMIT 1",
-        (email_norm, email_norm, email_norm),
+        (lookup_key, lookup_key, lookup_key),
     )
     return cur.fetchone()
 

@@ -39,24 +39,17 @@ def _resolve_tenant(cur, q: str) -> Optional[dict]:
     row = cur.fetchone()
     if row:
         return dict(row)
-    if "@" in q:
-        cur.execute(
-            "SELECT t.id::text AS id, t.name, t.created_at FROM tenants t "
-            "JOIN users u ON u.tenant_id = t.id WHERE lower(u.email) = lower(%s) LIMIT 1",
-            (q,),
-        )
-        row = cur.fetchone()
-        if row:
-            return dict(row)
-    else:
-        cur.execute(
-            "SELECT t.id::text AS id, t.name, t.created_at FROM tenants t "
-            "JOIN users u ON u.tenant_id = t.id WHERE lower(u.username) = lower(%s) LIMIT 1",
-            (q,),
-        )
-        row = cur.fetchone()
-        if row:
-            return dict(row)
+    # 含 @ 走邮箱列、否则用户名列(注册保证用户名不含 @,两形态不会互撞)。col 是二选一白名单
+    # 字面量、无注入面;标识值 q 仍参数化。
+    col = "email" if "@" in q else "username"
+    cur.execute(
+        f"SELECT t.id::text AS id, t.name, t.created_at FROM tenants t "
+        f"JOIN users u ON u.tenant_id = t.id WHERE lower(u.{col}) = lower(%s) LIMIT 1",
+        (q,),
+    )
+    row = cur.fetchone()
+    if row:
+        return dict(row)
     cur.execute(
         "SELECT id::text AS id, name, created_at FROM tenants WHERE name ILIKE %s "
         "ORDER BY created_at DESC LIMIT 1",

@@ -16,7 +16,10 @@
 access_token 后按主站同款(localStorage['mrpilot_token'])落地,登录成功进主应用 /home ——
 该账号是 pos_only 业态,home 自动渲染 7 项精简后台。
 
-自包含 · 4 语 · Pearnly 令牌(rgb 表色避 UI lint 裸 hex 闸)· noindex。
+自包含 · 4 语 · noindex。配色对齐 POS Purple v2:页内定义最小 :root 变量,accent/accent-press
+的值抄 static/pos/pos.css 的 --accent / --accent-d 令牌,样式引用一律走 var()。注意:本页 CSS
+内联在 .py 字符串里,ui_design_lint(只扫 src/home + static)扫不到——这不是通行证,改配色时
+人工对着 pos.css 令牌守,两处同步。
 """
 
 POS_LOGIN_HTML = """<!doctype html>
@@ -34,7 +37,9 @@ POS_LOGIN_HTML = """<!doctype html>
 <link rel="icon" href="/static/brand/favicon.ico?v=1" sizes="any" />
 <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png?v=1" />
 <style>
-:root{--bg:rgb(250,250,248);--panel:rgb(255,255,255);--ink:rgb(26,26,26);--ink-3:rgb(107,114,128);--line:rgb(229,231,235);--accent:rgb(37,99,235);--accent-press:rgb(29,78,216);--danger:rgb(220,38,38);--ok:rgb(5,150,105);--inverse:rgb(255,255,255)}
+/* accent/accent-press 值对齐 static/pos/pos.css 的 --accent / --accent-d 令牌(POS Purple v2)·
+   改令牌时两处同步。本文件在 .py 里,ui_design_lint 扫不到,靠人工守。 */
+:root{--bg:rgb(250,250,248);--panel:rgb(255,255,255);--ink:rgb(26,26,26);--ink-3:rgb(107,114,128);--line:rgb(229,231,235);--accent:#7C4DFF;--accent-press:#6B3FF2;--danger:rgb(220,38,38);--ok:rgb(5,150,105);--inverse:rgb(255,255,255)}
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'PingFang SC','Microsoft YaHei',sans-serif;padding:24px}
 .brand{font-size:22px;font-weight:700;letter-spacing:-.5px;margin-bottom:6px;color:var(--ink);text-decoration:none}
@@ -95,10 +100,10 @@ button.submit:disabled{opacity:.6;cursor:default}
 (function(){
 'use strict';
 var I18N={
-zh:{tag:'收银后台 · POS',title:'登录',sub:'用你的账号邮箱和密码登录 POS 后台。',email:'邮箱',pw:'密码',submit:'登录',submitting:'登录中…',empty:'请输入邮箱和密码',wrong:'邮箱或密码不正确',locked:'尝试次数过多 · 请 30 分钟后再试',neterr:'网络异常 · 请稍后重试',forgot:'忘记密码?',forgotEmail:'账号邮箱',forgotSend:'发送重置链接',forgotSending:'发送中…',forgotSent:'若该邮箱存在 · 重置链接已发出',forgotBad:'请输入有效邮箱'},
-th:{tag:'ระบบหลังร้าน · POS',title:'เข้าสู่ระบบ',sub:'เข้าสู่ระบบหลังร้าน POS ด้วยอีเมลและรหัสผ่านของคุณ',email:'อีเมล',pw:'รหัสผ่าน',submit:'เข้าสู่ระบบ',submitting:'กำลังเข้าสู่ระบบ…',empty:'กรุณากรอกอีเมลและรหัสผ่าน',wrong:'อีเมลหรือรหัสผ่านไม่ถูกต้อง',locked:'พยายามหลายครั้งเกินไป · ลองใหม่ใน 30 นาที',neterr:'เครือข่ายมีปัญหา · ลองใหม่อีกครั้ง',forgot:'ลืมรหัสผ่าน?',forgotEmail:'อีเมลบัญชี',forgotSend:'ส่งลิงก์รีเซ็ต',forgotSending:'กำลังส่ง…',forgotSent:'หากมีอีเมลนี้ · ได้ส่งลิงก์รีเซ็ตแล้ว',forgotBad:'กรุณากรอกอีเมลที่ถูกต้อง'},
-en:{tag:'Back office · POS',title:'Sign in',sub:'Sign in to the POS back office with your account email and password.',email:'Email',pw:'Password',submit:'Sign in',submitting:'Signing in…',empty:'Please enter email and password',wrong:'Incorrect email or password',locked:'Too many attempts · try again in 30 minutes',neterr:'Network error · please try again',forgot:'Forgot password?',forgotEmail:'Account email',forgotSend:'Send reset link',forgotSending:'Sending…',forgotSent:'If the email exists · a reset link has been sent',forgotBad:'Please enter a valid email'},
-ja:{tag:'バックオフィス · POS',title:'ログイン',sub:'アカウントのメールとパスワードで POS 管理画面にログイン。',email:'メール',pw:'パスワード',submit:'ログイン',submitting:'ログイン中…',empty:'メールとパスワードを入力してください',wrong:'メールまたはパスワードが正しくありません',locked:'試行回数が多すぎます · 30 分後に再試行',neterr:'ネットワークエラー · もう一度お試しください',forgot:'パスワードをお忘れですか?',forgotEmail:'アカウントのメール',forgotSend:'リセットリンクを送信',forgotSending:'送信中…',forgotSent:'該当メールがあれば · リセットリンクを送信しました',forgotBad:'有効なメールを入力してください'}};
+zh:{tag:'POS 老板后台',title:'登录',sub:'用你的账号邮箱和密码登录 POS 后台。',email:'邮箱',pw:'密码',submit:'登录',submitting:'登录中…',empty:'请输入邮箱和密码',wrong:'邮箱或密码不正确',locked:'尝试次数过多 · 请 30 分钟后再试',neterr:'网络异常 · 请稍后重试',forgot:'忘记密码?',forgotEmail:'账号邮箱',forgotSend:'发送重置链接',forgotSending:'发送中…',forgotSent:'若该邮箱存在 · 重置链接已发出',forgotBad:'请输入有效邮箱'},
+th:{tag:'ระบบหลังร้าน POS',title:'เข้าสู่ระบบ',sub:'เข้าสู่ระบบหลังร้าน POS ด้วยอีเมลและรหัสผ่านของคุณ',email:'อีเมล',pw:'รหัสผ่าน',submit:'เข้าสู่ระบบ',submitting:'กำลังเข้าสู่ระบบ…',empty:'กรุณากรอกอีเมลและรหัสผ่าน',wrong:'อีเมลหรือรหัสผ่านไม่ถูกต้อง',locked:'พยายามหลายครั้งเกินไป · ลองใหม่ใน 30 นาที',neterr:'เครือข่ายมีปัญหา · ลองใหม่อีกครั้ง',forgot:'ลืมรหัสผ่าน?',forgotEmail:'อีเมลบัญชี',forgotSend:'ส่งลิงก์รีเซ็ต',forgotSending:'กำลังส่ง…',forgotSent:'หากมีอีเมลนี้ · ได้ส่งลิงก์รีเซ็ตแล้ว',forgotBad:'กรุณากรอกอีเมลที่ถูกต้อง'},
+en:{tag:'POS Back Office',title:'Sign in',sub:'Sign in to the POS back office with your account email and password.',email:'Email',pw:'Password',submit:'Sign in',submitting:'Signing in…',empty:'Please enter email and password',wrong:'Incorrect email or password',locked:'Too many attempts · try again in 30 minutes',neterr:'Network error · please try again',forgot:'Forgot password?',forgotEmail:'Account email',forgotSend:'Send reset link',forgotSending:'Sending…',forgotSent:'If the email exists · a reset link has been sent',forgotBad:'Please enter a valid email'},
+ja:{tag:'POS 管理画面',title:'ログイン',sub:'アカウントのメールとパスワードで POS 管理画面にログイン。',email:'メール',pw:'パスワード',submit:'ログイン',submitting:'ログイン中…',empty:'メールとパスワードを入力してください',wrong:'メールまたはパスワードが正しくありません',locked:'試行回数が多すぎます · 30 分後に再試行',neterr:'ネットワークエラー · もう一度お試しください',forgot:'パスワードをお忘れですか?',forgotEmail:'アカウントのメール',forgotSend:'リセットリンクを送信',forgotSending:'送信中…',forgotSent:'該当メールがあれば · リセットリンクを送信しました',forgotBad:'有効なメールを入力してください'}};
 function pick(){var s='';try{s=localStorage.getItem('mrpilot_lang')||''}catch(e){}var n=(navigator.language||'').slice(0,2);var c=s||n;return I18N[c]?c:'zh'}
 var lang=pick(),dict=I18N[lang]||I18N.zh;
 function $(id){return document.getElementById(id)}

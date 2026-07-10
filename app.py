@@ -156,6 +156,9 @@ from routes.workspace_routes import (
 from routes.workorder_routes import (
     router as workorder_router,
 )  # M1-B1 · Pearnly AI 工单制 API(挂 pearnly_ai_m1 闸 · 默认关) · 2026-07-09
+from routes.tax_profile_routes import (
+    router as tax_profile_router,
+)  # B2-e · 税务画像/别名/义务清单 API(挂 pearnly_ai_m1 闸 · 默认关) · 2026-07-10
 from routes.categories_routes import (
     router as categories_router,
 )  # REFACTOR-B1 · 分类 1 路由 · 2026-05-25
@@ -330,6 +333,9 @@ app.include_router(email_ingest_router)  # REFACTOR-B1 · 邮箱抓取 6 路由(
 app.include_router(rd_router)  # REFACTOR-B1 · 泰国 RD 税务 4 路由(2026-05-25)
 app.include_router(workspace_router)  # B4 · workspace 账套主体读写(非破坏 · 2026-05-25)
 app.include_router(workorder_router)  # M1-B1 · Pearnly AI 工单制 API(pearnly_ai_m1 闸 · 2026-07-09)
+app.include_router(
+    tax_profile_router
+)  # B2-e · 税务画像/别名/义务清单 API(pearnly_ai_m1 闸 · 2026-07-10)
 app.include_router(settings_router)  # REFACTOR-B1 · 归档/查重设置 5 路由(2026-05-25)
 app.include_router(categories_router)  # REFACTOR-B1 · 分类 1 路由(2026-05-25)
 app.include_router(pages_router)  # REFACTOR-B1 · 静态页面 + 公开 meta 12 路由(2026-05-25)

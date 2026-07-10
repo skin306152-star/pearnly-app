@@ -195,6 +195,51 @@
                         return r.blob();
                     });
             },
+            // 税务画像/别名/义务清单(B2-e · routes/tax_profile_routes.py)。三块围绕
+            // 同一个 workspace_client_id,不挂在某个具体工单下。
+            getTaxProfile: function (clientId) {
+                return call(
+                    'GET',
+                    '/api/workspace/clients/' + encodeURIComponent(clientId) + '/tax-profile'
+                );
+            },
+            putTaxProfile: function (clientId, body) {
+                return call(
+                    'PUT',
+                    '/api/workspace/clients/' + encodeURIComponent(clientId) + '/tax-profile',
+                    body
+                );
+            },
+            listAliases: function (clientId) {
+                return call(
+                    'GET',
+                    '/api/workspace/clients/' + encodeURIComponent(clientId) + '/aliases'
+                );
+            },
+            addAlias: function (clientId, body) {
+                return call(
+                    'POST',
+                    '/api/workspace/clients/' + encodeURIComponent(clientId) + '/aliases',
+                    body
+                );
+            },
+            deactivateAlias: function (clientId, aliasId) {
+                return call(
+                    'POST',
+                    '/api/workspace/clients/' +
+                        encodeURIComponent(clientId) +
+                        '/aliases/' +
+                        encodeURIComponent(aliasId) +
+                        '/deactivate'
+                );
+            },
+            listObligations: function (clientId, period) {
+                var qs = period ? '?period=' + encodeURIComponent(period) : '';
+                return call(
+                    'GET',
+                    '/api/workspace/clients/' + encodeURIComponent(clientId) + '/obligations' + qs
+                );
+            },
         };
     }
 

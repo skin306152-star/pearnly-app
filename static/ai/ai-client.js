@@ -87,7 +87,14 @@
                 var cells = numKeys
                     .map(function (k) {
                         var v = (d.numbers || {})[k];
-                        var display = /vat|amount|due/.test(k) ? AI.format.money(v) : esc(v);
+                        // N-3 修复:prior_period_check 是对象({status:...}),不能走通用
+                        // esc(v) 路径(会字面显示 [object Object])——单独映射成人话文案。
+                        var display =
+                            k === 'prior_period_check'
+                                ? AI.format.priorPeriodCheckText(v)
+                                : /vat|amount|due/.test(k)
+                                  ? AI.format.money(v)
+                                  : esc(v);
                         return (
                             '<div class="cell"><div class="lb">' +
                             esc(AI.format.fieldLabel(k)) +
@@ -163,11 +170,19 @@
         AI.pkg.mount(S.api, order, S.clientId);
     }
 
+    // 画像/别名/义务(B2-e):不像其它四个 tab 那样要求先有工单——客户建档后、开第一张
+    // 工单前也该能填画像、加别名,故不早退 emptyHtml,order 可能是 null 原样传下去
+    // (AI.profile.mount 内部按 order 有无决定义务清单请求带不带 period)。
+    function renderProfile() {
+        AI.profile.mount(S.api, currentOrder(), S.clientId);
+    }
+
     function renderActiveView() {
         if (S.view === 'wo') renderWo();
         else if (S.view === 'intake') renderIntake();
         else if (S.view === 'review') renderReview();
         else if (S.view === 'pkg') renderPkg();
+        else if (S.view === 'profile') renderProfile();
     }
 
     function wireChrome() {
@@ -214,7 +229,7 @@
         S.periodIdx = 0;
         renderHeader();
         renderTabs();
-        ['intake', 'wo', 'review', 'pkg'].forEach(function (v) {
+        ['intake', 'wo', 'review', 'pkg', 'profile'].forEach(function (v) {
             $('cv-' + v).innerHTML = AI.state.loadingHtml();
         });
         Promise.all([api.getClient(clientId), api.listOrders({ client_id: clientId })])
@@ -230,7 +245,7 @@
             })
             .catch(function () {
                 renderHeader();
-                ['intake', 'wo', 'review', 'pkg'].forEach(function (v) {
+                ['intake', 'wo', 'review', 'pkg', 'profile'].forEach(function (v) {
                     $('cv-' + v).innerHTML = AI.state.errorHtml({
                         title: at('error_t'),
                         sub: at('error_s'),

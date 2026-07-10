@@ -109,6 +109,28 @@
         return String(email).split('@')[0];
     }
 
+    // prior_period_check(compute.py 产出的对象,{status:'no_prior_period'} 或 {status:'compared',
+    // prior_period, prior_tax_due, delta})→ i18n key + 插值(N-3 修复:B2-e 前 ai-client.js 把
+    // 整个对象直接扔进 esc() 显示成字面 "[object Object]")。如实展示原始差额数字,不臆断
+    // "多缴/少缴"方向(状态诚实)。
+    function priorPeriodCheckStatus(check) {
+        check = check || {};
+        if (check.status === 'compared') {
+            return {
+                key: 'ppc_compared',
+                vars: { period: check.prior_period, delta: money(check.delta) },
+            };
+        }
+        return { key: 'ppc_no_prior', vars: null };
+    }
+
+    // 浏览器专用:上面纯函数的结果套 at()+esc(),给 renderWo 的单元格直接用。
+    function priorPeriodCheckText(check) {
+        var d = priorPeriodCheckStatus(check);
+        if (!root || typeof root.at !== 'function') return d.key;
+        return escHtml(root.at(d.key, d.vars || undefined));
+    }
+
     // 交付物/工单数字字段名 → 四语人话短标签(补 W1 降级点 7)。查表在 ai-i18n.js 的
     // field_<key>;at() 对完全不存在的 key 会原样回退成传入字符串本身,据此判定"没有翻译"。
     function fieldLabel(key) {
@@ -129,6 +151,8 @@
         jwtPayload: jwtPayload,
         jwtDisplayName: jwtDisplayName,
         fieldLabel: fieldLabel,
+        priorPeriodCheckStatus: priorPeriodCheckStatus,
+        priorPeriodCheckText: priorPeriodCheckText,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) {

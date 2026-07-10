@@ -1,9 +1,9 @@
 /*
  * Pearnly AI · ai-router.js · 页内 hash 路由(纯解析/拼装 + 薄 DOM 订阅)
  *
- * 路由形态(M1-W1 拍板):
+ * 路由形态(M1-W1 拍板 · profile 见 B2-e):
  *   #/                        选客户层(默认)
- *   #/client/<id>/<view>      客户独立页,view ∈ intake|wo|review|pkg
+ *   #/client/<id>/<view>      客户独立页,view ∈ intake|wo|review|pkg|profile
  *
  * 无跨标签共享态——路由只读 URL,不读/写 localStorage(双标签隔离铁律)。
  * parse/build 是纯函数:浏览器挂 window.AI.router,node(测试)走 module.exports。
@@ -11,7 +11,9 @@
 (function (root) {
     'use strict';
 
-    var VIEWS = ['intake', 'wo', 'review', 'pkg'];
+    // profile(税务画像/别名/义务清单)排最后:不改前四个 tab 的默认路由行为,
+    // DEFAULT_VIEW 仍是 'wo'——只是给合法 view 集合添一个新成员。
+    var VIEWS = ['intake', 'wo', 'review', 'pkg', 'profile'];
     var DEFAULT_VIEW = 'wo';
 
     function parseHash(hash) {

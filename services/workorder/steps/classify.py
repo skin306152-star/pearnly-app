@@ -95,13 +95,20 @@ def run(ctx: StepContext) -> StepResult:
             seen=seen_purchase_fp,
         )
         upd = outcome["update"]
+        engine_ver = ocr.get("_ocr_engine") if isinstance(ocr, dict) else None
         with _item_scope(ctx):
             ctx.store.update_item(ctx.cur, tenant_id=ctx.tenant_id, item_id=item["id"], **upd)
             # 归堆即落 item_classified 事件:进项票带票面钱字段。这条事件是 reconcile 回放金额的
             # 唯一持久源(证据链 + 断点续跑),classify 不算钱,只把票面原值落进证据流。dedupe_key
             # 锚到 item:并发接管(过期租约被另一进程续跑)重放同件也只落一条,守恒不被撑破。
+            # ocr_engine=OCR 管线版本(冻结 manifest 的模型版本自证据流取,不依赖 ai_usage 表)。
             _emit_classified(
-                ctx, item, kind=upd["kind"], status=upd["status"], money=outcome.get("money")
+                ctx,
+                item,
+                kind=upd["kind"],
+                status=upd["status"],
+                money=outcome.get("money"),
+                ocr_engine=engine_ver,
             )
         bins[outcome["kind"]] = bins.get(outcome["kind"], 0) + 1
         if outcome["flagged"]:
@@ -193,9 +200,10 @@ def _ocr_in_order(images: list[dict], tenant_id: str):
         pool.shutdown(wait=False, cancel_futures=True)
 
 
-def _emit_classified(ctx, item, *, kind, status, money, sales_read=None):
+def _emit_classified(ctx, item, *, kind, status, money, sales_read=None, ocr_engine=None):
     """落一条 item_classified 证据事件。payload 带 item_id/kind/status,进项另带票面 money,
-    销项直读另带 sales_read——reconcile 据此回放,不依赖同进程 ctx.data(续跑不丢)。
+    销项直读另带 sales_read,OCR 件另带 ocr_engine(管线版本)——reconcile/冻结据此回放,不依赖
+    同进程 ctx.data(续跑不丢)。
 
     dedupe_key 锚到 item:同件重放(并发接管/异常续跑)命中事件唯一约束不重记,守恒不被撑破。"""
     payload = {"item_id": item["id"], "kind": kind, "status": status}
@@ -203,6 +211,8 @@ def _emit_classified(ctx, item, *, kind, status, money, sales_read=None):
         payload["money"] = money
     if sales_read is not None:
         payload["sales_read"] = sales_read
+    if ocr_engine:
+        payload["ocr_engine"] = ocr_engine
     ctx.store.append_event(
         ctx.cur,
         tenant_id=ctx.tenant_id,
@@ -415,6 +425,7 @@ def _default_ocr_image(path: str) -> dict:
     fields["_needs_review"] = bool(page.get("_needs_manual_review") or legacy.get("_needs_review"))
     fields["_validation_warnings"] = list(page.get("_validation_warnings") or [])
     fields["_confidence_band"] = page.get("_confidence_band") or legacy.get("_confidence_band")
+    fields["_ocr_engine"] = legacy.get("engine")  # 管线版本 → item_classified 证据(冻结用)
     return fields
 
 

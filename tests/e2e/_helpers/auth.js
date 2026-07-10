@@ -83,11 +83,22 @@ async function ensureStorageState(browser) {
     }
 
     fs.mkdirSync(AUTH_DIR, { recursive: true });
+    // 自举鸡生蛋:调用方 spec 通常 test.use({ storageState: STORAGE_STATE }),Playwright 会把该
+    // 选项继承给 browser.newContext()——文件还没生成时直接 ENOENT。先落一个空 state 占位,
+    // 登录失败再删掉(空文件是"新鲜"的,不删会让下一轮 TTL 误判已登录)。
+    fs.writeFileSync(STORAGE_STATE, JSON.stringify({ cookies: [], origins: [] }));
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
     try {
         await doUiLogin(page);
         await ctx.storageState({ path: STORAGE_STATE });
+    } catch (e) {
+        try {
+            fs.unlinkSync(STORAGE_STATE);
+        } catch {
+            /* 占位已被别处清 · 忽略 */
+        }
+        throw e;
     } finally {
         await ctx.close();
     }

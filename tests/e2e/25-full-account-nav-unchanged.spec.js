@@ -53,14 +53,6 @@ async function setBusinessType(page, businessType) {
     }, businessType);
 }
 
-async function workspaceCount(page) {
-    return page.evaluate(async () => {
-        if (typeof window.fetchWorkspaceClients !== 'function') return 0;
-        const l = await window.fetchWorkspaceClients();
-        return Array.isArray(l) ? l.length : 0;
-    });
-}
-
 async function expandAllGroups(page) {
     await page.evaluate(() =>
         document
@@ -91,11 +83,13 @@ test.describe('会计版 firm · 侧栏 + 头像 + 强制门回归', () => {
         expect(before.ok, 'GET /api/me/modules 成功').toBe(true);
         originalBusinessType = before.data.business_type || 'firm';
 
-        const wsN = await workspaceCount(page);
         const flip = await setBusinessType(page, 'firm');
         expect(flip.ok, 'PUT firm 成功(owner 权限)').toBe(true);
 
-        // 回归:清 session 模拟新登录会话后全新进场,firm 多套账仍应【强制弹选套账门】。
+        // 回归:清 session 模拟新登录会话后全新进场,firm 仍应【强制弹选套账门】。
+        // 设计口径(workspace-gate enforceWorkspaceGate 头注 + prod 实证 2026-07-10):
+        // 任何非超管账号每次新登录会话都弹,单套账也弹(列表恰一项)——pos_only 免门
+        // 改动不得波及此路径。
         await page.evaluate(() => {
             try {
                 sessionStorage.clear();
@@ -105,16 +99,12 @@ test.describe('会计版 firm · 侧栏 + 头像 + 强制门回归', () => {
         });
         await page.goto('/home');
 
-        if (wsN >= 2) {
-            // firm 多套账:门必须弹(pos_only 免门改动不得波及此路径)· 选第一个进场。
-            const pick = page.locator('#workspace-gate-root [data-wsg-pick]').first();
-            await expect(pick, 'firm 多套账应强制弹选套账门').toBeVisible({ timeout: 20000 });
-            await pick.click();
-            await expect(page.locator('#workspace-gate-root')).toHaveCount(0, { timeout: 10000 });
-        } else {
-            // 单套账:本就自动跳门(与业态无关)· 只确保进了工作台。
-            await expect(page.locator('#sidebar')).toBeVisible({ timeout: 20000 });
-        }
+        const pick = page.locator('#workspace-gate-root [data-wsg-pick]').first();
+        await expect(pick, 'firm 新会话应强制弹选套账门(单套账也弹)').toBeVisible({
+            timeout: 20000,
+        });
+        await pick.click();
+        await expect(page.locator('#workspace-gate-root')).toHaveCount(0, { timeout: 10000 });
 
         await page.waitForFunction(
             () => Array.isArray(window._avatarShellHide) && window._avatarShellHide.length === 3,

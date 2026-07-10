@@ -221,5 +221,36 @@ class PeriodOptionsTests(unittest.TestCase):
         self.assertEqual(out[0], out[1])
 
 
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class NeedsOpenControlTests(unittest.TestCase):
+    """开单控件显隐判据(A3 prod 实锤修复):判「当期没有工单」不是「从未有单」——
+    此前只判 entry.order 存在与否,历史账期开单在永远有旧单的真实客户上不可达。"""
+
+    def test_no_order_shows_control(self):
+        out = _run_node(f"""
+            const b = require({json.dumps(str(AI_DIR / "ai-board.js"))});
+            process.stdout.write(JSON.stringify(b.needsOpenControl({{order: null}}, '2569-05')));
+            """)
+        self.assertTrue(out)
+
+    def test_current_period_order_hides_control(self):
+        out = _run_node(f"""
+            const b = require({json.dumps(str(AI_DIR / "ai-board.js"))});
+            process.stdout.write(JSON.stringify(b.needsOpenControl(
+                {{order: {{period: '2569-05'}}}}, '2569-05'
+            )));
+            """)
+        self.assertFalse(out)
+
+    def test_historical_order_only_still_shows_control(self):
+        out = _run_node(f"""
+            const b = require({json.dumps(str(AI_DIR / "ai-board.js"))});
+            process.stdout.write(JSON.stringify(b.needsOpenControl(
+                {{order: {{period: '2568-06'}}}}, '2569-05'
+            )));
+            """)
+        self.assertTrue(out)
+
+
 if __name__ == "__main__":
     unittest.main()

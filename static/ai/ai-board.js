@@ -7,6 +7,7 @@
  *   summarizeCard(order, detail)    → 卡片摘要行的 i18n key + 变量
  *   currentPeriodBE(date)           → 公历日期换算佛历账期 "YYYY-MM"(开单默认账期)
  *   periodOptions(count, date)      → 开单可选账期列表(当月在前,往前 count-1 个月)
+ *   needsOpenControl(entry, cur)    → 卡片是否要渲染开单控件(当期没有工单)
  * COLUMNS 是五列的规范表(key + 顺序 + 列头圆点色),ai-kanban-render.js 渲染与
  * ai-dashboard.js 分组初始化都从这里派生,不各自维护第二份列清单。
  *
@@ -116,12 +117,22 @@
         return out;
     }
 
+    // 开单控件是否要出现在卡片上:当期(currentPeriod)没有工单——没有任何单,或
+    // entry 携带的最新单不是本期。此前判定是「entry.order 存在就不给开单控件」,
+    // 真实客户永远有历史单(如某客户仅有 2569-05 旧单),导致历史账期开单(A3)在
+    // 真实客户上永远不可达,prod 抓到实锤后改判据(见项目记忆 g1-first-run-direction
+    // -blackhole 同类教训:方向/开关判据只挑一种情形会在真实数据上打对折)。
+    function needsOpenControl(entry, currentPeriod) {
+        return !entry.order || entry.order.period !== currentPeriod;
+    }
+
     var api = {
         COLUMNS: COLUMNS,
         mapOrderToColumn: mapOrderToColumn,
         summarizeCard: summarizeCard,
         currentPeriodBE: currentPeriodBE,
         periodOptions: periodOptions,
+        needsOpenControl: needsOpenControl,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) {

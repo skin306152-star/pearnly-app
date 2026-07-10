@@ -47,10 +47,13 @@
         );
     }
 
-    function cardHtml(entry, optsHtml) {
+    function cardHtml(entry, optsHtml, currentPeriod) {
         var hotClass = entry.column === 'review' ? ' hot' : '';
         var summaryText = at(entry.summary.key, entry.summary.vars);
-        var openBtn = entry.order ? '' : openOrderHtml(entry.client.id, optsHtml);
+        // 判据是「当期没有工单」不是「从未有单」——见 AI.board.needsOpenControl 注释。
+        var openBtn = AI.board.needsOpenControl(entry, currentPeriod)
+            ? openOrderHtml(entry.client.id, optsHtml)
+            : '';
         // tabindex=0:卡片 Tab 可达(Enter/空格触发同点击,见 wireBoard);
         // title:名称/摘要窄卡被省略号截断时悬停可看全文(Canon §6.2)。
         return (
@@ -75,11 +78,11 @@
         );
     }
 
-    function columnHtml(col, items, optsHtml) {
+    function columnHtml(col, items, optsHtml, currentPeriod) {
         var body = items.length
             ? items
                   .map(function (entry) {
-                      return cardHtml(entry, optsHtml);
+                      return cardHtml(entry, optsHtml, currentPeriod);
                   })
                   .join('')
             : '<div class="kempty">' + esc(at('col_empty')) + '</div>';
@@ -100,10 +103,13 @@
     // entry: { client, order, detail, column, unknownStatus, summary }
     function renderBoard(container, groups) {
         var optsHtml = periodOptionsHtml();
+        // currentPeriod 整块看板算一次(同 optsHtml 的收敛理由,见 a19c8eef),各卡片
+        // 复用同一值,不在每卡重算 currentPeriodBE()。
+        var currentPeriod = AI.board.currentPeriodBE();
         container.innerHTML =
             '<div class="kanban">' +
             AI.board.COLUMNS.map(function (col) {
-                return columnHtml(col, groups[col.key] || [], optsHtml);
+                return columnHtml(col, groups[col.key] || [], optsHtml, currentPeriod);
             }).join('') +
             '</div>';
     }

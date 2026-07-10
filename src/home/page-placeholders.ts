@@ -1,5 +1,5 @@
 // ============================================================
-// REFACTOR-WB-C3 (2026-05-29) · 7 个静态占位页(coming-soon)骨架从 home.html 抽出 · 运行期注入
+// REFACTOR-WB-C3 (2026-05-29) · 静态占位页(coming-soon)骨架从 home.html 抽出 · 运行期注入
 //
 // 纯静态「即将上线」占位(仅 SVG + data-i18n · 0 交互元素 · grep 核 0 JS 绑定)· 批量注入。
 // home.html 各 <section> 留空壳。i18n 注入后子树补译(镜像 applyLang)。verbatim 0 改结构。
@@ -42,21 +42,6 @@
             <div class="coming-eta" data-i18n="cs-coming-soon">即将上线</div>
         </div>
 `,
-        'page-receivables': `
-        <div class="wrap">
-        <div class="auto-coming-hero">
-            <div class="coming-big-icon">
-                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M24 6v36"/>
-                    <path d="M34 14h-13a6 6 0 000 12h5a6 6 0 010 12h-13"/>
-                </svg>
-            </div>
-            <div class="coming-big-title" data-i18n="cs-receivables-title">应收追踪</div>
-            <div class="coming-big-desc" data-i18n="cs-receivables-desc">应收未收款一目了然 · 账龄自动分组 · 到期自动提醒客户付款 · DSO 指标实时更新</div>
-            <div class="coming-eta" data-i18n="cs-coming-soon">即将上线</div>
-        </div>
-        </div>
-`,
         'page-cloud': `
         <div class="auto-coming-hero">
             <div class="coming-big-icon">
@@ -71,14 +56,11 @@
         </div>
 `,
     };
-    // Pages that have been migrated to the Emerald kit scope.
-    const KIT_PAGES = new Set(['page-receivables']);
     const lang = window._currentLang || localStorage.getItem('mrpilot_lang') || 'th';
     const I = window.I18N;
     Object.keys(PAGES).forEach((id) => {
         const sec = document.getElementById(id);
         if (!sec || sec.dataset.wbInjected === '1') return;
-        if (KIT_PAGES.has(id)) sec.classList.add('ui');
         sec.innerHTML = PAGES[id as keyof typeof PAGES];
         sec.dataset.wbInjected = '1';
         if (I && I[lang]) {

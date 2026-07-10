@@ -26,7 +26,7 @@ import './home/page-integrations.js'; // REFACTOR-WB-C3 · 集成页骨架运行
 import './home/page-push-logs.js'; // 推送日志独立页骨架注入(2026-07-01 · 从集成页 Tab2 抽出 · 早于 erp-integration 绑定)
 import './home/page-settings.js'; // REFACTOR-WB-C3 · 设置页骨架运行期注入(home.html section 抽出 · 须早于 recon-subtab-settings DOM-move 及所有 settings 模块)
 import './home/page-automation.js'; // REFACTOR-WB-C3 · 自动化页骨架运行期注入(home.html section 抽出 · 须早于 notifications/folder-watcher/email-ingest/bank-recon 等 panel 模块 + openIntegrationDrawer DOM-move)
-import './home/page-placeholders.js'; // REFACTOR-WB-C3 · 7 个静态占位页(coming-soon)骨架运行期注入(integration/templates/api-keys/vouchers/sales-invoices/receivables/cloud)
+import './home/page-placeholders.js'; // REFACTOR-WB-C3 · 静态占位页(coming-soon)骨架运行期注入(templates/api-keys/vouchers/cloud)
 import './home/page-dashboard.js'; // REFACTOR-WB-C3 · 首页 section 骨架运行期注入(home.html 空壳 · 须在 dashboard.js 前)
 import './home/toast.js'; // REFACTOR-C1-home-batch6 · Toast/提示条/错误人话化(从 home.js 抽出 · window 桥 showToast/showAlert/hideAlerts/humanizeError/_humanizeBackendError · 被 ~38 模块裸调)
 import './home/with-loading.js'; // 丝滑专项 · 按钮即时反馈 withLoading(btn, fn)(window 桥 · 被各事件 handler 裸调)

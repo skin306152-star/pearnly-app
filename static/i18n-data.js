@@ -3853,7 +3853,6 @@ window.I18N = {
         'kb-info-note': '充值与扣费跟现有 OCR 共用同一个泰铢余额；问答按真实成本加合理毛利定价（与 OCR 同档）。',
         'kb-info-close': '知道了',
         'nav-vouchers': '自动凭证',
-        'nav-receivables': '应收追踪',
         // v118.33.3 NAV-IA Phase 3
         'sidebar-cta-upload': '上传识别',
         'nav-integrations': '集成',
@@ -5066,13 +5065,6 @@ window.I18N = {
         'cs-vouchers-f2': '批量审核 + 单笔修改 · 审计追溯完整 · 所有改动留痕',
         'cs-vouchers-f3': '支持中式凭证(借 / 贷)与泰式凭证(ใบสำคัญ)双格式',
         'cs-vouchers-eta': '预计 v104 上线',
-        // 应收追踪占位
-        'cs-receivables-title': '应收追踪',
-        'cs-receivables-desc': '应收未收款一目了然 · 账龄自动分组 · 到期自动提醒客户付款 · DSO 指标实时更新',
-        'cs-receivables-f1': '账龄分析(30 / 60 / 90 / 90+ 天) · 逾期自动红标',
-        'cs-receivables-f2': 'LINE / 邮件自动催收 · 多模板预设 · 一键群发不失礼',
-        'cs-receivables-f3': '银行流水回款自动核销 · 不用手动对账 · 收款秒到账',
-        'cs-receivables-eta': '预计 v107 上线',
         // 对账中心占位
         'cs-reconcile-title': '对账中心',
         'cs-reconcile-desc': '银行流水对账 + 月末自动报告 · 对账从 3 小时压到 30 分钟 · 不匹配项一目了然',
@@ -9032,7 +9024,6 @@ window.I18N = {
         'kb-info-note': 'Top-ups and charges share the same THB balance as OCR; Q&A is priced at real cost plus a reasonable margin (same tier as OCR).',
         'kb-info-close': 'Got it',
         'nav-vouchers': 'Auto Voucher',
-        'nav-receivables': 'Receivables',
         // v118.33.3 NAV-IA Phase 3
         'sidebar-cta-upload': 'Upload & Scan',
         'nav-integrations': 'Integrations',
@@ -10237,13 +10228,6 @@ window.I18N = {
         'cs-vouchers-f2': 'Batch review + single edit · full audit trail · every change logged',
         'cs-vouchers-f3': 'Supports Chinese (debit/credit) and Thai (ใบสำคัญ) voucher formats',
         'cs-vouchers-eta': 'Coming in v104',
-        // Receivables placeholder
-        'cs-receivables-title': 'Receivables Tracker',
-        'cs-receivables-desc': 'Unpaid invoices at a glance · aging auto-grouped · auto-remind customers · live DSO metrics',
-        'cs-receivables-f1': 'Aging analysis (30 / 60 / 90 / 90+ days) · overdue auto-flagged red',
-        'cs-receivables-f2': 'LINE / email auto-dunning · preset templates · one-click batch reminders',
-        'cs-receivables-f3': 'Bank inflow auto-reconciled against receivables · no manual matching',
-        'cs-receivables-eta': 'Coming in v107',
         // Reconciliation placeholder
         'cs-reconcile-title': 'Reconciliation',
         'cs-reconcile-desc': 'Bank statement reconciliation + month-end auto-reports · cut reconciliation from 3 hours to 30 minutes',
@@ -14197,7 +14181,6 @@ window.I18N = {
         'kb-info-note': 'การเติมเงินและการหักเงินใช้ยอด THB เดียวกับ OCR; ถาม-ตอบคิดราคาตามต้นทุนจริงบวกกำไรที่เหมาะสม (ระดับเดียวกับ OCR)',
         'kb-info-close': 'เข้าใจแล้ว',
         'nav-vouchers': 'ใบสำคัญอัตโนมัติ',
-        'nav-receivables': 'ลูกหนี้',
         // v118.33.3 NAV-IA Phase 3
         'sidebar-cta-upload': 'อัปโหลดและสแกน',
         'nav-integrations': 'การเชื่อมต่อ',
@@ -15399,13 +15382,6 @@ window.I18N = {
         'cs-vouchers-f2': 'ตรวจสอบเป็นชุด + แก้ทีละรายการ · ติดตามย้อนหลังครบถ้วน · บันทึกทุกการเปลี่ยนแปลง',
         'cs-vouchers-f3': 'รองรับใบสำคัญแบบจีน (เดบิต/เครดิต) และแบบไทย (ใบสำคัญ) ทั้งสองรูปแบบ',
         'cs-vouchers-eta': 'คาดว่าเปิดใน v104',
-        // ติดตามลูกหนี้
-        'cs-receivables-title': 'ติดตามลูกหนี้',
-        'cs-receivables-desc': 'ลูกหนี้ค้างชำระเห็นชัด · จัดกลุ่มตามอายุอัตโนมัติ · แจ้งเตือนลูกค้าเอง · ตัวชี้วัด DSO เรียลไทม์',
-        'cs-receivables-f1': 'วิเคราะห์อายุหนี้ (30 / 60 / 90 / 90+ วัน) · เกินกำหนดติดธงแดงอัตโนมัติ',
-        'cs-receivables-f2': 'ทวงอัตโนมัติทาง LINE / อีเมล · เทมเพลตหลายแบบ · ส่งเป็นกลุ่มคลิกเดียว',
-        'cs-receivables-f3': 'ยอดเข้าบัญชีตัดลูกหนี้อัตโนมัติ · ไม่ต้องจับคู่มือ',
-        'cs-receivables-eta': 'คาดว่าเปิดใน v107',
         // ศูนย์กระทบยอด
         'cs-reconcile-title': 'ศูนย์กระทบยอด',
         'cs-reconcile-desc': 'กระทบยอดธนาคาร + รายงานสิ้นเดือนอัตโนมัติ · ลดเวลากระทบยอดจาก 3 ชั่วโมงเหลือ 30 นาที',
@@ -19354,7 +19330,6 @@ window.I18N = {
         'kb-info-note': 'チャージと課金は OCR と同じ THB 残高を共有。Q&A は実コストに適正な利益を上乗せした価格（OCR と同等）。',
         'kb-info-close': '了解',
         'nav-vouchers': '自動仕訳',
-        'nav-receivables': '売掛追跡',
         // v118.33.3 NAV-IA Phase 3
         'sidebar-cta-upload': 'アップロード・読取',
         'nav-integrations': '連携',
@@ -20557,13 +20532,6 @@ window.I18N = {
         'cs-vouchers-f2': '一括承認 + 個別修正 · 完全な監査証跡 · 変更履歴を全保存',
         'cs-vouchers-f3': '中国式(借方/貸方)とタイ式(ใบสำคัญ)の二形式対応',
         'cs-vouchers-eta': 'v104 で公開予定',
-        // 売掛追跡
-        'cs-receivables-title': '売掛追跡',
-        'cs-receivables-desc': '未回収が一目瞭然 · 滞留期間別に自動分類 · 期限で自動催促 · DSO をリアルタイム表示',
-        'cs-receivables-f1': '滞留分析(30 / 60 / 90 / 90+ 日) · 期限超過は自動で赤フラグ',
-        'cs-receivables-f2': 'LINE / メールで自動催促 · テンプレート多数 · ワンクリック一括送信',
-        'cs-receivables-f3': '入金を銀行明細から自動消込 · 手動照合不要',
-        'cs-receivables-eta': 'v107 で公開予定',
         // 照合センター
         'cs-reconcile-title': '照合センター',
         'cs-reconcile-desc': '銀行明細照合 + 月末自動レポート · 照合作業を 3 時間から 30 分に短縮 · 不一致項目が一目瞭然',

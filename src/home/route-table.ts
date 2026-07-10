@@ -26,7 +26,6 @@ export const VALID_ROUTES = [
     'sales-products',
     'expense-data',
     'sales-account',
-    'receivables',
     'reconcile',
     'cloud',
     'knowledge',

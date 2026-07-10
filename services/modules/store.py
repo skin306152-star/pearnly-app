@@ -34,7 +34,7 @@ KNOWN_MODULES = (
 )
 
 # 无显式行时的回落:既有功能默认开(老租户导航不变 · 平台 onboarding 是 opt-in);
-# POS/库存默认关(onboarding 才开)。receivable 随既有「应收追踪」常显 → 默认开。
+# POS/库存默认关(onboarding 才开)。receivable 历史默认开(老租户不变;应收追踪占位页已删,模块开关留给 b2b 业态)。
 DEFAULT_ENABLED = {
     "sales": True,
     "expense": True,

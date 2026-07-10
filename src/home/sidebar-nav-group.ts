@@ -15,7 +15,6 @@
         reconcile: 'sales',
         'sales-invoices': 'sales',
         'sales-account': 'sales',
-        receivables: 'sales',
         'sales-products': 'products',
         'expense-data': 'products',
         purchase: 'expense',

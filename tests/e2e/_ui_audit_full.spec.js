@@ -25,7 +25,6 @@ const ROUTES = [
     'sales-account',
     'sales-products',
     'sales-report',
-    'receivables',
     'clients',
     'purchase',
     'purchase-suppliers',

@@ -161,7 +161,7 @@ export const SIDEBAR_HTML = `
         </div>
         <div class="nav-sub">
             <!-- 2026-06-10 五-bis:识别/对账 = 事务所代账工具 · 已移出到「事务所工具」组(business_type=firm 显)·
-                 销售开票组只留商户自己开票/收款相关:发票工作台 / 账套·开票资料 / 应收追踪 -->
+                 销售开票组只留商户自己开票/收款相关:发票工作台 / 账套·开票资料 -->
             <div class="nav-item nav-sub-item" data-route="sales-invoices" data-module="sales">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M5 2h8l3 3v13H5z"/>
@@ -176,13 +176,6 @@ export const SIDEBAR_HTML = `
                     <path d="M6 8.5h5M6 12h3"/>
                 </svg>
                 <span class="nav-label" data-i18n="nav-sales-account">账套 / 开票资料</span>
-            </div>
-            <div class="nav-item nav-sub-item" data-route="receivables" data-module="receivable">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M10 3v14"/>
-                    <path d="M14 6.5h-5a2.5 2.5 0 000 5h2a2.5 2.5 0 010 5h-5"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-receivables">应收追踪</span>
             </div>
         </div>
     </div>

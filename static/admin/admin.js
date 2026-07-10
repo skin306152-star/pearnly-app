@@ -3429,7 +3429,8 @@
                 body: { account: account, password: customPw || null },
             });
             _toast(_t('adm-pos-reset-done'), 'success');
-            if (host) host.innerHTML = _posPwOnceHtml(account, r.new_password, 'adm-pos-reset-copy');
+            if (host)
+                host.innerHTML = _posPwOnceHtml(account, r.new_password, 'adm-pos-reset-copy');
         } catch (e) {
             const msg =
                 String(e && e.message).indexOf('422') >= 0

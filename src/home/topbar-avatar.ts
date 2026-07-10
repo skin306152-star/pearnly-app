@@ -72,9 +72,12 @@
         // 壳只朝"隐"覆盖,不越权把它们显回来。
         var shellHide = window._avatarShellHide || [];
         var settingsEl = document.getElementById('avatar-menu-settings');
-        if (settingsEl) settingsEl.style.display = shellHide.indexOf('avatar-menu-settings') >= 0 ? 'none' : '';
+        if (settingsEl)
+            settingsEl.style.display = shellHide.indexOf('avatar-menu-settings') >= 0 ? 'none' : '';
         var shortcutsEl = document.getElementById('avatar-menu-shortcuts');
-        if (shortcutsEl) shortcutsEl.style.display = shellHide.indexOf('avatar-menu-shortcuts') >= 0 ? 'none' : '';
+        if (shortcutsEl)
+            shortcutsEl.style.display =
+                shellHide.indexOf('avatar-menu-shortcuts') >= 0 ? 'none' : '';
         if (shellHide.indexOf('avatar-menu-billing') >= 0) {
             var billEl = document.getElementById('avatar-menu-billing');
             if (billEl) billEl.style.display = 'none';

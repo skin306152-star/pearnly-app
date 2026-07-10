@@ -295,6 +295,54 @@ class AiIntakeRenderPureTests(unittest.TestCase):
             ],
         )
 
+    def test_split_batches_empty_and_single_file(self):
+        # G1 真机:一次传 25 张 ~55MB 撞 prod nginx 50M 单请求挂死——splitBatches 按总体积/
+        # 张数把选中文件切成安全批。边界:0 张不产批;1 张单独成 1 批(不因为"批"而空转)。
+        out = _run_node(f"""
+            const r = require({json.dumps(str(AI_DIR / "ai-intake-render.js"))});
+            process.stdout.write(JSON.stringify([
+                r.splitBatches([]),
+                r.splitBatches([{{size: 5}}]).map((b) => b.length),
+            ]));
+            """)
+        self.assertEqual(out, [[], [1]])
+
+    def test_split_batches_respects_byte_cap_exact_boundary(self):
+        # 刚好等于字节上限的两文件仍并一批(边界不误切);再加一字节的第三个文件必须另开批。
+        out = _run_node(f"""
+            const r = require({json.dumps(str(AI_DIR / "ai-intake-render.js"))});
+            const cap = 350;
+            const files = [{{size: 200}}, {{size: 150}}, {{size: 1}}];
+            process.stdout.write(JSON.stringify(
+                r.splitBatches(files, cap, 20).map((b) => b.reduce((s, f) => s + f.size, 0))
+            ));
+            """)
+        self.assertEqual(out, [350, 1])
+
+    def test_split_batches_respects_file_count_cap(self):
+        # 张数上限独立于字节上限:每个文件都很小(总字节远不到上限),仍按 capCount 切批。
+        out = _run_node(f"""
+            const r = require({json.dumps(str(AI_DIR / "ai-intake-render.js"))});
+            const files = Array.from({{length: 45}}, () => ({{size: 1}}));
+            process.stdout.write(JSON.stringify(
+                r.splitBatches(files, 10 * 1024 * 1024, 20).map((b) => b.length)
+            ));
+            """)
+        self.assertEqual(out, [20, 20, 5])
+
+    def test_split_batches_solo_file_that_would_overflow_running_batch(self):
+        # 单张文件本身在 per-file 上限内(≤ 批字节上限),但加进当前累积批会超批字节上限——
+        # 不能拆散单文件,必须让它独占下一批,而不是把批撑爆或报错。
+        out = _run_node(f"""
+            const r = require({json.dumps(str(AI_DIR / "ai-intake-render.js"))});
+            const cap = 100;
+            const files = [{{size: 80}}, {{size: 60}}];
+            process.stdout.write(JSON.stringify(
+                r.splitBatches(files, cap, 20).map((b) => b.map((f) => f.size))
+            ));
+            """)
+        self.assertEqual(out, [[80], [60]])
+
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class AiPkgRenderPureTests(unittest.TestCase):

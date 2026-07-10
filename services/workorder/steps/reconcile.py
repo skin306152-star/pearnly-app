@@ -24,6 +24,9 @@ _EVT_DECISION = "human_decision"
 _PURCHASE = "purchase_invoice"
 _SALES = "sales_summary"
 _BANK = "bank_statement"
+# classify 判不出进/销方向的票落 kind=unknown + flag_reason 以此起头(sort.bin_ocr_fields)。
+# 这类票必须走人工方向裁决(assign_kind),不许被 R1 静默漏掉——G1 定金冲抵票黑洞的根因。
+_DIRECTION_AMBIGUOUS = "direction_ambiguous"
 
 
 def run(ctx: StepContext) -> StepResult:
@@ -34,11 +37,18 @@ def run(ctx: StepContext) -> StepResult:
     classified = _replay_money(events)
     decisions = _replay(events, _EVT_DECISION)
 
-    # R1 进项税
+    # R1 进项税。除已归堆的进项票外,还收编「方向不明」票:它们钱已 OCR 出来,只是进/销没判准,
+    # 必须靠人工 assign_kind 裁决归位(裁进项才入 Σ),无裁决 → 与「flagged 无裁决」同等停机点名。
     purchases = [
         it for it in items if it["kind"] == _PURCHASE and it["status"] in ("ok", "flagged")
     ]
-    r1 = gates.resolve_input_vat(purchases, classified, decisions)
+    ambiguous = [
+        it
+        for it in items
+        if it["status"] == "flagged"
+        and str(it.get("flag_reason") or "").startswith(_DIRECTION_AMBIGUOUS)
+    ]
+    r1 = gates.resolve_input_vat(purchases, classified, decisions, ambiguous=ambiguous)
     if r1["unresolved"]:
         return StepResult.stuck(r1["unresolved"])
 
@@ -99,10 +109,11 @@ def _replay(events: list[dict], event_type: str) -> dict:
 
 
 def _replay_money(events: list[dict]) -> dict:
-    """进项票的票面钱字段:item_classified(kind=purchase_invoice)的 money 载荷。"""
+    """票面钱字段:任何带 money 载荷的 item_classified 事件(进项票 + 方向不明票——后者
+    钱已读出,待人工定向后按裁定 kind 决定是否进 R1)。按 item_id 回放,latest-wins。"""
     out: dict = {}
     for p in _replay(events, _EVT_CLASSIFIED).values():
-        if p.get("kind") == _PURCHASE and p.get("money"):
+        if p.get("money"):
             out[p["item_id"]] = p["money"]
     return out
 

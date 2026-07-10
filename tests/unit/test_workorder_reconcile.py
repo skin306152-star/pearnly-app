@@ -74,6 +74,50 @@ def _decision_evt(item_id, decision, values=None):
     }
 
 
+# G1 事故复现常量:定金冲抵结构(หัก เงินมัดจำ)的真进项票,VAT 3796.80 曾被 direction_ambiguous
+# 判成 kind=unknown 后彻底隐形——不进队列、不进 blocked_reasons、进项静默少这一笔。
+G1_DEPOSIT_VAT = Decimal("3796.80")
+
+
+def _ambiguous(item_id, *, file="IMG_deposit.jpg"):
+    """方向不明票在库里的形态(classify.bin_ocr_fields 判不出进/销):kind=unknown、flagged。"""
+    return {
+        "id": item_id,
+        "kind": "unknown",
+        "status": "flagged",
+        "flag_reason": "direction_ambiguous",
+        "file_ref": f"/in/{file}",
+    }
+
+
+def _ambiguous_money_evt(item_id, *, net, vat, grand, inv="DEP-01"):
+    """方向不明票的 item_classified 事件:钱已 OCR 出来(kind=unknown),待人工定向。"""
+    return {
+        "event_type": "item_classified",
+        "step": "classify",
+        "payload": {
+            "item_id": item_id,
+            "kind": "unknown",
+            "status": "flagged",
+            "money": {
+                "subtotal": net,
+                "vat": vat,
+                "total_amount": grand,
+                "invoice_number": inv,
+                "seller_tax": "0735527000289",
+            },
+        },
+    }
+
+
+def _assign_kind_evt(item_id, kind):
+    return {
+        "event_type": "human_decision",
+        "step": "reconcile",
+        "payload": {"item_id": item_id, "decision": "assign_kind", "kind": kind},
+    }
+
+
 def _sales_evt(item_id="s1"):
     """一份销项直读:表头 ยอดขาย/ภาษีขาย + 一条数据行 + 一条合计行(应被跳过不重复计)。"""
     rows = [
@@ -163,6 +207,59 @@ class R1InputVatTests(unittest.TestCase):
             _sales_evt(),
         ]
         return FakeStore(items, events)
+
+
+class R1DirectionAmbiguousTests(unittest.TestCase):
+    """G1 黑洞根治:方向不明票(direction_ambiguous)绝不静默,必须走人工方向裁决归位。"""
+
+    def _events(self, *extra):
+        return [
+            _money_evt("p1", net="1428.57", vat="100.00", grand="1528.57"),
+            _ambiguous_money_evt("d1", net="54240.00", vat=str(G1_DEPOSIT_VAT), grand="58036.80"),
+            *extra,
+            _sales_evt(),
+        ]
+
+    def _store(self, *extra):
+        items = [_pi("p1", file="a.jpg"), _ambiguous("d1", file="IMG_2647_deposit.jpg")]
+        return FakeStore(items, self._events(*extra))
+
+    def test_ambiguous_without_decision_stuck_names_ticket(self):
+        out = reconcile.run(_ctx(self._store()))
+        self.assertEqual(out.status, "stuck")
+        self.assertTrue(any("IMG_2647_deposit" in r for r in out.reasons))
+        self.assertTrue(any("direction_ambiguous" in r for r in out.reasons))
+
+    def test_assign_purchase_invoice_counts_its_vat_in_r1(self):
+        out = reconcile.run(_ctx(self._store(_assign_kind_evt("d1", "purchase_invoice"))))
+        self.assertEqual(out.status, "ok")
+        self.assertEqual(
+            Decimal(out.payload["input_vat_total"]), Decimal("100.00") + G1_DEPOSIT_VAT
+        )
+
+    def test_assign_non_tax_excludes_from_r1(self):
+        out = reconcile.run(_ctx(self._store(_assign_kind_evt("d1", "non_tax"))))
+        self.assertEqual(out.status, "ok")
+        self.assertEqual(Decimal(out.payload["input_vat_total"]), Decimal("100.00"))
+
+    def test_assign_sales_doc_excludes_from_r1(self):
+        # 销项票面不进 R1 进项 Σ(销项合计走 R2 的 POS 直读/人工申报)。
+        out = reconcile.run(_ctx(self._store(_assign_kind_evt("d1", "sales_doc"))))
+        self.assertEqual(out.status, "ok")
+        self.assertEqual(Decimal(out.payload["input_vat_total"]), Decimal("100.00"))
+
+    def test_latest_direction_decision_wins(self):
+        # 先裁进项(本应计入 3796.80)后改判非税 → latest-wins 排除,不计入。
+        out = reconcile.run(
+            _ctx(
+                self._store(
+                    _assign_kind_evt("d1", "purchase_invoice"),
+                    _assign_kind_evt("d1", "non_tax"),
+                )
+            )
+        )
+        self.assertEqual(out.status, "ok")
+        self.assertEqual(Decimal(out.payload["input_vat_total"]), Decimal("100.00"))
 
 
 class R2SalesTests(unittest.TestCase):

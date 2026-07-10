@@ -9,12 +9,19 @@
     'use strict';
 
     var PURCHASE_KIND = 'purchase_invoice';
+    var DIRECTION_AMBIGUOUS = 'direction_ambiguous';
 
-    // 契约 §1.1:队列 = flagged.filter(kind === 'purchase_invoice')。后端已按 created_at
-    // 出稳定序,这里只过滤不重排。
+    // 方向不明票(kind=unknown / flag_reason=direction_ambiguous):后端判不出进/销方向,
+    // 必须人工定向,否则进项被静默漏掉(G1 黑洞)。卡上切换成方向裁决三键,不走 A/E/X。
+    function isDirectionTicket(it) {
+        return !!it && String(it.flag_reason || '').indexOf(DIRECTION_AMBIGUOUS) === 0;
+    }
+
+    // 契约 §1.1:队列 = flagged 里的进项票 + 方向不明票(后者收编进队列由人定向,
+    // 不再隐形)。后端已按 created_at 出稳定序,这里只过滤不重排。
     function filterPurchaseQueue(flagged) {
         return (Array.isArray(flagged) ? flagged : []).filter(function (it) {
-            return it && it.kind === PURCHASE_KIND;
+            return it && (it.kind === PURCHASE_KIND || isDirectionTicket(it));
         });
     }
 
@@ -35,6 +42,7 @@
         ocr_validation_warning: 'rv_flag_validation',
         ocr_low_confidence: 'rv_flag_low_conf',
         ocr_error: 'rv_flag_ocr_error',
+        direction_ambiguous: 'rv_flag_direction',
     };
     function flagReasonKey(reason) {
         var r = String(reason || '');
@@ -50,11 +58,23 @@
         return root.AI.format.parseAmount(raw, true);
     }
 
-    // 一次按键(A 采纳 / E 改数 / X 剔除)→ POST /decisions 的 body(契约 §2)。
-    // recalc 缺合法 VAT 时返回 null——调用方不发请求,就地提示「请填有效 VAT」。
+    // 方向裁决三键(进项 P / 销项 S / 非税 X)→ 后端 assign_kind 的裁定 kind。方向票模式下
+    // X 语义从「剔除」切换成「非税票」(卡上明示),不与金额票的 A/E/X 混。
+    var _ASSIGN_KIND = {
+        assign_purchase: 'purchase_invoice',
+        assign_sales: 'sales_doc',
+        assign_nontax: 'non_tax',
+    };
+
+    // 一次按键 → POST /decisions 的 body(契约 §2)。金额票:A 采纳 / E 改数 / X 剔除;
+    // 方向票:P 进项 / S 销项 / X 非税(assign_kind)。recalc 缺合法 VAT 时返回 null——调用方
+    // 不发请求,就地提示「请填有效 VAT」。
     function buildDecisionPayload(itemId, action, vatRaw) {
         if (action === 'accept') return { item_id: itemId, decision: 'face_value' };
         if (action === 'exclude') return { item_id: itemId, decision: 'exclude' };
+        if (_ASSIGN_KIND[action]) {
+            return { item_id: itemId, decision: 'assign_kind', kind: _ASSIGN_KIND[action] };
+        }
         if (action === 'recalc') {
             var vat = parseVat(vatRaw);
             if (!vat) return null;
@@ -70,8 +90,15 @@
         recalc: 'rv_chip_recalc',
         exclude: 'rv_chip_excluded',
     };
+    // 方向裁决落定后的 chip:按裁定 kind 显进项/销项/非税(assign_kind 的裁定方向)。
+    var _ASSIGN_CHIP_KEY = {
+        purchase_invoice: 'rv_chip_dir_purchase',
+        sales_doc: 'rv_chip_dir_sales',
+        non_tax: 'rv_chip_dir_nontax',
+    };
     function decisionChipKey(decision) {
         if (!decision || !decision.decision) return null;
+        if (decision.decision === 'assign_kind') return _ASSIGN_CHIP_KEY[decision.kind] || null;
         return _CHIP_KEY[decision.decision] || null;
     }
 
@@ -84,6 +111,7 @@
 
     var api = {
         PURCHASE_KIND: PURCHASE_KIND,
+        isDirectionTicket: isDirectionTicket,
         filterPurchaseQueue: filterPurchaseQueue,
         flagSeverity: flagSeverity,
         flagReasonKey: flagReasonKey,

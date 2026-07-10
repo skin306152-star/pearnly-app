@@ -265,6 +265,37 @@ class RecordDecisionTests(_ApiTestBase):
         )
         self.assertEqual(self.store.appended[-1]["step"], "reconcile")
 
+    def test_assign_kind_direction_decision_appends_event(self):
+        evt = api.record_decision(
+            None,
+            tenant_id="t-1",
+            work_order_id="wo-1",
+            item_id="it-1",
+            decision="assign_kind",
+            values=None,
+            actor="user:9",
+            kind="purchase_invoice",
+        )
+        self.assertEqual(evt["event_type"], "human_decision")
+        self.assertEqual(
+            self.store.appended[-1]["payload"],
+            {"item_id": "it-1", "decision": "assign_kind", "kind": "purchase_invoice"},
+        )
+
+    def test_assign_kind_with_bad_kind_rejected(self):
+        with self.assertRaises(api.WorkOrderApiError) as ctx:
+            api.record_decision(
+                None,
+                tenant_id="t-1",
+                work_order_id="wo-1",
+                item_id="it-1",
+                decision="assign_kind",
+                values=None,
+                actor="u",
+                kind="whatever",
+            )
+        self.assertEqual(ctx.exception.code, "workorder.decision_invalid")
+
     def test_invalid_decision_rejected(self):
         with self.assertRaises(api.WorkOrderApiError) as ctx:
             api.record_decision(

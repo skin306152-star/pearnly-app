@@ -50,8 +50,11 @@ class OrderCreate(BaseModel):
 
 class DecisionIn(BaseModel):
     item_id: str = Field(..., description="被裁决的 work_order_item id")
-    decision: str = Field(..., description="face_value | recalc | exclude")
+    decision: str = Field(..., description="face_value | recalc | exclude | assign_kind")
     values: Optional[dict] = Field(None, description="recalc 时的人工补正数(如 {vat: '35.00'})")
+    kind: Optional[str] = Field(
+        None, description="assign_kind 方向裁决:purchase_invoice | sales_doc | non_tax"
+    )
 
 
 class SalesSummaryIn(BaseModel):
@@ -184,6 +187,7 @@ async def add_decision(work_order_id: str, req: DecisionIn, request: Request):
                 decision=req.decision,
                 values=req.values,
                 actor=f"user:{user['id']}",
+                kind=req.kind,
             )
         except api.WorkOrderApiError as e:
             code = 422 if e.code == "workorder.decision_invalid" else 404

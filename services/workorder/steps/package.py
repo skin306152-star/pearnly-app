@@ -109,6 +109,14 @@ _SOURCE_LABEL_TH = {
     "mixed": "กรอกเอง + อ่านตรง (人工申报 + 直读混合)",
 }
 
+# 方向裁决(assign_kind)的裁定 kind → 备忘泰文人话(与既有 _SOURCE_LABEL_TH 同风格)。
+# 备忘不该直出 "assign_kind" 这个内部裁决动作名——它只说"这是方向裁决",没说裁成了什么。
+_ASSIGN_KIND_LABEL_TH = {
+    "purchase_invoice": "ซื้อ (进项)",
+    "sales_doc": "ขาย (销项)",
+    "non_tax": "ไม่ใช่ใบกำกับ (非税)",
+}
+
 
 def _sales_source_visible(source: str | None) -> bool:
     """销项来源是否需要显著提示(状态诚实):direct_read 不提示(默认可信路径);
@@ -265,8 +273,12 @@ def _write_memo(
         return f"- {Path(it.get('file_ref') or '').name}: {it.get('flag_reason')}{extra}"
 
     def _flag_row(it: dict) -> str:
-        decision = (decisions.get(it["id"]) or {}).get("payload", {}).get("decision") or "无裁决"
-        return _tag(it, f" → {decision}")
+        dec = (decisions.get(it["id"]) or {}).get("payload") or {}
+        decision = dec.get("decision")
+        if decision == "assign_kind":
+            label = _ASSIGN_KIND_LABEL_TH.get(dec.get("kind"), dec.get("kind"))
+            return _tag(it, f" → {label}")
+        return _tag(it, f" → {decision or '无裁决'}")
 
     lines = [
         "# บันทึกเอกสารที่ขาด/ต้องทบทวน (缺料与待复核备忘)",

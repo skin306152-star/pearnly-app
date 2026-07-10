@@ -25,6 +25,9 @@
         rv_chip_accepted: 'g',
         rv_chip_recalc: 's',
         rv_chip_excluded: 'n',
+        rv_chip_dir_purchase: 'g',
+        rv_chip_dir_sales: 's',
+        rv_chip_dir_nontax: 'n',
     };
 
     function chip(cls, label) {
@@ -113,24 +116,73 @@
         );
     }
 
+    // 动作按钮定义表:A/E/X(金额票)与 P/S/X(方向票)两组共用同一套拼接逻辑
+    // (actionButton/renderActionButtons/kbdLine),不再各写一份重复 HTML 拼接。命名避开
+    // cardHtml 里已有的局部变量 actionsHtml(动作行拼好的 HTML 字符串),不与之同名撞混。
+    var _AMOUNT_ACTION_DEFS = [
+        { action: 'rv-accept', key: 'rv_key_accept', kbd: 'A', cls: 'ok' },
+        { action: 'rv-edit', key: 'rv_key_edit', kbd: 'E', cls: '' },
+        { action: 'rv-exclude', key: 'rv_key_exclude', kbd: 'X', cls: 'no' },
+    ];
+    // X 语义在方向票模式下是「非税票」而非「剔除」,提示条(dirNote)明示,按钮定义表不重叠含义。
+    var _DIRECTION_ACTION_DEFS = [
+        { action: 'rv-dir-purchase', key: 'rv_key_dir_purchase', kbd: 'P', cls: 'ok' },
+        { action: 'rv-dir-sales', key: 'rv_key_dir_sales', kbd: 'S', cls: '' },
+        { action: 'rv-dir-nontax', key: 'rv_key_dir_nontax', kbd: 'X', cls: 'no' },
+    ];
+
+    function actionButton(def) {
+        return (
+            '<button class="' +
+            (def.cls ? 'btn ' + def.cls : 'btn') +
+            '" data-action="' +
+            def.action +
+            '">' +
+            esc(at(def.key)) +
+            ' <span class="kbd">' +
+            def.kbd +
+            '</span></button>'
+        );
+    }
+
+    function renderActionButtons(defs) {
+        return (
+            '<div class="rv-actions" id="rvActions">' + defs.map(actionButton).join('') + '</div>'
+        );
+    }
+
+    // 金额票动作行(A 采纳 / E 改数 / X 剔除)。
+    function amountActions() {
+        return renderActionButtons(_AMOUNT_ACTION_DEFS);
+    }
+
+    // 方向票动作行(P 进项 / S 销项 / X 非税)。
+    function directionActions() {
+        return renderActionButtons(_DIRECTION_ACTION_DEFS);
+    }
+
+    function kbdLine(isDir) {
+        var labels = (isDir ? _DIRECTION_ACTION_DEFS : _AMOUNT_ACTION_DEFS).map(function (def) {
+            return esc(at(def.key)) + ' <span class="kbd">' + def.kbd + '</span>';
+        });
+        return (
+            '<p class="rv-kbdline">' +
+            labels.join(' · ') +
+            ' · <span class="kbd">←</span><span class="kbd">→</span></p>'
+        );
+    }
+
     // ctx: {entry, idx, total, local, editing, editErr, editValue}
     function cardHtml(ctx) {
         var entry = ctx.entry;
         var read = entry.ocr_read || {};
+        var isDir = AI.reviewQueue.isDirectionTicket(entry);
         var effectiveDecision = (ctx.local && ctx.local.decision) || entry.decision;
-        var actionsHtml = ctx.editing
-            ? ''
-            : '<div class="rv-actions" id="rvActions">' +
-              '<button class="btn ok" data-action="rv-accept">' +
-              esc(at('rv_key_accept')) +
-              ' <span class="kbd">A</span></button>' +
-              '<button class="btn" data-action="rv-edit">' +
-              esc(at('rv_key_edit')) +
-              ' <span class="kbd">E</span></button>' +
-              '<button class="btn no" data-action="rv-exclude">' +
-              esc(at('rv_key_exclude')) +
-              ' <span class="kbd">X</span></button>' +
-              '</div>';
+        // 方向票不进「改数」态(E),只定向;金额票编辑时隐藏动作行。
+        var dirNote = isDir
+            ? '<div class="rv-dir-note">' + esc(at('rv_dir_prompt')) + '</div>'
+            : '';
+        var actionsHtml = ctx.editing ? '' : isDir ? directionActions() : amountActions();
         var editHtml = ctx.editing
             ? '<div class="rv-edit" id="rvEdit">' +
               '<label class="rv-edit-lb" for="rvVatInput">' +
@@ -181,6 +233,7 @@
             ctx.total +
             '</span></h3></div>' +
             '<div class="bd">' +
+            dirNote +
             '<table class="fldt">' +
             fieldRows(read, effectiveDecision) +
             '</table>' +
@@ -189,13 +242,7 @@
             editHtml +
             '</div></div>' +
             '</div></div>' +
-            '<p class="rv-kbdline">' +
-            esc(at('rv_key_accept')) +
-            ' <span class="kbd">A</span> · ' +
-            esc(at('rv_key_edit')) +
-            ' <span class="kbd">E</span> · ' +
-            esc(at('rv_key_exclude')) +
-            ' <span class="kbd">X</span> · <span class="kbd">←</span><span class="kbd">→</span></p>'
+            kbdLine(isDir)
         );
     }
 

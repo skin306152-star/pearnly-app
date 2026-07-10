@@ -16,6 +16,12 @@ from typing import Any, Optional
 TOL = Decimal("0.01")
 ZERO = Decimal("0")
 
+# 人工方向裁决(assign_kind)的取值:进项票 / 销项票 / 非税票。api.py 落库、routes 校验同表。
+_ASSIGN_KIND = "assign_kind"
+_KIND_PURCHASE = "purchase_invoice"
+_KIND_SALES = "sales_doc"
+_KIND_NON_TAX = "non_tax"
+
 # 汇总表列角色识别关键词(泰/英)。先认销项税列再认销售额列,避免销售额误命中税额列。
 _SALES_HINTS = ("ยอดขาย", "มูลค่า", "จำนวนเงิน", "รวมเงิน", "sales", "amount", "ยอด")
 _VAT_HINTS = ("ภาษีขาย", "ภาษีมูลค่า", "vat", "ภาษี", "tax")
@@ -56,8 +62,15 @@ def _label(item: dict, money: dict) -> str:
     return f"{name}({inv})" if inv else name
 
 
-def resolve_input_vat(purchases: list[dict], classified: dict, decisions: dict) -> dict:
+def resolve_input_vat(
+    purchases: list[dict],
+    classified: dict,
+    decisions: dict,
+    ambiguous: list[dict] | None = None,
+) -> dict:
     """R1:进项税 = Σ票面。ok 直接进;flagged 必须有人工裁决,否则计入 unresolved(绝不默认吞)。
+    方向不明票(ambiguous)必须有人工 assign_kind 裁决:裁进项才入 Σ,裁销项/非税则排除,无裁决
+    → unresolved(与 flagged 无裁决同等停机点名,绝不静默漏进项)。
 
     返回 {total, unresolved[], entries[]}。unresolved 非空 → 上层整步 stuck;entries 是被计入
     合计的派生分录金额(供 R4 试算)。缺 item_classified 金额事件的 ok/face_value 件也算 unresolved
@@ -85,7 +98,38 @@ def resolve_input_vat(purchases: list[dict], classified: dict, decisions: dict) 
                 continue
         total += eff["vat"]
         entries.append(eff)
+    for it in ambiguous or []:
+        eff = _apply_direction(
+            it, classified.get(it["id"]) or {}, decisions.get(it["id"]), unresolved
+        )
+        if eff is None:
+            continue
+        total += eff["vat"]
+        entries.append(eff)
     return {"total": total, "unresolved": unresolved, "entries": entries}
+
+
+def _apply_direction(
+    it: dict, money: dict, dec: Optional[dict], unresolved: list
+) -> Optional[dict]:
+    """方向不明票的人工方向裁决取数。无裁决/未定方向 → 计 unresolved(点名·绝不静默);裁进项
+    → 用其 OCR 钱字段进 R1;裁销项 → 票面不进 R1(销项合计走 R2 的 POS 直读/人工申报);裁非税
+    → 排除。裁进项但缺金额事件(续跑丢事件)→ 停机不静默少算。"""
+    if not dec or dec.get("decision") != _ASSIGN_KIND:
+        unresolved.append(f"{_label(it, money)}: 方向不明(direction_ambiguous)未人工裁定")
+        return None
+    kind = dec.get("kind")
+    if kind == _KIND_NON_TAX:
+        return None
+    if kind == _KIND_SALES:
+        return None
+    if kind == _KIND_PURCHASE:
+        if not money:
+            unresolved.append(f"{_label(it, money)}: 方向裁定进项但缺 OCR 金额事件")
+            return None
+        return _effective(money)
+    unresolved.append(f"{_label(it, money)}: 未知方向裁决 kind={kind!r}")
+    return None
 
 
 def _apply_decision(it: dict, money: dict, dec: dict, unresolved: list) -> Optional[dict]:

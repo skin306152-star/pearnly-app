@@ -2,8 +2,10 @@
  * Pearnly AI · ai-intake.js · 收料视图(W4 补料流)编排:上传 + 人工填销项 + 补料后续跑
  *
  * 契约:M1 §四 W4 行 + §五 状态诚实(客户「⌄」只读、LINE/邮箱收料显示未开通)。上传走
- * add_materials(前端先挡 50 张/20MB,后端 413 权威),人工填销项走新 /sales-summary 端点
- * 落事件解锁 R2;补料后引导「重新跑」——续跑判活/轮询范式照抄 ai-review.js(切走后续段不认)。
+ * add_materials(前端先挡 50 张/20MB,后端 413 权威),按总体积/张数自动分批顺序调用(G1
+ * 真机:一次 25 张 ~55MB 撞 prod nginx 50M 单请求挂死,splitBatches 见 ai-intake-render.js),
+ * 人工填销项走新 /sales-summary 端点落事件解锁 R2;补料后引导「重新跑」——续跑判活/轮询
+ * 范式照抄 ai-review.js(切走后续段不认)。
  *
  * 依赖 window.AI.state/api/router/intakeRender 与全局 at(),排在它们之后、ai-client.js 之前
  * 加载(见 scripts/build-home-js.mjs 的 bundle 顺序)。
@@ -16,7 +18,6 @@
     };
     var POLL_INTERVAL_MS = 2000;
     var POLL_MAX_TRIES = 30;
-    var PURCHASE_KIND = 'purchase_invoice';
 
     var S = null;
     var wired = false;
@@ -36,6 +37,10 @@
             files: [],
             uploading: false,
             uploadErrKey: null,
+            uploadDone: 0, // 分批进度:已成功传的文件数(跨批累计,失败时留在原地不清)
+            uploadTotal: 0, // 本次上传选中的文件总数(分批进度分母)
+            uploadBatchIndex: 0, // 当前/失败批次序号(1-based)
+            uploadBatchTotal: 0, // 本次上传切成的批数(>1 才需要拼进度文案)
             formOpen: false,
             formErr: false,
             submitting: false,
@@ -53,6 +58,10 @@
             files: S.files,
             uploading: S.uploading,
             uploadErrKey: S.uploadErrKey,
+            uploadDone: S.uploadDone,
+            uploadTotal: S.uploadTotal,
+            uploadBatchIndex: S.uploadBatchIndex,
+            uploadBatchTotal: S.uploadBatchTotal,
             formOpen: S.formOpen,
             formErr: S.formErr,
             submitting: S.submitting,
@@ -131,17 +140,37 @@
         render();
     }
 
+    // 一次选中可能撞 prod nginx client_max_body_size(G1 真机:25 张 ~55MB 单请求挂死)——
+    // 按总体积/张数切成若干批(AI.intakeRender.splitBatches),顺序逐批调 addMaterials,
+    // 复用同一份 session 判活;全批成功才算成功,某批失败即停,已传批次不重试不回滚。
     function upload() {
         if (S.uploading || !S.files.length) return;
         var session = S;
-        var files = S.files;
+        var batches = AI.intakeRender.splitBatches(S.files);
         S.uploading = true;
         S.uploadErrKey = null;
+        S.uploadDone = 0;
+        S.uploadTotal = S.files.length;
+        S.uploadBatchIndex = 0;
+        S.uploadBatchTotal = batches.length;
         render();
+        uploadNextBatch(session, batches, 0);
+    }
+
+    function uploadNextBatch(session, batches, index) {
+        if (S !== session) return;
+        S.uploadBatchIndex = index + 1;
+        render();
+        var batch = batches[index];
         S.api
-            .addMaterials(S.orderId, files)
+            .addMaterials(S.orderId, batch)
             .then(function () {
                 if (S !== session) return;
+                S.uploadDone += batch.length;
+                if (index + 1 < batches.length) {
+                    uploadNextBatch(session, batches, index + 1);
+                    return;
+                }
                 S.uploading = false;
                 S.files = [];
                 S.dirty = true;
@@ -151,6 +180,11 @@
             .catch(function (err) {
                 if (S !== session) return;
                 S.uploading = false;
+                // 失败批 + 尚未发出的后续批留在 S.files 里(已成功批不放回)——重试/清空按
+                // 剩下的来,不会把刚落库成功的那部分又送一遍(写操作幂等,拒绝重复登记材料)。
+                S.files = batches.slice(index).reduce(function (acc, b) {
+                    return acc.concat(b);
+                }, []);
                 var key = AI.api.mapApiErrorKey(err && err.code);
                 S.uploadErrKey = at(key) !== key ? key : 'err_generic';
                 render();
@@ -250,9 +284,10 @@
 
     function routeAfter(detail, session, count) {
         var hasNumbers = Object.keys(detail.numbers || {}).length > 0;
-        var purchaseQueue = (detail.flagged || []).filter(function (it) {
-            return it && it.kind === PURCHASE_KIND;
-        });
+        // 进项队列口径与 W3 审核队列同一份判定(ai-review-queue.js):flagged 进项票 +
+        // 方向不明票(kind=unknown/flag_reason=direction_ambiguous)都算未定,不能只认
+        // kind===purchase_invoice 漏掉方向票,否则续跑卡在方向票时收料页无处可去。
+        var purchaseQueue = AI.reviewQueue.filterPurchaseQueue(detail.flagged || []);
         // 算到数(compute 出 tax_due)或已过 stuck → 去交付包看结果。
         if (hasNumbers || detail.status !== 'stuck') {
             window.location.hash = AI.router.buildClientHash(S.clientId, 'pkg');

@@ -40,7 +40,7 @@
             clientId: clientId,
             queue: [],
             idx: 0,
-            local: {}, // item_id -> {state: 'pending'|'accepted'|'recalc'|'excluded'|'failed', decision}
+            local: {}, // item_id -> {state: 'pending'|'accepted'|'recalc'|'excluded'|'assigned'|'failed', decision}
             editing: false,
             editErr: false,
             editValue: null,
@@ -155,14 +155,10 @@
             .then(function () {
                 if (S !== session) return; // 已切走
                 setLocal(submittedItemId, {
-                    state:
-                        action === 'accept'
-                            ? 'accepted'
-                            : action === 'exclude'
-                              ? 'excluded'
-                              : 'recalc',
+                    state: _stateForAction(action),
                     decision: {
                         decision: payload.decision,
+                        kind: payload.kind, // 方向裁决(assign_kind)携带,金额裁决为 undefined
                         values: payload.values,
                         actor: currentActorLabel(),
                         at: new Date().toISOString(),
@@ -192,6 +188,15 @@
                     false
                 );
             });
+    }
+
+    // 乐观终态标签(非 pending/failed 即视为已裁决,statusChip 据 decision 显 chip)。
+    // 方向裁决三键归一到 'assigned',金额裁决沿用各自终态。
+    function _stateForAction(action) {
+        if (action === 'accept') return 'accepted';
+        if (action === 'exclude') return 'excluded';
+        if (action === 'recalc') return 'recalc';
+        return 'assigned';
     }
 
     function advanceFocus() {
@@ -366,6 +371,27 @@
         }
         var tag = e.target && e.target.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        var entry = S.queue[S.idx];
+        // 方向不明票:键位切换成 P 进项 / S 销项 / X 非税(assign_kind),不走金额票的 A/E/X。
+        if (entry && AI.reviewQueue.isDirectionTicket(entry)) {
+            if (e.key === 'p' || e.key === 'P') {
+                e.preventDefault();
+                decide('assign_purchase');
+            } else if (e.key === 's' || e.key === 'S') {
+                e.preventDefault();
+                decide('assign_sales');
+            } else if (e.key === 'x' || e.key === 'X') {
+                e.preventDefault();
+                decide('assign_nontax');
+            } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                moveNext();
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                movePrev();
+            }
+            return;
+        }
         if (e.key === 'a' || e.key === 'A') {
             e.preventDefault();
             decide('accept');
@@ -391,6 +417,9 @@
         if (action === 'rv-accept') decide('accept');
         else if (action === 'rv-edit') startEdit();
         else if (action === 'rv-exclude') decide('exclude');
+        else if (action === 'rv-dir-purchase') decide('assign_purchase');
+        else if (action === 'rv-dir-sales') decide('assign_sales');
+        else if (action === 'rv-dir-nontax') decide('assign_nontax');
         else if (action === 'rv-rerun') startRerun();
         else if (action === 'rv-back-to-queue') backToQueue();
         else if (action === 'rv-goto-pkg') {

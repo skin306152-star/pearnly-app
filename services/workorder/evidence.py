@@ -17,6 +17,11 @@ _EVT_CLASSIFIED = "item_classified"
 _EVT_DECISION = "human_decision"
 _KIND_PURCHASE = "purchase_invoice"
 _KIND_SALES = "sales_summary"
+_KIND_UNKNOWN = "unknown"
+
+# 方向不明票(item_classified.kind=unknown)经人工 assign_kind 裁定为进项后的裁决取值——
+# 与 reconcile_gates._apply_direction 同一张表,不重复定义两套 assign_kind 语义。
+_DECISION_ASSIGN_KIND = "assign_kind"
 
 # 应缴税额的证据只挂 compute 自己的 step_done——它是"销项-进项"这一步减法的落库点。
 _NUMBER_STEP = {"tax_due": "compute"}
@@ -82,7 +87,9 @@ def build_evidence_index(
     classified = replay_items_by_type(events, _EVT_CLASSIFIED)
     decisions = replay_items_by_type(events, _EVT_DECISION)
 
-    purchase_evidence = _collect_evidence(classified, decisions, files_by_item, _KIND_PURCHASE)
+    purchase_evidence = _collect_evidence(
+        classified, decisions, files_by_item, _KIND_PURCHASE, include_direction_assigned=True
+    )
     sales_evidence = _collect_evidence(classified, decisions, files_by_item, _KIND_SALES)
     sales_source = sales_source_info(classified, decisions)
     compute_done = _compute_done_event(events)
@@ -109,21 +116,41 @@ def build_evidence_index(
     }
 
 
-def _collect_evidence(classified: dict, decisions: dict, files_by_item: dict, kind: str) -> dict:
+def _collect_evidence(
+    classified: dict,
+    decisions: dict,
+    files_by_item: dict,
+    kind: str,
+    *,
+    include_direction_assigned: bool = False,
+) -> dict:
     """某类 item(购/销)的证据聚合:事件 id / 原件路径各自去重后排序(确定性输出,利于
     快照测试与 diff 复核)+ items 逐条 {item_id, file_name}(item_id 排序,file_name 取
     file_ref 的 basename,没有原件就是 None——前端点验回链据此逐条打开原图或诚实降级)。
-    sales 只收 status=ok 的直读(flagged 的销项没有可用数字,不该被列为"支撑证据")。"""
+    sales 只收 status=ok 的直读(flagged 的销项没有可用数字,不该被列为"支撑证据")。
+
+    include_direction_assigned=True(仅 purchase 调用)时,额外纳入方向不明票:原始
+    item_classified.kind 恒为 unknown(reconcile R1 与本函数同口径认它),但已有 assign_kind
+    人工裁决把它定向为 kind——这类票的 VAT 已进 input_vat 合计,证据索引不能漏它。事件 id
+    同时收 item_classified 与 human_decision 两条(裁决本身也是证据);裁定 non_tax/sales_doc
+    的方向票不属于该 kind,不纳入。"""
     event_ids: set = set()
     source_files: set = set()
     file_by_item_id: dict = {}
     for item_id, rec in classified.items():
         payload = rec["payload"]
-        if payload.get("kind") != kind:
-            continue
-        if kind == _KIND_SALES and payload.get("status") != "ok":
-            continue
         dec = decisions.get(item_id)
+        direction_assigned = (
+            include_direction_assigned
+            and payload.get("kind") == _KIND_UNKNOWN
+            and dec is not None
+            and dec["payload"].get("decision") == _DECISION_ASSIGN_KIND
+            and dec["payload"].get("kind") == kind
+        )
+        if payload.get("kind") != kind and not direction_assigned:
+            continue
+        if not direction_assigned and kind == _KIND_SALES and payload.get("status") != "ok":
+            continue
         if dec and dec["payload"].get("decision") == "exclude":
             continue  # 人工裁决剔除的票没进合计,不算这个数字的支撑证据
         event_ids.add(rec["event_id"])

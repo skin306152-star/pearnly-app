@@ -311,6 +311,17 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+/* 方向不明票的定向提示条(G1 黑洞:进/销没判准,让人在卡上直接定向) */
+.rv-dir-note {
+  margin-top: 14px;
+  padding: 11px 13px;
+  background: var(--gold-soft);
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink);
+}
 .rv-edit {
   margin-top: 15px;
   padding: 14px;

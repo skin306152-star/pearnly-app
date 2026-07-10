@@ -14,6 +14,40 @@
     var MAX_FILES = 50;
     var MAX_BYTES = 20 * 1024 * 1024;
 
+    // 单次请求分批上限(G1 真机:一次传 25 张 ~55MB 撞 prod nginx client_max_body_size 50M,
+    // 请求挂死无响应)。35MB 留够安全边际(50M 硬顶打对折出头,扛住 multipart 边界开销);
+    // 20 张是既有实测安全值,与字节上限并列独立守——谁先触顶谁切批,两条都守。
+    var BATCH_MAX_BYTES = 35 * 1024 * 1024;
+    var BATCH_MAX_FILES = 20;
+
+    // 把已通过 validateFiles 的选中文件切成若干批,顺序上传用(每批一次 multipart 请求)。
+    // 贪心装箱:文件逐个塞进当前批,一旦加进去就超字节上限或张数上限 → 当前批收口开新批。
+    // 单文件不可能超 BATCH_MAX_BYTES(validateFiles 已挡在 MAX_BYTES=20MB < 35MB),但仍按
+    // "当前批非空才检查超限" 兜底,防御性地让任何超大单文件也能独占一批而不是死循环。
+    function splitBatches(files, maxBytes, maxCount) {
+        var capBytes = maxBytes || BATCH_MAX_BYTES;
+        var capCount = maxCount || BATCH_MAX_FILES;
+        var list = files || [];
+        var batches = [];
+        var current = [];
+        var currentBytes = 0;
+        for (var i = 0; i < list.length; i++) {
+            var f = list[i];
+            var size = (f && f.size) || 0;
+            var overBytes = current.length > 0 && currentBytes + size > capBytes;
+            var overCount = current.length >= capCount;
+            if (overBytes || overCount) {
+                batches.push(current);
+                current = [];
+                currentBytes = 0;
+            }
+            current.push(f);
+            currentBytes += size;
+        }
+        if (current.length) batches.push(current);
+        return batches;
+    }
+
     // 金额串 → 规范化十进制串(非负,最多两位小数,去千分位)或 null。销项销售额/税额不应为负,
     // 故不认负号(与后端 _valid_amount 的非负约束同口径)。真正的 Decimal 换算在后端,前端只挡形。
     // 共享解析在 ai-format.js(同 ai-review-queue.js 的 parseVat 先例,两处曾各自写同一条正则)。
@@ -46,9 +80,12 @@
     var pure = {
         MAX_FILES: MAX_FILES,
         MAX_BYTES: MAX_BYTES,
+        BATCH_MAX_BYTES: BATCH_MAX_BYTES,
+        BATCH_MAX_FILES: BATCH_MAX_FILES,
         parseAmount: parseAmount,
         buildSalesPayload: buildSalesPayload,
         validateFiles: validateFiles,
+        splitBatches: splitBatches,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = pure;
 
@@ -62,11 +99,31 @@
         return '<svg viewBox="0 0 24 24" fill="none" stroke-width="2">' + inner + '</svg>';
     }
 
+    // 上传中/失败时的批次进度后缀——分批(BATCH_MAX_BYTES/BATCH_MAX_FILES)对用户不透明,
+    // 单批就不拼数字(没必要的噪声);多批才拼「已传/共几张、第几批」,数字+分隔符不夹外语词,
+    // 不新增 i18n 键(复用既有 intake_uploading/错误文案原句,后面加纯数字进度)。
+    function batchProgressSuffix(ctx) {
+        if (!ctx.uploadBatchTotal || ctx.uploadBatchTotal <= 1) return '';
+        return (
+            ' (' +
+            (ctx.uploadDone || 0) +
+            '/' +
+            (ctx.uploadTotal || 0) +
+            ' · ' +
+            (ctx.uploadBatchIndex || 0) +
+            '/' +
+            ctx.uploadBatchTotal +
+            ')'
+        );
+    }
+
     // 拖拽/点选上传区。四态:idle(空)/ 已选文件 / 上传中 / 刚传完(引导重新跑)。
     function dropzoneHtml(ctx) {
         var n = ctx.files.length;
         var errRow = ctx.uploadErrKey
-            ? '<div class="intake-err" id="ikUploadErr">' + esc(at(ctx.uploadErrKey)) + '</div>'
+            ? '<div class="intake-err" id="ikUploadErr">' +
+              esc(at(ctx.uploadErrKey) + batchProgressSuffix(ctx)) +
+              '</div>'
             : '';
         var inner;
         if (ctx.uploading) {
@@ -74,7 +131,7 @@
                 '<div class="dz-inner"><div class="dz-ic">' +
                 svg('<path d="M21 12a9 9 0 1 1-6.2-8.5"/>') +
                 '</div><div class="dz-t">' +
-                esc(at('intake_uploading')) +
+                esc(at('intake_uploading') + batchProgressSuffix(ctx)) +
                 '</div></div>';
         } else if (n > 0) {
             var chips = '';
@@ -286,9 +343,12 @@
     root.AI.intakeRender = {
         MAX_FILES: MAX_FILES,
         MAX_BYTES: MAX_BYTES,
+        BATCH_MAX_BYTES: BATCH_MAX_BYTES,
+        BATCH_MAX_FILES: BATCH_MAX_FILES,
         parseAmount: parseAmount,
         buildSalesPayload: buildSalesPayload,
         validateFiles: validateFiles,
+        splitBatches: splitBatches,
         intakeHtml: intakeHtml,
         dropzoneHtml: dropzoneHtml,
         needsCardHtml: needsCardHtml,

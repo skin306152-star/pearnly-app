@@ -64,6 +64,17 @@ def _sales_item(item_id="s1"):
     }
 
 
+def _ambiguous_item(item_id, file_ref, *, status="flagged"):
+    """方向不明票(kind=unknown/flag_reason=direction_ambiguous),等人工 assign_kind 裁定。"""
+    return {
+        "id": item_id,
+        "kind": "unknown",
+        "status": status,
+        "flag_reason": "direction_ambiguous",
+        "file_ref": file_ref,
+    }
+
+
 def _classified_evt(event_id, item_id, *, kind, money=None, sales_read=None, status="ok"):
     payload = {"item_id": item_id, "kind": kind, "status": status}
     if money:
@@ -75,6 +86,12 @@ def _classified_evt(event_id, item_id, *, kind, money=None, sales_read=None, sta
 
 def _decision_evt(event_id, item_id, decision):
     payload = {"item_id": item_id, "decision": decision, "values": {}}
+    return {"id": event_id, "step": "reconcile", "event_type": "human_decision", "payload": payload}
+
+
+def _assign_kind_evt(event_id, item_id, kind):
+    """方向裁决事件(与普通 decision 事件结构不同:带 kind,不带 values)。"""
+    payload = {"item_id": item_id, "decision": "assign_kind", "kind": kind}
     return {"id": event_id, "step": "reconcile", "event_type": "human_decision", "payload": payload}
 
 
@@ -297,6 +314,125 @@ class EvidenceIndexTests(PackageFixture):
         # 被裁决剔除的票没进合计,不该出现在 input_vat 的支撑证据里。
         self.assertNotIn(1, index["numbers"]["input_vat"]["event_ids"])
         self.assertNotIn(2, index["numbers"]["input_vat"]["event_ids"])
+
+
+class DirectionAssignedEvidenceTests(PackageFixture):
+    """方向不明票(direction_ambiguous)经人工 assign_kind 裁定后,证据索引不能漏它——
+    裁进项的必须现身 input_vat 的 event_ids/source_files/items;裁非税的必须不现身。"""
+
+    def _money(self):
+        return {"subtotal": "1000.00", "vat": "70.00", "total_amount": "1070.00"}
+
+    def test_direction_assigned_purchase_ticket_included_in_input_vat_evidence(self):
+        items = [
+            _purchase_item("u", "/in/undisputed.jpg"),
+            _ambiguous_item("d", "/in/deposit_offset.jpg"),
+            _sales_item(),
+        ]
+        events = [
+            _classified_evt(
+                1,
+                "u",
+                kind="purchase_invoice",
+                money={
+                    "subtotal": "354923.86",
+                    "vat": "25194.28",
+                    "total_amount": "380118.14",
+                },
+            ),
+            _classified_evt(2, "d", kind="unknown", status="flagged", money=self._money()),
+            _assign_kind_evt(3, "d", "purchase_invoice"),
+            _classified_evt(4, "s1", kind="sales_summary", sales_read={"headers": [], "rows": []}),
+            _reconcile_done_evt(),
+            _compute_done_evt(),
+        ]
+        store = FakeStore(items, events)
+        package.run(self._ctx(store))
+
+        index = json.loads(
+            Path(store.deliverables["evidence_index"]["artifact_path"]).read_text(encoding="utf-8")
+        )
+        input_vat = index["numbers"]["input_vat"]
+        # 事件 id 含方向票的 item_classified(2)与 assign_kind 裁决(3)本身。
+        self.assertEqual(input_vat["event_ids"], [1, 2, 3])
+        self.assertIn("/in/deposit_offset.jpg", input_vat["source_files"])
+        self.assertIn({"item_id": "d", "file_name": "deposit_offset.jpg"}, input_vat["items"])
+
+    def test_direction_assigned_non_tax_ticket_excluded_from_input_vat_evidence(self):
+        items = [
+            _purchase_item("u", "/in/undisputed.jpg"),
+            _ambiguous_item("n", "/in/non_tax_candidate.jpg"),
+            _sales_item(),
+        ]
+        events = [
+            _classified_evt(
+                1,
+                "u",
+                kind="purchase_invoice",
+                money={
+                    "subtotal": "354923.86",
+                    "vat": "25194.28",
+                    "total_amount": "380118.14",
+                },
+            ),
+            _classified_evt(2, "n", kind="unknown", status="flagged", money=self._money()),
+            _assign_kind_evt(3, "n", "non_tax"),
+            _classified_evt(4, "s1", kind="sales_summary", sales_read={"headers": [], "rows": []}),
+            _reconcile_done_evt(),
+            _compute_done_evt(),
+        ]
+        store = FakeStore(items, events)
+        package.run(self._ctx(store))
+
+        index = json.loads(
+            Path(store.deliverables["evidence_index"]["artifact_path"]).read_text(encoding="utf-8")
+        )
+        input_vat = index["numbers"]["input_vat"]
+        self.assertEqual(input_vat["event_ids"], [1])
+        self.assertNotIn("/in/non_tax_candidate.jpg", input_vat["source_files"])
+
+
+class AssignKindMemoTests(PackageFixture):
+    """备忘的方向裁决渲染:不许直出内部动作名 "assign_kind",要换成裁定结果的人话。"""
+
+    def test_assign_kind_decision_renders_human_label_not_literal(self):
+        items = [
+            _purchase_item("u", "/in/undisputed.jpg"),
+            _ambiguous_item("d", "/in/deposit_offset.jpg"),
+            _sales_item(),
+        ]
+        events = [
+            _classified_evt(
+                1,
+                "u",
+                kind="purchase_invoice",
+                money={
+                    "subtotal": "354923.86",
+                    "vat": "25194.28",
+                    "total_amount": "380118.14",
+                },
+            ),
+            _classified_evt(
+                2,
+                "d",
+                kind="unknown",
+                status="flagged",
+                money={"subtotal": "1000.00", "vat": "70.00", "total_amount": "1070.00"},
+            ),
+            _assign_kind_evt(3, "d", "purchase_invoice"),
+            _classified_evt(4, "s1", kind="sales_summary", sales_read={"headers": [], "rows": []}),
+            _reconcile_done_evt(),
+            _compute_done_evt(),
+        ]
+        store = FakeStore(items, events)
+        package.run(self._ctx(store))
+
+        memo_md = Path(store.deliverables["missing_doc_memo"]["artifact_path"]).read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("assign_kind", memo_md)
+        self.assertIn("ซื้อ (进项)", memo_md)
+        self.assertIn("deposit_offset.jpg", memo_md)
 
 
 class SalesSourceAnnotationTests(PackageFixture):

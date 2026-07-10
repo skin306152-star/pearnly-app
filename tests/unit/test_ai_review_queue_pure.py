@@ -44,6 +44,35 @@ class FilterPurchaseQueueTests(unittest.TestCase):
             """)
         self.assertEqual(out, [[], []])
 
+    def test_direction_ambiguous_tickets_are_collected_into_queue(self):
+        # G1 黑洞根治:方向不明票(kind=unknown / flag_reason=direction_ambiguous)也进队列。
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            const flagged = [
+                {{item_id: 'a', kind: 'purchase_invoice', flag_reason: 'amount_math_fail'}},
+                {{item_id: 'd', kind: 'unknown', flag_reason: 'direction_ambiguous'}},
+                {{item_id: 'x', kind: 'unknown', flag_reason: 'sales_direction_unhandled'}},
+            ];
+            process.stdout.write(JSON.stringify(q.filterPurchaseQueue(flagged).map(x => x.item_id)));
+            """)
+        self.assertEqual(out, ["a", "d"])
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class IsDirectionTicketTests(unittest.TestCase):
+    def test_only_direction_ambiguous_prefixed_reasons_are_direction(self):
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            process.stdout.write(JSON.stringify([
+                q.isDirectionTicket({{flag_reason: 'direction_ambiguous'}}),
+                q.isDirectionTicket({{flag_reason: 'direction_ambiguous:deposit'}}),
+                q.isDirectionTicket({{flag_reason: 'amount_math_fail'}}),
+                q.isDirectionTicket({{flag_reason: ''}}),
+                q.isDirectionTicket(null),
+            ]));
+            """)
+        self.assertEqual(out, [True, True, False, False, False])
+
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class FlagSeverityTests(unittest.TestCase):
@@ -97,6 +126,16 @@ class FlagReasonKeyTests(unittest.TestCase):
             ]));
             """)
         self.assertEqual(out, [None, None, None])
+
+    def test_direction_ambiguous_maps_to_direction_key(self):
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            process.stdout.write(JSON.stringify([
+                q.flagReasonKey('direction_ambiguous'),
+                q.flagReasonKey('direction_ambiguous:deposit'),
+            ]));
+            """)
+        self.assertEqual(out, ["rv_flag_direction", "rv_flag_direction"])
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
@@ -162,6 +201,24 @@ class BuildDecisionPayloadTests(unittest.TestCase):
             """)
         self.assertEqual(out, [None, None, None])
 
+    def test_direction_actions_build_assign_kind_payloads(self):
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            process.stdout.write(JSON.stringify([
+                q.buildDecisionPayload('it1', 'assign_purchase'),
+                q.buildDecisionPayload('it1', 'assign_sales'),
+                q.buildDecisionPayload('it1', 'assign_nontax'),
+            ]));
+            """)
+        self.assertEqual(
+            out,
+            [
+                {"item_id": "it1", "decision": "assign_kind", "kind": "purchase_invoice"},
+                {"item_id": "it1", "decision": "assign_kind", "kind": "sales_doc"},
+                {"item_id": "it1", "decision": "assign_kind", "kind": "non_tax"},
+            ],
+        )
+
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class DecisionChipKeyTests(unittest.TestCase):
@@ -179,6 +236,21 @@ class DecisionChipKeyTests(unittest.TestCase):
         self.assertEqual(
             out,
             ["rv_chip_accepted", "rv_chip_recalc", "rv_chip_excluded", None, None],
+        )
+
+    def test_assign_kind_decisions_map_by_direction(self):
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            process.stdout.write(JSON.stringify([
+                q.decisionChipKey({{decision: 'assign_kind', kind: 'purchase_invoice'}}),
+                q.decisionChipKey({{decision: 'assign_kind', kind: 'sales_doc'}}),
+                q.decisionChipKey({{decision: 'assign_kind', kind: 'non_tax'}}),
+                q.decisionChipKey({{decision: 'assign_kind', kind: 'bogus'}}),
+            ]));
+            """)
+        self.assertEqual(
+            out,
+            ["rv_chip_dir_purchase", "rv_chip_dir_sales", "rv_chip_dir_nontax", None],
         )
 
 

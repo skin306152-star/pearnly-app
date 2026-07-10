@@ -16,6 +16,10 @@ from services.workorder import evidence, store
 # 人工裁决三态,与 CLI --decide 同语义(见 L2-验收.md):
 #   face_value=确认票面 OCR 读数 · recalc=人工看原票补正 · exclude=剔除不计入
 _DECISIONS = ("face_value", "recalc", "exclude")
+# 方向裁决:方向不明票(kind=unknown/flag_reason=direction_ambiguous)由人定进/销/非税方向。
+# 语义在 reconcile_gates._apply_direction:进项入 R1 Σ、销项走 R2、非税排除。
+_ASSIGN_KIND = "assign_kind"
+_ASSIGN_KINDS = ("purchase_invoice", "sales_doc", "non_tax")
 _DECISION_STEP = "reconcile"
 _EVT_DECISION = "human_decision"
 _EVT_CLASSIFIED = "item_classified"
@@ -155,6 +159,7 @@ def _decision_of(replayed: Optional[dict]) -> Optional[dict]:
     payload = replayed.get("payload") or {}
     return {
         "decision": payload.get("decision"),
+        "kind": payload.get("kind"),  # 方向裁决(assign_kind)携带的裁定 kind,普通裁决为 None
         "values": payload.get("values") or {},
         "actor": replayed.get("actor"),
         "at": replayed.get("at"),
@@ -191,10 +196,11 @@ def record_decision(
     decision: str,
     values: Optional[dict],
     actor: str,
+    kind: Optional[str] = None,
 ) -> dict:
-    """落人工裁决事件(CLI --decide 同语义)。校验裁决合法 + item 确属该单,否则拒。"""
-    if decision not in _DECISIONS:
-        raise WorkOrderApiError("workorder.decision_invalid")
+    """落人工裁决事件(CLI --decide 同语义)。金额裁决(face_value/recalc/exclude)带 values;
+    方向裁决(assign_kind)带 kind。校验裁决合法 + item 确属该单,否则拒。"""
+    payload = _decision_payload(item_id, decision, values, kind)
     item = store.get_item(cur, tenant_id=tenant_id, work_order_id=work_order_id, item_id=item_id)
     if not item:
         raise WorkOrderApiError("workorder.item_not_found")
@@ -204,9 +210,20 @@ def record_decision(
         work_order_id=work_order_id,
         step=_DECISION_STEP,
         event_type=_EVT_DECISION,
-        payload={"item_id": item_id, "decision": decision, "values": values or {}},
+        payload=payload,
         actor=actor,
     )
+
+
+def _decision_payload(item_id: str, decision: str, values: Optional[dict], kind: Optional[str]):
+    """裁决事件 payload 构造 + 合法性校验。方向裁决的 kind 必须在允许集内。"""
+    if decision == _ASSIGN_KIND:
+        if kind not in _ASSIGN_KINDS:
+            raise WorkOrderApiError("workorder.decision_invalid")
+        return {"item_id": item_id, "decision": decision, "kind": kind}
+    if decision in _DECISIONS:
+        return {"item_id": item_id, "decision": decision, "values": values or {}}
+    raise WorkOrderApiError("workorder.decision_invalid")
 
 
 def _valid_amount(raw) -> str:

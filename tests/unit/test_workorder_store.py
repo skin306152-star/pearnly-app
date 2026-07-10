@@ -155,24 +155,35 @@ class ItemsTests(unittest.TestCase):
 
 
 class DeliverablesTests(unittest.TestCase):
-    def test_upsert_deliverable_replaces_same_kind(self):
-        cur = FakeCursor([{"id": "d-1", "kind": "pp30_draft"}])
+    def test_upsert_deliverable_targets_kind_version_unique_key(self):
+        cur = FakeCursor([{"id": "d-1", "kind": "pp30_draft", "version": 2}])
         store.upsert_deliverable(
             cur,
             tenant_id="t-1",
             work_order_id="wo-1",
             kind="pp30_draft",
+            version=2,
             numbers={"tax_due": "30851.33"},
         )
         sql, params = cur.calls[0]
-        self.assertIn("ON CONFLICT (tenant_id, work_order_id, kind)", sql)
+        self.assertIn("ON CONFLICT (tenant_id, work_order_id, kind, version)", sql)
         self.assertIn("DO UPDATE SET artifact_path = EXCLUDED.artifact_path", sql)
-        self.assertEqual(json.loads(params[4]), {"tax_due": "30851.33"})
+        self.assertEqual(params[3], 2)  # version
+        self.assertEqual(json.loads(params[5]), {"tax_due": "30851.33"})
 
-    def test_list_deliverables_orders_by_created_at(self):
+    def test_list_deliverables_takes_latest_version_per_kind(self):
         cur = FakeCursor(fetchall_queue=[[]])
         store.list_deliverables(cur, tenant_id="t-1", work_order_id="wo-1")
-        self.assertIn("ORDER BY created_at", cur.calls[0][0])
+        sql = cur.calls[0][0]
+        self.assertIn("DISTINCT ON (kind)", sql)
+        self.assertIn("ORDER BY kind, version DESC", sql)
+
+    def test_next_deliverable_version_is_max_plus_one(self):
+        cur = FakeCursor([{"v": 3}])
+        self.assertEqual(
+            store.next_deliverable_version(cur, tenant_id="t-1", work_order_id="wo-1"), 3
+        )
+        self.assertIn("COALESCE(MAX(version), 0) + 1", cur.calls[0][0])
 
 
 class RunLeaseTests(unittest.TestCase):

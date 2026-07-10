@@ -48,10 +48,12 @@ def ensure_runtime() -> None:
 
 
 _ITEM_COLUMNS = (
-    "id, tenant_id, work_order_id, source, kind, file_ref, ocr_history_id, "
+    "id, tenant_id, work_order_id, source, kind, file_ref, original_name, ocr_history_id, "
     "status, flag_reason, dedupe_key, created_at, updated_at"
 )
-_DELIVERABLE_COLUMNS = "id, tenant_id, work_order_id, kind, artifact_path, numbers, created_at"
+_DELIVERABLE_COLUMNS = (
+    "id, tenant_id, work_order_id, kind, version, artifact_path, numbers, created_at"
+)
 
 
 def open_work_order(
@@ -292,18 +294,20 @@ def add_item(
     source: str,
     kind: str = "unknown",
     file_ref: Optional[str] = None,
+    original_name: Optional[str] = None,
     ocr_history_id: Optional[str] = None,
     status: str = "pending",
     flag_reason: Optional[str] = None,
     dedupe_key: Optional[str] = None,
 ) -> dict:
-    """登记一件料。带 dedupe_key 时幂等(intake 重跑不重复登记同一份文件)。"""
+    """登记一件料。带 dedupe_key 时幂等(intake 重跑不重复登记同一份文件)。original_name 留无损
+    原始文件名(冻结 manifest 的正规归宿),空时读侧回落 storage.original_name_of 反解落盘名。"""
     cur.execute(
         f"""
         INSERT INTO work_order_items
-            (tenant_id, work_order_id, source, kind, file_ref, ocr_history_id,
+            (tenant_id, work_order_id, source, kind, file_ref, original_name, ocr_history_id,
              status, flag_reason, dedupe_key)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (tenant_id, work_order_id, dedupe_key) WHERE dedupe_key IS NOT NULL
         DO UPDATE SET updated_at = work_order_items.updated_at
         RETURNING {_ITEM_COLUMNS}
@@ -314,6 +318,7 @@ def add_item(
             source,
             kind,
             file_ref,
+            original_name,
             ocr_history_id,
             status,
             flag_reason,
@@ -377,22 +382,45 @@ def update_item(
     )
 
 
+def next_deliverable_version(cur, *, tenant_id: str, work_order_id: str) -> int:
+    """本工单交付物的下一个版本号(现有最大 + 1,无则 1)。package 每次成整批出包用同一版本号,
+    未冻结重跑=版本递增、旧版本文件不动(C-2 交付物版本化)。"""
+    cur.execute(
+        "SELECT COALESCE(MAX(version), 0) + 1 AS v FROM work_order_deliverables "
+        "WHERE tenant_id = %s AND work_order_id = %s",
+        (tenant_id, work_order_id),
+    )
+    return int(cur.fetchone()["v"])
+
+
+def current_deliverable_version(cur, *, tenant_id: str, work_order_id: str) -> int:
+    """本工单交付物的最新(最大)版本号,无则 0。冻结把此版本钉进 manifest。"""
+    cur.execute(
+        "SELECT COALESCE(MAX(version), 0) AS v FROM work_order_deliverables "
+        "WHERE tenant_id = %s AND work_order_id = %s",
+        (tenant_id, work_order_id),
+    )
+    return int(cur.fetchone()["v"])
+
+
 def upsert_deliverable(
     cur,
     *,
     tenant_id: str,
     work_order_id: str,
     kind: str,
+    version: int = 1,
     artifact_path: Optional[str] = None,
     numbers: Optional[dict[str, Any]] = None,
 ) -> dict:
-    """产出一份交付物,重跑同一 kind 覆盖而非累加(package 步幂等)。"""
+    """产出一份交付物(某 kind 的某版本)。唯一键 (tenant, wo, kind, version):同版本同 kind
+    重写覆盖(单次 package 内幂等),换版本号=新行(未冻结重跑堆积新版本,旧版本文件不动)。"""
     cur.execute(
         f"""
         INSERT INTO work_order_deliverables
-            (tenant_id, work_order_id, kind, artifact_path, numbers)
-        VALUES (%s, %s, %s, %s, %s::jsonb)
-        ON CONFLICT (tenant_id, work_order_id, kind)
+            (tenant_id, work_order_id, kind, version, artifact_path, numbers)
+        VALUES (%s, %s, %s, %s, %s, %s::jsonb)
+        ON CONFLICT (tenant_id, work_order_id, kind, version)
         DO UPDATE SET artifact_path = EXCLUDED.artifact_path, numbers = EXCLUDED.numbers
         RETURNING {_DELIVERABLE_COLUMNS}
         """,
@@ -400,6 +428,7 @@ def upsert_deliverable(
             tenant_id,
             work_order_id,
             kind,
+            int(version),
             artifact_path,
             json.dumps(numbers or {}, ensure_ascii=False, default=str),
         ),
@@ -408,9 +437,11 @@ def upsert_deliverable(
 
 
 def list_deliverables(cur, *, tenant_id: str, work_order_id: str) -> list[dict]:
+    """读侧默认取每个 kind 的最新版本(DISTINCT ON (kind) 按版本降序取头)——旧版本仍在库,
+    列表/详情/下载看到的是最新那版(C-2 交付物版本化读侧口径)。"""
     cur.execute(
-        f"SELECT {_DELIVERABLE_COLUMNS} FROM work_order_deliverables "
-        "WHERE tenant_id = %s AND work_order_id = %s ORDER BY created_at",
+        f"SELECT DISTINCT ON (kind) {_DELIVERABLE_COLUMNS} FROM work_order_deliverables "
+        "WHERE tenant_id = %s AND work_order_id = %s ORDER BY kind, version DESC",
         (tenant_id, work_order_id),
     )
     return [dict(r) for r in cur.fetchall()]

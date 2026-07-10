@@ -62,6 +62,12 @@ def deliverables_dir(tenant_id: str, work_order_id: str) -> Path:
     return order_dir(tenant_id, work_order_id) / _DELIVERABLES
 
 
+def versioned_dir(base_dir, version: int) -> Path:
+    """交付物版本寻址的唯一函数(C-2)：把交付物基目录 + 版本号解析成 `{base}/v{n}`。落盘布局
+    的版本段只此一处认得 —— 将来换对象存储只改这个函数(设计留的接口位),调用方不碰路径约定。"""
+    return Path(base_dir) / f"v{int(version)}"
+
+
 def save_material(
     tenant_id: str,
     work_order_id: str,

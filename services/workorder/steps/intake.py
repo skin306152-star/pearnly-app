@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
+from services.workorder import storage
 from services.workorder.engine import StepContext, StepResult
 
 _DEFAULT_SOURCE = "upload"
@@ -48,6 +49,7 @@ def register_file(ctx: StepContext, path: Path, source: str = _DEFAULT_SOURCE) -
         work_order_id=ctx.work_order_id,
         source=source,
         file_ref=str(path),
+        original_name=storage.original_name_of(str(path)),
         dedupe_key=fingerprint(path),
     )
 

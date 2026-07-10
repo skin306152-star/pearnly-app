@@ -114,6 +114,7 @@ def enqueue_express(endpoint: Dict[str, Any], history: Dict[str, Any]) -> Dict[s
                 ],
                 "account_source": payload.get("account_source") or "config_default",
                 "account_review": bool(payload.get("account_review")),
+                "doc_lane": payload.get("doc_lane"),
                 "preflight": checks,
             },
             ensure_ascii=False,

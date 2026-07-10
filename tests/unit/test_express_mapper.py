@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """Express 映射器单测 · 确定性纯函数(无 DB/网络)。
 
-钉死:PTT 样例(税前 375347.20 / 7% / 含税 401621.50)→ 三行借贷平衡、佛历日期、
-RR/HP 按付款分流;数不自洽/缺日期/缺科目 → ok=False(留人工);VAT=0 走两行。
+钉死:PTT 样例(税前 375347.20 / 7% / 含税 401621.50 · 完整税票 + 买方税号 → 货道)→
+三行借贷平衡、佛历日期、RR/HP 按付款分流;数不自洽/缺日期/缺科目 → ok=False(留人工);
+VAT=0 走两行。费用车道(doc_lane=expense):进项税不可抵扣、VAT 折进成本,单行明细收尾。
 """
 
 from __future__ import annotations
@@ -31,6 +32,9 @@ _CONFIG = {
 }
 
 
+_BUYER_TAX = "1234567890123"  # 完整税票的买方税号(货道判据 · judge_direction 要求)
+
+
 def _ptt_history(**over):
     fields = {
         "seller_name": "บริษัท ปตท จำกัด (มหาชน)",
@@ -38,6 +42,9 @@ def _ptt_history(**over):
         "subtotal": "375347.20",
         "vat": "26274.30",
         "invoice_number": "RR581231-002",
+        # 默认样例钉死货道(人工优先·SRC_MANUAL):其余测试大量拿 document_type 单独测
+        # F3 付款语义(receipt/tax_invoice),不该连带被货/费判据的 tax_invoice+买方条件牵动。
+        "posting_item_type_manual": "goods",
     }
     fields.update(over.pop("fields", {}))
     h = {
@@ -74,6 +81,10 @@ class ExpressMapperTests(unittest.TestCase):
         # 采购科目落账套默认(无品类映射)→ 来源诚实标 config_default · 待核。
         self.assertEqual(p["account_source"], "config_default")
         self.assertTrue(p["account_review"])
+        # 样例人工钉死货道(可抵进项),不产生 vat_capitalized。
+        self.assertEqual(p["doc_lane"], "goods")
+        self.assertEqual(p["item_src"], SRC_MANUAL)
+        self.assertNotIn("vat_capitalized", p)
 
     def test_verified_official_name_preferred(self):
         # ③ 官方名核验:已核验 → 行摘要用税局 RD 官方抬头(进账更干净)
@@ -241,6 +252,105 @@ class ExpressMapperTests(unittest.TestCase):
         dr = sum(Decimal(ln["amount"]) for ln in r.payload["lines"] if ln["side"] == "D")
         cr = sum(Decimal(ln["amount"]) for ln in r.payload["lines"] if ln["side"] == "C")
         self.assertEqual(dr, cr)
+
+
+class ExpressExpenseLaneTests(unittest.TestCase):
+    """费用车道(doc_lane=expense):进项税不可抵扣、VAT 折进成本(拍板口径)。"""
+
+    def test_receipt_no_buyer_capitalizes_vat(self):
+        # 简式票/收据(非完整税票)即便读到 VAT、无买方身份 → 费用道:vat 清零、base 改
+        # 含税全额、无进项税行,借方金额=含税;vat_capitalized 留痕原本会读到的进项税。
+        h = _ptt_history(
+            fields={
+                "posting_item_type_manual": "",
+                "document_type": "receipt",
+                "buyer_tax": "",
+                "subtotal": "100.00",
+                "vat": "7.00",
+            },
+            total_amount="107.00",
+        )
+        r = build_express_payload(h, config=_CONFIG)
+        self.assertTrue(r.ok, r.reason)
+        p = r.payload
+        self.assertEqual(p["doc_lane"], "expense")
+        self.assertEqual(p["item_src"], "judge_direction=expense")
+        self.assertEqual(p["vat_amount"], "0.00")
+        self.assertEqual(p["vat_rate"], 0.0)
+        self.assertEqual(p["base_amount"], "107.00")
+        self.assertEqual(p["total_amount"], "107.00")
+        self.assertEqual(p["vat_capitalized"], "7.00")
+        self.assertNotIn("ภาษีซื้อ", [ln["desc"] for ln in p["lines"]])
+        self.assertEqual(len(p["lines"]), 2)
+        purchase_line = [ln for ln in p["lines"] if ln["side"] == "D"][0]
+        self.assertEqual(purchase_line["amount"], "107.00")
+        # 单行含税全额收尾(镜像 MR.ERP 453)· 对账闸诚实过关,不假装逐行进销存匹配。
+        self.assertEqual(p["items_status"], "ok")
+        self.assertEqual(len(p["items"]), 1)
+        self.assertEqual(p["items"][0]["amount"], "107.00")
+        # 行名固定通用费用物料(不吃卖方名)——小助手按名 ensure_item 建非库存主档,
+        # 吃卖方名会每个供应商长一个费用物料(主档污染);卖方名在 GL 借方行 desc 已带。
+        self.assertEqual(p["items"][0]["name"], "ค่าใช้จ่าย")
+        self.assertNotEqual(p["items"][0]["name"], p["supplier"]["name"])
+
+    def test_manual_expense_overrides_full_tax_invoice(self):
+        # F5:人工裁决(posting_item_type_manual=expense)压过完整税票+买方身份的自动判据——
+        # 不设人工裁决时这张票本会判 judge_direction=purchase_invoice(货道·可抵进项),
+        # 用户在复核屏显式点过「费用」,精度高于 judge_direction 猜测。
+        h = _ptt_history(
+            fields={
+                "document_type": "tax_invoice",
+                "buyer_tax": _BUYER_TAX,
+                "posting_item_type_manual": "expense",
+            }
+        )
+        r = build_express_payload(h, config=_CONFIG)
+        self.assertTrue(r.ok, r.reason)
+        self.assertEqual(r.payload["doc_lane"], "expense")
+        self.assertEqual(r.payload["item_src"], "manual")
+        self.assertEqual(r.payload["vat_amount"], "0.00")
+
+    def test_manual_goods_overrides_judge_direction_expense(self):
+        # F5 反向:人工点了「货品」压过 judge_direction=expense(如无买方的简式票)——
+        # 保留进项税行(可抵)。
+        h = _ptt_history(
+            fields={
+                "document_type": "receipt",
+                "buyer_tax": "",
+                "posting_item_type_manual": "goods",
+                "subtotal": "100.00",
+                "vat": "7.00",
+            },
+            total_amount="107.00",
+        )
+        r = build_express_payload(h, config=_CONFIG)
+        self.assertTrue(r.ok, r.reason)
+        p = r.payload
+        self.assertEqual(p["doc_lane"], "goods")
+        self.assertEqual(p["item_src"], "manual")
+        self.assertEqual(p["vat_amount"], "7.00")
+        self.assertEqual(len(p["lines"]), 3)
+        self.assertNotIn("vat_capitalized", p)
+
+    def test_full_tax_invoice_with_buyer_stays_goods_lane(self):
+        # ④ 完整税票 + VAT + 买方税号(无人工裁决,走 judge_direction 自动判)→
+        # doc_lane=goods、现行为全回归(进项税行在)。
+        h = _ptt_history(
+            fields={
+                "document_type": "tax_invoice",
+                "buyer_tax": _BUYER_TAX,
+                "posting_item_type_manual": "",
+            }
+        )
+        r = build_express_payload(h, config=_CONFIG)
+        self.assertTrue(r.ok, r.reason)
+        p = r.payload
+        self.assertEqual(p["doc_lane"], "goods")
+        self.assertEqual(p["item_src"], "judge_direction=purchase_invoice")
+        self.assertEqual(len(p["lines"]), 3)
+        self.assertEqual(p["vat_amount"], "26274.30")
+        self.assertIn("ภาษีซื้อ", [ln["desc"] for ln in p["lines"]])
+        self.assertNotIn("vat_capitalized", p)
 
 
 if __name__ == "__main__":

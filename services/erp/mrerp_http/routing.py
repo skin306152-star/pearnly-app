@@ -23,6 +23,7 @@ from services.erp.express_push.doc_sanity import check_document
 from services.erp.mrerp_adapter_models import FailedRow, ImportResult
 from services.erp.mrerp_http.modules import get_module
 from services.purchase.field_clean import clean_tax_id
+from services.purchase.item_verdict import item_verdict
 
 logger = logging.getLogger("mr-pilot")
 
@@ -56,17 +57,8 @@ def choose_doc_type(
     # 会计裁决,不是习惯裁决:有完整税票 = 可抵进项,票面法定证据不许被自动判据/档案习惯压过。
     # 供应商过账档案(supplier_posting_profiles)的 default_item_type 同理在此不自动消费,
     # 只留给工单线预填;唯用户在复核屏显式点过(manual)才算数,精度高于 judge_direction 猜测。
-    manual_item = str(fields.get("posting_item_type_manual") or "").strip().lower()
-    if manual_item in ("expense", "goods"):
-        is_expense = manual_item == "expense"
-        item_src = "manual"
-    else:
-        # 采购锚点已定 或 判不出方向(下方兜底)都要用同一个 judge_direction 结果,算一次复用。
-        from services.purchase.intake import judge_direction
-
-        kind, _ = judge_direction(fields)
-        is_expense = kind == "expense"
-        item_src = f"judge_direction={kind}"
+    # 判据抽在 services.purchase.item_verdict(与 Express 采购车道共用 · 防两车道漂移)。
+    is_expense, item_src = item_verdict(fields)
 
     if direction == "purchase":
         doc = "purchase_expense" if is_expense else "purchase"

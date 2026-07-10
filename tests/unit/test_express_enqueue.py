@@ -314,6 +314,18 @@ class ChartWhitelistTests(unittest.TestCase):
         self.assertEqual(body["account_source"], "config_default")
         self.assertTrue(body["account_review"])
 
+    def test_queued_response_carries_doc_lane(self):
+        # 完整税票+买方身份(_history 默认样例)→ 货道回显,供推送日志/详情卡诚实展示。
+        body = json.loads(enqueue_express(_endpoint(), _history())["response_body"])
+        self.assertEqual(body["doc_lane"], "goods")
+
+    def test_queued_response_carries_expense_lane(self):
+        # 简式票/收据(非完整税票 · 方向锚点仍靠 buyer_tax=OWN_TAX)→ 费用道回显,
+        # 即便读到 vat 也不建进项税行。
+        h = _history(document_type="receipt")
+        body = json.loads(enqueue_express(_endpoint(), h)["response_body"])
+        self.assertEqual(body["doc_lane"], "expense")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

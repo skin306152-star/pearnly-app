@@ -53,6 +53,14 @@ def ensure_seller_route_table():
         logger.info("✅ seller_workspace_routes 表已就绪")
     except Exception as e:
         logger.warning(f"ensure_seller_route_table failed: {e}")
+    # 税务画像 4 表挂 workspace 域 ensure 链自愈(alembic 0064 双跑)——方案 §5.3 首选
+    # ensure_workspace_tables 尾部,但 store.py 已贴 500 行上限,挂本函数尾(startup 同链紧随调用)。
+    try:
+        from services.workspace.tax_profile_schema import ensure_tax_profile_schema
+
+        ensure_tax_profile_schema()
+    except Exception as e:
+        logger.warning(f"ensure_tax_profile_schema failed: {e}")
 
 
 def learn_seller_workspace_route(

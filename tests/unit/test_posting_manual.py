@@ -199,6 +199,37 @@ class BackflowSupplierProfileTests(unittest.TestCase):
         self.assertEqual(kwargs["default_item_type"], "goods")
         self.assertEqual(kwargs["source"], "correction")
 
+    def test_own_tax_id_matches_workspace_skips_upsert(self):
+        # 销项票 seller_tax = 账套自家税号 → 没有"供应商"这维度,不落死档案。
+        own_cur = _FakeCur(select_row={"tax_id": "0105546015062"})
+        with mock.patch("services.purchase.supplier_posting.upsert_profile") as mocked_upsert:
+            with mock.patch.object(pm.db, "get_cursor", lambda **kw: _CtxOf(own_cur)):
+                pm.backflow_supplier_profile(
+                    record_id="h1",
+                    tenant_id="t1",
+                    payment="cash",
+                    item_type=None,
+                    workspace_client_id=7,
+                    seller_tax="0105546015062",
+                )
+        mocked_upsert.assert_not_called()
+
+    def test_workspace_tax_id_lookup_empty_still_backflows(self):
+        # 查不到账套税号(表无数据/字段空)→ 保守照旧回流,别把正常采购误杀。
+        own_cur = _FakeCur(select_row=None)
+        with mock.patch("services.purchase.supplier_posting.upsert_profile") as mocked_upsert:
+            with mock.patch.object(pm.db, "get_cursor", lambda **kw: _CtxOf(own_cur)):
+                pm.backflow_supplier_profile(
+                    record_id="h1",
+                    tenant_id="t1",
+                    payment="cash",
+                    item_type=None,
+                    workspace_client_id=7,
+                    seller_tax="0105546015062",
+                )
+        mocked_upsert.assert_called_once()
+        self.assertEqual(mocked_upsert.call_args.kwargs["seller_tax_id"], "0105546015062")
+
     def test_upsert_failure_swallowed(self):
         with mock.patch(
             "services.purchase.supplier_posting.upsert_profile",
@@ -219,6 +250,19 @@ class BackflowSupplierProfileTests(unittest.TestCase):
 class _NullCtx:
     def __enter__(self):
         return _FakeCur()
+
+    def __exit__(self, *a):
+        return False
+
+
+class _CtxOf:
+    """回流一个 with 块里先查账套税号再 upsert · 两次 execute 共用同一个 cur。"""
+
+    def __init__(self, cur):
+        self._cur = cur
+
+    def __enter__(self):
+        return self._cur
 
     def __exit__(self, *a):
         return False

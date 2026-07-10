@@ -119,6 +119,7 @@ def backflow_supplier_profile(
     """F4 回流(L2):复核屏这次改的现/赊或货/费,顺手记进供应商过账档案的默认值,同供应商
     下次免重复裁决(payment_verdict/choose_doc_type 第四级判据)。workspace_client_id/seller_tax
     由 update_history_posting_manual 的 SELECT 顺带带出(省一次 get_ocr_history_detail 整单重拉)。
+    seller_tax 命中账套自家税号(销项票)时跳过 · 供应商档案没有"卖给自己"这维度。
     失败只 warning,不挡本次保存。
     """
     if not payment and not item_type:
@@ -127,8 +128,16 @@ def backflow_supplier_profile(
         return
     try:
         from services.purchase.supplier_posting import upsert_profile
+        from services.sales.seller_profile import get_seller
 
         with db.get_cursor(commit=True) as cur:
+            # 供应商档案语义 = 采购习惯,销项票(账套自己是卖方)seller_tax 是账套自家税号,
+            # 没有"供应商"这维度;照写会留一行以自家税号为锚的死档案(采购判定永远匹配不到)。
+            # 查不到账套税号时保守照旧回流,别把正常采购回流误杀。
+            own = get_seller(cur, tenant_id=tenant_id, workspace_client_id=int(workspace_client_id))
+            own_tax = clean_tax_id((own or {}).get("tax_id"))
+            if own_tax and own_tax == seller_tax:
+                return
             upsert_profile(
                 cur,
                 tenant_id=tenant_id,

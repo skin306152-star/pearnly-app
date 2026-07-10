@@ -213,10 +213,13 @@ window.__AI_I18N_JA__ = {
     gate_login_btn_busy: 'ログイン中…',
     gate_err_required: 'ユーザー名とパスワードを入力してください',
     gate_err_network: 'ネットワークエラー、もう一度お試しください',
-    err_account_locked: 'アカウントが一時的にロックされています。しばらくしてからもう一度お試しください',
+    err_account_locked:
+        'アカウントが一時的にロックされています。しばらくしてからもう一度お試しください',
     err_auth_invalid_credentials: 'ユーザー名またはパスワードが正しくありません',
-    err_auth_account_disabled: 'アカウントが無効になっています。Pearnly チームにお問い合わせください。',
-    err_auth_account_expired: 'アカウントの有効期限が切れています。Pearnly チームにお問い合わせください。',
+    err_auth_account_disabled:
+        'アカウントが無効になっています。Pearnly チームにお問い合わせください。',
+    err_auth_account_expired:
+        'アカウントの有効期限が切れています。Pearnly チームにお問い合わせください。',
     gate_help_title: 'お困りですか？',
     gate_invite_title: 'Pearnly AI ワークベンチは招待制です',
     gate_invite_body: 'アクセス権限については Pearnly チームまでお問い合わせください。',

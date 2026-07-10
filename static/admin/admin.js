@@ -3505,15 +3505,17 @@
             input.addEventListener('keydown', function (e) {
                 if (e.key === 'Enter') go();
             });
-            document.getElementById('adm-ai-pwd-copy')?.addEventListener('click', async function () {
-                const val = document.getElementById('adm-ai-pwd-value');
-                if (!val || !val.value) return;
-                val.select();
-                try {
-                    await navigator.clipboard.writeText(val.value);
-                } catch (_) {}
-                _toast(_t('adm-ai-pwd-copied'), 'success');
-            });
+            document
+                .getElementById('adm-ai-pwd-copy')
+                ?.addEventListener('click', async function () {
+                    const val = document.getElementById('adm-ai-pwd-value');
+                    if (!val || !val.value) return;
+                    val.select();
+                    try {
+                        await navigator.clipboard.writeText(val.value);
+                    } catch (_) {}
+                    _toast(_t('adm-ai-pwd-copied'), 'success');
+                });
             document.getElementById('adm-ai-pwd-close')?.addEventListener('click', function () {
                 const box = document.getElementById('adm-ai-pwd-box');
                 const val = document.getElementById('adm-ai-pwd-value');

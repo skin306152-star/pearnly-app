@@ -68,7 +68,8 @@
             'adm-pos-action-fail': '操作失败(可能状态不允许或标识无效)',
             'adm-sidebar-pearnly-ai': 'Pearnly AI 邀请',
             'adm-ai-title': 'Pearnly AI 邀请管理',
-            'adm-ai-sub': '发放 pearnly_ai_m1 灰度 · 已有账号直接加名单 · 新客户建号并生成一次性密码',
+            'adm-ai-sub':
+                '发放 pearnly_ai_m1 灰度 · 已有账号直接加名单 · 新客户建号并生成一次性密码',
             'adm-ai-flag-title': '闸状态',
             'adm-ai-flag-hint': '只读展示 · 总闸/灰度策略切换请去「全局设置」',
             'adm-ai-flag-on': '已启用',
@@ -76,7 +77,8 @@
             'adm-ai-flag-rollout-all': '全部用户',
             'adm-ai-flag-rollout-allowlist': '仅名单内(灰度)',
             'adm-ai-invite-title': '邀请',
-            'adm-ai-invite-hint': '填已有用户的用户名/邮箱直接加名单;不存在的账号必须填邮箱,自动建号',
+            'adm-ai-invite-hint':
+                '填已有用户的用户名/邮箱直接加名单;不存在的账号必须填邮箱,自动建号',
             'adm-ai-invite-ph': '用户名或邮箱(新客户请填邮箱)',
             'adm-ai-invite-btn': '邀请',
             'adm-ai-invite-existing-ok': '已加入名单',
@@ -532,7 +534,8 @@
             'adm-ai-sub':
                 'เปิดสิทธิ์ pearnly_ai_m1 แบบทยอย · บัญชีที่มีอยู่เพิ่มเข้ารายชื่อได้ทันที · ลูกค้าใหม่สร้างบัญชีพร้อมรหัสผ่านใช้ครั้งเดียว',
             'adm-ai-flag-title': 'สถานะสวิตช์',
-            'adm-ai-flag-hint': 'แสดงอย่างเดียว · สลับสวิตช์หลัก/นโยบายทยอยเปิดที่หน้า "ตั้งค่าทั่วไป"',
+            'adm-ai-flag-hint':
+                'แสดงอย่างเดียว · สลับสวิตช์หลัก/นโยบายทยอยเปิดที่หน้า "ตั้งค่าทั่วไป"',
             'adm-ai-flag-on': 'เปิดใช้งาน',
             'adm-ai-flag-off': 'ปิดอยู่',
             'adm-ai-flag-rollout-all': 'ผู้ใช้ทั้งหมด',
@@ -543,7 +546,8 @@
             'adm-ai-invite-ph': 'ชื่อผู้ใช้หรืออีเมล (ลูกค้าใหม่กรุณากรอกอีเมล)',
             'adm-ai-invite-btn': 'เชิญ',
             'adm-ai-invite-existing-ok': 'เพิ่มเข้ารายชื่อแล้ว',
-            'adm-ai-invite-created-ok': 'สร้างบัญชีและเพิ่มเข้ารายชื่อแล้ว · รหัสผ่านเริ่มต้นด้านล่าง',
+            'adm-ai-invite-created-ok':
+                'สร้างบัญชีและเพิ่มเข้ารายชื่อแล้ว · รหัสผ่านเริ่มต้นด้านล่าง',
             'adm-ai-invite-needs-email': 'ไม่พบบัญชีนี้ · กรุณากรอกอีเมลเพื่อสร้างบัญชีอัตโนมัติ',
             'adm-ai-invite-username-exists': 'ชื่อผู้ใช้/อีเมลนี้ถูกใช้แล้ว',
             'adm-ai-pwd-warn':

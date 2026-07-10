@@ -13,7 +13,7 @@
 const path = require('path');
 const { test, expect } = require('@playwright/test');
 const { hasCreds, ensureStorageState, STORAGE_STATE } = require('./_helpers/auth');
-const { enterApp } = require('./_helpers/app');
+const { enterApp, getModules, visibleNavItems } = require('./_helpers/app');
 const { attachConsoleGuard, assertNoConsoleErrors } = require('./_helpers/console-guard');
 
 const OUT = path.join(process.cwd(), 'tests', 'e2e', '_artifacts', 'ps2');
@@ -28,14 +28,6 @@ const EXPECTED_ROUTES = new Set([
     'nav-pos-switch', // 收银台入口(切到收银台)
 ]);
 
-async function getModules(page) {
-    return page.evaluate(async () => {
-        const tok = localStorage.getItem('mrpilot_token');
-        const r = await fetch('/api/me/modules', { headers: { Authorization: 'Bearer ' + tok } });
-        return r.json();
-    });
-}
-
 async function setBusinessType(page, businessType) {
     return page.evaluate(async (bt) => {
         const tok = localStorage.getItem('mrpilot_token');
@@ -46,14 +38,6 @@ async function setBusinessType(page, businessType) {
         });
         return r.json();
     }, businessType);
-}
-
-async function visibleNavItems(page) {
-    return page.evaluate(() =>
-        Array.from(document.querySelectorAll('.nav-item'))
-            .filter((el) => getComputedStyle(el).display !== 'none' && el.offsetParent !== null)
-            .map((el) => el.dataset.route || el.id || '(no-route)')
-    );
 }
 
 test.describe('pos_only 精简外壳 · 侧栏门控', () => {
@@ -140,9 +124,6 @@ test.describe('pos_only 精简外壳 · 侧栏门控', () => {
         // (/api/knowledge/bases、/api/recon/bank-v2/tasks)被服务端 403 拒 = 模块门控
         // 在工作,浏览器却把 4xx 资源载入记成 console.error(消息不含 URL,无法按端点滤)。
         // 只放行 403 资源噪声、只在本条过渡场景;其余 console.error/pageerror 照抓。
-        guard.consoleErrors = guard.consoleErrors.filter(
-            (e) => !/Failed to load resource.*403/.test(e)
-        );
-        assertNoConsoleErrors(expect, guard);
+        assertNoConsoleErrors(expect, guard, { allow: [/Failed to load resource.*403/] });
     });
 });

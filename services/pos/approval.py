@@ -19,6 +19,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from core import feature_flags, pos_api
 from core.pos_api import PosError
 from services.authz import deps
 from services.authz.resolver import resolve
@@ -125,44 +126,42 @@ def execute_gated_write(
     sale_id_of,
     audit_details: Optional[dict] = None,
 ) -> dict:
-    """退货/作废共用「授权闸 + 单事务写 + 审计」信封。write_fn(cur, tid, ws, user) 执行真正的写。
+    """退货/作废的授权闸 + 审计,挂在共用写事务信封(core.pos_api.pos_write)上。
 
-    闸关时逐字节走历史(guard 直接放行、不写审计);闸开无权且无授权块 → PosError 上抛信封。
+    信封(鉴权/租户校验/账套归属/模块闸/单事务)不在此自持——只提供两个钩子:写前授权闸
+    (与写同事务),写后审计(须 commit 后独立写、不随退货回滚)。闸关时 guard 放行、不留痕。
     """
-    from core import db
-    from core.pos_api import PosError, assert_module_enabled, ok, pos_auth, require_workspace
+    state: dict = {}
 
-    user = pos_auth(request)
-    tid = user.get("tenant_id")
-    if not tid:
-        raise PosError("pos.forbidden", 403)
-    tid = str(tid)
-    ws = user.get("workspace_client_id") or ws_override
-    if ws is None:
-        raise PosError("pos.forbidden", 403)
-    ws = int(ws)
-    with db.get_cursor_rls(tid, commit=True) as cur:
-        assert_module_enabled(cur, tid, "pos")
-        require_workspace(cur, tid, ws)
-        gated, approver = guard(
+    def _authorize(cur, ctx):
+        state["gated"], state["approver"] = guard(
             cur,
             request=request,
-            user=user,
-            tenant_id=tid,
-            workspace_client_id=ws,
+            user=ctx["user"],
+            tenant_id=ctx["tenant_id"],
+            workspace_client_id=ctx["workspace_client_id"],
             approval=approval,
         )
-        result = write_fn(cur, tid, ws, user)
-    log_if_approved(
-        gated,
-        approver,
-        tenant_id=tid,
-        action=action,
-        sale_id=sale_id_of(result),
-        operator=user,
-        details=audit_details,
+
+    def _audit(result, ctx):
+        # 仅经店长授权(闸开且有授权人)时写审计;本人有权/闸关都不写。
+        if state.get("gated") and state.get("approver"):
+            log_approval(
+                tenant_id=ctx["tenant_id"],
+                action=action,
+                sale_id=sale_id_of(result),
+                operator=ctx["user"],
+                approver=state["approver"],
+                details=audit_details,
+            )
+
+    return pos_api.pos_write(
+        request,
+        ws_override=ws_override,
+        write_fn=write_fn,
+        before_write=_authorize,
+        after_commit=_audit,
     )
-    return ok(result)
 
 
 def guard(
@@ -173,8 +172,6 @@ def guard(
     闸关 → (False, None),调用方逐字节走历史。闸开 → 跑 authorize,(True, None)=本人有权、
     (True, {..})=店长授权(需审计);无权无授权块或校验失败则由 authorize 抛 PosError。
     """
-    from core import feature_flags
-
     if not feature_flags.pos_refund_approval_enabled_for(tenant_id):
         return False, None
     approver = authorize(
@@ -186,28 +183,6 @@ def guard(
         approval=approval,
     )
     return True, approver
-
-
-def log_if_approved(
-    gated: bool,
-    approver: Optional[dict],
-    *,
-    tenant_id: str,
-    action: str,
-    sale_id: Optional[str],
-    operator: dict,
-    details: Optional[dict] = None,
-) -> None:
-    """仅当经店长授权(闸开且有授权人)时写审计;本人有权/闸关都不写。"""
-    if gated and approver:
-        log_approval(
-            tenant_id=tenant_id,
-            action=action,
-            sale_id=sale_id,
-            operator=operator,
-            approver=approver,
-            details=details,
-        )
 
 
 def log_approval(

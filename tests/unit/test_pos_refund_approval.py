@@ -216,14 +216,14 @@ class RouteWiringTests(unittest.TestCase):
         import routes.pos_sales_routes as mod
 
         src = inspect.getsource(mod.api_refund)
-        self.assertIn("_gated_write", src)
+        self.assertIn("approval_svc.execute_gated_write", src)
         self.assertIn('"pos.refund.approved"', src)
 
     def test_void_route_wires_gate_and_audit(self):
         import routes.pos_sales_routes as mod
 
         src = inspect.getsource(mod.api_void)
-        self.assertIn("_gated_write", src)
+        self.assertIn("approval_svc.execute_gated_write", src)
         self.assertIn('"pos.void.approved"', src)
 
     def test_gate_short_circuits_when_off(self):

@@ -16,7 +16,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
-from core import db
+from core import db, pos_api
 from core.pos_api import PosError, assert_module_enabled, ok, pos_auth, require_workspace
 from services.imaging import image_store
 from services.pos import (
@@ -80,12 +80,8 @@ def _read(request: Request, ws_override: Optional[int], fn, commit: bool = False
 
 
 def _write(request: Request, ws_override: Optional[int], fn):
-    user, tid = _subject(request)
-    ws = _resolve_ws(user, ws_override)
-    with db.get_cursor_rls(tid, commit=True) as cur:
-        assert_module_enabled(cur, tid, "pos")
-        require_workspace(cur, tid, ws)
-        return ok(fn(cur, tid, ws, user))
+    # 写事务信封收在 core.pos_api.pos_write(单一事实源)· 退货授权闸走同一执行器。
+    return pos_api.pos_write(request, ws_override=ws_override, write_fn=fn)
 
 
 def _created_by(user: dict) -> Optional[str]:

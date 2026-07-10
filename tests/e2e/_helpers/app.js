@@ -2,6 +2,7 @@
 // ============================================================
 // 复用 storageState 进 /home 后,走真实点击切路由(home.js: .nav-item[data-route] → routeTo)。
 // ============================================================
+/* global document, getComputedStyle */
 
 const { expect } = require('@playwright/test');
 
@@ -55,4 +56,23 @@ async function openRoute(page, route) {
     await expect(page.locator(`#page-${route}`), `路由 ${route} 页面激活`).toHaveClass(/active/);
 }
 
-module.exports = { enterApp, openRoute, dismissWorkspaceGate };
+// 用登录 token 拉 /api/me/modules(业态 + 各模块启用状态)· pos_only 门控 spec 共用
+async function getModules(page) {
+    return page.evaluate(async () => {
+        const tok = localStorage.getItem('mrpilot_token');
+        const r = await fetch('/api/me/modules', { headers: { Authorization: 'Bearer ' + tok } });
+        return r.json();
+    });
+}
+
+// 当前侧栏「真正可见」的 .nav-item 的 data-route 列表(display≠none 且有布局盒)·
+// 数菜单靠它,不靠 class 自欺。返回 route(无则回落 id / 占位)。
+async function visibleNavItems(page) {
+    return page.evaluate(() =>
+        Array.from(document.querySelectorAll('.nav-item'))
+            .filter((el) => getComputedStyle(el).display !== 'none' && el.offsetParent !== null)
+            .map((el) => el.dataset.route || el.id || '(no-route)')
+    );
+}
+
+module.exports = { enterApp, openRoute, dismissWorkspaceGate, getModules, visibleNavItems };

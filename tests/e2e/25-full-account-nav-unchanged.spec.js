@@ -4,23 +4,13 @@
 // 行为与 pos_only 改动前完全一致——可见菜单项远超 7 个上限,且做账/报税等常规菜单正常
 // 显示。用来防「pos_only 门控代码不小心影响了正常账号」这一类回归。
 // ============================================================
-/* global document, getComputedStyle */
-
 const path = require('path');
 const { test, expect } = require('@playwright/test');
 const { hasCreds, ensureStorageState, STORAGE_STATE } = require('./_helpers/auth');
-const { enterApp } = require('./_helpers/app');
+const { enterApp, getModules, visibleNavItems } = require('./_helpers/app');
 const { attachConsoleGuard, assertNoConsoleErrors } = require('./_helpers/console-guard');
 
 const OUT = path.join(process.cwd(), 'tests', 'e2e', '_artifacts', 'ps2');
-
-async function getModules(page) {
-    return page.evaluate(async () => {
-        const tok = localStorage.getItem('mrpilot_token');
-        const r = await fetch('/api/me/modules', { headers: { Authorization: 'Bearer ' + tok } });
-        return r.json();
-    });
-}
 
 test.describe('完整版账号 · pos_only 改动零回归', () => {
     test.skip(!hasCreds(), '需测试账号·CI 无凭据时跳过');
@@ -49,11 +39,7 @@ test.describe('完整版账号 · pos_only 改动零回归', () => {
             });
         }
 
-        const visible = await page.evaluate(() =>
-            Array.from(document.querySelectorAll('.nav-item'))
-                .filter((el) => getComputedStyle(el).display !== 'none' && el.offsetParent !== null)
-                .map((el) => el.dataset.route || el.id || '(no-route)')
-        );
+        const visible = await visibleNavItems(page);
 
         expect(visible.length, 'pos_only 闸不该收窄完整版菜单').toBeGreaterThan(7);
 

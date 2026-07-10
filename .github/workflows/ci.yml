@@ -116,6 +116,15 @@ jobs:
             python scripts/check_line_ratchet.py
           fi
 
+      - name: 缓存破机械闸 · 产物变则源 HTML ?v= 必 bump(2026-07-10 事故固化 · FAIL 模式)
+        # PR 用 origin/master..HEAD 看全 diff;push 用默认 HEAD~1..HEAD
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python scripts/check_cachebust.py --base origin/${{ github.base_ref }} --head HEAD
+          else
+            python scripts/check_cachebust.py
+          fi
+
   # REFACTOR-WC · UI 一致性闸(审计发现 #2:check_ui_consistency 没接 CI · 1787 违规无人棘轮)
   #   棘轮:违规总数 > BASELINE_TOTAL(脚本内)→ 非零退出。
   #   FAIL 模式(2026-06-05 Zihao 拍板切硬门 · 见下方 job 注释)· UI 一致性反弹超基线 → CI 当场报红挡合并。

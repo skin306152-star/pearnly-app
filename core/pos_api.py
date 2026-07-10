@@ -25,6 +25,8 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from core import db
+
 # POS/库存/模块接口前缀:这些路径的请求体校验错误也要走信封(其余路由保持 FastAPI 默认)。
 # /api/me/modules 既匹配 GET(精确)也匹配 toggle 子路径(/api/me/modules/{key} 走前缀)。
 _POS_PREFIXES = (
@@ -177,3 +179,54 @@ def assert_module_enabled(cur, tenant_id: str, module_key: str) -> None:
 
     if not store.is_enabled(cur, tenant_id=tenant_id, module_key=module_key):
         raise PosError("pos.module_disabled", 403)
+
+
+def subject(request: Request) -> tuple[dict, str]:
+    """取 (user, tenant_id);无 tenant → PosError pos.forbidden(403)。写事务信封的第一步。"""
+    user = pos_auth(request)
+    tid = user.get("tenant_id")
+    if not tid:
+        raise PosError("pos.forbidden", 403)
+    return user, str(tid)
+
+
+def resolve_ws(user: dict, override: Optional[int]) -> int:
+    """定位账套:收银员 token 自带 workspace_client_id,老板调走 override;都无 → pos.forbidden。"""
+    ws = user.get("workspace_client_id") or override
+    if ws is None:
+        raise PosError("pos.forbidden", 403)
+    return int(ws)
+
+
+def pos_write(
+    request: Request,
+    *,
+    ws_override: Optional[int],
+    write_fn,
+    module_key: str = "pos",
+    before_write=None,
+    after_commit=None,
+) -> dict:
+    """POS 写事务信封 · 单一事实源(治「路由与授权层各持一份租户隔离+模块闸副本必漂移」)。
+
+    鉴权 → 账套定位 → 单事务(get_cursor_rls commit=True)内:模块闸 + 账套归属 + 可选写前钩子
+    + write_fn 原子写。租户隔离与模块闸是安全边界,只此一处,任何 POS 写都过同一道门。
+
+      - before_write(cur, ctx):可选,在同一事务游标里跑(如退货授权闸),ctx 带 user/tenant/ws。
+      - write_fn(cur, tid, ws, user):真正的写,返回业务结果。
+      - after_commit(result, ctx):可选,事务提交【后】跑(如审计须独立连接、不随退货回滚)。
+
+    返回 ok(result)。
+    """
+    user, tid = subject(request)
+    ws = resolve_ws(user, ws_override)
+    ctx = {"user": user, "tenant_id": tid, "workspace_client_id": ws}
+    with db.get_cursor_rls(tid, commit=True) as cur:
+        assert_module_enabled(cur, tid, module_key)
+        require_workspace(cur, tid, ws)
+        if before_write is not None:
+            before_write(cur, ctx)
+        result = write_fn(cur, tid, ws, user)
+    if after_commit is not None:
+        after_commit(result, ctx)
+    return ok(result)

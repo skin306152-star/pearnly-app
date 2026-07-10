@@ -34,13 +34,16 @@ function attachConsoleGuard(page) {
     return { consoleErrors, pageErrors };
 }
 
-// 收尾断言:无未过滤的 pageerror / console.error
-function assertNoConsoleErrors(expect, guard) {
+// 收尾断言:无未过滤的 pageerror / console.error。
+// opts.allow:spec 声明式豁免额外的 console.error 噪声(如切业态过渡期的 403 资源载入)——
+// 走共用接口而非各 spec 直改 guard.consoleErrors 数组。pageerror 永不豁免(未捕获 JS 异常)。
+function assertNoConsoleErrors(expect, guard, { allow = [] } = {}) {
+    const consoleErrors = guard.consoleErrors.filter((e) => !allow.some((re) => re.test(e || '')));
     expect(
         guard.pageErrors,
         `pageerror(uncaught JS 异常): ${guard.pageErrors.join(' | ')}`
     ).toEqual([]);
-    expect(guard.consoleErrors, `console.error: ${guard.consoleErrors.join(' | ')}`).toEqual([]);
+    expect(consoleErrors, `console.error: ${consoleErrors.join(' | ')}`).toEqual([]);
 }
 
 module.exports = { attachConsoleGuard, assertNoConsoleErrors, isIgnorable };

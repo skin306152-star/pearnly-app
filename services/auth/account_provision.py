@@ -121,7 +121,12 @@ def find_login_user(cur, email_norm: str):
 
 
 def create_owner_login_user(
-    cur, *, username: str, email: str | None = None, email_norm: str | None = None, password_hash: str
+    cur,
+    *,
+    username: str,
+    email: str | None = None,
+    email_norm: str | None = None,
+    password_hash: str,
 ) -> str:
     """建一个 owner 登录账号(is_active · plan=credits · 初始密码哈希已入库)。返回 user_id。
 

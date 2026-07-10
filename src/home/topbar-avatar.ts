@@ -208,7 +208,7 @@
                         } catch (_) {
                             /* silent · localStorage 私模/配额 */
                         }
-                        window.location.href = '/';
+                        window.location.href = '/login';
                     });
                     break;
             }

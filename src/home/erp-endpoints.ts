@@ -30,7 +30,7 @@ async function loadErpEndpoints() {
                 _showSessionRevokedModal();
                 return;
             }
-            window.location.href = '/';
+            window.location.href = '/login';
             return;
         }
         const data = await resp.json();

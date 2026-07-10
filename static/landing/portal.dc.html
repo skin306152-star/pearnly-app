@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearnly · เครื่องมือบัญชีและภาษีครบวงจร</title>
+<!-- 脸0 品牌门户经 dc-runtime(vendor/support.js)渲染 · 全资产自托管零外链。
+     __resources 把 support.js 内置的 React/ReactDOM unpkg 地址重定向到本地副本:
+     cdnScriptFor 命中此表即用本地、不落 unpkg(见 vendor/support.js loadReactUmd)。 -->
+<script>
+  window.__resources = {
+    "https://unpkg.com/react@18.3.1/umd/react.production.min.js": "/static/landing/vendor/react.production.min.js?v=1",
+    "https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js": "/static/landing/vendor/react-dom.production.min.js?v=1",
+  };
+</script>
+<script src="/static/landing/vendor/support.js?v=1"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<!-- 自托管字体 + WebGL/动画运行时(原 Google Fonts / cdnjs 外链 → 本地 vendor · 零外链) -->
+<link rel="stylesheet" href="/static/landing/vendor/fonts.css?v=1">
+<script src="/static/landing/vendor/three.min.js?v=1"></script>
+<script src="/static/landing/vendor/gsap.min.js?v=1"></script>
+<script src="/static/landing/vendor/ScrollTrigger.min.js?v=1"></script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: #FAF9F5; }
+  a { color: #4E7D25; text-decoration: none; }
+  a:hover { color: #3F671D; }
+  ::selection { background: #DCE8CE; }
+  [lang="en"] { display: none; }
+  [data-lang="en"] [lang="en"] { display: inline; }
+  [data-lang="en"] [lang="th"] { display: none; }
+  @media (max-width: 800px) {
+    [data-pstage] { height: auto !important; padding: 8px 0 12px !important; display: flex !important; flex-direction: column; gap: 18px; align-items: center; }
+    [data-pcard] { position: static !important; width: 100% !important; max-width: 400px !important; transform: none !important; }
+    [data-pcard]:nth-child(even) { margin-left: 24px; }
+    [data-pcard]:nth-child(odd) { margin-right: 24px; }
+    [data-aistage] { transform: scale(0.72); transform-origin: top center; margin-bottom: -120px; }
+    [data-hide-m] { display: none !important; }
+  }
+  /* 尊重系统「减少动态效果」:跳过入场动画,内容直接落定可见(不改默认动效视觉)。
+     !important 压过 GSAP 写在元素 style 上的 inline opacity/visibility(无 !important)。
+     即便脚本/WebGL 未起,这条也保证门户内容不被遮罩/隐藏卡住。 */
+  @media (prefers-reduced-motion: reduce) {
+    #pn-intro { display: none !important; }
+    [data-a], [data-pcard], [data-ai-doc], [data-ai-result],
+    [data-acc-chip], [data-acc-bench], [data-acc-task],
+    [data-pos-row], [data-pos-paid], [data-pos-slip],
+    [data-flow], [data-role] {
+      opacity: 1 !important; visibility: visible !important; transform: none !important;
+    }
+  }
+</style>
+</helmet>
+
+<div data-lang="{{ lang }}" data-theme-root="true" style="font-family: 'Anuphan', 'Helvetica Neue', sans-serif; background: #FAF9F5; color: #1B1E14; -webkit-font-smoothing: antialiased; overflow-x: hidden;">
+
+  <!-- ================= BRAND INTRO OVERLAY (v2 logo animation) ================= -->
+  <div id="pn-intro" style="position: fixed; inset: 0; z-index: 200; background: #FAF9F5; display: flex; align-items: center; justify-content: center;">
+    <div id="pn-intro-gl" style="position: absolute; inset: 0;"></div>
+  </div>
+
+  <!-- ================= NAV ================= -->
+  <header data-nav="true" style="position: sticky; top: 0; z-index: 60; background: rgba(250,249,245,0.88); backdrop-filter: blur(12px); border-bottom: 1px solid #ECEAE0; transition: background 0.5s, border-color 0.5s;">
+    <nav style="max-width: 1200px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 14px;">
+      <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 21px; letter-spacing: -0.02em;">
+        <span style="width: 12px; height: 12px; border-radius: 50%; background: #4E7D25; display: inline-block;"></span>
+        pearnly
+      </div>
+      <div style="flex: 1;"></div>
+      <div style="display: flex; align-items: center; border: 1px solid #E0DED2; border-radius: 999px; padding: 3px; gap: 2px; background: #FFFFFF;">
+        <button onClick="{{ setTh }}" style="{{ thBtnStyle }}">ไทย</button>
+        <button onClick="{{ setEn }}" style="{{ enBtnStyle }}">EN</button>
+      </div>
+      <a href="#products" style="background: #1B1E14; color: #FAF9F5; padding: 9px 20px; border-radius: 999px; font-size: 15px; font-weight: 600; display: inline-block;" style-hover="background: #4E7D25; color: #FFFFFF;">
+        <span lang="th">เลือกผลิตภัณฑ์</span><span lang="en">Products</span>
+      </a>
+    </nav>
+  </header>
+
+  <!-- ================= HERO ================= -->
+  <section data-screen-label="Hero" style="position: relative;">
+    <div id="pn-hero-grid" style="position: absolute; inset: 0; overflow: hidden; pointer-events: none;"></div>
+    <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 80px; background: linear-gradient(to bottom, rgba(250,249,245,0), #FAF9F5 90%); pointer-events: none;"></div>
+    <div style="position: relative; max-width: 1200px; margin: 0 auto; padding: clamp(52px, 7vw, 96px) 24px 12px;">
+    <div style="max-width: 880px;">
+      <div style="display: inline-flex; align-items: center; gap: 8px; border: 1px solid #DCE8CE; background: #F1F5E8; color: #3F671D; border-radius: 999px; padding: 6px 14px; font-size: 14px; font-weight: 600; margin-bottom: 26px;">
+        <span lang="th">สำหรับ SME และสำนักงานบัญชีไทย</span><span lang="en">For Thai SMEs &amp; accounting firms</span>
+      </div>
+      <h1 style="font-size: clamp(38px, 5.6vw, 72px); line-height: 1.08; font-weight: 700; letter-spacing: -0.03em; margin: 0 0 22px; text-wrap: balance;">
+        <span lang="th">เครื่องมือบัญชีและภาษี<br>ครบวงจร <span style="color: #4E7D25;">ในระบบเดียว</span></span>
+        <span lang="en">Accounting &amp; tax tools,<br>complete — <span style="color: #4E7D25;">in one system</span></span>
+      </h1>
+      <p style="font-size: clamp(17px, 1.7vw, 21px); line-height: 1.65; color: #57604B; margin: 0 0 30px; max-width: 54ch; text-wrap: pretty;">
+        <span lang="th">ตั้งแต่หน้าร้านขายของ จนถึงเตรียมยื่นภาษีรายเดือน — จบในระบบเดียว</span>
+        <span lang="en">From the shopfront checkout to monthly tax filing preparation — all in a single system.</span>
+      </p>
+      <a href="#products" style="background: #4E7D25; color: #FFFFFF; padding: 14px 30px; border-radius: 999px; font-size: 17px; font-weight: 600; display: inline-block; box-shadow: 0 10px 24px -10px rgba(78,125,37,0.55);" style-hover="background: #3F671D; transform: translateY(-2px);">
+        <span lang="th">เลือกผลิตภัณฑ์ของคุณ ↓</span><span lang="en">Choose your product ↓</span>
+      </a>
+    </div>
+    </div>
+  </section>
+
+  <!-- ================= PRODUCT CARDS (paper intro) ================= -->
+  <section id="products" data-screen-label="Products" style="max-width: 1200px; margin: 0 auto; padding: clamp(28px, 4vw, 56px) 24px clamp(40px, 6vw, 80px);">
+    <div data-pstage="true" style="position: relative; height: 560px;">
+
+      <!-- ① Pearnly AI — left front, dark, largest -->
+      <div data-pcard="ai" data-tilt="true" style="position: absolute; left: 0; top: 42px; width: 350px; z-index: 4; background: #1B1E14; color: #FAF9F5; border-radius: 22px; padding: 30px 28px; box-shadow: 0 30px 50px -24px rgba(27,30,20,0.5), 0 4px 10px -4px rgba(27,30,20,0.3); transition: transform 0.18s ease-out, box-shadow 0.25s;">
+        <div style="display: inline-block; background: #7FB84E; color: #1B1E14; border-radius: 999px; padding: 4px 13px; font-size: 13px; font-weight: 700; margin-bottom: 16px;">
+          <span lang="th">สำหรับสำนักงานบัญชี</span><span lang="en">For accounting firms</span>
+        </div>
+        <h3 style="font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 10px;">Pearnly AI</h3>
+        <p style="font-size: 15.5px; line-height: 1.6; color: #B9BCA9; margin: 0 0 18px; text-wrap: pretty;">
+          <span lang="th">ผู้ช่วย AI เตรียมภาษีรายเดือน อ่านเอกสารไทยแม่น ตรวจสอบได้ทุกขั้นตอน</span>
+          <span lang="en">AI assistant for monthly tax prep — reads Thai documents accurately, verifiable at every step.</span>
+        </p>
+        <ul style="list-style: none; margin: 0 0 22px; padding: 0; display: grid; gap: 8px;">
+          <li style="display: flex; gap: 9px; font-size: 14px; line-height: 1.5; color: #D5D7C8;"><span style="color: #7FB84E; font-weight: 700;">✓</span><span><span lang="th">สแกนใบกำกับภาษีไทย · ชุดหลักฐาน ภ.พ.30</span><span lang="en">Thai tax invoice scanning · PP.30 evidence pack</span></span></li>
+          <li style="display: flex; gap: 9px; font-size: 14px; line-height: 1.5; color: #D5D7C8;"><span style="color: #7FB84E; font-weight: 700;">✓</span><span><span lang="th">ส่งตรง Express / MR.ERP · เอกสารผ่าน LINE</span><span lang="en">Direct to Express / MR.ERP · docs via LINE</span></span></li>
+        </ul>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+          <a href="{{ loginAi }}" style="background: #7FB84E; color: #1B1E14; padding: 11px 22px; border-radius: 999px; font-size: 15px; font-weight: 700; display: inline-block;" style-hover="background: #A2D774;">
+            <span lang="th">เข้าสู่ระบบ</span><span lang="en">Sign in</span>
+          </a>
+          <a href="{{ bookDemo }}" style="border: 1.5px solid #3A4030; color: #D5D7C8; padding: 11px 20px; border-radius: 999px; font-size: 15px; font-weight: 600; display: inline-block;" style-hover="border-color: #7FB84E; color: #A2D774;">
+            <span lang="th">นัดดูตัวอย่าง</span><span lang="en">Book a demo</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- ② Accountant — center, higher -->
+      <div data-pcard="acc" data-tilt="true" style="position: absolute; left: 385px; top: 0; width: 290px; z-index: 3; background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 20px; padding: 26px 24px; box-shadow: 0 22px 40px -22px rgba(27,30,20,0.28), 0 2px 6px -2px rgba(27,30,20,0.1); transition: transform 0.18s ease-out, box-shadow 0.25s;">
+        <div style="display: inline-block; background: #F1F5E8; border: 1px solid #DCE8CE; color: #3F671D; border-radius: 999px; padding: 4px 12px; font-size: 12.5px; font-weight: 600; margin-bottom: 14px;">
+          <span lang="th">สำหรับนักบัญชี</span><span lang="en">For accountants</span>
+        </div>
+        <h3 style="font-size: 21px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 8px;">
+          <span lang="th">Pearnly สำหรับนักบัญชี</span><span lang="en">Pearnly for Accountants</span>
+        </h3>
+        <p style="font-size: 14.5px; line-height: 1.6; color: #57604B; margin: 0 0 18px; text-wrap: pretty;">
+          <span lang="th">เครื่องมือครบมือ สแกนเอกสาร กระทบยอดธนาคาร ส่ง ERP</span>
+          <span lang="en">Full toolkit: document scanning, bank reconciliation, ERP push.</span>
+        </p>
+        <a href="{{ loginAcc }}" style="border: 1.5px solid #1B1E14; color: #1B1E14; padding: 10px 20px; border-radius: 999px; font-size: 14.5px; font-weight: 600; display: inline-block;" style-hover="background: #1B1E14; color: #FAF9F5;">
+          <span lang="th">เข้าสู่ระบบ</span><span lang="en">Sign in</span>
+        </a>
+      </div>
+
+      <!-- ③ POS cashier — center-right, lower -->
+      <div data-pcard="cash" data-tilt="true" style="position: absolute; left: 620px; top: 250px; width: 290px; z-index: 3; background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 20px; padding: 26px 24px; box-shadow: 0 22px 40px -22px rgba(27,30,20,0.28), 0 2px 6px -2px rgba(27,30,20,0.1); transition: transform 0.18s ease-out, box-shadow 0.25s;">
+        <div style="display: inline-block; background: #F1F5E8; border: 1px solid #DCE8CE; color: #3F671D; border-radius: 999px; padding: 4px 12px; font-size: 12.5px; font-weight: 600; margin-bottom: 14px;">
+          <span lang="th">สำหรับพนักงานหน้าร้าน</span><span lang="en">For shopfront staff</span>
+        </div>
+        <h3 style="font-size: 21px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 8px;">
+          <span lang="th">Pearnly POS — หน้าจอขาย</span><span lang="en">Pearnly POS — Cashier</span>
+        </h3>
+        <p style="font-size: 14.5px; line-height: 1.6; color: #57604B; margin: 0 0 18px; text-wrap: pretty;">
+          <span lang="th">ขายได้ทุกที่ บนมือถือหรือแท็บเล็ต แม้เน็ตหลุดก็ยังขายได้</span>
+          <span lang="en">Sell anywhere on phone or tablet — even offline.</span>
+        </p>
+        <a href="{{ loginPosCashier }}" style="background: #4E7D25; color: #FFFFFF; padding: 10px 20px; border-radius: 999px; font-size: 14.5px; font-weight: 600; display: inline-block;" style-hover="background: #3F671D;">
+          <span lang="th">เปิดหน้าจอขาย</span><span lang="en">Open the register</span>
+        </a>
+      </div>
+
+      <!-- ④ POS owner — far right, farther -->
+      <div data-pcard="own" data-tilt="true" style="position: absolute; left: 930px; top: 70px; width: 260px; z-index: 2; background: #F4F2EA; border: 1px solid #E5E3D8; border-radius: 20px; padding: 24px 22px; box-shadow: 0 18px 34px -20px rgba(27,30,20,0.24); transition: transform 0.18s ease-out, box-shadow 0.25s;">
+        <div style="display: inline-block; background: #FFFFFF; border: 1px solid #DCE8CE; color: #3F671D; border-radius: 999px; padding: 4px 12px; font-size: 12.5px; font-weight: 600; margin-bottom: 14px;">
+          <span lang="th">สำหรับเจ้าของร้านค้า</span><span lang="en">For shop owners</span>
+        </div>
+        <h3 style="font-size: 20px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 8px;">
+          <span lang="th">Pearnly POS — เจ้าของร้าน</span><span lang="en">Pearnly POS — Owner</span>
+        </h3>
+        <p style="font-size: 14px; line-height: 1.6; color: #57604B; margin: 0 0 18px; text-wrap: pretty;">
+          <span lang="th">สินค้า สต๊อก ยอดขาย กำไร พนักงาน — เห็นครบในที่เดียว</span>
+          <span lang="en">Products, stock, sales, profit, staff — all in one place.</span>
+        </p>
+        <a href="{{ loginPosOwner }}" style="border: 1.5px solid #1B1E14; color: #1B1E14; padding: 10px 20px; border-radius: 999px; font-size: 14px; font-weight: 600; display: inline-block;" style-hover="background: #1B1E14; color: #FAF9F5;">
+          <span lang="th">เข้าสู่ระบบ</span><span lang="en">Sign in</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Accordion: compare the 4 products (Mercury-style grouping) -->
+    <div style="max-width: 860px; margin: clamp(36px, 5vw, 64px) auto 0;">
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.12em; color: #4E7D25; font-weight: 500; margin-bottom: 18px;"><span lang="th">เทียบทั้ง 4 ผลิตภัณฑ์</span><span lang="en">COMPARE ALL 4 PRODUCTS</span></div>
+
+      <div style="border-top: 1px solid #E0DED2;">
+        <button onClick="{{ accT0 }}" style="{{ accBtn0 }}">
+          <span style="display: flex; align-items: center; gap: 12px;"><span style="{{ accDot0 }}"></span>Pearnly AI <span style="font-weight: 500; font-size: 14px; color: #9A9E90;">· <span lang="th">สำนักงานบัญชี</span><span lang="en">accounting firms</span></span></span>
+          <span style="{{ accChev0 }}">↓</span>
+        </button>
+        <div style="{{ accWrap0 }}">
+          <div style="overflow: hidden;">
+            <div style="padding: 2px 4px 22px 30px; display: grid; gap: 10px;">
+              <p style="margin: 0; font-size: 15.5px; line-height: 1.65; color: #57604B; max-width: 60ch;"><span lang="th">ผู้ช่วย AI เตรียมภาษีรายเดือน — สแกนเอกสารไทย กระทบยอดภาษีซื้อ พร้อมชุดหลักฐาน ภ.พ.30 จุดสำคัญมีคนตรวจก่อนเสมอ</span><span lang="en">AI assistant for monthly tax prep — scans Thai documents, reconciles input VAT, builds the PP.30 evidence pack. Critical steps always human-reviewed.</span></p>
+              <a href="{{ loginAi }}" style="color: #3F671D; font-weight: 700; font-size: 15px;"><span lang="th">เข้าสู่ระบบ →</span><span lang="en">Sign in →</span></a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid #E0DED2;">
+        <button onClick="{{ accT1 }}" style="{{ accBtn1 }}">
+          <span style="display: flex; align-items: center; gap: 12px;"><span style="{{ accDot1 }}"></span><span lang="th">Pearnly สำหรับนักบัญชี</span><span lang="en">Pearnly for Accountants</span></span>
+          <span style="{{ accChev1 }}">↓</span>
+        </button>
+        <div style="{{ accWrap1 }}">
+          <div style="overflow: hidden;">
+            <div style="padding: 2px 4px 22px 30px; display: grid; gap: 10px;">
+              <p style="margin: 0; font-size: 15.5px; line-height: 1.65; color: #57604B; max-width: 60ch;"><span lang="th">เครื่องมือครบมือสำหรับคนที่อยากทำเอง — OCR เอกสารซื้อ-ขาย จัดหมวดอัตโนมัติ กระทบยอดธนาคารกับ GL แล้วส่งรายการเข้า Express / MR.ERP</span><span lang="en">A hands-on toolkit — OCR purchase &amp; sales docs, auto-categorize, reconcile bank vs GL, push entries into Express / MR.ERP.</span></p>
+              <a href="{{ loginAcc }}" style="color: #3F671D; font-weight: 700; font-size: 15px;"><span lang="th">เข้าสู่ระบบ →</span><span lang="en">Sign in →</span></a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid #E0DED2;">
+        <button onClick="{{ accT2 }}" style="{{ accBtn2 }}">
+          <span style="display: flex; align-items: center; gap: 12px;"><span style="{{ accDot2 }}"></span>Pearnly POS <span style="font-weight: 500; font-size: 14px; color: #9A9E90;">· <span lang="th">หน้าจอขาย</span><span lang="en">cashier</span></span></span>
+          <span style="{{ accChev2 }}">↓</span>
+        </button>
+        <div style="{{ accWrap2 }}">
+          <div style="overflow: hidden;">
+            <div style="padding: 2px 4px 22px 30px; display: grid; gap: 10px;">
+              <p style="margin: 0; font-size: 15.5px; line-height: 1.65; color: #57604B; max-width: 60ch;"><span lang="th">ขายบนมือถือ/แท็บเล็ต ไม่ต้องซื้อเครื่องเพิ่ม ออฟไลน์ได้ ขายต่อเนื่อง — รับเงินสด/เงินโอน สต๊อกตัดตามล็อต</span><span lang="en">Sell on phone or tablet, no extra hardware, works offline — cash &amp; transfer payments, lot-based stock deduction.</span></p>
+              <a href="{{ loginPosCashier }}" style="color: #3F671D; font-weight: 700; font-size: 15px;"><span lang="th">เปิดหน้าจอขาย →</span><span lang="en">Open the register →</span></a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid #E0DED2; border-bottom: 1px solid #E0DED2;">
+        <button onClick="{{ accT3 }}" style="{{ accBtn3 }}">
+          <span style="display: flex; align-items: center; gap: 12px;"><span style="{{ accDot3 }}"></span>Pearnly POS <span style="font-weight: 500; font-size: 14px; color: #9A9E90;">· <span lang="th">เจ้าของร้าน</span><span lang="en">owner</span></span></span>
+          <span style="{{ accChev3 }}">↓</span>
+        </button>
+        <div style="{{ accWrap3 }}">
+          <div style="overflow: hidden;">
+            <div style="padding: 2px 4px 22px 30px; display: grid; gap: 10px;">
+              <p style="margin: 0; font-size: 15.5px; line-height: 1.65; color: #57604B; max-width: 60ch;"><span lang="th">สินค้า สต๊อก ยอดขาย กำไร พนักงาน — รายงานเข้าใจง่าย จัดการหลายล็อต กำหนดสิทธิ์พนักงานขาย</span><span lang="en">Products, stock, sales, profit, staff — clear reports, multi-lot management, staff permissions.</span></p>
+              <a href="{{ loginPosOwner }}" style="color: #3F671D; font-weight: 700; font-size: 15px;"><span lang="th">เข้าสู่ระบบ →</span><span lang="en">Sign in →</span></a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SEC 2 · PEARNLY AI ================= -->
+  <section data-sec="ai" data-screen-label="Pearnly AI" style="background: #F4F2EA; border-top: 1px solid #ECEAE0; border-bottom: 1px solid #ECEAE0;">
+    <div style="max-width: 1200px; margin: 0 auto; padding: clamp(64px, 8vw, 120px) 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: clamp(36px, 5vw, 72px); align-items: center;">
+      <div>
+        <div data-a="true" style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.12em; color: #4E7D25; font-weight: 500; margin-bottom: 16px;">01 · PEARNLY AI</div>
+        <h2 data-a="true" style="font-size: clamp(30px, 3.4vw, 44px); line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 18px; text-wrap: balance;">
+          <span lang="th">จากกองเอกสาร<br>สู่ชุดภาษีที่พร้อมตรวจ</span>
+          <span lang="en">From a pile of documents<br>to a review-ready tax pack</span>
+        </h2>
+        <p data-a="true" style="font-size: 17.5px; line-height: 1.7; color: #57604B; margin: 0 0 24px; max-width: 50ch; text-wrap: pretty;">
+          <span lang="th">ผู้ช่วย AI เตรียมภาษีรายเดือน สแกนใบกำกับภาษีและใบเสร็จภาษาไทย ด้วยความแม่นยำจากการใช้งานจริง — จุดสำคัญมีคนตรวจก่อนเสมอ ไม่มั่วตัวเลข</span>
+          <span lang="en">An AI assistant for monthly tax preparation. Scans Thai tax invoices and receipts with real-world proven accuracy — critical steps are always human-reviewed. No made-up numbers.</span>
+        </p>
+        <ul style="list-style: none; margin: 0 0 28px; padding: 0; display: grid; gap: 12px;">
+          <li data-a="true" style="display: flex; gap: 11px; font-size: 15.5px; line-height: 1.55; color: #3A4030;"><span style="color: #4E7D25; font-weight: 700;">✓</span><span><span lang="th">กระทบยอดภาษีซื้ออัตโนมัติ พร้อมชุดหลักฐานสำหรับ ภ.พ.30</span><span lang="en">Automatic input-VAT reconciliation with a PP.30 evidence pack</span></span></li>
+          <li data-a="true" style="display: flex; gap: 11px; font-size: 15.5px; line-height: 1.55; color: #3A4030;"><span style="color: #4E7D25; font-weight: 700;">✓</span><span><span lang="th">ส่งข้อมูลเข้า Express / MR.ERP ได้โดยตรง</span><span lang="en">Pushes data directly into Express / MR.ERP</span></span></li>
+          <li data-a="true" style="display: flex; gap: 11px; font-size: 15.5px; line-height: 1.55; color: #3A4030;"><span style="color: #4E7D25; font-weight: 700;">✓</span><span><span lang="th">รับ-ส่งเอกสารกับลูกค้าผ่าน LINE ได้</span><span lang="en">Send &amp; receive client documents via LINE</span></span></li>
+        </ul>
+        <a data-a="true" href="{{ loginAi }}" style="background: #1B1E14; color: #FAF9F5; padding: 12px 26px; border-radius: 999px; font-size: 15.5px; font-weight: 600; display: inline-block;" style-hover="background: #4E7D25; color: #FFFFFF;">
+          <span lang="th">เข้าสู่ระบบ Pearnly AI</span><span lang="en">Sign in to Pearnly AI</span>
+        </a>
+      </div>
+
+      <!-- AI stage: receipts converge into a result card -->
+      <div data-aistage="true" style="position: relative; height: 470px;">
+        <div data-ai-doc="1" style="position: absolute; left: 4%; top: 6%; width: 200px; background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 12px; padding: 16px; transform: rotate(-7deg); box-shadow: 0 16px 30px -16px rgba(27,30,20,0.3);">
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9A9E90; margin-bottom: 10px;">ใบกำกับภาษี</div>
+          <div style="display: grid; gap: 7px;">
+            <div style="height: 8px; border-radius: 4px; background: #ECEAE0; width: 88%;"></div>
+            <div data-ai-hl="true" style="height: 14px; border-radius: 4px; background: rgba(127,184,78,0.25); border: 1.5px solid rgba(78,125,37,0); width: 62%;"></div>
+            <div style="height: 8px; border-radius: 4px; background: #ECEAE0; width: 74%;"></div>
+            <div data-ai-hl="true" style="height: 14px; border-radius: 4px; background: rgba(127,184,78,0.25); border: 1.5px solid rgba(78,125,37,0); width: 46%;"></div>
+          </div>
+        </div>
+        <div data-ai-doc="2" style="position: absolute; right: 2%; top: 0; width: 190px; background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 12px; padding: 16px; transform: rotate(5deg); box-shadow: 0 16px 30px -16px rgba(27,30,20,0.3);">
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9A9E90; margin-bottom: 10px;">ใบเสร็จรับเงิน</div>
+          <div style="display: grid; gap: 7px;">
+            <div style="height: 8px; border-radius: 4px; background: #ECEAE0; width: 80%;"></div>
+            <div style="height: 8px; border-radius: 4px; background: #ECEAE0; width: 64%;"></div>
+            <div data-ai-hl="true" style="height: 14px; border-radius: 4px; background: rgba(127,184,78,0.25); border: 1.5px solid rgba(78,125,37,0); width: 52%;"></div>
+          </div>
+        </div>
+        <div data-ai-doc="3" style="position: absolute; left: 16%; bottom: 4%; width: 180px; background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 12px; padding: 16px; transform: rotate(3deg); box-shadow: 0 16px 30px -16px rgba(27,30,20,0.3);">
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9A9E90; margin-bottom: 10px;">RECEIPT · สลิปโอน</div>
+          <div style="display: grid; gap: 7px;">
+            <div style="height: 8px; border-radius: 4px; background: #ECEAE0; width: 84%;"></div>
+            <div data-ai-hl="true" style="height: 14px; border-radius: 4px; background: rgba(127,184,78,0.25); border: 1.5px solid rgba(78,125,37,0); width: 58%;"></div>
+          </div>
+        </div>
+        <!-- result card -->
+        <div data-ai-result="true" style="position: absolute; right: 6%; bottom: 6%; width: 280px; background: #1B1E14; color: #FAF9F5; border-radius: 16px; padding: 22px; z-index: 3; box-shadow: 0 28px 48px -20px rgba(27,30,20,0.5);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #9A9E90;">ภ.พ.30 · <span lang="th">มิถุนายน</span><span lang="en">JUNE</span></div>
+            <div style="background: #7FB84E; color: #1B1E14; border-radius: 999px; padding: 3px 10px; font-size: 11.5px; font-weight: 700;"><span lang="th">พร้อมตรวจ</span><span lang="en">Ready</span></div>
+          </div>
+          <div style="display: grid; gap: 10px;">
+            <div style="display: flex; justify-content: space-between; font-size: 13.5px;"><span style="color: #B9BCA9;"><span lang="th">ภาษีขาย</span><span lang="en">Output VAT</span></span><span style="font-family: 'IBM Plex Mono', monospace;">42,318.00</span></div>
+            <div style="display: flex; justify-content: space-between; font-size: 13.5px;"><span style="color: #B9BCA9;"><span lang="th">ภาษีซื้อ</span><span lang="en">Input VAT</span></span><span style="font-family: 'IBM Plex Mono', monospace;">28,904.50</span></div>
+            <div style="border-top: 1px solid #3A4030; padding-top: 10px; display: flex; justify-content: space-between; font-size: 14px; font-weight: 700;"><span><span lang="th">เอกสารครบ</span><span lang="en">Documents</span></span><span style="color: #7FB84E;">128 / 128 ✓</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SEC 3 · ACCOUNTANT ================= -->
+  <section data-sec="acc" data-screen-label="Accountant" style="max-width: 1200px; margin: 0 auto; padding: clamp(64px, 8vw, 120px) 24px;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: clamp(36px, 5vw, 72px); align-items: center;">
+      <!-- hub stage -->
+      <div style="position: relative; height: 440px; order: 0;">
+        <div data-acc-chip="1" style="position: absolute; left: 2%; top: 8%; background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 999px; padding: 9px 18px; font-size: 13.5px; font-weight: 600; box-shadow: 0 10px 20px -12px rgba(27,30,20,0.3); display: flex; align-items: center; gap: 8px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #7FB84E;"></span><span lang="th">ร้านกาแฟ A</span><span lang="en">Café A</span></div>
+        <div data-acc-chip="2" style="position: absolute; right: 4%; top: 2%; background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 999px; padding: 9px 18px; font-size: 13.5px; font-weight: 600; box-shadow: 0 10px 20px -12px rgba(27,30,20,0.3); display: flex; align-items: center; gap: 8px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #4E7D25;"></span><span lang="th">บจก. B ค้าส่ง</span><span lang="en">B Trading Co.</span></div>
+        <div data-acc-chip="3" style="position: absolute; left: 0; bottom: 12%; background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 999px; padding: 9px 18px; font-size: 13.5px; font-weight: 600; box-shadow: 0 10px 20px -12px rgba(27,30,20,0.3); display: flex; align-items: center; gap: 8px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #B9D693;"></span><span lang="th">คลินิก C</span><span lang="en">Clinic C</span></div>
+        <div data-acc-chip="4" style="position: absolute; right: 0; bottom: 20%; background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 999px; padding: 9px 18px; font-size: 13.5px; font-weight: 600; box-shadow: 0 10px 20px -12px rgba(27,30,20,0.3); display: flex; align-items: center; gap: 8px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #2C4A16;"></span><span lang="th">ร้านอะไหล่ D</span><span lang="en">Parts Shop D</span></div>
+        <!-- workbench -->
+        <div data-acc-bench="true" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(320px, 82%); background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 18px; padding: 22px; box-shadow: 0 26px 48px -22px rgba(27,30,20,0.32); z-index: 2;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+            <span style="width: 10px; height: 10px; border-radius: 50%; background: #4E7D25;"></span>
+            <span style="font-weight: 700; font-size: 15.5px;"><span lang="th">โต๊ะทำงานนักบัญชี</span><span lang="en">Accountant workbench</span></span>
+          </div>
+          <div style="display: grid; gap: 10px;">
+            <div data-acc-task="true" style="display: flex; justify-content: space-between; align-items: center; background: #FAF9F5; border: 1px solid #ECEAE0; border-radius: 10px; padding: 10px 14px; font-size: 13.5px;"><span><span lang="th">OCR เอกสารซื้อ-ขาย</span><span lang="en">OCR purchase &amp; sales docs</span></span><span style="color: #4E7D25; font-weight: 700;">✓</span></div>
+            <div data-acc-task="true" style="display: flex; justify-content: space-between; align-items: center; background: #FAF9F5; border: 1px solid #ECEAE0; border-radius: 10px; padding: 10px 14px; font-size: 13.5px;"><span><span lang="th">กระทบยอดธนาคารกับ GL</span><span lang="en">Bank ↔ GL reconciliation</span></span><span style="color: #4E7D25; font-weight: 700;">✓</span></div>
+            <div data-acc-task="true" style="display: flex; justify-content: space-between; align-items: center; background: #FAF9F5; border: 1px solid #ECEAE0; border-radius: 10px; padding: 10px 14px; font-size: 13.5px;"><span><span lang="th">ส่งรายการเข้า Express / MR.ERP</span><span lang="en">Push entries to Express / MR.ERP</span></span><span style="color: #4E7D25; font-weight: 700;">✓</span></div>
+          </div>
+        </div>
+      </div>
+      <div style="order: 1;">
+        <div data-a="true" style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.12em; color: #4E7D25; font-weight: 500; margin-bottom: 16px;">02 · <span lang="th">สำหรับนักบัญชี</span><span lang="en">FOR ACCOUNTANTS</span></div>
+        <h2 data-a="true" style="font-size: clamp(30px, 3.4vw, 44px); line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 18px; text-wrap: balance;">
+          <span lang="th">ลูกค้าหลายราย<br>จัดการได้ในโต๊ะเดียว</span>
+          <span lang="en">Many clients,<br>one workbench</span>
+        </h2>
+        <p data-a="true" style="font-size: 17.5px; line-height: 1.7; color: #57604B; margin: 0 0 28px; max-width: 50ch; text-wrap: pretty;">
+          <span lang="th">เครื่องมือครบมือสำหรับนักบัญชีที่ต้องการทำงานเอง — สแกนเอกสาร จัดหมวดอัตโนมัติ กระทบยอดธนาคาร แล้วส่งรายการเข้า ERP ที่ใช้อยู่</span>
+          <span lang="en">A complete toolkit for accountants who want hands-on control — scan documents, auto-categorize, reconcile bank statements, then push entries into your existing ERP.</span>
+        </p>
+        <a data-a="true" href="{{ loginAcc }}" style="border: 1.5px solid #1B1E14; color: #1B1E14; padding: 12px 26px; border-radius: 999px; font-size: 15.5px; font-weight: 600; display: inline-block;" style-hover="background: #1B1E14; color: #FAF9F5;">
+          <span lang="th">เข้าสู่ระบบ</span><span lang="en">Sign in</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SEC 4 · POS CASHIER ================= -->
+  <section data-sec="pos" data-screen-label="POS Cashier" style="background: #1B1E14; color: #FAF9F5;">
+    <div style="max-width: 1200px; margin: 0 auto; padding: clamp(64px, 8vw, 120px) 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: clamp(36px, 5vw, 72px); align-items: center;">
+      <div>
+        <div data-a="true" style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.12em; color: #7FB84E; font-weight: 500; margin-bottom: 16px;">03 · POS</div>
+        <h2 data-a="true" style="font-size: clamp(30px, 3.4vw, 44px); line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 18px; text-wrap: balance;">
+          <span lang="th">ปิดการขาย<br>ได้ในไม่กี่วินาที</span>
+          <span lang="en">Close a sale<br>in seconds</span>
+        </h2>
+        <p data-a="true" style="font-size: 17.5px; line-height: 1.7; color: #B9BCA9; margin: 0 0 24px; max-width: 50ch; text-wrap: pretty;">
+          <span lang="th">ใช้งานบนมือถือหรือแท็บเล็ต ไม่ต้องซื้อเครื่องเพิ่ม แม้เน็ตหลุดก็ยังขายได้ — รับเงินสดและเงินโอน สต๊อกตัดตามล็อต</span>
+          <span lang="en">Runs on phone or tablet — no extra hardware. Keeps selling even when the internet drops. Cash &amp; transfer payments, lot-based stock deduction.</span>
+        </p>
+        <a data-a="true" href="{{ loginPosCashier }}" style="background: #7FB84E; color: #1B1E14; padding: 12px 26px; border-radius: 999px; font-size: 15.5px; font-weight: 700; display: inline-block;" style-hover="background: #A2D774;">
+          <span lang="th">เปิดหน้าจอขาย</span><span lang="en">Open the register</span>
+        </a>
+      </div>
+      <!-- POS mock -->
+      <div style="display: flex; justify-content: center;">
+        <div style="width: min(340px, 100%); background: #FAF9F5; color: #1B1E14; border-radius: 20px; padding: 20px; box-shadow: 0 30px 60px -24px rgba(0,0,0,0.5);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <span style="font-weight: 700; font-size: 15px;"><span lang="th">หน้าจอขาย</span><span lang="en">Register</span></span>
+            <span data-pos-off="true" style="font-size: 11.5px; font-weight: 700; color: #3F671D; background: #F1F5E8; border: 1px solid #DCE8CE; border-radius: 999px; padding: 3px 10px;"><span lang="th">ออฟไลน์ได้</span><span lang="en">Offline OK</span></span>
+          </div>
+          <div style="display: grid; gap: 8px; margin-bottom: 12px;">
+            <div data-pos-row="true" style="display: flex; justify-content: space-between; align-items: center; background: #FFFFFF; border: 1px solid #ECEAE0; border-radius: 10px; padding: 10px 12px; font-size: 13.5px;"><span><span lang="th">กาแฟลาเต้</span><span lang="en">Latte</span> × 2</span><span style="font-family: 'IBM Plex Mono', monospace;">130.00</span></div>
+            <div data-pos-row="true" style="display: flex; justify-content: space-between; align-items: center; background: #FFFFFF; border: 1px solid #ECEAE0; border-radius: 10px; padding: 10px 12px; font-size: 13.5px;"><span><span lang="th">ครัวซองต์</span><span lang="en">Croissant</span> × 1</span><span style="font-family: 'IBM Plex Mono', monospace;">85.00</span></div>
+            <div data-pos-row="true" style="display: flex; justify-content: space-between; align-items: center; background: #FFFFFF; border: 1px solid #ECEAE0; border-radius: 10px; padding: 10px 12px; font-size: 13.5px;"><span><span lang="th">น้ำส้มคั้น</span><span lang="en">Orange juice</span> × 1</span><span style="font-family: 'IBM Plex Mono', monospace;">65.00</span></div>
+          </div>
+          <div style="border-top: 1px dashed #E0DED2; padding-top: 12px; display: grid; gap: 6px; margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; font-size: 12.5px; color: #57604B;"><span>VAT 7%</span><span style="font-family: 'IBM Plex Mono', monospace;">18.32</span></div>
+            <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: 700;"><span><span lang="th">รวมทั้งสิ้น</span><span lang="en">Total</span></span><span style="font-family: 'IBM Plex Mono', monospace;">฿<span data-pos-total="280">0</span></span></div>
+          </div>
+          <div data-pos-paid="true" style="background: #4E7D25; color: #FFFFFF; border-radius: 12px; padding: 12px; text-align: center; font-weight: 700; font-size: 15px;">
+            <span lang="th">ชำระเงินแล้ว ✓</span><span lang="en">Paid ✓</span>
+          </div>
+          <div data-pos-slip="true" style="margin: 12px auto 0; width: 78%; background: #FFFFFF; border: 1px solid #ECEAE0; border-radius: 4px 4px 10px 10px; padding: 10px 14px; font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: #57604B; box-shadow: 0 10px 20px -12px rgba(27,30,20,0.25);">
+            <div style="text-align: center; margin-bottom: 6px; font-weight: 500;">— <span lang="th">ใบเสร็จ</span><span lang="en">RECEIPT</span> —</div>
+            <div style="display: flex; justify-content: space-between;"><span>3 <span lang="th">รายการ</span><span lang="en">items</span></span><span>฿280.00</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SEC 5 · POS OWNER ================= -->
+  <section data-sec="own" data-screen-label="POS Owner" style="max-width: 1200px; margin: 0 auto; padding: clamp(64px, 8vw, 120px) 24px;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: clamp(36px, 5vw, 72px); align-items: center;">
+      <!-- dashboard mock -->
+      <div style="order: 0; display: flex; justify-content: center;">
+        <div style="width: min(400px, 100%); background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 20px; padding: 24px; box-shadow: 0 26px 50px -24px rgba(27,30,20,0.3);">
+          <div style="font-size: 13px; color: #57604B; margin-bottom: 4px;"><span lang="th">ยอดขายวันนี้</span><span lang="en">Today's sales</span></div>
+          <div style="font-size: 34px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 16px;">฿<span data-own-total="18420">0</span></div>
+          <div style="display: flex; gap: 7px; align-items: flex-end; height: 76px; margin-bottom: 18px;">
+            <div data-own-bar="42" style="flex: 1; background: #ECEAE0; border-radius: 5px 5px 0 0; height: 0%;"></div>
+            <div data-own-bar="58" style="flex: 1; background: #ECEAE0; border-radius: 5px 5px 0 0; height: 0%;"></div>
+            <div data-own-bar="47" style="flex: 1; background: #ECEAE0; border-radius: 5px 5px 0 0; height: 0%;"></div>
+            <div data-own-bar="66" style="flex: 1; background: #DCE8CE; border-radius: 5px 5px 0 0; height: 0%;"></div>
+            <div data-own-bar="74" style="flex: 1; background: #B9D693; border-radius: 5px 5px 0 0; height: 0%;"></div>
+            <div data-own-bar="88" style="flex: 1; background: #7FB84E; border-radius: 5px 5px 0 0; height: 0%;"></div>
+            <div data-own-bar="100" style="flex: 1; background: #4E7D25; border-radius: 5px 5px 0 0; height: 0%;"></div>
+          </div>
+          <div style="display: grid; gap: 9px;">
+            <div data-own-row="true" style="display: flex; justify-content: space-between; align-items: center; font-size: 13.5px; background: #FAF9F5; border: 1px solid #ECEAE0; border-radius: 10px; padding: 9px 13px;"><span><span lang="th">กำไรขั้นต้น</span><span lang="en">Gross profit</span></span><span style="font-family: 'IBM Plex Mono', monospace; font-weight: 500; color: #3F671D;">฿6,180</span></div>
+            <div data-own-row="true" style="display: flex; justify-content: space-between; align-items: center; font-size: 13.5px; background: #FAF9F5; border: 1px solid #ECEAE0; border-radius: 10px; padding: 9px 13px;"><span><span lang="th">สินค้าขายดี — ลาเต้</span><span lang="en">Top seller — Latte</span></span><span style="font-family: 'IBM Plex Mono', monospace;">86 <span lang="th">แก้ว</span><span lang="en">cups</span></span></div>
+            <div data-own-row="true" style="display: flex; justify-content: space-between; align-items: center; font-size: 13.5px; background: #FAF9F5; border: 1px solid #ECEAE0; border-radius: 10px; padding: 9px 13px;"><span><span lang="th">สต๊อกใกล้หมด</span><span lang="en">Low stock</span></span><span style="color: #A65D21; font-weight: 600;">2 <span lang="th">รายการ</span><span lang="en">items</span></span></div>
+          </div>
+        </div>
+      </div>
+      <div style="order: 1;">
+        <div data-a="true" style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.12em; color: #4E7D25; font-weight: 500; margin-bottom: 16px;">04 · <span lang="th">เจ้าของร้าน</span><span lang="en">FOR OWNERS</span></div>
+        <h2 data-a="true" style="font-size: clamp(30px, 3.4vw, 44px); line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 18px; text-wrap: balance;">
+          <span lang="th">เห็นครบทุกยอด<br>ไม่ต้องอยู่หน้าร้าน</span>
+          <span lang="en">See every number<br>without being at the shop</span>
+        </h2>
+        <p data-a="true" style="font-size: 17.5px; line-height: 1.7; color: #57604B; margin: 0 0 28px; max-width: 50ch; text-wrap: pretty;">
+          <span lang="th">รายงานยอดขายและกำไรแบบเข้าใจง่าย จัดการสินค้าและสต๊อกหลายล็อต พร้อมกำหนดสิทธิ์พนักงานขายได้ในที่เดียว</span>
+          <span lang="en">Easy-to-read sales and profit reports, multi-lot product and stock management, and staff permissions — all in one place.</span>
+        </p>
+        <a data-a="true" href="{{ loginPosOwner }}" style="border: 1.5px solid #1B1E14; color: #1B1E14; padding: 12px 26px; border-radius: 999px; font-size: 15.5px; font-weight: 600; display: inline-block;" style-hover="background: #1B1E14; color: #FAF9F5;">
+          <span lang="th">เข้าสู่ระบบ</span><span lang="en">Sign in</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SEC 6 · WORKFLOW ================= -->
+  <section data-sec="flow" data-screen-label="Workflow" style="background: #F4F2EA; border-top: 1px solid #ECEAE0; border-bottom: 1px solid #ECEAE0;">
+    <div style="max-width: 1200px; margin: 0 auto; padding: clamp(64px, 8vw, 120px) 24px;">
+      <div style="max-width: 720px; margin-bottom: clamp(36px, 5vw, 56px);">
+        <div data-a="true" style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.12em; color: #4E7D25; font-weight: 500; margin-bottom: 16px;">05 · <span lang="th">ครบวงจร</span><span lang="en">END-TO-END</span></div>
+        <h2 data-a="true" style="font-size: clamp(30px, 3.4vw, 44px); line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 14px; text-wrap: balance;">
+          <span lang="th">จากการขายหน้าร้าน ถึงรายงานประจำเดือน</span>
+          <span lang="en">From the shopfront sale to the monthly report</span>
+        </h2>
+        <p data-a="true" style="font-size: 17px; line-height: 1.7; color: #57604B; margin: 0; text-wrap: pretty;">
+          <span lang="th">ทุกขั้นตอนต่อเนื่องกันในระบบเดียว — ข้อมูลไหลไปข้างหน้า ไม่ต้องคีย์ซ้ำ</span>
+          <span lang="en">Every step flows forward in one system — no re-keying data.</span>
+        </p>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px;">
+        <div data-flow="true" style="background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 14px; padding: 18px 16px;"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #9A9E90; margin-bottom: 8px;">01</div><div style="font-weight: 700; font-size: 15px; margin-bottom: 6px;"><span lang="th">ขายหน้าร้าน</span><span lang="en">Sell in store</span></div><div style="height: 7px; border-radius: 4px; background: #ECEAE0; width: 72%;"></div></div>
+        <div data-flow="true" style="background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 14px; padding: 18px 16px; margin-top: 18px;"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #9A9E90; margin-bottom: 8px;">02</div><div style="font-weight: 700; font-size: 15px; margin-bottom: 6px;"><span lang="th">ใบเสร็จ / ใบกำกับ</span><span lang="en">Receipt / invoice</span></div><div style="height: 7px; border-radius: 4px; background: #ECEAE0; width: 60%;"></div></div>
+        <div data-flow="true" style="background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 14px; padding: 18px 16px;"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #9A9E90; margin-bottom: 8px;">03</div><div style="font-weight: 700; font-size: 15px; margin-bottom: 6px;"><span lang="th">สแกน + จัดหมวด</span><span lang="en">Scan + categorize</span></div><div style="height: 7px; border-radius: 4px; background: #DCE8CE; width: 68%;"></div></div>
+        <div data-flow="true" style="background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 14px; padding: 18px 16px; margin-top: 18px;"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #9A9E90; margin-bottom: 8px;">04</div><div style="font-weight: 700; font-size: 15px; margin-bottom: 6px;"><span lang="th">กระทบยอดธนาคาร</span><span lang="en">Bank reconciliation</span></div><div style="height: 7px; border-radius: 4px; background: #DCE8CE; width: 55%;"></div></div>
+        <div data-flow="true" style="background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 14px; padding: 18px 16px;"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #9A9E90; margin-bottom: 8px;">05</div><div style="font-weight: 700; font-size: 15px; margin-bottom: 6px;"><span lang="th">เตรียม ภ.พ.30</span><span lang="en">Prepare PP.30</span></div><div style="height: 7px; border-radius: 4px; background: #B9D693; width: 64%;"></div></div>
+        <div data-flow="true" style="background: #1B1E14; color: #FAF9F5; border: 1px solid #1B1E14; border-radius: 14px; padding: 18px 16px; margin-top: 18px;"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #9A9E90; margin-bottom: 8px;">06</div><div style="font-weight: 700; font-size: 15px; margin-bottom: 6px;"><span lang="th">ส่งเข้า Express / MR.ERP</span><span lang="en">Into Express / MR.ERP</span></div><div style="height: 7px; border-radius: 4px; background: #7FB84E; width: 76%;"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SEC 7 · TRUST ================= -->
+  <section data-sec="trust" data-screen-label="Trust" style="max-width: 1200px; margin: 0 auto; padding: clamp(72px, 9vw, 130px) 24px; text-align: center;">
+    <h2 data-a="true" style="font-size: clamp(28px, 3.6vw, 48px); line-height: 1.25; font-weight: 700; letter-spacing: -0.02em; margin: 0 auto 20px; max-width: 24ch; text-wrap: balance;">
+      <span lang="th">ทุกฟีเจอร์มาจาก<span style="color: #4E7D25;">งานจริงหน้างาน</span></span>
+      <span lang="en">Every feature comes from <span style="color: #4E7D25;">real work in the field</span></span>
+    </h2>
+    <p data-a="true" style="font-size: 17.5px; line-height: 1.7; color: #57604B; margin: 0 auto 40px; max-width: 58ch; text-wrap: pretty;">
+      <span lang="th">Pearnly พัฒนาโดยทีมที่ทำงานกับสำนักงานบัญชีและร้านค้าไทยจริง</span>
+      <span lang="en">Pearnly is built by a team working side by side with real Thai accounting firms and shops.</span>
+    </p>
+    <div style="display: flex; flex-wrap: wrap; gap: 14px; justify-content: center;">
+      <div data-a="true" style="background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 999px; padding: 12px 24px; font-size: 15px; font-weight: 600; color: #3A4030;"><span lang="th">ความแม่นยำจากการใช้งานจริง</span><span lang="en">Real-world proven accuracy</span></div>
+      <div data-a="true" style="background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 999px; padding: 12px 24px; font-size: 15px; font-weight: 600; color: #3A4030;"><span lang="th">จุดสำคัญมีคนตรวจก่อนเสมอ</span><span lang="en">Critical steps always human-reviewed</span></div>
+      <div data-a="true" style="background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 999px; padding: 12px 24px; font-size: 15px; font-weight: 600; color: #3A4030;"><span lang="th">ข้อมูลปลอดภัยตาม PDPA</span><span lang="en">Data protected under PDPA</span></div>
+    </div>
+  </section>
+
+  <!-- ================= SEC 8 · ROLES & PERMISSIONS ================= -->
+  <section data-sec="roles" data-screen-label="Roles" style="background: #F4F2EA; border-top: 1px solid #ECEAE0; border-bottom: 1px solid #ECEAE0;">
+    <div style="max-width: 1200px; margin: 0 auto; padding: clamp(64px, 8vw, 120px) 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: clamp(36px, 5vw, 72px); align-items: center;">
+      <div>
+        <div data-a="true" style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.12em; color: #4E7D25; font-weight: 500; margin-bottom: 16px;">06 · <span lang="th">สิทธิ์การใช้งาน</span><span lang="en">PERMISSIONS</span></div>
+        <h2 data-a="true" style="font-size: clamp(30px, 3.4vw, 44px); line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 18px; text-wrap: balance;">
+          <span lang="th">ใครเห็นอะไร<br>คุณเป็นคนกำหนด</span>
+          <span lang="en">Who sees what —<br>you decide</span>
+        </h2>
+        <p data-a="true" style="font-size: 17.5px; line-height: 1.7; color: #57604B; margin: 0; max-width: 50ch; text-wrap: pretty;">
+          <span lang="th">กำหนดสิทธิ์แยกตามบทบาท — เจ้าของร้านเห็นครบทุกยอด นักบัญชีเข้าถึงเอกสารและรายงาน พนักงานขายใช้ได้เฉพาะหน้าจอขาย</span>
+          <span lang="en">Permissions by role — owners see everything, accountants access documents and reports, sales staff use only the register.</span>
+        </p>
+      </div>
+      <div style="background: #FFFFFF; border: 1px solid #E5E3D8; border-radius: 18px; padding: 26px; box-shadow: 0 24px 44px -24px rgba(27,30,20,0.28);">
+        <div style="display: grid; gap: 14px;">
+          <div data-role="true" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid #ECEAE0; padding-bottom: 14px;">
+            <div><div style="font-weight: 700; font-size: 15.5px;"><span lang="th">เจ้าของร้าน</span><span lang="en">Owner</span></div><div style="font-size: 13px; color: #57604B;"><span lang="th">ยอดขาย · กำไร · สต๊อก · พนักงาน</span><span lang="en">Sales · profit · stock · staff</span></div></div>
+            <div data-toggle="true" style="width: 46px; height: 26px; border-radius: 999px; background: #E0DED2; position: relative; flex-shrink: 0;"><div data-knob="true" style="position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 2px 5px rgba(27,30,20,0.25);"></div></div>
+          </div>
+          <div data-role="true" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid #ECEAE0; padding-bottom: 14px;">
+            <div><div style="font-weight: 700; font-size: 15.5px;"><span lang="th">นักบัญชี</span><span lang="en">Accountant</span></div><div style="font-size: 13px; color: #57604B;"><span lang="th">เอกสาร · กระทบยอด · รายงาน · ภาษี</span><span lang="en">Documents · reconciliation · reports · tax</span></div></div>
+            <div data-toggle="true" style="width: 46px; height: 26px; border-radius: 999px; background: #E0DED2; position: relative; flex-shrink: 0;"><div data-knob="true" style="position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 2px 5px rgba(27,30,20,0.25);"></div></div>
+          </div>
+          <div data-role="true" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid #ECEAE0; padding-bottom: 14px;">
+            <div><div style="font-weight: 700; font-size: 15.5px;"><span lang="th">พนักงานขาย</span><span lang="en">Sales staff</span></div><div style="font-size: 13px; color: #57604B;"><span lang="th">หน้าจอขายเท่านั้น</span><span lang="en">Register only</span></div></div>
+            <div data-toggle="true" style="width: 46px; height: 26px; border-radius: 999px; background: #E0DED2; position: relative; flex-shrink: 0;"><div data-knob="true" style="position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 2px 5px rgba(27,30,20,0.25);"></div></div>
+          </div>
+          <div data-role="true" style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+            <div><div style="font-weight: 700; font-size: 15.5px;"><span lang="th">ผู้ดูแลระบบ</span><span lang="en">Administrator</span></div><div style="font-size: 13px; color: #57604B;"><span lang="th">ตั้งค่า · สิทธิ์ · ความปลอดภัย</span><span lang="en">Settings · permissions · security</span></div></div>
+            <div data-toggle="true" style="width: 46px; height: 26px; border-radius: 999px; background: #E0DED2; position: relative; flex-shrink: 0;"><div data-knob="true" style="position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 2px 5px rgba(27,30,20,0.25);"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SEC 9 · CTA ================= -->
+  <section data-sec="cta" data-screen-label="CTA" style="max-width: 1200px; margin: 0 auto; padding: clamp(80px, 10vw, 150px) 24px; text-align: center;">
+    <h2 data-a="true" style="font-size: clamp(32px, 4.4vw, 60px); line-height: 1.12; font-weight: 700; letter-spacing: -0.03em; margin: 0 auto 28px; max-width: 20ch; text-wrap: balance;">
+      <span lang="th">เลือกผลิตภัณฑ์ Pearnly ที่เหมาะกับคุณ</span>
+      <span lang="en">Choose the Pearnly product that fits you</span>
+    </h2>
+    <div data-a="true" style="display: flex; flex-wrap: wrap; gap: 14px; justify-content: center;">
+      <a href="#products" style="background: #4E7D25; color: #FFFFFF; padding: 15px 34px; border-radius: 999px; font-size: 17px; font-weight: 600; display: inline-block; box-shadow: 0 10px 24px -10px rgba(78,125,37,0.55);" style-hover="background: #3F671D; transform: translateY(-2px);">
+        <span lang="th">เลือกผลิตภัณฑ์ของคุณ</span><span lang="en">Choose your product</span>
+      </a>
+      <a href="{{ contactUs }}" style="border: 1.5px solid #C9C7BA; color: #1B1E14; padding: 15px 30px; border-radius: 999px; font-size: 17px; font-weight: 600; display: inline-block; background: #FFFFFF;" style-hover="border-color: #4E7D25; color: #3F671D;">
+        <span lang="th">ติดต่อเรา</span><span lang="en">Contact us</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ================= FOOTER ================= -->
+  <footer data-screen-label="Footer" style="background: #1B1E14; color: #C9CBBE;">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 56px 24px 40px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 36px;">
+      <div style="display: grid; gap: 12px; align-content: start;">
+        <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 19px; color: #FAF9F5;">
+          <span style="width: 10px; height: 10px; border-radius: 50%; background: #7FB84E; display: inline-block;"></span>
+          pearnly
+        </div>
+        <p style="margin: 0; font-size: 14px; max-width: 44ch; line-height: 1.65;">
+          <span lang="th">Pearnly พัฒนาโดยทีมที่ทำงานกับสำนักงานบัญชีและร้านค้าไทยจริง ทุกฟีเจอร์มาจากงานจริงหน้างาน</span>
+          <span lang="en">Built by a team working with real Thai accounting firms and shops. Every feature comes from real fieldwork.</span>
+        </p>
+        <p style="margin: 0; font-size: 13.5px; color: #9A9E90;">
+          <span lang="th">ข้อมูลลูกค้าเก็บรักษาปลอดภัย ตามข้อกำหนด PDPA</span>
+          <span lang="en">Customer data stored securely, in compliance with PDPA.</span>
+        </p>
+      </div>
+      <dl style="margin: 0; display: grid; gap: 10px; align-content: start; font-size: 13.5px;">
+        <div style="display: grid; grid-template-columns: 150px 1fr; gap: 10px;"><dt style="color: #9A9E90; margin: 0;"><span lang="th">ชื่อบริษัท</span><span lang="en">Company</span></dt><dd style="margin: 0; font-family: 'IBM Plex Mono', monospace;">บริษัท เพิร์นลี่ (ประเทศไทย) จำกัด · Pearnly (Thailand) Co., Ltd.</dd></div>
+        <div style="display: grid; grid-template-columns: 150px 1fr; gap: 10px;"><dt style="color: #9A9E90; margin: 0;"><span lang="th">เลขทะเบียนนิติบุคคล</span><span lang="en">Registration no.</span></dt><dd style="margin: 0; font-family: 'IBM Plex Mono', monospace;">0-0000-00000-00-0</dd></div>
+        <div style="display: grid; grid-template-columns: 150px 1fr; gap: 10px;"><dt style="color: #9A9E90; margin: 0;"><span lang="th">ที่อยู่</span><span lang="en">Address</span></dt><dd style="margin: 0; font-family: 'IBM Plex Mono', monospace;">กรุงเทพฯ ประเทศไทย · Bangkok, Thailand</dd></div>
+        <div style="display: grid; grid-template-columns: 150px 1fr; gap: 10px;"><dt style="color: #9A9E90; margin: 0;"><span lang="th">อีเมล</span><span lang="en">Email</span></dt><dd style="margin: 0; font-family: 'IBM Plex Mono', monospace;">hello@pearnly.com</dd></div>
+        <div style="display: grid; grid-template-columns: 150px 1fr; gap: 10px;"><dt style="color: #9A9E90; margin: 0;">LINE OA</dt><dd style="margin: 0; font-family: 'IBM Plex Mono', monospace;">@pearnly</dd></div>
+      </dl>
+      <div style="display: flex; flex-direction: column; gap: 12px; align-content: start; font-size: 14px;">
+        <a href="{{ privacyUrl }}" style="color: #C9CBBE;" style-hover="color: #FAF9F5;"><span lang="th">นโยบายความเป็นส่วนตัว</span><span lang="en">Privacy policy</span></a>
+        <a href="{{ termsUrl }}" style="color: #C9CBBE;" style-hover="color: #FAF9F5;"><span lang="th">ข้อกำหนดการใช้งาน</span><span lang="en">Terms of use</span></a>
+      </div>
+    </div>
+    <div style="border-top: 1px solid #2C3123;">
+      <div style="max-width: 1200px; margin: 0 auto; padding: 18px 24px; font-size: 13px; color: #9A9E90;">© 2026 Pearnly</div>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;defaultLang&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;th&quot;, &quot;en&quot;], &quot;default&quot;: &quot;th&quot;, &quot;tsType&quot;: &quot;'th' | 'en'&quot;, &quot;section&quot;: &quot;Behavior&quot; },
+  &quot;enable3d&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Behavior&quot; }
+}">
+class Component extends DCLogic {
+  state = { lang: this.props.defaultLang ?? 'th', openAcc: 0 };
+
+  componentDidMount() {
+    this._reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this._narrow = window.innerWidth < 800;
+    this._renderers = [];
+    // hover tilt on product cards
+    this._onMove = (e) => {
+      if (this._reduced || this._narrow || !(this.props.enable3d ?? true) || !this._introDone) return;
+      const card = e.target && e.target.closest ? e.target.closest('[data-tilt]') : null;
+      if (card !== this._tiltEl && this._tiltEl) { this._tiltEl.style.transform = ''; this._tiltEl = null; }
+      if (card) {
+        this._tiltEl = card;
+        const r = card.getBoundingClientRect();
+        const px = (e.clientX - r.left) / r.width - 0.5;
+        const py = (e.clientY - r.top) / r.height - 0.5;
+        card.style.transform = `perspective(1000px) rotateX(${-py * 4.5}deg) rotateY(${px * 4.5}deg) translateY(-14px)`;
+      }
+    };
+    document.addEventListener('pointermove', this._onMove);
+    this._fitStage = () => {
+      const stage = document.querySelector('[data-pstage]');
+      if (!stage) return;
+      const pcs = getComputedStyle(stage.parentElement);
+      const w = stage.parentElement.clientWidth - parseFloat(pcs.paddingLeft) - parseFloat(pcs.paddingRight);
+      if (window.innerWidth <= 800) { stage.style.transform = ''; stage.style.height = ''; stage.style.width = ''; return; }
+      const s = Math.min(w / 1200, 1);
+      stage.style.transformOrigin = 'top left';
+      stage.style.transform = s < 1 ? `scale(${s})` : '';
+      stage.style.height = `${560 * s}px`;
+      stage.style.width = '1200px';
+    };
+    this._fitStage();
+    window.addEventListener('resize', this._fitStage);
+    // safety: if the paper intro never completes (throttled rAF etc), force cards visible
+    this._safety = setTimeout(() => {
+      if (!this._introDone) {
+        this._introDone = true;
+        document.querySelectorAll('[data-pcard]').forEach((el) => { el.style.opacity = 1; el.style.visibility = 'visible'; });
+        document.querySelectorAll('[data-pstage] > div:not([data-pcard])').forEach((el) => el.remove());
+      }
+    }, 4500);
+    this._waitLibs();
+  }
+
+  componentWillUnmount() {
+    this._dead = true;
+    document.removeEventListener('pointermove', this._onMove);
+    if (this._libTimer) clearTimeout(this._libTimer);
+    if (this._safety) clearTimeout(this._safety);
+    window.removeEventListener('resize', this._fitStage);
+    if (this._raf) cancelAnimationFrame(this._raf);
+    if (window.ScrollTrigger) ScrollTrigger.getAll().forEach((s) => s.kill());
+    (this._renderers || []).forEach((r) => { r.dispose(); r.domElement.remove(); });
+  }
+
+  _waitLibs() {
+    if (this._dead) return;
+    if (window.gsap && window.ScrollTrigger && window.THREE) {
+      gsap.registerPlugin(ScrollTrigger);
+      document.fonts.ready.then(() => { if (!this._dead) this._start(); });
+    } else {
+      this._libTimer = setTimeout(() => this._waitLibs(), 120);
+    }
+  }
+
+  _start() {
+    if (this._started) return;
+    this._started = true;
+    if (this._reduced) {
+      this._introDone = true;
+      const ov = document.getElementById('pn-intro');
+      if (ov) ov.remove();
+      this._heroGrid(true);
+      this._sections();
+      return;
+    }
+    this._brandIntro(() => {
+      this._clothIntro();
+      this._heroGrid(false);
+    });
+    this._sections();
+  }
+
+  // ---------- v2 brand intro: cloth logo type-on at viewport center ----------
+  _logoTexture() {
+    const c = document.createElement('canvas');
+    c.width = 1400; c.height = 340;
+    const x = c.getContext('2d');
+    // dot + wordmark (same as nav brand)
+    x.beginPath();
+    x.arc(130, 178, 46, 0, Math.PI * 2);
+    x.fillStyle = '#4E7D25';
+    x.fill();
+    x.font = '700 190px Anuphan';
+    x.fillStyle = '#1B1E14';
+    x.textBaseline = 'middle';
+    x.fillText('pearnly', 220, 182);
+    const tex = new THREE.CanvasTexture(c);
+    tex.anisotropy = 4;
+    return tex;
+  }
+
+  _brandIntro(onDone) {
+    const ov = document.getElementById('pn-intro');
+    const host = document.getElementById('pn-intro-gl');
+    let gl = true;
+    try { gl = !!document.createElement('canvas').getContext('webgl'); } catch (e) { gl = false; }
+    const finish = () => {
+      if (this._introFinished) return;
+      this._introFinished = true;
+      if (ov) {
+        gsap.to(ov, { yPercent: -6, autoAlpha: 0, duration: 0.6, ease: 'power2.in', onComplete: () => ov.remove() });
+      }
+      onDone();
+    };
+    if (!ov || !host || !gl) { if (ov) ov.remove(); this._introFinished = true; onDone(); return; }
+    ov.addEventListener('click', finish); // click to skip
+    setTimeout(finish, 4200); // safety
+
+    const W = host.clientWidth, H = host.clientHeight;
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(W, H);
+    host.appendChild(renderer.domElement);
+    this._renderers.push(renderer);
+    const scene = new THREE.Scene();
+    const cam = new THREE.PerspectiveCamera(40, W / H, 0.1, 50);
+    cam.position.z = 8;
+    const halfH = Math.tan(cam.fov * Math.PI / 360) * cam.position.z;
+    const halfW = halfH * cam.aspect;
+
+    const mat = new THREE.ShaderMaterial({
+      transparent: true,
+      side: THREE.DoubleSide,
+      uniforms: { uMap: { value: this._logoTexture() }, uTime: { value: 0 }, uProgress: { value: 0 }, uOpacity: { value: 0 } },
+      vertexShader:
+        'uniform float uTime; uniform float uProgress; varying vec2 vUv; varying float vSh;\n' +
+        'void main(){ vUv = uv; vec3 p = position;\n' +
+        '  float un = 1.0 - uProgress;\n' +
+        '  float fl = (sin(uv.y*6.28318 + uTime*1.6) + sin(uv.x*4.0 - uTime*1.1)) * 0.5;\n' +
+        '  p.z += fl * 0.05 * (0.2 + 0.8*un) * 0.85;\n' +
+        '  p.z += sin(uv.y*9.0) * un * un * 0.47;\n' +
+        '  p.x += sin(uv.y*5.0) * un * 0.15;\n' +
+        '  p.y += cos(uv.x*3.0) * un * 0.1;\n' +
+        '  vSh = fl * (0.2 + 0.8*un);\n' +
+        '  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }',
+      fragmentShader:
+        'uniform sampler2D uMap; uniform float uOpacity; uniform float uProgress; varying vec2 vUv; varying float vSh;\n' +
+        'void main(){ vec4 c = texture2D(uMap, vUv);\n' +
+        '  float sweep = smoothstep(vUv.x - 0.08, vUv.x, uProgress * 1.1);\n' +
+        '  c.rgb *= (1.0 - vSh * 0.28);\n' +
+        '  gl_FragColor = vec4(c.rgb, c.a * uOpacity * sweep); }',
+    });
+    const lw = Math.min(4.6, halfW * 2 * 0.8);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(lw, lw * 340 / 1400, 72, 20), mat);
+    scene.add(mesh);
+
+    const clock = new THREE.Clock();
+    let live = true;
+    const loop = () => {
+      if (!live || this._dead) return;
+      mat.uniforms.uTime.value = clock.getElapsedTime();
+      renderer.render(scene, cam);
+      requestAnimationFrame(loop);
+    };
+    loop();
+
+    const tl = gsap.timeline();
+    tl.to(mat.uniforms.uOpacity, { value: 1, duration: 0.35 }, 0.1);
+    tl.to(mat.uniforms.uProgress, { value: 1, duration: 1.55, ease: 'power3.inOut' }, 0.1);
+    tl.to(mesh.position, { y: 0.8, duration: 0.7, ease: 'power2.in' }, 2.15);
+    tl.to(mat.uniforms.uOpacity, { value: 0, duration: 0.5 }, 2.2);
+    tl.call(() => { live = false; finish(); }, [], 2.5);
+  }
+
+  // ---------- v2 perspective grid floor behind the hero ----------
+  _heroGrid(staticMode) {
+    const host = document.getElementById('pn-hero-grid');
+    let gl = true;
+    try { gl = !!document.createElement('canvas').getContext('webgl'); } catch (e) { gl = false; }
+    if (!host || !gl) return;
+    const W = host.clientWidth, H = host.clientHeight;
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(W, H);
+    host.appendChild(renderer.domElement);
+    this._renderers.push(renderer);
+    const scene = new THREE.Scene();
+    const cam = new THREE.PerspectiveCamera(42, W / H, 0.1, 100);
+    cam.position.set(0, 0.6, 7.4);
+    cam.lookAt(0, -0.6, 0);
+
+    const gridMat = new THREE.ShaderMaterial({
+      transparent: true,
+      uniforms: { uTime: { value: 0 }, uReveal: { value: staticMode ? 1 : 0 } },
+      vertexShader:
+        'uniform float uTime; varying vec2 vUv;\n' +
+        'void main(){ vUv = uv; vec3 p = position;\n' +
+        '  p.z += sin(p.x*0.6 + uTime*0.8) * cos(p.y*0.5 + uTime*0.6) * 0.4;\n' +
+        '  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }',
+      fragmentShader:
+        'uniform float uReveal; varying vec2 vUv;\n' +
+        'void main(){ vec2 g = abs(fract(vUv*44.0) - 0.5) / fwidth(vUv*44.0);\n' +
+        '  float line = 1.0 - min(min(g.x, g.y), 1.0);\n' +
+        '  float fade = smoothstep(0.52, 0.1, length(vUv - 0.5));\n' +
+        '  gl_FragColor = vec4(0.48, 0.62, 0.3, line * fade * 0.4 * uReveal); }',
+    });
+    gridMat.extensions.derivatives = true;
+    const grid = new THREE.Mesh(new THREE.PlaneGeometry(34, 34, 90, 90), gridMat);
+    grid.rotation.x = -Math.PI / 2;
+    grid.position.y = -2.1;
+    scene.add(grid);
+
+    this._gridPointer = 0;
+    if (!staticMode) {
+      document.addEventListener('pointermove', (e) => { this._gridPointer = (e.clientX / window.innerWidth) * 2 - 1; }, { passive: true });
+      gsap.to(gridMat.uniforms.uReveal, { value: 1, duration: 1.6, ease: 'power2.out' });
+    }
+    const clock = new THREE.Clock();
+    const loop = () => {
+      if (this._dead) return;
+      if (!staticMode) {
+        gridMat.uniforms.uTime.value = clock.getElapsedTime();
+        cam.position.x += (this._gridPointer * 0.35 - cam.position.x) * 0.03;
+        cam.lookAt(0, -0.6, 0);
+      }
+      renderer.render(scene, cam);
+      if (staticMode) return; // render once
+      requestAnimationFrame(loop);
+    };
+    loop();
+    const onR = () => {
+      const w2 = host.clientWidth, h2 = host.clientHeight;
+      renderer.setSize(w2, h2);
+      cam.aspect = w2 / h2;
+      cam.updateProjectionMatrix();
+    };
+    window.addEventListener('resize', onR);
+  }
+
+  // ---------- cloth paper intro for the 4 product cards ----------
+  _clothIntro() {
+    const cards = [...document.querySelectorAll('[data-pcard]')];
+    const stage = cards[0] && cards[0].parentElement;
+    if (!stage) { this._introDone = true; return; }
+    let gl = true;
+    try { gl = !!document.createElement('canvas').getContext('webgl'); } catch (e) { gl = false; }
+    if (!gl) { this._introDone = true; return; }
+
+    const dirs = { ai: [-1.4, 0.2, -10], acc: [0.2, -1.3, 7], cash: [0.3, 1.4, -6], own: [1.5, -0.2, 9] };
+    // use offset* (unscaled layout values) so overlays are correct inside a scaled stage
+    cards.forEach((el) => { gsap.set(el, { autoAlpha: 0 }); });
+
+    cards.forEach((el, i) => {
+      const r = { width: el.offsetWidth, height: el.offsetHeight, left: el.offsetLeft, top: el.offsetTop };
+      const M = 70; // deformation margin
+      const cw = r.width + M * 2, ch = r.height + M * 2;
+      const cnv = document.createElement('div');
+      cnv.style.cssText = `position:absolute; left:${r.left - M}px; top:${r.top - M}px; width:${cw}px; height:${ch}px; pointer-events:none; z-index:10;`;
+      stage.appendChild(cnv);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(cw, ch);
+      cnv.appendChild(renderer.domElement);
+      this._renderers.push(renderer);
+
+      const scene = new THREE.Scene();
+      const fov = 32;
+      const planeH = 1;
+      const dist = (planeH / 2) / Math.tan((fov * Math.PI) / 360) * (ch / r.height);
+      const cam = new THREE.PerspectiveCamera(fov, cw / ch, 0.1, 50);
+      cam.position.z = dist;
+
+      const tex = this._cardTex(el, r.width, r.height);
+      const mat = new THREE.ShaderMaterial({
+        transparent: true,
+        side: THREE.DoubleSide,
+        uniforms: { uMap: { value: tex }, uP: { value: 0 }, uOff: { value: i * 1.9 } },
+        vertexShader:
+          'uniform float uP; uniform float uOff; varying vec2 vUv; varying float vSh;\n' +
+          'void main(){ vUv = uv; vec3 p = position;\n' +
+          '  float un = 1.0 - uP;\n' +
+          '  float a = un * (uv.y - 0.5) * 1.5;\n' +
+          '  float ca = cos(a), sa = sin(a);\n' +
+          '  p = vec3(ca*p.x + sa*p.z, p.y, -sa*p.x + ca*p.z);\n' +
+          '  p.z += sin(uv.y * 6.2 + uOff) * un * un * 0.34;\n' +
+          '  p.z += pow(uv.x, 2.0) * un * 0.22;\n' +
+          '  p.y *= 1.0 + un * 0.4 * sin(uv.x * 3.1 + uOff);\n' +
+          '  p.x += sin(uv.y * 4.0 + uOff) * un * 0.12;\n' +
+          '  vSh = (sin(uv.y * 6.2 + uOff) + sin(uv.x * 5.0 - uOff)) * 0.5 * un;\n' +
+          '  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }',
+        fragmentShader:
+          'uniform sampler2D uMap; varying vec2 vUv; varying float vSh;\n' +
+          'void main(){ vec4 c = texture2D(uMap, vUv);\n' +
+          '  c.rgb *= (1.0 - vSh * 0.3);\n' +
+          '  gl_FragColor = c; }',
+      });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(r.width / r.height, 1, 44, 44), mat);
+      const d = dirs[el.getAttribute('data-pcard')] || [0, 1, 0];
+      mesh.position.set(d[0] * 1.6, -d[1] * 1.3, 0);
+      mesh.rotation.z = (d[2] * Math.PI) / 180;
+      scene.add(mesh);
+
+      let live = true;
+      const loop = () => { if (!live || this._dead) return; renderer.render(scene, cam); requestAnimationFrame(loop); };
+      loop();
+
+      const tl = gsap.timeline({ delay: 0.15 + i * 0.14 });
+      tl.to(mesh.position, { x: 0, y: 0, duration: 1.3, ease: 'power3.out' }, 0);
+      tl.to(mesh.rotation, { z: 0, duration: 1.3, ease: 'power3.out' }, 0);
+      tl.to(mat.uniforms.uP, { value: 1, duration: 1.75, ease: 'elastic.out(1, 0.58)' }, 0.12);
+      tl.to(cnv, { autoAlpha: 0, duration: 0.28, onStart: () => gsap.to(el, { autoAlpha: 1, duration: 0.28 }) }, 1.35);
+      tl.call(() => {
+        live = false;
+        renderer.dispose();
+        cnv.remove();
+        if (i === cards.length - 1) this._introDone = true;
+      }, [], 1.75);
+    });
+
+    // scroll-out drift: cards spread + fade as you scroll past
+    if (!this._narrow) {
+      const spread = { ai: -46, acc: -14, cash: 16, own: 50 };
+      cards.forEach((el) => {
+        gsap.to(el, {
+          x: spread[el.getAttribute('data-pcard')] || 0,
+          opacity: 0.3,
+          ease: 'none',
+          scrollTrigger: { trigger: el.parentElement, start: 'bottom 62%', end: 'bottom 8%', scrub: true },
+        });
+      });
+    }
+  }
+
+  // draw a lightweight replica of the DOM card as a texture
+  _cardTex(el, w, h) {
+    const S = 2;
+    const c = document.createElement('canvas');
+    c.width = w * S; c.height = h * S;
+    const x = c.getContext('2d');
+    x.scale(S, S);
+    const cs = getComputedStyle(el);
+    const dark = el.getAttribute('data-pcard') === 'ai';
+    const beige = el.getAttribute('data-pcard') === 'own';
+    const rr = (px, py, pw, ph, r) => { x.beginPath(); x.moveTo(px + r, py); x.arcTo(px + pw, py, px + pw, py + ph, r); x.arcTo(px + pw, py + ph, px, py + ph, r); x.arcTo(px, py + ph, px, py, r); x.arcTo(px, py, px + pw, py, r); x.closePath(); };
+    rr(0, 0, w, h, 20);
+    x.fillStyle = dark ? '#1B1E14' : beige ? '#F4F2EA' : '#FFFFFF';
+    x.fill();
+    if (!dark) { x.strokeStyle = '#E5E3D8'; x.lineWidth = 1.5; x.stroke(); }
+    // badge
+    const badge = el.querySelector('div');
+    const badgeTxt = badge ? badge.innerText.trim() : '';
+    x.font = '600 12.5px Anuphan';
+    const bw = x.measureText(badgeTxt).width + 26;
+    rr(26, 26, bw, 26, 13);
+    x.fillStyle = dark ? '#7FB84E' : '#F1F5E8';
+    x.fill();
+    if (!dark) { x.strokeStyle = '#DCE8CE'; x.stroke(); }
+    x.fillStyle = dark ? '#1B1E14' : '#3F671D';
+    x.textBaseline = 'middle';
+    x.fillText(badgeTxt, 39, 40);
+    // title
+    const titleEl = el.querySelector('h3');
+    x.font = `700 ${dark ? 26 : 20}px Anuphan`;
+    x.fillStyle = dark ? '#FAF9F5' : '#1B1E14';
+    x.fillText(titleEl ? titleEl.innerText.trim() : '', 27, dark ? 82 : 74);
+    // body bars
+    const top = dark ? 108 : 98;
+    [0.86, 0.68, 0.5].forEach((f, i) => {
+      rr(27, top + i * 20, (w - 54) * f, 10, 5);
+      x.fillStyle = dark ? '#3A4030' : '#ECEAE0';
+      x.fill();
+    });
+    // cta pill
+    const cta = el.querySelector('a');
+    const ctaTxt = cta ? cta.innerText.trim() : '';
+    x.font = '600 14px Anuphan';
+    const cw2 = x.measureText(ctaTxt).width + 44;
+    rr(27, h - 66, cw2, 40, 20);
+    x.fillStyle = dark ? '#7FB84E' : beige ? '#1B1E14' : '#4E7D25';
+    x.fill();
+    x.fillStyle = dark ? '#1B1E14' : '#FFFFFF';
+    x.fillText(ctaTxt, 49, h - 46);
+    const tex = new THREE.CanvasTexture(c);
+    tex.anisotropy = 4;
+    return tex;
+  }
+
+  // ---------- scroll-driven section stories ----------
+  _sections() {
+    const sec = (name) => document.querySelector(`[data-sec="${name}"]`);
+    const tlFor = (trigger, opts) => gsap.timeline({ scrollTrigger: Object.assign({ trigger, start: 'top 68%' }, opts) });
+
+    // generic copy reveals per section
+    document.querySelectorAll('[data-sec]').forEach((s) => {
+      const els = s.querySelectorAll('[data-a]');
+      if (!els.length) return;
+      gsap.set(els, { autoAlpha: 0, y: 28 });
+      tlFor(s, { start: 'top 74%' }).to(els, { autoAlpha: 1, y: 0, duration: 0.85, ease: 'power3.out', stagger: 0.1 });
+    });
+
+    // AI: docs fly in → fields highlight → converge → result card rises
+    const ai = sec('ai');
+    if (ai) {
+      const docs = ai.querySelectorAll('[data-ai-doc]');
+      const hls = ai.querySelectorAll('[data-ai-hl]');
+      const res = ai.querySelector('[data-ai-result]');
+      gsap.set(docs[0], { x: -160, y: -40, autoAlpha: 0, rotate: -18 });
+      gsap.set(docs[1], { x: 170, y: -60, autoAlpha: 0, rotate: 16 });
+      gsap.set(docs[2], { x: -60, y: 150, autoAlpha: 0, rotate: 12 });
+      gsap.set(hls, { opacity: 0 });
+      gsap.set(res, { autoAlpha: 0, y: 70, scale: 0.92 });
+      const t = tlFor(ai);
+      t.to(docs, { x: 0, y: 0, autoAlpha: 1, rotate: (i) => [-7, 5, 3][i], duration: 1.0, ease: 'power3.out', stagger: 0.16 }, 0);
+      t.to(hls, { opacity: 1, borderColor: 'rgba(78,125,37,0.9)', duration: 0.4, stagger: 0.13 }, 1.0);
+      t.to(docs, { x: (i) => [50, -40, 30][i], y: (i) => [30, 60, -30][i], scale: 0.92, opacity: 0.45, duration: 0.9, ease: 'power2.inOut' }, 2.0);
+      t.to(res, { autoAlpha: 1, y: 0, scale: 1, duration: 1.0, ease: 'elastic.out(1, 0.7)' }, 2.25);
+      if (!this._narrow) {
+        ai.addEventListener('pointermove', (e) => {
+          if (this._reduced) return;
+          const r = ai.getBoundingClientRect();
+          const dx = (e.clientX - r.left) / r.width - 0.5;
+          const dy = (e.clientY - r.top) / r.height - 0.5;
+          docs.forEach((d2, i) => gsap.to(d2, { xPercent: dx * (i + 2) * 2.2, yPercent: dy * (i + 2) * 1.6, duration: 0.6, overwrite: 'auto' }));
+        });
+      }
+    }
+
+    // Accountant: chips converge to workbench, tasks tick
+    const acc = sec('acc');
+    if (acc) {
+      const chips = acc.querySelectorAll('[data-acc-chip]');
+      const bench = acc.querySelector('[data-acc-bench]');
+      const tasks = acc.querySelectorAll('[data-acc-task]');
+      gsap.set(chips, { autoAlpha: 0, scale: 0.7 });
+      gsap.set(bench, { autoAlpha: 0, scale: 0.94 });
+      gsap.set(tasks, { autoAlpha: 0, x: -16 });
+      const t = tlFor(acc);
+      t.to(chips, { autoAlpha: 1, scale: 1, duration: 0.7, ease: 'back.out(1.8)', stagger: 0.12 }, 0);
+      t.to(bench, { autoAlpha: 1, scale: 1, duration: 0.9, ease: 'power3.out' }, 0.7);
+      t.to(chips, { x: (i) => [90, -90, 100, -100][i], y: (i) => [70, 90, -60, -70][i], opacity: 0.35, duration: 1.1, ease: 'power2.inOut' }, 1.3);
+      t.to(tasks, { autoAlpha: 1, x: 0, duration: 0.55, ease: 'power2.out', stagger: 0.18 }, 1.5);
+    }
+
+    // POS: rows add, total counts, paid pops, slip prints
+    const pos = sec('pos');
+    if (pos) {
+      const rows = pos.querySelectorAll('[data-pos-row]');
+      const total = pos.querySelector('[data-pos-total]');
+      const paid = pos.querySelector('[data-pos-paid]');
+      const slip = pos.querySelector('[data-pos-slip]');
+      gsap.set(rows, { autoAlpha: 0, x: 40 });
+      gsap.set(paid, { autoAlpha: 0, scale: 0.85 });
+      gsap.set(slip, { autoAlpha: 0, y: -26 });
+      const t = tlFor(pos);
+      t.to(rows, { autoAlpha: 1, x: 0, duration: 0.5, ease: 'power2.out', stagger: 0.28 }, 0.2);
+      t.to({ v: 0 }, { v: 280, duration: 1.2, ease: 'power1.out', onUpdate: function () { total.textContent = Math.round(this.targets()[0].v).toLocaleString(); } }, 0.4);
+      t.to(paid, { autoAlpha: 1, scale: 1, duration: 0.7, ease: 'elastic.out(1, 0.6)' }, 1.7);
+      t.to(slip, { autoAlpha: 1, y: 0, duration: 0.8, ease: 'power3.out' }, 2.1);
+    }
+
+    // Owner: counter + bars + rows
+    const own = sec('own');
+    if (own) {
+      const totalEl = own.querySelector('[data-own-total]');
+      const bars = own.querySelectorAll('[data-own-bar]');
+      const rows = own.querySelectorAll('[data-own-row]');
+      gsap.set(rows, { autoAlpha: 0, y: 16 });
+      const t = tlFor(own);
+      t.to({ v: 0 }, { v: 18420, duration: 1.6, ease: 'power2.out', onUpdate: function () { totalEl.textContent = Math.round(this.targets()[0].v).toLocaleString(); } }, 0.1);
+      bars.forEach((b, i) => t.to(b, { height: b.getAttribute('data-own-bar') + '%', duration: 0.8, ease: 'power3.out' }, 0.2 + i * 0.09));
+      t.to(rows, { autoAlpha: 1, y: 0, duration: 0.55, ease: 'power2.out', stagger: 0.16 }, 1.0);
+    }
+
+    // Workflow: sequential card reveal with directional motion
+    const flow = sec('flow');
+    if (flow) {
+      const steps = flow.querySelectorAll('[data-flow]');
+      gsap.set(steps, { autoAlpha: 0, x: -34 });
+      tlFor(flow).to(steps, { autoAlpha: 1, x: 0, duration: 0.6, ease: 'power3.out', stagger: 0.14 }, 0.1);
+    }
+
+    // Mercury-style global theme switch around the POS section
+    const posSec = sec('pos');
+    if (posSec) {
+      const root = document.querySelector('[data-theme-root]');
+      const nav = document.querySelector('[data-nav]');
+      const toDark = () => {
+        gsap.to(root, { backgroundColor: '#1B1E14', duration: 0.65, ease: 'power2.out' });
+        if (nav) { nav.style.background = 'rgba(27,30,20,0.88)'; nav.style.borderColor = '#2C3123'; }
+      };
+      const toLight = () => {
+        gsap.to(root, { backgroundColor: '#FAF9F5', duration: 0.65, ease: 'power2.out' });
+        if (nav) { nav.style.background = 'rgba(250,249,245,0.88)'; nav.style.borderColor = '#ECEAE0'; }
+      };
+      ScrollTrigger.create({
+        trigger: posSec,
+        start: 'top 62%',
+        end: 'bottom 38%',
+        onEnter: toDark,
+        onLeave: toLight,
+        onEnterBack: toDark,
+        onLeaveBack: toLight,
+      });
+    }
+
+    // Roles: toggles flip on
+    const roles = sec('roles');
+    if (roles) {
+      const rows = roles.querySelectorAll('[data-role]');
+      gsap.set(rows, { autoAlpha: 0, y: 18 });
+      const t = tlFor(roles);
+      t.to(rows, { autoAlpha: 1, y: 0, duration: 0.55, ease: 'power2.out', stagger: 0.16 }, 0);
+      rows.forEach((row, i) => {
+        const tog = row.querySelector('[data-toggle]');
+        const knob = row.querySelector('[data-knob]');
+        t.to(tog, { backgroundColor: '#4E7D25', duration: 0.3 }, 0.7 + i * 0.22);
+        t.to(knob, { left: 23, duration: 0.4, ease: 'back.out(2.4)' }, 0.7 + i * 0.22);
+      });
+    }
+  }
+
+  renderVals() {
+    const lang = this.state.lang;
+    const btn = (active) => ({
+      border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '13.5px', fontWeight: 600,
+      padding: '6px 14px', borderRadius: '999px',
+      background: active ? '#1B1E14' : 'transparent',
+      color: active ? '#FAF9F5' : '#57604B',
+      transition: 'background 0.15s, color 0.15s',
+    });
+    const open = this.state.openAcc;
+    const accVals = {};
+    for (let i = 0; i < 4; i++) {
+      const on = open === i;
+      accVals['accT' + i] = () => this.setState({ openAcc: on ? -1 : i });
+      accVals['accBtn' + i] = {
+        width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '14px',
+        background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+        padding: '18px 4px', fontSize: '18px', fontWeight: 700, letterSpacing: '-0.01em',
+        color: on ? '#1B1E14' : '#57604B', transition: 'color 0.25s',
+      };
+      accVals['accDot' + i] = {
+        width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0,
+        background: on ? '#4E7D25' : '#D5D3C6', transition: 'background 0.25s',
+      };
+      accVals['accChev' + i] = {
+        display: 'inline-block', fontSize: '16px', color: on ? '#4E7D25' : '#9A9E90',
+        transform: on ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s ease, color 0.25s',
+      };
+      accVals['accWrap' + i] = {
+        display: 'grid', gridTemplateRows: on ? '1fr' : '0fr',
+        transition: 'grid-template-rows 0.35s ease',
+      };
+    }
+    return {
+      lang,
+      ...accVals,
+      setTh: () => this.setState({ lang: 'th' }),
+      setEn: () => this.setState({ lang: 'en' }),
+      thBtnStyle: btn(lang === 'th'),
+      enBtnStyle: btn(lang === 'en'),
+      // 接入落值(2026-07-10)· 事务所(AI)/会计登录走 /login(登录页自带注册流,门户零注册入口);
+      // POS 收银台开台走 /pos(收银 SPA · 见 routes/pages_routes.py:_pos_page);
+      // POS 老板后台走独立域名 pos.pearnly.com(Zihao 拍板 · PS-5 在建 · 上线前此链接为死链,
+      //   门户须与 PS-5 域名接入同批上线 · 时序由主窗把关);
+      // 预约演示/联系我们走产品现有 LINE OA(与 /api/contact 的 CONTACT_LINE_URL 同源);
+      // 隐私/条款指向已有 /privacy /terms 页(routes/pages_routes.py)。
+      loginAi: '/login',
+      loginAcc: '/login',
+      loginPosCashier: '/pos',
+      loginPosOwner: 'https://pos.pearnly.com',
+      bookDemo: 'https://line.me/R/ti/p/@pearnly',
+      contactUs: 'https://line.me/R/ti/p/@pearnly',
+      privacyUrl: '/privacy',
+      termsUrl: '/terms',
+    };
+  }
+}
+</script>
+</body>
+</html>

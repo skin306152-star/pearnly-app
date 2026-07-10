@@ -15,6 +15,10 @@ const ROOTS = ['src/home', 'static/pos', 'static'];
 const TOKEN_SOURCE =
     /kit-final\.html|templates\.html|dashboard-final\.html|a\.html|b\.html|c\.html|kit\.html|i18n-data|sales-wizard-i18n|home-01-base\.css|console-theme\.css|home-48-recon-redesign\.css|ai-theme\.css/i;
 const SKIP_DIR = /node_modules|[\\/]dist[\\/]|_mock|\.map$/i;
+// 脸0 品牌门户(营销页)不受应用设计令牌约束:整版营销配色(裸 hex)是设计稿本身,
+// vendor/ 是自托管的第三方运行时(React/THREE/GSAP/support.js/字体)——都不是 Pearnly
+// 应用设计系统的一部分。整块排除,免得营销配色/第三方源码污染裸hex/emoji 等棘轮基线。
+const MARKETING_EXCLUDE = /static[\\/]landing[\\/](portal\.dc\.html|vendor[\\/])/i;
 const EXT = /\.(ts|js|css|html)$/i;
 
 const CHECKS = [
@@ -54,7 +58,7 @@ function walk(dir, out) {
     }
     for (const e of ents) {
         const p = path.join(dir, e.name);
-        if (SKIP_DIR.test(p)) continue;
+        if (SKIP_DIR.test(p) || MARKETING_EXCLUDE.test(p)) continue;
         if (e.isDirectory()) walk(p, out);
         else if (EXT.test(e.name)) out.push(p);
     }

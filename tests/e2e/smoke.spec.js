@@ -34,8 +34,9 @@ test('着陆页 smoke · 加载 + SPA 渲染 + 4 语切换 + 无 console error',
         }
     });
 
-    // ────── 1) 着陆页 200 + 标题 + landing.js SPA 渲染
-    const resp = await page.goto('/');
+    // ────── 1) 登录页 200 + 标题 + landing.js SPA 渲染
+    // 脸0(2026-07-10):根路径 `/` 已改为品牌门户,原登录着陆页挪到 `/login` · smoke 测登录 SPA 走 /login。
+    const resp = await page.goto('/login');
     expect(resp?.status(), '着陆页 HTTP 状态').toBeLessThan(400);
     await expect(page).toHaveTitle(/Pearnly/i);
     await expect(page.locator('.brand-logo').first(), '品牌 logo').toBeVisible();

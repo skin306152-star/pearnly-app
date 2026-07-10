@@ -29,7 +29,7 @@ async function rdFetch(url: string, payload: unknown) {
                 _showSessionRevokedModal();
                 return null;
             }
-            window.location.href = '/';
+            window.location.href = '/login';
             return null;
         }
         return await resp.json();

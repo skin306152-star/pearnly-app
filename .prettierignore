@@ -2,6 +2,10 @@
 # 构建产物 / 第三方 / 锁文件 / 运行期产物 —— 不格式化
 node_modules/
 static/dist/
+# 脸0 品牌门户(dc-runtime 营销页)+ 自托管第三方运行时(React/THREE/GSAP/support.js/字体)·
+# 非 app 源码 · 设计稿逐字保真不许 prettier 重排(会破像素级布局)· 整块豁免格式化。
+static/landing/portal.dc.html
+static/landing/vendor/
 # agent / IDE 配置目录 —— 非 app 代码 · 不受项目 prettier 管(否则权限/hook 配置改一下就红 lint)
 .claude/
 package-lock.json

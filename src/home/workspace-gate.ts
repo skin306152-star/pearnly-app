@@ -229,7 +229,7 @@ async function doLogout(): Promise<void> {
     } catch (_) {
         /* silent · localStorage 私模/配额 */
     }
-    window.location.href = '/';
+    window.location.href = '/login';
 }
 
 // 每次登录强制门:无 active 套账 → 起门(业务被全屏门盖住=锁;1 个也要选)。

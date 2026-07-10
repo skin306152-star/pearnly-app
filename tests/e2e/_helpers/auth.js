@@ -12,7 +12,7 @@
 //
 // 登录态机制(读 login.html / home.js 实证):
 //   - login.html 登录成功 → localStorage.setItem('mrpilot_token', access_token) → 跳 /home
-//   - home.js 启动:无 token 直接 window.location.href='/' · 有 token 才进主应用
+//   - home.js 启动:无 token 直接跳 /login(脸0 前 = '/';/ 现为品牌门户)· 有 token 才进主应用
 //   - 普通账号落 /home;超管会被 home.js 弹到 /admin/cost(故测试账号须为普通非超管账号)
 //   - token 是 localStorage(非 cookie)· Playwright storageState 会捕获 origin localStorage · 可复用
 // ============================================================
@@ -52,7 +52,8 @@ async function doUiLogin(page) {
         throw new Error('缺少 PEARNLY_E2E_USER / PEARNLY_E2E_PASS 环境变量');
     }
 
-    await page.goto('/');
+    // 脸0(2026-07-10):`/` 改为品牌门户,登录表单挪到 `/login`(门户四卡「登录」按钮亦指此)。
+    await page.goto('/login');
 
     // 登录表单(#form-login):用户名 #li-username · 密码 #li-password · 提交 #btn-login
     const form = page.locator('#form-login');

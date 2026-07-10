@@ -198,7 +198,7 @@ function _showSessionRevokedModal() {
         '</div>';
     document.body.appendChild(overlay);
     document.getElementById('pn-srm-ok')!.addEventListener('click', function () {
-        window.location.href = '/';
+        window.location.href = '/login';
     });
 }
 
@@ -262,7 +262,7 @@ async function apiGet(url: string) {
                         : 'alert-session';
                 showToast(t(_msgKey), 'error');
                 setTimeout(() => {
-                    if (!window.__LIFF_BOOTSTRAP__) window.location.href = '/';
+                    if (!window.__LIFF_BOOTSTRAP__) window.location.href = '/login';
                 }, 1500);
             }
             return null;
@@ -307,7 +307,7 @@ async function apiPost(url: string, data: unknown) {
                         : 'alert-session';
                 showToast(t(_msgKey), 'error');
                 setTimeout(() => {
-                    if (!window.__LIFF_BOOTSTRAP__) window.location.href = '/';
+                    if (!window.__LIFF_BOOTSTRAP__) window.location.href = '/login';
                 }, 1500);
             }
             return null;
@@ -351,7 +351,7 @@ async function apiPut(url: string, data: unknown) {
                             : 'alert-session';
                     showToast(t(_msgKey), 'error');
                     setTimeout(() => {
-                        if (!window.__LIFF_BOOTSTRAP__) window.location.href = '/';
+                        if (!window.__LIFF_BOOTSTRAP__) window.location.href = '/login';
                     }, 1500);
                 }
                 return { ok: false };

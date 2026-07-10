@@ -39,17 +39,16 @@
     }
 
     // 工单 status/current_step → 状态胶囊 class + label key(W2:五列看板落地,
-    // 真实四态 collecting/running/stuck/review 全接;signed/archived 前向兼容——
-    // 当前引擎不产出,但客户端不因未来值崩溃,统一按「已归档」胶囊显示)。
-    // 注:W1 曾误写 status 值 'archive'(真实值是 'archived'),此处一并订正。
-    var ARCHIVED_CHIP = { cls: 's', key: 'status_archive' };
+    // 真实五态全接:collecting/running/stuck/review/archive)。词汇随
+    // services/workorder/engine.py 的 ALL_STATUSES 同步——前端无法 import python,
+    // 手工对齐,改词必须两处同步(C4-R1 教训:首版手打 'signed'/'archived' 两个
+    // 臆造词,全仓不存在,真冻结单在矩阵/看板双双落 fallthrough 错标)。
     var STATUS_MAP = {
         collecting: { cls: 'n', key: 'status_collecting' },
         running: { cls: 'a', key: 'status_running' },
         stuck: { cls: 'b', key: 'status_stuck' },
         review: { cls: 'a', key: 'status_review' },
-        signed: ARCHIVED_CHIP,
-        archived: ARCHIVED_CHIP,
+        archive: { cls: 's', key: 'status_archive' },
     };
 
     // status(+可选 detail)→ 状态胶囊 {cls, key}。stuck 且逐条 needs 非空时是缺料的具体

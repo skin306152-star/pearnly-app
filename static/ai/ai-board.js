@@ -39,8 +39,10 @@
         return detail && Array.isArray(detail[key]) ? detail[key] : [];
     }
 
-    // status → 五列 key。真实后端只产出 collecting/running/stuck/review 四态,
-    // signed/archived 是引擎尚未建的 W5 终态——前向兼容,不因未知值崩溃。
+    // status → 五列 key。真实后端产出五态 collecting/running/stuck/review/archive,
+    // 词汇随 services/workorder/engine.py 的 ALL_STATUSES 同步——前端无法 import
+    // python,手工对齐,改词必须两处同步(C4-R1 教训:首版手打 'signed'/'archived'
+    // 两个臆造词,全仓不存在,真冻结单落 fallthrough 错标「未评估」)。
     function mapOrderToColumn(order, detail) {
         if (!order) return { column: 'materials' };
 
@@ -59,8 +61,7 @@
                 return { column: 'review' };
             case 'review':
                 return { column: 'sign' };
-            case 'signed':
-            case 'archived':
+            case 'archive':
                 return { column: 'archived' };
             default:
                 return { column: 'materials', unknown: true };

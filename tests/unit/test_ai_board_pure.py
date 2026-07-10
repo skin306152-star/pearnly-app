@@ -69,15 +69,12 @@ class MapOrderToColumnTests(unittest.TestCase):
             """)
         self.assertEqual(out, {"column": "sign"})
 
-    def test_signed_and_archived_forward_compat(self):
+    def test_archive_status_goes_archived_column(self):
         out = _run_node(f"""
             const b = require({json.dumps(str(AI_DIR / "ai-board.js"))});
-            process.stdout.write(JSON.stringify([
-                b.mapOrderToColumn({{status: 'signed'}}),
-                b.mapOrderToColumn({{status: 'archived'}}),
-            ]));
+            process.stdout.write(JSON.stringify(b.mapOrderToColumn({{status: 'archive'}})));
             """)
-        self.assertEqual(out, [{"column": "archived"}, {"column": "archived"}])
+        self.assertEqual(out, {"column": "archived"})
 
     def test_unknown_status_falls_back_and_flags(self):
         out = _run_node(f"""

@@ -376,7 +376,8 @@
             'posui.refund.confirm': 'Confirm refund · ฿{n}',
             'posui.refund.done': 'Refunded · stock returned',
             'posui.approve.title': 'Manager approval required',
-            'posui.approve.sub': 'This action needs a manager · pick the manager and enter their PIN',
+            'posui.approve.sub':
+                'This action needs a manager · pick the manager and enter their PIN',
             'posui.approve.cancel': 'Cancel',
             'posui.shift.title': 'Close shift',
             'posui.shift.cashier': 'Cashier',
@@ -832,7 +833,8 @@
             'posui.refund.confirm': '返品確定 · ฿{n}返金',
             'posui.refund.done': '返品完了 · 在庫戻し済',
             'posui.approve.title': '店長の承認が必要です',
-            'posui.approve.sub': 'この操作には店長の承認が必要です · 店長を選んでPINを入力してください',
+            'posui.approve.sub':
+                'この操作には店長の承認が必要です · 店長を選んでPINを入力してください',
             'posui.approve.cancel': 'キャンセル',
             'posui.shift.title': 'シフト締め · 日次集計',
             'posui.shift.cashier': 'レジ係',

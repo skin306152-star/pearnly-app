@@ -37,7 +37,8 @@
         }
         box.innerHTML = list
             .map((c, i) => {
-                const color = c.color || '#2563EB';
+                // 未配色的收银员回退主色令牌(inline style 可解析 var();新代码禁写死旧蓝/裸hex)
+                const color = c.color || 'var(--accent)';
                 const initial = POS.initial(c.display_name);
                 return (
                     '<div class="mgr-ca' +

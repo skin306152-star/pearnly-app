@@ -9,7 +9,9 @@
  */
 
 :root {
-    --blue: #7C4DFF; --blue-d: #6B3FF2; --blue-l: #EEE5FF;
+    /* 主色单源 --accent*(新代码一律用它);下行旧名别名只养存量选择器,禁再新增引用。 */
+    --accent: #7C4DFF; --accent-d: #6B3FF2; --accent-weak: #EEE5FF;
+    --blue: var(--accent); --blue-d: var(--accent-d); --blue-l: var(--accent-weak);
     --ink: #111827; --ink2: #6B7280; --ink3: #9CA3AF;
     --ink-2: #6B7280; --ink-3: #9CA3AF; --line-2: #ecece8;
     --bg: #f4f4f0; --card: #fff; --line: #e8e8e3;
@@ -81,17 +83,17 @@ body { background: var(--bg); color: var(--ink); font-size: 14px; }
 .pos-approve-card .mgr-ca { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; opacity: .55; transition: .12s; }
 .pos-approve-card .mgr-ca.on { opacity: 1; }
 .pos-approve-card .mgr-ca .av { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 17px; border: 3px solid transparent; }
-.pos-approve-card .mgr-ca.on .av { border-color: var(--blue); }
+.pos-approve-card .mgr-ca.on .av { border-color: var(--accent); }
 .pos-approve-card .mgr-ca .nm { font-size: 12.5px; }
 .pos-approve-card .mgr-empty { color: var(--ink3); font-size: 13px; padding: 12px 0; }
 .pos-approve-card .mgr-pinrow { display: flex; justify-content: center; gap: 12px; margin: 6px 0 12px; }
 .pos-approve-card .mgr-pinrow.shake { animation: pos-shake .4s; }
 .pos-approve-card .pd { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); }
-.pos-approve-card .pd.f { background: var(--blue); border-color: var(--blue); }
+.pos-approve-card .pd.f { background: var(--accent); border-color: var(--accent); }
 .pos-approve-card .mgr-pinerr { text-align: center; color: var(--red); font-size: 12.5px; min-height: 16px; margin: -4px 0 10px; }
 .pos-approve-card .mgr-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .pos-approve-card .mgr-pad .k { height: 54px; border: 1px solid var(--line); border-radius: 13px; background: #fff; font-size: 22px; font-weight: 600; cursor: pointer; }
-.pos-approve-card .mgr-pad .k:active { background: var(--blue-l); }
+.pos-approve-card .mgr-pad .k:active { background: var(--accent-weak); }
 .pos-approve-card .mgr-pad .k.fn { font-size: 14px; color: var(--ink2); }
 .pos-approve-card .ghost { width: 100%; height: 44px; margin-top: 12px; border: 0; background: transparent; color: var(--ink2); font-size: 14px; cursor: pointer; }
 

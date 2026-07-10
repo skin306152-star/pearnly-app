@@ -69,7 +69,8 @@ async function stub(page) {
             contentType: 'application/json',
             body: JSON.stringify({
                 ok: true,
-                data: { cashiers: [{ id: 'mgr1', display_name: 'Manager Nok', color: '#2563EB' }] },
+                // 不给 color:压授权窗头像的 var(--accent) 令牌回退路径(新代码禁写死旧蓝)
+                data: { cashiers: [{ id: 'mgr1', display_name: 'Manager Nok' }] },
             }),
         })
     );
@@ -143,6 +144,11 @@ test('退货被拦 → 弹店长授权窗 → PIN 覆盖成功', async ({ page }
     expect(vis.visibility).toBe('visible');
     expect(vis.shown).toBe(true);
     await expect(page.locator('#mgr-cashiers .mgr-ca')).toHaveCount(1);
+    // 无配色收银员的头像回退 = var(--accent) 解析成主色紫(#7C4DFF),不是写死旧蓝
+    const avatarBg = await page
+        .locator('#mgr-cashiers .mgr-ca .av')
+        .evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(avatarBg).toBe('rgb(124, 77, 255)');
 
     await page.screenshot({ path: path.join(ART, 'approval-modal-visible.png'), fullPage: true });
 

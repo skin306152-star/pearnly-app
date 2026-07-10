@@ -13,7 +13,7 @@
     <link rel="icon" href="/static/brand/favicon.ico?v=1" sizes="any" />
     <!-- PWA 预留(离线 PO-B5 再注册 Service Worker;此处先挂 manifest 占位) -->
     <link rel="manifest" href="/static/pos/manifest.webmanifest?v=11850716" />
-    <link rel="stylesheet" href="/static/dist/pos.css?v=11854600" />
+    <link rel="stylesheet" href="/static/dist/pos.css?v=11854700" />
   </head>
   <body>
     <!-- ── 设备绑定(未绑店铺 · 照稿 12②)── -->
@@ -898,7 +898,9 @@
       <div class="pos-approve-mask" id="mgr-mask">
         <div class="pos-approve-card">
           <div class="t" data-i18n="posui.approve.title">需要店长授权</div>
-          <div class="s" data-i18n="posui.approve.sub">此操作需店长授权 · 请店长选择本人并输入 PIN</div>
+          <div class="s" data-i18n="posui.approve.sub">
+            此操作需店长授权 · 请店长选择本人并输入 PIN
+          </div>
           <div class="mgr-cashiers" id="mgr-cashiers"></div>
           <div class="mgr-pinrow" id="mgr-pins">
             <div class="pd"></div>
@@ -1310,7 +1312,7 @@
       <div id="pos-toast-txt"></div>
     </div>
 
-    <script src="/static/pos/pos-i18n.js?v=11854600"></script>
-    <script src="/static/dist/pos.js?v=11854600" defer></script>
+    <script src="/static/pos/pos-i18n.js?v=11854700"></script>
+    <script src="/static/dist/pos.js?v=11854700" defer></script>
   </body>
 </html>

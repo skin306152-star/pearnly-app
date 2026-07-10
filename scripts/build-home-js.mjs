@@ -73,6 +73,10 @@ const BUNDLES = [
             'ai/ai-router.js',
             'ai/ai-state.js',
             'ai/ai-api.js',
+            // ai-gate.js(Z1-a 登录卡/邀请制门面)只依赖 AI.state.esc(可选)与全局 at()/
+            // atSetLang,排在 ai-state.js/ai-api.js 之后、ai.js(boot 调 AI.gate.mountLogin/
+            // mountInvited)之前即可,不依赖看板/客户页那批渲染模块。
+            'ai/ai-gate.js',
             'ai/ai-viewer.js',
             'ai/ai-board.js',
             'ai/ai-kanban-render.js',

@@ -63,6 +63,23 @@
         }
 
         return {
+            // Z1-a · 登录门面用:未登录态调用,不带 Authorization(authHeaders 见 token 为空
+            // 自然省略头)。成功回 {token, access_token, user, is_super_admin} 同 landing.js 契约。
+            login: function (username, password, remember) {
+                return call('POST', '/api/login', {
+                    username: username,
+                    password: password,
+                    remember: !!remember,
+                });
+            },
+            // 邀请制门面判别用:token 有效性探针(非闸接口)——工单闸 404 时借它分辨"未登录/
+            // token 失效"与"已登录但未受邀"(见 ai.js boot() 的 resolveGateClosed)。
+            getMe: function () {
+                return call('GET', '/api/me');
+            },
+            logout: function () {
+                return call('POST', '/api/logout');
+            },
             listOrders: function (query) {
                 var qs = query
                     ? '?' +

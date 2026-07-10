@@ -141,6 +141,9 @@ const POS_CSS = ['pos/pos.css', 'pos/pos-restaurant.css'];
 const AI_CSS = [
     'ai/ai-theme.css',
     'ai/ai-shell.css',
+    // ai-gate.css(Z1-a 登录卡/邀请制门面)吃 ai-theme 令牌 + ai-shell 的 .btn 系统,排在
+    // 两者之后、看板/客户页样式之前——门面与工作台视图互斥显示,层叠顺序对彼此零影响。
+    'ai/ai-gate.css',
     'ai/ai-dashboard.css',
     'ai/ai-client.css',
     'ai/ai-intake.css',

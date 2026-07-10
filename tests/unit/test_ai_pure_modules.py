@@ -425,5 +425,56 @@ class AiI18nStructureTests(unittest.TestCase):
             self.assertEqual(out[lang], zh_keys, f"{lang} 词典 key 集合与 zh 不一致")
 
 
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class AiGatePureTests(unittest.TestCase):
+    """Z1-a 登录卡/邀请制门面的纯函数守门:表单必填校验、登录失败错误 key 解析
+    (API 结构化错误 vs 网络失败两类必须分开报,见 ai-gate.js 顶注)。DOM 挂载
+    (mountLogin/mountInvited)靠 tests/e2e/_z1a_gate.spec.js 真浏览器覆盖。"""
+
+    def test_validate_login_input_requires_both_fields(self):
+        out = _run_node(f"""
+            const g = require({json.dumps(str(AI_DIR / "ai-gate.js"))});
+            process.stdout.write(JSON.stringify([
+                g.validateLoginInput('zihao', 'secret1'),
+                g.validateLoginInput('', 'secret1'),
+                g.validateLoginInput('zihao', ''),
+                g.validateLoginInput('  ', '  '),
+                g.validateLoginInput(null, null),
+            ]));
+            """)
+        self.assertEqual(
+            out,
+            [
+                {"ok": True},
+                {"ok": False, "errKey": "gate_err_required"},
+                {"ok": False, "errKey": "gate_err_required"},
+                {"ok": False, "errKey": "gate_err_required"},
+                {"ok": False, "errKey": "gate_err_required"},
+            ],
+        )
+
+    def test_resolve_login_error_key_splits_network_from_api_errors(self):
+        out = _run_node(f"""
+            const g = require({json.dumps(str(AI_DIR / "ai-gate.js"))});
+            process.stdout.write(JSON.stringify([
+                g.resolveLoginErrorKey({{status: 401, code: 'auth.invalid_credentials'}}),
+                g.resolveLoginErrorKey({{status: 429, code: 'account_locked'}}),
+                g.resolveLoginErrorKey({{status: 403, code: 'auth.account_disabled'}}),
+                g.resolveLoginErrorKey(new TypeError('Failed to fetch')),
+                g.resolveLoginErrorKey(null),
+            ]));
+            """)
+        self.assertEqual(
+            out,
+            [
+                "err_auth_invalid_credentials",
+                "err_account_locked",
+                "err_auth_account_disabled",
+                "gate_err_network",
+                "gate_err_network",
+            ],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

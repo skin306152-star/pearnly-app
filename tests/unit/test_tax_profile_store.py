@@ -197,5 +197,54 @@ class UpsertProfileTests(unittest.TestCase):
         self.assertEqual(got["branch_count"], 3)
 
 
+class _DefsFakeCursor:
+    """load_active_defs 只读一张全租户共享的参考表,不需要 workspace_clients 夹具。"""
+
+    def __init__(self, rows):
+        self._rows = rows
+        self.calls: list = []
+
+    def execute(self, sql, params=()):
+        self.calls.append((" ".join(sql.split()), params))
+
+    def fetchall(self):
+        return self._rows
+
+
+class LoadActiveDefsTests(unittest.TestCase):
+    """义务生成引擎(B2-d)的 defs 读侧:tax_obligation_defs 无 tenant_id 列(方案 §5.4
+    全租户共享法定常量),SQL 天生不带 tenant_id——不属于 services/workorder 的隔离机械闸
+    (test_workorder_sql_isolation)管辖范围,故放画像域而非 obligation_engine.py。"""
+
+    def test_maps_rows_by_obligation_code(self):
+        cur = _DefsFakeCursor(
+            [
+                {
+                    "obligation_code": "pnd1",
+                    "trigger_kind": "has_employees",
+                    "due_paper_day": 7,
+                    "due_efiling_day": 15,
+                    "sso_epayment_extra_workdays": 0,
+                    "effective_from": "2024-02-01",
+                    "effective_to": None,
+                },
+            ]
+        )
+        defs = store.load_active_defs(cur)
+        self.assertEqual(set(defs), {"pnd1"})
+        self.assertEqual(defs["pnd1"]["due_paper_day"], 7)
+        self.assertEqual(defs["pnd1"]["trigger_kind"], "has_employees")
+
+    def test_query_carries_no_tenant_filter_by_design(self):
+        cur = _DefsFakeCursor([])
+        store.load_active_defs(cur)
+        sql, params = cur.calls[0]
+        self.assertNotIn("tenant_id", sql.lower())
+        self.assertEqual(params, ())
+
+    def test_empty_table_returns_empty_dict(self):
+        self.assertEqual(store.load_active_defs(_DefsFakeCursor([])), {})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

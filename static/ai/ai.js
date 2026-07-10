@@ -1,8 +1,11 @@
 /*
  * Pearnly AI · ai.js · 启动入口(闸检查 + i18n 应用 + 路由挂载)
  *
- * 闸行为(2026-07-09 拍板):启动即调 GET /api/workorder/orders;闸关/未登录都是
- * 404/401 → 整页跳回 /home,不渲染任何业务内容(对存量 Pearnly 用户 = 不存在)。
+ * 闸行为(Zihao 拍板 Z1-a · 2026-07-10 · 取代 2026-07-09 版):启动仍调 GET
+ * /api/workorder/orders 探针,但不再无差别整页跳 /home——就地渲染两种门面
+ * (AI.gate,见该文件顶注):
+ *   无 token 或 401 → 登录卡;token 有效但探针 404(未受邀)→ 邀请制提示。
+ * 真正通过闸的用户走原有工作台渲染路径,零改变。
  */
 (function () {
     'use strict';
@@ -20,6 +23,11 @@
         });
     }
 
+    // Z1-a 之前 boot() 只跑一次,renderChrome() 的 addEventListener 从不重复挂载;现在
+    // 登录/邀请门面成功后会回调 boot() 二次进入工作台(见 enterApp),chromeWired 挡重复
+    // 绑定(不然每轮登录都在同一批按钮上叠一份监听器)。内容更新(姓名/头像)每次都照跑。
+    var chromeWired = false;
+
     function renderChrome() {
         var token = localStorage.getItem('mrpilot_token');
         var name = AI.format.jwtDisplayName(token);
@@ -36,6 +44,8 @@
         }
         $('firmName').textContent = at('brand_word') + ' ' + at('brand_ai');
         $('firmMeta').textContent = '';
+        if (chromeWired) return;
+        chromeWired = true;
         // 报表/客户档案/设置/待我处理:M1 未接(见 v4 降级表)——保留导航位但禁用,不假装可点。
         ['navTodo', 'navClients', 'navReports', 'navSettings'].forEach(function (id) {
             var el = $(id);
@@ -91,19 +101,86 @@
         }
     }
 
+    var routerUnsubscribe = null;
+
+    // 门面(登录卡/邀请提示)与工作台二选一显示——切走的一侧真正清空 innerHTML,不是
+    // 叠层藏起来占着 DOM(门面表单元素 id 与工作台无冲突,但没必要留着不用的节点树)。
+    function showShell() {
+        $('gateRoot').classList.remove('on');
+        $('gateRoot').innerHTML = '';
+        document.querySelector('.shell').style.display = '';
+    }
+
+    function showGate() {
+        document.querySelector('.shell').style.display = 'none';
+        $('gateRoot').classList.add('on');
+    }
+
+    function enterApp(api) {
+        showShell();
+        renderChrome();
+        // 二次进入(门面登出/登录闭环)可能已订阅过一次——先退订再订阅,防止 hashchange
+        // 监听器逐轮叠加(每次都多触发一遍 onRoute,状态越切越花)。
+        if (routerUnsubscribe) routerUnsubscribe();
+        routerUnsubscribe = AI.router.subscribe(function (route) {
+            onRoute(api, route);
+        });
+    }
+
+    function showLogin() {
+        showGate();
+        AI.gate.mountLogin($('gateRoot'), {
+            api: AI.api.create(),
+            onSuccess: function () {
+                boot();
+            },
+        });
+    }
+
+    function showInvited() {
+        showGate();
+        AI.gate.mountInvited($('gateRoot'), {
+            onLogout: function () {
+                localStorage.removeItem('mrpilot_token');
+                boot();
+            },
+        });
+    }
+
+    // 工单闸探针非 401(通常是 404 = 闸对该账号关闭)时,借一个非闸接口(/api/me)分辨
+    // "token 本身已失效"与"token 有效但未受邀"——前者清 token 回登录卡,后者才是邀请制
+    // 提示(Zihao Z1-a 拍板的判别口径,不靠猜)。
+    function resolveGateClosed(api) {
+        api.getMe()
+            .then(function () {
+                showInvited();
+            })
+            .catch(function () {
+                localStorage.removeItem('mrpilot_token');
+                showLogin();
+            });
+    }
+
     function boot() {
         applyTexts();
+        var token = localStorage.getItem('mrpilot_token');
+        if (!token) {
+            showLogin();
+            return;
+        }
         var api = AI.api.create();
         // 闸探针:限量拉 1 条即可判定闸开/鉴权是否通过,不预取业务数据(那是路由回调的活)。
         api.listOrders({ limit: 1 })
             .then(function () {
-                renderChrome();
-                AI.router.subscribe(function (route) {
-                    onRoute(api, route);
-                });
+                enterApp(api);
             })
-            .catch(function () {
-                window.location.href = '/home';
+            .catch(function (err) {
+                if (err && err.status === 401) {
+                    localStorage.removeItem('mrpilot_token');
+                    showLogin();
+                    return;
+                }
+                resolveGateClosed(api);
             });
     }
 

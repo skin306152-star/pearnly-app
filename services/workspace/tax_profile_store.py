@@ -215,3 +215,15 @@ def upsert_profile(
         f"{', '.join(update_sets)}",
         tuple(values),
     )
+
+
+def load_active_defs(cur) -> dict:
+    """读 tax_obligation_defs 全表(方案 §5.4:全租户共享法定常量表,无 tenant_id 列,
+    不启 RLS)。生效窗(effective_from/effective_to)按期间的过滤在
+    services.workorder.obligation_engine.generate_obligations 里做,这里只搬数据。"""
+    cur.execute(
+        "SELECT obligation_code, trigger_kind, due_paper_day, due_efiling_day, "
+        "sso_epayment_extra_workdays, effective_from, effective_to "
+        "FROM tax_obligation_defs"
+    )
+    return {row["obligation_code"]: dict(row) for row in cur.fetchall()}

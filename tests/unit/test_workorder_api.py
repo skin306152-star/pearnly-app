@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 
 from services.workorder import api
 from tests.unit._workorder_fakes import WorkOrderFakeStoreBase
@@ -68,6 +69,9 @@ class _FakeStore(WorkOrderFakeStoreBase):
         self, cur, *, tenant_id, workspace_client_id=None, period=None, status=None
     ):
         return 1
+
+    def open_work_order(self, cur, *, tenant_id, workspace_client_id, period, intent):
+        return dict(self.wo)
 
 
 class _ApiTestBase(unittest.TestCase):
@@ -503,6 +507,74 @@ class ListAndDeliverableTests(_ApiTestBase):
         self.assertIsNone(
             api.deliverable_artifact_path(None, tenant_id="t-1", work_order_id="wo-1", kind="nope")
         )
+
+
+class OpenOrderObligationWiringTests(_ApiTestBase):
+    """开单接线(B2-d):义务生成挂 pearnly_ai_m1 闸,闸关时零调用(税务画像-方案-B1 §3)。"""
+
+    def test_gate_closed_generates_nothing(self):
+        with (
+            mock.patch.object(api, "pearnly_ai_m1_enabled_for", return_value=False),
+            mock.patch.object(api.tax_profile_store, "get_profile") as get_profile,
+            mock.patch.object(api.obligation_engine, "generate_obligations") as generate,
+            mock.patch.object(api.obligation_engine, "materialize_obligations") as materialize,
+        ):
+            wo = api.open_order(None, tenant_id="t-1", workspace_client_id=7, period="2569-05")
+        self.assertEqual(wo["id"], "wo-1")
+        get_profile.assert_not_called()
+        generate.assert_not_called()
+        materialize.assert_not_called()
+
+    def test_gate_open_generates_and_materializes_once(self):
+        profile = {"vat_status": "registered"}
+        defs = {"pp30": {"trigger_kind": "vat_status"}}
+        obligations = [{"obligation_code": "pp30", "status": "nil"}]
+        with (
+            mock.patch.object(api, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(
+                api.tax_profile_store, "get_profile", return_value=profile
+            ) as get_profile,
+            mock.patch.object(
+                api.tax_profile_store, "load_active_defs", return_value=defs
+            ) as load_defs,
+            mock.patch.object(
+                api.obligation_engine, "generate_obligations", return_value=obligations
+            ) as generate,
+            mock.patch.object(api.obligation_engine, "materialize_obligations") as materialize,
+        ):
+            api.open_order(None, tenant_id="t-1", workspace_client_id=7, period="2569-05")
+        get_profile.assert_called_once_with(None, tenant_id="t-1", workspace_client_id=7)
+        load_defs.assert_called_once_with(None)
+        generate.assert_called_once_with(
+            profile=profile, period="2569-05", data_signals=None, defs=defs
+        )
+        materialize.assert_called_once_with(
+            None,
+            tenant_id="t-1",
+            workspace_client_id=7,
+            work_order_id="wo-1",
+            period="2569-05",
+            obligations=obligations,
+        )
+
+    def test_generation_failure_does_not_block_open_order(self):
+        with (
+            mock.patch.object(api, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(
+                api.tax_profile_store, "get_profile", side_effect=RuntimeError("boom")
+            ),
+        ):
+            wo = api.open_order(None, tenant_id="t-1", workspace_client_id=7, period="2569-05")
+        self.assertEqual(wo["id"], "wo-1")  # 义务生成炸了,开单本身照样成功
+
+    def test_missing_profile_skips_generation_without_error(self):
+        with (
+            mock.patch.object(api, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(api.tax_profile_store, "get_profile", return_value=None),
+            mock.patch.object(api.obligation_engine, "generate_obligations") as generate,
+        ):
+            api.open_order(None, tenant_id="t-1", workspace_client_id=7, period="2569-05")
+        generate.assert_not_called()
 
 
 if __name__ == "__main__":

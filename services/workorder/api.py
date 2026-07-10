@@ -8,10 +8,15 @@
 
 from __future__ import annotations
 
+import logging
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
-from services.workorder import decisions, evidence, store
+from core.feature_flags import pearnly_ai_m1_enabled_for
+from services.workorder import decisions, evidence, obligation_engine, store
+from services.workspace import tax_profile_store
+
+logger = logging.getLogger(__name__)
 
 # 人工裁决三态,与 CLI --decide 同语义(见 L2-验收.md):
 #   face_value=确认票面 OCR 读数 · recalc=人工看原票补正 · exclude=剔除不计入
@@ -62,13 +67,51 @@ def open_order(
     intent: str = "monthly_vat",
 ) -> dict:
     """开单(幂等返回既有单)。归属校验(该账套是否属本租户)由路由先行完成。"""
-    return store.open_work_order(
+    wo = store.open_work_order(
         cur,
         tenant_id=tenant_id,
         workspace_client_id=workspace_client_id,
         period=period,
         intent=intent,
     )
+    if pearnly_ai_m1_enabled_for(tenant_id, None):
+        _generate_obligations_on_open(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            work_order_id=wo["id"],
+            period=period,
+        )
+    return wo
+
+
+def _generate_obligations_on_open(
+    cur, *, tenant_id: str, workspace_client_id: int, work_order_id: str, period: str
+) -> None:
+    """开单即生成一次当期义务清单(税务画像-方案-B1.md §3 · B2-d)。数据信号本批传空
+    (TODO(D1):扫采购行 WHT/境外付款/利息股息付款出真实信号,现只吃画像判据),画像/
+    生成/物化任一环节出错都不应挡住开单本身(义务清单是供料层,不是开单主路径的一部分)。
+    """
+    try:
+        profile = tax_profile_store.get_profile(
+            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
+        )
+        if profile is None:
+            return
+        defs = tax_profile_store.load_active_defs(cur)
+        obligations = obligation_engine.generate_obligations(
+            profile=profile, period=period, data_signals=None, defs=defs
+        )
+        obligation_engine.materialize_obligations(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            work_order_id=work_order_id,
+            period=period,
+            obligations=obligations,
+        )
+    except Exception:
+        logger.exception("obligation_engine generation failed on open_order (tenant=%s)", tenant_id)
 
 
 def list_orders(

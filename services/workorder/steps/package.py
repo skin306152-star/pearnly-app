@@ -13,7 +13,7 @@ import json
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from services.workorder import decisions, evidence
+from services.workorder import decisions, evidence, storage
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import conservation, pp30_form
 
@@ -27,10 +27,16 @@ _COMPUTE_KEYS = ("tax_due", "sales_amount", "output_vat", "purchase_amount", "in
 
 
 def run(ctx: StepContext) -> StepResult:
-    out_dir = ctx.data.get("deliverables_dir")
-    if not out_dir:
+    base_dir = ctx.data.get("deliverables_dir")
+    if not base_dir:
         return StepResult.needs(["deliverables_dir"])
-    out_dir = Path(out_dir)
+
+    # 交付物版本化:未冻结重跑=新版本号,旧版本文件不动,读侧默认取最新版(C-2)。整批 5 件
+    # 共用同一版本号(一次出包=一个版本),落盘走版本段目录 {base}/v{n}。
+    version = ctx.store.next_deliverable_version(
+        ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id
+    )
+    out_dir = storage.versioned_dir(base_dir, version)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     events = ctx.store.list_events(
@@ -66,11 +72,14 @@ def run(ctx: StepContext) -> StepResult:
             tenant_id=ctx.tenant_id,
             work_order_id=ctx.work_order_id,
             kind=kind,
+            version=version,
             artifact_path=artifact_path,
             numbers=snapshot,
         )
 
-    return StepResult.ok(deliverables={k: v[0] for k, v in kinds.items()})
+    return StepResult.ok(
+        deliverables={k: v[0] for k, v in kinds.items()}, deliverable_version=version
+    )
 
 
 def _resolve_numbers(ctx: StepContext, events: list[dict]) -> dict:

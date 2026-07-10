@@ -35,7 +35,9 @@ class FakeStore:
     def __init__(self, items, events):
         self.items = items
         self.events = events
-        self.deliverables: dict = {}
+        self.deliverables: dict = {}  # kind -> 最新版本行(保持既有按 kind 断言)
+        self.all_writes: list = []  # (kind, version, artifact_path):跨版本落盘留痕
+        self._max_version = 0
 
     def list_items(self, cur, *, tenant_id, work_order_id, status=None):
         return [dict(it) for it in self.items if status is None or it["status"] == status]
@@ -43,12 +45,28 @@ class FakeStore:
     def list_events(self, cur, *, tenant_id, work_order_id):
         return list(self.events)
 
-    def upsert_deliverable(self, cur, *, tenant_id, work_order_id, kind, artifact_path, numbers):
-        # 真库靠 (work_order_id, kind) 唯一约束覆盖——这里用 dict 键模拟同一语义。
-        self.deliverables[kind] = {"artifact_path": artifact_path, "numbers": numbers}
+    def next_deliverable_version(self, cur, *, tenant_id, work_order_id):
+        return self._max_version + 1
+
+    def current_deliverable_version(self, cur, *, tenant_id, work_order_id):
+        return self._max_version
+
+    def upsert_deliverable(
+        self, cur, *, tenant_id, work_order_id, kind, version=1, artifact_path, numbers
+    ):
+        # 真库靠 (tenant, wo, kind, version) 唯一约束:同版本覆盖、换版本新增。这里 kind->最新
+        # 版本行保持既有按 kind 断言,all_writes 留全版本痕迹供版本化断言。
+        self._max_version = max(self._max_version, version)
+        self.deliverables[kind] = {
+            "kind": kind,
+            "version": version,
+            "artifact_path": artifact_path,
+            "numbers": numbers,
+        }
+        self.all_writes.append((kind, version, artifact_path))
 
     def list_deliverables(self, cur, *, tenant_id, work_order_id):
-        return [{"kind": k, **v} for k, v in self.deliverables.items()]
+        return [dict(v) for v in self.deliverables.values()]
 
 
 def _purchase_item(item_id, file_ref, *, status="ok"):
@@ -655,28 +673,43 @@ class WaiveTests(PackageFixture):
         self.assertEqual(memo["numbers"]["waived_count"], 1)
 
 
-class IdempotencyTests(PackageFixture):
-    def test_rerun_overwrites_not_duplicates(self):
+class VersioningTests(PackageFixture):
+    """交付物版本化(C-2 · 验收断言 2):未冻结重跑=新版本、v1 文件逐字节未动、读侧取最新版。"""
+
+    def test_rerun_creates_new_version_leaving_v1_untouched(self):
         store = self._sister_makeup_store()
-        ctx1 = self._ctx(store)
-        first = package.run(ctx1)
-        first_files = {k: v["artifact_path"] for k, v in store.deliverables.items()}
+        first = package.run(self._ctx(store))
+        self.assertEqual(first.status, "ok")
+        self.assertEqual(first.payload["deliverable_version"], 1)
+        # v1 五件真落盘在 {base}/v1/,记录逐字节快照。
+        v1_paths = {kind: path for kind, ver, path in store.all_writes if ver == 1}
+        self.assertEqual(len(v1_paths), 5)
+        v1_bytes = {k: Path(p).read_bytes() for k, p in v1_paths.items()}
+        for p in v1_paths.values():
+            self.assertEqual(Path(p).parent.name, "v1")
 
-        ctx2 = self._ctx(store)
-        second = package.run(ctx2)
+        second = package.run(self._ctx(store))
+        self.assertEqual(second.payload["deliverable_version"], 2)
+        v2_paths = {kind: path for kind, ver, path in store.all_writes if ver == 2}
+        self.assertEqual(len(v2_paths), 5)
 
-        self.assertEqual(first.status, second.status)
-        self.assertEqual(len(store.deliverables), 5)  # 未累加
-        for kind, path in first_files.items():
-            self.assertEqual(store.deliverables[kind]["artifact_path"], path)
-        self.assertEqual(
-            store.deliverables["pp30_draft"]["numbers"]["tax_due"],
-            store.deliverables["pp30_draft"]["numbers"]["tax_due"],
-        )
-        # 文件被覆盖为同样内容,不是追加。
-        ledger_path = Path(store.deliverables["ledger_workpaper"]["artifact_path"])
-        content = ledger_path.read_text(encoding="utf-8")
-        self.assertEqual(content.count("IMG_2647.jpg"), 1)
+        # v1 文件逐字节未动(重跑不覆盖旧版本)。
+        for kind, path in v1_paths.items():
+            self.assertTrue(Path(path).is_file(), f"{kind} v1 文件被删")
+            self.assertEqual(Path(path).read_bytes(), v1_bytes[kind], f"{kind} v1 被改写")
+        # v2 是不同物理文件(落在 v2/ 段),与 v1 路径不同。
+        for kind in v1_paths:
+            self.assertNotEqual(v1_paths[kind], v2_paths[kind])
+            self.assertIn("v2", str(Path(v2_paths[kind]).parent.name))
+        # 读侧默认取最新版 = v2。
+        latest = {
+            d["kind"]: d
+            for d in store.list_deliverables(None, tenant_id="t-1", work_order_id="wo-1")
+        }
+        self.assertEqual(len(latest), 5)
+        for kind in v1_paths:
+            self.assertEqual(latest[kind]["version"], 2)
+            self.assertEqual(latest[kind]["artifact_path"], v2_paths[kind])
 
 
 if __name__ == "__main__":

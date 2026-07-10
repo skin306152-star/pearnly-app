@@ -99,6 +99,7 @@ class FakeStore:
         source,
         kind="unknown",
         file_ref=None,
+        original_name=None,
         ocr_history_id=None,
         status="pending",
         flag_reason=None,
@@ -116,6 +117,7 @@ class FakeStore:
             "source": source,
             "kind": kind,
             "file_ref": file_ref,
+            "original_name": original_name,
             "ocr_history_id": ocr_history_id,
             "status": status,
             "flag_reason": flag_reason,
@@ -137,11 +139,27 @@ class FakeStore:
             if val is not None:
                 it[col] = val
 
+    def next_deliverable_version(self, cur, *, tenant_id, work_order_id):
+        return (
+            self.current_deliverable_version(cur, tenant_id=tenant_id, work_order_id=work_order_id)
+            + 1
+        )
+
+    def current_deliverable_version(self, cur, *, tenant_id, work_order_id):
+        bucket = self.deliverables.get(work_order_id, {})
+        return max((r.get("version", 1) for r in bucket.values()), default=0)
+
     def upsert_deliverable(
-        self, cur, *, tenant_id, work_order_id, kind, artifact_path=None, numbers=None
+        self, cur, *, tenant_id, work_order_id, kind, version=1, artifact_path=None, numbers=None
     ):
+        # kind->最新版本行(读侧 DISTINCT ON (kind) 取最新);inner bucket 按 kind 键便于断言。
         bucket = self.deliverables.setdefault(work_order_id, {})
-        bucket[kind] = {"artifact_path": artifact_path, "numbers": numbers or {}}
+        bucket[kind] = {
+            "kind": kind,
+            "version": version,
+            "artifact_path": artifact_path,
+            "numbers": numbers or {},
+        }
         return dict(bucket[kind])
 
     def list_deliverables(self, cur, *, tenant_id, work_order_id):

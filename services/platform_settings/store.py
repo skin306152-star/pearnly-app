@@ -72,6 +72,18 @@ def list_allowlist(key: str) -> list[str]:
         return [r["user_id"] for r in cur.fetchall()]
 
 
+def is_allowlisted(key: str, subject_id: str) -> bool:
+    """单主体名单点查(索引级)。跟 is_enabled_for_user 不同:不折总闸/rollout,
+    纯问「在不在名单」——发放侧(邀请管理)要的是名单事实,不是灰度判定结果。"""
+    with db.get_cursor() as cur:
+        cur.execute(
+            "SELECT 1 FROM platform_setting_allowlist "
+            "WHERE setting_key = %s AND user_id = %s LIMIT 1",
+            (key, str(subject_id)),
+        )
+        return cur.fetchone() is not None
+
+
 def add_to_allowlist(key: str, user_id: str) -> None:
     with db.get_cursor(commit=True) as cur:
         cur.execute(

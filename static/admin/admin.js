@@ -3499,7 +3499,7 @@
                     _toast(_t('adm-ai-reset-ok'), 'success');
                     _showAiPassword(r.initial_password, r.username);
                 } catch (e) {
-                    _toast(_t(_aiPasswordErrorKey(e)), 'error');
+                    _toast(_t(_aiErrorKey(e)), 'error');
                 }
             });
         });
@@ -3518,26 +3518,20 @@
         box.hidden = false;
     }
 
-    // 密码相关错误统一按 err.detail(后端 HTTPException detail)精确分流,而不是猜 HTTP
+    // 错误统一按 err.detail(后端 HTTPException detail)精确分流,而不是猜 HTTP
     // status——同一个 422 在 invite 上可能是「建号必须给邮箱」也可能是「自定义密码太弱」,
-    // 状态码分不清,必须落到 detail 上一一对应。
-    function _aiPasswordErrorKey(err) {
-        const detail = (err && err.detail) || '';
-        if (detail.indexOf('pwd.') === 0) return 'adm-ai-pwd-too-weak';
-        if (detail === 'admin.pearnly_ai_not_invited') return 'adm-ai-reset-not-invited';
-        if (detail === 'admin.pearnly_ai_subject_unknown') return 'adm-ai-reset-subject-unknown';
-        return 'adm-load-fail';
-    }
+    // 状态码分不清,必须落到 detail 上一一对应。invite/reset 两组 detail 不相交,共用一张表。
+    const _AI_ERROR_KEYS = {
+        'admin.pearnly_ai_not_invited': 'adm-ai-reset-not-invited',
+        'admin.pearnly_ai_subject_unknown': 'adm-ai-reset-subject-unknown',
+        'admin.pearnly_ai_needs_email_to_create': 'adm-ai-invite-needs-email',
+        'admin.username_exists': 'adm-ai-invite-username-exists',
+    };
 
-    function _aiInviteErrorKey(err) {
+    function _aiErrorKey(err) {
         const detail = (err && err.detail) || '';
         if (detail.indexOf('pwd.') === 0) return 'adm-ai-pwd-too-weak';
-        if (detail === 'admin.pearnly_ai_needs_email_to_create') return 'adm-ai-invite-needs-email';
-        if (detail === 'admin.username_exists') return 'adm-ai-invite-username-exists';
-        const msg = (err && err.message) || '';
-        if (msg.indexOf('422') !== -1) return 'adm-ai-invite-needs-email';
-        if (msg.indexOf('409') !== -1) return 'adm-ai-invite-username-exists';
-        return 'adm-load-fail';
+        return _AI_ERROR_KEYS[detail] || 'adm-load-fail';
     }
 
     async function _renderPearlyAiPage() {
@@ -3568,7 +3562,7 @@
                     }
                     _renderPearlyAiPage();
                 } catch (e) {
-                    _toast(_t(_aiInviteErrorKey(e)), 'error');
+                    _toast(_t(_aiErrorKey(e)), 'error');
                 }
             };
             btn.addEventListener('click', go);

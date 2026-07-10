@@ -26,7 +26,6 @@ import logging
 import secrets
 import string
 
-import bcrypt as _bcrypt
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
@@ -297,7 +296,7 @@ async def pearnly_ai_reset_password(request: Request, body: ResetPasswordBody):
     subject_id = body.subject_id.strip()
     if not subject_id:
         raise HTTPException(400, detail="admin.pearnly_ai_missing_subject")
-    if subject_id not in platform_settings_store.list_allowlist(PEARNLY_AI_M1_KEY):
+    if not platform_settings_store.is_allowlisted(PEARNLY_AI_M1_KEY, subject_id):
         raise HTTPException(404, detail="admin.pearnly_ai_not_invited")
 
     # 密码校验(cheap · 无 DB 依赖)先于目标反解,弱密码直接 422 不用多打一趟 DB。
@@ -307,9 +306,10 @@ async def pearnly_ai_reset_password(request: Request, body: ResetPasswordBody):
     if not target:
         raise HTTPException(404, detail="admin.pearnly_ai_subject_unknown")
 
-    pw_hash = _bcrypt.hashpw(new_password.encode("utf-8"), _bcrypt.gensalt()).decode("utf-8")
-    with db.get_cursor(commit=True) as cur:
-        cur.execute("UPDATE users SET password_hash = %s WHERE id = %s", (pw_hash, target["id"]))
+    # reset_user_password 同步刷 password_changed_at → 已签发旧 JWT 全失效(铁律 v118.28.9),
+    # 不许在这里手写 bcrypt+UPDATE 绕过这层。
+    if not db.reset_user_password(target["id"], new_password):
+        raise HTTPException(500, detail="admin.pearnly_ai_reset_failed")
 
     _log_op(
         request,

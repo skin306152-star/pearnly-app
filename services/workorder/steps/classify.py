@@ -24,10 +24,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
+from core import feature_flags
 from services.purchase.totals import dedupe_key
 from services.summary_import.parse import parse_table
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import sort as sort_step
+from services.workspace import client_alias_store
 
 # 校验警告文本命中这些关键词才归为「金额算不平」而非泛化的低置信——sanity.py 的
 # 硬闸消息(小计/VAT/行和/折扣勾稽)都落在这个词表里,命中即 amount_math_fail。
@@ -40,7 +42,14 @@ def run(ctx: StepContext) -> StepResult:
         ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id, status="pending"
     )
     own_tax_id = _resolve_own_tax_id(ctx)
-    own_name = _resolve_own_name(ctx)
+    # 别名闸 pearnly_ai_m1 开:走名集锚(法定名 + active human_confirmed 别名),补跨语种失锚。
+    # 关:走单一法定名现状路,方向输出逐字节不变。fail-closed 于 feature_flags 内部。
+    if _m1_enabled(ctx):
+        own_name = None
+        own_names = _resolve_own_names(ctx)
+    else:
+        own_name = _resolve_own_name(ctx)
+        own_names = None
 
     bins: dict[str, int] = {}
     flagged = 0
@@ -50,7 +59,11 @@ def run(ctx: StepContext) -> StepResult:
         if item["kind"] != "unknown":
             continue
         outcome = _classify_image(
-            item, own_tax_id=own_tax_id, own_name=own_name, seen=seen_purchase_fp
+            item,
+            own_tax_id=own_tax_id,
+            own_name=own_name,
+            own_names=own_names,
+            seen=seen_purchase_fp,
         )
         upd = outcome["update"]
         ctx.store.update_item(ctx.cur, tenant_id=ctx.tenant_id, item_id=item["id"], **upd)
@@ -107,7 +120,12 @@ def _emit_classified(ctx, item, *, kind, status, money, sales_read=None):
 
 
 def _classify_image(
-    item: dict, *, own_tax_id: Optional[str], own_name: Optional[str], seen: dict
+    item: dict,
+    *,
+    own_tax_id: Optional[str],
+    own_name: Optional[str],
+    own_names=None,
+    seen: dict,
 ) -> dict:
     """一张图/PDF:OCR → 归堆 → 购票查重 → 闸报警。异常只连坐这一件。"""
     try:
@@ -116,7 +134,9 @@ def _classify_image(
         upd = {"status": "flagged", "kind": None, "flag_reason": f"ocr_error:{type(exc).__name__}"}
         return {"kind": "unknown", "flagged": True, "update": upd, "money": None}
 
-    kind, bin_reason = sort_step.bin_ocr_fields(fields, own_tax_id=own_tax_id, own_name=own_name)
+    kind, bin_reason = sort_step.bin_ocr_fields(
+        fields, own_tax_id=own_tax_id, own_name=own_name, own_names=own_names
+    )
 
     if kind == "purchase_invoice":
         fp = _purchase_fingerprint(fields)
@@ -228,6 +248,27 @@ def _default_resolve_own_name(ctx: StepContext) -> Optional[str]:
     return _resolve_client_field(ctx, "name")
 
 
+def _default_resolve_own_names(ctx: StepContext) -> list:
+    """名集锚(别名闸开时):法定名 + 该客户 active human_confirmed 别名 → [(name, mode)]。
+
+    经 client_alias_store.resolve_names(单一事实源,含法定名并集)。工单未绑客户 → 空集
+    → bin_ocr_fields 名集为空,退回 ambiguous(与无名兜底同口径)。查询走 ctx.cur 同事务。
+    """
+    wo = ctx.store.get_work_order(ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id)
+    client_id = (wo or {}).get("workspace_client_id")
+    if not client_id:
+        return []
+    return client_alias_store.resolve_names(
+        ctx.cur, tenant_id=ctx.tenant_id, workspace_client_id=client_id
+    )
+
+
+def _default_m1_enabled(ctx: StepContext) -> bool:
+    """别名/名集锚放量闸(pearnly_ai_m1)。工单线只有 tenant_id(work_orders.tenant_id NOT NULL),
+    按 tenant 判定;fail-closed 在 feature_flags 内部(基建抖动绝不误开)。"""
+    return feature_flags.pearnly_ai_m1_enabled_for(ctx.tenant_id, None)
+
+
 def _default_ocr_image(path: str) -> dict:
     """真实现:调生产 OCR 管线(services.ocr.entrypoints.run_pipeline_for_file)。
 
@@ -263,5 +304,7 @@ def _default_read_sales_summary(path: str) -> dict:
 # 注入点:模块级绑定,测试用 classify._xxx = fake 替换,不改调用方代码。
 _resolve_own_tax_id = _default_resolve_own_tax_id
 _resolve_own_name = _default_resolve_own_name
+_resolve_own_names = _default_resolve_own_names
+_m1_enabled = _default_m1_enabled
 _ocr_image = _default_ocr_image
 _read_sales_summary = _default_read_sales_summary

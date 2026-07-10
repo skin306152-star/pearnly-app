@@ -218,6 +218,16 @@ async def pos_owner_login_layout(rest: str):
     return _pos_owner_login()
 
 
+# Earn 超管后台专属登录页(主域路径 /earn · 2026-07-10 Zihao 拍板)。只有账号+密码,
+# 登录后前端打 /api/me 复核 is_super_admin(与 admin.js 鉴权同一事实源),非超管不落 token。
+# admin.js 无登录态/鉴权失败统一甩回本页。内联 HTML 原因同 reset_page。
+@router.get("/earn", response_class=HTMLResponse)
+async def earn_login_page():
+    from routes.earn_login_page import EARN_LOGIN_HTML
+
+    return HTMLResponse(EARN_LOGIN_HTML, headers=_NO_CACHE)
+
+
 @router.get("/reset", response_class=HTMLResponse)
 async def reset_page():
     # 内联 HTML(非 static 文件)· 见 routes/reset_page.py 头注:webhook 不拾取新增 static 根文件

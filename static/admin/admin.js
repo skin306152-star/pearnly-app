@@ -125,24 +125,24 @@
     async function _verifySuperAdmin() {
         const token = localStorage.getItem('mrpilot_token');
         if (!token) {
-            window.location.replace('/login');
+            window.location.replace('/earn');
             return null;
         }
         try {
             const r = await fetch('/api/me', { headers: { Authorization: 'Bearer ' + token } });
             if (!r.ok) {
-                window.location.replace('/login');
+                window.location.replace('/earn');
                 return null;
             }
             const u = await r.json();
             if (!u || !u.is_super_admin) {
-                window.location.replace('/login');
+                window.location.replace('/earn');
                 return null;
             }
             return u;
         } catch (e) {
             console.warn('[admin] auth failed', e);
-            window.location.replace('/login');
+            window.location.replace('/earn');
             return null;
         }
     }
@@ -301,7 +301,7 @@
                 try {
                     localStorage.removeItem('mrpilot_user');
                 } catch (_) {}
-                window.location.href = '/login';
+                window.location.href = '/earn';
             });
         });
     }

@@ -24,9 +24,10 @@ _PW_LETTERS = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz"
 _PW_DIGITS = "23456789"
 _PW_LEN = 12
 
-# 账号用户名策略(前后端同源单一事实源):长度 3-64、无空白/控制符。大小写不敏感 →
-# 存储归一小写(登录侧 POS 页也小写化输入,两头对齐 lower(username) 命中)。放宽字符集
-# (字母/数字/常见符号皆可),只硬禁空白——空白会让口头转交/URL/登录框粘贴出歧义。
+# 账号用户名策略(前后端同源单一事实源):长度 3-64、无空白/控制符。大小写不敏感:
+# 权威在登录查询 find_user_by_username 的 lower() 匹配;这里存储归一小写只是让展示/
+# 转交观感一致,不是命中的前提。放宽字符集(字母/数字/常见符号皆可),只硬禁空白——
+# 空白会让口头转交/URL/登录框粘贴出歧义。
 _USERNAME_MIN = 3
 _USERNAME_MAX = 64
 

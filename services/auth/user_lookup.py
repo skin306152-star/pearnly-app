@@ -35,9 +35,18 @@ _USER_CACHE_TTL = 8.0
 
 
 def find_user_by_username(username: str) -> Optional[Dict[str, Any]]:
+    """按用户名(大小写不敏感)查用户;查不到且含 @ 再按邮箱回退。
+
+    lower() 匹配是大小写归一的权威:三个登录门前端行为不一(/pos 小写化、/ai 与
+    /earn 只 trim),存量用户名带大写的(prod 超管「Earn」无邮箱回退可用)在精确
+    匹配下,任何一门前端加小写化都会把这类账号锁外面。prod 已验 40 用户
+    lower(username) 零撞名。
+    """
     try:
         with db.get_cursor() as cur:
-            cur.execute("SELECT * FROM users WHERE username = %s LIMIT 1", (username,))
+            cur.execute(
+                "SELECT * FROM users WHERE lower(username) = lower(%s) LIMIT 1", (username,)
+            )
             row = cur.fetchone()
             if not row and "@" in username:
                 # 邮箱登录回退:用户名不含 @(注册校验保证),故 @ 必为邮箱 → 零歧义按 email 查

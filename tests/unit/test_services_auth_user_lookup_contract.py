@@ -91,7 +91,8 @@ class UserLookupBehaviorTests(unittest.TestCase):
         self.assertEqual(u["id"], "u1")
         self.assertEqual(u["username"], "alice")
         self.assertEqual(cur.executed[0][1], ("alice",))
-        self.assertIn("FROM users WHERE username", cur.executed[0][0])
+        # 大小写不敏感是登录门契约(prod 超管「Earn」带大写):必须 lower() 两侧匹配
+        self.assertIn("FROM users WHERE lower(username) = lower(%s)", cur.executed[0][0])
 
     def test_find_user_by_id_returns_none_when_no_row(self):
         from services.auth import user_lookup

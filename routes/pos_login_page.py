@@ -4,6 +4,9 @@
 为什么独立一页而非复用主站 login:POS 拆卖客户后台 = pearnly.com/pos,入口只留「账号 + 密码」
 一条路(账号=用户名或邮箱,发放制账号常无邮箱),不给 Google / LINE / 注册 / 忘记密码任何旁路
 (2026-07-10 Zihao 拍板:发放制账号不走自助找回,密码问题找发号人 → Earn 后台「重置密码」重发一次性密码)。
+账号大小写归一的权威在后端 find_user_by_username 的 lower() 匹配;本页 submit 里的
+toLowerCase() 只是锦上添花(与发放侧存储归一小写观感一致),删了也不影响命中——
+别的登录门(/ai /earn)不要照抄前端小写化,后端已兜底。
 
 老收银设备兼容(metta 已装 PWA):/pos 头部先探本机是否存过收银台设备绑定凭据
 (localStorage['pos_store_token'],键名与收银台 SPA 精确一致)。存了 → 立即 location.replace

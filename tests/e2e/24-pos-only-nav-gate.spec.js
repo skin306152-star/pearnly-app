@@ -136,6 +136,13 @@ test.describe('pos_only 精简外壳 · 侧栏门控', () => {
 
         await page.screenshot({ path: path.join(OUT, 'pos_only_sidebar.png'), fullPage: true });
 
+        // 切业态过渡的诚实 403 豁免:pos_only 关掉 knowledge/recon 后,boot 探针
+        // (/api/knowledge/bases、/api/recon/bank-v2/tasks)被服务端 403 拒 = 模块门控
+        // 在工作,浏览器却把 4xx 资源载入记成 console.error(消息不含 URL,无法按端点滤)。
+        // 只放行 403 资源噪声、只在本条过渡场景;其余 console.error/pageerror 照抓。
+        guard.consoleErrors = guard.consoleErrors.filter(
+            (e) => !/Failed to load resource.*403/.test(e)
+        );
         assertNoConsoleErrors(expect, guard);
     });
 });

@@ -3671,12 +3671,11 @@
     }
 
     // 错误统一按 err.detail(后端 HTTPException detail)精确分流,而不是猜 HTTP
-    // status——同一个 422 在 invite 上可能是「建号必须给邮箱」也可能是「自定义密码太弱」,
+    // status——同一个 422/409 各有多种业务因,状态码分不清,
     // 状态码分不清,必须落到 detail 上一一对应。invite/reset 两组 detail 不相交,共用一张表。
     const _AI_ERROR_KEYS = {
         'admin.pearnly_ai_not_invited': 'adm-ai-reset-not-invited',
         'admin.pearnly_ai_subject_unknown': 'adm-ai-reset-subject-unknown',
-        'admin.pearnly_ai_needs_email_to_create': 'adm-ai-invite-needs-email',
         'admin.username_exists': 'adm-ai-invite-username-exists',
     };
 

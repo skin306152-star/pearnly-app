@@ -313,14 +313,34 @@ class InviteCreateAccountTests(unittest.TestCase):
         all_call_text = str(m_log.call_args)
         self.assertNotIn(pwd, all_call_text)
 
-    def test_invite_unknown_non_email_rejected(self):
-        with mock.patch.object(
-            admin_pearnly_ai_routes.db, "find_user_by_username", return_value=None
+    def test_invite_unknown_plain_username_creates_account(self):
+        """自由邀请制(2026-07-10 拍板):任意用户名直接建号,不强制邮箱;
+        非邮箱用户名不写 users.email(不跑 UPDATE 游标)。"""
+        with (
+            mock.patch.object(
+                admin_pearnly_ai_routes.db, "find_user_by_username", return_value=None
+            ),
+            mock.patch.object(
+                admin_pearnly_ai_routes,
+                "create_owner_user",
+                return_value={"ok": True, "user_id": "new-user", "tenant_id": "new-tenant"},
+            ) as m_create,
+            mock.patch.object(
+                admin_pearnly_ai_routes.platform_settings_store, "add_to_allowlist"
+            ) as m_add,
+            mock.patch.object(admin_pearnly_ai_routes.db, "get_cursor") as m_cur,
+            mock.patch.object(admin_pearnly_ai_routes, "_log_op"),
         ):
             r = self.client.post(
                 "/api/admin/pearnly-ai/invite", json={"username_or_email": "plainusername"}
             )
-        self.assertEqual(r.status_code, 422)
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertTrue(body["created_account"])
+        self.assertEqual(body["username"], "plainusername")
+        self.assertEqual(m_create.call_args.kwargs["username"], "plainusername")
+        m_add.assert_called_once_with("pearnly_ai_m1", "new-tenant")
+        m_cur.assert_not_called()  # 非邮箱不落 users.email
 
     def test_invite_username_exists_race_returns_409(self):
         with (

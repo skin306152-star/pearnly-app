@@ -89,7 +89,25 @@ test.describe('pos_only 精简外壳 · 侧栏门控', () => {
         await page
             .waitForFunction(() => typeof window.routeTo === 'function', null, { timeout: 20000 })
             .catch(() => {});
-        await page.waitForTimeout(1500);
+
+        // 两道确定性等待,替代裸 sleep(三打回教训:切换遮罩/apply 未跑完就数菜单=竞态假果):
+        // ① 侧栏注入的必须是带 pos-only-hide 标记的新 bundle——抓「浏览器吃 CDN 旧缓存」
+        //   这类假活(2026-07-10 真机就是栽在这:main.js 变了没 bump ?v,边缘缓存 30 天)。
+        await page.waitForFunction(
+            () => document.querySelectorAll('[data-pos-only-hide]').length > 0,
+            null,
+            { timeout: 15000 }
+        );
+        // ② 集成入口平时常显、在 pos_only 隐藏名单里,且该隐藏是 apply() 的最后一步——
+        //   它藏起来 = module-nav 已按 pos_only 跑完,此刻数菜单才作数。
+        await page.waitForFunction(
+            () => {
+                const el = document.getElementById('nav-integrations');
+                return !!el && getComputedStyle(el).display === 'none';
+            },
+            null,
+            { timeout: 15000 }
+        );
 
         const visible = await visibleNavItems(page);
         expect(

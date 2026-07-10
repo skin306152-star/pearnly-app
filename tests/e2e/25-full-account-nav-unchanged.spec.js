@@ -40,6 +40,15 @@ test.describe('完整版账号 · pos_only 改动零回归', () => {
             '这条对照测试要求账号不是 pos_only(避免和 24 号 spec 的临时状态撞车)'
         ).not.toBe('pos_only');
 
+        // 数菜单前先等 module-nav apply 完(accounting 组默认 display:none,apply 才翻开;
+        // enterApp 只保证 sidebar 在,不保证模块显隐已生效——裸数是竞态)。
+        const acctOn = modules.data.modules.accounting && modules.data.modules.accounting.enabled;
+        if (acctOn) {
+            await expect(page.locator('.nav-item[data-route="acct-review"]')).toBeVisible({
+                timeout: 15000,
+            });
+        }
+
         const visible = await page.evaluate(() =>
             Array.from(document.querySelectorAll('.nav-item'))
                 .filter((el) => getComputedStyle(el).display !== 'none' && el.offsetParent !== null)
@@ -48,9 +57,9 @@ test.describe('完整版账号 · pos_only 改动零回归', () => {
 
         expect(visible.length, 'pos_only 闸不该收窄完整版菜单').toBeGreaterThan(7);
 
-        // accounting 模块若开(该账号默认业态 firm 全开),做账/报税相关菜单应正常显示——
+        // accounting 开(该账号默认业态 firm 全开)时做账/报税菜单应正常显示——
         // 证明 data-pos-only-hide 收口没有误伤非 pos_only 账号。
-        if (modules.data.modules.accounting && modules.data.modules.accounting.enabled) {
+        if (acctOn) {
             expect(visible).toContain('acct-review');
             expect(visible).toContain('tax-center');
         }

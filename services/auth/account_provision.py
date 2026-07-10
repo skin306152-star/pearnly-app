@@ -17,10 +17,18 @@ from __future__ import annotations
 
 import secrets
 
+from services.auth.signup_core import normalize_email
+
 # 初始/重置密码字母表:去掉易混字符(0/O/1/I/l),人念/手输/口头转交友好。
 _PW_LETTERS = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz"
 _PW_DIGITS = "23456789"
 _PW_LEN = 12
+
+# 账号用户名策略(前后端同源单一事实源):长度 3-64、无空白/控制符。大小写不敏感 →
+# 存储归一小写(登录侧 POS 页也小写化输入,两头对齐 lower(username) 命中)。放宽字符集
+# (字母/数字/常见符号皆可),只硬禁空白——空白会让口头转交/URL/登录框粘贴出歧义。
+_USERNAME_MIN = 3
+_USERNAME_MAX = 64
 
 
 def generate_one_time_password() -> str:
@@ -51,6 +59,51 @@ def resolve_password(custom: str | None) -> str:
     return generate_one_time_password()
 
 
+def validate_username(username: str) -> None:
+    """账号用户名策略校验(前后端同源)。不合格抛 ValueError('username_invalid')。"""
+    u = username or ""
+    if not (_USERNAME_MIN <= len(u) <= _USERNAME_MAX):
+        raise ValueError("username_invalid")
+    if any(c.isspace() or ord(c) < 0x20 for c in u):
+        raise ValueError("username_invalid")
+
+
+def resolve_account_identifier(raw: str) -> dict:
+    """把超管输入的账号标识解析成建号/查号所需字段(邮箱和纯用户名两种形态统一入口)。
+
+    含 @ → 邮箱形态:校验基本格式 + normalize_email 归一(与注册同口径),username 列存全邮箱。
+    否则 → 用户名形态:validate_username + 归一小写(大小写不敏感),email/email_norm 留空。
+    返回 {is_email, username, email, email_norm, lookup_key};lookup_key 供 find_login_user
+    的 lower(...) 三路命中(邮箱用 email_norm,用户名用小写 username)。
+    非法 → ValueError('email_invalid' | 'username_invalid' | 'account_missing')。
+    """
+    ident = (raw or "").strip()
+    if not ident:
+        raise ValueError("account_missing")
+    if "@" in ident:
+        email_clean = ident.lower()
+        local, _, domain = email_clean.partition("@")
+        if not local or "@" in domain or not domain or "." not in domain:
+            raise ValueError("email_invalid")
+        email_norm = normalize_email(email_clean)
+        return {
+            "is_email": True,
+            "username": email_clean,
+            "email": email_clean,
+            "email_norm": email_norm,
+            "lookup_key": email_norm,
+        }
+    username = ident.lower()
+    validate_username(username)
+    return {
+        "is_email": False,
+        "username": username,
+        "email": None,
+        "email_norm": None,
+        "lookup_key": username,
+    }
+
+
 def find_login_user(cur, email_norm: str):
     """按归一化邮箱找已存在账号(邮箱 / 归一化邮箱 / 用户名三路,与注册防薅同口径)。
 
@@ -66,17 +119,21 @@ def find_login_user(cur, email_norm: str):
     return cur.fetchone()
 
 
-def create_owner_login_user(cur, *, email: str, email_norm: str, password_hash: str) -> str:
+def create_owner_login_user(
+    cur, *, username: str, email: str | None = None, email_norm: str | None = None, password_hash: str
+) -> str:
     """建一个 owner 登录账号(is_active · plan=credits · 初始密码哈希已入库)。返回 user_id。
 
     只写 users 表铁定存在的核心列(注册路径同款):username/email/email_normalized/
     password_hash/role/plan/is_active;tenant_id 留空,由调用方随后补建租户回填。
+    纯用户名账号 email/email_norm 传 None(邮箱非必填 · 登录按 username 走),邮箱账号
+    则 username 存全邮箱、email/email_norm 一并落库(与注册同口径)。
     """
     cur.execute(
         "INSERT INTO users (username, email, email_normalized, password_hash, "
         "role, plan, is_active, created_at) "
         "VALUES (%s, %s, %s, %s, 'owner', 'credits', TRUE, NOW()) RETURNING id::text AS id",
-        (email, email, email_norm, password_hash),
+        (username, email, email_norm, password_hash),
     )
     row = cur.fetchone()
     return row["id"] if isinstance(row, dict) else row[0]

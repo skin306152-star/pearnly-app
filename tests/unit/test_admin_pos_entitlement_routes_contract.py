@@ -88,7 +88,7 @@ class GuardEnforcedTests(unittest.TestCase):
         with self._as_non_super():
             r = self.client.post(
                 "/api/admin/pos-entitlement/provision",
-                json={"email": "shop@example.com"},
+                json={"account": "shop@example.com"},
             )
         self.assertEqual(r.status_code, 403)
 
@@ -96,7 +96,7 @@ class GuardEnforcedTests(unittest.TestCase):
         with self._as_non_super():
             r = self.client.post(
                 "/api/admin/pos-entitlement/reset-password",
-                json={"email": "shop@example.com"},
+                json={"account": "shop@example.com"},
             )
         self.assertEqual(r.status_code, 403)
 

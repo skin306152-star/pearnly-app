@@ -3292,9 +3292,9 @@
                 '<button class="btn btn-sm" id="adm-pos-xfer-btn">' +
                 _esc(_t('adm-pos-xfer-btn')) +
                 '</button></div>' +
-                // 重置密码(仅发放制账号 · 范围外后端一律 404):邮箱 + 可选自定义密码。
+                // 重置密码(仅发放制账号 · 范围外后端一律 404):账号(用户名或邮箱)+ 可选自定义密码。
                 '<div class="adm-set-add" style="flex-wrap:wrap;gap:8px;margin-top:8px">' +
-                '<input type="email" id="adm-pos-reset-email" ' +
+                '<input type="text" id="adm-pos-reset-acct" ' +
                 'data-i18n-placeholder="adm-pos-reset-ph" placeholder="' +
                 _esc(_t('adm-pos-reset-ph')) +
                 '" style="min-width:220px" />' +
@@ -3398,26 +3398,26 @@
             };
         const reset = document.getElementById('adm-pos-reset-btn');
         if (reset) {
-            // 查询若本身是邮箱,预填省一次输入(重置只按邮箱定位账号)。
-            const emailInput = document.getElementById('adm-pos-reset-email');
-            if (emailInput && !emailInput.value && _posLastQuery.indexOf('@') >= 0)
-                emailInput.value = _posLastQuery;
+            // 查询本身若是有效账号(用户名或邮箱),预填省一次输入。
+            const acctInput = document.getElementById('adm-pos-reset-acct');
+            if (acctInput && !acctInput.value && _isValidPosAccount(_posLastQuery))
+                acctInput.value = _posLastQuery;
             reset.onclick = _posResetPassword;
         }
     }
 
     // 重置密码(仅发放制账号):可选自定义密码,回显一次;范围外后端一律 404。
     async function _posResetPassword() {
-        const email = ((document.getElementById('adm-pos-reset-email') || {}).value || '')
+        const account = ((document.getElementById('adm-pos-reset-acct') || {}).value || '')
             .trim()
             .toLowerCase();
         const customPw = ((document.getElementById('adm-pos-reset-pw') || {}).value || '').trim();
         const host = document.getElementById('adm-pos-reset-result');
-        if (!email || email.indexOf('@') < 0) {
+        if (!_isValidPosAccount(account)) {
             _toast(_t('adm-pos-reset-need'), 'error');
             return;
         }
-        const ok = await _admConfirm(_t('adm-pos-reset-confirm').replace('{email}', email), {
+        const ok = await _admConfirm(_t('adm-pos-reset-confirm').replace('{account}', account), {
             title: _t('adm-pos-reset-btn'),
             okText: _t('adm-pos-reset-btn'),
             danger: true,
@@ -3426,10 +3426,10 @@
         try {
             const r = await _adminFetch('/api/admin/pos-entitlement/reset-password', {
                 method: 'POST',
-                body: { email: email, password: customPw || null },
+                body: { account: account, password: customPw || null },
             });
             _toast(_t('adm-pos-reset-done'), 'success');
-            if (host) host.innerHTML = _posPwOnceHtml(email, r.new_password, 'adm-pos-reset-copy');
+            if (host) host.innerHTML = _posPwOnceHtml(account, r.new_password, 'adm-pos-reset-copy');
         } catch (e) {
             const msg =
                 String(e && e.message).indexOf('422') >= 0
@@ -3440,8 +3440,8 @@
     }
 
     // 一次性密码回显块(发放/重置共用):明文 + 复制按钮,提示只显示这一次。
-    // headExtraHtml 可选:标题行邮箱后追加的已转义 HTML(发放流带授权码用)。
-    function _posPwOnceHtml(email, pw, copyBtnId, headExtraHtml) {
+    // headExtraHtml 可选:标题行账号后追加的已转义 HTML(发放流带授权码用)。
+    function _posPwOnceHtml(account, pw, copyBtnId, headExtraHtml) {
         setTimeout(function () {
             const cp = document.getElementById(copyBtnId);
             if (cp && pw)
@@ -3457,7 +3457,7 @@
         return (
             '<div class="cost-section" style="border:1px solid var(--success);padding:14px 16px">' +
             '<div style="font-weight:600;margin-bottom:8px">' +
-            _esc(email) +
+            _esc(account) +
             (headExtraHtml || '') +
             '</div>' +
             '<div class="cost-section-hint" style="margin-bottom:6px">' +
@@ -3475,18 +3475,25 @@
         );
     }
 
-    // 发放账号:输邮箱 → 建号+建租户+grant 一条龙(新账号一次性回显初始密码)。
+    // 账号标识校验(前后端同源规则):含 @ 走邮箱格式;否则用户名 3-64 位、无空格。
+    function _isValidPosAccount(v) {
+        v = (v || '').trim();
+        if (v.indexOf('@') >= 0) return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+        return v.length >= 3 && v.length <= 64 && !/\s/.test(v);
+    }
+
+    // 发放账号:输账号(用户名或邮箱)→ 建号+建租户+grant 一条龙(新账号一次性回显初始密码)。
     async function _posProvision() {
-        const email = ((document.getElementById('adm-pos-prov-email') || {}).value || '')
+        const account = ((document.getElementById('adm-pos-prov-acct') || {}).value || '')
             .trim()
             .toLowerCase();
         const name = ((document.getElementById('adm-pos-prov-name') || {}).value || '').trim();
         const host = document.getElementById('adm-pos-prov-result');
-        if (!email || email.indexOf('@') < 0) {
-            _toast(_t('adm-pos-prov-bad-email'), 'error');
+        if (!_isValidPosAccount(account)) {
+            _toast(_t('adm-pos-prov-bad-acct'), 'error');
             return;
         }
-        const ok = await _admConfirm(_t('adm-pos-prov-confirm').replace('{email}', email), {
+        const ok = await _admConfirm(_t('adm-pos-prov-confirm').replace('{account}', account), {
             title: _t('adm-pos-prov-title'),
             okText: _t('adm-pos-prov-go'),
         });
@@ -3495,14 +3502,14 @@
         try {
             const r = await _adminFetch('/api/admin/pos-entitlement/provision', {
                 method: 'POST',
-                body: { email: email, tenant_name: name || null, password: customPw || null },
+                body: { account: account, tenant_name: name || null, password: customPw || null },
             });
             _toast(_t('adm-pos-granted') + ' ' + (r.grant_code || ''), 'success');
-            if (host) host.innerHTML = _posProvResultHtml(email, r);
-            // 顺手把查租户输入填成该邮箱,方便复核开通结果。
+            if (host) host.innerHTML = _posProvResultHtml(account, r);
+            // 顺手把查租户输入填成该账号,方便复核开通结果。
             const q = document.getElementById('adm-pos-q');
-            if (q) q.value = email;
-            _posLoadStatus(email);
+            if (q) q.value = account;
+            _posLoadStatus(account);
         } catch (e) {
             const msg =
                 String(e && e.message).indexOf('422') >= 0
@@ -3512,17 +3519,17 @@
         }
     }
 
-    function _posProvResultHtml(email, r) {
+    function _posProvResultHtml(account, r) {
         // 新账号:一次性回显最终生效的初始密码(自定义的也回显 · 转交客户后不可再得)。
         const codeHtml =
             ' · ' + _esc(_t('adm-pos-code')) + ' <code>' + _esc(r.grant_code || '') + '</code>';
         if (!r.existed && r.initial_password) {
-            return _posPwOnceHtml(email, r.initial_password, 'adm-pos-prov-copy', codeHtml);
+            return _posPwOnceHtml(account, r.initial_password, 'adm-pos-prov-copy', codeHtml);
         }
         return (
             '<div class="cost-section" style="border:1px solid var(--success);padding:14px 16px">' +
             '<div style="font-weight:600;margin-bottom:8px">' +
-            _esc(email) +
+            _esc(account) +
             codeHtml +
             '</div>' +
             '<div class="cost-section-hint">' +

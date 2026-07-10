@@ -27,7 +27,11 @@ _DEFAULT_AMOUNT_THB = 1000
 
 
 def _resolve_tenant(cur, q: str) -> Optional[dict]:
-    """按标识解析租户:tenant_id(uuid)优先,其次成员邮箱,再次租户名模糊。返回 {id,name,created_at}。"""
+    """按标识解析租户:tenant_id(uuid)优先,其次成员邮箱/用户名精确,再次租户名模糊。
+
+    用户名精确匹配放在租户名模糊之前:发放纯用户名账号后前端会用该用户名回查现状,
+    模糊命名会误命中他人租户,故先走成员用户名精确定位。返回 {id,name,created_at}。
+    """
     q = (q or "").strip()
     if not q:
         return None
@@ -39,6 +43,15 @@ def _resolve_tenant(cur, q: str) -> Optional[dict]:
         cur.execute(
             "SELECT t.id::text AS id, t.name, t.created_at FROM tenants t "
             "JOIN users u ON u.tenant_id = t.id WHERE lower(u.email) = lower(%s) LIMIT 1",
+            (q,),
+        )
+        row = cur.fetchone()
+        if row:
+            return dict(row)
+    else:
+        cur.execute(
+            "SELECT t.id::text AS id, t.name, t.created_at FROM tenants t "
+            "JOIN users u ON u.tenant_id = t.id WHERE lower(u.username) = lower(%s) LIMIT 1",
             (q,),
         )
         row = cur.fetchone()
@@ -106,7 +119,8 @@ class TransferBody(BaseModel):
 
 
 class ProvisionBody(BaseModel):
-    email: str = Field(..., min_length=3, max_length=200)
+    # 账号标识:任意用户名或邮箱(格式校验在服务层 resolve_account_identifier · 单一事实源)。
+    account: str = Field(..., min_length=1, max_length=200)
     tenant_name: Optional[str] = Field(None, max_length=100)
     amount_paid_thb: Optional[float] = Field(None, ge=0)
     # 可选自定义初始密码(留空自动生成强随机)· 策略校验在服务层(与重置流同源)
@@ -114,7 +128,8 @@ class ProvisionBody(BaseModel):
 
 
 class ResetPasswordBody(BaseModel):
-    email: str = Field(..., min_length=3, max_length=200)
+    # 账号标识:用户名或邮箱(与发放同口径)。
+    account: str = Field(..., min_length=1, max_length=200)
     # 可选自定义新密码(留空自动生成强随机)
     password: Optional[str] = Field(None, max_length=128)
 
@@ -159,9 +174,9 @@ async def grant_pos_entitlement(request: Request, body: GrantBody):
 
 @router.post("/api/admin/pos-entitlement/provision")
 async def provision_pos_account(request: Request, body: ProvisionBody):
-    """发放账号一条龙:输客户邮箱 → 无账号则建号(回显一次性初始密码)+ 建租户 + grant。
+    """发放账号一条龙:输客户账号(用户名或邮箱)→ 无账号则建号(回显一次性初始密码)+ 建租户 + grant。
 
-    邮箱已存在 → 走既有租户开通路(不建号、不回显密码)。审计只记邮箱/租户/授权码,
+    账号已存在 → 走既有租户开通路(不建号、不回显密码)。审计只记账号/租户/授权码,
     绝不落初始密码(铁律 #26:密码不进日志)。业务逻辑在 services/pos/provision。
     """
     user = _require_super_admin(request)
@@ -170,7 +185,7 @@ async def provision_pos_account(request: Request, body: ProvisionBody):
         try:
             res = pos_provision.provision_pos_account(
                 cur,
-                email=body.email,
+                account=body.account,
                 tenant_name=(body.tenant_name or None),
                 granted_by=str(user["id"]),
                 amount_paid_thb=amount,
@@ -181,21 +196,26 @@ async def provision_pos_account(request: Request, body: ProvisionBody):
             if code in ("password_too_short", "password_too_weak"):
                 status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
                 detail = f"account.{code}"
-            elif code in ("email_invalid", "tenant_provision_failed"):
+            elif code in (
+                "email_invalid",
+                "username_invalid",
+                "account_missing",
+                "tenant_provision_failed",
+            ):
                 status_code = status.HTTP_400_BAD_REQUEST
                 detail = f"pos.provision_{code}"
             else:
                 status_code = status.HTTP_409_CONFLICT
                 detail = f"pos.provision_{code}"
             raise HTTPException(status_code, detail=detail) from e
-    # 审计:带 existed/邮箱/租户/授权码 —— 刻意不带 initial_password(不落日志)。
+    # 审计:带 existed/账号/租户/授权码 —— 刻意不带 initial_password(不落日志)。
     _log_op(
         request,
         user,
         action="pos_entitlement.provision",
         target_type="tenant",
         target_id=res["tenant_id"],
-        target_name=body.email,
+        target_name=body.account,
         details=f"existed={res['existed']} code={res['grant_code']}",
     )
     return {
@@ -221,7 +241,7 @@ async def reset_pos_account_password(request: Request, body: ResetPasswordBody):
     with db.get_cursor(commit=True) as cur:
         try:
             res = pos_provision.reset_pos_account_password(
-                cur, email=body.email, password=body.password
+                cur, account=body.account, password=body.password
             )
         except ValueError as e:
             code = str(e)
@@ -237,9 +257,9 @@ async def reset_pos_account_password(request: Request, body: ResetPasswordBody):
         action="pos_entitlement.reset_password",
         target_type="user",
         target_id=res["user_id"],
-        target_name=body.email,
+        target_name=body.account,
     )
-    return {"ok": True, "email": res["email"], "new_password": res["new_password"]}
+    return {"ok": True, "account": res["account"], "new_password": res["new_password"]}
 
 
 @router.post("/api/admin/pos-entitlement/revoke")

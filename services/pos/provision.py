@@ -22,13 +22,13 @@ from services.auth.account_provision import (
     create_owner_login_user,
     find_login_user,
     generate_one_time_password as _gen_initial_password,  # noqa: F401 · 单测经本名引用
+    resolve_account_identifier,
     resolve_password,
     write_login_password,
 )
 from services.auth.signup_core import (
     _ensure_tenant_for_new_user,
     _hash_password,
-    normalize_email,
 )
 from services.pos import entitlements as ent
 
@@ -40,7 +40,7 @@ _DEFAULT_AMOUNT_THB = 1000
 def provision_pos_account(
     cur,
     *,
-    email: str,
+    account: str,
     tenant_name: str | None = None,
     granted_by: str | None = None,
     amount_paid_thb=None,
@@ -48,19 +48,18 @@ def provision_pos_account(
 ) -> dict:
     """发放 POS 账号一条龙。调用方负责 commit(建号/建租户/grant 同一事务)。
 
-    password 可选:传了(过策略校验)就作初始密码,留空自动生成强随机;账号已存在时不改密
-    (existed 路不碰凭据,要改走重置密码流)。返回 {existed, user_id, tenant_id, grant_code,
-    initial_password};initial_password 仅【新建账号】非 None(一次性回显,自定义的也回显)。
-    邮箱非法 → ValueError('email_invalid');密码不合格 → ValueError('password_too_*');
-    建租户失败 → ValueError(由路由翻错误码)。
+    account 支持任意用户名或邮箱(resolve_account_identifier 归一);用户名大小写不敏感、
+    存储归一小写,登录按 username 走(邮箱非必填)。password 可选:传了(过策略校验)就作
+    初始密码,留空自动生成强随机;账号已存在时不改密(existed 路不碰凭据,要改走重置密码流)。
+    返回 {existed, user_id, tenant_id, grant_code, initial_password, username};
+    initial_password 仅【新建账号】非 None(一次性回显,自定义的也回显)。
+    账号标识非法 → ValueError('email_invalid' | 'username_invalid' | 'account_missing');
+    密码不合格 → ValueError('password_too_*');建租户失败 → ValueError(由路由翻错误码)。
     """
-    email_clean = (email or "").strip().lower()
-    if not email_clean or "@" not in email_clean or "." not in email_clean.split("@", 1)[1]:
-        raise ValueError("email_invalid")
-    email_norm = normalize_email(email_clean)
+    ident = resolve_account_identifier(account)
     amount = _DEFAULT_AMOUNT_THB if amount_paid_thb is None else amount_paid_thb
 
-    existing = find_login_user(cur, email_norm)
+    existing = find_login_user(cur, ident["lookup_key"])
     if existing:
         tid = existing.get("tenant_id")
         if not tid:
@@ -81,17 +80,19 @@ def provision_pos_account(
             "tenant_id": str(tid),
             "grant_code": row["grant_code"],
             "initial_password": None,
+            "username": existing.get("username"),
         }
 
     initial_password = resolve_password(password)
     user_id = create_owner_login_user(
         cur,
-        email=email_clean,
-        email_norm=email_norm,
+        username=ident["username"],
+        email=ident["email"],
+        email_norm=ident["email_norm"],
         password_hash=_hash_password(initial_password),
     )
     tid = _ensure_tenant_for_new_user(
-        cur, user_id, "credits", company_name=tenant_name, username=email_clean
+        cur, user_id, "credits", company_name=tenant_name, username=ident["username"]
     )
     if not tid:
         raise ValueError("tenant_provision_failed")
@@ -102,25 +103,29 @@ def provision_pos_account(
         "tenant_id": str(tid),
         "grant_code": row["grant_code"],
         "initial_password": initial_password,
+        "username": ident["username"],
     }
 
 
-def reset_pos_account_password(cur, *, email: str, password: str | None = None) -> dict:
+def reset_pos_account_password(cur, *, account: str, password: str | None = None) -> dict:
     """发放制账号重置密码(超管 · Earn 后台)。调用方负责 commit。
 
-    范围严格限定(2026-07-10 安全纠正 · 照 TaxOps Z1-c 先例):账号所属租户必须持
-    pos_entitlement(任意 status)且账号是该租户成员(users.tenant_id 归属);超管账号、
-    无租户账号、租户无授权(=主站自由注册用户,有自助忘记密码通道)、邮箱不存在——一律
+    account 支持任意用户名或邮箱(与发放同一 resolve_account_identifier 口径)。范围严格
+    限定(2026-07-10 安全纠正 · 照 TaxOps Z1-c 先例):账号所属租户必须持 pos_entitlement
+    (任意 status)且账号是该租户成员(users.tenant_id 归属);超管账号、无租户账号、租户无
+    授权(=主站自由注册用户,有自助忘记密码通道)、账号不存在、标识非法——一律
     ValueError('not_in_scope'),路由统一翻 404 不区分缘由(防枚举)。历史上通用超管改密
     端点因账户接管风险被砍 410(勘察修复台账 #1),此处绝不复活通用口。
 
     password 可选:传了(过策略校验)就用它,留空自动生成强随机。返回
-    {user_id, email, new_password};明文只出现在返回值里,绝不写日志(调用方审计也不得带)。
+    {user_id, account, new_password};明文只出现在返回值里,绝不写日志(调用方审计也不得带)。
     """
-    email_clean = (email or "").strip().lower()
-    if not email_clean or "@" not in email_clean:
-        raise ValueError("not_in_scope")
-    user = find_login_user(cur, normalize_email(email_clean))
+    try:
+        ident = resolve_account_identifier(account)
+    except ValueError:
+        # 标识非法(空/超长/带空格)与「查无此账号」同归 not_in_scope,不泄露差异(防枚举)。
+        raise ValueError("not_in_scope") from None
+    user = find_login_user(cur, ident["lookup_key"])
     if not user or user.get("is_super_admin") or not user.get("tenant_id"):
         raise ValueError("not_in_scope")
     if not ent.get_for_tenant(cur, tenant_id=user["tenant_id"], active_only=False):
@@ -128,4 +133,4 @@ def reset_pos_account_password(cur, *, email: str, password: str | None = None) 
 
     new_password = resolve_password(password)
     write_login_password(cur, user_id=user["id"], password_hash=_hash_password(new_password))
-    return {"user_id": user["id"], "email": email_clean, "new_password": new_password}
+    return {"user_id": user["id"], "account": ident["username"], "new_password": new_password}

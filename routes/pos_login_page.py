@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """POS 老板后台专属登录页(主域路径 /pos)· 内联 HTML 常量(PS-5)。
 
-为什么独立一页而非复用主站 login:POS 拆卖客户后台 = pearnly.com/pos,入口只留「邮箱 + 密码」
-一条路,不给 Google / LINE / 注册 / 忘记密码任何旁路(2026-07-10 Zihao 拍板:发放制账号不走
-自助找回,密码问题找发号人 → Earn 后台「重置密码」重发一次性密码)。
+为什么独立一页而非复用主站 login:POS 拆卖客户后台 = pearnly.com/pos,入口只留「账号 + 密码」
+一条路(账号=用户名或邮箱,发放制账号常无邮箱),不给 Google / LINE / 注册 / 忘记密码任何旁路
+(2026-07-10 Zihao 拍板:发放制账号不走自助找回,密码问题找发号人 → Earn 后台「重置密码」重发一次性密码)。
 
 老收银设备兼容(metta 已装 PWA):/pos 头部先探本机是否存过收银台设备绑定凭据
 (localStorage['pos_store_token'],键名与收银台 SPA 精确一致)。存了 → 立即 location.replace
@@ -73,7 +73,7 @@ button.submit:disabled{opacity:.6;cursor:default}
 <form id="p-form">
 <label id="p-label-email" for="p-email"></label>
 <div class="field">
-<input id="p-email" type="email" autocomplete="username" inputmode="email" />
+<input id="p-email" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" />
 </div>
 <label id="p-label-pw" for="p-pw"></label>
 <div class="field">
@@ -91,16 +91,16 @@ button.submit:disabled{opacity:.6;cursor:default}
 (function(){
 'use strict';
 var I18N={
-zh:{tag:'POS 老板后台',title:'登录',sub:'用你的账号邮箱和密码登录 POS 后台。',email:'邮箱',pw:'密码',submit:'登录',submitting:'登录中…',empty:'请输入邮箱和密码',wrong:'邮箱或密码不正确',locked:'尝试次数过多 · 请 30 分钟后再试',neterr:'网络异常 · 请稍后重试'},
-th:{tag:'ระบบหลังร้าน POS',title:'เข้าสู่ระบบ',sub:'เข้าสู่ระบบหลังร้าน POS ด้วยอีเมลและรหัสผ่านของคุณ',email:'อีเมล',pw:'รหัสผ่าน',submit:'เข้าสู่ระบบ',submitting:'กำลังเข้าสู่ระบบ…',empty:'กรุณากรอกอีเมลและรหัสผ่าน',wrong:'อีเมลหรือรหัสผ่านไม่ถูกต้อง',locked:'พยายามหลายครั้งเกินไป · ลองใหม่ใน 30 นาที',neterr:'เครือข่ายมีปัญหา · ลองใหม่อีกครั้ง'},
-en:{tag:'POS Back Office',title:'Sign in',sub:'Sign in to the POS back office with your account email and password.',email:'Email',pw:'Password',submit:'Sign in',submitting:'Signing in…',empty:'Please enter email and password',wrong:'Incorrect email or password',locked:'Too many attempts · try again in 30 minutes',neterr:'Network error · please try again'},
-ja:{tag:'POS 管理画面',title:'ログイン',sub:'アカウントのメールとパスワードで POS 管理画面にログイン。',email:'メール',pw:'パスワード',submit:'ログイン',submitting:'ログイン中…',empty:'メールとパスワードを入力してください',wrong:'メールまたはパスワードが正しくありません',locked:'試行回数が多すぎます · 30 分後に再試行',neterr:'ネットワークエラー · もう一度お試しください'}};
+zh:{tag:'POS 老板后台',title:'登录',sub:'用你的账号和密码登录 POS 后台。',email:'账号',pw:'密码',submit:'登录',submitting:'登录中…',empty:'请输入账号和密码',wrong:'账号或密码不正确',locked:'尝试次数过多 · 请 30 分钟后再试',neterr:'网络异常 · 请稍后重试'},
+th:{tag:'ระบบหลังร้าน POS',title:'เข้าสู่ระบบ',sub:'เข้าสู่ระบบหลังร้าน POS ด้วยบัญชีและรหัสผ่านของคุณ',email:'บัญชี',pw:'รหัสผ่าน',submit:'เข้าสู่ระบบ',submitting:'กำลังเข้าสู่ระบบ…',empty:'กรุณากรอกบัญชีและรหัสผ่าน',wrong:'บัญชีหรือรหัสผ่านไม่ถูกต้อง',locked:'พยายามหลายครั้งเกินไป · ลองใหม่ใน 30 นาที',neterr:'เครือข่ายมีปัญหา · ลองใหม่อีกครั้ง'},
+en:{tag:'POS Back Office',title:'Sign in',sub:'Sign in to the POS back office with your account and password.',email:'Account',pw:'Password',submit:'Sign in',submitting:'Signing in…',empty:'Please enter account and password',wrong:'Incorrect account or password',locked:'Too many attempts · try again in 30 minutes',neterr:'Network error · please try again'},
+ja:{tag:'POS 管理画面',title:'ログイン',sub:'アカウントとパスワードで POS 管理画面にログイン。',email:'アカウント',pw:'パスワード',submit:'ログイン',submitting:'ログイン中…',empty:'アカウントとパスワードを入力してください',wrong:'アカウントまたはパスワードが正しくありません',locked:'試行回数が多すぎます · 30 分後に再試行',neterr:'ネットワークエラー · もう一度お試しください'}};
 function pick(){var s='';try{s=localStorage.getItem('mrpilot_lang')||''}catch(e){}var n=(navigator.language||'').slice(0,2);var c=s||n;return I18N[c]?c:'zh'}
 var lang=pick(),dict=I18N[lang]||I18N.zh;
 function $(id){return document.getElementById(id)}
 function applyLang(){document.documentElement.lang=lang;$('p-tag').textContent=dict.tag;$('p-title').textContent=dict.title;$('p-sub').textContent=dict.sub;$('p-label-email').textContent=dict.email;$('p-label-pw').textContent=dict.pw;$('p-submit').textContent=dict.submit;document.querySelectorAll('#p-langbar button').forEach(function(b){b.classList.toggle('active',b.dataset.lang===lang)})}
 function setMsg(t,k){var e=$('p-msg');e.textContent=t||'';e.className='msg'+(k?' '+k:'')}
-async function submit(e){e.preventDefault();var email=($('p-email').value||'').trim().toLowerCase(),pw=$('p-pw').value;if(!email||!pw)return setMsg(dict.empty,'error');var b=$('p-submit');b.disabled=true;b.textContent=dict.submitting;setMsg('','');try{var r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:email,password:pw,remember:true})});var data=await r.json().catch(function(){return{}});if(r.ok&&data.access_token){try{localStorage.setItem('mrpilot_token',data.access_token);localStorage.setItem('mrpilot_lang',lang)}catch(e2){}window.location.href=data.is_super_admin?'/admin/cost':'/home';return}setMsg(data.detail==='account_locked'?dict.locked:dict.wrong,'error')}catch(err){setMsg(dict.neterr,'error')}finally{b.disabled=false;b.textContent=dict.submit}}
+async function submit(e){e.preventDefault();var acct=($('p-email').value||'').trim().toLowerCase(),pw=$('p-pw').value;if(!acct||!pw)return setMsg(dict.empty,'error');var b=$('p-submit');b.disabled=true;b.textContent=dict.submitting;setMsg('','');try{var r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:acct,password:pw,remember:true})});var data=await r.json().catch(function(){return{}});if(r.ok&&data.access_token){try{localStorage.setItem('mrpilot_token',data.access_token);localStorage.setItem('mrpilot_lang',lang)}catch(e2){}window.location.href=data.is_super_admin?'/admin/cost':'/home';return}setMsg(data.detail==='account_locked'?dict.locked:dict.wrong,'error')}catch(err){setMsg(dict.neterr,'error')}finally{b.disabled=false;b.textContent=dict.submit}}
 function bind(){document.querySelectorAll('.eye').forEach(function(eye){eye.addEventListener('click',function(){var i=$(eye.dataset.target);if(i)i.type=i.type==='password'?'text':'password'})});$('p-form').addEventListener('submit',submit);$('p-langbar').addEventListener('click',function(e){var b=e.target.closest('button[data-lang]');if(!b)return;lang=b.dataset.lang;dict=I18N[lang]||I18N.zh;try{localStorage.setItem('mrpilot_lang',lang)}catch(e2){}applyLang();setMsg('','')})}
 applyLang();bind();
 })();

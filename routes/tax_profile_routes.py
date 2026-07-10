@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field
 
 from core import db
 from core.route_helpers import assert_owns_workspace, authorize_pearnly_ai
-from services.authz.deps import check_workspace_scope
+from services.authz.deps import check_workspace_scope, get_authz
 from services.workorder import obligation_engine
 from services.workorder.obligation_engine import PERIOD_RE
 from services.workspace import client_alias_store, tax_profile_store
@@ -36,8 +36,24 @@ router = APIRouter()
 # 画像/义务是账套主体资料的一部分,与「管理账套主体」同权(照 workorder_routes 先例)。
 _PERM = "settings.workspace.manage"
 
+# 矩阵(C4)是工单/义务的聚合只读视图,不是画像资料本身——读侧权限走 C3 的
+# tax.filing.view 细码(与 workorder_routes._C_VIEW 同码同权),不用 _PERM。
+_MATRIX_PERM = "tax.filing.view"
+
 # 别名/画像两类校验错都映射同一个 422(区分靠 detail 机器码,不靠状态码)。
 _VALIDATION_ERR_STATUS = 422
+
+# 矩阵格子徽章(C4 · UI-Canon-v4 §1 四色族:good=顺畅/完结,warn=缺料/催,
+# crit=等人判/卡点,sage=AI 在做)。stuck 与 review 两个引擎态合并成同一个「待审」
+# 徽章——矩阵一次 JOIN 喂全租户全客户,不能像工单详情那样逐单读 events 分辨 stuck
+# 是缺料还是等人判(那是 N+1),两态对矩阵使用者都是"要人看"这一层意思,故不细分。
+_BADGE_NO_NEED = "no_need"
+_BADGE_PENDING_ORDER = "pending_order"
+_BADGE_MISSING_MATERIALS = "missing_materials"
+_BADGE_IN_PROGRESS = "in_progress"
+_BADGE_PENDING_REVIEW = "pending_review"
+_BADGE_FROZEN = "frozen"
+_BADGE_NOT_EVALUATED = "not_evaluated"
 
 
 class TaxProfileUpdate(BaseModel):
@@ -235,3 +251,109 @@ async def list_client_obligations(
             if row.get(key) is not None:
                 row[key] = row[key].isoformat()
     return {"period": resolved_period, "obligations": rows}
+
+
+def _matrix_badge(obligation_status: Optional[str], order_status: Optional[str]) -> str:
+    """(obligation_status, order_status) → 矩阵格子徽章(纯函数,零 I/O,见常量顶注)。"""
+    if obligation_status is None:
+        return _BADGE_NOT_EVALUATED  # 该期从未物化过义务(未存过画像/未开过单)
+    if obligation_status == "nil":
+        return _BADGE_NO_NEED
+    if order_status is None:
+        return _BADGE_PENDING_ORDER
+    if order_status == "collecting":
+        return _BADGE_MISSING_MATERIALS
+    if order_status == "running":
+        return _BADGE_IN_PROGRESS
+    if order_status in ("stuck", "review"):
+        return _BADGE_PENDING_REVIEW
+    if order_status in ("archived", "signed"):
+        return _BADGE_FROZEN
+    return _BADGE_NOT_EVALUATED  # 未知未来态:诚实降级,不冒充已知徽章
+
+
+@router.get("/api/tax-profile/matrix")
+async def get_tax_profile_matrix(request: Request, period: Optional[str] = None):
+    """事务所矩阵(C4):客户行 × 当期义务列,一次 JOIN 喂全矩阵,严禁循环查询。
+
+    列集合 = 该租户该期实际物化过的 obligation_code(client_period_obligations 里
+    没有行的客户/期不会凭空长出列——诚实反映"先保存一次画像或开一次单才有义务"的
+    既有语义,见 obligation_engine 顶注);没有任何物化记录的客户仍出现在矩阵里,
+    各格子标「未评估」而非编造一个已知徽章。
+    """
+    user, tenant_id = authorize_pearnly_ai(request, _MATRIX_PERM, not_found="workorder.not_found")
+    resolved_period = period or obligation_engine.current_be_period()
+    if not PERIOD_RE.match(resolved_period):
+        raise HTTPException(422, detail="obligation.invalid_period")
+
+    with db.get_cursor() as cur:
+        cur.execute(
+            """
+            SELECT wc.id AS client_id, wc.name AS client_name,
+                   o.obligation_code, o.status AS obligation_status,
+                   o.due_paper, o.due_efiling, o.work_order_id,
+                   wo.status AS order_status, d.display_names
+            FROM workspace_clients wc
+            LEFT JOIN client_period_obligations o
+                ON o.tenant_id = wc.tenant_id
+               AND o.workspace_client_id = wc.id
+               AND o.period = %s
+            LEFT JOIN work_orders wo ON wo.id = o.work_order_id
+            LEFT JOIN tax_obligation_defs d ON d.obligation_code = o.obligation_code
+            WHERE wc.tenant_id = %s AND wc.is_active = TRUE
+            ORDER BY wc.name, o.obligation_code
+            """,
+            (resolved_period, tenant_id),
+        )
+        rows = [dict(r) for r in cur.fetchall()]
+
+    # 作用域收窄(照 workspace_routes.list_workspace_clients 先例):被分派成员只看
+    # 分配给自己的账套主体;超管/scope_mode='all' 零开销直接放行。
+    authz = get_authz(request, user)
+    if not user.get("is_super_admin") and authz.scope_mode == "assigned":
+        allowed = authz.workspace_ids or frozenset()
+        rows = [r for r in rows if int(r["client_id"]) in allowed]
+
+    clients: dict[int, dict] = {}
+    client_has_order: dict[int, bool] = {}
+    codes: set[str] = set()
+    labels: dict[str, dict] = {}
+    cells: list[dict] = []
+    for r in rows:
+        cid = int(r["client_id"])
+        clients.setdefault(cid, {"id": cid, "name": r["client_name"]})
+        client_has_order.setdefault(cid, False)
+        code = r["obligation_code"]
+        if code is None:
+            continue
+        codes.add(code)
+        if code not in labels and r.get("display_names"):
+            labels[code] = r["display_names"]
+        if r["work_order_id"]:
+            client_has_order[cid] = True
+        cells.append(
+            {
+                "client_id": cid,
+                "obligation_code": code,
+                "obligation_status": r["obligation_status"],
+                "order_status": r["order_status"],
+                "work_order_id": str(r["work_order_id"]) if r["work_order_id"] else None,
+                "due_paper": r["due_paper"].isoformat() if r["due_paper"] else None,
+                "due_efiling": r["due_efiling"].isoformat() if r["due_efiling"] else None,
+                "badge": _matrix_badge(r["obligation_status"], r["order_status"]),
+            }
+        )
+
+    out_clients = []
+    for cid, c in clients.items():
+        c["missing_order"] = not client_has_order.get(cid, False)
+        out_clients.append(c)
+    out_clients.sort(key=lambda c: c["name"])
+
+    return {
+        "period": resolved_period,
+        "clients": out_clients,
+        "obligation_codes": sorted(codes),
+        "obligation_labels": labels,
+        "cells": cells,
+    }

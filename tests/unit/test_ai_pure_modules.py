@@ -141,7 +141,22 @@ class AiRouterTests(unittest.TestCase):
             const r = require({json.dumps(str(AI_DIR / "ai-router.js"))});
             process.stdout.write(JSON.stringify([r.parseHash(''), r.parseHash('#/'), r.parseHash('#garbage')]));
             """)
-        self.assertEqual(out, [{"name": "dashboard"}] * 3)
+        self.assertEqual(out, [{"name": "dashboard", "sub": "matrix"}] * 3)
+
+    def test_parse_hash_board_is_secondary_subview(self):
+        """C4:矩阵是新默认(sub=matrix),看板降为 #/board 辅助入口(sub=board)。"""
+        out = _run_node(f"""
+            const r = require({json.dumps(str(AI_DIR / "ai-router.js"))});
+            process.stdout.write(JSON.stringify([
+                r.parseHash('#/board'),
+                r.buildBoardHash(),
+                r.buildDashboardHash(),
+            ]));
+            """)
+        self.assertEqual(
+            out,
+            [{"name": "dashboard", "sub": "board"}, "#/board", "#/"],
+        )
 
     def test_parse_hash_client_view_and_default_view(self):
         out = _run_node(f"""

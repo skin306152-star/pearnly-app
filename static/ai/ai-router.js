@@ -1,10 +1,14 @@
 /*
  * Pearnly AI · ai-router.js · 页内 hash 路由(纯解析/拼装 + 薄 DOM 订阅)
  *
- * 路由形态(M1-W1 拍板 · profile 见 B2-e):
- *   #/                        选客户层(默认)
+ * 路由形态(M1-W1 拍板 · profile 见 B2-e · 矩阵见 C4):
+ *   #/                        工作台(默认子视图=矩阵,sub='matrix')
+ *   #/board                   工作台(子视图=五列看板,sub='board' · 降为辅助)
  *   #/client/<id>/<view>      客户独立页,view ∈ intake|wo|review|pkg|profile
  *
+ * 矩阵/看板共用 route.name='dashboard'(同一个「工作台」页面壳,toolrow/统计卡不
+ * 重复挂载),靠 route.sub 区分渲染哪块 body——不新起一个顶层路由名,ai.js 的
+ * dashScrollY 记录逻辑(按 name==='dashboard' 判定)零改动就能覆盖两个子视图。
  * 无跨标签共享态——路由只读 URL,不读/写 localStorage(双标签隔离铁律)。
  * parse/build 是纯函数:浏览器挂 window.AI.router,node(测试)走 module.exports。
  */
@@ -15,12 +19,14 @@
     // DEFAULT_VIEW 仍是 'wo'——只是给合法 view 集合添一个新成员。
     var VIEWS = ['intake', 'wo', 'review', 'pkg', 'profile'];
     var DEFAULT_VIEW = 'wo';
+    var DEFAULT_SUB = 'matrix';
 
     function parseHash(hash) {
         var h = String(hash || '').replace(/^#/, '');
-        if (h === '' || h === '/') return { name: 'dashboard' };
+        if (h === '' || h === '/') return { name: 'dashboard', sub: DEFAULT_SUB };
+        if (h === '/board') return { name: 'dashboard', sub: 'board' };
         var m = /^\/client\/([^/]+)\/?([^/]*)$/.exec(h);
-        if (!m) return { name: 'dashboard' };
+        if (!m) return { name: 'dashboard', sub: DEFAULT_SUB };
         var clientId = decodeURIComponent(m[1]);
         var view = VIEWS.indexOf(m[2]) >= 0 ? m[2] : DEFAULT_VIEW;
         return { name: 'client', clientId: clientId, view: view };
@@ -31,8 +37,14 @@
         return '#/client/' + encodeURIComponent(clientId) + '/' + v;
     }
 
+    // 矩阵是新默认首页(C4·主窗拍板):「回工作台」一律回矩阵,看板改走
+    // buildBoardHash() 的独立辅助入口(视图切换 pill 用)。
     function buildDashboardHash() {
         return '#/';
+    }
+
+    function buildBoardHash() {
+        return '#/board';
     }
 
     // onChange(route) 在启动时立即调一次,并在每次 hashchange 后调用。
@@ -50,9 +62,11 @@
     var api = {
         VIEWS: VIEWS,
         DEFAULT_VIEW: DEFAULT_VIEW,
+        DEFAULT_SUB: DEFAULT_SUB,
         parseHash: parseHash,
         buildClientHash: buildClientHash,
         buildDashboardHash: buildDashboardHash,
+        buildBoardHash: buildBoardHash,
         subscribe: subscribe,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

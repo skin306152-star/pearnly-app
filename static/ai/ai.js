@@ -60,6 +60,14 @@
         $('navDash').addEventListener('click', function () {
             window.location.hash = AI.router.buildDashboardHash();
         });
+        // 矩阵/看板视图切换 pill(C4):矩阵是默认,看板降辅助——两个 hash 各自的
+        // build 函数已知道自己的默认子视图,这里只管点了跳哪。
+        $('vtMatrix').addEventListener('click', function () {
+            window.location.hash = AI.router.buildDashboardHash();
+        });
+        $('vtBoard').addEventListener('click', function () {
+            window.location.hash = AI.router.buildBoardHash();
+        });
     }
 
     function setCrumb(route) {
@@ -92,7 +100,15 @@
             // 回工作台离开了客户独立页——交付包的证据模态框挂在 document.body(不在
             // v-client 子树里),不主动收会悬在工作台上方(ai-pkg.js onLeave 同款注释)。
             if (window.AI.pkg) AI.pkg.onLeave();
-            AI.dashboard.load(api).then(function () {
+            // 矩阵(默认)/看板(辅助,C4):两个子视图各自独立拉数据,互斥显示;
+            // 切换子视图不销毁另一侧 DOM(只是 display 切换),回来不必重新走一次骨架屏。
+            var isMatrix = route.sub !== 'board';
+            $('matrixSection').style.display = isMatrix ? '' : 'none';
+            $('boardSection').style.display = isMatrix ? 'none' : '';
+            $('vtMatrix').classList.toggle('on', isMatrix);
+            $('vtBoard').classList.toggle('on', !isMatrix);
+            var loaded = isMatrix ? AI.matrix.load(api) : AI.dashboard.load(api);
+            loaded.then(function () {
                 window.scrollTo(0, dashScrollY);
             });
         } else {

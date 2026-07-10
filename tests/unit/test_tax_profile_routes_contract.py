@@ -43,6 +43,7 @@ class RouteContractTests(unittest.TestCase):
                 "/api/workspace/clients/{workspace_client_id}/aliases/{alias_id}/deactivate",
             ),
             ("GET", "/api/workspace/clients/{workspace_client_id}/obligations"),
+            ("GET", "/api/tax-profile/matrix"),
         }
         self.assertEqual(rs, expected)
 
@@ -377,6 +378,191 @@ class ObligationListTests(unittest.IsolatedAsyncioTestCase):
                 await tr.list_client_obligations(7, mock.Mock(), period="not-a-period")
         self.assertEqual(ctx.exception.status_code, 422)
         self.assertEqual(ctx.exception.detail, "obligation.invalid_period")
+
+
+class MatrixTests(unittest.IsolatedAsyncioTestCase):
+    """C4 事务所矩阵聚合端点:闸群 + 单查询无 N+1 + 徽章映射 + 作用域过滤。"""
+
+    async def test_gate_closed_404(self):
+        from routes import tax_profile_routes as tr
+
+        with (
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=False),
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await tr.get_tax_profile_matrix(mock.Mock(), period=None)
+        self.assertEqual(ctx.exception.status_code, 404)
+        self.assertEqual(ctx.exception.detail, "workorder.not_found")
+
+    async def test_malformed_period_422(self):
+        from routes import tax_profile_routes as tr
+
+        with (
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await tr.get_tax_profile_matrix(mock.Mock(), period="not-a-period")
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.detail, "obligation.invalid_period")
+
+    async def test_single_query_no_n_plus_one(self):
+        """一次 cur.execute,零额外往返——聚合端点无 N+1 的硬证(不是代码评审断言)。"""
+        from routes import tax_profile_routes as tr
+
+        rows = [
+            {
+                "client_id": 1,
+                "client_name": "A",
+                "obligation_code": "pp30",
+                "obligation_status": "due",
+                "due_paper": None,
+                "due_efiling": None,
+                "work_order_id": None,
+                "order_status": None,
+                "display_names": {"zh": "增值税申报(PP30)"},
+            },
+        ]
+        cur = _Cur(fetchall_value=rows)
+        authz = mock.Mock(scope_mode="all", workspace_ids=None)
+        with (
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
+            mock.patch.object(tr, "db", _FakeDB(cur)),
+            mock.patch.object(tr, "get_authz", return_value=authz),
+        ):
+            out = await tr.get_tax_profile_matrix(mock.Mock(), period="2569-05")
+        self.assertEqual(len(cur.queries), 1)
+        self.assertEqual(out["clients"], [{"id": 1, "name": "A", "missing_order": True}])
+        self.assertEqual(out["obligation_codes"], ["pp30"])
+        self.assertEqual(out["obligation_labels"]["pp30"]["zh"], "增值税申报(PP30)")
+        self.assertEqual(out["cells"][0]["badge"], "pending_order")
+
+    async def test_badge_mapping_covers_all_engine_states(self):
+        from routes import tax_profile_routes as tr
+
+        self.assertEqual(tr._matrix_badge(None, None), "not_evaluated")
+        self.assertEqual(tr._matrix_badge("nil", "archived"), "no_need")
+        self.assertEqual(tr._matrix_badge("due", None), "pending_order")
+        self.assertEqual(tr._matrix_badge("due", "collecting"), "missing_materials")
+        self.assertEqual(tr._matrix_badge("due", "running"), "in_progress")
+        self.assertEqual(tr._matrix_badge("due", "stuck"), "pending_review")
+        self.assertEqual(tr._matrix_badge("tentative", "review"), "pending_review")
+        self.assertEqual(tr._matrix_badge("due", "archived"), "frozen")
+        self.assertEqual(tr._matrix_badge("due", "signed"), "frozen")
+        self.assertEqual(tr._matrix_badge("due", "some_future_status"), "not_evaluated")
+
+    async def test_client_without_any_obligation_row_still_listed(self):
+        """无物化记录的客户仍出现在矩阵里(LEFT JOIN 空行不吞客户),且不产生虚假列。"""
+        from routes import tax_profile_routes as tr
+
+        rows = [
+            {
+                "client_id": 2,
+                "client_name": "B",
+                "obligation_code": None,
+                "obligation_status": None,
+                "due_paper": None,
+                "due_efiling": None,
+                "work_order_id": None,
+                "order_status": None,
+                "display_names": None,
+            },
+        ]
+        cur = _Cur(fetchall_value=rows)
+        authz = mock.Mock(scope_mode="all", workspace_ids=None)
+        with (
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
+            mock.patch.object(tr, "db", _FakeDB(cur)),
+            mock.patch.object(tr, "get_authz", return_value=authz),
+        ):
+            out = await tr.get_tax_profile_matrix(mock.Mock(), period="2569-05")
+        self.assertEqual(out["clients"], [{"id": 2, "name": "B", "missing_order": True}])
+        self.assertEqual(out["obligation_codes"], [])
+        self.assertEqual(out["cells"], [])
+
+    async def test_assigned_scope_filters_unallowed_clients(self):
+        from routes import tax_profile_routes as tr
+
+        rows = [
+            {
+                "client_id": 1,
+                "client_name": "A",
+                "obligation_code": "pp30",
+                "obligation_status": "due",
+                "due_paper": None,
+                "due_efiling": None,
+                "work_order_id": None,
+                "order_status": None,
+                "display_names": None,
+            },
+            {
+                "client_id": 2,
+                "client_name": "B",
+                "obligation_code": "pp30",
+                "obligation_status": "due",
+                "due_paper": None,
+                "due_efiling": None,
+                "work_order_id": None,
+                "order_status": None,
+                "display_names": None,
+            },
+        ]
+        cur = _Cur(fetchall_value=rows)
+        authz = mock.Mock(scope_mode="assigned", workspace_ids=frozenset({1}))
+        with (
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
+            mock.patch.object(tr, "db", _FakeDB(cur)),
+            mock.patch.object(tr, "get_authz", return_value=authz),
+        ):
+            out = await tr.get_tax_profile_matrix(mock.Mock(), period="2569-05")
+        self.assertEqual([c["id"] for c in out["clients"]], [1])
+
+    async def test_missing_order_false_when_any_cell_has_work_order(self):
+        from routes import tax_profile_routes as tr
+
+        rows = [
+            {
+                "client_id": 1,
+                "client_name": "A",
+                "obligation_code": "pp30",
+                "obligation_status": "due",
+                "due_paper": None,
+                "due_efiling": None,
+                "work_order_id": "11111111-1111-1111-1111-111111111111",
+                "order_status": "collecting",
+                "display_names": None,
+            },
+            {
+                "client_id": 1,
+                "client_name": "A",
+                "obligation_code": "sso",
+                "obligation_status": "tentative",
+                "due_paper": None,
+                "due_efiling": None,
+                "work_order_id": None,
+                "order_status": None,
+                "display_names": None,
+            },
+        ]
+        cur = _Cur(fetchall_value=rows)
+        authz = mock.Mock(scope_mode="all", workspace_ids=None)
+        with (
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
+            mock.patch.object(tr, "db", _FakeDB(cur)),
+            mock.patch.object(tr, "get_authz", return_value=authz),
+        ):
+            out = await tr.get_tax_profile_matrix(mock.Mock(), period="2569-05")
+        self.assertFalse(out["clients"][0]["missing_order"])
 
 
 if __name__ == "__main__":

@@ -58,7 +58,10 @@ const BUNDLES = [
     // ai-board.js(分列/摘要纯函数)必须排在 ai-kanban-render.js(用它渲染)之前;
     // ai-kanban-render.js 必须排在 ai-dashboard.js(用它渲染看板)之前。
     // ai-viewer.js(原件查看器框架,零依赖)必须排在 ai-review-render.js(拼查看器骨架 HTML)
-    // 和 ai-review.js(mount/remount 交互 + 共享 LRU 缓存)之前。ai-review-queue.js(队列
+    // 和 ai-review.js(mount/remount 交互 + 共享 LRU 缓存)之前。ai-matrix-render.js(矩阵表格
+    // 纯 HTML 拼装 + 事件委托,依赖 AI.state/format/board)必须排在 ai-matrix.js(数据编排,
+    // C4 · 工作台新默认视图)之前,两者都排在 ai-dashboard.js 之后即可(矩阵/看板互不依赖,
+    // 谁先谁后对彼此零影响,紧邻放置只是语义上的"同属工作台"分组)。ai-review-queue.js(队列
     // 过滤/分级/裁决 payload 纯函数)必须排在 ai-review-render.js(拼 HTML)之前,两者都要
     // 排在 ai-review.js(编排)之前;ai-client.js 挂 renderReview 时才用到 AI.review,
     // 故 ai-review.js 仍需排在 ai-client.js 之前。ai-intake-render.js(纯校验+HTML)排在
@@ -85,6 +88,8 @@ const BUNDLES = [
             'ai/ai-board.js',
             'ai/ai-kanban-render.js',
             'ai/ai-dashboard.js',
+            'ai/ai-matrix-render.js',
+            'ai/ai-matrix.js',
             'ai/ai-review-queue.js',
             'ai/ai-review-render.js',
             'ai/ai-review.js',

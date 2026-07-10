@@ -145,6 +145,9 @@ const AI_CSS = [
     // 两者之后、看板/客户页样式之前——门面与工作台视图互斥显示,层叠顺序对彼此零影响。
     'ai/ai-gate.css',
     'ai/ai-dashboard.css',
+    // ai-matrix.css(C4 · 工作台新默认视图)吃 ai-theme 令牌 + ai-shell 的 .btn/.chip/.dot,
+    // 排在 ai-dashboard.css 之后即可(矩阵/看板是同一工作台页的两个互斥子视图)。
+    'ai/ai-matrix.css',
     'ai/ai-client.css',
     'ai/ai-intake.css',
     'ai/ai-pkg.css',

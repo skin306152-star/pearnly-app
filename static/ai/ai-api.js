@@ -240,6 +240,12 @@
                     '/api/workspace/clients/' + encodeURIComponent(clientId) + '/obligations' + qs
                 );
             },
+            // 事务所矩阵(C4·routes/tax_profile_routes.py::get_tax_profile_matrix):客户 ×
+            // 当期义务的聚合只读端点,一次请求喂全矩阵。period 缺省=后端当期。
+            getTaxProfileMatrix: function (period) {
+                var qs = period ? '?period=' + encodeURIComponent(period) : '';
+                return call('GET', '/api/tax-profile/matrix' + qs);
+            },
         };
     }
 

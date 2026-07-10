@@ -1,0 +1,203 @@
+/* Pearnly AI · 事务所矩阵(C4)— v4 未画过此屏(v4 只有五列看板),按 Canon §1
+ * tokens 延展:表格沿用看板已有的 .btn/.chip/.period-pick 原子,新增部分只覆盖
+ * 视图切换 pill + 矩阵表格自身的布局/滚动/粘性表头。
+ */
+
+/* 矩阵/看板切换 pill(工作台顶部,统计卡下方)。 */
+.view-toggle {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--surface2);
+  border: 1px solid var(--hair);
+  border-radius: 11px;
+  padding: 3px;
+  margin-bottom: 16px;
+}
+.vt-btn {
+  border: none;
+  background: none;
+  color: var(--mut);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.vt-btn:hover {
+  color: var(--ink);
+}
+.vt-btn.on {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--sh-card);
+}
+.vt-btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* 工具条:账期选择 + 筛选 chip + 批量开单,同排,窄屏自动换行(Canon §6.1)。 */
+.mx-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.mx-filters {
+  display: inline-flex;
+  gap: 6px;
+}
+.mf-chip {
+  border: 1px solid var(--hair2);
+  background: var(--surface);
+  color: var(--ink2);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 6px 13px;
+  border-radius: 99px;
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    color 0.12s;
+}
+.mf-chip:hover {
+  border-color: var(--mut);
+}
+.mf-chip.on {
+  background: var(--warn-soft);
+  border-color: var(--warn-line);
+  color: var(--warn);
+}
+.mf-chip:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.mx-note {
+  font-size: 11.5px;
+  color: var(--mut);
+}
+
+/* 表格容器:宽内容(义务列多时)容器内横滑,页面级零横向滚动(Canon §6.1/§6.2)。 */
+.mx-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--sh-card);
+}
+.mx-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 640px;
+  font-size: 12.5px;
+}
+.mx-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--tabs-bg);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink2);
+  padding: 12px 10px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--hair2);
+  max-width: min(140px, 30vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mx-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--hair);
+  white-space: nowrap;
+}
+.mx-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.mx-table tbody tr:hover {
+  background: var(--surface2);
+}
+.mx-check-cell {
+  width: 34px;
+  text-align: center;
+  position: sticky;
+  left: 0;
+  background: inherit;
+  z-index: 2;
+}
+.mx-table thead .mx-check-cell {
+  z-index: 3;
+  background: var(--tabs-bg);
+}
+.mx-check {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+/* 客户名列吸左(横滑时客户名恒可见),文字省略号+title 兜底(Canon §6.2)。 */
+.mx-namecell {
+  position: sticky;
+  left: 34px;
+  background: var(--surface);
+  z-index: 2;
+  font-weight: 650;
+  font-family: var(--thai);
+  cursor: pointer;
+  max-width: min(180px, 40vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mx-table thead .mx-namecell {
+  z-index: 3;
+  background: var(--tabs-bg);
+}
+.mx-table tbody tr:hover .mx-namecell {
+  background: var(--surface2);
+}
+.mx-namecell:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+}
+.mx-cell {
+  text-align: center;
+}
+.mx-cellbtn {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+.mx-cellbtn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 99px;
+}
+
+/* 触屏目标 ≥40px(Canon §7)——粗指针设备放大勾选框与格子按钮命中区。 */
+@media (pointer: coarse) {
+  .mx-check {
+    width: 22px;
+    height: 22px;
+  }
+  .mx-check-cell {
+    width: 44px;
+  }
+}
+
+/* 窄屏(<960px):工具条与视图切换收紧留白,表格照旧容器内横滑不撑破页面。 */
+@media (max-width: 960px) {
+  .mx-toolbar {
+    gap: 8px;
+  }
+  .mx-table {
+    min-width: 560px;
+  }
+}

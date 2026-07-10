@@ -3,13 +3,22 @@
 
 纯函数 build_manifest:六要素齐(逐 item sha256 + 规则版本 + 模型版本 + 裁决回放 + 签批人 +
 时间)。fail-closed:有 file_ref 却算不出哈希 → FreezeError 点名。sha256_of 注入,不碰真盘。
+
+R1 回归:事件行 created_at 用真 datetime 类型(对齐 psycopg2 真 store 行,不许字符串替身失真)
+——带裁决的 manifest 必须 JSON 可序列化(datetime→ISO / Decimal→十进制串 / 未知类型 fail-loud)。
 """
 
 from __future__ import annotations
 
+import json
 import unittest
+from datetime import datetime, timezone
+from decimal import Decimal
 
 from services.workorder import freeze
+
+# 对齐真库行:psycopg2 的 timestamptz 是原生 datetime(R1 打回根因=替身用字符串失真)。
+_DECIDED_AT = datetime(2026, 7, 11, 0, 0, 0, tzinfo=timezone.utc)
 
 
 def _wo():
@@ -33,7 +42,7 @@ def _decision(event_id, item_id, decision, **extra):
         "event_type": "human_decision",
         "payload": payload,
         "actor": "user:77",
-        "created_at": "2026-07-11T00:00:00Z",
+        "created_at": _DECIDED_AT,
     }
 
 
@@ -90,9 +99,10 @@ class BuildManifestTests(unittest.TestCase):
         # 3 模型版本(引擎自事件流 + 模型名自 ai_usage,去重)
         self.assertEqual(m["model_version"]["ocr_engines"], ["pipeline_v1"])
         self.assertEqual(m["model_version"]["ocr_models"], ["gemini-3.1-flash-lite"])
-        # 4 裁决/豁免回放
+        # 4 裁决/豁免回放(at 源头规整:datetime 行 → ISO 字符串,R1)
         self.assertEqual(m["decisions"]["a"]["decision"], "face_value")
         self.assertEqual(m["decisions"]["a"]["actor"], "user:77")
+        self.assertEqual(m["decisions"]["a"]["at"], "2026-07-11T00:00:00+00:00")
         # 5 签批人 · 6 时间
         self.assertEqual(m["approved_by"], "user:77")
         self.assertEqual(m["frozen_at"], "2026-07-11T00:00:00+00:00")
@@ -153,6 +163,58 @@ class BuildManifestTests(unittest.TestCase):
             sha256_of=lambda fr: "zzz",
         )
         self.assertEqual(m["items"][0]["file_name"], "receipt.jpg")
+
+
+class ManifestSerializationTests(unittest.TestCase):
+    """R1 回归:带裁决(datetime 事件行)的 manifest 必须能走 dumps_manifest 全 JSON 序列化。"""
+
+    def _manifest_with_decisions(self):
+        items = [
+            {
+                "id": "a",
+                "kind": "purchase_invoice",
+                "status": "ok",
+                "file_ref": "/o/a.jpg",
+                "original_name": "a.jpg",
+            }
+        ]
+        events = [
+            _classified("a", "purchase_invoice"),
+            _decision(5, "a", "face_value", values={"vat": "70.00"}),
+        ]
+        return freeze.build_manifest(
+            work_order=_wo(),
+            items=items,
+            events=events,
+            deliverable_version=1,
+            ocr_models=[],
+            approver="user:77",
+            frozen_at="2026-07-11T00:00:00+00:00",
+            sha256_of=_fake_hash,
+        )
+
+    def test_manifest_with_datetime_decision_rows_serializes_and_round_trips(self):
+        # R1 打回的原始崩溃路径:decisions 非空 + at 来自 datetime 行 → dumps 必须成功。
+        text = freeze.dumps_manifest(self._manifest_with_decisions())
+        back = json.loads(text)
+        self.assertEqual(back["decisions"]["a"]["at"], "2026-07-11T00:00:00+00:00")
+        self.assertEqual(back["decisions"]["a"]["decision"], "face_value")
+
+    def test_default_handles_stray_datetime_and_decimal(self):
+        # 兜底层:汇编没规整到的 datetime/Decimal(如将来新字段)也确定性转换,不炸不失真。
+        m = self._manifest_with_decisions()
+        m["decisions"]["a"]["values"]["recalc_vat"] = Decimal("35.00")
+        m["decisions"]["a"]["seen_at"] = _DECIDED_AT
+        back = json.loads(freeze.dumps_manifest(m))
+        self.assertEqual(back["decisions"]["a"]["values"]["recalc_vat"], "35.00")  # 无损十进制串
+        self.assertEqual(back["decisions"]["a"]["seen_at"], "2026-07-11T00:00:00+00:00")
+
+    def test_unknown_type_fails_loud_not_silently_stringified(self):
+        # 冻结包是审计原件:未知类型必须 fail-loud,不许静默 str() 把 bug 埋进不可变文件。
+        m = self._manifest_with_decisions()
+        m["decisions"]["a"]["values"]["weird"] = object()
+        with self.assertRaises(TypeError):
+            freeze.dumps_manifest(m)
 
 
 if __name__ == "__main__":

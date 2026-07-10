@@ -4,6 +4,10 @@
 内存 FakeStore + 真临时盘(WORKORDER_STORAGE_DIR 指向 tmp),真算 sha256。覆盖:review→archive
 原子冻结、状态守卫(非 review/已冻结)、fail-closed 源文件缺失点名、篡改校验点名、回执 append-only
 补挂、冻结后只读守卫。
+
+R1 回归纪律:FakeStore 事件行必须带 datetime 类型 created_at(对齐真 store 行——psycopg2 的
+timestamptz 是原生 datetime),且夹具默认含一条人工裁决;字符串时间戳替身曾让「带裁决的真单
+archive 崩 TypeError」漏网。
 """
 
 from __future__ import annotations
@@ -11,10 +15,13 @@ from __future__ import annotations
 import hashlib
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 from services.workorder import archive, freeze, storage
 from services.workorder.api import WorkOrderApiError
+
+_NOW = datetime(2026, 7, 11, 8, 30, 0, tzinfo=timezone.utc)
 
 
 class _Cur:
@@ -83,6 +90,7 @@ class FakeStore:
             "event_type": event_type,
             "payload": payload or {},
             "actor": actor,
+            "created_at": _NOW,  # 对齐真 store 行:datetime 类型(R1)
         }
         self.events.append(row)
         return dict(row)
@@ -130,7 +138,18 @@ class _ArchiveFixture(unittest.TestCase):
                     "kind": "purchase_invoice",
                     "ocr_engine": "pipeline_v1",
                 },
-            }
+                "created_at": _NOW,
+            },
+            # 夹具默认含裁决:R1 打回的崩溃分支(decisions 非空 + datetime 行)每个 archive
+            # 用例都必经,不再留「演练单 decisions=0 测不到」的盲区。
+            {
+                "id": 2,
+                "step": "reconcile",
+                "event_type": "human_decision",
+                "payload": {"item_id": "a", "decision": "face_value", "values": {}},
+                "actor": "user:77",
+                "created_at": _NOW,
+            },
         ]
         return FakeStore(wo, items, events, version)
 
@@ -164,6 +183,9 @@ class ArchiveOrderTests(_ArchiveFixture):
         self.assertEqual(manifest["approved_by"], "user:77")
         self.assertTrue(manifest["frozen_at"])
         self.assertEqual(manifest["model_version"]["ocr_engines"], ["pipeline_v1"])
+        # 裁决段(R1 崩溃分支):datetime 行序列化成 ISO 字符串,裁决动作/actor 在案。
+        self.assertEqual(manifest["decisions"]["a"]["decision"], "face_value")
+        self.assertEqual(manifest["decisions"]["a"]["at"], _NOW.isoformat())
         # 落 workorder_archived 事件。
         self.assertTrue(any(e["event_type"] == "workorder_archived" for e in store.events))
 

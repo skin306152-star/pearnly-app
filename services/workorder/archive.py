@@ -94,7 +94,8 @@ def archive_order(cur, *, tenant_id: str, work_order_id: str, actor: str) -> dic
     out_dir = storage.versioned_dir(storage.deliverables_dir(tenant_id, work_order_id), version)
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / freeze.MANIFEST_FILENAME
-    path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    # 唯一序列化出口(R1:真库事件行的 datetime 裁决时间戳直接 json.dumps 会 TypeError)。
+    path.write_text(freeze.dumps_manifest(manifest), encoding="utf-8")
 
     summary = _manifest_summary(manifest)
     store.upsert_deliverable(

@@ -12,7 +12,10 @@ fail-closed:任一 item 的源文件已不在盘(算不出 sha256)→ FreezeErro
 
 from __future__ import annotations
 
+import datetime as _dt
 import hashlib
+import json
+from decimal import Decimal
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -43,6 +46,27 @@ def sha256_of_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _iso(v):
+    """时间字段规整:真库事件行的 created_at 是 psycopg2 原生 datetime(R1 打回:直接进
+    json.dumps 即 TypeError),统一转 ISO-8601 字符串;本就是字符串(测试替身/回读)原样过。"""
+    return v.isoformat() if isinstance(v, (_dt.datetime, _dt.date)) else v
+
+
+def _json_default(v):
+    """manifest 序列化兜底:datetime/date → ISO 字符串,Decimal → 无损十进制字符串(禁 float)。
+    其余未知类型 fail-loud——冻结包是审计原件,静默 str() 会把 bug 埋进不可变文件。"""
+    if isinstance(v, (_dt.datetime, _dt.date)):
+        return v.isoformat()
+    if isinstance(v, Decimal):
+        return format(v, "f")
+    raise TypeError(f"freeze manifest 不可序列化类型: {type(v).__name__}")
+
+
+def dumps_manifest(manifest: dict) -> str:
+    """冻结 manifest 的唯一序列化出口(archive 写盘用):已知非 JSON 原生类型确定性转换。"""
+    return json.dumps(manifest, ensure_ascii=False, indent=2, default=_json_default)
+
+
 def compute_source_hash(path: Optional[Path]) -> Optional[str]:
     """现算源文件 sha256;path 为 None(越界/已解析失败)或读不到 → None(交给闸点名)。"""
     if path is None:
@@ -70,7 +94,7 @@ def _replay_decisions(events: list[dict]) -> dict:
             "reason": payload.get("reason"),
             "values": payload.get("values") or {},
             "actor": rec.get("actor"),
-            "at": rec.get("at"),
+            "at": _iso(rec.get("at")),  # 真库行是 datetime,源头规整成 ISO(R1)
             "event_id": rec.get("event_id"),
         }
     return out

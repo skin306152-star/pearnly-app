@@ -64,6 +64,7 @@ import './home/erp-express-dbf-risk.js'; // Express · DBF 直写风险弹窗(br
 import './home/erp-express-steps.js'; // Express · 向导右栏步骤内容构建器(ExpressSteps)
 import './home/erp-express-wizard.js'; // Express · 接通向导(window.ExpressWizard)
 import './home/erp-express-connect.js'; // Express · 连接卡(渲染 #erp-connect-cards · adapter=express)
+import './home/posting-editor.js'; // 过账人工改判共用组件(现/赊 + 货/费两轴 · window.PostingEditor · Express 卡与 MR.ERP 详情共用)
 import './home/erp-express-detail.js'; // Express · 分录预览(挂推送详情抽屉 adapter=='express' 分支)
 import './home/report-templates.js'; // REFACTOR-C1 · 报表模板/统一导出弹窗(openReportModal)
 import './home/folder-watcher.js'; // REFACTOR-C1 · 文件夹监听(_loadFolderWatcherPanel)

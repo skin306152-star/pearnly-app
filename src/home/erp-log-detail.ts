@@ -4,6 +4,9 @@
 // 来源:erp-integration.js copyErpDocNo + showLogDetail(日志详情 modal · ~270 行)· verbatim 0 改逻辑。
 // 列表/批量/轮询组留 erp-integration.js。initAutomationPage 行点击经 window.showLogDetail/copyErpDocNo 调本模块。
 // 详情内「重试推送」按钮经 window.retryPushLog 调 erp-integration.js(留在那)。
+//
+// P3c (2026-07-10) · adapter=='mrerp' 分支挂 posting-editor.ts 的共用改判入口(现/赊 +
+// 货/费两轴人工裁决),补上 MR.ERP 此前完全没有的改判能力,与 Express 卡走同一控件。
 // ============================================================
 /* global escapeHtml, token, showConfirm, humanizeError, currentLang, routeTo, switchAutomationTab, _showSessionRevokedModal */
 
@@ -307,6 +310,14 @@ async function showLogDetail(logId: any) {
             adapter === 'express' && (window as any).ExpressDetail
                 ? (window as any).ExpressDetail.section(log)
                 : '';
+        // MR.ERP 人工改判入口(P3c · 挂时间线上方)· MR.ERP 载荷里没有 doctype_src/item_src
+        // 可读(不像 Express mapper 会把判据留痕进 request_body)· 徽标缺省不显示、两轴
+        // select 初值全「自动」——保存后同样是「已保存 · 点重试推送生效」的诚实三态文案。
+        // 无 history_id(理论不该发生 · 兜底)不渲染,防御与 Express 卡一致。
+        const mrerpEditorSec =
+            adapter === 'mrerp' && log.history_id && (window as any).PostingEditor
+                ? (window as any).PostingEditor.section(log.history_id, {})
+                : '';
 
         drawer.querySelector('.erp-detail-body')!.innerHTML = `
             <div class="erp-detail-head">
@@ -326,9 +337,10 @@ async function showLogDetail(logId: any) {
                     </div>
                 </section>
                 ${
-                    // express:自带识别字段 + 分录预览 + 诚实时间线(expSec)· 其它 adapter:通用时间线。
+                    // express:自带识别字段 + 分录预览 + 诚实时间线(expSec)· mrerp:改判入口
+                    // 挂时间线上方(mrerpEditorSec · 空字符串对非 mrerp adapter 零影响)。
                     expSec ||
-                    `<section class="erp-detail-sec">
+                    `${mrerpEditorSec}<section class="erp-detail-sec">
                     <h3>${escapeHtml(t('erp-detail-sec-timeline'))}</h3>
                     <div class="erp-detail-timeline">${tl.join('')}</div>
                 </section>`

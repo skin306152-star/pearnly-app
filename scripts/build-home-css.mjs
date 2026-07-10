@@ -67,6 +67,7 @@ const HOME_CSS = [
     'home-53-subscription.css',
     'home-54-records.css',
     'home-55-upload-zone.css',
+    'home-56-posting-editor.css',
 ];
 
 const ADMIN_CSS = [

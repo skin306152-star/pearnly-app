@@ -1,0 +1,61 @@
+/* ============================================================
+ * 过账人工改判共用组件(posting-editor.ts · P3c · 2026-07-10)
+ * Express 卡(挂在 .erp-detail-grid 里的一个 cell)与 MR.ERP 详情(挂独立 section)共用同
+ * 一套样式。来源徽标复用 .log-tag(定义在 home-10)· 颜色/圆角全走既有 --line / --brand
+ * 令牌,不新造设计语言。取代原 home-51 里的 .exp-doctype-*(单车道专属 · 已删)。
+ * ============================================================ */
+.posting-editor-cell {
+    grid-column: 1 / -1;
+}
+.posting-axis {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.posting-axis:last-of-type {
+    margin-bottom: 0;
+}
+.posting-axis label {
+    flex: 0 0 auto;
+    font-size: 9px;
+    color: var(--ink-3);
+    min-width: 46px;
+}
+.posting-axis strong {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 11px;
+}
+.posting-select {
+    height: 26px;
+    padding: 0 6px;
+    font-size: 11px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--card);
+    color: var(--ink);
+}
+.posting-edit-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 9px;
+}
+.posting-msg {
+    font-size: 10px;
+    color: var(--ink-3);
+}
+.posting-msg.ok {
+    color: var(--success);
+}
+.posting-msg.fail {
+    color: var(--danger);
+}
+.posting-src-badge {
+    font-size: 9px;
+}

@@ -32,8 +32,12 @@ class EarnLoginPageContentTests(unittest.TestCase):
         self.assertIn('id="e-user"', html)
         self.assertIn('id="e-pw"', html)
         self.assertIn('id="e-submit"', html)
-        # 账号=用户名或邮箱 · 不写死 type=email(超管账号可能不是邮箱)
-        self.assertIn('id="e-user" type="text"', html)
+        # 账号=用户名或邮箱 · 不写死 type=email(超管账号可能不是邮箱)。
+        # 对属性断言而非整行字面量:prettier 会把多属性 input 折行,行内空白不可依赖。
+        user_input = re.search(r"<input[^>]*id=\"e-user\"[^>]*>", html, flags=re.S)
+        self.assertIsNotNone(user_input, "缺账号输入框")
+        self.assertIn('type="text"', user_input.group(0))
+        self.assertIn('autocapitalize="none"', user_input.group(0))
         # 复用主站登录 API · 零新鉴权
         self.assertIn("/api/login", html)
 

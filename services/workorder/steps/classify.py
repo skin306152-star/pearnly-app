@@ -22,8 +22,10 @@ reconcile/人审,金标 IMG_2647 必须落在这条路径而非被吃掉)。
 from __future__ import annotations
 
 import os
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from itertools import islice
 from pathlib import Path
 from typing import Optional
 
@@ -31,6 +33,7 @@ from core import feature_flags
 from services.ai_gateway import attribution
 from services.purchase.totals import dedupe_key
 from services.summary_import.parse import parse_table
+from services.workorder import evidence
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import sort as sort_step
 from services.workspace import client_alias_store
@@ -73,12 +76,15 @@ def run(ctx: StepContext) -> StepResult:
 
     bins: dict[str, int] = {}
     flagged = 0
-    seen_purchase_fp: dict[str, str] = {}
 
     # 并发取 OCR、按原序回主线程逐件裁堆+落库。原序消费(非完成序)保证查重「先到先占」
     # 与串行逐字节一致;每件独立事务提交(有 cursor_factory 时),跑批中途被杀只丢在飞的
     # 那几件,已落库件不重烧(断点续跑从未处理件继续)。
     images = [it for it in pending if it["kind"] == "unknown"]
+    # 查重表先从已提交事件重建再叠加本次批:逐件提交后 kill 中断,已落库原件不在 pending 里,
+    # 内存从空建会让其复件漏判 duplicate → R1 双计(C1 打回单 R1 的静默钱洞)。重建保证
+    # 中断续跑对查重的裁决与不中断跑逐字节一致。
+    seen_purchase_fp: dict[str, str] = _replay_seen_fingerprints(ctx) if images else {}
     for item, ocr in _ocr_in_order(images, ctx.tenant_id):
         outcome = _classify_from_ocr(
             item,
@@ -164,16 +170,29 @@ def _ocr_safe(item: dict, tenant_id: str):
 
 def _ocr_in_order(images: list[dict], tenant_id: str):
     """并发取 OCR、按输入原序 yield (item, ocr_or_exc)。并发上限见 _ocr_concurrency;
-    ≤1 或单件走串行(免线程池开销,单测同步好断言)。原序消费保证下游查重/落库确定性。"""
+    ≤1 或单件走串行(免线程池开销,单测同步好断言)。原序消费保证下游查重/落库确定性。
+
+    窗口式提交(2n)而非整批:消费方中途异常/生成器提前关闭时,排队未起跑的直接取消、
+    在飞的不等(shutdown(wait=False)),失败立即上抛;白烧的 OCR 至多一个窗口,不是整批。"""
     n = _ocr_concurrency()
     if n <= 1 or len(images) <= 1:
         for it in images:
             yield it, _ocr_safe(it, tenant_id)
         return
-    with ThreadPoolExecutor(max_workers=n, thread_name_prefix="wo-classify-ocr") as pool:
-        futures = [pool.submit(_ocr_safe, it, tenant_id) for it in images]
-        for it, fut in zip(images, futures):
-            yield it, fut.result()
+    pool = ThreadPoolExecutor(max_workers=n, thread_name_prefix="wo-classify-ocr")
+    window: deque = deque()
+    rest = iter(images)
+    try:
+        for it in islice(rest, n * 2):
+            window.append((it, pool.submit(_ocr_safe, it, tenant_id)))
+        while window:
+            item, fut = window.popleft()
+            follow = next(rest, None)
+            if follow is not None:
+                window.append((follow, pool.submit(_ocr_safe, follow, tenant_id)))
+            yield item, fut.result()
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
 
 def _emit_classified(ctx, item, *, kind, status, money, sales_read=None):
@@ -281,6 +300,32 @@ def _purchase_fingerprint(fields: dict) -> Optional[str]:
         grand_total=fields.get("total_amount") or fields.get("subtotal"),
     )
     return f"doc:{digest}" if digest else None
+
+
+def _replay_seen_fingerprints(ctx: StepContext) -> dict[str, str]:
+    """从已提交 item_classified 事件重建进项查重表 {指纹: 原件文件名}。
+
+    指纹三要素(seller_tax/invoice_number/total_amount)都在事件的 money 快照里,与在跑时
+    对 OCR fields 算指纹同源同值;文件名从 items 表按 item_id 回查(duplicate_of:{name} 的
+    展示口径不变)。只认 kind=purchase_invoice(方向票/复件事件无 money 或非该 kind,天然
+    跳过——与在跑时只为进项票种表的语义一致)。首个持有者在先(事件按落库序,复件不覆写)。"""
+    events = ctx.store.list_events(
+        ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id
+    )
+    classified = evidence.replay_items_by_type(events, "item_classified")
+    if not classified:
+        return {}
+    items = ctx.store.list_items(ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id)
+    ref_by_id = {it["id"]: it.get("file_ref") for it in items}
+    seen: dict[str, str] = {}
+    for item_id, rec in classified.items():
+        payload = rec["payload"]
+        if payload.get("kind") != "purchase_invoice":
+            continue
+        fp = _purchase_fingerprint(payload.get("money") or {})
+        if fp and fp not in seen:
+            seen[fp] = Path(ref_by_id.get(item_id) or "").name
+    return seen
 
 
 def _gate_reason(fields: dict) -> Optional[str]:

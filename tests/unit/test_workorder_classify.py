@@ -17,7 +17,7 @@ OWN_NAME = "บริษัท ซิสเตอร์ ตัวอย่าง
 
 
 class FakeItemStore:
-    """list_items/update_item 的内存替身(classify 只用这两个)。"""
+    """list_items/update_item/list_events 的内存替身(classify 只用这三个)。"""
 
     def __init__(self, items):
         self.items = items
@@ -25,6 +25,9 @@ class FakeItemStore:
 
     def list_items(self, cur, *, tenant_id, work_order_id, status=None):
         return [dict(it) for it in self.items if status is None or it["status"] == status]
+
+    def list_events(self, cur, *, tenant_id, work_order_id):
+        return [dict(e) for e in self.events]
 
     def update_item(self, cur, *, tenant_id, item_id, status=None, kind=None, flag_reason=None):
         it = next(i for i in self.items if i["id"] == item_id)
@@ -44,7 +47,14 @@ class FakeItemStore:
         actor="system",
         dedupe_key=None,
     ):
-        self.events.append({"step": step, "event_type": event_type, "payload": payload or {}})
+        self.events.append(
+            {
+                "id": len(self.events) + 1,
+                "step": step,
+                "event_type": event_type,
+                "payload": payload or {},
+            }
+        )
 
     def by_id(self, item_id):
         return next(i for i in self.items if i["id"] == item_id)

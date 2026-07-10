@@ -151,6 +151,9 @@ class _FakeItemStore:
     def list_items(self, cur, *, tenant_id, work_order_id, status=None):
         return [dict(it) for it in self.items if status is None or it["status"] == status]
 
+    def list_events(self, cur, *, tenant_id, work_order_id):
+        return [dict(e) for e in self.events]
+
     def update_item(self, cur, *, tenant_id, item_id, status=None, kind=None, flag_reason=None):
         it = next(i for i in self.items if i["id"] == item_id)
         it["status"] = status
@@ -169,7 +172,9 @@ class _FakeItemStore:
         actor="system",
         dedupe_key=None,
     ):
-        self.events.append({"event_type": event_type, "payload": payload or {}})
+        self.events.append(
+            {"id": len(self.events) + 1, "event_type": event_type, "payload": payload or {}}
+        )
 
     def by_id(self, item_id):
         return next(i for i in self.items if i["id"] == item_id)

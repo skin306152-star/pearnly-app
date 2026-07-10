@@ -47,6 +47,9 @@ class _Store:
             if status is None or self.items[i]["status"] == status
         ]
 
+    def list_events(self, cur, *, tenant_id, work_order_id):
+        return [dict(e) for e in self.events]
+
     def update_item(self, cur, *, tenant_id, item_id, status=None, kind=None, flag_reason=None):
         it = self.items[item_id]
         it["status"] = status
@@ -66,7 +69,12 @@ class _Store:
         dedupe_key=None,
     ):
         self.events.append(
-            {"event_type": event_type, "payload": payload or {}, "dedupe_key": dedupe_key}
+            {
+                "id": len(self.events) + 1,
+                "event_type": event_type,
+                "payload": payload or {},
+                "dedupe_key": dedupe_key,
+            }
         )
 
 
@@ -193,6 +201,7 @@ class _TxnDB:
     def __init__(self, items):
         self.items = {it["id"]: dict(it) for it in items}
         self.events = []
+        self.evt_seq = 0
 
 
 class _TxnUnit:
@@ -220,6 +229,10 @@ class _TxnStore:
     def list_items(self, cur, *, tenant_id, work_order_id, status=None):
         return [dict(r) for r in self.dbo.items.values() if status is None or r["status"] == status]
 
+    def list_events(self, cur, *, tenant_id, work_order_id):
+        # 读已提交事件(_replay_seen_fingerprints 在批前调用,与 Postgres read-committed 同口径)。
+        return [dict(e) for e in self.dbo.events]
+
     def update_item(self, cur, *, tenant_id, item_id, status=None, kind=None, flag_reason=None):
         if item_id == self.fail_on:
             raise RuntimeError("simulated process kill mid-write")
@@ -241,7 +254,15 @@ class _TxnStore:
         actor="system",
         dedupe_key=None,
     ):
-        cur.buf_events.append({"event_type": event_type, "dedupe_key": dedupe_key})
+        self.dbo.evt_seq += 1
+        cur.buf_events.append(
+            {
+                "id": self.dbo.evt_seq,
+                "event_type": event_type,
+                "payload": payload or {},
+                "dedupe_key": dedupe_key,
+            }
+        )
 
 
 class MidClassifyKillCheckpointTests(unittest.TestCase):
@@ -297,6 +318,83 @@ class MidClassifyKillCheckpointTests(unittest.TestCase):
         self.assertNotIn("/in/0.jpg", run2_ocr)  # 已 OCR 件零重烧
         self.assertNotIn("/in/1.jpg", run2_ocr)
         self.assertTrue(all(r["status"] != "pending" for r in dbo.items.values()))  # 全部处理完
+
+    def test_resume_judges_duplicate_across_kill_boundary(self):
+        """打回单 R1 场景:kill 落在「原件 A 已提交、复件 A' 未处理」的边界。续跑必须凭
+        已提交 item_classified 事件重建查重表,把 A' 判 duplicate_of——查重表若从空建,
+        A' 会判成第二张 purchase_invoice → R1 进项税双计(守恒 Σ桶=N 抓不到的静默钱错)。
+        期望:中断续跑对查重的裁决与不中断跑逐字节一致。"""
+        items = [
+            _item("i0", "/in/A.jpg"),  # 原件,run1 落库提交
+            _item("i1", "/in/B.jpg"),  # 杀在此件写入处
+            _item("i2", "/in/A_dup.jpg"),  # A 的复件(不同图片字节、同票面),run2 才处理
+        ]
+        fields = {
+            "/in/A.jpg": _purchase(invoice_no="IV9", total="500.00"),
+            "/in/B.jpg": _purchase(invoice_no="IV8", total="200.00"),
+            "/in/A_dup.jpg": _purchase(invoice_no="IV9", total="500.00"),  # 与 A 同指纹
+        }
+        dbo = _TxnDB(items)
+        classify._ocr_image = lambda path: fields[path]
+
+        with self.assertRaises(RuntimeError):
+            classify.run(self._ctx(dbo, _TxnStore(dbo, fail_on="i1")))
+        self.assertEqual(dbo.items["i0"]["kind"], "purchase_invoice")  # 原件已提交
+        self.assertEqual(dbo.items["i2"]["status"], "pending")  # 复件还没跑到
+
+        out = classify.run(self._ctx(dbo, _TxnStore(dbo)))
+
+        dup = dbo.items["i2"]
+        self.assertEqual(dup["kind"], "duplicate")
+        self.assertEqual(dup["status"], "excluded")
+        self.assertEqual(dup["flag_reason"], "duplicate_of:A.jpg")
+        # 续跑批只有 B 一张新进项;复件绝不进 purchase_invoice 桶(R1 不双计)。
+        self.assertEqual(out.payload["bins"], {"purchase_invoice": 1, "duplicate": 1})
+
+    def test_uninterrupted_run_baseline_matches_resume_verdict(self):
+        """对照组:同一批料不中断跑,A' 同样判 duplicate_of:A.jpg——与上面的中断续跑
+        裁决逐字节一致(打回单 R1 的期望行为)。"""
+        items = [
+            _item("i0", "/in/A.jpg"),
+            _item("i1", "/in/B.jpg"),
+            _item("i2", "/in/A_dup.jpg"),
+        ]
+        fields = {
+            "/in/A.jpg": _purchase(invoice_no="IV9", total="500.00"),
+            "/in/B.jpg": _purchase(invoice_no="IV8", total="200.00"),
+            "/in/A_dup.jpg": _purchase(invoice_no="IV9", total="500.00"),
+        }
+        dbo = _TxnDB(items)
+        classify._ocr_image = lambda path: fields[path]
+
+        out = classify.run(self._ctx(dbo, _TxnStore(dbo)))
+
+        self.assertEqual(dbo.items["i2"]["kind"], "duplicate")
+        self.assertEqual(dbo.items["i2"]["flag_reason"], "duplicate_of:A.jpg")
+        self.assertEqual(out.payload["bins"], {"purchase_invoice": 2, "duplicate": 1})
+
+
+class OcrGeneratorEarlyCloseTests(unittest.TestCase):
+    """_ocr_in_order 窗口式提交:消费方中途异常/提前关闭时,白烧的 OCR 至多一个窗口不是整批,
+    失败立即上抛不等全部在飞 future。"""
+
+    def setUp(self):
+        self.addCleanup(setattr, classify, "_ocr_image", classify._default_ocr_image)
+        self._env = mock.patch.dict(os.environ, {"PEARNLY_WORKORDER_OCR_CONCURRENCY": "2"})
+        self._env.start()
+        self.addCleanup(self._env.stop)
+
+    def test_early_close_does_not_submit_whole_batch(self):
+        calls = []
+        classify._ocr_image = lambda path: (calls.append(path), _purchase())[1]
+        items = [_item(f"i{n}", f"/in/{n}.jpg") for n in range(20)]
+
+        gen = classify._ocr_in_order(items, "tid")
+        next(gen)  # 消费 1 件后模拟消费方异常退出
+        gen.close()
+
+        # 窗口 2n=4 + 消费 1 件补位 1 = 至多 5 件被提交;绝不整批 20 件都烧。
+        self.assertLessEqual(len(calls), 5)
 
 
 if __name__ == "__main__":

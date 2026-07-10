@@ -5,7 +5,34 @@
 
 import { minify } from 'html-minifier-terser';
 import { transform } from 'esbuild';
+import CleanCSS from 'clean-css';
 import { readSource, writeDist } from './build-lib.mjs';
+
+// 门户 dc-runtime 用 style="{{ 绑定 }}" 承载按状态变化的内联样式(导航语言按钮等),由
+// support.js 水合时把 {{…}} 换成 renderVals() 的样式对象。但 minifyCSS:true 走 CleanCSS,
+// 它视 {{…}} 为非法 CSS 整条丢弃 → served 产物退化成 style=""(占位没了,水合无从下手,
+// 元素裸奔无样式)。故自定义 minifyCSS:含 {{ 的内联样式原样放行交运行时,其余照
+// html-minifier 默认路径(wrap→CleanCSS→unwrap)压。
+const wrapCSS = (text, type) =>
+    type === 'inline'
+        ? '*{' + text + '}'
+        : type === 'media'
+          ? '@media ' + text + '{a{top:0}}'
+          : text;
+const unwrapCSS = (text, type) => {
+    const m =
+        type === 'inline'
+            ? text.match(/^\*\{([\s\S]*)\}$/)
+            : type === 'media'
+              ? text.match(/^@media ([\s\S]*?)\s*{[\s\S]*}$/)
+              : null;
+    return m ? m[1] : text;
+};
+async function minifyCSSKeepBindings(text, type) {
+    if (text.includes('{{')) return text; // dc-runtime 绑定占位:放行,交给运行时水合
+    const out = new CleanCSS({}).minify(wrapCSS(text, type));
+    return out.errors.length ? text : unwrapCSS(out.styles, type);
+}
 
 // 保守但有效:折叠标签间空白 + 压内联 JS(鉴权 bootstrap),保留 data-i18n / 属性引号 / 自闭合斜杠
 const OPTS = {
@@ -13,7 +40,7 @@ const OPTS = {
     conservativeCollapse: true, // 至少留一个空格,防 inline 元素(span/a)粘连
     removeComments: true,
     minifyJS: true,
-    minifyCSS: true,
+    minifyCSS: minifyCSSKeepBindings,
     keepClosingSlash: true,
     caseSensitive: true,
 };

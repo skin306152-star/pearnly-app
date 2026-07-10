@@ -61,6 +61,11 @@ GOLDEN_UNDISPUTED_INPUT_VAT = Decimal("25194.23")
 # 算术补正到印刷真值)。真工单 6a4bfbdd(client 94)现场裁决即 recalc vat=4069.05。
 DISPUTED_FACE_VAT_CORRECTED = "4069.05"
 DISPUTED_TICKET_MARK = "IMG_2647"
+# 11 张进项票=IMG_2640~2650(金标锚定,test_03 docstring 同口径)。别名上场
+# (B2-c:客户配 "Sister Makeup" 英文商号)+ OCR 读取方差,任一张都可能因
+# 双锚冲突(闸5 不猜)或锚缺失落进方向队列等人裁——答案键照 W3 人工看票面:
+# 这个文件段的方向票一律裁进项,其余裁销项。金标数字不动。
+PURCHASE_DIRECTION_MARKS = tuple(f"IMG_{n}" for n in range(2640, 2651))
 
 TENANT_ID = "22222222-2222-2222-2222-222222222222"  # 本地测试租户,策划窗按真账套改
 CLIENT_TAX_ID = "0105567178203"  # บริษัท ซิสเตอร์ เมคอัพ จำกัด
@@ -79,7 +84,8 @@ def _direction_kind(item: dict) -> str | None:
         return None
     if not str(item.get("flag_reason") or "").startswith(decisions.DIRECTION_PREFIXES):
         return None
-    if DISPUTED_TICKET_MARK in (item.get("file_ref") or ""):
+    ref = item.get("file_ref") or ""
+    if any(m in ref for m in PURCHASE_DIRECTION_MARKS):
         return "purchase_invoice"
     return "sales_doc"
 
@@ -267,7 +273,13 @@ class GoldenSisterMakeupTests(unittest.TestCase):
             items = self._items(cur)
             events = self._events(cur)
         classified = evidence.replay_items_by_type(events, "item_classified")
-        purchases = [it for it in items if it["kind"] == "purchase_invoice"]
+        # 按文件锚计数(IMG_2640~2650=金标锚定的 11 张进项票),不看 items.kind:
+        # 别名上场 + OCR 读取方差下,任一张可能停在方向队列等人裁(闸5 不猜是设计),
+        # 裁决是事件溯源不改 items.kind——票面层金标只关心「这 11 张的 OCR 钱字段」,
+        # 与它此刻停在哪个队列无关。方向裁决后的税额金标由 test_04/05 事件重放兜底。
+        purchases = [
+            it for it in items if any(m in (it["file_ref"] or "") for m in PURCHASE_DIRECTION_MARKS)
+        ]
         undisputed = [it for it in purchases if DISPUTED_TICKET_MARK not in (it["file_ref"] or "")]
         total = sum(
             (Decimal(str((classified[it["id"]]["payload"]["money"] or {}).get("vat") or "0")))

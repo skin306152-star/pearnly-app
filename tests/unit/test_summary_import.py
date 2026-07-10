@@ -8,6 +8,7 @@
 import unittest
 from unittest import mock
 
+from services.erp.express_push.common import DOC_TYPE_SOURCE_SYNTHETIC
 from services.summary_import import commit as commit_svc
 from services.summary_import import dates as dates_svc
 from services.summary_import import judge as judge_svc
@@ -87,6 +88,12 @@ class MappingTests(unittest.TestCase):
         self.assertEqual(f["buyer_tax"], "")  # 清税号 → 走 MR.ERP/Express 现金兜底
         self.assertTrue(f["_walkin"])
 
+    def test_document_type_source_marked_as_vat_checkbox(self):
+        # 合成票种(按「含VAT」勾选框推)必须留痕来源,供付款判定层识别并跳过
+        # (不当票面证据摊派现/赊 · 见 services/erp/express_push/common.py::payment_verdict)。
+        f = self._map(_sales_constants())[0]["fields"]
+        self.assertEqual(f["document_type_source"], DOC_TYPE_SOURCE_SYNTHETIC)
+
     def test_doc_no_generation_and_dupes(self):
         mapped = self._map(_sales_constants())
         self.assertEqual(mapped[0]["fields"]["invoice_number"], "711-2026-06-001")
@@ -119,6 +126,16 @@ class JudgeTests(unittest.TestCase):
         self.assertEqual(paid["target"], "cash")
         self.assertEqual(paid["source"], "auto")
         default = judge_svc.judge_payment_row(self._fields(_sales_constants(payment_method="")))
+        self.assertEqual(default["target"], "credit")
+        self.assertEqual(default["source"], "default")
+
+    def test_payment_default_not_leaked_by_synthetic_receipt_doc_type(self):
+        # has_vat=False → 合成 document_type="receipt";票种语义单看这值本应=已付,但它是
+        # 「含VAT」勾选框代理值非票面证据,无真实付款信号时必须仍兜底 default/credit,
+        # 不能被票种层误判成 auto/cash(证伪 payment_verdict 的 vat_checkbox 跳层生效)。
+        f = self._fields(_sales_constants(has_vat=False, payment_method=""))
+        self.assertEqual(f["document_type"], "receipt")
+        default = judge_svc.judge_payment_row(f)
         self.assertEqual(default["target"], "credit")
         self.assertEqual(default["source"], "default")
 

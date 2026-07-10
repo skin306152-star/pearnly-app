@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List
 
+from services.erp.express_push.common import DOC_TYPE_SOURCE_SYNTHETIC
 from services.purchase.field_clean import clean_tax_id
 from services.summary_import.dates import resolve_date, to_ad_year
 
@@ -175,6 +176,12 @@ def build_row_fields(
     date = resolve_date(raw_date, _period(constants)) or raw_date
     fields: Dict[str, Any] = {
         "document_type": "tax_invoice" if has_vat is not False else "receipt",
+        # 用户申报「含VAT」勾选框合成的代理值,不是票面 OCR 证据——标记来源,供付款判定
+        # 层(payment_verdict 的 doc_type_payment_hint)识别并跳过,不当票面付款证据摊派现/赊。
+        # 现状(非契约):这个代理 document_type 唯一的付款判据消费点是 payment_verdict,
+        # 已用此标记跳层;judge_direction_row 及 doc_sanity/preflight 等其它读 document_type
+        # 的地方目前不受此代理值影响,但那是当下没碰到而非有意设计——谁要新加消费点须重核。
+        "document_type_source": DOC_TYPE_SOURCE_SYNTHETIC,
         "invoice_number": _gen_doc_no(
             str(constants.get("doc_no_pattern") or ""), index, len(str(row_count))
         ),

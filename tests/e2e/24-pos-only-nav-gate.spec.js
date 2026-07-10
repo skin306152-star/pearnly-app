@@ -91,14 +91,27 @@ test.describe('pos_only 精简外壳 · 侧栏门控', () => {
         await page.waitForTimeout(1500);
 
         const visible = await visibleNavItems(page);
-        expect(visible.length, `pos_only 可见菜单项(实得:${visible.join(', ')})`).toBeLessThanOrEqual(7);
+        expect(
+            visible.length,
+            `pos_only 可见菜单项(实得:${visible.join(', ')})`
+        ).toBeLessThanOrEqual(7);
 
         // 目标名单里的项必须都在(收银台入口/商品/库存/报表/收银员一个都不能少)
         for (const route of EXPECTED_ROUTES) {
             expect(visible, `${route} 应可见`).toContain(route);
         }
         // 30+ 会计/报税/识别/事务所菜单必须都不在
-        for (const forbidden of ['acct-review', 'tax-center', 'vouchers', 'purchase', 'reconcile', 'clients', 'company', 'exceptions', 'integrations']) {
+        for (const forbidden of [
+            'acct-review',
+            'tax-center',
+            'vouchers',
+            'purchase',
+            'reconcile',
+            'clients',
+            'company',
+            'exceptions',
+            'integrations',
+        ]) {
             expect(visible, `${forbidden} 不该出现在 pos_only 侧栏`).not.toContain(forbidden);
         }
 

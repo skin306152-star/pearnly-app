@@ -5,10 +5,9 @@
 //   整组仅当组内模块全关才隐。owner + 有未开模块 → 显「可开启功能 →」引导项(进设置 · 业务/模块)。
 // 老租户无显式行 → 后端回落 DEFAULT_ENABLED(sales/expense/recon/receivable/knowledge=on)→ 导航维持现状(D1)。
 // POS 引导项(开通收银台)沿用既有逻辑:pos 未开 + owner 显(provisioned≠enabled · 见 02 D3)。
-// PS-2 pos_only 精简外壳(POS 拆卖 · POS-体检报告 §5.3):business_type="pos_only" 是运营侧
-// 显式打标的锁死收银店壳,不进自助业态选择器。apply() 末尾另按 data-pos-only-hide 再收一轮
-// (客户/公司资料/异常栏/集成/费用数据/交易明细/收款设置/Sheet留档一律隐),菜单只留
-// 收银台入口+商品+库存+简单报表+收银员管理。
+// PS-2 pos_only 精简外壳(POS 拆卖 · POS-体检报告 §5.3):运营侧显式打标的锁死收银店壳,
+// 不进自助业态选择器。apply() 末尾按 data-pos-only-hide 收一轮,菜单只留收银台入口+商品+
+// 库存+简单报表+收银员管理(客户/公司资料/异常栏/集成/费用数据/交易明细等一律隐)。
 /* global apiGet */
 
 interface ModuleFlag {
@@ -95,15 +94,12 @@ function apply(modules: Record<string, ModuleFlag>, businessType?: string | null
     const anyOff = owner && GATEABLE.some((k) => !on(k));
     show(document.getElementById('nav-enroll'), anyOff);
 
-    // PS-2 · pos_only 精简外壳:标 data-pos-only-hide 的项一律隐(客户/公司资料/异常栏/集成/
-    // 费用数据/交易明细/收款设置/Sheet留档/可开启功能引导)——只留收银台入口+商品+库存+
-    // 简单报表+收银员管理(「设置」走 sb-user 头像入口,不占侧栏项)。只在 isPosOnly 时收一轮
-    // 且只隐不显:非 pos_only 账号一律不碰这批元素,避免压掉它们各自已有的 data-module/
-    // anyOff 显隐结果(这批元素里有几个同时也标了 data-module="pos",两套门控叠加时
-    // 「只隐不显」才不会互相打架)。
-    const isPosOnly = businessType === 'pos_only';
-    if (isPosOnly) {
-        document.querySelectorAll<HTMLElement>('[data-pos-only-hide]').forEach((el) => show(el, false));
+    // PS-2 · pos_only 收一轮(菜单清单见文件头):只隐不显——非 pos_only 账号不碰这批元素,
+    // 免得压掉 data-module/anyOff 已算出的显隐(部分元素两套门控叠加,只隐不显才不打架)。
+    if (businessType === 'pos_only') {
+        document
+            .querySelectorAll<HTMLElement>('[data-pos-only-hide]')
+            .forEach((el) => show(el, false));
     }
 }
 

@@ -10,19 +10,20 @@ const BASELINE_FILE = 'scripts/ui_lint_baseline.json';
 const MODE_GATE = process.argv.includes('--gate');
 const MODE_UPDATE = process.argv.includes('--update-baseline');
 
-const ROOTS = ['src/home', 'static/pos', 'static'];
+// 'static' 已含 'static/pos',单列会让 static/pos/* 被走两遍(基线双计含水分)→ 只留 'static'。
+const ROOTS = ['src/home', 'static'];
 // 设计系统"实物源/令牌定义"文件——允许裸 hex(它们就是令牌来源),扫描时跳过 hex 检查
 const TOKEN_SOURCE =
     /kit-final\.html|templates\.html|dashboard-final\.html|a\.html|b\.html|c\.html|kit\.html|i18n-data|sales-wizard-i18n|home-01-base\.css|console-theme\.css|home-48-recon-redesign\.css|ai-theme\.css/i;
 const SKIP_DIR = /node_modules|[\\/]dist[\\/]|_mock|\.map$/i;
-// 脸0 品牌门户(营销页)不受应用设计令牌约束:整版营销配色(裸 hex)是设计稿本身,
-// vendor/ 是自托管的第三方运行时(React/THREE/GSAP/support.js/字体)——都不是 Pearnly
-// 应用设计系统的一部分。整块排除,免得营销配色/第三方源码污染裸hex/emoji 等棘轮基线。
-const MARKETING_EXCLUDE = /static[\\/]landing[\\/](portal\.dc\.html|vendor[\\/])/i;
-// 自包含独立登录页可读源(EN-6 view-source 压缩:原 routes/*.py 内联常量挪出,同字节
-// 此前本就不在扫描范围):页内自带局部 :root 令牌,不接应用设计系统的 CSS 变量基建,
-// 配色对齐义务在各文件头注(如 earn-login 对 admin.css 令牌)。served 产物在 dist 另有跳过。
-const STANDALONE_PAGE_EXCLUDE = /static[\\/](pos[\\/]pos-login|earn[\\/]earn-login)\.html/i;
+// vendor/ 是自托管的第三方运行时(React/THREE/GSAP/support.js/字体),不是 Pearnly 应用设计
+// 系统的一部分,且成百上千个 minified 文件无法逐个加标记 → 只能按目录整块排除。
+// 单文件的营销页/自包含独立页(portal.dc / *-login / reset)改走文件头标记(见 STANDALONE_MARKER)。
+const MARKETING_EXCLUDE = /static[\\/]landing[\\/]vendor[\\/]/i;
+// 文件头标记豁免:自包含独立页(登录/重置/门户营销稿)页内自带局部 :root 令牌,不接应用设计
+// 系统的 CSS 变量基建,整版配色/emoji 即设计稿本身。在文件前 5 行放 `<!-- ui-lint: standalone -->`
+// 即整文件跳过——比文件名正则稳:文件挪目录/改名不会意外落回扫描(reset.html 从此不再靠"住仓库根"侥幸)。
+const STANDALONE_MARKER = /<!--\s*ui-lint:\s*standalone\s*-->/;
 const EXT = /\.(ts|js|css|html)$/i;
 
 const CHECKS = [
@@ -62,10 +63,18 @@ function walk(dir, out) {
     }
     for (const e of ents) {
         const p = path.join(dir, e.name);
-        if (SKIP_DIR.test(p) || MARKETING_EXCLUDE.test(p) || STANDALONE_PAGE_EXCLUDE.test(p))
-            continue;
+        if (SKIP_DIR.test(p) || MARKETING_EXCLUDE.test(p)) continue;
         if (e.isDirectory()) walk(p, out);
-        else if (EXT.test(e.name)) out.push(p);
+        else if (EXT.test(e.name) && !hasStandaloneMarker(p)) out.push(p);
+    }
+}
+
+// 文件头(前 5 行内)带 standalone 标记 → 整文件豁免扫描(见 STANDALONE_MARKER)。
+function hasStandaloneMarker(f) {
+    try {
+        return STANDALONE_MARKER.test(fs.readFileSync(f, 'utf8').split('\n', 5).join('\n'));
+    } catch {
+        return false;
     }
 }
 

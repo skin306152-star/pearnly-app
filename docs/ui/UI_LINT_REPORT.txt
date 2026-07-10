@@ -1,13 +1,7 @@
-# UI 设计合规扫描报告 · 390 个源文件全扫
+# UI 设计合规扫描报告 · 375 个源文件全扫
 
 
-## 旧色/旧蓝(应改令牌) — 命中 8(8 文件)
-     1  static\pos\pos-cashier.js
-        └ 25: $('main-avatar').style.background = c.color || '#2563EB';
-     1  static\pos\pos-data.js
-        └ 345: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
-     1  static\pos\pos.js
-        └ 126: const color = c.color || '#2563EB';
+## 旧色/旧蓝(应改令牌) — 命中 5(5 文件)
      1  static\admin\admin.css
         └ 521: color: #2563eb;
      1  static\admin\admin.js
@@ -19,16 +13,10 @@
      1  static\pos\pos.js
         └ 126: const color = c.color || '#2563EB';
 
-## 旧token名(应用全局emerald) — 命中 286(32 文件)
+## 旧token名(应用全局emerald) — 命中 205(30 文件)
     59  static\pos\pos.css
         └ 14: --blue: var(--accent); --blue-d: var(--accent-d); --blue-l: var(--accent-weak);
         └ 41: .pos-view--login .brand .b .dot { width: 9px; height: 9px; border-radius: 50%; background:
-    59  static\pos\pos.css
-        └ 14: --blue: var(--accent); --blue-d: var(--accent-d); --blue-l: var(--accent-weak);
-        └ 41: .pos-view--login .brand .b .dot { width: 9px; height: 9px; border-radius: 50%; background:
-    22  static\pos\pos-restaurant.css
-        └ 5: * 复用 pos.css 顶层 --blue/--ink/--bg 等令牌;厨房屏自带深色令牌。.prettierignore 豁免(同 home-*.css)。
-        └ 18: .pos-view--rtables .rtop .brand .dot { width: 9px; height: 9px; border-radius: 50%; backgr
     22  static\pos\pos-restaurant.css
         └ 5: * 复用 pos.css 顶层 --blue/--ink/--bg 等令牌;厨房屏自带深色令牌。.prettierignore 豁免(同 home-*.css)。
         └ 18: .pos-view--rtables .rtop .brand .dot { width: 9px; height: 9px; border-radius: 50%; backgr
@@ -106,7 +94,7 @@
      1  static\home-31-navia-topbar.css
         └ 370: background: var(--blue-50);
 
-## emoji当图标(应换Lucide) — 命中 207(30 文件)
+## emoji当图标(应换Lucide) — 命中 201(28 文件)
     96  static\i18n-data.js
         └ 1399: 'billing-accuracy-good': '✅ 准',
         └ 1400: 'billing-accuracy-fair': '⚠ 一般',
@@ -128,13 +116,8 @@
      4  static\pos\pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
         └ 275: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
-     4  static\pos\pos-i18n.js
-        └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
-        └ 275: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
      2  src\home\core.ts
         └ 2: // 工具(t/escapeHtml/svgIcon)+ Session 被踢弹窗(🔴)+ 鉴权 API(🔴铁律#26)+ plan 上限 helper。
-     2  static\pos\pos-restaurant-ops.js
-        └ 83: const tm = (t.late ? '⚠ ' : '⏱ ') + (t.minutes || 0) + ' ' + POS.t('posui.rest.min');
      2  static\home-12-drawer-search.css
         └ 80: content: "▶";
         └ 300: content: "📑";
@@ -179,7 +162,7 @@
      1  static\home-37-html-inline.css
         └ 153: /* v102 · 统一「需复核」⚠ icon · 替代原「缺金额 → 补金额」黄按钮 */
 
-## 小固定max-width(查是否@media) — 命中 125(64 文件)
+## 小固定max-width(查是否@media) — 命中 121(63 文件)
      8  src\home\sales-detail.ts
         └ 115: detailMask().innerHTML = `<div class="modal" role="dialog" style="max-width:640px">
         └ 160: actionMask().innerHTML = `<div class="modal" role="dialog" style="max-width:380px">
@@ -192,9 +175,6 @@
      5  static\home-02-switcher.css
         └ 17: max-width: 240px;
         └ 53: max-width: 420px;
-     4  static\pos\pos.css
-        └ 227: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
-        └ 247: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
      4  static\home-37-html-inline.css
         └ 660: max-width: 420px;
         └ 1201: max-width: 420px;
@@ -422,13 +402,11 @@
         └ 429: 'time-hours-ago': '{n} 小时前',
         └ 430: 'time-days-ago': '{n} 天前',
 
-## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 1044(69 文件)
+## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 890(63 文件)
    157  static\home-18-admin-users.css
-    83  static\pos\pos.css
     83  static\pos\pos.css
     68  static\admin\admin.js
     63  static\erp-mrerp-connect.css
-    51  static\pos\pos-restaurant.css
     51  static\pos\pos-restaurant.css
     40  static\admin\admin.css
     39  static\landing\landing-auth.css
@@ -440,7 +418,6 @@
     17  static\home-38-buttons.css
     17  static\landing\landing-static-bg-mobile.css
     16  src\home\modal-client-edit.ts
-    15  static\pos\pos.html
     15  static\pos\pos.html
     12  static\home-40-sales-wizard.css
     12  static\landing\landing-tour.js
@@ -463,7 +440,6 @@
      4  src\home\line-panel.ts
      4  src\home\module-settings.ts
      4  static\erp-mrerp-connect.js
-     3  static\pos\pos-data.js
      3  static\landing\auth-modal.css
      3  static\landing\landing-tour-scenes.js
      3  static\landing\responsive.css
@@ -486,8 +462,6 @@
      1  src\home\knowledge-fab.ts
      1  src\home\notifications.ts
      1  src\home\purchase-list.ts
-     1  static\pos\pos-cashier.js
-     1  static\pos\pos.js
      1  static\home-15-team-folder.css
      1  static\landing\landing-interactions.css
      1  static\pos\pos-cashier.js

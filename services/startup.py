@@ -302,6 +302,14 @@ def _boot_schema_ddl() -> None:
     except Exception as e:
         logger.warning(f"启动 采购 schema 失败(等 alembic 0031-0033): {e}")
 
+    # 客户税务画像 schema 双跑 · 与 alembic 0064 同源幂等 DDL(税务画像-方案-B1 §5)。
+    try:
+        from services.workspace.tax_profile_schema import ensure_tax_profile_schema
+
+        ensure_tax_profile_schema()
+    except Exception as e:
+        logger.warning(f"启动 税务画像 schema 失败(等 alembic 0064): {e}")
+
     # 进项外流(Google 归档)schema + 注册 export 异步 handler(复用 recon_jobs worker)。
     try:
         from services.export.schema import ensure_export_schema

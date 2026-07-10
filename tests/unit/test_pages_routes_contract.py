@@ -40,6 +40,8 @@ EXPECTED = {
     ("GET", "/console"),
     ("GET", "/console/{rest:path}"),
     ("GET", "/invite/{token}"),
+    # EN-2:超管后台专属登录页(admin.js 未登录统一甩回本页)
+    ("GET", "/earn"),
     # M1-W2 新增:Pearnly AI SPA 友好路由(照 /console 先例 · 出 static/dist/ai.html)
     ("GET", "/ai"),
     ("GET", "/ai/{rest:path}"),

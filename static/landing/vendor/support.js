@@ -1374,6 +1374,21 @@
   }
 
   // src/pseudo.ts
+  // Local patch (Pearnly EN-11): interactive pseudo declarations (hover/focus/active)
+  // must win over the element's base *inline* style. A generated `.scp:hover{}` rule is
+  // a stylesheet rule, which inline styles always beat — so a button whose base style
+  // sets `color` could never recolor its text on hover (dark bg + dark text = unreadable).
+  // Flagging those declarations `!important` restores the intended "hover overrides base"
+  // semantics. Structural pseudo-elements (before/after) are left untouched.
+  var IMPORTANT_PSEUDOS = /* @__PURE__ */ new Set(["hover", "focus", "active", "focus-visible"]);
+  function forceImportant(css) {
+    return css
+      .split(";")
+      .map((d) => d.trim())
+      .filter(Boolean)
+      .map((d) => (/!important\s*$/.test(d) ? d : d + " !important"))
+      .join("; ");
+  }
   function createPseudoSheet(doc) {
     let el = null;
     const cache = /* @__PURE__ */ new Map();
@@ -1388,7 +1403,8 @@
       }
       const cls = "scp" + (n++).toString(36);
       const sel = pseudo === "before" || pseudo === "after" ? "." + cls + "::" + pseudo : "." + cls + ":" + pseudo;
-      el.sheet.insertRule(sel + "{" + css + "}", el.sheet.cssRules.length);
+      const body = IMPORTANT_PSEUDOS.has(pseudo) ? forceImportant(css) : css;
+      el.sheet.insertRule(sel + "{" + body + "}", el.sheet.cssRules.length);
       cache.set(k, cls);
       return cls;
     };

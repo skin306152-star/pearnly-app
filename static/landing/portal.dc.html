@@ -33,28 +33,11 @@
   [lang="en"] { display: none; }
   [data-lang="en"] [lang="en"] { display: inline; }
   [data-lang="en"] [lang="th"] { display: none; }
-  /* Scroll-scrub video: 300vh scroll drives a pinned 100vh frame (see Component._scrub).
-     Pinning is JS-driven (position toggled by _scrub), NOT CSS sticky — the portal root's
-     overflow-x:hidden establishes a scroll container that disables position:sticky for
-     descendants; JS fixed/absolute pins the frame without touching that shared root. */
-  .pn-scrub-wrap { position: relative; height: 300vh; }
-  .pn-scrub-sticky { position: absolute; top: 0; left: 0; right: 0; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-  .pn-scrub-frame { position: relative; width: 82vw; max-width: 1400px; aspect-ratio: 16 / 9; }
-  .pn-scrub-video {
-    width: 100%; height: 100%; object-fit: cover; border-radius: 20px; display: block;
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%), linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%);
-    -webkit-mask-composite: source-in; -webkit-mask-repeat: no-repeat, no-repeat; -webkit-mask-size: 100% 100%, 100% 100%;
-    mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%), linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%);
-    mask-composite: intersect; mask-repeat: no-repeat, no-repeat; mask-size: 100% 100%, 100% 100%;
-  }
-  .pn-scrub-caption { position: absolute; left: 50%; bottom: -50px; transform: translateX(-50%); text-align: center; font-size: 14px; color: #57604B; opacity: 0; transition: opacity 0.4s ease; white-space: nowrap; }
-  .pn-scrub-caption.visible { opacity: 1; }
-  .pn-scrub-track { position: absolute; bottom: -26px; left: 50%; transform: translateX(-50%); width: 200px; height: 3px; background: #E0DED2; border-radius: 999px; overflow: hidden; }
-  .pn-scrub-fill { height: 100%; width: 0%; background: #4E7D25; border-radius: 999px; }
-  @media (max-width: 640px) {
-    .pn-scrub-caption { font-size: 12.5px; bottom: -44px; }
-    .pn-scrub-track { width: 150px; }
-  }
+  /* AI document-review demo (replaces the old scroll-scrub video). Auto-plays once on
+     scroll-in, then stays interactive. Logic lives in Component.dm* (namespaced). */
+  @keyframes pnScan { 0% { top: 10%; } 50% { top: 86%; } 100% { top: 10%; } }
+  @keyframes pnAnnErr { 0%, 100% { box-shadow: 0 0 0 0 rgba(178,58,36,.30); } 50% { box-shadow: 0 0 0 9px rgba(178,58,36,0); } }
+  @keyframes pnAnnWarn { 0%, 100% { box-shadow: 0 0 0 0 rgba(176,122,30,.30); } 50% { box-shadow: 0 0 0 9px rgba(176,122,30,0); } }
   @media (max-width: 800px) {
     [data-pstage] { height: auto !important; padding: 8px 0 12px !important; display: flex !important; flex-direction: column; gap: 18px; align-items: center; }
     [data-pcard] { position: static !important; width: 100% !important; max-width: 400px !important; transform: none !important; }
@@ -62,6 +45,8 @@
     [data-pcard]:nth-child(odd) { margin-right: 24px; }
     [data-aistage] { transform: scale(0.72); transform-origin: top center; margin-bottom: -120px; }
     [data-hide-m] { display: none !important; }
+    /* AI demo workspace stacks on narrow screens (card body is not JS-animated). */
+    [data-wscard] { grid-template-columns: 1fr !important; height: min(680px,88vh) !important; padding: 14px !important; gap: 12px !important; }
   }
   /* 尊重系统「减少动态效果」:跳过入场动画,内容直接落定可见(不改默认动效视觉)。
      !important 压过 GSAP 写在元素 style 上的 inline opacity/visibility(无 !important)。
@@ -74,10 +59,6 @@
     [data-flow], [data-role] {
       opacity: 1 !important; visibility: visible !important; transform: none !important;
     }
-    /* No scroll-scrub: collapse the tall scroller, show the poster still frame in flow. */
-    .pn-scrub-wrap { height: auto; }
-    .pn-scrub-sticky { position: relative; height: auto; padding: 56px 0; }
-    .pn-scrub-caption { opacity: 1; }
   }
 </style>
 </helmet>
@@ -212,19 +193,242 @@
     </div>
   </section>
 
-  <!-- ================= SCRUB VIDEO (scroll-driven) ================= -->
-  <!-- 滚动搓视频:sticky 100vh 视频 + 300vh 滚程,blob 化解 seek(静态服务器无 Range),
-       进度条随滚动、字幕在中段淡入。逻辑挂 Component._scrub(),reduced-motion 降级为静帧海报。 -->
-  <section data-screen-label="Scrub" class="pn-scrub-wrap">
-    <div class="pn-scrub-sticky">
-      <div class="pn-scrub-frame">
-        <video class="pn-scrub-video" data-scrub-video muted playsinline preload="auto" poster="/static/landing/poster.jpg?v=1">
-          <source src="/static/landing/hero-scrub.mp4?v=1" type="video/mp4">
-        </video>
-        <div class="pn-scrub-caption" data-scrub-caption>
-          <span lang="th">ตรวจสอบทุกใบเสร็จอัตโนมัติ</span><span lang="en">Every receipt checked automatically</span>
+  <!-- ================= AI DOCUMENT-REVIEW DEMO (replaces old scrub video) ================= -->
+  <!-- 滚入视口自动播一次(单据聚拢 → AI 扫描 → 报告工作台),播完停在可交互态:
+       场景标签 / 清单 / 单据放大均可点。逻辑挂 Component.dm*(命名空间隔离主 Component)。 -->
+  <section ref="{{ dmRootRef }}" data-screen-label="AI review demo" style="font-family: 'Anuphan', system-ui, sans-serif; background: #F6F5EE; color: #1B2416;">
+    <div data-outer style="height: 100vh; position: relative;">
+      <div data-sticky style="position: sticky; top: 0; height: 100vh; overflow: hidden;">
+
+        <!-- kicker -->
+        <div data-kicker style="position: absolute; top: 34px; left: 50%; transform: translateX(-50%); z-index: 15; display: flex; align-items: center; gap: 10px;">
+          <span style="width: 7px; height: 7px; border-radius: 50%; background: #4E7D25; display: inline-block;"></span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.18em; color: #5C6355;">PEARNLY AI · <span lang="th">เดโม</span><span lang="en">LIVE DEMO</span></span>
         </div>
-        <div class="pn-scrub-track"><div class="pn-scrub-fill" data-scrub-fill></div></div>
+
+        <!-- phase rail -->
+        <div data-rail data-hide-m style="position: absolute; left: 34px; top: 50%; transform: translateY(-50%); z-index: 15; display: flex; flex-direction: column; gap: 26px; transition: opacity 0.3s;">
+          <div data-step style="display: flex; align-items: center; gap: 10px; opacity: 0.35; transition: opacity 0.3s;">
+            <span data-dot style="width: 9px; height: 9px; border-radius: 50%; background: #4E7D25; display: inline-block;"></span>
+            <span style="font-size: 12.5px; font-weight: 600; color: #1B2416;"><span lang="th">รวบรวมเอกสาร</span><span lang="en">Collect documents</span></span>
+          </div>
+          <div data-step style="display: flex; align-items: center; gap: 10px; opacity: 0.35; transition: opacity 0.3s;">
+            <span data-dot style="width: 9px; height: 9px; border-radius: 50%; background: #4E7D25; display: inline-block;"></span>
+            <span style="font-size: 12.5px; font-weight: 600; color: #1B2416;"><span lang="th">AI ตรวจสอบ</span><span lang="en">AI review</span></span>
+          </div>
+          <div data-step style="display: flex; align-items: center; gap: 10px; opacity: 0.35; transition: opacity 0.3s;">
+            <span data-dot style="width: 9px; height: 9px; border-radius: 50%; background: #4E7D25; display: inline-block;"></span>
+            <span style="font-size: 12.5px; font-weight: 600; color: #1B2416;"><span lang="th">รายงาน ภ.พ.30</span><span lang="en">PP.30 report</span></span>
+          </div>
+        </div>
+
+        <!-- flying documents -->
+        <div style="position: absolute; inset: 0; z-index: 10;">
+          <sc-for list="{{ docs }}" as="d" hint-placeholder-count="10">
+            <div data-doc data-x="{{ d.x }}" data-y="{{ d.y }}" data-r="{{ d.r }}" data-dl="{{ d.delay }}" data-k="{{ d.k }}" style="position: absolute; left: {{ d.x }}%; top: {{ d.y }}%; transform: translate(-50%,-50%) rotate({{ d.r }}deg); will-change: transform, opacity; width: 92px;">
+              <div style="background: #FFFFFF; border: 1px solid #E3E1D5; border-radius: 8px; padding: 7px 8px 8px; box-shadow: 0 4px 14px rgba(27,36,22,.07); transition: transform 0.25s, box-shadow 0.25s;" style-hover="transform: translateY(-5px) scale(1.07); box-shadow: 0 14px 30px rgba(27,36,22,.16);">
+                <div style="height: 3px; border-radius: 2px; background: {{ d.color }}; margin-bottom: 6px; width: 60%;"></div>
+                <div style="font-size: 7.5px; font-weight: 600; color: #1B2416; white-space: nowrap; overflow: hidden;">{{ d.label }}</div>
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 6.5px; color: #9A987F; margin-top: 1px;">#{{ d.no }}</div>
+                <div style="height: 3px; background: #EEEDE3; border-radius: 2px; margin-top: 5px;"></div>
+                <div style="height: 3px; background: #EEEDE3; border-radius: 2px; margin-top: 3px; width: 72%;"></div>
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 8px; color: #1B2416; text-align: right; margin-top: 6px;">{{ d.amt }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <!-- monitor -->
+        <div data-monitor style="position: absolute; left: 50%; top: 47%; transform: translate(-50%,-50%); z-index: 5; opacity: 0; width: min(720px,60vw); will-change: transform, opacity;">
+          <div style="background: #141A12; border-radius: 18px; padding: 12px; box-shadow: 0 30px 80px rgba(27,36,22,.28);">
+            <div style="background: #0E140C; border-radius: 10px; aspect-ratio: 16/9.4; position: relative; overflow: hidden; display: flex; flex-direction: column;">
+              <div style="display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,.07);">
+                <span style="width: 6px; height: 6px; border-radius: 50%; background: #8FC47E; display: inline-block;"></span>
+                <span style="font-size: 11px; font-weight: 600; color: #D8DECE;">Pearnly AI · <span lang="th">มิถุนายน 2569</span><span lang="en">June 2026</span></span>
+                <span data-ready style="margin-left: auto; font-size: 10.5px; font-weight: 600; color: #8FC47E; opacity: 0; transition: opacity 0.3s;"><span lang="th">พร้อมสร้างรายงาน ✓</span><span lang="en">Report ready ✓</span></span>
+              </div>
+              <div style="flex: 1; display: flex; align-items: center; justify-content: center; gap: min(44px,5vw); padding: 0 24px;">
+                <div style="text-align: center;">
+                  <div style="display: flex; align-items: baseline; gap: 6px; justify-content: center;">
+                    <span data-count style="font-family: 'IBM Plex Mono', monospace; font-size: clamp(34px,4.4vw,56px); font-weight: 500; color: #F2F3E9;">0</span>
+                    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: #6E7A64;">/ {{ nTotal }}</span>
+                  </div>
+                  <div style="font-size: 11.5px; color: #8A9480; margin-top: 2px;"><span lang="th">เอกสารเข้าระบบ</span><span lang="en">documents ingested</span></div>
+                </div>
+                <div data-hide-m style="display: flex; flex-direction: column; gap: 12px; min-width: 180px;">
+                  <div>
+                    <div style="display: flex; justify-content: space-between; font-size: 10.5px; color: #B9C2AE; margin-bottom: 4px;"><span><span lang="th">ใบกำกับภาษีขาย-ซื้อ</span><span lang="en">Tax invoices</span></span><span data-cat="0" style="font-family: 'IBM Plex Mono', monospace;">0</span></div>
+                    <div style="height: 4px; background: rgba(255,255,255,.08); border-radius: 2px; overflow: hidden;"><div data-catbar="0" style="height: 100%; width: 0%; background: #4E7D25; border-radius: 2px;"></div></div>
+                  </div>
+                  <div>
+                    <div style="display: flex; justify-content: space-between; font-size: 10.5px; color: #B9C2AE; margin-bottom: 4px;"><span><span lang="th">ใบเสร็จรับเงิน</span><span lang="en">Receipts</span></span><span data-cat="1" style="font-family: 'IBM Plex Mono', monospace;">0</span></div>
+                    <div style="height: 4px; background: rgba(255,255,255,.08); border-radius: 2px; overflow: hidden;"><div data-catbar="1" style="height: 100%; width: 0%; background: #B07A1E; border-radius: 2px;"></div></div>
+                  </div>
+                  <div>
+                    <div style="display: flex; justify-content: space-between; font-size: 10.5px; color: #B9C2AE; margin-bottom: 4px;"><span><span lang="th">สลิปธนาคาร</span><span lang="en">Bank slips</span></span><span data-cat="2" style="font-family: 'IBM Plex Mono', monospace;">0</span></div>
+                    <div style="height: 4px; background: rgba(255,255,255,.08); border-radius: 2px; overflow: hidden;"><div data-catbar="2" style="height: 100%; width: 0%; background: #3C7A6E; border-radius: 2px;"></div></div>
+                  </div>
+                </div>
+              </div>
+              <div style="padding: 0 16px 14px;">
+                <div style="display: flex; justify-content: space-between; font-size: 10px; color: #6E7A64; margin-bottom: 5px;"><span><span lang="th">AI ตรวจสอบยอด · VAT · เลขผู้เสียภาษี</span><span lang="en">AI checks totals · VAT · tax ID</span></span><span data-pct style="font-family: 'IBM Plex Mono', monospace;">0%</span></div>
+                <div style="height: 5px; background: rgba(255,255,255,.08); border-radius: 3px; overflow: hidden;"><div data-bar style="height: 100%; width: 0%; background: linear-gradient(90deg,#4E7D25,#8FC47E); border-radius: 3px;"></div></div>
+              </div>
+              <div data-scan style="position: absolute; left: 6%; right: 6%; height: 2px; background: linear-gradient(90deg,transparent,#8FC47E,transparent); opacity: 0; animation: pnScan 2.6s ease-in-out infinite;"></div>
+            </div>
+          </div>
+          <div style="width: 90px; height: 22px; background: #141A12; margin: 0 auto; border-radius: 0 0 6px 6px;"></div>
+          <div style="width: 180px; height: 8px; background: #1B2416; margin: 0 auto; border-radius: 6px;"></div>
+        </div>
+
+        <!-- workspace: report + inspector -->
+        <div data-ws style="position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%) translateY(46px); z-index: 20; opacity: 0; pointer-events: none; width: min(1180px,94vw); will-change: transform, opacity;">
+          <div data-wscard style="background: #FFFFFF; border: 1px solid #E3E1D5; border-radius: 20px; box-shadow: 0 40px 100px rgba(27,36,22,.18); padding: 20px; display: grid; grid-template-columns: minmax(300px,360px) 1fr; gap: 18px; height: min(700px,86vh); overflow: hidden;">
+
+            <!-- left: PP.30 + checklist -->
+            <div style="display: flex; flex-direction: column; gap: 14px; min-height: 0;">
+              <div style="background: #F1F0E7; border-radius: 16px; padding: 20px; color: #1B2416; overflow: auto; flex-shrink: 1; min-height: 120px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 17px; font-weight: 700;">ภ.พ.30</span>
+                  <span style="font-size: 11px; background: rgba(27,36,22,.07); padding: 3px 9px; border-radius: 99px; color: #4A5142;"><span lang="th">มิถุนายน 2569</span><span lang="en">June 2026</span></span>
+                  <span style="margin-left: auto; font-size: 11px; font-weight: 600; color: #2E7031; background: rgba(46,112,49,.12); padding: 3px 9px; border-radius: 99px;"><span lang="th">พร้อมตรวจ</span><span lang="en">Ready</span></span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-top: 16px; font-size: 13px;"><span style="color: #5C6355;"><span lang="th">ภาษีขาย</span><span lang="en">Output VAT</span></span><span style="font-family: 'IBM Plex Mono', monospace;">42,318.00</span></div>
+                <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 13px;"><span style="color: #5C6355;"><span lang="th">ภาษีซื้อ</span><span lang="en">Input VAT</span></span><span style="font-family: 'IBM Plex Mono', monospace;">28,904.50</span></div>
+                <div style="height: 1px; background: rgba(27,36,22,.1); margin: 12px 0;"></div>
+                <div style="display: flex; justify-content: space-between; align-items: baseline;"><span style="font-size: 13px; color: #5C6355;"><span lang="th">ภาษีที่ต้องชำระ</span><span lang="en">VAT payable</span></span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 600; color: #2E7031;">13,413.50</span></div>
+                <div style="margin-top: 16px;">
+                  <div style="display: flex; justify-content: space-between; font-size: 11px; color: #5C6355; margin-bottom: 5px;"><span style="white-space: nowrap;"><span lang="th">เอกสารครบ</span><span lang="en">Docs complete</span></span><span style="font-family: 'IBM Plex Mono', monospace; white-space: nowrap;">{{ cOkDocs }} / {{ nTotal }}</span></div>
+                  <div style="height: 5px; background: rgba(27,36,22,.1); border-radius: 3px; overflow: hidden;"><div style="height: 100%; width: 95%; background: #2E7031; border-radius: 3px;"></div></div>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px;">
+                  <span style="font-size: 10.5px; padding: 3px 8px; border-radius: 99px; background: rgba(46,112,49,.12); color: #2E7031; white-space: nowrap;">✓ <span lang="th">ผ่าน</span><span lang="en">Pass</span> {{ cPass }}</span>
+                  <span style="font-size: 10.5px; padding: 3px 8px; border-radius: 99px; background: rgba(178,58,36,.1); color: #B23A24; white-space: nowrap;">✗ <span lang="th">ผิด</span><span lang="en">Error</span> {{ cErr }}</span>
+                  <span style="font-size: 10.5px; padding: 3px 8px; border-radius: 99px; background: rgba(176,122,30,.12); color: #8A6512; white-space: nowrap;">⚠ <span lang="th">ขาด</span><span lang="en">Missing</span> {{ cWarn }}</span>
+                  <span style="font-size: 10.5px; padding: 3px 8px; border-radius: 99px; background: rgba(176,122,30,.12); color: #8A6512; white-space: nowrap;">⧉ <span lang="th">ซ้ำ</span><span lang="en">Dup</span> {{ cDup }}</span>
+                  <span style="font-size: 10.5px; padding: 3px 8px; border-radius: 99px; background: rgba(176,122,30,.12); color: #8A6512; white-space: nowrap;">◌ <span lang="th">เบลอ</span><span lang="en">Blur</span> {{ cBlur }}</span>
+                </div>
+              </div>
+
+              <div style="border: 1px solid #E3E1D5; border-radius: 16px; padding: 14px; flex: 1; min-height: 0; display: flex; flex-direction: column;">
+                <div style="font-size: 12px; font-weight: 700; color: #5C6355; letter-spacing: 0.04em; margin: 2px 4px 10px;"><span lang="th">รายการที่ต้องตรวจ · คลิกเพื่อดู</span><span lang="en">Items to review · click to view</span></div>
+                <div style="overflow: auto; display: flex; flex-direction: column; gap: 4px;">
+                  <sc-for list="{{ rows }}" as="row" hint-placeholder-count="4">
+                    <div onClick="{{ row.onClick }}" style="{{ row.style }}" style-hover="background: #EFEEE3;">
+                      <div style="min-width: 0;">
+                        <div style="font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ row.no }}</div>
+                        <div style="font-size: 11px; color: #8A8871; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ row.vendor }}</div>
+                      </div>
+                      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: #5C6355; margin-left: auto;">{{ row.amt }}</span>
+                      <span style="font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 99px; background: {{ row.pillBg }}; color: {{ row.pillFg }}; white-space: nowrap;">{{ row.pill }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+
+            <!-- right: scenario tabs + inspector -->
+            <div style="display: flex; flex-direction: column; gap: 12px; min-height: 0;">
+              <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                <sc-for list="{{ tabs }}" as="tab" hint-placeholder-count="6">
+                  <button onClick="{{ tab.onClick }}" style="{{ tab.style }}" style-hover="transform: translateY(-1px);">{{ tab.label }}</button>
+                </sc-for>
+              </div>
+
+              <div data-stage style="background: #F1F0E7; border-radius: 16px; flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; overflow: hidden;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; justify-content: center;">
+                  <span style="{{ badgeStyle }}">{{ scBadge }}</span>
+                  <span style="font-size: 12px; color: #5C6355; max-width: 420px;">{{ scNote }}</span>
+                </div>
+
+                <sc-if value="{{ zoom }}" hint-placeholder-val="{{ false }}">
+                  <div onClick="{{ toggleZoom }}" style="position: absolute; inset: 0; background: rgba(27,36,22,.38); z-index: 30; cursor: zoom-out; border-radius: 16px;"></div>
+                </sc-if>
+
+                <div style="{{ zoomStyle }}">
+                  <div data-fit style="position: relative; transition: transform 0.3s; will-change: transform;">
+                  <sc-if value="{{ isDup }}" hint-placeholder-val="{{ false }}">
+                    <div style="position: absolute; inset: 0; background: #FFFFFF; border-radius: 6px; transform: rotate(-4deg) translate(-16px,10px); box-shadow: 0 10px 30px rgba(27,36,22,.12); padding: 26px 28px;">
+                      <div style="height: 8px; background: #EEEDE3; border-radius: 3px; width: 55%;"></div>
+                      <div style="height: 6px; background: #EEEDE3; border-radius: 3px; width: 80%; margin-top: 12px;"></div>
+                      <div style="height: 6px; background: #EEEDE3; border-radius: 3px; width: 70%; margin-top: 8px;"></div>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{ showInv }}" hint-placeholder-val="{{ true }}">
+                    <div onClick="{{ toggleZoom }}" style="background: #FFFFFF; width: min(460px,72vw); border-radius: 6px; box-shadow: 0 18px 50px rgba(27,36,22,.16); position: relative;">
+                      <div style="{{ blurStyle }}">
+                        <div style="padding: 22px 26px 20px; font-size: 12.5px; line-height: 1.5;">
+                          <div style="display: flex; align-items: baseline; justify-content: space-between;">
+                            <span style="font-size: 15px; font-weight: 700;"><span lang="th">ใบกำกับภาษี / ใบเสร็จรับเงิน</span><span lang="en">Tax invoice / receipt</span></span>
+                            <span style="font-size: 10px; border: 1px solid #E3E1D5; padding: 2px 8px; border-radius: 99px; color: #8A8871;"><span lang="th">ต้นฉบับ</span><span lang="en">Original</span></span>
+                          </div>
+                          <div style="position: relative; display: inline-block; margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: #5C6355;">
+                            <span lang="th">เลขที่ INV-2569/0614 · วันที่ 14/06/2569</span><span lang="en">No. INV-2026/0614 · Date 14/06/2026</span>
+                            <sc-if value="{{ annDup }}" hint-placeholder-val="{{ false }}">
+                              <span style="position: absolute; inset: -4px -8px; border: 2px solid #B07A1E; border-radius: 6px; animation: pnAnnWarn 1.6s infinite;"></span>
+                              <span style="position: absolute; left: 0; top: 100%; margin-top: 9px; background: #B07A1E; color: #fff; font-size: 10.5px; font-weight: 600; padding: 4px 9px; border-radius: 7px; white-space: nowrap; z-index: 6; box-shadow: 0 6px 16px rgba(176,122,30,.32);">⧉ <span lang="th">เลขที่ซ้ำกับเอกสาร #0602</span><span lang="en">Duplicate no. with doc #0602</span></span>
+                            </sc-if>
+                          </div>
+                          <div style="margin-top: 10px; font-weight: 600;"><span lang="th">บริษัท สยามซัพพลาย จำกัด (สำนักงานใหญ่)</span><span lang="en">Siam Supply Co., Ltd. (Head Office)</span></div>
+                          <div style="font-size: 11px; color: #8A8871;"><span lang="th">88/12 ถ.พระราม 4 แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110</span><span lang="en">88/12 Rama IV Rd, Khlong Toei, Bangkok 10110</span></div>
+                          <div style="position: relative; display: inline-block; margin-top: 4px; font-size: 11.5px; color: #5C6355;">
+                            <span lang="th">เลขประจำตัวผู้เสียภาษี</span><span lang="en">Tax ID</span> <span style="font-family: 'IBM Plex Mono', monospace;">{{ invTaxId }}</span>
+                            <sc-if value="{{ annTax }}" hint-placeholder-val="{{ false }}">
+                              <span style="position: absolute; inset: -4px -8px; border: 2px solid #B23A24; border-radius: 6px; animation: pnAnnErr 1.6s infinite;"></span>
+                              <span style="position: absolute; left: 0; top: 100%; margin-top: 9px; background: #B23A24; color: #fff; font-size: 10.5px; font-weight: 600; padding: 4px 9px; border-radius: 7px; white-space: nowrap; z-index: 6; box-shadow: 0 6px 16px rgba(178,58,36,.32);">✗ <span lang="th">ไม่ตรงกับฐานข้อมูลกรมสรรพากร</span><span lang="en">No match in Revenue Dept records</span></span>
+                            </sc-if>
+                          </div>
+                          <div style="height: 1px; background: #E3E1D5; margin: 14px 0 10px;"></div>
+                          <div style="display: grid; grid-template-columns: 1fr auto; row-gap: 6px; font-size: 12px;">
+                            <span><span lang="th">กระดาษ A4 80 แกรม × 20 รีม</span><span lang="en">A4 paper 80 gsm × 20 reams</span></span><span style="font-family: 'IBM Plex Mono', monospace;">2,400.00</span>
+                            <span><span lang="th">หมึกพิมพ์เลเซอร์ × 2 กล่อง</span><span lang="en">Laser toner × 2 boxes</span></span><span style="font-family: 'IBM Plex Mono', monospace;">5,600.00</span>
+                          </div>
+                          <div style="height: 1px; background: #E3E1D5; margin: 10px 0;"></div>
+                          <div style="display: flex; justify-content: space-between; font-size: 12px;"><span style="color: #5C6355;"><span lang="th">รวมเป็นเงิน</span><span lang="en">Subtotal</span></span><span style="font-family: 'IBM Plex Mono', monospace;">8,000.00</span></div>
+                          <div style="position: relative; display: flex; justify-content: space-between; font-size: 12px; margin-top: 6px;">
+                            <span style="color: #5C6355;"><span lang="th">ภาษีมูลค่าเพิ่ม 7%</span><span lang="en">VAT 7%</span></span><span style="font-family: 'IBM Plex Mono', monospace;">{{ invVat }}</span>
+                            <sc-if value="{{ annVat }}" hint-placeholder-val="{{ false }}">
+                              <span style="position: absolute; inset: -5px -8px; border: 2px solid #B23A24; border-radius: 6px; animation: pnAnnErr 1.6s infinite;"></span>
+                              <span style="position: absolute; right: 0; top: 100%; margin-top: 9px; background: #B23A24; color: #fff; font-size: 10.5px; font-weight: 600; padding: 4px 9px; border-radius: 7px; white-space: nowrap; z-index: 6; box-shadow: 0 6px 16px rgba(178,58,36,.32);">✗ <span lang="th">คำนวณได้ 560.00 · เอกสารระบุ 605.00</span><span lang="en">Calculated 560.00 · doc says 605.00</span></span>
+                            </sc-if>
+                            <sc-if value="{{ annOk }}" hint-placeholder-val="{{ false }}">
+                              <span style="position: absolute; inset: -5px -8px; border: 2px solid #2E7031; border-radius: 6px;"></span>
+                              <span style="position: absolute; right: 0; top: 100%; margin-top: 9px; background: #2E7031; color: #fff; font-size: 10.5px; font-weight: 600; padding: 4px 9px; border-radius: 7px; white-space: nowrap; z-index: 6; box-shadow: 0 6px 16px rgba(46,112,49,.32);">✓ <span lang="th">ยอดถูกต้อง · เข้าชุด ภ.พ.30</span><span lang="en">Amount correct · added to PP.30</span></span>
+                            </sc-if>
+                          </div>
+                          <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; margin-top: 8px; padding-top: 8px; border-top: 1.5px solid #1B2416;"><span><span lang="th">จำนวนเงินทั้งสิ้น</span><span lang="en">Grand total</span></span><span style="font-family: 'IBM Plex Mono', monospace;">{{ invTotal }}</span></div>
+                          <div style="display: flex; justify-content: flex-end; margin-top: 16px; font-size: 10.5px; color: #8A8871;"><span lang="th">ผู้รับเงิน</span><span lang="en">Received by</span> ______________</div>
+                        </div>
+                      </div>
+                      <sc-if value="{{ annBlur }}" hint-placeholder-val="{{ false }}">
+                        <div style="position: absolute; left: 50%; top: 44%; transform: translate(-50%,-50%); background: #B07A1E; color: #fff; font-size: 11.5px; font-weight: 600; padding: 8px 14px; border-radius: 9px; white-space: nowrap; z-index: 6; box-shadow: 0 10px 26px rgba(176,122,30,.35);">◌ <span lang="th">ภาพไม่ชัด · ส่งคำขอเอกสารใหม่ผ่าน LINE แล้ว ✓</span><span lang="en">Blurred · re-request sent via LINE ✓</span></div>
+                      </sc-if>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{ isMiss }}" hint-placeholder-val="{{ false }}">
+                    <div style="width: min(460px,72vw); border: 2px dashed #C9B67E; border-radius: 10px; background: rgba(255,255,255,.55); padding: 44px 30px; text-align: center;">
+                      <div style="font-size: 30px; color: #B07A1E;">⚠</div>
+                      <div style="font-size: 14px; font-weight: 700; margin-top: 8px;"><span lang="th">ไม่พบใบกำกับภาษี</span><span lang="en">Tax invoice not found</span></div>
+                      <div style="font-size: 12px; color: #5C6355; margin-top: 5px;"><span lang="th">มีใบเสร็จ #RCP-0847 (1,177.00) แต่ชุดเอกสารขาดใบกำกับภาษีคู่กัน</span><span lang="en">Receipt #RCP-0847 (1,177.00) present, but its matching tax invoice is missing</span></div>
+                      <div style="display: inline-flex; align-items: center; gap: 7px; margin-top: 16px; background: #1B2416; color: #F2F3E9; font-size: 12px; font-weight: 600; padding: 8px 16px; border-radius: 99px; cursor: pointer;"><span lang="th">ทวงเอกสารผ่าน LINE →</span><span lang="en">Request via LINE →</span></div>
+                    </div>
+                  </sc-if>
+                  </div>
+                </div>
+
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9A987F; margin-top: 12px;">{{ zoomHint }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- footer hint -->
+        <div data-hint style="position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 30; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.12em; color: #8A8871; display: flex; flex-direction: column; align-items: center; gap: 6px;">
+          <span>PEARNLY AI · <span lang="th">เดโมอัตโนมัติ</span><span lang="en">AUTO DEMO</span></span>
+        </div>
+
       </div>
     </div>
   </section>
@@ -551,12 +755,17 @@
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{ &quot;defaultLang&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;th&quot;, &quot;en&quot;], &quot;default&quot;: &quot;th&quot;, &quot;tsType&quot;: &quot;'th' | 'en'&quot;, &quot;section&quot;: &quot;Behavior&quot; }, &quot;enable3d&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Behavior&quot; } }">
 class Component extends DCLogic {
-  state = { lang: this.props.defaultLang ?? 'th' };
+  state = { lang: this.props.defaultLang ?? 'th', sc: 'vat', zoom: false };
 
   componentDidMount() {
     this._reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this._narrow = window.innerWidth < 800;
     this._renderers = [];
+    // AI document-review demo: pure DOM/rAF, independent of gsap/three — start it eagerly
+    // so it plays even if the WebGL libs are slow/unavailable.
+    this._dmP = -1;
+    const dmLoop = () => { this._dmRaf = requestAnimationFrame(dmLoop); this.dmTick(); };
+    dmLoop();
     // hover tilt on product cards
     this._onMove = (e) => {
       if (this._reduced || this._narrow || !(this.props.enable3d ?? true) || !this._introDone) return;
@@ -603,10 +812,7 @@ class Component extends DCLogic {
     if (this._safety) clearTimeout(this._safety);
     window.removeEventListener('resize', this._fitStage);
     if (this._raf) cancelAnimationFrame(this._raf);
-    if (this._scrubRaf) cancelAnimationFrame(this._scrubRaf);
-    if (this._scrubScroll) window.removeEventListener('scroll', this._scrubScroll);
-    if (this._scrubResize) window.removeEventListener('resize', this._scrubResize);
-    if (this._scrubBlob) URL.revokeObjectURL(this._scrubBlob);
+    if (this._dmRaf) cancelAnimationFrame(this._dmRaf);
     if (window.ScrollTrigger) ScrollTrigger.getAll().forEach((s) => s.kill());
     (this._renderers || []).forEach((r) => { r.dispose(); r.domElement.remove(); });
   }
@@ -885,19 +1091,8 @@ class Component extends DCLogic {
         if (i === cards.length - 1) this._introDone = true;
       }, [], 1.75);
     });
-
-    // scroll-out drift: cards spread + fade as you scroll past
-    if (!this._narrow) {
-      const spread = { ai: -46, acc: -14, cash: 16, own: 50 };
-      cards.forEach((el) => {
-        gsap.to(el, {
-          x: spread[el.getAttribute('data-pcard')] || 0,
-          opacity: 0.3,
-          ease: 'none',
-          scrollTrigger: { trigger: el.parentElement, start: 'bottom 62%', end: 'bottom 8%', scrub: true },
-        });
-      });
-    }
+    // 无 scroll-out 视差:此前的 scrub 淡出把「入场前 opacity:0」当基线记录,滚离滚回
+    // 时反向回到 0 → 卡片整片消失。入场一次即定,滚动来回始终可见。
   }
 
   // draw a lightweight replica of the DOM card as a texture
@@ -1087,71 +1282,166 @@ class Component extends DCLogic {
       });
     }
 
-    this._scrub();
   }
 
-  // ---------- scroll-scrubbed hero video (self-hosted, seekable via blob) ----------
-  _scrub() {
-    if (this._reduced) return; // reduced-motion: CSS shows the poster still frame
-    const video = document.querySelector('[data-scrub-video]');
-    const wrap = video && video.closest('.pn-scrub-wrap');
-    if (!video || !wrap) return;
-    const sticky = wrap.querySelector('.pn-scrub-sticky');
-    const caption = document.querySelector('[data-scrub-caption]');
-    const fill = document.querySelector('[data-scrub-fill]');
+  // ---------- AI document-review demo (in-view autoplay, then interactive) ----------
+  // Deterministic doc field: seeded LCG so the scattered documents render identically
+  // every load (no flicker across re-renders).
+  dmMakeDocs(n) {
+    if (this._dmDocsCache && this._dmDocsN === n) return this._dmDocsCache;
+    let s = 42 >>> 0;
+    const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    const types = ['ก', 'ข', 'ค'];
+    const colors = ['#4E7D25', '#B07A1E', '#3C7A6E'];
+    const docs = [];
+    for (let i = 0; i < n; i++) {
+      docs.push({
+        k: i % 3,
+        x: Math.round((2 + rnd() * 96) * 10) / 10,
+        y: Math.round((2 + rnd() * 96) * 10) / 10,
+        r: Math.round((rnd() * 28 - 14) * 10) / 10,
+        delay: Math.round(rnd() * 550) / 1000,
+        label: this.state.lang === 'en' ? ['Tax invoice', 'Receipt', 'Bank slip'][i % 3] : ['ใบกำกับภาษี', 'ใบเสร็จรับเงิน', 'สลิปธนาคาร'][i % 3],
+        color: colors[i % 3],
+        no: String(600 + Math.floor(rnd() * 400)),
+        amt: (Math.floor(rnd() * 9000) + 400).toLocaleString('en-US') + '.00',
+      });
+    }
+    this._dmDocsCache = docs; this._dmDocsN = n;
+    return docs;
+  }
 
-    // Static hosting reports the file unseekable (no HTTP Range), which breaks
-    // scrubbing even once fully downloaded. A blob: URL is always fully seekable.
-    fetch(video.currentSrc || video.querySelector('source').src)
-      .then((res) => res.blob())
-      .then((blob) => {
-        if (this._dead) return;
-        this._scrubBlob = URL.createObjectURL(blob);
-        video.src = this._scrubBlob;
-      })
-      .catch(() => { /* fall back to networked <source>; seeking may be limited */ });
+  dmEnsureEls() {
+    const r = this._dmRoot;
+    if (!r) return null;
+    const n = this.props.docCount ?? 40;
+    if (!this._dmEl || this._dmEl.docsLen !== n) {
+      const q = (sel) => r.querySelector(sel);
+      const outer = q('[data-outer]');
+      if (!outer) return null;
+      const docNodes = Array.from(r.querySelectorAll('[data-doc]'));
+      docNodes.forEach((el) => {
+        el._p = {
+          x: parseFloat(el.dataset.x), y: parseFloat(el.dataset.y),
+          r: parseFloat(el.dataset.r), dl: parseFloat(el.dataset.dl),
+          k: parseInt(el.dataset.k, 10),
+        };
+      });
+      this._dmEl = {
+        docsLen: docNodes.length === n ? n : -1,
+        outer, docNodes,
+        sticky: q('[data-sticky]'), monitor: q('[data-monitor]'),
+        ws: q('[data-ws]'), hint: q('[data-hint]'),
+        count: q('[data-count]'), bar: q('[data-bar]'), pct: q('[data-pct]'),
+        ready: q('[data-ready]'), scan: q('[data-scan]'),
+        cats: [q('[data-cat="0"]'), q('[data-cat="1"]'), q('[data-cat="2"]')],
+        catbars: [q('[data-catbar="0"]'), q('[data-catbar="1"]'), q('[data-catbar="2"]')],
+        steps: Array.from(r.querySelectorAll('[data-step]')),
+        kicker: q('[data-kicker]'), rail: q('[data-rail]'),
+      };
+    }
+    return this._dmEl;
+  }
 
-    // JS sticky: pin the frame across the 300vh scroller. CSS position:sticky can't
-    // be used (the root's overflow-x:hidden disables it for descendants), so toggle
-    // fixed/absolute here — scoped to this section, no shared root change.
-    const pin = () => {
-      const rect = wrap.getBoundingClientRect();
-      const maxShift = wrap.offsetHeight - window.innerHeight;
-      if (rect.top >= 0) { sticky.style.position = 'absolute'; sticky.style.top = '0px'; }
-      else if (-rect.top <= maxShift) { sticky.style.position = 'fixed'; sticky.style.top = '0px'; }
-      else { sticky.style.position = 'absolute'; sticky.style.top = maxShift + 'px'; }
-    };
+  dmTick() {
+    if (this._dead) return;
+    const el = this.dmEnsureEls();
+    if (!el) return;
+    const vh = window.innerHeight;
+    const dur = (this.props.playDuration ?? 9) * 1000;
+    if (!this._dmStarted) {
+      const rc = el.outer.getBoundingClientRect();
+      if (rc.top < vh * 0.45 && rc.bottom > vh * 0.4) {
+        // reduced-motion: land straight on the finished workspace, skip the buildup.
+        this._dmStarted = this._reduced ? performance.now() - dur : performance.now();
+      }
+    }
+    let p = 0;
+    if (this._dmStarted) p = Math.min(1, (performance.now() - this._dmStarted) / dur);
+    this.dmFitInspector();
+    if (Math.abs(p - this._dmP) < 0.0004) return;
+    this._dmP = p;
+    this.dmApply(p, el);
+  }
 
-    let target = 0, cur = 0;
-    const progress = () => {
-      const total = wrap.offsetHeight - window.innerHeight;
-      if (total <= 0) return 0;
-      return Math.min(1, Math.max(0, -wrap.getBoundingClientRect().top / total));
-    };
-    this._scrubScroll = () => {
-      pin();
-      const p = progress();
-      const d = isFinite(video.duration) ? video.duration : 0;
-      if (d > 0) target = p * d;
-      if (fill) fill.style.width = (p * 100).toFixed(1) + '%';
-      if (caption) caption.classList.toggle('visible', p > 0.15 && p < 0.85);
-    };
-    this._scrubResize = pin;
-    window.addEventListener('resize', this._scrubResize, { passive: true });
-    const tick = () => {
-      if (this._dead) return;
-      cur += (target - cur) * 0.12;
-      if (Math.abs(cur - target) < 0.01) cur = target;
-      if (video.readyState >= 2) { try { video.currentTime = cur; } catch (e) { /* seeking during load */ } }
-      this._scrubRaf = requestAnimationFrame(tick);
-    };
-    window.addEventListener('scroll', this._scrubScroll, { passive: true });
-    this._scrubScroll();
-    this._scrubRaf = requestAnimationFrame(tick);
+  dmFitInspector() {
+    const r = this._dmRoot;
+    if (!r) return;
+    const stage = r.querySelector('[data-stage]');
+    const fit = r.querySelector('[data-fit]');
+    if (!stage || !fit) return;
+    const avail = stage.clientHeight - 104;
+    const nat = fit.offsetHeight;
+    if (nat < 2 || avail < 2) return;
+    const s = Math.max(0.4, Math.min(1, avail / nat));
+    if (Math.abs(s - (this._dmFitS || 0)) < 0.01) return;
+    this._dmFitS = s;
+    fit.style.transform = 'scale(' + s + ')';
+    const m = (-nat * (1 - s) / 2) + 'px';
+    fit.style.marginTop = m;
+    fit.style.marginBottom = m;
+  }
+
+  dmApply(p, el) {
+    const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+    const E = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+    const rc = el.sticky.getBoundingClientRect();
+    const vw = rc.width, vh = rc.height;
+    const n = el.docNodes.length || 1;
+
+    // documents converge onto the monitor
+    const pIn = clamp(p / 0.42, 0, 1);
+    let absorbed = 0;
+    const catCounts = [0, 0, 0];
+    for (let i = 0; i < el.docNodes.length; i++) {
+      const node = el.docNodes[i];
+      const d = node._p;
+      const t = clamp((pIn - d.dl * 0.6) / 0.4, 0, 1);
+      const e = E(t);
+      const dx = ((50 - d.x) / 100) * vw * e;
+      const dy = ((47 - d.y) / 100) * vh * e;
+      node.style.transform = 'translate(-50%,-50%) translate(' + dx + 'px,' + dy + 'px) rotate(' + (d.r * (1 - e)) + 'deg) scale(' + (1 - 0.9 * e) + ')';
+      const op = t < 0.8 ? 1 : clamp(1 - (t - 0.8) / 0.16, 0, 1);
+      node.style.opacity = op;
+      node.style.visibility = op <= 0.01 ? 'hidden' : 'visible';
+      if (t >= 0.95) { absorbed++; catCounts[d.k]++; }
+    }
+    el.count.textContent = absorbed;
+    for (let k = 0; k < 3; k++) {
+      el.cats[k].textContent = catCounts[k];
+      el.catbars[k].style.width = clamp((catCounts[k] / (n / 3)) * 100, 0, 100) + '%';
+    }
+
+    // monitor rises then hands off to the workspace
+    const mIn = clamp((p - 0.02) / 0.1, 0, 1);
+    const ex = E(clamp((p - 0.6) / 0.14, 0, 1));
+    el.monitor.style.opacity = mIn * (1 - ex);
+    el.monitor.style.transform = 'translate(-50%,-50%) scale(' + (0.92 + 0.08 * E(clamp(p / 0.4, 0, 1)) + ex * 0.7) + ')';
+
+    // AI processing bar
+    const pr = clamp((p - 0.4) / 0.18, 0, 1);
+    el.bar.style.width = (pr * 100) + '%';
+    el.pct.textContent = Math.round(pr * 100) + '%';
+    el.ready.style.opacity = clamp((pr - 0.9) / 0.1, 0, 1);
+    el.scan.style.opacity = p > 0.06 && p < 0.6 ? 0.9 : 0;
+
+    // workspace report
+    const w = E(clamp((p - 0.64) / 0.13, 0, 1));
+    el.ws.style.opacity = w;
+    el.ws.style.transform = 'translate(-50%,-50%) translateY(' + ((1 - w) * 46) + 'px) scale(' + (0.96 + 0.04 * w) + ')';
+    el.ws.style.pointerEvents = w > 0.85 ? 'auto' : 'none';
+
+    // phase rail + hint fade
+    const active = p < 0.42 ? 0 : p < 0.64 ? 1 : 2;
+    el.steps.forEach((s, i) => { s.style.opacity = i === active ? 1 : 0.35; });
+    el.hint.style.opacity = clamp(1 - p * 7, 0, 1);
+    el.kicker.style.opacity = 1 - w;
+    el.rail.style.opacity = 1 - w;
   }
 
   renderVals() {
     const lang = this.state.lang;
+    const L = (th, en) => (lang === 'en' ? en : th);
     const btn = (active) => ({
       border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '13.5px', fontWeight: 600,
       padding: '6px 14px', borderRadius: '999px',
@@ -1159,12 +1449,102 @@ class Component extends DCLogic {
       color: active ? '#FAF9F5' : '#57604B',
       transition: 'background 0.15s, color 0.15s',
     });
+
+    // ---- AI document-review demo bindings (scenario tabs + checklist + inspector) ----
+    const n = this.props.docCount ?? 40;
+    const sc = this.state.sc;
+    const zoom = this.state.zoom;
+    const SC = {
+      ok:    { badge: L('ผ่านการตรวจ ✓', 'Passed ✓'), bg: '#E4EFDD', fg: '#2E7031', note: L('ยอดเงิน ภาษี และเลขผู้เสียภาษีถูกต้อง — พร้อมเข้าชุดหลักฐาน ภ.พ.30', 'Amount, VAT and tax ID all correct — ready for the PP.30 evidence pack') },
+      vat:   { badge: L('ภาษีมูลค่าเพิ่มไม่ตรง ✗', 'VAT mismatch ✗'), bg: '#F7E4DF', fg: '#B23A24', note: L('ฐานภาษี 8,000.00 × 7% = 560.00 แต่เอกสารระบุ 605.00', 'Base 8,000.00 × 7% = 560.00, but the document says 605.00') },
+      taxid: { badge: L('เลขผู้เสียภาษีไม่ตรง ✗', 'Tax ID mismatch ✗'), bg: '#F7E4DF', fg: '#B23A24', note: L('เลข 13 หลักไม่ตรงกับชื่อผู้ขายในฐานข้อมูลกรมสรรพากร', 'The 13-digit ID does not match the seller name in Revenue Dept records') },
+      dup:   { badge: L('เอกสารซ้ำ ⧉', 'Duplicate ⧉'), bg: '#F5ECD8', fg: '#8A6512', note: L('เลขที่เอกสารซ้ำกับใบกำกับ #0602 ที่บันทึกไว้เมื่อ 02/06/2569', 'Document number duplicates invoice #0602 recorded on 02/06/2026') },
+      blur:  { badge: L('อ่านไม่ได้ ◌', 'Unreadable ◌'), bg: '#F5ECD8', fg: '#8A6512', note: L('ภาพถ่ายไม่ชัด ระบบส่งคำขอเอกสารใหม่ให้ลูกค้าผ่าน LINE อัตโนมัติ', 'Photo is blurry — the system auto-requested a fresh copy from the client via LINE') },
+      miss:  { badge: L('เอกสารไม่ครบ ⚠', 'Incomplete ⚠'), bg: '#F5ECD8', fg: '#8A6512', note: L('พบใบเสร็จแต่ไม่พบใบกำกับภาษีคู่กัน — สถานการณ์จริงที่เจอทุกเดือน', 'Receipt found but its matching tax invoice is missing — a real monthly occurrence') },
+    };
+    const cur = SC[sc];
+    const setSc = (id) => () => this.setState({ sc: id, zoom: false });
+    const tabDefs = [
+      ['ok', L('ถูกต้อง ✓', 'Correct ✓')], ['vat', L('VAT ไม่ตรง', 'VAT off')], ['taxid', L('เลขภาษีผิด', 'Bad tax ID')],
+      ['dup', L('เอกสารซ้ำ', 'Duplicate')], ['blur', L('ภาพเบลอ', 'Blurred')], ['miss', L('เอกสารขาด', 'Missing')],
+    ];
+    const tabs = tabDefs.map(([id, label]) => ({
+      label,
+      onClick: setSc(id),
+      style: {
+        fontFamily: 'inherit', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+        padding: '7px 14px', borderRadius: '99px', transition: 'all .2s', whiteSpace: 'nowrap',
+        border: sc === id ? '1px solid #1B2416' : '1px solid #E3E1D5',
+        background: sc === id ? '#1B2416' : '#FFFFFF',
+        color: sc === id ? '#F2F3E9' : '#4A5142',
+      },
+    }));
+    const rowDefs = [
+      { id: 'vat',   no: 'INV-2569/0614', vendor: L('บจก. สยามซัพพลาย', 'Siam Supply Co.'),   amt: '8,560.00',  pill: L('✗ VAT', '✗ VAT'),          err: 1 },
+      { id: 'taxid', no: 'INV-2569/0631', vendor: L('บจก. เอ็นพี เทรดดิ้ง', 'NP Trading Co.'), amt: '12,412.00', pill: L('✗ เลขภาษี', '✗ Tax ID'),    err: 1 },
+      { id: 'miss',  no: 'RCP-0847',      vendor: L('ร้านรุ่งเรืองการค้า', 'Rungruang Store'), amt: '1,177.00',  pill: L('⚠ ขาดใบกำกับ', '⚠ No invoice'), err: 0 },
+      { id: 'dup',   no: 'INV-2569/0602', vendor: L('บจก. สยามซัพพลาย', 'Siam Supply Co.'),   amt: '8,560.00',  pill: L('⧉ ซ้ำ', '⧉ Dup'),          err: 0 },
+      { id: 'blur',  no: 'IMG_4412.jpg',  vendor: L('รอระบุผู้ขาย', 'Seller pending'),        amt: '—',         pill: L('◌ เบลอ', '◌ Blur'),        err: 0 },
+      { id: 'ok',    no: 'INV-2569/0640', vendor: L('คลินิกทันตกรรมซี', 'C Dental Clinic'),    amt: '3,210.00',  pill: L('✓ ผ่าน', '✓ Pass'),         err: 2 },
+    ];
+    const rows = rowDefs.map((d) => ({
+      no: d.no, vendor: d.vendor, amt: d.amt, pill: d.pill,
+      pillBg: d.err === 1 ? '#F7E4DF' : d.err === 2 ? '#E4EFDD' : '#F5ECD8',
+      pillFg: d.err === 1 ? '#B23A24' : d.err === 2 ? '#2E7031' : '#8A6512',
+      onClick: setSc(d.id),
+      style: {
+        display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer',
+        padding: '8px 10px', borderRadius: '10px', transition: 'background .15s',
+        background: sc === d.id ? '#EFEEE3' : 'transparent',
+        outline: sc === d.id ? '1.5px solid #C9C6B4' : 'none',
+      },
+    }));
+    const dPass = Math.round(n * 0.87);
+    const dErr = Math.round(n * 0.05);
+    const dWarn = Math.round(n * 0.033);
+    const dDup = Math.round(n * 0.027);
+    const dBlur = Math.max(1, n - dPass - dErr - dWarn - dDup);
+
     return {
       lang,
       setTh: () => this.setState({ lang: 'th' }),
       setEn: () => this.setState({ lang: 'en' }),
       thBtnStyle: btn(lang === 'th'),
       enBtnStyle: btn(lang === 'en'),
+
+      // AI demo
+      dmRootRef: (el) => { this._dmRoot = el; },
+      docs: this.dmMakeDocs(n),
+      nTotal: n,
+      cOkDocs: dPass + dErr + dDup + dBlur,
+      cPass: dPass, cErr: dErr, cWarn: dWarn, cDup: dDup, cBlur: dBlur,
+      tabs, rows, zoom,
+      scBadge: cur.badge,
+      scNote: cur.note,
+      badgeStyle: { fontSize: '12px', fontWeight: 700, padding: '5px 12px', borderRadius: '99px', background: cur.bg, color: cur.fg, whiteSpace: 'nowrap' },
+      showInv: sc !== 'miss',
+      isMiss: sc === 'miss',
+      isDup: sc === 'dup',
+      annVat: sc === 'vat',
+      annTax: sc === 'taxid',
+      annDup: sc === 'dup',
+      annOk: sc === 'ok',
+      annBlur: sc === 'blur',
+      invVat: sc === 'vat' ? '605.00' : '560.00',
+      invTotal: sc === 'vat' ? '8,605.00' : '8,560.00',
+      invTaxId: sc === 'taxid' ? '0-1055-61023-49-9' : '0-1055-61023-45-7',
+      blurStyle: { filter: sc === 'blur' ? 'blur(3px)' : 'none', transition: 'filter .4s' },
+      toggleZoom: () => this.setState((s) => ({ zoom: !s.zoom })),
+      zoomHint: zoom ? L('คลิกเพื่อย่อ ⤡', 'Click to shrink ⤡') : L('คลิกเอกสารเพื่อขยาย ⤢', 'Click the document to zoom ⤢'),
+      zoomStyle: {
+        position: 'relative',
+        transform: zoom ? 'scale(1.4)' : 'scale(1)',
+        zIndex: zoom ? 40 : 1,
+        transition: 'transform .45s cubic-bezier(.22,1,.36,1)',
+        cursor: zoom ? 'zoom-out' : 'zoom-in',
+        maxHeight: '100%',
+      },
+
       // 四卡终版链接(2026-07-10 Zihao 拍板·子域名方案废弃):AI→/ai · 会计→/acc 未就绪前
       // 临时 /login · 收银台→/cashier · POS 老板后台→/pos;演示/联系走 LINE OA(与
       // /api/contact 的 CONTACT_LINE_URL 同源)。

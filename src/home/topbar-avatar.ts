@@ -227,7 +227,9 @@
                         } catch (_) {
                             /* silent · localStorage 私模/配额 */
                         }
-                        window.location.href = '/login';
+                        // 按壳分流:POS 收银店(pos_only)回收银入口,不落老猫登录页那个世界。
+                        window.location.href =
+                            window._businessType === 'pos_only' ? '/pos' : '/login';
                     });
                     break;
             }

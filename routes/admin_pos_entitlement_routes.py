@@ -138,6 +138,64 @@ async def get_pos_entitlement(request: Request, q: str = Query(..., min_length=1
         return _status_for(cur, tenant)
 
 
+# 每行:店名 + 账号(owner 用户名)+ 业态 + 授权状态 + 开通时间 + 已付额。业态哨兵行与
+# owner 用户名各一次 JOIN 取回(非逐行 N+1);owner 多号时取最早建的(发放路建的主账号)。
+_LIST_SQL = """
+    SELECT
+        e.tenant_id::text AS tenant_id,
+        t.name AS tenant_name,
+        e.status,
+        e.amount_paid_thb,
+        e.grant_code,
+        e.purchased_at,
+        bt.config->>'value' AS business_type,
+        u.username AS username
+    FROM pos_entitlements e
+    JOIN tenants t ON t.id = e.tenant_id
+    LEFT JOIN tenant_modules bt
+        ON bt.tenant_id = e.tenant_id AND bt.module_key = '__business_type__'
+    LEFT JOIN LATERAL (
+        SELECT ux.username FROM users ux
+        WHERE ux.tenant_id = e.tenant_id AND ux.role = 'owner'
+        ORDER BY ux.created_at ASC LIMIT 1
+    ) u ON TRUE
+    ORDER BY e.purchased_at DESC
+    LIMIT %s OFFSET %s
+"""
+
+
+@router.get("/api/admin/pos-entitlement/list")
+async def list_pos_entitlements(
+    request: Request,
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    """已开通商家常驻列表(超管进页自动加载)。跨租户读走 owner 游标(BYPASSRLS)。
+
+    首版全量(数据量小),分页参数留口子。点行=前端拿 tenant_id 回查现状(复用 get 接口)。
+    """
+    _require_super_admin(request)
+    with db.get_cursor() as cur:
+        cur.execute(_LIST_SQL, (int(limit), int(offset)))
+        rows = cur.fetchall() or []
+        cur.execute("SELECT count(*) AS n FROM pos_entitlements")
+        total = int((cur.fetchone() or {}).get("n") or 0)
+    items = [
+        {
+            "tenant_id": r["tenant_id"],
+            "tenant_name": r["tenant_name"] or "(无名)",
+            "username": r["username"] or "",
+            "business_type": r["business_type"] or "",
+            "status": r["status"],
+            "amount_paid_thb": float(r["amount_paid_thb"] or 0),
+            "grant_code": r["grant_code"],
+            "purchased_at": r["purchased_at"].isoformat() if r["purchased_at"] else None,
+        }
+        for r in rows
+    ]
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
 @router.post("/api/admin/pos-entitlement/grant")
 async def grant_pos_entitlement(request: Request, body: GrantBody):
     """开通买断授权(默认已付 ฿1000)→ 联动 pos_only 业态 + 记 credit_transactions 审计。"""

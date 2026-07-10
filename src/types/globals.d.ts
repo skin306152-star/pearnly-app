@@ -302,6 +302,8 @@ interface Window {
     autoSatisfyWorkspaceGate?: () => void;
     // pos_only 收银壳把客户知识入口排除白名单外:置旗让 knowledge-center 的 kbProbe reveal 不显。
     _navShellHidesKnowledge?: boolean;
+    // 当前租户业态(module-nav apply 写)· 退出登录按壳分流用:pos_only→/pos 其余→/login。
+    _businessType?: string;
     satisfyWorkspaceGate?: (id: number) => void;
     closeWorkspaceGate?: () => void;
     openSubjectCreate?: (opts?: { onCreated?: (id: number) => void }) => void;

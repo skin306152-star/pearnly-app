@@ -94,6 +94,8 @@ function applyMerchantNav(
 }
 
 function apply(modules: Record<string, ModuleFlag>, businessType?: string | null): void {
+    // 单一事实源:退出登录按壳分流(topbar-avatar)靠它决定落 /pos 还是 /login。
+    window._businessType = businessType || '';
     const owner = typeof window.isOwner === 'function' ? window.isOwner() : false;
     const emp = typeof window.isEmployee === 'function' ? window.isEmployee() : false;
     const on = (k: string) => !!(modules[k] && modules[k].enabled);

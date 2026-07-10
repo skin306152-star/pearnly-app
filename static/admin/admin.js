@@ -3213,6 +3213,25 @@
     // ============ POS 开通页(PS-3 买断授权 · 开通/吊销/转移)============
     let _posLastQuery = '';
 
+    // 业态代码 → 人话(单一来源:与后端 BUSINESS_PRESETS 同名七业态)。未知回落原始代码。
+    function _posBizLabel(bt) {
+        if (!bt) return '—';
+        const key = 'adm-pos-biz-' + bt;
+        const label = _t(key);
+        return label === key ? bt : label;
+    }
+
+    // 小号复制按钮(UUID/授权码等排查用编号):点按写剪贴板 + toast。用事件委托(data-pos-copy)。
+    function _posCopyBtn(value) {
+        return (
+            '<button type="button" class="btn btn-ghost btn-sm" data-pos-copy="' +
+            _esc(value) +
+            '" style="padding:1px 8px;font-size:11px;line-height:1.6">' +
+            _esc(_t('adm-pos-copy')) +
+            '</button>'
+        );
+    }
+
     function _posBadge(status) {
         // 自带样式(不依赖 POS-home 的 .csh-st · admin 包未必含该切片):active=绿,其余=灰。
         const color = status === 'active' ? 'var(--success)' : 'var(--ink-3)';
@@ -3226,12 +3245,38 @@
         );
     }
 
+    // 租户卡:店名当主值,UUID 降级为「租户编号」小字副行(排查/客服用)+ 复制按钮。
+    function _posTenantCard(t) {
+        const idLine = t.id
+            ? '<div class="cost-kpi-sub" style="display:flex;align-items:center;gap:6px;' +
+              'margin-top:2px;font-size:11px;opacity:.75">' +
+              '<span title="' +
+              _esc(_t('adm-pos-tenant-id-tip')) +
+              '">' +
+              _esc(_t('adm-pos-tenant-id')) +
+              ' <code style="font-size:10.5px">' +
+              _esc(t.id) +
+              '</code></span>' +
+              _posCopyBtn(t.id) +
+              '</div>'
+            : '';
+        return (
+            '<div class="cost-kpi-card"><div class="cost-kpi-label">' +
+            _esc(_t('adm-pos-tenant')) +
+            '</div><div class="cost-kpi-value">' +
+            _esc(t.name || '—') +
+            '</div>' +
+            idLine +
+            '</div>'
+        );
+    }
+
     function _posStatusHtml(d) {
         const t = d.tenant || {};
         const ent = d.entitlement;
         let rows =
             '<div class="cost-kpi-grid" style="margin-bottom:16px">' +
-            _engKpi(_t('adm-pos-tenant'), _esc(t.name || '—'), _esc(t.id || '')) +
+            _posTenantCard(t) +
             _engKpi(
                 _t('adm-pos-stores'),
                 (d.stores_used != null ? d.stores_used : '—') +
@@ -3241,10 +3286,11 @@
                     (d.cashiers_used != null ? d.cashiers_used : '—') +
                     (ent ? ' / ' + ent.cashier_limit : '')
             ) +
+            // 业态:人话当主值,原始代码缩到副行(客服/排查对照用)。
             _engKpi(
                 _t('adm-pos-biztype'),
-                _esc(d.business_type || '—'),
-                d.has_subscription ? _t('adm-pos-has-sub') : ''
+                _posBizLabel(d.business_type),
+                (d.business_type || '') + (d.has_subscription ? ' · ' + _t('adm-pos-has-sub') : '')
             ) +
             '</div>';
 
@@ -3255,13 +3301,19 @@
                 ' ' +
                 _posBadge(ent.status) +
                 ' · ' +
+                '<span title="' +
+                _esc(_t('adm-pos-code-tip')) +
+                '">' +
                 _t('adm-pos-code') +
                 ' <code>' +
                 _esc(ent.grant_code) +
-                '</code> · ' +
+                '</code></span> · ' +
                 _t('adm-pos-paid') +
                 ' ฿' +
                 _fmt(ent.amount_paid_thb || 0, 2) +
+                '</div>' +
+                '<div class="cost-section-hint" style="margin:-6px 0 12px;font-size:11px;opacity:.7">' +
+                _esc(_t('adm-pos-code-tip')) +
                 '</div>';
         } else {
             rows +=
@@ -3347,6 +3399,7 @@
                     });
                     _toast(_t('adm-pos-granted') + ' ' + (r.grant_code || ''), 'success');
                     _posLoadStatus(_posLastQuery);
+                    _posRenderList();
                 } catch (e) {
                     _toast(_t('adm-pos-action-fail'), 'error');
                 }
@@ -3367,6 +3420,7 @@
                     });
                     _toast(_t('adm-pos-revoked'), 'success');
                     _posLoadStatus(_posLastQuery);
+                    _posRenderList();
                 } catch (e) {
                     _toast(_t('adm-pos-action-fail'), 'error');
                 }
@@ -3391,7 +3445,12 @@
                         body: { from_tenant_id: tid, to_tenant_id: to },
                     });
                     _toast(_t('adm-pos-xferred'), 'success');
-                    _posLoadStatus(to); // 转移后跟随到目标租户看新状态
+                    // 跟随到目标租户看新状态:查询框同步成目标标识(与发放流一致),
+                    // 免得搜索框仍留源标识、再点查询回到已失授权的源。
+                    const qEl = document.getElementById('adm-pos-q');
+                    if (qEl) qEl.value = to;
+                    _posLoadStatus(to);
+                    _posRenderList();
                 } catch (e) {
                     _toast(_t('adm-pos-action-fail'), 'error');
                 }
@@ -3511,6 +3570,7 @@
             const q = document.getElementById('adm-pos-q');
             if (q) q.value = account;
             _posLoadStatus(account);
+            _posRenderList();
         } catch (e) {
             const msg =
                 String(e && e.message).indexOf('422') >= 0
@@ -3539,6 +3599,51 @@
         );
     }
 
+    // ── 已开通商家常驻列表(进页自动加载 · 发放/吊销/转移后刷新)──────────
+    function _posListRowHtml(it) {
+        const meta = [
+            it.username || '—',
+            _posBizLabel(it.business_type),
+            it.purchased_at ? new Date(it.purchased_at).toLocaleDateString() : '',
+            '฿' + _fmt(it.amount_paid_thb || 0, 0),
+        ]
+            .filter(Boolean)
+            .map(_esc)
+            .join(' · ');
+        return (
+            '<div class="adm-ai-list-row" data-pos-row="' +
+            _esc(it.tenant_id) +
+            '" style="cursor:pointer">' +
+            '<span class="adm-ai-list-who"><span class="adm-ai-list-name">' +
+            _esc(it.tenant_name || '(无名)') +
+            '</span><span class="adm-ai-list-meta">' +
+            meta +
+            '</span></span>' +
+            '<span class="adm-ai-list-actions">' +
+            _posBadge(it.status) +
+            '</span></div>'
+        );
+    }
+
+    async function _posRenderList() {
+        const host = document.getElementById('adm-pos-list');
+        if (!host) return;
+        host.innerHTML = '<div class="cost-section-hint">···</div>';
+        let d;
+        try {
+            d = await _adminFetch('/api/admin/pos-entitlement/list');
+        } catch (e) {
+            host.innerHTML = '<div class="adm-empty">' + _esc(_t('adm-load-fail')) + '</div>';
+            return;
+        }
+        const items = (d && d.items) || [];
+        if (!items.length) {
+            host.innerHTML = '<div class="adm-empty">' + _esc(_t('adm-pos-list-empty')) + '</div>';
+            return;
+        }
+        host.innerHTML = items.map(_posListRowHtml).join('');
+    }
+
     function _renderPosPage() {
         const btn = document.getElementById('adm-pos-find');
         const input = document.getElementById('adm-pos-q');
@@ -3559,6 +3664,37 @@
             prov.__bound = true;
             prov.addEventListener('click', _posProvision);
         }
+        // 列表点行 → 回查该租户;复制按钮 → 写剪贴板(事件委托 · 绑一次)。
+        const listHost = document.getElementById('adm-pos-list');
+        if (listHost && !listHost.__bound) {
+            listHost.__bound = true;
+            listHost.addEventListener('click', function (e) {
+                const copy = e.target.closest('[data-pos-copy]');
+                const row = e.target.closest('[data-pos-row]');
+                if (row && !copy) {
+                    const q = document.getElementById('adm-pos-q');
+                    if (q) q.value = row.dataset.posRow;
+                    _posLoadStatus(row.dataset.posRow);
+                }
+            });
+        }
+        // 复制按钮委托挂在 status 区(UUID 复制)与 list 区共用:整页一个委托。
+        const page = document.getElementById('page-admin-pos');
+        if (page && !page.__copyBound) {
+            page.__copyBound = true;
+            page.addEventListener('click', function (e) {
+                const copy = e.target.closest('[data-pos-copy]');
+                if (!copy) return;
+                e.preventDefault();
+                try {
+                    navigator.clipboard.writeText(copy.dataset.posCopy);
+                    _toast(_t('adm-pos-prov-copied'), 'success');
+                } catch (_) {
+                    /* 剪贴板不可用:值仍明示在页面 */
+                }
+            });
+        }
+        _posRenderList();
         // 语言切换后重渲染:若已有查询结果,用当前语言重绘。
         if (_posLastQuery) _posLoadStatus(_posLastQuery);
     }

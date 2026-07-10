@@ -33,6 +33,28 @@
   [lang="en"] { display: none; }
   [data-lang="en"] [lang="en"] { display: inline; }
   [data-lang="en"] [lang="th"] { display: none; }
+  /* Scroll-scrub video: 300vh scroll drives a pinned 100vh frame (see Component._scrub).
+     Pinning is JS-driven (position toggled by _scrub), NOT CSS sticky — the portal root's
+     overflow-x:hidden establishes a scroll container that disables position:sticky for
+     descendants; JS fixed/absolute pins the frame without touching that shared root. */
+  .pn-scrub-wrap { position: relative; height: 300vh; }
+  .pn-scrub-sticky { position: absolute; top: 0; left: 0; right: 0; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .pn-scrub-frame { position: relative; width: 82vw; max-width: 1400px; aspect-ratio: 16 / 9; }
+  .pn-scrub-video {
+    width: 100%; height: 100%; object-fit: cover; border-radius: 20px; display: block;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%), linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%);
+    -webkit-mask-composite: source-in; -webkit-mask-repeat: no-repeat, no-repeat; -webkit-mask-size: 100% 100%, 100% 100%;
+    mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%), linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%);
+    mask-composite: intersect; mask-repeat: no-repeat, no-repeat; mask-size: 100% 100%, 100% 100%;
+  }
+  .pn-scrub-caption { position: absolute; left: 50%; bottom: -50px; transform: translateX(-50%); text-align: center; font-size: 14px; color: #57604B; opacity: 0; transition: opacity 0.4s ease; white-space: nowrap; }
+  .pn-scrub-caption.visible { opacity: 1; }
+  .pn-scrub-track { position: absolute; bottom: -26px; left: 50%; transform: translateX(-50%); width: 200px; height: 3px; background: #E0DED2; border-radius: 999px; overflow: hidden; }
+  .pn-scrub-fill { height: 100%; width: 0%; background: #4E7D25; border-radius: 999px; }
+  @media (max-width: 640px) {
+    .pn-scrub-caption { font-size: 12.5px; bottom: -44px; }
+    .pn-scrub-track { width: 150px; }
+  }
   @media (max-width: 800px) {
     [data-pstage] { height: auto !important; padding: 8px 0 12px !important; display: flex !important; flex-direction: column; gap: 18px; align-items: center; }
     [data-pcard] { position: static !important; width: 100% !important; max-width: 400px !important; transform: none !important; }
@@ -52,6 +74,10 @@
     [data-flow], [data-role] {
       opacity: 1 !important; visibility: visible !important; transform: none !important;
     }
+    /* No scroll-scrub: collapse the tall scroller, show the poster still frame in flow. */
+    .pn-scrub-wrap { height: auto; }
+    .pn-scrub-sticky { position: relative; height: auto; padding: 56px 0; }
+    .pn-scrub-caption { opacity: 1; }
   }
 </style>
 </helmet>
@@ -184,69 +210,21 @@
         </a>
       </div>
     </div>
+  </section>
 
-    <!-- Accordion: compare the 4 products (Mercury-style grouping) -->
-    <div style="max-width: 860px; margin: clamp(36px, 5vw, 64px) auto 0;">
-      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.12em; color: #4E7D25; font-weight: 500; margin-bottom: 18px;"><span lang="th">เทียบทั้ง 4 ผลิตภัณฑ์</span><span lang="en">COMPARE ALL 4 PRODUCTS</span></div>
-
-      <div style="border-top: 1px solid #E0DED2;">
-        <button onClick="{{ accT0 }}" style="{{ accBtn0 }}">
-          <span style="display: flex; align-items: center; gap: 12px;"><span style="{{ accDot0 }}"></span>Pearnly AI <span style="font-weight: 500; font-size: 14px; color: #9A9E90;">· <span lang="th">สำนักงานบัญชี</span><span lang="en">accounting firms</span></span></span>
-          <span style="{{ accChev0 }}">↓</span>
-        </button>
-        <div style="{{ accWrap0 }}">
-          <div style="overflow: hidden;">
-            <div style="padding: 2px 4px 22px 30px; display: grid; gap: 10px;">
-              <p style="margin: 0; font-size: 15.5px; line-height: 1.65; color: #57604B; max-width: 60ch;"><span lang="th">ผู้ช่วย AI เตรียมภาษีรายเดือน — สแกนเอกสารไทย กระทบยอดภาษีซื้อ พร้อมชุดหลักฐาน ภ.พ.30 จุดสำคัญมีคนตรวจก่อนเสมอ</span><span lang="en">AI assistant for monthly tax prep — scans Thai documents, reconciles input VAT, builds the PP.30 evidence pack. Critical steps always human-reviewed.</span></p>
-              <a href="{{ loginAi }}" style="color: #3F671D; font-weight: 700; font-size: 15px;"><span lang="th">เข้าสู่ระบบ →</span><span lang="en">Sign in →</span></a>
-            </div>
-          </div>
+  <!-- ================= SCRUB VIDEO (scroll-driven) ================= -->
+  <!-- 滚动搓视频:sticky 100vh 视频 + 300vh 滚程,blob 化解 seek(静态服务器无 Range),
+       进度条随滚动、字幕在中段淡入。逻辑挂 Component._scrub(),reduced-motion 降级为静帧海报。 -->
+  <section data-screen-label="Scrub" class="pn-scrub-wrap">
+    <div class="pn-scrub-sticky">
+      <div class="pn-scrub-frame">
+        <video class="pn-scrub-video" data-scrub-video muted playsinline preload="auto" poster="/static/landing/poster.jpg?v=1">
+          <source src="/static/landing/hero-scrub.mp4?v=1" type="video/mp4">
+        </video>
+        <div class="pn-scrub-caption" data-scrub-caption>
+          <span lang="th">ตรวจสอบทุกใบเสร็จอัตโนมัติ</span><span lang="en">Every receipt checked automatically</span>
         </div>
-      </div>
-
-      <div style="border-top: 1px solid #E0DED2;">
-        <button onClick="{{ accT1 }}" style="{{ accBtn1 }}">
-          <span style="display: flex; align-items: center; gap: 12px;"><span style="{{ accDot1 }}"></span><span lang="th">Pearnly สำหรับนักบัญชี</span><span lang="en">Pearnly for Accountants</span></span>
-          <span style="{{ accChev1 }}">↓</span>
-        </button>
-        <div style="{{ accWrap1 }}">
-          <div style="overflow: hidden;">
-            <div style="padding: 2px 4px 22px 30px; display: grid; gap: 10px;">
-              <p style="margin: 0; font-size: 15.5px; line-height: 1.65; color: #57604B; max-width: 60ch;"><span lang="th">เครื่องมือครบมือสำหรับคนที่อยากทำเอง — OCR เอกสารซื้อ-ขาย จัดหมวดอัตโนมัติ กระทบยอดธนาคารกับ GL แล้วส่งรายการเข้า Express / MR.ERP</span><span lang="en">A hands-on toolkit — OCR purchase &amp; sales docs, auto-categorize, reconcile bank vs GL, push entries into Express / MR.ERP.</span></p>
-              <a href="{{ loginAcc }}" style="color: #3F671D; font-weight: 700; font-size: 15px;"><span lang="th">เข้าสู่ระบบ →</span><span lang="en">Sign in →</span></a>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div style="border-top: 1px solid #E0DED2;">
-        <button onClick="{{ accT2 }}" style="{{ accBtn2 }}">
-          <span style="display: flex; align-items: center; gap: 12px;"><span style="{{ accDot2 }}"></span>Pearnly POS <span style="font-weight: 500; font-size: 14px; color: #9A9E90;">· <span lang="th">หน้าจอขาย</span><span lang="en">cashier</span></span></span>
-          <span style="{{ accChev2 }}">↓</span>
-        </button>
-        <div style="{{ accWrap2 }}">
-          <div style="overflow: hidden;">
-            <div style="padding: 2px 4px 22px 30px; display: grid; gap: 10px;">
-              <p style="margin: 0; font-size: 15.5px; line-height: 1.65; color: #57604B; max-width: 60ch;"><span lang="th">ขายบนมือถือ/แท็บเล็ต ไม่ต้องซื้อเครื่องเพิ่ม ออฟไลน์ได้ ขายต่อเนื่อง — รับเงินสด/เงินโอน สต๊อกตัดตามล็อต</span><span lang="en">Sell on phone or tablet, no extra hardware, works offline — cash &amp; transfer payments, lot-based stock deduction.</span></p>
-              <a href="{{ loginPosCashier }}" style="color: #3F671D; font-weight: 700; font-size: 15px;"><span lang="th">เปิดหน้าจอขาย →</span><span lang="en">Open the register →</span></a>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div style="border-top: 1px solid #E0DED2; border-bottom: 1px solid #E0DED2;">
-        <button onClick="{{ accT3 }}" style="{{ accBtn3 }}">
-          <span style="display: flex; align-items: center; gap: 12px;"><span style="{{ accDot3 }}"></span>Pearnly POS <span style="font-weight: 500; font-size: 14px; color: #9A9E90;">· <span lang="th">เจ้าของร้าน</span><span lang="en">owner</span></span></span>
-          <span style="{{ accChev3 }}">↓</span>
-        </button>
-        <div style="{{ accWrap3 }}">
-          <div style="overflow: hidden;">
-            <div style="padding: 2px 4px 22px 30px; display: grid; gap: 10px;">
-              <p style="margin: 0; font-size: 15.5px; line-height: 1.65; color: #57604B; max-width: 60ch;"><span lang="th">สินค้า สต๊อก ยอดขาย กำไร พนักงาน — รายงานเข้าใจง่าย จัดการหลายล็อต กำหนดสิทธิ์พนักงานขาย</span><span lang="en">Products, stock, sales, profit, staff — clear reports, multi-lot management, staff permissions.</span></p>
-              <a href="{{ loginPosOwner }}" style="color: #3F671D; font-weight: 700; font-size: 15px;"><span lang="th">เข้าสู่ระบบ →</span><span lang="en">Sign in →</span></a>
-            </div>
-          </div>
-        </div>
+        <div class="pn-scrub-track"><div class="pn-scrub-fill" data-scrub-fill></div></div>
       </div>
     </div>
   </section>
@@ -573,7 +551,7 @@
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{ &quot;defaultLang&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;th&quot;, &quot;en&quot;], &quot;default&quot;: &quot;th&quot;, &quot;tsType&quot;: &quot;'th' | 'en'&quot;, &quot;section&quot;: &quot;Behavior&quot; }, &quot;enable3d&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Behavior&quot; } }">
 class Component extends DCLogic {
-  state = { lang: this.props.defaultLang ?? 'th', openAcc: 0 };
+  state = { lang: this.props.defaultLang ?? 'th' };
 
   componentDidMount() {
     this._reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -625,6 +603,10 @@ class Component extends DCLogic {
     if (this._safety) clearTimeout(this._safety);
     window.removeEventListener('resize', this._fitStage);
     if (this._raf) cancelAnimationFrame(this._raf);
+    if (this._scrubRaf) cancelAnimationFrame(this._scrubRaf);
+    if (this._scrubScroll) window.removeEventListener('scroll', this._scrubScroll);
+    if (this._scrubResize) window.removeEventListener('resize', this._scrubResize);
+    if (this._scrubBlob) URL.revokeObjectURL(this._scrubBlob);
     if (window.ScrollTrigger) ScrollTrigger.getAll().forEach((s) => s.kill());
     (this._renderers || []).forEach((r) => { r.dispose(); r.domElement.remove(); });
   }
@@ -662,15 +644,24 @@ class Component extends DCLogic {
     const c = document.createElement('canvas');
     c.width = 1400; c.height = 340;
     const x = c.getContext('2d');
-    // dot + wordmark (same as nav brand)
+    // dot + wordmark (same as nav brand). The plane maps this canvas onto a
+    // viewport-centered mesh, so the dot+word block must sit centered in the
+    // canvas — measure the word and center the whole block, else the wordmark
+    // renders left-and-low of screen center.
+    const dotR = 46, gap = 40, midY = c.height / 2;
+    const word = 'pearnly';
+    x.font = '700 190px Anuphan';
+    const textW = x.measureText(word).width;
+    const blockW = dotR * 2 + gap + textW;
+    const startX = (c.width - blockW) / 2;
     x.beginPath();
-    x.arc(130, 178, 46, 0, Math.PI * 2);
+    x.arc(startX + dotR, midY, dotR, 0, Math.PI * 2);
     x.fillStyle = '#4E7D25';
     x.fill();
-    x.font = '700 190px Anuphan';
     x.fillStyle = '#1B1E14';
     x.textBaseline = 'middle';
-    x.fillText('pearnly', 220, 182);
+    x.textAlign = 'left';
+    x.fillText(word, startX + dotR * 2 + gap, midY);
     const tex = new THREE.CanvasTexture(c);
     tex.anisotropy = 4;
     return tex;
@@ -1095,6 +1086,68 @@ class Component extends DCLogic {
         t.to(knob, { left: 23, duration: 0.4, ease: 'back.out(2.4)' }, 0.7 + i * 0.22);
       });
     }
+
+    this._scrub();
+  }
+
+  // ---------- scroll-scrubbed hero video (self-hosted, seekable via blob) ----------
+  _scrub() {
+    if (this._reduced) return; // reduced-motion: CSS shows the poster still frame
+    const video = document.querySelector('[data-scrub-video]');
+    const wrap = video && video.closest('.pn-scrub-wrap');
+    if (!video || !wrap) return;
+    const sticky = wrap.querySelector('.pn-scrub-sticky');
+    const caption = document.querySelector('[data-scrub-caption]');
+    const fill = document.querySelector('[data-scrub-fill]');
+
+    // Static hosting reports the file unseekable (no HTTP Range), which breaks
+    // scrubbing even once fully downloaded. A blob: URL is always fully seekable.
+    fetch(video.currentSrc || video.querySelector('source').src)
+      .then((res) => res.blob())
+      .then((blob) => {
+        if (this._dead) return;
+        this._scrubBlob = URL.createObjectURL(blob);
+        video.src = this._scrubBlob;
+      })
+      .catch(() => { /* fall back to networked <source>; seeking may be limited */ });
+
+    // JS sticky: pin the frame across the 300vh scroller. CSS position:sticky can't
+    // be used (the root's overflow-x:hidden disables it for descendants), so toggle
+    // fixed/absolute here — scoped to this section, no shared root change.
+    const pin = () => {
+      const rect = wrap.getBoundingClientRect();
+      const maxShift = wrap.offsetHeight - window.innerHeight;
+      if (rect.top >= 0) { sticky.style.position = 'absolute'; sticky.style.top = '0px'; }
+      else if (-rect.top <= maxShift) { sticky.style.position = 'fixed'; sticky.style.top = '0px'; }
+      else { sticky.style.position = 'absolute'; sticky.style.top = maxShift + 'px'; }
+    };
+
+    let target = 0, cur = 0;
+    const progress = () => {
+      const total = wrap.offsetHeight - window.innerHeight;
+      if (total <= 0) return 0;
+      return Math.min(1, Math.max(0, -wrap.getBoundingClientRect().top / total));
+    };
+    this._scrubScroll = () => {
+      pin();
+      const p = progress();
+      const d = isFinite(video.duration) ? video.duration : 0;
+      if (d > 0) target = p * d;
+      if (fill) fill.style.width = (p * 100).toFixed(1) + '%';
+      if (caption) caption.classList.toggle('visible', p > 0.15 && p < 0.85);
+    };
+    this._scrubResize = pin;
+    window.addEventListener('resize', this._scrubResize, { passive: true });
+    const tick = () => {
+      if (this._dead) return;
+      cur += (target - cur) * 0.12;
+      if (Math.abs(cur - target) < 0.01) cur = target;
+      if (video.readyState >= 2) { try { video.currentTime = cur; } catch (e) { /* seeking during load */ } }
+      this._scrubRaf = requestAnimationFrame(tick);
+    };
+    window.addEventListener('scroll', this._scrubScroll, { passive: true });
+    this._scrubScroll();
+    this._scrubRaf = requestAnimationFrame(tick);
   }
 
   renderVals() {
@@ -1106,33 +1159,8 @@ class Component extends DCLogic {
       color: active ? '#FAF9F5' : '#57604B',
       transition: 'background 0.15s, color 0.15s',
     });
-    const open = this.state.openAcc;
-    const accVals = {};
-    for (let i = 0; i < 4; i++) {
-      const on = open === i;
-      accVals['accT' + i] = () => this.setState({ openAcc: on ? -1 : i });
-      accVals['accBtn' + i] = {
-        width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '14px',
-        background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-        padding: '18px 4px', fontSize: '18px', fontWeight: 700, letterSpacing: '-0.01em',
-        color: on ? '#1B1E14' : '#57604B', transition: 'color 0.25s',
-      };
-      accVals['accDot' + i] = {
-        width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0,
-        background: on ? '#4E7D25' : '#D5D3C6', transition: 'background 0.25s',
-      };
-      accVals['accChev' + i] = {
-        display: 'inline-block', fontSize: '16px', color: on ? '#4E7D25' : '#9A9E90',
-        transform: on ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s ease, color 0.25s',
-      };
-      accVals['accWrap' + i] = {
-        display: 'grid', gridTemplateRows: on ? '1fr' : '0fr',
-        transition: 'grid-template-rows 0.35s ease',
-      };
-    }
     return {
       lang,
-      ...accVals,
       setTh: () => this.setState({ lang: 'th' }),
       setEn: () => this.setState({ lang: 'en' }),
       thBtnStyle: btn(lang === 'th'),

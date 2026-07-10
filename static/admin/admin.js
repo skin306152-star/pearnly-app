@@ -146,6 +146,7 @@
         if (p === '/admin/engine' || p === '/admin/engine/') return 'engine';
         if (p === '/admin/agent' || p === '/admin/agent/') return 'agent';
         if (p === '/admin/pos' || p === '/admin/pos/') return 'pos';
+        if (p === '/admin/pearnly-ai' || p === '/admin/pearnly-ai/') return 'pearnly-ai';
         return 'cost';
     }
 
@@ -159,6 +160,7 @@
             engine: 'page-admin-engine',
             agent: 'page-admin-agent',
             pos: 'page-admin-pos',
+            'pearnly-ai': 'page-admin-pearnly-ai',
         };
         Object.keys(pages).forEach(function (r) {
             const el = document.getElementById(pages[r]);
@@ -177,6 +179,7 @@
         if (route === 'engine') _renderEnginePage();
         if (route === 'agent') _renderAgentPage();
         if (route === 'pos') _renderPosPage();
+        if (route === 'pearnly-ai') _renderPearlyAiPage();
     }
 
     function _bindSidebar() {
@@ -270,6 +273,7 @@
                 else if (_r === 'engine') _renderEnginePage();
                 else if (_r === 'agent') _renderAgentPage();
                 else if (_r === 'pos') _renderPosPage();
+                else if (_r === 'pearnly-ai') _renderPearlyAiPage();
                 else _renderCostPage();
             });
         });
@@ -3386,6 +3390,147 @@
         }
         // 语言切换后重渲染:若已有查询结果,用当前语言重绘。
         if (_posLastQuery) _posLoadStatus(_posLastQuery);
+    }
+
+    // ============ Z1-b · Pearnly AI 邀请管理页 ============
+    function _aiFlagText(flag) {
+        flag = flag || {};
+        const on = flag.enabled ? _t('adm-ai-flag-on') : _t('adm-ai-flag-off');
+        const rollout =
+            flag.rollout === 'all'
+                ? _t('adm-ai-flag-rollout-all')
+                : _t('adm-ai-flag-rollout-allowlist');
+        return on + ' · ' + rollout;
+    }
+
+    function _renderAiList(rows) {
+        const host = document.getElementById('adm-ai-list');
+        if (!host) return;
+        if (!rows || !rows.length) {
+            host.innerHTML = '<div class="adm-empty">' + _esc(_t('adm-ai-list-empty')) + '</div>';
+            return;
+        }
+        host.innerHTML = rows
+            .map(function (r) {
+                const who =
+                    r.subject_type === 'unknown'
+                        ? _t('adm-ai-list-unknown')
+                        : _esc(r.username || r.email || r.subject_id);
+                const meta = [
+                    r.company_name,
+                    r.joined_at ? new Date(r.joined_at).toLocaleString() : '',
+                ]
+                    .filter(Boolean)
+                    .map(_esc)
+                    .join(' · ');
+                return (
+                    '<div class="adm-ai-list-row">' +
+                    '<span class="adm-ai-list-who"><span class="adm-ai-list-name">' +
+                    who +
+                    '</span><span class="adm-ai-list-meta">' +
+                    meta +
+                    '</span></span>' +
+                    '<button class="btn btn-ghost btn-sm" data-adm-ai-revoke="' +
+                    _esc(r.subject_id) +
+                    '">' +
+                    _esc(_t('adm-ai-revoke-btn')) +
+                    '</button>' +
+                    '</div>'
+                );
+            })
+            .join('');
+        host.querySelectorAll('[data-adm-ai-revoke]').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                const ok = await _admConfirm(_t('adm-ai-revoke-confirm'), {
+                    title: _t('adm-ai-revoke-btn'),
+                    okText: _t('adm-ai-revoke-btn'),
+                    danger: true,
+                });
+                if (!ok) return;
+                try {
+                    await _adminFetch('/api/admin/pearnly-ai/revoke', {
+                        method: 'POST',
+                        body: { subject_id: btn.dataset.admAiRevoke },
+                    });
+                    _renderPearlyAiPage();
+                } catch (e) {
+                    _toast(_t('adm-load-fail'), 'error');
+                }
+            });
+        });
+    }
+
+    function _showAiPassword(pwd) {
+        const box = document.getElementById('adm-ai-pwd-box');
+        const input = document.getElementById('adm-ai-pwd-value');
+        if (!box || !input) return;
+        input.value = pwd;
+        box.hidden = false;
+    }
+
+    function _aiInviteErrorKey(err) {
+        const msg = (err && err.message) || '';
+        if (msg.indexOf('422') !== -1) return 'adm-ai-invite-needs-email';
+        if (msg.indexOf('409') !== -1) return 'adm-ai-invite-username-exists';
+        return 'adm-load-fail';
+    }
+
+    async function _renderPearlyAiPage() {
+        const btn = document.getElementById('adm-ai-invite-btn');
+        const input = document.getElementById('adm-ai-invite-input');
+        if (!btn || !input) return;
+        if (!btn.__bound) {
+            btn.__bound = true;
+            const go = async function () {
+                const raw = (input.value || '').trim();
+                if (!raw) return;
+                try {
+                    const r = await _adminFetch('/api/admin/pearnly-ai/invite', {
+                        method: 'POST',
+                        body: { username_or_email: raw },
+                    });
+                    input.value = '';
+                    if (r.created_account) {
+                        _toast(_t('adm-ai-invite-created-ok'), 'success');
+                        _showAiPassword(r.initial_password);
+                    } else {
+                        _toast(_t('adm-ai-invite-existing-ok'), 'success');
+                    }
+                    _renderPearlyAiPage();
+                } catch (e) {
+                    _toast(_t(_aiInviteErrorKey(e)), 'error');
+                }
+            };
+            btn.addEventListener('click', go);
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') go();
+            });
+            document.getElementById('adm-ai-pwd-copy')?.addEventListener('click', async function () {
+                const val = document.getElementById('adm-ai-pwd-value');
+                if (!val || !val.value) return;
+                val.select();
+                try {
+                    await navigator.clipboard.writeText(val.value);
+                } catch (_) {}
+                _toast(_t('adm-ai-pwd-copied'), 'success');
+            });
+            document.getElementById('adm-ai-pwd-close')?.addEventListener('click', function () {
+                const box = document.getElementById('adm-ai-pwd-box');
+                const val = document.getElementById('adm-ai-pwd-value');
+                if (box) box.hidden = true;
+                if (val) val.value = '';
+            });
+        }
+        let d;
+        try {
+            d = await _adminFetch('/api/admin/pearnly-ai/overview');
+        } catch (e) {
+            _toast(_t('adm-load-fail'), 'error');
+            return;
+        }
+        const flagLine = document.getElementById('adm-ai-flag-line');
+        if (flagLine) flagLine.textContent = _aiFlagText(d.flag);
+        _renderAiList(d.allowlist);
     }
 
     // ============ Agent 助手观测页 ============

@@ -975,3 +975,63 @@ body.admin-layout-body .lang-switching-overlay {
   background: var(--card-bg, #fff);
   font-size: 13px;
 }
+
+/* ---- Z1-b · Pearnly AI 邀请管理页(adm-ai-*) ---- */
+.adm-ai-flag-line {
+  font-size: 13px;
+  color: #374151;
+  margin-top: 4px;
+}
+.adm-ai-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.adm-ai-list-who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.adm-ai-list-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+.adm-ai-list-meta {
+  font-size: 11px;
+  color: #9ca3af;
+}
+.adm-ai-pwd-box {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--warn-border, #fcd34d);
+  border-radius: 10px;
+  background: var(--warn-bg, #fffbeb);
+}
+.adm-ai-pwd-warn {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--amber-800, #92400e);
+  margin-bottom: 8px;
+}
+.adm-ai-pwd-row {
+  display: flex;
+  gap: 8px;
+}
+.adm-ai-pwd-value {
+  flex: 1;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--card-bg, #fff);
+}

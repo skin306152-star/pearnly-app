@@ -36,21 +36,73 @@ run aborts **before writing** so a backup can never fill the disk and take prod 
 
 **These backups live on the same physical disk as prod** (`/dev/vda2`). They protect against
 accidental deletion, file corruption, and app bugs. They do **NOT** protect against loss of
-the host / disk failure — if the Vultr box dies, both prod and these backups die with it.
+the host / disk failure — if the Vultr box dies, both prod and these backups die with it,
+**until an offsite remote is configured** (see below — the interface exists now, activating
+it is a config change, not a code change).
 
-Why not offsite yet (decision-tree outcome, 2026-07-11):
-- The old Tokyo fallback box (`45.76.53.194`) is decommissioned (unreachable).
-- No `rclone`/`aws` on the host and no object-storage bucket provisioned; the only key
-  present is Supabase's, i.e. the **same provider as the primary DB** (circular for the DB
-  dump, weak independence), and its per-object size limit forces a fragile multipart upload.
+#### Decision record (Zihao, 2026-07-11)
 
-**To close the gap (needs Zihao to green-light one):**
-1. Provision Vultr Object Storage (~$5/mo, S3-compatible), `apt-get install rclone`, add a
-   `rclone` push of `/var/backups/pearnly` at the end of the script. Cleanest true offsite.
-2. Or stand up a second small VPS with a disk and `rsync` the backup root to it nightly.
-3. Or enable Supabase PITR/daily backups on the DB side (covers DB only, not upload files).
+Paid offsite (Vultr Object Storage etc.) is **deferred**. Interim plan: build the offsite
+*interface* now (this section), wire it to a **free** S3-compatible bucket when someone has
+five minutes to click through a dashboard, and leave the door open to swap in any paid
+provider later — **without touching the script**, only the remote config + one env var.
 
-Until one of these is done, treat "disk/host loss" as **not covered**.
+The script (`scripts/ops/pearnly_backup.sh`) ships an optional stage that, when
+`PEARNLY_OFFSITE_REMOTE` is set, pushes the latest storage snapshot + latest `pg_dump` to any
+`rclone` remote via `rclone sync`/`copyto` (S3-compatible, provider-agnostic — the script
+never hardcodes a vendor). It is unset today, so offsite is still **not covered** — but
+turning it on is now a 5-step config change, not a code change.
+
+#### Activating it: Option A — Supabase Storage S3 endpoint (existing project, zero new account)
+
+Supabase Storage speaks the S3 API, so the already-provisioned Supabase project can host the
+offsite copy with no new signup. This is *not* circular with the DB dump: the DB dump would
+be moved to Supabase's **object storage** product, a separate subsystem from the Postgres
+instance being dumped — losing the DB doesn't take the Storage bucket with it.
+
+1. Supabase Dashboard → your project → **Settings → Storage** → note the **S3 Connection**
+   panel (endpoint URL + region, e.g. `https://<project-ref>.supabase.co/storage/v1/s3`).
+2. Same panel → **New access key** (or **Settings → API** for the service-role key) → generate
+   an S3-compatible **Access Key ID / Secret Access Key** pair scoped to Storage.
+3. Create a bucket for backups (Storage → New bucket, e.g. `pearnly-offsite`, private).
+4. On the server: `rclone config create pearnly-offsite s3 provider=Other \
+   endpoint=<endpoint from step 1> access_key_id=<from step 2> secret_access_key=<from step 2> \
+   region=<region from step 1>`
+5. `PEARNLY_OFFSITE_REMOTE=pearnly-offsite:pearnly-backups` in the cron environment (edit
+   `/etc/cron.d/pearnly-backup` or a sourced env file) — **the script itself needs no change.**
+
+#### Activating it: Option B — Cloudflare R2 (free 10 GB, backup instead)
+
+Genuinely independent of both Vultr and Supabase — a real second provider — and free up to
+10 GB (this dataset is ~1 GB).
+
+1. Cloudflare Dashboard → **R2 Object Storage** → **Create bucket** (e.g. `pearnly-offsite`).
+2. **R2 → Manage API tokens → Create API token** (scope: Object Read & Write, this bucket
+   only) → note the generated **Access Key ID / Secret Access Key** + the account's S3
+   **endpoint** (`https://<account-id>.r2.cloudflarestorage.com`, shown on the same page).
+3. On the server: `rclone config create pearnly-offsite s3 provider=Cloudflare \
+   endpoint=<endpoint from step 2> access_key_id=<...> secret_access_key=<...>`
+4. `PEARNLY_OFFSITE_REMOTE=pearnly-offsite:pearnly-backups` in the cron environment.
+5. (No step 5 — same as Option A, script needs no change.)
+
+Either way, activation = **install rclone + write one remote config + set one env var.**
+`rclone` on Ubuntu: `sudo -v ; curl https://rclone.org/install.sh | sudo bash` (official
+installer, adds the binary to `/usr/bin/rclone`).
+
+#### Checking offsite status
+
+- **Per-run log line** in `backup.log`: `offsite: not configured, skipped` (remote unset —
+  today's state) / `offsite: OK` (both storage + dump synced) / `offsite: FAIL (see ERROR
+  lines above)` (remote configured but sync failed — core backup still succeeded).
+- **Status file**: `$BACKUP_ROOT/offsite_last_status` (default
+  `/var/backups/pearnly/offsite_last_status`) — one line, `OK <UTC-ts>` or `FAIL <UTC-ts>`.
+  Absent = offsite has never run configured (matches the "not configured" log line).
+- Offsite failure **never** fails the cron job or blocks core backups — see the script's
+  `offsite_sync()` contract comment. A red `FAIL` here is a standalone alert to chase, not a
+  backup-is-broken signal.
+
+**Until a remote is configured, treat "disk/host loss" as not covered** — the interface is
+ready, but nothing is plugged into it yet.
 
 ## Restore: upload originals
 
@@ -107,6 +159,11 @@ Re-run this drill quarterly, or after any change to the DB schema or the backup 
   of storage free, whichever is larger, or it aborts before writing.
 - **Check health:** `tail -20 /var/backups/pearnly/backup.log` — last line `=== backup OK`.
   A non-zero exit / missing "OK" line means investigate (usually disk space or DB reach).
+- **Offsite (optional):** unset by default (`offsite: not configured, skipped`). Activate per
+  "Offsite gap" above. `PEARNLY_OFFSITE_REMOTE=<rclone remote:path>` turns it on;
+  `RCLONE_BIN` (default `rclone`) and `OFFSITE_STATUS_FILE` (default
+  `$BACKUP_ROOT/offsite_last_status`) are rarely-needed overrides. A failed offsite sync
+  never fails the run — see log/status-file contract above.
 - **Deploy note:** the script is deployed by `git-deploy` like any repo file; the cron file
   in `/etc/cron.d/` and the installed `postgresql-client-17` package are host-side, added
   once, and are not managed by deploys.

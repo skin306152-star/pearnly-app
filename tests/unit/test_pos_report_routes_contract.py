@@ -14,6 +14,7 @@ EXPECTED = {
     ("GET", "/api/pos/admin/report"),
     ("GET", "/api/pos/admin/audit/summary"),
     ("GET", "/api/pos/admin/audit/events"),
+    ("GET", "/api/pos/admin/shifts"),
 }
 
 
@@ -33,6 +34,7 @@ class PosReportRoutesContractTests(unittest.TestCase):
         self.assertIn("/api/pos/admin/report", paths)
         self.assertIn("/api/pos/admin/audit/summary", paths)
         self.assertIn("/api/pos/admin/audit/events", paths)
+        self.assertIn("/api/pos/admin/shifts", paths)
 
     def test_audit_routes_gate_on_report_view(self):
         self.assertIn(
@@ -42,6 +44,10 @@ class PosReportRoutesContractTests(unittest.TestCase):
         self.assertIn(
             'require_perm_pos_tid(request, "pos.report.view")',
             inspect.getsource(mod.api_audit_events),
+        )
+        self.assertIn(
+            'require_perm_pos_tid(request, "pos.report.view")',
+            inspect.getsource(mod.api_shifts_ledger),
         )
 
     def test_uses_perm_gate_and_envelope(self):

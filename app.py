@@ -75,7 +75,10 @@ from routes.pos_auth_routes import (
 )  # POS 收银员鉴权/开通 PO-B1 · 2026-06-07
 from routes.pos_sales_routes import (
     router as pos_sales_router,
-)  # POS 收银前台(班次/小票/退货)PO-B2 · 2026-06-07
+)  # POS 收银前台(小票/退货)PO-B2 · 2026-06-07
+from routes.pos_shift_routes import (
+    router as pos_shift_router,
+)  # POS 开/交班(连号+审计)PC-3 · 2026-07-11
 from routes.pos_report_routes import (
     router as pos_report_router,
 )  # POS 销售报表 PO-B6 · 2026-06-07
@@ -305,8 +308,9 @@ app.include_router(modules_router)  # POS 模块开关(GET /api/me/modules · PO
 app.include_router(inventory_router)  # POS 库存后台 6 路由(PO-A3 · 2026-06-07)
 app.include_router(inventory_report_router)  # POS 库存报表 1 路由(C1 · 2026-06-07)
 app.include_router(pos_auth_router)  # POS 收银员鉴权/开通 3 路由(PO-B1 · 2026-06-07)
-app.include_router(pos_sales_router)  # POS 收银前台 14 路由(PO-B2/B4/B5 · 2026-06-07)
-app.include_router(pos_report_router)  # POS 销售报表 1 路由(PO-B6 · 2026-06-07)
+app.include_router(pos_sales_router)  # POS 收银前台 11 路由(PO-B2/B4/B5 · 2026-06-07)
+app.include_router(pos_shift_router)  # POS 开/交班 3 路由(连号+审计 · PC-3 · 2026-07-11)
+app.include_router(pos_report_router)  # POS 报表 + 交接班台账 2 路由(PO-B6/PC-3)
 app.include_router(
     pos_sales_log_router
 )  # POS 交易明细日志 + CSV 导出 2 路由(老板后台 · 2026-07-08)

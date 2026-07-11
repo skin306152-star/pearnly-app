@@ -25,7 +25,6 @@ from services.pos import (
     receipt_pdf,
     refund as refund_svc,
     sale as sale_svc,
-    shift as shift_svc,
     upgrade as upgrade_svc,
 )
 
@@ -159,66 +158,6 @@ async def api_by_barcode(
         workspace_client_id,
         lambda cur, tid, ws, user: catalog.product_by_barcode(
             cur, tenant_id=tid, workspace_client_id=ws, code=code
-        ),
-    )
-
-
-# ── 班次 ──────────────────────────────────────────────────────────────
-class OpenShiftRequest(BaseModel):
-    workspace_client_id: Optional[int] = None
-    terminal_id: Optional[int] = None  # 缺省 → 服务端回落账套默认终端(单终端门店)
-    opening_float: float = Field(0, ge=0)
-
-
-class CloseShiftRequest(BaseModel):
-    workspace_client_id: Optional[int] = None
-    counted_cash: float = Field(..., ge=0)
-
-
-@router.post("/shifts/open")
-async def api_open_shift(req: OpenShiftRequest, request: Request):
-    def _fn(cur, tid, ws, user):
-        cashier_id = user.get("cashier_id")
-        if not cashier_id:
-            raise PosError("pos.forbidden", 403)  # 仅收银员(PIN 登录)可开班
-        return {
-            "shift": shift_svc.open_shift(
-                cur,
-                tenant_id=tid,
-                workspace_client_id=ws,
-                terminal_id=req.terminal_id,
-                cashier_id=cashier_id,
-                opening_float=req.opening_float,
-            )
-        }
-
-    return _write(request, req.workspace_client_id, _fn)
-
-
-@router.get("/shifts/current")
-async def api_current_shift(request: Request, workspace_client_id: Optional[int] = Query(None)):
-    """本收银台当前未结班次 + 汇总(交班屏直查,不依赖前端内存 → 刷新/换人后仍能交班)。
-    无班次 → data:null(屏显诚实空态)。"""
-    return _read(
-        request,
-        workspace_client_id,
-        lambda cur, tid, ws, user: shift_svc.current_shift(
-            cur, tenant_id=tid, workspace_client_id=ws
-        ),
-    )
-
-
-@router.post("/shifts/{shift_id}/close")
-async def api_close_shift(shift_id: str, req: CloseShiftRequest, request: Request):
-    return _write(
-        request,
-        req.workspace_client_id,
-        lambda cur, tid, ws, user: shift_svc.close_shift(
-            cur,
-            tenant_id=tid,
-            workspace_client_id=ws,
-            shift_id=shift_id,
-            counted_cash=req.counted_cash,
         ),
     )
 

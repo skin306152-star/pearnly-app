@@ -17,6 +17,7 @@ from core.pos_api import assert_module_enabled, ok, require_workspace
 from services.authz.deps import require_perm_pos_tid
 from services.pos import audit_report as audit_svc
 from services.pos import report as report_svc
+from services.pos import shift_report as shift_report_svc
 
 router = APIRouter(prefix="/api/pos", tags=["pos-report"])
 
@@ -99,5 +100,22 @@ async def api_audit_events(
             date_to=_parse_date(date_to),
             kind=kind,
             cashier_id=cashier_id,
+        )
+    return ok(data)
+
+
+@router.get("/admin/shifts")
+async def api_shifts_ledger(
+    request: Request,
+    workspace_client_id: int = Query(...),
+    limit: int = Query(200),
+):
+    """交接班台账:历史班次(连号倒序)+ 缺号警示。老板端钱箱盈亏对账、连号防删可见。"""
+    tid, _uid = require_perm_pos_tid(request, "pos.report.view")
+    with db.get_cursor_rls(tid) as cur:
+        assert_module_enabled(cur, tid, "pos")
+        require_workspace(cur, tid, workspace_client_id)
+        data = shift_report_svc.list_shifts(
+            cur, tenant_id=tid, workspace_client_id=workspace_client_id, limit=limit
         )
     return ok(data)

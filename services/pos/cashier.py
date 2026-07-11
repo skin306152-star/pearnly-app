@@ -95,6 +95,12 @@ def ensure_core_schema() -> None:
                 "CREATE INDEX IF NOT EXISTS ix_pos_shifts_cashier "
                 "ON pos_shifts (tenant_id, cashier_id, status)"
             )
+            # 与 alembic 0069 同源:每 (tenant,ws) 连号 tamper-evidence,唯一约束兜并发撞号。
+            cur.execute("ALTER TABLE pos_shifts ADD COLUMN IF NOT EXISTS shift_seq integer")
+            cur.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_pos_shift_seq "
+                "ON pos_shifts (tenant_id, workspace_client_id, shift_seq)"
+            )
             apply_tenant_rls(cur, *rls_tables)
         logger.info("✅ POS 核心 3 表 + RLS 已就绪 (POS PO-B1)")
     except Exception as e:
@@ -318,7 +324,7 @@ def get_open_shift_for_workspace(cur, *, tenant_id: str, workspace_client_id: in
     """套账(收银台)当前的未结班次 —— 按终端唯一,与开班人无关。
     收银台=共享钱箱:任何收银员登录都接续这一班、都能交班(避免第二人被锁死/重复开班)。"""
     cur.execute(
-        "SELECT id, terminal_id, opened_at, opening_float FROM pos_shifts "
+        "SELECT id, terminal_id, opened_at, opening_float, shift_seq FROM pos_shifts "
         "WHERE tenant_id = %s AND workspace_client_id = %s AND status = 'open' "
         "ORDER BY opened_at DESC LIMIT 1",
         (tenant_id, workspace_client_id),

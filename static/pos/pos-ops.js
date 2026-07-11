@@ -228,12 +228,23 @@
         const sh = d.shift;
         const openT = POS.hm(new Date(sh.opened_at));
         const expected = Number(sm.expected_cash);
+        // 未结班中途看=X 报表(班中小计);连号 #N 让收银员与老板对得上同一张班。
+        const seqTag =
+            sh.shift_seq != null
+                ? '<span class="seq">· ' +
+                  POS.tf('posui.shift.seq', { n: sh.shift_seq }) +
+                  '</span>'
+                : '';
         wrap.innerHTML =
             '<div class="card"><div class="h"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>' +
             POS.t('posui.shift.cashier') +
             ' ' +
             (state.cashier ? state.cashier.display_name : '') +
-            '</div><div class="kv"><span class="k">' +
+            ' ' +
+            seqTag +
+            '<span class="xtag">' +
+            POS.t('posui.shift.xtag') +
+            '</span></div><div class="kv"><span class="k">' +
             POS.t('posui.shift.opened') +
             '</span><span class="v tnum">' +
             openT +

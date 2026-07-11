@@ -11,12 +11,36 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Optional
 
+import psycopg2
+
 from core.pos_api import PosError
 from services.pos import cashier as cashier_dal
 
 
 def _f(v) -> float:
     return float(v) if v is not None else 0.0
+
+
+def _next_seq(cur, *, tenant_id: str, workspace_client_id: int) -> int:
+    """本 (tenant,ws) 的下一个班次连号 = MAX+1(空则 1)。与 insert 同事务读,唯一约束兜并发。"""
+    cur.execute(
+        "SELECT COALESCE(MAX(shift_seq), 0) + 1 AS n FROM pos_shifts "
+        "WHERE tenant_id = %s AND workspace_client_id = %s",
+        (tenant_id, workspace_client_id),
+    )
+    return int(cur.fetchone()["n"])
+
+
+def _insert_shift(cur, *, tenant_id, workspace_client_id, terminal_id, cashier_id, opening_float):
+    seq = _next_seq(cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id)
+    cur.execute(
+        "INSERT INTO pos_shifts "
+        "(tenant_id, workspace_client_id, terminal_id, cashier_id, opening_float, shift_seq) "
+        "VALUES (%s, %s, %s, %s, %s, %s) "
+        "RETURNING id, opened_at, opening_float, shift_seq",
+        (tenant_id, workspace_client_id, terminal_id, cashier_id, opening_float, seq),
+    )
+    return cur.fetchone()
 
 
 def open_shift(
@@ -40,16 +64,26 @@ def open_shift(
     )
     if cur.fetchone():
         raise PosError("pos.shift_already_open", 409)
-    cur.execute(
-        "INSERT INTO pos_shifts "
-        "(tenant_id, workspace_client_id, terminal_id, cashier_id, opening_float) "
-        "VALUES (%s, %s, %s, %s, %s) RETURNING id, opened_at, opening_float",
-        (tenant_id, workspace_client_id, terminal_id, cashier_id, Decimal(str(opening_float))),
+    kw = dict(
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        terminal_id=terminal_id,
+        cashier_id=cashier_id,
+        opening_float=Decimal(str(opening_float)),
     )
-    row = cur.fetchone()
+    # MAX+1 与 insert 分两步:多终端门店同秒并发开班可能读到同一 MAX → 撞唯一约束。用 SAVEPOINT
+    # 兜一次重取(不 poison 外层交易事务),仍撞则抛(极罕见,交前台重试)。
+    cur.execute("SAVEPOINT open_shift_seq")
+    try:
+        row = _insert_shift(cur, **kw)
+    except psycopg2.errors.UniqueViolation:
+        cur.execute("ROLLBACK TO SAVEPOINT open_shift_seq")
+        row = _insert_shift(cur, **kw)
+    cur.execute("RELEASE SAVEPOINT open_shift_seq")
     return {
         "id": str(row["id"]),
         "terminal_id": terminal_id,
+        "shift_seq": row["shift_seq"],
         "opened_at": row["opened_at"].isoformat() if row["opened_at"] else None,
         "opening_float": _f(row["opening_float"]),
     }
@@ -73,6 +107,7 @@ def current_shift(cur, *, tenant_id: str, workspace_client_id: int) -> Optional[
         "shift": {
             "id": shift_id,
             "terminal_id": shift["terminal_id"],
+            "shift_seq": shift.get("shift_seq"),
             "opened_at": shift["opened_at"].isoformat() if shift.get("opened_at") else None,
             "opening_float": _f(shift["opening_float"]),
         },
@@ -82,7 +117,8 @@ def current_shift(cur, *, tenant_id: str, workspace_client_id: int) -> Optional[
 
 def _get_open_shift(cur, *, tenant_id: str, shift_id: str):
     cur.execute(
-        "SELECT id, opening_float, status FROM pos_shifts WHERE tenant_id = %s AND id = %s",
+        "SELECT id, opening_float, status, shift_seq FROM pos_shifts "
+        "WHERE tenant_id = %s AND id = %s",
         (tenant_id, shift_id),
     )
     return cur.fetchone()
@@ -142,6 +178,7 @@ def close_shift(
     return {
         "shift": {
             "id": str(row["id"]),
+            "shift_seq": shift.get("shift_seq"),
             "closed_at": row["closed_at"].isoformat() if row["closed_at"] else None,
             "expected_cash": _f(row["expected_cash"]),
             "counted_cash": _f(row["counted_cash"]),

@@ -262,8 +262,11 @@ def log_void_operator(*, tenant_id: str, sale_id: str, operator: dict) -> None:
     from services.audit import store as audit_store
 
     audit_store.insert_operation_log(
+        # 作废操作人是收银员令牌(id=cashier_id·非 users.id)· operation_logs.actor_user_id 有
+        # users 外键 → 塞 cashier_id 会 FK 违约被静默吞掉。操作人身份全走 details.operator_cashier_id
+        # + actor_username(读模型据前者归属),actor_user_id 留空。
         tenant_id=tenant_id,
-        actor_user_id=operator.get("id"),
+        actor_user_id=None,
         actor_username=operator.get("display_name") or operator.get("username"),
         actor_is_super=bool(operator.get("is_super_admin")),
         action="pos.sale.voided",

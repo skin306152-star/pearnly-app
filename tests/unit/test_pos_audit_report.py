@@ -199,5 +199,24 @@ class EventsTests(unittest.TestCase):
         self.assertEqual(cur.calls, [])  # 非法 kind 不打库
 
 
+class VoidOperatorAttributionTests(unittest.TestCase):
+    """收银员令牌 id=cashier_id(非 users.id)· actor_user_id 有 users 外键 → 塞 cashier_id
+    会 FK 违约被静默吞(真库才暴露·prod 实测过)。守门:actor_user_id 必须留空,操作人身份
+    走 details.operator_cashier_id + actor_username。"""
+
+    def test_log_void_operator_never_puts_cashier_id_in_actor_user_id(self):
+        from unittest import mock
+        from services.pos import approval
+
+        operator = {"id": "cashier-uuid", "cashier_id": "cashier-uuid", "display_name": "Mgr E2E"}
+        with mock.patch("services.audit.store.insert_operation_log") as ins:
+            approval.log_void_operator(tenant_id=TID, sale_id="sale-1", operator=operator)
+        kw = ins.call_args.kwargs
+        self.assertIsNone(kw["actor_user_id"])  # 绝不塞 cashier_id(否则 FK 违约静默丢)
+        self.assertEqual(kw["action"], "pos.sale.voided")
+        self.assertEqual(kw["details"]["operator_cashier_id"], "cashier-uuid")
+        self.assertEqual(kw["actor_username"], "Mgr E2E")
+
+
 if __name__ == "__main__":
     unittest.main()

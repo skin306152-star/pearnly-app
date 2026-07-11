@@ -86,6 +86,11 @@ POS_PROVISION_LOCK_KEY = "pos_provision_lock"
 # 开(事务所)= 强制复核签批人∉制单集、冻结授权人∉制单集且须已有有效复核在场。按 tenant
 # 判定(单所整体开/关);消费在 services/workorder/sod.py。
 PEARNLY_AI_SOD_KEY = "pearnly_ai_sod"
+# LINE 待问客户池闸(D2 · 审核队列票挂客户经 LINE 问答回写改判):默认关。关 = 客户绑定码
+# 分支/暂挂/攒批推送/回答拦截全链不生效,webhook 走既有用户绑定码判定现状不变(fail-closed)。
+# 按 tenant 判定(单所整体开/关,与 pearnly_ai_sod 同款);超管在平台后台把该事务所
+# tenant_id 加进 allowlist 即单所灰度。
+PEARNLY_AI_CLIENT_POOL_KEY = "pearnly_ai_client_pool"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -221,3 +226,12 @@ def pearnly_ai_sod_enabled_for(tenant_id: Optional[str]) -> bool:
     事务所 tenant_id 加进 allowlist 即单所灰度。
     """
     return _enabled(PEARNLY_AI_SOD_KEY, tenant_id, "pearnly_ai_sod_enabled_for")
+
+
+def pearnly_ai_client_pool_enabled_for(tenant_id: Optional[str]) -> bool:
+    """LINE 待问客户池闸。关 = 客户绑定码/暂挂池/攒批推送/回答拦截全链不生效。
+
+    按 tenant 判定(单所整体开/关,与 pearnly_ai_sod 同款);超管在平台后台把该
+    事务所 tenant_id 加进 allowlist 即单所灰度。
+    """
+    return _enabled(PEARNLY_AI_CLIENT_POOL_KEY, tenant_id, "pearnly_ai_client_pool_enabled_for")

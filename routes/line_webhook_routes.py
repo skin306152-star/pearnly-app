@@ -294,6 +294,13 @@ async def _handle_line_text(
     if len(text) == 6 and text.isdigit() and not db.get_user_by_line_user_id(line_user_id):
         user_id = db.consume_line_binding_code(text)
         if not user_id:
+            # D2-S2:非用户码 → 试客户绑定码(闸控·fail-open·实现见 line_client_bind_intake)。
+            from services.line_binding import line_client_bind_intake
+
+            if line_client_bind_intake.try_consume(
+                text, line_user_id, reply_token, ev_lang, quote_token
+            ):
+                return
             # v118.25.4 · 绑定码无效 · 还不知道是哪个 Pearnly 用户 · 用 LINE 语言
             _reply_card_or_text(
                 reply_token,

@@ -78,5 +78,31 @@ class PearnlyAiSodEnabledForTests(unittest.TestCase):
             self.assertFalse(feature_flags.pearnly_ai_sod_enabled_for("t-1"))
 
 
+class PearnlyAiClientPoolEnabledForTests(unittest.TestCase):
+    """D2 · LINE 待问客户池闸:按 tenant 判定,默认关(现状 webhook 用户码流不变)。"""
+
+    def test_delegates_to_store_with_client_pool_key_and_tenant(self):
+        with mock.patch(
+            "services.platform_settings.store.is_enabled_for_user", return_value=True
+        ) as m:
+            self.assertTrue(feature_flags.pearnly_ai_client_pool_enabled_for("t-1"))
+            m.assert_called_once_with(feature_flags.PEARNLY_AI_CLIENT_POOL_KEY, "t-1")
+
+    def test_defaults_closed_no_setting_row(self):
+        with mock.patch("services.platform_settings.store.is_enabled_for_user", return_value=False):
+            self.assertFalse(feature_flags.pearnly_ai_client_pool_enabled_for("t-1"))
+
+    def test_none_tenant_is_closed(self):
+        with mock.patch("services.platform_settings.store.is_enabled_for_user", return_value=False):
+            self.assertFalse(feature_flags.pearnly_ai_client_pool_enabled_for(None))
+
+    def test_store_raises_fails_closed(self):
+        with mock.patch(
+            "services.platform_settings.store.is_enabled_for_user",
+            side_effect=RuntimeError("boom"),
+        ):
+            self.assertFalse(feature_flags.pearnly_ai_client_pool_enabled_for("t-1"))
+
+
 if __name__ == "__main__":
     unittest.main()

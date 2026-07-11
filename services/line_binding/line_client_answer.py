@@ -124,13 +124,10 @@ def _select_batch(line_user_id: str) -> Optional[dict]:
         return None
 
     _, tenant_id, workspace_client_id, batch_id, lang = best
-    full_rows = pool_store.list_batch(tenant_id, workspace_client_id, batch_id)
-    pending_rows = [r for r in full_rows if r["status"] == vocab.PENDING]
     return {
         "tenant_id": tenant_id,
         "workspace_client_id": workspace_client_id,
-        "rows": full_rows,
-        "pending_rows": pending_rows,
+        "rows": pool_store.list_batch(tenant_id, workspace_client_id, batch_id),
         "lang": lang,
     }
 
@@ -214,9 +211,7 @@ def _consume(
     tenant_id = selected["tenant_id"]
     workspace_client_id = selected["workspace_client_id"]
     full_rows = selected["rows"]  # 完整批次(全状态·按 created_at)= 编号基准
-    pending_rows = selected.get("pending_rows") or [
-        r for r in full_rows if r["status"] == vocab.PENDING
-    ]
+    pending_rows = [r for r in full_rows if r["status"] == vocab.PENDING]
     lang = selected["lang"]
 
     segments = _split_numbered_segments(text)
@@ -227,26 +222,11 @@ def _consume(
             if not (0 <= idx < len(full_rows)):
                 continue
             matched = True
-            row = full_rows[idx]
-            if row["status"] in vocab.TERMINAL_STATUSES:
-                # 编号指向已处理过的票 → 只回「已处理」不重复裁决(终态→终态非法跳转被 latest-wins 吞成 no-op)。
-                _finish(
-                    tenant_id,
-                    row["id"],
-                    row["status"],
-                    answer_raw=None,
-                    resolution=None,
-                    reply_token=reply_token,
-                    quote_token=quote_token,
-                    line_user_id=line_user_id,
-                    lang=lang,
-                    already_handled=True,
-                )
-                continue
+            # 终态槽(客户重复答已处理的票)由 _handle_one 顶部统一挡下,回「已处理」不重复裁决。
             _handle_one(
                 tenant_id,
                 workspace_client_id,
-                row,
+                full_rows[idx],
                 seg,
                 line_user_id,
                 reply_token,
@@ -262,7 +242,9 @@ def _consume(
         return
 
     if len(pending_rows) == 1:
-        # 无编号且此刻恰只剩一道 pending:唯一「段」是整条原文,只有短答形态(b)才自动裁决。
+        # 无编号且此刻恰只剩一道 pending → 落它。此路径【故意】依赖实时 pending 态(与编号路径锚
+        # 固定序相反):无号答案本无固定槽位可锚,"只剩一道就落它"是有界便利,别按"锚固定序"直觉改。
+        # 唯一「段」是整条原文,只有短答形态(b)才自动裁决。
         _handle_one(
             tenant_id,
             workspace_client_id,
@@ -316,6 +298,23 @@ def _handle_one(
     qid = question["id"]
     work_order_id = question["work_order_id"]
     item_id = question["item_id"]
+
+    if question["status"] in vocab.TERMINAL_STATUSES:
+        # 编号指向已处理过的票(客户重复答)→ 只回「已处理」不重复裁决(终态→终态非法跳转被
+        # latest-wins 吞成 no-op)。无号单 pending 路径传入的必是 pending,此守卫对它是 no-op。
+        _finish(
+            tenant_id,
+            qid,
+            question["status"],
+            answer_raw=None,
+            resolution=None,
+            reply_token=reply_token,
+            quote_token=quote_token,
+            line_user_id=line_user_id,
+            lang=lang,
+            already_handled=True,
+        )
+        return
 
     # force_manual:segment 非严格答题形态(见 _consume)→ 直接当解不出,不喂给 _resolve。
     outcome = None if force_manual else _resolve(question["question_type"], segment)

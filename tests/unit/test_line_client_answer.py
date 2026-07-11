@@ -167,7 +167,6 @@ class SelectBatchTests(unittest.TestCase):
         list_batch.assert_called_once_with("t-1", 2, "batch-2")
         self.assertEqual(out["workspace_client_id"], 2)
         self.assertEqual(out["rows"], [newer])
-        self.assertEqual(out["pending_rows"], [newer])
 
 
 class HandleAnswerConsumptionGateTests(unittest.TestCase):

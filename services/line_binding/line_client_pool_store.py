@@ -188,7 +188,11 @@ def list_batch(tenant_id, workspace_client_id, batch_id) -> list:
     """按 batch_id 取该批次【全状态】行按 created_at —— 重建推送时
     enumerate(questions, start=1) 的固定编号序(questions 亦按 created_at)。
     答题侧据此定位「客户嘴里的第 N 题」不随期间某题答完退出 pending、pending
-    列表收缩而位移(R3 串题根因:答题编号必须锚推送批次固定序,不看实时剩几道)。"""
+    列表收缩而位移(R3 串题根因:答题编号必须锚推送批次固定序,不看实时剩几道)。
+
+    ⚠️ 隐性契约:编号仍是"推送侧现算 vs 答题侧现算"的派生量,靠两处都按 created_at
+    排同一批行对齐(line_client_pool_push 的 enumerate 必须同序)。改任一侧排序必同改另一侧;
+    根治办法是推送时把序号落成 batch_seq 列、答题按存的序号定位(backlog·见交接)。"""
     from core import db
 
     def _run():

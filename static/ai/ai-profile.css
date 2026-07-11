@@ -1,6 +1,7 @@
-/* Pearnly AI · 税务画像/别名/义务清单视图(B2-e)——三块面板:画像表单 / 别名管理 /
- * 当期义务清单。配色/圆角/间距按 ai-theme tokens,复用 ai-intake.css 的 .sf-* 表单原子
- * (排在它之后加载,类名共享全局)。不做矩阵(归批次 C4),义务只列当期一份简单清单。 */
+/* Pearnly AI · 税务画像/别名/义务清单/供应商过账档案视图——四块面板:画像表单 / 别名管理 /
+ * 当期义务清单 / 供应商过账档案(Z3-b)。配色/圆角/间距按 ai-theme tokens,复用
+ * ai-intake.css 的 .sf-* 表单原子(排在它之后加载,类名共享全局)。不做矩阵(归批次 C4),
+ * 义务只列当期一份简单清单。 */
 
 .profile-form {
   display: flex;
@@ -116,6 +117,47 @@
   text-align: right;
 }
 
+/* 供应商过账档案(Z3-b · 骨架同构别名面板):列表 + 加行表单,复用 .alias-form/.alias-empty/
+ * .sf-in/.chip/.intake-err 原子,行结构自有(税号+名称+现赊/货费摘要一行,来源徽标点睛)。 */
+.sp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.sp-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+}
+.sp-main {
+  min-width: 0;
+}
+.sp-main b {
+  font-size: 13px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.sp-name {
+  color: var(--ink2);
+  font-size: 12.5px;
+  margin-left: 4px;
+}
+.sp-main .chip {
+  margin-left: 8px;
+}
+.sp-main small {
+  display: block;
+  color: var(--mut);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
 @media (max-width: 960px) {
   .alias-form {
     flex-direction: column;
@@ -129,5 +171,11 @@
   }
   .ob-due {
     text-align: left;
+  }
+  .sp-row {
+    flex-wrap: wrap;
+  }
+  .sp-main {
+    width: 100%;
   }
 }

@@ -18,6 +18,11 @@ _SELECT = (
     "seller_tax_id, default_payment, default_item_type, "
     "default_category_id, default_erp_account, source, updated_at"
 )
+_SELECT_WITH_SUPPLIER_NAME = (
+    "p.seller_tax_id, p.default_payment, p.default_item_type, "
+    "p.default_category_id, p.default_erp_account, p.source, p.updated_at, "
+    "s.name AS supplier_name"
+)
 
 
 def get_profiles(
@@ -42,6 +47,33 @@ def list_profiles(
     sql = (
         f"SELECT {_SELECT} FROM supplier_posting_profiles "
         "WHERE tenant_id = %s AND workspace_client_id = %s ORDER BY updated_at DESC"
+    )
+    params: list = [tenant_id, workspace_client_id]
+    if limit is not None:
+        sql += " LIMIT %s"
+        params.append(limit)
+    cur.execute(sql, tuple(params))
+    return [dict(row) for row in cur.fetchall()]
+
+
+def list_profiles_with_supplier_names(
+    cur, *, tenant_id: str, workspace_client_id: int, limit: Optional[int] = None
+) -> List[dict]:
+    """管理页列表读侧富化(Z3-b):LEFT JOIN 供应商主档按清洗税号取名,查不到 → supplier_name=None
+    (前端显示「—」)。独立新读 helper——不改 list_profiles 签名,批量预取
+    (preflight.build_batch_prefetch)与单票消费两条路仍读 get_profiles/list_profiles,零影响。
+
+    suppliers.tax_id 建档路径不保证已是纯数字(手录/OCR 落库格式不一),JOIN 前用
+    regexp_replace 剥非数字字符再比 —— 与 field_clean.clean_tax_id 同一清洗口径。
+    """
+    sql = (
+        f"SELECT {_SELECT_WITH_SUPPLIER_NAME} "
+        "FROM supplier_posting_profiles p "
+        "LEFT JOIN suppliers s ON s.tenant_id = p.tenant_id "
+        "AND s.workspace_client_id = p.workspace_client_id "
+        "AND regexp_replace(COALESCE(s.tax_id, ''), '\\D', '', 'g') = p.seller_tax_id "
+        "WHERE p.tenant_id = %s AND p.workspace_client_id = %s "
+        "ORDER BY p.updated_at DESC"
     )
     params: list = [tenant_id, workspace_client_id]
     if limit is not None:

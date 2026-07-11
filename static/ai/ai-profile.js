@@ -1,17 +1,18 @@
 /*
- * Pearnly AI · ai-profile.js · 税务画像/别名/义务清单视图(B2-e)编排
+ * Pearnly AI · ai-profile.js · 税务画像/别名/义务清单/供应商过账档案视图编排
  *
- * 三块一次拉齐(getTaxProfile + listAliases + listObligations 并发),不像 intake/review/pkg
- * 那样要求先有工单——客户建档后、开第一张工单前也该能填画像、加别名(税务画像-方案-B1.md
- * §2.1"宁多问不静默"),order 可能是 null,义务清单请求就不带 period(后端默认当期)。
+ * 四块一次拉齐(getTaxProfile + listAliases + listObligations + listSupplierProfiles 并发),
+ * 不像 intake/review/pkg 那样要求先有工单——客户建档后、开第一张工单前也该能填画像、加别名、
+ * 挂供应商规则(税务画像-方案-B1.md §2.1"宁多问不静默"),order 可能是 null,义务清单请求就
+ * 不带 period(后端默认当期);供应商档案不挂工单,与 order 无关。
  *
- * 三个局部动作各自只重拉自己需要的那份数据,不做整页 reload:
+ * 局部动作各自只重拉自己需要的那份数据,不做整页 reload:
  *   保存画像 → 刷新 profile + obligations(画像变了,当期义务后端会重物化,见
  *     routes/tax_profile_routes.py::put_tax_profile);
- *   加/停别名 → 只刷新 aliases。
+ *   加/停别名 → 只刷新 aliases;加/删供应商档案(Z3-b)→ 只刷新 supplierProfiles。
  *
- * 依赖 window.AI.state/api/format/profileRender/profilePanelsRender 与全局 at(),排在它们
- * 之后、ai-client.js 之前加载(见 scripts/build-home-js.mjs)。
+ * 依赖 window.AI.state/api/format/profileRender/profilePanelsRender/supplierProfilesRender
+ * 与全局 at(),排在它们之后、ai-client.js 之前加载(见 scripts/build-home-js.mjs)。
  */
 (function () {
     'use strict';
@@ -44,6 +45,13 @@
             aliasKindValue: 'misc',
             aliasModeValue: 'exact',
             deactivatingId: null,
+            supplierProfiles: [],
+            spSubmitting: false,
+            spErrKey: null,
+            spTaxIdValue: '',
+            spPaymentValue: '',
+            spItemTypeValue: '',
+            spDeletingTaxId: null,
         };
     }
 
@@ -66,6 +74,13 @@
             aliasKindValue: readVal('aliasKind', S.aliasKindValue),
             aliasModeValue: readVal('aliasMode', S.aliasModeValue),
             deactivatingId: S.deactivatingId,
+            supplierProfiles: S.supplierProfiles,
+            spSubmitting: S.spSubmitting,
+            spErrKey: S.spErrKey,
+            spTaxIdValue: readVal('spTaxId', S.spTaxIdValue),
+            spPaymentValue: readVal('spPayment', S.spPaymentValue),
+            spItemTypeValue: readVal('spItemType', S.spItemTypeValue),
+            spDeletingTaxId: S.spDeletingTaxId,
         };
     }
 
@@ -74,7 +89,8 @@
         body().innerHTML =
             AI.profileRender.formHtml(c) +
             AI.profilePanelsRender.aliasPanelHtml(c) +
-            AI.profilePanelsRender.obligationsPanelHtml(c);
+            AI.profilePanelsRender.obligationsPanelHtml(c) +
+            AI.supplierProfilesRender.supplierProfilePanelHtml(c);
     }
 
     // ============ 拉数据 ============
@@ -86,12 +102,14 @@
             S.api.getTaxProfile(S.clientId),
             S.api.listAliases(S.clientId),
             S.api.listObligations(S.clientId, S.orderPeriod),
+            S.api.listSupplierProfiles(S.clientId),
         ])
             .then(function (r) {
                 if (S !== session) return;
                 S.profile = r[0].profile;
                 S.aliases = r[1].aliases || [];
                 S.obligations = { period: r[2].period, rows: r[2].obligations || [] };
+                S.supplierProfiles = r[3].profiles || [];
                 render();
             })
             .catch(function () {
@@ -235,6 +253,90 @@
             });
     }
 
+    // ============ 供应商过账档案(Z3-b) ============
+
+    function addSupplierProfile(e) {
+        if (e) e.preventDefault();
+        if (S.spSubmitting) return;
+        var checked = AI.supplierProfilesRender.validateTaxIdRaw(readVal('spTaxId', ''));
+        if (!checked.ok) {
+            S.spErrKey = checked.errKey;
+            render();
+            return;
+        }
+        var UNSET = AI.supplierProfilesRender.UNSET;
+        var payment = readVal('spPayment', UNSET);
+        var itemType = readVal('spItemType', UNSET);
+        if (payment === UNSET && itemType === UNSET) {
+            S.spErrKey = 'err_sp_axis_required';
+            render();
+            return;
+        }
+        var body = {};
+        if (payment !== UNSET) body.default_payment = payment;
+        if (itemType !== UNSET) body.default_item_type = itemType;
+        var session = S;
+        S.spSubmitting = true;
+        S.spErrKey = null;
+        render();
+        S.api
+            .putSupplierProfile(S.clientId, checked.value, body)
+            .then(function () {
+                if (S !== session) return;
+                S.spTaxIdValue = '';
+                // readVal() 之后重渲染前优先读活 DOM 值(保留用户没提交那部分的在途输入),
+                // 提交成功这条路必须连活元素一起清空,不然 ctx() 会把清空前的旧值读回来
+                // (同一坑本可能也潜伏在别名加行,这里先在供应商档案这条路补上)。
+                var el = $('spTaxId');
+                if (el) el.value = '';
+                return S.api.listSupplierProfiles(S.clientId);
+            })
+            .then(function (r) {
+                if (S !== session || !r) return;
+                S.supplierProfiles = r.profiles || [];
+                S.spSubmitting = false;
+                render();
+            })
+            .catch(function (err) {
+                if (S !== session) return;
+                S.spSubmitting = false;
+                var key = AI.api.mapApiErrorKey(err && err.code);
+                S.spErrKey = at(key) !== key ? key : 'err_generic';
+                render();
+            });
+    }
+
+    function deleteSupplierProfile(taxId) {
+        if (S.spDeletingTaxId) return;
+        if (!root_confirm(at('sp_delete_confirm'))) return;
+        var session = S;
+        S.spDeletingTaxId = taxId;
+        render();
+        S.api
+            .deleteSupplierProfile(S.clientId, taxId)
+            .then(function () {
+                if (S !== session) return;
+                return S.api.listSupplierProfiles(S.clientId);
+            })
+            .then(function (r) {
+                if (S !== session) return;
+                S.supplierProfiles = (r && r.profiles) || [];
+                S.spDeletingTaxId = null;
+                render();
+            })
+            .catch(function () {
+                if (S !== session) return;
+                S.spDeletingTaxId = null;
+                render();
+            });
+    }
+
+    // window.confirm 委托一层薄封装:一是给测试/未来自定义弹窗留替换口子,二是避免直接在
+    // 业务函数里裸写全局名(同文件其它地方一律不直接碰 window/document 之外的全局)。
+    function root_confirm(msg) {
+        return window.confirm(msg);
+    }
+
     // ============ 事件接线(容器委托,只挂一次) ============
 
     function onClick(e) {
@@ -242,11 +344,13 @@
         if (!el) return;
         var a = el.getAttribute('data-action');
         if (a === 'alias-deactivate') deactivateAlias(Number(el.getAttribute('data-id')));
+        else if (a === 'sp-delete') deleteSupplierProfile(el.getAttribute('data-tax'));
     }
 
     function onSubmit(e) {
         if (e.target && e.target.id === 'profileForm') saveProfile(e);
         else if (e.target && e.target.id === 'aliasForm') addAlias(e);
+        else if (e.target && e.target.id === 'spForm') addSupplierProfile(e);
     }
 
     function wireOnce() {

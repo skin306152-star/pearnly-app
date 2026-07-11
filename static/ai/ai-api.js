@@ -62,6 +62,15 @@
                 .then(handleResponse);
         }
 
+        // core.pos_api.ok() 信封({"ok":true,"data":{...}})的调用方用这个,解出 .data 让
+        // 调用方拿到的形状跟其它 AI 端点(workorder/workspace,裸对象无信封)一致——
+        // 别让信封差异渗进 ai-profile.js 的业务代码里(Z3-b · 供应商过账档案)。
+        function callEnvelope(method, path, body) {
+            return call(method, path, body).then(function (j) {
+                return (j && j.data) || {};
+            });
+        }
+
         return {
             // Z1-a · 登录门面用:未登录态调用,不带 Authorization(authHeaders 见 token 为空
             // 自然省略头)。成功回 {token, access_token, user, is_super_admin} 同 landing.js 契约。
@@ -238,6 +247,31 @@
                 return call(
                     'GET',
                     '/api/workspace/clients/' + encodeURIComponent(clientId) + '/obligations' + qs
+                );
+            },
+            // 供应商过账档案(Z3-b · routes/supplier_posting_routes.py)。中立能力层 API,
+            // clientId 即该端点的 workspace_client_id(与 tax-profile/aliases 同一账套上下文)。
+            listSupplierProfiles: function (clientId) {
+                return callEnvelope(
+                    'GET',
+                    '/api/purchase/supplier-profiles?workspace_client_id=' +
+                        encodeURIComponent(clientId)
+                );
+            },
+            putSupplierProfile: function (clientId, taxId, body) {
+                return callEnvelope(
+                    'PUT',
+                    '/api/purchase/supplier-profiles/' + encodeURIComponent(taxId),
+                    Object.assign({ workspace_client_id: clientId }, body)
+                );
+            },
+            deleteSupplierProfile: function (clientId, taxId) {
+                return callEnvelope(
+                    'DELETE',
+                    '/api/purchase/supplier-profiles/' +
+                        encodeURIComponent(taxId) +
+                        '?workspace_client_id=' +
+                        encodeURIComponent(clientId)
                 );
             },
             // 事务所矩阵(C4·routes/tax_profile_routes.py::get_tax_profile_matrix):客户 ×

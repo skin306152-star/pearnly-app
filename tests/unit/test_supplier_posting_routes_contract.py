@@ -144,7 +144,9 @@ class ListRouteTests(_RouteTestBase):
         with mock.patch.object(
             routes_mod.db, "get_cursor_rls", side_effect=lambda *a, **k: _cm(mock.Mock())
         ):
-            with mock.patch.object(routes_mod.sp_svc, "list_profiles", return_value=[]) as m:
+            with mock.patch.object(
+                routes_mod.sp_svc, "list_profiles_with_supplier_names", return_value=[]
+            ) as m:
                 _run(
                     routes_mod.api_list_supplier_profiles(
                         mock.Mock(), workspace_client_id=None, limit=5
@@ -154,6 +156,23 @@ class ListRouteTests(_RouteTestBase):
         self.assertEqual(kwargs["limit"], 5)
         self.assertEqual(kwargs["tenant_id"], "t1")
         self.assertEqual(kwargs["workspace_client_id"], 7)
+
+    def test_supplier_name_passthrough_to_response(self):
+        # Z3-b:GET 列表响应每行带 supplier_name(读侧富化,查不到给 None)。
+        self._patch_auth()
+        rows = [{"seller_tax_id": "0107561000013", "supplier_name": "冰厂"}]
+        with mock.patch.object(
+            routes_mod.db, "get_cursor_rls", side_effect=lambda *a, **k: _cm(mock.Mock())
+        ):
+            with mock.patch.object(
+                routes_mod.sp_svc, "list_profiles_with_supplier_names", return_value=rows
+            ):
+                resp = _run(
+                    routes_mod.api_list_supplier_profiles(
+                        mock.Mock(), workspace_client_id=None, limit=None
+                    )
+                )
+        self.assertEqual(resp["data"]["profiles"][0]["supplier_name"], "冰厂")
 
 
 class UpsertRouteTests(_RouteTestBase):

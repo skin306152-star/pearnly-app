@@ -42,11 +42,15 @@ async def api_list_supplier_profiles(
     workspace_client_id: Optional[int] = Query(None),
     limit: Optional[int] = Query(None, ge=1, le=500),
 ):
+    """列表读侧富化(Z3-b):每行带 supplier_name(LEFT JOIN suppliers,查不到给 None,
+    前端显示「—」)。走独立读 helper,不动 list_profiles——预取/单票消费两条路无感知。"""
     _, tid = auth_member(request, "purchase.doc.view")
     with db.get_cursor_rls(tid, commit=False) as cur:
         gate(cur, tid)
         ws = resolve_ws(cur, request, tid, workspace_client_id)
-        rows = sp_svc.list_profiles(cur, tenant_id=tid, workspace_client_id=ws, limit=limit)
+        rows = sp_svc.list_profiles_with_supplier_names(
+            cur, tenant_id=tid, workspace_client_id=ws, limit=limit
+        )
         return ok({"profiles": rows})
 
 

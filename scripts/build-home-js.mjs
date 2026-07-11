@@ -69,10 +69,11 @@ const BUNDLES = [
     // ai-pkg-render.js(交付包纯函数+HTML,依赖 AI.format/AI.state/AI.viewer)排在
     // ai-pkg.js(挂载/下载/证据模态框编排)之前,两者都在 ai-client.js(renderPkg 用
     // AI.pkg)和 ai.js(离开客户页时调 AI.pkg.onLeave)之前。ai-profile-render.js(画像
-    // 表单纯函数+HTML,buildProfilePayload 借道 AI.format.parseAmount)与
-    // ai-profile-panels-render.js(别名+义务清单纯函数+HTML,拆自前者,单文件<500 铁律)
-    // 都必须排在 ai-profile.js(挂载/保存/别名增改编排)之前,三者都在 ai-client.js
-    // (renderProfile 用 AI.profile)之前(B2-e · 2026-07-10)。
+    // 表单纯函数+HTML,buildProfilePayload 借道 AI.format.parseAmount)、
+    // ai-profile-panels-render.js(别名+义务清单纯函数+HTML,拆自前者,单文件<500 铁律)、
+    // ai-supplier-profiles-render.js(供应商过账档案纯函数+HTML,Z3-b·骨架同构别名面板)
+    // 三者都必须排在 ai-profile.js(挂载/保存/别名与供应商档案增删编排)之前,四者都在
+    // ai-client.js(renderProfile 用 AI.profile)之前(B2-e · 2026-07-10;Z3-b · 2026-07-11)。
     {
         out: 'static/dist/ai.js',
         files: [
@@ -99,6 +100,7 @@ const BUNDLES = [
             'ai/ai-pkg.js',
             'ai/ai-profile-render.js',
             'ai/ai-profile-panels-render.js',
+            'ai/ai-supplier-profiles-render.js',
             'ai/ai-profile.js',
             'ai/ai-client.js',
             'ai/ai.js',

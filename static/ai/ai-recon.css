@@ -1,0 +1,121 @@
+/* Pearnly AI · 银行对账区(E2 · 工单详情 wo 视图)——四清单折叠列表 + 原图模态窄版。
+ * 折叠头/行沿用 .panel/.chip/.btn 原子(ai-shell.css),模态外壳复用 .pkg-mask/.pkg-modal
+ * (ai-pkg.css),本文件只加对账特有的行布局与折叠交互样式。
+ */
+.brx-body-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.brx-section {
+  border: 1px solid var(--hair);
+  border-radius: 11px;
+  overflow: hidden;
+}
+.brx-fold {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--surface2);
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--ink);
+  text-align: left;
+}
+.brx-caret {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mut);
+}
+.brx-body {
+  display: none;
+  padding: 4px 14px 12px;
+}
+.brx-section.on .brx-body {
+  display: block;
+}
+.brx-empty {
+  color: var(--mut);
+  font-size: 12px;
+  padding: 8px 2px;
+}
+.brx-row {
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--hair3);
+  font-size: 12.5px;
+}
+.brx-row:last-child {
+  border-bottom: none;
+}
+.brx-tx {
+  display: block;
+  color: var(--ink2);
+  font-variant-numeric: tabular-nums;
+}
+.brx-cand,
+.brx-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.brx-cands {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+.brx-score {
+  font-size: 11px;
+  color: var(--mut);
+  font-weight: 650;
+}
+.brx-reason {
+  font-size: 11px;
+  color: var(--mut);
+}
+.brx-hint {
+  font-size: 11px;
+  color: var(--mut);
+  margin-top: 6px;
+  line-height: 1.6;
+}
+.brx-hint a {
+  color: var(--gold);
+  font-weight: 600;
+}
+.brx-err {
+  font-size: 11px;
+  color: var(--crit);
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* 原图模态窄版(单窗格,不需要 pkg 证据模态的列表+查看器双栏)。 */
+.brx-view-modal {
+  max-width: min(560px, 100%);
+}
+.brx-view-mb {
+  display: block;
+  grid-template-columns: none;
+}
+.brx-view-mb .pkg-evid-view {
+  min-height: 360px;
+}
+
+@media (max-width: 480px) {
+  .brx-fold {
+    font-size: 12px;
+    padding: 11px 12px;
+  }
+  .brx-body {
+    padding: 4px 12px 10px;
+  }
+}

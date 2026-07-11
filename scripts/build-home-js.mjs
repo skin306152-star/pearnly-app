@@ -99,6 +99,11 @@ const BUNDLES = [
             'ai/ai-intake.js',
             'ai/ai-pkg-render.js',
             'ai/ai-pkg.js',
+            // ai-recon-render.js(E2 · 银行对账四清单纯逻辑+HTML,依赖 AI.state/format/
+            // viewer/router)排在 ai-recon.js(挂载/折叠/原图模态/推 LINE 待问编排)之前,
+            // 两者都在 ai-client.js(renderWo 用 AI.recon.mount)之前——同 ai-pkg 先例。
+            'ai/ai-recon-render.js',
+            'ai/ai-recon.js',
             'ai/ai-profile-render.js',
             'ai/ai-profile-panels-render.js',
             'ai/ai-supplier-profiles-render.js',

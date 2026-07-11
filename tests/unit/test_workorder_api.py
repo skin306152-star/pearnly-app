@@ -158,6 +158,108 @@ class OrderDetailTests(_ApiTestBase):
         self.assertIsNone(api.order_detail(None, tenant_id="t-1", work_order_id="ghost"))
 
 
+class BankReconTests(_ApiTestBase):
+    """E2 契约:order_detail 的 bank_recon 字段只读投影 gates.r3_bank.recon(闸开+有
+    recon 才带四清单,闸关/无流水/未跑到 reconcile/引擎异常降级一律诚实 None)。"""
+
+    def setUp(self):
+        super().setUp()
+        self.store.items = [
+            {
+                "id": "bank-1",
+                "work_order_id": "wo-1",
+                "kind": "bank_statement",
+                "status": "ok",
+                "flag_reason": None,
+                "file_ref": "/x/stmt.pdf",
+            },
+        ]
+
+    def _recon_payload(self):
+        return {
+            "auto_matched_count": 1,
+            "review_count": 1,
+            "missing_invoice_count": 1,
+            "unmatched_invoice_count": 1,
+            "auto_matched": [{"tx": {"amount": "100.00"}, "candidate_id": "it-1", "score": 92.0}],
+            "review": [{"tx": {"amount": "50.00"}, "candidates": [{"candidate_id": "it-2"}]}],
+            "missing_invoice": [{"amount": "30.00", "tx_date": "2026-05-01"}],
+            "unmatched_invoice": [{"candidate_id": "it-3", "amount": "20.00"}],
+            "diff": {
+                "missing_invoice_total": "30.00",
+                "unmatched_invoice_total": "20.00",
+                "net": "10.00",
+            },
+        }
+
+    def test_bank_recon_present_when_gate_open_and_reconciled(self):
+        self.store.events = [
+            {
+                "step": "reconcile",
+                "event_type": "step_done",
+                "payload": {"gates": {"r3_bank": {"recon": self._recon_payload()}}},
+            },
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        recon = detail["bank_recon"]
+        self.assertIsNotNone(recon)
+        self.assertEqual(recon["auto_matched_count"], 1)
+        self.assertEqual(recon["missing_invoice_count"], 1)
+        self.assertEqual(recon["diff"]["net"], "10.00")
+        self.assertEqual(recon["bank_item_ids"], ["bank-1"])
+
+    def test_bank_recon_none_when_gate_closed(self):
+        # 闸关:reconcile 的 r3_bank 只有材料存在性字段,没有 recon 键(reconcile.py 现状)。
+        self.store.events = [
+            {
+                "step": "reconcile",
+                "event_type": "step_done",
+                "payload": {
+                    "gates": {
+                        "r3_bank": {"bank_statement_present": True, "bank_statement_count": 1}
+                    }
+                },
+            },
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertIsNone(detail["bank_recon"])
+
+    def test_bank_recon_none_when_no_bank_statement(self):
+        self.store.events = [
+            {
+                "step": "reconcile",
+                "event_type": "step_done",
+                "payload": {"gates": {"r3_bank": {"note": "bank_statement_missing"}}},
+            },
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertIsNone(detail["bank_recon"])
+
+    def test_bank_recon_none_when_reconcile_not_reached(self):
+        self.store.events = []
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertIsNone(detail["bank_recon"])
+
+    def test_bank_recon_none_when_engine_error_shape(self):
+        # _run_bank_recon 的 except 分支落 {"error":..., "note": "bank_recon_skipped"} ——
+        # 形状不全(缺 auto_matched)不能冒充可用清单。
+        self.store.events = [
+            {
+                "step": "reconcile",
+                "event_type": "step_done",
+                "payload": {
+                    "gates": {
+                        "r3_bank": {
+                            "recon": {"error": "RuntimeError", "note": "bank_recon_skipped"}
+                        }
+                    }
+                },
+            },
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertIsNone(detail["bank_recon"])
+
+
 class FlaggedEnrichmentTests(_ApiTestBase):
     """W3 契约 §1.2/§5:flagged[] 每条带 ocr_read(票面钱字段)+ decision(最新裁决)。"""
 

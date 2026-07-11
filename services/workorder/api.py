@@ -44,6 +44,7 @@ _SALES_KIND = "sales_summary"
 _MANUAL_SOURCE = "manual"
 _MANUAL_SALES_DEDUPE = "manual:sales_summary"
 _MAX_NOTE_LEN = 500
+_KIND_BANK_STATEMENT = "bank_statement"
 # reconcile.aggregate_sales 靠表头关键词认「销售额列 / 销项税列」;人工填的两个合计以泰文规范
 # 列名 + 单数据行合成表落库,与真实 POS 汇总表直读产出的 sales_read 形状一致(不另造契约)。
 _SALES_HEADER = "ยอดขาย"
@@ -178,10 +179,30 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         "needs": needs,
         "blocked_reasons": blocked,
         "numbers": _numbers(events),
+        "bank_recon": _bank_recon(events, items),
         "deliverables": [
             {"kind": d["kind"], "numbers": d.get("numbers") or {}} for d in deliverables
         ],
     }
+
+
+def _bank_recon(events: list[dict], items: list[dict]) -> Optional[dict]:
+    """R3 银行对账四清单只读投影(E2 对账人审界面读侧)。
+
+    从 reconcile 步 step_done 回放里深取 gates.r3_bank.recon——闸关 / 无银行流水 /
+    尚未跑到 reconcile / 引擎异常降级(_run_bank_recon 的 except 分支落一份
+    {error,note} 残影)都诚实给 None,不拼一份假清单充数(状态诚实优先于"看着有内容")。
+    bank_item_ids 是本工单已收的银行流水件(kind=bank_statement),供前端「缺票行推
+    LINE 待问」的落点与「查看原图」共用——缺票行本身没有对应票据 item,问题与原图都
+    只能挂在流水件本身上(问的就是"这张流水缺哪张票")。"""
+    payload = evidence.replay_step_done(events, _DECISION_STEP)
+    if not payload:
+        return None
+    recon = ((payload.get("gates") or {}).get("r3_bank") or {}).get("recon")
+    if not isinstance(recon, dict) or "auto_matched" not in recon:
+        return None
+    bank_item_ids = [it["id"] for it in items if it.get("kind") == _KIND_BANK_STATEMENT]
+    return dict(recon, bank_item_ids=bank_item_ids)
 
 
 def _flagged(items: list[dict], events: list[dict]) -> list[dict]:

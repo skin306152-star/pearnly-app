@@ -151,6 +151,10 @@ const AI_CSS = [
     'ai/ai-client.css',
     'ai/ai-intake.css',
     'ai/ai-pkg.css',
+    // ai-recon.css(E2 · 银行对账四清单)复用 ai-pkg.css 的 .pkg-mask/.pkg-modal 原图
+    // 模态外壳,排在其后即可;与工单详情 .wosum/.needs-list(ai-client.css)同屏但
+    // 各管各的类名,层叠顺序对彼此零影响。
+    'ai/ai-recon.css',
     // ai-profile.css(B2-e 画像/别名/义务清单)吃 .sf-*(ai-intake.css)/.panel/.chip
     // (ai-shell.css)原子,排在两者之后即可;与 pkg 视图互斥显示,顺序对彼此零影响。
     'ai/ai-profile.css',

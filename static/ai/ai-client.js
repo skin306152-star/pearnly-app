@@ -121,7 +121,10 @@
                     '</span></h3></div><div class="bd">' +
                     (cells ? '<div class="wosum">' + cells + '</div>' : '') +
                     (needs ? '<div class="needs-list">' + needs + '</div>' : '') +
-                    '</div></div>';
+                    '</div></div>' +
+                    '<div id="brxRoot"></div>';
+                // 银行对账区(E2):同一次 getOrder() 已带回 bank_recon,不再二次请求。
+                AI.recon.mount(S.api, order.id, S.clientId, d.bank_recon, $('brxRoot'));
             })
             .catch(function () {
                 body.innerHTML = AI.state.errorHtml({
@@ -213,6 +216,10 @@
         // 里,tab 切走不会自动隐藏——见 ai-pkg.js onLeave 注释)。
         if (prevView === 'pkg' && view !== 'pkg' && window.AI.pkg) {
             AI.pkg.onLeave();
+        }
+        // 离开工单 tab 收掉银行对账区的原图模态(同上,挂 document.body 不随 innerHTML 走)。
+        if (prevView === 'wo' && view !== 'wo' && window.AI.recon) {
+            AI.recon.onLeave();
         }
         if (!chromeWired) {
             wireChrome();

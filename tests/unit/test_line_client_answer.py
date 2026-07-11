@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 
 from services.line_binding import client_pool_vocab as vocab
 from services.line_binding import line_client_answer as m
+from services.line_binding import line_client_answer_copy
 from services.workorder import decisions
 
 _NOW = datetime(2026, 7, 11, 10, 0, tzinfo=timezone.utc)
@@ -30,6 +31,7 @@ def _question(**overrides) -> dict:
         "question_payload": {},
         "status": vocab.PENDING,
         "batch_id": "batch-1",
+        "batch_seq": None,
         "answer_raw": None,
         "resolution": None,
         "created_by": "user:1",
@@ -346,7 +348,7 @@ class RaceGuardTests(unittest.TestCase):
         )
         reply.assert_called_once()
         # 回的是「已处理」话术,不是普通 manual_review 文案(区分两种关闭原因)。
-        self.assertEqual(reply.call_args.args[1], m._ALREADY_HANDLED_COPY["th"])
+        self.assertEqual(reply.call_args.args[1], line_client_answer_copy._ALREADY_HANDLED["th"])
 
     def test_decision_before_question_created_does_not_block(self):
         created_at = _NOW
@@ -553,6 +555,7 @@ class MultiMessageBatchAnchorTests(unittest.TestCase):
                 work_order_id=f"wo-{qid}",
                 question_type=qtype,
                 batch_id="batch-r3",
+                batch_seq=i + 1,  # 推送时落的固定编号 = 答题定位单一事实源
                 status=st,
                 created_at=_NOW - timedelta(minutes=30 - i),
             )
@@ -620,6 +623,26 @@ class MultiMessageBatchAnchorTests(unittest.TestCase):
         self.assertEqual(by_qid[103].args[2], vocab.MANUAL_REVIEW)
         self.assertEqual(by_qid[103].kwargs["answer_raw"], "ไม่แน่ใจค่ะ ช่วยดูให้หน่อย")
 
+    def test_batch_seq_authoritative_when_list_order_scrambled(self):
+        """batch_seq 迁移核心保证:即便 rows 列表序(created_at)与推送编号不一致,「1 ซื้อ」
+        也必须落到 batch_seq=1 的票——旧位序逻辑(full_rows[0])会贴到列表首行(此处 item-2)。"""
+        r1 = _question(id=101, item_id="item-1", work_order_id="wo-1", batch_seq=1)
+        r2 = _question(id=102, item_id="item-2", work_order_id="wo-2", batch_seq=2)
+        r3 = _question(id=103, item_id="item-3", work_order_id="wo-3", batch_seq=3)
+        scrambled = [r2, r3, r1]  # 列表序打乱,batch_seq 才是真编号
+        record = MagicMock(side_effect=lambda *a, **k: {"id": f"evt-{k['item_id']}"})
+        with (
+            patch("core.db.get_cursor", return_value=_cm(MagicMock())),
+            patch("services.workorder.api.order_detail", return_value=_order_detail()),
+            patch("services.workorder.api.record_decision", record),
+            patch("services.line_binding.line_client_pool_store.transition"),
+            patch("services.line_binding.line_client_pool_store.list_for_client", return_value=[]),
+            patch("services.line_binding.line_reply.reply_text_context"),
+        ):
+            m._consume(self._selected(scrambled), "1 ซื้อ", "U-163", "rt-1", None)
+        self.assertEqual(len(record.call_args_list), 1)
+        self.assertEqual(record.call_args_list[0].kwargs["item_id"], "item-1")
+
 
 class NumberedTerminalSlotTests(unittest.TestCase):
     """编号指向已 applied 的槽(客户重复发「1 ซื้อ」)→ 回「已处理」,绝不产生第二次裁决。"""
@@ -652,7 +675,7 @@ class NumberedTerminalSlotTests(unittest.TestCase):
                 None,
             )
         record.assert_not_called()  # 不在已 applied 的票上重复裁决
-        self.assertEqual(reply.call_args.args[1], m._ALREADY_HANDLED_COPY["th"])
+        self.assertEqual(reply.call_args.args[1], line_client_answer_copy._ALREADY_HANDLED["th"])
 
 
 class NumberedOutOfRangeTests(unittest.TestCase):

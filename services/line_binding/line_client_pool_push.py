@@ -179,8 +179,10 @@ def push_batch_for_client(tenant_id, workspace_client_id, actor: str) -> dict:
     batch_id = uuid.uuid4()
     marked = []
     try:
-        for question in batch:
-            marked.append(store.mark_sent(tenant_id, question["id"], batch_id))
+        # batch_seq = 消息里的编号(与 _render_batch_message 的 enumerate 同序同起点),
+        # 落列供答题侧按存序号定位,不再靠两侧 ORDER BY 对齐(R3 串题根治)。
+        for seq, question in enumerate(batch, start=1):
+            marked.append(store.mark_sent(tenant_id, question["id"], batch_id, seq))
     except Exception:
         logger.warning(
             "[line_client_pool_push] mark_sent failed mid-batch; rolling back to staged",

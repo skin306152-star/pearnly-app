@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS line_client_questions (
     question_payload    jsonb  NOT NULL DEFAULT '{}'::jsonb,
     status              text   NOT NULL DEFAULT 'staged',
     batch_id            uuid,
+    batch_seq           smallint,
     answer_raw          text,
     resolution          jsonb,
     created_by          text   NOT NULL,
@@ -39,6 +40,10 @@ CREATE TABLE IF NOT EXISTS line_client_questions (
     updated_at          timestamptz NOT NULL DEFAULT now()
 )
 """
+
+# 存量表补列:prod 已有 line_client_questions(alembic 停 0020,靠首用自愈),CREATE TABLE
+# IF NOT EXISTS 不会补新列,须显式幂等 ALTER,否则老库永远缺 batch_seq。
+_ALTER_BATCH_SEQ = "ALTER TABLE line_client_questions ADD COLUMN IF NOT EXISTS batch_seq smallint"
 
 _INDEX_ACTIVE_ITEM = """
 CREATE UNIQUE INDEX IF NOT EXISTS uq_lcq_active_item
@@ -58,7 +63,7 @@ CREATE INDEX IF NOT EXISTS ix_lcq_pending_chase
 
 _COLUMNS = (
     "id, tenant_id, workspace_client_id, work_order_id, item_id, period, "
-    "question_type, question_payload, status, batch_id, answer_raw, resolution, "
+    "question_type, question_payload, status, batch_id, batch_seq, answer_raw, resolution, "
     "created_by, created_at, sent_at, answered_at, closed_at, updated_at"
 )
 
@@ -92,6 +97,7 @@ def ensure_table() -> None:
 
     with db.get_cursor(commit=True) as cur:
         cur.execute(_TABLE)
+        cur.execute(_ALTER_BATCH_SEQ)
         cur.execute(_INDEX_ACTIVE_ITEM)
         cur.execute(_INDEX_CLIENT_ACTIVE)
         cur.execute(_INDEX_PENDING_CHASE)
@@ -99,11 +105,13 @@ def ensure_table() -> None:
 
 
 def _with_heal(fn):
-    """表不存在(新库/回滚后)→ 建表重试一次;其余异常向上抛由调用方 fail-safe。"""
+    """表不存在(新库/回滚后)或缺 batch_seq 列(存量表未补列)→ 自愈重试一次;
+    其余异常向上抛由调用方 fail-safe。"""
     try:
         return fn()
     except Exception as e:
-        if "line_client_questions" not in str(e):
+        msg = str(e)
+        if "line_client_questions" not in msg and "batch_seq" not in msg:
             raise
         ensure_table()
         return fn()
@@ -185,14 +193,13 @@ def list_for_client(tenant_id, workspace_client_id, *, statuses: Optional[tuple]
 
 
 def list_batch(tenant_id, workspace_client_id, batch_id) -> list:
-    """按 batch_id 取该批次【全状态】行按 created_at —— 重建推送时
-    enumerate(questions, start=1) 的固定编号序(questions 亦按 created_at)。
-    答题侧据此定位「客户嘴里的第 N 题」不随期间某题答完退出 pending、pending
-    列表收缩而位移(R3 串题根因:答题编号必须锚推送批次固定序,不看实时剩几道)。
+    """按 batch_id 取该批次【全状态】行。答题侧据此定位「客户嘴里的第 N 题」——用行自带的
+    batch_seq(推送时 mark_sent 落的固定编号)对号,不随期间某题答完退出 pending、列表
+    收缩而位移(R3 串题根因已根治:编号是持久列,不再靠推送/答题两侧现算对齐)。
 
-    ⚠️ 隐性契约:编号仍是"推送侧现算 vs 答题侧现算"的派生量,靠两处都按 created_at
-    排同一批行对齐(line_client_pool_push 的 enumerate 必须同序)。改任一侧排序必同改另一侧;
-    根治办法是推送时把序号落成 batch_seq 列、答题按存的序号定位(backlog·见交接)。"""
+    ORDER BY created_at 仅为稳定展示序;编号权威来自 batch_seq 列,与本查询排序无关。
+    (batch_seq 迁移前的存量批次 batch_seq 为 NULL,答题侧 _consume 对这种批次回落按位序,
+    见其注释。)"""
     from core import db
 
     def _run():
@@ -307,13 +314,17 @@ def transition(
     return _with_heal(_run)
 
 
-def mark_sent(tenant_id, question_id, batch_id) -> dict:
-    """staged→pending 且原子盖 batch_id(S4 攒批推送成功后逐行落定 · 方案 §7.2 S4)。
+def mark_sent(tenant_id, question_id, batch_id, batch_seq) -> dict:
+    """staged→pending 且原子盖 batch_id + batch_seq(S4 攒批推送成功后逐行落定 · 方案 §7.2 S4)。
 
-    transition() 没有 batch_id 写入口(通用跳转不知道"这是不是一次批量推送"),
-    专开此函数而不是把 batch_id 塞进 transition() 的通用签名——避免其余跳转路径
-    (人工裁决/自动关闭)误传/误留旧 batch_id。合法性仍过 LEGAL_TRANSITIONS,
-    CAS 用 WHERE status=<当前值> 同 transition() 语义,不绕状态机。
+    batch_seq = 该题在推送消息里的固定编号(enumerate start=1),持久落列作为答题定位的
+    单一事实源——答题按存的序号定位「客户嘴里的第 N 题」,不再靠推送/答题两侧各自 ORDER BY
+    对齐(根治 R3 串题:编号不随期间某题退出 pending、列表收缩而漂移)。
+
+    transition() 没有 batch_id/batch_seq 写入口(通用跳转不知道"这是不是一次批量推送"),
+    专开此函数而不是把它们塞进 transition() 的通用签名——避免其余跳转路径(人工裁决/
+    自动关闭)误传/误留旧批次标记。合法性仍过 LEGAL_TRANSITIONS,CAS 用 WHERE status=
+    <当前值> 同 transition() 语义,不绕状态机。
     """
     from core import db
 
@@ -333,11 +344,11 @@ def mark_sent(tenant_id, question_id, batch_id) -> dict:
                 raise IllegalTransitionError(current, to_status)
 
             cur.execute(
-                "UPDATE line_client_questions SET status = %s, batch_id = %s, "
+                "UPDATE line_client_questions SET status = %s, batch_id = %s, batch_seq = %s, "
                 "sent_at = now(), updated_at = now() "
                 "WHERE tenant_id = %s AND id = %s AND status = %s "
                 f"RETURNING {_COLUMNS}",
-                (to_status, str(batch_id), str(tenant_id), question_id, current),
+                (to_status, str(batch_id), int(batch_seq), str(tenant_id), question_id, current),
             )
             updated = cur.fetchone()
             if not updated:

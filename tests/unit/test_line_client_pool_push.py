@@ -51,11 +51,16 @@ _CONTACT = {
 
 
 def _mark_sent_recording(calls):
-    """side_effect:记录每次调用的 (tenant_id, question_id, batch_id),回一条已置 pending 的行。"""
+    """side_effect:记录每次调用 (tenant_id, question_id, batch_id, batch_seq),回一条已置 pending 的行。"""
 
-    def _run(tenant_id, question_id, batch_id):
-        calls.append((tenant_id, question_id, batch_id))
-        return {"id": question_id, "status": vocab.PENDING, "batch_id": str(batch_id)}
+    def _run(tenant_id, question_id, batch_id, batch_seq):
+        calls.append((tenant_id, question_id, batch_id, batch_seq))
+        return {
+            "id": question_id,
+            "status": vocab.PENDING,
+            "batch_id": str(batch_id),
+            "batch_seq": batch_seq,
+        }
 
     return _run
 
@@ -174,6 +179,9 @@ class PushBatchSuccessTests(unittest.TestCase):
         sent_text = push_fn.call_args.args[1]
         self.assertIn("2", sent_text)  # 尾句「还有 2 条」
         self.assertEqual(len(mark_calls), 5)  # 6/7 号从未被 mark_sent 触碰,原样留 staged
+        self.assertEqual(
+            [c[3] for c in mark_calls], [1, 2, 3, 4, 5]
+        )  # batch_seq 与消息编号同序落列
 
 
 class PushBatchFailureTests(unittest.TestCase):
@@ -229,7 +237,7 @@ class PushBatchFailureTests(unittest.TestCase):
             _question(3, vocab.QUESTION_DIRECTION, {"supplier": "C", "invno": "INV-3"}),
         ]
 
-        def _mark_sent_third_fails(tenant_id, question_id, batch_id):
+        def _mark_sent_third_fails(tenant_id, question_id, batch_id, batch_seq):
             if question_id == 3:
                 raise RuntimeError("db hiccup")
             return {"id": question_id, "status": vocab.PENDING, "batch_id": str(batch_id)}

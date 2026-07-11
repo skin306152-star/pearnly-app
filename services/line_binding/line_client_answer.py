@@ -16,6 +16,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from services.line_binding import client_pool_vocab as vocab
+from services.line_binding import line_client_answer_copy
 from services.workorder import decisions
 
 logger = logging.getLogger(__name__)
@@ -35,26 +36,6 @@ _AMOUNT_RE = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")
 _POLITE_TAIL_RE = re.compile(
     r"(?:ค่ะ|ค่า|คะ|ครับ|ครัช|ๆ|[!?.,~。!?、]|[\U0001F300-\U0001FAFF\U00002600-\U000027BF])+$"
 )
-
-# 回执文案(四语 · 客户侧 LINE push 独立小词表 · 照 _BOUND_COPY 范式,不并进会计端大 i18n)。
-_APPLIED_COPY = {
-    "th": "ได้รับแล้วค่ะ ✅ อัปเดตตามที่แจ้งเรียบร้อยแล้วนะคะ",
-    "en": "Got it! Updated as you said.",
-    "zh": "收到,已按你说的更新。",
-    "ja": "承知しました。ご回答の通り更新しました。",
-}
-_MANUAL_COPY = {
-    "th": "ได้รับแล้วค่ะ 🙏 ขอบันทึกไว้ก่อน นักบัญชีจะดูให้อีกทีนะคะ",
-    "en": "Got it! Noted — your accountant will take a look.",
-    "zh": "收到,先记下,会计会再确认。",
-    "ja": "承知しました。会計担当が確認いたします。",
-}
-_ALREADY_HANDLED_COPY = {
-    "th": "ไม่ต้องแล้วค่ะ 🙏 รายการนี้จัดการเรียบร้อยแล้ว",
-    "en": "No worries — this one's already been taken care of.",
-    "zh": "不用麻烦了,这条已经处理好了。",
-    "ja": "こちらはすでに処理済みですので大丈夫です。",
-}
 
 
 def handle_answer(
@@ -210,23 +191,32 @@ def _consume(
 ) -> None:
     tenant_id = selected["tenant_id"]
     workspace_client_id = selected["workspace_client_id"]
-    full_rows = selected["rows"]  # 完整批次(全状态·按 created_at)= 编号基准
+    full_rows = selected["rows"]  # 完整批次(全状态)
     pending_rows = [r for r in full_rows if r["status"] == vocab.PENDING]
+    # 编号→行:batch_seq 持久列是单一事实源(推送时 mark_sent 落的固定编号)。迁移前存量批次
+    # 无 batch_seq 时回落按位序(仍与旧行为一致),迁移后一律走列,不再靠两侧排序对齐(R3 根治)。
+    by_seq = {r["batch_seq"]: r for r in full_rows if r.get("batch_seq") is not None}
     lang = selected["lang"]
+
+    def _locate(num: int) -> Optional[dict]:
+        if by_seq:
+            return by_seq.get(num)
+        idx = num - 1
+        return full_rows[idx] if 0 <= idx < len(full_rows) else None
 
     segments = _split_numbered_segments(text)
     if segments:
         matched = False
         for num, seg in segments:
-            idx = num - 1
-            if not (0 <= idx < len(full_rows)):
+            row = _locate(num)
+            if row is None:
                 continue
             matched = True
             # 终态槽(客户重复答已处理的票)由 _handle_one 顶部统一挡下,回「已处理」不重复裁决。
             _handle_one(
                 tenant_id,
                 workspace_client_id,
-                full_rows[idx],
+                row,
                 seg,
                 line_user_id,
                 reply_token,
@@ -476,7 +466,7 @@ def _finish(
     if not reply_token:
         return
     try:
-        copy = _ack_copy(to_status, already_handled)
+        copy = line_client_answer_copy.ack_copy(to_status, already_handled)
         text = copy.get(lang or "") or copy["th"]
         from services.line_binding import line_reply
 
@@ -489,11 +479,3 @@ def _finish(
         )
     except Exception:
         logger.warning("[line_client_answer] 回执发送失败(裁决已落库不受影响)", exc_info=True)
-
-
-def _ack_copy(to_status: str, already_handled: bool) -> dict:
-    if already_handled:
-        return _ALREADY_HANDLED_COPY
-    if to_status == vocab.APPLIED:
-        return _APPLIED_COPY
-    return _MANUAL_COPY

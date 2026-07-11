@@ -146,7 +146,7 @@ class SelectBatchTests(unittest.TestCase):
 
     def test_picks_most_recent_batch_across_clients(self):
         older = _question(id=1, workspace_client_id=1, sent_at=_NOW - timedelta(days=1))
-        newer = _question(id=2, workspace_client_id=2, sent_at=_NOW)
+        newer = _question(id=2, workspace_client_id=2, batch_id="batch-2", sent_at=_NOW)
         contacts = [_contact(workspace_client_id=1), _contact(workspace_client_id=2)]
         with (
             patch(
@@ -158,10 +158,16 @@ class SelectBatchTests(unittest.TestCase):
                 "services.line_binding.line_client_pool_store.list_for_client",
                 side_effect=[[older], [newer]],
             ),
+            patch(
+                "services.line_binding.line_client_pool_store.list_batch", return_value=[newer]
+            ) as list_batch,
         ):
             out = m._select_batch("U-163")
+        # 编号基准取自选定批次的【全状态】行(list_batch),不是当前 pending 快照。
+        list_batch.assert_called_once_with("t-1", 2, "batch-2")
         self.assertEqual(out["workspace_client_id"], 2)
         self.assertEqual(out["rows"], [newer])
+        self.assertEqual(out["pending_rows"], [newer])
 
 
 class HandleAnswerConsumptionGateTests(unittest.TestCase):
@@ -527,6 +533,190 @@ class StrictShortFormGateTests(unittest.TestCase):
         transition.assert_called_once_with(
             "t-1", 53, vocab.MANUAL_REVIEW, answer_raw=text, resolution=None
         )
+
+
+class MultiMessageBatchAnchorTests(unittest.TestCase):
+    """R3 串题回归(本 bug 核心):老板分多条消息按号回答,编号必须锚定推送批次的固定序,
+    不随已答完的题退出 pending、列表收缩而位移。链:①「1 ซื้อ」→IN-001 进项;
+    ②「2 ไม่ใช่เดือนนี้」→IN-002 剔除;③「ไม่แน่ใจ」(无号·唯一剩 IN-003)→IN-003 人审。"""
+
+    def _batch(self, statuses):
+        # 三题固定顺序(created_at 升序)· statuses 给出当前每题状态,模拟逐条答后收缩。
+        base = [
+            (101, "item-1", vocab.QUESTION_DIRECTION),
+            (102, "item-2", vocab.QUESTION_DROP),
+            (103, "item-3", vocab.QUESTION_DIRECTION),
+        ]
+        return [
+            _question(
+                id=qid,
+                item_id=item,
+                work_order_id=f"wo-{qid}",
+                question_type=qtype,
+                batch_id="batch-r3",
+                status=st,
+                created_at=_NOW - timedelta(minutes=30 - i),
+            )
+            for i, ((qid, item, qtype), st) in enumerate(zip(base, statuses))
+        ]
+
+    def _selected(self, full_rows):
+        pending = [r for r in full_rows if r["status"] == vocab.PENDING]
+        return {
+            "tenant_id": "t-1",
+            "workspace_client_id": 84,
+            "rows": full_rows,
+            "pending_rows": pending,
+            "lang": "th",
+        }
+
+    def test_three_messages_land_on_correct_tickets(self):
+        cur = MagicMock()
+        record = MagicMock(side_effect=lambda *a, **k: {"id": f"evt-{k['item_id']}"})
+        transition = MagicMock()
+        with (
+            patch("core.db.get_cursor", return_value=_cm(cur)),
+            patch("services.workorder.api.order_detail", return_value=_order_detail()),
+            patch("services.workorder.api.record_decision", record),
+            patch("services.line_binding.line_client_pool_store.transition", transition),
+            patch("services.line_binding.line_client_pool_store.list_for_client", return_value=[]),
+            patch("services.line_binding.line_reply.reply_text_context"),
+        ):
+            # 消息①:三题全 pending · 编号 1 → IN-001(方向·进项)。
+            m._consume(
+                self._selected(self._batch([vocab.PENDING, vocab.PENDING, vocab.PENDING])),
+                "1 ซื้อ",
+                "U-163",
+                "rt-1",
+                None,
+            )
+            # 消息②:IN-001 已 applied 退出 pending · 编号 2 仍锚 IN-002(剔除),不漂到 IN-003。
+            m._consume(
+                self._selected(self._batch([vocab.APPLIED, vocab.PENDING, vocab.PENDING])),
+                "2 ไม่ใช่เดือนนี้",
+                "U-163",
+                "rt-1",
+                None,
+            )
+            # 消息③:无号 · 此刻唯一 pending 恰是 IN-003 → 长句非短答落人审,原文留底。
+            m._consume(
+                self._selected(self._batch([vocab.APPLIED, vocab.APPLIED, vocab.PENDING])),
+                "ไม่แน่ใจค่ะ ช่วยดูให้หน่อย",
+                "U-163",
+                "rt-1",
+                None,
+            )
+
+        # 裁决:恰两次(①②),各贴对票、对方向,③ 不产生裁决。
+        self.assertEqual(len(record.call_args_list), 2)
+        self.assertEqual(record.call_args_list[0].kwargs["item_id"], "item-1")
+        self.assertEqual(record.call_args_list[0].kwargs["kind"], decisions.PURCHASE_INVOICE)
+        self.assertEqual(record.call_args_list[1].kwargs["item_id"], "item-2")
+        self.assertEqual(record.call_args_list[1].kwargs["decision"], decisions.EXCLUDE)
+
+        # 池状态:IN-001/IN-002 applied,IN-003 manual_review 且留原文。
+        by_qid = {c.args[1]: c for c in transition.call_args_list}
+        self.assertEqual(by_qid[101].args[2], vocab.APPLIED)
+        self.assertEqual(by_qid[102].args[2], vocab.APPLIED)
+        self.assertEqual(by_qid[103].args[2], vocab.MANUAL_REVIEW)
+        self.assertEqual(by_qid[103].kwargs["answer_raw"], "ไม่แน่ใจค่ะ ช่วยดูให้หน่อย")
+
+
+class NumberedTerminalSlotTests(unittest.TestCase):
+    """编号指向已 applied 的槽(客户重复发「1 ซื้อ」)→ 回「已处理」,绝不产生第二次裁决。"""
+
+    def test_answering_already_applied_slot_does_not_record_again(self):
+        applied = _question(id=201, status=vocab.APPLIED)
+        pending = _question(id=202, item_id="item-2", status=vocab.PENDING)
+        reply = MagicMock()
+        from services.line_binding import line_client_pool_store as pool_store
+
+        with (
+            patch("services.workorder.api.record_decision") as record,
+            patch(
+                "services.line_binding.line_client_pool_store.transition",
+                side_effect=pool_store.IllegalTransitionError(vocab.APPLIED, vocab.APPLIED),
+            ),
+            patch("services.line_binding.line_reply.reply_text_context", reply),
+        ):
+            m._consume(
+                {
+                    "tenant_id": "t-1",
+                    "workspace_client_id": 84,
+                    "rows": [applied, pending],
+                    "pending_rows": [pending],
+                    "lang": "th",
+                },
+                "1 ซื้อ",
+                "U-163",
+                "rt-1",
+                None,
+            )
+        record.assert_not_called()  # 不在已 applied 的票上重复裁决
+        self.assertEqual(reply.call_args.args[1], m._ALREADY_HANDLED_COPY["th"])
+
+
+class NumberedOutOfRangeTests(unittest.TestCase):
+    """只 2 题却答「5」→ 编号越界定位不出 → 挂首条 pending 转人审,不乱贴。"""
+
+    def test_out_of_range_number_goes_to_unlocatable(self):
+        q1 = _question(id=301, status=vocab.PENDING)
+        q2 = _question(id=302, item_id="item-2", status=vocab.PENDING)
+        with (
+            patch("services.workorder.api.record_decision") as record,
+            patch("services.line_binding.line_client_pool_store.transition") as transition,
+            patch("services.line_binding.line_reply.reply_text_context"),
+        ):
+            m._consume(
+                {
+                    "tenant_id": "t-1",
+                    "workspace_client_id": 84,
+                    "rows": [q1, q2],
+                    "pending_rows": [q1, q2],
+                    "lang": "th",
+                },
+                "5 ซื้อ",
+                "U-163",
+                "rt-1",
+                None,
+            )
+        record.assert_not_called()
+        transition.assert_called_once_with(
+            "t-1", 301, vocab.MANUAL_REVIEW, answer_raw="5 ซื้อ", resolution=None
+        )
+
+
+class NoNumberUniquePendingTests(unittest.TestCase):
+    """无编号短答 + 此刻唯一 pending(非批次首条)→ 落到那道正确的票。"""
+
+    def test_short_answer_lands_on_the_lone_pending_ticket(self):
+        done = _question(id=401, status=vocab.APPLIED)
+        lone = _question(id=402, item_id="item-2", work_order_id="wo-402", status=vocab.PENDING)
+        cur = MagicMock()
+        with (
+            patch("core.db.get_cursor", return_value=_cm(cur)),
+            patch("services.workorder.api.order_detail", return_value=_order_detail()),
+            patch("services.workorder.api.record_decision", return_value={"id": "evt-x"}) as record,
+            patch("services.line_binding.line_client_pool_store.transition") as transition,
+            patch("services.line_binding.line_client_pool_store.list_for_client", return_value=[]),
+            patch("services.line_binding.line_reply.reply_text_context"),
+        ):
+            m._consume(
+                {
+                    "tenant_id": "t-1",
+                    "workspace_client_id": 84,
+                    "rows": [done, lone],
+                    "pending_rows": [lone],
+                    "lang": "th",
+                },
+                "ซื้อ",
+                "U-163",
+                "rt-1",
+                None,
+            )
+        self.assertEqual(record.call_args.kwargs["item_id"], "item-2")
+        applied = next(c for c in transition.call_args_list if c.args[1] == 402)
+        self.assertEqual(applied.args[2], vocab.APPLIED)
 
 
 if __name__ == "__main__":

@@ -184,6 +184,27 @@ def list_for_client(tenant_id, workspace_client_id, *, statuses: Optional[tuple]
     return _with_heal(_run)
 
 
+def list_batch(tenant_id, workspace_client_id, batch_id) -> list:
+    """按 batch_id 取该批次【全状态】行按 created_at —— 重建推送时
+    enumerate(questions, start=1) 的固定编号序(questions 亦按 created_at)。
+    答题侧据此定位「客户嘴里的第 N 题」不随期间某题答完退出 pending、pending
+    列表收缩而位移(R3 串题根因:答题编号必须锚推送批次固定序,不看实时剩几道)。"""
+    from core import db
+
+    def _run():
+        with db.get_cursor_rls(str(tenant_id)) as cur:
+            cur.execute(
+                f"SELECT {_COLUMNS} FROM line_client_questions "
+                "WHERE tenant_id = %s AND workspace_client_id = %s AND batch_id = %s "
+                "ORDER BY created_at",
+                (str(tenant_id), workspace_client_id, str(batch_id)),
+            )
+            rows = cur.fetchall()
+        return [dict(r) for r in rows]
+
+    return _with_heal(_run)
+
+
 def list_pending_for_dunning(*, sent_before) -> list:
     """催办 tick 扫全部租户 pending 且 sent_at 早于给定时间的行(跨 tenant 只读扫描,
     走 owner 连接;S6 逐行按行自带的 tenant_id 建 RLS 上下文回写,不代表放弃隔离)。"""

@@ -1,16 +1,11 @@
 # -*- coding: utf-8 -*-
 """客户回答回写(D2 方案 §4 / §7.2 S5)· webhook 拦截 + NL 解析 + record_decision。
 
-消费边界(主窗拍板修正 2/3,硬门):
-- 判定「这条消息是否要被本池吃掉」全程只读、零副作用,任何阶段判不出/闸关/无
-  pending 都直接 return False 回落原路(fail-open),绝不半吞。
-- 一旦越过消费边界(_consume 起)视为已受理:下游任一步失败也不得再回落原路
-  (防止同一条消息又被大脑记账路径处理第二遍),只记日志、按兜底转人审。
-- 回写前必须重读该票事件流:问题创建之后若已有人工裁决 → 不覆盖(latest-wins
-  保护会计裁决),问题转 resolved_internally,回「已处理」话术(修正 2)。
-
-裁决词全 import services.workorder.decisions,状态词全 import client_pool_vocab,
-本模块不新造裁决通道——唯一写口仍是 services.workorder.api.record_decision。
+消费边界(主窗拍板修正 2/3,硬门):判「是否被本池吃掉」全程只读零副作用,判不出/闸关/
+无 pending 一律 return False 回落原路(fail-open)绝不半吞;越过 _consume 视为已受理,
+下游失败只兜底转人审不再回落(防同一条消息又被大脑记账路径处理第二遍)。回写前重读该票
+事件流:问题创建后若已有人工裁决 → 不覆盖(latest-wins 护会计裁决),转 resolved_internally
+回「已处理」。裁决词全 import decisions、状态词全 import client_pool_vocab,不新造裁决通道。
 """
 
 from __future__ import annotations
@@ -41,8 +36,7 @@ _POLITE_TAIL_RE = re.compile(
     r"(?:ค่ะ|ค่า|คะ|ครับ|ครัช|ๆ|[!?.,~。!?、]|[\U0001F300-\U0001FAFF\U00002600-\U000027BF])+$"
 )
 
-# 回执文案(四语 · 客户侧 LINE push,独立小词表 · 照 line_client_contact._BOUND_COPY
-# 同款范式:这是客户身份维度的措辞,不并进会计端 UI 的大 i18n 框架)。
+# 回执文案(四语 · 客户侧 LINE push 独立小词表 · 照 _BOUND_COPY 范式,不并进会计端大 i18n)。
 _APPLIED_COPY = {
     "th": "ได้รับแล้วค่ะ ✅ อัปเดตตามที่แจ้งเรียบร้อยแล้วนะคะ",
     "en": "Got it! Updated as you said.",
@@ -91,14 +85,12 @@ def handle_answer(
 
 
 def _select_batch(line_user_id: str) -> Optional[dict]:
-    """反查该 sender 名下客户联系人,挑闸开租户里「最近 sent_at」那一批 pending 问题。
+    """反查该 sender 名下客户联系人,挑闸开租户里「最近 sent_at」那一批问题。
 
-    一个业主可能挂多主体(§1.3),各自可能都有在途批次;消歧口径:跨全部候选取
-    sent_at 最大的那一批,批内按 created_at 升序编号——与 S4(line_client_pool_push.
-    stage_batch_for_client)推送时 `for idx, q in enumerate(questions, start=1)`
-    的枚举顺序一致(questions 取自 store.list_for_client,该函数按 created_at
-    升序出行),保证客户回「1/2/3」对应的正是消息里看到的那个编号。
-    闸关的租户直接跳过(闸关时该池对该 sender 视而不见)。
+    一个业主可能挂多主体(§1.3),候选口径:只在还有 ≥1 条 pending 的批次里挑(无 pending
+    说明没在等这位客户),跨全部候选取 pending 行 sent_at 最大者所属批次。选定后编号基准取
+    该批次【全状态】行(list_batch 按 created_at)——与推送时 enumerate(start=1) 固定序一致,
+    不随期间某题答完退出 pending、列表收缩而位移(R3 串题根因)。闸关租户直接跳过。
     """
     from core import feature_flags
     from services.line_binding import line_client_contact
@@ -108,7 +100,7 @@ def _select_batch(line_user_id: str) -> Optional[dict]:
     if not contacts:
         return None
 
-    best = None  # (latest_sent_at, tenant_id, workspace_client_id, rows, lang)
+    best = None  # (latest_sent_at, tenant_id, workspace_client_id, batch_id, lang)
     for contact in contacts:
         tenant_id = contact["tenant_id"]
         if not feature_flags.pearnly_ai_client_pool_enabled_for(tenant_id):
@@ -119,28 +111,26 @@ def _select_batch(line_user_id: str) -> Optional[dict]:
         rows = [r for r in rows if r.get("sent_at")]
         if not rows:
             continue
-        latest = max(r["sent_at"] for r in rows)
-        if best is None or latest > best[0]:
+        top = max(rows, key=lambda r: r["sent_at"])
+        if best is None or top["sent_at"] > best[0]:
             best = (
-                latest,
+                top["sent_at"],
                 tenant_id,
                 contact["workspace_client_id"],
-                rows,
+                top.get("batch_id"),
                 contact.get("preferred_lang"),
             )
     if best is None:
         return None
 
-    _, tenant_id, workspace_client_id, rows, lang = best
-    batches: dict = {}
-    for row in rows:
-        batches.setdefault(row.get("batch_id"), []).append(row)
-    target_batch_id = max(batches, key=lambda bid: max(r["sent_at"] for r in batches[bid]))
-    batch_rows = sorted(batches[target_batch_id], key=lambda r: r["created_at"])
+    _, tenant_id, workspace_client_id, batch_id, lang = best
+    full_rows = pool_store.list_batch(tenant_id, workspace_client_id, batch_id)
+    pending_rows = [r for r in full_rows if r["status"] == vocab.PENDING]
     return {
         "tenant_id": tenant_id,
         "workspace_client_id": workspace_client_id,
-        "rows": batch_rows,
+        "rows": full_rows,
+        "pending_rows": pending_rows,
         "lang": lang,
     }
 
@@ -152,8 +142,7 @@ def _is_strict_short_form(text: str) -> bool:
 
 
 def _looks_like_answer(text: str) -> bool:
-    """严格答题形态(打回修正:长句含关键词 ≠ 答题)——(a) 编号段命中关键词,或
-    (b) 整条消息就是关键词本身,防「จ่ายค่าไฟ 500」被错吞。"""
+    """严格答题形态(长句含关键词 ≠ 答题):(a) 编号段命中关键词,或 (b) 整条=关键词本身。"""
     segments = _split_numbered_segments(text)
     if segments:
         return any(any(kw in seg for kw in _ANSWER_KEYWORDS) for _, seg in segments)
@@ -224,7 +213,10 @@ def _consume(
 ) -> None:
     tenant_id = selected["tenant_id"]
     workspace_client_id = selected["workspace_client_id"]
-    batch_rows = selected["rows"]
+    full_rows = selected["rows"]  # 完整批次(全状态·按 created_at)= 编号基准
+    pending_rows = selected.get("pending_rows") or [
+        r for r in full_rows if r["status"] == vocab.PENDING
+    ]
     lang = selected["lang"]
 
     segments = _split_numbered_segments(text)
@@ -232,32 +224,49 @@ def _consume(
         matched = False
         for num, seg in segments:
             idx = num - 1
-            if 0 <= idx < len(batch_rows):
-                matched = True
-                _handle_one(
+            if not (0 <= idx < len(full_rows)):
+                continue
+            matched = True
+            row = full_rows[idx]
+            if row["status"] in vocab.TERMINAL_STATUSES:
+                # 编号指向已处理过的票 → 只回「已处理」不重复裁决(终态→终态非法跳转被 latest-wins 吞成 no-op)。
+                _finish(
                     tenant_id,
-                    workspace_client_id,
-                    batch_rows[idx],
-                    seg,
-                    line_user_id,
-                    reply_token,
-                    quote_token,
-                    lang,
+                    row["id"],
+                    row["status"],
+                    answer_raw=None,
+                    resolution=None,
+                    reply_token=reply_token,
+                    quote_token=quote_token,
+                    line_user_id=line_user_id,
+                    lang=lang,
+                    already_handled=True,
                 )
+                continue
+            _handle_one(
+                tenant_id,
+                workspace_client_id,
+                row,
+                seg,
+                line_user_id,
+                reply_token,
+                quote_token,
+                lang,
+            )
         if matched:
             return
         # 编号全部越界(如只有 2 条却答"5")→ 当无法定位处理。
         _handle_unlocatable(
-            tenant_id, batch_rows, text, line_user_id, reply_token, quote_token, lang
+            tenant_id, pending_rows, text, line_user_id, reply_token, quote_token, lang
         )
         return
 
-    if len(batch_rows) == 1:
-        # 无编号单条 pending:唯一「段」是整条原文,只有短答形态(b)才自动裁决(打回修正 1)。
+    if len(pending_rows) == 1:
+        # 无编号且此刻恰只剩一道 pending:唯一「段」是整条原文,只有短答形态(b)才自动裁决。
         _handle_one(
             tenant_id,
             workspace_client_id,
-            batch_rows[0],
+            pending_rows[0],
             text,
             line_user_id,
             reply_token,
@@ -267,18 +276,22 @@ def _consume(
         )
         return
 
-    _handle_unlocatable(tenant_id, batch_rows, text, line_user_id, reply_token, quote_token, lang)
+    _handle_unlocatable(tenant_id, pending_rows, text, line_user_id, reply_token, quote_token, lang)
 
 
-def _handle_unlocatable(tenant_id, batch_rows, text, line_user_id, reply_token, quote_token, lang):
-    """多条 pending 又没编号定位不出具体哪条 → 保守挂批次首条转人审,原文留底给
-    会计判断(§4.2「宁可交人不瞎猜」;不逐条群发人审,避免同批其余题被误动)。"""
-    logger.info(
-        "[line_client_answer] 定位不出具体问题 · 默认挂批次首条 qid=%s", batch_rows[0]["id"]
-    )
+def _handle_unlocatable(
+    tenant_id, pending_rows, text, line_user_id, reply_token, quote_token, lang
+):
+    """定位不出具体哪条(编号全越界 / 多条 pending 又没编号)→ 保守挂首条 pending 转人审,
+    原文留底给会计判断(§4.2「宁可交人不瞎猜」;只挂 pending 行,不误动已终态题)。"""
+    if not pending_rows:
+        logger.info("[line_client_answer] 无 pending 可挂 · 放弃(消息已受理不回落)")
+        return
+    target_id = pending_rows[0]["id"]
+    logger.info("[line_client_answer] 定位不出具体问题 · 默认挂首条 pending qid=%s", target_id)
     _finish(
         tenant_id,
-        batch_rows[0]["id"],
+        target_id,
         vocab.MANUAL_REVIEW,
         answer_raw=text,
         resolution=None,
@@ -306,22 +319,11 @@ def _handle_one(
 
     # force_manual:segment 非严格答题形态(见 _consume)→ 直接当解不出,不喂给 _resolve。
     outcome = None if force_manual else _resolve(question["question_type"], segment)
-    if outcome is None:
-        _finish(
-            tenant_id,
-            qid,
-            vocab.MANUAL_REVIEW,
-            answer_raw=segment,
-            resolution=None,
-            reply_token=reply_token,
-            quote_token=quote_token,
-            line_user_id=line_user_id,
-            lang=lang,
-        )
-        return
 
-    if _decided_after(tenant_id, work_order_id, item_id, question.get("created_at")):
-        # 修正 2 硬门:该票在问题创建后已有人工裁决(会计已经处理过)→ 不覆盖,回「已处理」。
+    if outcome is not None and _decided_after(
+        tenant_id, work_order_id, item_id, question.get("created_at")
+    ):
+        # 修正 2 硬门:该票在问题创建后已有人工裁决(会计已处理过)→ 不覆盖,回「已处理」。
         _finish(
             tenant_id,
             qid,
@@ -336,12 +338,14 @@ def _handle_one(
         )
         return
 
-    decision, kind, values = outcome
-    event = _record_decision(
-        tenant_id, work_order_id, item_id, decision, kind, values, line_user_id
-    )
+    # 解不出(含 force_manual)或裁决落库失败 → 同归人审,原文留底,绝不假装成功也不吞。
+    event = None
+    if outcome is not None:
+        decision, kind, values = outcome
+        event = _record_decision(
+            tenant_id, work_order_id, item_id, decision, kind, values, line_user_id
+        )
     if event is None:
-        # 裁决通道本身炸了(极端情况)→ 保守转人审,绝不假装成功也绝不吞。
         _finish(
             tenant_id,
             qid,
@@ -379,8 +383,7 @@ def _handle_one(
 
 
 def _decided_after(tenant_id, work_order_id, item_id, question_created_at) -> bool:
-    """竞态守卫(修正 2):该票在问题创建之后是否已落过人工裁决。单已读不到(冻结/
-    归档/异常)一律保守当「已被处理」,绝不冒险覆盖。"""
+    """竞态守卫(修正 2):该票在问题创建后是否已落过人工裁决。读不到(冻结/异常)保守当已处理。"""
     from core import db
     from services.workorder import api as wo_api
 
@@ -422,9 +425,8 @@ def _record_decision(tenant_id, work_order_id, item_id, decision, kind, values, 
 
 
 def _close_siblings(tenant_id, workspace_client_id, work_order_id, item_id, applied_qid) -> None:
-    """同票(同 item)其它 active 问题顺手转 resolved_internally(主窗修正 1 之①)。
-    uq_lcq_active_item 已保证同票同时至多一个 active 问题,这里遍历是防御性收口
-    (数据异常/未来约束放宽时仍正确),常态下不会真的找到第二条。"""
+    """同票其它 active 问题顺手转 resolved_internally(修正 1 之①)。uq_lcq_active_item
+    已保证同票至多一个 active,遍历是防御性收口,常态找不到第二条。"""
     from services.line_binding import line_client_pool_store as pool_store
 
     try:
@@ -460,9 +462,7 @@ def _finish(
     lang,
     already_handled: bool = False,
 ) -> None:
-    """落池状态 + 回执(§7.2 S5)。回执失败不影响已落库的裁决/状态——上面的
-    record_decision/transition 已经提交,这里纯粹是给客户的一条 LINE 消息,丢了
-    不该回滚已经生效的裁决。"""
+    """落池状态 + 回执(§7.2 S5)。跳转失败/latest-wins 不阻塞回执,回执失败不回滚裁决。"""
     from services.line_binding import line_client_pool_store as pool_store
 
     try:
@@ -470,7 +470,7 @@ def _finish(
             tenant_id, qid, to_status, answer_raw=answer_raw, resolution=resolution
         )
     except pool_store.IllegalTransitionError:
-        pass  # latest-wins:期间已被别处改写(如会计并发裁了这条),不覆盖
+        pass  # latest-wins:期间已被别处改写(如会计并发裁了这条)/终态复答,不覆盖
     except Exception:
         logger.warning("[line_client_answer] 池状态跳转失败", exc_info=True)
 

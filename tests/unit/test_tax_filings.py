@@ -12,7 +12,7 @@ from io import BytesIO
 from unittest import mock
 
 from core.pos_api import PosError
-from services.tax import anomalies, efiling, filings, hooks, schema
+from services.tax import anomalies, efiling, filings, hooks, rdprep, schema
 from services.tax import settings as tax_settings
 
 
@@ -85,8 +85,8 @@ def _pnd_tables(lines53=(), lines3=(), missing53=0):
     }
 
 
-def _pnd_line(wht="30", tax_id="0105536000011"):
-    return {
+def _pnd_line(wht="30", tax_id="0105536000011", **overrides):
+    line = {
         "payee_name": "ผู้รับ",
         "payee_tax_id": tax_id,
         "payee_type": "juristic",
@@ -99,6 +99,8 @@ def _pnd_line(wht="30", tax_id="0105536000011"):
         "cert_url": None,
         "cert_status": "generated",
     }
+    line.update(overrides)
+    return line
 
 
 class DueDateTests(unittest.TestCase):
@@ -284,6 +286,79 @@ class EfilingTests(unittest.TestCase):
         bundle = efiling.export_bundle(filing, lang="zh")
         names = zipfile.ZipFile(BytesIO(bundle)).namelist()
         self.assertEqual(sorted(names), ["pp30_2026-06.pdf", "pp30_2026-06.xml"])
+
+
+class RdPrepExportTests(unittest.TestCase):
+    """方案 §8 D1-4:efiling.export_rdprep_txt 全走 rdprep.assemble,不自写格式逻辑。"""
+
+    def test_export_rdprep_pnd53(self):
+        line = _pnd_line(wht="30", tax_id="0105536000011")
+        filing = _filing_row(kind="pnd53", period="2026-07", lines=[line])
+        out = efiling.export_rdprep_txt(
+            filing, taxpayer={"tax_id": "0105551234567", "branch_no": "000000"}
+        )
+        self.assertEqual(out["excluded"], [])
+        self.assertEqual(out["filename"], "PND53_0105551234567_000000_2569_07_00_00.txt")
+        header, detail = out["text"].split("\r\n")
+        header_cells, detail_cells = header.split("|"), detail.split("|")
+        self.assertEqual(len(header_cells), rdprep.HEADER_FIELD_COUNT)
+        self.assertEqual(len(detail_cells), rdprep.DETAIL_FIELD_COUNT)
+        self.assertEqual(header_cells[17], "1")  # TOT_NUM
+        self.assertEqual(header_cells[18], "1000.00")  # TOT_AMT = 明细 base_amount 之和
+        self.assertEqual(header_cells[19], "30.00")  # TOT_TAX = 明细 wht_amount 之和
+        self.assertEqual(header_cells[21], "30.00")  # GTOT_TAX = TOT_TAX + SUR_AMT(0)
+        self.assertEqual(detail_cells[3], "0105536000011")  # 字段4 NID(法人)
+        self.assertEqual(detail_cells[10], "1000.00")  # PAID_AMT1
+        self.assertEqual(detail_cells[11], "30.00")  # TAX_AMT1
+        self.assertEqual(detail_cells[12], "ค่าบริการ·วิชาชีพ")  # INC_TYPE ← wht_rate=3 档
+        self.assertEqual(detail_cells[13], "1")  # PAY_CON1
+
+    def test_export_rdprep_pnd3_missing_address_excluded(self):
+        with_address = _pnd_line(
+            wht="15",
+            tax_id="1101700200111",
+            payee_type="individual",
+            payee_name="สมชาย ใจดี",
+            payee_address={
+                "amphur": "บางรัก",
+                "province": "กรุงเทพมหานคร",
+                "postal_code": "10500",
+            },
+        )
+        missing_address = _pnd_line(
+            wht="5",
+            tax_id="1234567890123",
+            payee_type="individual",
+            payee_name="ไม่มีที่อยู่",
+        )
+        filing = _filing_row(kind="pnd3", period="2026-07", lines=[with_address, missing_address])
+        out = efiling.export_rdprep_txt(filing, taxpayer={"tax_id": "1101700200111"})
+        self.assertEqual(
+            out["excluded"],
+            [
+                {
+                    "payee_name": "ไม่มีที่อยู่",
+                    "payee_tax_id": "1234567890123",
+                    "reason": "missing_address",
+                }
+            ],
+        )
+        header, detail = out["text"].split("\r\n")
+        header_cells, detail_cells = header.split("|"), detail.split("|")
+        self.assertEqual(header_cells[17], "1")  # TOT_NUM 只数留下的一行
+        self.assertEqual(header_cells[19], "15.00")  # TOT_TAX 不含被剔行的 5
+        self.assertEqual(detail_cells[3], "1101700200111")  # 字段4 PIN(个人)
+        self.assertEqual(detail_cells[35], "บางรัก")  # AMPHUR(字段36)
+        self.assertEqual(detail_cells[36], "กรุงเทพมหานคร")  # PROVINCE(字段37)
+        self.assertEqual(detail_cells[37], "10500")  # POSTAL_CODE(字段38)
+
+    def test_export_rdprep_rejects_unsupported_kind(self):
+        with self.assertRaises(PosError) as ctx:
+            efiling.export_rdprep_txt(_filing_row(kind="pp30", lines=[]))
+        self.assertEqual(ctx.exception.detail, "rdprep_unsupported_kind")
+
+    def test_export_formats_advertises_rdprep(self):
+        self.assertIn("rdprep", efiling.EXPORT_FORMATS)
 
 
 class HooksTests(unittest.TestCase):

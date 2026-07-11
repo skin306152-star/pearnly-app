@@ -12,12 +12,48 @@ from __future__ import annotations
 import io
 import xml.etree.ElementTree as ET
 import zipfile
+from datetime import date
+from decimal import Decimal
+from typing import Mapping
 
 from core.pos_api import PosError
 from services.accounting.books_pdf import _render_table
-from services.tax.aggregate import _dec
+from services.sales import wht as wht_presets
+from services.tax import rdprep
+from services.tax.aggregate import PND3, PND53, _dec
 
-EXPORT_FORMATS = ("pdf", "xml", "zip")
+EXPORT_FORMATS = ("pdf", "xml", "zip", "rdprep")
+
+# RD Prep 常量档(方案 §2.3 M1 口径):商业 WHT 主条款恒真,其余法条位恒假;媒介寄档
+# 报送人固定代码;PAY_CON 绝大多数走"扣缴"(§G2 边缘代付场景留人工,M1 不猜)。
+_RDPREP_SENDER_ID = "0000"
+_RDPREP_SENDER_ROLE = "1"
+_RDPREP_DEPT_NAME_HQ = "สำนักงานใหญ่"
+_RDPREP_SECTION3 = "1"
+_RDPREP_SECTION_OFF = "0"
+_RDPREP_LTO = "0"
+_RDPREP_FORM_TYPE = "00"
+_RDPREP_FORM_FLAG_MEDIA = "1"
+_RDPREP_TIN_LEGACY = "0000000000"
+_RDPREP_PAY_CON_STANDARD = "1"
+_RDPREP_USER_ID_PLACEHOLDER = "PLACEHOLDER"  # §G7:登记参考号未接,诚实占位待客户 RD 账号
+_RDPREP_TITLE_JURISTIC = "บริษัท"
+_RDPREP_TITLE_INDIVIDUAL = "-"
+_RDPREP_DEFAULT_BRANCH = "000000"
+_RDPREP_ZERO = Decimal("0")
+
+# PND3 收款人地址法定必填三项(官方 PDF §1.5 字段 36-38);缺一即不可导入 RD Prep,
+# 该行剔除而非臆造拆分(方案 §2.3 G5)。
+_RDPREP_ADDRESS_REQUIRED = ("amphur", "province", "postal_code")
+
+# 收入类型文字 = wht_rate → WHT_PRESETS 泰文档位(方案 §2.3 G1),单一事实源在
+# services.sales.wht,这里只取泰文部分(标签含 " / 英文" 与 RD Prep 分隔符 "|" 无关但
+# 保持记录纯泰文更贴官方示例)。未命中档位(如自定义税率)落 3% 服务档,与
+# purchase_settings.default_wht_service_rate 口径一致。
+_RDPREP_INC_TYPE_BY_RATE = {
+    Decimal(rate): label.split(" / ", 1)[0] for rate, label in wht_presets.WHT_PRESETS
+}
+_RDPREP_DEFAULT_INC_TYPE = _RDPREP_INC_TYPE_BY_RATE[Decimal("3")]
 
 _L = {
     "title.pp30": {
@@ -191,3 +227,135 @@ def export_bundle(filing: dict, *, lang: str = "th", taxpayer: dict | None = Non
         zf.writestr(f"{name}.pdf", export_pdf(filing, lang=lang))
         zf.writestr(f"{name}.xml", export_xml(filing, taxpayer=taxpayer))
     return buf.getvalue()
+
+
+def _rdprep_inc_type(rate) -> str:
+    if rate is None:
+        return _RDPREP_DEFAULT_INC_TYPE
+    return _RDPREP_INC_TYPE_BY_RATE.get(Decimal(str(rate)), _RDPREP_DEFAULT_INC_TYPE)
+
+
+def _rdprep_address_complete(addr: Mapping | None) -> bool:
+    if not addr:
+        return False
+    return all((addr.get(k) or "").strip() for k in _RDPREP_ADDRESS_REQUIRED)
+
+
+def _rdprep_paid_date(period: str, line: Mapping) -> date:
+    """支付日取源单 doc_date;filing_lines 现无此列(未来接线口),缺失退期初日,
+    不臆造具体日期(方案 §附:关键坐标速查·filing_lines schema 无 doc_date)。"""
+    raw = line.get("doc_date")
+    if raw:
+        return raw if isinstance(raw, date) else date.fromisoformat(str(raw))
+    return date(int(period[:4]), int(period[5:7]), 1)
+
+
+def _rdprep_detail_values(
+    form: str, seq_no: int, branch_no: str, period: str, line: Mapping
+) -> dict:
+    payee_type = line.get("payee_type") or "juristic"
+    addr = line.get("payee_address") or {}
+    values = {
+        "SEQ_NO": seq_no,
+        "BRANCH_NO": branch_no,
+        "TIN": _RDPREP_TIN_LEGACY,
+        "TITLE_NAME": (
+            _RDPREP_TITLE_JURISTIC if payee_type == "juristic" else _RDPREP_TITLE_INDIVIDUAL
+        ),
+        "FNAME": line.get("payee_name") or "",
+        "PAID_DATE1": rdprep.to_buddhist_paid_date(_rdprep_paid_date(period, line)),
+        "TAX_RATE1": line.get("wht_rate"),
+        "PAID_AMT1": line.get("base_amount"),
+        "TAX_AMT1": line.get("wht_amount"),
+        "INC_TYPE_PND1": _rdprep_inc_type(line.get("wht_rate")),
+        "PAY_CON1": _RDPREP_PAY_CON_STANDARD,
+        "AMPHUR": addr.get("amphur", ""),
+        "PROVINCE": addr.get("province", ""),
+        "POSTAL_CODE": addr.get("postal_code", ""),
+        "TAMBON": addr.get("tambon", ""),
+        "ADD_NO": addr.get("add_no", ""),
+        "MOO_NO": addr.get("moo_no", ""),
+        "SOI": addr.get("soi", ""),
+        "STREET_NAME": addr.get("street_name", ""),
+        "BUILD_NAME": addr.get("build_name", ""),
+        "ROOM_NO": addr.get("room_no", ""),
+        "FLOOR_NO": addr.get("floor_no", ""),
+        "VILLAGE_NAME": addr.get("village_name", ""),
+    }
+    values["NID" if form == rdprep.PND53 else "PIN"] = line.get("payee_tax_id") or ""
+    return values
+
+
+def export_rdprep_txt(filing: dict, *, taxpayer: dict | None = None) -> dict:
+    """RD Prep 中央格式 .txt 导出(方案 §5.4/D1-4):filing(aggregate.pnd 装出的
+    filing_lines 结构)→ rdprep.assemble 纯装配,钱/字段序单一事实源留在 rdprep.py,
+    这里只做取数映射,不重算。
+
+    PND3(个人)法定地址三项(AMPHUR/PROVINCE/POSTAL_CODE)未存 → 该行剔除出 txt,
+    在返回结构 excluded 里点名(方案 §2.3 G5,诚实不臆造拆分)。
+    """
+    kind = filing["kind"]
+    if kind not in (PND53, PND3):
+        raise PosError("tax.efiling_failed", 422, detail="rdprep_unsupported_kind")
+    form = rdprep.PND53 if kind == PND53 else rdprep.PND3
+    taxpayer = taxpayer or {}
+    nid = taxpayer.get("tax_id") or ""
+    branch_no = taxpayer.get("branch_no") or _RDPREP_DEFAULT_BRANCH
+    period = filing["period"]
+    year, month = int(period[:4]), int(period[5:7])
+
+    included, excluded = [], []
+    for line in filing.get("lines") or []:
+        if form == rdprep.PND3 and not _rdprep_address_complete(line.get("payee_address")):
+            excluded.append(
+                {
+                    "payee_name": line.get("payee_name"),
+                    "payee_tax_id": line.get("payee_tax_id"),
+                    "reason": "missing_address",
+                }
+            )
+            continue
+        included.append(line)
+
+    details = [
+        rdprep.build_detail(form, _rdprep_detail_values(form, i, branch_no, period, ln))
+        for i, ln in enumerate(included, start=1)
+    ]
+    tot_amt = sum((_dec(ln.get("base_amount")) for ln in included), _RDPREP_ZERO)
+    tot_tax = sum((_dec(ln.get("wht_amount")) for ln in included), _RDPREP_ZERO)
+    header_values = {
+        "SENDER_ID": _RDPREP_SENDER_ID,
+        "SENDER_NID": nid,
+        "SENDER_BRANCH": branch_no,
+        "SENDER_ROLE": _RDPREP_SENDER_ROLE,
+        "NID": nid,
+        "BRANCH_NO": branch_no,
+        "DEPT_NAME": _RDPREP_DEPT_NAME_HQ,
+        "SECTION3": _RDPREP_SECTION3,
+        "SECTION_B": _RDPREP_SECTION_OFF,
+        "SECTION_C": _RDPREP_SECTION_OFF,
+        "LTO": _RDPREP_LTO,
+        "TAX_MONTH": f"{month:02d}",
+        "TAX_YEAR": rdprep.to_buddhist_year(year),
+        "BRANCH_TYPE": (
+            taxpayer.get("branch_type") if taxpayer.get("branch_type") in ("V", "S") else ""
+        ),
+        "FORM_TYPE": _RDPREP_FORM_TYPE,
+        "TOT_NUM": len(details),
+        "TOT_AMT": tot_amt,
+        "TOT_TAX": tot_tax,
+        "SUR_AMT": _RDPREP_ZERO,
+        "GTOT_TAX": tot_tax,
+        "TRANS_AMT": _RDPREP_ZERO,
+        "USER_ID": taxpayer.get("user_id") or _RDPREP_USER_ID_PLACEHOLDER,
+        "FORM_FLAG": _RDPREP_FORM_FLAG_MEDIA,
+    }
+    text = rdprep.assemble(rdprep.build_header(form, header_values), details)
+    filename = rdprep.build_filename(
+        form=form,
+        nid=nid,
+        branch_no=branch_no,
+        tax_year_be=rdprep.to_buddhist_year(year),
+        tax_month=f"{month:02d}",
+    )
+    return {"text": text, "filename": filename, "excluded": excluded}

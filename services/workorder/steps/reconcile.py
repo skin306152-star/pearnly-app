@@ -83,24 +83,32 @@ def run(ctx: StepContext) -> StepResult:
         )
 
     purchase_amount = sum((e["net"] for e in r1["entries"]), gates.ZERO)
+    result_gates = {
+        "r1_input_vat": {"total": str(r1["total"]), "counted": len(r1["entries"])},
+        "r2_sales": {
+            "sales_amount": str(r2["sales_amount"]),
+            "output_vat": str(r2["output_vat"]),
+        },
+        "r3_bank": r3,
+        "r4_trial_balance": {
+            "balanced": True,
+            "debit": str(tb["debit"]),
+            "credit": str(tb["credit"]),
+        },
+    }
+    # R5 影子底稿(pearnly_ai_shadow_draft 闸)。闸关:_run_shadow_draft 返 None,gates 逐字节维持
+    # 现状(无 r5_shadow 键)。闸开:把 R1 已裁分录 + R2 聚合销项过纯函数复式引擎产出三件套影子
+    # 底稿,佐证层挂 r5_shadow——绝不 stuck、绝不阻断 package(影子只算不落法定表)。
+    shadow = _run_shadow_draft(ctx, r1, r2)
+    if shadow is not None:
+        result_gates["r5_shadow"] = shadow
+
     return StepResult.ok(
         input_vat_total=str(r1["total"]),
         purchase_amount_total=str(purchase_amount),
         sales_amount_total=str(r2["sales_amount"]),
         output_vat_total=str(r2["output_vat"]),
-        gates={
-            "r1_input_vat": {"total": str(r1["total"]), "counted": len(r1["entries"])},
-            "r2_sales": {
-                "sales_amount": str(r2["sales_amount"]),
-                "output_vat": str(r2["output_vat"]),
-            },
-            "r3_bank": r3,
-            "r4_trial_balance": {
-                "balanced": True,
-                "debit": str(tb["debit"]),
-                "credit": str(tb["credit"]),
-            },
-        },
+        gates=result_gates,
     )
 
 
@@ -154,6 +162,34 @@ def _run_bank_recon(ctx: StepContext, banks: list[dict], events: list[dict]) -> 
         return {"error": f"{type(exc).__name__}", "note": "bank_recon_skipped"}
 
 
+def _run_shadow_draft(ctx: StepContext, r1: dict, r2: dict) -> dict | None:
+    """闸开时的 R5 影子底稿:已裁进项分录(r1["entries"] · {net,vat,grand})+ 聚合销项 →
+    纯函数复式规则引擎 → 建议分录/科目余额/试算平衡。闸关返 None(gates 无 r5_shadow 键)。
+
+    结果作为纯 dict 挂 r5_shadow,随 reconcile 的 StepResult.ok 经 step_done 落进证据链(F3 视图 /
+    package 交付物据此渲染)。任何异常都收进 note 不上抛——佐证层绝不拖垮出包。
+    """
+    if not _shadow_draft_enabled(ctx):
+        return None
+    from services.accounting import workorder_shadow_adapter as adapter
+
+    try:
+        result = adapter.build_shadow(
+            purchase_entries=r1["entries"],
+            sales_amount=r2["sales_amount"],
+            output_vat=r2["output_vat"],
+        )
+        return result.as_gate_payload()
+    except Exception as exc:  # noqa: BLE001 - 佐证层单点隔离,绝不阻断 package
+        return {"error": f"{type(exc).__name__}", "note": "shadow_draft_skipped"}
+
+
+def _default_shadow_draft_enabled(ctx: StepContext) -> bool:
+    """R5 影子底稿放量闸(pearnly_ai_shadow_draft)。按 tenant 判定;fail-closed 在 feature_flags 内部
+    (基建抖动绝不误开影子路)。"""
+    return feature_flags.pearnly_ai_shadow_draft_enabled_for(ctx.tenant_id)
+
+
 def _default_bank_recon_enabled(ctx: StepContext) -> bool:
     """R3 真对平放量闸(pearnly_ai_bank_recon)。工单线只有 tenant_id,按 tenant 判定;
     fail-closed 在 feature_flags 内部(基建抖动绝不误开真对平路)。"""
@@ -183,3 +219,4 @@ def _default_bank_statement_rows(ctx: StepContext, banks: list[dict]) -> list:
 # 注入点:模块级绑定,测试用 reconcile._xxx = fake 替换,不改调用方代码(同 classify 惯例)。
 _bank_recon_enabled = _default_bank_recon_enabled
 _bank_statement_rows = _default_bank_statement_rows
+_shadow_draft_enabled = _default_shadow_draft_enabled

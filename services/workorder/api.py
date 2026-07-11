@@ -180,6 +180,7 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         "blocked_reasons": blocked,
         "numbers": _numbers(events),
         "bank_recon": _bank_recon(events, items),
+        "shadow_draft": _shadow_draft(events),
         "deliverables": [
             {"kind": d["kind"], "numbers": d.get("numbers") or {}} for d in deliverables
         ],
@@ -203,6 +204,21 @@ def _bank_recon(events: list[dict], items: list[dict]) -> Optional[dict]:
         return None
     bank_item_ids = [it["id"] for it in items if it.get("kind") == _KIND_BANK_STATEMENT]
     return dict(recon, bank_item_ids=bank_item_ids)
+
+
+def _shadow_draft(events: list[dict]) -> Optional[dict]:
+    """R5 影子底稿三件套只读投影(F3 影子底稿视图读侧)。
+
+    从 reconcile 步 step_done 回放里深取 gates.r5_shadow——闸关(无 r5_shadow 键)/ 尚未跑到
+    reconcile / 引擎异常降级(_run_shadow_draft 的 except 落 {error,note:shadow_draft_skipped}
+    残影,缺 trial_balance)一律诚实给 None,不拼一份假底稿充数(状态诚实优先于"看着有内容")。"""
+    payload = evidence.replay_step_done(events, _DECISION_STEP)
+    if not payload:
+        return None
+    shadow = (payload.get("gates") or {}).get("r5_shadow")
+    if not isinstance(shadow, dict) or "trial_balance" not in shadow:
+        return None
+    return shadow
 
 
 def _flagged(items: list[dict], events: list[dict]) -> list[dict]:

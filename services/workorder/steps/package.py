@@ -22,6 +22,7 @@ _KIND_LEDGER = "ledger_workpaper"
 _KIND_BANK = "bank_workpaper"
 _KIND_MEMO = "missing_doc_memo"
 _KIND_EVIDENCE = "evidence_index"
+_KIND_SHADOW = "shadow_workpaper"
 
 _COMPUTE_KEYS = ("tax_due", "sales_amount", "output_vat", "purchase_amount", "input_vat", "period")
 
@@ -71,6 +72,11 @@ def run(ctx: StepContext) -> StepResult:
         _KIND_EVIDENCE: _write_evidence_index(ctx, out_dir, items, events, numbers),
         **pnd_kinds,
     }
+    # 影子底稿(F1):仅当 reconcile 挂了 r5_shadow(闸开且产出成功)才出这件交付物——闸关
+    # 逐字节维持现状(不新增文件/交付物行)。从 gates.r5_shadow 取,只渲染不重算。
+    shadow_gate = (numbers.get("gates") or {}).get("r5_shadow")
+    if isinstance(shadow_gate, dict) and "trial_balance" in shadow_gate:
+        kinds[_KIND_SHADOW] = _write_shadow(out_dir, shadow_gate)
     for kind, (artifact_path, snapshot) in kinds.items():
         ctx.store.upsert_deliverable(
             ctx.cur,
@@ -301,6 +307,71 @@ def _write_bank(out_dir: Path, items: list[dict], numbers: dict) -> tuple[str, d
         "bank_statement_present": bool(banks),
         "bank_statement_count": len(banks),
         "note": gate.get("note"),
+    }
+    return str(path), snapshot
+
+
+def _write_shadow(out_dir: Path, shadow: dict) -> tuple[str, dict]:
+    """影子底稿(F1):建议分录表 + 科目余额 + 试算平衡(Σ借=Σ贷 判平)。从 gates.r5_shadow 取,
+    package 只渲染不重算(影子只算不落法定表——非第二账本,不写 journal_vouchers)。"""
+    tb = shadow.get("trial_balance") or {}
+    entry_rows = [
+        f"| {e.get('source') or '-'} | {e.get('rule_key') or '-'} | {e.get('dr_cr') or '-'} "
+        f"| {e.get('account_code') or '-'} {e.get('account_name') or ''} | {_dec_str(e.get('amount'))} |"
+        for e in shadow.get("entries") or []
+    ]
+    account_rows = [
+        f"| {a.get('code')} {a.get('name') or ''} | {_dec_str(a.get('debit'))} "
+        f"| {_dec_str(a.get('credit'))} | {_dec_str(a.get('balance'))} |"
+        for a in shadow.get("accounts") or []
+    ]
+    balanced = "✔ สมดุล (配平)" if tb.get("balanced") else "✘ ไม่สมดุล (不平)"
+    lines = [
+        "# ใบงานร่างบัญชีคู่ (影子底稿 · 内部校验用,非法定账本)",
+        "",
+        *_bullets(
+            "รายการบัญชีที่แนะนำ (建议分录)",
+            (
+                [
+                    "| ที่มา (来源) | กฎ (规则) | เดบิต/เครดิต (借/贷) | บัญชี (科目) | จำนวนเงิน (金额) |"
+                ]
+                + ["|---|---|---|---|---|"]
+                + entry_rows
+                if entry_rows
+                else []
+            ),
+        ),
+        *_bullets(
+            "ยอดคงเหลือแต่ละบัญชี (科目余额)",
+            (
+                [
+                    "| บัญชี (科目) | เดบิต (借方) | เครดิต (贷方) | คงเหลือ (净额) |",
+                    "|---|---|---|---|",
+                ]
+                + account_rows
+                if account_rows
+                else []
+            ),
+        ),
+        *_bullets(
+            "งบทดลอง (试算平衡)",
+            [
+                f"Σ เดบิต (借方合计): {_dec_str(tb.get('debit'))}",
+                f"Σ เครดิต (贷方合计): {_dec_str(tb.get('credit'))}",
+                f"ผลต่าง (差额): {_dec_str(tb.get('diff'))}",
+                f"สถานะ (状态): {balanced}",
+            ],
+        ),
+    ]
+    path = _write_md(out_dir, "shadow_workpaper.md", lines)
+    snapshot = {
+        "balanced": bool(tb.get("balanced")),
+        "debit": tb.get("debit"),
+        "credit": tb.get("credit"),
+        "diff": tb.get("diff"),
+        "entry_count": shadow.get("entry_count", len(shadow.get("entries") or [])),
+        "account_count": len(shadow.get("accounts") or []),
+        "uncertainties": shadow.get("uncertainties") or [],
     }
     return str(path), snapshot
 

@@ -126,5 +126,27 @@ class PearnlyAiBankReconEnabledForTests(unittest.TestCase):
             self.assertFalse(feature_flags.pearnly_ai_bank_recon_enabled_for("t-1"))
 
 
+class PearnlyAiShadowDraftEnabledForTests(unittest.TestCase):
+    """F1 · 工单影子底稿闸:按 tenant 判定,默认关(reconcile 现状 gates 无 r5_shadow 键)。"""
+
+    def test_delegates_to_store_with_shadow_key_and_tenant(self):
+        with mock.patch(
+            "services.platform_settings.store.is_enabled_for_user", return_value=True
+        ) as m:
+            self.assertTrue(feature_flags.pearnly_ai_shadow_draft_enabled_for("t-1"))
+            m.assert_called_once_with(feature_flags.PEARNLY_AI_SHADOW_DRAFT_KEY, "t-1")
+
+    def test_defaults_closed_no_setting_row(self):
+        with mock.patch("services.platform_settings.store.is_enabled_for_user", return_value=False):
+            self.assertFalse(feature_flags.pearnly_ai_shadow_draft_enabled_for("t-1"))
+
+    def test_store_raises_fails_closed(self):
+        with mock.patch(
+            "services.platform_settings.store.is_enabled_for_user",
+            side_effect=RuntimeError("boom"),
+        ):
+            self.assertFalse(feature_flags.pearnly_ai_shadow_draft_enabled_for("t-1"))
+
+
 if __name__ == "__main__":
     unittest.main()

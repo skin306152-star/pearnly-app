@@ -101,6 +101,12 @@ PEARNLY_AI_CLIENT_POOL_KEY = "pearnly_ai_client_pool"
 # package——银行对账是佐证层,税额来自 R1/R2 不来自它)。按 tenant 判定(单所整体开/关,与
 # pearnly_ai_sod 同款);消费在 services/workorder/steps/reconcile.py。
 PEARNLY_AI_BANK_RECON_KEY = "pearnly_ai_bank_recon"
+# 工单影子底稿闸(F1 · 佐证层):默认关 fail-closed。关 = reconcile 步逐字节维持现状
+# (gates 无 r5_shadow 键);开 = R4 试算平衡通过后,把已裁的进项分录 + 聚合销项过纯函数复式
+# 规则引擎,产出建议分录/科目余额/试算平衡三样影子底稿挂进 r5_shadow(不 stuck、不阻断
+# package——影子只算不落法定表)。按 tenant 判定(单所整体开/关,与 pearnly_ai_bank_recon 同款);
+# 消费在 services/workorder/steps/reconcile.py。
+PEARNLY_AI_SHADOW_DRAFT_KEY = "pearnly_ai_shadow_draft"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -262,3 +268,12 @@ def pearnly_ai_bank_recon_enabled_for(tenant_id: Optional[str]) -> bool:
     tenant_id 加进 allowlist 即单所灰度。
     """
     return _enabled(PEARNLY_AI_BANK_RECON_KEY, tenant_id, "pearnly_ai_bank_recon_enabled_for")
+
+
+def pearnly_ai_shadow_draft_enabled_for(tenant_id: Optional[str]) -> bool:
+    """工单影子底稿闸。关 = reconcile 逐字节维持现状(gates 无 r5_shadow);开 = 产出影子底稿三件套。
+
+    按 tenant 判定(单所整体开/关,与 pearnly_ai_bank_recon 同款);超管在平台后台把该事务所
+    tenant_id 加进 allowlist 即单所灰度。
+    """
+    return _enabled(PEARNLY_AI_SHADOW_DRAFT_KEY, tenant_id, "pearnly_ai_shadow_draft_enabled_for")

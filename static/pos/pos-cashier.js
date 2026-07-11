@@ -444,13 +444,25 @@
             grand: grandTotal(),
             tendered: method === 'cash' ? tendered : grandTotal(),
         };
-        try {
-            const res = await POS.data.createSale(buildSalePayload(method));
+        const payload = buildSalePayload(method);
+        const onOk = (res) => {
             closePay();
             POS.toast(POS.t('posui.toast.paid'));
             clearCart();
             showDone(res, snapshot);
+        };
+        try {
+            onOk(await POS.data.createSale(payload));
         } catch (e) {
+            // caps 闸开 + 折扣超上限/手工改价越权 → 弹店长授权窗,带 approval 重发建单;
+            // 授权成功走同一成交流程,失败留窗显错(同退货/作废 PS-1 流程)。
+            if (e.code === 'pos.approval_required' && POS.approve) {
+                POS.approve.open(
+                    (creds) => POS.data.createSale(Object.assign({}, payload, { approval: creds })),
+                    onOk
+                );
+                return;
+            }
             // 07 屏1:收款失败弹窗内红字,不关弹窗,可改可重试
             $(errId).textContent = POS.posErrMsg(e.code, 'pos.unexpected');
         } finally {

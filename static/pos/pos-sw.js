@@ -6,7 +6,7 @@
  *  - 其余同源 GET(外壳/静态): cache-first + 联网回填;离线导航回落已缓存的 /pos。
  * 缓存名带版本号,改外壳 bump 即可让旧缓存失效(对齐 ?v= 缓存破)。
  */
-const CACHE = 'pearnly-pos-v11854700';
+const CACHE = 'pearnly-pos-v11891204';
 const CORE = ['/pos'];
 
 self.addEventListener('install', (e) => {

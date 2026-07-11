@@ -6,6 +6,14 @@
 /* global t, token, escapeHtml, showToast */
 import { activeWsId, posErrMsg } from './inventory-common.js';
 
+interface Caps {
+    discount_limit_pct: number;
+    can_refund: boolean;
+    can_void: boolean;
+    can_override_price: boolean;
+    cost_visible: boolean;
+}
+
 interface Cashier {
     id: string;
     display_name: string;
@@ -13,9 +21,28 @@ interface Cashier {
     is_active: boolean;
     last_opened_at: string | null;
     has_shifts: boolean;
+    caps: Caps;
+    has_approver: boolean; // 绑主账号者权限随其 RBAC(caps 只读展示,不在此编辑)
 }
 
 const COLORS = ['#0E7C66', '#0891b2', '#7c3aed', '#16a34a', '#db2777', '#f59e0b'];
+
+const CAP_DEFAULTS: Caps = {
+    discount_limit_pct: 0,
+    can_refund: false,
+    can_void: false,
+    can_override_price: false,
+    cost_visible: false,
+};
+
+// 后端 caps 列可能缺键(存量收银员默认 '{}')→ 前端按最严默认补齐,避免 undefined 访问。
+function normCashier(c: Partial<Cashier> & { caps?: Partial<Caps> }): Cashier {
+    return {
+        ...(c as Cashier),
+        caps: { ...CAP_DEFAULTS, ...(c.caps || {}) },
+        has_approver: !!c.has_approver,
+    };
+}
 
 let items: Cashier[] = [];
 let modalTarget: Cashier | null = null; // null = 新增模式;非空 = 给该收银员重设 PIN
@@ -75,6 +102,7 @@ function rowHtml(c: Cashier, i: number): string {
     let ops: string;
     if (c.is_active) {
         ops =
+            `<button class="csh-op" data-act="caps" data-id="${c.id}">${escapeHtml(t('csh-cap-op'))}</button>` +
             `<button class="csh-op" data-act="resetpin" data-id="${c.id}">${escapeHtml(t('csh-resetpin'))}</button>` +
             `<button class="csh-op" data-act="toggle" data-id="${c.id}">${escapeHtml(t('csh-disable'))}</button>`;
     } else {
@@ -219,6 +247,7 @@ function renderList() {
         if (!c) return;
         const act = b.dataset.act;
         if (act === 'resetpin') b.onclick = () => openModal(c);
+        else if (act === 'caps') b.onclick = () => openCapsModal(c);
         else if (act === 'toggle') b.onclick = () => toggleActive(c);
         else if (act === 'delete') b.onclick = () => removeCashier(c);
     });
@@ -245,6 +274,96 @@ function closeModal() {
     const host = document.getElementById('csh-modal-host');
     if (host) host.innerHTML = '';
     modalTarget = null;
+}
+
+// ── 按人权限(caps)配置(PC-1b · 折扣上限/退作废/改价/看成本)────────────
+function capSwitch(id: string, label: string, on: boolean): string {
+    return `<label class="csh-cap-row"><span class="csh-cap-lbl">${escapeHtml(label)}</span>
+        <span class="csh-sw"><input type="checkbox" id="${id}"${on ? ' checked' : ''} />
+        <span class="csh-sw-t"></span></span></label>`;
+}
+
+function capsModalHtml(c: Cashier): string {
+    const title = `${escapeHtml(t('csh-perm-title'))} · ${escapeHtml(c.display_name)}`;
+    // 绑主账号者:权限随其 RBAC,本页只读提示,不给编辑(后端也忽略 caps 列)。
+    if (c.has_approver) {
+        return `<div class="csh-mask show" id="csh-mask"><div class="csh-modal">
+            <div class="csh-mh">${title}</div>
+            <div class="csh-mb"><div class="csh-cap-bound">${escapeHtml(t('csh-cap-bound'))}</div></div>
+            <div class="csh-mf"><button class="csh-ok" id="csh-cancel">${escapeHtml(t('csh-cancel'))}</button></div>
+        </div></div>`;
+    }
+    const cap = c.caps;
+    return `<div class="csh-mask show" id="csh-mask"><div class="csh-modal">
+        <div class="csh-mh">${title}</div>
+        <div class="csh-mb">
+            <label>${escapeHtml(t('csh-cap-discount'))}</label>
+            <div class="csh-fld"><input id="cap-pct" inputmode="numeric" maxlength="3" value="${cap.discount_limit_pct}" />
+                <span class="csh-suffix">%</span></div>
+            ${capSwitch('cap-refund', t('csh-cap-refund'), cap.can_refund)}
+            ${capSwitch('cap-void', t('csh-cap-void'), cap.can_void)}
+            ${capSwitch('cap-price', t('csh-cap-price'), cap.can_override_price)}
+            ${capSwitch('cap-cost', t('csh-cap-cost'), cap.cost_visible)}
+            <div class="csh-cap-note">${escapeHtml(t('csh-cap-hint'))}</div>
+            <div class="csh-err" id="csh-err"></div>
+        </div>
+        <div class="csh-mf">
+            <button class="csh-ghost" id="csh-cancel">${escapeHtml(t('csh-cancel'))}</button>
+            <button class="csh-ok" id="csh-save">${escapeHtml(t('csh-save'))}</button>
+        </div>
+    </div></div>`;
+}
+
+function openCapsModal(c: Cashier) {
+    const host = document.getElementById('csh-modal-host');
+    if (!host) return;
+    host.innerHTML = capsModalHtml(c);
+    document.getElementById('csh-cancel')!.onclick = closeModal;
+    document.getElementById('csh-mask')!.addEventListener('click', (e) => {
+        if ((e.target as HTMLElement).id === 'csh-mask') closeModal();
+    });
+    const saveBtn = document.getElementById('csh-save');
+    if (saveBtn) saveBtn.onclick = () => saveCaps(c);
+}
+
+function readCaps(): Caps | null {
+    const pctRaw = ((document.getElementById('cap-pct') as HTMLInputElement).value || '').trim();
+    if (!/^\d{1,3}$/.test(pctRaw) || Number(pctRaw) > 100) return null;
+    const chk = (id: string) => !!(document.getElementById(id) as HTMLInputElement | null)?.checked;
+    return {
+        discount_limit_pct: Number(pctRaw),
+        can_refund: chk('cap-refund'),
+        can_void: chk('cap-void'),
+        can_override_price: chk('cap-price'),
+        cost_visible: chk('cap-cost'),
+    };
+}
+
+async function saveCaps(c: Cashier) {
+    if (saving) return;
+    const wsId = activeWsId();
+    if (wsId == null) return;
+    const errEl = document.getElementById('csh-err')!;
+    const caps = readCaps();
+    if (!caps) {
+        errEl.textContent = t('csh-err-cap-pct');
+        return;
+    }
+    const btn = document.getElementById('csh-save') as HTMLButtonElement;
+    saving = true;
+    btn.disabled = true;
+    errEl.textContent = '';
+    try {
+        await cshApi('PUT', '/api/pos/admin/cashiers/' + c.id, { workspace_client_id: wsId, caps });
+        closeModal();
+        showToast(t('csh-save-ok'), 'success');
+        await load();
+    } catch (e) {
+        errEl.textContent = posErrMsg(e instanceof Error ? e.message : '', 'csh-save-fail');
+    } finally {
+        saving = false;
+        btn.disabled = false;
+    }
 }
 
 async function save() {
@@ -347,7 +466,7 @@ async function load() {
     loadAccess(); // 收银台接入(店铺码)· 不阻断主列表
     try {
         const data = await cshApi('GET', '/api/pos/admin/cashiers?workspace_client_id=' + wsId);
-        items = (data && data.cashiers) || [];
+        items = ((data && data.cashiers) || []).map(normCashier);
         renderList();
     } catch (e) {
         setList(

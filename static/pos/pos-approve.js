@@ -87,9 +87,10 @@
         // close() 会清空 onDone,先抓引用再关窗,否则成功回调被吞(退货成功却不回主屏)。
         const done = onDone;
         try {
-            await attemptFn({ cashier_id: selected.id, pin: pin });
+            // 重试结果回传给 done(建单场景要 res 渲染成交面板;退货/作废忽略此参,零影响)。
+            const res = await attemptFn({ cashier_id: selected.id, pin: pin });
             close();
-            if (done) done();
+            if (done) done(res);
         } catch (e) {
             const row = $('mgr-pins');
             if (row) {

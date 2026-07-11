@@ -267,6 +267,8 @@ async def api_admin_list_cashiers(request: Request, workspace_client_id: int = Q
         lo = r.get("last_opened_at")
         item["last_opened_at"] = lo.isoformat() if lo else None
         item["has_shifts"] = bool(r.get("has_shifts"))
+        # 绑主账号者权限随其 RBAC(resolve_caps 忽略 caps 列)→ 前端据此显只读提示、不给编辑。
+        item["has_approver"] = bool(r.get("user_id"))
         out.append(item)
     return ok({"cashiers": out})
 

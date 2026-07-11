@@ -168,10 +168,7 @@ def _by_method(cur, base, date_from, date_to) -> dict:
         "AND s.status='completed' AND s.sale_type='sale'" + rng_j + " GROUP BY p.method",
         list(base) + rp_j,
     )
-    out = {
-        r["method"]: Decimal(str(r["amount"] if r["amount"] is not None else 0))
-        for r in cur.fetchall()
-    }
+    out = {r["method"]: Decimal(str(r["amount"])) for r in cur.fetchall()}  # SQL 已 COALESCE(…,0)
     rng_s, rp_s = _range("sold_at", date_from, date_to)
     cur.execute(
         "SELECT COALESCE(SUM(change_amount),0) AS chg FROM pos_sales "
@@ -179,8 +176,7 @@ def _by_method(cur, base, date_from, date_to) -> dict:
         "AND status='completed' AND sale_type='sale'" + rng_s,
         list(base) + rp_s,
     )
-    row = cur.fetchone() or {}
-    total_change = Decimal(str(row.get("chg") if row.get("chg") is not None else 0))
+    total_change = Decimal(str((cur.fetchone() or {}).get("chg") or 0))
     if total_change:
         out["cash"] = out.get("cash", Decimal("0")) - total_change
     return {m: _money(v) for m, v in out.items()}

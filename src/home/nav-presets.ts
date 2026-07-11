@@ -89,15 +89,20 @@ function redirectOffHidden(home: string): void {
     if (ancestorHidden(item)) window.routeTo(home);
 }
 
+// 子项另有外部门控(角色/开通)的折叠组:整组显隐由清单处理、子项 display 交 applyPosRoles,
+// applyNavPreset 不复位其 [data-module] 子项(否则强显 owner-only 项)。新增此类组往这里加,
+// 别再往下面的判定堆 key !== '…' 字面量链。
+const CHILD_GATED_GROUPS = new Set(['cashier', 'perm']);
+
 // 按清单显隐顶层节点。显示的折叠组顺带复位子项 display(切业态往返时清残留),
-// 唯收银系统 / 权限管理系统两组子项另有角色/开通门控(调用方 applyPosRoles 处理),此处不碰。
+// 唯 CHILD_GATED_GROUPS 内的组子项另有门控(见上),此处不碰。
 export function applyNavPreset(preset: NavPreset): void {
     const visible = new Set(preset.show);
     Object.keys(NAV_NODES).forEach((key) => {
         const el = document.querySelector<HTMLElement>(NAV_NODES[key]);
         const on = visible.has(key);
         show(el, on);
-        if (el && on && key !== 'cashier' && key !== 'perm') {
+        if (el && on && !CHILD_GATED_GROUPS.has(key)) {
             el.querySelectorAll<HTMLElement>('[data-module]').forEach((s) => show(s, true));
         }
     });

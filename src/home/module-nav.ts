@@ -31,13 +31,12 @@ const POS_LABEL_KEYS: Record<string, string> = {
 };
 
 function applyPosLabels(): void {
-    const lang = window._currentLang || localStorage.getItem('mrpilot_lang') || 'zh';
-    const dict = (window.I18N && window.I18N[lang]) || {};
+    // 改指向 -pos 键(applyLang 后续切语言自动出 pos 名);当场用全局 t() 补一次文案免闪。
     Object.keys(POS_LABEL_KEYS).forEach((from) => {
         const to = POS_LABEL_KEYS[from];
         document.querySelectorAll<HTMLElement>('[data-i18n="' + from + '"]').forEach((el) => {
             el.dataset.i18n = to;
-            if (dict[to]) el.textContent = dict[to];
+            if (typeof window.t === 'function') el.textContent = window.t(to);
         });
     });
 }

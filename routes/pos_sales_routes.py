@@ -389,6 +389,7 @@ async def api_void(sale_id: str, request: Request, req: Optional[VoidRequest] = 
             workspace_client_id=ws,
             sale_id=sale_id,
             created_by=_created_by(user),
+            operator=user,
         ),
         action="pos.void.approved",
         sale_id_of=lambda _r: sale_id,

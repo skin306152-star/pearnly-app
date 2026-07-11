@@ -110,6 +110,7 @@ import './home/pos-payment-settings.js'; // POS · 收款设置(window.openPosPa
 import './home/pos-sheets-settings.js'; // POS · Google Sheet 留档设置(window.loadPosSheets · owner · 路由 pos-sheets · 平铺 section)
 import './home/sales-report.js'; // POS 屏9 · 销售报表(window.loadSalesReport · GET /api/pos/admin/report · KPI/图/榜 · 四态)
 import './home/pos-sales-log.js'; // POS · 交易明细日志(window.loadPosSalesLog · 逐笔流水+筛选+CSV导出 · GET /api/pos/admin/sales-log)
+import './home/pos-audit.js'; // POS · 操作记录/异常(window.loadPosAudit · 收银员异常汇总+下钻 · GET /api/pos/admin/audit/summary|events)
 import './home/pos-cashiers.js'; // POS · 收银员管理(window.loadPosCashiers · GET/POST/PUT /api/pos/admin/cashiers · owner · 加人/改名换色/重设PIN/启停)
 // 商户采购(进项)Phase 1 · 屏1 主屏 / 屏10 录入 / 屏6 详情 / 屏7-9+3 弹窗 / 屏4 供应商 / 屏5 设置(docs/purchasing)
 // mock 兜底先行(purchase-mock)· 后端 /api/purchase/* 上线自动切真 · 全屏照搬设计稿 Pearnly_采购_UI预览/。

@@ -10,7 +10,11 @@ import unittest
 import routes.pos_report_routes as mod
 from routes.pos_report_routes import router
 
-EXPECTED = {("GET", "/api/pos/admin/report")}
+EXPECTED = {
+    ("GET", "/api/pos/admin/report"),
+    ("GET", "/api/pos/admin/audit/summary"),
+    ("GET", "/api/pos/admin/audit/events"),
+}
 
 
 class PosReportRoutesContractTests(unittest.TestCase):
@@ -27,6 +31,18 @@ class PosReportRoutesContractTests(unittest.TestCase):
 
         paths = {r.path for r in app.app.routes if hasattr(r, "path")}
         self.assertIn("/api/pos/admin/report", paths)
+        self.assertIn("/api/pos/admin/audit/summary", paths)
+        self.assertIn("/api/pos/admin/audit/events", paths)
+
+    def test_audit_routes_gate_on_report_view(self):
+        self.assertIn(
+            'require_perm_pos_tid(request, "pos.report.view")',
+            inspect.getsource(mod.api_audit_summary),
+        )
+        self.assertIn(
+            'require_perm_pos_tid(request, "pos.report.view")',
+            inspect.getsource(mod.api_audit_events),
+        )
 
     def test_uses_perm_gate_and_envelope(self):
         self.assertTrue(hasattr(mod, "ok"))

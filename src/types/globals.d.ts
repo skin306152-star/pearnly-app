@@ -315,6 +315,8 @@ interface Window {
     loadPosSheets?: () => void;
     // POS · 交易明细日志页(view 级 · 路由 pos-sales-log · 平铺 section)
     loadPosSalesLog?: () => void;
+    // POS · 操作记录/异常页(view 级 · 路由 pos-audit · 平铺 section · 防内盗汇总+下钻)
+    loadPosAudit?: () => void;
     loadInventoryPage?: () => void;
     loadPosOnboardingPage?: () => void;
     loadSalesReport?: () => void;

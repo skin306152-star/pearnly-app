@@ -38,7 +38,7 @@ function applyPosRoles(
     show(document.getElementById('nav-pos-sheets'), pos && owner);
     show(document.getElementById('nav-pos-tables'), pos && owner && businessType === 'restaurant');
     show(qs('.nav-item[data-route="inventory"]'), inv);
-    ['sales-report', 'pos-sales-log'].forEach((r) =>
+    ['sales-report', 'pos-sales-log', 'pos-audit'].forEach((r) =>
         show(qs('.nav-item[data-route="' + r + '"]'), pos)
     );
     show(document.getElementById('nav-pos-switch'), pos);

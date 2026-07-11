@@ -170,7 +170,7 @@ def execute_gated_write(
         )
 
     def _audit(result, ctx):
-        # 仅经店长授权(闸开且有授权人)时写审计;本人有权/闸关都不写。
+        # 仅经店长授权(闸开且有授权人)时写授权审计;本人有权/闸关都不写。
         if state.get("gated") and state.get("approver"):
             log_approval(
                 tenant_id=ctx["tenant_id"],
@@ -250,4 +250,27 @@ def log_approval(
         target_id=sale_id,
         target_name=None,
         details=payload,
+    )
+
+
+def log_void_operator(*, tenant_id: str, sale_id: str, operator: dict) -> None:
+    """记「谁点了作废」到 operation_logs(actor = 操作者本人)。无条件、best-effort。
+
+    与 pos.void.approved(记「谁授权」)分开:原单 cashier_id 是原销售员,不是作废操作人,
+    异常读模型据 details.operator_cashier_id 把作废如实归到操作人名下(防内盗对账的关键)。
+    """
+    from services.audit import store as audit_store
+
+    audit_store.insert_operation_log(
+        tenant_id=tenant_id,
+        actor_user_id=operator.get("id"),
+        actor_username=operator.get("display_name") or operator.get("username"),
+        actor_is_super=bool(operator.get("is_super_admin")),
+        action="pos.sale.voided",
+        target_type="pos_sale",
+        target_id=sale_id,
+        details={
+            "operator_cashier_id": operator.get("cashier_id"),
+            "operator_name": operator.get("display_name"),
+        },
     )

@@ -420,9 +420,13 @@ def _header_view(sale: dict) -> dict:
 
 
 def void_sale(
-    cur, *, tenant_id: str, workspace_client_id: int, sale_id: str, created_by=None
+    cur, *, tenant_id: str, workspace_client_id: int, sale_id: str, created_by=None, operator=None
 ) -> dict:
-    """作废当班错单:回补库存 + 标 void。已交班/已退货/已作废 → void_not_allowed。"""
+    """作废当班错单:回补库存 + 标 void。已交班/已退货/已作废 → void_not_allowed。
+
+    记一行 operation_logs(谁点了作废):原单 cashier_id 是原销售员,不是作废操作人,异常读模型
+    据此把作废如实归到操作人名下(防内盗对账的关键)。
+    """
     sale = sales_store.get_sale(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, sale_id=sale_id
     )
@@ -455,4 +459,8 @@ def void_sale(
                 created_by=created_by,
             )
     sales_store.set_status(cur, tenant_id=tenant_id, sale_id=sale_id, status="void")
+    if operator is not None:
+        from services.pos import approval
+
+        approval.log_void_operator(tenant_id=tenant_id, sale_id=sale_id, operator=operator)
     return {"sale_id": sale_id, "status": "void", "stock_returned": restore_stock}

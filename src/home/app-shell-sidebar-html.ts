@@ -290,6 +290,13 @@ export const SIDEBAR_HTML = `
                 </svg>
                 <span class="nav-label" data-i18n="nav-pos-sales-log">交易明细</span>
             </div>
+            <div class="nav-item nav-sub-item" data-route="pos-audit" data-module="pos">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10 2.5l6.5 2.5v4.5c0 3.6-2.6 6.5-6.5 8-3.9-1.5-6.5-4.4-6.5-8V5z"/>
+                    <path d="M10 8v3.2M10 13.6v.05"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-pos-audit">操作记录/异常</span>
+            </div>
             <div class="nav-item nav-sub-item" data-route="pos-cashiers" id="nav-pos-cashiers" data-module="pos" style="display:none;">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="10" cy="6.5" r="3"/>

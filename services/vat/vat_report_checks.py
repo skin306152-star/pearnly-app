@@ -351,9 +351,10 @@ def run_report_checks(
 
 
 def to_jsonable(obj: Any) -> Any:
-    """Decimal → float(仅出线序列化边界·内部计算全程 Decimal)。"""
+    """Decimal → 定点字符串(钱字段出线保精度·JSON 无 Decimal 类型·不落 float 免税额毛刺;
+    前端 AI.format.money 的 Number() 兼容字符串)。"""
     if isinstance(obj, Decimal):
-        return float(obj)
+        return format(obj, "f")
     if isinstance(obj, dict):
         return {k: to_jsonable(v) for k, v in obj.items()}
     if isinstance(obj, list):

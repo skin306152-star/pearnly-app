@@ -181,9 +181,9 @@ class RunReportChecksTests(unittest.TestCase):
         result = checks.run_report_checks(_load_rows())
         safe = checks.to_jsonable(result)
         grand = safe["buyer_summary"]["grand_total"]
-        self.assertIsInstance(grand["net_total"], float)
-        self.assertAlmostEqual(grand["net_total"], 3902104.19, places=2)
-        self.assertAlmostEqual(grand["vat_total"], 273147.29, places=2)
+        self.assertIsInstance(grand["net_total"], str)
+        self.assertEqual(grand["net_total"], "3902104.19")
+        self.assertEqual(grand["vat_total"], "273147.29")
 
 
 if __name__ == "__main__":

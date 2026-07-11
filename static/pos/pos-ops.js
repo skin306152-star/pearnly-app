@@ -329,22 +329,20 @@
             0
         );
     }
+    function allocSum() {
+        return Object.keys(refundAlloc).reduce((s, m) => s + (Number(refundAlloc[m]) || 0), 0);
+    }
     // 混合退款是否已把退款额分摊平(Σ 各方式 == 退款总额)。单方式恒平。
     function allocBalanced(total) {
         if (origMethods().length <= 1) return true;
-        const sum = Object.keys(refundAlloc).reduce((s, m) => s + (Number(refundAlloc[m]) || 0), 0);
-        return Math.abs(round2(sum) - round2(total)) < 0.005;
+        return Math.abs(round2(allocSum()) - round2(total)) < 0.005;
     }
     function updateRefundState() {
         const total = refundTotal();
         $('refund-total').textContent = '฿' + fmt(total);
         const box = $('refund-alloc-box');
         if (box) {
-            const sum = Object.keys(refundAlloc).reduce(
-                (s, m) => s + (Number(refundAlloc[m]) || 0),
-                0
-            );
-            $('refund-alloc-sum').textContent = '฿' + fmt(sum);
+            $('refund-alloc-sum').textContent = '฿' + fmt(allocSum());
             box.className = 'wo-sum ' + (allocBalanced(total) ? 'ok' : 'bad');
         }
         const has = Object.keys(refundSel).length > 0;
@@ -376,14 +374,14 @@
             return;
         }
         // 混合原单→原路拆退各方式(正额,后端取负);单方式→走兼容路只给 refund_method。
+        // 拆退在场时后端忽略 refund_method,故混合路不必再改 method(留 refundWay 即可)。
         const methods = origMethods();
         let payments = null;
-        let method = refundWay;
+        const method = refundWay;
         if (methods.length > 1) {
             payments = methods
                 .map((m) => ({ method: m.method, amount: round2(refundAlloc[m.method] || 0) }))
                 .filter((p) => p.amount > 0);
-            method = (payments[0] && payments[0].method) || 'cash';
         }
         const btn = $('refund-do');
         const saleId = refundSale.sale.id;

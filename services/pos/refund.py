@@ -183,24 +183,16 @@ def refund(
                 created_by=created_by,
             )
 
-    if refund_payments:
-        # 原路拆退:逐笔按原方式记一行负额(现金退现金/刷卡退刷卡),对账各方式各归各。
-        for p in refund_payments:
-            sales_store.insert_payment(
-                cur,
-                tenant_id=tenant_id,
-                sale_id=refund_sale_id,
-                method=p.get("method", "cash"),
-                amount=-abs(Decimal(str(p.get("amount", 0)))),
-            )
-    else:
-        # 单笔兼容:老前台只给一个 refund_method,整额退到该方式(grand 已为负)。
+    # 原路拆退:逐笔按原方式记一行负额(现金退现金/刷卡退刷卡),对账各方式各归各。
+    # 单笔兼容(老前台只给 refund_method)= 整额退该方式的退化拆退,归一走同一条负额写入路径。
+    payments = refund_payments or [{"method": refund_method, "amount": grand}]
+    for p in payments:
         sales_store.insert_payment(
             cur,
             tenant_id=tenant_id,
             sale_id=refund_sale_id,
-            method=refund_method,
-            amount=grand,
+            method=p.get("method", "cash"),
+            amount=-abs(Decimal(str(p.get("amount", 0)))),
         )
     return _refund_result(refund_sale, deduped=False, stock_returned=restore_stock)
 

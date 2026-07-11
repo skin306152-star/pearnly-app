@@ -91,7 +91,10 @@ def _select_batch(line_user_id: str) -> Optional[dict]:
     """反查该 sender 名下客户联系人,挑闸开租户里「最近 sent_at」那一批 pending 问题。
 
     一个业主可能挂多主体(§1.3),各自可能都有在途批次;消歧口径:跨全部候选取
-    sent_at 最大的那一批,批内按 id 升序编号(与 S4 攒批消息 1..N 的出现顺序一致)。
+    sent_at 最大的那一批,批内按 created_at 升序编号——与 S4(line_client_pool_push.
+    stage_batch_for_client)推送时 `for idx, q in enumerate(questions, start=1)`
+    的枚举顺序一致(questions 取自 store.list_for_client,该函数按 created_at
+    升序出行),保证客户回「1/2/3」对应的正是消息里看到的那个编号。
     闸关的租户直接跳过(闸关时该池对该 sender 视而不见)。
     """
     from core import feature_flags
@@ -130,7 +133,7 @@ def _select_batch(line_user_id: str) -> Optional[dict]:
     for row in rows:
         batches.setdefault(row.get("batch_id"), []).append(row)
     target_batch_id = max(batches, key=lambda bid: max(r["sent_at"] for r in batches[bid]))
-    batch_rows = sorted(batches[target_batch_id], key=lambda r: r["id"])
+    batch_rows = sorted(batches[target_batch_id], key=lambda r: r["created_at"])
     return {
         "tenant_id": tenant_id,
         "workspace_client_id": workspace_client_id,

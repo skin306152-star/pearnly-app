@@ -105,6 +105,12 @@ const BUNDLES = [
             // 两者都在 ai-client.js(renderWo 用 AI.recon.mount)之前——同 ai-pkg 先例。
             'ai/ai-recon-render.js',
             'ai/ai-recon.js',
+            // ai-shadow-render.js(F3 · 影子底稿三件套+GL对平纯逻辑+HTML,依赖 AI.state/
+            // format)排在 ai-shadow.js(挂载/折叠编排)之前,两者都在 ai-client.js(renderWo
+            // 用 AI.shadow.mount)之前——同 ai-recon 先例;与银行对账区互不依赖,紧邻放置
+            // 只是"同属工单详情只读区块"的语义分组。
+            'ai/ai-shadow-render.js',
+            'ai/ai-shadow.js',
             'ai/ai-profile-render.js',
             'ai/ai-profile-panels-render.js',
             'ai/ai-supplier-profiles-render.js',

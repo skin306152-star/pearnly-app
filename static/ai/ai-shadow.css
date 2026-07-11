@@ -1,0 +1,132 @@
+/* Pearnly AI · 影子底稿区(F3 · 工单详情 wo 视图)——三分区折叠(建议分录/科目余额/
+ * GL 对平)。折叠头/胶囊沿用 .panel/.chip 原子(ai-shell.css);科目余额表复用
+ * .mx-scroll/.mx-table(ai-matrix.css,同为"宽表格容器内横滑"的通用原子);本文件
+ * 只加影子底稿特有的凭证分组卡片与折叠交互样式,不重复 E2(ai-recon.css)的类名——
+ * 两个区块各自折叠态独立,类名撞车会互相污染样式。
+ */
+.sdw-body-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sdw-section {
+  border: 1px solid var(--hair);
+  border-radius: 11px;
+  overflow: hidden;
+}
+.sdw-fold {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--surface2);
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--ink);
+  text-align: left;
+}
+.sdw-caret {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mut);
+}
+.sdw-body {
+  display: none;
+  padding: 10px 14px 14px;
+}
+.sdw-section.on .sdw-body {
+  display: block;
+}
+.sdw-empty {
+  color: var(--mut);
+  font-size: 12px;
+  padding: 8px 2px;
+}
+.sdw-hint {
+  font-size: 11.5px;
+  color: var(--warn);
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-line);
+  border-radius: 9px;
+  padding: 8px 12px;
+  margin: 0;
+}
+.sdw-note {
+  font-size: 11.5px;
+  color: var(--mut);
+  line-height: 1.6;
+  margin: 2px 0 8px;
+}
+.sdw-subtitle {
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--ink2);
+  margin: 10px 0 4px;
+}
+.sdw-subtitle:first-child {
+  margin-top: 0;
+}
+
+/* 凭证卡片(一次规则命中 = 一组配平分录),分录表本身容器内横滑(Canon §6.1)。 */
+.sdw-voucher {
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.sdw-voucher:last-child {
+  margin-bottom: 0;
+}
+.sdw-vh {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  margin-bottom: 4px;
+}
+.sdw-scroll {
+  overflow-x: auto;
+}
+.sdw-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 420px;
+  font-size: 12px;
+}
+.sdw-table th {
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink2);
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--hair2);
+  white-space: nowrap;
+}
+.sdw-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--hair);
+  white-space: nowrap;
+}
+.sdw-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.sdw-table td.num {
+  text-align: right;
+}
+
+@media (max-width: 480px) {
+  .sdw-fold {
+    font-size: 12px;
+    padding: 11px 12px;
+  }
+  .sdw-body {
+    padding: 8px 12px 12px;
+  }
+}

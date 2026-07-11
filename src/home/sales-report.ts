@@ -3,7 +3,7 @@
 // 只改三处 —— ① 假数据→GET /api/pos/admin/report(04 §7 · B6)② 写死文案→i18n(4 语)③ 补四态(07)。
 // 数据=收银卖货自动长出,无手录;不造假(概念稿的「较上周 +%」是 mock,接口无此项→不展示)。
 /* global t, token, escapeHtml, currentLang */
-import { activeWsId, localizedName, posErrMsg, type InvName } from './inventory-common.js';
+import { activeWsId, localizedName, posErrMsg, fmtQty, type InvName } from './inventory-common.js';
 
 interface Kpi {
     gross: string;
@@ -173,7 +173,7 @@ function listsPanel(top: TopProduct[], cashiers: CashierRow[]): string {
                   const profitUnknown = p.gross_profit == null;
                   return `<div class="row"><span class="rk">${i + 1}</span><span class="nm">${escapeHtml(
                       localizedName(p.name)
-                  )} <span class="q">· ${escapeHtml(p.qty)} ${escapeHtml(t('rep-unit-items'))}</span></span><span class="v-col"><span class="v tnum">฿${bahtInt(
+                  )} <span class="q">· ${escapeHtml(fmtQty(p.qty))} ${escapeHtml(t('rep-unit-items'))}</span></span><span class="v-col"><span class="v tnum">฿${bahtInt(
                       p.gross
                   )}</span><span class="pf tnum${profitUnknown ? ' unknown' : ''}">${escapeHtml(
                       t('rep-kpi-profit')

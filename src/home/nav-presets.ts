@@ -35,7 +35,8 @@ export const NAV_NODES: Record<string, string> = {
     purchases: '[data-collapsible="expense"]', // 采购系统
     sales: '[data-collapsible="sales"]', // 销售系统
     accounting: '[data-collapsible="accounting"]', // 做账
-    pos: '#nav-group-pos', // 收银业务
+    cashier: '#nav-group-cashier', // 收银系统(报表/交易明细/收款设置)
+    perm: '#nav-group-perm', // 权限管理系统(收银员/切收银台/操作记录)
     clients: '.nav-item[data-route="clients"]',
     company: '.nav-item[data-route="company"]',
     exceptions: '.nav-item[data-route="exceptions"]',
@@ -58,9 +59,9 @@ export const FIRM_PRESET: NavPreset = {
     avatarHide: FIRM_AVATAR_HIDE,
 };
 
-// POS 版(pos_only 拆卖收银壳):收银 + 客户 + 公司 + 商品 + 采购 + 销售(clients 放 company 前,同会计版)。
+// POS 版(pos_only 拆卖收银壳):收银 + 权限 + 客户 + 公司 + 商品 + 采购 + 发票(clients 放 company 前,同会计版)。
 export const POS_PRESET: NavPreset = {
-    show: ['pos', 'clients', 'company', 'products', 'purchases', 'sales'],
+    show: ['cashier', 'perm', 'clients', 'company', 'products', 'purchases', 'sales'],
     home: 'inventory',
     avatarHide: POS_AVATAR_HIDE,
 };
@@ -89,14 +90,14 @@ function redirectOffHidden(home: string): void {
 }
 
 // 按清单显隐顶层节点。显示的折叠组顺带复位子项 display(切业态往返时清残留),
-// 唯收银业务组子项另有角色/开通门控(调用方 applyPosRoles 处理),此处不碰。
+// 唯收银系统 / 权限管理系统两组子项另有角色/开通门控(调用方 applyPosRoles 处理),此处不碰。
 export function applyNavPreset(preset: NavPreset): void {
     const visible = new Set(preset.show);
     Object.keys(NAV_NODES).forEach((key) => {
         const el = document.querySelector<HTMLElement>(NAV_NODES[key]);
         const on = visible.has(key);
         show(el, on);
-        if (el && on && key !== 'pos') {
+        if (el && on && key !== 'cashier' && key !== 'perm') {
             el.querySelectorAll<HTMLElement>('[data-module]').forEach((s) => show(s, true));
         }
     });

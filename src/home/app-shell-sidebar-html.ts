@@ -76,36 +76,6 @@ export const SIDEBAR_HTML = `
         </div>
     </div>
 
-    <!-- 商品 ▼ 可折叠组(主数据枢纽:商品数据 + 费用数据 · 对齐 MR.ERP m3 ระบบสินค้า · 置于采购之上)·
-         对所有业态可见(费用数据人人要 · 商品数据卖货商户用)· 不加 data-module 门控 -->
-    <div class="nav-group nav-collapsible" data-collapsible="products">
-        <div class="nav-group-toggle" data-toggle-group="products">
-            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 7l7-4 7 4v6l-7 4-7-4V7z"/>
-                <path d="M3 7l7 4 7-4M10 11v6"/>
-            </svg>
-            <span class="nav-label" data-i18n="nav-group-products">商品</span>
-            <svg class="nav-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M6 8l4 4 4-4"/>
-            </svg>
-        </div>
-        <div class="nav-sub">
-            <div class="nav-item nav-sub-item" data-route="sales-products">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 7l1-4h12l1 4M4 7v9h12V7M8 16v-4h4v4"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-sales-products">商品数据</span>
-            </div>
-            <div class="nav-item nav-sub-item" data-route="expense-data">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 3.5h9a2 2 0 012 2V17l-3-2-3 2-3-2-2 2V3.5z"/>
-                    <path d="M7 7h5M7 10h4"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-expense-data">费用数据</span>
-            </div>
-        </div>
-    </div>
-
     <!-- 进项管理 ▼ 可折叠组(采购 Phase 1 · 3 子项:采购/进项 · 供应商 · 采购设置)· 门控 expense -->
     <div class="nav-group nav-collapsible" data-collapsible="expense">
         <div class="nav-group-toggle" data-toggle-group="expense">
@@ -146,6 +116,131 @@ export const SIDEBAR_HTML = `
         </div>
     </div>
 
+    <!-- 商品 ▼ 可折叠组(主数据枢纽:商品数据 + 费用数据 · 对齐 MR.ERP m3 ระบบสินค้า · 置于采购之上)·
+         对所有业态可见(费用数据人人要 · 商品数据卖货商户用)· 不加 data-module 门控 -->
+    <div class="nav-group nav-collapsible" data-collapsible="products">
+        <div class="nav-group-toggle" data-toggle-group="products">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 7l7-4 7 4v6l-7 4-7-4V7z"/>
+                <path d="M3 7l7 4 7-4M10 11v6"/>
+            </svg>
+            <span class="nav-label" data-i18n="nav-group-products">商品</span>
+            <svg class="nav-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 8l4 4 4-4"/>
+            </svg>
+        </div>
+        <div class="nav-sub">
+            <div class="nav-item nav-sub-item" data-route="sales-products">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 7l1-4h12l1 4M4 7v9h12V7M8 16v-4h4v4"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-sales-products">商品数据</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="expense-data">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 3.5h9a2 2 0 012 2V17l-3-2-3 2-3-2-2 2V3.5z"/>
+                    <path d="M7 7h5M7 10h4"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-expense-data">费用数据</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="inventory" data-module="inventory">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10 2l7 4v8l-7 4-7-4V6l7-4z"/>
+                    <path d="M10 2v16M3 6l7 4 7-4"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-inventory">库存</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- POS · 收银系统 ▼(从原「收银业务」拆出:报表 / 交易明细 / 收款设置)· pos_only 白名单显 · 商户按 pos 门控(module-nav applyPosRoles) -->
+    <div class="nav-group nav-collapsible" data-collapsible="cashier" id="nav-group-cashier" style="display:none;">
+        <div class="nav-group-toggle" data-toggle-group="cashier">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 7l2-3h10l2 3"/>
+                <path d="M3 7v9a1 1 0 001 1h12a1 1 0 001-1V7"/>
+                <path d="M3 7h14"/>
+                <path d="M8 11h4"/>
+            </svg>
+            <span class="nav-label" data-i18n="nav-group-cashier">收银系统</span>
+            <svg class="nav-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 8l4 4 4-4"/>
+            </svg>
+        </div>
+        <div class="nav-sub">
+            <div class="nav-item nav-sub-item" data-route="sales-report" data-module="pos">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="4" y1="17" x2="4" y2="9"/>
+                    <line x1="10" y1="17" x2="10" y2="4"/>
+                    <line x1="16" y1="17" x2="16" y2="12"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-sales-report">销售报表</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="pos-sales-log" data-module="pos">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 4h12v12H4z"/><path d="M4 8h12M7 4v12"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-pos-sales-log">交易明细</span>
+            </div>
+            <div class="nav-item nav-sub-item" id="nav-pos-payment" data-route="pos-payment" data-module="pos" style="display:none;">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="5" width="16" height="11" rx="1.5"/><line x1="2" y1="9" x2="18" y2="9"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-pos-payment">收款设置</span>
+            </div>
+            <div class="nav-item nav-sub-item" id="nav-pos-onboard" data-route="pos-onboarding" style="display:none;">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10 2l1.6 4.4 4.4 1.6-4.4 1.6L10 14l-1.6-4.4L4 8l4.4-1.6z"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-pos-onboard">开通收银台</span>
+            </div>
+            <div class="nav-item nav-sub-item" id="nav-pos-tables" data-route="pos-tables" data-module="pos" style="display:none;">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="6" height="6" rx="1"/><rect x="11" y="3" width="6" height="6" rx="1"/><rect x="3" y="11" width="6" height="6" rx="1"/><rect x="11" y="11" width="6" height="6" rx="1"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-pos-tables">桌台管理</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- POS · 权限管理系统 ▼(从原「收银业务」拆出:收银员 / 切到收银台 / 操作记录)· pos_only 白名单显 · owner 门控子项 -->
+    <div class="nav-group nav-collapsible" data-collapsible="perm" id="nav-group-perm" style="display:none;">
+        <div class="nav-group-toggle" data-toggle-group="perm">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 2.5l6.5 2.5v4.5c0 3.6-2.6 6.5-6.5 8-3.9-1.5-6.5-4.4-6.5-8V5z"/>
+                <path d="M7.4 9.8l1.9 1.9 3.3-3.5"/>
+            </svg>
+            <span class="nav-label" data-i18n="nav-group-perm">权限管理系统</span>
+            <svg class="nav-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 8l4 4 4-4"/>
+            </svg>
+        </div>
+        <div class="nav-sub">
+            <div class="nav-item nav-sub-item" data-route="pos-cashiers" id="nav-pos-cashiers" data-module="pos" style="display:none;">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="10" cy="6.5" r="3"/>
+                    <path d="M4 16.5a6 6 0 0 1 12 0"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-pos-cashiers">收银员</span>
+            </div>
+            <div class="nav-item nav-sub-item" id="nav-pos-switch" data-href="/cashier" data-module="pos">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="4" width="16" height="11" rx="1.5"/>
+                    <line x1="2" y1="9" x2="18" y2="9"/>
+                    <line x1="7" y1="18" x2="13" y2="18"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-pos-switch">切到收银台</span>
+            </div>
+            <div class="nav-item nav-sub-item" data-route="pos-audit" data-module="pos">
+                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10 2.5l6.5 2.5v4.5c0 3.6-2.6 6.5-6.5 8-3.9-1.5-6.5-4.4-6.5-8V5z"/>
+                    <path d="M10 8v3.2M10 13.6v.05"/>
+                </svg>
+                <span class="nav-label" data-i18n="nav-pos-audit">操作记录/异常</span>
+            </div>
+        </div>
+    </div>
+
     <!-- 销项管理 ▼ 可折叠组(默认展开) -->
     <div class="nav-group nav-collapsible" data-collapsible="sales">
         <div class="nav-group-toggle" data-toggle-group="sales">
@@ -161,7 +256,7 @@ export const SIDEBAR_HTML = `
         </div>
         <div class="nav-sub">
             <!-- 2026-06-10 五-bis:识别/对账 = 事务所代账工具 · 已移出到「事务所工具」组(business_type=firm 显)·
-                 销售开票组只留商户自己开票/收款相关:发票工作台 / 账套·开票资料 -->
+                 销售开票组只留商户自己开票/收款相关:发票工作台 / 账套·开票资料(pos_only 壳改名见 module-nav applyPosLabels) -->
             <div class="nav-item nav-sub-item" data-route="sales-invoices" data-module="sales">
                 <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M5 2h8l3 3v13H5z"/>
@@ -247,92 +342,6 @@ export const SIDEBAR_HTML = `
         </div>
     </div>
 
-    <!-- POS PO-A4 · 收银业务 ▼ 可折叠组(库存上线 · 销售报表 PO-B6 锁 · 切到收银台跳独立 /pos)
-         默认隐藏 · module-nav.ts 据 GET /api/me/modules 按租户开关显隐(inventory/pos 默认关) -->
-    <div class="nav-group nav-collapsible" data-collapsible="pos" id="nav-group-pos" style="display:none;">
-        <div class="nav-group-toggle" data-toggle-group="pos">
-            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 7l2-3h10l2 3"/>
-                <path d="M3 7v9a1 1 0 001 1h12a1 1 0 001-1V7"/>
-                <path d="M3 7h14"/>
-                <path d="M8 11h4"/>
-            </svg>
-            <span class="nav-label" data-i18n="nav-group-pos">收银业务</span>
-            <svg class="nav-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M6 8l4 4 4-4"/>
-            </svg>
-        </div>
-        <div class="nav-sub">
-            <div class="nav-item nav-sub-item" id="nav-pos-onboard" data-route="pos-onboarding" style="display:none;">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M10 2l1.6 4.4 4.4 1.6-4.4 1.6L10 14l-1.6-4.4L4 8l4.4-1.6z"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-pos-onboard">开通收银台</span>
-            </div>
-            <div class="nav-item nav-sub-item" data-route="inventory" data-module="inventory">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M10 2l7 4v8l-7 4-7-4V6l7-4z"/>
-                    <path d="M10 2v16M3 6l7 4 7-4"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-inventory">库存</span>
-            </div>
-            <div class="nav-item nav-sub-item" data-route="sales-report" data-module="pos">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="4" y1="17" x2="4" y2="9"/>
-                    <line x1="10" y1="17" x2="10" y2="4"/>
-                    <line x1="16" y1="17" x2="16" y2="12"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-sales-report">销售报表</span>
-            </div>
-            <div class="nav-item nav-sub-item" data-route="pos-sales-log" data-module="pos">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 4h12v12H4z"/><path d="M4 8h12M7 4v12"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-pos-sales-log">交易明细</span>
-            </div>
-            <div class="nav-item nav-sub-item" data-route="pos-audit" data-module="pos">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M10 2.5l6.5 2.5v4.5c0 3.6-2.6 6.5-6.5 8-3.9-1.5-6.5-4.4-6.5-8V5z"/>
-                    <path d="M10 8v3.2M10 13.6v.05"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-pos-audit">操作记录/异常</span>
-            </div>
-            <div class="nav-item nav-sub-item" data-route="pos-cashiers" id="nav-pos-cashiers" data-module="pos" style="display:none;">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="10" cy="6.5" r="3"/>
-                    <path d="M4 16.5a6 6 0 0 1 12 0"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-pos-cashiers">收银员</span>
-            </div>
-            <div class="nav-item nav-sub-item" id="nav-pos-tables" data-route="pos-tables" data-module="pos" style="display:none;">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="3" width="6" height="6" rx="1"/><rect x="11" y="3" width="6" height="6" rx="1"/><rect x="3" y="11" width="6" height="6" rx="1"/><rect x="11" y="11" width="6" height="6" rx="1"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-pos-tables">桌台管理</span>
-            </div>
-            <div class="nav-item nav-sub-item" id="nav-pos-payment" data-route="pos-payment" data-module="pos" style="display:none;">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="2" y="5" width="16" height="11" rx="1.5"/><line x1="2" y1="9" x2="18" y2="9"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-pos-payment">收款设置</span>
-            </div>
-            <div class="nav-item nav-sub-item" id="nav-pos-sheets" data-route="pos-sheets" data-module="pos" style="display:none;">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="2" y="3" width="16" height="14" rx="1.5"/><line x1="2" y1="7" x2="18" y2="7"/><line x1="7" y1="7" x2="7" y2="17"/><line x1="12" y1="7" x2="12" y2="17"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-pos-sheets">Google Sheet 留档</span>
-            </div>
-            <div class="nav-item nav-sub-item" id="nav-pos-switch" data-href="/cashier" data-module="pos">
-                <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="2" y="4" width="16" height="11" rx="1.5"/>
-                    <line x1="2" y1="9" x2="18" y2="9"/>
-                    <line x1="7" y1="18" x2="13" y2="18"/>
-                </svg>
-                <span class="nav-label" data-i18n="nav-pos-switch">切到收银台</span>
-            </div>
-        </div>
-    </div>
-
     <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
     <div class="nav-divider"></div>
 
@@ -344,6 +353,13 @@ export const SIDEBAR_HTML = `
     <div class="nav-item" data-route="clients"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 17v-1.5a3 3 0 00-3-3H5a3 3 0 00-3 3V17"/><circle cx="8" cy="6.5" r="3"/><path d="M18 17v-1.5a3 3 0 00-2.3-2.9"/><path d="M13 3.6a3 3 0 010 5.8"/></svg><span class="nav-label" data-i18n="nav-clients">客户管理</span></div>
     <!-- 公司资料 · 当前账套主体开票/申报信息(行内编辑 · company-profile.ts) -->
     <div class="nav-item" data-route="company"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2.5" width="12" height="15" rx="1.5"/><path d="M8 17.5v-3h4v3M7 6h.01M13 6h.01M7 9h.01M13 9h.01M7 12h.01M13 12h.01"/></svg><span class="nav-label" data-i18n="nav-company">公司资料</span></div>
+    <!-- POS · Google Sheet 留档(从收银组搬入主数据 · pos&&owner 门控 · module-nav applyPosRoles) -->
+    <div class="nav-item" id="nav-pos-sheets" data-route="pos-sheets" data-module="pos" style="display:none;">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="16" height="14" rx="1.5"/><line x1="2" y1="7" x2="18" y2="7"/><line x1="7" y1="7" x2="7" y2="17"/><line x1="12" y1="7" x2="12" y2="17"/>
+        </svg>
+        <span class="nav-label" data-i18n="nav-pos-sheets">Google Sheet 留档</span>
+    </div>
 
     <!-- KNOWLEDGE · 客户知识中心入口(放「客户管理」下方)· 探针门控(知识库 flag 开才显示 · knowledge-center.ts) -->
     <div class="nav-item" data-route="knowledge" id="nav-knowledge" style="display:none;">

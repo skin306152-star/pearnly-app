@@ -277,10 +277,12 @@ function closeModal() {
 }
 
 // ── 按人权限(caps)配置(PC-1b · 折扣上限/退作废/改价/看成本)────────────
-function capSwitch(id: string, label: string, on: boolean): string {
+function capSwitch(id: string, label: string, on: boolean, help?: string): string {
+    // help = 勾/不勾各代表什么(退作废权需讲清「免审批 vs 需授权人 PIN」),复用 note 样式免新增 CSS。
+    const helpHtml = help ? `<div class="csh-cap-note">${escapeHtml(help)}</div>` : '';
     return `<label class="csh-cap-row"><span class="csh-cap-lbl">${escapeHtml(label)}</span>
         <span class="csh-sw"><input type="checkbox" id="${id}"${on ? ' checked' : ''} />
-        <span class="csh-sw-t"></span></span></label>`;
+        <span class="csh-sw-t"></span></span></label>${helpHtml}`;
 }
 
 function capsModalHtml(c: Cashier): string {
@@ -300,8 +302,8 @@ function capsModalHtml(c: Cashier): string {
             <label>${escapeHtml(t('csh-cap-discount'))}</label>
             <div class="csh-fld"><input id="cap-pct" inputmode="numeric" maxlength="3" value="${cap.discount_limit_pct}" />
                 <span class="csh-suffix">%</span></div>
-            ${capSwitch('cap-refund', t('csh-cap-refund'), cap.can_refund)}
-            ${capSwitch('cap-void', t('csh-cap-void'), cap.can_void)}
+            ${capSwitch('cap-refund', t('csh-cap-refund'), cap.can_refund, t('csh-cap-refund-help'))}
+            ${capSwitch('cap-void', t('csh-cap-void'), cap.can_void, t('csh-cap-void-help'))}
             ${capSwitch('cap-price', t('csh-cap-price'), cap.can_override_price)}
             ${capSwitch('cap-cost', t('csh-cap-cost'), cap.cost_visible)}
             <div class="csh-cap-note">${escapeHtml(t('csh-cap-hint'))}</div>

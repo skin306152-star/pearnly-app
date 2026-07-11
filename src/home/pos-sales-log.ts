@@ -4,7 +4,7 @@
 // 接 GET /api/pos/admin/sales-log(分页)+ GET .../sales-log/export.csv(下载)。
 // view 级权限(同销售报表 pos.report.view,非"收款设置"那类老板专属改配置)。四态齐。
 /* global t, token, showToast, escapeHtml */
-import { activeWsId, posErrMsg } from './inventory-common';
+import { activeWsId, posErrMsg, fmtQty } from './inventory-common';
 
 interface LogItem {
     id: string;
@@ -186,7 +186,7 @@ function rowHtml(item: LogItem): string {
         <td>${escapeHtml(item.receipt_no)}</td>
         <td>${escapeHtml(item.cashier_name || '—')}</td>
         <td>${escapeHtml(item.items)}</td>
-        <td class="num">${escapeHtml(item.qty_total)}</td>
+        <td class="num">${escapeHtml(fmtQty(item.qty_total))}</td>
         <td class="num">฿${bahtInt(item.grand_total)}</td>
         <td>${escapeHtml(item.method)}</td>
         <td>${escapeHtml(shiftLabel(item))}</td>

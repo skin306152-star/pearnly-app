@@ -7,7 +7,7 @@
 //   头像留 4:团队与权限 / 暗夜模式 / 帮助 & 反馈 / 退出登录。
 //   关键解耦:firm 后端默认开 accounting,但「做账/商品」按白名单收起 —— 证明与模块开关脱钩。
 // ============================================================
-/* global window */
+/* global window, document */
 
 const path = require('path');
 const { test, expect } = require('@playwright/test');
@@ -91,8 +91,42 @@ test.describe('会计版 firm · 侧栏 + 头像 + 强制门回归', () => {
         ]) {
             await expect(page.locator(SIDEBAR[key]), `${key} 应可见`).toBeVisible();
         }
-        for (const key of ['products', 'accounting', 'pos', 'enroll']) {
+        for (const key of ['products', 'accounting', 'cashier', 'perm', 'enroll']) {
             await expect(page.locator(SIDEBAR[key]), `${key} 应隐藏`).toBeHidden();
+        }
+
+        // 会计版:4 个与 pos 共用节点保留原名(未被 -pos 改名波及)· 四语核对 data-i18n=原 key。
+        const firmLabelSel = {
+            'nav-group-sales': '[data-collapsible="sales"] > .nav-group-toggle > .nav-label',
+            'nav-purchase': '.nav-item[data-route="purchase"] .nav-label',
+            'nav-sales-workbench': '.nav-item[data-route="sales-invoices"] .nav-label',
+            'nav-sales-account': '.nav-item[data-route="sales-account"] .nav-label',
+        };
+        const firmLabels = await page.evaluate((sel) => {
+            const langs = ['zh', 'en', 'th', 'ja'];
+            const orig = window._currentLang || localStorage.getItem('mrpilot_lang') || 'zh';
+            const out = {};
+            for (const lang of langs) {
+                window.applyLang(lang);
+                out[lang] = {};
+                for (const key of Object.keys(sel)) {
+                    const el = document.querySelector(sel[key]);
+                    out[lang][key] = {
+                        text: el ? el.textContent : null,
+                        attr: el ? el.getAttribute('data-i18n') : null,
+                        expected: window.I18N[lang][key],
+                    };
+                }
+            }
+            window.applyLang(orig); // 复原语言(debounce 只发最后一次 → 不污染账号语言)
+            return out;
+        }, firmLabelSel);
+        for (const lang of ['zh', 'en', 'th', 'ja']) {
+            for (const key of Object.keys(firmLabelSel)) {
+                const r = firmLabels[lang][key];
+                expect(r.attr, `${lang}/${key} 会计版 data-i18n 应保留原 key`).toBe(key);
+                expect(r.text, `${lang}/${key} 会计版=原名`).toBe(r.expected);
+            }
         }
 
         // 头像菜单:留 4(含团队与权限)· 砍 3(设置/账户余额/键盘快捷键)。

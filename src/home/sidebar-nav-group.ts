@@ -23,7 +23,14 @@
         'purchase-form': 'expense',
         'purchase-detail': 'expense',
         vouchers: 'accounting',
-        inventory: 'pos',
+        inventory: 'products',
+        'sales-report': 'cashier',
+        'pos-sales-log': 'cashier',
+        'pos-payment': 'cashier',
+        'pos-onboarding': 'cashier',
+        'pos-tables': 'cashier',
+        'pos-cashiers': 'perm',
+        'pos-audit': 'perm',
     };
     function _getState(): Record<string, boolean> {
         try {

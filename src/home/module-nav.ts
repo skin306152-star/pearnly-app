@@ -20,9 +20,31 @@ function qs(sel: string): HTMLElement | null {
     return document.querySelector<HTMLElement>(sel);
 }
 
-// 收银业务组内子项的角色/开通门控(与整组显隐分开)。gateGroup=true 时顺带按 inventory/pos/
-// 开通引导决定整组显隐(商户路径);清单路径已显式显组,gateGroup=false 只管组内子项。
-// 常显子项(库存/报表/交易明细/切收银台)一并复位,清切业态往返时的残留 display:none。
+// pos_only 收银壳专属改名:4 个与会计版共用的 DOM 节点,把 data-i18n 指向 -pos 变体,
+// 让 applyLang 切语言时自动出 pos 名(天然抗语言切换);当场按当前语言补一次文案免闪。
+// 会计版(firm / 未选业态)不碰这些节点 → 保留原名(销售系统 / 采购·进项 / 发票工作台 / 账套·开票资料)。
+const POS_LABEL_KEYS: Record<string, string> = {
+    'nav-group-sales': 'nav-group-sales-pos',
+    'nav-purchase': 'nav-purchase-pos',
+    'nav-sales-workbench': 'nav-sales-workbench-pos',
+    'nav-sales-account': 'nav-sales-account-pos',
+};
+
+function applyPosLabels(): void {
+    const lang = window._currentLang || localStorage.getItem('mrpilot_lang') || 'zh';
+    const dict = (window.I18N && window.I18N[lang]) || {};
+    Object.keys(POS_LABEL_KEYS).forEach((from) => {
+        const to = POS_LABEL_KEYS[from];
+        document.querySelectorAll<HTMLElement>('[data-i18n="' + from + '"]').forEach((el) => {
+            el.dataset.i18n = to;
+            if (dict[to]) el.textContent = dict[to];
+        });
+    });
+}
+
+// 收银系统 / 权限管理系统两组子项的角色/开通门控(与整组显隐分开)。gateGroup=true 时(商户路径)
+// 顺带按 pos/开通引导决定两组整组显隐;清单路径已显式显组,gateGroup=false 只管组内子项。
+// 库存已移出到商品组(products 常显),由 inventory 逐项门控;报表/交易明细/切收银台等一并复位残留。
 function applyPosRoles(
     owner: boolean,
     pos: boolean,
@@ -31,7 +53,10 @@ function applyPosRoles(
     gateGroup: boolean
 ): void {
     const showOnboard = !pos && owner;
-    if (gateGroup) show(document.getElementById('nav-group-pos'), inv || pos || showOnboard);
+    if (gateGroup) {
+        show(document.getElementById('nav-group-cashier'), pos || showOnboard);
+        show(document.getElementById('nav-group-perm'), pos);
+    }
     show(document.getElementById('nav-pos-onboard'), showOnboard);
     show(document.getElementById('nav-pos-cashiers'), pos && owner);
     show(document.getElementById('nav-pos-payment'), pos && owner);
@@ -126,6 +151,7 @@ function apply(modules: Record<string, ModuleFlag>, businessType?: string | null
         // 收银业务组的角色/开通门控(组显隐已由清单处理,这里只管组内子项)。
         if (businessType === 'pos_only') {
             applyPosRoles(owner, on('pos'), on('inventory'), businessType, false);
+            applyPosLabels(); // 4 个共用节点改名为 pos 变体(抗语言切换)
         }
         lockAvatarShell(preset.avatarHide);
         return;

@@ -39,7 +39,8 @@
 
     function decideCtxFor(wsId, qid) {
         var c = ctxFor(wsId);
-        if (!c.decide[qid]) c.decide[qid] = { busy: false, editing: false, editValue: '', editErr: false };
+        if (!c.decide[qid])
+            c.decide[qid] = { busy: false, editing: false, editValue: '', editErr: false };
         return c.decide[qid];
     }
 

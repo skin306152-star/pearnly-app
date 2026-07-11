@@ -178,7 +178,11 @@
     function poolPanelHtml(pool) {
         pool = pool || {};
         if (pool.done) {
-            return '<div class="rv-pool"><span class="chip s">' + esc(at('rv_pool_done')) + '</span></div>';
+            return (
+                '<div class="rv-pool"><span class="chip s">' +
+                esc(at('rv_pool_done')) +
+                '</span></div>'
+            );
         }
         var toggleBtn =
             '<button type="button" class="btn sm" data-action="rv-pool-toggle"' +
@@ -187,20 +191,20 @@
             esc(at('rv_key_pool')) +
             ' <span class="kbd">Q</span></button>';
         if (!pool.open) return '<div class="rv-pool">' + toggleBtn + '</div>';
-        var options = _POOL_QTYPES.map(function (qt) {
-            return (
-                '<button type="button" class="btn sm" data-action="rv-pool-pick" data-qtype="' +
-                qt +
-                '"' +
-                (pool.busy ? ' disabled' : '') +
-                '>' +
-                esc(at('pool_qtype_' + qt)) +
-                '</button>'
-            );
-        }).join('');
-        var err = pool.errKey
-            ? '<div class="rv-pool-err">' + esc(at(pool.errKey)) + '</div>'
-            : '';
+        var options = _POOL_QTYPES
+            .map(function (qt) {
+                return (
+                    '<button type="button" class="btn sm" data-action="rv-pool-pick" data-qtype="' +
+                    qt +
+                    '"' +
+                    (pool.busy ? ' disabled' : '') +
+                    '>' +
+                    esc(at('pool_qtype_' + qt)) +
+                    '</button>'
+                );
+            })
+            .join('');
+        var err = pool.errKey ? '<div class="rv-pool-err">' + esc(at(pool.errKey)) + '</div>' : '';
         return (
             '<div class="rv-pool on">' +
             toggleBtn +

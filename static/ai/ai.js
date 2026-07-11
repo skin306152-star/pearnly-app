@@ -80,8 +80,7 @@
             crumb.innerHTML =
                 '<span style="color:var(--ink);font-weight:600">' + at('crumb_dash') + '</span>';
         } else if (route.name === 'pool') {
-            crumb.innerHTML =
-                '<a data-back>' + at('crumb_dash') + '</a> / ' + at('nav_todo');
+            crumb.innerHTML = '<a data-back>' + at('crumb_dash') + '</a> / ' + at('nav_todo');
             crumb.querySelector('[data-back]').onclick = function () {
                 window.location.hash = AI.router.buildDashboardHash();
             };

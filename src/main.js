@@ -8,6 +8,7 @@
 
 import './home/state.js'; // REFACTOR-C1-home-batch9g2 · 应用引导/全局状态(错误拦截IIFE + i18n总线 + window.* 状态 init)· 【必第 1 个】早于所有 sibling · 取代已删的 home.js
 import './home/core.js'; // REFACTOR-C1-home-batch9f · 真核心叶子层(t/escapeHtml/svgIcon/鉴权API🔴/_showSessionRevokedModal🔴/getMax*)· 【必第 1 个】保证 sibling 模块 eval 期 window.t/apiGet 等已就绪
+import './home/login-url.js'; // 登录口单一事实源(window.loginUrl · pos_only→/pos 其余→/login)· 早挂,被下方所有退出/踢session点裸调
 import './home/format-date.js'; // 共享日期格式化(formatDate/历法偏好)· window 桥 · 须早于消费方
 import './home/ui-templates.js'; // 6 页面模板骨架(uiTpl.*)· window 桥 · 供新屏/迁移屏对号套用
 import './home/app-shell-html.js'; // REFACTOR-WB-C3 · app shell(顶栏 .topbar + 侧栏 #sidebar)inner 注入(home.html 空壳 · ⚠️须在 core-boot 前·其 bootstrap eval 期 routeTo→querySelectorAll(.nav-item) + sidebar-nav.js eval 期 getElementById(sidebar-toggle) 无守卫;漏则 boot 崩·全 app 导航瘫)

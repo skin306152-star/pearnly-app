@@ -38,7 +38,7 @@
                     try {
                         _showSessionRevokedModal();
                     } catch (_) {
-                        window.location.href = '/login';
+                        window.location.href = window.loginUrl!();
                     }
                 } else {
                     const _msgKey =
@@ -55,7 +55,7 @@
                         /* silent: 提示展示失败(无 showToast/alert)不阻断下方登出跳转 */
                     }
                     setTimeout(() => {
-                        window.location.href = '/login';
+                        window.location.href = window.loginUrl!();
                     }, 1500);
                 }
             }

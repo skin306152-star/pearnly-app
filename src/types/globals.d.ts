@@ -302,6 +302,8 @@ interface Window {
     _navShellHidesKnowledge?: boolean;
     // 当前租户业态(module-nav apply 写)· 退出登录按壳分流用:pos_only→/pos 其余→/login。
     _businessType?: string;
+    // 登录口单一事实源(login-url.ts)· pos_only→/pos 其余→/login · 所有跳"重新登录"的点都读它。
+    loginUrl?: () => string;
     satisfyWorkspaceGate?: (id: number) => void;
     closeWorkspaceGate?: () => void;
     openSubjectCreate?: (opts?: { onCreated?: (id: number) => void }) => void;

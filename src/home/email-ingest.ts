@@ -40,7 +40,7 @@ import {
                     _showSessionRevokedModal();
                     return;
                 }
-                window.location.href = '/login';
+                window.location.href = window.loginUrl!();
                 return;
             }
             if (!resp.ok) {

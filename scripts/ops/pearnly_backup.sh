@@ -127,7 +127,7 @@ dump_db() {
   local db_url
   db_url="$(grep -oP '^DATABASE_URL=\K[^\r\n]+' "$ENV_FILE" | tr -d '"'"'"'"')"
   [ -n "$db_url" ] || die "DATABASE_URL empty in env"
-  command -v pg_dump >/dev/null || die "pg_dump not installed (apt-get install postgresql-client-16)"
+  command -v pg_dump >/dev/null || die "pg_dump not installed (apt-get install postgresql-client-17)"
   # --no-owner/--no-privileges: restore into any role without ownership errors.
   if ! PGCONNECT_TIMEOUT=30 pg_dump "$(dump_url "$db_url")" \
         --no-owner --no-privileges 2>>"$LOG_FILE" | gzip -c > "$out"; then
@@ -143,7 +143,6 @@ dump_db() {
 
 run() {
   mkdir -p "$BACKUP_ROOT"
-  : > /dev/null  # ensure LOG_FILE dir exists via BACKUP_ROOT default
   mkdir -p "$(dirname "$LOG_FILE")"
   exec 9>"$BACKUP_ROOT/.lock"
   flock -n 9 || die "another backup run holds the lock"
@@ -175,7 +174,6 @@ main() {
     run) run ;;
     _check_free) check_free "$2" "$3" ;;
     _rotate) rotate "$2" "$3" ;;
-    _free_gb) free_gb "$2" ;;
     _dump_url) dump_url "$2" ;;
     *) die "unknown subcommand: $1" ;;
   esac

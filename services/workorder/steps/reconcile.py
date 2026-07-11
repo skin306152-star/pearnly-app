@@ -16,6 +16,9 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+from core import feature_flags
 from services.workorder import decisions
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import reconcile_gates as gates
@@ -58,11 +61,18 @@ def run(ctx: StepContext) -> StepResult:
     if not r2["used"]:
         return StepResult.needs(["sales_summary"])
 
-    # R3 银行材料存在性(完整 GL↔银行对平是 M1)
+    # R3 银行材料存在性 + 逐笔真对平(pearnly_ai_bank_recon 闸)。闸关:逐字节维持存在性判定
+    # 现状(only present/count/note)。闸开且有 bank_statement 件:把流水与工单事件流的票据
+    # 逐笔打分对平,缺票/未达两张清单挂进 gate + 证据链(经 step_done 落库),绝不 stuck、绝不
+    # 阻断 package——银行对账是佐证层,税额来自 R1/R2 不来自它。
     banks = [it for it in items if it["kind"] == _BANK]
     r3 = {"bank_statement_present": bool(banks), "bank_statement_count": len(banks)}
     if not banks:
         r3["note"] = "bank_statement_missing"
+    elif _bank_recon_enabled(ctx):
+        recon = _run_bank_recon(ctx, banks, events)
+        if recon is not None:
+            r3["recon"] = recon
 
     # R4 试算平衡(纯函数)
     tb = gates.trial_balance(r1["entries"], r2["sales_amount"], r2["output_vat"])
@@ -123,3 +133,52 @@ def _replay_sales_reads(events: list[dict]) -> dict:
         if p.get("kind") == _SALES and p.get("sales_read"):
             out[p["item_id"]] = p["sales_read"]
     return out
+
+
+def _run_bank_recon(ctx: StepContext, banks: list[dict], events: list[dict]) -> dict | None:
+    """闸开时的 R3 逐笔对平:银行流水行(注入解析)+ 工单事件流候选票 → 缺票/未达两张清单。
+
+    对平结果作为纯 dict 挂在 r3["recon"],随 reconcile 的 StepResult.ok 经 step_done 落进证据链
+    (E2 人审界面据此读)。任何异常都收进 note 不上抛——佐证层绝不拖垮出包。
+    """
+    from services.recon import workorder_recon_adapter as adapter
+
+    try:
+        rows = _bank_statement_rows(ctx, banks)
+        statement_txs = [adapter.tx_from_statement_row(r) for r in rows]
+        candidates = adapter.candidates_from_events(events)
+        result = adapter.reconcile_workorder(statement_txs, candidates)
+        return result.as_gate_payload()
+    except Exception as exc:  # noqa: BLE001 - 佐证层单点隔离,绝不阻断 package
+        return {"error": f"{type(exc).__name__}", "note": "bank_recon_skipped"}
+
+
+def _default_bank_recon_enabled(ctx: StepContext) -> bool:
+    """R3 真对平放量闸(pearnly_ai_bank_recon)。工单线只有 tenant_id,按 tenant 判定;
+    fail-closed 在 feature_flags 内部(基建抖动绝不误开真对平路)。"""
+    return feature_flags.pearnly_ai_bank_recon_enabled_for(ctx.tenant_id)
+
+
+def _default_bank_statement_rows(ctx: StepContext, banks: list[dict]) -> list:
+    """默认银行流水解析:逐件读 file_ref 字节 → 生产 bank_recon 解析器 → StatementRow 列表。
+
+    单测全部注入替身(reconcile._bank_statement_rows = fake),本函数不在测试里跑 → 不触真解析
+    /付费。解析失败的件跳过(佐证层不因单件坏料中断);多件流水行顺序拼接。
+    """
+    from services.recon.bank_recon_v2 import _parse_bank_statement_impl
+
+    rows: list = []
+    for it in banks:
+        file_ref = it.get("file_ref")
+        if not file_ref:
+            continue
+        data = Path(file_ref).read_bytes()
+        parsed = _parse_bank_statement_impl(data, Path(file_ref).name, tenant_id=ctx.tenant_id)
+        if parsed.get("ok"):
+            rows.extend(parsed.get("rows") or [])
+    return rows
+
+
+# 注入点:模块级绑定,测试用 reconcile._xxx = fake 替换,不改调用方代码(同 classify 惯例)。
+_bank_recon_enabled = _default_bank_recon_enabled
+_bank_statement_rows = _default_bank_statement_rows

@@ -279,13 +279,19 @@ def _classify_from_ocr(
 
 def _money_fields(fields: dict) -> dict:
     """票面钱字段快照(进 item_classified 事件,供 reconcile 回放合计/试算)。Decimal 交给
-    reconcile,这里只搬 OCR 原值不做换算——净额/税额/含税额 + 票号税号做证据溯源。"""
+    reconcile,这里只搬 OCR 原值不做换算——净额/税额/含税额 + 票号税号做证据溯源。
+
+    date/seller_name 是 E1 银行对账候选的日期/供应商锚(佐证层),纯附加字段,不参与 R1/R2
+    税额计算(reconcile_gates 只读 subtotal/vat/total_amount)——缺失即为 None,对已有金标零影响。
+    """
     return {
         "subtotal": fields.get("subtotal"),
         "vat": fields.get("vat"),
         "total_amount": fields.get("total_amount"),
         "invoice_number": fields.get("invoice_number"),
         "seller_tax": fields.get("seller_tax"),
+        "invoice_date": fields.get("date"),
+        "vendor": fields.get("seller_name"),
     }
 
 

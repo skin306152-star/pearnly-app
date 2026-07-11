@@ -95,6 +95,12 @@ PEARNLY_AI_SOD_KEY = "pearnly_ai_sod"
 # 按 tenant 判定(单所整体开/关,与 pearnly_ai_sod 同款);超管在平台后台把该事务所
 # tenant_id 加进 allowlist 即单所灰度。
 PEARNLY_AI_CLIENT_POOL_KEY = "pearnly_ai_client_pool"
+# 工单银行对账逐笔真对平闸(E1 · 佐证层):默认关 fail-closed。关 = reconcile 步 R3 逐字节
+# 维持现状(只判 bank_statement 材料存在性,不跑对平);开 = 有 bank_statement 件时,把流水
+# 与工单事件流的票据逐笔打分对平,产出缺票/未达两张清单进 R3 gate + 证据链(不 stuck、不阻断
+# package——银行对账是佐证层,税额来自 R1/R2 不来自它)。按 tenant 判定(单所整体开/关,与
+# pearnly_ai_sod 同款);消费在 services/workorder/steps/reconcile.py。
+PEARNLY_AI_BANK_RECON_KEY = "pearnly_ai_bank_recon"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -247,3 +253,12 @@ def pearnly_ai_client_pool_enabled_for(tenant_id: Optional[str]) -> bool:
     事务所 tenant_id 加进 allowlist 即单所灰度。
     """
     return _enabled(PEARNLY_AI_CLIENT_POOL_KEY, tenant_id, "pearnly_ai_client_pool_enabled_for")
+
+
+def pearnly_ai_bank_recon_enabled_for(tenant_id: Optional[str]) -> bool:
+    """工单银行对账逐笔对平闸。关 = R3 只判材料存在性(现状逐字节不变);开 = 跑真对平出两张清单。
+
+    按 tenant 判定(单所整体开/关,与 pearnly_ai_sod 同款);超管在平台后台把该事务所
+    tenant_id 加进 allowlist 即单所灰度。
+    """
+    return _enabled(PEARNLY_AI_BANK_RECON_KEY, tenant_id, "pearnly_ai_bank_recon_enabled_for")

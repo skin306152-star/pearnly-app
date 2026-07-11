@@ -104,5 +104,27 @@ class PearnlyAiClientPoolEnabledForTests(unittest.TestCase):
             self.assertFalse(feature_flags.pearnly_ai_client_pool_enabled_for("t-1"))
 
 
+class PearnlyAiBankReconEnabledForTests(unittest.TestCase):
+    """E1 · 工单银行对账逐笔对平闸:按 tenant 判定,默认关(R3 现状存在性判定不变)。"""
+
+    def test_delegates_to_store_with_bank_recon_key_and_tenant(self):
+        with mock.patch(
+            "services.platform_settings.store.is_enabled_for_user", return_value=True
+        ) as m:
+            self.assertTrue(feature_flags.pearnly_ai_bank_recon_enabled_for("t-1"))
+            m.assert_called_once_with(feature_flags.PEARNLY_AI_BANK_RECON_KEY, "t-1")
+
+    def test_defaults_closed_no_setting_row(self):
+        with mock.patch("services.platform_settings.store.is_enabled_for_user", return_value=False):
+            self.assertFalse(feature_flags.pearnly_ai_bank_recon_enabled_for("t-1"))
+
+    def test_store_raises_fails_closed(self):
+        with mock.patch(
+            "services.platform_settings.store.is_enabled_for_user",
+            side_effect=RuntimeError("boom"),
+        ):
+            self.assertFalse(feature_flags.pearnly_ai_bank_recon_enabled_for("t-1"))
+
+
 if __name__ == "__main__":
     unittest.main()

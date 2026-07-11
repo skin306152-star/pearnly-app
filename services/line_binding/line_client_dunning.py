@@ -45,7 +45,9 @@ TEMPLATE_CODE = "line_client_dunning"
 CHASE_AFTER_DAYS = 3  # 推送后 3 天无回答起催(方案 §5.2)
 WINDOW_HOURS = range(10, 18)  # 曼谷 10:00–18:00,工作时段不半夜吵客户
 _TICK_MIN_INTERVAL_S = 3600
-_last_run = 0.0
+# -inf 而非 0.0:time.monotonic() 在 Linux 是自开机起的秒数,机器刚重启(uptime<1h)时
+# now 本身 <3600,若基线取 0.0 则 now-0.0<3600 会误吞开机首小时内的第一次 tick。
+_last_run = float("-inf")
 
 # 人工裁决事件类型字面量:services/workorder 全域(api.py/evidence.py/package.py 等)
 # 均各自内联同一字符串,无共享导出常量——本模块照此既有惯例,不新造依赖。

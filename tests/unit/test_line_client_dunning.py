@@ -352,8 +352,10 @@ class RunDunningAndSweepTests(unittest.TestCase):
 
 class RunTickTests(unittest.TestCase):
     def setUp(self):
-        dunning._last_run = 0.0
-        self.addCleanup(setattr, dunning, "_last_run", 0.0)
+        # -inf 而非 0.0:CI runner 刚开机时 time.monotonic()<3600,基线取 0.0 会让节流误吞
+        # 首次 tick(与模块默认同源,防跨用例/跨环境闪失)。
+        dunning._last_run = float("-inf")
+        self.addCleanup(setattr, dunning, "_last_run", float("-inf"))
 
     def test_process_throttle_blocks_rapid_reruns(self):
         import asyncio

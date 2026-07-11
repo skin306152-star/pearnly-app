@@ -144,11 +144,18 @@ def _grade(history: Dict[str, Any], payload: Dict[str, Any], has_category: bool,
 
 
 def _attach_payment_evidence(
-    flat: Dict[str, Any], mappings: Dict[str, Any], tenant_id: Optional[str], user_id: Any
+    flat: Dict[str, Any],
+    mappings: Dict[str, Any],
+    tenant_id: Optional[str],
+    user_id: Any,
+    *,
+    prefetch: Optional[Dict[str, Any]] = None,
 ) -> None:
     """F4(L2)+F6(L3):供应商过账档案(仅进项 · 档案锚是卖方税号)+ 银行流水索引(两方向)·
     就地写进 mappings 供 mapper/sales_mapper 的 payment_verdict 判据链读取。
 
+    prefetch 给了(批量入口 build_batch_prefetch 算好的整批份)→ 直接消费,单票 0 查询;
+    否则(单票直推/重试路径)原样自查 —— 两条路径消费同一套判据,结果必须等价。
     查不到/表未建/无日期 → 对应键留空,绝不挡推送(与 F4/F6 本身"只加固不否决"的定位一致)。
     """
     if flat.get("direction") == "purchase" and tenant_id and flat.get("workspace_client_id"):
@@ -157,20 +164,27 @@ def _attach_payment_evidence(
             (fields or {}).get("seller_tax") or (fields or {}).get("seller_tax_id")
         )
         if seller_tax:
-            try:
-                from core import db
-                from services.purchase.supplier_posting import get_profiles
+            wcid = int(flat["workspace_client_id"])
+            if prefetch is not None:
+                mappings["_supplier_profile"] = (
+                    (prefetch.get("profiles") or {}).get(wcid, {}).get(seller_tax)
+                )
+            else:
+                try:
+                    from core import db
+                    from services.purchase.supplier_posting import get_profiles
 
-                with db.get_cursor() as cur:
-                    profiles = get_profiles(
-                        cur,
-                        tenant_id=tenant_id,
-                        workspace_client_id=int(flat["workspace_client_id"]),
-                        tax_ids=[seller_tax],
-                    )
-                mappings["_supplier_profile"] = profiles.get(seller_tax)
-            except Exception:
-                logger.exception("preflight_express: supplier profile lookup failed")
+                    with db.get_cursor() as cur:
+                        profiles = get_profiles(
+                            cur, tenant_id=tenant_id, workspace_client_id=wcid, tax_ids=[seller_tax]
+                        )
+                    mappings["_supplier_profile"] = profiles.get(seller_tax)
+                except Exception:
+                    logger.exception("preflight_express: supplier profile lookup failed")
+
+    if prefetch is not None:
+        mappings["_bank_index"] = prefetch.get("bank_index") or []
+        return
 
     try:
         from services.erp.express_push.bank_evidence import load_bank_index_for_history
@@ -178,6 +192,72 @@ def _attach_payment_evidence(
         mappings["_bank_index"] = load_bank_index_for_history(flat, user_id)
     except Exception:
         logger.exception("preflight_express: bank index attach failed")
+
+
+def build_batch_prefetch(
+    endpoint: Dict[str, Any], histories: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """批级预取(去 N+1):整批一次拉供应商过账档案(F4)+ 银行流水索引(F6),逐票 preflight
+    消费同一份结果代替各自查询 —— N 张票的 2N 次查询收成 1 次银行查询 + 每个 workspace_client
+    一次档案查询(通常整批共用同一账套 → 常态就是 1 次)。
+
+    profiles 按 workspace_client_id 分组(套账隔离 · 不可跨套账混档案),键与
+    `_attach_payment_evidence` 消费时的 int(flat['workspace_client_id']) 对齐。方向判定复用
+    与 preflight_express 完全相同的 explicit_direction/detect_by_tax 序,同一 workspace_client_id
+    的自家税号在批内只解析一次(缓存)。任一环节失败 → 对应键留空,消费侧按"查不到"处理,
+    与单票路径的失败语义一致(不触发回退重查 · 见 _attach_payment_evidence)。
+    """
+    from core import db
+    from services.erp.erp_payload import flatten_history_for_mrerp
+    from services.erp.express_push.bank_evidence import load_bank_index_for_histories
+    from services.purchase.supplier_posting import get_profiles
+
+    user_id = endpoint.get("user_id")
+    tenant_id = db.get_user_tenant_id(user_id) if user_id else None
+    flats = [flatten_history_for_mrerp(h) for h in histories]
+
+    bank_index: List[Dict[str, Any]] = []
+    try:
+        bank_index = load_bank_index_for_histories(flats, user_id)
+    except Exception:
+        logger.exception("build_batch_prefetch: bank index attach failed")
+
+    profiles: Dict[int, Dict[str, dict]] = {}
+    if tenant_id:
+        own_tax_cache: Dict[int, str] = {}
+        tax_ids_by_wcid: Dict[int, set] = {}
+        for history, flat in zip(histories, flats):
+            wcid_raw = flat.get("workspace_client_id")
+            if not wcid_raw:
+                continue
+            fields = flat.get("fields") if isinstance(flat.get("fields"), dict) else {}
+            seller_tax = clean_tax_id(
+                (fields or {}).get("seller_tax") or (fields or {}).get("seller_tax_id")
+            )
+            if not seller_tax:
+                continue
+            wcid = int(wcid_raw)
+            direction = direction_mod.explicit_direction(flat, history)
+            if direction is None:
+                if wcid not in own_tax_cache:
+                    own_tax_cache[wcid] = _own_tax_id(endpoint, flat, tenant_id)
+                direction = direction_mod.detect_by_tax(flat, own_tax_cache[wcid])
+            if direction != "purchase":
+                continue
+            tax_ids_by_wcid.setdefault(wcid, set()).add(seller_tax)
+
+        for wcid, tax_ids in tax_ids_by_wcid.items():
+            try:
+                with db.get_cursor() as cur:
+                    profiles[wcid] = get_profiles(
+                        cur, tenant_id=tenant_id, workspace_client_id=wcid, tax_ids=list(tax_ids)
+                    )
+            except Exception:
+                logger.exception(
+                    "build_batch_prefetch: supplier profile lookup failed wcid=%s", wcid
+                )
+
+    return {"profiles": profiles, "bank_index": bank_index}
 
 
 def _fill_pending(checks: List[Check]) -> None:
@@ -202,8 +282,17 @@ def _block(
     return pf
 
 
-def preflight_express(endpoint: Dict[str, Any], history: Dict[str, Any]) -> Preflight:
-    """对一条 history 跑全部前置条件,返回逐项体检结果(纯读 · 不入队不写库)。"""
+def preflight_express(
+    endpoint: Dict[str, Any],
+    history: Dict[str, Any],
+    *,
+    prefetch: Optional[Dict[str, Any]] = None,
+) -> Preflight:
+    """对一条 history 跑全部前置条件,返回逐项体检结果(纯读 · 不入队不写库)。
+
+    prefetch:批量入口(build_batch_prefetch)算好的批级供应商档案/银行索引,原样透传给
+    _attach_payment_evidence;None(单票直推/重试路径)→ 该函数内部自查,行为不变。
+    """
     config = (endpoint or {}).get("config") or {}
     pf = Preflight()
 
@@ -277,7 +366,7 @@ def preflight_express(endpoint: Dict[str, Any], history: Dict[str, Any]) -> Pref
             )
         pf.checks.append(Check("document", OK))
 
-        _attach_payment_evidence(flat, mappings, tenant_id, user_id)
+        _attach_payment_evidence(flat, mappings, tenant_id, user_id, prefetch=prefetch)
 
         if direction == "sales":
             mres = build_express_sales_payload(

@@ -281,20 +281,41 @@ def _mrerp_resp(
     }
 
 
+def _dispatch_express_batch(
+    endpoint: Dict[str, Any], histories: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """Express 批量:preflight 批级预取供应商档案(F4)+ 银行索引(F6)一次(去 N+1),逐票仍
+    调 enqueue_express(出站拉取架构本就一票一队列行,无真批量上传 API)——只省掉查询这层。
+
+    预取失败(意外异常 · 内部各查询早已自吞)→ prefetch=None,每票回退各自查询(不回归)。
+    """
+    from services.erp.express_push.enqueue import enqueue_express
+    from services.erp.express_push.preflight import build_batch_prefetch
+
+    try:
+        prefetch = build_batch_prefetch(endpoint, histories)
+    except Exception:
+        logger.exception("_dispatch_express_batch: batch prefetch failed; 回退逐票自查")
+        prefetch = None
+    return [enqueue_express(endpoint, h, prefetch=prefetch) for h in histories]
+
+
 def dispatch_endpoint_batch(
     endpoint: Dict[str, Any], histories: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
     """统一批量推送入口。返回 per-history 结果列表(与 histories 同序 · 同 push_to_endpoint shape)。
 
-    adapter 差异只在本函数内一处:mrerp 走真批量,其余循环 push_to_endpoint。
+    adapter 差异只在本函数内一处:mrerp 走真批量,express 批级预取查询,其余循环 push_to_endpoint。
     """
     if not histories:
         return []
     adapter = endpoint.get("adapter", "webhook")
     if adapter == "mrerp":
         return _dispatch_mrerp_batch(endpoint, histories)
+    if adapter == "express":
+        return _dispatch_express_batch(endpoint, histories)
 
-    # 非 mrerp:暂无批量能力 → 循环单张(统一接口 · 行为不变)。
+    # 其余 adapter:暂无批量能力 → 循环单张(统一接口 · 行为不变)。
     from services.erp import erp_push
 
     return [erp_push.push_to_endpoint(endpoint, h) for h in histories]

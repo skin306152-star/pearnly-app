@@ -68,10 +68,19 @@ def _manual(
     )
 
 
-def enqueue_express(endpoint: Dict[str, Any], history: Dict[str, Any]) -> Dict[str, Any]:
-    """对一条 history 跑前置体检 + 映射 → 返回标准 push 结果(pending / manual / 短路)。"""
+def enqueue_express(
+    endpoint: Dict[str, Any],
+    history: Dict[str, Any],
+    *,
+    prefetch: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """对一条 history 跑前置体检 + 映射 → 返回标准 push 结果(pending / manual / 短路)。
+
+    prefetch:批量推送入口(push_dispatch._dispatch_express_batch)算好的批级预取,原样
+    透传给 preflight_express;单票路径(手动 /api/erp/push、重试队列)不传 → 内部自查。
+    """
     t0 = time.time()
-    pf = preflight_express(endpoint, history)
+    pf = preflight_express(endpoint, history, prefetch=prefetch)
 
     if pf.disabled:
         return _result(

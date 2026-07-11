@@ -68,6 +68,11 @@ class FakeStore:
     def list_deliverables(self, cur, *, tenant_id, work_order_id):
         return [dict(v) for v in self.deliverables.values()]
 
+    def get_work_order(self, cur, *, tenant_id, work_order_id):
+        # 未绑客户(pnd_prep 的边界分支):这批夹具都不测 WHT RD Prep,让 pnd_prep.build()
+        # 在查客户前就短路返回,ctx.cur=None 也不会被真的 execute() 到。
+        return None
+
 
 def _purchase_item(item_id, file_ref, *, status="ok"):
     return {

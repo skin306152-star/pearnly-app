@@ -15,7 +15,7 @@ from pathlib import Path
 
 from services.workorder import decisions, evidence, storage
 from services.workorder.engine import StepContext, StepResult
-from services.workorder.steps import conservation, pp30_form
+from services.workorder.steps import conservation, pnd_prep, pp30_form
 
 _KIND_PP30 = "pp30_draft"
 _KIND_LEDGER = "ledger_workpaper"
@@ -59,12 +59,17 @@ def run(ctx: StepContext) -> StepResult:
 
     numbers = _resolve_numbers(ctx, events)
 
+    # ภ.ง.ด.3/53 RD Prep(D1-3):当期有对应 payee 类型 WHT 才出,无则备忘录记一笔——
+    # 装配/取数全归 pnd_prep(零重算钱),这里只负责把它并进整批出包。
+    pnd_kinds, wht_memo_lines = pnd_prep.build(ctx, out_dir, numbers.get("period"))
+
     kinds = {
         _KIND_PP30: _write_pp30(out_dir, numbers),
         _KIND_LEDGER: _write_ledger(out_dir, items, events, decision_recs, numbers),
         _KIND_BANK: _write_bank(out_dir, items, numbers),
-        _KIND_MEMO: _write_memo(out_dir, items, cons, decision_recs, numbers),
+        _KIND_MEMO: _write_memo(out_dir, items, cons, decision_recs, numbers, wht_memo_lines),
         _KIND_EVIDENCE: _write_evidence_index(ctx, out_dir, items, events, numbers),
+        **pnd_kinds,
     }
     for kind, (artifact_path, snapshot) in kinds.items():
         ctx.store.upsert_deliverable(
@@ -306,10 +311,13 @@ def _write_memo(
     cons: conservation.Conservation,
     decision_recs: dict,
     numbers: dict,
+    wht_lines: list[str],
 ) -> tuple[str, dict]:
     """缺料备忘:银行单缺失、曾被标记复核的票及其裁决、non_tax/duplicate 排除清单、人工豁免
     留痕——如实枚举。豁免件虽出包,但谁豁免·为何·哪张必须显著在案(状态诚实,不悄悄放行)。
-    豁免成员资格取自守恒桶(cons.buckets[WAIVED]),与出包闸同一事实源,不另判一套。"""
+    豁免成员资格取自守恒桶(cons.buckets[WAIVED]),与出包闸同一事实源,不另判一套。
+    wht_lines 是 pnd_prep 算出的 ภ.ง.ด.3/53 附加事项(本期无 WHT / 缺税号 / 个人缺地址),
+    与其余"缺料"类别同一份文件、同一种直白列法,不另起一个交付物面。"""
     gate = (numbers.get("gates") or {}).get("r3_bank") or {}
     bank_missing = gate.get("note") == "bank_statement_missing"
     flagged = [it for it in items if it.get("flag_reason") and it["status"] == "flagged"]
@@ -351,6 +359,7 @@ def _write_memo(
             "รายการที่ยกเว้นโดยมนุษย์ (人工豁免出包 · 谁豁免·为何·哪张)",
             [_waive_row(it) for it in waived],
         ),
+        *_bullets("หัก ณ ที่จ่าย (WHT · ภ.ง.ด.3/53)", wht_lines),
     ]
     path = _write_md(out_dir, "missing_doc_memo.md", lines)
     snapshot = {

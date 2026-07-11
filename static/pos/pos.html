@@ -13,7 +13,7 @@
     <link rel="icon" href="/static/brand/favicon.ico?v=1" sizes="any" />
     <!-- PWA 预留(离线 PO-B5 再注册 Service Worker;此处先挂 manifest 占位) -->
     <link rel="manifest" href="/static/pos/cashier.webmanifest?v=11871100" />
-    <link rel="stylesheet" href="/static/dist/pos.css?v=11854700" />
+    <link rel="stylesheet" href="/static/dist/pos.css?v=11902100" />
   </head>
   <body>
     <!-- ── 设备绑定(未绑店铺 · 照稿 12②)── -->
@@ -407,6 +407,11 @@
             <div class="l" data-i18n="posui.pay.due">应收金额</div>
             <div class="v tnum">฿<span id="pay-due">0.00</span></div>
           </div>
+          <div class="pay-remaining" id="pay-remaining" style="display: none">
+            <span data-i18n="posui.pay.remaining">尚差</span>
+            <span class="tnum">฿<span id="pay-remaining-amt">0.00</span></span>
+          </div>
+          <div class="pay-taken" id="pay-taken" style="display: none"></div>
           <div class="pm-tabs">
             <div class="pm active" data-pm="cash">
               <svg
@@ -516,6 +521,10 @@
                 >0.00</span
               ><br /><span data-i18n="posui.pay.qr.auto">到账后自动确认</span>
             </div>
+            <div class="pm-amt">
+              <label for="pay-qr-amt-in" data-i18n="posui.pay.amt.this">本笔金额</label>
+              <div class="amt-in">฿<input id="pay-qr-amt-in" class="tnum" inputmode="decimal" /></div>
+            </div>
             <div class="pm-err" id="pay-qr-err"></div>
             <button class="confirm" id="pay-qr-confirm" data-i18n="posui.pay.confirm.qr">
               已到账 · 出小票
@@ -529,6 +538,16 @@
             >
               请在刷卡机上完成交易
             </div>
+            <div class="pm-amt">
+              <label for="pay-card-amt" data-i18n="posui.pay.amt.this">本笔金额</label>
+              <div class="amt-in">฿<input id="pay-card-amt" class="tnum" inputmode="decimal" /></div>
+            </div>
+            <input
+              id="pay-card-ref"
+              class="pm-ref"
+              data-i18n-placeholder="posui.pay.card.ref"
+              placeholder="末四位/终端备注"
+            />
             <div class="pm-err" id="pay-card-err"></div>
             <button class="confirm" id="pay-card-confirm" data-i18n="posui.pay.confirm.card">
               已完成 · 出小票
@@ -550,6 +569,12 @@
             </div>
             <div class="qr-note" data-i18n="posui.pay.transfer.hint">
               让顾客转账到下方账户,核对金额后再确认
+            </div>
+            <div class="pm-amt">
+              <label for="pay-transfer-amt" data-i18n="posui.pay.amt.this">本笔金额</label>
+              <div class="amt-in">
+                ฿<input id="pay-transfer-amt" class="tnum" inputmode="decimal" />
+              </div>
             </div>
             <div class="pm-err" id="pay-transfer-err"></div>
             <button
@@ -584,6 +609,7 @@
               <span data-i18n="posui.done.change">找零</span>
               <span class="tnum">฿<span id="done-change">0.00</span></span>
             </div>
+            <div class="done-methods" id="done-methods"></div>
             <div class="done-meta">
               <span data-i18n="posui.done.receipt">小票号</span> ·
               <span class="tnum" id="done-receipt">—</span>
@@ -1312,7 +1338,7 @@
       <div id="pos-toast-txt"></div>
     </div>
 
-    <script src="/static/pos/pos-i18n.js?v=11854701"></script>
-    <script src="/static/dist/pos.js?v=11891204" defer></script>
+    <script src="/static/pos/pos-i18n.js?v=11902101"></script>
+    <script src="/static/dist/pos.js?v=11902102" defer></script>
   </body>
 </html>

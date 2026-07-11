@@ -11,6 +11,7 @@
     let cart = []; // { id, name, sell_unit, qty, price }
     let activeCat = null;
     let tendered = 0;
+    let taken = []; // 本单已收明细(混合支付):{ method, amount:Number, ref? }·每次开收款窗重置
     let discount = 0;
     let lastSale = null; // 刚成交的单(成功面板 + 升级税票用)
     let taxBuyerType = 'company';
@@ -298,6 +299,126 @@
         const sub = subtotalOf(cart);
         return sub - Math.min(discount, sub);
     }
+
+    // ── 混合支付 running-tender ──
+    // 每方式确认按钮映射,+ 该方式默认「已付满」文案(用于按钮在成交/记一笔间活变时还原)。
+    const PM_CONFIRM_BTN = {
+        cash: 'pay-cash-confirm',
+        qr: 'pay-qr-confirm',
+        card: 'pay-card-confirm',
+        transfer: 'pay-transfer-confirm',
+    };
+    const PM_CONFIRM_KEY = {
+        cash: 'posui.pay.confirm.cash',
+        qr: 'posui.pay.confirm.qr',
+        card: 'posui.pay.confirm.card',
+        transfer: 'posui.pay.confirm.transfer',
+    };
+    const EPS = 0.005; // 金额到分,半分容差:防浮点让「刚好付满」误判成还差一点
+
+    function takenSum() {
+        return taken.reduce((s, p) => s + p.amount, 0);
+    }
+    // 尚差 = 应收 − 已收累加。四舍五入到分,防 0.1+0.2 类浮点尾巴。
+    function remaining() {
+        return Math.round((grandTotal() - takenSum()) * 100) / 100;
+    }
+    function pmAmtInput(method) {
+        if (method === 'qr') return $('pay-qr-amt-in');
+        if (method === 'card') return $('pay-card-amt');
+        if (method === 'transfer') return $('pay-transfer-amt');
+        return null;
+    }
+    // 本笔待收金额:现金取 tendered(实收现钞),非现金取该方式输入框(空=0)。
+    function tenderAmount(method) {
+        if (method === 'cash') return tendered;
+        const el = pmAmtInput(method);
+        const v = parseFloat((el && el.value ? el.value : '').replace(/[^\d.]/g, ''));
+        return Number.isFinite(v) ? v : 0;
+    }
+    function pmLabel(method) {
+        return POS.t('posui.pay.' + (method === 'qr' ? 'promptpay' : method));
+    }
+
+    // 收下一笔前重置本方式输入 → 默认填新尚差(非现金)/清空现钞(现金)。
+    function resetTenderInputs(method) {
+        if (method === 'cash') {
+            tendered = 0;
+            updateCash();
+            return;
+        }
+        const el = pmAmtInput(method);
+        if (el) el.value = remaining().toFixed(2);
+        if (method === 'card') $('pay-card-ref').value = '';
+        if (method === 'qr') loadQr();
+    }
+
+    function renderTaken() {
+        const box = $('pay-taken');
+        const remRow = $('pay-remaining');
+        if (!taken.length) {
+            box.style.display = 'none';
+            box.innerHTML = '';
+            remRow.style.display = 'none';
+            return;
+        }
+        box.style.display = 'flex';
+        box.innerHTML = taken
+            .map((p, i) => {
+                const ref = p.ref ? '<span class="tk-ref">· ' + POS.esc(p.ref) + '</span>' : '';
+                // 只有最后一笔可撤(倒序撤单),避免中间撤单让尚差链错位
+                const x =
+                    i === taken.length - 1
+                        ? '<button class="tk-x" aria-label="undo">✕</button>'
+                        : '';
+                return (
+                    '<span class="taken-chip"><span class="tk-m">' +
+                    pmLabel(p.method) +
+                    '</span><span class="tk-a tnum">฿' +
+                    fmt(p.amount) +
+                    '</span>' +
+                    ref +
+                    x +
+                    '</span>'
+                );
+            })
+            .join('');
+        const x = box.querySelector('.tk-x');
+        if (x) x.onclick = undoLastTaken;
+        remRow.style.display = 'flex';
+        $('pay-remaining-amt').textContent = fmt(remaining());
+    }
+
+    function undoLastTaken() {
+        taken.pop();
+        renderTaken();
+        const active = document.querySelector('#pay-mask .pm.active');
+        resetTenderInputs(active ? active.dataset.pm : 'cash');
+        updatePayButtons();
+    }
+
+    // 智能确认按钮:本笔 ≥ 尚差 → 成交文案(还原方式原文);0 < 本笔 < 尚差 → 记一笔并显剩余;本笔=0 → 禁用。
+    function updatePayButtons() {
+        const rem = remaining();
+        Object.keys(PM_CONFIRM_BTN).forEach((m) => {
+            const btn = $(PM_CONFIRM_BTN[m]);
+            if (!btn) return;
+            const amt = tenderAmount(m);
+            if (amt <= 0) {
+                btn.disabled = true;
+                btn.textContent = POS.t(PM_CONFIRM_KEY[m]);
+                return;
+            }
+            btn.disabled = false;
+            if (amt < rem - EPS) {
+                const record = m === 'cash' ? amt : Math.min(amt, rem);
+                btn.textContent = POS.tf('posui.pay.confirm.part', { y: fmt(rem - record) });
+            } else {
+                btn.textContent = POS.t(PM_CONFIRM_KEY[m]);
+            }
+        });
+    }
+
     function openPay() {
         if (!cart.length) return;
         closeSheet();
@@ -305,6 +426,9 @@
         $('pay-due').textContent = fmt(due);
         $('pay-qr-amt').textContent = fmt(due);
         tendered = 0;
+        taken = [];
+        $('pay-card-ref').value = '';
+        renderTaken();
         renderQuickCash();
         updateCash();
         POS.pay.applyMethods('#pay-mask .pm'); // 先按已缓存的设置显隐(瞬时,不阻塞开窗)
@@ -328,8 +452,12 @@
         $('pm-qr').style.display = m === 'qr' ? 'block' : 'none';
         $('pm-card').style.display = m === 'card' ? 'block' : 'none';
         $('pm-transfer').style.display = m === 'transfer' ? 'block' : 'none';
+        // 非现金默认整付尚差(最常见);loadQr 读该值出码,故先填后出码。
+        const amtEl = pmAmtInput(m);
+        if (amtEl) amtEl.value = remaining().toFixed(2);
         if (m === 'qr') loadQr();
         if (m === 'transfer') loadBankInfo();
+        updatePayButtons();
     }
     // 切到银行转账 → 显示老板配的银行名/账号/户名;没配就提示去收款设置填(参照 loadQr 的 no_id 提示)。
     function loadBankInfo() {
@@ -345,10 +473,13 @@
     async function loadQr() {
         const box = $('pay-qr-box');
         if (!box) return;
+        // 出码金额 = 本笔待收(默认尚差,可下调拆单),而非整单应收——拆单时码要对得上真收的这笔。
+        const amt = tenderAmount('qr') || remaining();
+        $('pay-qr-amt').textContent = fmt(amt);
         box.innerHTML = '<div class="qr-loading">' + POS.t('posui.loading') + '</div>';
         $('pay-qr-err').textContent = '';
         try {
-            const r = await POS.data.promptpayQr(grandTotal());
+            const r = await POS.data.promptpayQr(amt);
             box.innerHTML =
                 '<img alt="PromptPay QR" style="width:200px;height:200px;" src="data:image/png;base64,' +
                 r.png_base64 +
@@ -389,17 +520,15 @@
         updateCash();
     }
     function updateCash() {
-        const due = grandTotal();
         $('pay-tendered').textContent = tendered.toLocaleString('en-US');
-        const ch = tendered - due;
+        const ch = tendered - remaining(); // 找零对尚差算(单笔时尚差=应收,结果与旧版一致)
         $('pay-change').textContent = fmt(ch > 0 ? ch : 0);
         $('pay-cash-err').textContent = '';
+        updatePayButtons();
     }
 
-    function buildSalePayload(method) {
-        const due = grandTotal();
+    function buildSalePayload(payments) {
         const sub = subtotalOf(cart);
-        const paid = method === 'cash' ? Math.max(tendered, due) : due;
         return {
             client_uuid: POS.uuid(),
             workspace_client_id: state.workspaceClientId,
@@ -422,17 +551,39 @@
                 discount > 0
                     ? { type: 'amount', value: Math.min(discount, sub).toFixed(2) }
                     : { type: 'none', value: '0' },
-            payments: [{ method, amount: paid.toFixed(2) }],
+            payments: payments.map((p) => ({
+                method: p.method,
+                amount: p.amount.toFixed(2),
+                ref: p.ref || null,
+            })),
             sold_at: new Date().toISOString(),
         };
     }
 
+    // 一个方式的确认:本笔 ≥ 尚差 → 连同已收各笔一并出票成交;本笔 < 尚差 → 记一笔、更新尚差、留窗继续。
+    // 现金按实收现钞入账(可溢出,后端据 paid_total−grand 算找零);非现金封顶到尚差(卡/转账不产生找零)。
     async function confirmPay(method, errId, btn) {
-        if (method === 'cash' && tendered < grandTotal()) {
-            $(errId).textContent = POS.t('posui.pay.short');
+        const rem = remaining();
+        const amt = tenderAmount(method);
+        if (amt <= 0) return; // 按钮此时已禁用,双保险
+        const ref = method === 'card' ? ($('pay-card-ref').value || '').trim() || null : null;
+        const record = method === 'cash' ? amt : Math.min(amt, rem);
+        const tender = { method, amount: record, ref };
+        if (amt < rem - EPS) {
+            taken.push(tender);
+            renderTaken();
+            resetTenderInputs(method);
+            updatePayButtons();
+            POS.toast(POS.tf('posui.pay.part_toast', { x: fmt(record), y: fmt(remaining()) }));
             return;
         }
+        await submitSale(taken.concat([tender]), errId, btn);
+    }
+
+    async function submitSale(payments, errId, btn) {
         btn.disabled = true;
+        const grand = grandTotal();
+        const paidTotal = payments.reduce((s, p) => s + p.amount, 0);
         const snapshot = {
             lines: cart.map((c) => ({
                 name: c.name,
@@ -440,12 +591,13 @@
                 price: c.price,
                 sell_unit: c.sell_unit,
             })),
-            method,
-            grand: grandTotal(),
-            tendered: method === 'cash' ? tendered : grandTotal(),
+            payments: payments.map((p) => ({ method: p.method, amount: p.amount, ref: p.ref })),
+            grand,
+            change: Math.max(0, paidTotal - grand),
         };
-        const payload = buildSalePayload(method);
+        const payload = buildSalePayload(payments);
         const onOk = (res) => {
+            taken = [];
             closePay();
             POS.toast(POS.t('posui.toast.paid'));
             clearCart();
@@ -454,7 +606,7 @@
         try {
             onOk(await POS.data.createSale(payload));
         } catch (e) {
-            // caps 闸开 + 折扣超上限/手工改价越权 → 弹店长授权窗,带 approval 重发建单;
+            // caps 闸开 + 折扣超上限/手工改价越权 → 弹店长授权窗,带 approval(含全部已收笔)重发建单;
             // 授权成功走同一成交流程,失败留窗显错(同退货/作废 PS-1 流程)。
             if (e.code === 'pos.approval_required' && POS.approve) {
                 POS.approve.open(
@@ -463,7 +615,7 @@
                 );
                 return;
             }
-            // 07 屏1:收款失败弹窗内红字,不关弹窗,可改可重试
+            // 07 屏1:收款失败弹窗内红字,不关弹窗,可改可重试(taken 未变,不会重复记笔)
             $(errId).textContent = POS.posErrMsg(e.code, 'pos.unexpected');
         } finally {
             btn.disabled = false;
@@ -480,23 +632,35 @@
             change_amount: sale.change_amount,
             offline: !!(res && res.offline), // 离线补单(Part B5)→ 不可即时开税票
             lines: snap.lines,
-            method: snap.method,
+            payments: snap.payments,
             sold_at: new Date(),
         };
-        const cash = snap.method === 'cash';
+        // 后端据 paid_total 算的找零优先;离线本地兜底用快照。找零>0 才显(只在含现金溢出时发生)。
         const change =
-            lastSale.change_amount != null
-                ? lastSale.change_amount
-                : cash
-                  ? Math.max(0, snap.tendered - snap.grand).toFixed(2)
-                  : '0.00';
-        $('done-change-row').style.display = cash ? 'flex' : 'none';
+            lastSale.change_amount != null ? lastSale.change_amount : snap.change.toFixed(2);
+        $('done-change-row').style.display = Number(change) > 0 ? 'flex' : 'none';
         $('done-change').textContent = fmt(change);
+        renderDoneMethods(lastSale.payments);
         $('done-receipt').textContent = lastSale.receipt_no || '—';
         // 离线单 / 纯本地预览均不可开正式税票(税票需联网连号)→ 隐税票钮 + 显提示
         const taxable = !lastSale.offline && !!lastSale.id;
         document.querySelector('#done-mask .done-modal').classList.toggle('is-offline', !taxable);
         $('done-mask').classList.add('show');
+    }
+
+    // 成交面板按方式分列每笔收款(单笔时也就一行,与原单方式展示等价)。
+    function renderDoneMethods(payments) {
+        $('done-methods').innerHTML = (payments || [])
+            .map(
+                (p) =>
+                    '<div class="dm-row"><span>' +
+                    pmLabel(p.method) +
+                    (p.ref ? ' · ' + POS.esc(p.ref) : '') +
+                    '</span><span class="tnum">฿' +
+                    fmt(p.amount) +
+                    '</span></div>'
+            )
+            .join('');
     }
 
     function openReceipt() {
@@ -540,13 +704,25 @@
         const addrLine = state.storeAddress
             ? '<div class="meta">' + POS.esc(state.storeAddress) + '</div>'
             : '';
-        const methodLine = sale.method
-            ? '<tr class="tot"><td>' +
-              POS.t('posui.pay.method') +
-              '</td><td class="r">' +
-              POS.t('posui.pay.' + sale.method) +
-              '</td></tr>'
-            : '';
+        const methodLine = (sale.payments || [])
+            .map(
+                (p) =>
+                    '<tr><td>' +
+                    POS.t('posui.pay.' + (p.method === 'qr' ? 'promptpay' : p.method)) +
+                    (p.ref ? ' · ' + POS.esc(p.ref) : '') +
+                    '</td><td class="r">฿' +
+                    fmt(p.amount) +
+                    '</td></tr>'
+            )
+            .join('');
+        const changeLine =
+            sale.change_amount != null && Number(sale.change_amount) > 0
+                ? '<tr><td>' +
+                  POS.t('posui.done.change') +
+                  '</td><td class="r">฿' +
+                  fmt(sale.change_amount) +
+                  '</td></tr>'
+                : '';
         const html =
             '<!doctype html><html><head><meta charset="utf-8"><title>' +
             (sale.receipt_no || '') +
@@ -569,6 +745,7 @@
             fmt(sale.grand_total) +
             '</td></tr>' +
             methodLine +
+            changeLine +
             '</table>' +
             '<scr' +
             'ipt>window.onload=function(){window.print()}</scr' +
@@ -831,6 +1008,11 @@
         $('pay-transfer-confirm').addEventListener('click', (e) =>
             confirmPay('transfer', 'pay-transfer-err', e.currentTarget)
         );
+        // 非现金本笔金额:改额即刷新智能按钮;QR 还需按新额重新出码(用 change 避免逐键打 API)。
+        $('pay-card-amt').addEventListener('input', updatePayButtons);
+        $('pay-transfer-amt').addEventListener('input', updatePayButtons);
+        $('pay-qr-amt-in').addEventListener('input', updatePayButtons);
+        $('pay-qr-amt-in').addEventListener('change', loadQr);
         // 成交成功面板
         $('done-print').addEventListener('click', openReceipt);
         $('done-tax').addEventListener('click', () => {

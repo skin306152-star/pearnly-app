@@ -60,7 +60,7 @@
         else if (active === 'main' && POS.cashier) POS.cashier.enterMain();
         else if (active === 'hold' && POS.cashier) POS.cashier.renderHold();
         else if (active === 'refund' && POS.ops) POS.ops.resetRefund();
-        else if (active === 'shift' && POS.ops) POS.ops.renderShift();
+        else if (active === 'shift' && POS.shift) POS.shift.renderShift();
         else if (active === 'rtables' && POS.restaurant) POS.restaurant.renderTables();
         else if (active === 'rkitchen' && POS.restaurant) POS.restaurant.renderKitchen();
         else if (active === 'rorder' && POS.restaurant && POS.restaurant.curSession())
@@ -88,7 +88,7 @@
         if (fatal) fatal.style.display = name === 'fatal' ? 'grid' : 'none';
         if (name === 'hold' && POS.cashier) POS.cashier.renderHold();
         if (name === 'refund' && POS.ops) POS.ops.resetRefund();
-        if (name === 'shift' && POS.ops) POS.ops.renderShift();
+        if (name === 'shift' && POS.shift) POS.shift.renderShift();
         if (name === 'rkitchen' && POS.restaurant) POS.restaurant.renderKitchen();
     };
 
@@ -515,7 +515,7 @@
                 })
                 .catch(() => {});
             navigator.serviceWorker
-                .register('/cashier-sw.js?v=11871100', { scope: '/cashier' })
+                .register('/cashier-sw.js?v=11911100', { scope: '/cashier' })
                 .catch(() => {});
         }
         tick();

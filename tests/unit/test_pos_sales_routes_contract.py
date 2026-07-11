@@ -43,6 +43,7 @@ EXPECTED = {
     ("POST", "/api/pos/sales"),
     ("POST", "/api/pos/sales/sync"),
     ("GET", "/api/pos/sales/by-receipt"),
+    ("GET", "/api/pos/sales/today"),
     ("GET", "/api/pos/sales/{sale_id}"),
     ("POST", "/api/pos/sales/{sale_id}/refund"),
     ("POST", "/api/pos/sales/{sale_id}/void"),

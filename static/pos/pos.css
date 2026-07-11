@@ -299,6 +299,36 @@ body { background: var(--bg); color: var(--ink); font-size: 14px; }
 .pos-view--refund .do { width: 100%; height: 52px; border: 0; border-radius: 11px; background: var(--red); color: #fff; font-weight: 700; font-size: 16px; cursor: pointer; }
 .pos-view--refund .do:disabled { background: #e2a8a8; cursor: not-allowed; }
 .pos-view--refund .state { text-align: center; color: var(--ink3); padding: 28px 16px; font-size: 13.5px; }
+/* 今日交易列表(退货/作废入口 · 点一笔免手输小票号) */
+.pos-view--refund .tlist { background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 1px 2px rgba(17, 24, 39, .04), 0 6px 20px rgba(17, 24, 39, .07); overflow: hidden; }
+.pos-view--refund .tlist-h { padding: 12px 16px; border-bottom: 1px solid var(--line); font-weight: 700; font-size: 13px; color: var(--ink2); }
+.pos-view--refund .titem { display: flex; align-items: center; gap: 12px; padding: 13px 16px; border-bottom: 1px solid var(--line); }
+.pos-view--refund .titem:last-child { border-bottom: 0; }
+.pos-view--refund .ti-main { flex: 1; cursor: pointer; min-width: 0; }
+.pos-view--refund .ti-rc { font-size: 14px; font-weight: 600; }
+.pos-view--refund .ti-sub { font-size: 12px; color: var(--ink2); margin-top: 2px; }
+.pos-view--refund .ti-amt { font-weight: 700; font-size: 14px; white-space: nowrap; }
+.pos-view--refund .tvoid { flex: 0 0 auto; height: 34px; padding: 0 14px; border: 1.5px solid var(--red); border-radius: 9px; background: var(--card); color: var(--red); font-size: 13px; font-weight: 600; cursor: pointer; }
+/* 原路退款方式(单方式只读镜像 / 混合各方式可微调金额) */
+.pos-view--refund .way-orig { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; background: var(--bg); }
+.pos-view--refund .wo-h { font-size: 12.5px; font-weight: 700; color: var(--ink2); margin-bottom: 10px; }
+.pos-view--refund .prow { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 9px; }
+.pos-view--refund .prow.one { margin-bottom: 0; }
+.pos-view--refund .prow .pm { font-size: 14px; color: var(--ink); }
+.pos-view--refund .prow .inp { display: flex; align-items: center; gap: 4px; width: 120px; height: 40px; border: 1px solid var(--line); border-radius: 9px; padding: 0 11px; background: var(--card); }
+.pos-view--refund .prow .inp span { color: var(--ink3); font-size: 14px; }
+.pos-view--refund .prow .inp input { border: 0; outline: 0; background: transparent; flex: 1; width: 100%; text-align: right; font-size: 15px; }
+.pos-view--refund .wo-sum { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 13px; font-weight: 600; }
+.pos-view--refund .wo-sum.ok { color: var(--green); }
+.pos-view--refund .wo-sum.bad { color: var(--red); }
+/* 记录型退款诚实提示(刷卡/转账/PromptPay 系统只记账,实际退款去刷卡机/银行操作)· 琥珀=告警语义走 --amber 令牌 rgba */
+.pos-view--refund .pay-note { display: flex; gap: 8px; font-size: 12.5px; color: var(--ink); background: rgba(245, 158, 11, .12); border: 1px solid rgba(245, 158, 11, .38); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; line-height: 1.5; }
+.pos-view--refund .pay-note svg { flex: 0 0 16px; color: var(--amber); margin-top: 1px; }
+/* 引导:当班错单→建议作废;已交班/隔日→退货 */
+.pos-view--refund .guide { display: flex; align-items: center; gap: 12px; font-size: 12.5px; color: var(--ink2); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; line-height: 1.5; }
+.pos-view--refund .guide.void { background: var(--accent-weak); border-color: var(--accent-weak); color: var(--accent-d); }
+.pos-view--refund .guide span { flex: 1; }
+.pos-view--refund .gv-btn { flex: 0 0 auto; height: 34px; padding: 0 14px; border: 1.5px solid var(--accent); border-radius: 9px; background: var(--card); color: var(--accent-d); font-size: 13px; font-weight: 700; cursor: pointer; }
 
 /* ════════════════ 屏 5 · 交班日结(概念稿 05)════════════════ */
 .pos-view--shift { min-height: 100vh; background: var(--bg); }

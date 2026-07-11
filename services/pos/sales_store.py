@@ -173,6 +173,34 @@ def get_sale_by_receipt(cur, *, tenant_id: str, workspace_client_id: int, receip
     return cur.fetchone()
 
 
+def list_today_rows(cur, *, tenant_id: str, workspace_client_id: int, since, limit: int = 100):
+    """收银台今日已完成正常销售(退货/作废入口用 · 最近在前)。
+
+    主方式 = 金额最大的那笔 payment(混合单显占比最高的);pay_count>1 = 混合支付。
+    has_refund = 该单已被退过(退货单 refund_of_sale_id 指回它),据此判是否还可作废。
+    标量子查询取 method/笔数,不 join payments 进主查询(一对多会复制主行 · 同 sales_log 先例)。
+    """
+    cur.execute(
+        """
+        SELECT s.id, s.receipt_no, s.sold_at, s.grand_total, s.shift_id,
+               (SELECT p.method FROM pos_payments p
+                WHERE p.tenant_id = s.tenant_id AND p.sale_id = s.id
+                ORDER BY p.amount DESC, p.id LIMIT 1) AS top_method,
+               (SELECT COUNT(*) FROM pos_payments p2
+                WHERE p2.tenant_id = s.tenant_id AND p2.sale_id = s.id) AS pay_count,
+               EXISTS (SELECT 1 FROM pos_sales r
+                       WHERE r.tenant_id = s.tenant_id AND r.refund_of_sale_id = s.id) AS has_refund
+        FROM pos_sales s
+        WHERE s.tenant_id = %s AND s.workspace_client_id = %s
+          AND s.status = 'completed' AND s.sale_type = 'sale' AND s.sold_at >= %s
+        ORDER BY s.sold_at DESC
+        LIMIT %s
+        """,
+        (tenant_id, workspace_client_id, since, int(limit)),
+    )
+    return cur.fetchall()
+
+
 def insert_sale(cur, *, tenant_id: str, fields: dict) -> dict:
     cols = [
         "workspace_client_id",

@@ -574,14 +574,80 @@
         }
     };
 
+    // 今日已完成交易(退货/作废入口 · 收银员 token 可读)。每项带 method/mixed/voidable。
+    data.salesToday = async function () {
+        try {
+            const d = await apiFetch(
+                'GET',
+                '/api/pos/sales/today' +
+                    (state.workspaceClientId
+                        ? '?workspace_client_id=' + state.workspaceClientId
+                        : '')
+            );
+            return (d && d.items) || [];
+        } catch (e) {
+            if (POS.isRouteMissing(e) && POS.allowMock()) {
+                // 纯本地预览:一张现金单(可作废)+ 一张混合单(已交班不可作废,演示退货)
+                return [
+                    {
+                        id: 'mock-sale',
+                        receipt_no: 'RCP-3012',
+                        sold_at: new Date().toISOString(),
+                        grand_total: '75.00',
+                        method: 'cash',
+                        mixed: false,
+                        voidable: true,
+                    },
+                    {
+                        id: 'mock-sale-2',
+                        receipt_no: 'RCP-3009',
+                        sold_at: new Date(Date.now() - 5400000).toISOString(),
+                        grand_total: '120.00',
+                        method: 'card',
+                        mixed: true,
+                        voidable: false,
+                    },
+                ];
+            }
+            throw e;
+        }
+    };
+
+    // 单笔详情(退货详情 · 与 findReceipt 同信封 {sale, lines, payments})。
+    data.saleDetail = async function (saleId) {
+        try {
+            return await apiFetch('GET', '/api/pos/sales/' + saleId);
+        } catch (e) {
+            if (POS.isRouteMissing(e) && POS.allowMock()) return data.findReceipt(saleId);
+            throw e;
+        }
+    };
+
+    // 当班作废(错单干净回滚)。approval 同退货:授权闸开且收银员无权时带店长凭据重试。
+    data.void = async function (saleId, approval) {
+        const body = {};
+        if (state.workspaceClientId) body.workspace_client_id = state.workspaceClientId;
+        if (approval) body.approval = approval;
+        try {
+            return await apiFetch('POST', '/api/pos/sales/' + saleId + '/void', body);
+        } catch (e) {
+            if (POS.isRouteMissing(e) && POS.allowMock())
+                return { sale_id: saleId, status: 'void', stock_returned: true };
+            throw e;
+        }
+    };
+
     // approval(可选):店长授权覆盖凭据 { cashier_id, pin }。仅在授权闸开且收银员无权时,
     // 前台弹窗收集后带上重试;闸关时永不出现(后端不返 pos.approval_required)。
-    data.refund = async function (saleId, lines, method, approval) {
+    // refundPayments(可选):混合支付原路拆退 [{method, amount正额}],Σ 须等于退款额;
+    // 只给 refund_method 单笔时走后端兼容路。符号约定:前台传正额,后端统一取负存。
+    data.refund = async function (saleId, lines, method, approval, refundPayments) {
         const body = {
             client_uuid: POS.uuid(),
             lines,
             refund_method: method,
         };
+        if (refundPayments && refundPayments.length) body.refund_payments = refundPayments;
         if (approval) body.approval = approval;
         try {
             return await apiFetch('POST', '/api/pos/sales/' + saleId + '/refund', body);

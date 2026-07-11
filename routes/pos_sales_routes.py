@@ -261,6 +261,19 @@ async def api_sale_by_receipt(
     )
 
 
+@router.get("/sales/today")
+async def api_sales_today(request: Request, workspace_client_id: Optional[int] = Query(None)):
+    """收银台今日已完成交易(退货/作废入口 · 收银员 token 可读 · 限当前账套)。
+
+    路由须排在 /sales/{sale_id} 之前,否则 "today" 会被当成 sale_id 匹配。
+    """
+    return _read(
+        request,
+        workspace_client_id,
+        lambda cur, tid, ws, user: sale_svc.list_today(cur, tenant_id=tid, workspace_client_id=ws),
+    )
+
+
 @router.get("/sales/{sale_id}")
 async def api_get_sale(
     sale_id: str, request: Request, workspace_client_id: Optional[int] = Query(None)

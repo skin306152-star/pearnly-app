@@ -344,6 +344,10 @@ async def _handle_line_text(
         )
         return
 
+    from services.line_binding import line_client_answer  # D2-S5:客户答题拦截(fail-open)
+
+    if line_client_answer.handle_answer(line_user_id, text, reply_token, quote_token):
+        return
     # 非绑定码 · 判断是否已绑定
     bound_user = db.get_user_by_line_user_id(line_user_id)
     if not bound_user:

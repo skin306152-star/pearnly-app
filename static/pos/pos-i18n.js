@@ -916,7 +916,8 @@
             'pos.tax_id_invalid': '税番号が無効です',
             'pos.already_upgraded': '既に正式税額票を発行済みです',
             'pos.over_refund': '返品数が購入数を超えています',
-            'pos.module_disabled': 'この機能はまだ有効化されていません(管理者にお問い合わせください)',
+            'pos.module_disabled':
+                'この機能はまだ有効化されていません(管理者にお問い合わせください)',
             'pos.forbidden': 'この操作の権限がありません',
             'pos.offline_saved': 'オフライン保存しました。自動同期します',
             'pos.sync_partial': '一部の同期に失敗、再試行します',

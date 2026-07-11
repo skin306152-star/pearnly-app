@@ -163,6 +163,7 @@
   "uploads_routes": "B",
   "vat_excel_routes": "B",
   "vat_excel_tasks_routes": "B",
+  "vat_report_checks_routes": "B",
   "workorder_routes": "C",
   "workspace_routes": "B"
 }

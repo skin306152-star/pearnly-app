@@ -1,0 +1,37 @@
+# -*- coding: utf-8 -*-
+"""销项税报告三查(连号/买家分组/期间一致性)上传端点 · N1-a。"""
+
+import logging
+
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+
+from services.vat.vat_excel_helpers import _require_user, _user_key
+from services.vat.vat_report_checks import run_report_checks, to_jsonable
+from services.vat.vat_report_parser import parse_vat_report
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/api/vat_report_checks", tags=["vat-report-checks"])
+
+
+@router.post("/run")
+async def run_report_checks_endpoint(request: Request, report: UploadFile = File(...)):
+    """上传单份销项 VAT 报告 → 解析 → 三查(连号/买家分组/期间)→ JSON。"""
+    user = _require_user(request)
+    api_key = _user_key(user)
+
+    file_bytes = await report.read()
+    parsed = parse_vat_report(file_bytes, report.filename or "report.pdf", api_key=api_key)
+    if not parsed.get("ok"):
+        raise HTTPException(422, parsed.get("error") or "报告解析失败")
+
+    rows = parsed.get("rows") or []
+    if not rows:
+        raise HTTPException(422, "报告解析结果为空 · 请检查文件")
+
+    result = run_report_checks(rows)
+    logger.info(
+        f"[vat_report_checks] rows={len(rows)} "
+        f"buyers={len(result['buyer_summary']['buyers'])} "
+        f"families={len(result['sequence']['families'])}"
+    )
+    return to_jsonable(result)

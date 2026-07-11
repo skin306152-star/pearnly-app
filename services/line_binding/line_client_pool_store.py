@@ -203,6 +203,25 @@ def list_pending_for_dunning(*, sent_before) -> list:
     return _with_heal(_run)
 
 
+def list_active_all() -> list:
+    """全部租户 active(staged/pending/manual_review)问题(S6 关闭清扫 tick 用 · 跨 tenant
+    只读扫描,走 owner 连接,同 list_pending_for_dunning 口径:逐行按行自带的 tenant_id
+    建 RLS 上下文回写,不代表放弃隔离)。"""
+    from core import db
+
+    def _run():
+        with db.get_cursor() as cur:
+            cur.execute(
+                f"SELECT {_COLUMNS} FROM line_client_questions "
+                "WHERE status = ANY(%s) ORDER BY id",
+                (list(vocab.ACTIVE_STATUSES),),
+            )
+            rows = cur.fetchall()
+        return [dict(r) for r in rows]
+
+    return _with_heal(_run)
+
+
 def transition(
     tenant_id,
     question_id,

@@ -172,6 +172,12 @@ async def run_recovery_tick():
         await recall.run_tick()
     except Exception as e:
         logger.warning(f"[recall_nudge] tick failed: {e}")
+    try:
+        from services.line_binding import line_client_dunning
+
+        await line_client_dunning.run_tick()
+    except Exception as e:
+        logger.warning(f"[line_client_dunning] tick failed: {e}")
 
 
 async def run_accounting_posting_failure_tick():

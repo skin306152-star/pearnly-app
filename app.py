@@ -162,6 +162,9 @@ from routes.workorder_routes import (
 from routes.tax_profile_routes import (
     router as tax_profile_router,
 )  # B2-e · 税务画像/别名/义务清单 API(挂 pearnly_ai_m1 闸 · 默认关) · 2026-07-10
+from routes.client_pool_routes import (
+    router as client_pool_router,
+)  # D2-S8+S9 · LINE 待问客户池会计端 API(挂 pearnly_ai_m1+client_pool 双闸) · 2026-07-11
 from routes.categories_routes import (
     router as categories_router,
 )  # REFACTOR-B1 · 分类 1 路由 · 2026-05-25
@@ -340,6 +343,9 @@ app.include_router(workorder_router)  # M1-B1 · Pearnly AI 工单制 API(pearnl
 app.include_router(
     tax_profile_router
 )  # B2-e · 税务画像/别名/义务清单 API(pearnly_ai_m1 闸 · 2026-07-10)
+app.include_router(
+    client_pool_router
+)  # D2-S8+S9 · LINE 待问客户池会计端 API(pearnly_ai_m1+client_pool 双闸 · 2026-07-11)
 app.include_router(settings_router)  # REFACTOR-B1 · 归档/查重设置 5 路由(2026-05-25)
 app.include_router(categories_router)  # REFACTOR-B1 · 分类 1 路由(2026-05-25)
 app.include_router(pages_router)  # REFACTOR-B1 · 静态页面 + 公开 meta 12 路由(2026-05-25)

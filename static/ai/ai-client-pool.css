@@ -1,0 +1,96 @@
+/* Pearnly AI · ai-client-pool.css · D2-S8 客户池页(会计端)· 吃 ai-theme 令牌 +
+   ai-shell.css 的 .panel/.chip/.btn/.state-block 原子,只补待问池专属结构。 */
+
+.cp-group .hd h3 {
+    justify-content: space-between;
+}
+.cp-banner {
+    background: var(--warn-soft);
+    border: 1px solid var(--warn-line);
+    color: var(--warn);
+    border-radius: 9px;
+    padding: 8px 12px;
+    font-size: 12px;
+    margin-bottom: 12px;
+}
+.cp-section {
+    margin-bottom: 14px;
+}
+.cp-section:last-child {
+    margin-bottom: 0;
+}
+.cp-section-hd {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+.cp-section-n {
+    font-size: 11.5px;
+    color: var(--mut);
+    font-variant-numeric: tabular-nums;
+}
+.cp-q-row {
+    border: 1px solid var(--hair);
+    border-radius: 10px;
+    padding: 9px 12px;
+    margin-bottom: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+}
+.cp-q-row:last-child {
+    margin-bottom: 0;
+}
+.cp-q-type {
+    font-weight: 600;
+    color: var(--ink2);
+}
+.cp-q-meta {
+    color: var(--mut);
+    font-size: 11.5px;
+}
+.cp-q-manual {
+    flex-direction: column;
+    align-items: stretch;
+    background: var(--surface2);
+}
+.cp-q-head {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.cp-q-answer {
+    font-style: italic;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--hair2);
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 12.5px;
+}
+.cp-q-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.cp-q-vat-input {
+    border: 1px solid var(--hair2);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12.5px;
+    width: 120px;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+    .cp-q-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .cp-q-vat-input {
+        width: 100%;
+    }
+}

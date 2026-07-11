@@ -25,6 +25,9 @@
         var h = String(hash || '').replace(/^#/, '');
         if (h === '' || h === '/') return { name: 'dashboard', sub: DEFAULT_SUB };
         if (h === '/board') return { name: 'dashboard', sub: 'board' };
+        // 「待我处理」(D2-S8 客户池·跨客户会计队列):独立顶层路由,不挂在某个客户的
+        // 四视图之下(client-pool 是按客户分组的会计工作队列,不是单客户 tab)。
+        if (h === '/pool') return { name: 'pool' };
         var m = /^\/client\/([^/]+)\/?([^/]*)$/.exec(h);
         if (!m) return { name: 'dashboard', sub: DEFAULT_SUB };
         var clientId = decodeURIComponent(m[1]);
@@ -47,6 +50,10 @@
         return '#/board';
     }
 
+    function buildPoolHash() {
+        return '#/pool';
+    }
+
     // onChange(route) 在启动时立即调一次,并在每次 hashchange 后调用。
     function subscribe(onChange) {
         function fire() {
@@ -67,6 +74,7 @@
         buildClientHash: buildClientHash,
         buildDashboardHash: buildDashboardHash,
         buildBoardHash: buildBoardHash,
+        buildPoolHash: buildPoolHash,
         subscribe: subscribe,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

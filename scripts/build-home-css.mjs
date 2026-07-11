@@ -155,6 +155,9 @@ const AI_CSS = [
     // (ai-shell.css)原子,排在两者之后即可;与 pkg 视图互斥显示,顺序对彼此零影响。
     'ai/ai-profile.css',
     'ai/ai-viewer.css',
+    // ai-client-pool.css(D2-S8 客户池页)只吃 ai-theme 令牌 + ai-shell 的 .panel/.chip/.btn,
+    // 排最后即可(与其余视图互斥显示,层叠顺序对彼此零影响)。
+    'ai/ai-client-pool.css',
 ];
 
 const BUNDLES = [

@@ -46,8 +46,9 @@
         $('firmMeta').textContent = '';
         if (chromeWired) return;
         chromeWired = true;
-        // 报表/客户档案/设置/待我处理:M1 未接(见 v4 降级表)——保留导航位但禁用,不假装可点。
-        ['navTodo', 'navClients', 'navReports', 'navSettings'].forEach(function (id) {
+        // 报表/客户档案/设置:M1 未接(见 v4 降级表)——保留导航位但禁用,不假装可点。
+        // 待我处理(navTodo)D2-S8 已接:客户池页,不再落这个禁用桶。
+        ['navClients', 'navReports', 'navSettings'].forEach(function (id) {
             var el = $(id);
             el.addEventListener('click', function (e) {
                 e.preventDefault();
@@ -59,6 +60,9 @@
         });
         $('navDash').addEventListener('click', function () {
             window.location.hash = AI.router.buildDashboardHash();
+        });
+        $('navTodo').addEventListener('click', function () {
+            window.location.hash = AI.router.buildPoolHash();
         });
         // 矩阵/看板视图切换 pill(C4):矩阵是默认,看板降辅助——两个 hash 各自的
         // build 函数已知道自己的默认子视图,这里只管点了跳哪。
@@ -75,6 +79,12 @@
         if (route.name === 'dashboard') {
             crumb.innerHTML =
                 '<span style="color:var(--ink);font-weight:600">' + at('crumb_dash') + '</span>';
+        } else if (route.name === 'pool') {
+            crumb.innerHTML =
+                '<a data-back>' + at('crumb_dash') + '</a> / ' + at('nav_todo');
+            crumb.querySelector('[data-back]').onclick = function () {
+                window.location.hash = AI.router.buildDashboardHash();
+            };
         } else {
             crumb.innerHTML = '<a data-back>' + at('crumb_dash') + '</a> / ' + at('title_client');
             crumb.querySelector('[data-back]').onclick = function () {
@@ -91,11 +101,22 @@
         if (prevRouteName === 'dashboard' && route.name !== 'dashboard') {
             dashScrollY = window.scrollY;
         }
+        // 离开客户池页收它的一次性 toast(不挂在 v-pool 子树里,同 pkg 证据模态框先例)。
+        if (prevRouteName === 'pool' && route.name !== 'pool' && window.AI.pool) {
+            AI.pool.onLeave();
+        }
         prevRouteName = route.name;
         setCrumb(route);
         $('v-dashboard').classList.toggle('on', route.name === 'dashboard');
         $('v-client').classList.toggle('on', route.name === 'client');
+        $('v-pool').classList.toggle('on', route.name === 'pool');
         $('navDash').classList.toggle('on', route.name === 'dashboard');
+        $('navTodo').classList.toggle('on', route.name === 'pool');
+        if (route.name === 'pool') {
+            window.scrollTo(0, 0);
+            AI.pool.mount(api);
+            return;
+        }
         if (route.name === 'dashboard') {
             // 回工作台离开了客户独立页——交付包的证据模态框挂在 document.body(不在
             // v-client 子树里),不主动收会悬在工作台上方(ai-pkg.js onLeave 同款注释)。

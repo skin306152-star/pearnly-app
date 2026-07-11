@@ -117,6 +117,33 @@
         return parts[parts.length - 1] || s;
     }
 
+    // D2-S9:「推 LINE 待问」按票面已知信息猜一个默认 question_type,会计仍可在选择面板
+    // 改选——方向不明票天然该问买/卖;数学不自洽票天然该问金额;其余保守落 freeform
+    // (不替会计瞎猜「该不该计这月」,那是 drop 专属场景,没有信号不硬凑)。
+    function suggestQuestionType(entry) {
+        if (isDirectionTicket(entry)) return 'direction';
+        var reason = String((entry && entry.flag_reason) || '').split(':')[0];
+        if (reason === 'amount_math_fail') return 'amount';
+        return 'freeform';
+    }
+
+    // 暂挂请求体(不含 work_order_id——那是调用方已知的当前工单,同 buildDecisionPayload
+    // 不带 order id 一个道理)。question_payload 只喂票面已有的原始读数,不代会计填空。
+    function buildStagePayload(entry, questionType) {
+        if (!entry) return null;
+        var read = entry.ocr_read || {};
+        return {
+            item_id: entry.item_id,
+            question_type: questionType,
+            payload: {
+                supplier: read.seller_tax || '',
+                invno: read.invoice_number || '',
+                amount: read.total_amount || read.vat || '',
+                note: entry.flag_reason || '',
+            },
+        };
+    }
+
     var api = {
         PURCHASE_KIND: PURCHASE_KIND,
         isDirectionTicket: isDirectionTicket,
@@ -127,6 +154,8 @@
         buildDecisionPayload: buildDecisionPayload,
         decisionChipKey: decisionChipKey,
         fileName: fileName,
+        suggestQuestionType: suggestQuestionType,
+        buildStagePayload: buildStagePayload,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) {

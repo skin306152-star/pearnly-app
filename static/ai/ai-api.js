@@ -280,6 +280,35 @@
                 var qs = period ? '?period=' + encodeURIComponent(period) : '';
                 return call('GET', '/api/tax-profile/matrix' + qs);
             },
+            // LINE 待问客户池(D2-S8+S9 · routes/client_pool_routes.py)。stage 是 W3 第四动作
+            // 落点(work_order_id 由调用方按当前工单传入,同 decide() 不把 order id 塞进 body
+            // 一个道理——这里例外是因为 stage 端点不挂在 /orders/{id}/ 下,body 里必须带 id)。
+            stageQuestion: function (workOrderId, body) {
+                return call(
+                    'POST',
+                    '/api/ai/client-pool/stage',
+                    Object.assign({ work_order_id: workOrderId }, body)
+                );
+            },
+            listClientPool: function (workspaceClientId) {
+                var qs =
+                    workspaceClientId != null
+                        ? '?workspace_client_id=' + encodeURIComponent(workspaceClientId)
+                        : '';
+                return call('GET', '/api/ai/client-pool' + qs);
+            },
+            pushClientPoolBatch: function (workspaceClientId) {
+                return call('POST', '/api/ai/client-pool/push-batch', {
+                    workspace_client_id: workspaceClientId,
+                });
+            },
+            decideClientPoolQuestion: function (questionId, body) {
+                return call(
+                    'POST',
+                    '/api/ai/client-pool/questions/' + encodeURIComponent(questionId) + '/decide',
+                    body
+                );
+            },
         };
     }
 

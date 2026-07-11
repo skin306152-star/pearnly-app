@@ -172,7 +172,48 @@
         );
     }
 
-    // ctx: {entry, idx, total, local, editing, editErr, editValue}
+    // D2-S9:审核队列第四动作「推 LINE 待问」(A/E/X 之外·不串键盘裁决流)。pool:
+    // {open, busy, errKey, done} | undefined,按 item_id 独立持有(同 local 的乘载方式)。
+    var _POOL_QTYPES = ['direction', 'amount', 'drop', 'freeform'];
+    function poolPanelHtml(pool) {
+        pool = pool || {};
+        if (pool.done) {
+            return '<div class="rv-pool"><span class="chip s">' + esc(at('rv_pool_done')) + '</span></div>';
+        }
+        var toggleBtn =
+            '<button type="button" class="btn sm" data-action="rv-pool-toggle"' +
+            (pool.busy ? ' disabled' : '') +
+            '>' +
+            esc(at('rv_key_pool')) +
+            ' <span class="kbd">Q</span></button>';
+        if (!pool.open) return '<div class="rv-pool">' + toggleBtn + '</div>';
+        var options = _POOL_QTYPES.map(function (qt) {
+            return (
+                '<button type="button" class="btn sm" data-action="rv-pool-pick" data-qtype="' +
+                qt +
+                '"' +
+                (pool.busy ? ' disabled' : '') +
+                '>' +
+                esc(at('pool_qtype_' + qt)) +
+                '</button>'
+            );
+        }).join('');
+        var err = pool.errKey
+            ? '<div class="rv-pool-err">' + esc(at(pool.errKey)) + '</div>'
+            : '';
+        return (
+            '<div class="rv-pool on">' +
+            toggleBtn +
+            '<div class="rv-pool-options">' +
+            esc(at('rv_pool_pick_hint')) +
+            options +
+            '</div>' +
+            err +
+            '</div>'
+        );
+    }
+
+    // ctx: {entry, idx, total, local, editing, editErr, editValue, pool}
     function cardHtml(ctx) {
         var entry = ctx.entry;
         var read = entry.ocr_read || {};
@@ -203,6 +244,7 @@
                   : '') +
               '</div>'
             : '';
+        var poolHtml = ctx.editing ? '' : poolPanelHtml(ctx.pool);
         return (
             '<h2 class="rv-title">' +
             esc(at('review_title')) +
@@ -240,6 +282,7 @@
             decidedByLine(entry, ctx.local) +
             actionsHtml +
             editHtml +
+            poolHtml +
             '</div></div>' +
             '</div></div>' +
             kbdLine(isDir)

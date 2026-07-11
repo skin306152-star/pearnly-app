@@ -366,6 +366,26 @@
   margin-top: 12px;
 }
 
+/* D2-S9:第四动作「推 LINE 待问」选择面板(A/E/X 之外,独立一行,不挤进 .rv-actions)。 */
+.rv-pool {
+  margin-top: 12px;
+}
+.rv-pool-options {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--mut);
+}
+.rv-pool-err {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--crit);
+  font-weight: 600;
+}
+
 /* 空态/清空态(v4 .rv-done 1:1) */
 .rv-done {
   text-align: center;

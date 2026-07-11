@@ -131,19 +131,33 @@
         );
     }
 
-    // ============ 资产负债表 ============
-
-    function bsSectionHtml(bs, open) {
-        bs = bs || {};
-        var state = balanceState(bs.balanced);
-        var header =
+    // 标题 + 配平徽章头(BS/TB 共用);小节标题 + 科目表(资产/负债/权益/收入/费用共用)。
+    function chipHeaderHtml(titleKey, state) {
+        return (
             '<span>' +
-            esc(at('fin_bs_title')) +
+            esc(at(titleKey)) +
             '</span><span class="chip ' +
             state.cls +
             '">' +
             esc(at(state.key)) +
-            '</span>';
+            '</span>'
+        );
+    }
+
+    function subtitleTable(subtitleKey, rows, emptyKey) {
+        return (
+            '<p class="fin-subtitle">' +
+            esc(at(subtitleKey)) +
+            '</p>' +
+            acctTableHtml(rows, emptyKey)
+        );
+    }
+
+    // ============ 资产负债表 ============
+
+    function bsSectionHtml(bs, open) {
+        bs = bs || {};
+        var header = chipHeaderHtml('fin_bs_title', balanceState(bs.balanced));
         var body =
             '<p class="fin-note">' +
             esc(
@@ -154,18 +168,9 @@
                 })
             ) +
             '</p>' +
-            '<p class="fin-subtitle">' +
-            esc(at('fin_bs_assets')) +
-            '</p>' +
-            acctTableHtml(bs.assets, 'fin_bs_empty') +
-            '<p class="fin-subtitle">' +
-            esc(at('fin_bs_liabilities')) +
-            '</p>' +
-            acctTableHtml(bs.liabilities, 'fin_bs_empty') +
-            '<p class="fin-subtitle">' +
-            esc(at('fin_bs_equity')) +
-            '</p>' +
-            acctTableHtml(equityDisplayRows(bs), 'fin_bs_empty');
+            subtitleTable('fin_bs_assets', bs.assets, 'fin_bs_empty') +
+            subtitleTable('fin_bs_liabilities', bs.liabilities, 'fin_bs_empty') +
+            subtitleTable('fin_bs_equity', equityDisplayRows(bs), 'fin_bs_empty');
         return foldSectionHtml('bs', header, open, body);
     }
 
@@ -180,14 +185,8 @@
             esc(at('fin_pl_net_profit', { amount: money(pl.net_profit) })) +
             '</span>';
         var body =
-            '<p class="fin-subtitle">' +
-            esc(at('fin_pl_revenue')) +
-            '</p>' +
-            acctTableHtml(pl.revenue, 'fin_pl_empty') +
-            '<p class="fin-subtitle">' +
-            esc(at('fin_pl_expense')) +
-            '</p>' +
-            acctTableHtml(pl.expense, 'fin_pl_empty');
+            subtitleTable('fin_pl_revenue', pl.revenue, 'fin_pl_empty') +
+            subtitleTable('fin_pl_expense', pl.expense, 'fin_pl_empty');
         return foldSectionHtml('pl', header, open, body);
     }
 
@@ -209,15 +208,7 @@
 
     function tbSectionHtml(tb, open) {
         tb = tb || {};
-        var state = balanceState(tb.balanced);
-        var header =
-            '<span>' +
-            esc(at('fin_tb_title')) +
-            '</span><span class="chip ' +
-            state.cls +
-            '">' +
-            esc(at(state.key)) +
-            '</span>';
+        var header = chipHeaderHtml('fin_tb_title', balanceState(tb.balanced));
         var rows = tb.rows || [];
         var body =
             '<p class="fin-note">' +

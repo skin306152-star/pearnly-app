@@ -155,3 +155,9 @@ scripts/_ui_audit_full/
 # 不再散落到 scripts/ 根或仓库根。要留作正式工具的脚本才显式提交到 scripts/(不带 _scratch/)。
 /_scratch/
 scripts/_scratch/
+
+# 前端 sourcemap 禁入库(vite 已 sourcemap:false · 双保险;历史曾误提 306 份 3.2MB map 撑爆 .git)
+# 大文件闸见 scripts/check_blob_size.py + CI lint-size
+static/dist/*.map
+*.js.map
+*.css.map

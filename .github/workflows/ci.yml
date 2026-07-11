@@ -116,6 +116,15 @@ jobs:
             python scripts/check_line_ratchet.py
           fi
 
+      - name: 防屎山闸 #3 · 大文件/sourcemap 禁入库(防 .git 膨胀)
+        # 新增/改动 blob > 2.5MB 或 dist/*.map → fail(逃生门:commit 加 BLOB-EXEMPT: <path>)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python scripts/check_blob_size.py --base origin/${{ github.base_ref }} --head HEAD
+          else
+            python scripts/check_blob_size.py
+          fi
+
       - name: 缓存破机械闸 · 产物变则源 HTML ?v= 必 bump(2026-07-10 事故固化 · FAIL 模式)
         # PR 用 origin/master..HEAD 看全 diff;push 用默认 HEAD~1..HEAD
         run: |

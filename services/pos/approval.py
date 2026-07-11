@@ -31,6 +31,15 @@ APPROVE_CODE = "pos.refund.approve"
 # caps 动作(折扣超限/改价)的店长覆盖:授权人须是全权账号(持任一码即可)。
 FULL_CODES = ("pos.admin.manage", "pos.refund.approve")
 
+# 退货/作废动作 → 收银员本人 caps 键。勾上该 cap = 该收银员可直接完成对应操作、免外部
+# 授权人(等同持码);未勾 = 维持店长 PIN 覆盖流。退货与作废共用同一 RBAC 授权码
+# (pos.refund.approve · PS-1 设计:店长权一码通管两操作),故自持权按【具体动作】而非授权码
+# 区分该读哪个 cap —— 免得「可退货」误开成「可作废」。只覆盖这两动作,其它受闸写不读 caps。
+_ACTION_SELF_CAP = {
+    "pos.refund.approved": "can_refund",
+    "pos.void.approved": "can_void",
+}
+
 
 class ManagerApproval(BaseModel):
     # PS-1:收银员无 pos.refund.approve 时,店长在授权窗输入本人收银员身份 + PIN 覆盖。
@@ -45,6 +54,25 @@ def _actor_holds_code(request, user: dict, code: str) -> bool:
     if user.get("role") == "cashier":
         return False
     return deps.actor_has_perm(request, user, code)
+
+
+def _actor_self_cap_grants(
+    cur, *, user: dict, tenant_id: str, workspace_client_id: int, cap_key: Optional[str]
+) -> bool:
+    """操作者是否凭本人 caps(cap_key)自持该动作(免外部授权人)。
+
+    对标 Square/Loyverse「Allow refunds」员工权:勾上 can_refund/can_void 即等同持码放行。
+    受 pos_cashier_caps 闸管辖 —— 闸关时不读 caps、恒 False(行为回落最严 = 需审批,fail-safe,
+    绝不因本路径在闸关时放松任何权限)。cap_key 为空(非退货/作废动作)直接 False(其它受闸写不变)。
+    """
+    if not cap_key:
+        return False
+    if not feature_flags.pos_cashier_caps_enabled_for(tenant_id):
+        return False
+    caps = caps_svc.operator_caps(
+        cur, user=user, tenant_id=tenant_id, workspace_client_id=workspace_client_id
+    )
+    return bool(caps.get(cap_key))
 
 
 def _verify_approver(
@@ -96,6 +124,7 @@ def authorize(
     workspace_client_id: int,
     approval: Optional[dict],
     code: str = APPROVE_CODE,
+    self_cap: Optional[str] = None,
 ) -> Optional[dict]:
     """闸开时授权判定。返回:
 
@@ -104,9 +133,18 @@ def authorize(
 
     无权且未带授权块 → PosError pos.approval_required(前台据此弹店长授权窗);
     授权块校验失败 → pos.approval_denied / pos.pin_invalid。code 默认 pos.refund.approve
-    (退货/作废),调用方可换成其它授权码复用同一骨架。
+    (退货/作废共用的 RBAC 授权码),调用方可换成其它授权码复用同一骨架。self_cap 非空时,
+    收银员本人 caps 勾了该权 = 直接放行、免外部授权人(pos_cashier_caps 闸开时才读)。
     """
     if _actor_holds_code(request, user, code):
+        return None
+    if _actor_self_cap_grants(
+        cur,
+        user=user,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        cap_key=self_cap,
+    ):
         return None
     if not approval:
         raise PosError("pos.approval_required", 403)
@@ -157,6 +195,8 @@ def execute_gated_write(
     (与写同事务),写后审计(须 commit 后独立写、不随退货回滚)。闸关时 guard 放行、不留痕。
     """
     state: dict = {}
+    # 收银员自持权按具体动作选 cap(退货→can_refund / 作废→can_void);共用 RBAC 码不区分二者。
+    self_cap = _ACTION_SELF_CAP.get(action)
 
     def _authorize(cur, ctx):
         state["gated"], state["approver"] = guard(
@@ -167,6 +207,7 @@ def execute_gated_write(
             workspace_client_id=ctx["workspace_client_id"],
             approval=approval,
             code=code,
+            self_cap=self_cap,
         )
 
     def _audit(result, ctx):
@@ -199,11 +240,13 @@ def guard(
     workspace_client_id: int,
     approval: Optional[dict],
     code: str = APPROVE_CODE,
+    self_cap: Optional[str] = None,
 ) -> tuple[bool, Optional[dict]]:
     """退货/作废写前授权闸:返回 (gated, approver)。
 
     闸关 → (False, None),调用方逐字节走历史。闸开 → 跑 authorize,(True, None)=本人有权、
     (True, {..})=店长授权(需审计);无权无授权块或校验失败则由 authorize 抛 PosError。
+    self_cap 透传给 authorize:收银员本人 caps 勾了该权即免外部授权(pos_cashier_caps 闸开时)。
     """
     if not feature_flags.pos_refund_approval_enabled_for(tenant_id):
         return False, None
@@ -214,6 +257,7 @@ def guard(
         tenant_id=tenant_id,
         workspace_client_id=workspace_client_id,
         approval=approval,
+        self_cap=self_cap,
         code=code,
     )
     return True, approver

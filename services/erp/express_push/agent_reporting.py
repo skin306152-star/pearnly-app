@@ -203,6 +203,21 @@ def store_mapping(endpoint_id: str, mapping: Dict[str, Any]) -> bool:
     return _merge_config(endpoint_id, patch)
 
 
+def store_max_payload_version(endpoint_id: str, value: Any) -> bool:
+    """存小助手心跳上报的【最高支持载荷版本】→ config.max_payload_version(整数)。
+
+    preflight 拿它跟 common.PAYLOAD_VERSION 比:上报值更低 → 拦截该端点的推送(提示升级),
+    避免推一份老小助手解析不了的新契约字段。非法值(非数字/<1)→ 不写,视同未上报。
+    """
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return False
+    if n < 1:
+        return False
+    return _merge_config(endpoint_id, {"max_payload_version": n})
+
+
 def mark_offline(endpoint_id: str) -> None:
     """小助手优雅退出 → 把 last_seen 置远古,令前端在线判定(now-seen<180s)立即失败 → 显示离线。"""
     try:

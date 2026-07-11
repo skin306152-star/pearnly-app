@@ -386,6 +386,33 @@ class AccountsChartReportTests(unittest.TestCase):
         self.assertIn("adapter = 'express'", blob)
 
 
+class MaxPayloadVersionTests(unittest.TestCase):
+    """载荷版本协商上报 · store_max_payload_version 单一 DAL 落点。"""
+
+    def test_writes_config(self):
+        cur = FakeCursor()
+        with _patch_cursor(cur):
+            ok = agent_store.store_max_payload_version("ep-1", 2)
+        self.assertTrue(ok)
+        sql, params = cur.executed[0]
+        self.assertIn("adapter = 'express'", sql)
+        self.assertIn('"max_payload_version": 2', params[0])
+
+    def test_rejects_non_numeric(self):
+        cur = FakeCursor()
+        with _patch_cursor(cur):
+            ok = agent_store.store_max_payload_version("ep-1", "not-a-number")
+        self.assertFalse(ok)
+        self.assertEqual(cur.executed, [])
+
+    def test_rejects_below_one(self):
+        cur = FakeCursor()
+        with _patch_cursor(cur):
+            ok = agent_store.store_max_payload_version("ep-1", 0)
+        self.assertFalse(ok)
+        self.assertEqual(cur.executed, [])
+
+
 class HeartbeatReceiveTests(unittest.TestCase):
     def test_heartbeat_stores_accounts_chart(self):
         import asyncio
@@ -434,6 +461,30 @@ class HeartbeatReceiveTests(unittest.TestCase):
         self.assertEqual(res["account_sets_received"], 1)
         self.assertEqual(res["account_set"], "DATAT")
         store.assert_called_once()
+
+    def test_heartbeat_stores_max_payload_version(self):
+        import asyncio
+
+        from routes import erp_agent
+
+        class _Req:
+            headers = {"authorization": "Bearer exp_ep-1_x"}
+
+            async def json(self):
+                return {"max_payload_version": 2}
+
+        ep = {"id": "ep-1", "enabled": True, "config": {}}
+        with (
+            mock.patch.object(erp_agent, "express_push_enabled", return_value=True),
+            mock.patch.object(erp_agent.agent_store, "authenticate", return_value=ep),
+            mock.patch.object(erp_agent.agent_store, "touch_heartbeat"),
+            mock.patch.object(erp_agent.agent_store, "store_account_sets", return_value=0),
+            mock.patch.object(
+                erp_agent.agent_store, "store_max_payload_version", return_value=True
+            ) as store_pv,
+        ):
+            asyncio.run(erp_agent.erp_agent_heartbeat(_Req()))
+        store_pv.assert_called_once_with("ep-1", 2)
 
     def test_heartbeat_empty_body_ok(self):
         import asyncio

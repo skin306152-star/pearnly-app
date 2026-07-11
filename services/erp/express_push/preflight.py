@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 
 from services.erp.express_push import account_set_allowed, chart_codes, express_push_enabled
 from services.erp.express_push import direction as direction_mod
+from services.erp.express_push.common import PAYLOAD_VERSION
 from services.erp.express_push.doc_sanity import check_document
 from services.erp.express_push.mapper import build_express_payload
 from services.erp.express_push.sales_mapper import build_express_sales_payload
@@ -29,6 +30,7 @@ logger = logging.getLogger(__name__)
 CHECK_KEYS = (
     "feature",
     "account_set",
+    "payload_version",
     "direction",
     "direction_enabled",
     "document",
@@ -313,6 +315,23 @@ def preflight_express(
             request_body={"adapter": "express", "account_set": account_set},
         )
     pf.checks.append(Check("account_set", OK))
+
+    # 载荷版本协商:小助手心跳上报过 max_payload_version 且低于当前契约 → 拦下(会推一份它
+    # 解析不了的字段)。未上报(老客户端 · 未升级过心跳)→ 视同支持 1,绝不误拦现有推送。
+    reported_pv = config.get("max_payload_version")
+    if reported_pv is not None:
+        try:
+            supported_pv = int(reported_pv)
+        except (TypeError, ValueError):
+            supported_pv = PAYLOAD_VERSION  # 脏值读不出数 → 不拿它误拦,按支持最新处理
+        if supported_pv < PAYLOAD_VERSION:
+            return _block(
+                pf,
+                "payload_version",
+                reason=f"payload_version_outdated:{supported_pv}",
+                request_body={"adapter": "express", "max_payload_version": supported_pv},
+            )
+    pf.checks.append(Check("payload_version", OK))
 
     try:
         from core import db

@@ -34,10 +34,10 @@ from services.erp.express_push.common import (
     detect_prename,
     extract_line_items,
     fail,
+    finalize_payload,
     payment_verdict_for,
     resolve_account,
     resolve_account_sourced,
-    sanitize_payload_cp874,
     SRC_DEFAULT,
 )
 from services.purchase.field_clean import (
@@ -212,4 +212,4 @@ def build_express_sales_payload(
             "filename": history.get("filename"),
         },
     }
-    return ExpressMapResult(True, sanitize_payload_cp874(payload), "ok")
+    return ExpressMapResult(True, finalize_payload(payload), "ok")

@@ -208,6 +208,17 @@ def sanitize_payload_cp874(obj: Any) -> Any:
     return obj
 
 
+# 载荷契约版本(与小助手协商 · preflight 拿 endpoint 上报的 max_payload_version 比对,
+# 老客户端跟不上新字段就拦下而非推一份它解析不了的载荷)。加不兼容字段才需要 bump。
+PAYLOAD_VERSION = 1
+
+
+def finalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """进项/销项两个 mapper 共用的写盘前收口:盖版本号 + CP874 净化,单一落点不两处复制。"""
+    payload["payload_version"] = PAYLOAD_VERSION
+    return sanitize_payload_cp874(payload)
+
+
 def extract_line_items(
     fields: Dict[str, Any],
     base: Decimal,

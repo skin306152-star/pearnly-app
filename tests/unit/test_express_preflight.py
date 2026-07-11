@@ -180,6 +180,32 @@ class DocumentSanityTests(PreflightBase):
         self.assertEqual(sm["document"], "ok")
 
 
+class PayloadVersionTests(PreflightBase):
+    """载荷版本协商:老小助手(未上报)不拦;上报低于当前契约拦;上报够新放行。"""
+
+    def test_no_report_treated_as_supported_not_blocked(self):
+        pf = preflight_express(_endpoint(), _history())
+        self.assertTrue(pf.ready)
+        pv = next(c for c in pf.checks if c.key == "payload_version")
+        self.assertEqual(pv.status, "ok")
+
+    def test_outdated_report_blocks(self):
+        pf = preflight_express(_endpoint(config={"max_payload_version": 0}), _history())
+        self.assertTrue(pf.blocked)
+        self.assertEqual(pf.reason, "payload_version_outdated:0")
+        sm = _status_map(pf)
+        self.assertEqual(sm["account_set"], "ok")
+        self.assertEqual(sm["payload_version"], "blocked")
+        self.assertEqual(sm["direction"], "pending")
+        self.assertEqual(sm["confidence"], "pending")
+
+    def test_current_report_passes(self):
+        pf = preflight_express(_endpoint(config={"max_payload_version": 1}), _history())
+        self.assertTrue(pf.ready)
+        pv = next(c for c in pf.checks if c.key == "payload_version")
+        self.assertEqual(pv.status, "ok")
+
+
 class DisabledTests(unittest.TestCase):
     def test_disabled_short_circuit(self):
         with mock.patch.dict("os.environ", {"ERP_PUSH_ENABLED": "false"}):

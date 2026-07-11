@@ -115,6 +115,7 @@ from services.erp.express_push.agent_reporting import (  # noqa: E402,F401
     selected_account_changed,
     store_account_sets,
     store_mapping,
+    store_max_payload_version,
     store_reported_accounts,
     store_selected_account,
     touch_heartbeat,

@@ -116,6 +116,10 @@ async def erp_agent_heartbeat(request: Request):
         selected = str(body.get("account_set") or "").strip() or None
         if selected and agent_store.selected_account_changed(cfg, body):
             agent_store.store_selected_account(str(ep["id"]), body)
+        # 载荷版本协商:小助手上报自己最高支持的 payload_version → 存 config,喂 preflight
+        # 的版本闸(老客户端跟不上新契约字段就拦推送,而不是塞一份它解析不了的载荷)。
+        if body.get("max_payload_version") is not None:
+            agent_store.store_max_payload_version(str(ep["id"]), body.get("max_payload_version"))
     return {
         "ok": True,
         "endpoint_id": str(ep["id"]),

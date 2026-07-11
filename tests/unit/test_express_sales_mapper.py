@@ -17,7 +17,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from services.erp.express_push.common import SRC_BANK, SRC_MANUAL  # noqa: E402
+from services.erp.express_push.common import (  # noqa: E402
+    PAYLOAD_VERSION,
+    SRC_BANK,
+    SRC_MANUAL,
+)
 from services.erp.express_push.sales_mapper import build_express_sales_payload  # noqa: E402
 
 _CONFIG = {
@@ -73,6 +77,8 @@ class ExpressSalesMapperTests(unittest.TestCase):
         # 收入科目落账套默认(无品类映射)→ 来源诚实标 config_default · 待核。
         self.assertEqual(p["account_source"], "config_default")
         self.assertTrue(p["account_review"])
+        # 载荷版本协商(preflight 拿它跟 endpoint 上报的 max_payload_version 比对)。
+        self.assertEqual(p["payload_version"], PAYLOAD_VERSION)
 
     def test_customer_new_when_unmapped(self):
         r = build_express_sales_payload(_sales_history(), config=_CONFIG)

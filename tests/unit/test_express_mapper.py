@@ -18,6 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from services.erp.express_push.common import (  # noqa: E402
+    PAYLOAD_VERSION,
     SRC_BANK,
     SRC_MANUAL,
     SRC_PROFILE,
@@ -85,6 +86,8 @@ class ExpressMapperTests(unittest.TestCase):
         self.assertEqual(p["doc_lane"], "goods")
         self.assertEqual(p["item_src"], SRC_MANUAL)
         self.assertNotIn("vat_capitalized", p)
+        # 载荷版本协商(preflight 拿它跟 endpoint 上报的 max_payload_version 比对)。
+        self.assertEqual(p["payload_version"], PAYLOAD_VERSION)
 
     def test_verified_official_name_preferred(self):
         # ③ 官方名核验:已核验 → 行摘要用税局 RD 官方抬头(进账更干净)

@@ -48,12 +48,12 @@ from services.erp.express_push.common import (
     detect_prename,
     extract_line_items,
     fail,
+    finalize_payload,
     ITEM_MODE_NONSTOCK,
     ITEMS_OK,
     payment_verdict_for,
     resolve_account,
     resolve_account_sourced,
-    sanitize_payload_cp874,
     SRC_DEFAULT,
 )
 from services.purchase.field_clean import (
@@ -256,4 +256,4 @@ def build_express_payload(
     if is_expense:
         # 留痕:这张票原本会读到多少进项税,现改折进成本(VAT capitalized · 排障/对账用)。
         payload["vat_capitalized"] = vat_capitalized
-    return ExpressMapResult(True, sanitize_payload_cp874(payload), "ok")
+    return ExpressMapResult(True, finalize_payload(payload), "ok")

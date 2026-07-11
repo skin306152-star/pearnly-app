@@ -156,6 +156,23 @@
                     })
                     .then(handleResponse);
             },
+            // 销项税报告三查(N1-a · routes/vat_report_checks_routes.py):multipart 单文件上传,
+            // 同 addMaterials 不能走 call()(要让浏览器带 multipart boundary)。响应即三查结果,
+            // 不经 callEnvelope(该端点裸对象出线,无信封)。
+            runVatReportChecks: function (file) {
+                var token = getToken();
+                var headers = {};
+                if (token) headers.Authorization = 'Bearer ' + token;
+                var fd = new FormData();
+                fd.append('report', file);
+                return root
+                    .fetch('/api/vat_report_checks/run', {
+                        method: 'POST',
+                        headers: headers,
+                        body: fd,
+                    })
+                    .then(handleResponse);
+            },
             // 交付物下载(W5 交付包页):鉴权头是 Bearer,<a href> 发不了自定义头,调用方拿
             // blob 自建 object URL 触发下载(同 console.js exportLog 的 fetch+blob 先例)。
             // 文件名从服务端 Content-Disposition 读(FileResponse 已带 filename=真实文件名),

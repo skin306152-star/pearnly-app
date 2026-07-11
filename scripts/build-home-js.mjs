@@ -117,6 +117,11 @@ const BUNDLES = [
             'ai/ai-profile.js',
             'ai/ai-client-pool-render.js',
             'ai/ai-client-pool.js',
+            // ai-vatcheck-render.js(N1 · 销项税报告三查纯逻辑+HTML,依赖 AI.state/format)
+            // 排在 ai-vatcheck.js(上传/运行/挂载编排)之前,两者都在 ai.js(onRoute 用
+            // AI.vatcheck.mount)之前——同 ai-client-pool 先例(顶层独立视图,不挂客户页下)。
+            'ai/ai-vatcheck-render.js',
+            'ai/ai-vatcheck.js',
             'ai/ai-client.js',
             'ai/ai.js',
         ],

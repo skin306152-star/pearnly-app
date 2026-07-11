@@ -166,6 +166,10 @@ const AI_CSS = [
     // ai-client-pool.css(D2-S8 客户池页)只吃 ai-theme 令牌 + ai-shell 的 .panel/.chip/.btn,
     // 排最后即可(与其余视图互斥显示,层叠顺序对彼此零影响)。
     'ai/ai-client-pool.css',
+    // ai-vatcheck.css(N1 · 销项税报告三查)复用 ai-intake.css 的 .dropzone/.dz-* 上传区 +
+    // ai-matrix.css 的 .mx-scroll/.mx-table 宽表格容器,排在两者之后即可;与其余视图
+    // 互斥显示,层叠顺序对彼此零影响。
+    'ai/ai-vatcheck.css',
 ];
 
 const BUNDLES = [

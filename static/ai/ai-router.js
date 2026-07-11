@@ -28,6 +28,9 @@
         // 「待我处理」(D2-S8 客户池·跨客户会计队列):独立顶层路由,不挂在某个客户的
         // 四视图之下(client-pool 是按客户分组的会计工作队列,不是单客户 tab)。
         if (h === '/pool') return { name: 'pool' };
+        // 「销项税报告三查」(N1 · 顶层独立工具):上传一份报告文件即可查,不依赖任何
+        // 客户/工单上下文,同 /pool 一样是独立顶层路由。
+        if (h === '/vatcheck') return { name: 'vatcheck' };
         var m = /^\/client\/([^/]+)\/?([^/]*)$/.exec(h);
         if (!m) return { name: 'dashboard', sub: DEFAULT_SUB };
         var clientId = decodeURIComponent(m[1]);
@@ -54,6 +57,10 @@
         return '#/pool';
     }
 
+    function buildVatcheckHash() {
+        return '#/vatcheck';
+    }
+
     // onChange(route) 在启动时立即调一次,并在每次 hashchange 后调用。
     function subscribe(onChange) {
         function fire() {
@@ -75,6 +82,7 @@
         buildDashboardHash: buildDashboardHash,
         buildBoardHash: buildBoardHash,
         buildPoolHash: buildPoolHash,
+        buildVatcheckHash: buildVatcheckHash,
         subscribe: subscribe,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

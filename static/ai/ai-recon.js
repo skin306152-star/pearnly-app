@@ -128,8 +128,10 @@
         if (!el) return;
         var action = el.getAttribute('data-action');
         if (action === 'brx-fold') toggleFold(el.getAttribute('data-kind'), container);
-        else if (action === 'brx-view') openView(el.getAttribute('data-kind'), el.getAttribute('data-key'));
-        else if (action === 'brx-stage') stageMissing(Number(el.getAttribute('data-idx')), container);
+        else if (action === 'brx-view')
+            openView(el.getAttribute('data-kind'), el.getAttribute('data-key'));
+        else if (action === 'brx-stage')
+            stageMissing(Number(el.getAttribute('data-idx')), container);
     }
 
     // ============ 挂载 ============

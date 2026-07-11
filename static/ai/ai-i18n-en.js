@@ -372,7 +372,8 @@ window.__AI_I18N_EN__ = {
     // E2 · Bank reconciliation (work order detail, wo view)
     brx_title: 'Bank reconciliation',
     brx_disabled_t: 'Bank reconciliation not available',
-    brx_disabled_s: "This work order hasn't enabled bank reconciliation, or no bank statement has arrived yet",
+    brx_disabled_s:
+        "This work order hasn't enabled bank reconciliation, or no bank statement has arrived yet",
     brx_ok_chip: 'Reconciled',
     brx_diff_chip: 'Discrepancy found',
     brx_diff_net: 'Net difference {net}',
@@ -393,7 +394,8 @@ window.__AI_I18N_EN__ = {
     brx_pool_err: 'Failed to send, please retry',
     brx_pool_note_tpl:
         'Bank transaction on {date} ({dir} {amount}) has no matching receipt yet — please send the receipt/invoice',
-    brx_unmatched_hint: 'This invoice has no matching bank transaction (may be cash payment or a different month)',
+    brx_unmatched_hint:
+        'This invoice has no matching bank transaction (may be cash payment or a different month)',
     brx_unmatched_goto: 'Add materials',
     brx_view_title_invoice: 'Original invoice',
     brx_view_title_bank: 'Original bank statement',

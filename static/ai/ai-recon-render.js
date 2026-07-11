@@ -44,7 +44,11 @@
         };
     }
 
-    var pure = { hasGap: hasGap, diffState: diffState, buildMissingStagePayload: buildMissingStagePayload };
+    var pure = {
+        hasGap: hasGap,
+        diffState: diffState,
+        buildMissingStagePayload: buildMissingStagePayload,
+    };
     if (typeof module !== 'undefined' && module.exports) module.exports = pure;
 
     // ===== 以下为浏览器 HTML 拼装(依赖 at()/AI.state/AI.format/AI.viewer,node 不调用)=====
@@ -228,7 +232,10 @@
                 '<div class="panel"><div class="hd"><h3>' +
                 esc(at('brx_title')) +
                 '</h3></div><div class="bd">' +
-                root.AI.state.emptyHtml({ title: at('brx_disabled_t'), sub: at('brx_disabled_s') }) +
+                root.AI.state.emptyHtml({
+                    title: at('brx_disabled_t'),
+                    sub: at('brx_disabled_s'),
+                }) +
                 '</div></div>'
             );
         }

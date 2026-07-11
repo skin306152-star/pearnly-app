@@ -1,0 +1,87 @@
+/* Pearnly AI · 月度报表包区(G1b · 工单详情 wo 视图)——五分区折叠(资产负债表/损益表/
+ * 试算平衡表/账龄/折旧)。折叠头/胶囊沿用 .panel/.chip 原子(ai-shell.css);科目金额表
+ * 复用 .mx-scroll/.mx-table + td.num(ai-matrix.css/ai-vatcheck.css,同为"宽表格容器内
+ * 横滑 + 数字右对齐"的通用原子);本文件只加报表包特有的折叠壳与提示样式,不重复
+ * ai-shadow.css 的类名——两区块折叠态各自独立,类名撞车会互相污染样式。
+ */
+.fin-body-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fin-section {
+  border: 1px solid var(--hair);
+  border-radius: 11px;
+  overflow: hidden;
+}
+.fin-fold {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--surface2);
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--ink);
+  text-align: left;
+}
+.fin-caret {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mut);
+}
+.fin-body {
+  display: none;
+  padding: 10px 14px 14px;
+}
+.fin-section.on .fin-body {
+  display: block;
+}
+.fin-empty {
+  color: var(--mut);
+  font-size: 12px;
+  padding: 8px 2px;
+}
+.fin-note {
+  font-size: 11.5px;
+  color: var(--mut);
+  line-height: 1.6;
+  margin: 2px 0 8px;
+}
+.fin-hint {
+  font-size: 11.5px;
+  color: var(--warn);
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-line);
+  border-radius: 9px;
+  padding: 8px 12px;
+  margin: 0;
+}
+.fin-subtitle {
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--ink2);
+  margin: 10px 0 4px;
+}
+.fin-subtitle:first-child {
+  margin-top: 0;
+}
+/* 本期损益(未分配利润)行:非预置科目,斜体区分于真实科目行,提示这是计算得出而非过账。 */
+.fin-earnings-row td {
+  font-style: italic;
+}
+
+@media (max-width: 480px) {
+  .fin-fold {
+    font-size: 12px;
+    padding: 11px 12px;
+  }
+  .fin-body {
+    padding: 8px 12px 12px;
+  }
+}

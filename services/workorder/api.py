@@ -181,6 +181,7 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         "numbers": _numbers(events),
         "bank_recon": _bank_recon(events, items),
         "shadow_draft": _shadow_draft(events),
+        "financials": _financials(events),
         "deliverables": [
             {"kind": d["kind"], "numbers": d.get("numbers") or {}} for d in deliverables
         ],
@@ -219,6 +220,22 @@ def _shadow_draft(events: list[dict]) -> Optional[dict]:
     if not isinstance(shadow, dict) or "trial_balance" not in shadow:
         return None
     return shadow
+
+
+def _financials(events: list[dict]) -> Optional[dict]:
+    """R6 月度报表三件套只读投影(G1b 报表包视图读侧)。
+
+    从 reconcile 步 step_done 回放里深取 gates.r6_financials——闸关(无 r6_financials 键)/
+    影子跳过(无科目余额可算)/ 尚未跑到 reconcile / 引擎异常降级(_run_shadow_financials 的
+    except 落 {error,note:financials_skipped} 残影,缺 balance_sheet)一律诚实给 None,不拼一份
+    假报表充数(状态诚实优先于"看着有内容")。"""
+    payload = evidence.replay_step_done(events, _DECISION_STEP)
+    if not payload:
+        return None
+    fin = (payload.get("gates") or {}).get("r6_financials")
+    if not isinstance(fin, dict) or "balance_sheet" not in fin:
+        return None
+    return fin
 
 
 def _flagged(items: list[dict], events: list[dict]) -> list[dict]:

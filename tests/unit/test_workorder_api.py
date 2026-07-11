@@ -260,6 +260,87 @@ class BankReconTests(_ApiTestBase):
         self.assertIsNone(detail["bank_recon"])
 
 
+class FinancialsTests(_ApiTestBase):
+    """G1b 契约:order_detail 的 financials 字段只读投影 gates.r6_financials(闸开+影子科目
+    余额在场才带 BS/PL/TB 三件套,闸关/影子跳过/未跑到 reconcile/引擎异常降级一律诚实 None)。"""
+
+    def _financials_payload(self):
+        return {
+            "period": "2569-05",
+            "balance_sheet": {
+                "assets": [{"code": "1000", "name_zh": "现金", "amount": "918894.77"}],
+                "liabilities": [{"code": "2000", "name_zh": "应付账款", "amount": "478080.53"}],
+                "equity": [],
+                "current_earnings": "440814.24",
+                "asset_total": "918894.77",
+                "liability_total": "478080.53",
+                "equity_total": "440814.24",
+                "diff": "0.00",
+                "balanced": True,
+            },
+            "profit_loss": {
+                "revenue": [],
+                "expense": [],
+                "revenue_total": "440814.24",
+                "expense_total": "0.00",
+                "net_profit": "440814.24",
+            },
+            "trial_balance": {"rows": [], "debit": "918894.77", "credit": "918894.77", "balanced": True},
+            "ar_ap_aging": {"source": "not_wired", "status": "unavailable", "note": "..."},
+            "depreciation": {"source": "not_wired", "status": "unavailable", "note": "..."},
+            "unclassified_accounts": [],
+        }
+
+    def test_financials_present_when_gate_open_and_computed(self):
+        self.store.events = [
+            {
+                "step": "reconcile",
+                "event_type": "step_done",
+                "payload": {"gates": {"r6_financials": self._financials_payload()}},
+            },
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        fin = detail["financials"]
+        self.assertIsNotNone(fin)
+        self.assertTrue(fin["balance_sheet"]["balanced"])
+        self.assertEqual(fin["balance_sheet"]["asset_total"], "918894.77")
+        self.assertEqual(fin["profit_loss"]["net_profit"], "440814.24")
+
+    def test_financials_none_when_gate_closed(self):
+        # 闸关:reconcile 没跑 R5/R6,gates 无 r6_financials 键。
+        self.store.events = [
+            {
+                "step": "reconcile",
+                "event_type": "step_done",
+                "payload": {"gates": {"r4_trial_balance": {"balanced": True}}},
+            },
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertIsNone(detail["financials"])
+
+    def test_financials_none_when_reconcile_not_reached(self):
+        self.store.events = []
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertIsNone(detail["financials"])
+
+    def test_financials_none_when_engine_error_shape(self):
+        # _run_shadow_financials 的 except 分支落 {"error":..., "note": "financials_skipped"} ——
+        # 形状不全(缺 balance_sheet)不能冒充可用报表。
+        self.store.events = [
+            {
+                "step": "reconcile",
+                "event_type": "step_done",
+                "payload": {
+                    "gates": {
+                        "r6_financials": {"error": "RuntimeError", "note": "financials_skipped"}
+                    }
+                },
+            },
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertIsNone(detail["financials"])
+
+
 class FlaggedEnrichmentTests(_ApiTestBase):
     """W3 契约 §1.2/§5:flagged[] 每条带 ocr_read(票面钱字段)+ decision(最新裁决)。"""
 

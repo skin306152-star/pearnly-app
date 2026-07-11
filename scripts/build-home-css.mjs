@@ -159,6 +159,11 @@ const AI_CSS = [
     // .mx-table(ai-matrix.css,科目余额表复用宽表格容器内横滑原子),排在两者之后即可;
     // 与银行对账区(ai-recon.css)同屏但类名各自独立,层叠顺序对彼此零影响。
     'ai/ai-shadow.css',
+    // ai-financials.css(G1b · 月度报表包五分区折叠)吃 .panel/.chip(ai-shell.css)+
+    // .mx-scroll/.mx-table(ai-matrix.css/ai-vatcheck.css,科目金额表复用宽表格容器内横滑 +
+    // 数字右对齐原子),排在两者之后即可;与影子底稿区(ai-shadow.css)同屏但类名各自独立,
+    // 层叠顺序对彼此零影响。
+    'ai/ai-financials.css',
     // ai-profile.css(B2-e 画像/别名/义务清单)吃 .sf-*(ai-intake.css)/.panel/.chip
     // (ai-shell.css)原子,排在两者之后即可;与 pkg 视图互斥显示,顺序对彼此零影响。
     'ai/ai-profile.css',

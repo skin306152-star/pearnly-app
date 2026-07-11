@@ -166,15 +166,9 @@
     function renderRefund() {
         const s = refundSale;
         const head = s.sale;
+        // methodLabel 走 posui.pay.*(qr→promptpay 归一,方式齐全);shift.method.* 缺 qr/transfer 键会出裸键
         const paymentSummary = (s.payments || [])
-            .map(
-                (p) =>
-                    POS.t(
-                        'posui.shift.method.' + (p.method === 'promptpay' ? 'promptpay' : p.method)
-                    ) +
-                    ' ฿' +
-                    fmt(p.amount)
-            )
+            .map((p) => methodLabel(p.method) + ' ฿' + fmt(p.amount))
             .join(' · ');
         const lines = s.lines
             .map((l) => {

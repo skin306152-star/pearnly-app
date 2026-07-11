@@ -261,3 +261,43 @@ def transition(
             return dict(updated)
 
     return _with_heal(_run)
+
+
+def mark_sent(tenant_id, question_id, batch_id) -> dict:
+    """staged→pending 且原子盖 batch_id(S4 攒批推送成功后逐行落定 · 方案 §7.2 S4)。
+
+    transition() 没有 batch_id 写入口(通用跳转不知道"这是不是一次批量推送"),
+    专开此函数而不是把 batch_id 塞进 transition() 的通用签名——避免其余跳转路径
+    (人工裁决/自动关闭)误传/误留旧 batch_id。合法性仍过 LEGAL_TRANSITIONS,
+    CAS 用 WHERE status=<当前值> 同 transition() 语义,不绕状态机。
+    """
+    from core import db
+
+    to_status = vocab.PENDING
+
+    def _run():
+        with db.get_cursor_rls(str(tenant_id), commit=True) as cur:
+            cur.execute(
+                "SELECT status FROM line_client_questions WHERE tenant_id = %s AND id = %s",
+                (str(tenant_id), question_id),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise ClientPoolError(f"question not found: {question_id}")
+            current = row["status"]
+            if not vocab.is_legal_transition(current, to_status):
+                raise IllegalTransitionError(current, to_status)
+
+            cur.execute(
+                "UPDATE line_client_questions SET status = %s, batch_id = %s, "
+                "sent_at = now(), updated_at = now() "
+                "WHERE tenant_id = %s AND id = %s AND status = %s "
+                f"RETURNING {_COLUMNS}",
+                (to_status, str(batch_id), str(tenant_id), question_id, current),
+            )
+            updated = cur.fetchone()
+            if not updated:
+                raise IllegalTransitionError(current, to_status)
+            return dict(updated)
+
+    return _with_heal(_run)

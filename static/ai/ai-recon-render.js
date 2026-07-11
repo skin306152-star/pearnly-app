@@ -102,33 +102,21 @@
         );
     }
 
-    function autoRowHtml(entry) {
+    // 三张带流水行的清单(auto/review/missing)共用外壳:流水行 + 差异化内层。
+    function rowShell(txText, restHtml) {
         return (
-            '<div class="brx-row">' +
-            '<span class="brx-tx">' +
-            txLineText(entry.tx) +
-            '</span>' +
-            candidateLineHtml({
-                candidate_id: entry.candidate_id,
-                score: entry.score,
-                reason: entry.reason,
-            }) +
-            '</div>'
+            '<div class="brx-row"><span class="brx-tx">' + txText + '</span>' + restHtml + '</div>'
         );
+    }
+
+    function autoRowHtml(entry) {
+        // auto_matched 记录自带 candidate_id/score/reason,直接喂 candidateLineHtml。
+        return rowShell(txLineText(entry.tx), candidateLineHtml(entry));
     }
 
     function reviewRowHtml(entry) {
         var cands = (entry.candidates || []).map(candidateLineHtml).join('');
-        return (
-            '<div class="brx-row">' +
-            '<span class="brx-tx">' +
-            txLineText(entry.tx) +
-            '</span>' +
-            '<div class="brx-cands">' +
-            cands +
-            '</div>' +
-            '</div>'
-        );
+        return rowShell(txLineText(entry.tx), '<div class="brx-cands">' + cands + '</div>');
     }
 
     // missingState: {busy, done, errKey} | undefined(按行 idx 独立持有,ai-recon.js 状态机)。
@@ -150,17 +138,13 @@
         var err = missingState.errKey
             ? '<div class="brx-err">' + esc(at(missingState.errKey)) + '</div>'
             : '';
-        return (
-            '<div class="brx-row">' +
-            '<span class="brx-tx">' +
-            txLineText(entry) +
-            '</span>' +
+        return rowShell(
+            txLineText(entry),
             '<div class="brx-actions">' +
-            viewBtn('bank', entry._bankItemId) +
-            action +
-            '</div>' +
-            err +
-            '</div>'
+                viewBtn('bank', entry._bankItemId) +
+                action +
+                '</div>' +
+                err
         );
     }
 

@@ -86,7 +86,7 @@ def candidates_from_events(events: list[dict]) -> list[dict]:
 
     只收带票面 money 的票(进项票 + 方向不明票——两者 classify 都快照了钱字段);
     non_tax 裁决的票排除(已判无税务要素,不该进对账)。字段映射:
-      total_amount → amount_total / total(打分引擎金额位)
+      total_amount → amount_total(打分引擎金额位;引擎侧自带 amount_total or total 兜底)
       invoice_date → invoice_date(日期位;classify 由 OCR date 快照,缺则日期分为 0)
       seller_name  → vendor(关键词位,软加分)
       invoice_number → invoice_no
@@ -106,7 +106,6 @@ def candidates_from_events(events: list[dict]) -> list[dict]:
             {
                 "id": item_id,
                 "amount_total": money.get("total_amount"),
-                "total": money.get("total_amount"),
                 "invoice_date": money.get("invoice_date"),
                 "vendor": money.get("vendor"),
                 "invoice_no": money.get("invoice_number"),
@@ -116,25 +115,33 @@ def candidates_from_events(events: list[dict]) -> list[dict]:
     return out
 
 
-def tx_from_statement_row(row: Any) -> dict:
-    """StatementRow(dataclass)→ 打分引擎期望的银行流水字典。
-
-    方向约定沿用 deposit↔IN、withdrawal↔OUT(bank_recon_types 的方向约定)。金额取动的
-    那一侧的绝对值(存款额或取款额),两侧都 0 的行(纯 B/F)金额为 0——不会命中任何候选。
-    """
-    deposit = _dec(getattr(row, "deposit", 0))
-    withdrawal = _dec(getattr(row, "withdrawal", 0))
+def _tx_dict(
+    deposit: Decimal, withdrawal: Decimal, tx_date: Optional[str], description: str
+) -> dict:
+    """银行流水行的统一打分字典。方向按存/取哪侧有动定(deposit↔IN、withdrawal↔OUT),
+    金额取动的那一侧绝对值;两侧都 0 的行(纯 B/F)金额为 0,不命中任何候选。
+    `_amount` 留 Decimal 供清算,`amount` 是打分引擎的金额位(float)。"""
     direction = "IN" if deposit > withdrawal else "OUT"
     amount = deposit if direction == "IN" else withdrawal
-    d = getattr(row, "date", None)
-    tx_date = d.isoformat() if hasattr(d, "isoformat") else (str(d) if d else None)
     return {
         "amount": float(amount),
         "tx_date": tx_date,
         "direction": direction,
-        "description": getattr(row, "description", "") or "",
+        "description": description or "",
         "_amount": amount,
     }
+
+
+def tx_from_statement_row(row: Any) -> dict:
+    """StatementRow(dataclass)→ 打分引擎期望的银行流水字典(bank_recon_types 的方向约定)。"""
+    d = getattr(row, "date", None)
+    tx_date = d.isoformat() if hasattr(d, "isoformat") else (str(d) if d else None)
+    return _tx_dict(
+        _dec(getattr(row, "deposit", 0)),
+        _dec(getattr(row, "withdrawal", 0)),
+        tx_date,
+        getattr(row, "description", "") or "",
+    )
 
 
 def tx_from_gt_entry(entry: dict) -> dict:
@@ -143,17 +150,12 @@ def tx_from_gt_entry(entry: dict) -> dict:
     语料每条带 deposit/withdrawal/transaction_date/description(见 bank_kbank_01.json),
     直接映射,供对账金标测试复用同一条打分路径。
     """
-    deposit = _dec(entry.get("deposit"))
-    withdrawal = _dec(entry.get("withdrawal"))
-    direction = "IN" if deposit > withdrawal else "OUT"
-    amount = deposit if direction == "IN" else withdrawal
-    return {
-        "amount": float(amount),
-        "tx_date": entry.get("transaction_date"),
-        "direction": direction,
-        "description": entry.get("description") or "",
-        "_amount": amount,
-    }
+    return _tx_dict(
+        _dec(entry.get("deposit")),
+        _dec(entry.get("withdrawal")),
+        entry.get("transaction_date"),
+        entry.get("description") or "",
+    )
 
 
 @dataclass
@@ -219,9 +221,9 @@ def reconcile_workorder(
                 }
             )
         elif top and top["score"] >= thresh_suggest:
-            for s in scored:
-                if s["score"] >= thresh_suggest:
-                    touched_candidate_ids.add(s["history_id"])
+            qualifying = [s for s in scored if s["score"] >= thresh_suggest]
+            for s in qualifying:
+                touched_candidate_ids.add(s["history_id"])
             result.review.append(
                 {
                     "tx": _tx_view(tx),
@@ -231,8 +233,7 @@ def reconcile_workorder(
                             "score": s["score"],
                             "reason": s["reason"],
                         }
-                        for s in scored
-                        if s["score"] >= thresh_suggest
+                        for s in qualifying
                     ],
                 }
             )
@@ -245,7 +246,7 @@ def reconcile_workorder(
     for cand in candidates:
         if cand["id"] in touched_candidate_ids:
             continue
-        amt = _dec(cand.get("amount_total") or cand.get("total"))
+        amt = _dec(cand.get("amount_total"))
         unmatched_total += amt
         result.unmatched_invoice.append(
             {

@@ -9,7 +9,8 @@
 四道闸语义:
   R1 进项税=Σ票面   flagged 无裁决 → stuck(点名每张票),绝不默认吞进合计。
   R2 销项合计=POS直读 无可用直读源 → needs(["sales_summary"])。
-  R3 银行           M0 只判材料就绪(有 bank_statement 件即就绪),缺则记备忘不 stuck。
+  R3 银行           缺流水记备忘不 stuck;有流水时闸 pearnly_ai_bank_recon 开则逐笔真对平
+                    (缺票/未达两清单进证据链,佐证层绝不阻断 package),闸关维持只判材料就绪。
   R4 试算平衡        进销派生内部分录,Σ借≠Σ贷(容差 0.01)→ stuck。纯函数,不落库、不碰
                     accounting 模块开关、不写任何真租户数据(真复式引擎接线留 M1)。
 """

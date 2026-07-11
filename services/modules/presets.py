@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """业态预设 — business_type → 该开的模块组合(平台业态套餐 · docs/platform-onboarding/02)。
 
-平台 onboarding(注册选业态 / 设置切换业态)调 apply_preset:把 KNOWN_MODULES 7 个模块逐个
-按预设翻开关(在预设里→开,不在→关),并记录 business_type。只翻 enabled(config=None),
-不动既有 config、不建 POS 硬件(终端/收银员/默认仓走 services/pos/onboarding 屏8)。
+调用方(注册流默认静默套用 firm / Earn 运营侧开通 POS)调 apply_preset:把 KNOWN_MODULES
+7 个模块逐个按预设翻开关(在预设里→开,不在→关),并记录 business_type。只翻 enabled
+(config=None),不动既有 config、不建 POS 硬件(终端/收银员/默认仓走 services/pos/onboarding 屏8)。
+平台业态自选板块已下架(Zihao 2026-07-11 拍板)——本函数不再由客户自选触发。
 
 注意两层「预设」互不替代:
   - 本模块 = 平台【模块】预设(哪些模块出现)。
@@ -19,10 +20,12 @@ from services.modules import store
 # sales 在所有业态都开(平台主线尖刀)。未列业态拒绝(onboarding 报 unknown_business_type)。
 # accounting(自动做账)全业态都开:经营动作即输入是平台主线(docs/product-vision/00)。
 #
-# pos_only 例外:POS 拆卖精简外壳(PS-2 · POS-体检报告 §5.3)。刻意不开 sales/accounting——
-# 这不是正常商户业态,是给拆卖租户锁死的收银小店壳(只留收银+库存),会计/报税/识别菜单
-# 对这类账号根本不该出现,不走平台主线尖刀那条默认开 sales 的惯例。不进自助业态选择器
-# TYPES 卡片列表(onboarding-business.ts)——只走运营侧显式打标,不给客户自选。
+# pos_only = POS 独立板块商家(Earn 邀请制 · Zihao 2026-07-11 拍板:被邀请即全功能可用,
+# 不再有二道开关)。模块集合须覆盖 POS 老板后台壳(src/home/nav-presets.ts POS_PRESET 侧栏
+# 白名单)暴露的全部功能——商品/发票(sales)、费用/采购(expense)、库存、收银、
+# 无头记账引擎(accounting · 全业态惯例,后台记账不进侧栏)。knowledge/recon/receivable
+# 不在壳内,仍不开。不进自助业态选择器(平台业态自选板块已下架)——只走运营侧
+# Earn 开通,不给客户自选。
 BUSINESS_PRESETS: dict[str, list[str]] = {
     "firm": ["sales", "expense", "recon", "knowledge", "accounting"],
     "retail": ["sales", "inventory", "pos", "accounting"],
@@ -30,7 +33,7 @@ BUSINESS_PRESETS: dict[str, list[str]] = {
     "restaurant": ["sales", "inventory", "pos", "accounting"],
     "service": ["sales", "expense", "accounting"],
     "b2b": ["sales", "inventory", "receivable", "expense", "accounting"],
-    "pos_only": ["pos", "inventory"],
+    "pos_only": ["pos", "inventory", "sales", "expense", "accounting"],
 }
 
 

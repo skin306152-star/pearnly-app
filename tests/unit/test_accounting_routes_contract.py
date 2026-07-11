@@ -102,13 +102,9 @@ class AccountingRoutesContractTests(unittest.TestCase):
 
         self.assertIn("accounting", KNOWN_MODULES)
         self.assertFalse(DEFAULT_ENABLED["accounting"])
-        # pos_only 豁免:POS 拆卖锁死壳,非正常商户业态(PS-2 · POS-体检报告 §5.3),
-        # 产品拍板刻意不开 accounting——不是放宽契约,是把已拍板的例外显式登记。
-        exempt = {"pos_only"}
+        # 全预设(含 pos_only)都开 accounting:无头记账引擎是全业态惯例(Zihao 2026-07-11
+        # 拍板:被邀请的 POS 商家开通即全功能可用,accounting 不再豁免)。
         for business_type, keys in BUSINESS_PRESETS.items():
-            if business_type in exempt:
-                self.assertNotIn("accounting", keys, f"{business_type} 豁免档不该悄悄开 accounting")
-                continue
             self.assertIn("accounting", keys, f"{business_type} 预设缺 accounting")
 
 

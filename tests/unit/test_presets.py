@@ -37,10 +37,8 @@ class PresetTableTests(unittest.TestCase):
         )
 
     def test_every_preset_includes_sales_and_only_known_keys(self):
-        # pos_only 例外(PS-2 拆卖精简外壳):刻意不开 sales,不算平台主线尖刀那条通用惯例。
         for biz, keys in presets.BUSINESS_PRESETS.items():
-            if biz != "pos_only":
-                self.assertIn("sales", keys, f"{biz} 必含 sales(平台主线)")
+            self.assertIn("sales", keys, f"{biz} 必含 sales(平台主线)")
             for k in keys:
                 self.assertIn(k, store.KNOWN_MODULES, f"{biz} 用了非法 module_key {k}")
 
@@ -48,9 +46,14 @@ class PresetTableTests(unittest.TestCase):
         self.assertTrue(presets.is_known("retail"))
         self.assertFalse(presets.is_known("casino"))
 
-    def test_pos_only_opens_only_pos_and_inventory(self):
-        # PS-2:拆卖精简外壳只留收银+库存,会计/报税/识别/应收全不开。
-        self.assertEqual(set(presets.BUSINESS_PRESETS["pos_only"]), {"pos", "inventory"})
+    def test_pos_only_opens_five_modules(self):
+        # Zihao 2026-07-11 拍板:被邀请的 POS 商家开通即全功能可用(写死),不再有二道开关。
+        # 五模块覆盖 POS 老板后台壳(nav-presets.ts POS_PRESET)暴露的全部功能;
+        # knowledge/recon/receivable 不在壳内,仍不开。
+        self.assertEqual(
+            set(presets.BUSINESS_PRESETS["pos_only"]),
+            {"pos", "inventory", "sales", "expense", "accounting"},
+        )
 
 
 class ApplyPresetTests(unittest.TestCase):

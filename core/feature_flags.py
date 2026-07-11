@@ -220,19 +220,21 @@ def pearnly_ai_m1_enabled_for(tenant_id: Optional[str], user_id: Optional[str]) 
 
 
 def pos_refund_approval_enabled_for(tenant_id: Optional[str]) -> bool:
-    """POS 退货/作废店长授权闸。关 = 退货/作废权限校验现状不变(不校验、不弹授权)。
+    """POS 退货/作废店长授权(PS-1 · 防内盗)· 已验收上线 → 全店恒开(测完就全开 · 不灰度)。
 
-    按 tenant 判定(单店整体开关);超管在平台后台把该店 tenant_id 加进 allowlist 即单店灰度。
+    收银员须持 pos.refund.approve 或 caps.can_refund 才能直退,否则店长 PIN 覆盖;owner 主账号
+    直放。这是已上线的产品行为,不再走 platform_settings allowlist 灰度;要整体停用改这一行(20s 部署)。
     """
-    return _enabled(POS_REFUND_APPROVAL_KEY, tenant_id, "pos_refund_approval_enabled_for")
+    return True
 
 
 def pos_cashier_caps_enabled_for(tenant_id: Optional[str]) -> bool:
-    """POS 收银员 caps 闸。关 = 建单折扣/改价不校验(现网逐字节不变)。
+    """POS 收银员按人权限 caps(PC-1 · 防内盗)· 已验收上线 → 全店恒开(测完就全开 · 不灰度)。
 
-    按 tenant 判定(单店整体开关);超管在平台后台把该店 tenant_id 加进 allowlist 即单店灰度。
+    建单折扣/改价按操作者 caps 卡上限,超限须店长 PIN 覆盖;caps 由老板在收银员页按人配。
+    这是已上线的产品行为,不再走 platform_settings allowlist 灰度;要整体停用改这一行(20s 部署)。
     """
-    return _enabled(POS_CASHIER_CAPS_KEY, tenant_id, "pos_cashier_caps_enabled_for")
+    return True
 
 
 def pos_provision_lock_enabled_for(tenant_id: Optional[str]) -> bool:

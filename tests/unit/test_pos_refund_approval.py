@@ -365,26 +365,22 @@ class SelfCapActionWiringTests(unittest.TestCase):
 
 
 class GateDefaultTests(unittest.TestCase):
-    def test_gate_fail_closed_default_false(self):
-        """无 platform_settings 记录 → 闸关(现网 metta 逐字节不变)。"""
+    """POS 权限/审批已验收上线 → 代码层全店恒开(测完就全开·不灰度),不依赖 platform_settings。"""
+
+    def test_refund_approval_on_for_all_tenants(self):
+        from core import feature_flags
+
+        # 即便 platform_settings 无记录 / 答否,已上线功能对所有租户恒开(去 allowlist 灰度)。
+        with mock.patch("services.platform_settings.store.is_enabled_for_user", return_value=False):
+            self.assertTrue(feature_flags.pos_refund_approval_enabled_for("t-metta"))
+            self.assertTrue(feature_flags.pos_refund_approval_enabled_for("t-any"))
+
+    def test_cashier_caps_on_for_all_tenants(self):
         from core import feature_flags
 
         with mock.patch("services.platform_settings.store.is_enabled_for_user", return_value=False):
-            self.assertFalse(feature_flags.pos_refund_approval_enabled_for("t-metta"))
-
-    def test_gate_reads_tenant_key(self):
-        from core import feature_flags
-
-        seen = {}
-
-        def _fake(key, uid):
-            seen["key"], seen["uid"] = key, uid
-            return True
-
-        with mock.patch("services.platform_settings.store.is_enabled_for_user", _fake):
-            self.assertTrue(feature_flags.pos_refund_approval_enabled_for("t-1"))
-        self.assertEqual(seen["key"], "pos_refund_approval")
-        self.assertEqual(seen["uid"], "t-1")
+            self.assertTrue(feature_flags.pos_cashier_caps_enabled_for("t-metta"))
+            self.assertTrue(feature_flags.pos_cashier_caps_enabled_for(None))
 
 
 class RouteWiringTests(unittest.TestCase):
@@ -448,6 +444,9 @@ class GatedWriteTests(unittest.TestCase):
             mock.patch.object(pos_api, "assert_module_enabled"),
             mock.patch.object(pos_api, "require_workspace"),
             mock.patch("core.feature_flags.pos_refund_approval_enabled_for", return_value=gate_on),
+            # caps 闸已恒开(去灰度)→ 授权会真读操作者 caps;本套用例的收银员无 can_refund 自权,
+            # 直接短其 self-cap 授权(无权),验证"无权收银员即便审批闸开也被拦、须店长覆盖"。
+            mock.patch.object(approval_svc, "_actor_self_cap_grants", return_value=False),
         ):
             return approval_svc.execute_gated_write(
                 None,

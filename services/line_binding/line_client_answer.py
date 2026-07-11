@@ -69,9 +69,9 @@ def _select_batch(line_user_id: str) -> Optional[dict]:
     """反查该 sender 名下客户联系人,挑闸开租户里「最近 sent_at」那一批问题。
 
     一个业主可能挂多主体(§1.3),候选口径:只在还有 ≥1 条 pending 的批次里挑(无 pending
-    说明没在等这位客户),跨全部候选取 pending 行 sent_at 最大者所属批次。选定后编号基准取
-    该批次【全状态】行(list_batch 按 created_at)——与推送时 enumerate(start=1) 固定序一致,
-    不随期间某题答完退出 pending、列表收缩而位移(R3 串题根因)。闸关租户直接跳过。
+    说明没在等这位客户),跨全部候选取 pending 行 sent_at 最大者所属批次。选定后取该批次
+    【全状态】行交 _consume,由行自带的 batch_seq(推送时落的固定编号)定位「第 N 题」,不
+    随期间某题答完退出 pending、列表收缩而位移(R3 串题已根治)。闸关租户直接跳过。
     """
     from core import feature_flags
     from services.line_binding import line_client_contact
@@ -193,22 +193,18 @@ def _consume(
     workspace_client_id = selected["workspace_client_id"]
     full_rows = selected["rows"]  # 完整批次(全状态)
     pending_rows = [r for r in full_rows if r["status"] == vocab.PENDING]
-    # 编号→行:batch_seq 持久列是单一事实源(推送时 mark_sent 落的固定编号)。迁移前存量批次
-    # 无 batch_seq 时回落按位序(仍与旧行为一致),迁移后一律走列,不再靠两侧排序对齐(R3 根治)。
-    by_seq = {r["batch_seq"]: r for r in full_rows if r.get("batch_seq") is not None}
     lang = selected["lang"]
-
-    def _locate(num: int) -> Optional[dict]:
-        if by_seq:
-            return by_seq.get(num)
-        idx = num - 1
-        return full_rows[idx] if 0 <= idx < len(full_rows) else None
+    # 编号→行:batch_seq 持久列是单一事实源(推送时 mark_sent 落的固定编号);迁移前存量批次
+    # 无 batch_seq 时回落按位序(1..N,与旧行为一致)。整批要么全有列要么全 NULL(mark_sent
+    # 原子盖整批),故一次性选定 locator,越界编号 .get 自然落 None,不再靠两侧排序对齐(R3 根治)。
+    by_seq = {r["batch_seq"]: r for r in full_rows if r.get("batch_seq") is not None}
+    locator = by_seq or {i + 1: r for i, r in enumerate(full_rows)}
 
     segments = _split_numbered_segments(text)
     if segments:
         matched = False
         for num, seg in segments:
-            row = _locate(num)
+            row = locator.get(num)
             if row is None:
                 continue
             matched = True

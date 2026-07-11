@@ -1,6 +1,7 @@
 // 用户引导闭环 · 向导壳的样式 + 静态模板 + 图标(从 onboarding-flow 抽出控行数)。
 // 作用域 .onb · 全用全局令牌 var(--*) · 主色走 var(--accent)(对齐 acct 模块已上线范式)。
-// 交互基准:桌面 Pearnly_用户引导闭环_UI预览/01-交互原型.html(stepper / 业态卡 / 绿卡 / 完成清单)。
+// 交互基准:桌面 Pearnly_用户引导闭环_UI预览/01-交互原型.html(stepper / 绿卡 / 完成清单)。
+// 业态卡样式已随平台业态自选板块下架(Zihao 2026-07-11 拍板)一并删除。
 
 // lucide 风线性图标(禁 emoji 当图标 · 铁律 UI)。
 const ICON: Record<string, string> = {
@@ -18,16 +19,6 @@ export function onbIcon(name: string, cls = ''): string {
         `stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">` +
         (ICON[name] || '') +
         '</svg>'
-    );
-}
-
-// 业态卡图标(stroke-width 2 · 复用 onboarding-business 的 path)。
-export function onbBizIcon(path: string): string {
-    return (
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
-        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' +
-        path +
-        '"/></svg>'
     );
 }
 
@@ -57,21 +48,6 @@ export const ONB_CSS = `
 .onb-bar.done{background:var(--accent);}
 .onb-h1{font-size:23px;font-weight:740;letter-spacing:-.4px;text-align:center;}
 .onb-sub{color:var(--ink2);font-size:13.5px;text-align:center;margin-top:8px;line-height:1.65;}
-.onb-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:26px;}
-.onb-biz{display:flex;gap:13px;align-items:flex-start;border:1.5px solid var(--line);border-radius:14px;
-  padding:15px 16px;background:var(--card);transition:.12s;text-align:left;cursor:pointer;width:100%;}
-.onb-biz:hover{border-color:var(--accent);}
-.onb-biz.on{border-color:var(--accent);background:var(--accent-weak);}
-.onb-biz .ic{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;
-  flex:none;background:var(--bg);color:var(--accent);}
-.onb-biz .ic svg{width:21px;height:21px;}
-.onb-biz.on .ic{background:var(--card);}
-.onb-biz .t{font-weight:680;font-size:14px;}
-.onb-biz .d{color:var(--ink2);font-size:12px;margin-top:3px;line-height:1.5;}
-.onb-biz .chk{margin-left:auto;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--line);flex:none;position:relative;}
-.onb-biz.on .chk{background:var(--accent);border-color:var(--accent);}
-.onb-biz.on .chk::after{content:"";position:absolute;left:5px;top:2px;width:5px;height:8px;
-  border:solid var(--accent-ink);border-width:0 2px 2px 0;transform:rotate(45deg);}
 .onb-fgrid{margin-top:24px;display:flex;flex-direction:column;gap:16px;}
 .onb-fld label{display:block;font-size:12.5px;color:var(--ink);font-weight:600;margin-bottom:7px;}
 .onb-fld label .opt{color:var(--ink3);font-weight:400;font-size:11.5px;margin-left:6px;}
@@ -123,5 +99,5 @@ export const ONB_CSS = `
 .onb-cli .ck.todo{border:1.5px solid var(--line);}
 .onb-cli .ct{font-weight:600;font-size:13.5px;}
 .onb-cli .cd{color:var(--ink3);font-size:11.5px;margin-top:1px;}
-@media(max-width:780px){.onb-grid{grid-template-columns:1fr;}.onb-body{padding:8px 14px 60px;}}
+@media(max-width:780px){.onb-body{padding:8px 14px 60px;}}
 `;

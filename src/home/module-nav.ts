@@ -88,9 +88,6 @@ function applyMerchantNav(
     show(qs('[data-collapsible="accounting"]'), on('accounting'));
 
     applyPosRoles(owner, on('pos'), on('inventory'), businessType, true);
-
-    // 「可开启功能 →」引导(owner + 有未开模块)→ 进设置 · 业务/模块 自助开通。
-    show(document.getElementById('nav-enroll'), owner && GATEABLE.some((k) => !on(k)));
 }
 
 function apply(modules: Record<string, ModuleFlag>, businessType?: string | null): void {
@@ -147,13 +144,10 @@ function maybeAutoOnboard(data: { needs_onboarding?: boolean }): void {
     if (!owner) return;
     // 新注册:core-boot 早起的套账门壳要顶掉(向导末步=选/建套账,接管其职责)。
     if (typeof window.closeWorkspaceGate === 'function') window.closeWorkspaceGate();
-    // 引导闭环向导(业态→主体→账务→完成);未就绪时兜底回退老业态选择器。
+    // 引导闭环向导(主体→账务→完成;业态自选已下架,向导内部静默套用 firm 预设)。
     if (typeof window.startOnboardingFlow === 'function') {
         autoPopped = true;
         window.startOnboardingFlow();
-    } else if (typeof window.openBusinessPicker === 'function') {
-        autoPopped = true;
-        window.openBusinessPicker();
     }
 }
 

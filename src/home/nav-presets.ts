@@ -39,7 +39,6 @@ export const NAV_NODES: Record<string, string> = {
     clients: '.nav-item[data-route="clients"]',
     company: '.nav-item[data-route="company"]',
     exceptions: '.nav-item[data-route="exceptions"]',
-    enroll: '#nav-enroll',
     integrations: '#nav-integrations',
 };
 

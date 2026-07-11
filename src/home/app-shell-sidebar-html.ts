@@ -360,16 +360,9 @@ export const SIDEBAR_HTML = `
 
     </div>
 
-    <!-- 底部 pinned(Claude 式):可开启功能 / 集成 / 用户卡(点开 = 头像菜单) -->
+    <!-- 底部 pinned(Claude 式):集成 / 用户卡(点开 = 头像菜单)。
+         「可开启功能」自选业态入口已下架(Zihao 2026-07-11 拍板 · 平台业态套餐不再自选)。 -->
     <div class="sidebar-bottom">
-        <div class="nav-item" id="nav-enroll" style="display:none;">
-            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="10" cy="10" r="7.5"/>
-                <path d="M10 6.5v7M6.5 10h7"/>
-            </svg>
-            <span class="nav-label" data-i18n="nav-enroll">可开启功能</span>
-            <svg style="margin-left:auto;flex-shrink:0;color:var(--brand,#0E7C66);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
-        </div>
         <div class="nav-item" data-route="integrations" id="nav-integrations">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M6 14L3 17M14 6l3-3"/>

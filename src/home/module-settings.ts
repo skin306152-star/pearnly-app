@@ -2,9 +2,10 @@
 // page-settings.ts 只注入一个空壳 pane(data-pane="modules")+ tab 按钮;逻辑全在本模块,
 // 防 page-settings 破 500。owner 专属(tab 复用 .set-tab-owner-only 显隐机制)。
 //
-// 进 tab → GET /api/me/modules → 渲 bizbar(当前业态 + 切换业态)+ 底座常开卡 + 7 模块 toggle。
+// 进 tab → GET /api/me/modules → 渲 bizbar(当前业态只读展示)+ 底座常开卡 + 7 模块 toggle。
 // toggle → 乐观更新 + PUT /api/me/modules/{key} + 失败回滚 + posErrMsg → applyModuleNav 刷新导航。
-// 切换业态 → 复用 PP2 window.openBusinessPicker(选完整页 reload 重渲)。
+// 「切换业态」自选入口已下架(Zihao 2026-07-11 拍板 · 平台业态套餐不再自选);业态只能靠
+// 运营侧(Earn 开通 / 注册流默认 firm)变更,本页只展示当前值。
 // 视觉照搬设计稿(主蓝 var(--btn-blue))· 作用域 .modset · 信封 body.ok→data。
 /* global t, showToast, escapeHtml, apiGet, apiPut */
 import { posErrMsg } from './inventory-common';
@@ -55,7 +56,6 @@ const STYLE = `
 .modset .bizbar .info{flex:1;min-width:0;}
 .modset .bizbar .info .a{font-size:12px;color:var(--ink2);}
 .modset .bizbar .info .b{font-weight:700;font-size:15px;color:var(--ink);}
-.modset .bizbar .chg{height:34px;padding:0 14px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--btn-blue,#0E7C66);font-size:13px;cursor:pointer;flex:0 0 auto;}
 .modset .mcard{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:16px;}
 .modset .mcard .h{padding:12px 16px;border-bottom:1px solid var(--line2);font-weight:700;font-size:13.5px;color:var(--ink);}
 .modset .mod{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line2);}
@@ -119,7 +119,6 @@ function render(
             <div class="info"><div class="a">${escapeHtml(t('set.cur_biz'))}</div><div class="b" id="modset-biz">${escapeHtml(
                 bizLabel(bt)
             )}</div></div>
-            <button class="chg" id="modset-switch">${escapeHtml(t('set.switch_biz'))}</button>
         </div>
         <div class="mcard">
             <div class="h">${escapeHtml(t('set.base_section'))}</div>
@@ -171,7 +170,6 @@ function setRowState(row: HTMLElement, on: boolean): void {
 }
 
 let bound = false;
-let curBiz: string | null = null; // 最近一次拉到的业态(切换业态按钮用 · 避开 listener 闭包拿旧值)。
 
 async function loadModuleSettings(): Promise<void> {
     const pane = document.querySelector<HTMLElement>('.settings-pane[data-pane="modules"]');
@@ -188,19 +186,12 @@ async function loadModuleSettings(): Promise<void> {
         )}</div></div>`;
         return;
     }
-    curBiz = data.business_type;
     render(pane, data);
     if (bound) return;
     bound = true;
-    // 委托:toggle 开关 + 切换业态(pane 常驻 · 绑一次)。
+    // 委托:toggle 开关(pane 常驻 · 绑一次)。
     pane.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
-        if (target.closest('#modset-switch')) {
-            if (typeof window.openBusinessPicker === 'function') {
-                window.openBusinessPicker({ businessType: curBiz || undefined });
-            }
-            return;
-        }
         const sw = target.closest('.sw') as HTMLElement | null;
         const row = target.closest('.mod:not(.lock)') as HTMLElement | null;
         if (sw && row) toggle(row, sw);

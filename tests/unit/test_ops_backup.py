@@ -120,7 +120,9 @@ class TestOffsiteSync(unittest.TestCase):
         remote = os.path.join(self.tmp.name, "remote")
         status_file = os.path.join(self.tmp.name, "offsite_last_status")
         r = _run(
-            "_offsite_sync", self.snap, self.dump,
+            "_offsite_sync",
+            self.snap,
+            self.dump,
             env={
                 "PEARNLY_OFFSITE_REMOTE": remote,
                 "RCLONE_BIN": RCLONE,
@@ -134,9 +136,7 @@ class TestOffsiteSync(unittest.TestCase):
         synced_dump = os.path.join(remote, "db", "pearnly_db_latest.sql.gz")
         self.assertTrue(os.path.isfile(synced_pdf), "storage file did not land on remote")
         self.assertTrue(os.path.isfile(synced_dump), "dump did not land on remote")
-        self.assertEqual(
-            _sha256(os.path.join(self.snap, "invoice.pdf")), _sha256(synced_pdf)
-        )
+        self.assertEqual(_sha256(os.path.join(self.snap, "invoice.pdf")), _sha256(synced_pdf))
         self.assertEqual(_sha256(self.dump), _sha256(synced_dump))
 
         with open(status_file) as f:
@@ -147,7 +147,9 @@ class TestOffsiteSync(unittest.TestCase):
         # offsite_sync always exits 0: core backup can never be dragged down.
         status_file = os.path.join(self.tmp.name, "offsite_last_status")
         r = _run(
-            "_offsite_sync", self.snap, self.dump,
+            "_offsite_sync",
+            self.snap,
+            self.dump,
             env={
                 "PEARNLY_OFFSITE_REMOTE": "nonexistent_remote_xyz:bucket/path",
                 "RCLONE_BIN": RCLONE,

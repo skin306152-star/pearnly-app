@@ -10,6 +10,7 @@ e-Tax 直报未接通(RD 开放度未确认)→ file(etax) 诚实返 tax.efiling
 
 from __future__ import annotations
 
+import json
 from datetime import date
 from typing import Optional
 
@@ -267,26 +268,42 @@ async def api_export_filing(
             cur, tenant_id=tid, workspace_client_id=ws, filing_id=filing_id
         )
         taxpayer = _taxpayer(cur, tid, ws)
-    name = f"{filing['kind']}_{filing['period']}"
-    if fmt == "pdf":
-        content, media, ext = efiling.export_pdf(filing, lang=lang), "application/pdf", "pdf"
-    elif fmt == "xml":
-        content, media, ext = (
-            efiling.export_xml(filing, taxpayer=taxpayer),
-            "application/xml",
-            "xml",
-        )
-    else:
-        content, media, ext = (
-            efiling.export_bundle(filing, lang=lang, taxpayer=taxpayer),
-            "application/zip",
-            "zip",
-        )
+    content, media, filename, extra_headers = _export_payload(
+        filing, fmt, lang=lang, taxpayer=taxpayer
+    )
     return Response(
         content=content,
         media_type=media,
-        headers={"Content-Disposition": f'attachment; filename="{name}.{ext}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            **extra_headers,
+        },
     )
+
+
+def _export_payload(filing: dict, fmt: str, *, lang: str, taxpayer: dict) -> tuple:
+    """fmt → (content, media_type, filename, extra_headers)。EXPORT_FORMATS 每个成员
+    显式分发,无 else 兜底——验参通过却落进别的格式 = 假成功,状态不诚实。
+
+    rdprep 的剔行点名(个人缺法定地址)随响应头带回(X-Rdprep-Excluded,ASCII JSON,
+    泰文经 \\u 转义 header 安全),不静默丢。
+    """
+    name = f"{filing['kind']}_{filing['period']}"
+    if fmt == "pdf":
+        return efiling.export_pdf(filing, lang=lang), "application/pdf", f"{name}.pdf", {}
+    if fmt == "xml":
+        content = efiling.export_xml(filing, taxpayer=taxpayer)
+        return content, "application/xml", f"{name}.xml", {}
+    if fmt == "zip":
+        content = efiling.export_bundle(filing, lang=lang, taxpayer=taxpayer)
+        return content, "application/zip", f"{name}.zip", {}
+    if fmt == "rdprep":
+        out = efiling.export_rdprep_txt(filing, taxpayer=taxpayer)
+        headers = {"X-Rdprep-Excluded-Count": str(len(out["excluded"]))}
+        if out["excluded"]:
+            headers["X-Rdprep-Excluded"] = json.dumps(out["excluded"])
+        return out["text"].encode("utf-8"), "text/plain; charset=utf-8", out["filename"], headers
+    raise PosError("tax.unexpected", 422, detail="bad_fmt")
 
 
 @router.post("/wht-certs/{line_id}/issue")

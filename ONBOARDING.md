@@ -69,36 +69,27 @@ npm run build
 
 完整文件地图见 `CONTRIBUTING.md` §项目文件地图;下面是最常摸到的:
 
+> 现状(2026-06-03 目录大重组 d05cf6d 之后)。老版曾把 db.py/*_routes.py 画在根目录,已过时。
+
 ```
-pearnly_project/
-├── CLAUDE.md/                  # 项目"大脑"目录(优先级最高)
-│   ├── CLAUDE.md               #   ← 项目宪法 · 必读 · 25+ 条铁律
-│   ├── STATE_PEARNLY.md        #   ← 当前状态 · 每个工作窗口结尾更新
-│   ├── REFACTOR_MASTER_PLAN.md #   ← 整顿期主计划 · 单一权威源(9 阶段 A-I)
-│   ├── TECH_DEBT.md / BACKLOG.md / MODULE_*.md  # 技术债 / 任务 / 模块路线
-├── CONTRIBUTING.md             # 协作守则(人 + AI 都看)· 4 不许 + 提交前必跑
-├── AGENTS.md                   # 给 AI 协作 agent 的约定
-├── ONBOARDING.md               # 本文件
-│
-├── app.py                      # FastAPI 主入口(整顿期渐进瘦身 · 封死不许加新路由)
-├── db.py                       # DB 访问层(封死 · 复杂业务搬 services/)
-├── auth.py · auth_signup.py    # 鉴权 / 注册
-├── *_routes.py                 # 已拆出的独立路由(billing/recon/erp/admin_*/me 等 30+ 个)
-├── services/<domain>/*.py      # 业务 service 层(erp/recon/clients/billing/ocr/... DAL + 逻辑)
-├── src/                        # ★ 新前端业务逻辑(Vite ES modules · main.js + home/*)
-├── static/                     # 前端静态资源
-│   ├── home.html · home.js · home.css   # 主 SPA(巨石 · 整顿期渐进拆分中)
-│   ├── version-banner.js       #   独立 IIFE 小组件示范
-│   ├── admin/                  #   admin SPA(独立 layout · 不引 home.js)
-│   └── dist/main.js            #   Vite 构建产物
-├── tests/{unit,e2e,integration}/   # 测试
-├── scripts/                    # check_imports.py · check_i18n.py · refactor_progress.py
-├── alembic/ · alembic.ini      # DB 迁移(整顿期激活中)
-├── Dockerfile · docker-compose*.yml    # 本地容器(整顿 A3 · 配置就绪)
-└── .github/workflows/ci.yml    # CI(lint + test 双 job)
+pearnly_project/                    # FastAPI 后端 + Vite/TypeScript 前端
+├── app.py                          # FastAPI 入口(封死 · 新路由进 routes/ 不进这)
+├── routes/*_routes.py              # HTTP 接口层(billing/recon/erp/sales/pos… ~117 文件)
+├── core/                           # 内核:db.py · auth.py · feature_flags
+├── services/<域>/*.py              # 业务逻辑(~60 域:ocr/recon/sales/purchase/expense/pos/erp/vat/line_binding/agent…)
+├── src/                            # ★ 前端 TypeScript 源码(vite build → static/dist)
+├── static/                         # 前端产物:dist/(bundle · view-source 只见外壳)+ landing/ + pos/
+├── home.html · home.css · login.html · reset.html   # 页面外壳
+├── tests/{unit,e2e,integration}/   # 测试(unit=mock cursor · e2e=Playwright)
+├── scripts/                        # 质量闸:check_file_size · check_line_ratchet · check_ai_smell · check_blob_size …
+├── alembic/ · alembic.ini          # DB 迁移
+├── probes/                         # 安全渗透探针
+├── CLAUDE.md/ · AGENTS.md · docs/   # 宪法(28 铁律)· 入口 · 文档
+├── Dockerfile · docker-compose*.yml
+└── .github/workflows/ci.yml        # CI(lint · lint-size · lint-ui · lint-agent · unit · vite-build · e2e)
 ```
 
-**当前的 4 个"巨石"文件**(整顿期重点拆解对象,改起来要小心牵连):`home.js`(~3 万行)· `home.css` · `home.html` · `app.py` / `db.py`。**新功能严禁继续往里塞**(见 §6)。
+**整顿核心已收官**(2026-06):所有源文件 < 500 行,`home.js` 已拆进 `src/home/*` 由 Vite 打包(仓库内已无巨石),`app.py` ~479 行。新功能仍**严禁塞巨石**(见 §6);防屎山靠 CI 闸守死:`lint-size`(≤500 + 行数棘轮)· `lint-ui` · `check_blob_size`(大文件/sourcemap)。
 
 ---
 

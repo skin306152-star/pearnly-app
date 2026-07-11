@@ -117,38 +117,32 @@ npx playwright test
 
 ## 📁 项目文件地图
 
+> 现状(2026-06-03 目录大重组 d05cf6d 之后 · 122 个根 .py 已搬进 routes/core/services)。
+> 老版地图曾把 db.py/billing_routes.py 等画在根目录,均已过时——以下是真实结构。
+
 ```
-pearnly_project/
-├── CLAUDE.md/                       # 项目宪法 + 状态(优先级最高)
-│   ├── CLAUDE.md                    # 主宪法
-│   ├── STATE_PEARNLY.md             # 当前状态(每窗口更新)
-│   ├── EXECUTION_PLAN.md            # 8 阶段执行清单
-│   ├── BACKLOG.md / MODULE_*.md     # 任务 + 模块路线
-│   └── TECH_DEBT.md                 # 屎山治理待修清单
-├── CONTRIBUTING.md                  # 本文件
-│
-├── app.py                           # FastAPI 主入口(渐进瘦身中)
-├── db.py                            # DB 包装层
-├── auth.py · auth_signup.py         # 鉴权
-├── billing_routes.py                # billing 路由(2026-05-22 抽出)
-├── report_routes.py                 # 报告导出路由
-├── recon_routes.py · vat_excel_*    # 对账模块路由
-├── services/                        # 业务 service 层
-│   ├── erp/                         # ERP 集成(MR.ERP/Xero/FlowAccount)
-│   └── monitoring.py
-├── static/                          # 前端
-│   ├── home.html · home.js · home.css   # 主 SPA(渐进翻新中)
-│   ├── version-banner.js            # 独立 IIFE 模块示范
-│   └── admin/                       # admin SPA(独立 layout)
-│       ├── admin.js · admin-i18n.js
-├── tests/
-│   ├── unit/                        # contract tests(mock cursor · 不连真 DB)
-│   ├── e2e/                         # Playwright smoke(测 prod 着陆页)
-│   └── integration/                 # 跨模块集成
-├── scripts/
-│   ├── check_imports.py             # 静态 import 检查(CI 必跑)
-│   └── check_i18n.py                # 4 语完整性(CI 必跑)
-└── .github/workflows/ci.yml         # CI 配置(4 step · import/i18n/unit/e2e)
+pearnly_project/                       # FastAPI 后端 + Vite/TypeScript 前端
+├── app.py                             # FastAPI 入口(注册所有 router)
+├── routes/                            # HTTP 接口层(*_routes.py · ~117 文件)
+├── core/                              # 内核:db.py · auth.py · feature_flags
+├── services/                          # 业务逻辑主体(~60 域 · ~845 文件)
+│   ├── ocr/ recon/ sales/ purchase/ expense/ pos/ erp/
+│   ├── vat/ tax/ rd/ etax/            # 泰国报税
+│   ├── line_binding/ agent/ ai_gateway/ knowledge/   # LINE / AI Agent
+│   ├── workorder/ inventory/ products/ clients/
+│   ├── billing/ credits/ usage/ membership/          # 计费
+│   └── auth/ authz/ security/ rls_boot/ notification/ …
+├── src/                               # 前端 TypeScript 源码(vite build → static/dist)
+├── static/                            # 前端产物:dist/(bundle) + landing/ + pos/
+├── home.html · home.css · login.html · reset.html    # 页面外壳
+├── alembic/                           # 数据库迁移(schema 走迁移不走 ad-hoc)
+├── tests/                             # unit(mock cursor)· integration · e2e(Playwright)
+├── scripts/                           # 质量闸:check_file_size · check_line_ratchet · check_ai_smell · check_blob_size …
+├── probes/                            # 安全渗透探针
+├── CLAUDE.md/                         # 项目宪法目录(28 铁律 · STATE · BACKLOG · TECH_DEBT)
+├── AGENTS.md                          # 唯一一页入口 · 文档地图
+├── docs/ · design-preview/ · design-reference/       # 文档 / 设计参考
+└── .github/workflows/ci.yml           # CI(lint · lint-size · lint-ui · lint-agent · unit · vite-build · e2e)
 ```
 
 ---

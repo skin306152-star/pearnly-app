@@ -5,6 +5,7 @@ internal subcommands in a temp dir so no prod state is touched."""
 import os
 import shutil
 import subprocess
+import tempfile
 import time
 import unittest
 
@@ -15,7 +16,9 @@ BASH = shutil.which("bash")
 
 def _run(*args, env=None):
     full = os.environ.copy()
-    full["LOG_FILE"] = os.devnull  # keep logging out of prod paths during tests
+    # Keep script logging out of the repo. Not os.devnull: on Windows that is
+    # the reserved name "nul", which bash materializes as a real file in cwd.
+    full["LOG_FILE"] = os.path.join(tempfile.gettempdir(), "pearnly_backup_test.log")
     full.update(env or {})
     return subprocess.run(
         [BASH, SCRIPT, *args],
@@ -47,8 +50,6 @@ class TestBackupLogic(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
     def test_rotate_removes_old_keeps_recent(self):
-        import tempfile
-
         with tempfile.TemporaryDirectory() as d:
             old = os.path.join(d, "20200101_000000")
             new = os.path.join(d, "20991231_000000")

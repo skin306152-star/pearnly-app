@@ -258,7 +258,9 @@ def main() -> int:
         )
 
         # 热敏小票出字节
-        pdf = sale_svc.build_receipt_pdf(
+        from services.pos import receipt_pdf
+
+        pdf = receipt_pdf.build_receipt_pdf(
             cur, tenant_id=tid, workspace_client_id=ws, sale_id=sale_id
         )
         record("热敏小票 PDF 出字节", pdf[:4] == b"%PDF" and len(pdf) > 500, f"{len(pdf)}B")

@@ -15,7 +15,7 @@ from typing import Optional
 from core.pos_api import PosError
 from services.accounting import hooks as acct_hooks
 from services.inventory import store as inv_store
-from services.pos import numbering, sales_store, stock
+from services.pos import numbering, sale_caps, sales_store, stock
 from services.sales.totals import compute_totals
 
 VAT_RATE = Decimal("7")  # 泰国标准 VAT(价内外均按此 · 复用 totals.py)
@@ -34,11 +34,19 @@ def _parse_sold_at(raw) -> datetime:
         return datetime.now(timezone.utc)
 
 
-def _resolve_factor(
+def _to_decimal(v) -> Optional[Decimal]:
+    return Decimal(str(v)) if v is not None else None
+
+
+def _resolve_unit(
     cur, *, tenant_id: str, workspace_client_id: int, prod: dict, sell_unit: Optional[str]
-) -> Decimal:
+) -> tuple:
+    """(换算系数, 该售卖单位的挂牌价)。base 单位价取 products.unit_price;命名单位取 product_units.price。
+
+    挂牌价供 caps 改价判定用(手工价低于挂牌 = 改价);未设价 → None(无从判定改价,不拦)。
+    """
     if not sell_unit or sell_unit == prod["base_unit"]:
-        return Decimal("1")
+        return Decimal("1"), _to_decimal(prod.get("unit_price"))
     r = sales_store.get_unit_factor(
         cur,
         tenant_id=tenant_id,
@@ -48,7 +56,7 @@ def _resolve_factor(
     )
     if not r:
         raise PosError("pos.line_invalid", 422, detail=sell_unit)
-    return Decimal(str(r["factor_to_base"]))
+    return Decimal(str(r["factor_to_base"])), _to_decimal(r.get("price"))
 
 
 def _assert_shift_open(cur, *, tenant_id: str, shift_id: Optional[str]) -> None:
@@ -80,7 +88,7 @@ def _header_discount(hd: dict) -> tuple:
 
 
 def create_sale(
-    cur, *, tenant_id: str, workspace_client_id: int, payload: dict, created_by=None
+    cur, *, tenant_id: str, workspace_client_id: int, payload: dict, created_by=None, operator=None
 ) -> dict:
     cu = payload.get("client_uuid")
     if cu:
@@ -111,7 +119,7 @@ def create_sale(
         qty = Decimal(str(ln.get("qty", 0)))
         if qty <= 0:
             raise PosError("pos.line_invalid", 422)
-        factor = _resolve_factor(
+        factor, list_price = _resolve_unit(
             cur,
             tenant_id=tenant_id,
             workspace_client_id=workspace_client_id,
@@ -137,6 +145,7 @@ def create_sale(
                 "qty": qty,
                 "qty_base": qty * factor,
                 "unit_price": unit_price,
+                "list_price": list_price,
                 "vat_applicable": vat_app,
                 "track_batch": bool(prod["track_batch"]),
                 "explicit_batch_id": ln.get("batch_id"),
@@ -150,6 +159,17 @@ def create_sale(
         price_includes_vat=bool(payload.get("price_includes_vat")),
         header_discount_amount=hd_amount,
         header_discount_pct=hd_pct,
+    )
+
+    # 折扣/改价授权闸(flag 关时返 []·完全跳过):无权且未授权在此抛,一件库存都不动。
+    caps_events = sale_caps.enforce(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        operator=operator,
+        approval=payload.get("approval"),
+        totals=totals,
+        resolved=resolved,
     )
 
     terminal_id = payload.get("terminal_id")
@@ -256,6 +276,7 @@ def create_sale(
         source_id=sale_id,
         created_by=created_by,
     )
+    sale_caps.audit(tenant_id, sale_id, operator, caps_events)
     return _sale_result(sale, deduped=False)
 
 
@@ -267,6 +288,7 @@ def sync_sales(
     items: list,
     cashier_id=None,
     created_by=None,
+    operator=None,
 ) -> dict:
     """离线批量补传(PO-B5 · docs/pos/04 §6 sync)。逐张幂等处理,部分失败不卡其余。
 
@@ -287,6 +309,7 @@ def sync_sales(
                 workspace_client_id=workspace_client_id,
                 payload=payload,
                 created_by=created_by,
+                operator=operator,
             )
             cur.execute("RELEASE SAVEPOINT pos_sync_item")
             results.append(
@@ -394,61 +417,6 @@ def _header_view(sale: dict) -> dict:
         "status": sale["status"],
         "sold_at": sale["sold_at"].isoformat() if sale.get("sold_at") else None,
     }
-
-
-def build_receipt_pdf(
-    cur, *, tenant_id: str, workspace_client_id: int, sale_id: str, width_mm: int = 80
-) -> bytes:
-    """热敏小票 PDF(复用销项 pdf_thermal · 58/80mm)。doc_type=receipt;合计按存额反推以票面自洽。"""
-    from services.sales.pdf_thermal import render_thermal_pdf
-
-    sale = sales_store.get_sale(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, sale_id=sale_id
-    )
-    if not sale:
-        raise PosError("pos.product_not_found", 404)
-    cur.execute(
-        "SELECT l.qty, l.unit_price, l.line_total, p.name_th, p.name_en "
-        "FROM pos_sale_lines l JOIN products p ON p.id = l.product_id "
-        "WHERE l.tenant_id = %s AND l.sale_id = %s ORDER BY l.id",
-        (tenant_id, sale_id),
-    )
-    doc_lines = [
-        {
-            "description": r["name_th"] or r["name_en"],
-            "qty": r["qty"],
-            "unit_price": r["unit_price"],
-            "line_total": r["line_total"],
-        }
-        for r in cur.fetchall()
-    ]
-    payments = sales_store.list_payments(cur, tenant_id=tenant_id, sale_id=sale_id)
-    grand = Decimal(str(sale["grand_total"]))
-    vat = Decimal(str(sale["vat_amount"]))
-    subtotal = grand if sale["price_includes_vat"] else (grand - vat)
-    cur.execute(
-        "SELECT name, address, tax_id, phone FROM workspace_clients WHERE tenant_id = %s AND id = %s",
-        (tenant_id, sale["workspace_client_id"]),
-    )
-    seller = dict(cur.fetchone() or {})
-    doc = {
-        "doc_type": "receipt",
-        "doc_number": sale["receipt_no"],
-        "issue_date": sale["sold_at"],
-        "lines": doc_lines,
-        "subtotal": subtotal,
-        "header_discount_amount": 0,
-        "vat_rate": VAT_RATE,
-        "vat_amount": vat,
-        "wht_amount": 0,
-        "grand_total": grand,
-        "price_includes_vat": bool(sale["price_includes_vat"]),
-        "currency": "THB",
-        "payment_status": "paid",
-        "payment_method": payments[0]["method"] if payments else None,
-        "paid_amount": sale["paid_total"],
-    }
-    return render_thermal_pdf(doc, seller, {}, width_mm=width_mm)
 
 
 def void_sale(

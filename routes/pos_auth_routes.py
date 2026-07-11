@@ -22,6 +22,7 @@ from core.auth import create_pos_store_token, decode_access_token
 from core.pos_api import PosError, ok, require_workspace
 from services.authz.deps import require_perm_pos_tid
 from services.pos import auth as pos_auth
+from services.pos import caps as caps_svc
 from services.pos import cashier as cashier_dal
 from services.pos import entitlements as entitlement_svc
 from services.pos import onboarding as onboarding_svc
@@ -229,6 +230,8 @@ class CashierUpdate(BaseModel):
     is_active: Optional[bool] = None
     # ""/null = 解绑授权人;省略 = 不动绑定。
     approver_user_id: Optional[str] = Field(None, max_length=64)
+    # 纯收银员按人权限(折扣上限/退作废/改价/成本可见);省略 = 不动。白名单校验见 caps.sanitize_caps。
+    caps: Optional[dict] = None
 
 
 def _validate_approver(cur, tid: str, approver_user_id: Optional[str]) -> None:
@@ -245,6 +248,7 @@ def _cashier_out(row) -> dict:
         "display_name": row["display_name"],
         "color": row.get("color"),
         "is_active": bool(row["is_active"]),
+        "caps": caps_svc.merge_defaults(row.get("caps") if hasattr(row, "get") else None),
     }
 
 
@@ -297,6 +301,12 @@ async def api_admin_update_cashier(cashier_id: str, req: CashierUpdate, request:
     user_id_arg = cashier_dal._UNSET
     if "approver_user_id" in fields_set:
         user_id_arg = req.approver_user_id or None
+    caps_arg = cashier_dal._UNSET
+    if "caps" in fields_set:
+        try:
+            caps_arg = caps_svc.sanitize_caps(req.caps or {})
+        except ValueError as e:
+            raise PosError("pos.caps_invalid", 422, detail=str(e))
     with db.get_cursor_rls(tid, commit=True) as cur:
         require_workspace(cur, tid, req.workspace_client_id)
         _validate_approver(cur, tid, req.approver_user_id)
@@ -310,6 +320,7 @@ async def api_admin_update_cashier(cashier_id: str, req: CashierUpdate, request:
             is_active=req.is_active,
             pin_hash=pos_auth.hash_pin(req.pin) if req.pin else None,
             user_id=user_id_arg,
+            caps=caps_arg,
         )
         if not row:
             raise PosError("pos.cashier_not_found", 404)

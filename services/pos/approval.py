@@ -24,9 +24,12 @@ from core.pos_api import PosError
 from services.authz import deps
 from services.authz.resolver import resolve
 from services.pos import auth as pos_auth
+from services.pos import caps as caps_svc
 from services.pos import cashier as cashier_dal
 
 APPROVE_CODE = "pos.refund.approve"
+# caps 动作(折扣超限/改价)的店长覆盖:授权人须是全权账号(持任一码即可)。
+FULL_CODES = ("pos.admin.manage", "pos.refund.approve")
 
 
 class ManagerApproval(BaseModel):
@@ -35,31 +38,29 @@ class ManagerApproval(BaseModel):
     pin: str
 
 
-def _actor_holds_code(request, user: dict) -> bool:
+def _actor_holds_code(request, user: dict, code: str) -> bool:
     """操作者本人是否已持授权码。收银员令牌恒 False(交给店长覆盖流)。"""
     if user.get("is_super_admin"):
         return True
     if user.get("role") == "cashier":
         return False
-    return deps.actor_has_perm(request, user, APPROVE_CODE)
-
-
-def _load_user(cur, tenant_id: str, user_id: str) -> Optional[dict]:
-    """按 (id, tenant) 取授权人主账号最小字段(RBAC 解析 + 超管短路用)。跨租户取不到。"""
-    cur.execute(
-        "SELECT id, role, tenant_id, invited_by, "
-        "COALESCE(is_super_admin, FALSE) AS is_super_admin "
-        "FROM users WHERE id = %s AND tenant_id = %s",
-        (str(user_id), str(tenant_id)),
-    )
-    row = cur.fetchone()
-    return dict(row) if row else None
+    return deps.actor_has_perm(request, user, code)
 
 
 def _verify_approver(
-    cur, *, tenant_id: str, workspace_client_id: int, cashier_id: Optional[str], pin: Optional[str]
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    cashier_id: Optional[str],
+    pin: Optional[str],
+    codes: tuple,
 ) -> dict:
-    """校验店长凭据 → 授权人身份 dict。任一环不符抛 PosError(不区分细节,防枚举)。"""
+    """校验店长凭据 → 授权人身份 dict。任一环不符抛 PosError(不区分细节,防枚举)。
+
+    codes = 合格授权人须持有的码集(持任一即可);退货/作废传 (pos.refund.approve,),
+    caps 动作(折扣/改价)传 FULL_CODES。授权人权限走关联主账号 RBAC 这一单一事实源。
+    """
     if not cashier_id or not pin:
         raise PosError("pos.approval_denied", 403)
     row = cashier_dal.get_cashier(
@@ -73,11 +74,11 @@ def _verify_approver(
     if not approver_user_id:
         # 该收银员没绑主账号 → 无从核验其 RBAC 权限,不是合格授权人。
         raise PosError("pos.approval_denied", 403)
-    u = _load_user(cur, tenant_id, approver_user_id)
+    u = caps_svc.load_user_min(cur, tenant_id, approver_user_id)
     if not u:
         raise PosError("pos.approval_denied", 403)
     authz = resolve(u, cur=cur)
-    if not (u.get("is_super_admin") or authz.has(APPROVE_CODE)):
+    if not (u.get("is_super_admin") or any(authz.has(c) for c in codes)):
         raise PosError("pos.approval_denied", 403)
     return {
         "cashier_id": str(row["id"]),
@@ -94,6 +95,7 @@ def authorize(
     tenant_id: str,
     workspace_client_id: int,
     approval: Optional[dict],
+    code: str = APPROVE_CODE,
 ) -> Optional[dict]:
     """闸开时授权判定。返回:
 
@@ -101,9 +103,10 @@ def authorize(
       - {cashier_id...} → 店长授权人身份(需写审计留痕「谁授权的」)。
 
     无权且未带授权块 → PosError pos.approval_required(前台据此弹店长授权窗);
-    授权块校验失败 → pos.approval_denied / pos.pin_invalid。
+    授权块校验失败 → pos.approval_denied / pos.pin_invalid。code 默认 pos.refund.approve
+    (退货/作废),调用方可换成其它授权码复用同一骨架。
     """
-    if _actor_holds_code(request, user):
+    if _actor_holds_code(request, user, code):
         return None
     if not approval:
         raise PosError("pos.approval_required", 403)
@@ -113,6 +116,27 @@ def authorize(
         workspace_client_id=workspace_client_id,
         cashier_id=approval.get("cashier_id"),
         pin=approval.get("pin"),
+        codes=(code,),
+    )
+
+
+def verify_manager_override(
+    cur, *, tenant_id: str, workspace_client_id: int, approval: Optional[dict]
+) -> dict:
+    """caps 动作(折扣超限/改价)的店长覆盖:操作者本人无权已判定,这里只校验店长凭据。
+
+    无授权块 → pos.approval_required;授权块校验失败 → pos.approval_denied / pos.pin_invalid。
+    合格授权人 = 全权账号(FULL_CODES 任一)。返回授权人身份 dict 供审计。
+    """
+    if not approval:
+        raise PosError("pos.approval_required", 403)
+    return _verify_approver(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        cashier_id=approval.get("cashier_id"),
+        pin=approval.get("pin"),
+        codes=FULL_CODES,
     )
 
 
@@ -125,6 +149,7 @@ def execute_gated_write(
     action: str,
     sale_id_of,
     audit_details: Optional[dict] = None,
+    code: str = APPROVE_CODE,
 ) -> dict:
     """退货/作废的授权闸 + 审计,挂在共用写事务信封(core.pos_api.pos_write)上。
 
@@ -141,6 +166,7 @@ def execute_gated_write(
             tenant_id=ctx["tenant_id"],
             workspace_client_id=ctx["workspace_client_id"],
             approval=approval,
+            code=code,
         )
 
     def _audit(result, ctx):
@@ -165,7 +191,14 @@ def execute_gated_write(
 
 
 def guard(
-    cur, *, request, user: dict, tenant_id: str, workspace_client_id: int, approval: Optional[dict]
+    cur,
+    *,
+    request,
+    user: dict,
+    tenant_id: str,
+    workspace_client_id: int,
+    approval: Optional[dict],
+    code: str = APPROVE_CODE,
 ) -> tuple[bool, Optional[dict]]:
     """退货/作废写前授权闸:返回 (gated, approver)。
 
@@ -181,6 +214,7 @@ def guard(
         tenant_id=tenant_id,
         workspace_client_id=workspace_client_id,
         approval=approval,
+        code=code,
     )
     return True, approver
 

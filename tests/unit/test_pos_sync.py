@@ -24,7 +24,7 @@ class SyncTests(unittest.TestCase):
         cur = _Cur()
         calls = {"n": 0}
 
-        def fake_create_sale(c, *, tenant_id, workspace_client_id, payload, created_by=None):
+        def fake_create_sale(c, *, tenant_id, workspace_client_id, payload, created_by=None, operator=None):
             calls["n"] += 1
             cu = payload.get("client_uuid")
             if cu == "bad":
@@ -66,7 +66,7 @@ class SyncTests(unittest.TestCase):
     def test_structurally_bad_item_does_not_poison_batch(self):
         cur = _Cur()
 
-        def fake_create_sale(c, *, tenant_id, workspace_client_id, payload, created_by=None):
+        def fake_create_sale(c, *, tenant_id, workspace_client_id, payload, created_by=None, operator=None):
             if payload.get("client_uuid") == "boom":
                 raise KeyError("lines")  # 非 PosError 的结构性错
             cu = payload["client_uuid"]
@@ -84,7 +84,7 @@ class SyncTests(unittest.TestCase):
         cur = _Cur()
         seen = {}
 
-        def fake_create_sale(c, *, tenant_id, workspace_client_id, payload, created_by=None):
+        def fake_create_sale(c, *, tenant_id, workspace_client_id, payload, created_by=None, operator=None):
             seen["cashier_id"] = payload.get("cashier_id")
             return {"sale": {"id": "s", "receipt_no": "R"}, "deduped": False}
 

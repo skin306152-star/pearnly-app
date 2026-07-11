@@ -125,7 +125,7 @@ def ensure_sales_schema() -> None:
 # 否则知道 id/票号即可跨套账读取(见 [[workspace-isolation-audit]])。ws 为必填,不许漏。
 def get_product_for_sale(cur, *, tenant_id: str, workspace_client_id: int, product_id: str):
     cur.execute(
-        "SELECT id, base_unit, track_batch, vat_applicable, name_th, name_en, name_zh "
+        "SELECT id, base_unit, track_batch, vat_applicable, name_th, name_en, name_zh, unit_price "
         "FROM products WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s "
         "AND is_active = TRUE",
         (tenant_id, workspace_client_id, product_id),
@@ -137,7 +137,7 @@ def get_unit_factor(
     cur, *, tenant_id: str, workspace_client_id: int, product_id: str, unit_name: str
 ):
     cur.execute(
-        "SELECT factor_to_base FROM product_units "
+        "SELECT factor_to_base, price FROM product_units "
         "WHERE tenant_id = %s AND workspace_client_id = %s AND product_id = %s AND unit_name = %s",
         (tenant_id, workspace_client_id, product_id, unit_name),
     )

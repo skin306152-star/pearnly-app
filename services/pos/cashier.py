@@ -12,13 +12,15 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+from psycopg2.extras import Json
+
 from core.rls import apply_tenant_rls
 
 logger = logging.getLogger("mr-pilot")
 
 _CASHIER_COLS = (
     "id, tenant_id, workspace_client_id, user_id, display_name, pin_hash, "
-    "color, is_active, created_at, updated_at"
+    "color, is_active, caps, created_at, updated_at"
 )
 _CASHIER_PUBLIC = ("id", "display_name", "color")
 
@@ -62,6 +64,11 @@ def ensure_core_schema() -> None:
             cur.execute(
                 "CREATE INDEX IF NOT EXISTS ix_pos_cashiers_ws "
                 "ON pos_cashiers (tenant_id, workspace_client_id)"
+            )
+            # 与 alembic 0068 同源:纯收银员按人权限载体(绑主账号者按 RBAC 换算,不读本列)。
+            cur.execute(
+                "ALTER TABLE pos_cashiers "
+                "ADD COLUMN IF NOT EXISTS caps jsonb NOT NULL DEFAULT '{}'::jsonb"
             )
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS pos_shifts (
@@ -188,7 +195,7 @@ def create_cashier(
 def list_cashiers_admin(cur, *, tenant_id: str, workspace_client_id: int) -> list:
     """后台管理列表:含停用项 + is_active + 最近开班时间 + 是否开过班(决定可否删)。不含 pin_hash。"""
     cur.execute(
-        "SELECT c.id, c.display_name, c.color, c.is_active, "
+        "SELECT c.id, c.display_name, c.color, c.is_active, c.user_id, c.caps, "
         "  (SELECT MAX(s.opened_at) FROM pos_shifts s "
         "   WHERE s.tenant_id = c.tenant_id AND s.cashier_id = c.id) AS last_opened_at, "
         "  EXISTS(SELECT 1 FROM pos_shifts s "
@@ -237,6 +244,9 @@ def is_active_member(cur, *, tenant_id: str, user_id: str) -> bool:
 _UNSET = object()
 
 
+_RETURN_COLS = "id, display_name, color, is_active, caps"
+
+
 def update_cashier(
     cur,
     *,
@@ -248,11 +258,13 @@ def update_cashier(
     is_active: Optional[bool] = None,
     pin_hash: Optional[str] = None,
     user_id=_UNSET,
+    caps=_UNSET,
 ):
-    """改名/换色/启停/重设 PIN/绑解主账号(只更传入字段)。找不到返 None。
+    """改名/换色/启停/重设 PIN/绑解主账号/改 caps(只更传入字段)。找不到返 None。
 
     user_id 绑定 = 把该收银员标为「店长授权人」的载体:绑到一个持 pos.refund.approve 的
     主账号后,其 PIN 才能在退货授权窗覆盖放行(校验走关联主账号的 RBAC · services/pos/approval)。
+    caps = 纯收银员按人权限(折扣上限/退作废/改价/成本可见);调用方须先 caps.sanitize_caps 白名单。
     """
     sets, vals = [], []
     if display_name is not None:
@@ -270,9 +282,12 @@ def update_cashier(
     if user_id is not _UNSET:
         sets.append("user_id = %s")
         vals.append(str(user_id) if user_id else None)
+    if caps is not _UNSET:
+        sets.append("caps = %s")
+        vals.append(Json(caps or {}))
     if not sets:
         cur.execute(
-            "SELECT id, display_name, color, is_active FROM pos_cashiers "
+            f"SELECT {_RETURN_COLS} FROM pos_cashiers "
             "WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s",
             (tenant_id, workspace_client_id, cashier_id),
         )
@@ -282,7 +297,7 @@ def update_cashier(
     cur.execute(
         f"UPDATE pos_cashiers SET {set_clause} "
         "WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s "
-        "RETURNING id, display_name, color, is_active",
+        f"RETURNING {_RETURN_COLS}",
         vals + [tenant_id, workspace_client_id, cashier_id],
     )
     return cur.fetchone()

@@ -75,6 +75,10 @@ PEARNLY_AI_M1_KEY = "pearnly_ai_m1"
 # 收银员无此码 → 必须店长 PIN 覆盖(校验店长确有该码)才放行,并把授权人写进审计。
 # 按账套主体(tenant)判定 —— 一家店整体开/关,与操作的收银员是谁无关。
 POS_REFUND_APPROVAL_KEY = "pos_refund_approval"
+# POS 收银员按人权限(caps)闸(PC-1a · 防内盗):默认关。关 → 建单折扣/改价逐字节走历史
+# (任何收银员任意折扣/改价,现网行为不变);开 → 按操作者 caps 卡折扣上限/改价,超限须店长
+# PIN 覆盖(校验店长全权账号)并写审计。按账套主体(tenant)判定,一家店整体开/关。
+POS_CASHIER_CAPS_KEY = "pos_cashier_caps"
 # POS 新租户开通锁闸(PS-3 · 灰度闸后默认关):默认关 → 现网零变化(apply_preset 照旧开 pos)。
 # 开 → 新注册租户业态即便选出 pos 模块也「预备但锁定」(apply_preset 不真开 pos),须持
 # pos_entitlement 或有效订阅才放行;存量租户(建租户时间早于本闸开启时刻)永久豁免。
@@ -209,6 +213,14 @@ def pos_refund_approval_enabled_for(tenant_id: Optional[str]) -> bool:
     按 tenant 判定(单店整体开关);超管在平台后台把该店 tenant_id 加进 allowlist 即单店灰度。
     """
     return _enabled(POS_REFUND_APPROVAL_KEY, tenant_id, "pos_refund_approval_enabled_for")
+
+
+def pos_cashier_caps_enabled_for(tenant_id: Optional[str]) -> bool:
+    """POS 收银员 caps 闸。关 = 建单折扣/改价不校验(现网逐字节不变)。
+
+    按 tenant 判定(单店整体开关);超管在平台后台把该店 tenant_id 加进 allowlist 即单店灰度。
+    """
+    return _enabled(POS_CASHIER_CAPS_KEY, tenant_id, "pos_cashier_caps_enabled_for")
 
 
 def pos_provision_lock_enabled_for(tenant_id: Optional[str]) -> bool:

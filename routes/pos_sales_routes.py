@@ -22,6 +22,7 @@ from services.imaging import image_store
 from services.pos import (
     approval as approval_svc,
     catalog,
+    receipt_pdf,
     refund as refund_svc,
     sale as sale_svc,
     shift as shift_svc,
@@ -255,6 +256,8 @@ class CreateSaleRequest(BaseModel):
     header_discount: Optional[HeaderDiscount] = None
     payments: List[Payment] = Field(default_factory=list)
     sold_at: Optional[str] = None
+    # PC-1a:折扣超限/改价时,收银员在授权窗填店长收银员身份 + PIN 覆盖(flag 关时忽略)。
+    approval: Optional[approval_svc.ManagerApproval] = None
 
 
 def _dump(m) -> dict:
@@ -275,6 +278,7 @@ async def api_create_sale(req: CreateSaleRequest, request: Request):
             workspace_client_id=ws,
             payload={**payload, "cashier_id": user.get("cashier_id")},
             created_by=_created_by(user),
+            operator=user,
         )
     # 只对本次真新建的单留档(client_uuid 命中去重的重放不重复追加,天然幂等)。
     if not result.get("deduped"):
@@ -300,6 +304,7 @@ async def api_sync_sales(req: SyncRequest, request: Request):
             items=req.sales,
             cashier_id=user.get("cashier_id"),
             created_by=_created_by(user),
+            operator=user,
         ),
     )
 
@@ -488,7 +493,7 @@ async def api_receipt_pdf(
     with db.get_cursor_rls(tid) as cur:
         assert_module_enabled(cur, tid, "pos")
         require_workspace(cur, tid, ws)
-        pdf = sale_svc.build_receipt_pdf(
+        pdf = receipt_pdf.build_receipt_pdf(
             cur, tenant_id=tid, workspace_client_id=ws, sale_id=sale_id, width_mm=width
         )
     return Response(content=pdf, media_type="application/pdf")

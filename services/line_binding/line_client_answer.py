@@ -25,17 +25,21 @@ from services.workorder import decisions
 
 logger = logging.getLogger(__name__)
 
-# 方向/剔除关键词字典(§4.2)。substring 匹配,中文注释标语义;两两互斥,ไม่冲突。
+# 方向/剔除关键词字典(§4.2)。中文注释标语义;两两互斥,ไม่冲突。
 _PURCHASE_KEYWORDS = ("ซื้อ", "รายจ่าย", "จ่าย")  # 进项(买)
 _SALES_KEYWORDS = ("ขาย", "รายรับ", "รับ")  # 销项(卖)
 _NON_TAX_KEYWORDS = ("ไม่ใช่ทั้งคู่", "ไม่เกี่ยว")  # 都不是(非税)
 _DROP_KEYWORDS = ("ไม่ใช่เดือนนี้", "ซ้ำ", "ไม่ต้อง", "ตัดออก")  # 剔除
-# 拦截「文本是否可判定为答题」用的宽口径关键词全集(双身份消费闸 · 修正 3)。
 _ANSWER_KEYWORDS = _PURCHASE_KEYWORDS + _SALES_KEYWORDS + _NON_TAX_KEYWORDS + _DROP_KEYWORDS
 
 # 行首/句中编号标记:1-5 后跟标点+空白或纯空白,避免「100」「2,647.50」误判成编号。
 _MARKER_RE = re.compile(r"(?:^|(?<=\s))([1-5])(?:[)\.:]\s*|\s+)")
 _AMOUNT_RE = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")
+
+# 短答尾缀:礼貌语气词/标点/emoji,剥掉后核心=关键词本身才算短答(见 _is_strict_short_form)。
+_POLITE_TAIL_RE = re.compile(
+    r"(?:ค่ะ|ค่า|คะ|ครับ|ครัช|ๆ|[!?.,~。!?、]|[\U0001F300-\U0001FAFF\U00002600-\U000027BF])+$"
+)
 
 # 回执文案(四语 · 客户侧 LINE push,独立小词表 · 照 line_client_contact._BOUND_COPY
 # 同款范式:这是客户身份维度的措辞,不并进会计端 UI 的大 i18n 框架)。
@@ -72,8 +76,7 @@ def handle_answer(
 
         dual_identity = bool(db.get_user_by_line_user_id(line_user_id))
         if dual_identity and not _looks_like_answer(text):
-            # 修正 3 硬门:双重身份判不出是在答题 → 不吞不落 manual_review,原样回落
-            # (163 有 pending 时发「กาแฟ 100」必须仍走记账,零回归)。
+            # 修正 3 硬门:双重身份判不出是在答题 → 不吞不落 manual_review,原样回落。
             return False
     except Exception:
         logger.warning("[line_client_answer] 拦截判定异常 · fail-open 回落原路", exc_info=True)
@@ -142,11 +145,19 @@ def _select_batch(line_user_id: str) -> Optional[dict]:
     }
 
 
+def _is_strict_short_form(text: str) -> bool:
+    """短答形态(b):trim+剥离礼貌尾缀后=某关键词本身(如「ซื้อค่ะ」);不含编号。"""
+    core = _POLITE_TAIL_RE.sub("", (text or "").strip()).strip()
+    return core in _ANSWER_KEYWORDS
+
+
 def _looks_like_answer(text: str) -> bool:
-    """文本是否「可判定为答题」(修正 3 的双身份消费闸):带编号或命中答题关键词。"""
-    if _MARKER_RE.search(text or ""):
-        return True
-    return any(kw in (text or "") for kw in _ANSWER_KEYWORDS)
+    """严格答题形态(打回修正:长句含关键词 ≠ 答题)——(a) 编号段命中关键词,或
+    (b) 整条消息就是关键词本身,防「จ่ายค่าไฟ 500」被错吞。"""
+    segments = _split_numbered_segments(text)
+    if segments:
+        return any(any(kw in seg for kw in _ANSWER_KEYWORDS) for _, seg in segments)
+    return _is_strict_short_form(text)
 
 
 def _split_numbered_segments(text: str) -> list[tuple[int, str]]:
@@ -242,6 +253,7 @@ def _consume(
         return
 
     if len(batch_rows) == 1:
+        # 无编号单条 pending:唯一「段」是整条原文,只有短答形态(b)才自动裁决(打回修正 1)。
         _handle_one(
             tenant_id,
             workspace_client_id,
@@ -251,6 +263,7 @@ def _consume(
             reply_token,
             quote_token,
             lang,
+            force_manual=not _is_strict_short_form(text),
         )
         return
 
@@ -285,12 +298,14 @@ def _handle_one(
     reply_token,
     quote_token,
     lang,
+    force_manual: bool = False,
 ) -> None:
     qid = question["id"]
     work_order_id = question["work_order_id"]
     item_id = question["item_id"]
 
-    outcome = _resolve(question["question_type"], segment)
+    # force_manual:segment 非严格答题形态(见 _consume)→ 直接当解不出,不喂给 _resolve。
+    outcome = None if force_manual else _resolve(question["question_type"], segment)
     if outcome is None:
         _finish(
             tenant_id,

@@ -391,5 +391,143 @@ class AckReplyFailureTests(unittest.TestCase):
         transition.assert_called_once()  # 裁决/状态已落库,不受回执失败影响
 
 
+class StrictShortFormGateTests(unittest.TestCase):
+    """打回修正:自动回写(applied)判定收严,对所有 sender 一致——原全文子串判定会把
+    「จ่ายค่าไฟ 500」「ได้รับเงินจากลูกค้า」这类记账句错吞成答题(§4.2 咬人测试)。"""
+
+    def test_dual_identity_purchase_verb_in_expense_sentence_returns_false(self):
+        """「จ่ายค่าไฟ 500」含 จ่าย 子串但是记账句 → 双身份不被吞,回落记账路。"""
+        with (
+            patch.object(
+                m,
+                "_select_batch",
+                return_value={
+                    "tenant_id": "t-1",
+                    "workspace_client_id": 84,
+                    "rows": [_question()],
+                    "lang": "th",
+                },
+            ),
+            patch("core.db.get_user_by_line_user_id", return_value={"id": "u-1"}),
+            patch.object(m, "_consume") as consume,
+        ):
+            out = m.handle_answer("U-163", "จ่ายค่าไฟ 500", "rt-1", None)
+        self.assertFalse(out)
+        consume.assert_not_called()
+
+    def test_dual_identity_sales_verb_in_sentence_returns_false(self):
+        """「ได้รับเงินจากลูกค้า」含 รับ 子串但是记账句 → 双身份同样回落。"""
+        with (
+            patch.object(
+                m,
+                "_select_batch",
+                return_value={
+                    "tenant_id": "t-1",
+                    "workspace_client_id": 84,
+                    "rows": [_question()],
+                    "lang": "th",
+                },
+            ),
+            patch("core.db.get_user_by_line_user_id", return_value={"id": "u-1"}),
+            patch.object(m, "_consume") as consume,
+        ):
+            out = m.handle_answer("U-163", "ได้รับเงินจากลูกค้า", "rt-1", None)
+        self.assertFalse(out)
+        consume.assert_not_called()
+
+    def test_bare_keyword_short_form_is_applied(self):
+        """「ซื้อ」整条就是关键词本身(短答形态 b)→ 单条 pending 正确裁决为购。"""
+        q = _question(id=50)
+        cur = MagicMock()
+        with (
+            patch("core.db.get_cursor", return_value=_cm(cur)),
+            patch("services.workorder.api.order_detail", return_value=_order_detail()),
+            patch(
+                "services.workorder.api.record_decision", return_value={"id": "evt-50"}
+            ) as record,
+            patch("services.line_binding.line_client_pool_store.transition"),
+            patch("services.line_binding.line_client_pool_store.list_for_client", return_value=[q]),
+            patch("services.line_binding.line_reply.reply_text_context"),
+        ):
+            m._consume(
+                {"tenant_id": "t-1", "workspace_client_id": 84, "rows": [q], "lang": "th"},
+                "ซื้อ",
+                "U-163",
+                "rt-1",
+                None,
+            )
+        record.assert_called_once()
+        self.assertEqual(record.call_args.kwargs["kind"], decisions.PURCHASE_INVOICE)
+
+    def test_keyword_with_polite_tail_short_form_is_applied(self):
+        """「ซื้อค่ะ」剥掉礼貌尾缀后恰是关键词本身 → 同样允许自动裁决。"""
+        q = _question(id=51)
+        cur = MagicMock()
+        with (
+            patch("core.db.get_cursor", return_value=_cm(cur)),
+            patch("services.workorder.api.order_detail", return_value=_order_detail()),
+            patch(
+                "services.workorder.api.record_decision", return_value={"id": "evt-51"}
+            ) as record,
+            patch("services.line_binding.line_client_pool_store.transition"),
+            patch("services.line_binding.line_client_pool_store.list_for_client", return_value=[q]),
+            patch("services.line_binding.line_reply.reply_text_context"),
+        ):
+            m._consume(
+                {"tenant_id": "t-1", "workspace_client_id": 84, "rows": [q], "lang": "th"},
+                "ซื้อค่ะ",
+                "U-163",
+                "rt-1",
+                None,
+            )
+        record.assert_called_once()
+        self.assertEqual(record.call_args.kwargs["kind"], decisions.PURCHASE_INVOICE)
+
+    def test_numbered_short_segment_is_applied(self):
+        """「1 ซื้อ」编号命中+该段含关键词(短答形态 a)→ 仍按老路正确裁决。"""
+        q = _question(id=52)
+        cur = MagicMock()
+        with (
+            patch("core.db.get_cursor", return_value=_cm(cur)),
+            patch("services.workorder.api.order_detail", return_value=_order_detail()),
+            patch(
+                "services.workorder.api.record_decision", return_value={"id": "evt-52"}
+            ) as record,
+            patch("services.line_binding.line_client_pool_store.transition"),
+            patch("services.line_binding.line_client_pool_store.list_for_client", return_value=[q]),
+            patch("services.line_binding.line_reply.reply_text_context"),
+        ):
+            m._consume(
+                {"tenant_id": "t-1", "workspace_client_id": 84, "rows": [q], "lang": "th"},
+                "1 ซื้อ",
+                "U-163",
+                "rt-1",
+                None,
+            )
+        record.assert_called_once()
+        self.assertEqual(record.call_args.kwargs["kind"], decisions.PURCHASE_INVOICE)
+
+    def test_pure_customer_long_sentence_with_drop_keyword_goes_to_manual_review(self):
+        """纯客户长句含 ไม่ต้อง 不是短答形态 → 不 auto-exclude,落 manual_review 交人审。"""
+        q = _question(id=53, question_type=vocab.QUESTION_DROP)
+        text = "เดือนนี้ไม่ต้องคิดตัวนี้เพราะจ่ายไปแล้วนะครับ"
+        with (
+            patch("services.workorder.api.record_decision") as record,
+            patch("services.line_binding.line_client_pool_store.transition") as transition,
+            patch("services.line_binding.line_reply.reply_text_context"),
+        ):
+            m._consume(
+                {"tenant_id": "t-1", "workspace_client_id": 84, "rows": [q], "lang": "th"},
+                text,
+                "U-163",
+                "rt-1",
+                None,
+            )
+        record.assert_not_called()
+        transition.assert_called_once_with(
+            "t-1", 53, vocab.MANUAL_REVIEW, answer_raw=text, resolution=None
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

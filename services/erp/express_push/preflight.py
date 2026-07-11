@@ -100,6 +100,30 @@ def _own_tax_id(endpoint: Dict[str, Any], flat: Dict[str, Any], tenant_id: Optio
         return ""
 
 
+def _resolve_direction(
+    endpoint: Dict[str, Any],
+    flat: Dict[str, Any],
+    history: Dict[str, Any],
+    tenant_id: Optional[str],
+    own_tax_cache: Optional[Dict[int, str]] = None,
+) -> tuple:
+    """方向判定的唯一定义(单票/批量共用防手抄漂移):显式标签优先,否则懒取自家税号
+    比对票面(批量传 own_tax_cache 按套账缓存,免每票一次库往返)。返回 (direction, own_tax);
+    own_tax 仅在走了税号锚才非空,单票路径拿它区分 subject_unbound/ambiguous。
+    """
+    direction = direction_mod.explicit_direction(flat, history)
+    if direction is not None:
+        return direction, ""
+    if own_tax_cache is None:
+        own_tax = _own_tax_id(endpoint, flat, tenant_id)
+    else:
+        wcid = int(flat["workspace_client_id"])
+        if wcid not in own_tax_cache:
+            own_tax_cache[wcid] = _own_tax_id(endpoint, flat, tenant_id)
+        own_tax = own_tax_cache[wcid]
+    return direction_mod.detect_by_tax(flat, own_tax), own_tax
+
+
 def _unknown_account(payload: Dict[str, Any], codes: set) -> Optional[str]:
     """返回首个不在科目表白名单里的分录科目码(None=全部合法)。挡死码/AI 乱码/缓存过期。"""
     for ln in payload.get("lines") or []:
@@ -204,10 +228,9 @@ def build_batch_prefetch(
     一次档案查询(通常整批共用同一账套 → 常态就是 1 次)。
 
     profiles 按 workspace_client_id 分组(套账隔离 · 不可跨套账混档案),键与
-    `_attach_payment_evidence` 消费时的 int(flat['workspace_client_id']) 对齐。方向判定复用
-    与 preflight_express 完全相同的 explicit_direction/detect_by_tax 序,同一 workspace_client_id
-    的自家税号在批内只解析一次(缓存)。任一环节失败 → 对应键留空,消费侧按"查不到"处理,
-    与单票路径的失败语义一致(不触发回退重查 · 见 _attach_payment_evidence)。
+    `_attach_payment_evidence` 消费时的 int(flat['workspace_client_id']) 对齐。方向判定走
+    `_resolve_direction`(与单票同一份定义 · own_tax 按套账缓存批内只解析一次)。任一环节
+    失败 → 对应键留空,消费侧按"查不到"处理,与单票路径的失败语义一致。
     """
     from core import db
     from services.erp.erp_payload import flatten_history_for_mrerp
@@ -239,11 +262,7 @@ def build_batch_prefetch(
             if not seller_tax:
                 continue
             wcid = int(wcid_raw)
-            direction = direction_mod.explicit_direction(flat, history)
-            if direction is None:
-                if wcid not in own_tax_cache:
-                    own_tax_cache[wcid] = _own_tax_id(endpoint, flat, tenant_id)
-                direction = direction_mod.detect_by_tax(flat, own_tax_cache[wcid])
+            direction, _ = _resolve_direction(endpoint, flat, history, tenant_id, own_tax_cache)
             if direction != "purchase":
                 continue
             tax_ids_by_wcid.setdefault(wcid, set()).add(seller_tax)
@@ -345,11 +364,7 @@ def preflight_express(
         pf.category = category
 
         # 方向(确定性·税号锚点):显式标签优先,否则比对自家公司税号 × 票面 seller/buyer。
-        direction = direction_mod.explicit_direction(flat, history)
-        own_tax = ""
-        if direction is None:
-            own_tax = _own_tax_id(endpoint, flat, tenant_id)
-            direction = direction_mod.detect_by_tax(flat, own_tax)
+        direction, own_tax = _resolve_direction(endpoint, flat, history, tenant_id)
         if direction is None:
             # 区分两种判不出:主体没绑/税号没读到(subject_unbound)vs 票面对不上(ambiguous)。
             # 仅供 UI 提示;喂 enqueue 的规范 reason 仍是 direction_unknown。

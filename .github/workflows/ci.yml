@@ -60,7 +60,7 @@ jobs:
         run: pip-audit -r requirements.lock.txt --no-deps --progress-spinner off
 
       - name: Setup Node 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
           cache: npm
@@ -166,7 +166,7 @@ jobs:
         run: python scripts/check_theme_responsive.py --gate
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
 
@@ -325,7 +325,7 @@ jobs:
       # compile the src/home TS, else they fail with "Cannot find module
       # 'esbuild'". Build step below reuses this same install.
       - name: Setup Node 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
           cache: npm

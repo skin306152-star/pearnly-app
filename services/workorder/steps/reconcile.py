@@ -167,7 +167,8 @@ def _run_shadow_draft(ctx: StepContext, r1: dict, r2: dict) -> dict | None:
     纯函数复式规则引擎 → 建议分录/科目余额/试算平衡。闸关返 None(gates 无 r5_shadow 键)。
 
     结果作为纯 dict 挂 r5_shadow,随 reconcile 的 StepResult.ok 经 step_done 落进证据链(F3 视图 /
-    package 交付物据此渲染)。任何异常都收进 note 不上抛——佐证层绝不拖垮出包。
+    package 交付物据此渲染)。F2 在此基础上挂对数结果 reconcile_gl(影子科目 ↔ 上传 GL 文件对平 +
+    推送逐行成败核对)。任何异常都收进 note 不上抛——佐证层绝不拖垮出包。
     """
     if not _shadow_draft_enabled(ctx):
         return None
@@ -179,9 +180,33 @@ def _run_shadow_draft(ctx: StepContext, r1: dict, r2: dict) -> dict | None:
             sales_amount=r2["sales_amount"],
             output_vat=r2["output_vat"],
         )
-        return result.as_gate_payload()
+        payload = result.as_gate_payload()
+        payload["reconcile_gl"] = _run_shadow_gl_recon(ctx, result)
+        return payload
     except Exception as exc:  # noqa: BLE001 - 佐证层单点隔离,绝不阻断 package
         return {"error": f"{type(exc).__name__}", "note": "shadow_draft_skipped"}
+
+
+def _run_shadow_gl_recon(ctx: StepContext, shadow) -> dict:
+    """F2 对数:影子科目发生额 ↔ 上传 GL 文件(F2-主)+ 预期票 ↔ ERP 导入回执(F2-辅)。
+
+    GL 文件 / 导入回执经注入点取(当前工单管线尚无 GL 导出件与推送回执入口 → 默认空,如实降级为
+    no_gl_source / no_report,不虚构对平);账户桥从 erp_account_mappings 建,桥不全的科目标 unmapped。
+    自身再 try/except 一层,对数失败不带垮上层影子底稿(佐证之佐证,层层不阻断出包)。
+    """
+    from services.accounting import shadow_gl_recon as recon
+
+    try:
+        gl_rows = _shadow_gl_rows(ctx)
+        bridge = _shadow_account_bridge(ctx)
+        gl = recon.reconcile_gl(shadow.accounts, gl_rows, bridge)
+        expected, report = _shadow_push_report(ctx)
+        push = recon.reconcile_push(expected, report)
+        payload = gl.as_payload()
+        payload["push"] = push.as_payload()
+        return payload
+    except Exception as exc:  # noqa: BLE001 - 佐证层单点隔离,绝不阻断 package
+        return {"status": "reconcile_gl_skipped", "error": f"{type(exc).__name__}"}
 
 
 def _default_shadow_draft_enabled(ctx: StepContext) -> bool:
@@ -216,7 +241,34 @@ def _default_bank_statement_rows(ctx: StepContext, banks: list[dict]) -> list:
     return rows
 
 
+def _default_shadow_gl_rows(ctx: StepContext) -> list:
+    """F2-主 GL 文件解析源。当前工单管线只收进项/销项/银行件,无 Express/MR.ERP GL 导出件入口
+    → 恒空,对数如实降级 no_gl_source。GL 上传落地后本函数改为按 GL 件解析 GlRow(注入点已就位)。"""
+    return []
+
+
+def _default_shadow_account_bridge(ctx: StepContext) -> dict:
+    """F2 账户桥:erp_account_mappings(pearnly_category→erp_code)里以科目码填分类名的行 → 本地码→erp 码。
+    无 cur / 无配置 → 空桥(全科目 unmapped,如实反映桥未配,不臆造对应)。"""
+    if ctx.cur is None or not ctx.tenant_id:
+        return {}
+    from services.accounting import shadow_gl_recon as recon
+    from services.erp import mappings_store
+
+    mappings = mappings_store.list_erp_account_mappings(ctx.tenant_id)
+    return recon.build_account_bridge(mappings)
+
+
+def _default_shadow_push_report(ctx: StepContext) -> tuple:
+    """F2-辅 推送回执源。当前工单管线不含 ERP 推送步(推送在集成页独立流)→ (无预期票, 无回执),
+    对数如实降级 no_report。推送接入工单后本函数改为回放推送清单 + parse_import_report(注入点已就位)。"""
+    return [], None
+
+
 # 注入点:模块级绑定,测试用 reconcile._xxx = fake 替换,不改调用方代码(同 classify 惯例)。
 _bank_recon_enabled = _default_bank_recon_enabled
 _bank_statement_rows = _default_bank_statement_rows
 _shadow_draft_enabled = _default_shadow_draft_enabled
+_shadow_gl_rows = _default_shadow_gl_rows
+_shadow_account_bridge = _default_shadow_account_bridge
+_shadow_push_report = _default_shadow_push_report

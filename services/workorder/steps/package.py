@@ -362,6 +362,7 @@ def _write_shadow(out_dir: Path, shadow: dict) -> tuple[str, dict]:
                 f"สถานะ (状态): {balanced}",
             ],
         ),
+        *_shadow_gl_section(shadow.get("reconcile_gl")),
     ]
     path = _write_md(out_dir, "shadow_workpaper.md", lines)
     snapshot = {
@@ -372,8 +373,43 @@ def _write_shadow(out_dir: Path, shadow: dict) -> tuple[str, dict]:
         "entry_count": shadow.get("entry_count", len(shadow.get("entries") or [])),
         "account_count": len(shadow.get("accounts") or []),
         "uncertainties": shadow.get("uncertainties") or [],
+        "gl_recon_status": (shadow.get("reconcile_gl") or {}).get("status"),
     }
     return str(path), snapshot
+
+
+def _shadow_gl_section(recon: dict | None) -> list[str]:
+    """影子 ↔ GL 对平结果(F2)。仅在 reconcile.py 挂了 reconcile_gl(F2 对数已跑)时渲染;
+    只呈现不重算。无 GL 上传(no_gl_source)也如实标,不假装对平过。"""
+    if not isinstance(recon, dict) or not recon.get("status"):
+        return []
+    t = recon.get("totals") or {}
+    push = recon.get("push") or {}
+    lines = [
+        f"สถานะการกระทบยอด GL (对平状态): {recon.get('status')}"
+        + ("  ⚠ พบผลต่าง (有差额报警)" if recon.get("alert") else "")
+    ]
+    if t:
+        lines.append(
+            f"合计 借 影子/GL: {_dec_str(t.get('shadow_debit'))} / {_dec_str(t.get('gl_debit'))}"
+            f" · 贷: {_dec_str(t.get('shadow_credit'))} / {_dec_str(t.get('gl_credit'))}"
+        )
+    lines += [
+        f"✘ {m.get('local_code')}→{m.get('erp_code')} 借差 {_dec_str(m.get('debit_diff'))}"
+        f" 贷差 {_dec_str(m.get('credit_diff'))}"
+        for m in recon.get("mismatch") or []
+    ]
+    if recon.get("unmapped"):
+        lines.append(
+            "unmapped (桥不全,未对): " + ", ".join(u.get("local_code") for u in recon["unmapped"])
+        )
+    if push.get("status"):
+        miss = " · 漏推 " + ", ".join(push["missing"]) if push.get("missing") else ""
+        rej = " · 被拒 " + ", ".join(r.get("invoice_no") for r in push.get("rejected") or [])
+        lines.append(
+            f"推送核对 (F2-辅): {push.get('status')}{miss}{rej if push.get('rejected') else ''}"
+        )
+    return _bullets("กระทบยอดกับ GL (与 GL 对平 · F2)", lines)
 
 
 def _write_memo(

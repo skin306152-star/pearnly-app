@@ -67,28 +67,36 @@ def _kpi(cur, base, date_from, date_to) -> dict:
     row = cur.fetchone() or {}
     gross = Decimal(str(row.get("gross") or 0))
     count = int(row.get("sales_count") or 0)
+    refund = Decimal(str(row.get("refund") or 0))
     avg = (gross / count) if count else Decimal("0")
     cost, complete = _cost_agg(cur, base, date_from, date_to)
+    # 毛利净口径:营收净额(gross − 退货) − COGS 净额(售出成本 − 退货回冲成本)。gross/单数仍按
+    # sale 口径呈现不变(禁区),退货只从毛利底线扣回——否则卖฿100(成本60)全退仍显毛利฿40 虚高。
+    # COGS 净额由 _cost_agg 直接给(退货行带负成本,SUM 自动回冲),避免在多处 SQL 各自减退货。
     return {
         "gross": _money(gross),
         "sales_count": count,
         "avg_ticket": _money(avg),
-        "refund": _money(row.get("refund")),
+        "refund": _money(refund),
         "cost": _money(cost),
-        "gross_profit": _money(gross - cost) if complete else None,
+        "gross_profit": _money(gross - refund - cost) if complete else None,
         "cost_complete": complete,
     }
 
 
 def _cost_agg(cur, base, date_from, date_to) -> tuple[Decimal, bool]:
-    """期内售出行的 COGS 合计 + 是否每行都有成本快照(有老单据/无成本记录 → False)。"""
+    """期内 COGS 净额 + 成本快照是否齐全(有老单据/无成本记录 → False)。
+
+    净额=售出行成本 − 退货回冲:退货行的 cost_total 是负值(refund.py 按比例取负快照),故把
+    sale+refund 两类行一起 SUM 即得净 COGS,退货成本单一事实源在退货行本身,不在此处二次计算。
+    """
     rng, rp = _range("s.sold_at", date_from, date_to)
     cur.execute(
         "SELECT COALESCE(SUM(l.cost_total),0) AS cost, "
         "COALESCE(BOOL_AND(l.cost_total IS NOT NULL), TRUE) AS complete "
         "FROM pos_sale_lines l JOIN pos_sales s ON s.id = l.sale_id "
         "WHERE l.tenant_id=%s AND s.workspace_client_id=%s "
-        "AND s.status='completed' AND s.sale_type='sale'" + rng,
+        "AND s.status='completed' AND s.sale_type IN ('sale','refund')" + rng,
         list(base) + rp,
     )
     row = cur.fetchone() or {}

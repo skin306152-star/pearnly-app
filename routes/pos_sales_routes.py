@@ -279,11 +279,18 @@ class RefundLine(BaseModel):
     qty: float = Field(..., gt=0)
 
 
+class RefundPayment(BaseModel):
+    method: str
+    amount: float = Field(..., gt=0)
+
+
 class RefundRequest(BaseModel):
     workspace_client_id: Optional[int] = None
     client_uuid: Optional[str] = None
     lines: List[RefundLine] = Field(..., min_length=1)
     refund_method: str = "cash"
+    # 原路拆退:混合支付原单按各方式拆退款(现金退现金/刷卡退刷卡)。不给则走 refund_method 单笔。
+    refund_payments: Optional[List[RefundPayment]] = None
     approval: Optional[approval_svc.ManagerApproval] = None
 
 
@@ -305,6 +312,9 @@ async def api_refund(sale_id: str, req: RefundRequest, request: Request):
             original_sale_id=sale_id,
             lines=[_dump(line) for line in req.lines],
             refund_method=req.refund_method,
+            refund_payments=(
+                [_dump(p) for p in req.refund_payments] if req.refund_payments else None
+            ),
             client_uuid=req.client_uuid,
             cashier_id=user.get("cashier_id"),
             created_by=_created_by(user),

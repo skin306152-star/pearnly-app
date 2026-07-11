@@ -84,8 +84,8 @@ class AssemblyTests(unittest.TestCase):
         self.assertEqual(out["kpi"]["gross"], "300.00")
         self.assertEqual(out["kpi"]["avg_ticket"], "150.00")  # 300/2
         self.assertEqual(out["kpi"]["refund"], "20.00")
-        self.assertEqual(out["kpi"]["cost"], "120.00")
-        self.assertEqual(out["kpi"]["gross_profit"], "180.00")  # 300 - 120
+        self.assertEqual(out["kpi"]["cost"], "120.00")  # 净 COGS(此桶无退货行 → 与售出成本相等)
+        self.assertEqual(out["kpi"]["gross_profit"], "160.00")  # 净口径:300 - 20(退货) - 120
         self.assertTrue(out["kpi"]["cost_complete"])
         self.assertEqual(
             out["by_day"][0],
@@ -182,6 +182,43 @@ class CostHonestyTests(unittest.TestCase):
         self.assertIsNone(out["by_day"][0]["cost"])
         self.assertIsNone(out["by_day"][0]["gross_profit"])
         self.assertFalse(out["by_day"][0]["cost_complete"])
+
+
+class RefundNetProfitTests(unittest.TestCase):
+    """毛利净口径:退货从毛利底线回冲(营收扣退货、COGS 扣退货回冲成本),不再虚高。
+
+    _cost_agg 已把退货行(负成本)算进净 COGS,故 cost 参数在含退货桶里就是净额。"""
+
+    def _run(self, *, gross, refund, net_cost, complete=True):
+        scripted = [
+            ({"gross": Decimal(gross), "sales_count": 1, "refund": Decimal(refund)}, None),
+            ({"cost": Decimal(net_cost), "complete": complete}, None),
+            (None, []),
+            (None, []),
+            (None, []),
+            (None, []),
+            (None, []),
+        ]
+        return report.sales_report(_Cur(scripted), tenant_id="t", workspace_client_id=9)
+
+    def test_full_refund_zeroes_profit(self):
+        """卖฿100(成本60)全退:gross=100/refund=100/净COGS=0 → 毛利=0(非虚高的 40)。"""
+        out = self._run(gross="100", refund="100", net_cost="0")["kpi"]
+        self.assertEqual(out["gross"], "100.00")  # gross 口径不变(仍是 sale 营收)
+        self.assertEqual(out["refund"], "100.00")
+        self.assertEqual(out["cost"], "0.00")  # 净 COGS = 60 售出 − 60 退货回冲
+        self.assertEqual(out["gross_profit"], "0.00")  # 100 - 100 - 0
+
+    def test_partial_refund_net_profit(self):
+        """半退:营收净 50、净 COGS 30 → 毛利 20。"""
+        out = self._run(gross="100", refund="50", net_cost="30")["kpi"]
+        self.assertEqual(out["gross_profit"], "20.00")  # 100 - 50 - 30
+
+    def test_incomplete_cost_null_even_with_refund(self):
+        """退货行/售出行有 None 成本 → 净 COGS 不齐 → 毛利诚实置空(不拿假 0 冲)。"""
+        out = self._run(gross="100", refund="100", net_cost="0", complete=False)["kpi"]
+        self.assertIsNone(out["gross_profit"])
+        self.assertFalse(out["cost_complete"])
 
 
 if __name__ == "__main__":

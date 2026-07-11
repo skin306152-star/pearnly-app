@@ -25,6 +25,7 @@ def refund(
     original_sale_id: str,
     lines: list,
     refund_method: str = "cash",
+    refund_payments: list | None = None,
     client_uuid=None,
     terminal_id=None,
     shift_id=None,
@@ -109,6 +110,9 @@ def refund(
         workspace_client_id=workspace_client_id,
     )
     grand = -totals["grand_total"]
+    # 混合支付原路拆退:调用方按原单各方式给退款拆分;Σ 必须等于退款总额(防拆错钱)。
+    # 存前先校验,不等直接 422,绝不落一张各方式加不平的退货单。
+    _validate_refund_payments(refund_payments, totals["grand_total"])
 
     refund_sale = sales_store.insert_sale(
         cur,
@@ -161,6 +165,7 @@ def refund(
                 "batch_id": str(oline["batch_id"]) if oline["batch_id"] else None,
                 "refund_of_line_id": str(oline["id"]),
                 "line_total": -nl["line_total"],
+                "cost_total": _refund_line_cost(oline, item["qty"]),
             },
         )
         if restore_stock:
@@ -178,14 +183,52 @@ def refund(
                 created_by=created_by,
             )
 
-    sales_store.insert_payment(
-        cur,
-        tenant_id=tenant_id,
-        sale_id=refund_sale_id,
-        method=refund_method,
-        amount=grand,
-    )
+    if refund_payments:
+        # 原路拆退:逐笔按原方式记一行负额(现金退现金/刷卡退刷卡),对账各方式各归各。
+        for p in refund_payments:
+            sales_store.insert_payment(
+                cur,
+                tenant_id=tenant_id,
+                sale_id=refund_sale_id,
+                method=p.get("method", "cash"),
+                amount=-abs(Decimal(str(p.get("amount", 0)))),
+            )
+    else:
+        # 单笔兼容:老前台只给一个 refund_method,整额退到该方式(grand 已为负)。
+        sales_store.insert_payment(
+            cur,
+            tenant_id=tenant_id,
+            sale_id=refund_sale_id,
+            method=refund_method,
+            amount=grand,
+        )
     return _refund_result(refund_sale, deduped=False, stock_returned=restore_stock)
+
+
+def _validate_refund_payments(refund_payments: list | None, refund_grand_total: Decimal) -> None:
+    """拆退各方式金额之和必须等于退货总额,否则 422。
+
+    调用方按原单方式给正额拆分(现金 6 / 刷卡 4),存库时统一取负(见 insert 处)。此处按绝对值
+    合计对账,容忍调用方传正/负号,但总额加不平就拒——钱路不允许"退了但各方式加不平"。
+    """
+    if not refund_payments:
+        return
+    total = sum((abs(Decimal(str(p.get("amount", 0)))) for p in refund_payments), Decimal("0"))
+    if total.quantize(Decimal("0.01")) != refund_grand_total.quantize(Decimal("0.01")):
+        raise PosError("pos.refund_amount_mismatch", 422)
+
+
+def _refund_line_cost(oline: dict, rqty: Decimal) -> Decimal | None:
+    """退货行成本快照 = 原行成本 × 退货比例,取负(镜像 line_total 负号 · 报表毛利回冲用)。
+
+    原行无成本(老单据/无进价 · cost_total 为 None)→ 退货行也 None,不造 0:报表据此如实标
+    "成本不全"而非拿假 0 冲出虚高毛利。
+    """
+    ocost = oline.get("cost_total")
+    if ocost is None:
+        return None
+    fraction = rqty / Decimal(str(oline["qty"]))
+    return -(Decimal(str(ocost)) * fraction).quantize(Decimal("0.01"))
 
 
 def _refund_result(sale: dict, *, deduped: bool, stock_returned: bool) -> dict:

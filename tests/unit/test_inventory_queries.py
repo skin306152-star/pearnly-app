@@ -23,9 +23,9 @@ class FakeCursor:
         return self._alls.pop(0) if self._alls else []
 
 
-def _prow(qty, min_stock=None, avg_cost=None, image_url=None):
+def _prow(qty, min_stock=None, avg_cost=None, image_url=None, product_id="p1"):
     return {
-        "product_id": "p1",
+        "product_id": product_id,
         "name_th": "ยา",
         "name_en": None,
         "name_zh": None,
@@ -57,6 +57,19 @@ class StockOverviewSqlTests(unittest.TestCase):
         self.assertIn("p.workspace_client_id = %s", sql)
         self.assertIn("WHERE tenant_id = %s AND workspace_client_id = %s", sql)  # 批次子查询
 
+    def test_loose_wac_subquery_feeds_avg_cost(self):
+        # 散装(非批次)品成本走 inventory_transactions 的 WAC 子查询,口径对齐
+        # store.weighted_avg_purchase_cost_loose;否则散装品 avg_cost 恒 NULL → 库存总值恒 0。
+        cur = FakeCursor([[], []])
+        queries.stock_overview(cur, tenant_id="t", workspace_client_id=9)
+        sql = cur.calls[0][0]
+        self.assertIn("SUM(qty_delta * unit_cost) / NULLIF(SUM(qty_delta), 0) AS wac", sql)
+        self.assertIn("FROM inventory_transactions", sql)
+        self.assertIn("txn_type = 'purchase_in' AND batch_id IS NULL", sql)
+        self.assertIn("COALESCE(MAX(b.avg_cost), MAX(w.wac), p.default_cost)", sql)
+        # 参数化 + 隔离:散装 WAC 子查询也带 tenant + workspace(共 7 个占位符)
+        self.assertEqual(cur.calls[0][1], [9, "t", 9, "t", 9, "t", 9])
+
 
 class StatusAndSummaryTests(unittest.TestCase):
     def test_status_low_ok_out(self):
@@ -83,6 +96,31 @@ class StatusAndSummaryTests(unittest.TestCase):
         cur = FakeCursor([[_prow(500, min_stock=10)], []])
         out = queries.stock_overview(cur, tenant_id="t", workspace_client_id=9, filter_="low")
         self.assertEqual(out["items"], [])
+
+    def test_loose_products_avg_cost_and_stock_value(self):
+        # 两个非批次品:A qty30 WAC18、B qty50 WAC5(avg_cost 由 WAC 子查询解出,非 NULL)。
+        # 库存总值 = 30×18 + 50×5 = 790(修前散装 avg_cost=NULL 被跳过 → 0)。
+        cur = FakeCursor(
+            [
+                [
+                    _prow(30, avg_cost=18, product_id="pA"),
+                    _prow(50, avg_cost=5, product_id="pB"),
+                ],
+                [],
+            ]
+        )
+        out = queries.stock_overview(cur, tenant_id="t", workspace_client_id=9)
+        by_id = {i["product_id"]: i for i in out["items"]}
+        self.assertEqual(by_id["pA"]["avg_cost"], 18.0)
+        self.assertEqual(by_id["pB"]["avg_cost"], 5.0)
+        self.assertEqual(out["summary"]["stock_value"], 790.0)
+
+    def test_mask_cost_still_nulls_loose_avg_cost(self):
+        # G4 成本遮蔽:散装均价现有来源,被遮蔽时仍须返 None(货值列不泄成本)。
+        cur = FakeCursor([[_prow(30, avg_cost=18)], []])
+        out = queries.stock_overview(cur, tenant_id="t", workspace_client_id=9, mask_cost=True)
+        self.assertIsNone(out["items"][0]["avg_cost"])
+        self.assertIsNone(out["summary"]["stock_value"])
 
 
 class NearExpiryTests(unittest.TestCase):

@@ -42,11 +42,17 @@ def stock_overview(
     # 否则 stock×batches 笛卡尔积会把 SUM(qty_on_hand) 按批次数重复计(实测 2 批 → 翻倍)。
     # PO-5:商品按套账隔离(对齐 PO-3 products)——此前只 p.tenant_id,会把别套账的商品
     # 也列出来(零库存)。批次均价子查询同步按套账,避免跨套账批次拉低/抬高本套账均价。
+    # 均价三级回落 COALESCE(批次均价, 散装 WAC, 商品默认成本):
+    #   b = 批次品均价(inventory_batches.unit_cost),散装品此处为 NULL;
+    #   w = 散装(非批次)品的加权平均进货成本,口径与 store.weighted_avg_purchase_cost_loose
+    #       完全一致(purchase_in + batch_id IS NULL 的流水按数量加权)——否则散装品 avg_cost 恒
+    #       NULL,库存总值累加被跳过 → summary.stock_value 恒 0(散装商品的实测 bug 回归)。
+    # w.wac 每商品一行,须 MAX() 包裹(GROUP BY p.id 的函数依赖不覆盖 join 进来的 w 列)。
     sql = (
         "SELECT p.id AS product_id, p.name_th, p.name_en, p.name_zh, p.barcode, "
         "p.image_url, p.base_unit, p.min_stock, p.default_cost, p.track_batch, "
         "COALESCE(SUM(s.qty_on_hand), 0) AS qty_on_hand, "
-        "COALESCE(MAX(b.avg_cost), p.default_cost) AS avg_cost "
+        "COALESCE(MAX(b.avg_cost), MAX(w.wac), p.default_cost) AS avg_cost "
         "FROM products p "
         "LEFT JOIN inventory_stock s "
         "  ON s.product_id = p.id AND s.tenant_id = p.tenant_id "
@@ -54,9 +60,18 @@ def stock_overview(
         "LEFT JOIN (SELECT product_id, AVG(unit_cost) AS avg_cost FROM inventory_batches "
         "           WHERE tenant_id = %s AND workspace_client_id = %s "
         "           GROUP BY product_id) b ON b.product_id = p.id "
+        "LEFT JOIN (SELECT product_id, "
+        "                  SUM(qty_delta * unit_cost) / NULLIF(SUM(qty_delta), 0) AS wac "
+        "           FROM inventory_transactions "
+        "           WHERE tenant_id = %s AND workspace_client_id = %s "
+        "           AND txn_type = 'purchase_in' AND batch_id IS NULL "
+        "           AND unit_cost IS NOT NULL AND qty_delta > 0 "
+        "           GROUP BY product_id) w ON w.product_id = p.id "
         "WHERE p.tenant_id = %s AND p.workspace_client_id = %s AND p.is_active = TRUE"
     )
     params: list = [
+        workspace_client_id,
+        tenant_id,
         workspace_client_id,
         tenant_id,
         workspace_client_id,

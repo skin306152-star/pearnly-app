@@ -285,7 +285,12 @@ class FinancialsTests(_ApiTestBase):
                 "expense_total": "0.00",
                 "net_profit": "440814.24",
             },
-            "trial_balance": {"rows": [], "debit": "918894.77", "credit": "918894.77", "balanced": True},
+            "trial_balance": {
+                "rows": [],
+                "debit": "918894.77",
+                "credit": "918894.77",
+                "balanced": True,
+            },
             "ar_ap_aging": {"source": "not_wired", "status": "unavailable", "note": "..."},
             "depreciation": {"source": "not_wired", "status": "unavailable", "note": "..."},
             "unclassified_accounts": [],

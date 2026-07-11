@@ -96,7 +96,19 @@ def ensure_core_schema() -> None:
                 "ON pos_shifts (tenant_id, cashier_id, status)"
             )
             # 与 alembic 0069 同源:每 (tenant,ws) 连号 tamper-evidence,唯一约束兜并发撞号。
+            # prod 不自动跑迁移(靠本双跑建 schema)→ 回填必须也在此,否则存量班次 shift_seq 恒 NULL,
+            # 新开班 _next_seq=MAX+1=1 会与日后手动回填的 1 撞唯一约束。ADD→回填(仅补 NULL·幂等)→建索引。
             cur.execute("ALTER TABLE pos_shifts ADD COLUMN IF NOT EXISTS shift_seq integer")
+            cur.execute(
+                "WITH numbered AS ("
+                "  SELECT id, row_number() OVER ("
+                "    PARTITION BY tenant_id, workspace_client_id"
+                "    ORDER BY opened_at, created_at, id"
+                "  ) AS rn FROM pos_shifts"
+                ") "
+                "UPDATE pos_shifts s SET shift_seq = n.rn "
+                "FROM numbered n WHERE s.id = n.id AND s.shift_seq IS NULL"
+            )
             cur.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS uq_pos_shift_seq "
                 "ON pos_shifts (tenant_id, workspace_client_id, shift_seq)"

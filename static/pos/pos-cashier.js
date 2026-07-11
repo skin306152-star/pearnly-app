@@ -12,7 +12,10 @@
     let activeCat = null;
     let tendered = 0;
     let taken = []; // 本单已收明细(混合支付):{ method, amount:Number, ref? }·每次开收款窗重置
-    let discount = 0;
+    let discount = 0; // 折后金额(购物车渲染用·金额/百分比两种模式都归一到此)
+    let discountMode = 'none'; // 'none' | 'amount' | 'pct' · 建单走哪个 header_discount 分支
+    let discountPctValue = 0; // discountMode='pct' 时的原始百分比,建单传给后端按下单时小计复算
+    let discountReason = ''; // 折扣理由 · 随 payload 携带(后端暂无落点,extra 字段忽略即可)
     let lastSale = null; // 刚成交的单(成功面板 + 升级税票用)
     let taxBuyerType = 'company';
     let taxBranch = 'head';
@@ -201,9 +204,92 @@
         closeQtyPad();
         renderCart();
     }
+
+    // 折扣/扫码共用键盘弹窗:同一个 #pad-mask DOM(第 2/3 例复用 qty pad 骨架),
+    // 按 opts 显隐 %/฿ 切换与理由框。buf 存原始字符串(扫码码可能带前导 0,不当数字解析)。
+    let padCtx = null;
+    function openPad(opts) {
+        padCtx = {
+            kind: opts.kind,
+            mode: opts.mode || 'amount',
+            buf: '',
+            prefill: opts.prefill || '',
+            maxLen: opts.maxLen || 7,
+        };
+        $('pad-title').textContent = opts.title;
+        $('pad-label').textContent = opts.label || '';
+        $('pad-seg').style.display = opts.showToggle ? 'flex' : 'none';
+        $('pad-reason-row').style.display = opts.showReason ? 'flex' : 'none';
+        if (opts.showReason) $('pad-reason').value = opts.reasonValue || '';
+        if (opts.showToggle) {
+            document
+                .querySelectorAll('#pad-seg button')
+                .forEach((b) => b.classList.toggle('active', b.dataset.mode === padCtx.mode));
+        }
+        updatePadDisp();
+        $('pad-mask').classList.add('show');
+    }
+    function closePad() {
+        $('pad-mask').classList.remove('show');
+        padCtx = null;
+    }
+    function setPadMode(mode) {
+        if (!padCtx) return;
+        padCtx.mode = mode;
+        padCtx.buf = '';
+        padCtx.prefill = '';
+        document
+            .querySelectorAll('#pad-seg button')
+            .forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
+        updatePadDisp();
+    }
+    function updatePadDisp() {
+        if (!padCtx) return;
+        $('pad-disp').textContent =
+            padCtx.buf || padCtx.prefill || (padCtx.kind === 'scan' ? '' : '0');
+    }
+    function padKey(k) {
+        if (!padCtx) return;
+        if (k === 'clear') padCtx.buf = '';
+        else if (k === 'back') padCtx.buf = padCtx.buf.slice(0, -1);
+        else if (padCtx.buf.length < padCtx.maxLen) padCtx.buf += k;
+        updatePadDisp();
+    }
+    // 折扣:百分比模式只存原始百分比(单一事实源),不折成固定金额——预览按当前小计实时复算
+    // (见 discountFor),购物车加减商品后总计才不漂移、与后端 pct 复算口径一致。金额模式存绝对额。
+    // 扫码:命中即回填搜索框触发同款商品查找,空码不动作。
+    function confirmPad() {
+        if (!padCtx) return;
+        if (padCtx.kind === 'discount') {
+            const sub = subtotalOf(cart);
+            const raw = padCtx.buf === '' ? Number(padCtx.prefill) || 0 : parseInt(padCtx.buf, 10);
+            if (padCtx.mode === 'pct') {
+                discountPctValue = Math.max(0, Math.min(raw, 100));
+                discount = 0;
+                discountMode = discountPctValue > 0 ? 'pct' : 'none';
+            } else {
+                discount = Math.max(0, Math.min(raw, sub));
+                discountPctValue = 0;
+                discountMode = discount > 0 ? 'amount' : 'none';
+            }
+            discountReason = ($('pad-reason').value || '').trim();
+            renderCart();
+        } else if (padCtx.kind === 'scan') {
+            const code = padCtx.buf;
+            if (code) {
+                $('main-search').value = code;
+                loadGrid();
+            }
+        }
+        closePad();
+    }
+
     function clearCart() {
         cart = [];
         discount = 0;
+        discountMode = 'none';
+        discountPctValue = 0;
+        discountReason = '';
         closeSheet();
         renderCart();
     }
@@ -224,6 +310,15 @@
 
     function subtotalOf(list) {
         return list.reduce((s, c) => s + c.price * c.qty, 0);
+    }
+
+    // 当前生效折扣额:pct 模式按当前小计实时复算(quantize 到分,对齐后端 Decimal 口径),
+    // amount 模式取绝对额;两者都夹在 [0, 小计]。购物车渲染/应收/建单全走这一条,避免预览漂移。
+    function discountFor(sub) {
+        if (discountMode === 'pct') {
+            return Math.max(0, Math.min(Math.round(sub * discountPctValue) / 100, sub));
+        }
+        return Math.max(0, Math.min(discount, sub));
     }
 
     function renderCart() {
@@ -273,7 +368,7 @@
             });
         }
         const sub = subtotalOf(cart);
-        const disc = Math.min(discount, sub);
+        const disc = discountFor(sub);
         const grand = sub - disc;
         $('cart-subtotal').textContent = fmt(sub);
         $('cart-disc-amt').textContent = fmt(disc);
@@ -283,13 +378,25 @@
         $('cart-peek-grand').textContent = fmt(grand);
     }
 
-    function setDiscount() {
-        const sub = subtotalOf(cart);
-        const raw = window.prompt(POS.t('posui.discount.prompt'), String(discount || ''));
-        if (raw === null) return;
-        const v = Number(String(raw).replace(/[^\d.]/g, '')) || 0;
-        discount = Math.max(0, Math.min(v, sub));
-        renderCart();
+    function openDiscountPad() {
+        openPad({
+            kind: 'discount',
+            title: POS.t('posui.discount.title'),
+            label: POS.t('posui.cart.subtotal') + ' ฿' + fmt(subtotalOf(cart)),
+            showToggle: true,
+            mode: discountMode === 'pct' ? 'pct' : 'amount',
+            prefill:
+                discountMode === 'pct'
+                    ? String(discountPctValue || '')
+                    : discount
+                      ? String(discount)
+                      : '',
+            showReason: true,
+            reasonValue: discountReason,
+        });
+    }
+    function openScanPad() {
+        openPad({ kind: 'scan', title: POS.t('posui.scan.title'), maxLen: 24 });
     }
 
     // ════════════════ 收款弹窗 ════════════════
@@ -297,7 +404,7 @@
 
     function grandTotal() {
         const sub = subtotalOf(cart);
-        return sub - Math.min(discount, sub);
+        return sub - discountFor(sub);
     }
 
     // ── 混合支付 running-tender ──
@@ -548,8 +655,15 @@
                 vat_applicable: c.vat_applicable !== false, // 离线本地算价用(服务端忽略,以商品为准)
             })),
             header_discount:
-                discount > 0
-                    ? { type: 'amount', value: Math.min(discount, sub).toFixed(2) }
+                discountFor(sub) > 0
+                    ? {
+                          type: discountMode === 'pct' ? 'pct' : 'amount',
+                          value:
+                              discountMode === 'pct'
+                                  ? discountPctValue.toFixed(2)
+                                  : Math.min(discount, sub).toFixed(2),
+                          reason: discountReason || undefined,
+                      }
                     : { type: 'none', value: '0' },
             payments: payments.map((p) => ({
                 method: p.method,
@@ -876,7 +990,7 @@
             no: 'H-' + String(list.length + 1).padStart(2, '0'),
             time: POS.hm(new Date()),
             cart: cart.slice(),
-            discount,
+            discount: discountFor(subtotalOf(cart)), // 挂单快照存生效额(pct 也折成当时金额,取单按金额续)
         });
         saveHeld(list);
         clearCart();
@@ -933,6 +1047,9 @@
         if (!h) return;
         cart = h.cart.slice();
         discount = h.discount || 0;
+        discountMode = discount > 0 ? 'amount' : 'none'; // 挂单只存了金额,取单按金额模式续
+        discountPctValue = 0;
+        discountReason = '';
         saveHeld(list.filter((x) => x.id !== id));
         renderCart();
         POS.showView('main');
@@ -951,20 +1068,14 @@
             if (searchTimer) clearTimeout(searchTimer);
             searchTimer = setTimeout(loadGrid, 220);
         });
-        $('main-scan-btn').addEventListener('click', () => {
-            const code = window.prompt(POS.t('posui.scan.prompt'));
-            if (code) {
-                $('main-search').value = code;
-                loadGrid();
-            }
-        });
+        $('main-scan-btn').addEventListener('click', openScanPad);
         $('cart-peek').addEventListener('click', toggleSheet);
         $('cart-scrim').addEventListener('click', closeSheet);
         $('cart-hold-btn').addEventListener('click', holdCurrent);
         $('cart-clear-btn').addEventListener('click', clearCart);
         $('cart-resume-btn').addEventListener('click', () => POS.showView('hold'));
         $('cart-refund-btn').addEventListener('click', () => POS.showView('refund'));
-        $('cart-disc-btn').addEventListener('click', setDiscount);
+        $('cart-disc-btn').addEventListener('click', openDiscountPad);
         $('cart-pay-btn').addEventListener('click', openPay);
         $('main-menu-btn').addEventListener('click', () => POS.showView('shift'));
         $('net-pill').addEventListener('click', () => {
@@ -986,13 +1097,30 @@
         $('qty-mask').addEventListener('click', (e) => {
             if (e.target === $('qty-mask')) closeQtyPad();
         });
+        // 折扣/扫码共用键盘弹窗:同款点击键盘 + 关闭/确定/背景关 + %/฿ 切换。
+        bindKeypad('pad-keypad', padKey);
+        $('pad-close-btn').addEventListener('click', closePad);
+        $('pad-confirm').addEventListener('click', confirmPad);
+        $('pad-mask').addEventListener('click', (e) => {
+            if (e.target === $('pad-mask')) closePad();
+        });
+        document
+            .querySelectorAll('#pad-seg button')
+            .forEach((b) => b.addEventListener('click', () => setPadMode(b.dataset.mode)));
         // 桌面加成:弹窗开着时物理键盘也能输(数字/退格/回车/Esc);靠上面的点击兜底,吞键也不影响。
+        // 数量弹窗与折扣/扫码弹窗互斥(同时只开一个),按谁在开路由到对应 handler。
         document.addEventListener('keydown', (e) => {
-            if (qtyIdx < 0) return;
-            if (e.key >= '0' && e.key <= '9') qtyKey(e.key);
-            else if (e.key === 'Backspace') qtyKey('back');
-            else if (e.key === 'Enter') confirmQtyPad();
-            else if (e.key === 'Escape') closeQtyPad();
+            const target =
+                qtyIdx >= 0
+                    ? { key: qtyKey, ok: confirmQtyPad, esc: closeQtyPad }
+                    : padCtx
+                      ? { key: padKey, ok: confirmPad, esc: closePad }
+                      : null;
+            if (!target) return;
+            if (e.key >= '0' && e.key <= '9') target.key(e.key);
+            else if (e.key === 'Backspace') target.key('back');
+            else if (e.key === 'Enter') target.ok();
+            else if (e.key === 'Escape') target.esc();
             else return;
             e.preventDefault();
         });

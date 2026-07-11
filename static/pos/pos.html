@@ -385,6 +385,55 @@
         </div>
       </div>
 
+      <!-- 折扣/手输扫码键盘弹窗:复用数量键盘骨架,openPad(opts) 按用途显隐金额/百分比切换与理由框 -->
+      <div class="mask" id="pad-mask">
+        <div class="modal qty-modal">
+          <div class="modal-head">
+            <div class="t" id="pad-title"></div>
+            <button class="icbtn" id="pad-close-btn">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <div class="qty-body">
+            <div class="tax-seg" id="pad-seg">
+              <button class="active" data-mode="amount">฿</button>
+              <button data-mode="pct">%</button>
+            </div>
+            <div class="qty-item" id="pad-label"></div>
+            <div class="qty-disp tnum" id="pad-disp">0</div>
+            <div class="tax-fld" id="pad-reason-row">
+              <input id="pad-reason" data-i18n-placeholder="posui.discount.reason.ph" />
+            </div>
+            <div class="keypad" id="pad-keypad">
+              <button class="key" data-key="7">7</button>
+              <button class="key" data-key="8">8</button>
+              <button class="key" data-key="9">9</button>
+              <button class="key" data-key="4">4</button>
+              <button class="key" data-key="5">5</button>
+              <button class="key" data-key="6">6</button>
+              <button class="key" data-key="1">1</button>
+              <button class="key" data-key="2">2</button>
+              <button class="key" data-key="3">3</button>
+              <button class="key" data-key="clear">C</button>
+              <button class="key" data-key="0">0</button>
+              <button class="key" data-key="back">←</button>
+            </div>
+            <div style="height: 12px"></div>
+            <button class="confirm" id="pad-confirm" data-i18n="posui.qty.confirm">确定</button>
+          </div>
+        </div>
+      </div>
+
       <div class="mask" id="pay-mask">
         <div class="modal">
           <div class="modal-head">
@@ -1342,7 +1391,7 @@
       <div id="pos-toast-txt"></div>
     </div>
 
-    <script src="/static/pos/pos-i18n.js?v=11903101"></script>
-    <script src="/static/dist/pos.js?v=11903102" defer></script>
+    <script src="/static/pos/pos-i18n.js?v=11904101"></script>
+    <script src="/static/dist/pos.js?v=11904103" defer></script>
   </body>
 </html>

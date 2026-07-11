@@ -16,7 +16,7 @@ from unittest import mock
 
 os.environ.setdefault("JWT_SECRET", "test-secret-key-of-sufficient-length")
 
-from services.pos import sale as sale_svc
+from services.pos import sales_query
 
 
 def _row(**over):
@@ -38,12 +38,12 @@ class ListTodayTests(unittest.TestCase):
     def _run(self, rows, open_shift_id="sh-open"):
         open_shift = {"id": open_shift_id} if open_shift_id else None
         with (
-            mock.patch.object(sale_svc.sales_store, "list_today_rows", return_value=rows),
+            mock.patch.object(sales_query.sales_store, "list_today_rows", return_value=rows),
             mock.patch(
                 "services.pos.cashier.get_open_shift_for_workspace", return_value=open_shift
             ),
         ):
-            return sale_svc.list_today(cur=object(), tenant_id="t", workspace_client_id=1)
+            return sales_query.list_today(cur=object(), tenant_id="t", workspace_client_id=1)
 
     def test_current_shift_not_refunded_is_voidable(self):
         out = self._run([_row()])

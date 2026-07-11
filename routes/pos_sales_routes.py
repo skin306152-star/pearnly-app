@@ -25,6 +25,7 @@ from services.pos import (
     receipt_pdf,
     refund as refund_svc,
     sale as sale_svc,
+    sales_query,
     upgrade as upgrade_svc,
 )
 
@@ -270,7 +271,9 @@ async def api_sales_today(request: Request, workspace_client_id: Optional[int] =
     return _read(
         request,
         workspace_client_id,
-        lambda cur, tid, ws, user: sale_svc.list_today(cur, tenant_id=tid, workspace_client_id=ws),
+        lambda cur, tid, ws, user: sales_query.list_today(
+            cur, tenant_id=tid, workspace_client_id=ws
+        ),
     )
 
 

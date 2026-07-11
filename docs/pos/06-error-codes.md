@@ -18,7 +18,7 @@
 | pos.tax_id_invalid | 422 | เลขประจำตัวผู้เสียภาษีไม่ถูกต้อง | Invalid tax ID | 税号无效 | 税番号が無効です |
 | pos.already_upgraded | 409 | บิลนี้ออกใบกำกับเต็มรูปแล้ว | A full tax invoice was already issued | 该单已开过正式税票 | 既に正式税額票を発行済みです |
 | pos.over_refund | 409 | จำนวนคืนเกินที่ซื้อ | Refund exceeds purchased quantity | 退货量超过购买量 | 返品数が購入数を超えています |
-| pos.module_disabled | 403 | ยังไม่ได้เปิดใช้งานระบบขายหน้าร้าน | The POS module is not enabled | 尚未开通收银模块 | POS機能が有効化されていません |
+| pos.module_disabled | 403 | ฟีเจอร์นี้ยังไม่เปิดใช้งาน (ติดต่อผู้ดูแลระบบเพื่อเปิดใช้งาน) | This feature isn't enabled yet (ask your admin to enable it) | 此功能未开通(请联系管理员开通) | この機能はまだ有効化されていません(管理者にお問い合わせください) |
 | pos.forbidden | 403 | คุณไม่มีสิทธิ์ทำรายการนี้ | You don't have permission for this | 你没有此操作权限 | この操作の権限がありません |
 
 ## 系统/网络错误(兜底 · 不暴露内部)

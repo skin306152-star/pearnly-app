@@ -59,8 +59,9 @@ class AssemblyTests(unittest.TestCase):
                 None,
                 [{"d": date(2026, 6, 1), "cost": Decimal("120"), "complete": True}],
             ),  # by_day cost
-            # by_method:mock 回放 DB 已算净额(SQL 减完 change 后的现金收入),此桶无找零 → 净=200
-            (None, [{"method": "cash", "amount": Decimal("200")}]),  # by_method
+            # by_method:两句——方法汇总 tendered + 找零汇总(此桶无找零 chg=0 → 净=200)
+            (None, [{"method": "cash", "amount": Decimal("200")}]),  # by_method tendered
+            ({"chg": Decimal("0")}, None),  # by_method change
             (
                 None,
                 [
@@ -109,11 +110,12 @@ class AssemblyTests(unittest.TestCase):
         scripted = [
             ({"gross": Decimal("0"), "sales_count": 0, "refund": Decimal("0")}, None),
             ({"cost": Decimal("0"), "complete": True}, None),
-            (None, []),
-            (None, []),
-            (None, []),
-            (None, []),
-            (None, []),
+            (None, []),  # by_day
+            (None, []),  # by_day cost
+            (None, []),  # by_method tendered
+            ({"chg": Decimal("0")}, None),  # by_method change
+            (None, []),  # top_products
+            (None, []),  # by_cashier
         ]
         out = report.sales_report(_Cur(scripted), tenant_id="t", workspace_client_id=9)
         self.assertEqual(out["kpi"]["avg_ticket"], "0.00")  # 不除零
@@ -127,11 +129,12 @@ class CostHonestyTests(unittest.TestCase):
         scripted = [
             ({"gross": Decimal("300"), "sales_count": 2, "refund": Decimal("0")}, None),
             ({"cost": Decimal("50"), "complete": False}, None),  # 有行成本未知
-            (None, []),
-            (None, []),
-            (None, []),
-            (None, []),
-            (None, []),
+            (None, []),  # by_day
+            (None, []),  # by_day cost
+            (None, []),  # by_method tendered
+            ({"chg": Decimal("0")}, None),  # by_method change
+            (None, []),  # top_products
+            (None, []),  # by_cashier
         ]
         out = report.sales_report(_Cur(scripted), tenant_id="t", workspace_client_id=9)
         self.assertIsNone(out["kpi"]["gross_profit"])
@@ -144,7 +147,8 @@ class CostHonestyTests(unittest.TestCase):
             ({"cost": Decimal("0"), "complete": True}, None),
             (None, [{"d": date(2026, 6, 2), "gross": Decimal("100")}]),
             (None, [{"d": date(2026, 6, 2), "cost": Decimal("40"), "complete": False}]),
-            (None, []),
+            (None, []),  # by_method tendered
+            ({"chg": Decimal("0")}, None),  # by_method change
             (
                 None,
                 [
@@ -175,9 +179,10 @@ class CostHonestyTests(unittest.TestCase):
             ({"cost": Decimal("0"), "complete": True}, None),
             (None, [{"d": date(2026, 6, 3), "gross": Decimal("50")}]),
             (None, []),  # cost_by_day 空 · 无该日分组
-            (None, []),
-            (None, []),
-            (None, []),
+            (None, []),  # by_method tendered
+            ({"chg": Decimal("0")}, None),  # by_method change
+            (None, []),  # top_products
+            (None, []),  # by_cashier
         ]
         out = report.sales_report(_Cur(scripted), tenant_id="t", workspace_client_id=9)
         self.assertIsNone(out["by_day"][0]["cost"])
@@ -194,11 +199,12 @@ class RefundNetProfitTests(unittest.TestCase):
         scripted = [
             ({"gross": Decimal(gross), "sales_count": 1, "refund": Decimal(refund)}, None),
             ({"cost": Decimal(net_cost), "complete": complete}, None),
-            (None, []),
-            (None, []),
-            (None, []),
-            (None, []),
-            (None, []),
+            (None, []),  # by_day
+            (None, []),  # by_day cost
+            (None, []),  # by_method tendered
+            ({"chg": Decimal("0")}, None),  # by_method change
+            (None, []),  # top_products
+            (None, []),  # by_cashier
         ]
         return report.sales_report(_Cur(scripted), tenant_id="t", workspace_client_id=9)
 
@@ -226,41 +232,43 @@ class ByMethodChangeNettingTests(unittest.TestCase):
     """现金桶取净收入:tendered − change(Bug#4)。
 
     pos_payments.amount 存顾客给的钱(tendered),找零单独存在 pos_sales.change_amount。旧
-    _by_method 直接 SUM(amount) 把找零当现金收入虚增。修法:SQL 对每单最早一笔现金减一次
-    change_amount,非现金笔不动。真库聚合(单笔减一次 / 分组)由 _e2e 覆盖;此处守 SQL 形状
-    + 净额透传(mock 回放的是 DB 已算好的净额)。"""
+    _by_method 直接 SUM(amount) 把找零当现金收入虚增。修法:两句 SQL——按方式汇总 tendered +
+    从 pos_sales 单独汇总 change(每单一行·天然只算一次·避开 min(uuid) 聚合不存在),Python 侧
+    从现金桶减去找零。此处 mock 回放 tendered + change,真正跑 Python 净额逻辑。"""
 
-    def _run(self, rows):
-        cur = _Cur([(None, rows)])
+    def _run(self, method_rows, change=0):
+        cur = _Cur([(None, method_rows), ({"chg": Decimal(str(change))}, None)])
         out = report._by_method(cur, ("t", 9), None, None)
-        return out, cur.queries[0][0]
+        return out, cur.queries
 
-    def test_sql_subtracts_change_for_cash_only_once_per_sale(self):
-        _, sql = self._run([])
-        self.assertIn("s.change_amount", sql)  # 现金桶要减找零
-        self.assertIn("p.method='cash'", sql)  # 只对现金笔减
-        self.assertIn("MIN(p2.id)", sql)  # 每单只减最早一笔现金
-        self.assertIn("p2.sale_id=p.sale_id", sql)  # 同单范围内取最早
-        self.assertIn("p2.method='cash'", sql)
+    def test_sql_shape_no_min_uuid(self):
+        _, q = self._run([])
+        methods_sql, change_sql = q[0][0], q[1][0]
+        self.assertIn("SUM(p.amount)", methods_sql)  # 方法汇总取原始 tendered
+        self.assertIn("SUM(change_amount)", change_sql)  # 找零从 pos_sales 单独汇总
+        self.assertIn("FROM pos_sales", change_sql)
+        self.assertNotIn("MIN(", methods_sql)  # 禁 min(uuid)——Postgres 无此聚合(根因)
+        self.assertNotIn("MIN(", change_sql)
 
     def test_cash_amount_is_net_of_change(self):
-        # 应付฿55、现金 tendered฿100、change฿45 → DB 净额 55(不是 tendered 100)
-        out, _ = self._run([{"method": "cash", "amount": Decimal("55")}])
+        # 应付฿55、现金 tendered฿100、change฿45 → 净额 55(Python 侧 100 − 45)
+        out, _ = self._run([{"method": "cash", "amount": Decimal("100")}], change=45)
         self.assertEqual(out, {"cash": "55.00"})
 
     def test_mixed_payment_non_cash_bucket_untouched(self):
-        # 混合单:现金净฿56(tendered60 − change4)+ 刷卡฿44 → 各桶独立,刷卡不受影响
+        # 混合单:现金 tendered60 − change4 = 净56 + 刷卡44 → 刷卡桶不受找零影响
         out, _ = self._run(
             [
-                {"method": "cash", "amount": Decimal("56")},
+                {"method": "cash", "amount": Decimal("60")},
                 {"method": "card", "amount": Decimal("44")},
-            ]
+            ],
+            change=4,
         )
         self.assertEqual(out, {"cash": "56.00", "card": "44.00"})
 
     def test_non_cash_only_unchanged(self):
-        # 纯非现金单:无找零可减,口径与旧实现一致(回归)
-        out, _ = self._run([{"method": "transfer", "amount": Decimal("100")}])
+        # 纯非现金单:无找零(change=0),口径与旧实现一致(回归)
+        out, _ = self._run([{"method": "transfer", "amount": Decimal("100")}], change=0)
         self.assertEqual(out, {"transfer": "100.00"})
 
 

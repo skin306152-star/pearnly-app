@@ -155,23 +155,35 @@ def _profit_fields(gross: Decimal, cost_entry) -> dict:
 
 
 def _by_method(cur, base, date_from, date_to) -> dict:
-    # 现金桶取净收入:pos_payments.amount 存的是顾客给的钱(tendered),找零单独存在
-    # pos_sales.change_amount。直接 SUM(amount) 会把找零当现金收入虚增(Bug#4)。混合单里
-    # 只有现金笔可能溢付(非现金笔前端按剩余额封顶,无找零),故整单 change_amount 全归现金笔,
-    # 且只从每单最早一笔现金(MIN(id))减一次——防同单多现金笔重复扣。非现金桶口径不变。
-    rng, rp = _range("s.sold_at", date_from, date_to)
+    # pos_payments.amount 现金笔存的是顾客给的钱(tendered),找零单独存 pos_sales.change_amount。
+    # 直接 SUM(amount) 会把找零当现金收入虚增(Bug#4)。混合单里只有现金笔可能溢付(非现金笔前端
+    # 按剩余额封顶,无找零),故整单 change_amount 全归现金桶。分两句:按方式汇总 tendered,再单独
+    # 汇总找零(pos_sales 每单一行·SUM 天然每单只算一次·避开 min(uuid) 聚合不存在),Python 侧从
+    # 现金桶减去。非现金桶口径不变。
+    rng_j, rp_j = _range("s.sold_at", date_from, date_to)
     cur.execute(
-        "SELECT p.method AS method, COALESCE(SUM(p.amount - CASE "
-        "WHEN p.method='cash' AND p.id = ("
-        "SELECT MIN(p2.id) FROM pos_payments p2 "
-        "WHERE p2.sale_id=p.sale_id AND p2.method='cash') "
-        "THEN s.change_amount ELSE 0 END),0) AS amount "
+        "SELECT p.method AS method, COALESCE(SUM(p.amount),0) AS amount "
         "FROM pos_payments p JOIN pos_sales s ON s.id = p.sale_id "
         "WHERE p.tenant_id=%s AND s.workspace_client_id=%s "
-        "AND s.status='completed' AND s.sale_type='sale'" + rng + " GROUP BY p.method",
-        list(base) + rp,
+        "AND s.status='completed' AND s.sale_type='sale'" + rng_j + " GROUP BY p.method",
+        list(base) + rp_j,
     )
-    return {r["method"]: _money(r["amount"]) for r in cur.fetchall()}
+    out = {
+        r["method"]: Decimal(str(r["amount"] if r["amount"] is not None else 0))
+        for r in cur.fetchall()
+    }
+    rng_s, rp_s = _range("sold_at", date_from, date_to)
+    cur.execute(
+        "SELECT COALESCE(SUM(change_amount),0) AS chg FROM pos_sales "
+        "WHERE tenant_id=%s AND workspace_client_id=%s "
+        "AND status='completed' AND sale_type='sale'" + rng_s,
+        list(base) + rp_s,
+    )
+    row = cur.fetchone() or {}
+    total_change = Decimal(str(row.get("chg") if row.get("chg") is not None else 0))
+    if total_change:
+        out["cash"] = out.get("cash", Decimal("0")) - total_change
+    return {m: _money(v) for m, v in out.items()}
 
 
 def _top_products(cur, base, date_from, date_to, top_n) -> list:

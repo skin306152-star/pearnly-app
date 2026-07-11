@@ -15,7 +15,7 @@ from pathlib import Path
 
 from services.workorder import decisions, evidence, storage
 from services.workorder.engine import StepContext, StepResult
-from services.workorder.steps import conservation, pnd_prep, pp30_form
+from services.workorder.steps import conservation, financials_report, pnd_prep, pp30_form
 
 _KIND_PP30 = "pp30_draft"
 _KIND_LEDGER = "ledger_workpaper"
@@ -71,6 +71,7 @@ def run(ctx: StepContext) -> StepResult:
         _KIND_MEMO: _write_memo(out_dir, items, cons, decision_recs, numbers, wht_memo_lines),
         _KIND_EVIDENCE: _write_evidence_index(ctx, out_dir, items, events, numbers),
         **pnd_kinds,
+        **financials_report.build(out_dir, numbers),  # G1a 月度报表:有 r6_financials 才出
     }
     # 影子底稿(F1):仅当 reconcile 挂了 r5_shadow(闸开且产出成功)才出这件交付物——闸关
     # 逐字节维持现状(不新增文件/交付物行)。从 gates.r5_shadow 取,只渲染不重算。

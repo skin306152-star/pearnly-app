@@ -102,6 +102,12 @@ def run(ctx: StepContext) -> StepResult:
     shadow = _run_shadow_draft(ctx, r1, r2)
     if shadow is not None:
         result_gates["r5_shadow"] = shadow
+        # R6 月度报表(G1a):把 R5 影子科目余额过 books 注入式纯变换出 BS/PL/TB。闸复用
+        # pearnly_ai_shadow_draft(影子在场才有科目余额可算)——影子跳过残影无 accounts →
+        # _run_shadow_financials 返 None(无 r6_financials 键)。报表是佐证不改税额,佐证层隔离。
+        financials = _run_shadow_financials(ctx, shadow)
+        if financials is not None:
+            result_gates["r6_financials"] = financials
 
     return StepResult.ok(
         input_vat_total=str(r1["total"]),
@@ -185,6 +191,36 @@ def _run_shadow_draft(ctx: StepContext, r1: dict, r2: dict) -> dict | None:
         return payload
     except Exception as exc:  # noqa: BLE001 - 佐证层单点隔离,绝不阻断 package
         return {"error": f"{type(exc).__name__}", "note": "shadow_draft_skipped"}
+
+
+def _run_shadow_financials(ctx: StepContext, shadow: dict) -> dict | None:
+    """R6 月度报表(G1a):影子科目余额(shadow["accounts"])→ books 注入式纯变换 → BS/PL/TB。
+
+    只 import books 变换层 + coa_preset,一行不写/不读 journal_vouchers(影子非第二账本护栏)。
+    period 仅作报表标签,defensively 从 work_order 取(取不到=None,package 以 compute 权威期间
+    渲染);取 period 单独 try 隔离,不带垮报表本体。任何异常收进 note 不上抛——佐证之佐证,
+    层层不阻断出包。返 None(闸关/影子跳过残影无 accounts)= 调用方不挂 r6_financials 键。
+    """
+    from services.accounting import workorder_financials
+
+    try:
+        return workorder_financials.build_financials(shadow, period=_shadow_period(ctx))
+    except Exception as exc:  # noqa: BLE001 - 佐证层单点隔离,绝不阻断 package
+        return {"error": f"{type(exc).__name__}", "note": "financials_skipped"}
+
+
+def _default_shadow_period(ctx: StepContext) -> str | None:
+    """报表标签用期间:从 work_order 只读取一次(与 compute 同口径)。取不到 → None(不编造),
+    package 以 compute 落的权威 period 渲染。单独隔离:store 无该口子/无 cur 也不带垮报表。"""
+    if ctx.cur is None:
+        return None
+    try:
+        wo = ctx.store.get_work_order(
+            ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id
+        )
+        return (wo or {}).get("period")
+    except Exception:  # noqa: BLE001 - period 是标签,取不到不影响报表数字
+        return None
 
 
 def _run_shadow_gl_recon(ctx: StepContext, shadow) -> dict:
@@ -273,3 +309,4 @@ _shadow_draft_enabled = _default_shadow_draft_enabled
 _shadow_gl_rows = _default_shadow_gl_rows
 _shadow_account_bridge = _default_shadow_account_bridge
 _shadow_push_report = _default_shadow_push_report
+_shadow_period = _default_shadow_period

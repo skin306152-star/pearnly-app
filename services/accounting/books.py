@@ -47,12 +47,15 @@ def _account_period_sums(cur, *, tenant_id: str, workspace_client_id: int, perio
     return [dict(r) for r in cur.fetchall()]
 
 
-def general_ledger(cur, *, tenant_id: str, workspace_client_id: int, period: str) -> dict:
-    period = validate_period(period)
+def general_ledger_from_sums(sums: list, period: str) -> dict:
+    """注入式纯变换:逐科目 account_sums(期初净额 + 本期借/贷)→ 总账(期初/借/贷/期末)。
+
+    period 视为已校验(cur 入口先 validate_period 再注入)。法定表走 _account_period_sums 从
+    journal_vouchers 取 sums;影子路径直接喂内存 sums(不碰法定表),两者共用同一变换,报表口径
+    机械一致。sums 行契约 = _account_period_sums 输出(id/code/name_zh/name_th/acct_type/
+    period_debit/period_credit/opening_net)。"""
     accounts, td, tc = [], ZERO, ZERO
-    for r in _account_period_sums(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, period=period
-    ):
+    for r in sums:
         debit, credit = _dec(r["period_debit"]), _dec(r["period_credit"])
         opening = _dec(r["opening_net"])
         closing = opening + debit - credit
@@ -74,11 +77,17 @@ def general_ledger(cur, *, tenant_id: str, workspace_client_id: int, period: str
     return {"period": period, "accounts": accounts, "totals": {"debit": td, "credit": tc}}
 
 
-def trial_balance(cur, *, tenant_id: str, workspace_client_id: int, period: str) -> dict:
-    """试算表:期末净额正=借栏 负=贷栏,Σ借=Σ贷 即平。"""
-    gl = general_ledger(
+def general_ledger(cur, *, tenant_id: str, workspace_client_id: int, period: str) -> dict:
+    period = validate_period(period)
+    sums = _account_period_sums(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, period=period
     )
+    return general_ledger_from_sums(sums, period)
+
+
+def trial_balance_from_sums(sums: list, period: str) -> dict:
+    """试算表(注入式纯变换):期末净额正=借栏 负=贷栏,Σ借=Σ贷 即平。"""
+    gl = general_ledger_from_sums(sums, period)
     rows, td, tc = [], ZERO, ZERO
     for a in gl["accounts"]:
         bal = a["closing"]
@@ -102,6 +111,14 @@ def trial_balance(cur, *, tenant_id: str, workspace_client_id: int, period: str)
         "totals": {"debit": td, "credit": tc},
         "balanced": td == tc,
     }
+
+
+def trial_balance(cur, *, tenant_id: str, workspace_client_id: int, period: str) -> dict:
+    period = validate_period(period)
+    sums = _account_period_sums(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, period=period
+    )
+    return trial_balance_from_sums(sums, period)
 
 
 def subsidiary_ledger(cur, *, tenant_id: str, workspace_client_id: int, period: str) -> dict:
@@ -237,11 +254,9 @@ def wht_report(cur, *, tenant_id: str, workspace_client_id: int, period: str) ->
     return {"period": period, "rows": rows, "total": total}
 
 
-def financials(cur, *, tenant_id: str, workspace_client_id: int, period: str) -> dict:
-    """损益表(本期)+ 资产负债表(期末累计 · 本期累计净利挂权益方配平)。"""
-    gl = general_ledger(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, period=period
-    )
+def financials_from_sums(sums: list, period: str) -> dict:
+    """损益表 + 资产负债表(注入式纯变换)。法定表与影子路径共用,配平口径机械一致。"""
+    gl = general_ledger_from_sums(sums, period)
     pnl_rev, pnl_exp = [], []
     rev_total = exp_total = ZERO
     assets, liabilities, equity = [], [], []
@@ -294,3 +309,12 @@ def financials(cur, *, tenant_id: str, workspace_client_id: int, period: str) ->
             "balanced": asset_total == liab_total + equity_total,
         },
     }
+
+
+def financials(cur, *, tenant_id: str, workspace_client_id: int, period: str) -> dict:
+    """损益表(本期)+ 资产负债表(期末累计 · 本期累计净利挂权益方配平)。"""
+    period = validate_period(period)
+    sums = _account_period_sums(
+        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, period=period
+    )
+    return financials_from_sums(sums, period)

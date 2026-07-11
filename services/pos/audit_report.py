@@ -286,14 +286,19 @@ def events(
         ") al ON TRUE"
     )
     joins = _VOIDER_LATERAL + " " if is_void else ""
+    # 动态片段(归属列/金额式/kind 条件)全走 + 拼接常量,不进 f-string:满足 SQL 隔离闸
+    # (内插值须 %s 参数化或 ALL-CAPS 常量·见 test_pos_inventory_sql_isolation),值本身皆常量。
     cur.execute(
-        f"SELECT s.sold_at, {cashier_expr} AS cid, c.display_name AS cashier_name, "
-        f"{_KIND_AMOUNT[kind]} AS amount, s.receipt_no, al.approver AS authorized_by "
-        "FROM pos_sales s "
+        "SELECT s.sold_at, "
+        + cashier_expr
+        + " AS cid, c.display_name AS cashier_name, "
+        + _KIND_AMOUNT[kind]
+        + " AS amount, s.receipt_no, al.approver AS authorized_by FROM pos_sales s "
         + joins
         + approve_lateral
-        + f" LEFT JOIN pos_cashiers c ON c.id = {cashier_expr} "
-        "WHERE s.tenant_id = %s AND s.workspace_client_id = %s AND "
+        + " LEFT JOIN pos_cashiers c ON c.id = "
+        + cashier_expr
+        + " WHERE s.tenant_id = %s AND s.workspace_client_id = %s AND "
         + _KIND_WHERE[kind]
         + rng
         + cf

@@ -4,12 +4,8 @@ line_webhook_routes.py · LINE Bot Messaging API webhook(REFACTOR-B1)
 从 app.py L3263-3502 抽出 · 0 业务逻辑改:
     POST /api/line/webhook   LINE Bot follow / unfollow / text / image|file 事件分发
 
-包含:
-    - _normalize_line_lang  LINE 语言代码 → 4 语 (zh/en/th/ja)
-    - _ev_lang(ev)          从 event 安全拿语言并规范化
-    - _handle_line_event    单事件路由(follow 不回 · 欢迎语走 OA Greeting / unfollow / message)
-    - _handle_line_text     绑定码消费 / 引导提示
-    - line_webhook 入口路由(签名校验 → 事件分发)
+包含 _normalize_line_lang(语言规范化)/ _ev_lang(从 event 取语言)/ _handle_line_event
+(单事件路由)/ _handle_line_text(绑定码消费+引导)/ line_webhook(签名校验→事件分发入口)。
 
 LINE 图片/文件 → OCR 路径(`_handle_line_image_ocr`)已抽到 services/ocr/line_image_ocr.py
 (REFACTOR-WB-app · 2026-06-01)。`_handle_line_event` 内 import 调到 · 无循环 import。
@@ -463,15 +459,8 @@ async def _handle_line_text(
 
 @router.post("/api/line/webhook")
 async def line_webhook(request: Request):
-    """
-    LINE Messaging API webhook 入口。
-    处理的事件:
-      - follow:用户加 Bot 好友 · 回欢迎语 + 教绑定
-      - unfollow:用户删 Bot · 记录不处理(LINE 不允许回复)
-      - message.text:文字 · 若是 6 位数字 → 尝试绑定码消费
-      - message.image:T1 轮 3 实现 OCR · 本轮提示「即将上线」
-      - 其他 type:忽略
-    """
+    """LINE Messaging API webhook 入口:follow 回欢迎语+教绑定 / unfollow 只记录(LINE 不能回复)
+    / message.text 6 位数字试绑定码 / message.image 走 OCR / 其他 type 忽略。"""
     body = await request.body()
     signature = request.headers.get("x-line-signature", "")
 

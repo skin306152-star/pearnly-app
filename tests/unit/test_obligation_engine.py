@@ -359,5 +359,32 @@ class MaterializeObligationsTests(unittest.TestCase):
         self.assertEqual(row["status"], "conflict")
 
 
+class RematerializeDataSignalsPassthroughTests(unittest.TestCase):
+    """rematerialize_for_profile 的 data_signals(D1-2)必须原样透传 generate_obligations,
+    不被内部改写——开单/画像保存两处接线扫出的真信号才不会在编排层丢失。"""
+
+    def test_data_signals_forwarded_to_generate_obligations(self):
+        from unittest import mock
+
+        signals = {"wht_juristic": True}
+        with (
+            mock.patch.object(
+                engine.tax_profile_store, "load_active_defs", return_value=_seed_defs()
+            ),
+            mock.patch.object(engine, "generate_obligations", return_value=[]) as gen,
+            mock.patch.object(engine, "materialize_obligations"),
+        ):
+            ok = engine.rematerialize_for_profile(
+                _FakeCursor(),
+                tenant_id="t-1",
+                workspace_client_id=7,
+                period=_PERIOD,
+                profile={"pays_juristic": "no"},
+                data_signals=signals,
+            )
+        self.assertTrue(ok)
+        self.assertEqual(gen.call_args.kwargs["data_signals"], signals)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

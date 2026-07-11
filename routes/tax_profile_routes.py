@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 from core import db
 from core.route_helpers import assert_owns_workspace, authorize_pearnly_ai
 from services.authz.deps import check_workspace_scope, get_authz
-from services.workorder import obligation_engine
+from services.workorder import obligation_engine, wht_signals
 from services.workorder.engine import (
     STATUS_ARCHIVE,
     STATUS_COLLECTING,
@@ -156,12 +156,19 @@ async def put_tax_profile(workspace_client_id: int, req: TaxProfileUpdate, reque
             cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
         )
         if profile is not None:
+            period = obligation_engine.current_be_period()
+            # 画像一变即重算当期义务;WHT 信号与开单接线同源(wht_signals),两入口一致。
+            # 独立只读连接扫描——绝不用本 PUT 的写游标(防交接债 #2 静默丢画像 upsert)。
+            data_signals = wht_signals.scan_period_wht_signals_isolated(
+                tenant_id=tenant_id, workspace_client_id=workspace_client_id, period=period
+            )
             obligation_engine.rematerialize_for_profile(
                 cur,
                 tenant_id=tenant_id,
                 workspace_client_id=workspace_client_id,
-                period=obligation_engine.current_be_period(),
+                period=period,
                 profile=profile,
+                data_signals=data_signals,
             )
     if profile is None:
         raise HTTPException(404, detail="workspace.not_found")

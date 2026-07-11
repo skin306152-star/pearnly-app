@@ -584,6 +584,8 @@ class OpenOrderObligationWiringTests(_ApiTestBase):
         profile = {"vat_status": "registered"}
         defs = {"pp30": {"trigger_kind": "vat_status"}}
         obligations = [{"obligation_code": "pp30", "status": "nil"}]
+        # D1-2:开单接线扫当期 WHT 真信号(独立只读游标),透传给引擎。
+        signals = {"wht_juristic": True, "has_any_material": True}
         with (
             mock.patch.object(api, "pearnly_ai_m1_enabled_for", return_value=True),
             mock.patch.object(
@@ -593,6 +595,9 @@ class OpenOrderObligationWiringTests(_ApiTestBase):
                 api.tax_profile_store, "load_active_defs", return_value=defs
             ) as load_defs,
             mock.patch.object(
+                api.wht_signals, "scan_period_wht_signals_isolated", return_value=signals
+            ) as scan,
+            mock.patch.object(
                 api.obligation_engine, "generate_obligations", return_value=obligations
             ) as generate,
             mock.patch.object(api.obligation_engine, "materialize_obligations") as materialize,
@@ -600,8 +605,9 @@ class OpenOrderObligationWiringTests(_ApiTestBase):
             api.open_order(None, tenant_id="t-1", workspace_client_id=7, period="2569-05")
         get_profile.assert_called_once_with(None, tenant_id="t-1", workspace_client_id=7)
         load_defs.assert_called_once_with(None)
+        scan.assert_called_once_with(tenant_id="t-1", workspace_client_id=7, period="2569-05")
         generate.assert_called_once_with(
-            profile=profile, period="2569-05", data_signals=None, defs=defs
+            profile=profile, period="2569-05", data_signals=signals, defs=defs
         )
         materialize.assert_called_once_with(
             None,

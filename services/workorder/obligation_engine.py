@@ -310,14 +310,17 @@ def rematerialize_for_profile(
     period: str,
     profile: dict,
     work_order_id: Optional[str] = None,
+    data_signals: Optional[dict] = None,
 ) -> bool:
     """「取 defs → 现算 → 落库」三步曲的唯一编排入口(开单接线、画像保存后重算两处
-    调用方共用)。义务清单是供料层,不该挡住调用方的主路径——任一环节出错都吞掉、
-    记日志、返 False,调用方按返回值决定是否再报,不需自己包 try/except。"""
+    调用方共用)。data_signals 由调用方扫当期采购 WHT 后透传(见 services.workorder.
+    wht_signals);None = 兜底走全 False 空信号,只吃画像判据、不虚报数据触发义务。
+    义务清单是供料层,不该挡住调用方的主路径——任一环节出错都吞掉、记日志、返 False,
+    调用方按返回值决定是否再报,不需自己包 try/except。"""
     try:
         defs = tax_profile_store.load_active_defs(cur)
         obligations = generate_obligations(
-            profile=profile, period=period, data_signals=None, defs=defs
+            profile=profile, period=period, data_signals=data_signals, defs=defs
         )
         materialize_obligations(
             cur,

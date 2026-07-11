@@ -13,7 +13,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from core.feature_flags import pearnly_ai_m1_enabled_for, pearnly_ai_sod_enabled_for
-from services.workorder import decisions, evidence, obligation_engine, sod, store
+from services.workorder import decisions, evidence, obligation_engine, sod, store, wht_signals
 from services.workspace import tax_profile_store
 
 logger = logging.getLogger(__name__)
@@ -95,11 +95,13 @@ def open_order(
 def _generate_obligations_on_open(
     cur, *, tenant_id: str, workspace_client_id: int, work_order_id: str, period: str
 ) -> None:
-    """开单即生成一次当期义务清单(税务画像-方案-B1.md §3 · B2-d)。数据信号本批传空
-    (TODO(D1):扫采购行 WHT/境外付款/利息股息付款出真实信号,现只吃画像判据);画像读取/
-    生成/物化任一环节出错都不挡开单本身(义务清单是供料层,不是开单主路径的一部分)——
-    profile 读取本身也可能炸(DB 抖动),故这里单独兜底,不指望 rematerialize_for_profile
-    的内部 try/except(它只包 defs→生成→物化三步,profile 是调用方职责)。
+    """开单即生成一次当期义务清单(税务画像-方案-B1.md §3 · B2-d · D1-2)。当期采购 WHT
+    真实信号由 wht_signals 扫出后喂给引擎(个人→PND3 / 法人→PND53 数据触发);画像读取/
+    信号扫描/生成/物化任一环节出错都不挡开单本身(义务清单是供料层,不是开单主路径的一
+    部分)——profile 读取本身也可能炸(DB 抖动),故这里单独兜底,不指望
+    rematerialize_for_profile 的内部 try/except(它只包 defs→生成→物化三步,profile 是
+    调用方职责)。信号扫描走独立只读连接(见 wht_signals.scan_period_wht_signals_isolated),
+    绝不用本开单写游标——防交接债 #2 的「共享游标查询失败 abort 事务 → commit 静默丢工单」。
     """
     try:
         profile = tax_profile_store.get_profile(
@@ -112,6 +114,9 @@ def _generate_obligations_on_open(
         return
     if profile is None:
         return
+    data_signals = wht_signals.scan_period_wht_signals_isolated(
+        tenant_id=tenant_id, workspace_client_id=workspace_client_id, period=period
+    )
     obligation_engine.rematerialize_for_profile(
         cur,
         tenant_id=tenant_id,
@@ -119,6 +124,7 @@ def _generate_obligations_on_open(
         period=period,
         profile=profile,
         work_order_id=work_order_id,
+        data_signals=data_signals,
     )
 
 

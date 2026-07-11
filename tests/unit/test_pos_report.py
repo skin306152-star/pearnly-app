@@ -59,6 +59,7 @@ class AssemblyTests(unittest.TestCase):
                 None,
                 [{"d": date(2026, 6, 1), "cost": Decimal("120"), "complete": True}],
             ),  # by_day cost
+            # by_method:mock 回放 DB 已算净额(SQL 减完 change 后的现金收入),此桶无找零 → 净=200
             (None, [{"method": "cash", "amount": Decimal("200")}]),  # by_method
             (
                 None,
@@ -97,7 +98,7 @@ class AssemblyTests(unittest.TestCase):
                 "cost_complete": True,
             },
         )
-        self.assertEqual(out["by_method"], {"cash": "200.00"})
+        self.assertEqual(out["by_method"], {"cash": "200.00"})  # 净额口径(此桶无找零)
         self.assertEqual(out["top_products"][0]["name"], {"th": "โค้ก", "en": "Coke", "zh": "可乐"})
         self.assertEqual(out["top_products"][0]["qty"], "12.000")
         self.assertEqual(out["top_products"][0]["cost"], "70.00")
@@ -219,6 +220,48 @@ class RefundNetProfitTests(unittest.TestCase):
         out = self._run(gross="100", refund="100", net_cost="0", complete=False)["kpi"]
         self.assertIsNone(out["gross_profit"])
         self.assertFalse(out["cost_complete"])
+
+
+class ByMethodChangeNettingTests(unittest.TestCase):
+    """现金桶取净收入:tendered − change(Bug#4)。
+
+    pos_payments.amount 存顾客给的钱(tendered),找零单独存在 pos_sales.change_amount。旧
+    _by_method 直接 SUM(amount) 把找零当现金收入虚增。修法:SQL 对每单最早一笔现金减一次
+    change_amount,非现金笔不动。真库聚合(单笔减一次 / 分组)由 _e2e 覆盖;此处守 SQL 形状
+    + 净额透传(mock 回放的是 DB 已算好的净额)。"""
+
+    def _run(self, rows):
+        cur = _Cur([(None, rows)])
+        out = report._by_method(cur, ("t", 9), None, None)
+        return out, cur.queries[0][0]
+
+    def test_sql_subtracts_change_for_cash_only_once_per_sale(self):
+        _, sql = self._run([])
+        self.assertIn("s.change_amount", sql)  # 现金桶要减找零
+        self.assertIn("p.method='cash'", sql)  # 只对现金笔减
+        self.assertIn("MIN(p2.id)", sql)  # 每单只减最早一笔现金
+        self.assertIn("p2.sale_id=p.sale_id", sql)  # 同单范围内取最早
+        self.assertIn("p2.method='cash'", sql)
+
+    def test_cash_amount_is_net_of_change(self):
+        # 应付฿55、现金 tendered฿100、change฿45 → DB 净额 55(不是 tendered 100)
+        out, _ = self._run([{"method": "cash", "amount": Decimal("55")}])
+        self.assertEqual(out, {"cash": "55.00"})
+
+    def test_mixed_payment_non_cash_bucket_untouched(self):
+        # 混合单:现金净฿56(tendered60 − change4)+ 刷卡฿44 → 各桶独立,刷卡不受影响
+        out, _ = self._run(
+            [
+                {"method": "cash", "amount": Decimal("56")},
+                {"method": "card", "amount": Decimal("44")},
+            ]
+        )
+        self.assertEqual(out, {"cash": "56.00", "card": "44.00"})
+
+    def test_non_cash_only_unchanged(self):
+        # 纯非现金单:无找零可减,口径与旧实现一致(回归)
+        out, _ = self._run([{"method": "transfer", "amount": Decimal("100")}])
+        self.assertEqual(out, {"transfer": "100.00"})
 
 
 if __name__ == "__main__":

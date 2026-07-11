@@ -155,9 +155,17 @@ def _profit_fields(gross: Decimal, cost_entry) -> dict:
 
 
 def _by_method(cur, base, date_from, date_to) -> dict:
+    # 现金桶取净收入:pos_payments.amount 存的是顾客给的钱(tendered),找零单独存在
+    # pos_sales.change_amount。直接 SUM(amount) 会把找零当现金收入虚增(Bug#4)。混合单里
+    # 只有现金笔可能溢付(非现金笔前端按剩余额封顶,无找零),故整单 change_amount 全归现金笔,
+    # 且只从每单最早一笔现金(MIN(id))减一次——防同单多现金笔重复扣。非现金桶口径不变。
     rng, rp = _range("s.sold_at", date_from, date_to)
     cur.execute(
-        "SELECT p.method AS method, COALESCE(SUM(p.amount),0) AS amount "
+        "SELECT p.method AS method, COALESCE(SUM(p.amount - CASE "
+        "WHEN p.method='cash' AND p.id = ("
+        "SELECT MIN(p2.id) FROM pos_payments p2 "
+        "WHERE p2.sale_id=p.sale_id AND p2.method='cash') "
+        "THEN s.change_amount ELSE 0 END),0) AS amount "
         "FROM pos_payments p JOIN pos_sales s ON s.id = p.sale_id "
         "WHERE p.tenant_id=%s AND s.workspace_client_id=%s "
         "AND s.status='completed' AND s.sale_type='sale'" + rng + " GROUP BY p.method",

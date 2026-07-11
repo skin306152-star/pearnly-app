@@ -139,7 +139,7 @@ const STYLE = `
 .posaud td.neg{color:#dc2626;font-weight:700;}
 .posaud td.over{color:#c2410c;font-weight:700;}
 .posaud .st{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:600;}
-.posaud .st.open{background:#dbeafe;color:#1d4ed8;}
+.posaud .st.open{background:var(--btn-blue,var(--accent));color:var(--accent-ink);}
 .posaud .st.closed{background:var(--line2);color:var(--ink2);}
 .posaud .gapwarn{color:#dc2626;font-size:13px;font-weight:600;margin-bottom:12px;}
 .posaud .state{padding:44px 0;text-align:center;color:var(--ink3);font-size:13.5px;}

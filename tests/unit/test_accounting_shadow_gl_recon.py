@@ -246,6 +246,10 @@ class ReconWiringTests(unittest.TestCase):
         def _boom(ctx):
             raise RuntimeError("bridge blew up")
 
+        # 桥仅在有 GL 行时才建(省 DB 空跑),故先注入非空 gl_rows 让异常路径可达。
+        self._prev_rows = reconcile._shadow_gl_rows
+        reconcile._shadow_gl_rows = lambda ctx: [object()]
+        self.addCleanup(setattr, reconcile, "_shadow_gl_rows", self._prev_rows)
         self._prev_bridge = reconcile._shadow_account_bridge
         reconcile._shadow_account_bridge = _boom
         self.addCleanup(setattr, reconcile, "_shadow_account_bridge", self._prev_bridge)

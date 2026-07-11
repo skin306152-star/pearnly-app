@@ -198,7 +198,8 @@ def _run_shadow_gl_recon(ctx: StepContext, shadow) -> dict:
 
     try:
         gl_rows = _shadow_gl_rows(ctx)
-        bridge = _shadow_account_bridge(ctx)
+        # 桥仅在有 GL 行时才被 reconcile_gl 读(无 GL → no_gl_source 前置返回),空跑时省掉一次 DB 查询。
+        bridge = _shadow_account_bridge(ctx) if gl_rows else {}
         gl = recon.reconcile_gl(shadow.accounts, gl_rows, bridge)
         expected, report = _shadow_push_report(ctx)
         push = recon.reconcile_push(expected, report)

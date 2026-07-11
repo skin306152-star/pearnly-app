@@ -77,8 +77,6 @@ class ShadowResult:
             "trial_balance": self.trial_balance,
             "sources": self.sources,
             "uncertainties": self.uncertainties,
-            "entry_count": len(self.entries),
-            "source_count": len(self.sources),
         }
 
 

@@ -58,7 +58,7 @@
 
     // GL 对平结果 → 胶囊态。四态诚实:no_gl_source 不冒充平/不平,用中性色 + 专属文案;
     // 未知 status(如 _run_shadow_gl_recon 自身异常落的 reconcile_gl_skipped)一律中性色,
-    // 不替一个没见过的态编一句好听话(raw 原样带出,呈现层决定怎么兜底显示)。
+    // 不替一个没见过的态编一句好听话;呈现层直接回退显示原始 g.status。
     // no_gl_source 胶囊用短标签(shadow_gl_no_source_chip),完整诚实说明句留给正文
     // (glBodyHtml 的 shadow_gl_no_source)——两处文案不同字符串,避免同一句话在折叠头
     // 与正文重复出现两遍(also 撞 Playwright getByText 严格模式)。
@@ -70,7 +70,7 @@
     };
     function glReconState(reconcileGl) {
         var status = (reconcileGl || {}).status;
-        return _GL_STATE[status] || { cls: 'n', key: null, raw: status };
+        return _GL_STATE[status] || { cls: 'n', key: null };
     }
 
     var pure = {

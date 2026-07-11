@@ -112,7 +112,7 @@ class GlReconStateTests(unittest.TestCase):
             const r = require({json.dumps(str(AI_DIR / "ai-shadow-render.js"))});
             process.stdout.write(JSON.stringify(r.glReconState({{status: 'reconcile_gl_skipped'}})));
             """)
-        self.assertEqual(out, {"cls": "n", "key": None, "raw": "reconcile_gl_skipped"})
+        self.assertEqual(out, {"cls": "n", "key": None})
 
     def test_missing_reconcile_gl_falls_back_neutral(self):
         # status 是 undefined(非 null)时 JSON.stringify 直接省略该键,不是 raw:null。

@@ -52,6 +52,10 @@ def build_account_bridge(
     只收 pearnly_category 恰为预置科目码的行(会计在配置时把 GL 科目码填进该字段的情形)——
     这是唯一能从现有映射表可靠推出「coa 码 → erp 码」的路径,不猜测分类名与科目码的对应。
     erp_type 给定时按之过滤(一份 GL 文件属单一 ERP,避免 express/mrerp 两套码互串)。
+
+    ⚠️ 过渡启发式:erp_account_mappings.pearnly_category 的正式契约是费用分类【名】,此处靠"恰填成
+    科目码"兜底,现实中多为空桥(如实 unmapped 降级)。GL 上传落地时应换成专用 coa_code↔erp_code
+    桥表(或让影子科目携带 category 身份走按名 join),**替换本启发式而非在其上叠加特例**。
     """
     bridge: dict[str, str] = {}
     for m in account_mappings:
@@ -107,10 +111,6 @@ class GlReconResult:
             "mismatch": self.mismatch,
             "unmapped": self.unmapped,
             "gl_only": self.gl_only,
-            "matched_count": len(self.matched),
-            "mismatch_count": len(self.mismatch),
-            "unmapped_count": len(self.unmapped),
-            "gl_only_count": len(self.gl_only),
         }
 
 
@@ -219,9 +219,6 @@ class PushPresenceResult:
             "pushed_ok": self.pushed_ok,
             "missing": self.missing,
             "rejected": self.rejected,
-            "pushed_ok_count": len(self.pushed_ok),
-            "missing_count": len(self.missing),
-            "rejected_count": len(self.rejected),
         }
 
 

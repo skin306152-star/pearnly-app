@@ -370,7 +370,7 @@ def _write_shadow(out_dir: Path, shadow: dict) -> tuple[str, dict]:
         "debit": tb.get("debit"),
         "credit": tb.get("credit"),
         "diff": tb.get("diff"),
-        "entry_count": shadow.get("entry_count", len(shadow.get("entries") or [])),
+        "entry_count": len(shadow.get("entries") or []),
         "account_count": len(shadow.get("accounts") or []),
         "uncertainties": shadow.get("uncertainties") or [],
         "gl_recon_status": (shadow.get("reconcile_gl") or {}).get("status"),

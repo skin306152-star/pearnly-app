@@ -34,7 +34,14 @@ def _has_price_override(resolved: list) -> bool:
 
 
 def enforce(
-    cur, *, tenant_id: str, workspace_client_id: int, operator, approval, totals: dict, resolved: list
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    operator,
+    approval,
+    totals: dict,
+    resolved: list,
 ) -> list:
     """按操作者 caps 卡折扣上限/改价,超限须店长 PIN 覆盖。返回 [(action, approver, details)]。
 

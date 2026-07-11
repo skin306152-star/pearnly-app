@@ -24,13 +24,19 @@ class CashierAdminCapsUITests(unittest.TestCase):
     def test_caps_modal_and_button(self):
         self.assertIn("openCapsModal", self.src)
         self.assertIn("csh-cap-op", self.src)
-        self.assertIn("data-act=\"caps\"", self.src)
+        self.assertIn('data-act="caps"', self.src)
 
     def test_saves_caps_via_put(self):
         # 保存并入既有 PUT /admin/cashiers/{id},body 带 caps
         self.assertIn("/api/pos/admin/cashiers/", self.src)
         self.assertIn("caps", self.src)
-        for k in ("discount_limit_pct", "can_refund", "can_void", "can_override_price", "cost_visible"):
+        for k in (
+            "discount_limit_pct",
+            "can_refund",
+            "can_void",
+            "can_override_price",
+            "cost_visible",
+        ):
             self.assertIn(k, self.src)
 
     def test_bound_cashier_read_only(self):

@@ -30,7 +30,9 @@ class CashierCapsMigrationTests(unittest.TestCase):
 
     def test_dual_run_in_ensure_core_schema(self):
         # 与迁移同源的幂等 DDL 必须在 ensure_core_schema 里(prod 靠双跑落列)
-        self.assertIn("ADD COLUMN IF NOT EXISTS caps jsonb NOT NULL DEFAULT '{}'::jsonb", self.ensure)
+        self.assertIn(
+            "ADD COLUMN IF NOT EXISTS caps jsonb NOT NULL DEFAULT '{}'::jsonb", self.ensure
+        )
 
     def test_downgrade_drops_caps(self):
         m = re.search(r"def downgrade\(\)[^:]*:(.*)", self.mig, re.DOTALL)

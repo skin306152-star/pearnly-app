@@ -121,7 +121,9 @@ class EnforceCapsTests(unittest.TestCase):
                 caps=caps,
                 totals=_totals(80, 20),  # 20%
                 resolved=[],
-                verify=lambda *a, **k: (_ for _ in ()).throw(PosError("pos.approval_required", 403)),
+                verify=lambda *a, **k: (_ for _ in ()).throw(
+                    PosError("pos.approval_required", 403)
+                ),
             )
         self.assertEqual(ctx.exception.code, "pos.approval_required")
 
@@ -189,7 +191,12 @@ class ApprovalGeneralizationTests(unittest.TestCase):
 
         with mock.patch.object(approval_svc.deps, "actor_has_perm", side_effect=_holds):
             out = approval_svc.authorize(
-                _Cur(), request=None, user=owner, tenant_id="t", workspace_client_id=1, approval=None
+                _Cur(),
+                request=None,
+                user=owner,
+                tenant_id="t",
+                workspace_client_id=1,
+                approval=None,
             )
         self.assertIsNone(out)
         self.assertEqual(seen["code"], "pos.refund.approve")
@@ -239,7 +246,9 @@ class ApprovalGeneralizationTests(unittest.TestCase):
             mock.patch.object(approval_svc.cashier_dal, "get_cashier", return_value=cashier_row),
             mock.patch.object(approval_svc.pos_auth, "verify_pin", return_value=True),
             mock.patch.object(
-                approval_svc, "resolve", return_value=Authz(role_key="admin", permissions=frozenset({"pos.admin.manage"}))
+                approval_svc,
+                "resolve",
+                return_value=Authz(role_key="admin", permissions=frozenset({"pos.admin.manage"})),
             ),
         ):
             out = approval_svc.verify_manager_override(

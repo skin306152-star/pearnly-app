@@ -118,6 +118,9 @@ from routes.line_liff_routes import (
 from routes.purchase_config_routes import (
     router as purchase_config_router,
 )  # 商户采购 配置后台(供应商/科目/设置)· 2026-06-08
+from routes.supplier_posting_routes import (
+    router as supplier_posting_router,
+)  # 供应商过账档案能力层 CRUD(F4 · L2 · 零 UI)· 2026-07-11
 from routes.accounting_routes import (
     router as accounting_router,
 )  # 自动做账 凭证/逐笔审/科目/映射/设置 · 2026-06-10
@@ -316,6 +319,7 @@ app.include_router(purchase_export_router)  # 进项外流 Excel/Drive/Sheet 导
 app.include_router(google_oauth_router)  # 集成中心 Google Drive/Sheets 授权(2026-06-14)
 app.include_router(line_liff_router)  # LINE LIFF 鉴权 + 复核屏入口(2026-06-14)
 app.include_router(purchase_config_router)  # 商户采购 配置后台 供应商/科目/设置(2026-06-08)
+app.include_router(supplier_posting_router)  # 供应商过账档案能力层 CRUD(2026-07-11)
 app.include_router(accounting_router)  # 自动做账 凭证/逐笔审/科目/映射/设置(2026-06-10)
 app.include_router(accounting_books_router)  # 自动做账 出账本/报税/结账(2026-06-10)
 app.include_router(accounting_bank_router)  # 银行对账 账户/导入/匹配/收割(2026-06-11)

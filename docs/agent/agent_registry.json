@@ -154,6 +154,7 @@
   "security_routes": "D",
   "settings_routes": "C",
   "summary_import_routes": "C",
+  "supplier_posting_routes": "C",
   "tax_profile_routes": "C",
   "tax_routes": "B",
   "tenant_routes": "B",

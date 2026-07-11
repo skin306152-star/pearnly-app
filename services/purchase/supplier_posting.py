@@ -35,6 +35,35 @@ def get_profiles(
     return {row["seller_tax_id"]: dict(row) for row in cur.fetchall()}
 
 
+def list_profiles(
+    cur, *, tenant_id: str, workspace_client_id: int, limit: Optional[int] = None
+) -> List[dict]:
+    """套账下全部过账档案,按 updated_at 倒序(管理页用途 · 量小照惯例不分页,limit 供路由层收口)。"""
+    sql = (
+        f"SELECT {_SELECT} FROM supplier_posting_profiles "
+        "WHERE tenant_id = %s AND workspace_client_id = %s ORDER BY updated_at DESC"
+    )
+    params: list = [tenant_id, workspace_client_id]
+    if limit is not None:
+        sql += " LIMIT %s"
+        params.append(limit)
+    cur.execute(sql, tuple(params))
+    return [dict(row) for row in cur.fetchall()]
+
+
+def delete_profile(cur, *, tenant_id: str, workspace_client_id: int, seller_tax_id: str) -> bool:
+    """删一条过账档案。幂等:不存在也不报错,返回值告知调用方是否真删到行(路由层自定 404/no-op)。"""
+    tax = str(seller_tax_id or "").strip()
+    if not tax:
+        return False
+    cur.execute(
+        "DELETE FROM supplier_posting_profiles "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND seller_tax_id = %s",
+        (tenant_id, workspace_client_id, tax),
+    )
+    return cur.rowcount > 0
+
+
 def upsert_profile(
     cur,
     *,

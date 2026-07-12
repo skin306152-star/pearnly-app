@@ -88,4 +88,28 @@ assert.equal(mapped.status, 'synced');
 assert.equal(await context.POS.offline.pendingCount(), 0);
 assert.equal(events[0].detail.receipt_no, 'RCP-1');
 
+context.POS.offline.cacheCatalog([
+    { id: 'p1', stock: { qty_base: '1' }, units: [{ unit_name: 'each', factor: '1' }] },
+]);
+await context.POS.offline.enqueueSale({
+    ...payload,
+    client_uuid: 'sale-auth',
+    lines: [{ ...payload.lines[0], qty: 1 }],
+});
+context.POS.state.token = 'eyJ.old-cashier-token';
+context.POS.data.syncSales = async () => ({
+    results: [
+        { client_uuid: 'sale-auth', ok: false, status: 401, error: { code: 'pos.login_required' } },
+    ],
+});
+await context.POS.offline.sync();
+assert.equal(JSON.stringify([...storage.values()]).includes('eyJ.old-cashier-token'), false);
+assert.equal(await context.POS.offline.pendingCount(), 1);
+context.POS.state.token = 'eyJ.new-cashier-token';
+context.POS.data.syncSales = async () => ({
+    results: [{ client_uuid: 'sale-auth', ok: true, sale_id: 'server-2', receipt_no: 'RCP-2' }],
+});
+await context.POS.offline.sync();
+assert.equal(await context.POS.offline.pendingCount(), 0);
+
 console.log('POS offline runtime contracts passed');

@@ -263,13 +263,22 @@
     function retryAt(tries) {
         return Date.now() + Math.min(300000, 1000 * 2 ** Math.min(tries, 8));
     }
+    function authMarker(token) {
+        let hash = 2166136261;
+        for (let i = 0; i < String(token || '').length; i += 1) {
+            hash ^= String(token).charCodeAt(i);
+            hash = Math.imul(hash, 16777619);
+        }
+        return (hash >>> 0).toString(36);
+    }
     async function markFailure(it, status, code) {
         it.tries = Number(it.tries || 0) + 1;
         it.status = failureState(status);
         it.last_error =
             code || (status === 401 || status === 403 ? 'pos.login_required' : 'pos.sync_failed');
         it.next_retry_at = it.status === 'retrying' ? retryAt(it.tries) : null;
-        it.paused_token = it.status === 'auth_paused' ? state.token : null;
+        it.paused_auth_marker = it.status === 'auth_paused' ? authMarker(state.token) : null;
+        delete it.paused_token;
         await outboxPut(it);
     }
     async function sync() {
@@ -280,11 +289,12 @@
             if (
                 record.status === 'auth_paused' &&
                 state.token &&
-                state.token !== record.paused_token
+                authMarker(state.token) !== record.paused_auth_marker
             ) {
                 record.status = 'pending';
                 record.last_error = null;
-                record.paused_token = null;
+                record.paused_auth_marker = null;
+                delete record.paused_token;
                 await outboxPut(record);
             }
         }

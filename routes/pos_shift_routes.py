@@ -14,7 +14,7 @@ from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
 from core import db, pos_api
-from core.pos_api import PosError, assert_module_enabled, ok, require_workspace
+from core.pos_api import PosError, assert_module_enabled, ok, require_workspace_access
 from services.pos import shift as shift_svc
 from services.pos import shift_audit
 
@@ -53,6 +53,7 @@ async def api_open_shift(req: OpenShiftRequest, request: Request):
         request,
         ws_override=req.workspace_client_id,
         write_fn=_fn,
+        permission="pos.shift.operate",
         after_commit=shift_audit.after_open,
     )
 
@@ -61,11 +62,11 @@ async def api_open_shift(req: OpenShiftRequest, request: Request):
 async def api_current_shift(request: Request, workspace_client_id: Optional[int] = Query(None)):
     """本收银台当前未结班次 + 汇总(交班屏直查,不依赖前端内存 → 刷新/换人后仍能交班)。
     无班次 → data:null(屏显诚实空态)。"""
-    user, tid = pos_api.subject(request)
+    user, tid = pos_api.subject(request, "pos.shift.operate")
     ws = pos_api.resolve_ws(user, workspace_client_id)
     with db.get_cursor_rls(tid) as cur:
         assert_module_enabled(cur, tid, "pos")
-        require_workspace(cur, tid, ws)
+        require_workspace_access(cur, request, tid, ws)
         return ok(shift_svc.current_shift(cur, tenant_id=tid, workspace_client_id=ws))
 
 
@@ -84,5 +85,6 @@ async def api_close_shift(shift_id: str, req: CloseShiftRequest, request: Reques
         request,
         ws_override=req.workspace_client_id,
         write_fn=_fn,
+        permission="pos.shift.operate",
         after_commit=shift_audit.after_close,
     )

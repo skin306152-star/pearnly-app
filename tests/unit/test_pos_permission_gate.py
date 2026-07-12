@@ -13,6 +13,7 @@ from unittest import mock
 os.environ.setdefault("JWT_SECRET", "test-secret-key-of-sufficient-length")
 
 from core.pos_api import PosError
+from core import pos_api
 from services.authz import deps
 from services.authz.registry import ALL_CODES
 from services.authz.resolver import Authz
@@ -43,6 +44,71 @@ class RequirePermPosTests(unittest.TestCase):
         self.assertEqual(ctx.exception.code, "pos.forbidden")
         self.assertEqual(ctx.exception.http_status, 403)
 
+
+class PosWorkspaceGateTests(unittest.TestCase):
+    def test_subject_requires_sale_permission(self):
+        request = _Req()
+        user = {"tenant_id": "t", "id": "u"}
+        with mock.patch("services.authz.deps.require_perm_pos", return_value=user) as require_perm:
+            self.assertEqual(pos_api.subject(request), (user, "t"))
+        require_perm.assert_called_once_with(request, "pos.sale.operate")
+
+    def test_pos_write_forwards_explicit_permission(self):
+        request = _Req()
+        user = {"tenant_id": "t", "id": "u", "workspace_client_id": 7}
+        cursor = mock.MagicMock()
+        cursor_context = mock.MagicMock()
+        cursor_context.__enter__.return_value = cursor
+        with (
+            mock.patch.object(pos_api, "subject", return_value=(user, "t")) as subject,
+            mock.patch.object(pos_api.db, "get_cursor_rls", return_value=cursor_context),
+            mock.patch.object(pos_api, "assert_module_enabled"),
+            mock.patch.object(pos_api, "require_workspace_access"),
+        ):
+            pos_api.pos_write(
+                request,
+                ws_override=None,
+                write_fn=lambda *_args: {},
+                permission="pos.shift.operate",
+            )
+        subject.assert_called_once_with(request, "pos.shift.operate")
+
+    def test_workspace_gate_checks_assignment_after_tenant_ownership(self):
+        request = _Req()
+        cur = object()
+        with (
+            mock.patch.object(pos_api, "require_workspace") as require_workspace,
+            mock.patch("services.authz.deps.check_request_scope") as check_scope,
+        ):
+            pos_api.require_workspace_access(cur, request, "t", 7)
+        require_workspace.assert_called_once_with(cur, "t", 7)
+        check_scope.assert_called_once_with(request, 7, pos=True)
+
+    def test_unassigned_workspace_uses_pos_not_found(self):
+        request = _Req()
+        authz = Authz(
+            role_key="member",
+            permissions=frozenset({"pos.sale.operate"}),
+            scope_mode="assigned",
+            workspace_ids=frozenset({8}),
+        )
+        with (
+            mock.patch.object(pos_api, "require_workspace"),
+            mock.patch.object(deps, "_cached_authz", return_value=authz),
+            mock.patch.object(deps, "_pos_token_payload", return_value=None),
+            mock.patch("core.auth.get_current_user_from_request", return_value={"id": "u"}),
+        ):
+            with self.assertRaises(PosError) as ctx:
+                pos_api.require_workspace_access(object(), request, "t", 7)
+        self.assertEqual((ctx.exception.code, ctx.exception.http_status), ("pos.not_found", 404))
+
+    def test_cashier_workspace_override_mismatch_is_forbidden(self):
+        with self.assertRaises(PosError) as ctx:
+            pos_api.resolve_ws({"workspace_client_id": 7}, 8)
+        self.assertEqual((ctx.exception.code, ctx.exception.http_status), ("pos.forbidden", 403))
+
+
+class RequirePermPosMatrixTests(unittest.TestCase):
     def test_cashier_allowed_on_cashier_code(self):
         cashier = {"tenant_id": "t", "id": "c", "role": "cashier", "is_super_admin": False}
         with mock.patch("core.pos_api.pos_auth", return_value=cashier):
@@ -110,6 +176,21 @@ class WiringTests(unittest.TestCase):
             'require_perm_pos_tid(request, "settings.modules.manage")',
             inspect.getsource(auth.api_onboarding),
         )
+
+    def test_sales_routes_use_shared_permission_and_workspace_gate(self):
+        import routes.pos_sales_routes as sales
+
+        self.assertIn("pos_api.subject(request)", inspect.getsource(sales._subject))
+        self.assertIn("require_workspace_access", inspect.getsource(sales._read))
+
+    def test_shift_routes_use_shift_permission(self):
+        import routes.pos_shift_routes as shift
+
+        self.assertIn('permission="pos.shift.operate"', inspect.getsource(shift.api_open_shift))
+        self.assertIn(
+            'subject(request, "pos.shift.operate")', inspect.getsource(shift.api_current_shift)
+        )
+        self.assertIn('permission="pos.shift.operate"', inspect.getsource(shift.api_close_shift))
 
 
 if __name__ == "__main__":

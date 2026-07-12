@@ -181,18 +181,33 @@ def assert_module_enabled(cur, tenant_id: str, module_key: str) -> None:
         raise PosError("pos.module_disabled", 403)
 
 
-def subject(request: Request) -> tuple[dict, str]:
+def subject(request: Request, permission: str = "pos.sale.operate") -> tuple[dict, str]:
     """取 (user, tenant_id);无 tenant → PosError pos.forbidden(403)。写事务信封的第一步。"""
-    user = pos_auth(request)
+    from services.authz.deps import require_perm_pos
+
+    user = require_perm_pos(request, permission)
     tid = user.get("tenant_id")
     if not tid:
         raise PosError("pos.forbidden", 403)
     return user, str(tid)
 
 
+def require_workspace_access(
+    cur, request: Request, tenant_id: str, workspace_client_id: int
+) -> None:
+    """Verify tenant ownership and the platform member's assigned workspace scope."""
+    from services.authz.deps import check_request_scope
+
+    require_workspace(cur, tenant_id, workspace_client_id)
+    check_request_scope(request, workspace_client_id, pos=True)
+
+
 def resolve_ws(user: dict, override: Optional[int]) -> int:
     """定位账套:收银员 token 自带 workspace_client_id,老板调走 override;都无 → pos.forbidden。"""
-    ws = user.get("workspace_client_id") or override
+    token_ws = user.get("workspace_client_id")
+    if token_ws is not None and override is not None and int(token_ws) != int(override):
+        raise PosError("pos.forbidden", 403)
+    ws = token_ws or override
     if ws is None:
         raise PosError("pos.forbidden", 403)
     return int(ws)
@@ -204,6 +219,7 @@ def pos_write(
     ws_override: Optional[int],
     write_fn,
     module_key: str = "pos",
+    permission: str = "pos.sale.operate",
     before_write=None,
     after_commit=None,
 ) -> dict:
@@ -218,12 +234,12 @@ def pos_write(
 
     返回 ok(result)。
     """
-    user, tid = subject(request)
+    user, tid = subject(request, permission)
     ws = resolve_ws(user, ws_override)
     ctx = {"user": user, "tenant_id": tid, "workspace_client_id": ws}
     with db.get_cursor_rls(tid, commit=True) as cur:
         assert_module_enabled(cur, tid, module_key)
-        require_workspace(cur, tid, ws)
+        require_workspace_access(cur, request, tid, ws)
         if before_write is not None:
             before_write(cur, ctx)
         result = write_fn(cur, tid, ws, user)

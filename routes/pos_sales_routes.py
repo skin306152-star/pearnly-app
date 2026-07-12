@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from core import db, pos_api
-from core.pos_api import PosError, assert_module_enabled, ok, pos_auth, require_workspace
+from core.pos_api import PosError, assert_module_enabled, ok, require_workspace_access
 from services.imaging import image_store
 from services.pos import (
     approval as approval_svc,
@@ -57,18 +57,11 @@ def _schedule_sheets_sync(tenant_id: str, workspace_client_id: int, sale_id: str
 
 
 def _subject(request: Request) -> tuple[dict, str]:
-    user = pos_auth(request)
-    tid = user.get("tenant_id")
-    if not tid:
-        raise PosError("pos.forbidden", 403)
-    return user, str(tid)
+    return pos_api.subject(request)
 
 
 def _resolve_ws(user: dict, override: Optional[int]) -> int:
-    ws = user.get("workspace_client_id") or override
-    if ws is None:
-        raise PosError("pos.forbidden", 403)
-    return int(ws)
+    return pos_api.resolve_ws(user, override)
 
 
 def _read(request: Request, ws_override: Optional[int], fn, commit: bool = False):
@@ -76,7 +69,7 @@ def _read(request: Request, ws_override: Optional[int], fn, commit: bool = False
     ws = _resolve_ws(user, ws_override)
     with db.get_cursor_rls(tid, commit=commit) as cur:
         assert_module_enabled(cur, tid, "pos")
-        require_workspace(cur, tid, ws)
+        require_workspace_access(cur, request, tid, ws)
         return ok(fn(cur, tid, ws, user))
 
 
@@ -211,7 +204,7 @@ async def api_create_sale(req: CreateSaleRequest, request: Request):
     ws = _resolve_ws(user, req.workspace_client_id)
     with db.get_cursor_rls(tid, commit=True) as cur:
         assert_module_enabled(cur, tid, "pos")
-        require_workspace(cur, tid, ws)
+        require_workspace_access(cur, request, tid, ws)
         result = sale_svc.create_sale(
             cur,
             tenant_id=tid,
@@ -456,7 +449,7 @@ async def api_receipt_pdf(
     ws = _resolve_ws(user, workspace_client_id)
     with db.get_cursor_rls(tid) as cur:
         assert_module_enabled(cur, tid, "pos")
-        require_workspace(cur, tid, ws)
+        require_workspace_access(cur, request, tid, ws)
         pdf = receipt_pdf.build_receipt_pdf(
             cur, tenant_id=tid, workspace_client_id=ws, sale_id=sale_id, width_mm=width
         )

@@ -54,7 +54,7 @@ class ScheduleOnCreateSaleTests(unittest.IsolatedAsyncioTestCase):
             patch.object(psr, "_resolve_ws", return_value=7),
             patch.object(psr.db, "get_cursor_rls", return_value=_CursorCtx()),
             patch.object(psr, "assert_module_enabled"),
-            patch.object(psr, "require_workspace"),
+            patch.object(psr, "require_workspace_access"),
             patch.object(
                 psr.sale_svc,
                 "create_sale",
@@ -73,7 +73,7 @@ class ScheduleOnCreateSaleTests(unittest.IsolatedAsyncioTestCase):
             patch.object(psr, "_resolve_ws", return_value=7),
             patch.object(psr.db, "get_cursor_rls", return_value=_CursorCtx()),
             patch.object(psr, "assert_module_enabled"),
-            patch.object(psr, "require_workspace"),
+            patch.object(psr, "require_workspace_access"),
             patch.object(
                 psr.sale_svc,
                 "create_sale",

@@ -75,7 +75,7 @@ class PosSalesRoutesContractTests(unittest.TestCase):
         self.assertTrue(hasattr(mod, "ok"))
         self.assertTrue(hasattr(mod, "assert_module_enabled"))
         self.assertTrue(hasattr(mod, "PosError"))
-        self.assertTrue(hasattr(mod, "pos_auth"))
+        self.assertTrue(hasattr(mod.pos_api, "subject"))
 
 
 class PaymentMethodsRouteTests(unittest.IsolatedAsyncioTestCase):
@@ -83,11 +83,13 @@ class PaymentMethodsRouteTests(unittest.IsolatedAsyncioTestCase):
         # 收银员 token(带 workspace_client_id · 无 admin 权限)即可读 → 走 _read 不是 owner admin 口。
         with (
             patch.object(
-                mod, "pos_auth", return_value={"tenant_id": "t-1", "workspace_client_id": 7}
+                mod.pos_api,
+                "subject",
+                return_value=({"tenant_id": "t-1", "workspace_client_id": 7}, "t-1"),
             ),
             patch.object(mod.db, "get_cursor_rls", return_value=_CursorCtx()),
             patch.object(mod, "assert_module_enabled"),
-            patch.object(mod, "require_workspace"),
+            patch.object(mod, "require_workspace_access"),
             patch.object(
                 pay_settings,
                 "get_settings",

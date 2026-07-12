@@ -34,6 +34,12 @@ def refund(
     created_by=None,
 ) -> dict:
     if client_uuid:
+        sales_store.lock_client_uuid(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            client_uuid=str(client_uuid),
+        )
         existing = sales_store.find_sale_by_client_uuid(
             cur,
             tenant_id=tenant_id,
@@ -41,6 +47,10 @@ def refund(
             client_uuid=client_uuid,
         )
         if existing:
+            if existing["sale_type"] != "refund" or str(existing.get("refund_of_sale_id")) != str(
+                original_sale_id
+            ):
+                raise PosError("pos.line_invalid", 409, detail="client_uuid_conflict")
             # 重放也如实报库存侧结果(餐饮单本就没回补过)。
             return _refund_result(
                 existing,
@@ -50,32 +60,44 @@ def refund(
                 ),
             )
 
-    orig = sales_store.get_sale(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, sale_id=original_sale_id
-    )
-    if not orig:
-        raise PosError("pos.product_not_found", 404)
-    if orig["status"] != "completed" or orig["sale_type"] != "sale":
-        raise PosError("pos.void_not_allowed", 409)
     binding = _current_refund_binding(
         cur,
         tenant_id=tenant_id,
         workspace_client_id=workspace_client_id,
         cashier_id=cashier_id,
     )
+    orig = sales_store.get_sale(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        sale_id=original_sale_id,
+        for_update=True,
+    )
+    if not orig:
+        raise PosError("pos.product_not_found", 404)
+    if orig["status"] != "completed" or orig["sale_type"] != "sale":
+        raise PosError("pos.void_not_allowed", 409)
 
     orig_lines = {
         str(ln["id"]): ln
-        for ln in sales_store.list_lines(cur, tenant_id=tenant_id, sale_id=original_sale_id)
+        for ln in sales_store.list_lines(
+            cur, tenant_id=tenant_id, sale_id=original_sale_id, for_update=True
+        )
     }
+
+    requested_qty = {}
+    for rl in lines:
+        line_id = str(rl.get("sale_line_id"))
+        requested_qty[line_id] = requested_qty.get(line_id, Decimal("0")) + Decimal(
+            str(rl.get("qty", 0))
+        )
 
     refund_items = []
     totals_lines = []
-    for rl in lines:
-        oline = orig_lines.get(str(rl.get("sale_line_id")))
+    for line_id, rqty in requested_qty.items():
+        oline = orig_lines.get(line_id)
         if not oline:
-            raise PosError("pos.line_invalid", 422, detail=str(rl.get("sale_line_id")))
-        rqty = Decimal(str(rl.get("qty", 0)))
+            raise PosError("pos.line_invalid", 422, detail=line_id)
         oqty = Decimal(str(oline["qty"]))
         if rqty <= 0 or oqty <= 0:
             raise PosError("pos.line_invalid", 422)

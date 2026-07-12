@@ -154,10 +154,20 @@ def find_sale_by_client_uuid(cur, *, tenant_id: str, workspace_client_id: int, c
     return cur.fetchone()
 
 
-def get_sale(cur, *, tenant_id: str, workspace_client_id: int, sale_id: str):
+def lock_client_uuid(cur, *, tenant_id: str, workspace_client_id: int, client_uuid: str) -> None:
+    scope = f"pos:{tenant_id}:{workspace_client_id}:{client_uuid}"
+    cur.execute(
+        "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0)) /* tenant_id in scope */", (scope,)
+    )
+
+
+def get_sale(
+    cur, *, tenant_id: str, workspace_client_id: int, sale_id: str, for_update: bool = False
+):
     cur.execute(
         f"SELECT {_SALE_COLS} FROM pos_sales "
-        f"WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s",
+        f"WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s"
+        + (" FOR UPDATE" if for_update else ""),
         (tenant_id, workspace_client_id, sale_id),
     )
     return cur.fetchone()
@@ -283,11 +293,12 @@ def insert_payment(cur, *, tenant_id: str, sale_id: str, method: str, amount, re
     )
 
 
-def list_lines(cur, *, tenant_id: str, sale_id: str) -> list:
+def list_lines(cur, *, tenant_id: str, sale_id: str, for_update: bool = False) -> list:
     cur.execute(
         "SELECT id, product_id, sell_unit, unit_factor, qty, qty_base, unit_price, "
         "line_discount, vat_applicable, batch_id, refund_of_line_id, line_total, cost_total "
-        "FROM pos_sale_lines WHERE tenant_id = %s AND sale_id = %s ORDER BY id",
+        "FROM pos_sale_lines WHERE tenant_id = %s AND sale_id = %s ORDER BY id"
+        + (" FOR UPDATE" if for_update else ""),
         (tenant_id, sale_id),
     )
     return cur.fetchall()
@@ -311,11 +322,18 @@ def refunded_qty_for_line(cur, *, tenant_id: str, line_id: str) -> Decimal:
     return Decimal(str(cur.fetchone()["q"]))
 
 
-def set_status(cur, *, tenant_id: str, sale_id: str, status: str) -> None:
+def set_status(
+    cur, *, tenant_id: str, sale_id: str, status: str, expected_status: str | None = None
+) -> bool:
+    condition = " AND status = %s" if expected_status is not None else ""
+    params = [status, tenant_id, sale_id]
+    if expected_status is not None:
+        params.append(expected_status)
     cur.execute(
-        "UPDATE pos_sales SET status = %s WHERE tenant_id = %s AND id = %s",
-        (status, tenant_id, sale_id),
+        "UPDATE pos_sales SET status = %s WHERE tenant_id = %s AND id = %s" + condition,
+        params,
     )
+    return cur.rowcount == 1
 
 
 def set_full_invoice_id(cur, *, tenant_id: str, sale_id: str, doc_id) -> None:

@@ -11,7 +11,7 @@
 
 import re
 from decimal import Decimal
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 from services.fileconv.amounts import money_tokens, repair_number_spaces
 

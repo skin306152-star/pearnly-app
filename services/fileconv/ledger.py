@@ -11,7 +11,7 @@
 
 import re
 from decimal import Decimal
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 from services.fileconv.amounts import MONEY_RE, repair_number_spaces, trailing_money_block
 from services.fileconv.model import LedgerRow

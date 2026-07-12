@@ -1,8 +1,7 @@
 // 用户引导闭环 · 注册后向导壳(全屏 · 主体 → 账务 → 完成清单)。
 // 由 module-nav 的 needs_onboarding 触发(window.startOnboardingFlow);owner 专属。
-// 平台业态自选板块已下架(Zihao 2026-07-11 拍板):不再让新租户挑业态卡片,向导起步即
-// 静默 PUT /api/me/onboarding 套用 firm 预设(后端锁死 firm-only)。设置页模块自助开关
-// 也已下架(2026-07-12)——模块组合只由域名/运营侧决定,失败不阻塞,下次向导重跑重试。
+// 业态自选+设置页模块自助开关均已下架(2026-07-11/12 拍板):向导起步静默 PUT
+// /api/me/onboarding 套 firm(后端锁死 firm-only);失败不阻塞,下次向导重跑重试。
 // 步① 复用 subject-create 三分支。步② 账务设置当前无 per-主体 持久化字段 → 只读默认值确认(状态诚实)。
 /* global t, token, escapeHtml, showToast */
 import { ONB_CSS, onbIcon } from './onboarding-flow-html.js';

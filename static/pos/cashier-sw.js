@@ -7,8 +7,20 @@
  * 缓存名带版本号,改外壳 bump 即可让旧缓存失效(对齐 ?v= 缓存破)。
  * 独立于 /pos 旧 SW:老收银设备的 /pos SW 原样不动,两作用域互不干扰。
  */
-const CACHE = 'pearnly-cashier-v11911101';
+const CACHE = 'pearnly-cashier-v11911102';
 const CORE = ['/cashier'];
+
+function isCashierAsset(pathname) {
+    return (
+        pathname === '/cashier' ||
+        pathname.startsWith('/cashier/') ||
+        pathname === '/cashier-sw.js' ||
+        pathname.startsWith('/static/pos/') ||
+        pathname.startsWith('/static/brand/') ||
+        pathname === '/static/dist/pos.js' ||
+        pathname === '/static/dist/pos.css'
+    );
+}
 
 self.addEventListener('install', (e) => {
     e.waitUntil(
@@ -36,7 +48,7 @@ self.addEventListener('fetch', (e) => {
     if (req.method !== 'GET') return;
     const url = new URL(req.url);
     if (url.origin !== self.location.origin) return;
-    if (url.pathname.startsWith('/api/')) return; // 放行 → 离线时自然失败,前端用 outbox
+    if (!isCashierAsset(url.pathname)) return;
     e.respondWith(
         caches.match(req).then(
             (cached) =>

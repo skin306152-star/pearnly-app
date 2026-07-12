@@ -39,6 +39,16 @@ _NO_CACHE = {
     "Pragma": "no-cache",
     "Expires": "0",
 }
+_CASHIER_HEADERS = {
+    **_NO_CACHE,
+    "Content-Security-Policy": (
+        "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; "
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; "
+        "font-src 'self' data:; connect-src 'self' https://static.cloudflareinsights.com; "
+        "worker-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; "
+        "form-action 'self'; report-uri /api/csp-report"
+    ),
+}
 
 
 # ============================================================
@@ -141,7 +151,7 @@ async def admin_layout_page(rest: str):
 # 登录页(见下,带老设备接回 /cashier 的 guard);老收银设备装的旧 PWA(scope /pos + cache-first
 # service worker)继续吐缓存老壳照常收银,零感知。
 def _cashier_page() -> FileResponse:
-    return FileResponse("static/dist/pos.html", headers=_NO_CACHE)
+    return FileResponse("static/dist/pos.html", headers=_CASHIER_HEADERS)
 
 
 @router.get("/pos-sw.js")

@@ -301,7 +301,7 @@
 
     function readEnv() {
         try {
-            state.token = localStorage.getItem('mrpilot_token') || null;
+            state.token = null;
             const lang = localStorage.getItem('mrpilot_lang');
             if (lang && window.POS_I18N[lang]) state.lang = lang;
             // 设备店铺绑定(收银员任意设备路径)优先;否则老板「切到收银台」旧路径(选的账套)
@@ -310,10 +310,6 @@
                 const sw = localStorage.getItem(STORE_WS_KEY);
                 state.workspaceClientId = sw ? Number(sw) : null;
                 state.store = localStorage.getItem(STORE_NAME_KEY) || '';
-            } else {
-                const wc = localStorage.getItem('pearnly_active_workspace_client_id');
-                state.workspaceClientId = wc ? Number(wc) : null;
-                state.store = localStorage.getItem('pearnly_active_workspace_name') || '';
             }
             // 小票抬头地址:离线打印用,来源见 pos-data.js pay.ensure() 拉到 bootstrap.store 后回写缓存。
             state.storeAddress = localStorage.getItem(STORE_ADDR_KEY) || '';
@@ -515,7 +511,7 @@
                 })
                 .catch(() => {});
             navigator.serviceWorker
-                .register('/cashier-sw.js?v=11911101', { scope: '/cashier' })
+                .register('/cashier-sw.js?v=11911102', { scope: '/cashier' })
                 .catch(() => {});
         }
         tick();

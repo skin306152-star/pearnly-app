@@ -121,6 +121,7 @@ def main() -> int:
                 "lines": [{"product_id": pid, "qty": 1, "unit_price": 10}],
                 "payments": [{"method": "cash", "amount": 10}],
             },
+            operator={"cashier_id": str(c["id"])},
         )
         sale_id = sale["sale"]["id"]
 

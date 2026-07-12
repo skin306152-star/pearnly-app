@@ -212,6 +212,7 @@ def main() -> int:
                     {"method": "promptpay", "amount": 71.20},
                 ],
             },
+            operator={"cashier_id": cid},
         )
         s = sale1["sale"]
         record(
@@ -293,6 +294,7 @@ def main() -> int:
             tenant_id=tid,
             workspace_client_id=ws,
             cashier_id=cid,
+            operator={"cashier_id": cid},
             items=[
                 dict(
                     client_uuid="f0000001-0000-0000-0000-000000000001",
@@ -346,6 +348,7 @@ def main() -> int:
             tenant_id=tid,
             workspace_client_id=ws,
             shift_id=sh["id"],
+            cashier_id=cid,
             counted_cash=float(_expected_cash(cur, tid, sh["id"])),
         )
         record(

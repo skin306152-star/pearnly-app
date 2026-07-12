@@ -16,6 +16,7 @@ from core.pos_api import PosError
 from services.accounting import hooks as acct_hooks
 from services.inventory import store as inv_store
 from services.pos import numbering, payment_settlement, sale_caps, sales_store, stock
+from services.pos.sale_binding import resolve as _resolve_sale_binding
 from services.sales.totals import compute_totals
 
 VAT_RATE = Decimal("7")  # 泰国标准 VAT(价内外均按此 · 复用 totals.py)
@@ -107,7 +108,14 @@ def create_sale(
         if existing:
             return _sale_result(existing, deduped=True)
 
-    _assert_shift_open(cur, tenant_id=tenant_id, shift_id=payload.get("shift_id"))
+    binding = _resolve_sale_binding(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        shift_id=payload.get("shift_id"),
+        terminal_id=payload.get("terminal_id"),
+        cashier_id=operator.get("cashier_id") if operator else None,
+    )
     wh = inv_store.get_or_create_default_warehouse(
         cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
     )
@@ -184,7 +192,7 @@ def create_sale(
         resolved=resolved,
     )
 
-    terminal_id = payload.get("terminal_id")
+    terminal_id = binding["terminal_id"]
     doc_kind = payload.get("doc_kind", "receipt")
     num_kind = doc_kind if doc_kind in ("receipt", "abbrev_tax_invoice") else "receipt"
     receipt_no, _n = numbering.next_number(
@@ -206,7 +214,7 @@ def create_sale(
             "client_uuid": cu,
             "shift_id": payload.get("shift_id"),
             "terminal_id": terminal_id,
-            "cashier_id": payload.get("cashier_id"),  # 必须是 pos_cashiers.id 或 NULL(FK)
+            "cashier_id": binding["cashier_id"],
             "receipt_no": receipt_no,
             "doc_kind": doc_kind,
             "sale_type": "sale",

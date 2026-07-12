@@ -119,6 +119,7 @@ def main() -> int:
                     "lines": [{"product_id": pid, "qty": qty, "unit_price": 10}],
                     "payments": [{"method": "cash", "amount": 10 * qty}],
                 },
+                operator={"cashier_id": cid},
             )
 
         cuA = "bd000001-0000-0000-0000-000000000001"
@@ -177,7 +178,12 @@ def main() -> int:
         # 跨班:另开一单 → 交班 → 作废被拒 + 闭班不能再开单
         sb = _sale("bd000002-0000-0000-0000-000000000002", 1)
         shift_svc.close_shift(
-            cur, tenant_id=tid, workspace_client_id=ws, shift_id=s1["id"], counted_cash=0
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            shift_id=s1["id"],
+            cashier_id=cid,
+            counted_cash=0,
         )
         _expect(
             "已交班作废被拒 void_not_allowed",

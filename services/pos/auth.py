@@ -48,9 +48,11 @@ def login(cur, *, tenant_id: str, workspace_client_id: int, cashier_id: str, pin
         cashier_id=str(row["id"]),
         display_name=row["display_name"],
     )
-    # 共享钱箱:返回本收银台当前未结班次(与开班人无关),任何收银员登录都接续同一班。
-    shift = cashier_dal.get_open_shift_for_workspace(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
+    shift = cashier_dal.get_open_shift_for_cashier(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        cashier_id=str(row["id"]),
     )
     return {
         "token": token,

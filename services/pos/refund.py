@@ -13,7 +13,8 @@ from decimal import Decimal
 
 from core.pos_api import PosError
 from services.inventory import store as inv_store
-from services.pos import numbering, sale as sale_svc, sales_store, stock
+from services.pos import cashier as cashier_dal
+from services.pos import numbering, sale as sale_svc, sale_binding, sales_store, stock
 from services.sales.totals import compute_totals
 
 
@@ -56,6 +57,12 @@ def refund(
         raise PosError("pos.product_not_found", 404)
     if orig["status"] != "completed" or orig["sale_type"] != "sale":
         raise PosError("pos.void_not_allowed", 409)
+    binding = _current_refund_binding(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        cashier_id=cashier_id,
+    )
 
     orig_lines = {
         str(ln["id"]): ln
@@ -104,7 +111,7 @@ def refund(
     receipt_no, _n = numbering.next_number(
         cur,
         tenant_id=tenant_id,
-        terminal_id=terminal_id or orig.get("terminal_id"),
+        terminal_id=binding["terminal_id"],
         kind="refund",
         on=date.today(),
         workspace_client_id=workspace_client_id,
@@ -120,9 +127,9 @@ def refund(
         fields={
             "workspace_client_id": workspace_client_id,
             "client_uuid": client_uuid,
-            "shift_id": shift_id or orig.get("shift_id"),
-            "terminal_id": terminal_id or orig.get("terminal_id"),
-            "cashier_id": cashier_id,  # pos_cashiers.id 或 NULL(FK)
+            "shift_id": binding["shift_id"],
+            "terminal_id": binding["terminal_id"],
+            "cashier_id": binding["cashier_id"],
             "receipt_no": receipt_no,
             "doc_kind": orig["doc_kind"],
             "sale_type": "refund",
@@ -195,6 +202,31 @@ def refund(
             amount=-abs(Decimal(str(p.get("amount", 0)))),
         )
     return _refund_result(refund_sale, deduped=False, stock_returned=restore_stock)
+
+
+def _current_refund_binding(
+    cur, *, tenant_id: str, workspace_client_id: int, cashier_id: str | None
+) -> dict:
+    if not cashier_id:
+        raise PosError("pos.forbidden", 403)
+    shift = cashier_dal.get_open_shift_for_cashier(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        cashier_id=cashier_id,
+        for_update=True,
+    )
+    if not shift:
+        raise PosError("pos.shift_closed", 409)
+    bound = sale_binding.resolve(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        shift_id=str(shift["id"]),
+        terminal_id=shift["terminal_id"],
+        cashier_id=cashier_id,
+    )
+    return {**bound, "shift_id": str(shift["id"])}
 
 
 def _validate_refund_payments(refund_payments: list | None, refund_grand_total: Decimal) -> None:

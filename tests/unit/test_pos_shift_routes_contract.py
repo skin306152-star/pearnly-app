@@ -45,6 +45,12 @@ class PosShiftRoutesContractTests(unittest.TestCase):
         self.assertIn("cashier_id", inspect.getsource(mod.api_open_shift))
         self.assertIn('PosError("pos.forbidden", 403)', inspect.getsource(mod.api_open_shift))
 
+    def test_current_and_close_shift_require_cashier(self):
+        for handler in (mod.api_current_shift, mod.api_close_shift):
+            src = inspect.getsource(handler)
+            self.assertIn('user.get("cashier_id")', src)
+            self.assertIn('PosError("pos.forbidden", 403)', src)
+
 
 if __name__ == "__main__":
     unittest.main()

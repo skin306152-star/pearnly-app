@@ -108,7 +108,12 @@ def main() -> int:
         batch = [_item(a, pid), _item(a, pid), _item(b, bad_pid)]
 
         out = sale_svc.sync_sales(
-            cur, tenant_id=tid, workspace_client_id=ws, items=batch, cashier_id=cid
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            items=batch,
+            cashier_id=cid,
+            operator={"cashier_id": cid},
         )
         r = out["results"]
         record("有效张落库", r[0]["ok"] and not r[0]["deduped"], r[0].get("receipt_no"))

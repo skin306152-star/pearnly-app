@@ -311,6 +311,7 @@ def run(cur, tid):
             "lines": [{"product_id": str(product_id), "qty": 2, "unit_price": 50}],
             "payments": [{"method": "cash", "amount": 107}],
         },
+        operator={"cashier_id": str(cashier_id)},
     )
     v6 = voucher_for(cur, tid, ws, "pos", sold["sale"]["id"])
     full6, ok6 = balanced(cur, tid, ws, v6["id"]) if v6 else (None, False)

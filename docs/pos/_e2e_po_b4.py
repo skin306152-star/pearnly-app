@@ -45,7 +45,13 @@ def _make_sale(cur, *, tid, ws, pid, term_id, cashier_id, shift_id, client_uuid)
         "lines": [{"product_id": pid, "qty": 2, "unit_price": 50}],
         "payments": [{"method": "cash", "amount": 200}],
     }
-    return sale_svc.create_sale(cur, tenant_id=tid, workspace_client_id=ws, payload=payload)
+    return sale_svc.create_sale(
+        cur,
+        tenant_id=tid,
+        workspace_client_id=ws,
+        payload=payload,
+        operator={"cashier_id": cashier_id},
+    )
 
 
 def main() -> int:

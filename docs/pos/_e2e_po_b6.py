@@ -116,7 +116,13 @@ def main() -> int:
                 {"method": "promptpay", "amount": 57},
             ],
         }
-        sold = sale_svc.create_sale(cur, tenant_id=tid, workspace_client_id=ws, payload=payload)
+        sold = sale_svc.create_sale(
+            cur,
+            tenant_id=tid,
+            workspace_client_id=ws,
+            payload=payload,
+            operator={"cashier_id": cid},
+        )
         record(
             "建 2行2支付小票 grand=107",
             sold["sale"]["grand_total"] == "107.00",

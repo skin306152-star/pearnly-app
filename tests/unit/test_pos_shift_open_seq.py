@@ -8,9 +8,11 @@
 import unittest
 from datetime import datetime
 from decimal import Decimal
+from unittest import mock
 
 import psycopg2
 
+from core.pos_api import PosError
 from services.pos import shift
 
 OPENED = datetime(2026, 7, 11, 8, 0)
@@ -29,7 +31,11 @@ class OpenCursor:
 
     def execute(self, sql, params=None):
         self.calls.append((sql, params))
-        if sql.strip().startswith("INSERT INTO pos_shifts"):
+        if "FROM pos_terminals" in sql:
+            self._pending = {"id": 3, "is_active": True}
+        elif "FROM pos_cashiers" in sql:
+            self._pending = {"id": "c1", "is_active": True}
+        elif sql.strip().startswith("INSERT INTO pos_shifts"):
             if self.fail_inserts > 0:
                 self.fail_inserts -= 1
                 raise psycopg2.errors.UniqueViolation("dup shift_seq")
@@ -77,6 +83,24 @@ class OpenShiftSeqTests(unittest.TestCase):
         self.assertTrue(any("ROLLBACK TO SAVEPOINT" in c[0] for c in cur.calls))
         inserts = [c for c in cur.calls if c[0].strip().startswith("INSERT")]
         self.assertEqual(len(inserts), 2)  # 撞一次 + 重试一次
+
+    def test_terminal_unique_conflict_returns_pos_error(self):
+        cur = OpenCursor(seqs=[{"n": 4}], insert_rows=[], fail_inserts=1)
+        with (
+            mock.patch.object(shift, "_terminal_open_conflict", return_value=True),
+            self.assertRaises(PosError) as ctx,
+        ):
+            shift.open_shift(
+                cur,
+                tenant_id="t",
+                workspace_client_id=9,
+                terminal_id=3,
+                cashier_id="c1",
+                opening_float=500,
+            )
+        self.assertEqual(ctx.exception.code, "pos.shift_already_open")
+        inserts = [c for c in cur.calls if c[0].strip().startswith("INSERT")]
+        self.assertEqual(len(inserts), 1)
 
 
 if __name__ == "__main__":

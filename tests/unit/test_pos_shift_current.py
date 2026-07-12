@@ -30,7 +30,9 @@ class FakeCursor:
 class CurrentShiftTests(unittest.TestCase):
     def test_none_when_no_open_shift(self):
         cur = FakeCursor(ones=[None])
-        self.assertIsNone(shift.current_shift(cur, tenant_id="t", workspace_client_id=9))
+        self.assertIsNone(
+            shift.current_shift(cur, tenant_id="t", workspace_client_id=9, cashier_id="c1")
+        )
 
     def test_returns_shift_with_expected_cash(self):
         opened = datetime(2026, 5, 2, 20, 35)
@@ -49,7 +51,7 @@ class CurrentShiftTests(unittest.TestCase):
             # _summary by_method fetchall
             many=[[{"method": "cash", "amt": Decimal("1000")}]],
         )
-        out = shift.current_shift(cur, tenant_id="t", workspace_client_id=9)
+        out = shift.current_shift(cur, tenant_id="t", workspace_client_id=9, cashier_id="c1")
         self.assertEqual(out["shift"]["id"], "s1")
         self.assertEqual(out["shift"]["terminal_id"], 3)
         self.assertEqual(out["summary"]["sales_count"], 4)

@@ -60,24 +60,35 @@ async def api_open_shift(req: OpenShiftRequest, request: Request):
 
 @router.get("/shifts/current")
 async def api_current_shift(request: Request, workspace_client_id: Optional[int] = Query(None)):
-    """本收银台当前未结班次 + 汇总(交班屏直查,不依赖前端内存 → 刷新/换人后仍能交班)。
+    """当前收银员在本套账的未结班次 + 汇总(交班屏直查,不依赖前端内存)。
     无班次 → data:null(屏显诚实空态)。"""
     user, tid = pos_api.subject(request, "pos.shift.operate")
+    cashier_id = user.get("cashier_id")
+    if not cashier_id:
+        raise PosError("pos.forbidden", 403)
     ws = pos_api.resolve_ws(user, workspace_client_id)
     with db.get_cursor_rls(tid) as cur:
         assert_module_enabled(cur, tid, "pos")
         require_workspace_access(cur, request, tid, ws)
-        return ok(shift_svc.current_shift(cur, tenant_id=tid, workspace_client_id=ws))
+        return ok(
+            shift_svc.current_shift(
+                cur, tenant_id=tid, workspace_client_id=ws, cashier_id=cashier_id
+            )
+        )
 
 
 @router.post("/shifts/{shift_id}/close")
 async def api_close_shift(shift_id: str, req: CloseShiftRequest, request: Request):
     def _fn(cur, tid, ws, user):
+        cashier_id = user.get("cashier_id")
+        if not cashier_id:
+            raise PosError("pos.forbidden", 403)
         return shift_svc.close_shift(
             cur,
             tenant_id=tid,
             workspace_client_id=ws,
             shift_id=shift_id,
+            cashier_id=cashier_id,
             counted_cash=req.counted_cash,
         )
 

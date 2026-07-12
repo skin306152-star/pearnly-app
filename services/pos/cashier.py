@@ -179,11 +179,14 @@ def list_cashiers(cur, *, tenant_id: str, workspace_client_id: int) -> list:
     return cur.fetchall()
 
 
-def get_cashier(cur, *, tenant_id: str, workspace_client_id: int, cashier_id: str):
+def get_cashier(
+    cur, *, tenant_id: str, workspace_client_id: int, cashier_id: str, for_update: bool = False
+):
     """完整收银员行(含 pin_hash/is_active)· PIN 登录校验用。"""
     cur.execute(
         f"SELECT {_CASHIER_COLS} FROM pos_cashiers "
-        f"WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s",
+        f"WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s"
+        + (" FOR UPDATE" if for_update else ""),
         (tenant_id, workspace_client_id, cashier_id),
     )
     return cur.fetchone()
@@ -322,12 +325,20 @@ def update_cashier(
 
 
 # ── 班次只读(PIN 登录返回当前 open 班次 · 开/交逻辑在 shift.py B2)────────
-def get_open_shift_for_cashier(cur, *, tenant_id: str, cashier_id: str):
+def get_open_shift_for_cashier(
+    cur,
+    *,
+    tenant_id: str,
+    workspace_client_id: int,
+    cashier_id: str,
+    for_update: bool = False,
+):
     cur.execute(
-        "SELECT id, terminal_id, opened_at, opening_float FROM pos_shifts "
-        "WHERE tenant_id = %s AND cashier_id = %s AND status = 'open' "
-        "ORDER BY opened_at DESC LIMIT 1",
-        (tenant_id, cashier_id),
+        "SELECT id, terminal_id, cashier_id, opened_at, opening_float, shift_seq "
+        "FROM pos_shifts WHERE tenant_id = %s AND workspace_client_id = %s "
+        "AND cashier_id = %s AND status = 'open' ORDER BY opened_at DESC LIMIT 1"
+        + (" FOR UPDATE" if for_update else ""),
+        (tenant_id, workspace_client_id, cashier_id),
     )
     return cur.fetchone()
 

@@ -171,7 +171,10 @@ def main() -> int:
             "lines": [{"product_id": pid, "qty": 3, "unit_price": 10}],
             "payments": [{"method": "cash", "amount": 50}],
         }
-        r1 = sale_svc.create_sale(cur, tenant_id=tid, workspace_client_id=ws, payload=payload)
+        operator = {"cashier_id": cid}
+        r1 = sale_svc.create_sale(
+            cur, tenant_id=tid, workspace_client_id=ws, payload=payload, operator=operator
+        )
         record(
             "建小票 totals 价外 VAT",
             r1["sale"]["grand_total"] == "32.10" and r1["sale"]["vat_amount"] == "2.10",
@@ -191,7 +194,9 @@ def main() -> int:
         )
 
         # 幂等:同 client_uuid 重发 → deduped 且不二次扣
-        r1b = sale_svc.create_sale(cur, tenant_id=tid, workspace_client_id=ws, payload=payload)
+        r1b = sale_svc.create_sale(
+            cur, tenant_id=tid, workspace_client_id=ws, payload=payload, operator=operator
+        )
         record(
             "幂等不双扣",
             r1b["deduped"] is True and _stock_of(cur, tid, batch["NEAR"]) == Decimal("7"),
@@ -220,6 +225,7 @@ def main() -> int:
             original_sale_id=sale_id,
             lines=[{"sale_line_id": line_id, "qty": 1}],
             refund_method="cash",
+            cashier_id=cid,
         )
         record(
             "退货负额 + 回补原批(NEAR 7→8)",
@@ -236,6 +242,7 @@ def main() -> int:
                 workspace_client_id=ws,
                 original_sale_id=sale_id,
                 lines=[{"sale_line_id": line_id, "qty": 5}],
+                cashier_id=cid,
             )
             record("超退被拦", False, "未抛错")
         except PosError as e:
@@ -248,7 +255,9 @@ def main() -> int:
             payments=[{"method": "cash", "amount": 20}],
         )
         p2["lines"] = [{"product_id": pid, "qty": 1, "unit_price": 10}]
-        r2 = sale_svc.create_sale(cur, tenant_id=tid, workspace_client_id=ws, payload=p2)
+        r2 = sale_svc.create_sale(
+            cur, tenant_id=tid, workspace_client_id=ws, payload=p2, operator=operator
+        )
         before = _stock_of(cur, tid, batch["NEAR"])
         v = sale_svc.void_sale(cur, tenant_id=tid, workspace_client_id=ws, sale_id=r2["sale"]["id"])
         record(
@@ -271,6 +280,7 @@ def main() -> int:
             tenant_id=tid,
             workspace_client_id=ws,
             shift_id=sh["id"],
+            cashier_id=cid,
             counted_cash=closed_expected(cur, tid, sh["id"]),
         )
         record(

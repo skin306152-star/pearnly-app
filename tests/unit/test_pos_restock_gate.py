@@ -95,6 +95,11 @@ class RefundRestockGateTests(unittest.TestCase):
                 refund.stock, "restock", side_effect=lambda *a, **k: restock_calls.append(k)
             ),
             mock.patch.object(refund.sales_store, "insert_payment"),
+            mock.patch.object(
+                refund,
+                "_current_refund_binding",
+                return_value={"shift_id": "shift1", "terminal_id": 1, "cashier_id": "c1"},
+            ),
         ):
             result = refund.refund(
                 cur,
@@ -102,6 +107,7 @@ class RefundRestockGateTests(unittest.TestCase):
                 workspace_client_id=1,
                 original_sale_id="orig1",
                 lines=[{"sale_line_id": "line1", "qty": Decimal("1")}],
+                cashier_id="c1",
             )
         return result, restock_calls
 

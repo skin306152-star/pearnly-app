@@ -203,7 +203,11 @@ class CreateSaleCostWiringTests(unittest.TestCase):
         deducted = {"batch_id": "b1", "moves": [("b1", Decimal("1")), ("b2", Decimal("1"))]}
         insert_line_calls = []
         with (
-            mock.patch.object(sale, "_assert_shift_open"),
+            mock.patch.object(
+                sale,
+                "_resolve_sale_binding",
+                return_value={"terminal_id": 1, "cashier_id": "cashier-1"},
+            ),
             mock.patch.object(
                 sale.inv_store, "get_or_create_default_warehouse", return_value={"id": 1}
             ),
@@ -276,7 +280,11 @@ class CreateSalePaymentGateTests(unittest.TestCase):
             "lines": [],
         }
         with (
-            mock.patch.object(sale, "_assert_shift_open"),
+            mock.patch.object(
+                sale,
+                "_resolve_sale_binding",
+                return_value={"terminal_id": 1, "cashier_id": "cashier-1"},
+            ),
             mock.patch.object(
                 sale.inv_store, "get_or_create_default_warehouse", return_value={"id": 1}
             ),

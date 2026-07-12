@@ -21,6 +21,10 @@ def _f(v) -> float:
     return float(v) if v is not None else 0.0
 
 
+def _terminal_open_conflict(exc: psycopg2.errors.UniqueViolation) -> bool:
+    return getattr(getattr(exc, "diag", None), "constraint_name", None) == "uq_pos_shift_open"
+
+
 def _next_seq(cur, *, tenant_id: str, workspace_client_id: int) -> int:
     """本 (tenant,ws) 的下一个班次连号 = MAX+1(空则 1)。与 insert 同事务读,唯一约束兜并发。"""
     cur.execute(
@@ -58,9 +62,28 @@ def open_shift(
             cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
         )
         terminal_id = term["id"]
+    else:
+        term = cashier_dal.get_terminal(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            terminal_id=terminal_id,
+        )
+        if not term or not term["is_active"]:
+            raise PosError("pos.not_found", 404)
+    cashier = cashier_dal.get_cashier(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        cashier_id=cashier_id,
+        for_update=True,
+    )
+    if not cashier or not cashier["is_active"]:
+        raise PosError("pos.cashier_inactive", 403)
     cur.execute(
-        "SELECT 1 FROM pos_shifts WHERE tenant_id = %s AND terminal_id = %s AND status = 'open'",
-        (tenant_id, terminal_id),
+        "SELECT 1 FROM pos_shifts WHERE tenant_id = %s AND workspace_client_id = %s "
+        "AND (terminal_id = %s OR cashier_id = %s) AND status = 'open'",
+        (tenant_id, workspace_client_id, terminal_id, cashier_id),
     )
     if cur.fetchone():
         raise PosError("pos.shift_already_open", 409)
@@ -76,9 +99,19 @@ def open_shift(
     cur.execute("SAVEPOINT open_shift_seq")
     try:
         row = _insert_shift(cur, **kw)
-    except psycopg2.errors.UniqueViolation:
+    except psycopg2.errors.UniqueViolation as exc:
         cur.execute("ROLLBACK TO SAVEPOINT open_shift_seq")
-        row = _insert_shift(cur, **kw)
+        if _terminal_open_conflict(exc):
+            cur.execute("RELEASE SAVEPOINT open_shift_seq")
+            raise PosError("pos.shift_already_open", 409) from exc
+        try:
+            row = _insert_shift(cur, **kw)
+        except psycopg2.errors.UniqueViolation as retry_exc:
+            cur.execute("ROLLBACK TO SAVEPOINT open_shift_seq")
+            cur.execute("RELEASE SAVEPOINT open_shift_seq")
+            if _terminal_open_conflict(retry_exc):
+                raise PosError("pos.shift_already_open", 409) from retry_exc
+            raise
     cur.execute("RELEASE SAVEPOINT open_shift_seq")
     return {
         "id": str(row["id"]),
@@ -89,11 +122,15 @@ def open_shift(
     }
 
 
-def current_shift(cur, *, tenant_id: str, workspace_client_id: int) -> Optional[dict]:
-    """本收银台当前未结班次 + 实时汇总(交班屏用)。无 → None。
-    按套账(终端)取,与登录人无关 → 刷新/换人后仍能找到该班并交班(治"找不到地方交班")。"""
-    shift = cashier_dal.get_open_shift_for_workspace(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
+def current_shift(
+    cur, *, tenant_id: str, workspace_client_id: int, cashier_id: str
+) -> Optional[dict]:
+    """当前收银员在本套账的未结班次 + 实时汇总(交班屏用)。无 → None。"""
+    shift = cashier_dal.get_open_shift_for_cashier(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        cashier_id=cashier_id,
     )
     if not shift:
         return None
@@ -115,11 +152,14 @@ def current_shift(cur, *, tenant_id: str, workspace_client_id: int) -> Optional[
     }
 
 
-def _get_open_shift(cur, *, tenant_id: str, shift_id: str):
+def _get_open_shift(
+    cur, *, tenant_id: str, workspace_client_id: int, shift_id: str, cashier_id: str
+):
     cur.execute(
         "SELECT id, opening_float, status, shift_seq FROM pos_shifts "
-        "WHERE tenant_id = %s AND id = %s",
-        (tenant_id, shift_id),
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s "
+        "AND cashier_id = %s AND status = 'open' FOR UPDATE",
+        (tenant_id, workspace_client_id, shift_id, cashier_id),
     )
     return cur.fetchone()
 
@@ -155,9 +195,15 @@ def _summary(cur, *, tenant_id: str, shift_id: str) -> dict:
 
 
 def close_shift(
-    cur, *, tenant_id: str, workspace_client_id: int, shift_id: str, counted_cash
+    cur, *, tenant_id: str, workspace_client_id: int, shift_id: str, cashier_id: str, counted_cash
 ) -> dict:
-    shift = _get_open_shift(cur, tenant_id=tenant_id, shift_id=shift_id)
+    shift = _get_open_shift(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        shift_id=shift_id,
+        cashier_id=cashier_id,
+    )
     if not shift or shift["status"] != "open":
         raise PosError("pos.shift_closed", 409)
     summary = _summary(cur, tenant_id=tenant_id, shift_id=shift_id)
@@ -170,9 +216,10 @@ def close_shift(
     cur.execute(
         "UPDATE pos_shifts SET status = 'closed', closed_at = now(), "
         "expected_cash = %s, counted_cash = %s, cash_diff = %s "
-        "WHERE tenant_id = %s AND id = %s "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s "
+        "AND cashier_id = %s AND status = 'open' "
         "RETURNING id, closed_at, expected_cash, counted_cash, cash_diff",
-        (expected, counted, diff, tenant_id, shift_id),
+        (expected, counted, diff, tenant_id, workspace_client_id, shift_id, cashier_id),
     )
     row = cur.fetchone()
     return {

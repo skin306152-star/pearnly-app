@@ -51,6 +51,7 @@ class _RefundHarness:
     def __init__(self, *, orig_line_cost=Decimal("60")):
         self.line_calls = []
         self.payment_calls = []
+        self.sale_calls = []
         self._orig_line = _orig_line(orig_line_cost)
 
     def run(self, *, lines, refund_payments=None, refund_method="cash"):
@@ -67,7 +68,7 @@ class _RefundHarness:
         ss.get_sale.return_value = _orig_sale()
         ss.list_lines.return_value = [self._orig_line]
         ss.refunded_qty_for_line.return_value = Decimal("0")
-        ss.insert_sale.return_value = {
+        ss.insert_sale.side_effect = lambda *a, **k: self.sale_calls.append(k) or {
             "id": "r1",
             "receipt_no": "RFD-1",
             "grand_total": Decimal("-100"),
@@ -94,6 +95,11 @@ class _RefundHarness:
             mock.patch.object(refund_svc, "inv_store", inv),
             mock.patch.object(refund_svc, "numbering", numbering),
             mock.patch.object(refund_svc, "compute_totals", return_value=totals),
+            mock.patch.object(
+                refund_svc,
+                "_current_refund_binding",
+                return_value={"shift_id": "sh1", "terminal_id": 1, "cashier_id": "c1"},
+            ),
         ):
             return refund_svc.refund(
                 object(),
@@ -103,10 +109,19 @@ class _RefundHarness:
                 lines=lines,
                 refund_method=refund_method,
                 refund_payments=refund_payments,
+                cashier_id="c1",
             )
 
 
 class MultiPaymentTests(unittest.TestCase):
+    def test_refund_uses_current_cashier_shift_not_original_sale_shift(self):
+        h = _RefundHarness()
+        h.run(lines=[{"sale_line_id": "ol1", "qty": 1}])
+        fields = h.sale_calls[0]["fields"]
+        self.assertEqual(fields["shift_id"], "sh1")
+        self.assertEqual(fields["terminal_id"], 1)
+        self.assertEqual(fields["cashier_id"], "c1")
+
     def test_split_refund_records_negative_per_method(self):
         """混合原单原路退:现金 60 + 刷卡 40 → pos_payments 两行负额,方式各归各。"""
         h = _RefundHarness()
@@ -193,6 +208,11 @@ class CostSnapshotTests(unittest.TestCase):
             mock.patch.object(refund_svc, "inv_store", inv),
             mock.patch.object(refund_svc, "numbering", numbering),
             mock.patch.object(refund_svc, "compute_totals", return_value=totals),
+            mock.patch.object(
+                refund_svc,
+                "_current_refund_binding",
+                return_value={"shift_id": "sh1", "terminal_id": 1, "cashier_id": "c1"},
+            ),
         ):
             refund_svc.refund(
                 object(),
@@ -200,6 +220,7 @@ class CostSnapshotTests(unittest.TestCase):
                 workspace_client_id=9,
                 original_sale_id="s1",
                 lines=[{"sale_line_id": "ol1", "qty": 0.5}],
+                cashier_id="c1",
             )
         self.assertEqual(calls[0]["fields"]["cost_total"], Decimal("-30.00"))
 

@@ -118,15 +118,22 @@ class SyncTests(unittest.TestCase):
             c, *, tenant_id, workspace_client_id, payload, created_by=None, operator=None
         ):
             seen["cashier_id"] = payload.get("cashier_id")
+            seen["operator_cashier_id"] = operator.get("cashier_id")
             return {"sale": {"id": "s", "receipt_no": "R"}, "deduped": False}
 
         # body 里塞了伪造 cashier_id,必须被 token 的覆盖
         items = [{"client_uuid": "x", "cashier_id": "forged", "lines": [1]}]
         with mock.patch.object(sale, "create_sale", side_effect=fake_create_sale):
             sale.sync_sales(
-                cur, tenant_id="t", workspace_client_id=9, items=items, cashier_id="real-cashier"
+                cur,
+                tenant_id="t",
+                workspace_client_id=9,
+                items=items,
+                cashier_id="real-cashier",
+                operator={"cashier_id": "real-cashier"},
             )
         self.assertEqual(seen["cashier_id"], "real-cashier")
+        self.assertEqual(seen["operator_cashier_id"], "real-cashier")
 
 
 if __name__ == "__main__":

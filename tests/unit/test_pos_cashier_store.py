@@ -54,10 +54,12 @@ class CashierStoreTests(unittest.TestCase):
 
     def test_get_open_shift_filters_status_open(self):
         cur = FakeCursor(ones=[None])
-        cashier.get_open_shift_for_cashier(cur, tenant_id="t", cashier_id="c1")
+        cashier.get_open_shift_for_cashier(
+            cur, tenant_id="t", workspace_client_id=9, cashier_id="c1"
+        )
         sql, params = cur.calls[0]
         self.assertIn("status = 'open'", sql)
-        self.assertEqual(params, ("t", "c1"))
+        self.assertEqual(params, ("t", 9, "c1"))
 
     def test_open_shift_for_workspace_keyed_by_ws_not_cashier(self):
         # 共享钱箱:按套账(终端)取未结班次 · 与开班人无关(第二个收银员也能接续/交班)。

@@ -163,6 +163,12 @@ def to_buddhist_paid_date(d: _dt.date) -> str:
     return f"{d.day:02d}{d.month:02d}{d.year + _BUDDHIST_OFFSET}"
 
 
+def to_buddhist_date_slashes(d: _dt.date) -> str:
+    """支付日 → dd/mm/พ.ศ.(键入底稿人读版式,同一佛历偏移,只是分隔符不同)。
+    2026-07-01 → '01/07/2569'。"""
+    return f"{d.day:02d}/{d.month:02d}/{d.year + _BUDDHIST_OFFSET}"
+
+
 def build_header(form: str, values: Mapping) -> str:
     """HEADER(25 字段)→ pipe 分隔串。字段 1 恒 'H';TAX_TYPE 缺省取 form。"""
     _require_form(form)

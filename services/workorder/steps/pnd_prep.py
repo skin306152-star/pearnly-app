@@ -7,10 +7,14 @@ services/tax/aggregate.pnd() 取(与主产品同一函数同一口径),本模块
 只多查一次 doc_date(aggregate.pnd 的返回行没带,且不得改 services/tax/ 补它)。
 
 生成条件(方案 §5.3):当期有对应 payee 类型 WHT 行才出该 kind。ภ.ง.ด.53(法人)
-只要 payee 税号是合法 13 位就出;ภ.ง.ด.3(个人)官方要求 AMPHUR/PROVINCE/POSTAL
-必填(§1.5 field 36-38),但 suppliers 表只有一个自由文本 address 列、无结构化
-地址字段(schema 现状,方案 G5/U7)——本 M1 无法可靠拆分,故个人 payee 恒被剔除、
-在备忘录点名家数,不臆造拆地址。两 kind 都无数据 → 不出,备忘录记「本期无 WHT」。
+只要 payee 税号是合法 13 位就出;ภ.ง.ด.3(个人)官方 RD Prep txt 要求 AMPHUR/PROVINCE/
+POSTAL 必填(§1.5 field 36-38),但 suppliers 表只有一个自由文本 address 列、无结构化
+地址字段(schema 现状,方案 G5/U7)——本 M1 无法可靠拆分,故官方件恒不出、在备忘录点名
+家数,不臆造拆地址。两 kind 都无数据 → 不出,备忘录记「本期无 WHT」。
+
+键入底稿(D1-6,services/tax/pnd_keying_sheet.py):事务所真实工作流是在 RD e-Filing
+网页逐条键入、从不用 RD Prep 程序,故另出一份会计照抄用的 xlsx——它是辅助件非官方申报
+文件,不受地址必填约束,PND3 个人 payee 照样出、地址栏诚实留空标注,不因缺地址剔除。
 """
 
 from __future__ import annotations
@@ -22,7 +26,7 @@ from pathlib import Path
 from typing import Optional
 
 from services.sales.wht import WHT_PRESETS
-from services.tax import rdprep
+from services.tax import pnd_keying_sheet, rdprep
 from services.tax.aggregate import PND3 as _TABLE_PND3
 from services.tax.aggregate import PND53 as _TABLE_PND53
 from services.tax.aggregate import pnd as aggregate_pnd
@@ -32,6 +36,8 @@ logger = logging.getLogger(__name__)
 
 KIND_PND3 = "pnd3_prep_txt"
 KIND_PND53 = "pnd53_prep_txt"
+KIND_PND3_KEYING = "pnd3_keying_xlsx"
+KIND_PND53_KEYING = "pnd53_keying_xlsx"
 
 # G1:WHT 档率 → 泰文收入类型文字,复用 sales/wht.py 的档位表(单一事实源,不另起一份)。
 # 档率不落在预设表(自定义档)时兜底成 3% 服务档文案——官方 PDF 未给收入类型编码表
@@ -44,6 +50,7 @@ _HEADQUARTERS_BRANCH_CODE = "000000"
 _MAX_INCOME_GROUPS = 3  # 官方 §16:一 SEQ_NO 下最多 3 组收入类型,超出另起 SEQ_NO
 _THAI_TAX_ID_LEN = 13
 _USER_ID_PLACEHOLDER = "PLACEHOLDER"  # G7:RD e-filing 登记参考号,M1 无落点,诚实占位
+_CONDITION_LABEL = {"1": "หัก ณ ที่จ่าย (代扣)"}  # 键入底稿เงื่อนไข列文案,与 PAY_CON="1" 同义
 
 
 def _valid_tax_id(raw) -> bool:
@@ -269,8 +276,8 @@ def _build_for_client(ctx, out_dir: Path, period_be: str, client_id) -> tuple[di
             )
         return {}, memo
 
-    # 个人(PND3)行恒被剔除(见下),doc_date 只服务 PND53 分组,不为用不上的行搭车查询。
-    doc_ids = [ln["source_purchase_id"] for ln in valid[_TABLE_PND53]]
+    # 键入底稿(辅助件)两表都出,doc_date 服务两表分组;一次 IN 查询覆盖两表,不逐票查。
+    doc_ids = [ln["source_purchase_id"] for ln in valid[_TABLE_PND53] + valid[_TABLE_PND3]]
     doc_dates = _fetch_doc_dates(ctx.cur, tenant_id=ctx.tenant_id, doc_ids=doc_ids)
 
     tax_month, tax_year = period_be.split("-")[1], period_be.split("-")[0]
@@ -306,14 +313,34 @@ def _build_for_client(ctx, out_dir: Path, period_be: str, client_id) -> tuple[di
             wht_total=tot_tax,
             period=period_be,
         )
+        kinds[KIND_PND53_KEYING] = _write_keying_xlsx(
+            out_dir,
+            rdprep.PND53,
+            payees,
+            client=client,
+            tax_month=tax_month,
+            tax_year=tax_year,
+            period_be=period_be,
+        )
 
     if valid[_TABLE_PND3]:
         excluded_payees = {ln["payee_tax_id"].strip() for ln in valid[_TABLE_PND3]}
+        payees3 = _group_by_payee(valid[_TABLE_PND3], doc_dates)
+        kinds[KIND_PND3_KEYING] = _write_keying_xlsx(
+            out_dir,
+            rdprep.PND3,
+            payees3,
+            client=client,
+            tax_month=tax_month,
+            tax_year=tax_year,
+            period_be=period_be,
+        )
         memo_lines.append(
             f"ผู้รับเงินบุคคลธรรมดา {len(excluded_payees)} รายขาดที่อยู่แบบโครงสร้าง "
-            f"(AMPHUR/PROVINCE/POSTAL) จึงไม่รวมใน ภ.ง.ด.3 RD Prep งวดนี้ "
+            f"(AMPHUR/PROVINCE/POSTAL) จึงไม่รวมใน ภ.ง.ด.3 RD Prep งวดนี้ แต่มีไฟล์คีย์ข้อมูล "
+            f"(keying sheet) สำหรับกรอก e-Filing ด้วยตนเองแทน "
             f"(个人预扣税收款人 {len(excluded_payees)} 家缺结构化地址,本期未随批产出 "
-            f"ภ.ง.ด.3 RD Prep,待补地址后另出)"
+            f"ภ.ง.ด.3 RD Prep 官方件,但已产出键入底稿 xlsx 供人工照抄 e-Filing)"
         )
 
     if invalid_payee_count:
@@ -323,6 +350,58 @@ def _build_for_client(ctx, out_dir: Path, period_be: str, client_id) -> tuple[di
         )
 
     return kinds, memo_lines
+
+
+def _keying_rows(form: str, payees: dict[str, dict]) -> list[dict]:
+    """payees(_group_by_payee 产出)→ 键入底稿逐行:一 payee 一税率一行,不受 RD Prep txt
+    「一序 ≤3 组收入类型」拼行限制(那是官方格式契约,键入底稿是给人逐行照抄的清单)。"""
+    rows = []
+    for tax_id in sorted(payees):
+        payee = payees[tax_id]
+        for key in sorted(payee["groups"], key=lambda k: payee["groups"][k]["rate"]):
+            g = payee["groups"][key]
+            rows.append(
+                {
+                    "tax_id": tax_id,
+                    "title_name": _title_name(form, payee["name"]),
+                    "payee_name": payee["name"] or "",
+                    "address": None,  # M1 数据源无结构化地址(见模块 docstring),诚实留空
+                    "paid_date": g["first_date"],
+                    "income_type": _income_type_text(g["rate"]),
+                    "rate": g["rate"],
+                    "paid_amount": g["base"],
+                    "wht_amount": g["wht"],
+                    "condition": _CONDITION_LABEL["1"],
+                }
+            )
+    return rows
+
+
+def _write_keying_xlsx(
+    out_dir: Path,
+    form: str,
+    payees: dict[str, dict],
+    *,
+    client: dict,
+    tax_month: str,
+    tax_year: str,
+    period_be: str,
+) -> tuple[str, dict]:
+    rows = _keying_rows(form, payees)
+    payload = pnd_keying_sheet.build_workbook(form, rows)
+    filename = pnd_keying_sheet.build_filename(
+        form=form, nid=client["tax_id"], tax_year_be=tax_year, tax_month=tax_month
+    )
+    path = out_dir / filename
+    path.write_bytes(payload)
+    row_totals = pnd_keying_sheet.totals(rows)
+    return str(path), {
+        "payee_count": len(payees),
+        "row_count": len(rows),
+        "paid_amount_total": row_totals["paid_amount"],
+        "wht_total": row_totals["wht_amount"],
+        "period": period_be,
+    }
 
 
 def _write_txt(out_dir: Path, filename: str, text: str, **numbers) -> tuple[str, dict]:

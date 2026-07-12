@@ -32,6 +32,8 @@ _DEFAULT_EXEMPT_PREFIXES = (
 
 # 认证敏感路径:按客户端 IP 强限流(远低于全局阈值)· 防密码爆破/撞库(安全评估 2026-07-07 H2)
 _AUTH_PATHS = ("/api/login", "/api/v1/login")
+_POS_BIND_PATH = "/api/pos/bind"
+_POS_PIN_PATH = "/api/pos/auth/pin"
 
 
 def _client_ip(headers: dict, scope: Scope) -> str:
@@ -45,6 +47,11 @@ def _client_ip(headers: dict, scope: Scope) -> str:
     xff = headers.get(b"x-forwarded-for", b"").decode("latin-1").strip()
     if xff:
         return xff.split(",")[0].strip()
+    client = scope.get("client")
+    return client[0] if client else "unknown"
+
+
+def _peer_ip(scope: Scope) -> str:
     client = scope.get("client")
     return client[0] if client else "unknown"
 
@@ -77,6 +84,22 @@ async def _reject(send: Send, retry_after: int) -> None:
     await send({"type": "http.response.body", "body": body})
 
 
+async def _reject_pos(send: Send, retry_after: int) -> None:
+    code = "pos.too_many_requests"
+    body = json.dumps({"ok": False, "error": {"code": code, "message_key": code}}).encode()
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 429,
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"retry-after", str(retry_after).encode()),
+            ],
+        }
+    )
+    await send({"type": "http.response.body", "body": body})
+
+
 class RateLimitMiddleware:
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
@@ -91,6 +114,14 @@ class RateLimitMiddleware:
             self.login_limit = int(os.environ.get("LOGIN_RATE_LIMIT_PER_MIN", "10"))
         except ValueError:
             self.login_limit = 10
+        try:
+            self.pos_bind_limit = int(os.environ.get("POS_BIND_RATE_LIMIT_PER_MIN", "10"))
+        except ValueError:
+            self.pos_bind_limit = 10
+        try:
+            self.pos_pin_limit = int(os.environ.get("POS_PIN_RATE_LIMIT_PER_MIN", "10"))
+        except ValueError:
+            self.pos_pin_limit = 10
         self.auth_paths = _AUTH_PATHS
         override = (os.environ.get("RATE_LIMIT_EXEMPT_PREFIXES") or "").strip()
         self.exempt = (
@@ -114,7 +145,31 @@ class RateLimitMiddleware:
 
         headers = dict(scope.get("headers") or [])  # 物化一次 · 供分桶 key 复用
 
-        # 登录路径先过一道按 IP 的强限流(独立分桶)· 防密码爆破 · fail-open
+        # POS 登录按可信转发来源限流,并用直连 peer 宽桶约束伪造/轮换转发头。
+        pos_auth_limit = {
+            _POS_BIND_PATH: self.pos_bind_limit,
+            _POS_PIN_PATH: self.pos_pin_limit,
+        }.get(path)
+        if pos_auth_limit and pos_auth_limit > 0:
+            try:
+                ok, retry_after = self.limiter.check(
+                    f"pos-auth:{path}:{_client_ip(headers, scope)}",
+                    pos_auth_limit,
+                    window=60,
+                )
+                if ok:
+                    ok, retry_after = self.limiter.check(
+                        f"pos-auth-peer:{path}:{_peer_ip(scope)}",
+                        pos_auth_limit * 10,
+                        window=60,
+                    )
+            except Exception:
+                ok, retry_after = True, 0
+            if not ok:
+                await _reject_pos(send, retry_after)
+                return
+
+        # 普通登录保持原有独立限流与响应格式。
         if path in self.auth_paths and self.login_limit > 0:
             try:
                 ok, retry_after = self.limiter.check(
@@ -134,7 +189,10 @@ class RateLimitMiddleware:
             allowed, retry_after = True, 0
 
         if not allowed:
-            await _reject(send, retry_after)
+            if path in (_POS_BIND_PATH, _POS_PIN_PATH):
+                await _reject_pos(send, retry_after)
+            else:
+                await _reject(send, retry_after)
             return
 
         await self.app(scope, receive, send)

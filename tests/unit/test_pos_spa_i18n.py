@@ -39,6 +39,7 @@ POS_ERROR_CODES = (
     "pos.over_refund",
     "pos.module_disabled",
     "pos.forbidden",
+    "pos.too_many_requests",
     "pos.offline_saved",
     "pos.sync_partial",
     "pos.server_busy",

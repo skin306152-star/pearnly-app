@@ -8,6 +8,7 @@
 import inspect
 import os
 import unittest
+from unittest import mock
 
 os.environ.setdefault("JWT_SECRET", "test-secret-key-of-sufficient-length")
 
@@ -81,6 +82,78 @@ class PosAuthRoutesContractTests(unittest.TestCase):
 class _Req:
     def __init__(self, token=None):
         self.headers = {"Authorization": f"Bearer {token}"} if token else {}
+
+
+class _StoreCursor:
+    pass
+
+
+class StoreTokenBoundaryTests(unittest.TestCase):
+    def test_cashier_access_requires_store_token(self):
+        with self.assertRaises(pos_api.PosError) as ctx:
+            mod._workspace_from_store_token(_StoreCursor(), _Req(), None)
+        self.assertEqual(ctx.exception.code, "pos.store_unbound")
+        self.assertEqual(ctx.exception.http_status, 401)
+
+    def test_workspace_id_without_any_identity_is_rejected(self):
+        with self.assertRaises(pos_api.PosError) as ctx:
+            mod._workspace_from_store_token(_StoreCursor(), _Req(), 9)
+        self.assertEqual(ctx.exception.http_status, 401)
+
+    def test_request_workspace_must_match_store_token(self):
+        token = core_auth.create_pos_store_token(tenant_id="t-1", workspace_client_id=9, version=3)
+        with mock.patch.object(mod.store_binding, "current_version", return_value=3):
+            with self.assertRaises(pos_api.PosError) as ctx:
+                mod._workspace_from_store_token(_StoreCursor(), _Req(token), 10)
+        self.assertEqual(ctx.exception.code, "pos.forbidden")
+        self.assertEqual(ctx.exception.http_status, 403)
+
+    def test_store_token_workspace_is_authoritative(self):
+        token = core_auth.create_pos_store_token(tenant_id="t-1", workspace_client_id=9, version=3)
+        with mock.patch.object(mod.store_binding, "current_version", return_value=3):
+            self.assertEqual(
+                mod._workspace_from_store_token(_StoreCursor(), _Req(token), 9),
+                ("t-1", 9),
+            )
+
+    def test_revoked_store_token_wins_over_workspace_mismatch(self):
+        token = core_auth.create_pos_store_token(tenant_id="t-1", workspace_client_id=9, version=3)
+        with mock.patch.object(mod.store_binding, "current_version", return_value=4):
+            with self.assertRaises(pos_api.PosError) as ctx:
+                mod._workspace_from_store_token(_StoreCursor(), _Req(token), 10)
+        self.assertEqual(ctx.exception.code, "pos.store_unbound")
+        self.assertEqual(ctx.exception.http_status, 401)
+
+    def test_authorized_platform_member_can_use_selected_workspace(self):
+        user = {"id": "u-1", "tenant_id": "t-1", "role": "owner"}
+        with (
+            mock.patch.object(mod, "require_perm_pos", return_value=user),
+            mock.patch.object(mod, "require_workspace") as require_workspace,
+            mock.patch.object(mod, "check_workspace_scope") as check_scope,
+        ):
+            result = mod._workspace_from_store_token(_StoreCursor(), _Req("user-jwt"), 9)
+        self.assertEqual(result, ("t-1", 9))
+        require_workspace.assert_called_once_with(mock.ANY, "t-1", 9)
+        check_scope.assert_called_once_with(mock.ANY, user, 9, pos=True)
+
+    def test_platform_member_without_pos_permission_is_rejected(self):
+        denied = pos_api.PosError("pos.forbidden", 403)
+        with mock.patch.object(mod, "require_perm_pos", side_effect=denied):
+            with self.assertRaises(pos_api.PosError) as ctx:
+                mod._workspace_from_store_token(_StoreCursor(), _Req("user-jwt"), 9)
+        self.assertEqual(ctx.exception.code, "pos.forbidden")
+
+    def test_assigned_workspace_scope_is_enforced(self):
+        user = {"id": "u-1", "tenant_id": "t-1", "role": "member"}
+        denied = pos_api.PosError("pos.not_found", 404)
+        with (
+            mock.patch.object(mod, "require_perm_pos", return_value=user),
+            mock.patch.object(mod, "require_workspace"),
+            mock.patch.object(mod, "check_workspace_scope", side_effect=denied),
+        ):
+            with self.assertRaises(pos_api.PosError) as ctx:
+                mod._workspace_from_store_token(_StoreCursor(), _Req("user-jwt"), 9)
+        self.assertEqual(ctx.exception.code, "pos.not_found")
 
 
 class PosTokenSubjectTests(unittest.TestCase):

@@ -3,9 +3,8 @@
 
 薄层:统一 POS 信封(ok / PosError)。SQL/逻辑在 services/pos/{cashier,auth,onboarding}。
 
-匿名前台(开班选人 + PIN 登录):前台启动时还没 token,按 workspace_client_id(全局 bigserial)
-反查 tenant,再以该 tenant 为界查收银员。匿名只暴露名字/颜色(低敏);真正登录仍需 PIN。游标用
-bypass=True 但每条语句仍 WHERE tenant_id(应用层硬隔离 · RLS 仅兜底)。
+开班选人和 PIN 登录只接受已绑定设备令牌,或具备 POS 权限且通过账套范围校验的平台会话。
+游标用 bypass=True,每条语句仍以已验证的 tenant_id 和 workspace_client_id 限定范围。
 
 onboarding 是管理动作:require_perm_pos_tid(收银员 token 不可调)。
 """
@@ -20,7 +19,7 @@ from pydantic import BaseModel, Field
 from core import db
 from core.auth import create_pos_store_token, decode_access_token
 from core.pos_api import PosError, ok, require_workspace
-from services.authz.deps import require_perm_pos_tid
+from services.authz.deps import check_workspace_scope, require_perm_pos, require_perm_pos_tid
 from services.pos import auth as pos_auth
 from services.pos import caps as caps_svc
 from services.pos import cashier as cashier_dal
@@ -73,9 +72,8 @@ def _pos_base_url() -> str:
     return (os.environ.get("PEARNLY_BASE_URL") or "https://pearnly.com").rstrip("/")
 
 
-def _workspace_from_store_or_legacy(cur, request: Request, legacy_ws: Optional[int]) -> tuple:
-    """收银前台定位 (tenant, workspace):优先设备店铺令牌(校 token_version 防重置后旧令牌),
-    否则回落老板「切到收银台」旧路径(localStorage 选的账套 → 传 workspace_client_id)。"""
+def _workspace_from_store_token(cur, request: Request, requested_workspace: Optional[int]) -> tuple:
+    """从店铺令牌或已授权平台账号解析收银账套,拒绝匿名账套反查。"""
     claims = _store_claims(request)
     if claims:
         tid = str(claims["tenant_id"])
@@ -83,11 +81,21 @@ def _workspace_from_store_or_legacy(cur, request: Request, legacy_ws: Optional[i
         ver = store_binding.current_version(cur, tenant_id=tid, workspace_client_id=ws)
         if ver is None or ver != claims.get("ver"):
             raise PosError("pos.store_unbound", 401)  # 店铺码已被重置 → 设备需重绑
+        if requested_workspace is not None and int(requested_workspace) != ws:
+            raise PosError("pos.forbidden", 403)
         return tid, ws
-    if legacy_ws is None:
+    if not request.headers.get("Authorization") and not request.headers.get("authorization"):
         raise PosError("pos.store_unbound", 401)  # 既无店铺令牌又无账套 → 设备未绑定
-    tid = _resolve_tenant(cur, legacy_ws)
-    return tid, int(legacy_ws)
+    if requested_workspace is None:
+        raise PosError("pos.store_unbound", 401)
+    user = require_perm_pos(request, "pos.sale.operate")
+    if user.get("role") == "cashier" or not user.get("tenant_id"):
+        raise PosError("pos.forbidden", 403)
+    tid = str(user["tenant_id"])
+    ws = int(requested_workspace)
+    require_workspace(cur, tid, ws)
+    check_workspace_scope(request, user, ws, pos=True)
+    return tid, ws
 
 
 class FirstCashier(BaseModel):
@@ -101,13 +109,6 @@ class OnboardingRequest(BaseModel):
     business_type: str = Field("retail", max_length=40)
     warehouse_name: Optional[str] = Field(None, max_length=120)
     first_cashier: Optional[FirstCashier] = None
-
-
-def _resolve_tenant(cur, workspace_client_id: int) -> str:
-    tid = cashier_dal.resolve_tenant_for_workspace(cur, workspace_client_id=workspace_client_id)
-    if not tid:
-        raise PosError("pos.forbidden", 403)
-    return tid
 
 
 def _enforce_entitlement_limit(cur, tid: str, workspace_client_id: int, kind: str) -> None:
@@ -148,18 +149,18 @@ async def api_bind_device(req: BindRequest, request: Request):
 
 @router.get("/cashiers")
 async def api_list_cashiers(request: Request, workspace_client_id: Optional[int] = Query(None)):
-    """开班选人列表(仅名字/颜色)。账套来自设备店铺令牌(优先)或老板旧路径 workspace_client_id。"""
+    """开班选人列表(仅名字/颜色)。账套来自店铺令牌或已授权平台账号。"""
     with db.get_cursor_rls(bypass=True) as cur:
-        tid, ws = _workspace_from_store_or_legacy(cur, request, workspace_client_id)
+        tid, ws = _workspace_from_store_token(cur, request, workspace_client_id)
         rows = cashier_dal.list_cashiers(cur, tenant_id=tid, workspace_client_id=ws)
     return ok({"cashiers": [dict(r) | {"id": str(r["id"])} for r in rows]})
 
 
 @router.post("/auth/pin")
 async def api_pin_login(req: PinLoginRequest, request: Request):
-    """PIN 登录 → POS 收银员 token。账套来自设备店铺令牌(优先)或老板旧路径。"""
+    """PIN 登录 → POS 收银员 token。账套来自店铺令牌或已授权平台账号。"""
     with db.get_cursor_rls(bypass=True) as cur:
-        tid, ws = _workspace_from_store_or_legacy(cur, request, req.workspace_client_id)
+        tid, ws = _workspace_from_store_token(cur, request, req.workspace_client_id)
         data = pos_auth.login(
             cur,
             tenant_id=tid,

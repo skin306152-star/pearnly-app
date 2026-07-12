@@ -61,5 +61,23 @@ class PayrollSchemaParityTests(unittest.TestCase):
         self.assertIn(needle, _text(_MIGRATION))
 
 
+class PayrollEnsureStartupChainTests(unittest.TestCase):
+    """启动自愈接线:startup → ensure_seller_route_table → ensure_tax_profile_schema →
+    ensure_payroll_schema(startup.py 贴 500 行上限,ensure 挂链尾不占行 · H1a R1 修法)。
+    任一环断 → 红,防「表没人建」静默回归。"""
+
+    def test_tax_profile_ensure_calls_payroll_ensure(self):
+        text = _text("services/workspace/tax_profile_schema.py")
+        self.assertIn("from services.payroll.schema import ensure_payroll_schema", text)
+        self.assertIn("ensure_payroll_schema()", text)
+
+    def test_seller_routing_calls_tax_profile_ensure(self):
+        text = _text("services/workspace/seller_routing.py")
+        self.assertIn("ensure_tax_profile_schema()", text)
+
+    def test_startup_boot_chain_includes_seller_route_ensure(self):
+        self.assertIn("db.ensure_seller_route_table", _text("services/startup.py"))
+
+
 if __name__ == "__main__":
     unittest.main()

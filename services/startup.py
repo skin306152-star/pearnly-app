@@ -217,14 +217,6 @@ def _boot_schema_ddl() -> None:
         except Exception as e:
             logger.warning(f"启动 {label} 失败: {e}")
 
-    # 工资进料 2 表(批次 H · alembic 0072 双跑)——独立域,懒导入不牵 db facade re-export。
-    try:
-        from services.payroll.schema import ensure_payroll_schema
-
-        ensure_payroll_schema()
-    except Exception as e:
-        logger.warning(f"启动 client_payroll 建表失败: {e}")
-
     # B8 RLS 孤儿表 enroll(纯 enroll·建表 ensure 之后、ensure_no_orphan_rls 之前·见 services/rls_boot)。
     # 包 try 与所有兄弟块一致:enroll 批异常绝不连坐后续 schema 块与末步 ensure_no_orphan_rls 自愈守卫。
     try:

@@ -31,6 +31,9 @@
         // 「销项税报告三查」(N1 · 顶层独立工具):上传一份报告文件即可查,不依赖任何
         // 客户/工单上下文,同 /pool 一样是独立顶层路由。
         if (h === '/vatcheck') return { name: 'vatcheck' };
+        // 「财务文件转换」(K1b · 顶层独立工具):同 /vatcheck,转换一份 PDF 本身不依赖
+        // 任何客户/工单上下文。
+        if (h === '/fileconv') return { name: 'fileconv' };
         var m = /^\/client\/([^/]+)\/?([^/]*)$/.exec(h);
         if (!m) return { name: 'dashboard', sub: DEFAULT_SUB };
         var clientId = decodeURIComponent(m[1]);
@@ -61,6 +64,10 @@
         return '#/vatcheck';
     }
 
+    function buildFileconvHash() {
+        return '#/fileconv';
+    }
+
     // onChange(route) 在启动时立即调一次,并在每次 hashchange 后调用。
     function subscribe(onChange) {
         function fire() {
@@ -83,6 +90,7 @@
         buildBoardHash: buildBoardHash,
         buildPoolHash: buildPoolHash,
         buildVatcheckHash: buildVatcheckHash,
+        buildFileconvHash: buildFileconvHash,
         subscribe: subscribe,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

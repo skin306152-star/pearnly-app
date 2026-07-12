@@ -175,6 +175,10 @@ const AI_CSS = [
     // ai-matrix.css 的 .mx-scroll/.mx-table 宽表格容器,排在两者之后即可;与其余视图
     // 互斥显示,层叠顺序对彼此零影响。
     'ai/ai-vatcheck.css',
+    // ai-fileconv.css(K1b · 财务文件转换)复用 ai-intake.css 的 .dropzone/.dz-* 上传区,
+    // 横幅/结果条布局同构 ai-vatcheck.css 但类名独立(fc-*),排最后即可;与其余视图
+    // 互斥显示,层叠顺序对彼此零影响。
+    'ai/ai-fileconv.css',
 ];
 
 const BUNDLES = [

@@ -67,6 +67,9 @@
         $('navVatcheck').addEventListener('click', function () {
             window.location.hash = AI.router.buildVatcheckHash();
         });
+        $('navFileconv').addEventListener('click', function () {
+            window.location.hash = AI.router.buildFileconvHash();
+        });
         // 矩阵/看板视图切换 pill(C4):矩阵是默认,看板降辅助——两个 hash 各自的
         // build 函数已知道自己的默认子视图,这里只管点了跳哪。
         $('vtMatrix').addEventListener('click', function () {
@@ -89,6 +92,11 @@
             };
         } else if (route.name === 'vatcheck') {
             crumb.innerHTML = '<a data-back>' + at('crumb_dash') + '</a> / ' + at('nav_vatcheck');
+            crumb.querySelector('[data-back]').onclick = function () {
+                window.location.hash = AI.router.buildDashboardHash();
+            };
+        } else if (route.name === 'fileconv') {
+            crumb.innerHTML = '<a data-back>' + at('crumb_dash') + '</a> / ' + at('nav_fileconv');
             crumb.querySelector('[data-back]').onclick = function () {
                 window.location.hash = AI.router.buildDashboardHash();
             };
@@ -118,9 +126,11 @@
         $('v-client').classList.toggle('on', route.name === 'client');
         $('v-pool').classList.toggle('on', route.name === 'pool');
         $('v-vatcheck').classList.toggle('on', route.name === 'vatcheck');
+        $('v-fileconv').classList.toggle('on', route.name === 'fileconv');
         $('navDash').classList.toggle('on', route.name === 'dashboard');
         $('navTodo').classList.toggle('on', route.name === 'pool');
         $('navVatcheck').classList.toggle('on', route.name === 'vatcheck');
+        $('navFileconv').classList.toggle('on', route.name === 'fileconv');
         if (route.name === 'pool') {
             window.scrollTo(0, 0);
             AI.pool.mount(api);
@@ -129,6 +139,11 @@
         if (route.name === 'vatcheck') {
             window.scrollTo(0, 0);
             AI.vatcheck.mount(api);
+            return;
+        }
+        if (route.name === 'fileconv') {
+            window.scrollTo(0, 0);
+            AI.fileconv.mount(api);
             return;
         }
         if (route.name === 'dashboard') {

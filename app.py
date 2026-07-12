@@ -63,6 +63,9 @@ from routes.vat_excel_routes import router as vat_excel_router  # v118.32.4.9.5 
 from routes.vat_report_checks_routes import (
     router as vat_report_checks_router,
 )  # N1-a · 销项税报告三查(连号/买家分组/期间) · 2026-07-11
+from routes.fileconv_routes import (
+    router as fileconv_router,
+)  # K1b · 财务文件转换(PDF→结构化结果/xlsx·pearnly_ai_m1 闸) · 2026-07-12
 from routes.notification_routes import router as notification_router  # REFACTOR-B1 · 2026-05-24
 from routes.clients_routes import (
     router as clients_router,
@@ -305,6 +308,7 @@ app.include_router(signup_router)  # v109.3
 app.include_router(recon_router)  # v118.32.0 · 销项税对账
 app.include_router(vat_excel_router)  # v118.32.4.9.5 · Excel 公式对账内测(skin306152 only)
 app.include_router(vat_report_checks_router)  # N1-a · 销项税报告三查 · 2026-07-11
+app.include_router(fileconv_router)  # K1b · 财务文件转换(pearnly_ai_m1 闸) · 2026-07-12
 app.include_router(notification_router)  # REFACTOR-B1 · 通知规则 6 路由(2026-05-24)
 app.include_router(clients_router)  # REFACTOR-B1 · 客户管理 5 路由(2026-05-24)
 app.include_router(products_router)  # 销项商品主数据 6 路由(PO-2 · 2026-06-06)

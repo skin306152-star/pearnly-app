@@ -420,8 +420,10 @@ class AiI18nStructureTests(unittest.TestCase):
     挂上 window.__AI_I18N_*__,同 ai.html 里 4 个 <script> 排 ai-i18n.js 之前的顺序。"""
 
     def test_four_languages_have_identical_key_sets(self):
+        # 分片 2(-2 后缀,G1b 起新词条落这里)一并装载——只查分片 1 会漏掉 -2 的漏翻。
         shards = "".join(
             f'require({json.dumps(str(AI_DIR / f"ai-i18n-{lang}.js"))});\n'
+            f'require({json.dumps(str(AI_DIR / f"ai-i18n-{lang}-2.js"))});\n'
             for lang in ("zh", "th", "en", "ja")
         )
         out = _run_node(f"""

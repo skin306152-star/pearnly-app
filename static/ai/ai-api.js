@@ -173,6 +173,47 @@
                     })
                     .then(handleResponse);
             },
+            // 财务文件转换(K1b · routes/fileconv_routes.py):multipart 单文件上传,同
+            // runVatReportChecks 不能走 call()。默认回 JSON 摘要;下载 Excel 是同一份
+            // 文件再 POST 一次 ?format=xlsx(后端无状态两段式,引擎幂等不落服务端状态)。
+            convertFile: function (file) {
+                var fd = new FormData();
+                fd.append('file', file);
+                return root
+                    .fetch('/api/fileconv/convert', {
+                        method: 'POST',
+                        headers: authHeaders(),
+                        body: fd,
+                    })
+                    .then(handleResponse);
+            },
+            // xlsx 附件路:成功是二进制流不能进 handleResponse(它只认 JSON);失败仍是
+            // JSON 错误壳,借 handleResponse 抛同构 code/status 错误,调用方文案不分叉。
+            downloadConvertedXlsx: function (file) {
+                var fd = new FormData();
+                fd.append('file', file);
+                return root
+                    .fetch('/api/fileconv/convert?format=xlsx', {
+                        method: 'POST',
+                        headers: authHeaders(),
+                        body: fd,
+                    })
+                    .then(function (r) {
+                        if (!r.ok) return handleResponse(r);
+                        // 泰文原名在 filename*(RFC 5987),优先取;取不到退 ASCII filename。
+                        var disp = r.headers.get('Content-Disposition') || '';
+                        var star = /filename\*=UTF-8''([^;]+)/.exec(disp);
+                        var plain = /filename="?([^";]+)"?/.exec(disp);
+                        var filename = star
+                            ? decodeURIComponent(star[1])
+                            : plain
+                              ? plain[1]
+                              : 'convert.xlsx';
+                        return r.blob().then(function (blob) {
+                            return { blob: blob, filename: filename };
+                        });
+                    });
+            },
             // 交付物下载(W5 交付包页):鉴权头是 Bearer,<a href> 发不了自定义头,调用方拿
             // blob 自建 object URL 触发下载(同 console.js exportLog 的 fetch+blob 先例)。
             // 文件名从服务端 Content-Disposition 读(FileResponse 已带 filename=真实文件名),

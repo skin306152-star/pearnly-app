@@ -70,6 +70,7 @@
     "agent": "exempt:file-export",
     "why": "文件导出下载走网页"
   },
+  "fileconv_routes": "B",
   "google_oauth_routes": "D",
   "history_routes": "B",
   "import_routes": "B",

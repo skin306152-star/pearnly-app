@@ -128,6 +128,11 @@ const BUNDLES = [
             // AI.vatcheck.mount)之前——同 ai-client-pool 先例(顶层独立视图,不挂客户页下)。
             'ai/ai-vatcheck-render.js',
             'ai/ai-vatcheck.js',
+            // ai-fileconv-render.js(K1b · 财务文件转换纯逻辑+HTML,依赖 AI.state/format)
+            // 排在 ai-fileconv.js(上传/转换/下载编排)之前,两者都在 ai.js(onRoute 用
+            // AI.fileconv.mount)之前——同 ai-vatcheck 先例(顶层独立工具视图)。
+            'ai/ai-fileconv-render.js',
+            'ai/ai-fileconv.js',
             'ai/ai-client.js',
             'ai/ai.js',
         ],

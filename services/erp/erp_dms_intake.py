@@ -87,6 +87,8 @@ def _err(code: str, raw: str = "") -> Dict[str, Any]:
         "error_code": code,
         "error_friendly": _dms_friendly(code),
         "raw_error": (raw or "")[:300],
+        # 进 erp_push_logs.response_body:光有 error_code 分不清「DMS 拒」还是「复核没查到」
+        "response_body": {"raw_error": (raw or "")[:300]},
     }
 
 

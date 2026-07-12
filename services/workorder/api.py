@@ -13,7 +13,15 @@ from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from core.feature_flags import pearnly_ai_m1_enabled_for, pearnly_ai_sod_enabled_for
-from services.workorder import decisions, evidence, obligation_engine, sod, store, wht_signals
+from services.workorder import (
+    decisions,
+    evidence,
+    kinds,
+    obligation_engine,
+    sod,
+    store,
+    wht_signals,
+)
 from services.workspace import tax_profile_store
 
 logger = logging.getLogger(__name__)
@@ -40,11 +48,11 @@ _NUMBER_KEYS = (
 
 # 人工填销项(W4 补料流)常量。落一条与 classify 直读同构的 item_classified(sales_summary)
 # 事件,reconcile 的 _replay_sales_reads/aggregate_sales 原样回放解锁 R2——引擎/steps 不改一行。
-_SALES_KIND = "sales_summary"
+_SALES_KIND = kinds.SALES_SUMMARY
 _MANUAL_SOURCE = "manual"
 _MANUAL_SALES_DEDUPE = "manual:sales_summary"
 _MAX_NOTE_LEN = 500
-_KIND_BANK_STATEMENT = "bank_statement"
+_KIND_BANK_STATEMENT = kinds.BANK_STATEMENT
 # reconcile.aggregate_sales 靠表头关键词认「销售额列 / 销项税列」;人工填的两个合计以泰文规范
 # 列名 + 单数据行合成表落库,与真实 POS 汇总表直读产出的 sales_read 形状一致(不另造契约)。
 _SALES_HEADER = "ยอดขาย"

@@ -3,9 +3,10 @@
 
 F2-主(对平):影子试算平衡的科目发生额(gates.r5_shadow.accounts,coa_preset 本地科目码)
 对上上传的 Express/MR.ERP GL 对账单文件(bank_gl_stacked → GlRow.account_code,ERP 科目码)。
-两侧口径不同,靠账户桥(local_code → erp_code)对齐:桥不全的科目如实标 unmapped,GL 里桥没
-指到的科目标 gl_only——绝不臆造对应关系。合计对平与桥无关(整期借/贷发生额总额直接比),逐科目
-仅对已桥科目;任一侧发生额差 > 容差(0.01)标 mismatch 报警,如实报不掩盖(状态诚实)。
+两侧口径不同,靠账户桥(local_code → erp_code,coa_erp_bridge 专表 · bridge_store)对齐:
+桥不全的科目如实标 unmapped,GL 里桥没指到的科目标 gl_only——绝不臆造对应关系。合计对平与桥
+无关(整期借/贷发生额总额直接比),逐科目仅对已桥科目;任一侧发生额差 > 容差(0.01)标
+mismatch 报警,如实报不掩盖(状态诚实)。
 
 F2-辅(推送闭环 · presence 级):推 ERP 后 parse_import_report 逐行成败,核对每张预期票是否都
 推成功——漏推(预期在,回执 success/failed 都没有)/被拒(在 failed)如实报警。不做金额级 GL
@@ -19,16 +20,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
-from typing import Any, Optional
-
-from services.accounting import coa_preset
+from typing import Any
 
 _ZERO = Decimal("0")
 _TOL = Decimal("0.01")
-
-# 桥只认预置科目码为本地端 key(shadow accounts 的 code 恒是 coa_preset 码)——把 erp_account_mappings
-# 里恰好用科目码填 pearnly_category 的行认成桥,其余(按分类名填的)不强解,避免臆造 code↔分类 对应。
-_PRESET_CODES = frozenset(code for code, *_ in coa_preset.PRESET_ACCOUNTS)
 
 
 def _dec(value: Any) -> Decimal:
@@ -42,30 +37,6 @@ def _dec(value: Any) -> Decimal:
         return Decimal(s) if s else _ZERO
     except InvalidOperation:
         return _ZERO
-
-
-def build_account_bridge(
-    account_mappings: list[dict], *, erp_type: Optional[str] = None
-) -> dict[str, str]:
-    """erp_account_mappings 行 → {本地科目码: erp_code} 桥。
-
-    只收 pearnly_category 恰为预置科目码的行(会计在配置时把 GL 科目码填进该字段的情形)——
-    这是唯一能从现有映射表可靠推出「coa 码 → erp 码」的路径,不猜测分类名与科目码的对应。
-    erp_type 给定时按之过滤(一份 GL 文件属单一 ERP,避免 express/mrerp 两套码互串)。
-
-    ⚠️ 过渡启发式:erp_account_mappings.pearnly_category 的正式契约是费用分类【名】,此处靠"恰填成
-    科目码"兜底,现实中多为空桥(如实 unmapped 降级)。GL 上传落地时应换成专用 coa_code↔erp_code
-    桥表(或让影子科目携带 category 身份走按名 join),**替换本启发式而非在其上叠加特例**。
-    """
-    bridge: dict[str, str] = {}
-    for m in account_mappings:
-        if erp_type and (m.get("erp_type") or "").strip().lower() != erp_type.strip().lower():
-            continue
-        cat = (m.get("pearnly_category") or "").strip()
-        code = (m.get("erp_code") or "").strip()
-        if cat in _PRESET_CODES and code:
-            bridge[cat] = code
-    return bridge
 
 
 def aggregate_gl_rows(gl_rows: list[Any]) -> dict[str, dict[str, Decimal]]:

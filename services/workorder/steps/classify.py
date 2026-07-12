@@ -33,7 +33,7 @@ from core import feature_flags
 from services.ai_gateway import attribution
 from services.purchase.totals import dedupe_key
 from services.summary_import.parse import parse_table
-from services.workorder import evidence
+from services.workorder import evidence, kinds
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import sort as sort_step
 from services.workspace import client_alias_store
@@ -80,7 +80,7 @@ def run(ctx: StepContext) -> StepResult:
     # 并发取 OCR、按原序回主线程逐件裁堆+落库。原序消费(非完成序)保证查重「先到先占」
     # 与串行逐字节一致;每件独立事务提交(有 cursor_factory 时),跑批中途被杀只丢在飞的
     # 那几件,已落库件不重烧(断点续跑从未处理件继续)。
-    images = [it for it in pending if it["kind"] == "unknown"]
+    images = [it for it in pending if it["kind"] == kinds.UNKNOWN]
     # 查重表先从已提交事件重建再叠加本次批:逐件提交后 kill 中断,已落库原件不在 pending 里,
     # 内存从空建会让其复件漏判 duplicate → R1 双计(C1 打回单 R1 的静默钱洞)。重建保证
     # 中断续跑对查重的裁决与不中断跑逐字节一致。
@@ -116,7 +116,7 @@ def run(ctx: StepContext) -> StepResult:
 
     reads: dict[str, dict] = dict(ctx.data.get("sales_summary_reads") or {})
     for item in pending:
-        if item["kind"] != "sales_summary":
+        if item["kind"] != kinds.SALES_SUMMARY:
             continue
         parsed, reason = _classify_summary(item)
         with _item_scope(ctx):
@@ -128,14 +128,14 @@ def run(ctx: StepContext) -> StepResult:
                     status="flagged",
                     flag_reason=reason,
                 )
-                _emit_classified(ctx, item, kind="sales_summary", status="flagged", money=None)
+                _emit_classified(ctx, item, kind=kinds.SALES_SUMMARY, status="flagged", money=None)
                 flagged += 1
             else:
                 ctx.store.update_item(
                     ctx.cur, tenant_id=ctx.tenant_id, item_id=item["id"], status="ok"
                 )
                 _emit_classified(
-                    ctx, item, kind="sales_summary", status="ok", money=None, sales_read=parsed
+                    ctx, item, kind=kinds.SALES_SUMMARY, status="ok", money=None, sales_read=parsed
                 )
                 reads[item["id"]] = parsed
 
@@ -238,19 +238,23 @@ def _classify_from_ocr(
     OCR 调用本身在 _ocr_safe(可并发)完成,这里是纯裁决(主线程逐件、原序执行 → 查重确定性)。"""
     if isinstance(ocr, Exception):
         upd = {"status": "flagged", "kind": None, "flag_reason": f"ocr_error:{type(ocr).__name__}"}
-        return {"kind": "unknown", "flagged": True, "update": upd, "money": None}
+        return {"kind": kinds.UNKNOWN, "flagged": True, "update": upd, "money": None}
     fields = ocr
 
     kind, bin_reason = sort_step.bin_ocr_fields(
         fields, own_tax_id=own_tax_id, own_name=own_name, own_names=own_names
     )
 
-    if kind == "purchase_invoice":
+    if kind == kinds.PURCHASE_INVOICE:
         fp = _purchase_fingerprint(fields)
         hit = seen.get(fp) if fp else None
         if hit:
-            upd = {"status": "excluded", "kind": "duplicate", "flag_reason": f"duplicate_of:{hit}"}
-            return {"kind": "duplicate", "flagged": False, "update": upd, "money": None}
+            upd = {
+                "status": "excluded",
+                "kind": kinds.DUPLICATE,
+                "flag_reason": f"duplicate_of:{hit}",
+            }
+            return {"kind": kinds.DUPLICATE, "flagged": False, "update": upd, "money": None}
         if fp:
             seen[fp] = Path(item["file_ref"] or "").name
         # 数学勾稽/OCR 置信闸只对进项票生效:进项要用票面钱字段算 VAT,才需盯净+税=总额。
@@ -262,7 +266,7 @@ def _classify_from_ocr(
 
     # non_tax 是「确定无税务要素」的排除,不是留人工的疑点——与 sort.py 对
     # non_tax 的既有约定(status=excluded)同口径,不占 flagged 计数。
-    if kind == "non_tax":
+    if kind == kinds.NON_TAX:
         status = "excluded"
     else:
         status = "flagged" if reason else "ok"
@@ -270,7 +274,7 @@ def _classify_from_ocr(
     # 方向不明的票也快照票面钱字段:该票 OCR 已读过,钱在手上,只是进/销方向没判准。人工
     # 裁定为进项后,reconcile 直接用这份读数进 R1,不必为定向重跑一遍付费 OCR。两类方向票
     # (direction_ambiguous / sales_direction_unhandled)同口径,后者裁进项时也要有钱可用。
-    capture_money = kind == "purchase_invoice" or (reason or "").startswith(
+    capture_money = kind == kinds.PURCHASE_INVOICE or (reason or "").startswith(
         ("direction_ambiguous", "sales_direction_unhandled")
     )
     money = _money_fields(fields) if capture_money else None
@@ -334,7 +338,7 @@ def _replay_seen_fingerprints(ctx: StepContext) -> dict[str, str]:
     seen: dict[str, str] = {}
     for item_id, rec in classified.items():
         payload = rec["payload"]
-        if payload.get("kind") != "purchase_invoice":
+        if payload.get("kind") != kinds.PURCHASE_INVOICE:
             continue
         fp = _purchase_fingerprint(payload.get("money") or {})
         if fp and fp not in seen:

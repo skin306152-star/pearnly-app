@@ -181,3 +181,11 @@ def ensure_tax_profile_schema() -> None:
         ensure_payroll_schema()
     except Exception as e:
         logger.warning(f"ensure_payroll_schema failed: {e}")
+
+    # 科目桥表(T4a · alembic 0073 双跑)同挂链尾,独立 try 不连坐。
+    try:
+        from services.accounting.bridge_schema import ensure_coa_erp_bridge_schema
+
+        ensure_coa_erp_bridge_schema()
+    except Exception as e:
+        logger.warning(f"ensure_coa_erp_bridge_schema failed: {e}")

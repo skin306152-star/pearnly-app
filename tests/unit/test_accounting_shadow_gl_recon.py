@@ -3,10 +3,12 @@
 
 覆盖:F2-主 影子科目 ↔ 上传 GL 文件——完全一致无报警 / 人为制造一科目差额→mismatch 如实列出 /
 桥不全→unmapped 不强对 / 合计对平 / 无 GL 上传→no_gl_source 诚实降级;F2-辅 推送逐行成败——
-全推成功无报警 / 漏推→报警 / 被拒带原因;账户桥只认以科目码填分类名的映射行;接线把对数结果挂
-gates.r5_shadow.reconcile_gl,对数自身异常隔离不带垮影子底稿(佐证之佐证,不阻断出包)。
+全推成功无报警 / 漏推→报警 / 被拒带原因;接线把对数结果挂 gates.r5_shadow.reconcile_gl 并带
+gl_source 三态(T4a:none/parse_failed/ok,解析失败绝不伪装成没上传),对数自身异常隔离不带垮
+影子底稿(佐证之佐证,不阻断出包);无 GL 件存量工单 payload 除新增 gl_source 外逐字节钉死。
 """
 
+import json
 import unittest
 from decimal import Decimal
 
@@ -111,26 +113,6 @@ class GlReconUnmappedTests(unittest.TestCase):
         self.assertFalse(r.alert)
 
 
-class BridgeBuilderTests(unittest.TestCase):
-    """账户桥只认 pearnly_category 恰为预置科目码的行,按分类名填的行不臆造成桥。"""
-
-    def test_only_preset_code_categories_bridge(self):
-        mappings = [
-            {"erp_type": "mrerp", "pearnly_category": "2010", "erp_code": "210000"},
-            {"erp_type": "mrerp", "pearnly_category": "租金", "erp_code": "521000"},  # 分类名,不认
-            {"erp_type": "mrerp", "pearnly_category": "5290", "erp_code": "530000"},
-        ]
-        bridge = recon.build_account_bridge(mappings)
-        self.assertEqual(bridge, {"2010": "210000", "5290": "530000"})
-
-    def test_erp_type_filter(self):
-        mappings = [
-            {"erp_type": "mrerp", "pearnly_category": "2010", "erp_code": "210000"},
-            {"erp_type": "express", "pearnly_category": "2010", "erp_code": "2000"},
-        ]
-        self.assertEqual(recon.build_account_bridge(mappings, erp_type="express"), {"2010": "2000"})
-
-
 # ── F2-辅:推送逐行成败 presence 核对 ────────────────────────────
 class PushPresenceTests(unittest.TestCase):
     def test_all_pushed_no_alert(self):
@@ -225,11 +207,38 @@ class ReconWiringTests(unittest.TestCase):
         out = reconcile.run(_store())
         rg = out.payload["gates"]["r5_shadow"]["reconcile_gl"]
         self.assertEqual(rg["status"], "no_gl_source")
+        self.assertEqual(rg["gl_source"], reconcile.GL_SOURCE_NONE)
+        self.assertNotIn("gl_source_note", rg)
         self.assertEqual(rg["push"]["status"], "no_report")
+
+    def test_no_gl_payload_frozen_except_gl_source(self):
+        # 回归钉死(闸已 rollout=all):无 GL 件存量工单的 reconcile_gl payload 与 T4a 改前
+        # 逐字节一致,唯一新增 gl_source=none(改前快照 2026-07-13 捕获)。
+        out = reconcile.run(_store())
+        rg = dict(out.payload["gates"]["r5_shadow"]["reconcile_gl"])
+        self.assertEqual(rg.pop("gl_source"), "none")
+        frozen = {
+            "alert": False,
+            "gl_only": [],
+            "matched": [],
+            "mismatch": [],
+            "push": {
+                "alert": False,
+                "expected_count": 0,
+                "missing": [],
+                "pushed_ok": [],
+                "rejected": [],
+                "status": "no_report",
+            },
+            "status": "no_gl_source",
+            "totals": {},
+            "unmapped": [],
+        }
+        self.assertEqual(json.dumps(rg, sort_keys=True), json.dumps(frozen, sort_keys=True))
 
     def test_injected_gl_and_push_flow_through(self):
         self._inject(
-            gl_rows=[_gl("530000", 1000.0, 0.0)],
+            gl_src={"rows": [_gl("530000", 1000.0, 0.0)], "source": "ok", "note": None},
             bridge={"5290": "530000"},
             push=(["INV-1"], ImportReportStub(success=["INV-1"], failed=[])),
         )
@@ -237,10 +246,29 @@ class ReconWiringTests(unittest.TestCase):
         rg = out.payload["gates"]["r5_shadow"]["reconcile_gl"]
         # 费用 5290 桥到 530000,发生额 1000 逐科目对上(无 mismatch),其余科目 unmapped 如实标。
         # GL 文件只含这一科目 → 合计不平,alert 如实为 True(不虚构对平),push 侧全推成功。
+        self.assertEqual(rg["gl_source"], reconcile.GL_SOURCE_OK)
         self.assertEqual(rg["mismatch"], [])
         self.assertIn("5290", [m["local_code"] for m in rg["matched"]])
         self.assertTrue(any(u["local_code"] == "2010" for u in rg["unmapped"]))
         self.assertEqual(rg["push"]["status"], "all_pushed")
+
+    def test_parse_failed_never_masquerades_as_no_source(self):
+        # 有件但解析失败:rows 空 → reconcile_gl 契约仍报 no_gl_source(签名/逻辑一行不改),
+        # 但 gl_source=parse_failed + note 把「读不出」与「没上传」分开,绝不伪装。
+        self._inject(
+            gl_src={
+                "rows": [],
+                "source": "parse_failed",
+                "note": "gl_may.pdf: no_text_layer",
+            },
+            bridge={},
+            push=([], None),
+        )
+        out = reconcile.run(_store())
+        rg = out.payload["gates"]["r5_shadow"]["reconcile_gl"]
+        self.assertEqual(rg["status"], "no_gl_source")
+        self.assertEqual(rg["gl_source"], reconcile.GL_SOURCE_PARSE_FAILED)
+        self.assertEqual(rg["gl_source_note"], "gl_may.pdf: no_text_layer")
 
     def test_recon_exception_isolated_keeps_shadow(self):
         def _boom(ctx):
@@ -248,7 +276,7 @@ class ReconWiringTests(unittest.TestCase):
 
         # 桥仅在有 GL 行时才建(省 DB 空跑),故先注入非空 gl_rows 让异常路径可达。
         self._prev_rows = reconcile._shadow_gl_rows
-        reconcile._shadow_gl_rows = lambda ctx: [object()]
+        reconcile._shadow_gl_rows = lambda ctx: {"rows": [object()], "source": "ok", "note": None}
         self.addCleanup(setattr, reconcile, "_shadow_gl_rows", self._prev_rows)
         self._prev_bridge = reconcile._shadow_account_bridge
         reconcile._shadow_account_bridge = _boom
@@ -260,11 +288,11 @@ class ReconWiringTests(unittest.TestCase):
         self.assertIn("trial_balance", shadow)
         self.assertEqual(shadow["reconcile_gl"]["status"], "reconcile_gl_skipped")
 
-    def _inject(self, *, gl_rows, bridge, push):
+    def _inject(self, *, gl_src, bridge, push):
         prev_rows = reconcile._shadow_gl_rows
         prev_bridge = reconcile._shadow_account_bridge
         prev_push = reconcile._shadow_push_report
-        reconcile._shadow_gl_rows = lambda ctx: gl_rows
+        reconcile._shadow_gl_rows = lambda ctx: gl_src
         reconcile._shadow_account_bridge = lambda ctx: bridge
         reconcile._shadow_push_report = lambda ctx: push
         self.addCleanup(setattr, reconcile, "_shadow_gl_rows", prev_rows)

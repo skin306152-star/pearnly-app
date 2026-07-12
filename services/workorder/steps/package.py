@@ -13,7 +13,7 @@ import json
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from services.workorder import decisions, evidence, storage
+from services.workorder import decisions, evidence, kinds, storage
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import conservation, financials_report, pnd_prep, pp30_form
 
@@ -234,7 +234,7 @@ def _write_ledger(
     """进销明细底稿:每张进项票一行[文件名/票号/卖方税号/净额/税额/状态/裁决] + 销项汇总一段。"""
     classified = evidence.replay_items_by_type(events, "item_classified")
     purchases = sorted(
-        (it for it in items if it["kind"] == "purchase_invoice"),
+        (it for it in items if it["kind"] == kinds.PURCHASE_INVOICE),
         key=lambda it: it.get("file_ref") or "",
     )
 
@@ -252,7 +252,9 @@ def _write_ledger(
         "| มูลค่าสุทธิ (净额) | ภาษีซื้อ (税额) | สถานะ (状态) | คำวินิจฉัย (裁决) |",
         "|---|---|---|---|---|---|---|",
     ]
-    sales_count = sum(1 for it in items if it["kind"] == "sales_summary" and it["status"] == "ok")
+    sales_count = sum(
+        1 for it in items if it["kind"] == kinds.SALES_SUMMARY and it["status"] == "ok"
+    )
     source = numbers.get("sales_source")
     source_line = (
         f"แหล่งที่มา (来源): {_SOURCE_LABEL_TH.get(source, source)}"
@@ -292,7 +294,7 @@ def _write_ledger(
 
 def _write_bank(out_dir: Path, items: list[dict], numbers: dict) -> tuple[str, dict]:
     """银行材料清单:M0 只判存在性,如实写 present/missing。"""
-    banks = [it for it in items if it["kind"] == "bank_statement"]
+    banks = [it for it in items if it["kind"] == kinds.BANK_STATEMENT]
     gate = (numbers.get("gates") or {}).get("r3_bank") or {}
     rows = [f"| {Path(it.get('file_ref') or '').name} | present |" for it in banks]
     header = ["| ไฟล์ (文件名) | สถานะ (状态) |", "|---|---|"] if banks else []
@@ -429,8 +431,10 @@ def _write_memo(
     gate = (numbers.get("gates") or {}).get("r3_bank") or {}
     bank_missing = gate.get("note") == "bank_statement_missing"
     flagged = [it for it in items if it.get("flag_reason") and it["status"] == "flagged"]
-    non_tax = [it for it in items if it["kind"] == "non_tax" and it["status"] == "excluded"]
-    duplicates = [it for it in items if it["kind"] == "duplicate" and it["status"] == "excluded"]
+    non_tax = [it for it in items if it["kind"] == kinds.NON_TAX and it["status"] == "excluded"]
+    duplicates = [
+        it for it in items if it["kind"] == kinds.DUPLICATE and it["status"] == "excluded"
+    ]
     waived = cons.buckets[conservation.WAIVED]
 
     def _tag(it: dict, extra: str = "") -> str:

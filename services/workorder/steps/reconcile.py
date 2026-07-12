@@ -20,15 +20,21 @@ from __future__ import annotations
 from pathlib import Path
 
 from core import feature_flags
-from services.workorder import decisions
+from services.workorder import decisions, kinds
 from services.workorder.engine import StepContext, StepResult
 from services.workorder.steps import reconcile_gates as gates
 
 _EVT_CLASSIFIED = "item_classified"
 _EVT_DECISION = "human_decision"
-_PURCHASE = "purchase_invoice"
-_SALES = "sales_summary"
-_BANK = "bank_statement"
+_PURCHASE = kinds.PURCHASE_INVOICE
+_SALES = kinds.SALES_SUMMARY
+_BANK = kinds.BANK_STATEMENT
+
+# gates.r5_shadow.reconcile_gl.gl_source 三态(T4a·勘察风险#6):无件 / 有件但解析失败 / 解析成功。
+# parse_failed 绝不伪装成 no_gl_source——「读不出」和「没上传」必须分得开。
+GL_SOURCE_NONE = "none"
+GL_SOURCE_PARSE_FAILED = "parse_failed"
+GL_SOURCE_OK = "ok"
 
 
 def run(ctx: StepContext) -> StepResult:
@@ -226,20 +232,24 @@ def _default_shadow_period(ctx: StepContext) -> str | None:
 def _run_shadow_gl_recon(ctx: StepContext, shadow) -> dict:
     """F2 对数:影子科目发生额 ↔ 上传 GL 文件(F2-主)+ 预期票 ↔ ERP 导入回执(F2-辅)。
 
-    GL 文件 / 导入回执经注入点取(当前工单管线尚无 GL 导出件与推送回执入口 → 默认空,如实降级为
-    no_gl_source / no_report,不虚构对平);账户桥从 erp_account_mappings 建,桥不全的科目标 unmapped。
+    GL 行经注入点取(kind=gl_ledger 件逐件解析),payload 另带 gl_source 三态 + note,
+    解析失败与没上传分得开;账户桥从 coa_erp_bridge 专表建,桥不全的科目标 unmapped。
     自身再 try/except 一层,对数失败不带垮上层影子底稿(佐证之佐证,层层不阻断出包)。
     """
     from services.accounting import shadow_gl_recon as recon
 
     try:
-        gl_rows = _shadow_gl_rows(ctx)
+        src = _shadow_gl_rows(ctx)
+        gl_rows = src["rows"]
         # 桥仅在有 GL 行时才被 reconcile_gl 读(无 GL → no_gl_source 前置返回),空跑时省掉一次 DB 查询。
         bridge = _shadow_account_bridge(ctx) if gl_rows else {}
         gl = recon.reconcile_gl(shadow.accounts, gl_rows, bridge)
         expected, report = _shadow_push_report(ctx)
         push = recon.reconcile_push(expected, report)
         payload = gl.as_payload()
+        payload["gl_source"] = src["source"]
+        if src.get("note"):
+            payload["gl_source_note"] = src["note"]
         payload["push"] = push.as_payload()
         return payload
     except Exception as exc:  # noqa: BLE001 - 佐证层单点隔离,绝不阻断 package
@@ -278,22 +288,65 @@ def _default_bank_statement_rows(ctx: StepContext, banks: list[dict]) -> list:
     return rows
 
 
-def _default_shadow_gl_rows(ctx: StepContext) -> list:
-    """F2-主 GL 文件解析源。当前工单管线只收进项/销项/银行件,无 Express/MR.ERP GL 导出件入口
-    → 恒空,对数如实降级 no_gl_source。GL 上传落地后本函数改为按 GL 件解析 GlRow(注入点已就位)。"""
-    return []
+def _default_shadow_gl_rows(ctx: StepContext) -> dict:
+    """F2-主 GL 佐证源:本工单 kind=gl_ledger 件逐件读字节解析成 GlRow。
+
+    返回 {"rows", "source", "note"} 三态诚实(勘察风险#6 根治):无件 → none;有件但任一
+    整件解析失败 → parse_failed + note 逐件摘要(其余成功件的行仍参与对平);全部成功 → ok,
+    行级定向丢弃(单金额行方向定不了)如实进 note。单件失败只连坐该件,不拖垮整批。
+    """
+    items = ctx.store.list_items(ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id)
+    gl_items = [it for it in items if it["kind"] == kinds.GL_LEDGER]
+    if not gl_items:
+        return {"rows": [], "source": GL_SOURCE_NONE, "note": None}
+    from services.accounting import gl_upload_adapter as gl_adapter
+
+    rows: list = []
+    failures: list[str] = []
+    row_notes: list[str] = []
+    for it in gl_items:
+        name = Path(it.get("file_ref") or "").name or str(it.get("id"))
+        try:
+            parsed = gl_adapter.parse_gl_bytes(Path(it["file_ref"]).read_bytes(), name)
+        except gl_adapter.GlUploadParseError as exc:
+            failures.append(f"{name}: {exc}")
+            continue
+        except Exception as exc:  # noqa: BLE001 - 读盘/解析库炸也如实记 parse_failed,不上抛
+            failures.append(f"{name}: {type(exc).__name__}")
+            continue
+        rows.extend(parsed["rows"])
+        row_notes.extend(parsed["row_issues"])
+    if failures:
+        return {"rows": rows, "source": GL_SOURCE_PARSE_FAILED, "note": "; ".join(failures)}
+    return {"rows": rows, "source": GL_SOURCE_OK, "note": "; ".join(row_notes) or None}
 
 
 def _default_shadow_account_bridge(ctx: StepContext) -> dict:
-    """F2 账户桥:erp_account_mappings(pearnly_category→erp_code)里以科目码填分类名的行 → 本地码→erp 码。
-    无 cur / 无配置 → 空桥(全科目 unmapped,如实反映桥未配,不臆造对应)。"""
+    """F2 账户桥:coa_erp_bridge 专表(T4a,替换 erp_account_mappings 过渡启发式)。
+
+    无 cur / 工单未绑账套 / 表空 → 空桥(全科目 unmapped,如实反映桥未配,不臆造对应)。
+    工单不带 erp_type:该账套桥行恰属单一 erp_type 时即用之;多 ERP 桥并存时无法归属
+    GL 件属谁 → 空桥不猜(T4b 若要多 ERP 需带件级 erp_type 信号)。
+    """
     if ctx.cur is None or not ctx.tenant_id:
         return {}
-    from services.accounting import shadow_gl_recon as recon
-    from services.erp import mappings_store
+    from services.accounting import bridge_store
 
-    mappings = mappings_store.list_erp_account_mappings(ctx.tenant_id)
-    return recon.build_account_bridge(mappings)
+    wo = ctx.store.get_work_order(ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id)
+    client_id = (wo or {}).get("workspace_client_id")
+    if not client_id:
+        return {}
+    erp_types = bridge_store.list_erp_types(
+        ctx.cur, tenant_id=ctx.tenant_id, workspace_client_id=client_id
+    )
+    if len(erp_types) != 1:
+        return {}
+    return bridge_store.load_bridge(
+        ctx.cur,
+        tenant_id=ctx.tenant_id,
+        workspace_client_id=client_id,
+        erp_type=erp_types[0],
+    )
 
 
 def _default_shadow_push_report(ctx: StepContext) -> tuple:

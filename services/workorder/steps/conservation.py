@@ -15,12 +15,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from services.workorder import decisions
+from services.workorder import decisions, kinds
 
 # 终态桶键。BUCKET_ORDER 固定顺序,给确定性输出(利于快照/诊断复核)。
 INPUT_COUNTED = "input_counted"  # 已计入进项(purchase_invoice ok/裁决保留,或方向票裁进项)
 SALES_MATERIAL = "sales_material"  # 销项材料(sales_summary 直读/人工申报,已就绪)
-BANK = "bank"  # 银行件(M0 只判存在性)
+BANK = "bank"  # 佐证件(银行流水 + GL 上传件:只供佐证层消费,不进税额)
 EXCLUDED = "excluded"  # 排除(non_tax·duplicate·exclude 裁决·方向票裁非税)
 SALES_REASSIGNED = "sales_reassigned"  # 改判销项(方向票裁 assign_sales:票面不进 R1,归销项侧)
 PENDING = "pending_decision"  # 待裁决(fail-closed 兜底:无明确终态一律落此,出包被拦)
@@ -38,13 +38,14 @@ BUCKET_ORDER = (
 
 _KEEP_DECISIONS = (decisions.FACE_VALUE, decisions.RECALC)  # 保留进合计的金额裁决
 
-# item.kind 取值(与裁决动词分属两套命名空间,故不进 decisions 词汇表)。
-_KIND_PURCHASE = "purchase_invoice"
-_KIND_SALES = "sales_summary"
-_KIND_BANK = "bank_statement"
-_KIND_NON_TAX = "non_tax"
-_KIND_DUPLICATE = "duplicate"
-_KIND_UNKNOWN = "unknown"
+# item.kind 取值(与裁决动词分属两套命名空间 · 单一事实源 kinds.py)。
+_KIND_PURCHASE = kinds.PURCHASE_INVOICE
+_KIND_SALES = kinds.SALES_SUMMARY
+_KIND_BANK = kinds.BANK_STATEMENT
+_KIND_GL = kinds.GL_LEDGER
+_KIND_NON_TAX = kinds.NON_TAX
+_KIND_DUPLICATE = kinds.DUPLICATE
+_KIND_UNKNOWN = kinds.UNKNOWN
 
 # 方向票 assign_kind 裁定 kind → 终态桶。裁进项计入 R1、裁销项归销项侧、裁非税排除;
 # 裁定 kind 非法(不在表内)→ _bucket_of 兜底 PENDING。
@@ -109,7 +110,8 @@ def _bucket_of(item: dict, dec: dict | None) -> str:
     if kind == _KIND_SALES:
         return SALES_MATERIAL if item.get("status") == "ok" else PENDING
 
-    if kind == _KIND_BANK:
+    if kind in (_KIND_BANK, _KIND_GL):
+        # GL 上传件与银行件同型:佐证材料,不进税额、不需裁决,归佐证桶(T4a)。
         return BANK
 
     if kind in (_KIND_NON_TAX, _KIND_DUPLICATE):

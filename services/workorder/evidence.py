@@ -12,14 +12,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from services.workorder import decisions
+from services.workorder import decisions, kinds
 
 _EVT_DONE = "step_done"
 _EVT_CLASSIFIED = "item_classified"
 _EVT_DECISION = "human_decision"
-_KIND_PURCHASE = "purchase_invoice"
-_KIND_SALES = "sales_summary"
-_KIND_UNKNOWN = "unknown"
+_KIND_PURCHASE = kinds.PURCHASE_INVOICE
+_KIND_SALES = kinds.SALES_SUMMARY
+_KIND_UNKNOWN = kinds.UNKNOWN
 
 # 应缴税额的证据只挂 compute 自己的 step_done——它是"销项-进项"这一步减法的落库点。
 _NUMBER_STEP = {"tax_due": "compute"}

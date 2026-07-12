@@ -239,7 +239,10 @@ window.openPurchaseMatch = function (lineArg, onDone) {
     };
     const fetchProducts = async (q: string) => {
         try {
-            const d = (await papi('GET', '/api/products?q=' + encodeURIComponent(q || ''))) as {
+            const d = (await papi(
+                'GET',
+                '/api/sales/products?q=' + encodeURIComponent(q || '')
+            )) as {
                 products?: MatchProduct[];
             };
             render(d.products || [], q);

@@ -11,7 +11,7 @@ import unittest
 from decimal import Decimal
 from unittest import mock
 
-from services.pos import refund, sale, stock
+from services.pos import refund, sale, stock, void
 
 
 def _fake_cursor():
@@ -137,17 +137,17 @@ class VoidSaleRestockGateTests(unittest.TestCase):
         line = {"product_id": "prod1", "batch_id": None, "qty_base": Decimal("2")}
         restock_calls = []
         with (
-            mock.patch.object(sale.sales_store, "get_sale", return_value=original),
-            mock.patch.object(sale.sales_store, "has_refunds", return_value=False),
+            mock.patch.object(void.sales_store, "get_sale", return_value=original),
+            mock.patch.object(void.sales_store, "has_refunds", return_value=False),
             mock.patch.object(
-                sale.inv_store, "get_or_create_default_warehouse", return_value={"id": 1}
+                void.inv_store, "get_or_create_default_warehouse", return_value={"id": 1}
             ),
-            mock.patch.object(sale.stock, "sale_deducted_stock", return_value=deducted),
-            mock.patch.object(sale.sales_store, "list_lines", return_value=[line]),
+            mock.patch.object(void.stock, "sale_deducted_stock", return_value=deducted),
+            mock.patch.object(void.sales_store, "list_lines", return_value=[line]),
             mock.patch.object(
-                sale.stock, "restock", side_effect=lambda *a, **k: restock_calls.append(k)
+                void.stock, "restock", side_effect=lambda *a, **k: restock_calls.append(k)
             ),
-            mock.patch.object(sale.sales_store, "set_status"),
+            mock.patch.object(void.sales_store, "set_status", return_value=True),
         ):
             result = sale.void_sale(cur, tenant_id="t1", workspace_client_id=1, sale_id="s1")
         return result, restock_calls

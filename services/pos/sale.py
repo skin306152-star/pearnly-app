@@ -15,7 +15,7 @@ from typing import Optional
 from core.pos_api import PosError
 from services.accounting import hooks as acct_hooks
 from services.inventory import store as inv_store
-from services.pos import numbering, payment_settlement, sale_caps, sales_store, stock
+from services.pos import numbering, payment_settlement, sale_caps, sales_store, stock, void
 from services.pos.sale_binding import resolve as _resolve_sale_binding
 from services.sales.totals import compute_totals
 
@@ -71,19 +71,6 @@ def _assert_shift_open(cur, *, tenant_id: str, shift_id: Optional[str]) -> None:
     row = cur.fetchone()
     if not row or row["status"] != "open":
         raise PosError("pos.shift_closed", 409)
-
-
-def _shift_is_open(
-    cur, *, tenant_id: str, workspace_client_id: int, shift_id: str, for_update: bool = False
-) -> bool:
-    cur.execute(
-        "SELECT status FROM pos_shifts "
-        "WHERE tenant_id = %s AND workspace_client_id = %s AND id = %s"
-        + (" FOR UPDATE" if for_update else ""),
-        (tenant_id, workspace_client_id, shift_id),
-    )
-    row = cur.fetchone()
-    return bool(row and row["status"] == "open")
 
 
 def _header_discount(hd: dict) -> tuple:
@@ -443,68 +430,11 @@ def _header_view(sale: dict) -> dict:
 def void_sale(
     cur, *, tenant_id: str, workspace_client_id: int, sale_id: str, created_by=None, operator=None
 ) -> dict:
-    """作废当班错单:回补库存 + 标 void。已交班/已退货/已作废 → void_not_allowed。
-
-    记一行 operation_logs(谁点了作废):原单 cashier_id 是原销售员,不是作废操作人,异常读模型
-    据此把作废如实归到操作人名下(防内盗对账的关键)。
-    """
-    snapshot = sales_store.get_sale(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, sale_id=sale_id
-    )
-    if not snapshot or snapshot["sale_type"] != "sale":
-        raise PosError("pos.void_not_allowed", 409)
-    if snapshot.get("shift_id") and not _shift_is_open(
-        cur,
-        tenant_id=tenant_id,
-        workspace_client_id=workspace_client_id,
-        shift_id=str(snapshot["shift_id"]),
-        for_update=True,
-    ):
-        raise PosError("pos.void_not_allowed", 409)
-    sale = sales_store.get_sale(
+    return void.void_sale(
         cur,
         tenant_id=tenant_id,
         workspace_client_id=workspace_client_id,
         sale_id=sale_id,
-        for_update=True,
+        created_by=created_by,
+        operator=operator,
     )
-    if not sale or sale["status"] != "completed" or sale["sale_type"] != "sale":
-        raise PosError("pos.void_not_allowed", 409)
-    locked_lines = sales_store.list_lines(
-        cur, tenant_id=tenant_id, sale_id=sale_id, for_update=True
-    )
-    if sales_store.has_refunds(cur, tenant_id=tenant_id, sale_id=sale_id):
-        raise PosError("pos.void_not_allowed", 409)
-    wh = inv_store.get_or_create_default_warehouse(
-        cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id
-    )
-    # 原单没扣过库存(餐饮成品单)就不回补——回补要照镜像扣减,不是照有单就补。
-    restore_stock = stock.sale_deducted_stock(cur, tenant_id=tenant_id, sale_id=sale_id)
-    if restore_stock:
-        for ln in locked_lines:
-            stock.restock(
-                cur,
-                tenant_id=tenant_id,
-                workspace_client_id=workspace_client_id,
-                warehouse_id=wh["id"],
-                product_id=str(ln["product_id"]),
-                batch_id=str(ln["batch_id"]) if ln["batch_id"] else None,
-                qty_base=ln["qty_base"],
-                ref_type="pos_void",
-                ref_id=sale_id,
-                txn_type="adjust",
-                created_by=created_by,
-            )
-    if not sales_store.set_status(
-        cur,
-        tenant_id=tenant_id,
-        sale_id=sale_id,
-        status="void",
-        expected_status="completed",
-    ):
-        raise PosError("pos.void_not_allowed", 409)
-    if operator is not None:
-        from services.pos import approval
-
-        approval.log_void_operator(tenant_id=tenant_id, sale_id=sale_id, operator=operator)
-    return {"sale_id": sale_id, "status": "void", "stock_returned": restore_stock}

@@ -1,7 +1,7 @@
 import inspect
 import unittest
 
-from services.pos import refund, sale, sales_store
+from services.pos import refund, sales_store, void
 
 
 class PosRefundConcurrencyContractTests(unittest.TestCase):
@@ -18,7 +18,7 @@ class PosRefundConcurrencyContractTests(unittest.TestCase):
         self.assertIn("refund_of_sale_id", source)
 
     def test_void_locks_shift_sale_and_lines_before_checks(self):
-        source = inspect.getsource(sale.void_sale)
+        source = inspect.getsource(void.void_sale)
         shift_at = source.index("_shift_is_open")
         sale_at = source.index("for_update=True", source.index("sales_store.get_sale", shift_at))
         lines_at = source.index("sales_store.list_lines", sale_at)

@@ -117,6 +117,7 @@ body { background: var(--bg); color: var(--ink); font-size: 14px; }
 .pos-view--main .topbar-langs button.on { border-color: var(--blue); background: var(--blue); color: #fff; }
 .pos-view--main .sync-pill { background: rgba(124, 77, 255, .22); color: #ddccff; }
 .pos-view--main .sync-pill.busy .ic { animation: pos-spin 1s linear infinite; }
+.pos-view--main .sync-pill.blocked { background: rgba(239, 68, 68, .22); color: #fecaca; }
 @keyframes pos-spin { to { transform: rotate(360deg); } }
 .pos-view--main .top-cashier { display: flex; align-items: center; gap: 9px; }
 .pos-view--main .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--blue); display: grid; place-items: center; font-size: 12px; font-weight: 700; }

@@ -84,6 +84,7 @@ class SyncTests(unittest.TestCase):
         self.assertFalse(res[1]["ok"])
         self.assertEqual(res[1]["error"]["code"], "pos.out_of_stock")
         self.assertEqual(res[1]["error"]["detail"], "p1")
+        self.assertEqual(res[1]["status"], 409)
         self.assertTrue(res[2]["ok"])
         self.assertTrue(res[2]["deduped"])  # 幂等透传
         # 成功张 RELEASE、失败张 ROLLBACK TO —— 每张都有自己的 savepoint

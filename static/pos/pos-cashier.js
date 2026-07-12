@@ -17,6 +17,15 @@
     let discountPctValue = 0; // discountMode='pct' 时的原始百分比,建单传给后端按下单时小计复算
     let discountReason = ''; // 折扣理由 · 随 payload 携带(后端暂无落点,extra 字段忽略即可)
     let lastSale = null; // 刚成交的单(成功面板 + 升级税票用)
+    window.addEventListener('pos:sale-synced', (event) => {
+        const synced = event.detail || {};
+        if (!lastSale || lastSale.client_uuid !== synced.client_uuid) return;
+        lastSale.id = synced.sale_id;
+        lastSale.receipt_no = synced.receipt_no;
+        lastSale.offline = false;
+        lastSale.temporary_receipt = false;
+        if ($('done-receipt')) $('done-receipt').textContent = synced.receipt_no || '—';
+    });
     let taxBuyerType = 'company';
     let taxBranch = 'head';
     const HELD_KEY = 'pos_held_orders';
@@ -741,10 +750,12 @@
         const sale = (res && res.sale) || {};
         lastSale = {
             id: sale.id || null,
+            client_uuid: snap.client_uuid || sale.id || null,
             receipt_no: sale.receipt_no || '',
             grand_total: sale.grand_total != null ? sale.grand_total : snap.grand.toFixed(2),
             change_amount: sale.change_amount,
             offline: !!(res && res.offline), // 离线补单(Part B5)→ 不可即时开税票
+            temporary_receipt: !!sale.temporary_receipt,
             lines: snap.lines,
             payments: snap.payments,
             sold_at: new Date(),
@@ -755,7 +766,9 @@
         $('done-change-row').style.display = Number(change) > 0 ? 'flex' : 'none';
         $('done-change').textContent = fmt(change);
         renderDoneMethods(lastSale.payments);
-        $('done-receipt').textContent = lastSale.receipt_no || '—';
+        $('done-receipt').textContent = lastSale.temporary_receipt
+            ? (lastSale.receipt_no || '—') + ' · ' + POS.t('posui.sync.receipt_pending')
+            : lastSale.receipt_no || '—';
         // 离线单 / 纯本地预览均不可开正式税票(税票需联网连号)→ 隐税票钮 + 显提示
         const taxable = !lastSale.offline && !!lastSale.id;
         document.querySelector('#done-mask .done-modal').classList.toggle('is-offline', !taxable);

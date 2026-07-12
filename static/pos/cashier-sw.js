@@ -7,7 +7,7 @@
  * 缓存名带版本号,改外壳 bump 即可让旧缓存失效(对齐 ?v= 缓存破)。
  * 独立于 /pos 旧 SW:老收银设备的 /pos SW 原样不动,两作用域互不干扰。
  */
-const CACHE = 'pearnly-cashier-v11911100';
+const CACHE = 'pearnly-cashier-v11911101';
 const CORE = ['/cashier'];
 
 self.addEventListener('install', (e) => {

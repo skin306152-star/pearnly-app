@@ -534,6 +534,17 @@
     };
 
     data.findReceipt = async function (no) {
+        if (String(no).startsWith('OFF-') && POS.offline) {
+            const local = await POS.offline.findReceipt(no);
+            if (!local || local.status !== 'synced') {
+                const code =
+                    local && local.status === 'blocked'
+                        ? 'pos.offline_blocked'
+                        : 'pos.offline_pending';
+                throw new PosErr(code, 409, local && local.last_error, true);
+            }
+            no = local.receipt_no;
+        }
         try {
             return await apiFetch('GET', '/api/pos/sales/by-receipt?no=' + encodeURIComponent(no));
         } catch (e) {

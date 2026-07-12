@@ -331,7 +331,14 @@ def sync_sales(
             )
         except PosError as e:
             cur.execute("ROLLBACK TO SAVEPOINT pos_sync_item")
-            results.append({"client_uuid": cu, "ok": False, "error": _err_body(e.code, e.detail)})
+            results.append(
+                {
+                    "client_uuid": cu,
+                    "ok": False,
+                    "status": e.http_status,
+                    "error": _err_body(e.code, e.detail),
+                }
+            )
         except Exception:
             # 结构性坏张(类型/缺字段)也不许卡批:回退到 savepoint,标 line_invalid 让端上重试。
             cur.execute("ROLLBACK TO SAVEPOINT pos_sync_item")

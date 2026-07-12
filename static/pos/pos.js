@@ -515,7 +515,7 @@
                 })
                 .catch(() => {});
             navigator.serviceWorker
-                .register('/cashier-sw.js?v=11911100', { scope: '/cashier' })
+                .register('/cashier-sw.js?v=11911101', { scope: '/cashier' })
                 .catch(() => {});
         }
         tick();

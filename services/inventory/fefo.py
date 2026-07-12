@@ -35,7 +35,8 @@ def select_batches_for_outflow(
         "FROM inventory_stock s JOIN inventory_batches b ON b.id = s.batch_id "
         "WHERE s.tenant_id = %s AND s.workspace_client_id = %s AND s.product_id = %s "
         "AND s.warehouse_id = %s AND s.batch_id IS NOT NULL AND s.qty_on_hand > 0 "
-        "ORDER BY b.expiry_date ASC NULLS LAST, b.received_at ASC",
+        "ORDER BY b.expiry_date ASC NULLS LAST, b.received_at ASC, s.batch_id ASC "
+        "FOR UPDATE OF s",
         (tenant_id, workspace_client_id, product_id, warehouse_id),
     )
     allocations = []

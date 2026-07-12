@@ -119,19 +119,23 @@ def _apply_sale_moves(
     (batch_id=记到销售行的首个批次,全散装=None;moves 原样回传供成本计算用)。"""
     first = None
     for batch_id, qty in moves:
-        ledger.apply_movement(
-            cur,
-            tenant_id=tenant_id,
-            workspace_client_id=workspace_client_id,
-            warehouse_id=warehouse_id,
-            product_id=product_id,
-            batch_id=batch_id,
-            txn_type="sale_out",
-            qty_delta=-qty,
-            ref_type="pos_sale",
-            ref_id=sale_id,
-            created_by=created_by,
-        )
+        try:
+            ledger.apply_movement(
+                cur,
+                tenant_id=tenant_id,
+                workspace_client_id=workspace_client_id,
+                warehouse_id=warehouse_id,
+                product_id=product_id,
+                batch_id=batch_id,
+                txn_type="sale_out",
+                qty_delta=-qty,
+                ref_type="pos_sale",
+                ref_id=sale_id,
+                created_by=created_by,
+                reject_negative=True,
+            )
+        except inv_store.InsufficientStockError as exc:
+            raise PosError("pos.out_of_stock", 409, detail=str(product_id)) from exc
         first = first or batch_id
     return {"batch_id": first, "moves": moves}
 
@@ -198,6 +202,15 @@ def _check_and_move(
     sale_id: str,
     created_by=None,
 ) -> None:
+    batch = inv_store.get_batch(
+        cur,
+        tenant_id=tenant_id,
+        workspace_client_id=workspace_client_id,
+        product_id=product_id,
+        batch_id=batch_id,
+    )
+    if not batch:
+        raise PosError("pos.out_of_stock", 409, detail=str(product_id))
     row = inv_store.get_stock_for_update(
         cur,
         tenant_id=tenant_id,
@@ -208,19 +221,23 @@ def _check_and_move(
     avail = Decimal(str(row["qty_on_hand"])) if row else Decimal("0")
     if avail < qty:
         raise PosError("pos.out_of_stock", 409, detail=str(product_id))
-    ledger.apply_movement(
-        cur,
-        tenant_id=tenant_id,
-        workspace_client_id=workspace_client_id,
-        warehouse_id=warehouse_id,
-        product_id=product_id,
-        batch_id=batch_id,
-        txn_type="sale_out",
-        qty_delta=-qty,
-        ref_type="pos_sale",
-        ref_id=sale_id,
-        created_by=created_by,
-    )
+    try:
+        ledger.apply_movement(
+            cur,
+            tenant_id=tenant_id,
+            workspace_client_id=workspace_client_id,
+            warehouse_id=warehouse_id,
+            product_id=product_id,
+            batch_id=batch_id,
+            txn_type="sale_out",
+            qty_delta=-qty,
+            ref_type="pos_sale",
+            ref_id=sale_id,
+            created_by=created_by,
+            reject_negative=True,
+        )
+    except inv_store.InsufficientStockError as exc:
+        raise PosError("pos.out_of_stock", 409, detail=str(product_id)) from exc
 
 
 def sale_deducted_stock(cur, *, tenant_id: str, sale_id: str) -> bool:

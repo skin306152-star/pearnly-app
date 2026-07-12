@@ -70,6 +70,7 @@ def apply_movement(
     client_uuid=None,
     reason=None,
     created_by=None,
+    reject_negative: bool = False,
 ) -> dict:
     """写一笔流水 + 物化库存。返回 {"txn", "qty_on_hand", "deduped"}。"""
     if client_uuid:
@@ -100,6 +101,7 @@ def apply_movement(
         warehouse_id=warehouse_id,
         batch_id=batch_id,
         qty_delta=qty_delta,
+        reject_negative=reject_negative,
     )
     return {"txn": txn, "qty_on_hand": new_qty, "deduped": False}
 

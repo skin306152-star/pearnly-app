@@ -17,6 +17,11 @@ from core.rls import apply_tenant_rls
 
 logger = logging.getLogger("mr-pilot")
 
+
+class InsufficientStockError(Exception):
+    pass
+
+
 _TXN_COLS = (
     "id, tenant_id, workspace_client_id, product_id, warehouse_id, batch_id, "
     "txn_type, qty_delta, unit_cost, ref_type, ref_id, client_uuid, reason, "
@@ -283,6 +288,7 @@ def apply_stock_delta(
     warehouse_id: int,
     batch_id: Optional[str],
     qty_delta,
+    reject_negative: bool = False,
 ) -> Decimal:
     """加减某 (product,warehouse,batch) 行的在库量,返回新 qty_on_hand。
 
@@ -297,6 +303,8 @@ def apply_stock_delta(
         batch_id=batch_id,
     )
     if existing:
+        if reject_negative and Decimal(str(existing["qty_on_hand"])) + delta < 0:
+            raise InsufficientStockError
         # id 来自上面 tenant 限定的 get_stock_for_update(且 FOR UPDATE 锁行);UPDATE 再带
         # tenant_id 是纵深防御——RLS 被 BYPASSRLS 架空,应用层每句自证隔离不依赖调用方纪律。
         cur.execute(
@@ -305,6 +313,8 @@ def apply_stock_delta(
             (delta, existing["id"], tenant_id),
         )
         return cur.fetchone()["qty_on_hand"]
+    if reject_negative and delta < 0:
+        raise InsufficientStockError
     cur.execute(
         "INSERT INTO inventory_stock "
         "(tenant_id, workspace_client_id, product_id, warehouse_id, batch_id, qty_on_hand) "

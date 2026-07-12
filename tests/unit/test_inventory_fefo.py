@@ -35,6 +35,8 @@ class FefoTests(unittest.TestCase):
         )
         self.assertIn("ORDER BY b.expiry_date ASC NULLS LAST", cur.calls[0][0])
         self.assertIn("s.qty_on_hand > 0", cur.calls[0][0])
+        self.assertIn("FOR UPDATE OF s", cur.calls[0][0])
+        self.assertIn("s.batch_id ASC", cur.calls[0][0])
 
     def test_allocates_from_earliest_until_satisfied(self):
         cur = FakeCursor(_rows(("near", 3), ("far", 10)))

@@ -86,6 +86,36 @@ class ApplyStockDeltaTests(unittest.TestCase):
         self.assertIn("INSERT INTO inventory_stock", cur.calls[1][0])
         self.assertEqual(cur.calls[1][1][0], "t-1")
 
+    def test_sale_guard_rejects_negative_before_update(self):
+        cur = FakeCursor(ones=[{"id": "s1", "qty_on_hand": Decimal("2")}])
+        with self.assertRaises(store.InsufficientStockError):
+            store.apply_stock_delta(
+                cur,
+                tenant_id="t-1",
+                workspace_client_id=9,
+                product_id="p",
+                warehouse_id=1,
+                batch_id="b1",
+                qty_delta=-3,
+                reject_negative=True,
+            )
+        self.assertEqual(len(cur.calls), 1)
+
+    def test_sale_guard_rejects_negative_missing_row_before_insert(self):
+        cur = FakeCursor(ones=[None])
+        with self.assertRaises(store.InsufficientStockError):
+            store.apply_stock_delta(
+                cur,
+                tenant_id="t-1",
+                workspace_client_id=9,
+                product_id="p",
+                warehouse_id=1,
+                batch_id="b1",
+                qty_delta=-1,
+                reject_negative=True,
+            )
+        self.assertEqual(len(cur.calls), 1)
+
 
 class BatchWarehouseTests(unittest.TestCase):
     def test_get_or_create_batch_returns_existing(self):

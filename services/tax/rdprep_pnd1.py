@@ -16,7 +16,6 @@
 
 from __future__ import annotations
 
-import datetime as _dt
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Iterable, Mapping, Optional
 
@@ -221,8 +220,3 @@ def _require_tax_type(tax_type: str) -> None:
 
 def _dec(value) -> Decimal:
     return value if isinstance(value, Decimal) else Decimal(str(value or 0))
-
-
-def to_buddhist_paid_date(d: _dt.date) -> str:
-    """便捷转发(与 rdprep 同一佛历偏移)。"""
-    return rdprep.to_buddhist_paid_date(d)

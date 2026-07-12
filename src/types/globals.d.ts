@@ -307,8 +307,6 @@ interface Window {
     satisfyWorkspaceGate?: (id: number) => void;
     closeWorkspaceGate?: () => void;
     openSubjectCreate?: (opts?: { onCreated?: (id: number) => void }) => void;
-    // 平台业态套餐 PO-PP3 · 设置「业务/模块」页加载(切到 modules tab 调)
-    loadModuleSettings?: () => void;
     // 餐厅 POS · 桌台管理页(owner · 餐厅业态 · 路由 pos-tables · 平铺 section)
     loadPosTables?: () => void;
     // POS · 收款设置页(owner · 路由 pos-payment · 平铺 section)

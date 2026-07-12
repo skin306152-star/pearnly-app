@@ -51,9 +51,6 @@ function switchSettingsTab(tabName: any) {
         // v118.21.2 · 切到 learned tab 时加载学习规则
         if (tabName === 'learned' && typeof window.loadLearnedRules === 'function')
             window.loadLearnedRules();
-        // 平台业态套餐 PO-PP3 · 切到「业务/模块」tab 时拉取并渲染开关
-        if (tabName === 'modules' && typeof window.loadModuleSettings === 'function')
-            window.loadModuleSettings();
     } catch (e) {
         console.warn('settings tab side effect failed:', e);
     }

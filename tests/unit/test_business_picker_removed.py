@@ -51,11 +51,19 @@ class BusinessPickerEntryPointsRemovedTests(unittest.TestCase):
         text = _read("src/home/nav-presets.ts")
         self.assertNotIn("nav-enroll", text)
 
-    def test_settings_switch_business_button_removed(self):
-        text = _read("src/home/module-settings.ts")
-        self.assertNotIn("openBusinessPicker", text)
-        self.assertNotIn("modset-switch", text)
-        self.assertNotIn("curBiz", text)
+    def test_settings_module_panel_fully_removed(self):
+        # 按域名分功能收口(Zihao 2026-07-12 拍板):设置页「业务/模块」自助开关整页下架,
+        # 文件物理删除 + 四个挂载点(import/tab/pane/加载分支)全清,不许回潮。
+        self.assertFalse(
+            (PROJECT_ROOT / "src/home/module-settings.ts").exists(),
+            "module-settings.ts(设置·业务/模块自助开关页)又诈尸了",
+        )
+        self.assertNotIn("module-settings", _read("src/main.js"))
+        page = _read("src/home/page-settings.ts")
+        self.assertNotIn('data-tab="modules"', page)
+        self.assertNotIn('data-pane="modules"', page)
+        self.assertNotIn("loadModuleSettings", _read("src/home/settings-core.ts"))
+        self.assertNotIn("loadModuleSettings", _read("src/types/globals.d.ts"))
 
     def test_onboarding_flow_no_longer_has_business_type_step(self):
         text = _read("src/home/onboarding-flow.ts")
@@ -115,6 +123,29 @@ class OrphanedI18nKeysDeletedTests(unittest.TestCase):
         "biz.service.desc",
         "biz.b2b.desc",
         "set.switch_biz",
+        # ↓ 设置页模块自助开关下架(2026-07-12)后新增的孤儿(唯一引用者 module-settings.ts 已删)
+        "biz.firm",
+        "biz.pharmacy",
+        "biz.restaurant",
+        "biz.retail",
+        "biz.service",
+        "mod.expense",
+        "mod.knowledge",
+        "mod.receivable",
+        "mod.recon",
+        "mod.sales",
+        "modset.expense.d",
+        "modset.inventory.d",
+        "modset.knowledge.d",
+        "modset.pos.d",
+        "modset.receivable.d",
+        "modset.recon.d",
+        "modset.sales.d",
+        "onb.base_tag",
+        "onb.tag_off",
+        "set.cur_biz",
+        "set.module_section",
+        "set.biz_none",
     )
 
     def test_i18n_data_has_no_orphaned_keys(self):
@@ -124,22 +155,9 @@ class OrphanedI18nKeysDeletedTests(unittest.TestCase):
             self.assertNotIn(needle, text, msg=f"i18n 键 {key} 又诈尸了")
 
     def test_still_used_keys_survive(self):
-        # 这些 key 被 module-settings.ts(个别模块开关面板)等仍在用的功能复用,不该被连坐删掉。
+        # POS 开通向导(pos-onboarding.ts)仍在用的两个模块名 key,不该被连坐删掉。
         text = _read("static/i18n-data.js")
-        for key in (
-            "mod.sales",
-            "mod.inventory",
-            "mod.pos",
-            "mod.expense",
-            "mod.recon",
-            "mod.receivable",
-            "mod.knowledge",
-            "onb.base_tag",
-            "onb.tag_off",
-            "biz.firm",
-            "set.cur_biz",
-            "set.biz_none",
-        ):
+        for key in ("mod.inventory", "mod.pos"):
             needle = "'" + key + "':"
             self.assertIn(needle, text, msg=f"i18n 键 {key} 被误删了")
 

@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
-"""模块开关 + 业态 onboarding 路由(POS PO-A1 / 平台业态套餐 · docs/platform-onboarding/03)。
+"""模块视图 + 注册 onboarding 路由(平台业态套餐 · docs/platform-onboarding/03)。
 
 薄层:鉴权 + 信封;读写 SQL/逻辑在 services/modules/{store,presets}.py。主程序导航据此显隐。
-租户隔离走 db.get_cursor_rls。读(GET)任意已登录主体可调(导航需要);写(onboarding/toggle)
-走 settings.modules.manage(owner/admin · 收银员/会计/录入不可改模块配置)。
+租户隔离走 db.get_cursor_rls。读(GET)任意已登录主体可调(导航需要);onboarding 走
+settings.modules.manage(owner/admin)。
+
+按域名分功能收口(Zihao 2026-07-12 拍板):客户侧业态自选/模块自选全部下架——
+onboarding 锁死只收 firm(新注册向导静默套用的唯一合法值);逐模块 toggle 路由已删。
+非 firm 预设(pos_only 等)只走运营侧(Earn 超管开通,直调 presets.apply_preset)。
 """
 
 from __future__ import annotations
@@ -21,10 +25,6 @@ router = APIRouter(prefix="/api/me", tags=["modules"])
 
 class OnboardingRequest(BaseModel):
     business_type: str = Field(..., min_length=1, max_length=40)
-
-
-class ModuleToggleRequest(BaseModel):
-    enabled: bool
 
 
 def _modules_view(cur, tenant_id: str) -> dict:
@@ -47,22 +47,11 @@ async def api_get_modules(request: Request):
 
 @router.put("/onboarding")
 async def api_onboarding(req: OnboardingRequest, request: Request):
-    """注册选业态 / 设置切换业态:应用预设翻 7 模块开关 + 记录业态(owner/admin)。"""
+    """新注册向导静默套用 firm 预设(owner/admin)。业态自选已下架,非 firm 一律拒——
+    防老前端/脚本把租户改回旧业态标签,与「域名分功能」的壳判据打架。"""
     tid, _uid = require_perm_pos_tid(request, "settings.modules.manage")
-    if not presets.is_known(req.business_type):
-        raise PosError("platform.unknown_business_type", 400, detail=req.business_type)
+    if req.business_type != "firm":
+        raise PosError("platform.business_type_locked", 403, detail=req.business_type)
     with db.get_cursor_rls(tid, commit=True) as cur:
         presets.apply_preset(cur, tenant_id=tid, business_type=req.business_type)
         return ok(_modules_view(cur, tid))
-
-
-@router.put("/modules/{module_key}")
-async def api_toggle_module(module_key: str, req: ModuleToggleRequest, request: Request):
-    """设置页逐个开关模块(owner/admin)。关=隐藏不删数据(只翻 enabled)。"""
-    tid, _uid = require_perm_pos_tid(request, "settings.modules.manage")
-    with db.get_cursor_rls(tid, commit=True) as cur:
-        try:
-            row = store.set_module(cur, tenant_id=tid, module_key=module_key, enabled=req.enabled)
-        except ValueError as exc:
-            raise PosError("platform.unknown_module", 404, detail=module_key) from exc
-        return ok(row)

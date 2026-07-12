@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 
 from core import db
 from core.auth import create_pos_store_token, decode_access_token
-from core.pos_api import PosError, ok, require_workspace
+from core.pos_api import PosError, ok, require_workspace, require_workspace_access
 from services.authz.deps import check_workspace_scope, require_perm_pos, require_perm_pos_tid
 from services.pos import auth as pos_auth
 from services.pos import caps as caps_svc
@@ -176,7 +176,7 @@ async def api_get_store_code(request: Request, workspace_client_id: int = Query(
     """取该账套店铺码(无则建)· owner。前端拼二维码/链接 pearnly.com/cashier?store=<code>(PS-5 迁址)。"""
     tid, _uid = require_perm_pos_tid(request, "pos.admin.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
-        require_workspace(cur, tid, workspace_client_id)
+        require_workspace_access(cur, request, tid, workspace_client_id)
         # 开通版店铺上限:新账套要码时卡(本账套已有码=幂等放行,不算新开店)。
         _enforce_entitlement_limit(cur, tid, workspace_client_id, "store")
         store_name = _store_name(cur, tid, workspace_client_id)
@@ -203,7 +203,7 @@ async def api_reset_store_code(req: WorkspaceBody, request: Request):
     """重置店铺码:换码 + 吊销所有已绑设备(丢机/离职)· owner。"""
     tid, _uid = require_perm_pos_tid(request, "pos.admin.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
-        require_workspace(cur, tid, req.workspace_client_id)
+        require_workspace_access(cur, request, tid, req.workspace_client_id)
         store_name = _store_name(cur, tid, req.workspace_client_id)
         info = store_binding.reset_code(
             cur,
@@ -258,7 +258,7 @@ async def api_admin_list_cashiers(request: Request, workspace_client_id: int = Q
     """收银员后台管理列表(老板/超管 · 含停用项 + 最近开班 + 可否删)。"""
     tid, _uid = require_perm_pos_tid(request, "pos.admin.manage")
     with db.get_cursor_rls(tid) as cur:
-        require_workspace(cur, tid, workspace_client_id)
+        require_workspace_access(cur, request, tid, workspace_client_id)
         rows = cashier_dal.list_cashiers_admin(
             cur, tenant_id=tid, workspace_client_id=workspace_client_id
         )
@@ -279,7 +279,7 @@ async def api_admin_create_cashier(req: CashierCreate, request: Request):
     """新增收银员(名字 + PIN + 颜色)。"""
     tid, _uid = require_perm_pos_tid(request, "pos.admin.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
-        require_workspace(cur, tid, req.workspace_client_id)
+        require_workspace_access(cur, request, tid, req.workspace_client_id)
         # 开通版收银员上限:达上限拦新增(启停/改名不受影响)。
         _enforce_entitlement_limit(cur, tid, req.workspace_client_id, "cashier")
         _validate_approver(cur, tid, req.approver_user_id)
@@ -311,7 +311,7 @@ async def api_admin_update_cashier(cashier_id: str, req: CashierUpdate, request:
         except ValueError as e:
             raise PosError("pos.caps_invalid", 422, detail=str(e))
     with db.get_cursor_rls(tid, commit=True) as cur:
-        require_workspace(cur, tid, req.workspace_client_id)
+        require_workspace_access(cur, request, tid, req.workspace_client_id)
         _validate_approver(cur, tid, req.approver_user_id)
         row = cashier_dal.update_cashier(
             cur,
@@ -337,7 +337,7 @@ async def api_admin_delete_cashier(
     """删除从未开过班的收银员;开过班的只能停用(保历史)→ pos.cashier_in_use(409)。"""
     tid, _uid = require_perm_pos_tid(request, "pos.admin.manage")
     with db.get_cursor_rls(tid, commit=True) as cur:
-        require_workspace(cur, tid, workspace_client_id)
+        require_workspace_access(cur, request, tid, workspace_client_id)
         res = cashier_dal.delete_cashier_if_unused(
             cur, tenant_id=tid, workspace_client_id=workspace_client_id, cashier_id=cashier_id
         )
@@ -354,7 +354,7 @@ async def api_onboarding(req: OnboardingRequest, request: Request):
     tid, _uid = require_perm_pos_tid(request, "settings.modules.manage")
     fc = req.first_cashier.model_dump() if req.first_cashier else None
     with db.get_cursor_rls(tid, commit=True) as cur:
-        require_workspace(cur, tid, req.workspace_client_id)
+        require_workspace_access(cur, request, tid, req.workspace_client_id)
         data = onboarding_svc.onboard(
             cur,
             tenant_id=tid,

@@ -13,7 +13,7 @@ from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
 from core import db
-from core.pos_api import PosError, ok, require_workspace
+from core.pos_api import PosError, ok, require_workspace_access
 from services.authz.deps import require_perm_pos_tid
 from services.modules import store as modules_store
 from services.pos import onboarding as onboarding_svc
@@ -59,7 +59,7 @@ async def api_onboarding_state(request: Request, workspace_client_id: int = Quer
     """该账套是否已开通收银 + 当前业态(屏8 据此判断,避免重复开通)。"""
     tid, _uid = require_perm_pos_tid(request, "settings.modules.manage")
     with db.get_cursor_rls(tid) as cur:
-        require_workspace(cur, tid, workspace_client_id)
+        require_workspace_access(cur, request, tid, workspace_client_id)
         state = onboarding_svc.get_state(
             cur, tenant_id=tid, workspace_client_id=workspace_client_id
         )

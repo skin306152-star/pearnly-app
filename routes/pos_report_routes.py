@@ -13,7 +13,7 @@ from typing import Optional
 from fastapi import APIRouter, Query, Request
 
 from core import db
-from core.pos_api import assert_module_enabled, ok, require_workspace
+from core.pos_api import assert_module_enabled, ok, require_workspace_access
 from services.authz.deps import require_perm_pos_tid
 from services.pos import audit_report as audit_svc
 from services.pos import report as report_svc
@@ -43,7 +43,7 @@ async def api_report(
     tid, _uid = require_perm_pos_tid(request, "pos.report.view")
     with db.get_cursor_rls(tid) as cur:
         assert_module_enabled(cur, tid, "pos")
-        require_workspace(cur, tid, workspace_client_id)
+        require_workspace_access(cur, request, tid, workspace_client_id)
         data = report_svc.sales_report(
             cur,
             tenant_id=tid,
@@ -66,7 +66,7 @@ async def api_audit_summary(
     tid, _uid = require_perm_pos_tid(request, "pos.report.view")
     with db.get_cursor_rls(tid) as cur:
         assert_module_enabled(cur, tid, "pos")
-        require_workspace(cur, tid, workspace_client_id)
+        require_workspace_access(cur, request, tid, workspace_client_id)
         data = audit_svc.summary(
             cur,
             tenant_id=tid,
@@ -91,7 +91,7 @@ async def api_audit_events(
     tid, _uid = require_perm_pos_tid(request, "pos.report.view")
     with db.get_cursor_rls(tid) as cur:
         assert_module_enabled(cur, tid, "pos")
-        require_workspace(cur, tid, workspace_client_id)
+        require_workspace_access(cur, request, tid, workspace_client_id)
         data = audit_svc.events(
             cur,
             tenant_id=tid,
@@ -114,7 +114,7 @@ async def api_shifts_ledger(
     tid, _uid = require_perm_pos_tid(request, "pos.report.view")
     with db.get_cursor_rls(tid) as cur:
         assert_module_enabled(cur, tid, "pos")
-        require_workspace(cur, tid, workspace_client_id)
+        require_workspace_access(cur, request, tid, workspace_client_id)
         data = shift_report_svc.list_shifts(
             cur, tenant_id=tid, workspace_client_id=workspace_client_id, limit=limit
         )

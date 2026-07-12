@@ -51,7 +51,7 @@ class RoutesContractTests(unittest.TestCase):
         src = inspect.getsource(pos_sales_log_routes)
         self.assertIn('require_perm_pos_tid(request, "pos.report.view")', src)
         self.assertIn('assert_module_enabled(cur, tid, "pos")', src)
-        self.assertIn("require_workspace", src)
+        self.assertIn("require_workspace_access", src)
 
     def test_csv_export_uses_safe_writer(self):
         from routes import pos_sales_log_routes
@@ -83,7 +83,7 @@ class ListRouteTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(psr.db, "get_cursor_rls", return_value=_CursorCtx()),
             patch.object(psr, "assert_module_enabled"),
-            patch.object(psr, "require_workspace"),
+            patch.object(psr, "require_workspace_access"),
             patch.object(
                 psr.svc,
                 "list_sales",
@@ -121,7 +121,7 @@ class ExportRouteTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(psr.db, "get_cursor_rls", return_value=_CursorCtx()),
             patch.object(psr, "assert_module_enabled"),
-            patch.object(psr, "require_workspace"),
+            patch.object(psr, "require_workspace_access"),
             patch.object(
                 psr.svc,
                 "export_rows",

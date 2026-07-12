@@ -59,7 +59,7 @@ class RoutesContractTests(unittest.TestCase):
         src = inspect.getsource(pos_sheets_routes)
         self.assertIn('require_perm_pos(request, "pos.admin.manage")', src)
         self.assertIn('assert_module_enabled(cur, tid, "pos")', src)
-        self.assertIn("require_workspace", src)
+        self.assertIn("require_workspace_access", src)
 
     def test_registered_in_agent_registry_as_app_exclusive(self):
         import json
@@ -85,7 +85,7 @@ class GetRouteTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(psr.db, "get_cursor_rls", return_value=_CursorCtx()),
             patch.object(psr, "assert_module_enabled"),
-            patch.object(psr, "require_workspace"),
+            patch.object(psr, "require_workspace_access"),
             patch.object(
                 psr.google_store,
                 "get_credential",
@@ -123,7 +123,7 @@ class GetRouteTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(psr.db, "get_cursor_rls", return_value=_CursorCtx()),
             patch.object(psr, "assert_module_enabled"),
-            patch.object(psr, "require_workspace"),
+            patch.object(psr, "require_workspace_access"),
             patch.object(psr.google_store, "get_credential", return_value=None),
             patch.object(
                 psr.svc,
@@ -149,7 +149,7 @@ class PutRouteTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(psr.db, "get_cursor_rls", return_value=_CursorCtx()),
             patch.object(psr, "assert_module_enabled"),
-            patch.object(psr, "require_workspace"),
+            patch.object(psr, "require_workspace_access"),
             patch.object(
                 psr.svc,
                 "ensure_target_sheet",
@@ -183,7 +183,7 @@ class PutRouteTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(psr.db, "get_cursor_rls", return_value=_CursorCtx()),
             patch.object(psr, "assert_module_enabled"),
-            patch.object(psr, "require_workspace"),
+            patch.object(psr, "require_workspace_access"),
             patch.object(psr, "svc") as svc_mock,
         ):
             svc_mock.set_enabled.return_value = {
@@ -214,7 +214,7 @@ class PutRouteTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(psr.db, "get_cursor_rls", return_value=_CursorCtx()),
             patch.object(psr, "assert_module_enabled"),
-            patch.object(psr, "require_workspace"),
+            patch.object(psr, "require_workspace_access"),
             patch.object(
                 psr.svc,
                 "ensure_target_sheet",

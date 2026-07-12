@@ -16,7 +16,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import Response
 
 from core import db
-from core.pos_api import assert_module_enabled, ok, require_workspace
+from core.pos_api import assert_module_enabled, ok, require_workspace_access
 from services.authz.deps import require_perm_pos_tid
 from services.export.csv_safe import SafeCsvWriter
 from services.pos import sales_log as svc
@@ -49,7 +49,7 @@ async def api_sales_log(
     tid, _uid = require_perm_pos_tid(request, "pos.report.view")
     with db.get_cursor_rls(tid) as cur:
         assert_module_enabled(cur, tid, "pos")
-        require_workspace(cur, tid, workspace_client_id)
+        require_workspace_access(cur, request, tid, workspace_client_id)
         data = svc.list_sales(
             cur,
             tenant_id=tid,
@@ -78,7 +78,7 @@ async def api_sales_log_export(
     lg = sheets_labels.norm_lang(lang)
     with db.get_cursor_rls(tid) as cur:
         assert_module_enabled(cur, tid, "pos")
-        require_workspace(cur, tid, workspace_client_id)
+        require_workspace_access(cur, request, tid, workspace_client_id)
         rows = svc.export_rows(
             cur,
             tenant_id=tid,

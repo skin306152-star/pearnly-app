@@ -13,7 +13,7 @@ from typing import Optional
 from fastapi import APIRouter, Query, Request
 
 from core import db
-from core.pos_api import assert_module_enabled, ok, require_workspace
+from core.pos_api import assert_module_enabled, ok, require_workspace_access
 from services.authz import field_mask
 from services.authz.deps import require_perm_pos_tid
 from services.inventory import reports as report_svc
@@ -45,7 +45,7 @@ async def api_inventory_report(
     tid, _uid = require_perm_pos_tid(request, "inv.report.view")
     with db.get_cursor_rls(tid) as cur:
         assert_module_enabled(cur, tid, "inventory")
-        require_workspace(cur, tid, workspace_client_id)
+        require_workspace_access(cur, request, tid, workspace_client_id)
         data = report_svc.inventory_report(
             cur,
             tenant_id=tid,

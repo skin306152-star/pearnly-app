@@ -14,7 +14,7 @@ from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel
 
 from core import db
-from core.pos_api import PosError, assert_module_enabled, ok, require_workspace
+from core.pos_api import PosError, assert_module_enabled, ok, require_workspace_access
 from services.authz.deps import require_perm_pos
 from services.export import google_store
 from services.pos import sheets_sync as svc
@@ -46,7 +46,7 @@ async def api_get_sheets_settings(
     tid, ws = _owner_ctx(request, workspace_client_id)
     with db.get_cursor_rls(tid, commit=False) as cur:
         assert_module_enabled(cur, tid, "pos")
-        require_workspace(cur, tid, ws)
+        require_workspace_access(cur, request, tid, ws)
         cred = google_store.get_credential(cur, tenant_id=tid, workspace_client_id=ws)
         settings = svc.get_settings(cur, tenant_id=tid, workspace_client_id=ws)
     return ok(
@@ -64,7 +64,7 @@ async def api_save_sheets_settings(req: SheetsSettings, request: Request):
     tid, ws = _owner_ctx(request, req.workspace_client_id)
     with db.get_cursor_rls(tid, commit=True) as cur:
         assert_module_enabled(cur, tid, "pos")
-        require_workspace(cur, tid, ws)
+        require_workspace_access(cur, request, tid, ws)
         settings = (
             svc.ensure_target_sheet(cur, tenant_id=tid, workspace_client_id=ws, lang=req.lang)
             if req.enabled

@@ -192,6 +192,45 @@ class WiringTests(unittest.TestCase):
         )
         self.assertIn('permission="pos.shift.operate"', inspect.getsource(shift.api_close_shift))
 
+    def test_workspace_scoped_backoffice_routes_use_assignment_gate(self):
+        from routes import (
+            inventory_report_routes,
+            pos_auth_routes,
+            pos_modules_routes,
+            pos_payment_routes,
+            pos_report_routes,
+            pos_sales_log_routes,
+            pos_sheets_routes,
+        )
+
+        handlers = (
+            pos_auth_routes.api_get_store_code,
+            pos_auth_routes.api_reset_store_code,
+            pos_auth_routes.api_admin_list_cashiers,
+            pos_auth_routes.api_admin_create_cashier,
+            pos_auth_routes.api_admin_update_cashier,
+            pos_auth_routes.api_admin_delete_cashier,
+            pos_auth_routes.api_onboarding,
+            pos_payment_routes.api_get_payment_settings,
+            pos_payment_routes.api_save_payment_settings,
+            pos_sheets_routes.api_get_sheets_settings,
+            pos_sheets_routes.api_save_sheets_settings,
+            pos_report_routes.api_report,
+            pos_report_routes.api_audit_summary,
+            pos_report_routes.api_audit_events,
+            pos_report_routes.api_shifts_ledger,
+            pos_sales_log_routes.api_sales_log,
+            pos_sales_log_routes.api_sales_log_export,
+            pos_modules_routes.api_onboarding_state,
+            inventory_report_routes.api_inventory_report,
+        )
+        for handler in handlers:
+            self.assertIn(
+                "require_workspace_access(cur, request, tid,",
+                inspect.getsource(handler),
+                handler.__name__,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

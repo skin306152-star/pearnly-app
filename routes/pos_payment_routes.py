@@ -13,7 +13,7 @@ from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
 from core import db
-from core.pos_api import PosError, assert_module_enabled, ok, require_workspace
+from core.pos_api import PosError, assert_module_enabled, ok, require_workspace_access
 from services.authz.deps import require_perm_pos
 from services.pos import payment_settings as svc
 
@@ -51,7 +51,7 @@ async def api_get_payment_settings(
     tid, ws = _owner_ctx(request, workspace_client_id)
     with db.get_cursor_rls(tid, commit=False) as cur:
         assert_module_enabled(cur, tid, "pos")
-        require_workspace(cur, tid, ws)
+        require_workspace_access(cur, request, tid, ws)
         return ok(svc.get_settings(cur, tenant_id=tid, workspace_client_id=ws))
 
 
@@ -60,7 +60,7 @@ async def api_save_payment_settings(req: PaymentSettings, request: Request):
     tid, ws = _owner_ctx(request, req.workspace_client_id)
     with db.get_cursor_rls(tid, commit=True) as cur:
         assert_module_enabled(cur, tid, "pos")
-        require_workspace(cur, tid, ws)
+        require_workspace_access(cur, request, tid, ws)
         return ok(
             svc.save_settings(
                 cur,

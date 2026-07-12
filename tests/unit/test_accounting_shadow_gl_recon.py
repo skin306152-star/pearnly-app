@@ -240,7 +240,7 @@ class ReconWiringTests(unittest.TestCase):
         self._inject(
             gl_src={"rows": [_gl("530000", 1000.0, 0.0)], "source": "ok", "note": None},
             bridge={"5290": "530000"},
-            push=(["INV-1"], ImportReportStub(success=["INV-1"], failed=[])),
+            push=(["INV-1"], ImportReportStub(success=["INV-1"], failed=[]), 1),
         )
         out = reconcile.run(_store())
         rg = out.payload["gates"]["r5_shadow"]["reconcile_gl"]
@@ -251,6 +251,24 @@ class ReconWiringTests(unittest.TestCase):
         self.assertIn("5290", [m["local_code"] for m in rg["matched"]])
         self.assertTrue(any(u["local_code"] == "2010" for u in rg["unmapped"]))
         self.assertEqual(rg["push"]["status"], "all_pushed")
+        # T4c 诚实标注:有回执可核对时才挂 matched_by/matched_rows(见口径限制注释)。
+        self.assertEqual(rg["push"]["matched_by"], "invoice_no")
+        self.assertEqual(rg["push"]["matched_rows"], 1)
+
+    def test_no_report_push_has_no_matched_annotation(self):
+        # no_report(查无回执)不挂 matched_by/matched_rows——存量工单 payload 逐字节维持现状
+        # 的前提就是这两个新键只在真有报告时出现(与 test_no_gl_payload_frozen_except_gl_source
+        # 的冻结快照对齐)。
+        self._inject(
+            gl_src={"rows": [], "source": "none", "note": None},
+            bridge={},
+            push=(["INV-1"], None, 0),
+        )
+        out = reconcile.run(_store())
+        push = out.payload["gates"]["r5_shadow"]["reconcile_gl"]["push"]
+        self.assertEqual(push["status"], "no_report")
+        self.assertNotIn("matched_by", push)
+        self.assertNotIn("matched_rows", push)
 
     def test_parse_failed_never_masquerades_as_no_source(self):
         # 有件但解析失败:rows 空 → reconcile_gl 契约仍报 no_gl_source(签名/逻辑一行不改),
@@ -262,7 +280,7 @@ class ReconWiringTests(unittest.TestCase):
                 "note": "gl_may.pdf: no_text_layer",
             },
             bridge={},
-            push=([], None),
+            push=([], None, 0),
         )
         out = reconcile.run(_store())
         rg = out.payload["gates"]["r5_shadow"]["reconcile_gl"]

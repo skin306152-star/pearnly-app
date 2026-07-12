@@ -322,6 +322,40 @@ def get_push_log_detail(
         return None
 
 
+def list_push_logs_by_invoice_nos(
+    cur, *, tenant_id: str, invoice_nos: List[str]
+) -> List[Dict[str, Any]]:
+    """按 tenant_id + 票号集查最新推送状态(T4c · 工单 F2-辅回执重建源 · 纯读侧)。
+
+    与 list_push_logs(草稿列表页用,user_id scope + 自开 RLS 游标)不同:这里吃调用方已开的
+    游标(workorder 引擎的系统级读连接),显式 WHERE tenant_id 做租户隔离——erp_push_logs 的
+    RLS policy 按 user_id(见 push_schema.ensure_erp_push_rls),没有 tenant 维度策略;
+    tenant_id 列存在但历史行大量 NULL(集成页推送多数不落 tenant_id),故"查无行"是常态
+    不是异常,调用方按 no_report 诚实降级,不当错误处理。
+
+    同票号可能重试/手动补推产生多行(retry_count/手动重推):取每票号 created_at 最新一条
+    (DISTINCT ON),口径与 list_push_logs 的折叠"当前态"逻辑一致,只是折叠键换成票号
+    (工单侧没有 history_id/endpoint_id 可用来折)。
+    """
+    if not tenant_id or not invoice_nos:
+        return []
+    try:
+        cur.execute(
+            """
+            SELECT DISTINCT ON (invoice_no)
+                   invoice_no, status, error_msg, created_at
+            FROM erp_push_logs
+            WHERE tenant_id = %s AND invoice_no = ANY(%s::text[])
+            ORDER BY invoice_no, created_at DESC
+            """,
+            (str(tenant_id), list(invoice_nos)),
+        )
+        return [dict(r) for r in (cur.fetchall() or [])]
+    except Exception as e:
+        logger.error(f"list_push_logs_by_invoice_nos failed: {e}")
+        return []
+
+
 def get_push_stats_today(user_id: str) -> Dict[str, Any]:
     """今日推送统计(总数 · 成功 · 失败)"""
     try:

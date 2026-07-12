@@ -244,13 +244,20 @@ def _run_shadow_gl_recon(ctx: StepContext, shadow) -> dict:
         # 桥仅在有 GL 行时才被 reconcile_gl 读(无 GL → no_gl_source 前置返回),空跑时省掉一次 DB 查询。
         bridge = _shadow_account_bridge(ctx) if gl_rows else {}
         gl = recon.reconcile_gl(shadow.accounts, gl_rows, bridge)
-        expected, report = _shadow_push_report(ctx)
+        expected, report, matched_rows = _shadow_push_report(ctx)
         push = recon.reconcile_push(expected, report)
         payload = gl.as_payload()
         payload["gl_source"] = src["source"]
         if src.get("note"):
             payload["gl_source_note"] = src["note"]
-        payload["push"] = push.as_payload()
+        push_payload = push.as_payload()
+        # T4c 诚实标注(仅在真有回执可核对时挂):erp_push_logs 无 work_order_id 外键,只能按
+        # 票号在租户范围内匹配——跨工单同票号理论上会串,靠此标注兜住,不由算法层假装精确。
+        # report is None(no_report)时不挂,存量工单(无 GL/无推送)payload 逐字节维持改前现状。
+        if report is not None:
+            push_payload["matched_by"] = "invoice_no"
+            push_payload["matched_rows"] = matched_rows
+        payload["push"] = push_payload
         return payload
     except Exception as exc:  # noqa: BLE001 - 佐证层单点隔离,绝不阻断 package
         return {"status": "reconcile_gl_skipped", "error": f"{type(exc).__name__}"}
@@ -349,10 +356,87 @@ def _default_shadow_account_bridge(ctx: StepContext) -> dict:
     )
 
 
+_PUSH_TERMINAL_SUCCESS = ("success", "skipped_dup")
+
+
 def _default_shadow_push_report(ctx: StepContext) -> tuple:
-    """F2-辅 推送回执源。当前工单管线不含 ERP 推送步(推送在集成页独立流)→ (无预期票, 无回执),
-    对数如实降级 no_report。推送接入工单后本函数改为回放推送清单 + parse_import_report(注入点已就位)。"""
-    return [], None
+    """F2-辅 推送回执源(T4c · 纯读侧接入 · 零碰推送主路径)。
+
+    expected:本工单已裁进项票号——kind=purchase_invoice 且 status=ok(已计入 R1 合计),
+    或 status=flagged 且裁决非 exclude/waive(同样已计入 R1 合计,与 reconcile_gates.
+    resolve_input_vat 同一份"采信"口径),从事件流回放 item_classified.money.invoice_number,
+    空号丢弃、票号去重保序。方向不明票(assign_kind 裁进项)不在此列——本函数只认 sort/
+    classify 阶段已直接定堆 purchase_invoice 的件,范围小于 R1 entries(有意收窄,不外推)。
+
+    report:按 tenant_id + 票号集查 erp_push_logs(services.erp.push_log_queries,SQL 参数化
+    + tenant_id 显式过滤做租户隔离),状态词映射到 ImportReport 鸭子契约(见 _build_import_
+    report)。查无任何匹配行 → (expected, None, 0),对数如实降级 no_report(没推过≠推失败)。
+
+    matched_by="invoice_no" 限制:erp_push_logs 无 work_order_id 外键(推送是集成页独立流,
+    勘察硬结论),只能按票号在租户范围内匹配——跨工单同票号理论上会串,佐证层只提示不改
+    税额,由 _run_shadow_gl_recon 把 matched_by/matched_rows(本函数第三个返回值,实际命中
+    行数)挂进 payload 兜住此口径限制。
+
+    无 cur / 无 tenant_id(内存态单测、cursor_factory 续跑早期阶段等)→ ([], None, 0),
+    不触真查询——同 _shadow_gl_rows/_shadow_account_bridge 的同款防御。
+    """
+    if ctx.cur is None or not ctx.tenant_id:
+        return [], None, 0
+    items = ctx.store.list_items(ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id)
+    events = ctx.store.list_events(
+        ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id
+    )
+    classified = _replay_money(events)
+    decisions_by_item = _replay(events, _EVT_DECISION)
+
+    expected: list[str] = []
+    seen: set[str] = set()
+    for it in items:
+        if it["kind"] != _PURCHASE or it["status"] not in ("ok", "flagged"):
+            continue
+        if it["status"] == "flagged":
+            dec = decisions_by_item.get(it["id"]) or {}
+            if dec.get("decision") in decisions.NON_COUNTING:
+                continue  # 剔除/豁免——未采信,不进期望票号清单
+        inv = str((classified.get(it["id"]) or {}).get("invoice_number") or "").strip()
+        if inv and inv not in seen:
+            seen.add(inv)
+            expected.append(inv)
+    if not expected:
+        return [], None, 0
+
+    from services.erp import push_log_queries
+
+    rows = push_log_queries.list_push_logs_by_invoice_nos(
+        ctx.cur, tenant_id=ctx.tenant_id, invoice_nos=expected
+    )
+    if not rows:
+        return expected, None, 0
+    return expected, _build_import_report(rows), len(rows)
+
+
+def _build_import_report(rows: list[dict]):
+    """erp_push_logs 状态词 → ImportReport 鸭子契约(T4c 状态词映射 · 复用 mrerp_report_parser
+    的 dataclass,不新造平行类)。
+
+    success / skipped_dup → success 侧(skipped_dup=判重跳过,语义是"之前已成功推过",归成功
+    不归失败)。failed → failed 侧,reasons 取 error_msg(缺失兜底 "failed",不留空列表假装
+    无原因)。pending / retrying / manual 是未终态——两侧都不进:如实反映"仍在途",让上层
+    reconcile_push 把它落进 missing 桶,好过冒充任一终态。
+    """
+    from services.erp.mrerp_report_parser import ImportReport, ImportReportRow
+
+    report = ImportReport()
+    for row in rows:
+        status = row.get("status")
+        inv = row.get("invoice_no")
+        if status in _PUSH_TERMINAL_SUCCESS:
+            report.success.append(inv)
+        elif status == "failed":
+            report.failed.append(
+                ImportReportRow(invoice_no=inv, reasons=[row.get("error_msg") or "failed"])
+            )
+    return report
 
 
 # 注入点:模块级绑定,测试用 reconcile._xxx = fake 替换,不改调用方代码(同 classify 惯例)。

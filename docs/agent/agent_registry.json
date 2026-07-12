@@ -122,6 +122,7 @@
   "ocr_jobs_routes": "B",
   "ocr_recognize_routes": "B",
   "pages_routes": "D",
+  "payroll_routes": "B",
   "pos_auth_routes": "D",
   "pos_modules_routes": "C",
   "pos_payment_routes": "C",

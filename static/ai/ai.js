@@ -70,6 +70,9 @@
         $('navFileconv').addEventListener('click', function () {
             window.location.hash = AI.router.buildFileconvHash();
         });
+        $('navPayroll').addEventListener('click', function () {
+            window.location.hash = AI.router.buildPayrollHash();
+        });
         // 矩阵/看板视图切换 pill(C4):矩阵是默认,看板降辅助——两个 hash 各自的
         // build 函数已知道自己的默认子视图,这里只管点了跳哪。
         $('vtMatrix').addEventListener('click', function () {
@@ -100,6 +103,11 @@
             crumb.querySelector('[data-back]').onclick = function () {
                 window.location.hash = AI.router.buildDashboardHash();
             };
+        } else if (route.name === 'payroll') {
+            crumb.innerHTML = '<a data-back>' + at('crumb_dash') + '</a> / ' + at('nav_payroll');
+            crumb.querySelector('[data-back]').onclick = function () {
+                window.location.hash = AI.router.buildDashboardHash();
+            };
         } else {
             crumb.innerHTML = '<a data-back>' + at('crumb_dash') + '</a> / ' + at('title_client');
             crumb.querySelector('[data-back]').onclick = function () {
@@ -127,10 +135,12 @@
         $('v-pool').classList.toggle('on', route.name === 'pool');
         $('v-vatcheck').classList.toggle('on', route.name === 'vatcheck');
         $('v-fileconv').classList.toggle('on', route.name === 'fileconv');
+        $('v-payroll').classList.toggle('on', route.name === 'payroll');
         $('navDash').classList.toggle('on', route.name === 'dashboard');
         $('navTodo').classList.toggle('on', route.name === 'pool');
         $('navVatcheck').classList.toggle('on', route.name === 'vatcheck');
         $('navFileconv').classList.toggle('on', route.name === 'fileconv');
+        $('navPayroll').classList.toggle('on', route.name === 'payroll');
         if (route.name === 'pool') {
             window.scrollTo(0, 0);
             AI.pool.mount(api);
@@ -144,6 +154,11 @@
         if (route.name === 'fileconv') {
             window.scrollTo(0, 0);
             AI.fileconv.mount(api);
+            return;
+        }
+        if (route.name === 'payroll') {
+            window.scrollTo(0, 0);
+            AI.payroll.mount(api);
             return;
         }
         if (route.name === 'dashboard') {

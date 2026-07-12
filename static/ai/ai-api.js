@@ -31,7 +31,9 @@
         }
 
         // 响应外壳统一处理:非 2xx → 抛带 code/status 的 Error(调用方 mapApiErrorKey 取文案),
-        // 2xx → 解出 JSON。JSON/multipart 请求共用同一份,不各拼一套错误契约。
+        // 2xx → 解出 JSON。JSON/multipart 请求共用同一份,不各拼一套错误契约。detail 多数是
+        // 裸字符串 key,但 payroll output 端点的「无该期数据」故意回结构化 {code,message}
+        // (routes/payroll_routes.py)——两种形态都取得到 code,不新开一条错误处理分叉。
         function handleResponse(r) {
             return r
                 .json()
@@ -40,7 +42,11 @@
                 })
                 .then(function (j) {
                     if (!r.ok) {
-                        var code = j.detail || (j.error && j.error.code) || 'generic';
+                        var detail = j.detail;
+                        var code =
+                            (detail && typeof detail === 'object' ? detail.code : detail) ||
+                            (j.error && j.error.code) ||
+                            'generic';
                         var err = new Error(String(code));
                         err.status = r.status;
                         err.code = code;
@@ -366,6 +372,62 @@
                     '/api/ai/client-pool/questions/' + encodeURIComponent(questionId) + '/decide',
                     body
                 );
+            },
+            // 工资表 ภ.ง.ด.1 工具卡(H1b · routes/payroll_routes.py):parse 纯读猜列/套模板,
+            // commit 落库 + 点亮义务,output 下载三产出——三者都是 multipart(parse/commit
+            // 带文件),不能走 call()。
+            parsePayroll: function (file, workspaceClientId, period) {
+                var fd = new FormData();
+                fd.append('file', file);
+                fd.append('workspace_client_id', workspaceClientId);
+                fd.append('period', period);
+                return root
+                    .fetch('/api/payroll/parse', {
+                        method: 'POST',
+                        headers: authHeaders(),
+                        body: fd,
+                    })
+                    .then(handleResponse);
+            },
+            commitPayroll: function (file, opts) {
+                var fd = new FormData();
+                fd.append('file', file);
+                fd.append('workspace_client_id', opts.workspaceClientId);
+                fd.append('period', opts.period);
+                fd.append('column_map', JSON.stringify(opts.columnMap || {}));
+                fd.append('fixed_values', JSON.stringify(opts.fixedValues || {}));
+                fd.append('income_code', opts.incomeCode || '40(1)');
+                fd.append('manual_entries', JSON.stringify(opts.manualEntries || []));
+                return root
+                    .fetch('/api/payroll/commit', {
+                        method: 'POST',
+                        headers: authHeaders(),
+                        body: fd,
+                    })
+                    .then(handleResponse);
+            },
+            // 三产出下载:GET 带鉴权头,<a href> 发不了自定义头,调用方拿 blob 自建
+            // object URL(同 downloadDeliverable 先例)。泰文原名走 filename*(RFC 5987)。
+            downloadPayrollOutput: function (workspaceClientId, period, kind) {
+                var qs =
+                    '?workspace_client_id=' +
+                    encodeURIComponent(workspaceClientId) +
+                    '&period=' +
+                    encodeURIComponent(period) +
+                    '&kind=' +
+                    encodeURIComponent(kind);
+                return root
+                    .fetch('/api/payroll/output' + qs, { headers: authHeaders() })
+                    .then(function (r) {
+                        if (!r.ok) return handleResponse(r);
+                        var disp = r.headers.get('Content-Disposition') || '';
+                        var star = /filename\*=UTF-8''([^;]+)/.exec(disp);
+                        var plain = /filename="?([^";]+)"?/.exec(disp);
+                        var filename = star ? decodeURIComponent(star[1]) : plain ? plain[1] : kind;
+                        return r.blob().then(function (blob) {
+                            return { blob: blob, filename: filename };
+                        });
+                    });
             },
         };
     }

@@ -179,6 +179,11 @@ const AI_CSS = [
     // 横幅/结果条布局同构 ai-vatcheck.css 但类名独立(fc-*),排最后即可;与其余视图
     // 互斥显示,层叠顺序对彼此零影响。
     'ai/ai-fileconv.css',
+    // ai-payroll.css(H1b · 工资表 ภ.ง.ด.1 工具卡)复用 ai-intake.css 的 .dropzone/.dz-*
+    // 上传区 + ai-fileconv.css 的 .fc-*(横幅/统计行/issue 行),排在两者之后即可;只补
+    // 列映射表格 + 手工加行表单这两块 H1b 独有的 .pr-* 结构,与其余视图互斥显示,层叠
+    // 顺序对彼此零影响。
+    'ai/ai-payroll.css',
 ];
 
 const BUNDLES = [

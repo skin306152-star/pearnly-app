@@ -133,6 +133,12 @@ const BUNDLES = [
             // AI.fileconv.mount)之前——同 ai-vatcheck 先例(顶层独立工具视图)。
             'ai/ai-fileconv-render.js',
             'ai/ai-fileconv.js',
+            // ai-payroll-render.js(H1b · 工资表 ภ.ง.ด.1 工具卡纯逻辑+HTML,依赖 AI.state/
+            // format)排在 ai-payroll.js(选客户/期间/上传/映射确认/提交/手工加行/下载
+            // 编排)之前,两者都在 ai.js(onRoute 用 AI.payroll.mount)之前——同 ai-fileconv
+            // 先例(顶层独立工具视图)。
+            'ai/ai-payroll-render.js',
+            'ai/ai-payroll.js',
             'ai/ai-client.js',
             'ai/ai.js',
         ],

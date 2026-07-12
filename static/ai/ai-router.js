@@ -34,6 +34,9 @@
         // 「财务文件转换」(K1b · 顶层独立工具):同 /vatcheck,转换一份 PDF 本身不依赖
         // 任何客户/工单上下文。
         if (h === '/fileconv') return { name: 'fileconv' };
+        // 「工资表 ภ.ง.ด.1」(H1b · 顶层独立工具):选客户/期间后上传工资表,自身不挂在
+        // 某个具体工单下,同 /fileconv 一样是独立顶层路由。
+        if (h === '/payroll') return { name: 'payroll' };
         var m = /^\/client\/([^/]+)\/?([^/]*)$/.exec(h);
         if (!m) return { name: 'dashboard', sub: DEFAULT_SUB };
         var clientId = decodeURIComponent(m[1]);
@@ -68,6 +71,10 @@
         return '#/fileconv';
     }
 
+    function buildPayrollHash() {
+        return '#/payroll';
+    }
+
     // onChange(route) 在启动时立即调一次,并在每次 hashchange 后调用。
     function subscribe(onChange) {
         function fire() {
@@ -91,6 +98,7 @@
         buildPoolHash: buildPoolHash,
         buildVatcheckHash: buildVatcheckHash,
         buildFileconvHash: buildFileconvHash,
+        buildPayrollHash: buildPayrollHash,
         subscribe: subscribe,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -74,6 +74,11 @@ def ensure_sales_schema() -> None:
                 "CREATE INDEX IF NOT EXISTS ix_pos_sales_sold_at "
                 "ON pos_sales (tenant_id, workspace_client_id, sold_at)"
             )
+            cur.execute("ALTER TABLE pos_sales DROP CONSTRAINT IF EXISTS pos_sales_client_uuid_key")
+            cur.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_pos_sales_client_uuid_scope "
+                "ON pos_sales (tenant_id, workspace_client_id, client_uuid)"
+            )
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS pos_sale_lines (
                     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

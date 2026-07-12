@@ -79,5 +79,28 @@ class PosSaleLineCostMigrationTests(unittest.TestCase):
         self.assertIn("ALTER TABLE pos_sale_lines DROP COLUMN IF EXISTS cost_total", self.mig)
 
 
+class PosClientUuidScopeMigrationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        with open(
+            os.path.join(ROOT, "alembic", "versions", "0071_pos_client_uuid_scope.py"),
+            encoding="utf-8",
+        ) as f:
+            cls.mig = f.read()
+        with open(os.path.join(ROOT, "services", "pos", "sales_store.py"), encoding="utf-8") as f:
+            cls.ensure = f.read()
+
+    def test_revision_chain(self):
+        self.assertIn('revision = "0071_pos_client_uuid_scope"', self.mig)
+        self.assertIn('down_revision = "0070_line_client_batch_seq"', self.mig)
+
+    def test_replaces_global_constraint_in_both_schema_paths(self):
+        drop = "DROP CONSTRAINT IF EXISTS pos_sales_client_uuid_key"
+        scoped = "ON pos_sales (tenant_id, workspace_client_id, client_uuid)"
+        for source in (self.mig, self.ensure):
+            self.assertIn(drop, source)
+            self.assertIn(scoped, source)
+
+
 if __name__ == "__main__":
     unittest.main()

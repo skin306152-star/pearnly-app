@@ -453,6 +453,8 @@
         validateFile: validateFile,
         issueKindKey: issueKindKey,
         confidenceKey: confidenceKey,
+        FIELD_ORDER: FIELD_ORDER,
+        FIXABLE_FIELDS: FIXABLE_FIELDS,
         defaultPeriod: defaultPeriod,
         isPeriodValid: isPeriodValid,
         requiredFieldsSatisfied: requiredFieldsSatisfied,

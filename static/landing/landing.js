@@ -265,6 +265,7 @@
             }
             localStorage.setItem('mrpilot_token', data.access_token);
             localStorage.setItem('mrpilot_lang', currentLang());
+            localStorage.setItem('pearnly_entry', 'main');
             setMessage(T('loginSuccess'), 'success');
             window.setTimeout(() => {
                 window.location.href = data.is_super_admin ? '/admin/cost' : '/home';

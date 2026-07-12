@@ -342,6 +342,7 @@
               try {
                 localStorage.setItem('mrpilot_token', data.access_token);
                 localStorage.setItem('mrpilot_lang', lang);
+                localStorage.setItem('pearnly_entry', 'pos');
               } catch (e2) {}
               window.location.href = data.is_super_admin ? '/admin/cost' : '/home';
               return;

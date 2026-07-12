@@ -302,6 +302,9 @@ interface Window {
     _navShellHidesKnowledge?: boolean;
     // 当前租户业态(module-nav apply 写)· 退出登录按壳分流用:pos_only→/pos 其余→/login。
     _businessType?: string;
+    // 登录入口记号(pos-login.html / 主站登录写 'pos'|'main' · module-nav apply 每次登录后同步)
+    // · 壳与退出登录判据的第一优先级,业态标签只在无记号的老会话里兜底。
+    _entry?: string;
     // 登录口单一事实源(login-url.ts)· pos_only→/pos 其余→/login · 所有跳"重新登录"的点都读它。
     loginUrl?: () => string;
     satisfyWorkspaceGate?: (id: number) => void;

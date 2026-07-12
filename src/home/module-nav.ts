@@ -114,19 +114,34 @@ function applyMerchantNav(
     applyPosRoles(owner, on('pos'), on('inventory'), businessType, true);
 }
 
-function apply(modules: Record<string, ModuleFlag>, businessType?: string | null): void {
-    // 单一事实源:退出登录按壳分流(topbar-avatar)靠它决定落 /pos 还是 /login。
-    window._businessType = businessType || '';
-    const owner = typeof window.isOwner === 'function' ? window.isOwner() : false;
-    const emp = typeof window.isEmployee === 'function' ? window.isEmployee() : false;
-    const on = (k: string) => !!(modules[k] && modules[k].enabled);
-
-    const preset =
+// 登录入口(pos-login.html / 主站登录写)决定壳,业态标签退居入口内部的兜底判据——
+// entry='pos' 且开了 pos 模块→POS 壳;entry='main' 仅 pos_only+开了 pos 模块才给 POS 壳
+// (其余场景与无 entry 的老会话同一份判据,行为不变,见 businessType 三段 ternary)。
+function resolvePreset(
+    businessType: string | null | undefined,
+    posEnabled: boolean
+): typeof POS_PRESET | typeof FIRM_PRESET | null {
+    const original =
         businessType === 'pos_only'
             ? POS_PRESET
             : !businessType || businessType === 'firm'
               ? FIRM_PRESET
               : null;
+    const entry = window._entry || '';
+    if (entry === 'pos') return posEnabled ? POS_PRESET : original; // 没开 pos 模块则忽略 entry
+    if (entry === 'main') return businessType === 'pos_only' && posEnabled ? POS_PRESET : original;
+    return original; // 无 entry(存量已登录会话):完全回落业态判据,行为零变化
+}
+
+function apply(modules: Record<string, ModuleFlag>, businessType?: string | null): void {
+    // 单一事实源:退出登录按壳分流(topbar-avatar)靠它决定落 /pos 还是 /login。
+    window._businessType = businessType || '';
+    window._entry = localStorage.getItem('pearnly_entry') || '';
+    const owner = typeof window.isOwner === 'function' ? window.isOwner() : false;
+    const emp = typeof window.isEmployee === 'function' ? window.isEmployee() : false;
+    const on = (k: string) => !!(modules[k] && modules[k].enabled);
+
+    const preset = resolvePreset(businessType, on('pos'));
 
     // 客户知识入口由 knowledge-center 的 kbProbe 按"有没有知识库"独立显隐(异步),module-nav 不抢。
     // 唯 pos_only 收银壳要它彻底消失(不在白名单)→ 置旗让 kbProbe 的 reveal 不再显(竞态双保险)。

@@ -1,17 +1,13 @@
-# UI 设计合规扫描报告 · 388 个源文件全扫
+# UI 设计合规扫描报告 · 401 个源文件全扫
 
 
-## 旧色/旧蓝(应改令牌) — 命中 5(5 文件)
+## 旧色/旧蓝(应改令牌) — 命中 3(3 文件)
      1  static\admin\admin.css
         └ 521: color: #2563eb;
      1  static\admin\admin.js
         └ 318: google_vision: { label: 'Google Vision', color: '#2563EB' },
-     1  static\pos\pos-cashier.js
-        └ 29: $('main-avatar').style.background = c.color || '#2563EB';
      1  static\pos\pos-data.js
-        └ 345: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
-     1  static\pos\pos.js
-        └ 126: const color = c.color || '#2563EB';
+        └ 349: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
 
 ## 旧token名(应用全局emerald) — 命中 202(29 文件)
     59  static\pos\pos.css
@@ -93,8 +89,8 @@
 
 ## emoji当图标(应换Lucide) — 命中 201(28 文件)
     96  static\i18n-data.js
-        └ 1399: 'billing-accuracy-good': '✅ 准',
-        └ 1400: 'billing-accuracy-fair': '⚠ 一般',
+        └ 1401: 'billing-accuracy-good': '✅ 准',
+        └ 1402: 'billing-accuracy-fair': '⚠ 一般',
     35  static\erp-mrerp-connect.js
         └ 254: zh: '⚙ 高级设置(自动创建买方/商品的模板 · 可不填)',
         └ 255: en: '⚙ Advanced (templates for auto-creating buyers/products · optional)',
@@ -112,7 +108,7 @@
         └ 1912: u.is_super_admin ? '⭐ Super Admin' : _esc(u.role || 'owner')
      4  static\pos\pos-i18n.js
         └ 44: 'posui.rest.kot.stat': 'รอทำ {p} · กำลังทำ {c} · ⚠ เกินเวลา {l}',
-        └ 296: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
+        └ 308: 'posui.rest.kot.stat': 'To make {p} · Cooking {c} · ⚠ Late {l}',
      2  src\home\core.ts
         └ 2: // 工具(t/escapeHtml/svgIcon)+ Session 被踢弹窗(🔴)+ 鉴权 API(🔴铁律#26)+ plan 上限 helper。
      2  static\home-12-drawer-search.css
@@ -127,7 +123,7 @@
      2  static\pos\pos-restaurant-ops.js
         └ 83: const tm = (t.late ? '⚠ ' : '⏱ ') + (t.minutes || 0) + ' ' + POS.t('posui.rest.min');
      1  src\home\app-shell-sidebar-html.ts
-        └ 336: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
+        └ 345: <!-- v118.33.7.4 · prototype 风格分隔线(销项/进项 ↔ 客户/异常 视觉断开) -->
      1  src\home\dms-intake-invoice-submit.ts
         └ 92: '<div class="dx-erp-empty"><div class="dx-erp-empty-ic">⚙</div>' +
      1  src\home\dms-intake.ts
@@ -176,8 +172,8 @@
         └ 660: max-width: 420px;
         └ 1201: max-width: 420px;
      4  static\pos\pos.css
-        └ 242: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
-        └ 262: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
+        └ 243: .pos-view--hold .wrap { max-width: 920px; margin: 0 auto; padding: 22px 18px 60px; }
+        └ 263: .pos-view--refund .wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 60px; }
      3  src\home\knowledge-ask.ts
         └ 116: .kb-qa{background:var(--card,var(--card));border:1px solid var(--line,var(--line));border-
         └ 142: .kb-qa-hint{font-size:12px;color:var(--ink-3,#999);margin-top:12px;max-width:760px;line-he
@@ -393,15 +389,15 @@
 
 ## i18n原始键残留 — 命中 24(2 文件)
     20  static\i18n-data.js
-        └ 1207: 'time-min-ago-suffix': ' 分钟前',
-        └ 1208: 'time-hour-ago-suffix': ' 小时前',
+        └ 1208: 'time-min-ago-suffix': ' 分钟前',
+        └ 1209: 'time-hour-ago-suffix': ' 小时前',
      4  static\admin\admin-i18n.js
         └ 443: 'time-hours-ago': '{n} 小时前',
         └ 444: 'time-days-ago': '{n} 天前',
 
-## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 889(62 文件)
+## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 888(60 文件)
    157  static\home-18-admin-users.css
-    85  static\pos\pos.css
+    86  static\pos\pos.css
     68  static\admin\admin.js
     63  static\erp-mrerp-connect.css
     51  static\pos\pos-restaurant.css
@@ -460,5 +456,3 @@
      1  src\home\purchase-list.ts
      1  static\home-15-team-folder.css
      1  static\landing\landing-interactions.css
-     1  static\pos\pos-cashier.js
-     1  static\pos\pos.js

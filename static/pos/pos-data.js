@@ -53,8 +53,9 @@
             (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
         );
     };
+    // 色值白名单:仅 #rrggbb 才上 inline style(防 style 注入);回退主色令牌,禁写死旧蓝(lint-ui)。
     POS.safeColor = function (value, fallback) {
-        return /^#[0-9a-f]{6}$/i.test(String(value || '')) ? value : fallback || '#2563EB';
+        return /^#[0-9a-f]{6}$/i.test(String(value || '')) ? value : fallback || 'var(--accent)';
     };
     // 商品名缓存(product_id → name 对象)· 选品时填充 · 历史小票退货(详情行不带 name)按 id 回查
     POS.nameCache = {};

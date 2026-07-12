@@ -123,19 +123,19 @@
         }
         box.innerHTML = list
             .map((c, i) => {
-                const color = c.color || '#2563EB';
+                const color = POS.safeColor(c.color);
                 const initial = POS.initial(c.display_name);
                 return (
                     '<div class="ca' +
                     (i === 0 ? ' on' : '') +
                     '" data-cid="' +
-                    c.id +
+                    POS.esc(c.id) +
                     '"><div class="av" style="background:' +
                     color +
                     '">' +
                     initial +
                     '</div><div class="nm">' +
-                    (c.display_name || '') +
+                    POS.esc(c.display_name || '') +
                     '</div></div>'
                 );
             })

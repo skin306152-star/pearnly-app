@@ -35,7 +35,7 @@
         const c = state.cashier;
         if (!c) return;
         $('main-avatar').textContent = POS.initial(c.display_name);
-        $('main-avatar').style.background = c.color || '#2563EB';
+        $('main-avatar').style.background = POS.safeColor(c.color);
         $('main-cashier-name').textContent = c.display_name || '';
         $('main-store').textContent = state.store ? '· ' + state.store : '';
         if (state.shift) {
@@ -62,9 +62,9 @@
                         '<div class="cat' +
                         (activeCat === c.id ? ' active' : '') +
                         '" data-cat="' +
-                        c.id +
+                        POS.esc(c.id) +
                         '">' +
-                        POS.nm(c.name) +
+                        POS.esc(POS.nm(c.name)) +
                         '</div>'
                 )
                 .join('');
@@ -139,7 +139,7 @@
             '<div class="prod' +
             (out ? ' out' : '') +
             '" data-pid="' +
-            p.id +
+            POS.esc(p.id) +
             '"><div class="thumb">' +
             thumbInner +
             '<span class="stock' +
@@ -147,7 +147,7 @@
             '">' +
             qty +
             '</span></div><div class="meta"><div class="nm">' +
-            POS.nm(p.name) +
+            POS.esc(POS.nm(p.name)) +
             '</div><div class="pr tnum">฿' +
             fmt(unit.price) +
             '</div></div></div>'
@@ -344,7 +344,7 @@
                 .map(
                     (c, i) =>
                         '<div class="line"><div class="li-nm"><div class="n">' +
-                        POS.nm(c.name) +
+                        POS.esc(POS.nm(c.name)) +
                         '</div><div class="u tnum">฿' +
                         fmt(c.price) +
                         ' ' +
@@ -820,7 +820,7 @@
             .map(
                 (l) =>
                     '<tr><td>' +
-                    POS.nm(l.name) +
+                    POS.esc(POS.nm(l.name)) +
                     ' ×' +
                     l.qty +
                     '</td><td class="r">฿' +
@@ -852,16 +852,16 @@
                 : '';
         const html =
             '<!doctype html><html><head><meta charset="utf-8"><title>' +
-            (sale.receipt_no || '') +
+            POS.esc(sale.receipt_no || '') +
             '</title><style>body{font:12px monospace;width:280px;margin:0 auto;padding:12px;color:#111}' +
             'h3{text-align:center;margin:0 0 8px}table{width:100%;border-collapse:collapse}' +
             'td{padding:2px 0}.r{text-align:right}.tot td{border-top:1px dashed #000;padding-top:6px;font-weight:700}' +
             '.meta{color:#555;margin-bottom:8px}</style></head><body><h3>' +
-            (state.store || 'Pearnly POS') +
+            POS.esc(state.store || 'Pearnly POS') +
             '</h3>' +
             addrLine +
             '<div class="meta">' +
-            (sale.receipt_no || '') +
+            POS.esc(sale.receipt_no || '') +
             ' · ' +
             POS.hm(sale.sold_at || new Date()) +
             '</div><table>' +
@@ -1025,12 +1025,12 @@
                 const items = h.cart.reduce((s, c) => s + c.qty, 0);
                 const sub = subtotalOf(h.cart);
                 const total = sub - Math.min(h.discount || 0, sub);
-                const names = h.cart.map((c) => POS.nm(c.name) + ' ×' + c.qty).join(' · ');
+                const names = h.cart.map((c) => POS.esc(POS.nm(c.name)) + ' ×' + c.qty).join(' · ');
                 return (
                     '<div class="held"><div class="h"><span class="no">' +
-                    h.no +
+                    POS.esc(h.no) +
                     '</span><span class="tm">' +
-                    h.time +
+                    POS.esc(h.time) +
                     '</span></div><div class="items">' +
                     names +
                     '</div><div class="ft"><span class="sum">' +
@@ -1038,11 +1038,11 @@
                     '</span><span class="amt tnum">฿' +
                     fmt(total) +
                     '</span></div><div class="ft2"><button class="resume" data-resume="' +
-                    h.id +
+                    POS.esc(h.id) +
                     '"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>' +
                     POS.t('posui.hold.resume') +
                     '</button><button class="del" data-del="' +
-                    h.id +
+                    POS.esc(h.id) +
                     '"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button></div></div>'
                 );
             })

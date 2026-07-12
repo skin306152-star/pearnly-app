@@ -68,18 +68,18 @@
                 const sub = POS.hm(new Date(it.sold_at)) + ' · ' + methodLabel(it.method) + mix;
                 const voidBtn = it.voidable
                     ? '<button class="tvoid" data-void="' +
-                      it.id +
+                      POS.esc(it.id) +
                       '">' +
                       POS.t('posui.void.action') +
                       '</button>'
                     : '';
                 return (
                     '<div class="titem" data-sale="' +
-                    it.id +
+                    POS.esc(it.id) +
                     '"><div class="ti-main"><div class="ti-rc">' +
                     POS.esc(it.receipt_no || '') +
                     '</div><div class="ti-sub">' +
-                    sub +
+                    POS.esc(sub) +
                     '</div></div><div class="ti-amt tnum">฿' +
                     fmt(it.grand_total) +
                     '</div>' +
@@ -179,9 +179,9 @@
                     '<div class="line' +
                     (sel > 0 ? ' sel' : '') +
                     '" data-lid="' +
-                    lid +
+                    POS.esc(lid) +
                     '"><div class="chk"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></div><div class="nm"><div class="n">' +
-                    lineName(l) +
+                    POS.esc(lineName(l)) +
                     '</div><div class="u tnum">฿' +
                     fmt(l.unit_price) +
                     ' · ' +
@@ -189,11 +189,11 @@
                     ' ' +
                     l.qty +
                     '</div></div><div class="qty"><button data-rdec="' +
-                    lid +
+                    POS.esc(lid) +
                     '">−</button><span class="q tnum">' +
                     (sel || 1) +
                     '</span><button data-rinc="' +
-                    lid +
+                    POS.esc(lid) +
                     '">+</button></div><div class="amt tnum">฿' +
                     fmt(amt) +
                     '</div></div>'
@@ -202,10 +202,10 @@
             .join('');
         $('refund-body').innerHTML =
             '<div class="card"><div class="h"><div><div class="a">' +
-            head.receipt_no +
+            POS.esc(head.receipt_no) +
             '</div><div class="b">' +
-            paymentSummary +
-            (head.cashier ? ' · ' + head.cashier : '') +
+            POS.esc(paymentSummary) +
+            (head.cashier ? ' · ' + POS.esc(head.cashier) : '') +
             '</div></div><div class="paid">' +
             POS.t('posui.refund.paid') +
             '</div></div>' +

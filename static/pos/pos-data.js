@@ -53,6 +53,9 @@
             (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
         );
     };
+    POS.safeColor = function (value, fallback) {
+        return /^#[0-9a-f]{6}$/i.test(String(value || '')) ? value : fallback || '#2563EB';
+    };
     // 商品名缓存(product_id → name 对象)· 选品时填充 · 历史小票退货(详情行不带 name)按 id 回查
     POS.nameCache = {};
     POS.productName = function (productId) {

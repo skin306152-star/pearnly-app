@@ -38,19 +38,19 @@
         box.innerHTML = list
             .map((c, i) => {
                 // 未配色的收银员回退主色令牌(inline style 可解析 var();新代码禁写死旧蓝/裸hex)
-                const color = c.color || 'var(--accent)';
+                const color = POS.safeColor(c.color);
                 const initial = POS.initial(c.display_name);
                 return (
                     '<div class="mgr-ca' +
                     (i === 0 ? ' on' : '') +
                     '" data-cid="' +
-                    c.id +
+                    POS.esc(c.id) +
                     '"><div class="av" style="background:' +
                     color +
                     '">' +
                     initial +
                     '</div><div class="nm">' +
-                    (c.display_name || '') +
+                    POS.esc(c.display_name || '') +
                     '</div></div>'
                 );
             })

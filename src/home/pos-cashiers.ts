@@ -204,9 +204,13 @@ async function loadAccess() {
     let data: StoreCode;
     try {
         data = await cshApi('GET', '/api/pos/admin/store-code?workspace_client_id=' + wsId);
-    } catch (_) {
-        host.innerHTML = '';
-        return; // 取不到不阻断收银员管理主功能
+    } catch (e) {
+        const code = e instanceof Error ? e.message : '';
+        // 店铺/收银员额度用尽(pos.entitlement_*)要显式告知,否则卡片无声消失,用户误以为功能丢了
+        host.innerHTML = code.startsWith('pos.entitlement_')
+            ? `<div class="csh-access-card"><div class="csh-ac-h">${escapeHtml(t('csh-access-title'))}</div><div class="csh-ac-sub">${escapeHtml(posErrMsg(code, 'csh-error'))}</div></div>`
+            : '';
+        return; // 其它错误(网络抖动等)维持静默,不阻断收银员管理主功能
     }
     host.innerHTML = accessHtml(data || {});
     const copy = document.getElementById('csh-ac-copy');

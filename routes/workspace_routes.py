@@ -26,6 +26,7 @@ from core.auth import get_current_user_from_request
 from core.feature_flags import pearnly_ai_m1_enabled_for
 from core.route_helpers import _tid, _log_op
 from services.authz.deps import get_authz, require_perm
+from services.modules.store import get_business_type
 from services.workspace import thai_name_gate
 
 router = APIRouter()
@@ -142,6 +143,24 @@ async def workspace_tax_lookup(tax_id: str, request: Request, branch: int = 0):
     return {"ok": True, "data": data, "cached": bool(result.get("cached"))}
 
 
+def _pos_single_store_blocked(tenant_id: Optional[str]) -> bool:
+    """pos_only 且该租户已有 ≥1 个套账 → True(阻止再建)。
+
+    非 pos_only(含 firm)恒 False——判据显式限定 business_type == "pos_only",
+    firm/未选业态/其它租户零影响。无 tenant_id(未建档主体)也恒 False,不碰 DB。
+    """
+    if not tenant_id:
+        return False
+    with db.get_cursor_rls(tenant_id=tenant_id) as cur:
+        if get_business_type(cur, tenant_id=tenant_id) != "pos_only":
+            return False
+        cur.execute(
+            "SELECT count(*) AS n FROM workspace_clients WHERE tenant_id = %s",
+            (tenant_id,),
+        )
+        return int((cur.fetchone() or {}).get("n") or 0) >= 1
+
+
 @router.post("/api/workspace/clients")
 async def create_workspace_client(req: WorkspaceClientCreate, request: Request):
     """新建账套主体。仅老板/超管(建账套主体是重大操作 · 区别于建买方)。
@@ -151,6 +170,11 @@ async def create_workspace_client(req: WorkspaceClientCreate, request: Request):
     """
     user = require_perm(request, "settings.workspace.manage")
     tenant_id = _tid(user)
+    # POS 一号一店(Zihao 2026-07-12 拍板):pos_only 已有套账 → 禁止再建(照本文件既有
+    # 错误抛法 · HTTPException+detail code · 与下方 tax_id_duplicate 同款,前端 apiClient
+    # 读 err.detail 映射四语,不用 PosError 信封)。
+    if _pos_single_store_blocked(tenant_id):
+        raise HTTPException(403, detail="pos.workspace_single_store")
     # M1-B2:泰文注册名必填(闸关 = 现状不变)——税号被 OCR 读花时,这是分拣方向
     # 判定唯一的名称锚兜底(见 L2-验收.md 真语料坐实)。
     if pearnly_ai_m1_enabled_for(

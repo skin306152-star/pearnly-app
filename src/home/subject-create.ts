@@ -137,6 +137,8 @@ export function subjectErrorText(e: unknown): string {
     const code = err && err.message;
     if (code === 'subj-name-required') return t('subj-name-required');
     if (code === 'workspace.tax_id_duplicate') return t('workspace.tax_id_duplicate');
+    // POS 一号一店(Zihao 2026-07-12 拍板):正常走「藏入口」不会摸到这里,后端闸兜底。
+    if (code === 'pos.workspace_single_store') return t('pos.workspace_single_store');
     return t('subj-create-fail');
 }
 

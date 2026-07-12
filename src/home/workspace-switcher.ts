@@ -153,8 +153,14 @@ import { WSG_CSS, wsgIcon, wsgInitials } from './workspace-gate-html.js';
                   })
                   .join('')
             : `<div class="orgsw-empty">${_esc(_t('wsg-pop-nomatch', '无匹配主体'))}</div>`;
+        // POS 一号一店(Zihao 2026-07-12 拍板):pos_only 首个套账已在开通时建好,之后不许再开——
+        // 藏「新建主体」入口(后端 pos.workspace_single_store 闸兜底)。「管理全部客户」不受影响。
+        const isPosOnly = window._businessType === 'pos_only';
         const foot = _isOwner()
-            ? `<div class="orgsw-foot"><button class="orgsw-fa" data-orgcreate="1">${wsgIcon('plus')}${_esc(_t('wsg-create', '新建主体'))}</button>` +
+            ? '<div class="orgsw-foot">' +
+              (isPosOnly
+                  ? ''
+                  : `<button class="orgsw-fa" data-orgcreate="1">${wsgIcon('plus')}${_esc(_t('wsg-create', '新建主体'))}</button>`) +
               `<button class="orgsw-fa" data-orgmanage="1">${wsgIcon('users')}${_esc(_t('wsg-manage-all', '管理全部客户'))}</button></div>`
             : '';
         return (

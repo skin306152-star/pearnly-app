@@ -59,21 +59,32 @@ def normalize_branch(s) -> str:
 
 
 def _thai_to_gregorian(year: int) -> int:
-    """佛历年→西历年(-543)"""
+    """佛历年→西历年。
+    · 2 位年(<100):泰国财税文档一律佛历缩写(25xx),2500+yy 佛历 → 西历(=1957+yy);
+      如 69→พ.ศ.2569→2026。Python %y 会把这类年扩成 19xx/20xx 西历,须先取回 2 位再折算。
+    · 4 位佛历(>2400):-543。
+    · 4 位西历:原样返回。
+    """
+    if year < 100:
+        return 1957 + year  # 2500 + yy − 543
     return year - 543 if year > 2400 else year
 
 
 def parse_date(s) -> Optional[date]:
-    """解析日期字符串,支持多种格式 + 佛历自动转换"""
+    """解析日期字符串,支持多种格式 + 佛历自动转换。
+    2 位年份按泰国财税惯例视作佛历缩写(25xx),不套用 Python %y 的西历假设。
+    """
     if not s:
         return None
     s = str(s).strip()
     for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%y", "%Y/%m/%d", "%d %b %Y", "%d %B %Y"):
         try:
             d = datetime.strptime(s, fmt).date()
-            return d.replace(year=_thai_to_gregorian(d.year))
         except ValueError:
             continue
+        # %y 已被 strptime 扩成 4 位西历(69→1969),取回 2 位交佛历折算
+        year = d.year % 100 if "%y" in fmt else d.year
+        return d.replace(year=_thai_to_gregorian(year))
     return None
 
 

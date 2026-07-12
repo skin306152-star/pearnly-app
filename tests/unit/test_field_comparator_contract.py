@@ -71,6 +71,18 @@ class DateParseTests(unittest.TestCase):
         self.assertIsNone(fc.parse_date(""))
         self.assertIsNone(fc.parse_date("not-a-date"))
 
+    def test_parse_date_two_digit_thai_year(self):
+        # 泰国财税文档 2 位年一律佛历缩写(25xx),不套 Python %y 的西历假设(69→1969)
+        self.assertEqual(fc.parse_date("01/06/69"), date(2026, 6, 1))  # พ.ศ.2569
+        self.assertEqual(fc.parse_date("31/12/69"), date(2026, 12, 31))
+        self.assertEqual(fc.parse_date("01/06/68"), date(2025, 6, 1))  # พ.ศ.2568
+        # 4 位年(佛历/西历)语义不变
+        self.assertEqual(fc.parse_date("01/06/2569"), date(2026, 6, 1))
+        self.assertEqual(fc.parse_date("01/06/2026"), date(2026, 6, 1))
+        # 2 位年折算不经 datetime.replace 溢出(闰日等)· _thai_to_gregorian 直算
+        self.assertEqual(fc._thai_to_gregorian(69), 2026)
+        self.assertEqual(fc._thai_to_gregorian(68), 2025)
+
 
 class LevenshteinTests(unittest.TestCase):
     def test_levenshtein_basic(self):

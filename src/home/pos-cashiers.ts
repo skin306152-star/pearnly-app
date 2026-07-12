@@ -170,12 +170,16 @@ interface StoreCode {
     link?: string;
     qr?: string;
 }
+// 卡片开头(标题行)两处复用:正常态 accessHtml 与 loadAccess 的额度用尽错误态。
+function accessCardOpen(): string {
+    return `<div class="csh-access-card"><div class="csh-ac-h">${escapeHtml(t('csh-access-title'))}</div>`;
+}
+
 function accessHtml(d: StoreCode): string {
     const code = d.code || '';
     const link = d.link || location.origin + '/cashier?store=' + encodeURIComponent(code);
     const qr = d.qr ? `<img class="csh-ac-qr" alt="QR" src="data:image/png;base64,${d.qr}" />` : '';
-    return `<div class="csh-access-card">
-        <div class="csh-ac-h">${escapeHtml(t('csh-access-title'))}</div>
+    return `${accessCardOpen()}
         <div class="csh-ac-sub">${escapeHtml(t('csh-access-sub'))}</div>
         <div class="csh-ac-row">
             ${qr}
@@ -208,7 +212,7 @@ async function loadAccess() {
         const code = e instanceof Error ? e.message : '';
         // 店铺/收银员额度用尽(pos.entitlement_*)要显式告知,否则卡片无声消失,用户误以为功能丢了
         host.innerHTML = code.startsWith('pos.entitlement_')
-            ? `<div class="csh-access-card"><div class="csh-ac-h">${escapeHtml(t('csh-access-title'))}</div><div class="csh-ac-sub">${escapeHtml(posErrMsg(code, 'csh-error'))}</div></div>`
+            ? `${accessCardOpen()}<div class="csh-ac-sub">${escapeHtml(posErrMsg(code, 'csh-error'))}</div></div>`
             : '';
         return; // 其它错误(网络抖动等)维持静默,不阻断收银员管理主功能
     }

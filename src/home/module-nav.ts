@@ -114,9 +114,10 @@ function applyMerchantNav(
     applyPosRoles(owner, on('pos'), on('inventory'), businessType, true);
 }
 
-// 登录入口(pos-login.html / 主站登录写)决定壳,业态标签退居入口内部的兜底判据——
-// entry='pos' 且开了 pos 模块→POS 壳;entry='main' 仅 pos_only+开了 pos 模块才给 POS 壳
-// (其余场景与无 entry 的老会话同一份判据,行为不变,见 businessType 三段 ternary)。
+// 登录入口(pos-login.html 写)决定壳,业态标签退居兜底判据——entry='pos' 且开了 pos
+// 模块→POS 壳;其余场景(entry='main'/无 entry 的老会话)与 businessType 三段 ternary
+// 同一份判据,行为不变(entry='main' 时该 ternary 本就与「pos_only 且开 pos」结果一致,
+// 无需再判一次)。
 function resolvePreset(
     businessType: string | null | undefined,
     posEnabled: boolean
@@ -127,10 +128,8 @@ function resolvePreset(
             : !businessType || businessType === 'firm'
               ? FIRM_PRESET
               : null;
-    const entry = window._entry || '';
-    if (entry === 'pos') return posEnabled ? POS_PRESET : original; // 没开 pos 模块则忽略 entry
-    if (entry === 'main') return businessType === 'pos_only' && posEnabled ? POS_PRESET : original;
-    return original; // 无 entry(存量已登录会话):完全回落业态判据,行为零变化
+    if ((window._entry || '') === 'pos') return posEnabled ? POS_PRESET : original; // 没开 pos 模块则忽略 entry
+    return original;
 }
 
 function apply(modules: Record<string, ModuleFlag>, businessType?: string | null): void {

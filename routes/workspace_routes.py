@@ -148,6 +148,11 @@ def _pos_single_store_blocked(tenant_id: Optional[str]) -> bool:
 
     非 pos_only(含 firm)恒 False——判据显式限定 business_type == "pos_only",
     firm/未选业态/其它租户零影响。无 tenant_id(未建档主体)也恒 False,不碰 DB。
+
+    ⚠️ 与 services/pos/entitlements.py 的 pos_entitlements.store_limit 是两套独立机制,
+    这里硬编码 >=1,不读 store_limit——Zihao 拍板「一号一店」是固定业务规则(2026-07-12),
+    不是「额度内可多店」的软上限。若未来 grant API 开放 store_limit>1(目前无入口暴露),
+    此闸仍会卡死第 2 家,须显式改这里,不会自动跟着额度联动。
     """
     if not tenant_id:
         return False

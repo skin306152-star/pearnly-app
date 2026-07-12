@@ -33,14 +33,15 @@ class ModuleNavEntryRoutingTests(unittest.TestCase):
     def test_pos_entry_guarded_by_pos_module_enabled(self):
         # entry='pos' 没开 pos 模块要忽略入口回落,不能无条件给 POS 壳。
         text = _read("src/home/module-nav.ts")
-        self.assertIn("entry === 'pos'", text)
+        self.assertIn("window._entry || '') === 'pos'", text)
         self.assertIn("posEnabled", text)
 
-    def test_main_entry_skips_pos_only_dedicated_branch(self):
-        # entry='main' 时套现逻辑,仅 pos_only 且开了 pos 模块才给 POS 壳。
+    def test_no_dedicated_main_entry_branch(self):
+        # /simplify 2026-07-13 收口:entry='main' 曾有专属分支,证实与 businessType 三段
+        # ternary(original)恒同值(纯冗余,两条分支返回值逐场景相等)→ 已删。resolvePreset
+        # 只应对 'pos' 特判,'main'/无 entry 一律走 original 回落——这条钉子防它又被加回来。
         text = _read("src/home/module-nav.ts")
-        self.assertIn("entry === 'main'", text)
-        self.assertIn("businessType === 'pos_only' && posEnabled", text)
+        self.assertNotIn("entry === 'main'", text)
 
     def test_no_entry_falls_back_to_business_type_unchanged(self):
         # 无 entry(老会话)完全回落 business_type 判据,行为零变化。

@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from unittest import mock
 
+from core.pos_api import PosError
 from services.pos import sale
 
 
@@ -46,6 +47,113 @@ class HelperTests(unittest.TestCase):
 
     def test_vat_rate_is_seven(self):
         self.assertEqual(sale.VAT_RATE, Decimal("7"))
+
+
+class PaymentSettlementTests(unittest.TestCase):
+    def test_exact_cash_payment(self):
+        paid, change = sale._settle_payments(
+            [{"method": "cash", "amount": "107.30"}], Decimal("107.30")
+        )
+        self.assertEqual(paid, Decimal("107.30"))
+        self.assertEqual(change, Decimal("0"))
+
+    def test_cash_may_create_change(self):
+        paid, change = sale._settle_payments(
+            [{"method": "cash", "amount": "200.00"}], Decimal("107.30")
+        )
+        self.assertEqual(paid, Decimal("200.00"))
+        self.assertEqual(change, Decimal("92.70"))
+
+    def test_mixed_payment_change_must_be_covered_by_cash(self):
+        paid, change = sale._settle_payments(
+            [
+                {"method": "card", "amount": "80.00"},
+                {"method": "cash", "amount": "30.00"},
+            ],
+            Decimal("100.00"),
+        )
+        self.assertEqual(paid, Decimal("110.00"))
+        self.assertEqual(change, Decimal("10.00"))
+
+    def test_every_payment_must_be_positive(self):
+        for amount in ("0", "-0.01", "NaN", "Infinity", "bad", None):
+            with self.subTest(amount=amount), self.assertRaises(PosError) as ctx:
+                sale._settle_payments([{"method": "cash", "amount": amount}], Decimal("10"))
+            self.assertEqual(ctx.exception.code, "pos.payment_invalid")
+            self.assertEqual(ctx.exception.detail, "amount")
+
+    def test_payment_shape_method_and_scale_are_validated(self):
+        cases = (
+            (["not-an-object"], "payment"),
+            ([{"method": "crypto", "amount": "10.00"}], "method"),
+            ([{"method": "cash", "amount": "10.001"}], "amount"),
+        )
+        for payments, detail in cases:
+            with self.subTest(payments=payments), self.assertRaises(PosError) as ctx:
+                sale._settle_payments(payments, Decimal("10.00"))
+            self.assertEqual(ctx.exception.code, "pos.payment_invalid")
+            self.assertEqual(ctx.exception.detail, detail)
+
+    def test_supported_noncash_methods_settle_exact_amount(self):
+        for method in ("qr", "promptpay", "card", "transfer"):
+            with self.subTest(method=method):
+                self.assertEqual(
+                    sale._settle_payments(
+                        [{"method": method, "amount": "10.00"}], Decimal("10.00")
+                    ),
+                    (Decimal("10.00"), Decimal("0.00")),
+                )
+
+    def test_qr_is_persisted_as_promptpay_without_mutating_input(self):
+        source = [{"method": "qr", "amount": "10.00", "ref": "qr-1"}]
+        normalized, paid, change = sale._validated_payments(source, Decimal("10.00"))
+        self.assertEqual(source[0]["method"], "qr")
+        self.assertEqual(
+            normalized,
+            [{"method": "promptpay", "amount": Decimal("10.00"), "ref": "qr-1"}],
+        )
+        self.assertEqual(paid - change, Decimal("10.00"))
+
+    def test_grand_total_contract(self):
+        for grand in (Decimal("NaN"), Decimal("Infinity"), Decimal("-0.01")):
+            with self.subTest(grand=grand), self.assertRaises(PosError) as ctx:
+                sale._settle_payments([], grand)
+            self.assertEqual(ctx.exception.detail, "grand_total")
+        self.assertEqual(sale._settle_payments([], Decimal("0")), (Decimal("0"), Decimal("0")))
+        with self.assertRaises(PosError) as ctx:
+            sale._settle_payments([{"method": "cash", "amount": "1.00"}], Decimal("0"))
+        self.assertEqual(ctx.exception.detail, "zero_total")
+
+    def test_underpayment_is_rejected(self):
+        with self.assertRaises(PosError) as ctx:
+            sale._settle_payments([{"method": "cash", "amount": "99.99"}], Decimal("100.00"))
+        self.assertEqual(ctx.exception.code, "pos.payment_invalid")
+        self.assertEqual(ctx.exception.detail, "underpaid")
+
+    def test_noncash_cannot_create_change(self):
+        cases = (
+            [{"method": "card", "amount": "100.01"}],
+            [
+                {"method": "card", "amount": "100.01"},
+                {"method": "cash", "amount": "1.00"},
+            ],
+        )
+        for payments in cases:
+            with self.subTest(payments=payments), self.assertRaises(PosError) as ctx:
+                sale._settle_payments(payments, Decimal("100.00"))
+            self.assertEqual(ctx.exception.code, "pos.payment_invalid")
+            self.assertEqual(ctx.exception.detail, "noncash_overpay")
+
+    def test_decimal_sum_does_not_use_binary_float(self):
+        paid, change = sale._settle_payments(
+            [
+                {"method": "card", "amount": "0.10"},
+                {"method": "cash", "amount": "0.20"},
+            ],
+            Decimal("0.30"),
+        )
+        self.assertEqual(paid, Decimal("0.30"))
+        self.assertEqual(change, Decimal("0"))
 
 
 class IdempotencyTests(unittest.TestCase):
@@ -131,7 +239,7 @@ class CreateSaleCostWiringTests(unittest.TestCase):
                 payload={
                     "shift_id": "shift1",
                     "lines": [{"product_id": "prod1", "qty": 2, "unit_price": 10}],
-                    "payments": [{"method": "cash", "amount": 20}],
+                    "payments": [{"method": "cash", "amount": 100}],
                 },
             )
         return ded_mock, cost_mock, insert_line_calls
@@ -155,6 +263,40 @@ class CreateSaleCostWiringTests(unittest.TestCase):
         _ded, _cost, calls = self._run(cost_return=None)
         fields = calls[0]["fields"]
         self.assertIsNone(fields["cost_total"])
+
+
+class CreateSalePaymentGateTests(unittest.TestCase):
+    def test_invalid_settlement_is_rejected_before_receipt_numbering(self):
+        totals = {
+            "subtotal": Decimal("100.00"),
+            "discount_total": Decimal("0"),
+            "header_discount_amount": Decimal("0"),
+            "vat_amount": Decimal("0"),
+            "grand_total": Decimal("100.00"),
+            "lines": [],
+        }
+        with (
+            mock.patch.object(sale, "_assert_shift_open"),
+            mock.patch.object(
+                sale.inv_store, "get_or_create_default_warehouse", return_value={"id": 1}
+            ),
+            mock.patch.object(sale, "compute_totals", return_value=totals),
+            mock.patch.object(sale.numbering, "next_number") as next_number,
+            self.assertRaises(PosError) as ctx,
+        ):
+            sale.create_sale(
+                _Cur(),
+                tenant_id="t1",
+                workspace_client_id=9,
+                payload={
+                    "shift_id": "shift1",
+                    "lines": [],
+                    "payments": [{"method": "card", "amount": "99.99"}],
+                },
+            )
+        self.assertEqual(ctx.exception.code, "pos.payment_invalid")
+        self.assertEqual(ctx.exception.detail, "underpaid")
+        next_number.assert_not_called()
 
 
 if __name__ == "__main__":

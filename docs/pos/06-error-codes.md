@@ -14,6 +14,7 @@
 | pos.shift_already_open | 409 | มีกะที่เปิดอยู่แล้ว | A shift is already open | 已有未结束的班次 | 開始済みのシフトがあります |
 | pos.shift_closed | 409 | กะนี้ปิดแล้ว | This shift is closed | 班次已交班 | このシフトは締め済みです |
 | pos.line_invalid | 422 | รายการสินค้าไม่ถูกต้อง | Invalid item in the order | 商品行有误 | 明細に誤りがあります |
+| pos.payment_invalid | 422 | ยอดชำระเงินไม่ถูกต้อง | Invalid payment amount | 付款金额有误 | 支払金額に誤りがあります |
 | pos.void_not_allowed | 409 | ไม่สามารถยกเลิกบิลนี้ได้ | This receipt cannot be voided | 该小票不可作废 | このレシートは取消できません |
 | pos.tax_id_invalid | 422 | เลขประจำตัวผู้เสียภาษีไม่ถูกต้อง | Invalid tax ID | 税号无效 | 税番号が無効です |
 | pos.already_upgraded | 409 | บิลนี้ออกใบกำกับเต็มรูปแล้ว | A full tax invoice was already issued | 该单已开过正式税票 | 既に正式税額票を発行済みです |

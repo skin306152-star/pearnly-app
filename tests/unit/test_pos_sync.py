@@ -5,6 +5,7 @@
 错误码)+ 幂等透传(deduped)。重流程(真扣库存/连号)由 _e2e_po_b5 真库覆盖。"""
 
 import unittest
+from decimal import Decimal
 from unittest import mock
 
 from core.pos_api import PosError
@@ -20,6 +21,31 @@ class _Cur:
 
 
 class SyncTests(unittest.TestCase):
+    def test_raw_payment_contract_propagates_through_sync(self):
+        cur = _Cur()
+        seen = []
+
+        def payment_gate(
+            c, *, tenant_id, workspace_client_id, payload, created_by=None, operator=None
+        ):
+            seen.append(payload["payments"])
+            sale._settle_payments(payload["payments"], Decimal("10.00"))
+            return {"sale": {"id": "unused", "receipt_no": "unused"}, "deduped": False}
+
+        raw_payments = [{"method": "card", "amount": "9.99"}]
+        with mock.patch.object(sale, "create_sale", side_effect=payment_gate):
+            out = sale.sync_sales(
+                cur,
+                tenant_id="t",
+                workspace_client_id=9,
+                items=[{"client_uuid": "bad-pay", "payments": raw_payments}],
+            )
+
+        self.assertIs(seen[0], raw_payments)
+        self.assertFalse(out["results"][0]["ok"])
+        self.assertEqual(out["results"][0]["error"]["code"], "pos.payment_invalid")
+        self.assertEqual(out["results"][0]["error"]["detail"], "underpaid")
+
     def test_partial_failure_isolated_per_item(self):
         cur = _Cur()
         calls = {"n": 0}

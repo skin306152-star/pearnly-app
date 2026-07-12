@@ -15,7 +15,7 @@ from typing import Optional
 from core.pos_api import PosError
 from services.accounting import hooks as acct_hooks
 from services.inventory import store as inv_store
-from services.pos import numbering, sale_caps, sales_store, stock
+from services.pos import numbering, payment_settlement, sale_caps, sales_store, stock
 from services.sales.totals import compute_totals
 
 VAT_RATE = Decimal("7")  # 泰国标准 VAT(价内外均按此 · 复用 totals.py)
@@ -85,6 +85,15 @@ def _header_discount(hd: dict) -> tuple:
     hd = hd or {}
     t, val = hd.get("type"), hd.get("value", 0)
     return (0, val) if t == "pct" else (val, 0) if t == "amount" else (0, 0)
+
+
+def _validated_payments(payments: list, grand_total: Decimal) -> tuple[list, Decimal, Decimal]:
+    return payment_settlement.validate(payments, grand_total)
+
+
+def _settle_payments(payments: list, grand_total: Decimal) -> tuple[Decimal, Decimal]:
+    _, paid_total, change = payment_settlement.validate(payments, grand_total)
+    return paid_total, change
 
 
 def create_sale(
@@ -160,6 +169,9 @@ def create_sale(
         header_discount_amount=hd_amount,
         header_discount_pct=hd_pct,
     )
+    payments, paid_total, change = payment_settlement.validate(
+        payload.get("payments") or [], totals["grand_total"]
+    )
 
     # 折扣/改价授权闸(flag 关时返 []·完全跳过):无权且未授权在此抛,一件库存都不动。
     caps_events = sale_caps.enforce(
@@ -184,10 +196,7 @@ def create_sale(
         workspace_client_id=workspace_client_id,
     )
 
-    payments = payload.get("payments") or []
-    paid_total = sum((Decimal(str(p.get("amount", 0))) for p in payments), Decimal("0"))
     grand = totals["grand_total"]
-    change = (paid_total - grand) if paid_total > grand else Decimal("0.00")
 
     sale = sales_store.insert_sale(
         cur,

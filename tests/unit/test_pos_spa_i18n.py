@@ -33,6 +33,7 @@ POS_ERROR_CODES = (
     "pos.shift_already_open",
     "pos.shift_closed",
     "pos.line_invalid",
+    "pos.payment_invalid",
     "pos.void_not_allowed",
     "pos.tax_id_invalid",
     "pos.already_upgraded",

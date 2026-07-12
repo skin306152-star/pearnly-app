@@ -252,9 +252,7 @@ def _write_ledger(
         "| มูลค่าสุทธิ (净额) | ภาษีซื้อ (税额) | สถานะ (状态) | คำวินิจฉัย (裁决) |",
         "|---|---|---|---|---|---|---|",
     ]
-    sales_count = sum(
-        1 for it in items if it["kind"] == kinds.SALES_SUMMARY and it["status"] == "ok"
-    )
+    sales_count = sum(it["kind"] == kinds.SALES_SUMMARY and it["status"] == "ok" for it in items)
     source = numbers.get("sales_source")
     source_line = (
         f"แหล่งที่มา (来源): {_SOURCE_LABEL_TH.get(source, source)}"
@@ -432,9 +430,7 @@ def _write_memo(
     bank_missing = gate.get("note") == "bank_statement_missing"
     flagged = [it for it in items if it.get("flag_reason") and it["status"] == "flagged"]
     non_tax = [it for it in items if it["kind"] == kinds.NON_TAX and it["status"] == "excluded"]
-    duplicates = [
-        it for it in items if it["kind"] == kinds.DUPLICATE and it["status"] == "excluded"
-    ]
+    dup_items = [it for it in items if it["kind"] == kinds.DUPLICATE and it["status"] == "excluded"]
     waived = cons.buckets[conservation.WAIVED]
 
     def _tag(it: dict, extra: str = "") -> str:
@@ -466,7 +462,7 @@ def _write_memo(
             "รายการที่เคยถูกตั้งค่าสถานะ flagged (曾被标记复核)", [_flag_row(it) for it in flagged]
         ),
         *_bullets("รายการที่ไม่ใช่เอกสารภาษี (non_tax 排除清单)", [_tag(it) for it in non_tax]),
-        *_bullets("เอกสารซ้ำ (duplicate 排除清单)", [_tag(it) for it in duplicates]),
+        *_bullets("เอกสารซ้ำ (duplicate 排除清单)", [_tag(it) for it in dup_items]),
         *_bullets(
             "รายการที่ยกเว้นโดยมนุษย์ (人工豁免出包 · 谁豁免·为何·哪张)",
             [_waive_row(it) for it in waived],
@@ -478,7 +474,7 @@ def _write_memo(
         "bank_statement_missing": bank_missing,
         "flagged_count": len(flagged),
         "non_tax_count": len(non_tax),
-        "duplicate_count": len(duplicates),
+        "duplicate_count": len(dup_items),
         "waived_count": len(waived),
     }
     return str(path), snapshot

@@ -206,18 +206,6 @@
             });
     }
 
-    // blob → 触发浏览器下载(月报三产出/年报底稿共用,r = {blob, filename})。
-    function saveBlob(r) {
-        var url = URL.createObjectURL(r.blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = r.filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-    }
-
     function download(kind) {
         if (S.downloading[kind]) return;
         var session = S;
@@ -227,7 +215,7 @@
             .downloadPayrollOutput(S.clientId, S.period, kind)
             .then(function (r) {
                 if (S !== session) return;
-                saveBlob(r);
+                AI.api.saveBlob(r);
             })
             .catch(function (err) {
                 if (S !== session) return;
@@ -275,7 +263,7 @@
             .downloadPayrollAnnualOutput(S.clientId, S.annualYear, 'keying')
             .then(function (r) {
                 if (S !== session) return;
-                saveBlob(r);
+                AI.api.saveBlob(r);
             })
             .catch(function (err) {
                 if (S !== session) return;

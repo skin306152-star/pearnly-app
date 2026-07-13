@@ -99,17 +99,6 @@
             });
     }
 
-    function triggerDownload(blob, filename) {
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-    }
-
     // kind: 'xlsx' | 'pdf'——同一份已上传文件再跑一次 K1b/K2 转换直接回附件。
     function downloadAs(kind) {
         if (S.downloadKind || !S.file) return;
@@ -123,7 +112,7 @@
         fetchPromise
             .then(function (r) {
                 if (S !== session) return;
-                triggerDownload(r.blob, r.filename);
+                AI.api.saveBlob(r);
             })
             .catch(function (err) {
                 if (S !== session) return;

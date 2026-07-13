@@ -37,15 +37,11 @@
         var qIdx = h.indexOf('?');
         if (qIdx < 0) return { path: h, query: {} };
         var query = {};
-        h.slice(qIdx + 1)
-            .split('&')
-            .forEach(function (pair) {
-                if (!pair) return;
-                var eq = pair.indexOf('=');
-                var k = eq >= 0 ? pair.slice(0, eq) : pair;
-                var v = eq >= 0 ? pair.slice(eq + 1) : '';
-                query[decodeURIComponent(k)] = decodeURIComponent(v);
-            });
+        // URLSearchParams 替手写 split/decode(2026-07-14 simplify):语义同款(重复键
+        // 后者胜),外加畸形 % 序列不再抛异常;node 单测同样可用(≥10 全局内置)。
+        new URLSearchParams(h.slice(qIdx + 1)).forEach(function (v, k) {
+            query[k] = v;
+        });
         return { path: h.slice(0, qIdx), query: query };
     }
 

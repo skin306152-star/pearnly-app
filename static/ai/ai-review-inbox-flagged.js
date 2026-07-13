@@ -240,14 +240,36 @@
             if (focusFn) focusFn();
         }
 
+        // 原图模态:生产同款查看器(AI.viewer 缩放/拖拽/旋转 + LRU 缓存,UI-Canon 惯例;
+        // 骨架复用 AI.reconRender.viewModalHtml,同 ai-recon.js 原图模态先例)。此前裸
+        // window.open(objectURL)既没有查看器交互也不 revoke;载入失败由查看器 noimg 态
+        // 诚实呈现。挂 document.body,路由切走由编排层调 closeImage 收。
         function viewImage(orderId, itemId) {
-            api.getItemImageBlob(orderId, itemId)
-                .then(function (blob) {
-                    window.open(URL.createObjectURL(blob), '_blank');
-                })
-                .catch(function () {
-                    hooks.showToast(at('err_workorder_item_image_not_found'), null);
-                });
+            closeImage();
+            document.body.insertAdjacentHTML(
+                'beforeend',
+                AI.reconRender.viewModalHtml({ kind: 'invoice' })
+            );
+            var mask = document.getElementById('brxViewMask');
+            mask.classList.add('enter');
+            mask.querySelector('.mclose').onclick = closeImage;
+            mask.addEventListener('click', function (e) {
+                if (e.target === mask) closeImage();
+            });
+            AI.viewer.remountViewer('riq-img', mask.querySelector('.pkg-evid-view'), {
+                key: itemId,
+                loader: function () {
+                    return api.getItemImageBlob(orderId, itemId).then(function (blob) {
+                        return URL.createObjectURL(blob);
+                    });
+                },
+            });
+        }
+
+        function closeImage() {
+            AI.viewer.remountViewer('riq-img', null, {});
+            var mask = document.getElementById('brxViewMask');
+            if (mask) mask.remove();
         }
 
         function firstUndecidedItem(group) {
@@ -276,6 +298,7 @@
             decideItem: decideItem,
             startEdit: startEdit,
             viewImage: viewImage,
+            closeImage: closeImage,
             findGroup: findGroup,
             firstUndecidedItem: firstUndecidedItem,
         };

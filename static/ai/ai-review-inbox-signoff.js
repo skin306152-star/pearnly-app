@@ -6,19 +6,12 @@
  * 忙态与结果,与「异常票据」裁决态平行独立、互不干扰。
  *
  * SoD 显隐(方案 §2 b2「preparer 看不到复核钮」)受限于可用数据:order-detail 不携带
- * 制单人/复核人集合(那是 events 回放,读侧投影未暴露,b2 红线不碰后端加字段)。本模块
- * 采用「反应式收敛」:按钮默认显示,首次撞上后端 SoD 拒绝(422/409)才把按钮收起换成
- * 解释文案 + 指向自审声明的出路——不是不显隐,是显隐由后端权威判定驱动而非前端猜测,
- * 状态诚实优先于假装能提前算准角色(前端确实算不准,猜错比不猜更危险)。
+ * 制单人/复核人集合(那是 events 回放,读侧投影未暴露,b2 红线不碰后端加字段)。现状:
+ * 按钮常显,撞上后端 SoD 拒绝(422/409)时显示解释文案(sodErr)+ 自审声明出路;真正的
+ * 按角色收起按钮升格到 MC2-A(前端提前算不准角色,猜错比不猜更危险)。
  */
 (function () {
     'use strict';
-
-    var _SOD_CODES = {
-        'workorder.sod.reviewer_is_preparer': true,
-        'workorder.sod.approver_is_preparer': true,
-        'workorder.sod.review_required': true,
-    };
 
     function create(api) {
         var ui = {};
@@ -39,7 +32,6 @@
                     receiptBusy: false,
                     receiptNote: null,
                     sodErr: null,
-                    sodBlocked: null, // 'review' | 'archive' | null——撞过哪个动作的 SoD 拒绝
                 };
             }
             return ui[orderId];
@@ -48,10 +40,6 @@
         function errText(err) {
             var key = AI.api.mapApiErrorKey(err && err.code);
             return at(key) !== key ? at(key) : at('err_generic');
-        }
-
-        function isSodError(err) {
-            return !!(err && _SOD_CODES[err.code]);
         }
 
         function signoff(orderId, actorLabel, onSettle) {
@@ -68,12 +56,7 @@
                 })
                 .catch(function (err) {
                     u.signoffBusy = false;
-                    if (isSodError(err)) {
-                        u.sodBlocked = 'review';
-                        u.sodErr = errText(err);
-                    } else {
-                        u.sodErr = errText(err);
-                    }
+                    u.sodErr = errText(err);
                     onSettle();
                 });
         }
@@ -92,12 +75,7 @@
                 })
                 .catch(function (err) {
                     u.archiveBusy = false;
-                    if (isSodError(err)) {
-                        u.sodBlocked = 'archive';
-                        u.sodErr = errText(err);
-                    } else {
-                        u.sodErr = errText(err);
-                    }
+                    u.sodErr = errText(err);
                     onSettle();
                 });
         }
@@ -157,7 +135,6 @@
                     u.selfDeclareBusy = false;
                     u.selfDeclared = true;
                     u.sodErr = null;
-                    u.sodBlocked = null;
                     onSettle();
                 })
                 .catch(function (err) {

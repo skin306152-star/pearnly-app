@@ -165,14 +165,7 @@
             .downloadDeliverable(S.orderId, kind)
             .then(function (r) {
                 if (S !== session) return;
-                var url = URL.createObjectURL(r.blob);
-                var a = document.createElement('a');
-                a.href = url;
-                a.download = r.filename;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                URL.revokeObjectURL(url);
+                AI.api.saveBlob(r);
             })
             .catch(function () {
                 /* 下载失败:交付物在库里登记过却读不到文件是服务端异常,重试一次即可,

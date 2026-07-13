@@ -114,9 +114,7 @@
                 return S.api.listOrders({ client_id: S.clientId });
             })
             .then(function (r) {
-                S.orders = (r.orders || []).slice().sort(function (a, b) {
-                    return String(b.period).localeCompare(String(a.period));
-                });
+                S.orders = AI.clientArchiveRender.sortOrdersByPeriodDesc(r.orders);
                 S.periodIdx = 0;
                 renderPeriodPicker();
                 renderWo();
@@ -323,9 +321,7 @@
         Promise.all([api.getClient(clientId), api.listOrders({ client_id: clientId })])
             .then(function (r) {
                 S.client = r[0].client;
-                S.orders = (r[1].orders || []).slice().sort(function (a, b) {
-                    return String(b.period).localeCompare(String(a.period));
-                });
+                S.orders = AI.clientArchiveRender.sortOrdersByPeriodDesc(r[1].orders);
                 S.periodIdx = periodIndexOf(period);
                 renderHeader();
                 renderPeriodPicker();

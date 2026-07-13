@@ -1,9 +1,11 @@
 /*
- * Pearnly AI · ai-review-render.js · 人审队列(W3)的 HTML 拼装(纯字符串,不碰网络/状态)
+ * Pearnly AI · ai-review-render.js · 人审队列(W3)的 HTML 拼装 + toast
  *
  * 同 ai-kanban-render.js 先例:拼 HTML + 少量样式判断,值得单独断言的逻辑(过滤/分级/
- * payload 构造)已经在 ai-review-queue.js 被单测覆盖,这里不再重复测。依赖 window.AI.state/
- * format/reviewQueue/viewer 与全局 at(),故必须排在它们之后、ai-review.js 之前加载。
+ * payload 构造)已经在 ai-review-queue.js 被单测覆盖,这里不再重复测。唯一带 DOM 的例外
+ * 是 showToast/hideToast(挂 document.body 的全局提示,审核队列与收件箱两个编排层共用,
+ * 见函数注释)。依赖 window.AI.state/format/reviewQueue/viewer 与全局 at(),故必须排在
+ * 它们之后、ai-review.js 之前加载。
  */
 (function () {
     'use strict';
@@ -119,6 +121,7 @@
     // 动作按钮定义表:A/E/X(金额票)与 P/S/X(方向票)两组共用同一套拼接逻辑
     // (actionButton/renderActionButtons/kbdLine),不再各写一份重复 HTML 拼接。命名避开
     // cardHtml 里已有的局部变量 actionsHtml(动作行拼好的 HTML 字符串),不与之同名撞混。
+    // 收件箱(ai-review-inbox-render.js)经导出面复用同两张表,data-action 前缀参数化。
     var _AMOUNT_ACTION_DEFS = [
         { action: 'rv-accept', key: 'rv_key_accept', kbd: 'A', cls: 'ok' },
         { action: 'rv-edit', key: 'rv_key_edit', kbd: 'E', cls: '' },
@@ -131,13 +134,20 @@
         { action: 'rv-dir-nontax', key: 'rv_key_dir_nontax', kbd: 'X', cls: 'no' },
     ];
 
-    function actionButton(def) {
+    // opts(收件箱行内按钮用):actionPrefix 换掉 rv- 前缀(riq-*)、btnClass 覆盖语义色
+    // (行内统一 btn sm)、itemId 附 data-item(聚合页一屏多卡,靠它定位是哪张票)。
+    function actionButton(def, opts) {
+        opts = opts || {};
+        var action = opts.actionPrefix ? def.action.replace(/^rv-/, opts.actionPrefix) : def.action;
+        var cls = opts.btnClass || (def.cls ? 'btn ' + def.cls : 'btn');
         return (
-            '<button class="' +
-            (def.cls ? 'btn ' + def.cls : 'btn') +
+            '<button type="button" class="' +
+            cls +
             '" data-action="' +
-            def.action +
-            '">' +
+            action +
+            '"' +
+            (opts.itemId ? ' data-item="' + opts.itemId + '"' : '') +
+            '>' +
             esc(at(def.key)) +
             ' <span class="kbd">' +
             def.kbd +
@@ -147,7 +157,13 @@
 
     function renderActionButtons(defs) {
         return (
-            '<div class="rv-actions" id="rvActions">' + defs.map(actionButton).join('') + '</div>'
+            '<div class="rv-actions" id="rvActions">' +
+            defs
+                .map(function (def) {
+                    return actionButton(def);
+                })
+                .join('') +
+            '</div>'
         );
     }
 
@@ -359,11 +375,54 @@
         );
     }
 
+    // ============ toast(挂 document.body,3 秒 undo / 4 秒失败提示) ============
+    // 审核队列(ai-review.js)与收件箱(ai-review-inbox.js)此前各持一份近逐字实现;
+    // 计时器句柄收敛到这里(全局同刻至多一个 #rvToast),编排层只传文案 + 各自的 undo
+    // 回调(队列回滚上一张 / 收件箱撤销批量)。
+    var UNDO_TOAST_MS = 3000;
+    var FAIL_TOAST_MS = 4000;
+    var toastTimer = null;
+
+    function showToast(message, undoFn) {
+        hideToast();
+        var div = document.createElement('div');
+        div.innerHTML = toastHtml(message, !!undoFn);
+        var el = div.firstChild;
+        document.body.appendChild(el);
+        requestAnimationFrame(function () {
+            el.classList.add('on');
+        });
+        if (undoFn) {
+            var undoBtn = el.querySelector('[data-action="rv-undo"]');
+            if (undoBtn)
+                undoBtn.onclick = function () {
+                    undoFn();
+                    hideToast();
+                };
+        }
+        toastTimer = setTimeout(hideToast, undoFn ? UNDO_TOAST_MS : FAIL_TOAST_MS);
+    }
+
+    function hideToast() {
+        if (toastTimer) {
+            clearTimeout(toastTimer);
+            toastTimer = null;
+        }
+        var el = document.getElementById('rvToast');
+        if (el) el.parentNode.removeChild(el);
+    }
+
     window.AI = window.AI || {};
     window.AI.reviewRender = {
         cardHtml: cardHtml,
         emptyOkHtml: emptyOkHtml,
         clearedHtml: clearedHtml,
         toastHtml: toastHtml,
+        showToast: showToast,
+        hideToast: hideToast,
+        fieldRows: fieldRows,
+        actionButton: actionButton,
+        AMOUNT_ACTION_DEFS: _AMOUNT_ACTION_DEFS,
+        DIRECTION_ACTION_DEFS: _DIRECTION_ACTION_DEFS,
     };
 })();

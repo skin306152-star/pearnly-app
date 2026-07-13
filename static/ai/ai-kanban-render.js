@@ -19,14 +19,12 @@
         return AI.format.chipHtml(entry.order.status, entry.detail);
     }
 
-    // 账期 <option> 串:整块看板一次算好(periodOptions 不随卡片变),各开单卡复用同一串。
+    // 账期 <option> 串:整块看板一次算好(periodOptions 不随卡片变),各开单卡复用同一串;
+    // 拼装收口 AI.state.optionsHtml(不选中任何项,原生 select 默认选首项=当月)。
     function periodOptionsHtml() {
-        return AI.board
-            .periodOptions()
-            .map(function (p) {
-                return '<option value="' + esc(p) + '">' + esc(p) + '</option>';
-            })
-            .join('');
+        return AI.state.optionsHtml(AI.board.periodOptions(), null, function (p) {
+            return p;
+        });
     }
 
     // 开单账期选择器 + 按钮(v4 未画过此场景,按 Canon tokens 延展)。当月排第一,原生

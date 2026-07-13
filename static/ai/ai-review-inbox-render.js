@@ -13,9 +13,6 @@
     function esc(s) {
         return AI.state.esc(s);
     }
-    function money(v) {
-        return v == null || v === '' ? '—' : AI.format.money(v);
-    }
     function txt(v) {
         return v ? esc(v) : '—';
     }
@@ -203,37 +200,8 @@
     }
 
     // ============ 异常票据(跨工单按 flag_reason 分组的裁决卡三件套) ============
-
-    function fieldRowsHtml(read) {
-        read = read || {};
-        return (
-            '<tr><td class="lb">' +
-            esc(at('rv_field_supplier')) +
-            '</td><td class="vl">' +
-            txt(read.seller_tax) +
-            '</td></tr>' +
-            '<tr><td class="lb">' +
-            esc(at('rv_field_net')) +
-            '</td><td class="vl num">' +
-            money(read.subtotal) +
-            '</td></tr>' +
-            '<tr><td class="lb">' +
-            esc(at('rv_field_vat_face')) +
-            '</td><td class="vl num">' +
-            money(read.vat) +
-            '</td></tr>' +
-            '<tr><td class="lb">' +
-            esc(at('rv_field_total')) +
-            '</td><td class="vl num">' +
-            money(read.total_amount) +
-            '</td></tr>' +
-            '<tr><td class="lb">' +
-            esc(at('rv_field_invno')) +
-            '</td><td class="vl">' +
-            txt(read.invoice_number) +
-            '</td></tr>'
-        );
-    }
+    // 读值表格复用 ai-review-render.js 的 fieldRows(传 null effectiveDecision 走原读数
+    // 路径)——收件箱裁决卡与单工单人审卡是同一张五行读值表,不再各拼一份。
 
     // 判据人话:narrative_key 有值走 i18n 模板,否则诚实回退 flag_reason 原文(verdict.py
     // 顶注约定 + ai-review-verdict.js narrativeOf)。
@@ -269,17 +237,16 @@
     }
 
     // 一张 flagged 件的裁决动作行:方向票(kind=sales_doc / flag_reason 前缀命中方向)
-    // 走 P/S/N;其余(金额/OCR 质量类)走 Accept/Edit(内联改数)/Exclude——两套键位与
-    // 单工单人审队列(ai-review-render.js)逐字一致,只是脱离单卡聚焦,改成组内行内按钮。
+    // 走 P/S/N;其余(金额/OCR 质量类)走 Accept/Edit(内联改数)/Exclude——键位/文案取
+    // ai-review-render.js 的按钮定义表(同一份,data-action 前缀参数化成 riq-*),只是
+    // 脱离单卡聚焦,改成组内行内按钮(btn sm + data-item)。
     function itemActionsHtml(item, itemUi) {
         itemUi = itemUi || {};
         var isDir = AI.reviewQueue.isDirectionTicket(item);
         if (isDir) {
             return (
                 '<div class="riq-item-actions">' +
-                actionBtn(item.item_id, 'riq-dir-purchase', at('rv_key_dir_purchase'), 'P') +
-                actionBtn(item.item_id, 'riq-dir-sales', at('rv_key_dir_sales'), 'S') +
-                actionBtn(item.item_id, 'riq-dir-nontax', at('rv_key_dir_nontax'), 'X') +
+                actionRowHtml(AI.reviewRender.DIRECTION_ACTION_DEFS, item.item_id) +
                 viewImgBtn(item) +
                 '</div>'
             );
@@ -292,7 +259,7 @@
                 '" value="' +
                 esc(itemUi.editValue || '') +
                 '">' +
-                actionBtn(item.item_id, 'riq-recalc-submit', at('rv_key_edit'), 'Enter') +
+                actionBtn({ action: 'riq-recalc-submit', key: 'rv_key_edit', kbd: 'Enter' }, item) +
                 (itemUi.editErr
                     ? '<span class="riq-item-err">' + esc(at('rv_edit_vat_required')) + '</span>'
                     : '') +
@@ -301,26 +268,26 @@
         }
         return (
             '<div class="riq-item-actions">' +
-            actionBtn(item.item_id, 'riq-accept', at('rv_key_accept'), 'A') +
-            actionBtn(item.item_id, 'riq-edit', at('rv_key_edit'), 'E') +
-            actionBtn(item.item_id, 'riq-exclude', at('rv_key_exclude'), 'X') +
+            actionRowHtml(AI.reviewRender.AMOUNT_ACTION_DEFS, item.item_id) +
             viewImgBtn(item) +
             '</div>'
         );
     }
 
-    function actionBtn(itemId, action, label, kbd) {
-        return (
-            '<button type="button" class="btn sm" data-action="' +
-            action +
-            '" data-item="' +
-            itemId +
-            '">' +
-            esc(label) +
-            ' <span class="kbd">' +
-            kbd +
-            '</span></button>'
-        );
+    function actionBtn(def, item) {
+        return AI.reviewRender.actionButton(def, {
+            actionPrefix: 'riq-',
+            btnClass: 'btn sm',
+            itemId: item.item_id,
+        });
+    }
+
+    function actionRowHtml(defs, itemId) {
+        return defs
+            .map(function (def) {
+                return actionBtn(def, { item_id: itemId });
+            })
+            .join('');
     }
 
     function viewImgBtn(item) {
@@ -361,7 +328,7 @@
             '</span>' +
             '</div>' +
             '<table class="fldt riq-fldt">' +
-            fieldRowsHtml(item.ocr_read) +
+            AI.reviewRender.fieldRows(item.ocr_read, null) +
             '</table>' +
             narrativeHtml(item) +
             itemActionsHtml(item, itemUi || {}) +

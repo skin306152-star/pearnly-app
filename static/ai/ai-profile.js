@@ -50,6 +50,9 @@
             orderPeriod: order ? order.period : null,
             container: opts.container || $('cv-profile'),
             sections: opts.sections || ALL_SECTIONS,
+            // 画像响应旁听钩子(EN-clients 档案页 0% CTA 用):收到 GET tax-profile 的完整
+            // 响应(profile + completeness)时回调,免得调用方为同一份数据再发一次请求。
+            onProfile: opts.onProfile || null,
             profile: null,
             aliases: [],
             obligations: { period: null, rows: [] },
@@ -122,7 +125,9 @@
         if (has('form')) {
             tasks.push(
                 S.api.getTaxProfile(S.clientId).then(function (r) {
-                    if (S === session) S.profile = r.profile;
+                    if (S !== session) return;
+                    S.profile = r.profile;
+                    if (S.onProfile) S.onProfile(r);
                 })
             );
         }

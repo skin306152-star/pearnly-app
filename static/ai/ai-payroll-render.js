@@ -137,23 +137,11 @@
         '<path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>';
 
     // P1-3:账期从裸文本手输换成 periodOptions 下拉(与矩阵/看板/报表中心同款范式——此前
-    // 手输格式错了和"还没选"提示同一句,不诚实;四处独立现算不共享一份 DOM 缓存,同
-    // ai-matrix.js periodOptionsHtml() 先例)。
+    // 手输格式错了和"还没选"提示同一句,不诚实);<option> 拼装收口 AI.state.optionsHtml。
     function periodSelectOptionsHtml(selected) {
-        return root.AI.board
-            .periodOptions()
-            .map(function (p) {
-                return (
-                    '<option value="' +
-                    p +
-                    '"' +
-                    (p === selected ? ' selected' : '') +
-                    '>' +
-                    p +
-                    '</option>'
-                );
-            })
-            .join('');
+        return root.AI.state.optionsHtml(root.AI.board.periodOptions(), selected, function (p) {
+            return p;
+        });
     }
 
     function clientPickerHtml(ctx) {

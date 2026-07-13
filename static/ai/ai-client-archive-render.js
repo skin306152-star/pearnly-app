@@ -13,39 +13,18 @@
 (function (root) {
     'use strict';
 
-    // 工单历史按账期倒序(最新在前)——同 ai-client.js renderPeriodPicker 的既有口径,
-    // 目录/档案/操作页三处独立现算不共享一份缓存(账期是字符串"YYYY-MM"字典序即时间序)。
+    // 工单历史按账期倒序(最新在前)——账期是字符串"YYYY-MM",字典序即时间序。
+    // ai-client.js(操作页 orders 列表)也调这份,不再各写一遍比较器。
     function sortOrdersByPeriodDesc(orders) {
         return (orders || []).slice().sort(function (a, b) {
             return String(b.period).localeCompare(String(a.period));
         });
     }
 
-    // P1-5:0% 画像无 CTA 的判据——与后端 routes/tax_profile_routes.py::_profile_completeness
-    // / _COMPLETENESS_FIELDS 同一份 6 字段集合(该端点的分母口径:只数真正默认 unknown 的
-    // 字段,不含 sbt_status/filing_disposition 这类默认值本身就是"已答"的字段)。Python/JS
-    // 两处各自实现(无法共享代码),改动任一处务必同步另一处——单测已锁两侧字段名对齐。
-    var COMPLETENESS_FIELDS = [
-        'has_employees',
-        'pays_individuals',
-        'pays_juristic',
-        'pays_foreign',
-        'pays_interest_dividend',
-        'efiling_enrolled',
-    ];
+    // P1-5:0% 画像 CTA 的完整度判据由后端 GET tax-profile 出参(completeness)权威给出,
+    // 前端不再手抄一份 6 字段集合(此前 Python/JS 双实现靠人肉同步,2026-07-14 收敛)。
 
-    function completenessFraction(profile) {
-        profile = profile || {};
-        var answered = COMPLETENESS_FIELDS.filter(function (f) {
-            return (profile[f] || 'unknown') !== 'unknown';
-        }).length;
-        return answered / COMPLETENESS_FIELDS.length;
-    }
-
-    var pure = {
-        sortOrdersByPeriodDesc: sortOrdersByPeriodDesc,
-        completenessFraction: completenessFraction,
-    };
+    var pure = { sortOrdersByPeriodDesc: sortOrdersByPeriodDesc };
     if (typeof module !== 'undefined' && module.exports) module.exports = pure;
 
     // ===== 以下为浏览器 HTML 拼装(依赖 at()/AI.state/AI.format/AI.router,node 不调用)=====
@@ -141,7 +120,6 @@
     root.AI = root.AI || {};
     root.AI.clientArchiveRender = {
         sortOrdersByPeriodDesc: sortOrdersByPeriodDesc,
-        completenessFraction: completenessFraction,
         headerHtml: headerHtml,
         tabsHtml: tabsHtml,
         historyListHtml: historyListHtml,

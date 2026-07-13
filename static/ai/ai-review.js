@@ -16,8 +16,6 @@
     };
     var POLL_INTERVAL_MS = 2000;
     var POLL_MAX_TRIES = 30;
-    var UNDO_TOAST_MS = 3000;
-    var FAIL_TOAST_MS = 4000;
 
     var S = null;
     var wired = false; // 照 ai-client.js chromeWired 先例:监听器只挂一次,不随每次 mount 重挂。
@@ -50,7 +48,6 @@
             mode: 'card', // 'card' | 'done'
             rerunState: 'idle',
             blockedInfo: null,
-            toastTimer: null,
         };
     }
 
@@ -187,10 +184,11 @@
                 });
                 if (S.mode === 'card') renderCurrent();
                 if (action === 'exclude') {
-                    showToast(
+                    AI.reviewRender.showToast(
                         AI.reviewQueue.fileName(entry.file_ref) + ' · ' + at('rv_chip_excluded'),
-                        true,
-                        submittedIdx
+                        function () {
+                            undoExclude(submittedIdx);
+                        }
                     );
                 }
             })
@@ -204,9 +202,9 @@
                 S.idx = submittedIdx;
                 S.mode = 'card';
                 renderCurrent();
-                showToast(
+                AI.reviewRender.showToast(
                     hit ? at(errKey) : at('rv_decision_failed', { n: submittedIdx + 1 }),
-                    false
+                    null
                 );
             });
     }
@@ -237,7 +235,7 @@
         S.idx = idx;
         S.mode = 'card';
         S.sessionDecided = Math.max(0, S.sessionDecided - 1);
-        hideToast();
+        AI.reviewRender.hideToast();
         renderCurrent();
     }
 
@@ -274,38 +272,6 @@
             S.idx -= 1;
             renderCurrent();
         }
-    }
-
-    // ============ toast(3 秒 undo / 失败提示) ============
-
-    function showToast(message, showUndo, undoIdx) {
-        hideToast();
-        var host = document.body;
-        var div = document.createElement('div');
-        div.innerHTML = AI.reviewRender.toastHtml(message, showUndo);
-        var toastEl = div.firstChild;
-        host.appendChild(toastEl);
-        requestAnimationFrame(function () {
-            toastEl.classList.add('on');
-        });
-        if (showUndo) {
-            var undoBtn = toastEl.querySelector('[data-action="rv-undo"]');
-            if (undoBtn) {
-                undoBtn.onclick = function () {
-                    undoExclude(undoIdx);
-                };
-            }
-        }
-        S.toastTimer = setTimeout(hideToast, showUndo ? UNDO_TOAST_MS : FAIL_TOAST_MS);
-    }
-
-    function hideToast() {
-        if (S.toastTimer) {
-            clearTimeout(S.toastTimer);
-            S.toastTimer = null;
-        }
-        var el = $('rvToast');
-        if (el) el.parentNode.removeChild(el);
     }
 
     // ============ 重新跑 + 轮询(契约 §4) ============

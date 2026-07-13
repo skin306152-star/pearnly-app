@@ -46,10 +46,18 @@
 
     function loadProfileTab() {
         var container = $('cav-profile');
+        var clientId = S.clientId;
         container.innerHTML = AI.state.loadingHtml();
-        AI.profile.mount(S.api, null, S.clientId, {
+        AI.profile.mount(S.api, null, clientId, {
             container: container,
             sections: ['form', 'alias', 'obligations'],
+            // P1-5:0% 画像 CTA 的完整度旁听自 AI.profile 同一次 GET tax-profile
+            // (completeness 由后端出),不再为 CTA 单独重复请求一次画像。
+            onProfile: function (r) {
+                if (S.clientId !== clientId) return;
+                S.completeness = r.completeness;
+                renderProfileCta();
+            },
         });
     }
 
@@ -141,17 +149,6 @@
             })
             .catch(function () {
                 /* 头部展示降级用 clientId 本身(renderHeader 已处理 client=null),不阻断三 tab */
-            });
-        // P1-5:独立小请求算 0% 画像 CTA(不借道 AI.profile 内部状态——那是它自己的闭包,
-        // 保持模块解耦;画像本就是单行小查询,多这一次请求成本可忽略)。
-        api.getTaxProfile(clientId)
-            .then(function (r) {
-                if (S.clientId !== clientId) return;
-                S.completeness = AI.clientArchiveRender.completenessFraction(r.profile);
-                renderProfileCta();
-            })
-            .catch(function () {
-                /* 拉不到画像不阻断三 tab,CTA 保持不显示(S.completeness 仍是 null) */
             });
     }
 

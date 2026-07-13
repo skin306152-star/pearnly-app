@@ -19,8 +19,6 @@
     var $ = function (id) {
         return document.getElementById(id);
     };
-    var UNDO_TOAST_MS = 3000;
-    var FAIL_TOAST_MS = 4000;
     var AUTO_REFRESH_MS = 2500; // 裁决落库后引擎自驱重跑是异步的,给点时间再刷工单卡计数/状态。
 
     var S = null;
@@ -59,20 +57,19 @@
                     renderWo();
                     scheduleAutoRefresh();
                 },
-                showToast: showToast,
+                showToast: AI.reviewRender.showToast,
             }),
             actorLabel: currentActorLabel(),
             refreshTimer: null,
-            toastTimer: null,
         };
     }
 
     // ============ 渲染 ============
 
-    function renderWo() {
-        var el = woBody();
+    // 两个分区共用同一副 loading/error 外壳,只有 loading 判据与内容拼装不同。
+    function renderSection(el, loading, contentFn) {
         if (!el || !S) return;
-        if (S.loading) {
+        if (loading) {
             el.innerHTML = AI.state.loadingHtml();
             return;
         }
@@ -86,36 +83,28 @@
             if (btn) btn.onclick = load;
             return;
         }
-        var uiByOrder = {};
-        (S.queue.clients || []).forEach(function (c) {
-            c.orders.forEach(function (o) {
-                uiByOrder[o.work_order_id] = S.signoff.forOrder(o.work_order_id);
+        el.innerHTML = contentFn();
+    }
+
+    function renderWo() {
+        renderSection(woBody(), S && S.loading, function () {
+            var uiByOrder = {};
+            (S.queue.clients || []).forEach(function (c) {
+                c.orders.forEach(function (o) {
+                    uiByOrder[o.work_order_id] = S.signoff.forOrder(o.work_order_id);
+                });
             });
+            return AI.reviewInboxRender.woSectionHtml(S.queue.clients || [], uiByOrder);
         });
-        el.innerHTML = AI.reviewInboxRender.woSectionHtml(S.queue.clients || [], uiByOrder);
     }
 
     function renderFlagged() {
-        var el = flaggedBody();
-        if (!el || !S) return;
-        if (S.loading || S.flagged.isLoading()) {
-            el.innerHTML = AI.state.loadingHtml();
-            return;
-        }
-        if (S.error) {
-            el.innerHTML = AI.state.errorHtml({
-                title: at('error_t'),
-                sub: at('error_s'),
-                retryLabel: at('retry'),
-            });
-            var btn = el.querySelector('[data-action="retry"]');
-            if (btn) btn.onclick = load;
-            return;
-        }
-        el.innerHTML = AI.reviewInboxRender.flaggedSectionHtml(
-            S.flagged.groups(),
-            S.flagged.groupUiMap()
-        );
+        renderSection(flaggedBody(), S && (S.loading || S.flagged.isLoading()), function () {
+            return AI.reviewInboxRender.flaggedSectionHtml(
+                S.flagged.groups(),
+                S.flagged.groupUiMap()
+            );
+        });
     }
 
     // ============ 加载(review-queue → 按需并行拉 flagged 工单详情,交给 flagged 状态机) ============
@@ -167,37 +156,8 @@
         }, AUTO_REFRESH_MS);
     }
 
-    // ============ toast(3 秒 undo / 失败提示,同 ai-review.js showToast 先例) ============
-
-    function showToast(message, undoFn) {
-        hideToast();
-        var div = document.createElement('div');
-        div.innerHTML = AI.reviewRender.toastHtml(message, !!undoFn);
-        var el = div.firstChild;
-        document.body.appendChild(el);
-        requestAnimationFrame(function () {
-            el.classList.add('on');
-        });
-        if (undoFn) {
-            var undoBtn = el.querySelector('[data-action="rv-undo"]');
-            if (undoBtn)
-                undoBtn.onclick = function () {
-                    undoFn();
-                    hideToast();
-                };
-        }
-        S.toastTimer = setTimeout(hideToast, undoFn ? UNDO_TOAST_MS : FAIL_TOAST_MS);
-    }
-    function hideToast() {
-        if (S && S.toastTimer) {
-            clearTimeout(S.toastTimer);
-            S.toastTimer = null;
-        }
-        var el = $('rvToast');
-        if (el) el.parentNode.removeChild(el);
-    }
-
     // ============ 异常票据分区:事件委托 → 交给 flagged 状态机 ============
+    // toast 收敛在 AI.reviewRender.showToast/hideToast(与单工单人审队列共用)。
 
     function onFlaggedClick(e) {
         var groupEl = e.target.closest('.riq-group');
@@ -315,8 +275,11 @@
     }
 
     function onLeave() {
-        hideToast();
-        if (S && S.refreshTimer) clearTimeout(S.refreshTimer);
+        AI.reviewRender.hideToast();
+        if (S) {
+            if (S.refreshTimer) clearTimeout(S.refreshTimer);
+            S.flagged.closeImage(); // 原图模态挂 document.body,切走路由要主动收
+        }
         if (AI.clientPool) AI.clientPool.onLeave();
     }
 

@@ -182,14 +182,7 @@
             .downloadDeliverable(S.order.id, kind)
             .then(function (r) {
                 if (S !== session) return;
-                var url = URL.createObjectURL(r.blob);
-                var a = document.createElement('a');
-                a.href = url;
-                a.download = r.filename;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                URL.revokeObjectURL(url);
+                AI.api.saveBlob(r);
             })
             .catch(function () {
                 /* 下载失败不额外报错态,按钮解禁即可再点(同 ai-pkg.js download() 先例) */
@@ -213,14 +206,7 @@
             .downloadFinancialsReport(S.order.id, format, lang)
             .then(function (r) {
                 if (S !== session) return;
-                var url = URL.createObjectURL(r.blob);
-                var a = document.createElement('a');
-                a.href = url;
-                a.download = r.filename;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                URL.revokeObjectURL(url);
+                AI.api.saveBlob(r);
             })
             .catch(function () {
                 /* 下载失败按钮解禁即可再点,同 download() 既有惯例 */

@@ -15,6 +15,19 @@
         return key;
     }
 
+    // blob 附件({blob, filename},attachmentResponse 的产物)→ 触发浏览器下载。鉴权头
+    // 下载走不了 <a href>,各视图(payroll/reports/fileconv/pkg)拿到 blob 后都经这里落盘。
+    function saveBlob(r) {
+        var url = URL.createObjectURL(r.blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = r.filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    }
+
     function apiFactory(opts) {
         opts = opts || {};
         var getToken =
@@ -68,6 +81,37 @@
                 .then(handleResponse);
         }
 
+        // query 对象 → '?a=b&c=d' 串:undefined/null/'' 一律略过(缺省字段不上串)。
+        // listOrders 与 getReviewQueue(ai-api-review.js)共用同一份拼装。
+        function queryString(query) {
+            var parts = Object.keys(query || {})
+                .filter(function (k) {
+                    return query[k] !== undefined && query[k] !== null && query[k] !== '';
+                })
+                .map(function (k) {
+                    return encodeURIComponent(k) + '=' + encodeURIComponent(query[k]);
+                });
+            return parts.length ? '?' + parts.join('&') : '';
+        }
+
+        // 附件响应统一收口(xlsx/pdf/图片二进制流不能进 handleResponse,它只认 JSON):
+        // 文件名取 Content-Disposition 的 filename*=UTF-8''(RFC 5987 泰文原名)优先、裸
+        // filename= 兜底、都没有用 fallbackName;失败仍是 JSON 错误壳,借 handleResponse
+        // 抛同构 code/status 错误。_downloadAttachment/downloadDeliverable/
+        // downloadFinancialsReport 与 ai-api-payroll.js 两个下载全走它,不各解一套头。
+        function attachmentResponse(fallbackName) {
+            return function (r) {
+                if (!r.ok) return handleResponse(r);
+                var disp = r.headers.get('Content-Disposition') || '';
+                var star = /filename\*=UTF-8''([^;]+)/.exec(disp);
+                var plain = /filename="?([^";]+)"?/.exec(disp);
+                var filename = star ? decodeURIComponent(star[1]) : plain ? plain[1] : fallbackName;
+                return r.blob().then(function (blob) {
+                    return { blob: blob, filename: filename };
+                });
+            };
+        }
+
         // core.pos_api.ok() 信封({"ok":true,"data":{...}})的调用方用这个,解出 .data 让
         // 调用方拿到的形状跟其它 AI 端点(workorder/workspace,裸对象无信封)一致——
         // 别让信封差异渗进 ai-profile.js 的业务代码里(Z3-b · 供应商过账档案)。
@@ -98,18 +142,7 @@
                 return call('POST', '/api/logout');
             },
             listOrders: function (query) {
-                var qs = query
-                    ? '?' +
-                      Object.keys(query)
-                          .filter(function (k) {
-                              return query[k] !== undefined && query[k] !== null && query[k] !== '';
-                          })
-                          .map(function (k) {
-                              return encodeURIComponent(k) + '=' + encodeURIComponent(query[k]);
-                          })
-                          .join('&')
-                    : '';
-                return call('GET', '/api/workorder/orders' + qs);
+                return call('GET', '/api/workorder/orders' + queryString(query));
             },
             getOrder: function (id) {
                 return call('GET', '/api/workorder/orders/' + encodeURIComponent(id));
@@ -195,29 +228,13 @@
                     })
                     .then(handleResponse);
             },
-            // 附件路共用(xlsx/pdf 二进制流不能进 handleResponse,它只认 JSON):成功从
-            // Content-Disposition 取文件名(泰文原名在 filename*/RFC 5987,优先取;取不到
-            // 退 ASCII filename),失败仍是 JSON 错误壳,借 handleResponse 抛同构 code/status
-            // 错误,调用方文案不分叉。
+            // multipart 附件路共用:同一份文件 POST 出去,直接回附件(K1b/K2 两段式)。
             _downloadAttachment: function (url, file, fallbackName) {
                 var fd = new FormData();
                 fd.append('file', file);
                 return root
                     .fetch(url, { method: 'POST', headers: authHeaders(), body: fd })
-                    .then(function (r) {
-                        if (!r.ok) return handleResponse(r);
-                        var disp = r.headers.get('Content-Disposition') || '';
-                        var star = /filename\*=UTF-8''([^;]+)/.exec(disp);
-                        var plain = /filename="?([^";]+)"?/.exec(disp);
-                        var filename = star
-                            ? decodeURIComponent(star[1])
-                            : plain
-                              ? plain[1]
-                              : fallbackName;
-                        return r.blob().then(function (blob) {
-                            return { blob: blob, filename: filename };
-                        });
-                    });
+                    .then(attachmentResponse(fallbackName));
             },
             downloadConvertedXlsx: function (file) {
                 return this._downloadAttachment(
@@ -235,8 +252,8 @@
             },
             // 交付物下载(W5 交付包页):鉴权头是 Bearer,<a href> 发不了自定义头,调用方拿
             // blob 自建 object URL 触发下载(同 console.js exportLog 的 fetch+blob 先例)。
-            // 文件名从服务端 Content-Disposition 读(FileResponse 已带 filename=真实文件名),
-            // 读不到时退化用 kind 本身,不编一个假名字。
+            // 文件名走 attachmentResponse(filename* 优先)——N1-P1-6 的「客户名_账期_报表名」
+            // 泰文原名在 filename*,此前只解裸 filename= 导致交付包主路径拿回内部名。
             downloadDeliverable: function (orderId, kind) {
                 return root
                     .fetch(
@@ -246,19 +263,7 @@
                             encodeURIComponent(kind),
                         { headers: authHeaders() }
                     )
-                    .then(function (r) {
-                        if (!r.ok) {
-                            var err = new Error('workorder.deliverable_not_found');
-                            err.status = r.status;
-                            throw err;
-                        }
-                        var disp = r.headers.get('Content-Disposition') || '';
-                        var m = /filename="?([^";]+)"?/.exec(disp);
-                        var filename = m ? m[1] : kind;
-                        return r.blob().then(function (blob) {
-                            return { blob: blob, filename: filename };
-                        });
-                    });
+                    .then(attachmentResponse(kind));
             },
             // 原图直出(W3 审核队列 / W5 证据回链):鉴权头是 Bearer,<img src> 发不了自定义头,
             // 调用方拿 blob 自建 object URL 挂 <img>(同 console.js 导出下载的 fetch+blob 先例)。
@@ -422,27 +427,20 @@
                             qs,
                         { headers: authHeaders() }
                     )
-                    .then(function (r) {
-                        if (!r.ok) return handleResponse(r);
-                        var disp = r.headers.get('Content-Disposition') || '';
-                        var star = /filename\*=UTF-8''([^;]+)/.exec(disp);
-                        var plain = /filename="?([^";]+)"?/.exec(disp);
-                        var filename = star
-                            ? decodeURIComponent(star[1])
-                            : plain
-                              ? plain[1]
-                              : 'financials.' + (format || 'pdf');
-                        return r.blob().then(function (blob) {
-                            return { blob: blob, filename: filename };
-                        });
-                    });
+                    .then(attachmentResponse('financials.' + (format || 'pdf')));
             },
         };
-        Object.assign(base, AI.apiPayroll.create(root, authHeaders, handleResponse));
-        return Object.assign(base, AI.apiReview.create(root, authHeaders, handleResponse));
+        Object.assign(
+            base,
+            AI.apiPayroll.create(root, authHeaders, handleResponse, attachmentResponse)
+        );
+        return Object.assign(
+            base,
+            AI.apiReview.create(root, authHeaders, handleResponse, call, queryString)
+        );
     }
 
-    var apiExport = { mapApiErrorKey: mapApiErrorKey, create: apiFactory };
+    var apiExport = { mapApiErrorKey: mapApiErrorKey, saveBlob: saveBlob, create: apiFactory };
     if (typeof module !== 'undefined' && module.exports) module.exports = apiExport;
     if (root) {
         root.AI = root.AI || {};

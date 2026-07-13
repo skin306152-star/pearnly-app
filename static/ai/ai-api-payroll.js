@@ -6,14 +6,14 @@
  * 依赖面窄(只用 root/authHeaders/handleResponse 三个 apiFactory 内部闭包量),拆出去
  * 零行为改变——同 ai-payroll-annual-render.js 拆自 ai-payroll-render.js 的先例。
  *
- * 工厂函数 create(root, authHeaders, handleResponse) 由 ai-api.js 的 apiFactory() 调用,
- * 返回的方法对象被 Object.assign 进 AI.api.create() 的结果里,调用方(ai-payroll.js)
- * 感知不到这层拆分。
+ * 工厂函数 create(root, authHeaders, handleResponse, attachmentResponse) 由 ai-api.js 的
+ * apiFactory() 调用(四个都是它的内部闭包量),返回的方法对象被 Object.assign 进
+ * AI.api.create() 的结果里,调用方(ai-payroll.js)感知不到这层拆分。
  */
 (function (root) {
     'use strict';
 
-    function create(root, authHeaders, handleResponse) {
+    function create(root, authHeaders, handleResponse, attachmentResponse) {
         return {
             // parse 纯读猜列/套模板,commit 落库 + 点亮义务,output 下载三产出——三者都是
             // multipart(parse/commit 带文件),不能走 ai-api.js 的 call()。
@@ -48,7 +48,7 @@
                     .then(handleResponse);
             },
             // 三产出下载:GET 带鉴权头,<a href> 发不了自定义头,调用方拿 blob 自建
-            // object URL(同 downloadDeliverable 先例)。泰文原名走 filename*(RFC 5987)。
+            // object URL(同 downloadDeliverable 先例)。文件名解析走共享 attachmentResponse。
             downloadPayrollOutput: function (workspaceClientId, period, kind) {
                 var qs =
                     '?workspace_client_id=' +
@@ -59,16 +59,7 @@
                     encodeURIComponent(kind);
                 return root
                     .fetch('/api/payroll/output' + qs, { headers: authHeaders() })
-                    .then(function (r) {
-                        if (!r.ok) return handleResponse(r);
-                        var disp = r.headers.get('Content-Disposition') || '';
-                        var star = /filename\*=UTF-8''([^;]+)/.exec(disp);
-                        var plain = /filename="?([^";]+)"?/.exec(disp);
-                        var filename = star ? decodeURIComponent(star[1]) : plain ? plain[1] : kind;
-                        return r.blob().then(function (blob) {
-                            return { blob: blob, filename: filename };
-                        });
-                    });
+                    .then(attachmentResponse(kind));
             },
             // ภ.ง.ด.1ก 年度聚合(批次 H 收尾件)——summary 纯读聚合预览(JSON),output 只接受
             // kind=keying(上传件格式未经官方样本核实,诚实降级见 routes/payroll_routes.py)。
@@ -92,16 +83,7 @@
                     encodeURIComponent(kind);
                 return root
                     .fetch('/api/payroll/annual/output' + qs, { headers: authHeaders() })
-                    .then(function (r) {
-                        if (!r.ok) return handleResponse(r);
-                        var disp = r.headers.get('Content-Disposition') || '';
-                        var star = /filename\*=UTF-8''([^;]+)/.exec(disp);
-                        var plain = /filename="?([^";]+)"?/.exec(disp);
-                        var filename = star ? decodeURIComponent(star[1]) : plain ? plain[1] : kind;
-                        return r.blob().then(function (blob) {
-                            return { blob: blob, filename: filename };
-                        });
-                    });
+                    .then(attachmentResponse(kind));
             },
         };
     }

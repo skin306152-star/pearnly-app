@@ -49,23 +49,12 @@
         return root.AI.state.esc(s);
     }
 
-    // P1-3:账期从裸文本手输换成 periodOptions 下拉(与矩阵/看板同款范式,不再自成一套
-    // "输对格式才算选过"的隐性契约——payroll 工具卡的同病同修见 ai-payroll-render.js)。
+    // P1-3:账期从裸文本手输换成 periodOptions 下拉(与矩阵/看板同款范式);<option>
+    // 拼装收口 AI.state.optionsHtml,不再各写一遍循环。
     function periodSelectOptionsHtml(selected) {
-        return AI.board
-            .periodOptions()
-            .map(function (p) {
-                return (
-                    '<option value="' +
-                    esc(p) +
-                    '"' +
-                    (p === selected ? ' selected' : '') +
-                    '>' +
-                    esc(p) +
-                    '</option>'
-                );
-            })
-            .join('');
+        return AI.state.optionsHtml(AI.board.periodOptions(), selected, function (p) {
+            return p;
+        });
     }
 
     function pickerHtml(ctx) {

@@ -55,6 +55,12 @@ ISSUE_WHT_OUT_OF_RANGE = "wht_out_of_range"  # V4 wht<0 或 wht>amount
 ISSUE_BAD_AMOUNT = "bad_amount"  # 金额无法解析
 ISSUE_MISSING_FIELD = "missing_required_field"  # V5
 
+# ภ.ง.ด.1ก 年度聚合专属(services/payroll/pnd1a.py)——月度五校验(V1-V5)之外,年度视角
+# 才浮现的两类问题:跨月同身份证改名 / 聚合与月度进料不守恒(词表统一收在这里,不另开
+# 一份枚举,同 Issue 全域共享单一事实源的既有约定)。
+ISSUE_NAME_MISMATCH = "cross_month_name_mismatch"
+ISSUE_YEAR_SUM_MISMATCH = "year_sum_mismatch"
+
 
 @dataclass(frozen=True)
 class Issue:

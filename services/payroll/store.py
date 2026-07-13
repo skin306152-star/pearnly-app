@@ -120,6 +120,22 @@ def load_period_rows(cur, *, tenant_id: str, workspace_client_id: int, period: s
     return [dict(r) for r in cur.fetchall()]
 
 
+def load_year_rows(cur, *, tenant_id: str, workspace_client_id: int, tax_year: str) -> list:
+    """读该客户全年度(佛历 4 位年 · 调用方须先校验格式)已落库月度进料行,供 ภ.ง.ด.1ก
+    年度聚合(services/payroll/pnd1a.aggregate_year)。period 形如 "2569-05",按
+    (period, seq) 排序——聚合按时间序取「最新月姓名」依赖这个排序。
+    """
+    cur.execute(
+        "SELECT period, seq, employee_id, title, first_name, last_name, income_code, "
+        "paid_date, paid_amount, wht_amount, condition "
+        "FROM client_payroll_rows "
+        "WHERE tenant_id = %s AND workspace_client_id = %s AND period LIKE %s "
+        "ORDER BY period, seq",
+        (tenant_id, workspace_client_id, f"{tax_year}-%"),
+    )
+    return [dict(r) for r in cur.fetchall()]
+
+
 def _as_dict(value) -> dict:
     if isinstance(value, dict):
         return value

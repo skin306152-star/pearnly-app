@@ -100,5 +100,20 @@ class PeriodRowsStoreTests(unittest.TestCase):
         )
 
 
+class YearRowsStoreTests(unittest.TestCase):
+    def test_load_year_rows_scoped_by_tenant_and_year_pattern(self):
+        cur = FakeCursor(fetchall=[{"period": "2569-05", "seq": 1}])
+        rows = store.load_year_rows(cur, tenant_id="t", workspace_client_id=1, tax_year="2569")
+        self.assertEqual(rows, [{"period": "2569-05", "seq": 1}])
+        sql, params = cur.calls[0]
+        self.assertIn("WHERE tenant_id = %s AND workspace_client_id = %s AND period LIKE %s", sql)
+        self.assertEqual(params, ("t", 1, "2569-%"))
+
+    def test_load_year_rows_empty_when_no_data(self):
+        cur = FakeCursor(fetchall=[])
+        rows = store.load_year_rows(cur, tenant_id="t", workspace_client_id=1, tax_year="2570")
+        self.assertEqual(rows, [])
+
+
 if __name__ == "__main__":
     unittest.main()

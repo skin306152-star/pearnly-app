@@ -4,7 +4,7 @@
 // 2026-07-12 改判据:壳跟登录入口走(_entry),业态标签退居无入口记号时的老会话回落
 // (landing.js/pos-login.html 登录成功写 pearnly_entry,module-nav.apply 每次登录后同步 window._entry)。
 // 2026-07-13 冷启动回落:module-nav.apply 只在鉴权成功后才 seed window._entry,冷进入/
-// 会话过期 401 直跳时 _entry 尚空 → 此处自读入口记号,POS 设备才不会被甩去会计站 /login。
+// 会话过期 401 直跳时 _entry 尚空 → 此处自读入口记号。⚠️ 新增 entry 分支须同步 home.html:9 preboot 门(物理拷贝,它跑在 main.js 之前调不到这里)。
 export function loginUrl(): string {
     if (!window._entry) window._entry = localStorage.getItem('pearnly_entry') || '';
     if (window._entry === 'pos') return '/pos';

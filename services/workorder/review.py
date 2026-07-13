@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Optional
 
 from services.line_binding import client_pool_vocab, line_client_pool_store
-from services.workorder import api, engine, obligation_engine, runner, store
+from services.workorder import api, engine, obligation_engine, review_feed, runner, store, verdict
 
 # review 域 append-only 事件词(单一事实源)。
 EVT_REVIEW_REJECTED = "review_rejected"
@@ -33,19 +33,9 @@ _REOPEN_FROM = "reconcile"
 # 待审工单纳入队列的状态:review(跑绿待签)+ stuck(有料过不去待人裁)。取 engine 权威常量。
 _QUEUE_STATUSES = [engine.STATUS_REVIEW, engine.STATUS_STUCK]
 
-# flag_reason 冒号前缀 → 红/黄严重度(与前端 static/ai/ai-review-queue.js flagSeverity 同口径:
-# 置信度/校验/本方销项存疑=黄,其余含未知=红,没把握的异常不淡化)。前端 JS 无法 import 本表,
-# 两处靠契约同步维护;severity 筛选用它现算,不落库。
-_WARN_REASONS = frozenset({"ocr_low_confidence", "ocr_validation_warning", "sales_doc_review"})
-_SEV_CRIT = "crit"
-_SEV_WARN = "warn"
-
-
-def _severity(flag_reason: Optional[str]) -> str:
-    head = str(flag_reason or "").split(":", 1)[0]
-    return _SEV_WARN if head in _WARN_REASONS else _SEV_CRIT
-
-
+# 三个原分组子查询(义务/客户池/驳回)改 LEFT JOIN LATERAL:聚合只对队列内工单现算,代价随
+# 队列长度而非全租户历史增长(效率7);rj 走 ix_wo_events_wo (tenant,wo,id) 前缀窄扫。tenant_id
+# 由 wo 相关子句携带,子查询不再各带一个 tenant 谓词。
 _QUEUE_SQL = """
 SELECT
     wo.id AS work_order_id, wo.workspace_client_id, wo.period, wo.status,
@@ -61,25 +51,28 @@ JOIN workspace_clients wc
     ON wc.id = wo.workspace_client_id AND wc.tenant_id = wo.tenant_id
 LEFT JOIN work_order_items wi
     ON wi.tenant_id = wo.tenant_id AND wi.work_order_id = wo.id AND wi.status = 'flagged'
-LEFT JOIN (
-    SELECT workspace_client_id, period,
-           min(due_efiling) AS next_due_efiling, min(due_paper) AS next_due_paper
-    FROM client_period_obligations
-    WHERE tenant_id = %s AND status <> %s
-    GROUP BY workspace_client_id, period
-) ob ON ob.workspace_client_id = wo.workspace_client_id AND ob.period = wo.period
-LEFT JOIN (
-    SELECT workspace_client_id, count(*) AS pending_count
-    FROM line_client_questions
-    WHERE tenant_id = %s AND status = ANY(%s)
-    GROUP BY workspace_client_id
-) cp ON cp.workspace_client_id = wo.workspace_client_id
-LEFT JOIN (
-    SELECT work_order_id, count(*) AS reject_count
-    FROM work_order_events
-    WHERE tenant_id = %s AND event_type = %s
-    GROUP BY work_order_id
-) rj ON rj.work_order_id = wo.id
+LEFT JOIN LATERAL (
+    SELECT min(o.due_efiling) AS next_due_efiling, min(o.due_paper) AS next_due_paper
+    FROM client_period_obligations o
+    WHERE o.tenant_id = wo.tenant_id
+      AND o.workspace_client_id = wo.workspace_client_id
+      AND o.period = wo.period
+      AND o.status <> %s
+) ob ON true
+LEFT JOIN LATERAL (
+    SELECT count(*) AS pending_count
+    FROM line_client_questions q
+    WHERE q.tenant_id = wo.tenant_id
+      AND q.workspace_client_id = wo.workspace_client_id
+      AND q.status = ANY(%s)
+) cp ON true
+LEFT JOIN LATERAL (
+    SELECT count(*) AS reject_count
+    FROM work_order_events e
+    WHERE e.tenant_id = wo.tenant_id
+      AND e.work_order_id = wo.id
+      AND e.event_type = %s
+) rj ON true
 WHERE wo.tenant_id = %s
   AND wo.status = ANY(%s)
   AND (%s::text IS NULL OR wo.period = %s::text)
@@ -98,19 +91,19 @@ def review_queue(
     period: Optional[str] = None,
     client_id: Optional[int] = None,
     severity: Optional[str] = None,
+    actor: Optional[str] = None,
+    sod_enforced: bool = False,
 ) -> dict:
-    """按客户 × 工单聚合待审队列。单条 SQL(主表 + 义务/客户池/驳回三分组子查询),Python
-    分组投影:每工单给 flagged 件按 flag_reason 分组计数 + 严重度、义务最近到期日、客户池
-    pending 数、返工标记(reject_count>0);severity 传入则只留含该严重度组的工单。到期近→前。"""
+    """按客户 × 工单聚合待审队列。主表 SQL(义务/客户池/驳回三 LATERAL 子查询)出工单行 +
+    flagged 按 flag_reason 分组计数/严重度/到期日/客户池 pending/返工标记;再一把批量取回队列内
+    工单的事件与 flagged 明细(review_feed),挂 SoD 投影(actor/sod_enforced 决定)并出跨工单
+    扁平 flagged item feed(前端纯渲染,不再逐单回放)。severity 传入则只留该严重度。到期近→前。"""
     line_client_pool_store.ensure_table()  # 保证 line_client_questions 存在(首用自愈)再 JOIN
     cur.execute(
         _QUEUE_SQL,
         (
-            tenant_id,
             obligation_engine.STATUS_NIL,
-            tenant_id,
             list(client_pool_vocab.ACTIVE_STATUSES),
-            tenant_id,
             EVT_REVIEW_REJECTED,
             tenant_id,
             _QUEUE_STATUSES,
@@ -121,10 +114,19 @@ def review_queue(
         ),
     )
     orders = _group_rows([dict(r) for r in cur.fetchall()], severity)
+    flagged_items = review_feed.enrich(
+        cur,
+        tenant_id=tenant_id,
+        orders=orders,
+        actor=actor,
+        sod_enforced=sod_enforced,
+        severity=severity,
+    )
     clients = _group_clients(orders)
     return {
         "period": period,
         "clients": clients,
+        "flagged_items": flagged_items,
         "counts": {
             "clients": len(clients),
             "orders": len(orders),
@@ -167,7 +169,7 @@ def _group_rows(rows: list[dict], severity: Optional[str]) -> list[dict]:
         reason = r["flag_reason"]
         if reason is None:
             continue  # 无 flagged 件的待审工单:LEFT JOIN 空行,不造分组
-        sev = _severity(reason)
+        sev = verdict.severity_of(reason)
         order["flagged_groups"].append(
             {"flag_reason": reason, "severity": sev, "count": int(r["flagged_count"] or 0)}
         )
@@ -177,9 +179,9 @@ def _group_rows(rows: list[dict], severity: Optional[str]) -> list[dict]:
     for wid in order_seq:
         order = by_order[wid]
         order["top_severity"] = (
-            _SEV_CRIT
-            if any(g["severity"] == _SEV_CRIT for g in order["flagged_groups"])
-            else (_SEV_WARN if order["flagged_groups"] else None)
+            verdict.SEV_CRIT
+            if any(g["severity"] == verdict.SEV_CRIT for g in order["flagged_groups"])
+            else (verdict.SEV_WARN if order["flagged_groups"] else None)
         )
         if severity:
             order["flagged_groups"] = [

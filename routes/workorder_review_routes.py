@@ -18,6 +18,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from core import db
+from core.feature_flags import pearnly_ai_sod_enabled_for
 from routes.workorder_routes import (
     DecisionIn,
     _auto_advance,
@@ -64,15 +65,22 @@ async def get_review_queue(
     client_id: Optional[int] = None,
 ):
     """全所审核队列(客户 × 工单聚合)。待审工单(review/stuck)+ flagged 按 flag_reason 分组 +
-    客户池 pending 数 + 义务最近到期日 + 返工标记,到期近→前。筛 period/severity/client。"""
-    _user, tenant_id = _authorize(request, _C_VIEW)
+    客户池 pending 数 + 义务最近到期日 + 返工标记 + 跨工单 flagged item feed + SoD 投影,到期近→前。
+    筛 period/severity/client。actor/SoD 闸传入读模型现算「登录态在各单上的制单/复核/自审」显隐投影。"""
+    user, tenant_id = _authorize(request, _C_VIEW)
     if period is not None and not obligation_engine.PERIOD_RE.match(period):
         raise HTTPException(422, detail="obligation.invalid_period")
     if severity is not None and severity not in _SEVERITIES:
         raise HTTPException(422, detail="review.invalid_severity")
     with db.get_cursor() as cur:
         return review.review_queue(
-            cur, tenant_id=tenant_id, period=period, client_id=client_id, severity=severity
+            cur,
+            tenant_id=tenant_id,
+            period=period,
+            client_id=client_id,
+            severity=severity,
+            actor=f"user:{user['id']}",
+            sod_enforced=pearnly_ai_sod_enabled_for(tenant_id),
         )
 
 

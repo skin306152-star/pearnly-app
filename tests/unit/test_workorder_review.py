@@ -15,17 +15,26 @@ from services.workorder import api, engine, review
 
 
 class FakeCur:
-    """单查询假游标:execute 存参、fetchall 回预置行(RealDict 风格 dict 行)。"""
+    """多查询假游标:review_queue 现发三条 SQL(主聚合 + review_feed 的事件/flagged 明细
+    两条批量)。首条(主聚合)喂预置队列行并留下参数供接线断言,其余(事件/明细)回空——
+    脱库单测只锁队列分组投影;feed/SoD 的真行为在 test_workorder_review_feed 单独脱库验。"""
 
     def __init__(self, rows):
         self._rows = rows
         self.params = None
+        self._calls = 0
+        self._pending: list = []
 
     def execute(self, _sql, params):
-        self.params = params
+        if self._calls == 0:
+            self.params = params
+            self._pending = self._rows
+        else:
+            self._pending = []
+        self._calls += 1
 
     def fetchall(self):
-        return self._rows
+        return self._pending
 
 
 def _row(**kw):
@@ -110,8 +119,8 @@ class ReviewQueueTests(unittest.TestCase):
         cur = FakeCur([])
         with mock.patch.object(review.line_client_pool_store, "ensure_table"):
             review.review_queue(cur, tenant_id="t-1", period="2569-05", client_id=7, severity=None)
-        # period/client 出现在尾部参数(静态谓词值),tenant 首位
-        self.assertEqual(cur.params[0], "t-1")
+        # LATERAL 化后 tenant 从子查询移到主 WHERE(不再首位),period/client 静态谓词值仍在尾部
+        self.assertIn("t-1", cur.params)
         self.assertIn("2569-05", cur.params)
         self.assertIn(7, cur.params)
 

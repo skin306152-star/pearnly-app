@@ -75,6 +75,51 @@ class ColonSuffixTests(unittest.TestCase):
         self.assertEqual(h["params"]["error"], "TimeoutError")
 
 
+class SeverityPolicyTests(unittest.TestCase):
+    """severity 政策单一事实源(F5):前端 flagSeverity 副本已删,红/黄口径归此。"""
+
+    def test_crit_and_warn_split_matches_legacy_frontend(self):
+        crit = ["amount_math_fail", "ocr_error:X", "direction_ambiguous", "duplicate_of:a"]
+        warn = ["ocr_low_confidence:hi", "ocr_validation_warning", "sales_doc_review"]
+        for r in crit:
+            self.assertEqual(verdict.severity_of(r), verdict.SEV_CRIT, r)
+        for r in warn:
+            self.assertEqual(verdict.severity_of(r), verdict.SEV_WARN, r)
+
+    def test_unknown_and_empty_are_crit(self):
+        for r in ("some_future_reason", "", None):
+            self.assertEqual(verdict.severity_of(r), verdict.SEV_CRIT)
+
+    def test_hint_carries_severity(self):
+        self.assertEqual(verdict.hint(flag_reason="sales_doc_review")["severity"], verdict.SEV_WARN)
+        self.assertEqual(verdict.hint(flag_reason="amount_math_fail")["severity"], verdict.SEV_CRIT)
+
+
+class SuggestedDecisionPolicyTests(unittest.TestCase):
+    """批量建议裁决政策单一事实源(F5):前端 _BULK_TEMPLATES 副本已删。"""
+
+    def test_direction_and_duplicate_carry_safe_default(self):
+        self.assertEqual(
+            verdict.hint(flag_reason="sales_direction_unhandled")["suggested_decision"],
+            {"decision": "assign_kind", "kind": "sales_doc"},
+        )
+        self.assertEqual(
+            verdict.hint(flag_reason="sales_doc_review")["suggested_decision"],
+            {"decision": "assign_kind", "kind": "sales_doc"},
+        )
+        self.assertEqual(
+            verdict.hint(flag_reason="duplicate_of:IMG.jpg")["suggested_decision"],
+            {"decision": "exclude"},
+        )
+
+    def test_low_confidence_and_conflict_have_no_default(self):
+        for r in ("amount_math_fail", "direction_ambiguous", "ocr_low_confidence:x", "ocr_error"):
+            self.assertIsNone(verdict.hint(flag_reason=r)["suggested_decision"], r)
+
+    def test_unknown_reason_has_no_default(self):
+        self.assertIsNone(verdict.hint(flag_reason="future")["suggested_decision"])
+
+
 class DegradeTests(unittest.TestCase):
     def test_unknown_reason_is_null_key_low_conf(self):
         h = verdict.hint(flag_reason="some_future_reason")

@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-"""K1b 路由契约 · 财务文件转换端点(routes/fileconv_routes.py)。
+"""K1b/K2 路由契约 · 财务文件转换端点(routes/fileconv_routes.py)。
 
 锁定:①路由按 path+method 注册且挂进 app;②pearnly_ai_m1 闸关 → 404(fail-closed,
 不泄漏端点存在性);③未登录 → 401;④超 20MB → 413;⑤happy path 打桩 convert_pdf 回
 JSON 摘要(doc_type/status/conserved/stats/issue_count + issues 截断);⑥?format=xlsx
-回 xlsx 附件(Content-Disposition);⑦no_text_layer → 200 + status 诚实返回,不是 500。
-"""
+回 xlsx 附件(Content-Disposition);⑦no_text_layer → 200 + status 诚实返回,不是 500;
+⑧K2:.xlsx 上传分流到 convert_excel;⑨K2:?format=pdf 回 application/pdf 附件(闸关同样
+404,不为新出口单开一套鉴权)。"""
 
 from __future__ import annotations
 
@@ -226,6 +227,83 @@ class XlsxFilenameTests(unittest.TestCase):
     def test_empty_name_falls_back(self):
         self.assertEqual(fcr._xlsx_filename(""), "convert.xlsx")
         self.assertEqual(fcr._xlsx_filename(".pdf"), "convert.xlsx")
+
+
+class PdfFilenameTests(unittest.TestCase):
+    def test_windows_reserved_chars_replaced(self):
+        self.assertEqual(fcr._pdf_filename('a<b>:"c.xlsx'), "a_b___c.pdf")
+
+    def test_empty_name_falls_back(self):
+        self.assertEqual(fcr._pdf_filename(""), "convert.pdf")
+
+
+class ExcelDispatchTests(GatedRouteCase):
+    """K2:.xlsx/.xls/.csv 分流到 convert_excel,不牵连 PDF/图片路。"""
+
+    async def test_xlsx_upload_routes_to_excel_converter(self):
+        self._wire()
+        m_excel = self.enterContext(
+            mock.patch.object(fcr, "convert_excel", return_value=_ok_result())
+        )
+        m_pdf = self.enterContext(mock.patch.object(fcr, "convert_pdf", return_value=_ok_result()))
+        out = await fcr.convert_endpoint(mock.Mock(), file=_upload(name="gl.xlsx"), fmt=None)
+        self.assertEqual(out["status"], STATUS_OK)
+        m_excel.assert_called_once()
+        m_pdf.assert_not_called()
+
+    async def test_xls_and_csv_also_route_to_excel_converter(self):
+        self._wire()
+        m_excel = self.enterContext(
+            mock.patch.object(fcr, "convert_excel", return_value=_ok_result())
+        )
+        for name in ("old.xls", "data.csv"):
+            m_excel.reset_mock()
+            await fcr.convert_endpoint(mock.Mock(), file=_upload(name=name), fmt=None)
+            m_excel.assert_called_once()
+
+
+class PdfFormatTests(GatedRouteCase):
+    async def test_format_pdf_returns_pdf_attachment(self):
+        self._wire()
+        self.enterContext(mock.patch.object(fcr, "convert_pdf", return_value=_ok_result()))
+        self.enterContext(mock.patch.object(fcr.pdf_out, "render", return_value=b"%PDF-fake"))
+        out = await fcr.convert_endpoint(mock.Mock(), file=_upload(name="GL TTB.pdf"), fmt="pdf")
+        self.assertIsInstance(out, StreamingResponse)
+        self.assertEqual(out.media_type, "application/pdf")
+        disp = out.headers["Content-Disposition"]
+        self.assertIn("attachment", disp)
+        self.assertIn("filename*=UTF-8''GL%20TTB.pdf", disp)
+
+    async def test_format_pdf_thai_filename_survives_header_encoding(self):
+        self._wire()
+        self.enterContext(mock.patch.object(fcr, "convert_pdf", return_value=_ok_result()))
+        self.enterContext(mock.patch.object(fcr.pdf_out, "render", return_value=b"%PDF-fake"))
+        out = await fcr.convert_endpoint(
+            mock.Mock(), file=_upload(name="สมุดแยกประเภท.pdf"), fmt="pdf"
+        )
+        disp = out.headers["Content-Disposition"]
+        disp.encode("latin-1")  # 编不过 = 生产 500,直接让测试红
+        self.assertIn("filename*=UTF-8''", disp)
+
+    async def test_format_pdf_passes_lang_through(self):
+        self._wire()
+        self.enterContext(mock.patch.object(fcr, "convert_pdf", return_value=_ok_result()))
+        m_render = self.enterContext(mock.patch.object(fcr.pdf_out, "render", return_value=b"%PDF"))
+        await fcr.convert_endpoint(mock.Mock(), file=_upload(), fmt="pdf", lang="ja")
+        self.assertEqual(m_render.call_args.kwargs.get("lang"), "ja")
+
+    async def test_format_pdf_unknown_lang_falls_back_to_th(self):
+        self._wire()
+        self.enterContext(mock.patch.object(fcr, "convert_pdf", return_value=_ok_result()))
+        m_render = self.enterContext(mock.patch.object(fcr.pdf_out, "render", return_value=b"%PDF"))
+        await fcr.convert_endpoint(mock.Mock(), file=_upload(), fmt="pdf", lang="fr")
+        self.assertEqual(m_render.call_args.kwargs.get("lang"), "th")
+
+    async def test_pdf_format_gated_closed_is_404(self):
+        self._wire(m1=False)
+        with self.assertRaises(HTTPException) as ctx:
+            await fcr.convert_endpoint(mock.Mock(), file=_upload(), fmt="pdf")
+        self.assertEqual(ctx.exception.status_code, 404)
 
 
 if __name__ == "__main__":

@@ -30,9 +30,7 @@ class SortOrdersByPeriodDescTests(unittest.TestCase):
             process.stdout.write(JSON.stringify([sorted, input]));
             """)
         sorted_out, original = out
-        self.assertEqual(
-            [o["period"] for o in sorted_out], ["2569-05", "2569-03", "2569-01"]
-        )
+        self.assertEqual([o["period"] for o in sorted_out], ["2569-05", "2569-03", "2569-01"])
         # 原数组顺序不被就地排序打乱(调用方 listOrders() 拿到的响应可能被别处复用)。
         self.assertEqual([o["period"] for o in original], ["2569-01", "2569-05", "2569-03"])
 

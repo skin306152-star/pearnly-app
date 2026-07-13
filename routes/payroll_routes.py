@@ -359,24 +359,15 @@ def _build_central(nid: str, tax_year: str, tax_month: str, rows: list) -> str:
     )
 
 
-@router.get("/annual/summary")
-async def annual_summary_endpoint(
-    request: Request,
-    workspace_client_id: int = Query(...),
-    tax_year: str = Query(...),
-):
-    """年度聚合预览(JSON):Σ支付/Σ预扣 + issues(mod-11 复验/跨月改名/年度守恒断言)。
-    先看这个再下载键入底稿——同月报 commit→output 两段式(方案 §H 收尾件)。tax_year
-    为佛历 4 位年,如 "2569"。"""
+def _load_year_or_404(request, workspace_client_id: int, tax_year: str):
+    """年报双端点共用的「鉴权 → 校验年份 → 读客户+全年行 → 空则 404」前半程。"""
     _user, tenant_id = authorize_pearnly_ai(request, _PERM, not_found="payroll.not_found")
     _require_valid_tax_year(tax_year)
-
     with db.get_cursor() as cur:
-        _load_client(cur, tenant_id, workspace_client_id)
+        client = _load_client(cur, tenant_id, workspace_client_id)
         raw_rows = store.load_year_rows(
             cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, tax_year=tax_year
         )
-
     if not raw_rows:
         raise HTTPException(
             404,
@@ -386,7 +377,19 @@ async def annual_summary_endpoint(
                 f"tax_year={tax_year}",
             },
         )
+    return client, raw_rows
 
+
+@router.get("/annual/summary")
+async def annual_summary_endpoint(
+    request: Request,
+    workspace_client_id: int = Query(...),
+    tax_year: str = Query(...),
+):
+    """年度聚合预览(JSON):Σ支付/Σ预扣 + issues(mod-11 复验/跨月改名/年度守恒断言)。
+    先看这个再下载键入底稿——同月报 commit→output 两段式(方案 §H 收尾件)。tax_year
+    为佛历 4 位年,如 "2569"。"""
+    _client_row, raw_rows = _load_year_or_404(request, workspace_client_id, tax_year)
     annual_rows, issues = pnd1a.aggregate_year(raw_rows)
     totals = pnd1a.annual_totals(annual_rows)
     return {
@@ -412,8 +415,7 @@ async def annual_output_endpoint(
 ):
     """年度聚合键入底稿下载。kind 只接受 "keying"——ใบแนบ/FORMAT กลาง 的 1ก 年报变体
     字段未经官方样本核实,诚实降级不产出上传件(见 services/payroll/pnd1a.py 顶注)。"""
-    _user, tenant_id = authorize_pearnly_ai(request, _PERM, not_found="payroll.not_found")
-    _require_valid_tax_year(tax_year)
+    client, raw_rows = _load_year_or_404(request, workspace_client_id, tax_year)
     if kind not in _ANNUAL_OUTPUT_KINDS:
         raise HTTPException(
             400,
@@ -422,23 +424,6 @@ async def annual_output_endpoint(
                 "message": "1ก 上传件格式待官方样本核实,当前只支持键入底稿(kind=keying)",
             },
         )
-
-    with db.get_cursor() as cur:
-        client = _load_client(cur, tenant_id, workspace_client_id)
-        raw_rows = store.load_year_rows(
-            cur, tenant_id=tenant_id, workspace_client_id=workspace_client_id, tax_year=tax_year
-        )
-
-    if not raw_rows:
-        raise HTTPException(
-            404,
-            detail={
-                "code": "payroll.no_year_data",
-                "message": f"No payroll rows for workspace_client_id={workspace_client_id} "
-                f"tax_year={tax_year}",
-            },
-        )
-
     annual_rows, _issues = pnd1a.aggregate_year(raw_rows)
     nid = client.get("tax_id") or ""
     content = pnd1a.build_annual_keying_workbook(annual_rows)

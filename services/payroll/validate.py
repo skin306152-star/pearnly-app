@@ -74,11 +74,16 @@ def _check_required(row) -> list:
     return out
 
 
+def is_valid_employee_id(tid: str) -> bool:
+    """13 位数字 + mod-11 校验位。月度进料校验与 pnd1a 年度复验共用的单源谓词。"""
+    return len(tid) == _TAX_ID_LEN and tid.isdigit() and mod11_check(tid)
+
+
 def _check_employee_id(row) -> list:
     tid = row.employee_id
     if not tid:
         return []  # 缺失已由 _check_required 点名,不重复
-    if len(tid) != _TAX_ID_LEN or not tid.isdigit() or not mod11_check(tid):
+    if not is_valid_employee_id(tid):
         return [
             model.Issue(
                 kind=model.ISSUE_INVALID_ID,

@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from core import db
 from core.pos_api import PosError, ok
+from core.route_helpers import lang_or_default
 from routes.accounting_common import auth_member, auth_owner, gate, resolve_ws, uid
 from services.accounting import books, books_pdf, closing
 from services.tax import hooks as tax_hooks
@@ -28,15 +29,9 @@ _BOOK_FN = {
 }
 _TAX_FN = {"vat": books.vat_report, "wht": books.wht_report}
 
-_LANGS = ("th", "zh", "en", "ja")
-
 
 class ClosePeriodIn(BaseModel):
     period: str
-
-
-def _lang(lang: Optional[str]) -> str:
-    return lang if lang in _LANGS else "th"
 
 
 def _report(request, *, fn, kind, period, workspace_client_id, fmt, lang, perm):
@@ -46,7 +41,7 @@ def _report(request, *, fn, kind, period, workspace_client_id, fmt, lang, perm):
         ws = resolve_ws(cur, request, tid, workspace_client_id)
         payload = fn(cur, tenant_id=tid, workspace_client_id=ws, period=period)
     if fmt == "pdf":
-        pdf = books_pdf.render(kind, payload, lang=_lang(lang))
+        pdf = books_pdf.render(kind, payload, lang=lang_or_default(lang))
         return Response(
             content=pdf,
             media_type="application/pdf",
@@ -175,7 +170,7 @@ async def api_export_package(
                 cur, tenant_id=tid, workspace_client_id=ws, period=period
             ),
         }
-    data = books_pdf.export_package(payloads, period=period, lang=_lang(lang))
+    data = books_pdf.export_package(payloads, period=period, lang=lang_or_default(lang))
     return Response(
         content=data,
         media_type="application/zip",

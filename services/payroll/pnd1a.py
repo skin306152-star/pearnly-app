@@ -31,10 +31,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 
-from services.payroll import model
-from services.recon.field_comparator import mod11_check
+from services.payroll import model, validate
 
-_TAX_ID_LEN = 13
 _EPS = Decimal("0.01")
 
 _TWO_DP = Decimal("0.01")
@@ -213,7 +211,7 @@ def _check_id(row: dict) -> list:
     """mod-11 复验(月度提交时验过,但 commit_endpoint 的 issues 不阻断落库——坏行可能
     已进库,年度聚合前再查一遍,不能假设库里的都是干净数据)。"""
     tid = row.get("employee_id") or ""
-    if len(tid) == _TAX_ID_LEN and tid.isdigit() and mod11_check(tid):
+    if validate.is_valid_employee_id(tid):
         return []
     return [
         model.Issue(

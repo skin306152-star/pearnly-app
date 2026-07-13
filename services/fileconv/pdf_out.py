@@ -22,6 +22,7 @@ from typing import List
 from services.fileconv.model import (
     BANK_STATEMENT,
     GL_LEDGER,
+    ISSUE_ROW_HIGHLIGHT,
     REJECT_STATUSES,
     ConvertResult,
     Table,
@@ -30,7 +31,7 @@ from services.usage.usage_report_pdf_text import _build_paragraph_text, _registe
 
 _LEDGER_TYPES = (GL_LEDGER, BANK_STATEMENT)
 _LANDSCAPE_COL_THRESHOLD = 8
-_ISSUE_ROW_BG = "#FFF3CD"  # 同 xlsx_out._ISSUE_FILL,PDF/xlsx 不平行同一视觉语言
+_ISSUE_ROW_BG = "#" + ISSUE_ROW_HIGHLIGHT  # PDF/xlsx 不平行同一视觉语言(单源在 model)
 
 _L = {
     "title.gl": {
@@ -145,15 +146,14 @@ def _table_flowable(table: Table, bad_lines: set, avail_width: float):
     from reportlab.platypus import LongTable, Paragraph, Spacer, TableStyle
 
     base, bold = _register_fonts()
+    # 样式只有三种组合,提到循环外一次建好——千行 GL 表逐格现造 ParagraphStyle
+    # 是 O(rows×cols) 次全量属性继承,纯浪费(下载 PDF 是同步热路径)。
+    header_style = ParagraphStyle("h", fontName=bold, fontSize=8.2, leading=11, alignment=TA_LEFT)
+    num_style = ParagraphStyle("n", fontName=base, fontSize=8, leading=11, alignment=TA_RIGHT)
+    text_style = ParagraphStyle("t", fontName=base, fontSize=8, leading=11, alignment=TA_LEFT)
 
     def cell(text, is_num, header=False):
-        style = ParagraphStyle(
-            "c",
-            fontName=(bold if header else base),
-            fontSize=8 if not header else 8.2,
-            leading=11,
-            alignment=TA_RIGHT if is_num else TA_LEFT,
-        )
+        style = header_style if header else (num_style if is_num else text_style)
         return Paragraph(_build_paragraph_text(str(text), header), style)
 
     data = [[cell(h, False, header=True) for h in table.columns]]

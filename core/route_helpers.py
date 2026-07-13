@@ -53,6 +53,15 @@ def content_disposition(filename: str, fallback: str) -> str:
     return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}"
 
 
+_LANGS = ("th", "zh", "en", "ja")
+
+
+def lang_or_default(lang) -> str:
+    """?lang= 查询参归一:四语白名单,兜底 th(用户主力语)。fileconv_routes /
+    accounting_books_routes 曾各自维护逐字节相同的实现(2026-07-13 simplify 收敛于此)。"""
+    return lang if lang in _LANGS else "th"
+
+
 @contextmanager
 def translate_unique_violation(code: str):
     """把 DB 唯一约束冲突翻成干净 409(而非裸 500)。

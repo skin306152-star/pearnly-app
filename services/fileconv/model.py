@@ -34,6 +34,9 @@ ISSUE_RUNNING_BALANCE = "running_balance"  # |余额变动| ≠ 本行金额(单
 ISSUE_FOOTER_TOTAL = "footer_total"  # 明细列合计 ≠ 报表总计行
 ISSUE_CLOSING_ANCHOR = "closing_anchor"  # 文档印刷期末余额 ≠ 解析末行余额(治截断假自洽的独立锚)
 
+# 不平行高亮色(无 # 前缀 hex)——xlsx_out(PatternFill)/pdf_out(表格底色)同一视觉语言的单源。
+ISSUE_ROW_HIGHLIGHT = "FFF3CD"
+
 
 @dataclass
 class LedgerRow:

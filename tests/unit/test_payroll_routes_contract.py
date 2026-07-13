@@ -452,7 +452,9 @@ class AnnualOutputTests(_GatedCase):
         self.assertEqual(ctx.exception.detail["code"], "payroll.no_year_data")
 
     async def test_bad_kind_is_400_honest_downgrade_message(self):
-        self._wire(cur=_Cur(fetchone_seq=[_CLIENT_ROW]))
+        # 有数据时 kind 非法才是 400 语义;鉴权/数据存在性检查在前(simplify 收口后
+        # kind 检查挪到 _load_year_or_404 之后,无数据的 attach 请求走 404 不泄语义)。
+        self._wire(cur=_Cur(fetchone_seq=[_CLIENT_ROW], fetchall_return=_annual_db_rows()[:1]))
         with self.assertRaises(HTTPException) as ctx:
             await pr.annual_output_endpoint(
                 mock.Mock(), workspace_client_id=7, tax_year="2569", kind="attach"

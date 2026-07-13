@@ -129,6 +129,15 @@ def _usage(resp) -> Tuple[int, int]:
     return (0, 0)
 
 
+def _safe_text(resp) -> str:
+    """`.text` 访问器在混合 parts/空 candidates 时可能抛——统一收敛为空串,走各调用方
+    既有的 empty/parse 路(同 aistudio._safe_raw 手法;vertex 不细分截断,刻意最小化)。"""
+    try:
+        return (getattr(resp, "text", "") or "").strip()
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def _gen_json(contents, *, model_name, config, max_retries):
     from services.ocr.layer2_gemini import _parse_json
 
@@ -141,10 +150,7 @@ def _gen_json(contents, *, model_name, config, max_retries):
             )
         except Exception as e:  # noqa: BLE001
             return ProviderOutcome(ok=False, error_kind=_error_kind(e), model=model_name)
-        try:
-            raw = (getattr(resp, "text", "") or "").strip()
-        except Exception:  # noqa: BLE001 — 混合 parts 时 .text 可能抛(同 text_to_action 口径)
-            raw = ""
+        raw = _safe_text(resp)
         it, ot = _usage(resp)
         if raw:
             last_raw = raw
@@ -251,10 +257,7 @@ def text_to_action(
             input_tokens=it,
             output_tokens=ot,
         )
-    try:
-        text = (getattr(resp, "text", "") or "").strip()
-    except Exception:  # noqa: BLE001 — 混合 parts 时 .text 可能抛
-        text = ""
+    text = _safe_text(resp)
     if text:
         return ProviderOutcome(
             ok=True,
@@ -314,10 +317,7 @@ def text_to_text(
         )
     except Exception as e:  # noqa: BLE001
         return ProviderOutcome(ok=False, error_kind=_error_kind(e), model=model_name)
-    try:
-        text = (getattr(resp, "text", "") or "").strip()
-    except Exception:  # noqa: BLE001 — 混合 parts 时 .text 可能抛(同 text_to_action 口径)
-        text = ""
+    text = _safe_text(resp)
     it, ot = _usage(resp)
     if not text:
         return ProviderOutcome(ok=False, error_kind="parse", model=model_name)

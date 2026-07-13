@@ -21,7 +21,7 @@ from typing import Optional
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
-from core.route_helpers import authorize_pearnly_ai, content_disposition
+from core.route_helpers import authorize_pearnly_ai, content_disposition, lang_or_default
 from services.fileconv import pdf_out
 from services.fileconv.convert import convert_image, convert_pdf
 from services.fileconv.excel_in import convert_excel
@@ -39,11 +39,6 @@ _PDF_MEDIA_TYPE = "application/pdf"
 # 图片扩展白名单:扫描件走 OCR(K1c);Excel/CSV 走 K2;带文字层 PDF(默认)走纯函数路。
 _IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp")
 _EXCEL_EXTS = (".xlsx", ".xlsm", ".xls", ".csv")
-_LANGS = ("th", "zh", "en", "ja")
-
-
-def _lang(lang: Optional[str]) -> str:
-    return lang if lang in _LANGS else "th"
 
 
 def _run_conversion(data: bytes, filename: str, tenant_id: str) -> ConvertResult:
@@ -113,7 +108,7 @@ async def convert_endpoint(
         )
 
     if fmt == "pdf":
-        pdf_bytes = pdf_out.render(result, lang=_lang(lang))
+        pdf_bytes = pdf_out.render(result, lang=lang_or_default(lang))
         return StreamingResponse(
             io.BytesIO(pdf_bytes),
             media_type=_PDF_MEDIA_TYPE,

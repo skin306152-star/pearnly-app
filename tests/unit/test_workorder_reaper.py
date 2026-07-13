@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-"""部署中断工单收尸守门(services/workorder/reaper.py · MC2-0)。
+"""部署中断工单收尸守门(services/workorder/reaper.py · MC2-0 + MC2-A1)。
 
-脱库:注入假 db/store,验证 ①死亡判据只认 status=running+租约过期(状态词取
-engine.STATUS_RUNNING,抢占单句条件 UPDATE 重验)②事件序列 run_failed(interrupted)
-→ run_requested(auto)→ 续跑,租约 owner 原样交给 advance ③熔断:自动重跑限 3 次,
-从事件流现算,超限停 stuck 不再爬(去掉熔断逻辑本组必红)④人工重跑重置熔断预算
+脱库:注入假 db/store,验证 ①死亡判据只认 status=running + store 判据谓词(状态词取
+engine.STATUS_RUNNING,抢占单句条件 UPDATE 重验,宽限=租约 TTL)②事件序列
+run_failed(interrupted)→ run_requested(auto)→ 续跑走 runner.request_run(推进原语单一
+事实源),租约 owner 原样交给 advance ③熔断:自动重跑限 3 次,从 run_requested 的 actor
+序列现算(窄读),超限停 stuck 不再爬(去掉熔断逻辑本组必红)④人工重跑重置熔断预算
 ⑤一单失败不连坐 ⑥同进程 in-flight 可证活不误收。
 """
 
@@ -35,9 +36,9 @@ class _FakeDB:
 
 
 class _FakeStore:
-    def __init__(self, dead=None, events=None, claim=True):
+    def __init__(self, dead=None, actors=None, claim=True):
         self.dead = list(dead or [])
-        self.events_by_wo = dict(events or {})
+        self.actors_by_wo = dict(actors or {})
         self.claim = claim  # True/False 或 callable(work_order_id) -> bool
         self.scan_calls = []
         self.claim_calls = []
@@ -48,18 +49,27 @@ class _FakeStore:
     def ensure_runtime(self):
         pass
 
-    def list_dead_runs(self, cur, *, status, limit):
-        self.scan_calls.append({"status": status, "limit": limit})
+    def list_dead_runs(self, cur, *, status, orphan_grace_seconds, limit):
+        self.scan_calls.append({"status": status, "grace": orphan_grace_seconds, "limit": limit})
         return list(self.dead)
 
-    def claim_dead_run(self, cur, *, tenant_id, work_order_id, owner, ttl_seconds, status):
+    def claim_dead_run(
+        self, cur, *, tenant_id, work_order_id, owner, ttl_seconds, status, orphan_grace_seconds
+    ):
         self.claim_calls.append(
-            {"work_order_id": work_order_id, "owner": owner, "ttl": ttl_seconds, "status": status}
+            {
+                "work_order_id": work_order_id,
+                "owner": owner,
+                "ttl": ttl_seconds,
+                "status": status,
+                "grace": orphan_grace_seconds,
+            }
         )
         return self.claim(work_order_id) if callable(self.claim) else self.claim
 
-    def list_events(self, cur, *, tenant_id, work_order_id):
-        return list(self.events_by_wo.get(work_order_id, []))
+    def list_event_actors(self, cur, *, tenant_id, work_order_id, step, event_type):
+        assert step == runner.RUN_STEP and event_type == runner.EVT_RUN_REQUESTED
+        return list(self.actors_by_wo.get(work_order_id, []))
 
     def append_event(
         self, cur, *, tenant_id, work_order_id, step, event_type, payload=None, actor="system"
@@ -81,40 +91,43 @@ class _FakeStore:
         self.statuses.append({"work_order_id": work_order_id, "status": status})
 
 
-def _run_requested(actor):
-    return {"step": runner.RUN_STEP, "event_type": runner.EVT_RUN_REQUESTED, "actor": actor}
-
-
 _DEAD = {"id": "wo-1", "tenant_id": "t-1"}
 
 
 class ReaperTestBase(unittest.TestCase):
     def setUp(self):
-        self._patch("db", _FakeDB())
+        fake_db = _FakeDB()
+        self._patch(reaper, "db", fake_db)
+        self._patch(runner, "db", fake_db)  # request_run 的事务也走假库
         self.spawned = []
-        self._patch("_spawn_advance", lambda t, w, o: self.spawned.append((t, w, o)))
+        self._patch(runner, "_spawn_advance", lambda t, w, o: self.spawned.append((t, w, o)))
 
-    def _patch(self, name, value):
-        orig = getattr(reaper, name)
-        setattr(reaper, name, value)
-        self.addCleanup(setattr, reaper, name, orig)
+    def _patch(self, mod, name, value):
+        orig = getattr(mod, name)
+        setattr(mod, name, value)
+        self.addCleanup(setattr, mod, name, orig)
 
     def _use(self, store):
         self.store = store
-        self._patch("store", store)
+        self._patch(reaper, "store", store)
+        self._patch(runner, "store", store)  # 收尸续跑经 request_run 落 run_requested
         return store
 
 
 class DeathCriterionTests(ReaperTestBase):
-    def test_scan_and_claim_use_running_status_only(self):
-        # 判据单一:扫描与抢占都只认 engine.STATUS_RUNNING(词汇不手打),抢占带收尸 owner。
+    def test_scan_and_claim_use_running_status_and_ttl_grace(self):
+        # 判据单一:扫描与抢占都只认 engine.STATUS_RUNNING(词汇不手打),孤儿宽限=租约 TTL,
+        # 抢占带收尸 owner。
         store = self._use(_FakeStore(dead=[_DEAD]))
         reaper.reap_dead_runs()
-        self.assertEqual(store.scan_calls[0]["status"], engine.STATUS_RUNNING)
+        scan = store.scan_calls[0]
+        self.assertEqual(scan["status"], engine.STATUS_RUNNING)
+        self.assertEqual(scan["grace"], runner.run_lease_ttl_seconds())
         claim = store.claim_calls[0]
         self.assertEqual(claim["status"], engine.STATUS_RUNNING)
         self.assertTrue(claim["owner"].startswith("reaper:"))
         self.assertEqual(claim["ttl"], runner.run_lease_ttl_seconds())
+        self.assertEqual(claim["grace"], runner.run_lease_ttl_seconds())
 
     def test_claim_lost_is_noop(self):
         # 幂等抢占:多 worker 同扫一单,抢不到的一方不落事件、不续跑。
@@ -148,7 +161,7 @@ class AcknowledgeAndResumeTests(ReaperTestBase):
         self.assertEqual(failed["actor"], reaper.ACTOR_REAPER)
         self.assertEqual(requested["payload"], {"auto_resume": 1})
         self.assertEqual(requested["actor"], reaper.ACTOR_REAPER)
-        # 抢到的租约原样交给 advance(与 /run 同路径),不释放再重抢。
+        # 抢到的租约原样交给 advance(与 /run 同一 request_run 路径),不释放再重抢。
         self.assertEqual(self.spawned, [("t-1", "wo-1", store.claim_calls[0]["owner"])])
         self.assertEqual(store.released, [])
         self.assertEqual(stats, {"reaped": 1, "resumed": 1, "halted": 0})
@@ -171,8 +184,8 @@ class BreakerTests(ReaperTestBase):
     def test_breaker_trips_at_limit_and_halts_honestly(self):
         # 咬人测试:去掉熔断(无条件续跑)→ 这里必红。3 次自动重跑用尽 → 只认账不再爬:
         # run_failed(exhausted)+ step_stuck(人话原因)+ 工单置 stuck + 释放租约,不 spawn。
-        history = [_run_requested(reaper.ACTOR_REAPER)] * reaper.AUTO_RESUME_LIMIT
-        store = self._use(_FakeStore(dead=[_DEAD], events={"wo-1": history}))
+        history = [reaper.ACTOR_REAPER] * reaper.AUTO_RESUME_LIMIT
+        store = self._use(_FakeStore(dead=[_DEAD], actors={"wo-1": history}))
         stats = reaper.reap_dead_runs()
 
         kinds = [e["event_type"] for e in store.appended]
@@ -186,9 +199,8 @@ class BreakerTests(ReaperTestBase):
 
     def test_breaker_resets_after_human_rerun(self):
         # 人工 /run 过一次 = 人已介入,自动重跑预算重置,继续收尸续跑。
-        history = [_run_requested(reaper.ACTOR_REAPER)] * reaper.AUTO_RESUME_LIMIT
-        history.append(_run_requested("user:zihao"))
-        store = self._use(_FakeStore(dead=[_DEAD], events={"wo-1": history}))
+        history = [reaper.ACTOR_REAPER] * reaper.AUTO_RESUME_LIMIT + ["user:zihao"]
+        store = self._use(_FakeStore(dead=[_DEAD], actors={"wo-1": history}))
         stats = reaper.reap_dead_runs()
         self.assertEqual(stats["resumed"], 1)
         self.assertEqual(len(self.spawned), 1)
@@ -196,31 +208,20 @@ class BreakerTests(ReaperTestBase):
         self.assertEqual(requested["event_type"], runner.EVT_RUN_REQUESTED)
         self.assertEqual(requested["payload"], {"auto_resume": 1})
 
-    def test_auto_resume_count_from_event_stream(self):
+    def test_auto_resume_count_from_request_actors(self):
         count = reaper.auto_resume_count
         self.assertEqual(count([]), 0)
-        self.assertEqual(count([_run_requested("user:a")]), 0)
-        self.assertEqual(count([_run_requested(reaper.ACTOR_REAPER)] * 2), 2)
-        # 人为请求重置;非 run 步/其它事件不计。
-        self.assertEqual(
-            count(
-                [
-                    _run_requested(reaper.ACTOR_REAPER),
-                    _run_requested("user:a"),
-                    _run_requested(reaper.ACTOR_REAPER),
-                    {"step": "classify", "event_type": "item_classified", "actor": "system"},
-                    {"step": runner.RUN_STEP, "event_type": runner.EVT_RUN_STARTED, "actor": "x"},
-                ]
-            ),
-            1,
-        )
+        self.assertEqual(count(["user:a"]), 0)
+        self.assertEqual(count([reaper.ACTOR_REAPER] * 2), 2)
+        # 人为请求重置计数。
+        self.assertEqual(count([reaper.ACTOR_REAPER, "user:a", reaper.ACTOR_REAPER]), 1)
 
 
 class TickHookTests(ReaperTestBase):
     def test_run_tick_is_coroutine_running_shared_impl(self):
         self.assertTrue(inspect.iscoroutinefunction(reaper.run_tick))
         calls = []
-        self._patch("reap_dead_runs", lambda: calls.append(1))
+        self._patch(reaper, "reap_dead_runs", lambda: calls.append(1))
         asyncio.run(reaper.run_tick())
         self.assertEqual(calls, [1])
 
@@ -229,7 +230,7 @@ class TickHookTests(ReaperTestBase):
         from services import background_loops as bl
 
         calls = []
-        self._patch("reap_dead_runs", lambda: calls.append(1))
+        self._patch(reaper, "reap_dead_runs", lambda: calls.append(1))
         asyncio.run(bl.run_recovery_tick())
         self.assertEqual(calls, [1])
 
@@ -245,7 +246,7 @@ class TickHookTests(ReaperTestBase):
         async def fake_tick():
             calls.append(1)
 
-        self._patch("run_tick", fake_tick)
+        self._patch(reaper, "run_tick", fake_tick)
         # 收尸后 loop 进 30s sleep;wait_for 掐断它,只验证开场那一步。
 
         async def main():
@@ -260,7 +261,7 @@ class TickHookTests(ReaperTestBase):
         def boom():
             raise RuntimeError("db down")
 
-        self._patch("reap_dead_runs", boom)
+        self._patch(reaper, "reap_dead_runs", boom)
         asyncio.run(reaper.run_tick())  # 不应 raise
 
 

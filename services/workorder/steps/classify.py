@@ -145,8 +145,9 @@ def run(ctx: StepContext) -> StepResult:
 @contextmanager
 def _item_scope(ctx: StepContext):
     """单件写作用域。有 cursor_factory:每件开一个独立事务(update_item + item_classified 原子
-    落库并提交),进程被杀只丢在飞件、已落件永久成立——逐件检查点。无 cursor_factory(内存
-    测试 / CLI 单事务):复用 ctx.cur,由上层统一提交,行为逐字节不变。"""
+    落库并提交),进程被杀只丢在飞件、已落件永久成立——逐件检查点;提交前顺带给 run 租约
+    续期(MC2-A1 ④ 心跳):超长合法跑批不再耗穿 TTL 被收尸人误判为死。无 cursor_factory
+    (内存测试 / CLI 单事务):复用 ctx.cur,由上层统一提交,行为逐字节不变。"""
     if ctx.cursor_factory is None:
         yield
         return
@@ -155,8 +156,24 @@ def _item_scope(ctx: StepContext):
         ctx.cur = cur
         try:
             yield
+            _renew_lease(ctx, cur)
         finally:
             ctx.cur = prev
+
+
+def _renew_lease(ctx: StepContext, cur) -> None:
+    """检查点心跳:只续自己 owner 的租约(条件 UPDATE,易主即不续)。租约料由 runner.advance
+    放进 ctx.data['run_lease'];直调(CLI/测试)不持约则无此键,零动作。"""
+    lease = ctx.data.get("run_lease") or {}
+    if not lease.get("owner"):
+        return
+    ctx.store.renew_run_lease(
+        cur,
+        tenant_id=ctx.tenant_id,
+        work_order_id=ctx.work_order_id,
+        owner=lease["owner"],
+        ttl_seconds=lease["ttl_seconds"],
+    )
 
 
 def _ocr_safe(item: dict, tenant_id: str):

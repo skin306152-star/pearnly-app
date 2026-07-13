@@ -332,7 +332,7 @@ class DecideTests(_GatedRouteCase):
             "closed_at": None,
         }
 
-    async def test_decide_applies_and_transitions(self):
+    async def test_decide_applies_transitions_and_schedules_advance(self):
         from routes import client_pool_routes as cpr
 
         self._wire(cpr)
@@ -345,24 +345,33 @@ class DecideTests(_GatedRouteCase):
         trans = self.enterContext(
             mock.patch.object(cpr.pool_store, "transition", return_value=applied)
         )
+        adv = self.enterContext(mock.patch.object(cpr, "_auto_advance"))
         out = await cpr.decide_question(
-            5, cpr.DecideIn(workspace_client_id=7, decision="exclude"), mock.Mock()
+            5, cpr.DecideIn(workspace_client_id=7, decision="exclude"), mock.Mock(), mock.Mock()
         )
         self.assertTrue(out["ok"])
         self.assertEqual(out["question"]["status"], vocab.APPLIED)
         trans.assert_called_once()
         self.assertEqual(trans.call_args.args[2], vocab.APPLIED)
+        # MC2-A1 补的漏接:裁决落库成功后同源自驱续跑该工单(不再停等手点 /run)。
+        adv.assert_called_once()
+        self.assertEqual(adv.call_args.args[2], "wo-1")
 
     async def test_question_not_in_manual_review_is_404(self):
         from routes import client_pool_routes as cpr
 
         self._wire(cpr)
         self.enterContext(mock.patch.object(cpr.pool_store, "list_for_client", return_value=[]))
+        adv = self.enterContext(mock.patch.object(cpr, "_auto_advance"))
         with self.assertRaises(HTTPException) as ctx:
             await cpr.decide_question(
-                99, cpr.DecideIn(workspace_client_id=7, decision="exclude"), mock.Mock()
+                99,
+                cpr.DecideIn(workspace_client_id=7, decision="exclude"),
+                mock.Mock(),
+                mock.Mock(),
             )
         self.assertEqual(ctx.exception.status_code, 404)
+        adv.assert_not_called()
 
     async def test_illegal_transition_is_409(self):
         from routes import client_pool_routes as cpr
@@ -382,7 +391,7 @@ class DecideTests(_GatedRouteCase):
         )
         with self.assertRaises(HTTPException) as ctx:
             await cpr.decide_question(
-                5, cpr.DecideIn(workspace_client_id=7, decision="exclude"), mock.Mock()
+                5, cpr.DecideIn(workspace_client_id=7, decision="exclude"), mock.Mock(), mock.Mock()
             )
         self.assertEqual(ctx.exception.status_code, 409)
 

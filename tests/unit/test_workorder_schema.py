@@ -145,5 +145,32 @@ class FreezeEvidenceParityTests(unittest.TestCase):
         self.assertIn("ON DELETE CASCADE", text)  # 反向恢复
 
 
+_SCAN_INDEX_MIGRATION = "alembic/versions/0075_workorder_reaper_scan_index.py"
+
+# 收尸扫描部分索引(MC2-A1 效率8)DDL 关键片段:ensure(schema.RUNTIME_ALTERS)与 0075
+# 迁移必须同款(dual-run,prod alembic 停 0020 靠 ensure 自愈)。
+_SCAN_INDEX_NEEDLES = (
+    "ix_wo_dead_run_scan",
+    "ON work_orders (run_lease_expires_at)",
+    "WHERE status = 'running' AND run_lease_expires_at IS NOT NULL",
+)
+
+
+class ReaperScanIndexParityTests(unittest.TestCase):
+    def test_ensure_and_migration_carry_same_index_ddl(self):
+        ensure_text = _text(_ENSURE)
+        migration_text = _text(_SCAN_INDEX_MIGRATION)
+        for needle in _SCAN_INDEX_NEEDLES:
+            self.assertIn(needle, ensure_text, f"ensure 缺扫描索引 DDL: {needle}")
+            self.assertIn(needle, migration_text, f"0075 迁移缺扫描索引 DDL: {needle}")
+
+    def test_migration_chains_to_current_head(self):
+        text = _text(_SCAN_INDEX_MIGRATION)
+        self.assertIn('down_revision = "0074_line_intake_staging"', text)
+
+    def test_migration_downgrade_drops_index(self):
+        self.assertIn("DROP INDEX IF EXISTS ix_wo_dead_run_scan", _text(_SCAN_INDEX_MIGRATION))
+
+
 if __name__ == "__main__":
     unittest.main()

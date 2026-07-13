@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Optional
 
 from services.line_binding import client_pool_vocab, line_client_pool_store
-from services.workorder import api, engine, obligation_engine, store
+from services.workorder import api, engine, obligation_engine, runner, store
 
 # review 域 append-only 事件词(单一事实源)。
 EVT_REVIEW_REJECTED = "review_rejected"
@@ -255,12 +255,53 @@ def batch_decisions(
     }
 
 
+def reject_and_rerun(
+    *, tenant_id: str, work_order_id: str, actor: str, reason: Optional[str], background=None
+) -> dict:
+    """驳回重做 + 自动重跑,状态翻转与抢租约同一事务(MC2-A1 ②)。
+
+    reject_review 把 status 翻回 running——若翻完事务提交、事后调度才抢租约,中间被杀就留下
+    「running + 租约 NULL」孤儿(F3 立案的谎言窗口)。这里把「抢租约 → 驳回翻状态」装进
+    request_run 的 lease 闭包:同一事务要么全成(状态=running 且租约在手),要么全滚
+    (工单还是 review,可重试);校验错(非 review 态/空原因)在闭包内抛,事务回滚、租约不留。
+    抢不到租约(罕见:有 run 正在跑)→ 驳回不落,抛 run_in_progress 交路由 409。"""
+    out: dict = {}
+
+    def lease_and_reject(cur, *, tenant_id, work_order_id, owner, ttl_seconds) -> bool:
+        if not store.acquire_run_lease(
+            cur,
+            tenant_id=tenant_id,
+            work_order_id=work_order_id,
+            owner=owner,
+            ttl_seconds=ttl_seconds,
+        ):
+            return False
+        out.update(
+            reject_review(
+                cur,
+                tenant_id=tenant_id,
+                work_order_id=work_order_id,
+                actor=actor,
+                reason=reason,
+            )
+        )
+        return True
+
+    scheduled = runner.request_run(
+        tenant_id, work_order_id, actor=actor, lease=lease_and_reject, background=background
+    )
+    if scheduled is None:
+        raise api.WorkOrderApiError("workorder.run_in_progress")
+    return out
+
+
 def reject_review(
     cur, *, tenant_id: str, work_order_id: str, actor: str, reason: Optional[str]
 ) -> dict:
     """驳回重做:落 review_rejected(原因必填)→ 重开受影响步(append-only step_reopened)→
-    状态回可跑态。返回后由路由排 _schedule_advance,引擎从 reconcile 重跑到 package(交付物
-    version+1,机制现成)再落回 review——二次进队列,reject_count>0 标返工件。仅 review 态可驳回。"""
+    状态回可跑态。调用方 reject_and_rerun 把本函数与抢租约装进同一事务并排后台重跑,引擎从
+    reconcile 重跑到 package(交付物 version+1,机制现成)再落回 review——二次进队列,
+    reject_count>0 标返工件。仅 review 态可驳回。"""
     wo = store.get_work_order(cur, tenant_id=tenant_id, work_order_id=work_order_id)
     if not wo:
         raise api.WorkOrderApiError("workorder.not_found")

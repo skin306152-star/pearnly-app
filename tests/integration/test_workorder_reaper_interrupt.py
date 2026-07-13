@@ -89,12 +89,21 @@ class ReaperInterruptIntegration(unittest.TestCase):
         self.wo_id = str(wo["id"])
 
     def _neutralize_stray_dead_runs(self):
-        """共享本地库可能残留别的测试留下的死单——收尸人是全局扫描,先把它们摘出判据,
-        保证本用例的 OCR 计数/事件断言不被无关工单污染。"""
+        """共享本地库可能残留别的测试留下的死单——收尸人是全局扫描,先把它们摘出判据
+        (两支都摘:过期租约支清租约,孤儿支刷新 updated_at 重启宽限),保证本用例的
+        OCR 计数/事件断言不被无关工单污染。"""
+        from services.workorder import runner
+
+        ttl = runner.run_lease_ttl_seconds()
         with self.db.get_cursor(commit=True) as cur:
             cur.execute(
-                "UPDATE work_orders SET run_lease_owner = NULL, run_lease_expires_at = NULL "
-                "WHERE status = 'running' AND run_lease_expires_at < now()"
+                "UPDATE work_orders SET run_lease_owner = NULL, run_lease_expires_at = NULL, "
+                "updated_at = now() "
+                "WHERE status = 'running' AND ("
+                "(run_lease_expires_at IS NOT NULL AND run_lease_expires_at < now()) "
+                "OR (run_lease_owner IS NULL AND run_lease_expires_at IS NULL "
+                "AND updated_at < now() - make_interval(secs => %s)))",
+                (ttl,),
             )
 
     def _register_materials(self, n=_N_ITEMS):
@@ -302,11 +311,273 @@ class ReaperInterruptIntegration(unittest.TestCase):
             work_order_id=self.wo_id,
             ttl_seconds=runner.run_lease_ttl_seconds(),
             status="running",
+            orphan_grace_seconds=runner.run_lease_ttl_seconds(),
         )
         with self.db.get_cursor(commit=True) as cur:
             self.assertTrue(self.store.claim_dead_run(cur, owner="reaper:a", **kw))
         with self.db.get_cursor(commit=True) as cur:
             self.assertFalse(self.store.claim_dead_run(cur, owner="reaper:b", **kw))
+
+    def _make_orphan(self, *, stale: bool):
+        """造 F3 孤儿现场:status=running、租约 NULL;stale=True 把 updated_at 拨老过宽限。"""
+        with self.db.get_cursor(commit=True) as cur:
+            self.store.set_status(
+                cur,
+                tenant_id=self.tenant,
+                work_order_id=self.wo_id,
+                status="running",
+                current_step="reconcile",
+            )
+            cur.execute(
+                "UPDATE work_orders SET run_lease_owner = NULL, run_lease_expires_at = NULL, "
+                "updated_at = now() - make_interval(secs => %s) WHERE id = %s",
+                (99999 if stale else 0, self.wo_id),
+            )
+
+    def test_orphan_running_without_lease_is_reaped_after_grace(self):
+        # F3 咬人:reject 翻了 running、调度被吞 → 「running + 租约 NULL」孤儿。判据扩展前
+        # 收尸人对它失明(本测必红);扩展后照常认账 + 自动续跑到自然停点。
+        from services.workorder import reaper
+
+        self._register_materials(2)
+        self._make_orphan(stale=True)
+        stats = reaper.reap_dead_runs()
+        self.assertEqual(stats["resumed"], 1)
+
+        self._poll(
+            lambda cur: _count(_events(cur, self.store, self.tenant, self.wo_id), "run_finished")
+            or None,
+            timeout=120,
+            desc="孤儿收尸后自动续跑收尾",
+        )
+        with self.db.get_cursor() as cur:
+            evts = _events(cur, self.store, self.tenant, self.wo_id)
+            wo = self.store.get_work_order(cur, tenant_id=self.tenant, work_order_id=self.wo_id)
+        failed = next(e for e in evts if e["event_type"] == "run_failed")
+        self.assertEqual(failed["payload"]["reason"], reaper.REASON_INTERRUPTED)
+        self.assertEqual(failed["actor"], reaper.ACTOR_REAPER)
+        self.assertEqual(_count(evts, "item_classified"), 2)  # 续跑真跑了 classify
+        self.assertEqual(wo["status"], "stuck")  # 自然停点(缺销项),不再谎称 running
+
+    def test_orphan_within_grace_is_left_alone(self):
+        # 宽限内(updated_at 新鲜)不收:刚翻 running 正要抢租约的合法瞬态不被误咬。
+        from services.workorder import reaper
+
+        self._make_orphan(stale=False)
+        reaper.reap_dead_runs()
+        with self.db.get_cursor() as cur:
+            wo = self.store.get_work_order(cur, tenant_id=self.tenant, work_order_id=self.wo_id)
+            evts = _events(cur, self.store, self.tenant, self.wo_id)
+        self.assertEqual(wo["status"], "running")
+        self.assertEqual(_count(evts, "run_failed"), 0)
+
+    def test_renew_run_lease_is_owner_conditional(self):
+        # MC2-A1 ④ 心跳 SQL:同 owner 续约延到期时间;易主(收尸接管)后旧 owner 续不动。
+        from services.workorder import runner
+
+        with self.db.get_cursor(commit=True) as cur:
+            self.assertTrue(
+                self.store.acquire_run_lease(
+                    cur,
+                    tenant_id=self.tenant,
+                    work_order_id=self.wo_id,
+                    owner="run:hb",
+                    ttl_seconds=60,
+                )
+            )
+        with self.db.get_cursor() as cur:
+            before = self.store.run_lease_holder(
+                cur, tenant_id=self.tenant, work_order_id=self.wo_id
+            )["run_lease_expires_at"]
+        with self.db.get_cursor(commit=True) as cur:
+            self.assertTrue(
+                self.store.renew_run_lease(
+                    cur,
+                    tenant_id=self.tenant,
+                    work_order_id=self.wo_id,
+                    owner="run:hb",
+                    ttl_seconds=runner.run_lease_ttl_seconds(),
+                )
+            )
+            self.assertFalse(
+                self.store.renew_run_lease(
+                    cur,
+                    tenant_id=self.tenant,
+                    work_order_id=self.wo_id,
+                    owner="run:someone-else",
+                    ttl_seconds=runner.run_lease_ttl_seconds(),
+                )
+            )
+        with self.db.get_cursor() as cur:
+            after = self.store.run_lease_holder(
+                cur, tenant_id=self.tenant, work_order_id=self.wo_id
+            )
+        self.assertEqual(after["run_lease_owner"], "run:hb")
+        self.assertGreater(after["run_lease_expires_at"], before)
+
+    def test_classify_checkpoint_heartbeat_extends_lease_end_to_end(self):
+        # ④ 全链证:真库真跑 classify(OCR 桩),短租约(60s)在逐件检查点被续成整 TTL——
+        # 超长合法跑批不再耗穿 TTL。摘掉 _item_scope 里的 _renew_lease 本测必红。
+        from services.workorder import engine as wo_engine
+        from services.workorder import runner
+        from services.workorder.steps import real_handlers
+
+        self._register_materials(3)
+        ttl = runner.run_lease_ttl_seconds()
+        with self.db.get_cursor(commit=True) as cur:
+            self.assertTrue(
+                self.store.acquire_run_lease(
+                    cur,
+                    tenant_id=self.tenant,
+                    work_order_id=self.wo_id,
+                    owner="run:hb-e2e",
+                    ttl_seconds=60,
+                )
+            )
+            before = self.store.run_lease_holder(
+                cur, tenant_id=self.tenant, work_order_id=self.wo_id
+            )["run_lease_expires_at"]
+
+        with self.db.get_cursor() as cur:
+            items = self.store.list_items(cur, tenant_id=self.tenant, work_order_id=self.wo_id)
+        ctx = wo_engine.StepContext(
+            cur=None,
+            tenant_id=self.tenant,
+            work_order_id=self.wo_id,
+            # data 与 runner.advance 同款(intake 回喂已登记料 + 心跳租约料)。
+            data={
+                "intake_files": [it["file_ref"] for it in items if it.get("file_ref")],
+                "run_lease": {"owner": "run:hb-e2e", "ttl_seconds": ttl},
+            },
+            cursor_factory=lambda: self.db.get_cursor(commit=True),
+        )
+        out = wo_engine.run_work_order(ctx, handlers=real_handlers())
+        self.assertFalse(out.completed)  # 自然停点(缺销项),与主剧本一致
+
+        with self.db.get_cursor() as cur:
+            holder = self.store.run_lease_holder(
+                cur, tenant_id=self.tenant, work_order_id=self.wo_id
+            )
+            evts = _events(cur, self.store, self.tenant, self.wo_id)
+        self.assertEqual(_count(evts, "item_classified"), 3)
+        self.assertEqual(holder["run_lease_owner"], "run:hb-e2e")
+        # 60s 短约被检查点心跳续成整 TTL(远超原到期点),不是只挪了几秒。
+        gained = (holder["run_lease_expires_at"] - before).total_seconds()
+        self.assertGreater(gained, ttl - 120)
+
+
+class _RecordingBg:
+    """假 BackgroundTasks:只记不跑,让事务后的状态可静态断言(不被后台 advance 抢跑)。"""
+
+    def __init__(self):
+        self.tasks = []
+
+    def add_task(self, fn, *args):
+        self.tasks.append((fn, args))
+
+
+class RejectRerunAtomicityIntegration(unittest.TestCase):
+    """MC2-A1 ②:驳回翻状态与抢租约同一事务——提交后的单一快照必须同时看到
+    status=running 和在手租约,任何时刻都不存在「running + 租约 NULL」窗口。"""
+
+    def setUp(self):
+        require_db()
+        from core import db
+        from services.workorder import store
+        from tests.integration._workorder_schema import build_workorder_schema
+
+        self.db, self.store = db, store
+        build_workorder_schema()
+        store.ensure_runtime()
+        self.tenant = str(uuid.uuid4())
+        with self.db.get_cursor(commit=True) as cur:
+            wo = self.store.open_work_order(
+                cur, tenant_id=self.tenant, workspace_client_id=1, period="2569-06"
+            )
+            self.store.set_status(
+                cur, tenant_id=self.tenant, work_order_id=str(wo["id"]), status="review"
+            )
+        self.wo_id = str(wo["id"])
+
+    def _snapshot(self):
+        with self.db.get_cursor() as cur:
+            wo = self.store.get_work_order(cur, tenant_id=self.tenant, work_order_id=self.wo_id)
+            holder = self.store.run_lease_holder(
+                cur, tenant_id=self.tenant, work_order_id=self.wo_id
+            )
+            evts = _events(cur, self.store, self.tenant, self.wo_id)
+        return wo, holder, evts
+
+    def test_reject_commits_running_and_lease_atomically(self):
+        from services.workorder import review
+
+        bg = _RecordingBg()
+        out = review.reject_and_rerun(
+            tenant_id=self.tenant,
+            work_order_id=self.wo_id,
+            actor="user:reviewer",
+            reason="税额可疑",
+            background=bg,
+        )
+        wo, holder, evts = self._snapshot()
+        self.assertEqual(out["status"], "running")
+        self.assertEqual(wo["status"], "running")
+        self.assertEqual(wo["current_step"], "reconcile")
+        self.assertIsNotNone(holder, "翻成 running 的同一事务里必须已持有租约")
+        kinds = [e["event_type"] for e in evts]
+        self.assertIn("review_rejected", kinds)
+        self.assertEqual(kinds.count("step_reopened"), 3)
+        self.assertEqual(kinds[-1], "run_requested")
+        self.assertEqual(evts[-1]["actor"], "user:reviewer")
+        self.assertEqual(len(bg.tasks), 1)  # 重跑已排上(此处只记不跑,便于静态断言)
+
+    def test_validation_error_rolls_back_lease_too(self):
+        # 原子性的反向证:非 review 态驳回被拒 → 整事务回滚,租约不留(否则会卡死后续 /run)。
+        from services.workorder import api, review
+
+        with self.db.get_cursor(commit=True) as cur:
+            self.store.set_status(
+                cur, tenant_id=self.tenant, work_order_id=self.wo_id, status="stuck"
+            )
+        with self.assertRaises(api.WorkOrderApiError) as ctx:
+            review.reject_and_rerun(
+                tenant_id=self.tenant,
+                work_order_id=self.wo_id,
+                actor="user:reviewer",
+                reason="x",
+                background=_RecordingBg(),
+            )
+        self.assertEqual(ctx.exception.code, "workorder.not_reviewable")
+        wo, holder, evts = self._snapshot()
+        self.assertEqual(wo["status"], "stuck")
+        self.assertIsNone(holder, "校验失败必须连租约一起回滚")
+        self.assertEqual([e for e in evts if e["event_type"] == "review_rejected"], [])
+
+    def test_run_in_progress_blocks_reject(self):
+        from services.workorder import api, review, runner
+
+        with self.db.get_cursor(commit=True) as cur:
+            self.assertTrue(
+                self.store.acquire_run_lease(
+                    cur,
+                    tenant_id=self.tenant,
+                    work_order_id=self.wo_id,
+                    owner="run:busy",
+                    ttl_seconds=runner.run_lease_ttl_seconds(),
+                )
+            )
+        with self.assertRaises(api.WorkOrderApiError) as ctx:
+            review.reject_and_rerun(
+                tenant_id=self.tenant,
+                work_order_id=self.wo_id,
+                actor="user:reviewer",
+                reason="x",
+                background=_RecordingBg(),
+            )
+        self.assertEqual(ctx.exception.code, "workorder.run_in_progress")
+        wo, _holder, evts = self._snapshot()
+        self.assertEqual(wo["status"], "review")
+        self.assertEqual([e for e in evts if e["event_type"] == "review_rejected"], [])
 
 
 if __name__ == "__main__":

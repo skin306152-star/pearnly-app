@@ -23,6 +23,18 @@ from __future__ import annotations
 import json
 from typing import Any, Optional
 
+# run 租约 + 死亡判据 DAL 拆在 run_leases.py(单文件 <500 铁律),re-export 保持调用方
+# (runner/reaper/routes/测试)的 store.* 口径不变,实现单源在彼。
+from services.workorder.run_leases import (  # noqa: F401
+    _DEAD_RUN_PREDICATE,
+    acquire_run_lease,
+    claim_dead_run,
+    list_dead_runs,
+    release_run_lease,
+    renew_run_lease,
+    run_lease_holder,
+)
+
 _EVENT_COLUMNS = "id, tenant_id, work_order_id, step, event_type, payload, actor, created_at"
 
 _runtime_ensured = False
@@ -173,92 +185,6 @@ def set_status(
         )
 
 
-def acquire_run_lease(
-    cur, *, tenant_id: str, work_order_id: str, owner: str, ttl_seconds: int
-) -> bool:
-    """抢 /run 推进租约(单句条件 UPDATE,原子)。抢到返 True,被他人未过期租约占着返 False。
-
-    可抢条件:无人持有 / 自己已持有(续租)/ 上一持有者租约已过期(接管)。过期由 now()
-    与 run_lease_expires_at 比较判定,无需后台回收线程。双终端并发 /run 各自跑这条 UPDATE,
-    Postgres 行锁串行化 → 恰一个 RETURNING 到行。
-    """
-    cur.execute(
-        """
-        UPDATE work_orders
-           SET run_lease_owner = %s,
-               run_lease_expires_at = now() + make_interval(secs => %s),
-               updated_at = now()
-         WHERE tenant_id = %s AND id = %s
-           AND (run_lease_owner IS NULL
-                OR run_lease_owner = %s
-                OR run_lease_expires_at IS NULL
-                OR run_lease_expires_at < now())
-        RETURNING id
-        """,
-        (owner, int(ttl_seconds), tenant_id, work_order_id, owner),
-    )
-    return cur.fetchone() is not None
-
-
-def list_dead_runs(cur, *, status: str, limit: int = 20) -> list[dict]:
-    """收尸扫描(MC2-0):status(调用方传 engine.STATUS_RUNNING;engine→store 的 import
-    方向不能反,状态词由调用方注入)且租约已过期 = 进程被杀实锤。活 run 持有未过期租约;
-    MC1-a 进程内崩溃路径已在 finally 释放租约置 NULL,不落入本判据(它自己落过 run_failed)。
-    跨租户系统扫描,与 background_loops 其它恢复队列同口径。"""
-    cur.execute(
-        "SELECT id, tenant_id FROM work_orders "
-        "WHERE status = %s AND run_lease_expires_at IS NOT NULL "
-        "AND run_lease_expires_at < now() "
-        "ORDER BY run_lease_expires_at LIMIT %s",
-        (status, limit),
-    )
-    return [dict(r) for r in cur.fetchall()]
-
-
-def claim_dead_run(
-    cur, *, tenant_id: str, work_order_id: str, owner: str, ttl_seconds: int, status: str
-) -> bool:
-    """收尸抢占(MC2-0):单句条件 UPDATE 重验死亡判据并接管租约(照 acquire_run_lease 的
-    接管先例)。多 worker 同时收尸,行锁串行化后恰一个 RETURNING 到行;扫描与抢占之间
-    判据若不再成立(别人已收/原单已推进),抢不到即放手。"""
-    cur.execute(
-        """
-        UPDATE work_orders
-           SET run_lease_owner = %s,
-               run_lease_expires_at = now() + make_interval(secs => %s),
-               updated_at = now()
-         WHERE tenant_id = %s AND id = %s
-           AND status = %s
-           AND run_lease_expires_at IS NOT NULL
-           AND run_lease_expires_at < now()
-        RETURNING id
-        """,
-        (owner, int(ttl_seconds), tenant_id, work_order_id, status),
-    )
-    return cur.fetchone() is not None
-
-
-def release_run_lease(cur, *, tenant_id: str, work_order_id: str, owner: str) -> None:
-    """释放租约(仅当仍是自己持有——防误释放别人接管后的租约)。"""
-    cur.execute(
-        "UPDATE work_orders SET run_lease_owner = NULL, run_lease_expires_at = NULL, "
-        "updated_at = now() WHERE tenant_id = %s AND id = %s AND run_lease_owner = %s",
-        (tenant_id, work_order_id, owner),
-    )
-
-
-def run_lease_holder(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
-    """当前有效租约(过期视为无);无 → None。观测/详情用,不参与抢占决策。"""
-    cur.execute(
-        "SELECT run_lease_owner, run_lease_expires_at FROM work_orders "
-        "WHERE tenant_id = %s AND id = %s AND run_lease_owner IS NOT NULL "
-        "AND (run_lease_expires_at IS NULL OR run_lease_expires_at > now())",
-        (tenant_id, work_order_id),
-    )
-    row = cur.fetchone()
-    return dict(row) if row else None
-
-
 def append_event(
     cur,
     *,
@@ -312,6 +238,20 @@ def append_event(
         (tenant_id, work_order_id, step, event_type, dedupe_key),
     )
     return dict(cur.fetchone())
+
+
+def list_event_actors(
+    cur, *, tenant_id: str, work_order_id: str, step: str, event_type: str
+) -> list[str]:
+    """某类事件的 actor 序列(按发生序)。收尸人算自动重跑预算只需 run/run_requested 的
+    actor,不必整条事件流搬回来(吃 ix_wo_events_wo 前缀,窄读)。"""
+    cur.execute(
+        "SELECT actor FROM work_order_events "
+        "WHERE tenant_id = %s AND work_order_id = %s AND step = %s AND event_type = %s "
+        "ORDER BY id",
+        (tenant_id, work_order_id, step, event_type),
+    )
+    return [r["actor"] if isinstance(r, dict) else r[0] for r in cur.fetchall()]
 
 
 def list_events(cur, *, tenant_id: str, work_order_id: str) -> list[dict]:

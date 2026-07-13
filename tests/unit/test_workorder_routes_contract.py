@@ -120,6 +120,8 @@ class RunLeaseRouteTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(wr, "check_workspace_scope", return_value=None),
             mock.patch.object(route_helpers, "check_workspace_scope", return_value=None),
             mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            # 推进原语下沉后事务在 runner 层开(MC2-A1),假库也要打在 runner 上。
+            mock.patch.object(wr.runner, "db", _FakeDB(_Cur())),
             mock.patch.object(wr.store, "ensure_runtime", return_value=None),
             mock.patch.object(
                 wr.store,
@@ -650,7 +652,9 @@ class AutoAdvanceTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ScheduleAdvanceTests(unittest.TestCase):
-    """_schedule_advance:抢到租约 → 落 run_requested + 排后台 advance;抢不到 → False,不排。"""
+    """_schedule_advance:抢到租约 → 落 run_requested + 排后台 advance;抢不到 → False,不排。
+    行为逐字节回归(MC2-A1 换调 runner.request_run 原语后断言不变;事务落在 runner 层,
+    故 db 假件打在 wr.runner 上)。"""
 
     def test_acquired_queues_advance(self):
         from routes import workorder_routes as wr
@@ -658,13 +662,14 @@ class ScheduleAdvanceTests(unittest.TestCase):
         bg = mock.Mock()
         with (
             mock.patch.object(wr.store, "ensure_runtime", return_value=None),
-            mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            mock.patch.object(wr.runner, "db", _FakeDB(_Cur())),
             mock.patch.object(wr.store, "acquire_run_lease", return_value=True),
             mock.patch.object(wr.store, "append_event", return_value={"id": 1}) as append,
         ):
             ok = wr._schedule_advance(bg, "t-1", "wo-1", _USER)
         self.assertTrue(ok)
         append.assert_called_once()
+        self.assertEqual(append.call_args.kwargs["actor"], "user:u1")
         bg.add_task.assert_called_once()
         args = bg.add_task.call_args[0]
         self.assertEqual((args[1], args[2]), ("t-1", "wo-1"))
@@ -676,7 +681,7 @@ class ScheduleAdvanceTests(unittest.TestCase):
         bg = mock.Mock()
         with (
             mock.patch.object(wr.store, "ensure_runtime", return_value=None),
-            mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            mock.patch.object(wr.runner, "db", _FakeDB(_Cur())),
             mock.patch.object(wr.store, "acquire_run_lease", return_value=False),
             mock.patch.object(wr.store, "append_event") as append,
         ):

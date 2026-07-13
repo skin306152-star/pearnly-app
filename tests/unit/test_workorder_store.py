@@ -108,10 +108,13 @@ class EventsAppendOnlyTests(unittest.TestCase):
         self.assertEqual([r["id"] for r in out], [1, 2])
 
     def test_dal_exposes_no_mutation_functions_for_events(self):
-        # 只追加铁律的直接证据:store 模块公开 API 里没有改/删事件的函数。
+        # 只追加铁律的直接证据:store 模块公开 API 里没有改/删事件的函数
+        # (append 与两个只读查询是全部合法出口)。
         public = {n for n in dir(store) if not n.startswith("_")}
         event_mutators = {
-            n for n in public if "event" in n and n not in ("append_event", "list_events")
+            n
+            for n in public
+            if "event" in n and n not in ("append_event", "list_events", "list_event_actors")
         }
         self.assertEqual(event_mutators, set())
 
@@ -186,82 +189,18 @@ class DeliverablesTests(unittest.TestCase):
         self.assertIn("COALESCE(MAX(version), 0) + 1", cur.calls[0][0])
 
 
-class RunLeaseTests(unittest.TestCase):
-    """C-1 §3 租约 SQL 形状:条件抢占(空/自持/过期)+ 参数化 + 释放只认自己。"""
-
-    def test_acquire_conditional_update_and_params(self):
-        cur = FakeCursor([{"id": "wo-1"}])  # RETURNING 到行 = 抢到
-        got = store.acquire_run_lease(
-            cur, tenant_id="t-1", work_order_id="wo-1", owner="run:abc", ttl_seconds=1800
+class NarrowEventReadTests(unittest.TestCase):
+    def test_list_event_actors_is_narrow_read_in_insertion_order(self):
+        # 效率4(MC2-A1):熔断预算只要 run/run_requested 的 actor 序列,不整流搬回。
+        cur = FakeCursor(fetchall_queue=[[{"actor": "system:reaper"}, {"actor": "user:a"}]])
+        out = store.list_event_actors(
+            cur, tenant_id="t-1", work_order_id="wo-1", step="run", event_type="run_requested"
         )
-        self.assertTrue(got)
         sql, params = cur.calls[0]
-        self.assertIn("UPDATE work_orders", sql)
-        self.assertIn("run_lease_owner IS NULL", sql)
-        self.assertIn("run_lease_expires_at < now()", sql)
-        self.assertIn("make_interval(secs => %s)", sql)
-        self.assertEqual(params, ("run:abc", 1800, "t-1", "wo-1", "run:abc"))
-
-    def test_acquire_returns_false_when_no_row(self):
-        cur = FakeCursor([None])  # 被他人未过期租约占着 → 0 行
-        self.assertFalse(
-            store.acquire_run_lease(
-                cur, tenant_id="t-1", work_order_id="wo-1", owner="run:x", ttl_seconds=60
-            )
-        )
-
-    def test_release_only_matches_owner(self):
-        cur = FakeCursor()
-        store.release_run_lease(cur, tenant_id="t-1", work_order_id="wo-1", owner="run:abc")
-        sql, params = cur.calls[0]
-        self.assertIn("SET run_lease_owner = NULL", sql)
-        self.assertIn("AND run_lease_owner = %s", sql)
-        self.assertEqual(params, ("t-1", "wo-1", "run:abc"))
-
-
-class DeadRunReaperDalTests(unittest.TestCase):
-    """MC2-0 收尸 DAL:死亡判据(status + 过期租约)进 SQL 谓词,状态词由调用方注入不写死。"""
-
-    def test_list_dead_runs_predicate_and_params(self):
-        cur = FakeCursor(fetchall_queue=[[{"id": "wo-1", "tenant_id": "t-1"}]])
-        rows = store.list_dead_runs(cur, status="running", limit=5)
-        sql, params = cur.calls[0]
-        self.assertIn("WHERE status = %s", sql)
-        self.assertIn("run_lease_expires_at IS NOT NULL", sql)
-        self.assertIn("run_lease_expires_at < now()", sql)
-        self.assertEqual(params, ("running", 5))
-        self.assertEqual(rows, [{"id": "wo-1", "tenant_id": "t-1"}])
-
-    def test_claim_dead_run_revalidates_death_in_single_update(self):
-        cur = FakeCursor([{"id": "wo-1"}])
-        got = store.claim_dead_run(
-            cur,
-            tenant_id="t-1",
-            work_order_id="wo-1",
-            owner="reaper:x",
-            ttl_seconds=1800,
-            status="running",
-        )
-        self.assertTrue(got)
-        sql, params = cur.calls[0]
-        self.assertIn("UPDATE work_orders", sql)
-        self.assertIn("AND status = %s", sql)
-        self.assertIn("run_lease_expires_at < now()", sql)
-        self.assertIn("make_interval(secs => %s)", sql)
-        self.assertEqual(params, ("reaper:x", 1800, "t-1", "wo-1", "running"))
-
-    def test_claim_dead_run_false_when_criteria_gone(self):
-        cur = FakeCursor([None])  # 别人已收 / 原单已推进 → 0 行
-        self.assertFalse(
-            store.claim_dead_run(
-                cur,
-                tenant_id="t-1",
-                work_order_id="wo-1",
-                owner="reaper:x",
-                ttl_seconds=60,
-                status="running",
-            )
-        )
+        self.assertIn("SELECT actor FROM work_order_events", sql)
+        self.assertIn("ORDER BY id", sql)
+        self.assertEqual(params, ("t-1", "wo-1", "run", "run_requested"))
+        self.assertEqual(out, ["system:reaper", "user:a"])
 
 
 class AppendEventDedupeTests(unittest.TestCase):

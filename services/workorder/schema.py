@@ -142,6 +142,11 @@ RUNTIME_ALTERS = (
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_wo_deliverables_kind_version "
     "ON work_order_deliverables (tenant_id, work_order_id, kind, version)",
     "ALTER TABLE work_order_items ADD COLUMN IF NOT EXISTS original_name text",
+    # MC2-A1(效率8):收尸扫描的部分索引——过期租约支只扫 running 且持约的极少数行,
+    # 不随工单总量线性变慢(与 0075 迁移 dual-run 对齐)。
+    "CREATE INDEX IF NOT EXISTS ix_wo_dead_run_scan "
+    "ON work_orders (run_lease_expires_at) "
+    "WHERE status = 'running' AND run_lease_expires_at IS NOT NULL",
 )
 
 

@@ -16,7 +16,6 @@ from __future__ import annotations
 import logging
 import mimetypes
 import os
-import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -131,6 +130,7 @@ _CONFLICT_CODES = {
     "workorder.not_archived",
     "workorder.sod.approver_is_preparer",
     "workorder.sod.review_required",
+    "workorder.run_in_progress",
 }
 
 
@@ -152,30 +152,14 @@ def _schedule_advance(
     """抢 run 租约 + 落 run_requested + 交后台 advance。抢到返 True(已排后台);抢不到
     (已有 run 在跑)返 False。
 
-    P-7 引擎自驱:裁决/补料/补销项落库成功后调此,引擎自动续跑,用户不必盯着状态手点 /run
-    ——与 /run 端点同一条推进路径(同租约、同 run_requested、同 BackgroundTasks),不另造一套。
-    抢不到租约不是错:已有 run 会带着刚落库的新事件续跑(reconcile 从事件流回放),不重复排。"""
-    owner = f"run:{uuid.uuid4().hex}"
-    store.ensure_runtime()  # 建租约列(独立事务)· 必须先于下面锁 work_orders 的 UPDATE
-    with db.get_cursor(commit=True) as cur:
-        if not store.acquire_run_lease(
-            cur,
-            tenant_id=tenant_id,
-            work_order_id=work_order_id,
-            owner=owner,
-            ttl_seconds=runner.run_lease_ttl_seconds(),
-        ):
-            return False
-        store.append_event(
-            cur,
-            tenant_id=tenant_id,
-            work_order_id=work_order_id,
-            step=runner.RUN_STEP,
-            event_type=runner.EVT_RUN_REQUESTED,
-            actor=f"user:{user['id']}",
-        )
-    background.add_task(runner.advance, tenant_id, work_order_id, owner)
-    return True
+    P-7 引擎自驱:裁决/补料/补销项落库成功后调此,引擎自动续跑,用户不必盯着状态手点 /run。
+    实体是 runner.request_run 推进原语(路由/收尸/LINE 回写同一事实源),路由径保留
+    BackgroundTasks 派发(响应返回后才起跑)。抢不到租约不是错:已有 run 会带着刚落库的
+    新事件续跑(reconcile 从事件流回放),不重复排。"""
+    owner = runner.request_run(
+        tenant_id, work_order_id, actor=f"user:{user['id']}", background=background
+    )
+    return owner is not None
 
 
 def _auto_advance(

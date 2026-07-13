@@ -354,5 +354,62 @@ class ClassifySalesSummaryTests(unittest.TestCase):
         self.assertEqual(out.payload["flagged"], 1)
 
 
+class _HeartbeatStore(FakeItemStore):
+    def __init__(self, items):
+        super().__init__(items)
+        self.renewals = []
+
+    def renew_run_lease(self, cur, *, tenant_id, work_order_id, owner, ttl_seconds):
+        self.renewals.append({"owner": owner, "ttl": ttl_seconds})
+        return True
+
+
+class _UnitCM:
+    def __enter__(self):
+        return object()
+
+    def __exit__(self, *a):
+        return False
+
+
+class ClassifyHeartbeatTests(unittest.TestCase):
+    """MC2-A1 ④ 心跳:按步提交模式下,每件检查点提交顺带给 run 租约续期(只续自己 owner);
+    无租约料(直调/CLI)零续约,行为不变。"""
+
+    def setUp(self):
+        classify._resolve_own_tax_id = lambda ctx: OWN_TAX
+        classify._resolve_own_name = lambda ctx: OWN_NAME
+        classify._ocr_image = lambda path: _purchase_fields(
+            invoice_no=f"IV{abs(hash(path)) % 1000}", seller=f"1{abs(hash(path)) % 10**12:012d}"
+        )
+        self.addCleanup(
+            setattr, classify, "_resolve_own_tax_id", classify._default_resolve_own_tax_id
+        )
+        self.addCleanup(setattr, classify, "_resolve_own_name", classify._default_resolve_own_name)
+        self.addCleanup(setattr, classify, "_ocr_image", classify._default_ocr_image)
+
+    def _ctx(self, store, data):
+        return StepContext(
+            cur=None,
+            tenant_id="t-1",
+            work_order_id="wo-1",
+            store=store,
+            data=data,
+            cursor_factory=_UnitCM,
+        )
+
+    def test_each_item_checkpoint_renews_lease(self):
+        store = _HeartbeatStore([_item("i1", "/in/a.jpg"), _item("i2", "/in/b.jpg")])
+        lease = {"owner": "run:hb", "ttl_seconds": 1800}
+        classify.run(self._ctx(store, {"run_lease": dict(lease)}))
+        self.assertEqual(len(store.renewals), 2)  # 逐件检查点各续一次
+        self.assertEqual(store.renewals[0], {"owner": "run:hb", "ttl": 1800})
+
+    def test_no_lease_payload_means_no_renewal(self):
+        store = _HeartbeatStore([_item("i1", "/in/a.jpg")])
+        classify.run(self._ctx(store, {}))
+        self.assertEqual(store.renewals, [])
+
+
 if __name__ == "__main__":
     unittest.main()

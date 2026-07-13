@@ -65,6 +65,16 @@ def _order_detail(flagged=None):
     return {"flagged": flagged or []}
 
 
+class ResumeStubbedCase(unittest.TestCase):
+    """消费路径公共桩:_resume_run(裁决后自动续跑,MC2-A1)不真起后台线程/不碰库。
+    applied 路径的测试据 self.resume 断言续跑被排上;人审/已处理路径断言零续跑。"""
+
+    def setUp(self):
+        p = patch.object(m, "_resume_run")
+        self.resume = p.start()
+        self.addCleanup(p.stop)
+
+
 class LooksLikeAnswerTests(unittest.TestCase):
     def test_leading_number_is_classifiable(self):
         self.assertTrue(m._looks_like_answer("1 ซื้อ"))
@@ -247,7 +257,7 @@ class HandleAnswerConsumptionGateTests(unittest.TestCase):
             self.assertFalse(m.handle_answer("U-163", "1 ซื้อ", "rt-1", None))
 
 
-class HandleOneAppliedTests(unittest.TestCase):
+class HandleOneAppliedTests(ResumeStubbedCase):
     """断言①:「1 ซื้อ」→ human_decision(assign_kind,purchase_invoice,actor=line_client:…)
     落库 + 问题转 applied + 同票兄弟被关。"""
 
@@ -291,9 +301,11 @@ class HandleOneAppliedTests(unittest.TestCase):
         sibling_call = next(c for c in transition.call_args_list if c.args[1] == 11)
         self.assertEqual(sibling_call.args[2], vocab.RESOLVED_INTERNALLY)
         reply.assert_called_once()
+        # MC2-A1 补的漏接:裁决落库后自动续跑该工单,客户答完题不再停等会计手点 /run。
+        self.resume.assert_called_once_with("t-1", "wo-1", "U-163")
 
 
-class HandleOneAmbiguousTests(unittest.TestCase):
+class HandleOneAmbiguousTests(ResumeStubbedCase):
     """断言②:歧义答案不回写,原文存底转人审。"""
 
     def test_ambiguous_answer_goes_to_manual_review_without_recording(self):
@@ -309,9 +321,10 @@ class HandleOneAmbiguousTests(unittest.TestCase):
         transition.assert_called_once_with(
             "t-1", 20, vocab.MANUAL_REVIEW, answer_raw="ไม่แน่ใจ", resolution=None
         )
+        self.resume.assert_not_called()  # 没落裁决就不续跑
 
 
-class RaceGuardTests(unittest.TestCase):
+class RaceGuardTests(ResumeStubbedCase):
     """断言④:先会计裁后客户答 → 客户答不成为 latest,问题转 resolved_internally。"""
 
     def test_decision_after_question_created_blocks_overwrite(self):
@@ -377,7 +390,7 @@ class RaceGuardTests(unittest.TestCase):
         record.assert_called_once()
 
 
-class AckReplyFailureTests(unittest.TestCase):
+class AckReplyFailureTests(ResumeStubbedCase):
     """断言⑥回执失败不影响已落库的裁决(裁决先落,回执后发,互不阻塞)。"""
 
     def test_reply_failure_does_not_raise(self):
@@ -398,7 +411,7 @@ class AckReplyFailureTests(unittest.TestCase):
         transition.assert_called_once()  # 裁决/状态已落库,不受回执失败影响
 
 
-class StrictShortFormGateTests(unittest.TestCase):
+class StrictShortFormGateTests(ResumeStubbedCase):
     """打回修正:自动回写(applied)判定收严,对所有 sender 一致——原全文子串判定会把
     「จ่ายค่าไฟ 500」「ได้รับเงินจากลูกค้า」这类记账句错吞成答题(§4.2 咬人测试)。"""
 
@@ -536,7 +549,7 @@ class StrictShortFormGateTests(unittest.TestCase):
         )
 
 
-class MultiMessageBatchAnchorTests(unittest.TestCase):
+class MultiMessageBatchAnchorTests(ResumeStubbedCase):
     """R3 串题回归(本 bug 核心):老板分多条消息按号回答,编号必须锚定推送批次的固定序,
     不随已答完的题退出 pending、列表收缩而位移。链:①「1 ซื้อ」→IN-001 进项;
     ②「2 ไม่ใช่เดือนนี้」→IN-002 剔除;③「ไม่แน่ใจ」(无号·唯一剩 IN-003)→IN-003 人审。"""
@@ -644,7 +657,7 @@ class MultiMessageBatchAnchorTests(unittest.TestCase):
         self.assertEqual(record.call_args_list[0].kwargs["item_id"], "item-1")
 
 
-class NumberedTerminalSlotTests(unittest.TestCase):
+class NumberedTerminalSlotTests(ResumeStubbedCase):
     """编号指向已 applied 的槽(客户重复发「1 ซื้อ」)→ 回「已处理」,绝不产生第二次裁决。"""
 
     def test_answering_already_applied_slot_does_not_record_again(self):
@@ -678,7 +691,7 @@ class NumberedTerminalSlotTests(unittest.TestCase):
         self.assertEqual(reply.call_args.args[1], line_client_answer_copy._ALREADY_HANDLED["th"])
 
 
-class NumberedOutOfRangeTests(unittest.TestCase):
+class NumberedOutOfRangeTests(ResumeStubbedCase):
     """只 2 题却答「5」→ 编号越界定位不出 → 挂首条 pending 转人审,不乱贴。"""
 
     def test_out_of_range_number_goes_to_unlocatable(self):
@@ -708,7 +721,21 @@ class NumberedOutOfRangeTests(unittest.TestCase):
         )
 
 
-class NoNumberUniquePendingTests(unittest.TestCase):
+class ResumeRunTests(unittest.TestCase):
+    """_resume_run 席位:走 runner.request_run 推进原语(actor=line_client:…·守护线程派发);
+    排程失败只记日志不上抛(mutation-already-committed,裁决不被连坐)。"""
+
+    def test_delegates_to_request_run_with_line_actor(self):
+        with patch("services.workorder.runner.request_run") as req:
+            m._resume_run("t-1", "wo-1", "U-163")
+        req.assert_called_once_with("t-1", "wo-1", actor="line_client:U-163")
+
+    def test_scheduling_failure_is_swallowed(self):
+        with patch("services.workorder.runner.request_run", side_effect=RuntimeError("lease down")):
+            m._resume_run("t-1", "wo-1", "U-163")  # 不抛
+
+
+class NoNumberUniquePendingTests(ResumeStubbedCase):
     """无编号短答 + 此刻唯一 pending(非批次首条)→ 落到那道正确的票。"""
 
     def test_short_answer_lands_on_the_lone_pending_ticket(self):

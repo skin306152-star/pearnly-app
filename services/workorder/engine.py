@@ -254,12 +254,18 @@ def _run_step(
     返回 RunOutcome 表示本步停机(已在同一事务里落好停机态);None 表示本步绿、继续下一步。
     handler 抛异常时不吞:_committed_unit 回滚整步(started 也一并撤销)并向上抛,续跑重做本步。
     进步先独立提交 current_step(_mark_running)让进度诚实,再进主步事务(见 _mark_running)。
+
+    按步提交模式下主步事务【不再】重写 running 状态位(_mark_running 刚提交过同值):那次
+    重写会让主步事务全程压着 work_orders 行锁,handler 内逐件检查点的租约心跳(MC2-A1 ④,
+    同一行的条件 UPDATE)将与之互等成自死锁。停机/最终态的状态写不受影响(在 handler 返回后)。
+    单事务旧路(无 factory)无独立提交语义,保留事务内置位,行为逐字节不变。
     """
     if ctx.cursor_factory is not None:
         _mark_running(ctx, step)
     with unit(ctx) as cur, _bound(ctx, cur):
         _emit(ctx, step, EVT_STARTED, {})
-        _set_status(ctx, STATUS_RUNNING, step)
+        if ctx.cursor_factory is None:
+            _set_status(ctx, STATUS_RUNNING, step)
         result = handler(ctx)
         if result.halted:
             return _halt(ctx, step, result)

@@ -14,11 +14,12 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from core import db
 from core.route_helpers import authorize_pearnly_ai
+from routes.workorder_routes import _auto_advance
 from services.authz.deps import check_workspace_scope
 from services.line_binding import client_pool_vocab as vocab
 from services.line_binding import line_client_contact
@@ -188,10 +189,12 @@ async def push_batch(req: PushBatchIn, request: Request):
 
 
 @router.post("/api/ai/client-pool/questions/{question_id}/decide")
-async def decide_question(question_id: int, req: DecideIn, request: Request):
+async def decide_question(
+    question_id: int, req: DecideIn, request: Request, background: BackgroundTasks
+):
     """S8 manual_review 会计裁决:走既有裁决通道 record_decision(actor=user:{id}),
     成功后问题 manual_review→applied(方案 §4.2 末段·同 line_client_answer 客户裁决路
-    落库的 resolution 形状)。"""
+    落库的 resolution 形状),并自动续跑工单(P-7 同源自驱,MC2-A1 补的漏接)。"""
     user, tenant_id = _authorize(request, _C_PREPARE)
     with db.get_cursor() as cur:
         _assert_owns_client(cur, request, user, tenant_id, req.workspace_client_id)
@@ -234,4 +237,5 @@ async def decide_question(question_id: int, req: DecideIn, request: Request):
         raise HTTPException(
             409, detail={"code": "client_pool.illegal_transition", "message": str(e)}
         )
+    _auto_advance(background, tenant_id, question["work_order_id"], user)
     return {"ok": True, "event_id": evt["id"], "question": _question_out(updated)}

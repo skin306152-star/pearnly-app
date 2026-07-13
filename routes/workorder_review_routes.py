@@ -105,22 +105,22 @@ async def reject_order_review(
     work_order_id: str, req: RejectIn, request: Request, background: BackgroundTasks
 ):
     """驳回重做:落 review_rejected(原因必填)→ 重开 reconcile→package → 引擎自动重跑出新版本
-    交付物(version+1)→ 二次进队列标返工。仅 review 态可驳回(否则 409 not_reviewable)。"""
+    交付物(version+1)→ 二次进队列标返工。仅 review 态可驳回(否则 409 not_reviewable)。
+    状态翻转与抢租约同一事务(reject_and_rerun,MC2-A1 ②):不再有「翻了 running 没租约」的
+    孤儿窗口;正有 run 在跑 → 409 run_in_progress,驳回不落。"""
     user, tenant_id = _authorize(request, _C_REVIEW)
-    with db.get_cursor(commit=True) as cur:
+    with db.get_cursor() as cur:  # 鉴权/归属/冻结闸读侧先行,写与租约在 reject_and_rerun 一个事务
         _load_mutable_order(cur, request, user, tenant_id, work_order_id)
-        try:
-            out = review.reject_review(
-                cur,
-                tenant_id=tenant_id,
-                work_order_id=work_order_id,
-                actor=f"user:{user['id']}",
-                reason=req.reason,
-            )
-        except api.WorkOrderApiError as e:
-            _raise_from_api_error(e)
-    _auto_advance(background, tenant_id, work_order_id, user)
-    return out
+    try:
+        return review.reject_and_rerun(
+            tenant_id=tenant_id,
+            work_order_id=work_order_id,
+            actor=f"user:{user['id']}",
+            reason=req.reason,
+            background=background,
+        )
+    except api.WorkOrderApiError as e:
+        _raise_from_api_error(e)
 
 
 @router.post("/api/workorder/orders/{work_order_id}/bank-recon/decide")

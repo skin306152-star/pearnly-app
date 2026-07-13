@@ -365,6 +365,7 @@ def _handle_one(
         lang=lang,
     )
     _close_siblings(tenant_id, workspace_client_id, work_order_id, item_id, qid)
+    _resume_run(tenant_id, work_order_id, line_user_id)
 
 
 def _decided_after(tenant_id, work_order_id, item_id, question_created_at) -> bool:
@@ -386,6 +387,18 @@ def _decided_after(tenant_id, work_order_id, item_id, question_created_at) -> bo
     decision = (entry or {}).get("decision")
     at = decision.get("at") if decision else None
     return bool(at and question_created_at and at > question_created_at)
+
+
+def _resume_run(tenant_id, work_order_id, line_user_id) -> None:
+    """裁决落库后自动续跑工单(P-7 LINE 径,MC2-A1 补的漏接):客户答完题不再停等会计手点
+    /run。尽力而为——裁决已提交,续跑排程失败绝不连坐回写(照 _auto_advance 的
+    mutation-already-committed 语义),最多退化成会计手点一次。"""
+    from services.workorder import runner
+
+    try:
+        runner.request_run(str(tenant_id), str(work_order_id), actor=f"line_client:{line_user_id}")
+    except Exception:  # noqa: BLE001 - 自驱是增益不是主路径
+        logger.warning("[line_client_answer] 自动续跑排程失败(裁决已落库不受影响)", exc_info=True)
 
 
 def _record_decision(tenant_id, work_order_id, item_id, decision, kind, values, line_user_id):

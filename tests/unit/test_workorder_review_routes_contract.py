@@ -162,7 +162,7 @@ class PermCodeWiringTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(wr, "_load_mutable_order", return_value={"workspace_client_id": 7}),
             mock.patch.object(wr.review, "review_queue", return_value={}),
             mock.patch.object(wr.review, "batch_decisions", return_value={"ok_count": 0}),
-            mock.patch.object(wr.review, "reject_review", return_value={}),
+            mock.patch.object(wr.review, "reject_and_rerun", return_value={}),
             mock.patch.object(wr.review, "declare_self_review", return_value={}),
             mock.patch.object(wr.bank_recon_review, "record_bank_decision", return_value={"id": 1}),
             mock.patch.object(wr, "_auto_advance"),
@@ -210,6 +210,60 @@ class PermCodeWiringTests(unittest.IsolatedAsyncioTestCase):
         for coro, expected in cases:
             with self.subTest(expected=expected):
                 self.assertEqual(await self._perm_code_used(wr, coro), expected)
+
+
+class RejectRouteTests(unittest.IsolatedAsyncioTestCase):
+    """驳回端点接线(MC2-A1 ②):写与租约同一事务收进 review.reject_and_rerun,路由只做
+    鉴权/冻结闸/翻错码;正有 run 在跑 → 409 run_in_progress。"""
+
+    def _open_gate(self):
+        return (
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
+        )
+
+    async def test_success_passthrough(self):
+        from routes import workorder_review_routes as wr
+
+        for p in self._open_gate():
+            self.enterContext(p)
+        result = {"status": "running", "reopened_steps": ["reconcile", "compute", "package"]}
+        with (
+            mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            mock.patch.object(wr, "_load_mutable_order", return_value={"workspace_client_id": 7}),
+            mock.patch.object(wr.review, "reject_and_rerun", return_value=result) as reject,
+        ):
+            out = await wr.reject_order_review(
+                "wo-1", wr.RejectIn(reason="税额可疑"), mock.Mock(), mock.Mock()
+            )
+        self.assertEqual(out, result)
+        kw = reject.call_args.kwargs
+        self.assertEqual(kw["actor"], "user:u1")
+        self.assertEqual(kw["reason"], "税额可疑")
+        self.assertIsNotNone(kw["background"])  # 路由径保留 BackgroundTasks 派发
+
+    async def test_run_in_progress_maps_409(self):
+        from routes import workorder_review_routes as wr
+        from services.workorder import api as wo_api
+
+        for p in self._open_gate():
+            self.enterContext(p)
+        with (
+            mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            mock.patch.object(wr, "_load_mutable_order", return_value={"workspace_client_id": 7}),
+            mock.patch.object(
+                wr.review,
+                "reject_and_rerun",
+                side_effect=wo_api.WorkOrderApiError("workorder.run_in_progress"),
+            ),
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.reject_order_review(
+                    "wo-1", wr.RejectIn(reason="x"), mock.Mock(), mock.Mock()
+                )
+        self.assertEqual(ctx.exception.status_code, 409)
+        self.assertEqual(ctx.exception.detail, "workorder.run_in_progress")
 
 
 class BankReconDecideRouteTests(unittest.IsolatedAsyncioTestCase):

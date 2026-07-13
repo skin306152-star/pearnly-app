@@ -221,6 +221,95 @@ class RejectReviewTests(unittest.TestCase):
         self.assertEqual(ctx.exception.code, "workorder.not_reviewable")
 
 
+class RejectAndRerunTests(unittest.TestCase):
+    """MC2-A1 ②:驳回翻状态与抢租约同一事务(收进 request_run 的 lease 闭包),消灭
+    「running + 租约 NULL」孤儿窗口;抢不到租约驳回不落 → run_in_progress。"""
+
+    class _FakeCM:
+        def __enter__(self):
+            return mock.Mock()
+
+        def __exit__(self, *a):
+            return False
+
+    class _FakeDB:
+        def get_cursor(self, commit=False):
+            return RejectAndRerunTests._FakeCM()
+
+    def _wire(self, *, acquire=True, wo_status="review"):
+        from services.workorder import runner
+
+        self.appended = []
+        self.acquired = []
+        self.spawned = []
+
+        def _append(cur, **kw):
+            self.appended.append(kw)
+            return {"id": len(self.appended)}
+
+        def _acquire(cur, *, tenant_id, work_order_id, owner, ttl_seconds):
+            self.acquired.append(owner)
+            return acquire
+
+        return (
+            mock.patch.object(runner, "db", self._FakeDB()),
+            mock.patch.object(
+                runner, "_spawn_advance", lambda t, w, o: self.spawned.append((t, w, o))
+            ),
+            mock.patch.object(review.store, "ensure_runtime", return_value=None),
+            mock.patch.object(review.store, "acquire_run_lease", side_effect=_acquire),
+            mock.patch.object(review.store, "get_work_order", return_value={"status": wo_status}),
+            mock.patch.object(review.store, "append_event", side_effect=_append),
+            mock.patch.object(review.store, "set_status", return_value=None),
+        )
+
+    def _enter_all(self, stack, patches):
+        for p in patches:
+            stack.enter_context(p)
+
+    def test_reject_and_requeue_share_one_transaction(self):
+        import contextlib
+
+        with contextlib.ExitStack() as stack:
+            self._enter_all(stack, self._wire())
+            out = review.reject_and_rerun(
+                tenant_id="t-1", work_order_id="wo-1", actor="user:u2", reason="税额可疑"
+            )
+        self.assertEqual(out["status"], engine.STATUS_RUNNING)
+        types = [a["event_type"] for a in self.appended]
+        # 同一事务序:review_rejected → step_reopened×3 → run_requested(租约已在手)。
+        self.assertEqual(types[0], review.EVT_REVIEW_REJECTED)
+        self.assertEqual(types[-1], "run_requested")
+        self.assertEqual(types.count(engine.EVT_REOPENED), 3)
+        self.assertEqual(len(self.acquired), 1)
+        self.assertEqual(self.spawned, [("t-1", "wo-1", self.acquired[0])])
+
+    def test_lease_busy_raises_run_in_progress_without_reject(self):
+        import contextlib
+
+        with contextlib.ExitStack() as stack:
+            self._enter_all(stack, self._wire(acquire=False))
+            with self.assertRaises(api.WorkOrderApiError) as ctx:
+                review.reject_and_rerun(
+                    tenant_id="t-1", work_order_id="wo-1", actor="user:u2", reason="x"
+                )
+        self.assertEqual(ctx.exception.code, "workorder.run_in_progress")
+        self.assertEqual(self.appended, [])  # 驳回不落,工单还是 review
+        self.assertEqual(self.spawned, [])
+
+    def test_validation_error_propagates_and_nothing_scheduled(self):
+        import contextlib
+
+        with contextlib.ExitStack() as stack:
+            self._enter_all(stack, self._wire(wo_status="stuck"))
+            with self.assertRaises(api.WorkOrderApiError) as ctx:
+                review.reject_and_rerun(
+                    tenant_id="t-1", work_order_id="wo-1", actor="user:u2", reason="x"
+                )
+        self.assertEqual(ctx.exception.code, "workorder.not_reviewable")
+        self.assertEqual(self.spawned, [])
+
+
 class SelfReviewDeclareTests(unittest.TestCase):
     def test_declares_event_with_dedupe_key(self):
         captured = {}

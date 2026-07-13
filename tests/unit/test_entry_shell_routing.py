@@ -61,6 +61,22 @@ class LoginUrlEntryPriorityTests(unittest.TestCase):
         self.assertLess(entry_pos_idx, fallback_idx, "entry 判据必须先于业态回落判据")
         self.assertLess(entry_main_idx, fallback_idx, "entry 判据必须先于业态回落判据")
 
+    def test_cold_boot_seeds_entry_from_localstorage(self):
+        # 冷启动/会话过期时 module-nav 未跑,window._entry 尚空——loginUrl 必须自己回落读
+        # 入口记号,否则 POS 设备 401 后被甩去会计站 /login(2026-07-13)。
+        text = _read("src/home/login-url.ts")
+        self.assertIn("localStorage.getItem('pearnly_entry')", text)
+
+    def test_home_preboot_gate_routes_by_entry(self):
+        # home.html 头部 preboot 门(无 token 即踢)比 main.js 早跑,曾硬编码 /login——
+        # 零 token 冷设备(退出后/换机)根本到不了 loginUrl(),POS 设备照样被甩会计站
+        # (2026-07-13 真浏览器剧本1抓出)。锁:落点必须按 pearnly_entry 分流。
+        text = _read("home.html")
+        self.assertIn(
+            "location.replace(localStorage.getItem('pearnly_entry')==='pos'?'/pos':'/login')",
+            text,
+        )
+
 
 class LoginEntryPointsWriteEntryMarkTests(unittest.TestCase):
     def test_pos_login_page_writes_pos_entry_mark(self):

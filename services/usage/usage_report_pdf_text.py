@@ -8,6 +8,7 @@ _BASE_FONT = "Helvetica"
 _BOLD_FONT = "Helvetica-Bold"
 _HAS_CJK = False
 _HAS_THAI = False
+_HAS_THAI_BOLD = False
 
 
 def _try_register(name: str, path: str, subfont_index=None) -> bool:
@@ -34,7 +35,7 @@ def _register_fonts():
       - Noto Sans Thai (TTF) — Thai (covers ฿ U+0E3F)
       - Helvetica — Latin (built-in)
     """
-    global _FONTS_REGISTERED, _BASE_FONT, _BOLD_FONT, _HAS_CJK, _HAS_THAI
+    global _FONTS_REGISTERED, _BASE_FONT, _BOLD_FONT, _HAS_CJK, _HAS_THAI, _HAS_THAI_BOLD
     if _FONTS_REGISTERED:
         return _BASE_FONT, _BOLD_FONT
 
@@ -49,16 +50,20 @@ def _register_fonts():
             _HAS_CJK = True
             break
 
-    # Thai
+    # Thai。末位 = 仓库捆绑 Sarabun(OFL,proof_pdf 同源)——prod 实测系统路径一个都不在
+    # (fc-list thai = 0,wqy 泰文字形为零),没有这条兜底,泰文 PDF 全线渲染成 notdef 方块。
+    _bundled = os.path.join(os.path.dirname(__file__), "..", "export", "fonts")
     thai_paths = [
         "/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf",
         "/usr/share/fonts/truetype/tlwg/Norasi.ttf",
         "/usr/share/fonts/truetype/tlwg/Garuda.ttf",
+        os.path.join(_bundled, "Sarabun-Regular.ttf"),
     ]
     thai_bold_paths = [
         "/usr/share/fonts/truetype/noto/NotoSansThai-Bold.ttf",
         "/usr/share/fonts/truetype/tlwg/Norasi-Bold.ttf",
         "/usr/share/fonts/truetype/tlwg/Garuda-Bold.ttf",
+        os.path.join(_bundled, "Sarabun-Bold.ttf"),
     ]
     for p in thai_paths:
         if _try_register("PR-Thai", p):
@@ -66,6 +71,7 @@ def _register_fonts():
             break
     for p in thai_bold_paths:
         if _try_register("PR-ThaiBold", p):
+            _HAS_THAI_BOLD = True
             break
 
     # Use CJK as base since it also covers Latin (WQY Zenhei has full ASCII).
@@ -74,7 +80,7 @@ def _register_fonts():
         _BOLD_FONT = "PR-CJK"  # WQY Zenhei TTC doesn't have a separate bold
     elif _HAS_THAI:
         _BASE_FONT = "PR-Thai"
-        _BOLD_FONT = "PR-ThaiBold" if os.path.exists(thai_bold_paths[0]) else "PR-Thai"
+        _BOLD_FONT = "PR-ThaiBold" if _HAS_THAI_BOLD else "PR-Thai"
 
     _FONTS_REGISTERED = True
     return _BASE_FONT, _BOLD_FONT
@@ -126,7 +132,9 @@ def _build_paragraph_text(s: str, bold: bool = False) -> str:
         if _HAS_CJK
         else ("PR-Thai" if _HAS_THAI else ("Helvetica-Bold" if bold else "Helvetica"))
     )
-    thai_font = "PR-ThaiBold" if (bold and _HAS_THAI) else ("PR-Thai" if _HAS_THAI else cjk_font)
+    thai_font = (
+        "PR-ThaiBold" if (bold and _HAS_THAI_BOLD) else ("PR-Thai" if _HAS_THAI else cjk_font)
+    )
     latin_font = "Helvetica-Bold" if bold else "Helvetica"
     parts = []
     for sc, txt in _script_runs(s):

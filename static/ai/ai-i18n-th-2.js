@@ -33,17 +33,18 @@ Object.assign(window.__AI_I18N_TH__, {
     // K1b · แปลงไฟล์การเงิน
     nav_fileconv: 'แปลงไฟล์การเงิน',
     fileconv_title: 'แปลงไฟล์การเงิน',
-    fileconv_note: 'อัปโหลด PDF / รูปภาพการเงิน · ตรวจความสอดคล้องก่อนแปลงเป็น Excel',
-    fileconv_drop_t: 'ลากไฟล์ PDF / รูปภาพมาวาง หรือ คลิกเลือกไฟล์',
+    fileconv_note:
+        'อัปโหลด PDF / รูปภาพ / ไฟล์ Excel ทางการเงิน · ตรวจความสอดคล้องก่อนแปลงเป็น Excel/PDF',
+    fileconv_drop_t: 'ลากไฟล์ PDF / รูปภาพ / Excel มาวาง หรือ คลิกเลือกไฟล์',
     fileconv_drop_s:
-        'รองรับ PDF การเงินและรูปถ่ายจากมือถือ (สเตทเมนต์ / สมุดแยกประเภท / รายงานภาษี) ไฟล์สแกนอ่านอัตโนมัติ ไม่เกิน 20MB ต่อไฟล์',
+        'รองรับ PDF การเงิน, รูปถ่ายจากมือถือ (สเตทเมนต์ / สมุดแยกประเภท / รายงานภาษี) และไฟล์ Excel/CSV ไฟล์สแกนอ่านอัตโนมัติ ไม่เกิน 20MB ต่อไฟล์',
     fileconv_run: 'เริ่มแปลง →',
     fileconv_running: 'กำลังแปลง…',
     fileconv_ocr_running: 'กำลังอ่านไฟล์สแกน · ช้ากว่า PDF ที่มีชั้นข้อความ กรุณารอสักครู่',
     fileconv_uploaded: 'อัปโหลดแล้ว: {name}',
     fileconv_reset: 'เปลี่ยนไฟล์',
-    fileconv_err_no_file: 'กรุณาเลือกไฟล์ PDF หรือรูปภาพก่อน',
-    fileconv_err_bad_type: 'รองรับเฉพาะไฟล์ PDF / JPG / PNG / WebP',
+    fileconv_err_no_file: 'กรุณาเลือกไฟล์ PDF, รูปภาพ หรือ Excel ก่อน',
+    fileconv_err_bad_type: 'รองรับเฉพาะไฟล์ PDF / JPG / PNG / WebP / Excel (.xlsx/.xls) / CSV',
     fileconv_conserved_chip: 'ยอดตรวจผ่าน',
     fileconv_conserved_s: 'ตรวจความสอดคล้องผ่านทั้งหมด · ตัวเลขเชื่อถือได้ ดาวน์โหลด Excel ได้เลย',
     fileconv_has_issues_chip: 'พบยอดไม่ตรง',
@@ -58,6 +59,9 @@ Object.assign(window.__AI_I18N_TH__, {
     fileconv_ocr_unavailable_chip: 'OCR ใช้งานไม่ได้',
     fileconv_ocr_unavailable_s:
         'ระบบอ่าน OCR ใช้งานไม่ได้ชั่วคราว ไม่มีข้อมูลถูกสร้าง กรุณาลองใหม่ภายหลัง',
+    fileconv_unsupported_format_chip: 'รูปแบบไม่รองรับ',
+    fileconv_unsupported_format_s:
+        'ไม่สามารถอ่านไฟล์นี้ได้ (เสียหาย / ไฟล์ว่าง / .xls รุ่นเก่าขาดไลบรารีอ่าน) ไม่มีข้อมูลถูกสร้าง หากเป็น .xls รุ่นเก่ากรุณาบันทึกเป็น .xlsx แล้วลองใหม่',
     fileconv_doctype_gl_ledger: 'สมุดแยกประเภท',
     fileconv_doctype_bank_statement: 'สเตทเมนต์ธนาคาร',
     fileconv_doctype_vat_report: 'รายงานภาษีมูลค่าเพิ่ม',
@@ -81,6 +85,7 @@ Object.assign(window.__AI_I18N_TH__, {
     fileconv_expected: 'ควรเป็น {v}',
     fileconv_actual: 'พบ {v}',
     fileconv_download: 'ดาวน์โหลด Excel',
+    fileconv_download_pdf: 'ดาวน์โหลด PDF',
     fileconv_downloading: 'กำลังสร้าง…',
     err_fileconv_file_too_large: 'ไฟล์เกินขนาดสูงสุด 20MB',
     err_fileconv_empty_file: 'ไฟล์ว่างเปล่า',

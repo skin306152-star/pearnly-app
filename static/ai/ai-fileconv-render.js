@@ -1,11 +1,12 @@
 /*
- * Pearnly AI · ai-fileconv-render.js · K1b 财务文件转换纯逻辑 + HTML 拼装
+ * Pearnly AI · ai-fileconv-render.js · K1b/K2 财务文件转换纯逻辑 + HTML 拼装
  *
- * 引擎 K1a(services/fileconv/)PDF→结构化结果的产品化外壳:上传单份 PDF,后端跑
- * convert_pdf 直接回 JSON 摘要(doc_type/status/conserved/stats/issues 前 N 条+总数,
- * 见 routes/fileconv_routes.py)。守恒校验(GL 余额链/银行跑余额/报表合计)全过才敢
- * 显示「可信」大字,有一条不平也逐行点名行号+期望+实际——转换工具不因为"只是导出"
- * 就打折四态诚实。
+ * 引擎 K1a/K2(services/fileconv/)PDF/Excel→结构化结果的产品化外壳:上传单份文件,后端
+ * 按扩展名分流跑 convert_pdf/convert_image/convert_excel 直接回 JSON 摘要(doc_type/
+ * status/conserved/stats/issues 前 N 条+总数,见 routes/fileconv_routes.py)。守恒校验
+ * (GL 余额链/银行跑余额/报表合计)全过才敢显示「可信」大字,有一条不平也逐行点名行号+
+ * 期望+实际——转换工具不因为"只是导出"就打折四态诚实。K2:Excel 底稿额外可下载规范
+ * 排版 PDF(戳同样的三态诚实语义),认不出台账结构时降级 generic 网格,不假背书。
  *
  * 上半段(validateFile/docTypeKey/issueKindKey)零 DOM/零 i18n 依赖,node
  * (tests/unit/test_ai_fileconv_pure.py)直接 require 断言;下半段 HTML 拼装依赖
@@ -14,9 +15,9 @@
 (function (root) {
     'use strict';
 
-    // 带文字层 PDF 走纯函数路;扫描件 PDF/图片(jpg/png/webp)走 OCR 路(K1c)。客户端先挡
-    // 明显打错的文件类型,省一趟网络往返。
-    var ALLOWED_EXT = /\.(pdf|jpe?g|png|webp)$/i;
+    // 带文字层 PDF 走纯函数路;扫描件 PDF/图片(jpg/png/webp)走 OCR 路(K1c);
+    // xlsx/xls/csv 走 K2 Excel 引擎。客户端先挡明显打错的文件类型,省一趟网络往返。
+    var ALLOWED_EXT = /\.(pdf|jpe?g|png|webp|xlsx|xlsm|xls|csv)$/i;
     var IMAGE_EXT = /\.(jpe?g|png|webp)$/i;
 
     function validateFile(file) {
@@ -56,12 +57,13 @@
         return ISSUE_KIND_KEYS[kind] || kind;
     }
 
-    // OCR 读不全/够不到模型 = 结构化拒绝(services/fileconv/model.py),与无文字层同属拒绝态:
-    // 横幅走「拒绝」样式,绝不显示「可信」大字。
+    // OCR 读不全/够不到模型、Excel 损坏或格式不受支持 = 结构化拒绝(services/fileconv/
+    // model.py),与无文字层同属拒绝态:横幅走「拒绝」样式,绝不显示「可信」大字。
     var REJECT_STATUSES = {
         no_text_layer: 'fileconv_no_text_layer',
         ocr_incomplete: 'fileconv_ocr_incomplete',
         ocr_unavailable: 'fileconv_ocr_unavailable',
+        unsupported_format: 'fileconv_unsupported_format',
     };
 
     function isRejected(status) {
@@ -210,7 +212,22 @@
                   '</span></div>';
     }
 
-    function resultsHtml(result, downloading) {
+    // downloadKind: null(无下载在跑)| 'xlsx' | 'pdf'——两个按钮各自独立禁用/文案,不用
+    // 一个全局布尔互相拖累(下 PDF 时 Excel 按钮仍可点)。
+    function downloadButtonHtml(kind, action, labelKey, downloadKind) {
+        var busy = downloadKind === kind;
+        return (
+            '<button type="button" class="btn pri" data-action="' +
+            action +
+            '"' +
+            (busy ? ' disabled' : '') +
+            '>' +
+            esc(busy ? at('fileconv_downloading') : at(labelKey)) +
+            '</button>'
+        );
+    }
+
+    function resultsHtml(result, downloadKind) {
         result = result || {};
         if (isRejected(result.status)) {
             return bannerHtml(result);
@@ -223,12 +240,9 @@
                 esc(at('fileconv_issues_more', { n: result.issue_count - issues.length })) +
                 '</div>';
         }
-        var downloadBtn =
-            '<button type="button" class="btn pri" data-action="fc-download"' +
-            (downloading ? ' disabled' : '') +
-            '>' +
-            esc(downloading ? at('fileconv_downloading') : at('fileconv_download')) +
-            '</button>';
+        var actionsHtml =
+            downloadButtonHtml('xlsx', 'fc-download-xlsx', 'fileconv_download', downloadKind) +
+            downloadButtonHtml('pdf', 'fc-download-pdf', 'fileconv_download_pdf', downloadKind);
         return (
             bannerHtml(result) +
             '<div class="panel"><div class="hd"><h3>' +
@@ -242,7 +256,7 @@
             (issuesHtml || '<div class="fc-clean">' + esc(at('fileconv_no_issues')) + '</div>') +
             '</div></div>' +
             '<div class="fc-actions">' +
-            downloadBtn +
+            actionsHtml +
             '</div>'
         );
     }
@@ -267,7 +281,7 @@
             '</span><button type="button" class="btn sm" data-action="fc-reset">' +
             esc(at('fileconv_reset')) +
             '</button></div>' +
-            resultsHtml(ctx.result, ctx.downloading)
+            resultsHtml(ctx.result, ctx.downloadKind)
         );
     }
 

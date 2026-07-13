@@ -1,15 +1,16 @@
 /*
- * Pearnly AI · ai-fileconv.js · K1b 财务文件转换(顶层独立视图)编排:上传 PDF + 跑
- * 转换 + 下载 xlsx
+ * Pearnly AI · ai-fileconv.js · K1b/K2 财务文件转换(顶层独立视图)编排:上传
+ * PDF/图片/Excel + 跑转换 + 下载 xlsx / pdf
  *
- * 顶层导航位(id=v-fileconv,同 /vatcheck 先例:转换一份 PDF 本身不依赖任何客户/工单
- * 上下文)。上传走 POST /api/fileconv/convert(JSON 摘要),下载 Excel 是同一份文件
- * 再 POST 一次 `?format=xlsx`(K1b 派单书:无状态两段式,引擎幂等不落服务端状态)。
- * 状态机 + 网络 + 事件委托在本文件,HTML 拼装交给 AI.fileconvRender(纯函数,零网络
- * 依赖)——同 ai-vatcheck.js 先例。
+ * 顶层导航位(id=v-fileconv,同 /vatcheck 先例:转换一份文件本身不依赖任何客户/工单
+ * 上下文)。上传走 POST /api/fileconv/convert(JSON 摘要),下载是同一份文件再 POST
+ * 一次 `?format=xlsx|pdf`(K1b 派单书:无状态两段式,引擎幂等不落服务端状态)。K2:
+ * Excel 底稿额外可下载规范排版 PDF,两个下载各自独立 in-flight(downloadKind),不共用
+ * 一个全局布尔互相拖累。状态机 + 网络 + 事件委托在本文件,HTML 拼装交给
+ * AI.fileconvRender(纯函数,零网络依赖)——同 ai-vatcheck.js 先例。
  *
- * 依赖 window.AI.state/api/format/fileconvRender 与全局 at(),排在它们之后、ai.js
- * 之前加载(见 scripts/build-home-js.mjs)。
+ * 依赖 window.AI.state/api/format/fileconvRender 与全局 at()/AII18N,排在它们之后、
+ * ai.js 之前加载(见 scripts/build-home-js.mjs)。
  */
 (function () {
     'use strict';
@@ -31,7 +32,7 @@
             api: api,
             file: null,
             running: false,
-            downloading: false,
+            downloadKind: null, // null | 'xlsx' | 'pdf'——哪个下载在跑,两键各自独立禁用
             errKey: null,
             result: null,
         };
@@ -41,7 +42,7 @@
         body().innerHTML = AI.fileconvRender.pageHtml({
             file: S.file,
             running: S.running,
-            downloading: S.downloading,
+            downloadKind: S.downloadKind,
             errKey: S.errKey,
             result: S.result,
         });
@@ -98,23 +99,31 @@
             });
     }
 
-    function download() {
-        if (S.downloading || !S.file) return;
+    function triggerDownload(blob, filename) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    // kind: 'xlsx' | 'pdf'——同一份已上传文件再跑一次 K1b/K2 转换直接回附件。
+    function downloadAs(kind) {
+        if (S.downloadKind || !S.file) return;
         var session = S;
-        S.downloading = true;
+        S.downloadKind = kind;
         render();
-        S.api
-            .downloadConvertedXlsx(S.file)
+        var fetchPromise =
+            kind === 'pdf'
+                ? S.api.downloadConvertedPdf(S.file, (window.AII18N && window.AII18N.lang) || 'th')
+                : S.api.downloadConvertedXlsx(S.file);
+        fetchPromise
             .then(function (r) {
                 if (S !== session) return;
-                var url = URL.createObjectURL(r.blob);
-                var a = document.createElement('a');
-                a.href = url;
-                a.download = r.filename;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                URL.revokeObjectURL(url);
+                triggerDownload(r.blob, r.filename);
             })
             .catch(function (err) {
                 if (S !== session) return;
@@ -123,7 +132,7 @@
             })
             .then(function () {
                 if (S !== session) return;
-                S.downloading = false;
+                S.downloadKind = null;
                 render();
             });
     }
@@ -142,7 +151,8 @@
         if (a === 'fc-pick' || a === 'fc-goto-upload') pickFile();
         else if (a === 'fc-clear-file') clearFile();
         else if (a === 'fc-run') run();
-        else if (a === 'fc-download') download();
+        else if (a === 'fc-download-xlsx') downloadAs('xlsx');
+        else if (a === 'fc-download-pdf') downloadAs('pdf');
         else if (a === 'fc-reset') reset();
     }
 
@@ -180,7 +190,7 @@
         fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.id = 'fcFileInput';
-        fileInput.accept = '.pdf,.jpg,.jpeg,.png,.webp';
+        fileInput.accept = '.pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xlsm,.xls,.csv';
         fileInput.style.display = 'none';
         fileInput.addEventListener('change', function () {
             setFile(fileInput.files);

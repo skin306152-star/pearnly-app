@@ -100,6 +100,7 @@
 .fc-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
   padding: 4px 0 16px;
 }
 /* OCR(图片/扫描件)识别中提示:比文字层慢一个量级,诚实告知在识别而非卡死。 */
@@ -121,6 +122,7 @@
     gap: 3px;
   }
   .fc-actions {
+    flex-direction: column;
     justify-content: stretch;
   }
   .fc-actions .btn {

@@ -35,17 +35,19 @@ Object.assign(window.__AI_I18N_JA__, {
     // K1b · 財務ファイル変換
     nav_fileconv: '財務ファイル変換',
     fileconv_title: '財務ファイル変換',
-    fileconv_note: '財務 PDF / 画像をアップロード · Excel 変換前に整合性チェックを実行',
-    fileconv_drop_t: 'PDF / 写真をドラッグ、またはここをクリックして選択',
+    fileconv_note:
+        '財務 PDF / 画像 / Excel 帳票をアップロード · Excel/PDF 変換前に整合性チェックを実行',
+    fileconv_drop_t: 'PDF / 写真 / Excel 帳票をドラッグ、またはここをクリックして選択',
     fileconv_drop_s:
-        '財務 PDF とスマホ撮影画像（銀行明細 / 総勘定元帳 / 税務レポート）に対応。スキャンは自動で読み取り、1 ファイル 20MB 以内。',
+        '財務 PDF、スマホ撮影画像（銀行明細 / 総勘定元帳 / 税務レポート）、Excel/CSV 帳票に対応。スキャンは自動で読み取り、1 ファイル 20MB 以内。',
     fileconv_run: '変換開始 →',
     fileconv_running: '変換中…',
     fileconv_ocr_running: 'スキャン読み取り中 · テキストレイヤー付き PDF より時間がかかります',
     fileconv_uploaded: 'アップロード済み：{name}',
     fileconv_reset: '別のファイルにする',
-    fileconv_err_no_file: '先に PDF または画像ファイルを選択してください',
-    fileconv_err_bad_type: 'PDF / JPG / PNG / WebP ファイルのみ対応しています',
+    fileconv_err_no_file: '先に PDF、画像、または Excel ファイルを選択してください',
+    fileconv_err_bad_type:
+        'PDF / JPG / PNG / WebP / Excel（.xlsx/.xls）/ CSV ファイルのみ対応しています',
     fileconv_conserved_chip: 'チェック通過',
     fileconv_conserved_s:
         '整合性チェックすべて通過 · 数値は信頼できます。Excel をダウンロードできます。',
@@ -61,6 +63,9 @@ Object.assign(window.__AI_I18N_JA__, {
     fileconv_ocr_unavailable_chip: 'OCR 利用不可',
     fileconv_ocr_unavailable_s:
         'OCR エンジンが一時的に利用できません。データは生成されていません。後でもう一度お試しください。',
+    fileconv_unsupported_format_chip: '未対応の形式',
+    fileconv_unsupported_format_s:
+        'このファイルは読み取れませんでした(破損 / 空ファイル / 旧形式 .xls の解析ライブラリ不足)。データは生成されていません。旧形式 .xls は .xlsx で保存し直してから再試行してください。',
     fileconv_doctype_gl_ledger: '総勘定元帳',
     fileconv_doctype_bank_statement: '銀行取引明細',
     fileconv_doctype_vat_report: '付加価値税レポート',
@@ -84,6 +89,7 @@ Object.assign(window.__AI_I18N_JA__, {
     fileconv_expected: '期待値 {v}',
     fileconv_actual: '実際 {v}',
     fileconv_download: 'Excel をダウンロード',
+    fileconv_download_pdf: 'PDF をダウンロード',
     fileconv_downloading: '生成中…',
     err_fileconv_file_too_large: 'ファイルが上限 20MB を超えています',
     err_fileconv_empty_file: 'ファイルが空です',

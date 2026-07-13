@@ -35,17 +35,19 @@ Object.assign(window.__AI_I18N_EN__, {
     // K1b · financial file conversion
     nav_fileconv: 'File Conversion',
     fileconv_title: 'Financial File Conversion',
-    fileconv_note: 'Upload a financial PDF / photo · conservation checks run before Excel export',
-    fileconv_drop_t: 'Drop a PDF or photo here, or click to pick',
+    fileconv_note:
+        'Upload a financial PDF / photo / Excel workpaper · conservation checks run before Excel/PDF export',
+    fileconv_drop_t: 'Drop a PDF, photo, or Excel workpaper here, or click to pick',
     fileconv_drop_s:
-        'Financial PDFs and phone photos (bank statement / GL / tax report); scans are read automatically, up to 20MB each.',
+        'Financial PDFs, phone photos (bank statement / GL / tax report), and Excel/CSV workpapers; scans are read automatically, up to 20MB each.',
     fileconv_run: 'Convert →',
     fileconv_running: 'Converting…',
     fileconv_ocr_running: 'Reading scanned document · slower than a text-layer PDF, please wait',
     fileconv_uploaded: 'Uploaded: {name}',
     fileconv_reset: 'Pick another file',
-    fileconv_err_no_file: 'Please pick a PDF or image file first',
-    fileconv_err_bad_type: 'Only PDF / JPG / PNG / WebP files are supported',
+    fileconv_err_no_file: 'Please pick a PDF, image, or Excel file first',
+    fileconv_err_bad_type:
+        'Only PDF / JPG / PNG / WebP / Excel (.xlsx/.xls) / CSV files are supported',
     fileconv_conserved_chip: 'Checks passed',
     fileconv_conserved_s:
         'All conservation checks passed · the numbers are trustworthy, safe to download Excel.',
@@ -61,6 +63,9 @@ Object.assign(window.__AI_I18N_EN__, {
     fileconv_ocr_unavailable_chip: 'OCR unavailable',
     fileconv_ocr_unavailable_s:
         'The OCR engine is temporarily unavailable; no data was generated. Please try again later.',
+    fileconv_unsupported_format_chip: 'Unsupported format',
+    fileconv_unsupported_format_s:
+        'This file could not be read (corrupt / empty / old .xls without a parser library); no data was generated. For old .xls files, please re-save as .xlsx and retry.',
     fileconv_doctype_gl_ledger: 'General Ledger',
     fileconv_doctype_bank_statement: 'Bank Statement',
     fileconv_doctype_vat_report: 'VAT Report',
@@ -84,6 +89,7 @@ Object.assign(window.__AI_I18N_EN__, {
     fileconv_expected: 'expected {v}',
     fileconv_actual: 'actual {v}',
     fileconv_download: 'Download Excel',
+    fileconv_download_pdf: 'Download PDF',
     fileconv_downloading: 'Generating…',
     err_fileconv_file_too_large: 'File exceeds the 20MB limit',
     err_fileconv_empty_file: 'File is empty',

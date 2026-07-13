@@ -193,20 +193,17 @@
                     })
                     .then(handleResponse);
             },
-            // xlsx 附件路:成功是二进制流不能进 handleResponse(它只认 JSON);失败仍是
-            // JSON 错误壳,借 handleResponse 抛同构 code/status 错误,调用方文案不分叉。
-            downloadConvertedXlsx: function (file) {
+            // 附件路共用(xlsx/pdf 二进制流不能进 handleResponse,它只认 JSON):成功从
+            // Content-Disposition 取文件名(泰文原名在 filename*/RFC 5987,优先取;取不到
+            // 退 ASCII filename),失败仍是 JSON 错误壳,借 handleResponse 抛同构 code/status
+            // 错误,调用方文案不分叉。
+            _downloadAttachment: function (url, file, fallbackName) {
                 var fd = new FormData();
                 fd.append('file', file);
                 return root
-                    .fetch('/api/fileconv/convert?format=xlsx', {
-                        method: 'POST',
-                        headers: authHeaders(),
-                        body: fd,
-                    })
+                    .fetch(url, { method: 'POST', headers: authHeaders(), body: fd })
                     .then(function (r) {
                         if (!r.ok) return handleResponse(r);
-                        // 泰文原名在 filename*(RFC 5987),优先取;取不到退 ASCII filename。
                         var disp = r.headers.get('Content-Disposition') || '';
                         var star = /filename\*=UTF-8''([^;]+)/.exec(disp);
                         var plain = /filename="?([^";]+)"?/.exec(disp);
@@ -214,11 +211,25 @@
                             ? decodeURIComponent(star[1])
                             : plain
                               ? plain[1]
-                              : 'convert.xlsx';
+                              : fallbackName;
                         return r.blob().then(function (blob) {
                             return { blob: blob, filename: filename };
                         });
                     });
+            },
+            downloadConvertedXlsx: function (file) {
+                return this._downloadAttachment(
+                    '/api/fileconv/convert?format=xlsx',
+                    file,
+                    'convert.xlsx'
+                );
+            },
+            // K2:规范排版 PDF 附件,lang 走当前 UI 语种(缺省 th,同 accounting_books_routes
+            // 的 _lang() 兜底口径)。
+            downloadConvertedPdf: function (file, lang) {
+                var url =
+                    '/api/fileconv/convert?format=pdf&lang=' + encodeURIComponent(lang || 'th');
+                return this._downloadAttachment(url, file, 'convert.pdf');
             },
             // 交付物下载(W5 交付包页):鉴权头是 Bearer,<a href> 发不了自定义头,调用方拿
             // blob 自建 object URL 触发下载(同 console.js exportLog 的 fetch+blob 先例)。

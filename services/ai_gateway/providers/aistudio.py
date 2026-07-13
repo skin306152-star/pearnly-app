@@ -92,6 +92,21 @@ def _usage(resp) -> Tuple[int, int]:
     return (0, 0)
 
 
+def _safe_raw(resp) -> Tuple[str, bool]:
+    """`.text` 快取器在 candidates 为空(典型:截断)时抛 ValueError,不是 AttributeError ——
+    hasattr/getattr 挡不住(真调实锤:finish_reason=MAX_TOKENS 走此路)。截断单独标记出来,
+    调用方据此直接判 error_kind='parse' 且不重试(截断是确定性的,重试是白烧钱);其余异常
+    按空串处理,走既有 empty 重试路。"""
+    try:
+        return (resp.text or "").strip(), False
+    except Exception:  # noqa: BLE001 — SDK 快取器炸法不止 ValueError 一种,统一收敛
+        candidates = getattr(resp, "candidates", None) or []
+        finish_reason = getattr(candidates[0], "finish_reason", None) if candidates else None
+        fr_name = str(getattr(finish_reason, "name", finish_reason) or "")
+        truncated = "MAX_TOKENS" in fr_name.upper() or finish_reason == 2
+        return "", truncated
+
+
 def _json_or_outcome(model_name, contents, *, timeout_s, max_retries, model):
     """调用 + JSON 解析重试(parse/empty 才重试);其余异常即收敛为 error_kind。"""
     from services.ocr.layer2_gemini import _parse_json
@@ -106,7 +121,9 @@ def _json_or_outcome(model_name, contents, *, timeout_s, max_retries, model):
             kind = _error_kind(e)
             _record(False, 429 if kind == "quota" else 500, int((time.time() - t0) * 1000))
             return ProviderOutcome(ok=False, error_kind=kind, model=model_name)
-        raw = (resp.text or "").strip() if hasattr(resp, "text") else ""
+        raw, truncated = _safe_raw(resp)
+        if truncated:
+            return ProviderOutcome(ok=False, error_kind="parse", model=model_name)
         it, ot = _usage(resp)
         if not raw:
             last_err = "empty"
@@ -200,7 +217,9 @@ def text_to_text(
         kind = _error_kind(e)
         _record(False, 429 if kind == "quota" else 500, int((time.time() - t0) * 1000))
         return ProviderOutcome(ok=False, error_kind=kind, model=model_name)
-    text = (resp.text or "").strip() if hasattr(resp, "text") else ""
+    text, truncated = _safe_raw(resp)
+    if truncated:
+        return ProviderOutcome(ok=False, error_kind="parse", model=model_name)
     it, ot = _usage(resp)
     if not text:
         return ProviderOutcome(ok=False, error_kind="parse", model=model_name)

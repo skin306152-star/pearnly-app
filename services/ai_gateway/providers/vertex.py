@@ -141,7 +141,10 @@ def _gen_json(contents, *, model_name, config, max_retries):
             )
         except Exception as e:  # noqa: BLE001
             return ProviderOutcome(ok=False, error_kind=_error_kind(e), model=model_name)
-        raw = (getattr(resp, "text", "") or "").strip()
+        try:
+            raw = (getattr(resp, "text", "") or "").strip()
+        except Exception:  # noqa: BLE001 — 混合 parts 时 .text 可能抛(同 text_to_action 口径)
+            raw = ""
         it, ot = _usage(resp)
         if raw:
             last_raw = raw
@@ -311,7 +314,10 @@ def text_to_text(
         )
     except Exception as e:  # noqa: BLE001
         return ProviderOutcome(ok=False, error_kind=_error_kind(e), model=model_name)
-    text = (getattr(resp, "text", "") or "").strip()
+    try:
+        text = (getattr(resp, "text", "") or "").strip()
+    except Exception:  # noqa: BLE001 — 混合 parts 时 .text 可能抛(同 text_to_action 口径)
+        text = ""
     it, ot = _usage(resp)
     if not text:
         return ProviderOutcome(ok=False, error_kind="parse", model=model_name)

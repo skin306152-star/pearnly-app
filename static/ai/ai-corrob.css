@@ -1,8 +1,9 @@
 /*
  * Pearnly AI · ai-corrob.css · 销项佐证卡(MC1-c.1)· 已开票逐票聚合四态呈现
  *
- * 吃 .panel/.chip(ai-shell.css)外壳,只补佐证卡自己的行布局/点名色。与工单详情其余
- * 只读区块(ai-recon/ai-shadow/ai-financials)同屏但类名各自独立(crb-*),层叠零影响。
+ * 吃 .panel/.chip(ai-shell.css)外壳 + ai-theme.css 令牌(--mut/--warn/--crit/--surface2),
+ * 只补佐证卡自己的行布局/点名色,零裸 hex。与工单详情其余只读区块(ai-recon/ai-shadow/
+ * ai-financials)同屏但类名各自独立(crb-*),层叠零影响。
  */
 
 .crb .bd {
@@ -20,7 +21,7 @@
 }
 
 .crb-lb {
-  color: var(--ai-text-dim, #6b7280);
+  color: var(--mut);
 }
 
 .crb-vl {
@@ -30,28 +31,28 @@
 
 .crb-gap {
   font-weight: 600;
-  color: var(--ai-warn, #b45309);
+  color: var(--warn);
 }
 
 .crb-needs {
   font-size: 13px;
-  color: var(--ai-text-dim, #6b7280);
+  color: var(--mut);
   padding: 6px 8px;
   border-radius: 8px;
-  background: var(--ai-surface-2, rgba(148, 163, 184, 0.12));
+  background: var(--surface2);
 }
 
 .crb-note {
   font-size: 13px;
-  color: var(--ai-text-dim, #6b7280);
+  color: var(--mut);
 }
 
 .crb-viol {
-  color: var(--ai-crit, #b91c1c);
+  color: var(--crit);
 }
 
 .crb-basis {
   font-size: 12px;
-  color: var(--ai-text-dim, #6b7280);
+  color: var(--mut);
   margin-top: 2px;
 }

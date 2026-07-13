@@ -1,10 +1,16 @@
 # -*- coding: utf-8 -*-
 """K2 · Excel/CSV → ConvertResult(会计底稿 → PDF 规范输出的解析入口)。
 
-GL 路复用现成结构识别(services.recon.bank_gl_excel.parse_gl_excel,T4a 已验过)——认出
-表头 + 借贷映射才转 LedgerRow 走守恒校验;认不出结构(needs_mapping/解析失败/零行)落
-generic 路,不强套。generic 路忠实网格渲染(openpyxl/xlrd data_only 取值,合并格取左上
-值),issues 留空——无守恒可判,不假装能勾稽任意表格(同 ocr_bridge._convert_generic 口径)。
+GL 路复用现成结构识别(services.recon.bank_gl_excel.parse_gl_excel,T4a 已验过),但进
+GL 路的门收得很紧(R1 打回收口):仅限【单科目 + 表内真有印刷余额列】的件。原因两条——
+① bank_gl_excel 的行余额是 attach_running_balance 从借贷衍生的单条全局链,多科目 GL
+(如 MR.ERP 735 行导出)每科目余额各自成链,渲染衍生链 = 悄悄改了用户原表的余额数;
+② closing 非印刷值时(表内无余额列),衍生链 vs 衍生 closing 的校验永远自洽,✓ 戳
+是自导自演。不满足门槛的一律落 generic 路——忠实转录含原表自己的余额列,零改数,
+诚实标「未做数字校验」(同 ocr_bridge._convert_generic 口径)。
+
+GL 路的 ✓ 戳靠真锚立住:衍生链末行余额 vs 表内印刷 closing(bank_gl_excel 读自余额列
+最后一笔),对不上进 ISSUE_CLOSING_ANCHOR——同 K1c ocr_bridge._anchor_issues 的独立锚。
 
 老式 .xls:GL 路本身够用(parse_gl_excel 内部已有 openpyxl→xlrd→CSV 嗅探的级联);仅当
 GL 认不出、需要落 generic 网格时才单独走 xlrd——环境缺 xlrd 时诚实拒绝,不静默转空表。
@@ -20,13 +26,17 @@ from services.fileconv.ledger import LEDGER_COLUMNS, to_table_rows
 from services.fileconv.model import (
     GENERIC_TABLE,
     GL_LEDGER,
+    ISSUE_CLOSING_ANCHOR,
     STATUS_OK,
     STATUS_UNSUPPORTED_FORMAT,
     ConvertResult,
+    Issue,
     LedgerRow,
     Table,
 )
 from services.fileconv import validate as validate_mod
+
+_TOL = Decimal("0.01")
 
 _XLSX_EXTS = ("xlsx", "xlsm")
 _XLS_EXTS = ("xls",)
@@ -53,11 +63,8 @@ def _gl_row(row, line_no: int) -> LedgerRow:
     parse_gl_excel 已归一的公历值——原始文本(含泰历原样)在该解析器内未回传,忠实转录
     只能到归一层,非本模块能力边界。
 
-    account 统一留空(单链 key,不按科目分链):bank_gl_excel.attach_running_balance 本就
-    不分科目,算的是一条全局流水链(GL Excel 常见"总账"多科目混排导出)——若按各行真实
-    科目分链交给 validate_ledger,后一科目的锚点会取到"全局链上某一时点的余额"而非该科目
-    自身连续链,一遇科目交替就会把全局链的正常波动误判成本科目不平(假阳性)。真实科目码
-    仍写回渲染表(见 _try_gl 的 zip 回填),不丢显示信息,只是不拿去当分链 key。"""
+    account 统一留空(单链 key):GL 路门槛已收紧到单科目件(见 _try_gl),单链即该科目
+    自身的连续链;真实科目码仍写回渲染表(_try_gl 的 zip 回填),不丢显示信息。"""
     iso = row.date.isoformat() if row.date else ""
     return LedgerRow(
         line_no=line_no,
@@ -72,8 +79,31 @@ def _gl_row(row, line_no: int) -> LedgerRow:
     )
 
 
+def _closing_anchor_issue(rows: List[LedgerRow], printed_closing: Decimal) -> List[Issue]:
+    """真锚对照(口径同 ocr_bridge._anchor_issues):表内印刷期末余额 vs 衍生链末行余额。
+    衍生链从借贷重算、自身永远自洽——✓ 戳的公信力全靠这条独立锚,对不上必须点名。"""
+    if not rows or abs(printed_closing - rows[-1].balance) <= _TOL:
+        return []
+    return [
+        Issue(
+            kind=ISSUE_CLOSING_ANCHOR,
+            line_no=rows[-1].line_no,
+            message="印刷期末余额 ≠ 重算末行余额(疑借贷有误/漏行)",
+            expected=f"{printed_closing}",
+            actual=f"{rows[-1].balance}",
+        )
+    ]
+
+
 def _try_gl(data: bytes, source_name: str) -> Optional[ConvertResult]:
-    """走现成 GL 结构识别;认不出/解析失败返回 None,交调用方落 generic 路。"""
+    """走现成 GL 结构识别;不满足 GL 路门槛(见模块顶注)返回 None 落 generic 路。
+
+    门槛(缺一即落 generic):
+    · 单科目(accounts ≤ 1)——多科目件的衍生单链余额 ≠ 原表每科目各自成链的印刷余额,
+      渲染出来就是改用户的数;
+    · closing 读自表内印刷余额列(closing_printed)——否则 closing 也是从借贷衍生的,
+      拿它当锚校验自己 = 自导自演,✓ 戳没有公信力。
+    """
     from services.recon.bank_gl_excel import parse_gl_excel
 
     try:
@@ -83,10 +113,13 @@ def _try_gl(data: bytes, source_name: str) -> Optional[ConvertResult]:
     gl_rows = parsed.get("rows") or []
     if not parsed.get("ok") or not gl_rows:
         return None
+    if len(parsed.get("accounts") or []) > 1 or not parsed.get("closing_printed"):
+        return None
 
     rows = [_gl_row(r, i) for i, r in enumerate(gl_rows, start=1)]
     opening = {"": Decimal(str(parsed.get("opening") or 0))}
     issues = validate_mod.validate_ledger(rows, opening)
+    issues.extend(_closing_anchor_issue(rows, Decimal(str(parsed.get("closing") or 0))))
     stats = validate_mod.ledger_stats(rows, opening)
     stats["engine"] = "excel_gl"
     stats["accounts"] = sorted({r.account_code for r in gl_rows if r.account_code})

@@ -109,6 +109,26 @@ class ReconGlBalanceTests(unittest.TestCase):
         self.assertTrue(res.get("ok"))
         bals = [r.balance for r in res["rows"]]
         self.assertEqual(bals, [300.0, 250.0])  # 100+200=300 · 300-50=250
+        # K2 · closing 读自余额列时 closing_printed=True(fileconv GL 路的真锚判据)
+        self.assertTrue(res["closing_printed"])
+        self.assertEqual(res["closing"], 250.0)
+
+    def test_closing_printed_false_without_balance_column(self):
+        # 无余额列 → closing 是借贷衍生值,closing_printed 必须诚实为 False
+        # (fileconv K2 据此拒进 GL 路:衍生值当锚校验自己 = 自导自演)
+        import io
+        from services.recon.bank_gl_excel import parse_gl_excel
+
+        wb = openpyxl.Workbook()
+        wsx = wb.active
+        wsx.append(["วันที่", "เลขที่ใบสำคัญ", "รายละเอียด", "เดบิต", "เครดิต"])
+        wsx.append(["02/05/2026", "V1", "in", 200.0, None])
+        wsx.append(["02/05/2026", "V2", "out", None, 50.0])
+        buf = io.BytesIO()
+        wb.save(buf)
+        res = parse_gl_excel(buf.getvalue(), "gl.xlsx")
+        self.assertTrue(res.get("ok"))
+        self.assertFalse(res["closing_printed"])
 
 
 if __name__ == "__main__":

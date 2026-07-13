@@ -360,5 +360,6 @@ def parse_gl_excel(
         "accounts": sorted(accounts_seen - {"?"}),
         "opening": opening,
         "closing": closing,
+        "closing_printed": last_balance_seen is not None,  # K2 · closing 是否读自表内余额列
         "row_count": len(rows),
     }

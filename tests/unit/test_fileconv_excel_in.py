@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 """K2 · services/fileconv/excel_in.py · Excel/CSV → ConvertResult。
 
-GL 路走真实 openpyxl 合成台账(端到端,不桩 parse_gl_excel)验证守恒过;不平场景桩
-parse_gl_excel 直接喂一组内部不自洽的 GlRow——bank_gl_excel.attach_running_balance
-按定义把每行 balance 算成 opening+累计借贷,永远自洽,真实 xlsx 走不出"不平"路径,
-桩是唯一能触达 validate_ledger 判不平分支的办法(测的是本模块的适配器代码,不是伪造
-通过)。generic/xls/CSV/拒绝态各一。
+GL 路四态全走真实 openpyxl 合成件(端到端,不桩 parse_gl_excel):①多科目 → 落 generic
+(衍生单链余额 ≠ 原表每科目印刷余额,渲染即改数);②单科目带余额列自洽 → GL 路 ✓;
+③篡改一格 debit(印刷 closing 不再吻合)→ ISSUE_CLOSING_ANCHOR 点名(✓ 戳的真锚);
+④无余额列 → 落 generic(closing 非印刷,校验自己 = 自导自演)。
+
+桩 parse_gl_excel 的链不平用例保留为辅助——衍生链按定义自洽,真实 xlsx 走不出
+validate_ledger 的判不平分支,桩是覆盖该分支适配代码的唯一办法(独立锚已由 ③ 真件钉住)。
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ from services.fileconv import excel_in
 from services.fileconv.model import (
     GENERIC_TABLE,
     GL_LEDGER,
+    ISSUE_CLOSING_ANCHOR,
     ISSUE_GL_BALANCE_CHAIN,
     STATUS_OK,
     STATUS_UNSUPPORTED_FORMAT,
@@ -38,19 +41,26 @@ def _xlsx_bytes(rows) -> bytes:
     return buf.getvalue()
 
 
+def _gl_xlsx(*, debit1=500.00, accounts=("1140-01", "1140-01"), with_balance_col=True) -> bytes:
+    """合成 GL:期初 1000 + 借 debit1 + 贷 200,余额列印刷值按 debit1=500 的正确账面写死
+    (1500/1300)——篡改 debit1 即制造「印刷 closing 与借贷对不上」的真件。"""
+    header = ["Date", "Doc No", "Description", "Account", "Debit", "Credit"]
+    opening = ["Opening", "", "", "", "", ""]
+    row1 = ["1/1/2026", "V001", "Sales", accounts[0], debit1, 0]
+    row2 = ["2/1/2026", "V002", "Payment", accounts[1], 0, 200.00]
+    if with_balance_col:
+        header.append("Balance")
+        opening.append(1000.00)
+        row1.append(1500.00)
+        row2.append(1300.00)
+    return _xlsx_bytes([header, opening, row1, row2])
+
+
 class GlConservedRoundtripTests(unittest.TestCase):
-    """真实合成 GL xlsx(期初 + 借贷两行闭合)→ 端到端过守恒,零桩。"""
+    """态②:单科目 + 余额列 + 借贷与印刷 closing 自洽 → GL 路,issues 空(真 ✓)。"""
 
     def setUp(self):
-        data = _xlsx_bytes(
-            [
-                ["Date", "Doc No", "Description", "Debit", "Credit", "Balance"],
-                ["Opening", "", "", "", "", 1000.00],
-                ["1/1/2026", "V001", "Sales", 500.00, 0, 1500.00],
-                ["2/1/2026", "V002", "Payment", 0, 200.00, 1300.00],
-            ]
-        )
-        self.result = excel_in.convert_excel(data, "gl.xlsx")
+        self.result = excel_in.convert_excel(_gl_xlsx(), "gl.xlsx")
 
     def test_recognized_as_gl_and_conserved(self):
         self.assertEqual(self.result.doc_type, GL_LEDGER)
@@ -66,6 +76,7 @@ class GlConservedRoundtripTests(unittest.TestCase):
         self.assertEqual(stats["sum_credit"], "200.0")
         self.assertEqual(stats["opening_balance"], "1000.0")
         self.assertEqual(stats["closing_balance"], "1300.0")
+        self.assertEqual(stats["accounts"], ["1140-01"])
 
     def test_table_rows_carry_ledger_columns(self):
         table = self.result.tables[0]
@@ -73,10 +84,49 @@ class GlConservedRoundtripTests(unittest.TestCase):
         self.assertEqual(len(table.columns), 9)  # LEDGER_COLUMNS 定长契约
         self.assertEqual(len(table.rows), 2)
         self.assertEqual(table.rows[0][3], "V001")  # doc_no 落位不变
+        self.assertEqual(table.rows[0][0], "1140-01")  # 真实科目码回填显示
 
 
-class GlUnbalancedTests(unittest.TestCase):
-    """桩 parse_gl_excel:直接构造一组余额链不自洽的 GlRow,验 issues 点名。"""
+class GlHonestyGateTests(unittest.TestCase):
+    """R1 收口:GL 路门槛(单科目 + 印刷 closing)与真锚——全真件,不桩。"""
+
+    def test_multi_account_falls_back_to_generic(self):
+        """态①:多科目 → 落 generic。衍生单链余额会偏离原表每科目各自成链的印刷余额,
+        进 GL 路渲染 = 悄悄改用户的数;generic 网格忠实转录原表(含它自己的余额列)。"""
+        result = excel_in.convert_excel(
+            _gl_xlsx(accounts=("1140-01", "5000-01")), "multi_acct.xlsx"
+        )
+        self.assertEqual(result.doc_type, GENERIC_TABLE)
+        self.assertEqual(result.stats["engine"], "excel_grid")
+        self.assertEqual(result.issues, [])
+        # 原表余额列印刷值原样在网格里,零改数。
+        grid = result.tables[0].rows
+        self.assertIn(1500, [c for row in grid for c in row])
+        self.assertIn(1300, [c for row in grid for c in row])
+
+    def test_tampered_debit_trips_closing_anchor(self):
+        """态③:篡改一格 debit(500→600)→ 衍生链末值 1400 ≠ 印刷 closing 1300 →
+        ISSUE_CLOSING_ANCHOR 点名。衍生链自身永远自洽,✓ 戳全靠这条独立锚立住。"""
+        result = excel_in.convert_excel(_gl_xlsx(debit1=600.00), "tampered.xlsx")
+        self.assertEqual(result.doc_type, GL_LEDGER)
+        self.assertFalse(result.conserved)
+        anchors = [i for i in result.issues if i.kind == ISSUE_CLOSING_ANCHOR]
+        self.assertEqual(len(anchors), 1)
+        self.assertEqual(anchors[0].expected, "1300.0")  # 印刷期末余额
+        self.assertEqual(anchors[0].actual, "1400.0")  # 借贷重算末行余额
+
+    def test_no_balance_column_falls_back_to_generic(self):
+        """态④:无余额列 → closing 是借贷衍生值(closing_printed=False),拿它当锚校验
+        自己 = 自导自演 → 拒进 GL 路,落 generic 诚实「未校验」。"""
+        result = excel_in.convert_excel(_gl_xlsx(with_balance_col=False), "no_bal.xlsx")
+        self.assertEqual(result.doc_type, GENERIC_TABLE)
+        self.assertEqual(result.stats["engine"], "excel_grid")
+        self.assertEqual(result.issues, [])
+
+
+class GlUnbalancedStubTests(unittest.TestCase):
+    """辅助(桩 parse_gl_excel):覆盖 validate_ledger 链不平分支的适配代码——真实 xlsx
+    的衍生链按定义自洽走不到这里;真锚路径由 GlHonestyGateTests 真件钉住。"""
 
     def test_broken_chain_is_named_with_line_and_expected_actual(self):
         rows = [
@@ -99,7 +149,15 @@ class GlUnbalancedTests(unittest.TestCase):
                 balance=999.0,  # 应为 1050
             ),
         ]
-        parsed = {"ok": True, "rows": rows, "opening": 1000.0, "closing": 999.0, "row_count": 2}
+        parsed = {
+            "ok": True,
+            "rows": rows,
+            "accounts": ["1140-01"],
+            "opening": 1000.0,
+            "closing": 999.0,
+            "closing_printed": True,
+            "row_count": 2,
+        }
         with mock.patch("services.recon.bank_gl_excel.parse_gl_excel", return_value=parsed):
             result = excel_in.convert_excel(b"stubbed-parser-ignores-bytes", "bad.xlsx")
 
@@ -124,7 +182,15 @@ class GlUnbalancedTests(unittest.TestCase):
                 balance=1100.0,
             ),
         ]
-        parsed = {"ok": True, "rows": rows, "opening": 1000.0, "closing": 1100.0, "row_count": 1}
+        parsed = {
+            "ok": True,
+            "rows": rows,
+            "accounts": ["1140-01"],
+            "opening": 1000.0,
+            "closing": 1100.0,
+            "closing_printed": True,
+            "row_count": 1,
+        }
         with mock.patch("services.recon.bank_gl_excel.parse_gl_excel", return_value=parsed):
             result = excel_in.convert_excel(b"stub", "a.xlsx")
         self.assertEqual(result.tables[0].rows[0][0], "1140-01")

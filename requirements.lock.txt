@@ -125,7 +125,7 @@ pdfminer-six==20251230
     #   pdfplumber
 pdfplumber==0.11.9
     # via -r requirements.txt
-pillow==12.2.0
+pillow==12.3.0
     # via
     #   -r requirements.txt
     #   pdfplumber

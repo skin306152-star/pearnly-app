@@ -173,10 +173,11 @@ async function bootPayroll(
 
 async function pickClientPeriodAndUpload(page) {
     await page.selectOption('#prClientSel', '7');
-    await page.fill('#prPeriodInput', '2569-05');
-    // 真实用户改完期间会点开别处触发浏览器原生 blur→change(同 K1b 范式:不手工派发
-    // change 事件,免得同步 innerHTML 重建撞上仍聚焦的输入框这种合成事件才有的边界情况)。
-    await page.locator('#prPeriodInput').press('Tab');
+    // P1-3:账期从裸文本手输换成下拉(periodOptions 生成"当月+往前 13 个月"佛历
+    // YYYY-MM);2026-07 起当月为 2569-07,2569-05 在往前 13 个月窗口内必定在场。
+    // selectOption 走浏览器原生 select 交互,自带 input/change 事件,不必再手工
+    // press Tab 补触发(那是给裸文本输入框的 blur→change 边界情况准备的,select 不适用)。
+    await page.selectOption('#prPeriodInput', '2569-05');
     await page.setInputFiles('#prFileInput', {
         name: 'payroll.xlsx',
         mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

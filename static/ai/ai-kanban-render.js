@@ -151,7 +151,11 @@
         if (card) {
             var id = card.getAttribute('data-client-id');
             var cardPeriod = card.getAttribute('data-period');
-            window.location.hash = AI.router.buildClientHash(id, AI.router.DEFAULT_VIEW, cardPeriod);
+            window.location.hash = AI.router.buildClientHash(
+                id,
+                AI.router.DEFAULT_VIEW,
+                cardPeriod
+            );
         }
     }
 

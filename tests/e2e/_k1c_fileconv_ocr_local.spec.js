@@ -189,7 +189,8 @@ test.describe('K1c · 图片→Excel OCR 增量(本地 stub 真浏览器)', () =
         await expect(page.locator('.fc-banner.n')).toBeVisible();
         await expect(page.locator('.fc-banner.n')).toContainText('截断');
         await expect(page.locator('.fc-banner.g')).toHaveCount(0);
-        await expect(page.locator('[data-action="fc-download"]')).toHaveCount(0);
+        await expect(page.locator('[data-action="fc-download-xlsx"]')).toHaveCount(0);
+        await expect(page.locator('[data-action="fc-download-pdf"]')).toHaveCount(0);
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '03-ocr-incomplete.png'),
             fullPage: true,
@@ -201,7 +202,8 @@ test.describe('K1c · 图片→Excel OCR 增量(本地 stub 真浏览器)', () =
         await pickImageAndRun(page);
         await expect(page.locator('.fc-banner.n')).toBeVisible();
         await expect(page.locator('.fc-banner.g')).toHaveCount(0);
-        await expect(page.locator('[data-action="fc-download"]')).toHaveCount(0);
+        await expect(page.locator('[data-action="fc-download-xlsx"]')).toHaveCount(0);
+        await expect(page.locator('[data-action="fc-download-pdf"]')).toHaveCount(0);
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '04-ocr-unavailable.png'),
             fullPage: true,

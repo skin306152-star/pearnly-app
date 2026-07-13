@@ -181,7 +181,9 @@ test.describe('K1b · 财务文件转换视图(本地 stub 真浏览器)', () =>
         await expect(page.locator('.fc-banner.g')).toBeVisible({ timeout: 5000 });
         await expect(page.locator('.fc-banner.g')).toContainText('数字可信');
         await expect(page.locator('.fc-stats')).toContainText('608,917.35');
-        await expect(page.locator('[data-action="fc-download"]')).toBeVisible();
+        // K2 起下载区拆两个独立按钮(xlsx/pdf),同 fc-run 不再共用一个 fc-download。
+        await expect(page.locator('[data-action="fc-download-xlsx"]')).toBeVisible();
+        await expect(page.locator('[data-action="fc-download-pdf"]')).toBeVisible();
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '03-result-conserved.png'),
             fullPage: true,
@@ -212,7 +214,8 @@ test.describe('K1b · 财务文件转换视图(本地 stub 真浏览器)', () =>
         await expect(page.locator('.fc-banner.n')).toBeVisible();
         await expect(page.locator('.fc-banner.n')).toContainText('OCR');
         await expect(page.locator('.fc-banner.g')).toHaveCount(0);
-        await expect(page.locator('[data-action="fc-download"]')).toHaveCount(0);
+        await expect(page.locator('[data-action="fc-download-xlsx"]')).toHaveCount(0);
+        await expect(page.locator('[data-action="fc-download-pdf"]')).toHaveCount(0);
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '05-no-text-layer.png'),
             fullPage: true,
@@ -237,11 +240,11 @@ test.describe('K1b · 财务文件转换视图(本地 stub 真浏览器)', () =>
     test('下载:点按钮真发 ?format=xlsx 并触发浏览器下载', async ({ page }) => {
         await bootFileconv(page, {});
         await pickPdfAndRun(page);
-        await expect(page.locator('[data-action="fc-download"]')).toBeVisible();
+        await expect(page.locator('[data-action="fc-download-xlsx"]')).toBeVisible();
         const [download, request] = await Promise.all([
             page.waitForEvent('download'),
             page.waitForRequest((r) => r.url().includes('format=xlsx')),
-            page.click('[data-action="fc-download"]'),
+            page.click('[data-action="fc-download-xlsx"]'),
         ]);
         expect(request.method()).toBe('POST');
         expect(download.suggestedFilename()).toBe('GL TTB.xlsx');

@@ -26,6 +26,10 @@ logger = logging.getLogger(__name__)
 RUN_STEP = "run"
 EVT_RUN_STARTED = "run_started"
 EVT_RUN_FINISHED = "run_finished"
+# 后台 run 崩溃的诚实收尾事件(P-8):任何异常都落此(带 error 原因),与成功的 run_finished
+# 分开,好让详情/接管方一眼看出「这次 run 死了」而非「跑完了」。run 级事件词汇单一事实源在此
+# (与 routes 的 run_requested 一道构成 step="run" 的事件类型全集)。
+EVT_RUN_FAILED = "run_failed"
 
 _inflight_lock = threading.Lock()
 _inflight: set = set()
@@ -97,13 +101,17 @@ def advance(tenant_id: str, work_order_id: str, lease_owner: str | None = None) 
             "status": out.status,
             "stopped_at": out.stopped_at,
         }
-        _finish(tenant_id, work_order_id, result)
+        _finish(tenant_id, work_order_id, EVT_RUN_FINISHED, result)
         return result
-    except Exception as e:  # noqa: BLE001 - 后台任务:吞异常记日志,已提交步保留,续跑可恢复
-        logger.error(f"[workorder-runner] advance {work_order_id} failed: {e}")
-        _finish(tenant_id, work_order_id, {"error": str(e)[:200]})
+    except (
+        Exception
+    ) as e:  # noqa: BLE001 - 后台任务:异常落 run_failed 认账 + finally 释放租约,不静默死
+        logger.exception(f"[workorder-runner] advance {work_order_id} failed")
+        _finish(tenant_id, work_order_id, EVT_RUN_FAILED, {"error": str(e)[:200]})
         return {"error": str(e)[:200]}
     finally:
+        # 无论成功/异常都释放租约(供另一终端接管)+ 解进程内去重锁。异常时 finish 已落
+        # run_failed,这里的租约释放与 finish 各自独立 best-effort,任一失败不牵连另一个。
         _release(key)
         _release_lease(tenant_id, work_order_id, lease_owner)
 
@@ -121,7 +129,9 @@ def _release_lease(tenant_id: str, work_order_id: str, lease_owner: str | None) 
         logger.warning(f"[workorder-runner] release-lease {work_order_id} failed: {e}")
 
 
-def _finish(tenant_id: str, work_order_id: str, result: dict) -> None:
+def _finish(tenant_id: str, work_order_id: str, event_type: str, result: dict) -> None:
+    """收尾台账:成功落 run_finished、异常落 run_failed(event_type 由调用方按结局定)。
+    best-effort:落库失败只记日志,不牵连 finally 的租约释放(诚实收尾优先于事件必达)。"""
     try:
         with db.get_cursor(commit=True) as cur:
             store.append_event(
@@ -129,7 +139,7 @@ def _finish(tenant_id: str, work_order_id: str, result: dict) -> None:
                 tenant_id=tenant_id,
                 work_order_id=work_order_id,
                 step=RUN_STEP,
-                event_type=EVT_RUN_FINISHED,
+                event_type=event_type,
                 payload=result,
                 actor="system:runner",
             )

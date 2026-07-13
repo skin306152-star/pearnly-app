@@ -101,15 +101,30 @@ class AdvanceTests(RunnerTestBase):
             runner._inflight.discard(("t-1", "wo-1"))
         self.assertEqual(out, {"skipped": "already_running"})
 
-    def test_engine_exception_is_swallowed_and_finish_recorded(self):
+    def test_engine_exception_records_run_failed_not_finished(self):
+        # P-8:后台 run 抛异常 → 落 run_failed(带原因)认账,而非冒充成功的 run_finished;
+        # in-flight 释放不卡死后续。
         def _boom(ctx, *, handlers=None):
             raise RuntimeError("kaboom")
 
         runner.engine.run_work_order = _boom
         out = runner.advance("t-1", "wo-1")
         self.assertIn("error", out)
-        self.assertEqual(runner._inflight, set())  # 释放了 in-flight,不会卡死后续
-        self.assertIn("run_finished", [e["event_type"] for e in self.store.events])
+        self.assertEqual(runner._inflight, set())
+        kinds = [e["event_type"] for e in self.store.events]
+        self.assertIn("run_failed", kinds)
+        self.assertNotIn("run_finished", kinds)  # 死了就不许落 run_finished
+        failed = next(e for e in self.store.events if e["event_type"] == "run_failed")
+        self.assertIn("kaboom", failed["payload"].get("error", ""))
+
+    def test_lease_released_even_when_run_fails(self):
+        # P-8 硬门:异常路径也必须释放 DB 租约(供另一终端接管),不让死 run 占租约到 TTL。
+        def _boom(ctx, *, handlers=None):
+            raise RuntimeError("boom")
+
+        runner.engine.run_work_order = _boom
+        runner.advance("t-1", "wo-1", "run:owner-x")
+        self.assertEqual(self.store.released, ["run:owner-x"])
 
     def test_lease_owner_released_on_finish(self):
         # 路由抢到租约后把 owner 交 advance,收尾必须释放(供另一终端接管)。

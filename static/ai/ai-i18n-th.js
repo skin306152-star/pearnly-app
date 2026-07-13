@@ -147,6 +147,7 @@ window.__AI_I18N_TH__ = {
     rv_flag_ocr_error: 'อ่านเอกสารไม่สำเร็จ',
     rv_flag_direction: 'ทิศทางไม่ชัด · ซื้อหรือขาย?',
     rv_flag_sales_direction: 'คล้ายเอกสารขายของเรา · โปรดยืนยันทิศทาง',
+    rv_flag_sales_doc: 'เอกสารขายของเรา · โปรดยืนยัน (กด S)',
     rv_key_dir_purchase: 'ภาษีซื้อ',
     rv_key_dir_sales: 'ภาษีขาย',
     rv_key_dir_nontax: 'ไม่ใช่เอกสารภาษี',

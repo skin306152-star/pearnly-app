@@ -236,4 +236,21 @@ Object.assign(window.__AI_I18N_JA__, {
     settings_account_email: 'メール',
     settings_account_tenant: '所属事務所',
     settings_logout_btn: 'ログアウト',
+    // MC1-c.1 · 売上補強カード（伝票別集計 · 補強であり正値ではない）
+    crb_title: '請求済み売上（参考）',
+    crb_state_green: '十分にカバー',
+    crb_state_amber: 'カバー不足',
+    crb_state_needs: '確定値は未申告',
+    crb_invoiced: '請求済み純額',
+    crb_vat_label: '売上VAT（請求書合計）',
+    crb_period: '請求期間',
+    crb_tickets: '{n} 件（重複除去後 {m}）',
+    crb_vs_authoritative: '今期の確定売上',
+    crb_gap: '差額',
+    crb_coverage: 'カバー率 {pct}',
+    crb_needs_hint:
+        '今期の確定売上は未申告——伝票別集計は参考／下限のみ。POS の Z レポートまたは手入力を追加してください',
+    crb_dupes: '重複伝票番号（重複除去済み・二重計上なし）：{list}',
+    crb_violations: '整合性違反（伝票の3項目が不整合・個別に要確認）：{list}',
+    crb_basis: '判定根拠：売り手の税番号＝当勘定 → 自社売上（信頼度高）',
 });

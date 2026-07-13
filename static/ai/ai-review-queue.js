@@ -14,10 +14,15 @@
     // 随 services/workorder/decisions.py 的 DIRECTION_PREFIXES 同步(前端无法 import,手工对齐)。
     var DIRECTION_PREFIXES = ['direction_ambiguous', 'sales_direction_unhandled'];
 
-    // 方向不明票必须人工定向,否则进项被静默漏掉(G1/G1R2 黑洞)。卡上切换成方向裁决三键,
-    // 不走 A/E/X。按 flag_reason 前缀判(两类同一套 P/S/X 定向流程)。
+    // 自动判本方销项票(kind=sales_doc · MC1-c.1):flagged 留人工过目,卡上走同一套 P/S/X
+    // 定向键(默认按 S 确认销项;客户拍错票可 P 改进项 / X 非税)。随 decisions.SALES_DOC 同步。
+    var SALES_DOC_KIND = 'sales_doc';
+
+    // 方向不明票必须人工定向,否则进项被静默漏掉(G1/G1R2 黑洞)。本方销项票 sales_doc 也走同一套
+    // P/S/X 卡(留人工过目/一键确认)。卡上切换成方向裁决三键,不走 A/E/X。
     function isDirectionTicket(it) {
         if (!it) return false;
+        if (it.kind === SALES_DOC_KIND) return true;
         var reason = String(it.flag_reason || '');
         return DIRECTION_PREFIXES.some(function (p) {
             return reason.indexOf(p) === 0;
@@ -35,7 +40,11 @@
     // flag_reason → 红/黄分级(契约 §1.1):数学不自洽 / 整张 OCR 读失败 = 红(crit);
     // 置信度/校验存疑 = 黄(warn)。未知原因保守当红——没把握的异常不该被淡化成黄。
     // 冒号前缀处理同 flagReasonKey:先取冒号前段再比对,两处「怎么拆 flag_reason」写法统一。
-    var _WARN_REASONS = { ocr_low_confidence: true, ocr_validation_warning: true };
+    var _WARN_REASONS = {
+        ocr_low_confidence: true,
+        ocr_validation_warning: true,
+        sales_doc_review: true,
+    };
     function flagSeverity(reason) {
         var head = String(reason || '').split(':')[0];
         return _WARN_REASONS[head] ? 'warn' : 'crit';
@@ -51,6 +60,7 @@
         ocr_error: 'rv_flag_ocr_error',
         direction_ambiguous: 'rv_flag_direction',
         sales_direction_unhandled: 'rv_flag_sales_direction',
+        sales_doc_review: 'rv_flag_sales_doc',
     };
     function flagReasonKey(reason) {
         var r = String(reason || '');

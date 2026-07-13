@@ -162,8 +162,8 @@ class BinOcrFieldsTests(unittest.TestCase):
         self.assertEqual(kind, "non_tax")
         self.assertEqual(reason, "no_tax_elements:receipt")
 
-    def test_own_tax_as_seller_stays_unknown_for_review(self):
-        # M0 销项事实源 = POS 直读,单张销项票不自动归堆,留人工(T0 §四.4)。
+    def test_own_tax_as_seller_bins_sales_doc_for_review(self):
+        # 自家==卖方 → 自动归本方销项堆 sales_doc,flagged 留人工过目(MC1-c.1,替代旧判死 unknown)。
         kind, reason = sort_step.bin_ocr_fields(
             {
                 "document_type": "tax_invoice",
@@ -173,7 +173,7 @@ class BinOcrFieldsTests(unittest.TestCase):
             },
             own_tax_id=OWN_TAX,
         )
-        self.assertEqual((kind, reason), ("unknown", "sales_direction_unhandled"))
+        self.assertEqual((kind, reason), ("sales_doc", "sales_doc_review"))
 
     def test_tax_elements_but_no_anchor_match_is_ambiguous(self):
         kind, reason = sort_step.bin_ocr_fields(
@@ -253,7 +253,8 @@ class NameAnchorFallbackTests(unittest.TestCase):
         )
         self.assertEqual((kind, reason), ("purchase_invoice", None))
 
-    def test_seller_name_matches_own_is_sales_direction(self):
+    def test_seller_name_matches_own_bins_sales_doc(self):
+        # 税号锚失灵、名集命中卖方名 → 本方销项堆 sales_doc(MC1-c.1,与税号锚路同口径)。
         kind, reason = sort_step.bin_ocr_fields(
             {
                 "document_type": "tax_invoice",
@@ -265,7 +266,7 @@ class NameAnchorFallbackTests(unittest.TestCase):
             own_tax_id=OWN_TAX,
             own_name=OWN_NAME,
         )
-        self.assertEqual((kind, reason), ("unknown", "sales_direction_unhandled"))
+        self.assertEqual((kind, reason), ("sales_doc", "sales_doc_review"))
 
     def test_name_mismatch_stays_ambiguous(self):
         kind, reason = sort_step.bin_ocr_fields(

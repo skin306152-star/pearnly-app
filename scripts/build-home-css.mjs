@@ -155,6 +155,9 @@ const AI_CSS = [
     // 模态外壳,排在其后即可;与工单详情 .wosum/.needs-list(ai-client.css)同屏但
     // 各管各的类名,层叠顺序对彼此零影响。
     'ai/ai-recon.css',
+    // ai-corrob.css(MC1-c.1 · 销项佐证卡)吃 .panel/.chip(ai-shell.css)外壳,只补 crb-* 行
+    // 布局/点名色,排在 ai-recon.css 之后即可;与其余工单详情只读区块类名各自独立,层叠零影响。
+    'ai/ai-corrob.css',
     // ai-shadow.css(F3 · 影子底稿三分区折叠)吃 .panel/.chip(ai-shell.css)+ .mx-scroll/
     // .mx-table(ai-matrix.css,科目余额表复用宽表格容器内横滑原子),排在两者之后即可;
     // 与银行对账区(ai-recon.css)同屏但类名各自独立,层叠顺序对彼此零影响。

@@ -93,6 +93,16 @@ def _bucket_of(item: dict, dec: dict | None) -> str:
             return _ASSIGN_BUCKET.get((dec or {}).get("kind"), PENDING)
         return PENDING  # 方向票无 assign_kind 裁决 → 待裁决
 
+    if kind == decisions.SALES_DOC:
+        # 自动判本方销项票(MC1-c.1):佐证材料,不进 R1。人工可 assign_kind 改判(拍错票兜底);
+        # 改判走 _ASSIGN_BUCKET(进项→计入 / 销项→归销项侧 / 非税→排除)。flagged 且无裁决 →
+        # 待人工过目(拍板① 留一次触碰,配 MC1-b 批量确认);status=ok(MC1-c.2 放宽后)免裁归销项侧。
+        if decision == decisions.ASSIGN_KIND:
+            return _ASSIGN_BUCKET.get((dec or {}).get("kind"), PENDING)
+        if item.get("status") == "ok":
+            return SALES_REASSIGNED
+        return PENDING
+
     if kind == _KIND_PURCHASE:
         status = item.get("status")
         if status == "ok":

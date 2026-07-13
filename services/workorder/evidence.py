@@ -131,11 +131,11 @@ def _collect_evidence(
     file_ref 的 basename,没有原件就是 None——前端点验回链据此逐条打开原图或诚实降级)。
     sales 只收 status=ok 的直读(flagged 的销项没有可用数字,不该被列为"支撑证据")。
 
-    include_direction_assigned=True(仅 purchase 调用)时,额外纳入方向不明票:原始
-    item_classified.kind 恒为 unknown(reconcile R1 与本函数同口径认它),但已有 assign_kind
-    人工裁决把它定向为 kind——这类票的 VAT 已进 input_vat 合计,证据索引不能漏它。事件 id
-    同时收 item_classified 与 human_decision 两条(裁决本身也是证据);裁定 non_tax/sales_doc
-    的方向票不属于该 kind,不纳入。"""
+    include_direction_assigned=True(仅 purchase 调用)时,额外纳入被改判进项的票:原始
+    item_classified.kind 是 unknown(方向不明票)或 sales_doc(MC1-c.1 自动判本方销项票),但已有
+    assign_kind 人工裁决把它改判为 kind——这类票的 VAT 已进 input_vat 合计(reconcile R1 同口径),
+    证据索引不能漏它。事件 id 同时收 item_classified 与 human_decision 两条(裁决本身也是证据);
+    裁定 non_tax/sales_doc 的票不属于该 kind,不纳入。"""
     event_ids: set = set()
     source_files: set = set()
     file_by_item_id: dict = {}
@@ -144,7 +144,7 @@ def _collect_evidence(
         dec = decisions_by_item.get(item_id)
         direction_assigned = (
             include_direction_assigned
-            and payload.get("kind") == _KIND_UNKNOWN
+            and payload.get("kind") in (_KIND_UNKNOWN, decisions.SALES_DOC)
             and dec is not None
             and dec["payload"].get("decision") == decisions.ASSIGN_KIND
             and dec["payload"].get("kind") == kind

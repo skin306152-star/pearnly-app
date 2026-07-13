@@ -190,9 +190,9 @@ class ClassifyImageTests(unittest.TestCase):
         self.assertEqual(row["flag_reason"], "amount_math_fail")
         self.assertEqual(out.payload["flagged"], 1)
 
-    def test_sales_receipt_with_math_warning_keeps_direction_not_amount_math_fail(self):
-        # 自家==卖方的销售小票:OCR 也会报「净+税≠总额」,但销项票不进数学闸——
-        # 维持 sales_direction_unhandled,不被误挂 amount_math_fail(L2 首跑 47 张误判的形态)。
+    def test_sales_receipt_with_math_warning_bins_sales_doc_not_amount_math_fail(self):
+        # 自家==卖方的销售小票:OCR 也会报「净+税≠总额」,但销项票不进数学闸——归本方销项堆
+        # sales_doc(MC1-c.1),不被误挂 amount_math_fail(L2 首跑 47 张误判的形态)。
         item = _item("i1", "/in/IMG_ocha_sale.jpg")
         store = FakeItemStore([item])
         fields = _purchase_fields(seller=OWN_TAX, buyer=OTHER_TAX, invoice_no="POS-88", vat="7.00")
@@ -202,9 +202,9 @@ class ClassifyImageTests(unittest.TestCase):
         out = classify.run(_ctx(store))
 
         row = store.by_id("i1")
-        self.assertEqual(row["kind"], "unknown")
+        self.assertEqual(row["kind"], "sales_doc")
         self.assertEqual(row["status"], "flagged")
-        self.assertEqual(row["flag_reason"], "sales_direction_unhandled")
+        self.assertEqual(row["flag_reason"], "sales_doc_review")
         self.assertEqual(out.payload["flagged"], 1)
 
     def test_bank_statement_keyword_without_vat_bins_bank_and_skips_math_gate(self):

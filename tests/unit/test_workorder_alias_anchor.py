@@ -8,7 +8,7 @@
 
 import unittest
 
-from services.workorder.decisions import DIRECTION_AMBIGUOUS, SALES_DIRECTION_UNHANDLED
+from services.workorder.decisions import DIRECTION_AMBIGUOUS, SALES_DOC, SALES_DOC_REVIEW
 from services.workorder.engine import StepContext
 from services.workorder.steps import classify
 from services.workorder.steps import sort as sort_step
@@ -44,7 +44,7 @@ class NameSetAnchorTests(unittest.TestCase):
         kind, reason = sort_step.bin_ocr_fields(
             _ocha_receipt(ALIAS_EN), own_tax_id=OWN_TAX, own_names=[LEGAL_ENTRY, ALIAS_ENTRY]
         )
-        self.assertEqual((kind, reason), ("unknown", SALES_DIRECTION_UNHANDLED))
+        self.assertEqual((kind, reason), (SALES_DOC, SALES_DOC_REVIEW))
 
     def test_alias_exact_does_not_match_superstring(self):
         # exact = 归一等值,不吃子串:别名 "sisterbeauty" 不命中 "sisterbeautysupply"。
@@ -75,7 +75,7 @@ class NameSetAnchorTests(unittest.TestCase):
             own_tax_id=OWN_TAX,
             own_names=[(THAI_LEGAL, "legal"), ("Sister Beauty", "substring")],
         )
-        self.assertEqual((kind, reason), ("unknown", SALES_DIRECTION_UNHANDLED))
+        self.assertEqual((kind, reason), (SALES_DOC, SALES_DOC_REVIEW))
 
     def test_legal_name_in_set_keeps_min4_substring(self):
         # 名集路里的法定名仍走 ≥4 子串现状(与闸关单名路同口径)。
@@ -138,7 +138,7 @@ class G1R2ReplayTests(unittest.TestCase):
             )
             self.assertEqual(
                 (kind, reason),
-                ("unknown", SALES_DIRECTION_UNHANDLED),
+                (SALES_DOC, SALES_DOC_REVIEW),
                 msg=f"form={form!r}",
             )
 
@@ -222,8 +222,8 @@ class ClassifyFlagWiringTests(unittest.TestCase):
         classify.run(_ctx(store))
 
         row = store.by_id("i1")
-        self.assertEqual(row["kind"], "unknown")
-        self.assertEqual(row["flag_reason"], SALES_DIRECTION_UNHANDLED)
+        self.assertEqual(row["kind"], SALES_DOC)
+        self.assertEqual(row["flag_reason"], SALES_DOC_REVIEW)
 
     def test_flag_off_uses_single_legal_name_and_stays_ambiguous(self):
         classify._m1_enabled = lambda ctx: False

@@ -109,6 +109,10 @@ const BUNDLES = [
             // 两者都在 ai-client.js(renderWo 用 AI.recon.mount)之前——同 ai-pkg 先例。
             'ai/ai-recon-render.js',
             'ai/ai-recon.js',
+            // ai-corrob.js(MC1-c.1 · 销项佐证卡:已开票逐票聚合的只读四态呈现,依赖 AI.state/
+            // format)必须在 ai-client.js(renderWo 用 AI.corrob.mount)之前——同 ai-recon 先例;
+            // 与银行对账区互不依赖,同属工单详情只读区块的语义分组。
+            'ai/ai-corrob.js',
             // ai-shadow-render.js(F3 · 影子底稿三件套+GL对平纯逻辑+HTML,依赖 AI.state/
             // format)排在 ai-shadow.js(挂载/折叠编排)之前,两者都在 ai-client.js(renderWo
             // 用 AI.shadow.mount)之前——同 ai-recon 先例;与银行对账区互不依赖,紧邻放置

@@ -27,7 +27,7 @@ from tests.unit.test_workorder_golden_synthetic import (
     OUTPUT_VAT,
 )
 
-# 自家==卖方的合成销项方向票(sort.bin_ocr_fields → kind=unknown/sales_direction_unhandled)。
+# 自家==卖方的合成本方销项票(sort.bin_ocr_fields → kind=sales_doc/sales_doc_review · MC1-c.1)。
 DIR_NET, DIR_VAT, DIR_TOTAL = Decimal("54240.00"), Decimal("3796.80"), Decimal("58036.80")
 
 WAIVE_REASON = "客户 LINE 确认为对方留底联·原件不归本方申报"
@@ -54,14 +54,14 @@ class _WaivePipelineTestCase(_GoldenSyntheticTestCase):
 
 
 class WaivedSalesDirectionTicketTests(_WaivePipelineTestCase):
-    """1 张 sales_direction_unhandled 无裁决 → 先 stuck 点名;waive 后重跑 → completed,
-    五件套齐、memo 留痕、pp30 金额不含该票。"""
+    """1 张自动判本方销项票(kind=sales_doc)不再判死停机;waive 后重跑 → completed,
+    五件套齐、memo 留痕、pp30 金额不含该票——验证 waive 在 sales_doc 上仍全链可达。"""
 
     def setUp(self):
         super().setUp()
         self.p_dir = self.corpus.dir / "own_sales_doc.jpg"
         self.p_dir.write_bytes(b"jpeg-own-sales")
-        # seller==自家税号 → 方向判据落 sales_direction_unhandled(非进项,不自动归堆)。
+        # seller==自家税号 → 自动归本方销项堆 sales_doc(MC1-c.1,flagged 留人工过目)。
         self.corpus.ocr_map[str(self.p_dir)] = _purchase_fields(
             seller=OWN_TAX,
             buyer=OTHER_TAX,
@@ -75,16 +75,17 @@ class WaivedSalesDirectionTicketTests(_WaivePipelineTestCase):
         files = self.corpus.intake_files() + [str(self.p_dir)]
         return self.corpus.ctx(intake_files=files)
 
-    def test_stuck_names_ticket_then_waive_completes_with_memo_trace(self):
+    def test_sales_doc_binned_then_waive_completes_with_memo_trace(self):
         out1 = self._run(self._first_run_ctx())
         self.assertFalse(out1.completed)
         self.assertEqual(out1.stopped_at, "reconcile")
-        self.assertTrue(any("own_sales_doc" in r for r in out1.result.reasons))
-        self.assertTrue(any("sales_direction_unhandled" in r for r in out1.result.reasons))
+        # 本方销项票(sales_doc)不再判死进 R1 停机;首跑停在待裁决的争议进项票(amount_math_fail)。
+        self.assertTrue(any("amount_math_fail" in r for r in out1.result.reasons))
+        self.assertFalse(any("sales_direction_unhandled" in r for r in out1.result.reasons))
 
         dir_item = self.corpus.item_by_file(self.p_dir)
-        self.assertEqual(dir_item["kind"], "unknown")
-        self.assertEqual(dir_item["flag_reason"], "sales_direction_unhandled")
+        self.assertEqual(dir_item["kind"], "sales_doc")
+        self.assertEqual(dir_item["flag_reason"], "sales_doc_review")
 
         # 争议票走常规裁决,方向票走豁免——重跑必须一路推进到 completed(review)。
         self.corpus.decide("face_value")

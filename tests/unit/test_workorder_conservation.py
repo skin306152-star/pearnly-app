@@ -81,6 +81,38 @@ class BucketPartitionTests(unittest.TestCase):
         self.assertEqual(c.stuck_reasons(cons, len(items)), [])
 
 
+class SalesDocBucketTests(unittest.TestCase):
+    """自动判本方销项票(kind=sales_doc · MC1-c.1)的终态归属。"""
+
+    def test_flagged_sales_doc_without_decision_is_pending(self):
+        # 拍板①:自动判 sales_doc 后 flagged 留一次人工过目 → 无裁决落待裁决桶(配 MC1-b 批量确认)。
+        items = [_item("sd", "sales_doc", status="flagged", flag_reason="sales_doc_review")]
+        cons = c.bucket_items(items, {})
+        self.assertEqual([it["id"] for it in cons.pending], ["sd"])
+        self.assertFalse(cons.conserved(1))
+
+    def test_confirmed_sales_doc_goes_to_sales_reassigned(self):
+        # 人工按 S(assign_kind sales_doc)确认销项 → 归销项侧桶,不再待裁决。
+        items = [_item("sd", "sales_doc", status="flagged", flag_reason="sales_doc_review")]
+        decs = {"sd": _dec("assign_kind", kind="sales_doc")}
+        b = c.bucket_items(items, decs).buckets
+        self.assertEqual({it["id"] for it in b[c.SALES_REASSIGNED]}, {"sd"})
+        self.assertEqual(b[c.PENDING], [])
+
+    def test_reassigned_sales_doc_to_purchase_counts_as_input(self):
+        # 客户拍错票兜底:改判进项 → 计入 R1 桶(与方向票 assign_kind 同 _ASSIGN_BUCKET 口径)。
+        items = [_item("sd", "sales_doc", status="flagged", flag_reason="sales_doc_review")]
+        decs = {"sd": _dec("assign_kind", kind="purchase_invoice")}
+        b = c.bucket_items(items, decs).buckets
+        self.assertEqual({it["id"] for it in b[c.INPUT_COUNTED]}, {"sd"})
+
+    def test_ok_sales_doc_reassigned_without_decision(self):
+        # MC1-c.2 放宽自动 ok 后:status=ok 的 sales_doc 免裁直接归销项侧,不卡待裁决。
+        items = [_item("sd", "sales_doc", status="ok")]
+        b = c.bucket_items(items, {}).buckets
+        self.assertEqual({it["id"] for it in b[c.SALES_REASSIGNED]}, {"sd"})
+
+
 class FailClosedTests(unittest.TestCase):
     """畸形/未裁决件一律 fail-closed 归待裁决,守恒违例被逐件点名。"""
 

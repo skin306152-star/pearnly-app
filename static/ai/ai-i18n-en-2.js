@@ -237,4 +237,22 @@ Object.assign(window.__AI_I18N_EN__, {
     settings_account_email: 'Email',
     settings_account_tenant: 'Firm',
     settings_logout_btn: 'Log out',
+    // MC1-c.1 · Sales corroboration card (per-invoice sum · corroboration, not authority)
+    crb_title: 'Invoiced sales (corroboration)',
+    crb_state_green: 'Well covered',
+    crb_state_amber: 'Under-covered',
+    crb_state_needs: 'Authoritative not filed',
+    crb_invoiced: 'Invoiced net',
+    crb_vat_label: 'Output VAT (invoice sum)',
+    crb_period: 'Invoice period',
+    crb_tickets: '{n} tickets ({m} after dedupe)',
+    crb_vs_authoritative: 'Authoritative sales this period',
+    crb_gap: 'Gap',
+    crb_coverage: '{pct} covered',
+    crb_needs_hint:
+        'Authoritative sales not yet filed — per-invoice sum is corroboration/floor only; add POS Z-report or manual entry',
+    crb_dupes: 'Duplicate invoice no. (deduped, not double-counted): {list}',
+    crb_violations:
+        'Conservation breach (invoice figures inconsistent, flagged for review): {list}',
+    crb_basis: 'Basis: seller tax ID = this account → own sales (high confidence)',
 });

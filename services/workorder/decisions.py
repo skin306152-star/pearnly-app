@@ -27,8 +27,16 @@ ASSIGN_KINDS = (PURCHASE_INVOICE, SALES_DOC, NON_TAX)
 # 「不计入合计」语义集:剔除与豁免都不进 Σ、不进 unresolved(豁免另在备忘留痕)。
 NON_COUNTING = frozenset({EXCLUDE, WAIVE})
 
-# 方向不明票的 flag_reason:税号/名称锚点判不出进/销(direction_ambiguous),或自家命中卖方
-# =疑似本方销项票(sales_direction_unhandled)。两者都 kind=unknown,都必须人工定向(assign_kind)。
+# 方向不明票的 flag_reason:税号/名称锚点判不出进/销(direction_ambiguous)。kind=unknown,
+# 必须人工定向(assign_kind)。SALES_DIRECTION_UNHANDLED 是 MC1-c.1 前「自家==卖方判死」的旧码
+# ——现已改为 sort 自动归 sales_doc 堆(见 SALES_DOC_REVIEW),此常量仅为存量工单的 flag_reason
+# 向后兼容保留(reconcile 的 ambiguous 收编口径、conservation 的方向判据仍认它)。
 DIRECTION_AMBIGUOUS = "direction_ambiguous"
 SALES_DIRECTION_UNHANDLED = "sales_direction_unhandled"
 DIRECTION_PREFIXES = (DIRECTION_AMBIGUOUS, SALES_DIRECTION_UNHANDLED)
+
+# 自动判定的本方销项票 flag_reason(MC1-c.1):seller==自家税号/名集 → sort 归 SALES_DOC 堆,
+# 默认 flagged 留一次人工过目(拍板① · 配 MC1-b 批量键盘流一键确认),不再判死为 unknown。
+# 刻意不进 DIRECTION_PREFIXES:它是「机器已判本方销项」而非「方向不明」,reconcile R1 不把它
+# 当 unresolved 停机(佐证聚合不阻断出税),人工仍可 assign_kind 改判(客户拍错票的兜底)。
+SALES_DOC_REVIEW = "sales_doc_review"

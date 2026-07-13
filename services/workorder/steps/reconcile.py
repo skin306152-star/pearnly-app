@@ -56,7 +56,11 @@ def run(ctx: StepContext) -> StepResult:
         if it["status"] == "flagged"
         and str(it.get("flag_reason") or "").startswith(decisions.DIRECTION_PREFIXES)
     ]
-    r1 = gates.resolve_input_vat(purchases, classified, decisions_by_item, ambiguous=ambiguous)
+    # 自动判本方销项票(MC1-c.1):默认销项不进 R1、无裁决不停机,人工改判进项才计入(拍错票兜底)。
+    sales_docs = [it for it in items if it["kind"] == decisions.SALES_DOC]
+    r1 = gates.resolve_input_vat(
+        purchases, classified, decisions_by_item, ambiguous=ambiguous, sales_docs=sales_docs
+    )
     if r1["unresolved"]:
         return StepResult.stuck(r1["unresolved"])
 
@@ -102,6 +106,12 @@ def run(ctx: StepContext) -> StepResult:
             "credit": str(tb["credit"]),
         },
     }
+    # R2 销项佐证(MC1-c.1):逐票本方销项票聚合成「已开票销售」对账点,对比 R2 权威值给覆盖率/缺口。
+    # 纯佐证层——R2 权威取值(上面 r2_sales)一行不改,聚合只读 sales_doc 件的票面钱、异常收 note
+    # 不阻断出包。零 sales_doc 件返 None(不挂键,存量工单 payload 逐字节维持现状)。
+    corroboration = _run_invoice_aggregate(items, classified, r2)
+    if corroboration is not None:
+        result_gates["r2_sales_corroboration"] = corroboration
     # R5 影子底稿(pearnly_ai_shadow_draft 闸)。闸关:_run_shadow_draft 返 None,gates 逐字节维持
     # 现状(无 r5_shadow 键)。闸开:把 R1 已裁分录 + R2 聚合销项过纯函数复式引擎产出三件套影子
     # 底稿,佐证层挂 r5_shadow——绝不 stuck、绝不阻断 package(影子只算不落法定表)。
@@ -154,6 +164,28 @@ def _replay_sales_reads(events: list[dict]) -> dict:
         if p.get("kind") == _SALES and p.get("sales_read"):
             out[p["item_id"]] = p["sales_read"]
     return out
+
+
+def _run_invoice_aggregate(items: list[dict], classified: dict, r2: dict) -> dict | None:
+    """R2 销项佐证:sales_doc 件的逐票票面钱 → sales_aggregate 聚合(去重+守恒+求和)+ 对 R2 权威
+    值算覆盖率/缺口。佐证层单点隔离——任何异常收进 note 不上抛,绝不拖垮出包。零 sales_doc 件 → None
+    (调用方不挂 r2_sales_corroboration 键,存量工单 payload 逐字节维持改前现状)。"""
+    money_list = [
+        classified[it["id"]]
+        for it in items
+        if it["kind"] == decisions.SALES_DOC and classified.get(it["id"])
+    ]
+    if not money_list:
+        return None
+    from services.workorder.steps import sales_aggregate
+
+    try:
+        agg = sales_aggregate.aggregate_invoice_sales(money_list)
+        return sales_aggregate.build_corroboration(
+            agg, authoritative_net=r2["sales_amount"], authoritative_vat=r2["output_vat"]
+        )
+    except Exception as exc:  # noqa: BLE001 - 佐证层单点隔离,绝不阻断 package
+        return {"error": f"{type(exc).__name__}", "note": "invoice_aggregate_skipped"}
 
 
 def _run_bank_recon(ctx: StepContext, banks: list[dict], events: list[dict]) -> dict | None:

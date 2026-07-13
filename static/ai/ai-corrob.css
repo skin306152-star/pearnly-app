@@ -1,0 +1,57 @@
+/*
+ * Pearnly AI · ai-corrob.css · 销项佐证卡(MC1-c.1)· 已开票逐票聚合四态呈现
+ *
+ * 吃 .panel/.chip(ai-shell.css)外壳,只补佐证卡自己的行布局/点名色。与工单详情其余
+ * 只读区块(ai-recon/ai-shadow/ai-financials)同屏但类名各自独立(crb-*),层叠零影响。
+ */
+
+.crb .bd {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.crb-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.crb-lb {
+  color: var(--ai-text-dim, #6b7280);
+}
+
+.crb-vl {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.crb-gap {
+  font-weight: 600;
+  color: var(--ai-warn, #b45309);
+}
+
+.crb-needs {
+  font-size: 13px;
+  color: var(--ai-text-dim, #6b7280);
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--ai-surface-2, rgba(148, 163, 184, 0.12));
+}
+
+.crb-note {
+  font-size: 13px;
+  color: var(--ai-text-dim, #6b7280);
+}
+
+.crb-viol {
+  color: var(--ai-crit, #b91c1c);
+}
+
+.crb-basis {
+  font-size: 12px;
+  color: var(--ai-text-dim, #6b7280);
+  margin-top: 2px;
+}

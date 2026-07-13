@@ -76,6 +76,20 @@ class IsDirectionTicketTests(unittest.TestCase):
             """)
         self.assertEqual(out, [True, True, True, False, False, False])
 
+    def test_sales_doc_kind_is_direction_ticket_for_confirm(self):
+        # MC1-c.1:自动判本方销项票(kind=sales_doc)也走 P/S/X 卡(留人工过目/按 S 一键确认)。
+        out = _run_node(f"""
+            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
+            process.stdout.write(JSON.stringify([
+                q.isDirectionTicket({{kind: 'sales_doc', flag_reason: 'sales_doc_review'}}),
+                q.filterPurchaseQueue([
+                    {{item_id: 'sd', kind: 'sales_doc', flag_reason: 'sales_doc_review'}},
+                    {{item_id: 'p', kind: 'purchase_invoice', flag_reason: 'amount_math_fail'}},
+                ]).map(x => x.item_id),
+            ]));
+            """)
+        self.assertEqual(out, [True, ["sd", "p"]])
+
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class FlagSeverityTests(unittest.TestCase):

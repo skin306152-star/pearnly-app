@@ -78,10 +78,14 @@ def resolve_input_vat(
     classified: dict,
     decisions: dict,
     ambiguous: list[dict] | None = None,
+    sales_docs: list[dict] | None = None,
 ) -> dict:
     """R1:进项税 = Σ票面。ok 直接进;flagged 必须有人工裁决,否则计入 unresolved(绝不默认吞)。
     方向不明票(ambiguous)必须有人工 assign_kind 裁决:裁进项才入 Σ,裁销项/非税则排除,无裁决
     → unresolved(与 flagged 无裁决同等停机点名,绝不静默漏进项)。
+
+    自动判本方销项票(sales_docs · MC1-c.1)默认销项:票面不进 R1、无裁决也不 unresolved(机器已判
+    销项,佐证聚合不阻断出税);人工 assign_kind 改判进项才进 R1(拍错票兜底),改判非税/销项则排除。
 
     返回 {total, unresolved[], entries[]}。unresolved 非空 → 上层整步 stuck;entries 是被计入
     合计的派生分录金额(供 R4 试算)。缺 item_classified 金额事件的 ok/face_value 件也算 unresolved
@@ -117,7 +121,24 @@ def resolve_input_vat(
             continue
         total += eff["vat"]
         entries.append(eff)
+    for it in sales_docs or []:
+        eff = _apply_sales_doc(it, classified.get(it["id"]) or {}, decisions.get(it["id"]))
+        if eff is None:
+            continue
+        total += eff["vat"]
+        entries.append(eff)
     return {"total": total, "unresolved": unresolved, "entries": entries}
+
+
+def _apply_sales_doc(it: dict, money: dict, dec: Optional[dict]) -> Optional[dict]:
+    """自动判本方销项票的 R1 取数(MC1-c.1)。默认销项:票面不进 R1,无裁决也不 unresolved
+    (机器已判销项,佐证聚合另算,绝不阻断出税)。人工 assign_kind 改判进项 → 用其 OCR 钱字段进 R1
+    (缺金额事件则跳过,不静默少算也不停整步——佐证票不该拖垮进项主线);改判销项/非税/豁免 → 排除。"""
+    if not dec or dec.get("decision") != decisions.ASSIGN_KIND:
+        return None
+    if dec.get("kind") == decisions.PURCHASE_INVOICE and money:
+        return _effective(money)
+    return None
 
 
 def _apply_direction(

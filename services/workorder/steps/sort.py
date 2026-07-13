@@ -165,9 +165,10 @@ def bin_ocr_fields(
 
     支付/订单截图与「无 VAT 且两头税号都没有」的票据 = 无税务要素 → non_tax 留原因。
     银行流水页(正文出现行名且无 VAT 税票结构)→ bank_statement,不进方向判据、不进数学闸。
-    有税务要素的按税号锚点判向:自家==买方 → purchase_invoice;自家==卖方 → 不自动归堆
-    (M0 销项事实源 = POS 直读,单张销项票留人工,T0 §四.4)。税号锚对不上任何一方(买方
-    税号 OCR 读花/缺失)时退到公司名称锚点;名称也对不上才留 ambiguous。
+    有税务要素的按税号锚点判向:自家==买方 → purchase_invoice;自家==卖方 → 自动归本方销项
+    堆 sales_doc(status=flagged 留人工过目 · MC1-c.1,替代此前判死为 unknown 的 sales_direction_
+    unhandled)。税号锚对不上任何一方(买方税号 OCR 读花/缺失)时退到公司名称锚点;名称也对不上
+    才留 ambiguous。
 
     名称锚有两条入口(precedence 不变,税号仍第一优先):
       own_name(单名,向后兼容)——法定名单锚,子串 ≥4 现状,不做税号/名称冲突检测。
@@ -199,7 +200,7 @@ def bin_ocr_fields(
     if match_buyer and not match_seller:
         return (kinds.PURCHASE_INVOICE, None)
     if match_seller and not match_buyer:
-        return (kinds.UNKNOWN, decisions.SALES_DIRECTION_UNHANDLED)
+        return (decisions.SALES_DOC, decisions.SALES_DOC_REVIEW)
 
     # own_names(名集)是别名闸开时的新路;缺省 own_name 是闸关的现状路,行为逐字节不变。
     if own_names is not None:
@@ -252,8 +253,9 @@ _AMBIGUOUS_TAXID_CONFLICT = f"{decisions.DIRECTION_AMBIGUOUS}:name_taxid_conflic
 def _direction_by_name(
     fields: dict, entries, *, conflict: Optional["_NameConflict"] = None
 ) -> Optional[tuple[str, Optional[str]]]:
-    """税号锚失灵时的名称兜底:名集任一命中买方名 → 进项;任一命中卖方名 → 销项方向;
-    都不命中 → None(交回 ambiguous)。买方优先:进项是工单主线,先认买方少漏票。
+    """税号锚失灵时的名称兜底:名集任一命中买方名 → 进项;任一命中卖方名 → 本方销项堆
+    sales_doc(MC1-c.1);都不命中 → None(交回 ambiguous)。买方优先:进项是工单主线,先认
+    买方少漏票。
 
     entries = [(name, mode)] 序列(法定名 legal / 别名 exact|substring)。conflict 非空且
     命中侧的税号与自家矛盾 → ambiguous+冲突旗(闸关的单名路 conflict=None,不做此检测,现状不变)。
@@ -267,7 +269,7 @@ def _direction_by_name(
     if _name_set_hits(entries, fields.get("seller_name")):
         if conflict is not None and conflict.contradicts("seller"):
             return (kinds.UNKNOWN, _AMBIGUOUS_TAXID_CONFLICT)
-        return (kinds.UNKNOWN, decisions.SALES_DIRECTION_UNHANDLED)
+        return (decisions.SALES_DOC, decisions.SALES_DOC_REVIEW)
     return None
 
 

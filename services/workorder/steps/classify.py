@@ -24,7 +24,6 @@ from __future__ import annotations
 import os
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
 from itertools import islice
 from pathlib import Path
 from typing import Optional
@@ -35,6 +34,7 @@ from services.purchase.totals import dedupe_key
 from services.summary_import.parse import parse_table
 from services.workorder import decisions, evidence, kinds
 from services.workorder.engine import StepContext, StepResult
+from services.workorder.steps import checkpoint, ocr_ledger
 from services.workorder.steps import sort as sort_step
 from services.workspace import client_alias_store
 
@@ -76,6 +76,10 @@ def run(ctx: StepContext) -> StepResult:
 
     bins: dict[str, int] = {}
     flagged = 0
+    # OCR 识别台账双写归属(件 1):工单绑定客户账套的 owner user + workspace_client_id,
+    # 整步解析一次(逐件复用,不 N 次查库)。解不出(未绑客户/无 owner)→ None,双写整体
+    # 优雅跳过,item.ocr_history_id 如实留 NULL(只向前,不回填存量)。
+    history_owner = _resolve_history_owner(ctx)
 
     # 并发取 OCR、按原序回主线程逐件裁堆+落库。原序消费(非完成序)保证查重「先到先占」
     # 与串行逐字节一致;每件独立事务提交(有 cursor_factory 时),跑批中途被杀只丢在飞的
@@ -96,8 +100,19 @@ def run(ctx: StepContext) -> StepResult:
         )
         upd = outcome["update"]
         engine_ver = ocr.get("_ocr_engine") if isinstance(ocr, dict) else None
-        with _item_scope(ctx):
-            ctx.store.update_item(ctx.cur, tenant_id=ctx.tenant_id, item_id=item["id"], **upd)
+        # 件 1:每件 OCR 落库时双写 ocr_history(识别台账,主站据此看得见工单侧识别)——
+        # 独立自管事务(insert 自开 RLS 游标),失败/无归属只留 NULL,绝不拖垮 classify。
+        # ai_usage 成本归因已在 _ocr_safe 记过,这里只搬 OCR 读值不重复计费。
+        history_id = (
+            _record_ocr_history(item, ocr, history_owner) if isinstance(ocr, dict) else None
+        )
+        # 只在真拿到 history_id 时才传 ocr_history_id(否则不传):无归属/无双写的路径 update_item
+        # 调用与件 1 前逐字节一致,存量 NULL 不被回填。
+        link = {"ocr_history_id": history_id} if history_id else {}
+        with checkpoint.item_scope(ctx):
+            ctx.store.update_item(
+                ctx.cur, tenant_id=ctx.tenant_id, item_id=item["id"], **link, **upd
+            )
             # 归堆即落 item_classified 事件:进项票带票面钱字段。这条事件是 reconcile 回放金额的
             # 唯一持久源(证据链 + 断点续跑),classify 不算钱,只把票面原值落进证据流。dedupe_key
             # 锚到 item:并发接管(过期租约被另一进程续跑)重放同件也只落一条,守恒不被撑破。
@@ -119,7 +134,7 @@ def run(ctx: StepContext) -> StepResult:
         if item["kind"] != kinds.SALES_SUMMARY:
             continue
         parsed, reason = _classify_summary(item)
-        with _item_scope(ctx):
+        with checkpoint.item_scope(ctx):
             if reason:
                 ctx.store.update_item(
                     ctx.cur,
@@ -140,40 +155,6 @@ def run(ctx: StepContext) -> StepResult:
                 reads[item["id"]] = parsed
 
     return StepResult.ok(bins=bins, flagged=flagged, sales_summary_reads=reads)
-
-
-@contextmanager
-def _item_scope(ctx: StepContext):
-    """单件写作用域。有 cursor_factory:每件开一个独立事务(update_item + item_classified 原子
-    落库并提交),进程被杀只丢在飞件、已落件永久成立——逐件检查点;提交前顺带给 run 租约
-    续期(MC2-A1 ④ 心跳):超长合法跑批不再耗穿 TTL 被收尸人误判为死。无 cursor_factory
-    (内存测试 / CLI 单事务):复用 ctx.cur,由上层统一提交,行为逐字节不变。"""
-    if ctx.cursor_factory is None:
-        yield
-        return
-    prev = ctx.cur
-    with ctx.cursor_factory() as cur:
-        ctx.cur = cur
-        try:
-            yield
-            _renew_lease(ctx, cur)
-        finally:
-            ctx.cur = prev
-
-
-def _renew_lease(ctx: StepContext, cur) -> None:
-    """检查点心跳:只续自己 owner 的租约(条件 UPDATE,易主即不续)。租约料由 runner.advance
-    放进 ctx.data['run_lease'];直调(CLI/测试)不持约则无此键,零动作。"""
-    lease = ctx.data.get("run_lease") or {}
-    if not lease.get("owner"):
-        return
-    ctx.store.renew_run_lease(
-        cur,
-        tenant_id=ctx.tenant_id,
-        work_order_id=ctx.work_order_id,
-        owner=lease["owner"],
-        ttl_seconds=lease["ttl_seconds"],
-    )
 
 
 def _ocr_safe(item: dict, tenant_id: str):
@@ -466,6 +447,8 @@ def _default_read_sales_summary(path: str) -> dict:
 _resolve_own_tax_id = _default_resolve_own_tax_id
 _resolve_own_name = _default_resolve_own_name
 _resolve_own_names = _default_resolve_own_names
+_resolve_history_owner = ocr_ledger.resolve_owner
+_record_ocr_history = ocr_ledger.record
 _m1_enabled = _default_m1_enabled
 _ocr_image = _default_ocr_image
 _read_sales_summary = _default_read_sales_summary

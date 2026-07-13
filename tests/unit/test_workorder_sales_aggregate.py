@@ -273,5 +273,79 @@ class OrderDetailProjectionTests(unittest.TestCase):
         self.assertIsNone(sales_aggregate.corroboration_from_events(events, items))
 
 
+class CorroborationForDetailF6Tests(unittest.TestCase):
+    """F6 写读归一:order_detail 优先消费 reconcile 落库佐证,未跑到 reconcile 回退现算,
+    分叉以落库值为准标 stale。冻结与现算在数据未变时逐字节一致由本组锁死。"""
+
+    def _sd_evt(self, item_id, money):
+        return {
+            "event_type": "item_classified",
+            "step": "classify",
+            "payload": {
+                "item_id": item_id,
+                "kind": "sales_doc",
+                "status": "flagged",
+                "money": money,
+            },
+            "actor": "system",
+            "id": item_id,
+            "created_at": None,
+        }
+
+    def _base(self):
+        money = _sales_money()
+        items = [{"id": f"s{i}", "kind": decisions.SALES_DOC} for i in range(len(money))]
+        events = [self._sd_evt(it["id"], m) for it, m in zip(items, money)]
+        return events, items
+
+    def _step_done(self, corrob):
+        return {
+            "event_type": "step_done",
+            "step": "reconcile",
+            "payload": {"gates": {"r2_sales_corroboration": corrob}},
+            "actor": "system",
+            "id": "done",
+            "created_at": None,
+        }
+
+    def test_falls_back_to_live_when_no_reconcile(self):
+        events, items = self._base()
+        detail = sales_aggregate.corroboration_for_detail(events, items)
+        live = sales_aggregate.corroboration_from_events(events, items)
+        self.assertEqual(detail, live)
+        self.assertNotIn("stale", detail)
+
+    def test_prefers_frozen_and_agrees_with_live(self):
+        events, items = self._base()
+        # reconcile 冻结的佐证 = 数据未变时的现算值(单一事实源锁:两路逐字节一致)。
+        frozen = sales_aggregate.corroboration_from_events(events, items)
+        events2 = events + [self._step_done(frozen)]
+        detail = sales_aggregate.corroboration_for_detail(events2, items)
+        self.assertEqual(detail, frozen)  # 消费落库值
+        self.assertNotIn("stale", detail)  # 与现算一致 → 不标 stale
+
+    def test_divergence_prefers_frozen_and_marks_stale(self):
+        events, items = self._base()
+        live = sales_aggregate.corroboration_from_events(events, items)
+        # 模拟算法演进 / reconcile 后补料:落库值与现算分叉。
+        frozen = dict(live, net_total="999999.00")
+        events2 = events + [self._step_done(frozen)]
+        detail = sales_aggregate.corroboration_for_detail(events2, items)
+        self.assertEqual(detail["net_total"], "999999.00")  # 以落库值为准
+        self.assertTrue(detail["stale"])  # 诚实标注分叉,不糊
+
+    def test_none_when_reconcile_ran_without_corroboration(self):
+        # reconcile 跑过但无 sales_doc → 不冻结 r2_sales_corroboration 键;现算也 None → None。
+        step_done = {
+            "event_type": "step_done",
+            "step": "reconcile",
+            "payload": {"gates": {}},
+            "actor": "system",
+            "id": "done",
+            "created_at": None,
+        }
+        self.assertIsNone(sales_aggregate.corroboration_for_detail([step_done], []))
+
+
 if __name__ == "__main__":
     unittest.main()

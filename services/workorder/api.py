@@ -196,7 +196,7 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         "bank_recon": _bank_recon(events, items),
         "shadow_draft": _shadow_draft(events),
         "financials": _financials(events),
-        "sales_corroboration": sales_aggregate.corroboration_from_events(
+        "sales_corroboration": sales_aggregate.corroboration_for_detail(
             events, items, classified=classified
         ),
         "deliverables": [
@@ -207,15 +207,10 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
 
 def bank_recon_raw(events: list[dict]) -> Optional[dict]:
     """R3 银行对账清单原始 dict(reconcile 步 step_done 落库的 recon,未叠加 bank_item_ids /
-    人审裁决覆盖)。闸关 / 无银行流水 / 尚未跑到 reconcile / 引擎异常降级(_run_bank_recon
-    的 except 分支落一份 {error,note} 残影)都诚实给 None——判定与 _bank_recon 共用,单一
-    事实源。MC1-b3 落裁决前校验 statement_tx_id/candidate_id 合法用此纯读函数(见
-    bank_recon_review.record_bank_decision),不重复回放逻辑。"""
-    payload = evidence.replay_step_done(events, _DECISION_STEP)
-    if not payload:
-        return None
-    recon = ((payload.get("gates") or {}).get("r3_bank") or {}).get("recon")
-    return recon if isinstance(recon, dict) and "auto_matched" in recon else None
+    人审裁决覆盖)。闸关 / 无银行流水 / 尚未跑到 reconcile / 引擎异常降级都诚实给 None——
+    recon 提取判定收口在 evidence.bank_recon_from_step_done(与 bank_recon_review 的窄读路
+    共用单一事实源,见 record_bank_decision)。"""
+    return evidence.bank_recon_from_step_done(evidence.replay_step_done(events, _DECISION_STEP))
 
 
 def _bank_recon(events: list[dict], items: list[dict]) -> Optional[dict]:

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from services.workorder import api, decisions, store
+from services.workorder import api, decisions, evidence, store
 
 _DECISION_STEP = "reconcile"
 _EVT_DECISION = "human_decision"
@@ -47,8 +47,7 @@ def record_bank_decision(
     decision = _ACTION_TO_DECISION.get(action)
     if decision is None:
         raise api.WorkOrderApiError("workorder.bank_recon_action_invalid")
-    events = store.list_events(cur, tenant_id=tenant_id, work_order_id=work_order_id)
-    review_tx = _find_review_tx(events, statement_tx_id)
+    review_tx = _find_review_tx(cur, tenant_id, work_order_id, statement_tx_id)
     if review_tx is None:
         raise api.WorkOrderApiError("workorder.bank_recon_tx_not_found")
     if decision == decisions.BANK_RECON_ACCEPT:
@@ -72,12 +71,21 @@ def record_bank_decision(
     )
 
 
-def _find_review_tx(events: list[dict], statement_tx_id: str) -> Optional[dict]:
+def _find_review_tx(
+    cur, tenant_id: str, work_order_id: str, statement_tx_id: str
+) -> Optional[dict]:
     """从当前 recon.review 清单里找这笔流水(未找到——空 id / tx 不在人审桶 / 对账闸关
-    / 尚未跑到 reconcile,一律 None,调用方据此统一拒)。"""
+    / 尚未跑到 reconcile,一律 None,调用方据此统一拒)。
+
+    效率5:窄取 reconcile 步最后一条 step_done payload(store.last_step_done_payload)取 recon,
+    不再 list_events 全量回放整条事件流——recon 只藏在 step_done 里,一张 SQL 直取即可。recon
+    提取判定复用 evidence.bank_recon_from_step_done(与 api.bank_recon_raw 同一份,不另写)。"""
     if not statement_tx_id:
         return None
-    recon = api.bank_recon_raw(events)
+    payload = store.last_step_done_payload(
+        cur, tenant_id=tenant_id, work_order_id=work_order_id, step=_DECISION_STEP
+    )
+    recon = evidence.bank_recon_from_step_done(payload)
     if not recon:
         return None
     for entry in recon.get("review") or []:

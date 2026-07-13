@@ -12,7 +12,7 @@ from decimal import Decimal
 
 from services.recon.bank_recon_types import StatementRow
 from services.workorder.engine import StepContext
-from services.workorder.steps import reconcile
+from services.workorder.steps import reconcile, reconcile_bank
 
 
 class FakeStore:
@@ -25,6 +25,16 @@ class FakeStore:
 
     def list_events(self, cur, *, tenant_id, work_order_id):
         return list(self.events)
+
+    def append_event(self, cur, *, tenant_id, work_order_id, step, event_type, payload, **kw):
+        # R3 检查点在内存态落 item_bank_parsed(dedupe_key 锚件,重复落只留一条)。
+        key = kw.get("dedupe_key")
+        if key and any(e.get("_dedupe") == key for e in self.events):
+            return {}
+        self.events.append(
+            {"step": step, "event_type": event_type, "payload": payload, "_dedupe": key}
+        )
+        return {"id": len(self.events)}
 
 
 def _pi(item_id, file="IMG.jpg"):
@@ -106,8 +116,9 @@ def _store():
     return FakeStore(items, events)
 
 
-def _rows_auto_plus_missing(ctx, banks):
-    """p1(1070)有对应付款行 → 自动匹配;一条 555 无票 → 缺票;p2(214)无流水 → 未达。"""
+def _rows_auto_plus_missing(ctx, item):
+    """单件解析桩(检查点逐件调):p1(1070)有对应付款行 → 自动匹配;一条 555 无票 → 缺票;
+    p2(214)无流水 → 未达。签名 (ctx, item) 与 reconcile_bank._parse_bank_file 一致。"""
     d = datetime.date
     return [
         StatementRow(d(2026, 6, 7), "Acme payment INV1", 1070.0, 0.0, 8930.0),
@@ -119,9 +130,9 @@ class GateOffKeepsPresenceOnly(unittest.TestCase):
     """闸关:R3 逐字节维持现状(only present/count,无 recon 键)。"""
 
     def setUp(self):
-        self._prev = reconcile._bank_recon_enabled
-        reconcile._bank_recon_enabled = lambda ctx: False
-        self.addCleanup(setattr, reconcile, "_bank_recon_enabled", self._prev)
+        self._prev = reconcile_bank._bank_recon_enabled
+        reconcile_bank._bank_recon_enabled = lambda ctx: False
+        self.addCleanup(setattr, reconcile_bank, "_bank_recon_enabled", self._prev)
 
     def test_r3_has_no_recon_key_when_gate_off(self):
         out = reconcile.run(_ctx(_store()))
@@ -136,12 +147,12 @@ class GateOnRunsReconWithoutBlockingPackage(unittest.TestCase):
     """闸开:产出两张清单进 r3_bank.recon,工单 ok(不 stuck,能继续到 package)。"""
 
     def setUp(self):
-        self._prev_flag = reconcile._bank_recon_enabled
-        self._prev_rows = reconcile._bank_statement_rows
-        reconcile._bank_recon_enabled = lambda ctx: True
-        reconcile._bank_statement_rows = _rows_auto_plus_missing
-        self.addCleanup(setattr, reconcile, "_bank_recon_enabled", self._prev_flag)
-        self.addCleanup(setattr, reconcile, "_bank_statement_rows", self._prev_rows)
+        self._prev_flag = reconcile_bank._bank_recon_enabled
+        self._prev_rows = reconcile_bank._parse_bank_file
+        reconcile_bank._bank_recon_enabled = lambda ctx: True
+        reconcile_bank._parse_bank_file = _rows_auto_plus_missing
+        self.addCleanup(setattr, reconcile_bank, "_bank_recon_enabled", self._prev_flag)
+        self.addCleanup(setattr, reconcile_bank, "_parse_bank_file", self._prev_rows)
 
     def test_recon_produces_two_lists_and_stays_ok(self):
         out = reconcile.run(_ctx(_store()))
@@ -173,10 +184,10 @@ class GateOnRunsReconWithoutBlockingPackage(unittest.TestCase):
         self.assertEqual(Decimal(out.payload["input_vat_total"]), Decimal("84.00"))
 
     def test_parser_failure_is_isolated_not_fatal(self):
-        def _boom(ctx, banks):
+        def _boom(ctx, item):
             raise RuntimeError("parse blew up")
 
-        reconcile._bank_statement_rows = _boom
+        reconcile_bank._parse_bank_file = _boom
         out = reconcile.run(_ctx(_store()))
         self.assertEqual(out.status, "ok")
         self.assertEqual(out.payload["gates"]["r3_bank"]["recon"]["note"], "bank_recon_skipped")
@@ -212,6 +223,44 @@ class GateOnRunsReconWithoutBlockingPackage(unittest.TestCase):
         )
         self.assertEqual(
             out.payload["gates"]["r4_trial_balance"], baseline.payload["gates"]["r4_trial_balance"]
+        )
+
+
+class BankParseCheckpointTests(unittest.TestCase):
+    """件 4:银行流水解析逐件检查点——落 item_bank_parsed 事件,续跑从事件回放零重解析(重烧)。"""
+
+    def setUp(self):
+        self._flag = reconcile_bank._bank_recon_enabled
+        self._parse = reconcile_bank._parse_bank_file
+        reconcile_bank._bank_recon_enabled = lambda ctx: True
+        self.calls = []
+
+        def _counting(ctx, item):
+            self.calls.append(item["id"])
+            return _rows_auto_plus_missing(ctx, item)
+
+        reconcile_bank._parse_bank_file = _counting
+        self.addCleanup(setattr, reconcile_bank, "_bank_recon_enabled", self._flag)
+        self.addCleanup(setattr, reconcile_bank, "_parse_bank_file", self._parse)
+
+    def test_emits_parsed_event_and_resume_skips_reparse(self):
+        store = _store()
+        out1 = reconcile.run(_ctx(store))
+        self.assertEqual(out1.status, "ok")
+        parsed = [e for e in store.events if e["event_type"] == "item_bank_parsed"]
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0]["payload"]["item_id"], "b1")
+        self.assertEqual(self.calls, ["b1"])  # 首跑解析一次
+
+        # 模拟续跑:再跑一遍,已解析银行件从 item_bank_parsed 事件回放,零重解析。
+        out2 = reconcile.run(_ctx(store))
+        self.assertEqual(self.calls, ["b1"])  # 未再解析(零重烧)
+        self.assertEqual(
+            len([e for e in store.events if e["event_type"] == "item_bank_parsed"]), 1
+        )  # dedupe_key 锚件,事件不双落
+        # 回放行喂 tx_from_statement_row 与首跑逐字节等价:对平结果一致。
+        self.assertEqual(
+            out2.payload["gates"]["r3_bank"]["recon"], out1.payload["gates"]["r3_bank"]["recon"]
         )
 
 

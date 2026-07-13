@@ -254,6 +254,27 @@ def list_event_actors(
     return [r["actor"] if isinstance(r, dict) else r[0] for r in cur.fetchall()]
 
 
+def last_step_done_payload(
+    cur, *, tenant_id: str, work_order_id: str, step: str
+) -> Optional[dict[str, Any]]:
+    """窄取某步最后一条 step_done 的 payload(效率5:银行对账裁决校验免全量事件流回放)。
+
+    与 evidence.replay_step_done 同语义(同一步理论只 done 一次,取最后一条防御重复),但
+    走 SQL ORDER BY id DESC LIMIT 1 直取,不把整条事件流搬回内存再线性扫。无该步 step_done
+    → None(诚实说查不到,不拿空字典冒充已完成)。"""
+    cur.execute(
+        "SELECT payload FROM work_order_events "
+        "WHERE tenant_id = %s AND work_order_id = %s AND step = %s AND event_type = 'step_done' "
+        "ORDER BY id DESC LIMIT 1",
+        (tenant_id, work_order_id, step),
+    )
+    row = cur.fetchone()
+    if not row:
+        return None
+    payload = row["payload"] if isinstance(row, dict) else row[0]
+    return payload or {}
+
+
 def list_events(cur, *, tenant_id: str, work_order_id: str) -> list[dict]:
     """按落库顺序(id 递增 = 发生顺序)返回全部事件,供重放/证据索引用。"""
     cur.execute(
@@ -343,10 +364,18 @@ def update_item(
     status: Optional[str] = None,
     kind: Optional[str] = None,
     flag_reason: Optional[str] = None,
+    ocr_history_id: Optional[str] = None,
 ) -> None:
-    """sort/classify 步用:定堆(kind)/判结论(status)/记原因(flag_reason)。省略的字段不动。"""
+    """sort/classify 步用:定堆(kind)/判结论(status)/记原因(flag_reason)/回填识别台账
+    (ocr_history_id · 件 1)。省略的字段不动——ocr_history_id 缺省 None 即不写,存量 NULL
+    不被清跑覆盖(只向前)。"""
     set_clause, params = [], []
-    for col, val in (("status", status), ("kind", kind), ("flag_reason", flag_reason)):
+    for col, val in (
+        ("status", status),
+        ("kind", kind),
+        ("flag_reason", flag_reason),
+        ("ocr_history_id", ocr_history_id),
+    ):
         if val is not None:
             set_clause.append(f"{col} = %s")
             params.append(val)

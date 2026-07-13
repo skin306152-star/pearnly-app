@@ -24,6 +24,16 @@ from services.workorder.steps import reconcile_gates
 from services.workorder.steps.reconcile_gates import STANDARD_VAT_RATE, to_dec
 
 _EVT_CLASSIFIED = "item_classified"
+_RECON_STEP = "reconcile"
+# 冻结值 vs 现算比对的核心钱字段(算法演进 / reconcile 后补料致分叉时据此判 stale)。
+_CORROBORATION_KEYS = (
+    "net_total",
+    "vat_total",
+    "gross_total",
+    "authoritative_net",
+    "coverage",
+    "covered_state",
+)
 
 # 守恒抽查容差(与 T0 抽查同口径 0.02):|vat − net×7%| 与 |net+vat − 含税| 超此即点名。
 _CONSERV_TOL = Decimal("0.02")
@@ -128,6 +138,37 @@ def build_corroboration(agg: dict, *, authoritative_net=None, authoritative_vat=
         out["coverage"] = None
         out["covered_state"] = "needs"
     return out
+
+
+def corroboration_for_detail(events: list, items: list, classified: dict | None = None):
+    """order_detail 销项佐证读侧(F6 写读归一):优先消费 reconcile 已落库的
+    gates.r2_sales_corroboration(与交付包 / step_done 同一份冻结值,详情页不另现算一个数),
+    工单未跑到 reconcile / R1·R2 needs 停机时回退现算(corroboration_from_events)。
+
+    冻结值在场且与现算分叉(算法演进,或 reconcile 后又补了人工销项)→ 以冻结值为准并标
+    stale=True:诚实呈现「这是交付那一刻的值,现算已不同」,不静默糊成一个数。无 sales_doc
+    件两路都 None,前端不渲染佐证卡(现状诚实)。冻结与现算在数据未变时逐字节一致由单测锁死。"""
+    live = corroboration_from_events(events, items, classified=classified)
+    frozen = _frozen_corroboration(events)
+    if frozen is None:
+        return live
+    if live is not None and not _corroboration_agrees(frozen, live):
+        return dict(frozen, stale=True)
+    return frozen
+
+
+def _frozen_corroboration(events: list):
+    """reconcile 步 step_done 落库的 gates.r2_sales_corroboration(无则 None)。"""
+    payload = evidence.replay_step_done(events, _RECON_STEP)
+    if not payload:
+        return None
+    frozen = (payload.get("gates") or {}).get("r2_sales_corroboration")
+    return frozen if isinstance(frozen, dict) else None
+
+
+def _corroboration_agrees(frozen: dict, live: dict) -> bool:
+    """冻结值与现算在核心钱字段上是否一致(JSON 串值精确比对)。"""
+    return all(frozen.get(k) == live.get(k) for k in _CORROBORATION_KEYS)
 
 
 def corroboration_from_events(events: list, items: list, classified: dict | None = None):

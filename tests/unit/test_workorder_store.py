@@ -156,6 +156,37 @@ class ItemsTests(unittest.TestCase):
         store.update_item(cur, tenant_id="t-1", item_id="item-1")
         self.assertEqual(cur.calls, [])
 
+    def test_update_item_backfills_ocr_history_id(self):
+        # 件 1:ocr_history_id 回填(给了才写,缺省不动存量 NULL)。
+        cur = FakeCursor()
+        store.update_item(cur, tenant_id="t-1", item_id="item-1", status="ok", ocr_history_id="h-9")
+        sql, params = cur.calls[0]
+        self.assertIn("ocr_history_id = %s", sql)
+        self.assertEqual(params, ("ok", "h-9", "t-1", "item-1"))
+
+
+class LastStepDonePayloadTests(unittest.TestCase):
+    """效率5:窄取某步最后一条 step_done payload(银行对账裁决校验免全量事件流回放)。"""
+
+    def test_narrow_query_shape_and_params(self):
+        cur = FakeCursor([{"payload": {"gates": {"r3_bank": {"recon": {"auto_matched": []}}}}}])
+        out = store.last_step_done_payload(
+            cur, tenant_id="t-1", work_order_id="wo-1", step="reconcile"
+        )
+        sql, params = cur.calls[0]
+        self.assertIn("event_type = 'step_done'", sql)
+        self.assertIn("ORDER BY id DESC LIMIT 1", sql)
+        self.assertEqual(params, ("t-1", "wo-1", "reconcile"))
+        self.assertEqual(out["gates"]["r3_bank"]["recon"], {"auto_matched": []})
+
+    def test_none_when_no_step_done(self):
+        cur = FakeCursor([])
+        self.assertIsNone(
+            store.last_step_done_payload(
+                cur, tenant_id="t-1", work_order_id="wo-1", step="reconcile"
+            )
+        )
+
 
 class DeliverablesTests(unittest.TestCase):
     def test_upsert_deliverable_targets_kind_version_unique_key(self):

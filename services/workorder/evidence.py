@@ -42,6 +42,18 @@ def replay_step_done(events: list[dict], step: str) -> Optional[dict]:
     return payload
 
 
+def bank_recon_from_step_done(payload: Optional[dict]) -> Optional[dict]:
+    """从 reconcile 步 step_done 的 payload 深取 R3 银行对账 recon(gates.r3_bank.recon)。
+
+    闸关 / 无银行流水 / 引擎异常降级(_run_bank_recon 落的 {error,note} 残影,无 auto_matched)
+    一律给 None。纯函数,不认 payload 从何来——api.bank_recon_raw(全量回放取 payload)与
+    bank_recon_review(store 窄取 step_done payload)共用同一份判定,单一事实源不各写一份。"""
+    if not payload:
+        return None
+    recon = ((payload.get("gates") or {}).get("r3_bank") or {}).get("recon")
+    return recon if isinstance(recon, dict) and "auto_matched" in recon else None
+
+
 def replay_items_by_type(events: list[dict], event_type: str) -> dict:
     """按 item_id 回放某类事件为 {item_id: {"event_id":, "payload":, "actor":, "at":}}
     (同 item 多条时后者胜,反映最新裁决/识别——与 reconcile.py 回放同一份事件流的语义

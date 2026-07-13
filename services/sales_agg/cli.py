@@ -15,20 +15,14 @@ import sys
 from decimal import Decimal
 from pathlib import Path
 
+from core.console import make_stdout_encoding_safe
 from services.sales_agg.aggregate import aggregate_month
 
 _PREVIEW = 20
 
 
-def _make_stdout_encoding_safe() -> None:
-    """摘要含泰文/中文而目标控制台编码不一(cp874/cp936/utf-8),编不了的字符退化为 '?',
-    绝不让成功路径因打印崩溃(fileconv cp874 打印崩的血泪同款)。"""
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(errors="replace")
-
-
 def main(argv=None) -> int:
-    _make_stdout_encoding_safe()
+    make_stdout_encoding_safe()
     argv = list(sys.argv[1:] if argv is None else argv)
     if len(argv) not in (1, 2):
         print("用法: python -m services.sales_agg.cli <input.json> [out.json]")

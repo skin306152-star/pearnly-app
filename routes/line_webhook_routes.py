@@ -171,23 +171,23 @@ async def _handle_line_event(ev: dict):
         if msg_type in ("image", "file"):
             message_id = msg.get("id")
             filename = msg.get("fileName") if msg_type == "file" else f"line_{message_id}.jpg"
-            # LN-1 收料暂存:命中绑定上下文(单聊客户/已绑群)且闸开才接手,否则回落现状。
+            ev_lang = _ev_lang(ev)
+            # 身份只查一次:预查喂 LN-1 收料暂存;staging 回落后未绑定/OCR 现状路复用不二查。
+            bound_user = db.get_user_by_line_user_id(line_user_id) if line_user_id else None
             from services.line_binding import line_intake_staging
 
-            if await line_intake_staging.try_stage_media(ev, lang_hint=_ev_lang(ev)):
+            if await line_intake_staging.try_stage_media(
+                ev, lang_hint=ev_lang, bound_user=bound_user
+            ):
                 return
-            # 检查是否绑定
-            bound_user = db.get_user_by_line_user_id(line_user_id) if line_user_id else None
             if not bound_user:
                 if reply_token:
-                    # v118.25.4 · 用规范化后的 LINE 用户语言
-                    lang = _ev_lang(ev)
                     line_reply.begin_loading(line_user_id)
                     _reply_card_or_text(
                         reply_token,
                         "image_not_bound",
-                        line_bind_i18n.image_not_bound_msg(lang),
-                        lang=lang,
+                        line_bind_i18n.image_not_bound_msg(ev_lang),
+                        lang=ev_lang,
                         line_user_id=line_user_id,
                         quote_token=msg.get("quoteToken"),
                     )
@@ -196,7 +196,7 @@ async def _handle_line_event(ev: dict):
             # 图片OCR结果卡跟随最近对话语言,不跟账号偏好(治泰语对话收到中文结果卡)。
             from services.expense import line_lang
 
-            lang = line_lang.card_lang(line_user_id, bound_user.get("tenant_id"), _ev_lang(ev))
+            lang = line_lang.card_lang(line_user_id, bound_user.get("tenant_id"), ev_lang)
 
             # 收到票据即用 replyToken 回处理中 ack(P1E-1·有上下文):说明正在读取金额/日期/卖家/VAT/明细。
             # 结果卡稍后异步 push;此处 replyToken 仅这一次用,不影响后续。

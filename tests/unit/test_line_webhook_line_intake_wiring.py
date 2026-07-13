@@ -3,8 +3,9 @@
 
 守门断言:收料分支说「没接住」(闸关/未绑定统一返 False)时,图片/文件消息的既有
 路径逐字节不变——未绑定回 image_not_bound、已绑定照旧进 OCR 队列;接住(True)则
-早退,OCR / 未绑定提示一个都不再流动。文字绑定码接线只多传 group_id,单聊传 None。
-分支内部逻辑见 test_line_intake_staging.py,这里只测接线。
+早退,OCR / 未绑定提示一个都不再流动。LINE 身份整个分支只查一次:预查结果经
+bound_user= 喂给收料分支,回落后现状路复用同一结果(不二查)。文字绑定码接线只多传
+group_id,单聊传 None。分支内部逻辑见 test_line_intake_staging.py,这里只测接线。
 """
 
 import unittest
@@ -30,12 +31,14 @@ class ImageBranchRegressionTests(unittest.IsolatedAsyncioTestCase):
                 "services.line_binding.line_intake_staging.try_stage_media",
                 new=AsyncMock(return_value=False),
             ) as stage,
-            patch.object(w.db, "get_user_by_line_user_id", return_value=None),
+            patch.object(w.db, "get_user_by_line_user_id", return_value=None) as lookup,
             patch.object(w.line_reply, "begin_loading"),
             patch.object(w, "_reply_card_or_text") as reply,
         ):
             await w._handle_line_event(_image_event({"type": "user", "userId": "U-1"}))
         stage.assert_awaited_once()
+        lookup.assert_called_once()  # 身份只查一次,预查结果直接喂收料分支
+        self.assertIsNone(stage.call_args.kwargs["bound_user"])
         reply.assert_called_once()
         self.assertEqual(reply.call_args.args[1], "image_not_bound")
 
@@ -46,8 +49,8 @@ class ImageBranchRegressionTests(unittest.IsolatedAsyncioTestCase):
             patch(
                 "services.line_binding.line_intake_staging.try_stage_media",
                 new=AsyncMock(return_value=False),
-            ),
-            patch.object(w.db, "get_user_by_line_user_id", return_value=bound),
+            ) as stage,
+            patch.object(w.db, "get_user_by_line_user_id", return_value=bound) as lookup,
             patch("services.expense.line_lang.card_lang", return_value="th"),
             patch.object(w.line_reply, "reply_text_context"),
             patch("services.ocr.line_ocr_jobs.enqueue_job", return_value=None) as enqueue,
@@ -56,6 +59,8 @@ class ImageBranchRegressionTests(unittest.IsolatedAsyncioTestCase):
             ) as serial,
         ):
             await w._handle_line_event(_image_event({"type": "user", "userId": "U-1"}))
+        lookup.assert_called_once()  # staging 拒收后 OCR 路复用预查结果,不二查
+        self.assertIs(stage.call_args.kwargs["bound_user"], bound)
         enqueue.assert_called_once()
         serial.assert_called_once()  # enqueue 返 None 走串行回落(既有路径)
 

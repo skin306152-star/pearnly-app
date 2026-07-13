@@ -16,7 +16,7 @@ from services.recon.field_comparator import normalize_invoice_no
 from services.sales_agg import linker, vat
 from services.sales_agg.model import BankCredit, EdcSettlement, SalesDoc
 
-INCLUSION_RULES = {
+INCLUSION_RULES = {  # 出处说明(随报告输出给人看);纳入逻辑的事实源是聚合代码,不由这张表驱动
     "edc_settlement": "counted:gross(ยอดขาย 毛额口径;手续费只点名不冲减,银行到账不重计)",
     "sales_doc": "counted:face_total(票面含税额;与 EDC 同日共存不自动判重,疑似逐笔点名)",
     "bank_credit": "excluded:cross_check_only(到账=结算净额,计入即与 EDC 毛额双计)",
@@ -160,7 +160,7 @@ def _gaps(edc_ok, bank_ok, doc_ok, matched_bank: set[str], matched_edc: set[str]
             by_day.setdefault((edc.day, "settlement_without_credit"), []).append(edc.ref)
     return [
         {"date": day.isoformat(), "kind": kind, "refs": refs}
-        for (day, kind), refs in sorted(by_day.items(), key=lambda kv: (kv[0][0], kv[0][1]))
+        for (day, kind), refs in sorted(by_day.items(), key=lambda kv: kv[0])
     ]
 
 

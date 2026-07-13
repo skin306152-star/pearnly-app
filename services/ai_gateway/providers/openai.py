@@ -14,10 +14,10 @@ env:
 
 from __future__ import annotations
 
-import base64
 import os
 from typing import List, Optional, Tuple
 
+from services.ai_gateway.providers.http_common import error_kind_for_status, image_content_parts
 from services.ai_gateway.tasks import ProviderOutcome
 
 NAME = "openai"
@@ -40,21 +40,11 @@ def _model(tier: str) -> str:
     """抽象档位 → 具体模型(集中此处·业务/文档不出现型号名·无内置默认)。"""
     flash = os.environ.get("OPENAI_FLASH_MODEL", "").strip()
     best = os.environ.get("OPENAI_BEST_MODEL", "").strip() or flash
-    return {"best": best, "fallback": best}.get(tier, flash)
+    return best if tier in ("best", "fallback") else flash
 
 
 def _embed_model() -> str:
     return os.environ.get("OPENAI_EMBED_MODEL", "").strip()
-
-
-def _error_kind_status(status: int) -> str:
-    if status in (401, 403):
-        return "auth"
-    if status == 429:
-        return "quota"
-    if status in (500, 502, 503, 504):
-        return "timeout"
-    return "provider"
 
 
 def _payload(model: str, messages: list, *, temperature, max_tokens, json_mode: bool) -> dict:
@@ -109,7 +99,7 @@ def _chat(payload: dict, model: str, timeout_s: int):
         if resp.status_code == 400 and _adapt_param_rejection(payload, model, resp.text):
             continue
         if resp.status_code >= 400:
-            return None, _error_kind_status(resp.status_code), (0, 0)
+            return None, error_kind_for_status(resp.status_code), (0, 0)
         try:
             body = resp.json()
         except Exception:  # noqa: BLE001
@@ -129,14 +119,6 @@ def _chat(payload: dict, model: str, timeout_s: int):
     return None, "provider", (0, 0)  # 理论不可达(每类参数只调整一次,第三发必走到返回)
 
 
-def _content_parts(prompt: str, images: List[Tuple[bytes, str]]) -> list:
-    parts: list = [{"type": "text", "text": prompt}]
-    for data, mime in images:
-        b64 = base64.b64encode(data).decode("ascii")
-        parts.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
-    return parts
-
-
 def _chat_json(
     prompt, images, *, tier, temperature, response_mime, max_tokens, timeout_s, max_retries
 ):
@@ -145,7 +127,7 @@ def _chat_json(
     model = _model(tier)
     if not model:
         return ProviderOutcome(ok=False, error_kind="auth", model=NAME)  # 未配置 → 上层 fallback
-    content = _content_parts(prompt, images) if images else prompt
+    content = image_content_parts(prompt, images) if images else prompt
     payload = _payload(
         model,
         [{"role": "user", "content": content}],
@@ -154,7 +136,7 @@ def _chat_json(
         json_mode=bool(response_mime),
     )
     last_raw = ""
-    for attempt in range(max_retries + 1):
+    for _ in range(max_retries + 1):
         text, kind, toks = _chat(payload, model, timeout_s)
         if kind:
             return ProviderOutcome(ok=False, error_kind=kind, model=model)
@@ -170,8 +152,6 @@ def _chat_json(
                 )
             except Exception:  # noqa: BLE001 — 坏 JSON → 重试;用尽落 parse
                 pass
-        if attempt < max_retries:
-            continue
     # 解析失败带回原文(上层可把散文当回复救援)· raw 绝不进日志(_observe 只记 error_kind/token)
     return ProviderOutcome(ok=False, error_kind="parse", model=model, raw=last_raw)
 
@@ -283,7 +263,7 @@ def embed(
         return ProviderOutcome(ok=False, error_kind="provider", model=model)
     if resp.status_code >= 400:
         return ProviderOutcome(
-            ok=False, error_kind=_error_kind_status(resp.status_code), model=model
+            ok=False, error_kind=error_kind_for_status(resp.status_code), model=model
         )
     try:
         rows = sorted(resp.json()["data"], key=lambda d: d.get("index", 0))

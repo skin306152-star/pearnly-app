@@ -5,6 +5,7 @@ import json
 import unittest
 
 from services.sales_agg import aggregate_month  # 包级出口(__init__ 契约)
+from services.sales_agg.aggregate import INCLUSION_RULES
 
 
 def _edc(ref, day, gross, fee, net, batch):
@@ -178,6 +179,20 @@ class TestHonestDegradation(unittest.TestCase):
         kinds = {c["kind"] for c in report["conflicts"]}
         self.assertIn("doc_dup_number_amount_differs", kinds)
         self.assertEqual(report["month_total"]["gross"], "321.00")  # 两张都计入,交人裁
+
+    def test_inclusion_rules_match_actually_counted_channels(self):
+        """INCLUSION_RULES 只是出处说明,不驱动逻辑——这里锁「声明 counted 的渠道 =
+        实际计入销项的渠道」,谁改聚合口径忘改说明(或反过来)就红。"""
+        feeds = {
+            "edc_settlement": ([EDC[0]], [], []),
+            "bank_credit": ([], [BANK[0]], []),
+            "sales_doc": ([], [], [DOCS[0]]),
+        }
+        self.assertEqual(set(feeds), set(INCLUSION_RULES))
+        for channel, (edc, bank, docs) in feeds.items():
+            counted = aggregate_month(edc, bank, docs)["month_total"]["gross"] != "0"
+            declared = INCLUSION_RULES[channel].startswith("counted:")
+            self.assertEqual(counted, declared, channel)
 
     def test_settlement_without_credit_gap(self):
         report = aggregate_month(EDC[:1], [_credit("b9", "2026-05-25", "1.00", "tx9")], [])

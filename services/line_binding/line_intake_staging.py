@@ -24,6 +24,9 @@ logger = logging.getLogger(__name__)
 
 _BASE = os.environ.get("LINE_INTAKE_STORAGE_DIR", "/opt/mrpilot/storage/line_intake")
 
+# bound_user 未传时的哨兵:分支内自查(None 是合法预查结果「已查无」,不能当未传)。
+_SELF_RESOLVE = object()
+
 # 收料确认回执四语(照 line_client_contact._BOUND_COPY 范式:客户侧措辞,独立小词表)。
 _RECEIPT_COPY = {
     "th": "ได้รับเอกสารแล้วค่ะ ✅ จัดเก็บเข้าแฟ้มของ {client} เรียบร้อย",
@@ -39,19 +42,22 @@ def receipt_text(lang: Optional[str], client_name: str) -> str:
     return tpl.format(client=client_name)
 
 
-async def try_stage_media(ev: dict, *, lang_hint: str = "th") -> bool:
+async def try_stage_media(ev: dict, *, lang_hint: str = "th", bound_user=_SELF_RESOLVE) -> bool:
     """webhook 图片/文件分支入口。True=本分支已处理完(调用方 return);False=交回原路。
 
     to_thread:下载(阻塞 urllib)+ 同步 DB 不能卡 webhook 事件循环(照 line_expense 先例)。
+    bound_user:调用方预查好的登录用户行(None=已查无),免单聊路二查同一 LINE 身份。
     """
     try:
-        return await asyncio.to_thread(_stage_sync, ev, lang_hint)
+        return await asyncio.to_thread(_stage_sync, ev, lang_hint, bound_user)
     except Exception:
         logger.warning("[line_intake_staging] 收料分支异常 · 回落原路", exc_info=True)
         return False
 
 
-def _resolve_target(src: dict, line_user_id: Optional[str]) -> Optional[tuple]:
+def _resolve_target(
+    src: dict, line_user_id: Optional[str], bound_user=_SELF_RESOLVE
+) -> Optional[tuple]:
     """发送上下文 → (归属行, 来源, 语言) 或 None(未命中绑定 → 交回原路)。
 
     群聊按 groupId 查已绑群(成员是谁不影响归属);单聊排除登录用户(他们的图是
@@ -63,7 +69,11 @@ def _resolve_target(src: dict, line_user_id: Optional[str]) -> Optional[tuple]:
     if src.get("type") == "group":
         g = line_client_group.get_group(src.get("groupId"))
         return (g, "group", None) if g else None
-    if not line_user_id or db.get_user_by_line_user_id(line_user_id):
+    if not line_user_id:
+        return None
+    if bound_user is _SELF_RESOLVE:
+        bound_user = db.get_user_by_line_user_id(line_user_id)
+    if bound_user:
         return None
     contacts = line_client_contact.list_contacts_by_line_user(line_user_id)
     if len(contacts) != 1:
@@ -101,7 +111,7 @@ def _discard_file(path: Optional[str]) -> None:
         pass
 
 
-def _stage_sync(ev: dict, lang_hint: str) -> bool:
+def _stage_sync(ev: dict, lang_hint: str, bound_user=_SELF_RESOLVE) -> bool:
     from core import feature_flags
     from services.line_binding import line_intake_store, line_reply
 
@@ -112,7 +122,7 @@ def _stage_sync(ev: dict, lang_hint: str) -> bool:
     if not message_id:
         return False
 
-    target = _resolve_target(src, line_user_id)
+    target = _resolve_target(src, line_user_id, bound_user)
     if not target:
         return False
     row, source, lang = target

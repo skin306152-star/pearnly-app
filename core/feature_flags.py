@@ -272,8 +272,8 @@ def pearnly_ai_client_pool_enabled_for(tenant_id: Optional[str]) -> bool:
 def pearnly_ai_line_intake_enabled_for(tenant_id: Optional[str]) -> bool:
     """LINE 收料暂存闸(LN-1)。关 = webhook 图片/文件与群绑定分支逐字节走现状。
 
-    双闸:pearnly_ai_m1 在场才有效(照 client_pool 端点「m1+本闸」先例,内嵌让每个
-    消费点天然双闸);任一关或任何异常均 fail-closed。按 tenant 判定(单所整体开/关)。
+    双闸:pearnly_ai_m1 在场才有效。与 client_pool(两独立闸在各自消费层分别判)不同,这是仓库首个
+    flag 内嵌依赖 flag 的组合闸——让每个消费点天然双闸;任一关或异常均 fail-closed。按 tenant 判定(单所整体开/关)。
     """
     if not pearnly_ai_m1_enabled_for(tenant_id, None):
         return False

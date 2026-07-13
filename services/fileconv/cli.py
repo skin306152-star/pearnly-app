@@ -9,6 +9,7 @@
 import sys
 from pathlib import Path
 
+from core.console import make_stdout_encoding_safe
 from services.fileconv.convert import convert_image, convert_pdf
 from services.fileconv.model import REJECT_STATUSES
 from services.fileconv.xlsx_out import build_xlsx
@@ -16,18 +17,8 @@ from services.fileconv.xlsx_out import build_xlsx
 _IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp")
 
 
-def _make_stdout_encoding_safe() -> None:
-    """摘要含泰文/中文/特殊符号,而目标用户控制台编码不一(cp874/cp936/utf-8)。
-
-    保留控制台原生编码(cp874 下泰文照常显示),编码不了的字符退化为 '?',
-    绝不让成功路径因打印崩溃。
-    """
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(errors="replace")
-
-
 def main(argv=None) -> int:
-    _make_stdout_encoding_safe()
+    make_stdout_encoding_safe()
     argv = list(sys.argv[1:] if argv is None else argv)
     if len(argv) != 2:
         print("用法: python -m services.fileconv.cli <in.pdf> <out.xlsx>")

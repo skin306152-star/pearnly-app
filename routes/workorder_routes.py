@@ -25,38 +25,13 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from core import db
-from core.route_helpers import assert_owns_workspace, authorize_pearnly_ai, content_disposition
+from core.route_helpers import assert_owns_workspace, authorize_pearnly_ai
 from services.authz.deps import check_workspace_scope
 from services.workorder import api, archive, engine, runner, storage, store
 from services.workorder.steps import intake
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-# N1-P1-6:交付文件名 "{客户名}_{账期}_{报表名}.{ext}"——RFC 5987 helper 已在
-# core.route_helpers,交付物 kind → 人读短名(泰文,与内部 markdown 标题呼应,不直出
-# 内部 kind 字面量 pp30_draft.md 这种开发者黑话)。financials_report(_pdf/_xlsx 走独立
-# 下载端点 routes/workorder_financials_routes.py,不经这张表)以外的既有五件套 + WHT/
-# 影子件都在这张表里。
-_DELIVERABLE_LABEL_TH = {
-    "pp30_draft": "แบบร่าง ภ.พ.30",
-    "ledger_workpaper": "ใบงานประกอบบัญชี",
-    "bank_workpaper": "เอกสารธนาคาร",
-    "missing_doc_memo": "บันทึกเอกสารที่ขาด",
-    "evidence_index": "ดัชนีหลักฐาน",
-    "financials_report": "งบการเงิน",
-    "shadow_workpaper": "ใบงานร่างบัญชีคู่",
-}
-
-
-def _deliverable_download_name(kind: str, path_name: str, *, client_name: str, period: str) -> str:
-    """交付物下载文件名:能定位到客户名就拼"{客户名}_{账期}_{报表名}.{ext}",定位不到
-    (客户查询失败等边缘情形)诚实退回落盘原名,不硬凑一个可能张冠李戴的名字。"""
-    if not client_name:
-        return path_name
-    label = _DELIVERABLE_LABEL_TH.get(kind, kind)
-    ext = Path(path_name).suffix or ".md"
-    return f"{client_name}_{period or ''}_{label}{ext}"
 
 
 def _client_name_for_order(cur, *, tenant_id: str, user_id: str, workspace_client_id) -> str:
@@ -381,51 +356,6 @@ async def add_materials(
     if registered:
         _auto_advance(background, tenant_id, work_order_id, user)
     return {"registered": registered, "count": len(registered)}
-
-
-@router.get("/api/workorder/orders/{work_order_id}/deliverables")
-async def list_order_deliverables(work_order_id: str, request: Request):
-    """交付物清单(kind + 关键数字 + 是否有可下载文件)。"""
-    user, tenant_id = _authorize(request, _C_VIEW)
-    with db.get_cursor() as cur:
-        _load_order(cur, request, user, tenant_id, work_order_id)
-        return {
-            "deliverables": api.list_deliverables(
-                cur, tenant_id=tenant_id, work_order_id=work_order_id
-            )
-        }
-
-
-@router.get("/api/workorder/orders/{work_order_id}/deliverables/{kind}")
-async def download_deliverable(work_order_id: str, kind: str, request: Request):
-    """下载单个交付物文件。只放行库里登记过的 artifact_path,再做工单目录内含校验(防穿越)。
-
-    N1-P1-6:文件名从落盘内部名(如 pp30_draft.md)换成"客户名_账期_报表名"——归档/转发
-    给客户时不用手改文件名;取不到客户名(边缘态)诚实退回原名,不拼假名字。"""
-    user, tenant_id = _authorize(request, _C_VIEW)
-    with db.get_cursor() as cur:
-        wo = _load_order(cur, request, user, tenant_id, work_order_id)
-        artifact = api.deliverable_artifact_path(
-            cur, tenant_id=tenant_id, work_order_id=work_order_id, kind=kind
-        )
-        client_name = _client_name_for_order(
-            cur,
-            tenant_id=tenant_id,
-            user_id=str(user["id"]),
-            workspace_client_id=wo["workspace_client_id"],
-        )
-    if not artifact:
-        raise HTTPException(404, detail="workorder.deliverable_not_found")
-    path = storage.resolve_within_order(tenant_id, work_order_id, artifact)
-    if not path:
-        raise HTTPException(404, detail="workorder.deliverable_not_found")
-    download_name = _deliverable_download_name(
-        kind, path.name, client_name=client_name, period=wo.get("period") or ""
-    )
-    return FileResponse(
-        str(path),
-        headers={"Content-Disposition": content_disposition(download_name, path.name)},
-    )
 
 
 @router.get("/api/workorder/orders/{work_order_id}/items/{item_id}/image")

@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
-"""Pearnly AI · 月度报表(BS/PL/TB)打印级 PDF / Excel 下载(N1 · 导航三门 P0-3)。
+"""Pearnly AI · 工单交付物 / 月度报表下载(N1 · 导航三门 P0-3 + M1-B1 交付包)。
 
 拆成独立文件是 routes/workorder_routes.py 单文件<500 行铁律已在预算线上(见该文件
 顶注);鉴权/归属校验复用它已有的 _authorize/_load_order/_C_VIEW/_client_name_for_order
-(同一份判定,不重抄第二套)。
+(同一份判定,不重抄第二套)。2026-07 再拆一轮时把"交付物清单 + 交付物下载"两个端点
+也并进本文件(而非另起新文件)——同属"下载已生成产物"这一类,与月度报表下载语义同构,
+鉴权/客户名解析已经共用一套。
+
+## 月度报表(BS/PL/TB)PDF/Excel
 
 数据源:services/workorder/api.py::order_detail() 已经算好并对工单详情页暴露的
 financials 字段(reconcile R6 的只读投影)——本路由不重算一个钱字段,不落任何新文件,
@@ -12,21 +16,96 @@ financials 字段(reconcile R6 的只读投影)——本路由不重算一个钱
 services.fileconv.pdf_out/xlsx_out(只调用,不改引擎——本文件里唯一确需的小改已收在
 services/fileconv/model.py 新增 FINANCIALS_REPORT 常量 + pdf_out.py 的 stamp/title 映射,
 理由见两处顶注)。
+
+## 交付物清单 / 下载
+
+N1-P1-6:交付文件名 "{客户名}_{账期}_{报表名}.{ext}"——RFC 5987 helper 已在
+core.route_helpers,交付物 kind → 人读短名(泰文,与内部 markdown 标题呼应,不直出
+内部 kind 字面量 pp30_draft.md 这种开发者黑话)。financials_report(即上方月度报表,走
+独立的 /financials/download 端点,不经这张表)以外的既有五件套 + WHT/影子件都在这张
+表里。
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 
 from core import db
 from core.route_helpers import content_disposition
 from routes.workorder_routes import _C_VIEW, _authorize, _client_name_for_order, _load_order
 from services.fileconv import pdf_out, xlsx_out
 from services.reports.financials_pdf import FILE_LABEL, build_financials_convert_result
-from services.workorder import api
+from services.workorder import api, storage
 
 router = APIRouter()
+
+_DELIVERABLE_LABEL_TH = {
+    "pp30_draft": "แบบร่าง ภ.พ.30",
+    "ledger_workpaper": "ใบงานประกอบบัญชี",
+    "bank_workpaper": "เอกสารธนาคาร",
+    "missing_doc_memo": "บันทึกเอกสารที่ขาด",
+    "evidence_index": "ดัชนีหลักฐาน",
+    "financials_report": "งบการเงิน",
+    "shadow_workpaper": "ใบงานร่างบัญชีคู่",
+}
+
+
+def _deliverable_download_name(kind: str, path_name: str, *, client_name: str, period: str) -> str:
+    """交付物下载文件名:能定位到客户名就拼"{客户名}_{账期}_{报表名}.{ext}",定位不到
+    (客户查询失败等边缘情形)诚实退回落盘原名,不硬凑一个可能张冠李戴的名字。"""
+    if not client_name:
+        return path_name
+    label = _DELIVERABLE_LABEL_TH.get(kind, kind)
+    ext = Path(path_name).suffix or ".md"
+    return f"{client_name}_{period or ''}_{label}{ext}"
+
+
+@router.get("/api/workorder/orders/{work_order_id}/deliverables")
+async def list_order_deliverables(work_order_id: str, request: Request):
+    """交付物清单(kind + 关键数字 + 是否有可下载文件)。"""
+    user, tenant_id = _authorize(request, _C_VIEW)
+    with db.get_cursor() as cur:
+        _load_order(cur, request, user, tenant_id, work_order_id)
+        return {
+            "deliverables": api.list_deliverables(
+                cur, tenant_id=tenant_id, work_order_id=work_order_id
+            )
+        }
+
+
+@router.get("/api/workorder/orders/{work_order_id}/deliverables/{kind}")
+async def download_deliverable(work_order_id: str, kind: str, request: Request):
+    """下载单个交付物文件。只放行库里登记过的 artifact_path,再做工单目录内含校验(防穿越)。
+
+    N1-P1-6:文件名从落盘内部名(如 pp30_draft.md)换成"客户名_账期_报表名"——归档/转发
+    给客户时不用手改文件名;取不到客户名(边缘态)诚实退回原名,不拼假名字。"""
+    user, tenant_id = _authorize(request, _C_VIEW)
+    with db.get_cursor() as cur:
+        wo = _load_order(cur, request, user, tenant_id, work_order_id)
+        artifact = api.deliverable_artifact_path(
+            cur, tenant_id=tenant_id, work_order_id=work_order_id, kind=kind
+        )
+        client_name = _client_name_for_order(
+            cur,
+            tenant_id=tenant_id,
+            user_id=str(user["id"]),
+            workspace_client_id=wo["workspace_client_id"],
+        )
+    if not artifact:
+        raise HTTPException(404, detail="workorder.deliverable_not_found")
+    path = storage.resolve_within_order(tenant_id, work_order_id, artifact)
+    if not path:
+        raise HTTPException(404, detail="workorder.deliverable_not_found")
+    download_name = _deliverable_download_name(
+        kind, path.name, client_name=client_name, period=wo.get("period") or ""
+    )
+    return FileResponse(
+        str(path),
+        headers={"Content-Disposition": content_disposition(download_name, path.name)},
+    )
 
 
 @router.get("/api/workorder/orders/{work_order_id}/financials/download")

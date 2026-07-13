@@ -2,9 +2,10 @@
 """工单制路由契约 + fail-closed 守门(routes/workorder_routes.py · M1-B1 + C3 四权分立)。
 
 锁定:①端点按 path+method 注册且挂进 app;②M1 闸关时任一端点 404(对存量用户路由等于
-不存在);③闸开 + 鉴权后开单外形正确;④非法裁决 → 422、item 不属该单 → 404;⑤下载只
-放行库里登记过的交付物(未登记 → 404,不碰磁盘);⑥C3:每个端点传给 require_perm 的
-tax.filing.* 细码与方案闸点表逐一对齐(PermCodeWiringTests)。
+不存在);③闸开 + 鉴权后开单外形正确;④非法裁决 → 422、item 不属该单 → 404;⑤C3:每个
+端点传给 require_perm 的 tax.filing.* 细码与方案闸点表逐一对齐(PermCodeWiringTests)。
+交付物清单/下载(deliverables)与月度报表下载(financials/download)已并进
+routes/workorder_financials_routes.py,守门在 test_workorder_financials_routes_contract.py。
 """
 
 from __future__ import annotations
@@ -38,8 +39,6 @@ class RouteContractTests(unittest.TestCase):
             ("POST", "/api/workorder/orders/{work_order_id}/decisions"),
             ("POST", "/api/workorder/orders/{work_order_id}/sales-summary"),
             ("POST", "/api/workorder/orders/{work_order_id}/materials"),
-            ("GET", "/api/workorder/orders/{work_order_id}/deliverables"),
-            ("GET", "/api/workorder/orders/{work_order_id}/deliverables/{kind}"),
             ("GET", "/api/workorder/orders/{work_order_id}/items/{item_id}/image"),
             ("POST", "/api/workorder/orders/{work_order_id}/review"),
             ("POST", "/api/workorder/orders/{work_order_id}/archive"),
@@ -310,28 +309,6 @@ class SalesSummaryMappingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.status_code, 422)
 
 
-class DownloadGuardTests(unittest.IsolatedAsyncioTestCase):
-    async def test_unregistered_kind_is_404_without_touching_disk(self):
-        from routes import workorder_routes as wr
-
-        wo = {"workspace_client_id": 7}
-        with (
-            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
-            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
-            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
-            mock.patch.object(wr, "check_workspace_scope", return_value=None),
-            mock.patch.object(route_helpers, "check_workspace_scope", return_value=None),
-            mock.patch.object(wr, "db", _FakeDB(_Cur())),
-            mock.patch.object(wr.store, "get_work_order", return_value=wo),
-            mock.patch.object(wr.api, "deliverable_artifact_path", return_value=None),
-            mock.patch.object(wr.storage, "resolve_within_order") as resolve,
-        ):
-            with self.assertRaises(HTTPException) as ctx:
-                await wr.download_deliverable("wo-1", "pp30_draft", mock.Mock())
-        self.assertEqual(ctx.exception.status_code, 404)
-        resolve.assert_not_called()  # 未登记就短路,不进磁盘解析
-
-
 class _FakeUpload:
     """UploadFile 替身:read(n) 尊重封顶字节数(验证路由的封顶读法,不整读)。"""
 
@@ -376,8 +353,6 @@ class PermCodeWiringTests(unittest.IsolatedAsyncioTestCase):
         cases = (
             (wr.list_orders(mock.Mock()), wr._C_VIEW),
             (wr.get_order("wo-1", mock.Mock()), wr._C_VIEW),
-            (wr.list_order_deliverables("wo-1", mock.Mock()), wr._C_VIEW),
-            (wr.download_deliverable("wo-1", "pp30_draft", mock.Mock()), wr._C_VIEW),
             (wr.get_item_image("wo-1", "it-1", mock.Mock()), wr._C_VIEW),
             (wr.verify_order("wo-1", mock.Mock()), wr._C_VIEW),
             (

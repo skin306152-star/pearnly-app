@@ -193,6 +193,10 @@ def ensure_erp_push_logs_work_order_id_column():
     """MC2-C · erp_push_logs 加可空列 work_order_id + 部分索引(幂等 · dual-run 对齐
     alembic/versions/0076_erp_push_logs_work_order_id.py)。
 
+    评审依据(策划窗裁定):prod alembic 指针未通(部署不跑迁移),启动期 ensure 链才是
+    生产实际生效路径——0076 必须配本 dual-run 才能在 prod 落列,照 0073 coa_erp_bridge
+    (bridge_schema.ensure_coa_erp_bridge_schema)同款先例。
+
     T4c 回执核对(services/workorder/steps/reconcile.py)此前只能按 invoice_no 在租户范围
     匹配,跨工单同票号理论上会串;本列补上后,工单发起的推送可带精确归属,读侧优先按列
     匹配、无列值回落票号。无外键(legacy 集成表,推送多为主站直推独立流);老行 NULL 如实。

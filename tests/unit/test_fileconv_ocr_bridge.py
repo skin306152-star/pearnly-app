@@ -101,6 +101,28 @@ class TruncationHardGateTests(unittest.TestCase):
         result = ocr_bridge.convert_images([b"img"], "scan.jpg", provider_call=call)
         self.assertEqual(result.status, STATUS_OCR_INCOMPLETE)
 
+    def test_max_tokens_raise_leak_is_incomplete(self):
+        """aistudio resp.text 快取器在 finish_reason=2(MAX_TOKENS)时抛 ValueError 泄漏出
+        网关(真调实锤)——桥必须收敛成截断拒绝,绝不 500 也绝不出半件。"""
+
+        def raising_call(prompt, image_bytes, **kwargs):
+            raise ValueError(
+                "Invalid operation: The `response.text` quick accessor requires the response "
+                "to contain a valid `Part`, but none were returned. The candidate's "
+                "[finish_reason](https://ai.google.dev/api/generate-content#finishreason) is 2."
+            )
+
+        result = ocr_bridge.convert_images([b"img"], "scan.jpg", provider_call=raising_call)
+        self.assertEqual(result.status, STATUS_OCR_INCOMPLETE)
+        self.assertEqual(result.tables, [])
+
+    def test_other_provider_raise_is_unavailable(self):
+        def raising_call(prompt, image_bytes, **kwargs):
+            raise RuntimeError("connection reset")
+
+        result = ocr_bridge.convert_images([b"img"], "scan.jpg", provider_call=raising_call)
+        self.assertEqual(result.status, STATUS_OCR_UNAVAILABLE)
+
     def test_provider_unreachable_is_unavailable_not_incomplete(self):
         call = _fake_call([_classify_data("bank_statement"), _Outcome(False, error_kind="auth")])
         result = ocr_bridge.convert_images([b"img"], "scan.jpg", provider_call=call)

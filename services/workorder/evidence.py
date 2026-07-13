@@ -62,14 +62,18 @@ def replay_items_by_type(events: list[dict], event_type: str) -> dict:
     return out
 
 
-def flagged_projection(items: list[dict], events: list[dict]) -> list[dict]:
+def flagged_projection(
+    items: list[dict], events: list[dict], classified: Optional[dict] = None
+) -> list[dict]:
     """挂起清单投影(W3 审核队列 + order-detail 一次喂满,零额外往返)。每张 flagged 票带
     OCR 读数、最新裁决、判据人话 + 置信度(verdict_hint · MC1-b1 纯读侧现算,不改引擎不落库)。
 
     ocr_read = item_classified 的 payload.money(票面钱字段原始串);decision = 该 item 最新一条
     human_decision(latest-wins,与 reconcile 回放同语义);verdict_hint = verdict.hint(flag_reason,
-    ocr_read)。都可为 None/空 —— 没读出/没判过就诚实给空,不造数据。"""
-    classified = replay_items_by_type(events, _EVT_CLASSIFIED)
+    ocr_read)。都可为 None/空 —— 没读出/没判过就诚实给空,不造数据。classified 可由调用方
+    (api.order_detail)传入已回放好的索引,同一请求不重复扫事件流;缺省自算。"""
+    if classified is None:
+        classified = replay_items_by_type(events, _EVT_CLASSIFIED)
     decisions_by_item = replay_items_by_type(events, _EVT_DECISION)
     out = []
     for it in items:

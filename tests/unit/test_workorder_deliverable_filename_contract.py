@@ -22,32 +22,18 @@ from unittest import mock
 from core import route_helpers
 from routes import workorder_financials_routes as wfr
 from routes import workorder_routes as wr
+from tests.unit._route_contract_fakes import FakeDB
 
 _USER = {"id": "u1", "tenant_id": "t-1"}
 _WO = {"workspace_client_id": 7, "period": "2569-06"}
 
 
-class _Cur:
-    pass
+class _FakeDB(FakeDB):
+    """共享 FakeDB 之上补 _client_name_for_order 要的 get_workspace_client 桩。"""
 
-
-class _CM:
-    def __init__(self, cur):
-        self.cur = cur
-
-    def __enter__(self):
-        return self.cur
-
-    def __exit__(self, *a):
-        return False
-
-
-class _FakeDB:
     def __init__(self, client=None):
+        super().__init__()
         self._client = client
-
-    def get_cursor(self, commit=False):
-        return _CM(_Cur())
 
     def get_workspace_client(self, workspace_client_id, user_id, tenant_id=None):
         return self._client

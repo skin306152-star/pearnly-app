@@ -132,7 +132,8 @@ async def get_tax_profile(workspace_client_id: int, request: Request):
     if profile is None:
         raise HTTPException(404, detail="workspace.not_found")
     check_workspace_scope(request, user, workspace_client_id)
-    return {"profile": _serialize_profile(profile)}
+    # completeness 给档案页 0% CTA(前端消费此值,不再手抄字段表)。
+    return {"profile": _serialize_profile(profile), "completeness": _profile_completeness(profile)}
 
 
 @router.put("/api/workspace/clients/{workspace_client_id}/tax-profile")
@@ -268,23 +269,25 @@ async def list_client_obligations(
 
 
 # 客户目录(EN-clients · 2026-07-13)「画像完整度」= 这 6 个默认落 unknown 的画像字段
-# 里已被人工确认几个,0..1。挂在矩阵响应上(同一 LEFT JOIN,零额外往返),不是画像表单
+# 里已被人工确认几个,0..1。挂在矩阵响应(同一 LEFT JOIN,零额外往返,列带 p_ 前缀)
+# 与 GET tax-profile 出参(档案页 0% CTA 消费,前端不再手抄一份字段表),不是画像表单
 # FIELD_DEFS 全集——sbt_status/filing_disposition 默认值本身就是"已答"(none/active),
 # 计入分母只会让每个新客户显得比实际更"完整",故只数真正默认 unknown 的字段。
 _COMPLETENESS_FIELDS = (
-    "p_has_employees",
-    "p_pays_individuals",
-    "p_pays_juristic",
-    "p_pays_foreign",
-    "p_pays_interest_dividend",
-    "p_efiling_enrolled",
+    "has_employees",
+    "pays_individuals",
+    "pays_juristic",
+    "pays_foreign",
+    "pays_interest_dividend",
+    "efiling_enrolled",
 )
 
 
-def _profile_completeness(row: dict) -> float:
-    """0..1,round 到 2 位。行里没有画像列(旧调用点/测试 fixture 没带)一律按全 unknown
-    算,不假装完整——client_tax_profiles 缺档时 COALESCE 已在 SQL 层退到 'unknown'。"""
-    answered = sum(1 for f in _COMPLETENESS_FIELDS if row.get(f, "unknown") != "unknown")
+def _profile_completeness(row: dict, prefix: str = "") -> float:
+    """0..1,round 到 2 位。prefix 供矩阵行(画像列 SQL 别名带 p_)复用同一份字段表;
+    行里没有画像列(旧调用点/测试 fixture 没带)一律按全 unknown 算,不假装完整——
+    client_tax_profiles 缺档时 COALESCE 已在 SQL 层退到 'unknown'。"""
+    answered = sum(1 for f in _COMPLETENESS_FIELDS if row.get(prefix + f, "unknown") != "unknown")
     return round(answered / len(_COMPLETENESS_FIELDS), 2)
 
 
@@ -379,7 +382,7 @@ async def get_tax_profile_matrix(request: Request, period: Optional[str] = None)
                 "id": cid,
                 "name": r["client_name"],
                 "tax_id": r.get("client_tax_id"),
-                "profile_completeness": _profile_completeness(r),
+                "profile_completeness": _profile_completeness(r, prefix="p_"),
             },
         )
         client_has_order.setdefault(cid, False)

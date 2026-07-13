@@ -24,19 +24,17 @@ from services.fileconv.model import FINANCIALS_REPORT as _DOC_TYPE
 # BS/TB 的不平是整表级结论,没有单一行号可指)。
 _NO_ROW = 1_000_000
 
+# bs/pl 表头四语完全相同(分类/科目/金额),共享同一份;消费侧(_h)只读不改。
+_BSPL_HEADERS = {
+    "zh": ["分类", "科目", "金额"],
+    "th": ["หมวด", "บัญชี", "จำนวนเงิน"],
+    "en": ["Section", "Account", "Amount"],
+    "ja": ["区分", "科目", "金額"],
+}
+
 _HEADERS = {
-    "bs": {
-        "zh": ["分类", "科目", "金额"],
-        "th": ["หมวด", "บัญชี", "จำนวนเงิน"],
-        "en": ["Section", "Account", "Amount"],
-        "ja": ["区分", "科目", "金額"],
-    },
-    "pl": {
-        "zh": ["分类", "科目", "金额"],
-        "th": ["หมวด", "บัญชี", "จำนวนเงิน"],
-        "en": ["Section", "Account", "Amount"],
-        "ja": ["区分", "科目", "金額"],
-    },
+    "bs": _BSPL_HEADERS,
+    "pl": _BSPL_HEADERS,
     "tb": {
         "zh": ["科目", "借方", "贷方"],
         "th": ["บัญชี", "เดบิต", "เครดิต"],
@@ -80,11 +78,6 @@ _TOTAL_LABEL = {
     "en": "Total",
     "ja": "合計",
 }
-
-# 下载文件名用的报表短名(P1-6 · "客户名_账期_งบการเงิน.pdf" 拍板原文),与 PDF 页眉的
-# "งบการเงินรายเดือน"(月度报表标题,见 pdf_out.py _L["title.financials"])故意不同——
-# 文件名要短,页眉要说清楚是月度的。
-FILE_LABEL = {"zh": "报表", "th": "งบการเงิน", "en": "Financial Report", "ja": "財務報告書"}
 
 _CURRENT_EARNINGS_LABEL = {
     "zh": "本期损益(计入权益)",

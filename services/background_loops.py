@@ -183,12 +183,10 @@ async def run_recovery_tick():
         await line_client_dunning.run_tick()
     except Exception as e:
         logger.warning(f"[line_client_dunning] tick failed: {e}")
-    try:
-        from services.workorder import reaper
+    from services.workorder import reaper
 
-        await reaper.run_tick()
-    except Exception as e:
-        logger.warning(f"[workorder_reaper] tick failed: {e}")
+    # run_tick 自吞异常(挂点安全在 reaper 内部保证),与 erp_retry_loop 开场的调用点一致裸调。
+    await reaper.run_tick()
 
 
 async def run_accounting_posting_failure_tick():

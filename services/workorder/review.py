@@ -266,11 +266,11 @@ def reject_review(
         raise api.WorkOrderApiError("workorder.not_found")
     if wo["status"] != engine.STATUS_REVIEW:
         raise api.WorkOrderApiError("workorder.not_reviewable")
+    # 长度上限由路由层 pydantic RejectIn(max_length=500)把守;这里只挡 strip 后的空原因
+    # (pydantic min_length 拦不住纯空白)。
     reason_s = (reason or "").strip()
     if not reason_s:
         raise api.WorkOrderApiError("workorder.reject_reason_required")
-    if len(reason_s) > 500:
-        raise api.WorkOrderApiError("workorder.reject_reason_too_long")
 
     reopened = list(engine.reopen_steps_from(_REOPEN_FROM))
     store.append_event(

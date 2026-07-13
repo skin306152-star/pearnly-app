@@ -43,16 +43,18 @@ _ROW = {
 
 
 class EnsureTableTests(unittest.TestCase):
-    def test_idempotent_rerun_does_not_raise(self):
+    def test_process_once_flag_runs_ddl_only_first_time(self):
+        # 进程内 once-flag:重复调用不重跑 6 条 DDL(review-queue 等高频读侧每请求都调);
+        # 自愈路(_with_heal)重置 flag 后仍强制重跑,见 test_missing_table_self_heals。
         cur = MagicMock()
         with (
             patch("core.db.get_cursor", return_value=_cm(cur)),
             patch("core.rls.apply_tenant_rls") as apply_rls,
+            patch.object(s, "_table_ensured", False),
         ):
             s.ensure_table()
             s.ensure_table()
-        apply_rls.assert_called_with(cur, "line_client_questions")
-        self.assertEqual(apply_rls.call_count, 2)
+        apply_rls.assert_called_once_with(cur, "line_client_questions")
 
 
 class StageTests(unittest.TestCase):

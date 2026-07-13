@@ -26,33 +26,20 @@ from routes import workorder_financials_routes as wfr
 from routes import workorder_routes as wr
 from routes.workorder_financials_routes import router as financials_router
 from services.accounting import workorder_financials, workorder_shadow_adapter
+from tests.unit._route_contract_fakes import FakeDB as _FakeDB
 
 _USER = {"id": "u1", "tenant_id": "t-1"}
 _WO = {"id": "wo-1", "workspace_client_id": 7, "period": "2569-05"}
 
 
-def _golden_detail():
+def _golden_financials():
     shadow = workorder_shadow_adapter.build_shadow(
         purchase_entries=[{"net": Decimal("1000"), "vat": Decimal("70"), "grand": Decimal("1070")}],
         sales_amount=Decimal("5000"),
         output_vat=Decimal("350"),
         period="2569-05",
     )
-    fin = workorder_financials.build_financials(shadow.as_gate_payload(), period="2569-05")
-    return {"financials": fin}
-
-
-class _CM:
-    def __enter__(self):
-        return mock.Mock()
-
-    def __exit__(self, *a):
-        return False
-
-
-class _FakeDB:
-    def get_cursor(self, commit=False):
-        return _CM()
+    return workorder_financials.build_financials(shadow.as_gate_payload(), period="2569-05")
 
 
 _DELIVERABLE_PATHS = (
@@ -96,7 +83,7 @@ class DownloadBehaviorTests(unittest.IsolatedAsyncioTestCase):
             p1,
             p2,
             p3,
-            mock.patch.object(wfr.api, "order_detail", return_value={"financials": None}),
+            mock.patch.object(wfr.api, "financials_projection", return_value=None),
             mock.patch.object(wfr, "_client_name_for_order", return_value="Sister Makeup"),
         ):
             with self.assertRaises(HTTPException) as ctx:
@@ -109,7 +96,7 @@ class DownloadBehaviorTests(unittest.IsolatedAsyncioTestCase):
             p1,
             p2,
             p3,
-            mock.patch.object(wfr.api, "order_detail", return_value=_golden_detail()),
+            mock.patch.object(wfr.api, "financials_projection", return_value=_golden_financials()),
             mock.patch.object(wfr, "_client_name_for_order", return_value="Sister Makeup"),
         ):
             resp = await wfr.download_financials_report(
@@ -129,7 +116,7 @@ class DownloadBehaviorTests(unittest.IsolatedAsyncioTestCase):
             p1,
             p2,
             p3,
-            mock.patch.object(wfr.api, "order_detail", return_value=_golden_detail()),
+            mock.patch.object(wfr.api, "financials_projection", return_value=_golden_financials()),
             mock.patch.object(wfr, "_client_name_for_order", return_value="Sister Makeup"),
         ):
             resp = await wfr.download_financials_report(
@@ -148,7 +135,7 @@ class DownloadBehaviorTests(unittest.IsolatedAsyncioTestCase):
             p1,
             p2,
             p3,
-            mock.patch.object(wfr.api, "order_detail", return_value=_golden_detail()),
+            mock.patch.object(wfr.api, "financials_projection", return_value=_golden_financials()),
             mock.patch.object(wfr, "_client_name_for_order", return_value=""),
         ):
             resp = await wfr.download_financials_report(

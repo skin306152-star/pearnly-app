@@ -17,15 +17,9 @@ from fastapi import HTTPException
 
 from core import route_helpers
 from routes.workorder_routes import router as workorder_router
-
-
-def _route_set(router):
-    out = set()
-    for r in router.routes:
-        for m in getattr(r, "methods", set()) or set():
-            if m in ("GET", "POST", "PUT", "PATCH", "DELETE"):
-                out.add((m, r.path))
-    return out
+from tests.unit._route_contract_fakes import FakeCur as _Cur
+from tests.unit._route_contract_fakes import FakeDB as _FakeDB
+from tests.unit._route_contract_fakes import route_set as _route_set
 
 
 class RouteContractTests(unittest.TestCase):
@@ -54,36 +48,6 @@ class RouterMountedTests(unittest.TestCase):
 
         paths = {getattr(r, "path", None) for r in app.app.routes}
         self.assertIn("/api/workorder/orders", paths)
-
-
-class _Cur:
-    def __init__(self, fetch=(1,)):
-        self._fetch = fetch
-
-    def execute(self, *a, **k):
-        pass
-
-    def fetchone(self):
-        return self._fetch
-
-
-class _CM:
-    def __init__(self, cur):
-        self.cur = cur
-
-    def __enter__(self):
-        return self.cur
-
-    def __exit__(self, *a):
-        return False
-
-
-class _FakeDB:
-    def __init__(self, cur):
-        self._cur = cur
-
-    def get_cursor(self, commit=False):
-        return _CM(self._cur)
 
 
 _USER = {"id": "u1", "tenant_id": "t-1"}

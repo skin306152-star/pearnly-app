@@ -130,15 +130,17 @@ def build_corroboration(agg: dict, *, authoritative_net=None, authoritative_vat=
     return out
 
 
-def corroboration_from_events(events: list, items: list):
+def corroboration_from_events(events: list, items: list, classified: dict | None = None):
     """order_detail 读侧投影(MC1-c.1):从事件流现算销项佐证,独立于 reconcile 是否 ok。
 
     sales_doc 件的逐票票面钱 → 聚合;R2 权威取 sales_summary 件的 sales_read 直读聚合(人工申报
     858,780.16 走这条),缺权威 → needs 态只显已开票不编缺口。工单停在 R1/R2 needs 时 step_done
     里没有 r2_sales_corroboration,故不走 replay_step_done——照样出佐证。无 sales_doc 件 → None,
     前端不渲染佐证卡(现状诚实)。R2 权威取值逻辑一行不碰(方案 §7.5 佐证不夺权威护栏)。
+    classified 可由调用方传入已回放好的 item_classified 索引(api.order_detail 同请求只算一次)。
     """
-    classified = evidence.replay_items_by_type(events, _EVT_CLASSIFIED)
+    if classified is None:
+        classified = evidence.replay_items_by_type(events, _EVT_CLASSIFIED)
     money_list = [
         (classified.get(it["id"]) or {}).get("payload", {}).get("money")
         for it in items

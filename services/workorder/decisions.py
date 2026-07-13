@@ -34,7 +34,6 @@ NON_COUNTING = frozenset({EXCLUDE, WAIVE})
 # bank_recon_review.py + api._bank_recon 的读侧覆盖)。
 BANK_RECON_ACCEPT = "bank_recon_accept"
 BANK_RECON_REJECT = "bank_recon_reject"
-BANK_RECON_ACTIONS = (BANK_RECON_ACCEPT, BANK_RECON_REJECT)
 
 # 方向不明票的 flag_reason:税号/名称锚点判不出进/销(direction_ambiguous)。kind=unknown,
 # 必须人工定向(assign_kind)。SALES_DIRECTION_UNHANDLED 是 MC1-c.1 前「自家==卖方判死」的旧码

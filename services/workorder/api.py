@@ -179,6 +179,8 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
     events = store.list_events(cur, tenant_id=tenant_id, work_order_id=work_order_id)
     deliverables = store.list_deliverables(cur, tenant_id=tenant_id, work_order_id=work_order_id)
     needs, blocked = _halt_info(events, wo["status"])
+    # item_classified 回放同一请求只算一次,喂给 flagged/进度/佐证三个读侧投影(纯参数下沉)。
+    classified = evidence.replay_items_by_type(events, _EVT_CLASSIFIED)
     return {
         "id": wo["id"],
         "workspace_client_id": wo["workspace_client_id"],
@@ -186,15 +188,17 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         "intent": wo["intent"],
         "status": wo["status"],
         "current_step": wo["current_step"],
-        "progress": _classify_progress(wo, items, events),
-        "flagged": evidence.flagged_projection(items, events),
+        "progress": _classify_progress(wo, items, classified),
+        "flagged": evidence.flagged_projection(items, events, classified=classified),
         "needs": needs,
         "blocked_reasons": blocked,
         "numbers": _numbers(events),
         "bank_recon": _bank_recon(events, items),
         "shadow_draft": _shadow_draft(events),
         "financials": _financials(events),
-        "sales_corroboration": sales_aggregate.corroboration_from_events(events, items),
+        "sales_corroboration": sales_aggregate.corroboration_from_events(
+            events, items, classified=classified
+        ),
         "deliverables": [
             {"kind": d["kind"], "numbers": d.get("numbers") or {}} for d in deliverables
         ],
@@ -275,13 +279,22 @@ def _financials(events: list[dict]) -> Optional[dict]:
     return fin
 
 
-def _classify_progress(wo: dict, items: list[dict], events: list[dict]) -> Optional[dict]:
+def financials_projection(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
+    """报表下载路由专用薄函数:只回放事件取 financials 投影,不算整份 order_detail
+    (下载端点只消费这一个键,没必要连 flagged/银行对账/佐证全算一遍)。语义与
+    order_detail()['financials'] 同一份 _financials,不另造第二套判定。"""
+    events = store.list_events(cur, tenant_id=tenant_id, work_order_id=work_order_id)
+    return _financials(events)
+
+
+def _classify_progress(wo: dict, items: list[dict], classified: dict) -> Optional[dict]:
     """classify 逐件进度(P-4:219 秒别再像死机)。仅当工单正卡在 classify 步时给一份
     {processed, total};其余步返 None(前端只在 classify 期显进度条)。
 
-    从事件流现算,不建新状态表:total = 本单要过 OCR 的图片件数(file_ref 是图片扩展名);
-    processed = 其中已落 item_classified 事件的件数(classify 逐件独立事务提交,已处理件即时
-    可见)——processed 随 OCR 推进单调递增,跑完 == total。销项直读/银行件不过 OCR,不计入。"""
+    classified 是调用方(order_detail)已回放好的 item_classified 索引,不建新状态表:
+    total = 本单要过 OCR 的图片件数(file_ref 是图片扩展名);processed = 其中已落
+    item_classified 事件的件数(classify 逐件独立事务提交,已处理件即时可见)——processed
+    随 OCR 推进单调递增,跑完 == total。销项直读/银行件不过 OCR,不计入。"""
     if wo.get("current_step") != "classify":
         return None
     image_ids = {
@@ -291,7 +304,6 @@ def _classify_progress(wo: dict, items: list[dict], events: list[dict]) -> Optio
     }
     if not image_ids:
         return None
-    classified = evidence.replay_items_by_type(events, _EVT_CLASSIFIED)
     processed = sum(1 for iid in image_ids if iid in classified)
     return {"step": "classify", "processed": processed, "total": len(image_ids)}
 

@@ -182,6 +182,8 @@ class GetProfileTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(out["profile"]["vat_credit_carry"], str)
         self.assertEqual(out["profile"]["updated_at"], "2026-07-10T03:00:00")
         self.assertIsNone(out["profile"]["created_at"])
+        # 档案页 0% CTA 消费的完整度(6 个默认 unknown 字段全未答 → 0.0)。
+        self.assertEqual(out["completeness"], 0.0)
 
     async def test_profile_not_found_404(self):
         from routes import tax_profile_routes as tr
@@ -607,7 +609,8 @@ class MatrixTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(out["clients"][0]["missing_order"])
 
     def test_profile_completeness_counts_answered_unknown_defaultable_fields(self):
-        """纯函数:6 个默认 unknown 的画像字段答了几个,0..1(EN-clients 客户目录用)。"""
+        """纯函数:6 个默认 unknown 的画像字段答了几个,0..1(EN-clients 客户目录 · 矩阵行
+        画像列带 p_ 前缀走 prefix 参数;GET tax-profile 的 profile dict 不带前缀)。"""
         from routes import tax_profile_routes as tr
 
         self.assertEqual(tr._profile_completeness({}), 0.0)
@@ -620,19 +623,20 @@ class MatrixTests(unittest.IsolatedAsyncioTestCase):
                     "p_pays_foreign": "unknown",
                     "p_pays_interest_dividend": "unknown",
                     "p_efiling_enrolled": "unknown",
-                }
+                },
+                prefix="p_",
             ),
             0.33,
         )
         self.assertEqual(
             tr._profile_completeness(
                 {
-                    "p_has_employees": "yes",
-                    "p_pays_individuals": "no",
-                    "p_pays_juristic": "no",
-                    "p_pays_foreign": "no",
-                    "p_pays_interest_dividend": "yes",
-                    "p_efiling_enrolled": "yes",
+                    "has_employees": "yes",
+                    "pays_individuals": "no",
+                    "pays_juristic": "no",
+                    "pays_foreign": "no",
+                    "pays_interest_dividend": "yes",
+                    "efiling_enrolled": "yes",
                 }
             ),
             1.0,

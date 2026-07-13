@@ -90,8 +90,16 @@ class IllegalTransitionError(ClientPoolError):
         self.to_status = to_status
 
 
+_table_ensured = False
+
+
 def ensure_table() -> None:
-    """幂等建表 + 三索引 + RLS(首用自愈调)。"""
+    """幂等建表 + 三索引 + RLS(首用自愈调)。进程内 once-flag(照 workorder
+    store.ensure_runtime 先例):review-queue 等高频读侧每请求都调,DDL 只真跑进程首次;
+    自愈路(_with_heal)先重置 flag 强制重跑。"""
+    global _table_ensured
+    if _table_ensured:
+        return
     from core import db
     from core.rls import apply_tenant_rls
 
@@ -102,17 +110,20 @@ def ensure_table() -> None:
         cur.execute(_INDEX_CLIENT_ACTIVE)
         cur.execute(_INDEX_PENDING_CHASE)
         apply_tenant_rls(cur, "line_client_questions")
+    _table_ensured = True
 
 
 def _with_heal(fn):
     """表不存在(新库/回滚后)或缺 batch_seq 列(存量表未补列)→ 自愈重试一次;
     其余异常向上抛由调用方 fail-safe。"""
+    global _table_ensured
     try:
         return fn()
     except Exception as e:
         msg = str(e)
         if "line_client_questions" not in msg and "batch_seq" not in msg:
             raise
+        _table_ensured = False
         ensure_table()
         return fn()
 

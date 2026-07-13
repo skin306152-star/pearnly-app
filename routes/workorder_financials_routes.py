@@ -21,9 +21,8 @@ services/fileconv/model.py 新增 FINANCIALS_REPORT 常量 + pdf_out.py 的 stam
 
 N1-P1-6:交付文件名 "{客户名}_{账期}_{报表名}.{ext}"——RFC 5987 helper 已在
 core.route_helpers,交付物 kind → 人读短名(泰文,与内部 markdown 标题呼应,不直出
-内部 kind 字面量 pp30_draft.md 这种开发者黑话)。financials_report(即上方月度报表,走
-独立的 /financials/download 端点,不经这张表)以外的既有五件套 + WHT/影子件都在这张
-表里。
+内部 kind 字面量 pp30_draft.md 这种开发者黑话)。月度报表下载(/financials/download)
+虽走独立端点不查交付物表,文件名同样经 _deliverable_download_name 拼(单源)。
 """
 
 from __future__ import annotations
@@ -34,10 +33,10 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, Response
 
 from core import db
-from core.route_helpers import content_disposition
+from core.route_helpers import content_disposition, lang_or_default
 from routes.workorder_routes import _C_VIEW, _authorize, _client_name_for_order, _load_order
 from services.fileconv import pdf_out, xlsx_out
-from services.reports.financials_pdf import FILE_LABEL, build_financials_convert_result
+from services.reports.financials_pdf import build_financials_convert_result
 from services.workorder import api, storage
 
 router = APIRouter()
@@ -112,21 +111,21 @@ async def download_deliverable(work_order_id: str, kind: str, request: Request):
 async def download_financials_report(
     work_order_id: str, request: Request, format: str = "pdf", lang: str = "th"
 ):
-    """月度报表打印级 PDF / Excel。format=pdf|xlsx,lang 走当前 UI 语种(缺省 th,同
-    fileconv_routes 的 _lang() 兜底口径)。"""
+    """月度报表打印级 PDF / Excel。format=pdf|xlsx,lang 走当前 UI 语种(lang_or_default
+    四语白名单兜底 th,同 fileconv_routes 口径)。"""
     if format not in ("pdf", "xlsx"):
         raise HTTPException(422, detail="workorder.financials_bad_format")
+    lang = lang_or_default(lang)
     user, tenant_id = _authorize(request, _C_VIEW)
     with db.get_cursor() as cur:
         wo = _load_order(cur, request, user, tenant_id, work_order_id)
-        detail = api.order_detail(cur, tenant_id=tenant_id, work_order_id=work_order_id)
+        fin = api.financials_projection(cur, tenant_id=tenant_id, work_order_id=work_order_id)
         client_name = _client_name_for_order(
             cur,
             tenant_id=tenant_id,
             user_id=str(user["id"]),
             workspace_client_id=wo["workspace_client_id"],
         )
-    fin = (detail or {}).get("financials")
     if not fin:
         raise HTTPException(404, detail="workorder.financials_not_available")
     period = wo.get("period") or ""
@@ -140,10 +139,8 @@ async def download_financials_report(
         content = xlsx_out.build_xlsx(result)
         media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         ext = ".xlsx"
-    display_name = (
-        f"{client_name}_{period}_{FILE_LABEL['th']}{ext}"
-        if client_name
-        else f"financials_{period}{ext}"
+    display_name = _deliverable_download_name(
+        "financials_report", f"financials_{period}{ext}", client_name=client_name, period=period
     )
     fallback_name = f"financials_{work_order_id}{ext}"
     return Response(

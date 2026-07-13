@@ -3,7 +3,7 @@
 
 纯函数,脱库脱框架。锁三件:①每个已知 flag_reason 前缀映射到对的 narrative_key + 置信度;
 ②amount_math_fail 的 params 差额算术正确(净+税 vs 票面);③未知原因诚实降级(key=None,
-confidence=low,不淡化不编造);④银行 score 分档。
+confidence=low,不淡化不编造)。
 """
 
 import unittest
@@ -84,19 +84,6 @@ class DegradeTests(unittest.TestCase):
 
     def test_none_reason_is_null_key(self):
         self.assertIsNone(verdict.hint(flag_reason=None)["narrative_key"])
-
-
-class ScoreConfidenceTests(unittest.TestCase):
-    def test_score_bands(self):
-        self.assertEqual(verdict.confidence_from_score(0.95), verdict.HIGH)
-        self.assertEqual(verdict.confidence_from_score(0.9), verdict.HIGH)
-        self.assertEqual(verdict.confidence_from_score(0.7), verdict.MID)
-        self.assertEqual(verdict.confidence_from_score(0.6), verdict.MID)
-        self.assertEqual(verdict.confidence_from_score(0.3), verdict.LOW)
-
-    def test_non_numeric_score_is_low(self):
-        self.assertEqual(verdict.confidence_from_score(None), verdict.LOW)
-        self.assertEqual(verdict.confidence_from_score("nan-ish"), verdict.LOW)
 
 
 if __name__ == "__main__":

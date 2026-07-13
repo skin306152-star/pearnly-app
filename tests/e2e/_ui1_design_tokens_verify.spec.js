@@ -14,11 +14,9 @@
 /* global window, document */
 
 const { test, expect } = require('@playwright/test');
-const { spawn } = require('child_process');
 const path = require('path');
-const http = require('http');
+const localServer = require('./_local_static_server');
 
-const ROOT = path.resolve(__dirname, '..', '..');
 const PORT = 8986;
 const BASE = `http://127.0.0.1:${PORT}`;
 const PAGE = `${BASE}/static/dist/ai.html`;
@@ -30,31 +28,12 @@ const ACC_SOFT_RGB = 'rgb(246, 230, 221)'; // --acc-soft #f6e6dd
 
 let server;
 
-function waitUp(url, tries = 40) {
-    return new Promise((resolve, reject) => {
-        const hit = (n) => {
-            http.get(url, (r) => {
-                r.resume();
-                resolve();
-            }).on('error', () => {
-                if (n <= 0) return reject(new Error('server not up'));
-                setTimeout(() => hit(n - 1), 150);
-            });
-        };
-        hit(tries);
-    });
-}
-
 test.beforeAll(async () => {
-    server = spawn('python', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], {
-        cwd: ROOT,
-        stdio: 'ignore',
-    });
-    await waitUp(PAGE);
+    server = await localServer.start(PORT);
 });
 
 test.afterAll(() => {
-    if (server) server.kill();
+    localServer.stop(server);
 });
 
 const MATRIX = {

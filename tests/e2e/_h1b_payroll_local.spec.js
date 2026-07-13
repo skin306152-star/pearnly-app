@@ -10,42 +10,21 @@
 /* global document, window, getComputedStyle */
 
 const { test, expect } = require('@playwright/test');
-const { spawn } = require('child_process');
 const path = require('path');
-const http = require('http');
+const localServer = require('./_local_static_server');
 
-const ROOT = path.resolve(__dirname, '..', '..');
 const PORT = 8982;
 const BASE = `http://127.0.0.1:${PORT}`;
 const ARTIFACT_DIR = path.join(__dirname, '_artifacts', 'h1b');
 
 let server;
 
-function waitUp(url, tries = 40) {
-    return new Promise((resolve, reject) => {
-        const hit = (n) => {
-            http.get(url, (r) => {
-                r.resume();
-                resolve();
-            }).on('error', () => {
-                if (n <= 0) return reject(new Error('server not up'));
-                setTimeout(() => hit(n - 1), 150);
-            });
-        };
-        hit(tries);
-    });
-}
-
 test.beforeAll(async () => {
-    server = spawn('python', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], {
-        cwd: ROOT,
-        stdio: 'ignore',
-    });
-    await waitUp(`${BASE}/static/dist/ai.html`);
+    server = await localServer.start(PORT);
 });
 
 test.afterAll(() => {
-    if (server) server.kill();
+    localServer.stop(server);
 });
 
 const CLIENTS = { clients: [{ id: 7, name: 'Sister Makeup' }] };

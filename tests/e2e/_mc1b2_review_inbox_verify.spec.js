@@ -15,11 +15,9 @@
 // 对本 spec 无影响——每个用例都用绝对 PAGE URL 打自起的本地服务)。
 /* global window, document */
 const { test, expect } = require('@playwright/test');
-const { spawn } = require('child_process');
 const path = require('path');
-const http = require('http');
+const localServer = require('./_local_static_server');
 
-const ROOT = path.resolve(__dirname, '..', '..');
 const PORT = 8984;
 const BASE = `http://127.0.0.1:${PORT}`;
 const PAGE = BASE + '/static/dist/ai.html';
@@ -27,31 +25,12 @@ const ART = path.join(__dirname, '_artifacts', 'mc1b2');
 
 let server;
 
-function waitUp(url, tries = 40) {
-    return new Promise((resolve, reject) => {
-        const hit = (n) => {
-            http.get(url, (r) => {
-                r.resume();
-                resolve();
-            }).on('error', () => {
-                if (n <= 0) return reject(new Error('server not up'));
-                setTimeout(() => hit(n - 1), 150);
-            });
-        };
-        hit(tries);
-    });
-}
-
 test.beforeAll(async () => {
-    server = spawn('python', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], {
-        cwd: ROOT,
-        stdio: 'ignore',
-    });
-    await waitUp(PAGE);
+    server = await localServer.start(PORT);
 });
 
 test.afterAll(() => {
-    if (server) server.kill();
+    localServer.stop(server);
 });
 
 // ---------------------------------------------------------------- fixtures ----

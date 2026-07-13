@@ -22,6 +22,9 @@ STATUS_NO_TEXT_LAYER = "no_text_layer"
 STATUS_OCR_INCOMPLETE = "ocr_incomplete"  # 模型读了但输出截断/不可解析 → 拒绝(K1c 命门)
 STATUS_OCR_UNAVAILABLE = "ocr_unavailable"  # 够不到/授权不了模型 → 拒绝,不假装转出来
 
+# 拒绝态分组:绝不出数据表(截断/读不到时半截行集会假自洽)——xlsx_out/cli 共用同一判据。
+REJECT_STATUSES = frozenset({STATUS_NO_TEXT_LAYER, STATUS_OCR_INCOMPLETE, STATUS_OCR_UNAVAILABLE})
+
 # issue.kind 取值。
 ISSUE_GL_BALANCE_CHAIN = "gl_balance_chain"  # 期初±借贷 ≠ 本行余额
 ISSUE_RUNNING_BALANCE = "running_balance"  # |余额变动| ≠ 本行金额(单金额列格式)

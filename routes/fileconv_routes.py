@@ -15,12 +15,11 @@ from __future__ import annotations
 
 import io
 import logging
-from urllib.parse import quote
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
-from core.route_helpers import authorize_pearnly_ai
+from core.route_helpers import authorize_pearnly_ai, content_disposition
 from services.fileconv.convert import convert_image, convert_pdf
 from services.fileconv.model import ConvertResult, Issue
 from services.fileconv.xlsx_out import build_xlsx
@@ -61,13 +60,6 @@ def _xlsx_filename(source_name: str) -> str:
     return f"{safe}.xlsx"
 
 
-def _content_disposition(filename: str) -> str:
-    """泰文原名走 RFC 5987 filename*(HTTP 头只认 latin-1,裸塞泰文会 500),
-    ASCII 兜底名给不认 filename* 的老客户端——同 vat_excel_routes 先例。"""
-    encoded = quote(filename.encode("utf-8"))
-    return f"attachment; filename=\"convert.xlsx\"; filename*=UTF-8''{encoded}"
-
-
 @router.post("/convert")
 async def convert_endpoint(
     request: Request,
@@ -90,7 +82,11 @@ async def convert_endpoint(
         return StreamingResponse(
             io.BytesIO(xlsx_bytes),
             media_type=_XLSX_MEDIA_TYPE,
-            headers={"Content-Disposition": _content_disposition(_xlsx_filename(file.filename))},
+            headers={
+                "Content-Disposition": content_disposition(
+                    _xlsx_filename(file.filename), "convert.xlsx"
+                )
+            },
         )
 
     logger.info(

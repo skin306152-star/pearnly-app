@@ -32,6 +32,7 @@ from __future__ import annotations
 import logging
 from contextlib import contextmanager
 from typing import Any, Dict, Optional
+from urllib.parse import quote
 
 import psycopg2
 from fastapi import HTTPException, Request, status
@@ -42,6 +43,14 @@ from core.feature_flags import pearnly_ai_m1_enabled_for
 from services.authz.deps import check_workspace_scope, require_perm
 
 logger = logging.getLogger("mr-pilot")
+
+
+def content_disposition(filename: str, fallback: str) -> str:
+    """泰文原名走 RFC 5987 filename*(HTTP 头只认 latin-1,裸塞泰文会 500),
+    ASCII 兜底名给不认 filename* 的老客户端——fileconv_routes / payroll_routes /
+    vat_excel_routes 曾各自维护字节级相同的实现(2026-07-13 simplify 收敛于此)。"""
+    encoded = quote(filename.encode("utf-8"))
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}"
 
 
 @contextmanager

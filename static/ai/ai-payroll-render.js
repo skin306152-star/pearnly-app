@@ -449,16 +449,5 @@
     }
 
     root.AI = root.AI || {};
-    root.AI.payrollRender = {
-        validateFile: validateFile,
-        issueKindKey: issueKindKey,
-        confidenceKey: confidenceKey,
-        FIELD_ORDER: FIELD_ORDER,
-        FIXABLE_FIELDS: FIXABLE_FIELDS,
-        defaultPeriod: defaultPeriod,
-        isPeriodValid: isPeriodValid,
-        requiredFieldsSatisfied: requiredFieldsSatisfied,
-        manualEntryValid: manualEntryValid,
-        pageHtml: pageHtml,
-    };
+    root.AI.payrollRender = Object.assign({ pageHtml: pageHtml }, pure);
 })(typeof self !== 'undefined' ? self : typeof globalThis !== 'undefined' ? globalThis : this);

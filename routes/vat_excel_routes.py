@@ -10,7 +10,6 @@ import time
 import asyncio
 import logging
 from typing import List, Optional
-from urllib.parse import quote
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Form
 from fastapi.responses import StreamingResponse, FileResponse
@@ -18,6 +17,7 @@ from fastapi.responses import StreamingResponse, FileResponse
 from core import db
 from core import workspace_context as wc
 from core.auth import get_current_user_from_request
+from core.route_helpers import content_disposition as _content_disposition
 from services.vat.vat_excel_export import (
     extract_invoices_parallel,
     extract_invoices_batched_parallel,  # v118.32.5 · 批量OCR 性能优化 B
@@ -251,10 +251,7 @@ async def build_excel_endpoint(
     fname_prefix = _FNAME_PREFIX.get(lang, "销项税对账表")
     fname = f"{fname_prefix}_{seller_short}_{period_str}.xlsx"
     fname_clean = "".join(c if c not in '/\\:*?"<>|' else "_" for c in fname)
-    fname_encoded = quote(fname_clean.encode("utf-8"))
-    content_disposition = (
-        f'attachment; filename="vat_recon.xlsx"; ' f"filename*=UTF-8''{fname_encoded}"
-    )
+    content_disposition = _content_disposition(fname_clean, "vat_recon.xlsx")
 
     # ── 异步存库(try/except · 不阻断下载) ──
     task_id = None
@@ -351,15 +348,10 @@ async def download_task(task_id: str, request: Request):
         fname_prefix = _FNAME_PREFIX.get(lang, "销项税对账表")
         fname = f"{fname_prefix}_{client_name}_{period}.xlsx"
         fname_clean = "".join(c if c not in '/\\:*?"<>|' else "_" for c in fname)
-        fname_encoded = quote(fname_clean.encode("utf-8"))
         return FileResponse(
             excel_path,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={
-                "Content-Disposition": (
-                    f'attachment; filename="vat_recon.xlsx"; ' f"filename*=UTF-8''{fname_encoded}"
-                )
-            },
+            headers={"Content-Disposition": _content_disposition(fname_clean, "vat_recon.xlsx")},
         )
 
     # 文件不存在 → 从 raw_data_json 重新生成
@@ -387,16 +379,11 @@ async def download_task(task_id: str, request: Request):
     fname_prefix = _FNAME_PREFIX.get(lang, "销项税对账表")
     fname = f"{fname_prefix}_{client_name}_{period}.xlsx"
     fname_clean = "".join(c if c not in '/\\:*?"<>|' else "_" for c in fname)
-    fname_encoded = quote(fname_clean.encode("utf-8"))
 
     return StreamingResponse(
         io.BytesIO(xlsx_bytes),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={
-            "Content-Disposition": (
-                f'attachment; filename="vat_recon.xlsx"; ' f"filename*=UTF-8''{fname_encoded}"
-            )
-        },
+        headers={"Content-Disposition": _content_disposition(fname_clean, "vat_recon.xlsx")},
     )
 
 
@@ -463,15 +450,12 @@ async def regenerate_task(task_id: str, request: Request):
     fname_prefix = _FNAME_PREFIX.get(lang, "销项税对账表")
     fname = f"{fname_prefix}_{client_name}_{period}.xlsx"
     fname_clean = "".join(c if c not in '/\\:*?"<>|' else "_" for c in fname)
-    fname_encoded = quote(fname_clean.encode("utf-8"))
 
     return StreamingResponse(
         io.BytesIO(xlsx_bytes),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
-            "Content-Disposition": (
-                f'attachment; filename="vat_recon.xlsx"; ' f"filename*=UTF-8''{fname_encoded}"
-            ),
+            "Content-Disposition": _content_disposition(fname_clean, "vat_recon.xlsx"),
             "X-Vex-Elapsed-Ms": str(int(elapsed * 1000)),
         },
     )

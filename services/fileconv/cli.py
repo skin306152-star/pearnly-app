@@ -10,14 +10,9 @@ import sys
 from pathlib import Path
 
 from services.fileconv.convert import convert_image, convert_pdf
-from services.fileconv.model import (
-    STATUS_NO_TEXT_LAYER,
-    STATUS_OCR_INCOMPLETE,
-    STATUS_OCR_UNAVAILABLE,
-)
+from services.fileconv.model import REJECT_STATUSES
 from services.fileconv.xlsx_out import build_xlsx
 
-_REJECT_STATUSES = (STATUS_NO_TEXT_LAYER, STATUS_OCR_INCOMPLETE, STATUS_OCR_UNAVAILABLE)
 _IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp")
 
 
@@ -46,7 +41,7 @@ def main(argv=None) -> int:
     converter = convert_image if in_path.suffix.lower() in _IMAGE_EXTS else convert_pdf
     result = converter(in_path.read_bytes(), source_name=in_path.name)
 
-    if result.status in _REJECT_STATUSES:
+    if result.status in REJECT_STATUSES:
         reason = result.stats.get("reason", "")
         print(f"[REJECT] {in_path.name}: {result.status} · {reason}")
         Path(out_path).write_bytes(build_xlsx(result))

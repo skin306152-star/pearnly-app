@@ -14,13 +14,13 @@ from openpyxl.utils import get_column_letter
 
 from services.fileconv.model import (
     ConvertResult,
+    REJECT_STATUSES,
     STATUS_NO_TEXT_LAYER,
     STATUS_OCR_INCOMPLETE,
     STATUS_OCR_UNAVAILABLE,
 )
 
-# 拒绝态:绝不出数据表(截断/读不到时半截行集会假自洽,只写一张诚实的 Rejected 说明页)。
-_REJECT_STATUSES = {STATUS_NO_TEXT_LAYER, STATUS_OCR_INCOMPLETE, STATUS_OCR_UNAVAILABLE}
+# 拒绝态说明页:只写一张诚实的 Rejected 说明,不出半截数据表。
 _REJECT_NOTE = {
     STATUS_NO_TEXT_LAYER: "此 PDF 无文字层(疑扫描件)· 已转 OCR 通道。",
     STATUS_OCR_INCOMPLETE: "OCR 输出被截断/不完整 · 已拒绝出件,未生成任何行(诚实优于假自洽)。",
@@ -55,7 +55,7 @@ def build_xlsx(result: ConvertResult) -> bytes:
     wb = Workbook()
     wb.remove(wb.active)
 
-    if result.status in _REJECT_STATUSES:
+    if result.status in REJECT_STATUSES:
         ws = wb.create_sheet("Rejected")
         ws["A1"] = result.status
         ws["A2"] = _REJECT_NOTE.get(result.status, "转换被拒绝。")

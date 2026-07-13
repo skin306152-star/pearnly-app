@@ -38,6 +38,7 @@ from services.fileconv.model import (
     Table,
 )
 from services.fileconv.ledger import LEDGER_COLUMNS, to_table_rows
+from services.ocr.direct_read import _sniff_mime
 
 logger = logging.getLogger(__name__)
 
@@ -129,18 +130,6 @@ def _default_provider_call(
         )
     finally:
         attribution.reset_attribution(token)
-
-
-def _sniff_mime(image_bytes: bytes) -> str:
-    if image_bytes[:8] == b"\x89PNG\r\n\x1a\n":
-        return "image/png"
-    if image_bytes[:2] == b"\xff\xd8":
-        return "image/jpeg"
-    if image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
-        return "image/webp"
-    if image_bytes[:3] == b"GIF":
-        return "image/gif"
-    return "image/png"
 
 
 def _rasterize_pdf(pdf_bytes: bytes) -> Optional[List[bytes]]:
@@ -404,7 +393,7 @@ def convert_images(
     stats["engine"] = "ocr_image_direct"
     stats["pages"] = len(images)
     table = Table(
-        name={True: "GL Ledger", False: "Bank Statement"}[is_gl],
+        name="GL Ledger" if is_gl else "Bank Statement",
         columns=LEDGER_COLUMNS,
         rows=to_table_rows(rows),
     )

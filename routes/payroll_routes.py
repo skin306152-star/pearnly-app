@@ -17,13 +17,12 @@ import io
 import json
 import logging
 from decimal import Decimal
-from urllib.parse import quote
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from core import db
-from core.route_helpers import authorize_pearnly_ai
+from core.route_helpers import authorize_pearnly_ai, content_disposition
 from services.payroll import guess, intake, keying_sheet, model, obligations, store, validate
 from services.payroll.model import PayrollRow
 from services.tax import pnd1_attach, rdprep_pnd1
@@ -60,12 +59,6 @@ def _cell_out(value):
     if value is None or isinstance(value, (int, float, str, bool)):
         return value
     return str(value)
-
-
-def _content_disposition(filename: str) -> str:
-    """泰文原名走 RFC 5987 filename*(HTTP 头只认 latin-1),同 fileconv_routes 先例。"""
-    encoded = quote(filename.encode("utf-8"))
-    return f"attachment; filename=\"payroll.txt\"; filename*=UTF-8''{encoded}"
 
 
 async def _read_upload(file: UploadFile) -> bytes:
@@ -313,29 +306,22 @@ async def output_endpoint(
     if kind == "keying":
         content = keying_sheet.build_workbook(rows)
         filename = keying_sheet.build_filename(nid=nid, tax_year_be=tax_year, tax_month=tax_month)
-        return StreamingResponse(
-            io.BytesIO(content),
-            media_type=_KEYING_MEDIA,
-            headers={"Content-Disposition": _content_disposition(filename)},
-        )
-
-    if kind == "attach":
-        text = pnd1_attach.build_attachment(rows)
+        media = _KEYING_MEDIA
+    elif kind == "attach":
+        content = pnd1_attach.build_attachment(rows).encode("utf-8")
         filename = f"PND1_{nid}_{tax_year}_{tax_month}_attach.txt"
-        return StreamingResponse(
-            io.BytesIO(text.encode("utf-8")),
-            media_type=_TEXT_MEDIA,
-            headers={"Content-Disposition": _content_disposition(filename)},
+        media = _TEXT_MEDIA
+    else:
+        content = _build_central(nid, tax_year, tax_month, rows).encode("utf-8")
+        filename = rdprep_pnd1.build_filename(
+            nid=nid, branch_no="000000", tax_year_be=tax_year, tax_month=tax_month
         )
+        media = _TEXT_MEDIA
 
-    text = _build_central(nid, tax_year, tax_month, rows)
-    filename = rdprep_pnd1.build_filename(
-        nid=nid, branch_no="000000", tax_year_be=tax_year, tax_month=tax_month
-    )
     return StreamingResponse(
-        io.BytesIO(text.encode("utf-8")),
-        media_type=_TEXT_MEDIA,
-        headers={"Content-Disposition": _content_disposition(filename)},
+        io.BytesIO(content),
+        media_type=media,
+        headers={"Content-Disposition": content_disposition(filename, "payroll.txt")},
     )
 
 

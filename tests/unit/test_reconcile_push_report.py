@@ -223,8 +223,18 @@ class DalWorkOrderIdPreciseMatchTests(unittest.TestCase):
         sql, params = cur.execute.call_args[0]
         self.assertIn("work_order_id = %s", sql)
         self.assertEqual(params, ("t-1", "wo-1", ["IV-1"]))
-        self.assertEqual(out, [{"invoice_no": "IV-1", "status": "success", "error_msg": None,
-                                 "created_at": None, "matched_by": "work_order_id"}])
+        self.assertEqual(
+            out,
+            [
+                {
+                    "invoice_no": "IV-1",
+                    "status": "success",
+                    "error_msg": None,
+                    "created_at": None,
+                    "matched_by": "work_order_id",
+                }
+            ],
+        )
 
     def test_precise_miss_falls_back_to_invoice_no(self):
         cur = MagicMock()

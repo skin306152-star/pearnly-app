@@ -114,8 +114,14 @@ class PushReportReconTests(unittest.TestCase):
                 "INSERT INTO erp_push_logs"
                 "(user_id, tenant_id, invoice_no, status, error_msg, attempt, work_order_id) "
                 "VALUES (%s,%s,%s,%s,%s,1,%s)",
-                (self.user_id, tenant_id or self.tenant_id, invoice_no, status, error_msg,
-                 work_order_id),
+                (
+                    self.user_id,
+                    tenant_id or self.tenant_id,
+                    invoice_no,
+                    status,
+                    error_msg,
+                    work_order_id,
+                ),
             )
 
     def _ctx(self, cur, invoice_nos, work_order_id=None):

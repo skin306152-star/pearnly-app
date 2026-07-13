@@ -27,6 +27,11 @@ async def erp_retry_loop():
     """每 30 秒跑一次重试 tick"""
     import asyncio
 
+    # MC2-0 · 服务启动即收一次工单死单:部署重启杀掉的跑批不等 30s 首 tick 就认账续跑。
+    # 与下方周期巡检(run_recovery_tick 里的 reaper.run_tick)同一实现;run_tick 自吞异常。
+    from services.workorder import reaper
+
+    await reaper.run_tick()
     # 启动时先等 30 秒 · 避开和其他 startup 竞争
     await asyncio.sleep(30)
     interval_sec = int(os.environ.get("ERP_RETRY_TICK_SEC", "30"))
@@ -178,6 +183,12 @@ async def run_recovery_tick():
         await line_client_dunning.run_tick()
     except Exception as e:
         logger.warning(f"[line_client_dunning] tick failed: {e}")
+    try:
+        from services.workorder import reaper
+
+        await reaper.run_tick()
+    except Exception as e:
+        logger.warning(f"[workorder_reaper] tick failed: {e}")
 
 
 async def run_accounting_posting_failure_tick():

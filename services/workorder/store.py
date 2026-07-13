@@ -200,6 +200,44 @@ def acquire_run_lease(
     return cur.fetchone() is not None
 
 
+def list_dead_runs(cur, *, status: str, limit: int = 20) -> list[dict]:
+    """收尸扫描(MC2-0):status(调用方传 engine.STATUS_RUNNING;engine→store 的 import
+    方向不能反,状态词由调用方注入)且租约已过期 = 进程被杀实锤。活 run 持有未过期租约;
+    MC1-a 进程内崩溃路径已在 finally 释放租约置 NULL,不落入本判据(它自己落过 run_failed)。
+    跨租户系统扫描,与 background_loops 其它恢复队列同口径。"""
+    cur.execute(
+        "SELECT id, tenant_id FROM work_orders "
+        "WHERE status = %s AND run_lease_expires_at IS NOT NULL "
+        "AND run_lease_expires_at < now() "
+        "ORDER BY run_lease_expires_at LIMIT %s",
+        (status, limit),
+    )
+    return [dict(r) for r in cur.fetchall()]
+
+
+def claim_dead_run(
+    cur, *, tenant_id: str, work_order_id: str, owner: str, ttl_seconds: int, status: str
+) -> bool:
+    """收尸抢占(MC2-0):单句条件 UPDATE 重验死亡判据并接管租约(照 acquire_run_lease 的
+    接管先例)。多 worker 同时收尸,行锁串行化后恰一个 RETURNING 到行;扫描与抢占之间
+    判据若不再成立(别人已收/原单已推进),抢不到即放手。"""
+    cur.execute(
+        """
+        UPDATE work_orders
+           SET run_lease_owner = %s,
+               run_lease_expires_at = now() + make_interval(secs => %s),
+               updated_at = now()
+         WHERE tenant_id = %s AND id = %s
+           AND status = %s
+           AND run_lease_expires_at IS NOT NULL
+           AND run_lease_expires_at < now()
+        RETURNING id
+        """,
+        (owner, int(ttl_seconds), tenant_id, work_order_id, status),
+    )
+    return cur.fetchone() is not None
+
+
 def release_run_lease(cur, *, tenant_id: str, work_order_id: str, owner: str) -> None:
     """释放租约(仅当仍是自己持有——防误释放别人接管后的租约)。"""
     cur.execute(

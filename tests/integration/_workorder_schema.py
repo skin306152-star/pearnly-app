@@ -18,6 +18,16 @@ def build_workorder_schema() -> None:
         for ddl in schema._TABLES:
             cur.execute(ddl)
         for idx in schema._INDEXES:
+            # 库已过 C-2 hardening 时,旧 (kind) 唯一索引已被版本化索引撤换;对着存量
+            # 多版本数据重建它必撞 UniqueViolation。0059 基线索引只在未 hardening 的
+            # 新库需要(建完随即被下面 hardening 换掉)。
+            if "uq_wo_deliverables_kind " in idx and _deliverables_versioned(cur):
+                continue
             cur.execute(idx)
         schema.ensure_runtime_hardening(cur)  # C-1 租约/幂等键/原始文件名列
         apply_tenant_rls(cur, *schema._RLS_TABLES)
+
+
+def _deliverables_versioned(cur) -> bool:
+    cur.execute("SELECT to_regclass('uq_wo_deliverables_kind_version') AS idx")
+    return cur.fetchone()["idx"] is not None

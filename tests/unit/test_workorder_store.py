@@ -219,6 +219,51 @@ class RunLeaseTests(unittest.TestCase):
         self.assertEqual(params, ("t-1", "wo-1", "run:abc"))
 
 
+class DeadRunReaperDalTests(unittest.TestCase):
+    """MC2-0 收尸 DAL:死亡判据(status + 过期租约)进 SQL 谓词,状态词由调用方注入不写死。"""
+
+    def test_list_dead_runs_predicate_and_params(self):
+        cur = FakeCursor(fetchall_queue=[[{"id": "wo-1", "tenant_id": "t-1"}]])
+        rows = store.list_dead_runs(cur, status="running", limit=5)
+        sql, params = cur.calls[0]
+        self.assertIn("WHERE status = %s", sql)
+        self.assertIn("run_lease_expires_at IS NOT NULL", sql)
+        self.assertIn("run_lease_expires_at < now()", sql)
+        self.assertEqual(params, ("running", 5))
+        self.assertEqual(rows, [{"id": "wo-1", "tenant_id": "t-1"}])
+
+    def test_claim_dead_run_revalidates_death_in_single_update(self):
+        cur = FakeCursor([{"id": "wo-1"}])
+        got = store.claim_dead_run(
+            cur,
+            tenant_id="t-1",
+            work_order_id="wo-1",
+            owner="reaper:x",
+            ttl_seconds=1800,
+            status="running",
+        )
+        self.assertTrue(got)
+        sql, params = cur.calls[0]
+        self.assertIn("UPDATE work_orders", sql)
+        self.assertIn("AND status = %s", sql)
+        self.assertIn("run_lease_expires_at < now()", sql)
+        self.assertIn("make_interval(secs => %s)", sql)
+        self.assertEqual(params, ("reaper:x", 1800, "t-1", "wo-1", "running"))
+
+    def test_claim_dead_run_false_when_criteria_gone(self):
+        cur = FakeCursor([None])  # 别人已收 / 原单已推进 → 0 行
+        self.assertFalse(
+            store.claim_dead_run(
+                cur,
+                tenant_id="t-1",
+                work_order_id="wo-1",
+                owner="reaper:x",
+                ttl_seconds=60,
+                status="running",
+            )
+        )
+
+
 class AppendEventDedupeTests(unittest.TestCase):
     """C-1 §4 事件幂等键:无 dedupe_key = 老路径逐字节;带 key = ON CONFLICT DO NOTHING。"""
 

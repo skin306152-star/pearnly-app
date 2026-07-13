@@ -24,6 +24,7 @@ from services.workorder.steps import real_handlers
 logger = logging.getLogger(__name__)
 
 RUN_STEP = "run"
+EVT_RUN_REQUESTED = "run_requested"
 EVT_RUN_STARTED = "run_started"
 EVT_RUN_FINISHED = "run_finished"
 # 后台 run 崩溃的诚实收尾事件(P-8):任何异常都落此(带 error 原因),与成功的 run_finished
@@ -61,6 +62,13 @@ def _try_claim(key: tuple) -> bool:
 def _release(key: tuple) -> None:
     with _inflight_lock:
         _inflight.discard(key)
+
+
+def is_inflight(tenant_id: str, work_order_id: str) -> bool:
+    """本进程内该工单是否有 advance 在跑。收尸人的负向守卫:同进程可证活的 run(如超长跑批
+    把租约耗过期)绝不误收;跨进程仍以租约过期为唯一死亡判据。"""
+    with _inflight_lock:
+        return (str(tenant_id), str(work_order_id)) in _inflight
 
 
 def advance(tenant_id: str, work_order_id: str, lease_owner: str | None = None) -> dict:

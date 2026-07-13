@@ -171,7 +171,7 @@ def _schedule_advance(
             tenant_id=tenant_id,
             work_order_id=work_order_id,
             step=runner.RUN_STEP,
-            event_type="run_requested",
+            event_type=runner.EVT_RUN_REQUESTED,
             actor=f"user:{user['id']}",
         )
     background.add_task(runner.advance, tenant_id, work_order_id, owner)

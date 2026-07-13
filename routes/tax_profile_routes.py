@@ -104,6 +104,11 @@ def _assert_owns_workspace(cur, request: Request, user: dict, tenant_id: str, ws
     assert_owns_workspace(cur, request, user, tenant_id, ws_id, not_found="workspace.not_found")
 
 
+def _iso(value):
+    """date/datetime → ISO 字符串,None 直通(供顺延日期等可能为空的派生字段序列化)。"""
+    return value.isoformat() if value is not None else None
+
+
 def _serialize_profile(profile: dict) -> dict:
     """Decimal → 十进制字符串(禁 float 精度丢失)、datetime → ISO,其余原样透传。"""
     out = dict(profile)
@@ -262,6 +267,10 @@ async def list_client_obligations(
         )
         rows = [dict(r) for r in cur.fetchall()]
     for row in rows:
+        # 顺延(G3 · MC2-B 件2)在裸日期基础上现算,原始日先留原样再顺延——两个事实都
+        # 序列化出去(读侧如实展示,别只留顺延日糊掉规则见 obligation_engine 顶注)。
+        row["due_paper_deferred"] = _iso(obligation_engine.defer_optional(row.get("due_paper")))
+        row["due_efiling_deferred"] = _iso(obligation_engine.defer_optional(row.get("due_efiling")))
         for key in ("due_paper", "due_efiling", "updated_at"):
             if row.get(key) is not None:
                 row[key] = row[key].isoformat()
@@ -403,6 +412,11 @@ async def get_tax_profile_matrix(request: Request, period: Optional[str] = None)
                 "work_order_id": str(r["work_order_id"]) if r["work_order_id"] else None,
                 "due_paper": r["due_paper"].isoformat() if r["due_paper"] else None,
                 "due_efiling": r["due_efiling"].isoformat() if r["due_efiling"] else None,
+                # 顺延(G3 · MC2-B 件2):原始日照旧透传,顺延日现算另加字段——矩阵前端的
+                # 逾期判据(static/ai/ai-matrix-render.js isOverdue)目前仍读 due_efiling
+                # 原始日,尚未切到 due_efiling_deferred(前端改动归后续 A3,本批只接线后端)。
+                "due_paper_deferred": _iso(obligation_engine.defer_optional(r["due_paper"])),
+                "due_efiling_deferred": _iso(obligation_engine.defer_optional(r["due_efiling"])),
                 "badge": _matrix_badge(r["obligation_status"], r["order_status"]),
             }
         )

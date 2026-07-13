@@ -356,6 +356,32 @@ class ObligationListTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(row["due_efiling"], "2026-08-23")
         self.assertEqual(row["updated_at"], "2026-07-10T03:00:00")
         self.assertEqual(row["display_names"]["zh"], "增值税申报(PP30)")
+        # G3 顺延(MC2-B 件2):原始日照旧(上面两条断言),读侧另带顺延后的事实——
+        # 2026-08-15 是周六 → 顺延至周一 08-17;2026-08-23 是周日 → 顺延至周一 08-24。
+        self.assertEqual(row["due_paper_deferred"], "2026-08-17")
+        self.assertEqual(row["due_efiling_deferred"], "2026-08-24")
+
+    async def test_deferred_fields_pass_through_none_when_due_dates_absent(self):
+        from routes import tax_profile_routes as tr
+
+        rows = [
+            {
+                "obligation_code": "pnd1",
+                "status": "tentative",
+                "trigger_source": "profile_unknown",
+                "due_paper": None,
+                "due_efiling": None,
+                "updated_at": None,
+                "display_names": None,
+            }
+        ]
+        cur = _Cur(fetchone_value=(1,), fetchall_value=rows)
+        for p in _common_patches(tr, cur):
+            self.enterContext(p)
+        out = await tr.list_client_obligations(7, mock.Mock(), period="2569-08")
+        row = out["obligations"][0]
+        self.assertIsNone(row["due_paper_deferred"])
+        self.assertIsNone(row["due_efiling_deferred"])
 
     async def test_defaults_to_current_period_when_missing(self):
         from routes import tax_profile_routes as tr
@@ -453,6 +479,40 @@ class MatrixTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(out["obligation_codes"], ["pp30"])
         self.assertEqual(out["obligation_labels"]["pp30"]["zh"], "增值税申报(PP30)")
         self.assertEqual(out["cells"][0]["badge"], "pending_order")
+
+    async def test_cell_carries_original_and_deferred_due_dates(self):
+        """矩阵读侧「两个事实」:原始日照旧透传,顺延日(G3 · MC2-B 件2)另加字段,
+        不覆盖原始值(存量快照/审计原样,顺延只在展示层现算)。"""
+        from routes import tax_profile_routes as tr
+
+        rows = [
+            {
+                "client_id": 1,
+                "client_name": "A",
+                "obligation_code": "pp30",
+                "obligation_status": "due",
+                "due_paper": date(2026, 8, 15),  # 周六
+                "due_efiling": date(2026, 8, 23),  # 周日
+                "work_order_id": None,
+                "order_status": None,
+                "display_names": {"zh": "增值税申报(PP30)"},
+            },
+        ]
+        cur = _Cur(fetchall_value=rows)
+        authz = mock.Mock(scope_mode="all", workspace_ids=None)
+        with (
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
+            mock.patch.object(tr, "db", _FakeDB(cur)),
+            mock.patch.object(tr, "get_authz", return_value=authz),
+        ):
+            out = await tr.get_tax_profile_matrix(mock.Mock(), period="2569-05")
+        cell = out["cells"][0]
+        self.assertEqual(cell["due_paper"], "2026-08-15")
+        self.assertEqual(cell["due_efiling"], "2026-08-23")
+        self.assertEqual(cell["due_paper_deferred"], "2026-08-17")
+        self.assertEqual(cell["due_efiling_deferred"], "2026-08-24")
 
     async def test_badge_mapping_covers_all_engine_states(self):
         """状态词汇全部取自 engine.STATUS_*(单一事实源)——C4-R1 教训:首版测试手打

@@ -14,7 +14,7 @@ from openpyxl.utils import get_column_letter
 
 from services.fileconv.model import (
     ConvertResult,
-    ISSUE_ROW_HIGHLIGHT,
+    ISSUE_ROW_HIGHLIGHT as _HL,
     REJECT_STATUSES,
     STATUS_NO_TEXT_LAYER,
     STATUS_OCR_INCOMPLETE,
@@ -30,9 +30,7 @@ _REJECT_NOTE = {
 
 _HEADER_FILL = PatternFill(start_color="2C5282", end_color="2C5282", fill_type="solid")
 _HEADER_FONT = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-_ISSUE_FILL = PatternFill(
-    start_color=ISSUE_ROW_HIGHLIGHT, end_color=ISSUE_ROW_HIGHLIGHT, fill_type="solid"
-)
+_ISSUE_FILL = PatternFill(start_color=_HL, end_color=_HL, fill_type="solid")
 _RIGHT = Alignment(horizontal="right")
 
 

@@ -122,6 +122,34 @@ class OcrLedgerDoubleWriteRealDb(unittest.TestCase):
         self.assertEqual(fields.get("vat"), money["vat"])
         self.assertEqual(fields.get("invoice_number"), money["invoice_number"])
 
+    def _insert_ledger_row(self, source, total):
+        with self.db.get_cursor(commit=True) as cur:
+            cur.execute(
+                "INSERT INTO ocr_history(user_id, tenant_id, workspace_client_id, filename, "
+                "pages, source, total_amount) VALUES (%s, %s, %s, %s, %s::jsonb, %s, %s) RETURNING id",
+                (self.user, self.tenant, self.ws_id, "x.jpg", "[]", source, total),
+            )
+            return str(cur.fetchone()["id"])
+
+    def _enriched_ws_stats(self):
+        from services.workspace import store as ws_store
+
+        rows = ws_store.list_workspace_clients_enriched(self.user, tenant_id=self.tenant)
+        return next(r for r in rows if int(r["id"]) == self.ws_id)
+
+    def test_workorder_ledger_row_excluded_from_workspace_enriched_stats(self):
+        # 裁定②:件1 双写行不进套账管理页发票统计——加一条 workorder_classify 行后
+        # invoice_count/total_amount 逐字节不变(去掉 source 黑名单该断言必红)。
+        self._insert_ledger_row("manual", 500)
+        base = self._enriched_ws_stats()
+        self.assertEqual(int(base["invoice_count"]), 1)
+        self.assertEqual(float(base["total_amount"]), 500.0)
+
+        self._insert_ledger_row("workorder_classify", 999)
+        after = self._enriched_ws_stats()
+        self.assertEqual(int(after["invoice_count"]), 1)  # 工单行不计入
+        self.assertEqual(float(after["total_amount"]), 500.0)  # 金额逐字节不变
+
     def test_backfill_is_forward_only_no_ai_usage_double_count(self):
         # ai_usage 不双计:双写不经付费 OCR 调用,ai_usage 表零新增(桩不落 ai_usage)。
         tmp = tempfile.mkdtemp(prefix="wo-ledger2-")

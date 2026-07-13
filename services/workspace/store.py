@@ -428,7 +428,7 @@ def list_workspace_clients_enriched(
                            SUM(total_amount)      AS total_amount,
                            MAX(created_at)        AS last_invoice_at
                     FROM ocr_history
-                    WHERE workspace_client_id IS NOT NULL
+                    WHERE workspace_client_id IS NOT NULL AND source IS DISTINCT FROM 'workorder_classify'
                     GROUP BY workspace_client_id
                 ) agg ON agg.workspace_client_id = wc.id
                 WHERE {where} {join_user}

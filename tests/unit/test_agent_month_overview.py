@@ -34,6 +34,12 @@ class TestOwnerVisibilityWhere(unittest.TestCase):
         where, _ = ls.owner_visibility_where("u1", "t1", None, [])
         self.assertIn("(user_id = %s AND client_id IS NULL)", " ".join(where))
 
+    def test_excludes_workorder_ledger_rows_from_aggregations(self):
+        # MC2-A2 ②:工单台账行(source=workorder_classify)不进主站识别聚合(月报/概览/画像/
+        # 提醒/召回共用此谓词)。黑名单只挡工单行,NULL/其它 source 全放行(IS DISTINCT FROM)。
+        where, _ = ls.owner_visibility_where("u1", "t1", 9, None)
+        self.assertIn("source IS DISTINCT FROM 'workorder_classify'", where)
+
 
 class TestMonthOverview(unittest.TestCase):
     def _cursor(self, fetchone, fetchall=None):

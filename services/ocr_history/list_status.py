@@ -62,6 +62,12 @@ def owner_visibility_where(
             params.append([int(c) for c in restrict_client_ids])
             params.append(user_id)
     where.append("staged = FALSE")
+    # 工单台账行(件1 双写 source=workorder_classify)不进主站识别聚合(月报/概览/画像/提醒/召回):
+    # 工单票与主站录入票可能同张,计入会双计。黑名单只挡工单行,NULL 与其它 source(manual/
+    # summary_table_batch/line_bot)全放行——`IS DISTINCT FROM` 让 NULL 也算「不同」故放行。识别记录
+    # 列表内联版(queries.list_ocr_history)【不】加此挡:台账仍可查(件1「看得见工单侧识别」),
+    # 只统计层不双计。「工单票是否计入套账主站统计」是独立正向产品决策(留 Zihao),届时删此行即翻。
+    where.append("source IS DISTINCT FROM 'workorder_classify'")
     return where, params
 
 

@@ -66,6 +66,9 @@ Object.assign(window.__AI_I18N_EN__, {
     fileconv_unsupported_format_chip: 'Unsupported format',
     fileconv_unsupported_format_s:
         'This file could not be read (corrupt / empty / old .xls without a parser library); no data was generated. For old .xls files, please re-save as .xlsx and retry.',
+    fileconv_generic_no_check_chip: 'Not validated',
+    fileconv_generic_no_check_s:
+        'Not recognized as a financial ledger (GL/statement); rendered faithfully as a generic table, no numeric validation performed.',
     fileconv_doctype_gl_ledger: 'General Ledger',
     fileconv_doctype_bank_statement: 'Bank Statement',
     fileconv_doctype_vat_report: 'VAT Report',

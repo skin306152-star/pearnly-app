@@ -62,6 +62,9 @@ Object.assign(window.__AI_I18N_TH__, {
     fileconv_unsupported_format_chip: 'รูปแบบไม่รองรับ',
     fileconv_unsupported_format_s:
         'ไม่สามารถอ่านไฟล์นี้ได้ (เสียหาย / ไฟล์ว่าง / .xls รุ่นเก่าขาดไลบรารีอ่าน) ไม่มีข้อมูลถูกสร้าง หากเป็น .xls รุ่นเก่ากรุณาบันทึกเป็น .xlsx แล้วลองใหม่',
+    fileconv_generic_no_check_chip: 'ยังไม่ตรวจสอบ',
+    fileconv_generic_no_check_s:
+        'ไม่สามารถระบุว่าเป็นบัญชีทางการเงิน (GL/สเตทเมนต์) จึงแสดงผลเป็นตารางทั่วไปตามข้อมูลจริง ไม่มีการตรวจสอบตัวเลข',
     fileconv_doctype_gl_ledger: 'สมุดแยกประเภท',
     fileconv_doctype_bank_statement: 'สเตทเมนต์ธนาคาร',
     fileconv_doctype_vat_report: 'รายงานภาษีมูลค่าเพิ่ม',

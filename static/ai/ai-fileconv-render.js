@@ -199,6 +199,18 @@
                 '</span></div>'
             );
         }
+        // K2:认不出台账结构的表(doc_type=generic_table)issues 恒为空,conserved 会
+        // 恒为 true——不能借这个字段显示「校验通过」大字,那是没做过的检查在假背书
+        // (同 pdf_out.py 页脚戳三态口径:generic 明示未做数字校验,不搭这班车)。
+        if (result.doc_type === 'generic_table') {
+            return (
+                '<div class="fc-banner n"><span class="chip n">' +
+                esc(at('fileconv_generic_no_check_chip')) +
+                '</span><span>' +
+                esc(at('fileconv_generic_no_check_s')) +
+                '</span></div>'
+            );
+        }
         return result.conserved
             ? '<div class="fc-banner g"><span class="chip g">' +
                   esc(at('fileconv_conserved_chip')) +

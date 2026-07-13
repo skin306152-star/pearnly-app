@@ -66,6 +66,9 @@ Object.assign(window.__AI_I18N_JA__, {
     fileconv_unsupported_format_chip: '未対応の形式',
     fileconv_unsupported_format_s:
         'このファイルは読み取れませんでした(破損 / 空ファイル / 旧形式 .xls の解析ライブラリ不足)。データは生成されていません。旧形式 .xls は .xlsx で保存し直してから再試行してください。',
+    fileconv_generic_no_check_chip: '未検証',
+    fileconv_generic_no_check_s:
+        '財務帳簿(総勘定元帳/明細)として認識できなかったため、汎用テーブルとしてそのまま表示しています。数値検証は実施していません。',
     fileconv_doctype_gl_ledger: '総勘定元帳',
     fileconv_doctype_bank_statement: '銀行取引明細',
     fileconv_doctype_vat_report: '付加価値税レポート',

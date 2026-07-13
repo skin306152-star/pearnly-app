@@ -56,6 +56,9 @@ Object.assign(window.__AI_I18N_ZH__, {
     fileconv_unsupported_format_chip: '格式不支持',
     fileconv_unsupported_format_s:
         '文件无法读取（已损坏 / 空文件 / 老式 .xls 缺解析库），未生成任何数据。老式 .xls 请另存为 .xlsx 后重试。',
+    fileconv_generic_no_check_chip: '未做校验',
+    fileconv_generic_no_check_s:
+        '未识别为财务台账（GL/流水），已忠实渲染为通用表格，未做数字校验。',
     fileconv_doctype_gl_ledger: '总账（สมุดแยกประเภท）',
     fileconv_doctype_bank_statement: '银行流水',
     fileconv_doctype_vat_report: '增值税报表',

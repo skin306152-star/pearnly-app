@@ -1,4 +1,5 @@
-// MC1-b2 · 全所审核收件箱(#/pool 三分区聚合页)· 本地真浏览器 + 网络桩验收(临时件)
+// MC1-b2 · 全所审核收件箱(#/pool 三分区聚合页)· 本地 stub 真浏览器验收(非 CI 用例 ·
+// 照 _h1b_payroll_local.spec.js 范式,自起本地静态服务不依赖外部已起的 server)
 // ============================================================
 // 真渲染代码(static/dist/ai.js/ai.css/ai.html 原样加载,零改造)+ 真 DOM + 真键盘事件 +
 // 真 CSS 布局/缩放,只有网络层桩(page.route 拦 /api/*)——因为 review-queue 需要的
@@ -9,17 +10,49 @@
 // flagged_projection()、verdict.py hint()、routes/workorder_routes.py review/archive/
 // review-reject/self-review-declare),不是拍脑袋编的。
 //
-// 起法(本机):
-//   1) npm run build(已产出含本次改动的 static/dist/ai.js/ai.css/ai.html)
-//   2) python -m http.server 8850(仓库根目录,serve /static/* 静态资源)
-//   3) npx playwright test tests/e2e/_mc1b2_review_inbox_verify.spec.js
+// 起法:npx playwright test tests/e2e/_mc1b2_review_inbox_verify.spec.js
+//（beforeAll 自起 python -m http.server,afterAll 自杀,CI 的默认 baseURL=pearnly.com
+// 对本 spec 无影响——每个用例都用绝对 PAGE URL 打自起的本地服务)。
 /* global window, document */
 const { test, expect } = require('@playwright/test');
+const { spawn } = require('child_process');
 const path = require('path');
+const http = require('http');
 
-const ART = path.join(__dirname, '_artifacts', 'mc1b2');
-const BASE = process.env.PEARNLY_E2E_STATIC_BASE_URL || 'http://localhost:8850';
+const ROOT = path.resolve(__dirname, '..', '..');
+const PORT = 8984;
+const BASE = `http://127.0.0.1:${PORT}`;
 const PAGE = BASE + '/static/dist/ai.html';
+const ART = path.join(__dirname, '_artifacts', 'mc1b2');
+
+let server;
+
+function waitUp(url, tries = 40) {
+    return new Promise((resolve, reject) => {
+        const hit = (n) => {
+            http.get(url, (r) => {
+                r.resume();
+                resolve();
+            }).on('error', () => {
+                if (n <= 0) return reject(new Error('server not up'));
+                setTimeout(() => hit(n - 1), 150);
+            });
+        };
+        hit(tries);
+    });
+}
+
+test.beforeAll(async () => {
+    server = spawn('python', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], {
+        cwd: ROOT,
+        stdio: 'ignore',
+    });
+    await waitUp(PAGE);
+});
+
+test.afterAll(() => {
+    if (server) server.kill();
+});
 
 // ---------------------------------------------------------------- fixtures ----
 

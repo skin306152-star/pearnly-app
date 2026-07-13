@@ -25,7 +25,7 @@ from core import db
 from core.auth import get_current_user_from_request
 from core.feature_flags import pearnly_ai_m1_enabled_for
 from core.route_helpers import _tid, _log_op
-from services.authz.deps import get_authz, require_perm
+from services.authz.deps import actor_has_perm, get_authz, require_perm
 from services.modules.store import get_business_type
 from services.workspace import thai_name_gate
 
@@ -88,6 +88,16 @@ async def list_workspace_clients(request: Request, include_inactive: bool = Fals
         allowed = authz.workspace_ids or frozenset()
         rows = [r for r in rows if int(r.get("id") or 0) in allowed]
     return {"clients": rows, "count": len(rows)}
+
+
+@router.get("/api/workspace/clients/can-create")
+async def can_create_workspace_client(request: Request):
+    """员工端"+新建客户"按钮显隐探针(N1-P0-1)。建账套主体挂 settings.workspace.manage
+    (owner/admin 专属),客户目录页要在渲染前就知道能不能显示按钮——不给点了才 403 的
+    假门(state honesty:按钮存在即承诺可用)。必须放在 /{workspace_client_id} 之前注册,
+    否则 "can-create" 会被当成 int 路径参数解析失败(422)。"""
+    user = get_current_user_from_request(request)
+    return {"allowed": actor_has_perm(request, user, "settings.workspace.manage")}
 
 
 @router.get("/api/workspace/clients/{workspace_client_id}")

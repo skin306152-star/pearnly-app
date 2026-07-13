@@ -21,7 +21,31 @@
         });
     }
 
-    var pure = { sortOrdersByPeriodDesc: sortOrdersByPeriodDesc };
+    // P1-5:0% 画像无 CTA 的判据——与后端 routes/tax_profile_routes.py::_profile_completeness
+    // / _COMPLETENESS_FIELDS 同一份 6 字段集合(该端点的分母口径:只数真正默认 unknown 的
+    // 字段,不含 sbt_status/filing_disposition 这类默认值本身就是"已答"的字段)。Python/JS
+    // 两处各自实现(无法共享代码),改动任一处务必同步另一处——单测已锁两侧字段名对齐。
+    var COMPLETENESS_FIELDS = [
+        'has_employees',
+        'pays_individuals',
+        'pays_juristic',
+        'pays_foreign',
+        'pays_interest_dividend',
+        'efiling_enrolled',
+    ];
+
+    function completenessFraction(profile) {
+        profile = profile || {};
+        var answered = COMPLETENESS_FIELDS.filter(function (f) {
+            return (profile[f] || 'unknown') !== 'unknown';
+        }).length;
+        return answered / COMPLETENESS_FIELDS.length;
+    }
+
+    var pure = {
+        sortOrdersByPeriodDesc: sortOrdersByPeriodDesc,
+        completenessFraction: completenessFraction,
+    };
     if (typeof module !== 'undefined' && module.exports) module.exports = pure;
 
     // ===== 以下为浏览器 HTML 拼装(依赖 at()/AI.state/AI.format/AI.router,node 不调用)=====
@@ -40,7 +64,13 @@
             esc(name) +
             '</div><div class="csub">' +
             esc((client && client.tax_id) || '—') +
-            '</div></div></div></div>'
+            '</div></div></div>' +
+            // P1-1:档案页 → 工单操作页(反向已有,历史 tab 点行进对应期)。header 按钮
+            // 不带 data-order-period,onClick 里读到 null 自然回落"打开最新一期"。
+            '<button type="button" class="btn sm" data-action="ca-open-order">' +
+            esc(at('ca_open_order_btn')) +
+            '</button>' +
+            '</div>'
         );
     }
 
@@ -96,11 +126,25 @@
         );
     }
 
+    // P1-5:新客户 0% 画像提示条——直达即"这就是画像表单所在的 tab",无需再来一次页面
+    // 跳转(CTA 本身就是当前 tab 内容的引导语,不是外部链接)。
+    function profileCtaHtml() {
+        return (
+            '<div class="fc-banner w"><span class="chip w">' +
+            esc(at('ca_profile_cta_chip')) +
+            '</span><span>' +
+            esc(at('ca_profile_cta_s')) +
+            '</span></div>'
+        );
+    }
+
     root.AI = root.AI || {};
     root.AI.clientArchiveRender = {
         sortOrdersByPeriodDesc: sortOrdersByPeriodDesc,
+        completenessFraction: completenessFraction,
         headerHtml: headerHtml,
         tabsHtml: tabsHtml,
         historyListHtml: historyListHtml,
+        profileCtaHtml: profileCtaHtml,
     };
 })(typeof self !== 'undefined' ? self : typeof globalThis !== 'undefined' ? globalThis : this);

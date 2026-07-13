@@ -21,6 +21,7 @@ from typing import List
 
 from services.fileconv.model import (
     BANK_STATEMENT,
+    FINANCIALS_REPORT,
     GL_LEDGER,
     ISSUE_ROW_HIGHLIGHT,
     REJECT_STATUSES,
@@ -29,7 +30,9 @@ from services.fileconv.model import (
 )
 from services.usage.usage_report_pdf_text import _build_paragraph_text, _register_fonts
 
-_LEDGER_TYPES = (GL_LEDGER, BANK_STATEMENT)
+# N1-P0-3(小改·理由见 model.py FINANCIALS_REPORT 顶注):月度报表与台账/流水共享
+# "余额已校验"戳语义,加入这个家族即可,不新造第二套戳文案分支。
+_LEDGER_TYPES = (GL_LEDGER, BANK_STATEMENT, FINANCIALS_REPORT)
 _LANDSCAPE_COL_THRESHOLD = 8
 _ISSUE_ROW_BG = "#" + ISSUE_ROW_HIGHLIGHT  # PDF/xlsx 不平行同一视觉语言(单源在 model)
 
@@ -47,6 +50,12 @@ _L = {
         "ja": "銀行明細",
     },
     "title.generic": {"zh": "表格", "th": "ตาราง", "en": "Table", "ja": "表"},
+    "title.financials": {
+        "zh": "月度报表",
+        "th": "งบการเงินรายเดือน",
+        "en": "Monthly Financial Report",
+        "ja": "月次財務報告書",
+    },
     "h.source": {"zh": "来源文件", "th": "ไฟล์ต้นทาง", "en": "Source file", "ja": "元ファイル"},
     "h.generated": {"zh": "生成日期", "th": "วันที่สร้าง", "en": "Generated on", "ja": "生成日"},
     "stamp.conserved": {
@@ -82,7 +91,11 @@ _L = {
     "page": {"zh": "第 {p} 页", "th": "หน้า {p}", "en": "Page {p}", "ja": "{p} ページ"},
 }
 
-_TITLE_KEYS = {GL_LEDGER: "title.gl", BANK_STATEMENT: "title.bank"}
+_TITLE_KEYS = {
+    GL_LEDGER: "title.gl",
+    BANK_STATEMENT: "title.bank",
+    FINANCIALS_REPORT: "title.financials",
+}
 
 
 def _t(key: str, lang: str) -> str:

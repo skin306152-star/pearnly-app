@@ -46,8 +46,14 @@
         input.oninput = applySearch;
     }
 
+    // P0-1:建完档直接落新客户的档案页(0% 画像提示条 → 填画像,零数据首跑旅程原文)。
+    function onClientCreated(clientId) {
+        window.location.hash = AI.router.buildClientArchiveHash(clientId, 'profile');
+    }
+
     function load(api) {
         S.api = api;
+        AI.clientNew.wireButton(api, onClientCreated);
         if (!body().querySelector('.mx-table')) body().innerHTML = AI.state.loadingHtml();
         return api
             .getTaxProfileMatrix()

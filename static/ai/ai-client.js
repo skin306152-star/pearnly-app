@@ -23,6 +23,17 @@
         return S.orders[S.periodIdx] || null;
     }
 
+    // P0-2:深链带的 period → S.orders 里的下标。找不到(该期确实没单/期已过滤掉)
+    // 诚实落最新期(下标 0,S.orders 已按期倒序),不是静默忽略也不是报错整页——降级到
+    // "打开这个客户能打开的最新一期",比空白页更可用。
+    function periodIndexOf(period) {
+        if (!period) return 0;
+        for (var i = 0; i < S.orders.length; i++) {
+            if (S.orders[i].period === period) return i;
+        }
+        return 0;
+    }
+
     function renderHeader() {
         var name = S.client ? S.client.name : S.clientId;
         $('clientName').textContent = name;
@@ -72,11 +83,57 @@
         });
     }
 
+    // 零数据首跑旅程收口(方案 §5:"填画像 → 开当期工单 → 传料",零死路):brand-new
+    // 客户第一次进工单 tab 时 S.orders 为空,此前是纯空态死胡同(矩阵/看板批量开单是
+    // 唯一入口,但那要求先回工作台再找到这个客户)——就地给一个"开当期工单"按钮,
+    // 复用现成 createOrder(),period 取 AI.board.currentPeriodBE()(同矩阵/看板的
+    // "当期"权威口径,不自造第二套)。
+    function woEmptyHtml() {
+        return (
+            AI.state.emptyHtml({ title: at('wo_empty_t'), sub: at('wo_empty_s') }) +
+            '<button type="button" class="btn pri" data-action="wo-open-first">' +
+            esc(at('wo_open_first_btn')) +
+            '</button>'
+        );
+    }
+
+    function openFirstOrder() {
+        var btn = $('cv-wo').querySelector('[data-action="wo-open-first"]');
+        if (btn) {
+            if (btn.disabled) return;
+            btn.disabled = true;
+            btn.textContent = at('wo_open_first_busy');
+        }
+        S.api
+            .createOrder({
+                workspace_client_id: Number(S.clientId),
+                period: AI.board.currentPeriodBE(),
+                intent: 'monthly_vat',
+            })
+            .then(function () {
+                return S.api.listOrders({ client_id: S.clientId });
+            })
+            .then(function (r) {
+                S.orders = (r.orders || []).slice().sort(function (a, b) {
+                    return String(b.period).localeCompare(String(a.period));
+                });
+                S.periodIdx = 0;
+                renderPeriodPicker();
+                renderWo();
+            })
+            .catch(function () {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = at('wo_open_first_btn');
+                }
+            });
+    }
+
     function renderWo() {
         var body = $('cv-wo');
         var order = currentOrder();
         if (!order) {
-            body.innerHTML = AI.state.emptyHtml({ title: at('wo_empty_t'), sub: at('wo_empty_s') });
+            body.innerHTML = woEmptyHtml();
             return;
         }
         body.innerHTML = AI.state.loadingHtml();
@@ -195,6 +252,16 @@
     }
 
     function wireChrome() {
+        // P1-1:工单操作页 → 客户档案页互跳(此前只有档案页→工单单向)。
+        $('clientArchiveLink').onclick = function () {
+            window.location.hash = AI.router.buildClientArchiveHash(
+                S.clientId,
+                AI.router.DEFAULT_ARCHIVE_TAB
+            );
+        };
+        $('cv-wo').addEventListener('click', function (e) {
+            if (e.target.closest('[data-action="wo-open-first"]')) openFirstOrder();
+        });
         $('periodBtn').onclick = function () {
             $('periodMenu').classList.toggle('on');
         };
@@ -213,8 +280,9 @@
 
     var chromeWired = false;
 
-    // route(clientId, view) 由 ai.js 的路由订阅调用;同一客户内切 tab/切期不重新拉客户身份。
-    function mount(api, clientId, view) {
+    // route(clientId, view, period) 由 ai.js 的路由订阅调用;period 由 P0-2 深链带入
+    // (缺省 = 落最新期,既有行为不变)。同一客户内切 tab/切期不重新拉客户身份。
+    function mount(api, clientId, view, period) {
         var prevView = S.view;
         S.api = api;
         S.view = view;
@@ -232,7 +300,11 @@
             chromeWired = true;
         }
         if (S.clientId === clientId) {
+            // 同客户内的深链切期(如工单历史点了另一行):orders 已在手,直接定位,
+            // 不重新拉一遍客户身份(同分支既有的"只切 tab 不重拉"精神一致)。
+            if (period && S.orders.length) S.periodIdx = periodIndexOf(period);
             renderTabs();
+            renderPeriodPicker();
             renderActiveView();
             return;
         }
@@ -251,7 +323,7 @@
                 S.orders = (r[1].orders || []).slice().sort(function (a, b) {
                     return String(b.period).localeCompare(String(a.period));
                 });
-                S.periodIdx = 0;
+                S.periodIdx = periodIndexOf(period);
                 renderHeader();
                 renderPeriodPicker();
                 renderActiveView();

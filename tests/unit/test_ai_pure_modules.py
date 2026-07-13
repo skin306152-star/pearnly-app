@@ -170,20 +170,24 @@ class AiRouterTests(unittest.TestCase):
         self.assertEqual(
             out,
             [
-                {"name": "client", "clientId": "42", "view": "review"},
-                {"name": "client", "clientId": "42", "view": "wo"},
-                {"name": "client", "clientId": "42", "view": "wo"},
+                {"name": "client", "clientId": "42", "view": "review", "period": None},
+                {"name": "client", "clientId": "42", "view": "wo", "period": None},
+                {"name": "client", "clientId": "42", "view": "wo", "period": None},
             ],
         )
 
     def test_build_client_hash_round_trips_through_parse(self):
+        # N1-P0-2:buildClientHash 加了第三参 period(全站深链丢账期修复),parseHash
+        # 现在总是带 period 键(缺省 null)——period 往返/特殊字符/其它路由不受影响的
+        # 专项覆盖见 tests/unit/test_ai_router_pure.py。
         out = _run_node(f"""
             const r = require({json.dumps(str(AI_DIR / "ai-router.js"))});
             const h = r.buildClientHash(7, 'pkg');
             process.stdout.write(JSON.stringify([h, r.parseHash(h)]));
             """)
         self.assertEqual(
-            out, ["#/client/7/pkg", {"name": "client", "clientId": "7", "view": "pkg"}]
+            out,
+            ["#/client/7/pkg", {"name": "client", "clientId": "7", "view": "pkg", "period": None}],
         )
 
     def test_clients_reports_settings_are_independent_top_level_routes(self):
@@ -228,7 +232,7 @@ class AiRouterTests(unittest.TestCase):
                 {"name": "client-archive", "clientId": "9", "tab": "profile"},
                 {"name": "client-archive", "clientId": "9", "tab": "profile"},
                 "#/clients/9/history",
-                {"name": "client", "clientId": "9", "view": "wo"},
+                {"name": "client", "clientId": "9", "view": "wo", "period": None},
             ],
         )
 

@@ -88,6 +88,14 @@
         );
     }
 
+    // P1-5(矩阵新客户行「开首单」高亮):矩阵响应没有"这客户历史上开过几张单"这个字段,
+    // 借 profile_completeness===0(建档后从没被人工碰过画像)当"大概率是刚建档的新客户"
+    // 的代理判据——比"missing_order"单独判(只说明"本期没单",老客户漏开一期同样命中)
+    // 更贴近"真新客户",不新起后端字段。
+    function isLikelyNewClient(client) {
+        return client.profile_completeness === 0 && !!client.missing_order;
+    }
+
     function rowHtml(client, codes, cellByKey) {
         var rowCells = codes
             .map(function (code) {
@@ -101,6 +109,13 @@
               '" aria-label="' +
               esc(at('matrix_checkbox_aria', { name: client.name })) +
               '" />'
+            : '';
+        var newChip = isLikelyNewClient(client)
+            ? '<span class="chip w" title="' +
+              esc(at('matrix_new_client_hint')) +
+              '">' +
+              esc(at('matrix_new_client_chip')) +
+              '</span> '
             : '';
         return (
             '<tr class="mx-row" data-client-id="' +
@@ -116,6 +131,7 @@
             '" tabindex="0" title="' +
             esc(client.name) +
             '">' +
+            newChip +
             esc(client.name) +
             '</td>' +
             rowCells +

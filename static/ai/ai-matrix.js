@@ -187,9 +187,12 @@
             AI.matrixRender.wireTable(
                 body,
                 function (clientId) {
+                    // P0-2:矩阵切到哪期就带哪期进客户页(此前丢了 period,点 6 月格子却
+                    // 打开最新一期工单——"矩阵→客户页"看着通了,实际每次都穿越)。
                     window.location.hash = AI.router.buildClientHash(
                         clientId,
-                        AI.router.DEFAULT_VIEW
+                        AI.router.DEFAULT_VIEW,
+                        S.matrix && S.matrix.period
                     );
                 },
                 updateBulkButton

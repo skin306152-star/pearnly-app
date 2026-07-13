@@ -172,7 +172,7 @@ Object.assign(window.__AI_I18N_TH__, {
 
     // EN-clients(2026-07-13)· ลูกค้า/โปรไฟล์ลูกค้า/รายงาน/ตั้งค่า——เปิดใช้งานสามเมนูที่เคยปิดไว้
     clients_empty_t: 'ยังไม่มีลูกค้า',
-    clients_empty_s: 'ลูกค้าจะปรากฏที่นี่อัตโนมัติหลังเปิดใบงานแรกจากแดชบอร์ด',
+    clients_empty_s: 'คลิก "+ ลูกค้าใหม่" ด้านบนเพื่อสร้างลูกค้ารายแรก',
     clients_col_name: 'ชื่อลูกค้า',
     clients_col_tax_id: 'เลขผู้เสียภาษี',
     clients_col_completeness: 'ความครบถ้วนของโปรไฟล์',
@@ -191,6 +191,35 @@ Object.assign(window.__AI_I18N_TH__, {
     reports_downloads_title: 'ดาวน์โหลดเอกสารส่งมอบ',
     reports_prompt_t: 'เลือกลูกค้า + งวดบัญชีเพื่อดูรายงาน',
     reports_prompt_s: 'เมื่อเลือกลูกค้าและงวดแล้ว งบดุล/งบกำไรขาดทุน/งบทดลองของงวดนั้นจะแสดงที่นี่',
+    // N1(2026-07-13) · ปรับปรุงสามเมนูนำทางให้ระดับพร้อมใช้งานเชิงพาณิชย์
+    // (P0-1/P0-3/P1-1/P1-2/P1-4/P1-5)
+    clients_new_btn: '+ ลูกค้าใหม่',
+    clients_new_title: 'สร้างลูกค้าใหม่',
+    clients_new_hint:
+        'สร้างลูกค้าบัญชี (นิติบุคคล/บุคคลที่ทำบัญชีให้) ใหม่ ต้องกรอกชื่อจดทะเบียนภาษาไทย ส่วนเลขผู้เสียภาษีเป็นตัวเลือก กรอกภายหลังได้',
+    clients_new_name_label: 'ชื่อจดทะเบียน (ภาษาไทย)',
+    clients_new_tax_id_label: 'เลขผู้เสียภาษี (ไม่บังคับ)',
+    clients_new_submit: 'สร้างลูกค้า',
+    clients_new_submitting: 'กำลังสร้าง…',
+    clients_new_err_name_required: 'กรุณากรอกชื่อลูกค้า',
+    err_workspace_thai_name_required:
+        'กรุณากรอกชื่อจดทะเบียนภาษาไทย (ใช้เป็นตัวสำรองเมื่ออ่านเลขผู้เสียภาษีผิด)',
+    err_workspace_tax_id_duplicate: 'เลขผู้เสียภาษีนี้ถูกใช้กับลูกค้ารายอื่นในบัญชีนี้แล้ว',
+    err_pos_workspace_single_store: 'บัญชีนี้จำกัดไว้ที่ 1 ร้านค้า ติดต่อผู้ดูแลระบบเพื่อเพิ่ม',
+    client_view_archive_btn: 'ดูโปรไฟล์ลูกค้า',
+    ca_open_order_btn: 'เปิดใบงานงวดปัจจุบัน',
+    ca_profile_cta_chip: 'ยังไม่เริ่ม',
+    ca_profile_cta_s:
+        'กรุณากรอกโปรไฟล์ภาษีด้านล่างก่อน — ใช้กำหนดว่าลูกค้ารายนี้ต้องยื่นอะไรบ้างในแต่ละงวด',
+    matrix_new_client_chip: 'ใหม่',
+    matrix_new_client_hint: 'ยังไม่กรอกโปรไฟล์ — น่าจะเป็นลูกค้าที่เพิ่งสร้าง',
+    reports_view_order_btn: 'ดูใบงาน',
+    reports_financials_download_title: 'ดาวน์โหลดงบการเงิน',
+    reports_download_pdf_btn: 'ดาวน์โหลด PDF',
+    reports_download_xlsx_btn: 'ดาวน์โหลด Excel',
+    reports_downloading: 'กำลังดาวน์โหลด…',
+    wo_open_first_btn: 'เปิดใบงานงวดปัจจุบัน',
+    wo_open_first_busy: 'กำลังเปิด…',
     settings_lang_title: 'ภาษา',
     settings_lang_zh: '中文',
     settings_lang_th: 'ไทย',

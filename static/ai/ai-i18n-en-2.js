@@ -176,7 +176,7 @@ Object.assign(window.__AI_I18N_EN__, {
     // EN-clients(2026-07-13) · Clients / client archive / reports / settings — three
     // sidebar entries moving from disabled placeholders to real routes.
     clients_empty_t: 'No clients yet',
-    clients_empty_s: 'Clients appear here automatically once the first work order is opened',
+    clients_empty_s: 'Click "+ New client" above to create your first client',
     clients_col_name: 'Client',
     clients_col_tax_id: 'Tax ID',
     clients_col_completeness: 'Profile completeness',
@@ -197,6 +197,37 @@ Object.assign(window.__AI_I18N_EN__, {
     reports_prompt_t: 'Pick a client and period to view reports',
     reports_prompt_s:
         "Once you pick a client and period, that period's balance sheet, P&L and trial balance show here",
+    // N1(2026-07-13) · Navigation three-door commercial-grade fixes(P0-1/P0-3/P1-1/
+    // P1-2/P1-4/P1-5)
+    clients_new_btn: '+ New client',
+    clients_new_title: 'New client',
+    clients_new_hint:
+        'This registers a new workspace client (accounting subject). Requires a Thai registered name — the tax ID is optional and can be filled in later.',
+    clients_new_name_label: 'Registered name (Thai)',
+    clients_new_tax_id_label: 'Tax ID (optional)',
+    clients_new_submit: 'Create client',
+    clients_new_submitting: 'Creating…',
+    clients_new_err_name_required: 'Please enter a client name',
+    err_workspace_thai_name_required:
+        'Please enter the Thai registered name (used as a fallback when the tax ID is misread)',
+    err_workspace_tax_id_duplicate:
+        'This tax ID is already used by another client in this workspace',
+    err_pos_workspace_single_store:
+        'This account is limited to one store — contact your administrator to add more',
+    client_view_archive_btn: 'View client profile',
+    ca_open_order_btn: 'Open current work order',
+    ca_profile_cta_chip: 'Not started',
+    ca_profile_cta_s:
+        'Complete the tax profile below first — it drives which obligations this client owes each period',
+    matrix_new_client_chip: 'New',
+    matrix_new_client_hint: 'Profile not filled in yet — likely a newly created client',
+    reports_view_order_btn: 'View work order',
+    reports_financials_download_title: 'Download financial statements',
+    reports_download_pdf_btn: 'Download PDF',
+    reports_download_xlsx_btn: 'Download Excel',
+    reports_downloading: 'Downloading…',
+    wo_open_first_btn: 'Open current-period work order',
+    wo_open_first_busy: 'Opening…',
     settings_lang_title: 'Language',
     settings_lang_zh: '中文',
     settings_lang_th: 'ไทย',

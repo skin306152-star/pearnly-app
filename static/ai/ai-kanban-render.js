@@ -56,11 +56,16 @@
             : '';
         // tabindex=0:卡片 Tab 可达(Enter/空格触发同点击,见 wireBoard);
         // title:名称/摘要窄卡被省略号截断时悬停可看全文(Canon §6.2)。
+        // P0-2:卡片携带的工单期(entry.order 是该客户最新一期,可能不是当月)——点卡
+        // 进客户页要显式带上这一期,不依赖 ai-client.js mount() 的"缺省落最新"隐式默认。
+        var cardPeriod = entry.order ? entry.order.period : '';
         return (
             '<div class="kcard' +
             hotClass +
             '" tabindex="0" data-client-id="' +
             esc(entry.client.id) +
+            '" data-period="' +
+            esc(cardPeriod) +
             '" data-name="' +
             esc((entry.client.name || '').toLowerCase()) +
             '"><b title="' +
@@ -145,7 +150,8 @@
         var card = e.target.closest('.kcard');
         if (card) {
             var id = card.getAttribute('data-client-id');
-            window.location.hash = AI.router.buildClientHash(id, AI.router.DEFAULT_VIEW);
+            var cardPeriod = card.getAttribute('data-period');
+            window.location.hash = AI.router.buildClientHash(id, AI.router.DEFAULT_VIEW, cardPeriod);
         }
     }
 

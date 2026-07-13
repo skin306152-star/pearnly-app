@@ -49,6 +49,25 @@
         return root.AI.state.esc(s);
     }
 
+    // P1-3:账期从裸文本手输换成 periodOptions 下拉(与矩阵/看板同款范式,不再自成一套
+    // "输对格式才算选过"的隐性契约——payroll 工具卡的同病同修见 ai-payroll-render.js)。
+    function periodSelectOptionsHtml(selected) {
+        return AI.board
+            .periodOptions()
+            .map(function (p) {
+                return (
+                    '<option value="' +
+                    esc(p) +
+                    '"' +
+                    (p === selected ? ' selected' : '') +
+                    '>' +
+                    esc(p) +
+                    '</option>'
+                );
+            })
+            .join('');
+    }
+
     function pickerHtml(ctx) {
         var options =
             '<option value="">' +
@@ -76,15 +95,23 @@
             '</select></label>' +
             '<label class="pr-lb">' +
             esc(at('reports_period_label')) +
-            '<input id="rptPeriodInput" type="text" placeholder="2569-05" value="' +
-            esc(ctx.period || '') +
-            '" maxlength="7" /></label>' +
+            '<select id="rptPeriodInput">' +
+            periodSelectOptionsHtml(ctx.period) +
+            '</select></label>' +
             '</div>'
         );
     }
 
-    function goOpenOrderBtnHtml() {
+    // P1-2:「去开单」失败不再静默吞(此前 catch(load) 一律装没事)——四语人话 + 重试
+    // 走的正常态,同 ai-payroll.js 的 errKey 惯例(mapApiErrorKey 取 key)。
+    function errBannerHtml(errKey) {
+        if (!errKey) return '';
+        return '<div class="intake-err">' + esc(at(errKey)) + '</div>';
+    }
+
+    function goOpenOrderBtnHtml(errKey) {
         return (
+            errBannerHtml(errKey) +
             '<button type="button" class="btn pri" data-action="reports-open-order">' +
             esc(at('reports_open_order_btn')) +
             '</button>'
@@ -92,12 +119,50 @@
     }
 
     // 该客户该期间没有工单——四语明说 + 去开单入口(状态诚实,不假装有数据)。
-    function noOrderHtml() {
+    function noOrderHtml(errKey) {
         return (
             AI.state.emptyHtml({
                 title: at('reports_no_order_t'),
                 sub: at('reports_no_order_s'),
-            }) + goOpenOrderBtnHtml()
+            }) + goOpenOrderBtnHtml(errKey)
+        );
+    }
+
+    // P1-4:报表中心查到报表后,给一条「查看工单」直达链接(想看凭证/裁决/证据链不再
+    // 断头)——链到工单操作页的当期(P0-2 深链带 period,不会打开别的期)。
+    function viewOrderLinkHtml(clientId, period) {
+        return (
+            '<a class="btn sm" href="' +
+            esc(AI.router.buildClientHash(clientId, 'wo', period)) +
+            '">' +
+            esc(at('reports_view_order_btn')) +
+            '</a>'
+        );
+    }
+
+    // P0-3:月度报表(BS/PL/TB)一步到位打印级 PDF + Excel(K2 引擎复用),不再是"看得到
+    // 拿不走"——两个按钮各自独立 loading 态(downloadingFormat 是 'pdf'/'xlsx'/null)。
+    function financialsDownloadPanelHtml(hasFinancials, downloadingFormat) {
+        if (!hasFinancials) return '';
+        function btn(format, labelKey) {
+            var busy = downloadingFormat === format;
+            return (
+                '<button type="button" class="btn" data-action="reports-download-financials" data-format="' +
+                format +
+                '"' +
+                (busy ? ' disabled' : '') +
+                '>' +
+                esc(busy ? at('reports_downloading') : at(labelKey)) +
+                '</button>'
+            );
+        }
+        return (
+            '<div class="panel"><div class="hd"><h3>' +
+            esc(at('reports_financials_download_title')) +
+            '</h3></div><div class="bd" style="display: flex; gap: 10px">' +
+            btn('pdf', 'reports_download_pdf_btn') +
+            btn('xlsx', 'reports_download_xlsx_btn') +
+            '</div></div>'
         );
     }
 
@@ -142,7 +207,10 @@
         pickOrderForPeriod: pickOrderForPeriod,
         downloadableDeliverables: downloadableDeliverables,
         pickerHtml: pickerHtml,
+        errBannerHtml: errBannerHtml,
         noOrderHtml: noOrderHtml,
+        viewOrderLinkHtml: viewOrderLinkHtml,
+        financialsDownloadPanelHtml: financialsDownloadPanelHtml,
         deliverablesPanelHtml: deliverablesPanelHtml,
     };
 })(typeof self !== 'undefined' ? self : typeof globalThis !== 'undefined' ? globalThis : this);

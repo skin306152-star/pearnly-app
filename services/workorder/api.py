@@ -187,7 +187,7 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         "status": wo["status"],
         "current_step": wo["current_step"],
         "progress": _classify_progress(wo, items, events),
-        "flagged": _flagged(items, events),
+        "flagged": evidence.flagged_projection(items, events),
         "needs": needs,
         "blocked_reasons": blocked,
         "numbers": _numbers(events),
@@ -270,41 +270,6 @@ def _classify_progress(wo: dict, items: list[dict], events: list[dict]) -> Optio
     classified = evidence.replay_items_by_type(events, _EVT_CLASSIFIED)
     processed = sum(1 for iid in image_ids if iid in classified)
     return {"step": "classify", "processed": processed, "total": len(image_ids)}
-
-
-def _flagged(items: list[dict], events: list[dict]) -> list[dict]:
-    """挂起清单 + 每张票的 OCR 读数与最新裁决(W3 审核队列一次喂满,零额外往返)。
-
-    ocr_read = item_classified 的 payload.money(票面钱字段原始串);decision = 该 item
-    最新一条 human_decision(latest-wins,与 reconcile 回放同语义)。都可为 None——没读出
-    /没判过就诚实给空,不造数据。"""
-    classified = evidence.replay_items_by_type(events, _EVT_CLASSIFIED)
-    decisions = evidence.replay_items_by_type(events, _EVT_DECISION)
-    return [
-        {
-            "item_id": it["id"],
-            "file_ref": it.get("file_ref"),
-            "kind": it["kind"],
-            "flag_reason": it.get("flag_reason"),
-            "ocr_read": (classified.get(it["id"]) or {}).get("payload", {}).get("money"),
-            "decision": _decision_of(decisions.get(it["id"])),
-        }
-        for it in items
-        if it["status"] == "flagged"
-    ]
-
-
-def _decision_of(replayed: Optional[dict]) -> Optional[dict]:
-    if not replayed:
-        return None
-    payload = replayed.get("payload") or {}
-    return {
-        "decision": payload.get("decision"),
-        "kind": payload.get("kind"),  # 方向裁决(assign_kind)携带的裁定 kind,普通裁决为 None
-        "values": payload.get("values") or {},
-        "actor": replayed.get("actor"),
-        "at": replayed.get("at"),
-    }
 
 
 def _halt_info(events: list[dict], status: str) -> tuple[list, list]:

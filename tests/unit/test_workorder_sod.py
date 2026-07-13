@@ -128,5 +128,32 @@ class ApproverViolationTests(unittest.TestCase):
         self.assertIsNone(sod.approver_violation(events, "user:3", enforced=True))
 
 
+def _self_review(actor):
+    return {"event_type": "self_review_declared", "actor": actor, "payload": {}}
+
+
+class SelfReviewEscapeTests(unittest.TestCase):
+    """单人所自审逃生门(方案决策 5 · 声明制不豁免制):授权人本人声明自审 → 放行,但留痕可审。"""
+
+    def test_declared_by_actor_detected(self):
+        events = [_decision("user:1"), _self_review("user:1")]
+        self.assertTrue(sod.self_review_declared_by(events, "user:1"))
+        self.assertFalse(sod.self_review_declared_by(events, "user:2"))
+
+    def test_self_declared_approver_is_allowed_despite_being_preparer(self):
+        # 单人所:制单=授权=user:1,本会因 approver_is_preparer 被拒;自审声明后放行。
+        events = [_decision("user:1")]
+        self.assertEqual(
+            sod.approver_violation(events, "user:1", enforced=True), sod.APPROVER_IS_PREPARER
+        )
+        events_declared = events + [_self_review("user:1")]
+        self.assertIsNone(sod.approver_violation(events_declared, "user:1", enforced=True))
+
+    def test_declaration_does_not_bypass_when_flag_off_is_moot(self):
+        # 闸关本就放行,声明与否不改变(逐字节维持单人流)。
+        events = [_decision("user:1"), _self_review("user:1")]
+        self.assertIsNone(sod.approver_violation(events, "user:1", enforced=False))
+
+
 if __name__ == "__main__":
     unittest.main()

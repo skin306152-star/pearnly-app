@@ -22,6 +22,7 @@ from typing import Optional
 _EVT_DECISION = "human_decision"
 _EVT_CLASSIFIED = "item_classified"
 _EVT_REVIEW_SIGNOFF = "review_signoff"
+_EVT_SELF_REVIEW = "self_review_declared"
 _KIND_SALES = "sales_summary"
 
 REVIEWER_IS_PREPARER = "workorder.sod.reviewer_is_preparer"
@@ -63,8 +64,15 @@ def reviewer_violation(events: list[dict], actor: str, *, enforced: bool) -> Opt
 
 def approver_violation(events: list[dict], actor: str, *, enforced: bool) -> Optional[str]:
     """冻结授权闸判定。关恒放行;开时授权人不得是制单人,且须已有一条签批人∉制单集的
-    有效复核签批(签批人本身若也在制单集内,不算数——不能自审自签绕过闸)。"""
+    有效复核签批(签批人本身若也在制单集内,不算数——不能自审自签绕过闸)。
+
+    单人所逃生门(方案决策 5 · 声明制不豁免制):授权人本人已落 self_review_declared
+    → 放行(返 None),但不是「关掉 SoD 装没事」——声明是 append-only 留痕事件,archive
+    据此在归档事件里标 self_reviewed=True(风险透明可审计)。判定与留痕分离:本函数只回答
+    「这次授权是否放行」,是否声明过由 self_review_declared_by 现算,archive 编排层组合两者。"""
     if not enforced:
+        return None
+    if self_review_declared_by(events, actor):
         return None
     preparers = preparer_actors(events)
     if actor in preparers:
@@ -72,3 +80,9 @@ def approver_violation(events: list[dict], actor: str, *, enforced: bool) -> Opt
     if not (reviewer_actors(events) - preparers):
         return REVIEW_REQUIRED
     return None
+
+
+def self_review_declared_by(events: list[dict], actor: str) -> bool:
+    """actor 是否已落一条自审声明(self_review_declared)。单人所在 SoD 开时用它换取归档放行;
+    多人所也可声明,但声明留痕入证据链,治理上可事后追责——透明而非静默豁免。"""
+    return any(e.get("event_type") == _EVT_SELF_REVIEW and e.get("actor") == actor for e in events)

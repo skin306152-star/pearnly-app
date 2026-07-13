@@ -79,11 +79,13 @@ def archive_order(cur, *, tenant_id: str, work_order_id: str, actor: str) -> dic
 
     items = store.list_items(cur, tenant_id=tenant_id, work_order_id=work_order_id)
     events = store.list_events(cur, tenant_id=tenant_id, work_order_id=work_order_id)
-    violation = sod.approver_violation(
-        events, actor, enforced=pearnly_ai_sod_enabled_for(tenant_id)
-    )
+    sod_on = pearnly_ai_sod_enabled_for(tenant_id)
+    violation = sod.approver_violation(events, actor, enforced=sod_on)
     if violation:
         raise WorkOrderApiError(violation)
+    # 单人所自审逃生门(方案决策 5):SoD 开 + 授权人本人已声明自审 → 上面已放行,这里标记
+    # self_reviewed 入归档事件,风险透明可审计(声明制不豁免制,绝非静默关闸)。
+    self_reviewed = sod_on and sod.self_review_declared_by(events, actor)
     ocr_models = store.ocr_models_for_items(
         cur, tenant_id=tenant_id, item_ids=[it["id"] for it in items]
     )
@@ -123,7 +125,7 @@ def archive_order(cur, *, tenant_id: str, work_order_id: str, actor: str) -> dic
         work_order_id=work_order_id,
         step=_ARCHIVE_STEP,
         event_type=_EVT_ARCHIVED,
-        payload={**summary, "role": "approver"},
+        payload={**summary, "role": "approver", "self_reviewed": self_reviewed},
         actor=actor,
         dedupe_key=f"archive:{work_order_id}",
     )

@@ -168,5 +168,6 @@
   "vat_report_checks_routes": "B",
   "workorder_routes": "C",
   "workorder_financials_routes": "C",
+  "workorder_review_routes": "C",
   "workspace_routes": "B"
 }

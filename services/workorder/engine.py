@@ -58,6 +58,9 @@ EVT_STARTED = "step_started"
 EVT_DONE = "step_done"
 EVT_STUCK = "step_stuck"
 EVT_NEEDS = "step_needs"
+# 驳回重做(MC1-b1):review 态被驳回时对受影响步落此,撤销其 step_done「已完成」判定,
+# 令引擎重跑该步(append-only,不删已落事件)。词汇单一事实源在此,review.py 复用不另造。
+EVT_REOPENED = "step_reopened"
 
 
 class WorkOrderEngineError(RuntimeError):
@@ -174,12 +177,29 @@ def _bound(ctx: StepContext, cur: Any):
 
 
 def _completed_steps(ctx: StepContext, unit: Callable) -> set:
-    """从事件流推导已完成步(step_done 存在即完成)——续跑/幂等的唯一依据。"""
+    """从事件流推导已完成步——续跑/幂等的唯一依据。按追加序(= 发生序)回放:step_done 记
+    完成,step_reopened(驳回重做)撤销完成、令该步重跑;后续再落 step_done 又记回。无
+    step_reopened 时行为与「step_done 存在即完成」逐字节一致(存量续跑/幂等不变)。"""
     with unit(ctx) as cur, _bound(ctx, cur):
         events = ctx.store.list_events(
             ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id
         )
-    return {e["step"] for e in events if e["event_type"] == EVT_DONE}
+    done: set = set()
+    for e in events:
+        etype = e["event_type"]
+        if etype == EVT_DONE:
+            done.add(e["step"])
+        elif etype == EVT_REOPENED:
+            done.discard(e["step"])
+    return done
+
+
+def reopen_steps_from(step: str) -> tuple:
+    """从 step(含)到最后一个可跑步的序列——驳回重做据此重开受影响步(review.py)。
+    step 不在可跑步里 → 空(防御性,不重开未知步)。"""
+    if step not in RUNNABLE_STEPS:
+        return ()
+    return RUNNABLE_STEPS[RUNNABLE_STEPS.index(step) :]
 
 
 def _emit(ctx: StepContext, step: str, event_type: str, payload: dict) -> None:

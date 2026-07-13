@@ -12,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from services.workorder import decisions, kinds
+from services.workorder import decisions, kinds, verdict
 
 _EVT_DONE = "step_done"
 _EVT_CLASSIFIED = "item_classified"
@@ -60,6 +60,49 @@ def replay_items_by_type(events: list[dict], event_type: str) -> dict:
                 "at": e.get("created_at"),
             }
     return out
+
+
+def flagged_projection(items: list[dict], events: list[dict]) -> list[dict]:
+    """挂起清单投影(W3 审核队列 + order-detail 一次喂满,零额外往返)。每张 flagged 票带
+    OCR 读数、最新裁决、判据人话 + 置信度(verdict_hint · MC1-b1 纯读侧现算,不改引擎不落库)。
+
+    ocr_read = item_classified 的 payload.money(票面钱字段原始串);decision = 该 item 最新一条
+    human_decision(latest-wins,与 reconcile 回放同语义);verdict_hint = verdict.hint(flag_reason,
+    ocr_read)。都可为 None/空 —— 没读出/没判过就诚实给空,不造数据。"""
+    classified = replay_items_by_type(events, _EVT_CLASSIFIED)
+    decisions_by_item = replay_items_by_type(events, _EVT_DECISION)
+    out = []
+    for it in items:
+        if it["status"] != "flagged":
+            continue
+        ocr_read = (classified.get(it["id"]) or {}).get("payload", {}).get("money")
+        out.append(
+            {
+                "item_id": it["id"],
+                "file_ref": it.get("file_ref"),
+                "kind": it["kind"],
+                "flag_reason": it.get("flag_reason"),
+                "ocr_read": ocr_read,
+                "decision": _decision_of(decisions_by_item.get(it["id"])),
+                "verdict_hint": verdict.hint(flag_reason=it.get("flag_reason"), ocr_read=ocr_read),
+            }
+        )
+    return out
+
+
+def _decision_of(replayed: Optional[dict]) -> Optional[dict]:
+    """一条 human_decision 回放 → 裁决摘要({decision, kind, values, actor, at});无则 None。
+    kind 是方向裁决(assign_kind)携带的裁定 kind,普通裁决为 None。"""
+    if not replayed:
+        return None
+    payload = replayed.get("payload") or {}
+    return {
+        "decision": payload.get("decision"),
+        "kind": payload.get("kind"),
+        "values": payload.get("values") or {},
+        "actor": replayed.get("actor"),
+        "at": replayed.get("at"),
+    }
 
 
 def build_evidence_index(

@@ -188,5 +188,42 @@ class RegistryTests(unittest.TestCase):
             engine.run_work_order(_ctx(store), handlers=handlers)
 
 
+class ReopenTests(unittest.TestCase):
+    """驳回重做(MC1-b1):step_reopened 撤销 step_done「已完成」判定,令引擎重跑受影响步。"""
+
+    def test_reopen_steps_from_slices_runnable_tail(self):
+        self.assertEqual(engine.reopen_steps_from("reconcile"), ("reconcile", "compute", "package"))
+        self.assertEqual(engine.reopen_steps_from("bogus"), ())  # 未知步不重开
+
+    def test_reopened_step_reruns_and_reemits_done(self):
+        store = FakeStore()
+        engine.run_work_order(_ctx(store))  # 跑到 review,全步 step_done
+        self.assertEqual(store.count("package", engine.EVT_DONE), 1)
+
+        # 模拟驳回:对受影响步落 step_reopened(append-only)
+        for step in engine.reopen_steps_from("reconcile"):
+            store.append_event(
+                None,
+                tenant_id="t-1",
+                work_order_id="wo-1",
+                step=step,
+                event_type=engine.EVT_REOPENED,
+            )
+        engine.run_work_order(_ctx(store))
+        # 重开步各再跑一次(step_done 第二条);未重开步(sort)仍只一条,不重跑
+        for step in ("reconcile", "compute", "package"):
+            self.assertEqual(store.count(step, engine.EVT_DONE), 2)
+        self.assertEqual(store.count("sort", engine.EVT_DONE), 1)
+        self.assertEqual(store.status, "review")
+
+    def test_no_reopen_events_preserve_completed_set(self):
+        # 无 step_reopened 时行为与旧「step_done 存在即完成」逐字节一致(续跑/幂等不变)。
+        store = FakeStore()
+        engine.run_work_order(_ctx(store))
+        n = len(store.events)
+        engine.run_work_order(_ctx(store))
+        self.assertEqual(len(store.events), n)
+
+
 if __name__ == "__main__":
     unittest.main()

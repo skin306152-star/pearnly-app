@@ -1,15 +1,9 @@
 """
-line_webhook_routes.py · LINE Bot Messaging API webhook(REFACTOR-B1)
+line_webhook_routes.py · LINE Bot Messaging API webhook(REFACTOR-B1 · 从 app.py 抽出)
 
-从 app.py L3263-3502 抽出 · 0 业务逻辑改:
-    POST /api/line/webhook   LINE Bot follow / unfollow / text / image|file 事件分发
-
-包含 _normalize_line_lang(语言规范化)/ _ev_lang(从 event 取语言)/ _handle_line_event
-(单事件路由)/ _handle_line_text(绑定码消费+引导)/ line_webhook(签名校验→事件分发入口)。
-
-LINE 图片/文件 → OCR 路径(`_handle_line_image_ocr`)已抽到 services/ocr/line_image_ocr.py
-(REFACTOR-WB-app · 2026-06-01)。`_handle_line_event` 内 import 调到 · 无循环 import。
-
+POST /api/line/webhook:follow / unfollow / text / image|file 事件分发。OCR 路径在
+services/ocr/line_image_ocr.py;客户收料暂存(LN-1)在 services/line_binding/
+line_intake_staging.py——图片分支最前闸内抢先,失手 fail-open 回原路。
 E2E 闸:spec 14(LINE binding)间接覆盖签名校验前的拒绝路径。
 """
 
@@ -177,6 +171,11 @@ async def _handle_line_event(ev: dict):
         if msg_type in ("image", "file"):
             message_id = msg.get("id")
             filename = msg.get("fileName") if msg_type == "file" else f"line_{message_id}.jpg"
+            # LN-1 收料暂存:命中绑定上下文(单聊客户/已绑群)且闸开才接手,否则回落现状。
+            from services.line_binding import line_intake_staging
+
+            if await line_intake_staging.try_stage_media(ev, lang_hint=_ev_lang(ev)):
+                return
             # 检查是否绑定
             bound_user = db.get_user_by_line_user_id(line_user_id) if line_user_id else None
             if not bound_user:
@@ -293,8 +292,9 @@ async def _handle_line_text(
             # D2-S2:非用户码 → 试客户绑定码(闸控·fail-open·实现见 line_client_bind_intake)。
             from services.line_binding import line_client_bind_intake
 
+            src_group = (ev.get("source") or {}).get("groupId")  # 群里发码 → 群绑定形态(LN-1)
             if line_client_bind_intake.try_consume(
-                text, line_user_id, reply_token, ev_lang, quote_token
+                text, line_user_id, reply_token, ev_lang, quote_token, group_id=src_group
             ):
                 return
             # v118.25.4 · 绑定码无效 · 还不知道是哪个 Pearnly 用户 · 用 LINE 语言

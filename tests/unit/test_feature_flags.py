@@ -148,5 +148,47 @@ class PearnlyAiShadowDraftEnabledForTests(unittest.TestCase):
             self.assertFalse(feature_flags.pearnly_ai_shadow_draft_enabled_for("t-1"))
 
 
+class PearnlyAiLineIntakeEnabledForTests(unittest.TestCase):
+    """LN-1 · LINE 收料暂存闸:双闸(m1 + 本闸),任一关或异常均 fail-closed。"""
+
+    def test_both_gates_open_returns_true(self):
+        def by_key(key, subject):
+            self.assertEqual(subject, "t-1")
+            return key in (
+                feature_flags.PEARNLY_AI_M1_KEY,
+                feature_flags.PEARNLY_AI_LINE_INTAKE_KEY,
+            )
+
+        with mock.patch(
+            "services.platform_settings.store.is_enabled_for_user", side_effect=by_key
+        ) as m:
+            self.assertTrue(feature_flags.pearnly_ai_line_intake_enabled_for("t-1"))
+        asked = [c.args[0] for c in m.call_args_list]
+        self.assertEqual(
+            asked, [feature_flags.PEARNLY_AI_M1_KEY, feature_flags.PEARNLY_AI_LINE_INTAKE_KEY]
+        )
+
+    def test_m1_closed_shorts_out_without_asking_own_key(self):
+        with mock.patch(
+            "services.platform_settings.store.is_enabled_for_user", return_value=False
+        ) as m:
+            self.assertFalse(feature_flags.pearnly_ai_line_intake_enabled_for("t-1"))
+        m.assert_called_once_with(feature_flags.PEARNLY_AI_M1_KEY, "t-1")
+
+    def test_own_key_closed_returns_false(self):
+        def by_key(key, subject):
+            return key == feature_flags.PEARNLY_AI_M1_KEY
+
+        with mock.patch("services.platform_settings.store.is_enabled_for_user", side_effect=by_key):
+            self.assertFalse(feature_flags.pearnly_ai_line_intake_enabled_for("t-1"))
+
+    def test_store_raises_fails_closed(self):
+        with mock.patch(
+            "services.platform_settings.store.is_enabled_for_user",
+            side_effect=RuntimeError("boom"),
+        ):
+            self.assertFalse(feature_flags.pearnly_ai_line_intake_enabled_for("t-1"))
+
+
 if __name__ == "__main__":
     unittest.main()

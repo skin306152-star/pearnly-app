@@ -12,7 +12,20 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from services.fileconv.model import ConvertResult, STATUS_NO_TEXT_LAYER
+from services.fileconv.model import (
+    ConvertResult,
+    STATUS_NO_TEXT_LAYER,
+    STATUS_OCR_INCOMPLETE,
+    STATUS_OCR_UNAVAILABLE,
+)
+
+# 拒绝态:绝不出数据表(截断/读不到时半截行集会假自洽,只写一张诚实的 Rejected 说明页)。
+_REJECT_STATUSES = {STATUS_NO_TEXT_LAYER, STATUS_OCR_INCOMPLETE, STATUS_OCR_UNAVAILABLE}
+_REJECT_NOTE = {
+    STATUS_NO_TEXT_LAYER: "此 PDF 无文字层(疑扫描件)· 已转 OCR 通道。",
+    STATUS_OCR_INCOMPLETE: "OCR 输出被截断/不完整 · 已拒绝出件,未生成任何行(诚实优于假自洽)。",
+    STATUS_OCR_UNAVAILABLE: "OCR 引擎当前不可用(够不到/授权失败)· 未生成任何行。",
+}
 
 _HEADER_FILL = PatternFill(start_color="2C5282", end_color="2C5282", fill_type="solid")
 _HEADER_FONT = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
@@ -42,10 +55,10 @@ def build_xlsx(result: ConvertResult) -> bytes:
     wb = Workbook()
     wb.remove(wb.active)
 
-    if result.status == STATUS_NO_TEXT_LAYER:
+    if result.status in _REJECT_STATUSES:
         ws = wb.create_sheet("Rejected")
-        ws["A1"] = "no_text_layer"
-        ws["A2"] = "此 PDF 无文字层(疑扫描件),本引擎不做 OCR。请走 OCR 通道。"
+        ws["A1"] = result.status
+        ws["A2"] = _REJECT_NOTE.get(result.status, "转换被拒绝。")
     else:
         for i, table in enumerate(result.tables, start=1):
             title = table.name[:28] or f"Sheet{i}"

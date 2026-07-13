@@ -1,16 +1,24 @@
 # -*- coding: utf-8 -*-
-"""命令行:python -m services.fileconv.cli <in.pdf> <out.xlsx>
+"""命令行:python -m services.fileconv.cli <in.pdf|图片> <out.xlsx>
 
-转换 + 守恒校验,写出 xlsx,并在 stdout 打印摘要(含不平行点名)。
-退出码:0 = 转换成功且守恒全过;2 = 转换成功但有守恒 issue;3 = 无文字层拒绝;1 = 用法/IO 错误。
+转换 + 守恒校验,写出 xlsx,并在 stdout 打印摘要(含不平行点名)。扫描件/图片走 OCR 桥。
+退出码:0 = 转换成功且守恒全过;2 = 转换成功但有守恒 issue;3 = 拒绝(无文字层且 OCR
+读不全/不可用);1 = 用法/IO 错误。
 """
 
 import sys
 from pathlib import Path
 
-from services.fileconv.convert import convert_pdf
-from services.fileconv.model import STATUS_NO_TEXT_LAYER
+from services.fileconv.convert import convert_image, convert_pdf
+from services.fileconv.model import (
+    STATUS_NO_TEXT_LAYER,
+    STATUS_OCR_INCOMPLETE,
+    STATUS_OCR_UNAVAILABLE,
+)
 from services.fileconv.xlsx_out import build_xlsx
+
+_REJECT_STATUSES = (STATUS_NO_TEXT_LAYER, STATUS_OCR_INCOMPLETE, STATUS_OCR_UNAVAILABLE)
+_IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp")
 
 
 def _make_stdout_encoding_safe() -> None:
@@ -35,10 +43,12 @@ def main(argv=None) -> int:
         print(f"输入文件不存在: {in_path}")
         return 1
 
-    result = convert_pdf(in_path.read_bytes(), source_name=in_path.name)
+    converter = convert_image if in_path.suffix.lower() in _IMAGE_EXTS else convert_pdf
+    result = converter(in_path.read_bytes(), source_name=in_path.name)
 
-    if result.status == STATUS_NO_TEXT_LAYER:
-        print(f"[REJECT] {in_path.name}: no_text_layer(疑扫描件)· 本引擎不做 OCR")
+    if result.status in _REJECT_STATUSES:
+        reason = result.stats.get("reason", "")
+        print(f"[REJECT] {in_path.name}: {result.status} · {reason}")
         Path(out_path).write_bytes(build_xlsx(result))
         return 3
 

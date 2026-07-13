@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-"""转换编排:PDF bytes → ConvertResult。
+"""转换编排:PDF/图片 bytes → ConvertResult。
 
-流程:抽文字层 → 无文字层则诚实拒绝 → 识别 doc_type → 按类型抽表 → 守恒校验。
-守恒校验不平进 result.issues,四态诚实由 result.conserved 承载。
+流程:抽文字层 → 有文字层按类型抽表 → 无文字层(扫描件)/图片走 OCR 桥(K1c)→ 守恒校验。
+守恒校验不平进 result.issues,四态诚实由 result.conserved 承载。文字层路(convert_pages)
+纯函数核心零改;OCR 路收在 ocr_bridge,本文件只做入口分流。
 """
 
-from typing import List
+from typing import List, Optional
 
 from services.fileconv import ledger as ledger_mod
 from services.fileconv import tables as tables_mod
@@ -17,7 +18,6 @@ from services.fileconv.model import (
     GL_LEDGER,
     BANK_STATEMENT,
     STATUS_OK,
-    STATUS_NO_TEXT_LAYER,
 )
 from services.fileconv.text_layer import extract_pages, has_text_layer
 
@@ -66,14 +66,22 @@ def convert_pages(pages: List[str], source_name: str) -> ConvertResult:
     )
 
 
-def convert_pdf(pdf_bytes: bytes, source_name: str = "") -> ConvertResult:
-    """入口:带文字层的财务 PDF → ConvertResult。无文字层 → no_text_layer 拒绝。"""
+def convert_pdf(
+    pdf_bytes: bytes, source_name: str = "", *, tenant_id: Optional[str] = None
+) -> ConvertResult:
+    """入口:财务 PDF → ConvertResult。带文字层走纯函数路;无文字层(扫描件)转 OCR 桥。"""
     pages = extract_pages(pdf_bytes)
     if not has_text_layer(pages):
-        return ConvertResult(
-            doc_type="",
-            status=STATUS_NO_TEXT_LAYER,
-            source_name=source_name,
-            stats={"reason": "无文字层(疑扫描件)· OCR 归 K1c"},
-        )
+        from services.fileconv import ocr_bridge  # 懒加载:文字层路不牵连 OCR/pydantic 依赖
+
+        return ocr_bridge.convert_scanned_pdf(pdf_bytes, source_name, tenant_id=tenant_id)
     return convert_pages(pages, source_name)
+
+
+def convert_image(
+    image_bytes: bytes, source_name: str = "", *, tenant_id: Optional[str] = None
+) -> ConvertResult:
+    """入口:财务文件图片(jpg/png/webp)→ OCR 桥 → ConvertResult。"""
+    from services.fileconv import ocr_bridge
+
+    return ocr_bridge.convert_image(image_bytes, source_name, tenant_id=tenant_id)

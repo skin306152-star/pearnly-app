@@ -21,8 +21,8 @@ from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from core.route_helpers import authorize_pearnly_ai
-from services.fileconv.convert import convert_pdf
-from services.fileconv.model import Issue
+from services.fileconv.convert import convert_image, convert_pdf
+from services.fileconv.model import ConvertResult, Issue
 from services.fileconv.xlsx_out import build_xlsx
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,16 @@ _PERM = "tax.filing.view"
 _MAX_BYTES = 20 * 1024 * 1024
 _ISSUES_PREVIEW = 50
 _XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+# 图片扩展白名单:扫描件走 OCR(K1c);带文字层 PDF 走纯函数路。其余类型 415。
+_IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp")
+
+
+def _run_conversion(data: bytes, filename: str, tenant_id: str) -> ConvertResult:
+    """按文件类型分流:图片 → OCR 桥;PDF(默认)→ 文字层引擎(无文字层内部再转 OCR)。"""
+    name = (filename or "").lower()
+    if name.endswith(_IMAGE_EXTS):
+        return convert_image(data, source_name=filename or "upload.png", tenant_id=tenant_id)
+    return convert_pdf(data, source_name=filename or "upload.pdf", tenant_id=tenant_id)
 
 
 def _issue_out(issue: Issue) -> dict:
@@ -64,16 +74,16 @@ async def convert_endpoint(
     file: UploadFile = File(...),
     fmt: str = Query(None, alias="format", description="留空=JSON 摘要;xlsx=直接回附件"),
 ):
-    """上传单份 PDF → 转换 + 守恒校验。`?format=xlsx` 回同一份文件的 xlsx 转换结果。"""
-    authorize_pearnly_ai(request, _PERM, not_found="fileconv.not_found")
+    """上传单份 PDF/图片 → 转换 + 守恒校验。`?format=xlsx` 回同一份文件的 xlsx 转换结果。"""
+    _, tenant_id = authorize_pearnly_ai(request, _PERM, not_found="fileconv.not_found")
 
-    pdf_bytes = await file.read()
-    if len(pdf_bytes) > _MAX_BYTES:
+    data = await file.read()
+    if len(data) > _MAX_BYTES:
         raise HTTPException(413, detail="fileconv.file_too_large")
-    if not pdf_bytes:
+    if not data:
         raise HTTPException(400, detail="fileconv.empty_file")
 
-    result = convert_pdf(pdf_bytes, source_name=file.filename or "upload.pdf")
+    result = _run_conversion(data, file.filename, tenant_id)
 
     if fmt == "xlsx":
         xlsx_bytes = build_xlsx(result)

@@ -1,15 +1,17 @@
 # -*- coding: utf-8 -*-
-"""fileconv 编排 + no_text_layer 拒绝 + xlsx 输出闭环。"""
+"""fileconv 编排 + 无文字层转 OCR 桥(K1c 起)+ xlsx 输出闭环。"""
 
 import io
 import unittest
+from unittest import mock
 
 import openpyxl
 
+from services.fileconv import ocr_bridge
 from services.fileconv.convert import convert_pages, convert_pdf
 from services.fileconv.text_layer import has_text_layer
 from services.fileconv.xlsx_out import build_xlsx
-from services.fileconv.model import GL_LEDGER, STATUS_OK, STATUS_NO_TEXT_LAYER
+from services.fileconv.model import GL_LEDGER, STATUS_OK, STATUS_OCR_UNAVAILABLE
 
 _GL = """รายงานสมุดแยกประเภท
 วันที่ เดบิต เครดิต ยอดคงเหลือ
@@ -24,7 +26,8 @@ class NoTextLayerTests(unittest.TestCase):
         self.assertFalse(has_text_layer(None))
         self.assertTrue(has_text_layer(["x" * 500]))
 
-    def test_blank_pdf_rejected(self):
+    def test_blank_pdf_routes_to_ocr_and_rejects_when_unreachable(self):
+        """K1c 起无文字层转 OCR 桥;够不到模型时结构化拒绝,仍零表格输出(桩掉 provider,不触网)。"""
         from pypdf import PdfWriter
 
         writer = PdfWriter()
@@ -32,8 +35,10 @@ class NoTextLayerTests(unittest.TestCase):
         buf = io.BytesIO()
         writer.write(buf)
 
-        result = convert_pdf(buf.getvalue(), "blank.pdf")
-        self.assertEqual(result.status, STATUS_NO_TEXT_LAYER)
+        unreachable = mock.Mock(return_value=mock.Mock(ok=False, error_kind="auth", data=None))
+        with mock.patch.object(ocr_bridge, "_default_provider_call", unreachable):
+            result = convert_pdf(buf.getvalue(), "blank.pdf")
+        self.assertEqual(result.status, STATUS_OCR_UNAVAILABLE)
         self.assertEqual(result.tables, [])
 
 
@@ -58,18 +63,20 @@ class XlsxOutTests(unittest.TestCase):
         self.assertIn("Issues", wb.sheetnames)
         self.assertIn("Summary", wb.sheetnames)
 
-    def test_no_text_layer_xlsx_marks_rejection(self):
+    def test_ocr_reject_xlsx_marks_rejection(self):
         from pypdf import PdfWriter
 
         writer = PdfWriter()
         writer.add_blank_page(width=200, height=200)
         buf = io.BytesIO()
         writer.write(buf)
-        result = convert_pdf(buf.getvalue(), "blank.pdf")
+        unreachable = mock.Mock(return_value=mock.Mock(ok=False, error_kind="auth", data=None))
+        with mock.patch.object(ocr_bridge, "_default_provider_call", unreachable):
+            result = convert_pdf(buf.getvalue(), "blank.pdf")
 
         wb = openpyxl.load_workbook(io.BytesIO(build_xlsx(result)))
         self.assertIn("Rejected", wb.sheetnames)
-        self.assertEqual(wb["Rejected"]["A1"].value, "no_text_layer")
+        self.assertEqual(wb["Rejected"]["A1"].value, STATUS_OCR_UNAVAILABLE)
 
 
 if __name__ == "__main__":

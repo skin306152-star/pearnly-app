@@ -163,6 +163,34 @@ class SummaryTests(GatedRouteCase):
         self.assertEqual(out["issue_count"], 0)
 
 
+class ImageDispatchTests(GatedRouteCase):
+    async def test_image_upload_routes_to_ocr_converter_with_tenant(self):
+        """K1c:图片扩展 → convert_image(OCR 桥)且带租户归因;PDF 路不受牵连。"""
+        self._wire()
+        m_img = self.enterContext(
+            mock.patch.object(fcr, "convert_image", return_value=_ok_result())
+        )
+        m_pdf = self.enterContext(mock.patch.object(fcr, "convert_pdf", return_value=_ok_result()))
+        out = await fcr.convert_endpoint(
+            mock.Mock(), file=_upload(name="scan.JPG", data=b"\xff\xd8jpeg"), fmt=None
+        )
+        self.assertEqual(out["status"], STATUS_OK)
+        m_img.assert_called_once()
+        self.assertEqual(m_img.call_args.kwargs.get("tenant_id"), "t-1")
+        m_pdf.assert_not_called()
+
+    async def test_pdf_upload_still_uses_pdf_converter(self):
+        self._wire()
+        m_img = self.enterContext(
+            mock.patch.object(fcr, "convert_image", return_value=_ok_result())
+        )
+        m_pdf = self.enterContext(mock.patch.object(fcr, "convert_pdf", return_value=_ok_result()))
+        await fcr.convert_endpoint(mock.Mock(), file=_upload(), fmt=None)
+        m_pdf.assert_called_once()
+        self.assertEqual(m_pdf.call_args.kwargs.get("tenant_id"), "t-1")
+        m_img.assert_not_called()
+
+
 class XlsxTests(GatedRouteCase):
     async def test_format_xlsx_returns_attachment(self):
         self._wire()

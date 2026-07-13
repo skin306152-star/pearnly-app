@@ -29,12 +29,12 @@ class ValidateFileTests(unittest.TestCase):
             """)
         self.assertEqual(out, {"ok": False, "errKey": "fileconv_err_no_file"})
 
-    def test_non_pdf_rejected(self):
+    def test_unsupported_types_rejected(self):
         out = _run_node(f"""
             const r = require({_RENDER});
             process.stdout.write(JSON.stringify([
                 r.validateFile({{name: 'report.xlsx'}}),
-                r.validateFile({{name: 'scan.jpg'}}),
+                r.validateFile({{name: 'notes.txt'}}),
             ]));
             """)
         self.assertEqual(
@@ -45,15 +45,42 @@ class ValidateFileTests(unittest.TestCase):
             ],
         )
 
-    def test_pdf_accepted_case_insensitive(self):
+    def test_pdf_and_images_accepted_case_insensitive(self):
+        # K1c 起图片(jpg/png/webp)走 OCR 路,前端放行。
         out = _run_node(f"""
             const r = require({_RENDER});
             process.stdout.write(JSON.stringify([
                 r.validateFile({{name: 'GL TTB.pdf'}}),
                 r.validateFile({{name: 'REPORT.PDF'}}),
+                r.validateFile({{name: 'scan.jpg'}}),
+                r.validateFile({{name: 'stmt.PNG'}}),
+                r.validateFile({{name: 'photo.webp'}}),
             ]));
             """)
-        self.assertEqual(out, [{"ok": True}, {"ok": True}])
+        self.assertEqual(out, [{"ok": True}] * 5)
+
+    def test_is_image_file_distinguishes_ocr_path(self):
+        out = _run_node(f"""
+            const r = require({_RENDER});
+            process.stdout.write(JSON.stringify([
+                r.isImageFile({{name: 'scan.jpg'}}),
+                r.isImageFile({{name: 'gl.pdf'}}),
+                r.isImageFile(null),
+            ]));
+            """)
+        self.assertEqual(out, [True, False, False])
+
+    def test_rejected_statuses(self):
+        out = _run_node(f"""
+            const r = require({_RENDER});
+            process.stdout.write(JSON.stringify([
+                r.isRejected('no_text_layer'),
+                r.isRejected('ocr_incomplete'),
+                r.isRejected('ocr_unavailable'),
+                r.isRejected('ok'),
+            ]));
+            """)
+        self.assertEqual(out, [True, True, True, False])
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")

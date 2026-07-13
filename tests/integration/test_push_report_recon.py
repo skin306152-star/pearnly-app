@@ -7,6 +7,10 @@ push_log_queries.list_push_logs_by_invoice_nos 新 DAL):工单 3 票号落 2 suc
 matched_by/matched_rows 标注;skipped_dup 归 success 侧;pending 未终态两侧都不进落 missing;
 查无匹配行降级 no_report;跨租户行不可见(SQL 显式 tenant_id 隔离,非 RLS)。
 
+MC2-C(erp_push_logs.work_order_id 列):同票号两工单场景下新推送精确归属零串(见
+test_cross_work_order_same_invoice_no_zero_bleed);老数据(work_order_id 全 NULL)回落
+invoice_no 路径不回归(见 test_legacy_null_work_order_id_falls_back)。
+
 CI 默认 skip(tests/integration 惯例),本地跑:
     set PEARNLY_INTEGRATION_DB=1
     set DATABASE_URL=postgresql://pearnly:pearnly_local_dev@localhost:5432/pearnly
@@ -85,6 +89,8 @@ class PushReportReconTests(unittest.TestCase):
     def setUp(self):
         self.tenant_id = str(uuid.uuid4())
         self.user_id = str(uuid.uuid4())
+        # 真 work_order_id 须是合法 UUID(erp_push_logs.work_order_id 列是 uuid 类型 · MC2-C)。
+        self.work_order_id = str(uuid.uuid4())
         with self.db.get_cursor(commit=True) as cur:
             cur.execute(
                 "INSERT INTO users(id, username, password_hash) VALUES (%s, %s, 'x')",
@@ -102,15 +108,17 @@ class PushReportReconTests(unittest.TestCase):
             cur.execute("DELETE FROM erp_push_logs WHERE user_id = %s", (self.user_id,))
             cur.execute("DELETE FROM users WHERE id = %s", (self.user_id,))
 
-    def _insert_log(self, invoice_no, status, tenant_id=None, error_msg=None):
+    def _insert_log(self, invoice_no, status, tenant_id=None, error_msg=None, work_order_id=None):
         with self.db.get_cursor(commit=True) as cur:
             cur.execute(
-                "INSERT INTO erp_push_logs(user_id, tenant_id, invoice_no, status, error_msg, attempt) "
-                "VALUES (%s,%s,%s,%s,%s,1)",
-                (self.user_id, tenant_id or self.tenant_id, invoice_no, status, error_msg),
+                "INSERT INTO erp_push_logs"
+                "(user_id, tenant_id, invoice_no, status, error_msg, attempt, work_order_id) "
+                "VALUES (%s,%s,%s,%s,%s,1,%s)",
+                (self.user_id, tenant_id or self.tenant_id, invoice_no, status, error_msg,
+                 work_order_id),
             )
 
-    def _ctx(self, cur, invoice_nos):
+    def _ctx(self, cur, invoice_nos, work_order_id=None):
         items = [
             {"id": f"p{i}", "kind": "purchase_invoice", "status": "ok", "flag_reason": None}
             for i in range(1, len(invoice_nos) + 1)
@@ -120,12 +128,16 @@ class PushReportReconTests(unittest.TestCase):
         ]
         store = _FakeStore(items, events)
         return self.StepContext(
-            cur=cur, tenant_id=self.tenant_id, work_order_id="wo-t4c", store=store, data={}
+            cur=cur,
+            tenant_id=self.tenant_id,
+            work_order_id=work_order_id or self.work_order_id,
+            store=store,
+            data={},
         )
 
-    def _push(self, invoice_nos):
+    def _push(self, invoice_nos, work_order_id=None):
         with self.db.get_cursor() as cur:
-            out = self.reconcile.run(self._ctx(cur, invoice_nos))
+            out = self.reconcile.run(self._ctx(cur, invoice_nos, work_order_id=work_order_id))
         self.assertEqual(out.status, "ok")
         return out.payload["gates"]["r5_shadow"]["reconcile_gl"]["push"]
 
@@ -168,6 +180,29 @@ class PushReportReconTests(unittest.TestCase):
         self._insert_log("IV-X", "success", tenant_id=other_tenant)
         push = self._push(["IV-X"])
         self.assertEqual(push["status"], "no_report")  # 本租户查无匹配行,不串号
+
+    def test_cross_work_order_same_invoice_no_zero_bleed(self):
+        # MC2-C 验收剧本:同租户两工单各自推过同一票号——本工单那行 success,
+        # 另一工单那行 failed。按 work_order_id 精确查必须只看见本工单那行(success),
+        # 绝不被另一工单的 failed 行串扰(旧口径靠 invoice_no 会两行都命中、行为不确定)。
+        other_wo = str(uuid.uuid4())
+        self._insert_log("IV-DUP", "success", work_order_id=self.work_order_id)
+        self._insert_log("IV-DUP", "failed", error_msg="อีกงานหนึ่งพลาด", work_order_id=other_wo)
+        push = self._push(["IV-DUP"])
+        self.assertEqual(push["status"], "all_pushed")
+        self.assertEqual(push["pushed_ok"], ["IV-DUP"])
+        self.assertEqual(push["rejected"], [])
+        self.assertEqual(push["matched_by"], "work_order_id")
+        self.assertEqual(push["matched_rows"], 1)
+
+    def test_legacy_null_work_order_id_falls_back(self):
+        # 老数据(work_order_id 列 NULL,补列前的历史行)回落 invoice_no 路径不回归。
+        self._insert_log("IV-LEGACY", "success", work_order_id=None)
+        push = self._push(["IV-LEGACY"])
+        self.assertEqual(push["status"], "all_pushed")
+        self.assertEqual(push["pushed_ok"], ["IV-LEGACY"])
+        self.assertEqual(push["matched_by"], "invoice_no")
+        self.assertEqual(push["matched_rows"], 1)
 
 
 if __name__ == "__main__":

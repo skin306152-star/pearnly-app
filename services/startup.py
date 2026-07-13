@@ -200,6 +200,7 @@ def _boot_schema_ddl() -> None:
         (db.ensure_notification_tables, "notification 建表"),
         (db.ensure_archive_settings_table, "archive_settings 建表+RLS"),
         (db.ensure_erp_retry_columns, "erp_push_logs retry 列"),
+        (db.ensure_erp_push_logs_work_order_id_column, "erp_push_logs.work_order_id 列+索引"),
         (db.ensure_erp_endpoints_adapter_constraint, "erp_endpoints adapter constraint"),
         (db.ensure_erp_push_logs_adapter_constraint, "erp_push_logs adapter constraint"),
         (db.ensure_erp_push_logs_status_constraint, "erp_push_logs status constraint"),

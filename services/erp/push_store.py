@@ -254,7 +254,13 @@ def insert_push_log(
     attempt: int,
     elapsed_ms: int,
     trigger: str = "manual",
+    work_order_id: Optional[str] = None,
 ) -> Optional[str]:
+    """work_order_id(MC2-C · 尾参默认 None):只有工单发起的推送才带,主站直推(集成页/
+    LINE agent/自动推/邮件收料)一律不传、如实留 NULL——现存写入点全集勘察实锤(派单书
+    MC2-C 附完工报告)零个在工单上下文,此参数是给未来工单侧推送预留的插座,不强改
+    任一现存调用点。见 services/erp/push_log_queries.list_push_logs_by_invoice_nos 读侧
+    如何用它做精确匹配。"""
     import json as _json
 
     try:
@@ -264,8 +270,8 @@ def insert_push_log(
                 INSERT INTO erp_push_logs (
                     user_id, endpoint_id, history_id, invoice_no, seller_name,
                     total_amount, status, http_status, request_body, response_body,
-                    error_msg, attempt, elapsed_ms, trigger
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s)
+                    error_msg, attempt, elapsed_ms, trigger, work_order_id
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """,
                 (
@@ -283,6 +289,7 @@ def insert_push_log(
                     attempt,
                     elapsed_ms,
                     trigger,
+                    work_order_id,
                 ),
             )
             row = cur.fetchone()
@@ -403,6 +410,7 @@ from services.erp.push_schema import (  # noqa: F401,E402
     ensure_erp_endpoints_adapter_constraint,
     ensure_erp_push_logs_adapter_constraint,
     ensure_erp_push_logs_status_constraint,
+    ensure_erp_push_logs_work_order_id_column,
     ensure_erp_push_rls,
     ensure_erp_retry_columns,
     ensure_single_express_endpoint,

@@ -276,18 +276,19 @@ def _run_shadow_gl_recon(ctx: StepContext, shadow) -> dict:
         # 桥仅在有 GL 行时才被 reconcile_gl 读(无 GL → no_gl_source 前置返回),空跑时省掉一次 DB 查询。
         bridge = _shadow_account_bridge(ctx) if gl_rows else {}
         gl = recon.reconcile_gl(shadow.accounts, gl_rows, bridge)
-        expected, report, matched_rows = _shadow_push_report(ctx)
+        expected, report, matched_rows, matched_by = _shadow_push_report(ctx)
         push = recon.reconcile_push(expected, report)
         payload = gl.as_payload()
         payload["gl_source"] = src["source"]
         if src.get("note"):
             payload["gl_source_note"] = src["note"]
         push_payload = push.as_payload()
-        # T4c 诚实标注(仅在真有回执可核对时挂):erp_push_logs 无 work_order_id 外键,只能按
-        # 票号在租户范围内匹配——跨工单同票号理论上会串,靠此标注兜住,不由算法层假装精确。
+        # T4c 诚实标注(仅在真有回执可核对时挂,MC2-C):erp_push_logs.work_order_id 列已补
+        # (老行 NULL),命中行全部按本工单精确匹配才标 "work_order_id";只要有一票落回租户+
+        # 票号的旧口径,如实标 "invoice_no"(弱链接决定整体可信度,不由算法层假装精确)。
         # report is None(no_report)时不挂,存量工单(无 GL/无推送)payload 逐字节维持改前现状。
         if report is not None:
-            push_payload["matched_by"] = "invoice_no"
+            push_payload["matched_by"] = matched_by
             push_payload["matched_rows"] = matched_rows
         payload["push"] = push_payload
         return payload
@@ -391,6 +392,15 @@ def _default_shadow_account_bridge(ctx: StepContext) -> dict:
 _PUSH_TERMINAL_SUCCESS = ("success", "skipped_dup")
 
 
+def _aggregate_matched_by(rows: list[dict]) -> str:
+    """一批推送回执行的整体匹配口径(MC2-C):全部行都按本工单 work_order_id 精确命中才
+    标 "work_order_id";只要有一行落回租户+票号的旧口径,如实标 "invoice_no"——弱链接
+    决定整体可信度,不因部分精确命中就把有歧义风险的那部分也包装成精确。"""
+    if rows and all(r.get("matched_by") == "work_order_id" for r in rows):
+        return "work_order_id"
+    return "invoice_no"
+
+
 def _default_shadow_push_report(ctx: StepContext) -> tuple:
     """F2-辅 推送回执源(T4c · 纯读侧接入 · 零碰推送主路径)。
 
@@ -400,20 +410,21 @@ def _default_shadow_push_report(ctx: StepContext) -> tuple:
     空号丢弃、票号去重保序。方向不明票(assign_kind 裁进项)不在此列——本函数只认 sort/
     classify 阶段已直接定堆 purchase_invoice 的件,范围小于 R1 entries(有意收窄,不外推)。
 
-    report:按 tenant_id + 票号集查 erp_push_logs(services.erp.push_log_queries,SQL 参数化
-    + tenant_id 显式过滤做租户隔离),状态词映射到 ImportReport 鸭子契约(见 _build_import_
-    report)。查无任何匹配行 → (expected, None, 0),对数如实降级 no_report(没推过≠推失败)。
+    report:按 tenant_id(+ work_order_id 精确优先)查 erp_push_logs(services.erp.
+    push_log_queries,SQL 参数化 + tenant_id 显式过滤做租户隔离),状态词映射到 ImportReport
+    鸭子契约(见 _build_import_report)。查无任何匹配行 → (expected, None, 0, None),对数
+    如实降级 no_report(没推过≠推失败)。
 
-    matched_by="invoice_no" 限制:erp_push_logs 无 work_order_id 外键(推送是集成页独立流,
-    勘察硬结论),只能按票号在租户范围内匹配——跨工单同票号理论上会串,佐证层只提示不改
-    税额,由 _run_shadow_gl_recon 把 matched_by/matched_rows(本函数第三个返回值,实际命中
-    行数)挂进 payload 兜住此口径限制。
+    matched_by(MC2-C · erp_push_logs.work_order_id 列已补):命中行按 ctx.work_order_id
+    精确匹配的标 "work_order_id"(绝不跨工单串号);该列历史 NULL 或此票从未在本工单下推过的
+    票号回落「租户 + 票号」旧口径,标 "invoice_no"(理论上可能跨工单同票号误命中)。整批的
+    matched_by 汇总见 _aggregate_matched_by,挂进 payload 兜住口径差异,不由算法层假装精确。
 
-    无 cur / 无 tenant_id(内存态单测、cursor_factory 续跑早期阶段等)→ ([], None, 0),
+    无 cur / 无 tenant_id(内存态单测、cursor_factory 续跑早期阶段等)→ ([], None, 0, None),
     不触真查询——同 _shadow_gl_rows/_shadow_account_bridge 的同款防御。
     """
     if ctx.cur is None or not ctx.tenant_id:
-        return [], None, 0
+        return [], None, 0, None
     items = ctx.store.list_items(ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id)
     events = ctx.store.list_events(
         ctx.cur, tenant_id=ctx.tenant_id, work_order_id=ctx.work_order_id
@@ -435,16 +446,16 @@ def _default_shadow_push_report(ctx: StepContext) -> tuple:
             seen.add(inv)
             expected.append(inv)
     if not expected:
-        return [], None, 0
+        return [], None, 0, None
 
     from services.erp import push_log_queries
 
     rows = push_log_queries.list_push_logs_by_invoice_nos(
-        ctx.cur, tenant_id=ctx.tenant_id, invoice_nos=expected
+        ctx.cur, tenant_id=ctx.tenant_id, invoice_nos=expected, work_order_id=ctx.work_order_id
     )
     if not rows:
-        return expected, None, 0
-    return expected, _build_import_report(rows), len(rows)
+        return expected, None, 0, None
+    return expected, _build_import_report(rows), len(rows), _aggregate_matched_by(rows)
 
 
 def _build_import_report(rows: list[dict]):

@@ -323,7 +323,7 @@ def get_push_log_detail(
 
 
 def list_push_logs_by_invoice_nos(
-    cur, *, tenant_id: str, invoice_nos: List[str]
+    cur, *, tenant_id: str, invoice_nos: List[str], work_order_id: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """按 tenant_id + 票号集查最新推送状态(T4c · 工单 F2-辅回执重建源 · 纯读侧)。
 
@@ -336,21 +336,49 @@ def list_push_logs_by_invoice_nos(
     同票号可能重试/手动补推产生多行(retry_count/手动重推):取每票号 created_at 最新一条
     (DISTINCT ON),口径与 list_push_logs 的折叠"当前态"逻辑一致,只是折叠键换成票号
     (工单侧没有 history_id/endpoint_id 可用来折)。
+
+    work_order_id(MC2-C):给出时先按「本工单 + 票号」精确查一轮——那批行的 matched_by 标
+    "work_order_id",绝不跨工单串号。查不到精确行的票号(该列历史 NULL,或此票从未在本工单
+    下推过)按原口径回落到「租户 + 票号」查,matched_by 标 "invoice_no"(旧口径,理论上可能
+    跨工单同票号误命中,由上层 payload 如实标注兜住,不假装精确)。省略此参数=旧调用方零改动
+    (纯 invoice_no 单轮查询,SQL 形状逐字节不变)。
     """
     if not tenant_id or not invoice_nos:
         return []
     try:
-        cur.execute(
-            """
-            SELECT DISTINCT ON (invoice_no)
-                   invoice_no, status, error_msg, created_at
-            FROM erp_push_logs
-            WHERE tenant_id = %s AND invoice_no = ANY(%s::text[])
-            ORDER BY invoice_no, created_at DESC
-            """,
-            (str(tenant_id), list(invoice_nos)),
-        )
-        return [dict(r) for r in (cur.fetchall() or [])]
+        matched: Dict[str, Dict[str, Any]] = {}
+        if work_order_id:
+            cur.execute(
+                """
+                SELECT DISTINCT ON (invoice_no)
+                       invoice_no, status, error_msg, created_at
+                FROM erp_push_logs
+                WHERE tenant_id = %s AND work_order_id = %s AND invoice_no = ANY(%s::text[])
+                ORDER BY invoice_no, created_at DESC
+                """,
+                (str(tenant_id), str(work_order_id), list(invoice_nos)),
+            )
+            for r in cur.fetchall() or []:
+                row = dict(r)
+                row["matched_by"] = "work_order_id"
+                matched[row["invoice_no"]] = row
+        remaining = [inv for inv in invoice_nos if inv not in matched]
+        if remaining:
+            cur.execute(
+                """
+                SELECT DISTINCT ON (invoice_no)
+                       invoice_no, status, error_msg, created_at
+                FROM erp_push_logs
+                WHERE tenant_id = %s AND invoice_no = ANY(%s::text[])
+                ORDER BY invoice_no, created_at DESC
+                """,
+                (str(tenant_id), list(remaining)),
+            )
+            for r in cur.fetchall() or []:
+                row = dict(r)
+                row["matched_by"] = "invoice_no"
+                matched[row["invoice_no"]] = row
+        return list(matched.values())
     except Exception as e:
         logger.error(f"list_push_logs_by_invoice_nos failed: {e}")
         return []

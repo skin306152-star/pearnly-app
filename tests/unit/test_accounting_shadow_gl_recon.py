@@ -240,7 +240,7 @@ class ReconWiringTests(unittest.TestCase):
         self._inject(
             gl_src={"rows": [_gl("530000", 1000.0, 0.0)], "source": "ok", "note": None},
             bridge={"5290": "530000"},
-            push=(["INV-1"], ImportReportStub(success=["INV-1"], failed=[]), 1),
+            push=(["INV-1"], ImportReportStub(success=["INV-1"], failed=[]), 1, "invoice_no"),
         )
         out = reconcile.run(_store())
         rg = out.payload["gates"]["r5_shadow"]["reconcile_gl"]
@@ -255,6 +255,18 @@ class ReconWiringTests(unittest.TestCase):
         self.assertEqual(rg["push"]["matched_by"], "invoice_no")
         self.assertEqual(rg["push"]["matched_rows"], 1)
 
+    def test_matched_by_work_order_id_flows_through(self):
+        # MC2-C:_shadow_push_report 报的 matched_by 原样透传到 payload——精确匹配时不被
+        # _run_shadow_gl_recon 硬编码覆盖回 "invoice_no"(咬人测试:去掉透传这行必红)。
+        self._inject(
+            gl_src={"rows": [], "source": "none", "note": None},
+            bridge={},
+            push=(["INV-1"], ImportReportStub(success=["INV-1"], failed=[]), 1, "work_order_id"),
+        )
+        out = reconcile.run(_store())
+        push = out.payload["gates"]["r5_shadow"]["reconcile_gl"]["push"]
+        self.assertEqual(push["matched_by"], "work_order_id")
+
     def test_no_report_push_has_no_matched_annotation(self):
         # no_report(查无回执)不挂 matched_by/matched_rows——存量工单 payload 逐字节维持现状
         # 的前提就是这两个新键只在真有报告时出现(与 test_no_gl_payload_frozen_except_gl_source
@@ -262,7 +274,7 @@ class ReconWiringTests(unittest.TestCase):
         self._inject(
             gl_src={"rows": [], "source": "none", "note": None},
             bridge={},
-            push=(["INV-1"], None, 0),
+            push=(["INV-1"], None, 0, None),
         )
         out = reconcile.run(_store())
         push = out.payload["gates"]["r5_shadow"]["reconcile_gl"]["push"]
@@ -280,7 +292,7 @@ class ReconWiringTests(unittest.TestCase):
                 "note": "gl_may.pdf: no_text_layer",
             },
             bridge={},
-            push=([], None, 0),
+            push=([], None, 0, None),
         )
         out = reconcile.run(_store())
         rg = out.payload["gates"]["r5_shadow"]["reconcile_gl"]

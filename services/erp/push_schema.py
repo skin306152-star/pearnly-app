@@ -189,6 +189,27 @@ def ensure_erp_retry_columns():
         logger.warning(f"ensure_erp_retry_columns failed: {e}")
 
 
+def ensure_erp_push_logs_work_order_id_column():
+    """MC2-C · erp_push_logs 加可空列 work_order_id + 部分索引(幂等 · dual-run 对齐
+    alembic/versions/0076_erp_push_logs_work_order_id.py)。
+
+    T4c 回执核对(services/workorder/steps/reconcile.py)此前只能按 invoice_no 在租户范围
+    匹配,跨工单同票号理论上会串;本列补上后,工单发起的推送可带精确归属,读侧优先按列
+    匹配、无列值回落票号。无外键(legacy 集成表,推送多为主站直推独立流);老行 NULL 如实。
+    """
+    try:
+        with db.get_cursor(commit=True) as cur:
+            cur.execute("ALTER TABLE erp_push_logs ADD COLUMN IF NOT EXISTS work_order_id UUID")
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS ix_erp_push_logs_tenant_wo "
+                "ON erp_push_logs (tenant_id, work_order_id) "
+                "WHERE work_order_id IS NOT NULL"
+            )
+            logger.info("✅ erp_push_logs.work_order_id 列 + 部分索引就绪")
+    except Exception as e:
+        logger.warning(f"ensure_erp_push_logs_work_order_id_column failed: {e}")
+
+
 def ensure_erp_push_rls():
     """B8 RLS wave4:给 erp_endpoints / erp_push_logs 上 policy(幂等 · 独立事务防牵连别的 ensure)。
 

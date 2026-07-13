@@ -102,6 +102,15 @@
   justify-content: flex-end;
   padding: 4px 0 16px;
 }
+/* OCR(图片/扫描件)识别中提示:比文字层慢一个量级,诚实告知在识别而非卡死。 */
+.fc-ocr-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0 4px;
+  font-size: 12.5px;
+  color: var(--ink2);
+}
 
 @media (max-width: 480px) {
   .fc-stats {

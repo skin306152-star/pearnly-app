@@ -35,16 +35,17 @@ Object.assign(window.__AI_I18N_JA__, {
     // K1b · 財務ファイル変換
     nav_fileconv: '財務ファイル変換',
     fileconv_title: '財務ファイル変換',
-    fileconv_note: '財務 PDF をアップロード · Excel 変換前に整合性チェックを実行',
-    fileconv_drop_t: 'PDF をドラッグ、またはここをクリックして選択',
+    fileconv_note: '財務 PDF / 画像をアップロード · Excel 変換前に整合性チェックを実行',
+    fileconv_drop_t: 'PDF / 写真をドラッグ、またはここをクリックして選択',
     fileconv_drop_s:
-        'テキストレイヤー付き財務 PDF（銀行明細 / 総勘定元帳 / 税務レポート）、1 ファイル 20MB 以内。',
+        '財務 PDF とスマホ撮影画像（銀行明細 / 総勘定元帳 / 税務レポート）に対応。スキャンは自動で読み取り、1 ファイル 20MB 以内。',
     fileconv_run: '変換開始 →',
     fileconv_running: '変換中…',
+    fileconv_ocr_running: 'スキャン読み取り中 · テキストレイヤー付き PDF より時間がかかります',
     fileconv_uploaded: 'アップロード済み：{name}',
     fileconv_reset: '別のファイルにする',
-    fileconv_err_no_file: '先に PDF ファイルを選択してください',
-    fileconv_err_bad_type: 'PDF ファイルのみ対応しています',
+    fileconv_err_no_file: '先に PDF または画像ファイルを選択してください',
+    fileconv_err_bad_type: 'PDF / JPG / PNG / WebP ファイルのみ対応しています',
     fileconv_conserved_chip: 'チェック通過',
     fileconv_conserved_s:
         '整合性チェックすべて通過 · 数値は信頼できます。Excel をダウンロードできます。',
@@ -53,7 +54,13 @@ Object.assign(window.__AI_I18N_JA__, {
         '{n} 行で整合性チェック不一致 · 下に行ごとに列挙。ダウンロードした Excel にも Issues シートが付きます。',
     fileconv_no_text_layer_chip: 'スキャン画像',
     fileconv_no_text_layer_s:
-        'この PDF にはテキストレイヤーがありません（スキャンの可能性）。現在未対応 · OCR チャネルは近日対応予定。',
+        'この PDF にはテキストレイヤーがありません(スキャンの可能性)。今回は OCR で読み取れませんでした。',
+    fileconv_ocr_incomplete_chip: '読み取り不完全',
+    fileconv_ocr_incomplete_s:
+        'OCR の出力が途中で切れた/不完全のため、出力を正直に拒否しました — 中途半端なデータは出しません。再試行するか、より鮮明なファイルをお試しください。',
+    fileconv_ocr_unavailable_chip: 'OCR 利用不可',
+    fileconv_ocr_unavailable_s:
+        'OCR エンジンが一時的に利用できません。データは生成されていません。後でもう一度お試しください。',
     fileconv_doctype_gl_ledger: '総勘定元帳',
     fileconv_doctype_bank_statement: '銀行取引明細',
     fileconv_doctype_vat_report: '付加価値税レポート',
@@ -73,6 +80,7 @@ Object.assign(window.__AI_I18N_JA__, {
     fileconv_issue_gl_balance_chain: '残高チェーン不一致',
     fileconv_issue_running_balance: '累計残高不一致',
     fileconv_issue_footer_total: '合計が閉じない',
+    fileconv_issue_closing_anchor: '期末残高不一致',
     fileconv_expected: '期待値 {v}',
     fileconv_actual: '実際 {v}',
     fileconv_download: 'Excel をダウンロード',

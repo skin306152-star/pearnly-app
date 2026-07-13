@@ -180,7 +180,7 @@
         fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.id = 'fcFileInput';
-        fileInput.accept = '.pdf';
+        fileInput.accept = '.pdf,.jpg,.jpeg,.png,.webp';
         fileInput.style.display = 'none';
         fileInput.addEventListener('change', function () {
             setFile(fileInput.files);

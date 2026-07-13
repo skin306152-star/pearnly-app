@@ -35,16 +35,17 @@ Object.assign(window.__AI_I18N_EN__, {
     // K1b · financial file conversion
     nav_fileconv: 'File Conversion',
     fileconv_title: 'Financial File Conversion',
-    fileconv_note: 'Upload a financial PDF · conservation checks run before Excel export',
-    fileconv_drop_t: 'Drop a PDF here, or click to pick',
+    fileconv_note: 'Upload a financial PDF / photo · conservation checks run before Excel export',
+    fileconv_drop_t: 'Drop a PDF or photo here, or click to pick',
     fileconv_drop_s:
-        'Financial PDFs with a text layer (bank statement / GL / tax report), up to 20MB each.',
+        'Financial PDFs and phone photos (bank statement / GL / tax report); scans are read automatically, up to 20MB each.',
     fileconv_run: 'Convert →',
     fileconv_running: 'Converting…',
+    fileconv_ocr_running: 'Reading scanned document · slower than a text-layer PDF, please wait',
     fileconv_uploaded: 'Uploaded: {name}',
     fileconv_reset: 'Pick another file',
-    fileconv_err_no_file: 'Please pick a PDF file first',
-    fileconv_err_bad_type: 'Only PDF files are supported',
+    fileconv_err_no_file: 'Please pick a PDF or image file first',
+    fileconv_err_bad_type: 'Only PDF / JPG / PNG / WebP files are supported',
     fileconv_conserved_chip: 'Checks passed',
     fileconv_conserved_s:
         'All conservation checks passed · the numbers are trustworthy, safe to download Excel.',
@@ -53,7 +54,13 @@ Object.assign(window.__AI_I18N_EN__, {
         '{n} line(s) failed conservation checks · named below; the downloaded Excel includes an Issues sheet.',
     fileconv_no_text_layer_chip: 'Scanned file',
     fileconv_no_text_layer_s:
-        'This PDF has no text layer (likely a scan), not supported yet · OCR channel coming soon.',
+        'This PDF has no text layer (likely a scan) and OCR could not read it this time.',
+    fileconv_ocr_incomplete_chip: 'Incomplete read',
+    fileconv_ocr_incomplete_s:
+        'The OCR output was truncated or incomplete, so the export was honestly refused — no partial data is ever produced. Retry or use a clearer file.',
+    fileconv_ocr_unavailable_chip: 'OCR unavailable',
+    fileconv_ocr_unavailable_s:
+        'The OCR engine is temporarily unavailable; no data was generated. Please try again later.',
     fileconv_doctype_gl_ledger: 'General Ledger',
     fileconv_doctype_bank_statement: 'Bank Statement',
     fileconv_doctype_vat_report: 'VAT Report',
@@ -73,6 +80,7 @@ Object.assign(window.__AI_I18N_EN__, {
     fileconv_issue_gl_balance_chain: 'Balance chain broken',
     fileconv_issue_running_balance: 'Running balance mismatch',
     fileconv_issue_footer_total: 'Total does not close',
+    fileconv_issue_closing_anchor: 'Closing balance mismatch',
     fileconv_expected: 'expected {v}',
     fileconv_actual: 'actual {v}',
     fileconv_download: 'Download Excel',

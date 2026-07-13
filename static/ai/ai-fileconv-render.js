@@ -14,9 +14,10 @@
 (function (root) {
     'use strict';
 
-    // K1a 本单只接带文字层的 PDF(扫描件走 no_text_layer 诚实拒绝,OCR 归 K1c),
-    // 客户端先挡明显打错的文件类型,省一趟网络往返。
-    var ALLOWED_EXT = /\.pdf$/i;
+    // 带文字层 PDF 走纯函数路;扫描件 PDF/图片(jpg/png/webp)走 OCR 路(K1c)。客户端先挡
+    // 明显打错的文件类型,省一趟网络往返。
+    var ALLOWED_EXT = /\.(pdf|jpe?g|png|webp)$/i;
+    var IMAGE_EXT = /\.(jpe?g|png|webp)$/i;
 
     function validateFile(file) {
         if (!file) return { ok: false, errKey: 'fileconv_err_no_file' };
@@ -24,6 +25,10 @@
             return { ok: false, errKey: 'fileconv_err_bad_type' };
         }
         return { ok: true };
+    }
+
+    function isImageFile(file) {
+        return !!file && IMAGE_EXT.test(file.name || '');
     }
 
     // doc_type(services/fileconv/model.py 四枚举)→ i18n key。未来引擎加新类型忘同步
@@ -39,21 +44,36 @@
         return DOC_TYPE_KEYS[docType] || 'fileconv_doctype_generic_table';
     }
 
-    // issue.kind(services/fileconv/model.py 三种守恒校验)→ i18n key,逐行点名用。
+    // issue.kind(services/fileconv/model.py 守恒校验 + OCR 独立锚)→ i18n key,逐行点名用。
     var ISSUE_KIND_KEYS = {
         gl_balance_chain: 'fileconv_issue_gl_balance_chain',
         running_balance: 'fileconv_issue_running_balance',
         footer_total: 'fileconv_issue_footer_total',
+        closing_anchor: 'fileconv_issue_closing_anchor',
     };
 
     function issueKindKey(kind) {
         return ISSUE_KIND_KEYS[kind] || kind;
     }
 
+    // OCR 读不全/够不到模型 = 结构化拒绝(services/fileconv/model.py),与无文字层同属拒绝态:
+    // 横幅走「拒绝」样式,绝不显示「可信」大字。
+    var REJECT_STATUSES = {
+        no_text_layer: 'fileconv_no_text_layer',
+        ocr_incomplete: 'fileconv_ocr_incomplete',
+        ocr_unavailable: 'fileconv_ocr_unavailable',
+    };
+
+    function isRejected(status) {
+        return Object.prototype.hasOwnProperty.call(REJECT_STATUSES, status);
+    }
+
     var pure = {
         validateFile: validateFile,
+        isImageFile: isImageFile,
         docTypeKey: docTypeKey,
         issueKindKey: issueKindKey,
+        isRejected: isRejected,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = pure;
 
@@ -167,12 +187,13 @@
     }
 
     function bannerHtml(result) {
-        if (result.status === 'no_text_layer') {
+        if (isRejected(result.status)) {
+            var base = REJECT_STATUSES[result.status];
             return (
                 '<div class="fc-banner n"><span class="chip n">' +
-                esc(at('fileconv_no_text_layer_chip')) +
+                esc(at(base + '_chip')) +
                 '</span><span>' +
-                esc(at('fileconv_no_text_layer_s')) +
+                esc(at(base + '_s')) +
                 '</span></div>'
             );
         }
@@ -191,8 +212,7 @@
 
     function resultsHtml(result, downloading) {
         result = result || {};
-        var rejected = result.status === 'no_text_layer';
-        if (rejected) {
+        if (isRejected(result.status)) {
             return bannerHtml(result);
         }
         var issues = result.issues || [];
@@ -233,7 +253,13 @@
     function pageHtml(ctx) {
         ctx = ctx || {};
         var zone = uploadZoneHtml(ctx);
-        if (ctx.running) return zone + root.AI.state.loadingHtml();
+        if (ctx.running) {
+            // OCR(图片/扫描件)比文字层慢一个量级,加载态诚实标「识别中」不让用户以为卡死。
+            var note = isImageFile(ctx.file)
+                ? '<div class="fc-ocr-note">' + esc(at('fileconv_ocr_running')) + '</div>'
+                : '';
+            return zone + note + root.AI.state.loadingHtml();
+        }
         if (!ctx.result) return zone;
         return (
             '<div class="fc-done-bar"><span>' +
@@ -248,8 +274,10 @@
     root.AI = root.AI || {};
     root.AI.fileconvRender = {
         validateFile: validateFile,
+        isImageFile: isImageFile,
         docTypeKey: docTypeKey,
         issueKindKey: issueKindKey,
+        isRejected: isRejected,
         pageHtml: pageHtml,
     };
 })(typeof self !== 'undefined' ? self : typeof globalThis !== 'undefined' ? globalThis : this);

@@ -158,6 +158,20 @@ Object.assign(window.__AI_I18N_EN__, {
     err_payroll_client_not_found: 'Client not found or not accessible',
     err_payroll_bad_kind: 'Unknown output kind',
     err_payroll_no_period_data: 'No submitted payroll data yet for this client and period',
+    // PND1A annual aggregation (batch H closing item)
+    payroll_annual_title: 'PND1A annual aggregation',
+    payroll_annual_upload_note:
+        'Upload-file format still awaits official sample verification — this tool only produces the keying sheet',
+    payroll_annual_year_label: 'Tax year (4-digit Buddhist Era)',
+    payroll_annual_run: 'Generate annual aggregation →',
+    payroll_annual_stat_employees: 'Employees',
+    payroll_download_annual_keying: 'Download annual keying sheet',
+    payroll_issue_name_mismatch: 'Name changed across months',
+    payroll_issue_year_sum_mismatch: 'Annual aggregation does not reconcile with monthly data',
+    err_payroll_no_year_data: 'No submitted payroll data yet for this client and tax year',
+    err_payroll_bad_tax_year: 'Invalid tax year format — must be 4-digit Buddhist Era',
+    err_payroll_annual_kind_not_available:
+        'PND1A upload-file format still awaits official sample verification — only the keying sheet is available',
 
     // EN-clients(2026-07-13) · Clients / client archive / reports / settings — three
     // sidebar entries moving from disabled placeholders to real routes.

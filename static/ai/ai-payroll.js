@@ -11,6 +11,10 @@
  *
  * 依赖 window.AI.state/api/format/payrollRender 与全局 at(),排在它们之后、ai.js
  * 之前加载(见 scripts/build-home-js.mjs)。
+ *
+ * ภ.ง.ด.1ก 年度聚合(批次 H 收尾件)——独立于上面月度状态机的小面板(loadAnnualSummary/
+ * downloadAnnual),渲染委托 AI.payrollAnnualRender(ai-payroll-annual-render.js),
+ * render() 里常驻拼在页面末尾。
  */
 (function () {
     'use strict';
@@ -48,11 +52,17 @@
             manualForm: null,
             downloading: {},
             errKey: null,
+            // ภ.ง.ด.1ก 年度聚合(批次 H 收尾件)——独立于上面月度进料状态机的小面板状态。
+            annualYear: AI.payrollAnnualRender.defaultTaxYear(),
+            annualSummary: null,
+            annualLoading: false,
+            annualDownloading: false,
+            annualErrKey: null,
         };
     }
 
     function render() {
-        body().innerHTML = R().pageHtml(S);
+        body().innerHTML = R().pageHtml(S) + AI.payrollAnnualRender.panelHtml(S);
     }
 
     function loadClients() {
@@ -225,6 +235,61 @@
             });
     }
 
+    // ภ.ง.ด.1ก 年度聚合(批次 H 收尾件)——先拉 JSON 汇总(Σ支付/Σ预扣 + issues)看清楚
+    // 再下载,同月报 parse→commit 两段式先例,不闷头吐文件。
+    function loadAnnualSummary() {
+        var ready = S.clientId && AI.payrollAnnualRender.isTaxYearValid(S.annualYear);
+        if (!ready || S.annualLoading) return;
+        var session = S;
+        S.annualLoading = true;
+        S.annualErrKey = null;
+        S.annualSummary = null;
+        render();
+        S.api
+            .getPayrollAnnualSummary(S.clientId, S.annualYear)
+            .then(function (result) {
+                if (S !== session) return;
+                S.annualLoading = false;
+                S.annualSummary = result;
+                render();
+            })
+            .catch(function (err) {
+                if (S !== session) return;
+                S.annualLoading = false;
+                S.annualErrKey = mapErrKey(err);
+                render();
+            });
+    }
+
+    function downloadAnnual() {
+        if (S.annualDownloading) return;
+        var session = S;
+        S.annualDownloading = true;
+        render();
+        S.api
+            .downloadPayrollAnnualOutput(S.clientId, S.annualYear, 'keying')
+            .then(function (r) {
+                if (S !== session) return;
+                var url = URL.createObjectURL(r.blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = r.filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            })
+            .catch(function (err) {
+                if (S !== session) return;
+                S.annualErrKey = mapErrKey(err);
+            })
+            .then(function () {
+                if (S !== session) return;
+                S.annualDownloading = false;
+                render();
+            });
+    }
+
     function reset() {
         S.file = null;
         S.parseResult = null;
@@ -268,10 +333,19 @@
             S.manualForm = null;
             render();
         } else if (a === 'pr-manual-submit') submitManual();
+        else if (a === 'pr-annual-summary') loadAnnualSummary();
+        else if (a === 'pr-annual-download') downloadAnnual();
     }
 
     function onChange(e) {
         var t = e.target;
+        if (t.id === 'prAnnualYearInput') {
+            S.annualYear = t.value.trim();
+            S.annualSummary = null;
+            S.annualErrKey = null;
+            render();
+            return;
+        }
         if (t.id === 'prClientSel' || t.id === 'prPeriodInput') {
             if (t.id === 'prClientSel') S.clientId = t.value;
             else S.period = t.value.trim();

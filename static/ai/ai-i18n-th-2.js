@@ -155,6 +155,20 @@ Object.assign(window.__AI_I18N_TH__, {
     err_payroll_client_not_found: 'ไม่พบลูกค้ารายนี้หรือไม่มีสิทธิ์เข้าถึง',
     err_payroll_bad_kind: 'ไม่รู้จักประเภทไฟล์ผลลัพธ์นี้',
     err_payroll_no_period_data: 'ยังไม่มีข้อมูลเงินเดือนที่ส่งแล้วของลูกค้ารายนี้ในงวดนี้',
+    // ภ.ง.ด.1ก สรุปยอดรายปี (ชุดปิดล็อต H)
+    payroll_annual_title: 'สรุปยอด ภ.ง.ด.1ก รายปี',
+    payroll_annual_upload_note:
+        'รูปแบบไฟล์อัปโหลดยังรอตัวอย่างทางการยืนยัน · รอบนี้ให้เฉพาะชีตคีย์ข้อมูล',
+    payroll_annual_year_label: 'ปีภาษี (พ.ศ. 4 หลัก)',
+    payroll_annual_run: 'สรุปยอดรายปี →',
+    payroll_annual_stat_employees: 'จำนวนพนักงาน',
+    payroll_download_annual_keying: 'ดาวน์โหลดชีตคีย์ข้อมูลรายปี',
+    payroll_issue_name_mismatch: 'ชื่อไม่ตรงกันข้ามเดือน',
+    payroll_issue_year_sum_mismatch: 'ยอดรวมรายปีไม่ตรงกับยอดรายเดือน',
+    err_payroll_no_year_data: 'ยังไม่มีข้อมูลเงินเดือนที่ส่งแล้วของลูกค้ารายนี้ในปีนี้',
+    err_payroll_bad_tax_year: 'รูปแบบปีภาษีไม่ถูกต้อง ต้องเป็นตัวเลข พ.ศ. 4 หลัก',
+    err_payroll_annual_kind_not_available:
+        'รูปแบบไฟล์อัปโหลด 1ก ยังรอตัวอย่างทางการยืนยัน · ตอนนี้รองรับเฉพาะชีตคีย์ข้อมูล',
 
     // EN-clients(2026-07-13)· ลูกค้า/โปรไฟล์ลูกค้า/รายงาน/ตั้งค่า——เปิดใช้งานสามเมนูที่เคยปิดไว้
     clients_empty_t: 'ยังไม่มีลูกค้า',

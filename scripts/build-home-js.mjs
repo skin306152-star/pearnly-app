@@ -136,8 +136,13 @@ const BUNDLES = [
             // ai-payroll-render.js(H1b · 工资表 ภ.ง.ด.1 工具卡纯逻辑+HTML,依赖 AI.state/
             // format)排在 ai-payroll.js(选客户/期间/上传/映射确认/提交/手工加行/下载
             // 编排)之前,两者都在 ai.js(onRoute 用 AI.payroll.mount)之前——同 ai-fileconv
-            // 先例(顶层独立工具视图)。
+            // 先例(顶层独立工具视图)。ai-payroll-annual-render.js(批次 H 收尾件 · ภ.ง.ด.1ก
+            // 年度聚合面板纯逻辑+HTML,依赖 AI.state/format/AI.payrollRender.issueRowHtml)
+            // 拆自 ai-payroll-render.js(单文件<500 行铁律已在预算线上),排它之后即可
+            // (只用它导出的 issueRowHtml,不依赖装配顺序),ai-payroll.js 之前(render() 里
+            // 拼 AI.payrollAnnualRender.panelHtml)。
             'ai/ai-payroll-render.js',
+            'ai/ai-payroll-annual-render.js',
             'ai/ai-payroll.js',
             'ai/ai-client.js',
             // EN-clients(2026-07-13)· 客户目录/单客户档案页/报表中心/设置——三个侧栏占位

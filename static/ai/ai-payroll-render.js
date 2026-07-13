@@ -24,7 +24,8 @@
         return { ok: true };
     }
 
-    // Issue.kind(services/payroll/model.py 七枚举)→ i18n key,逐行点名用。
+    // Issue.kind(services/payroll/model.py 九枚举:月度五校验 + 年度聚合两枚举)→ i18n key,
+    // 逐行点名用。
     var ISSUE_KIND_KEYS = {
         invalid_employee_id: 'payroll_issue_invalid_employee_id',
         bad_paid_date: 'payroll_issue_bad_paid_date',
@@ -33,6 +34,8 @@
         wht_out_of_range: 'payroll_issue_wht_out_of_range',
         bad_amount: 'payroll_issue_bad_amount',
         missing_required_field: 'payroll_issue_missing_required_field',
+        cross_month_name_mismatch: 'payroll_issue_name_mismatch',
+        year_sum_mismatch: 'payroll_issue_year_sum_mismatch',
     };
 
     function issueKindKey(kind) {
@@ -439,7 +442,8 @@
     // ctx 四态:未上传(无 file/无 result,setup 区)/ 识别或提交中(parsing||committing,
     // 骨架屏)/ 出错(errKey)/ 映射待确认(parseResult 有但 commitResult 无)/ 有结果
     // (commitResult)。骨架屏与已选文件名共存,不整块替换掉用户已选的文件——同
-    // ai-fileconv-render.js 先例。
+    // ai-fileconv-render.js 先例。ภ.ง.ด.1ก 年度聚合面板(ai-payroll-annual-render.js,单文件
+    // <500 行铁律拆出)独立于本状态机,由 ai-payroll.js 的 render() 常驻拼在末尾。
     function pageHtml(ctx) {
         ctx = ctx || {};
         if (ctx.parsing || ctx.committing) return setupHtml(ctx) + root.AI.state.loadingHtml();
@@ -449,5 +453,5 @@
     }
 
     root.AI = root.AI || {};
-    root.AI.payrollRender = Object.assign({ pageHtml: pageHtml }, pure);
+    root.AI.payrollRender = Object.assign({ pageHtml: pageHtml, issueRowHtml: issueRowHtml }, pure);
 })(typeof self !== 'undefined' ? self : typeof globalThis !== 'undefined' ? globalThis : this);

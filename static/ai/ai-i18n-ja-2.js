@@ -159,6 +159,20 @@ Object.assign(window.__AI_I18N_JA__, {
     err_payroll_client_not_found: 'クライアントが存在しないかアクセス権限がありません',
     err_payroll_bad_kind: '不明な出力種別です',
     err_payroll_no_period_data: 'このクライアント・期間の送信済み給与データはまだありません',
+    // ภ.ง.ด.1ก 年次集計(バッチ H 締めくくり案件)
+    payroll_annual_title: 'ภ.ง.ด.1ก 年次集計',
+    payroll_annual_upload_note:
+        'アップロードファイル形式は公式サンプルでの検証待ちのため、今回はキー入力用シートのみ提供します',
+    payroll_annual_year_label: '申告年度(仏暦4桁)',
+    payroll_annual_run: '年次集計を生成 →',
+    payroll_annual_stat_employees: '従業員数',
+    payroll_download_annual_keying: '年次キー入力用シートをダウンロード',
+    payroll_issue_name_mismatch: '月をまたいで氏名が一致しません',
+    payroll_issue_year_sum_mismatch: '年次集計が月次データと一致しません',
+    err_payroll_no_year_data: 'このクライアント・年度の送信済み給与データはまだありません',
+    err_payroll_bad_tax_year: '申告年度の形式が不正です(仏暦4桁の数字が必要)',
+    err_payroll_annual_kind_not_available:
+        '1ก のアップロードファイル形式は公式サンプルでの検証待ちのため、現在はキー入力用シートのみ対応しています',
 
     // EN-clients(2026-07-13)· 顧客/顧客プロフィール/レポート/設定——無効だった3つの
     // サイドバー項目を実ルートへ。

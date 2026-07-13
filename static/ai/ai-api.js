@@ -440,6 +440,39 @@
                         });
                     });
             },
+            // ภ.ง.ด.1ก 年度聚合(批次 H 收尾件)——summary 纯读聚合预览(JSON),output 只接受
+            // kind=keying(上传件格式未经官方样本核实,诚实降级见 routes/payroll_routes.py)。
+            getPayrollAnnualSummary: function (workspaceClientId, taxYear) {
+                var qs =
+                    '?workspace_client_id=' +
+                    encodeURIComponent(workspaceClientId) +
+                    '&tax_year=' +
+                    encodeURIComponent(taxYear);
+                return root
+                    .fetch('/api/payroll/annual/summary' + qs, { headers: authHeaders() })
+                    .then(handleResponse);
+            },
+            downloadPayrollAnnualOutput: function (workspaceClientId, taxYear, kind) {
+                var qs =
+                    '?workspace_client_id=' +
+                    encodeURIComponent(workspaceClientId) +
+                    '&tax_year=' +
+                    encodeURIComponent(taxYear) +
+                    '&kind=' +
+                    encodeURIComponent(kind);
+                return root
+                    .fetch('/api/payroll/annual/output' + qs, { headers: authHeaders() })
+                    .then(function (r) {
+                        if (!r.ok) return handleResponse(r);
+                        var disp = r.headers.get('Content-Disposition') || '';
+                        var star = /filename\*=UTF-8''([^;]+)/.exec(disp);
+                        var plain = /filename="?([^";]+)"?/.exec(disp);
+                        var filename = star ? decodeURIComponent(star[1]) : plain ? plain[1] : kind;
+                        return r.blob().then(function (blob) {
+                            return { blob: blob, filename: filename };
+                        });
+                    });
+            },
         };
     }
 

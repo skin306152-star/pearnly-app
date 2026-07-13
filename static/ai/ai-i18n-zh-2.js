@@ -146,6 +146,18 @@ Object.assign(window.__AI_I18N_ZH__, {
     err_payroll_client_not_found: '客户不存在或无权限',
     err_payroll_bad_kind: '未知的产出类型',
     err_payroll_no_period_data: '该客户该申报期还没有已提交的工资数据',
+    // ภ.ง.ด.1ก 年度聚合(批次 H 收尾件)
+    payroll_annual_title: 'ภ.ง.ด.1ก 年报聚合',
+    payroll_annual_upload_note: '上传件格式待官方样本核实，本单只提供键入底稿',
+    payroll_annual_year_label: '申报年度（佛历 4 位）',
+    payroll_annual_run: '生成年报聚合 →',
+    payroll_annual_stat_employees: '员工人数',
+    payroll_download_annual_keying: '下载年报键入底稿',
+    payroll_issue_name_mismatch: '跨月姓名不一致',
+    payroll_issue_year_sum_mismatch: '年度聚合与月度不守恒',
+    err_payroll_no_year_data: '该客户该年度还没有已提交的工资数据',
+    err_payroll_bad_tax_year: '申报年度格式不对，应为佛历 4 位数字',
+    err_payroll_annual_kind_not_available: '1ก 上传件格式待官方样本核实，暂只支持键入底稿',
 
     // EN-clients(2026-07-13)· 客户目录/单客户档案页/报表中心/设置——三个侧栏占位收口。
     clients_empty_t: '还没有客户',

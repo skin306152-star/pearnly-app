@@ -10,7 +10,6 @@ window.__AI_I18N_TH__ = {
     nav_clients: 'ลูกค้า',
     nav_reports: 'รายงาน',
     nav_settings: 'ตั้งค่า',
-    nav_soon: '（ยังไม่เปิดใช้งาน）',
     firm_name: 'สำนักงานบัญชี',
     firm_meta: 'สมุดบัญชี · {n} สมาชิก',
     crumb_dash: 'แดชบอร์ด',

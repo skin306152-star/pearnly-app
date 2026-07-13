@@ -10,7 +10,6 @@ window.__AI_I18N_JA__ = {
     nav_clients: '顧客',
     nav_reports: 'レポート',
     nav_settings: '設定',
-    nav_soon: '（未対応）',
     firm_name: '会計事務所',
     firm_meta: 'ワークスペース · {n} 名',
     crumb_dash: 'ダッシュボード',

@@ -10,7 +10,6 @@ window.__AI_I18N_EN__ = {
     nav_clients: 'Clients',
     nav_reports: 'Reports',
     nav_settings: 'Settings',
-    nav_soon: ' (not available yet)',
     firm_name: 'Accounting Firm',
     firm_meta: 'Workspace · {n} members',
     crumb_dash: 'Dashboard',

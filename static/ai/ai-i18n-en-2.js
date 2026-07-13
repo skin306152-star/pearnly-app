@@ -158,4 +158,38 @@ Object.assign(window.__AI_I18N_EN__, {
     err_payroll_client_not_found: 'Client not found or not accessible',
     err_payroll_bad_kind: 'Unknown output kind',
     err_payroll_no_period_data: 'No submitted payroll data yet for this client and period',
+
+    // EN-clients(2026-07-13) · Clients / client archive / reports / settings — three
+    // sidebar entries moving from disabled placeholders to real routes.
+    clients_empty_t: 'No clients yet',
+    clients_empty_s: 'Clients appear here automatically once the first work order is opened',
+    clients_col_name: 'Client',
+    clients_col_tax_id: 'Tax ID',
+    clients_col_completeness: 'Profile completeness',
+    clients_col_obligations: 'Current obligations',
+    ca_tab_profile: 'Tax profile',
+    ca_tab_supplier: 'Supplier posting profiles',
+    ca_tab_history: 'Work order history',
+    ca_history_empty_t: 'No work orders yet',
+    ca_history_empty_s: 'This client has not had a work order opened yet',
+    reports_pick_client: 'Select a client',
+    reports_client_label: 'Client',
+    reports_period_label: 'Period',
+    reports_open_order_btn: 'Open a work order',
+    reports_no_order_t: 'No work order for this period',
+    reports_no_order_s:
+        'This client has no work order for the selected period yet — open one to start generating reports',
+    reports_downloads_title: 'Deliverable downloads',
+    reports_prompt_t: 'Pick a client and period to view reports',
+    reports_prompt_s:
+        "Once you pick a client and period, that period's balance sheet, P&L and trial balance show here",
+    settings_lang_title: 'Language',
+    settings_lang_zh: '中文',
+    settings_lang_th: 'ไทย',
+    settings_lang_en: 'English',
+    settings_lang_ja: '日本語',
+    settings_account_title: 'Account',
+    settings_account_email: 'Email',
+    settings_account_tenant: 'Firm',
+    settings_logout_btn: 'Log out',
 });

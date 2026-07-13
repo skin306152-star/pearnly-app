@@ -6,6 +6,10 @@
  * (AI.gate,见该文件顶注):
  *   无 token 或 401 → 登录卡;token 有效但探针 404(未受邀)→ 邀请制提示。
  * 真正通过闸的用户走原有工作台渲染路径,零改变。
+ *
+ * 客户/报表/设置三个侧栏位(EN-clients · 2026-07-13)已从 M1 诚实占位转正为真路由——
+ * 客户=目录(ai-clients.js)+ 单客户档案页(ai-client-archive.js),报表=跨客户报表中心
+ * (ai-reports.js),设置=语言+账号+退出(ai-settings.js)。见 ai-router.js 顶注的路由表。
  */
 (function () {
     'use strict';
@@ -46,14 +50,14 @@
         $('firmMeta').textContent = '';
         if (chromeWired) return;
         chromeWired = true;
-        // 报表/客户档案/设置:M1 未接(见 v4 降级表)——保留导航位但禁用,不假装可点。
-        // 待我处理(navTodo)D2-S8 已接:客户池页,不再落这个禁用桶。
-        ['navClients', 'navReports', 'navSettings'].forEach(function (id) {
-            var el = $(id);
-            el.addEventListener('click', function (e) {
-                e.preventDefault();
-            });
-            el.title = at('nav_soon');
+        $('navClients').addEventListener('click', function () {
+            window.location.hash = AI.router.buildClientsHash();
+        });
+        $('navReports').addEventListener('click', function () {
+            window.location.hash = AI.router.buildReportsHash();
+        });
+        $('navSettings').addEventListener('click', function () {
+            window.location.hash = AI.router.buildSettingsHash();
         });
         $('brandHome').addEventListener('click', function () {
             window.location.hash = AI.router.buildDashboardHash();
@@ -83,37 +87,45 @@
         });
     }
 
+    // 顶层独立视图 → 面包屑第二段的文案 key(都是"工作台 / <本页>"这一种形状)。
+    // client/client-archive 不在表里,各自的形状不一样,setCrumb 里单独处理。
+    var CRUMB_LABEL_KEY = {
+        pool: 'nav_todo',
+        vatcheck: 'nav_vatcheck',
+        fileconv: 'nav_fileconv',
+        payroll: 'nav_payroll',
+        clients: 'nav_clients',
+        reports: 'nav_reports',
+        settings: 'nav_settings',
+    };
+
+    function wireBack(el, hash) {
+        el.onclick = function () {
+            window.location.hash = hash;
+        };
+    }
+
     function setCrumb(route) {
         var crumb = $('crumb');
         if (route.name === 'dashboard') {
             crumb.innerHTML =
                 '<span style="color:var(--ink);font-weight:600">' + at('crumb_dash') + '</span>';
-        } else if (route.name === 'pool') {
-            crumb.innerHTML = '<a data-back>' + at('crumb_dash') + '</a> / ' + at('nav_todo');
-            crumb.querySelector('[data-back]').onclick = function () {
-                window.location.hash = AI.router.buildDashboardHash();
-            };
-        } else if (route.name === 'vatcheck') {
-            crumb.innerHTML = '<a data-back>' + at('crumb_dash') + '</a> / ' + at('nav_vatcheck');
-            crumb.querySelector('[data-back]').onclick = function () {
-                window.location.hash = AI.router.buildDashboardHash();
-            };
-        } else if (route.name === 'fileconv') {
-            crumb.innerHTML = '<a data-back>' + at('crumb_dash') + '</a> / ' + at('nav_fileconv');
-            crumb.querySelector('[data-back]').onclick = function () {
-                window.location.hash = AI.router.buildDashboardHash();
-            };
-        } else if (route.name === 'payroll') {
-            crumb.innerHTML = '<a data-back>' + at('crumb_dash') + '</a> / ' + at('nav_payroll');
-            crumb.querySelector('[data-back]').onclick = function () {
-                window.location.hash = AI.router.buildDashboardHash();
-            };
-        } else {
-            crumb.innerHTML = '<a data-back>' + at('crumb_dash') + '</a> / ' + at('title_client');
-            crumb.querySelector('[data-back]').onclick = function () {
-                window.location.hash = AI.router.buildDashboardHash();
-            };
+            return;
         }
+        if (route.name === 'client-archive') {
+            crumb.innerHTML =
+                '<a data-back>' +
+                at('crumb_dash') +
+                '</a> / <a data-back-clients>' +
+                at('nav_clients') +
+                '</a>';
+            wireBack(crumb.querySelector('[data-back]'), AI.router.buildDashboardHash());
+            wireBack(crumb.querySelector('[data-back-clients]'), AI.router.buildClientsHash());
+            return;
+        }
+        var labelKey = CRUMB_LABEL_KEY[route.name] || 'title_client';
+        crumb.innerHTML = '<a data-back>' + at('crumb_dash') + '</a> / ' + at(labelKey);
+        wireBack(crumb.querySelector('[data-back]'), AI.router.buildDashboardHash());
     }
 
     // 离开工作台时记滚动位,回来时恢复(Canon §7:视图切换回来滚动位置不丢)。
@@ -136,11 +148,21 @@
         $('v-vatcheck').classList.toggle('on', route.name === 'vatcheck');
         $('v-fileconv').classList.toggle('on', route.name === 'fileconv');
         $('v-payroll').classList.toggle('on', route.name === 'payroll');
+        $('v-clients').classList.toggle('on', route.name === 'clients');
+        $('v-client-archive').classList.toggle('on', route.name === 'client-archive');
+        $('v-reports').classList.toggle('on', route.name === 'reports');
+        $('v-settings').classList.toggle('on', route.name === 'settings');
         $('navDash').classList.toggle('on', route.name === 'dashboard');
         $('navTodo').classList.toggle('on', route.name === 'pool');
         $('navVatcheck').classList.toggle('on', route.name === 'vatcheck');
         $('navFileconv').classList.toggle('on', route.name === 'fileconv');
         $('navPayroll').classList.toggle('on', route.name === 'payroll');
+        $('navClients').classList.toggle(
+            'on',
+            route.name === 'clients' || route.name === 'client-archive'
+        );
+        $('navReports').classList.toggle('on', route.name === 'reports');
+        $('navSettings').classList.toggle('on', route.name === 'settings');
         if (route.name === 'pool') {
             window.scrollTo(0, 0);
             AI.pool.mount(api);
@@ -159,6 +181,31 @@
         if (route.name === 'payroll') {
             window.scrollTo(0, 0);
             AI.payroll.mount(api);
+            return;
+        }
+        if (route.name === 'clients') {
+            window.scrollTo(0, 0);
+            AI.clients.load(api);
+            return;
+        }
+        if (route.name === 'client-archive') {
+            window.scrollTo(0, 0);
+            AI.clientArchive.mount(api, route.clientId, route.tab);
+            return;
+        }
+        if (route.name === 'reports') {
+            window.scrollTo(0, 0);
+            AI.reports.mount(api);
+            return;
+        }
+        if (route.name === 'settings') {
+            window.scrollTo(0, 0);
+            AI.settings.mount(api, {
+                onLogout: function () {
+                    localStorage.removeItem('mrpilot_token');
+                    boot();
+                },
+            });
             return;
         }
         if (route.name === 'dashboard') {

@@ -159,4 +159,38 @@ Object.assign(window.__AI_I18N_JA__, {
     err_payroll_client_not_found: 'クライアントが存在しないかアクセス権限がありません',
     err_payroll_bad_kind: '不明な出力種別です',
     err_payroll_no_period_data: 'このクライアント・期間の送信済み給与データはまだありません',
+
+    // EN-clients(2026-07-13)· 顧客/顧客プロフィール/レポート/設定——無効だった3つの
+    // サイドバー項目を実ルートへ。
+    clients_empty_t: 'まだ顧客がいません',
+    clients_empty_s: '最初のワークオーダーを開くと、顧客がここに自動的に表示されます',
+    clients_col_name: '顧客名',
+    clients_col_tax_id: '税番号',
+    clients_col_completeness: 'プロフィール完成度',
+    clients_col_obligations: '当期の申告義務',
+    ca_tab_profile: '税務プロフィール',
+    ca_tab_supplier: '仕入先計上プロフィール',
+    ca_tab_history: 'ワークオーダー履歴',
+    ca_history_empty_t: 'まだワークオーダーがありません',
+    ca_history_empty_s: 'この顧客はまだワークオーダーを開いていません',
+    reports_pick_client: '顧客を選択',
+    reports_client_label: '顧客',
+    reports_period_label: '申告期間',
+    reports_open_order_btn: 'ワークオーダーを開く',
+    reports_no_order_t: 'この期間のワークオーダーはありません',
+    reports_no_order_s:
+        '選択した顧客はこの期間のワークオーダーがまだありません。開いてレポート作成を始めてください',
+    reports_downloads_title: '成果物のダウンロード',
+    reports_prompt_t: '顧客と期間を選んでレポートを表示',
+    reports_prompt_s:
+        '顧客と期間を選ぶと、その期間の貸借対照表・損益計算書・試算表がここに表示されます',
+    settings_lang_title: '言語',
+    settings_lang_zh: '中文',
+    settings_lang_th: 'ไทย',
+    settings_lang_en: 'English',
+    settings_lang_ja: '日本語',
+    settings_account_title: 'アカウント',
+    settings_account_email: 'メール',
+    settings_account_tenant: '所属事務所',
+    settings_logout_btn: 'ログアウト',
 });

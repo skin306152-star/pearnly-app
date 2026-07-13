@@ -10,7 +10,6 @@ window.__AI_I18N_ZH__ = {
     nav_clients: '客户',
     nav_reports: '报表',
     nav_settings: '设置',
-    nav_soon: '（本页尚未开放）',
     firm_name: '会计事务所',
     firm_meta: '套账 · {n} 名成员',
     crumb_dash: '工作台',

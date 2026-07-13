@@ -80,6 +80,7 @@ Object.assign(window.__AI_I18N_TH__, {
     fileconv_no: 'ไม่',
     fileconv_issues_title: 'ผลตรวจความสอดคล้อง',
     fileconv_no_issues: 'ตรวจผ่านทั้งหมด ไม่มีบรรทัดที่ยอดไม่ตรง',
+    fileconv_no_check: 'ตารางนี้ไม่ได้ผ่านการตรวจสอบตัวเลข',
     fileconv_issues_more: '… อีก {n} บรรทัด ดูรายการเต็มในชีต Issues ของไฟล์ Excel',
     fileconv_issue_gl_balance_chain: 'สายยอดคงเหลือไม่ตรง',
     fileconv_issue_running_balance: 'ยอดสะสมไม่ตรง',

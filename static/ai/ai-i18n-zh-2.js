@@ -74,6 +74,7 @@ Object.assign(window.__AI_I18N_ZH__, {
     fileconv_no: '否',
     fileconv_issues_title: '守恒校验',
     fileconv_no_issues: '守恒校验全过，无不平行。',
+    fileconv_no_check: '本表未做数字校验。',
     fileconv_issues_more: '… 另有 {n} 行，完整清单见下载 Excel 的 Issues 页',
     fileconv_issue_gl_balance_chain: '余额链不平',
     fileconv_issue_running_balance: '跑余额不平',

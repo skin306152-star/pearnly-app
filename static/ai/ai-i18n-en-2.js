@@ -84,6 +84,7 @@ Object.assign(window.__AI_I18N_EN__, {
     fileconv_no: 'No',
     fileconv_issues_title: 'Conservation Checks',
     fileconv_no_issues: 'All checks passed, no discrepant lines.',
+    fileconv_no_check: 'No numeric validation was performed for this table.',
     fileconv_issues_more: '… {n} more line(s), full list in the Issues sheet of the Excel file',
     fileconv_issue_gl_balance_chain: 'Balance chain broken',
     fileconv_issue_running_balance: 'Running balance mismatch',

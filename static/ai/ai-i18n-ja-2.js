@@ -84,6 +84,7 @@ Object.assign(window.__AI_I18N_JA__, {
     fileconv_no: 'いいえ',
     fileconv_issues_title: '整合性チェック',
     fileconv_no_issues: 'すべて通過、不一致行はありません。',
+    fileconv_no_check: 'この表は数値検証を行っていません。',
     fileconv_issues_more: '… ほか {n} 行、全リストは Excel の Issues シートを参照',
     fileconv_issue_gl_balance_chain: '残高チェーン不一致',
     fileconv_issue_running_balance: '累計残高不一致',

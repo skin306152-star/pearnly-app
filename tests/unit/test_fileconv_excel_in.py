@@ -3,7 +3,8 @@
 
 GL 路四态全走真实 openpyxl 合成件(端到端,不桩 parse_gl_excel):①多科目 → 落 generic
 (衍生单链余额 ≠ 原表每科目印刷余额,渲染即改数);②单科目带余额列自洽 → GL 路 ✓;
-③篡改一格 debit(印刷 closing 不再吻合)→ ISSUE_CLOSING_ANCHOR 点名(✓ 戳的真锚);
+③篡改一格 debit(印刷 closing 不再吻合)→ 锚不匹配整件降 generic(R2:closing-only 锚
+分不清「数字不自洽」和「多科目漏检」,后者更常见,假指控比漏检更伤);
 ④无余额列 → 落 generic(closing 非印刷,校验自己 = 自导自演)。
 
 桩 parse_gl_excel 的链不平用例保留为辅助——衍生链按定义自洽,真实 xlsx 走不出
@@ -23,7 +24,6 @@ from services.fileconv import excel_in
 from services.fileconv.model import (
     GENERIC_TABLE,
     GL_LEDGER,
-    ISSUE_CLOSING_ANCHOR,
     ISSUE_GL_BALANCE_CHAIN,
     STATUS_OK,
     STATUS_UNSUPPORTED_FORMAT,
@@ -104,16 +104,36 @@ class GlHonestyGateTests(unittest.TestCase):
         self.assertIn(1500, [c for row in grid for c in row])
         self.assertIn(1300, [c for row in grid for c in row])
 
-    def test_tampered_debit_trips_closing_anchor(self):
-        """态③:篡改一格 debit(500→600)→ 衍生链末值 1400 ≠ 印刷 closing 1300 →
-        ISSUE_CLOSING_ANCHOR 点名。衍生链自身永远自洽,✓ 戳全靠这条独立锚立住。"""
+    def test_anchor_mismatch_demotes_to_generic(self):
+        """态③(R2):篡改一格 debit(500→600)→ 衍生链末值 1400 ≠ 印刷 closing 1300 →
+        锚不匹配整件降 generic(带 gl_demote 留痕),网格余额列保持原表印刷值零改数。
+        closing-only 锚分不清「数字不自洽」和「多科目漏检」,不指控只降级。"""
         result = excel_in.convert_excel(_gl_xlsx(debit1=600.00), "tampered.xlsx")
-        self.assertEqual(result.doc_type, GL_LEDGER)
-        self.assertFalse(result.conserved)
-        anchors = [i for i in result.issues if i.kind == ISSUE_CLOSING_ANCHOR]
-        self.assertEqual(len(anchors), 1)
-        self.assertEqual(anchors[0].expected, "1300.0")  # 印刷期末余额
-        self.assertEqual(anchors[0].actual, "1400.0")  # 借贷重算末行余额
+        self.assertEqual(result.doc_type, GENERIC_TABLE)
+        self.assertEqual(result.stats["engine"], "excel_grid")
+        self.assertEqual(result.stats["gl_demote"], "closing_anchor_mismatch")
+        self.assertEqual(result.issues, [])
+        grid = result.tables[0].rows
+        self.assertIn(1300, [c for row in grid for c in row])  # 原表印刷 closing 原样
+
+    def test_refed_ledger_layout_with_unmapped_accounts_stays_faithful(self):
+        """态⑤(R2 金标漏网复刻):多科目件但科目码 parse_gl_excel 哪都认不出(不在可映射
+        列、doc_no/description 也提不出)→ accounts 空集绕过「单科目」门;每科目余额各自
+        成链,衍生末值对不上印刷 closing → 锚守门降 generic,余额列印刷值逐字保留。
+        修前这类件(主窗金标:735 行 MR.ERP 件)混进 GL 路被改数+假指控「不平」。"""
+        header = ["วันที่", "เลขที่", "รายละเอียด", "เดบิต", "เครดิต", "คงเหลือ"]
+        rows = [
+            header,
+            ["1/1/2026", "A1", "เงินฝากธนาคาร", 500.00, 0, 1500.00],
+            ["2/1/2026", "A2", "ขายสินค้า", 0, 200.00, 800.00],  # 换科目段,余额换链
+        ]
+        result = excel_in.convert_excel(_xlsx_bytes(rows), "refed.xlsx")
+        self.assertEqual(result.doc_type, GENERIC_TABLE)
+        self.assertEqual(result.stats.get("gl_demote"), "closing_anchor_mismatch")
+        grid = result.tables[0].rows
+        flat = [c for row in grid for c in row]
+        self.assertIn(1500, flat)
+        self.assertIn(800, flat)  # 两条链的印刷余额都原样,零改数
 
     def test_no_balance_column_falls_back_to_generic(self):
         """态④:无余额列 → closing 是借贷衍生值(closing_printed=False),拿它当锚校验

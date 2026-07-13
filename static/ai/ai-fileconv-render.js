@@ -265,7 +265,17 @@
             '<div class="panel"><div class="hd"><h3>' +
             esc(at('fileconv_issues_title')) +
             '</h3></div><div class="bd">' +
-            (issuesHtml || '<div class="fc-clean">' + esc(at('fileconv_no_issues')) + '</div>') +
+            // generic 没跑过守恒,issues 空 ≠「全过」——中性文案,别跟横幅同屏打架(假背书)。
+            (issuesHtml ||
+                '<div class="fc-clean">' +
+                    esc(
+                        at(
+                            result.doc_type === 'generic_table'
+                                ? 'fileconv_no_check'
+                                : 'fileconv_no_issues'
+                        )
+                    ) +
+                    '</div>') +
             '</div></div>' +
             '<div class="fc-actions">' +
             actionsHtml +

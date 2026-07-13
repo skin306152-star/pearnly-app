@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
 """K2 · Excel/CSV → ConvertResult(会计底稿 → PDF 规范输出的解析入口)。
 
-GL 路复用现成结构识别(services.recon.bank_gl_excel.parse_gl_excel,T4a 已验过),但进
-GL 路的门收得很紧(R1 打回收口):仅限【单科目 + 表内真有印刷余额列】的件。原因两条——
-① bank_gl_excel 的行余额是 attach_running_balance 从借贷衍生的单条全局链,多科目 GL
-(如 MR.ERP 735 行导出)每科目余额各自成链,渲染衍生链 = 悄悄改了用户原表的余额数;
-② closing 非印刷值时(表内无余额列),衍生链 vs 衍生 closing 的校验永远自洽,✓ 戳
-是自导自演。不满足门槛的一律落 generic 路——忠实转录含原表自己的余额列,零改数,
+GL 路复用现成结构识别(services.recon.bank_gl_excel.parse_gl_excel,T4a 已接过),但进
+GL 路的门收得很紧(R1/R2 打回收口):仅限【单科目 + 印刷 closing 在手 + 印刷锚对得上】
+的件。原因——bank_gl_excel 的行余额是 attach_running_balance 从借贷衍生的单条全局链,
+多科目 GL(如 MR.ERP 735 行导出)每科目余额各自成链,渲染衍生链 = 悄悄改了用户原表的
+余额数;closing 非印刷值时(表内无余额列),衍生链 vs 衍生 closing 的校验永远自洽,
+✓ 戳是自导自演。不满足门槛的一律落 generic 路——忠实转录含原表自己的余额列,零改数,
 诚实标「未做数字校验」(同 ocr_bridge._convert_generic 口径)。
 
-GL 路的 ✓ 戳靠真锚立住:衍生链末行余额 vs 表内印刷 closing(bank_gl_excel 读自余额列
-最后一笔),对不上进 ISSUE_CLOSING_ANCHOR——同 K1c ocr_bridge._anchor_issues 的独立锚。
+印刷锚(衍生链末行余额 vs bank_gl_excel 读自余额列最后一笔的 closing)是守门条件而非
+issue(R2):closing-only 锚无法区分「单科目数字不自洽」和「多科目漏检」(accounts 靠
+表头词典识列,认不出就空集,漏检远更常见——MR.ERP 全账导出是常态),错误建模 + 假指控
+「N 处不平」比漏检篡改更伤;锚对不上 → 整件降 generic(stats 带 gl_demote 原因)。
+真正的逐行守恒等 per-row 印刷余额回传(GlRow additive 字段,记 M 后续债)。
 
 老式 .xls:GL 路本身够用(parse_gl_excel 内部已有 openpyxl→xlrd→CSV 嗅探的级联);仅当
 GL 认不出、需要落 generic 网格时才单独走 xlrd——环境缺 xlrd 时诚实拒绝,不静默转空表。
@@ -20,17 +23,15 @@ from __future__ import annotations
 
 import io
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from services.fileconv.ledger import LEDGER_COLUMNS, to_table_rows
 from services.fileconv.model import (
     GENERIC_TABLE,
     GL_LEDGER,
-    ISSUE_CLOSING_ANCHOR,
     STATUS_OK,
     STATUS_UNSUPPORTED_FORMAT,
     ConvertResult,
-    Issue,
     LedgerRow,
     Table,
 )
@@ -79,47 +80,38 @@ def _gl_row(row, line_no: int) -> LedgerRow:
     )
 
 
-def _closing_anchor_issue(rows: List[LedgerRow], printed_closing: Decimal) -> List[Issue]:
-    """真锚对照(口径同 ocr_bridge._anchor_issues):表内印刷期末余额 vs 衍生链末行余额。
-    衍生链从借贷重算、自身永远自洽——✓ 戳的公信力全靠这条独立锚,对不上必须点名。"""
-    if not rows or abs(printed_closing - rows[-1].balance) <= _TOL:
-        return []
-    return [
-        Issue(
-            kind=ISSUE_CLOSING_ANCHOR,
-            line_no=rows[-1].line_no,
-            message="印刷期末余额 ≠ 重算末行余额(疑借贷有误/漏行)",
-            expected=f"{printed_closing}",
-            actual=f"{rows[-1].balance}",
-        )
-    ]
-
-
-def _try_gl(data: bytes, source_name: str) -> Optional[ConvertResult]:
-    """走现成 GL 结构识别;不满足 GL 路门槛(见模块顶注)返回 None 落 generic 路。
+def _try_gl(data: bytes, source_name: str) -> Tuple[Optional[ConvertResult], Optional[str]]:
+    """走现成 GL 结构识别;不满足 GL 路门槛(见模块顶注)返回 (None, 降级原因) 落 generic 路。
 
     门槛(缺一即落 generic):
     · 单科目(accounts ≤ 1)——多科目件的衍生单链余额 ≠ 原表每科目各自成链的印刷余额,
       渲染出来就是改用户的数;
     · closing 读自表内印刷余额列(closing_printed)——否则 closing 也是从借贷衍生的,
-      拿它当锚校验自己 = 自导自演,✓ 戳没有公信力。
+      拿它当锚校验自己 = 自导自演,✓ 戳没有公信力;
+    · 印刷锚对得上(衍生链末行余额 ≈ 印刷 closing)——accounts 靠表头词典识列,认不出就
+      空集,「单科目」判定会漏检多科目件(主窗金标实锤:735 行 MR.ERP 件 accounts 为空
+      混进 GL 路,衍生末行 736,665.84 vs 印刷 608,917.35);锚对不上无法区分「数字不自洽」
+      和「多科目漏检」,后者远更常见,错误建模+假指控比漏检篡改更伤 → 整件降 generic。
     """
     from services.recon.bank_gl_excel import parse_gl_excel
 
     try:
         parsed = parse_gl_excel(data, source_name)
     except Exception:  # noqa: BLE001 · 解析器内部炸(损坏文件等)· 不许 500,落 generic
-        return None
+        return None, None
     gl_rows = parsed.get("rows") or []
     if not parsed.get("ok") or not gl_rows:
-        return None
+        return None, None
     if len(parsed.get("accounts") or []) > 1 or not parsed.get("closing_printed"):
-        return None
+        return None, None
 
     rows = [_gl_row(r, i) for i, r in enumerate(gl_rows, start=1)]
+    printed_closing = Decimal(str(parsed.get("closing") or 0))
+    if not rows or abs(printed_closing - rows[-1].balance) > _TOL:
+        return None, "closing_anchor_mismatch"
+
     opening = {"": Decimal(str(parsed.get("opening") or 0))}
     issues = validate_mod.validate_ledger(rows, opening)
-    issues.extend(_closing_anchor_issue(rows, Decimal(str(parsed.get("closing") or 0))))
     stats = validate_mod.ledger_stats(rows, opening)
     stats["engine"] = "excel_gl"
     stats["accounts"] = sorted({r.account_code for r in gl_rows if r.account_code})
@@ -128,7 +120,7 @@ def _try_gl(data: bytes, source_name: str) -> Optional[ConvertResult]:
     for cells, src in zip(table_rows, gl_rows):
         cells[0] = src.account_code or ""  # 换回真实科目码(_gl_row 注:链 key 统一单链)
     table = Table(name="GL Ledger", columns=LEDGER_COLUMNS, rows=table_rows)
-    return ConvertResult(
+    result = ConvertResult(
         doc_type=GL_LEDGER,
         status=STATUS_OK,
         source_name=source_name,
@@ -136,6 +128,7 @@ def _try_gl(data: bytes, source_name: str) -> Optional[ConvertResult]:
         issues=issues,
         stats=stats,
     )
+    return result, None
 
 
 def _merged_fill_openpyxl(ws) -> Dict[tuple, Any]:
@@ -280,12 +273,14 @@ def convert_excel(data: bytes, source_name: str = "") -> ConvertResult:
     if ext not in _ALL_EXTS:
         return _reject(source_name, f"unsupported_ext:{ext or '(none)'}")
 
-    gl = _try_gl(data, source_name)
+    gl, demote = _try_gl(data, source_name)
     if gl is not None:
         return gl
 
     generic = _try_generic(data, source_name, ext)
     if generic is not None:
+        if demote and generic.status == STATUS_OK:
+            generic.stats["gl_demote"] = demote  # 排障留痕:GL 路因锚不匹配主动降级
         return generic
 
     return _reject(source_name, "unreadable_or_empty")

@@ -16,7 +16,7 @@ import os
 from contextvars import ContextVar, Token
 from typing import Optional
 
-_VALID = ("aistudio", "vertex", "selfhost", "anthropic")
+_VALID = ("aistudio", "vertex", "selfhost", "anthropic", "openai")
 
 # 请求级后端覆盖:某处需为本请求固定某家 provider 时用(通用能力)。
 # 现无生产调用方——economy 曾用它钉 aistudio(Vertex 无 2.5),已改由 vertex provider
@@ -76,6 +76,10 @@ def get_provider(name: Optional[str] = None):
         from services.ai_gateway.providers import anthropic
 
         return anthropic
+    if backend == "openai":
+        from services.ai_gateway.providers import openai
+
+        return openai
     from services.ai_gateway.providers import aistudio
 
     return aistudio

@@ -12,10 +12,10 @@ env:
 
 from __future__ import annotations
 
-import base64
 import os
 from typing import List, Optional, Tuple
 
+from services.ai_gateway.providers.http_common import error_kind_for_status, image_content_parts
 from services.ai_gateway.tasks import ProviderOutcome
 
 NAME = "selfhost"
@@ -41,16 +41,6 @@ def _embed_model() -> str:
     return os.environ.get("SELFHOST_EMBED_MODEL", "").strip() or _model()
 
 
-def _error_kind_status(status: int) -> str:
-    if status in (401, 403):
-        return "auth"
-    if status == 429:
-        return "quota"
-    if status in (500, 502, 503, 504):
-        return "timeout"
-    return "provider"
-
-
 def _post(path: str, payload: dict, timeout_s: int):
     """POST → (json, error_kind)。网络/HTTP 错收敛为 error_kind。"""
     import httpx
@@ -65,19 +55,11 @@ def _post(path: str, payload: dict, timeout_s: int):
     except httpx.HTTPError:
         return None, "provider"
     if resp.status_code >= 400:
-        return None, _error_kind_status(resp.status_code)
+        return None, error_kind_for_status(resp.status_code)
     try:
         return resp.json(), None
     except Exception:  # noqa: BLE001
         return None, "parse"
-
-
-def _content_parts(prompt: str, images: List[Tuple[bytes, str]]) -> list:
-    parts: list = [{"type": "text", "text": prompt}]
-    for data, mime in images:
-        b64 = base64.b64encode(data).decode("ascii")
-        parts.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
-    return parts
 
 
 def _chat_text(payload, timeout_s):
@@ -100,7 +82,7 @@ def _chat_json(prompt, images, *, temperature, response_mime, max_tokens, timeou
     from services.ocr.layer2_gemini import _parse_json
 
     model_name = _model()
-    content = _content_parts(prompt, images) if images else prompt
+    content = image_content_parts(prompt, images) if images else prompt
     payload = {
         "model": model_name,
         "messages": [{"role": "user", "content": content}],

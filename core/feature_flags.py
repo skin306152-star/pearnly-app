@@ -107,6 +107,12 @@ PEARNLY_AI_BANK_RECON_KEY = "pearnly_ai_bank_recon"
 # package——影子只算不落法定表)。按 tenant 判定(单所整体开/关,与 pearnly_ai_bank_recon 同款);
 # 消费在 services/workorder/steps/reconcile.py。
 PEARNLY_AI_SHADOW_DRAFT_KEY = "pearnly_ai_shadow_draft"
+# LINE 收料暂存闸(LN-1):默认关 fail-closed。关 = webhook 图片/文件消息与绑定码分支
+# 逐字节走现状(对话 Agent/记账 OCR/待问池/单聊客户绑定全不动);开 = 已绑上下文(单聊
+# 客户 contact / 已绑群)发的票据下载落 client_intake_staging 暂存池 + 四语确认回执。
+# 按 tenant 判定;消费在 services/line_binding/line_intake_staging.py(收料)与
+# line_client_bind_intake.py(群绑定形态)。
+PEARNLY_AI_LINE_INTAKE_KEY = "pearnly_ai_line_intake"
 
 
 def _enabled(key: str, user_id: Optional[str], label: str) -> bool:
@@ -261,6 +267,17 @@ def pearnly_ai_client_pool_enabled_for(tenant_id: Optional[str]) -> bool:
     事务所 tenant_id 加进 allowlist 即单所灰度。
     """
     return _enabled(PEARNLY_AI_CLIENT_POOL_KEY, tenant_id, "pearnly_ai_client_pool_enabled_for")
+
+
+def pearnly_ai_line_intake_enabled_for(tenant_id: Optional[str]) -> bool:
+    """LINE 收料暂存闸(LN-1)。关 = webhook 图片/文件与群绑定分支逐字节走现状。
+
+    双闸:pearnly_ai_m1 在场才有效。与 client_pool(两独立闸在各自消费层分别判)不同,这是仓库首个
+    flag 内嵌依赖 flag 的组合闸——让每个消费点天然双闸;任一关或异常均 fail-closed。按 tenant 判定(单所整体开/关)。
+    """
+    if not pearnly_ai_m1_enabled_for(tenant_id, None):
+        return False
+    return _enabled(PEARNLY_AI_LINE_INTAKE_KEY, tenant_id, "pearnly_ai_line_intake_enabled_for")
 
 
 def pearnly_ai_bank_recon_enabled_for(tenant_id: Optional[str]) -> bool:

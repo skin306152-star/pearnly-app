@@ -11,17 +11,13 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from core.console import make_stdout_encoding_safe
 from services.payroll import guess, intake, keying_sheet, validate
 from services.tax import pnd1_attach, rdprep_pnd1
 
 
-def _make_stdout_safe() -> None:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(errors="replace")
-
-
 def main(argv=None) -> int:
-    _make_stdout_safe()
+    make_stdout_encoding_safe()
     argv = list(sys.argv[1:] if argv is None else argv)
     if len(argv) != 2:
         print("用法: python -m services.payroll.cli <in.xlsx> <outdir>")

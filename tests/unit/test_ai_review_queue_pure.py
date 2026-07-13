@@ -91,29 +91,9 @@ class IsDirectionTicketTests(unittest.TestCase):
         self.assertEqual(out, [True, ["sd", "p"]])
 
 
-@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
-class FlagSeverityTests(unittest.TestCase):
-    def test_math_fail_and_ocr_error_are_crit(self):
-        out = _run_node(f"""
-            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
-            process.stdout.write(JSON.stringify([
-                q.flagSeverity('amount_math_fail'),
-                q.flagSeverity('ocr_error:ValueError'),
-                q.flagSeverity('anything_unknown'),
-                q.flagSeverity(''),
-            ]));
-            """)
-        self.assertEqual(out, ["crit", "crit", "crit", "crit"])
-
-    def test_low_confidence_and_validation_warning_are_warn(self):
-        out = _run_node(f"""
-            const q = require({json.dumps(str(AI_DIR / "ai-review-queue.js"))});
-            process.stdout.write(JSON.stringify([
-                q.flagSeverity('ocr_low_confidence:needs_review'),
-                q.flagSeverity('ocr_validation_warning'),
-            ]));
-            """)
-        self.assertEqual(out, ["warn", "warn"])
+# severity 政策副本(flagSeverity/_WARN_REASONS)MC2-A3 已删,单一事实源移到后端
+# services/workorder/verdict.py(见 test_workorder_verdict.SeverityPolicyTests);前端只渲染
+# 后端下发的 verdict_hint.severity,不再有可脱管单测的前端 severity 纯函数。
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")

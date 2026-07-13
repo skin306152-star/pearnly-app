@@ -67,49 +67,45 @@ class NarrativeOfTests(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class BulkDecisionTemplateTests(unittest.TestCase):
-    def test_direction_and_duplicate_have_templates(self):
+    """MC2-A3:建议裁决改读后端 verdict_hint.suggested_decision(政策副本 _BULK_TEMPLATES 已删),
+    前端只透传,不再自持 flag_reason→模板表。"""
+
+    def test_reads_suggested_decision_from_backend_hint(self):
         out = _run_node(f"""
             const v = require({json.dumps(str(AI_DIR / "ai-review-verdict.js"))});
             process.stdout.write(JSON.stringify([
-                v.bulkDecisionTemplate('sales_direction_unhandled'),
-                v.bulkDecisionTemplate('sales_direction_unhandled:tail'),
-                v.bulkDecisionTemplate('sales_doc_review'),
-                v.bulkDecisionTemplate('duplicate_of:it-9'),
+                v.bulkDecisionTemplate({{verdict_hint: {{suggested_decision: {{decision: 'assign_kind', kind: 'sales_doc'}}}}}}),
+                v.bulkDecisionTemplate({{verdict_hint: {{suggested_decision: {{decision: 'exclude'}}}}}}),
             ]));
             """)
         self.assertEqual(
             out,
-            [
-                {"decision": "assign_kind", "kind": "sales_doc"},
-                {"decision": "assign_kind", "kind": "sales_doc"},
-                {"decision": "assign_kind", "kind": "sales_doc"},
-                {"decision": "exclude"},
-            ],
+            [{"decision": "assign_kind", "kind": "sales_doc"}, {"decision": "exclude"}],
         )
 
-    def test_low_confidence_reasons_have_no_template(self):
+    def test_no_suggested_decision_yields_null(self):
         out = _run_node(f"""
             const v = require({json.dumps(str(AI_DIR / "ai-review-verdict.js"))});
             process.stdout.write(JSON.stringify([
-                v.bulkDecisionTemplate('amount_math_fail'),
-                v.bulkDecisionTemplate('direction_ambiguous'),
-                v.bulkDecisionTemplate('ocr_low_confidence:band'),
-                v.bulkDecisionTemplate('ocr_validation_warning'),
-                v.bulkDecisionTemplate('ocr_error'),
-                v.bulkDecisionTemplate(''),
+                v.bulkDecisionTemplate({{verdict_hint: {{suggested_decision: null}}}}),
+                v.bulkDecisionTemplate({{verdict_hint: {{}}}}),
+                v.bulkDecisionTemplate({{}}),
+                v.bulkDecisionTemplate(null),
             ]));
             """)
-        self.assertEqual(out, [None, None, None, None, None, None])
+        self.assertEqual(out, [None, None, None, None])
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class GroupCanBulkTests(unittest.TestCase):
+    _SD = "suggested_decision: {decision: 'assign_kind', kind: 'sales_doc'}"
+
     def test_uniform_high_confidence_allows_bulk(self):
         out = _run_node(f"""
             const v = require({json.dumps(str(AI_DIR / "ai-review-verdict.js"))});
             const items = [
-                {{flag_reason: 'sales_direction_unhandled', verdict_hint: {{confidence: 'high'}}}},
-                {{flag_reason: 'sales_direction_unhandled', verdict_hint: {{confidence: 'high'}}}},
+                {{verdict_hint: {{confidence: 'high', {self._SD}}}}},
+                {{verdict_hint: {{confidence: 'mid', {self._SD}}}}},
             ];
             process.stdout.write(JSON.stringify(v.groupCanBulk(items)));
             """)
@@ -119,19 +115,17 @@ class GroupCanBulkTests(unittest.TestCase):
         out = _run_node(f"""
             const v = require({json.dumps(str(AI_DIR / "ai-review-verdict.js"))});
             const items = [
-                {{flag_reason: 'sales_direction_unhandled', verdict_hint: {{confidence: 'high'}}}},
-                {{flag_reason: 'sales_direction_unhandled', verdict_hint: {{confidence: 'low'}}}},
+                {{verdict_hint: {{confidence: 'high', {self._SD}}}}},
+                {{verdict_hint: {{confidence: 'low', {self._SD}}}}},
             ];
             process.stdout.write(JSON.stringify(v.groupCanBulk(items)));
             """)
         self.assertFalse(out)
 
-    def test_no_template_blocks_bulk_even_at_high_confidence(self):
+    def test_no_suggested_decision_blocks_bulk_even_at_high_confidence(self):
         out = _run_node(f"""
             const v = require({json.dumps(str(AI_DIR / "ai-review-verdict.js"))});
-            const items = [
-                {{flag_reason: 'amount_math_fail', verdict_hint: {{confidence: 'high'}}}},
-            ];
+            const items = [{{verdict_hint: {{confidence: 'high'}}}}];
             process.stdout.write(JSON.stringify(v.groupCanBulk(items)));
             """)
         self.assertFalse(out)

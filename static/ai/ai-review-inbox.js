@@ -19,7 +19,6 @@
     var $ = function (id) {
         return document.getElementById(id);
     };
-    var AUTO_REFRESH_MS = 2500; // 裁决落库后引擎自驱重跑是异步的,给点时间再刷工单卡计数/状态。
 
     var S = null;
     var wired = false;
@@ -55,12 +54,14 @@
                 },
                 afterMutate: function () {
                     renderWo();
-                    scheduleAutoRefresh();
+                    startProgressPoll();
                 },
                 showToast: AI.reviewRender.showToast,
             }),
             actorLabel: currentActorLabel(),
             refreshTimer: null,
+            pollAttempt: 0,
+            pollBaseline: {},
         };
     }
 
@@ -99,7 +100,7 @@
     }
 
     function renderFlagged() {
-        renderSection(flaggedBody(), S && (S.loading || S.flagged.isLoading()), function () {
+        renderSection(flaggedBody(), S && S.loading, function () {
             return AI.reviewInboxRender.flaggedSectionHtml(
                 S.flagged.groups(),
                 S.flagged.groupUiMap()
@@ -107,7 +108,7 @@
         });
     }
 
-    // ============ 加载(review-queue → 按需并行拉 flagged 工单详情,交给 flagged 状态机) ============
+    // ============ 加载(review-queue 一次带回工单卡 + 跨工单 flagged item feed) ============
 
     function load() {
         S.loading = true;
@@ -122,7 +123,7 @@
                 S.queue = data;
                 S.loading = false;
                 renderWo();
-                return S.flagged.loadFor(flaggedTargets(data));
+                S.flagged.setFeed(data.flagged_items || []); // 后端下发,不再逐单 getOrder(F1)
             })
             .catch(function () {
                 if (S !== session) return;
@@ -133,27 +134,30 @@
             });
     }
 
-    function flaggedTargets(data) {
-        var out = [];
-        (data.clients || []).forEach(function (c) {
-            c.orders.forEach(function (o) {
-                if (o.flagged_total > 0)
-                    out.push({ id: o.work_order_id, client: c, period: o.period });
-            });
-        });
-        return out;
+    // 裁决落库后引擎自驱重跑(review→running→…→review)是异步的:指数退避有限次轮询
+    // review-queue(F10),复用进度读模型语义(running 工单从队列消失、跑完回 review 才重现),
+    // 每轮刷工单卡 + feed,直到基线内工单都落定或退避次数用尽。替掉此前单发 2.5s 猜时器。
+    function startProgressPoll() {
+        S.pollAttempt = 0;
+        S.pollBaseline = AI.reviewProgress.baseline(S.queue);
+        scheduleNextPoll();
     }
 
-    function scheduleAutoRefresh() {
+    function scheduleNextPoll() {
+        var delay = AI.reviewProgress.nextDelayMs(S.pollAttempt);
+        if (delay == null) return; // 退避次数用尽,停轮询
         if (S.refreshTimer) clearTimeout(S.refreshTimer);
+        var session = S;
         S.refreshTimer = setTimeout(function () {
-            var session = S;
             S.api.getReviewQueue().then(function (data) {
                 if (S !== session) return;
                 S.queue = data;
+                S.flagged.setFeed(data.flagged_items || []);
                 renderWo();
+                S.pollAttempt += 1;
+                if (!AI.reviewProgress.settled(data, S.pollBaseline)) scheduleNextPoll();
             });
-        }, AUTO_REFRESH_MS);
+        }, delay);
     }
 
     // ============ 异常票据分区:事件委托 → 交给 flagged 状态机 ============

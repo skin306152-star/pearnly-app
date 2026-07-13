@@ -2,10 +2,11 @@
  * Pearnly AI · ai-review-inbox-flagged.js · 异常票据分区状态机(MC1-b2)
  *
  * 拆出独立于 ai-review-inbox.js 主编排(单文件<500 铁律,同 ai-review-inbox-signoff.js
- * 拆自同一预算线的先例):review-queue 只给按 flag_reason 分组的计数,本模块对每个
- * flagged_total>0 的工单并行拉 getOrder() 详情,跨工单按 flag_reason 重新分组,持有
- * 组内批量(A/X)与逐张(A/E/X/P/S/N)两套裁决状态——裁决 payload 构造复用
- * ai-review-queue.js(与单工单人审队列 W3 同一份,不重造),不重算/不重估任何钱。
+ * 拆自同一预算线的先例):MC2-A3 起 review-queue 直接下发跨工单 item 级 flagged feed
+ * (services/workorder/review_feed),本模块只按 flag_reason 分组渲染,持有组内批量(A/X)
+ * 与逐张(A/E/X/P/S/N)两套裁决状态——不再对每张 flagged 工单并行 getOrder()(F1 浏览器
+ * N+1 根治)。裁决 payload 构造复用 ai-review-queue.js(与单工单人审队列 W3 同一份,不重造),
+ * 不重算/不重估任何钱。
  *
  * hooks(调用方 ai-review-inbox.js 传入):
  *   onChange()            状态变化后触发重渲染(loading/分组/裁决态任一变化都调)。
@@ -17,9 +18,8 @@
 
     function create(api, hooks) {
         var st = {
-            detailLoading: false,
-            orderDetail: {}, // work_order_id -> {detail, clientName, period} | null
-            itemIndex: {}, // item_id -> merged flagged item
+            feed: [], // 后端下发的跨工单 flagged item 扁平 feed(每件自带 work_order_id/client_name/period)
+            itemIndex: {}, // item_id -> feed item
             flaggedGroups: [],
             groupUi: {}, // flag_reason -> {busy, itemUi:{}, local:{}}
         };
@@ -35,62 +35,30 @@
             return g.itemUi[itemId];
         }
 
-        function loadFor(targets) {
-            if (!targets.length) {
-                st.flaggedGroups = [];
-                st.itemIndex = {};
-                hooks.onChange();
-                return Promise.resolve();
-            }
-            st.detailLoading = true;
+        // 后端 review-queue 一次下发的 flagged item feed 直接灌入(F1:不再逐单 getOrder)。
+        function setFeed(items) {
+            st.feed = Array.isArray(items) ? items : [];
+            rebuildGroups();
             hooks.onChange();
-            return Promise.all(
-                targets.map(function (t) {
-                    return api
-                        .getOrder(t.id)
-                        .then(function (detail) {
-                            st.orderDetail[t.id] = {
-                                detail: detail,
-                                clientName: t.client.client_name,
-                                period: t.period,
-                            };
-                        })
-                        .catch(function () {
-                            st.orderDetail[t.id] = null;
-                        });
-                })
-            ).then(function () {
-                st.detailLoading = false;
-                rebuildGroups();
-                hooks.onChange();
-            });
         }
 
         function rebuildGroups() {
             var byReason = {};
             var index = {};
-            Object.keys(st.orderDetail).forEach(function (orderId) {
-                var rec = st.orderDetail[orderId];
-                if (!rec) return;
-                (rec.detail.flagged || []).forEach(function (item) {
-                    var g = groupUiFor(item.flag_reason);
-                    var local = g.local[item.item_id];
-                    if (local && local.state === 'done') return; // 已裁决(乐观态)不再进队列
-                    var merged = Object.assign({}, item, {
-                        work_order_id: orderId,
-                        client_name: rec.clientName,
-                        period: rec.period,
+            st.feed.forEach(function (item) {
+                var g = groupUiFor(item.flag_reason);
+                var local = g.local[item.item_id];
+                if (local && local.state === 'done') return; // 已裁决(乐观态)不再进队列
+                index[item.item_id] = item;
+                var bucket =
+                    byReason[item.flag_reason] ||
+                    (byReason[item.flag_reason] = {
+                        flagReason: item.flag_reason,
+                        // 严重度读后端 verdict_hint.severity(政策单一事实源 verdict.py),不前端复算。
+                        severity: (item.verdict_hint && item.verdict_hint.severity) || 'crit',
+                        items: [],
                     });
-                    index[item.item_id] = merged;
-                    var bucket =
-                        byReason[item.flag_reason] ||
-                        (byReason[item.flag_reason] = {
-                            flagReason: item.flag_reason,
-                            severity: AI.reviewQueue.flagSeverity(item.flag_reason),
-                            items: [],
-                        });
-                    bucket.items.push(merged);
-                });
+                bucket.items.push(item);
             });
             st.itemIndex = index;
             st.flaggedGroups = Object.keys(byReason)
@@ -184,7 +152,7 @@
         function onBulk(flagReason) {
             var group = findGroup(flagReason);
             if (!group || !AI.reviewVerdict.groupCanBulk(group.items)) return;
-            runGroupBatch(flagReason, AI.reviewVerdict.bulkDecisionTemplate(flagReason));
+            runGroupBatch(flagReason, AI.reviewVerdict.bulkDecisionTemplate(group.items[0]));
         }
 
         function onExcludeAll(flagReason) {
@@ -280,9 +248,6 @@
         }
 
         return {
-            isLoading: function () {
-                return st.detailLoading;
-            },
             groups: function () {
                 return st.flaggedGroups;
             },
@@ -292,7 +257,7 @@
             itemById: function (itemId) {
                 return st.itemIndex[itemId];
             },
-            loadFor: loadFor,
+            setFeed: setFeed,
             onBulk: onBulk,
             onExcludeAll: onExcludeAll,
             decideItem: decideItem,

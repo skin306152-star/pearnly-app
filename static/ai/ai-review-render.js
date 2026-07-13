@@ -50,7 +50,9 @@
         var localKey = local && AI.reviewQueue.decisionChipKey(local.decision);
         var key = localKey || AI.reviewQueue.decisionChipKey(entry.decision);
         if (key) return chip(_CHIP_CLASS[key], at(key));
-        var sev = AI.reviewQueue.flagSeverity(entry.flag_reason);
+        // 严重度读后端 verdict_hint.severity(政策单一事实源在 services/workorder/verdict.py);
+        // 缺 hint(未知原因)诚实回落 crit,与 severity_of 未知→crit 同口径。
+        var sev = (entry.verdict_hint && entry.verdict_hint.severity) || 'crit';
         var reasonKey = AI.reviewQueue.flagReasonKey(entry.flag_reason);
         var reasonLabel = reasonKey ? at(reasonKey) : entry.flag_reason || '';
         return chip(sev === 'crit' ? 'b' : 'w', reasonLabel);

@@ -47,29 +47,56 @@
         );
     }
 
+    // SoD proactive 显隐(F9):order.sod = {enforced, is_preparer, has_independent_review,
+    // self_declared}——后端权威投影。制单人在强制态下签批/冻结会撞 422/409,提前收起按钮不让
+    // 白点(后端仍是权威闸)。缺 sod 投影(旧调用方/未接线)则不做 proactive 收起,行为不变。
+    function sodGate(order, ui) {
+        var sod = order.sod;
+        var proactive = !!sod;
+        var declared = !!(ui.selfDeclared || (sod && sod.self_declared));
+        var archiveAllowed =
+            !proactive ||
+            !sod.enforced ||
+            declared ||
+            (!sod.is_preparer && sod.has_independent_review);
+        return {
+            hideSignoff: proactive && sod.enforced && sod.is_preparer,
+            archiveAllowed: archiveAllowed,
+            declared: declared,
+            // 声明制逃生门:强制态下当前登录态过不了冻结闸(制单人自审/缺独立复核)才提示声明,
+            // 非强制态沿用旧行为(常显),已声明则收起改显 chip。
+            showSelfDeclare: !declared && (!proactive || (sod.enforced && !archiveAllowed)),
+        };
+    }
+
     // ui: {signoffBusy, signedNote, archiveBusy, archivedNote, rejectBusy, sodErr,
     //      selfDeclareBusy, selfDeclared, receiptBusy, receiptNote}
     function woActionsHtml(order, ui) {
         ui = ui || {};
         var blocked = order.status !== 'review'; // stuck(还有待裁决)不给签批,避免签个空
+        var gate = sodGate(order, ui);
         var signoffBtn = ui.signedNote
             ? '<span class="chip g">' + esc(ui.signedNote) + '</span>'
-            : '<button type="button" class="btn sm" data-action="riq-signoff" data-wo="' +
-              order.work_order_id +
-              '"' +
-              (blocked || ui.signoffBusy ? ' disabled' : '') +
-              '>' +
-              esc(ui.signoffBusy ? at('riq_signoff_busy') : at('riq_signoff_btn')) +
-              '</button>';
+            : gate.hideSignoff
+              ? ''
+              : '<button type="button" class="btn sm" data-action="riq-signoff" data-wo="' +
+                order.work_order_id +
+                '"' +
+                (blocked || ui.signoffBusy ? ' disabled' : '') +
+                '>' +
+                esc(ui.signoffBusy ? at('riq_signoff_busy') : at('riq_signoff_btn')) +
+                '</button>';
         var archiveBtn = ui.archivedNote
             ? '<span class="chip g">' + esc(ui.archivedNote) + '</span>'
-            : '<button type="button" class="btn sm pri" data-action="riq-archive" data-wo="' +
-              order.work_order_id +
-              '"' +
-              (blocked || ui.archiveBusy ? ' disabled' : '') +
-              '>' +
-              esc(ui.archiveBusy ? at('riq_archive_busy') : at('riq_archive_btn')) +
-              '</button>';
+            : !gate.archiveAllowed
+              ? ''
+              : '<button type="button" class="btn sm pri" data-action="riq-archive" data-wo="' +
+                order.work_order_id +
+                '"' +
+                (blocked || ui.archiveBusy ? ' disabled' : '') +
+                '>' +
+                esc(ui.archiveBusy ? at('riq_archive_busy') : at('riq_archive_btn')) +
+                '</button>';
         var rejectBtn = ui.archivedNote
             ? ''
             : '<button type="button" class="btn sm no" data-action="riq-reject-open" data-wo="' +
@@ -92,15 +119,17 @@
         var sodErr = ui.sodErr ? '<p class="riq-sod-err">' + esc(ui.sodErr) + '</p>' : '';
         var selfDeclareBtn = ui.archivedNote
             ? ''
-            : ui.selfDeclared
+            : gate.declared
               ? '<span class="chip s">' + esc(at('riq_self_declared')) + '</span>'
-              : '<button type="button" class="btn sm" data-action="riq-self-declare" data-wo="' +
-                order.work_order_id +
-                '"' +
-                (ui.selfDeclareBusy ? ' disabled' : '') +
-                '>' +
-                esc(at('riq_self_declare_btn')) +
-                '</button>';
+              : gate.showSelfDeclare
+                ? '<button type="button" class="btn sm" data-action="riq-self-declare" data-wo="' +
+                  order.work_order_id +
+                  '"' +
+                  (ui.selfDeclareBusy ? ' disabled' : '') +
+                  '>' +
+                  esc(at('riq_self_declare_btn')) +
+                  '</button>'
+                : '';
         return (
             '<div class="riq-wo-steps">' +
             signoffBtn +

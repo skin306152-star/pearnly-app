@@ -37,19 +37,6 @@
         });
     }
 
-    // flag_reason → 红/黄分级(契约 §1.1):数学不自洽 / 整张 OCR 读失败 = 红(crit);
-    // 置信度/校验存疑 = 黄(warn)。未知原因保守当红——没把握的异常不该被淡化成黄。
-    // 冒号前缀处理同 flagReasonKey:先取冒号前段再比对,两处「怎么拆 flag_reason」写法统一。
-    var _WARN_REASONS = {
-        ocr_low_confidence: true,
-        ocr_validation_warning: true,
-        sales_doc_review: true,
-    };
-    function flagSeverity(reason) {
-        var head = String(reason || '').split(':')[0];
-        return _WARN_REASONS[head] ? 'warn' : 'crit';
-    }
-
     // flag_reason → 人话 i18n key(契约:兜底不许把后端原始英文键糊脸给用户)。
     // 后端全集里 ocr_low_confidence/ocr_error 带冒号后缀(band/异常名),先取冒号前段
     // 再映射;未知/空原因返回 null,调用方据此诚实回退到原始键(总比编个假人话强)。
@@ -158,7 +145,6 @@
         PURCHASE_KIND: PURCHASE_KIND,
         isDirectionTicket: isDirectionTicket,
         filterPurchaseQueue: filterPurchaseQueue,
-        flagSeverity: flagSeverity,
         flagReasonKey: flagReasonKey,
         parseVat: parseVat,
         buildDecisionPayload: buildDecisionPayload,

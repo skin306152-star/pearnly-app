@@ -140,6 +140,9 @@ const BUNDLES = [
             // ai-client-pool.js 现更名导出 AI.clientPool(MC1-b2·「客户待答」降级为审核
             // 收件箱聚合页的第三分区,不再独占 #/pool——见该文件顶注)。
             'ai/ai-client-pool.js',
+            // ai-review-progress.js(MC2-A3 · 裁决后进度轮询状态机纯函数,零依赖)排在
+            // ai-review-inbox.js(用它排期轮询)之前即可。
+            'ai/ai-review-progress.js',
             // 审核收件箱聚合页(MC1-b2 · 接管 #/pool,方案见 ai-review-inbox.js 顶注)四文件:
             // -render.js(纯 HTML,依赖 AI.state/format/reviewQueue/reviewVerdict 均已在上面)、
             // -signoff.js(工单卡签批闭环状态机,依赖 AI.api)、-flagged.js(异常票据分组+

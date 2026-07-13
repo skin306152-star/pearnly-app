@@ -116,6 +116,19 @@ class StatementRowMappingTests(unittest.TestCase):
         self.assertEqual(tx["direction"], "IN")
         self.assertEqual(tx["amount"], 655.0)
 
+    def test_tx_id_is_row_hash_and_stable_on_reparse(self):
+        # MC1-b3:statement_tx_id 是内容指纹(row_hash),同一行重解析恒定不变,是人审
+        # 裁决落库的落点身份——不是随机 uuid,不需要额外持久化映射表。
+        import datetime
+
+        row_a = StatementRow(datetime.date(2026, 6, 7), "Supplier INV", 752.0, 0.0, 1000.0)
+        row_b = StatementRow(datetime.date(2026, 6, 7), "Supplier INV", 752.0, 0.0, 1000.0)
+        tx_a = adapter.tx_from_statement_row(row_a)
+        tx_b = adapter.tx_from_statement_row(row_b)
+        self.assertEqual(tx_a["_tx_id"], row_a.row_hash)
+        self.assertEqual(tx_a["_tx_id"], tx_b["_tx_id"])
+        self.assertTrue(tx_a["_tx_id"])
+
 
 class ReconcileBucketsTests(unittest.TestCase):
     """逐笔对平:唯一高分自动 / 多候选人审 / 缺票 / 未达,差额手算一致。"""
@@ -180,6 +193,22 @@ class ReconcileBucketsTests(unittest.TestCase):
         r = adapter.reconcile_workorder([], [])
         self.assertEqual(r.diff["net"], "0")
         self.assertEqual(r.as_gate_payload()["missing_invoice_count"], 0)
+
+    def test_review_bucket_carries_statement_tx_id_for_decide_endpoint(self):
+        # MC1-b3:review 桶的 tx 视图要带 statement_tx_id,前端裁决卡才有落点可传给
+        # POST .../bank-recon/decide。用真 StatementRow(非 gt_entry)喂,拿到真 row_hash。
+        import datetime
+
+        from services.recon.bank_recon_types import StatementRow
+
+        row = StatementRow(datetime.date(2026, 6, 7), "payment", 500.0, 0.0, 1000.0)
+        tx = adapter.tx_from_statement_row(row)
+        cands = adapter.candidates_from_events(
+            [_classified("p2", total="500.00", inv="IVX", vendor=None)]
+        )
+        r = adapter.reconcile_workorder([tx], cands)
+        self.assertEqual(len(r.review), 1)
+        self.assertEqual(r.review[0]["tx"]["statement_tx_id"], row.row_hash)
 
 
 if __name__ == "__main__":

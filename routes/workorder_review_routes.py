@@ -29,7 +29,7 @@ from routes.workorder_routes import (
     _load_mutable_order,
     _raise_from_api_error,
 )
-from services.workorder import api, obligation_engine, review
+from services.workorder import api, bank_recon_review, obligation_engine, review
 
 router = APIRouter()
 
@@ -43,6 +43,16 @@ class BatchDecisionsIn(BaseModel):
 class RejectIn(BaseModel):
     reason: str = Field(
         ..., min_length=1, max_length=500, description="驳回原因(必填):要复核者修什么"
+    )
+
+
+class BankReconDecideIn(BaseModel):
+    statement_tx_id: str = Field(
+        ..., min_length=1, max_length=64, description="银行流水行身份(候选适配器给的内容指纹)"
+    )
+    action: str = Field(..., description="accept | reject")
+    candidate_id: Optional[str] = Field(
+        None, description="accept 时必填:采信的候选票 item_id(须在该笔候选集内)"
     )
 
 
@@ -111,6 +121,31 @@ async def reject_order_review(
             _raise_from_api_error(e)
     _auto_advance(background, tenant_id, work_order_id, user)
     return out
+
+
+@router.post("/api/workorder/orders/{work_order_id}/bank-recon/decide")
+async def decide_bank_recon(work_order_id: str, req: BankReconDecideIn, request: Request):
+    """银行对账 review 清单逐笔人审裁决(MC1-b3 · E2 债):accept 采信某候选为该笔流水的
+    匹配 / reject 否掉全部候选。落 human_decision 事件(payload 用 statement_tx_id 取代
+    item_id),order-detail 的 bank_recon.review[].human_decision 据此覆盖读回——只改
+    佐证呈现,不碰 R1/R2/R4 税额路径一个字。冻结后只读(_load_mutable_order 闸);tx 不
+    在当前 review 清单 → 404;accept 缺/野 candidate_id → 422。"""
+    user, tenant_id = _authorize(request, _C_PREPARE)
+    with db.get_cursor(commit=True) as cur:
+        _load_mutable_order(cur, request, user, tenant_id, work_order_id)
+        try:
+            evt = bank_recon_review.record_bank_decision(
+                cur,
+                tenant_id=tenant_id,
+                work_order_id=work_order_id,
+                statement_tx_id=req.statement_tx_id,
+                action=req.action,
+                candidate_id=req.candidate_id,
+                actor=f"user:{user['id']}",
+            )
+        except api.WorkOrderApiError as e:
+            _raise_from_api_error(e)
+    return {"ok": True, "event_id": evt["id"]}
 
 
 @router.post("/api/workorder/orders/{work_order_id}/self-review-declare")

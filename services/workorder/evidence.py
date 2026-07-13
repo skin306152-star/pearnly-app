@@ -90,6 +90,31 @@ def flagged_projection(items: list[dict], events: list[dict]) -> list[dict]:
     return out
 
 
+def bank_recon_decisions(events: list[dict]) -> dict:
+    """银行对账人审裁决回放(MC1-b3 · E2 债 · statement_tx_id → 裁决摘要,latest-wins)。
+
+    与 replay_items_by_type 同族但键是 statement_tx_id 不是 item_id——银行流水行不是
+    work_order_item,没有 items 表身份(见 services/recon/workorder_recon_adapter 的
+    statement_tx_id = StatementRow.row_hash 内容指纹)。human_decision 事件按有无
+    statement_tx_id/item_id 天然互斥(assign 类裁决走 item_id,银行裁决走 statement_tx_id),
+    这里只收后者。供 api._bank_recon 覆盖到 R3 呈现层,一行不碰 R1/R2/R4 税额路径。"""
+    out: dict = {}
+    for e in events:
+        if e["event_type"] != _EVT_DECISION:
+            continue
+        payload = e.get("payload") or {}
+        tx_id = payload.get("statement_tx_id")
+        if not tx_id:
+            continue
+        out[tx_id] = {
+            "decision": payload.get("decision"),
+            "candidate_id": payload.get("candidate_id"),
+            "actor": e.get("actor"),
+            "at": e.get("created_at"),
+        }
+    return out
+
+
 def _decision_of(replayed: Optional[dict]) -> Optional[dict]:
     """一条 human_decision 回放 → 裁决摘要({decision, kind, values, actor, at});无则 None。
     kind 是方向裁决(assign_kind)携带的裁定 kind,普通裁决为 None。"""

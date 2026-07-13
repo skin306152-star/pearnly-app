@@ -181,6 +181,39 @@ class GateOnRunsReconWithoutBlockingPackage(unittest.TestCase):
         self.assertEqual(out.status, "ok")
         self.assertEqual(out.payload["gates"]["r3_bank"]["recon"]["note"], "bank_recon_skipped")
 
+    def test_bank_recon_human_decision_events_are_tax_invisible(self):
+        # MC1-b3 验收断言:银行对账 review 人审裁决(human_decision · statement_tx_id 载荷,
+        # 无 item_id)不该被 reconcile 的任何回放捡到——它只在 api._bank_recon 读侧覆盖呈现,
+        # 一进 reconcile.run() 就该跟没发生过一样。逐字节比对 R1/R2/R4/税额产出。
+        baseline = reconcile.run(_ctx(_store()))
+
+        store_with_decision = _store()
+        store_with_decision.events.append(
+            {
+                "event_type": "human_decision",
+                "step": "reconcile",
+                "payload": {
+                    "statement_tx_id": "some-bank-row-hash",
+                    "decision": "bank_recon_accept",
+                    "candidate_id": "p1",
+                },
+            }
+        )
+        out = reconcile.run(_ctx(store_with_decision))
+
+        self.assertEqual(out.status, baseline.status)
+        self.assertEqual(out.payload["input_vat_total"], baseline.payload["input_vat_total"])
+        self.assertEqual(
+            out.payload["purchase_amount_total"], baseline.payload["purchase_amount_total"]
+        )
+        self.assertEqual(out.payload["sales_amount_total"], baseline.payload["sales_amount_total"])
+        self.assertEqual(
+            out.payload["gates"]["r1_input_vat"], baseline.payload["gates"]["r1_input_vat"]
+        )
+        self.assertEqual(
+            out.payload["gates"]["r4_trial_balance"], baseline.payload["gates"]["r4_trial_balance"]
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

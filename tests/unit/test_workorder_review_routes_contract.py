@@ -34,6 +34,7 @@ class RouteContractTests(unittest.TestCase):
             ("POST", "/api/workorder/orders/{work_order_id}/decisions:batch"),
             ("POST", "/api/workorder/orders/{work_order_id}/review-reject"),
             ("POST", "/api/workorder/orders/{work_order_id}/self-review-declare"),
+            ("POST", "/api/workorder/orders/{work_order_id}/bank-recon/decide"),
         }
         self.assertTrue(
             expected.issubset(_route_set(router)), f"缺路由: {expected - _route_set(router)}"
@@ -199,6 +200,7 @@ class PermCodeWiringTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(wr.review, "batch_decisions", return_value={"ok_count": 0}),
             mock.patch.object(wr.review, "reject_review", return_value={}),
             mock.patch.object(wr.review, "declare_self_review", return_value={}),
+            mock.patch.object(wr.bank_recon_review, "record_bank_decision", return_value={"id": 1}),
             mock.patch.object(wr, "_auto_advance"),
             mock.patch.object(route_helpers, "require_perm", return_value=_USER) as perm,
         ):
@@ -230,10 +232,121 @@ class PermCodeWiringTests(unittest.IsolatedAsyncioTestCase):
                 wr._C_REVIEW,
             ),
             (wr.declare_self_review("wo-1", mock.Mock()), wr._C_APPROVE),
+            (
+                wr.decide_bank_recon(
+                    "wo-1",
+                    wr.BankReconDecideIn(
+                        statement_tx_id="tx-1", action="accept", candidate_id="it-2"
+                    ),
+                    mock.Mock(),
+                ),
+                wr._C_PREPARE,
+            ),
         )
         for coro, expected in cases:
             with self.subTest(expected=expected):
                 self.assertEqual(await self._perm_code_used(wr, coro), expected)
+
+
+class BankReconDecideRouteTests(unittest.IsolatedAsyncioTestCase):
+    """decide 端点接线:成功透传 event_id;冻结只读闸(_load_mutable_order 409)先于服务
+    层校验;服务层拒(tx 不在 review 桶/野 candidate)照 _raise_from_api_error 翻码。"""
+
+    def _open_gate(self):
+        return (
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
+        )
+
+    async def test_success_returns_event_id(self):
+        from routes import workorder_review_routes as wr
+
+        for p in self._open_gate():
+            self.enterContext(p)
+        with (
+            mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            mock.patch.object(wr, "_load_mutable_order", return_value={"workspace_client_id": 7}),
+            mock.patch.object(
+                wr.bank_recon_review, "record_bank_decision", return_value={"id": 55}
+            ),
+        ):
+            out = await wr.decide_bank_recon(
+                "wo-1",
+                wr.BankReconDecideIn(statement_tx_id="tx-1", action="accept", candidate_id="it-2"),
+                mock.Mock(),
+            )
+        self.assertEqual(out, {"ok": True, "event_id": 55})
+
+    async def test_frozen_order_rejected_before_service_call(self):
+        from routes import workorder_review_routes as wr
+
+        for p in self._open_gate():
+            self.enterContext(p)
+        svc = mock.Mock()
+        with (
+            mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            mock.patch.object(
+                wr,
+                "_load_mutable_order",
+                side_effect=HTTPException(status_code=409, detail="workorder.archived_readonly"),
+            ),
+            mock.patch.object(wr.bank_recon_review, "record_bank_decision", svc),
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.decide_bank_recon(
+                    "wo-1",
+                    wr.BankReconDecideIn(statement_tx_id="tx-1", action="reject"),
+                    mock.Mock(),
+                )
+        self.assertEqual(ctx.exception.status_code, 409)
+        svc.assert_not_called()
+
+    async def test_tx_not_found_maps_404(self):
+        from routes import workorder_review_routes as wr
+        from services.workorder import api as wo_api
+
+        for p in self._open_gate():
+            self.enterContext(p)
+        with (
+            mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            mock.patch.object(wr, "_load_mutable_order", return_value={"workspace_client_id": 7}),
+            mock.patch.object(
+                wr.bank_recon_review,
+                "record_bank_decision",
+                side_effect=wo_api.WorkOrderApiError("workorder.bank_recon_tx_not_found"),
+            ),
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.decide_bank_recon(
+                    "wo-1",
+                    wr.BankReconDecideIn(statement_tx_id="tx-ghost", action="reject"),
+                    mock.Mock(),
+                )
+        self.assertEqual(ctx.exception.status_code, 404)
+
+    async def test_invalid_candidate_maps_422(self):
+        from routes import workorder_review_routes as wr
+        from services.workorder import api as wo_api
+
+        for p in self._open_gate():
+            self.enterContext(p)
+        with (
+            mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            mock.patch.object(wr, "_load_mutable_order", return_value={"workspace_client_id": 7}),
+            mock.patch.object(
+                wr.bank_recon_review,
+                "record_bank_decision",
+                side_effect=wo_api.WorkOrderApiError("workorder.bank_recon_candidate_invalid"),
+            ),
+        ):
+            with self.assertRaises(HTTPException) as ctx:
+                await wr.decide_bank_recon(
+                    "wo-1",
+                    wr.BankReconDecideIn(statement_tx_id="tx-1", action="accept", candidate_id="x"),
+                    mock.Mock(),
+                )
+        self.assertEqual(ctx.exception.status_code, 422)
 
 
 if __name__ == "__main__":

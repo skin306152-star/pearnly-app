@@ -135,7 +135,11 @@ _CONFLICT_CODES = {
 
 
 def _raise_from_api_error(e: "api.WorkOrderApiError") -> None:
-    if e.code in ("workorder.not_found", "workorder.item_not_found"):
+    if e.code in (
+        "workorder.not_found",
+        "workorder.item_not_found",
+        "workorder.bank_recon_tx_not_found",
+    ):
         raise HTTPException(404, detail=e.code)
     status = 409 if e.code in _CONFLICT_CODES else 422
     detail = {"code": e.code, **e.context} if e.context else e.code

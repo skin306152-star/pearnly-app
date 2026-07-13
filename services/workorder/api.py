@@ -201,23 +201,47 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
     }
 
 
-def _bank_recon(events: list[dict], items: list[dict]) -> Optional[dict]:
-    """R3 银行对账四清单只读投影(E2 对账人审界面读侧)。
-
-    从 reconcile 步 step_done 回放里深取 gates.r3_bank.recon——闸关 / 无银行流水 /
-    尚未跑到 reconcile / 引擎异常降级(_run_bank_recon 的 except 分支落一份
-    {error,note} 残影)都诚实给 None,不拼一份假清单充数(状态诚实优先于"看着有内容")。
-    bank_item_ids 是本工单已收的银行流水件(kind=bank_statement),供前端「缺票行推
-    LINE 待问」的落点与「查看原图」共用——缺票行本身没有对应票据 item,问题与原图都
-    只能挂在流水件本身上(问的就是"这张流水缺哪张票")。"""
+def bank_recon_raw(events: list[dict]) -> Optional[dict]:
+    """R3 银行对账清单原始 dict(reconcile 步 step_done 落库的 recon,未叠加 bank_item_ids /
+    人审裁决覆盖)。闸关 / 无银行流水 / 尚未跑到 reconcile / 引擎异常降级(_run_bank_recon
+    的 except 分支落一份 {error,note} 残影)都诚实给 None——判定与 _bank_recon 共用,单一
+    事实源。MC1-b3 落裁决前校验 statement_tx_id/candidate_id 合法用此纯读函数(见
+    bank_recon_review.record_bank_decision),不重复回放逻辑。"""
     payload = evidence.replay_step_done(events, _DECISION_STEP)
     if not payload:
         return None
     recon = ((payload.get("gates") or {}).get("r3_bank") or {}).get("recon")
-    if not isinstance(recon, dict) or "auto_matched" not in recon:
+    return recon if isinstance(recon, dict) and "auto_matched" in recon else None
+
+
+def _bank_recon(events: list[dict], items: list[dict]) -> Optional[dict]:
+    """R3 银行对账四清单只读投影(E2 对账人审界面读侧)。
+
+    bank_item_ids 是本工单已收的银行流水件(kind=bank_statement),供前端「缺票行推
+    LINE 待问」的落点与「查看原图」共用——缺票行本身没有对应票据 item,问题与原图都
+    只能挂在流水件本身上(问的就是"这张流水缺哪张票")。review 清单逐笔叠加人审裁决
+    (MC1-b3 · accept/reject,见 _overlay_bank_decisions)——只改呈现,不改 R1/R2/R4。"""
+    recon = bank_recon_raw(events)
+    if recon is None:
         return None
     bank_item_ids = [it["id"] for it in items if it.get("kind") == _KIND_BANK_STATEMENT]
-    return dict(recon, bank_item_ids=bank_item_ids)
+    recon = dict(recon, bank_item_ids=bank_item_ids)
+    return _overlay_bank_decisions(recon, events)
+
+
+def _overlay_bank_decisions(recon: dict, events: list[dict]) -> dict:
+    """review 清单逐笔叠加人审裁决(MC1-b3 · E2 债)。零副作用:不改 recon 入参,命中的
+    review 条目换成带 human_decision 的新 dict;auto_matched/missing_invoice/unmatched_invoice
+    三张清单与 diff 合计一字不动——银行对账四清单本身不回流 R1/R2 税额。"""
+    decisions_by_tx = evidence.bank_recon_decisions(events)
+    if not decisions_by_tx or not recon.get("review"):
+        return recon
+    review = []
+    for entry in recon["review"]:
+        tx_id = (entry.get("tx") or {}).get("statement_tx_id")
+        dec = decisions_by_tx.get(tx_id) if tx_id else None
+        review.append(dict(entry, human_decision=dec) if dec else entry)
+    return dict(recon, review=review)
 
 
 def _shadow_draft(events: list[dict]) -> Optional[dict]:

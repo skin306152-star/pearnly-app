@@ -27,6 +27,15 @@ ASSIGN_KINDS = (PURCHASE_INVOICE, SALES_DOC, NON_TAX)
 # 「不计入合计」语义集:剔除与豁免都不进 Σ、不进 unresolved(豁免另在备忘留痕)。
 NON_COUNTING = frozenset({EXCLUDE, WAIVE})
 
+# 银行对账 review 清单人审裁决(MC1-b3 · E2 债):accept=采信某候选票为该笔流水的匹配 /
+# reject=否掉全部候选。与上面的裁决动词同族(同落 human_decision 事件)但独立成一对——
+# 它裁决的对象是银行流水行(statement_tx_id),不是 work_order_item,不共用 item 校验路径。
+# 银行对账是佐证层:这对动词绝不进 R1/R2/R4 税额计算,只覆盖 R3 呈现(services/workorder/
+# bank_recon_review.py + api._bank_recon 的读侧覆盖)。
+BANK_RECON_ACCEPT = "bank_recon_accept"
+BANK_RECON_REJECT = "bank_recon_reject"
+BANK_RECON_ACTIONS = (BANK_RECON_ACCEPT, BANK_RECON_REJECT)
+
 # 方向不明票的 flag_reason:税号/名称锚点判不出进/销(direction_ambiguous)。kind=unknown,
 # 必须人工定向(assign_kind)。SALES_DIRECTION_UNHANDLED 是 MC1-c.1 前「自家==卖方判死」的旧码
 # ——现已改为 sort 自动归 sales_doc 堆(见 SALES_DOC_REVIEW),此常量仅为存量工单的 flag_reason

@@ -116,11 +116,16 @@ def candidates_from_events(events: list[dict]) -> list[dict]:
 
 
 def _tx_dict(
-    deposit: Decimal, withdrawal: Decimal, tx_date: Optional[str], description: str
+    deposit: Decimal,
+    withdrawal: Decimal,
+    tx_date: Optional[str],
+    description: str,
+    tx_id: str = "",
 ) -> dict:
     """银行流水行的统一打分字典。方向按存/取哪侧有动定(deposit↔IN、withdrawal↔OUT),
     金额取动的那一侧绝对值;两侧都 0 的行(纯 B/F)金额为 0,不命中任何候选。
-    `_amount` 留 Decimal 供清算,`amount` 是打分引擎的金额位(float)。"""
+    `_amount` 留 Decimal 供清算,`amount` 是打分引擎的金额位(float)。`_tx_id` 是这笔
+    流水的稳定身份(MC1-b3 人审裁决落库/覆盖用,见 `statement_tx_id`),不参与打分。"""
     direction = "IN" if deposit > withdrawal else "OUT"
     amount = deposit if direction == "IN" else withdrawal
     return {
@@ -129,11 +134,16 @@ def _tx_dict(
         "direction": direction,
         "description": description or "",
         "_amount": amount,
+        "_tx_id": tx_id,
     }
 
 
 def tx_from_statement_row(row: Any) -> dict:
-    """StatementRow(dataclass)→ 打分引擎期望的银行流水字典(bank_recon_types 的方向约定)。"""
+    """StatementRow(dataclass)→ 打分引擎期望的银行流水字典(bank_recon_types 的方向约定)。
+
+    `row.row_hash` 是这行的内容指纹(日期+借贷+余额+摘要,见 bank_recon_types.StatementRow.
+    __post_init__)——同一份流水重解析恒定不变,拿它当 statement_tx_id(MC1-b3 人审裁决落库
+    的落点身份),不必另建 id 生成器。"""
     d = getattr(row, "date", None)
     tx_date = d.isoformat() if hasattr(d, "isoformat") else (str(d) if d else None)
     return _tx_dict(
@@ -141,6 +151,7 @@ def tx_from_statement_row(row: Any) -> dict:
         _dec(getattr(row, "withdrawal", 0)),
         tx_date,
         getattr(row, "description", "") or "",
+        tx_id=getattr(row, "row_hash", "") or "",
     )
 
 
@@ -272,14 +283,19 @@ def _is_unique_top(scored: list[dict], thresh_auto: int) -> bool:
 
 
 def _tx_view(tx: dict) -> dict:
-    """流水对外视图(去掉内部 _amount 私有键,金额以字符串精确呈现)。"""
+    """流水对外视图(去掉内部 _amount/_tx_id 私有键,金额以字符串精确呈现)。statement_tx_id
+    只在有值时挂出(gt 语料喂的流水无 id,不虚构一个空串——见 tx_from_gt_entry)。"""
     amt = tx.get("_amount", _dec(tx.get("amount")))
-    return {
+    view = {
         "amount": _fmt(amt),
         "tx_date": tx.get("tx_date"),
         "direction": tx.get("direction"),
         "description": tx.get("description"),
     }
+    tx_id = tx.get("_tx_id")
+    if tx_id:
+        view["statement_tx_id"] = tx_id
+    return view
 
 
 def _fmt(value: Decimal) -> str:

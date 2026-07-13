@@ -246,14 +246,19 @@ class BankReconTests(_ApiTestBase):
             },
         ]
 
-    def _recon_payload(self):
+    def _recon_payload(self, *, tx_id="tx-50"):
         return {
             "auto_matched_count": 1,
             "review_count": 1,
             "missing_invoice_count": 1,
             "unmatched_invoice_count": 1,
             "auto_matched": [{"tx": {"amount": "100.00"}, "candidate_id": "it-1", "score": 92.0}],
-            "review": [{"tx": {"amount": "50.00"}, "candidates": [{"candidate_id": "it-2"}]}],
+            "review": [
+                {
+                    "tx": {"amount": "50.00", "statement_tx_id": tx_id},
+                    "candidates": [{"candidate_id": "it-2"}],
+                }
+            ],
             "missing_invoice": [{"amount": "30.00", "tx_date": "2026-05-01"}],
             "unmatched_invoice": [{"candidate_id": "it-3", "amount": "20.00"}],
             "diff": {
@@ -310,6 +315,62 @@ class BankReconTests(_ApiTestBase):
         self.store.events = []
         detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
         self.assertIsNone(detail["bank_recon"])
+
+    def test_review_entry_overlays_human_decision_by_statement_tx_id(self):
+        # MC1-b3:human_decision(statement_tx_id=...)覆盖到对应 review 条目,其余三张
+        # 清单 + diff 逐字节不动——银行对账人审只改呈现,不回流 R1/R2 税额。
+        self.store.events = [
+            {
+                "step": "reconcile",
+                "event_type": "step_done",
+                "payload": {"gates": {"r3_bank": {"recon": self._recon_payload()}}},
+            },
+            {
+                "event_type": "human_decision",
+                "actor": "user:u1",
+                "created_at": "2026-07-13T00:00:00Z",
+                "payload": {
+                    "statement_tx_id": "tx-50",
+                    "decision": "bank_recon_accept",
+                    "candidate_id": "it-2",
+                },
+            },
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        recon = detail["bank_recon"]
+        review = recon["review"][0]
+        self.assertEqual(
+            review["human_decision"],
+            {
+                "decision": "bank_recon_accept",
+                "candidate_id": "it-2",
+                "actor": "user:u1",
+                "at": "2026-07-13T00:00:00Z",
+            },
+        )
+        # 未被叠加的字段与无裁决时逐字节一致(不重算清单/合计)。
+        baseline = self._recon_payload()
+        self.assertEqual(recon["auto_matched"], baseline["auto_matched"])
+        self.assertEqual(recon["missing_invoice"], baseline["missing_invoice"])
+        self.assertEqual(recon["unmatched_invoice"], baseline["unmatched_invoice"])
+        self.assertEqual(recon["diff"], baseline["diff"])
+
+    def test_review_entry_no_overlay_when_no_matching_decision(self):
+        self.store.events = [
+            {
+                "step": "reconcile",
+                "event_type": "step_done",
+                "payload": {"gates": {"r3_bank": {"recon": self._recon_payload()}}},
+            },
+            {
+                "event_type": "human_decision",
+                "actor": "user:u1",
+                "payload": {"statement_tx_id": "tx-other", "decision": "bank_recon_reject"},
+            },
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        review = detail["bank_recon"]["review"][0]
+        self.assertNotIn("human_decision", review)
 
     def test_bank_recon_none_when_engine_error_shape(self):
         # _run_bank_recon 的 except 分支落 {"error":..., "note": "bank_recon_skipped"} ——

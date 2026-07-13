@@ -33,7 +33,7 @@ class ValidateFileTests(unittest.TestCase):
         out = _run_node(f"""
             const r = require({_RENDER});
             process.stdout.write(JSON.stringify([
-                r.validateFile({{name: 'report.xlsx'}}),
+                r.validateFile({{name: 'report.docx'}}),
                 r.validateFile({{name: 'notes.txt'}}),
             ]));
             """)
@@ -59,6 +59,18 @@ class ValidateFileTests(unittest.TestCase):
             """)
         self.assertEqual(out, [{"ok": True}] * 5)
 
+    def test_excel_and_csv_accepted(self):
+        # K2 起 xlsx/xls/csv 走 Excel 引擎,前端放行(大小写不敏感)。
+        out = _run_node(f"""
+            const r = require({_RENDER});
+            process.stdout.write(JSON.stringify([
+                r.validateFile({{name: 'report.xlsx'}}),
+                r.validateFile({{name: 'OLD.XLS'}}),
+                r.validateFile({{name: 'data.csv'}}),
+            ]));
+            """)
+        self.assertEqual(out, [{"ok": True}] * 3)
+
     def test_is_image_file_distinguishes_ocr_path(self):
         out = _run_node(f"""
             const r = require({_RENDER});
@@ -77,10 +89,11 @@ class ValidateFileTests(unittest.TestCase):
                 r.isRejected('no_text_layer'),
                 r.isRejected('ocr_incomplete'),
                 r.isRejected('ocr_unavailable'),
+                r.isRejected('unsupported_format'),
                 r.isRejected('ok'),
             ]));
             """)
-        self.assertEqual(out, [True, True, True, False])
+        self.assertEqual(out, [True, True, True, True, False])
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")

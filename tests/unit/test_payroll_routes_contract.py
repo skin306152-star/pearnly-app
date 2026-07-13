@@ -121,6 +121,8 @@ class RouteContractTests(unittest.TestCase):
                 ("POST", "/api/payroll/parse"),
                 ("POST", "/api/payroll/commit"),
                 ("GET", "/api/payroll/output"),
+                ("GET", "/api/payroll/annual/summary"),
+                ("GET", "/api/payroll/annual/output"),
             },
         )
 
@@ -131,6 +133,8 @@ class RouteContractTests(unittest.TestCase):
         self.assertIn("/api/payroll/parse", paths)
         self.assertIn("/api/payroll/commit", paths)
         self.assertIn("/api/payroll/output", paths)
+        self.assertIn("/api/payroll/annual/summary", paths)
+        self.assertIn("/api/payroll/annual/output", paths)
 
 
 class _GatedCase(unittest.IsolatedAsyncioTestCase):
@@ -161,6 +165,20 @@ class GateTests(_GatedCase):
         with self.assertRaises(HTTPException) as ctx:
             await pr.output_endpoint(
                 mock.Mock(), workspace_client_id=7, period="2569-05", kind="attach"
+            )
+        self.assertEqual(ctx.exception.status_code, 404)
+
+    async def test_m1_gate_closed_hides_annual_summary_as_404(self):
+        self._wire(m1=False)
+        with self.assertRaises(HTTPException) as ctx:
+            await pr.annual_summary_endpoint(mock.Mock(), workspace_client_id=7, tax_year="2569")
+        self.assertEqual(ctx.exception.status_code, 404)
+
+    async def test_m1_gate_closed_hides_annual_output_as_404(self):
+        self._wire(m1=False)
+        with self.assertRaises(HTTPException) as ctx:
+            await pr.annual_output_endpoint(
+                mock.Mock(), workspace_client_id=7, tax_year="2569", kind="keying"
             )
         self.assertEqual(ctx.exception.status_code, 404)
 
@@ -364,6 +382,91 @@ class OutputTests(_GatedCase):
         body = b"".join([chunk async for chunk in out.body_iterator])
         rows = [pr._row_from_db(r) for r in db_rows]
         self.assertEqual(body, pnd1_attach.build_attachment(rows).encode("utf-8"))
+        disp = out.headers["Content-Disposition"]
+        self.assertIn("filename*=UTF-8''", disp)
+
+
+def _annual_db_rows():
+    return [
+        {
+            "period": "2569-05",
+            "seq": 1,
+            "employee_id": _EMP[0],
+            "title": "นางสาว",
+            "first_name": "สมหญิง",
+            "last_name": "ใจดี",
+            "income_code": "40(1)",
+            "paid_date": dt.date(2026, 5, 31),
+            "paid_amount": Decimal("13000"),
+            "wht_amount": Decimal("0"),
+            "condition": "1",
+        },
+        {
+            "period": "2569-06",
+            "seq": 1,
+            "employee_id": _EMP[0],
+            "title": "นางสาว",
+            "first_name": "สมหญิง",
+            "last_name": "ใจดี",
+            "income_code": "40(1)",
+            "paid_date": dt.date(2026, 6, 30),
+            "paid_amount": Decimal("13000"),
+            "wht_amount": Decimal("0"),
+            "condition": "1",
+        },
+    ]
+
+
+class AnnualSummaryTests(_GatedCase):
+    async def test_no_data_is_404_structured(self):
+        self._wire(cur=_Cur(fetchone_seq=[_CLIENT_ROW], fetchall_return=[]))
+        with self.assertRaises(HTTPException) as ctx:
+            await pr.annual_summary_endpoint(mock.Mock(), workspace_client_id=7, tax_year="2569")
+        self.assertEqual(ctx.exception.status_code, 404)
+        self.assertEqual(ctx.exception.detail["code"], "payroll.no_year_data")
+
+    async def test_bad_tax_year_is_400(self):
+        self._wire(cur=_Cur(fetchone_seq=[_CLIENT_ROW]))
+        with self.assertRaises(HTTPException) as ctx:
+            await pr.annual_summary_endpoint(mock.Mock(), workspace_client_id=7, tax_year="25a9")
+        self.assertEqual(ctx.exception.status_code, 400)
+
+    async def test_summary_aggregates_across_months(self):
+        self._wire(cur=_Cur(fetchone_seq=[_CLIENT_ROW], fetchall_return=_annual_db_rows()))
+        out = await pr.annual_summary_endpoint(mock.Mock(), workspace_client_id=7, tax_year="2569")
+        self.assertEqual(out["employee_count"], 1)
+        self.assertEqual(out["totals"]["paid_amount"], "26000")
+        self.assertEqual(out["months_present"], ["2569-05", "2569-06"])
+        self.assertEqual(out["issues"], [])
+        self.assertEqual(out["upload_kinds_available"], ["keying"])
+
+
+class AnnualOutputTests(_GatedCase):
+    async def test_no_data_is_404_structured(self):
+        self._wire(cur=_Cur(fetchone_seq=[_CLIENT_ROW], fetchall_return=[]))
+        with self.assertRaises(HTTPException) as ctx:
+            await pr.annual_output_endpoint(
+                mock.Mock(), workspace_client_id=7, tax_year="2569", kind="keying"
+            )
+        self.assertEqual(ctx.exception.status_code, 404)
+        self.assertEqual(ctx.exception.detail["code"], "payroll.no_year_data")
+
+    async def test_bad_kind_is_400_honest_downgrade_message(self):
+        self._wire(cur=_Cur(fetchone_seq=[_CLIENT_ROW]))
+        with self.assertRaises(HTTPException) as ctx:
+            await pr.annual_output_endpoint(
+                mock.Mock(), workspace_client_id=7, tax_year="2569", kind="attach"
+            )
+        self.assertEqual(ctx.exception.status_code, 400)
+        self.assertEqual(ctx.exception.detail["code"], "payroll.annual_kind_not_available")
+
+    async def test_keying_download_streams_xlsx(self):
+        self._wire(cur=_Cur(fetchone_seq=[_CLIENT_ROW], fetchall_return=_annual_db_rows()[:1]))
+        out = await pr.annual_output_endpoint(
+            mock.Mock(), workspace_client_id=7, tax_year="2569", kind="keying"
+        )
+        self.assertIsInstance(out, StreamingResponse)
+        self.assertEqual(out.media_type, pr._KEYING_MEDIA)
         disp = out.headers["Content-Disposition"]
         self.assertIn("filename*=UTF-8''", disp)
 

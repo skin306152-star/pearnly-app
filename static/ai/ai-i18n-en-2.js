@@ -226,6 +226,8 @@ Object.assign(window.__AI_I18N_EN__, {
     reports_download_pdf_btn: 'Download PDF',
     reports_download_xlsx_btn: 'Download Excel',
     reports_downloading: 'Downloading…',
+    wo_open_first_btn: 'Open current-period work order',
+    wo_open_first_busy: 'Opening…',
     settings_lang_title: 'Language',
     settings_lang_zh: '中文',
     settings_lang_th: 'ไทย',

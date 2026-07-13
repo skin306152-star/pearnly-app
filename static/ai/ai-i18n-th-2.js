@@ -218,6 +218,8 @@ Object.assign(window.__AI_I18N_TH__, {
     reports_download_pdf_btn: 'ดาวน์โหลด PDF',
     reports_download_xlsx_btn: 'ดาวน์โหลด Excel',
     reports_downloading: 'กำลังดาวน์โหลด…',
+    wo_open_first_btn: 'เปิดใบงานงวดปัจจุบัน',
+    wo_open_first_busy: 'กำลังเปิด…',
     settings_lang_title: 'ภาษา',
     settings_lang_zh: '中文',
     settings_lang_th: 'ไทย',

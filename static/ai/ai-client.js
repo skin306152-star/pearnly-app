@@ -83,11 +83,57 @@
         });
     }
 
+    // 零数据首跑旅程收口(方案 §5:"填画像 → 开当期工单 → 传料",零死路):brand-new
+    // 客户第一次进工单 tab 时 S.orders 为空,此前是纯空态死胡同(矩阵/看板批量开单是
+    // 唯一入口,但那要求先回工作台再找到这个客户)——就地给一个"开当期工单"按钮,
+    // 复用现成 createOrder(),period 取 AI.board.currentPeriodBE()(同矩阵/看板的
+    // "当期"权威口径,不自造第二套)。
+    function woEmptyHtml() {
+        return (
+            AI.state.emptyHtml({ title: at('wo_empty_t'), sub: at('wo_empty_s') }) +
+            '<button type="button" class="btn pri" data-action="wo-open-first">' +
+            esc(at('wo_open_first_btn')) +
+            '</button>'
+        );
+    }
+
+    function openFirstOrder() {
+        var btn = $('cv-wo').querySelector('[data-action="wo-open-first"]');
+        if (btn) {
+            if (btn.disabled) return;
+            btn.disabled = true;
+            btn.textContent = at('wo_open_first_busy');
+        }
+        S.api
+            .createOrder({
+                workspace_client_id: Number(S.clientId),
+                period: AI.board.currentPeriodBE(),
+                intent: 'monthly_vat',
+            })
+            .then(function () {
+                return S.api.listOrders({ client_id: S.clientId });
+            })
+            .then(function (r) {
+                S.orders = (r.orders || []).slice().sort(function (a, b) {
+                    return String(b.period).localeCompare(String(a.period));
+                });
+                S.periodIdx = 0;
+                renderPeriodPicker();
+                renderWo();
+            })
+            .catch(function () {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = at('wo_open_first_btn');
+                }
+            });
+    }
+
     function renderWo() {
         var body = $('cv-wo');
         var order = currentOrder();
         if (!order) {
-            body.innerHTML = AI.state.emptyHtml({ title: at('wo_empty_t'), sub: at('wo_empty_s') });
+            body.innerHTML = woEmptyHtml();
             return;
         }
         body.innerHTML = AI.state.loadingHtml();
@@ -213,6 +259,9 @@
                 AI.router.DEFAULT_ARCHIVE_TAB
             );
         };
+        $('cv-wo').addEventListener('click', function (e) {
+            if (e.target.closest('[data-action="wo-open-first"]')) openFirstOrder();
+        });
         $('periodBtn').onclick = function () {
             $('periodMenu').classList.toggle('on');
         };

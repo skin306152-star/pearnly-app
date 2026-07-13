@@ -225,6 +225,8 @@ Object.assign(window.__AI_I18N_JA__, {
     reports_download_pdf_btn: 'PDF をダウンロード',
     reports_download_xlsx_btn: 'Excel をダウンロード',
     reports_downloading: 'ダウンロード中…',
+    wo_open_first_btn: '当期のワークオーダーを開く',
+    wo_open_first_busy: '作成中…',
     settings_lang_title: '言語',
     settings_lang_zh: '中文',
     settings_lang_th: 'ไทย',

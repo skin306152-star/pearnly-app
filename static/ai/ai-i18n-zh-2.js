@@ -203,6 +203,8 @@ Object.assign(window.__AI_I18N_ZH__, {
     reports_download_pdf_btn: '下载 PDF',
     reports_download_xlsx_btn: '下载 Excel',
     reports_downloading: '下载中…',
+    wo_open_first_btn: '开当期工单',
+    wo_open_first_busy: '开单中…',
     settings_lang_title: '语言',
     settings_lang_zh: '中文',
     settings_lang_th: 'ไทย',

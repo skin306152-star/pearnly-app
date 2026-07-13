@@ -186,6 +186,52 @@ class AiRouterTests(unittest.TestCase):
             out, ["#/client/7/pkg", {"name": "client", "clientId": "7", "view": "pkg"}]
         )
 
+    def test_clients_reports_settings_are_independent_top_level_routes(self):
+        """EN-clients:导航禁用占位收口——三个侧栏入口各自独立顶层路由。"""
+        out = _run_node(f"""
+            const r = require({json.dumps(str(AI_DIR / "ai-router.js"))});
+            process.stdout.write(JSON.stringify([
+                r.parseHash('#/clients'),
+                r.parseHash('#/reports'),
+                r.parseHash('#/settings'),
+                r.buildClientsHash(), r.buildReportsHash(), r.buildSettingsHash(),
+            ]));
+            """)
+        self.assertEqual(
+            out,
+            [
+                {"name": "clients"},
+                {"name": "reports"},
+                {"name": "settings"},
+                "#/clients",
+                "#/reports",
+                "#/settings",
+            ],
+        )
+
+    def test_client_archive_hash_parses_tab_and_defaults_unknown_to_profile(self):
+        # "clients" vs "client" 前缀不重叠——单客户档案页与按期操作页互不误判。
+        out = _run_node(f"""
+            const r = require({json.dumps(str(AI_DIR / "ai-router.js"))});
+            process.stdout.write(JSON.stringify([
+                r.parseHash('#/clients/9/supplier'),
+                r.parseHash('#/clients/9'),
+                r.parseHash('#/clients/9/not-a-tab'),
+                r.buildClientArchiveHash(9, 'history'),
+                r.parseHash('#/client/9/wo'),
+            ]));
+            """)
+        self.assertEqual(
+            out,
+            [
+                {"name": "client-archive", "clientId": "9", "tab": "supplier"},
+                {"name": "client-archive", "clientId": "9", "tab": "profile"},
+                {"name": "client-archive", "clientId": "9", "tab": "profile"},
+                "#/clients/9/history",
+                {"name": "client", "clientId": "9", "view": "wo"},
+            ],
+        )
+
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class AiStateTests(unittest.TestCase):

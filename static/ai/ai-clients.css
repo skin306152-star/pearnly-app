@@ -1,0 +1,21 @@
+/* Pearnly AI · 客户目录(EN-clients)— 表格骨架/搜索/义务徽章列复用 .mx-table/.mx-scroll
+ * (ai-matrix.css)与 .search(ai-dashboard.css),本文件只补矩阵没有的两处细节:税号列
+ * 等宽数字对齐、义务徽章列多枚 chip 需要换行的容器。档案页(ai-client-archive.js)复用
+ * .chead/.ctabs/.cview(ai-client.css)与 .dlv-line(ai-client.css),零新增样式。
+ */
+
+.cl-taxid {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink2);
+}
+
+.cl-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+}
+
+.cl-badges-empty {
+  color: var(--faint);
+}

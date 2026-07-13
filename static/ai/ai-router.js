@@ -1,10 +1,14 @@
 /*
  * Pearnly AI · ai-router.js · 页内 hash 路由(纯解析/拼装 + 薄 DOM 订阅)
  *
- * 路由形态(M1-W1 拍板 · profile 见 B2-e · 矩阵见 C4):
+ * 路由形态(M1-W1 拍板 · profile 见 B2-e · 矩阵见 C4 · 客户/报表/设置见 EN-clients):
  *   #/                        工作台(默认子视图=矩阵,sub='matrix')
  *   #/board                   工作台(子视图=五列看板,sub='board' · 降为辅助)
- *   #/client/<id>/<view>      客户独立页,view ∈ intake|wo|review|pkg|profile
+ *   #/client/<id>/<view>      客户独立页(按期操作),view ∈ intake|wo|review|pkg|profile
+ *   #/clients                 客户目录(全租户客户表 · 侧栏「客户」)
+ *   #/clients/<id>/<tab>      单客户档案页,tab ∈ profile|supplier|history
+ *   #/reports                 跨客户报表中心(侧栏「报表」)
+ *   #/settings                设置(语言 + 账号 + 退出 · 侧栏「设置」)
  *
  * 矩阵/看板共用 route.name='dashboard'(同一个「工作台」页面壳,toolrow/统计卡不
  * 重复挂载),靠 route.sub 区分渲染哪块 body——不新起一个顶层路由名,ai.js 的
@@ -20,6 +24,11 @@
     var VIEWS = ['intake', 'wo', 'review', 'pkg', 'profile'];
     var DEFAULT_VIEW = 'wo';
     var DEFAULT_SUB = 'matrix';
+
+    // 客户档案页(EN-clients)三 tab:画像(表单+别名+义务)/供应商过账档案(Z3-b)/
+    // 工单历史——独立于上面按期操作的 VIEWS 集合,默认落税务画像(最常查的一块)。
+    var ARCHIVE_TABS = ['profile', 'supplier', 'history'];
+    var DEFAULT_ARCHIVE_TAB = 'profile';
 
     function parseHash(hash) {
         var h = String(hash || '').replace(/^#/, '');
@@ -37,6 +46,24 @@
         // 「工资表 ภ.ง.ด.1」(H1b · 顶层独立工具):选客户/期间后上传工资表,自身不挂在
         // 某个具体工单下,同 /fileconv 一样是独立顶层路由。
         if (h === '/payroll') return { name: 'payroll' };
+        // 客户目录(EN-clients · 侧栏「客户」转正):全租户客户表,独立顶层路由。
+        if (h === '/clients') return { name: 'clients' };
+        // 报表中心(EN-clients · 侧栏「报表」转正):选客户+期间查报表包,独立顶层路由。
+        if (h === '/reports') return { name: 'reports' };
+        // 设置(EN-clients · 侧栏「设置」转正):语言/账号/退出,独立顶层路由。
+        if (h === '/settings') return { name: 'settings' };
+        // 单客户档案页必须排在 /client/... 的正则前面判断——两者前缀不重叠
+        // (client vs clients),顺序对彼此零影响,紧邻只是同属客户域的语义分组。
+        var mArchive = /^\/clients\/([^/]+)\/?([^/]*)$/.exec(h);
+        if (mArchive) {
+            var archiveTab =
+                ARCHIVE_TABS.indexOf(mArchive[2]) >= 0 ? mArchive[2] : DEFAULT_ARCHIVE_TAB;
+            return {
+                name: 'client-archive',
+                clientId: decodeURIComponent(mArchive[1]),
+                tab: archiveTab,
+            };
+        }
         var m = /^\/client\/([^/]+)\/?([^/]*)$/.exec(h);
         if (!m) return { name: 'dashboard', sub: DEFAULT_SUB };
         var clientId = decodeURIComponent(m[1]);
@@ -75,6 +102,23 @@
         return '#/payroll';
     }
 
+    function buildClientsHash() {
+        return '#/clients';
+    }
+
+    function buildClientArchiveHash(clientId, tab) {
+        var t = ARCHIVE_TABS.indexOf(tab) >= 0 ? tab : DEFAULT_ARCHIVE_TAB;
+        return '#/clients/' + encodeURIComponent(clientId) + '/' + t;
+    }
+
+    function buildReportsHash() {
+        return '#/reports';
+    }
+
+    function buildSettingsHash() {
+        return '#/settings';
+    }
+
     // onChange(route) 在启动时立即调一次,并在每次 hashchange 后调用。
     function subscribe(onChange) {
         function fire() {
@@ -91,6 +135,8 @@
         VIEWS: VIEWS,
         DEFAULT_VIEW: DEFAULT_VIEW,
         DEFAULT_SUB: DEFAULT_SUB,
+        ARCHIVE_TABS: ARCHIVE_TABS,
+        DEFAULT_ARCHIVE_TAB: DEFAULT_ARCHIVE_TAB,
         parseHash: parseHash,
         buildClientHash: buildClientHash,
         buildDashboardHash: buildDashboardHash,
@@ -99,6 +145,10 @@
         buildVatcheckHash: buildVatcheckHash,
         buildFileconvHash: buildFileconvHash,
         buildPayrollHash: buildPayrollHash,
+        buildClientsHash: buildClientsHash,
+        buildClientArchiveHash: buildClientArchiveHash,
+        buildReportsHash: buildReportsHash,
+        buildSettingsHash: buildSettingsHash,
         subscribe: subscribe,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -436,7 +436,18 @@ class MatrixTests(unittest.IsolatedAsyncioTestCase):
         ):
             out = await tr.get_tax_profile_matrix(mock.Mock(), period="2569-05")
         self.assertEqual(len(cur.queries), 1)
-        self.assertEqual(out["clients"], [{"id": 1, "name": "A", "missing_order": True}])
+        self.assertEqual(
+            out["clients"],
+            [
+                {
+                    "id": 1,
+                    "name": "A",
+                    "missing_order": True,
+                    "tax_id": None,
+                    "profile_completeness": 0.0,
+                }
+            ],
+        )
         self.assertEqual(out["obligation_codes"], ["pp30"])
         self.assertEqual(out["obligation_labels"]["pp30"]["zh"], "增值税申报(PP30)")
         self.assertEqual(out["cells"][0]["badge"], "pending_order")
@@ -502,7 +513,18 @@ class MatrixTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(tr, "get_authz", return_value=authz),
         ):
             out = await tr.get_tax_profile_matrix(mock.Mock(), period="2569-05")
-        self.assertEqual(out["clients"], [{"id": 2, "name": "B", "missing_order": True}])
+        self.assertEqual(
+            out["clients"],
+            [
+                {
+                    "id": 2,
+                    "name": "B",
+                    "missing_order": True,
+                    "tax_id": None,
+                    "profile_completeness": 0.0,
+                }
+            ],
+        )
         self.assertEqual(out["obligation_codes"], [])
         self.assertEqual(out["cells"], [])
 
@@ -583,6 +605,75 @@ class MatrixTests(unittest.IsolatedAsyncioTestCase):
         ):
             out = await tr.get_tax_profile_matrix(mock.Mock(), period="2569-05")
         self.assertFalse(out["clients"][0]["missing_order"])
+
+    def test_profile_completeness_counts_answered_unknown_defaultable_fields(self):
+        """纯函数:6 个默认 unknown 的画像字段答了几个,0..1(EN-clients 客户目录用)。"""
+        from routes import tax_profile_routes as tr
+
+        self.assertEqual(tr._profile_completeness({}), 0.0)
+        self.assertEqual(
+            tr._profile_completeness(
+                {
+                    "p_has_employees": "yes",
+                    "p_pays_individuals": "no",
+                    "p_pays_juristic": "unknown",
+                    "p_pays_foreign": "unknown",
+                    "p_pays_interest_dividend": "unknown",
+                    "p_efiling_enrolled": "unknown",
+                }
+            ),
+            0.33,
+        )
+        self.assertEqual(
+            tr._profile_completeness(
+                {
+                    "p_has_employees": "yes",
+                    "p_pays_individuals": "no",
+                    "p_pays_juristic": "no",
+                    "p_pays_foreign": "no",
+                    "p_pays_interest_dividend": "yes",
+                    "p_efiling_enrolled": "yes",
+                }
+            ),
+            1.0,
+        )
+
+    async def test_client_row_carries_tax_id_and_profile_completeness(self):
+        """EN-clients:客户目录复用矩阵响应——tax_id + 完整度必须挂在每个客户行上。"""
+        from routes import tax_profile_routes as tr
+
+        rows = [
+            {
+                "client_id": 5,
+                "client_name": "C",
+                "client_tax_id": "1234567890123",
+                "obligation_code": "pp30",
+                "obligation_status": "due",
+                "due_paper": None,
+                "due_efiling": None,
+                "work_order_id": None,
+                "order_status": None,
+                "display_names": None,
+                "p_has_employees": "yes",
+                "p_pays_individuals": "yes",
+                "p_pays_juristic": "yes",
+                "p_pays_foreign": "unknown",
+                "p_pays_interest_dividend": "unknown",
+                "p_efiling_enrolled": "unknown",
+            },
+        ]
+        cur = _Cur(fetchall_value=rows)
+        authz = mock.Mock(scope_mode="all", workspace_ids=None)
+        with (
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
+            mock.patch.object(tr, "db", _FakeDB(cur)),
+            mock.patch.object(tr, "get_authz", return_value=authz),
+        ):
+            out = await tr.get_tax_profile_matrix(mock.Mock(), period="2569-05")
+        self.assertEqual(out["clients"][0]["tax_id"], "1234567890123")
+        self.assertEqual(out["clients"][0]["profile_completeness"], 0.5)
 
 
 if __name__ == "__main__":

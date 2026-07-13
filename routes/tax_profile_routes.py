@@ -267,6 +267,27 @@ async def list_client_obligations(
     return {"period": resolved_period, "obligations": rows}
 
 
+# 客户目录(EN-clients · 2026-07-13)「画像完整度」= 这 6 个默认落 unknown 的画像字段
+# 里已被人工确认几个,0..1。挂在矩阵响应上(同一 LEFT JOIN,零额外往返),不是画像表单
+# FIELD_DEFS 全集——sbt_status/filing_disposition 默认值本身就是"已答"(none/active),
+# 计入分母只会让每个新客户显得比实际更"完整",故只数真正默认 unknown 的字段。
+_COMPLETENESS_FIELDS = (
+    "p_has_employees",
+    "p_pays_individuals",
+    "p_pays_juristic",
+    "p_pays_foreign",
+    "p_pays_interest_dividend",
+    "p_efiling_enrolled",
+)
+
+
+def _profile_completeness(row: dict) -> float:
+    """0..1,round 到 2 位。行里没有画像列(旧调用点/测试 fixture 没带)一律按全 unknown
+    算,不假装完整——client_tax_profiles 缺档时 COALESCE 已在 SQL 层退到 'unknown'。"""
+    answered = sum(1 for f in _COMPLETENESS_FIELDS if row.get(f, "unknown") != "unknown")
+    return round(answered / len(_COMPLETENESS_FIELDS), 2)
+
+
 def _matrix_badge(obligation_status: Optional[str], order_status: Optional[str]) -> str:
     """(obligation_status, order_status) → 矩阵格子徽章(纯函数,零 I/O,见常量顶注)。
 
@@ -299,6 +320,10 @@ async def get_tax_profile_matrix(request: Request, period: Optional[str] = None)
     没有行的客户/期不会凭空长出列——诚实反映"先保存一次画像或开一次单才有义务"的
     既有语义,见 obligation_engine 顶注);没有任何物化记录的客户仍出现在矩阵里,
     各格子标「未评估」而非编造一个已知徽章。
+
+    客户目录(EN-clients)复用本端点当数据源:tax_id + profile_completeness 挂在同一
+    LEFT JOIN 里一次带出(client_tax_profiles 与 workspace_clients 是 1:1,不会像
+    obligation 那样按期/按义务码炸出多行),零额外查询。
     """
     user, tenant_id = authorize_pearnly_ai(request, _MATRIX_PERM, not_found="workorder.not_found")
     resolved_period = period or obligation_engine.current_be_period()
@@ -308,10 +333,16 @@ async def get_tax_profile_matrix(request: Request, period: Optional[str] = None)
     with db.get_cursor() as cur:
         cur.execute(
             """
-            SELECT wc.id AS client_id, wc.name AS client_name,
+            SELECT wc.id AS client_id, wc.name AS client_name, wc.tax_id AS client_tax_id,
                    o.obligation_code, o.status AS obligation_status,
                    o.due_paper, o.due_efiling, o.work_order_id,
-                   wo.status AS order_status, d.display_names
+                   wo.status AS order_status, d.display_names,
+                   COALESCE(p.has_employees, 'unknown') AS p_has_employees,
+                   COALESCE(p.pays_individuals, 'unknown') AS p_pays_individuals,
+                   COALESCE(p.pays_juristic, 'unknown') AS p_pays_juristic,
+                   COALESCE(p.pays_foreign, 'unknown') AS p_pays_foreign,
+                   COALESCE(p.pays_interest_dividend, 'unknown') AS p_pays_interest_dividend,
+                   COALESCE(p.efiling_enrolled, 'unknown') AS p_efiling_enrolled
             FROM workspace_clients wc
             LEFT JOIN client_period_obligations o
                 ON o.tenant_id = wc.tenant_id
@@ -319,6 +350,8 @@ async def get_tax_profile_matrix(request: Request, period: Optional[str] = None)
                AND o.period = %s
             LEFT JOIN work_orders wo ON wo.id = o.work_order_id
             LEFT JOIN tax_obligation_defs d ON d.obligation_code = o.obligation_code
+            LEFT JOIN client_tax_profiles p
+                ON p.tenant_id = wc.tenant_id AND p.workspace_client_id = wc.id
             WHERE wc.tenant_id = %s AND wc.is_active = TRUE
             ORDER BY wc.name, o.obligation_code
             """,
@@ -340,7 +373,15 @@ async def get_tax_profile_matrix(request: Request, period: Optional[str] = None)
     cells: list[dict] = []
     for r in rows:
         cid = int(r["client_id"])
-        clients.setdefault(cid, {"id": cid, "name": r["client_name"]})
+        clients.setdefault(
+            cid,
+            {
+                "id": cid,
+                "name": r["client_name"],
+                "tax_id": r.get("client_tax_id"),
+                "profile_completeness": _profile_completeness(r),
+            },
+        )
         client_has_order.setdefault(cid, False)
         code = r["obligation_code"]
         if code is None:

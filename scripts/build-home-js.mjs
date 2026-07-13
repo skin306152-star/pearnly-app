@@ -140,6 +140,24 @@ const BUNDLES = [
             'ai/ai-payroll-render.js',
             'ai/ai-payroll.js',
             'ai/ai-client.js',
+            // EN-clients(2026-07-13)· 客户目录/单客户档案页/报表中心/设置——三个侧栏占位
+            // 收口转正。ai-clients-render.js(目录纯拼装,依赖 AI.matrixRender.BADGE_CHIP)
+            // 排在 ai-matrix-render.js 之后即可(已在上面);ai-clients.js(目录编排)排它
+            // 之后。ai-client-archive-render.js/ai-client-archive.js(档案页,复用
+            // ai-profile.js 的 container/sections 改造,复用 ai-client.js 的 .chead/.ctabs
+            // 结构)排在 ai-profile.js 与 ai-client.js 之后。ai-reports-render.js 依赖
+            // AI.pkgRender.KIND_ORDER(已在上面 ai-pkg-render.js)与 AI.payrollRender.
+            // defaultPeriod(已在上面 ai-payroll-render.js);ai-reports.js(报表中心编排)
+            // 直接复用 AI.financials.mount()/AI.shadow.mount()(已在上面),排它们之后即可。
+            // ai-settings.js 编排+拼装未拆(体量小,同 ai-financials.js 先例),零跨模块依赖
+            // 之外的顺序要求,排最后、ai.js 之前。
+            'ai/ai-clients-render.js',
+            'ai/ai-clients.js',
+            'ai/ai-client-archive-render.js',
+            'ai/ai-client-archive.js',
+            'ai/ai-reports-render.js',
+            'ai/ai-reports.js',
+            'ai/ai-settings.js',
             'ai/ai.js',
         ],
     },

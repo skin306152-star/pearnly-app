@@ -1,16 +1,22 @@
 /*
  * Pearnly AI · ai-profile.js · 税务画像/别名/义务清单/供应商过账档案视图编排
  *
- * 四块一次拉齐(getTaxProfile + listAliases + listObligations + listSupplierProfiles 并发),
- * 不像 intake/review/pkg 那样要求先有工单——客户建档后、开第一张工单前也该能填画像、加别名、
- * 挂供应商规则(税务画像-方案-B1.md §2.1"宁多问不静默"),order 可能是 null,义务清单请求就
- * 不带 period(后端默认当期);供应商档案不挂工单,与 order 无关。
+ * 四块并发拉齐,只拉调用方要的那几块(见 opts.sections)——不像 intake/review/pkg 那样
+ * 要求先有工单:客户建档后、开第一张工单前也该能填画像、加别名、挂供应商规则(税务画像
+ * -方案-B1.md §2.1"宁多问不静默"),order 可能是 null,义务清单请求就不带 period(后端
+ * 默认当期);供应商档案不挂工单,与 order 无关。
  *
  * 局部动作各自只重拉自己需要的那份数据,不做整页 reload:
  *   保存画像 → 刷新 profile + obligations(画像变了,当期义务后端会重物化,见
  *     routes/tax_profile_routes.py::put_tax_profile);
  *   加/停别名 → 只刷新 aliases;加/删供应商档案(Z3-b)→ 只刷新 supplierProfiles。
  *
+ * container/sections(EN-clients · 2026-07-13 收口导航占位新增):原本硬绑
+ * document.getElementById('cv-profile')——客户档案页(ai-client-archive.js)要把「画像+
+ * 别名+义务」与「供应商过账档案」拆两个 tab 各自的容器复用同一份表单/面板 HTML + 保存/
+ * 增删逻辑,不重抄一份,故把挂载点与要渲染的分区都改成调用方传参,不传时回落 ai-client.js
+ * 的既有用法(cv-profile + 全四块)零改变。单例 S 假设同一时刻只有一处调用 mount()
+ * (同 ai-pkg.js/ai-review.js 先例),客户独立页四视图切换与档案页 tab 切换都满足这一点。
  * 依赖 window.AI.state/api/format/profileRender/profilePanelsRender/supplierProfilesRender
  * 与全局 at(),排在它们之后、ai-client.js 之前加载(见 scripts/build-home-js.mjs)。
  */
@@ -21,18 +27,29 @@
         return document.getElementById(id);
     };
 
+    var ALL_SECTIONS = ['form', 'alias', 'obligations', 'supplier'];
+
     var S = null;
-    var wired = false;
+    // 每个曾经挂载过的容器各记一次"已绑事件"(不是全局一次性锁)——客户独立页反复
+    // 切回同一个 cv-profile 容器只绑一次,档案页的画像/供应商两个 tab 容器各自独立绑定。
+    var wiredContainers = [];
 
     function body() {
-        return $('cv-profile');
+        return S.container;
     }
 
-    function freshState(api, order, clientId) {
+    function has(section) {
+        return S.sections.indexOf(section) >= 0;
+    }
+
+    function freshState(api, order, clientId, opts) {
+        opts = opts || {};
         return {
             api: api,
             clientId: clientId,
             orderPeriod: order ? order.period : null,
+            container: opts.container || $('cv-profile'),
+            sections: opts.sections || ALL_SECTIONS,
             profile: null,
             aliases: [],
             obligations: { period: null, rows: [] },
@@ -86,30 +103,54 @@
 
     function render() {
         var c = ctx();
-        body().innerHTML =
-            AI.profileRender.formHtml(c) +
-            AI.profilePanelsRender.aliasPanelHtml(c) +
-            AI.profilePanelsRender.obligationsPanelHtml(c) +
-            AI.supplierProfilesRender.supplierProfilePanelHtml(c);
+        var html = '';
+        if (has('form')) html += AI.profileRender.formHtml(c);
+        if (has('alias')) html += AI.profilePanelsRender.aliasPanelHtml(c);
+        if (has('obligations')) html += AI.profilePanelsRender.obligationsPanelHtml(c);
+        if (has('supplier')) html += AI.supplierProfilesRender.supplierProfilePanelHtml(c);
+        body().innerHTML = html;
     }
 
     // ============ 拉数据 ============
 
+    // 只发调用方要的那几块请求(archive 页画像 tab 不需要 supplierProfiles,供应商 tab
+    // 不需要 profile/aliases/obligations)——不像客户独立页全量四块都要,避免多余往返。
     function loadAll() {
         body().innerHTML = AI.state.loadingHtml();
         var session = S;
-        Promise.all([
-            S.api.getTaxProfile(S.clientId),
-            S.api.listAliases(S.clientId),
-            S.api.listObligations(S.clientId, S.orderPeriod),
-            S.api.listSupplierProfiles(S.clientId),
-        ])
-            .then(function (r) {
+        var tasks = [];
+        if (has('form')) {
+            tasks.push(
+                S.api.getTaxProfile(S.clientId).then(function (r) {
+                    if (S === session) S.profile = r.profile;
+                })
+            );
+        }
+        if (has('alias')) {
+            tasks.push(
+                S.api.listAliases(S.clientId).then(function (r) {
+                    if (S === session) S.aliases = r.aliases || [];
+                })
+            );
+        }
+        if (has('obligations')) {
+            tasks.push(
+                S.api.listObligations(S.clientId, S.orderPeriod).then(function (r) {
+                    if (S === session)
+                        S.obligations = { period: r.period, rows: r.obligations || [] };
+                })
+            );
+        }
+        if (has('supplier')) {
+            tasks.push(
+                S.api.listSupplierProfiles(S.clientId).then(function (r) {
+                    if (S === session) S.supplierProfiles = r.profiles || [];
+                })
+            );
+        }
+        Promise.all(tasks)
+            .then(function () {
                 if (S !== session) return;
-                S.profile = r[0].profile;
-                S.aliases = r[1].aliases || [];
-                S.obligations = { period: r[2].period, rows: r[2].obligations || [] };
-                S.supplierProfiles = r[3].profiles || [];
                 render();
             })
             .catch(function () {
@@ -353,18 +394,18 @@
         else if (e.target && e.target.id === 'spForm') addSupplierProfile(e);
     }
 
-    function wireOnce() {
-        if (wired) return;
-        wired = true;
-        var host = body();
+    function wireOnce(host) {
+        if (wiredContainers.indexOf(host) >= 0) return;
+        wiredContainers.push(host);
         host.addEventListener('click', onClick);
         host.addEventListener('submit', onSubmit);
         host.addEventListener('change', onFormChange);
     }
 
-    function mount(api, order, clientId) {
-        S = freshState(api, order, clientId);
-        wireOnce();
+    // opts.container(默认 cv-profile)/ opts.sections(默认四块全要)——见顶注。
+    function mount(api, order, clientId, opts) {
+        S = freshState(api, order, clientId, opts);
+        wireOnce(S.container);
         loadAll();
     }
 

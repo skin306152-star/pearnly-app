@@ -222,5 +222,7 @@
         applyFilters: applyFilters,
         wireTable: wireTable,
         badgeLabel: badgeLabel,
+        // 客户目录(ai-clients-render.js)复用同一份徽章 → chip 色族映射,不重抄一份。
+        BADGE_CHIP: BADGE_CHIP,
     };
 })();

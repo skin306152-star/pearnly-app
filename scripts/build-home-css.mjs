@@ -184,6 +184,11 @@ const AI_CSS = [
     // 列映射表格 + 手工加行表单这两块 H1b 独有的 .pr-* 结构,与其余视图互斥显示,层叠
     // 顺序对彼此零影响。
     'ai/ai-payroll.css',
+    // ai-clients.css(EN-clients · 客户目录/单客户档案页)只补 .mx-table 系没有的两处细节
+    // (税号列数字对齐 + 义务徽章列换行容器);档案页/报表中心/设置三视图其余全复用既有
+    // .chead/.ctabs/.cview(ai-client.css)、.pr-setup-row/.pr-lb(ai-payroll.css)、
+    // .pkg-files/.pfile(ai-pkg.css)、.view-toggle/.vt-btn(ai-matrix.css)——零新增文件。
+    'ai/ai-clients.css',
 ];
 
 const BUNDLES = [

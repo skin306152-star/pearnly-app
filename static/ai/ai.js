@@ -225,7 +225,7 @@
             });
         } else {
             window.scrollTo(0, 0);
-            AI.client.mount(api, route.clientId, route.view);
+            AI.client.mount(api, route.clientId, route.view, route.period);
         }
     }
 

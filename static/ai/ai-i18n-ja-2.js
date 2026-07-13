@@ -177,7 +177,7 @@ Object.assign(window.__AI_I18N_JA__, {
     // EN-clients(2026-07-13)· 顧客/顧客プロフィール/レポート/設定——無効だった3つの
     // サイドバー項目を実ルートへ。
     clients_empty_t: 'まだ顧客がいません',
-    clients_empty_s: '最初のワークオーダーを開くと、顧客がここに自動的に表示されます',
+    clients_empty_s: '右上の「+ 新規顧客」をクリックして最初の顧客を作成してください',
     clients_col_name: '顧客名',
     clients_col_tax_id: '税番号',
     clients_col_completeness: 'プロフィール完成度',
@@ -198,6 +198,33 @@ Object.assign(window.__AI_I18N_JA__, {
     reports_prompt_t: '顧客と期間を選んでレポートを表示',
     reports_prompt_s:
         '顧客と期間を選ぶと、その期間の貸借対照表・損益計算書・試算表がここに表示されます',
+    // N1(2026-07-13)· ナビゲーション三門の商用グレード化(P0-1/P0-3/P1-1/P1-2/P1-4/P1-5)
+    clients_new_btn: '+ 新規顧客',
+    clients_new_title: '新規顧客',
+    clients_new_hint:
+        '新しいワークスペース顧客(記帳対象)を登録します。タイ語の登録名は必須、税番号は任意で後から入力できます。',
+    clients_new_name_label: '登録名(タイ語)',
+    clients_new_tax_id_label: '税番号(任意)',
+    clients_new_submit: '顧客を作成',
+    clients_new_submitting: '作成中…',
+    clients_new_err_name_required: '顧客名を入力してください',
+    err_workspace_thai_name_required:
+        'タイ語の登録名を入力してください(税番号の読み取りミス時の代替として使用します)',
+    err_workspace_tax_id_duplicate: 'この税番号は同じテナント内の別の顧客で既に使用されています',
+    err_pos_workspace_single_store:
+        'このアカウントは1店舗に限定されています。追加は管理者にお問い合わせください',
+    client_view_archive_btn: '顧客プロフィールを見る',
+    ca_open_order_btn: '当期のワークオーダーを開く',
+    ca_profile_cta_chip: '未着手',
+    ca_profile_cta_s:
+        'まず下記の税務プロフィールを完成させてください——各期にこの顧客が負う義務を決定します',
+    matrix_new_client_chip: '新規',
+    matrix_new_client_hint: 'プロフィール未入力——新規作成の顧客の可能性が高い',
+    reports_view_order_btn: 'ワークオーダーを見る',
+    reports_financials_download_title: '財務諸表をダウンロード',
+    reports_download_pdf_btn: 'PDF をダウンロード',
+    reports_download_xlsx_btn: 'Excel をダウンロード',
+    reports_downloading: 'ダウンロード中…',
     settings_lang_title: '言語',
     settings_lang_zh: '中文',
     settings_lang_th: 'ไทย',

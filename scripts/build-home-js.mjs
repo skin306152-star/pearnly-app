@@ -81,6 +81,10 @@ const BUNDLES = [
             'ai/ai-format.js',
             'ai/ai-router.js',
             'ai/ai-state.js',
+            // ai-api-payroll.js(工资表 H1b 五端点,拆自 ai-api.js·单文件<500 铁律)只需
+            // 排在 ai-api.js 之前(apiFactory() 到调用时才读 AI.apiPayroll,不是加载时),
+            // 紧邻放置是"同属后端调用薄层"的语义分组。
+            'ai/ai-api-payroll.js',
             'ai/ai-api.js',
             // ai-gate.js(Z1-a 登录卡/邀请制门面)只依赖 AI.state.esc(可选)与全局 at()/
             // atSetLang,排在 ai-state.js/ai-api.js 之后、ai.js(boot 调 AI.gate.mountLogin/
@@ -157,6 +161,9 @@ const BUNDLES = [
             // ai-settings.js 编排+拼装未拆(体量小,同 ai-financials.js 先例),零跨模块依赖
             // 之外的顺序要求,排最后、ai.js 之前。
             'ai/ai-clients-render.js',
+            // ai-client-new.js(N1-P0-1 ·「+新建客户」模态,依赖 AI.state/api/router)只需
+            // 排在 ai-clients.js(load() 里调 AI.clientNew.wireButton)之前。
+            'ai/ai-client-new.js',
             'ai/ai-clients.js',
             'ai/ai-client-archive-render.js',
             'ai/ai-client-archive.js',

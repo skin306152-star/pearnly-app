@@ -33,8 +33,15 @@
             order: null,
             deliverables: [],
             downloading: null,
+            downloadingFinancials: null,
+            errKey: null,
             loading: false,
         };
+    }
+
+    function mapErrKey(err) {
+        var key = AI.api.mapApiErrorKey(err && err.code);
+        return at(key) !== key ? key : 'err_generic';
     }
 
     function renderPicker() {
@@ -49,15 +56,29 @@
     }
 
     function renderNoOrder() {
-        body().innerHTML = AI.reportsRender.noOrderHtml();
+        body().innerHTML = AI.reportsRender.noOrderHtml(S.errKey);
     }
 
     function renderReport() {
         body().innerHTML =
+            AI.reportsRender.viewOrderLinkHtml(S.clientId, S.period) +
+            '<div id="rptFinancialsDownload"></div>' +
             '<div id="rptFinancials"></div><div id="rptShadow"></div><div id="rptDeliverables"></div>';
         AI.financials.mount(S.order.financials, $('rptFinancials'));
         AI.shadow.mount(S.order.shadow_draft, $('rptShadow'));
+        renderFinancialsDownload();
         renderDeliverables();
+    }
+
+    // P0-3:BS/PL/TB 有数据才出下载面板(financials 为 null 说明闸关/未算到——不给一个
+    // 点了 404 的假按钮)。
+    function renderFinancialsDownload() {
+        var el = $('rptFinancialsDownload');
+        if (el)
+            el.innerHTML = AI.reportsRender.financialsDownloadPanelHtml(
+                !!(S.order && S.order.financials),
+                S.downloadingFinancials
+            );
     }
 
     function renderDeliverables() {
@@ -127,7 +148,9 @@
 
     function openOrder() {
         if (!isReady() || S.loading) return;
+        var session = S;
         S.loading = true;
+        S.errKey = null;
         body().innerHTML = AI.state.loadingHtml();
         S.api
             .createOrder({
@@ -135,8 +158,19 @@
                 period: S.period,
                 intent: 'monthly_vat',
             })
-            .then(load)
-            .catch(load);
+            .then(function () {
+                if (S !== session) return;
+                S.loading = false;
+                load();
+            })
+            .catch(function (err) {
+                // P1-2:失败不再静默吞——权限/重复/非法期一律四语人话回显,同 ai-payroll.js
+                // errKey 惯例(mapApiErrorKey 取不到具体文案时落 err_generic,不甩错误码)。
+                if (S !== session) return;
+                S.loading = false;
+                S.errKey = mapErrKey(err);
+                renderNoOrder();
+            });
     }
 
     function download(kind) {
@@ -167,12 +201,45 @@
             });
     }
 
+    // P0-3:月度报表打印级 PDF/Excel——同 download() 的 blob→object URL 触发下载先例,
+    // 独立 downloadingFinancials 态(不复用 W5 交付物的 downloading,两组按钮互不锁)。
+    function downloadFinancials(format) {
+        if (S.downloadingFinancials || !S.order) return;
+        var session = S;
+        S.downloadingFinancials = format;
+        renderFinancialsDownload();
+        var lang = (window.AII18N && window.AII18N.lang) || 'th';
+        S.api
+            .downloadFinancialsReport(S.order.id, format, lang)
+            .then(function (r) {
+                if (S !== session) return;
+                var url = URL.createObjectURL(r.blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = r.filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            })
+            .catch(function () {
+                /* 下载失败按钮解禁即可再点,同 download() 既有惯例 */
+            })
+            .then(function () {
+                if (S !== session) return;
+                S.downloadingFinancials = null;
+                renderFinancialsDownload();
+            });
+    }
+
     function onClick(e) {
         var el = e.target.closest('[data-action]');
         if (!el) return;
         var a = el.getAttribute('data-action');
         if (a === 'reports-open-order') openOrder();
         else if (a === 'reports-download') download(el.getAttribute('data-kind'));
+        else if (a === 'reports-download-financials')
+            downloadFinancials(el.getAttribute('data-format'));
     }
 
     function onChange(e) {
@@ -180,7 +247,7 @@
             S.clientId = e.target.value;
             load();
         } else if (e.target.id === 'rptPeriodInput') {
-            S.period = e.target.value.trim();
+            S.period = e.target.value;
             load();
         }
     }

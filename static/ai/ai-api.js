@@ -77,7 +77,9 @@
             });
         }
 
-        return {
+        // base 拼上 ai-api-payroll.js 拆出去的工资表方法(见文末 Object.assign)——单文件
+        // <500 行铁律下 apiFactory() 主体不再直接容纳工资表五个端点。
+        var base = {
             // Z1-a · 登录门面用:未登录态调用,不带 Authorization(authHeaders 见 token 为空
             // 自然省略头)。成功回 {token, access_token, user, is_super_admin} 同 landing.js 契约。
             login: function (username, password, remember) {
@@ -384,96 +386,51 @@
                     body
                 );
             },
-            // 工资表 ภ.ง.ด.1 工具卡(H1b · routes/payroll_routes.py):parse 纯读猜列/套模板,
-            // commit 落库 + 点亮义务,output 下载三产出——三者都是 multipart(parse/commit
-            // 带文件),不能走 call()。
-            parsePayroll: function (file, workspaceClientId, period) {
-                var fd = new FormData();
-                fd.append('file', file);
-                fd.append('workspace_client_id', workspaceClientId);
-                fd.append('period', period);
-                return root
-                    .fetch('/api/payroll/parse', {
-                        method: 'POST',
-                        headers: authHeaders(),
-                        body: fd,
-                    })
-                    .then(handleResponse);
+            // N1-P0-1:建账套主体(客户目录页「+新建客户」表单)。裸对象出线(无信封),
+            // 422 走 workspace.thai_name_required / workspace.tax_id_duplicate,调用方
+            // mapApiErrorKey 取四语文案(同 handleResponse 既有 code 抽取口径,detail
+            // 是 {code,message} 对象还是裸字符串都取得到 code,不必在这里特判)。
+            createWorkspaceClient: function (body) {
+                return call('POST', '/api/workspace/clients', body);
             },
-            commitPayroll: function (file, opts) {
-                var fd = new FormData();
-                fd.append('file', file);
-                fd.append('workspace_client_id', opts.workspaceClientId);
-                fd.append('period', opts.period);
-                fd.append('column_map', JSON.stringify(opts.columnMap || {}));
-                fd.append('fixed_values', JSON.stringify(opts.fixedValues || {}));
-                fd.append('income_code', opts.incomeCode || '40(1)');
-                fd.append('manual_entries', JSON.stringify(opts.manualEntries || []));
-                return root
-                    .fetch('/api/payroll/commit', {
-                        method: 'POST',
-                        headers: authHeaders(),
-                        body: fd,
-                    })
-                    .then(handleResponse);
+            // 按钮显隐探针(state honesty:没权限不给一个点了才 403 的假门)。
+            canCreateWorkspaceClient: function () {
+                return call('GET', '/api/workspace/clients/can-create');
             },
-            // 三产出下载:GET 带鉴权头,<a href> 发不了自定义头,调用方拿 blob 自建
-            // object URL(同 downloadDeliverable 先例)。泰文原名走 filename*(RFC 5987)。
-            downloadPayrollOutput: function (workspaceClientId, period, kind) {
+            // N1-P0-3:月度报表打印级 PDF/Excel——附件路,同 downloadConvertedPdf/
+            // downloadPayrollOutput 先例(GET 带鉴权头,<a href> 发不了自定义头,调用方
+            // 拿 blob 自建 object URL)。
+            downloadFinancialsReport: function (orderId, format, lang) {
                 var qs =
-                    '?workspace_client_id=' +
-                    encodeURIComponent(workspaceClientId) +
-                    '&period=' +
-                    encodeURIComponent(period) +
-                    '&kind=' +
-                    encodeURIComponent(kind);
+                    '?format=' +
+                    encodeURIComponent(format || 'pdf') +
+                    '&lang=' +
+                    encodeURIComponent(lang || 'th');
                 return root
-                    .fetch('/api/payroll/output' + qs, { headers: authHeaders() })
+                    .fetch(
+                        '/api/workorder/orders/' +
+                            encodeURIComponent(orderId) +
+                            '/financials/download' +
+                            qs,
+                        { headers: authHeaders() }
+                    )
                     .then(function (r) {
                         if (!r.ok) return handleResponse(r);
                         var disp = r.headers.get('Content-Disposition') || '';
                         var star = /filename\*=UTF-8''([^;]+)/.exec(disp);
                         var plain = /filename="?([^";]+)"?/.exec(disp);
-                        var filename = star ? decodeURIComponent(star[1]) : plain ? plain[1] : kind;
-                        return r.blob().then(function (blob) {
-                            return { blob: blob, filename: filename };
-                        });
-                    });
-            },
-            // ภ.ง.ด.1ก 年度聚合(批次 H 收尾件)——summary 纯读聚合预览(JSON),output 只接受
-            // kind=keying(上传件格式未经官方样本核实,诚实降级见 routes/payroll_routes.py)。
-            getPayrollAnnualSummary: function (workspaceClientId, taxYear) {
-                var qs =
-                    '?workspace_client_id=' +
-                    encodeURIComponent(workspaceClientId) +
-                    '&tax_year=' +
-                    encodeURIComponent(taxYear);
-                return root
-                    .fetch('/api/payroll/annual/summary' + qs, { headers: authHeaders() })
-                    .then(handleResponse);
-            },
-            downloadPayrollAnnualOutput: function (workspaceClientId, taxYear, kind) {
-                var qs =
-                    '?workspace_client_id=' +
-                    encodeURIComponent(workspaceClientId) +
-                    '&tax_year=' +
-                    encodeURIComponent(taxYear) +
-                    '&kind=' +
-                    encodeURIComponent(kind);
-                return root
-                    .fetch('/api/payroll/annual/output' + qs, { headers: authHeaders() })
-                    .then(function (r) {
-                        if (!r.ok) return handleResponse(r);
-                        var disp = r.headers.get('Content-Disposition') || '';
-                        var star = /filename\*=UTF-8''([^;]+)/.exec(disp);
-                        var plain = /filename="?([^";]+)"?/.exec(disp);
-                        var filename = star ? decodeURIComponent(star[1]) : plain ? plain[1] : kind;
+                        var filename = star
+                            ? decodeURIComponent(star[1])
+                            : plain
+                              ? plain[1]
+                              : 'financials.' + (format || 'pdf');
                         return r.blob().then(function (blob) {
                             return { blob: blob, filename: filename };
                         });
                     });
             },
         };
+        return Object.assign(base, AI.apiPayroll.create(root, authHeaders, handleResponse));
     }
 
     var apiExport = { mapApiErrorKey: mapApiErrorKey, create: apiFactory };

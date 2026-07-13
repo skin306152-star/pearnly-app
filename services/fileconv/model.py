@@ -14,6 +14,10 @@ GL_LEDGER = "gl_ledger"
 BANK_STATEMENT = "bank_statement"
 VAT_REPORT = "vat_report"
 GENERIC_TABLE = "generic_table"
+# N1-P0-3:月度报表(BS/PL/TB)不是原始台账/流水,但同样过了守恒校验(资产=负债+权益、
+# 借=贷)——复用 K2 引擎第二个真场景(见 services/reports/financials_pdf.py),
+# 不该被 pdf_out 的 stamp 逻辑落进"未识别台账·未做数字校验"那支(状态诚实)。
+FINANCIALS_REPORT = "financials_report"
 
 # status 取值。无文字层的扫描件/图片走 OCR(K1c);OCR 读不全或读不到一律结构化拒绝,
 # 绝不把截断的行集当成功出件(截断尾行会让余额链假自洽,比拒绝更危险)。

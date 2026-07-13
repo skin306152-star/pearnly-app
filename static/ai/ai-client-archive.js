@@ -14,11 +14,22 @@
         return document.getElementById(id);
     };
 
-    var S = { api: null, clientId: null, tab: null, client: null };
+    var S = { api: null, clientId: null, tab: null, client: null, completeness: null };
     var wired = false;
 
     function renderHeader() {
         $('caHeader').innerHTML = AI.clientArchiveRender.headerHtml(S.client, S.clientId);
+    }
+
+    // P1-5:0% 画像提示条只在「画像」tab 且完整度确实为 0 时出现——完整度未知(还没
+    // 拉到 profile)不误报 0%,other tab 也不该被这条与自己无关的 CTA 打扰。
+    function renderProfileCta() {
+        var el = $('caProfileCta');
+        if (!el) return;
+        el.innerHTML =
+            S.tab === 'profile' && S.completeness === 0
+                ? AI.clientArchiveRender.profileCtaHtml()
+                : '';
     }
 
     function renderTabs() {
@@ -74,6 +85,7 @@
     }
 
     function loadActiveTab() {
+        renderProfileCta();
         if (S.tab === 'profile') loadProfileTab();
         else if (S.tab === 'supplier') loadSupplierTab();
         else if (S.tab === 'history') loadHistoryTab();
@@ -90,9 +102,12 @@
         }
         var orderRow = e.target.closest('[data-action="ca-open-order"]');
         if (orderRow) {
-            // 点历史行进现有工单详情路由(操作页自己按最新期定位,期间切换用它内置的
-            // 账期选择器——档案页不重复实现"打开某一期"的定位逻辑)。
-            window.location.hash = AI.router.buildClientHash(S.clientId, 'wo');
+            // P0-2:点历史行必须进那一行对应的账期(此前恒落最新期,历史列表形同虚设)。
+            // data-order-period 只有历史行才有;P1-1 页头"打开当期工单"链接复用同一个
+            // data-action 但不带该属性,取到 null 时 buildClientHash 自然回落"最新期"
+            // ——同一处代码路径服务两个入口,不必分叉。
+            var period = orderRow.getAttribute('data-order-period');
+            window.location.hash = AI.router.buildClientHash(S.clientId, 'wo', period || undefined);
         }
     }
 
@@ -114,6 +129,7 @@
         }
         S.clientId = clientId;
         S.client = null;
+        S.completeness = null;
         renderHeader();
         renderTabs();
         loadActiveTab();
@@ -125,6 +141,17 @@
             })
             .catch(function () {
                 /* 头部展示降级用 clientId 本身(renderHeader 已处理 client=null),不阻断三 tab */
+            });
+        // P1-5:独立小请求算 0% 画像 CTA(不借道 AI.profile 内部状态——那是它自己的闭包,
+        // 保持模块解耦;画像本就是单行小查询,多这一次请求成本可忽略)。
+        api.getTaxProfile(clientId)
+            .then(function (r) {
+                if (S.clientId !== clientId) return;
+                S.completeness = AI.clientArchiveRender.completenessFraction(r.profile);
+                renderProfileCta();
+            })
+            .catch(function () {
+                /* 拉不到画像不阻断三 tab,CTA 保持不显示(S.completeness 仍是 null) */
             });
     }
 

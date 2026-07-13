@@ -210,6 +210,12 @@
                   <div class="csub" data-at="client_readonly_note"></div>
                 </div>
               </div>
+              <button
+                type="button"
+                class="btn sm"
+                id="clientArchiveLink"
+                data-at="client_view_archive_btn"
+              ></button>
               <div class="period-pick">
                 <button class="pk" id="periodBtn" type="button">
                   <span class="pl" data-at="period_label"></span><b id="periodValue">—</b>
@@ -271,6 +277,13 @@
             <div class="board-head">
               <h2 data-at="nav_clients"></h2>
               <span class="note" data-at="clients_col_obligations"></span>
+              <button
+                type="button"
+                id="clientsNewBtn"
+                class="btn pri"
+                style="display: none; margin-left: auto"
+                data-at="clients_new_btn"
+              ></button>
             </div>
             <div class="search">
               <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
@@ -285,6 +298,7 @@
           <section class="view" id="v-client-archive">
             <div id="caHeader"></div>
             <div id="caTabsWrap"></div>
+            <div id="caProfileCta"></div>
             <div class="cview" id="cav-profile"></div>
             <div class="cview" id="cav-supplier"></div>
             <div class="cview" id="cav-history"></div>
@@ -310,14 +324,14 @@
     </div>
 
     <script src="/static/ai/ai-i18n-zh.js?v=19"></script>
-    <script src="/static/ai/ai-i18n-zh-2.js?v=8"></script>
+    <script src="/static/ai/ai-i18n-zh-2.js?v=9"></script>
     <script src="/static/ai/ai-i18n-th.js?v=19"></script>
-    <script src="/static/ai/ai-i18n-th-2.js?v=8"></script>
+    <script src="/static/ai/ai-i18n-th-2.js?v=9"></script>
     <script src="/static/ai/ai-i18n-en.js?v=19"></script>
-    <script src="/static/ai/ai-i18n-en-2.js?v=8"></script>
+    <script src="/static/ai/ai-i18n-en-2.js?v=9"></script>
     <script src="/static/ai/ai-i18n-ja.js?v=19"></script>
-    <script src="/static/ai/ai-i18n-ja-2.js?v=8"></script>
+    <script src="/static/ai/ai-i18n-ja-2.js?v=9"></script>
     <script src="/static/ai/ai-i18n.js?v=10"></script>
-    <script src="/static/dist/ai.js?v=29" defer></script>
+    <script src="/static/dist/ai.js?v=30" defer></script>
   </body>
 </html>

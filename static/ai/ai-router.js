@@ -30,8 +30,29 @@
     var ARCHIVE_TABS = ['profile', 'supplier', 'history'];
     var DEFAULT_ARCHIVE_TAB = 'profile';
 
+    // 深链带的查询串(目前只有 ?period=,P0-2):在路径匹配前先切掉,不然 view 段的
+    // 正则 [^/]* 会把 "wo?period=2569-06" 整段当成非法 view 值,连累 period 也丢——
+    // 一次切分两个问题一起解(period 丢是根因,view 误判是同一处代码路径的副作用)。
+    function splitQuery(h) {
+        var qIdx = h.indexOf('?');
+        if (qIdx < 0) return { path: h, query: {} };
+        var query = {};
+        h.slice(qIdx + 1)
+            .split('&')
+            .forEach(function (pair) {
+                if (!pair) return;
+                var eq = pair.indexOf('=');
+                var k = eq >= 0 ? pair.slice(0, eq) : pair;
+                var v = eq >= 0 ? pair.slice(eq + 1) : '';
+                query[decodeURIComponent(k)] = decodeURIComponent(v);
+            });
+        return { path: h.slice(0, qIdx), query: query };
+    }
+
     function parseHash(hash) {
-        var h = String(hash || '').replace(/^#/, '');
+        var raw = String(hash || '').replace(/^#/, '');
+        var split = splitQuery(raw);
+        var h = split.path;
         if (h === '' || h === '/') return { name: 'dashboard', sub: DEFAULT_SUB };
         if (h === '/board') return { name: 'dashboard', sub: 'board' };
         // 「待我处理」(D2-S8 客户池·跨客户会计队列):独立顶层路由,不挂在某个客户的
@@ -68,12 +89,23 @@
         if (!m) return { name: 'dashboard', sub: DEFAULT_SUB };
         var clientId = decodeURIComponent(m[1]);
         var view = VIEWS.indexOf(m[2]) >= 0 ? m[2] : DEFAULT_VIEW;
-        return { name: 'client', clientId: clientId, view: view };
+        // P0-2:period 深链——缺省(未带 ?period=)才落最新期,mount() 侧判定;带了就是
+        // "从矩阵/看板/工单历史点进来的那一期",不许被 mount() 的默认逻辑悄悄穿越成别的期。
+        return {
+            name: 'client',
+            clientId: clientId,
+            view: view,
+            period: split.query.period || null,
+        };
     }
 
-    function buildClientHash(clientId, view) {
+    // period 缺省(undefined/null/''):不追加 ?period=,退回"进最新期"的既有默认行为
+    // (矩阵/看板/工单历史三个调用点都传真实 period;客户档案页头部"打开当期工单"链接
+    // 不传,故意落最新)。
+    function buildClientHash(clientId, view, period) {
         var v = VIEWS.indexOf(view) >= 0 ? view : DEFAULT_VIEW;
-        return '#/client/' + encodeURIComponent(clientId) + '/' + v;
+        var h = '#/client/' + encodeURIComponent(clientId) + '/' + v;
+        return period ? h + '?period=' + encodeURIComponent(period) : h;
     }
 
     // 矩阵是新默认首页(C4·主窗拍板):「回工作台」一律回矩阵,看板改走

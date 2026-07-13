@@ -208,6 +208,13 @@ Object.assign(window.__AI_I18N_JA__, {
     clients_new_submit: '顧客を作成',
     clients_new_submitting: '作成中…',
     clients_new_err_name_required: '顧客名を入力してください',
+    // MC1-b0(2026-07-13)· 税番号照会で登録名を自動入力(本サイトの登録ウィザードと同じRD照会を再利用)
+    clients_new_tax_mod11_warn: 'この税番号はチェックディジットに一致しません。ご確認ください',
+    clients_new_tax_checking: '税番号を照会中…',
+    clients_new_tax_found: '税務局データベースで見つかりました。登録名を下に入力しました',
+    clients_new_tax_not_found: '税務局データベースに見つかりません。手動で入力できます',
+    clients_new_tax_use_result_hint: '照会結果:{name}',
+    clients_new_tax_use_result_btn: 'この名前を使う',
     err_workspace_thai_name_required:
         'タイ語の登録名を入力してください(税番号の読み取りミス時の代替として使用します)',
     err_workspace_tax_id_duplicate: 'この税番号は同じテナント内の別の顧客で既に使用されています',

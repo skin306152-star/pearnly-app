@@ -202,6 +202,14 @@ Object.assign(window.__AI_I18N_TH__, {
     clients_new_submit: 'สร้างลูกค้า',
     clients_new_submitting: 'กำลังสร้าง…',
     clients_new_err_name_required: 'กรุณากรอกชื่อลูกค้า',
+    // MC1-b0(2026-07-13) · เลขผู้เสียภาษี → ค้นหาอัตโนมัติ (ใช้ตัวค้นหา RD เดิมของเว็บหลัก)
+    clients_new_tax_mod11_warn:
+        'เลขผู้เสียภาษีนี้ไม่ผ่านการตรวจสอบเลขตรวจสอบ — กรุณาตรวจสอบอีกครั้ง',
+    clients_new_tax_checking: 'กำลังค้นหาเลขผู้เสียภาษี…',
+    clients_new_tax_found: 'พบข้อมูลจากกรมสรรพากร — กรอกชื่อจดทะเบียนให้ด้านล่างแล้ว',
+    clients_new_tax_not_found: 'ไม่พบในระบบกรมสรรพากร — กรอกข้อมูลด้วยตนเองได้',
+    clients_new_tax_use_result_hint: 'พบจากกรมสรรพากร: {name}',
+    clients_new_tax_use_result_btn: 'ใช้ชื่อนี้',
     err_workspace_thai_name_required:
         'กรุณากรอกชื่อจดทะเบียนภาษาไทย (ใช้เป็นตัวสำรองเมื่ออ่านเลขผู้เสียภาษีผิด)',
     err_workspace_tax_id_duplicate: 'เลขผู้เสียภาษีนี้ถูกใช้กับลูกค้ารายอื่นในบัญชีนี้แล้ว',

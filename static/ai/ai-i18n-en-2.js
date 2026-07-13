@@ -208,6 +208,14 @@ Object.assign(window.__AI_I18N_EN__, {
     clients_new_submit: 'Create client',
     clients_new_submitting: 'Creating…',
     clients_new_err_name_required: 'Please enter a client name',
+    // MC1-b0(2026-07-13) · Tax ID lookup auto-fill (reuses main-site RD lookup)
+    clients_new_tax_mod11_warn: 'This tax ID does not pass the checksum — please double-check it',
+    clients_new_tax_checking: 'Looking up the tax ID…',
+    clients_new_tax_found: 'Found in the registry — registered name filled in below',
+    clients_new_tax_not_found:
+        'Not found in the registry — you can still fill in the details manually',
+    clients_new_tax_use_result_hint: 'Registry lookup: {name}',
+    clients_new_tax_use_result_btn: 'Use this name',
     err_workspace_thai_name_required:
         'Please enter the Thai registered name (used as a fallback when the tax ID is misread)',
     err_workspace_tax_id_duplicate:

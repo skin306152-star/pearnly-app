@@ -397,6 +397,14 @@
             canCreateWorkspaceClient: function () {
                 return call('GET', '/api/workspace/clients/can-create');
             },
+            // MC1-b0(2026-07-13):税号直查带出注册名(建客户模态)。复用主站现成端点
+            // GET /api/workspace/tax-lookup(routes/workspace_routes.py::workspace_tax_lookup ·
+            // 内置 RD 7 天缓存 + 5s 超时),鉴权口径与「+新建客户」按钮显隐同一个
+            // settings.workspace.manage——能看到按钮就能查,零新增后端。查不到/格式错后端
+            // 诚实返 {ok:false,error},调用方降级手填,不阻断建档。
+            workspaceTaxLookup: function (taxId) {
+                return call('GET', '/api/workspace/tax-lookup?tax_id=' + encodeURIComponent(taxId));
+            },
             // N1-P0-3:月度报表打印级 PDF/Excel——附件路,同 downloadConvertedPdf/
             // downloadPayrollOutput 先例(GET 带鉴权头,<a href> 发不了自定义头,调用方
             // 拿 blob 自建 object URL)。

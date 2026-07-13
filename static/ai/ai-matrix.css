@@ -23,8 +23,8 @@
   border-radius: 8px;
   cursor: pointer;
   transition:
-    background 0.12s,
-    color 0.12s;
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 .vt-btn:hover {
   color: var(--ink);
@@ -33,10 +33,6 @@
   background: var(--surface);
   color: var(--ink);
   box-shadow: var(--sh-card);
-}
-.vt-btn:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 2px;
 }
 
 /* 工具条:账期选择 + 筛选 chip + 批量开单,同排,窄屏自动换行(Canon §6.1)。 */
@@ -61,9 +57,9 @@
   border-radius: 99px;
   cursor: pointer;
   transition:
-    border-color 0.12s,
-    background 0.12s,
-    color 0.12s;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 .mf-chip:hover {
   border-color: var(--mut);
@@ -72,10 +68,6 @@
   background: var(--warn-soft);
   border-color: var(--warn-line);
   color: var(--warn);
-}
-.mf-chip:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 2px;
 }
 .mx-note {
   font-size: 11.5px;
@@ -118,19 +110,22 @@
   padding: 9px 10px;
   border-bottom: 1px solid var(--hair);
   white-space: nowrap;
+  transition: background var(--dur-base) var(--ease);
 }
 .mx-table tbody tr:last-child td {
   border-bottom: none;
 }
-.mx-table tbody tr:hover {
-  background: var(--surface2);
+.mx-table tbody tr:hover td {
+  background: var(--sage-soft);
 }
+/* 冻结列必须实底(v5 §五1):横滑内容从其下滑过不透字;行 hover 时同步换底
+ * (tr:hover td 一条已含冻结列,这里只补静止态底色)。 */
 .mx-check-cell {
   width: 34px;
   text-align: center;
   position: sticky;
   left: 0;
-  background: inherit;
+  background: var(--surface);
   z-index: 2;
 }
 .mx-table thead .mx-check-cell {
@@ -142,12 +137,14 @@
   height: 16px;
   cursor: pointer;
 }
-/* 客户名列吸左(横滑时客户名恒可见),文字省略号+title 兜底(Canon §6.2)。 */
+/* 客户名列吸左(横滑时客户名恒可见),文字省略号+title 兜底(Canon §6.2);
+ * 冻结列右缘投影(--sh-pin)标出"下面还有内容在滑"。 */
 .mx-namecell {
   position: sticky;
   left: 34px;
   background: var(--surface);
   z-index: 2;
+  box-shadow: var(--sh-pin);
   font-weight: 650;
   font-family: var(--thai);
   cursor: pointer;
@@ -158,13 +155,16 @@
 .mx-table thead .mx-namecell {
   z-index: 3;
   background: var(--tabs-bg);
+  box-shadow: var(--sh-pin);
 }
-.mx-table tbody tr:hover .mx-namecell {
-  background: var(--surface2);
-}
-.mx-namecell:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: -2px;
+/* 内嵌柔环(冻结列被 overflow 裁切,外环画不出来)——:not(#_) 特异度垫片同
+ * ai-shell.css 统一环的注释,保证盖得过它。 */
+.mx-namecell:focus-visible:not(#_) {
+  outline: none;
+  box-shadow:
+    inset 0 0 0 1px var(--acc),
+    inset 0 0 0 4px var(--acc-soft),
+    var(--sh-pin);
 }
 .mx-cell {
   text-align: center;
@@ -174,10 +174,6 @@
   background: none;
   padding: 0;
   cursor: pointer;
-}
-.mx-cellbtn:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 2px;
   border-radius: 99px;
 }
 

@@ -310,4 +310,7 @@ Object.assign(window.__AI_I18N_TH__, {
     verdict_ocr_validation: 'ค่าที่ OCR อ่านขัดกับกฎตรวจสอบ กรุณาตรวจกับต้นฉบับ',
     verdict_ocr_error: 'OCR อ่านไม่สำเร็จ: {error}',
     verdict_duplicate: 'ซ้ำกับรายการที่มีอยู่แล้ว (ซ้ำกับ {of})',
+    // UI1 (2026-07-13) · แถวรายชื่อลูกค้าแบบแบ่งชั้น + breadcrumb ตามจริง
+    clients_obligations_n: 'ภาระงวดนี้ {n} รายการ',
+    crumb_archive: 'แฟ้มลูกค้า',
 });

@@ -160,6 +160,25 @@
 .pkg-mask.on {
   display: flex;
 }
+/* 进场动效(v5 §四):遮罩淡入 + 卡片浮起。挂 .enter 而非 .on——模态内容变化走
+ * outerHTML 重渲染(ai-pkg.js 先例),动效只该在首次打开播一次,不随每次重渲染重放。 */
+.pkg-mask.enter {
+  animation: ai-mask-in var(--dur-slow) var(--ease);
+}
+.pkg-mask.enter .pkg-modal {
+  animation: ai-modal-in var(--dur-slow) var(--ease);
+}
+@keyframes ai-mask-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ai-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+}
 .pkg-modal {
   background: var(--surface);
   border-radius: 14px;
@@ -218,7 +237,7 @@
   border-radius: 8px;
 }
 .ev-row.sel {
-  background: var(--gold-soft);
+  background: var(--acc-soft);
 }
 .ev-row.novisual .evid {
   color: var(--mut);

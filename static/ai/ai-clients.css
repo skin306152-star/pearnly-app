@@ -1,21 +1,107 @@
-/* Pearnly AI · 客户目录(EN-clients)— 表格骨架/搜索/义务徽章列复用 .mx-table/.mx-scroll
- * (ai-matrix.css)与 .search(ai-dashboard.css),本文件只补矩阵没有的两处细节:税号列
- * 等宽数字对齐、义务徽章列多枚 chip 需要换行的容器。档案页(ai-client-archive.js)复用
- * .chead/.ctabs/.cview(ai-client.css)与 .dlv-line(ai-client.css),零新增样式。
+/* Pearnly AI · 客户目录(v5 §六 行内分层)——名(最大)/税号(次)/完成度小环+百分比/
+ * 义务计数标签/行尾箭头,整行可点;手机端收列(藏税号与进度)。档案页(ai-client-archive.js)
+ * 复用 .chead/.ctabs/.cview(ai-client.css)与 .dlv-line(ai-client.css),零新增样式。
  */
 
-.cl-taxid {
-  font-variant-numeric: tabular-nums;
-  color: var(--ink2);
+.cl-list {
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  box-shadow: var(--sh-card);
+  overflow: hidden;
 }
 
-.cl-badges {
+.cl-row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--hair3);
+  cursor: pointer;
+  transition: background var(--dur-base) var(--ease);
+}
+.cl-row:last-child {
+  border-bottom: none;
+}
+.cl-row:hover {
+  background: var(--sage-soft);
 }
 
-.cl-badges-empty {
+.cl-main {
+  flex: 1;
+  min-width: 0;
+}
+.cl-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  font-family: var(--thai);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cl-taxid {
+  display: block;
+  font-size: 11.5px;
+  color: var(--mut);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 完成度小环:conic-gradient 吃行内 --p(0..100),空心由 ::after 挖出。 */
+.cl-prog {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--ink2);
+  flex-shrink: 0;
+}
+.cl-ring {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: conic-gradient(var(--acc) calc(var(--p) * 1%), var(--hair) 0);
+  position: relative;
+  flex-shrink: 0;
+}
+.cl-ring::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--surface);
+  transition: background var(--dur-base) var(--ease);
+}
+.cl-row:hover .cl-ring::after {
+  background: var(--sage-soft);
+}
+
+.cl-obl {
+  flex-shrink: 0;
+}
+.cl-obl-empty {
   color: var(--faint);
+}
+
+.cl-arrow {
+  width: 16px;
+  height: 16px;
+  stroke: var(--faint);
+  flex-shrink: 0;
+  transition:
+    transform var(--dur-fast) var(--ease),
+    stroke var(--dur-fast) var(--ease);
+}
+.cl-row:hover .cl-arrow {
+  transform: translateX(2px);
+  stroke: var(--ink2);
+}
+
+/* 手机端收列(v5 §六):名字+义务+箭头,税号/进度环藏起。 */
+@media (max-width: 720px) {
+  .cl-taxid,
+  .cl-prog {
+    display: none;
+  }
 }

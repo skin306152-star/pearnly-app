@@ -36,6 +36,28 @@
   --serif: Georgia, 'Times New Roman', serif;
   --thai: 'Leelawadee UI', 'Sarabun', system-ui, sans-serif;
 
+  /* v5(UI-Canon-v5 §一)——值逐字节抄设计稿,组件层只准 var() 引用。 */
+  /* 强调色 · 赤陶橙(主 CTA/聚焦环/关键交互) */
+  --acc: #c2683f;
+  --acc-h: #a95733;
+  --acc-soft: #f6e6dd;
+  --acc-line: #e6c3ac;
+
+  /* 动效 · 全站只用这四个值 */
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 240ms;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* 阴影补两级 */
+  --sh-lift: 0 2px 6px rgba(80, 66, 32, 0.08), 0 12px 26px rgba(80, 66, 32, 0.1);
+  --sh-pin: 9px 0 14px -9px rgba(80, 66, 32, 0.2);
+
+  /* 环境循环动效(骨架屏/加载圈)——不是 v5 §三管的交互过渡(那套 ≤240ms),
+     但组件层禁写死毫秒,时长一样收编到令牌层。 */
+  --dur-skel: 1400ms;
+  --dur-spin: 800ms;
+
   /* v4 组件层直接写死、未提到 :root 的固定色(值逐字节抄 v4,只是在本仓库补成令牌 ——
      * lint-ui 禁裸 hex,v4 原型文件本身不受这条约束)。 */
   --nav-hover: #f0ece0;

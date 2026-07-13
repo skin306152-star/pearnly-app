@@ -36,6 +36,8 @@
         }).length;
         $('statPendingV').textContent = String(pending);
         $('statRunningV').textContent = String(running);
+        // 看板统计跨期现算(每客户最新一期),没有单一账期可言——账期 pill 只归矩阵。
+        $('sumPeriod').style.display = 'none';
     }
 
     // 只对「每客户最新一期」里 status=stuck(区分缺料/挂起)或 review(读 tax_due)的那些

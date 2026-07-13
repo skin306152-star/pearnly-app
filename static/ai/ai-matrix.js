@@ -54,6 +54,8 @@
         $('statClientsV').textContent = String((matrix.clients || []).length);
         $('statPendingV').textContent = String(pending);
         $('statRunningV').textContent = String(running);
+        $('sumPeriodV').textContent = matrix.period || '—';
+        $('sumPeriod').style.display = '';
     }
 
     function periodOptionsHtml(selected) {

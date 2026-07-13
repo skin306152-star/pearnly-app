@@ -32,7 +32,19 @@
     // 绑定(不然每轮登录都在同一批按钮上叠一份监听器)。内容更新(姓名/头像)每次都照跑。
     var chromeWired = false;
 
-    function renderChrome() {
+    // 左下角用户块(v5 §五3):显示登录用户名,取不到整块藏(状态诚实,不摆假占位)。
+    function setFootUser(name) {
+        var foot = $('footUser');
+        if (!name) {
+            foot.style.display = 'none';
+            return;
+        }
+        foot.style.display = '';
+        $('footName').textContent = name;
+        $('footAv').textContent = name.slice(0, 1).toUpperCase();
+    }
+
+    function renderChrome(api) {
         var token = localStorage.getItem('mrpilot_token');
         var name = AI.format.jwtDisplayName(token);
         // 登录态没有姓名字段(实测 token payload 只有不透明 sub)时,不拿字母/短横线冒充
@@ -46,8 +58,18 @@
         } else {
             who.style.display = 'none';
         }
-        $('firmName').textContent = at('brand_word') + ' ' + at('brand_ai');
-        $('firmMeta').textContent = '';
+        // token payload 常只有 sub,用户名以 /api/me 为准;等响应期间先用 token 里
+        // 现成的邮箱前缀垫底,双双拿不到就保持隐藏。
+        setFootUser(name);
+        api.getMe()
+            .then(function (me) {
+                var emailPrefix =
+                    me.email && me.email.indexOf('@') > 0 ? me.email.split('@')[0] : null;
+                setFootUser(me.username || emailPrefix || name);
+            })
+            .catch(function () {
+                // 探针失败保持 token 回落态(名字有就显示,没有就藏)。
+            });
         if (chromeWired) return;
         chromeWired = true;
         $('navClients').addEventListener('click', function () {
@@ -87,9 +109,11 @@
         });
     }
 
-    // 顶层独立视图 → 面包屑第二段的文案 key(都是"工作台 / <本页>"这一种形状)。
-    // client/client-archive 不在表里,各自的形状不一样,setCrumb 里单独处理。
+    // 顶层独立视图(与工作台平级)→ 面包屑只显示栏目名(v5 §五2:不再假装挂在
+    // 「工作台 /」之下)。真下级只有两个,setCrumb 里单独处理:单客户档案页挂在
+    // 客户目录下,按期操作页挂在工作台(从矩阵格子点进来)下。
     var CRUMB_LABEL_KEY = {
+        dashboard: 'crumb_dash',
         pool: 'nav_todo',
         vatcheck: 'nav_vatcheck',
         fileconv: 'nav_fileconv',
@@ -105,27 +129,28 @@
         };
     }
 
+    function crumbCur(label) {
+        return '<span class="cur">' + label + '</span>';
+    }
+
     function setCrumb(route) {
         var crumb = $('crumb');
-        if (route.name === 'dashboard') {
-            crumb.innerHTML =
-                '<span style="color:var(--ink);font-weight:600">' + at('crumb_dash') + '</span>';
-            return;
-        }
         if (route.name === 'client-archive') {
             crumb.innerHTML =
-                '<a data-back>' +
-                at('crumb_dash') +
-                '</a> / <a data-back-clients>' +
+                '<a data-back-clients>' +
                 at('nav_clients') +
-                '</a>';
-            wireBack(crumb.querySelector('[data-back]'), AI.router.buildDashboardHash());
+                '</a> / ' +
+                crumbCur(at('crumb_archive'));
             wireBack(crumb.querySelector('[data-back-clients]'), AI.router.buildClientsHash());
             return;
         }
-        var labelKey = CRUMB_LABEL_KEY[route.name] || 'title_client';
-        crumb.innerHTML = '<a data-back>' + at('crumb_dash') + '</a> / ' + at(labelKey);
-        wireBack(crumb.querySelector('[data-back]'), AI.router.buildDashboardHash());
+        if (route.name === 'client') {
+            crumb.innerHTML =
+                '<a data-back>' + at('crumb_dash') + '</a> / ' + crumbCur(at('title_client'));
+            wireBack(crumb.querySelector('[data-back]'), AI.router.buildDashboardHash());
+            return;
+        }
+        crumb.innerHTML = crumbCur(at(CRUMB_LABEL_KEY[route.name] || 'crumb_dash'));
     }
 
     // 离开工作台时记滚动位,回来时恢复(Canon §7:视图切换回来滚动位置不丢)。
@@ -246,7 +271,7 @@
 
     function enterApp(api) {
         showShell();
-        renderChrome();
+        renderChrome(api);
         // 二次进入(门面登出/登录闭环)可能已订阅过一次——先退订再订阅,防止 hashchange
         // 监听器逐轮叠加(每次都多触发一遍 onRoute,状态越切越花)。
         if (routerUnsubscribe) routerUnsubscribe();

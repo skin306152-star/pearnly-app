@@ -4,58 +4,35 @@
 
 .toolrow {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: 14px;
-  margin-bottom: 22px;
+  margin-bottom: 18px;
   flex-wrap: wrap;
 }
-.stat {
+/* 一行安静摘要条(v5 §五4,撤三张大统计卡):小字号 pill,数据源不变。 */
+.sumline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
   flex: 1;
-  min-width: 210px;
+  min-width: 0;
+}
+.sum-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
   background: var(--surface);
   border: 1px solid var(--hair);
-  border-radius: 14px;
-  padding: 15px 18px;
-  box-shadow: var(--sh-card);
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.stat .ic {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: var(--sage-soft);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.stat .ic svg {
-  width: 19px;
-  height: 19px;
-  stroke: var(--sage-deep);
-}
-.stat.warn .ic {
-  background: var(--crit-soft);
-}
-.stat.warn .ic svg {
-  stroke: var(--crit);
-}
-.stat .lb {
+  border-radius: 99px;
+  padding: 4px 12px;
   font-size: 11.5px;
   color: var(--mut);
-  margin-bottom: 2px;
+  white-space: nowrap;
 }
-.stat .v {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-.stat .v small {
-  font-size: 12px;
-  color: var(--mut);
-  font-weight: 500;
+.sum-pill b {
+  font-size: 12.5px;
+  color: var(--ink);
 }
 .search {
   display: flex;
@@ -66,6 +43,9 @@
   border-radius: 11px;
   padding: 0 14px;
   min-width: 220px;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 .search svg {
   width: 15px;
@@ -82,8 +62,16 @@
   color: var(--ink);
   width: 100%;
 }
-.search input:focus {
+/* 聚焦环画在整个搜索胶囊上(输入框本体无边框,环在里面会悬空);
+ * :not(#_) 特异度垫片同 ai-shell.css 统一环的注释。 */
+.search input:focus,
+.search input:focus-visible:not(#_) {
   outline: none;
+  box-shadow: none;
+}
+.search:focus-within {
+  border-color: var(--acc);
+  box-shadow: 0 0 0 3px var(--acc-soft);
 }
 
 .board-head {
@@ -158,14 +146,15 @@
   box-shadow: var(--sh-card);
   cursor: pointer;
   transition:
-    border-color 0.12s,
-    box-shadow 0.12s,
-    transform 0.08s;
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
 }
+/* 可点卡 hover 抬起(v5 §四:translateY(-2px) + --sh-lift)。 */
 .kcard:hover {
   border-color: var(--hair2);
-  box-shadow: var(--sh-pop);
-  transform: translateY(-1px);
+  box-shadow: var(--sh-lift);
+  transform: translateY(-2px);
 }
 .kcard.hot {
   border-color: var(--crit-line);
@@ -180,11 +169,7 @@
   border-radius: 0 3px 3px 0;
   background: var(--crit);
 }
-/* Tab 可达的卡片(tabindex=0)聚焦金环——Canon §7,不用浏览器默认蓝。 */
-.kcard:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 2px;
-}
+/* 聚焦柔环由 ai-shell.css 的 [tabindex]:focus-visible 统一接线,不再各写一份。 */
 /* 文字溢出省略号(Canon §6.2),完整内容在 title 提示里。 */
 .kcard b {
   display: block;

@@ -66,6 +66,8 @@
         var html = AI.pkgRender.evidModalHtml(S.evid);
         if (existing) existing.outerHTML = html;
         else document.body.insertAdjacentHTML('beforeend', html);
+        // 进场动效只在首开播一次:选证据行等状态变化走 outerHTML 重渲染,不重放。
+        if (!existing) $('pkgEvidMask').classList.add('enter');
 
         var mask = $('pkgEvidMask');
         mask.querySelector('.mclose').onclick = closeEvid;

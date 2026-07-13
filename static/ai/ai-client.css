@@ -14,11 +14,14 @@
   padding: 0 6px;
   font-family: Consolas, monospace;
 }
+/* toast 右下滑入淡入(v5 §四),出场对称走同一条 transition。 */
 .toast {
   position: fixed;
   bottom: 26px;
-  left: 50%;
-  transform: translateX(-50%) translateY(90px);
+  right: 26px;
+  transform: translateY(14px);
+  opacity: 0;
+  pointer-events: none;
   background: var(--ink);
   color: var(--surface);
   font-size: 12.5px;
@@ -26,13 +29,17 @@
   padding: 12px 22px;
   border-radius: 11px;
   box-shadow: var(--sh-pop);
-  transition: transform 0.22s ease;
+  transition:
+    transform var(--dur-base) var(--ease),
+    opacity var(--dur-base) var(--ease);
   z-index: 200;
   max-width: min(560px, 90vw);
   text-align: center;
 }
 .toast.on {
-  transform: translateX(-50%) translateY(0);
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
 }
 .toast .rv-toast-undo {
   margin-left: 4px;
@@ -130,6 +137,7 @@
   cursor: pointer;
   color: var(--ink2);
   font-family: inherit;
+  transition: background var(--dur-base) var(--ease);
 }
 .period-menu button:hover {
   background: var(--sage-soft);
@@ -156,6 +164,9 @@
   border-radius: 8px;
   cursor: pointer;
   font-family: inherit;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 .ctabs button.on {
   background: var(--surface);
@@ -168,7 +179,7 @@
 }
 .cview.on {
   display: block;
-  animation: ai-fade 0.18s ease;
+  animation: ai-fade var(--dur-base) var(--ease);
 }
 
 /* 工单视图:管线摘要 + 关键数字(真数据 · order_detail) */
@@ -344,10 +355,9 @@
   border-radius: 9px;
   background: var(--surface);
   color: var(--ink);
-}
-.rv-vat-input:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 2px;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 .rv-edit-hint {
   font-size: 11px;

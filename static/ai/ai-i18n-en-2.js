@@ -321,4 +321,7 @@ Object.assign(window.__AI_I18N_EN__, {
         'OCR reading conflicts with a validation rule — please verify against the original',
     verdict_ocr_error: 'OCR could not read this document: {error}',
     verdict_duplicate: 'Duplicate of an existing item ({of})',
+    // UI1 (2026-07-13) · layered client rows + honest breadcrumb
+    clients_obligations_n: '{n} obligations this period',
+    crumb_archive: 'Client file',
 });

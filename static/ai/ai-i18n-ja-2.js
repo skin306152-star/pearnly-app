@@ -318,4 +318,7 @@ Object.assign(window.__AI_I18N_JA__, {
     verdict_ocr_validation: 'OCR の読取値が検証ルールと食い違い、原本と照合してください',
     verdict_ocr_error: 'OCR 読取に失敗:{error}',
     verdict_duplicate: '既存項目と重複(重複先:{of})',
+    // UI1(2026-07-13)· 顧客一覧の階層化 + パンくず修正
+    clients_obligations_n: '当期の義務 {n} 件',
+    crumb_archive: '顧客ファイル',
 });

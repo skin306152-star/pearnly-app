@@ -291,4 +291,7 @@ Object.assign(window.__AI_I18N_ZH__, {
     verdict_ocr_validation: 'OCR 读数与校验规则有出入，请核对票面',
     verdict_ocr_error: 'OCR 识别失败：{error}',
     verdict_duplicate: '与已收票据重复（重复于 {of}）',
+    // UI1(2026-07-13)· 客户目录行内分层 + 面包屑修真
+    clients_obligations_n: '当期义务 {n} 项',
+    crumb_archive: '客户档案',
 });

@@ -74,7 +74,7 @@
   font-size: 13.5px;
   cursor: pointer;
   text-decoration: none;
-  transition: background 0.12s;
+  transition: background var(--dur-fast) var(--ease);
 }
 .snav a svg {
   width: 16px;
@@ -106,6 +106,7 @@
 .snav a.on .n {
   color: var(--nav-on-n);
 }
+/* 左下角=登录用户块(v5 §五3):首字母方块头像 + 用户名,禁死品牌名占位。 */
 .side .foot {
   margin-top: auto;
   padding: 16px 20px;
@@ -114,28 +115,31 @@
   align-items: center;
   gap: 11px;
 }
-.fbadge {
+.side .foot .uav {
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: var(--gold-soft);
-  border: 1px solid var(--hair2);
+  background: var(--sage);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-.fbadge svg {
-  width: 15px;
-  height: 15px;
-  stroke: var(--gold);
+  flex-shrink: 0;
 }
 .side .foot small {
   color: var(--mut);
   font-size: 11.5px;
   line-height: 1.4;
+  min-width: 0;
 }
 .side .foot small b {
   color: var(--ink2);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .main {
@@ -164,6 +168,10 @@
   color: var(--sage);
   cursor: pointer;
   text-decoration: none;
+  font-weight: 600;
+}
+.topbar .crumb .cur {
+  color: var(--ink);
   font-weight: 600;
 }
 .topbar h1 {
@@ -233,7 +241,7 @@
 }
 .view.on {
   display: block;
-  animation: ai-fade 0.18s ease;
+  animation: ai-fade var(--dur-base) var(--ease);
 }
 @keyframes ai-fade {
   from {
@@ -326,32 +334,28 @@
   color: var(--ink);
   cursor: pointer;
   transition:
-    border-color 0.12s,
-    background 0.12s,
-    transform 0.06s;
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
 }
 .btn:hover {
   border-color: var(--mut);
+  box-shadow: var(--sh-card);
 }
 .btn:active {
-  transform: translateY(1px);
+  transform: scale(0.98);
 }
-/* 聚焦金环(Canon §7:不用默认蓝)——按钮/侧栏项/自定义可点元素统一。 */
-.btn:focus-visible,
-.snav a:focus-visible,
-[tabindex]:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 2px;
-}
+/* 主 CTA=赤陶橙实底(v5 §二:一屏 ≤1 个;sage 留给导航当前项/次级实底)。 */
 .btn.pri {
-  background: var(--sage);
-  border-color: var(--sage);
+  background: var(--acc);
+  border-color: var(--acc);
   color: #fff;
-  box-shadow: 0 1px 2px rgba(91, 103, 61, 0.28);
+  box-shadow: var(--sh-card);
 }
 .btn.pri:hover {
-  background: var(--sage-deep);
-  border-color: var(--sage-deep);
+  background: var(--acc-h);
+  border-color: var(--acc-h);
 }
 .btn.sm {
   font-size: 12px;
@@ -360,6 +364,19 @@
 .btn[disabled] {
   opacity: 0.42;
   cursor: not-allowed;
+}
+/* 聚焦柔环(v5 §四,替换旧硬 outline 金环)——全站可聚焦原子统一一处接线。
+ * :not(#_) 是纯特异度垫片(#_ 不存在,永真):聚焦环必须压过组件态类的 box-shadow
+ * (.btn.pri/.vt-btn.on 是两个 class 的特异度,裸 button:focus-visible 赢不了);
+ * 要改环样式的(矩阵冻结列内嵌环)用同款垫片覆盖。 */
+:is(.btn, .snav a, [tabindex], button, input, select, textarea, a):focus-visible:not(#_) {
+  outline: none;
+  box-shadow:
+    0 0 0 3px var(--acc-soft),
+    0 0 0 4px var(--acc);
+}
+:is(input, select, textarea):focus-visible:not(#_) {
+  border-color: var(--acc);
 }
 .panel {
   background: var(--surface);
@@ -436,7 +453,7 @@
 .skel {
   background: linear-gradient(90deg, var(--surface2) 25%, var(--hair) 50%, var(--surface2) 75%);
   background-size: 200% 100%;
-  animation: ai-skel 1.4s ease infinite;
+  animation: ai-skel var(--dur-skel) ease infinite;
   border-radius: 8px;
 }
 @keyframes ai-skel {

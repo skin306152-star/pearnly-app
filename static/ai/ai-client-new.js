@@ -171,6 +171,8 @@
         if (existing) existing.outerHTML = html;
         else document.body.insertAdjacentHTML('beforeend', html);
         var m = mask();
+        // 进场动效只在首开播一次(同 ai-pkg.js renderEvidModal 先例)。
+        if (!existing) m.classList.add('enter');
         m.querySelectorAll('[data-action="cn-close"]').forEach(function (btn) {
             btn.onclick = close;
         });

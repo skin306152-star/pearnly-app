@@ -22,11 +22,11 @@
         return $('clientsBody');
     }
 
-    function renderTable() {
-        body().innerHTML = AI.clientsRender.tableHtml(S.matrix);
+    function renderList() {
+        body().innerHTML = AI.clientsRender.listHtml(S.matrix);
         applySearch();
         if (!S.wired) {
-            AI.clientsRender.wireTable(body(), function (clientId) {
+            AI.clientsRender.wireList(body(), function (clientId) {
                 window.location.hash = AI.router.buildClientArchiveHash(
                     clientId,
                     AI.router.DEFAULT_ARCHIVE_TAB
@@ -54,12 +54,12 @@
     function load(api) {
         S.api = api;
         AI.clientNew.wireButton(api, onClientCreated);
-        if (!body().querySelector('.mx-table')) body().innerHTML = AI.state.loadingHtml();
+        if (!body().querySelector('.cl-list')) body().innerHTML = AI.state.loadingHtml();
         return api
             .getTaxProfileMatrix()
             .then(function (matrix) {
                 S.matrix = matrix;
-                renderTable();
+                renderList();
                 wireSearch();
             })
             .catch(function () {

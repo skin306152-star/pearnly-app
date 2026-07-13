@@ -66,8 +66,8 @@
   flex: none;
 }
 .pv-tools button:hover {
-  border-color: var(--gold);
-  color: var(--gold);
+  border-color: var(--acc);
+  color: var(--acc);
 }
 .pv-zoom {
   background: var(--surface2);
@@ -106,7 +106,7 @@
   border-radius: 50%;
   border: 3px solid var(--hair2);
   border-top-color: var(--gold);
-  animation: pv-spin 0.8s linear infinite;
+  animation: pv-spin var(--dur-spin) linear infinite;
 }
 @keyframes pv-spin {
   to {

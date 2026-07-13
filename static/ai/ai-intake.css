@@ -24,18 +24,14 @@
   justify-content: center;
   cursor: pointer;
   transition:
-    border-color 0.15s,
-    background 0.15s;
+    border-color var(--dur-base) var(--ease),
+    background var(--dur-base) var(--ease);
   padding: 24px;
 }
 .dropzone:hover,
 .dropzone.over {
   border-color: var(--sage);
   background: var(--sage-soft);
-}
-.dropzone:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 3px;
 }
 .dz-inner {
   text-align: center;
@@ -217,10 +213,9 @@
   background: var(--surface);
   color: var(--ink);
   font-family: inherit;
-}
-.sf-in:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 2px;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 .sf-hint {
   font-size: 11px;

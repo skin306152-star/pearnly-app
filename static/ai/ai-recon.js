@@ -60,6 +60,8 @@
         if (existing) existing.outerHTML = html;
         else document.body.insertAdjacentHTML('beforeend', html);
         var mask = $('brxViewMask');
+        // 进场动效只在首开播一次(同 ai-pkg.js renderEvidModal 先例)。
+        if (!existing) mask.classList.add('enter');
         mask.querySelector('.mclose').onclick = closeView;
         mask.addEventListener('click', function (e) {
             if (e.target === mask) closeView();

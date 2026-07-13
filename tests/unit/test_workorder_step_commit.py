@@ -171,6 +171,39 @@ class InterruptAtStepCommitsPriorSteps(unittest.TestCase):
             self.assertEqual(store.committed_count(step, engine.EVT_DONE), 1)
 
 
+class CurrentStepCommittedBeforeHandler(unittest.TestCase):
+    """P-4 进度诚实:进步即在独立短事务提交 current_step,长步(如 classify 219s)运行期间
+    详情读侧立刻看到真实步位,不再卡显上一步。"""
+
+    def test_current_step_visible_while_handler_runs(self):
+        store = _TxnStore()
+        seen = {}
+
+        def _watch_handler(ctx):
+            # handler 运行时,另一连接(= 已提交态 store.current_step)应已看到本步。
+            seen["current_step"] = store.current_step
+            seen["status"] = store.status
+            return StepResult.ok()
+
+        handlers = engine.default_handlers()
+        handlers["classify"] = _watch_handler
+        engine.run_work_order(_ctx(store), handlers=handlers)
+        # 修复前:主步事务未提交,classify 运行时仍是上一步 sort → 断言失败(咬人)。
+        self.assertEqual(seen["current_step"], "classify")
+        self.assertEqual(seen["status"], "running")
+
+    def test_started_event_still_rolls_back_on_crash(self):
+        # _mark_running 只提交 current_step,不提交 step_started——被杀整步回滚(连 started 都不留)
+        # 的续跑不变式不被破坏。
+        store = _TxnStore()
+        handlers = engine.default_handlers()
+        handlers.update(_raise_at("classify"))
+        with self.assertRaises(RuntimeError):
+            engine.run_work_order(_ctx(store), handlers=handlers)
+        self.assertEqual(store.committed_count("classify", engine.EVT_STARTED), 0)
+        self.assertEqual(store.committed_count("classify", engine.EVT_DONE), 0)
+
+
 class NoFactoryKeepsLegacySingleTxn(unittest.TestCase):
     def test_without_factory_engine_orchestration_unchanged(self):
         # 无 cursor_factory:走 _shared_unit,引擎正常跑到 review(旧路不被改坏)。

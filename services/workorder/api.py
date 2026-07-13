@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from typing import Optional
 
 from core.feature_flags import pearnly_ai_m1_enabled_for, pearnly_ai_sod_enabled_for
@@ -22,6 +23,7 @@ from services.workorder import (
     store,
     wht_signals,
 )
+from services.workorder.steps import sort as sort_step
 from services.workspace import tax_profile_store
 
 logger = logging.getLogger(__name__)
@@ -183,6 +185,7 @@ def order_detail(cur, *, tenant_id: str, work_order_id: str) -> Optional[dict]:
         "intent": wo["intent"],
         "status": wo["status"],
         "current_step": wo["current_step"],
+        "progress": _classify_progress(wo, items, events),
         "flagged": _flagged(items, events),
         "needs": needs,
         "blocked_reasons": blocked,
@@ -244,6 +247,27 @@ def _financials(events: list[dict]) -> Optional[dict]:
     if not isinstance(fin, dict) or "balance_sheet" not in fin:
         return None
     return fin
+
+
+def _classify_progress(wo: dict, items: list[dict], events: list[dict]) -> Optional[dict]:
+    """classify 逐件进度(P-4:219 秒别再像死机)。仅当工单正卡在 classify 步时给一份
+    {processed, total};其余步返 None(前端只在 classify 期显进度条)。
+
+    从事件流现算,不建新状态表:total = 本单要过 OCR 的图片件数(file_ref 是图片扩展名);
+    processed = 其中已落 item_classified 事件的件数(classify 逐件独立事务提交,已处理件即时
+    可见)——processed 随 OCR 推进单调递增,跑完 == total。销项直读/银行件不过 OCR,不计入。"""
+    if wo.get("current_step") != "classify":
+        return None
+    image_ids = {
+        it["id"]
+        for it in items
+        if Path(it.get("file_ref") or "").suffix.lower() in sort_step.IMAGE_EXTS
+    }
+    if not image_ids:
+        return None
+    classified = evidence.replay_items_by_type(events, _EVT_CLASSIFIED)
+    processed = sum(1 for iid in image_ids if iid in classified)
+    return {"step": "classify", "processed": processed, "total": len(image_ids)}
 
 
 def _flagged(items: list[dict], events: list[dict]) -> list[dict]:

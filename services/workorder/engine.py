@@ -213,6 +213,19 @@ def _halt(ctx: StepContext, step: str, result: StepResult) -> RunOutcome:
     return RunOutcome(status=STATUS_STUCK, completed=False, stopped_at=step, result=result)
 
 
+def _mark_running(ctx: StepContext, step: str) -> None:
+    """进步即在一个独立短事务里提交 current_step=step(P-4 进度诚实)。
+
+    主步事务把 set_status 与 handler(如 classify 真跑 219s)、step_done 绑在一起,提交前对
+    别的连接不可见——详情读侧因此在 classify 全程看到上一步 sort,像死机(P-4 实锤)。这里在
+    主步事务之前先独立提交一次 current_step,让轮询立刻看到真实步位。只在按步提交模式
+    (cursor_factory 在场)启用:单事务旧路无独立提交语义,由主事务内的 _set_status 收口
+    (逐字节维持现状)。不落 step_started 事件——那仍留在主步事务里随停机/异常一并回滚,
+    「被杀整步回滚连 started 都不留」的续跑不变式(见 test_workorder_step_commit)不被破坏。"""
+    with ctx.cursor_factory() as cur, _bound(ctx, cur):
+        _set_status(ctx, STATUS_RUNNING, step)
+
+
 def _run_step(
     ctx: StepContext, unit: Callable, step: str, handler: Handler
 ) -> Optional[RunOutcome]:
@@ -220,7 +233,10 @@ def _run_step(
 
     返回 RunOutcome 表示本步停机(已在同一事务里落好停机态);None 表示本步绿、继续下一步。
     handler 抛异常时不吞:_committed_unit 回滚整步(started 也一并撤销)并向上抛,续跑重做本步。
+    进步先独立提交 current_step(_mark_running)让进度诚实,再进主步事务(见 _mark_running)。
     """
+    if ctx.cursor_factory is not None:
+        _mark_running(ctx, step)
     with unit(ctx) as cur, _bound(ctx, cur):
         _emit(ctx, step, EVT_STARTED, {})
         _set_status(ctx, STATUS_RUNNING, step)

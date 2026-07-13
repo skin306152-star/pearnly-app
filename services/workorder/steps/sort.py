@@ -25,7 +25,9 @@ from services.recon.bank_recon_utils import _BANK_SIGNATURES, _bank_from_filenam
 from services.workorder import decisions, kinds
 from services.workorder.engine import StepContext, StepResult
 
-_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff", ".bmp"}
+# classify 会过 OCR 的图片扩展名(单一事实源:sort 定堆时判「留给 classify」用,api 的
+# 逐件进度投影也据此认「哪些件要过 OCR」——同一份定义,不各写一套)。
+IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tif", ".tiff", ".bmp"}
 _SHEET_EXTS = {".xlsx", ".xlsm", ".xls", ".csv"}
 # 流水表头列名:命中 ≥2 个不同关键词才算银行(POS 汇总也有「วันที่」,单词不作数)。
 _BANK_HEADER_KW = ("ถอน", "ฝาก", "ยอดคงเหลือ", "withdrawal", "deposit", "balance")
@@ -108,7 +110,7 @@ def _bin_by_file(file_ref: str) -> Optional[tuple[str, str, Optional[str]]]:
     """文件名/表头可判的堆 → (kind, status, flag_reason);要过 OCR 才知道的 → None。"""
     path = Path(file_ref or "")
     ext = path.suffix.lower()
-    if ext in _IMAGE_EXTS:
+    if ext in IMAGE_EXTS:
         return None
     if ext in _SHEET_EXTS:
         if _is_gl_name(path.name):

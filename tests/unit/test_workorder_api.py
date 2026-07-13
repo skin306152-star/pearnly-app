@@ -158,6 +158,77 @@ class OrderDetailTests(_ApiTestBase):
         self.assertIsNone(api.order_detail(None, tenant_id="t-1", work_order_id="ghost"))
 
 
+class ClassifyProgressTests(_ApiTestBase):
+    """P-4 逐件进度:classify 期间 detail.progress 给 processed/total(从事件流现算),
+    其余步为 None——219 秒别再像死机。"""
+
+    def _images(self):
+        return [
+            {
+                "id": f"img-{i}",
+                "work_order_id": "wo-1",
+                "kind": "unknown",
+                "status": "pending",
+                "flag_reason": None,
+                "file_ref": f"/x/IMG_{i}.jpg",
+            }
+            for i in range(3)
+        ] + [
+            # 销项汇总表(xlsx)不过 OCR,不计入 total
+            {
+                "id": "xlsx-1",
+                "work_order_id": "wo-1",
+                "kind": "sales_summary",
+                "status": "ok",
+                "flag_reason": None,
+                "file_ref": "/x/sales.xlsx",
+            }
+        ]
+
+    def test_progress_counts_classified_images_during_classify(self):
+        self.store.wo["status"] = "running"
+        self.store.wo["current_step"] = "classify"
+        self.store.items = self._images()
+        # 3 张图里 2 张已落 item_classified(逐件独立事务已可见),1 张在飞。
+        self.store.events = [
+            {
+                "id": 1,
+                "step": "classify",
+                "event_type": "item_classified",
+                "payload": {"item_id": "img-0", "kind": "purchase_invoice", "status": "ok"},
+            },
+            {
+                "id": 2,
+                "step": "classify",
+                "event_type": "item_classified",
+                "payload": {"item_id": "img-1", "kind": "purchase_invoice", "status": "flagged"},
+            },
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertEqual(detail["progress"], {"step": "classify", "processed": 2, "total": 3})
+
+    def test_no_progress_outside_classify(self):
+        self.store.wo["current_step"] = "reconcile"
+        self.store.items = self._images()
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertIsNone(detail["progress"])
+
+    def test_no_progress_when_no_image_items(self):
+        self.store.wo["current_step"] = "classify"
+        self.store.items = [
+            {
+                "id": "xlsx-1",
+                "work_order_id": "wo-1",
+                "kind": "sales_summary",
+                "status": "ok",
+                "flag_reason": None,
+                "file_ref": "/x/sales.xlsx",
+            }
+        ]
+        detail = api.order_detail(None, tenant_id="t-1", work_order_id="wo-1")
+        self.assertIsNone(detail["progress"])
+
+
 class BankReconTests(_ApiTestBase):
     """E2 契约:order_detail 的 bank_recon 字段只读投影 gates.r3_bank.recon(闸开+有
     recon 才带四清单,闸关/无流水/未跑到 reconcile/引擎异常降级一律诚实 None)。"""

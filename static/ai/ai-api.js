@@ -438,7 +438,8 @@
                     });
             },
         };
-        return Object.assign(base, AI.apiPayroll.create(root, authHeaders, handleResponse));
+        Object.assign(base, AI.apiPayroll.create(root, authHeaders, handleResponse));
+        return Object.assign(base, AI.apiReview.create(root, authHeaders, handleResponse));
     }
 
     var apiExport = { mapApiErrorKey: mapApiErrorKey, create: apiFactory };

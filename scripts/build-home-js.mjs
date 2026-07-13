@@ -85,6 +85,9 @@ const BUNDLES = [
             // 排在 ai-api.js 之前(apiFactory() 到调用时才读 AI.apiPayroll,不是加载时),
             // 紧邻放置是"同属后端调用薄层"的语义分组。
             'ai/ai-api-payroll.js',
+            // ai-api-review.js(MC1-b2 · 审核收件箱 + 签批闭环七端点,拆自 ai-api.js·单文件
+            // <500 铁律)同 ai-api-payroll.js 先例,只需排在 ai-api.js 之前。
+            'ai/ai-api-review.js',
             'ai/ai-api.js',
             // ai-gate.js(Z1-a 登录卡/邀请制门面)只依赖 AI.state.esc(可选)与全局 at()/
             // atSetLang,排在 ai-state.js/ai-api.js 之后、ai.js(boot 调 AI.gate.mountLogin/
@@ -97,6 +100,10 @@ const BUNDLES = [
             'ai/ai-matrix-render.js',
             'ai/ai-matrix.js',
             'ai/ai-review-queue.js',
+            // ai-review-verdict.js(MC1-b2 · 判据人话渲染 + 批量建议裁决纯函数,零依赖)
+            // 排在 ai-review-queue.js 之后即可(同属人审判据的纯函数分组),
+            // ai-review-inbox-render.js(用它拼裁决卡三件套)之前。
+            'ai/ai-review-verdict.js',
             'ai/ai-review-render.js',
             'ai/ai-review-pool.js',
             'ai/ai-review.js',
@@ -130,7 +137,18 @@ const BUNDLES = [
             'ai/ai-supplier-profiles-render.js',
             'ai/ai-profile.js',
             'ai/ai-client-pool-render.js',
+            // ai-client-pool.js 现更名导出 AI.clientPool(MC1-b2·「客户待答」降级为审核
+            // 收件箱聚合页的第三分区,不再独占 #/pool——见该文件顶注)。
             'ai/ai-client-pool.js',
+            // 审核收件箱聚合页(MC1-b2 · 接管 #/pool,方案见 ai-review-inbox.js 顶注)四文件:
+            // -render.js(纯 HTML,依赖 AI.state/format/reviewQueue/reviewVerdict 均已在上面)、
+            // -signoff.js(工单卡签批闭环状态机,依赖 AI.api)、-flagged.js(异常票据分组+
+            // 批量/逐张裁决状态机,依赖 AI.reviewQueue/reviewVerdict/api)三者互不依赖,
+            // 只需都排在 -inbox.js(编排,依赖前三者 + AI.clientPool,后者已在上面)之前。
+            'ai/ai-review-inbox-render.js',
+            'ai/ai-review-inbox-signoff.js',
+            'ai/ai-review-inbox-flagged.js',
+            'ai/ai-review-inbox.js',
             // ai-vatcheck-render.js(N1 · 销项税报告三查纯逻辑+HTML,依赖 AI.state/format)
             // 排在 ai-vatcheck.js(上传/运行/挂载编排)之前,两者都在 ai.js(onRoute 用
             // AI.vatcheck.mount)之前——同 ai-client-pool 先例(顶层独立视图,不挂客户页下)。

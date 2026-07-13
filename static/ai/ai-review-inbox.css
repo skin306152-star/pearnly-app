@@ -1,0 +1,190 @@
+/* Pearnly AI · ai-review-inbox.css · 全所审核收件箱(MC1-b2)三分区聚合页
+ * 吃 ai-theme 令牌 + ai-shell.css 的 .panel/.chip/.btn/.kbd/.toast(ai-client.css)+
+ * ai-client-pool.css 的 .cp-section 间距惯例,只补三分区专属结构。 */
+
+.riq-sec {
+  margin-bottom: 22px;
+}
+.riq-sec-hd {
+  margin-bottom: 10px;
+}
+.riq-sec-hd h3 {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink2);
+}
+
+/* ---- 待审工单卡(签批闭环三步按钮化) ---- */
+.riq-wo-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.riq-wo-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.riq-wo-blocked-note {
+  font-size: 11.5px;
+  color: var(--warn);
+  margin-top: 8px;
+}
+.riq-receipt {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.riq-receipt-input {
+  display: none;
+}
+.riq-sod-strip {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hair3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+}
+.riq-sod-err {
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--crit);
+  font-weight: 600;
+}
+.riq-reject-form {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--surface2);
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+}
+.riq-reject-form label {
+  display: block;
+  font-size: 11px;
+  color: var(--mut);
+  margin-bottom: 6px;
+}
+.riq-reject-textarea {
+  width: 100%;
+  min-height: 64px;
+  font-size: 12.5px;
+  padding: 9px 11px;
+  border: 1px solid var(--hair2);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  resize: vertical;
+  font-family: inherit;
+}
+.riq-reject-err {
+  font-size: 11.5px;
+  color: var(--crit);
+  font-weight: 600;
+  margin-top: 6px;
+}
+.riq-reject-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* ---- 异常票据分组(跨工单按 flag_reason) ---- */
+.riq-group-hd h3 {
+  flex-wrap: wrap;
+}
+.riq-group-bulk {
+  font-size: 12px;
+}
+.riq-group-manual {
+  font-size: 12px;
+  color: var(--mut);
+  font-weight: 600;
+}
+.riq-items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.riq-item {
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: var(--surface2);
+}
+.riq-item-hd {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.riq-item-file {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.riq-fldt {
+  background: var(--surface);
+  border-radius: 8px;
+}
+.riq-narrative {
+  margin: 10px 0;
+  padding: 9px 12px;
+  background: var(--gold-soft);
+  border: 1px solid var(--hair);
+  border-radius: 9px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.riq-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.riq-item-recalc {
+  align-items: center;
+}
+.riq-vat-input {
+  width: 130px;
+  font-size: 13px;
+  font-weight: 650;
+  padding: 7px 10px;
+  border: 1px solid var(--hair2);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.riq-vat-input:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.riq-item-err {
+  font-size: 11.5px;
+  color: var(--crit);
+  font-weight: 600;
+}
+.riq-item-focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold-soft);
+}
+
+@media (max-width: 640px) {
+  .riq-wo-steps,
+  .riq-item-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .riq-vat-input {
+    width: 100%;
+  }
+}

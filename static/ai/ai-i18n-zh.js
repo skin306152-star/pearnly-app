@@ -165,6 +165,14 @@ window.__AI_I18N_ZH__ = {
     err_workorder_decision_invalid: '这个裁决不合法，请重试',
     err_workorder_item_not_found: '这张票不属于本工单',
     err_workorder_item_image_not_found: '原图读不到',
+    // MC1-b2 · 审核收件箱签批闭环(SoD/驳回/冻结错码人话)
+    err_workorder_sod_reviewer_is_preparer: '你是本单制单人，复核须换人签（SoD）',
+    err_workorder_sod_approver_is_preparer: '你是本单制单人，签批冻结须换人授权（SoD）',
+    err_workorder_sod_review_required: '尚无有效复核签批，请先请人复核或声明单人模式',
+    err_workorder_not_reviewable: '本单当前状态不可签批，请先清空待裁决票据',
+    err_workorder_reject_reason_required: '请填写驳回原因',
+    err_workorder_freeze_source_missing: '部分原始票据文件已缺失，无法冻结出包',
+    err_workorder_already_archived: '本单已冻结归档',
     imgv_loading: '原件加载中…',
     imgv_noimg: '原件不可用',
     imgv_hint: '拖拽平移 · 滚轮缩放',
@@ -330,7 +338,7 @@ window.__AI_I18N_ZH__ = {
     err_sp_axis_required: '现-赊、货-费至少选一项',
     // D2-S8+S9 · LINE 待问客户池(会计端)
     pool_title: '待我处理',
-    pool_note: '客户 LINE 待问 · 按客户分组',
+    pool_note: '全所审核收件箱 · 待审工单 / 异常票据 / 客户待答',
     pool_empty_t: '没有待问客户的票',
     pool_empty_s: '审核队列里对票按「推 LINE 待问」,会归集到这里',
     pool_status_staged: '暂挂',

@@ -1,0 +1,325 @@
+/*
+ * Pearnly AI · ai-review-inbox.js · 全所审核收件箱(MC1-b2)编排:三分区聚合页
+ *
+ * 方案:桌面\pearnly ai\设计稿\MC1b-审核队列与签批闭环-方案.md §2 b2。接管 `#/pool`
+ * 顶层路由(window.AI.pool = {mount, onLeave},取代此前只有「客户待答」一块的旧实现):
+ *   ① 待审工单(GET review-queue,到期近→前)+ 签批闭环按钮,状态机在
+ *      ai-review-inbox-signoff.js。
+ *   ② 异常票据(按 flag_reason 跨工单分组的裁决卡三件套 + 批量/逐张键盘流),状态机在
+ *      ai-review-inbox-flagged.js——本文件只管挂载/渲染分发/toast,不重复业务逻辑。
+ *   ③ 客户待答:原样委托 ai-client-pool.js(现更名 AI.clientPool,腾出 AI.pool 给本
+ *      文件),挂进自己的子容器,零改动零回归。
+ *
+ * 依赖 window.AI.state/format/api/reviewRender/reviewInboxRender/reviewInboxSignoff/
+ * reviewInboxFlagged/clientPool 与全局 at(),排在它们之后、ai.js 之前加载。
+ */
+(function () {
+    'use strict';
+
+    var $ = function (id) {
+        return document.getElementById(id);
+    };
+    var UNDO_TOAST_MS = 3000;
+    var FAIL_TOAST_MS = 4000;
+    var AUTO_REFRESH_MS = 2500; // 裁决落库后引擎自驱重跑是异步的,给点时间再刷工单卡计数/状态。
+
+    var S = null;
+    var wired = false;
+    var focusedFlag = null; // 键盘流当前聚焦的组(点组头/组内元素时更新,跨渲染保留)。
+
+    function woBody() {
+        return $('riqWoBody');
+    }
+    function flaggedBody() {
+        return $('riqFlaggedBody');
+    }
+
+    // 同 ai-review.js currentActorLabel 先例:本次刚提交的动作没有服务端 actor 回显,
+    // 用当前登录态占位,刷新后从服务端读到的值会是同一个字符串。
+    function currentActorLabel() {
+        var token = localStorage.getItem('mrpilot_token');
+        var name = AI.format.jwtDisplayName(token);
+        if (name) return name;
+        var payload = AI.format.jwtPayload(token);
+        return payload && payload.sub ? 'user:' + payload.sub : '';
+    }
+
+    function freshState(api) {
+        return {
+            api: api,
+            loading: true,
+            error: false,
+            queue: null,
+            signoff: AI.reviewInboxSignoff.create(api),
+            flagged: AI.reviewInboxFlagged.create(api, {
+                onChange: function () {
+                    renderFlagged();
+                },
+                afterMutate: function () {
+                    renderWo();
+                    scheduleAutoRefresh();
+                },
+                showToast: showToast,
+            }),
+            actorLabel: currentActorLabel(),
+            refreshTimer: null,
+            toastTimer: null,
+        };
+    }
+
+    // ============ 渲染 ============
+
+    function renderWo() {
+        var el = woBody();
+        if (!el || !S) return;
+        if (S.loading) {
+            el.innerHTML = AI.state.loadingHtml();
+            return;
+        }
+        if (S.error) {
+            el.innerHTML = AI.state.errorHtml({
+                title: at('error_t'),
+                sub: at('error_s'),
+                retryLabel: at('retry'),
+            });
+            var btn = el.querySelector('[data-action="retry"]');
+            if (btn) btn.onclick = load;
+            return;
+        }
+        var uiByOrder = {};
+        (S.queue.clients || []).forEach(function (c) {
+            c.orders.forEach(function (o) {
+                uiByOrder[o.work_order_id] = S.signoff.forOrder(o.work_order_id);
+            });
+        });
+        el.innerHTML = AI.reviewInboxRender.woSectionHtml(S.queue.clients || [], uiByOrder);
+    }
+
+    function renderFlagged() {
+        var el = flaggedBody();
+        if (!el || !S) return;
+        if (S.loading || S.flagged.isLoading()) {
+            el.innerHTML = AI.state.loadingHtml();
+            return;
+        }
+        if (S.error) {
+            el.innerHTML = AI.state.errorHtml({
+                title: at('error_t'),
+                sub: at('error_s'),
+                retryLabel: at('retry'),
+            });
+            var btn = el.querySelector('[data-action="retry"]');
+            if (btn) btn.onclick = load;
+            return;
+        }
+        el.innerHTML = AI.reviewInboxRender.flaggedSectionHtml(
+            S.flagged.groups(),
+            S.flagged.groupUiMap()
+        );
+    }
+
+    // ============ 加载(review-queue → 按需并行拉 flagged 工单详情,交给 flagged 状态机) ============
+
+    function load() {
+        S.loading = true;
+        S.error = false;
+        renderWo();
+        renderFlagged();
+        var session = S;
+        S.api
+            .getReviewQueue()
+            .then(function (data) {
+                if (S !== session) return;
+                S.queue = data;
+                S.loading = false;
+                renderWo();
+                return S.flagged.loadFor(flaggedTargets(data));
+            })
+            .catch(function () {
+                if (S !== session) return;
+                S.loading = false;
+                S.error = true;
+                renderWo();
+                renderFlagged();
+            });
+    }
+
+    function flaggedTargets(data) {
+        var out = [];
+        (data.clients || []).forEach(function (c) {
+            c.orders.forEach(function (o) {
+                if (o.flagged_total > 0)
+                    out.push({ id: o.work_order_id, client: c, period: o.period });
+            });
+        });
+        return out;
+    }
+
+    function scheduleAutoRefresh() {
+        if (S.refreshTimer) clearTimeout(S.refreshTimer);
+        S.refreshTimer = setTimeout(function () {
+            var session = S;
+            S.api.getReviewQueue().then(function (data) {
+                if (S !== session) return;
+                S.queue = data;
+                renderWo();
+            });
+        }, AUTO_REFRESH_MS);
+    }
+
+    // ============ toast(3 秒 undo / 失败提示,同 ai-review.js showToast 先例) ============
+
+    function showToast(message, undoFn) {
+        hideToast();
+        var div = document.createElement('div');
+        div.innerHTML = AI.reviewRender.toastHtml(message, !!undoFn);
+        var el = div.firstChild;
+        document.body.appendChild(el);
+        requestAnimationFrame(function () {
+            el.classList.add('on');
+        });
+        if (undoFn) {
+            var undoBtn = el.querySelector('[data-action="rv-undo"]');
+            if (undoBtn)
+                undoBtn.onclick = function () {
+                    undoFn();
+                    hideToast();
+                };
+        }
+        S.toastTimer = setTimeout(hideToast, undoFn ? UNDO_TOAST_MS : FAIL_TOAST_MS);
+    }
+    function hideToast() {
+        if (S && S.toastTimer) {
+            clearTimeout(S.toastTimer);
+            S.toastTimer = null;
+        }
+        var el = $('rvToast');
+        if (el) el.parentNode.removeChild(el);
+    }
+
+    // ============ 异常票据分区:事件委托 → 交给 flagged 状态机 ============
+
+    function onFlaggedClick(e) {
+        var groupEl = e.target.closest('.riq-group');
+        if (groupEl) focusedFlag = groupEl.getAttribute('data-flag');
+        var el = e.target.closest('[data-action]');
+        if (!el) return;
+        var action = el.getAttribute('data-action');
+        var itemId = el.getAttribute('data-item');
+        var flagReason = el.getAttribute('data-flag');
+        if (action === 'riq-bulk') S.flagged.onBulk(flagReason);
+        else if (action === 'riq-exclude-all') S.flagged.onExcludeAll(flagReason);
+        else if (action === 'riq-accept') S.flagged.decideItem(itemId, 'accept');
+        else if (action === 'riq-edit') {
+            S.flagged.startEdit(itemId, function () {
+                var input = flaggedBody().querySelector(
+                    '.riq-vat-input[data-item="' + itemId + '"]'
+                );
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            });
+        } else if (action === 'riq-exclude') S.flagged.decideItem(itemId, 'exclude');
+        else if (action === 'riq-dir-purchase') S.flagged.decideItem(itemId, 'assign_purchase');
+        else if (action === 'riq-dir-sales') S.flagged.decideItem(itemId, 'assign_sales');
+        else if (action === 'riq-dir-nontax') S.flagged.decideItem(itemId, 'assign_nontax');
+        else if (action === 'riq-recalc-submit') {
+            var input2 = flaggedBody().querySelector('.riq-vat-input[data-item="' + itemId + '"]');
+            S.flagged.decideItem(itemId, 'recalc', input2 ? input2.value : '');
+        } else if (action === 'riq-view-img') {
+            S.flagged.viewImage(el.getAttribute('data-wo'), itemId);
+        }
+    }
+
+    // E 键(逐张审):把当前组第一张未裁决的票滚入视口并高亮,不切一套新 UI——按钮/键盘
+    // 对同一张卡效力相同,高亮只是视觉引导(同 Canon §7 微动效,120-200ms)。
+    function focusItemEl(itemId) {
+        var prev = flaggedBody().querySelector('.riq-item-focus');
+        if (prev) prev.classList.remove('riq-item-focus');
+        var el = flaggedBody().querySelector('[data-item="' + itemId + '"]');
+        if (el) {
+            el.classList.add('riq-item-focus');
+            el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+    }
+
+    function onKeydown(e) {
+        var view = $('v-pool');
+        if (!view || !view.classList.contains('on')) return;
+        var tag = e.target && e.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        if (!focusedFlag) return;
+        var group = S.flagged.findGroup(focusedFlag);
+        if (!group) return;
+        if (e.key === 'a' || e.key === 'A') {
+            e.preventDefault();
+            S.flagged.onBulk(focusedFlag);
+        } else if (e.key === 'x' || e.key === 'X') {
+            e.preventDefault();
+            S.flagged.onExcludeAll(focusedFlag);
+        } else if (e.key === 'e' || e.key === 'E') {
+            e.preventDefault();
+            var next = S.flagged.firstUndecidedItem(group);
+            if (next) focusItemEl(next.item_id);
+        }
+    }
+
+    // ============ 待审工单分区:事件委托 → 交给 signoff 状态机 ============
+
+    function onWoClick(e) {
+        var el = e.target.closest('[data-action]');
+        if (!el) return;
+        var action = el.getAttribute('data-action');
+        var orderId = el.getAttribute('data-wo');
+        if (!orderId) return;
+        if (action === 'riq-signoff') S.signoff.signoff(orderId, S.actorLabel, renderWo);
+        else if (action === 'riq-archive') S.signoff.archive(orderId, S.actorLabel, renderWo);
+        else if (action === 'riq-reject-open') S.signoff.openReject(orderId, renderWo);
+        else if (action === 'riq-reject-cancel') S.signoff.cancelReject(orderId, renderWo);
+        else if (action === 'riq-reject-submit') S.signoff.submitReject(orderId, renderWo, load);
+        else if (action === 'riq-self-declare') S.signoff.selfDeclare(orderId, renderWo);
+    }
+
+    function onWoInput(e) {
+        var ta = e.target.closest('.riq-reject-textarea');
+        if (ta) S.signoff.setRejectValue(ta.getAttribute('data-wo'), ta.value);
+    }
+
+    function onWoChange(e) {
+        var fileInput = e.target.closest('.riq-receipt-input');
+        if (!fileInput || !fileInput.files || !fileInput.files[0]) return;
+        S.signoff.attachReceipt(fileInput.getAttribute('data-wo'), fileInput.files[0], renderWo);
+    }
+
+    // ============ 挂载 ============
+
+    function wireOnce() {
+        if (wired) return;
+        wired = true;
+        woBody().addEventListener('click', onWoClick);
+        woBody().addEventListener('input', onWoInput);
+        woBody().addEventListener('change', onWoChange);
+        flaggedBody().addEventListener('click', onFlaggedClick);
+        document.addEventListener('keydown', onKeydown);
+        var refreshBtn = $('riqRefreshBtn');
+        if (refreshBtn) refreshBtn.addEventListener('click', load);
+    }
+
+    function mount(api) {
+        S = freshState(api);
+        focusedFlag = null;
+        wireOnce();
+        load();
+        AI.clientPool.mount(api);
+    }
+
+    function onLeave() {
+        hideToast();
+        if (S && S.refreshTimer) clearTimeout(S.refreshTimer);
+        if (AI.clientPool) AI.clientPool.onLeave();
+    }
+
+    window.AI = window.AI || {};
+    window.AI.pool = { mount: mount, onLeave: onLeave };
+})();

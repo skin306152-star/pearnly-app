@@ -263,4 +263,62 @@ Object.assign(window.__AI_I18N_EN__, {
     crb_violations:
         'Conservation breach (invoice figures inconsistent, flagged for review): {list}',
     crb_basis: 'Basis: seller tax ID = this account → own sales (high confidence)',
+
+    // MC1-b2 · Firm-wide review inbox (pending orders / flagged items / client answers)
+    riq_refresh_btn: 'Refresh',
+    riq_sec_workorders: 'Pending orders',
+    riq_sec_flagged: 'Flagged items',
+    riq_sec_clientpool: 'Client answers',
+    riq_wo_due: 'Due {date}',
+    riq_wo_due_none: 'No obligation due date',
+    riq_signoff_btn: 'Approve review',
+    riq_signoff_busy: 'Signing…',
+    riq_signoff_done: 'Reviewed · {actor}',
+    riq_archive_btn: 'Sign off & freeze',
+    riq_archive_busy: 'Freezing…',
+    riq_archive_done: 'Frozen · {actor}',
+    riq_reject_btn: 'Reject',
+    riq_receipt_btn: 'Attach receipt',
+    riq_receipt_busy: 'Uploading…',
+    riq_receipt_done: 'Receipt attached',
+    riq_self_declared: 'Solo review declared',
+    riq_self_declare_btn: 'Declare solo review',
+    riq_self_declare_hint: 'No independent reviewer at your firm?',
+    riq_wo_needs_review: 'Flagged items still pending — clear them before signing off',
+    riq_reject_reason_label: 'Reject reason (required)',
+    riq_reject_reason_required: 'Please enter a reject reason',
+    riq_reject_busy: 'Submitting…',
+    riq_reject_submit: 'Confirm reject',
+    riq_reject_cancel: 'Cancel',
+    riq_rework_badge: 'Rework',
+    riq_wo_client_fallback: 'Client #{id}',
+    riq_wo_empty_t: 'No orders pending review',
+    riq_wo_empty_s: 'Every order is clear, or still collecting materials / being processed by AI',
+    riq_flagged_empty_t: 'No flagged items',
+    riq_flagged_empty_s: 'Nothing needs a human decision right now',
+    riq_bulk_busy: 'Processing…',
+    riq_group_hd_bulk: '{n} similar · apply suggested to all',
+    riq_group_hd_manual: '{n} similar · confidence too low, review one by one',
+    riq_group_exclude_all: 'Exclude group',
+    riq_conf_high: 'High confidence',
+    riq_conf_mid: 'Medium confidence',
+    riq_conf_low: 'Low confidence',
+    riq_bulk_result: '{ok} succeeded · {fail} failed',
+    riq_view_img_btn: 'View original',
+
+    // MC1-b2 · verdict narrative templates (narrative_key namespace aligned by hand with
+    // services/workorder/verdict.py; params come from that file's _*_params builders)
+    verdict_amount_math_fail:
+        'Net {net} + VAT {vat} = {sum}, off by {diff} from the face total {total} — the document is internally inconsistent',
+    verdict_sales_direction:
+        'Seller tax ID {seller_tax} matches this account — likely your own sales document, please confirm the direction',
+    verdict_sales_doc:
+        'Auto-classified as your own sales document (seller tax ID {seller_tax}) — please confirm',
+    verdict_direction_ambiguous:
+        'Cannot tell purchase vs. sale (seller tax ID {seller_tax}) — needs a manual call',
+    verdict_ocr_low_conf: 'Low OCR confidence ({band}) — please verify against the original',
+    verdict_ocr_validation:
+        'OCR reading conflicts with a validation rule — please verify against the original',
+    verdict_ocr_error: 'OCR could not read this document: {error}',
+    verdict_duplicate: 'Duplicate of an existing item ({of})',
 });

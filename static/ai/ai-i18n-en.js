@@ -168,6 +168,17 @@ window.__AI_I18N_EN__ = {
     err_workorder_decision_invalid: 'That decision was invalid, please retry',
     err_workorder_item_not_found: 'This item does not belong to this order',
     err_workorder_item_image_not_found: 'Could not load the original image',
+    // MC1-b2 · Review inbox sign-off loop (SoD/reject/freeze error codes, human copy)
+    err_workorder_sod_reviewer_is_preparer:
+        'You prepared this order — reviewing needs a different signer (SoD)',
+    err_workorder_sod_approver_is_preparer:
+        'You prepared this order — freezing needs a different approver (SoD)',
+    err_workorder_sod_review_required:
+        'No valid review sign-off yet — get one, or declare solo mode',
+    err_workorder_not_reviewable: 'This order cannot be signed off yet — clear pending items first',
+    err_workorder_reject_reason_required: 'Please enter a reject reason',
+    err_workorder_freeze_source_missing: 'Some source files are missing — cannot freeze this order',
+    err_workorder_already_archived: 'This order is already archived',
     imgv_loading: 'Loading original…',
     imgv_noimg: 'Original unavailable',
     imgv_hint: 'Drag to pan · Scroll to zoom',
@@ -338,7 +349,7 @@ window.__AI_I18N_EN__ = {
     err_sp_axis_required: 'Pick at least one of payment or item type',
     // D2-S8+S9 · LINE client question pool (accountant side)
     pool_title: 'To do',
-    pool_note: 'Questions staged for LINE · grouped by client',
+    pool_note: 'Firm-wide review inbox · pending orders / flagged items / client answers',
     pool_empty_t: 'No client questions pending',
     pool_empty_s: 'Use "Ask via LINE" in the review queue to stage one here',
     pool_status_staged: 'Staged',

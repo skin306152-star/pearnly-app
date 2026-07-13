@@ -167,6 +167,16 @@ window.__AI_I18N_TH__ = {
     err_workorder_decision_invalid: 'การตัดสินนี้ไม่ถูกต้อง กรุณาลองใหม่',
     err_workorder_item_not_found: 'รายการนี้ไม่ได้อยู่ในงานนี้',
     err_workorder_item_image_not_found: 'อ่านภาพต้นฉบับไม่ได้',
+    // MC1-b2 · กล่องคิวตรวจสอบ + วงจรลงนาม (ข้อความ SoD/ตีกลับ/ปิดงาน)
+    err_workorder_sod_reviewer_is_preparer: 'คุณเป็นผู้จัดทำงานนี้ ต้องให้คนอื่นตรวจทาน (SoD)',
+    err_workorder_sod_approver_is_preparer:
+        'คุณเป็นผู้จัดทำงานนี้ ต้องให้คนอื่นอนุมัติปิดงาน (SoD)',
+    err_workorder_sod_review_required:
+        'ยังไม่มีการตรวจทานที่ใช้ได้ กรุณาให้คนตรวจก่อน หรือประกาศโหมดคนเดียว',
+    err_workorder_not_reviewable: 'งานนี้ยังลงนามไม่ได้ กรุณาตัดสินรายการค้างให้หมดก่อน',
+    err_workorder_reject_reason_required: 'กรุณากรอกเหตุผลการตีกลับ',
+    err_workorder_freeze_source_missing: 'ไฟล์ต้นฉบับบางส่วนหายไป ไม่สามารถปิดงานได้',
+    err_workorder_already_archived: 'งานนี้ปิดและเก็บเข้าคลังแล้ว',
     imgv_loading: 'กำลังโหลดต้นฉบับ…',
     imgv_noimg: 'ไม่มีต้นฉบับ',
     imgv_hint: 'ลาก · เลื่อนเมาส์ซูม',
@@ -334,7 +344,7 @@ window.__AI_I18N_TH__ = {
     err_sp_axis_required: 'เลือกอย่างน้อยหนึ่ง: เงินสด-เชื่อ หรือ สินค้า-ค่าใช้จ่าย',
     // D2-S8+S9 · กองคำถามค้าง LINE (ฝั่งนักบัญชี)
     pool_title: 'งานที่รอฉัน',
-    pool_note: 'คำถามค้างส่ง LINE ลูกค้า · จัดกลุ่มตามลูกค้า',
+    pool_note: 'กล่องตรวจสอบรวมทั้งสำนักงาน · งานรอตรวจ / รายการผิดปกติ / รอลูกค้าตอบ',
     pool_empty_t: 'ไม่มีบิลที่รอถามลูกค้า',
     pool_empty_s: 'กดปุ่ม "ส่ง LINE ถามลูกค้า" ในคิวตรวจสอบ จะมารวมที่นี่',
     pool_status_staged: 'พักไว้',

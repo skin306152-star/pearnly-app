@@ -168,6 +168,18 @@ window.__AI_I18N_JA__ = {
     err_workorder_decision_invalid: 'この判断は無効です。再試行してください',
     err_workorder_item_not_found: 'この項目はこのワークオーダーに属していません',
     err_workorder_item_image_not_found: '原本画像を読み込めません',
+    // MC1-b2 · 審査受信箱の署名クローズ(SoD/差し戻し/凍結エラーの人向け文言)
+    err_workorder_sod_reviewer_is_preparer:
+        'あなたはこの案件の作成者です。レビューは別の人が行ってください(SoD)',
+    err_workorder_sod_approver_is_preparer:
+        'あなたはこの案件の作成者です。凍結の承認は別の人が行ってください(SoD)',
+    err_workorder_sod_review_required:
+        '有効なレビュー署名がまだありません。先にレビューを受けるか、単独モードを宣言してください',
+    err_workorder_not_reviewable:
+        'この案件はまだ署名できません。未処理の項目を先に片付けてください',
+    err_workorder_reject_reason_required: '差し戻し理由を入力してください',
+    err_workorder_freeze_source_missing: '一部の元ファイルが見つからないため凍結できません',
+    err_workorder_already_archived: 'この案件はすでに凍結・保管済みです',
     imgv_loading: '原本を読み込み中…',
     imgv_noimg: '原本がありません',
     imgv_hint: 'ドラッグで移動 · スクロールでズーム',
@@ -341,7 +353,7 @@ window.__AI_I18N_JA__ = {
     err_sp_axis_required: '現金-掛け、商品-費用のいずれか一つは選択してください',
     // D2-S8+S9 · LINE 顧客問い合わせプール(会計担当側)
     pool_title: '対応待ち',
-    pool_note: 'LINE 送信待ちの質問 · 顧客ごとにグループ表示',
+    pool_note: '事務所全体の審査受信箱 · 審査待ち案件 / 異常票 / 顧客回答待ち',
     pool_empty_t: '顧客への質問はありません',
     pool_empty_s: 'レビューキューで「LINEで確認」を押すとここに集まります',
     pool_status_staged: '保留中',

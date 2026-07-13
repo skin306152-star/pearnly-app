@@ -1,10 +1,12 @@
 /*
  * Pearnly AI · ai-client-pool.js · D2-S8 客户池页(会计端)编排:拉取/推批/裁决
  *
- * 顶层「待我处理」导航位(id=v-pool,不挂在客户独立页四视图之下——待问池是跨客户的
- * 会计工作队列,不是某个客户的一个 tab)。四态由 AI.clientPoolRender.pageHtml 拼装,
- * 本文件只管状态机 + 网络 + 事件委托。依赖 window.AI.state/api/format/clientPoolRender
- * 与全局 at(),须排在它们之后、ai.js 之前加载(见 scripts/build-home-js.mjs)。
+ * 「客户待答」子区(MC1-b2 · 挂进 ai-review-inbox.js 三分区聚合页的第三块,不再独占
+ * 顶层 `#/pool`——导出改名 AI.clientPool,腾出 AI.pool 给聚合页;内部逻辑零改动零
+ * 回归,只是从「独占整页」降级为「被别人 mount」的一个子组件,容器 id=poolBody 不变)。
+ * 四态由 AI.clientPoolRender.pageHtml 拼装,本文件只管状态机 + 网络 + 事件委托。
+ * 依赖 window.AI.state/api/format/clientPoolRender 与全局 at(),须排在它们之后、
+ * ai-review-inbox.js 之前加载(见 scripts/build-home-js.mjs)。
  */
 (function () {
     'use strict';
@@ -237,5 +239,5 @@
     }
 
     window.AI = window.AI || {};
-    window.AI.pool = { mount: mount, onLeave: onLeave };
+    window.AI.clientPool = { mount: mount, onLeave: onLeave };
 })();

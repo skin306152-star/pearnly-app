@@ -260,4 +260,62 @@ Object.assign(window.__AI_I18N_JA__, {
     crb_dupes: '重複伝票番号（重複除去済み・二重計上なし）：{list}',
     crb_violations: '整合性違反（伝票の3項目が不整合・個別に要確認）：{list}',
     crb_basis: '判定根拠：売り手の税番号＝当勘定 → 自社売上（信頼度高）',
+
+    // MC1-b2 · 事務所全体の審査受信箱(審査待ち案件 / 異常票 / 顧客回答待ち)
+    riq_refresh_btn: '更新',
+    riq_sec_workorders: '審査待ち案件',
+    riq_sec_flagged: '異常票',
+    riq_sec_clientpool: '顧客回答待ち',
+    riq_wo_due: '期限 {date}',
+    riq_wo_due_none: '申告期限なし',
+    riq_signoff_btn: 'レビュー承認',
+    riq_signoff_busy: '署名中…',
+    riq_signoff_done: 'レビュー済み · {actor}',
+    riq_archive_btn: '署名して凍結',
+    riq_archive_busy: '凍結中…',
+    riq_archive_done: '凍結済み · {actor}',
+    riq_reject_btn: '差し戻し',
+    riq_receipt_btn: '受領書を添付',
+    riq_receipt_busy: 'アップロード中…',
+    riq_receipt_done: '受領書を添付しました',
+    riq_self_declared: '単独レビューを宣言済み',
+    riq_self_declare_btn: '単独モードを宣言',
+    riq_self_declare_hint: '事務所に独立したレビュー担当者がいませんか？',
+    riq_wo_needs_review: 'まだ未処理の異常票があります。先に片付けてから署名してください',
+    riq_reject_reason_label: '差し戻し理由（必須）',
+    riq_reject_reason_required: '差し戻し理由を入力してください',
+    riq_reject_busy: '送信中…',
+    riq_reject_submit: '差し戻しを確定',
+    riq_reject_cancel: 'キャンセル',
+    riq_rework_badge: '再処理',
+    riq_wo_client_fallback: '顧客 #{id}',
+    riq_wo_empty_t: '審査待ちの案件はありません',
+    riq_wo_empty_s: 'すべて処理済み、または資料収集中／AI処理中です',
+    riq_flagged_empty_t: '異常票はありません',
+    riq_flagged_empty_s: '現在、人の判断が必要な項目はありません',
+    riq_bulk_busy: '処理中…',
+    riq_group_hd_bulk: '同種 {n} 件 · すべて提案どおり処理',
+    riq_group_hd_manual: '同種 {n} 件 · 信頼度不足のため1件ずつ確認',
+    riq_group_exclude_all: 'このグループを除外',
+    riq_conf_high: '信頼度：高',
+    riq_conf_mid: '信頼度：中',
+    riq_conf_low: '信頼度：低',
+    riq_bulk_result: '成功 {ok} 件 · 失敗 {fail} 件',
+    riq_view_img_btn: '原本を見る',
+
+    // MC1-b2 · 判定根拠テンプレート(narrative_key の命名は
+    // services/workorder/verdict.py と手動で対応 · パラメータは同ファイルの
+    // 各 _*_params ビルダー由来)
+    verdict_amount_math_fail:
+        '純額 {net} + 税額 {vat} = {sum}、票面合計 {total} と {diff} の差異 · 票面自体が不整合です',
+    verdict_sales_direction:
+        '売り手の税番号 {seller_tax} が当勘定と一致 · 自社の売上書類の可能性、方向を確認してください',
+    verdict_sales_doc:
+        '自社の売上書類として自動分類済み(売り手税番号 {seller_tax})、確認してください',
+    verdict_direction_ambiguous:
+        '仕入か売上か判定不能(売り手税番号 {seller_tax})、手動で指定してください',
+    verdict_ocr_low_conf: 'OCR の信頼度が低い({band})、原本と照合してください',
+    verdict_ocr_validation: 'OCR の読取値が検証ルールと食い違い、原本と照合してください',
+    verdict_ocr_error: 'OCR 読取に失敗:{error}',
+    verdict_duplicate: '既存項目と重複(重複先:{of})',
 });

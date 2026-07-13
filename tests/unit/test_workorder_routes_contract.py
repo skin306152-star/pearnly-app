@@ -220,9 +220,10 @@ class DecisionMappingTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(wr, "db", _FakeDB(_Cur())),
             mock.patch.object(wr.store, "get_work_order", return_value=wo),
             mock.patch.object(wr.api, "record_decision", side_effect=_rec),
+            mock.patch.object(wr, "_schedule_advance", return_value=True),
         ):
             return await wr.add_decision(
-                "wo-1", wr.DecisionIn(item_id="it-1", decision=decision), mock.Mock()
+                "wo-1", wr.DecisionIn(item_id="it-1", decision=decision), mock.Mock(), mock.Mock()
             )
 
     async def test_valid_decision_ok(self):
@@ -249,7 +250,10 @@ class DecisionMappingTests(unittest.IsolatedAsyncioTestCase):
         ):
             with self.assertRaises(HTTPException) as ctx:
                 await wr.add_decision(
-                    "wo-1", wr.DecisionIn(item_id="it-1", decision="bogus"), mock.Mock()
+                    "wo-1",
+                    wr.DecisionIn(item_id="it-1", decision="bogus"),
+                    mock.Mock(),
+                    mock.Mock(),
                 )
         self.assertEqual(ctx.exception.status_code, 422)
 
@@ -281,10 +285,12 @@ class SalesSummaryMappingTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(wr, "db", _FakeDB(_Cur())),
             mock.patch.object(wr.store, "get_work_order", return_value=wo),
             mock.patch.object(wr.api, "record_sales_summary", side_effect=_rec),
+            mock.patch.object(wr, "_schedule_advance", return_value=True),
         ):
             return await wr.add_sales_summary(
                 "wo-1",
                 wr.SalesSummaryIn(sales_amount="858780.16", output_vat="60114.61", note="ยื่นเอง"),
+                mock.Mock(),
                 mock.Mock(),
             )
 
@@ -383,17 +389,23 @@ class PermCodeWiringTests(unittest.IsolatedAsyncioTestCase):
             (wr.run_order("wo-1", mock.Mock(), mock.Mock()), wr._C_PREPARE),
             (
                 wr.add_decision(
-                    "wo-1", wr.DecisionIn(item_id="it-1", decision="face_value"), mock.Mock()
+                    "wo-1",
+                    wr.DecisionIn(item_id="it-1", decision="face_value"),
+                    mock.Mock(),
+                    mock.Mock(),
                 ),
                 wr._C_PREPARE,
             ),
             (
                 wr.add_sales_summary(
-                    "wo-1", wr.SalesSummaryIn(sales_amount="1", output_vat="1"), mock.Mock()
+                    "wo-1",
+                    wr.SalesSummaryIn(sales_amount="1", output_vat="1"),
+                    mock.Mock(),
+                    mock.Mock(),
                 ),
                 wr._C_PREPARE,
             ),
-            (wr.add_materials("wo-1", mock.Mock(), files=[]), wr._C_PREPARE),
+            (wr.add_materials("wo-1", mock.Mock(), mock.Mock(), files=[]), wr._C_PREPARE),
             (wr.review_signoff("wo-1", wr.ReviewSignoffIn(), mock.Mock()), wr._C_REVIEW),
             (wr.archive_order("wo-1", mock.Mock()), wr._C_APPROVE),
             (
@@ -419,6 +431,7 @@ class MaterialsUploadLimitTests(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(route_helpers, "check_workspace_scope", return_value=None),
             mock.patch.object(wr, "db", _FakeDB(_Cur())),
             mock.patch.object(wr.store, "get_work_order", return_value={"workspace_client_id": 7}),
+            mock.patch.object(wr, "_schedule_advance", return_value=True),
         )
 
     async def test_too_many_files_maps_413(self):
@@ -429,7 +442,7 @@ class MaterialsUploadLimitTests(unittest.IsolatedAsyncioTestCase):
             for p in self._patches(wr):
                 self.enterContext(p)
             with self.assertRaises(HTTPException) as ctx:
-                await wr.add_materials("wo-1", mock.Mock(), files=files)
+                await wr.add_materials("wo-1", mock.Mock(), mock.Mock(), files=files)
         self.assertEqual(ctx.exception.status_code, 413)
         self.assertEqual(ctx.exception.detail, "workorder.too_many_files")
         save.assert_not_called()
@@ -442,7 +455,7 @@ class MaterialsUploadLimitTests(unittest.IsolatedAsyncioTestCase):
             for p in self._patches(wr):
                 self.enterContext(p)
             with self.assertRaises(HTTPException) as ctx:
-                await wr.add_materials("wo-1", mock.Mock(), files=[big])
+                await wr.add_materials("wo-1", mock.Mock(), mock.Mock(), files=[big])
         self.assertEqual(ctx.exception.status_code, 413)
         self.assertEqual(ctx.exception.detail, "workorder.file_too_large")
         # 封顶读法:只请求上限+1 字节,不整读超大文件。
@@ -463,7 +476,7 @@ class MaterialsUploadLimitTests(unittest.IsolatedAsyncioTestCase):
         ):
             for p in self._patches(wr):
                 self.enterContext(p)
-            out = await wr.add_materials("wo-1", mock.Mock(), files=[ok_file])
+            out = await wr.add_materials("wo-1", mock.Mock(), mock.Mock(), files=[ok_file])
         self.assertEqual(out["count"], 1)
         save.assert_called_once()
 
@@ -608,6 +621,130 @@ class ItemImageTests(unittest.IsolatedAsyncioTestCase):
                 resp = await wr.get_item_image("wo-1", "it-1", mock.Mock())
         self.assertEqual(resp.media_type, "image/jpeg")
         self.assertEqual(resp.path, str(img))
+
+
+class AutoAdvanceTests(unittest.IsolatedAsyncioTestCase):
+    """P-7 引擎自驱:裁决/补销项/补料落库成功后端点自动排 advance,用户不必手点 /run。"""
+
+    def _base(self, wr):
+        return (
+            mock.patch.object(route_helpers, "get_current_user_from_request", return_value=_USER),
+            mock.patch.object(route_helpers, "pearnly_ai_m1_enabled_for", return_value=True),
+            mock.patch.object(route_helpers, "require_perm", return_value=_USER),
+            mock.patch.object(wr, "check_workspace_scope", return_value=None),
+            mock.patch.object(route_helpers, "check_workspace_scope", return_value=None),
+            mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            mock.patch.object(wr.store, "get_work_order", return_value={"workspace_client_id": 7}),
+        )
+
+    async def test_decision_success_schedules_advance(self):
+        from routes import workorder_routes as wr
+
+        with (
+            mock.patch.object(wr.api, "record_decision", return_value={"id": 5}),
+            mock.patch.object(wr, "_schedule_advance", return_value=True) as sched,
+        ):
+            for p in self._base(wr):
+                self.enterContext(p)
+            out = await wr.add_decision(
+                "wo-1",
+                wr.DecisionIn(item_id="it-1", decision="face_value"),
+                mock.Mock(),
+                mock.Mock(),
+            )
+        self.assertTrue(out["ok"])
+        sched.assert_called_once()
+
+    async def test_sales_summary_success_schedules_advance(self):
+        from routes import workorder_routes as wr
+
+        with (
+            mock.patch.object(wr.api, "record_sales_summary", return_value={"id": 5}),
+            mock.patch.object(wr, "_schedule_advance", return_value=True) as sched,
+        ):
+            for p in self._base(wr):
+                self.enterContext(p)
+            out = await wr.add_sales_summary(
+                "wo-1",
+                wr.SalesSummaryIn(sales_amount="1", output_vat="1"),
+                mock.Mock(),
+                mock.Mock(),
+            )
+        self.assertTrue(out["ok"])
+        sched.assert_called_once()
+
+    async def test_materials_success_schedules_advance(self):
+        from routes import workorder_routes as wr
+
+        with (
+            mock.patch.object(wr.storage, "save_material", return_value=mock.Mock()),
+            mock.patch.object(
+                wr.intake, "register_file", return_value={"id": "it-1", "file_ref": "/m/a.jpg"}
+            ),
+            mock.patch.object(wr, "_schedule_advance", return_value=True) as sched,
+        ):
+            for p in self._base(wr):
+                self.enterContext(p)
+            out = await wr.add_materials(
+                "wo-1", mock.Mock(), mock.Mock(), files=[_FakeUpload(b"bytes", filename="a.jpg")]
+            )
+        self.assertEqual(out["count"], 1)
+        sched.assert_called_once()
+
+    async def test_auto_advance_swallows_scheduling_error(self):
+        # 自驱是增益:排后台若抛错,已提交的裁决/销项不能被翻成 5xx。
+        from routes import workorder_routes as wr
+
+        with (
+            mock.patch.object(wr.api, "record_decision", return_value={"id": 5}),
+            mock.patch.object(wr, "_schedule_advance", side_effect=RuntimeError("lease down")),
+        ):
+            for p in self._base(wr):
+                self.enterContext(p)
+            out = await wr.add_decision(
+                "wo-1",
+                wr.DecisionIn(item_id="it-1", decision="face_value"),
+                mock.Mock(),
+                mock.Mock(),
+            )
+        self.assertTrue(out["ok"])  # 写成功,自驱失败被吞
+
+
+class ScheduleAdvanceTests(unittest.TestCase):
+    """_schedule_advance:抢到租约 → 落 run_requested + 排后台 advance;抢不到 → False,不排。"""
+
+    def test_acquired_queues_advance(self):
+        from routes import workorder_routes as wr
+
+        bg = mock.Mock()
+        with (
+            mock.patch.object(wr.store, "ensure_runtime", return_value=None),
+            mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            mock.patch.object(wr.store, "acquire_run_lease", return_value=True),
+            mock.patch.object(wr.store, "append_event", return_value={"id": 1}) as append,
+        ):
+            ok = wr._schedule_advance(bg, "t-1", "wo-1", _USER)
+        self.assertTrue(ok)
+        append.assert_called_once()
+        bg.add_task.assert_called_once()
+        args = bg.add_task.call_args[0]
+        self.assertEqual((args[1], args[2]), ("t-1", "wo-1"))
+        self.assertTrue(str(args[3]).startswith("run:"))
+
+    def test_lease_held_does_not_queue(self):
+        from routes import workorder_routes as wr
+
+        bg = mock.Mock()
+        with (
+            mock.patch.object(wr.store, "ensure_runtime", return_value=None),
+            mock.patch.object(wr, "db", _FakeDB(_Cur())),
+            mock.patch.object(wr.store, "acquire_run_lease", return_value=False),
+            mock.patch.object(wr.store, "append_event") as append,
+        ):
+            ok = wr._schedule_advance(bg, "t-1", "wo-1", _USER)
+        self.assertFalse(ok)
+        append.assert_not_called()
+        bg.add_task.assert_not_called()
 
 
 if __name__ == "__main__":

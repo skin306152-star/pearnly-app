@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import logging
 import mimetypes
 import os
 import uuid
@@ -30,6 +31,7 @@ from services.workorder import api, archive, engine, runner, storage, store
 from services.workorder.steps import intake
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # 工单 = 月度申报工作,四权分立映射到 tax.filing.* 细码(C3):制单/复核/授权/申报/只读
 # 各自独立判定,owner/admin 走 all 短路、accountant 全含、clerk 仅制单+只读——一人所全兼
@@ -129,6 +131,52 @@ def _raise_from_api_error(e: "api.WorkOrderApiError") -> None:
     raise HTTPException(status, detail=detail)
 
 
+def _schedule_advance(
+    background: BackgroundTasks, tenant_id: str, work_order_id: str, user: dict
+) -> bool:
+    """抢 run 租约 + 落 run_requested + 交后台 advance。抢到返 True(已排后台);抢不到
+    (已有 run 在跑)返 False。
+
+    P-7 引擎自驱:裁决/补料/补销项落库成功后调此,引擎自动续跑,用户不必盯着状态手点 /run
+    ——与 /run 端点同一条推进路径(同租约、同 run_requested、同 BackgroundTasks),不另造一套。
+    抢不到租约不是错:已有 run 会带着刚落库的新事件续跑(reconcile 从事件流回放),不重复排。"""
+    owner = f"run:{uuid.uuid4().hex}"
+    store.ensure_runtime()  # 建租约列(独立事务)· 必须先于下面锁 work_orders 的 UPDATE
+    with db.get_cursor(commit=True) as cur:
+        if not store.acquire_run_lease(
+            cur,
+            tenant_id=tenant_id,
+            work_order_id=work_order_id,
+            owner=owner,
+            ttl_seconds=runner.run_lease_ttl_seconds(),
+        ):
+            return False
+        store.append_event(
+            cur,
+            tenant_id=tenant_id,
+            work_order_id=work_order_id,
+            step=runner.RUN_STEP,
+            event_type="run_requested",
+            actor=f"user:{user['id']}",
+        )
+    background.add_task(runner.advance, tenant_id, work_order_id, owner)
+    return True
+
+
+def _auto_advance(
+    background: BackgroundTasks, tenant_id: str, work_order_id: str, user: dict
+) -> None:
+    """补料/裁决/补销项后的尽力而为自驱(P-7)。绝不让自驱的意外(租约抖动等)牵连已提交的
+    落库结果——用户的裁决/销项已经落库成功,推进失败最多是「还得手点一次 /run」的退化,不能
+    让它把一个成功的写操作翻成 5xx。抢不到租约(已有 run 在跑)是正常路径,静默即可。"""
+    try:
+        _schedule_advance(background, tenant_id, work_order_id, user)
+    except Exception:  # noqa: BLE001 - 自驱是增益不是主路径,失败不翻已成功的写
+        logger.warning(
+            "auto-advance scheduling failed for %s (mutation already committed)", work_order_id
+        )
+
+
 @router.post("/api/workorder/orders")
 async def create_order(req: OrderCreate, request: Request):
     """开单(幂等:同账套同期同意图返既有单)。"""
@@ -196,33 +244,19 @@ async def run_order(work_order_id: str, request: Request, background: Background
     双终端/双击同时 /run:先抢 DB 租约,抢不到(他人未过期租约占着)→ 409 run_in_progress;
     抢到者把 owner 交后台 advance,收尾释放。进程猝死则租约过期后另一终端可接管。"""
     user, tenant_id = _authorize(request, _C_PREPARE)
-    owner = f"run:{uuid.uuid4().hex}"
-    store.ensure_runtime()  # 建租约列(独立事务)· 必须先于下面 SELECT/UPDATE 锁 work_orders
-    with db.get_cursor(commit=True) as cur:
+    with db.get_cursor() as cur:  # 冻结只读闸 + 归属校验先行(读侧),再抢租约推进
         wo = _load_mutable_order(cur, request, user, tenant_id, work_order_id)
-        if not store.acquire_run_lease(
-            cur,
-            tenant_id=tenant_id,
-            work_order_id=work_order_id,
-            owner=owner,
-            ttl_seconds=runner.run_lease_ttl_seconds(),
-        ):
-            raise HTTPException(409, detail="workorder.run_in_progress")
-        store.append_event(
-            cur,
-            tenant_id=tenant_id,
-            work_order_id=work_order_id,
-            step=runner.RUN_STEP,
-            event_type="run_requested",
-            actor=f"user:{user['id']}",
-        )
-    background.add_task(runner.advance, tenant_id, work_order_id, owner)
+    if not _schedule_advance(background, tenant_id, work_order_id, user):
+        raise HTTPException(409, detail="workorder.run_in_progress")
     return {"queued": True, "status": wo["status"]}
 
 
 @router.post("/api/workorder/orders/{work_order_id}/decisions")
-async def add_decision(work_order_id: str, req: DecisionIn, request: Request):
-    """人工裁决(face_value/recalc/exclude),落 human_decision 事件(校验 item 属该单)。"""
+async def add_decision(
+    work_order_id: str, req: DecisionIn, request: Request, background: BackgroundTasks
+):
+    """人工裁决(face_value/recalc/exclude),落 human_decision 事件(校验 item 属该单)。
+    落库成功后引擎自动续跑(P-7),用户不必手点 /run。"""
     user, tenant_id = _authorize(request, _C_PREPARE)
     with db.get_cursor(commit=True) as cur:
         _load_mutable_order(cur, request, user, tenant_id, work_order_id)
@@ -241,13 +275,17 @@ async def add_decision(work_order_id: str, req: DecisionIn, request: Request):
         except api.WorkOrderApiError as e:
             code = 404 if e.code == "workorder.item_not_found" else 422
             raise HTTPException(code, detail=e.code) from e
+    _auto_advance(background, tenant_id, work_order_id, user)
     return {"ok": True, "event_id": evt["id"]}
 
 
 @router.post("/api/workorder/orders/{work_order_id}/sales-summary")
-async def add_sales_summary(work_order_id: str, req: SalesSummaryIn, request: Request):
+async def add_sales_summary(
+    work_order_id: str, req: SalesSummaryIn, request: Request, background: BackgroundTasks
+):
     """人工填销项(销售额 + 销项税 + 凭据备注)。落 item_classified(sales_summary) 事件,
-    reconcile 的 R2 据此解锁(引擎/steps 不改)。金额十进制字符串进出、禁 float、非负。"""
+    reconcile 的 R2 据此解锁(引擎/steps 不改)。金额十进制字符串进出、禁 float、非负。
+    落库成功后引擎自动续跑(P-7):补销项常是最后一块料,自驱直接把工单带到 review。"""
     user, tenant_id = _authorize(request, _C_PREPARE)
     with db.get_cursor(commit=True) as cur:
         _load_mutable_order(cur, request, user, tenant_id, work_order_id)
@@ -264,12 +302,19 @@ async def add_sales_summary(work_order_id: str, req: SalesSummaryIn, request: Re
         except api.WorkOrderApiError as e:
             code = 422 if e.code.startswith("workorder.sales_summary") else 404
             raise HTTPException(code, detail=e.code) from e
+    _auto_advance(background, tenant_id, work_order_id, user)
     return {"ok": True, "event_id": evt["id"]}
 
 
 @router.post("/api/workorder/orders/{work_order_id}/materials")
-async def add_materials(work_order_id: str, request: Request, files: list[UploadFile] = File(...)):
-    """补料:multipart 上传,落盘到工单目录并登记成 work_order_items(走 intake 幂等指纹)。"""
+async def add_materials(
+    work_order_id: str,
+    request: Request,
+    background: BackgroundTasks,
+    files: list[UploadFile] = File(...),
+):
+    """补料:multipart 上传,落盘到工单目录并登记成 work_order_items(走 intake 幂等指纹)。
+    登记成功后引擎自动续跑(P-7):新料直接进 intake→classify,用户不必手点 /run。"""
     user, tenant_id = _authorize(request, _C_PREPARE)
     if len(files) > _MAX_MATERIAL_FILES:
         raise HTTPException(413, detail="workorder.too_many_files")
@@ -297,6 +342,8 @@ async def add_materials(work_order_id: str, request: Request, files: list[Upload
         for path in saved:
             item = intake.register_file(ctx, path, "upload")
             registered.append({"item_id": item["id"], "file_ref": item["file_ref"]})
+    if registered:
+        _auto_advance(background, tenant_id, work_order_id, user)
     return {"registered": registered, "count": len(registered)}
 
 

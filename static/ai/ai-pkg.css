@@ -50,8 +50,11 @@
   color: var(--mut);
 }
 .pkg-total .n {
-  font-family: var(--serif);
-  font-style: italic;
+  /* 2026-07-14 Zihao 金标验收拍板:金额大数不留衬线斜体(฿+斜体违和),正体+tabular。
+     衬线令牌自此只剩 logo 品牌位(Canon v5 §6.6 的「金额大数点缀」豁免作废)。 */
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   font-size: 34px;
   letter-spacing: -0.01em;
   color: var(--gold);

@@ -108,6 +108,29 @@
         return String(email).split('@')[0];
     }
 
+    // 签批区 actor 展示(v5 §五3 与左下角同源):/api/me 的 users.username → 邮箱前缀 →
+    // 登录态 sub 短八位。绝不拼 "user:<uuid>" 糊脸(2026-07-14 清单 #2);短八位是最后
+    // 兜底,让「谁签的」至少可比对不刷屏。me 未返回时传 null,走 token 侧回落链。
+    function actorLabel(me, token) {
+        me = me || {};
+        if (me.username) return String(me.username);
+        var email = String(me.email || '');
+        if (email.indexOf('@') > 0) return email.split('@')[0];
+        var name = jwtDisplayName(token);
+        if (name) return name;
+        var payload = jwtPayload(token);
+        var sub = payload && payload.sub ? String(payload.sub) : '';
+        return sub ? sub.slice(0, 8) : '';
+    }
+
+    // 服务端事件流回显的 actor 串("user:<uuid>",routes 落库格式)→ 展示名:浏览器端
+    // 没有他人 uuid→用户名 的解析端点,退 uuid 短八位;非该格式(用户名/邮箱前缀占位)
+    // 原样透传。与 actorLabel 的最后兜底同口径。
+    function actorDisplay(raw) {
+        var s = String(raw || '');
+        return s.indexOf('user:') === 0 ? s.slice(5, 13) : s;
+    }
+
     // prior_period_check(compute.py 产出的对象,{status:'no_prior_period'} 或 {status:'compared',
     // prior_period, prior_tax_due, delta})→ i18n key + 插值(N-3 修复:B2-e 前 ai-client.js 把
     // 整个对象直接扔进 esc() 显示成字面 "[object Object]")。如实展示原始差额数字,不臆断
@@ -149,6 +172,8 @@
         chipHtml: chipHtml,
         jwtPayload: jwtPayload,
         jwtDisplayName: jwtDisplayName,
+        actorLabel: actorLabel,
+        actorDisplay: actorDisplay,
         fieldLabel: fieldLabel,
         priorPeriodCheckStatus: priorPeriodCheckStatus,
         priorPeriodCheckText: priorPeriodCheckText,

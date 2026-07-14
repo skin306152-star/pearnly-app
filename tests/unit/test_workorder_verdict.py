@@ -34,6 +34,35 @@ class MathFailTests(unittest.TestCase):
         self.assertEqual(h["params"]["diff"], "1070.00")
 
 
+class MathFailTemplateSplitTests(unittest.TestCase):
+    """amount_math_fail 按票面数字重选模板(2026-07-14 清单#1):三字段自洽的票禁用
+    「不自洽」模板——差 0.00 还说自身冲突,人和大脑都会被带偏(摸底考 2647 实锤)。"""
+
+    def test_consistent_fields_with_vat_rate_anomaly_names_expected_vat(self):
+        # 金标 2647(折扣票):净+税=总额自洽,但 58048.35×7%=4063.38 ≠ 票面 4060.05
+        h = verdict.hint(
+            flag_reason="amount_math_fail",
+            ocr_read={"subtotal": "58,048.35", "vat": "4060.05", "total_amount": "62108.40"},
+        )
+        self.assertEqual(h["narrative_key"], "verdict_vat_rate_mismatch")
+        self.assertEqual(
+            h["params"],
+            {"net": "58048.35", "vat": "4060.05", "expected": "4063.38", "diff": "3.33"},
+        )
+        self.assertEqual(h["confidence"], verdict.LOW)  # 政策不变:仍逼人工看数
+        self.assertEqual(h["severity"], verdict.SEV_CRIT)
+        self.assertIsNone(h["suggested_decision"])
+
+    def test_fully_consistent_reading_degrades_to_generic_validation(self):
+        # 三字段自洽且 VAT=7%(行和/折扣类勾稽警告触发的 flag)→ 泛化校验模板,零参数
+        h = verdict.hint(
+            flag_reason="amount_math_fail",
+            ocr_read={"subtotal": "100.00", "vat": "7.00", "total_amount": "107.00"},
+        )
+        self.assertEqual(h["narrative_key"], "verdict_ocr_validation")
+        self.assertEqual(h["params"], {})
+
+
 class DirectionAndConfidenceTests(unittest.TestCase):
     def test_sales_direction_is_high_with_seller_tax(self):
         h = verdict.hint(

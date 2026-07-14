@@ -304,11 +304,14 @@ Object.assign(window.__AI_I18N_TH__, {
     riq_conf_low: 'เชื่อมั่นต่ำ',
     riq_bulk_result: 'สำเร็จ {ok} · ล้มเหลว {fail}',
     riq_view_img_btn: 'ดูต้นฉบับ',
+    riq_item_frozen: 'ปิดงานแล้ว · อ่านอย่างเดียว',
 
     // MC1-b2 · เทมเพลตคำอธิบายเกณฑ์ตัดสิน (narrative_key อ้างอิงตรงกับ
     // services/workorder/verdict.py ด้วยมือ · พารามิเตอร์มาจาก _*_params ในไฟล์นั้น)
     verdict_amount_math_fail:
         'สุทธิ {net} + ภาษี {vat} = {sum} ต่างจากยอดรวมหน้าบิล {total} อยู่ {diff} · ตัวเลขบนบิลไม่สอดคล้องกันเอง',
+    verdict_vat_rate_mismatch:
+        'สุทธิ ภาษี และยอดรวมสอดคล้องกัน แต่ 7% ของสุทธิ {net} ควรเป็น {expected} ขณะที่หน้าบิลระบุ {vat} ต่างกัน {diff} (พบบ่อยในบิลมีส่วนลด) กรุณาตรวจกับต้นฉบับ',
     verdict_sales_direction:
         'เลขภาษีผู้ขาย {seller_tax} ตรงกับบัญชีเรา คาดว่าเป็นเอกสารขายของเราเอง กรุณายืนยันทิศทาง',
     verdict_sales_doc:

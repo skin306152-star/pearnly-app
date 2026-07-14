@@ -135,6 +135,41 @@ class AiFormatTests(unittest.TestCase):
 
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class ActorLabelTests(unittest.TestCase):
+    """签批区 actor 展示(2026-07-14 清单 #2):users.username 同源解析,查不到逐级回落
+    (邮箱前缀 → sub 短八位),任何分支都不产出 'user:<uuid>' 裸串。"""
+
+    _TOKEN_JS = (
+        "const token = 'x.' + Buffer.from(JSON.stringify("
+        "{sub: '5effc038-d181-4875-a11f-ec111a979d64'})).toString('base64') + '.y';"
+    )
+
+    def test_username_wins_then_email_prefix_then_short_sub(self):
+        out = _run_node(f"""
+            const f = require({json.dumps(str(AI_DIR / "ai-format.js"))});
+            {self._TOKEN_JS}
+            process.stdout.write(JSON.stringify([
+                f.actorLabel({{username: 'somchai', email: 'a@b.co'}}, token),
+                f.actorLabel({{email: 'aksara@b.co'}}, token),
+                f.actorLabel(null, token),
+                f.actorLabel(null, null),
+            ]));
+            """)
+        self.assertEqual(out, ["somchai", "aksara", "5effc038", ""])
+
+    def test_actor_display_shortens_server_uuid_and_passes_names_through(self):
+        out = _run_node(f"""
+            const f = require({json.dumps(str(AI_DIR / "ai-format.js"))});
+            process.stdout.write(JSON.stringify([
+                f.actorDisplay('user:5effc038-d181-4875-a11f-ec111a979d64'),
+                f.actorDisplay('somchai'),
+                f.actorDisplay(null),
+            ]));
+            """)
+        self.assertEqual(out, ["5effc038", "somchai", ""])
+
+
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class AiRouterTests(unittest.TestCase):
     def test_parse_hash_dashboard_default(self):
         out = _run_node(f"""

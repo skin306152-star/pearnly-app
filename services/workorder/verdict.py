@@ -18,7 +18,7 @@ confidence 分级(方案决策 3):税号精确=high / 名称锚=mid / OCR 低置
 from __future__ import annotations
 
 from collections import namedtuple
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Optional
 
 from services.workorder.steps.reconcile_gates import to_dec
@@ -36,6 +36,7 @@ SEV_WARN = "warn"
 # narrative_key 命名空间(verdict_*)。前端为每个键配 i18n 模板,用 params 填空;缺模板
 # 时前端诚实回退到 flag_reason 原文(总比编假人话强)。
 _K_MATH = "verdict_amount_math_fail"
+_K_VAT_RATE = "verdict_vat_rate_mismatch"
 _K_SALES_DIRECTION = "verdict_sales_direction"
 _K_SALES_DOC = "verdict_sales_doc"
 _K_DIRECTION = "verdict_direction_ambiguous"
@@ -45,23 +46,46 @@ _K_OCR_ERROR = "verdict_ocr_error"
 _K_DUPLICATE = "verdict_duplicate"
 
 
+# 泰国标准 VAT 税率。amount_math_fail 的勾稽闸词表(classify._MATH_HINTS)混装了
+# 「净+税≠总额」与「VAT≠净额×7%」两类警告,文案在读侧按票面数字重分——分错模板会把
+# 三字段自洽的折扣票说成「相差 0.00,票面自身不自洽」(2026-07-14 清单 #1)。
+_VAT_RATE = Decimal("0.07")
+_CENT = Decimal("0.01")
+
+
 def _money_str(d: Decimal) -> str:
-    return format(d.quantize(Decimal("0.01")), "f")
+    return format(d.quantize(_CENT), "f")
 
 
-def _math_params(money: dict, _tail: str) -> dict:
-    """净{net}+税{vat}={sum},与票面{total}差{diff}(方案 §2 给定模板)。"""
+def _math_narrative(money: dict) -> tuple[str, dict]:
+    """amount_math_fail → (narrative_key, params),按票面数字选对模板:
+    ①净+税≠总额 → 自身不自洽(净{net}+税{vat}={sum},与票面{total}差{diff});
+    ②三字段自洽但 VAT≠净额×7% → 税率异常(按 7% 应为{expected},票面{vat}差{diff},
+      常见于折扣票——这句话直接决定人/大脑能不能裁对折扣票);
+    ③两项都过(行和/折扣勾稽类警告)→ 泛化校验模板,绝不硬说「不自洽」。"""
     net = to_dec(money.get("subtotal"))
     vat = to_dec(money.get("vat"))
     total = to_dec(money.get("total_amount"))
     net_plus_vat = net + vat
-    return {
-        "net": _money_str(net),
-        "vat": _money_str(vat),
-        "sum": _money_str(net_plus_vat),
-        "total": _money_str(total),
-        "diff": _money_str((total - net_plus_vat).copy_abs()),
-    }
+    diff = (total - net_plus_vat).copy_abs().quantize(_CENT)
+    if diff != 0:
+        return _K_MATH, {
+            "net": _money_str(net),
+            "vat": _money_str(vat),
+            "sum": _money_str(net_plus_vat),
+            "total": _money_str(total),
+            "diff": _money_str(diff),
+        }
+    expected = (net * _VAT_RATE).quantize(_CENT, rounding=ROUND_HALF_UP)
+    rate_diff = (vat - expected).copy_abs().quantize(_CENT)
+    if rate_diff != 0:
+        return _K_VAT_RATE, {
+            "net": _money_str(net),
+            "vat": _money_str(vat),
+            "expected": _money_str(expected),
+            "diff": _money_str(rate_diff),
+        }
+    return _K_VALIDATION, {}
 
 
 def _seller_params(money: dict, _tail: str) -> dict:
@@ -95,8 +119,9 @@ _EXCLUDE = {"decision": "exclude"}
 # 本表把「机器码 → 人话模板 + 置信度 + 严重度 + 建议裁决」收成一处读侧政策,跨前后端不再各持副本。
 _Policy = namedtuple("_Policy", "narrative_key confidence params severity suggested_decision")
 _MAP = {
-    # 票面净+税≠总额=自身冲突 → low 置信、crit 严重、无安全默认(必须人工看数)。
-    "amount_math_fail": _Policy(_K_MATH, LOW, _math_params, SEV_CRIT, None),
+    # 票面勾稽闸报警 → low 置信、crit 严重、无安全默认(必须人工看数)。narrative_key 是
+    # 占位:hint() 对该前缀按票面数字经 _math_narrative 重选模板(不自洽/税率异常/泛化)。
+    "amount_math_fail": _Policy(_K_MATH, LOW, _empty_params, SEV_CRIT, None),
     # 税号精确判本方销项 → high 置信,建议确认为销项。
     "sales_direction_unhandled": _Policy(
         _K_SALES_DIRECTION, HIGH, _seller_params, SEV_CRIT, _ASSIGN_SALES
@@ -136,9 +161,13 @@ def hint(*, flag_reason: Optional[str], ocr_read: Optional[dict] = None) -> dict
             "severity": SEV_CRIT,
             "suggested_decision": None,
         }
+    if head == "amount_math_fail":
+        key, params = _math_narrative(ocr_read or {})
+    else:
+        key, params = entry.narrative_key, entry.params(ocr_read or {}, tail)
     return {
-        "narrative_key": entry.narrative_key,
-        "params": entry.params(ocr_read or {}, tail),
+        "narrative_key": key,
+        "params": params,
         "confidence": entry.confidence,
         "severity": entry.severity,
         "suggested_decision": entry.suggested_decision,

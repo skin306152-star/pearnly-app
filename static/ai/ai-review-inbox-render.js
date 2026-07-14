@@ -333,12 +333,21 @@
     }
 
     // 裁决卡三件套:读值(fldt)/判据人话(riq-narrative)/置信度徽标(chip)——三者都是
-    // isVisible 断言的直接对象,不藏进折叠面板。
-    function itemCardHtml(item, itemUi, local) {
+    // isVisible 断言的直接对象,不藏进折叠面板。冻结单的件(frozen)收起全部裁决钮改只读
+    // 徽章(清单 #3 · 四态诚实:后端 archive 只读闸会拒,UI 不许先摆出可点的样子),
+    // 原图查看是只读动作照留。
+    function itemCardHtml(item, itemUi, local, frozen) {
         var doneChip =
             local && local.state && local.state !== 'pending' && local.state !== 'failed'
                 ? '<span class="chip g">' + esc(at('rv_chip_accepted')) + '</span>'
                 : '';
+        var actionsHtml = frozen
+            ? '<div class="riq-item-actions"><span class="chip s">' +
+              esc(at('riq_item_frozen')) +
+              '</span>' +
+              viewImgBtn(item) +
+              '</div>'
+            : itemActionsHtml(item, itemUi || {});
         return (
             '<div class="riq-item" data-item="' +
             item.item_id +
@@ -360,30 +369,45 @@
             AI.reviewRender.fieldRows(item.ocr_read, null) +
             '</table>' +
             narrativeHtml(item) +
-            itemActionsHtml(item, itemUi || {}) +
+            actionsHtml +
             '</div>'
         );
     }
 
-    function groupHeaderHtml(group, canBulk, busy) {
+    // actionableCount = 组内未冻结件数:批量/排除按钮只对它们生效,全冻结的组两钮都收,
+    // 头部只留只读徽章(不给「60 张待批量」的假承诺)。
+    function groupHeaderHtml(group, canBulk, busy, actionableCount) {
         var key = AI.reviewQueue.flagReasonKey(group.flagReason);
         var label = key ? at(key) : group.flagReason;
         var sevCls = group.severity === 'crit' ? 'b' : 'w';
-        var bulkPill = canBulk
-            ? '<button type="button" class="btn pri riq-group-bulk" data-action="riq-bulk" data-flag="' +
-              esc(group.flagReason) +
-              '"' +
-              (busy ? ' disabled' : '') +
-              '>' +
-              esc(
-                  busy
-                      ? at('riq_bulk_busy')
-                      : at('riq_group_hd_bulk', { n: group.items.length, reason: label })
-              ) +
-              ' <span class="kbd">A</span></button>'
-            : '<span class="riq-group-manual">' +
-              esc(at('riq_group_hd_manual', { n: group.items.length, reason: label })) +
-              '</span>';
+        var bulkPill =
+            actionableCount === 0
+                ? '<span class="chip s">' + esc(at('riq_item_frozen')) + '</span>'
+                : canBulk
+                  ? '<button type="button" class="btn pri riq-group-bulk" data-action="riq-bulk" data-flag="' +
+                    esc(group.flagReason) +
+                    '"' +
+                    (busy ? ' disabled' : '') +
+                    '>' +
+                    esc(
+                        busy
+                            ? at('riq_bulk_busy')
+                            : at('riq_group_hd_bulk', { n: actionableCount, reason: label })
+                    ) +
+                    ' <span class="kbd">A</span></button>'
+                  : '<span class="riq-group-manual">' +
+                    esc(at('riq_group_hd_manual', { n: group.items.length, reason: label })) +
+                    '</span>';
+        var excludeBtn =
+            actionableCount === 0
+                ? ''
+                : '<button type="button" class="btn sm" data-action="riq-exclude-all" data-flag="' +
+                  esc(group.flagReason) +
+                  '"' +
+                  (busy ? ' disabled' : '') +
+                  '>' +
+                  esc(at('riq_group_exclude_all')) +
+                  ' <span class="kbd">X</span></button>';
         return (
             '<div class="hd riq-group-hd">' +
             '<h3><span class="chip ' +
@@ -393,26 +417,25 @@
             '</span>' +
             bulkPill +
             '<span class="note" style="margin-left:auto">' +
-            '<button type="button" class="btn sm" data-action="riq-exclude-all" data-flag="' +
-            esc(group.flagReason) +
-            '"' +
-            (busy ? ' disabled' : '') +
-            '>' +
-            esc(at('riq_group_exclude_all')) +
-            ' <span class="kbd">X</span></button>' +
+            excludeBtn +
             '</span></h3></div>'
         );
     }
 
-    function groupHtml(group, ui) {
+    function groupHtml(group, ui, archivedIds) {
         ui = ui || {};
+        archivedIds = archivedIds || {};
+        var actionableCount = group.items.filter(function (item) {
+            return !archivedIds[item.work_order_id];
+        }).length;
         var canBulk = AI.reviewVerdict.groupCanBulk(group.items);
         var itemsHtml = group.items
             .map(function (item) {
                 return itemCardHtml(
                     item,
                     ui.itemUi && ui.itemUi[item.item_id],
-                    ui.local && ui.local[item.item_id]
+                    ui.local && ui.local[item.item_id],
+                    !!archivedIds[item.work_order_id]
                 );
             })
             .join('');
@@ -420,14 +443,14 @@
             '<div class="panel riq-group" data-flag="' +
             esc(group.flagReason) +
             '">' +
-            groupHeaderHtml(group, canBulk, ui.busy) +
+            groupHeaderHtml(group, canBulk, ui.busy, actionableCount) +
             '<div class="bd"><div class="riq-items">' +
             itemsHtml +
             '</div></div></div>'
         );
     }
 
-    function flaggedSectionHtml(groups, uiByFlag) {
+    function flaggedSectionHtml(groups, uiByFlag, archivedIds) {
         if (!groups.length) {
             return AI.state.emptyHtml({
                 title: at('riq_flagged_empty_t'),
@@ -436,7 +459,7 @@
         }
         return groups
             .map(function (g) {
-                return groupHtml(g, uiByFlag[g.flagReason]);
+                return groupHtml(g, uiByFlag[g.flagReason], archivedIds);
             })
             .join('');
     }

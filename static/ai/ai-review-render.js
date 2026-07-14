@@ -64,7 +64,7 @@
         var at_ = String(d.at || '')
             .slice(0, 16)
             .replace('T', ' ');
-        var actor = d.actor || '';
+        var actor = AI.format.actorDisplay(d.actor); // 服务端回显 "user:<uuid>" → 短八位
         return (
             '<p class="rv-decided-by">' +
             esc(at('rv_decided_by', { actor: actor, at: at_ })) +

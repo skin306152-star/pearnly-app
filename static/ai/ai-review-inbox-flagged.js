@@ -12,6 +12,8 @@
  *   onChange()            状态变化后触发重渲染(loading/分组/裁决态任一变化都调)。
  *   afterMutate()         裁决/批量落库成功后触发(调用方据此刷新工单卡计数)。
  *   showToast(msg, undo)  提示(undo 传函数则显 3 秒撤销 toast,不传则普通失败提示)。
+ *   isArchived(orderId)   该工单是否已冻结(可选)——冻结件只读:批量跳过、单裁拒发
+ *                         (后端 archive 只读闸仍是权威,这里不让 UI 先撒谎)。
  */
 (function () {
     'use strict';
@@ -83,6 +85,10 @@
             return key !== 'err_generic' && at(key) !== key ? key : null;
         }
 
+        function isArchived(orderId) {
+            return !!(hooks.isArchived && hooks.isArchived(orderId));
+        }
+
         function findGroup(flagReason) {
             return st.flaggedGroups.filter(function (g) {
                 return g.flagReason === flagReason;
@@ -92,11 +98,16 @@
         function runGroupBatch(flagReason, template) {
             var group = findGroup(flagReason);
             if (!group || !group.items.length) return;
+            // 冻结单的件不进批量(后端会整单拒,发了也是白撞 409 刷失败计数)
+            var actionable = group.items.filter(function (it) {
+                return !isArchived(it.work_order_id);
+            });
+            if (!actionable.length) return;
             var g = groupUiFor(flagReason);
             if (g.busy) return;
             g.busy = true;
             hooks.onChange();
-            var grouped = byOrder(group.items);
+            var grouped = byOrder(actionable);
             var orderIds = Object.keys(grouped);
             Promise.all(
                 orderIds.map(function (oid) {
@@ -161,7 +172,7 @@
 
         function decideItem(itemId, action, vatRaw) {
             var item = st.itemIndex[itemId];
-            if (!item) return;
+            if (!item || isArchived(item.work_order_id)) return;
             var payload = AI.reviewQueue.buildDecisionPayload(itemId, action, vatRaw);
             var g = groupUiFor(item.flag_reason);
             var iu = itemUiFor(item.flag_reason, itemId);

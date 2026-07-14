@@ -56,12 +56,56 @@ class BuildQuestionTests(unittest.TestCase):
         self.assertEqual(q["evidence_event_ids"], [])
         self.assertEqual(q["kind"], "unknown")
 
+    def test_carries_flag_hint_from_verdict_policy(self):
+        # 判据人话与人审卡同源(#1 顺带救大脑):方向题带 verdict_direction_ambiguous
+        q = brain_shadow.build_question(_item(), _CLASSIFIED, _OWN)
+        self.assertEqual(q["flag_hint"]["narrative_key"], "verdict_direction_ambiguous")
+        self.assertNotIn("suggested_decision", q["flag_hint"])  # 安全默认不许漏进题面
+
+    def test_flag_hint_names_vat_rate_anomaly_for_discount_ticket(self):
+        # 金标 2647:三字段自洽 + VAT≠7% → 题面明说「按 7% 应为 X」,不再谎报不自洽
+        classified = {
+            "event_id": 902,
+            "payload": {
+                "money": {"subtotal": "58048.35", "vat": "4060.05", "total_amount": "62108.40"}
+            },
+        }
+        q = brain_shadow.build_question(_item(flag_reason="amount_math_fail"), classified, _OWN)
+        self.assertEqual(q["flag_hint"]["narrative_key"], "verdict_vat_rate_mismatch")
+        self.assertEqual(q["flag_hint"]["params"]["expected"], "4063.38")
+        self.assertEqual(q["flag_hint"]["params"]["diff"], "3.33")
+
     def test_prompt_embeds_question_and_vocabulary(self):
         q = brain_shadow.build_question(_item(), _CLASSIFIED, _OWN)
         prompt = brain_shadow.build_prompt(q)
         self.assertIn("0105561234567", prompt)
-        for s in brain_shadow.SUGGESTIONS:
+        for s in brain_shadow.DIRECTION_SUGGESTIONS:
             self.assertIn(s, prompt)
+
+
+class AnswerTypeConstraintTests(unittest.TestCase):
+    """题型约束(摸底考失分#2):方向题只准 assign_kind:*/cannot_judge,金额题只准
+    face_value/recalc/exclude/cannot_judge;题面枚举与 parse 校验同一张表。"""
+
+    def test_direction_prompt_excludes_amount_verbs(self):
+        q = brain_shadow.build_question(_item(flag_reason="sales_doc_review"), _CLASSIFIED, _OWN)
+        prompt = brain_shadow.build_prompt(q)
+        for s in brain_shadow.DIRECTION_SUGGESTIONS:
+            self.assertIn(s, prompt)
+        for s in (decisions.FACE_VALUE, decisions.RECALC, decisions.WAIVE):
+            self.assertNotIn(s, prompt)
+
+    def test_amount_prompt_excludes_direction_verbs(self):
+        q = brain_shadow.build_question(_item(flag_reason="amount_math_fail"), _CLASSIFIED, _OWN)
+        prompt = brain_shadow.build_prompt(q)
+        for s in brain_shadow.AMOUNT_SUGGESTIONS:
+            self.assertIn(s, prompt)
+        self.assertNotIn(decisions.ASSIGN_KIND, prompt)
+
+    def test_unknown_flag_reason_keeps_full_vocabulary(self):
+        self.assertEqual(
+            brain_shadow.allowed_suggestions("some_future_reason"), brain_shadow.SUGGESTIONS
+        )
 
 
 class ParseSuggestionTests(unittest.TestCase):
@@ -98,6 +142,22 @@ class ParseSuggestionTests(unittest.TestCase):
         rec = brain_shadow.parse_suggestion(
             self._reply(suggestion=brain_shadow.CANNOT_JUDGE, cited_event_ids=[]), [901]
         )
+        self.assertTrue(rec["valid"])
+
+    def test_amount_verb_on_direction_question_is_wrong_answer_type(self):
+        # 摸底考失分#2 的机器面:sales_doc_review 票答 face_value = 内容对、题型错
+        rec = brain_shadow.parse_suggestion(self._reply(), [901], flag_reason="sales_doc_review")
+        self.assertFalse(rec["valid"])
+        self.assertEqual(rec["invalid_reason"], brain_shadow.INVALID_WRONG_ANSWER_TYPE)
+
+    def test_direction_verb_on_amount_question_is_wrong_answer_type(self):
+        rec = brain_shadow.parse_suggestion(
+            self._reply(suggestion="assign_kind:sales_doc"), [901], flag_reason="amount_math_fail"
+        )
+        self.assertEqual(rec["invalid_reason"], brain_shadow.INVALID_WRONG_ANSWER_TYPE)
+
+    def test_matching_answer_type_still_passes(self):
+        rec = brain_shadow.parse_suggestion(self._reply(), [901], flag_reason="amount_math_fail")
         self.assertTrue(rec["valid"])
 
     def test_unknown_suggestion_and_bad_confidence_invalid(self):

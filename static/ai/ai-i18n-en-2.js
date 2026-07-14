@@ -313,11 +313,14 @@ Object.assign(window.__AI_I18N_EN__, {
     riq_conf_low: 'Low confidence',
     riq_bulk_result: '{ok} succeeded · {fail} failed',
     riq_view_img_btn: 'View original',
+    riq_item_frozen: 'Frozen · read-only',
 
     // MC1-b2 · verdict narrative templates (narrative_key namespace aligned by hand with
     // services/workorder/verdict.py; params come from that file's _*_params builders)
     verdict_amount_math_fail:
         'Net {net} + VAT {vat} = {sum}, off by {diff} from the face total {total} — the document is internally inconsistent',
+    verdict_vat_rate_mismatch:
+        'Net, VAT and total agree, but 7% of net {net} would be {expected} while the face VAT is {vat}, off by {diff} (common on discounted receipts) — please verify against the original',
     verdict_sales_direction:
         'Seller tax ID {seller_tax} matches this account — likely your own sales document, please confirm the direction',
     verdict_sales_doc:

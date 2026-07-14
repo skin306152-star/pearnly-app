@@ -20,15 +20,11 @@
     var S = null;
     var wired = false; // 照 ai-client.js chromeWired 先例:监听器只挂一次,不随每次 mount 重挂。
 
-    // 本次刚提交的裁决没有服务端 actor 回显(响应体只有 event_id),用当前登录态占位——
-    // 有邮箱就显邮箱名(jwtDisplayName);没有就照后端落库的同款格式拼 "user:<sub>",
-    // 刷新后从服务端读到的值会是同一个字符串(不臆造、不留空)。
+    // 本次刚提交的裁决没有服务端 actor 回显(响应体只有 event_id),用当前登录态的展示名
+    // 占位(AI.format.actorLabel 回落链:邮箱前缀 → sub 短八位)——不再拼 "user:<uuid>"
+    // 糊脸(清单 #2 同源修法,后端落库的 actor 串不变)。
     function currentActorLabel() {
-        var token = localStorage.getItem('mrpilot_token');
-        var name = AI.format.jwtDisplayName(token);
-        if (name) return name;
-        var payload = AI.format.jwtPayload(token);
-        return payload && payload.sub ? 'user:' + payload.sub : '';
+        return AI.format.actorLabel(null, localStorage.getItem('mrpilot_token'));
     }
 
     function freshState(api, order, clientId) {

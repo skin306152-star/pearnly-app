@@ -1,4 +1,4 @@
-# UI 设计合规扫描报告 · 401 个源文件全扫
+# UI 设计合规扫描报告 · 427 个源文件全扫
 
 
 ## 旧色/旧蓝(应改令牌) — 命中 3(3 文件)
@@ -9,7 +9,7 @@
      1  static\pos\pos-data.js
         └ 349: { id: 'mock-c1', display_name: 'Nok', color: '#2563EB' },
 
-## 旧token名(应用全局emerald) — 命中 202(29 文件)
+## 旧token名(应用全局emerald) — 命中 200(28 文件)
     59  static\pos\pos.css
         └ 14: --blue: var(--accent); --blue-d: var(--accent-d); --blue-l: var(--accent-weak);
         └ 41: .pos-view--login .brand .b .dot { width: 9px; height: 9px; border-radius: 50%; background:
@@ -46,9 +46,6 @@
      3  static\home-45-kit.css
         └ 482: background: var(--blue-weak);
         └ 483: border-color: var(--blue);
-     2  src\home\module-settings.ts
-        └ 55: .modset .bizbar .ico{width:40px;height:40px;border-radius:11px;background:var(--blue-weak)
-        └ 71: .modset .mod.lock .sw{background:var(--blue-200);cursor:not-allowed;}.modset .mod.lock .sw
      2  static\erp-mrerp-connect.css
         └ 79: background: var(--blue-weak);
         └ 80: color: var(--blue-800);
@@ -155,7 +152,7 @@
      1  static\home-37-html-inline.css
         └ 153: /* v102 · 统一「需复核」⚠ icon · 替代原「缺金额 → 补金额」黄按钮 */
 
-## 小固定max-width(查是否@media) — 命中 121(63 文件)
+## 小固定max-width(查是否@media) — 命中 120(62 文件)
      8  src\home\sales-detail.ts
         └ 115: detailMask().innerHTML = `<div class="modal" role="dialog" style="max-width:640px">
         └ 160: actionMask().innerHTML = `<div class="modal" role="dialog" style="max-width:380px">
@@ -260,10 +257,8 @@
         └ 6: <div class="modal" style="max-width:440px">
      1  src\home\modal-notif-new.ts
         └ 14: <div class="modal" style="max-width:520px;">
-     1  src\home\module-settings.ts
-        └ 53: .modset{max-width:680px;}
      1  src\home\page-settings.ts
-        └ 405: <input type="text" class="form-input" id="access-log-search" data-i18n-placeholder="set-ac
+        └ 400: <input type="text" class="form-input" id="access-log-search" data-i18n-placeholder="set-ac
      1  src\home\purchase-capture.ts
         └ 35: .pur.cap .rhint{font-size:12.5px;color:var(--ink2);max-width:320px;line-height:1.6;}
      1  src\home\rules-settings.ts
@@ -395,7 +390,7 @@
         └ 443: 'time-hours-ago': '{n} 小时前',
         └ 444: 'time-days-ago': '{n} 天前',
 
-## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 888(60 文件)
+## 裸 hex 色值(应改令牌·已排除令牌定义文件)— 命中 885(59 文件)
    157  static\home-18-admin-users.css
     86  static\pos\pos.css
     68  static\admin\admin.js
@@ -432,7 +427,6 @@
      4  src\home\erp-mrerp-dms-connect.ts
      4  src\home\line-panel.ts
      4  static\erp-mrerp-connect.js
-     3  src\home\module-settings.ts
      3  static\landing\auth-modal.css
      3  static\landing\landing-tour-scenes.js
      3  static\landing\responsive.css

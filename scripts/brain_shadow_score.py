@@ -200,7 +200,9 @@ def _run_arm(model: Optional[str], questions: list[dict], tenant_id: str) -> dic
             )
             print(f"  [{i}/{len(questions)}] {question['item_id'][:8]} FAIL({outcome.error_kind})")
             continue
-        rec = brain_shadow.parse_suggestion(outcome.data, question["evidence_event_ids"])
+        rec = brain_shadow.parse_suggestion(
+            outcome.data, question["evidence_event_ids"], flag_reason=question.get("flag_reason")
+        )
         rec.update({"item_id": question["item_id"], "gold": gold, "pred": rec["suggestion"]})
         records.append(rec)
         mark = "=" if rec["pred"] == gold else "x"

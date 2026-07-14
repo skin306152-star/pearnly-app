@@ -31,14 +31,24 @@
         return $('riqFlaggedBody');
     }
 
-    // 同 ai-review.js currentActorLabel 先例:本次刚提交的动作没有服务端 actor 回显,
-    // 用当前登录态占位,刷新后从服务端读到的值会是同一个字符串。
+    // 本次刚提交的动作没有服务端 actor 回显,签批注记用当前登录态的展示名:mount 时经
+    // /api/me 解析 users.username(与左下角同源 · v5 §五3,一次调用无 N+1),未返回前
+    // 走 token 侧回落链(邮箱前缀 → sub 短八位),绝不显示裸 UUID(清单 #2)。
     function currentActorLabel() {
-        var token = localStorage.getItem('mrpilot_token');
-        var name = AI.format.jwtDisplayName(token);
-        if (name) return name;
-        var payload = AI.format.jwtPayload(token);
-        return payload && payload.sub ? 'user:' + payload.sub : '';
+        return AI.format.actorLabel(null, localStorage.getItem('mrpilot_token'));
+    }
+
+    function resolveActorLabel() {
+        var session = S;
+        S.api
+            .getMe()
+            .then(function (me) {
+                if (S !== session) return;
+                S.actorLabel = AI.format.actorLabel(me, localStorage.getItem('mrpilot_token'));
+            })
+            .catch(function () {
+                // 探针失败保持 token 回落态(短八位),不打扰主流程
+            });
     }
 
     function freshState(api) {
@@ -57,6 +67,7 @@
                     startProgressPoll();
                 },
                 showToast: AI.reviewRender.showToast,
+                isArchived: isOrderArchived,
             }),
             actorLabel: currentActorLabel(),
             refreshTimer: null,
@@ -66,6 +77,33 @@
     }
 
     // ============ 渲染 ============
+
+    // 冻结态判定(清单 #3 · 四态诚实):status=archive(服务端权威)或本会话刚点过冻结
+    // (archivedNote,queue 还没重取)。feed 卡据此收起裁决钮、批量/单裁经此闸拒发。
+    function isOrderArchived(orderId) {
+        if (S && S.signoff.forOrder(orderId).archivedNote) return true;
+        var hit = false;
+        if (S && S.queue) {
+            (S.queue.clients || []).forEach(function (c) {
+                c.orders.forEach(function (o) {
+                    if (o.work_order_id === orderId && o.status === 'archive') hit = true;
+                });
+            });
+        }
+        return hit;
+    }
+
+    function archivedOrderIds() {
+        var ids = {};
+        if (S && S.queue) {
+            (S.queue.clients || []).forEach(function (c) {
+                c.orders.forEach(function (o) {
+                    if (isOrderArchived(o.work_order_id)) ids[o.work_order_id] = true;
+                });
+            });
+        }
+        return ids;
+    }
 
     // 两个分区共用同一副 loading/error 外壳,只有 loading 判据与内容拼装不同。
     function renderSection(el, loading, contentFn) {
@@ -103,9 +141,16 @@
         renderSection(flaggedBody(), S && S.loading, function () {
             return AI.reviewInboxRender.flaggedSectionHtml(
                 S.flagged.groups(),
-                S.flagged.groupUiMap()
+                S.flagged.groupUiMap(),
+                archivedOrderIds()
             );
         });
+    }
+
+    // 冻结落库后工单连同 feed 一起翻只读(feed 卡还留着 P/S/X 就是四态撒谎),两区同帧重画。
+    function renderAfterArchive() {
+        renderWo();
+        renderFlagged();
     }
 
     // ============ 加载(review-queue 一次带回工单卡 + 跨工单 flagged item feed) ============
@@ -238,7 +283,8 @@
         var orderId = el.getAttribute('data-wo');
         if (!orderId) return;
         if (action === 'riq-signoff') S.signoff.signoff(orderId, S.actorLabel, renderWo);
-        else if (action === 'riq-archive') S.signoff.archive(orderId, S.actorLabel, renderWo);
+        else if (action === 'riq-archive')
+            S.signoff.archive(orderId, S.actorLabel, renderAfterArchive);
         else if (action === 'riq-reject-open') S.signoff.openReject(orderId, renderWo);
         else if (action === 'riq-reject-cancel') S.signoff.cancelReject(orderId, renderWo);
         else if (action === 'riq-reject-submit') S.signoff.submitReject(orderId, renderWo, load);
@@ -274,6 +320,7 @@
         S = freshState(api);
         focusedFlag = null;
         wireOnce();
+        resolveActorLabel();
         load();
         AI.clientPool.mount(api);
     }

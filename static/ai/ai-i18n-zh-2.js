@@ -286,11 +286,14 @@ Object.assign(window.__AI_I18N_ZH__, {
     riq_conf_low: '低置信',
     riq_bulk_result: '{ok} 张成功 · {fail} 张失败',
     riq_view_img_btn: '查看原图',
+    riq_item_frozen: '已冻结 · 只读',
 
     // MC1-b2 · 判据人话模板(narrative_key 命名空间随 services/workorder/verdict.py
     // 手工对齐,params 见该文件各 _*_params 构造器)
     verdict_amount_math_fail:
         '净额 {net} + 税额 {vat} = {sum}，与票面合计 {total} 相差 {diff}，票面自身不自洽',
+    verdict_vat_rate_mismatch:
+        '净额、税额、合计三项自洽，但净额 {net} 按 7% 计税应为 {expected}，票面税额 {vat} 相差 {diff}（常见于折扣票），请核对票面',
     verdict_sales_direction: '卖方税号 {seller_tax} 与本账套一致，疑似本方销项票，请确认方向',
     verdict_sales_doc: '已自动归类为本方销项票（卖方税号 {seller_tax}），请确认',
     verdict_direction_ambiguous: '进项/销项方向判不出（卖方税号 {seller_tax}），需人工指定',

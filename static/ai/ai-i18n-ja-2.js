@@ -310,12 +310,15 @@ Object.assign(window.__AI_I18N_JA__, {
     riq_conf_low: '信頼度：低',
     riq_bulk_result: '成功 {ok} 件 · 失敗 {fail} 件',
     riq_view_img_btn: '原本を見る',
+    riq_item_frozen: '凍結済み · 読み取り専用',
 
     // MC1-b2 · 判定根拠テンプレート(narrative_key の命名は
     // services/workorder/verdict.py と手動で対応 · パラメータは同ファイルの
     // 各 _*_params ビルダー由来)
     verdict_amount_math_fail:
         '純額 {net} + 税額 {vat} = {sum}、票面合計 {total} と {diff} の差異 · 票面自体が不整合です',
+    verdict_vat_rate_mismatch:
+        '純額・税額・合計は整合していますが、純額 {net} の 7% は {expected} のはずで、票面税額 {vat} と {diff} の差異(値引き票でよくあります)· 原本と照合してください',
     verdict_sales_direction:
         '売り手の税番号 {seller_tax} が当勘定と一致 · 自社の売上書類の可能性、方向を確認してください',
     verdict_sales_doc:

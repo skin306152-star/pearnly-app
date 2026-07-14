@@ -30,7 +30,7 @@ from typing import Optional
 
 from core import feature_flags
 from services.ai_gateway.providers.openai import TAXOPS_VERDICT_TIER
-from services.workorder import decisions, evidence, store
+from services.workorder import decisions, evidence, store, verdict
 
 logger = logging.getLogger(__name__)
 
@@ -41,21 +41,52 @@ BACKEND_ENV = "TAXOPS_BRAIN_BACKEND"
 DEFAULT_BACKEND = "openai"
 
 CANNOT_JUDGE = "cannot_judge"
+_ASSIGN_PURCHASE = f"{decisions.ASSIGN_KIND}:{decisions.PURCHASE_INVOICE}"
+_ASSIGN_SALES = f"{decisions.ASSIGN_KIND}:{decisions.SALES_DOC}"
+_ASSIGN_NON_TAX = f"{decisions.ASSIGN_KIND}:{decisions.NON_TAX}"
 # 建议词汇表 = 人工裁决动词(decisions 单一事实源)+ cannot_judge。assign_kind 带裁定方向,
 # 与 human_decision payload 的 decision/kind 一一可映射,评分 CLI 直接对答案。
 SUGGESTIONS = (
     decisions.FACE_VALUE,
     decisions.RECALC,
     decisions.EXCLUDE,
-    f"{decisions.ASSIGN_KIND}:{decisions.PURCHASE_INVOICE}",
-    f"{decisions.ASSIGN_KIND}:{decisions.SALES_DOC}",
-    f"{decisions.ASSIGN_KIND}:{decisions.NON_TAX}",
+    _ASSIGN_PURCHASE,
+    _ASSIGN_SALES,
+    _ASSIGN_NON_TAX,
     decisions.WAIVE,
     CANNOT_JUDGE,
 )
 
+# 题型约束(2026-07-14 摸底考失分#2:sales_doc_review 票答成 face_value——内容对、题型错):
+# 方向类 flag 只考「这张票是谁的什么票」,金额类 flag 只考「票面数字信不信」。允许集写进
+# 题面,parse 层对词汇表内但超本题集的答案判 wrong_answer_type。未知 flag 不设限(全集)。
+_DIRECTION_FLAGS = frozenset({*decisions.DIRECTION_PREFIXES, decisions.SALES_DOC_REVIEW})
+_AMOUNT_FLAGS = frozenset(
+    {
+        "amount_math_fail",
+        "ocr_low_confidence",
+        "ocr_validation_warning",
+        "ocr_error",
+        "duplicate_of",
+    }
+)
+DIRECTION_SUGGESTIONS = (_ASSIGN_PURCHASE, _ASSIGN_SALES, _ASSIGN_NON_TAX, CANNOT_JUDGE)
+AMOUNT_SUGGESTIONS = (decisions.FACE_VALUE, decisions.RECALC, decisions.EXCLUDE, CANNOT_JUDGE)
+
+_SUGGESTION_MEANINGS = {
+    decisions.FACE_VALUE: "face_value=采信票面读数",
+    decisions.RECALC: "recalc=票面读数有误需人工看原件补正",
+    decisions.EXCLUDE: "exclude=剔除不计入合计",
+    _ASSIGN_PURCHASE: "assign_kind:purchase_invoice=裁定为进项票",
+    _ASSIGN_SALES: "assign_kind:sales_doc=裁定为本方销项票",
+    _ASSIGN_NON_TAX: "assign_kind:non_tax=裁定为非税票",
+    decisions.WAIVE: "waive=无法归位但放行留痕",
+    CANNOT_JUDGE: "cannot_judge=证据不足判断不了",
+}
+
 INVALID_BAD_SHAPE = "bad_shape"
 INVALID_SUGGESTION_UNKNOWN = "suggestion_unknown"
+INVALID_WRONG_ANSWER_TYPE = "wrong_answer_type"
 INVALID_CONFIDENCE = "confidence_out_of_range"
 INVALID_CITED_MISSING = "cited_event_missing"
 INVALID_CITATION_REQUIRED = "citation_required"
@@ -65,12 +96,10 @@ INVALID_CITATION_REQUIRED = "citation_required"
 _PROMPT_TEMPLATE = """你是泰国代账事务所的月结审核助手。下面是一张被系统点名(flagged)的票据的机器读数与上下文。
 任务:给出建议裁决。只做判断,不算钱——钱数永远由确定性代码计算,你的建议仅供会计参考。
 
-可选建议(只准选一个,原样输出):
+可选建议(只准从下面选一个,原样输出;列表外的建议一律无效):
 {suggestions}
 
-各建议含义:face_value=采信票面读数;recalc=票面读数有误需人工看原件补正;exclude=剔除不计入合计;
-assign_kind:purchase_invoice=裁定为进项票;assign_kind:sales_doc=裁定为本方销项票;
-assign_kind:non_tax=裁定为非税票;waive=无法归位但放行留痕;cannot_judge=证据不足判断不了。
+各建议含义:{meanings}。
 
 硬规则:
 1. 只依据下面上下文判断。证据缺失、读数冲突到看不出真相、上下文不足 → 必须选 cannot_judge,严禁编造或猜测。
@@ -143,17 +172,32 @@ def own_anchor(cur, *, tenant_id: str, work_order_id: str) -> dict:
     return {"tax_id": row.get("tax_id"), "name": row.get("name")}
 
 
+def allowed_suggestions(flag_reason: Optional[str]) -> tuple:
+    """flag_reason → 本题允许的建议集(题面枚举与 parse 校验共用,防题型漂移)。"""
+    head = str(flag_reason or "").split(":", 1)[0]
+    if head in _DIRECTION_FLAGS:
+        return DIRECTION_SUGGESTIONS
+    if head in _AMOUNT_FLAGS:
+        return AMOUNT_SUGGESTIONS
+    return SUGGESTIONS
+
+
 def build_question(item: dict, classified_rec: Optional[dict], own: dict) -> dict:
     """一件 flagged 料 → 判断题上下文(纯函数,评分 CLI 与影子跑共用,保证同卷)。
 
     上下文全部来自事件 payload / items 行 / 账套锚,绝不掺 human_decision(考试防漏题
     天然成立:本函数根本不消费裁决事件)。无 item_classified 事件(没读出来的料)则
-    money=None、evidence_event_ids=[]——模型按硬规则只能答 cannot_judge。"""
+    money=None、evidence_event_ids=[]——模型按硬规则只能答 cannot_judge。flag_hint 是
+    verdict.py 的判据人话(narrative_key+params,与人审卡同源):flag 具体在哪一条勾稽
+    上报警(如三字段自洽但 VAT≠7%),不给会把大脑带偏成「票面算不平」(摸底考 2647)。
+    刻意不带 suggested_decision——那是规则给的安全默认,漏进题面等于漏答案。"""
     payload = (classified_rec or {}).get("payload") or {}
+    hint = verdict.hint(flag_reason=item.get("flag_reason"), ocr_read=payload.get("money"))
     return {
         "item_id": str(item["id"]),
         "kind": payload.get("kind") or item.get("kind"),
         "flag_reason": item.get("flag_reason"),
+        "flag_hint": {"narrative_key": hint["narrative_key"], "params": hint["params"]},
         "money": payload.get("money"),
         "own_tax_id": own.get("tax_id"),
         "own_name": own.get("name"),
@@ -162,15 +206,18 @@ def build_question(item: dict, classified_rec: Optional[dict], own: dict) -> dic
 
 
 def build_prompt(question: dict) -> str:
+    allowed = allowed_suggestions(question.get("flag_reason"))
     return _PROMPT_TEMPLATE.format(
-        suggestions="\n".join(f"- {s}" for s in SUGGESTIONS),
+        suggestions="\n".join(f"- {s}" for s in allowed),
+        meanings=";".join(_SUGGESTION_MEANINGS[s] for s in allowed),
         question=json.dumps(question, ensure_ascii=False, default=str),
     )
 
 
-def parse_suggestion(data, allowed_event_ids) -> dict:
+def parse_suggestion(data, allowed_event_ids, flag_reason: Optional[str] = None) -> dict:
     """模型回复 → 规范化建议记录(纯函数)。校验即硬闸②③的机器面:引用只认题面给过的
-    事件 id(⊆ 该单事件流),实建议必须带引用;任何不合规照单落 invalid,不悄悄修正。"""
+    事件 id(⊆ 该单事件流),实建议必须带引用;flag_reason 传入时同步校验题型(词汇表内
+    但超本题允许集 = wrong_answer_type);任何不合规照单落 invalid,不悄悄修正。"""
     out = {
         "suggestion": None,
         "confidence": None,
@@ -187,6 +234,9 @@ def parse_suggestion(data, allowed_event_ids) -> dict:
     out["reason_zh"] = str(data.get("reason_zh") or "").strip()
     if suggestion not in SUGGESTIONS:
         out["invalid_reason"] = INVALID_SUGGESTION_UNKNOWN
+        return out
+    if suggestion not in allowed_suggestions(flag_reason):
+        out["invalid_reason"] = INVALID_WRONG_ANSWER_TYPE
         return out
     try:
         confidence = float(data.get("confidence"))
@@ -307,7 +357,9 @@ def _run(cur, tenant_id: str, work_order_id: str) -> dict:
         if not outcome.ok:
             failed += 1  # 网关已按 error_kind 记账(ai_usage),这里不重复留痕
             continue
-        rec = parse_suggestion(outcome.data, question["evidence_event_ids"])
+        rec = parse_suggestion(
+            outcome.data, question["evidence_event_ids"], flag_reason=question["flag_reason"]
+        )
         rec["item_id"] = item_id
         rec["model"] = outcome.model
         rows.append(rec)

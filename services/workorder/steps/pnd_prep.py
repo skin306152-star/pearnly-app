@@ -97,7 +97,7 @@ def _fetch_doc_dates(cur, *, tenant_id: str, doc_ids: list[str]) -> dict[str, ob
     if not doc_ids:
         return {}
     cur.execute(
-        "SELECT id, doc_date FROM purchase_docs WHERE tenant_id = %s AND id = ANY(%s)",
+        "SELECT id, doc_date FROM purchase_docs WHERE tenant_id = %s AND id = ANY(%s::uuid[])",
         (tenant_id, doc_ids),
     )
     return {str(r["id"]): r["doc_date"] for r in cur.fetchall()}

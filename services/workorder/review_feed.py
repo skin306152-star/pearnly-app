@@ -23,14 +23,14 @@ from services.workorder import evidence, sod
 _EVENTS_SQL = """
 SELECT id, work_order_id, step, event_type, payload, actor, created_at
 FROM work_order_events
-WHERE tenant_id = %s AND work_order_id = ANY(%s)
+WHERE tenant_id = %s AND work_order_id = ANY(%s::uuid[])
 ORDER BY work_order_id, id
 """
 
 _FLAGGED_ITEMS_SQL = """
 SELECT id, work_order_id, kind, file_ref, flag_reason, status
 FROM work_order_items
-WHERE tenant_id = %s AND work_order_id = ANY(%s) AND status = 'flagged'
+WHERE tenant_id = %s AND work_order_id = ANY(%s::uuid[]) AND status = 'flagged'
 ORDER BY work_order_id, created_at
 """
 

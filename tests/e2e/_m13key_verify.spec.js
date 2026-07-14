@@ -32,16 +32,41 @@ test.afterAll(() => localServer.stop(server));
 
 const SHADOW = {
     entries: [
-        { source: '进项票 #1', rule_key: 'r_purchase', dr_cr: 'debit', account_code: '5290', account_name: '杂项费用', amount: '1000.00' },
-        { source: '进项票 #1', rule_key: 'r_purchase', dr_cr: 'debit', account_code: '1140', account_name: '进项税', amount: '70.00' },
-        { source: '进项票 #1', rule_key: 'r_purchase', dr_cr: 'credit', account_code: '2010', account_name: '应付账款', amount: '1070.00' },
+        {
+            source: '进项票 #1',
+            rule_key: 'r_purchase',
+            dr_cr: 'debit',
+            account_code: '5290',
+            account_name: '杂项费用',
+            amount: '1000.00',
+        },
+        {
+            source: '进项票 #1',
+            rule_key: 'r_purchase',
+            dr_cr: 'debit',
+            account_code: '1140',
+            account_name: '进项税',
+            amount: '70.00',
+        },
+        {
+            source: '进项票 #1',
+            rule_key: 'r_purchase',
+            dr_cr: 'credit',
+            account_code: '2010',
+            account_name: '应付账款',
+            amount: '1070.00',
+        },
     ],
     accounts: [],
     trial_balance: { debit: '1070.00', credit: '1070.00', diff: '0.00', balanced: true },
 };
 
 const DELIVERABLES = [
-    { kind: 'pp30_draft', has_file: true, numbers: { output_vat: '350.00', input_vat: '70.00', tax_due: '280.00' } },
+    {
+        kind: 'pp30_draft',
+        has_file: true,
+        numbers: { output_vat: '350.00', input_vat: '70.00', tax_due: '280.00' },
+    },
     { kind: 'shadow_workpaper', has_file: true, numbers: { balanced: true, entry_count: 3 } },
     { kind: 'evidence_index', has_file: true, numbers: {} },
 ];
@@ -67,15 +92,22 @@ async function routeApi(page, { initialStatus }) {
         const u = new URL(req.url());
         const p = u.pathname;
         const json = (body, code = 200) =>
-            route.fulfill({ status: code, contentType: 'application/json', body: JSON.stringify(body) });
+            route.fulfill({
+                status: code,
+                contentType: 'application/json',
+                body: JSON.stringify(body),
+            });
 
         if (p === '/api/me') return json({ username: 'reviewer' });
-        if (p === '/api/workorder/orders' && u.searchParams.has('limit')) return json({ orders: [], count: 0 });
-        if (p === `/api/workspace/clients/${CLIENT_ID}`) return json({ client: { id: CLIENT_ID, name: 'Sister Makeup' } });
+        if (p === '/api/workorder/orders' && u.searchParams.has('limit'))
+            return json({ orders: [], count: 0 });
+        if (p === `/api/workspace/clients/${CLIENT_ID}`)
+            return json({ client: { id: CLIENT_ID, name: 'Sister Makeup' } });
         if (p === '/api/workorder/orders' && u.searchParams.get('client_id') === CLIENT_ID)
             return json({ orders: [{ id: ORDER_ID, period: '2569-05' }] });
         if (p === `/api/workorder/orders/${ORDER_ID}`) return json(orderDetail(state.status));
-        if (p === `/api/workorder/orders/${ORDER_ID}/deliverables`) return json({ deliverables: DELIVERABLES });
+        if (p === `/api/workorder/orders/${ORDER_ID}/deliverables`)
+            return json({ deliverables: DELIVERABLES });
         if (p === `/api/workorder/orders/${ORDER_ID}/review` && req.method() === 'POST')
             return json({ ok: true, event_id: 1 });
         if (p === `/api/workorder/orders/${ORDER_ID}/review-reject` && req.method() === 'POST') {
@@ -174,7 +206,10 @@ test.describe('M1-3KEY · 冻结(archive)态', () => {
         const [download] = await Promise.all([page.waitForEvent('download'), exp.click()]);
         expect(download.suggestedFilename()).toContain('entries');
         expect(download.suggestedFilename()).toContain('.xlsx');
-        await page.screenshot({ path: path.join(ART, '5-frozen-export-done.png'), fullPage: false });
+        await page.screenshot({
+            path: path.join(ART, '5-frozen-export-done.png'),
+            fullPage: false,
+        });
     });
 });
 

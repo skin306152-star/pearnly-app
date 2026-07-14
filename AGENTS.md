@@ -26,7 +26,7 @@
 
 ## 1. 当前在干啥(2026-07 · 整顿核心已收官 → 正常产品开发)
 
-- **▶ 当前主线(2026-07-01)**:**对话 Agent M1(WP1~WP5)全线收官**,灰度上线 skin canary(enabled=True·rollout=allowlist=[skin]·真机验收通过),**待 Zihao 拍板放量**。近期已上线:OCR 兜底 gemini-3.5-flash、网页 OCR 上传异步(flag `OCR_ASYNC_WEB` 默认关)、录入续步记忆 + 发票/身份证两入口布局统一。**唯一活地图 = `CLAUDE.md/STATE_PEARNLY.md` 顶部状态卡**;Agent 线全景见 `docs/agent/MASTER-PLAN.md`。下面 2026-06-03 一段是整顿收官时的历史快照,已不代表当前主线。
+- **▶ 当前主线(2026-07-14 更新)**:**Pearnly AI(TaxOps 月结 Agent · pearnly.com/ai)**——MC3 端到端金标真跑已收官(pp30 四数逐字命中官方),当前推进 SA-3 银行流水倒推销项及后续队列。施工体系=`桌面 pearnly ai\施工体系-Fable5窗口SOP-2026-07-10.md`(主窗策划验收·子代理施工),任务板=`桌面 pearnly ai\Pearnly-AI-进度.md`。**唯一活地图 = `CLAUDE.md/STATE_PEARNLY.md` 顶部状态卡**。历史主线(对话 Agent M1,2026-07-01 全线收官放量 all)见 `docs/agent/MASTER-PLAN.md`;下面 2026-06-03 一段是整顿收官时的历史快照,已不代表当前主线。
 
 
 - **⏳ 当前实况(2026-06-03)**:✅ 后端 .py 全 ≤500 · ✅ **前端 `src/home/*.js` 全部 ≤500 收官**(本窗口收最后 11 个 · 11→0 FAIL · 全 push 上线 + prod 真浏览器实测 · 零 console error)。**check_file_size FAIL 0 · 所有源文件 ≤500 达成**(login.html 分层着陆页换新已上线·巨石退场·5000 豁免已删)。法律页 `/terms` `/privacy` 孤儿捞回 git + 重做标准界面(prod 验绿)。范式 [[c9-store-centralization-bankrecon]]。**✅ 代码目录重组收官上线**(铁律#30·整顿最后一步·`d05cf6d`·122 root .py→顶层 routes/core/+复用 services/<域>/·方案B·prod 零 500)。整顿核心全收官。**下一步:staging(Wave3)或品牌资产接线**。

@@ -17,7 +17,13 @@ from services.workorder.engine import RunOutcome
 
 
 class _FakeCur:
-    pass
+    # _latest_decision_id(裁决竞态兜底)会真执行一条 max(id) 查询;返回 0 = 无新裁决,
+    # 兜底不触发,存量断言语义不变。
+    def execute(self, *a, **k):
+        pass
+
+    def fetchone(self):
+        return {"max_id": 0}
 
 
 class _FakeCM:

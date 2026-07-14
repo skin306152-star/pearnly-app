@@ -133,6 +133,69 @@ def is_inflight(tenant_id: str, work_order_id: str) -> bool:
         return (str(tenant_id), str(work_order_id)) in _inflight
 
 
+_RACE_DRAIN_ROUNDS = 3
+
+
+def _latest_decision_id(tenant_id: str, work_order_id: str) -> int:
+    with db.get_cursor() as cur:
+        cur.execute(
+            "SELECT coalesce(max(id), 0) AS max_id FROM work_order_events "
+            "WHERE tenant_id = %s AND work_order_id = %s AND event_type = 'human_decision'",
+            (tenant_id, work_order_id),
+        )
+        return int(cur.fetchone()["max_id"])
+
+
+def _drain_raced_decisions(run_once, probe, out, seen: int):
+    """裁决竞态兜底(2026-07-14 金标真跑实锤):快速连裁时首条裁决自驱的 run 在飞,后续
+    裁决的 _auto_advance 被进程内去重吞掉(already_running),run 收尾后无人再点火——
+    全裁完的工单永远卡 stuck 且前端无跑批钮。run 落 stuck 时查「本轮起跑后有无新
+    human_decision」,有则就地再跑一轮(有界,防止裁决流不断时转圈不还租约)。"""
+    for _ in range(_RACE_DRAIN_ROUNDS):
+        if out.status != engine.STATUS_STUCK:
+            return out
+        latest = probe()
+        if latest <= seen:
+            return out
+        seen = latest
+        out = run_once()
+    return out
+
+
+def _heal_stranded_material(cur, tenant_id: str, work_order_id: str, items: list) -> tuple:
+    """搁浅料自愈(MC2-0 家族·2026-07-14 金标真跑实锤):逐件上传每请求各自自驱(P-7),
+    首批料的 run 抢在余料落库前把 classify 跑成 step_done——引擎跳步语义下,后到料
+    status=pending 永久搁浅,前端无按钮可救(驳回只认 review 态)。起跑前发现
+    「classify 已完成 + 仍有 pending 料」即重开 sort→package(append-only step_reopened,
+    语义同驳回),本次 run 真跑新料;已识别件靠 classify 逐件检查点指纹不重烧。
+    review/archive 态不碰(审核期归驳回流程管辖)。"""
+    if not any(it.get("status") == "pending" for it in items):
+        return ()
+    wo = store.get_work_order(cur, tenant_id=tenant_id, work_order_id=work_order_id)
+    if not wo or wo.get("status") not in (engine.STATUS_STUCK, engine.STATUS_RUNNING):
+        return ()
+    done: set = set()
+    for e in store.list_events(cur, tenant_id=tenant_id, work_order_id=work_order_id):
+        if e["event_type"] == engine.EVT_DONE:
+            done.add(e["step"])
+        elif e["event_type"] == engine.EVT_REOPENED:
+            done.discard(e["step"])
+    if "classify" not in done:
+        return ()
+    reopened = engine.reopen_steps_from("sort")
+    for step in reopened:
+        store.append_event(
+            cur,
+            tenant_id=tenant_id,
+            work_order_id=work_order_id,
+            step=step,
+            event_type=engine.EVT_REOPENED,
+            payload={"cause": "stranded_material_self_heal"},
+            actor="system:self-heal",
+        )
+    return reopened
+
+
 def advance(tenant_id: str, work_order_id: str, lease_owner: str | None = None) -> dict:
     """把某工单推进到底或首个卡点(缺料 needs / 挂起票 stuck)。每步独立事务提交。
 
@@ -147,6 +210,13 @@ def advance(tenant_id: str, work_order_id: str, lease_owner: str | None = None) 
         store.ensure_runtime()  # 建租约/幂等键列(独立事务·先于任何锁工单表的 txn)
         with db.get_cursor(commit=True) as cur:
             items = store.list_items(cur, tenant_id=tenant_id, work_order_id=work_order_id)
+            healed = _heal_stranded_material(cur, tenant_id, work_order_id, items)
+            if healed:
+                logger.warning(
+                    "[workorder-runner] stranded material self-heal: reopened %s for %s",
+                    ",".join(healed),
+                    work_order_id,
+                )
             store.append_event(
                 cur,
                 tenant_id=tenant_id,
@@ -170,10 +240,19 @@ def advance(tenant_id: str, work_order_id: str, lease_owner: str | None = None) 
             data=data,
             cursor_factory=lambda: db.get_cursor(commit=True),
         )
+        decisions_seen = _latest_decision_id(str(tenant_id), str(work_order_id))
         out = engine.run_work_order(ctx, handlers=real_handlers())
-        # 落 review 后大脑影子出建议。整块自吞异常:影子(含开游标)任何炸法都不许把
-        # 已成功的 run 翻成 run_failed(闸关零动作,run_shadow 内部另有一层隔离)。
-        if out.completed and feature_flags.pearnly_ai_brain_shadow_enabled_for(str(tenant_id)):
+        out = _drain_raced_decisions(
+            lambda: engine.run_work_order(ctx, handlers=real_handlers()),
+            lambda: _latest_decision_id(str(tenant_id), str(work_order_id)),
+            out,
+            decisions_seen,
+        )
+        # 落 review 或 stuck 后大脑影子出建议——审核队列收 review+stuck 两态,裁决大多发生
+        # 在 reconcile 挂起阶段(2026-07-14 金标真跑实测),只挂 review 会让建议迟到。整块
+        # 自吞异常:影子(含开游标)任何炸法都不许把已成功的 run 翻成 run_failed。
+        shadow_due = out.completed or out.status == engine.STATUS_STUCK
+        if shadow_due and feature_flags.pearnly_ai_brain_shadow_enabled_for(str(tenant_id)):
             try:
                 with db.get_cursor(commit=True) as cur:
                     brain_shadow.run_shadow(

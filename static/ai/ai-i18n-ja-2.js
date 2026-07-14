@@ -260,6 +260,14 @@ Object.assign(window.__AI_I18N_JA__, {
     crb_dupes: '重複伝票番号（重複除去済み・二重計上なし）：{list}',
     crb_violations: '整合性違反（伝票の3項目が不整合・個別に要確認）：{list}',
     crb_basis: '判定根拠：売り手の税番号＝当勘定 → 自社売上（信頼度高）',
+    crb_title_edc: 'EDC 決済集計（傍証）',
+    crb_invoiced_edc: 'EDC 売上（集計）',
+    crb_vat_label_edc: '売上VAT（総額から分離）',
+    crb_period_edc: '精算期間',
+    crb_tickets_edc: '精算伝票 {n} 枚（計上 {m}）',
+    crb_basis_edc:
+        '判定根拠：EDC 日次精算伝票（SETTLEMENT）・総額基準・傍証のみ、申告額には書かない',
+    crb_conflicts_edc: '要確認 {n} 件（日付/金額に疑義、案件詳細参照）',
 
     // MC1-b2 · 事務所全体の審査受信箱(審査待ち案件 / 異常票 / 顧客回答待ち)
     riq_refresh_btn: '更新',

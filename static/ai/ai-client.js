@@ -181,8 +181,9 @@
                     '<div id="brxRoot"></div>' +
                     '<div id="shadowRoot"></div>' +
                     '<div id="financialsRoot"></div>';
-                // 销项佐证区(MC1-c.1):同一次 getOrder() 已带回 sales_corroboration,不再二次请求。
-                AI.corrob.mount(d.sales_corroboration, $('corrobRoot'));
+                // 销项佐证区(MC1-c.1 / SA-2b):同一次 getOrder() 已带回 sales_corroboration
+                // 与 edc_corroboration,两卡并排渲染,不再二次请求。
+                AI.corrob.mount(d.sales_corroboration, $('corrobRoot'), d.edc_corroboration);
                 // 银行对账区(E2):同一次 getOrder() 已带回 bank_recon,不再二次请求。
                 AI.recon.mount(S.api, order.id, S.clientId, d.bank_recon, $('brxRoot'));
                 // 影子底稿区(F3):同一次 getOrder() 已带回 shadow_draft,不再二次请求。

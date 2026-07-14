@@ -44,10 +44,14 @@
     }
 
     // 单元格是否「逾期风险」:仍未办结(非无需申报/已冻结)且截止日已过今天。
+    // 截止日读顺延后的 due_efiling_deferred(MC2-B G3:周末/假日顺延),缺该字段
+    // (老缓存/降级响应)回落原始 due_efiling——周六截止顺延到周一前不算逾期。
     function isOverdue(cell, todayIso) {
-        if (!cell || !cell.due_efiling) return false;
+        if (!cell) return false;
+        var due = cell.due_efiling_deferred || cell.due_efiling;
+        if (!due) return false;
         if (cell.badge === 'no_need' || cell.badge === 'frozen') return false;
-        return cell.due_efiling < todayIso;
+        return due < todayIso;
     }
 
     function cellHtml(cell, obligationCode, clientId) {

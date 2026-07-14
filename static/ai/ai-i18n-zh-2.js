@@ -237,6 +237,13 @@ Object.assign(window.__AI_I18N_ZH__, {
     crb_dupes: '重复票号(已去重不双计):{list}',
     crb_violations: '守恒违反(票面三字段不自洽,单列人审):{list}',
     crb_basis: '判据:卖方税号=本账套 → 本方销项(置信度高)',
+    crb_title_edc: 'EDC 收单聚合(佐证)',
+    crb_invoiced_edc: 'EDC 销售额(聚合)',
+    crb_vat_label_edc: '销项税(毛额拆税)',
+    crb_period_edc: '结算期间',
+    crb_tickets_edc: '{n} 张结算票(计入 {m})',
+    crb_basis_edc: '判据:EDC 日终结算票(SETTLEMENT)· 毛额口径 · 仅佐证,不写申报数',
+    crb_conflicts_edc: '聚合点名 {n} 项待核(日期/金额存疑,见工单详情)',
 
     // MC1-b2 · 全所审核收件箱(三分区聚合页:待审工单 / 异常票据 / 客户待答)
     riq_refresh_btn: '刷新',

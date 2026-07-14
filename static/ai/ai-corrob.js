@@ -1,16 +1,15 @@
 /*
- * Pearnly AI · ai-corrob.js · 销项佐证卡(MC1-c.1)· 已开票销售逐票聚合的只读四态呈现
+ * Pearnly AI · ai-corrob.js · 销项佐证卡(MC1-c.1 / SA-2b)· 只读四态呈现
  *
  * 挂在工单详情(wo 视图)关键数字之下,数据源是 ai-client.js renderWo() 已取到的
- * order_detail().sales_corroboration(不再发第二次网络请求)。纯只读——本方销项票的逐票
- * 聚合是佐证/地板,不夺 R2 权威销项;卡上如实呈现「已开票金额 / 占比 / 缺口点名 / 判据一句话 /
- * 守恒违反单列」。零交互(逐票确认走人审队列的 S 键,不在本卡)。
+ * order_detail().sales_corroboration(c.1 逐票聚合)与 edc_corroboration(SA-2 EDC 结算
+ * 聚合),两卡并排、同一套渲染只换文案(_SRC 按 source 取 i18n key)。纯只读——聚合是
+ * 佐证/地板,不夺 R2 权威销项;卡上如实呈现「聚合金额 / 覆盖占比 / 缺口点名 / 判据一句话」。
  *
- * 上半段(coveredChipKey)零 DOM/零 i18n,node(tests/unit/test_ai_corrob_pure.py)直接
- * require 断言;下半段 HTML 拼装依赖 at()/AI.state/AI.format,只在浏览器根挂载——同
- * ai-recon-render.js 双段先例。数据形状见 services/workorder/steps/sales_aggregate.py::
- * build_corroboration(covered_state/net_total/gap_net/duplicates/conservation_violations…),
- * 本文件只读不改其形状。
+ * 上半段(coveredChipKey/srcVariant)零 DOM/零 i18n,node(tests/unit/test_ai_corrob_pure.py)
+ * 直接 require 断言;下半段 HTML 拼装依赖 at()/AI.state/AI.format,只在浏览器根挂载——同
+ * ai-recon-render.js 双段先例。数据形状见 services/workorder/steps/sales_aggregate.py 与
+ * edc_corroboration.py 的 build_corroboration,本文件只读不改其形状。
  */
 (function (root) {
     'use strict';
@@ -26,7 +25,31 @@
         return _STATE[st] ? st : 'needs';
     }
 
-    var pure = { coveredChipKey: coveredChipKey };
+    // source → 文案族。两卡钱字段同形(net_total/coverage/…),差异只在标题/口径措辞。
+    var _SRC = {
+        invoice_aggregate: {
+            title: 'crb_title',
+            invoiced: 'crb_invoiced',
+            vat: 'crb_vat_label',
+            period: 'crb_period',
+            tickets: 'crb_tickets',
+            basis: 'crb_basis',
+        },
+        edc_aggregate: {
+            title: 'crb_title_edc',
+            invoiced: 'crb_invoiced_edc',
+            vat: 'crb_vat_label_edc',
+            period: 'crb_period_edc',
+            tickets: 'crb_tickets_edc',
+            basis: 'crb_basis_edc',
+        },
+    };
+    function srcVariant(crb) {
+        var s = (crb && crb.source) || 'invoice_aggregate';
+        return _SRC[s] ? s : 'invoice_aggregate';
+    }
+
+    var pure = { coveredChipKey: coveredChipKey, srcVariant: srcVariant };
     if (typeof module !== 'undefined' && module.exports) module.exports = pure;
 
     if (!root) return;
@@ -69,11 +92,12 @@
         );
     }
 
-    // 点名区:重复票号(已去重不双计)+ 守恒违反(票面不自洽单列人审)。均为空则不出行。
+    // 点名区:重复票号(已去重不双计)+ 守恒违反(c.1)/ 聚合冲突点名(EDC)。均空则不出行。
     function namedHtml(crb) {
         var out = '';
         var dupes = crb.duplicates || [];
         var viol = crb.conservation_violations || [];
+        var conflicts = crb.conflicts || [];
         if (dupes.length) {
             out +=
                 '<div class="crb-note">' +
@@ -86,42 +110,54 @@
                 esc(at('crb_violations', { list: viol.join('、') })) +
                 '</div>';
         }
+        if (conflicts.length) {
+            out +=
+                '<div class="crb-note crb-viol">' +
+                esc(at('crb_conflicts_edc', { n: conflicts.length })) +
+                '</div>';
+        }
         return out;
     }
 
     function pageHtml(crb) {
         if (!crb) return '';
         var st = coveredChipKey(crb);
+        var k = _SRC[srcVariant(crb)];
         var chip =
             '<span class="chip ' + _STATE[st].cls + '">' + esc(at(_STATE[st].key)) + '</span>';
-        var count = at('crb_tickets', { n: crb.invoice_count, m: crb.deduped_count });
+        var count = at(k.tickets, { n: crb.invoice_count, m: crb.deduped_count });
         var period =
             crb.date_from && crb.date_to ? esc(crb.date_from) + ' – ' + esc(crb.date_to) : '—';
         return (
             '<div class="panel crb"><div class="hd"><h3>' +
-            esc(at('crb_title')) +
+            esc(at(k.title)) +
             ' ' +
             chip +
             '</h3></div><div class="bd">' +
-            line(at('crb_invoiced'), money(crb.net_total) + ' · ' + esc(count)) +
-            line(at('crb_vat_label'), money(crb.vat_total)) +
-            line(at('crb_period'), period) +
+            line(at(k.invoiced), money(crb.net_total) + ' · ' + esc(count)) +
+            line(at(k.vat), money(crb.vat_total)) +
+            line(at(k.period), period) +
             authoritativeHtml(crb) +
             namedHtml(crb) +
             '<div class="crb-basis">' +
-            esc(at('crb_basis')) +
+            esc(at(k.basis)) +
             '</div>' +
             '</div></div>'
         );
     }
 
-    // container 由 ai-client.js renderWo 传入;crb 是 order_detail().sales_corroboration
-    // (null → 不渲染,前端不假装有已开票数据)。
-    function mount(crb, container) {
+    // container 由 ai-client.js renderWo 传入;crb/edcCrb 是 order_detail() 的
+    // sales_corroboration / edc_corroboration(null → 不渲染,前端不假装有聚合数据)。
+    function mount(crb, container, edcCrb) {
         if (!container) return;
-        container.innerHTML = crb ? pageHtml(crb) : '';
+        container.innerHTML = (crb ? pageHtml(crb) : '') + (edcCrb ? pageHtml(edcCrb) : '');
     }
 
     root.AI = root.AI || {};
-    root.AI.corrob = { mount: mount, pageHtml: pageHtml, coveredChipKey: coveredChipKey };
+    root.AI.corrob = {
+        mount: mount,
+        pageHtml: pageHtml,
+        coveredChipKey: coveredChipKey,
+        srcVariant: srcVariant,
+    };
 })(typeof self !== 'undefined' ? self : typeof globalThis !== 'undefined' ? globalThis : this);

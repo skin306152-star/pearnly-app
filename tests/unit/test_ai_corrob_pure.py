@@ -41,5 +41,26 @@ class CoveredChipKeyTests(unittest.TestCase):
         self.assertEqual(self._key(None), "needs")
 
 
+@unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
+class SrcVariantTests(unittest.TestCase):
+    """source → 文案族选择(SA-2b:EDC 聚合卡与 c.1 逐票卡同一套渲染、不同措辞)。"""
+
+    def _variant(self, crb):
+        return _run_node(f"""
+            const r = require({json.dumps(str(AI_DIR / "ai-corrob.js"))});
+            process.stdout.write(JSON.stringify(r.srcVariant({json.dumps(crb)})));
+            """)
+
+    def test_edc_source_selected(self):
+        self.assertEqual(self._variant({"source": "edc_aggregate"}), "edc_aggregate")
+
+    def test_invoice_source_selected(self):
+        self.assertEqual(self._variant({"source": "invoice_aggregate"}), "invoice_aggregate")
+
+    def test_unknown_or_missing_source_falls_back_to_invoice(self):
+        self.assertEqual(self._variant({"source": "weird"}), "invoice_aggregate")
+        self.assertEqual(self._variant(None), "invoice_aggregate")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -263,6 +263,14 @@ Object.assign(window.__AI_I18N_EN__, {
     crb_violations:
         'Conservation breach (invoice figures inconsistent, flagged for review): {list}',
     crb_basis: 'Basis: seller tax ID = this account → own sales (high confidence)',
+    crb_title_edc: 'EDC acquiring aggregate (corroboration)',
+    crb_invoiced_edc: 'EDC sales (aggregated)',
+    crb_vat_label_edc: 'Output VAT (split from gross)',
+    crb_period_edc: 'Settlement period',
+    crb_tickets_edc: '{n} settlement slips ({m} counted)',
+    crb_basis_edc:
+        'Basis: EDC end-of-day SETTLEMENT slips · gross basis · corroboration only, never filed',
+    crb_conflicts_edc: '{n} aggregate flags to verify (date/amount doubts, see order detail)',
 
     // MC1-b2 · Firm-wide review inbox (pending orders / flagged items / client answers)
     riq_refresh_btn: 'Refresh',

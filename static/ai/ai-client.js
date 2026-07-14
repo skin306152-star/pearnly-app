@@ -38,6 +38,10 @@
         var name = S.client ? S.client.name : S.clientId;
         $('clientName').textContent = name;
         $('clientAvatar').textContent = (name || '?').trim().slice(0, 1).toUpperCase();
+        // 面包屑尾节点补真实客户名(清单 #6):setCrumb 在路由时先挂「客户」占位
+        // (首访客户名未必在手),身份拉到后在这里写回。
+        var crumbCur = $('crumbClientCur');
+        if (crumbCur && S.client) crumbCur.textContent = S.client.name;
     }
 
     function renderPeriodPicker() {
@@ -164,16 +168,23 @@
                         return '<div class="ni">' + esc(n) + '</div>';
                     })
                     .join('');
+                // 归档单不再谎报「当前步骤: review」(清单 #6):状态胶囊(status_archive)
+                // 已交代「已归档」,步骤注记只在流程未收口时显示。
+                var stepNote =
+                    d.status === 'archive'
+                        ? ''
+                        : '<span class="note">' +
+                          esc(at('wo_step')) +
+                          ': ' +
+                          esc(d.current_step) +
+                          '</span>';
                 body.innerHTML =
                     '<div class="panel"><div class="hd"><h3>' +
                     esc(at('tab_wo')) +
                     ' ' +
                     AI.format.chipHtml(d.status, d) +
-                    '<span class="note">' +
-                    esc(at('wo_step')) +
-                    ': ' +
-                    esc(d.current_step) +
-                    '</span></h3></div><div class="bd">' +
+                    stepNote +
+                    '</h3></div><div class="bd">' +
                     (cells ? '<div class="wosum">' + cells + '</div>' : '') +
                     (needs ? '<div class="needs-list">' + needs + '</div>' : '') +
                     '</div></div>' +
@@ -339,6 +350,12 @@
             });
     }
 
+    // crumbName:同客户回访(切 tab/切期)时面包屑即刻显真名;身份没拉到或不是这个
+    // 客户给 null,setCrumb 回落「客户」占位(ai.js)。
+    function crumbName(clientId) {
+        return S.client && String(S.clientId) === String(clientId) ? S.client.name : null;
+    }
+
     window.AI = window.AI || {};
-    window.AI.client = { mount: mount };
+    window.AI.client = { mount: mount, crumbName: crumbName };
 })();

@@ -28,13 +28,16 @@ class FakeCur:
         return self._pending
 
 
-def _order(wid, *, flagged_total, client="Sister Makeup", period="2569-06"):
-    return {
+def _order(wid, *, flagged_total, client="Sister Makeup", period="2569-06", flagged_groups=None):
+    order = {
         "work_order_id": wid,
         "client_name": client,
         "period": period,
         "flagged_total": flagged_total,
     }
+    if flagged_groups is not None:
+        order["flagged_groups"] = flagged_groups
+    return order
 
 
 def _classified_evt(wid, item_id, money):
@@ -113,6 +116,110 @@ class EnrichFeedTests(unittest.TestCase):
             cur, tenant_id="t-1", orders=orders, actor=None, sod_enforced=False, severity="crit"
         )
         self.assertEqual([it["item_id"] for it in feed], ["it-crit"])
+
+
+def _decision_evt(wid, item_id, decision="accept"):
+    return {
+        "id": 9,
+        "work_order_id": wid,
+        "step": "review",
+        "event_type": "human_decision",
+        "payload": {"item_id": item_id, "decision": decision},
+        "actor": "user:rev",
+        "created_at": None,
+    }
+
+
+class BadgeUndecidedTests(unittest.TestCase):
+    """清单 #4:裁决不改 item.status,徽章组按最新裁决现算 decided/undecided_count。"""
+
+    def _group(self, reason, count):
+        return {"flag_reason": reason, "severity": "crit", "count": count}
+
+    def test_decided_items_leave_badge_counts(self):
+        orders = [
+            _order("wo-1", flagged_total=2, flagged_groups=[self._group("amount_math_fail", 2)])
+        ]
+        events = [
+            _classified_evt("wo-1", "it-1", {}),
+            _classified_evt("wo-1", "it-2", {}),
+            _decision_evt("wo-1", "it-1"),
+        ]
+        items = [
+            _flagged_item("wo-1", "it-1", "amount_math_fail"),
+            _flagged_item("wo-1", "it-2", "amount_math_fail"),
+        ]
+        review_feed.enrich(
+            cur=FakeCur(events, items),
+            tenant_id="t-1",
+            orders=orders,
+            actor=None,
+            sod_enforced=False,
+        )
+        g = orders[0]["flagged_groups"][0]
+        self.assertEqual(g["decided_count"], 1)
+        self.assertEqual(g["undecided_count"], 1)
+
+    def test_all_decided_zeroes_undecided(self):
+        orders = [
+            _order("wo-1", flagged_total=1, flagged_groups=[self._group("amount_math_fail", 1)])
+        ]
+        events = [_classified_evt("wo-1", "it-1", {}), _decision_evt("wo-1", "it-1")]
+        items = [_flagged_item("wo-1", "it-1", "amount_math_fail")]
+        review_feed.enrich(
+            cur=FakeCur(events, items),
+            tenant_id="t-1",
+            orders=orders,
+            actor=None,
+            sod_enforced=False,
+        )
+        g = orders[0]["flagged_groups"][0]
+        self.assertEqual(g["decided_count"], 1)
+        self.assertEqual(g["undecided_count"], 0)
+
+    def test_decisions_only_reduce_matching_reason_group(self):
+        orders = [
+            _order(
+                "wo-1",
+                flagged_total=2,
+                flagged_groups=[
+                    self._group("amount_math_fail", 1),
+                    self._group("direction_ambiguous", 1),
+                ],
+            )
+        ]
+        events = [
+            _classified_evt("wo-1", "it-1", {}),
+            _classified_evt("wo-1", "it-2", {}),
+            _decision_evt("wo-1", "it-1"),
+        ]
+        items = [
+            _flagged_item("wo-1", "it-1", "amount_math_fail"),
+            _flagged_item("wo-1", "it-2", "direction_ambiguous", kind="unknown"),
+        ]
+        review_feed.enrich(
+            cur=FakeCur(events, items),
+            tenant_id="t-1",
+            orders=orders,
+            actor=None,
+            sod_enforced=False,
+        )
+        by_reason = {g["flag_reason"]: g for g in orders[0]["flagged_groups"]}
+        self.assertEqual(by_reason["amount_math_fail"]["undecided_count"], 0)
+        self.assertEqual(by_reason["direction_ambiguous"]["undecided_count"], 1)
+
+    def test_orders_without_groups_key_do_not_crash(self):
+        orders = [_order("wo-1", flagged_total=1)]
+        events = [_classified_evt("wo-1", "it-1", {})]
+        items = [_flagged_item("wo-1", "it-1", "amount_math_fail")]
+        feed = review_feed.enrich(
+            cur=FakeCur(events, items),
+            tenant_id="t-1",
+            orders=orders,
+            actor=None,
+            sod_enforced=False,
+        )
+        self.assertEqual(len(feed), 1)
 
 
 class SodProjectionTests(unittest.TestCase):

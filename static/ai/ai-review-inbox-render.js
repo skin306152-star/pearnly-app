@@ -24,25 +24,35 @@
         return d ? esc(at('riq_wo_due', { date: d })) : esc(at('riq_wo_due_none'));
     }
 
+    // 徽章数只数未决件(清单 #4):裁决落库不改 item.status,引擎重跑前 count 不掉,照显总数
+    // 给人「白裁了」错觉。undecided_count 是后端按最新裁决现算的诚实余数——有已裁的追加
+    // 「已裁 n」,全裁完转灰底只读;缺字段(旧响应)回落总数,行为同旧版。
+    function flaggedChipHtml(g) {
+        var key = AI.reviewQueue.flagReasonKey(g.flag_reason);
+        var label = key ? at(key) : g.flag_reason;
+        var undecided = typeof g.undecided_count === 'number' ? g.undecided_count : g.count;
+        var decided = g.decided_count || 0;
+        var decidedNote = decided ? ' · ' + esc(at('riq_flag_decided', { n: decided })) : '';
+        if (!undecided && decided) {
+            return '<span class="chip n">' + esc(label) + decidedNote + '</span>';
+        }
+        return (
+            '<span class="chip ' +
+            (g.severity === 'crit' ? 'b' : 'w') +
+            '">' +
+            undecided +
+            ' × ' +
+            esc(label) +
+            decidedNote +
+            '</span>'
+        );
+    }
+
     function flaggedChipsHtml(order) {
         if (!order.flagged_groups.length) return '';
         return (
             '<div class="riq-wo-flags">' +
-            order.flagged_groups
-                .map(function (g) {
-                    var key = AI.reviewQueue.flagReasonKey(g.flag_reason);
-                    var label = key ? at(key) : g.flag_reason;
-                    return (
-                        '<span class="chip ' +
-                        (g.severity === 'crit' ? 'b' : 'w') +
-                        '">' +
-                        g.count +
-                        ' × ' +
-                        esc(label) +
-                        '</span>'
-                    );
-                })
-                .join('') +
+            order.flagged_groups.map(flaggedChipHtml).join('') +
             '</div>'
         );
     }

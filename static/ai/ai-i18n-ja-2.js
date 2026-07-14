@@ -332,4 +332,15 @@ Object.assign(window.__AI_I18N_JA__, {
     // UI1(2026-07-13)· 顧客一覧の階層化 + パンくず修正
     clients_obligations_n: '当期の義務 {n} 件',
     crumb_archive: '顧客ファイル',
+    // UI批3(2026-07-14)· マトリクス列頭を公式様式コードに(#9)+ キュー頭バッジの未裁数(#4)
+    obl_short_pnd1: 'PND1',
+    obl_short_pnd2: 'PND2',
+    obl_short_pnd3: 'PND3',
+    obl_short_pnd53: 'PND53',
+    obl_short_pnd54: 'PND54',
+    obl_short_pp30: 'PP30',
+    obl_short_pp36: 'PP36',
+    obl_short_sso: 'SSO 1-10',
+    obl_short_sbt: 'PT40',
+    riq_flag_decided: '裁定済み {n}',
 });

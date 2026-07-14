@@ -15,7 +15,7 @@ window.__AI_I18N_JA__ = {
     crumb_dash: 'ダッシュボード',
     title_dash: 'ダッシュボード',
     title_client: '顧客',
-    search_ph: 'ค้นหาลูกค้า / 顧客を検索',
+    search_ph: '顧客を検索',
     stat_clients: '顧客数',
     stat_clients_unit: '社',
     stat_pending: '要確認',

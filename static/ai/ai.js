@@ -110,8 +110,8 @@
     }
 
     // 顶层独立视图(与工作台平级)→ 面包屑只显示栏目名(v5 §五2:不再假装挂在
-    // 「工作台 /」之下)。真下级只有两个,setCrumb 里单独处理:单客户档案页挂在
-    // 客户目录下,按期操作页挂在工作台(从矩阵格子点进来)下。
+    // 「工作台 /」之下)。真下级只有两个,setCrumb 里单独处理:单客户档案页与按期
+    // 操作页都挂在客户目录下,尾节点显真实客户名(清单 #6)。
     var CRUMB_LABEL_KEY = {
         dashboard: 'crumb_dash',
         pool: 'nav_todo',
@@ -145,9 +145,16 @@
             return;
         }
         if (route.name === 'client') {
+            // 客户名异步到手:同客户回访 crumbName 即刻给真名,首访先挂「客户」占位,
+            // ai-client.js 拉到身份后补写 #crumbClientCur(用户数据,必须转义)。
+            var known = window.AI.client && AI.client.crumbName(route.clientId);
             crumb.innerHTML =
-                '<a data-back>' + at('crumb_dash') + '</a> / ' + crumbCur(at('title_client'));
-            wireBack(crumb.querySelector('[data-back]'), AI.router.buildDashboardHash());
+                '<a data-back-clients>' +
+                at('nav_clients') +
+                '</a> / <span class="cur" id="crumbClientCur">' +
+                AI.state.esc(known || at('title_client')) +
+                '</span>';
+            wireBack(crumb.querySelector('[data-back-clients]'), AI.router.buildClientsHash());
             return;
         }
         crumb.innerHTML = crumbCur(at(CRUMB_LABEL_KEY[route.name] || 'crumb_dash'));

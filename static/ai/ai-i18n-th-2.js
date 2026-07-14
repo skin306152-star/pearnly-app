@@ -324,4 +324,15 @@ Object.assign(window.__AI_I18N_TH__, {
     // UI1 (2026-07-13) · แถวรายชื่อลูกค้าแบบแบ่งชั้น + breadcrumb ตามจริง
     clients_obligations_n: 'ภาระงวดนี้ {n} รายการ',
     crumb_archive: 'แฟ้มลูกค้า',
+    // UI批3 (2026-07-14) · หัวคอลัมน์เมทริกซ์ใช้รหัสแบบทางการ (#9) + ป้ายคิวนับเฉพาะที่ค้าง (#4)
+    obl_short_pnd1: 'ภ.ง.ด.1',
+    obl_short_pnd2: 'ภ.ง.ด.2',
+    obl_short_pnd3: 'ภ.ง.ด.3',
+    obl_short_pnd53: 'ภ.ง.ด.53',
+    obl_short_pnd54: 'ภ.ง.ด.54',
+    obl_short_pp30: 'ภ.พ.30',
+    obl_short_pp36: 'ภ.พ.36',
+    obl_short_sso: 'สปส.1-10',
+    obl_short_sbt: 'ภ.ธ.40',
+    riq_flag_decided: 'ตัดสินแล้ว {n}',
 });

@@ -335,4 +335,15 @@ Object.assign(window.__AI_I18N_EN__, {
     // UI1 (2026-07-13) · layered client rows + honest breadcrumb
     clients_obligations_n: '{n} obligations this period',
     crumb_archive: 'Client file',
+    // UI batch 3 (2026-07-14) · official form codes in matrix headers (#9) + undecided badge counts (#4)
+    obl_short_pnd1: 'PND1',
+    obl_short_pnd2: 'PND2',
+    obl_short_pnd3: 'PND3',
+    obl_short_pnd53: 'PND53',
+    obl_short_pnd54: 'PND54',
+    obl_short_pp30: 'PP30',
+    obl_short_pp36: 'PP36',
+    obl_short_sso: 'SSO 1-10',
+    obl_short_sbt: 'PT40',
+    riq_flag_decided: '{n} decided',
 });

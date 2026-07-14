@@ -66,7 +66,9 @@ def enrich(
         order["sod"] = sod_projection(events, actor, sod_enforced)
         if order["flagged_total"] <= 0:
             continue
-        for item in evidence.flagged_projection(items_by_order.get(wid, []), events):
+        projection = evidence.flagged_projection(items_by_order.get(wid, []), events)
+        _annotate_undecided(order.get("flagged_groups") or [], projection)
+        for item in projection:
             if severity and (item.get("verdict_hint") or {}).get("severity") != severity:
                 continue
             item["work_order_id"] = wid
@@ -74,6 +76,20 @@ def enrich(
             item["period"] = order["period"]
             feed.append(item)
     return feed
+
+
+def _annotate_undecided(groups: list[dict], projection: list[dict]) -> None:
+    """队列头徽章的未决数(2026-07-14 清单 #4):裁决只落 human_decision 事件,item.status
+    仍是 flagged,引擎重跑前队列 SQL 的 flagged 计数不会掉——按投影里每件最新裁决现算已裁数,
+    徽章组补 decided_count/undecided_count,前端据此不把已裁的计入徽章数字。"""
+    decided: dict = {}
+    for item in projection:
+        if item.get("decision"):
+            reason = item.get("flag_reason")
+            decided[reason] = decided.get(reason, 0) + 1
+    for g in groups:
+        g["decided_count"] = decided.get(g["flag_reason"], 0)
+        g["undecided_count"] = max(int(g.get("count") or 0) - g["decided_count"], 0)
 
 
 def sod_projection(events: list[dict], actor: Optional[str], enforced: bool) -> dict:

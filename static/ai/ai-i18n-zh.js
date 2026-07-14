@@ -15,7 +15,7 @@ window.__AI_I18N_ZH__ = {
     crumb_dash: '工作台',
     title_dash: '工作台',
     title_client: '客户',
-    search_ph: 'ค้นหาลูกค้า / 搜索客户',
+    search_ph: '搜索客户',
     stat_clients: '客户总数',
     stat_clients_unit: '家',
     stat_pending: '待你处理',

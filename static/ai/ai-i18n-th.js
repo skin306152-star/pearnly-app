@@ -15,7 +15,7 @@ window.__AI_I18N_TH__ = {
     crumb_dash: 'แดชบอร์ด',
     title_dash: 'แดชบอร์ด',
     title_client: 'ลูกค้า',
-    search_ph: 'ค้นหาลูกค้า / 搜索客户',
+    search_ph: 'ค้นหาลูกค้า',
     stat_clients: 'ลูกค้าทั้งหมด',
     stat_clients_unit: 'ราย',
     stat_pending: 'รอคุณตัดสินใจ',

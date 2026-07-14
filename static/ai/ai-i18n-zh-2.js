@@ -304,4 +304,15 @@ Object.assign(window.__AI_I18N_ZH__, {
     // UI1(2026-07-13)· 客户目录行内分层 + 面包屑修真
     clients_obligations_n: '当期义务 {n} 项',
     crumb_archive: '客户档案',
+    // UI批3(2026-07-14)· 矩阵列头官方表号短码(#9)+ 队列头徽章未决数(#4)
+    obl_short_pnd1: 'PND1',
+    obl_short_pnd2: 'PND2',
+    obl_short_pnd3: 'PND3',
+    obl_short_pnd53: 'PND53',
+    obl_short_pnd54: 'PND54',
+    obl_short_pp30: 'PP30',
+    obl_short_pp36: 'PP36',
+    obl_short_sso: 'SSO 1-10',
+    obl_short_sbt: 'PT40',
+    riq_flag_decided: '已裁 {n}',
 });

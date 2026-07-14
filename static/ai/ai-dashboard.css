@@ -80,14 +80,23 @@
   gap: 10px;
   margin-bottom: 12px;
 }
+/* 标题/按钮不许折行(390px 下「待我处理」曾断词、「刷新」曾竖排两行——清单 #5);
+ * 挤压全让给 .note(min-width:0 解除 flex 最小内容宽,自身多行换行)。 */
 .board-head h2 {
   font-size: 13px;
   font-weight: 700;
   letter-spacing: -0.01em;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .board-head .note {
   font-size: 11.5px;
   color: var(--mut);
+  min-width: 0;
+}
+.board-head .btn {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* 五列看板(v4 §2 .kanban/.kcol/.kcard · 1:1 抄,颜色一律走 --token 变量)。

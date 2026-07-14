@@ -43,6 +43,14 @@
         return l[lang] || l.zh || code;
     }
 
+    // 列头显官方表号短码(泰文 ภ.ง.ด.1/ภ.พ.30 · 其余语言拉丁码),全名挪 title 悬浮——
+    // 五列窄格里全名必截断成同串不可辨。新义务码没补 obl_short_* 键时回落大写义务码,
+    // 短码语义丢了但可辨性还在。
+    function obligationShortLabel(code) {
+        var key = 'obl_short_' + code;
+        return at(key) === key ? String(code).toUpperCase() : at(key);
+    }
+
     // 单元格是否「逾期风险」:仍未办结(非无需申报/已冻结)且截止日已过今天。
     // 截止日读顺延后的 due_efiling_deferred(MC2-B G3:周末/假日顺延),缺该字段
     // (老缓存/降级响应)回落原始 due_efiling——周六截止顺延到周一前不算逾期。
@@ -165,7 +173,7 @@
                         '<th class="mx-colhead" title="' +
                         esc(obligationLabel(code, matrix.obligation_labels, lang)) +
                         '">' +
-                        esc(obligationLabel(code, matrix.obligation_labels, lang)) +
+                        esc(obligationShortLabel(code)) +
                         '</th>'
                     );
                 })

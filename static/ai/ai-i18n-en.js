@@ -15,7 +15,7 @@ window.__AI_I18N_EN__ = {
     crumb_dash: 'Dashboard',
     title_dash: 'Dashboard',
     title_client: 'Client',
-    search_ph: 'ค้นหาลูกค้า / Search clients',
+    search_ph: 'Search clients',
     stat_clients: 'Total clients',
     stat_clients_unit: '',
     stat_pending: 'Needs your review',

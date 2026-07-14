@@ -108,6 +108,13 @@ const BUNDLES = [
             'ai/ai-review-pool.js',
             'ai/ai-review.js',
             'ai/ai-intake-render.js',
+            // ai-bank-sales-render.js(SA-3b · 银行流水倒推销项建议卡纯逻辑+HTML,依赖
+            // AI.state/format)排在 ai-intake.js 之前——收料 tab 缺 sales_summary 时,
+            // needsCardHtml() 直接内嵌调用 AI.bankSalesRender.cardHtml(),不另开 mount。
+            // ai-intake-bank-sales.js(拆自 ai-intake.js 的网络编排,单文件<500 行铁律)
+            // 只需排在 ai-intake.js(mount() 里用 AI.intakeBankSales.create())之前。
+            'ai/ai-bank-sales-render.js',
+            'ai/ai-intake-bank-sales.js',
             'ai/ai-intake.js',
             'ai/ai-pkg-render.js',
             'ai/ai-pkg.js',

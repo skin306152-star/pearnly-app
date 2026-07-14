@@ -340,8 +340,18 @@
     }
 
     // 收料主视图。needsSales 时补料卡置顶;上传区 + 进料口并列;末尾重新跑面。
+    // 银行流水倒推卡(SA-3b)排在人工填销项表单之上——cardHtml 闸关/无数据时自己返回空串,
+    // needsCardHtml() 的既有人工表单标记不受影响(逐字节不变)。
     function intakeHtml(ctx) {
-        var needs = ctx.needsSales ? needsCardHtml(ctx) : '';
+        var bankSales = ctx.needsSales
+            ? root.AI.bankSalesRender.cardHtml(
+                  ctx.bankSalesSuggestion,
+                  ctx.bankSalesUi,
+                  ctx.salesCorrob,
+                  ctx.edcCorrob
+              )
+            : '';
+        var needs = ctx.needsSales ? bankSales + needsCardHtml(ctx) : '';
         return (
             '<div class="intake-body">' +
             '<p class="intake-lead">' +

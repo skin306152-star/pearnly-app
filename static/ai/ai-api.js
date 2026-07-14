@@ -180,6 +180,24 @@
                     body
                 );
             },
+            // 银行流水倒推销项(SA-3b · 双闸 pearnly_ai_m1 + pearnly_ai_bank_sales_suggest,
+            // 关一个即 404):run 对未决入账行调大脑分类(幂等,已判行不重调);decide 是行级
+            // 人裁(latest-wins)。建议本体不经这两个端点读,随下一次 getOrder() 的
+            // order_detail.bank_sales_suggestion 读侧回放(同 submitSalesSummary 落库后
+            // 调用方自行 getOrder 刷新的既有口径,不另开读端点)。
+            runBankSales: function (orderId) {
+                return call(
+                    'POST',
+                    '/api/workorder/orders/' + encodeURIComponent(orderId) + '/bank-sales/run'
+                );
+            },
+            decideBankSales: function (orderId, body) {
+                return call(
+                    'POST',
+                    '/api/workorder/orders/' + encodeURIComponent(orderId) + '/bank-sales/decide',
+                    body
+                );
+            },
             // 补料上传(W4):multipart。<fetch> 发 FormData 时不能手设 Content-Type
             // (要让浏览器带 multipart boundary),故不走 call()。413 等结构化错误同源经
             // handleResponse 抛出,调用方 mapApiErrorKey 取四语文案。

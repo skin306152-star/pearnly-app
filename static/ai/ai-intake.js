@@ -5,10 +5,12 @@
  * add_materials(前端先挡 50 张/20MB,后端 413 权威),按总体积/张数自动分批顺序调用(G1
  * 真机:一次 25 张 ~55MB 撞 prod nginx 50M 单请求挂死,splitBatches 见 ai-intake-render.js),
  * 人工填销项走新 /sales-summary 端点落事件解锁 R2;补料后引导「重新跑」——续跑判活/轮询
- * 范式照抄 ai-review.js(切走后续段不认)。
+ * 范式照抄 ai-review.js(切走后续段不认)。银行流水倒推销项(SA-3b)的折叠/裁决/预判/
+ * 采用建议值四个动作的网络编排拆到 ai-intake-bank-sales.js(单文件<500 行铁律),本文件
+ * 只在 mount() 时用 bankSales.create(getS, render) 接上,onClick 里转发 data-action。
  *
- * 依赖 window.AI.state/api/router/intakeRender 与全局 at(),排在它们之后、ai-client.js 之前
- * 加载(见 scripts/build-home-js.mjs 的 bundle 顺序)。
+ * 依赖 window.AI.state/api/router/intakeRender/bankSalesRender/intakeBankSales 与全局 at(),
+ * 排在它们之后、ai-client.js 之前加载(见 scripts/build-home-js.mjs 的 bundle 顺序)。
  */
 (function () {
     'use strict';
@@ -22,6 +24,7 @@
     var S = null;
     var wired = false;
     var fileInput = null; // 持久隐藏文件选择器(单例,不随 render 重建 → File 不丢)
+    var bankSales = null; // AI.intakeBankSales 实例,mount() 时装配一次,取当前 S 靠 getS()
 
     function body() {
         return $('cv-intake');
@@ -47,6 +50,10 @@
             dirty: false, // 本会话补过料(上传或人工填)→ 亮出「重新跑」
             rerunState: 'idle',
             rerunErrKey: null,
+            // 银行流水倒推销项(SA-3b):折叠/行级裁决/预判 三区确认清单的纯 UI 态,
+            // 建议本体不落在这里——始终读 S.order.bank_sales_suggestion(getOrder 回放)。
+            bankSalesUi: AI.bankSalesRender.freshUiState(),
+            bankSalesPrefill: null, // 「采用建议值」一次性预填 {sales, vat},render() 消费后清空
         };
     }
 
@@ -68,6 +75,10 @@
             dirty: S.dirty,
             rerunState: S.rerunState,
             rerunErrKey: S.rerunErrKey,
+            bankSalesSuggestion: S.order && S.order.bank_sales_suggestion,
+            bankSalesUi: S.bankSalesUi,
+            salesCorrob: S.order && S.order.sales_corroboration,
+            edcCorrob: S.order && S.order.edc_corroboration,
             salesValue: readVal('ikSales'),
             vatValue: readVal('ikVat'),
             noteValue: readVal('ikNote'),
@@ -82,6 +93,16 @@
     function render() {
         body().innerHTML = AI.intakeRender.intakeHtml(ctx());
         if (S.formOpen) {
+            // 「采用建议值」一次性预填(SA-3b):ctx() 在 innerHTML 替换前读的是旧 DOM(此时
+            // 新表单还没有值可读),故预填改成替换后直接置 .value——同下面既有的
+            // focus-after-replace 手法同一个道理,消费后立即清空防重复写。
+            if (S.bankSalesPrefill) {
+                var se = $('ikSales');
+                var ve = $('ikVat');
+                if (se) se.value = S.bankSalesPrefill.sales;
+                if (ve) ve.value = S.bankSalesPrefill.vat;
+                S.bankSalesPrefill = null;
+            }
             var input = $('ikSales');
             if (input) input.focus();
         }
@@ -326,6 +347,11 @@
         else if (a === 'ik-open-form') openForm();
         else if (a === 'ik-form-cancel') cancelForm();
         else if (a === 'ik-rerun') startRerun();
+        else if (a === 'bxs-fold') bankSales.toggleFold(el.getAttribute('data-kind'));
+        else if (a === 'bxs-decide') {
+            bankSales.decideRow(el.getAttribute('data-fp'), el.getAttribute('data-verdict'));
+        } else if (a === 'bxs-run') bankSales.run();
+        else if (a === 'bxs-apply') bankSales.apply();
     }
 
     function onSubmit(e) {
@@ -399,6 +425,11 @@
 
     function mount(api, order, clientId) {
         S = freshState(api, order, clientId);
+        if (!bankSales) {
+            bankSales = AI.intakeBankSales.create(function () {
+                return S;
+            }, render);
+        }
         wireOnce();
         loadDetail();
     }

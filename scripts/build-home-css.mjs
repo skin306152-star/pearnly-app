@@ -151,6 +151,12 @@ const AI_CSS = [
     'ai/ai-matrix.css',
     'ai/ai-client.css',
     'ai/ai-intake.css',
+    // ai-bank-sales.css(SA-3b · 收料 tab 银行流水倒推销项确认清单)吃 ai-recon.css 的
+    // .brx-* 折叠列表原子 + ai-fileconv.css 的 .fc-banner 降级横幅 + ai-shell.css 的
+    // .panel/.chip/.btn,故排在 ai-recon.css/ai-fileconv.css 之后单独引不现实(那两个
+    // 排更后面)——.brx-*/.fc-banner 类名与具体声明顺序无关(纯附加类,非覆盖关系),
+    // 排在 ai-intake.css 之后即可,不影响其余视图。
+    'ai/ai-bank-sales.css',
     'ai/ai-pkg.css',
     // ai-recon.css(E2 · 银行对账四清单)复用 ai-pkg.css 的 .pkg-mask/.pkg-modal 原图
     // 模态外壳,排在其后即可;与工单详情 .wosum/.needs-list(ai-client.css)同屏但

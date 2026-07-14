@@ -1,0 +1,105 @@
+/* Pearnly AI · 银行流水倒推销项建议卡(SA-3b · 收料 tab needs-card 之上)——三区确认清单
+ * 复用 ai-recon.css 的 .brx-section/.brx-fold/.brx-row/.brx-actions/.brx-err(同款折叠列表
+ * 视觉,行为各管各的,类名不跨模块共享逻辑)+ ai-fileconv.css 的 .fc-banner(降级黄灯横幅)+
+ * ai-shell.css 的 .panel/.chip/.btn。本文件只补 SA-3b 独有的摘要行/交叉佐证行/操作区布局。
+ */
+.bxs-card {
+  margin-bottom: 16px;
+}
+.bxs-sub {
+  color: var(--mut);
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+.bxs-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+.bxs-sum-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+}
+.bxs-sum-lb {
+  color: var(--mut);
+}
+.bxs-sum-vl {
+  text-align: right;
+  font-weight: 650;
+}
+.bxs-xc {
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.bxs-xc-h {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mut);
+  margin-bottom: 6px;
+}
+.bxs-xc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  padding: 4px 0;
+}
+.bxs-xc-lb {
+  color: var(--ink2);
+  flex: 1;
+}
+.bxs-xc-vl {
+  text-align: right;
+}
+.bxs-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--mut);
+}
+.bxs-src {
+  font-weight: 650;
+}
+.bxs-run {
+  margin: 10px 0;
+}
+.bxs-gate-hint {
+  font-size: 11.5px;
+  color: var(--warn);
+  margin: 8px 0 0;
+}
+.bxs-actions {
+  margin-top: 14px;
+}
+.bxs-err {
+  font-size: 11px;
+  color: var(--crit);
+  font-weight: 600;
+  margin-top: 4px;
+}
+.bxs-hint {
+  font-size: 12.5px;
+  color: var(--ink2);
+  background: var(--surface2);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  line-height: 1.7;
+}
+
+@media (max-width: 480px) {
+  .bxs-xc-row,
+  .bxs-sum-line {
+    font-size: 12px;
+  }
+}

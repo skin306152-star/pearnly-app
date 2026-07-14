@@ -182,7 +182,7 @@ test.describe('M1-3KEY · review 态', () => {
         await expect(page.locator('[data-action="pkg-sign"]')).toBeDisabled();
         const op = await page
             .locator('[data-action="pkg-return"]')
-            .evaluate((el) => getComputedStyle(el).opacity);
+            .evaluate((el) => window.getComputedStyle(el).opacity);
         expect(Number(op)).toBeLessThan(1);
         await page.screenshot({ path: path.join(ART, '3-returned-running.png'), fullPage: false });
     });

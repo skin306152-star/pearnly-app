@@ -8,6 +8,7 @@ env:
   OPENAI_FLASH_MODEL  flash 档模型名(不在代码里写死·未配置 → 当后端不可用)
   OPENAI_BEST_MODEL   best 档模型名(未配置回落 flash 档)
   OPENAI_EMBED_MODEL  embedding 模型名(chat 模型不能 embed·未配置 → 当不可用)
+  TAXOPS_BRAIN_MODEL  taxops_verdict 档模型名(工单大脑影子车道·有内置默认,见下)
 
 请求一律带 store:false:数据边界——不让 OpenAI 侧留存请求/响应用于其产品功能。
 """
@@ -36,8 +37,23 @@ def _key() -> str:
     return (os.environ.get("OPENAI_API_KEY") or "").strip()
 
 
+# 工单大脑影子车道(routing_matrix 的 taxops.verdict · brain_shadow 裁决预判):独立 env,
+# 不与通用 flash/best 档互相牵动(改 OCR/对话档不许连坐工单大脑,契约测试锁死)。默认
+# gpt-5-mini 是占位:key 到手后按 /v1/models 实况 + 官方价钉死,同 PR 改
+# routing_matrix.EXPECTED_DEFAULT_ROUTES 与 services/ocr/cost.py 价表。
+TAXOPS_VERDICT_TIER = "taxops_verdict"
+_TAXOPS_DEFAULT_MODEL = "gpt-5-mini"
+
+
+def taxops_verdict_model() -> str:
+    """taxops.verdict 车道模型名(env 覆写 > 内置默认)。routing_matrix 引用此函数解析车道。"""
+    return (os.environ.get("TAXOPS_BRAIN_MODEL") or "").strip() or _TAXOPS_DEFAULT_MODEL
+
+
 def _model(tier: str) -> str:
-    """抽象档位 → 具体模型(集中此处·业务/文档不出现型号名·无内置默认)。"""
+    """抽象档位 → 具体模型(集中此处·业务/文档不出现型号名·通用档无内置默认)。"""
+    if tier == TAXOPS_VERDICT_TIER:
+        return taxops_verdict_model()
     flash = os.environ.get("OPENAI_FLASH_MODEL", "").strip()
     best = os.environ.get("OPENAI_BEST_MODEL", "").strip() or flash
     return best if tier in ("best", "fallback") else flash

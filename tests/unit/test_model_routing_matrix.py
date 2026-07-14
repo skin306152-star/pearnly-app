@@ -50,6 +50,21 @@ class RoutingMatrixContractTests(unittest.TestCase):
             routes = rm.resolve_routes()
         self.assertEqual(routes["agent.brain"], rm.EXPECTED_DEFAULT_ROUTES["agent.brain"])
 
+    def test_taxops_brain_model_env_moves_only_verdict_lane(self):
+        # 工单大脑车道独立旋钮:改它不许连坐对话大脑/OCR 任何档,反向亦然
+        with scrubbed_env(TAXOPS_BRAIN_MODEL="gpt-9.9-test"):
+            diff = rm.diff_from_defaults(rm.resolve_routes())
+        self.assertEqual(set(diff), {"taxops.verdict"})
+        exp, act = diff["taxops.verdict"]
+        self.assertEqual(act.model, "gpt-9.9-test")
+        self.assertEqual(act.backend, "openai")
+        self.assertEqual(exp.backend, "openai")
+
+    def test_agent_brain_env_leaves_taxops_verdict_untouched(self):
+        with scrubbed_env(AGENT_BRAIN_MODEL="gemini-9.9-test"):
+            routes = rm.resolve_routes()
+        self.assertEqual(routes["taxops.verdict"], rm.EXPECTED_DEFAULT_ROUTES["taxops.verdict"])
+
     def test_vertex_location_env_does_not_move_brain(self):
         # VERTEX_LOCATION 只该挪非 global-only 模型(3.5/embedding);大脑(2.5 前缀)不动
         with scrubbed_env(VERTEX_LOCATION="us-central1"):

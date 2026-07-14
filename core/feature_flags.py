@@ -107,6 +107,11 @@ PEARNLY_AI_BANK_RECON_KEY = "pearnly_ai_bank_recon"
 # package——影子只算不落法定表)。按 tenant 判定(单所整体开/关,与 pearnly_ai_bank_recon 同款);
 # 消费在 services/workorder/steps/reconcile.py。
 PEARNLY_AI_SHADOW_DRAFT_KEY = "pearnly_ai_shadow_draft"
+# 工单大脑影子闸(裁决预判/审核建议 · brain_shadow):默认关 fail-closed。关 = run_shadow
+# 直接 no-op(零构题/零网关调用/零落库,零支出);开 = 对 flagged 未裁项影子出建议,唯一
+# 落点 brain_shadow_log(只建议不落账,业务表写路径 grep 为零)。按 tenant 判定(单所整体
+# 开/关,与 pearnly_ai_shadow_draft 同款);消费在 services/workorder/brain_shadow.py。
+PEARNLY_AI_BRAIN_SHADOW_KEY = "pearnly_ai_brain_shadow"
 # LINE 收料暂存闸(LN-1):默认关 fail-closed。关 = webhook 图片/文件消息与绑定码分支
 # 逐字节走现状(对话 Agent/记账 OCR/待问池/单聊客户绑定全不动);开 = 已绑上下文(单聊
 # 客户 contact / 已绑群)发的票据下载落 client_intake_staging 暂存池 + 四语确认回执。
@@ -287,6 +292,15 @@ def pearnly_ai_bank_recon_enabled_for(tenant_id: Optional[str]) -> bool:
     tenant_id 加进 allowlist 即单所灰度。
     """
     return _enabled(PEARNLY_AI_BANK_RECON_KEY, tenant_id, "pearnly_ai_bank_recon_enabled_for")
+
+
+def pearnly_ai_brain_shadow_enabled_for(tenant_id: Optional[str]) -> bool:
+    """工单大脑影子闸。关 = brain_shadow.run_shadow no-op(零调用零落库,现状零变化)。
+
+    按 tenant 判定(单所整体开/关,与 pearnly_ai_shadow_draft 同款);超管在平台后台把该
+    事务所 tenant_id 加进 allowlist 即单所灰度。
+    """
+    return _enabled(PEARNLY_AI_BRAIN_SHADOW_KEY, tenant_id, "pearnly_ai_brain_shadow_enabled_for")
 
 
 def pearnly_ai_shadow_draft_enabled_for(tenant_id: Optional[str]) -> bool:

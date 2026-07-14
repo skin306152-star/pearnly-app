@@ -21,6 +21,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Dict, NamedTuple, Tuple
 
+from services.ai_gateway.providers.openai import taxops_verdict_model
 from services.ai_gateway.providers.selfhost import _model as _selfhost_model
 from services.ai_gateway.providers.vertex import _embed_model, _location, _location_for_model
 from services.ocr import engine_policy, gemini_models
@@ -35,6 +36,7 @@ class Route(NamedTuple):
 # 会拧动路由的全部 env 旋钮(契约测试逐一清空;冒烟脚本据此标注覆写来源)。
 ROUTE_ENV_VARS: Tuple[str, ...] = (
     "AGENT_BRAIN_MODEL",
+    "TAXOPS_BRAIN_MODEL",
     "OCR_FLASH_MODEL",
     "OCR_FLASHLITE_MODEL",
     "OCR_FALLBACK_MODEL",
@@ -59,6 +61,9 @@ _OCR_TIERS: Tuple[str, ...] = ("flash", "flash_lite", "fallback", "escalate")
 EXPECTED_DEFAULT_ROUTES: Dict[str, Route] = {
     "agent.brain": Route("gemini-2.5-flash", "global"),
     "agent.best": Route("gemini-3.5-flash", "asia-southeast1"),
+    # 工单大脑影子(brain_shadow 裁决预判):OpenAI 直连,无 Vertex 区域概念。默认 gpt-5-mini
+    # 为占位——key 到手后按 /v1/models 实况 + 官方价钉死,同 PR 改本表与 ocr/cost.py 价表。
+    "taxops.verdict": Route("gpt-5-mini", "", "openai"),
     "knowledge.embedding": Route("gemini-embedding-001", "asia-southeast1"),
     "ocr.direct35.flash": Route("gemini-3.5-flash", "asia-southeast1"),
     "ocr.direct35.flash_lite": Route("gemini-3.5-flash", "asia-southeast1"),
@@ -88,6 +93,7 @@ def resolve_routes() -> "OrderedDict[str, Route]":
     routes: "OrderedDict[str, Route]" = OrderedDict()
     routes["agent.brain"] = _route(gemini_models.brain())
     routes["agent.best"] = _route(gemini_models.best())
+    routes["taxops.verdict"] = Route(taxops_verdict_model(), "", "openai")
     routes["knowledge.embedding"] = Route(_embed_model(), _location())
     for mode in engine_policy.CONCRETE_MODES:
         # 后端覆盖档(selfhost):不走 Gemini 档位解析,四档同映射到自托管 VLM,无区域。

@@ -156,6 +156,12 @@
         renderEvidModal();
     }
 
+    // 缺料卡「去收料补」(2026-07-14 UI 记债 #3):照既有 tab 切换机制跳收料 tab,
+    // 不另造路由(同 wireChrome() 里 tab 按钮走 AI.router.buildClientHash 同一条路)。
+    function gotoIntake() {
+        window.location.hash = AI.router.buildClientHash(S.clientId, 'intake');
+    }
+
     function download(kind) {
         if (S.downloading) return; // 禁双击重复触发(Canon §7:提交必有 loading 态)
         var session = S;
@@ -187,6 +193,7 @@
         if (a === 'pkg-evid') openEvid(el.getAttribute('data-num'));
         else if (a === 'pkg-calc') toggleCalc();
         else if (a === 'pkg-download') download(el.getAttribute('data-kind'));
+        else if (a === 'pkg-go-intake') gotoIntake();
     }
 
     function onKeydown(e) {

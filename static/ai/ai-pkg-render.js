@@ -26,6 +26,16 @@
         return /\.(jpe?g|png|gif|webp|bmp)$/i.test(String(name || ''));
     }
 
+    // 落盘名剥壳(2026-07-14 UI 记债 #1):file_name 是落盘 basename `{uuid}__原名{ext}`
+    // (services/workorder/storage.py 命名惯例),证据链只该给人看原名——只剥显示层前缀,
+    // 不碰存储路径/下载/manifest(冻结包字节不可变)。前缀非 uuid 形态(CLI 直喂真实路径等)
+    // 原样返回,不误切用户文件名里巧合出现的 `__`。
+    var _UUID_PREFIX = /^[0-9a-f]{8,32}__/;
+    function displayFileName(name) {
+        var s = String(name || '');
+        return _UUID_PREFIX.test(s) ? s.replace(_UUID_PREFIX, '') : s;
+    }
+
     // tax_due 的应缴/留抵展示口径:负数=留抵(如实表达,不 clamp 成 0,与 compute.py 同口径)。
     // 返回 {labelKey, amount}(amount 已取绝对值,标签自己已经说明方向,不必再显负号)。
     function dueDisplay(taxDueRaw) {
@@ -37,7 +47,12 @@
         };
     }
 
-    var pure = { KIND_ORDER: KIND_ORDER, isImageFileName: isImageFileName, dueDisplay: dueDisplay };
+    var pure = {
+        KIND_ORDER: KIND_ORDER,
+        isImageFileName: isImageFileName,
+        displayFileName: displayFileName,
+        dueDisplay: dueDisplay,
+    };
     if (typeof module !== 'undefined' && module.exports) module.exports = pure;
 
     // ===== 以下为浏览器 HTML 拼装(依赖 at()/AI.state/AI.format/AI.viewer,node 不调用)=====
@@ -113,9 +128,13 @@
     }
 
     // ---- 草稿被卡:状态诚实,不假装已生成(needs/blocked_reasons 来自 order_detail) ----
+    // needs 专指「缺料能补齐」(intake.py/reconcile.py 落的 intake_files/sales_summary 等,
+    // 收料 tab 能解),blocked_reasons 是内部矛盾/闸报警(裁决在审核 tab 解,不该指去收料),
+    // 故「去收料补」按钮只在 needs 非空时出现(2026-07-14 UI 记债 #3)。
     function blockedHtml(detail) {
         detail = detail || {};
-        var reasons = [].concat(detail.needs || [], detail.blocked_reasons || []);
+        var needs = detail.needs || [];
+        var reasons = [].concat(needs, detail.blocked_reasons || []);
         return (
             '<div class="panel"><div class="bd pkg-blocked">' +
             '<div class="t">' +
@@ -127,6 +146,11 @@
                 ? '<div class="reasons">' +
                   esc(at('pkg_blocked_reasons', { list: reasons.join('、') })) +
                   '</div>'
+                : '') +
+            (needs.length
+                ? '<button type="button" class="btn sm pri" data-action="pkg-go-intake">' +
+                  esc(at('pkg_go_intake_btn')) +
+                  '</button>'
                 : '') +
             '</div></div>'
         );
@@ -237,15 +261,16 @@
 
     // ---- 证据模态框(v4 .mask/.modal/.ev-row 1:1;点验回链:数字 → 证据行 → 原图,≤2 击) ----
     function evidRowHtml(item, selectedId) {
-        var name = item.file_name;
-        if (!name) {
+        var raw = item.file_name;
+        if (!raw) {
             return (
                 '<div class="ev-row novisual"><span>' +
                 esc(at('pkg_evid_empty')) +
                 '</span><span></span></div>'
             );
         }
-        if (!isImageFileName(name)) {
+        var name = displayFileName(raw);
+        if (!isImageFileName(raw)) {
             return (
                 '<div class="ev-row novisual"><span>' +
                 esc(name) +
@@ -313,6 +338,7 @@
     root.AI.pkgRender = {
         KIND_ORDER: KIND_ORDER,
         isImageFileName: isImageFileName,
+        displayFileName: displayFileName,
         dueDisplay: dueDisplay,
         pageHtml: pageHtml,
         pp30CardHtml: pp30CardHtml,

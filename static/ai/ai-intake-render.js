@@ -77,6 +77,24 @@
         return { ok: true };
     }
 
+    // 分批选择累积(2026-07-14 UI 记债 #4):点选/拖拽第二批不该顶替第一批已选文件——
+    // 按 name+size 去重(浏览器 File 无稳定 id,同名同字节视为同一份,重选不重复计入),
+    // 已选的排前面、新选的追加在后,保持选择顺序可预期。
+    function mergeFiles(existing, incoming) {
+        var merged = (existing || []).slice();
+        var seen = {};
+        merged.forEach(function (f) {
+            seen[f.name + '|' + f.size] = true;
+        });
+        (incoming || []).forEach(function (f) {
+            var key = f.name + '|' + f.size;
+            if (seen[key]) return;
+            seen[key] = true;
+            merged.push(f);
+        });
+        return merged;
+    }
+
     var pure = {
         MAX_BYTES: MAX_BYTES,
         BATCH_MAX_BYTES: BATCH_MAX_BYTES,
@@ -85,6 +103,7 @@
         buildSalesPayload: buildSalesPayload,
         validateFiles: validateFiles,
         splitBatches: splitBatches,
+        mergeFiles: mergeFiles,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = pure;
 
@@ -347,6 +366,7 @@
         buildSalesPayload: buildSalesPayload,
         validateFiles: validateFiles,
         splitBatches: splitBatches,
+        mergeFiles: mergeFiles,
         intakeHtml: intakeHtml,
         dropzoneHtml: dropzoneHtml,
         needsCardHtml: needsCardHtml,

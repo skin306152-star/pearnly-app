@@ -335,4 +335,6 @@ Object.assign(window.__AI_I18N_TH__, {
     obl_short_sso: 'สปส.1-10',
     obl_short_sbt: 'ภ.ธ.40',
     riq_flag_decided: 'ตัดสินแล้ว {n}',
+    // UI记债 (2026-07-14) · การ์ดเอกสารขาดมีปุ่มไปเติมเอกสาร (#3)
+    pkg_go_intake_btn: 'ไปเติมเอกสารที่ขาด',
 });

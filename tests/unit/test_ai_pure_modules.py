@@ -446,6 +446,30 @@ class AiIntakeRenderPureTests(unittest.TestCase):
             """)
         self.assertEqual(out, [[80], [60]])
 
+    def test_merge_files_appends_second_batch_without_replacing_first(self):
+        # UI 记债 #4:分两批选择,第二批追加不顶替(此前 setFiles 整份替换,第一批悄悄丢失)。
+        out = _run_node(f"""
+            const r = require({json.dumps(str(AI_DIR / "ai-intake-render.js"))});
+            const batch1 = [{{name: 'a.jpg', size: 100}}, {{name: 'b.jpg', size: 200}}];
+            const batch2 = [{{name: 'c.jpg', size: 300}}];
+            process.stdout.write(JSON.stringify(
+                r.mergeFiles(batch1, batch2).map((f) => f.name)
+            ));
+            """)
+        self.assertEqual(out, ["a.jpg", "b.jpg", "c.jpg"])
+
+    def test_merge_files_dedupes_by_name_and_size(self):
+        # 同名同字节视为同一份重选(浏览器 File 无稳定 id)——不重复计入列表。
+        out = _run_node(f"""
+            const r = require({json.dumps(str(AI_DIR / "ai-intake-render.js"))});
+            const batch1 = [{{name: 'a.jpg', size: 100}}];
+            const batch2 = [{{name: 'a.jpg', size: 100}}, {{name: 'b.jpg', size: 200}}];
+            process.stdout.write(JSON.stringify(
+                r.mergeFiles(batch1, batch2).map((f) => f.name + ':' + f.size)
+            ));
+            """)
+        self.assertEqual(out, ["a.jpg:100", "b.jpg:200"])
+
 
 @unittest.skipUnless(shutil.which("node"), "node 不可用 · 跳过前端纯函数测试")
 class AiPkgRenderPureTests(unittest.TestCase):
@@ -463,6 +487,24 @@ class AiPkgRenderPureTests(unittest.TestCase):
             ]));
             """)
         self.assertEqual(out, [True, True, False, False, False, False])
+
+    def test_display_file_name_strips_uuid_prefix_only(self):
+        # UI 记债 #1:落盘名 `{uuid}__原名` 只该剥壳给人看原名;非 uuid 形态的前缀
+        # (CLI 直喂真实路径 IMG_2647.JPG,或用户原名本身含 `__`)不误切,原样返回。
+        out = _run_node(f"""
+            const r = require({json.dumps(str(AI_DIR / "ai-pkg-render.js"))});
+            process.stdout.write(JSON.stringify([
+                r.displayFileName('a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4__IMG_2647.jpg'),
+                r.displayFileName('deadbeef__ใบกำกับ.pdf'),
+                r.displayFileName('IMG_2647.JPG'),
+                r.displayFileName('my__report.xlsx'),
+                r.displayFileName(null),
+            ]));
+            """)
+        self.assertEqual(
+            out,
+            ["IMG_2647.jpg", "ใบกำกับ.pdf", "IMG_2647.JPG", "my__report.xlsx", ""],
+        )
 
     def test_due_display_reports_refund_for_negative_tax_due(self):
         out = _run_node(f"""

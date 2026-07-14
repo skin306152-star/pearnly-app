@@ -343,4 +343,6 @@ Object.assign(window.__AI_I18N_JA__, {
     obl_short_sso: 'SSO 1-10',
     obl_short_sbt: 'PT40',
     riq_flag_decided: '裁定済み {n}',
+    // UI記債(2026-07-14)· 資料不足カードに収集タブへの導線(#3)
+    pkg_go_intake_btn: '資料を補充する',
 });

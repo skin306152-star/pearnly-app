@@ -346,4 +346,6 @@ Object.assign(window.__AI_I18N_EN__, {
     obl_short_sso: 'SSO 1-10',
     obl_short_sbt: 'PT40',
     riq_flag_decided: '{n} decided',
+    // UI debt cleanup (2026-07-14) · missing-materials card jumps to intake (#3)
+    pkg_go_intake_btn: 'Add missing materials',
 });

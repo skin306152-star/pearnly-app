@@ -315,4 +315,6 @@ Object.assign(window.__AI_I18N_ZH__, {
     obl_short_sso: 'SSO 1-10',
     obl_short_sbt: 'PT40',
     riq_flag_decided: '已裁 {n}',
+    // UI记债(2026-07-14)· 缺料卡去收料补跳转(#3)
+    pkg_go_intake_btn: '去收料补',
 });

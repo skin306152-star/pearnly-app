@@ -57,6 +57,14 @@
         );
     }
 
+    // 卡住提示条读未决数(清单 #2):status!=='review' 只说结构性停在 stuck,不说异常票据
+    // 还剩几张没裁——口径与 flaggedChipHtml 的 undecided_count 一致,不照总数判断致与徽章矛盾。
+    function orderUndecidedTotal(order) {
+        return (order.flagged_groups || []).reduce(function (sum, g) {
+            return sum + (typeof g.undecided_count === 'number' ? g.undecided_count : g.count || 0);
+        }, 0);
+    }
+
     // SoD proactive 显隐(F9):order.sod = {enforced, is_preparer, has_independent_review,
     // self_declared}——后端权威投影。制单人在强制态下签批/冻结会撞 422/409,提前收起按钮不让
     // 白点(后端仍是权威闸)。缺 sod 投影(旧调用方/未接线)则不做 proactive 收起,行为不变。
@@ -154,7 +162,7 @@
             '</span>' +
             selfDeclareBtn +
             '</div>' +
-            (blocked
+            (blocked && orderUndecidedTotal(order) > 0
                 ? '<p class="riq-wo-blocked-note">' + esc(at('riq_wo_needs_review')) + '</p>'
                 : '')
         );
@@ -479,6 +487,7 @@
         flaggedSectionHtml: flaggedSectionHtml,
         workOrderCardHtml: workOrderCardHtml,
         groupHtml: groupHtml,
+        orderUndecidedTotal: orderUndecidedTotal,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) {

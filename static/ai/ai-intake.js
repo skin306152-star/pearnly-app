@@ -119,17 +119,20 @@
         fileInput.click();
     }
 
+    // 分批选择累积(清单 #4):再次点选/拖拽追加进已选列表(去重按 name+size),不清空上一批
+    // ——之前每次选择都整份替换,选完第一批再选第二批会把第一批悄悄丢掉。校验失败时保留原
+    // 已选列表不动(只是这一次追加的批不并入),不因新增文件超限连累已经选好的那些。
     function setFiles(list) {
-        var files = Array.prototype.slice.call(list || []);
-        if (!files.length) return;
-        var check = AI.intakeRender.validateFiles(files);
+        var incoming = Array.prototype.slice.call(list || []);
+        if (!incoming.length) return;
+        var merged = AI.intakeRender.mergeFiles(S.files, incoming);
+        var check = AI.intakeRender.validateFiles(merged);
         if (!check.ok) {
-            S.files = [];
             S.uploadErrKey = check.errKey;
             render();
             return;
         }
-        S.files = files;
+        S.files = merged;
         S.uploadErrKey = null;
         render();
     }
